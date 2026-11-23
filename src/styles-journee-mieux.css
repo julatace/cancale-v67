@@ -219,9 +219,6 @@ html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting { width: 100% !import
    fondu de `data-rail-suite` (styles-atelier) pâlissait la dernière entrée
    visible (« eBay ») : elle avait l'air grisée, désactivée. Plus de fondu : un
    filet d'1 px dit qu'il y a une suite, l'entrée garde son encre. */
-html body .vrm-app-shell .vrm-rail-scroll[data-rail-suite] { -webkit-mask-image: none !important; mask-image: none !important; }
-html body .vrm-app-shell .vrm-rail-scroll:is([data-rail-suite="bas"], [data-rail-suite="les-deux"]) { border-bottom: 1px solid var(--vrm-line); }
-html body .vrm-app-shell .vrm-rail-scroll:is([data-rail-suite="haut"], [data-rail-suite="les-deux"]) { border-top: 1px solid var(--vrm-line); }
 
 /* ── 7. TENDANCES : autant de colonnes que de cases (2 à 4), dans l'ordre ───── */
 @container (min-width: 560px) {

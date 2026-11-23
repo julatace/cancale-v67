@@ -86,7 +86,7 @@ async function controles(T, ok) {
     || (/const idsCasesTuile = new Set\(T\.filter\(\(x\) => visJ\(x\.id\)\.montree\)\.map\(\(x\) => x\.id\)\);/.test(app)
       && /<div hidden>\{T\.filter\(\(x\) => !idsCasesTuile\.has\(x\.id\)\)\.map\(\(x\) => <span key=\{x\.id\} data-tuile=\{x\.id\}/.test(app)),
     'B2 une case tue garde son compteur publié (bloc caché `data-tuile`)');
-  ok(/entreeMontree\(t, ctx\)/.test(app) && /\.filter\(\(o\) => siteMontre\(o\.id, ctx\)\)/.test(app), 'B3 la navigation et les filtres passent par la règle');
+  ok(/entreeMontree\(t, ctx\)/.test(app) && (/\.filter\(\(o\) => siteMontre\(o\.id, ctx\)\)/.test(app) || /\.filter\(\(x\) => siteMontre\(x, \{ mode: profilSites\.mode, relies: profilSites\.relies, plateformes: profilSites\.plateformes \}\)\)/.test(app))   /* (20 nov.) le sélecteur global */, 'B3 la navigation et les filtres passent par la règle');
   ok(/<VentesToutes sites=\{sitesPresents\}/.test(app), 'B4 « Tous » des ventes reçoit tous les sites présents (aucun filtre Simple)');
   ok(/'vrm_affichage','vrm_je_vends'/.test(app), 'B5 les deux réglages sont synchronisés (SYNC_KEYS)');
   // ── C ────────────────────────────────────────────────────────────────────
@@ -108,7 +108,8 @@ async function controles(T, ok) {
     while ((m = re.exec(sansCommentaires(s)))) appels.push([f, /facultatifs/.test(m[1]) || /verifV/.test(m[1])]);
     if (/problemesAnnonce\(verifV, 'vinted'\)/.test(s)) appels.push([f, /const verifV = \{ \.\.\.\(a\.verif \|\| \{\}\), facultatifs: champsFacultatifs\(vendActuel\(\)\) \}/.test(s)]);
   }
-  ok(appels.length >= 4 && appels.every(([, o]) => o), 'C5 chaque vérification de publication de l’app passe `facultatifs`', appels.filter(([, o]) => !o).map(([f]) => f).join(', ') || `${appels.length} appels`);
+  // (20 nov.) la vérification avant « Publier sur Vestiaire » est partie avec la publication (dans l'extension) : 3 appels restent.
+  ok(appels.length >= 3 && appels.every(([, o]) => o), 'C5 chaque vérification de publication de l’app passe `facultatifs`', appels.filter(([, o]) => !o).map(([f]) => f).join(', ') || `${appels.length} appels`);
   ok(/manquesEnvoi\(sx, apercu, \{[\s\S]{0,200}?facultatifs: champsFacultatifs\(vendActuel\(\)\)/.test(app) && /facultatifs: facultatifs === true \}, SITE_VERIF\[site\]/.test(T.publier || ''), 'C6 « Publier ailleurs » (manquesEnvoi) passe `facultatifs`');
   if (P) {
     const m = P.motsArticle('autre');

@@ -15,6 +15,7 @@ import { RevenirEnArriere } from '../App.jsx';   // (11 nov.) revenir en arrièr
 import { ImporterSetting } from '../App.jsx';   // (11 nov.) Importer son stock et ses ventes passées (src/importStock.js)
 import { lireLitigesVinted, changerCompteVrm } from '../App.jsx';
 import { AlerteDejaRelie } from '../AlerteDejaRelie.jsx';
+import { CLE_ROLES_COMPTES, ROLES_COMPTE, roleCompte, avecRole } from '../rolesComptes.js';   // (20 nov., lot bleam-suite)
 import { PhraseComptePro, ArgentComptePro } from '../VintedProCompte.jsx';   // (11 nov., lot vinted-pro)
 import { statutProVinted } from '../vintedPro.js';
 import { lireSaisieObjectif, objectifAEnregistrer } from '../objectifMois.js';
@@ -47,6 +48,8 @@ import { photoACacherSelon, poserReglesStream, normaliserRegles, masquerTexteStr
 import { noterTicketDiscord } from '../communaute/discordAttente.js';
 import { CLE_MODELES } from '../modelesDescription.js';
 import { MesModeles } from '../ModelesDescription.jsx';
+import EtiquetageReglage from '../etiquetage/EtiquetageReglage.jsx';   // (19 nov., lot stock-etiquetage) la méthode d'étiquetage
+import { CLE_ETIQUETAGE, CLE_PREFIXE, CLE_QUI, CLES_METHODE, methodeDe } from '../etiquetage/methode.js';
 import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroEcrit as lireNumeroEcritRegle, lireNumeroTexte, apercuNumeroEcrit, basculerOu, OU_NUMERO, NOM_OU } from '../numeroEcrit.js';
 // (9 nov.) Les sources cochées (« Où est ton numéro ? ») passent à chaque lecture.
 const lireNumeroEcritReglages = (o) => lireNumeroEcritRegle({ ou: lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).ou, ...o });
@@ -72,14 +75,17 @@ import SuiviComptes from '../SuiviComptes.jsx';
 import SanteComptes from '../SanteComptes.jsx';   // (11 nov., lot sante-comptes)
 // (8 nov.) Paramètres → « Tout va bien ? » (garde-fous de la capture, api/_lib/garde-capture.js).
 import { ToutVaBien } from '../ToutVaBien.jsx';
+import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « choses à trancher », comptes, santé : derrière « Tout va bien ? »
 import { VeilleJournee } from '../VeilleJournee.jsx';   // (15 nov., refonte-journee) le contrôle de cette nuit quitte Ma journée pour « Tout va bien ? »
 import { SanteDonnees } from '../SanteDonnees.jsx';
 import HistoriqueVinted from '../ImportDepart.jsx';
 import HistoriqueSites from '../HistoriqueSites.jsx';   // (11 nov., lot import-historique-sites) Leboncoin, Vestiaire, eBay : la même carte (ext. 5.365)   // (11 nov., lot import-depart) l'historique Vinted, compte par compte (ext. 5.344)
-import ModeVacances from '../ModeVacances.jsx';   // (10 nov., lot O) le mode vacances, compte par compte (ext. 5.338)
+import { BoutonExtension } from '../BoutonExtension.jsx';
+import { lienPanneau, ouvrirPanneau } from '../ouvrirPanneau.js';
+import { automatisationsActives } from '../automatisationsEtat.js';   // (20 nov., décision de Julien) le mode vacances : dans l'extension
 import SecuriteComptes from '../SecuriteComptes.jsx';   // (11 nov., lot securite-vinted) la sécurité des comptes Vinted et Vestiaire (ext. 5.366)
 import CopieAnnonces from '../CopieAnnonces.jsx';   // (12 nov., sécurité des comptes) un zip d'annonces par compte
-import CarteDoubleVerif from '../CarteDoubleVerif.jsx';
+// (21 nov., ux-reglages) plus rendue : la rangée « Double vérification » dit l’état — import CarteDoubleVerif from '../CarteDoubleVerif.jsx';
 import { ReglageCodeLocal } from '../VerrouCode.jsx';   // (14 nov., lot 127) code à 4 chiffres, sur cet appareil
 import { ReglageLienAide } from '../LienAide.jsx';      // (14 nov., lot 120) lien temporaire pour l'aide
 import { ReglageCarteMerci, CLE_CARTE_MERCI } from '../CarteMerci.jsx';   // (14 nov., lot 130) carte de remerciement   // (12 nov.) « Protège ton compte VRM »
@@ -97,6 +103,9 @@ import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov.) « Ou
 import { preparerApercusModes } from '../apercusBordereaux.js';
 import { CLE_IMPRESSION, FORMATS_THERMIQUES, TAMPONS, ENCRES, CONTRASTES, MARGE_MAX_MM, AUTRE_MIN_MM, AUTRE_MAX_MM, reglageImpression, papierThermique, fmtMm } from '../impression/thermique.js';   // (11 nov., lot thermique)
 import { fabriquerBordereau } from '../impression/bordereauExemple.js';
+import TamponsBordereaux from '../parametres/TamponsBordereaux.jsx';   // (16 nov., lot tampons-parametres)
+import { reglageTamponsChoisi, ecrireReglageTampons } from '../App.jsx';
+import { avecChoix as avecChoixTampons, modeDuContenu, contenuDuMode } from '../impression/tampons.js';
 import { actionsReglages } from '../reglagesActions.js';
 // ⟦← App.jsx #3⟧
 import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
@@ -105,7 +114,7 @@ import { grouperAppareils, nConnexions } from '../appareilsGroupes.js';
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : la famille « Rappels » dit si l'URSSAF en fait partie.
 import { useProfilFiscal } from '../App.jsx';
 import { useExemplesVendeur, vendActuel } from '../App.jsx';   // (11 nov., lot DJ2) exemples selon ce qu'il vend
-import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide,reglageSoir,HEURES_SOIR,reglageJours,JOURS_SEMAINE,jourCalme} from '../../api/_lib/notif-textes.js';
+import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide,reglageSoir,HEURES_SOIR,reglageJours,JOURS_SEMAINE,jourCalme,CAPTE_TYPES,capteActif} from '../../api/_lib/notif-textes.js';
 import {reglageSeuilAvis,SEUILS_AVIS,SEUIL_AVIS_DEFAUT} from '../avisNegatif.js';   // (11 nov.) le seuil « avis négatif » (push_prefs.avisSeuil)
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
 import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
@@ -161,6 +170,16 @@ import { useLangue } from '../i18n/react.js';
 import { ReglagesAidesAccueil } from '../accueilReste/AccueilReste.jsx';   // (14 nov., idées 136 139 140 147)
 import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?raw";
 import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, après, échec d'un geste (src/ui/Accompagne.jsx)
+import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) les composants du design du 17 nov. (le SEUL depuis le 19 nov.)
+import { RangeeTouchable } from '../designV2/BoutonV2.jsx';   // (17 nov., phase 2) les rangées de Paramètres
+import { Bouton as BoutonNatif, BoutonIcone as BoutonIconeNatif } from '../natif/Bouton.jsx';
+import { Glyphe as GlypheNatif } from '../natif/icones.jsx';
+import { Groupe as GroupeNatif } from '../natif/Groupe.jsx';   // (21 nov., ux-reglages) Paramètres en liste groupée native
+import { Rangee as RangeeNatif } from '../natif/Rangee.jsx';
+// (21 nov., ux-reglages) « Comme l'iPhone » sur un iPhone, « Comme l'appareil » ailleurs (le même mode `auto`).
+const surIphone = () => { try { return /iP(hone|od)/.test(navigator.userAgent); } catch (_) { return false; } };
+const libelleApparence = (m) => (m === 'auto' ? tr(surIphone() ? 'uxr.apparence.autoIphone' : 'uxr.apparence.auto') : tr('uxr.apparence.' + m));
+const phraseApparence = (m) => tr('uxr.apparence.' + m + '.phrase');
 
 // ⟦← App.jsx #10⟧
 const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));
@@ -363,10 +382,17 @@ const champMm = { width: 76, minHeight: 44, border: `1px solid ${C.border}`, bor
 const ImpressionBordereaux = ({ mode, reg, changer }) => {
   useLangue();
   const th = mode === 'thermique' || mode === 'planche4';   // (14 nov., 98) 4 par page : les étiquettes isolées comme en thermique
+  // (16 nov., lot tampons-parametres) Ce que le tampon écrit vient de `vrm_tampons` (LE réglage des tampons) : la liste
+  // courte ci-dessous l'écrit ; les cases fines (titre sans N°, sans mention…) sont dans « Tampons des bordereaux ».
+  const [tps, setTps] = React.useState(() => reglageTamponsChoisi());
+  React.useEffect(() => { const f = () => setTps(reglageTamponsChoisi()); window.addEventListener('vrm:tampons', f); const d = onCloudReady(f); return () => { window.removeEventListener('vrm:tampons', f); if (typeof d === 'function') d(); }; }, []);
+  const contenuVu = th ? tps.th : tps.a4;
+  const tampon = modeDuContenu(contenuVu) || 'perso';
+  const choisirTamponCourt = (v) => { const c = contenuDuMode(v); if (!c) return; const n = avecChoixTampons(tps, 'tous', { contenu: c }, { support: th ? 'th' : 'a4' }); ecrireReglageTampons(n); setTps(reglageTamponsChoisi()); };
   const papier = papierThermique(reg);
   const fmt = FORMATS_THERMIQUES.find((f) => f.id === reg.format) || FORMATS_THERMIQUES[0];
   const [ap, setAp] = React.useState(null);   // null · {etat:'charge'} · {etat:'ko'} · {etat:'lu', octets, pages, r1}
-  const cle = JSON.stringify([mode, reg]);
+  const cle = JSON.stringify([mode, reg, tps]);
   React.useEffect(() => { setAp(null); }, [cle]);
   const voir = async () => {
     if (ap && ap.etat === 'charge') return;
@@ -379,7 +405,6 @@ const ImpressionBordereaux = ({ mode, reg, changer }) => {
       setAp({ etat: 'lu', octets: await out.save(), pages: out.getPageCount(), r1, b: bilanThermique(r1.details) });
     } catch (_) { setAp({ etat: 'ko' }); }
   };
-  const tampon = th ? reg.tamponTh : reg.tamponA4;
   const mm = (nom, val, min, max, vide) => (
     <input key={`${nom}-${val}`} type="text" inputMode="decimal" aria-label={tr(`impression.${nom}`)} data-impression-champ={nom} defaultValue={val == null ? '' : fmtMm(val)} placeholder={vide}
       style={champMm} onBlur={(e) => { const v = e.target.value.trim(); changer({ [nom]: v === '' ? null : v }); }}
@@ -422,9 +447,10 @@ const ImpressionBordereaux = ({ mode, reg, changer }) => {
         {/* Une liste, pas des pastilles : quatre choix ne tiennent pas sur 390 px (« Rie… » coupé). */}
         <div style={{ ...ligne, marginTop: 0 }}>
           <label htmlFor="vrm-impression-tampon" style={lib}>{tr('impression.tampon')}</label>
-          <select id="vrm-impression-tampon" data-impression-tampon-choix={tampon} value={tampon} onChange={(e) => changer(th ? { tamponTh: e.target.value } : { tamponA4: e.target.value })}
+          <select id="vrm-impression-tampon" data-impression-tampon-choix={tampon} value={tampon} onChange={(e) => choisirTamponCourt(e.target.value)}
             style={{ minHeight: 44, flex: '1 1 180px', maxWidth: 320, border: `1px solid ${C.border}`, borderRadius: 12, padding: '0 10px', fontSize: 15, background: C.bg, color: C.text, fontFamily: 'inherit' }}>
             {TAMPONS.map((v) => <option key={v} value={v}>{tr(`impression.tampon.${v}`)}</option>)}
+            {tampon === 'perso' && <option value="perso" disabled>{tr('tampons.perso')}</option>}
           </select>
         </div>
         {th && <div data-impression-pourquoi-titre="" style={aide}>{tr('impression.tampon.pourquoi')}</div>}
@@ -546,6 +572,7 @@ const ImprimanteSetting = ({ nu = false }) => {
           : <>A4, <b style={{color:C.text}}>une feuille par bordereau</b>, ton N° dans un blanc du PDF. <Pourquoi label="Recto-verso ?">Le document n’est pas réduit. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d’impression : le PDF le demande, le pilote peut passer outre.</Pourquoi></>}
       </div>
       <ImpressionBordereaux mode={mode} reg={reg} changer={changerReg}/>
+      <TamponsBordereaux/>
       <div style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
         <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes types de bordereaux</div>
         {ap&&ap.etat!=='charge'&&<button type="button" onClick={charger} style={{marginTop:8,minHeight:44,border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,padding:'8px 12px',font:'inherit',cursor:'pointer'}}>Actualiser les aperçus</button>}
@@ -763,9 +790,11 @@ function ComptesAutresSites({ lu, relire }) {
     if (!(j && j.ok)) toast((j && j.error) || 'Je n’ai pas pu le délier — rien n’a changé, réessaie.');
     signalerComptesEbay(); relire();
   };
+  // (19 nov., banc parcours-erreurs, base en panne) `liste === null` (« pas su » : la lecture a raté) : `GroupeComptes`
+  // dit « — Réessayer », mais `enfants` était calculé quand même — `null.length` faisait tomber tout l'écran Comptes.
   const groupe = (plateforme, liste, carte) => (liste === undefined ? null
     : <GroupeComptes key={plateforme} plateforme={plateforme} n={Array.isArray(liste) && liste.length ? liste.length : null} pasSu={liste === null} onRelire={relire}
-        enfants={liste.length ? liste.map(carte) : <div className="vrm-cl-vide" data-comptes-vide={plateforme}>{ouvrir(plateforme)}</div>}/>);
+        enfants={Array.isArray(liste) && liste.length ? liste.map(carte) : <div className="vrm-cl-vide" data-comptes-vide={plateforme}>{ouvrir(plateforme)}</div>}/>);
   return (<>
     {groupe('vestiaire', lu.vestiaire, (c) => {
       const etat = etatCompteLie({ ouvert: c.ouvert, lu: c.lu, maintenant });
@@ -802,6 +831,8 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
   const [loading, setLoading] = useState(false);
 
   const [labels, setLabels] = useStateCle('vinted_account_labels', () => load('vinted_account_labels', {}));
+  // (20 nov., lot bleam-suite) Le rôle de chaque compte : vente (défaut) · achats · personnel (hors totaux déclarés) — src/rolesComptes.js.
+  const [rolesComptes, setRolesComptes] = useStateCle(CLE_ROLES_COMPTES, () => load(CLE_ROLES_COMPTES, {}) || {});
   const [editingLabel, setEditingLabel] = useState(null);
   const [labelDraft, setLabelDraft] = useState('');
   // Email associé à chaque compte (l'adresse à laquelle Vinted écrit — masquée
@@ -1254,6 +1285,12 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
               <input defaultValue={labels[acc.vinted_user_id] || ''} placeholder={acc.login || `#${uid}`} aria-label="Nom affiché"
                 onBlur={(e) => { const v = e.target.value.trim(); const u = { ...labels, [acc.vinted_user_id]: v }; if (!v) delete u[acc.vinted_user_id]; setLabels(u); save('vinted_account_labels', u); }}
                 style={{width:'100%',maxWidth:320,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:15,fontFamily:'inherit',background:C.surface,color:C.text}}/>
+              <div role="radiogroup" aria-label={tr('roles.titre')} data-role-compte={roleCompte(rolesComptes, uid)} style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {ROLES_COMPTE.map((r) => <button key={r} type="button" role="radio" aria-checked={roleCompte(rolesComptes, uid) === r} data-role-choix={r} className="sb-touche"
+                  onClick={() => { const u = avecRole(rolesComptes, uid, r); setRolesComptes(u); save(CLE_ROLES_COMPTES, u); }}
+                  style={{minHeight:44,padding:'0 12px',borderRadius:12,border:`1px solid ${C.border}`,background:roleCompte(rolesComptes, uid) === r ? C.surface2 || C.surface : C.surface,color:C.text,fontWeight:roleCompte(rolesComptes, uid) === r ? 700 : 500,fontFamily:'inherit',fontSize:14}}>{tr({ vente: 'roles.vente', achats: 'roles.achats', perso: 'roles.perso' }[r])}</button>)}
+              </div>
+              {roleCompte(rolesComptes, uid) === 'perso' && <div data-role-perso-note="" style={{fontSize:13,color:C.muted}}>{tr('roles.persoNote')}</div>}
               <input value={acctEmails[uid] || ''} onChange={e=>setAcctEmail(acc.vinted_user_id, e.target.value)} placeholder="E-mail du compte" aria-label="E-mail du compte"
                 style={{width:'100%',maxWidth:320,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:15,fontFamily:'inherit',background:C.surface,color:C.text}}/>
               <input type="tel" inputMode="tel" value={acctPhones[uid] || ''} onChange={e=>setAcctPhone(acc.vinted_user_id, e.target.value)} placeholder="Téléphone du compte" aria-label="Téléphone du compte"
@@ -1340,7 +1377,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
             </div>
             <div style={{borderTop:`1px solid ${C.border}`,padding:'12px 16px',display:'flex',flexDirection:'column',gap:8}}>
               <div style={{display:'flex',gap:8}}>
-                <button className="vrm-b vrm-b-discret" type="button" onClick={()=>!delBusy&&setDelCible(null)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+                <Bouton variante="discret" onClick={()=>!delBusy&&setDelCible(null)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</Bouton>
                 <button type="button" onClick={confirmerSuppression} disabled={delBusy||rienCoche} style={{flex:2,border:'none',background:rienCoche?C.border:C.danger,color:'#fff',borderRadius:12,padding:'12px',fontSize:15,fontWeight:700,cursor:(delBusy||rienCoche)?'default':'pointer',fontFamily:'inherit',opacity:delBusy?0.6:1}}>{delBusy?'…':rienCoche?'Coche au moins une case':'Supprimer'}</button>
               </div>
               {/* ── POUR DE BON : par catégorie (26 oct., demande de Julien) ──────
@@ -1475,6 +1512,8 @@ function RelancesEssaiSetting() {
 }
 
 // ── LE BILAN DU MOIS PAR E-MAIL (8 nov., api/_lib/bilan-mois.js) ─────────────
+// (22 nov., choix n° 36) « Résumé du mois par e-mail » : + colis non retirés et montant URSSAF ; le défaut est désormais
+// « allumé seulement si l'envoi est configuré » (plus la date de création du compte).
 // Un résumé (ventes, vendu, reçu, bénéfice brut, sa plus belle vente) le 1er du
 // mois, à l'adresse de son compte. (13 nov., lot 53) « Bilan mensuel par e-mail » :
 // ACTIVÉ par défaut pour un compte créé depuis le 13 nov., éteint avant — le
@@ -1500,8 +1539,8 @@ function BilanMoisSetting() {
     try {
       const x = await fetch('/api/compte?mode=bilan-mois', { method: 'POST', headers: { ...enTeteSession(), 'Content-Type': 'application/json' }, body: JSON.stringify({ actif: !r.actif }) });
       const j = x.ok ? await x.json() : null;
-      if (j && j.ok) setR({ ...r, actif: j.actif, defaut: false }); else toast('Choix non enregistré — réessaie dans un instant.');
-    } catch (_) { toast('Choix non enregistré — réessaie quand tu as du réseau.'); }
+      if (j && j.ok) setR({ ...r, actif: j.actif, defaut: false }); else toast(tr('reglages.bilanMois.rate'));
+    } catch (_) { toast(tr('reglages.bilanMois.rate')); }
     setBusy(false);
   };
   const etat = !r || r.actif === null ? 'passu' : r.actif ? 'on' : 'off';
@@ -1509,12 +1548,13 @@ function BilanMoisSetting() {
   return (
     <div data-bilan-mois={etat} data-bilan-mois-configure={r ? (r.configure ? 'oui' : 'non') : 'passu'} data-bilan-mois-defaut={r && r.defaut ? '1' : '0'} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
       <div className="vrm-np-ligne">
-        <span className="vrm-np-lib">Bilan mensuel par e-mail<small>{!r ? 'Pas su pour l’instant — réessaie plus tard.'
-          : !r.configure ? 'L’envoi d’e-mails n’est pas configuré sur ce serveur : aucun bilan ne part.'
-          : dernier ? `Le 1er du mois : ventes, vendu, reçu, bénéfice. Dernier envoyé : ${dernier}.`
-          : 'Le 1er du mois : ventes, vendu, reçu, bénéfice, et un lien vers le récap du mois.'}</small></span>
+        {/* (22 nov., choix n° 36) « Résumé du mois par e-mail » : + colis non retirés, montant URSSAF, lien vers Argent ;
+            allumé par défaut SEULEMENT si l'envoi est configuré (le serveur le dit, `choixEffectif`). Pas configuré ⇒ la ligne le dit. */}
+        <span className="vrm-np-lib">{tr('reglages.bilanMois.titre')}<small>{!r ? tr('reglages.bilanMois.pasSu')
+          : !r.configure ? tr('reglages.bilanMois.nonConfigure')
+          : [tr('reglages.bilanMois.sous'), dernier ? tr('reglages.bilanMois.dernier', { mois: dernier }) : ''].filter(Boolean).join(' ')}</small></span>
         {etat === 'passu' ? <span className="vrm-np-relance">—</span>
-          : <Interrupteur on={!!r.actif} onClick={basculer} disabled={busy} label={`Bilan mensuel par e-mail : ${r.actif ? 'activé' : 'désactivé'}`}/>}
+          : <Interrupteur on={!!r.actif} onClick={basculer} disabled={busy} label={tr(r.actif ? 'reglages.bilanMois.on' : 'reglages.bilanMois.off')}/>}
       </div>
     </div>
   );
@@ -1651,6 +1691,20 @@ function PushPrefsSetting({ comptes, onMuets }) {
             </div>
           </section>
         ))}
+        {/* (21 nov., ext. 5.422, `pushcapte`) Ce que l'extension capte : un interrupteur par type, rangé dans
+            `push_prefs.capte` et lu par le serveur avant d'envoyer (api/_lib/notif-textes.js `capteActif`,
+            api/_lib/push-capte.js) ; vente et offre allumées par défaut, message éteint. La famille décide d'abord. */}
+        <section className="vrm-notif-groupe" data-notif-capte="">
+          <h4 className="vrm-notif-groupe-titre">{tr('reglages.push.capte.titre')}</h4>
+          <div className="vrm-notif-groupe-corps" style={{padding:'0 12px'}}>
+            {CAPTE_TYPES.map(t => { const on = capteActif(prefs || {}, t.id); const nom = tr(`reglages.push.capte.${t.id}`); return (
+              <div key={t.id} className="vrm-np-ligne" data-np-capte={t.id} data-np-capte-etat={on ? 'on' : 'off'}>
+                <span className="vrm-np-lib">{nom}<small>{tr(`reglages.push.capte.${t.id}Desc`)}</small></span>
+                <Interrupteur on={on} onClick={() => ecrirePrefs({ ...(prefs || {}), capte: { ...((prefs && prefs.capte) || {}), [t.id]: !on } }, `« ${nom} »`)} disabled={!prefs || busy} label={tr(on ? 'reglages.push.capte.on' : 'reglages.push.capte.off', { quoi: nom })}/>
+              </div>); })}
+            <div style={{fontSize:12,color:C.muted,lineHeight:1.4,padding:'6px 0 2px'}} data-np-capte-note="">{tr('reglages.push.capte.note')}</div>
+          </div>
+        </section>
       </div>
     </details>
     {/* (5 nov.) Heures calmes et regroupement : lus par le serveur juste avant
@@ -1746,6 +1800,7 @@ const GROUPES_NOTIF = [
   { id: 'echanges', titre: 'Échanges avec les acheteurs', ids: ['offres', 'messages'] },
   { id: 'comptes', titre: 'Comptes et avis', ids: ['comptes', 'avis'] },
   { id: 'achats', titre: 'Achats', ids: ['alertesebay'] },
+  { id: 'communaute', titre: 'Communauté', ids: ['communaute'] },
 ];
 function groupesFamillesNotif(familles) {
   const vus = new Set();
@@ -1800,12 +1855,30 @@ function LigneFamilleNotif({ c, on, disabled, onBascule }) {
 // ⟦← App.jsx #36⟧
 
 function StatutSauvegardeReglages() {
+  // (21 nov., ux-reglages — « Enregistrement… » restait affiché en permanence, audit design n° 33) « Enregistrement… »
+  // n'est dit QUE pendant une écriture RÉELLE (l'envoi au nuage en vol : `_syncInfo.etat === 'saving'`), puis
+  // « Enregistré » 1,5 s, puis rien. Un réglage dont l'envoi attend son tour (l'écriture groupée) ne dit rien : il passe
+  // en « Enregistrement… » dès qu'il part. Raté, refusé, refusé par l'appareil : dit, avec le geste (inchangé).
   const [,maj]=React.useReducer(n=>n+1,0);
+  const [vientDe,setVientDe]=React.useState(0);   // l'heure de la dernière écriture CONFIRMÉE vue d'ici
+  const avant=React.useRef(_syncInfo.etat);
   React.useEffect(()=>{
-    const f=()=>maj();const stop=onSyncChange(f);
+    const f=()=>{ const e=_syncInfo.etat; if(avant.current==='saving'&&e==='synced') setVientDe(Date.now()); avant.current=e; maj(); };
+    const stop=onSyncChange(f);
     window.addEventListener('vrm:reglage-attente',f);window.addEventListener('vrm:save',f);
     return ()=>{stop();window.removeEventListener('vrm:reglage-attente',f);window.removeEventListener('vrm:save',f);};
   },[]);
+  React.useEffect(()=>{ if(!vientDe) return undefined; const t=setTimeout(()=>setVientDe(0),1500); return ()=>clearTimeout(t); },[vientDe]);
+  if(AUTH.user && CLOISONNE){
+    const attente0=_settingsRevision>_settingsConfirmed;
+    const stockage0=[..._failedLocalSaves.values()].some(v=>v.owner===AUTH.user?.id);
+    const echec0=stockage0||(attente0&&['error','refus'].includes(_syncInfo.etat));
+    if(!echec0&&!lectureSeuleActive()){
+      if(attente0&&_syncInfo.etat==='saving') return <div className="vrm-settings-status" role="status" data-statut-reglages="encours" style={{color:C.muted}}><span className="vrm-settings-status-pt" aria-hidden="true"/><span>{tr('uxr.sauve.encours')}</span></div>;
+      if(vientDe&&!attente0) return <div className="vrm-settings-status" role="status" data-statut-reglages="enregistre" style={{color:C.muted}}><span>{tr('uxr.sauve.fait')}</span></div>;
+      return null;
+    }
+  }
   // (30 oct.) Une ligne, et seulement quand il y a quelque chose à dire : tout
   // va bien ⇒ rien (« synchronisées » écrit en permanence sur deux lignes, en
   // tête de chaque écran de réglage, était du bruit). En cours, raté, refusé :
@@ -1846,6 +1919,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // (docs/emails/boite-collective.md). Le montrer à un autre, c'était un réglage
   // qui s'enregistre et ne fait rien : il n'est pas proposé.
   const proprioInst = useEstProprietaire();
+  const designV2 = useDesignV2();   // (17 nov., phase 2) le premier écran en liste groupée d'iOS
   // Actions sur le compte : une vraie fenêtre plutôt qu'un prompt du navigateur.
   // Un window.prompt ne se style pas, ne masque pas le mot de passe saisi, et
   // sur iPhone il s'affiche comme une alerte système au milieu de rien — c'est
@@ -1923,7 +1997,15 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const ongletsCompte = MULTI_USER && !!AUTH.user;
   // La catégorie ouverte (téléphone) : null = le premier écran. Le retour de Stripe ouvre l'abonnement.
   const [cat, setCat] = React.useState(() => (RETOUR_ABONNEMENT || RETOUR_VUE === 'abonnement' || RETOUR_VUE === 'compte') ? 'compte' : null);
-  const [catActive, setCatActive] = React.useState(null);   // la catégorie surlignée dans le sommaire (ordinateur)
+  const [catActive, setCatActive] = React.useState(null);
+  const [surligne, setSurligne] = React.useState(null);   // (17 nov., nouveau design) la rangée trouvée par la recherche, surlignée 2,4 s
+  React.useEffect(() => {
+    if (!surligne) return undefined;
+    let el = null;
+    const t1 = setTimeout(() => { try { el = document.querySelector(`[data-reglage-id="${surligne}"]`); if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('v2-pm-surligne'); } } catch (_) {} }, 80);
+    const t2 = setTimeout(() => { try { if (el) el.classList.remove('v2-pm-surligne'); } catch (_) {} setSurligne(null); }, 2600);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [surligne]);   // la catégorie surlignée dans le sommaire (ordinateur)
 
   // ── LA DISPOSITION (16 octobre : « trop vibe-codé, surtout sur téléphone ») ─
   // Modèle : les Réglages d'iOS. Des groupes en listes à lignes ; un panneau
@@ -1977,6 +2059,15 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // ── Les valeurs dites à droite des lignes : lues dans LEUR réglage, jamais
   //    recalculées (§11). Relues à chaque rendu (fermer un sous-écran en est un).
   const valNumeros = (() => { const p = prefixeNumeros(); return p ? `Série ${p}` : 'Chiffres'; })();
+  const lireMethodeBrute = () => ({ numeroEcrit: load(CLE_QUI, null), prefixe: load(CLE_PREFIXE, ''), etiquetage: load(CLE_ETIQUETAGE, null) });
+  const valEtiquetage = (() => { const m = methodeDe(lireMethodeBrute()); if (!m.qui) return tr('etq.val.aChoisir'); return tr(m.qui === 'moi' ? 'etq.resume.moi' : m.serie === 'lettre' ? 'etq.resume.lettre' : 'etq.resume.chiffres', { l: m.lettre }); })();
+  // Les écritures de la méthode : la lettre passe par la copie locale (lue tout de suite par les champs N°, comme
+  // NumerosSetting) ; chaque clé prévient ceux qui l'écoutent. Une clé hors CLES_METHODE n'est JAMAIS écrite.
+  const ecrireMethode = (ecritures) => Promise.all((ecritures || []).filter((w) => CLES_METHODE.includes(w.cle)).map((w) => new Promise((res) => {
+    if (w.cle === CLE_PREFIXE && !ecrireCopieLocale(CLE_PREFIXE, w.valeur)) { res(false); return; }
+    save(w.cle, w.valeur, (ok) => res(ok !== false));
+    try { window.dispatchEvent(new Event(w.cle === CLE_PREFIXE ? 'vrm-prefixe' : w.cle === CLE_QUI ? 'vrm-numero-ecrit' : 'vrm-etiquetage')); } catch (_) {}
+  }))).then((r) => { const ok = r.every(Boolean); if (ok) toast(tr('etq.enregistre')); return ok; });
   const valRegime = (() => { const r = regimeFiscal(); const x = r && REGIMES_FISCAUX.find((g) => g[0] === r); return x ? x[1] : 'À choisir'; })();
   const valZoom = (() => { const z = readZoom(); const t = etroit && Number(z) < 1 ? '1' : z; return (ZOOMS.find(([v]) => v === t) || [, 'Normal'])[1]; })();
   const derniereSauvegarde = (() => { const t = Number(load('vinted_last_backup', 0)) || 0; const days = t ? Math.floor((Date.now() - t) / 86400000) : null; return { t, days, old: days === null || days >= 30 }; })();
@@ -2098,11 +2189,13 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // pas (bancs, recherche) ; seuls les titres, l'ordre et les phrases changent.
     { id:'comptes', titre:tr('reglages.groupe.comptes'), items:[
       // (8 nov.) « Tout va bien ? » EN HAUT : chaque compte relu ou bloqué, chaque appareil et sa version (src/ToutVaBien.jsx).
-      { id:'toutvabien', type:'panneau', ic:'heart', lib:tr('reglages.toutvabien.lib'), desc:tr('reglages.toutvabien.desc'), data:{ 'data-reglage-toutvabien':'' }, el:<><ToutVaBien onComptes={()=>setTab('vintedaccounts')}/><VeilleJournee/></> },
+      { id:'toutvabien', type:'panneau', ic:'heart', lib:tr('reglages.toutvabien.lib'), desc:tr('reglages.toutvabien.desc'), data:{ 'data-reglage-toutvabien':'' }, el:<><ARegler onglet="sante" Icon={Icon}/><ToutVaBien onComptes={()=>setTab('vintedaccounts')}/><VeilleJournee/></> },
       // (11 nov., lot sante-donnees) Tout ce qui cloche dans tes données, le plus grave d'abord, un bouton par ligne (src/SanteDonnees.jsx).
       { id:'sante', type:'panneau', ic:'check', lib:tr('reglages.sante.lib'), desc:tr('reglages.sante.desc'), data:{ 'data-reglage-sante':'' }, el:<SanteDonnees/> },
       // (11 nov., lot sante-comptes) Chaque compte Vinted : en forme / à surveiller, LA raison et LE geste, chaque point lisible (src/SanteComptes.jsx).
       { id:'santecomptes', type:'panneau', ic:'star', lib:tr('reglages.santecomptes.lib'), desc:tr('reglages.santecomptes.desc'), data:{ 'data-reglage-santecomptes':'' }, el:<SanteComptes variante="reglages" comptes={comptes||[]}/> },
+      // (22 nov., ext. 5.436) « Mes comptes » : chaque compte et ton ordinateur, les gestes à distance (src/aDistance/).
+      { id:'adistance', type:'nav', ic:'users', lib:tr('nav.adistance'), desc:tr('adist.reglages.desc'), data:{ 'data-reglage-adistance':'' }, onClick:()=>setTab('adistance') },
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:tr('reglages.liens.desc'), onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:tr('reglages.connexions.lib'), desc:tr('reglages.connexions.desc'), titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (11 nov., lot import-depart) Tout l'historique Vinted (ventes, achats), lu par l'extension ; « Tout récupérer » pour le compte de l'onglet.
@@ -2110,13 +2203,15 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (10 nov., lot O) Tous ses comptes en vacances puis rouverts, compte par compte, sur SON clic (src/ModeVacances.jsx).
       // (11 nov., lot securite-vinted) Julien : « faire comme Vintex, pour ne pas se faire bannir » — une phrase par compte, ses réglages, « Tout arrêter » (src/SecuriteComptes.jsx).
       { id:'securite-comptes', type:'panneau', ic:'sleep', lib:tr('reglages.securite.lib'), desc:tr('reglages.securite.desc'), data:{ 'data-reglage-securite-comptes':'' }, el:<SecuriteComptes comptes={comptes||[]}/> },
-      { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<ModeVacances comptes={comptes||[]}/> },
+      { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<div data-vacances-panneau="" style={{ padding: '8px 0' }}><BoutonExtension action="vacances" large/></div> },
       // (12 nov., ext. 5.370) La discrétion : plafond par jour, vérification demandée par Vinted, freins des 7 jours (src/Discretion.jsx).
       { id:'discretion', type:'panneau', ic:'pin', lib:tr('reglages.discretion.lib'), desc:tr('reglages.discretion.desc'), data:{ 'data-reglage-discretion':'' }, el:<PanneauDiscretion uids={(comptes||[]).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean)} nomCompte={(u) => { const a = (comptes||[]).find((x) => String(x && x.vinted_user_id) === String(u)); return (a && (a.label || a.login)) || null; }}/> },
       // (12 nov., sécurité des comptes) Un zip par compte Vinted, fait dans le navigateur, envoyé nulle part (src/CopieAnnonces.jsx).
       { id:'copieannonces', type:'panneau', ic:'save', lib:tr('reglages.copieannonces.lib'), desc:tr('reglages.copieannonces.desc'), data:{ 'data-reglage-copieannonces':'' }, el:<CopieAnnonces comptes={comptes||[]}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:tr('reglages.ebay.lib'), desc:tr('reglages.ebay.desc'), el:ebayCompte },
+      // (20 nov. soir) Les rangées par plateforme ont quitté la barre de gauche : les recherches et alertes eBay s'ouvrent d'ici.
+      ebayCompte && { id:'ebay-recherches', type:'nav', ic:'search', lib:tr('ebay.recherches.titre'), desc:'', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:ebay-recherches')); } catch (_) {} }, data:{ 'data-reglage-ebay-recherches':'' } },
     ]},
     { id:'emails-reglages', titre:tr('reglages.groupe.emails-reglages'), items:[
       // (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : l'ancien sous-écran est devenu
@@ -2148,6 +2243,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // (15 nov.) « Mon abonnement » n'est plus un onglet ni un renvoi : c'est un panneau de « Mon compte »
     // (GROUPES_COMPTE, `abonnement`), le même composant qu'avant (§11).
     MULTI_USER && { id:'stock', titre:tr('reglages.groupe.stock'), items:[
+      // (19 nov., lot stock-etiquetage) « Méthode d'étiquetage » : qui numérote, la forme des PROCHAINS N°, l'étiquette.
+      // Les seules clés écrites : CLES_METHODE (src/etiquetage/methode.js) — aucun numéro, aucun pool.
+      { id:'etiquetage', type:'panneau', nu:true, ic:'cintre', lib:tr('etq.lib'), desc:tr('etq.desc'), val:valEtiquetage, data:{ 'data-reglage-etiquetage':'' },
+        el:<EtiquetageReglage lire={lireMethodeBrute} archive={archiveNumeros()} ecrire={ecrireMethode} onNumeros={()=>{ DEMANDE_REGLAGE_SOUS.id='numeros'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }}/> },
       { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:tr('reglages.numeros.lib'), desc:tr(profilV.vend === 'sneakers' ? 'reglages.numeros.desc.paires' : 'reglages.numeros.desc.articles'), val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')} onAnnonces={()=>setTab('cat_annonces')}/> },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
       // ⛔ Détourage des photos retiré des Paramètres (17 oct., sa décision) :
@@ -2195,7 +2294,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'sombre', type:'switch', ic:'moon', lib:tr('reglages.sombre.lib'), desc: apparence === 'auto' || apparence === 'soir' ? `${LIBELLES_APPARENCE[apparence]} : ${PHRASES_APPARENCE[apparence].replace(/\.$/, '').toLowerCase()}.` : tr('reglages.sombre.desc'), on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       // (8 nov., « beauté ») L'apparence : Clair · Sombre · Automatique (le système) · Le soir (19 h–7 h).
       // L'interrupteur ci-dessus reste le choix explicite (il quitte Automatique / Le soir).
-      onApparence && { id:'apparence', type:'panneau', nu:true, ic:'contraste', lib:tr('reglages.apparence.lib'), desc:tr('reglages.apparence.desc'), val: LIBELLES_APPARENCE[apparence] || '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
+      onApparence && { id:'apparence', type:'panneau', ic:'contraste',   /* (21 nov.) pas « nu » : la liste native porte sa carte (pas de carte dans une carte) */ lib:tr('reglages.apparence.lib'), desc:tr('reglages.apparence.desc'), val: APPARENCES.includes(apparence) ? libelleApparence(apparence) : '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
       // (15 nov.) LA TAILLE DU TEXTE (src/tailleTexte.js) : quatre tailles, toute l'app grandit avec (le mécanisme du
       // texte en grand de l'appareil, src/grandTexte.js) — rien ne déborde. Propre à CET appareil.
       { id:'taille-texte', type:'panneau', nu:true, ic:'texte', lib:tr('reglages.tailleTexte.lib'), desc:tr('reglages.tailleTexte.desc'), val: tr('reglages.tailleTexte.' + lireTailleTexte()), data:{ 'data-reglage-taille-texte': lireTailleTexte() }, el:<TailleTexteSetting/> },
@@ -2239,6 +2338,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'carte-merci', type:'panneau', nu:true, ic:'cadeau', lib:tr('confort.merci.lib'), desc:tr('confort.merci.desc'), data:{ 'data-reglage-carte-merci':'' }, el:<ReglageCarteMerci lire={()=>load(CLE_CARTE_MERCI, {})} ecrire={(v)=>save(CLE_CARTE_MERCI, v)} telecharger={telechargerFichier}/> },
     ]},
     {id:'aide',titre:tr('reglages.groupe.aide'),items:[
+      // (20 nov.) « Bien démarrer » : le parcours de 5 minutes (src/parcoursNouveau/Demarrage.jsx), rouvert à son sommaire.
+      { id:'bien-demarrer', type:'action', ic:'drapeau', lib:tr('dm.reglage.lib'), desc:tr('dm.reglage.desc'), onClick:()=>{ try { window.dispatchEvent(new CustomEvent('vrm:parcours-nouveau', { detail: 'sommaire' })); } catch (_) {} }, data:{ 'data-reglage-bien-demarrer':'' } },
       // (8 nov.) Un geste : extension (présente, version, connectée à CE compte), comptes, boîte e-mail, dernière relecture — et ce qui manque.
       { id:'verifier', type:'panneau', nu:true, ic:'scan', lib:tr('reglages.verifier.lib'), desc:tr('reglages.verifier.desc'), data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
@@ -2363,7 +2464,31 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
   const categories = rangerParCategorie(groupes);
   rangementRef.current = categories;
-  const titreCat = (id) => tr(`parametres.cat.${id}`);
+  // (17 nov., nouveau design — Julien : « c'est beau mais les cases sont dispersées partout ») NEUF SECTIONS, dans l'ordre des
+  // Réglages d'iOS : Compte · Plateformes et comptes · Ventes et colis · Stock et numéros · Argent et compta · Apparence et
+  // langue · Notifications · Sécurité et données · Aide. « Sécurité des comptes » et « Sécurité des données » (le panneau
+  // technique, tel quel) deviennent UNE section ; les mêmes rangées, les mêmes panneaux — rien n'est retiré.
+  const ORDRE_V2 = ['compte', 'plateformes', 'ventes', 'stock', 'argent', 'apparence', 'notifications', 'securite-donnees', 'aide'];
+  const catsV2 = (() => {
+    const par = new Map(categories.map((c) => [c.id, c]));
+    const sc = par.get('securite-comptes'), dn = par.get('donnees');
+    const fus = sc || dn ? { id: 'securite-donnees', ic: 'shield', expert: false, groupes: [...((sc && sc.groupes) || []), ...((dn && dn.groupes) || [])], ids: [...((sc && sc.ids) || []), ...((dn && dn.ids) || [])] } : null;
+    if (fus) par.set('securite-donnees', fus);
+    // (17 nov., revue) Apparence et langue sans doublons : l'interrupteur « Mode sombre » fait la même chose que « Apparence »
+    // (Clair / Sombre / comme l'appareil) — il n'est pas montré ici (le lot apparence-rangee, PR #1235, le retire pour tous) ;
+    // « Taille de l'affichage » et « Taille du texte » sont deux réglages différents : leurs noms et leur phrase le disent.
+    const NOMS_V2 = { zoom: ['v2.pm.zoom', 'v2.pm.zoom.desc'], 'taille-texte': ['v2.pm.texte', 'v2.pm.texte.desc'] };
+    for (const [k, c] of [...par]) par.set(k, { ...c, groupes: c.groupes.map((g) => ({ ...g, items: g.items.filter((it) => it && it.id !== 'sombre').map((it) => (NOMS_V2[it.id] ? { ...it, lib: tr(NOMS_V2[it.id][0]), desc: tr(NOMS_V2[it.id][1]) } : it)) })) });
+    const connus = ORDRE_V2.map((id) => par.get(id)).filter(Boolean);
+    const restes = categories.filter((c) => !ORDRE_V2.includes(c.id) && c.id !== 'securite-comptes' && c.id !== 'donnees');
+    return [...connus, ...restes];
+  })();
+  const idV2 = (id) => (id === 'securite-comptes' || id === 'donnees' ? 'securite-donnees' : id);
+  const sectionDeRangee = (id) => { const c = catsV2.find((x) => Array.isArray(x.ids) && x.ids.includes(id)); return c ? c.id : null; };
+  // La recherche mène AU réglage : sa section s'ouvre, la rangée vient au centre, surlignée.
+  const allerARangee = (id) => { const sec = sectionDeRangee(id); setRechercheReglage(''); if (etroit) ouvrirCategorie(sec); else setCatActive(sec); setSurligne(id); };
+  const TITRES_V2 = { plateformes: 'v2.pm.cat.plateformes', argent: 'v2.pm.cat.argent', 'securite-donnees': 'v2.pm.cat.securite', aide: 'v2.pm.cat.aide' };
+  const titreCat = (id) => (designV2 && TITRES_V2[id] ? tr(TITRES_V2[id]) : tr(`parametres.cat.${id}`));
   const panneaux = groupes.flatMap((g) => g.items.filter((it) => it.type === 'panneau'));
   const ouvert = sous ? panneaux.find((it) => it.id === sous) : null;
   // Le retour d'un panneau : sa catégorie (téléphone), ou « Paramètres » (ordinateur : tout est sur une page).
@@ -2442,6 +2567,22 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       </button>
     );
   };
+  // (17 nov., nouveau design · phase 2) La rangée d'une catégorie, en `RangeeTouchable` : icône teintée, nom, la valeur de
+  // `valeurCat` (rien d'inventé), le chevron ; la phrase reste pour les lecteurs d'écran. Le même geste, les mêmes data-*.
+  const allerAutomatisations = () => ouvrirPanneau({ site: 'vinted', page: 'automatisations' });   // (20 nov.) dans l'extension
+  const rangeeCatV2 = (c) => {
+    const pl = c.id === 'compte' ? (reglePlanCourante() || {}).plan : null;
+    const v = c.id === 'compte' ? (pl === 'pro' ? 'Pro' : pl === 'solo' ? 'Solo' : null) : c.id === 'securite-donnees' ? valeurCat({ ...c, id: 'donnees' }) : valeurCat(c);
+    const ambre = (c.id === 'donnees' || c.id === 'securite-donnees') && derniereSauvegarde.old;
+    return (
+      <RangeeTouchable key={c.id} className="v2-pm-rangee" onClick={() => ouvrirCategorie(c.id)} attrs={{ 'data-categorie-ouvrir': c.id, 'data-categorie-contient': ` ${c.ids.join(' ')} ` }}>
+        <span className="v2-pm-ic" aria-hidden="true"><Icon name={c.ic} size={18}/></span>
+        <span className="v2-pm-lib">{titreCat(c.id)}<span className="vg-sr">{' — ' + tr(`parametres.cat.${c.id}.desc`)}</span></span>
+        {v ? <span className={'v2-pm-val' + (ambre ? ' is-ambre' : '')} data-categorie-valeur={c.id}>{v}</span> : null}
+        <span className="v2-pm-chev" aria-hidden="true">{chevron}</span>
+      </RangeeTouchable>
+    );
+  };
   // « Mon compte » : la carte (l'avatar, le nom de la catégorie, l'adresse de connexion), un toucher l'ouvre.
   const carteCompte = (c) => (
     <button key={c.id} type="button" className="vg-carte vg-pm-moi" data-categorie-ouvrir={c.id} data-vue="compte" data-categorie-contient={` ${c.ids.join(' ')} `} onClick={() => ouvrirCategorie(c.id)}>
@@ -2455,7 +2596,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // Ce qui se pose en tête d'une catégorie (et seulement là) : le profil et la double vérification dans
   // « Mon compte », ce qui reste à terminer (adresses e-mail) dans « Mes plateformes ».
   const teteCategorie = (id) => {
-    if (id === 'compte') return <>{AUTH.user ? profil : null}{AUTH.user && <div className="vrm-pf-set-afaire" data-pf-set-afaire=""><CarteDoubleVerif/></div>}</>;
+    if (id === 'compte') return <>{AUTH.user ? profil : null}</>;   /* (21 nov., ux-reglages, CLAUDE.md §2.10) la carte « Protège ton compte » (un reproche récurrent) n’est plus montrée : la rangée « Double vérification · Désactivée › » dit l’état */
     if (id === 'plateformes') return <div className="vrm-pf-set-afaire" data-pf-set-afaire=""><ActionsReglages comptes={comptes||[]} onOuvrir={id2=>id2==='comptes'?setTab('vintedaccounts'):id2==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):allerAuReglage(id2)}/></div>;
     return null;
   };
@@ -2470,14 +2611,16 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const q = rechercheReglage.trim();
   // La recherche : dans TOUTES les catégories (avant : l'onglet « Réglages » seul) ; le nom de la
   // catégorie et celui du groupe comptent (« argent » trouve le statut, l'URSSAF, les prix d'achat).
-  const resultats = q ? filtrerReglages(categories.flatMap((c) => c.groupes.map((g) => ({ id: g.id, titre: [titreCat(c.id), g.titreCle ? tr(g.titreCle) : (g.titre || '')].filter(Boolean).join(' · '), items: g.items }))), q) : null;
+  const resultats = q ? filtrerReglages((designV2 ? catsV2 : categories).flatMap((c) => c.groupes.map((g) => ({ id: g.id, titre: [titreCat(c.id), g.titreCle ? tr(g.titreCle) : (g.titre || '')].filter(Boolean).join(' · '), items: g.items }))), q) : null;
   const nTrouves = resultats ? resultats.reduce((n, g) => n + g.items.length, 0) : 0;
-  const catOuverte = etroit && cat ? categories.find((c) => c.id === cat) || null : null;
+  const catOuverte = etroit && cat ? (designV2 ? catsV2.find((c) => c.id === idV2(cat)) : categories.find((c) => c.id === cat)) || null : null;
 
   return (
     <div ref={racine} className="vrm-set vrm-pm" data-espace="autres" data-reglages-disposition={etroit ? 'telephone' : 'ordinateur'} data-sous-ecran-ouvert={ouvert ? ouvert.id : ''}
       data-parametres="" data-categorie-ouverte={catOuverte ? catOuverte.id : ''} data-recherche-active={q ? '1' : ''}
       style={{'--vrm-set-filet': C.border, '--vrm-set-appui': `${C.text}0a`}}>
+      {/* (17 nov., accessibilité WCAG 1.3.1) L'écran avait des h2/h3 mais aucun h1 : le titre de l'écran, lu seulement. */}
+      <h1 className="vrm-sr-seul" data-reglages-h1="">{tr('ecran.settings')}</h1>
       {/* (5 nov., chantier H) Appelée, pas montée : `<AcctSheet/>` était un composant
           RECRÉÉ à chaque rendu — chaque lettre tapée remontait la feuille. */}
       {AcctSheet()}
@@ -2486,26 +2629,24 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {feuilleAdresseVrm && <FeuilleAdresseVrm headers={sbAuth} FermeAuRetour={FermeAuRetour} proprio={proprioInst===true} onBoite={()=>setTab('emails')} onFermer={()=>setFeuilleAdresseVrm(false)}/>}
       {ouvert ? (
         // ── LE PANNEAU D'UN RÉGLAGE : « ‹ sa catégorie » (téléphone) ou « ‹ Paramètres » ──
-        <div className="vrm-set-nav vg-pm-nav">
-          <button type="button" className="vrm-set-retour vg-pm-retour" onClick={fermerSous} data-sous-retour="" aria-label={titreRetour}>
-            <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>
-          </button>
-          <span className="vg-pm-nav-txt"><small aria-hidden="true">{titreRetour}</small><h2 className="vrm-set-sous-h" style={{color:C.text}}>{ouvert.lib}</h2></span>
+        // (21 nov., ux-reglages, audit design n° 34) UN retour : « ‹ Paramètres » (ou « ‹ sa catégorie ») en texte accent,
+        // comme une page poussée native (`n-barre-retour`), puis le grand titre — plus de rond gris ni de fil d'Ariane.
+        <><div className="vrm-set-nav ux-pm-barre" data-ux-pm-barre="">
+          <BoutonNatif variante="texte" className="vrm-set-retour ux-pm-retour" icone={<GlypheNatif nom="chevron" taille={22} className="n-barre-retour-fleche"/>} onClick={fermerSous} attrs={{ 'data-sous-retour': '', 'aria-label': tr('natif.retourVers', { ecran: titreRetour }) }}>{titreRetour}</BoutonNatif>
           <StatutSauvegardeReglages/>
         </div>
+        <h2 className="vrm-set-h1 vrm-set-sous-h ux-pm-titre" data-ux-pm-titre="">{ouvert.lib}</h2></>
       ) : catOuverte && !q ? (
         // ── UNE CATÉGORIE (téléphone) : « ‹ Paramètres », puis son grand titre ──
-        <div className="vrm-set-nav vg-pm-nav">
-          <button type="button" className="vrm-set-retour vg-pm-retour" onClick={fermerCategorie} data-categorie-retour="" aria-label={tr('ecran.settings')}>
-            <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>
-          </button>
-          <span className="vg-pm-nav-txt"><small aria-hidden="true">{tr('ecran.settings')}</small><h2 className="vrm-set-sous-h vrm-pm-cat-titre" style={{color:C.text}}>{titreCat(catOuverte.id)}</h2></span>
+        <><div className="vrm-set-nav ux-pm-barre" data-ux-pm-barre="">
+          <BoutonNatif variante="texte" className="vrm-set-retour ux-pm-retour" icone={<GlypheNatif nom="chevron" taille={22} className="n-barre-retour-fleche"/>} onClick={fermerCategorie} attrs={{ 'data-categorie-retour': '', 'aria-label': tr('natif.retourVers', { ecran: tr('ecran.settings') }) }}>{tr('ecran.settings')}</BoutonNatif>
           <StatutSauvegardeReglages/>
         </div>
+        <h2 className="vrm-set-h1 vrm-set-sous-h vrm-pm-cat-titre ux-pm-titre" data-ux-pm-titre="">{titreCat(catOuverte.id)}</h2></>
       ) : (<>
         {/* (14 nov., refonte visible — AJOUT 3.8) Le titre et son « ? ». Puis la RECHERCHE, en haut, comme les Réglages d'iOS. */}
         <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>{tr('ecran.settings')}</h2>{PHRASES_ECRAN.settings ? <span className="vrm-pf-set-aide" data-phrase-ecran="settings" title={PHRASES_ECRAN.settings}><AideEcran cle="settings"/></span> : null}<StatutSauvegardeReglages/></div>
-        <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={tr('parametres.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>
+        <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={designV2 ? tr('v2.pm.chercher') : tr('parametres.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>
         <ReglagesPasLus/>
       </>)}
 
@@ -2518,7 +2659,12 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         {q ? (
           resultats.length ? <>
             <p className="vrm-settings-search-info" role="status" data-recherche-trouves={nTrouves} style={{color:C.muted}}>{tr('reglages.recherche.trouves', { n: nTrouves })}</p>
-            {resultats.map(groupe)}
+            {designV2 ? <div className="v2-pm-liste" data-v2-pm-resultats="">{resultats.flatMap((g) => g.items).filter((it) => it && it.lib).map((it) => (
+              <RangeeTouchable key={it.id} className="v2-pm-rangee" onClick={() => allerARangee(it.id)} attrs={{ 'data-v2-pm-resultat': it.id }}>
+                <span className="v2-pm-lib">{it.lib}</span>
+                {sectionDeRangee(it.id) ? <span className="v2-pm-val">{tr('v2.pm.trouve', { section: titreCat(sectionDeRangee(it.id)) })}</span> : null}
+                <span className="v2-pm-chev" aria-hidden="true">{chevron}</span>
+              </RangeeTouchable>))}</div> : resultats.map(groupe)}
           </> : <div role="status" className="vrm-set-rien" data-recherche-trouves="0" style={{color:C.muted,fontSize:13}}><p style={{margin:'0 0 4px'}}>{tr('reglages.recherche.rien', { q })}</p><Bouton variante="discret" onClick={()=>setRechercheReglage('')}>{tr('reglages.recherche.effacer')}</Bouton></div>
         ) : etroit ? (
           catOuverte ? ecranCategorie(catOuverte, { avecTitre: false }) : (
@@ -2526,6 +2672,20 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
             // (15 nov., maquette « Verre dépoli » validée : « Tuiles plutôt qu'une longue liste : tout tient sur un
             // écran ») « Mon compte » en carte, puis les neuf autres catégories en tuiles (trois par rangée) ; « Sécurité
             // des données » (expert) en dernière tuile. Les mêmes `data-categorie-ouvrir`, le même geste.
+            designV2 ? (
+            // (17 nov., nouveau design · phase 2) La liste groupée d'iOS : « Compte » (la carte), « Réglages » (les catégories en
+            // rangées : icône, nom, valeur, chevron — `ligneCategorie`, le même geste), « Avancé » (Sécurité des données).
+            <section className="vrm-pm-racine v2-pm-racine" data-v2-parametres="">
+              <div data-categories-reglages="" data-onglets-reglages="">
+                <div className="v2-pm-liste" data-v2-pm-sections={catsV2.length}>{catsV2.map(rangeeCatV2)}</div>
+                {/* (20 nov., précision de Julien : « les automatisations … plutôt dans l'extension ») L'écran de l'app est retiré :
+                    UNE rangée qui ouvre le panneau de l'extension (page automatisations), l'état lu à droite. */}
+                <div className="v2-pm-liste" data-auto-entree=""><RangeeTouchable className="v2-pm-rangee" onClick={allerAutomatisations} attrs={{ 'data-auto-ouvrir': '', 'data-vrm-panneau': 'automatisations', 'data-vrm-panneau-site': 'vinted', 'data-vrm-panneau-lien': lienPanneau({ site: 'vinted', page: 'automatisations' }) }}>
+                  <span className="v2-pm-ic" aria-hidden="true"><Icon name="spark" size={18}/></span><span className="v2-pm-lib">{tr('actionsExt.autoRangee')}</span>
+                  <span className="v2-pm-val" data-auto-actives={String(automatisationsActives(load))}>{tr('actionsExt.autoActives', { n: automatisationsActives(load) })}</span><span className="v2-pm-chev" aria-hidden="true">{chevron}</span></RangeeTouchable></div>
+              </div>
+            </section>
+            ) :
             <section className="vrm-pm-racine vg-pm-racine">
               <div className="vg-pm-cats" data-categories-reglages="" data-onglets-reglages="">
                 {categories.filter((c) => c.id === 'compte').map((c) => carteCompte(c))}
@@ -2540,10 +2700,15 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
           <div className="vrm-pm-bureau">
             <nav className="vrm-pm-sommaire" aria-label={tr('ecran.settings')}>
               <div className="vrm-set-liste" data-categories-reglages="" data-onglets-reglages="">
-                {categories.map((c) => ligneCategorie(c, { actif: catActive === c.id, surClic: () => { setCatActive(c.id); try { const el = document.getElementById(`parametres-${c.id}`); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} } }))}
+                {(designV2 ? catsV2 : categories).map((c) => ligneCategorie(c, { actif: designV2 ? idV2(catActive || cat || 'compte') === c.id : catActive === c.id, surClic: () => { setCatActive(c.id); try { const el = document.getElementById(`parametres-${c.id}`); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} } }))}
+                <button type="button" className="vrm-set-ligne vrm-pm-cat-ligne" data-auto-ouvrir="" onClick={allerAutomatisations}>
+                  <span className="vrm-pm-cat-ic" aria-hidden="true"><Icon name="spark" size={17}/></span><span className="vrm-set-lib"><b style={{color:C.text}}>{tr('auto.titre')}</b><small className="vrm-set-desc" style={{color:C.muted}}>{tr('auto.desc')}</small></span>{chevron}
+                </button>
               </div>
             </nav>
-            <div className="vrm-pm-contenu">{categories.map((c) => ecranCategorie(c, { avecTitre: true }))}</div>
+            <div className="vrm-pm-contenu">{designV2
+              ? (() => { const c = catsV2.find((x) => x.id === idV2(catActive || cat || 'compte')) || catsV2[0]; return c ? <div data-v2-pm-section={c.id}>{ecranCategorie(c, { avecTitre: true })}</div> : null; })()
+              : categories.map((c) => ecranCategorie(c, { avecTitre: true }))}</div>
           </div>
         )}
       </>}
@@ -2799,7 +2964,7 @@ function DoubleVerification({ onEtat } = {}) {
       {f === undefined && <div style={txt}>Lecture de l'état de la double vérification…</div>}
       {f === null && (<>
         <div style={txt}>Double vérification pas lue (connexion muette). Rien n'a changé.</div>
-        <button type="button" data-mfa-relire="" onClick={relire} className="vrm-b vrm-b-secondaire" style={{marginTop:10}}>Réessayer</button>
+        <Bouton variante="secondaire" data-mfa-relire="" onClick={relire}  style={{marginTop:10}}>Réessayer</Bouton>
       </>)}
       {f && !actif && !cours && (<>
         <div style={txt}>
@@ -2807,7 +2972,7 @@ function DoubleVerification({ onEtat } = {}) {
           <Pourquoi label="Comment ça marche">Après ton mot de passe, VRM demande le code affiché par une app d'authentification (Mots de passe de l'iPhone, Google Authenticator, Microsoft Authenticator, Authy). Quelqu'un qui connaîtrait ton mot de passe ne pourrait pas entrer sans ton téléphone.</Pourquoi>
         </div>
         {champDuNom}
-        <button type="button" data-mfa-activer="" disabled={busy} onClick={creer} className="vrm-b vrm-b-primaire" style={{marginTop:10}}>{busy ? 'Préparation…' : 'Activer'}</button>
+        <Bouton variante="primaire" data-mfa-activer="" disabled={busy} onClick={creer}  style={{marginTop:10}}>{busy ? 'Préparation…' : 'Activer'}</Bouton>
       </>)}
       {cours && cours.etape === 'qr' && (<>
         {cours.ajout && <div data-mfa-ajout-consigne="" style={{...txt,marginBottom:6}}>Prends <b style={{color:C.text}}>l'autre appareil</b> (« {cours.nom} »), pas celui des codes actuels.</div>}
@@ -2819,20 +2984,20 @@ function DoubleVerification({ onEtat } = {}) {
           <p>Choisis « saisir une clé ». Garde-la privée, jamais en capture.</p>
           <div data-mfa-cle="" style={{fontFamily:'ui-monospace,Menlo,monospace',fontSize:15,color:C.text,wordBreak:'break-all',userSelect:'all'}}>{cours.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
         </details>
-        <button type="button" data-mfa-recommencer="" disabled={busy} onClick={recommencerActivation} className="vrm-b vrm-b-secondaire" style={{marginBottom:10}}>Remplacer cette configuration</button>
+        <Bouton variante="secondaire" data-mfa-recommencer="" disabled={busy} onClick={recommencerActivation}  style={{marginBottom:10}}>Remplacer cette configuration</Bouton>
         <div style={txt}><b style={{color:C.text}}>2.</b> Tape le code à 6 chiffres que {cours.ajout ? 'ce nouvel appareil' : "l'app"} affiche pour VRM :</div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
           <input data-mfa-code-activer="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
-          <button type="button" data-mfa-confirmer="" disabled={busy || code.length !== 6} onClick={confirmerActivation} className="vrm-b vrm-b-primaire">{busy ? 'Vérification…' : 'Confirmer'}</button>
-          <button className="vrm-b vrm-b-discret" type="button" data-mfa-annuler="" disabled={busy} onClick={annulerActivation}>Annuler</button>
+          <Bouton variante="primaire" data-mfa-confirmer="" disabled={busy || code.length !== 6} onClick={confirmerActivation}>{busy ? 'Vérification…' : 'Confirmer'}</Bouton>
+          <Bouton variante="discret" data-mfa-annuler="" disabled={busy} onClick={annulerActivation}>Annuler</Bouton>
         </div>
       </>)}
       {actif && cours && cours.etape === 'nom' && (<>
         <div style={txt}>Un autre téléphone ou une tablette, en secours.</div>
         {champDuNom}
         <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
-          <button type="button" data-mfa-ajouter-continuer="" disabled={busy} onClick={creer} className="vrm-b vrm-b-primaire">{busy ? 'Préparation…' : 'Afficher le code QR'}</button>
-          <button className="vrm-b vrm-b-discret" type="button" disabled={busy} onClick={() => { setCours(null); setMsg(null); }}>Annuler</button>
+          <Bouton variante="primaire" data-mfa-ajouter-continuer="" disabled={busy} onClick={creer}>{busy ? 'Préparation…' : 'Afficher le code QR'}</Bouton>
+          <Bouton variante="discret" disabled={busy} onClick={() => { setCours(null); setMsg(null); }}>Annuler</Bouton>
         </div>
       </>)}
       {actif && !cours && (<>
@@ -2847,13 +3012,13 @@ function DoubleVerification({ onEtat } = {}) {
                 {x.created_at && <div style={{fontSize:12,color:C.muted}}>ajouté le {new Date(x.created_at).toLocaleDateString('fr-FR')}</div>}
               </div>
               {seul
-                ? <button type="button" data-mfa-desactiver="" onClick={() => ouvrirRetrait(x)} className="vrm-b vrm-b-secondaire">Désactiver…</button>
-                : <button type="button" data-mfa-retirer={String(x.id)} onClick={() => ouvrirRetrait(x)} className="vrm-b vrm-b-secondaire">Retirer…</button>}
+                ? <Bouton variante="secondaire" data-mfa-desactiver="" onClick={() => ouvrirRetrait(x)}>Désactiver…</Bouton>
+                : <Bouton variante="secondaire" data-mfa-retirer={String(x.id)} onClick={() => ouvrirRetrait(x)}>Retirer…</Bouton>}
             </div>
           ))}
         </div>
         {seul && <div data-mfa-conseil-secours="" style={{...txt,marginTop:10}}>Un seul appareil : perdu, plus d'accès. Ajoute un secours.</div>}
-        <button type="button" data-mfa-ajouter="" onClick={() => { setNom(nomParDefaut(verifies, true)); setCours({ etape: 'nom' }); setMsg(null); }} className="vrm-b vrm-b-secondaire" style={{marginTop:10}}>{seul ? 'Ajouter un appareil de secours' : 'Ajouter un autre appareil'}</button>
+        <Bouton variante="secondaire" data-mfa-ajouter="" onClick={() => { setNom(nomParDefaut(verifies, true)); setCours({ etape: 'nom' }); setMsg(null); }}  style={{marginTop:10}}>{seul ? 'Ajouter un appareil de secours' : 'Ajouter un autre appareil'}</Bouton>
       </>)}
       {actif && cours && cours.etape === 'off' && (<>
         <div style={txt}>{seul
@@ -2861,8 +3026,8 @@ function DoubleVerification({ onEtat } = {}) {
           : <>Pour retirer <b style={{color:C.text}}>« {cours.nom} »</b>, tape le code actuel de <b style={{color:C.text}}>l'un</b> de tes appareils — celui d'un autre si « {cours.nom} » est perdu. Les autres restent actifs.</>}</div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
           <input data-mfa-code-desactiver="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
-          <button type="button" data-mfa-confirmer-off="" disabled={busy || code.length !== 6} onClick={retirer} className="vrm-b vrm-b-primaire">{busy ? 'Vérification…' : seul ? 'Désactiver' : 'Retirer'}</button>
-          <button type="button" disabled={busy} onClick={() => { setCours(null); setCode(''); setMsg(null); }} className="vrm-b vrm-b-discret">Garder</button>
+          <Bouton variante="primaire" data-mfa-confirmer-off="" disabled={busy || code.length !== 6} onClick={retirer}>{busy ? 'Vérification…' : seul ? 'Désactiver' : 'Retirer'}</Bouton>
+          <Bouton variante="discret" disabled={busy} onClick={() => { setCours(null); setCode(''); setMsg(null); }}>Garder</Bouton>
         </div>
       </>)}
       {bandeau}
@@ -3377,7 +3542,7 @@ function MonAbonnement() {
       // De retour de Stripe : le webhook peut avoir quelques secondes de retard.
       for (let i = 0; RETOUR_ABONNEMENT === 'merci' && x && !x.actif && i < 8 && !mort; i++) {
         await new Promise((r) => setTimeout(r, 2000));
-        x = await lireAbonnement();
+        x = await lireAbonnement({ frais: true });
       }
       if (mort) return;
       setE(x);
@@ -3430,7 +3595,7 @@ function MonAbonnement() {
       const r = await fetch('/api/compte?mode=changer-plan', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ plan, cgv: true, accesImmediat: true }) });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j && j.ok) {
-        const x = await lireAbonnement();
+        const x = await lireAbonnement({ frais: true });
         if (x) { setE(x); publierAbonnement(x); }
         toast(plan === 'pro' ? '✓ Tu es en Pro : tous tes comptes vendent' : '✓ Tu es en Solo : choisis le compte qui vend');
         if (plan === 'solo') ouvrirQuelCompte();
@@ -3603,7 +3768,7 @@ function MonAbonnement() {
         {groupeOffres}
         {annule && (
           <div className="vrm-abo-actions" style={{ padding: '0 0' }}>
-            <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(true)} className="vrm-b vrm-b-primaire vrm-b-plein" style={{ marginTop: 12 }}>{occupe === 'reprendre' ? 'Un instant…' : 'Reprendre mon abonnement'}</button>
+            <Bouton variante="primaire" plein disabled={!!occupe} onClick={() => resilierOuReprendre(true)}  style={{ marginTop: 12 }}>{occupe === 'reprendre' ? 'Un instant…' : 'Reprendre mon abonnement'}</Bouton>
           </div>
         )}
         {groupePaiement}
@@ -3628,7 +3793,7 @@ function MonAbonnement() {
       <div data-abonnement="impaye" data-abonnement-etat="impaye">
         <Tete etat="Paiement en échec" titre="Le dernier prélèvement n'est pas passé"
           phrase="Le dernier prélèvement n'est pas passé. Mets à jour ta carte : Stripe réessaie pendant 14 jours, puis l'app passe en lecture seule (tes données restent intactes).">
-          <div className="vrm-abo-actions"><button type="button" disabled={!!occupe} onClick={() => agir('portail')} className="vrm-b vrm-b-primaire vrm-b-plein">{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</button></div>
+          <div className="vrm-abo-actions"><Bouton variante="primaire" plein disabled={!!occupe} onClick={() => agir('portail')}>{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</Bouton></div>
         </Tete>
         {texteCarte && <GroupeIos titre="Paiement"><RangeeIos titre="Carte enregistrée" detail={<span data-carte="">{texteCarte}</span>}/></GroupeIos>}
         {erreur}
@@ -3645,12 +3810,12 @@ function MonAbonnement() {
         <Tete etat="Abonnement terminé" titre={et.impaye ? "Ton prélèvement n'est pas passé" : 'Ton abonnement a pris fin'}
           phrase={`Tes données sont là, rien n’est supprimé : ${e.lecture === true ? 'un aperçu reste visible, le reste est masqué' : 'elles reviennent telles quelles'}. Pour tout retrouver et agir à nouveau, ${et.impaye ? 'mets ta carte à jour' : `reprends l’abonnement${portePaiementFerme ? '' : ` : ${prixLisible(e.prix)}, sans engagement`}`}.`}>
           {et.impaye
-            ? <div className="vrm-abo-actions"><button type="button" disabled={!!occupe} onClick={() => agir('portail')} className="vrm-b vrm-b-primaire vrm-b-plein">{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</button></div>
+            ? <div className="vrm-abo-actions"><Bouton variante="primaire" plein disabled={!!occupe} onClick={() => agir('portail')}>{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</Bouton></div>
             : portePaiementFerme
               ? <div className="vrm-abo-phrase" data-paiement-ferme="">Le paiement n'est pas encore ouvert : rien n'a été prélevé. Réessaie un peu plus tard.</div>
               : <>
                   <CaseCgv cases={cases} onChange={setCases}/>
-                  <div className="vrm-abo-actions"><button type="button" disabled={!!occupe || !cgv} data-sabonner="" onClick={() => agir('checkout')} className="vrm-b vrm-b-primaire vrm-b-plein" title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : (et.ancien ? "Reprendre l'abonnement" : "S'abonner")}</button></div>
+                  <div className="vrm-abo-actions"><Bouton variante="primaire" plein disabled={!!occupe || !cgv} data-sabonner="" onClick={() => agir('checkout')}  title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : (et.ancien ? "Reprendre l'abonnement" : "S'abonner")}</Bouton></div>
                 </>}
         </Tete>
         {erreur}
@@ -3680,7 +3845,7 @@ function MonAbonnement() {
         <OffresSoloPro x={e} prixSolo={prixLisible(e.prix)} prixProAffiche={`${PRIX_PRO_MOIS} € / mois`}/>
         <CaseCgv cases={cases} onChange={setCases}/>
         <div className="vrm-abo-actions">
-          <button type="button" disabled={!!occupe || !cgv} data-sabonner="" data-essai={e.essaiDispo ? '' : undefined} onClick={() => agir('checkout')} className="vrm-b vrm-b-primaire vrm-b-plein" title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : e.essaiDispo ? `Commencer l'essai gratuit de ${e.essaiJours || 7} jours` : "S'abonner"}</button>
+          <Bouton variante="primaire" plein disabled={!!occupe || !cgv} data-sabonner="" data-essai={e.essaiDispo ? '' : undefined} onClick={() => agir('checkout')}  title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : e.essaiDispo ? `Commencer l'essai gratuit de ${e.essaiJours || 7} jours` : "S'abonner"}</Bouton>
         </div>
         {e.essaiDispo && <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Essai gratuit <b>une seule fois</b> — par adresse e-mail et par compte Vinted. Ta carte n'est débitée qu'après {e.essaiJours || 7} jours ; tu peux résilier avant sans rien payer.</div>}
       </Tete>
@@ -3764,9 +3929,9 @@ function NomParrain({ nom, onChange }) {
       <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>Ton prénom ou un pseudo VRM, jamais ton pseudo Vinted. Rien d’autre ne se voit.</div>
       {msg ? <div role="alert" data-parrainage-nom-refus="" style={{ fontSize: 13, color: C.text, marginTop: 6 }}>{msg}</div> : null}
       <div className="vrm-abo-actions" style={{ marginTop: 10 }}>
-        <button type="button" className="vrm-b vrm-b-primaire" disabled={occupe || !v.trim()} onClick={() => envoyer(v)} data-parrainage-nom-enregistrer="">{occupe ? 'Enregistrement…' : 'Enregistrer'}</button>
-        {nom ? <button type="button" className="vrm-b vrm-b-secondaire" disabled={occupe} onClick={() => envoyer('')}>Ne plus montrer de nom</button> : null}
-        <button type="button" className="vrm-b vrm-b-secondaire" disabled={occupe} onClick={() => setOuvert(false)}>Annuler</button>
+        <Bouton variante="primaire"  disabled={occupe || !v.trim()} onClick={() => envoyer(v)} data-parrainage-nom-enregistrer="">{occupe ? 'Enregistrement…' : 'Enregistrer'}</Bouton>
+        {nom ? <Bouton variante="secondaire"  disabled={occupe} onClick={() => envoyer('')}>Ne plus montrer de nom</Bouton> : null}
+        <Bouton variante="secondaire"  disabled={occupe} onClick={() => setOuvert(false)}>Annuler</Bouton>
       </div>
     </div>
   );
@@ -3815,8 +3980,8 @@ function Parrainage() {
           <div data-parrainage-titre="" style={{ fontSize: 17, fontWeight: 600, color: C.text, lineHeight: 1.35, marginBottom: 10 }}>{PHRASE_PARRAINAGE}</div>
           <div className="vrm-abo-lien"><code data-lien-parrainage="">{lien}</code></div>
           <div className="vrm-abo-actions" style={{ marginTop: 10 }}>
-            <button type="button" className="vrm-b vrm-b-primaire" onClick={copier} data-copier-parrainage="">Copier le lien</button>
-            {peutPartager ? <button type="button" className="vrm-b vrm-b-secondaire" onClick={partager} data-partager-parrainage="">Partager</button> : null}
+            <Bouton variante="primaire"  onClick={copier} data-copier-parrainage="">Copier le lien</Bouton>
+            {peutPartager ? <Bouton variante="secondaire"  onClick={partager} data-partager-parrainage="">Partager</Bouton> : null}
           </div>
         </div>
         <RangeeIos titre="Mois gagnés" detail={s.enAttente ? `${s.enAttente} en attente de ton premier abonnement` : undefined} valeur={<span data-chiffre-mois="">{gagnes == null ? '—' : gagnes}</span>}/>
@@ -3916,8 +4081,8 @@ function DiscordCompte() {
     <div data-discord-compte={lu.discord ? 'relie' : 'aucun'} style={{ fontSize: 13, color: C.text, padding:'10px 14px 10px 16px',minHeight:56,boxSizing:'border-box',borderTop:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap' }}>
       <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><span aria-hidden="true" style={{width:32,height:32,display:'grid',placeItems:'center',borderRadius:12,background:'#5865F218'}}><BrandMark id="discord"/></span><span>{lu.discord ? <>Discord relié : <b data-discord-compte-pseudo={lu.discord}>{lu.discord}</b></> : <><b>Profil Discord</b><span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Ton pseudo et ton avatar Discord dans VRM</span></>}</span></div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {lu.connexion && <button type="button" data-discord-compte-connecter="" disabled={occupe} onClick={connecter} className="vrm-b vrm-b-secondaire">{occupe ? 'Un instant…' : lu.discord ? 'Changer de compte' : 'Connecter Discord'}</button>}
-        {lu.discord && <button type="button" data-discord-compte-retirer="" disabled={occupe} onClick={retirer} className="vrm-b vrm-b-discret">Retirer</button>}
+        {lu.connexion && <Bouton variante="secondaire" data-discord-compte-connecter="" disabled={occupe} onClick={connecter}>{occupe ? 'Un instant…' : lu.discord ? 'Changer de compte' : 'Connecter Discord'}</Bouton>}
+        {lu.discord && <Bouton variante="discret" data-discord-compte-retirer="" disabled={occupe} onClick={retirer}>Retirer</Bouton>}
       </div>
       {!lu.connexion && !lu.discord && <span data-discord-compte-indispo="" title={DISCORD_ERREURS['non-configure']} style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>Bientôt</span>}
       {note}
@@ -3959,7 +4124,7 @@ function EquipeSetting() {
   if (lu === undefined) return <div data-equipe-reglage="chargement" style={{ fontSize: 13, color: C.muted }}>Lecture de ton équipe…</div>;
   if (lu === null) return (
     <div data-equipe-reglage="pas-su" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
-      Je n'ai pas pu lire ton équipe — la base n'a pas répondu. <button type="button" onClick={relire} className="vrm-b vrm-b-secondaire" style={{ marginLeft: 6 }}>Réessayer</button>
+      Je n'ai pas pu lire ton équipe — la base n'a pas répondu. <Bouton variante="secondaire" onClick={relire}  style={{ marginLeft: 6 }}>Réessayer</Bouton>
     </div>
   );
   // (8 nov.) Tant que la 016 n'est pas appliquée : la phrase (la même que l'écran de
@@ -3994,23 +4159,23 @@ function EquipeSetting() {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e-mail de la personne" aria-label="E-mail à inviter" data-equipe-email=""
           style={{ flex: '1 1 200px', minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 12, padding: '8px 10px', fontSize: 15, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' }}/>
-        <button type="button" data-equipe-inviter="" disabled={!!occupe} onClick={inviter} className="vrm-b vrm-b-primaire">{occupe === 'inviter' ? 'Invitation…' : 'Inviter'}</button>
+        <Bouton variante="primaire" data-equipe-inviter="" disabled={!!occupe} onClick={inviter}>{occupe === 'inviter' ? 'Invitation…' : 'Inviter'}</Bouton>
       </div>
       <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>VRM n'envoie aucun e-mail. Touche « Envoyer l'invitation ».</div>
       {msg && <div data-equipe-msg="" style={{ color: C.warn, marginTop: 8 }}>{msg}</div>}
       {retiree && <div data-equipe-retiree={retiree} role="status" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 10, color: C.text }}>
         <span style={{ flex: '1 1 200px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{retiree}</b> ne voit plus tes colis, depuis maintenant.</span>
-        <button type="button" data-equipe-reinviter="" disabled={!!occupe} onClick={() => agir('inviter', 'inviter', { email: retiree }, () => { setRetiree(''); setMsg('Invitée à nouveau. Envoie-lui le message.'); })} className="vrm-b vrm-b-secondaire">Réinviter</button>
+        <Bouton variante="secondaire" data-equipe-reinviter="" disabled={!!occupe} onClick={() => agir('inviter', 'inviter', { email: retiree }, () => { setRetiree(''); setMsg('Invitée à nouveau. Envoie-lui le message.'); })}>Réinviter</Bouton>
       </div>}
       {vivants.length > 0 && <div style={{ marginTop: 12 }}>
         {vivants.map((x) => (
           <div key={x.id} data-equipe-membre={x.statut} style={ligne}>
             <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{x.email}</b> <span style={{ color: C.muted }}>· {x.statut === 'actif' ? 'membre' : 'invitée'}</span></span>
             <span style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
-            {x.statut !== 'actif' && <button type="button" data-equipe-partager={x.id} onClick={async () => { const r = await partagerInvitationEquipe(x.email); setMontre(r === 'montre' ? x.id : ''); setMsg(r === 'copie' ? 'Message copié. Colle-le-lui.' : ''); }} className="vrm-b vrm-b-secondaire">Envoyer l'invitation</button>}
+            {x.statut !== 'actif' && <Bouton variante="secondaire" data-equipe-partager={x.id} onClick={async () => { const r = await partagerInvitationEquipe(x.email); setMontre(r === 'montre' ? x.id : ''); setMsg(r === 'copie' ? 'Message copié. Colle-le-lui.' : ''); }}>Envoyer l'invitation</Bouton>}
             {/* (13 nov., lot 58) RÉVOCATION EN UN GESTE : un toucher, effet immédiat (la base coupe la lecture tout de suite).
                 Revenir en arrière = « Réinviter » (une NOUVELLE invitation, qu'il devra accepter) — jamais un accès rendu en silence. */}
-            <button type="button" data-equipe-revoquer={x.id} disabled={!!occupe} aria-label={`Retirer l'accès de ${x.email}`} onClick={() => agir(x.id, 'revoquer', { id: x.id }, () => { setRetiree(x.email); setMsg(''); })} className="vrm-b vrm-b-discret">{occupe === x.id ? 'Retrait…' : 'Retirer'}</button>
+            <Bouton variante="discret" data-equipe-revoquer={x.id} disabled={!!occupe} aria-label={`Retirer l'accès de ${x.email}`} onClick={() => agir(x.id, 'revoquer', { id: x.id }, () => { setRetiree(x.email); setMsg(''); })}>{occupe === x.id ? 'Retrait…' : 'Retirer'}</Bouton>
             </span>
             {montre === x.id && <div data-equipe-message={x.id} style={{ flex: '1 1 100%', whiteSpace: 'pre-line', userSelect: 'text', WebkitUserSelect: 'text', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', color: C.text }}>{texteInvitationEquipe(x.email)}</div>}
           </div>
@@ -4020,14 +4185,14 @@ function EquipeSetting() {
         {lu.invitations.map((inv) => (
           <div key={inv.id} data-invitation={inv.id} style={ligne}>
             <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{inv.de || 'Un vendeur'}</b> t'invite à préparer ses colis</span>
-            <button type="button" data-accepter={inv.id} disabled={!!occupe} onClick={() => agir(inv.id, 'accepter', { id: inv.id })} className="vrm-b vrm-b-primaire">Accepter</button>
+            <Bouton variante="primaire" data-accepter={inv.id} disabled={!!occupe} onClick={() => agir(inv.id, 'accepter', { id: inv.id })}>Accepter</Bouton>
           </div>
         ))}
         {lu.membreDe.map((m) => (
           <div key={m.id} data-membre-de={m.vendeur} style={ligne}>
             <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}>Tu prépares les colis de <b>{m.de || 'un vendeur'}</b>{m.acces === false ? <span style={{ color: C.muted }}> · son abonnement n'est plus actif</span> : null}</span>
-            <button type="button" data-ouvrir-equipe={m.vendeur} onClick={() => { if (uid) choisirVueEquipe(uid, m.vendeur); }} className="vrm-b vrm-b-primaire">Ouvrir ses colis</button>
-            <button type="button" data-quitter={m.id} disabled={!!occupe} onClick={async () => { if (await askConfirm({ title: "Quitter l'équipe ?", desc: `Tu ne verras plus les colis de ${m.de || 'ce vendeur'}.`, ok: 'Quitter', cancel: 'Annuler', danger: true })) agir(m.id, 'quitter', { id: m.id }); }} className="vrm-b vrm-b-discret">Quitter</button>
+            <Bouton variante="primaire" data-ouvrir-equipe={m.vendeur} onClick={() => { if (uid) choisirVueEquipe(uid, m.vendeur); }}>Ouvrir ses colis</Bouton>
+            <Bouton variante="discret" data-quitter={m.id} disabled={!!occupe} onClick={async () => { if (await askConfirm({ title: "Quitter l'équipe ?", desc: `Tu ne verras plus les colis de ${m.de || 'ce vendeur'}.`, ok: 'Quitter', cancel: 'Annuler', danger: true })) agir(m.id, 'quitter', { id: m.id }); }}>Quitter</Bouton>
           </div>
         ))}
       </div>}
@@ -4321,7 +4486,7 @@ function NumeroEcritSetting({ onAnnonces }) {
       <div data-numero-ecrit-exemple="" style={{marginTop:12,padding:'12px 14px',borderRadius:12,background:C.bg,border:`1px solid ${C.border}`,fontSize:13,color:C.text,lineHeight:1.55}}>
         <div style={{fontWeight:700}}>Termine ta description par :</div>
         <div style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:15,marginTop:6}}>N° 123</div>
-        <div style={{color:C.muted,marginTop:6}}>Ou une seule fois dans le titre. <Pourquoi label="Les formes acceptées">« N° 123 », « N°123 », « No 123 », « Réf 123 », « Ref. 123 », « #123 », ou avec ta lettre : « N° B125 ». Un nombre seul (« 42 ») n’est jamais lu : c’est peut-être une taille. Deux numéros différents dans la même annonce : VRM ne choisit pas.</Pourquoi></div>
+        <div style={{color:C.muted,marginTop:6}}>Ou une seule fois dans le titre. <Pourquoi label="Les formes acceptées">« N° 123 », « N°123 », « No 123 », « Réf 123 », « Ref. 123 », « #202024 », ou avec ta lettre : « N° B125 ». Un nombre seul (« 42 ») n’est jamais lu : c’est peut-être une taille. Deux numéros différents dans la même annonce : VRM ne choisit pas.</Pourquoi></div>
       </div>
       <div data-numero-essai={lectureEssai ? lectureEssai.etat : 'vide'} style={{marginTop:12}}>
         <label htmlFor="vrm-numero-essai" style={{display:'block',fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Essaie : colle une description</label>
@@ -4417,7 +4582,7 @@ function NumerosSetting({ nu = false, onStock, onAnnonces }) {
         <label style={{display:'flex',alignItems:'center',gap:8,marginTop:10,fontSize:13,color:C.text}}>
           Lettre(s) de ta série
           <input value={p} onChange={(e) => poser(e.target.value)} placeholder={defaut} autoCapitalize="characters" aria-label="Lettres de la série"
-            style={{width:70,padding:'8px 10px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:15,fontFamily:'inherit',textTransform:'uppercase'}}/>
+            style={{width:70,padding:'8px 10px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:15,fontFamily:'inherit',textTransform:'none'}}/>
         </label>
       )}
       {mode === 'lettre' && !refusee && !enregistree && (
@@ -4721,18 +4886,20 @@ function ReglagesStream() {
 // (8 nov., « beauté ») L'APPARENCE : quatre choix en liste d'iOS (une coche sur le choisi).
 // Le choix est le sien, jamais posé tout seul ; « Le soir » suit l'heure de l'appareil.
 function ApparenceSetting({ valeur, onChoisir }) {
-  return (
-    <div className="vrm-apparence" role="radiogroup" aria-label="Apparence" data-apparence-choix={valeur || ''}>
-      {APPARENCES.map((m) => (
-        <button key={m} type="button" role="radio" aria-checked={valeur === m} className={'vrm-apparence-ligne' + (valeur === m ? ' is-choisi' : '')}
-          data-apparence={m} onClick={() => onChoisir && onChoisir(m)}>
-          <span className={'vrm-apparence-apercu is-' + m} aria-hidden="true"><span/></span>
-          <span className="vrm-apparence-txt"><b>{LIBELLES_APPARENCE[m]}</b><small>{PHRASES_APPARENCE[m]}</small></span>
-          <svg className="vrm-apparence-coche" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.8"/></svg>
-        </button>
+  // (21 nov., ux-reglages — Julien : « UN seul réglage du mode sombre ») « Apparence › Clair / Sombre / Comme l'iPhone »
+  // (l'interrupteur « Mode sombre » n'est plus montré nulle part). « Le soir » n'est plus proposé ; un appareil qui l'a
+  // choisi le garde et le voit coché (rien ne change tout seul). Une liste groupée native, une coche sur le choisi.
+  const choix = ['clair', 'sombre', 'auto'].concat(valeur === 'soir' ? ['soir'] : []).filter((m) => APPARENCES.includes(m));
+  return (<>
+    <GroupeNatif attrs={{ 'data-apparence-choix': valeur || '' }}>
+      {choix.map((m) => (
+        <RangeeNatif key={m} titre={libelleApparence(m)} sousTitre={phraseApparence(m)} fin={valeur === m ? 'coche' : undefined}
+          attrs={{ 'data-apparence': m, 'data-apparence-coche': valeur === m ? '1' : '0' }} onClick={() => onChoisir && onChoisir(m)}/>
       ))}
-    </div>
-  );
+    </GroupeNatif>
+    {/* (19 nov., « VRM natif », docs/design/NATIF.md) UN seul design : les réglages « Style » (Apple · Studio bleu) et « Ancien design » ont disparu. */}
+    {/* (19 nov.) Le réglage « Barre d'onglets » (cinq dessins de l'ancienne barre) est RETIRÉ : la barre native n'a qu'un dessin, il n'avait plus d'effet. */}
+  </>);
 }
 // (11 nov., lot traduction) LA LANGUE : la même liste d'iOS que l'Apparence. Chaque langue
 // est écrite DANS sa langue (on la retrouve sans comprendre la langue courante) ; le choix
@@ -5682,11 +5849,11 @@ function EmailsSetting({onComptes}) {
           </span>
           <button type="button" className="vrm-email-configurer" aria-label={`Configurer le transfert de ${adr}`} onClick={()=>configurerAdresse(adr)}>Configurer</button>
           {geste && (
-            <button type="button" data-confirmer-adresse={normAdresse(adr)} disabled={preuveBusy === adr} onClick={()=>confirmerAdresse(adr, false)} aria-label={`${geste} ${adr}`}
-              className="vrm-b vrm-b-secondaire vrm-b-petit" style={{flexShrink:0}}>{preuveBusy === adr ? '…' : geste}</button>
+            <Bouton variante="secondaire" taille="petit" data-confirmer-adresse={normAdresse(adr)} disabled={preuveBusy === adr} onClick={()=>confirmerAdresse(adr, false)} aria-label={`${geste} ${adr}`}
+               style={{flexShrink:0}}>{preuveBusy === adr ? '…' : geste}</Bouton>
           )}
-          <button type="button" onClick={()=>retirer(adr)} aria-label={`Retirer ${adr}`}
-            className="vrm-b vrm-b-discret" style={{flexShrink:0}}>Retirer</button>
+          <Bouton variante="discret" onClick={()=>retirer(adr)} aria-label={`Retirer ${adr}`}
+             style={{flexShrink:0}}>Retirer</Bouton>
         </div>
       ); })}
       </>)}
@@ -5724,21 +5891,21 @@ function EmailsSetting({onComptes}) {
                   {v.n} email{v.n>1?'s':''}{v.dernier ? ` · dernier le ${new Date(v.dernier).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}
                 </span>
               </span>
-              <button type="button" onClick={()=>ajouterAdresses([v.adresse])} aria-label={`Ajouter ${v.adresse}`}
-                className="vrm-b vrm-b-secondaire vrm-b-petit" style={{flexShrink:0}}>Ajouter</button>
+              <Bouton variante="secondaire" taille="petit" onClick={()=>ajouterAdresses([v.adresse])} aria-label={`Ajouter ${v.adresse}`}
+                 style={{flexShrink:0}}>Ajouter</Bouton>
             </div>
           ))}
           {sugg.length > 1 && (
-            <button type="button" onClick={toutesSugg} className="vrm-b vrm-b-discret" style={{marginTop:6}}>
+            <Bouton variante="discret" onClick={toutesSugg}  style={{marginTop:6}}>
               Les ajouter toutes ({sugg.length})
-            </button>
+            </Bouton>
           )}
         </div>
       )}
-      <button type="button" onClick={ajouter} disabled={reg === null || reg === undefined}
-        className="vrm-b vrm-b-secondaire" style={{marginTop:10}} title={reg ? undefined : 'Tes adresses ne sont pas encore lues'}>
+      <Bouton variante="secondaire" onClick={ajouter} disabled={reg === null || reg === undefined}
+         style={{marginTop:10}} title={reg ? undefined : 'Tes adresses ne sont pas encore lues'}>
         + Ajouter une adresse
-      </button>
+      </Bouton>
       <details className="vrm-email-aide-adresses"><summary>Comprendre les adresses et le transfert</summary>
       <div data-adresses-explication="" style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',margin:'6px 0 12px'}}>
         <div style={{display:'grid',gridTemplateColumns:'auto 1fr',columnGap:9,rowGap:6,fontSize:13,lineHeight:1.45,color:C.text}}>
@@ -5753,7 +5920,7 @@ function EmailsSetting({onComptes}) {
               ? "Adresse absente ? E-mails gardés, proposés dès que tu l'ajoutes."
               : "Adresse absente ? E-mails gardés, rien n'est perdu."}</span>
         </div>
-        <div data-adresse-transfert-vrm="" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:10,fontSize:12}}><span>Adresse de transfert : <b style={{overflowWrap:'anywhere'}}>{ADRESSE_COLLECTRICE}</b></span><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(ADRESSE_COLLECTRICE);toast('Adresse de transfert copiée.');}catch(_){toast('Sélectionne l’adresse affichée pour la copier.');}}} className="vrm-b vrm-b-secondaire vrm-b-petit">Copier l’adresse</button></div>
+        <div data-adresse-transfert-vrm="" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:10,fontSize:12}}><span>Adresse de transfert : <b style={{overflowWrap:'anywhere'}}>{ADRESSE_COLLECTRICE}</b></span><Bouton variante="secondaire" taille="petit" onClick={async()=>{try{await navigator.clipboard.writeText(ADRESSE_COLLECTRICE);toast('Adresse de transfert copiée.');}catch(_){toast('Sélectionne l’adresse affichée pour la copier.');}}}>Copier l’adresse</Bouton></div>
         <details style={{marginTop:8}}>
           <summary style={{cursor:'pointer',fontSize:13,fontWeight:600,color:C.accentTexte,padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes e-mails Vinted vers VRM&nbsp;?</summary>
           <ol style={{margin:'8px 0 0',paddingLeft:18,fontSize:12,color:C.text,lineHeight:1.5,display:'grid',gap:5}}>
@@ -5802,18 +5969,18 @@ function EmailsSetting({onComptes}) {
               phrase="Chaque e-mail repasse dans le traitement normal. Rien n'est supprimé avant la fin."
               compte={compteAvancement({ faites: lot.ok, ratees: lot.fait - lot.ok, restent: lot.total - lot.fait, motFait: 'traité' })}
               data={{ 'data-rejeu-lot': `${lot.fait}/${lot.total}` }}/>
-            : <button type="button" onClick={toutRejouer} className="vrm-b vrm-b-primaire vrm-b-plein" style={{marginBottom:10}}>
+            : <Bouton variante="primaire" plein onClick={toutRejouer}  style={{marginBottom:10}}>
               {enAttente.length>1?`Réessayer les ${enAttente.length} e-mails`:'Réessayer cet e-mail'}
-            </button>}
+            </Bouton>}
           {rattachementsVisibles.slice(0,limiteRattachement).map(q => (
             <div key={q.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
               <span style={{flex:'1 1 130px',minWidth:0,fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                 {q.sujet || '(sans sujet)'} <span style={{color:C.muted}}>· {q.raison || ''}</span>
               </span>
-              <button type="button" disabled={busy===q.id || !!lot} onClick={()=>rattacher(q.id)}
-                className="vrm-b vrm-b-secondaire vrm-b-petit" style={{flexShrink:0}}>
+              <Bouton variante="secondaire" taille="petit" disabled={busy===q.id || !!lot} onClick={()=>rattacher(q.id)}
+                 style={{flexShrink:0}}>
                 {busy===q.id ? '…' : "C'est à moi"}
-              </button>
+              </Bouton>
             </div>
           ))}
           {rattachementsVisibles.length===0&&<div className="vrm-email-vide">Aucun e-mail ne correspond à cette recherche.</div>}

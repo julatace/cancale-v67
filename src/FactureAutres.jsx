@@ -18,6 +18,7 @@ import { ApercuFacture, MiniatureFacture, apercuEnGrand, useFicheFacturation, Fi
 import { compteFacturable, avecCompte, compteDeVente } from './facturePro/comptes.js';
 import { verifierSiret, manquantsVendeur, manquantsVente, contenuFacture, euros, jourParis, nomFichier } from './facturePro/regle.js';
 import { PLATEFORMES, venteAutre, idFactureAutre, manquantsAcheteurSaisi, venteFacture, ID_FACTURE_AUTRE_RE } from './facturePro/sources.js';
+import { BoutonBase } from './composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 // ── Les factures de ces plateformes, lues une fois pour tout l'écran ─────────
 // Trois états : undefined en cours · null pas su · Map id → ligne projetée (§4.4).
@@ -84,7 +85,7 @@ export function FactureAutreVente({ plateforme, vente, deps }) {
       <button type="button" className="vrm-fp-vente-ligne" disabled={occupe} onClick={() => voir(false)} data-fa-pdf="">
         <b>Facture {emise.numero}</b><span>émise le {jourParis(emise.emiseLe)} · à joindre au colis ou à partager</span>
       </button>
-      <button type="button" className="vrm-b vrm-b-secondaire" disabled={occupe} onClick={() => voir(true)}>Partager</button>
+      <BoutonBase variante="secondaire"  disabled={occupe} onClick={() => voir(true)}>Partager</BoutonBase>
       {/* La feuille qui vient de l'émettre reste ouverte (« Facture … émise », PDF) jusqu'à SA fermeture. */}
       {ouverte && v.ok ? <FeuilleFactureAutre v={v} cfg={cfg} deps={deps} deja={emise} fermer={() => setOuverte(false)}/> : null}
     </div>;
@@ -98,7 +99,7 @@ export function FactureAutreVente({ plateforme, vente, deps }) {
   if (f === null) return <p className="vrm-fp-muet" data-fa-etat="pas-su">Facture : tes factures n'ont pas pu être lues — réessaie dans un instant.</p>;
   if (!v.ok) return <p className="vrm-fp-muet vrm-fp-raison" data-fa-plateforme={plateforme} data-fa-ref={ref} data-fa-etat="refus" data-fa-code={v.code}>Facture : {v.raison}.</p>;
   return <div className="vrm-fp-vente vrm-fa" data-fa-plateforme={plateforme} data-fa-ref={ref} data-fa-etat="a-faire">
-    <button type="button" className="vrm-b vrm-b-secondaire vrm-b-plein" data-fa-faire="" onClick={() => setOuverte(true)}>Faire la facture</button>
+    <BoutonBase variante="secondaire" plein  data-fa-faire="" onClick={() => setOuverte(true)}>Faire la facture</BoutonBase>
     {ouverte ? <FeuilleFactureAutre v={v} cfg={cfg} deps={deps} fermer={() => setOuverte(false)}/> : null}
   </div>;
 }
@@ -117,8 +118,8 @@ function QuestionCompte({ plateforme, compte, nom, deps }) {
   return <div className="vrm-fp-vente vrm-fa vrm-fa-question" data-fa-plateforme={plateforme} data-fa-etat="demander" data-fa-compte={compte}>
     <p className="vrm-fp-muet" style={{ margin: 0 }}>Facture Pro : <span className="vrm-sensible" data-stream-type="compte">{nom || compte}</span> est-il ton compte {L} professionnel ?</p>
     <div className="vrm-fp-gestes">
-      <button type="button" className="vrm-b vrm-b-secondaire" disabled={occupe} data-fa-compte-oui="" onClick={() => repondre(true)}>Oui, facturer</button>
-      <button type="button" className="vrm-b vrm-b-discret" disabled={occupe} data-fa-compte-non="" onClick={() => repondre(false)}>Non</button>
+      <BoutonBase variante="secondaire"  disabled={occupe} data-fa-compte-oui="" onClick={() => repondre(true)}>Oui, facturer</BoutonBase>
+      <BoutonBase variante="discret"  disabled={occupe} data-fa-compte-non="" onClick={() => repondre(false)}>Non</BoutonBase>
     </div>
   </div>;
 }
@@ -158,12 +159,12 @@ function FeuilleFactureAutre({ v, cfg, deps, fermer, deja = null }) {
         : emise ? <>
           <div className="vrm-fp-etat" data-fa-emise={emise.numero}><b>Émise</b><span>À joindre au colis ou à partager.</span></div>
           <div className="vrm-fp-gestes">
-            <button type="button" className="vrm-b vrm-b-primaire" onClick={() => pdf(false)} data-fa-pdf="">Voir le PDF</button>
-            <button type="button" className="vrm-b vrm-b-secondaire" onClick={() => pdf(true)}>Partager</button>
+            <BoutonBase variante="primaire"  onClick={() => pdf(false)} data-fa-pdf="">Voir le PDF</BoutonBase>
+            <BoutonBase variante="secondaire"  onClick={() => pdf(true)}>Partager</BoutonBase>
           </div>
         </> : <>
           {mv.length ? <div className="vrm-fp-etat is-manque" data-fa-fiche={mv.length}><b>Ta fiche « Ma facture » n'est pas complète</b><span>Il manque {mv.map((m) => m.l).join(', ')}.</span>
-            <button type="button" className="vrm-b vrm-b-primaire" onClick={() => setFiche(mv[0].champ)}>Compléter ma fiche</button></div> : null}
+            <BoutonBase variante="primaire"  onClick={() => setFiche(mv[0].champ)}>Compléter ma fiche</BoutonBase></div> : null}
           <section className="vrm-fp-section" data-fa-acheteur="">
             <h3>L'acheteur</h3>
             <p className="vrm-fp-muet" data-fa-source={v.acheteurPropose ? 'propose' : 'saisi'}>{v.acheteurPropose ? `Lu dans la commande ${L} : vérifie-le.` : `${L} ne le donne pas : recopie-le du bordereau.`}</p>
@@ -178,7 +179,7 @@ function FeuilleFactureAutre({ v, cfg, deps, fermer, deja = null }) {
           {apercu ? <section className="vrm-fp-section"><h3>Aperçu de la facture</h3><MiniatureFacture ouvrir={() => ouvrirPdf(apercuEnGrand(apercu), deps)}><ApercuFacture contenu={apercu} provisoire sensible numeroLibelle="N° donné à l'émission"/></MiniatureFacture></section> : null}
           {!mv.length && (ma.length || mvt.length) ? <p className="vrm-fp-muet" data-fa-manque="">Il manque {[...ma, ...mvt].map((m) => m.l).filter((x, i, t) => t.indexOf(x) === i).join(', ')}.</p> : null}
           <div className="vrm-fp-gestes is-bas">
-            <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-fa-emettre="" disabled={occupe || !cfg || !!mv.length || !!ma.length || !!mvt.length} onClick={emettre}>{occupe ? 'Un instant…' : 'Émettre la facture'}</button>
+            <BoutonBase variante="primaire" plein  data-fa-emettre="" disabled={occupe || !cfg || !!mv.length || !!ma.length || !!mvt.length} onClick={emettre}>{occupe ? 'Un instant…' : 'Émettre la facture'}</BoutonBase>
           </div>
         </>}
       {retour ? <p className="vrm-fp-retour-msg is-ko" role="status" data-fa-retour="ko">{retour}</p> : null}

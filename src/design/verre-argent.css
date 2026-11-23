@@ -1,0 +1,116 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   VRM — ARGENT, LISIBLE PARTOUT (16 nov. 2026, lot argent-mieux)
+   Julien, 5 captures iPhone d'Argent : « Corrige et améliore ». Récit : docs/passation/2026-11-16-argent-mieux.md
+   Mesuré (banc scripts/bancs/argent-mieux.cjs, mesure de verre.cjs) sur le code d'avant : 32 textes sous 4,5:1 dans
+   Déclarer au clair (le pire 1,04:1). Trois causes, une règle chacune :
+     1. une CARTE posée dans un conteneur « sur le fond » (studio-verre §6 lui passe l'encre CLAIRE) sans être dans la
+        liste des surfaces (§7) : « Déclarer octobre », « Mois bouclé », les tuiles de la Révision — blanc sur verre ;
+     2. la carte du mois (« Novembre, en cours ») et « Ton bénéfice » peintes en NUIT par un ::before
+        (styles-widgets-ios) alors que leur encre est celle du verre — bleu foncé sur nuit ;
+     3. des replis (Ta micro-entreprise, Tes déclarations URSSAF, DAC7, Comment c'est calculé) posés sur le bleu sans
+        carte : leur encre sombre (ou ambre) sur le fond.
+   La réponse : dans Argent, ces blocs sont du VERRE (la brique `.vg-carte` de verre-ecrans.css : mêmes jetons, même
+   rayon) et reprennent l'encre du verre. Aucune couleur codée ici : les jetons `--sv-*` (clair ET sombre).
+   RIEN DE MÉTIER : aucun texte, aucun chiffre, aucun data-* ne vit ici.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-verre {
+
+/* ── 1. Les blocs qui deviennent du verre (fond + forme) ─────────────────────── */
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(
+  .vrm-compta-carte, details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details,
+  .vrm-mb, .vrm-urssaf-geste
+) {
+  background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important;
+  box-shadow: var(--sv-ombre) !important; border: 0 !important; border-radius: 22px !important;
+}
+/* La nuit peinte en ::before (styles-widgets-ios) : retirée — la carte est son propre verre. */
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] .vrm-compta-carte::before { content: none !important; display: none !important; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] .vrm-compta-carte { padding: 18px 18px 14px !important; }
+/* Un repli devenu carte : l'air dedans, son titre au doigt. */
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details) {
+  padding: 2px 16px 6px !important; margin: 12px 0 0 !important;
+}
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details) > summary { min-height: 48px !important; }
+/* Deux replis qui se suivent : une liste-carte (le filet entre eux, pas deux îles). */
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] details.vrm-compta-repli + details.vrm-compta-repli::before { display: none !important; }
+
+/* ── 2. L'encre du VERRE dans ces blocs (et dans ce qu'ils contiennent) ──────── */
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(
+  .vrm-compta-carte, details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details,
+  .vrm-mb, .vrm-urssaf-geste, .vrm-ac-tuile, .vrm-ac-carte, .vrm-nc
+) {
+  --sb-encre: var(--sv-encre) !important; --d-encre: var(--sv-encre) !important; --vrm-ink: var(--sv-encre) !important; --vrm-text: var(--sv-encre) !important;
+  --p-encre: var(--sv-encre) !important; --w-encre: var(--sv-encre) !important; --fu-encre: var(--sv-encre) !important; --mb-encre: var(--sv-encre) !important;
+  --at-encre: var(--sv-encre) !important; --studio-ink: var(--sv-encre) !important; --vrm-b-encre: var(--sv-encre) !important; --b-encre: var(--sv-encre) !important;
+  --sb-encre-2: var(--sv-encre-2) !important; --d-gris: var(--sv-encre-2) !important; --vrm-muted: var(--sv-encre-2) !important; --vrm-faint: var(--sv-encre-2) !important;
+  --p-gris: var(--sv-encre-2) !important; --p-gris-2: var(--sv-encre-2) !important; --w-gris: var(--sv-encre-2) !important; --fu-gris: var(--sv-encre-2) !important;
+  --fu-gris2: var(--sv-encre-2) !important; --fu-gris3: var(--sv-encre-2) !important; --mb-gris: var(--sv-encre-2) !important; --studio-muted: var(--sv-encre-2) !important;
+  --fu-sur-sombre-2: var(--sv-encre-2) !important;
+  --sb-lien: var(--sv-lien) !important; --d-accent-texte: var(--sv-lien) !important; --vrm-accent-texte: var(--sv-lien) !important; --vrm-b-lien: var(--sv-lien) !important;
+  --p-accent-texte: var(--sv-lien) !important;
+  --sb-ambre: var(--sv-ambre) !important; --d-ambre: var(--sv-ambre) !important; --fu-ambre-txt: var(--sv-ambre) !important; --p-ambre-texte: var(--sv-ambre) !important;
+  --vrm-warn: var(--sv-ambre) !important; --mb-ambre: var(--sv-ambre) !important;
+  color: var(--sv-encre) !important;
+}
+/* Les couleurs posées EN LIGNE (C.text, C.muted, C.warn du thème JS) dans ces blocs : l'encre du verre, par nature. */
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(.vrm-compta-carte, details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details, .vrm-mb, .vrm-urssaf-geste)
+  :is(b, strong, h3, h4, .vrm-display, .vrm-compta-hero, .vrm-compta-libelle, .vrm-compta-repli-titre, summary, [style*="color"]):not(:is(button, a, .vrm-b, .sb-btn-plein, [class*="ambre"], [data-nc-groupe] *, .vrm-nc-geste)) {
+  color: var(--sv-encre) !important;
+}
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(.vrm-compta-carte, details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details, .vrm-mb, .vrm-urssaf-geste)
+  :is(small, .vrm-compta-phrase, .vrm-compta-repli-resume, .vrm-mb-sous, .vrm-urssaf-lib small, .vrm-urssaf-etape small, .vrm-urssaf-geste-tete span, .vrm-ac-note, [style*="color: rgb(1"], [style*="color:var(--vrm-muted"]) {
+  color: var(--sv-encre-2) !important;
+}
+/* Un texte en ambre (un geste à faire, §7) dans le verre : l'ambre du verre. */
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(.vrm-compta-carte, details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section, .vrm-mb, .vrm-urssaf-geste, .vrm-ac-tuile)
+  :is([class*="ambre"], .is-ambre, [data-micro-attention="1"] summary span span + span) { color: var(--sv-ambre) !important; }
+/* Les tuiles de la Révision du mois : un chiffre ambre (à faire) ou encre, le libellé gris — sur leur verre. */
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] .vrm-ac-tuile .vrm-ac-chiffre { color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] .vrm-ac-tuile.is-ambre .vrm-ac-chiffre { color: var(--sv-ambre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] .vrm-ac-tuile .vrm-ac-libelle { color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] .vrm-ac-tuile:disabled { opacity: 1 !important; }
+
+/* ── 3. « Copier » : un VRAI bouton (une touche pleine, son bord) ────────────── */
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] button.vrm-urssaf-copier {
+  background: var(--sv-encre) !important; color: var(--sv-porcelaine) !important; border: 1px solid var(--sv-encre) !important;
+  font-weight: 650 !important; min-height: 44px !important; border-radius: 14px !important;
+}
+:root[data-theme="dark"]:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] button.vrm-urssaf-copier { color: #1C1C20 !important; }
+
+/* ── 4. Les libellés ENTIERS (jamais « … ») ─────────────────────────────────── */
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(.vrm-ac-site-nom, .vrm-mb-sous, .vrm-mb-nom, .vrm-ac-sous, .vrm-ac-titre-ligne, .vrm-compta-repli-resume) {
+  white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere;
+}
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] .vrm-mb-geste {
+  display: block; font: 400 13px/1.35 var(--mb-police, inherit) !important; color: var(--sv-encre-2) !important; white-space: normal !important;
+}
+
+/* ── 5. Les ventes non comptées, GROUPÉES (src/composants/NonComptees.jsx) ──── */
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 0; font-size: 13px; line-height: 1.4; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc-tete { margin: 0 !important; font-weight: 600; color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc-groupes { list-style: none; margin: 0 !important; padding: 0 !important; display: flex; flex-direction: column; gap: 8px; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc-groupe { padding: 10px 12px !important; border-radius: 14px; background: var(--sv-verre-2) !important; box-shadow: inset 0 0 0 1px rgb(127 145 165 / .28) !important; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc-ligne { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 10px; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc-lib { font-weight: 600; color: var(--sv-ambre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc-eur { font-weight: 600; color: var(--sv-encre) !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc-geste { margin: 2px 0 0 !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc .vrm-pourquoi summary,
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc-detail > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--sv-lien) !important; font-weight: 600; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc .vrm-pourquoi > div { color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc-ventes { list-style: none; margin: 0 !important; padding: 0 !important; max-height: 320px; overflow-y: auto; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc-vente { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; padding: 7px 0; border-top: 1px solid rgb(127 145 165 / .25); color: var(--sv-encre) !important; font-variant-numeric: tabular-nums; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc-vente > * { color: inherit !important; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc-num { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc-date { color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-nc-prix { text-align: right; white-space: nowrap; }
+
+} /* fin de @layer vrm-verre */
+
+@layer vrm-verre {
+/* ── 6. Un bouton INACTIF (« Chercher » tant que rien n'est tapé) reste lisible : sa propre matière, l'encre grise
+   du verre (il était transparent sur le bleu : gris sur bleu, 1,39:1). */
+:root:root:root:root:root:root:root:root body .vrm-app-shell[data-espace="argent"] .vrm-main .vrm-b:disabled {
+  background: var(--sv-verre-2) !important; background-image: none !important; color: var(--sv-encre-2) !important;
+  border: 1px solid rgb(127 145 165 / .45) !important; opacity: 1 !important;
+}
+} /* fin de @layer vrm-verre */

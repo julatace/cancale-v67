@@ -188,6 +188,13 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, chemin = '/?ta
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   await pg.addInitScript(({ s, sombre, local }) => {
     try { localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {}
+    // (17 nov.) Un vendeur déjà installé : ni Bienvenue, ni parcours, ni « Tu vends quoi ? » par-dessus l'écran (rouge sur main sans ça).
+    try { const at = '2026-11-01T10:00:00.000Z';
+      localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: 'banc' })); localStorage.setItem('vrm_visite_vue', JSON.stringify({ at: 'banc' }));
+      localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at, statut: null, version: 1 }));
+      localStorage.setItem('vrm_parcours_nouveau', JSON.stringify({ etape: 'fin', fini: true, at }));
+      localStorage.setItem('vrm_je_vends', JSON.stringify({ choix: 'sneakers', at, vu: at }));
+      localStorage.setItem('vrm_mfa_plus_tard_' + s.user.id, String(Date.now())); } catch (_) {}
     try { if (!sessionStorage.getItem('banc_seme')) { for (const [k, v] of Object.entries(local)) localStorage.setItem(k, JSON.stringify(v)); sessionStorage.setItem('banc_seme', '1'); } } catch (_) {}
   }, { s: session(qui), sombre, local });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, async (r) => {
@@ -261,9 +268,11 @@ const secretsDans = (s, autre) => [autre, USERS[autre].email, USERS[autre].login
       await pg.click('[data-cm-accomp-creer]');
       await pg.fill('[data-cm-accomp-nom]', 'Accompagnement novembre');
       await pg.fill('[data-cm-accomp-description]', 'Le groupe des élèves du banc : on suit les ventes ensemble.');
+      // (17 nov., groupes-coucou) Créer en trois étapes : nom et phrase ⇒ « Continuer » ⇒ son nom ⇒ « Créer » ⇒ inviter.
+      await pg.click('[data-cm-accomp-continuer]');
       await pg.fill('[data-cm-accomp-createur]', 'Coach Alice');
       await pg.click('[data-cm-accomp-valider]');
-      await pg.waitForSelector('[data-cm-accomp-cree]', { timeout: 8000 });
+      await pg.waitForSelector('[data-cm-accomp-etape="3"] [data-cm-accomp-code]', { timeout: 8000 });
       code = await attr(pg, '[data-cm-accomp-code]', 'data-cm-accomp-code');
       dit(/^[A-HJ-NP-Z2-9]{8}$/.test(code || '') && B.groupes.length === 1 && B.groupes[0].code === code, 'le groupe est créé, son code s’affiche', code);
       dit(!!(await pg.$('[data-cm-accomp-copier-lien]')) && !!(await pg.$('[data-cm-accomp-copier-code]')), 'le créateur peut copier le LIEN et le CODE d’invitation');
@@ -271,6 +280,8 @@ const secretsDans = (s, autre) => [autre, USERS[autre].email, USERS[autre].login
       await pg.waitForSelector('[data-cm-accomp-copie]', { timeout: 3000 }).catch(() => {});
       const copie = await pg.evaluate(() => navigator.clipboard.readText().catch(() => ''));
       dit(copie.endsWith('/?tab=communaute&groupe=' + code), 'le lien copié ouvre Communauté avec le code', copie);
+      await pg.click('[data-cm-accomp-termine]');
+      await pg.waitForSelector('[data-cm-accomp-cree]', { timeout: 8000 });
       dit(!!(await pg.$('[data-cm-accomp-aucun-membre]')), 'aucun membre : dit, et la marche à suivre');
       dit(erreurs.length === 0, 'aucune erreur de page', erreurs.join(' | '));
       await capture(pg, '1-createur-1512-clair');
@@ -394,6 +405,9 @@ const secretsDans = (s, autre) => [autre, USERS[autre].email, USERS[autre].login
     console.log('\n── Alice retire Bruno');
     await essaie('retirer', async () => {
       pgA.once('dialog', (d) => d.accept());
+      // (17 nov.) « Retirer » vit dans la fiche du membre (toucher sa rangée).
+      await pgA.click('[data-cm-accomp-voir-membre]');
+      await pgA.waitForSelector('[data-cm-accomp-retirer]', { timeout: 5000 });
       await pgA.click('[data-cm-accomp-retirer]');
       await pgA.waitForSelector('[data-cm-accomp-aucun-membre]', { timeout: 5000 });
       dit(B.membres[0].statut === 'retire', 'Retirer ⇒ il n’est plus membre');

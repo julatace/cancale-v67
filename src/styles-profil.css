@@ -5,7 +5,6 @@
   background: var(--vrm-hair, rgba(0,0,0,.06)); color: var(--vrm-ink, inherit);
   font-weight: 600; line-height: 1; box-sizing: border-box;
 }
-.vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-nav-avatar.vrm-profil-pastille { overflow: hidden; }
 .vrm-app-shell .vrm-hdr-profil { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; border-radius: 50%; }
 .vrm-app-shell .vrm-hdr-profil .vrm-profil-pastille { box-shadow: 0 0 0 .5px var(--vrm-line, rgba(0,0,0,.12)); }
 .vrm-profil-menu { display: grid; gap: 14px; padding: 2px 0 6px; color: var(--vrm-ink); }

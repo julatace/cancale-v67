@@ -2,7 +2,7 @@
 //  LE PASSAGE D'UN ONGLET À L'AUTRE (8 nov., Julien : « des petites animations
 //  entre chaque onglet, que ce soit vraiment fluide, pas robotique »).
 //
-//  · Le nouvel écran arrive en FONDU (opacité seule, 200 ms, courbe douce ;
+//  · Le nouvel écran arrive en FONDU (opacité seule, 0,85 → 1 en 160 ms, courbe douce ;
 //    à l'ordinateur 0,9 → 1 en 180 ms), joué par Web Animations sur `<main>` :
 //    le compositeur s'en charge, aucun style recalculé, aucun `transform` sur
 //    `<main>` (§7). Pendant ce temps la pastille de la barre du bas GLISSE vers
@@ -18,7 +18,8 @@
 
 import { MQ_ORDINATEUR } from './coque.js';
 
-export const DUREE_FONDU_MS = 200;
+export const DUREE_FONDU_MS = 160;
+export const DEPART_FONDU_TEL = 0.85;
 export const COURBE_FONDU = 'cubic-bezier(.22, 1, .36, 1)';
 export const mouvementReduit = () => {
   try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return false; }
@@ -28,6 +29,9 @@ export const mouvementReduit = () => {
 export function fonduEntree(el) {
   if (!el || mouvementReduit() || typeof el.animate !== 'function') return null;
   // Sur ordinateur, à peine (la zone de travail ne s'éteint pas) : 0,9 → 1 en 180 ms (comme avant).
+  // (21 nov., fluidité — Julien : « des écrans qui se superposent, ça part dans tous les sens ») Au téléphone aussi, le
+  // fondu part de 0,85 et plus de 0 : parti de 0, la première image du nouvel écran était VIDE (mesuré, banc
+  // couches-chargement : Aujourd'hui → vide → Ventes, un clignotement à chaque toucher d'onglet).
   let bureau = false; try { bureau = window.matchMedia(MQ_ORDINATEUR).matches; } catch (_) {}
-  try { return el.animate([{ opacity: bureau ? 0.9 : 0 }, { opacity: 1 }], { duration: bureau ? 180 : DUREE_FONDU_MS, easing: bureau ? 'ease' : COURBE_FONDU }); } catch (_) { return null; }
+  try { return el.animate([{ opacity: bureau ? 0.9 : DEPART_FONDU_TEL }, { opacity: 1 }], { duration: bureau ? 180 : DUREE_FONDU_MS, easing: bureau ? 'ease' : COURBE_FONDU }); } catch (_) { return null; }
 }

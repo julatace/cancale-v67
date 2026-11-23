@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : agent2-argent-parrainage (11 nov.) — PRÉVISION DU MOIS, COÛT PAR SITE
 //         ET PAR MOIS, LIEN DE PARRAINAGE COURT.
@@ -173,7 +174,7 @@ const url = (f) => require('url').pathToFileURL(path.join(SRC, f)).href;
   dit(/<CoutSitesCarte periode=\{periodeStats\} ebayCommandes=\{ebayCommandes\} parPeriode=\{<FraisParSiteCarte/.test(stats) && /if \(vue === 'periode'\) return/.test(ap), 'E2 « Frais par site » gardé ; « Mois par mois » est une AUTRE vue (le même nombre jamais deux fois)');
   dit(/<PrevisionLigne liveStats=\{liveStats\}/.test(app) && /if \(P\.etat !== 'ok' \|\| !T\.ligne\) return null;/.test(ap), 'E3 Ma journée : une ligne, seulement quand la prévision est sue');
   dit(/fraisDetail: \(o\) => detailFraisFiche\(effEntry\(o\)\)/.test(app), 'E4 le relevé de Ventes porte le détail des frais de SA fiche ([11])');
-  dit(!/beneficePaire|coutsVente\(/.test(ap + sansCommentaires(lire('coutPlateformes.js')).replace(/import[^\n]*\n/g, '')), 'E5 aucun second calcul de bénéfice ni de frais dans les écrans');
+  dit(!/beneficePaire|coutsVente\(/.test(ap + sansCommentaires(lire('coutPlateformes.js')).replace(/import[^\n]*\n/g, '').replace(/coutsVente\(f\)\.emballageForfait/g, '')   /* (22 nov., rentabilite) LIRE le forfait d'emballage de LA règle n'est pas un second calcul */), 'E5 aucun second calcul de bénéfice ni de frais dans les écrans');
   dit(!/#D70015|#FF3B30|#ff3b30|red\b/i.test(lire('argent-plus.css')), 'E6 aucun rouge (§7)');
   let vj = null; try { vj = JSON.parse(fs.readFileSync(path.join(R, 'vercel.json'), 'utf8')); } catch (_) {}
   const red = vj && Array.isArray(vj.redirects) ? vj.redirects.find((x) => /^\/r\//.test(x.source)) : null;

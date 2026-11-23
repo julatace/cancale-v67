@@ -45,6 +45,7 @@ import { ConnexionEbayGuidee, RetourConnexionEbay, EtatJetonEbay } from '../ebay
 // (10 nov., lot S) La facture Pro d'une commande eBay (src/FactureAutres.jsx), chargée à la demande.
 import { DEPS_FACTURE, MicDictee, DEMANDE_RETOUR_EBAY, lireComptesEbay, montantRecuEbay } from '../App.jsx';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
+import { lienApresPublication } from '../ebay/lienPublication.js';   // (19 nov.) le lien posé à la publication, par identité
 import { motsInsecables } from '../motsInsecables.jsx';
 import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov., refonte visible) « À faire · N › »
 import { BarreOutils, Filtres } from '../ui/index.js';   // (14 nov., passe 2) « Gel-1130 » ne se coupe pas au trait d'union
@@ -358,6 +359,7 @@ async function lireBrouillonsEbay() {
     const it = rows[0] && rows[0].items;
     const out = (it && typeof it === 'object' && !Array.isArray(it)) ? it : {};
     // Un brouillon publié garde l'IDENTITÉ de sa paire (`pairId`) et son annonce.
+    // (19 nov.) Un brouillon relu plus tard : sa paire seulement (son N° a pu changer de fiche depuis — panne du 11–18 oct.).
     try { for (const b of Object.values(out)) { const iid = b && ((b.programme && b.programme.itemId) || b.itemId); if (b && b.pairId && iid) noterLienEbay(iid, b.pairId, b.numero, 'brouillon'); } } catch (_) {}
     return out;
   } catch (_) { return null; }
@@ -1305,7 +1307,9 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       // Ce qu'eBay a fait de la règle (relue après l'ajout), et ce qu'il signale.
       const mo = offre ? messageOffreCreation(j.offre, offre) : null;
       const avert = Array.isArray(j.avertissements) ? j.avertissements.filter(Boolean).map(String) : [];
-      try { const pid = (b && b.pairId) || pairId; if (j.itemId && pid) noterLienEbay(j.itemId, pid, b && b.item && b.item.numero, 'publication'); } catch (_) {}
+      // (19 nov.) Le lien est posé par IDENTITÉ même quand l'écran a perdu la paire : LA fiche qui porte le N° envoyé en SKU
+      // (une seule), sinon rien — src/ebay/lienPublication.js (mesuré : 0 lien « publication » sur ses annonces).
+      try { const li = lienApresPublication({ itemId: j.itemId, pairId: (b && b.pairId) || pairId, numero: (b && b.item && b.item.numero) || (j.sku ? numDeSkuEbay(j.sku) : ''), fiches: fichesPourEbay(), cle: cleNum }); if (li) noterLienEbay(li.itemId, li.pairId, li.numero, 'publication'); } catch (_) {}
       // (11 nov.) L'annonce SPONSORISÉE (éteinte par défaut) : sur ce même clic
       // confirmé, la promotion « coût par vente » est posée chez eBay (Marketing
       // API, `promouvoir`) ; un refus ne défait pas l'annonce et se dit.
@@ -1487,7 +1491,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 <span style={{ fontSize: 13, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pairSel.title}</span>
               </div>
               {nVinted === 0 && (
-                <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>{photosEtat === 'cherche' ? 'Je récupère ses photos sur Vinted…' : "Pas de photo : rouvre l'annonce sur Vinted, ou ajoute-les ci-dessous."}</div>
+                <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>{photosEtat === 'cherche' ? tr('lbcPhotos.enCours') : tr('photosFond.aucuneOuAjoute')}</div>
               )}
               {/* ⚠️ HONNÊTE sur le nombre : si Vinted a plus de photos que ce
                   qu'on a capté (carrousel lazy tant que l'extension à jour n'est
@@ -1497,7 +1501,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
               ) : photosEtat && photosEtat.raison ? (
                 <div data-ebay-photos="echec" style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45 }}>Photos pas récupérées : {photosEtat.raison}. Ouvre son annonce sur Vinted, puis rechoisis l'article.</div>
               ) : pairSel.nPhotos != null && nVinted < pairSel.nPhotos ? (
-                <div style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '8px 10px' }}>Seulement {nVinted} photo{nVinted > 1 ? 's' : ''} captée{nVinted > 1 ? 's' : ''} sur {pairSel.nPhotos} : rouvre l'annonce sur Vinted.</div>
+                <div style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '8px 10px' }}>{tr('photosFond.partielles', { n: nVinted, total: pairSel.nPhotos })}</div>
               ) : (
                 <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>Ses photos Vinted sont reprises dans « Photos », juste en dessous.</div>
               )}
@@ -1889,7 +1893,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
     })();
     return () => { stop = true; };
   }, [connected, lireData, synchroniser, lireSolde, comptesEbay]);
-  const eti = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400 };
+  const eti = { fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 400 };
   const boite = (bg, bord) => ({ border: `1px solid ${bord || C.border}`, background: bg || C.card, borderRadius: 12, padding: '14px 16px' });
   return (
     <div style={boite()}>
@@ -1991,7 +1995,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                 const enRoute = (solde.enAttente != null || solde.retenu != null) ? (Number(solde.enAttente || 0) + Number(solde.retenu || 0)) : null;
                 return (
                   <div key={cpt.ref} data-ebay-solde={cpt.ref} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '12px 14px', marginBottom: 10 }}>
-                    <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400, marginBottom: 8 }}>Solde eBay{nomS}</div>
+                    <div style={{ fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 400, marginBottom: 8 }}>Solde eBay{nomS}</div>
                     <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                       {item(solde.dispo, 'disponible à virer', C.text)}
                       {enRoute != null && enRoute > 0 && item(enRoute, 'en attente / retenu par eBay', C.muted)}
@@ -3170,7 +3174,7 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
           <div data-planif-apercu={lignes.length} style={{ background: E.card2, borderRadius: 12, padding: '10px 12px', marginBottom: 10 }}>
             {groupes.map((g) => (
               <div key={g.date} data-planif-jour-groupe={g.date} style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: E.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>{jourParisTexte(g.date)}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: E.muted, textTransform:'none', letterSpacing: 0.6, marginBottom: 4 }}>{jourParisTexte(g.date)}</div>
                 {g.lignes.map((l) => {
                   const v = verifDe(l);
                   return (
@@ -3352,7 +3356,7 @@ function EbayProgrammees({ programmees, brouillons, onRelire, onAnnule, vue = '*
       {etat === 'pas-su' && <div style={{ fontSize: 13, color: E.warn, lineHeight: 1.5 }}>Je n'ai pas pu lire tes annonces programmées : « Relire chez eBay ».</div>}
       {groupes.map((g) => (
         <div key={g.date} data-prog-jour={g.date} style={{ marginTop: 6 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: E.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>{g.date === 'inconnue' ? 'heure inconnue' : jourParisTexte(g.date)}</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: E.muted, textTransform:'none', letterSpacing: 0.6, marginBottom: 2 }}>{g.date === 'inconnue' ? 'heure inconnue' : jourParisTexte(g.date)}</div>
           {g.lignes.map((l) => {
             const s = statut(l);
             const t = Date.parse(l.debut || '');
@@ -3607,7 +3611,7 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
           <span className="vrm-ios-chevron" aria-hidden="true"><svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m1.5 1.5 5 5-5 5"/></svg></span>
         </button>
         {url && relancer && !(infos[l.itemId] && infos[l.itemId].ton === 'ok') && (
-          <button type="button" className="vrm-b vrm-b-secondaire vrm-eb-ina-geste" data-inactive-relancer={url} disabled={!!geste} onClick={() => remettre(l, n)} style={{ opacity: geste && geste !== String(l.itemId) ? 0.5 : 1 }}>{geste === String(l.itemId) ? 'eBay…' : 'Remettre en vente'}</button>
+          <Bouton variante="secondaire" className="vrm-eb-ina-geste" data-inactive-relancer={url} disabled={!!geste} onClick={() => remettre(l, n)} style={{ opacity: geste && geste !== String(l.itemId) ? 0.5 : 1 }}>{geste === String(l.itemId) ? 'eBay…' : 'Remettre en vente'}</Bouton>
         )}
         {infos[l.itemId] && infos[l.itemId].texte ? <div role="status" data-inactive-resultat={infos[l.itemId].ton} style={{ flexBasis: '100%', fontSize: 12, color: infos[l.itemId].ton === 'ko' ? E.warn : infos[l.itemId].ton === 'ok' ? E.text : E.muted, paddingLeft: 54, lineHeight: 1.45 }}>{infos[l.itemId].texte}</div> : null}
       </div>
@@ -4269,11 +4273,11 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     lirePreuvesVenteVinted({ comptes: avecSku ? comptesPreuve : null }).then((p) => { if (!stop) { setVendusVinted(p ? p.vendus : null); setSansPreuve(p ? p.sansPreuve : null); setSansPreuveKO(p && Array.isArray(p.sansPreuveKO) ? p.sansPreuveKO : []); } });
     (async () => {
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });   // (22 nov.) projetée (§4.4)
         if (!r.ok) { if (!stop) setVentesLbc(null); return; }
         const rows = await r.json();
         if (!Array.isArray(rows)) { if (!stop) setVentesLbc(null); return; }
-        const v = rows[0] && rows[0].data && rows[0].data.ventes;
+        const v = rows[0] && rows[0].ventes;
         if (!stop) setVentesLbc(v && typeof v === 'object' && !Array.isArray(v) ? v : {});
       } catch (_) { if (!stop) setVentesLbc(null); }
     })();
@@ -4939,7 +4943,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // ⚠️ Une paire VENDUE sur eBay sort de cette liste (l'annonce est terminée) :
   //    c'est justement quand il n'en reste aucune que « retire-la de Vinted »
   //    compte le plus. Les alertes passent donc AVANT ce cas.
-  if (!itemsVue.length) return wrap(<>{head(0)}{publier}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outilsSuite(pasSu)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Aucune annonce sur ce compte' : 'Aucune annonce eBay'}{connected === true ? null : <div style={{ marginTop: 8 }}><button type="button" className="vrm-b vrm-b-primaire" data-vers-comptes-ebay="" onClick={allerComptesEbay} style={{ minHeight: 44 }}>Relier eBay</button></div>}</div></>);
+  if (!itemsVue.length) return wrap(<>{head(0)}{publier}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outilsSuite(pasSu)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Aucune annonce sur ce compte' : 'Aucune annonce eBay'}{connected === true ? null : <div style={{ marginTop: 8 }}><Bouton variante="primaire"  data-vers-comptes-ebay="" onClick={allerComptesEbay} style={{ minHeight: 44 }}>Relier eBay</Bouton></div>}</div></>);
   // ── 4. L'OFFRE AUX OBSERVATEURS et les annonces pas reliées : une phrase
   //    chacune, au-dessus de la liste ; sur la carte, seulement le bouton ou la
   //    pastille, qui distinguent (§7). ─────────────────────────────────────────
@@ -5077,7 +5081,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       <div data-regles-fenetre-ventes {...(ventesAge.etat === 'lu' ? { 'data-regles-ventes-age-h': String(ventesAge.h) } : {})} style={{ marginTop: 12, color: ventesVieilles ? E.warn : E.muted, fontSize: 13, lineHeight: 1.45 }}>
         eBay vend sans attendre VRM : VRM ne voit cette vente qu'en relisant tes ventes eBay — {ventesAge.etat === 'lu' ? `dernière lecture il y a ${ventesAge.h < 1 ? 'moins d\'une heure' : (ventesAge.h < 48 ? `${ventesAge.h} h` : `${Math.floor(ventesAge.h / 24)} jours`)}` : (ventesAge.etat === 'jamais' ? 'pas encore lues' : (ventesAge.etat === 'illisible' ? 'je n\'ai pas pu savoir quand' : 'lecture en cours'))}.
         {/* (6 nov.) Le bouton sur SA ligne, jamais au milieu d'une phrase. */}
-        <div style={{ marginTop: 8 }}><button type="button" data-regles-relire-ventes disabled={relitVentes} onClick={relireVentesEbay} className="vrm-b vrm-b-secondaire" style={{ opacity: relitVentes ? 0.6 : 1 }}>{relitVentes ? 'Lecture…' : 'Relire mes ventes eBay'}</button></div>
+        <div style={{ marginTop: 8 }}><Bouton variante="secondaire" data-regles-relire-ventes disabled={relitVentes} onClick={relireVentesEbay}  style={{ opacity: relitVentes ? 0.6 : 1 }}>{relitVentes ? 'Lecture…' : 'Relire mes ventes eBay'}</Bouton></div>
       </div>
       <div data-regles-fenetre style={{ marginTop: 12, color: E.muted, fontSize: 13, lineHeight: 1.45 }}>
         Vendu sur Vinted ? Retiré d'eBay quand tu rouvres VRM{retraitAuto ? '' : ' (retrait auto éteint : par ton clic)'}. D'ici là, une offre peut passer.

@@ -90,17 +90,12 @@ async function controles(racine, { bg = path.join(racine, F.bg) } = {}) {
   const dit = (ok, m, d) => res.push({ ok: !!ok, m, d: d == null ? '' : String(d).slice(0, 400) });
 
   // ── V. MODE VACANCES AU JOURNAL ──────────────────────────────────────────
-  { const f = fondVacances(bg); const r = await commandeVacances(f, true);
-    const j = journalDe(f);
-    dit(r && r.etape === 'fait' && j.length === 1 && j[0].s === 'vacances_on', 'V1 mis en vacances, accepté ET relu ⇒ UNE entrée « vacances_on » au journal', JSON.stringify({ r, j }));
-    dit(j.length === 1 && Object.keys(j[0]).sort().join(',') === 's,t', 'V2 l’entrée ne porte qu’une heure et une sorte (rien de personnel)', JSON.stringify(j));
-    const l = ligneJournal(f);
-    dit(l && Array.isArray(l.e) && l.e.some((x) => x.s === 'vacances_on') && l.uid === UID, 'V3 publiée dans la ligne dédiée `journal_vrm_{uid}_{nav}`', JSON.stringify(l)); }
-  { const f = fondVacances(bg, { etat: true }); const r = await commandeVacances(f, false); const j = journalDe(f);
-    dit(r && r.etape === 'fait' && j.length === 1 && j[0].s === 'vacances_off', 'V4 rouvert, relu ⇒ « vacances_off »', JSON.stringify({ r, j })); }
-  for (const [nom, o, att, sens] of [['V5 déjà dans l’état voulu', { etat: true }, 'deja', true], ['V6 Vinted relit l’autre état (écart)', { relu: false }, 'ecart', true], ['V7 relecture ratée (incertain)', { relu: 'ko' }, 'incertain', true], ['V8 Vinted refuse (422)', { putStatus: 422 }, 'echec', true]]) {
+  // ⚠️ 5.414 (`toutinterface`, « on ne fait plus les requêtes ») : le mode vacances n'est plus REJOUÉ par requête (son
+  //    chemin dans l'interface de vinted.fr n'est pas relevé) : rien ne part, c'est dit — et donc RIEN au journal (le journal
+  //    ne note que les gestes faits). Les entrées « vacances_on / off » restent possibles pour un geste fait (règle inchangée).
+  for (const [nom, o, sens] of [['V1 mettre en vacances', {}, true], ['V4 rouvrir', { etat: true }, false], ['V5 déjà dans l’état voulu', { etat: true }, true]]) {
     const f = fondVacances(bg, o); const r = await commandeVacances(f, sens); await attendre(40);
-    dit(r && r.etape === att && journalDe(f).length === 0 && !ligneJournal(f), `${nom} ⇒ RIEN au journal`, JSON.stringify({ r, j: journalDe(f) }));
+    dit(r && r.accepte === false && r.code === 'interface-pas-encore' && journalDe(f).length === 0 && !ligneJournal(f), `${nom} ⇒ rien ne part (dit), RIEN au journal`, JSON.stringify({ r, j: journalDe(f) }));
   }
   // Serveur et écran.
   let S = null, E = null;

@@ -92,56 +92,25 @@ const fuite = (o) => { const s = JSON.stringify(o == null ? null : o); return PE
     const a1 = ann && ann.items.find((x) => x.id === '501'), a2 = ann && ann.items.find((x) => x.id === '502');
     dit(!!a1 && a1.favoris === 3 && a1.cleFavoris === 'likesCount' && !!a2 && a2.favoris === null, 'favoris : un NOMBRE lu sur une clé qui le dit ; sans clé ⇒ `null` (pas su), jamais 0', JSON.stringify([a1, a2]));
 
-    // ── L'envoi que fait la PAGE : la recette, sans le texte ni les valeurs d'en-tête
+    // ── (21 nov., décision de Julien : « on ne fait plus les requêtes » pour les ÉCRITURES) L'envoi fait par la
+    //    page n'est plus appris comme REQUÊTE à rejouer, et l'ordre « répondre » par requête n'existe plus : un
+    //    message part par l'INTERFACE de la page (vc-ecrire.js) — jugé par scripts/audit-vc-ecrire.cjs.
     await A.p.evaluate(async ([h]) => {
       await fetch('https://apiv2.vestiairecollective.com/conversations/C7777/messages', { method: 'POST', headers: h, body: JSON.stringify({ data: { type: 'messages', attributes: { content: 'Merci beaucoup, je poste demain' } } }) }).then((r) => r.text());
     }, [H]);
     await pause(300);
-    const rec = (await A.msgs('vcenvoiappris'))[0];
-    const r = rec && rec.recette;
-    dit(!!r && r.rejouable === true && r.methode === 'POST' && r.hote === 'apiv2.vestiairecollective.com' && r.modele === '/conversations/{conv}/messages', 'un envoi fait par la page ⇒ une recette REJOUABLE : méthode, hôte, chemin à trou `{conv}`', JSON.stringify(r));
-    dit(!!r && JSON.stringify(r.cleTexte) === '["data","attributes","content"]' && JSON.stringify(r.fixes) === '[[["data","type"],"messages","string"]]', 'la clé du texte, et les mots fixes du corps (`type: messages`)', JSON.stringify(r && { t: r.cleTexte, f: r.fixes }));
-    dit(!!r && JSON.stringify(r.entetes) === '["x-vc-auth"]' && !JSON.stringify(rec).includes('Merci') && fuite(rec).length === 0, 'les NOMS des en-têtes seulement — jamais leur valeur, jamais ton texte', JSON.stringify(rec));
-    // ── Ce qui demanderait de deviner : « pas rejouable », avec sa raison
-    await A.p.evaluate(async ([h]) => {
-      await fetch('https://apiv2.vestiairecollective.com/conversations/C5555/messages', { method: 'POST', headers: h, body: JSON.stringify({ content: 'Coucou' }) }).then((r) => r.text());
-      await fetch('https://apiv2.vestiairecollective.com/conversations/C7777/messages', { method: 'POST', headers: h, body: JSON.stringify({ content: 'Coucou', clientRef: 'a1b2-77zz' }) }).then((r) => r.text());
-    }, [H]);
-    await pause(300);
-    const non = (await A.msgs('vcenvoiappris')).slice(1).map((m) => m.recette);
-    dit(non.length === 2 && non[0].rejouable === false && non[0].raison === 'conversation-non-vue' && non[1].rejouable === false && non[1].raison === 'valeur-inconnue', 'une conversation jamais vue dans l’onglet, une valeur inconnue dans le corps ⇒ « pas rejouable », avec la raison', JSON.stringify(non));
-
-    // ── L'ordre « répondre » : la recette rejouée telle quelle, avec les en-têtes DE LA PAGE
+    dit(!(await A.msgs('vcenvoiappris')).length, 'un envoi fait par la page n’est plus appris comme requête à rejouer (21 nov.)', JSON.stringify(await A.msgs('vcenvoiappris')));
+    const r = { methode: 'POST', hote: 'apiv2.vestiairecollective.com', chemin: '/conversations/{id}/messages', rejouable: true, raison: '', modele: '/conversations/{conv}/messages', recherche: '', cleTexte: ['data', 'attributes', 'content'], fixes: [[['data', 'type'], 'messages', 'string']], entetes: ['x-vc-auth'] };
     const avant = A.recues.length;
     const res = await A.p.evaluate(async (recette) => {
       const j = 'jeton-ordre-0001';
-      const p = new Promise((ok) => { window.addEventListener('message', (e) => { if (e.data && e.data.__tag === 'CANCALE_VC' && e.data.kind === 'vcenvoiresultat' && e.data.jeton === j) ok(e.data); }); setTimeout(() => ok(null), 4000); });
+      const p = new Promise((ok) => { window.addEventListener('message', (e) => { if (e.data && e.data.__tag === 'CANCALE_VC' && e.data.kind === 'vcenvoiresultat' && e.data.jeton === j) ok(e.data); }); setTimeout(() => ok(null), 2000); });
       window.postMessage({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton: j, conv: 'C7777', texte: 'Oui, envoi demain matin', recette }, '*');
       return p;
     }, r);
     const envoi = A.recues.slice(avant).filter((x) => x.methode === 'POST');
-    dit(!!res && res.statut === 201 && res.idMsg === 'M99', 'l’ordre « répondre » part et rend le statut de Vestiaire et l’identifiant du message', JSON.stringify(res));
-    dit(envoi.length === 1 && envoi[0].url === 'https://apiv2.vestiairecollective.com/conversations/C7777/messages' && envoi[0].corps === JSON.stringify({ data: { type: 'messages', attributes: { content: 'Oui, envoi demain matin' } } }), 'UNE requête : l’adresse et le corps de la recette, ton texte à sa place', JSON.stringify(envoi.map((x) => [x.url, x.corps])));
-    dit(envoi.length === 1 && envoi[0].entetes['x-vc-auth'] === 'jeton-tres-secret', 'avec l’en-tête que la PAGE vient d’envoyer (gardé en mémoire dans la page, jamais transmis)', JSON.stringify(envoi[0] && envoi[0].entetes));
-    const res2 = await A.p.evaluate(async (recette) => {
-      const j = 'jeton-ordre-0002';
-      const p = new Promise((ok) => { window.addEventListener('message', (e) => { if (e.data && e.data.__tag === 'CANCALE_VC' && e.data.kind === 'vcenvoiresultat' && e.data.jeton === j) ok(e.data); }); setTimeout(() => ok(null), 3000); });
-      window.postMessage({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton: j, conv: 'C7777', texte: 'x', recette: Object.assign({}, recette, { hote: 'evil.exemple.test' }) }, '*');
-      return p;
-    }, r);
-    dit(!!res2 && res2.statut === 0 && res2.erreur === 'recette', 'une recette vers un AUTRE hôte que Vestiaire est refusée (rien ne part)', JSON.stringify(res2));
+    dit(res === null && envoi.length === 0, 'un ordre « répondre » par REQUÊTE (même avec une recette « rejouable ») ne fait partir AUCUNE requête', JSON.stringify({ res, n: envoi.length }));
     await A.c.close();
-    // ── Une page qui n'a encore parlé à personne : pas d'en-têtes ⇒ rien ne part
-    const B = await ouvrir();
-    const n0 = B.recues.length;
-    const res3 = await B.p.evaluate(async (recette) => {
-      const j = 'jeton-ordre-0003';
-      const p = new Promise((ok) => { window.addEventListener('message', (e) => { if (e.data && e.data.__tag === 'CANCALE_VC' && e.data.kind === 'vcenvoiresultat' && e.data.jeton === j) ok(e.data); }); setTimeout(() => ok(null), 3000); });
-      window.postMessage({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton: j, conv: 'C7777', texte: 'Bonjour', recette }, '*');
-      return p;
-    }, r);
-    dit(!!res3 && res3.statut === 0 && res3.erreur === 'entetes' && B.recues.length === n0, 'sans les en-têtes de la page (rien chargé depuis l’ouverture) : RIEN ne part, et c’est dit', JSON.stringify({ res3, n: B.recues.length - n0 }));
-    await B.c.close();
     await nav.close();
     globalThis.__recette = r;
   });
@@ -150,13 +119,16 @@ const fuite = (o) => { const s = JSON.stringify(o == null ? null : o); return PE
   await essaie('B. background.js', async () => {
     const recette = globalThis.__recette || { methode: 'POST', hote: 'apiv2.vestiairecollective.com', chemin: '/conversations/{id}/messages', rejouable: true, raison: '', modele: '/conversations/{conv}/messages', recherche: '', cleTexte: ['data', 'attributes', 'content'], fixes: [[['data', 'type'], 'messages', 'string']], entetes: ['x-vc-auth'] };
     const VC = 'https://fr.vestiairecollective.com/messages/';
+    const VC_CONV = `https://fr.vestiairecollective.com/chat?id=${CONV}`;
+    const UI = { champ: { tag: 'textarea', ce: false, attrs: { 'data-testid': 'chat-input' } }, envoi: { mode: 'bouton', tag: 'button', ce: false, attrs: { 'data-testid': 'send' }, mot: 'Envoyer' }, at: '2026-11-21T10:00:00Z' };
     const faire = (opts = {}) => {
-      const f = faireFond({ src: bgPath, onglets: opts.onglets || [{ id: 31, url: VC, active: true }], lectureKO: opts.lectureKO || (() => false) });
+      // (21 nov.) L'écriture passe par l'INTERFACE : l'onglet montre la conversation, le champ et le bouton sont appris (sauf `sansUi`).
+      const f = faireFond({ src: bgPath, onglets: opts.onglets || [{ id: 31, url: VC_CONV, active: true }], lectureKO: opts.lectureKO || (() => false), store: opts.sansUi ? {} : { vrmVcUi: UI } });
       const ordres = [];
       f.ctx.chrome.tabs.sendMessage = (id, m, o, cb) => {
         if (m && m.__vmrEvt) { f.j.evts.push(m.evt); if (typeof cb === 'function') cb(); return Promise.resolve(); }
         ordres.push({ id, m: JSON.parse(JSON.stringify(m)) });
-        const rep = opts.rep ? opts.rep(m) : { ok: true, statut: 201, idMsg: 'M99', cles: [] };
+        const rep = opts.rep ? opts.rep(m) : { ok: true, statut: 200, confirme: true };
         return Promise.resolve(rep);
       };
       const page = (msg, tabId = 31, url = VC) => f.envoyer(Object.assign({ from: 'cancale-vc' }, msg), { tab: { id: tabId, url } });
@@ -164,7 +136,7 @@ const fuite = (o) => { const s = JSON.stringify(o == null ? null : o); return PE
       return { ...f, ordres, page, cmd };
     };
     // Le compte, par onglet ; le fil ; la recette.
-    const F = faire();
+    const F = faire({ sansUi: true });
     await F.page({ action: 'vcMoi', id: MOI, forme: ['data.id:string'] });
     dit(F.lignes.vc_session && F.lignes.vc_session.id === MOI && F.store.vrmVcOnglets && F.store.vrmVcOnglets['31'] && F.store.vrmVcOnglets['31'].compte === MOI, '`vc_session = { id, at }` rangé, et le compte tenu PAR ONGLET', JSON.stringify({ s: F.lignes.vc_session, o: F.store.vrmVcOnglets }));
     const autreSite = await F.page({ action: 'vcMoi', id: 'PIRATE' }, 32, 'https://evil.exemple.test/');
@@ -178,42 +150,44 @@ const fuite = (o) => { const s = JSON.stringify(o == null ? null : o); return PE
     // Répondre avant d'avoir appris : rien ne part, le geste est dit.
     const r0 = await F.cmd({ cmd: 'vcRepondre', conv: CONV, texte: 'Je poste demain' });
     dit(r0 && r0.accepte === false && r0.code === 'pas-appris' && /envoie UNE réponse toi-même/.test(r0.raison) && F.ordres.length === 0, 'sans recette apprise : RIEN ne part, et le geste est dit', JSON.stringify(r0));
+    // (21 nov.) Une recette de REQUÊTE envoyée par une page n'est plus rangée : `vc_envoi` dit seulement l'interface apprise.
     await F.page({ action: 'vcEnvoiAppris', recette: Object.assign({}, recette, { entetes: ['x-vc-auth', 'cookie'] }) });
-    dit(F.lignes.vc_envoi && F.lignes.vc_envoi.appris === true && F.store.vrmVcRecette && JSON.stringify(F.store.vrmVcRecette.recette.entetes) === '["x-vc-auth"]', 'la recette est rangée (sans en-tête interdit), `vc_envoi.appris` pour l’app', JSON.stringify(F.lignes.vc_envoi));
-    await F.page({ action: 'vcEnvoiAppris', recette: { methode: 'POST', hote: 'apiv2.vestiairecollective.com', chemin: '/x', rejouable: false, raison: 'valeur-inconnue' } });
-    dit(F.store.vrmVcRecette.recette.rejouable === true && F.store.vrmVcRecette.dernierEssai.raison === 'valeur-inconnue', 'un essai « pas rejouable » ne remplace jamais une recette rejouable (il est noté à côté)', JSON.stringify(F.store.vrmVcRecette.dernierEssai));
+    dit(!F.store.vrmVcRecette && !F.lignes.vc_envoi, 'une recette de requête n’est plus rangée (ni dans l’extension, ni `vc_envoi`)', JSON.stringify({ r: F.store.vrmVcRecette, e: F.lignes.vc_envoi }));
+    await F.page({ action: 'vcUiAppris', mode: 'bouton', conv: CONV }, 31, VC_CONV);
+    dit(F.lignes.vc_envoi && F.lignes.vc_envoi.appris === true && F.lignes.vc_envoi.mode === 'interface', 'l’interface apprise de SON envoi ⇒ `vc_envoi.appris` (mode « interface ») pour l’app', JSON.stringify(F.lignes.vc_envoi));
+    F.store.vrmVcUi = UI;
     // Répondre : la commande part vers l'onglet du MÊME compte, avec la recette.
     const r1 = await F.cmd({ cmd: 'vcRepondre', conv: CONV, texte: '  Je poste demain  ' });
-    dit(r1 && r1.accepte === true && r1.etape === 'fait' && F.ordres.length === 1 && F.ordres[0].id === 31 && F.ordres[0].m.action === 'vcRepondre' && F.ordres[0].m.texte === 'Je poste demain' && F.ordres[0].m.conv === CONV, 'sur SA commande : UN ordre vers l’onglet Vestiaire du compte de la conversation, le texte nettoyé', JSON.stringify({ r1, o: F.ordres }));
+    dit(r1 && r1.accepte === true && r1.etape === 'fait' && F.ordres.length === 1 && F.ordres[0].id === 31 && F.ordres[0].m.action === 'vcEcrireUI' && !('recette' in F.ordres[0].m) && F.ordres[0].m.texte === 'Je poste demain' && F.ordres[0].m.conv === CONV, 'sur SA commande : UN ordre vers l’onglet Vestiaire du compte de la conversation, le texte nettoyé', JSON.stringify({ r1, o: F.ordres }));
     const f2 = F.lignes[`vc_fil_${CONV}`];
     const env = f2 && f2.messages.find((m) => m.t === 'Je poste demain');
-    dit(!!env && env.deMoi === true && env.envoyeParVrm === true && env.id === 'M99', 'le message envoyé rejoint le fil : « de toi », « envoyé depuis VRM »', JSON.stringify(env));
+    dit(!!env && env.deMoi === true && env.envoyeParVrm === true, 'le message envoyé rejoint le fil : « de toi », « envoyé depuis VRM »', JSON.stringify(env));
     dit(Array.isArray((F.store.vrmActions || {})['vc:' + MOI]) && F.store.vrmActions['vc:' + MOI].length === 1, 'il compte UNE action dans le plafond de l’heure, sous le compte Vestiaire', JSON.stringify(F.store.vrmActions));
     // Conversation jamais lue ⇒ refus ; trop long ⇒ refus.
     const r2 = await F.cmd({ cmd: 'vcRepondre', conv: 'C1234', texte: 'x' });
     dit(r2 && r2.accepte === false && r2.code === 'inconnue' && F.ordres.length === 1, 'une conversation que l’extension n’a pas lue : rien ne part', JSON.stringify(r2));
     const r3 = await F.cmd({ cmd: 'vcRepondre', conv: CONV, texte: 'x'.repeat(2001) });
-    dit(r3 && r3.accepte === false && r3.code === 'invalide' && F.ordres.length === 1, 'un message de plus de 2 000 caractères : rien ne part', JSON.stringify(r3 && r3.code));
+    dit(r3 && r3.accepte === false && r3.code === 'invalide' && F.ordres.length === 1, 'un message de plus de 1 000 caractères : rien ne part', JSON.stringify(r3 && r3.code));
     // Le plafond : 50 actions dans l'heure sur ce compte ⇒ refus.
     F.store.vrmActions = { ['vc:' + MOI]: Array.from({ length: 50 }, () => Date.now()) };
     const r4 = await F.cmd({ cmd: 'vcRepondre', conv: CONV, texte: 'encore' });
     dit(r4 && r4.accepte === false && r4.code === 'plafond' && F.ordres.length === 1, 'le plafond de 50 actions/heure du compte : refus, rien ne part', JSON.stringify(r4));
     F.store.vrmActions = {};
     // Un 429 ⇒ la pause ; pendant la pause, rien ne part.
-    const G = faire({ rep: () => ({ ok: true, statut: 429, cles: [] }) });
+    const G = faire({ rep: () => ({ ok: true, statut: 0, erreur: 'verification', defi: true }) });
     await G.page({ action: 'vcMoi', id: MOI });
     await G.page({ action: 'vcFil', conv: CONV, moi: MOI, messages: [{ id: 'M1', t: 'Bonjour', deMoi: false, at: '2026-10-31T08:00:00.000Z' }] });
     await G.page({ action: 'vcEnvoiAppris', recette });
     const g1 = await G.cmd({ cmd: 'vcRepondre', conv: CONV, texte: 'Bonjour' });
     const g2 = await G.cmd({ cmd: 'vcRepondre', conv: CONV, texte: 'Bonjour' });
-    dit(g1 && g1.etape === 'refuse' && g1.statut === 429 && G.store.vrmPauseVc && g2 && g2.accepte === false && g2.code === 'vc-pause' && G.ordres.length === 1, 'un 429 de Vestiaire pose la pause ; pendant la pause, RIEN ne part', JSON.stringify({ g1, g2, n: G.ordres.length }));
+    dit(g1 && g1.etape === 'refuse' && G.store.vrmPauseVc && g2 && g2.accepte === false && g2.code === 'vc-pause' && G.ordres.length === 1, 'une vérification de Vestiaire pose la pause ; pendant la pause, RIEN ne part', JSON.stringify({ g1, g2, n: G.ordres.length }));
     // Arrêté avant de partir (pas d'en-têtes dans la page) : la place est RENDUE.
-    const K = faire({ rep: () => ({ ok: true, statut: 0, erreur: 'entetes', cles: [] }) });
+    const K = faire({ rep: () => ({ ok: true, statut: 0, erreur: 'champ-introuvable' }) });
     await K.page({ action: 'vcMoi', id: MOI });
     await K.page({ action: 'vcFil', conv: CONV, moi: MOI, messages: [{ id: 'M1', t: 'Bonjour', deMoi: false, at: '2026-10-31T08:00:00.000Z' }] });
     await K.page({ action: 'vcEnvoiAppris', recette });
     const k1 = await K.cmd({ cmd: 'vcRepondre', conv: CONV, texte: 'Bonjour' });
-    dit(k1 && k1.accepte === false && k1.code === 'entetes' && /recharge ta messagerie/.test(k1.raison) && ((K.store.vrmActions || {})['vc:' + MOI] || []).length === 0, 'arrêté AVANT de partir (la page n’a pas encore parlé à son serveur) : dit, et la place du plafond est RENDUE', JSON.stringify({ k1, a: K.store.vrmActions }));
+    dit(k1 && k1.accepte === false && k1.code === 'champ-introuvable' && /réapprenne/.test(k1.raison) && ((K.store.vrmActions || {})['vc:' + MOI] || []).length === 0, 'arrêté AVANT de partir (champ appris introuvable) : dit, et la place du plafond est RENDUE', JSON.stringify({ k1, a: K.store.vrmActions }));
     // L'onglet est sur un AUTRE compte que celui de la conversation ⇒ refus.
     const M = faire();
     await M.page({ action: 'vcMoi', id: MOI });

@@ -78,7 +78,7 @@ for (const n of ast.program.body) {
   if (d.type === 'VariableDeclaration') for (const v of d.declarations) if (v.id && v.id.name) decl.set(v.id.name, `${d.kind} ${src.slice(v.start, v.end)};`);
 }
 const VOULUS = ['BENEF_CHAMPS', 'beneficeVide', 'ajouterVenteBenefice', 'jourBeneficeEnTableau', 'cumulerBenefice', 'resumeBenefice', 'beneficeDesJours', 'caVintedDuMois', 'beneficePeriode',
-  'ventesAutresBenefice', 'numeroLbcIdentite', 'numLigneEbay', 'couvertureBenefice', 'caBeneficeDuMois'];
+  'ventesAutresBenefice', 'numeroLbcIdentite', 'numLigneEbay', 'couvertureBenefice', 'caBeneficeDuMois', 'comptaDepensesJour'];
 const manquants = VOULUS.filter((k) => !decl.has(k));
 dit(!manquants.length, 'les fonctions du bénéfice existent dans App.jsx', manquants.join(', '));
 if (manquants.length) { console.log(`\n❌ audit-benefice : ${ko} rouge(s)`); process.exit(1); }
@@ -220,6 +220,20 @@ essaie('net final complet', () => {
   dit(V.n === 0 && V.brut === 0 && V.netFinal === -12.5 && V.cotis === 0, 'aucune vente, des dépenses : le net = −les dépenses (aucune URSSAF des versements du mois)', `${V.brut} · ${V.netFinal}`);
   const W = F.beneficePeriode({ jours: {}, compta: {}, ligneUrssaf: ligne, taux: 13.5, periode: 'mois', maintenant: now.getTime() });
   dit(W.netFinal === null && W.raison === 'rien', '(3 nov.) aucune vente ni dépense ⇒ « — » (rien à calculer), jamais 0 ni −URSSAF', `${W.netFinal} · ${W.raison}`);
+  // (21 nov., lot journee-stats) Le bénéfice d'AUJOURD'HUI (Ma journée, « brut et net […] d'aujourd'hui ») : la même règle
+  // (frais, URSSAF de ces ventes), SANS les dépenses du mois (elles ne se partagent pas entre les jours), et c'est dit.
+  const jJ = {}; const bJ = F.beneficeVide(); F.ajouterVenteBenefice(bJ, 80, 30, 2);
+  const kJ = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; jJ[kJ] = F.jourBeneficeEnTableau(bJ);
+  const hier = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const bH = F.beneficeVide(); F.ajouterVenteBenefice(bH, 999, 1, 0); jJ[`${hier.getFullYear()}-${String(hier.getMonth() + 1).padStart(2, '0')}-${String(hier.getDate()).padStart(2, '0')}`] = F.jourBeneficeEnTableau(bH);
+  // (21 nov., transp-depenses) une dépense d'HIER (jamais aujourd'hui, quel que soit le jour du banc) : elle n'entre pas dans le jour.
+  const comptaJ = { ...compta, depenses: [{ date: `${hier.getFullYear()}-${String(hier.getMonth() + 1).padStart(2, '0')}-${String(hier.getDate()).padStart(2, '0')}`, montant: 12.5 }] };
+  const J = F.beneficePeriode({ jours: jJ, compta: comptaJ, ligneUrssaf: ligne, taux: 13.5, periode: 'jour', maintenant: now.getTime() });
+  const cotisJ = Math.round(cents(80) * 13.5 / 100) / 100;
+  dit(J.n === 1 && J.brut === 50 && J.charges === 0 && J.chargesAuMois === true && J.cotis === cotisJ && Math.abs(J.netFinal - (cents(80) - cents(30) - cents(2) - cents(cotisJ)) / 100) < 0.005,
+    '(21 nov.) aujourd’hui : la vente du jour seule (pas celle d’hier), frais et URSSAF de CETTE vente, aucune dépense du mois (dit `chargesAuMois`)', `${J.n} · ${J.brut} · ${J.charges} · ${J.netFinal}`);
+  const J0 = F.beneficePeriode({ jours: {}, compta, ligneUrssaf: ligne, taux: 13.5, periode: 'jour', maintenant: now.getTime() });
+  dit(J0.netFinal === null && J0.raison === 'rien', '(21 nov.) aucune vente aujourd’hui ⇒ « — » (jamais −les dépenses du mois)', `${J0.netFinal} · ${J0.raison}`);
 });
 
 essaie('Leboncoin et eBay par identité', () => {

@@ -86,7 +86,12 @@ function baseFiches() {
   m.vinted_used_nums = [...new Set([...(m.vinted_used_nums || []), 3119, 3120, 3102])];
   return b;
 }
-const VOULUES = liste('VUES', Object.keys(VUES).join(','));
+// (19 nov., décision de Julien — « je dois cliquer sur la paire puis cliquer sur les points pour avoir des informations. Ce
+// n'est pas normal » — puis « VRM natif ») La fiche D (photo 310, segment Argent · Sites · Histoire, feuille « ⋯ ») n'existe
+// plus : la fiche montre tout, sans onglets ni « ⋯ » obligatoire. Ses vues `fiche-*` ne sont plus jouées par défaut ; la
+// fiche est jugée par scripts/bancs/fiche-directe.cjs (mêmes paires 3119, 3120, 3102 : `baseFiches()` ci-dessous). Les
+// rejouer à la main (`VUES=fiche-vendue`) rapporte l'écart avec l'ancienne fiche.
+const VOULUES = liste('VUES', Object.keys(VUES).filter((v) => !v.startsWith('fiche-')).join(','));
 const LARGEURS = liste('LARGEURS', '390,1512').map(Number);
 const THEMES = liste('THEMES', 'clair,sombre');
 const DSF = Number(process.env.DSF || 1);

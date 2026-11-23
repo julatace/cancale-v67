@@ -73,10 +73,53 @@ function etatsDressingModeration(items) {
   }
   return out;
 }
+// (21 nov., ext. 5.428, choix 57 de Julien) CE QUE DIT L'ANNONCE MASQUÉE : son titre et sa taille (affichage
+// seulement — l'alerte désigne toujours l'IDENTIFIANT), et la raison SI Vinted en donne une. ⚠️ Forme MESURÉE le
+// 21 nov. sur la vraie base : les dressings rangés (allégés) n'ont AUCUN champ de raison, et aucune ligne brute n'en
+// montre (seuls `is_hidden`, `hidden_at` sur des conversations). Les champs ci-dessous ne sont donc lus QUE s'ils
+// arrivent un jour, sous ces noms exacts et en texte ; sinon rien n'est deviné : « Vinted ne dit pas pourquoi ».
+const CHAMPS_RAISON_MASQUAGE = ['hide_reason', 'hidden_reason', 'moderation_reason', 'moderation_status', 'item_alert_type'];
+const CONSEILS_MASQUAGE = [
+  ['authenticite', /authent|counterfeit|replica|fake|contrefa|copie/i],
+  ['photos', /photo|picture|image/i],
+  ['interdit', /prohib|forbidden|interdit|not allowed|policy|r[eè]gle/i],
+  ['description', /descri|title|titre|brand|marque|categor/i],
+];
+function texteCourtModeration(v, n) { return typeof v === 'string' ? v.replace(/[\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n) : ''; }
+function raisonMasquage(it) {
+  if (!it || typeof it !== 'object') return '';
+  const cands = [];
+  for (const k of CHAMPS_RAISON_MASQUAGE) cands.push(it[k]);
+  const al = it.item_alert && typeof it.item_alert === 'object' ? it.item_alert : null;
+  if (al) cands.push(al.title, al.message, al.item_alert_type);
+  for (const c of cands) { const t = texteCourtModeration(c, 160); if (t && !/^(true|false|null|\d+)$/i.test(t)) return t; }
+  return '';
+}
+// Le conseil suit la raison LUE (un mot-clé de son texte) ; pas de raison ⇒ '' (l'écran dit « Vinted ne dit pas pourquoi »).
+function conseilMasquage(raison) {
+  const r = String(raison || '');
+  if (!r) return '';
+  for (const [c, re] of CONSEILS_MASQUAGE) if (re.test(r)) return c;
+  return 'autre';
+}
+// Ce que la lecture complète dit de chaque annonce MASQUÉE : { [id]: { ti, ta, r } } (titre ≤ 80, taille ≤ 16, raison).
+function detailsMasqueesModeration(items) {
+  const out = {};
+  for (const it of Array.isArray(items) ? items : []) {
+    if (etatArticleModeration(it) !== 'h') continue;
+    const ta = it.size_title != null ? it.size_title : (it.size && typeof it.size === 'object' ? it.size.title : it.size);
+    out[String(it.id)] = { ti: texteCourtModeration(it.title, 80), ta: texteCourtModeration(typeof ta === 'number' ? String(ta) : ta, 16), r: raisonMasquage(it) };
+  }
+  return out;
+}
 // `avant` / `apres` : { at (ms), etats } — deux lectures COMPLÈTES du même compte.
 // `supprimees` : { [id]: date } de SES suppressions (`null` = pas su).
 // `vacances` : true · false · null (son profil).
-function evenementsDressingModeration({ avant, apres, supprimees, vacances } = {}) {
+// `masquesConnus` (5.428) : { [id]: 'vrm' | 'lui' } — les annonces que VRM (son journal) ou LUI (sa requête vue sur
+// vinted.fr dans ce Chrome) ont masquées depuis la lecture d'avant : ce n'est pas Vinted ⇒ aucune alerte. `null` = pas
+// su (journal illisible) ⇒ aucune « masquée » (jamais d'alerte sur « pas su ») ; absent = rien de connu.
+// `details` (5.428) : { [id]: { ti, ta, r } } posés sur l'événement (affichage, raison).
+function evenementsDressingModeration({ avant, apres, supprimees, vacances, masquesConnus, details } = {}) {
   const rien = (raison) => ({ evenements: [], raison });
   if (!apres || !apres.etats || typeof apres.etats !== 'object' || !Number.isFinite(Number(apres.at))) return rien('lecture');
   if (!avant || !avant.etats || typeof avant.etats !== 'object' || !Number.isFinite(Number(avant.at))) return rien('premiere-lecture');
@@ -88,13 +131,25 @@ function evenementsDressingModeration({ avant, apres, supprimees, vacances } = {
   const raisons = [];
   if (vacances === true && masquees.length) { masquees = []; raisons.push('vacances'); }
   if (masquees.length >= 3 && masquees.length === ouverts.length) { masquees = []; raisons.push('tout-masque'); }
+  if (masquees.length && masquesConnus === null) { masquees = []; raisons.push('masques-pas-sus'); }
+  else if (masquees.length && masquesConnus && typeof masquesConnus === 'object') {
+    const par = masquees.filter((id) => masquesConnus[id] === 'vrm' || masquesConnus[id] === 'lui');
+    if (par.length) { masquees = masquees.filter((id) => !par.includes(id)); raisons.push(par.some((id) => masquesConnus[id] === 'vrm') ? 'par-vrm' : 'par-lui'); }
+  }
   let disparues = Object.keys(A).filter((id) => (A[id] === 'o' || A[id] === 'h') && !Object.prototype.hasOwnProperty.call(B, id));
   if (disparues.length && (supprimees === null || supprimees === undefined || typeof supprimees !== 'object')) { disparues = []; raisons.push('suppressions-pas-sues'); }
   else disparues = disparues.filter((id) => !(supprimees[id] != null && supprimees[id] !== ''));
   const restants = Object.keys(B).filter((id) => B[id] === 'o' || B[id] === 'h' || B[id] === 'r');
   if (disparues.length >= 3 && !restants.length) { disparues = []; raisons.push('tout-disparu'); }
   const evenements = [];
-  for (const id of masquees.sort()) evenements.push({ k: `masquee:${id}:${at}`, s: 'masquee', t: at, a: id, av });
+  for (const id of masquees.sort()) {
+    const d = details && typeof details === 'object' && details[id] ? details[id] : null;
+    const e = { k: `masquee:${id}:${at}`, s: 'masquee', t: at, a: id, av };
+    if (d && d.ti) e.ti = d.ti;
+    if (d && d.ta) e.ta = d.ta;
+    if (d && d.r) { e.r = d.r; e.c = conseilMasquage(d.r); }
+    evenements.push(e);
+  }
   for (const id of disparues.sort()) evenements.push({ k: `disparue:${id}:${at}`, s: 'disparue', t: at, a: id, av });
   return { evenements, raison: raisons.join(',') };
 }
@@ -121,6 +176,12 @@ function nettoyerModeration(e) {
   const f = Number(e.f); if (e.f != null && Number.isFinite(f) && f >= t) o.f = f;
   const r = typeof e.r === 'string' ? e.r.replace(/\s+/g, ' ').trim().slice(0, 160) : '';
   if (r) o.r = r;
+  if (e.s === 'masquee') {
+    const ti = texteCourtModeration(e.ti, 80), ta = texteCourtModeration(e.ta, 16);
+    if (ti) o.ti = ti;
+    if (ta) o.ta = ta;
+    if (r && ['authenticite', 'photos', 'interdit', 'description', 'autre'].includes(e.c)) o.c = e.c;
+  }
   return o;
 }
 // Ajoute les nouveaux événements à la liste rangée (jamais deux fois) et ferme
@@ -291,5 +352,5 @@ export function evenementsJournalModeration(rows) {
 export {
   MODERATION_LIGNE, MODERATION_MAX, MODERATION_JOURS, MODERATION_RESTREINT_MS, MODERATION_SORTES,
   etatArticleModeration, etatsDressingModeration, evenementsDressingModeration, evenementCompteModeration,
-  nettoyerModeration, fusionnerModeration,
+  nettoyerModeration, fusionnerModeration, raisonMasquage, conseilMasquage, detailsMasqueesModeration,
 };

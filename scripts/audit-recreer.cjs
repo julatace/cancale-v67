@@ -23,7 +23,37 @@ require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lect
 const { faireFond } = require('./_fond-vm.cjs');
 
 let ok = 0, ko = 0;
-const dit = (c, msg, det) => { if (c) { ok++; console.log('✅ ' + msg); } else { ko++; console.log('❌ ' + msg + (det ? '  → ' + det : '')); } };
+// ⚠️ 5.414 (`toutinterface`, Julien, 21 nov. : « on ne fait plus les requêtes ») : la méthode « directe » (photos,
+//    brouillon, suppression, mise en ligne par requêtes du service worker, mise en ligne PLANIFIÉE 1–3 min plus tard,
+//    réparations à la mise en ligne : photos dédoublonnées, taille corrigée et renvoyée) est RETIRÉE. Ces contrôles
+//    jugeaient ce chemin-là ; ils sont NOMMÉS ici un par un, avec leur raison, et rapportés « retiré » (jamais en silence).
+//    Leurs garanties, sur le formulaire : audit-comme-bleam (R1–R18), audit-republication-parfaite (A–I, reprise à chaque
+//    étape), audit-repub-copie-fidele (G1–G5), audit-tout-interface (T1–T8), banc interface-vinted (I1–I13).
+const RETIRES = [
+  ["brouillon VRM aux photos en double", "la page « Ajouter » envoie le brouillon tel que Vinted le garde : VRM ne réécrit plus ses photos"],
+  ["grille PAS en cache : lue AVANT la mise en ligne", "pendant une republication, aucune page de plus : le formulaire choisit la taille par son identifiant (absente ⇒ arrêt nommé)"],
+  ["la grille lue n'est pas redemandée", "idem : plus de lecture de grille pendant une republication"],
+  ["grille PAS en cache, taille de la paire inconnue", "idem"],
+  ["le brouillon tel que Vinted le montre l'emporte : taille changée", "la mise en ligne est le bouton « Ajouter » de la page du brouillon : c'est Vinted qui envoie ce qu'il montre"],
+  ["republier (« comme Vintex », délais mesurés)", "les pauses du formulaire (5 à 15 s entre deux champs, au hasard) remplacent celles des requêtes : audit-comme-bleam R4"],
+  ["republier, mise en ligne refusée : UN essai", "un refus à la mise en ligne s'arrête et dit le geste (« Reprendre ») : audit-comme-bleam, republication-parfaite A4"],
+  ["Refaire annonce ses étapes", "Refaire passe par le formulaire : ses étapes sont celles du formulaire (formulaire, photos, brouillon, attente, en ligne)"],
+  ["Refaire : photos ×2 depuis VRM, PUIS brouillon, PUIS (5.408) sa relecture", "la page du brouillon est ouverte (elle se lit elle-même) : plus de relecture par le fond"],
+  ["suppression de l'ancienne PAS confirmée : le brouillon est refait", "Refaire par le formulaire : l'ancienne non prouvée supprimée ⇒ brouillon seulement (republication-parfaite D)"],
+  ["brouillon disparu de Vinted (dressing complet lu après)", "republication-parfaite D1 (par le formulaire)"],
+  ["à la suite : brouillon et suppression faits, la mise en ligne est planifiée", "plus de mise en ligne planifiée : « Ajouter » dans la même passe, dans l'onglet de travail (republication-parfaite A1, B10)"],
+  ["la mise en ligne à faire est rangée dans chrome.storage.local", "idem : rien n'est laissé en attente"],
+  ["à l'heure : lecture du brouillon, mise en ligne", "idem"],
+  ["faite une seule fois : retirée de l'attente", "idem"],
+  ["mise en ligne planifiée refusée", "idem"],
+  ["42 actions déjà dans l'heure : la paire part ET sa mise en ligne planifiée", "les 3 gestes de la paire sont réservés d'un coup (audit-comme-bleam R7)"],
+  ["réveil et planification en même temps", "plus de planification"],
+  ["mise en ligne interrompue par Chrome", "reprise à chaque étape : republication-parfaite B"],
+  ["un brouillon déjà planifié ne se met pas en ligne une seconde fois", "plus de planification ; « jamais deux en ligne » : republication-parfaite C"],
+  ["brouillon déjà en ligne : la mise en ligne planifiée n'envoie rien", "idem"],
+];
+let retires = 0;
+const dit = (c, msg, det) => { const rt = RETIRES.find(([p]) => String(msg).startsWith(p)); if (rt) { retires++; console.log(`⏭ retiré (5.414, méthode directe) — ${msg.slice(0, 90)} : ${rt[1]}`); return; } if (c) { ok++; console.log('✅ ' + msg); } else { ko++; console.log('❌ ' + msg + (det ? '  → ' + det : '')); } };
 const nowISO = () => new Date().toISOString();
 const MODELE = JSON.stringify({ item: { id: 9101, title: 'Nike Air Max 1', description: 'nickel', price: '60.0', currency: 'EUR', catalog_id: 1234, brand_id: 53, color_ids: [1], item_attributes: [{ code: 'size', ids: [56] }, { code: 'condition', ids: [2] }], package_size_id: 1, assigned_photos: [{ id: 1 }] } });
 const PHOTOS = ['https://images1.vinted.net/t/01_0121e_hsUzFGeDP3Vk/f800/1.jpeg', 'https://images1.vinted.net/t/02_02248_Ka3jojtDMin8/f800/2.jpeg'];
@@ -77,7 +107,7 @@ async function run(opts = {}) {
   const f = monter({ src: process.env.BG_SRC || undefined, ...opts });
   if (typeof f.ctx.recreerVinted !== 'function') return { f, r: {}, absent: true };
   if (typeof opts.avant === 'function') opts.avant(f);
-  let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: opts.prix != null ? opts.prix : 54, titre: opts.titre || 'Nike Air Max 1 — remise en ligne', plancher: opts.plancher, reglages: opts.reglages, lettre: opts.lettre, viaBrouillon: opts.viaBrouillon, versBrouillon: opts.versBrouillon, differer: opts.differer, confirme: opts.confirme !== false }); } catch (e) { r = { erreur: String(e.message) }; }
+  let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: opts.prix != null ? opts.prix : 54, titre: opts.titre || 'Nike Air Max 1 — remise en ligne', plancher: opts.plancher, ...(opts.gardeConfirmeC != null ? { gardeConfirmeC: opts.gardeConfirmeC } : {}), reglages: opts.reglages, lettre: opts.lettre, viaBrouillon: opts.viaBrouillon, versBrouillon: opts.versBrouillon, differer: opts.differer, confirme: opts.confirme !== false }); } catch (e) { r = { erreur: String(e.message) }; }
   return { f, r };
 }
 const LECTURE = /\/item_upload\/(colors|attributes)$/;   // lire la liste des couleurs ou des tailles n'est pas un geste
@@ -98,18 +128,22 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
   // A — tout prêt.
   { const { f, r } = await run();
     const seq = seqV(f.j);
-    dit(seq === 'LPPBSLM' && r.etape === 'fait' && r.nouvelId === '88001', "comme Vintex : lecture de l'annonce, photos ×2, brouillon, suppression juste après, lecture du brouillon, mise en ligne", `seq=${seq} etape=${r.etape} code=${r.code || ''} ${r.raison || ''}`);
+    // 5.414 (`toutinterface`) : tout par le FORMULAIRE — la page du brouillon est OUVERTE (elle se lit elle-même), plus de GET du fond.
+    dit(seq === 'LPPBSM' && r.etape === 'fait' && r.nouvelId === '88001', "comme Vintex : lecture de l'annonce, photos ×2, brouillon, suppression juste après, page du brouillon ouverte, mise en ligne (tout par la page)", `seq=${seq} etape=${r.etape} code=${r.code || ''} ${r.raison || ''}`);
     const pg = gestes(f.j).concat(f.j.vinted.filter((v) => LECTURE.test(v.chemin)));
     dit(pg.length && pg.every((v) => v.origine === 'page' && v.credentials === 'include' && !Object.keys(v.entetes || {}).some((k) => /^authorization$/i.test(k))), "TOUTES les requêtes partent de la page Vinted, avec ses cookies, sans « Authorization » (comme le site)", JSON.stringify(pg.map((v) => [v.origine, v.credentials, Object.keys(v.entetes || {})])));
     let corps = {}; try { corps = JSON.parse(creations(f.j)[0].corps); } catch (_) {}
     const it = corps.draft || {};
     dit(it.id === null && it.title === 'Nike Air Max 1 — remise en ligne' && it.price === '54', "la nouvelle annonce porte le titre et le prix choisis (id null : c'est une création)", JSON.stringify({ id: it.id, title: it.title, price: it.price }));
-    dit(it.catalog_id === 1234 && it.package_size_id === 1 && JSON.stringify(it.item_attributes) === JSON.stringify([{ code: 'size', ids: [56] }, { code: 'condition', ids: [2] }]), "la recette est celle de CETTE annonce (catégorie, taille/état, colis)", JSON.stringify(it.item_attributes));
+    dit(it.catalog_id === 1234 && it.package_size_id === 1 && JSON.stringify([...(it.item_attributes || [])].sort((a, b) => String(a.code).localeCompare(String(b.code)))) === JSON.stringify([{ code: 'condition', ids: [2] }, { code: 'size', ids: [56] }]), "la recette est celle de CETTE annonce (catégorie, taille/état, colis)", JSON.stringify(it.item_attributes));
     dit(Array.isArray(it.assigned_photos) && it.assigned_photos.map((p) => p.id).join(',') === '501,502' && it.assigned_photos.every((p) => p.orientation === 0), "les photos sont les NOUVELLES (identifiants rendus par Vinted), dans l'ordre", JSON.stringify(it.assigned_photos));
     dit(Array.isArray(it.assigned_photos) && it.assigned_photos.every((p) => JSON.stringify(Object.keys(p).sort()) === '["id","orientation"]') && 'feedback_id' in corps && corps.feedback_id === null, "forme de Vintex : photos {id, orientation} seulement, feedback_id null", JSON.stringify({ ph: it.assigned_photos && it.assigned_photos[0], fb: corps.feedback_id }));
-    dit(typeof it.temp_uuid === 'string' && it.temp_uuid.length === 36 && corps.upload_session_id === it.temp_uuid && !('push_up' in corps) && corps.parcel === null, "forme mesurée : upload_session_id = temp_uuid, parcel null, pas de push_up dans le brouillon", JSON.stringify({ u: corps.upload_session_id, t: it.temp_uuid, p: corps.push_up }));
+    // 5.414 : c'est la PAGE qui écrit son brouillon (sa forme à elle) ; le juge garde ce qui compte : une session, pas de remontée.
+    dit(typeof it.temp_uuid === 'string' && it.temp_uuid.length > 0 && corps.upload_session_id === it.temp_uuid && !('push_up' in corps) && corps.parcel === null, "forme : upload_session_id = temp_uuid, parcel null, pas de push_up dans le brouillon (écrit par la page)", JSON.stringify({ u: corps.upload_session_id, t: it.temp_uuid, p: corps.push_up }));
     const fd = photosP(f.j)[0] && photosP(f.j)[0].corps;
-    dit(fd && typeof fd.get === 'function' && fd.get('photo[type]') === 'item' && fd.get('photo[temp_uuid]') === it.temp_uuid && fd.get('photo[file]'), "chaque photo part en FormData photo[type]=item, photo[file], photo[temp_uuid] de l'annonce", fd && typeof fd.get === 'function' ? fd.get('photo[type]') : typeof fd);
+    // 5.414 : les photos sont DÉPOSÉES dans le champ de fichiers du formulaire ; c'est la page qui les téléverse (une requête chacune).
+    void fd;
+    dit(photosP(f.j).length === 2 && photosP(f.j).every((v) => v.origine === 'page') && (f.j.etapesPage || []).filter((x) => x.etape === 'photos').length === 1, "les 2 photos déposées UNE fois dans le champ de fichiers : la page les téléverse (aucune par le fond)", JSON.stringify(photosP(f.j).map((v) => v.origine)));
     dit(f.lignes.vrm_vinted_modele && f.lignes.vrm_vinted_modele['88001'], "la recette de la NOUVELLE annonce est gardée (la prochaine recréation n'a rien à réapprendre)");
     dit(f.lignes['coffre_111_88001'] && f.lignes['coffre_111_88001'].recreeDe === '9101', "la nouvelle annonce a sa sauvegarde coffre (filet)");
     dit(directes(f.j).length === 0, "plus jamais de création directe (POST item_upload/items) : le site, et Vintex, passent par un brouillon", `n=${directes(f.j).length}`); }
@@ -128,7 +162,8 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     dit(creations(f.j).length === 0 && suppressions(f.j).length === 0 && r.etape === 'echec', "photo refusée : AUCUNE création, AUCUNE suppression (l'annonce reste intacte)", `c=${creations(f.j).length} s=${suppressions(f.j).length} ${r.raison || ''}`); }
   // B2 — une photo acceptée mais sans identifiant lisible : pareil.
   { const { f } = await run({ photoSansId: true });
-    dit(creations(f.j).length === 0 && suppressions(f.j).length === 0, "photo sans identifiant lisible : rien n'est créé ni supprimé", `c=${creations(f.j).length}`); }
+    // 5.414 : le brouillon de la page RELU contre la fiche : une photo manquante ⇒ arrêt AVANT la suppression.
+    dit(suppressions(f.j).length === 0, "photo sans identifiant lisible : le brouillon relu n'a pas ses photos ⇒ rien n'est supprimé", `c=${creations(f.j).length} s=${suppressions(f.j).length}`); }
   // C — création refusée : l'ancienne n'est JAMAIS supprimée.
   { const { f, r } = await run({ brouillon: 422 });
     dit(suppressions(f.j).length === 0 && creations(f.j).length === 1 && r.etape === 'echec' && /toujours en ligne/.test(r.raison || ''), "brouillon refusé : UN envoi, jamais retenté, l'ancienne n'est JAMAIS supprimée, et c'est dit", `s=${suppressions(f.j).length} b=${creations(f.j).length} ${r.raison || ''}`); }
@@ -197,12 +232,13 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     const { f, r } = await run({ modele: false, viaBrouillon: via, lecture: { status: 200, body: { item: { id: 9101, catalog_id: 88, brand_id: 9, item_attributes: [{ code: 'size', ids: [55] }], package_size_id: 2 } } } });
     dit(suppressions(f.j).length === 0 && creations(f.j).length === 0 && de(f.j, /\/item_upload\/drafts/).length === 0 && photosP(f.j).length === 0 && r.code === 'couleur-absente' && /couleur/.test(r.raison || ''), `couleur inconnue (${via ? 'par brouillon' : 'directe'}) : rien n'est supprimé ni créé, la couleur est nommée`, JSON.stringify({ s: suppressions(f.j).length, c: creations(f.j).length, code: r.code })); }
   // C2 — la couleur sous `color1_id` (objet) est lue, et part dans le brouillon ET sa mise en ligne.
-  { const { f, r } = await run({ modele: false, viaBrouillon: true, lecture: { status: 200, body: { item: { id: 9101, catalog_id: 88, brand_id: 9, color1_id: { id: 1, title: 'Noir' }, item_attributes: [{ code: 'size', ids: [55] }], package_size_id: 2 } } } });
+  { const { f, r } = await run({ modele: false, viaBrouillon: true, lecture: { status: 200, body: { item: { id: 9101, catalog_id: 88, brand_id: 9, color1_id: { id: 1, title: 'Noir' }, item_attributes: [{ code: 'size', ids: [55] }, { code: 'condition', ids: [2] }], package_size_id: 2 } } } });   // 5.414 : l'état connu (le formulaire l'exige)
     let cb = {}, cc = {}; try { cb = JSON.parse(de(f.j, /\/item_upload\/drafts\/?$/)[0].corps).draft; cc = JSON.parse(de(f.j, /\/completion$/)[0].corps).draft; } catch (_) {}
-    dit(r.etape === 'fait' && JSON.stringify(cb.color_ids) === '[1]' && JSON.stringify(cc.color_ids) === '[1]', "couleur lue sous color1_id : brouillon et mise en ligne la portent, la republication aboutit", JSON.stringify({ e: r.etape, code: r.code, b: cb.color_ids, c: cc.color_ids, raison: r.raison })); }
+    // 5.414 : la couleur est CHOISIE dans le formulaire (le brouillon la porte) ; « Ajouter » envoie le brouillon tel que la page le garde.
+    dit(r.etape === 'fait' && JSON.stringify(cb.color_ids) === '[1]' && (cc.color_ids === undefined || JSON.stringify(cc.color_ids) === '[1]'), "couleur lue sous color1_id : le brouillon la porte (jamais une autre à la mise en ligne), la republication aboutit", JSON.stringify({ e: r.etape, code: r.code, b: cb.color_ids, c: cc.color_ids, raison: r.raison })); }
   // C3 — un modèle SANS couleur : la couleur est lue chez Vinted, jamais envoyée vide.
   { const sansCouleur = JSON.stringify({ item: { ...JSON.parse(MODELE).item, color_ids: [] } });
-    const { f, r } = await run({ extra: { vrm_vinted_modele: { '9101': { corps: sansCouleur, at: nowISO(), uid: '111' } } }, lecture: { status: 200, body: { item: { id: 9101, catalog_id: 1234, color_ids: [7], item_attributes: [{ code: 'size', ids: [56] }], package_size_id: 1 } } } });
+    const { f, r } = await run({ extra: { vrm_vinted_modele: { '9101': { corps: sansCouleur, at: nowISO(), uid: '111' } } }, lecture: { status: 200, body: { item: { id: 9101, catalog_id: 1234, color_ids: [7], item_attributes: [{ code: 'size', ids: [56] }, { code: 'condition', ids: [2] }], package_size_id: 1 } } } });
     let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).draft; } catch (_) {}
     dit(r.etape === 'fait' && JSON.stringify(it.color_ids) === '[7]', "modèle sans couleur : elle est lue chez Vinted, l'annonce part avec", JSON.stringify({ e: r.etape, code: r.code, c: it.color_ids })); }
   // C3b — (2 nov., 5.311, Julien : « elle avait oublié la couleur et la taille… tout est
@@ -219,11 +255,14 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
   { const { f, r } = await run({ viaBrouillon: true });
     const et = f.j.evts.filter((e) => e && e.quoi === 'repub' && e.id === '9101' && e.etape).map((e) => e.etape);
     const ordre = [...new Set(et)].join(',');
-    dit(r.etape === 'fait' && ordre === 'lecture,photos,enregistrement,brouillon,suppression,attente,en-ligne', "les étapes (lecture, photos, enregistrement, brouillon, suppression, attente, mise en ligne) sont annoncées à l'app, dans l'ordre", ordre);
-    const ph = f.j.evts.filter((e) => e && e.quoi === 'repub' && e.etape === 'photos');
-    dit(ph.length === 2 && ph[1].fait === 1 && ph[1].total === 2, "l'envoi des photos dit « photo n sur N »", JSON.stringify(ph)); }
+    dit(r.etape === 'fait' && ordre === 'lecture,formulaire,photos,brouillon,suppression,attente,en-ligne', "les étapes (lecture, formulaire, photos, brouillon, suppression, attente, mise en ligne) sont annoncées à l'app, dans l'ordre", ordre);
+    // 5.410.5 : l'onglet de travail VRM est un second onglet dans le faux Chrome (dont `tabs.query` ne filtre pas l'adresse) : chaque
+    // annonce à l'app y est comptée deux fois — on juge les annonces DISTINCTES.
+    const ph = [...new Map(f.j.evts.filter((e) => e && e.quoi === 'repub' && e.etape === 'photos').map((e) => [JSON.stringify(e), e])).values()];
+    // 5.414 : les photos sont déposées d'un coup dans le champ du formulaire : « 0 sur 2 », puis « 2 sur 2 ».
+    dit(ph.length === 2 && ph[0].fait === 0 && ph[1].fait === 2 && ph[1].total === 2, "l'envoi des photos dit « n sur N » (déposées d'un coup dans le formulaire)", JSON.stringify(ph)); }
   // G — sans modèle, avec les codes rangés de sa fiche : la recette vient d'eux.
-  { const { f, r } = await run({ modele: false, codes: { catalog_id: 77, brand_id: 9, brand: 'Nike', color_ids: [3], item_attributes: [{ code: 'size', ids: [60] }], package_size_id: 2 } });
+  { const { f, r } = await run({ modele: false, codes: { catalog_id: 77, brand_id: 9, brand: 'Nike', color_ids: [3], item_attributes: [{ code: 'size', ids: [60] }, { code: 'condition', ids: [2] }], package_size_id: 2 } });
     let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).draft; } catch (_) {}
     dit(r.etape === 'fait' && it.catalog_id === 77 && it.package_size_id === 2 && it.description === 'Nickel, boîte d’origine', "sans modèle : la recette vient des codes de SA fiche, la description du coffre", JSON.stringify({ e: r.etape, c: it.catalog_id, d: it.description })); }
   // J — (28 oct.) la description part MOT POUR MOT ; la lettre en option va
@@ -240,9 +279,12 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).draft; } catch (_) {}
     dit(it.description === 'Taille x', "une « lettre » invalide (plusieurs caractères) n'ajoute rien, et un texte qui finit par x sans lettre notée n'est pas touché", JSON.stringify(it.description)); }
   // H — plancher.
+  // (22 nov., 5.432) 60 → 35 = −42 % : plus que SON seuil (40 %) ⇒ la garde du prix demande SA confirmation du chiffre exact.
   { const { f } = await run({ prix: 20, plancher: 35 });
+    dit(creations(f.j).length === 0, "garde du prix : −42 % sans SA confirmation du chiffre ⇒ aucune création", `creations=${creations(f.j).length}`); }
+  { const { f } = await run({ prix: 20, plancher: 35, gardeConfirmeC: 3500 });
     let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).draft; } catch (_) {}
-    dit(it.price === '35', "jamais sous le prix d'achat : 20 € demandé ⇒ 35 €", it.price); }
+    dit(it.price === '35', "jamais sous le prix d'achat : 20 € demandé ⇒ 35 € (35 € confirmés)", it.price); }
   // I — réglages photo que ce navigateur ne sait pas appliquer (le vm n'a pas
   //     OffscreenCanvas) : rien ne part, jamais l'original à la place.
   { const { f, r } = await run({ reglages: { rot: 0, bright: 1.2, contrast: 1, sat: 1, zoom: 1 } });
@@ -255,13 +297,13 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
   { const { f, r } = await run({ viaBrouillon: true });
     const seq = seqV(f.j);
     const cf = f.lignes['coffre_111_9101'];
-    dit(seq === 'LPPBSLM' && r.etape === 'fait' && r.nouvelId === '88001' && cf && cf.versBrouillon && cf.versBrouillon.publier === true, "republier (« comme Vintex ») : enregistrée dans VRM, brouillon, PUIS suppression, PUIS mise en ligne", `seq=${seq} etape=${r.etape} id=${r.nouvelId} ${r.raison || ''}`);
+    dit(seq === 'LPPBSM' && r.etape === 'fait' && r.nouvelId === '88001' && cf && cf.versBrouillon && cf.versBrouillon.publier === true, "republier (« comme Vintex ») : enregistrée dans VRM, brouillon, PUIS suppression, PUIS mise en ligne (tout par la page)", `seq=${seq} etape=${r.etape} id=${r.nouvelId} ${r.raison || ''}`);
     let b = {}, c = {}; try { b = JSON.parse(brouillonsP(f.j)[0].corps); c = JSON.parse(completions(f.j)[0].corps); } catch (_) {}
     dit(b.draft && b.draft.id === null && !('push_up' in b) && !('push_up' in b.draft) && b.parcel === null && b.upload_session_id === b.draft.temp_uuid && b.draft.title === 'Nike Air Max 1 — remise en ligne' && b.draft.price === '54', "brouillon : forme mesurée {draft:{id:null,…}, parcel:null, upload_session_id}, sans push_up", JSON.stringify({ id: b.draft && b.draft.id, pu: 'push_up' in b }));
-    dit(c.draft && c.draft.id === 88001 && c.push_up === false && c.parcel === null && /\/drafts\/88001\/completion$/.test(completions(f.j)[0].chemin) && c.draft.description === b.draft.description, "mise en ligne : POST …/drafts/88001/completion, même corps, draft.id posé, push_up false", JSON.stringify({ id: c.draft && c.draft.id, pu: c.push_up }));
+    dit(c.draft && c.draft.id === 88001 && c.push_up === false && c.parcel === null && /\/drafts\/88001\/completion$/.test(completions(f.j)[0].chemin) && completions(f.j)[0].origine === 'page', "mise en ligne : POST …/drafts/88001/completion par la page (« Ajouter »), draft.id posé, push_up false", JSON.stringify({ id: c.draft && c.draft.id, pu: c.push_up }));
     dit(f.lignes['vinted_brouillon_88001'] && f.lignes['vinted_brouillon_88001'].etat === 'publie' && f.lignes['vinted_brouillon_88001'].ancienId === '9101', "le brouillon est noté « publié » (avec l'annonce qu'il remplace)", JSON.stringify(f.lignes['vinted_brouillon_88001'] && f.lignes['vinted_brouillon_88001'].etat)); }
   { const { f, r } = await run({ viaBrouillon: true, completion: 422 });
-    dit(suppressions(f.j).length === 1 && r.etape === 'brouillon-a-refaire' && /Brouillons → en ligne/.test(r.raison || '') && f.lignes['vinted_brouillon_88001'] && f.lignes['vinted_brouillon_88001'].etat === 'brouillon', "mise en ligne refusée : le brouillon reste rangé, et le geste pour le remettre en ligne est dit", `s=${suppressions(f.j).length} ${r.raison || ''}`); }
+    dit(suppressions(f.j).length === 1 && r.etape === 'brouillon-a-refaire' && /Brouillons → en ligne|dans tes brouillons Vinted/.test(r.raison || '') && f.lignes['vinted_brouillon_88001'] && f.lignes['vinted_brouillon_88001'].etat === 'brouillon', "mise en ligne refusée : le brouillon reste rangé, et le geste pour le remettre en ligne est dit", `s=${suppressions(f.j).length} ${r.raison || ''}`); }
   { const { f, r } = await run({ viaBrouillon: true, completion: 502 });
     dit(r.etape === 'incertain' && /PEUT-ÊTRE en ligne/.test(r.raison || ''), "mise en ligne sans réponse claire : « incertain », dit", `s=${suppressions(f.j).length} etape=${r.etape}`); }
   { const { f, r } = await run({ viaBrouillon: true, brouillon: 422 });
@@ -289,7 +331,7 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
   { const { f, r } = await run({ versBrouillon: true, suppression: 403 });
     dit(brouillonsP(f.j).length === 1 && r.etape === 'echec' && /toujours en ligne/.test(r.raison || ''), "en ligne → brouillon, suppression refusée : elle est dite toujours en ligne, le brouillon en trop nommé", `b=${brouillonsP(f.j).length} etape=${r.etape}`); }
   { const { f, r } = await run({ versBrouillon: true, suppression: 502 });
-    dit(brouillonsP(f.j).length === 1 && r.etape === 'double' && /PEUT-ÊTRE/.test(r.raison || ''), "en ligne → brouillon, suppression sans réponse claire : le brouillon est créé quand même, « peut-être encore en ligne » dit", `b=${brouillonsP(f.j).length} etape=${r.etape}`); }
+    dit(brouillonsP(f.j).length === 1 && (r.etape === 'double' || r.etape === 'incertain') && /PEUT-ÊTRE/.test(r.raison || ''), "en ligne → brouillon, suppression sans réponse claire : le brouillon est créé quand même, « peut-être encore en ligne » dit", `b=${brouillonsP(f.j).length} etape=${r.etape}`); }
   { const { f, r } = await run({ versBrouillon: true, brouillon: 422 });
     dit(suppressions(f.j).length === 0 && brouillonsP(f.j).length === 1 && completions(f.j).length === 0 && r.etape === 'echec' && /toujours en ligne/.test(r.raison || ''), "en ligne → brouillon, brouillon refusé : jamais retenté, rien supprimé", `s=${suppressions(f.j).length} b=${brouillonsP(f.j).length} etape=${r.etape}`); }
   { const { f, r } = await run({ versBrouillon: true, brouillon: 502 });
@@ -313,7 +355,7 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
   };
   { const { f, r } = await pubB();
     let c = {}; try { c = JSON.parse(completions(f.j)[0].corps); } catch (_) {}
-    dit(gestes(f.j).length === 2 && gestes(f.j)[0].methode === 'GET' && /item_upload\/items\/10432342904$/.test(gestes(f.j)[0].chemin) && r.etape === 'fait' && c.draft && c.draft.id === 10432342904 && c.push_up === false && c.draft.title === 'Nike Air Max 1 dark teal' && /drafts\/10432342904\/completion$/.test(completions(f.j)[0].chemin), "brouillon complet de son dressing : la page du brouillon lue (comme Vintex), puis UNE mise en ligne, avec SON corps tel quel", `n=${f.j.vinted.length} etape=${r.etape} ${r.raison || r.erreur || ''}`);
+    dit(gestes(f.j).length === 2 && gestes(f.j)[0].methode === 'GET' && /item_upload\/items\/10432342904$/.test(gestes(f.j)[0].chemin) && r.etape === 'fait' && c.draft && c.draft.id === 10432342904 && c.push_up === false && completions(f.j)[0].origine === 'page' && /drafts\/10432342904\/completion$/.test(completions(f.j)[0].chemin), "brouillon complet de son dressing : la page du brouillon lue (comme Vintex), puis UNE mise en ligne, avec SON corps tel quel", `n=${f.j.vinted.length} etape=${r.etape} ${r.raison || r.erreur || ''}`);
     dit(f.lignes.vinted_brouillon_10432342904.etat === 'publie' && f.lignes.vrm_vinted_modele && f.lignes.vrm_vinted_modele['10432342904'], "noté « publié », et sa recette gardée pour une prochaine republication"); }
   { const { f, r } = await pubB({ corps: CORPS_B({ price: 0 }) });
     dit(zero(f.j) && r.code === 'incomplet' && /prix/.test(r.raison || ''), "brouillon sans prix : refusé, aucune requête, il est nommé ce qui manque", `n=${f.j.vinted.length} ${r.raison || ''}`); }
@@ -360,7 +402,7 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     const f = monter({ src: process.env.BG_SRC || undefined, extra });
     let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r = { erreur: e.message }; }
     let c = {}; try { c = JSON.parse(completions(f.j)[0].corps); } catch (_) {}
-    dit(r.etape === 'fait' && c.draft && JSON.stringify(c.draft.assigned_photos.map((p) => p.id)) === '[11,12]', "brouillon VRM aux photos en double : la mise en ligne ne garde qu'UNE photo par photo", JSON.stringify({ e: r.etape, ids: c.draft && c.draft.assigned_photos && c.draft.assigned_photos.map((p) => p.id), raison: r.raison || r.erreur })); }
+    dit(r.etape === 'fait' && c.draft && JSON.stringify((c.draft.assigned_photos || []).map((p) => p.id)) === '[11,12]', "brouillon VRM aux photos en double : la mise en ligne ne garde qu'UNE photo par photo", JSON.stringify({ e: r.etape, ids: c.draft && c.draft.assigned_photos && c.draft.assigned_photos.map((p) => p.id), raison: r.raison || r.erreur })); }
   // (28 oct., N°2 Jordan 3) Vinted refuse les PHOTOS d'un brouillon fait par VRM
   //  (« Erreur lors du chargement de la photo ») : VRM renvoie les photos du
   //  coffre, remplace celles du brouillon, et réessaie UNE fois.
@@ -527,13 +569,13 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
   { const sansDesc = { coffre_111_9101: { id: '9101', title: 'Nike Air Max 1', price: 60, desc: 'q', photos: PHOTOS } };
     const { f, r } = await run({ coffre: false, extra: sansDesc, viaBrouillon: true });
     dit(suppressions(f.j).length === 0 && brouillonsP(f.j).length === 0 && r.code === 'description-absente', "description vide (la lettre seule) et introuvable : refusé AVANT de supprimer, rien créé", JSON.stringify({ s: suppressions(f.j).length, b: brouillonsP(f.j).length, code: r.code, e: r.etape }));
-    const g = await run({ coffre: false, extra: sansDesc, viaBrouillon: true, lettre: true, lecture: { status: 200, body: { item: { id: 9101, description: 'Très bon état, boîte d’origine', catalog_id: 88, brand_id: 9, color_ids: [1], item_attributes: [{ code: 'size', ids: [55] }], package_size_id: 2 } } } });
+    const g = await run({ coffre: false, extra: sansDesc, viaBrouillon: true, lettre: true, lecture: { status: 200, body: { item: { id: 9101, description: 'Très bon état, boîte d’origine', catalog_id: 88, brand_id: 9, color_ids: [1], item_attributes: [{ code: 'size', ids: [55] }, { code: 'condition', ids: [2] }], package_size_id: 2 } } } });   // 5.414 : l'état connu (le formulaire l'exige)
     let b = {}; try { b = JSON.parse(brouillonsP(g.f.j)[0].corps); } catch (_) {}
     const d = (b.draft && b.draft.description) || '';
     dit(g.r.etape === 'fait' && /^Très bon état, boîte d’origine/.test(d) && !/^q\b/.test(d), "description vide : reprise sur l'annonce Vinted, le brouillon part avec elle (et la lettre en bas)", JSON.stringify({ e: g.r.etape, d, raison: g.r.raison || g.r.erreur })); }
   // D2 — « Refaire le brouillon » d'un passage enregistré avec la lettre seule
   //      comme description (les Air Max 1 et zoom fly du 28 oct.).
-  { const corps = JSON.stringify({ draft: { id: null, title: 'Nike Air Max 1', price: '54', catalog_id: 88, brand_id: 9, color_ids: [1], description: '\n\nq', item_attributes: [{ code: 'size', ids: [55] }], package_size_id: 2, assigned_photos: [] }, parcel: null, upload_session_id: 'x' });
+  { const corps = JSON.stringify({ draft: { id: null, title: 'Nike Air Max 1', price: '54', catalog_id: 88, brand_id: 9, color_ids: [1], description: '\n\nq', item_attributes: [{ code: 'size', ids: [55] }, { code: 'condition', ids: [2] }], package_size_id: 2, assigned_photos: [] }, parcel: null, upload_session_id: 'x' });
     const coffreVb = (extraDesc) => ({ coffre_111_9101: { id: '9101', title: 'Nike Air Max 1', price: 60, desc: extraDesc, photos: PHOTOS, versBrouillon: { etat: 'a-refaire', supprime: true, corps, majAt: new Date(Date.now() - 3600e3).toISOString() } } });
     const f1 = monter({ src: process.env.BG_SRC || undefined, coffre: false, extra: coffreVb('q') });
     let r1 = {}; if (typeof f1.ctx.refaireBrouillon === 'function') { try { r1 = await f1.ctx.refaireBrouillon({ cmd: 'refaireBrouillon', uid: '111', id: '9101', confirme: true }); } catch (e) { r1 = { erreur: e.message }; } }
@@ -582,7 +624,7 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     dit(rf.code === 'frein-refus' && f.j.vinted.length === nF && /reprends à partir de/.test(rf.raison || ''), "Refaire juste après un refus de Vinted : freiné, aucune requête, l'heure de reprise est dite", JSON.stringify({ code: rf.code, n: f.j.vinted.length - nF, raison: rf.raison }));
     finFrein(f); const n0 = f.j.vinted.length;
     const r = await refaire(f); const seq = seqDe({ vinted: f.j.vinted.slice(n0) });
-    dit(seq === 'PPBM' && r.etape === 'fait' && vb(f).etat === 'fait', "Refaire : photos ×2 depuis VRM, PUIS brouillon, PUIS mise en ligne — l'ancienne n'est pas retouchée", `seq=${seq} etape=${r.etape} ${r.raison || r.erreur || ''}`);
+    dit(seq === 'PPBCM' && r.etape === 'fait' && vb(f).etat === 'fait', "Refaire : photos ×2 depuis VRM, PUIS brouillon, PUIS (5.408) sa relecture, PUIS mise en ligne — l'ancienne n'est pas retouchée", `seq=${seq} etape=${r.etape} ${r.raison || r.erreur || ''}`);
     let b = {}; try { b = JSON.parse(brouillonsP({ vinted: f.j.vinted.slice(n0) })[0].corps); } catch (_) {}
     dit(b.draft && b.draft.id === null && b.draft.title === 'Nike Air Max 1' && b.draft.price === '54' && b.draft.assigned_photos && b.draft.assigned_photos.length === 2 && b.upload_session_id === b.draft.temp_uuid, "le brouillon refait porte le titre, le prix et les photos NEUVES enregistrés", JSON.stringify(b.draft && { t: b.draft.title, p: b.draft.price }));
     const n1 = f.j.vinted.length; const r2 = await refaire(f);
@@ -621,7 +663,7 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     st = 200; const n0 = f.j.vinted.length; const r = await refaire(f);
     const seq = seqDe({ vinted: f.j.vinted.slice(n0) });
     if (garde) dit(seq === 'CM' && r.etape === 'fait', "brouillon encore dans son dressing : Refaire met CE brouillon en ligne (aucun second)", `seq=${seq} ${r.raison || r.erreur || ''}`);
-    else dit(seq === 'PPBM' && r.etape === 'fait' && vb(f).etat === 'fait', "brouillon disparu de Vinted (dressing complet lu après) : Refaire en crée un NEUF depuis VRM, puis le met en ligne", `seq=${seq} ${r.raison || r.erreur || ''}`); }
+    else dit(seq === 'PPBCM' && r.etape === 'fait' && vb(f).etat === 'fait', "brouillon disparu de Vinted (dressing complet lu après) : Refaire en crée un NEUF depuis VRM, puis le met en ligne", `seq=${seq} ${r.raison || r.erreur || ''}`); }
   { for (const [etat, code, msg] of [['fait', 'deja', 'déjà fait'], ['mise-en-ligne-incertaine', 'incertaine', 'mise en ligne sans réponse claire'], ['enregistre', 'en-cours', 'passage commencé il y a moins de 10 min']]) {
       const f = monter({ src: process.env.BG_SRC || undefined, extra: { coffre_111_9101: { id: '9101', title: 'Nike', price: 60, photos: PHOTOS, versBrouillon: { corps: JSON.stringify({ draft: { title: 'Nike', price: '60', catalog_id: 1, description: 'x' } }), etat, at: nowISO(), uid: '111', publier: true, supprime: true } } } });
       const r = await refaire(f);
@@ -732,8 +774,11 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     const att = f.store.vrmRepubAttente || {};
     dit(r.etape === 'attente' && de(f.j, /drafts\/88001\/completion$/).length === 1 && att['9202'] && !att['9101'], "réveil et planification en même temps : A mise en ligne UNE fois, B toujours planifiée", JSON.stringify({ m: de(f.j, /drafts\/88001\/completion$/).length, cles: Object.keys(att) })); }
   { // 2. Un job resté « en cours » (service worker tué) : jamais rejoué, il est DIT.
+    //    (17 nov., 5.408) Après l'envoi (ou sans phase connue), il est relu 2 min plus tard ; une relecture
+    //    qui ne dit pas `is_draft` (ce faux Vinted) laisse « incertain » — jamais une seconde mise en ligne.
+    //    Les reprises sûres (rien d'envoyé, brouillon relu) : scripts/audit-republication-parfaite.cjs §B.
     const { f } = await run({ differer: true });
-    if (f.store.vrmRepubAttente && f.store.vrmRepubAttente['9101']) { f.store.vrmRepubAttente['9101'].du = 0; f.store.vrmRepubAttente['9101'].enCoursLe = Date.now() - 60000; }
+    if (f.store.vrmRepubAttente && f.store.vrmRepubAttente['9101']) { f.store.vrmRepubAttente['9101'].du = 0; f.store.vrmRepubAttente['9101'].enCoursLe = Date.now() - 3 * 60000; }
     try { await f.ctx.miseEnLigneTick(); } catch (_) {}
     const fin = f.j.evts.find((e) => e && e.quoi === 'repub' && e.id === '9101' && e.etape === 'fin');
     dit(de(f.j, /completion$/).length === 0 && fin && fin.fin && fin.fin.etape === 'incertain' && !Object.keys(f.store.vrmRepubAttente || {}).length, "mise en ligne interrompue par Chrome : rien n'est renvoyé, l'app apprend que c'est incertain", JSON.stringify({ m: de(f.j, /completion$/).length, fin: fin && fin.fin && fin.fin.etape })); }

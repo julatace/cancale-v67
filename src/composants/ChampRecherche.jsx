@@ -30,7 +30,7 @@ import { tr } from '../i18n/index.js';
 let N_CANAL = 0;
 
 export function ChampRecherche({ valeur = '', onChange, placeholder = 'Rechercher', label, micro = false, voix = 'requete',
-  onValider, autoFocus = false, inputRef, className = '', ...rest }) {
+  onValider, autoFocus = false, inputRef, className = '', fin = null, ...rest }) {
   const refLocal = React.useRef(null);
   const ref = inputRef || refLocal;
   const canalRef = React.useRef(null);
@@ -77,6 +77,8 @@ export function ChampRecherche({ valeur = '', onChange, placeholder = 'Recherche
           <IconeComposant nom="mic" taille={18}/>
         </button>
       ) : null}
+      {/* (17 nov., nouveau design) Un geste de plus DANS le champ (le scanner de Ventes), passé par l'écran ; absent ⇒ rien. */}
+      {fin}
       {phrase ? <span className="vrm-champ-recherche-voix" data-voix-erreur={phrase} role="status"
         style={{position:'absolute',left:0,top:'calc(100% + 4px)',width:'max(100%, 260px)',maxWidth:'calc(100vw - 32px)',boxSizing:'border-box',zIndex:5,fontSize:12,lineHeight:1.4,padding:'6px 10px',borderRadius:10,background:'var(--vrm-surface, #fff)',color:'var(--vrm-ink, #1D1D1F)',border:'1px solid var(--vrm-line, rgba(0,0,0,.1))',boxShadow:'0 2px 10px rgba(0,0,0,.12)'}}
         onClick={()=>effacerErreurVoix(canal)}>{PHRASES_VOIX[phrase] || PHRASES_VOIX.autre}</span> : null}

@@ -44,7 +44,7 @@
 }
 :root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:focus { outline: none !important; }
 :root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:has(select:focus-visible),
-:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3) !important; outline-offset: 2px; }
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:focus-visible { outline: 2px solid var(--vrm-accent, #16181D) !important; outline-offset: 2px; }
 /* Trier : la liste native du système (au doigt comme à la souris), posée sur le bouton. */
 :root:root:root body .vrm-main .vrm-annbar .vrm-annbar-tri > select.vrm-ann-tri {
   position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; min-width: 0 !important; min-height: 0 !important;
@@ -97,7 +97,7 @@ html body .vrm-ann-avis > button.vrm-ann-avis-neufs {
 }
 html body .vrm-ann-avis > button.vrm-ann-avis-neufs:only-child { flex: 1 1 auto; justify-content: space-between; border-radius: 12px !important; }
 html body .vrm-ann-avis > button.vrm-ann-avis-neufs b { font-weight: 700; font-variant-numeric: tabular-nums; }
-.vrm-ann-avis-voir { font-size: 13px; font-weight: 600; color: var(--vrm-accent-texte, #0066CC); }
+.vrm-ann-avis-voir { font-size: 13px; font-weight: 600; color: var(--vrm-accent-texte, #16181D); }
 html body .vrm-ann-avis > button.vrm-ann-avis-neufs[aria-expanded="true"] .vrm-ann-avis-voir { color: var(--vrm-muted); }
 html body .vrm-ann-avis > button.vrm-ann-avis-neufs:active { background: var(--vrm-b-teinte) !important; }
 .vrm-ann-achats-texte { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; line-height: 1.3; }
@@ -215,7 +215,7 @@ html body .vrm-act-main > .vrm-b:disabled { color: var(--vrm-muted) !important; 
 .vrm-act-paire-nom { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .vrm-act-paire-nom > b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-act-ok { display: inline-flex; margin-left: auto; color: var(--vrm-muted); flex: none; }
-html body .vrm-act .vrm-act-pb a { color: var(--vrm-accent-texte, #0066CC); }
+html body .vrm-act .vrm-act-pb a { color: var(--vrm-accent-texte, #16181D); }
 @media (max-width: 420px) {
   .vrm-act-tuiles { grid-template-columns: minmax(0, 1fr); }
 }
@@ -234,7 +234,7 @@ html body .vrm-act .vrm-act-pb a { color: var(--vrm-accent-texte, #0066CC); }
    3,6:1 sur la carte sombre, banc fusion-app F6). Dans l'écran Annonces et ses
    feuilles, le texte bleu est le bleu « lien » (`--vrm-accent-texte`), lisible dans
    les deux thèmes — par la variable, comme Compta (styles-compta-claire). */
-.vrm-main:has(.vrm-annbar), .vrm-main .vrm-sel, .vrm-act, .vrm-fiche-menu { --vrm-b-lien: var(--vrm-accent-texte, #0066CC); }
+.vrm-main[data-vrm-d25], .vrm-main .vrm-sel, .vrm-act, .vrm-fiche-menu { --vrm-b-lien: var(--vrm-accent-texte, #16181D); }
 
 
 /* ── 7. « N NOUVEAUX N° POSÉS PAR VRM » : la liste dépliée sous la ligne d'avis ── */
@@ -255,7 +255,7 @@ html body .vrm-act .vrm-act-pb a { color: var(--vrm-accent-texte, #0066CC); }
 .vrm-ann-neufs-prix-connu { font-size: 12px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
 .vrm-ann-neufs-prix-champ { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--vrm-muted); min-height: 44px; }
 .vrm-ann-neufs-prix-champ input { width: 92px; height: 36px; box-sizing: border-box; border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); border-radius: 12px; padding: 0 8px; background: transparent; color: var(--vrm-ink); font: inherit; font-size: 16px; outline: none; }
-.vrm-ann-neufs-prix-champ input:focus { border-color: var(--vrm-accent, #0071E3); }
+.vrm-ann-neufs-prix-champ input:focus { border-color: var(--vrm-accent, #16181D); }
 .vrm-ann-neufs-prix .vrm-b { max-width: 100%; }
 /* Au téléphone : la phrase du prix d'achat dans l'infobulle, la ligne reste UNE ligne. */
 @media (max-width: 767px) {
@@ -286,4 +286,4 @@ html body .vrm-ann-avis > button.vrm-ann-avis-neufs > svg { display: none; flex:
 
 /* (11 nov., lot accessibilité) « Vérifier » sur le remplissage gris : #0066CC = 4,36:1 ⇒ en
    clair un bleu un cran plus sombre (#005BB8 : 5,1:1), même teinte d’accent. */
-:root:not([data-theme="dark"]) body .vrm-ann-avis-voir { color: #005BB8; }
+:root:not([data-theme="dark"]) body .vrm-ann-avis-voir { color: #16181D; }

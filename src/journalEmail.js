@@ -72,6 +72,21 @@ const ANCIEN = 'Classé avant le 31 oct. — détail non gardé.';
 const ongletDuType = { suivi: 'cat_bord', bordereau: 'cat_bord', achat: 'achats', vente: 'cat_ventes', 'vente-vestiaire': 'cat_ventes', finalisation: 'cat_ventes', offre: 'cat_msg', message: 'cat_msg', favori: 'cat_annonces', action: 'cat_msg' };
 const TYPES_ANCIENS = { suivi: 'Suivi de colis', bordereau: 'Bordereau', achat: 'Reçu d’achat', vente: 'Vente', 'vente-vestiaire': 'Vente Vestiaire', finalisation: 'Versement', offre: 'Offre', message: 'Message', favori: 'Favori', action: 'Demande Vinted', 'connu-sans-action': 'Information', information: 'Information', ignoré: 'E-mail non reconnu' };
 
+// (19 nov.) L'E-MAIL VINTED D'UN ACHAT ARRIVÉ (« Commande mise à jour pour {titre} » : « ton achat t'attend au point
+// relais… », « ta commande t'attend ici… », « ton colis a été livré dans le Point Relais… » — api/_lib/achat-arrive-
+// relais.js). Il ne porte JAMAIS de n° de suivi : son identité est la conversation de la commande (`cv`). Julien
+// (19 nov., capture) en voyait une dizaine par jour « à vérifier · je n'ai pas trouvé le n° de suivi », que personne ne
+// peut traiter. Reconnu par ce que la route a écrit (un suivi « autre », arrivé, sans n°) ET le sujet de la famille —
+// avec `cv` (classé depuis le 19 nov.) ou sans (classé avant : la clé de sa ligne était déjà la conversation, mesuré
+// 61 sur 61). Jamais un e-mail de transporteur (il a son transporteur, et son n° de suivi quand il est lisible).
+const SUJET_ACHAT_VINTED = /^\s*(?:(?:TR|Fwd?|Re)\s*:\s*)*Commande mise [àa] jour pour\s+\S/i;
+export function arriveeAchatVinted(e) {
+  const r = e && e.resume && typeof e.resume === 'object' ? e.resume : null;
+  if (!r || r.t !== 'suivi' || r.s || r.tr !== 'autre' || r.st !== 'available' || r.sens === 'sortant') return false;
+  if (r.av && r.av !== 'sans-suivi') return false;
+  return !!r.cv || SUJET_ACHAT_VINTED.test(String((e && e.subject) || ''));
+}
+
 // e : une ligne du journal (route `mode=journal`) ; delies : { [id de la ligne
 // du reçu]: { tx } } — les reçus que LUI a déliés (« Ce n'est pas ça »).
 export function lectureEmail(e, delies = {}) {
@@ -104,10 +119,14 @@ export function lectureEmail(e, delies = {}) {
         : r.st === 'transit' ? 'Colis en route'
         : r.st === 'retour' ? 'Colis reparti chez l’expéditeur'
         : 'Nouvelles d’un colis';
+      // (19 nov.) L'e-mail Vinted « Commande mise à jour — ton achat t'attend » : pas de n° de suivi, mais la
+      // CONVERSATION de sa commande (`cv`, une identité) ⇒ rangé avec SON achat, rien à vérifier (`arriveeAchatVinted`).
+      const parAchat = arriveeAchatVinted(e);
       o = { quoi: r.lim && r.st === 'available' ? `${quoi} · à retirer avant le ${r.lim}` : quoi,
-        fait: r.s ? `Rangé avec le colis n° ${r.s}` : 'Gardé, relié à aucun colis',
-        lien: lien(r.sens === 'sortant' && r.st === 'delivered' ? 'cat_ventes' : r.st === 'delivered' ? 'achats' : 'cat_bord'),
-        cible: r.s ? { k: 'suivi', v: r.s } : null };
+        fait: r.s ? `Rangé avec le colis n° ${r.s}` : parAchat ? (r.cv ? 'Rangé avec ton achat, par la conversation de sa commande' : 'Rangé avec tes colis à retirer (l’e-mail de Vinted de ton achat)') : 'Gardé, relié à aucun colis',
+        lien: lien(r.sens === 'sortant' && r.st === 'delivered' ? 'cat_ventes' : (r.st === 'delivered' || parAchat) ? 'achats' : 'cat_bord'),
+        cible: r.s ? { k: 'suivi', v: r.s } : (parAchat && r.cv ? { k: 'conv', v: r.cv } : null) };
+      if (parAchat) { o.etat = 'range'; o.delier = { offert: false, pourquoi: 'Cet e-mail de Vinted est relié à ton achat par la conversation de sa commande, écrite dans son lien : rien n’a été deviné.' }; break; }
       if (r.av === 'sans-suivi') Object.assign(o, { raison: 'Je n’ai pas trouvé le n° de suivi dans cet e-mail : je ne sais pas à quel colis il appartient.', geste: 'Lis le texte ci-dessous ; si c’est un de tes colis, retrouve-le dans Colis par son code.' });
       o.delier = { offert: false, pourquoi: POURQUOI_PAS_DELIER.suivi };
       break;

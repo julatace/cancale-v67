@@ -33,4 +33,7 @@ export default {
   "nn.reglage.moi.phrase": "VRM no da ningún número: lee el que escribes en el anuncio y te pide un número para cada anuncio nuevo que no lo tenga.",
   "nn.reglage.toast.vrm": "Anotado: VRM numera los anuncios nuevos y te lo dice.",
   "nn.reglage.toast.moi": "Anotado: VRM ya no da números, lee el tuyo y te pide los que faltan.",
+  "nn.stock.titre": "Para escribir en tus cajas · {n}",
+  "nn.stock.pied": "Los N.º que VRM acaba de dar. Una vez escritos, toca «Escrito».",
+  "nn.stock.ecrit": "Escrito",
 };

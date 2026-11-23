@@ -21,8 +21,9 @@
 //   C5 un émoji coupé en deux par une borne de longueur ne fait plus refuser la
 //      ligne par la base (jsonb refuse un « surrogate » seul) ;
 //   C6 les non-lus Vestiaire sont rangés PAR COMPTE (et l'app les additionne) ;
-//   C7 répondre : la page refuse d'envoyer si son compte n'est pas celui que le
-//      fond attend (rien ne part) ;
+//   C7 répondre : (21 nov., décision de Julien « plus de requêtes » pour les écritures)
+//      l'ancien ordre « repondre » qui REJOUAIT une requête ne fait plus rien partir,
+//      quel que soit le compte (l'envoi passe par l'interface : audit-vc-ecrire) ;
 //   C8 Leboncoin : le compteur de messagerie et les comptes liés arrivés dans la
 //      même seconde sont TOUS LES DEUX rangés (plus de réécriture perdue) ;
 //   C9 l'app : une annonce plus vue depuis 24 h sous une lecture fraîche est
@@ -287,7 +288,9 @@ async function c7() {
   const n0 = p.appels.length;
   const r = await p.ordre({ jeton: 'jeton-banc-0001', conv: 'C777', texte: 'Bonjour', recette, compte: 'compteA' });
   const fin = r.find((x) => x.kind === 'vcenvoiresultat');
-  dit(fin && fin.statut === 0 && fin.erreur === 'autre-compte' && p.appels.length === n0, 'C7 · la page est sur le compte B, le fond veut parler pour A : rien ne part, c’est dit', JSON.stringify({ fin, envois: p.appels.length - n0 }));
+  dit(!fin && p.appels.length === n0, 'C7 · l’ordre « repondre » par REQUÊTE est retiré (21 nov.) : aucune requête ne part, même pour un autre compte', JSON.stringify({ fin, envois: p.appels.length - n0 }));
+  const r2 = await p.ordre({ jeton: 'jeton-banc-0002', conv: 'C777', texte: 'Bonjour', recette, compte: 'compteB' });
+  dit(!r2.find((x) => x.kind === 'vcenvoiresultat') && p.appels.length === n0, 'C7 · même sur le bon compte, aucune requête d’envoi ne part plus de vc-inject', JSON.stringify({ envois: p.appels.length - n0 }));
 }
 
 async function c8() {
