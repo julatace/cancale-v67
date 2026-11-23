@@ -482,6 +482,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **23 nov. · « Vinted a agi » regroupée (`claude/moderation-carte`)** : disparues d'un compte = un groupe (compte et dates une fois, « Pourquoi ? », un bouton « Vérifier sur Vinted », lignes photo + N° + « Vu ») ; ni orange ni trait de bord ; règle inchangée. `docs/passation/2026-11-23-moderation-carte.md`. Geste : aucun.
 - **23 nov. · Gris clair étagé (`claude/style-clair`)** : variante A validée (gris froid, accent ardoise), sombre = gris choisi ; iPhone compact ; dessin fin ; pop-up d'événement + galerie du propriétaire. `docs/passation/2026-11-23-style-clair.md`. Geste : essayer le pop-up sur un vrai iPhone.
 - **23 nov. · Photos nettes (`claude/photos-nettes`)** : chaque photo Vinted prend la plus petite taille DÉJÀ LUE du même fichier qui donne 2 px réels par point (`src/photoTaille.js`) ; visionneuse progressive (petite puis grande) ; aucune adresse fabriquée (chaque taille a sa signature). Achats : souvent 150x210 seule. `docs/passation/2026-11-23-photos-nettes.md`. Geste : aucun.
 - **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.

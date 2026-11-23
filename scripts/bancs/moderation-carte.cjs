@@ -152,6 +152,9 @@ async function verifierGroupes(pg, nom, attendus) {
     dit((await gi.locator('[data-moderation-fenetre]').count()) === 1 && /entre le .+ et le /.test(await gi.locator('[data-moderation-fenetre]').innerText()), `${nom} : ${a.login} : la fenêtre dite une fois (« entre le … et le … »)`, (await gi.locator('[data-moderation-fenetre]').count()) ? await gi.locator('[data-moderation-fenetre]').innerText() : '');
     const lignesTxt = await gi.locator('[data-moderation-sorte="disparue"]').allInnerTexts();
     dit(lignesTxt.every((t) => !/entre le|vue |·|Vinted|vente/i.test(t)), `${nom} : ${a.login} : aucune ligne ne répète compte, fenêtre ou explication`, lignesTxt.find((t) => /entre le|vue |·|Vinted|vente/i.test(t)));
+    // « Trop de texte » (23 nov.) : aucun texte VISIBLE de plus de 8 mots dans le groupe (« Pourquoi ? » replié).
+    const longs = await gi.evaluate((g) => [...g.querySelectorAll('*')].filter((e) => e.getClientRects().length && ![...e.children].some((c) => c.getClientRects().length && c.innerText)).map((e) => String(e.innerText || '').trim()).filter((t) => t && t.split(/\s+/).length > 8));
+    dit(!longs.length, `${nom} : ${a.login} : aucun texte visible de plus de 8 mots`, longs.join(' | '));
     // 2. l'explication UNE fois, sous « Pourquoi ? » (repliée).
     dit((await gi.locator('[data-moderation-pourquoi="disparue"]').count()) === 1, `${nom} : ${a.login} : un seul « Pourquoi ? »`, String(await gi.locator('[data-moderation-pourquoi="disparue"]').count()));
     dit(occurrences(await gi.textContent(), 'Aucune vente prouvée') === 1, `${nom} : ${a.login} : l’explication « Aucune vente prouvée » une seule fois`, String(occurrences(await gi.textContent(), 'Aucune vente prouvée')));
