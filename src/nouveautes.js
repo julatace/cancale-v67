@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (23 nov., Julien : « tous les tutos doivent ressembler à l'application ») docs/passation/2026-11-23-tutos-design.md
+  { id: 'tutos-au-design', date: '2026-11-23', titre: 'Aide, vidéos et e-mails au nouveau design', phrase: 'Captures, vidéos et e-mails montrent l’app d’aujourd’hui.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov., audit « chaque bouton marche ») docs/passation/2026-11-23-audit-boutons.md
   { id: 'boutons-reveilles', date: '2026-11-23', titre: 'Les boutons qui ne faisaient rien, réparés', phrase: 'Poignée des feuilles, retour au téléphone, Échap, menu des achats.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., latence-totale — Julien : « l'app bug beaucoup trop ») docs/passation/2026-11-22-latence.md
