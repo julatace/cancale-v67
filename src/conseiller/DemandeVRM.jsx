@@ -96,7 +96,7 @@ export default function DemandeVRM({ sources = null, conseils = [], outils = nul
               {(x.chiffres.length ? x.chiffres.map((c) => `${c.libelle} : ${c.valeur}`).join(' · ') + ' · ' : '') + tr('ia.cout', { c: usd(x.cout) })}</span>
             {x.geste && x.geste !== 'aucun' && GESTE_LIB[x.geste] && onGeste ? <Bouton variante="teinte" taille="compact" onClick={() => onGeste(x.geste)} attrs={{ 'data-ia-geste': x.geste }}>{tr(GESTE_LIB[x.geste])}</Bouton> : null}
           </div>}/>)) : null}
-      {posee ? <Rangee titre={tr('ia.estimation', { c: usd(estime) })} sousTitre={tr('ia.estimationSous', { fin: cle.fin || '' })} lignes={1} sousLignes={2}
+      {posee ? <Rangee titre={tr('ia.estimation', { c: usd(estime) })} sousTitre={tr('ia.estimationSous', { fin: cle.fin || '' })} lignes={2} sousLignes={2}
         fin={<Bouton variante="destructif" taille="compact" confirmation={tr('ia.cle.retirerConfirme')} onClick={() => envoyerCle('retirer')} attrs={{ 'data-ia-cle-retirer': '' }}>{tr('ia.cle.retirer')}</Bouton>}
         attrs={{ 'data-ia-estimation': String(estime) }}/> : null}
     </Groupe>
