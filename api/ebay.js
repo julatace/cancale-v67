@@ -38,6 +38,7 @@ import { creerRouteAlertes, lectureProjetee } from './_lib/ebay-alertes.js';
 import { portee as porteeEbay } from './_lib/ebay.js';
 import { traiterSuppressionEbay } from './_lib/ebay-suppression.js';
 import { lireItemRelance, jugerRelance, xmlRelance, ID_ANNONCE_EBAY } from './_lib/ebay-relance.js';
+import { jugerOffre, offreEnCours, offresEnCours, noterOffre } from './_lib/ebay-offre.js';   // (23 nov.) le prix vu, une offre par annonce
 import { televerserPhotoEbay } from './_lib/ebay-photo.js';
 import { creerRemisesEbay } from './_lib/ebay-remises.js';
 // (15 nov., eBay complet 2) L'argent réel (Finances, signé), le trafic, la santé du compte, les litiges.
@@ -1438,8 +1439,12 @@ async function handleOffreInfo(ctx) {
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const e = await eligiblesOffre(at.token);
   if (!e.ok) return { status: e.status || 502, body: { ok: false, reason: e.reason, error: e.error } };
-  return { status: 200, body: { ok: true, eligibles: e.ids, complet: e.complet } };
+  // (23 nov.) Les offres envoyées depuis moins de 48 h (journal de VRM) : `null` = pas su.
+  const jo = await lireDonnee(ligneDe(JOURNAL_OFFRES, ctx), ctx.owner);
+  return { status: 200, body: { ok: true, eligibles: e.ids, complet: e.complet, enCours: jo === undefined ? null : offresEnCours(jo) } };
 }
+// (23 nov.) Le journal des offres envoyées, par compte eBay (une PETITE ligne).
+const JOURNAL_OFFRES = 'ebay_offres_envoyees';
 // Le message joint à l'offre : du texte, 2 000 caractères au plus (limite
 // d'eBay). `null` = trop long (on refuse plutôt que de couper sa phrase).
 function texteOffre(m) {
@@ -1456,13 +1461,28 @@ async function handleOffre(b, ctx) {
   if (!Number.isInteger(remise) || remise < 5 || remise > 50) return { status: 400, body: { ok: false, reason: 'remise', error: 'La remise doit être un nombre entier entre 5 et 50 %.' } };
   const message = texteOffre(b.message);
   if (message === null) return { status: 400, body: { ok: false, reason: 'message', error: 'Message trop long (2 000 caractères au plus).' } };
+  // (23 nov.) LE PRIX VU (§2.8) : l'offre part en pourcentage du prix qu'eBay tient ; sans le prix que
+  //    Julien a vu, on ne peut pas vérifier qu'elle part au prix montré ⇒ rien.
+  if (prixLu(b.prixVu) == null) return { status: 400, body: { ok: false, reason: 'prix', error: PRIX_ILLISIBLE } };
   const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  // (23 nov.) UNE OFFRE PAR ANNONCE, 48 h : le journal relu ; illisible ⇒ rien ne part.
+  const ligneJ = ligneDe(JOURNAL_OFFRES, ctx);
+  const jo = await lireDonnee(ligneJ, ctx.owner);
+  if (jo === undefined) return { status: 503, body: { ok: false, reason: 'journal-pas-su', error: 'Je n\'ai pas pu relire les offres déjà envoyées — rien n\'a été envoyé.' } };
+  const deja = offreEnCours(jo, listingId);
+  if (deja) return { status: 409, body: { ok: false, reason: 'deja-envoyee', error: `Une offre est déjà partie sur cette annonce le ${new Date(deja.at).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} : elle court jusqu'au ${new Date(deja.jusqua).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} — rien n'a été envoyé.`, enCours: deja } };
   // On REVÉRIFIE chez eBay, au moment d'envoyer : l'écran a pu être ouvert il y
   // a une heure. « Pas su » ⇒ on n'envoie pas.
   const e = await eligiblesOffre(at.token);
   if (!e.ok) return { status: e.status || 502, body: { ok: false, reason: e.reason, error: 'Je n\'ai pas pu vérifier chez eBay que cette annonce a des observateurs — rien n\'a été envoyé.' } };
   if (!e.ids.includes(listingId)) return { status: 409, body: { ok: false, reason: 'non-eligible', error: 'eBay n\'a personne à qui envoyer une offre pour cette annonce en ce moment — rien n\'a été envoyé.' } };
+  // (23 nov.) L'annonce RELUE chez eBay : en ligne, sans variantes, même devise, au prix vu (au centime).
+  const g = await tradingCall(at.token, 'GetItem', `<ItemID>${listingId}</ItemID>`);
+  if (sansAck(g) || !g.ok) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'eBay n\'a pas rendu le prix de cette annonce — rien n\'a été envoyé.' } };
+  const jg = jugerOffre(lireItemRelance(g.xml), { listingId, prixVu: b.prixVu, remise }, { devise: marcheCourant().devise });
+  if (!jg.ok) return { status: jg.status, body: jg.body };
+  const noter = (etat, envoyees) => modifierDonnee(ligneJ, ctx.owner, noterOffre({ listingId, at: new Date().toISOString(), remise, prixCents: jg.prixCents, offreCents: jg.offreCents, envoyees, etat })).catch(() => false);
   const corps = { allowCounterOffer: false, offerDuration: { unit: 'DAY', value: 2 }, offeredItems: [{ listingId, discountPercentage: String(remise), quantity: 1 }] };
   if (message) corps.message = message;
   let r;
@@ -1475,7 +1495,8 @@ async function handleOffre(b, ctx) {
   } catch (_) {
     // La requête a pu ARRIVER chez eBay avant la coupure : on ne dit ni
     // « envoyée » ni « pas envoyée ».
-    return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu — je ne sais pas si l\'offre est partie. Regarde sur eBay avant de la renvoyer.' } };
+    const nI = await noter('incertaine', null);
+    return { status: 504, body: { ok: false, reason: 'incertain', note: nI === true, error: 'eBay n\'a pas répondu — je ne sais pas si l\'offre est partie. Regarde sur eBay avant de la renvoyer.' } };
   }
   const txt = await r.text().catch(() => '');
   let j = null; try { j = JSON.parse(txt); } catch (_) {}
@@ -1484,7 +1505,8 @@ async function handleOffre(b, ctx) {
     return { status: r.status >= 400 ? r.status : 502, body: { ok: false, error: messageEbaySur(e0 && (e0.longMessage || e0.message)) || 'eBay a refusé l\'offre.' } };
   }
   const offres = (j && Array.isArray(j.offers)) ? j.offers : [];
-  return { status: 200, body: { ok: true, remise, envoyees: offres.length } };
+  const nOk = await noter('envoyee', offres.length);
+  return { status: 200, body: { ok: true, remise, envoyees: offres.length, prix: jg.prixCents / 100, prixOffre: jg.offreCents / 100, note: nOk === true } };
 }
 
 // ── RETIRER UNE ANNONCE eBAY (Trading EndFixedPriceItem) ────────────────────
