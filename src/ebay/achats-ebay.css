@@ -6,37 +6,22 @@
    sombre), des champs en porcelaine opaque avec un bord, 44 px au doigt. Rien n'est posé sur le
    fond hors d'une carte. Sans le verre, les replis gardent l'écran lisible. */
 .eba {
-  --eba-carte: var(--sv-verre, #FFFFFF);
-  --eba-encre: var(--sv-encre, #1D1D1F);
-  --eba-gris: var(--sv-encre-2, #515154);
-  --eba-lien: var(--sv-lien, #0060CC);
-  --eba-ambre: var(--sv-ambre, #8A4B00);
-  --eba-champ: #FFFFFF;
-  --eba-champ-encre: #0C1D30;
-  --eba-champ-gris: #4E5D6C;
-  --eba-bord: rgb(12 29 48 / .28);
-  --eba-trait: rgb(12 29 48 / .12);
-  --eba-plein: #0C1D30;
-  --eba-plein-encre: #FFFFFF;
-  --eba-inter-fond: rgb(12 29 48 / .22);
-  --eba-inter-on: #1F7A3E;
+  /* (23 nov., intégration) Les jetons natifs de main (src/natif/jetons.css, « noir encre ») : clair et sombre suivent seuls. */
+  --eba-carte: var(--n-carte);
+  --eba-encre: var(--n-encre);
+  --eba-gris: var(--n-encre-2);
+  --eba-lien: var(--n-accent);
+  --eba-ambre: var(--n-ambre);
+  --eba-champ: var(--n-carte-2);
+  --eba-champ-encre: var(--n-encre);
+  --eba-champ-gris: var(--n-encre-2);
+  --eba-bord: var(--n-bord);
+  --eba-trait: var(--n-gris-bord);
+  --eba-plein: var(--n-plein);
+  --eba-plein-encre: var(--n-inverse);
+  --eba-inter-fond: var(--n-gris-fond);
+  --eba-inter-on: var(--n-accent);
   display: grid; gap: 14px; margin: 0 0 18px; min-width: 0; color: var(--eba-encre);
-}
-:root[data-theme="dark"] .eba {
-  --eba-carte: var(--sv-verre, #1C1C1E);
-  --eba-encre: var(--sv-encre, #F2F2F7);
-  --eba-gris: var(--sv-encre-2, #AEAEB2);
-  --eba-lien: var(--sv-lien, #6CB4FF);
-  --eba-ambre: var(--sv-ambre, #F2B65E);
-  --eba-champ: #0F1D30;
-  --eba-champ-encre: #EAF2FB;
-  --eba-champ-gris: #A9BBCE;
-  --eba-bord: rgb(255 255 255 / .30);
-  --eba-trait: rgb(255 255 255 / .12);
-  --eba-plein: #EAF2FB;
-  --eba-plein-encre: #0C1D30;
-  --eba-inter-fond: rgb(255 255 255 / .26);
-  --eba-inter-on: #34A853;
 }
 .eba * { box-sizing: border-box; }
 @media (min-width: 1100px) {
@@ -45,7 +30,7 @@
 }
 .eba-carte {
   background: var(--eba-carte); color: var(--eba-encre); border-radius: 18px; padding: 16px;
-  box-shadow: var(--sv-ombre, 0 1px 3px rgb(0 0 0 / .08)); border: 1px solid var(--sv-bord, rgb(0 0 0 / .06));
+  box-shadow: var(--n-ombre-carte); border: 1px solid var(--n-bord);
   min-width: 0; display: grid; gap: 12px;
 }
 .eba-tete { display: flex; align-items: center; gap: 8px; min-height: 32px; min-width: 0; }
@@ -110,7 +95,7 @@
 .eba-a-meta { display: flex; flex-wrap: wrap; gap: 0 6px; font-size: 13px; line-height: 1.4; color: var(--eba-gris); min-width: 0; }
 .eba .eba-prix { color: var(--eba-encre); font-weight: 600; font-variant-numeric: tabular-nums; }
 .eba-a-act { grid-column: 2; display: flex; align-items: center; gap: 4px; margin-left: -6px; flex-wrap: wrap; }
-.eba .eba-nouveau { font-size: 11px; font-weight: 700; color: var(--eba-lien); margin-right: 6px; text-transform: uppercase; letter-spacing: .3px; }
+.eba .eba-nouveau { font-size: 11px; font-weight: 700; color: var(--eba-lien); margin-right: 6px; }
 .eba-plus-liste { justify-self: start; }
 
 /* Mes recherches : une ligne par recherche. */
@@ -141,7 +126,7 @@
 .eba-menu { position: relative; flex-shrink: 0; }
 .eba-menu > summary { list-style: none; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; cursor: pointer; color: var(--eba-encre); font-size: 20px; font-weight: 700; letter-spacing: 1px; -webkit-tap-highlight-color: transparent; }
 .eba-menu > summary::-webkit-details-marker { display: none; }
-.eba-menu-corps { position: absolute; right: 0; top: 46px; z-index: 30; min-width: 220px; display: grid; padding: 6px; border-radius: 14px; background: var(--sv-porcelaine, #FFFFFF); color: var(--sv-encre, #1D1D1F); box-shadow: 0 12px 32px rgb(0 0 0 / .22), 0 0 0 1px rgb(0 0 0 / .06); }
+.eba-menu-corps { position: absolute; right: 0; top: 46px; z-index: 30; min-width: 220px; display: grid; padding: 6px; border-radius: 14px; background: var(--n-carte); color: var(--n-encre); box-shadow: 0 12px 32px rgb(0 0 0 / .22), 0 0 0 1px rgb(0 0 0 / .06); }
 .eba .eba-menu-corps button { display: flex; align-items: center; min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px; background: none; color: inherit; font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
 .eba .eba-menu-corps button:disabled { opacity: .5; }
 
@@ -154,7 +139,5 @@
 .eba-details p { margin: 2px 0; }
 
 /* « Tes achats gagnés sur eBay » (le repli sous les trois cartes, App.jsx) : une carte aussi. */
-.vrm-repli.eba-gagnes { background: var(--sv-verre, #FFFFFF); color: var(--sv-encre, #1D1D1F); border-radius: 18px; padding: 4px 16px; box-shadow: var(--sv-ombre, 0 1px 3px rgb(0 0 0 / .08)); border: 1px solid var(--sv-bord, rgb(0 0 0 / .06)); }
-.vrm-repli.eba-gagnes > summary { color: var(--sv-encre, #1D1D1F) !important; min-height: 44px; display: flex; align-items: center; font-weight: 600; font-size: 15px; }
-:root[data-theme="dark"] .vrm-repli.eba-gagnes { background: var(--sv-verre, #1C1C1E); color: var(--sv-encre, #F2F2F7); }
-:root[data-theme="dark"] .vrm-repli.eba-gagnes > summary { color: var(--sv-encre, #F2F2F7) !important; }
+.vrm-repli.eba-gagnes { background: var(--n-carte); color: var(--n-encre); border-radius: var(--n-r-carte); padding: 4px 16px; box-shadow: var(--n-ombre-carte); border: 1px solid var(--n-bord); }
+.vrm-repli.eba-gagnes > summary { color: var(--n-encre) !important; min-height: 44px; display: flex; align-items: center; font-weight: 600; font-size: 15px; }

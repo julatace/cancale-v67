@@ -54,7 +54,8 @@ export default {
   "etag.descendus": {"one": "{liste} ha bajado una posición.", "other": "{liste} han bajado una posición."},
   "etag.descendusCrans": {"one": "{liste} ha bajado {crans} posiciones.", "other": "{liste} han bajado {crans} posiciones."},
   "etag.site.enligne": "publicado",
-  "etag.site.aconfirmer": "por confirmar",
+  "etag.site.aconfirmer": "sin revisar hace tiempo",
   "etag.site.masquee": "oculto por Vinted",
   "etag.site.depuis": "desde el {date}",
+  "etag.glisser": "Arrastra «{nom}» arriba o abajo",
 };

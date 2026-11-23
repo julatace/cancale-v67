@@ -25,7 +25,8 @@
   position: relative; font-weight: 600; color: var(--p-encre, currentColor); text-decoration: underline; text-underline-offset: 2px;
 }
 /* 44 px au doigt sans grandir la ligne : la zone de toucher déborde autour du mot. */
-.vrm-rpf-itineraire::after { content: ''; position: absolute; inset: -12px -8px; }
+/* (20 nov., chasse-bugs-2) Centrée sur le mot et haute de 44 px : `inset: -12px` sur un mot de 16 px ne faisait que 40 (banc parcours-chasse). */
+.vrm-rpf-itineraire::after { content: ''; position: absolute; left: -8px; right: -8px; top: 50%; height: 44px; transform: translateY(-50%); }
 
 /* ── (12 nov., finitions — Julien : « regarde comment rien n'est cohérent ») UNE FORME DE LIGNE ──────────
    Chaque colis à retirer a les MÊMES zones, aux MÊMES places (src/CarteRelais.jsx, `LigneRetraitF`) :
@@ -46,9 +47,34 @@
 /* (12 nov., finitions) Le QR : une petite icône à côté du code, sur la ligne ; au doigt une zone de 44 px autour
    (sans grandir la ligne) ⇒ le QR en grand. Plus de tuile QR sous la vignette. */
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-comptoir { overflow: visible !important; }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr-mini { position: relative; display: inline-grid; place-items: center; width: 26px; height: 26px; margin-left: 10px; border-radius: 7px; background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--p-encre, currentColor); cursor: pointer; flex: none; }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr-mini svg { width: 16px; height: 16px; }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr-mini::after { content: ''; position: absolute; inset: -9px; }
+/* (16 nov., lot achats-qr — Julien : « le QR code doit être bien mieux placé ») Plus de petite icône grise : un vrai
+   bouton « Afficher le QR » (icône + texte, 44 px) dans la rangée des gestes, à côté de « J'ai retiré ». Au téléphone
+   la ligne d'un colis AVEC QR passe sur deux étages : le colis en entier, puis [Afficher le QR] [J'ai retiré]. */
+:root:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr { display: flex !important; align-items: center !important; justify-content: center !important; gap: 8px !important; min-height: 44px !important; height: 44px !important; padding: 0 14px !important; font-weight: 650 !important; }
+:root:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr svg { width: 20px; height: 20px; flex: none; }
+/* Au téléphone, la ligne garde UNE forme (même hauteur que les autres colis, « J'ai retiré » au même pixel) : le bouton
+   dit « QR » à côté de son icône ; le libellé entier reste son nom (aria-label) et s'écrit dès qu'il y a la place. */
+@media (max-width: 480px) {
+  :root:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr .vrm-rpf-qr-long { display: none !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr { padding: 0 12px !important; gap: 6px !important; font-size: 14px !important; }
+}
+@media (min-width: 481px) { :root:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr .vrm-rpf-qr-court { display: none !important; } }
+/* Achats → À retirer au téléphone (là où Julien est au comptoir) : la ligne d'un colis AVEC QR passe sur deux étages —
+   le colis en entier (titre, code, n°, délai), puis [▣ Afficher le QR] [J'ai retiré] : le QR est LE geste évident. */
+@media (max-width: 767px) {
+  :root:root:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-ligne[data-rp-a-qr] > .vrm-rpf-rang { display: flex !important; flex-wrap: wrap !important; row-gap: 10px !important; column-gap: 8px !important; }
+  :root:root:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-ligne[data-rp-a-qr] > .vrm-rpf-rang > .vrm-rpf-ouvrir { flex: 1 1 100% !important; min-width: 0 !important; }
+  :root:root:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-ligne[data-rp-a-qr] > .vrm-rpf-rang > .vrm-rpf-qr { flex: 1 1 auto !important; order: 2 !important; font-size: 15px !important; padding: 0 16px !important; }
+  :root:root:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-ligne[data-rp-a-qr] > .vrm-rpf-rang > .vrm-rpf-retire { flex: 0 0 auto !important; order: 3 !important; }
+  :root:root:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-ligne[data-rp-a-qr] .vrm-rpf-qr .vrm-rpf-qr-long { display: inline !important; }
+  :root:root:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-ligne[data-rp-a-qr] .vrm-rpf-qr .vrm-rpf-qr-court { display: none !important; }
+}
+/* Le n° de suivi : coupé à l'écran, copié en entier au toucher (le tiret du bas dit qu'il se touche). */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-suivi-copie { cursor: copy; text-decoration: underline dotted; text-underline-offset: 3px; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-suivi-copie[data-rp-suivi-copie-etat="copie"] { text-decoration: none; color: var(--p-encre, currentColor); }
+/* « Achat pas encore relié · Relier » : sous la ligne, aligné sur le texte, le geste en lien (44 px). */
+.vrm-rpf-relier { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: -6px 0 6px 60px; font-size: 13px; color: var(--p-gris, #6E6E73); }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-relier .vrm-rpf-relier-b { min-height: 44px; padding: 0 6px; border: 0; background: transparent; color: var(--p-encre, #1d1d1f); font: 650 13px/1 var(--vrm-police, system-ui); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 /* « QR en grand » dans la rangée des gestes : une vignette du QR + le mot. */
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-qr-grand img { width: 22px !important; height: 22px !important; border-radius: 3px; background: #fff; }
 /* Au téléphone, le NOM du point garde toute sa ligne (« Phone C… » était rogné par « 4 colis · 1 code à venir ·
@@ -87,7 +113,7 @@
 :root[data-theme="dark"]:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):not([data-colis-retire]) { background: rgba(118, 118, 128, .24) !important; color: #F5F5F7 !important; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes img { width: 28px !important; height: 28px !important; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes > [data-colis-retire] { display: none !important; }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):focus-visible { outline: 2px solid var(--fu-bleu, #0071e3) !important; outline-offset: 2px !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):focus-visible { outline: 2px solid var(--fu-bleu, #16181D) !important; outline-offset: 2px !important; }
 @media (max-width: 599px) {
   :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail { padding-left: 0 !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-l { grid-template-columns: 104px minmax(0, 1fr) !important; }

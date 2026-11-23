@@ -122,7 +122,7 @@ async function ouvrir(b, vp, sc, { sombre = false, onglet = 'journee', vc = null
   pg.on('pageerror', (e) => errs.push(e.message));
   await pg.clock.install({ time: maintenant });
   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_prenom', JSON.stringify('Julien')); if (s) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, sombre);
-  await pg.addInitScript(PONT, { version: '5.393.0' });
+  await pg.addInitScript(PONT, { version: '5.395.0' });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font', 'document'].includes(r.request().resourceType()) || /api-adresse|openfreemap/.test(r.request().url()) ? r.abort() : r.continue()));
   const LIGNES = sc ? Object.entries(sc.listings).map(([uid, l]) => ({ id: `harvest_${uid}_listings`, data: { capturedAt: l.cap, uid, payload: { items: l.items, pagination: { total_entries: l.items.length } } } })) : [];
   if (sc && sc.empreintes) for (const [uid, an] of Object.entries(sc.empreintes)) LIGNES.push({ id: `photo_emprunte_${uid}`, data: { capturedAt: iso(1), payload: { version: 1, annonces: an } } });

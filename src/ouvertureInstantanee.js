@@ -86,20 +86,61 @@ export function ouvreMaJournee(stock, search, uid, maintenant = Date.now()) {
   } catch (_) { return false; }
 }
 
+// LA PORTE commune (instantané de Ma journée, copie d'un écran) : rien que ce que la porte « hors ligne à froid »
+// laisserait voir. Rend { uid } ou { raison }.
+export function porteOuverture({ stock, maintenant = Date.now() } = {}) {
+  if (!stock) return { raison: 'stockage' };
+  const session = lireJson(stock, 'vrm_session');
+  const uid = session && session.user && typeof session.user.id === 'string' ? session.user.id : '';
+  if (!uid) return { raison: 'session' };
+  if (!mfaPassee(session)) return { raison: 'mfa' };
+  const lp = laissezPasserHorsLigne({ stock, session, maintenant });
+  if (!lp.ok) return { raison: 'porte:' + lp.raison };
+  const abo = lp.abo || null;
+  if (!abo || abo.acces === false) return { raison: 'abonnement' };
+  try { if (etatAbonnement(abo, maintenant).lectureSeule) return { raison: 'abonnement' }; } catch (_) { return { raison: 'abonnement' }; }
+  if (!boutiquePropre(stock, uid)) return { raison: 'equipe' };
+  return { uid };
+}
+// (20 nov., affichage instantané) L'écran qui va s'ouvrir : le lien `?tab=`, sinon la reprise de moins de 30 min,
+// sinon Ma journée. null = un autre chemin (connexion, retour d'e-mail…) ou pas su.
+export function ecranQuiOuvre(stock, search, uid, maintenant = Date.now()) {
+  const q = String(search || '');
+  if (LIENS_AUTRES.test(q)) return null;
+  const m = /[?&]tab=([^&]*)/.exec(q);
+  if (m) { try { return decodeURIComponent(m[1]); } catch (_) { return null; } }
+  try {
+    const carte = lireCarte(lireJson(stock, CLE_REPRISE_ECRANS), uid);
+    const r = ecranAOuvrir({ carte, locale: repriseLocale(stock, uid), ongletsOk: TOUS_ONGLETS, search: q, now: maintenant });
+    return r ? r.tab : 'journee';
+  } catch (_) { return null; }
+}
+// La décision de la COPIE d'un écran (src/copieEcran.js) : la porte, l'écran qui s'ouvre, une copie du JOUR de cet
+// écran rangée sur CET appareil pour CE compte, avec sa coque, à la même largeur et dans le même thème.
+// Rend { uid, ecran } ou { raison }. Ne lit QUE l'index synchrone : la copie elle-même est lue ensuite (IndexedDB).
+export function apercuCopie({ stock, search = '', maintenant = Date.now(), largeur = 0, theme = '', index = null } = {}) {
+  try {
+    const p = porteOuverture({ stock, maintenant });
+    if (!p.uid) return p;
+    const ecran = ecranQuiOuvre(stock, search, p.uid, maintenant);
+    if (!ecran) return { raison: 'ecran' };
+    const e = (index || {})[ecran];
+    if (!e || !e.coque) return { raison: 'copie' };
+    const d = new Date(maintenant);
+    const jour = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (e.jour !== jour) return { raison: 'copie:jour' };
+    if (largeur && e.largeur && Math.abs(e.largeur - largeur) > 2) return { raison: 'copie:largeur' };
+    if ((e.theme || '') !== (theme || '')) return { raison: 'copie:theme' };
+    return { uid: p.uid, ecran };
+  } catch (_) { return { raison: 'erreur' }; }
+}
+
 // LA décision. Rend { uid, snap, montrable } ou { raison } (jamais une exception).
 export function apercuOuverture({ stock, search = '', maintenant = Date.now() } = {}) {
   try {
-    if (!stock) return { raison: 'stockage' };
-    const session = lireJson(stock, 'vrm_session');
-    const uid = session && session.user && typeof session.user.id === 'string' ? session.user.id : '';
-    if (!uid) return { raison: 'session' };
-    if (!mfaPassee(session)) return { raison: 'mfa' };
-    const lp = laissezPasserHorsLigne({ stock, session, maintenant });
-    if (!lp.ok) return { raison: 'porte:' + lp.raison };
-    const abo = lp.abo || null;
-    if (!abo || abo.acces === false) return { raison: 'abonnement' };
-    try { if (etatAbonnement(abo, maintenant).lectureSeule) return { raison: 'abonnement' }; } catch (_) { return { raison: 'abonnement' }; }
-    if (!boutiquePropre(stock, uid)) return { raison: 'equipe' };
+    const p = porteOuverture({ stock, maintenant });
+    if (!p.uid) return p;
+    const uid = p.uid;
     if (!ouvreMaJournee(stock, search, uid, maintenant)) return { raison: 'ecran' };
     const snap = lireInstantane(uid, { maintenant, ls: stock });
     const montrable = instantaneMontrable(snap, maintenant);

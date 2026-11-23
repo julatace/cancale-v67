@@ -242,7 +242,8 @@ export function texteAlerte(a) {
       titre: caBaisse ? `Ton CA ${deMois(a.ym)} est passé de ${euros(a.caDe)} à ${euros(a.caA)}` : `Les ventes ${deMois(a.ym)} sont passées de ${a.nDe} à ${a.nA}`,
       phrase: 'Un mois passé ne devrait plus baisser : vérifie.',
       pourquoi: `${a.nDe} ${pl(a.nDe, 'vente', 'ventes')} avant, ${a.nA} maintenant. Un compte pas lu ou une vente annulée peut l’expliquer.`,
-      geste: { libelle: 'Voir le mois', aller: '/?tab=compta&cible=urssaf' },
+      // (16 nov.) Argent → « Déclarer » (la section URSSAF y est visible ; le Résumé la cache).
+      geste: { libelle: 'Voir le mois', aller: '/?tab=compta&section=declarer&cible=urssaf' },
     };
   }
   return null;

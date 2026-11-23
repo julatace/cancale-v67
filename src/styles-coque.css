@@ -38,6 +38,11 @@
   margin: 0; font-size: var(--vrm-t-title); font-weight: 700;
   line-height: 1.12; letter-spacing: -.025em;
 }
+/* (intégration 21 nov.) Statistiques · Pilotage est posé DANS la tête d'Argent (src/ecrans/Stats.jsx) : les titres de SES cartes
+   (h2.n-carte-titre, src/natif/complements.css) gardent leur forme natif — sans ceci, la règle du titre d'écran ci-dessus les
+   écrivait à 32 px (1512, banc stats-pilotage-place P3).
+   (Les règles du titre d'écran sont !important à :root:root : celle-ci les passe, pour CES titres seulement.) */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-screen-head .vrm-stats-pilotage h2.n-carte-titre { font: var(--n-t-legende-fort) !important; letter-spacing: .06em !important; line-height: normal !important; }
 /* Dans un espace de plateforme, l'écran est une SECTION : son titre descend
    d'un cran. Sur téléphone il disparaît — le segment actif juste au-dessus
    dit déjà « Ventes » (un mot écrit deux fois à 40 px d'écart, §7). Les
@@ -75,7 +80,7 @@
    le banc `jetons-coherence` mesure le retrait, la hauteur et les libellés. */
 :root {
   --seg-piste: rgba(118,118,128,.12); --seg-actif: #ffffff; --seg-actif-texte: #1d1d1f;
-  --seg-actif-ombre: 0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
+  --seg-actif-ombre: none;
 }
 :root[data-theme="dark"] { --seg-piste: rgba(118,118,128,.24); --seg-actif: #636366; --seg-actif-texte: #ffffff; --seg-actif-ombre: none; }
 .vrm-seg-cadre { padding: 0 16px 12px; min-width: 0; }
@@ -97,7 +102,7 @@
   transition: background-color .18s var(--vrm-ease-out, ease), box-shadow .18s ease;
 }
 :root .vrm-seg > .vrm-seg-btn:not(#vrm-seg):is([aria-current="page"], [aria-pressed="true"], [aria-selected="true"]) {
-  background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: var(--seg-actif-ombre) !important;
+  background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: none !important;
 }
 .vrm-seg-btn:active:not(:disabled) { transform: none; }
 .vrm-seg-btn:disabled { opacity: .45; cursor: not-allowed; }
@@ -242,17 +247,7 @@
     background: var(--vrm-bar); border-bottom-color: var(--vrm-hair);
     -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
   }
-  .vrm-header-brand { grid-column: 1; display: flex; align-items: center; gap: 2px; min-width: 0; }
-  .vrm-hdr-titre {
-    grid-column: 2; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    font-size: 17px; font-weight: 600; letter-spacing: -.02em; color: var(--vrm-ink);
-    opacity: 0; transform: translateY(6px); pointer-events: none;
-    transition: opacity .2s ease, transform .25s var(--vrm-ease-out, ease);
-  }
-  .vrm-app-header.is-defile .vrm-hdr-titre { opacity: 1; transform: none; }
   .vrm-header-actions { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 0; }
-  .vrm-header-logo { display: flex; align-items: center; justify-content: center; width: 40px; height: 44px; cursor: pointer; position: relative; }
-  .vrm-header-logo > img, .vrm-header-logo > svg { width: 30px !important; height: 30px !important; border-radius: 12px; object-fit: cover; }
 
   /* Les commandes de l'en-tête : des ICÔNES, sans boîte. Cible de 44 px. */
   .vrm-hbtn, .vrm-app-header [data-etat-actions], .vrm-app-header [data-stream-pastille] {
@@ -280,29 +275,6 @@
 
   /* ── BARRE D'ONGLETS (téléphone) ────────────────────────────────────────
      Dans le flux (frère de <main>), jamais `fixed` : voir BottomBar. */
-  .vrm-tabbar {
-    flex-shrink: 0; z-index: 60; display: flex; align-items: stretch; box-sizing: border-box;
-    background: var(--vrm-bar); border-top: 1px solid var(--vrm-hair);
-    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
-    padding: 0 max(4px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(4px, env(safe-area-inset-left));
-  }
-  .vrm-tab {
-    flex: 1 1 0; min-width: 0; min-height: 54px; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 3px; padding: 6px 2px 4px;
-    border: 0; border-radius: 0; background: transparent;
-    /* Les onglets au repos sont en gris CLAIR (entre secondaire et tertiaire) :
-       l'onglet actif, à l'accent, se détache sans pastille. */
-    color: color-mix(in srgb, var(--vrm-muted) 72%, var(--vrm-faint));
-    font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
-  }
-  .vrm-tab:active:not(:disabled) { transform: none; filter: none; opacity: .6; }
-  .vrm-tab-ic { display: flex; align-items: center; justify-content: center; width: 28px; height: 26px; }
-  .vrm-tab .vrm-nav-label {
-    font-size: 11px; font-weight: 400; letter-spacing: 0; line-height: 1.1;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
-  }
-  .vrm-tab[aria-current="page"] { color: var(--vrm-accent-texte, var(--vrm-accent)); }
-  .vrm-tab[aria-current="page"] .vrm-nav-label { font-weight: 600; }
 
   /* Le contenu ne réserve plus la zone sûre : la barre la porte déjà. */
   .vrm-main { padding-bottom: 28px !important; }
@@ -368,8 +340,8 @@
 .vrm-sheet-groupe { margin-bottom: 18px; }
 .vrm-sheet-groupe:last-child { margin-bottom: 4px; }
 .vrm-sheet-label {
-  padding: 0 4px 7px 14px; font-size: 12px; font-weight: 600; letter-spacing: .05em;
-  text-transform: uppercase; color: var(--vrm-muted);
+  padding: 0 4px 7px 14px; font-size: 12px; font-weight: 600; letter-spacing: normal;
+  text-transform: none; color: var(--vrm-muted);
 }
 .vrm-sheet-carte { background: var(--vrm-surface); border-radius: var(--vrm-r-md); overflow: hidden; }
 .vrm-sheet-row {
@@ -388,7 +360,7 @@
 .vrm-sheet-row[aria-current="page"] .vrm-sheet-fin { color: var(--vrm-accent-texte, var(--vrm-accent)); }
 @media (hover: hover) and (pointer: fine) { .vrm-sheet-row:hover { background: var(--vrm-card2); filter: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .vrm-sheet, .vrm-sheet-voile, .vrm-hdr-titre { animation: none !important; transition: none !important; }
+  .vrm-sheet, .vrm-sheet-voile { animation: none !important; transition: none !important; }
 }
 
 /* ── LE MODE SOMBRE (revue du 16 oct.) ──────────────────────────────────────
@@ -405,8 +377,6 @@
 }
 
 /* (17 oct.) Le nom de l'entreprise, à côté du logo (retrouvé par le SIRET). */
-.vrm-sidebar-brand { flex-direction: column; align-items: center; gap: 7px; }
-.vrm-sidebar-entreprise { display: block; max-width: 136px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; letter-spacing: -.01em; opacity: .72; text-align: center; }
 .vrm-hdr-entreprise { display: none; }
 @media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
   .vrm-hdr-entreprise { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 600; letter-spacing: -.015em; color: var(--vrm-ink); padding-left: 2px; transition: opacity .2s ease; }

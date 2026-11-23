@@ -18,6 +18,13 @@
 //      Moins de 3 groupes classables ⇒ rien n'est conclu (`peu`), jamais un conseil
 //      sur deux ventes.
 // Module PUR : exécuté par scripts/audit-argent-choix.cjs.
+// (21 nov., lot rentabilite — choix n° 36 de Julien) « À RACHETER EN PRIORITÉ » = le meilleur SCORE marge × vitesse :
+//   `scoreRachat(g)` = bénéfice brut moyen par paire (€, ventes reliées) ÷ délai médian de vente (jours, au moins 1 :
+//   une paire vendue le jour même ne vaut pas l'infini) — « ce qu'une paire de ce groupe rapporte par jour en rayon ».
+//   Seulement pour un groupe d'au moins `MIN_RACHAT` ventes reliées ET datées, au bénéfice moyen positif ; sinon `null`
+//   (rien n'est conclu). `prioritaires` : les 3 meilleurs scores. `axe` (défaut « modèle et taille », la carte d'avant) :
+//   le même classement sur un autre axe (Statistiques › Finances : modèle, marque, taille, modèle × taille).
+//   L'ancienne liste `aRacheter` (seuils médians, carte « Quoi racheter » d'Argent) est gardée telle quelle.
 // ═══════════════════════════════════════════════════════════════════════════
 import { classementRapporte } from './ceQuiRapporte.js';
 
@@ -46,11 +53,16 @@ export function trierRachat(groupes, tri = 'brut') {
 // rapporte le plus » : { plateforme, eur, ts, achat, taille, modeleSur, enLigne… }).
 // Rend null (relevé pas lu) ou { n, nReliees, nDelai, ecartees, groupes, autres, aRacheter,
 // classables, seuil, peu }.
-export function quoiRacheter(lignes, { tri = 'brut', min = MIN_RACHAT } = {}) {
+export const PRIORITAIRES = 3;
+export function scoreRachat(g, min = MIN_RACHAT) {
+  if (!g || g.k === '' || !(g.n >= min) || !(g.nDelai >= min) || g.moyen == null || !(g.moyen > 0) || g.mediane == null || !Number.isFinite(g.mediane)) return null;
+  return Math.round((g.moyen / Math.max(1, g.mediane)) * 100) / 100;
+}
+export function quoiRacheter(lignes, { tri = 'brut', min = MIN_RACHAT, axe = 'modeleTaille' } = {}) {
   if (!Array.isArray(lignes)) return null;
   const tout = classementRapporte(lignes, 'site');           // la population (et ce qui est écarté)
   const reliees = lignes.filter(connu);
-  const C = classementRapporte(reliees, 'modeleTaille');
+  const C = classementRapporte(reliees, axe);
   const nommes = C.groupes.filter((g) => g.k !== '');
   const autres = C.groupes.find((g) => g.k === '') || null;
   const classables = nommes.filter((g) => g.n >= min && g.nDelai >= min && g.moyen != null);
@@ -65,5 +77,8 @@ export function quoiRacheter(lignes, { tri = 'brut', min = MIN_RACHAT } = {}) {
     n: tout.n, ecartees: tout.ecartees, nReliees: C.n, nDelai: C.nDelai,
     groupes: trierRachat(nommes, tri), autres: autres ? { n: autres.n, brut: autres.brut } : { n: 0, brut: null },
     classables: classables.length, aRacheter, seuil, peu, min,
+    groupesReliees: nommes,
+    prioritaires: nommes.map((g) => ({ ...g, score: scoreRachat(g, min) })).filter((g) => g.score != null)
+      .sort((a, b) => b.score - a.score || b.n - a.n || (a.nom < b.nom ? -1 : 1)).slice(0, PRIORITAIRES),
   };
 }

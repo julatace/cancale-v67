@@ -1,22 +1,28 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov., phase 2)
+import '../natif/ecrans/argent-pont.css';   // (20 nov., lot argent-natif) titres des cartes d'avant au style §2 bis
+import { BoutonV2 } from '../designV2/BoutonV2.jsx';
 import { motsVendeur } from '../profilVendeur.js';
 import { GraphiqueSemaines } from '../GraphiqueSemaines.jsx';   // (8 nov., « beauté ») le vendu par semaine façon Santé
-import { annulationsParCompte } from '../annulationsCompte.js';
+import { lienVenteVinted } from '../annulationsCompte.js';
+import { ventesAnnulees, bilanAnnulees } from '../ventesAnnulees.js';   // (22 nov.) les annulées de TOUTES les plateformes
+import { etatCommandeEbay } from '../../api/_lib/ebay-etat-commande.js';
+import { LogoSite } from '../SelecteurSites.jsx';
 import { modeleSur, classementRapporte, eclaterReleveLots } from '../ceQuiRapporte.js';
 import { classerSansConclureTropVite, compteQuiVendLeMieux, brutParCompte, cleBrutCompte, SEUIL_CONCLUSION } from '../vendrePlus.js';   // (9 nov., « vendre plus »)
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar } from '../statsVentes.js';
 import React, { useState, useMemo } from 'react';
 import { L } from '../libelles.js';
 import { etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc, fraisVc } from '../../api/_lib/vestiaire-regle.js';
-import { caAutresParJour, sommePlage } from '../caAutresParJour.js';   // (11 nov., parité) le finalisé des autres plateformes par jour
+import { caAutresParJour, sommePlage, resumeFinaliseVestiaire } from '../caAutresParJour.js';   // (11 nov., parité) le finalisé des autres plateformes par jour
 import { phrasePlage } from '../periodeCalendrier.js';
 import { lireSupprimes, CLE_SUPPRIMES } from '../comptesSupprimes.js';
 import { recuPublieEntre, valeurObjectif, valeurObjectifMois } from '../design/carteChiffres.js';
 import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif, phraseResteObjectif, resteObjectif, rythmeObjectif, phraseRythme, moisPleinsAvant, objectifDuMoisYm } from '../objectifMois.js';
 import { PropositionObjectif, BilanObjectif, bilanObjectif } from '../design/CarteStats.jsx';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
-import { AUTH, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant, lireDatesLbc, avecDatesLbc, montantRecuEbay, useSansCompte, chargeAbonnement } from '../App.jsx';
+import { STUDIO_BASE, AUTH, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant, lireDatesLbc, avecDatesLbc, montantRecuEbay, useSansCompte, chargeAbonnement } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { notesParCompte } from '../notesRecues.js';
@@ -36,6 +42,7 @@ import { tauxOffresComptes } from '../tauxOffres.js';
 import { tauxDesSites } from '../prixVoulu.js';
 // ⟦← App.jsx #3⟧
 import { boostRentable, SEUIL_BOOST } from "../boostRentable.js";
+import { BoostsDuMois } from '../BoostVerdict.jsx';   // (21 nov., ext. 5.429)
 // ⟦← App.jsx #4⟧
 import CeQuiRapporte from "../design/CeQuiRapporte.jsx";
 import QuoiRacheter from "../design/QuoiRacheter.jsx";
@@ -59,6 +66,7 @@ import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
 import { totauxVentesManuelles, beneficeVenteManuelle } from '../venteManuelle.js';
 import { ecrireLocal } from '../stockageSur.js';   // (11 nov.) Safari privé / quota : le bouton ferme quand même
 import { tr } from '../i18n/index.js';
+import { useLectureBornee } from '../attenteBornee.js';
 import { trj } from '../i18n/react.js';
 import ComptesVinted from '../ComptesVinted.jsx';   // (13 nov., lot 36-27) « Tes comptes Vinted » sur 30 j / 90 j / année
 
@@ -257,18 +265,16 @@ function nomAffichePlat(n) { return n === 'Vestiaire Collective' ? 'Vestiaire Co
 // versée/terminée) ; un montant pas sûr ⇒ « — » et la raison, jamais un total
 // partiel. Leboncoin : un prix inconnu n'est plus compté 0 €, il est dit.
 const caVestiaireFinalise = (ventesVc) => {
-  if (ventesVc === undefined) return { ca: null, note: 'lecture en cours' };
-  if (!Array.isArray(ventesVc)) return { ca: null, note: 'ventes Vestiaire pas lues' };
-  let ca = 0, n = 0, pasSur = 0;
-  for (const v of ventesVc) {
-    if (!v || vcVenteAnnulee(v)) continue;
-    const et = etapeMotVc(v); if (et !== 'versee' && et !== 'terminee') continue;
-    const r = montantRecuVc(v);
-    if (r.eur == null) { pasSur++; continue; }
-    ca += r.eur; n++;
-  }
-  if (pasSur) return { ca: null, note: `${pasSur} vente${pasSur > 1 ? 's' : ''} finalisée${pasSur > 1 ? 's' : ''} au montant pas sûr` };
-  return n ? { ca: Math.round(ca * 100) / 100, note: 'ventes finalisées (montant versé)' } : { ca: null, note: 'pas encore de vente finalisée' };
+  // (16 nov., lot plateformes-restes) LA règle commune avec « CA entre deux dates »
+  // (`resumeFinaliseVestiaire`, src/caAutresParJour.js) : les sûres sont sommées, les
+  // pas sûres NOMMÉES (« au moins »), plus jamais « — » pour tout dès qu'une manque.
+  const r = resumeFinaliseVestiaire(ventesVc, { etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc });
+  if (r.etat === 'lecture') return { ca: null, note: tr('stats.vcFin.lecture') };
+  if (r.etat === 'pas-lu') return { ca: null, note: tr('stats.vcFin.pasLu') };
+  if (r.etat === 'aucune') return { ca: null, note: tr('stats.vcFin.aucune') };
+  if (r.etat === 'pas-sur') return { ca: null, note: tr('stats.vcFin.pasSur', { n: r.pasSur }) };
+  if (r.etat === 'au-moins') return { ca: r.ca, auMoins: true, note: tr('stats.vcFin.auMoins', { n: r.pasSur }) };
+  return { ca: r.ca, note: tr('stats.vcFin.lu') };
 };
 // (11 nov., parité) `excluAutre` : le prédicat des comptes écartés (Paramètres → Comptes liés,
 // et l'offre Solo) — le MÊME que `ventesFaites`/`ventesDeclarables`. Avant, cette carte
@@ -296,7 +302,7 @@ function caParPlateforme(liveStats, lbcVentes, ebayCa, ebayCommandes, ventesVc, 
     { nom:'Vinted', ca:caVinted, note:'ventes finalisées, tous comptes' + (liveStats && liveStats.nMasque > 0 ? ` · sans ${liveStats.nMasque} masquée${liveStats.nMasque>1?'s':''}` : '') },
     { nom:'Leboncoin', ca:caLbc, note:lbcSansPrix?`${lbcSansPrix} vente${lbcSansPrix>1?'s':''} finalisée${lbcSansPrix>1?'s':''} au prix inconnu`:caLbc==null?'pas encore de vente finalisée':'ventes finalisées (argent reçu)' },
     { nom:'eBay', ca:caEbay, note: caEbay != null ? NOTE_CA_EBAY.lu : NOTE_CA_EBAY[etatCaEbay(ebayCommandes)] },
-    { nom:'Vestiaire Collective', ca:vc.ca, note:vc.note },
+    { nom:'Vestiaire Collective', ca:vc.ca, note:vc.note, auMoins:!!vc.auMoins },
   ];
 }
 // ⟦← App.jsx #13⟧
@@ -323,7 +329,8 @@ function RepliStats({ id, titre, phrase, children, ouvertDefaut = false }) {
     </details>
   );
 }
-function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},lbcLu,ebayCa=null,ebayCommandes,panelOff=null,ventesVc,sousNav=null}) {
+function Dashboard({pilotage=null,catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},lbcLu,ebayCa=null,ebayCommandes,panelOff=null,ventesVc,sousNav=null,versPrix=null}) {
+  const designV2 = useDesignV2();   // (17 nov., phase 2) un seul segmenté : la période en menu compact, « Prix qui marche » en lien
   // Les N° des annonces « à confirmer » (la liste dépliée sous « Annonces en ligne ») :
   // relus avec les chiffres, jamais un « sans N° » inventé (revue de la 5.167).
   const numerosDash=React.useMemo(()=>load('vinted_annonce_numeros',{}),[liveStats]);
@@ -527,6 +534,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         R: { lbcAnnulee, lbcFinalisee, commandeEbayEngagee, montantRecuEbay, etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc } });
     } catch(_) { return null; }
   },[lbcLu,lbcVentes,ebayCommandes,ventesVc,excluAutreDash]);
+  // (22 nov.) Les ventes des autres sites pour « Annulations » (src/ventesAnnulees.js) : `undefined` en cours · `null` pas su · tableau.
+  const autresAnnul=useMemo(()=>({ lbc: lbcLu===undefined ? undefined : lbcLu===null ? null : avecDatesLbc((lbcVentes&&lbcVentes.ventes)||[], lireDatesLbc()), ebay: ebayCommandes, vestiaire: ventesVc, lbcRoleInconnu: lbcLu===true && lbcVentes ? Number(lbcVentes.inconnuesAnnulees)||0 : 0 }),[lbcLu,lbcVentes,ebayCommandes,ventesVc]);
   const caRange=useMemo(()=>{
     if(!caDu && !caAu) return null;
     const parJour = liveStats && liveStats.caFinaliseParJour;
@@ -674,11 +683,21 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
   return (
     <div className="vrm-finance-page vrm-statistiques-premium" data-espace="argent" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null} right={<Segmente label={tr('stats.periode')} className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
+      <ScreenHead titreCoque icon="euro" title={L.argent} phrase="dashboard" sous={sousNav || pilotage ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}{/* (intégration 21 nov.) PILOTAGE · FINANCES · TRANSPORTEURS DANS la tête (sous la barre d'Argent) : posé plus bas, comme enfant de la
+          grille de l'écran, il tombait sous toutes les anciennes cartes (390 : `order` 7 ; 1512 : la vitrine rangée en 2ᵉ rangée) —
+          ~4 900 px plus bas. Banc stats-pilotage-place. */}
+        {pilotage ? <div className="vrm-stats-pilotage" data-stats-pilotage="">{pilotage}</div> : null}{designV2 ? <div className="v2-stats-ligne" data-v2-stats-ligne="">
+        <label className="v2-stats-periode"><span className="vg-sr">{tr('stats.periode')}</span>
+          <select value={periodeStats} onChange={(e) => setPeriodeStats(e.target.value)} data-v2-stats-periode={periodeStats}>{Object.entries(PERIODES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+          <Icon name="chevron" size={14}/></label>
+        {versPrix ? <BoutonV2 role="texte" onClick={versPrix} attrs={{ 'data-v2-stats-prix': '' }}>{tr('v2.st.prix')}</BoutonV2> : null}
+      </div> : null}</div> : null} right={designV2 ? null : <Segmente label={tr('stats.periode')} className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
+
+      {/* (21 nov., lot journee-stats) PILOTAGE · FINANCES, 7 j · 30 j · 90 j — src/natif/ecrans/StatsPilotage.jsx : dans la tête (plus haut). */}
       {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre.
           (11 nov., lot objectifs-mois) Sorti du volet replié : c'est LE détail de l'objectif dans Argent.
           (14 nov., lot argent-choix) Remonté sous les tuiles de la vitrine (trouvable sans défiler). */}
-      <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats} onSaisirPrix={versSaisiePrix} onGo={onGo}
+      <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats} onSaisirPrix={versSaisiePrix} onGo={onGo} autresAnnul={autresAnnul}
         apresTuiles={<div className="vrm-objectif-argent" data-objectif-argent=""><Card><ObjectifDuMois liveStats={liveStats}/></Card></div>}/>
       {/* (11 nov., agent2-argent-parrainage) « Fin de novembre, à ce rythme » : le vendu prouvé du mois prolongé (src/previsionMois.js). */}
       <PrevisionMoisCarte liveStats={liveStats} onSaisirPrix={versSaisiePrix}/>
@@ -896,12 +915,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <div className="vrm-stats-comptes" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(320px,100%), 1fr))',gap:12,marginTop:4}}>
             <div data-stats-carte="plateformes" data-stats-plateformes data-notion="finalise" style={{...sCarte,paddingBottom:12}}>
               <div style={{...sTitre,marginBottom:8}}>{tr('stats.finalisePlateforme')}</div>
-              {plateformes.map(p => <Ligne key={p.nom} label={nomAffichePlat(p.nom)} val={p.ca} note={p.note} part={p.ca!=null && totPlat>0 && plateformes.filter(x=>x.ca!=null).length>1 ? p.ca/totPlat : null}/>)}
+              {plateformes.map(p => <div key={p.nom} data-stats-plat={p.nom} data-stats-plat-cents={p.ca==null?'':String(Math.round(p.ca*100))} data-stats-plat-au-moins={p.auMoins?'1':'0'}><Ligne label={nomAffichePlat(p.nom)} val={p.ca} note={p.note} part={p.ca!=null && totPlat>0 && plateformes.filter(x=>x.ca!=null).length>1 ? p.ca/totPlat : null}/></div>)}
               {/* Total = somme des plateformes captées = le CA global de l'onglet
                   Collectif (§11 : les deux écrans ne peuvent pas se contredire).
                   Affiché seulement quand ≥ 2 plateformes ont des ventes, sinon il
                   répète la seule ligne remplie. */}
-              {(()=>{ const nz=plateformes.filter(p=>p.ca!=null); return nz.length>=2 ? <Ligne label={tr('stats.totalFinalise')} val={nz.reduce((s,p)=>s+p.ca,0)} fort/> : null; })()}
+              {(()=>{ const nz=plateformes.filter(p=>p.ca!=null); return nz.length>=2 ? <div data-stats-total-au-moins={nz.some(p=>p.auMoins)?'1':'0'}><Ligne label={tr('stats.totalFinalise')} val={nz.reduce((s,p)=>s+p.ca,0)} note={nz.some(p=>p.auMoins) ? tr('stats.totalAuMoins') : null} fort/></div> : null; })()}
             </div>
             <div data-stats-carte="comptes" style={{...sCarte,paddingBottom:12}}>
               <div style={{...sTitre,marginBottom:8}}>{tr('stats.caVintedCompte')}</div>
@@ -1156,12 +1175,14 @@ const OFFRES_STATS_LECTURES = 'id=like.harvest_%25_conv_%25&select=id,cap:data->
 const OFFRES_STATS_TXN = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,sys:data->payload->transaction->offer->>is_system,op:data->payload->transaction->offer->price->>amount,oc:data->payload->transaction->offer->price->>currency_code,ic:data->payload->transaction->order->>item_count,ip:data->payload->transaction->order->items->0->price->>amount,icur:data->payload->transaction->order->items->0->price->>currency_code';
 const lireOffresStats = async () => {
   const owner = AUTH.user?.id;
-  if (!owner) return { convs: null, lectures: null, txn: null };
+  if (!owner) return { convs: null, lectures: null, txn: null, journal: null };
   if (_offresCache?.owner === owner && Date.now() - _offresCache.at < 10 * 60 * 1000) return _offresCache;
-  const [rc, rl, rt] = await Promise.all([
+  const [rc, rl, rt, rj] = await Promise.all([
     lireTout(OFFRES_STATS_CONV, { strict: true }).catch(() => null),
     lireTout(OFFRES_STATS_LECTURES, { strict: true }).catch(() => null),
     lireTout(OFFRES_STATS_TXN, { strict: true }).catch(() => null),
+    // (16 nov.) Le journal des gestes ACCEPTÉS par Vinted (extension 5.337, `journal_vrm_{uid}_{nav}`, projeté sur `e`).
+    lireTout('id=like.journal_vrm_*&select=id,e:data->e', { strict: true }).catch(() => null),
   ]);
   const uidDe = (id) => { const m = /^harvest_(\d+)_conv_\d+$/.exec(String(id || '')); return m ? m[1] : null; };
   const convs = Array.isArray(rc) && Array.isArray(rl) ? rc.map((r) => ({ compte: uidDe(r.id), side: r.side, opp: r.opp, tx: r.tx == null ? '' : String(r.tx), messages: Array.isArray(r.msgs) ? r.msgs : [] })).filter((c) => c.compte) : null;
@@ -1172,8 +1193,8 @@ const lireOffresStats = async () => {
   }
   let txn = null;
   if (Array.isArray(rt)) { txn = {}; for (const r of rt) if (r && r.tx) txn[String(r.tx)] = { sys: r.sys, op: r.op, oc: r.oc, ic: r.ic, ip: r.ip, icur: r.icur }; }
-  if (AUTH.user?.id !== owner) return { convs: null, lectures: null, txn: null };
-  _offresCache = { owner, at: Date.now(), convs, lectures, txn };
+  if (AUTH.user?.id !== owner) return { convs: null, lectures: null, txn: null, journal: null };
+  _offresCache = { owner, at: Date.now(), convs, lectures, txn, journal: Array.isArray(rj) ? rj : null };
   return _offresCache;
 };
 // ⟦← App.jsx #15⟧
@@ -1260,9 +1281,9 @@ const titrePeriodeStats = (b) => {
   return `${maj(new Date(b.de).toLocaleDateString('fr-FR', { month: 'long' }))} · comparé à ${new Date(b.prevDe).toLocaleDateString('fr-FR', { month: 'long' })}`;
 };
 // ── ANNULATIONS PAR COMPTE ET NOTES REÇUES (3 nov.) ─────────────────────────
-// Deux cartes de Statistiques, sur les règles pures `annulationsParCompte`
-// (src/annulationsCompte.js : « annulée » = `classifyOrderStatus`, la règle de
-// `PAS_UNE_VENTE`, sur la période choisie) et `notesParCompte`
+// Deux cartes de Statistiques, sur les règles pures `bilanAnnulees`
+// (src/ventesAnnulees.js, 22 nov. : toutes les plateformes, chacune par SA règle « annulée »,
+// sur la période choisie) et `notesParCompte`
 // (src/notesRecues.js : le profil Vinted capté, lecture seule, aucun rappel).
 // Les comptes : ceux que la coque range sur l'appareil (`vinted_accounts`),
 // moins les exclus (masqués, panneau, supprimés pour de bon) — un compte exclu
@@ -1311,7 +1332,7 @@ function CarteStatsVitrine({ k, titre, droite, corps, attrs, cls }) {
     </section>
   );
 }
-function AnnulationsEtNotes({ b, panelOff }) {
+function AnnulationsEtNotes({ b, panelOff, autres = null }) {
   const { ventes, ko } = useVentesCoque();
   const [profils, setProfils] = React.useState(undefined);
   React.useEffect(() => { let mort = false; lireProfilsNotes().then((x) => { if (!mort) setProfils(x); }); return () => { mort = true; }; }, []);
@@ -1327,7 +1348,16 @@ function AnnulationsEtNotes({ b, panelOff }) {
     // (`vinted_accounts`, sans événement) — relue à ce moment-là.
   }, [profils, ecarteUid, ventes]); // eslint-disable-line react-hooks/exhaustive-deps
   const nomDe = (u) => (comptes.find((c) => c.uid === String(u)) || {}).nom || 'un compte';
-  const A = React.useMemo(() => annulationsParCompte({ ventes, ko, de: b.de, a: b.a, estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled', ecarte: ecarteUid }), [ventes, ko, b, ecarteUid]);
+  // (22 nov., Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées ») UNE règle
+  // (src/ventesAnnulees.js) : Vinted, Leboncoin, eBay, Vestiaire — chacune par SA règle « annulée », celle qui la sort
+  // déjà du Vendu et du Reçu. Une plateforme pas lue n'a aucun chiffre et le pied la nomme (jamais 0).
+  const excluAutreA = useExcluAutre();
+  const A = React.useMemo(() => bilanAnnulees(ventesAnnulees({
+    vinted: ventes, ko, lbc: autres ? autres.lbc : undefined, ebay: autres ? autres.ebay : undefined, vestiaire: autres ? autres.vestiaire : undefined,
+    ecarteVinted: ecarteUid, excluAutre: excluAutreA || (() => false), lbcRoleInconnu: autres ? autres.lbcRoleInconnu : 0,
+    R: { annuleeVinted: (o) => classifyOrderStatus(o.status) === 'cancelled', montantVinted: (o) => { const v = o && o.price && typeof o.price === 'object' ? (o.price.currency_code && String(o.price.currency_code).toUpperCase() !== 'EUR' ? null : o.price.amount) : o && o.price; const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isFinite(n) ? n : null; },
+      lbcAnnulee, etatEbay: etatCommandeEbay, vcVenteAnnulee, dateVenteVc },
+  }), { de: b.de, a: b.a }), [ventes, ko, b, ecarteUid, autres, excluAutreA]);
   const N = React.useMemo(() => notesParCompte({ profils, comptes }), [profils, comptes]);
   const pl = (n, s1, p) => `${n} ${n > 1 ? (p || s1 + 's') : s1}`;
   const pctTxt = (t) => (t == null ? '—' : `${String(t).replace('.', ',')}\u00a0%`);
@@ -1335,35 +1365,54 @@ function AnnulationsEtNotes({ b, panelOff }) {
   const jour = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   const carte = (k, titre, droite, corps, attrs) => <CarteStatsVitrine k={k} titre={titre} droite={droite} corps={corps} attrs={attrs}/>;
   const vide = videStatsVitrine;
-  const maxT = A.etat === 'lu' ? Math.max(1, ...A.comptes.map((g) => g.taux || 0)) : 1;
-  // (5 nov., chantier F, revue 2.25) « Annulations » se dit UNE fois : le total d'en-tête
-  // n'apparaît que s'il additionne PLUSIEURS comptes (avec un seul, il redisait la ligne).
-  const annul = carte('sv-annulations', 'Annulations',
-    A.etat === 'lu' && A.n && A.comptes.length > 1 ? <span data-sv-annul-total={`${A.annulees}/${A.n}`}>{A.annulees} {tr('journee.texte2')} {A.n}{A.partiel ? '' : ` · ${pctTxt(A.taux)}`}</span> : null,
+  const SITE_A = { Vinted: 'vinted', Leboncoin: 'leboncoin', eBay: 'ebay', Vestiaire: 'vestiaire' };
+  const lignesA = A.etat === 'lu' ? A.plateformes.filter((p) => p.etat === 'lu').flatMap((p) => p.comptes) : [];
+  const maxT = Math.max(1, ...lignesA.map((g) => g.taux || 0));
+  const T = A.total;
+  const lienA = (x) => (x.plateforme === 'Vinted' ? lienVenteVinted({ conversation_id: x.conv || null, transaction_id: x.id }) : '');
+  const moisTxt = (ym) => { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }); };
+  const pasLues = A.plateformes ? A.plateformes.filter((p) => p.etat === 'passu').map((p) => p.plateforme) : [];
+  const enCoursA = A.plateformes ? A.plateformes.filter((p) => p.etat === 'encours').map((p) => p.plateforme) : [];
+  const manquantsV = A.plateformes ? ((A.plateformes.find((p) => p.plateforme === 'Vinted') || {}).manquants || []) : [];
+  // « Annulations » se dit UNE fois : le total d'en-tête n'apparaît que s'il additionne PLUSIEURS lignes.
+  const annul = carte('sv-annulations', tr('annul.titre'),
+    A.etat === 'lu' && T && T.n && lignesA.length > 1 ? <span data-sv-annul-total={`${T.annulees}/${T.n}`}>{tr('annul.surN', { a: T.annulees, n: T.n })}{A.partiel ? '' : ` · ${pctTxt(T.taux)}`}</span> : null,
     A.etat === 'encours' ? vide('…', { 'data-sv-annul': 'encours' })
-      : A.etat !== 'lu' ? vide(tr('stats.ventesVintedOnt'), { 'data-sv-annul': 'passu' })
-        : !A.comptes.length ? vide(tr('stats.aucuneVenteVinted'), { 'data-sv-annul': 'lu' })
+      : A.etat !== 'lu' ? vide(tr('annul.passu'), { 'data-sv-annul': 'passu' })
+        : !lignesA.length ? vide([tr('annul.aucune'), pasLues.length ? tr('annul.pasLu', { sites: pasLues.join(', ') }) : ''].filter(Boolean).join(' '), { 'data-sv-annul': 'lu', 'data-sv-annul-pas-lues': pasLues.join(',') })
         : (<div className="vrm-sv-lignes" data-sv-annul="lu">
-          {A.comptes.map((g) => (
-            <details key={g.cle} className="vrm-sv-annul-compte" data-sv-annul-compte={g.uid} data-n={g.n} data-annulees={g.annulees} data-taux={g.taux == null ? '' : g.taux}>
+          {lignesA.map((g) => (
+            <details key={g.cle} className="vrm-sv-annul-compte" data-sv-annul-compte={g.uid} data-sv-annul-site={SITE_A[g.plateforme]} data-n={g.n} data-annulees={g.annulees} data-retours={g.retours} data-taux={g.taux == null ? '' : g.taux}>
               <summary className="vrm-sv-annul-ligne">
-                <span className="vrm-sv-nom" title={g.compte || undefined}>{g.compte}</span>
+                <span className="vrm-sv-nom vrm-sv-annul-nom" title={g.compte || undefined}><LogoSite site={SITE_A[g.plateforme]}/><span>{g.compte}</span></span>
                 <span className="vrm-sv-piste"><span style={{ width: `${g.taux ? Math.max(3, g.taux / maxT * 100) : 0}%` }}/></span>
                 <span className="vrm-sv-chiffre">{g.annulees}/{g.n} · {pctTxt(g.taux)}</span>
               </summary>
-              {g.liste.length ? g.liste.map((x) => (
-                <a key={x.id} className="vrm-sv-annul-vente" data-sv-annul-vente={x.id} href={x.lien || undefined} target="_blank" rel="noreferrer">
+              {g.liste.length ? g.liste.map((x) => { const l = lienA(x); const El = l ? 'a' : 'div'; return (
+                <El key={x.cle} className="vrm-sv-annul-vente" data-sv-annul-vente={x.id} data-sv-annul-motif={x.motif} data-sv-annul-sorte={x.sorte} {...(l ? { href: l, target: '_blank', rel: 'noreferrer' } : {})}>
                   <span className="vrm-sv-annul-titre">{x.titre || tr('stats.vente', { id: String(x.id) })}</span>
-                  <span className="vrm-sv-chiffre">{jour(x.ts)}{x.eur != null ? ` · ${fmt(x.eur)}` : ''}</span>
-                  <span className="vrm-sv-annul-etat">{x.statut}</span>
-                </a>
-              )) : <div className="vrm-sv-note" style={{ padding: '4px 0 8px' }}>{tr('stats.aucuneAnnulation')}</div>}
+                  <span className="vrm-sv-chiffre">{x.ts != null ? jour(x.ts) : tr('annul.dateInconnue')}{x.eur != null ? ` · ${fmt(x.eur)}` : ''}</span>
+                  <span className="vrm-sv-annul-etat">{tr('annul.motif.' + x.motif)}</span>
+                </El>); }) : <div className="vrm-sv-note" style={{ padding: '4px 0 8px' }}>{tr('stats.aucuneAnnulation')}</div>}
             </details>
           ))}
-          {(A.manquants.length > 0 || A.sansDate > 0) && <div className="vrm-sv-note" data-sv-annul-manque={A.manquants.join(',')} style={{ marginTop: 8 }}>
-            {A.manquants.length ? tr('stats.lu', { x: String(A.manquants.map(nomDe).join(', ')) }) : ''}{A.manquants.length && A.sansDate ? ' · ' : ''}{A.sansDate ? `${pl(A.sansDate, 'vente')} sans date` : ''}
+          {T && T.annulees > 0 && <div className="vrm-sv-note" data-sv-annul-eur={Math.round(T.eurAnnule * 100)} data-sv-annul-eur-inconnus={T.eurInconnus} style={{ marginTop: 8 }}>
+            {T.eurInconnus ? tr('annul.montantAuMoins', { x: fmt(T.eurAnnule), n: T.eurInconnus }) : tr('annul.montant', { x: fmt(T.eurAnnule) })}
           </div>}
-          <div className="vrm-sv-note" data-sv-annul-non-couvertes={A.nonCouvertes.join(',')} style={{ marginTop: 4 }}>{trj('stats.comptes', { x: A.nonCouvertes.join(', ') })}</div>
+          {T && T.retours > 0 && <div className="vrm-sv-note" data-sv-annul-retours={T.retours} style={{ marginTop: 4 }}>{tr('annul.retours', { n: T.retours })}</div>}
+          {A.mois.length > 1 && <details className="vrm-sv-annul-mois" data-sv-annul-mois={A.mois.length}>
+            <summary className="vrm-sv-note">{tr('annul.parMois')}</summary>
+            {A.mois.slice(0, 12).map((m) => <div key={m.ym} className="vrm-sv-annul-vente" data-sv-annul-ym={m.ym} data-annulees={m.annulees} data-n={m.n}>
+              <span className="vrm-sv-annul-titre">{moisTxt(m.ym)}</span>
+              <span className="vrm-sv-chiffre">{tr('annul.surN', { a: m.annulees, n: m.n })} · {pctTxt(m.taux)}</span>
+              <span className="vrm-sv-annul-etat">{m.eurAnnule ? fmt(m.eurAnnule) : ''}</span>
+            </div>)}
+          </details>}
+          {(pasLues.length > 0 || enCoursA.length > 0 || manquantsV.length > 0 || A.sansDate > 0 || A.roleInconnu > 0 || A.demandees > 0) && <div className="vrm-sv-note" data-sv-annul-manque={manquantsV.join(',')} data-sv-annul-pas-lues={pasLues.join(',')} data-sv-annul-role={A.roleInconnu} data-sv-annul-demandees={A.demandees} style={{ marginTop: 8 }}>
+            {[pasLues.length ? tr('annul.pasLu', { sites: pasLues.join(', ') }) : '', enCoursA.length ? tr('annul.enCours', { sites: enCoursA.join(', ') }) : '',
+              manquantsV.length ? tr('stats.lu', { x: String(manquantsV.map(nomDe).join(', ')) }) : '', A.sansDate ? tr('annul.sansDate', { n: A.sansDate }) : '',
+              A.roleInconnu ? tr('annul.roleInconnu', { n: A.roleInconnu }) : '', A.demandees ? tr('annul.demandees', { n: A.demandees }) : ''].filter(Boolean).join(' · ')}
+          </div>}
         </div>),
     { 'data-sv-carte': 'annulations', 'data-sv-etat': A.etat });
   // (5 nov., chantier F) Aucun compte lu : une ligne repliée, pas une liste de « pas lu — ».
@@ -1744,7 +1793,10 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
     : (<>
       <GraphiqueVenduRecu VR={VR} lib={lib} titre={tr('stats.venduRecu', { noteBarres: String(noteBarres) })}/>
       <div className="vrm-sv-note" data-sp-vr-note={VR.raison || ''}>
-        {tr('stats.venduDateVente')}{!VR.recuLu ? ` · ${RAISON_RECU[VR.raison] || 'reçu pas lu'}` : !VR.recuComplet ? tr('stats.recuToutLu') : ''}{aDater > 0 ? ` · ${plSP(aDater, 'vente')} sans date de versement (dans aucune barre)` : ''}
+        {/* (16 nov., bancs-rouges-b) Le manque reste DIT à l'écran (§5) ; la définition Vendu / Reçu, toujours la même,
+            passe sous « Pourquoi ? » (textes courts : plus de paragraphe de 130 caractères). */}
+        {[!VR.recuLu ? (RAISON_RECU[VR.raison] || 'reçu pas lu') : !VR.recuComplet ? tr('stats.recuToutLu').replace(/^\s*·\s*/, '') : '', aDater > 0 ? `${plSP(aDater, 'vente')} sans date de versement (dans aucune barre)` : ''].filter(Boolean).join(' · ')}
+        {' '}<Pourquoi>{tr('stats.venduDateVente')}</Pourquoi>
       </div>
     </>);
   // ── Les 10 meilleures ventes ──
@@ -1800,11 +1852,13 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
     </>
   );
 }
-function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo = null, apresTuiles = null }) {
+function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo = null, apresTuiles = null, autresAnnul = null }) {
   const sansCompteStats = useSansCompte();   // (11 nov., états vides) aucun compte relié, prouvé par la coque
   const maintenant = React.useMemo(() => Date.now(), [periode, liveStats]); // eslint-disable-line react-hooks/exhaustive-deps
   const b = React.useMemo(() => bornesPeriode(periode, maintenant), [periode, maintenant]);
-  const { releve, stock, benef, extras, lignes } = useReleveStats();
+  const { releve, stock, benef, extras: extrasLu, lignes } = useReleveStats();
+  // (22 nov., chasse P2-5) « Je lis les dates de mise en ligne… » finit : sans réponse après 10 s ⇒ pas su (« n'ont pas pu être lues »).
+  const extras = useLectureBornee(extrasLu);
   const { ventes: ventesCoque } = useVentesCoque();
   const [nuage, setNuage] = React.useState(() => isCloudReady());
   React.useEffect(() => onCloudReady(() => setNuage(true)), []);
@@ -1883,6 +1937,22 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
       montantVente: montantCommande,
     });
   }, [ventesCoque, extras, nuage, ecarteStats, b]);
+
+  // (21 nov., ext. 5.429) « Boosts du mois » : les comptes Vinted sélectionnés, les annonces lues (compte, prix), la date de
+  // chaque vente PROUVÉE de l'annonce (par SA transaction), le « Boost payé » saisi. Le mois en cours.
+  const boostsMois = React.useMemo(() => {
+    if (!extras || !extras.items || !Array.isArray(ventesCoque)) return null;
+    let lies = []; try { const x = JSON.parse(localStorage.getItem('vinted_accounts') || 'null'); if (Array.isArray(x)) lies = x; } catch (_) {}
+    const comptes = [...new Set(lies.map((x) => String((x && x.vinted_user_id) || '')).filter((u) => /^\d{1,20}$/.test(u) && !ecarteStats(u)))];
+    const items = Object.values(extras.items).filter((it) => it && it.uid && comptes.includes(String(it.uid))).map((it) => ({ id: String(it.id), uid: String(it.uid), prix: it.price, titre: it.title || '' }));
+    const ventes = {};
+    for (const o of ventesCoque) { if (!o || classifyOrderStatus(o.status) === 'cancelled') continue; const tx = String(o.transaction_id || ''); const item = tx && extras.txn && extras.txn[tx] && extras.txn[tx].item ? String(extras.txn[tx].item) : ''; const t = Date.parse(o.date || ''); if (item && t > 0 && !(ventes[item] <= t)) ventes[item] = t; }
+    let fiches = {}; try { fiches = load('vinted_annonce_numeros', {}) || {}; } catch (_) { fiches = {}; }
+    const couts = {}; for (const [id, f] of Object.entries(fiches)) { const c = Number(String((f && f.fees) == null ? '' : f.fees).replace(',', '.')); if (c > 0) couts[id] = c; }
+    for (const x of items) { const f = fiches[x.id]; if (f && f.numero) x.numero = String(f.numero); }
+    const d = new Date(); const de = Date.UTC(d.getFullYear(), d.getMonth(), 1), a = Date.UTC(d.getFullYear(), d.getMonth() + 1, 1);
+    return { comptes, items, ventes, couts, de, a };
+  }, [extras, ventesCoque, ecarteStats]);
 
   // (4 nov.) LES OFFRES (src/statsOffres.js) : lues quand la carte paraît
   // (lecture projetée, ~1,2 Mo de messages, une fois par dix minutes).
@@ -2174,7 +2244,9 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
           return carte('sv-boost', tr('stats.boostRentable'), droite, corps, { 'data-sv-carte': 'boost', 'data-sv-etat': etat, 'data-sv-boostees': C2 ? C2.b : '', 'data-sv-autres': C2 ? C2.nb : '' });
         })()}
       </div>
-      <AnnulationsEtNotes b={b} panelOff={panelOff}/>
+      {/* (21 nov., ext. 5.429) « Boosts du mois » : chaque boost relevé par l'extension, pendant contre la même durée avant. */}
+      {boostsMois ? <BoostsDuMois base={STUDIO_BASE} {...boostsMois}/> : null}
+      <AnnulationsEtNotes b={b} panelOff={panelOff} autres={autresAnnul}/>
       <div className="vrm-sv-note vrm-sv-pied">
         {/* (3 nov., critique #4) Plus la phrase de définitions (« Vendu : toutes tes plateformes… ») : restent les seuls MANQUES nommés (§5). */}
         {liveStats && liveStats.venduSansDate ? `${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date` : ''}{liveStats && (liveStats.venduNonComptees || []).length ? <span data-stats-non-comptees={liveStats.venduNonComptees.length}>{tr('stats.dansVendu', { x: String(liveStats.venduSansDate ? ' · ' : ''), phraseNonComptees: String(phraseNonComptees(liveStats.venduNonComptees)) })}</span> : null}

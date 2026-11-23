@@ -39,8 +39,14 @@ export function resumeClassement(code, corps, extra) {
   let r;
   switch (t) {
     case 'suivi': {
-      r = { t, tr: court(c.carrier, 20), s: ident(c.suivi), st: court(c.status, 12), code: court(x.code, 20), lieu: court(x.lieu, 50), lim: court(x.limite, 25), sens: x.sens === 'sortant' ? 'sortant' : undefined };
-      if (!r.s && ['available', 'delivered', 'retour'].includes(c.status)) r.av = 'sans-suivi';
+      // (19 nov.) `cv` : la CONVERSATION de la commande, lue dans le lien de l'e-mail Vinted « Commande mise à jour pour
+      // {titre} — ton achat t'attend » (api/_lib/achat-arrive-relais.js). Cet e-mail n'a jamais de n° de suivi, mais la
+      // conversation est une IDENTITÉ : la ligne `email_track_autre_conv-{conversation}` est celle de SON achat.
+      // Mesuré sur la base de Julien (30 jours) : 78 e-mails, 61 colis, 61 reliés à leur achat par la conversation — et
+      // les 78 étaient rangés « à vérifier · relié à aucun colis » parce que seule l'absence de n° de suivi était
+      // regardée. Avec sa conversation, l'e-mail est RANGÉ (plus « sans-suivi ») ; sans elle, rien ne change.
+      r = { t, tr: court(c.carrier, 20), s: ident(c.suivi), cv: ident(c.conv), st: court(c.status, 12), code: court(x.code, 20), lieu: court(x.lieu, 50), lim: court(x.limite, 25), sens: x.sens === 'sortant' ? 'sortant' : undefined };
+      if (!r.s && !r.cv && ['available', 'delivered', 'retour'].includes(c.status)) r.av = 'sans-suivi';
       break;
     }
     case 'bordereau': {

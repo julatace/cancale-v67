@@ -44,7 +44,8 @@ fs.mkdirSync(SHOTS, { recursive: true });
 const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim()).filter(Boolean);
 const LARGEURS = liste('LARGEURS', '390,1512').map(Number);
 const THEMES = liste('THEMES', 'clair,sombre');
-const PARTIES = liste('PARTIES', 'P,A,S');
+// (20 nov.) La partie P (le parcours) vit dans scripts/bancs/demarrage-parcours.cjs (« Bien démarrer », six pages poussées).
+const PARTIES = liste('PARTIES', 'A,S');
 const RACINE_API = process.env.BANC_API_RACINE || RAC;   // le code serveur jugé (mutations : une copie)
 
 let ko = 0; const defauts = [];

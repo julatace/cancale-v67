@@ -126,7 +126,8 @@ const etats = (p) => p.etapes.map((x) => x.etat).join(',');
   const APP = SRC('src/App.jsx');
   dit(/id=in\.\(vc_ventes,vc_messages,vc_achats,vc_listings,vc_offres\)/.test(APP) && /id: 'vestiaire-offre'/.test(APP) && /offresJourneeVc\(offresVestiaire\(vcEtat\.offres\)\)/.test(APP), 'C1 · Ma journée lit `vc_offres` et pousse une ligne « vestiaire-offre » par offre');
   const VC = SRC('src/ecrans/Vestiaire.jsx');
-  dit(/<ParcoursVestiaire v=\{v\}/.test(VC) && /photosExigeesVc\(photosDe\(p\)\)[\s\S]{0,2500}vmrCmd\(\{ cmd: 'vcPreparer'/.test(VC), 'C1 · le récapitulatif monte le parcours ; « Préparer » vérifie les photos AVANT d’appeler l’extension');
+  // (20 nov., décision de Julien) la publication Leboncoin / Vestiaire se fait dans le PANNEAU de l'extension, qui vérifie l'annonce (règle src/verifAnnonce.js) avant SON dépôt : l'app n'envoie rien.
+  dit(/<ParcoursVestiaire v=\{v\}/.test(VC) && !/vmrCmd\(\{ cmd: 'vcPreparer'/.test(VC), 'C1 · le récapitulatif monte le parcours ; « Publier » (photos vérifiées) se fait dans l’extension');
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s)` : '\n✅ Vestiaire plus : tout est vert');
   process.exit(ko ? 1 : 0);
 })();

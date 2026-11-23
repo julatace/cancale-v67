@@ -111,7 +111,10 @@ const revCond = (e) => { const m = /data->>rev=eq\.(\d+)/.exec(e.url); return m 
     await pg.addInitScript(() => { window.__cmdExt = []; const pm = window.postMessage.bind(window); window.postMessage = (d, o, t) => { try { if (d && d.__vmr && /^cmd/.test(String(d.__vmr))) window.__cmdExt.push(d); } catch (_) {} return pm(d, o, t); }; });
     // Une LECTURE par une fonction serveur (GET : santé, relais, comptes…) n'agit pas ; ce qui
     // pourrait agir (POST/PUT/PATCH/DELETE vers /api) est compté.
-    const api = []; pg.on('request', (r) => { const u = r.url(); if (/\/api\//.test(u) && r.method() !== 'GET') api.push(r.method() + ' ' + u.replace(/^https?:\/\/[^/]+/, '')); });
+    // (16 nov.) Le lot de MESURES anonymes de l'app (src/mesuresCollecte.js, 6 nov. : des comptes dans des cases fermées,
+    // au plus une fois par minute, par horloge, quel que soit l'écran) n'est pas un envoi du geste : il est écarté par SA
+    // route exacte (ROUTE_MESURES) ; tout autre POST /api reste compté.
+    const api = []; pg.on('request', (r) => { const u = r.url(); if (/\/api\//.test(u) && r.method() !== 'GET' && !/\/api\/compte\?mode=mesures$/.test(u)) api.push(r.method() + ' ' + u.replace(/^https?:\/\/[^/]+/, '')); });
     const lecturesPdf = () => base.lectures.filter((l) => /pdfB64|select=data(&|$)|select=\*/.test(l.url) && /email_bord_/.test(l.url)).length;
 
     await pg.goto(srv.url + '/?tab=cat_bord', { waitUntil: 'domcontentloaded' });

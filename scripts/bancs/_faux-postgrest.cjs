@@ -22,6 +22,7 @@ function fauxPostgrest({ schemas = {}, absentes = new Set(), fermees = new Set()
     return ligne[col];
   };
   const egal = (a, b) => (a == null ? false : String(a) === String(b));
+  const num = (x, v) => typeof x === 'number' && /^-?\d+(\.\d+)?$/.test(String(v));
   const filtre = (col, expr) => {
     let neg = false, e = expr;
     if (e.startsWith('not.')) { neg = true; e = e.slice(4); }
@@ -34,10 +35,11 @@ function fauxPostgrest({ schemas = {}, absentes = new Set(), fermees = new Set()
         case 'is': return v === 'null' ? x == null : v === 'true' ? x === true : x === false;
         case 'in': { const vals = v.replace(/^\(|\)$/g, '').split(',').map((s) => s.replace(/^"|"$/g, '')); return vals.some((y) => egal(x, y)); }
         case 'like': { const re = new RegExp('^' + v.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/%/g, '.*') + '$'); return x != null && re.test(String(x)); }
-        case 'gt': return x != null && String(x) > v;
-        case 'gte': return x != null && String(x) >= v;
-        case 'lt': return x != null && String(x) < v;
-        case 'lte': return x != null && String(x) <= v;
+        // (16 nov.) Une colonne NOMBRE se compare en nombre (comme Postgres : 100 < 282, jamais « "100" < "50" »).
+        case 'gt': return x != null && (num(x, v) ? Number(x) > Number(v) : String(x) > v);
+        case 'gte': return x != null && (num(x, v) ? Number(x) >= Number(v) : String(x) >= v);
+        case 'lt': return x != null && (num(x, v) ? Number(x) < Number(v) : String(x) < v);
+        case 'lte': return x != null && (num(x, v) ? Number(x) <= Number(v) : String(x) <= v);
         default: throw new Error('opérateur inconnu ' + op);
       }
     };

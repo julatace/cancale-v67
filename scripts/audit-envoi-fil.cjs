@@ -38,8 +38,9 @@ async function juger(src, code, dire) {
     'un « Oui » de l’acheteur, ou un ancien « Oui » à lui, n’est pas l’envoi du jour');
   // Chaque site la prend (code lu, commentaires retirés).
   const lbc = sansCom(code.lbc), vc = sansCom(code.vc), eb = sansCom(code.eb);
-  dit(/const etat = etatEnvoiExtension\(r\);/.test(lbc) && /<EnvoiDansFil envoi=\{envoiFil\}[^>]*site="Leboncoin"/.test(lbc) && /cmd: 'lbcRepondre', conv, texte: t/.test(lbc), 'Leboncoin : `lbcRepondre` inchangé, l’état par la règle, la bulle dans le fil');
-  dit(/const etat = etatEnvoiExtension\(r\);/.test(vc) && /<EnvoiDansFil envoi=\{envoiFil\}[^>]*site="Vestiaire"/.test(vc) && /cmd: 'vcRepondre', conv, texte: t/.test(vc), 'Vestiaire : `vcRepondre` inchangé, l’état par la règle, la bulle dans le fil');
+  // (20 nov., décision de Julien) Répondre sur Leboncoin / Vestiaire se fait dans le PANNEAU de l'extension : le fil reste lu ici.
+  dit(!/cmd: 'lbcRepondre'/.test(lbc) && /<BoutonExtension action="repondre" site="leboncoin" ids=\{\[String\(conv\)\]\}/.test(lbc), 'Leboncoin : répondre ouvre le panneau sur CETTE conversation (rien n’est envoyé d’ici)');
+  dit(!/cmd: 'vcRepondre'/.test(vc) && /<BoutonExtension action="repondre" site="vestiaire" ids=\{\[String\(conv\)\]\}/.test(vc), 'Vestiaire : répondre ouvre le panneau sur CETTE conversation (rien n’est envoyé d’ici)');
   dit(/etat:etatEnvoiEbay\(e\)/.test(eb) && /<EnvoiDansFil envoi=\{envoiFil\}[^>]*site="eBay"/.test(eb) && /call\('repondre',\{itemId:m\.itemId,messageId:m\.id,body:texte,confirme:true\},headers,\{write:true\}\)/.test(eb) && /if\(!await confirm\(/.test(eb), 'eBay : route `repondre` confirmée inchangée, l’état par la règle');
   dit(/filPasLu\(fil\.messages, annonce\)/.test(lbc) && /filPasLu\(fil\.messages, annonce\)/.test(vc) && /<FilPasLu onRelire=\{relireEchange\}\/>/.test(eb), 'les trois sites : fil vide annoncé ⇒ « pas encore lu · Relire »');
   dit(/<FilIllisible[^>]*'data-lbc-fil-etat': 'pas-su'/.test(lbc) && /<FilIllisible[^>]*'data-vc-fil': 'pas-su'/.test(vc) && /'data-ebay-lecture':'pas-su'/.test(eb), 'les trois sites : lecture ratée ⇒ « Réessayer »');

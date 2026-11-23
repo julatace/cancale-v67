@@ -24,6 +24,7 @@
 // `--prouve` : réaffaiblit le contrôle, une règle à la fois ⇒ ROUGE exigé.
 // `AUDIT_SEUL=nom` : un seul scénario de panne (sert à --prouve).
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const path = require('path'), fs = require('fs'), http = require('http'), zlib = require('zlib');
 const { spawn, spawnSync } = require('child_process');
 const R = path.join(__dirname, '..');

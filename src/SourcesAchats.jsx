@@ -8,6 +8,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { beneficeParSource, texteSource, lireSources, CLE_SOURCES, EVT_SOURCES } from './sourceAchats.js';
 import './styles-sources-achats.css';
+import { Carte, Rangee } from './natif/index.js';
+import './natif/ecrans/argent.css';
 
 export function useSources(owner) {
   const [v, setV] = useState(() => lireSources(owner));
@@ -28,30 +30,21 @@ const pl = (k, s, p) => `${k} ${k > 1 ? (p || s + 's') : s}`;
 export default function SourcesAchats({ owner = '', de, a }) {
   const pub = useSources(owner);
   const r = useMemo(() => (pub ? beneficeParSource(pub.lignes.filter((l) => Number.isFinite(l.ts) && l.ts >= de && l.ts < a)) : null), [pub, de, a]);
-  const max = r ? Math.max(0, ...r.groupes.map((g) => g.moyenne || 0)) : 0;
-  const tete = <div className="vrm-sv-carte-tete"><h2 className="vrm-display vrm-sv-carte-titre">D’où viennent mes achats</h2><span className="vrm-sv-note">bénéfice moyen</span></div>;
+  // (20 nov., lot argent-natif) AU STYLE NATIF §2 bis : une carte à filet, une rangée par source (le nom, « sur N ventes »
+  // en gris, le bénéfice moyen à droite, aligné), le manque NOMMÉ en lignes grises dessous. Les mêmes textes (`texteSource`).
   let corps;
-  if (!r) corps = <p className="vrm-sa-vide" data-sa-etat="passu">— · ouvre Ventes pour les calculer</p>;
-  else if (!r.n) corps = <p className="vrm-sa-vide" data-sa-etat="lu" data-sa-n="0">Aucune vente finalisée sur la période.</p>;
+  if (!r) corps = <Rangee titre="—" sousTitre="ouvre Ventes pour les calculer" attrs={{ 'data-sa-etat': 'passu' }}/>;
+  else if (!r.n) corps = <Rangee titre="Aucune vente finalisée sur la période." attrs={{ 'data-sa-etat': 'lu', 'data-sa-n': '0' }}/>;
   else corps = (
     <div className="vrm-sa" data-sa-etat="lu" data-sa-n={r.n}>
-      {r.groupes.length ? <ol className="vrm-sa-liste">
-        {r.groupes.map((g, i) => {
-          const t = texteSource(g);
-          const w = g.moyenne != null && g.moyenne > 0 && max > 0 ? Math.max(3, (g.moyenne / max) * 100) : 0;
-          return (
-            <li key={g.cle} className="vrm-sa-ligne" data-sa-source={g.cle} data-sa-moyenne={g.moyenne == null ? '' : String(g.moyenne)} data-sa-n={g.n} data-sa-connu={g.nConnu} data-sa-partiel={g.partiel ? '1' : undefined}>
-              <span className="vrm-sa-nom">{g.libelle}</span>
-              <span className="vrm-sa-piste" aria-hidden="true"><span data-plus={i === 0 && g.moyenne != null && g.moyenne > 0 ? '1' : undefined} style={{ width: `${w}%` }}/></span>
-              <span className="vrm-sa-montant">{t.montant}</span>
-              <span className="vrm-sa-sur">{t.sur}</span>
-            </li>
-          );
-        })}
-      </ol> : null}
-      {r.sansSource ? <p className="vrm-sa-note" data-sa-sans-source={r.sansSource}>{pl(r.sansSource, 'vente')} : source pas saisie sur l’achat (Achats → l’achat → « Où »).</p> : null}
-      {r.sansAchat ? <p className="vrm-sa-note" data-sa-sans-achat={r.sansAchat}>{pl(r.sansAchat, 'vente')} sans achat relié : source pas sue.</p> : null}
+      {r.groupes.map((g) => {
+        const t = texteSource(g);
+        return <Rangee key={g.cle} titre={g.libelle} sousTitre={t.sur} valeur={t.montant} valeurForte
+          attrs={{ 'data-sa-source': g.cle, 'data-sa-moyenne': g.moyenne == null ? '' : String(g.moyenne), 'data-sa-n': g.n, 'data-sa-connu': g.nConnu, 'data-sa-partiel': g.partiel ? '1' : undefined }}/>;
+      })}
+      {r.sansSource ? <p className="n-arg-pied" data-sa-sans-source={r.sansSource}>{pl(r.sansSource, 'vente')} : source pas saisie sur l’achat (Achats → l’achat → « Où »).</p> : null}
+      {r.sansAchat ? <p className="n-arg-pied" data-sa-sans-achat={r.sansAchat}>{pl(r.sansAchat, 'vente')} sans achat relié : source pas sue.</p> : null}
     </div>
   );
-  return <section className="vrm-sv-carte vrm-sa-carte" data-stats-carte="sources-achats">{tete}{corps}</section>;
+  return <Carte titre="D’où viennent mes achats" sousTitre="bénéfice moyen" className="vrm-sa-carte" attrs={{ 'data-stats-carte': 'sources-achats' }}>{corps}</Carte>;
 }

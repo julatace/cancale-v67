@@ -70,7 +70,15 @@ const parts = [
   const imp = CI.impression(APP);
   if (imp) {
     parts.length = 0;
-    parts.push(CI.regles(), imp, bloc('typeBordereau'),
+    // (16 nov., lot tampons-parametres) `typeBordereau` est désormais DANS le morceau extrait (le réglage des tampons
+    // s'en sert) ; le tampon lui-même reste neutre ici (les bancs tampon-bordereau / tampons-reglages le rendent).
+    parts.push(CI.regles(), imp, /const typeBordereau = /.test(imp) ? '' : bloc('typeBordereau'),
+      'const reglageTamponsChoisi = () => reglageTampons(null);',
+      'const formeTampon = (t) => ({ cle: String(t) + "·x", nom: "" });',
+      'const choixTamponValide = () => false;',
+      'const versAffiche = (b, r, X, Y) => ({ x: X - b.x, y: b.y + b.height - Y });',
+      'const rotationPage = () => 0;',
+      'const tailleAffichee = (p) => { const s = p.getSize(); return { w: s.width, h: s.height }; };',
       'const load = (k, d) => d;',
       'const elargir = (z, m) => ({ x: z.x - m, y: z.y - m, w: z.w + 2 * m, h: z.h + 2 * m });',
       'const MENTION = { codes: 5 * 72 / 25.4 };',

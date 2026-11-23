@@ -81,7 +81,9 @@ dit(!/\/api\/relais\?city=/.test(sansComm),
 // ── 4. CE QUI EST VIVANT L'EST TOUJOURS ─────────────────────────────────────
 // La recherche/ajout MANUEL et « Où déposer » ne doivent pas partir avec le
 // ménage : ce sont eux qui portent la fonction aujourd'hui.
-dit(/setRelayPicker\(/.test(APP), 'la recherche manuelle de relais (`relayPicker`) est toujours là');
+// (16 nov., lot ecrans-restes) La recherche manuelle (`relayPicker`) n'avait plus aucun bouton : retirée (tranché,
+// docs/passation/2026-11-16-ecrans-restes.md). Ce qui porte la fonction : les points LUS (`ensureSavedPoint`).
+dit(!/setRelayPicker\(/.test(APP) && /const ensureSavedPoint = /.test(APP), 'les points lus restent enregistrés (`ensureSavedPoint`) ; la recherche manuelle sans bouton est partie');
 dit(/dropOffs/.test(APP), '« Où déposer tes colis » (`dropOffs`) est toujours là');
 
 console.log(ko

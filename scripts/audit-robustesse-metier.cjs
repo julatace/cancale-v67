@@ -168,11 +168,10 @@ const MUTATIONS = {
     dit(d && d.bloque === true, 'H1b vendue ailleurs (prouvé) même si eBay n\'est pas relu ⇒ bloquée', JSON.stringify(d));
     const c = M.avisAcceptationManuelle && M.avisAcceptationManuelle(garde, '8002', now);
     dit(c === null, 'H3 garde fraîche, paire pas vendue ailleurs ⇒ rien à dire');
-    const i = APP.indexOf('const actionOffre = async'), g = i < 0 ? '' : APP.slice(i, i + 4000);
-    const iA = g.indexOf('avisAcceptationManuelle('), iC = g.indexOf('askConfirm(');
-    dit(iA > 0 && iA < iC && /if \(avis && avis\.bloque\)[^\n]*return;/.test(g), 'H4 Messages lit la garde AVANT la confirmation, et s\'arrête si vendue ailleurs');
-    const iG = g.indexOf('chargerRetraitsMulti()');
-    dit(iG > 0 && iG < iA && /avisAcceptationManuelle\(gardeMain,/.test(g), 'H5 la garde est RECALCULÉE au clic (la publiée n\'existe que moteur allumé)');
+    // (20 nov., décision de Julien) Accepter une offre se fait dans le PANNEAU de l'extension : l'app n'accepte plus rien. La règle
+    // `avisAcceptationManuelle` (H1-H3) reste — c'est au panneau de la lire avant SA confirmation (récit 2026-11-20-actions-extension).
+    dit(!/const actionOffre = async/.test(APP) && !/offer_requests/.test(APP), 'H4 (20 nov.) l’app n’accepte aucune offre (plus de chemin d’acceptation ici)');
+    dit(/<BoutonExtension className="vrm-chat-btn vrm-chat-btn-p" action="offres"/.test(APP), 'H5 (20 nov.) la carte d’offre ouvre le panneau de l’extension (où la garde est relue)');
   });
 
   // ── I. Baisse en euros ────────────────────────────────────────────────────

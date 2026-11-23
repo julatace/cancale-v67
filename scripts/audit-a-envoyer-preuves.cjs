@@ -24,6 +24,7 @@
 // dans <d>/scripts et le lancer DEPUIS <d> (la règle n'existe pas ⇒ rouge).
 // ─────────────────────────────────────────────────────────────────────────────
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');

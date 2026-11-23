@@ -36,7 +36,7 @@
   will-change: transform;
   font-family: var(--vrm-police, inherit);
 }
-.vrm-fs:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -2px; }
+.vrm-fs:focus-visible { outline: 2px solid var(--vrm-accent, #16181D); outline-offset: -2px; }
 /* La poignée : 36 × 5, prise au doigt sur 44 px (la zone déborde de 20 px
    au-dessus du bord : on attrape le haut de la feuille sans viser). */
 .vrm-fs-poignee-zone {
@@ -73,7 +73,7 @@ html body button.vrm-fs-croix {
 }
 @media (hover: hover) and (pointer: fine) { html body button.vrm-fs-croix:hover .vrm-fs-croix-rond { background: var(--fu-remplir-fort, rgba(118,118,128,.2)); } }
 html body button.vrm-fs-croix:active .vrm-fs-croix-rond { transform: scale(.94); }
-html body button.vrm-fs-croix:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3) !important; outline-offset: -4px; }
+html body button.vrm-fs-croix:focus-visible { outline: 2px solid var(--vrm-accent, #16181D) !important; outline-offset: -4px; }
 /* Le corps défile seul (la poignée et la croix restent à leur place). */
 .vrm-fs-corps {
   flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
@@ -99,9 +99,9 @@ html body button.vrm-fs-croix:focus-visible { outline: 2px solid var(--vrm-accen
 :root[data-theme="dark"] .vrm-fs.vrm-fs-lumineuse {
   --vrm-bg: #FFFFFF; --vrm-surface: #FFFFFF; --vrm-card2: #F2F2F7; --vrm-ink: #1D1D1F; --vrm-muted: #6E6E73;
   --vrm-faint: #6E6E73; --vrm-line: #E5E5EA; --vrm-hair: rgba(0,0,0,.06); --vrm-photo: #F2F2F7;
-  --vrm-accent: #0066CC; --vrm-on-accent: #FFFFFF; --vrm-warn: #B25000; --vrm-warn-soft: #FFF4E5;
+  --vrm-accent: #16181D; --vrm-on-accent: #FFFFFF; --vrm-warn: #B25000; --vrm-warn-soft: #FFF4E5;
   --fu-remplir: rgba(118,118,128,.12); --fu-remplir-fort: rgba(118,118,128,.2);
-  --vrm-b-teinte: rgba(0,102,204,.08); --vrm-b-teinte-f: rgba(0,102,204,.14); --vrm-b-encre: #1D1D1F; --vrm-b-lien: #0066CC;
+  --vrm-b-teinte: rgba(11,81,57,.08); --vrm-b-teinte-f: rgba(11,81,57,.14); --vrm-b-encre: #1D1D1F; --vrm-b-lien: #16181D;
   color-scheme: light;
   background: #FFFFFF; color: #1D1D1F;
 }
@@ -134,7 +134,7 @@ html body button.vrm-fs-croix:focus-visible { outline: 2px solid var(--vrm-accen
 @media (pointer: coarse), (max-width: 767px) {
   .vrm-champ-recherche, .vrm-app-shell .vrm-main .vrm-champ-recherche { --cr-h: 44px; }
 }
-.vrm-champ-recherche:focus-within { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; }
+.vrm-champ-recherche:focus-within { outline: 2px solid var(--vrm-accent, #16181D); outline-offset: 2px; }
 .vrm-champ-recherche-loupe { flex: none; display: grid; place-items: center; width: 22px; margin-right: 6px; color: var(--vrm-muted, #6E6E73); pointer-events: none; }
 /* Spécificité (0,8,2) : styles-epure, styles-iphone et styles-mineral teintent et
    arrondissent chaque <input> de l'écran avec !important (jusqu'à 0,4,1) ; le champ
@@ -163,8 +163,8 @@ html body .vrm-app-shell .vrm-main button.vrm-champ-recherche-bouton {
   display: grid; place-items: center; width: 17px; height: 17px; border-radius: 999px;
   background: var(--vrm-muted, #6E6E73); color: var(--vrm-surface, #FFFFFF); opacity: .85;
 }
-html body button.vrm-champ-recherche-micro[data-micro-ecoute="1"] { color: var(--vrm-accent, #0071E3) !important; }
-html body button.vrm-champ-recherche-bouton:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3) !important; outline-offset: -4px; }
+html body button.vrm-champ-recherche-micro[data-micro-ecoute="1"] { color: var(--vrm-accent, #16181D) !important; }
+html body button.vrm-champ-recherche-bouton:focus-visible { outline: 2px solid var(--vrm-accent, #16181D) !important; outline-offset: -4px; }
 
 /* ── 4. LA VIGNETTE SANS PHOTO (PhotoVide) ──────────────────────────────────── */
 .vrm-photo-vide {

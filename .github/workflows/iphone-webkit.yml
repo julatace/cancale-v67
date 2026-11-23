@@ -38,6 +38,14 @@ jobs:
           ECRANS: ${{ inputs.ecrans }}
           SHOTS: banc-iphone
         run: node scripts/bancs/stabilite-iphone.cjs
+      # (17 nov., lot relier-tout-achat — « Ici ça bug de ouf quand je swipe ») « Relier achats et ventes » au doigt :
+      # un seul défilement, défiler ne relie rien, appui long + glisser, deux touchers, aucune bande vide.
+      - name: Relier achats et ventes sous WebKit
+        if: always()
+        env:
+          NAVIGATEUR: webkit
+          SHOTS: banc-iphone
+        run: node scripts/bancs/relier-glisser-iphone.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

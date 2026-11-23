@@ -14,7 +14,7 @@
 }
 button.vrm-cc-carte { cursor: pointer; }
 button.vrm-cc-carte:hover { box-shadow: 0 0 0 1px var(--vrm-line, #E5E5EA); }
-button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
+button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #16181D); outline-offset: 2px; }
 .vrm-cc-haut { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .vrm-cc-photo { width: 36px; height: 36px; border-radius: 12px; overflow: hidden; flex: none; background: var(--vrm-card2, #F2F2F7); display: block; }
 .vrm-cc-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -56,13 +56,13 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3)
 .vrm-rp-note { font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); margin: 0 2px; }
 .vrm-rp-attrib { font-size: 11px; }
 .vrm-rp-point { display: flex; flex-direction: column; gap: 6px; scroll-margin-top: 72px; border-radius: 12px; }
-.vrm-rp-point.is-choisi { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 3px; }
+.vrm-rp-point.is-choisi { outline: 2px solid var(--vrm-focus, #16181D); outline-offset: 3px; }
 .vrm-rp-tete { display: flex; align-items: flex-start; gap: 10px; padding: 2px 2px 0; }
 .vrm-rp-numero { flex: none; width: 26px; height: 26px; border-radius: 12px; background: var(--vrm-ink, #1D1D1F); color: var(--vrm-bg, #FFFFFF);
   font: 600 13px/26px var(--vrm-police-mono, ui-monospace, monospace); text-align: center; font-variant-numeric: tabular-nums; margin-top: 1px; }
 /* (1er nov.) La pastille porte le NOMBRE de colis — la même que l'épingle (même couleur). */
 .vrm-rp-compte { width: auto; min-width: 26px; padding: 0 6px; box-sizing: border-box; background: var(--vrm-bg, #FFFFFF); color: var(--vrm-ink, #1D1D1F); box-shadow: inset 0 0 0 1.5px var(--vrm-line, #E5E5EA); }
-.vrm-rp-compte.is-fort { background: var(--vrm-accent, #0071E3); color: #fff; box-shadow: none; }
+.vrm-rp-compte.is-fort { background: var(--vrm-accent, #16181D); color: #fff; box-shadow: none; }
 /* (1er nov.) La pastille = l'épingle de la carte : une icône de colis + le nombre (jamais lu comme un rang). */
 .vrm-rp-epingle { display: inline-flex; align-items: center; justify-content: center; gap: 3px; padding: 0 7px 0 6px; font-variant-numeric: tabular-nums; }
 .vrm-rp-epingle-ic { flex: none; opacity: .75; }
@@ -176,6 +176,10 @@ html body .vrm-colis-barre > .vrm-b:disabled { opacity: .45; }
 .vrm-eg-corps { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 4px 0 6px; }
 .vrm-eg-photo { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; box-shadow: inset 0 0 0 1px var(--vrm-line, #E5E5EA); }
 .vrm-eg-qr { width: min(300px, 86%); aspect-ratio: 1; object-fit: contain; image-rendering: pixelated; background: #FFFFFF; }
+/* (16 nov., lot achats-qr) Touché : le QR prend toute la largeur (et le plein écran quand le navigateur le permet). */
+.vrm-eg-qr { cursor: zoom-in; }
+.vrm-eg-qr.is-plein { width: min(96vw, 560px); cursor: zoom-out; }
+.vrm-eg-qr:fullscreen { width: 100vw; height: 100vh; background: #FFFFFF; object-fit: contain; padding: 6vmin; box-sizing: border-box; }
 .vrm-eg-code { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
 .vrm-eg-code-l { font: 600 12px/1.3 var(--vrm-police, inherit); color: var(--vrm-muted, #6E6E73); letter-spacing: .02em; }
 .vrm-eg-code-v { font: 700 44px/1.1 var(--vrm-police-mono, ui-monospace, monospace); letter-spacing: .08em; color: var(--vrm-ink, #1D1D1F);
@@ -240,11 +244,11 @@ html body .vrm-lot-pied > .vrm-b { margin: 0; }
 html:not([data-colis-outils]) body .vrm-app-shell .vrm-main .vrm-colis-recap.vrm-colis-recap-nu { height: 0 !important; margin: 0 !important; overflow: hidden !important; }
 /* Le titre d'un colis tient sur deux lignes au téléphone (une seule coupait « Samba noir… »). */
 @media (max-width: 767px) {
-  html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] .vrm-colis-titre { -webkit-line-clamp: 2 !important; }
+  html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] .vrm-colis-titre { -webkit-line-clamp: 2 !important; }
 }
 /* « Relier » et « Poser le N° » : la pilule discrète de 32 px reste, la CIBLE fait 44 px au doigt
    (6 px de bord transparent autour, le fond s'arrête à la pilule). Fusion-app F5. */
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] .vrm-colis-actions > :is([data-geste="relier"], [data-geste="poser-num"]) {
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] .vrm-colis-actions > :is([data-geste="relier"], [data-geste="poser-num"]) {
   min-height: 44px !important; border: 6px solid transparent !important; background-clip: padding-box !important; box-sizing: border-box !important;
 }
 /* La pastille N° (`Numero`, inline-flex) se LIT « N°\n31 » (innerText, copier-coller) : dans Colis elle est
@@ -266,7 +270,7 @@ html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete-delai { paddin
 /* La carte en haut de la liste (téléphone compris) ; « Agrandir » posé dans son coin, 44 px au doigt. */
 :root:root body .vrm-rpf-carte[hidden] { display: none !important; }
 :root:root body .vrm-rpf-agrandir { position: absolute; left: 8px; bottom: 8px; z-index: 3; min-height: 44px; min-width: 44px; padding: 0 14px; border: 0; border-radius: 999px; font: 600 13px/44px var(--vrm-police, system-ui); color: #1d1d1f; background: rgba(255,255,255,.88); box-shadow: 0 1px 4px rgba(0,0,0,.18); cursor: pointer; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
-:root:root body .vrm-rpf-agrandir:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 2px; }
+:root:root body .vrm-rpf-agrandir:focus-visible { outline: 2px solid var(--d-accent, #16181D); outline-offset: 2px; }
 :root:root body .vrm-rpf-ligne-delai { padding: 0 0 12px calc(56px + 12px); margin-top: -4px; }
 :root:root body .vrm-rpf-ligne-delai .vrm-rpf-delai { margin-top: 0; }
 /* (9 nov., retraits frais) Le voile de MapLibre (« Deux doigts pour déplacer la carte ») s'affichait EN
@@ -335,7 +339,7 @@ html body .vrm-rpf-ligne .vrm-rpf-verifie { white-space: normal !important; }
   border-radius: 50% !important; background: transparent !important; border: 0 !important; box-shadow: none !important;
   color: var(--fu-gris, #6e6e73) !important; cursor: pointer !important;
 }
-:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card] .vrm-rangee-bord > button.vrm-fu-plus.vrm-fu-plus-carte:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3) !important; outline-offset: 2px !important; }
+:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card] .vrm-rangee-bord > button.vrm-fu-plus.vrm-fu-plus-carte:focus-visible { outline: 2px solid var(--fu-bleu, #16181D) !important; outline-offset: 2px !important; }
 :root[data-theme="dark"]:root:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-bord-card] .vrm-rangee-bord > button.vrm-fu-plus.vrm-fu-plus-carte { color: #98989d !important; }
 /* La place du texte de la carte suit la rangée (« … » + bouton) : au téléphone 92 px (deux ronds), 136 px quand
    le bouton est « Générer le bordereau » (avec « sur Vinted ↗ » dessous) ; à l'ordinateur, où le bouton porte son

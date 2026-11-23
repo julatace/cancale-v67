@@ -40,25 +40,27 @@ const MUTS = {
   'sans-numero': ['src/publierAilleurs.js', "if (!ap.num) out.push({ code: 'numero'", "if (false) out.push({ code: 'numero'"],
   'ref-sans-numero': ['src/publierAilleurs.js', "export const refVrm = (num) => (str(num) ? 'VRM-' + str(num) : '');", "export const refVrm = (num) => 'VRM-' + str(num);"],
   'titre-avant-numero': ['src/publierAilleurs.js', "  if (exact.length) return exact;\n", ''],
-  'reception-passu-gardee': ['src/suggestionsAchat.js', "if (r == null || !Number.isFinite(Number(r))) { sansReception++; continue; }", "if (r == null || !Number.isFinite(Number(r))) { out.push({ a, d: Number.isFinite(d) ? d : -Infinity }); continue; }"],
+  // (16 nov., bancs-rouges-a) sept motifs avaient bougé (écrans découpés en src/ecrans/, compteur `libre`, montant Leboncoin
+  // par `montant()`, Vestiaire sans identifiant du 15 nov.) : chacun visé à sa place d'aujourd'hui, même défaut réintroduit.
+  'reception-passu-gardee': ['src/suggestionsAchat.js', "if (r == null || !Number.isFinite(Number(r))) { if (libre) sansReception++; continue; }", "if (r == null || !Number.isFinite(Number(r))) { out.push({ a, d: Number.isFinite(d) ? d : -Infinity }); continue; }"],
   'prix-ignore': ['src/suggestionsAchat.js', "if ((pMin != null && px < pMin) || (pMax != null && px > pMax)) continue;", ''],
   'taille-ignoree': ['src/suggestionsAchat.js', "if (tq && tailleDuTitre(String(a.title || '')) !== tq) continue;", ''],
   'rangee-a-la-main': ['src/App.jsx', "return <SelecteurSites id={tache}", "return <div className=\"vrm-rangee vrm-filtres vrm-filtre-site\" data-filtre-site={tache}/>; <SelecteurSites id={tache}"],
-  'compte-lbc-oublie': ['src/App.jsx', 'titre={titre} sous={sous} compte={compte} ton={ton} montant={lbcEuro(o.price)}', 'titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)}'],
-  'compte-vc-oublie': ['src/App.jsx', "<LigneVenteCompacte compte={nomCompteVente('vestiaire', v, {}) || undefined} className=\"vrm-sale-row\"", '<LigneVenteCompacte className="vrm-sale-row"'],
+  'compte-lbc-oublie': ['src/App.jsx', 'titre={titre} sous={sous} compte={compte} ton={ton} montant={montant(o.price', 'titre={titre} sous={sous} ton={ton} montant={montant(o.price'],
+  'compte-vc-oublie': ['src/ecrans/Vestiaire.jsx', "<LigneVenteCompacte compte={nomCompteVente('vestiaire', v, {}) || undefined} className=\"vrm-sale-row\"", '<LigneVenteCompacte className="vrm-sale-row"'],
   // (intégration lot 1) UNE règle : `compteVenteLbc`/`compteVenteEbay` passent par l'identité de src/plateformes.js,
   // « non fourni » ('' de l'ancienne convention) n'écrit rien, le compte n'est jamais recopié dans `sous`.
   'vide-dit-non-releve': ['src/App.jsx', "const compteFourni = (compte) => compte !== undefined && compte !== '';", "const compteFourni = (compte) => compte !== undefined;"],
   'compte-voisin-lbc': ['src/App.jsx', "if (ann && ann.accountName && idAnn === id) return", "if (ann && ann.accountName) return"],
   'ebay-sans-identite': ['src/App.jsx', "  const ref = identiteCompteVente('ebay', o);\n  if (!ref) return null;", "  const ref = (o && o._compte) || (Array.isArray(comptes) && comptes[0] && comptes[0].ref);\n  if (!ref) return null;"],
-  'compte-dans-sous': ['src/App.jsx', "compte={compteVenteEbay(o, comptesEbay)} sous={o.creationDate", "compte={compteVenteEbay(o, comptesEbay)} sous={(o._pseudo ? o._pseudo + ' · ' : '') + o.creationDate"],
+  'compte-dans-sous': ['src/ecrans/Ebay.jsx', "compte={compteVenteEbay(o, comptesEbay)} sous={o.creationDate", "compte={compteVenteEbay(o, comptesEbay)} sous={(o._pseudo ? o._pseudo + ' · ' : '') + o.creationDate"],
   'ebay-publie-prepare': ['src/publierAilleurs.js', "const marquee = site === 'ebay' ? !!(publiesEbay && typeof publiesEbay.has === 'function' && publiesEbay.has(id))", "const marquee = site === 'ebay' ? false"],
   'hors-vinted-ignore': ['src/publierAilleurs.js', "if (site === 'leboncoin' && horsVinted === true) out.push(", "if (false) out.push("],
-  'hors-vinted-pas-passe': ['src/App.jsx', ", horsVinted: paire.chezMoi === true }", " }"],
+  'hors-vinted-pas-passe': ['src/App.jsx', ", horsVinted: paire.chezMoi === true,", ","],
   'reception-pas-lue-ici': ['src/App.jsx', "if (!besoinInfosRelier || !pickerFor", "if (true || !besoinInfosRelier || !pickerFor"],
-  'date-filtre-pendant-lecture': ['src/App.jsx', "recuDu: dateEnAttente ? '' : recuDu, recuAu: dateEnAttente ? '' : recuAu", "recuDu, recuAu"],
-  'lbc-demande-muette': ['src/App.jsx', "    else toast('Cet article n’est pas dans ta file « À publier » Leboncoin", "    else void ('Cet article n’est pas dans ta file « À publier » Leboncoin"],
-  'vc-id-tronque': ['src/plateformes.js', "return id === '-' ? '' : `n° ${id}`;", "return id === '-' ? '' : `n° ${id.slice(0, 8)}`;"],
+  'date-filtre-pendant-lecture': ['src/ecrans/Achats.jsx', "recuDu: dateEnAttente ? '' : recuDu, recuAu: dateEnAttente ? '' : recuAu", "recuDu, recuAu"],
+  'lbc-demande-muette': ['src/ecrans/Leboncoin.jsx', "    else toast('Cet article n’est pas dans ta file « À publier » Leboncoin", "    else void ('Cet article n’est pas dans ta file « À publier » Leboncoin"],
+  'vc-id-ecrit': ['src/plateformes.js', "if (site === 'vestiaire') return '';", "if (site === 'vestiaire') return `n° ${id}`;"],
   'vc-texte-brut': ['src/publierAilleurs.js', "const description = typeof r.descriptionLbc === 'function' ? str(r.descriptionLbc({ ref, texte: x.desc, marque: x.marque, taille: x.taille, etat: x.etat, couleur: x.couleur })) : str(x.desc);\n    return { ...base, titre, description, identite: ref ? { quoi: 'Référence'", "const description = str(x.desc);\n    return { ...base, titre, description, identite: ref ? { quoi: 'Référence'"],
   'ebay-titre-brut': ['src/publierAilleurs.js', "const titre = typeof r.titreEbay === 'function' ? str(r.titreEbay(x.title, x.taille)) : str(x.title);", "const titre = str(x.title);"],
   // (15 nov.) D10 sur la règle d'aujourd'hui : l'entrée « + » de la barre doit ouvrir Publier ailleurs SUR SON site.
@@ -79,6 +81,8 @@ let SRC = path.join(R, 'src');
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split('=')[1];
 if (MUT) {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'plat-'));
+  // (16 nov., bancs-rouges-a) La copie de src/ (≈ 25 Mo) restait dans /tmp à chaque mutation : 72 copies, 1,8 Go, disque plein.
+  process.on('exit', () => { try { fs.rmSync(d, { recursive: true, force: true }); } catch (_) {} });
   fs.cpSync(path.join(R, 'src'), path.join(d, 'src'), { recursive: true, filter: (s) => !/node_modules/.test(s) });
   const [fic, de, vers] = MUTS[MUT];
   const f = path.join(d, fic); const s = fs.readFileSync(f, 'utf8');
@@ -159,7 +163,8 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const hote = (() => { const a = APP.indexOf('function HotePublierAilleurs('); const b = APP.indexOf('\nfunction EntreePublierAilleurs(', a); return a < 0 || b < 0 ? '' : APP.slice(a, b); })();
   dit(!!hote && !/vmrCmd|appelEbay|fetch\([^)]*\/api\//.test(PAsrc + hote), 'B18 le parcours n’envoie rien : ni commande à l’extension, ni appel eBay (les moteurs existants publient)');
   dit(!/AgentEbay|agentEbay|ebay\.agent|autoPub/.test(PAsrc + hote), 'B19 l’agent eBay n’est pas réintroduit');
-  dit(/DEMANDE_LBC_FICHE\.id = id/.test(hote) && /DEMANDE_EBAY_PAIRE\.id = id/.test(hote) && /DEMANDE_VC_PAIRE\.id = id/.test(hote), 'B20 « Publier » ouvre le moteur existant sur CET article (fiche Leboncoin, formulaire eBay, ligne Vestiaire)');
+  // (20 nov., décision de Julien) Leboncoin et Vestiaire : le panneau de l'extension sur CET article ; eBay : son formulaire.
+  dit(/if \(sx === 'leboncoin' \|\| sx === 'vestiaire'\) \{ ouvrirPanneau\(\{ site: sx, page: 'publier', ids: \[id\], action: 'publier' \}\)/.test(hote) && /DEMANDE_EBAY_PAIRE\.id = id/.test(hote), 'B20 « Publier » : Leboncoin / Vestiaire dans l’extension sur CET article, eBay dans son formulaire');
 
   // ── C. Relier un achat : les filtres ──
   const A = [
@@ -185,7 +190,12 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(rangees === 0, 'D1 plus aucune rangée de sites écrite à la main : toutes passent par SelecteurSites', String(rangees));
   // (11 nov., lot DJ3) Colis n'est plus un onglet : la rangée « Colis · Leboncoin » est remplacée par le filtre de Ventes
   // (un seul filtre en haut) ; reste celle de l'écran Colis seul. Même règle : un seul composant de sélecteur.
-  dit((APP.match(/<SelecteurSites id=/g) || []).length >= 2 && /return <SelecteurSites id=\{tache\}/.test(APP) && !/<select\b[^>]*data-site/.test(APP), 'D2 Annonces, Ventes, Achats, Messages (FiltreSites) et Colis : le même sélecteur');
+  // (20 nov. soir, Julien : « tu vas aussi enlever les onglets par plateforme ») Plus AUCUN sélecteur de plateforme dans les
+  // onglets (ni FiltreSites, ni le sélecteur global) ; l'écran Colis seul garde SelecteurSites ; chaque rangée porte le logo
+  // de son site (src/natif/LogoSite.jsx), dans Ventes, Annonces et Aujourd'hui.
+  const VENTES = fs.readFileSync(path.join(SRC, 'natif', 'ecrans', 'Ventes.jsx'), 'utf8'), ANN = fs.readFileSync(path.join(SRC, 'natif', 'ecrans', 'Annonces.jsx'), 'utf8');
+  dit((APP.match(/<SelecteurSites id=/g) || []).length >= 1 && !/SelecteurSiteCoque|function FiltreSites\(|data-selecteur-site/.test(APP) && !fs.existsSync(path.join(SRC, 'natif', 'SelecteurSite.jsx')) && !/<select\b[^>]*data-site/.test(APP)
+    && /<LogoSite site=\{r\.site\}/.test(VENTES) && /<LogoSite key=\{x\} site=\{x\}/.test(ANN), 'D2 aucun sélecteur de plateforme dans les onglets ; le logo du site sur chaque rangée');
   dit(/data-vente-compte=\{compte\|\|undefined\}/.test(APP) && /data-fu-compte="">· <CompteVente compte=\{compte\}/.test(APP) && /<CompteVente compte=\{compte\} plateforme=\{plateforme\} ou="ligne"\/>/.test(APP) && /Vendue sur <CompteVente compte=\{compte\}/.test(APP), 'D3 la ligne de vente porte le compte (repliée, carte Fusion, détail), écrit par UN composant (`CompteVente`)');
   dit(/sous=\{sous\} compte=\{compte\} ton=\{ton\} montant=\{(?:lbcEuro|montant)\(/.test(APP) && /compte: compteVenteLbc\(o, itemsLbc, annLbc\)/.test(APP), 'D4 Leboncoin : le compte de la transaction (ou de SON annonce), par identité');
   dit(/compte=\{compteVenteEbay\(o, comptesEbay\)\}/.test(APP) && /const ref = identiteCompteVente\('ebay', o\);/.test(APP), 'D5 eBay : le compte de la ligne de commandes (identité de src/plateformes.js)');

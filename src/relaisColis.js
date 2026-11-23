@@ -175,9 +175,15 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     const rueCle = rueOk ? normRue(rueOk) : '';
     const villeLue = String(morceaux.ville || '').trim();
     const nomSeul = !!nom && !cp && !rueCle && !villeLue;
+    // (19 nov., retraits parfaits) UNE CONSIGNE N'EST JAMAIS LE COMPTOIR DU MÊME MAGASIN : la sorte du colis
+    // (`sorte`, posée par l'écran depuis src/retraitSorte.js — le nom du lieu, le drapeau de SON e-mail, le libellé
+    // du transporteur de SON n°) entre dans l'identité du point. Mesuré chez Julien : « Locker 24/7 Intermarché » et
+    // « Intermarché Le Portail » au même code postal ; un colis de consigne Vinted Go à l'Intermarché, au nom sans
+    // « locker ». Deux endroits, deux gestes (taper le code / le donner au comptoir).
+    const sorteCle = x.sorte === 'consigne' ? 'consigne~' : '';
     const cle = nom
-      ? (nomSeul ? `seul:${normNomRelais(nom)}:${idc || points.size}` : normNomRelais(nom) + '|' + cp + '|' + rueCle + (cp ? '' : '|' + normNomRelais(villeLue)))
-      : (rueOk && cp ? 'adr:' + normNomRelais(rueOk) + '|' + cp : CLE_INCONNU);
+      ? (nomSeul ? `seul:${sorteCle}${normNomRelais(nom)}:${idc || points.size}` : sorteCle + normNomRelais(nom) + '|' + cp + '|' + rueCle + (cp ? '' : '|' + normNomRelais(villeLue)))
+      : (rueOk && cp ? 'adr:' + sorteCle + normNomRelais(rueOk) + '|' + cp : CLE_INCONNU);
     const inconnu = cle === CLE_INCONNU;
     const p = points.get(cle) || { cle, nom: inconnu ? '' : nom, nomConnu: !!nom, inconnu, adressePasLue: nomSeul, rue: '', cp, ville: '', transporteurs: [], arrives: [], attendus: [] };
     if (!inconnu) {
@@ -214,7 +220,7 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     // « Speed Queen - Vannes » (consigne sans code postal) : le nom ET la ville écrits, la rue si les deux l'ont.
     if (!memes.length && !p.cp) {
       const tiret = /^(.*?)\s+[-–]\s+(.{2,40})$/.exec(p.nom);
-      if (tiret) memes = [...points.values()].filter((q) => q !== p && q.cp && !q.adressePasLue && nomDe(q.cle) === normNomRelais(tiret[1]) && normNomRelais(q.ville) === normNomRelais(tiret[2]) && (!p.rue || !q.rue || normRue(q.rue) === normRue(p.rue)));
+      if (tiret) memes = [...points.values()].filter((q) => q !== p && q.cp && !q.adressePasLue && nomDe(q.cle) === (cle.startsWith('consigne~') ? 'consigne~' : '') + normNomRelais(tiret[1]) && normNomRelais(q.ville) === normNomRelais(tiret[2]) && (!p.rue || !q.rue || normRue(q.rue) === normRue(p.rue)));
     }
     if (memes.length !== 1) continue;
     const q = memes[0];
@@ -265,6 +271,7 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     return { ...p, rue, ville, adresse: [rue, [p.cp, ville].filter(Boolean).join(' ')].filter(Boolean).join(', '), adresseCourte: [rue, ville].filter(Boolean).join(', ') || p.cp,
       geocode: p.inconnu ? null : adresseGeocodable({ rue, cp: p.cp, ville }),
       nArrives: p.arrives.length, nAttendus: p.attendus.length, nComptes: p.arrives.filter((c) => !c.horsCompte).length,
+      consigne: p.arrives.length > 0 && p.arrives.every((c) => c && c.sorte === 'consigne'),
       prochaineEstimee: est[0] || null, prochaineLimite, triPoint, urgent: prochaineLimite != null && prochaineLimite <= 1 };
   });
   // Le point où des colis ATTENDENT d'abord (ils repartent si on ne vient pas) :

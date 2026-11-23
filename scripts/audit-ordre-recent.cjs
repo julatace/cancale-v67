@@ -1,3 +1,4 @@
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // Audit : L'ORDRE DES LISTES — LE PLUS RÉCENT EN HAUT, TOUS COMPTES MÉLANGÉS (lot AJ, 9 nov. soir).
 // Julien : « Les ventes, achats, colis à expédier, à préparer ne sont pas rangés dans l'ordre, du plus
 // récent en haut au plus vieux en bas, peu importe le compte, ça doit être parfait. »
