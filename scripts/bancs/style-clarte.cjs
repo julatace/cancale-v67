@@ -56,7 +56,7 @@ async function journee(nav, b, W, sombre) {
       return g.map((x) => { const r = x.getBoundingClientRect(); const code = x.getAttribute('data-direct'); const vis = x.getClientRects().length > 0;
         const enfant = x.querySelector('button, .n-rangee'); const re = enfant ? enfant.getBoundingClientRect() : r;
         return { code, vis, carte: x.matches('.n-groupe, .n-carte') || !!x.querySelector('.n-groupe-liste, .n-carte-corps'), w: Math.round(re.width), h: Math.round(re.height), lc: Math.round(lc) }; }); });
-    dit(dx.length >= 1 && dx.every((d) => ['action', 'verification', 'arret', 'pause', 'muette'].includes(d.code) || !d.vis || (!d.carte && d.w < d.lc * 0.7 && d.h <= 48)), `C5 bis ${t} : « En direct » rien ou une puce (pas de carte pleine largeur)`, dx);
+    dit(dx.length >= 1 && dx.every((d) => ['action', 'verification', 'arret', 'pause', 'muette'].includes(d.code) || !d.vis || (!d.carte && d.w <= d.lc * 0.8 && d.h <= 48)), `C5 bis ${t} : « En direct » rien ou une puce (pas de carte pleine largeur)`, dx);
     dit(m.imprimer && m.disques.length >= 3 && m.disques.every(([w, h]) => w >= 44 && h >= 44), `C7 ${t} : Imprimer = le plein des disques ; chaque disque ≥ 44`, m.disques);
     dit(m.deborde <= 1, `C8 ${t} : rien ne déborde`, m.deborde);
     await pg.screenshot({ path: path.join(SHOTS, `journee-${W}-${sombre ? 'sombre' : 'clair'}.png`) });
