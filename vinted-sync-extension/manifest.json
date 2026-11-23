@@ -13,7 +13,8 @@
     "tabs",
     "downloads",
     "contextMenus",
-    "power"
+    "power",
+    "notifications"
   ],
   "host_permissions": [
     "https://*.vinted.fr/*",

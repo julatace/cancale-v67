@@ -3139,7 +3139,7 @@ function vrmVerifVisible(sel) {
       if (!selection.length) return;
       favOccupe = true; favErreur = ''; favRefus = null; rendre();
       // 5.406 : la photo et le titre de chaque favori choisi (ce que l'aperçu montre), pour l'écran « action en cours ».
-      const items = src.filter((x) => selFav.has(x.id)).map((x) => ({ itemId: String(x.itemId || ''), photo: x.photo || '', titre: x.titre || '' }));
+      const items = src.filter((x) => selFav.has(x.id)).map((x) => ({ itemId: String(x.itemId || ''), notificationId: String(x.id || ''), photo: x.photo || '', titre: x.titre || '' }));   // 5.440 : l'état de CHAQUE ligne sur la fenêtre de vinted.fr
       // 5.419 : le taux qu'il a choisi dans la feuille (gardé pour ce compte), le message modifié POUR CET ENVOI.
       const env9 = grand6() && favEnv ? Object.assign({}, favEnv.taux != null && favEnv.taux !== favEnv.taux0 ? { taux: favEnv.taux, arrondi: favEnv.arrondi } : {}, favEnv.texte != null && favEnv.texte.trim() ? { texte: favEnv.texte.trim() } : {}, favEnv.relire ? { relire: true } : {}) : {};
       demander('lancer', { selection, reglages: a.reglages, confirme: true, items, ...env9, ...(grand6() && a.file && a.file.active ? { remplacer: true } : {}), ...(rythmeDe(a.message) === 'perso' ? {} : { rythme: rythmeDe(a.message) }) }, (r) => {
