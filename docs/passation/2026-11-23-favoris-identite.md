@@ -136,3 +136,9 @@ chaque ligne.
 - **#1311** : versions, zips, `App.jsx`, `audit-coherence.cjs`, CLAUDE.md seulement.
 - Après la fusion des PR du train, la version servie remonte à 5.44x : chaque PR doit garder les capacités `favorislienapp` /
   `favoriscommande` à **5.440.1** dans `EXT_CAPACITES` et `audit-coherence.cjs`.
+
+## ÉTAT À LA REPRISE
+- PR #1344 (`claude/favoris-identite` → `main`), 5.440.1, zips régénérés, `origin/main` fusionné (vrai merge).
+- CI à 23:39 UTC : 35 exécutions en file sur le dépôt, celle de la PR attend un exécuteur depuis ~2 h ; seul
+  `comptes-et-reception` a tourné — rouge, avec EXACTEMENT les mêmes tests rouges que la PR #1332 fusionnée (B1–B7,
+  sauvegardes différées). Fusion seulement quand la CI complète est comparée job par job (référence : #1332).
