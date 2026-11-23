@@ -30552,6 +30552,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           onFermer={() => setDepotOuvert(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
       {curSub==='bordereaux' && !scanOuvert && !tourneeDepot && !depotOuvert ? <BarreAnnulerDepose attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 1}/> : null}
       {/* Modale : relier un achat (depuis Annonces) */}
+      {/* (23 nov., robot chaque-bouton, 2ᵉ passe) Au-dessus des pages poussées du natif (18000) : au téléphone, « Relier à son
+          achat » depuis la fiche d'une vente l'ouvrait DERRIÈRE la fiche — invisible, et la croix touchait la fiche. */}
       {/* (16 nov., lot relier-glisser) « Relier en glissant » : plein écran, au-dessus de la feuille. */}
       {glisserOuvert ? <RelierGlisser C={C} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensGlisser}
           recuDe={(a)=>chezMoiDe(a).chez}
@@ -30569,7 +30571,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           vend={vendMots()} Photo={PhotoVinted} Icon={Icon} onFermer={onCompleterFermer}/> : null}
       {/* Modale : relier un achat (depuis Annonces) */}
       {pickerFor && createPortal(
-        <div data-relier-feuille data-relier-autre={pickerFor._autre ? String(pickerFor._autre) : undefined} onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:only==='completer'?18500:1300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+        <div data-relier-feuille data-relier-autre={pickerFor._autre ? String(pickerFor._autre) : undefined} onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:18500,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setPickerFor(null)}/>
           <div className="vrm-relier-feuille-boite" role="dialog" aria-modal="true" aria-label={tr('relierTout.titreFeuille')} onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             {/* ⚠️ ON MONTRE LA PAIRE QU'ON RELIE. La modale couvrait l'écran et
