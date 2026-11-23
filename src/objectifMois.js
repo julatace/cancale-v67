@@ -262,3 +262,36 @@ export const phraseBilan = (b, montre) => {
   if (b.ecart == null) return `${b.nom} : au moins ${m(p.valeur)} sur ${m(p.objectif)}`;
   return `${b.nom} : ${m(p.valeur)} sur ${m(p.objectif)} · il a manqué ${m(b.ecart)}`;
 };
+
+// ── CE QUI RESTE, EN VENTES MOYENNES (23 nov., lot objectif-mois) ───────────
+// Julien (validé le 23 nov.) : « Aujourd'hui montre la progression et ce qu'il reste,
+// en € et en ventes moyennes, d'après le bénéfice réel avec sa couverture ».
+// Rien n'est recalculé : le reste vient de `resteObjectif` (la case du mois). La
+// MOYENNE est celle DU MOIS, sur les seules ventes qui portent le chiffre :
+//   · bénéfice : la case « Bénéfice brut » ÷ les ventes finalisées AU PRIX D'ACHAT
+//     CONNU (`nCout`) — une vente sans prix d'achat n'a pas de bénéfice connu, elle
+//     n'entre pas dans la moyenne ; elle est NOMMÉE à côté (`sansPrix`, la porte
+//     « Saisir les prix d'achat ») ;
+//   · vendu : le vendu du mois ÷ le nombre de ventes du mois (lu en entier) ;
+//   · ventes : le reste EST déjà en ventes ⇒ rien de plus.
+// Moins de VENTES_MIN_MOYENNE ventes, une moyenne ≤ 0, un reste pas su ⇒ null
+// (aucune moyenne inventée sur deux ventes). Le nombre de ventes s'arrondit VERS LE
+// HAUT (8 ventes qui tiennent l'objectif, jamais 7 qui le ratent). Un reste « au
+// plus » (des ventes pas lues, des prix manquants) rend « au plus N ventes ».
+// `mois` : { n, nCout } — n : ventes du mois (finalisées pour le bénéfice, lues pour
+// le vendu), nCout : celles au prix d'achat connu (bénéfice seulement).
+export const VENTES_MIN_MOYENNE = 3;
+export function resteEnVentes(prog, mois = {}, maintenant = Date.now()) {
+  if (!prog || prog.valeur == null || prog.type === 'ventes' || !estEuros(prog.type)) return null;
+  const r = resteObjectif(prog, maintenant);
+  if (!r) return null;
+  const n = Number(mois && mois.n), nCout = Number(mois && mois.nCout);
+  const base = prog.type === 'benefice' ? nCout : n;
+  const sansPrix = prog.type === 'benefice' && Number.isInteger(n) && Number.isInteger(nCout) && n > nCout ? n - nCout : 0;
+  if (r.atteint) return { atteint: true, ventes: 0, moyenne: null, auPlus: false, sansPrix };
+  if (!Number.isInteger(base) || base < VENTES_MIN_MOYENNE) return { atteint: false, ventes: null, moyenne: null, auPlus: r.auPlus, sansPrix, raison: 'peu' };
+  const moyenne = Math.round((prog.valeur / base) * 100) / 100;
+  if (!(moyenne > 0)) return { atteint: false, ventes: null, moyenne: null, auPlus: r.auPlus, sansPrix, raison: 'moyenne' };
+  const ventes = Math.ceil(r.reste / moyenne - 1e-9);
+  return { atteint: false, ventes, moyenne, auPlus: r.auPlus || sansPrix > 0, sansPrix, reste: r.reste };
+}

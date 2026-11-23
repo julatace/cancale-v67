@@ -65,7 +65,9 @@ const STATS2 = { stock: { enLigne: 142, raisonEnLigne: '', achat: 4380, achatPar
   ecoulement: { pct: 18, ventes: 26, enLigne: 142 }, prevision: { etat: 'ok', centre: 310000, bas: 260000, haut: 360000, cumul: 196800, jours: 18, joursMois: 30, partiel: false },
   dorment: { valeur: 37, partiel: false, raison: '' }, avenir: { valeur: 952, partiel: false, raison: '' } };
 const PLUS = { stats2: STATS2, courbe: { jours: C30 }, comptes: { jour: TABLE(1).slice(0, 2), semaine: TABLE(1), mois: TABLE(3) }, capte: { favoris: null, offres: 4, messages: 7, ventes: 2 },
-  vrm: [{ cle: 'baisses', n: 3 }, { cle: 'favoris', n: 12 }, { cle: 'offres', n: 1 }], objectif: { etat: 'lu', type: 'ca', cible: 3000, valeur: 1840, pct: 61, partiel: false, atteint: false, jours: 11, enregistrer: () => true, retirer: () => {} } };
+  vrm: [{ cle: 'baisses', n: 3 }, { cle: 'favoris', n: 12 }, { cle: 'offres', n: 1 }], objectif: { etat: 'lu', type: 'ca', cible: 3000, valeur: 1840, pct: 61, partiel: false, atteint: false, jours: 11, enregistrer: () => true, retirer: () => {},
+    // (23 nov., lot objectif-mois) ce qui reste : 1 160 €, ≈ 10 ventes moyennes (116 € la vente, 16 ventes du mois inventées).
+    reste: 1160, resteAuPlus: false, ventesRestantes: 10, ventesAuPlus: false, sansPrix: 0 } };
 const CAS = {
   capture: { pret: true, affiche: { n: 8, pasSu: false, sous: '3 pas encore prêts', ambre: true }, colis: colis(8), plein: { n: 5 },
     retraits: { n: 15, pasSu: false, nPoints: 6, points: [{ lieu: 'Relais Pickup Tabac-Presse du Marché Couvert de la Gare Centrale', code: '416362' }], premier: { txt: 'dernier jour', ambre: true } },

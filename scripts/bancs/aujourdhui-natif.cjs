@@ -40,7 +40,7 @@ function construire() {
   const m = app.match(/const ICON_PATHS = \{[\s\S]*?\n\};/); if (!m) throw new Error('ICON_PATHS introuvable dans src/App.jsx');
   const gen = path.join(DOSSIER, 'icones-app.gen.jsx'); fs.writeFileSync(gen, "import React from 'react';\nexport " + m[0] + '\n');
   esbuild.buildSync({ entryPoints: [path.join(RACINE, 'outils', 'natif-aujourdhui', 'ecran.jsx')], bundle: true, outfile: path.join(DOSSIER, 'ecran.js'),
-    loader: { '.jsx': 'jsx', '.js': 'jsx', '.woff2': 'file', '.woff': 'file' }, jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' }, alias: { 'vrm-icones-app': gen }, nodePaths: [NM], logLevel: 'error' });
+    loader: { '.jsx': 'jsx', '.js': 'jsx', '.woff2': 'file', '.woff': 'file' }, jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' }, alias: { 'vrm-icones-app': gen }, nodePaths: [NM], logLevel: 'error', external: ['/brands/*'] });   // (23 nov.) les logos des sites (public/brands/) sont servis par la page, pas emballés
   fs.copyFileSync(path.join(RACINE, 'outils', 'natif-aujourdhui', 'index.html'), path.join(DOSSIER, 'index.html'));
 }
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.woff2': 'font/woff2', '.woff': 'font/woff' };
@@ -108,8 +108,15 @@ async function unEcran(nav, port, base, W, sombre) {
             pastilleSous: !p || !!p.closest('.n-rangee-sous') }; }));
         dit(lig.length >= 6 && lig.every((x) => !x.coupe && x.lignes <= 2 && x.pastilleSous), `L ${ou} : ${lig.length} rangées — titre entier (2 lignes au plus), l’échéance sous le titre, jamais à côté`, lig.filter((x) => x.coupe || x.lignes > 2 || !x.pastilleSous));
         // (19 nov., « applique ce que tu proposes ») L'objectif sous les tuiles ; « Personnaliser » coche une carte et elle vient.
+        // (23 nov.) L'objectif est le pied des tuiles sur la période « Mois » seulement (`p === 'mois'`) : on la choisit d'abord.
+        await pg.evaluate(() => { const g = document.querySelector('[data-v2-bloc="chiffres"] [role="radiogroup"]'); const r = g ? [...g.querySelectorAll('[role="radio"]')] : []; if (r.length) r[r.length - 1].click(); });
+        await pg.waitForTimeout(400);
         const ob = await pg.evaluate(() => { const o = document.querySelector('[data-v2-objectif]'); return o ? { e: o.getAttribute('data-v2-objectif'), pct: o.getAttribute('data-v2-objectif-pct'), t: o.textContent } : null; });
         dit(!!ob && ob.e === 'lu' && ob.pct === '61' && /1\s?840/.test(ob.t) && /3\s?000/.test(ob.t) && /11 jours/.test(ob.t), `O ${ou} : objectif « 1 840 € / 3 000 € · 61 % · il reste 11 jours »`, ob);
+        // (23 nov., lot objectif-mois) CE QUI RESTE : « encore 1 160 € · ≈ 10 ventes moyennes », lu sur ses data-* et son texte.
+        const re = await pg.evaluate(() => { const p = document.querySelector('[data-objectif-reste]'); return p ? { c: p.getAttribute('data-objectif-reste'), v: p.getAttribute('data-objectif-ventes-restantes'), t: p.textContent } : null; });
+        { const el = await pg.$('[data-v2-bloc="chiffres"]'); if (el) { await el.scrollIntoViewIfNeeded().catch(() => {}); await el.screenshot({ path: path.join(SHOTS, `objectif-mois-${W}-${th}.png`) }).catch(() => {}); } }
+        dit(!!re && re.c === '116000' && re.v === '10' && /1\s?160/.test(re.t) && /10 ventes moyennes/.test(re.t), `O2 ${ou} : « encore 1 160 € · ≈ 10 ventes moyennes »`, re);
         await pg.evaluate(() => localStorage.clear());
         await pg.goto(pg.url().replace(/&cartes=toutes|$/, '&cartes=toutes'), { waitUntil: 'load' }); await pg.waitForSelector(ECRAN, { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(700);
         const t2 = await pg.evaluate(() => ({ blocs: [...document.querySelectorAll('[data-v2-bloc]')].map((b) => b.getAttribute('data-v2-bloc')), courbe: (document.querySelector('[data-v2-courbe]') || { getAttribute: () => '' }).getAttribute('data-v2-courbe').split(',').length,

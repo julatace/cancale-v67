@@ -124,7 +124,20 @@ function ObjectifLigne({ objectif: o, montant }) {
   const texte = tr('v2.obj.texte', { v: o.valeur == null ? '—' : f(o.valeur), c: f(o.cible) });
   const detail = o.etat !== 'lu' || o.pct == null ? (o.raison || tr('v2.jour.lecture'))
     : o.atteint ? tr('v2.obj.atteint', { pct: o.pct }) : (o.partiel ? tr('journee.moins') + ' ' : '') + tr('v2.obj.detail', { pct: o.pct, j: o.jours, n: o.jours });
-  return <Progression pct={o.etat === 'lu' ? o.pct : null} texte={texte} detail={detail} onClick={o.ouvrir} attrs={{ 'data-v2-objectif': o.etat, 'data-v2-objectif-pct': o.pct == null ? '' : String(o.pct) }}/>;
+  // (23 nov., lot objectif-mois) CE QUI RESTE : « encore 760 € · ≈ 8 ventes moyennes » (src/objectifMois.js `resteEnVentes`),
+  // « au plus » sur un « au moins » ; les ventes sans prix d'achat NOMMÉES. Pas su ⇒ rien (jamais un reste inventé).
+  const reste = o.etat === 'lu' && !o.atteint && o.reste != null ? [
+    tr(o.resteAuPlus ? 'objr.resteAuPlus' : 'objr.reste', { reste: f(o.reste) }),
+    o.ventesRestantes != null ? tr(o.ventesAuPlus ? 'objr.ventesAuPlus' : 'objr.ventes', { n: o.ventesRestantes }) : '',
+    o.sansPrix > 0 ? tr('objr.sansPrix', { n: o.sansPrix }) : '',
+  ].filter(Boolean).join(' · ') : '';
+  return (
+    <>
+      <Progression pct={o.etat === 'lu' ? o.pct : null} texte={texte} detail={detail} onClick={o.ouvrir} attrs={{ 'data-v2-objectif': o.etat, 'data-v2-objectif-pct': o.pct == null ? '' : String(o.pct), 'data-v2-objectif-type': o.type }}/>
+      {reste ? <p className="n-obj-reste" data-objectif-reste={o.type === 'ventes' ? String(o.reste) : String(Math.round(o.reste * 100))} data-objectif-ventes-restantes={o.ventesRestantes == null ? '' : String(o.ventesRestantes)}
+        data-objectif-sans-prix={String(o.sansPrix || 0)} data-objectif-au-plus={o.resteAuPlus || o.ventesAuPlus ? '1' : '0'}>{reste}</p> : null}
+    </>
+  );
 }
 
 // LE TABLEAU DE BORD (22 nov., chantier style-clarte — Julien : « ici tu peux faire mieux avec des graphiques »).
@@ -231,9 +244,10 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
   const [objOuvert, setObjOuvert] = React.useState(false);
   const [saisie, setSaisie] = React.useState('');
   const [saisieKo, setSaisieKo] = React.useState(false);
+  const [typeObj, setTypeObj] = React.useState('ca');   // (23 nov., lot objectif-mois) Vendu ou Bénéfice : SON choix
   const choix = cartesChoisies(cartes ? cartes.brut : null);
   const montant = chiffres && chiffres.montant ? chiffres.montant : (x) => String(x);
-  const obj = objectif ? { ...objectif, ouvrir: () => { setSaisie(objectif.cible ? String(objectif.cible) : ''); setSaisieKo(false); setObjOuvert(true); } } : null;
+  const obj = objectif ? { ...objectif, ouvrir: () => { setSaisie(objectif.cible ? String(objectif.cible) : ''); setTypeObj(objectif.type || 'ca'); setSaisieKo(false); setObjOuvert(true); } } : null;
   // Prêt une fois, prêt pour de bon ; une lecture qui ne répond pas n'enferme pas l'écran (10 s, puis « — » là où ce n'est pas su).
   const dejaPret = React.useRef(false);
   const [delai, setDelai] = React.useState(false);
@@ -564,7 +578,9 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
   const visibles = choix.ordre.filter((k) => choix.montrees.has(k));
   const aAjouter = choix.ordre.filter((k) => !choix.montrees.has(k));
   const libellesListe = { retirer: (x) => tr('v2.perso.retirerX', { x }), ajouter: (x) => tr('v2.perso.ajouterX', { x }), deplacer: (x) => tr('v2.perso.deplacerX', { x }), monter: tr('v2.perso.monter'), descendre: tr('v2.perso.descendre') };
-  const enregistrerObjectif = () => { if (!objectif || !objectif.enregistrer) return; if (objectif.enregistrer(saisie)) setObjOuvert(false); else setSaisieKo(true); };
+  const enregistrerObjectif = () => { if (!objectif || !objectif.enregistrer) return; if (objectif.enregistrer(saisie, typeObj)) setObjOuvert(false); else setSaisieKo(true); };
+  // Les mesures proposées : Vendu et Bénéfice ; un objectif posé ailleurs en ventes ou en reçu garde la sienne.
+  const typesObj = ['ca', 'benefice', ...(objectif && (objectif.type === 'ventes' || objectif.type === 'recu') ? [objectif.type] : [])];
   return (
     <Page titre={titre}
       actions={onScanner && !aPilotage ? <BoutonIcone libelle={tr('v2.scanner')} icone={<Icon name="scan" size={22}/>} onClick={onScanner} attrs={{ 'data-v2-scanner': '' }}/> : null}
@@ -632,8 +648,11 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
       {defait ? <Toast key={defait.id} message={tr('v2.perso.remis')} onAnnuler={() => { poser(defait.ordre, new Set(defait.montrees)); setDefait(null); }} onFin={() => setDefait(null)}/> : null}
       <Feuille ouverte={objOuvert} onFermer={() => setObjOuvert(false)} titre={tr('v2.obj.titre')} detente="moitie"
         pied={<Bouton variante="plein" onClick={enregistrerObjectif}>{tr('v2.obj.enregistrer')}</Bouton>}>
-        <Champ libelle={tr('v2.obj.libelle')} valeur={saisie} onChange={(v) => { setSaisie(v); setSaisieKo(false); }} inputMode="decimal" suffixe="€" attrs={{ 'data-v2-objectif-saisie': '' }}/>
-        {saisieKo ? <Groupe pied={tr('v2.obj.invalide')}/> : null}
+        <div className="n-obj-type" data-v2-objectif-choix={typeObj}>
+          <Segmente libelle={tr('objr.choix')} valeur={typeObj} onChange={(t) => { setTypeObj(t); setSaisieKo(false); }} options={typesObj.map((k) => ({ cle: k, libelle: tr('objr.type.' + k) }))}/>
+        </div>
+        <Champ libelle={typeObj === 'ca' ? tr('v2.obj.libelle') : tr('objr.libelle.' + typeObj)} valeur={saisie} onChange={(v) => { setSaisie(v); setSaisieKo(false); }} inputMode={typeObj === 'ventes' ? 'numeric' : 'decimal'} suffixe={typeObj === 'ventes' ? '' : '€'} attrs={{ 'data-v2-objectif-saisie': '' }}/>
+        {saisieKo ? <Groupe pied={typeObj === 'ventes' ? tr('objr.invalideVentes') : tr('v2.obj.invalide')}/> : null}
         {objectif && objectif.cible && objectif.retirer ? <Groupe><Rangee titre={tr('v2.obj.retirer')} onClick={() => { objectif.retirer(); setObjOuvert(false); }}/></Groupe> : null}
       </Feuille>
     </Page>
