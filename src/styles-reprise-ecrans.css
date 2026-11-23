@@ -15,4 +15,4 @@
   min-height: 44px; min-width: 44px; padding: 0 10px; border: 0; background: transparent; cursor: pointer;
   font: inherit; font-size: 13px; font-weight: 600; color: var(--fu-encre, #1d1d1f); text-decoration: underline; text-underline-offset: 3px;
 }
-.vrm-reprise-effacer:focus-visible { outline: 2px solid var(--fu-bleu, #0F6B4C); outline-offset: -2px; border-radius: 12px; }
+.vrm-reprise-effacer:focus-visible { outline: 2px solid var(--fu-bleu, #16181D); outline-offset: -2px; border-radius: 12px; }

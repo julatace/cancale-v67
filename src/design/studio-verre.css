@@ -49,10 +49,10 @@
 }
 :root:root:root:root[data-theme="dark"] {
   --sb-puits: rgb(22 22 24 / .94) !important;
-  --sb-lien: #3FD49A !important;
+  --sb-lien: #F4F4F5 !important;
 }
 @media (prefers-color-scheme: dark) {
-  :root:root:root:root:not([data-theme]) { --sb-puits: rgb(22 22 24 / .94) !important; --sb-lien: #3FD49A !important; }
+  :root:root:root:root:not([data-theme]) { --sb-puits: rgb(22 22 24 / .94) !important; --sb-lien: #F4F4F5 !important; }
 }
 /* Les aplats d'espace (±2 points) n'ont plus de sens sur un dégradé : un seul fond. */
 :root [data-espace] { --sb-aplat: var(--sv-milieu) !important; }

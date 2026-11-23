@@ -13,7 +13,7 @@
 :root body .vrm-aide-bouton svg { display: block; }
 :root body .vrm-aide-bouton:active { background: var(--vrm-card2, #F2F2F7); transform: none; }
 @media (hover: hover) and (pointer: fine) { :root body .vrm-aide-bouton:hover { color: var(--vrm-ink, #1D1D1F); } }
-:root body .vrm-aide-bouton:focus-visible { outline: 2px solid var(--vrm-accent, #0F6B4C); outline-offset: -4px; }
+:root body .vrm-aide-bouton:focus-visible { outline: 2px solid var(--vrm-accent, #16181D); outline-offset: -4px; }
 .vrm-phrase-ecran-seule { min-height: 20px; }
 
 /* ── La feuille : deux groupes iOS, puis « Signaler » ── */
@@ -34,8 +34,8 @@
 }
 .vrm-aide-q > summary::-webkit-details-marker { display: none; }
 .vrm-aide-q > summary:active, .vrm-aide-liens a:active { background: var(--vrm-card2, #F2F2F7); }
-.vrm-aide-q > summary:focus-visible, .vrm-aide-liens a:focus-visible { outline: 2px solid var(--vrm-accent, #0F6B4C); outline-offset: -2px; }
-.vrm-aide-liens a { font-weight: 400; color: var(--vrm-accent-texte, var(--vrm-accent, #0B5139)); }
+.vrm-aide-q > summary:focus-visible, .vrm-aide-liens a:focus-visible { outline: 2px solid var(--vrm-accent, #16181D); outline-offset: -2px; }
+.vrm-aide-liens a { font-weight: 400; color: var(--vrm-accent-texte, var(--vrm-accent, #16181D)); }
 .vrm-aide-chevron { flex: 0 0 auto; color: var(--vrm-muted, #6E6E73); opacity: .6; transition: transform 200ms cubic-bezier(.2,.8,.2,1); }
 .vrm-aide-q[open] > summary .vrm-aide-chevron { transform: rotate(90deg); }
 .vrm-aide-q > p { margin: -4px 0 0; padding: 0 16px 14px; font-size: 15px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); text-wrap: pretty; }
@@ -56,7 +56,7 @@
 
 /* ── (11 nov., lot centre-aide) Le geste en cours, allumé par l'animation ── */
 .vrm-aide-etapes > li { transition: background-color 200ms ease-out; }
-.vrm-aide-etapes > li[data-aide-etape-actif] .vrm-aide-etape-n { background: var(--vrm-accent, #0F6B4C); color: #fff; }
+.vrm-aide-etapes > li[data-aide-etape-actif] .vrm-aide-etape-n { background: var(--vrm-accent, #16181D); color: #fff; }
 
 /* ── L'animation : une maquette SVG, jetons seulement (clair et sombre) ── */
 .vrm-aa { position: relative; margin: 4px 0 12px; padding: 0; border-radius: 20px; background: var(--vrm-card2, #F2F2F7); overflow: hidden; }
@@ -79,14 +79,14 @@
 .vrm-aa-ambre .vrm-aa-grand { fill: #B25000; }
 .vrm-aa-double .vrm-aa-fond { fill: color-mix(in srgb, var(--vrm-doublon, #D70015) 16%, transparent); stroke: var(--vrm-doublon, #D70015); stroke-width: 1.2; }
 .vrm-aa-el { transform-box: fill-box; transform-origin: center; }
-.vrm-aa-actif .vrm-aa-fond { stroke: var(--vrm-accent, #0F6B4C); stroke-width: 1.6; }
+.vrm-aa-actif .vrm-aa-fond { stroke: var(--vrm-accent, #16181D); stroke-width: 1.6; }
 .vrm-aa-actif.vrm-aa-tap { animation: vrm-aa-appui 1000ms cubic-bezier(.2,.8,.2,1) both; }
 .vrm-aa-actif.vrm-aa-arrive { animation: vrm-aa-arrive 1000ms cubic-bezier(.2,.8,.2,1) both; }
 .vrm-aa-actif.vrm-aa-part { animation: vrm-aa-part 1000ms cubic-bezier(.4,0,.2,1) both; }
 .vrm-aa-doigt { transition: transform 420ms cubic-bezier(.2,.8,.2,1); }
 .vrm-aa-bout { fill: rgba(29,29,31,.28); stroke: #fff; stroke-width: 1.5; }
-.vrm-aa-onde { fill: none; stroke: var(--vrm-accent, #0F6B4C); stroke-width: 1.5; animation: vrm-aa-onde 700ms 380ms ease-out both; transform-box: fill-box; transform-origin: center; }
-.vrm-aa-repere circle { fill: var(--vrm-accent, #0F6B4C); }
+.vrm-aa-onde { fill: none; stroke: var(--vrm-accent, #16181D); stroke-width: 1.5; animation: vrm-aa-onde 700ms 380ms ease-out both; transform-box: fill-box; transform-origin: center; }
+.vrm-aa-repere circle { fill: var(--vrm-accent, #16181D); }
 .vrm-aa-repere text { fill: #fff; font-size: 8px; font-weight: 700; }
 @keyframes vrm-aa-appui { 0%, 38% { transform: scale(1); } 50% { transform: scale(.96); } 70%, 100% { transform: scale(1); } }
 @keyframes vrm-aa-arrive { 0% { opacity: 0; transform: translateY(-6px); } 45%, 100% { opacity: 1; transform: none; } }
@@ -96,7 +96,7 @@
   position: absolute; right: 4px; bottom: 4px; width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 999px;
   background: none; color: var(--vrm-muted, #6E6E73); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: none;
 }
-.vrm-aa-pause:focus-visible { outline: 2px solid var(--vrm-accent, #0F6B4C); outline-offset: -6px; }
+.vrm-aa-pause:focus-visible { outline: 2px solid var(--vrm-accent, #16181D); outline-offset: -6px; }
 :root[data-theme="dark"] .vrm-aa-bout { fill: rgba(255,255,255,.32); stroke: rgba(0,0,0,.6); }
 :root[data-theme="dark"] .vrm-aa-ambre .vrm-aa-grand { fill: #FF9F0A; }
 @media (prefers-reduced-motion: reduce) {
@@ -109,7 +109,7 @@
   border-radius: 12px; background: var(--vrm-card2, #F2F2F7); color: var(--vrm-muted, #6E6E73);
 }
 .vrm-aide-cherche input { flex: 1; min-width: 0; min-height: 44px; border: 0; background: none; outline: none; font: inherit; font-size: 16px; color: var(--vrm-ink, #1D1D1F); padding: 0; }
-.vrm-aide-cherche:focus-within { box-shadow: 0 0 0 2px var(--vrm-accent, #0F6B4C); }
+.vrm-aide-cherche:focus-within { box-shadow: 0 0 0 2px var(--vrm-accent, #16181D); }
 .vrm-aide-tete { margin: 18px 4px 6px; font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--vrm-muted, #6E6E73); }
 .vrm-aide-fiche-ou { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--vrm-muted, #6E6E73); }
 .vrm-aide-fiche-etapes { margin: -2px 0 0; padding: 0 16px 0 36px; font-size: 15px; line-height: 1.45; color: var(--vrm-ink, #1D1D1F); }
@@ -125,7 +125,7 @@
   color: var(--vrm-ink, #1D1D1F); font: inherit; -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease-out;
 }
 :root body .vrm-aide-video-ouvrir:active { background: var(--vrm-card2, #F2F2F7); transform: none; }
-:root body .vrm-aide-video-ouvrir:focus-visible { outline: 2px solid var(--vrm-accent, #0F6B4C); outline-offset: -2px; }
+:root body .vrm-aide-video-ouvrir:focus-visible { outline: 2px solid var(--vrm-accent, #16181D); outline-offset: -2px; }
 .vrm-aide-video-apercu { position: relative; flex: 0 0 45px; height: 80px; border-radius: 8px; overflow: hidden; background: var(--vrm-card2, #F2F2F7); }
 .vrm-aide-video-apercu img { display: block; width: 45px; height: 80px; object-fit: cover; }
 .vrm-aide-video-play {

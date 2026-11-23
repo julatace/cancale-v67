@@ -10,7 +10,7 @@
 .vrm-retour-cat { padding: 6px 14px 8px 12px; }
 .vrm-retour-cat + .vrm-retour-cat { border-top: .5px solid var(--w-filet, rgba(60,60,67,.18)); }
 .vrm-retour-case { display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer; }
-.vrm-retour-case input { width: 22px; height: 22px; flex: 0 0 auto; accent-color: var(--accent, #0F6B4C); }
+.vrm-retour-case input { width: 22px; height: 22px; flex: 0 0 auto; accent-color: var(--accent, #16181D); }
 .vrm-retour-case span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .vrm-retour-case b { font-size: 15px; font-weight: 600; color: var(--w-encre, #1D1D1F); }
 .vrm-retour-case small { font-size: 12.5px; color: var(--w-gris, #6E6E73); }

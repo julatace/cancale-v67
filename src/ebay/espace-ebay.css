@@ -32,10 +32,10 @@ button.ebt-rangee:active, a.ebt-rangee:active { transform: scale(.985); }
 .ebt-geste { color: var(--sv-ambre, #8A4B00); }
 .ebt-geste::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; }
 .ebt-chevron { flex-shrink: 0; color: var(--sv-encre-2, #3F5468); opacity: .7; }
-.ebt-lien { color: var(--sv-lien, var(--sb-lien, #0B5139)); font-weight: 600; font-size: 15px; background: none; border: 0; padding: 0 4px; min-height: 44px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-family: inherit; text-decoration: none; }
-.ebt-titre .ebt-lien { color: var(--sv-clair-lien, var(--sb-lien, #0B5139)); font-size: 13px; min-height: 32px; }
+.ebt-lien { color: var(--sv-lien, var(--sb-lien, #16181D)); font-weight: 600; font-size: 15px; background: none; border: 0; padding: 0 4px; min-height: 44px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-family: inherit; text-decoration: none; }
+.ebt-titre .ebt-lien { color: var(--sv-clair-lien, var(--sb-lien, #16181D)); font-size: 13px; min-height: 32px; }
 .ebt-pied { margin: 0 4px; font-size: 12px; line-height: 1.4; color: var(--sv-clair-2, var(--d-gris, #6E6E73)); }
-.ebt-pied .ebt-lien { color: var(--sv-clair-lien, var(--sb-lien, #0B5139)); font-size: 13px; min-height: 44px; }
+.ebt-pied .ebt-lien { color: var(--sv-clair-lien, var(--sb-lien, #16181D)); font-size: 13px; min-height: 44px; }
 .ebt-vide { padding: 16px; font-size: 14px; color: var(--sv-encre-2, #3F5468); }
 .ebt-panne { padding: 14px 16px; display: grid; gap: 6px; }
 .ebt-panne-texte { font-size: 14px; line-height: 1.4; }
@@ -75,5 +75,5 @@ button.ebt-rangee:active, a.ebt-rangee:active { transform: scale(.985); }
 /* (2e tour) Dans une FEUILLE (porcelaine opaque, « Pourquoi elle ne se voit pas ») : titres, pieds et liens à
    l'encre SOMBRE — l'encre claire du fond y serait invisible. */
 [data-ebt-diagnostic] .ebt-titre, [data-ebt-diagnostic] .ebt-pied { color: var(--sv-encre-2, var(--d-gris, #6E6E73)); }
-[data-ebt-diagnostic] .ebt-titre .ebt-lien, [data-ebt-diagnostic] .ebt-pied .ebt-lien { color: var(--sv-lien, var(--sb-lien, #0B5139)); }
+[data-ebt-diagnostic] .ebt-titre .ebt-lien, [data-ebt-diagnostic] .ebt-pied .ebt-lien { color: var(--sv-lien, var(--sb-lien, #16181D)); }
 [data-ebt-diagnostic] .ebt-pied.ebt-large { color: var(--sv-encre, #1C1C20); font-size: 15px; }

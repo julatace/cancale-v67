@@ -10,7 +10,7 @@
 .vrm-pc.is-sombre .vrm-pc-b.is-discret { color: #d1d1d6; }
 /* (14 nov., passe design 3) Le bouton secondaire du système : la capsule remplie — plus un rectangle cerclé de 12. */
 .vrm-pc.is-clair .vrm-pc-b { background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-encre, #1D1D1F); box-shadow: none; }
-.vrm-pc.is-clair .vrm-pc-b.is-discret { color: var(--vrm-accent-texte, #0B5139); }
+.vrm-pc.is-clair .vrm-pc-b.is-discret { color: var(--vrm-accent-texte, #16181D); }
 .vrm-pc.is-compact .vrm-pc-b { width: auto; min-height: 44px; font-size: 15px; padding: 0 14px; }
 .vrm-pc-range { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 6px; border-radius: 12px; }
 .vrm-pc.is-sombre .vrm-pc-range { background: #1c1c1e; color: #fff; }
@@ -24,5 +24,5 @@
 .vrm-pc.is-clair .vrm-pc-note.is-ambre { color: #B25000; }
 .vrm-pc-ligne dd { display: flex; align-items: center; gap: 10px; justify-content: flex-end; min-width: 0; }
 .vrm-pc-date { color: var(--d-gris, #6E6E73); font-size: 13px; }
-.vrm-pc-voir { min-height: 44px; min-width: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--vrm-accent-texte, #0B5139); font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.vrm-pc-voir { min-height: 44px; min-width: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--vrm-accent-texte, #16181D); font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
 .vrm-pc-ligne .vrm-pc { flex: 0 0 auto; }

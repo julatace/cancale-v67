@@ -1,7 +1,7 @@
 /* L'écran « Communauté » — VRM Noir : une seule couleur d'accent, rare. */
 .vrm-communaute {
   --cm-fond: #F2F2F7; --cm-carte: #FFFFFF; --cm-encre: #1C1C1E; --cm-doux: #636366;
-  --cm-bord: #E5E5EA; --cm-accent: #0F6B4C; --cm-accent-fond: rgba(15,107,76,.10); 
+  --cm-bord: #E5E5EA; --cm-accent: #16181D; --cm-accent-fond: rgba(22, 24, 29,.10); 
   color: var(--cm-encre); padding: 16px; max-width: 1080px; margin: 0 auto; box-sizing: border-box;
 }
 .vrm-communaute[data-dark="true"] {
@@ -188,7 +188,7 @@ form.vrm-cm-discord-moi { display: block !important; }
    cartes sans bordure ni ombre, comme le reste. Les variables du thème manquent
    ⇒ les valeurs d'avant restent (repli). */
 .vrm-communaute, .vrm-communaute[data-dark="true"] {
-  --cm-accent: var(--vrm-accent, #0F6B4C);
+  --cm-accent: var(--vrm-accent, #16181D);
   --cm-accent-fond: var(--vrm-b-teinte, rgba(0,0,0,.08));
   --cm-encre: var(--vrm-ink, #38383A);
   --cm-doux: var(--vrm-muted, #636366);

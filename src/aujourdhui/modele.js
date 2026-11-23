@@ -180,7 +180,13 @@ export function courbe30({ valeur, maintenant = Date.now() }) {
   return trenteJours(maintenant).map((j) => {
     const p = { de: j.de, a: j.a, label: '' };
     const V = valeur('vendu', p) || {}, N = valeur('ventes', p) || {};
-    return { ...j, v: V.valeur == null ? null : V.valeur, partiel: !!V.partiel, n: N.valeur == null ? null : N.valeur };
+    // (22 nov., style-clarte — le graphique d'Aujourd'hui) Le bénéfice brut du jour, DEMANDÉ au même propriétaire que la
+    // tuile (`valeur('brut', …)` = `chiffreBrut` sur `vrm_benefice_jours`), avec SA règle de statsPeriodes : moins de ventes
+    // comptées que vendues ⇒ pas su (null) — jamais un 0 sur une journée qui a vendu.
+    const B = valeur('brut', p) || {};
+    const nV = N.valeur == null || N.partiel ? null : N.valeur;
+    const b = B.valeur == null ? null : (Number.isFinite(B.n) && nV != null && nV > B.n ? null : B.valeur);
+    return { ...j, v: V.valeur == null ? null : V.valeur, partiel: !!V.partiel, n: N.valeur == null ? null : N.valeur, b, bp: b != null && !!B.partiel };
   });
 }
 

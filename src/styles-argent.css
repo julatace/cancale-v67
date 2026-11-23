@@ -49,7 +49,7 @@
 }
 :root:root body .vrm-argent-w:active { transform: scale(.97); }
 @media (prefers-reduced-motion: reduce) { :root:root body .vrm-argent-w:active { transform: none; } }
-:root:root body .vrm-argent-w:focus-visible { outline: 2px solid var(--w-accent, #0F6B4C); outline-offset: 2px; }
+:root:root body .vrm-argent-w:focus-visible { outline: 2px solid var(--w-accent, #16181D); outline-offset: 2px; }
 :root:root body .vrm-argent-w-l {
   font-size: 13px; font-weight: 600; line-height: 1.25; color: var(--w-gris, #6E6E73);
   padding-right: 18px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

@@ -2,14 +2,14 @@
    l'app (bande encre + carte blanche, police système, bleu Apple rare). */
 :root{
  --fond:#F2F2F7;--carte:#FFFFFF;--encre:#1D1D1F;--doux:#6E6E73;--trait:#D1D1D6;--champ:#FFFFFF;
- --accent:#0F6B4C;--accent-texte:#0B5139;--sur-accent:#FFFFFF;--ambre:#B25000;--ok:#1D1D1F;
+ --accent:#16181D;--accent-texte:#16181D;--sur-accent:#FFFFFF;--ambre:#B25000;--ok:#1D1D1F;
  color-scheme:light;
  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",system-ui,sans-serif;
  -webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;
 }
 @media (prefers-color-scheme:dark){
  :root{--fond:#000000;--carte:#1C1C1E;--encre:#F5F5F7;--doux:#98989D;--trait:#3A3A3C;--champ:#2C2C2E;
-  --accent:#0F6B4C;--accent-texte:#3FD49A;--ambre:#FF9F0A;color-scheme:dark}
+  --accent:#16181D;--accent-texte:#F4F4F5;--ambre:#FF9F0A;color-scheme:dark}
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--fond);color:var(--encre)}

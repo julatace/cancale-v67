@@ -58,7 +58,8 @@ export function Tuiles({ titre = '', action = null, pied = null, className = '',
   );
 }
 
-export function Tuile({ libelle, valeur = null, unite = '', detail = '', ton = 'neutre', onClick = null, className = '', attrs = null }) {
+// `graphe` (22 nov., style-clarte) : une petite forme sous le chiffre (<Etincelle>), facultative.
+export function Tuile({ libelle, valeur = null, unite = '', detail = '', ton = 'neutre', onClick = null, className = '', attrs = null, graphe = null }) {
   const su = !(valeur == null || valeur === '');
   const contenu = (
     <>
@@ -66,6 +67,7 @@ export function Tuile({ libelle, valeur = null, unite = '', detail = '', ton = '
       <span className="n-tuile-ligne">
         <span className="n-tuile-valeur" data-n-vide={su ? undefined : '1'}>{su ? valeur : TIRET}</span>
         {su && unite ? <span className="n-tuile-unite">{unite}</span> : null}
+        {graphe ? <span className="n-tuile-graphe">{graphe}</span> : null}
       </span>
       <span className="n-tuile-detail" data-n-ton={ton}>{detail || ' '}</span>
     </>

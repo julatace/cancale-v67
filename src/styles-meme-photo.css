@@ -34,5 +34,5 @@
 .vrm-mph-averifier b { font-weight: 600; }
 .vrm-mph-raison { flex-basis: 100%; padding-left: 12px; font-size: 12px; line-height: 1.35; }
 .vrm-mph-choix .vrm-mph-raison { padding-left: 0; }
-.vrm-mph-diode { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sb-diode, #0B5139); box-shadow: 0 0 0 3px color-mix(in oklab, var(--sb-diode, #0B5139) 18%, transparent); }
+.vrm-mph-diode { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sb-diode, #16181D); box-shadow: 0 0 0 3px color-mix(in oklab, var(--sb-diode, #16181D) 18%, transparent); }
 .vrm-mph-choix .vrm-mph-sur, .vrm-mph-choix .vrm-mph-averifier { font-size: 12px; margin: 0; }

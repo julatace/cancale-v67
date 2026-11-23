@@ -40,8 +40,8 @@
   --vrm-b-h: 44px;
 }
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) { :root { --vrm-t-title: 44px; --vrm-t-section: 26px; } }
-:root[data-theme="dark"] { --vrm-ombre-flottante: 0 10px 28px rgba(0,0,0,.45); --vrm-focus: #0F6B4C; }
-:root[data-theme="light"] { --vrm-focus: #0F6B4C; }
+:root[data-theme="dark"] { --vrm-ombre-flottante: 0 10px 28px rgba(0,0,0,.45); --vrm-focus: #16181D; }
+:root[data-theme="light"] { --vrm-focus: #16181D; }
 
 html body, html body :is(button, input, select, textarea),
 html .vrm-app-shell, body > :not(#root) {
@@ -325,11 +325,11 @@ html .vrm-app-shell .vrm-inbox-row.is-current { box-shadow: inset 3px 0 var(--vr
 html .vrm-app-shell .vrm-finance-metric.is-primary { background: var(--vrm-surface) !important; border-color: transparent !important; }
 html .vrm-app-shell .vrm-finance-metric.is-primary * { color: var(--vrm-ink) !important; }
 .vrm-bienvenue {
-  --b-carte: #FFFFFF; --b-encre: #1D1D1F; --b-doux: #6E6E73; --b-filet: #E5E5EA; --b-sol: #F2F2F7; --b-accent: var(--vrm-accent, #0F6B4C);
+  --b-carte: #FFFFFF; --b-encre: #1D1D1F; --b-doux: #6E6E73; --b-filet: #E5E5EA; --b-sol: #F2F2F7; --b-accent: var(--vrm-accent, #16181D);
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
 :root[data-theme="dark"] .vrm-bienvenue {
-  --b-carte: #1C1C1E; --b-encre: #F5F5F7; --b-doux: #98989D; --b-filet: #38383A; --b-sol: #000000; --b-accent: var(--vrm-accent, #0F6B4C);
+  --b-carte: #1C1C1E; --b-encre: #F5F5F7; --b-doux: #98989D; --b-filet: #38383A; --b-sol: #000000; --b-accent: var(--vrm-accent, #16181D);
 }
 /* (5 nov., chantier A) Le texte du bouton principal suit `onAccent` : blanc, en sombre aussi
    (un seul aplat bleu, texte blanc, comme iOS — themeMineral.js). */
