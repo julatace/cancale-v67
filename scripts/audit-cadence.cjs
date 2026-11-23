@@ -22,7 +22,7 @@ const MUTATIONS = {
   plafond: ["const capH = /^\\d{1,20}$/.test(String(uid)) ? cad.actionsHeure : ACTIONS_MAX_HEURE;", 'const capH = ACTIONS_MAX_HEURE;'],
   reserve: ['const max = Math.max(1, capH - decal);', 'const max = capH;'],
   captcha: ["if (decal > 0 && /^\\d{1,20}$/.test(String(uid))) {\n      const ta", "if (decal > 0 && capH <= 50 && /^\\d{1,20}$/.test(String(uid))) {\n      const ta"],
-  bornes: ["const RA_CADENCE_BORNES = { favorisHeure: [1, 60],", "const RA_CADENCE_BORNES = { favorisHeure: [1, 600],"],
+  bornes: ["const RA_CADENCE_BORNES = { favorisHeure: [1, 15],", "const RA_CADENCE_BORNES = { favorisHeure: [1, 60],"],
   confirme: ["if (plusVite && confirme !== true) return", "if (false) return"],
   favoris: ["if (cad.poses.includes('favorisHeure')) lim = cad.favorisHeure;", ''],
   plage: ['if (!(px > pm)) return', 'if (false) return'],
@@ -66,23 +66,24 @@ const compter = async (C, plafond, n) => { let k = 0; for (let i = 0; i < n; i++
     dit(cad.favorisHeure === 15 && cad.actionsHeure === 50 && cad.pauseMin === 20 && cad.pauseMax === 60 && cad.parJour === null, 'défauts : 15 favoris/h, 50 actions/h, pause 20–60 s (5.419, sa demande du 21 nov.), plafond du jour de « Discrétion »', JSON.stringify(cad));
   });
   await essai('reglee', async () => {
-    const f = fond({ actionsHeure: 60, favorisHeure: 20, at: 1 }); const C = f.ctx;
+    const f = fond({ actionsHeure: 60, favorisHeure: 10, at: 1 }); const C = f.ctx;
     const a = await compter(C, 45, 120), b = await compter(C, 50, 120);
     dit(a.k === 55 && b.k === 5, 'réglée à 60/h : 55 automatiques + 5 clics (la réserve reste)', `${a.k} + ${b.k}`);
     const t = Date.now();
-    const s = fond({ favorisHeure: 20, at: 1 }, { store: { vrmSortes: { [UID]: { favori: Array.from({ length: 15 }, (_, i) => t - i * MIN), at: t } } } });
-    dit((await s.ctx.porteDiscretion(UID, 'favori')) === null, 'favoris réglés à 20/h : le 16e passe');
-    const s2 = fond({ favorisHeure: 20, at: 1 }, { store: { vrmSortes: { [UID]: { favori: Array.from({ length: 20 }, (_, i) => t - i * MIN), at: t } } } });
+    const s = fond({ favorisHeure: 10, at: 1 }, { store: { vrmSortes: { [UID]: { favori: Array.from({ length: 9 }, (_, i) => t - i * MIN), at: t } } } });
+    dit((await s.ctx.porteDiscretion(UID, 'favori')) === null, 'favoris réglés à 10/h : le 10e passe');
+    const s2 = fond({ favorisHeure: 10, at: 1 }, { store: { vrmSortes: { [UID]: { favori: Array.from({ length: 10 }, (_, i) => t - i * MIN), at: t } } } });
     const r2 = await s2.ctx.porteDiscretion(UID, 'favori');
-    dit(r2 && r2.quoi === 'sorte', 'favoris réglés à 20/h : le 21e attend', JSON.stringify(r2));
+    dit(r2 && r2.quoi === 'sorte', 'favoris réglés à 10/h : le 11e attend', JSON.stringify(r2));
     const s3 = fond(null, { store: { vrmSortes: { [UID]: { favori: Array.from({ length: 15 }, (_, i) => t - i * MIN), at: t } } } });
     const r3 = await s3.ctx.porteDiscretion(UID, 'favori');
     dit(r3 && r3.quoi === 'sorte', 'défaut : le 16e message aux favoris attend (15/h)', JSON.stringify(r3));
   });
   await essai('bornes', async () => {
     const C = fond(null).ctx, N = (v, c) => C.reglageAutoNormalise('vinted_cadence', Object.assign({ uid: UID }, v), null, c === true, 1);
-    dit(N({ favorisHeure: 61 }, true).ok === false, 'bornes : 61 messages aux favoris par heure refusé');
-    dit(N({ favorisHeure: 60 }, true).ok === true, 'bornes : 60 messages aux favoris par heure accepté (confirmé)');
+    dit(N({ favorisHeure: 16 }, true).ok === false && N({ favorisHeure: 60 }, true).ok === false, 'bornes (5.437) : 16 et 60 messages aux favoris par heure refusés — 15 par heure, la limite de Vinted');
+    dit(N({ favorisHeure: 15 }, true).ok === true, 'bornes : 15 messages aux favoris par heure accepté');
+    dit(C.cadenceDe({ comptes: { [UID]: { favorisHeure: 20 } } }, UID).favorisHeure === 15, 'un réglage d’avant à 20/h retombe à 15/h (jamais au-dessus de la limite de Vinted)');
     dit(N({ actionsHeure: 101 }, true).ok === false && N({ actionsHeure: 9 }, true).ok === false, 'bornes : 101 et 9 actions par heure refusés');
     dit(N({ pauseMin: 19, pauseMax: 60 }, true).ok === false, 'bornes : une pause de 19 s refusée');
     dit(N({ pauseMin: 60, pauseMax: 60 }, true).ok === false, 'bornes : une pause fixe (pas une plage) refusée — toujours aléatoire');
@@ -93,7 +94,7 @@ const compter = async (C, plafond, n) => { let k = 0; for (let i = 0; i < n; i++
   });
   await essai('captcha', async () => {
     const t = Date.now();
-    const f = fond({ actionsHeure: 60, favorisHeure: 60, at: 1 }, { store: { vrmCaptcha: { [UID]: { depuis: t - MIN, quoi: 'captcha' } } } });
+    const f = fond({ actionsHeure: 60, favorisHeure: 15, at: 1 }, { store: { vrmCaptcha: { [UID]: { depuis: t - MIN, quoi: 'captcha' } } } });
     const r = await f.ctx.compterAction(UID, 45);
     dit(!r.ok && r.code === 'verification', 'captcha : à 60/h, AUCUN geste automatique tant qu’il n’a pas repris', JSON.stringify(r));
     const p = fond({ actionsHeure: 100, at: 1 }, { store: { vrmPrudence: { [UID]: { jusqua: t + 3600000, at: t } } } });

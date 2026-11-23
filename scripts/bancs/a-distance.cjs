@@ -116,6 +116,9 @@ function semer() {
   app.push({ id: 'lbc_listings', owner: U.id, updated_at: iso(t), data: { updatedAt: iso(t - 5 * 60000), lectures: { [LBC]: { at: iso(t - 5 * 60000) } }, items: { '2900000001': { id: '2900000001', ref: 'B125', price: 120, status: 'active', subject: 'Jordan 4 Retro', images: ['https://images1.vinted.net/t/lbc.jpg'], seenAt: iso(t - 5 * 60000) } } } });
   app.push({ id: 'lbc_fil_conv-lbc-1', owner: U.id, updated_at: iso(t), data: { n: 2, dernierAt: iso(t - 10 * 60000), apercu: 'Bonjour, encore dispo ?', dernierDeMoi: false, compte: 'lbc-account:' + LBC, updatedAt: iso(t - 10 * 60000),
     messages: [{ t: 'Bonjour, encore dispo ?', at: t - 12 * 60000, deMoi: false }, { t: 'Je peux passer samedi', at: t - 10 * 60000, deMoi: false }] } });
+  // 5.438 (`santenote`) : la note publiée par l'extension dans la ligne de la jauge de boutique_a (forme de `resumeNote`).
+  app.push({ id: `actions_compte_${A}_${APP}`, owner: U.id, updated_at: iso(t), data: { uid: A, nav: APP, ts: [], at: iso(t - 4 * 60000), max: 50,
+    note: { n: 70, pct: 60, at: t - 4 * 60000, pts: [{ k: 'captcha', n24: 2, n72: 2, r: 30 }], manque: ['vues'], cap: 30, fav: 9, reglage: { actionsHeure: 50, favorisHeure: 15 }, reduite: true, par: ['note'], prec: false, ph: 'reduite', raison: { k: 'captcha', n: 2, h: 24 } } } });
   presence();
 }
 // La présence de l'ordinateur simulé (la forme de `publierPresence`, background.js).
@@ -226,12 +229,16 @@ async function parcours(nav, { mobile, sombre, nom }) {
     const ca = e && e.comptes.find((c) => c.id === 'vinted:' + A), cb = e && e.comptes.find((c) => c.id === 'vinted:' + B);
     dit(!!ca && ca.ouvert === '1' && ca.vieux === '0', 'boutique_a : ouvert sur l’ordinateur, relu récemment', JSON.stringify(ca));
     dit(!!cb && cb.vieux === '1' && /Pas relu/.test(cb.texte), 'atelier_b : « Pas relu · il y a 3 jours » en ambre', JSON.stringify(cb));
+    // 5.438 : la note de santé sur la rangée (la plus fraîche publiée par l'extension) ; atelier_b n'en a pas ⇒ rien d'inventé.
+    dit(!!ca && /Santé 70\/100/.test(ca.texte) && /cadence 30\/h/.test(ca.texte) && !!cb && !/Santé \d/.test(cb.texte), '5.438 : « Santé 70/100 · cadence 30/h » sur boutique_a ; atelier_b sans note publiée : rien d’inventé', JSON.stringify({ a: ca && ca.texte, b: cb && cb.texte }));
     dit(!!e && e.deborde <= 0 && (!mobile || !e.petites.length), 'aucun débordement ; cibles ≥ 44 px', JSON.stringify(e && { d: e.deborde, p: e.petites.slice(0, 4) }));
     dit(!!e && !TECHNIQUES.test(e.texte), 'aucun mot technique ni « undefined » dans le texte rendu', e && (e.texte.match(TECHNIQUES) || [])[0]);
     // ── un compte → sa boîte → le fil → répondre (UN toucher pour envoyer)
     await pg.click(`[data-adist-compte="vinted:${A}"]`);
     await pg.waitForSelector(`[data-adist-conv="${CONV}"]`, { timeout: 15000 }).catch(() => {});
     await attendre(400); await photo(pg, nom + '-2-compte');
+    { const n = await pg.evaluate(() => { const g = document.querySelector('[data-adist-note]'); return g ? { n: g.getAttribute('data-adist-note'), t: (g.innerText || '').replace(/\s+/g, ' '), pt: !!g.querySelector('[data-adist-note-point="captcha"]'), mq: !!g.querySelector('[data-adist-note-manque="vues"]') } : null; });
+      dit(!!n && n.n === '70' && n.pt && n.mq && /Cadence réduite à 30\/h/.test(n.t) && /2 vérification/.test(n.t), '5.438 : la page du compte : « Santé du compte · Note 70/100 · Cadence réduite à 30/h : 2 vérification(s) demandée(s) en 24 h », le point, les vues pas comptées', JSON.stringify(n)); }
     const nonLu = await pg.getAttribute(`[data-adist-conv="${CONV}"]`, 'data-adist-non-lu').catch(() => null);
     dit(nonLu === '1', 'la boîte du compte : la conversation non lue est dite', nonLu);
     await pg.click(`[data-adist-conv="${CONV}"]`);

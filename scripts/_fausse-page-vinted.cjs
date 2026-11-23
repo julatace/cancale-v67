@@ -41,8 +41,13 @@ function fabriquerFaussePage({ ctx, j, tab, fetchPage }) {
       case 'supprimer': if (!new RegExp(`^/items/${d.id}(?:-[^/]*)?/?$`).test(chemin)) return { ok: false, code: 'identite', chemin }; return { ok: true, rep: await envoi('POST', `/api/v2/items/${d.id}/delete`, null) };
       // « Ajouter » sur la page du brouillon : la page envoie le brouillon AVEC ce que VRM y a réglé (couleur, taille, état, colis, catégorie).
       case 'publier': { const c = st.champs || {}; const draft = { id: Number(d.draftId) }; if (c.couleurs) draft.color_ids = c.couleurs.ids; if (c.colis) draft.package_size_id = c.colis.id; if (c.categorie) draft.catalog_id = c.categorie.id; if (c.taille || c.etat) draft.item_attributes = [...(c.etat ? [{ code: 'condition', ids: [c.etat.id] }] : []), ...(c.taille ? [{ code: 'size', ids: [c.taille.id] }] : [])]; return { ok: true, rep: await envoi('POST', `/api/v2/item_upload/drafts/${d.draftId}/completion`, { draft, feedback_id: null, parcel: null, push_up: false }) }; }
-      case 'favoriOuvrir': {
+      case 'favoriOuvrir': case 'favoriListe': {
         if (!id(d.itemId) || !id(d.receiverId)) return { ok: false, code: 'etape' };
+        // 22 nov. : la liste de la cloche ne montre que les DERNIÈRES notifications (tous types) — `opt.cloche` :
+        //   'absente'    : la ligne du favori n'y est pas, elle est sur la page complète (« Voir tout ») ;
+        //   'nulle-part' : elle n'est ni dans la liste ni sur la page complète.
+        if (etape === 'favoriOuvrir' && (opt.cloche === 'absente' || opt.cloche === 'nulle-part')) return { ok: false, code: 'selecteur', manque: 'favori-notification', absent: true, cloche: true, voirTout: opt.voirTout === undefined ? '/member/notifications' : opt.voirTout, chemin };
+        if (etape === 'favoriListe') { if (!/notif/.test(chemin)) return { ok: false, code: 'identite', chemin }; if (opt.cloche === 'nulle-part') return { ok: false, code: 'selecteur', manque: 'favori-notification', absent: true, liste: true, chemin }; }
         if (opt.favoriConv) { tab.url = `https://www.vinted.fr/inbox/${opt.favoriConv}`; return { ok: true, rep: null, conv: String(opt.favoriConv), envoye: false }; }
         const rep = await envoi('POST', '/api/v2/conversations', { initiator: 'seller_enters_notification', item_id: String(d.itemId), opposite_user_id: String(d.receiverId) });
         const conv = rep && rep.json && rep.json.conversation && id(rep.json.conversation.id) ? String(rep.json.conversation.id) : '';
