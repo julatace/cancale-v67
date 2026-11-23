@@ -79,13 +79,20 @@ sur la même règle) — rien à changer.
 
 ## 4. Preuves
 
-- `scripts/audit-lbc-panneau.cjs` (vrai `background.js` sur `_fond-vm.cjs` + la vraie règle de l'app) : **29 ✅**.
+- `scripts/audit-lbc-panneau.cjs` (vrai `background.js` sur `_fond-vm.cjs` + la vraie règle de l'app) : **29 ✅** ;
+  `--prouve` : **origin/main ⇒ 18 ❌** ; 9 mutations (sens deviné, finalisée ignorée, prix pas converti, suivi chez
+  n'importe qui, attente muette, conversation d'un autre compte rangée, lecture ratée qui écrit, geste par onglet
+  seulement, règle d'annulation divergente) ⇒ chacune 1–2 ❌.
   R (630 cas, même verdict que l'app), V (ventes/achats/sens inconnu, livrée ≠ à expédier, centimes, suivi, autre
   compte), A (attente compte / vrm), M (conversations et porte-monnaie de CE compte, aucun nom), C (capture : compte de
   l'onglet seulement, autre compte gardé, aucun nom, lecture ratée n'écrit rien, onglet ambigu), G (geste tu après une
   lecture ailleurs). `--prouve` : voir ÉTAT À LA REPRISE.
 - `scripts/bancs/lbc-panneau.cjs` (vrais vrm-ui.js + vrm-badge.js, fausse page leboncoin.fr, 1512 puis 390) : P1–P6 —
-  voir ÉTAT À LA REPRISE.
+  **26 ✅** (13 par largeur) ; sur l'extension d'origin/main **20 ❌** (le symptôme de Julien reproduit : « Tes annonces
+  n'ont pas pu être lues », « Ouvre « Mes transactions » » sur Messagerie). Captures regardées (Commandes, Achats,
+  Favoris, Accueil, Messagerie, Articles ; 1512 et 390). TMPDIR court obligatoire (chemin de socket de Chromium).
+- Build OK. Passe complète (`lancer-audits`, 832 audits) : 32 rouges, tous rouges aussi dans les passes d'autres
+  branches du jour (`sa-audits`, `aoc-audits`) — aucun nouveau.
 - Audits portés sur la règle : `audit-panneau-carte` F (une vente se prouve par `isSeller` ; la vente de l'autre compte
   l'est aussi, seul le compte l'écarte), `audit-relais-lbc-kinds` (exemples `lbcconvs`, `lbcporte`).
 - Verts : coherence, discretion, ext-contrat-messages, extension-moyennes, lbc-clair, lbc-details, lbc-interface,
@@ -102,4 +109,12 @@ sur la même règle) — rien à changer.
    Achats, Messagerie, Accueil (porte-monnaie) ; et « Mon compte → Porte-monnaie » le jour où le solde n'est pas nul.
 
 ## ÉTAT À LA REPRISE
-(mis à jour en fin de session, voir en bas)
+- Branche `claude/leboncoin-complet` poussée, origin/main fusionné (vrai merge), **PR #1331 ouverte, PAS fusionnée**
+  (consigne : aucune fusion avant le 24 nov. 07:00 UTC ; ordre des versions 5.441 → 5.444 → 5.445).
+- À faire au moment de fusionner : si une 5.441–5.444 est passée avant, refaire le vrai merge (les numéros, `EXT_CAPACITES`,
+  §8, `vrm-badge.js`/`vrm-ui.js`/`background.js carteListesSite` se croiseront avec `claude/vestiaire-complet` — garder
+  les deux : la ligne de retour de `carteListesSite` ajoute `achats`/`porteMonnaie` pour Leboncoin seulement),
+  régénérer les zips (`node scripts/zip-extension.cjs`), relancer `audit-lbc-panneau`, `audit-panneau-carte`,
+  `audit-relais-lbc-kinds`, `audit-coherence`, le banc `lbc-panneau` (TMPDIR court), comparer la CI à celle de main.
+- Reste : republication Leboncoin (§3 ci-dessus) ; unité du porte-monnaie (une mesure) ; vues/favoris (une visite de
+  « Statistiques »).
