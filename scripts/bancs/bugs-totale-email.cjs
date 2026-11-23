@@ -74,12 +74,20 @@ async function lire(nav, ICI, vue, opts) {
     await pg.evaluate(() => { window.dispatchEvent(new Event('focus')); });
     await pg.waitForTimeout(6000);
   }
-  const j = await pg.evaluate((T) => { const c = document.querySelector('[data-v2-bloc="chiffres"]'); const env = document.querySelector('[data-v2-envoyer]'); const pr = document.querySelector('[data-v2-principal]');
-    const corps = (document.querySelector('.vrm-main') || document.body).innerText.replace(/\s+/g, ' ');
-    return { vendu: c ? c.getAttribute('data-v2-jour-vendu') : null, ventes: c ? c.getAttribute('data-v2-jour-ventes') : null, dernieres: [...document.querySelectorAll('[data-v2-vente]')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()),
-      envoyer: env ? env.getAttribute('data-v2-envoyer') : null, imprimer: pr ? pr.getAttribute('data-v2-principal') : null, colisTitre: [...document.querySelectorAll('[data-v2-colis]')].some((e) => e.innerText.includes(T)), titreN: corps.split(T).length - 1 }; }, opts.sans ? TITRE_S : TITRE);
+  // (23 nov.) Deux dessins d'Aujourd'hui coexistent (le natif `data-v2-*`, Ma journée « verre » `data-jv2-*` / `data-sj-*`) : le banc lit
+  // les NOMBRES de celui qui est monté — jamais un libellé.
+  const j = await pg.evaluate((T) => { const q = (s) => document.querySelector(s); const c = q('[data-v2-bloc="chiffres"]');
+    const auj = (() => { const p = q('[data-jv2-periode]'); const d = new Date(); const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); return p && p.getAttribute('data-jv2-periode') === iso; })();
+    const jv = q('[data-jv2-vendu]'), jn = q('[data-journal-case="ventes"]');
+    const env = q('[data-v2-envoyer]'), sj = q('[data-sj-titre]'), pr = q('[data-v2-principal]') || q('[data-sj-imprimer]');
+    const corps = (q('.vrm-main') || document.body).innerText.replace(/\s+/g, ' ');
+    const vendu = c ? c.getAttribute('data-v2-jour-vendu') : (auj && jv ? jv.getAttribute('data-jv2-vendu') : null);
+    const ventes = c ? c.getAttribute('data-v2-jour-ventes') : (auj && jn ? jn.getAttribute('data-valeur') : null);
+    const envoyer = env ? env.getAttribute('data-v2-envoyer') : (sj ? ((/^(\d+)/.exec(sj.getAttribute('data-sj-titre') || '') || [])[1] || null) : null);
+    return { vendu, ventes, dernieres: [...document.querySelectorAll('[data-v2-vente], [data-jv2-vente]')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()),
+      envoyer, imprimer: pr ? (pr.getAttribute('data-v2-principal') || pr.getAttribute('data-sj-imprimer')) : null, titreN: corps.split(T).length - 1, titreIci: corps.includes(T) }; }, opts.sans ? TITRE_S : TITRE);
   await cap('journee-' + Object.keys(opts).filter((k) => opts[k]).join('-'));
-  await B.aller(pg, 'ventes', 5000);
+  await B.aller(pg, 'ventes', 8000);
   let colis = null;
   if (opts.sans) {
     await B.aller(pg, 'colis', 5000);
@@ -103,10 +111,10 @@ async function main() {
       const cts = (x) => (x == null || x === '' ? NaN : Number(x));
       const c = await lire(nav, ICI, vue, { email: true, capte: true });
       const t = await lire(nav, ICI, vue, { email: true, tard: true });
-      dit(vue, 'App déjà ouverte quand l\'e-mail arrive : au retour sur l\'app, la vente apparaît (Dernières ventes)', (t.j.dernieres[0] || '').includes(TITRE), t.j.dernieres.slice(0, 2).join(' | '));
+      dit(vue, 'App déjà ouverte quand l\'e-mail arrive : au retour sur l\'app, la vente apparaît sur Aujourd\'hui (Dernières ventes ou À envoyer, SON titre)', (t.j.dernieres[0] || '').includes(TITRE) || t.j.titreIci, t.j.dernieres.slice(0, 2).join(' | '));
       dit(vue, 'App déjà ouverte : le CA du jour la compte au retour', cts(t.j.vendu) - cts(ref.j.vendu) === 8500, `sans ${ref.j.vendu} · après ${t.j.vendu}`);
       dit(vue, 'Ventes « À envoyer » : la vente connue par e-mail se voit', m.v.present, m.v.autour);
-      dit(vue, 'Aujourd\'hui : « Dernières ventes » la montre avec SON titre', (m.j.dernieres[0] || '').includes(TITRE), m.j.dernieres.slice(0, 2).join(' | '));
+      dit(vue, 'Aujourd\'hui la montre avec SON titre (Dernières ventes ou À envoyer)', (m.j.dernieres[0] || '').includes(TITRE) || m.j.titreIci, m.j.dernieres.slice(0, 2).join(' | '));
       dit(vue, 'Aujourd\'hui : le CA vendu du jour la compte (+85 €)', cts(m.j.vendu) - cts(ref.j.vendu) === 8500, `sans e-mail ${ref.j.vendu} · avec ${m.j.vendu}`);
       dit(vue, 'Aujourd\'hui : le nombre de ventes du jour la compte (+1)', cts(m.j.ventes) - cts(ref.j.ventes) === 1, `sans ${ref.j.ventes} · avec ${m.j.ventes}`);
       dit(vue, 'Plus tard, captée par l\'extension : UNE vente (CA +85 €, pas +170 €)', cts(c.j.vendu) - cts(ref.j.vendu) === 8500 && cts(c.j.ventes) - cts(ref.j.ventes) === 1, `avec e-mail + captée : ${c.j.vendu} / ${c.j.ventes}`);
@@ -117,7 +125,8 @@ async function main() {
       const s2 = await lire(nav, ICI, vue, { sans: true, email: true, capte: true });
       dit(vue, 'Sans n° : CA vendu du jour +64 € et +1 vente', cts(s1.j.vendu) - cts(rs.j.vendu) === 6400 && cts(s1.j.ventes) - cts(rs.j.ventes) === 1, `réf ${rs.j.vendu}/${rs.j.ventes} · e-mail ${s1.j.vendu}/${s1.j.ventes}`);
       dit(vue, 'Sans n° : Ma journée compte le colis à envoyer (+1)', cts(s1.j.envoyer) - cts(rs.j.envoyer) === 1 || cts(s1.j.imprimer) - cts(rs.j.imprimer) === 1, `envoyer ${rs.j.envoyer}→${s1.j.envoyer} · imprimer ${rs.j.imprimer}→${s1.j.imprimer}`);
-      dit(vue, 'Sans n° : Colis montre le colis (son titre, une fois)', s1.colis && s1.colis.n >= 1, JSON.stringify(s1.colis));
+      dit(vue, 'Sans n° : Colis montre le colis (son titre)', s1.colis && s1.colis.n >= 1, JSON.stringify(s1.colis));
+      dit(vue, 'Sans n° : sans l\'e-mail, rien de ce titre (le banc juge bien la règle)', rs.colis && rs.colis.n === 0 && !rs.v.present, JSON.stringify(rs.colis));
       dit(vue, 'Sans n° : Ventes montre la vente', s1.v.present, s1.v.autour);
       dit(vue, 'Sans n°, captée ensuite : UNE vente (CA +64 €, +1), un colis', cts(s2.j.vendu) - cts(rs.j.vendu) === 6400 && cts(s2.j.ventes) - cts(rs.j.ventes) === 1 && (cts(s2.j.envoyer) - cts(rs.j.envoyer) === 1 || cts(s2.j.imprimer) - cts(rs.j.imprimer) === 1), `${s2.j.vendu}/${s2.j.ventes} · envoyer ${s2.j.envoyer} · imprimer ${s2.j.imprimer}`);
       dit(vue, 'Sans n°, captée ensuite : Ventes la montre une fois', s2.v.n === 1, `${s2.v.n} fois`);

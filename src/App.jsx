@@ -20758,9 +20758,27 @@ function useEtapePont() {
 //     commune à toutes les ventes (extension absente, muette, en retard…) est
 //     dite UNE fois par l'écran (`raisonExtGlobale`) ; le bouton ne dit que ce
 //     qui le distingue (le compte Vinted à connecter).
+// (23 nov., bugs-totale §3.3) CE QUE L'EXTENSION A DIT, EN UNE EMPREINTE. Chaque message du pont (« ready » à chaque sonde, chaque
+// battement, chaque évènement de commande, chaque relecture du relais) prévenait TOUS les abonnés, même quand rien n'avait changé :
+// la pastille, la ligne de fraîcheur, les boutons d'extension… se redessinaient à chaque message (des dizaines de composants, sur
+// chaque écran gardé). L'empreinte réunit tout l'état que ces composants lisent ; inchangée ⇒ aucun rendu. La minute en cours en
+// fait partie : ce qui dépend de l'heure (« vivant il y a… ») avance au plus une minute en retard, comme avant au battement.
+let _sigExt = null;
+const signatureExt = () => {
+  if (_sigExt !== null) return _sigExt;
+  let s;
+  try {
+    s = JSON.stringify([__vmrExtReady, __vmrExtVersion, __vmrPlusieurs, __vmrAppelsFinis, __vmrEtat === undefined ? 'u' : __vmrEtat, __vmrRates, __vmrJobs,
+      __vmrPerimePont, __relais === undefined ? 'u' : __relais, __extAilleurs === undefined ? 'u' : __extAilleurs, __lier, __sessExtEnVol, __sessExtPasAvant, __vmrPontUnique,
+      [...__vmrPontSeul].sort(), Math.floor(Date.now() / 60000)]);
+  } catch (_) { s = 'x' + Math.random(); }
+  _sigExt = s;
+  queueMicrotask(() => { _sigExt = null; });   // une empreinte par tour de messages, partagée par tous les abonnés
+  return s;
+};
 function useExtVivante() {
   const [, force] = React.useReducer((n) => n + 1, 0);
-  React.useEffect(() => onVmrExt(force), []);
+  React.useEffect(() => { let vu = signatureExt(); return onVmrExt(() => { const s = signatureExt(); if (s === vu) return; vu = s; force(); }); }, []);
   React.useEffect(() => { demarrerRelais(); }, []);
   // (19 nov.) Aucune extension ici, à l'ordinateur : une du compte vit-elle ailleurs ? (une lecture, 10 min de mémoire)
   React.useEffect(() => { veillerExtAilleurs(); return onVmrExt(veillerExtAilleurs); }, []);

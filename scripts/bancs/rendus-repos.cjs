@@ -50,7 +50,16 @@ async function main() {
       await crochet(pg);
       await B.demarrer(pg, ICI, ECRAN);
       await pg.locator('[data-toast-numeros] .n-toast-action').click({ timeout: 1500 }).catch(() => {});
+      // VISITER=ventes,achats,… : les onglets visités d'abord (leurs écrans restent montés, gardés), puis retour sur ECRAN.
+      for (const o of String(process.env.VISITER || '').split(',').map((x) => x.trim()).filter(Boolean)) await B.aller(pg, o, 4000);
+      if (process.env.VISITER) await B.aller(pg, ECRAN, 3000);
       await pg.waitForTimeout(ATTENTE);
+      // PONT_MS=1300 : un pont d'extension qui parle toutes les N ms (« ready », la réponse à chaque sonde) et SAVE_MS=1300 : une
+      // écriture d'une clé sans rapport (`vrm:save`, ce qu'une capture fait plusieurs fois par minute) — l'activité réelle d'un
+      // ordinateur où l'extension capte, que la base inventée n'a pas. Rien ne change dans l'état : un rendu de plus est de trop.
+      if (Number(process.env.PONT_MS) > 0) await pg.evaluate((ms) => { setInterval(() => window.postMessage({ __vmr: 'ready', version: '5.436.0' }, '*'), ms); }, Number(process.env.PONT_MS));
+      if (Number(process.env.SAVE_MS) > 0) await pg.evaluate((ms) => { setInterval(() => window.dispatchEvent(new CustomEvent('vrm:save', { detail: { k: 'harvest_banc_sans_rapport', inchange: true } })), ms); }, Number(process.env.SAVE_MS));
+      if (Number(process.env.PONT_MS) > 0 || Number(process.env.SAVE_MS) > 0) await pg.waitForTimeout(4000);
       const t0 = await pg.evaluate(() => performance.now());
       await pg.waitForTimeout(REPOS);
       const r = await pg.evaluate((t0) => ({ V: window.__vrmValid.filter((x) => x.t >= t0), S: window.__vrmSaves.filter((x) => x.t >= t0) }), t0);
