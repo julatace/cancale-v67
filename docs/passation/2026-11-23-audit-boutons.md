@@ -36,7 +36,7 @@ Données : le vendeur INVENTÉ du banc (`_base-volume.cjs`), écritures intercep
 | Achats | case « À retirer » de la bande : `onNav('retraits')` revenait sur Achats — rien ne bougeait (ordi) | ouvre et met en vue la section « À retirer » |
 | Stock | « Nouveau meuble » : pas un dialogue (ni rôle, ni retour, ni Échap), × de 20 px | `role="dialog"`, `FermeAuRetour`, × 44 px |
 | Paramètres (téléphone) | une catégorie / un panneau ouvert d'un toucher : le geste retour quittait Paramètres entier | page poussée (une entrée par niveau) ; un lien direct (Menu → Langue) n'en prend pas : le retour ramène au Menu |
-| Statistiques | vente annulée sans lien : un `<a>` sans adresse, touchable, menant nulle part | une ligne simple quand le lien n'est pas connu |
+| Statistiques | vente annulée sans lien : un `<a>` sans adresse, touchable, menant nulle part | une ligne simple quand le lien n’est pas connu (même correction arrivée par `main` le 23 nov., lot annulées : leur version gardée) |
 | Catalogue | prix d'achat « 12,50 » devenait « 1250 » (champ numérique) ; Précédent / Suivant actifs sans effet en page 1/1 ; « Ajouter » vide sans effet ; « +1 » de 30 px | champ texte décimal (virgule lue), boutons désactivés avec leur raison (5 langues), +1 à 44 px |
 | Stock Vinted | « Ajouter » à vide : rien | met le doigt dans le champ |
 
