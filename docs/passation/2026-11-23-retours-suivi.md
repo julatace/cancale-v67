@@ -138,3 +138,47 @@ n'est lu aujourd'hui. Le plan (sur le modèle de `capterSuivisRetours`, 5.431, c
 - Faire tourner build + bancs (après 15:30 UTC), rouge sur le code d'avant, captures avant/après regardées.
 - « À retirer » : coder la proposition choisie par Julien (ne rien changer à `src/retraitPreuves.js` ni à l'identité).
 - PR après 15:30 UTC ; fusion demain après 07:00 UTC selon la règle, et après le choix de Julien.
+
+## 23 nov. au soir — « le transporteur inconnu, le logo mal mis, l'affichage est moche » (capture iPhone 390, production)
+
+Julien a CHOISI la proposition C. Sa capture montrait la PRODUCTION (`main`, variante « b » billet, sans la correction du point) :
+« Point pas encore connu · Vinted Go · comptoir », pastille « à retirer avant le 25 nov. », « adresse pas lue · fermé — ouvre demain
+à 8 h » (contradiction : point inconnu, horaires connus), logo décalé, orange sur « Vérifie leur suivi avant d'y aller ».
+
+**Mesuré (lecture seule, projections scalaires, rien de personnel copié ici)** : le colis de la capture (Vinted Go, payé 13,36 €,
+au point le 19, limite le 25, code 978 216) est `email_track_vinted_{n°}` ; `lieu` = « Relais Vinted Go, <commerce>, <n° et rue> »
+SANS code postal ni ville, `horaires` = tableau `[{jours:[1..4], plages:[{de,a},{de,a}]}, {jours:[5],…}, {jours:[6],…}, {jours:[7], plages:[]}]`,
+`consigne` false, `status` available. Le 1er e-mail (19 nov., « Nouveau relais ») n'avait PAS de lieu ; le rappel (22 nov.) l'a
+apporté. Aucune ligne `harvest_*_suivi_*` ni de destination de l'extension pour ce n°. Sur les 46 lignes `email_track_vinted_*` :
+23 « Consigne Vinted Go, … », 3 « *Consigne Vinted Go* », 2 « Relais Vinted Go, … » (avec horaires), 18 SANS lieu.
+**Cause** : celle déjà corrigée sur cette branche (`TYPE_LIEU` / `TYPE_EN_TETE` : « Relais Vinted Go » pris pour le nom puis écarté) ;
+les horaires venaient du MÊME e-mail, d'où la contradiction. Avec la vraie forme, la branche nomme le point (audit V1/V5, banc K6/K7).
+Les 18 lignes sans lieu restent sans nom : le titre devient alors le TRANSPORTEUR (« Vinted Go »), jamais « Point pas encore connu ».
+
+**Changé (variante C seulement ; a/b intactes pour les captures)** — `src/natif/RetraitsPoints.jsx`, `src/natif/retraits.css` :
+- en-tête du point façon liste iOS : logo ENTIER 36 px (la tuile du transporteur, comme #1321) centré sur le bloc du titre ; nom sur
+  UNE ligne ; dessous « transporteur · avant le 24 nov. » (l'échéance LUE en texte calme, gras si elle presse : « dernier jour demain »,
+  « 1 à vérifier ») — plus de pastille ; « comptoir » seulement pour le lecteur d'écran, « consigne » dit ;
+- nom pas lu ⇒ titre = transporteur (`data-rp-nom-de="transporteur"`), sinon « Point relais » ; « adresse pas lue » seulement si
+  RIEN n'est lu (ni adresse ni horaires) ;
+- « adresse · horaires » sur une ligne (l'adresse se coupe, les horaires restent entiers) ;
+- titre d'un colis 15 px sur 2 lignes au plus ; « En route · point pas encore dit 22 » ⇒ « 22 en route » (le pourquoi est dedans) ;
+- « Pas compté dans « à retirer ». » + « Pourquoi ? » (le reste replié) ; le résumé « À retirer » sans cadre ;
+- plus d'orange : pastille d'état d'Achats (`--a-ambre-*`, `src/styles-achats-photos.css`) et ambre de NUIT (`--n-ambre*`,
+  `src/natif/jetons.css` — il nourrissait aussi `--sv-ambre`/`--ap-ambre`) passent à l'ardoise / l'encre claire. « Colis à vérifier ·
+  Vérifie leur suivi » (rangée `ton="ambre"` d'« À régler ») est donc neutre en clair (déjà, style-clair) ET en sombre.
+- « Tout le détail des retraits » : la coque défile DANS l'écran (`data-n-defile="ecran"`, barre d'onglets dans le flux) — le lien ne
+  peut pas passer sous la barre ; la capture était prise en cours de défilement. Garde-fou K12 posé (vert avant et après : rien à corriger).
+- Textes neufs : `retraits.p.pointRelais`, `retraits.p.echAvant/echAuj/echDemain`, `retraits.m.horsCompteCourt` (5 langues).
+
+**Preuves** :
+- `scripts/audit-point-vinted-go.cjs` V5–V7 (RetraitsPoints RENDU par esbuild + react-dom/server, forme réelle) : vert ; rouge sur
+  le code d'avant (87ccb0ce5 : V5–V7) et sur `origin/main` (V1, V3, V4, V5–V7) ; `--prouve` 5/5 mutations rouges.
+- Banc `scripts/bancs/retrait-point-c.cjs` K7–K12 (forme réelle + colis sans lieu avec horaires + colis à limite dépassée) :
+  78 verts à 390/1512 clair/sombre ; sur le code d'avant 19 rouges (K7 logo pas entier, K8 « Point pas encore connu », K9 pastille,
+  K10 orange, K11 « En route · point pas encore dit 60 ») ; mutation « ambre de nuit remis » ⇒ K10 rouge.
+- Captures regardées : 390 et 1512, clair et sombre (scratchpad de la session, jamais dans le dépôt).
+- Voisins : `retrait-billet` 106/0, `relais-prevision` 52/0, `retraits-visuel` 240/0 (un rouge instable, différent à chaque passage, AUSSI sur le code d'avant) ; audits retrait-*, codes, coherence, style-vintex, rouge-doublon,
+  textes-courts, traduction, quoi-de-neuf, studio : verts. `retraits-parfaits` lit `.n-rp-sorte` (classe disparue AVANT ce lot) : 4 rouges
+  anciens. `audit-boutons-natifs` : rouge sur `AchatsTableau.jsx` (venu de main, sans lien).
+- Train : #1341 se fusionne APRÈS #1326 (`claude/style-clair`, déjà fusionnée dans cette branche).

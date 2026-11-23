@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (23 nov. au soir, lot retours-suivi — Julien : « le transporteur inconnu, le logo mal mis ») docs/passation/2026-11-23-retours-suivi.md
+  { id: 'retraits-point-clair', date: '2026-11-23', titre: 'Points relais nommés, plus clairs, sans orange', phrase: 'Le nom du point Vinted Go, son logo, sa date limite.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov., lot retours-suivi — Julien : « fais le suivi des colis retournés ») docs/passation/2026-11-23-retours-suivi.md
   { id: 'retours-achat-suivi', date: '2026-11-23', titre: 'Tes retours suivis jusqu’au remboursement', phrase: 'Chaque étape cochée, mise à jour toute seule, boutons clairs.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov., photos-nettes — Julien : « toutes les photos sont floues ») docs/passation/2026-11-23-photos-nettes.md
