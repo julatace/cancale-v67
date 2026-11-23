@@ -483,7 +483,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **23 nov. · Scan d'un colis d'achat : son N° et le geste** : la fiche du scanner dit le N° de CET achat (par son n° de transaction), « Rangé · case », « Ranger en Étagère A · R1 C2 », « Numéroter » (aucun N° « prévu » non servi) ou « déjà vendue » ⇒ la vente ; n° de transaction / code de retrait tapés. Mesuré : 25 % des achats ont leur suivi, 0/114 leur transaction acheteur. `2026-11-23-scan-achat.md`. Geste : aucun.
+- **23 nov. · Scan d'un colis d'achat : son N° et le geste** : N° de CET achat (par son n° de transaction), « Rangé · case », « Ranger en … », « Numéroter » ou « déjà vendue » ⇒ la vente ; transaction / code de retrait tapés. `2026-11-23-scan-achat.md`. Geste : aucun.
 - **23 nov. · Mode présentation (`claude/presentation`)** : Paramètres → Apparence et langue (aussi menu du compte, « Plus », bouton à côté de l’œil de la barre latérale) : montants, pseudos, adresses, codes, n° de suivi cachés, comptes « Compte 1, 2… » ; photos, titres, N° visibles ; pastille « Présentation » ; propre à l’appareil, rien en base ; règle du stream à programme fixe + composants marqués. Banc `mode-presentation`. `docs/passation/2026-11-23-presentation.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
