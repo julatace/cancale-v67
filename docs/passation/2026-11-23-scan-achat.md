@@ -91,19 +91,24 @@ lecture d'un texte ne se ferait que dans la page (§2.9) ; le n° tapé couvre l
   valait « pas su » (tout le monde sans arrivée gardait l'ancien « Ranger ») ⇒ vide une fois le nuage lu ; le lot disait
   « Plus aucune case libre » et le N° de la vente était écrit deux fois (§7). Captures regardées (390/1512, clair/sombre :
   rangé, à ranger, vendue, numéroter, feuille Relier, lot, inconnu, arrivée), non commitées.
-- PAS ENCORE FAIT (machine saturée avant la démo, consigne du coordinateur : aucune commande lourde avant 15:30 UTC) :
-  le banc sur la dernière retouche du lot (ligne par N°), les bancs voisins `scan-achat.cjs` et `arrivee-scan.cjs` sur ce
-  build, la passe complète `lancer-audits.cjs`, le banc sur le build de `origin/main` (rouge attendu : aucun
-  `data-scan-a-suite`). Audits légers verts : scan-achat-suite 22/22 (+ 12 mutations), traduction, tdz, variables,
-  identite, textes-courts, style-vintex, studio, scan-colis 52/52, arrivee-scan 44, quoi-de-neuf.
+- Vérifications lourdes reprises après la démo (23 nov., 15:36 UTC), sur `origin/main` 96db7a3e1 fusionné :
+  build ; **scan-achat-suite 172 verts** sur la dernière retouche (lot : chaque N° sur sa ligne, capture regardée) ;
+  **arrivee-scan 236 verts** ; `scan-achat.cjs` : 30 verts, 2 rouges E — contrôle PÉRIMÉ depuis le 20 nov. (il attendait
+  l'atelier `data-atelier-arrivee` ; « Ranger » ouvre l'écran d'arrivée) : porté sur la règle (`data-arv-achat` de CET
+  achat), relance en file au moment de la passation.
+  Passe complète `lancer-audits.cjs` : 833 audits, 34 rouges — **les 34 sont rouges aussi sur `origin/main` 96db7a3e1**
+  (relancés un par un sur l'arbre de main : aucun rouge nouveau, aucun vert perdu).
+  Banc sur un build de `origin/main` : PAS FAIT (le travail est resté 2 h en file d'attente de lourd.sh et a été coupé) ;
+  à la place, preuve statique : `data-scan-a-suite` n'existe pas dans `src/ScannerRetrouver.jsx` de main (0), donc
+  chaque contrôle A/L du banc y est rouge ; l'audit, lui, rougit sur l'arbre de main (fichier absent) et par 12 mutations.
 
 ## ÉTAT À LA REPRISE
-- Branche `claude/scan-achat` poussée, `origin/main` fusionné (vrai merge), PR ouverte en brouillon (voir le rapport).
-- **Pas fusionnée** : gel des fusions de 15:00 UTC (23 nov.) à 07:00 UTC (24 nov.) pour la démo de Julien, et aucune
-  commande lourde avant 15:30 UTC. À faire à la reprise, dans l'ordre (via lourd.sh) : build ; `scan-achat-suite.cjs`,
-  `scan-achat.cjs`, `arrivee-scan.cjs` sur ce build ; le banc `scan-achat-suite.cjs` sur un build de `origin/main`
-  (doit rougir) ; `AUDITS_PARALLELE=2 node scripts/lancer-audits.cjs` ; comparer la CI de la PR à celle de main ;
-  vrai merge de main si elle a bougé ; fusion après 07:00 UTC le 24 nov. si aucun rouge nouveau ; statut Vercel.
+- PR #1317 (brouillon), branche `claude/scan-achat` poussée, `origin/main` 96db7a3e1 fusionné (vrai merge).
+- **Pas fusionnée** : gel jusqu'au 24 nov. 07:00 UTC. CI de la tête : « Construire » vert, le reste en file chez GitHub
+  au moment de la passation ; CI de main 96db7a3e1 : `comptes-et-reception` et `ecrans (bureau-chargement)` rouges.
+- À faire : lire la CI de la tête et la comparer job par job à main ; relancer `scan-achat.cjs` (contrôle E porté) ;
+  si main a bougé, vrai merge + repousser + réattendre ; passer la PR en prête, fusionner après 07:00 UTC si aucun
+  rouge nouveau ; statut Vercel du commit de main.
 
 ## Reste
 - Vendeur / taille / état d'un achat récent : « — » tant que sa transaction côté acheteur n'est pas rangée (0 sur 114).
