@@ -1373,7 +1373,8 @@ async function numerosVintedDuSoir(txs) {
   for (const r of rows) if (r && ids.includes(String(r.tx)) && /^\d{1,20}$/.test(String(r.it || ''))) itemDeTx[String(r.tx)] = String(r.it);
   const items = [...new Set(Object.values(itemDeTx))];
   if (!items.length) return {};
-  const sel = items.map((i) => `n${i}:data->vinted_annonce_numeros->${i}->>numero`).join(',');
+  // (23 nov., intégration) La clé (n° d'annonce) ENTRE GUILLEMETS : sans eux, PostgREST lit un rang de tableau (audit-chemin-json-guillemets).
+  const sel = items.map((i) => `n${i}:data->vinted_annonce_numeros->"${i}"->>numero`).join(',');
   const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.main&select=${sel}`)}`, { headers: HEADERS });
   if (!r.ok) return {};
   const lignes = await r.json();
