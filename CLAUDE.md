@@ -483,8 +483,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **23 nov. · Mode présentation (`claude/presentation`)** : Paramètres → Apparence et langue (aussi menu du compte, « Plus », bouton à côté de l’œil de la barre latérale) : montants, pseudos, adresses, codes, n° de suivi cachés, comptes « Compte 1, 2… » ; photos, titres, N° visibles ; pastille « Présentation » ; propre à l’appareil, rien en base ; règle du stream à programme fixe + composants marqués. Banc `mode-presentation`. `docs/passation/2026-11-23-presentation.md`. Geste : aucun.
-- **23 nov. · Achats à l'ordinateur, moitié gauche vide (`claude/achats-ordi-casse`)** : la grille deux colonnes d'Achats (codes à gauche) ne s'allume plus avec le tableau de travail ; banc `largeur-ordi` (app telle qu'en production). `2026-11-23-achats-ordi-casse.md`. Geste : aucun.
+- **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
