@@ -8,7 +8,7 @@ require('./_porte-banc.cjs');
 //  Récit : docs/passation/2026-11-21-ventes-lisibles.md. Code : src/natif/ecrans/Ventes.jsx, celluleAchat.jsx, LierAchatGrille.jsx.
 //
 //  390 × 844 tactile et 1512 × 950 ; mesures data-* et boîtes RENDUES (jamais un libellé seul) :
-//    V  vignette ≥ 64 px au téléphone, ≥ 56 px dans le tableau de l'ordinateur ;
+//    V  vignette ≥ 52 px au téléphone (23 nov., Julien : « moins zoomé », rangées de 64–72 px), ≥ 56 px dans le tableau de l'ordinateur ;
 //    T  le titre de chaque vente est ENTIER (rien de rogné) et la taille est écrite sur la rangée ;
 //    G  « Relier » et le champ « Prix d'achat » sont SUR chaque rangée Vinted sans achat (aucun menu « ⋯ » à ouvrir) ;
 //    O  aucune pilule « stock », aucune rangée « bordereaux déjà traités », aucun groupe « eBay » posés sur la liste ;
@@ -59,7 +59,7 @@ function mesure() {
     const v = r.querySelector('.n-vignette'), t = r.querySelector('.n-rangee-titre');
     return { cle: r.getAttribute('data-vn-rang') || r.getAttribute('data-vn-route'), vig: v ? Math.round(R(v).width) : 0, titreRogne: rogne(t), titre: t ? t.textContent.trim() : '',
       taille: /\b(taille|T)\s?\d{2}/.test(r.textContent), relier: !!r.querySelector('[data-vt-relier]') && vis(r.querySelector('[data-vt-relier]')),
-      achat: (r.querySelector('[data-vt-achat]') || { getAttribute: () => '' }).getAttribute('data-vt-achat'), champ: !!r.querySelector('[data-vt-prix-champ]') && vis(r.querySelector('[data-vt-prix-champ]')),
+      achat: (r.querySelector('[data-vt-achat]') || { getAttribute: () => '' }).getAttribute('data-vt-achat'), champ: (!!r.querySelector('[data-vt-prix-champ]') && vis(r.querySelector('[data-vt-prix-champ]'))) || (!!r.querySelector('[data-vt-plus-prix]') && vis(r.querySelector('[data-vt-plus-prix]'))),
       haut: Math.round(R(r).height) };
   });
   const tab = [...document.querySelectorAll('[data-vn="ventes"] [data-tt-ligne], [data-ventes-tableau] [data-tt-ligne]')].filter(vis).map((l) => {
@@ -96,12 +96,15 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
       await pg.screenshot({ path: path.join(SHOTS, `lisibles-${W}-${th}.png`) });
       const rangs = tel ? m.tel : m.tab;
       dit(rangs.length > 5, `les ventes sont rendues (${rangs.length})`);
-      const vMin = tel ? 64 : 56;
+      const vMin = tel ? 52 : 56;
       dit(rangs.length && rangs.every((x) => x.vig >= vMin), `V vignette ≥ ${vMin} px sur chaque vente (mini ${Math.min(...rangs.map((x) => x.vig))})`, rangs.filter((x) => x.vig < vMin).slice(0, 3));
+      // H (23 nov., Julien : « moins zoomé ») au téléphone, une rangée de vente tient en 64–80 px (pied « Relier · + prix » compris).
+      if (tel) { const hs = await pg.evaluate(() => [...document.querySelectorAll('[data-vn-rang]')].filter((e) => e.getClientRects().length).slice(0, 8).map((e) => Math.round(e.getBoundingClientRect().height)));
+        dit(hs.length > 3 && hs.every((h) => h >= 60 && h <= 80), `H rangées de vente de 60 à 80 px au téléphone (${hs.join(', ')})`, hs); }
       dit(rangs.length && rangs.every((x) => !x.titreRogne), 'T le titre de chaque vente est entier (rien de rogné)', rangs.filter((x) => x.titreRogne).map((x) => x.titre).slice(0, 4));
       dit(rangs.length && rangs.every((x) => x.taille), 'T la taille est écrite sur chaque rangée', rangs.filter((x) => !x.taille).map((x) => x.titre).slice(0, 4));
       const sansAchat = rangs.filter((x) => tel ? x.achat === 'libre' : x.champ);
-      dit(sansAchat.length > 3 && sansAchat.every((x) => x.relier && x.champ), `G « Relier » et « Prix d'achat » sur la rangée, sans « ⋯ » (${sansAchat.length} rangées)`, rangs.slice(0, 3));
+      dit(sansAchat.length > 3 && sansAchat.every((x) => x.relier && x.champ), `G « Relier » et « Prix d'achat » (le champ, ou « + prix » qui l'ouvre) sur la rangée, sans « ⋯ » (${sansAchat.length} rangées)`, rangs.slice(0, 3));
       dit(m.stock === 0, `O aucune pilule « stock » posée sur la liste (${m.stock})`);
       dit(m.bords === 0, `O aucune rangée « bordereaux déjà traités » sur la liste (${m.bords})`);
       dit(m.ebay === 0, `O aucun groupe « eBay » au milieu de Ventes (${m.ebay})`);
