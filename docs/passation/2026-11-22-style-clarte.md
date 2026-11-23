@@ -124,6 +124,32 @@ plein « Imprimer N bordereaux » reste dans la barre d'outils, la sélection pi
 Banc `scripts/bancs/style-clarte-2.cjs` (T1–T5) : **4 rouges sur la tranche 1** (`BANC_DIST` = son build : 2 recherches, rangées
 68, cadre sans bord, barre de sélection blanche, prix 22 px), **12 verts** après. Captures : scratchpad `sc2/avant/`, `sc2/apres2/`.
 
+## 7. Tranche 3 : finitions (branche `claude/style-clarte-3`, 23 nov.)
+
+Demandes du coordinateur après les captures finales (« Julien veut parfait ») :
+1. **« En direct »** sur Aujourd'hui : rien quand rien ne tourne (lecture, rien en cours : `data-direct` reste sur une balise cachée) ;
+   l'extension absente / ancienne / muette ⇒ une PUCE (« ● Extension pas ouverte dans ce navigateur ») qui ouvre la feuille de
+   l'extension, jamais une carte pleine largeur ; une vraie action en cours garde sa carte (« Republie 3/6 », « Tout arrêter »).
+2. **Le grand chiffre suit la fenêtre** : « Vendu · 7 derniers jours 567 € » / « Vendu · 30 derniers jours » / « Vendu · novembre »,
+   la valeur = `courbe.fenetres[f].vendu` (même source que la courbe et « Par site ») ; dessous l'écart et le nombre de ventes ;
+   pied **Bénéfice brut (la fenêtre, sa couverture « sur n/N ») · Reçu · À venir** (le vendu n'est plus écrit deux fois).
+3. **390** : les cinq actions se partagent la largeur (plus de libellés qui se touchent, disques 52) ; le toast des N° neufs
+   réserve sa hauteur au bout du contenu (`--n-toast-reserve`, `.n-coque-ecran::after`) : ce qu'il couvre se fait défiler.
+   Il reste posé au-dessus de la barre (10 s, il ne pousse pas le contenu visible au moment où il arrive).
+4. `aujourdhui-propre` F5 réécrit sur la règle du tableau de bord (héros en tête, Colis, chiffres, ventes ; les cases de Colis
+   portent `data-v2-ecart` et le point / code) ; F4 : « Reçu » et « À venir » seulement dans le pied du héros. **Encore rouge** :
+   F5 « 15 colis à retirer » (l'écran en compte 14 : le 1er point semé est classé « à vérifier » par la règle des retraits —
+   le banc était déjà rouge à 21a1b2d02, avec `null`) ; F2/F3 (pastilles et « À régler » des onglets) déjà rouges avant.
+   `journee-stats` J3 à 1512 : **vert avant la tranche 1** (arbre 21a1b2d02, son propre banc), rouge après : Colis (deux cases,
+   plus courtes) laissait « Dernières ventes » remplir le trou à sa droite après la lecture ⇒ corrigé (sans graphique, Colis prend
+   la rangée entière) : 122 verts.
+5. **Publier** = le parcours existant (`vrm:publier-ailleurs`, choisir l'article dans la feuille) ; **Relier** = Achats et sa
+   feuille « Relier achats et ventes » (`ouvrirGlisser`, demandée par `DEMANDE_GLISSER`, prise par Achats à son arrivée) — rien
+   n'est relié sans son glisser puis son « Oui ». Annonces et Statistiques quittent les disques (Annonces est un onglet ;
+   « Toutes les statistiques » reste en bas d'Aujourd'hui).
+Banc `style-clarte` : C5 bis, C10 (porté), C12 (le grand chiffre = la somme de la courbe dans les 3 fenêtres), C13, C14, C15 ;
+**14 rouges sur la tranche 2**, vert après. Captures : scratchpad `sc3/avant/`, `sc3/apres/`.
+
 ## ÉTAT À LA REPRISE
 
 Tranche 1 : voir §5 et la PR. Tranche 2 (Ventes, Annonces, fiche annonce en tableau dense) : branche `claude/style-clarte-2`.

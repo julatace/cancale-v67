@@ -87,4 +87,9 @@ export default {
   "ext.maj.texte": "Es wird in deinem Browser installiert; deine Einstellungen bleiben.",
   "ext.maj.retard": "Diese Version ist zu alt, um aus VRM zu handeln.",
   "ext.maj.bouton": "Aktualisieren ({de} → {a})",
+  "pil.h.titreJours": "Verkauft · letzte {n} Tage",
+  "pil.t.benefMois": "Gewinn · {mois}",
+  "pil.t.sur": "von {c}",
+  "pil.a.publier": "Einstellen",
+  "pil.a.relier": "Verknüpfen",
 };

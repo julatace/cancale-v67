@@ -9488,7 +9488,9 @@ const TXN_ETATS = new Map();
 // `false` la lecture a échoué (« pas su » — le suivi des retours le dit).
 let TXN_ETATS_LU;
 // ⟦→ ecrans/Comptabilite.jsx #151⟧
-const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || ''), su: r.su || null, cap: r.cap || null }); toucherMemoire(); };   // (18 nov.) table remplie en place : les calculs mémorisés qui la lisent sont refaits (src/versionDonnees.js)
+// (22 nov., latence-totale) La version ne monte que si une ligne a CHANGÉ : la même table relue (trois lecteurs à
+// l'ouverture, puis chaque relecture) refaisait tous les calculs qui la lisent dans tous les écrans gardés.
+const noterEtatsTxn = (rows) => { let change = false; for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) { const k = String(r.tx), n = { s: Number(r.s), ss: String(r.ss || ''), su: r.su || null, cap: r.cap || null }; const a = TXN_ETATS.get(k); if (!a || a.s !== n.s || a.ss !== n.ss || a.su !== n.su || a.cap !== n.cap) { TXN_ETATS.set(k, n); change = true; } } if (change) toucherMemoire(); };   // (18 nov.) table remplie en place : les calculs mémorisés qui la lisent sont refaits (src/versionDonnees.js)
 const lireEtatsTxn = async () => { try { const rows = await lireTxnMeta(); if (rows === null) return false; noterEtatsTxn(rows); return true; } catch (_) { return false; } };
 const etatTxn = (tx) => (tx == null ? null : TXN_ETATS.get(String(tx)) || null);
 const txnBloqueEnvoi = (tx) => { const e = etatTxn(tx); return !!(e && (e.s === 220 || e.s >= 430)); };
@@ -15598,13 +15600,19 @@ function ToastNumeros() {
     const mo = new MutationObserver(voir); mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['role', 'aria-modal', 'data-n-etat'] });
     return () => mo.disconnect();
   }, [t]);
+  // (23 nov., style-clarte-3) Le toast ne masque rien pour de bon : tant qu'il est là, le bas du contenu lui réserve sa hauteur
+  // (`--n-toast-reserve`, un espace au bout de <main>, natif.css) — ce qu'il couvre se fait défiler au-dessus de lui.
+  const refToast = React.useRef(null);
+  React.useLayoutEffect(() => {
+    const r = document.documentElement;
+    const el = refToast.current && refToast.current.querySelector('.n-toast');
+    if (!t || cache || !el) { r.style.removeProperty('--n-toast-reserve'); return undefined; }
+    r.style.setProperty('--n-toast-reserve', Math.round(el.getBoundingClientRect().height + 16) + 'px');
+    return () => r.style.removeProperty('--n-toast-reserve');
+  });
   if (!t || cache) return null;
   const fin = () => { try { localStorage.setItem(CLE_TOAST_NUMEROS_VU, String(t.message)); } catch (_) {} _toastNumeros = null; setT(null); };
-  // (22 nov., bugs-totale) Le toast vit DANS l'écran : changer d'écran le remontait avec 10 s neuves — il suivait Julien sur
-  // chaque écran jusqu'à « Fermer ». Ses 10 s se comptent depuis sa PREMIÈRE apparition, quel que soit l'écran.
-  if (!_toastNumeros || _toastNumeros.id !== t.id) { /* rien : un toast d'un autre tour */ } else if (_toastNumeros.vuA == null) _toastNumeros.vuA = Date.now();
-  const reste = _toastNumeros && _toastNumeros.vuA != null ? Math.max(1200, 10000 - (Date.now() - _toastNumeros.vuA)) : 10000;
-  return <div data-toast-numeros="" style={dessus ? { '--n-toast-dessus': dessus + 'px' } : undefined}><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin} duree={reste}/></div>;
+  return <div ref={refToast} data-toast-numeros="" style={dessus ? { '--n-toast-dessus': dessus + 'px' } : undefined}><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin}/></div>;
 }
 // Stock : « À écrire sur tes cartons · N » — la liste reste jusqu'à « C'est écrit » (son toucher).
 function NumerosAEcrire() {
@@ -16762,7 +16770,8 @@ const GROUPES_PLUS=[
     // (19 nov., demande H) LE seul endroit qui parle de l'extension et des comptes ; la pastille de la coque y mène.
     entreeNav({id:'extension', icon:'link', label:'Extension'}),
     // (22 nov., ext. 5.436) « Mes comptes » : chaque compte, ton ordinateur, les gestes à distance (src/aDistance/).
-    entreeNav({id:'adistance', icon:'link', label:'Mes comptes'}),
+    // (22 nov., latence-totale §3.6) Sa propre icône (des personnes) : « Extension » garde le lien — la même icône pour les deux se confondait.
+    entreeNav({id:'adistance', icon:'users', label:'Mes comptes'}),
     // (13 nov., lot 54) UNE ligne discrète « Parrainer » (téléphone) : ouvre Réglages → Mon abonnement,
     // groupe Parrainage. Montrée seulement quand le programme est OUVERT (`siParrainage`), jamais une pop-up.
     entreeNav({id:'parrainage', icon:'cadeau', label:'Parrainer', tel:true, siParrainage:true}),
@@ -18574,7 +18583,10 @@ function BottomBar({tab,setTab,sites,badges}) {
   // d'autre ne change : le même `setTab`, le même onglet au bout.
   const [vise,setVise]=React.useState(null);
   const [enCours,demarrer]=React.useTransition();
-  React.useEffect(()=>{ if(!enCours) setVise(null); },[enCours,tab]);
+  // (22 nov., latence) `attenteOngletRef` : le toucher est noté, son écran pas encore demandé (il part APRÈS l'image qui
+  // allume l'onglet, voir `allerA`) — l'onglet visé reste allumé pendant ce court délai.
+  const attenteOngletRef=React.useRef(0);
+  React.useEffect(()=>{ if(!enCours && !attenteOngletRef.current) setVise(null); },[enCours,tab]);
   // (8 nov.) Un toucher de la barre est un simple changement d'écran : un écran GARDÉ
   // (déjà vu, src/ecransGardes.jsx) revient tel quel, sans calcul.
   // (14 nov., Studio bleu clair) Changer d'ESPACE : l'ondulation de lumière part de l'onglet touché (src/design/ondulation.js).
@@ -18592,11 +18604,22 @@ function BottomBar({tab,setTab,sites,badges}) {
   const secoursRef=React.useRef(0);
   React.useEffect(()=>()=>clearTimeout(secoursRef.current),[]);
   React.useEffect(()=>{ if(!enCours){ try{ if(window.__vrmTransitionOnglet){ noterSuspens('transition-aboutie', window.__vrmTransitionOnglet.id); window.__vrmTransitionOnglet=null; } }catch(_){} } },[enCours]);
-  const allerA=(id)=>{ noterNavigationSimple(id); setVise(id); try{ window.__vrmTransitionOnglet={ id, t: Date.now() }; }catch(_){} noterSuspens('transition-partie', id); demarrer(()=>setTab(id));
-    clearTimeout(secoursRef.current);
-    secoursRef.current=setTimeout(()=>{ if(enCoursRef.current && !window.__vrmSansSecours){ try{ window.__vrmSecoursOnglet=(window.__vrmSecoursOnglet||0)+1; }catch(_){} noterSuspens('secours', id); try{ flushSync(()=>setTab(id)); }catch(_){ setTab(id); } } },1500); };   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
+  // (22 nov., latence-totale) L'IMAGE D'ABORD, L'ÉCRAN ENSUITE. Mesuré (banc fluidite-generale, 390 ×4) : la transition
+  // partait dans le même tour que le toucher ; un écran gardé qui revient se valide d'un bloc (rattacher son DOM, son style,
+  // sa mise en page : 0,3 à 0,7 s) et la première image — celle qui allume l'onglet — attendait la fin de la validation.
+  // Maintenant le toucher allume l'onglet (mise à jour urgente, peinte), et l'écran est demandé juste APRÈS cette image
+  // (rAF puis tâche : la tâche suivante court après la peinture) ; 120 ms au plus si aucune image ne vient (onglet caché).
+  // Un second toucher pendant ce délai remplace le premier (le jeton) — rien d'autre ne change : le même `setTab`, le même filet.
+  const allerA=(id)=>{ noterNavigationSimple(id); const jeton=++attenteOngletRef.current; setVise(id); try{ window.__vrmTransitionOnglet={ id, t: Date.now() }; }catch(_){} noterSuspens('transition-partie', id);
+    let parti=false;
+    const partir=()=>{ if(parti) return; parti=true; if(attenteOngletRef.current!==jeton) return; attenteOngletRef.current=0;
+      demarrer(()=>setTab(id));
+      clearTimeout(secoursRef.current);
+      secoursRef.current=setTimeout(()=>{ if(enCoursRef.current && !window.__vrmSansSecours){ try{ window.__vrmSecoursOnglet=(window.__vrmSecoursOnglet||0)+1; }catch(_){} noterSuspens('secours', id); try{ flushSync(()=>setTab(id)); }catch(_){ setTab(id); } } },1500); };
+    try{ requestAnimationFrame(()=>setTimeout(partir,0)); }catch(_){ partir(); }
+    setTimeout(partir,120); };   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
   // (17 nov., chasse-bugs) L'onglet allumé suit l'écran MONTRÉ ; le toucher en cours ne l'emporte que pendant sa transition.
-  const tabMontre=(vise&&enCours)?vise:tab;
+  const tabMontre=(vise&&(enCours||attenteOngletRef.current))?vise:tab;
   const navRef=React.useRef(null);
   // (8 nov.) LA PASTILLE DE L'ONGLET CHOISI GLISSE vers l'onglet touché (Julien : « vraiment
   // fluide, pas robotique »). Les places des onglets sont relevées quand la barre change de
@@ -20069,8 +20092,12 @@ function EnAttenteEnvoi() {
   // sauvegarde réussie), 4 s — jamais avant, jamais sur une simple supposition.
   const dit = React.useRef(false);
   const [fait, setFait] = React.useState(0);
-  let n = 0; try { n = compterEnAttente(localStorage, AUTH.user?.id) || 0; } catch (_) { n = 0; }
   const horsLigneMesure = typeof navigator !== 'undefined' && navigator.onLine === false;
+  // (22 nov., latence) Le compte des changements en attente relit la file et compare chaque clé à sa copie locale (≈ 70 ms
+  // au téléphone ×4, à CHAQUE rendu de la coque — chaque toucher d'onglet). Il ne sert que hors ligne, sur une base en
+  // erreur, ou juste après l'avoir dit (« Enregistré ✓ ») : en ligne et synchronisé, rien ne se montre quel que soit le compte.
+  const aCompter = horsLigneMesure || _syncInfo.etat === 'error' || dit.current || !!fait;
+  let n = 0; if (aCompter) { try { n = compterEnAttente(localStorage, AUTH.user?.id) || 0; } catch (_) { n = 0; } }
   const montre = !lectureSeuleActive() && !!n && (horsLigneMesure || _syncInfo.etat === 'error');
   React.useEffect(() => {
     if (montre) { dit.current = true; if (fait) setFait(0); return undefined; }
@@ -32298,13 +32325,30 @@ function premiereLectureFaite({ comptes, liveStats, sitesLus, comptesEbay }) {
 poserStockageEcransVus(() => load(CLE_ECRANS_VUS, null));
 const DEPS_FACTURE = { lireReglage, lireReglageMontage, ecrireReglage, lireTout, enTeteSession, askConfirm, toast: (m) => toast(m), chercherEntreprise, ouvrirPdfOnglet, FermeAuRetour, typeCompteVinted, lireProprietaire: () => lireProprietaire(), useVentesCoque, classifyOrderStatus, vendActuel: () => vendActuel(), exemples: () => exemplesActuels() };
 // Trois états : `undefined` en cours · `null` pas su · l'objet du serveur.
-async function lireAbonnement() {
+// (22 nov., latence-totale) PARTAGÉE : à l'ouverture, cinq lecteurs (porte d'abonnement, propriétaire, cartes d'accueil,
+// note de satisfaction, Paramètres) la demandaient chacun — 5 allers-retours au serveur (une fonction serverless chacun)
+// dans les premières secondes, banc latence-repos. Une lecture EN COURS sert les appels qui arrivent pendant elle, et une
+// réponse LUE (jamais un « pas su ») sert 10 s, pour la MÊME session seulement. `{ frais: true }` relit toujours (retour
+// de Stripe : l'attente du webhook relit toutes les 2 s).
+const ABO_PARTAGE = { cle: null, p: null, v: null, at: 0 };
+async function lireAbonnementServeur() {
   try {
     const r = await fetch('/api/compte?mode=abonnement', { headers: enTeteSession(), cache: 'no-store' });
     if (!r.ok) return null;
     const j = await r.json();
     return j && j.ok ? j : null;
   } catch (_) { return null; }
+}
+function lireAbonnement({ frais = false } = {}) {
+  const cle = String((AUTH.session && AUTH.session.access_token) || '');
+  const P = ABO_PARTAGE;
+  if (!frais && P.cle === cle) {
+    if (P.p) return P.p;
+    if (P.v && Date.now() - P.at < 10000) return Promise.resolve(P.v);
+  }
+  const p = lireAbonnementServeur().then((v) => { if (P.p === p) { P.p = null; P.v = v || null; P.at = v ? Date.now() : 0; } return v; });
+  P.cle = cle; P.p = p; P.v = null;
+  return p;
 }
 // (14 nov., accueil, le reste) Les outils de l'app prêtés aux cartes de src/accueilReste/ (sans import
 // circulaire d'App.jsx) : lectures et écritures par les mêmes chemins que le reste de l'app.

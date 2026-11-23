@@ -87,4 +87,9 @@ export default {
   "ext.maj.texte": "Elle s’installe dans ton navigateur, tes réglages restent.",
   "ext.maj.retard": "Cette version est trop ancienne pour agir depuis VRM.",
   "ext.maj.bouton": "Mettre à jour ({de} → {a})",
+  "pil.h.titreJours": "Vendu · {n} derniers jours",
+  "pil.t.benefMois": "Bénéfice · {mois}",
+  "pil.t.sur": "sur {c}",
+  "pil.a.publier": "Publier",
+  "pil.a.relier": "Relier",
 };

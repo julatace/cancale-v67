@@ -49,9 +49,53 @@ async function journee(nav, b, W, sombre) {
     if (W < 600) dit(m.cartes.length > 0 && m.cartes.every((x) => x >= 12 && x <= 20), `C3 ${t} : les cartes à 16 px du bord (pas 32)`, m.cartes);
     dit(m.accRendu === (sombre ? 'rgb(244, 244, 245)' : 'rgb(22, 24, 29)'), `C4 ${t} : l'accent est l'encre`, m.accRendu);
     dit(!m.enDirectTitre || !m.court, `C5 ${t} : « En direct » sans en-tête quand rien ne tourne (une ligne)`, m);
+    // C5 bis (23 nov., style-clarte-3) « jamais une carte vide en tête » : sans action en cours, « En direct » n'est jamais une carte /
+    // un groupe pleine largeur — rien (lecture, rien en cours) ou une PUCE de moins de 70 % de la largeur et de 48 px de haut au plus.
+    const dx = await pg.evaluate(() => { const g = [...document.querySelectorAll('[data-direct-lieu="journee"]')]; const c = document.querySelector('.n-page-contenu') || document.body;
+      const lc = c.getBoundingClientRect().width;
+      return g.map((x) => { const r = x.getBoundingClientRect(); const code = x.getAttribute('data-direct'); const vis = x.getClientRects().length > 0;
+        const enfant = x.querySelector('button, .n-rangee'); const re = enfant ? enfant.getBoundingClientRect() : r;
+        return { code, vis, carte: x.matches('.n-groupe, .n-carte') || !!x.querySelector('.n-groupe-liste, .n-carte-corps'), w: Math.round(re.width), h: Math.round(re.height), lc: Math.round(lc) }; }); });
+    dit(dx.length >= 1 && dx.every((d) => ['action', 'verification', 'arret', 'pause', 'muette'].includes(d.code) || !d.vis || (!d.carte && d.w < d.lc * 0.7 && d.h <= 48)), `C5 bis ${t} : « En direct » rien ou une puce (pas de carte pleine largeur)`, dx);
     dit(m.imprimer && m.disques.length >= 3 && m.disques.every(([w, h]) => w >= 44 && h >= 44), `C7 ${t} : Imprimer = le plein des disques ; chaque disque ≥ 44`, m.disques);
     dit(m.deborde <= 1, `C8 ${t} : rien ne déborde`, m.deborde);
     await pg.screenshot({ path: path.join(SHOTS, `journee-${W}-${sombre ? 'sombre' : 'clair'}.png`) });
+    // C13 (23 nov.) les actions rondes : Publier et Relier (les parcours existants), aucun libellé qui en touche un autre, cibles ≥ 44.
+    const ar = await pg.evaluate(() => { const L = [...document.querySelectorAll('.n-action-ronde')].filter((x) => x.getClientRects().length);
+      const txt = L.map((x) => { const l = x.querySelector('.n-action-ronde-libelle'); const r = document.createRange(); r.selectNodeContents(l); const q = r.getBoundingClientRect(); const o = l.getBoundingClientRect();
+        return { l: Math.max(q.left, o.left), r: Math.min(q.right, o.right), coupe: l.scrollWidth > l.clientWidth + 1 }; });
+      let touche = 0; for (let i = 1; i < txt.length; i++) if (txt[i].l - txt[i - 1].r < 4) touche++;
+      return { cles: L.map((x) => x.hasAttribute('data-v2-publier') ? 'publier' : x.hasAttribute('data-v2-relier') ? 'relier' : x.hasAttribute('data-v2-principal') || x.hasAttribute('data-v2-imprimer-rien') ? 'imprimer' : x.hasAttribute('data-v2-scanner') ? 'scanner' : 'autre'), touche, coupes: txt.filter((x) => x.coupe).length,
+        cibles: L.map((x) => { const r = x.getBoundingClientRect(); return Math.min(Math.round(r.width), Math.round(r.height)); }) }; });
+    dit(ar.cles.includes('publier') && ar.cles.includes('relier') && ar.touche === 0 && ar.coupes === 0 && ar.cibles.every((c) => c >= 44), `C13 ${t} : Publier et Relier, libellés séparés et entiers, cibles ≥ 44`, ar);
+    // C15 (23 nov.) Publier ouvre LE parcours existant (choisir l'article), Relier ouvre la feuille « Relier achats et ventes » d'Achats.
+    if (W >= 1024 && !sombre) {
+      await pg.locator('[data-v2-publier]').first().click({ timeout: 5000 }).catch(() => {});
+      const pub = await pg.waitForSelector('[data-publier-ailleurs]', { timeout: 8000 }).then(() => true).catch(() => false);
+      await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);
+      await pg.evaluate(() => { const v = document.querySelector('.vrm-ao-voile'); if (v) v.click(); });
+      await pg.waitForTimeout(400);
+      await pg.locator('[data-v2-relier]').first().click({ timeout: 5000 }).catch(() => {});
+      const rel = await pg.waitForSelector('[data-relier-glisser]', { timeout: 20000 }).then(() => true).catch(() => false);
+      dit(pub && rel, `C15 ${t} : Publier ouvre le parcours de publication, Relier la feuille « Relier achats et ventes »`, { pub, rel });
+      await pg.screenshot({ path: path.join(SHOTS, `relier-${W}.png`) });
+      await pg.goto(pg.url().replace(/\?.*$/, '') + '?tab=journee').catch(() => {}); await pret(pg);
+    }
+    // C14 (23 nov.) un toast (N° neufs) ne masque rien pour de bon : <main> lui réserve sa hauteur ; au bas du défilement, rien de
+    // touchable sous lui.
+    if (W < 1024) {
+      await pg.evaluate(() => { try { localStorage.removeItem('vrm_toast_numeros_vu'); } catch (_) {} window.dispatchEvent(new CustomEvent('vrm:numeros-donnes', { detail: { message: 'Banc : 2 nouvelles paires numérotées · N°901, 902' } })); });
+      await pg.waitForSelector('[data-toast-numeros] .n-toast', { timeout: 4000 }).catch(() => {});
+      await pg.waitForTimeout(300);
+      const to = await pg.evaluate(async () => { const tt = document.querySelector('[data-toast-numeros] .n-toast'); const m = document.querySelector('.vrm-main'); if (!tt || !m) return null;
+        m.scrollTop = m.scrollHeight; await new Promise((r) => setTimeout(r, 250));
+        const r = tt.getBoundingClientRect(); const pts = [[r.left + 8, r.top + r.height / 2], [r.left + r.width / 2, r.top + r.height / 2], [r.right - 8, r.top + 4]];
+        const sous = pts.flatMap(([x, y]) => document.elementsFromPoint(x, y)).filter((e) => !tt.contains(e) && e.closest('.vrm-main') && e.closest('button, a, [role="button"], input'));
+        return { h: Math.round(r.height), pad: parseFloat(getComputedStyle(m, '::after').height) || 0, sous: sous.map((e) => (e.closest('button, a, input').textContent || '').trim().slice(0, 30)) }; });
+      dit(to && to.pad >= to.h && to.sous.length === 0, `C14 ${t} : le toast réserve sa place ; au bas, rien de touchable dessous`, to);
+      await pg.screenshot({ path: path.join(SHOTS, `toast-${W}-${sombre ? 'sombre' : 'clair'}.png`) });
+      await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; });
+    }
     // 30 jours : 30 barres
     await pg.locator('[data-v2-bloc="pilotage"] .n-segmente-choix').nth(1).click({ timeout: 5000 }).catch(() => {});
     await pg.waitForTimeout(500);
@@ -63,8 +107,18 @@ async function journee(nav, b, W, sombre) {
     const mo = await pg.evaluate(() => { const h = document.querySelector('[data-v2-bloc="pilotage"]'); return h ? { n: h.querySelectorAll('[data-n-jour]').length, aire: h.querySelectorAll('.n-graphe-aire, .n-graphe-courbe').length, f: h.getAttribute('data-pil-fenetre') } : null; });
     dit(mo && mo.f === 'mois' && mo.n === Math.min(30, new Date().getDate()) && mo.aire >= 1, `C9 ${t} : « Mois » = les jours du mois, en courbe`, mo);
     // C10 le pied du héros : Vendu · Reçu · À venir (chaque case porte sa source).
-    const pied = await pg.evaluate(() => [...document.querySelectorAll('[data-v2-bloc="pilotage"] .n-heros-trio-case')].map((c) => (c.hasAttribute('data-pil-vendu') ? 'vendu' : c.hasAttribute('data-pil-recu') ? 'recu' : c.hasAttribute('data-pil-avenir') ? 'avenir' : '?')).join(','));
-    dit(pied === 'vendu,recu,avenir', `C10 ${t} : le pied du héros = Vendu · Reçu · À venir`, pied);
+    const pied = await pg.evaluate(() => [...document.querySelectorAll('[data-v2-bloc="pilotage"] .n-heros-trio-case')].map((c) => (c.hasAttribute('data-pil-benef-fen') ? 'benef' : c.hasAttribute('data-pil-recu') ? 'recu' : c.hasAttribute('data-pil-avenir') ? 'avenir' : '?')).join(','));
+    dit(pied === 'benef,recu,avenir', `C10 ${t} : le pied du héros = Bénéfice (la fenêtre) · Reçu · À venir (le vendu est le grand chiffre)`, pied);
+    // C12 (23 nov.) le GRAND CHIFFRE suit la fenêtre : il vaut la somme des jours de la courbe (quand tous sont lus), en 7 j, 30 j et Mois.
+    const suit = [];
+    for (const k of [0, 1, 2]) {
+      await pg.locator('[data-v2-bloc="pilotage"] .n-segmente-choix').nth(k).click({ timeout: 5000 }).catch(() => {});
+      await pg.waitForTimeout(400);
+      suit.push(await pg.evaluate(() => { const h = document.querySelector('[data-v2-bloc="pilotage"]'); if (!h) return null;
+        const v = h.querySelector('.n-heros-valeur'); const txt = v ? v.textContent.replace(/[\s\u00a0\u202f]/g, '').replace('€', '').replace(/[^0-9,]/g, '').replace(',', '.') : '';
+        return { f: h.getAttribute('data-pil-fenetre'), heros: txt === '' ? null : Math.round(Number(txt) * 100), somme: h.getAttribute('data-pil-somme'), vendu: h.getAttribute('data-pil-vendu') }; }));
+    }
+    dit(suit.every((x) => x && (x.somme === '' || String(x.heros) === x.somme) && String(x.heros) === x.vendu), `C12 ${t} : le grand chiffre = le vendu de la fenêtre choisie (7 j · 30 j · Mois), la somme de la courbe`, suit);
     // C11 Colis en deux cases côte à côte (à envoyer | à retirer), chacune ≥ 44 de haut ; à l'ordinateur l'en-tête porte relire + cloche.
     const cx = await pg.evaluate(() => { const c = [...document.querySelectorAll('[data-n-colis-duo] [data-v2-cj-ligne]')].map((x) => x.getBoundingClientRect());
       return { n: c.length, cote: c.length === 2 && Math.abs(c[0].top - c[1].top) < 2 && c[1].left > c[0].right - 2, h: c.map((r) => Math.round(r.height)),
