@@ -88,4 +88,5 @@ export default {
   "cons.vSeuilMicro": "{pct} % du plafond micro",
   "cons.vVentes": {"one": "{n} vente en 30 j", "other": "{n} ventes en 30 j"},
   "cons.vDuo": "Ventes en 30 jours : {a} {na}, {b} {nb}",
+  "cons.pres.exemple": "Qu’est-ce que je devrais baisser ?",
 };

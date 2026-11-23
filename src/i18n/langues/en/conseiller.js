@@ -88,4 +88,5 @@ export default {
   "cons.vSeuilMicro": "{pct}% of the micro-business cap",
   "cons.vVentes": {"one": "{n} sale in 30 days", "other": "{n} sales in 30 days"},
   "cons.vDuo": "Sales in 30 days: {a} {na}, {b} {nb}",
+  "cons.pres.exemple": "What should I reduce?",
 };

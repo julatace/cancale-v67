@@ -88,4 +88,5 @@ export default {
   "cons.vSeuilMicro": "{pct} % der Kleinunternehmer-Grenze",
   "cons.vVentes": {"one": "{n} Verkauf in 30 Tagen", "other": "{n} Verkäufe in 30 Tagen"},
   "cons.vDuo": "Verkäufe in 30 Tagen: {a} {na}, {b} {nb}",
+  "cons.pres.exemple": "Was sollte ich reduzieren?",
 };

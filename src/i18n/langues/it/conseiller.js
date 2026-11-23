@@ -88,4 +88,5 @@ export default {
   "cons.vSeuilMicro": "{pct}% della soglia micro",
   "cons.vVentes": {"one": "{n} vendita in 30 giorni", "other": "{n} vendite in 30 giorni"},
   "cons.vDuo": "Vendite in 30 giorni: {a} {na}, {b} {nb}",
+  "cons.pres.exemple": "Cosa dovrei ribassare?",
 };
