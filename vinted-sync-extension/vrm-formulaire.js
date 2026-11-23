@@ -25,7 +25,7 @@
 //  formulaire et la réponse attendue.
 // ════════════════════════════════════════════════════════════════════════════
 (() => {
-  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 7) return;
+  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 7.1) return;
   const SEL = Object.freeze({
     vendre: 'a[data-testid="header-upload-item-button"]',
     photos: 'input[data-testid="add-photos-input"]',
@@ -961,7 +961,7 @@
       return x ? { ok: true, rep: x } : { ok: false, code: 'sans-reponse' };
     },
   };
-  globalThis.__vrmFormulaireV = 7;   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
+  globalThis.__vrmFormulaireV = 7.1;   // 5.440.1 : 7.1 (ligne du favori par `user_id`)   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
   globalThis.__vrmFormulaireSel = SEL;
   globalThis.__vrmFormulaire = async (etape, d) => {
     if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(location.hostname)) return { ok: false, code: 'hors-vinted' };
