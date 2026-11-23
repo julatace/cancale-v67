@@ -88,7 +88,8 @@ sur la même règle) — rien à changer.
   l'onglet seulement, autre compte gardé, aucun nom, lecture ratée n'écrit rien, onglet ambigu), G (geste tu après une
   lecture ailleurs). `--prouve` : voir ÉTAT À LA REPRISE.
 - `scripts/bancs/lbc-panneau.cjs` (vrais vrm-ui.js + vrm-badge.js, fausse page leboncoin.fr, 1512 puis 390) : P1–P6 —
-  **26 ✅** (13 par largeur) ; sur l'extension d'origin/main **20 ❌** (le symptôme de Julien reproduit : « Tes annonces
+  **28 ✅** (14 par largeur) ; mutations du panneau : sans la relecture « pas encore » ⇒ 18 ❌, bandeau sur chaque écran ⇒
+  6 ❌ ; sur l'extension d'origin/main **20 ❌** (le symptôme de Julien reproduit : « Tes annonces
   n'ont pas pu être lues », « Ouvre « Mes transactions » » sur Messagerie). Captures regardées (Commandes, Achats,
   Favoris, Accueil, Messagerie, Articles ; 1512 et 390). TMPDIR court obligatoire (chemin de socket de Chromium).
 - Build OK. Passe complète (`lancer-audits`, 832 audits) : 32 rouges, tous rouges aussi dans les passes d'autres

@@ -89,7 +89,7 @@ const page = async (pg, p) => { await clic(pg, `.side6 [data-onglet-b="${p}"], [
       await montrer(t.pg);
       await page(t.pg, 'annonces');
       await t.pg.waitForTimeout(4600);   // la relecture seule (4 s)
-      const an = await R(t.pg, 'return { pasLu: !!r.querySelector("[data-annonces=\\"pas_su\\"]"), n: r.querySelectorAll("[data-annonce]").length, txt: (r.querySelector(".corps6") || r).innerText.slice(0, 200), geste: !!r.querySelector("[data-lb-geste]") };');
+      const an = await R(t.pg, 'return { pasLu: !!r.querySelector("[data-annonces=\\"pas_su\\"]"), n: r.querySelectorAll("[data-annonce]").length, txt: (r.querySelector(".corps6") || r).innerText.slice(0, 200), geste: !!r.querySelector("[data-lb-geste]") || /Mes transactions/.test((r.querySelector(".carte") || r).innerText) };');
       dit(an && !an.pasLu && an.n >= 1, `P1 ${o.nom} : 1re réponse « pas encore », la liste arrive seule (${an && an.n} annonces), jamais « pas pu être lues »`, JSON.stringify(an));
       dit(an && !an.geste, `P3 ${o.nom} : pas de « Ouvre « Mes transactions » » sur Annonces`);
       await t.pg.screenshot({ path: path.join(SORTIE, `${o.nom}-1-annonces.png`) });
@@ -106,6 +106,7 @@ const page = async (pg, p) => { await clic(pg, `.side6 [data-onglet-b="${p}"], [
       await page(t.pg, 'messages');
       const m = await R(t.pg, 'return (r.querySelector(".corps6") || r).innerText.slice(0, 400);');
       dit(/toujours disponible/.test(m || ''), `P5 ${o.nom} : la conversation rangée est dans Messagerie`, m);
+      dit(!/Mes transactions/.test(m || ''), `P3 ${o.nom} : pas de « Ouvre « Mes transactions » » sur Messagerie`, m);
       await t.pg.screenshot({ path: path.join(SORTIE, `${o.nom}-4-messages.png`) });
       await page(t.pg, 'favoris');
       const fv = await R(t.pg, 'return { n: r.querySelectorAll("[data-lb-fav]").length, premier: (r.querySelector("[data-lb-fav]") || {}).innerText || "", note: !!r.querySelector("[data-favoris-site=\\"leboncoin\\"]"), ecrire: /écrire|message aux favoris/i.test((r.querySelector(".corps6") || r).innerText) };');
@@ -115,7 +116,7 @@ const page = async (pg, p) => { await clic(pg, `.side6 [data-onglet-b="${p}"], [
       const bx = await R(t.pg, 'return !!r.querySelector("[data-prix-ligne=\\"3000000001\\"]");');
       dit(bx === true, `P6 ${o.nom} : « Baisser le prix » ouvre la baisse gardée pour CETTE annonce`);
       await page(t.pg, 'accueil');
-      const ac = await R(t.pg, 'const p = r.querySelector("[data-accueil-porte]"); return { porte: p ? p.innerText : "", geste: !!r.querySelector("[data-lb-geste]") };');
+      const ac = await R(t.pg, 'const p = r.querySelector("[data-accueil-porte]"); return { porte: p ? p.innerText : "", geste: !!r.querySelector("[data-lb-geste]") || /Mes transactions/.test((r.querySelector(".carte") || r).innerText) };');
       dit(ac && /0,00\s€/.test(ac.porte), `P4 ${o.nom} : porte-monnaie à 0 ⇒ « 0,00 € »`, JSON.stringify(ac));
       dit(ac && !ac.geste, `P3 ${o.nom} : ventes rangées ⇒ pas de « Ouvre « Mes transactions » » sur l’Accueil`);
       await t.pg.screenshot({ path: path.join(SORTIE, `${o.nom}-5-accueil.png`) });
