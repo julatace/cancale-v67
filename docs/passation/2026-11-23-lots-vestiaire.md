@@ -103,3 +103,20 @@ Aujourd'hui elle est déjà hors du reçu et du CA (pas versée).
   filtre/chemin/session à part, échec reste échec) verte ; mutations `commune-off`, `commune-noms-faux` rougissent. La
   mutation `fond-partout` (motif périmé depuis le 22 nov. sur main : « motif introuvable ») portée sur la règle actuelle.
 - Voisins : coherence, vc-moderation, capture-vc-lbc, fiabilite-annonces, lbc-vc-lecture verts (suite dans la PR).
+
+## 3. Porte-monnaie Vinted dans « Ma journée » (demande ajoutée le 23 nov.) — DÉJÀ CAPTÉ, rien à ajouter à l'extension
+
+Mesuré (lecture seule) : **14 comptes** ont une ligne `harvest_{uid}_billing` (la plus fraîche le 23 nov. au matin), rangée
+par l'extension au passage (porte-monnaie et `/payouts` que la page charge — aucune requête de plus). Deux formes, les deux
+avec montant + devise :
+
+| forme | disponible | EN ATTENTE | autres |
+|---|---|---|---|
+| solde (5 comptes) | `data.payload.main` `{amount, currency_code}` | `data.payload.escrow` `{amount, currency_code}` | — |
+| versement (9 comptes) | `data.payload.balance` `{amount, currency_code}` | `data.payload.pending_balance` `{amount, currency_code}` | `previous_balance`, `history`, `invoice_lines`… |
+
+Date de lecture : `data.capturedAt`. Une ligne dédiée `harvest_{uid}_portemonnaie` serait un doublon : non créée.
+Lecteur de l'app (une seule règle, déjà utilisée par Argent) : `fetchWalletEscrow(uidsVivants)` (src/App.jsx) →
+`{ total` (EN ATTENTE, euros), `dispo` (disponible), `accounts`, `avecSolde` (Set d'uid lus), `parCompte: [{ uid, attente,
+dispo, jours }]`, `plusVieuxJours`, `autreDevise` (uid hors euros, jamais convertis) `}` ; `null`/`accounts: 0` = pas su.
+À afficher dans Ma journée par l'agent design (avec l'âge de la lecture : `jours`).
