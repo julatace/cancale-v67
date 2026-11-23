@@ -10,7 +10,8 @@ require('./_porte-banc.cjs');
 //       UN colis attend ; UN seul plein sur l'écran (le premier point) ;
 //    K3 AUCUN orange ni ambre dans « À retirer » (l'échéance proche se dit à l'encre) ;
 //    K4 toucher une rangée ouvre le guichet (plein écran : le geste d'avant) ; « Code » aussi ;
-//    K5 rien ne déborde ; aucune erreur.
+//    K5 rien ne déborde ; aucune erreur ;
+//    K6 un e-mail Vinted Go « Relais Vinted Go, <commerce>, <rue> » (forme réelle mesurée, sans code postal) nomme SON point et son adresse.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 'use strict';
 const path = require('path'), fs = require('fs'), os = require('os');
@@ -47,6 +48,9 @@ function baseBillet() {
   colis('XW700000001TS', 'chronopost', '978216', 'RELAIS DU MARCHE, 12 RUE DES LILAS, 35000 RENNES', { qr: true, tx: 99100011, titre: 'Nike Air Zoom Alphafly NEXT% Eliud Kipchoge taille 42' });
   colis('XW700000002TS', 'chronopost', 'AB12CD34EF', 'RELAIS DU MARCHE, 12 RUE DES LILAS, 35000 RENNES', { tx: 99100012, titre: 'Adidas Handball Spezial bleu marine taille 40' });
   colis('87100011', 'mondialrelay', '4521', 'TABAC DE LA GARE, 3 RUE EXEMPLE, 22100 DINAN', { jours: 1, tx: 99100013, titre: 'Salomon XT-6 noir taille 43' });
+  // (23 nov., Julien : « comment ça le point relais n'est pas reconnu ») La forme RÉELLE mesurée d'un e-mail Vinted Go (2 e-mails, 15 et
+  // 22 nov.) : « Relais Vinted Go, <nom du commerce>, <n° et rue> » — sans code postal. Valeurs inventées, forme exacte.
+  colis('1794500000000001', 'vinted', '551234', 'Relais Vinted Go, Droguerie Banc, 7 Rue Des Essais', { jours: 3, tx: 99100014, titre: 'Asics Gel-1130 banc taille 41' });
   return b;
 }
 const releve = () => {
@@ -83,7 +87,7 @@ const guichet = () => !!document.querySelector('.vrm-qr-view, [data-qr-view], [d
       await pg.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_banc_dom_ancien'); localStorage.removeItem('vrm_banc_retrait_variante'); } catch (_) {} });
       await pg.reload({ waitUntil: 'domcontentloaded' });
       await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
-      const vu = await attendre(pg, () => document.querySelectorAll('[data-rp-point] [data-rp-colis]').length >= 3);
+      const vu = await attendre(pg, () => document.querySelectorAll('[data-rp-point] [data-rp-colis]').length >= 4);
       await pg.waitForTimeout(1500);
       const r = await pg.evaluate(releve);
       const marche = r.points.find((p) => /MARCHE/i.test(p.nom)), tabac = r.points.find((p) => /TABAC/i.test(p.nom));
@@ -99,18 +103,23 @@ const guichet = () => !!document.querySelector('.vrm-qr-view, [data-qr-view], [d
         `K2 « Itinéraire » sur chaque point, « Code » seulement au tabac (un colis), vrais boutons dans la carte`, [marche.btns, tabac.btns]);
       dit(r.pleins === 1, `K2 un seul plein sur l’écran (${r.pleins})`);
       dit(r.oranges && r.oranges.length === 0, 'K3 aucun orange ni ambre dans « À retirer »', r.oranges);
+      const vg = r.points.find((p) => /Droguerie Banc/i.test(p.nom));
+      const inconnus = await pg.evaluate(() => [...document.querySelectorAll('[data-rp-point]')].filter((c) => c.getAttribute('data-rp-point') === 'inconnu').length);
+      const adrVg = await pg.evaluate(() => { const c = [...document.querySelectorAll('[data-rp-point]')].find((x) => /Droguerie Banc/i.test(x.textContent)); return c ? ((c.querySelector('[data-rp-adresse]') || {}).textContent || '').trim() : null; });
+      dit(!!vg && inconnus === 0 && /^7 Rue des Essais/i.test(adrVg || ''), `K6 « Relais Vinted Go, Droguerie Banc, 7 Rue des Essais » ⇒ le point « ${vg && vg.nom} », adresse « ${adrVg} » (jamais « Point pas encore connu »)`, { pts: r.points.map((p) => p.nom), inconnus, adrVg });
       dit(r.deb <= 1, `K5 rien ne déborde (${r.deb})`);
       await pg.screenshot({ path: path.join(SHOTS, `point-c-${W}-${th}.png`), fullPage: false });
       const h = await pg.evaluateHandle(() => document.querySelector('.n-rp'));
       if (h.asElement()) await h.asElement().screenshot({ path: path.join(SHOTS, `point-c-liste-${W}-${th}.png`) }).catch(() => {});
-      // K4 : la rangée du code ouvre le guichet ; « Code » aussi.
-      const ouvre1 = await pg.evaluate(async (g) => { const z = document.querySelector('[data-rp-colis] [data-rp-billet]'); if (!z) return 'absent'; z.click(); await new Promise((r) => setTimeout(r, 800)); return (new Function('return (' + g + ')()'))() ? 'ouvert' : 'fermé'; }, guichet.toString());
-      dit(ouvre1 === 'ouvert', `K4 toucher la rangée ouvre le guichet (${ouvre1})`);
-      await pg.keyboard.press('Escape').catch(() => {});
-      await pg.reload({ waitUntil: 'domcontentloaded' });
-      await attendre(pg, () => document.querySelectorAll('[data-rp-code-plein]').length >= 1, 30000);
-      const ouvre2 = await pg.evaluate(async (g) => { const z = document.querySelector('[data-rp-code-plein]'); if (!z) return 'absent'; z.click(); await new Promise((r) => setTimeout(r, 800)); return (new Function('return (' + g + ')()'))() ? 'ouvert' : 'fermé'; }, guichet.toString());
+      // K4 : « Code » ouvre le guichet ; puis (page relue) toucher la rangée aussi.
+      const ouvrir = (sel) => pg.evaluate(async ([sl, g]) => { const z = document.querySelector(sl); if (!z) return 'absent'; z.click(); await new Promise((r) => setTimeout(r, 800)); return (new Function('return (' + g + ')()'))() ? 'ouvert' : 'fermé'; }, [sel, guichet.toString()]);
+      const ouvre2 = await ouvrir('[data-rp-code-plein]');
       dit(ouvre2 === 'ouvert', `K4 « Code » ouvre le guichet (${ouvre2})`);
+      await pg.reload({ waitUntil: 'domcontentloaded' });
+      await attendre(pg, () => document.querySelectorAll('[data-rp-point] [data-rp-colis]').length >= 4, 30000);
+      await pg.waitForTimeout(800);
+      const ouvre1 = await ouvrir('[data-rp-colis] [data-rp-billet]');
+      dit(ouvre1 === 'ouvert', `K4 toucher la rangée ouvre le guichet (${ouvre1})`);
       dit(!erreurs.length, 'K5 aucune erreur de page', erreurs.slice(0, 3));
       await ctx.close();
     }

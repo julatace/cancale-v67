@@ -39,7 +39,7 @@ export const cpDe = (s) => { const m = /\b(\d{5})\b/.exec(String(s || '')); retu
 //     quand l'e-mail ne donne que « 40 RUE DU PORT 35260 CANCALE » (« Cancale »).
 // Le nom propre est rendu, ou '' : un point sans nom reste un point (son
 // adresse le désigne), jamais un nom inventé.
-const TYPE_EN_TETE = /^(?:(?:votre|ton|le|la|au|en|dans)\s+)?(?:point\s+relais|point\s+de\s+retrait|relais\s+pick-?up|consigne(?:\s+vinted\s*go|\s+pick-?up|\s+automatique)?|locker(?:\s*24\s*\/?\s*7)?(?:\s+vinted\s*go)?|casier|vinted\s*go|mondial\s+relay|relais\s+colis|chrono\s*relais|relais\s+shop2shop|chronopost(?:\s+pick-?up)?)\b\s*[:,\-–]?\s*/i;
+const TYPE_EN_TETE = /^(?:(?:votre|ton|le|la|au|en|dans)\s+)?(?:relais\s+vinted(?:\s*go)?|point\s+relais|point\s+de\s+retrait|relais\s+pick-?up|consigne(?:\s+vinted\s*go|\s+pick-?up|\s+automatique)?|locker(?:\s*24\s*\/?\s*7)?(?:\s+vinted\s*go)?|casier|vinted\s*go|mondial\s+relay|relais\s+colis|chrono\s*relais|relais\s+shop2shop|chronopost(?:\s+pick-?up)?)\b\s*[:,\-–]?\s*/i;
 // (1er nov., « plus fiable ») Le TYPE peut aussi venir EN QUEUE : « Kusmi Tea -
 // Consigne Vinted Go », « TABAVAP (Point Relais) ». Il est retiré de la même façon.
 const TYPE_EN_QUEUE = /\s*(?:[,\-–(]\s*)(?:point\s+relais|point\s+de\s+retrait|relais\s+pick-?up|consigne(?:\s+vinted\s*go|\s+pick-?up)?|locker(?:\s+vinted\s*go)?|vinted\s*go)\s*\)?\s*$/i;
@@ -158,7 +158,11 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     // (12 nov., Julien : « Intermarche — 35350 St Meloir des Ondes », rue absente) Une ligne d'adresse LUE qui n'est
     // pas une rue cherchable (un lieu-dit : « LE PORTAIL ») reste l'adresse ÉCRITE du point — affichée, jamais
     // cherchée sur la carte (`adresseGeocodable` exige toujours une rue) ni utilisée comme identité.
-    const rueEcrite = rueOk || (rueLue && rueLue.length <= 60 && /[A-Za-zÀ-ÿ]{3}/.test(rueLue) && !/\d{5}|https?:|@/.test(rueLue) && !PAS_UNE_ADRESSE.test(rueLue) && cp ? rueLue : '');
+    // (23 nov., Julien : « le point relais n'est pas reconnu ») Vinted Go n'écrit parfois que la RUE numérotée, sans code postal
+    // (« 10 Rue Du Bois Aurant ») : elle reste l'adresse ÉCRITE du point (affichée) — jamais cherchée sur la carte (pas de code
+    // postal) ni prise pour une identité (`rueCle` exige toujours une rue cherchable).
+    const rueNumerotee = !!rueLue && RUE.test(rueLue) && rueLue.length <= 60 && !/\d{5}|https?:|@/.test(rueLue) && !PAS_UNE_ADRESSE.test(rueLue);
+    const rueEcrite = rueOk || (rueLue && rueLue.length <= 60 && /[A-Za-zÀ-ÿ]{3}/.test(rueLue) && !/\d{5}|https?:|@/.test(rueLue) && !PAS_UNE_ADRESSE.test(rueLue) && (cp || rueNumerotee) ? rueLue : '');
     // (6 nov.) Un CASIER le dit devant son nom (« Casier 24/7 Super U ») : le type lu en tête du lieu
     // (`lieuType`, posé par l'écran Colis). Un casier et un comptoir du même nom sont deux points.
     const nom0 = nomRelaisPropre(nomLu, morceaux.ville);

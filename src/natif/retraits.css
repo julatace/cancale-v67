@@ -308,6 +308,6 @@
 :root[data-theme="dark"] .n-rp[data-rp-variante="c"] .n-rp-frise-txt b { color: var(--n-encre); }
 /* Hors couche (la règle de police globale `n-anciens` gagnerait) : le code de la rangée, chasse fixe, 17–20 px, à l'encre. */
 .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-billet-code [data-rp-code-grand] { color: var(--n-encre); font-size: 19px; line-height: 24px; letter-spacing: .02em; }
-.n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-billet-code [data-rp-code-grand].is-long { font-size: 15px; }
+.n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-billet-code [data-rp-code-grand].is-long { font-size: 17px; letter-spacing: 0; }
 .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-contenu .n-rp-colis-titre { font: 600 14px/18px var(--n-police); -webkit-line-clamp: 1; }
 .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-billet-code .n-rp-code-btn { min-height: 44px; justify-content: flex-end; }
