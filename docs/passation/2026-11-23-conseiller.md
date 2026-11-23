@@ -83,3 +83,29 @@ Les offres : le conseil OUVRE la liste ; accepter / contre-offrir se fait à son
 - `scripts/bancs/conseiller.cjs` (390 tactile, 1512, clair, sombre ; bases lue et vide) : **48 verts** ; mutations
   `carte5`, `cartevide` rouges. Captures regardées (écran 390 clair, 1512 sombre, carte).
 - Rouge sur le code d'avant : `src/conseiller/` n'existe pas sur `origin/main` (l'audit et le banc ne se construisent pas).
+
+## Ce qui est fait — tranche 2 (« Demande à VRM », branche `claude/conseiller-ia`)
+- `api/_lib/claude-cle.js` + `/api/compte?mode=claude` : poser (vérifiée chez Anthropic par la liste des modèles, gratuite ;
+  refusée ⇒ rien rangé), état (posée · …4 derniers · date), retirer (confirmé, toujours possible). Chiffrée dans le coffre
+  (usage `claude-v1`), jamais en clair, jamais rendue au navigateur ; base pas cloisonnée ⇒ rien.
+- `api/_lib/conseiller-ia.js` + `/api/ai?mode=conseiller` (passe AVANT la clé du serveur) : session, abonnement, SA clé du
+  coffre seulement (aucune clé du corps, jamais `AI_API_KEY`) ; contexte NETTOYÉ (nombres, textes ≤ 80, aucune clé qui nomme
+  un acheteur / un message / une adresse, ≤ 12 000 caractères) ; Claude Haiku 5.5, effort bas, sortie structurée
+  `{reponse, chiffres[], geste}` ; geste hors liste fermée ⇒ « aucun » ; refus / sortie illisible dits (`facture: true`) ;
+  coût réel rendu (jetons × prix publics). Appel en HTTP brut comme le reste de `api/ai.js` (pas de SDK dans le projet).
+- `src/conseiller/contexte.js` (agrégats seulement : conseils, CA 30 j / 30 j d'avant / mois, modèles 90 j, comptes 30 j,
+  stock) et `src/conseiller/DemandeVRM.jsx` (clé masquée, estimation du coût avant, réponse + chiffres + coût après, geste
+  en bouton ; aucune requête sans clé posée).
+
+## Preuves — tranche 2
+- `node scripts/audit-conseiller-ia.cjs` : **19 verts** ; `--mutation=toutes` **8/8** (clé du serveur, clé du corps,
+  filtre du contexte, geste libre, « pas su » = aucune clé, clé refusée rangée, clé en clair, écran sans garde).
+- Passe du banc `scripts/bancs/_conseiller-ia.cjs` (I1 sans clé : aucune requête ; I2 une question ⇒ une requête, agrégats
+  seuls, réponse, coût, geste au toucher) : **écrite, pas encore lancée** (machine saturée, consigne du coordinateur
+  jusqu'à 15:30 UTC).
+
+## Ce qui reste (après 15:30 UTC, puis fusion le 24 nov. après 07:00 UTC avec l'accord du coordinateur)
+1. `npx vite build` des deux branches ; `node scripts/bancs/conseiller.cjs` sur `claude/conseiller-ia` (avec la passe IA) ;
+   mutations du banc `MUTATION=carte5|cartevide` ; passe complète `AUDITS_PARALLELE=2 node scripts/lancer-audits.cjs`.
+2. Comparer la CI des PR à celle du dernier commit de main ; fusionner #tranche1 puis #tranche2 ; vérifier « Vercel ».
+3. Mesure réelle manquante : une vraie question avec une vraie clé (forme de la réponse structurée de Haiku 5.5).
