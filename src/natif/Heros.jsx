@@ -27,7 +27,7 @@ export function Heros({ titre = '', valeur = null, unite = '', sous = '', tonSou
           {trio.map((t) => (
             <div key={t.cle} className="n-heros-trio-case" {...(t.attrs || {})}>
               <dt>{t.libelle}</dt><dd>{t.onClick ? <button type="button" className="n-heros-trio-porte" onClick={t.onClick} data-heros-porte={t.cle}>
-                {t.valeur == null || t.valeur === '' ? TIRET : t.valeur}{t.pourquoi ? <span className="n-heros-trio-pourquoi">{t.pourquoi}</span> : null}</button>
+                <span className="n-heros-trio-v">{t.valeur == null || t.valeur === '' ? TIRET : t.valeur}</span>{t.pourquoi ? <span className="n-heros-trio-pourquoi">{t.pourquoi}</span> : null}</button>
                 : <>{t.valeur == null || t.valeur === '' ? TIRET : t.valeur}{t.pourquoi ? <span className="n-heros-trio-pourquoi">{t.pourquoi}</span> : null}</>}</dd>
             </div>
           ))}

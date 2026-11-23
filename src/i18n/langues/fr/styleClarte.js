@@ -114,4 +114,6 @@ export default {
   "pop.fermer": "Fermer",
   "pop.region": "Notifications",
   "pop.replier": "Replier",
+  "pil.t.saisis": "Saisis les prix ›",
+  "pil.t.saisisN": "Saisis {n} prix ›",
 };

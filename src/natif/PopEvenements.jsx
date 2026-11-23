@@ -59,17 +59,24 @@ function Carte({ e, Icon, onFermer, tenue, photoDe, i }) {
   // La pile entière est tenue (souris, doigt ou clavier sur N'IMPORTE QUELLE carte) : toutes attendent, toutes repartent ensemble.
   const premier = React.useRef(true);
   React.useEffect(() => { if (premier.current) { premier.current = false; if (!tenue) return; } if (!e.ctl) return; if (tenue) e.ctl.pause(); else e.ctl.lancer(); }, [tenue, e]);
+  // (23 nov., iPhone) Balayer la carte vers le haut la ferme (comme une bannière d'iOS) ; relâchée avant 32 px, elle revient.
+  const [glisse, setGlisse] = React.useState(0);
+  const depart = React.useRef(null);
+  const toucheDebut = (x) => { const t = x.touches && x.touches[0]; depart.current = t ? t.clientY : null; };
+  const toucheMouv = (x) => { const t = x.touches && x.touches[0]; if (depart.current == null || !t) return; setGlisse(Math.min(0, t.clientY - depart.current)); };
+  const toucheFin = () => { if (depart.current == null) return; depart.current = null; if (glisse < -32) fermer(); else setGlisse(0); };
   const geste = e.action || (e.url ? { titre: tr('pop.voir'), url: e.url } : null);
   return (
-    <div className="n-pop" data-n-pop={e.genre || 'autre'} data-n-pop-sort={sort ? '1' : undefined} data-n-pop-rang={i} style={{ '--i': i }} role="status" {...(i > 0 && !tenue ? { inert: '' } : {})}>
+    <div className="n-pop" data-n-pop={e.genre || 'autre'} data-n-pop-sort={sort ? '1' : undefined} data-n-pop-rang={i} style={{ '--i': i, ...(glisse ? { transform: `translateY(${glisse}px)`, opacity: Math.max(0.3, 1 + glisse / 120), transition: 'none' } : {}) }} role="status"
+      onTouchStart={toucheDebut} onTouchMove={toucheMouv} onTouchEnd={toucheFin} onTouchCancel={toucheFin} data-n-pop-glisse={glisse ? '1' : undefined} {...(i > 0 && !tenue ? { inert: '' } : {})}>
       {photo
         ? <img className="n-pop-photo" src={photo} alt="" referrerPolicy="no-referrer" loading="eager" decoding="async"/>
         : <span className="n-pop-ic" aria-hidden="true">{Icon ? <Icon name={ICONE_GENRE[e.genre] || 'bell2'} size={20}/> : null}</span>}
       <div className="n-pop-corps">
         <div className="n-pop-titre">{e.titre}</div>
         <div className="n-pop-detail">{e.site ? <LogoSite site={e.site} taille={14} nom={NOM_SITE[e.site]}/> : null}<span>{e.detail}</span></div>
-        {geste ? <button type="button" className="n-pop-geste" data-n-pop-geste="" onClick={() => { aller(geste.url); fermer(); }}>{geste.titre}</button> : null}
       </div>
+      {geste ? <button type="button" className="n-pop-geste" data-n-pop-geste="" onClick={() => { aller(geste.url); fermer(); }}>{geste.titre}</button> : null}
       <button type="button" className="n-pop-fermer" aria-label={tr('pop.fermer')} title={tr('pop.fermer')} onClick={fermer}>
         {Icon ? <Icon name="close" size={16}/> : '×'}
       </button>

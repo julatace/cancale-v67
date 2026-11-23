@@ -63,7 +63,7 @@ function cartesEnPlus({ valeurSel, objectif: O, live, maintenant, regles, benefi
     const couv = brut != null && Number.isFinite(Bb.n) && nV != null && nV > Bb.n ? `${Bb.n}/${nV}` : '';
     const ecart = V.valeur != null && !V.partiel && A.valeur != null && !A.partiel && A.valeur > 0 ? Math.round(((V.valeur - A.valeur) / A.valeur) * 100) : null;
     return { vendu: V.valeur == null ? null : V.valeur, partiel: !!V.partiel, raison: V.valeur == null ? raisonCourte(V) : '', ventes: N.valeur == null ? null : N.valeur, ventesPartiel: !!N.partiel,
-      brut, brutCouv: couv, ecart };
+      brut, brutCouv: couv, ecart, manque: nV != null && Number.isFinite(Bb.n) ? Math.max(0, nV - Bb.n) : null };
   };
   courbe.fenetres = { 7: fen(7), 30: fen(30), mois: fen('mois') };
   courbe.joursMois = new Date(maintenant).getDate();   // le nombre de jours du mois écoulés (la fenêtre « Mois » du graphique)

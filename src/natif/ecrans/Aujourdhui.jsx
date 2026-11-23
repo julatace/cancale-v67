@@ -133,7 +133,7 @@ function ObjectifLigne({ objectif: o, montant }) {
 // chiffres. Tout vient de `courbe` (src/aujourdhui/Branche.jsx : chaque nombre DEMANDÉ au propriétaire, `valeurSel`) ;
 // un total pas su = « — » et sa raison ; un total incomplet = « au moins ».
 const FENETRES = [7, 30, 'mois'];   // (22 nov. soir, maquettes de Julien) 7 j · 30 j · Mois
-function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, onVentes, onSaisirPrix = null, aVenir = null }) {
+function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, onVentes, onSaisirPrix = null, aVenir = null, telephone = false }) {
   const debutMois = (() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d.getTime(); })();
   const L = !Array.isArray(courbe.jours) ? [] : f === 'mois' ? courbe.jours.filter((x) => x.de >= debutMois) : courbe.jours.slice(-f);
   const W = courbe.fenetres ? courbe.fenetres[f] : null;
@@ -174,7 +174,9 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
     { cle: 'benef', libelle: (f === 'mois' ? tr('pil.t.benefMois', { mois: nomMois }) : tr('pil.t.benef', { n: f })) + (W && W.brutCouv ? ' · ' + tr('pil.t.sur', { c: W.brutCouv }) : ''),
       valeur: benefFen, attrs: { 'data-pil-benef-fen': W ? cents(W.brut) : '', 'data-pil-couv': W && W.brutCouv ? W.brutCouv : undefined },
       // (23 nov.) « — » dit POURQUOI, et le chiffre faux est la porte pour le corriger (CLAUDE.md §5) : il ouvre la saisie des prix.
-      ...(benefFen == null && manquePrix && onSaisirPrix ? { pourquoi: tr('pil.t.prixManquants'), onClick: onSaisirPrix } : {}) },
+      // (23 nov., iPhone) au téléphone, la porte est une puce courte « Saisis 5 prix › » (le nombre de ventes sans prix d'achat
+      // de la fenêtre, quand il est su) — plus de bouton pleine largeur dans le héros.
+      ...(benefFen == null && manquePrix && onSaisirPrix ? { pourquoi: telephone ? (W && W.manque > 0 ? tr('pil.t.saisisN', { n: W.manque }) : tr('pil.t.saisis')) : tr('pil.t.prixManquants'), onClick: onSaisirPrix } : {}) },
     { cle: 'recu', libelle: tr('pil.t.recu', { mois: nomMois }), valeur: Rc && Rc.valeur != null ? (Rc.partiel ? tr('journee.moins') + ' ' : '') + montant(Rc.valeur) : null, attrs: { 'data-pil-recu': Rc ? cents(Rc.valeur) : '' } },
     { cle: 'avenir', libelle: tr('pil.t.avenir'), valeur: aVenir && aVenir.valeur != null ? (aVenir.partiel ? tr('journee.moins') + ' ' : '') + montant(aVenir.valeur) : null, attrs: { 'data-pil-avenir': aVenir ? cents(aVenir.valeur) : '', ...(aVenir && aVenir.valeur > 0 ? { 'data-v2-avenir': cents(aVenir.valeur) } : {}) } },
   ];
@@ -184,12 +186,12 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
     <Heros titre={titreH} valeur={hn} unite={hu} sous={sousFen}
       action={<Segmente libelle={tr('pil.fenetre')} valeur={String(f)} onChange={(v) => { setF(v === 'mois' ? 'mois' : Number(v)); setJour(null); }} options={FENETRES.map((x) => ({ cle: String(x), libelle: x === 'mois' ? tr('pil.mois') : tr('pil.jours', { n: x }) }))}/>}
       trio={trio}
-      pied={porte ? <div className="n-heros-porte"><Bouton variante="teinte" taille="compact" onClick={onSaisirPrix} attrs={{ 'data-pil-porte': 'prix' }}>{tr('v2.ben.prixManquentGeste')}</Bouton></div> : null}
+      pied={porte && !telephone ? <div className="n-heros-porte"><Bouton variante="teinte" taille="compact" onClick={onSaisirPrix} attrs={{ 'data-pil-porte': 'prix' }}>{tr('v2.ben.prixManquentGeste')}</Bouton></div> : null}
       attrs={{ 'data-v2-bloc': 'pilotage', 'data-pil-heros': 'fenetre', 'data-pil-fenetre': String(f), 'data-pil-vendu': W ? cents(W.vendu) : '', 'data-pil-brut-mois': Bm ? cents(Bm.valeur) : '', 'data-pil-jours': L.map((x) => cents(x.v)).join(','), 'data-pil-benef': L.map((x) => cents(x.b)).join(','),
         'data-pil-somme': (() => { const lus = L.filter((x) => x.v != null); return lus.length === L.length ? cents(lus.reduce((t, x) => t + x.v, 0)) : ''; })() }}
       graphe={<>
         <GrapheJours forme="aire" jours={jours} choisie={k} onChoisir={setJour} libelle={f === 'mois' ? tr('pil.grapheMois') : tr('pil.graphe', { n: f })} moyenneLibelle={tr('pil.moyenne')} attrs={{ 'data-pil-jour': j ? j.cle : '' }}/>
-        <p className="n-heros-jour" data-pil-detail="">{detailJour}</p>
+        <p className="n-heros-jour" data-pil-detail="" data-pil-touche={jour != null ? '1' : undefined}>{detailJour}</p>
         <ul className="n-pilotage-legende" aria-hidden="true">
           <li><span className="n-pilotage-cle" data-n-cle="aire"/>{tr('pil.cle.vendu')}</li>
           {aBenef ? <li><span className="n-pilotage-cle" data-n-cle="ligne"/>{tr('pil.cle.benefice')}</li> : null}
@@ -596,8 +598,9 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
       <Colonnes className="n-colonnes-tb">
         {haut ? <Colonne pleine>{haut}</Colonne> : null}
         {/* (21 nov., ext. 5.428 `endirect`) Ce que fait l'extension EN CE MOMENT, en tête (src/extension/EnDirect.jsx). */}
-        {(!ordinateur && enDirect) || ligneOrdi ? <Colonne pleine>{!ordinateur ? enDirect : null}{ligneOrdi}</Colonne> : null}
-        {courbe && Array.isArray(courbe.jours) ? <Colonne large attrs={{ 'data-tb': 'pilotage' }}><Pilotage courbe={courbe} chiffres={chiffres} aVenir={aVenir && aVenir.valeur != null ? aVenir : stats2 ? stats2.avenir : null} onSaisirPrix={onSaisirPrix} f={fen} setF={setFen} jour={jourPil} setJour={setJourPil} montant={montant} onVentes={onVentes}/></Colonne> : null}
+        {/* (23 nov., Julien : « on n'a jamais d'extension sur iPhone ») au téléphone, plus rien de l'extension ici. */}
+        {ligneOrdi ? <Colonne pleine>{ligneOrdi}</Colonne> : null}
+        {courbe && Array.isArray(courbe.jours) ? <Colonne large attrs={{ 'data-tb': 'pilotage' }}><Pilotage courbe={courbe} chiffres={chiffres} aVenir={aVenir && aVenir.valeur != null ? aVenir : stats2 ? stats2.avenir : null} onSaisirPrix={onSaisirPrix} f={fen} setF={setFen} jour={jourPil} setJour={setJourPil} montant={montant} onVentes={onVentes} telephone={!ordinateur}/></Colonne> : null}
         {/* (22 nov., style-clarte) À l'ordinateur, la colonne de droite du haut : Colis (LE geste « Imprimer », attaché à ses
             colis) puis la répartition par site — aucune zone vide à côté du graphique. Au téléphone, la même suite. */}
         {aPilotage ? <Colonne attrs={{ 'data-tb': 'droite' }}>
@@ -615,10 +618,12 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
             !onRelier && onNav ? { cle: 'stats', libelle: tr('pil.a.stats'), icone: <Icon name="chart" size={22}/>, onClick: () => onNav('dashboard') } : null,
           ].filter(Boolean)}/>
           {/* (23 nov.) Les N° neufs à écrire sur les cartons : une carte en ligne, sous les gestes, avant Colis (jamais un toast). */}
-          {aEcrire}
+          {ordinateur ? aEcrire : null}
           {montrees.includes('colis') ? <Editable cle="colis" actif={modifier && ordinateur} libelleRetirer={tr('v2.perso.retirerX', { x: tr('v2.perso.carte.colis') })} onRetirer={() => basculer('colis')} onDeposer={deposer}>{BLOCS.colis()}</Editable> : null}
           {/* (23 nov., Julien) LE PORTE-MONNAIE VINTED : « Montant en attente » d'abord (les mots de Vinted), « Montant disponible »
               ensuite, la date de lecture ; jamais 0 € pour « pas lu ». */}
+          {/* (23 nov., iPhone) le premier écran = l'essentiel : héros, gestes, Colis ; les N° à écrire viennent après. */}
+          {!ordinateur ? aEcrire : null}
           {porteMonnaie !== undefined ? <PorteMonnaie pm={porteMonnaie} montant={montant} Icon={Icon}/> : null}
           {pret && courbe.parSite && courbe.parSite[fen] && courbe.parSite[fen].length ? <ParSite courbe={courbe} f={fen} montant={montant} nomMois={chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : ''}/> : null}
         </Colonne> : null}

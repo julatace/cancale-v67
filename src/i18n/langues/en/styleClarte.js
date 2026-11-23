@@ -114,4 +114,6 @@ export default {
   "pop.fermer": "Close",
   "pop.region": "Notifications",
   "pop.replier": "Collapse",
+  "pil.t.saisis": "Enter prices ›",
+  "pil.t.saisisN": "Enter {n} prices ›",
 };

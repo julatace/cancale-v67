@@ -114,4 +114,6 @@ export default {
   "pop.fermer": "Schließen",
   "pop.region": "Benachrichtigungen",
   "pop.replier": "Einklappen",
+  "pil.t.saisis": "Preise eingeben ›",
+  "pil.t.saisisN": "{n} Preise eingeben ›",
 };

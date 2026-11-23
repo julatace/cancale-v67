@@ -114,4 +114,6 @@ export default {
   "pop.fermer": "Cerrar",
   "pop.region": "Notificaciones",
   "pop.replier": "Plegar",
+  "pil.t.saisis": "Introduce los precios ›",
+  "pil.t.saisisN": "Introduce {n} precios ›",
 };

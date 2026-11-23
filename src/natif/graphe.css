@@ -204,5 +204,45 @@
   :root:not([data-theme="dark"]) .n-heros .n-pilotage-cle[data-n-cle="ligne"] { background: var(--n-vert); }
   :root:not([data-theme="dark"]) .n-heros-porte .n-bouton { background: #FFFFFF; color: var(--n-sur-heros); box-shadow: inset 0 0 0 1px rgb(29 29 31 / .16); }
   :root:not([data-theme="dark"]) .n-graphe-pt { stroke: #FFFFFF; }
+
+  /* (23 nov., Julien : « sur téléphone c'est pas ouf », « tu peux faire moins zoomé ») L'IPHONE, DENSITÉ D'APP NATIVE.
+     Le héros compact (~240 px) : libellé, gros chiffre 38 px, écart, une petite courbe SANS axes, quadrillage, moyenne ni
+     légende ; le détail d'un jour n'apparaît qu'au toucher de la courbe ; le segment discret ; le pied en une ligne de trois
+     chiffres. Les gestes ronds et les cases de Colis plus serrés : héros + gestes + Colis tiennent dans le premier écran.
+     Les cibles restent ≥ 44 px (zone de toucher), aucun champ sous 16 px. */
+  @media (max-width: 1023px) {
+    .n-heros { margin-bottom: 12px; padding: 12px 14px 10px; border-radius: 18px; }
+    .n-heros-tete { min-height: 32px; }
+    .n-heros-titre { font-size: 12.5px; }
+    .n-heros-action .n-segmente { min-height: 0; padding: 2px; }
+    .n-heros-action .n-segmente-choix { min-height: 28px; padding: 0 8px; font-size: 12px; position: relative; }
+    .n-heros-action .n-segmente-choix::after { content: ''; position: absolute; inset: -8px -2px; }
+    .n-heros-valeur { margin-top: 0; font-size: 38px; line-height: 42px; }
+    .n-heros-unite { font-size: 19px; line-height: 24px; }
+    .n-heros-sous { font-size: 12.5px; line-height: 17px; }
+    .n-heros-graphe { margin-top: 4px; }
+    .n-heros .n-graphe-svg { height: 56px; }
+    .n-heros .n-graphe-grille, .n-heros .n-graphe-base, .n-heros .n-graphe-moyenne, .n-heros .n-graphe-axe, .n-heros .n-pilotage-legende { display: none; }
+    .n-heros .n-graphe { margin: 0; }
+    .n-heros-jour { display: none; }
+    .n-heros-jour[data-pil-touche] { display: block; }
+    .n-heros-trio { margin-top: 8px; padding-top: 8px; }
+    .n-heros-trio-case + .n-heros-trio-case { padding-inline-start: 10px; }
+    .n-heros-trio dt { font-size: 11.5px; line-height: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .n-heros-trio dd { font-size: 15px; line-height: 20px; }
+    .n-heros-trio-porte { position: relative; flex-wrap: nowrap; }
+    .n-heros-trio-porte::after { content: ''; position: absolute; inset: -12px -6px; }
+    .n-heros-trio-porte:has(.n-heros-trio-pourquoi) { gap: 0; }
+    .n-heros-trio-porte:has(.n-heros-trio-pourquoi) > :not(.n-heros-trio-pourquoi) { display: none; }
+    .n-heros-trio-pourquoi { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--n-teinte); color: var(--n-sur-heros); text-decoration: none; font: 600 12px/18px var(--n-police); }
+    .n-actions-rondes { margin-bottom: 12px; }
+    .n-action-ronde { gap: 4px; }
+    .n-action-ronde-disque { width: 46px; height: 46px; }
+    .n-action-ronde-disque svg { width: 20px; height: 20px; }
+    .n-cc { min-height: 0; padding: 10px 14px 12px; }
+    .n-cc-tete { font-size: 12.5px; }
+    .n-cc-valeur { font-size: 26px; line-height: 32px; }
+    .n-cc-sous { min-height: 0; font-size: 12px; line-height: 16px; -webkit-line-clamp: 1; }
+  }
   @media (prefers-reduced-motion: reduce) { .n-graphe-barre, .n-action-ronde-disque { transition: none; } }
 }
