@@ -74,7 +74,7 @@ export default function DemandeVRM({ sources = null, conseils = [], outils = nul
       {/* LA QUESTION, en haut, toujours visible : le champ, « Demander », trois questions toutes prêtes. */}
       <div className="n-cons-ligne" data-ia-zone="">
         <Champ libelle={tr('ia.question')} valeur={question} onChange={setQuestion} placeholder={tr('ia.exemple')} attrs={{ maxLength: 500, 'data-ia-question': '', onKeyDown: (e) => { if (e.key === 'Enter') demander(); } }}/>
-        <Bouton variante="teinte" icone={Icon ? <Icon name="conseiller" size={18}/> : null} chargement={occupe} indisponible={!question.trim()} raison={tr('ia.questionRaison')} onClick={() => demander()} attrs={{ 'data-ia-demander': '' }}>{tr('ia.demander')}</Bouton>
+        <Bouton variante="teinte" icone={Icon ? <Icon name="conseiller" size={18}/> : null} chargement={occupe} onClick={() => demander()} attrs={{ 'data-ia-demander': '' }}>{tr('ia.demander')}</Bouton>
       </div>
       <div className="n-cons-suggestions" data-ia-suggestions="">
         {SUGGESTIONS.map((k) => <Bouton key={k} variante="teinte" taille="compact" onClick={() => demander(tr(k))} attrs={{ 'data-ia-suggestion': k }}>{tr(k)}</Bouton>)}
