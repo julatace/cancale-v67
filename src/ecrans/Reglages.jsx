@@ -1796,7 +1796,7 @@ function PushPrefsSetting({ comptes, onMuets }) {
 // jamais cachée.
 const GROUPES_NOTIF = [
   { id: 'argent', titre: 'Ventes, argent et rappels', ids: ['ventes', 'doublevente', 'rappels'] },
-  { id: 'colis', titre: 'Colis', ids: ['poster', 'arrives'] },
+  { id: 'colis', titre: 'Colis', ids: ['poster', 'arrives', 'colisdanger'] },
   { id: 'echanges', titre: 'Échanges avec les acheteurs', ids: ['offres', 'messages'] },
   { id: 'comptes', titre: 'Comptes et avis', ids: ['comptes', 'avis'] },
   { id: 'achats', titre: 'Achats', ids: ['alertesebay'] },

@@ -29,6 +29,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import crypto from 'crypto';
 import { RYTHME_MS, CADENCE_COLIS_MS, MARGE_RYTHME_MS } from './transporteurs.js';
+import { RYTHME_DANGER_MS } from './depart-colis.js';
 export { CADENCE_COLIS_MS, MARGE_RYTHME_MS };
 
 export const PREMIERE_LECTURE_MS = 24 * 3600000;   // un e-mail « disponible » de moins d'un jour
@@ -55,6 +56,9 @@ export function requetesColisDus(maintenant = Date.now()) {
     // le recul de `RECUL_MS` reste celui du passage : le visiter ne force aucune lecture).
     `app_data?id=like.transp_*&meta->>etat=in.(inconnu,incident,retour_expediteur)&${pasFini}&meta->>essai=lt.${avant(RYTHME_MS.inconnu)}&select=owner`,
     `app_data?id=like.transp_*&meta->>etat=is.null&${pasFini}&meta->>essai=lt.${avant(30 * 60000)}&select=owner`,
+    // (23 nov., « Colis en danger ») Un colis VENDU au point relais de l'acheteur dont la date de départ est LUE
+    // (Vinted Go) : relu toutes les 2 h, pour savoir s'il est retiré avant de prévenir (api/_lib/colis-danger.js).
+    `app_data?id=like.depart_vinted_*&meta->>etat=eq.disponible&meta->>limiteSure=eq.true&or=(meta->>clos.is.null,meta->>clos.eq.false)&meta->>essai=lt.${avant(RYTHME_DANGER_MS)}&select=owner`,
   ];
 }
 // Les vendeurs à visiter : l'union des réponses ; `null` si UNE requête n'a pas répondu.

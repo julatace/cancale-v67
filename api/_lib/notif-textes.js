@@ -48,6 +48,9 @@ export const FAMILLES = [
   // (17 nov., Julien : « que les personnes puissent se faire coucou ») Quelqu'un d'un de tes
   // groupes d'accompagnement t'a fait coucou (api/_lib/coucou.js) : une fois par coucou.
   { id: 'communaute', titre: 'Coucous de la communauté', def: true },
+  // (23 nov., Julien : « te prévient avant qu'il reparte ») Le colis d'une VENTE attend l'acheteur au point
+  // relais (Vinted Go) et va repartir à la date LUE chez le transporteur (api/_lib/colis-danger.js).
+  { id: 'colisdanger', titre: 'Colis en danger', def: true },
 ];
 
 // Catégorie (le mot que chaque route passe à `pushCategorieActive` et à
@@ -90,6 +93,8 @@ export const FAMILLE_DE = {
   alerteebay: 'alertesebay',
   // (17 nov.) Un coucou reçu dans un groupe d'accompagnement (api/_lib/coucou.js).
   coucou: 'communaute',
+  // (23 nov.) Un colis vendu pas encore retiré, la veille et le jour où il repart (api/_lib/colis-danger.js).
+  colisdanger: 'colisdanger',
 };
 // Un type NEUF hérite du réglage de la famille d'où il sort tant qu'il n'est pas
 // posé lui-même : il avait coupé « Ventes », la double vente reste coupée ; il
