@@ -114,7 +114,7 @@ Chaque refus a une raison technique ou une décision de Julien. Détail complet 
 | **Téléphone (vérification par SMS à l'inscription)** | Pas fait exprès (§2.9, payant sur sa clé). |
 | **International** | ⚠️ **11 nov. : décision de Julien du 11 nov. — VRM se TRADUIT en anglais, espagnol, italien, allemand, compta comprise** (remplace le refus du 28 oct.) : les TEXTES seulement, par `tr()` (`src/i18n/`, langue = Paramètres → Langue, `vrm_langue`) ; aucune règle de calcul ne change (compta par pays : lot d'étude `fiscalite-pays`). L'argent reste en euros (une commande en GBP/USD est écartée et dite, jamais convertie). Écrans traduits et ce qui reste en français : `2026-11-11-traduction.md`, `2026-11-13-integration-traduction.md`. |
 | **Détourage** | Vestiaire Collective SEUL (sa décision du 17 oct. : « pas du tout pour Leboncoin, ne le mets pas dans les paramètres »). La carte « Ta clé Photoroom » vit sur l'écran Vestiaire, **pas dans Paramètres** (`detourage-reglage.cjs` le refuse). Studio photo : détourage local gratuit (U²-Net, licences vérifiées). |
-| **Palette** | ⚠️ 19 nov. (Julien : « drastique, nouveau, totalement différent ») : **« VRM natif »**, le SEUL design (`docs/design/NATIF.md`, `src/natif/`, jetons `--n-*`) : structure d'une app iOS/macOS (grands titres, listes groupées, 5 onglets égaux en bas, feuilles, trois volets à l'ordinateur), clair/sombre par `vinted_dark`, accent `#0068D6` rare, ambre = geste à faire. Plus de réglage « Style » ni d'« Ancien design » ; le « Verre dépoli » (15 nov.) est remplacé. Violet **REFUSÉ**, rouge = doublon de N° seulement. |
+| **Palette** | ⚠️⚠️ **22 nov. (Julien : « j'aime bien en noir ») : l'ACCENT EST L'ENCRE NOIRE** (#16181D, nuit #F4F4F5 ; héros d'Aujourd'hui à l'encre, vert seulement pour un écart positif, ambre = geste) — `2026-11-22-style-clarte.md`. ⚠️ 19 nov. (Julien : « drastique, nouveau, totalement différent ») : **« VRM natif »**, le SEUL design (`docs/design/NATIF.md`, `src/natif/`, jetons `--n-*`) : structure d'une app iOS/macOS (grands titres, listes groupées, 5 onglets égaux en bas, feuilles, trois volets à l'ordinateur), clair/sombre par `vinted_dark`, accent `#0068D6` rare, ambre = geste à faire. Plus de réglage « Style » ni d'« Ancien design » ; le « Verre dépoli » (15 nov.) est remplacé. Violet **REFUSÉ**, rouge = doublon de N° seulement. |
 | **Sans abonnement** | ⛔ 8 nov. (Julien) : ni la lecture seule complète, ni la porte qui cache tout — **un extrait net (titres, 3 premières lignes de chaque liste), le reste flouté, `inert`, aucune action ni export, aucune écriture** ; rien n'est supprimé. Ne pas rendre le reste lisible (`src/abonnement/apercu.js`, banc `abonnement-propre`). |
 | **Ventes masquées** | ⚠️ 29 oct. : **on ne peut plus masquer une vente** (« on ne doit plus pouvoir les masquer ») ; `vinted_sales_hidden` n'est plus lu nulle part. Les ACHATS masqués restent. |
 | **Saisie « N° + Entrée »** | Retirée de Ventes, Colis, Annonces, Leboncoin, eBay (29 oct.) ; la loupe « Tout sur le N° » et la saisie du Stock restent. |
@@ -413,6 +413,8 @@ déploient pas (`vercel.json`) ; ne jamais « promouvoir » une prévisualisatio
 
 ## 7. Le visuel
 
+> ⚠️ **22 nov. : l'accent est l'ENCRE NOIRE** (décision de Julien, « en noir » ; détail `docs/passation/2026-11-22-style-clarte.md`).
+>
 > **UNE SEULE couleur d'accent, et elle est RARE.** Tout le reste est neutre. Un
 > chiffre ne porte une couleur que s'il y a vraiment quelque chose à rattraper ;
 > **ambre** pour un geste à faire, **rouge** seulement pour deux paires sous un N°.
@@ -479,10 +481,9 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **22 nov. soir · Design noir encre, tranche 1 (`claude/style-clarte`)** : les maquettes de Julien : en-tête d'Aujourd'hui à l'ordinateur (date, « Mis à jour il y a … » = dernière lecture réussie de la veille, relire, loupe, cloche), héros en courbe 7 j / 30 j / Mois (« vs octobre au même jour »), pied Vendu · Reçu · À venir, Colis en deux cases, Notifications dans Gestion, « N comptes Vinted · Pro » en pied, « Une mise à jour est prête » dans la feuille de l'extension. `docs/passation/2026-11-22-style-clarte.md`. Geste : aucun.
 - **22 nov. · Achats en lot** : lot prouvé par SA transaction, « Diviser » sur son toucher, prix réparti au centime (`src/achatDivise.js`). `2026-11-22-achats-lot.md`. Geste : aucun.
 - **22 nov. · Train de l'extension (ext. 5.438.0, `claude/ext-5438`, contient la 5.437 jamais servie seule)** : note de santé par compte (cadence qui baisse seule par palier, remonte par marches), « compte précieux », « à nouveau visible » + gestes, relance des offres acceptées sans achat, lot seul, brouillons seuls + « Publier » en un toucher ; 5.437 : prix mini à la publication, négo intelligente, formulaire en ordre variable, pause « en vérification » (programmation d'avant comprise), la nuit aussi ; favoris débloqués (cloche à plusieurs ancres, favori introuvable sauté, la file continue). `2026-11-22-ext-5438.md`, `2026-11-22-ext-5437.md`. Geste : installer la 5.438.0 dans CHAQUE Chrome (Orion : dossier 5.438.0).
-- **22 nov. · Anti-robot ALLUMÉ** : clé de site Turnstile sur Vercel (`VITE_TURNSTILE_SITE_KEY`, production), CAPTCHA activé dans Supabase par Julien ; retour arrière : éteindre dans Supabase d'abord, puis vider la clé. Détail : `historique-securite-base-serveur.md` (20 oct.). Geste : aucun.
-- **22 nov. · Intégration 2 (ext. 5.436.0, `claude/integration-22nov-2`)** : les 4 chantiers ci-dessous, une seule version d'extension **5.436.0** (contient la 5.435). Geste : installer la 5.436.0 dans CHAQUE Chrome (Orion : dossier 5.436.0) et laisser Chrome ouvert pour « À distance ».
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).

@@ -57,7 +57,7 @@ export function documentCadre(html, { images = false, sombre = false } = {}) {
     + '.vrm-cadre-corps{padding:14px 14px 18px;box-sizing:border-box}'
     + 'img{max-width:100%;height:auto}'
     + 'img[data-vrm-src]{display:inline-block;min-width:28px;min-height:28px;background:#ececf0;border-radius:4px;color:transparent}'
-    + 'a{color:#0F6B4C}'
+    + 'a{color:#16181D}'
     + 'pre{white-space:pre-wrap}'
     + `</style></head><body${attrsCorps}><div class="vrm-cadre-corps">`
     + corps

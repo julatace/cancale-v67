@@ -109,7 +109,7 @@
 :root:root body .vrm-pap .vrm-pap-gestes .vrm-b { min-height: 44px; }
 :root:root body .vrm-pap .vrm-ret-note { margin-top: 8px; }
 :root:root body button.vrm-pap-ouvrir { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--ret-tuile); color: var(--ret-encre); font: 650 15px/1.1 var(--vrm-police, system-ui, sans-serif); cursor: pointer; -webkit-tap-highlight-color: transparent; }
-:root:root body button.vrm-pap-ouvrir:focus-visible { outline: 3px solid var(--w-accent, #0F6B4C); outline-offset: 2px; }
+:root:root body button.vrm-pap-ouvrir:focus-visible { outline: 3px solid var(--w-accent, #16181D); outline-offset: 2px; }
 }
 
 /* (16 nov., lot impression-retours) LES RETOURS DANS LE LOT D'IMPRESSION : le mot RETOUR, distinct, en

@@ -9,11 +9,11 @@
 }
 .vrm-anneau-obj.is-touchable { cursor: pointer; border-radius: 14px; transition: transform 100ms ease; }
 .vrm-anneau-obj.is-touchable:active { transform: scale(.97); }
-.vrm-anneau-obj.is-touchable:focus-visible { outline: 2px solid var(--sb-lien, #0B5139); outline-offset: 3px; }
+.vrm-anneau-obj.is-touchable:focus-visible { outline: 2px solid var(--sb-lien, #16181D); outline-offset: 3px; }
 .vrm-anneau-obj-rond { position: relative; flex: 0 0 64px; width: 64px; height: 64px; display: grid; place-items: center; }
 .vrm-anneau-obj-rond svg { position: absolute; inset: 0; }
 .vrm-anneau-obj-piste { stroke: color-mix(in srgb, var(--sb-encre, #1C1C20) 14%, transparent); }
-.vrm-anneau-obj-fait { stroke: var(--sb-lien, #0B5139); transition: stroke-dasharray .6s cubic-bezier(.23, 1, .32, 1); }
+.vrm-anneau-obj-fait { stroke: var(--sb-lien, #16181D); transition: stroke-dasharray .6s cubic-bezier(.23, 1, .32, 1); }
 .vrm-anneau-obj.is-atteint .vrm-anneau-obj-fait { stroke: var(--sb-encre, #1C1C20); }
 .vrm-anneau-obj-centre {
   position: relative; font: 600 15px/1 var(--sb-police-affiche, Inter, system-ui, sans-serif); letter-spacing: -0.02em;

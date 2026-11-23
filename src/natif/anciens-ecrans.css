@@ -32,11 +32,11 @@ html {
      gris (champ de recherche, puce, repli : #E3E3E8) où elle tombait à 4,09:1 (banc lisible-partout). Ici, 15 % d'encre en plus. */
   --ap-gris: color-mix(in srgb, var(--n-encre-2, #6C6C70) 85%, var(--n-encre, #111114));
   --ap-muet: var(--n-encre-3, #8E8E93);              /* jamais du texte : chevrons, icônes muettes */
-  --ap-bleu: var(--n-accent, #0B5139);
-  --ap-bleu-vif: var(--n-accent, #0F6B4C);          /* (21 nov.) le vert sapin : interrupteur, coche */
-  --ap-bleu-appui: #0B5139;
-  --ap-bleu-teinte: var(--n-sur-teinte, #0B5A40);    /* le texte d'un bouton teinté (≥ 4,5:1 sur la teinte) */
-  --ap-plein: var(--n-plein, #0B5139);
+  --ap-bleu: var(--n-accent, #16181D);
+  --ap-bleu-vif: var(--n-accent, #16181D);          /* (21 nov.) le vert sapin : interrupteur, coche */
+  --ap-bleu-appui: #16181D;
+  --ap-bleu-teinte: var(--n-sur-teinte, #16181D);    /* le texte d'un bouton teinté (≥ 4,5:1 sur la teinte) */
+  --ap-plein: var(--n-plein, #16181D);
   --ap-sur-plein: var(--n-sur-plein, #FFFFFF);
   --ap-teinte: var(--n-teinte, rgb(11 81 57 / .12));
   --ap-ambre: var(--n-ambre, #8A4B00);
@@ -57,13 +57,13 @@ html[data-theme="dark"] {
   --ap-encre: var(--n-encre, #FFFFFF);
   --ap-gris: color-mix(in srgb, var(--n-encre-2, #98989F) 85%, var(--n-encre, #FFFFFF));
   --ap-muet: var(--n-encre-3, #636366);
-  --ap-bleu: var(--n-accent, #3FD49A);
-  --ap-bleu-vif: var(--n-accent, #3FD49A);
-  --ap-bleu-appui: #34BE89;
+  --ap-bleu: var(--n-accent, #F4F4F5);
+  --ap-bleu-vif: var(--n-accent, #F4F4F5);
+  --ap-bleu-appui: #E4E4E7;
   --ap-bleu-teinte: var(--n-sur-teinte, #6FE3B5);
-  --ap-plein: var(--n-plein, #0B5139);
+  --ap-plein: var(--n-plein, #16181D);
   --ap-sur-plein: var(--n-sur-plein, #FFFFFF);
-  --ap-teinte: var(--n-teinte, rgb(63 212 154 / .20));
+  --ap-teinte: var(--n-teinte, rgb(244 244 245 / .20));
   --ap-ambre: var(--n-ambre, #FFB340);
   --ap-ambre-fond: var(--n-ambre-fond, rgb(255 179 64 / .16));
   --ap-ambre-point: #FF9F0A;

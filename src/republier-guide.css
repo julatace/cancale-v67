@@ -13,7 +13,7 @@
 }
 .vrm-rg-feuille .vrm-rg-repli > summary {
   min-height: 44px; display: flex; align-items: center; cursor: pointer; list-style: none;
-  font: 600 14px/1.3 var(--sb-police-texte, inherit); color: var(--sb-lien, #0B5139);
+  font: 600 14px/1.3 var(--sb-police-texte, inherit); color: var(--sb-lien, #16181D);
   -webkit-tap-highlight-color: transparent;
 }
 .vrm-rg-feuille .vrm-rg-repli > summary::-webkit-details-marker { display: none; }
@@ -34,14 +34,14 @@ html body .vrm-rg-feuille button.vrm-rg-tuile {
   background: transparent !important; box-shadow: none !important; border-radius: inherit; overflow: hidden; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-html body .vrm-rg-feuille button.vrm-rg-tuile:focus-visible { outline: 2px solid var(--sb-diode, #0B5139) !important; outline-offset: -2px; }
+html body .vrm-rg-feuille button.vrm-rg-tuile:focus-visible { outline: 2px solid var(--sb-diode, #16181D) !important; outline-offset: -2px; }
 .vrm-rg-feuille .vrm-rg-tuile img { width: 100%; height: 100%; object-fit: cover; transition: opacity var(--sb-e-retour, 160ms) ease; }
 .vrm-rg-feuille .vrm-rg-tuile[aria-pressed="false"] img { opacity: .32; filter: grayscale(1) !important; }
 .vrm-rg-feuille .vrm-rg-coche {
   position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 999px; display: grid; place-items: center;
   background: rgb(255 255 255 / .86); box-shadow: inset 0 0 0 1.5px rgb(var(--sb-o, 18 52 96) / .35); color: #fff;
 }
-.vrm-rg-feuille .vrm-rg-tuile[aria-pressed="true"] .vrm-rg-coche { background: var(--sb-diode, #0B5139); box-shadow: none; }
+.vrm-rg-feuille .vrm-rg-tuile[aria-pressed="true"] .vrm-rg-coche { background: var(--sb-diode, #16181D); box-shadow: none; }
 .vrm-rg-feuille .vrm-rg-couverture {
   position: absolute; left: 6px; top: 6px; padding: 2px 7px; border-radius: 999px; font: 600 11px/1.4 var(--sb-police-texte, inherit);
   color: var(--sb-encre, #1C1C20); background: rgb(255 255 255 / .88);
@@ -75,4 +75,4 @@ html body .vrm-rg-pres input[type=range]::-webkit-slider-thumb {
 }
 html body .vrm-rg-pres input[type=range]::-moz-range-track { height: 4px; border-radius: 999px; background: var(--rg-piste); }
 html body .vrm-rg-pres input[type=range]::-moz-range-thumb { width: 28px; height: 28px; border-radius: 999px; border: 0; background: var(--sb-touche-fond, #fff); box-shadow: var(--sb-touche-ombre, 0 1px 3px rgba(0,0,0,.3)); }
-html body .vrm-rg-pres input[type=range]:focus-visible { outline: 2px solid var(--sb-diode, #0B5139); outline-offset: 2px; border-radius: 8px; }
+html body .vrm-rg-pres input[type=range]:focus-visible { outline: 2px solid var(--sb-diode, #16181D); outline-offset: 2px; border-radius: 8px; }

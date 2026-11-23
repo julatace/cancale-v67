@@ -19,7 +19,7 @@
   color: var(--fu-encre, #1d1d1f); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
 }
 .vrm-lvc-relier:disabled { opacity: .4; cursor: default; }
-.vrm-lvc-relier:focus-visible, .vrm-lvc-cherche:focus-visible { outline: 2px solid var(--fu-bleu, #0F6B4C); outline-offset: 2px; }
+.vrm-lvc-relier:focus-visible, .vrm-lvc-cherche:focus-visible { outline: 2px solid var(--fu-bleu, #16181D); outline-offset: 2px; }
 /* Les N° à barrer : une ligne par article, « N°a → N°b », jusqu'à « C'est écrit ». */
 .vrm-lvc-barrer { background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: none; padding: 6px 12px; margin-bottom: 12px; }
 .vrm-lvc-barrer h3 { margin: 6px 0 4px; font-size: 15px; font-weight: 700; color: var(--fu-ambre-txt, #b25000); }

@@ -4,7 +4,7 @@
 // Neutre (ni ambre ni rouge : aucun geste à faire) ; elle s'efface seule.
 import React from 'react';
 import './styles-temps-reel.css';
-import { creerVeille, ouvrirCanal, noterNeuf, ecouterNeuf, oublierNeuf, EVENEMENT, PERIODE_MS, PERIODE_REALTIME_MS } from './tempsReel.js';
+import { creerVeille, ouvrirCanal, noterNeuf, noterLue, ecouterNeuf, oublierNeuf, EVENEMENT, PERIODE_MS, PERIODE_REALTIME_MS } from './tempsReel.js';
 import { rythme } from './rythmeLectures.js';
 import { heureVu } from './copieLignes.js';
 import { trj } from './i18n/react.js';
@@ -32,6 +32,7 @@ export default function VeilleTempsReel({ uid, lireDepuis, urlBase, cleApi, jeto
     const veille = creerVeille({
       uid,
       lireDepuis: (x) => lire.current(x),
+      surLue: (at) => noterLue(at),
       diffuser: (d) => {
         try { window.dispatchEvent(new CustomEvent(EVENEMENT, { detail: d })); } catch (_) {}
         if ((d.quoi || []).some((q) => VISIBLES.has(q.quoi))) noterNeuf(d.at);

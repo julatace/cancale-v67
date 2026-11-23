@@ -21,6 +21,7 @@ import ecran_transp_depenses from './de/transpDepenses.js';   // (21 nov.) Trans
 import ecran_file_actions from './de/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_a_distance from './de/aDistance.js';   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './de/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
+import ecran_styleClarte from './de/styleClarte.js';   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './de/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './de/ext5438.js';   // (22 nov.) ext. 5.438
 import ecran_ext5428 from './de/ext5428.js';   // (21 nov.) ext. 5.428   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
@@ -2397,6 +2398,7 @@ export default {
   ...ecran_ext5438,
   ...ecran_a_distance,
   ...ecran_apresFinale,
+  ...ecran_styleClarte,
   ...ecran_relier_retires,
   ...ecran_fiched,
   ...ecran_egalite,

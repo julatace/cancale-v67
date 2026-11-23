@@ -2678,7 +2678,7 @@ const suivantSerieDecl = (ym) => {
 const MARQUES_PLAT = {
   vinted:    { nom: 'Vinted',    court: 'V',   bg: '#007782', fg: '#fff' },
   leboncoin: { nom: 'Leboncoin', court: 'lbc', bg: LBC_ORANGE, fg: '#fff' },
-  ebay:      { nom: 'eBay',      court: 'eBay', bg: '#fff', fg: '#0F6B4C', bord: '#D1D1D6' },
+  ebay:      { nom: 'eBay',      court: 'eBay', bg: '#fff', fg: '#16181D', bord: '#D1D1D6' },
   // (11 nov., « Publier partout ») Vestiaire, en neutre (aucune couleur de marque en plus, §7).
   vestiaire: { nom: 'Vestiaire', court: 'VC', bg: '#fff', fg: '#1d1d1f', bord: '#D1D1D6' },
 };
@@ -20799,7 +20799,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         prix, transporteur: trV && trV.nom, transporteurCle: trV && trV.cle, t: [o && o.date, b && b.date, b && b.receivedAt], pdf, imprime, depose: !!posted,
         ligneLot: lotPar.get(String(e.txn || e.key)) || null, coches,
         echeance: ec, limiteEstimee: estimee, presse: avantDemainColis(e), place: ouE, attente: attenteColis(e),
-        notes: [lit ? { cle: 'litige', texte: `L'email disait N°${lit.mail}, la vente dit N°${lit.txn} — on garde celui de la vente.` } : null,
+        notes: [lit ? { cle: 'litige', texte: tr('sc.litigeNum', { txn: lit.txn, mail: lit.mail }) }   /* (22 nov., style-clarte) le N° retenu d'abord, le geste à la fin */ : null,
           sansNumC ? { cle: 'sans-num', texte: sansNumC } : (e.venteEmail && !num ? { cle: 'sans-num', texte: MENTION_SANS_NUM } : null)].filter(Boolean),
         fiche: attrsFicheLigne({ contexte: 'colis', site: 'vinted', cle: 'c' + (e.txn || e.key), nums: num ? [num] : [], tx: e.txn || '', photo: typeof photo === 'string' ? photo : '', titre: typeof titre === 'string' ? titre : '', sous: '' }),
         detail: o ? { vendu: prix, pourToi: prix, sansFrais: !!prix, etapes: pv && Array.isArray(pv.etapes) ? etapesFicheVente(pv.etapes) : null,
@@ -21906,7 +21906,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // (19 nov., « VRM natif ») Ventes (À envoyer, En route) : l'écran natif pose ses propres marges — ni le cadre de
     // 14–16 px d'avant, ni `data-colis-dans` (que des règles d'avant élargissaient en !important) : la liste reprend sa place.
     // (20 nov., « même bord partout ») la marge de la page : 16 px, comme chaque écran natif (elle était de 14).
-    <div style={{padding: natifVentes ? 0 : colisDans ? '16px var(--n-marge, 16px) 12px' : retraitsOutils ? '0 var(--n-marge, 16px)' : '16px var(--n-marge, 16px) 40px'}} data-colis-dans={natifVentes ? undefined : (colisDans || undefined)} data-colis-natif={natifVentes ? 'ventes' : undefined}>
+    // (22 nov., style-clarte) Aujourd'hui (écran natif) pose ses marges lui-même : le cadre de 16 px les DOUBLAIT (cartes à 32 px du bord).
+    <div style={{padding: natifVentes ? 0 : colisDans ? '16px var(--n-marge, 16px) 12px' : retraitsOutils ? '0 var(--n-marge, 16px)' : designV2 ? '8px 0 40px' : '16px var(--n-marge, 16px) 40px'}} data-colis-dans={natifVentes ? undefined : (colisDans || undefined)} data-colis-natif={natifVentes ? 'ventes' : undefined} data-page-native={!colisDans && !retraitsOutils && designV2 ? '' : undefined}>
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
       {emballage && (()=>{
         // (1er nov.) Le mode emballage : un portail plein écran (§7, FermeAuRetour).

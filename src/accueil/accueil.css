@@ -12,7 +12,7 @@
   --haut:#F4F5F7;--aplat:#E3E6EA;--bas:#D5DAE1;
   --fond:#F4F5F7;--fond2:#EBEDF0;
   --porc:#FFFFFF;--porc2:#F9FAFB;
-  --encre:#1C1C20;--gris:#3F5468;--lien:#0B5139;--accent-texte:#0B5139;--accent:#1C1C20;--diode:#0B5139;
+  --encre:#1C1C20;--gris:#3F5468;--lien:#16181D;--accent-texte:#16181D;--accent:#1C1C20;--diode:#16181D;
   --filet:rgb(54 54 60 / .10);
   --o:18 52 96;
   --ombre-pose:0 .5px 1px rgb(var(--o) / .16),0 3px 6px -3px rgb(var(--o) / .28);
@@ -41,7 +41,7 @@
     --haut:#27272B;--aplat:#19191C;--bas:#0F0F10;
     --fond:#27272B;--fond2:#131316;
     --porc:#27272B;--porc2:#212126;
-    --encre:#F1F2F4;--gris:#A9BBCF;--lien:#3FD49A;--accent-texte:#3FD49A;--accent:#F1F2F4;--diode:#3FD49A;
+    --encre:#F1F2F4;--gris:#A9BBCF;--lien:#F4F4F5;--accent-texte:#F4F4F5;--accent:#F1F2F4;--diode:#F4F4F5;
     --filet:rgb(255 255 255 / .08);
     --o:0 0 0;
     --ombre-pose:0 .5px 1px rgb(0 0 0 / .5),0 3px 6px -3px rgb(0 0 0 / .7);
@@ -56,7 +56,7 @@
     --cadre:#09090A;
     --nuit:#F1F2F4;--nuit-encre:#1C1C20;--nuit-gris:#3F5468;
     --verre:rgb(39 39 43 / .72);
-    background-image:radial-gradient(90% 40% at 18% 0%,rgb(63 212 154 / .10),transparent 70%),linear-gradient(180deg,var(--haut) 0%,var(--aplat) 38%,var(--bas) 100%);
+    background-image:radial-gradient(90% 40% at 18% 0%,rgb(244 244 245 / .10),transparent 70%),linear-gradient(180deg,var(--haut) 0%,var(--aplat) 38%,var(--bas) 100%);
   }
 }
 @supports not (overflow-x:clip){.av{overflow-x:hidden}}
@@ -123,7 +123,7 @@
 /* La scène : l'ordinateur posé, le téléphone devant. Le studio : une lumière douce derrière. */
 .av-scene{position:relative;margin:0;padding:0 0 28px 40px;width:calc(100% + 120px)}
 .av-scene:before{content:"";position:absolute;z-index:-1;inset:-12% -20% -6% 0;pointer-events:none;background:radial-gradient(48% 50% at 55% 45%,rgb(255 255 255 / .75),transparent 72%)}
-@media (prefers-color-scheme:dark){.av-scene:before{background:radial-gradient(48% 50% at 55% 45%,rgb(63 212 154 / .14),transparent 72%)}}
+@media (prefers-color-scheme:dark){.av-scene:before{background:radial-gradient(48% 50% at 55% 45%,rgb(244 244 245 / .14),transparent 72%)}}
 .av-ecran-bureau{display:block;border-radius:16px;overflow:hidden;background:var(--porc);box-shadow:var(--ombre-avant);border:5px solid var(--porc)}
 .av-ecran-bureau img,.av-tel img{display:block;width:100%;height:auto}
 .av-tel{display:block;background:var(--cadre);padding:6px;border-radius:42px;box-shadow:var(--ombre-avant),0 0 0 1px rgb(255 255 255 / .06) inset}
@@ -319,8 +319,8 @@
    Contenu inchangé. Aucun violet, aucun rouge.
    ════════════════════════════════════════════════════════════════════════════ */
 .av{
-  --bleu-uni:#0B5139;
-  --fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(63 212 154 / .16) 0%,rgb(63 212 154 / 0) 55%),radial-gradient(70% 45% at 100% 38%,rgb(52 190 137 / .16) 0%,rgb(52 190 137 / 0) 70%),linear-gradient(170deg,#0B5139 0%,#0B5139 45%,#303036 100%);
+  --bleu-uni:#16181D;
+  --fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(244 244 245 / .16) 0%,rgb(244 244 245 / 0) 55%),radial-gradient(70% 45% at 100% 38%,rgb(52 190 137 / .16) 0%,rgb(52 190 137 / 0) 70%),linear-gradient(170deg,#16181D 0%,#16181D 45%,#303036 100%);
   --verre-c:rgb(249 250 251 / .9);--verre-o:#D7DEE6;--verre-bord:rgb(255 255 255 / .75);
   --verre-ombre:inset 0 1px 0 rgb(255 255 255 / .9),0 18px 40px -18px rgb(27 27 31 / .55);
   --sur:#FFFFFF;--sur-2:#F3F4F6;
@@ -349,7 +349,7 @@
 }
 /* Les plaques de verre : le texte y est à l'encre (la nuit, clair) ; le plein, d'encre (la nuit, blanc). */
 .av .av-tuile,.av .av-panneau,.av .av-offre-solo,.av .av-fin-plaque,.av .av-tg,.av .av-faq-texte{
-  --encre:#1C1C20;--gris:#3F5468;--lien:#0B5139;--accent-texte:#0B5139;--accent:#1C1C20;--diode:#0B5139;
+  --encre:#1C1C20;--gris:#3F5468;--lien:#16181D;--accent-texte:#16181D;--accent:#1C1C20;--diode:#16181D;
   --filet:rgb(54 54 60 / .10);--porc:#FFFFFF;--porc2:#F9FAFB;--creux:rgb(54 54 60 / .07);
   --plein-fond:radial-gradient(120% 90% at 50% 0%,#3D4B5B 0%,#1C1C20 55%);--plein-uni:#1C1C20;--plein-encre:#FFFFFF;
   --plein-ombre:inset 0 .5px 0 rgb(255 255 255 / .25),0 1px 2px rgb(54 54 60 / .25),0 12px 22px -10px rgb(54 54 60 / .6);
@@ -359,7 +359,7 @@
 }
 @media (prefers-color-scheme:dark){
   .av .av-tuile,.av .av-panneau,.av .av-offre-solo,.av .av-fin-plaque,.av .av-tg,.av .av-faq-texte{
-    --encre:#F1F2F4;--gris:#A9BBCF;--lien:#3FD49A;--accent-texte:#3FD49A;--accent:#F1F2F4;--diode:#3FD49A;
+    --encre:#F1F2F4;--gris:#A9BBCF;--lien:#F4F4F5;--accent-texte:#F4F4F5;--accent:#F1F2F4;--diode:#F4F4F5;
     --filet:rgb(255 255 255 / .08);--porc:rgb(255 255 255 / .06);--porc2:rgb(255 255 255 / .04);--creux:rgb(255 255 255 / .07);
     --plein-fond:linear-gradient(180deg,#FFFFFF,#E5E8EC);--plein-uni:#F1F2F4;--plein-encre:#1C1C20;
     --plein-ombre:inset 0 -.5px 0 rgb(0 0 0 / .12),0 1px 2px rgb(0 0 0 / .5),0 12px 22px -10px rgb(0 0 0 / .8);
