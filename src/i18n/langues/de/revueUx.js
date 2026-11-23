@@ -21,4 +21,5 @@ export default {
   "ru.mod.messages": "Meine Vinted-Nachrichten öffnen",
   "ru.mod.toutVu": "Alles gesehen",
   "ru.mod.aria": "Von Vinted verschwundene Anzeigen",
+  "ru.mod.court": "Verschwunden zwischen {debut} und {fin}.",
 };

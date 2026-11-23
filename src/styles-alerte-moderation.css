@@ -62,3 +62,5 @@
 .vrm-mod-plein, .vrm-mod-second { display: flex; align-items: center; justify-content: center; min-height: 48px; border-radius: 12px; font: 600 16px var(--vrm-police, -apple-system, system-ui, sans-serif); text-decoration: none; cursor: pointer; }
 .vrm-mod-plein { background: var(--n-plein, #18181B); color: var(--n-sur-plein, #fff); border: 0; }
 .vrm-mod-second { background: transparent; color: var(--n-encre, #18181B); border: 1px solid var(--n-trait, #E4E4E7); }
+.vrm-mod-phrase, .vrm-mod-grille, .vrm-mod-gestes { margin-inline: 16px; }
+.vrm-mod-gestes { margin-bottom: 16px; }

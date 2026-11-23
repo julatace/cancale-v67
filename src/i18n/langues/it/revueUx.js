@@ -21,4 +21,5 @@ export default {
   "ru.mod.messages": "Apri i miei messaggi Vinted",
   "ru.mod.toutVu": "Tutto visto",
   "ru.mod.aria": "Annunci spariti da Vinted",
+  "ru.mod.court": "Spariti tra il {debut} e il {fin}.",
 };

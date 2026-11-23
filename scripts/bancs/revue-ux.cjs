@@ -217,7 +217,7 @@ async function moderation(nav, b) {
     const f = await pg.evaluate(new Function(`${VIS} const fe = [...document.querySelectorAll('[data-moderation-feuille]')].find(vis); if (!fe) return null;
       const cases = [...fe.querySelectorAll('[data-moderation-case]')].filter(vis);
       return { cases: cases.length, photos: cases.filter((c) => c.getAttribute('data-moderation-photo') === '1' && c.querySelector('img')).length, phrase: !!fe.querySelector('[data-moderation-phrase]'),
-        messages: (fe.querySelector('[data-moderation-geste="disparue"]') || {}).href || '', toutVu: !!fe.querySelector('[data-moderation-tout-vu]') };`));
+        messages: (fe.querySelector('[data-moderation-geste="disparue"]') || { getAttribute: () => '' }).getAttribute('data-href') || ((fe.querySelector('[data-moderation-geste="disparue"]') || {}).href || ''), toutVu: !!fe.querySelector('[data-moderation-tout-vu]') };`));
     dit(!!f && f.cases === 5 && f.photos === 5 && f.phrase && /vinted\.fr\/inbox/.test(f.messages) && f.toutVu, 'M 390 : la feuille montre les 5 annonces avec leur photo, la phrase commune, « Ouvrir mes messages Vinted », « Tout est vu »', f);
     await pg.screenshot({ path: path.join(SHOTS, 'moderation-feuille-390.png') });
     dit(!erreurs.length, 'Modération 390 : aucune erreur d\'app', erreurs.join(' | '));

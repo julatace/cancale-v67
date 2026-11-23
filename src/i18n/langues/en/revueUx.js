@@ -21,4 +21,5 @@ export default {
   "ru.mod.messages": "Open my Vinted messages",
   "ru.mod.toutVu": "All seen",
   "ru.mod.aria": "Listings gone from Vinted",
+  "ru.mod.court": "Gone between {debut} and {fin}.",
 };

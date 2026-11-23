@@ -14,8 +14,8 @@
 // Ambre (un geste à faire), jamais rouge (§7).
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { lireTout, load, save, onCloudReady, lirePreuvesVenteVinted, PhotoVinted } from './App.jsx';
-import { Feuille } from './natif/index.js';
+import { lireTout, load, save, onCloudReady, lirePreuvesVenteVinted, PhotoVinted, Pourquoi, Icon } from './App.jsx';
+import { Feuille, Bouton } from './natif/index.js';
 import { poserComptesFeuille } from './moderationFeuille.js';
 import { ArretModerationCompte } from './Discretion.jsx';
 import { SELECT_MODERATION, LIGNE_MODERATION_VU, alertesActives, texteEvenement, evenementsDesLignes } from './moderationVinted.js';
@@ -103,6 +103,7 @@ export default function AlerteModeration({ comptes = [] }) {
   const prixDe = (f) => { const p = f && f.price; const v = p && typeof p === 'object' ? p.amount : p; const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
   const euros = (n) => (n == null ? '' : n.toLocaleString('fr-FR', { maximumFractionDigits: n % 1 ? 2 : 0 }) + ' €');
   const quand = (ms) => dateLoc(ms, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const jour = (ms) => dateLoc(ms, { day: 'numeric', month: 'short' });
   const ligneDisparues = ([u, evts]) => {
     const photos = evts.map((e) => (ficheDe(e.a) || {}).photo).filter(Boolean).slice(0, 3);
     return (
@@ -122,7 +123,9 @@ export default function AlerteModeration({ comptes = [] }) {
     const debut = Math.min(...evts.map((e) => e.av || e.t)), fin = Math.max(...evts.map((e) => e.t));
     return (
       <Feuille ouverte onFermer={() => { setFeuille(''); setMenuA(''); }} titre={tr('ru.mod.titreFeuille', { compte: nomDe(u) || ('#' + u) })} attrs={{ 'data-moderation-feuille': u, 'data-moderation-feuille-n': String(evts.length) }}>
-        <p className="vrm-mod-phrase" data-moderation-phrase="">{tr('ru.mod.phrase', { debut: quand(debut), fin: quand(fin) })}</p>
+        {/* Une phrase courte (≤ 8 mots) ; l'explication entière sous « Pourquoi ? » (règle de Julien, 23 nov.). */}
+        <p className="vrm-mod-phrase" data-moderation-phrase="">{tr('ru.mod.court', { debut: jour(debut), fin: jour(fin) })}{' '}
+          <Pourquoi>{tr('ru.mod.phrase', { debut: quand(debut), fin: quand(fin) })}</Pourquoi></p>
         <ArretModerationCompte uid={u}/>
         <ul className="vrm-mod-grille" data-moderation-grille={String(evts.length)}>
           {evts.map((e) => { const f = ficheDe(e.a); const px = prixDe(f); const num = f && f.numero ? f.numero : null;
@@ -140,8 +143,8 @@ export default function AlerteModeration({ comptes = [] }) {
             ); })}
         </ul>
         <div className="vrm-mod-gestes">
-          <a className="vrm-mod-plein" href="https://www.vinted.fr/inbox" target="_blank" rel="noopener noreferrer" data-moderation-geste="disparue">{tr('ru.mod.messages')}</a>
-          <button type="button" className="vrm-mod-second" data-moderation-tout-vu="feuille" onClick={() => { marquerVu(evts.map((e) => e.cle)); setFeuille(''); }}>{tr('ru.mod.toutVu')}</button>
+          <Bouton variante="plein" large icone={<Icon name="chat" size={18}/>} onClick={() => { try { window.open('https://www.vinted.fr/inbox', '_blank', 'noopener'); } catch (_) {} }} attrs={{ 'data-moderation-geste': 'disparue', 'data-href': 'https://www.vinted.fr/inbox' }}>{tr('ru.mod.messages')}</Bouton>
+          <Bouton variante="teinte" large icone={<Icon name="check" size={18}/>} onClick={() => { marquerVu(evts.map((e) => e.cle)); setFeuille(''); }} attrs={{ 'data-moderation-tout-vu': 'feuille' }}>{tr('ru.mod.toutVu')}</Bouton>
         </div>
       </Feuille>
     );
