@@ -282,6 +282,8 @@
     .n-vt-rang .n-vignette, .n-vt-rang img.n-vignette { width: 52px !important; height: 52px !important; border-radius: 10px; }
     .n-vt-rang .n-rangee-titre[data-n-lignes] { -webkit-line-clamp: 1 !important; line-clamp: 1; font-size: 14.5px; line-height: 19px; }
     .n-vt-rang .n-rangee-sous-texte[data-n-lignes] { -webkit-line-clamp: 1 !important; line-clamp: 1; font-size: 12.5px; line-height: 16px; }
+    /* Une seule ligne de détail : le texte ne passe plus à la ligne (« sans bordereau · à vérifier » faisait 92 px), il se coupe en « … ». */
+    .n-vt-rang .n-rangee-sous-texte[data-n-lignes] { display: block; flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .n-vt-rang .n-rangee-note { margin-top: 2px; padding-inline-end: 132px; min-height: 22px; }
     .n-vt-rang .n-vt-ligne { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
     /* « À expédier » répète l'onglet « À envoyer » : au téléphone, la pastille se tait (le statut reste dans la fiche et le tableau). */

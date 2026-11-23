@@ -92,6 +92,11 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
       const tel = W < 600;
       console.log(`\n── Ventes lisibles · ${W} · ${th}`);
       const { ctx, pg, erreurs } = await ouvrirVentes(nav, { W, sombre: th === 'sombre', b });
+      // Les rangées à partir de la 20ᵉ portent `content-visibility: auto` (natif.css) : hors de la fenêtre, leur contenu n'est pas
+      // mis en page (vignette 0 px, hauteur de réserve 64). Pour juger CHAQUE rangée (vignette, hauteur), on les fait toutes mettre
+      // en page le temps de la mesure — la règle mesurée (taille de la vignette, hauteur de la rangée) est la même.
+      await pg.addStyleTag({ content: '.n-rangee { content-visibility: visible !important; }' });
+      await pg.waitForTimeout(150);
       const m = await pg.evaluate(mesure);
       await pg.screenshot({ path: path.join(SHOTS, `lisibles-${W}-${th}.png`) });
       const rangs = tel ? m.tel : m.tab;
@@ -99,8 +104,8 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
       const vMin = tel ? 52 : 56;
       dit(rangs.length && rangs.every((x) => x.vig >= vMin), `V vignette ≥ ${vMin} px sur chaque vente (mini ${Math.min(...rangs.map((x) => x.vig))})`, rangs.filter((x) => x.vig < vMin).slice(0, 3));
       // H (23 nov., Julien : « moins zoomé ») au téléphone, une rangée de vente tient en 64–80 px (pied « Relier · + prix » compris).
-      if (tel) { const hs = await pg.evaluate(() => [...document.querySelectorAll('[data-vn-rang]')].filter((e) => e.getClientRects().length).slice(0, 8).map((e) => Math.round(e.getBoundingClientRect().height)));
-        dit(hs.length > 3 && hs.every((h) => h >= 60 && h <= 80), `H rangées de vente de 60 à 80 px au téléphone (${hs.join(', ')})`, hs); }
+      if (tel) { const hs = await pg.evaluate(() => [...document.querySelectorAll('[data-vn-rang]')].filter((e) => e.getClientRects().length).map((e) => Math.round(e.getBoundingClientRect().height)));
+        dit(hs.length > 3 && hs.every((h) => h >= 60 && h <= 80), `H chaque rangée de vente de 60 à 80 px au téléphone (${hs.length} : ${[...new Set(hs)].join(', ')})`, hs.filter((h) => h < 60 || h > 80).slice(0, 8)); }
       dit(rangs.length && rangs.every((x) => !x.titreRogne), 'T le titre de chaque vente est entier (rien de rogné)', rangs.filter((x) => x.titreRogne).map((x) => x.titre).slice(0, 4));
       dit(rangs.length && rangs.every((x) => x.taille), 'T la taille est écrite sur chaque rangée', rangs.filter((x) => !x.taille).map((x) => x.titre).slice(0, 4));
       const sansAchat = rangs.filter((x) => tel ? x.achat === 'libre' : x.champ);
