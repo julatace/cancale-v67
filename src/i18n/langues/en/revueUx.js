@@ -1,7 +1,7 @@
 // (23 nov.) Revue UX : textes de la tranche « revue-ux » (Achats iPhone, Relier, fiche, Annonces, Argent, extension).
 export default {
   "tableau.plusActions": "More",
-  "egalite.groupe.nSur": {"one": "{n} of {total} listing", "other": "{n} of {total} listings"},
+  "egalite.groupe.nSur": {"one": "{k} of {n} listing", "other": "{k} of {n} listings"},
   "ru.fiche.prixAchat": "Purchase price",
   "ru.argent.prixConnus": "Purchase prices known: {k}/{n} · Enter",
   "ru.argent.prixConnusSans": "Purchase prices known: {k}/{n}",
