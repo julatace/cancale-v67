@@ -388,4 +388,5 @@ export default {
   "achats.relier.chercher": "Search my purchases",
   "achats.serie.titre": { one: "{n} purchase arrived, no sale linked", other: "{n} purchases arrived, no sale linked" },
   "achats.serie.sous": "Link them one after another",
+  "achats.calculette": "Calculator",
 };
