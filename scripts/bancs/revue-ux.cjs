@@ -19,6 +19,8 @@ require('./_porte-banc.cjs');
 //        ligne « Pas encore calculé » au-dessus ;
 //    E16 le panneau de l'extension : UN verdict en tête (jamais « Lecture seule » quand l'extension vit ailleurs) ;
 //    S30 Stock : l'onglet des paires n'écrit pas « ≥ » ;  N20 la pastille de la cloche : la même couleur clair et sombre ;
+//    M   Aujourd'hui (390) : 5 annonces disparues d'un compte ⇒ UNE ligne compacte (photos empilées) ; un toucher ouvre une
+//        feuille : la phrase commune, les 5 annonces avec LEUR photo (par identité), « Ouvrir mes messages Vinted » ; aucun orange ;
 //    plus les captures Notifications et E-mails (390 et 1512, clair et sombre), à REGARDER.
 //  `BANC_DIST=<dist d'avant>` : rouge. `SHOTS=…` les captures.
 // ════════════════════════════════════════════════════════════════════════════
@@ -188,6 +190,40 @@ async function notifsEtEmails(nav, b) {
   }
 }
 
+async function moderation(nav, b) {
+  const b2 = JSON.parse(JSON.stringify(b));
+  const uid = String(b2.accounts[0].vinted_user_id);
+  const fiches = b2.main[0].data.vinted_annonce_numeros;
+  const ids = Object.keys(fiches).slice(0, 5);
+  ids.forEach((id, i) => { fiches[id] = { ...fiches[id], accountId: uid, title: `Nike dunk banc ${i + 1}`, price: { amount: String(40 + i * 5) }, photo: `https://images1.vinted.net/t/banc-disparue-${i}.jpg`, numero: fiches[id].num || String(130 + i) }; });
+  const t = Date.now() - 3600e3;
+  b2.rows.push({ id: 'moderation_vinted_' + uid, data: { e: ids.map((id, i) => ({ k: 'd' + id, s: 'disparue', t: t + i * 1000, av: t - 2 * 864e5, a: id })) } });
+  const { ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre: false, b: b2, url: '/?tab=journee' });
+  try {
+    await pret(pg);
+    await pg.waitForTimeout(1500);
+    const orange = `const orange = (c) => { const m = String(c).match(/\d+(\.\d+)?/g); if (!m || m.length < 3) return false; const [r, g, bb] = m.map(Number); if (m.length > 3 && Number(m[3]) === 0) return false; const mx = Math.max(r, g, bb), mn = Math.min(r, g, bb); if (mx - mn < 60) return false; let h; if (mx === r) h = 60 * (((g - bb) / (mx - mn)) % 6); else if (mx === g) h = 60 * ((bb - r) / (mx - mn) + 2); else h = 60 * ((r - g) / (mx - mn) + 4); if (h < 0) h += 360; return h >= 15 && h <= 50; };`;
+    const m = await pg.evaluate(new Function(`${VIS} ${orange}
+      const zone = [...document.querySelectorAll('.vrm-moderation')].find(vis);
+      const lignes = [...document.querySelectorAll('[data-moderation-disparues]')].filter(vis);
+      const anciennes = [...document.querySelectorAll('.vrm-moderation-ligne[data-moderation-sorte="disparue"]')].filter(vis).length;
+      const oranges = zone ? [zone, ...zone.querySelectorAll('*')].filter(vis).filter((x) => { const c = getComputedStyle(x); return orange(c.color) || orange(c.backgroundColor) || orange(c.borderLeftColor); }).length : -1;
+      return { lignes: lignes.length, n: lignes[0] ? lignes[0].getAttribute('data-moderation-disparues') : null, anciennes, oranges, h: zone ? Math.round(zone.getBoundingClientRect().height) : null };`));
+    dit(m.lignes === 1 && m.n === '5' && m.anciennes === 0 && m.h != null && m.h <= 90, `M 390 : 5 annonces disparues = UNE ligne compacte (${m.h} px), plus cinq blocs`, m);
+    dit(m.oranges === 0, 'M 390 : aucun orange dans la carte des annonces disparues', m.oranges);
+    await pg.screenshot({ path: path.join(SHOTS, 'moderation-ligne-390.png') });
+    await pg.locator('[data-moderation-disparues]').first().click({ timeout: 5000 }).catch(() => {});
+    await pg.waitForTimeout(1500);
+    const f = await pg.evaluate(new Function(`${VIS} const fe = [...document.querySelectorAll('[data-moderation-feuille]')].find(vis); if (!fe) return null;
+      const cases = [...fe.querySelectorAll('[data-moderation-case]')].filter(vis);
+      return { cases: cases.length, photos: cases.filter((c) => c.getAttribute('data-moderation-photo') === '1' && c.querySelector('img')).length, phrase: !!fe.querySelector('[data-moderation-phrase]'),
+        messages: (fe.querySelector('[data-moderation-geste="disparue"]') || {}).href || '', toutVu: !!fe.querySelector('[data-moderation-tout-vu]') };`));
+    dit(!!f && f.cases === 5 && f.photos === 5 && f.phrase && /vinted\.fr\/inbox/.test(f.messages) && f.toutVu, 'M 390 : la feuille montre les 5 annonces avec leur photo, la phrase commune, « Ouvrir mes messages Vinted », « Tout est vu »', f);
+    await pg.screenshot({ path: path.join(SHOTS, 'moderation-feuille-390.png') });
+    dit(!erreurs.length, 'Modération 390 : aucune erreur d\'app', erreurs.join(' | '));
+  } finally { await ctx.close(); }
+}
+
 async function distinct() {
   let D = null; try { D = await import(pathToFileURL(path.join(__dirname, '..', '..', 'src', 'achatDistinct.js')).href); } catch (_) {}
   const trois = [{ transaction_id: '22000000417', title: 'Nike achat 0', date: '2026-11-21T14:32:00+01:00' }, { transaction_id: '22000000418', title: 'Nike achat 0', date: '2026-11-21T14:32:00+01:00' }, { transaction_id: '22000009931', title: 'Nike achat 0', date: '2026-11-22T09:05:00+01:00' }];
@@ -210,7 +246,7 @@ async function distinct() {
   try {
     await distinct();
     for (const [nom, f] of [['achats', () => achats(nav, b)], ['annonces', () => annonces(nav, b)], ['journee', () => journee(nav, b)], ['argent390', () => argent(nav, b, 390)], ['argent1512', () => argent(nav, b, 1512)],
-      ['extension', () => extension(nav, b)], ['stock', () => stockEtCloche(nav, b)], ['captures', () => notifsEtEmails(nav, b)]]) {
+      ['extension', () => extension(nav, b)], ['moderation', () => moderation(nav, b)], ['stock', () => stockEtCloche(nav, b)], ['captures', () => notifsEtEmails(nav, b)]]) {
       console.log('\n── ' + nom);
       try { await f(); } catch (e) { dit(false, `${nom} : le banc a pu se dérouler`, String(e && e.message || e)); }
     }
