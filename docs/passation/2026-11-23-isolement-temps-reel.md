@@ -40,7 +40,13 @@ donnée entre utilisateurs ne peut se croiser » (priorité absolue).
   (`effacerCopies`) ; au changement de vendeur `wipeLocalData` efface QR, bordereaux, photos hors ligne ;
   le service worker ne met JAMAIS `/api/` ni Supabase en cache.
 - Routes `api/` : `scripts/audit-cloisonnement.cjs` (chaque mode de chaque route, trois vendeurs inventés,
-  canaris, usurpation, jeton forgé) — résultat dans la PR.
+  canaris, usurpation, jeton forgé) : **1 866 appels de l'attaquant, 5 598 ✅, 0 ❌** (toutes les routes,
+  widget, push, relais, e-mails, compte/équipe compris). Verts aussi : `audit-adresse-reception` (45),
+  `audit-preuve-adresse` (56), `audit-adresse-sans-compte`, `audit-equipe-ecriture-membre` (16),
+  `audit-session-extension` (29), `audit-pont-session` (87), `audit-temps-reel-sql` (15).
+- Rouges DÉJÀ sur `origin/main`, sans lien, inchangés : `audit-stockage-sur` (2), `audit-copie-annonces` (C4).
+- Au passage : la mutation « ecran-ne-relit-pas » visait encore `src/App.jsx` (le code vit dans
+  `src/ecrans/Comptabilite.jsx` depuis le 22 nov.) et restait verte ; elle vise le bon fichier.
 
 ## 3. La chaîne « temps réel » (comment un colis arrive à l'écran)
 1. E-mail → `api/email-inbound.js` (adresse de RÉCEPTION ⇒ vendeur) → lignes `email_reception_*`,

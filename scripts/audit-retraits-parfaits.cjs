@@ -33,7 +33,7 @@ const MUTATIONS = {
   'veille-sans-colis': ['src/tempsReel.js', "  [/^email_track_[a-z0-9]{1,30}_[A-Za-z0-9_.-]{1,120}$/, 'colis'],\n", ''],
   'veille-sans-bordereau': ['src/tempsReel.js', "  [/^email_bord_[A-Za-z0-9_.-]{3,80}$/, 'bordereaux'],\n", ''],
   'bordereau-pas-relu': ['src/ecrans/Comptabilite.jsx', "if (cache()) { aRelire = true; return; }\n      relire();", "if (cache()) { aRelire = true; return; }"],
-  'ecran-ne-relit-pas': ['src/App.jsx', "if (q.quoi === 'colis') { if (!deja.has('colis')", "if (false) { if (!deja.has('colis')"],
+  'ecran-ne-relit-pas': ['src/ecrans/Comptabilite.jsx', "if (q.quoi === 'colis') { if (!deja.has('colis')", "if (false) { if (!deja.has('colis')"],
 };
 if (process.argv.includes('--mutation') || process.argv.includes('--prouve')) {
   let ok = 0;
