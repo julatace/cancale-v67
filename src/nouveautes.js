@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (23 nov., extension 5.444 — Julien : « le panneau de l'extension n'affiche rien ») docs/passation/2026-11-23-vestiaire-complet.md
+  { id: 'vestiaire-complet', date: '2026-11-24', titre: 'Vestiaire : litiges, achats et panneau réparés', phrase: 'Ventes à l’état juste, frise datée, achats et favoris dans l’extension.', tab: 'plat_vestiaire', pour: 'tous', mode: 'tous' },
   // (23 nov., audit « chaque bouton marche ») docs/passation/2026-11-23-audit-boutons.md
   { id: 'boutons-reveilles', date: '2026-11-23', titre: 'Les boutons qui ne faisaient rien, réparés', phrase: 'Poignée des feuilles, retour au téléphone, Échap, menu des achats.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., latence-totale — Julien : « l'app bug beaucoup trop ») docs/passation/2026-11-22-latence.md
