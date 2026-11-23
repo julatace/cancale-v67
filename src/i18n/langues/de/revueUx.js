@@ -23,4 +23,5 @@ export default {
   "ru.mod.aria": "Von Vinted verschwundene Anzeigen",
   "ru.mod.court": "Verschwunden zwischen {debut} und {fin}.",
   "ru.ann.achatRelie": "Verknüpfter Einkauf",
+  "ru.rp.bientot": {"one": "Bald am Abholpunkt · {n} unterwegs", "other": "Bald am Abholpunkt · {n} unterwegs"},
 };

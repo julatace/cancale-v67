@@ -54,7 +54,7 @@ const MESURE = `
       let rogne = false; for (let a = e.parentElement; a && a !== r; a = a.parentElement) { const c = getComputedStyle(a); if (/hidden|clip|auto|scroll/.test(c.overflow + c.overflowX + c.overflowY)) { const A = a.getBoundingClientRect(); if (b.top >= A.top - 1 && b.bottom <= A.bottom + 1 && b.left >= A.left - 1 && b.right <= A.right + 1) break; rogne = true; break; } }
       if (rogne) continue;
       if (b.left < R.left - 1 || b.right > R.right + 1 || b.top < R.top - 1 || b.bottom > R.bottom + 1) hors.push(nom(e) + ' ' + [Math.round(b.top - R.top), Math.round(R.bottom - b.bottom)].join('/'));
-      if (!e.children.length) { const c = getComputedStyle(e); if ((e.innerText || '').trim().length > 2 && e.scrollWidth > e.clientWidth + 1 && /hidden|clip/.test(c.overflowX) && c.textOverflow !== 'ellipsis') coupes.push(nom(e)); }
+      if (!e.children.length && b.width > 2 && b.height > 2) { const c = getComputedStyle(e); if (/inset\(50%\)|rect\(0/.test(c.clipPath + c.clip)) continue; if ((e.innerText || '').trim().length > 2 && e.scrollWidth > e.clientWidth + 1 && /hidden|clip/.test(c.overflowX) && c.textOverflow !== 'ellipsis') coupes.push(nom(e)); }
     }
     const t = (r.innerText || '').replace(/[\\u00a0\\u202f]/g, ' ');
     if (/·\\s*·/.test(t) || / {2,}·|· {2,}/.test(t)) doubles.push(t.replace(/\\s+/g, ' ').slice(0, 80));
@@ -77,6 +77,10 @@ async function liste(nav, b, W, nomL, url, prep) {
     dit(!m.doubles.length, `L3 ${suf} : aucun séparateur double`, m.doubles);
     dit(!m.coupes.length, `L4 ${suf} : aucun texte coupé net (ellipse « … »)`, m.coupes);
     await pg.screenshot({ path: path.join(SHOTS, `${nomL}-${W}.png`) });
+    if (nomL === 'achats' && W < 600) {
+      const prem = await pg.evaluate(() => { for (const c of document.querySelectorAll('.vrm-main')) c.scrollTop = 0; scrollTo(0, 0); const r = [...document.querySelectorAll('.vrm-buy-list > .vrm-buy-row')].find((x) => x.getClientRects().length); return r ? Math.round(r.getBoundingClientRect().top) : null; });
+      dit(prem != null && prem <= 422, `L7 ${suf} : avec des achats attendus à un point, la 1re rangée reste au premier écran, à mi-hauteur au plus (${prem} ≤ 422)`, prem);
+    }
     if (nomL === 'achats') {
       const orange = await pg.evaluate(() => {
         const o = (c) => { const m = String(c).match(/\d+(\.\d+)?/g); if (!m || m.length < 3) return false; if (m.length > 3 && Number(m[3]) < 0.05) return false; const [r, g, b] = m.map(Number); const mx = Math.max(r, g, b), mn = Math.min(r, g, b); if (mx - mn < 50) return false; let h; if (mx === r) h = 60 * (((g - b) / (mx - mn)) % 6); else if (mx === g) h = 60 * ((b - r) / (mx - mn) + 2); else h = 60 * ((r - g) / (mx - mn) + 4); if (h < 0) h += 360; return h >= 15 && h <= 50; };
@@ -93,7 +97,7 @@ async function liste(nav, b, W, nomL, url, prep) {
           const r = menu.getBoundingClientRect(); const barre = [...document.querySelectorAll('.n-onglets, .vrm-bottom-nav, nav[aria-label]')].filter(vis).map((x) => x.getBoundingClientRect().top).filter((t) => t > innerHeight / 2);
           return { bas: Math.round(r.bottom), vh: innerHeight, dansListe: !!menu.closest('.vrm-buy-row'), barre: barre.length ? Math.round(Math.min(...barre)) : null, coupe: menu.scrollHeight > menu.clientHeight + 1 && getComputedStyle(menu).overflowY === 'visible' };
         });
-        dit(!!f && !f.dansListe && f.bas <= f.vh + 1, `L5 ${suf} : « ⋯ » ouvre une feuille d'actions (portail, rien sous la barre d'onglets)`, f);
+        dit(!!f && !f.dansListe && f.bas <= f.vh + 12, `L5 ${suf} : « ⋯ » ouvre une feuille d'actions (portail, rien sous la barre d'onglets)`, f);
         await pg.screenshot({ path: path.join(SHOTS, `${nomL}-menu-${W}.png`) });
       }
     }

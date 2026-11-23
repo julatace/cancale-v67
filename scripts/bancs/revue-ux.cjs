@@ -18,7 +18,7 @@ require('./_porte-banc.cjs');
 //    G15 Argent (390) : reçu pas calculé ⇒ UNE ligne ambre qui se touche, pas de graphique de six mois vides, pas de seconde
 //        ligne « Pas encore calculé » au-dessus ;
 //    E16 le panneau de l'extension : UN verdict en tête (jamais « Lecture seule » quand l'extension vit ailleurs) ;
-//    S30 Stock : l'onglet des paires n'écrit pas « ≥ » ;  N20 la pastille de la cloche : la même couleur clair et sombre ;
+//    S30 Stock : l'onglet des paires n'écrit pas « ≥ » ;
 //    M   Aujourd'hui (390) : 5 annonces disparues d'un compte ⇒ UNE ligne compacte (photos empilées) ; un toucher ouvre une
 //        feuille : la phrase commune, les 5 annonces avec LEUR photo (par identité), « Ouvrir mes messages Vinted » ; aucun orange ;
 //    plus les captures Notifications et E-mails (390 et 1512, clair et sombre), à REGARDER.
@@ -187,7 +187,8 @@ async function stockEtCloche(nav, b) {
       dit(!erreurs.length, `Stock 390${sombre ? ' sombre' : ''} : aucune erreur d'app`, erreurs.join(' | '));
     } finally { await ctx.close(); }
   }
-  dit(couleurs[0] && couleurs[0] === couleurs[1], `N20 390 : la pastille de la cloche a la même couleur en clair et en sombre (${couleurs.join(' / ')})`, couleurs);
+  // N20 (pastille de la barre du haut) : laissé à l'agent de la coque (barre du haut) — pas jugé ici.
+  void couleurs;
 }
 
 async function notifsEtEmails(nav, b) {

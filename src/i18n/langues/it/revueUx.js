@@ -23,4 +23,5 @@ export default {
   "ru.mod.aria": "Annunci spariti da Vinted",
   "ru.mod.court": "Spariti tra il {debut} e il {fin}.",
   "ru.ann.achatRelie": "Acquisto collegato",
+  "ru.rp.bientot": {"one": "Presto al punto · {n} in arrivo", "other": "Presto al punto · {n} in arrivo"},
 };

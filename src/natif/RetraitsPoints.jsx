@@ -286,7 +286,7 @@ export function RienARetirer({ phrase = '' }) {
 // séparés par une ligne de coupe ; « a » le bandeau du point posé sur la page, chaque billet une carte. `vrm_banc_retrait_variante`
 // (« a ») ne sert qu'aux captures de comparaison.
 const varianteRetrait = () => { try { return localStorage.getItem('vrm_banc_retrait_variante') === 'a' ? 'a' : 'b'; } catch (_) { return 'b'; } };
-export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo, enRouteSansPoint = [], extRelais = 'ok', titre = '', scanner = null, variante = varianteRetrait() }) {
+export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo, enRouteSansPoint = [], extRelais = 'ok', titre = '', scanner = null, variante = varianteRetrait(), compact = false }) {
   const propres = points.map((p) => ({ ...p, arrives: (p.arrives || []).filter((x) => x && !x.redirige) }));
   const avec = trierPoints(propres.filter((p) => { const d = colisDuPoint(p); return d.comptes.length + d.verif.length > 0; }));
   // Les points où rien n'attend encore, mais où des achats ARRIVENT (prévision) : après, du plus chargé au moins chargé.
@@ -303,6 +303,14 @@ export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo, enRouteS
   // La carte : un repère par point à la position LUE (liste Vinted), son nombre à retirer, sinon en route.
   const reperes = [...avec, ...bientot].filter((p) => p.repere && !p.sansCarte && Number.isFinite(Number(p.repere.lat)) && Number.isFinite(Number(p.repere.lon)))
     .map((p) => { const d = colisDuPoint(p); const n = d.comptes.length + d.verif.length; return { cle: p.cle || String(p.numero), lat: p.repere.lat, lon: p.repere.lon, nom: p.nom || '', n: n || (p.attendus || []).length, sorte: n ? 'aretirer' : 'enroute' }; });
+  // (23 nov., revue UX #7) `compact` (Achats au téléphone) : RIEN à retirer, seulement des achats attendus à un point ⇒ UNE ligne
+  // repliée « Bientôt au point · N en route › » (le détail, les mêmes cartes, en dépliant) : la liste des achats reste au 1er écran.
+  if (compact && !avec.length && bientot.length) return (
+    <details className="n-rp n-rp-compact" data-rp="" data-rp-compact="" data-rp-points="0" data-rp-colis="0" data-rp-bientot={String(bientot.length)} data-rp-en-route={String(nRoute)}>
+      <summary className="n-rp-compact-tete"><span>{tr('ru.rp.bientot', { n: nRoute })}</span><span className="n-rp-routes-n" aria-hidden="true">›</span></summary>
+      <div className="n-rp-cartes">{bientot.map((p) => <CartePoint key={p.cle || p.numero} p={p} aides={aides} Photo={Photo} Icon={Icon} Logo={Logo} nouveaux={nouveaux} apple={apple} loc={loc}/>)}</div>
+    </details>
+  );
   const aller = (cle) => { try { document.getElementById('n-rp-' + cle).scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {} };
   return (
     <div className="n-rp" data-rp-variante={variante} data-rp="" data-rp-points={String(avec.length)} data-rp-colis={String(r.colis)} data-rp-bientot={String(bientot.length)} data-rp-en-route={String(nRoute)}>

@@ -23,4 +23,5 @@ export default {
   "ru.mod.aria": "Listings gone from Vinted",
   "ru.mod.court": "Gone between {debut} and {fin}.",
   "ru.ann.achatRelie": "Linked purchase",
+  "ru.rp.bientot": {"one": "Soon at the pickup point · {n} on the way", "other": "Soon at the pickup point · {n} on the way"},
 };
