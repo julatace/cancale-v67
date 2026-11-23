@@ -561,6 +561,11 @@
   .n-coque[data-n-defile="ecran"] { --n-bas: 0px; display: flex; flex-direction: column; height: 100%; min-height: 0; }
   .n-coque[data-n-defile="ecran"] > .n-coque-ecran { flex: 1 1 auto; min-height: 0; padding-bottom: 0 !important; /* (19 nov.) ni le style en ligne ni les vieilles feuilles : le plein collant touche la barre d'onglets */ overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; }
   .n-coque[data-n-defile="ecran"] > .n-onglets { position: relative; flex: 0 0 auto; }
+  /* (23 nov., style-clarte-4) LA PLACE DU BAS (src/natif/zoneMessages.js) : les messages passagers s'y rangent DANS le flux, au-dessus
+     de la barre d'onglets ; l'écran raccourcit de leur hauteur, rien n'est recouvert. Vide : 0 px. */
+  .n-coque[data-n-defile="ecran"] > .n-place-bas { flex: 0 0 auto; position: relative; display: flex; flex-direction: column; gap: 6px; }
+  .n-place-bas > .n-toast { position: static; margin: 6px var(--n-marge); max-width: none; animation: n-monte var(--n-duree) var(--n-courbe); }
+  .n-place-bas > .vrm-toasts:not(:empty) { padding-top: 6px !important; padding-bottom: 6px !important; }
   /* (23 nov., style-clarte-3) Un toast passager réserve sa hauteur AU BOUT du contenu (`--n-toast-reserve`, posé par le toast) :
      ce qu'il couvre se fait défiler au-dessus de lui ; la marge basse reste 0 (le plein collant touche toujours la barre). */
   .n-coque[data-n-defile="ecran"] > .n-coque-ecran::after { content: ''; display: block; height: var(--n-toast-reserve, 0px); }
@@ -639,7 +644,7 @@
     .n-feuille-poignee { display: none; }
     .n-feuille-barre { padding-top: 6px; }
     .n-feuille-corps { padding-bottom: 16px; }
-    .n-toast { left: auto; right: 24px; margin: 0; width: 380px; }
+    .n-toast { left: auto; right: 24px; margin: 0; width: 380px; top: 12px; bottom: auto; }   /* (23 nov.) en haut à droite : en bas il couvrait la dernière rangée */
   }
 
   /* ── le survol, seulement là où il existe (souris) ──────────────────────── */

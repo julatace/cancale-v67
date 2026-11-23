@@ -81,20 +81,28 @@ async function journee(nav, b, W, sombre) {
       await pg.screenshot({ path: path.join(SHOTS, `relier-${W}.png`) });
       await pg.goto(pg.url().replace(/\?.*$/, '') + '?tab=journee').catch(() => {}); await pret(pg);
     }
-    // C14 (23 nov.) un toast (N° neufs) ne masque rien pour de bon : <main> lui réserve sa hauteur ; au bas du défilement, rien de
-    // touchable sous lui.
-    if (W < 1024) {
-      await pg.evaluate(() => { try { localStorage.removeItem('vrm_toast_numeros_vu'); } catch (_) {} window.dispatchEvent(new CustomEvent('vrm:numeros-donnes', { detail: { message: 'Banc : 2 nouvelles paires numérotées · N°901, 902' } })); });
-      await pg.waitForSelector('[data-toast-numeros] .n-toast', { timeout: 4000 }).catch(() => {});
-      await pg.waitForTimeout(300);
-      const to = await pg.evaluate(async () => { const tt = document.querySelector('[data-toast-numeros] .n-toast'); const m = document.querySelector('.vrm-main'); if (!tt || !m) return null;
-        m.scrollTop = m.scrollHeight; await new Promise((r) => setTimeout(r, 250));
-        const r = tt.getBoundingClientRect(); const pts = [[r.left + 8, r.top + r.height / 2], [r.left + r.width / 2, r.top + r.height / 2], [r.right - 8, r.top + 4]];
-        const sous = pts.flatMap(([x, y]) => document.elementsFromPoint(x, y)).filter((e) => !tt.contains(e) && e.closest('.vrm-main') && e.closest('button, a, [role="button"], input'));
-        return { h: Math.round(r.height), pad: parseFloat(getComputedStyle(m, '::after').height) || 0, sous: sous.map((e) => (e.closest('button, a, input').textContent || '').trim().slice(0, 30)) }; });
-      dit(to && to.pad >= to.h && to.sous.length === 0, `C14 ${t} : le toast réserve sa place ; au bas, rien de touchable dessous`, to);
+    // C14 (23 nov., style-clarte-4) Les N° neufs à écrire : une CARTE en ligne (sous les gestes, avant Colis), jamais un toast flottant ;
+    // un message court se range DANS le flux au-dessus de la barre (téléphone) : aucun chiffre ni bouton recouvert.
+    {
+      const nn = await pg.evaluate(() => { const c = document.querySelector('[data-numeros-a-ecrire-journee]'); const a = document.querySelector('.n-actions-rondes'); const k = document.querySelector('[data-n-colis-duo]');
+        const y = (e) => (e ? Math.round(e.getBoundingClientRect().top) : null);
+        return { carte: !!c, n: c ? c.getAttribute('data-numeros-a-ecrire-journee') : null, ordre: c && a && k ? y(a) < y(c) && y(c) < y(k) : null, flotte: !!document.querySelector('[data-toast-numeros] .n-toast') }; });
+      dit(nn.carte && nn.ordre && !nn.flotte, `C14 ${t} : les N° neufs = une carte en ligne entre les gestes et Colis, aucun toast flottant`, nn);
+      await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:toast', { detail: { texte: 'Banc : un message court pour vérifier sa place, assez long pour tenir deux lignes au téléphone.' } })));
+      await pg.waitForSelector('.vrm-toast', { timeout: 4000 }).catch(() => {});
+      await pg.waitForTimeout(400);
+      const to = await pg.evaluate(() => { const tt = document.querySelector('.vrm-toast'); if (!tt) return null; const r = tt.getBoundingClientRect();
+        const coupe = (q) => Math.min(r.right, q.right) - Math.max(r.left, q.left) > 1 && Math.min(r.bottom, q.bottom) - Math.max(r.top, q.top) > 1;
+        // La part VISIBLE de chaque élément (coupée par le cadre qui défile, <main>) : un élément hors de la vue n'est pas « couvert ».
+        const m = document.querySelector('.vrm-main'); const rm = m ? m.getBoundingClientRect() : { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
+        const vue = (q) => ({ left: Math.max(q.left, rm.left), top: Math.max(q.top, rm.top), right: Math.min(q.right, rm.right), bottom: Math.min(q.bottom, rm.bottom) });
+        const cibles = [...document.querySelectorAll('.n-cc-valeur, .n-heros-valeur, .n-heros-trio dd, .n-tuile-valeur, [data-chiffre], .vrm-main button, .vrm-main a')].filter((e) => e.getClientRects().length && !tt.contains(e));
+        const sous = cibles.filter((e) => coupe(vue(e.getBoundingClientRect()))).map((e) => (e.textContent || '').trim().slice(0, 24));
+        const barre = document.querySelector('[data-n-onglets]'); const rb = barre ? barre.getBoundingClientRect() : null;
+        return { sous, place: (tt.closest('[data-toasts-place]') || { getAttribute: () => '' }).getAttribute('data-toasts-place'), auDessus: !rb || r.bottom <= rb.top + 1 }; });
+      dit(to && to.sous.length === 0 && to.auDessus, `C14 ${t} : un message court ne couvre aucun chiffre ni bouton, au-dessus de la barre`, to);
       await pg.screenshot({ path: path.join(SHOTS, `toast-${W}-${sombre ? 'sombre' : 'clair'}.png`) });
-      await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; });
+      await pg.evaluate(() => { const b = document.querySelector('.vrm-toast'); if (b) b.click(); });
     }
     // 30 jours : 30 barres
     await pg.locator('[data-v2-bloc="pilotage"] .n-segmente-choix').nth(1).click({ timeout: 5000 }).catch(() => {});

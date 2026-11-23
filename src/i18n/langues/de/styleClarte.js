@@ -92,4 +92,8 @@ export default {
   "pil.t.sur": "von {c}",
   "pil.a.publier": "Einstellen",
   "pil.a.relier": "Verknüpfen",
+  "nn.carte.titre": {"one": "{n} neue Nr. für deinen Karton", "other": "{n} neue Nr. für deine Kartons"},
+  "nn.carte.sous": "Schreib sie auf, dann tippe „Erledigt“.",
+  "nn.carte.voir": "Nr. ansehen",
+  "nn.carte.masquer": "Einklappen",
 };
