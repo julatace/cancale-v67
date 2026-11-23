@@ -53,8 +53,45 @@ plus pratique ». Puis, règle générale : « trop de texte, pas assez de beaux
 
 ## Bancs
 
-(rempli après la passe)
+`node scripts/bancs/republier-feuille.cjs` (vraie app construite, données INVENTÉES, Annonces → « ⋯ » / tableau de travail →
+« Republier à la main », 390 tactile avec partage de fichiers simulé et 1512, clair et sombre ; captures dans `SHOTS`) :
+**152 contrôles verts, 0 rouge** sur la branche après le vrai `git merge origin/main` (e34e24f0b). Captures REGARDÉES
+(les quatre vues, étapes Photos, retouche, enregistrées, Supprimer, Créer, Fini, il en manque, relu).
+
+- **Vu sur les captures et corrigé** : « Pass / er » (pied de l'étape Photos) et « Ret / our » (étape Fini) coupés sur deux
+  lignes à 390 ET à 1512 — la coque remet `white-space` du bouton (`revert-layer` sous un sélecteur à id) et le libellé natif
+  coupe partout (`overflow-wrap: anywhere`). `src/republier-feuille.css` : le libellé du pied tient sur une ligne. Contrôle
+  neuf H10 « pied : chaque geste sur une ligne » (nœuds de texte, `Range.getClientRects`), à chaque étape.
+- Ajouts au banc : service worker bloqué (`serviceWorkers: 'block'`, comme 66 autres bancs) ; H2 « prêtes, elles le
+  restent » (4 s observées, le plein ne se grise pas sous le doigt) ; H8 joue le vrai geste (« Ouvrir sur Vinted », puis le
+  retour dans VRM) et garde le journal des lectures de la fiche pour dire pourquoi il rougirait.
+- ⚠️ Intermittent vu AVANT ce changement de H8 : 2 rouges sur ~10 passes complètes (« retour » par `visibilitychange`
+  seul, sans le toucher « Ouvrir sur Vinted »), jamais reproduit en 3 passes 390 seules. Le chemin réel (toucher, puis
+  retour ; relecture aussi toutes les 20 s pendant 10 min) est vert partout ; la cause exacte du retour manqué n'est pas
+  établie (pas de remontage observé).
+
+**§6.1, rouge sur le code d'avant** (banc copié dans `git archive origin/main`, e34e24f0b, construit) : **82 rouges / 152**
+— H1 ×4 (masquée ⇒ « Supprimer » cochée, `{"etat":"fait","coche":true}` : la capture de Julien), H2 ×22, H3 ×4 (↓/✓ posés
+sur la tuile), H4 ×8, H5 ×16, H6 ×12, H7 ×4, H8 ×8 (« VRM a lu 1 sur 5 photos… puis « Relire les photos » », deux
+boutons ; jamais relu seul), H9 ×4.
+
+**Mutations** (390 et 1512 clair, chacune rouge seule sur SON contrôle, le reste vert) :
+- `etatAncienne` sans la garde « masquée » ⇒ H1 rouge (2/2) ;
+- le libellé du pied sans `nowrap` ⇒ H10 rouge (Photos et Fini, 4/4) ;
+- sans `visibilitychange` ⇒ H8 rouge (2/2, banc d'avant le geste « Ouvrir ») ; sans AUCUNE relecture seule (ni retour ni
+  20 s) ⇒ H8 rouge avec le banc final (journal : aucune lecture après « retour »).
+
+Audits voisins : `audit-republier-guide` 28 verts, `--prouve` **28/28** (trois ancres de mutation périmées depuis la feuille
+refaite — `envoi_vinted`, `texte_en_dur`, `cle_absente_it` — portées sur `ouvrirAncienne` / `rg2.supprimer.ouvrir`, et D5
+compte maintenant les clés `rg2.*` : 124 clés dans les 5 langues) ; `audit-republier-kit` 17 verts, `--prouve` 14/14 ;
+`audit-traduction` 45/0 ; `audit-quoi-de-neuf`, `audit-icones` verts ; `npm run build` vert.
 
 ## ÉTAT À LA REPRISE
 
-(rempli à la mise en ligne)
+- Branche `claude/republier-main-feuille` poussée, `origin/main` fusionné (vrai merge ; CLAUDE.md 58 037 octets, §9 :
+  les deux côtés, la ligne « Mode présentation » déjà déplacée par `main` dans `historique-divers.md`), PR ouverte, à
+  prendre par le train (pas fusionnée par cette session).
+- Pas vérifiable ici : la feuille sur un VRAI iPhone (partage « Enregistrer N images », maintenir-glisser au doigt réel,
+  barre de Safari) ; la lecture de la fiche par l'extension sur une vraie annonce (simulée par le banc) ; le rendu au gris
+  clair de `claude/style-clair` (#1326) une fois sur `main` (le plein suit `--n-plein`).
+- Geste de Julien : ouvrir « Republier à la main » sur une annonce masquée et sur une de 10+ photos, au téléphone.

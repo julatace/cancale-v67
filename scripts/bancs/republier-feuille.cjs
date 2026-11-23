@@ -8,7 +8,8 @@
 //   H5 chaque texte visible ≤ 8 mots (le détail sous « Pourquoi ? ») ;
 //   H6 la retouche repliée : avant / après, 5 curseurs (nom à gauche, UNE piste fine, valeur à droite, 44 px), double-toucher = zéro ;
 //   H7 l'ordre au glisser (souris ; doigt : maintenir puis glisser) : la 4e photo passe en couverture ;
-//   H8 il manque des photos : une ligne, UN bouton ; la fiche lue arrive ⇒ VRM relit tout seul au retour (aucun « Relire ») ;
+//   H8 il manque des photos : une ligne, UN bouton ; « Ouvrir sur Vinted », la fiche arrive ⇒ VRM relit tout seul au retour
+//      (et toutes les 20 s ensuite ; aucun « Relire ») ;
 //   H9 une barre de progression fine ; H10 44 px au doigt, aucun débordement, aucune erreur.
 // §6.1 : sur le code d'avant, H1 (masquée ⇒ « partie »), H2 (pas de pied), H3 (↓/✓ sur la tuile), H5, H6, H8 sont rouges.
 require('../_source-app.cjs').brancher();
@@ -41,6 +42,7 @@ const A5 = ann(9106, { title: 'New Balance 550 blanc vert taille 43', brand_titl
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
 const MAIN = { vinted_annonce_numeros: { 9110: { numero: '12' }, 9105: { numero: '13' }, 9106: { numero: '14' } }, vinted_used_numeros: [12, 13, 14], vrm_num_vinted: { place: 'desc_fin', forme: 'numero' } };
 const etat = { ficheCinq: false };
+const journalDetails = [];   // les lectures de la fiche de la page (pour dire POURQUOI H8 rougit)
 const lignes = () => [
   { id: 'main', data: MAIN },
   { id: 'harvest_111_listings', data: { capturedAt: new Date().toISOString(), payload: { items: [A13, MASQ, A5], pagination: { total_entries: 3 } } } },
@@ -118,6 +120,7 @@ async function contexte(b, vp, sombre) {
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
     const rows = lignes();
+    if (/vinted_item_details/.test(u)) journalDetails.push(`${Date.now() % 100000} cinq=${etat.ficheCinq ? 1 : 0} ${u.split('select=')[1] || ''}`.slice(0, 120));
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: new Date().toISOString(), cap: r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
@@ -359,10 +362,12 @@ const piedCoupe = (pg, F) => pg.evaluate((f) => [...document.querySelectorAll(`$
             dit(m && m.boutons === 1 && m.ouvrir && !m.relire && mots(m.t.replace(/Ouvrir sur Vinted/, '')) <= 8, `H8 ${T} il en manque : une ligne courte et UN bouton « Ouvrir sur Vinted » (plus de « Relire les photos »)`, m);
             const or3 = await orangesDans(pg, F5); dit(!or3.length, `H4 ${T} il en manque : en gris, pas en orange`, or3);
             await pg.screenshot({ path: nomF('6-manque') });
-            etat.ficheCinq = true;
+            // Comme lui : « Ouvrir sur Vinted » (l'onglet s'ouvre, l'extension y range la fiche), puis le retour dans VRM.
+            await clicPopup(pg, `${F5} [data-rg-ouvrir-annonce]`);
+            etat.ficheCinq = true; journalDetails.push(`${Date.now() % 100000} retour`);
             await premierPlan(pg);
-            const cinq = await attendre(pg, (f) => { const g = document.querySelector(`${f} [data-main-photos]`); return g && g.getAttribute("data-main-photos") === "5" && !document.querySelector(`${f} [data-rg-photos-manque]`) ? 5 : null; }, 30000, F5);
-            dit(cinq === 5, `H8 ${T} de retour dans VRM, sans toucher : les 5 photos sont là`, cinq || await pg.evaluate((f) => { const g = document.querySelector(`${f} [data-main-photos]`); const m = document.querySelector(`${f} [data-rg-photos-manque]`); return { n: g && g.getAttribute('data-main-photos'), manque: m && m.getAttribute('data-rg-photos-manque') }; }, F5));
+            const cinq = await attendre(pg, (f) => { const g = document.querySelector(`${f} [data-main-photos]`); return g && g.getAttribute("data-main-photos") === "5" && !document.querySelector(`${f} [data-rg-photos-manque]`) ? 5 : null; }, 45000, F5);
+            dit(cinq === 5, `H8 ${T} de retour dans VRM, sans toucher : les 5 photos sont là`, cinq || await pg.evaluate(([f, j]) => { const g = document.querySelector(`${f} [data-main-photos]`); const m = document.querySelector(`${f} [data-rg-photos-manque]`); return { n: g && g.getAttribute('data-main-photos'), manque: m && m.getAttribute('data-rg-photos-manque'), vis: document.visibilityState, lectures: j }; }, [F5, journalDetails.slice(-6)]));
             await pg.screenshot({ path: nomF('7-manque-relu') });
           }
           const deb = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
