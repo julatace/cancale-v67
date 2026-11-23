@@ -9,6 +9,7 @@
 import './jetons.css';
 import './natif.css';
 import './mouvements.css';   // (21 nov., ux-reglages) toucher 0,97 · feuille 250 ms · fondu de segment 150 ms
+import './finitions.css';   // (23 nov., « mieux travailler les bords ») filets nets, rayons cohérents, relief doux, état appuyé
 
 export { poserIcone, iconePosee, Glyphe, GLYPHES } from './icones.jsx';
 export { Bouton, BoutonIcone, useGesteUnique } from './Bouton.jsx';
