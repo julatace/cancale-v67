@@ -21,7 +21,7 @@ import { EncartPhotosAutresComptes } from '../PhotosEntreComptes.jsx';   // (11 
 import { Numero } from '../composants/Numero.jsx';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, lireReglageEtiquette } from '../etiquetteNumero.js';
 // (15 nov.) Le parcours guidé « à la main » (republier, remettre en vente, publier) : sa règle.
-import { etapesGuide, etatsEtapes, nFaites, champsAnnonce, couvertureCopie, resultatFin, travailFait, photosDeLAnnonce, photosChoisies } from '../republierGuide.js';
+import { etapesGuide, etatsEtapes, nFaites, champsAnnonce, couvertureCopie, resultatFin, travailFait, photosDeLAnnonce, photosChoisies, photosRangees, deplacerPhoto } from '../republierGuide.js';
 import { CLE_NUMERO_ECRIT } from '../numeroEcrit.js';
 // (17 nov., extension 5.408) Republier étape par étape : la chaîne de chaque paire, le plan, le bilan.
 import { chaineRepub, planRepub, resumeRepub, dureeCourte, gesteProbleme } from '../repubEtapes.js';
@@ -30,6 +30,7 @@ import { texteAnnonceVinted } from '../annonceVinted.js';
 import { useLangue } from '../i18n/react.js';
 import '../republier-guide.css';
 import '../republication.css';   // (17 nov., 5.408) chaîne, plan, bilan
+import '../republier-feuille.css';   // (23 nov.) Republier / Publier à la main refaits : une étape à la fois, curseurs propres
 import { numeroACopier, texteKit, couvertureKit } from '../republierKit.js';
 import { annoncerFicheAPublier, ACTIONS_REPUB, AUTH, Avancement, Bouton, C, ChipsModeles, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, FermeAuRetour, Icon, NAV, PhotoVinted, Pourquoi, SUPABASE_URL, Segmente, SheetShell, askConfirm, chargerPhotoBoite, demanderQuestionRepub, ecrireJournalRepub, extSait, ilYaBr, load, onCloudReady, poserRepubVivant, prixCourt, questionRepubOk, save, sbAuth, toast, verifierAvantPublication } from '../App.jsx';
 
@@ -951,24 +952,29 @@ function useCopies() {
   };
   return [copie, copies, copier];
 }
-// LA PROGRESSION : une pastille par étape, la courante pleine, une étape FAITE cochée.
+// LA PROGRESSION (23 nov., captures de Julien : « ça doit être beaucoup mieux, plus pratique ») : une barre FINE en
+// segments, un par étape ; la courante et celles d'avant pleines ; le mot de chaque étape dessous, la courante en gras.
+// Une étape n'est cochée (✓ après son mot) que FAITE — un geste fait ou une preuve lue (src/republierGuide.js).
+// Chaque segment est un bouton de 44 px qui mène à son étape.
 function EtapesGuide({ mode, etape, etats, aller }) {
   const l = etapesGuide(mode);
-  const i = l.indexOf(etape);
+  const i = Math.max(0, l.indexOf(etape));
   return (
-    <ol className="vrm-rm-etapes vrm-rg-etapes" style={{ gridTemplateColumns: `repeat(${l.length}, minmax(0, 1fr))` }} aria-label={tr('rg.etape.surN', { i: i + 1, n: l.length })} data-main-fait={nFaites(mode, etats)} data-rg-etapes={l.join(',')}>
-      {l.map((k, j) => {
-        const fait = etats[k] === 'fait' || etats[k] === 'sans';
-        return (
-          <li key={k}>
-            <button type="button" className="vrm-rm-etape" data-main-aller={k} data-main-etape-fait={fait ? '1' : undefined} data-rg-etat={etats[k]} aria-current={etape === k ? 'step' : undefined} onClick={() => aller(k)}>
-              <span className="vrm-rm-pastille" aria-hidden="true">{fait && etape !== k ? <Icon name="check" size={13}/> : j + 1}</span>
-              <span className="vrm-rm-etape-mot">{tr(`rg.mot.${k}`)}</span>
-            </button>
-          </li>
-        );
-      })}
-    </ol>
+    <nav className="rg2-progres" aria-label={tr('rg.etape.surN', { i: i + 1, n: l.length })} data-main-fait={nFaites(mode, etats)} data-rg-etapes={l.join(',')}>
+      <ol style={{ gridTemplateColumns: `repeat(${l.length}, minmax(0, 1fr))` }}>
+        {l.map((k, j) => {
+          const fait = etats[k] === 'fait' || etats[k] === 'sans';
+          return (
+            <li key={k}>
+              <button type="button" className="rg2-seg" data-main-aller={k} data-main-etape-fait={fait ? '1' : undefined} data-rg-etat={etats[k]} data-rg-seg={j < i ? 'avant' : j === i ? 'ici' : 'apres'} aria-current={etape === k ? 'step' : undefined} onClick={() => aller(k)}>
+                <span className="rg2-trait" aria-hidden="true"/>
+                <span className="rg2-mot">{tr(`rg.mot.${k}`)}{fait && etape !== k ? <Icon name="check" size={12}/> : null}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
   );
 }
 // UN CHAMP À COLLER dans Vinted : son nom, sa valeur (ou « pas lu »), « Copier » d'un toucher.
@@ -984,60 +990,102 @@ function ChampACopier({ k, valeur, copie, copies, copier, multi = false }) {
     </div>
   );
 }
-// LES PHOTOS DANS LA GALERIE : TOUTES les photos de l'annonce (l'ordre de Vinted, la 1re = la
-// couverture), chacune touchable pour la retirer / la remettre, l'aperçu réglé sur chacune (le MÊME
-// réglage pour toutes) ; UN bouton (préparées d'avance) ; le résultat dit ; s'il en manque, le geste.
-// `photos` : toutes ; `choisies` : celles qui partent (dans l'ordre) ; `lecture` : { source, manque, attendu }.
-function SectionPhotos({ photos, choisies = null, onBasculer = null, lecture = null, lienAnnonce = '', onRelirePhotos = null, numero = "", regsPhoto, ph, pretes, enregistrer, enregistrerUne, libelle, fait, reglage = null, mode }) {
+// LA GRILLE DE TOUTES LES PHOTOS (23 nov.) : un toucher retire / remet une photo (la case ronde en haut à droite) ;
+// maintenir puis glisser la range (au doigt : 300 ms sans bouger, puis glisser ; à la souris : glisser). L'ordre est
+// SON choix (`photosRangees` / `deplacerPhoto`, src/republierGuide.js) ; la 1re gardée est la couverture. Sur la tuile,
+// seulement la photo, son rang et la case : aucun autre bouton posé dessus (avant : ↓, ✓ et un libellé se chevauchaient).
+function GrillePhotos({ photos, choisies, onBasculer, onDeplacer, cssPh }) {
+  const ref = React.useRef(null);
+  const g = React.useRef(null);   // { i, x, y, id, souris, actif, cible, minuteur }
+  const [glisse, setGlisse] = useState(null);   // { de, vers } pendant un glisser
+  const tuileSous = (x, y) => { try { const el = document.elementFromPoint(x, y); const t = el && el.closest && el.closest('[data-rg-photo]'); return t && ref.current && ref.current.contains(t) ? Number(t.getAttribute('data-rg-photo')) : null; } catch (_) { return null; } };
+  const fin = () => { const s = g.current; if (s && s.minuteur) clearTimeout(s.minuteur); g.current = null; setGlisse(null); };
+  // iPhone : une fois le glisser lancé, la feuille ne doit pas défiler sous le doigt (écouteur non passif).
+  useEffect(() => {
+    const el = ref.current; if (!el) return undefined;
+    const tm = (e) => { if (g.current && g.current.actif) e.preventDefault(); };
+    el.addEventListener('touchmove', tm, { passive: false });
+    return () => el.removeEventListener('touchmove', tm);
+  }, []);
+  const bas = (i) => (e) => {
+    if (e.button != null && e.button !== 0) return;
+    const souris = e.pointerType === 'mouse';
+    const s = { i, x: e.clientX, y: e.clientY, id: e.pointerId, souris, actif: false, cible: i, minuteur: null };
+    if (!souris) s.minuteur = setTimeout(() => { if (g.current === s) { s.actif = true; setGlisse({ de: i, vers: i }); try { navigator.vibrate && navigator.vibrate(8); } catch (_) {} } }, 300);
+    g.current = s;
+  };
+  const bouge = (e) => {
+    const s = g.current; if (!s || e.pointerId !== s.id) return;
+    const d = Math.hypot(e.clientX - s.x, e.clientY - s.y);
+    if (!s.actif) {
+      if (s.souris && d > 6) { s.actif = true; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {} setGlisse({ de: s.i, vers: s.i }); }
+      else if (!s.souris && d > 8) { fin(); return; }   // il fait défiler : pas un glisser
+      else return;
+    }
+    const v = tuileSous(e.clientX, e.clientY);
+    if (v != null && v !== s.cible) { s.cible = v; setGlisse({ de: s.i, vers: v }); }
+  };
+  const haut = (u) => (e) => {
+    const s = g.current; if (!s || e.pointerId !== s.id) return;
+    const { actif, i, cible } = s; fin();
+    if (actif) { if (cible != null && cible !== i && onDeplacer) onDeplacer(i, cible); return; }
+    if (onBasculer) onBasculer(u);
+  };
+  return (
+    <div ref={ref} className="rg2-grille" data-main-photos={photos.length} data-rg-photos-choisies={choisies.length} data-rg-ordre={photos.map((u) => String(u).replace(/^.*\//, '')).join(',')} data-rg-glisse={glisse ? `${glisse.de}>${glisse.vers}` : undefined}>
+      {photos.map((u, i) => {
+        const j = choisies.indexOf(u); const garde = j >= 0;
+        return (
+          <div key={u} className="rg2-tuile" data-rg-photo={i} data-rg-photo-gardee={garde ? '1' : '0'} data-rg-cible={glisse && glisse.vers === i && glisse.de !== i ? '1' : undefined} data-rg-tenue={glisse && glisse.de === i ? '1' : undefined}>
+            <button type="button" className="rg2-tuile-b" data-rg-photo-choix={i} aria-pressed={garde} disabled={!onBasculer}
+              aria-label={tr(garde ? 'rg.photos.retirer' : 'rg.photos.remettre', { i: i + 1 })}
+              onPointerDown={bas(i)} onPointerMove={bouge} onPointerUp={haut(u)} onPointerCancel={fin} onContextMenu={(e) => e.preventDefault()}
+              onClick={(e) => { if (e.detail === 0 && onBasculer) onBasculer(u); }}>
+              <PhotoVinted src={u} alt={tr('rg.photos.alt', { i: i + 1 })} style={cssPh} draggable={false}/>
+              {garde ? <span className="rg2-rang" aria-hidden="true">{j === 0 ? tr('rg.photos.couverture') : j + 1}</span> : null}
+              <span className="rg2-coche" aria-hidden="true">{garde ? <Icon name="check" size={14}/> : null}</span>
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+// L'ÉTAPE PHOTOS : une ligne, la grille, ce qui manque (une ligne, UN bouton), la retouche repliée, le résultat.
+// Le GESTE (« Enregistrer les 13 photos ») est le bouton plein du pied de la feuille, pas ici.
+function SectionPhotos({ photos, choisies = null, onBasculer = null, onDeplacer = null, lecture = null, lienAnnonce = '', onOuvrirAnnonce = null, regsPhoto, ph, pretes, enregistrer, reglage = null, mode }) {
   const nPh = photos.length;
   const ch = Array.isArray(choisies) ? choisies : photos;
   const nCh = ch.length;
   const cssPh = { width: '100%', height: '100%', objectFit: 'cover', ...cssApercuPhoto(regsPhoto || PHOTO_NEUTRE) };
-  const neutre = photoNeutre(regsPhoto || PHOTO_NEUTRE);
   const envoyees = ph && ph.envoyees ? ph.envoyees : 0;
   const manque = lecture ? lecture.manque : 0;
   return (<>
-    {nCh ? <p className="vrm-acc-avant vrm-rg-avant" data-acc-avant="republier.main">{trN(neutre ? 'rg.photos.avantNeutre' : 'rg.photos.avant', nCh)} <span className="vrm-acc-pas">{tr('rg.photos.pas')}</span></p>
-      : nPh ? <div className="vrm-rm-note vrm-rm-ambre" data-rg-aucune-choisie="">{tr('rg.photos.aucuneChoisie')}</div>
-      : <div className="vrm-rm-note" data-main-sans-photo="">{tr(mode === 'publier' ? 'rg.photos.aucunePublier' : 'rg.photos.aucune')}</div>}
-    {/* (15 nov., capture de Julien : « une seule photo ») Il en manque, ou VRM n'a que la couverture : dit, avec le geste. */}
-    {nPh > 0 && (manque === null || manque > 0) ? <div className="vrm-rm-note vrm-rm-ambre vrm-rg-manque" data-rg-photos-manque={manque === null ? 'couverture' : manque}>
-      <span>{manque === null ? tr('rg.photos.seuleCouverture') : tr('rg.photos.manque', { n: nPh, m: lecture.attendu })}</span>
-      <div className="vrm-b-rangee vrm-rm-gauche">
-        {lienAnnonce ? <Bouton variante="secondaire" data-rg-ouvrir-annonce="" href={lienAnnonce} target="_blank" rel="noopener noreferrer">{tr('rg.photos.ouvrirAnnonce')}</Bouton> : null}
-        {onRelirePhotos ? <Bouton variante="discret" data-rg-relire-photos="" onClick={onRelirePhotos}>{tr('rg.photos.relire')}</Bouton> : null}
-      </div>
+    {nPh ? <p className="rg2-ligne" data-acc-avant="republier.main">{tr(nPh > 1 ? 'rg2.photos.ligne' : 'rg2.photos.ligneUne')}</p>
+      : <p className="rg2-ligne" data-main-sans-photo="">{tr(mode === 'publier' ? 'rg2.photos.aucunePublier' : 'rg2.photos.aucune')}</p>}
+    {/* Il en manque (ou VRM n'a que la couverture) : UNE ligne, UN bouton ; VRM relit tout seul à son retour. */}
+    {nPh > 0 && (manque === null || manque > 0) ? <div className="rg2-manque" data-rg-photos-manque={manque === null ? 'couverture' : manque}>
+      <span>{manque === null ? tr('rg2.photos.seuleCouverture') : trN('rg2.photos.manque', manque)}</span>
+      {lienAnnonce ? <Bouton variante="secondaire" icone="link" data-rg-ouvrir-annonce="" href={lienAnnonce} target="_blank" rel="noopener noreferrer" onClick={() => onOuvrirAnnonce && onOuvrirAnnonce()}>{tr('rg2.photos.ouvrir')}</Bouton> : null}
     </div> : null}
-    {nPh ? <div className="vrm-main-photos vrm-rg-grille" data-main-photos={nPh} data-rg-photos-choisies={nCh}>{photos.map((u, i) => {
-      const j = ch.indexOf(u); const garde = j >= 0;
-      return (
-        <div key={u + i} className="vrm-rm-photo vrm-rg-photo" data-rg-photo={i} data-rg-photo-gardee={garde ? '1' : '0'}>
-          <button type="button" className="vrm-rg-tuile" data-rg-photo-choix={i} aria-pressed={garde} disabled={!onBasculer} aria-label={tr(garde ? 'rg.photos.retirer' : 'rg.photos.remettre', { i: i + 1 })} onClick={() => onBasculer && onBasculer(u)}>
-            <PhotoVinted src={u} alt={tr('rg.photos.alt', { i: i + 1 })} style={cssPh}/>
-            {garde && j === 0 ? <span className="vrm-rg-couverture">{tr('rg.photos.couverture')}</span> : null}
-            <span className="vrm-rg-coche" aria-hidden="true">{garde ? <Icon name="check" size={14}/> : null}</span>
-          </button>
-          {garde && pretes && ph.parIndice[j] ? <button type="button" className="vrm-rm-photo-une" data-main-photo-une={j} data-main-photo-une-fait={ph.unes.has(j) ? '1' : undefined} aria-label={tr('rg.photos.une', { i: i + 1 })} onClick={() => enregistrerUne(j)}><Icon name={ph.unes.has(j) ? 'check' : 'save'} size={18}/></button> : null}
-        </div>
-      );
-    })}</div> : null}
-    {nPh > 1 ? <p className="vrm-rm-muet" data-rg-photos-compte={`${nCh}/${nPh}`}>{tr('rg.photos.choix', { n: nCh, m: nPh })}</p> : null}
-    {nCh > 0 && <div className="vrm-b-rangee vrm-rm-gauche">
-      <Bouton variante={fait ? 'secondaire' : 'primaire'} icone={fait ? 'check' : 'image'} data-main-telecharger={nCh} data-rg-photos-pretes={pretes ? ph.fichiers.length : 0} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours) || !(ph && ph.fichiers && ph.fichiers.length) && !!(ph && !ph.encours && ph.rate)} onClick={enregistrer}>{libelle}</Bouton>
-    </div>}
-    {ph && ph.envoi === 'partage' && envoyees > 0 ? <AccApres geste="republier.main" ensuite={null} texte={trN('rg.photos.apresGalerie', envoyees)}/> : null}
-    {ph && ph.envoi === 'telecharge' && envoyees > 0 ? <AccApres geste="republier.main" ensuite={null} texte={trN('rg.photos.apresTelecharge', envoyees)}/> : null}
+    {nPh ? <GrillePhotos photos={photos} choisies={ch} onBasculer={onBasculer} onDeplacer={onDeplacer} cssPh={cssPh}/> : null}
+    {nPh > 0 && nCh === 0 ? <p className="rg2-ligne rg2-fort" data-rg-aucune-choisie="">{tr('rg2.photos.aucuneChoisie')}</p> : null}
+    {nPh > 1 ? <p className="rg2-muet" data-rg-photos-compte={`${nCh}/${nPh}`}>{tr('rg2.photos.compte', { n: nCh, m: nPh })}</p> : null}
+    {reglage}
+    {ph && ph.envoi === 'partage' && envoyees > 0 ? <AccApres geste="republier.main" ensuite={null} texte={trN('rg2.photos.galerie', envoyees)}/> : null}
+    {ph && ph.envoi === 'telecharge' && envoyees > 0 ? <AccApres geste="republier.main" ensuite={null} texte={trN('rg2.photos.telechargees', envoyees)}/> : null}
+    {ph && envoyees > 0 && pretes ? <div className="rg2-rangee"><Bouton variante="discret" icone="restore" data-rg-reenregistrer="" onClick={enregistrer}>{tr('rg2.photos.encore')}</Bouton></div> : null}
     {ph && !ph.encours && ph.rate ? <AccEchec geste="republier.main" lu={{ code: 'pasSu', texte: tr('rg.photos.rate', { n: ph.rate }) }} gesteTexte={tr('rg.photos.rateGeste')}/> : null}
     {ph && ph.erreur ? <AccEchec geste="republier.main" lu={{ code: 'inconnu', texte: tr('rg.photos.refusPartage') }} gesteTexte={tr('rg.photos.refusGeste')}/> : null}
-    {nCh > 0 && pretes ? <p className="vrm-rm-muet" data-main-dl-fait={ph.fait} data-main-dl-rate={ph.rate}>{tr(partageRepublierPossible() ? 'rg.photos.ouUne' : 'rg.photos.noms', { nom: nomPhotoReglee(numero, 0) })}</p> : null}
-    {reglage}
+    {nPh ? <Pourquoi ecrit label={tr('rg2.pourquoi')}>{tr(photoNeutre(regsPhoto || PHOTO_NEUTRE) ? 'rg2.photos.pourquoiNeutre' : 'rg2.photos.pourquoi')} {tr(partageRepublierPossible() ? 'rg2.photos.pourquoiPartage' : 'rg.photos.noms', { nom: nomPhotoReglee('', 0) })}</Pourquoi> : null}
   </>);
 }
-// LA PRÉSENTATION, UN RÉGLAGE POUR TOUTES (15 nov., Julien : « je veux que les barres pour modifier les
-// photos soient beaucoup mieux ») — Studio : chaque barre a son nom et sa valeur en clair (« +10 % »,
-// « +2° », « ×1,20 »), une prise de 44 px au doigt, un double-toucher la remet à zéro ; l'aperçu
-// change tout de suite sur la couverture et sur la grille ; « Réinitialiser » en lien. Les bornes
-// sont celles de l'atelier et de l'extension (`CURSEURS_PHOTO`). Aucun hasard, aucun réglage par photo.
+// LA RETOUCHE, UN RÉGLAGE POUR TOUTES (15 nov. ; refaite le 23 nov. : « les curseurs dessinés comme deux barres avec un
+// trou au milieu ») — chaque curseur : son nom à gauche, UNE piste fine (le trait plein va du zéro à la valeur), une
+// poignée ronde, la valeur en clair à droite (« +10 % », « +2° », « ×1,20 ») ; double-toucher = zéro. La piste est
+// DESSINÉE par VRM (un seul trait), le curseur natif est posé dessus, invisible : il garde le doigt, le clavier et le
+// lecteur d'écran. Avant / Après sur la couverture. Les bornes : `CURSEURS_PHOTO` (atelier et extension). Aucun hasard,
+// aucun réglage par photo.
 const valeurCurseur = (cle, v) => {
   const n = Number(v) || 0;
   if (cle === 'rot') return n === 0 ? '0°' : `${n > 0 ? '+' : '−'}${String(Math.abs(n)).replace('.', ',')}°`;
@@ -1051,30 +1099,37 @@ function CurseursPresentation({ regs, poserRegs, presets = [], couverture = '', 
   // Le double-toucher (iPhone ne rend pas toujours `dblclick` sur une barre) : deux relâchés en 350 ms.
   const relache = (cle) => { const t = Date.now(); const a = derniers.current[cle] || 0; derniers.current[cle] = t; if (t - a < 350) { derniers.current[cle] = 0; neutreCle(cle); } };
   const regNeutre = photoNeutre(regs.photo);
+  const img = (r) => (couverture ? <PhotoVinted src={couverture} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', ...cssApercuPhoto(r) }}/> : <PhotoVide remplir/>);
   return (
-    <div className="vrm-rg-pres" data-rg-presentation="">
-      <div className="vrm-rg-pres-tete">
-        <span className="vrm-rg-pres-couv">{couverture ? <PhotoVinted src={couverture} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', ...cssApercuPhoto(regs.photo) }}/> : <PhotoVide remplir/>}</span>
-        <div className="vrm-rg-pres-texte">
-          <b>{tr('rg.pres.titre')}</b>
-          <span>{tr('rg.pres.aide')}</span>
-          {!regNeutre ? <Bouton variante="discret" data-main-neutre="" onClick={() => poserRegs({ photo: { ...PHOTO_NEUTRE } })}>{tr('rg.pres.reinit')}</Bouton> : null}
-        </div>
+    <div className="rg2-retouche" data-rg-presentation="">
+      <div className="rg2-avant-apres" data-rg-avant-apres="">
+        <figure><span className="rg2-ap-photo">{img(PHOTO_NEUTRE)}</span><figcaption>{tr('rg2.avant')}</figcaption></figure>
+        <figure><span className="rg2-ap-photo vrm-rg-pres-couv">{img(regs.photo)}</span><figcaption>{tr('rg2.apres')}</figcaption></figure>
       </div>
-      {presets.length > 0 && <div className="vrm-rm-puces">{presets.map((x) => <Bouton key={x.nom} variante="secondaire" data-main-preset={x.nom} onClick={() => poserRegs({ photo: { ...PHOTO_NEUTRE, ...x.r } })}>{x.nom}</Bouton>)}</div>}
+      {presets.length > 0 && <div className="rg2-rangee rg2-puces">{presets.map((x) => <Bouton key={x.nom} variante="secondaire" data-main-preset={x.nom} onClick={() => poserRegs({ photo: { ...PHOTO_NEUTRE, ...x.r } })}>{x.nom}</Bouton>)}</div>}
       {CURSEURS_PHOTO.map((c) => {
-        const v = regs.photo[c.cle]; const id = `vrm-rg-c-${mode || 'm'}-${c.cle}`;
-        const pct = ((Number(v) - c.min) / (c.max - c.min)) * 100, zero = ((PHOTO_NEUTRE[c.cle] - c.min) / (c.max - c.min)) * 100;
+        const v = Number(regs.photo[c.cle]); const id = `vrm-rg-c-${mode || 'm'}-${c.cle}`;
+        const pct = Math.max(0, Math.min(100, ((v - c.min) / (c.max - c.min)) * 100)), zero = ((PHOTO_NEUTRE[c.cle] - c.min) / (c.max - c.min)) * 100;
+        const g = Math.min(pct, zero), d = Math.max(pct, zero);
         return (
-          <div key={c.cle} className="vrm-rg-curseur" data-rg-curseur={c.cle} data-rg-curseur-neutre={v === PHOTO_NEUTRE[c.cle] ? '1' : undefined}>
-            <div className="vrm-rg-curseur-tete"><label htmlFor={id}>{tr(`rg.curseur.${c.cle}`)}</label><output htmlFor={id} data-rg-valeur={c.cle}>{valeurCurseur(c.cle, v)}</output></div>
-            <input id={id} type="range" min={c.min} max={c.max} step={c.pas} value={v} data-main-reglage={c.cle}
-              style={{ '--rg-pos': `${pct}%`, '--rg-zero': `${zero}%` }}
-              onChange={(ev) => { const n = Number(ev.target.value); poserRegs((x) => ({ photo: { ...x.photo, [c.cle]: n } })); }}
-              onPointerUp={() => relache(c.cle)} onDoubleClick={() => neutreCle(c.cle)}/>
+          <div key={c.cle} className="rg2-curseur" data-rg-curseur={c.cle} data-rg-curseur-neutre={v === PHOTO_NEUTRE[c.cle] ? '1' : undefined}>
+            <label htmlFor={id}>{tr(`rg.curseur.${c.cle}`)}</label>
+            <span className="rg2-zone">
+              <span className="rg2-piste" aria-hidden="true" data-rg-piste="">
+                <span className="rg2-rempli" style={{ left: `${g}%`, width: `${d - g}%` }}/>
+                <span className="rg2-zero" style={{ left: `${zero}%` }}/>
+                <span className="rg2-poignee" style={{ left: `${pct}%` }}/>
+              </span>
+              <input id={id} className="rg2-natif" type="range" min={c.min} max={c.max} step={c.pas} value={v} data-main-reglage={c.cle}
+                aria-valuetext={valeurCurseur(c.cle, v)}
+                onChange={(ev) => { const n = Number(ev.target.value); poserRegs((x) => ({ photo: { ...x.photo, [c.cle]: n } })); }}
+                onPointerUp={() => relache(c.cle)} onDoubleClick={() => neutreCle(c.cle)}/>
+            </span>
+            <output htmlFor={id} data-rg-valeur={c.cle}>{valeurCurseur(c.cle, v)}</output>
           </div>
         );
       })}
+      {!regNeutre ? <div className="rg2-rangee"><Bouton variante="discret" icone="undo" data-main-neutre="" onClick={() => poserRegs({ photo: { ...PHOTO_NEUTRE } })}>{tr('rg.pres.reinit')}</Bouton></div> : null}
     </div>
   );
 }
@@ -1125,7 +1180,23 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
   // TOUTES les photos de l'annonce (src/republierGuide.js, `photosDeLAnnonce`) : coffre, fiche de la page,
   // dressing, la vignette en dernier — la source qui en porte le plus ; s'il en manque, l'écran le dit.
   const lecturePh = photosDeLAnnonce({ coffre: f.photos, detail, liste: paire.photos, couverture: paire.photo, attendu: paire.nPhotos != null ? paire.nPhotos : (paire.verif && paire.verif.nPhotos) });
-  const photos = lecturePh.photos;
+  // (23 nov.) SON ordre (glisser) : `photosRangees` garde ses déplacements, une photo lue après coup va à la fin.
+  const [ordre, setOrdre] = useState([]);
+  const photos = photosRangees(lecturePh.photos, ordre);
+  const deplacer = (de, vers) => setOrdre(deplacerPhoto(photos, de, vers));
+  // (23 nov., « le flux oblige à aller sur Vinted puis revenir ») Il en manque : VRM RELIT tout seul ce qu'il connaît
+  // déjà (coffre, fiche de la page — ses données, par l'identité de CETTE annonce), au retour dans l'app et toutes les
+  // 20 s pendant 10 min après « Ouvrir sur Vinted » (l'extension range la fiche dès que la page s'ouvre). Plus de
+  // bouton « Relire les photos ». Une lecture, rien ne part.
+  const [attendPhotos, setAttendPhotos] = useState(0);
+  const manquePh = lecturePh.manque === null || lecturePh.manque > 0;
+  useEffect(() => {
+    if (!manquePh || typeof document === 'undefined') return undefined;
+    const vis = () => { if (document.visibilityState === 'visible') setRelu((x) => x + 1); };
+    document.addEventListener('visibilitychange', vis);
+    const t = attendPhotos ? setInterval(() => { if (Date.now() - attendPhotos > 600000) return; if (document.visibilityState === 'visible') setRelu((x) => x + 1); }, 20000) : null;
+    return () => { document.removeEventListener('visibilitychange', vis); if (t) clearInterval(t); };
+  }, [manquePh, attendPhotos]);
   const [exclues, setExclues] = useState(() => new Set());   // les adresses qu'il a retirées (ses touchers)
   const basculerPhoto = (u) => setExclues((e) => { const n = new Set(e); if (n.has(u)) n.delete(u); else n.add(u); return n; });
   const choisies = photosChoisies(photos, exclues);
@@ -1139,7 +1210,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
   const placeN = (PLACES_ETIQUETTE.find((x) => x.v === etq.place) || PLACES_ETIQUETTE[0]);
   // ── Les photos : le MÊME dessin que l'atelier (`dessinerPhotoReglee`), préparées dès que la fiche est lue.
   const nPh = choisies.length;
-  const { ph, pretes, enregistrer, enregistrerUne, libelle: libellePhotos } = usePhotosReglees(choisies, regs.photo, paire.numero, { auto: fiche !== undefined && detail !== undefined, source: { id: paire.id, uid: paire.uid } });
+  const { ph, pretes, enregistrer, libelle: libellePhotos } = usePhotosReglees(choisies, regs.photo, paire.numero, { auto: fiche !== undefined && detail !== undefined, source: { id: paire.id, uid: paire.uid } });
   // ── Ce qui est fait (la progression en tête) : un geste fait ou une preuve lue, jamais deviné.
   const nouvelle = etatSuivi === 'fait' && (paire.numero || paire.annulee) ? 'fait' : etatSuivi === 'lie' ? 'lie' : 'attente';
   const etats = etatsEtapes(mode, { photos: { n: nPh, pretes: pretes ? ph.fichiers.length : 0, envoyees: ph && ph.envoyees ? ph.envoyees : 0 }, ancienne, ancienneOuverte: ouvertes.has('ancienne'), copies: cvC.faits, vintedOuvert: ouvertes.has('vinted'), nouvelle });
@@ -1178,68 +1249,76 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
   const numVu = paire.numero || paire.numAffiche || '';
   const derniere = !rang || rang.i >= rang.n - 1;
   const fin = resultatFin(mode, { etatSuivi: nouvelle === 'fait' ? 'fait' : nouvelle, numero: paire.numero, nCandidats: Array.isArray(candidats) ? candidats.length : null });
-  const section = (k, enfants) => { const i = l.indexOf(k); return <section className="vrm-rm-section" data-main-section={k} hidden={etape !== k} aria-labelledby={`vrm-rm-t-${k}`}><h3 className="vrm-rm-titre" id={`vrm-rm-t-${k}`}>{i + 1}. {tr(`rg.titre.${k}.${mode}`)}</h3>{enfants}</section>; };
-  // Le repli « Présentation des photos » : un réglage pour toutes (aucun « Varier », aucun réglage par annonce).
+  // UNE étape à la fois : son titre, UNE ligne courte, son contenu ; le détail sous « Pourquoi ? » (23 nov.).
+  const section = (k, enfants) => <section className="vrm-rm-section rg2-section" data-main-section={k} hidden={etape !== k} aria-labelledby={`vrm-rm-t-${k}`}><h3 className="rg2-titre" id={`vrm-rm-t-${k}`}>{tr(`rg.titre.${k}.${mode}`)}</h3>{enfants}</section>;
+  // La retouche, repliée : « Retouche · Aucune / Retouchée » ; un réglage pour toutes (aucun « Varier », aucun réglage par annonce).
   const reglagePhotos = photos.length > 0 ? (
-    <details className="vrm-repli vrm-rg-repli" data-main-reglages="">
-      <summary>{tr(regNeutre ? 'rg.pres.resumeNeutre' : 'rg.pres.resume')}</summary>
-      <div className="vrm-rm-memes" data-main-memes-reglages={resumeGardes(regs).join(' · ')}>
-        <b>{tr('rg.memes')}</b> {tr('rg.memes.pas')}
-      </div>
+    <details className="rg2-repli" data-main-reglages="">
+      <summary><span>{tr('rg2.retouche')}</span><span className="rg2-repli-etat">{tr(regNeutre ? 'rg2.retouche.aucune' : 'rg2.retouche.oui')}</span><Icon name="chevron" size={16}/></summary>
       <CurseursPresentation regs={regs} poserRegs={poserRegs} presets={presets} couverture={choisies[0] || photos[0] || ''} mode={mode}/>
+      {/* Mêmes réglages que Republier (l'atelier) : dit sous « Pourquoi ? », plus en mur de texte. */}
+      <div data-main-memes-reglages={resumeGardes(regs).join(' · ')}><Pourquoi ecrit label={tr('rg2.pourquoi')}>{tr('rg.memes')} {tr('rg.memes.pas')} {tr('rg.pres.aide')}</Pourquoi></div>
     </details>) : null;
-  // Le gros geste de chaque étape est le SEUL plein tant qu'il n'est pas fait ; fait, c'est « Suivant » qui devient plein.
+  // Le gros geste de chaque étape est LE plein du pied tant qu'il n'est pas fait ; fait, c'est « Suivant » qui devient plein.
   const faitIci = etats[etape] === 'fait' || etats[etape] === 'sans';
+  const ouvrirAncienne = () => { debut(); setOuvertes((o) => new Set(o).add('ancienne')); };
+  const ouvrirVinted = () => { debut(); setOuvertes((o) => new Set(o).add('vinted')); if (ann.titre) copier('titre', ann.titre); };
+  const gesteEtape = faitIci ? null
+    : etape === 'photos' ? (nPh > 0 ? <Bouton variante="primaire" icone="image" data-main-telecharger={nPh} data-rg-photos-pretes={pretes ? ph.fichiers.length : 0} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours) || !(ph && ph.fichiers && ph.fichiers.length) && !!(ph && !ph.encours && ph.rate)} onClick={enregistrer}>{libellePhotos}</Bouton> : null)
+    : etape === 'supprimer' ? <Bouton variante="primaire" icone="link" data-rg-ouvrir-ancienne="" href={ancienneUrl} target="_blank" rel="noopener noreferrer" onClick={ouvrirAncienne}>{tr('rg2.supprimer.ouvrir')}</Bouton>
+    : etape === 'creer' ? <Bouton variante="primaire" icone="link" data-main-ouvrir-vinted="" href={nouvelleUrl} target="_blank" rel="noopener noreferrer" onClick={ouvrirVinted}>{tr('rg2.creer.ouvrir')}</Bouton>
+    : null;
+  const suite = suivante ? { data: { 'data-main-suivant': suivante }, onClick: () => aller(suivante), lib: tr('rg2.suivant') }
+    : !derniere && onSuivante ? { data: { 'data-main-suivante': `${rang.i + 2}/${rang.n}` }, onClick: () => onSuivante({ prix: regs.prix, titre: regs.titre }), lib: `${motsVendeur().Nom} ${rang.i + 2}/${rang.n}` }
+    : { data: { 'data-main-terminer': '' }, onClick: onClose, lib: tr(faitIci ? 'rg.terminer' : 'rg.fermer') };
+  const ligneAncienne = ancienne === 'partie' ? 'rg2.ancienne.partie' : ancienne === 'en-ligne' ? 'rg2.ancienne.enLigne' : 'rg2.ancienne.pasSu';
   return (
-    <SheetShell onClose={onClose} maxWidth={600} className="vrm-rm-feuille vrm-rg-feuille" titre={tr(`rg.feuille.${mode}`)}
+    <SheetShell onClose={onClose} maxWidth={600} className="vrm-rm-feuille vrm-rg-feuille rg2-feuille" titre={tr(`rg.feuille.${mode}`)}
       sousTitre={rang ? `${motsVendeur().Nom} ${rang.i + 1}/${rang.n}` : undefined}
       data-repub-main={paire.id} data-repub-main-etat={etatSuivi} data-main-etape={etape} data-main-rang={rang ? `${rang.i + 1}/${rang.n}` : undefined} data-rg-mode={mode}>
-      {/* La paire : son N°, son titre, son compte — une fois, en tête. */}
-      <div className="vrm-rm-paire">
-        <span className="vrm-rm-paire-photo">{photos[0] ? <PhotoVinted src={photos[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <PhotoVide remplir/>}</span>
-        <div className="vrm-rm-paire-texte">
-          <div className="vrm-rm-paire-nom">{numVu ? <Numero n={numVu} data-main-num={numVu}/> : null}<span>{titreLu || tr('rg.sansTitre')}</span></div>
-          <div className="vrm-rm-paire-sous">{tr('rg.compte', { compte: paire.compte || '' })}</div>
+      {/* La paire : sa photo, son N°, son titre, son compte — une ligne, en tête. */}
+      <div className="rg2-paire">
+        <span className="rg2-paire-photo">{photos[0] ? <PhotoVinted src={choisies[0] || photos[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <PhotoVide remplir/>}</span>
+        <div className="rg2-paire-texte">
+          <div className="rg2-paire-nom">{numVu ? <Numero n={numVu} data-main-num={numVu}/> : null}<span>{titreLu || tr('rg.sansTitre')}</span></div>
+          <div className="rg2-muet">{paire.compte || ''}</div>
         </div>
+        {rang && rang.n > 1 && onToutes ? <Bouton variante="discret" data-main-toutes={rang.n} onClick={onToutes}>{tr('rg2.toutes', { n: rang.n })}</Bouton> : null}
       </div>
-      {rang && rang.n > 1 && onToutes ? <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante="discret" data-main-toutes={rang.n} onClick={onToutes}>{tr('rg.toutes', { n: rang.n })}</Bouton></div> : null}
       <EtapesGuide mode={mode} etape={etape} etats={etats} aller={aller}/>
-      {fiche === undefined && <div className="vrm-rm-muet" data-main-lecture="">{tr('rg.lecture')}</div>}
-      {fiche === null && <div className="vrm-rm-note" data-main-passu="">{tr('rg.ficheRatee')}</div>}
+      {fiche === undefined && <p className="rg2-muet" data-main-lecture="">{tr('rg2.lecture')}</p>}
+      {fiche === null && <p className="rg2-ligne" data-main-passu="">{tr('rg2.ficheRatee')}</p>}
 
-      {section('photos', <SectionPhotos photos={photos} choisies={choisies} onBasculer={basculerPhoto} lecture={lecturePh} lienAnnonce={`https://${paire.domain || 'www.vinted.fr'}/items/${encodeURIComponent(String(paire.id))}`} onRelirePhotos={() => setRelu((x) => x + 1)} numero={paire.numero} regsPhoto={regs.photo} ph={ph} pretes={pretes} enregistrer={enregistrer} enregistrerUne={enregistrerUne} libelle={libellePhotos} fait={faitIci && etape === 'photos'} reglage={reglagePhotos} mode={mode}/>)}
+      {section('photos', <SectionPhotos photos={photos} choisies={choisies} onBasculer={basculerPhoto} onDeplacer={deplacer} lecture={lecturePh} lienAnnonce={ancienneUrl} onOuvrirAnnonce={() => setAttendPhotos(Date.now())} regsPhoto={regs.photo} ph={ph} pretes={pretes} enregistrer={enregistrer} reglage={reglagePhotos} mode={mode}/>)}
 
       {mode === 'republier' && section('supprimer', <>
-        <p className="vrm-acc-avant vrm-rg-avant" data-acc-avant="republier.main">{tr('rg.supprimer.avant', { compte: paire.compte || '' })} <span className="vrm-acc-pas">{tr('rg.supprimer.pas')}</span></p>
-        {etats.photos !== 'fait' && nPh > 0 ? <div className="vrm-rm-note vrm-rm-ambre" data-rg-garde="photos">{tr('rg.supprimer.photosAvant')}</div> : null}
-        {fiche === null || (fiche && !String(f.desc || '').trim()) ? <div className="vrm-rm-note vrm-rm-ambre" data-rg-garde="description">{tr('rg.supprimer.descAvant')}</div> : null}
-        <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante={etats.supprimer === 'fait' ? 'secondaire' : 'primaire'} data-rg-ouvrir-ancienne="" href={ancienneUrl} target="_blank" rel="noopener noreferrer" onClick={() => { debut(); setOuvertes((o) => new Set(o).add('ancienne')); }}>{tr('rg.supprimer.ouvrir')}</Bouton></div>
-        <div data-rg-ancienne={ancienne === undefined ? 'pas-su' : ancienne}>
-          {ancienne === 'partie' ? <AccApres geste="republier.main" ensuite={null} texte={tr('rg.supprimer.partie')}/>
-            : ancienne === 'en-ligne' ? <p className="vrm-rm-muet">{tr(ouvertes.has('ancienne') ? 'rg.supprimer.encoreOuverte' : 'rg.supprimer.encore')}</p>
-            : <p className="vrm-rm-muet">{tr('rg.supprimer.pasSu')}</p>}
+        <p className="rg2-ligne" data-acc-avant="republier.main">{tr('rg2.supprimer.ligne', { compte: paire.compte || '' })}</p>
+        {etats.photos !== 'fait' && nPh > 0 ? <p className="rg2-ligne rg2-fort" data-rg-garde="photos">{tr('rg2.supprimer.photosAvant')}</p> : null}
+        {fiche === null || (fiche && !String(f.desc || '').trim()) ? <p className="rg2-ligne rg2-fort" data-rg-garde="description">{tr('rg2.supprimer.descAvant')}</p> : null}
+        <div className="rg2-etat" data-rg-ancienne={ancienne === undefined ? 'pas-su' : ancienne}>
+          {ancienne === 'partie' ? <AccApres geste="republier.main" ensuite={null} texte={tr(ligneAncienne)}/> : <span className="rg2-muet">{tr(ligneAncienne)}</span>}
+          {ancienne !== 'partie' ? <Bouton variante="discret" icone="sync" data-main-relire="" onClick={onRelire}>{tr('rg2.relire')}</Bouton> : null}
         </div>
-        {ancienne !== 'partie' ? <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante="discret" data-main-relire="" onClick={onRelire}>{tr('rg.relire')}</Bouton></div> : null}
+        <Pourquoi ecrit label={tr('rg2.pourquoi')}>{tr('rg.supprimer.avant', { compte: paire.compte || '' })} {tr('rg.supprimer.pas')} {tr('rg2.supprimer.pourquoi')}</Pourquoi>
       </>)}
 
       {section('creer', <>
-        <p className="vrm-acc-avant vrm-rg-avant" data-acc-avant="republier.main">{tr('rg.creer.avant', { compte: paire.compte || '' })} <span className="vrm-acc-pas">{tr('rg.creer.pas')}</span></p>
-        {paire.annulee ? <div className="vrm-rm-muet" data-main-annulee={paire.tx || ''}>{tr(paire.retour ? 'rg.creer.annuleeRetour' : 'rg.creer.annulee')}</div> : null}
-        <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante={etats.creer === 'fait' ? 'secondaire' : 'primaire'} data-main-ouvrir-vinted="" href={nouvelleUrl} target="_blank" rel="noopener noreferrer" onClick={() => { debut(); setOuvertes((o) => new Set(o).add('vinted')); if (ann.titre) copier('titre', ann.titre); }}>{tr('rg.creer.ouvrir')}</Bouton></div>
-        <p className="vrm-rm-muet" data-rg-copies={`${cvC.faits}/${cvC.n}`}>{tr('rg.creer.copies', { n: cvC.faits, m: cvC.n })}</p>
+        <p className="rg2-ligne" data-acc-avant="republier.main">{tr('rg2.creer.ligne')}</p>
+        {paire.annulee ? <p className="rg2-muet" data-main-annulee={paire.tx || ''}>{tr(paire.retour ? 'rg2.creer.annuleeRetour' : 'rg2.creer.annulee')}</p> : null}
+        <p className="rg2-muet" data-rg-copies={`${cvC.faits}/${cvC.n}`}>{tr('rg.creer.copies', { n: cvC.faits, m: cvC.n })}</p>
         {champs.map((c) => <ChampACopier key={c.k} k={c.k} valeur={c.v} copie={copie} copies={copies} copier={copier} multi={c.k === 'description'}/>)}
-        <div className="vrm-rm-muet" data-main-etiquette={ann.etiquette.pose ? ann.etiquette.place : (ann.etiquette.refus ? 'refus' : 'aucune')}>
+        <p className="rg2-muet" data-main-etiquette={ann.etiquette.pose ? ann.etiquette.place : (ann.etiquette.refus ? 'refus' : 'aucune')}>
           {etq.place === 'aucune' && !ann.numeroEcritPose ? tr('rg.num.aucune')
             : ann.etiquette.pose || ann.numeroEcritPose ? tr('rg.num.pose', { num: ann.etiquette.texte || `N°${paire.numero}`, ou: ann.etiquette.pose ? placeN.ou : tr('rg.num.fin') })
             : ann.etiquette.refus === 'pas de numéro' ? tr('rg.num.sans')
-            : <span className="vrm-rm-ambre">{tr('rg.num.refus', { raison: ann.etiquette.refus })}</span>}
-        </div>
-        <details className="vrm-repli vrm-rg-repli" data-rg-repli-prix="">
-          <summary>{tr(prixChange(regs) || titreChange(regs) ? 'rg.prixTitre.change' : 'rg.prixTitre.resume')}</summary>
+            : <b>{tr('rg.num.refus', { raison: ann.etiquette.refus })}</b>}
+        </p>
+        <details className="rg2-repli" data-rg-repli-prix="">
+          <summary><span>{tr('rg2.prixTitre')}</span><span className="rg2-repli-etat">{tr(prixChange(regs) || titreChange(regs) ? 'rg2.prixTitre.change' : 'rg2.prixTitre.garde')}</span><Icon name="chevron" size={16}/></summary>
           <div className="vrm-rm-bloc" data-main-bloc="prix">
             <div className="vrm-rm-bloc-tete"><b>{tr('rg.champ.prix')}</b><span>{tr('rg.prix.plancher')}</span></div>
             <div className="vrm-filtres vrm-rm-puces" role="group" aria-label={tr('rg.prix.baisse')}>
-              {[['aucun', tr('rg.prix.garder')], ...REDUCTIONS_RAPIDES.map((v) => [v, `−${v.slice(1)} %`]), ['autre', tr('rg.prix.autre')]].map(([v, lb]) => {
+              {[['aucun', tr('rg.prix.garder')], ...REDUCTIONS_RAPIDES.map((v) => [v, `−${v.slice(1)} %`]), ['autre', tr('rg.prix.autre')]].map(([v, lb]) => {
                 const actif = v === 'aucun' ? p.base === 'aucun' : v === 'autre' ? (p.base !== 'aucun' && !rapide) : (p.base === 'pct' && String(p.delta).trim() === v);
                 return <button key={v} type="button" data-main-reduc={v} aria-pressed={actif} onClick={() => choixPrix(v)}>{lb}</button>;
               })}
@@ -1256,7 +1335,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
             {p.base !== 'aucun' && <label className="vrm-rm-case"><input type="checkbox" data-main-arrondi="" checked={p.arrondi === 'euro'} onChange={(ev) => { const on = ev.target.checked; poserRegs((c) => ({ prix: { ...c.prix, arrondi: on ? 'euro' : 'aucun', fin: 'aucune' } })); }}/><span>{tr('rg.prix.arrondi')}</span></label>}
             <div className="vrm-rm-resultat" data-main-prix-resultat={ann.prix != null ? Math.round(ann.prix * 100) : ''}>
               {ann.prixAvant == null ? <span className="vrm-rm-muet">{tr('rg.prix.pasLu')}</span>
-                : ann.prix !== ann.prixAvant ? <>{montant(ann.prixAvant)} → <b>{montant(ann.prix)}</b>{ann.plancher ? <span className="vrm-rm-ambre"> · {tr('rg.prix.ramene')}</span> : null}</>
+                : ann.prix !== ann.prixAvant ? <>{montant(ann.prixAvant)} → <b>{montant(ann.prix)}</b>{ann.plancher ? <b> · {tr('rg.prix.ramene')}</b> : null}</>
                 : <>{montant(ann.prix)} · {tr('rg.prix.inchange')}</>}
             </div>
           </div>
@@ -1267,24 +1346,25 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
             </select>
             {(modeT === 'remplacer' || modeT === 'supprimer') && <input value={regs.titre.chercher} placeholder={tr('rg.titreChercher')} aria-label={tr('rg.titreChercher')} onChange={(ev) => { const v = ev.target.value; poserRegs((c) => ({ titre: { ...c.titre, chercher: v } })); }}/>}
             {(modeT === 'prefixe' || modeT === 'suffixe' || modeT === 'remplacer') && <input value={regs.titre.valeur} placeholder={tr(PH_TITRE[modeT] || 'rg.titreAjout')} aria-label={tr('rg.titreTexte')} data-main-titre-valeur="" onChange={(ev) => { const v = ev.target.value; poserRegs((c) => ({ titre: { ...c.titre, valeur: v } })); }}/>}
-            {(titreChange(regs) || ann.etiquette.pose && etq.place.startsWith('titre')) && <div className="vrm-rm-resultat" data-main-titre-resultat="">{ann.titre || <span className="vrm-rm-muet">{tr('rg.titreVide')}</span>}{ann.tropLong ? <span className="vrm-rm-ambre"> · {tr('rg.titreTropLong', { n: ann.titre.length, max: TITRE_VINTED_MAX })}</span> : null}</div>}
+            {(titreChange(regs) || ann.etiquette.pose && etq.place.startsWith('titre')) && <div className="vrm-rm-resultat" data-main-titre-resultat="">{ann.titre || <span className="vrm-rm-muet">{tr('rg.titreVide')}</span>}{ann.tropLong ? <b> · {tr('rg.titreTropLong', { n: ann.titre.length, max: TITRE_VINTED_MAX })}</b> : null}</div>}
           </div>
           <label className="vrm-rm-case"><input type="checkbox" data-main-lettre="" checked={regs.lettre} onChange={(ev) => { const on = ev.target.checked; poserRegs({ lettre: on }); }}/><span>{tr('rg.lettre')}{regs.lettre ? <> {tr('rg.lettreIci', { lettre })}</> : null}</span></label>
           {!neutreTout && <Bouton variante="discret" data-main-reglages-zero="" onClick={() => poserRegs(lireReglagesRepub(null))}>{tr('rg.zero')}</Bouton>}
         </details>
+        <Pourquoi ecrit label={tr('rg2.pourquoi')}>{tr('rg.creer.avant', { compte: paire.compte || '' })} {tr('rg.creer.pas')}</Pourquoi>
       </>)}
 
       {section('fini', <>
         <div data-rg-fin={fin.etat} data-rg-fin-cle={fin.cle}>
-          {nouvelle === 'fait' ? <AccApres geste="republier.main" ensuite={null} texte={tr(fin.cle, { num: paire.numero || '' })}/>
-            : <p className="vrm-rm-muet">{tr(fin.cle, { num: paire.numero || '', compte: paire.compte || '' })}</p>}
+          {nouvelle === 'fait' ? <AccApres geste="republier.main" ensuite={null} texte={tr(`rg2.${fin.cle.slice(3)}`, { num: paire.numero || '' })}/>
+            : <p className="rg2-ligne">{tr(`rg2.${fin.cle.slice(3)}`, { num: paire.numero || '', compte: paire.compte || '' })}</p>}
         </div>
-        {nouvelle === 'fait' ? <p className="vrm-rm-muet" data-rg-journal="">{tr('rg.fini.journal')}</p> : null}
-        {paire.annulee && !paire.numero && nouvelle !== 'fait' ? <div className="vrm-rm-muet" data-main-num-neuf={paire.archive ? 'archive' : 'sans'}>{paire.archive ? tr('rg.num.archive', { num: paire.numAffiche || '' }) : tr('rg.num.venteSans')}</div> : null}
-        {!paire.numero && !paire.annulee ? <div className="vrm-rm-muet" data-main-sans-num="">{tr('rg.num.sansNouvelle')}</div> : null}
+        {nouvelle === 'fait' ? <p className="rg2-muet" data-rg-journal="">{tr('rg2.fini.journal')}</p> : null}
+        {paire.annulee && !paire.numero && nouvelle !== 'fait' ? <p className="rg2-muet" data-main-num-neuf={paire.archive ? 'archive' : 'sans'}>{paire.archive ? tr('rg.num.archive', { num: paire.numAffiche || '' }) : tr('rg.num.venteSans')}</p> : null}
+        {!paire.numero && !paire.annulee ? <p className="rg2-muet" data-main-sans-num="">{tr('rg.num.sansNouvelle')}</p> : null}
         {nouvelle === 'lie' ? <div className="vrm-rm-lie" data-main-lie={suivi.nouvelId}>
-            <span>{nomNouvelle ? tr('rg.fini.designee', { titre: nomNouvelle }) : ''} {paire.annulee ? tr('rg.fini.passeLecture', { num: paire.numero || '' }) : tr('rg.fini.passeQuand', { num: paire.numero || '' })}</span>
-            <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante="discret" data-main-delier="" onClick={onDelier}>{tr('rg.fini.pasElle')}</Bouton></div>
+            <span>{nomNouvelle ? tr('rg.fini.designee', { titre: nomNouvelle }) : ''}</span>
+            <div className="rg2-rangee"><Bouton variante="discret" icone="undo" data-main-delier="" onClick={onDelier}>{tr('rg.fini.pasElle')}</Bouton></div>
           </div>
           : nouvelle === 'attente' && (paire.numero || paire.annulee) ? <>
               {(candidats || []).length ? <ul className="vrm-sel-liste" data-main-candidats={candidats.length}>{candidats.slice(0, 12).map((c) => (
@@ -1293,17 +1373,17 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
                   <span className="vrm-sel-centre"><span className="vrm-sel-nom">{c.titre || tr('rg.sansTitre')}</span><span className="vrm-sel-sous">{c.prix != null ? montant(c.prix) : tr('rg.sansPrix')}{c.numero ? ` · ${tr('rg.numAuto', { num: c.numero })}` : ''}</span></span>
                   <Bouton variante="secondaire" icone="link" data-main-lier={c.id} onClick={() => onLier(c)}>{tr('rg.fini.cestElle')}</Bouton>
                 </div></li>))}</ul>
-                : <div className="vrm-rm-muet" data-main-aucun-candidat="">{tr('rg.fini.aucune', { compte: paire.compte || '' })}</div>}
-              <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante="discret" data-main-relire="" onClick={onRelire}>{tr('rg.relire')}</Bouton></div>
+                : <p className="rg2-muet" data-main-aucun-candidat="">{tr('rg2.fini.aucune')}</p>}
+              <div className="rg2-rangee"><Bouton variante="discret" icone="sync" data-main-relire="" onClick={onRelire}>{tr('rg2.relire')}</Bouton></div>
             </> : null}
+        <Pourquoi ecrit label={tr('rg2.pourquoi')}>{tr(fin.cle, { num: paire.numero || '', compte: paire.compte || '' })} {nouvelle === 'lie' ? (paire.annulee ? tr('rg.fini.passeLecture', { num: paire.numero || '' }) : tr('rg.fini.passeQuand', { num: paire.numero || '' })) : ''} {nouvelle === 'fait' ? tr('rg.fini.journal') : ''}</Pourquoi>
       </>)}
 
-      {/* Le pied : revenir, aller à l'étape suivante ; à la dernière, la paire suivante. */}
-      <div className="vrm-rm-pied">
-        {iE > 0 ? <Bouton variante="discret" data-main-retour="" onClick={() => aller(l[iE - 1])}>{tr('rg.retour')}</Bouton> : <span/>}
-        {suivante ? <Bouton variante={faitIci ? 'primaire' : 'secondaire'} data-main-suivant={suivante} onClick={() => aller(suivante)}>{tr('rg.suivant', { etape: tr(`rg.mot.${suivante}`) })}</Bouton>
-          : !derniere && onSuivante ? <Bouton variante={faitIci ? 'primaire' : 'secondaire'} data-main-suivante={`${rang.i + 2}/${rang.n}`} onClick={() => onSuivante({ prix: regs.prix, titre: regs.titre })}>{`${motsVendeur().Nom} ${rang.i + 2}/${rang.n}`}</Bouton>
-          : <Bouton variante={faitIci ? 'primaire' : 'secondaire'} data-main-terminer="" onClick={onClose}>{tr(faitIci ? 'rg.terminer' : 'rg.fermer')}</Bouton>}
+      {/* Le pied, toujours en bas : revenir · passer · LE geste de l'étape (plein) ; fait ⇒ « Suivant » devient le plein. */}
+      <div className="rg2-pied" data-rg-pied="">
+        {iE > 0 ? <Bouton variante="discret" icone="undo" data-main-retour="" aria-label={tr('rg.retour')} onClick={() => aller(l[iE - 1])}>{tr('rg.retour')}</Bouton> : <span/>}
+        {gesteEtape ? <Bouton variante="discret" {...suite.data} onClick={suite.onClick}>{suivante ? tr('rg2.passer') : suite.lib}</Bouton> : null}
+        {gesteEtape || <Bouton variante={faitIci ? 'primaire' : 'secondaire'} {...suite.data} onClick={suite.onClick}>{suite.lib}</Bouton>}
       </div>
     </SheetShell>
   );
@@ -1426,14 +1506,15 @@ function PublierALaMain({ fiche, vue, onFini, onClose }) {
   // (16 nov., ext. 5.395) « Publier cette fiche » : SON clic sur « Ouvrir Vinted » annonce la fiche à l'extension,
   // qui réserve CE N° à côté de « Publier » et le relie à l'annonce créée. null = pas encore · { ok, code }.
   const [resaFiche, setResaFiche] = useState(null);
-  const photos = (Array.isArray(f.photos) ? f.photos : []).filter((u) => typeof u === 'string' && u).slice(0, 20);
+  const [ordre, setOrdre] = useState([]);   // (23 nov.) SON ordre (glisser)
+  const photos = photosRangees((Array.isArray(f.photos) ? f.photos : []).filter((u) => typeof u === 'string' && u).slice(0, 20), ordre);
   const [exclues, setExclues] = useState(() => new Set());
   const choisies = photosChoisies(photos, exclues);
   const nPh = choisies.length;
   const texte = texteAnnonceVinted(f, { etiquette: etq, numeroEcrit: numEcrit });
   const champs = champsAnnonce({ titre: texte.ok ? texte.titre : f.titre, description: texte.ok ? texte.description : f.description, prix: f.prix, categorie: f.categorie, marque: f.marque, taille: f.taille, etat: f.etat, couleur: f.couleur });
   const cvC = couvertureCopie(champs, copies);
-  const { ph, pretes, enregistrer, enregistrerUne, libelle } = usePhotosReglees(choisies, null, f.numero, { auto: true, source: { id: f.id, uid: f.uid } });
+  const { ph, pretes, enregistrer, libelle } = usePhotosReglees(choisies, null, f.numero, { auto: true, source: { id: f.id, uid: f.uid } });
   const etats = etatsEtapes(mode, { photos: { n: nPh, pretes: pretes ? ph.fichiers.length : 0, envoyees: ph && ph.envoyees ? ph.envoyees : 0 }, copies: cvC.faits, vintedOuvert: ouvert, nouvelle: vue === true ? 'vue' : 'attente' });
   const l = etapesGuide(mode);
   const iE = Math.max(0, l.indexOf(etape));
@@ -1441,36 +1522,43 @@ function PublierALaMain({ fiche, vue, onFini, onClose }) {
   const fin = resultatFin(mode, { vue: vue === true });
   useEffect(() => { if (vue !== true || typeof onFini !== 'function') return; const w = travailFait(mode, { id: f.id, numero: f.numero, titre: f.titre }); if (w) onFini(w); }, [vue]);   // eslint-disable-line react-hooks/exhaustive-deps
   const faitIci = etats[etape] === 'fait' || etats[etape] === 'sans';
-  const section = (k, enfants) => { const i = l.indexOf(k); return <section className="vrm-rm-section" data-main-section={k} hidden={etape !== k} aria-labelledby={`vrm-pm-t-${k}`}><h3 className="vrm-rm-titre" id={`vrm-pm-t-${k}`}>{i + 1}. {tr(`rg.titre.${k}.${mode}`)}</h3>{enfants}</section>; };
+  const section = (k, enfants) => <section className="vrm-rm-section rg2-section" data-main-section={k} hidden={etape !== k} aria-labelledby={`vrm-pm-t-${k}`}><h3 className="rg2-titre" id={`vrm-pm-t-${k}`}>{tr(`rg.titre.${k}.${mode}`)}</h3>{enfants}</section>;
+  const ouvrirVinted = () => { setOuvert(true); if (f.numero && !numEcrit) annoncerFicheAPublier(f).then(setResaFiche, () => setResaFiche({ ok: false })); const t0 = champs.find((c) => c.k === 'titre'); if (t0 && t0.v) copier('titre', t0.v); };
+  const gesteEtape = faitIci ? null
+    : etape === 'photos' ? (nPh > 0 ? <Bouton variante="primaire" icone="image" data-main-telecharger={nPh} data-rg-photos-pretes={pretes ? ph.fichiers.length : 0} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours)} onClick={enregistrer}>{libelle}</Bouton> : null)
+    : etape === 'creer' ? <Bouton variante="primaire" icone="link" data-main-ouvrir-vinted="" href="https://www.vinted.fr/items/new" target="_blank" rel="noopener noreferrer" onClick={ouvrirVinted}>{tr('rg2.creer.ouvrir')}</Bouton>
+    : null;
+  const suite = suivante ? { data: { 'data-main-suivant': suivante }, onClick: () => setEtape(suivante), lib: tr('rg2.suivant') } : { data: { 'data-main-terminer': '' }, onClick: onClose, lib: tr(faitIci ? 'rg.terminer' : 'rg.fermer') };
   return (
-    <SheetShell onClose={onClose} maxWidth={600} className="vrm-rm-feuille vrm-rg-feuille" titre={tr('rg.feuille.publier')} data-publier-main={f.numero || ''} data-main-etape={etape} data-rg-mode={mode}>
-      <div className="vrm-rm-paire">
-        <span className="vrm-rm-paire-photo">{photos[0] ? <PhotoVinted src={photos[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <PhotoVide remplir/>}</span>
-        <div className="vrm-rm-paire-texte">
-          <div className="vrm-rm-paire-nom">{f.numero ? <Numero n={f.numero} data-main-num={f.numero}/> : null}<span>{f.titre || tr('rg.sansTitre')}</span></div>
-          <div className="vrm-rm-paire-sous">{tr('rg.publier.sous')}</div>
+    <SheetShell onClose={onClose} maxWidth={600} className="vrm-rm-feuille vrm-rg-feuille rg2-feuille" titre={tr('rg.feuille.publier')} data-publier-main={f.numero || ''} data-main-etape={etape} data-rg-mode={mode}>
+      <div className="rg2-paire">
+        <span className="rg2-paire-photo">{photos[0] ? <PhotoVinted src={choisies[0] || photos[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <PhotoVide remplir/>}</span>
+        <div className="rg2-paire-texte">
+          <div className="rg2-paire-nom">{f.numero ? <Numero n={f.numero} data-main-num={f.numero}/> : null}<span>{f.titre || tr('rg.sansTitre')}</span></div>
+          <div className="rg2-muet">{tr('rg2.publier.sous')}</div>
         </div>
       </div>
       <EtapesGuide mode={mode} etape={etape} etats={etats} aller={setEtape}/>
-      {section('photos', <SectionPhotos photos={photos} choisies={choisies} onBasculer={(u) => setExclues((e) => { const n = new Set(e); if (n.has(u)) n.delete(u); else n.add(u); return n; })} numero={f.numero} regsPhoto={null} ph={ph} pretes={pretes} enregistrer={enregistrer} enregistrerUne={enregistrerUne} libelle={libelle} fait={faitIci && etape === 'photos'} mode={mode}/>)}
+      {section('photos', <SectionPhotos photos={photos} choisies={choisies} onBasculer={(u) => setExclues((e) => { const n = new Set(e); if (n.has(u)) n.delete(u); else n.add(u); return n; })} onDeplacer={(de, vers) => setOrdre(deplacerPhoto(photos, de, vers))} regsPhoto={null} ph={ph} pretes={pretes} enregistrer={enregistrer} mode={mode}/>)}
       {section('creer', <>
-        <p className="vrm-acc-avant vrm-rg-avant" data-acc-avant="publier.main">{tr('rg.publier.avant')} <span className="vrm-acc-pas">{tr('rg.creer.pas')}</span></p>
-        {!texte.ok ? <div className="vrm-rm-note vrm-rm-ambre" data-rg-texte-refus="">{tr('rg.publier.refus', { raison: texte.raison || '' })}</div> : null}
-        <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante={etats.creer === 'fait' ? 'secondaire' : 'primaire'} data-main-ouvrir-vinted="" href="https://www.vinted.fr/items/new" target="_blank" rel="noopener noreferrer" onClick={() => { setOuvert(true); if (f.numero && !numEcrit) annoncerFicheAPublier(f).then(setResaFiche, () => setResaFiche({ ok: false })); const t0 = champs.find((c) => c.k === 'titre'); if (t0 && t0.v) copier('titre', t0.v); }}>{tr('rg.creer.ouvrir')}</Bouton></div>
-        <p className="vrm-rm-muet" data-rg-copies={`${cvC.faits}/${cvC.n}`}>{tr('rg.creer.copies', { n: cvC.faits, m: cvC.n })}</p>
+        <p className="rg2-ligne" data-acc-avant="publier.main">{tr('rg2.creer.ligne')}</p>
+        {!texte.ok ? <p className="rg2-ligne rg2-fort" data-rg-texte-refus="">{tr('rg.publier.refus', { raison: texte.raison || '' })}</p> : null}
+        <p className="rg2-muet" data-rg-copies={`${cvC.faits}/${cvC.n}`}>{tr('rg.creer.copies', { n: cvC.faits, m: cvC.n })}</p>
         {champs.map((c) => <ChampACopier key={c.k} k={c.k} valeur={c.v} copie={copie} copies={copies} copier={copier} multi={c.k === 'description'}/>)}
-        {f.numero ? <p className="vrm-rm-muet" data-rg-num-fiche={f.numero} data-rg-resa-fiche={resaFiche ? (resaFiche.ok ? 'ok' : String(resaFiche.code || 'non')) : ''}>{resaFiche && resaFiche.ok ? tr('rg.publier.reserve', { num: f.numero }) : resaFiche && resaFiche.code === 'pris' ? tr('rg.publier.pris', { num: f.numero }) : tr('rg.publier.num', { num: f.numero })}</p> : null}
+        {f.numero ? <p className="rg2-muet" data-rg-num-fiche={f.numero} data-rg-resa-fiche={resaFiche ? (resaFiche.ok ? 'ok' : String(resaFiche.code || 'non')) : ''}>{resaFiche && resaFiche.ok ? tr('rg.publier.reserve', { num: f.numero }) : resaFiche && resaFiche.code === 'pris' ? tr('rg.publier.pris', { num: f.numero }) : tr('rg.publier.num', { num: f.numero })}</p> : null}
+        <Pourquoi ecrit label={tr('rg2.pourquoi')}>{tr('rg.publier.avant')} {tr('rg.creer.pas')}</Pourquoi>
       </>)}
       {section('fini', <>
         <div data-rg-fin={fin.etat} data-rg-fin-cle={fin.cle}>
-          {vue === true ? <AccApres geste="publier.main" ensuite={null} texte={tr(fin.cle, { num: f.numero || '' })}/> : <p className="vrm-rm-muet">{tr(fin.cle, { num: f.numero || '' })}</p>}
+          {vue === true ? <AccApres geste="publier.main" ensuite={null} texte={tr(`rg2.${fin.cle.slice(3)}`, { num: f.numero || '' })}/> : <p className="rg2-ligne">{tr(`rg2.${fin.cle.slice(3)}`, { num: f.numero || '' })}</p>}
         </div>
-        {vue === true ? <p className="vrm-rm-muet" data-rg-journal="">{tr('rg.fini.journal')}</p> : null}
+        {vue === true ? <p className="rg2-muet" data-rg-journal="">{tr('rg2.fini.journal')}</p> : null}
+        <Pourquoi ecrit label={tr('rg2.pourquoi')}>{tr(fin.cle, { num: f.numero || '' })}</Pourquoi>
       </>)}
-      <div className="vrm-rm-pied">
-        {iE > 0 ? <Bouton variante="discret" data-main-retour="" onClick={() => setEtape(l[iE - 1])}>{tr('rg.retour')}</Bouton> : <span/>}
-        {suivante ? <Bouton variante={faitIci ? 'primaire' : 'secondaire'} data-main-suivant={suivante} onClick={() => setEtape(suivante)}>{tr('rg.suivant', { etape: tr(`rg.mot.${suivante}`) })}</Bouton>
-          : <Bouton variante={faitIci ? 'primaire' : 'secondaire'} data-main-terminer="" onClick={onClose}>{tr(faitIci ? 'rg.terminer' : 'rg.fermer')}</Bouton>}
+      <div className="rg2-pied" data-rg-pied="">
+        {iE > 0 ? <Bouton variante="discret" icone="undo" data-main-retour="" onClick={() => setEtape(l[iE - 1])}>{tr('rg.retour')}</Bouton> : <span/>}
+        {gesteEtape ? <Bouton variante="discret" {...suite.data} onClick={suite.onClick}>{suivante ? tr('rg2.passer') : suite.lib}</Bouton> : null}
+        {gesteEtape || <Bouton variante={faitIci ? 'primaire' : 'secondaire'} {...suite.data} onClick={suite.onClick}>{suite.lib}</Bouton>}
       </div>
     </SheetShell>
   );
