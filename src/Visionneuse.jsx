@@ -11,6 +11,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { EVT_VISIONNEUSE, vignetteTouchee, origineVignette, lienVignette, galerieDe, borneZoom, borneDeplacement, ZOOM_DOUBLE } from './visionneuse.js';
+import { pleineTaille } from './photoTaille.js';
 
 // Au-dessus des feuilles ET des pleins écrans (scanner 19998, bienvenue 19000), sous les confirmations
 // (20000) et les messages (30000) : une photo touchée dans le scanner s'ouvre DEVANT lui.
@@ -140,7 +141,9 @@ function Scene({ photos, index, lien = '', titre = '', sous = '', article = '', 
         style={{ position: 'absolute', inset: 0, touchAction: 'none', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: z > 1 ? 'grab' : 'zoom-in', userSelect: 'none', WebkitUserSelect: 'none' }}>
         <div key={i} className="vrm-visionneuse-photo" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
           transform: `translate3d(${pos.x + glisse}px, ${pos.y}px, 0) scale(${z})`, transition: geste.current ? 'none' : 'transform .22s cubic-bezier(.2,.8,.2,1)' }}>
-          {Photo ? <Photo src={src} alt="" draggable={false} data-visionneuse-img="" style={PLEIN} repli={null}/>
+          {/* (23 nov., photos-nettes) `mieux` : la plus grande taille CONNUE du même fichier (src/photoTaille.js), préchargée
+              à côté ; la petite reste à l'écran jusqu'à ce qu'elle soit chargée (chargement progressif). */}
+          {Photo ? <Photo src={src} mieux={pleineTaille(src)} alt="" draggable={false} data-visionneuse-img="" style={PLEIN} repli={null}/>
             : null /* (11 nov.) sans la règle des photos (PhotoVinted), aucune <img> brute */}
         </div>
       </div>
