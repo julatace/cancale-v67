@@ -113,4 +113,5 @@ export default {
   "pop.voir": "View",
   "pop.fermer": "Close",
   "pop.region": "Notifications",
+  "pop.replier": "Collapse",
 };

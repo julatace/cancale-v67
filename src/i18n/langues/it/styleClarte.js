@@ -113,4 +113,5 @@ export default {
   "pop.voir": "Vedi",
   "pop.fermer": "Chiudi",
   "pop.region": "Notifiche",
+  "pop.replier": "Comprimi",
 };

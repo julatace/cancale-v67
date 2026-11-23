@@ -113,4 +113,5 @@ export default {
   "pop.voir": "Ansehen",
   "pop.fermer": "Schließen",
   "pop.region": "Benachrichtigungen",
+  "pop.replier": "Einklappen",
 };

@@ -15,7 +15,7 @@ import { tr } from '../i18n/index.js';
 import './pop-evenements.css';
 
 const DUREE = 7000, MAX = 3;
-const RE_PHOTO = /^https:\/\/images\d*\.vinted\.net\/tc?\/[^\s"'<>]{8,480}$/i;
+const RE_PHOTO = /^https:\/\/images\d*\.vinted\.net\/[^\s"'<>]{8,480}$/i;
 const ICONE_GENRE = { vente: 'cash', offre: 'tag', arrivee: 'pin', message: 'chat', bordereau: 'box', argent: 'cash', rappel: 'clock' };
 const genreDeTag = (t) => { t = String(t || ''); if (/^(sale|vc-vente)-/.test(t)) return 'vente'; if (/^offer-/.test(t)) return 'offre'; if (/^(relais|retrait-code)-/.test(t)) return 'arrivee'; if (/^msg-/.test(t)) return 'message'; if (/^bord-/.test(t)) return 'bordereau'; if (/^final-/.test(t)) return 'argent'; if (/^rappel-/.test(t)) return 'rappel'; return ''; };
 const siteDeTag = (t) => { t = String(t || ''); if (/^vc-/.test(t)) return 'vestiaire'; if (/^(sale|offer)-/.test(t)) return 'vinted'; if (/^lbc-/.test(t)) return 'leboncoin'; if (/^ebay-/.test(t)) return 'ebay'; return ''; };
@@ -36,33 +36,38 @@ export function evenementPropre(ev) {
 const recouvrement = () => { try { return !!document.querySelector('[role="dialog"][aria-modal="true"], [data-n-poussee]:not([data-n-volet]), .vrm-fp'); } catch (_) { return false; } };
 const aller = (u) => { if (!u) return; try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: u.replace(/^\//, '') })); } catch (_) {} };
 
-function Carte({ e, Icon, onFermer }) {
+function Carte({ e, Icon, onFermer, tenue, photoDe, i }) {
+  // La photo : celle de la notification (prouvée par l'e-mail), sinon celle que l'app connaît PAR IDENTITÉ (n° de transaction,
+  // n° de conversation de l'adresse — `photoDe`, src/App.jsx) ; jamais par ressemblance. Rien ⇒ l'icône de la famille.
+  const [photo, setPhoto] = React.useState(e.image);
+  React.useEffect(() => { if (e.image || typeof photoDe !== 'function') return undefined; let vivant = true;
+    Promise.resolve().then(() => photoDe(e)).then((u) => { if (vivant && RE_PHOTO.test(String(u || ''))) setPhoto(String(u)); }).catch(() => {});
+    return () => { vivant = false; }; }, [e, photoDe]);
   const [sort, setSort] = React.useState(false);
-  const tenue = React.useRef(0);
   const reste = React.useRef(DUREE);
   const fermer = React.useCallback(() => { setSort(true); setTimeout(() => onFermer(e.id), 190); }, [e.id, onFermer]);
   React.useEffect(() => {
-    let debut = Date.now(), t = null;
-    const lancer = () => { clearTimeout(t); debut = Date.now(); t = setTimeout(fermer, Math.max(800, reste.current)); };
-    const pause = () => { clearTimeout(t); reste.current -= Date.now() - debut; };
+    let debut = Date.now(), t = null, court = false;
+    const lancer = () => { if (court) return; court = true; debut = Date.now(); t = setTimeout(fermer, Math.max(1500, reste.current)); };
+    const pause = () => { if (!court) return; court = false; clearTimeout(t); reste.current -= Date.now() - debut; };
     e.ctl = { pause, lancer };
     lancer();
     const vis = () => (document.visibilityState === 'hidden' ? pause() : lancer());
     document.addEventListener('visibilitychange', vis);
     return () => { clearTimeout(t); document.removeEventListener('visibilitychange', vis); };
   }, [e, fermer]);
-  const tenir = (v) => { tenue.current = Math.max(0, tenue.current + (v ? 1 : -1)); if (!e.ctl) return; if (tenue.current) e.ctl.pause(); else e.ctl.lancer(); };
+  // La pile entière est tenue (souris, doigt ou clavier sur N'IMPORTE QUELLE carte) : toutes attendent, toutes repartent ensemble.
+  const premier = React.useRef(true);
+  React.useEffect(() => { if (premier.current) { premier.current = false; if (!tenue) return; } if (!e.ctl) return; if (tenue) e.ctl.pause(); else e.ctl.lancer(); }, [tenue, e]);
   const geste = e.action || (e.url ? { titre: tr('pop.voir'), url: e.url } : null);
   return (
-    <div className="n-pop" data-n-pop={e.genre || 'autre'} data-n-pop-sort={sort ? '1' : undefined} role="status"
-      onMouseEnter={() => tenir(true)} onMouseLeave={() => tenir(false)} onFocus={() => tenir(true)} onBlur={() => tenir(false)}
-      onTouchStart={() => tenir(true)} onTouchEnd={() => tenir(false)}>
-      {e.image
-        ? <img className="n-pop-photo" src={e.image} alt="" referrerPolicy="no-referrer" loading="eager" decoding="async"/>
+    <div className="n-pop" data-n-pop={e.genre || 'autre'} data-n-pop-sort={sort ? '1' : undefined} data-n-pop-rang={i} style={{ '--i': i }} role="status" {...(i > 0 && !tenue ? { inert: '' } : {})}>
+      {photo
+        ? <img className="n-pop-photo" src={photo} alt="" referrerPolicy="no-referrer" loading="eager" decoding="async"/>
         : <span className="n-pop-ic" aria-hidden="true">{Icon ? <Icon name={ICONE_GENRE[e.genre] || 'bell2'} size={20}/> : null}</span>}
       <div className="n-pop-corps">
         <div className="n-pop-titre">{e.titre}</div>
-        {e.detail || e.site ? <div className="n-pop-detail">{e.site ? <LogoSite site={e.site} taille={14} nom={NOM_SITE[e.site]}/> : null}<span>{e.detail}</span></div> : null}
+        <div className="n-pop-detail">{e.site ? <LogoSite site={e.site} taille={14} nom={NOM_SITE[e.site]}/> : null}<span>{e.detail}</span></div>
         {geste ? <button type="button" className="n-pop-geste" data-n-pop-geste="" onClick={() => { aller(geste.url); fermer(); }}>{geste.titre}</button> : null}
       </div>
       <button type="button" className="n-pop-fermer" aria-label={tr('pop.fermer')} title={tr('pop.fermer')} onClick={fermer}>
@@ -72,8 +77,11 @@ function Carte({ e, Icon, onFermer }) {
   );
 }
 
-export function PopEvenements({ Icon }) {
+export function PopEvenements({ Icon, photoDe = null }) {
   const [vues, setVues] = React.useState([]);
+  const [souris, setSouris] = React.useState(false), [focus, setFocus] = React.useState(false), [doigt, setDoigt] = React.useState(false);
+  const [deplie, setDeplie] = React.useState(false);
+  const tenue = souris || focus || doigt || deplie;
   const attente = React.useRef([]);
   const vuesRef = React.useRef([]); vuesRef.current = vues;
   const servir = React.useCallback(() => {
@@ -98,11 +106,18 @@ export function PopEvenements({ Icon }) {
     const t = setInterval(servir, 600);
     return () => { clearInterval(t); try { if (navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message', sw); } catch (_) {} window.removeEventListener('vrm:evenement', bus); window.removeEventListener('keydown', echap); };
   }, [poser, servir]);
-  const fermer = React.useCallback((id) => { setVues((v) => v.filter((x) => x.id !== id)); setTimeout(servir, 50); }, [servir]);
+  const fermer = React.useCallback((id) => { setVues((v) => { const n = v.filter((x) => x.id !== id); if (n.length < 2) setDeplie(false); return n; }); setTimeout(servir, 50); }, [servir]);
   if (typeof document === 'undefined') return null;
   return createPortal(
-    <div className="n-pops" aria-live="polite" aria-label={tr('pop.region')} data-n-pops={vues.length}>
-      {vues.map((e) => <Carte key={e.id} e={e} Icon={Icon} onFermer={fermer}/>)}
+    <div className="n-pops" aria-live="polite" aria-label={tr('pop.region')} data-n-pops={vues.length} data-n-pops-tenue={tenue ? '1' : undefined}
+      onMouseEnter={() => setSouris(true)} onMouseLeave={() => setSouris(false)}
+      onFocus={() => setFocus(true)} onBlur={(x) => { if (!x.currentTarget.contains(x.relatedTarget)) setFocus(false); }}
+      onTouchStart={() => setDoigt(true)} onTouchEnd={() => setTimeout(() => setDoigt(false), 1200)} onTouchCancel={() => setDoigt(false)}
+      data-n-pops-ouvert={tenue && vues.length > 1 ? '1' : undefined}>
+      {vues.map((e, i) => <Carte key={e.id} e={e} i={i} Icon={Icon} onFermer={fermer} tenue={tenue} photoDe={photoDe}/>)}
+      {/* Empilement compact : la plus récente en entier, les autres repliées derrière ; « +2 » les déplie (doigt, clavier). */}
+      {vues.length > 1 ? <button type="button" className="n-pops-plus" data-n-pops-plus={vues.length - 1} aria-expanded={tenue} onClick={() => setDeplie((v) => !v)}>
+        {tenue ? tr('pop.replier') : '+' + (vues.length - 1)}</button> : null}
     </div>, document.body);
 }
 export default PopEvenements;
