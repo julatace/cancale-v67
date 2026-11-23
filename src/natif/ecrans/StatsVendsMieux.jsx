@@ -121,6 +121,7 @@ function ParSource({ S, tri, choix, montant, jours }) {
           S.achatPasLu ? tr('rs.couv.pasLu', { n: nombre(S.achatPasLu) }) : '',
           S.vintedLus ? '' : tr('rs.couv.vintedPasLus'),
         ].filter(Boolean).join(' · ')}</p> : null}
+        <details className="vrm-repli n-ps-mieux-note" data-ps-source-pourquoi=""><summary>{tr('rs.pourquoi')}</summary><p>{tr('rs.pourquoi.texte')}</p></details>
       </Carte>
     </Colonne>
   );

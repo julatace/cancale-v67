@@ -32,7 +32,7 @@ lancer({ lot: 'rentabilite-source', url: '/?base=lu', parcours: async (pg, { W, 
   const ordreM = lu.rangs.map((r) => r.k).filter((k) => k !== 'non-saisie');
   const attendu = [...lu.S.groupes].filter((g) => !g.pasSaisie).sort((a, b) => (a.beneficeMoyen == null) - (b.beneficeMoyen == null) || (b.beneficeMoyen || 0) - (a.beneficeMoyen || 0) || b.revendus - a.revendus || a.nom.localeCompare(b.nom, 'fr')).map((g) => g.k);
   dit(ordreM.join() === attendu.join(), `S3 ${W} ${th} : tri marge recompté`, { ordreM, attendu });
-  dit(/sans achat relié/.test(lu.couv) && /8 ventes/.test(lu.couv), `S3b ${W} ${th} : la couverture dit les 8 ventes sans achat relié`, lu.couv);
+  dit(/sans achat relié/.test(lu.couv) && /8 ventes/.test(lu.couv) && await pg.evaluate(() => !!document.querySelector("[data-ps-source-pourquoi] summary")), `S3b ${W} ${th} : la couverture dit les 8 ventes sans achat relié`, lu.couv);
   const r = await pg.evaluate(REGLES_PAGE, '[data-ps-bloc="mieux"] .n-rangee');
   dit(!r.deborde && !r.nan && r.petites === 0, `S5 ${W} ${th} : rien ne déborde, aucun NaN, cibles ≥ 44`, r);
   await pg.screenshot({ path: path.join(SHOTS, `source-marge-${W}-${th}.png`), fullPage: true });
