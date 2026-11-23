@@ -1,7 +1,7 @@
 # 23 nov. 2026 — Republication « intelligente » : inventaire, mesures, plan (phase 1)
 
 Branche `claude/republication-intelligente` (depuis `origin/main` b5fc00bd4). **Aucune ligne de l'extension n'est
-touchée dans cette phase** : `claude/favoris-auto` (5.440 / 5.441) construit la couche commune (`vrm-trouver.js`), les
+touchée dans cette phase** : `claude/favoris-auto` (5.440 / 5.441) construit la couche commune (`vrm-trouver.js`) ;
 on branche la republication sur le repérage commun **après sa fusion**.
 
 Sources lues : CLAUDE.md §3 (ligne « Republication », ordre coffre → brouillon → suppression → mise en ligne),
