@@ -282,7 +282,12 @@
     .n-vt-rang .n-vignette, .n-vt-rang img.n-vignette { width: 52px !important; height: 52px !important; border-radius: 10px; }
     .n-vt-rang .n-rangee-titre[data-n-lignes] { -webkit-line-clamp: 1 !important; line-clamp: 1; font-size: 14.5px; line-height: 19px; }
     .n-vt-rang .n-rangee-sous-texte[data-n-lignes] { -webkit-line-clamp: 1 !important; line-clamp: 1; font-size: 12.5px; line-height: 16px; }
-    .n-vt-rang .n-rangee-note { margin-top: 2px; padding-inline-end: 120px; }
+    .n-vt-rang .n-rangee-note { margin-top: 2px; padding-inline-end: 132px; min-height: 22px; }
+    .n-vt-rang .n-vt-ligne { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
+    /* « À expédier » répète l'onglet « À envoyer » : au téléphone, la pastille se tait (le statut reste dans la fiche et le tableau). */
+    .n-vt-rang .n-vt-ligne .n-pastille[data-n-ton="ambre"] { display: none; }
+    /* Le N° et la date limite sur la ligne du titre : la plaque passe dans la ligne de détail (une seule ligne). */
+    .n-vt-rang .n-rangee-sous { flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
     .n-rangee.n-vt-rang > .n-rangee-pied, .n-rangee.n-vt-rang[data-n-a-pied] > .n-rangee-pied { position: absolute; z-index: 2; right: 10px; bottom: 6px; margin: 0; padding: 0; border: 0; background: none; }
     .n-rangee.n-vt-rang > .n-rangee-pied .n-vt-achat { gap: 2px; }
     .n-actions-rondes .n-action-ronde-disque { box-shadow: 0 0 0 .5px var(--n-bord), 0 1px 2px rgb(29 29 31 / .05); }
