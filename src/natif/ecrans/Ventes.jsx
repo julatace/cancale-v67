@@ -114,7 +114,7 @@ function RangeeRoute({ r, Icon, Photo, choisie, onOuvrir }) {
       pied={piedAchat(r, Icon)}
       selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)}
       actions={r.lienSuivi ? [{ cle: 'suivre', libelle: tr('vn.b.suivre'), icone: <Icon name="truck" size={20}/>, onClick: () => { try { window.open(r.lienSuivi, '_blank', 'noopener'); } catch (_) {} }, franc: true }] : null}
-      attrs={{ 'data-vn-route': r.cle, 'data-vn-num': r.num, 'data-vn-etape': String((r.etapes || []).filter((e) => e.fait).length) }}
+      className="n-vt-rang" attrs={{ 'data-vn-route': r.cle, 'data-vn-num': r.num, 'data-vn-etape': String((r.etapes || []).filter((e) => e.fait).length) }}
     />
   );
 }

@@ -162,11 +162,4 @@
     :root { --n-duree: 1ms; --n-duree-lente: 1ms; }
   }
 
-  /* (23 nov., proposition à Julien) VARIANTE B « gris chaud » (pierre) — posée par `data-gris="b"` sur la racine, le temps du choix. */
-  :root[data-gris="b"]:not([data-theme="dark"]) {
-    --n-fond: #DFDCD6; --n-laterale: #D5D1CA; --n-carte: #FAF9F7; --n-carte-2: #E9E6E1; --n-bord: #CCC7BF; --n-trait: #E2DFD9;
-    --n-encre-2: #53504A; --n-encre-3: #8F8B84; --n-accent: #4A4F57; --n-plein: #4A4F57; --n-teinte: rgb(74 79 87 / .10);
-    --n-ambre: #4A4F57; --n-ambre-fond: #E4E2DE; --n-ambre-bord: #CFCAC3; --n-inverse: #4A4F57; --n-appui: #D7D3CC; --n-barre: rgb(223 220 214 / .94);
-    --n-heros: #CFC9C0; --n-heros-2: #F2F0EC;
-  }
 }

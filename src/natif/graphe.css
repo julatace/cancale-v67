@@ -193,7 +193,6 @@
     --n-graphe-courbe: var(--n-accent); --n-graphe-barre: rgb(29 29 31 / .10); --n-graphe-barre-fort: rgb(29 29 31 / .22); --n-graphe-ligne: var(--n-vert);
     --n-trait: rgb(29 29 31 / .09); --n-bord: rgb(29 29 31 / .14); --n-encre: var(--n-sur-heros); --n-encre-2: var(--n-sur-heros-2); --n-encre-3: #8C8F98; --n-accent: #3D4B5B;
   }
-  :root[data-gris="b"]:not([data-theme="dark"]) .n-heros { --n-accent: #4A4F57; }
   :root:not([data-theme="dark"]) .n-heros-action .n-segmente { background: rgb(29 29 31 / .07); }
   :root:not([data-theme="dark"]) .n-heros-action .n-segmente-curseur { background: #FFFFFF; box-shadow: 0 1px 2px rgb(29 29 31 / .12); }
   :root:not([data-theme="dark"]) .n-heros-action .n-segmente-choix[aria-checked="true"] { color: var(--n-sur-heros); }

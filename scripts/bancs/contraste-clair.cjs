@@ -2,21 +2,23 @@ require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));
 process.env.BANC_DESIGN_V2 = process.env.BANC_DESIGN_V2 || 'defaut';
 require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
-//  LE GRIS DE VRM.CENTER (23 nov., Julien : « le gris de l'écran d'accueil […] mais il faut que les infos ressortent bien »)
-//  docs/passation/2026-11-23-style-gris.md. Mesuré sur l'app RENDUE, apparence PAR DÉFAUT (aucun choix posé) :
-//    G1 l'app s'ouvre en SOMBRE quand rien n'est choisi, et le fond est le gris-ardoise de vrm.center (#1C1C20) ;
+//  LE GRIS CLAIR ÉTAGÉ (23 nov., Julien : « j'aime pas le noir, je veux que ce soit gris clair », « un mélange de degrés de
+//  gris », « gris un peu plus foncé » ; variante A retenue) — docs/passation/2026-11-23-style-clair.md. Le gris foncé de
+//  vrm.center reste le mode sombre CHOISI. Mesuré sur l'app RENDUE, apparence PAR DÉFAUT (aucun choix posé) :
+//    G1 l'app s'ouvre en CLAIR quand rien n'est choisi, et le fond est le gris clair de l'app (#DFE1E5) ;
 //    G2 chaque texte visible de chaque écran monté tient 4,5:1 sur ce qu'il y a derrière lui (3:1 au-dessus de 24 px, ou
 //       18,66 px gras) — le fond est recomposé couche par couche (couleurs et transparences, opacités des parents) ;
 //       un texte posé sur un DÉGRADÉ est jugé sur la couleur la plus claire de ce dégradé (le pire cas) ;
-//    G3 les cartes sont plus claires que le fond (un cran) ; le héros d'Aujourd'hui s'en détache (écart de luminance) ;
+//    G3 les cartes sont NETTEMENT plus claires que le fond ; le héros d'Aujourd'hui s'en détache (son dégradé n'est pas le fond) ;
 //    G4 rien ne déborde, aucune erreur d'app.
-//  `BANC_DIST=<dist d'avant>` : rouge sur l'app d'avant (G1 : clair par défaut). `SHOTS=…` les captures. `ECRANS=a,b`.
+//  `BANC_DIST=<dist d'avant>` : rouge sur l'app d'avant (G1 : fond #F4F4F2, pas le gris étagé). `SOMBRE=1` : le même contrôle
+//  de contraste (G2) sur le mode sombre choisi (le gris de vrm.center). `SHOTS=…` les captures. `ECRANS=a,b`.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 const path = require('path'), fs = require('fs');
 const P = require('./design-passe.cjs');
 const { base, srv, PORT, chromium } = P;
-const SHOTS = process.env.SHOTS || path.join(require('os').tmpdir(), 'banc-contraste-gris');
+const SHOTS = process.env.SHOTS || path.join(require('os').tmpdir(), 'banc-contraste-clair');
 fs.mkdirSync(SHOTS, { recursive: true });
 const ECRANS = (process.env.ECRANS || 'journee,cat_annonces,ventes,achats,compta,garage,messages,settings').split(',');
 let ok = 0, ko = 0;
@@ -24,10 +26,11 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
 
 // Le contexte de design-passe (session, base, routes), puis on RETIRE le choix d'apparence qu'il pose (`vinted_dark`) et on
 // recharge : l'app doit s'ouvrir dans son apparence par défaut (les scripts d'ouverture passent dans l'ordre où ils sont posés).
+const SOMBRE = process.env.SOMBRE === '1';
 async function ouvrirDefaut(nav, W, b, url) {
-  const o = await P.ouvrir(nav, { W, sombre: false, b, url });
-  await o.pg.addInitScript(() => { try { localStorage.removeItem('vinted_dark'); localStorage.removeItem('vrm_apparence'); } catch (_) {} });
-  await o.pg.reload({ waitUntil: 'domcontentloaded' });
+  const o = await P.ouvrir(nav, { W, sombre: SOMBRE, b, url });
+  if (!SOMBRE) { await o.pg.addInitScript(() => { try { localStorage.removeItem('vinted_dark'); localStorage.removeItem('vrm_apparence'); } catch (_) {} });
+    await o.pg.reload({ waitUntil: 'domcontentloaded' }); }
   o.erreurs.length = 0;
   return o;
 }
@@ -53,7 +56,7 @@ const MESURE = () => {
       const c = parse(cs.backgroundColor); if (c && c.a > 0) { couches.push(c); if (c.a >= 0.999) break; }
       x = null; }
     let f = x ? null : { ...racine, a: 1 };
-    if (!f) f = { r: 28, g: 28, b: 32, a: 1 };
+    if (!f) f = { r: 223, g: 225, b: 229, a: 1 };
     for (let i = couches.length - 1; i >= 0; i--) f = couches[i].a >= 0.999 ? couches[i] : sur(couches[i], f);
     return f;
   };
@@ -94,17 +97,18 @@ const MESURE = () => {
       try {
         await pg.waitForSelector('.vrm-main', { timeout: 40000 }).catch(() => {}); await pg.waitForTimeout(5500);
         const m = await pg.evaluate(MESURE);
-        dit(m.theme === 'dark' && /^#1C1C20$/i.test(m.fondApp), `G1 ${e} ${W} : sans choix posé, l'app est en sombre, fond #1C1C20 (vrm.center)`, { theme: m.theme, fond: m.fondApp });
+        if (SOMBRE) dit(m.theme === 'dark' && /^#1C1C20$/i.test(m.fondApp), `G1 ${e} ${W} : sombre choisi, fond #1C1C20 (vrm.center)`, { theme: m.theme, fond: m.fondApp });
+        else dit(m.theme !== 'dark' && /^#DFE1E5$/i.test(m.fondApp), `G1 ${e} ${W} : sans choix posé, l'app est en clair, fond #DFE1E5 (gris étagé)`, { theme: m.theme, fond: m.fondApp });
         dit(m.n > 5 && m.ko.length === 0, `G2 ${e} ${W} : chaque texte visible tient 4,5:1 (3:1 en grand) — ${m.n} textes mesurés`, m.ko.slice(0, 25));
         if (e === 'journee') {
-          dit(m.lumCarte != null && m.lumCarte > m.lumFond, `G3 ${e} ${W} : les cartes sont plus claires que le fond`, { carte: m.lumCarte, fond: m.lumFond });
-          dit(!!m.heros && m.heros.length > 0 && Math.max(...m.heros) > m.lumFond * 1.6, `G3 ${e} ${W} : le héros se détache du fond (son ardoise plus claire)`, m.heros);
+          dit(m.lumCarte != null && m.lumCarte > m.lumFond * (SOMBRE ? 1 : 1.15), `G3 ${e} ${W} : les cartes sont nettement plus claires que le fond`, { carte: m.lumCarte, fond: m.lumFond });
+          dit(!!m.heros && m.heros.length > 0 && (SOMBRE ? Math.max(...m.heros) > m.lumFond * 1.6 : Math.abs(Math.max(...m.heros) - m.lumFond) > 0.05), `G3 ${e} ${W} : le héros se détache du fond (son dégradé n'est pas le fond)`, m.heros);
         }
         dit(m.deborde <= 1 && !erreurs.length, `G4 ${e} ${W} : rien ne déborde, aucune erreur d'app`, { deborde: m.deborde, erreurs });
         await pg.screenshot({ path: path.join(SHOTS, `${e}-${W}.png`) });
       } finally { await ctx.close(); }
     }
   } finally { await nav.close(); srv.close(); }
-  console.log(`\n${ko ? '❌' : '✅'} contraste-gris : ${ok} verts, ${ko} rouges — captures : ${SHOTS}`);
+  console.log(`\n${ko ? '❌' : '✅'} contraste-clair : ${ok} verts, ${ko} rouges — captures : ${SHOTS}`);
   process.exit(ko ? 1 : 0);
 })();
