@@ -34,5 +34,10 @@
   "cle": "› N° ?# · [^|]* \\|\\|",
   "defaut": "retour-ailleurs",
   "raison": "La feuille « Gestes » d'une annonce ou d'une vente (« N°… · titre », ouverte par « … ») est une feuille d'actions : le geste choisi (Republier, Relier, Prix…) la ferme et ouvre le sien ; refermé, on revient à la liste."
+ },
+ {
+  "cle": "\\|\\|A\\|\\|\\|\\|[^|]*@[^|]*\\|",
+  "defaut": "petit",
+  "raison": "Une adresse e-mail écrite DANS une phrase (lien en ligne) : la règle des 44 px ne s'applique pas à un lien dans le texte (exception « en ligne » de WCAG 2.5.8) ; l'adresse se copie aussi d'un appui long."
  }
 ]
