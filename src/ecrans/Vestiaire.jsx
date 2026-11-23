@@ -20,7 +20,7 @@ import { PAS_SU } from '../libelles.js';
 import { trierRecents } from '../ordreConversations.js';
 import { etatEnvoiExtension, dejaDansFil, filPasLu } from '../envoiFil.js';   // (12 nov.) l'envoi vu dans le fil
 import { EnvoiDansFil, FilPasLu, FilIllisible } from '../composants/EnvoiDansFil.jsx';
-import { VC_VENTE_ETAPES, VC_ANNONCE_ETATS, etapeMotVc, vcVenteAnnulee, numVcVente, numVcAnnonce, montantRecuVc, departsVc, etatAnnonceVcBrut, fraisVc, venteVcFraiche } from '../../api/_lib/vestiaire-regle.js';
+import { VC_MODERATION, vcModerationGeste, compteursVc, VC_VENTE_ETAPES, VC_ANNONCE_ETATS, etapeMotVc, vcVenteAnnulee, numVcVente, numVcAnnonce, montantRecuVc, departsVc, etatAnnonceVcBrut, fraisVc, venteVcFraiche } from '../../api/_lib/vestiaire-regle.js';
 import { etatVenteVc, RANG_ETAT_VC } from '../etatVenteVc.js';   // (15 nov.) l'état d'une vente Vestiaire PAR SES ÉTAPES (jamais le code machine)
 import { texteEtatVc } from '../etatVenteVcTexte.js';
 import PastilleTransporteur from '../PastilleTransporteur.jsx';
@@ -271,6 +271,9 @@ function etatAnnonceVc(it, vendueParVente, capturedAt) {
   }
   if (etatR === 'pas-dit') return { etat: 'pas-dit', label: 'État non dit par Vestiaire', brut: '' };
   const f = VC_ANNONCE_ETATS.find(([k]) => k === etatR);
+  // (22 nov.) La MODÉRATION de Vestiaire (en attente de validation · à corriger · refusée) : dite dans la langue, et
+  // `mod` la porte — l'annonce est présente, pas en ligne ; l'ambre seulement s'il y a un geste (« à corriger »).
+  if (f && VC_MODERATION.includes(f[0])) return { etat: f[0], label: tr('vcmod.' + f[0]), brut, mod: f[0] };
   return f ? { etat: f[0], label: f[2], brut } : { etat: 'autre', label: `Vestiaire : « ${brut} »`, brut };
 }
 // ⟦← App.jsx #8⟧
@@ -288,7 +291,7 @@ function AnnoncesVestiaire() {
   useNumerotationVestiaire();
   const relire = React.useCallback(async () => {
     const [rl, rv, rp] = await Promise.all([
-      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt,complet:data->complet,total:data->total,inconnu:data->formeInconnue`),
+      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt,complet:data->complet,total:data->total,inconnu:data->formeInconnue,compteurs:data->compteurs`),
       lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`),
       // (11 nov., 5.364) Baisser un prix : la recette APPRISE de son propre geste sur Vestiaire (jamais devinée).
       lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_prix_recette&select=appris:data->appris,raison:data->>raison,at:data->>at`),
@@ -302,7 +305,7 @@ function AnnoncesVestiaire() {
     // Les ventes ne servent qu'à PROUVER « vendue » ; illisibles ⇒ on n'en tire rien.
     const vendus = new Set();
     if (Array.isArray(rv) && rv[0] && rv[0].ventes && typeof rv[0].ventes === 'object') for (const v of Object.values(rv[0].ventes)) if (v && v.productId) vendus.add(String(v.productId));
-    setD({ items: r.items && typeof r.items === 'object' ? r.items : null, liens: (r.liens && typeof r.liens === 'object') ? r.liens : {}, capturedAt: r.capturedAt || '', complet: r.complet === true, total: typeof r.total === 'number' ? r.total : null, vendus, ventesKO: !Array.isArray(rv), inconnu: Array.isArray(r.inconnu) && r.inconnu.length > 0 });
+    setD({ items: r.items && typeof r.items === 'object' ? r.items : null, liens: (r.liens && typeof r.liens === 'object') ? r.liens : {}, capturedAt: r.capturedAt || '', complet: r.complet === true, total: typeof r.total === 'number' ? r.total : null, compteurs: r.compteurs && typeof r.compteurs === 'object' ? r.compteurs : null, vendus, ventesKO: !Array.isArray(rv), inconnu: Array.isArray(r.inconnu) && r.inconnu.length > 0 });
   }, []);
   useEffect(() => { relire(); }, [relire]);
   useEffect(() => {
@@ -322,7 +325,7 @@ function AnnoncesVestiaire() {
       const num = numVcAnnonce(id, it, d.liens, vcLoc.auto);
       return { id, it, num, ...etatAnnonceVc(it, d.vendus.has(String(id)), d.capturedAt) };
     });
-    const ordre = { 'en-ligne': 0, attente: 1, autre: 2, 'pas-dit': 3, 'a-confirmer': 4, vendue: 5, retiree: 6 };
+    const ordre = { corriger: -2, refusee: -1, 'en-ligne': 0, attente: 1, autre: 2, 'pas-dit': 3, 'a-confirmer': 4, vendue: 5, retiree: 6 };
     liste.sort((a, z) => (ordre[a.etat] - ordre[z.etat]) || (z.num ? 1 : 0) - (a.num ? 1 : 0) || String(a.num || '').localeCompare(String(z.num || ''), 'fr', { numeric: true }));
     const qn = q.trim().toLowerCase().replace(/^n°\s*/, '');
     const visibles = !qn ? liste : liste.filter(({ it, num }) => (num && String(num).toLowerCase() === qn) || [it.titre, num ? 'n°' + num : ''].filter(Boolean).some((x) => String(x).toLowerCase().includes(q.trim().toLowerCase())));
@@ -338,6 +341,7 @@ function AnnoncesVestiaire() {
         {/* (14 nov., refonte visible) La porte « Baisser des prix » vit dans « • À faire › » (sa feuille, son geste) ;
             la feuille de la série reste montée ici, hors de la feuille « À faire ». */}
         {liste.some((l) => l.etat === 'en-ligne') ? <AFaireSite site="vestiaire" n={1}><div data-vc-baisse-porte="" className="vrm-pf-porte"><Bouton variante="secondaire" icone="tag" data-vc-baisse-ouvrir="" data-afaire-ferme="" onClick={() => setBaisseOuverte(true)}>{tr('vcBaisse.ouvrir')}</Bouton></div></AFaireSite> : null}
+        <CompteursModerationVc lst={d}/>
         <div className="vrm-pf-collant" data-pf-outils="vestiaire">
           <BarreOutils valeur={q} onChange={setQ} placeholder={tr('plateformes.vc.chercher')} label={tr('plateformes.vc.chercherLabel')}>
             <span className="vrm-pa-entree is-outil" data-pa-entree="vestiaire"><BoutonIcone label={tr('plateformes.publierSur', { site: 'Vestiaire' })} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: { site: 'vestiaire' } })); } catch (_) {} }}><IconePlus/></BoutonIcone></span>
@@ -350,14 +354,17 @@ function AnnoncesVestiaire() {
         <section className="vrm-pf-liste vrm-vc-catalog" aria-label="Mes annonces Vestiaire" data-pf-liste="vestiaire" style={{ margin: 0 }}>
           {/* (11 nov.) Regroupées par compte quand un compte Vestiaire est ouvert (src/regroupeComptes.js, suit le flou). */}
           {!visibles.length ? <p className="vrm-pf-vide" data-vc-annonces-rien="">{tr('plateformes.rien')}</p> : null}
-          <ul className="vrm-pf-rangees sb-liste" data-sb-liste="" onClick={clicAvantSite}><ListeParCompte enLi unite="annonce" libelle="Compte ouvert sur Vestiaire" lignes={visibles} ouvert={vcOuvert} floute={(l) => vcFloute(vcOuvert, l.it.compte)} compteDe={(l) => String(l.it.compte == null ? '' : l.it.compte).trim()} nomDe={(id) => nomCompteVente('vestiaire', { compte: id }, {})} rendre={({ id, it, num, etat, label, brut }) => {
+          <ul className="vrm-pf-rangees sb-liste" data-sb-liste="" onClick={clicAvantSite}><ListeParCompte enLi unite="annonce" libelle="Compte ouvert sur Vestiaire" lignes={visibles} ouvert={vcOuvert} floute={(l) => vcFloute(vcOuvert, l.it.compte)} compteDe={(l) => String(l.it.compte == null ? '' : l.it.compte).trim()} nomDe={(id) => nomCompteVente('vestiaire', { compte: id }, {})} rendre={({ id, it, num, etat, mod, label, brut }) => {
             const flou = vcFloute(vcOuvert, it.compte);
             const prix = it.prix && isFinite(Number(it.prix.valeur)) ? (it.prix.devise && it.prix.devise !== 'EUR' ? `${Number(it.prix.valeur).toFixed(2).replace('.', ',')} ${it.prix.devise}` : fmt(it.prix.valeur)) : '—';
             // (20 nov., 5.410) Depuis quand : la date LUE chez Vestiaire (« en ligne depuis le … »), sinon la 1re lecture
             // par VRM, toujours dite « vue en ligne depuis au moins le … » (jamais présentée comme la date de mise en ligne).
             const depuisVc = etat === 'en-ligne' ? phraseEnLigneVc(it, tr, langueCourante() || 'fr') : '';
             const dVc = dateEnLigneVc(it);
-            const extra = [it.boost === true ? 'boostée' : '', typeof it.favoris === 'number' ? `${it.favoris} favori${it.favoris > 1 ? 's' : ''}` : '', depuisVc].filter(Boolean).join(' · ');
+            // (22 nov.) Ce que Vestiaire vient de trancher pour CETTE annonce (lu par l'extension entre deux lectures) : dit 7 jours.
+            const evMod = it.moderation && (it.moderation.vers === 'validee' || it.moderation.vers === 'refusee') && Date.now() - Date.parse(it.moderation.at || '') < 7 * 86400000 && ((it.moderation.vers === 'validee' && etat === 'en-ligne') || (it.moderation.vers === 'refusee' && etat === 'refusee'))
+              ? tr('vcmod.evt.' + it.moderation.vers, { quand: ageCourtVc(it.moderation.at) }) : '';
+            const extra = [it.boost === true ? 'boostée' : '', typeof it.favoris === 'number' ? `${it.favoris} favori${it.favoris > 1 ? 's' : ''}` : '', depuisVc, evMod && etat !== 'refusee' ? evMod : ''].filter(Boolean).join(' · ');
             // (14 nov., proposition 62) Toucher l'annonce ouvre LA fiche de la paire (le N° lié à CE produit Vestiaire) ;
             // « Relier / Délier Vinted » y est rendu dans « Actions » (`DansFiche`).
             const flVc = attrsFicheLigne({ contexte: 'annonce', site: 'vestiaire', cle: 'v' + id, nums: num ? [String(num)] : [], photo: it.photo || '', titre: it.titre || '', prix: prix !== '—' ? prix : '' });
@@ -374,7 +381,7 @@ function AnnoncesVestiaire() {
                       bloc sous la rangée : un lien court AU BOUT de la ligne d'état (« • En ligne · Relier à Vinted »),
                       le même bouton, le même `data-vc-relier`, le même geste ; la fiche ouverte le porte toujours (DansFiche). */}
                   <span className="vrm-ui-ligne-sous vrm-pf-sous-geste">
-                    <span className="vrm-pf-sous-texte"><span data-etat={etat === 'en-ligne' ? 'active' : etat === 'vendue' ? 'vendue' : 'autre'} title={brut ? 'État lu sur Vestiaire' : undefined}>{label}</span>{num ? '' : etat === 'retiree' ? ' · Sans N° (retirée)' : ' · N° en attente'}{extra ? ` · ${extra}` : ''}</span>
+                    <span className="vrm-pf-sous-texte"><span data-etat={etat === 'en-ligne' ? 'active' : etat === 'vendue' ? 'vendue' : 'autre'} data-vc-moderation={mod || undefined} data-vc-moderation-geste={mod && vcModerationGeste(mod) ? '1' : undefined} className={mod ? (vcModerationGeste(mod) ? 'vrm-vc-mod vrm-vc-mod-geste' : 'vrm-vc-mod') : undefined} title={brut ? 'État lu sur Vestiaire' : undefined}>{etat === 'refusee' && evMod ? evMod : label}</span>{mod && vcModerationGeste(mod) ? <> · <a className="vrm-lvc-geste sb-lien" data-vc-corriger={id} href={VC_MES_ARTICLES} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{tr('vcmod.corrigerGeste')}</a></> : null}{num ? '' : etat === 'retiree' ? ' · Sans N° (retirée)' : ' · N° en attente'}{extra ? ` · ${extra}` : ''}</span>
                     <DansFiche cle={flVc['data-fiche-ligne']}><span className="vrm-pf-gestes">
                       {/* (3 nov.) Un seul N° pour l'article aussi en ligne sur Vinted : SON toucher relie. */}
                       {lienDe(vcLoc.liens, id)
@@ -1128,3 +1135,35 @@ function MessagesVestiaire() {
   );
 }
 export { PublierVestiaire, AnnoncesVestiaire, MessagesVestiaire, VentesVestiaire, ClePhotoroom, FilVestiaire, ficheDuNumero };
+
+// (22 nov., Julien : « sur Vestiaire, voir quand une annonce est en attente de validation ») CE QUE VESTIAIRE COMPTE,
+// par compte : en attente de validation · en attente de photos (un geste : ambre) · refusées. Les nombres viennent de
+// SES compteurs (`users/me/products/count`, lus au passage par l'extension 5.439 — `compteursVc`). Jamais lus ⇒ rien
+// n'est écrit (pas de « 0 » inventé) ; un nombre que Vestiaire compte sans qu'une annonce lue le porte est dit tel
+// quel (« Vestiaire donne le nombre, pas encore l'annonce »). Rien à dire (tout à 0) ⇒ rien.
+// « Mes articles » de Vestiaire : la page relevée dans ses propres réponses (`/listings/`).
+const VC_MES_ARTICLES = 'https://fr.vestiairecollective.com/listings/';
+export function CompteursModerationVc({ lst, compact = false }) {
+  const comptes = lst && lst.compteurs && typeof lst.compteurs === 'object' ? Object.keys(lst.compteurs) : [];
+  const lignes = comptes.map((c) => ({ c, k: compteursVc(lst, c) })).filter((x) => x.k && ((x.k.attente || 0) > 0 || (x.k.photos || 0) > 0 || (x.k.refusees || 0) > 0));
+  if (!lignes.length) return null;
+  return (
+    <div className={compact ? 'vrm-vc-cpt vrm-vc-cpt-compact' : 'vrm-vc-cpt'} data-vc-compteurs={lignes.length}>
+      {lignes.map(({ c, k }) => {
+        const inconnue = (k.inconnues.attente || 0) + (k.inconnues.photos || 0) + (k.inconnues.refusees || 0) > 0;
+        return (
+          <div key={c} className="vrm-vc-cpt-ligne" data-vc-compteurs-compte={c} data-attente={k.attente == null ? '' : k.attente} data-photos={k.photos == null ? '' : k.photos} data-refusees={k.refusees == null ? '' : k.refusees} data-vieux={k.vieux ? '1' : '0'} data-inconnues={inconnue ? '1' : '0'}>
+            <span className="vrm-vc-cpt-titre">{tr('vcmod.cpt.titre')}{lignes.length > 1 ? ' · ' + nomCompteVente('vestiaire', { compte: c }, {}) : ''}</span>
+            <span className="vrm-vc-cpt-nombres">
+              {k.photos > 0 ? <span className="vrm-vc-mod vrm-vc-mod-geste" data-vc-cpt="photos">{tr('vcmod.cpt.photos', { n: k.photos })}</span> : null}
+              {k.attente > 0 ? <span className="vrm-vc-mod" data-vc-cpt="attente">{tr('vcmod.cpt.attente', { n: k.attente })}</span> : null}
+              {k.refusees > 0 ? <span className="vrm-vc-mod" data-vc-cpt="refusees">{tr('vcmod.cpt.refusees', { n: k.refusees })}</span> : null}
+              {k.at ? <span className="vrm-vc-cpt-age">{tr('vcmod.cpt.lu', { quand: ageCourtVc(new Date(k.at).toISOString()) })}</span> : null}
+            </span>
+            {inconnue && !compact ? <span className="vrm-vc-cpt-note" data-vc-cpt-laquelle="">{tr('vcmod.cpt.laquelle')} <a className="sb-lien" href={VC_MES_ARTICLES} target="_blank" rel="noreferrer">Vestiaire ↗</a></span> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}

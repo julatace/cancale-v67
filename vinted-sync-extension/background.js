@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.438.0';
+const CODE_VERSION = '5.439.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4640,6 +4640,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (compteOnglet) secuLectureNormale('vestiaire', compteOnglet).catch(() => {});   // (5.366) sa page Vestiaire lit normalement
           const ok = await rangerVcAnnonces({ items: msg.items, offset: msg.offset, total: msg.total, lus: msg.lus, forme: msg.forme, compte: compteOnglet, complet: msg.complet, inconnu: msg.inconnu });
           if (Array.isArray(msg.inconnu)) { noterDiag('vc_format_inconnu_annonces'); await noterVcCapte('annonces', ok === true, 0, { inconnu: true }); } else await noterVcCapte('annonces', ok === true, Array.isArray(msg.items) ? msg.items.length : 0);
+          sendResponse({ ok: ok === true });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
+    // 5.439 (22 nov.) — LES COMPTEURS DE « MES ARTICLES » d'un compte Vestiaire (en attente de validation, de photos,
+    // refusées…) : rangés sous le compte de L'ONGLET (jamais celui que dirait le message) ; compte pas su ⇒ rien.
+    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcCompteurs') {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          const compteOnglet = await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi);
+          const ok = await rangerVcAnnonces({ compteurs: msg.compteurs, compte: compteOnglet });
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -39191,6 +39205,46 @@ function liensPublieesVc(publiees, lus, liens) {
   }
   return { liens: out, faites };
 }
+// ── 5.439 (22 nov.) LA MODÉRATION DE VESTIAIRE ──────────────────────────────
+// <vc-moderation-regle> (même texte que api/_lib/vestiaire-regle.js `VC_ANNONCE_ETATS` / `transitionModerationVc` —
+// scripts/audit-vc-moderation.cjs exige que les deux répondent pareil). Le mot de Vestiaire rangé dans une famille ;
+// ce que Vestiaire a TRANCHÉ entre deux lectures de la MÊME annonce (son identifiant) : jamais déduit d'une
+// disparition, il faut le NOUVEAU mot.
+const VC_MOD_FAMILLES = [
+  ['vendue', /sold|vendu/i],
+  ['retiree', /withdraw|retir|delet|supprim|archiv|expir|inactiv|unpublish|deactiv|cancel|annul|unreceived/i],
+  ['refusee', /invalid|reject|refus/i],
+  ['corriger', /waiting.?(picture|photo)|(picture|photo).?(waiting|missing|required)|to.?(fix|correct|complete)|action.?required|need.?(change|correction|edit)|incomplet|corriger/i],
+  ['attente', /pending|review|moderat|curation|waiting|attente|submitted|soumis|draft|brouillon|to.?validate|validation/i],
+  ['en-ligne', /on.?sale|online|en.?ligne|published|publi[ée]|active|live|en.?vente|for.?sale|selling|approved|valid/i],
+];
+function familleModVc(mot) { const b = String(mot || '').trim(); if (!b) return ''; const f = VC_MOD_FAMILLES.find(([, re]) => re.test(b)); return f ? f[0] : 'autre'; }
+function transitionModVc(motAvant, motApres) {
+  const a = familleModVc(motAvant), b = familleModVc(motApres);
+  if (!a || !b || a === b) return '';
+  if ((a === 'attente' || a === 'corriger') && b === 'en-ligne') return 'validee';
+  if ((a === 'attente' || a === 'corriger') && b === 'refusee') return 'refusee';
+  if (a === 'attente' && b === 'corriger') return 'corriger';
+  return '';
+}
+// </vc-moderation-regle>
+// Les compteurs rebâtis champ par champ (entier ≥ 0 ou null) ; rien de lisible ⇒ null.
+function compteursVcPropres(c, maintenant) {
+  if (!c || typeof c !== 'object') return null;
+  const n = (x) => (typeof x === 'number' && isFinite(x) && x >= 0 && x < 100000 ? Math.floor(x) : null);
+  const out = { enVente: n(c.enVente), attentePhoto: n(c.attentePhoto), attenteValidation: n(c.attenteValidation), vendues: n(c.vendues), refusees: n(c.refusees), nonRecues: n(c.nonRecues) };
+  return Object.values(out).every((x) => x == null) ? null : Object.assign(out, { at: maintenant });
+}
+// Dit UNE fois ce que Vestiaire a tranché (notification du navigateur, si elle est permise) — lecture seule, rien n'est envoyé à Vestiaire.
+const VC_MOD_TEXTES = { validee: ['Vestiaire a validé ton annonce', 'Elle est en ligne.'], refusee: ['Vestiaire a refusé ton annonce', 'Ouvre Vestiaire pour voir pourquoi.'], corriger: ['Vestiaire demande une correction', 'Ton annonce attend une correction avant d’être en ligne.'] };
+function annoncerModerationVc(evts) {
+  try {
+    for (const e of (evts || []).slice(0, 5)) {
+      const t = VC_MOD_TEXTES[e.vers]; if (!t) continue;
+      if (chrome.notifications && chrome.notifications.create) chrome.notifications.create('vrm-vc-mod-' + String(e.id).slice(-12) + '-' + e.vers, { type: 'basic', iconUrl: 'icon128.png', title: t[0], message: (e.titre ? e.titre + ' — ' : '') + t[1] }, () => { void chrome.runtime.lastError; });
+    }
+  } catch (_) {}
+}
 async function rangerVcAnnoncesMaintenant(patch) {
   const rows = await sbGet('app_data?id=eq.vc_listings&select=data');
   if (rows === null) return false;
@@ -39203,6 +39257,12 @@ async function rangerVcAnnoncesMaintenant(patch) {
     if (!/^[\w-]{1,40}$/.test(k) || !v) continue;
     if (data.liens[k] !== String(v)) { data.liens[k] = String(v); change = true; }
   }
+  // 5.439 : les compteurs de Vestiaire pour CE compte (jamais sans compte : on ne saurait pas à qui ils sont).
+  const evtsMod = [];
+  if (patch.compteurs && compte) {
+    const c = compteursVcPropres(patch.compteurs, maintenant);
+    if (c) { data.compteurs = Object.assign({}, cur.compteurs || {}, { [compte]: c }); change = true; }
+  }
   if (Array.isArray(patch.inconnu) && !(Array.isArray(patch.items) && patch.items.length)) {
     // 5.299 : une réponse au format INCONNU n'est pas « aucune annonce » : ni
     // fraîcheur, ni total, ni liste vidée — seulement sa forme, pour viser juste.
@@ -39212,7 +39272,11 @@ async function rangerVcAnnoncesMaintenant(patch) {
     for (const x of patch.items.slice(0, 200)) {
       const id = String((x && x.id) || '');
       if (!/^[\w-]{1,40}$/.test(id)) continue;
+      // 5.439 : ce que Vestiaire a tranché pour CETTE annonce depuis la lecture d'avant (validée, refusée, à corriger).
+      const avantMod = data.items[id] && data.items[id].statut, versMod = transitionModVc(avantMod, x && x.statut);
       lus[id] = ficheVcAnnonce(x, data.items[id] || {}, compte, maintenant);
+      if (versMod) { lus[id].moderation = { vers: versMod, at: maintenant, de: String(avantMod || '').slice(0, 40) }; evtsMod.push({ id, vers: versMod, titre: lus[id].titre || '' }); }
+      else if (data.items[id] && data.items[id].moderation) lus[id].moderation = data.items[id].moderation;
     }
     const offset = Number(patch.offset) || 0; const total = typeof patch.total === 'number' ? patch.total : null;
     // 5.299 : une liste lue en entier sur PLUSIEURS pages (`complet`) fait foi aussi.
@@ -39242,7 +39306,8 @@ async function rangerVcAnnoncesMaintenant(patch) {
   }
   if (!change) return true;
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_listings', data }], 'id');
-  if (ok === true && Array.isArray(patch.items)) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  if (ok === true && (Array.isArray(patch.items) || patch.compteurs)) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  if (ok === true && evtsMod.length) annoncerModerationVc(evtsMod);
   if (ok === true && Array.isArray(patch.items)) await capteVc('annonces', compte, patch.items.slice(0, 200).filter((x) => x && /^[\w-]{1,40}$/.test(String(x.id || ''))).map((x) => ({ id: String(x.id), t: x.date || x.creeLe || null })));   // 5.377
   return ok === true;
 }

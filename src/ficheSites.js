@@ -23,7 +23,9 @@ export const SITES_PUBLIABLES = ['leboncoin', 'ebay', 'vestiaire'];
 // (22 nov., intégration finale) + 'publiee' (ext. 5.424) : l'annonce que VRM vient de CRÉER, retenue par SON identifiant, pas encore relue.
 // (22 nov., ext. 5.435, choix 2a) + 'en-pause' (une annonce Leboncoin en pause) et 'hors-ligne' (une annonce Vestiaire hors ligne,
 // ou en attente de validation) : encore chez lui, sur CE site, par la même identité — pas « pas publiée », pas « vendue ».
-const RANG = { vendue: 0, 'en-ligne': 1, publiee: 2, 'en-pause': 3, 'hors-ligne': 3, masquee: 3, 'pas-revue': 4, retiree: 5 };
+// (22 nov., annulées + validation Vestiaire, Julien : « voir quand une annonce est en attente de validation ») la modération de
+// Vestiaire a SES états, distincts de « hors ligne » : à corriger (un geste), en attente de validation, refusée — présentes, pas en ligne.
+const RANG = { vendue: 0, 'en-ligne': 1, corriger: 1.5, attente: 1.6, publiee: 2, 'en-pause': 3, 'hors-ligne': 3, masquee: 3, 'pas-revue': 4, refusee: 4.5, retiree: 5 };
 const ETATS_ENTREE = Object.keys(RANG);
 const JOUR = 86400000;
 
@@ -94,10 +96,10 @@ export function rangeesSitesFiche(entrees, o = {}) {
 // à la main, référence VRM) et `o.numVc` (N° donné, référence, lien VRM) — jamais par un titre (aucun titre n'est lu ici).
 //   lbcItems  `lbc_listings.items` (null = pas lu ⇒ rien) ; vcItems `vc_listings.items` (null = pas lu ⇒ rien) ;
 //   o.etatLbc(ad) ⇒ l'état Leboncoin de l'app (`etatAnnonceLeboncoin` avec `lbcSortieDe`) : 'pause' ⇒ « en pause » ;
-//   o.etatVc(it)  ⇒ la famille Vestiaire (`etatAnnonceVcBrut`) : 'attente' ⇒ « hors ligne » ; 'retiree' ⇒ « hors ligne » si le
+//   o.etatVc(it)  ⇒ la famille Vestiaire (`etatAnnonceVcBrut`) : 'attente' / 'corriger' / 'refusee' ⇒ ce même état (22 nov.) ; 'retiree' ⇒ « hors ligne » si le
 //                   mot de Vestiaire dit hors ligne (dépublié, désactivé…), sinon « plus en ligne » ; jamais 'vendue' (la vente
 //                   a sa rangée par sa transaction), jamais un état inconnu (« pas dit » n'est pas « hors ligne »).
-// Rend les entrées de `rangeesSitesFiche` ({ site, etat: 'en-pause'|'hors-ligne'|'retiree', id, compte, prix (centimes|null),
+// Rend les entrées de `rangeesSitesFiche` ({ site, etat: 'en-pause'|'hors-ligne'|'attente'|'corriger'|'refusee'|'retiree', id, compte, prix (centimes|null),
 // favoris, depuis, lien }). Un nombre pas lu reste absent.
 const HORS_LIGNE_VC = /unpublish|offline|hors.?ligne|deactiv|d[ée]sactiv|inactiv|paus|hidden|masqu/i;
 const centimes = (v) => { const a = v && typeof v === 'object' ? (v.valeur != null ? v.valeur : v.amount) : Array.isArray(v) ? v[0] : v; const n = Number(String(a == null ? '' : a).replace(',', '.')); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null; };
@@ -121,11 +123,14 @@ export function annoncesHorsLigneAutresSites(cle, { lbcItems, vcItems } = {}, o 
     for (const [id, it] of Object.entries(vcItems)) {
       if (!it || typeof it !== 'object' || !/^[\w-]{3,40}$/.test(String(id))) continue;
       let e = null; try { e = o.etatVc(it, id); } catch (_) { e = null; }
-      if (e !== 'attente' && e !== 'retiree') continue;
+      if (e !== 'attente' && e !== 'corriger' && e !== 'refusee' && e !== 'retiree') continue;
       if (!meme(o.numVc(id, it))) continue;
-      const hors = e === 'attente' || HORS_LIGNE_VC.test(String(it.statut || ''));
-      out.push({ site: 'vestiaire', etat: hors ? 'hors-ligne' : 'retiree', id: String(id), compte: '', prix: centimes(it.prix), depuis: msLu(it.depuis),
-        lien: hors ? `https://fr.vestiairecollective.com/${encodeURIComponent(String(id))}.shtml` : '' });
+      // (22 nov.) La modération de Vestiaire garde SON état (attente · corriger · refusee, le mot LU chez Vestiaire,
+      // `moderationVc`) : « en attente de validation » n'est plus fondu dans « hors ligne ».
+      const mod = e === 'attente' || e === 'corriger' || e === 'refusee';
+      const hors = !mod && HORS_LIGNE_VC.test(String(it.statut || ''));
+      out.push({ site: 'vestiaire', etat: mod ? e : hors ? 'hors-ligne' : 'retiree', id: String(id), compte: '', prix: centimes(it.prix), depuis: msLu(it.depuis),
+        lien: mod || hors ? `https://fr.vestiairecollective.com/${encodeURIComponent(String(id))}.shtml` : '' });
     }
   }
   return out;

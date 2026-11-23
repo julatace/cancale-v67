@@ -128,23 +128,25 @@ async function lancer(R) {
     const vcP = {};
     for (let i = 0; i < 50; i++) vcP[String(70000 + i)] = { statut: 'unpublished', titre: TITRE, prix: { valeur: 90 } };
     const etatLbc = (ad) => (/pause/i.test(String(ad.status)) || ad.pauseAt ? 'pause' : /active/i.test(String(ad.status)) ? 'active' : 'inconnu');
-    const etatVc = (it) => (/sold/i.test(String(it.statut)) ? 'vendue' : /pending|review/i.test(String(it.statut)) ? 'attente' : /unpublish|delet|archiv/i.test(String(it.statut)) ? 'retiree' : /online|published/i.test(String(it.statut)) ? 'en-ligne' : 'autre');
+    const etatVc = (it) => (/sold/i.test(String(it.statut)) ? 'vendue' : /refus/i.test(String(it.statut)) ? 'refusee' : /waiting_picture/i.test(String(it.statut)) ? 'corriger' : /pending|review/i.test(String(it.statut)) ? 'attente' : /unpublish|delet|archiv/i.test(String(it.statut)) ? 'retiree' : /online|published/i.test(String(it.statut)) ? 'en-ligne' : 'autre');
     const numVc = (id, it) => { const m = /^VRM-(\w+)$/.exec(String(it.ref || '')); return m ? m[1] : ''; };
     const o9 = { cleNum, numLbc, numVc, etatLbc, etatVc };
     const sans = FS.annoncesHorsLigneAutresSites('12', { lbcItems: lbcP, vcItems: vcP }, o9);
     dit(sans.length === 0, 'S9 50 annonces Leboncoin en pause et 50 Vestiaire hors ligne au MÊME titre, sans identité ⇒ aucune n’est l’article', sans.length);
     const lbc2 = { ...lbcP, '4000000007': { ...lbcP['4000000007'], ref: 'VRM-12', stats: { favoris: 3 }, publieeLe: '2026-11-01T10:00:00Z' } };
-    const vc2 = { ...vcP, '70011': { ...vcP['70011'], ref: 'VRM-12' }, '70012': { statut: 'pending_review', ref: 'VRM-12', prix: 80 }, '70013': { statut: 'deleted', ref: 'VRM-12' }, '70014': { statut: 'sold', ref: 'VRM-12' }, '70015': { statut: '', ref: 'VRM-12' } };
+    const vc2 = { ...vcP, '70011': { ...vcP['70011'], ref: 'VRM-12' }, '70012': { statut: 'pending_review', ref: 'VRM-12', prix: 80 }, '70013': { statut: 'deleted', ref: 'VRM-12' }, '70014': { statut: 'sold', ref: 'VRM-12' }, '70015': { statut: '', ref: 'VRM-12' }, '70016': { statut: 'refused', ref: 'VRM-12' }, '70017': { statut: 'waiting_picture', ref: 'VRM-12' } };
     const avec9 = FS.annoncesHorsLigneAutresSites('12', { lbcItems: lbc2, vcItems: vc2 }, o9);
     const de9 = (id) => avec9.find((x) => x.id === id);
     dit(de9('4000000007') && de9('4000000007').etat === 'en-pause' && de9('4000000007').site === 'leboncoin' && de9('4000000007').prix === 5500 && de9('4000000007').favoris === 3 && /^https:\/\/www\.leboncoin\.fr\//.test(de9('4000000007').lien), 'S9 la seule annonce Leboncoin qui porte « VRM-12 » ⇒ « en pause », son prix, ses favoris, son lien', de9('4000000007'));
-    dit(de9('70011') && de9('70011').etat === 'hors-ligne' && de9('70012') && de9('70012').etat === 'hors-ligne' && de9('70012').prix === 8000, 'S9 Vestiaire dépubliée ou en attente de validation ⇒ « hors ligne »', [de9('70011'), de9('70012')]);
+    dit(de9('70011') && de9('70011').etat === 'hors-ligne', 'S9 Vestiaire dépubliée ⇒ « hors ligne »', de9('70011'));
+    // (22 nov., annulées + validation Vestiaire) la modération garde SON état, distinct de « hors ligne ».
+    dit(de9('70012') && de9('70012').etat === 'attente' && de9('70012').prix === 8000 && /^https:\/\/fr\.vestiairecollective\.com\//.test(de9('70012').lien) && de9('70016') && de9('70016').etat === 'refusee' && de9('70017') && de9('70017').etat === 'corriger', 'S9 Vestiaire en attente de validation / refusée / à corriger ⇒ ces états-là (pas « hors ligne »)', [de9('70012'), de9('70016'), de9('70017')]);
     dit(de9('70013') && de9('70013').etat === 'retiree' && !de9('70013').lien && !de9('70014') && !de9('70015'), 'S9 supprimée ⇒ « plus en ligne » ; vendue ou état pas dit ⇒ aucune rangée (pas su ≠ hors ligne)', avec9.map((x) => x.id + ':' + x.etat));
-    dit(avec9.length === 4, 'S9 rien d’autre', avec9.map((x) => x.id));
+    dit(avec9.length === 6, 'S9 rien d’autre', avec9.map((x) => x.id));
     dit(FS.annoncesHorsLigneAutresSites('12', { lbcItems: null, vcItems: null }, o9).length === 0, 'S9 sites pas lus ⇒ rien (jamais « pas publiée » tiré de là)');
     const r9 = R1(avec9.concat([{ site: 'vinted', etat: 'en-ligne' }]));
     const L9 = r9.find((r) => r.site === 'leboncoin'), V9 = r9.filter((r) => r.site === 'vestiaire');
-    dit(L9 && L9.etat === 'en-pause' && !L9.publier && V9.length === 2 && V9.every((r) => r.etat === 'hors-ligne' && !r.publier), 'S9 la fiche : sa rangée « en pause » / « hors ligne », et pas « Publier » (elle y est encore)', etats(r9));
+    dit(L9 && L9.etat === 'en-pause' && !L9.publier && V9.length === 4 && V9.every((r) => ['hors-ligne', 'attente', 'refusee', 'corriger'].includes(r.etat) && !r.publier) && V9[0].etat === 'corriger', 'S9 la fiche : sa rangée « en pause » / « hors ligne », et pas « Publier » (elle y est encore)', etats(r9));
   }
   const srcApp9 = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
   dit(/for \(const x of annoncesHorsLigneAutresSitesFiche\(numF, ex\)\)/.test(srcApp9) && /numLbc: \(ad, id\) => numeroLbcIdentite\(\{ itemId: id \}, \{ \[id\]: ad \}, load\('vrm_lbc_liens', \{\}\) \|\| \{\}\),\n  numVc: \(id, it\) => numeroVcIdentite\(id, it, extra \? extra\.vcLiens : null\),\n  etatLbc/.test(srcApp9), 'S9 branché dans la fiche (sitesAutresFiche) avec les identités de la règle du prix', '');

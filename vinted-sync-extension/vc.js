@@ -84,6 +84,13 @@
         chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vc', action: 'vcAnnonces', items, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, suite(d)), () => { void chrome.runtime.lastError; });
         return;
       }
+      // 5.439 : les compteurs de « Mes articles » (en vente, en attente de validation, de photos, refusées) — six nombres ou null.
+      if (d.kind === 'vccompteurs') {
+        const c = d.compteurs && typeof d.compteurs === 'object' ? d.compteurs : {};
+        const n = (x) => (typeof x === 'number' && isFinite(x) && x >= 0 && x < 100000 ? Math.floor(x) : null);
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcCompteurs', compteurs: { enVente: n(c.enVente), attentePhoto: n(c.attentePhoto), attenteValidation: n(c.attenteValidation), vendues: n(c.vendues), refusees: n(c.refusees), nonRecues: n(c.nonRecues) }, moi: String(d.moi || '').slice(0, 40) }, () => { void chrome.runtime.lastError; });
+        return;
+      }
       // ⛔ 5.323 : `vcbrut` / `vcpdf` (la capture brute de la 5.315) ne sont plus relayés — coupée sur sa décision.
       // 5.316 : le suivi d'UNE vente (transporteur, n° de suivi, bordereau PDF signé, étapes).
       if (d.kind === 'vctimeline' && /^\d{3,15}$/.test(String(d.productId || ''))) {
