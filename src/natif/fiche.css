@@ -26,6 +26,9 @@
   /* (iPhone, onglet Safari : 664 px utiles) la photo garde toute la largeur mais ne passe pas 46 % de la hauteur : le prix et le plein restent au premier écran. */
   .nf-defile::-webkit-scrollbar { display: none; }
   .nf-galerie[data-nf-sans] .nf-defile { aspect-ratio: 16 / 9; }
+  /* (22 nov., bugs-totale) Une photo Vinted qui ne se charge pas (« perdue » : c'est souvent le cas au téléphone, sans
+     l'extension) laissait un carré vide de 45 % de l'écran au-dessus de la fiche : la même bande basse que « sans photo ». */
+  .nf-defile:not(:has([data-photo-vinted="natif"], [data-photo-vinted="secours"], [data-photo-vinted="attente"], img:not([data-photo-vinted]))):has([data-photo-vinted="perdue"]) { aspect-ratio: 16 / 9; max-height: 22svh; }
   /* Un titre très long (jamais coupé) prend ses lignes : la photo cède un peu de hauteur, le prix et le plein restent au premier écran. */
   .nf[data-nf-titre-long] .nf-defile { max-height: 34svh; }
   .nf-photo {

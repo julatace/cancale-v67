@@ -28,8 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
-  // (16 nov., lot doublons-meme-compte) docs/passation/2026-11-16-doublons-meme-compte.md
-  { id: 'doublons-meme-compte', date: '2026-11-23', titre: 'Deux annonces d’un compte, une paire', phrase: 'Même photo sur un compte : dit avant la double vente.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (23 nov., audit « chaque bouton marche ») docs/passation/2026-11-23-audit-boutons.md
+  { id: 'boutons-reveilles', date: '2026-11-23', titre: 'Les boutons qui ne faisaient rien, réparés', phrase: 'Poignée des feuilles, retour au téléphone, Échap, menu des achats.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., latence-totale — Julien : « l'app bug beaucoup trop ») docs/passation/2026-11-22-latence.md
   { id: 'onglets-plus-rapides', date: '2026-11-23', titre: 'Achats et Ventes s’ouvrent plus vite', phrase: 'Les longues listes de colis arrivent au fil du défilement.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées » ; « sur Vestiaire, voir quand une annonce est en attente de validation ») docs/passation/2026-11-22-annulees-vc.md
@@ -344,6 +344,8 @@ export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot barre-achats — Julien : « ajoute les Achats dans la barre » ; « je ne veux pas qu'on puisse glisser
   // entre les onglets ») docs/passation/2026-11-16-barre-achats.md
   { id: 'barre-achats', date: '2026-11-16', titre: 'Achats a son onglet dans la barre', phrase: 'Et glisser du doigt ne change plus d’onglet.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot doublons-meme-compte) docs/passation/2026-11-16-doublons-meme-compte.md
+  { id: 'doublons-meme-compte', date: '2026-11-16', titre: 'Deux annonces d’un compte, une paire', phrase: 'Même photo sur un compte : dit avant la double vente.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (16 nov., lot ventes-selection) docs/passation/2026-11-16-ventes-selection.md
   { id: 'selection-visible', date: '2026-11-16', titre: 'Sélection : seulement les lignes affichées', phrase: '« Tout sélectionner » prend ce que tu vois, rien de caché.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., stabilite-iphone — « l'app bug un peu » sur iPhone) docs/passation/2026-11-16-stabilite-iphone.md
