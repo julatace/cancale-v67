@@ -18567,6 +18567,8 @@ function TeteNative({ tab, setTab, ordi, titre, nonLus = 0, rechercheOuverte = f
       messages={tab === 'messages' ? null : { n: nMsg || undefined, libelle: tr('nav.messages'), libellePastille: nMsg ? `${tr('nav.messages')} · ${nMsg}` : '', icone: <Icon name="chat" size={24}/>, onOuvrir: () => { revenirSurOnglet(); ouvrirEntree(ONGLET_MESSAGES, setTab); } }}
       avatar={uid ? <PastilleProfil owner={uid} headers={enTeteSession} nom="" email={String(AUTH.user.email || '')} taille={30} className="vrm-sensible"/> : <Natif.Avatar compte={{ initiales: 'V' }}/>}/>
   </>);
+  // (23 nov., audit démo) À l'ordinateur, Aujourd'hui pose SON titre (date et ronds, src/natif/ecrans/Aujourdhui.jsx ;
+  // `sj-titre` pour un compte neuf) : la coque n'en ajoute pas un second (banc titre-unique).
   return (
     <Natif.TetePage titre={!natif && !ordi && !ECRANS_TITRE_COQUE.has(tab) ? '' : tab === 'journee' ? tr('nav.journee.court') : argentTab ? tr('nav.compta') : titre} grandTitre={natif || (ECRANS_TITRE_COQUE.has(tab) && !ordi)} gauche={gauche} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}/>
   );
