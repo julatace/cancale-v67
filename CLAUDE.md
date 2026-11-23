@@ -483,9 +483,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **23 nov. · Republier à la main refait** : une étape à la fois, barre fine, grille de TOUTES les photos (glisser), un plein en bas, retouche repliée aux vrais curseurs, ≤ 8 mots par étape, aucun orange ; « Supprimer » cochée seulement sur une lecture complète du compte (une masquée n'est pas supprimée). `2026-11-23-republier-main-feuille.md`. Geste : aucun.
+- **23 nov. · Republier à la main refait** : une étape à la fois, grille de toutes les photos (glisser), un plein en bas, vrais curseurs, aucun orange ; « Supprimer » cochée sur lecture complète seulement. `2026-11-23-republier-main-feuille.md`. Geste : aucun.
 - **23 nov. · Mode présentation (`claude/presentation`)** : Paramètres → Apparence et langue (aussi menu du compte, « Plus », bouton à côté de l’œil de la barre latérale) : montants, pseudos, adresses, codes, n° de suivi cachés, comptes « Compte 1, 2… » ; photos, titres, N° visibles ; pastille « Présentation » ; propre à l’appareil, rien en base ; règle du stream à programme fixe + composants marqués. Banc `mode-presentation`. `docs/passation/2026-11-23-presentation.md`. Geste : aucun.
-- **23 nov. · Achats à l'ordinateur, moitié gauche vide (`claude/achats-ordi-casse`)** : la grille deux colonnes d'Achats (codes à gauche) ne s'allume plus avec le tableau de travail ; banc `largeur-ordi` (app telle qu'en production). `2026-11-23-achats-ordi-casse.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
