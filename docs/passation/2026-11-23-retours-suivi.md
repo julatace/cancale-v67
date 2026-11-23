@@ -12,7 +12,7 @@ orange/ambre. Suite de `2026-11-15-retours-suivi.md` (la règle par n° exact), 
   `docs/*.md`, `docs/passation/*.md`, `docs/design/*.md`, et `dist/` ne sont pas extraits — le disque était PLEIN à 11:45 UTC).
 - PAS de PR ni de fusion : consigne « pas de fusion avant le choix de Julien » (maquettes ci-dessous) et « aucune fusion
   avant demain 07:00 UTC ».
-- « À retirer » : seulement les 3 maquettes ; rien codé (attend le choix de Julien).
+- « À retirer » : la proposition C est codée (consigne du coordinateur en attendant le choix de Julien) ; A et B restent des maquettes.
 - Voir « Reste à faire » en bas.
 
 ## Mesuré d'abord (lecture seule, base de production, projections scalaires)
@@ -61,7 +61,15 @@ peut donc venir que du remboursement (qui l'implique) — d'où le cas de sa cap
    serveur, abandonnée). Maintenant : `email_bordretour_*` / `email_retourdemande_*` / `email_rembachat_*` rangés ⇒ signal
    `vrm:neuf` « retours » (la veille) ⇒ relecture des retours ; `email_track_*` (« colis ») ⇒ relecture des faits du
    transporteur ; retour sur l'app après 20 s ⇒ les deux. Projections scalaires, mêmes lecteurs.
-5. « Quoi de neuf » : `retours-achat-suivi`. Textes en 5 langues (`rt.*` dans `src/i18n/langues/<l>/renvoyer.js`).
+5. **« À retirer » — proposition C** (`src/natif/RetraitsPoints.jsx`, `src/natif/retraits.css`, `data-rp-variante="c"`, défaut) :
+   une carte BLANCHE par point (logo, nom, « transporteur · comptoir », l'échéance LUE — au contour d'encre quand elle presse, plus
+   d'ambre —, adresse · horaires lus), chaque colis en RANGÉE compacte (photo 44, titre, N° · prix, le CODE à droite en chasse
+   fixe, son QR en vignette 44 ; toucher = le plein écran d'avant), la frise fine dessous, et au pied des VRAIS boutons :
+   « Itinéraire » (plein sur le premier point, celui qui presse le plus) et « Code » quand un seul colis attend. Aucune règle
+   touchée : `pointsARetirer`, `colisDuPoint`, `src/retraitPreuves.js`, l'identité — inchangés ; les repères `data-rp-*` sont ceux
+   d'avant. Les variantes « a » / « b » restent (`vrm_banc_retrait_variante`). Mini-carte par point : PAS faite (aucune tuile
+   gratuite sûre par carte ; la carte des points existante, `CartePoints`, reste sur son bouton).
+6. « Quoi de neuf » : `retours-achat-suivi`. Textes en 5 langues (`rt.*` dans `src/i18n/langues/<l>/renvoyer.js`).
 
 ## L'extension : ce qu'il faudrait (PAS fait aujourd'hui : 5.440–5.443 réservées ailleurs)
 
