@@ -25,11 +25,15 @@ const { metaVersData } = require('./_meta.cjs');
 // (13 nov., intégration) Le DERNIER midi passé, jamais un midi à venir : avant 12 h, « midi aujourd'hui »
 // datait les ventes dans le futur et l'app relisait les commandes (budget-vitesse rouge chaque matin,
 // mesuré : main 3709 Ko au lieu de 2896 Ko à 0 h 40, vert en reculant l'horloge de 12 h).
-const midi = new Date(); midi.setHours(12, 0, 0, 0);
-if (midi.getTime() > Date.now()) midi.setDate(midi.getDate() - 1);
+// (22 nov.) `BANC_MAINTENANT=<date ISO>` : la base est fabriquée comme si on était à cette heure-là (l'horloge de la page
+// est posée à la même par le banc — scripts/bancs/iphone-rapide.cjs, étape `argent`). Absent : l'heure de la machine.
+const DECALAGE_BANC = process.env.BANC_MAINTENANT ? Date.parse(process.env.BANC_MAINTENANT) - Date.now() : 0;
+const maintenantBanc = () => Date.now() + DECALAGE_BANC;
+const midi = new Date(maintenantBanc()); midi.setHours(12, 0, 0, 0);
+if (midi.getTime() > maintenantBanc()) midi.setDate(midi.getDate() - 1);
 const NOW = midi.getTime();
 const iso = (msAgo) => new Date(NOW - msAgo).toISOString();
-const frais = (msAgo) => new Date(Date.now() - msAgo).toISOString();
+const frais = (msAgo) => new Date(maintenantBanc() - msAgo).toISOString();
 const J = 86400000;
 // Générateur déterministe : deux passages servent EXACTEMENT les mêmes lignes
 // (sinon un avant/après comparerait deux bases).

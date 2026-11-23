@@ -195,8 +195,12 @@ export function registreDesAchats({ achats = null, hors = [], fiches = null, ven
       else if (m) { montant = m.centimes / 100; source = 'article'; }
       else raison = String((o.price && o.price.currency_code) || 'EUR').toUpperCase() !== 'EUR' ? 'autre devise' : 'prix pas lu';
     }
+    // (21 nov., lot relier-retires) Un remboursement PARTIEL lu (src/coutAchatNet.js, `_rembPartiel`, par SON n°) : seul le
+    // RESTE est un achat ; le remboursé est dit sur la ligne (`rembourse`). Jamais sous 0.
+    let rembourse = null;
+    if (o._rembPartiel && montant != null && Number.isFinite(Number(o._rembPartiel.montant))) { rembourse = Math.min(montant, Number(o._rembPartiel.montant)); montant = Math.round((montant - rembourse) * 100) / 100; }
     const ts = Date.parse(o.date || '');
-    const l = { id, ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Vinted', fournisseur: 'Vinted', montant, source, raison, saisi,
+    const l = { id, ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Vinted', fournisseur: 'Vinted', montant, source, raison, saisi, rembourse, rembAttente: o._rembAttente || '',
       reglement: 'Paiement Vinted', reference: tx, num: nums.join(' + '), compte: String(o.compte || ''), titre: String(o.title || ''), uid: String(o._uid || '') };
     if (l.ts == null) { sansDate.push(l); continue; }
     if (dansPeriode(ymLocal(l.ts), periode)) lignes.push(l);

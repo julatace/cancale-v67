@@ -50,7 +50,7 @@ const CSS = `
 .sc-feuille .rel{font-size:12px;line-height:16px;color:#48484A;margin-top:2px;white-space:nowrap}
 .sc-cb{display:flex;align-items:stretch;gap:2px;margin-top:8px}
 .sc-cb i{display:block;background:${K.ink}}
-.sc-tampon{position:relative;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border:1.5px solid ${K.cta};border-radius:6px;background:rgba(36,88,230,.06);font-size:12px;font-weight:600;color:${K.ink};white-space:nowrap;font-variant-numeric:tabular-nums}
+.sc-tampon{position:relative;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border:1.5px solid ${K.cta};border-radius:6px;background:rgba(22, 24, 29,.06);font-size:12px;font-weight:600;color:${K.ink};white-space:nowrap;font-variant-numeric:tabular-nums}
 .sc-encre{position:absolute;inset:-3px;border:2px solid ${K.accent};border-radius:6px;pointer-events:none}
 .sc-carton{position:absolute;border-radius:6px;background:${K.card2};border:1px solid ${K.line2};display:flex;align-items:flex-end;justify-content:center;padding-bottom:7px;font-size:12px;font-weight:600;color:${K.muted};font-variant-numeric:tabular-nums}
 .sc-carton:before{content:"";position:absolute;left:0;right:0;top:14px;height:6px;background:rgba(255,255,255,.06)}
@@ -59,12 +59,12 @@ const CSS = `
 .sc-etiq{position:absolute;font-size:12px;font-weight:500;color:${K.text};white-space:nowrap;line-height:16px}
 .sc-curseur{position:absolute;left:0;top:0;width:18px;height:22px;z-index:20;pointer-events:none;transform-origin:2px 2px}
 .sc-anneau{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:1.5px solid rgba(255,255,255,.85);z-index:19;pointer-events:none}
-.sc-vol{position:absolute;left:0;top:0;z-index:15;pointer-events:none;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:12px;background:rgba(0,113,227,.18);border:1px solid ${K.accent};font-size:12px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums;white-space:nowrap}
+.sc-vol{position:absolute;left:0;top:0;z-index:15;pointer-events:none;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:12px;background:rgba(22, 24, 29,.18);border:1px solid ${K.accent};font-size:12px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums;white-space:nowrap}
 .sc-plat{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:${K.muted};line-height:16px}
 .sc-plat i{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:7px;vertical-align:1px}
 .sc-plat strong{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:15px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums}
 .sc-ident{position:relative;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:12px;background:${K.card2};border:1px solid ${K.line2};font-size:12px;font-weight:600;color:${K.text};font-variant-numeric:tabular-nums;white-space:nowrap}
-.sc-ident .lum{position:absolute;inset:-1px;border-radius:12px;background:${K.accentSoft};border:1px solid rgba(0,113,227,.6)}
+.sc-ident .lum{position:absolute;inset:-1px;border-radius:12px;background:${K.accentSoft};border:1px solid rgba(22, 24, 29,.6)}
 .sc-ident span{position:relative}
 .sc-etat{position:relative;height:22px;flex:1;min-width:0}
 .sc-etat > span{position:absolute;right:0;top:0;height:22px;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}
@@ -76,7 +76,7 @@ const CSS = `
 .sc-bulle .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 .sc-mois{position:absolute;left:0;top:0;right:0;background:${K.card};border:1px solid ${K.line2};border-radius:12px;box-shadow:${REFLET},${OMBRE_CARTE};padding:22px 24px 24px}
 .sc-mois .t1{font-size:13px;font-weight:600;color:${K.muted}}
-.sc-pastille{position:absolute;display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:12px;background:rgba(0,113,227,.12);border:1px solid ${K.accent};font-size:12px;font-weight:600;color:${K.text};white-space:nowrap;font-variant-numeric:tabular-nums}
+.sc-pastille{position:absolute;display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:12px;background:rgba(22, 24, 29,.12);border:1px solid ${K.accent};font-size:12px;font-weight:600;color:${K.text};white-space:nowrap;font-variant-numeric:tabular-nums}
 .sc-total{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:38px;font-weight:700;letter-spacing:-.02em;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap}
 .sc-n{position:relative;height:20px;font-size:15px;color:${K.muted};margin-top:6px}
 .sc-n span{position:absolute;left:0;top:0;white-space:nowrap}

@@ -20,7 +20,10 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { transporteursNommes } from './transporteur-bordereau.js';
 import { transporteurDeForme, FORME_CHRONOPOST_PROPRE } from './suivi-colis.js';
-import { texteDuPdf } from './texte-pdf.js';
+// (17 nov., fiabilité-vitesse) texte-pdf.js (et pdf-lib, ≈ 180 Ko compressés) chargé À LA DEMANDE, dans
+// `transporteurDuPdf` : l'app importe ce module (par transporteur-anciens.js) pour ses constantes, et cet
+// import statique collait pdf-lib dans le morceau App, téléchargé à chaque démarrage. Même décision, même
+// « illisible » si le chargement échoue (le try l'attrape).
 
 const sansAccents = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -49,7 +52,9 @@ export function transporteursDuPdf(texte) {
 // 26 chiffres commençant par « 56 », dont les chiffres 3 à 10 sont le n° Mondial Relay (3 bordereaux sur 3 :
 // le n° de l'e-mail). Une FORME PROPRE, comme XW…TS pour Chronopost : un seul code de cette forme dans le
 // PDF ⇒ Mondial Relay et son n° ; zéro ou plusieurs ⇒ rien (jamais deviné).
-export const RE_CODE_MR = /56\d{24}/g;
+// (17 nov., lot scan-bordereau-vente) MESURÉ : l'étiquette Mondial Relay du 16 nov. imprime « 55… » (26 chiffres,
+// chiffres 3 à 10 = le n° de l'e-mail) — `suiviPdf` restait vide. « 55 » et « 56 » : la même forme.
+export const RE_CODE_MR = /5[56]\d{24}/g;
 export function codeMondialRelay(texte) {
   const colle = String(texte == null ? '' : texte).replace(/\s+/g, '');
   const codes = [...new Set(colle.match(RE_CODE_MR) || [])];
@@ -92,7 +97,7 @@ export function decisionTexteBordereau(texte) {
 
 // Le PDF (base64 ou octets) ⇒ la décision. Ne lève jamais.
 export async function transporteurDuPdf(pdf) {
-  try { return decisionTexteBordereau(await texteDuPdf(pdf)); }
+  try { const { texteDuPdf } = await import('./texte-pdf.js'); return decisionTexteBordereau(await texteDuPdf(pdf)); }
   catch (_) { return { etat: 'illisible', t: '', s: '' }; }
 }
 

@@ -27,6 +27,7 @@ import {resumeMessagesEbay,retirerMessageRepondu} from './_lib/ebay-messages-non
 // navigateur ; échecs honnêtes (503 sans clés, un refus eBay remonte).
 
 import crypto from 'crypto';
+import { gardePrixRegle, gardePhrase } from './_lib/garde-prix-regle.js';
 import {creerGestionEbay,lireXmlEbay} from './_lib/ebay-gestion.js';
 import {creerApresVenteEbay,annulerCommandeRangee} from './_lib/ebay-apres-vente.js';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
@@ -662,6 +663,10 @@ async function handleRevise(b, ctx) {
     if (!pre.ok || !pre.annonce) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'eBay n\'a pas rendu l\'annonce pour vérifier son prix actuel — rien n\'a été changé.' } };
     if (pre.annonce.devise !== marcheCourant().devise) return { status: 409, body: { ok: false, reason: 'devise', error: `Cette annonce n'est pas dans la devise de ton compte ${marcheCourant().nom} (${pre.annonce.devise || 'devise inconnue'}) : VRM ne change pas son prix. Fais-le sur eBay.` } };
     if (cents(pre.annonce.prix) !== cents(vu)) return { status: 409, body: { ok: false, reason: 'prix-change', prixActuel: pre.annonce.prix, error: `Le prix a changé sur eBay (${eur(pre.annonce.prix)} au lieu de ${eur(vu)}) — rien n'a été changé. Recharge l'annonce.` } };
+    // (21 nov., ext. 5.432 — la garde du prix, src/gardePrix.js recopiée) : un prix suspect (×10 / ÷10, plus de 40 % sous le
+    // prix actuel) ne part que si SON écran l'a confirmé au centime près (`gardeConfirmeC`).
+    const gp = gardePrixRegle({ prixC: Math.round(px * 100), actuelC: Math.round(vu * 100), plancher: null, mode: 'main', confirmeC: Number.isInteger(b.gardeConfirmeC) ? b.gardeConfirmeC : null });
+    if (!gp.ok) return { status: 409, body: { ok: false, reason: 'garde-prix', garde: gp, error: `${gardePhrase(gp)} — confirme ce prix pour qu'il parte. Rien n'a été envoyé à eBay.` } };
   }
   let avant = undefined, aRegle = false;
   if (prixChange) {

@@ -113,7 +113,7 @@ export default function Accueil({ onEntrer }) {
   React.useEffect(() => {
     const avant = document.body.style.background, titre = document.title;
     let mq = null;
-    const poser = () => { document.body.style.background = mq && mq.matches ? '#15263D' : '#EEF6FD'; };
+    const poser = () => { document.body.style.background = mq && mq.matches ? '#27272B' : '#F4F5F7'; };
     try { mq = window.matchMedia('(prefers-color-scheme: dark)'); mq.addEventListener && mq.addEventListener('change', poser); } catch (_) {}
     poser();
     document.title = tr('accueil.titrePage');

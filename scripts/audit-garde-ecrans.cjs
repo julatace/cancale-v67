@@ -25,7 +25,8 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m +
 const lignes = src.split('\n');
 const montages = lignes.map((l, i) => ({ l, i: i + 1 })).filter(({ l }) => /^        \{\(?tab==='[a-z_]+'/.test(l));
 // Les titres seuls (un <header> sans écran) ne sont pas des écrans.
-const ecrans = montages.filter(({ l }) => !/&&<header className="vrm-market-heading/.test(l));
+// (18 nov., design-v2-messages) le titre d'E-mails du nouveau design (`<header className="v2-tete-tache"`) : un titre seul, lui aussi.
+const ecrans = montages.filter(({ l }) => !/&&<header className="(?:vrm-market-heading|v2-tete-tache)/.test(l));
 // Un montage écrit sur deux lignes (`{…&&(` puis `<GardeEcran …>`) : la ligne suivante compte.
 const sansGarde = ecrans.filter(({ l, i }) => !/<GardeEcran nom=/.test(l) && !/^\s*<GardeEcran nom=/.test(lignes[i] || ''));
 console.log(`${ecrans.length} écrans montés par la coque (lignes « {tab==='…'&& »), ${montages.length - ecrans.length} titre(s) seul(s).`);
@@ -41,8 +42,9 @@ dit(/<GardeEcran nom="achats:retirer"><div data-colis-retraits="outils">/.test(s
 dit(/<GardeEcran nom=\{t\+':'\+site\} resetKey=\{platSub\}>/.test(src), 'la section d’un site (rendreTache) a son garde-fou : le filtre des sites reste');
 // Les feuilles hors de la zone des écrans.
 const FEUILLES = [
-  ['fiche', /<GardeEcran nom="fiche" feuille resetKey=\{ficheNum\} onFermer=\{\(\)=>setFicheNum\(null\)\}><Differe rendre=/],
-  ['prix', /<GardeEcran nom="prix" feuille resetKey=\{prixNum\} onFermer=\{\(\)=>setPrixNum\(null\)\}><Differe rendre=/],
+  ['fiche', /<GardeEcran nom="fiche" feuille resetKey=\{ficheNum\} onFermer=\{\(\)=>(?:setFicheNum\(null\)|\{ ficheDeLoupe\.current=null; setFicheNum\(null\); \})\}><Differe rendre=/],
+  // (20 nov., chasse-bugs) La feuille « prix » est un composant (`HotePrixPartout`) : il se calcule pendant SON rendu, sous le garde-fou.
+  ['prix', /<GardeEcran nom="prix" feuille resetKey=\{prixNum\} onFermer=\{\(\)=>setPrixNum\(null\)\}><(?:Differe rendre=|HotePrixPartout )/],
   ['publier', /<GardeEcran nom="publier" feuille [^>]*onFermer=\{\(\)=>setPubAil\(null\)\}><Differe rendre=/],
   ['lienvc', /<GardeEcran nom="lienvc" feuille><HoteLienVc /],
   ['bienvenue', /<GardeEcran nom="bienvenue" feuille [^\n]*><Bienvenue /],

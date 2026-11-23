@@ -1,3 +1,4 @@
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // AUDIT — LES TAMPONS DES BORDEREAUX : UN SEUL RÉGLAGE, TOUTES LES IMPRESSIONS (16 nov., lot tampons-parametres)
 // Julien : « une seule source de vérité utilisée par TOUTES les impressions » ; « quand je touche Imprimer, les
 // réglages sont appliqués aux bordereaux ». Juge la RÈGLE (code exécuté, appels réels), pas l'orthographe :
@@ -43,7 +44,8 @@ function juger(src) {
   try {
     const T = src.T;
     const m = T.reglageTampons(null, { impression: { tamponA4: 'num', tamponTh: 'rien' }, positions: { 'x·A4·portrait': { vx: 0.1, vy: 0.2, vw: 0.3, v: 1 } } });
-    dit(m.a4.num && !m.a4.titre && !m.th.num && !m.th.mention && m.formes['x·A4·portrait'].n.vx === 0.1, 'T7 migration : choix et places d’avant repris tels quels');
+    // (17 nov., lot tampon-qr) « Créé par vrm.center » ne s'enlève plus : un ancien « rien » garde la mention.
+    dit(m.a4.num && !m.a4.titre && !m.th.num && m.th.mention === true && m.formes['x·A4·portrait'].n.vx === 0.1, 'T7 migration : choix et places d’avant repris tels quels (la mention, elle, reste)');
     dit(T.reglageTampons(null).a4.titre === true && T.reglageTampons(null).th.titre === false && T.reglageTampons(null).placeMention === 'qr', 'T7 origine : titre en A4, N° seul en thermique, mention au-dessus du QR');
     const e = T.avecChoix(T.reglageTampons(null), 'mondialrelay', { contenu: { titre: false } });
     dit(!T.resoudreTampon(e, { famille: 'mondialrelay' }).contenu.titre && T.resoudreTampon(e, { famille: 'colissimo' }).contenu.titre, 'T7 exception « seulement Mondial Relay »');
@@ -52,7 +54,7 @@ function juger(src) {
     dit(T.estOrigine(T.reglageOrigine()) && !T.estOrigine(T.avecPlace(T.reglageOrigine(), 'k', 'n', { vx: 0.1, vy: 0.1, vw: 0.2 })), 'T7 « Revenir au réglage d’origine »');
     const c = T.texteDuCartouche({ num: true, titre: false, taille: true }, { numero: '7', titre: 'Veste 42', taille: '42' });
     dit(c.numero === '7' && c.titre === 'T 42', 'T7 cases : N° + taille sans le titre');
-    dit(JSON.stringify(T.contenuDuMode('rien')) === JSON.stringify({ num: false, titre: false, taille: false, mention: false }), 'T7 « Rien » : rien d’écrit, pas de mention');
+    dit(JSON.stringify(T.contenuDuMode('rien')) === JSON.stringify({ num: false, titre: false, taille: false, mention: true }), 'T7 « Sans N° » : rien d’écrit que « Créé par vrm.center » (17 nov. : elle ne s’enlève plus)');
   } catch (e2) { dit(false, 'T7 règles pures : ' + String(e2.message || e2).slice(0, 120)); }
   // T8 — textes
   const cles = new Set();

@@ -348,11 +348,14 @@ async function partieFenetre(nav, atelier) {
       await t.pg.goto('https://ext.test/popup.html');
       await t.pg.waitForFunction(() => !document.body.classList.contains('decide') && document.querySelector('#auth') && document.querySelector('#auth').children.length > 0, null, { timeout: 5000 }).catch(() => {});
       await t.pg.waitForTimeout(300);
-      const fond = await t.pg.evaluate(() => { const b = getComputedStyle(document.body); const a = getComputedStyle(document.getElementById('auth')); return { img: b.backgroundImage, flou: a.backdropFilter || a.webkitBackdropFilter || 'none', bg: a.backgroundColor }; });
-      dit(/linear-gradient/.test(fond.img) && /blur/.test(fond.flou), `${T} : F le fond de la fenêtre est le dégradé, la connexion sur une plaque de verre`, JSON.stringify(fond));
+      // (21 nov., ext. 5.415) la fenêtre est passée au design « VRM natif » (le seul depuis le 19 nov., CLAUDE.md §3
+      // « Palette ») : fond uni gris système (#F2F2F7 / noir), UN groupe blanc / gris foncé, sans dégradé ni verre.
+      const fond = await t.pg.evaluate(() => { const b = getComputedStyle(document.body); const g = document.querySelector('#auth .groupe'); return { img: b.backgroundImage, bg: b.backgroundColor, groupe: g ? getComputedStyle(g).backgroundColor : '' }; });
+      dit(fond.img === 'none' && !!fond.groupe && fond.groupe !== fond.bg, `${T} : F « VRM natif » — fond uni, la connexion dans UN groupe`, JSON.stringify(fond));
       const nu = await t.pg.screenshot({ timeout: 120000 });
       const [p] = await lirePixels(atelier, nu, [[8, 8]]);
-      dit(bleuProfond(p) && bleuVif(p), `${T} : F le bleu profond se voit autour de la plaque (${p})`);
+      const attendu = scheme === 'light' ? [242, 242, 247] : [0, 0, 0];
+      dit(Array.isArray(p) && p.slice(0, 3).every((v, i) => Math.abs(v - attendu[i]) <= 3), `${T} : F le fond est le gris système natif (${p})`);
       const m = await mesurer(t.pg, atelier, { racine: 'document', dpr: 1 });
       dit(m.n >= 6 && m.faibles.length === 0, `${T} : F contraste AA de chaque texte (${m.n} textes, le plus faible ${m.min}:1)`, resumeFaibles(m.faibles));
       fs.writeFileSync(path.join(SORTIE, `fenetre-${scheme === 'light' ? 'clair' : 'sombre'}.png`), nu);

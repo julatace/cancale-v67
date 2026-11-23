@@ -20,16 +20,19 @@ try {
   var lien = /[?&](connexion|inscription|tab|code|error|error_description|type|lier-extension|confirmer-adresse)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h);
   var film = /[?&]film(=|&|$)/.test(q);
   if (s && !film && (session || lien)) {
-    var poser = function (rel, href, as) {
+    var poser = function (rel, href, as, basse) {
       if (!href) return;
       var l = document.createElement('link');
       l.rel = rel; l.href = href;
       if (as) l.as = as;
+      if (basse) { try { l.fetchPriority = 'low'; l.setAttribute('fetchpriority', 'low'); } catch (e) {} }
       // même mode que le chargeur de Vite (crossOrigin = '') : sinon le navigateur retélécharge
       l.crossOrigin = '';
       document.head.appendChild(l);
     };
     (s.getAttribute('data-js') || '').split(',').forEach(function (u) { poser('modulepreload', u); });
     (s.getAttribute('data-css') || '').split(',').forEach(function (u) { poser('preload', u, 'style'); });
+    // (21 nov.) Le morceau de Comptabilite (Aujourd'hui) : demandé aussi, en BASSE priorité, après le morceau App.
+    (s.getAttribute('data-js-ensuite') || '').split(',').forEach(function (u) { poser('modulepreload', u, null, true); });
   }
 } catch (e) { /* rien : main.jsx demandera le morceau comme avant */ }

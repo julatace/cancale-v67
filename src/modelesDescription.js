@@ -22,7 +22,11 @@ export function lireModeles(v) {
     const id = str(m.id).slice(0, 40), texte = str(m.texte).slice(0, MAX_TEXTE);
     if (!id || vus.has(id) || !texte.trim()) continue;
     vus.add(id);
-    out.push({ id, nom: str(m.nom).trim().slice(0, MAX_NOM) || texte.trim().split('\n')[0].slice(0, MAX_NOM), texte });
+    // 5.429 (descriptions types) : la PORTÉE — choisie automatiquement par la règle la plus précise (src/depot/regles.js
+    //    `choisirModele` : modèle > marque > défaut). Sans portée : un modèle « à insérer » (comme avant), jamais automatique.
+    const portee = ['defaut', 'marque', 'modele'].includes(m.portee) ? m.portee : '';
+    out.push({ id, nom: str(m.nom).trim().slice(0, MAX_NOM) || texte.trim().split('\n')[0].slice(0, MAX_NOM), texte,
+      ...(portee ? { portee, marque: str(m.marque).trim().slice(0, 40), modele: str(m.modele).trim().slice(0, 60) } : {}), ...(m.majAt ? { majAt: str(m.majAt).slice(0, 30) } : {}) });
     if (out.length >= MAX_MODELES) break;
   }
   return out;

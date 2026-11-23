@@ -27,7 +27,7 @@ const { pathToFileURL } = require('url');
 const RACINE = path.join(__dirname, '..');
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').slice(11);
 const FICHIERS = ['src/profilVendeur.js', 'src/operations/atelier.js', 'src/operations/metier.js', 'src/operations/Atelier.jsx', 'src/operations/Operations.jsx',
-  'api/_lib/operations.js', 'api/_lib/session.js', 'api/_lib/cle.js', 'api/_lib/fetch-delai.js', 'src/App.jsx'];
+  'api/_lib/operations.js', 'api/_lib/session.js', 'api/_lib/cle.js', 'api/_lib/fetch-delai.js', 'api/_lib/mail-textes.js', 'src/App.jsx', 'src/ecrans/Comptabilite.jsx'];   // (22 nov.) Ma journée vit dans Comptabilite (découpé d'App.jsx)
 const MUTATIONS = {
   // Le membre n'est plus borné à mission.* : il pourrait déplacer les paires du vendeur.
   membre: ['src/operations/metier.js', (s) => s.replace(" if(membre)exige(['mission.etat','mission.etape'].includes(type),'Action réservée au responsable.');\n", '\n')],
@@ -40,7 +40,7 @@ const MUTATIONS = {
   // Le membre lit toute la ligne du vendeur.
   projection: ['api/_lib/operations.js', (s) => s.replace('function projection(d,membre){return membre?', 'function projection(d,membre){return false?')],
   // Ma journée relit toute la ligne.
-  selectdata: ['src/App.jsx', (s) => s.replace('&select=a:data->atelier`', '&select=data`')],
+  selectdata: ['src/ecrans/Comptabilite.jsx', (s) => s.replace('&select=a:data->atelier`', '&select=data`')],
 };
 
 let ko = 0, ok = 0;
@@ -128,7 +128,7 @@ const dit = (vrai, quoi, detail) => { if (vrai) { ok++; console.log('  ✅ ' + q
   dit(p7.enRetard === 0, 'exactement 7 j ⇒ pas encore « plus de 7 j »');
 
   console.log('4. Lectures et envois');
-  const app = fs.readFileSync(path.join(tmp, 'src/App.jsx'), 'utf8');
+  const app = require('./_source-app.cjs').sourceAppCode(tmp);   // (22 nov.) App.jsx + écrans découpés (Comptabilite)
   const hook = (app.match(/function useAtelierJournee[\s\S]*?\n}\n/) || [''])[0];
   dit(/select=a:data->atelier`/.test(hook) && !/select=data[`&]/.test(hook), 'Ma journée projette data->atelier (jamais select=data)');
   dit(/useAtelierJournee\(only === 'journee'\)/.test(app) && /id: 'atelier-attente'[^\n]*color: C\.warn[^\n]*tab: 'organisation'/.test(app), 'la ligne de Ma journée est ambre et ouvre Organisation');

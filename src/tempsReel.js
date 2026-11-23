@@ -70,8 +70,15 @@ const REGLES = [
   [/^lbc_(?:listings|ventes|accounts|messages)$/, 'lbc'],
   [/^vc_(?:listings|ventes|session|offres|messages|achats)$/, 'vestiaire'],
   [/^email_reception_[0-9a-f]{16,64}$/, 'emails'],
+  // (19 nov., retraits parfaits — Julien : « je dois voir dans l'app quand un nouveau QR code ou colis à retirer a été
+  // détecté ») Un e-mail de colis rangé par le serveur (`email_track_*`) et un code de retrait lu dans une conversation
+  // par l'extension (`panel_colis_relais`) : l'app relit CETTE famille (`lireSuivis`, `relireColisRelais`) ; la liste
+  // « à retirer » se refait et ce qui est nouveau est annoncé (src/retraitsNouveaux.js). L'app n'écrit ni l'une ni l'autre
+  // sur une relecture (aucune boucle).
+  [/^email_track_[a-z0-9]{1,30}_[A-Za-z0-9_.-]{1,120}$/, 'colis'],
+  [/^panel_colis_relais$/, 'retrait'],
 ];
-const SANS_COMPTE = new Set(['transp', 'lbc', 'vestiaire', 'emails']);
+const SANS_COMPTE = new Set(['transp', 'lbc', 'vestiaire', 'emails', 'colis', 'retrait']);
 export function quoiDe(id) {
   const s = String(id == null ? '' : id);
   for (const [re, quoi] of REGLES) { const m = re.exec(s); if (m) return { quoi, uid: SANS_COMPTE.has(quoi) ? null : m[1] }; }
@@ -86,7 +93,7 @@ const plusRecente = (r) => { let m = null; for (const t of [tsDe(r.updated_at), 
 // ── La veille ───────────────────────────────────────────────────────────────
 // `lireDepuis(isoX)` → lignes `SEL_VEILLE` écrites depuis X (de CE vendeur) ou `null` (pas su).
 // `diffuser({ ids, quoi:[{quoi,uid}], at })` reçoit les changements, au plus un par ligne / budget.
-export function creerVeille({ uid, lireDepuis, diffuser, maintenant = Date.now, minuteur = setTimeout, annuler = clearTimeout, budgetMs = BUDGET_LIGNE_MS, fenetreMs = FENETRE_MS }) {
+export function creerVeille({ uid, lireDepuis, diffuser, surLue = null, maintenant = Date.now, minuteur = setTimeout, annuler = clearTimeout, budgetMs = BUDGET_LIGNE_MS, fenetreMs = FENETRE_MS }) {
   const t0 = maintenant();
   const vus = new Map();          // id → version vue
   const dernier = new Map();      // id → heure du dernier signal
@@ -152,6 +159,8 @@ export function creerVeille({ uid, lireDepuis, diffuser, maintenant = Date.now, 
       const rows = await Promise.resolve().then(() => lireDepuis(borne)).catch(() => null);
       if (!vivant || !Array.isArray(rows)) return { ok: false };   // pas su ⇒ rien
       const base = premier; premier = false;
+      // (22 nov. soir) La base a RÉPONDU : l'heure de cette lecture (« Mis à jour il y a 1 min » en tête d'Aujourd'hui).
+      if (surLue) { try { surLue(at); } catch (_) {} }
       return { ok: true, signales: recevoir(rows, { base }) };
     })();
     try { return await enCours; } finally { enCours = null; }
@@ -235,4 +244,10 @@ let _dernierNeuf = null;
 export function noterNeuf(at) { _dernierNeuf = at; for (const f of _ecoutes) { try { f(at); } catch (_) {} } }
 export function ecouterNeuf(f) { _ecoutes.add(f); return () => _ecoutes.delete(f); }
 export const dernierNeuf = () => _dernierNeuf;
-export function oublierNeuf() { _dernierNeuf = null; }
+export function oublierNeuf() { _dernierNeuf = null; _derniereLue = null; }
+// (22 nov. soir, maquettes de Julien) LA DERNIÈRE LECTURE RÉUSSIE de la veille : l'heure où la base a répondu (rien de deviné :
+// pas encore de réponse ⇒ null, l'en-tête ne dit rien).
+let _derniereLue = null; const _ecoutesLue = new Set();
+export function noterLue(at) { _derniereLue = at; for (const f of _ecoutesLue) { try { f(at); } catch (_) {} } }
+export function ecouterLue(f) { _ecoutesLue.add(f); return () => _ecoutesLue.delete(f); }
+export const derniereLue = () => _derniereLue;

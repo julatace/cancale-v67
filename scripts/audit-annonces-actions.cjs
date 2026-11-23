@@ -123,20 +123,22 @@ async function auditer(sources) {
   { const a = L([{ id: '7', uid: '111', etat: 'masquee' }]);
     dit(!a.recreer.ok && !a.enLigne.ok && a.main.ok, 'B10 une masquée ⇒ « à la main » seulement (les moteurs ne prennent que leurs annonces)'); }
   { const a = L([{ id: '1', uid: '222', etat: 'en-ligne' }], '111');
-    dit(!a.recreer.ok && /compte_a/.test(a.recreer.raison) && /compte_b/.test(a.recreer.raison) && a.main.ok, 'B11 Chrome sur un AUTRE compte ⇒ moteurs grisés (les deux comptes nommés), « à la main » reste', a.recreer.raison); }
+    // (20 nov., décision de Julien) Les moteurs se font dans le PANNEAU de l'extension : c'est lui qui vérifie le compte de
+    // l'onglet. L'app ne grise plus sur Chrome — elle ouvre le panneau (`panneau`), sans `robot`.
+    dit(a.recreer.ok && a.recreer.panneau === true && a.recreer.robot === false && a.main.ok, 'B11 Chrome sur un AUTRE compte ⇒ Republier ouvre le panneau (il vérifie le compte), « à la main » reste', a.recreer.raison); }
   { const a = parK(R.actionsPossibles({ selection: [{ id: '1', uid: '111', etat: 'en-ligne' }], chrome: undefined, capOk: caps, nomCompte: nom }));
-    dit(!a.recreer.ok && /ne sait pas/.test(a.recreer.raison), 'B12 compte de Chrome pas su ⇒ rien ne part (pas su ≠ oui)', a.recreer.raison);
+    dit(a.recreer.ok && a.recreer.panneau === true, 'B12 compte de Chrome pas su ⇒ le panneau s’ouvre (rien ne part d’ici)', a.recreer.raison);
     const b = L([{ id: '1', uid: '111', etat: 'en-ligne' }], null);
-    dit(!b.recreer.ok && /Aucun compte/.test(b.recreer.raison), 'B13 aucun compte ouvert dans Chrome ⇒ le geste est dit', b.recreer.raison); }
+    dit(b.recreer.ok && b.recreer.panneau === true, 'B13 aucun compte ouvert dans Chrome ⇒ le panneau s’ouvre sur vinted.fr (rien ne part d’ici)', b.recreer.raison); }
   { const a = L([{ id: '1', uid: '111', etat: 'en-ligne' }], '111', (c) => c !== 'recreer');
-    dit(!a.recreer.ok && /extension/.test(a.recreer.raison) && a.modifier.ok, 'B14 extension trop ancienne pour une action ⇒ elle seule est grisée'); }
+    dit(a.recreer.ok && a.modifier.ok, 'B14 la version de l’extension d’ICI ne grise plus rien : le panneau juge la sienne'); }
   { const a = L([{ id: '1', uid: '', etat: 'en-ligne' }]); dit(Object.values(a).filter((x) => x.k !== 'mini' && x.k !== 'partout' && x.k !== 'visuels').every((x) => !x.ok), 'B15 compte inconnu ⇒ rien qui agisse au nom d’un compte Vinted'); }
   // (10 nov., lot C) « Baisser le prix… » : comptes mélangés permis (la feuille dit « ouvre ce compte »
   // pour ceux qui ne sont pas dans l'onglet), extension 5.336 exigée, seulement des annonces en ligne.
   { const a = L([{ id: '1', uid: '111', etat: 'en-ligne' }, { id: '2', uid: '222', etat: 'en-ligne' }]);
     dit(a.baisser && a.baisser.ok && a.baisser.robot === false, 'B23 « Baisser le prix… » sur deux comptes ⇒ la feuille s’ouvre (chaque annonce garde son compte)', a.baisser && a.baisser.raison);
     const b = L([{ id: '1', uid: '111', etat: 'en-ligne' }], '111', (c) => c !== 'baisseprix');
-    dit(b.baisser && !b.baisser.ok && /extension/.test(b.baisser.raison), 'B24 extension sans `baisseprix` ⇒ « Baisser le prix… » grisé, raison dite', b.baisser && b.baisser.raison);
+    dit(b.baisser && b.baisser.ok && b.baisser.panneau === true, 'B24 « Baisser dans l’extension » ne dépend pas de l’extension d’ici : il ouvre le panneau', b.baisser && b.baisser.raison);
     const c = L([{ id: '5', uid: '111', etat: 'brouillon' }]);
     dit(c.baisser && !c.baisser.ok && /en ligne/.test(c.baisser.raison), 'B25 un brouillon ⇒ « Baisser le prix… » grisé', c.baisser && c.baisser.raison);
     dit(!R.ACTIONS_TUILES.includes('baisser'), 'B26 « Baisser le prix… » est un lien sous les quatre tuiles, pas une cinquième tuile'); }
@@ -190,7 +192,7 @@ async function auditer(sources) {
   const app = sources.app;
   dit(/actionsPossibles\(\{ selection:/.test(app) && /<ChoixAnnoncesVinted /.test(app) && /<ActionsSelectionFeuille /.test(app), 'F1 la sélection et le carré « Actions possibles » sont rendus');
   dit(/repriseNumerosRecreation\(\{[\s\S]{0,600}?recrees: recreesEff,/.test(app) && /fusionLiensRecrees\(recreesNum, liensRepubMain\(repubMain, \{ presentes: pres, dejaRecrees: recreesNum \|\| \{\} \}\)\)/.test(app), 'F2 la table de SES liens s’ajoute à celle de l’extension (même règle de reprise), anciennes encore présentes écartées');
-  dit(/depart=\{repubDepart\?'modif':null\}/.test(app) && /depart=\{repubDepart\?'envoi':null\}/.test(app), 'F3 Republier ouvert depuis la sélection commence après « Choisir »');
+  dit(/if \(PANNEAU_DE_SELECTION\[k\]\) \{ const a = ACTIONS_EXTENSION\[PANNEAU_DE_SELECTION\[k\]\]; ouvrirPanneau\(\{ site:'vinted', page:a\.page, ids:choisies\.map/.test(app), 'F3 (20 nov.) Republier, modifier, brouillon, mise en ligne, baisse depuis la sélection ⇒ le panneau de l’extension, les annonces cochées');
   dit(/'vrm_repub_main',/.test(app.slice(app.indexOf('const SYNC_KEYS'), app.indexOf('\n];', app.indexOf('const SYNC_KEYS')))), 'F4 `vrm_repub_main` est synchronisé');
   dit((/problemesAnnonce\(a\.verif \|\| \{\}, 'vinted'\)/.test(app) || (/const verifV = \{ \.\.\.\(a\.verif \|\| \{\}\), facultatifs: /.test(app) && /problemesAnnonce\(verifV, 'vinted'\)/.test(app))) && /champsNonJuges\((a\.verif|verifV)/.test(app), 'F5 le carré dit, paire par paire, ce qui manque (la règle de « vérifier avant »)');
   dit(!/titre[^;\n]{0,40}===[^;\n]{0,40}titre/.test(app.slice(app.indexOf('function RepublierALaMain'), app.indexOf('function RepublierVinted('))), 'F6 « à la main » ne relie jamais par le titre');

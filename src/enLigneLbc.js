@@ -76,6 +76,8 @@ export function etatEnLigneLbc(ad, { enVente, lectures = null, maintenant = Date
   const compte = idCompteLbcPur(ad && (ad.account || ad.lbcUser));
   if (!ad || ad.id == null) return { etat: 'sortie', compte, lu: null, raison: 'regle' };
   if (typeof enVente !== 'function' || !enVente(ad)) return { etat: 'sortie', compte, lu: null, raison: 'regle' };
+  // (20 nov.) Sans compte prouvé, ce n'est pas SON annonce (relevée en naviguant chez un autre vendeur) : jamais comptée.
+  if (!compte) return { etat: 'sortie', compte, lu: null, raison: 'pas-a-lui' };
   const L = lectureCompleteLbc(lectures, compte);
   if (!L) return { etat: 'aconfirmer', compte, lu: null, raison: 'jamais' };
   const vu = Date.parse(String(ad.seenAt || ''));
