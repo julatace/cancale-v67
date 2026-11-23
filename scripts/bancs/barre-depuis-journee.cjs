@@ -9,7 +9,7 @@
 //  visible : il n'y en a aucun sur Ma journée au téléphone ⇒ aucun toucher, « pas arrivé ».
 //  L'app, elle, y mène. Ce banc tient la promesse au doigt, pour TOUS les onglets :
 //
-//   J1  la barre = Aujourd'hui · Annonces (`paires`) · Achats · Ventes · Argent, chacun visible ;
+//   J1  la barre = Aujourd'hui · Annonces (`paires`) · Ventes · Achats · Argent, chacun visible ;
 //   J2  ouverture sans rien de repris ⇒ Ma journée ; puis, au DOIGT (touchscreen.tap au centre
 //       de l'onglet, jamais un clic de souris), chaque onglet ⇒ SON écran (Annonces ⇒ annonces),
 //       lui seul allumé, puis Aujourd'hui ⇒ Ma journée, et ainsi de suite (aller-retour) ;
@@ -55,14 +55,16 @@ function fabriquer(reprise) {
   });
 }
 // L'onglet de la barre ⇒ l'écran attendu (Annonces : `paires` ouvre le dernier de Annonces · Stock ; appareil neuf ⇒ Annonces).
-const ONGLETS = [['paires', 'annonces'], ['achats', 'achats'], ['ventes', 'ventes'], ['compta', 'compta']];
-const BARRE = ['journee', 'paires', 'achats', 'ventes', 'compta'];
+// (23 nov., intégration) La barre native de main (`BarreOnglets`, 21 nov. « garde les onglets ») : Aujourd'hui · Annonces ·
+// Ventes · Achats · Argent ; ses onglets sont `[data-n-onglets] > .n-onglet` (l'identifiant reste `data-nav-entree`).
+const ONGLETS = [['paires', 'annonces'], ['ventes', 'ventes'], ['achats', 'achats'], ['compta', 'compta']];
+const BARRE = ['journee', 'paires', 'ventes', 'achats', 'compta'];
 const ecran = (pg) => pg.evaluate(() => (document.querySelector('main.vrm-main') || {}).dataset?.ecran || '');
-const allumes = (pg) => pg.evaluate(() => [...document.querySelectorAll('.vrm-tabbar > .vrm-tab[aria-current="page"]')].map((b) => b.getAttribute('data-nav-entree')));
+const allumes = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-n-onglets] > .n-onglet[aria-current="page"]')].map((b) => b.getAttribute('data-nav-entree')));
 const capture = async (pg, nom) => { try { await pg.screenshot({ path: path.join(CAPT, nom + '.png') }); } catch (_) {} };
 // Le centre de l'onglet, et ce qui est SOUS ce point (J4).
 const boite = (pg, id) => pg.evaluate((id) => {
-  const b = document.querySelector(`.vrm-tabbar > .vrm-tab[data-nav-entree="${id}"]`);
+  const b = document.querySelector(`[data-n-onglets] > .n-onglet[data-nav-entree="${id}"]`);
   if (!b) return null;
   const r = b.getBoundingClientRect();
   if (!r.width || !r.height) return null;
@@ -81,9 +83,9 @@ async function arrive(pg, voulu, ms = 10000) { return H.attendre(async () => (aw
 
 async function parcours(pg, qui) {
   // J1 · la barre
-  const ids = await pg.evaluate(() => [...document.querySelectorAll('.vrm-tabbar > .vrm-tab')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('data-nav-entree')));
-  dit(JSON.stringify(ids) === JSON.stringify(BARRE), `J1 ${qui} : la barre = Aujourd'hui · Annonces (paires) · Achats · Ventes · Argent, visibles`, JSON.stringify(ids));
-  const libAnnonces = await pg.evaluate(() => { const b = document.querySelector('.vrm-tabbar > .vrm-tab[data-nav-entree="paires"] .vrm-nav-label'); return b ? b.textContent.trim() : ''; });
+  const ids = await pg.evaluate(() => [...document.querySelectorAll('[data-n-onglets] > .n-onglet')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('data-nav-entree')));
+  dit(JSON.stringify(ids) === JSON.stringify(BARRE), `J1 ${qui} : la barre = Aujourd'hui · Annonces (paires) · Ventes · Achats · Argent, visibles`, JSON.stringify(ids));
+  const libAnnonces = await pg.evaluate(() => { const b = document.querySelector('[data-n-onglets] > .n-onglet[data-nav-entree="paires"] .n-onglet-libelle'); return b ? b.textContent.trim() : ''; });
   dit(libAnnonces === 'Annonces', `J1 ${qui} : l'onglet « paires » s'appelle « Annonces »`, libAnnonces);
   const vus = [];
   for (const [id, voulu] of ONGLETS) {
