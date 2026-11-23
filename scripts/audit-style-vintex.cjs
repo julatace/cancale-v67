@@ -104,7 +104,7 @@ function juger(depot = {}, { sousAudits = true } = {}) {
   const val = (bloc, nom) => { const m = new RegExp('--n-' + nom + '\\s*:\\s*([^;]+);').exec(bloc); return m ? m[1].trim().toLowerCase() : null; };
   const attendus = [
     [blocClair, 'clair', { accent: '#16181d', fond: '#f4f4f2', carte: '#ffffff', bord: '#e5e4e0' }],   // (22 nov.) l'accent est l'encre (décision de Julien)
-    [blocSombre, 'sombre', { accent: '#f4f4f5', fond: '#0f0f11', carte: '#18181b' }],
+    [blocSombre, 'sombre', { accent: '#f4f4f5', fond: '#1c1c20', carte: '#2a2a2f' }],   // (23 nov., Julien) la nuit = le gris de vrm.center
   ];
   for (const [bloc, nom, att] of attendus) {
     for (const [k, v] of Object.entries(att)) dit(val(bloc, k) === v, `S2 --n-${k} (${nom}) vaut ${v}`, val(bloc, k));

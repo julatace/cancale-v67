@@ -124,7 +124,7 @@
     --n-encre-2: #B8B8C0;
     --n-encre-3: #92929B;
     --n-accent: #F4F4F5;
-    --n-plein: #F4F4F5;
+    --n-plein: #FFFFFF;   /* le plein = l'encre (texte blanc pur la nuit) */
     --n-sur-plein: #18181B;
     --n-teinte: rgb(244 244 245 / .10);
     --n-ambre: #FFC266;
