@@ -140,8 +140,11 @@ const LIRE = (sel) => { const e = document.querySelector(sel); if (!e) return nu
     stats: (() => { try { return JSON.parse(a(c, 'data-v2-stats') || 'null'); } catch (_) { return null; } })(),
     mois: Object.fromEntries([...e.querySelectorAll('[data-v2-mois]')].map((m) => [m.getAttribute('data-v2-mois'), { cents: m.getAttribute('data-v2-mois-cents'), partiel: m.getAttribute('data-v2-mois-partiel') === '1', brut: m.getAttribute('data-v2-mois-brut') === '1', texte: m.textContent.trim() }])),
     colis: e.querySelectorAll('[data-v2-colis]').length, plus: Number(a(q('[data-v2-bande] [data-n-plus]'), 'data-n-plus') || 0),
-    retirer: a(q('[data-v2-groupe="retirer"] [data-v2-n]'), 'data-v2-n'), lieu: a(q('[data-v2-passe-lieu]'), 'data-v2-passe-lieu') || '', code: a(q('[data-v2-passe-code]'), 'data-v2-passe-code') || '',
+    retirer: a(q('[data-v2-groupe="retirer"] [data-v2-n]'), 'data-v2-n') || a(q('[data-v2-cj-ligne="retirer"]'), 'data-v2-cj-n'), lieu: a(q('[data-v2-passe-lieu]'), 'data-v2-passe-lieu') || '', code: a(q('[data-v2-passe-code]'), 'data-v2-passe-code') || '',
     ventes: [...e.querySelectorAll('[data-v2-vente]')].map((v) => v.getAttribute('data-v2-vente')), avenir: a(q('[data-v2-avenir]'), 'data-v2-avenir'),
+    avenirHors: [...e.querySelectorAll('[data-v2-avenir]')].filter((x) => !x.closest('[data-v2-bloc="pilotage"]')).length,
+    cjEnv: a(q('[data-v2-cj-ligne="envoyer"]'), 'data-v2-cj-n'), cjEnvTxt: (q('[data-v2-cj-ligne="envoyer"]') || { textContent: '' }).textContent,
+    cjRet: a(q('[data-v2-cj-ligne="retirer"]'), 'data-v2-cj-n'), cjRetTxt: (q('[data-v2-cj-ligne="retirer"]') || { textContent: '' }).textContent,
     alerte: a(q('[data-v2-alerte]'), 'data-v2-alerte'), alertes: e.querySelectorAll('[data-v2-alerte]').length, texte: e.innerText }; };
 
 // LE DESSIN, mesuré dans la page.
@@ -282,12 +285,16 @@ async function unEcran(nav, nomBase, b, W, sombre) {
       const w = await pg.evaluate(LIRE, ECRAN);
       // ── LE FOND ──
       dit(w.jobs === 0 && !/À faire/.test(w.texte), `F1 ${ou} : aucun groupe « À faire » dans Aujourd’hui (décision du 19 nov.)`, { jobs: w.jobs });
-      dit(w.blocs[0] === 'chiffres' && !w.blocs.includes('mois') && w.blocs.includes('envoyer') && w.blocs.includes('retirer') && w.blocs.includes('ventes'), `F5 ${ou} : les chiffres, À envoyer, À retirer, Dernières ventes — dans cet ordre`, w.blocs);
+      // (23 nov., style-clarte-3) Le TABLEAU DE BORD (22 nov., maquettes de Julien) : le héros (« pilotage », la fenêtre choisie) en
+      // tête, puis Colis (à envoyer | à retirer, UNE carte), les chiffres et les dernières ventes ; plus de carte « Mois » à part.
+      const tete = w.blocs.includes('pilotage') ? 'pilotage' : 'chiffres';
+      dit(w.blocs[0] === tete && !w.blocs.includes('mois') && w.blocs.includes('colis') && w.blocs.includes('chiffres') && w.blocs.includes('ventes') && w.blocs.indexOf('colis') < w.blocs.indexOf('ventes'),
+        `F5 ${ou} : le héros (ou les chiffres) en tête, Colis, les chiffres, Dernières ventes`, w.blocs);
       dit(w.alertes <= 1, `F6 ${ou} : au plus UNE alerte (${w.alertes})`, w.alerte);
       if (nomBase === 'capture') {
         const A = b.attendu, X = attenduJours(A.ventes);
-        dit(w.affiche === String(A.nEnvoyer) && w.plein === String(A.nPrets) && /3/.test(w.ecart) && /prêts\b/.test(w.ecart), `F5 ${ou} : ${A.nEnvoyer} colis à envoyer, « ${w.ecart} » (accordé), le plein dit ${A.nPrets} bordereaux`, { affiche: w.affiche, plein: w.plein, ecart: w.ecart });
-        dit(w.retirer === String(A.nRetirer) && w.lieu === A.point && /^\d{6}$/.test(w.code), `F5 ${ou} : ${A.nRetirer} colis à retirer, la passe du premier point et son code`, { retirer: w.retirer, lieu: w.lieu, code: w.code });
+        dit(w.affiche === String(A.nEnvoyer) && w.cjEnv === String(A.nEnvoyer) && w.plein === String(A.nPrets) && /3/.test(w.ecart) && /prêts\b/.test(w.ecart), `F5 ${ou} : ${A.nEnvoyer} colis à envoyer (la case de Colis, « ${w.ecart} » accordé), le plein dit ${A.nPrets} bordereaux`, { affiche: w.affiche, cj: w.cjEnv, plein: w.plein, ecart: w.ecart });
+        dit(w.cjRet === String(A.nRetirer) && w.cjRetTxt.includes(A.point) && /\b\d{6}\b/.test(w.cjRetTxt), `F5 ${ou} : ${A.nRetirer} colis à retirer, le premier point et son code dans la case`, { cj: w.cjRet, txt: w.cjRetTxt });
         dit(w.ventes.length === 5 && new Set(w.ventes).size === 5, `F5 ${ou} : les 5 dernières ventes, chacune une fois`, w.ventes);
         // (19 nov., Julien : « plus de stats […] le CA, le bénéfice ») Jour · Semaine · Mois : CA vendu, ventes, panier =
         // les ventes SEMÉES (« au moins » quand un prix n'est pas lu, « — » pour un panier sur une partie des ventes).
@@ -398,7 +405,9 @@ async function onglets(nav, b, sombre) {
       return { recu: a('[data-v2-argent-recu]', 'data-v2-argent-recu'), partiel: a('[data-v2-argent-recu]', 'data-v2-argent-partiel') === '1', benefice: a('[data-v2-argent-fait="benefice"]', 'data-v2-argent-valeur'), attente: a('[data-v2-argent-fait="attente"]', 'data-v2-argent-valeur') }; });
     const mo = auj.stats && auj.stats.mois ? auj.stats.mois : {};
     dit((mo.benefice != null ? mo.benefice : null) === (ar.benefice || ''), `F4 bénéfice du mois : Aujourd’hui (${mo.benefice}) = Argent (${ar.benefice})`, { auj: mo, argent: ar.benefice });
-    dit(!auj.avenir && !auj.mois.recu, 'F4 « Reçu » et « Argent à venir » sont dans Argent, plus sur Aujourd’hui (19 nov.)', { avenir: auj.avenir, recu: auj.mois.recu });
+    // (23 nov., style-clarte-3) Les maquettes de Julien (22 nov.) posent « Reçu » et « À venir » dans le PIED du héros : sur Aujourd'hui
+    // ils ne vivent que là (plus de carte à part, jamais deux fois) ; leurs montants restent ceux d'Argent (même règle).
+    dit(!auj.avenirHors && !auj.mois.recu, 'F4 « Reçu » et « À venir » : seulement dans le pied du héros sur Aujourd’hui (22 nov.), jamais une carte à part', { hors: auj.avenirHors, recu: auj.mois.recu });
     dit(!erreurs.length, 'les onglets : aucune erreur JS', erreurs);
   } catch (e) { dit(false, 'les onglets : le contrôle est allé au bout', String(e && e.stack || e).slice(0, 600)); }
   await ctx.close();

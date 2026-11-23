@@ -6345,6 +6345,9 @@ const indexBordsItem = (list, txnItem) => {
 };
 const _indexBordsVide = {};
 const _indexBordsListeVide = [];
+// (23 nov.) La demande « ouvre Relier » d'Aujourd'hui, prise par Achats à son arrivée (voir `ouvrirGlisser`).
+const DEMANDE_GLISSER = { at: 0 };
+function demanderRelier(onNav) { DEMANDE_GLISSER.at = Date.now(); if (onNav) onNav('achats'); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:relier-ouvrir')); } catch (_) {} }, 0); }
 function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false, colisDans = null, completer = null, onCompleterFermer = null, sectionsAutres = null }) {
   // (20 nov., bugs-terrain) LES LECTURES ASYNCHRONES DU MOTEUR, RENDUES PAR VAGUES. Mesuré (12 comptes, processeur ×4) : ~40
   // rendus par moteur en 42 s, un par lecture qui arrive. Dans ce moteur, un `setState` appelé HORS d'un geste (réponse
@@ -17254,6 +17257,15 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // en un geste annulable 5 s. Rien n'est relié sans SON glisser PUIS son « Oui ».
   const ouvrirGlisser = (init = null) => { const c = pickerFor ? (pickerFor._saleTx ? cleArticleVente(pickerFor._saleTx) : (pickerFor.id != null && !String(pickerFor.id).startsWith('_') ? cleArticleAnnonce(pickerFor.id) : '')) : ''; setPickerFor(null);
     setGlisserOuvert({ achat: init && init.achat ? String(init.achat) : '', cible: init && init.cible ? String(init.cible) : c }); if (accounts.length && !fillBuyAchats.items) chargerAchats(); };
+  // (23 nov., style-clarte-3) « Relier » des actions rondes d'Aujourd'hui : il mène à Achats et DEMANDE la feuille « Relier achats et
+  // ventes » (la même, `ouvrirGlisser`) ; Achats monté plus tard la prend à son arrivée (15 s). Rien n'est relié sans SON glisser puis son « Oui ».
+  React.useEffect(() => {
+    if (only !== 'achats') return undefined;
+    const f = () => { DEMANDE_GLISSER.at = 0; ouvrirGlisser(); };
+    if (DEMANDE_GLISSER.at && Date.now() - DEMANDE_GLISSER.at < 15000) f();
+    window.addEventListener('vrm:relier-ouvrir', f);
+    return () => window.removeEventListener('vrm:relier-ouvrir', f);
+  }, [only]);   // eslint-disable-line react-hooks/exhaustive-deps
   // (20 nov., Julien : « il n'y a même pas toutes les paires ») Mesuré sur sa base (lecture seule) : l'écran ne listait que
   // les annonces Vinted EN LIGNE et les ventes Vinted des 12 DERNIERS MOIS. Il manquait : les ventes plus anciennes (aucune
   // borne ici : une vente de 2024 sans achat attend son achat comme une autre), les annonces MASQUÉES par Vinted et « à
@@ -23832,6 +23844,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               groupes={baseKO ? null : groupesJ} alerte={alerteJ} ventes={dernieresJ}
               plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimerCourt'), faire: () => { poserPendingBordPrint('imprimer'); if (onNav) onNav(xE.tab); } } : null}
               onScanner={() => ouvrirRetrouver('journee')}
+              // (23 nov., style-clarte-3) « Publier » : le parcours existant (choisir l'article dans la feuille, `vrm:publier-ailleurs`) ;
+              // « Relier » : Achats et sa feuille « Relier achats et ventes » (la même que son bouton).
+              onPublier={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} }}
+              onRelier={() => demanderRelier(onNav)}
               onColis={() => { if (onNav && xE) onNav(xE.tab); }}
               onVentes={() => { if (onNav) onNav('cat_ventes'); }}
               onRetraits={() => { if (onNav) onNav('retraits'); }}/>

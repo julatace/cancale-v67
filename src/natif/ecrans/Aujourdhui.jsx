@@ -152,39 +152,42 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
   const quand = j ? new Date(j.de).toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'short' }) : '';
   const detailJour = !j ? '' : [quand, j.v == null ? '—' : (j.partiel ? tr('journee.moins') + ' ' : '') + montant(j.v), j.n != null ? tr('v2.comptes.ventes', { n: j.n }) : '', j.b != null ? tr('pil.beneficeCourt', { v: montant(j.b) }) : ''].filter(Boolean).join(' · ');
   const aBenef = L.some((x) => x.b != null);
-  // (22 nov., « en noir ») LE HÉROS : le BÉNÉFICE BRUT DU MOIS en grand (la tuile du mois, `stats.mois.brut` : la même règle et
-  // la même couverture que Comptabilité) ; dessous le graphique de la fenêtre (7 ou 30 j) et son trio Vendu · Ventes · Bénéfice.
+  // Le bénéfice brut du mois (la tuile du mois) : sa raison dit si des prix d'achat manquent (la porte « Saisir les prix d'achat »).
   const Sm = chiffres && chiffres.etat === 'lu' && chiffres.stats ? chiffres.stats.mois : null;
   const Bm = Sm ? Sm.brut : null;
-  // Bénéfice pas su (des prix d'achat manquent, pas encore calculé) : le héros dit le VENDU du mois (un chiffre sûr, jamais un
-  // grand « — ») et la ligne dessous ouvre la porte du bénéfice. Rien n'est deviné : c'est le titre qui change.
-  const parVendu = !(Bm && Bm.valeur != null) && !!Sm && Sm.vendu.valeur != null;
-  const [bn, bu] = Bm && Bm.valeur != null ? coupe(montant(Bm.valeur)) : parVendu ? coupe(montant(Sm.vendu.valeur)) : [null, ''];
   const manquePrix = !!Bm && (Bm.raison === 'achats' || /achat/.test(String(Bm.note || '')));
   const nomMois = chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : '';
-  const sousH = !chiffres || chiffres.etat === 'encours' ? tr('v2.jour.lecture') : !Sm ? (chiffres.raison || tr('v2.jour.pasSu'))
-    : Bm && Bm.valeur != null ? [Bm.couverture ? tr('pil.h.couv', { c: Bm.couverture }) : '', Sm.vendu.valeur != null ? tr('pil.h.vendu', { v: (Sm.vendu.partiel ? tr('journee.moins') + ' ' : '') + montant(Sm.vendu.valeur) }) : ''].filter(Boolean).join(' · ')
-    : [parVendu && Sm.ventes.valeur != null ? tr('v2.comptes.ventes', { n: Sm.ventes.valeur }) : '', (manquePrix ? tr('pil.h.benefPrix') : tr('pil.h.benefCalc'))].filter(Boolean).join(' · ');
-  // (22 nov. soir, maquettes de Julien) LE PIED DU HÉROS : Vendu (la fenêtre) · Reçu (ce mois, date de VERSEMENT — la règle
-  // d'Argent) · À venir (la règle d'Argent, `attente`). Chaque nombre demandé à son propriétaire ; pas su ⇒ « — ».
+  // (23 nov., style-clarte-3 — « le grand chiffre suit la fenêtre ») LE HÉROS DIT LA FENÊTRE CHOISIE : le VENDU des 7 j / 30 j / du mois
+  // (`courbe.fenetres[f]`, la même source que la courbe et que « Par site »), l'écart nommé et le nombre de ventes dessous. Le
+  // bénéfice brut du mois reste celui de la tuile du mois (`stats.mois.brut`) : il n'est plus le grand chiffre d'une autre période.
+  // LE PIED : Bénéfice brut (la fenêtre, sa couverture) · Reçu (ce mois, date de VERSEMENT) · À venir (la règle d'Argent).
   const Rc = courbe.recu || null;
+  const ecartTxt = W && W.ecart != null ? (f === 'mois' ? tr('pil.ecartMois', { s: signe(W.ecart), mois: (chiffres && chiffres.moisAvant) || '' }) : tr('pil.ecart', { s: signe(W.ecart), n: f })) : '';
+  const ventesFen = W && W.ventes != null ? tr('pil.ventesFen', { n: W.ventes }) : '';
+  const [hn, hu] = W && W.vendu != null ? coupe((W.partiel ? tr('journee.moins') + ' ' : '') + montant(W.vendu)) : [null, ''];
+  const titreH = f === 'mois' ? tr('pil.h.titreVendu', { mois: nomMois }) : tr('pil.h.titreJours', { n: f });
+  const sousFen = !W ? (!chiffres || chiffres.etat === 'encours' ? tr('v2.jour.lecture') : tr('v2.jour.pasSu'))
+    : W.vendu == null ? (W.raison || tr('v2.jour.pasSu'))
+    : ecartTxt ? <><span className={W.ecart >= 0 ? 'n-heros-hausse' : 'n-heros-baisse'} data-pil-ecart={String(W.ecart)}>{(W.ecart >= 0 ? '▲ ' : '▼ ') + ecartTxt}</span>{ventesFen ? ' · ' + ventesFen : ''}</> : ventesFen;
+  const benefFen = W && W.brut != null ? montant(W.brut) : null;
   const trio = [
-    { cle: 'vendu', libelle: f === 'mois' ? tr('pil.t.venduMois', { mois: nomMois }) : tr('pil.t.vendu', { n: f }), valeur: W && W.vendu != null ? (W.partiel ? tr('journee.moins') + ' ' : '') + montant(W.vendu) : null, attrs: { 'data-pil-vendu': W ? cents(W.vendu) : '' } },
+    { cle: 'benef', libelle: (f === 'mois' ? tr('pil.t.benefMois', { mois: nomMois }) : tr('pil.t.benef', { n: f })) + (W && W.brutCouv ? ' · ' + tr('pil.t.sur', { c: W.brutCouv }) : ''),
+      valeur: benefFen, attrs: { 'data-pil-benef-fen': W ? cents(W.brut) : '', 'data-pil-couv': W && W.brutCouv ? W.brutCouv : undefined } },
     { cle: 'recu', libelle: tr('pil.t.recu', { mois: nomMois }), valeur: Rc && Rc.valeur != null ? (Rc.partiel ? tr('journee.moins') + ' ' : '') + montant(Rc.valeur) : null, attrs: { 'data-pil-recu': Rc ? cents(Rc.valeur) : '' } },
     { cle: 'avenir', libelle: tr('pil.t.avenir'), valeur: aVenir && aVenir.valeur != null ? (aVenir.partiel ? tr('journee.moins') + ' ' : '') + montant(aVenir.valeur) : null, attrs: { 'data-pil-avenir': aVenir ? cents(aVenir.valeur) : '', ...(aVenir && aVenir.valeur > 0 ? { 'data-v2-avenir': cents(aVenir.valeur) } : {}) } },
   ];
-  const ecartTxt = W && W.ecart != null ? (f === 'mois' ? tr('pil.ecartMois', { s: signe(W.ecart), mois: (chiffres && chiffres.moisAvant) || '' }) : tr('pil.ecart', { s: signe(W.ecart), n: f })) : '';
-  const ventesFen = W && W.ventes != null ? tr('pil.ventesFen', { n: W.ventes }) : '';
+  // La porte du bénéfice : des prix d'achat manquent (la raison du mois) et le bénéfice de la fenêtre n'est pas su.
+  const porte = benefFen == null && onSaisirPrix && manquePrix;
   return (
-    <Heros titre={parVendu ? tr('pil.h.titreVendu', { mois: nomMois }) : tr('pil.h.titre', { mois: nomMois })} valeur={bn} unite={bu} sous={sousH}
+    <Heros titre={titreH} valeur={hn} unite={hu} sous={sousFen}
       action={<Segmente libelle={tr('pil.fenetre')} valeur={String(f)} onChange={(v) => { setF(v === 'mois' ? 'mois' : Number(v)); setJour(null); }} options={FENETRES.map((x) => ({ cle: String(x), libelle: x === 'mois' ? tr('pil.mois') : tr('pil.jours', { n: x }) }))}/>}
       trio={trio}
-      pied={parVendu && onSaisirPrix && manquePrix ? <div className="n-heros-porte"><Bouton variante="texte" taille="compact" onClick={onSaisirPrix} attrs={{ 'data-pil-porte': 'prix' }}>{tr('v2.ben.prixManquentGeste')}</Bouton></div> : null}
-      attrs={{ 'data-v2-bloc': 'pilotage', 'data-pil-heros': parVendu ? 'vendu' : 'benefice', 'data-pil-fenetre': String(f), 'data-pil-brut-mois': Bm ? cents(Bm.valeur) : '', 'data-pil-jours': L.map((x) => cents(x.v)).join(','), 'data-pil-benef': L.map((x) => cents(x.b)).join(',') }}
+      pied={porte ? <div className="n-heros-porte"><Bouton variante="texte" taille="compact" onClick={onSaisirPrix} attrs={{ 'data-pil-porte': 'prix' }}>{tr('v2.ben.prixManquentGeste')}</Bouton></div> : null}
+      attrs={{ 'data-v2-bloc': 'pilotage', 'data-pil-heros': 'fenetre', 'data-pil-fenetre': String(f), 'data-pil-vendu': W ? cents(W.vendu) : '', 'data-pil-brut-mois': Bm ? cents(Bm.valeur) : '', 'data-pil-jours': L.map((x) => cents(x.v)).join(','), 'data-pil-benef': L.map((x) => cents(x.b)).join(','),
+        'data-pil-somme': (() => { const lus = L.filter((x) => x.v != null); return lus.length === L.length ? cents(lus.reduce((t, x) => t + x.v, 0)) : ''; })() }}
       graphe={<>
         <GrapheJours forme="aire" jours={jours} choisie={k} onChoisir={setJour} libelle={f === 'mois' ? tr('pil.grapheMois') : tr('pil.graphe', { n: f })} moyenneLibelle={tr('pil.moyenne')} attrs={{ 'data-pil-jour': j ? j.cle : '' }}/>
-        <p className="n-heros-sous" data-pil-detail="">{ecartTxt ? <><span className={W.ecart >= 0 ? 'n-heros-hausse' : 'n-heros-baisse'} data-pil-ecart={String(W.ecart)}>{(W.ecart >= 0 ? '▲ ' : '▼ ') + ecartTxt}</span>{ventesFen ? ' · ' + ventesFen : ''}</> : ventesFen}</p>
-        <p className="n-heros-jour" data-pil-jour-detail="">{detailJour}</p>
+        <p className="n-heros-jour" data-pil-detail="">{detailJour}</p>
         <ul className="n-pilotage-legende" aria-hidden="true">
           <li><span className="n-pilotage-cle" data-n-cle="aire"/>{tr('pil.cle.vendu')}</li>
           {aBenef ? <li><span className="n-pilotage-cle" data-n-cle="ligne"/>{tr('pil.cle.benefice')}</li> : null}
@@ -215,7 +218,7 @@ function ParSite({ courbe, f, montant, nomMois = '' }) {
 export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true, affiche, colis = [], retraits = null, groupes = [], plein = null, Photo = null, Icon, onColis, onRetraits,
   onScanner = null, chiffres = null, alerte = null, ventes = null, aVenir = null, onVentes = null,
   objectif = null, courbe = null, comptes = null, capte = null, vrm = null, cartes = null, onMessages = null, onJournal = null,
-  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, teteDroite = null, aRepublier = null, offresSR = null, photoDouble = null }) {   // (22 nov., choix n° 33 et 35) offresSR : { n, age, ouvrir } · photoDouble : { n, groupes, ouvrir } | null   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
+  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, teteDroite = null, onPublier = null, onRelier = null, aRepublier = null, offresSR = null, photoDouble = null }) {   // (22 nov., choix n° 33 et 35) offresSR : { n, age, ouvrir } · photoDouble : { n, groupes, ouvrir } | null   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
   const ordinateur = useOrdinateur();
   const [modifier, setModifier] = React.useState(false);
   const [defait, setDefait] = React.useState(null);   // le choix d'avant « Remettre par défaut » (annulable 10 s)
@@ -276,10 +279,10 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
               « 3 à retirer » (le point relais). Les mêmes nombres, les mêmes repères (`data-v2-cj-ligne`), le même toucher. */}
           <CasesChiffres attrs={{ 'data-n-colis-duo': '' }} cases={[
             { cle: 'envoyer', icone: <Icon name="truck" size={18}/>, libelle: tr('v2.envoyer.titre'), valeur: lecture || n == null ? '—' : nombre(n), sous: envSous, tonSous: alerteEnv ? 'ambre' : undefined,
-              onClick: () => onColis && onColis(null), attrs: { 'data-v2-cj-ligne': 'envoyer', 'data-v2-cj-n': n == null ? '' : String(n), 'data-v2-alerte': alerteEnv ? 'poster' : undefined } },
+              onClick: () => onColis && onColis(null), attrs: { 'data-v2-cj-ligne': 'envoyer', 'data-v2-cj-n': n == null ? '' : String(n), 'data-v2-ecart': (affiche && affiche.sous) || '', 'data-v2-alerte': alerteEnv ? 'poster' : undefined } },
             { cle: 'retirer', icone: <Icon name="pin" size={18}/>, libelle: tr('v2.retirer.titre'), valeur: lecture || nRet == null ? '—' : nombre(nRet), sous: retSous,
               tonSous: retraits && retraits.premier && retraits.premier.ambre ? 'ambre' : point && point.lieu && nRet > 0 ? 'lieu' : undefined,
-              onClick: onRetraits, attrs: { 'data-v2-cj-ligne': 'retirer', 'data-v2-cj-n': nRet == null ? '' : String(nRet), 'data-v2-alerte': alerte && alerte.id === 'retirer' ? 'retirer' : undefined } },
+              onClick: onRetraits, attrs: { 'data-v2-cj-ligne': 'retirer', 'data-v2-cj-n': nRet == null ? '' : String(nRet), 'data-v2-passe-lieu': point ? point.lieu || '' : '', 'data-v2-passe-code': point && point.code ? point.code : undefined, 'data-v2-alerte': alerte && alerte.id === 'retirer' ? 'retirer' : undefined } },
           ]}/>
           {/* (intégration 21 nov.) La prévision des points relais (ext. 5.411, relais-prevision) vivait dans la carte « À retirer » ;
               « Colis » la remplace par défaut (journee-stats) : la même rangée, la même source, ici — sinon elle disparaissait ; jamais deux fois. */}
@@ -583,15 +586,21 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
           <ActionsRondes libelle={tr('pil.a.libelle')} elements={[
             { cle: 'imprimer', libelle: tr('pil.a.imprimer'), icone: <Icon name="printer" size={22}/>, n: plein ? plein.n : 0, plein: true, onClick: plein ? plein.faire : null, attrs: plein ? { 'data-v2-principal': String(plein.n) } : { 'data-v2-imprimer-rien': '' } },
             onScanner ? { cle: 'scanner', libelle: tr('pil.a.scanner'), icone: <Icon name="scan" size={22}/>, onClick: onScanner, attrs: { 'data-v2-scanner': '' } } : null,
-            onNav ? { cle: 'annonces', libelle: tr('pil.a.annonces'), icone: <Icon name="tag" size={22}/>, onClick: () => onNav('cat_annonces') } : null,
+            // (23 nov., maquettes de Julien) Publier (le parcours existant : choisir l'article) et Relier (la feuille d'Achats) ;
+            // sans eux, Annonces et Statistiques comme avant.
+            onPublier ? { cle: 'publier', libelle: tr('pil.a.publier'), icone: <Icon name="plus" size={22}/>, onClick: onPublier, attrs: { 'data-v2-publier': '' } }
+              : onNav ? { cle: 'annonces', libelle: tr('pil.a.annonces'), icone: <Icon name="tag" size={22}/>, onClick: () => onNav('cat_annonces') } : null,
+            onRelier ? { cle: 'relier', libelle: tr('pil.a.relier'), icone: <Icon name="link" size={22}/>, onClick: onRelier, attrs: { 'data-v2-relier': '' } } : null,
             onMessages ? { cle: 'messages', libelle: tr('pil.a.messages'), icone: <Icon name="chat" size={22}/>, onClick: onMessages } : null,
-            onNav ? { cle: 'stats', libelle: tr('pil.a.stats'), icone: <Icon name="chart" size={22}/>, onClick: () => onNav('dashboard') } : null,
+            !onRelier && onNav ? { cle: 'stats', libelle: tr('pil.a.stats'), icone: <Icon name="chart" size={22}/>, onClick: () => onNav('dashboard') } : null,
           ].filter(Boolean)}/>
           {montrees.includes('colis') ? <Editable cle="colis" actif={modifier && ordinateur} libelleRetirer={tr('v2.perso.retirerX', { x: tr('v2.perso.carte.colis') })} onRetirer={() => basculer('colis')} onDeposer={deposer}>{BLOCS.colis()}</Editable> : null}
           {pret && courbe.parSite && courbe.parSite[fen] && courbe.parSite[fen].length ? <ParSite courbe={courbe} f={fen} montant={montant} nomMois={chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : ''}/> : null}
         </Colonne> : null}
         {montrees.filter((k) => k !== 'courbe' && !(aPilotage && k === 'colis')).map((k) => (
-          <Colonne key={k} pleine={k === 'chiffres'} large={k === 'ventes'}>
+          // (23 nov.) Sans graphique, Colis (deux cases) prend la rangée entière : sinon « Dernières ventes », arrivée après la lecture,
+          // venait remplir le trou à sa droite et poussait les chiffres vers le bas (banc journee-stats J3 à 1512).
+          <Colonne key={k} pleine={k === 'chiffres' || (k === 'colis' && !aPilotage)} large={k === 'ventes'}>
             <Editable cle={k} actif={modifier && ordinateur} libelleRetirer={tr('v2.perso.retirerX', { x: tr('v2.perso.carte.' + k) })} onRetirer={() => basculer(k)} onDeposer={deposer}>
               {k === 'chiffres' ? <Chiffres chiffres={chiffres} p={p} setP={setP} objectif={obj} onSaisirPrix={onSaisirPrix} onVentes={onVentes} courbe={courbe}/> : BLOCS[k]()}
             </Editable>
