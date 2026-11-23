@@ -37,6 +37,7 @@ export function texteConseil(c) {
 // LE MINI-VISUEL d'un conseil (23 nov., coordinateur : « quand c'est parlant ») : les N° des colis, les photos de SES
 // annonces concernées, la barre d'un seuil ou des prix saisis, la semaine des ventes, deux comptes côte à côte. Tout vient de
 // `c.visuel` (posé par la règle, sur la même source) ; rien sinon. Hauteurs et largeurs en paliers (aucun style en ligne).
+const LIB_SEUIL = { tva: 'cons.vSeuilTva', tvaMajore: 'cons.vSeuilTvaMajore', micro: 'cons.vSeuilMicro' };
 const palier = (x, max) => String(max > 0 ? Math.max(0, Math.min(10, Math.round((x / max) * 10))) : 0);
 export function Visuel({ v, Photo = null }) {
   if (!v) return null;
@@ -50,7 +51,7 @@ export function Visuel({ v, Photo = null }) {
   // Un SVG étiré (viewBox 0–100) : la largeur du plein EST le pourcentage, aucun palier, aucun style en ligne.
   if (v.type === 'barre') {
     const pct = Math.max(0, Math.min(100, Number(v.pct) || 0));
-    const libelle = v.quoi === 'seuil' ? tr('cons.vSeuil_' + (v.seuil || 'tva'), { pct: nombre(pct) }) : tr('cons.vPrix', { pct: nombre(pct) });
+    const libelle = v.quoi === 'seuil' ? tr(LIB_SEUIL[v.seuil] || LIB_SEUIL.tva, { pct: nombre(pct) }) : tr('cons.vPrix', { pct: nombre(pct) });
     return (
       <span className="n-cons-barre" data-cons-visuel="barre" data-cons-pct={String(pct)} role="img" aria-label={libelle}>
         <span className="n-cons-barre-libelle">{libelle}</span>

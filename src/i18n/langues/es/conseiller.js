@@ -83,9 +83,9 @@ export default {
   "cons.pres.question.tt": "Haz tu pregunta",
   "cons.pres.question.ph": "Con tu clave de Claude, «Pregunta a VRM» responde citando tus cifras.",
   "cons.vPrix": "{pct} % de los precios de compra conocidos",
-  "cons.vSeuil_tva": "{pct} % del umbral de IVA",
-  "cons.vSeuil_tvaMajore": "{pct} % del umbral de IVA aumentado",
-  "cons.vSeuil_micro": "{pct} % del tope micro",
+  "cons.vSeuilTva": "{pct} % del umbral de IVA",
+  "cons.vSeuilTvaMajore": "{pct} % del umbral de IVA aumentado",
+  "cons.vSeuilMicro": "{pct} % del tope micro",
   "cons.vVentes": {"one": "{n} venta en 30 días", "other": "{n} ventas en 30 días"},
   "cons.vDuo": "Ventas en 30 días: {a} {na}, {b} {nb}",
 };

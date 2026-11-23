@@ -83,9 +83,9 @@ export default {
   "cons.pres.question.tt": "Ask your question",
   "cons.pres.question.ph": "With your Claude key, “Ask VRM” answers by citing your numbers.",
   "cons.vPrix": "{pct}% of purchase prices known",
-  "cons.vSeuil_tva": "{pct}% of the VAT threshold",
-  "cons.vSeuil_tvaMajore": "{pct}% of the higher VAT threshold",
-  "cons.vSeuil_micro": "{pct}% of the micro-business cap",
+  "cons.vSeuilTva": "{pct}% of the VAT threshold",
+  "cons.vSeuilTvaMajore": "{pct}% of the higher VAT threshold",
+  "cons.vSeuilMicro": "{pct}% of the micro-business cap",
   "cons.vVentes": {"one": "{n} sale in 30 days", "other": "{n} sales in 30 days"},
   "cons.vDuo": "Sales in 30 days: {a} {na}, {b} {nb}",
 };
