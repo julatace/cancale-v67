@@ -25,7 +25,7 @@
 //  formulaire et la réponse attendue.
 // ════════════════════════════════════════════════════════════════════════════
 (() => {
-  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 6) return;
+  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 7) return;
   const SEL = Object.freeze({
     vendre: 'a[data-testid="header-upload-item-button"]',
     photos: 'input[data-testid="add-photos-input"]',
@@ -306,6 +306,14 @@
   const dialogue = () => { const l = [...document.querySelectorAll('[role="dialog"], [aria-modal="true"], [data-testid*="modal" i]')].filter((x) => visible(x) && !deVrm(x)); const fin = l.filter((el) => !l.some((x) => x !== el && el.contains(x))); return fin.length === 1 ? fin[0] : null; };
   // Le champ du message (hors fenêtre) : un seul candidat.
   function composeur() {
+    const x0 = composeurAncien();
+    if (x0.el || x0.ambigu) return x0;
+    // 5.440 : la couche de repérage (plusieurs stratégies, un seul gagnant) quand la règle d'avant ne voit rien.
+    const t = T(); if (!t) return x0;
+    const r = t.trouver('champMessage', {}); noterTrouve('champMessage', r);
+    return { el: r.el || null, ambigu: !!r.ambigu };
+  }
+  function composeurAncien() {
     const ok = (x) => visible(x) && !x.closest('[role="dialog"],[aria-modal="true"]') && !x.readOnly && !x.disabled;
     for (const s of ['textarea[data-testid*="message" i]', 'textarea[data-testid*="conversation" i]', 'textarea[name="message"]', 'textarea[name="body"]', '[contenteditable="true"][role="textbox"]']) {
       const l = [...document.querySelectorAll(s)].filter(ok);
@@ -316,6 +324,13 @@
   }
   // « Envoyer » de CE champ : le bouton d'envoi de son formulaire, sinon un seul bouton « Envoyer » de la page.
   function boutonEnvoyer(champ) {
+    const x0 = boutonEnvoyerAncien(champ);
+    if (x0.el || x0.ambigu) return x0;
+    const t = T(); if (!t) return x0;
+    const r = t.trouver('envoyer', { champ }); noterTrouve('envoyer', r);
+    return { el: r.el || null, ambigu: !!r.ambigu };
+  }
+  function boutonEnvoyerAncien(champ) {
     const f = champ && champ.closest && champ.closest('form');
     if (f) {
       const s = [...f.querySelectorAll('button[type="submit"], button:not([type])')].filter((b) => visible(b) && actif(b) && (RE_ENVOYER.test(norm(nomAcc(b))) || /send|submit/i.test(b.getAttribute('data-testid') || '') || b.type === 'submit'));
@@ -401,6 +416,42 @@
     const fin = Date.now() + ms;
     for (;;) { if (captcha()) return { captcha: true }; if (r.test(location.pathname)) return { ok: true }; if (Date.now() > fin) return { ok: false }; await nap(150); }
   }
+  // ══ 5.440 (23 nov., mesuré en production) — LA NOUVELLE MESSAGERIE DE VINTED ══════════════════════════════════════
+  //  Relevé passif du 23 nov. 06:33 (compte de Julien, `harvest_*_seen_urls`, formes seulement) : la conversation ouverte
+  //  depuis la cloche n'est plus `POST /api/v2/conversations` mais `POST api.vinted.fr/messaging/main/inquiries` (201 :
+  //  `conversation_id` texte, `transaction_id`) ; la page vit sur `/inbox/{uuid}` et relit
+  //  `GET api.vinted.fr/messaging/main/conversations/{uuid}` (porte `core_id_deprecated`, l'ANCIEN n° de la conversation) ;
+  //  le message part en `POST …/messaging/main/conversations/{uuid}/replies` (réponse : `conversation_id`, `data.content`).
+  //  inject.js retient, dans la page seulement, uuid → ancien n° (`__vrmConvCore`, lu sur la réponse de Vinted elle-même).
+  //  Une conversation n'est « la bonne » que par IDENTITÉ : l'adresse porte son ancien n°, ou son uuid dont la page a dit
+  //  qu'il est CE n°. Jamais par un titre ni un pseudo.
+  const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  const uuidIci = () => { const m = /^\/inbox\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/.exec(location.pathname); return m ? m[1] : ''; };
+  const coeurDe = (uuid) => { try { const x = globalThis.__vrmConvCore && globalThis.__vrmConvCore[uuid]; return x && /^[1-9]\d{0,19}$/.test(String(x.core)) ? String(x.core) : ''; } catch (_) { return ''; } };
+  function surConv(conv, d) {
+    if (!/^[1-9]\d{0,19}$/.test(String(conv || ''))) return false;
+    if (new RegExp(`^/inbox/${conv}/?$`).test(location.pathname)) return true;
+    const u = uuidIci(); if (!u) return false;
+    const route = String((d && d.route) || '');
+    // L'uuid passé par le fond (appris de CETTE page) ou celui dont la page a dit l'ancien n° : les deux doivent concorder.
+    const c = coeurDe(u);
+    if (c) return c === String(conv);
+    return RE_UUID.test(route) && route === u;
+  }
+  // La page vient d'être ouverte : la relecture de la conversation par Vinted (qui dit l'ancien n°) peut arriver juste après.
+  async function attendreConv(conv, d, ms) { const fin = Date.now() + ms; for (;;) { if (surConv(conv, d)) return true; if (!uuidIci() || Date.now() > fin) return surConv(conv, d); await nap(200); } }
+  // La réponse d'un message, ancienne ou nouvelle messagerie : 2xx ET la conversation dite par Vinted = celle-ci.
+  function repMessageNormale(r, conv) {
+    if (!r || !r.json || typeof r.json !== 'object') return r;
+    const j = r.json, u = uuidIci();
+    if (j.code == null && typeof j.conversation_id === 'string' && u && j.conversation_id === u && r.ok) return Object.assign({}, r, { json: Object.assign({}, j, { code: 0, nouvelle: true, conversation: { id: Number(conv) } }) });
+    return r;
+  }
+  const T = () => globalThis.__vrmTrouver || null;
+  // Ce que la couche de repérage a vu pendant l'étape : rendu au fond (mémoire de la stratégie gagnante, journal sinon).
+  const TROUVES = [];
+  let MEMOIRE = {};
+  function noterTrouve(nom, r) { try { if (!r) return; TROUVES.push({ nom, s: r.el ? String(r.strategie || '') : '', ambigu: !!r.ambigu, essais: (r.essais || []).map((e) => ({ s: e.s, n: e.n })).slice(0, 8) }); if (TROUVES.length > 12) TROUVES.shift(); } catch (_) {} }
   const ETAPES = {
     async etat() { return { ok: true, chemin: location.pathname, captcha: captcha(), formulaire: !!document.querySelector(SEL.titre) }; },
     async ouvrirVente() {
@@ -556,6 +607,8 @@
     // Avant chaque geste : la page montrée est la BONNE (identifiants dans l'adresse, jamais un titre) ; un élément
     // introuvable ou ambigu (deux candidats) ⇒ arrêt AVANT le geste, son nom dit (`selecteur`).
     async ouvrir(d) {
+      // 5.440 : une conversation (ancien n° ou uuid de la nouvelle messagerie) se reconnaît par `surConv`, pas par l'adresse seule.
+      if (d && /^[1-9]\d{0,19}$/.test(String(d.conv || ''))) { const fin = Date.now() + 20000; for (;;) { if (captcha()) return vuCaptcha(); if (surConv(String(d.conv), d)) return { ok: true, chemin: location.pathname }; if (Date.now() > fin) return { ok: false, code: 'identite', chemin: location.pathname }; await nap(150); } }
       const a = await attendreChemin(d && d.chemin, 20000); if (a.captcha) return vuCaptcha(); if (!a.ok) return { ok: false, code: 'identite', chemin: location.pathname };
       return { ok: true, chemin: location.pathname };
     },
@@ -601,13 +654,27 @@
           if ((stable === 2 || tours === 0) && tours < 8) { tours++; try { window.scrollTo(0, Math.max(0, h - window.innerHeight - 240)); window.scrollTo(0, h); } catch (_) {} }
           return '';
         });
-        if (t.captcha) return vuCaptcha(); if (t.ambigu) return manque('favori-notification-ambigue'); if (t.absent) return absent({ liste: true });
+        if (t.captcha) return vuCaptcha(); if (t.ambigu) return manque('favori-notification-ambigue');
+        // 5.440 : « absent » ne se dit que sur une VRAIE liste de notifications (au moins une ligne de favori ou de notification
+        //    native) ; une page qui n'en montre aucune n'est pas la liste (adresse changée, page d'erreur) ⇒ nommé, rien sauté.
+        if (t.absent && !document.querySelector('a[href*="/want_it/"], a[href*="receiver_id="], a[href*="offering_id="], [data-testid*="notification" i]')) return manque('notifications-introuvables');
+        if (t.absent) return absent({ liste: true });
         try { t.el.scrollIntoView({ block: 'center' }); } catch (_) {}
         l = { el: t.el };
       } else if (!l.el) {
         let p = panneauCloche();
         if (!p) {
-          const c = ouAppris('cloche', clocheVisible()); if (c.ambigu) return manque('cloche-ambigue'); if (!c.el) return manque('cloche');
+          // 5.440 (`clocheauto`) : la cloche par la couche de repérage — plusieurs stratégies (nom en 5 langues, data-testid,
+          //    lien des notifications, icône, en-tête, compteur), la page attendue 12 s pendant qu'elle se construit, la
+          //    stratégie qui a marché la dernière fois d'abord. Plus JAMAIS « touche le bouton » : introuvable ⇒ le fond
+          //    passe par la page complète des notifications, puis s'arrête avec le journal des stratégies essayées.
+          const t = T();
+          let c;
+          if (t) { const r = await t.attendre('cloche', { prefere: MEMOIRE.cloche || '' }, 12000, captcha); if (r.captcha) return vuCaptcha(); noterTrouve('cloche', r); c = { el: r.el || null, ambigu: !!r.ambigu }; }
+          else c = clocheVisible();
+          if (c.ambigu) return manque('cloche-ambigue'); if (!c.el) return manque('cloche');
+          // Un LIEN vers la page des notifications : la même liste, complète — le fond l'ouvre (`favoriListe`).
+          if (c.el.tagName === 'A') { const ch = cheminNotif(c.el); if (ch) return absent({ cloche: true, voirTout: ch, lienCloche: true }); }
           if (c.el.getAttribute('aria-expanded') !== 'true') clic(c.el);
         }
         // La ligne attendue 8 s au plus ; dès que la liste est ouverte (« Voir tout » montré) depuis 2,5 s sans elle, c'est su.
@@ -618,13 +685,17 @@
         l = { el: t.el };
       }
       // 2. La ligne du favori (le lien porte l'article ET la personne) : un clic ; la page ouvre la conversation.
+      // 5.440 : l'ancienne création (`POST /api/v2/conversations`) OU la nouvelle (`POST …/messaging/main/inquiries`, mesurée
+      //    le 23 nov.) ; la conversation montrée sur `/inbox/{n°}` ou `/inbox/{uuid}` — l'uuid n'est reconnu que par l'ancien
+      //    n° que la page a lu de Vinted (`__vrmConvCore`), jamais deviné.
       let rep = null, repVue = false;
-      reponseDe('POST', /\/api\/v2\/conversations\/?$/, 25000, d && d.cle).then((x) => { rep = x; repVue = true; });
+      reponseDe('POST', /(?:\/api\/v2\/conversations|\/messaging\/main\/inquiries)\/?$/, 25000, d && d.cle).then((x) => { rep = x; repVue = true; });
       clic(l.el);
-      const fin = Date.now() + 25000; let conv = '';
+      const fin = Date.now() + 25000; let conv = '', route = '';
       for (;;) {
         if (captcha()) return Object.assign(vuCaptcha(), { parti: true });
         const m = /^\/inbox\/([1-9]\d{0,19})\/?$/.exec(location.pathname); if (m) conv = m[1];
+        const u = uuidIci(); if (u) { route = u; const c = coeurDe(u); if (c) conv = c; }
         if (!conv && rep && rep.json && rep.json.conversation && /^[1-9]\d{0,19}$/.test(String(rep.json.conversation.id))) conv = String(rep.json.conversation.id);
         // La conversation montrée ; la réponse de création attendue encore 3 s (une conversation déjà là n'en a pas).
         if (conv && (repVue || Date.now() > fin - 22000)) break;
@@ -632,16 +703,22 @@
         await nap(200);
       }
       if (rep && rep.captcha) return Object.assign(vuCaptcha(), { parti: true });
+      // La nouvelle création dit l'uuid : il doit être CELUI de la page (sinon ce n'est pas notre conversation).
+      if (rep && rep.json && typeof rep.json.conversation_id === 'string' && route && rep.json.conversation_id !== route) return { ok: false, code: 'identite', parti: true, chemin: location.pathname };
+      const txN = rep && rep.json && /^[1-9]\d{0,19}$/.test(String(rep.json.transaction_id || '')) ? String(rep.json.transaction_id) : '';
       // Rien vu partir (aucune requête de création, aucune conversation montrée) : la page n'a rien écrit — arrêt, rien ne part.
-      if (!conv) return rep ? { ok: true, rep, conv: '', envoye: true } : manque('conversation-pas-ouverte');
-      return { ok: true, rep, conv, envoye: !!rep, chemin: location.pathname };
+      // Une conversation montrée (uuid) dont l'ancien n° n'a pas été lu : ouverte, mais pas prouvée ⇒ « partie », jamais rejouée.
+      if (!conv) return rep || route ? { ok: true, rep, conv: '', route, envoye: !!rep, nonProuvee: true } : manque('conversation-pas-ouverte');
+      return { ok: true, rep, conv, route, tx: txN, envoye: !!rep, chemin: location.pathname };
     },
     // La même étape sur la PAGE complète des notifications (« Voir tout ») : la cloche n'y est pas touchée.
     async favoriListe(d) { return ETAPES.favoriOuvrir(Object.assign({}, d || {}, { liste: true })); },
+    // 5.440 : la même étape depuis l'accueil de Vinted (l'en-tête complet), quand la messagerie ne montre pas la cloche.
+    async favoriAccueil(d) { return ETAPES.favoriOuvrir(Object.assign({}, d || {}, { liste: false })); },
     async message(d) {
       const conv = String((d && d.conv) || ''), texte = String((d && d.texte) || '');
       if (!/^[1-9]\d{0,19}$/.test(conv) || !texte.trim()) return { ok: false, code: 'etape' };
-      if (!new RegExp(`^/inbox/${conv}/?$`).test(location.pathname)) return { ok: false, code: 'identite', chemin: location.pathname };
+      if (!(await attendreConv(conv, d, 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
       const z = await attendreN('message-champ', () => { const x = composeur(); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (z.captcha) return vuCaptcha(); if (z.absent) return manque('message-champ'); if (z.el === 'AMBIGU') return manque('message-champ-ambigu');
       const champ = z.el;
@@ -650,12 +727,15 @@
       const okT = await saisir(champ, texte, { garderFocus: true });
       if (!okT) return { ok: false, code: 'valeur', manque: 'message-champ' };
       if (captcha()) return vuCaptcha();
-      if (!new RegExp(`^/inbox/${conv}/?$`).test(location.pathname)) return { ok: false, code: 'identite', chemin: location.pathname };
+      if (!surConv(conv, d)) return { ok: false, code: 'identite', chemin: location.pathname };
       const b2 = ouAppris('message-envoyer', boutonEnvoyer(champ)); if (!b2.el || b2.ambigu) return manque('message-envoyer');
       ecouter();
-      const att = reponseDe('POST', new RegExp(`/api/v2/conversations/${conv}/replies$`), 30000, d && d.cle);
+      // 5.440 : l'ancienne messagerie (`/api/v2/conversations/{n°}/replies`) ou la nouvelle (`…/messaging/main/
+      //    conversations/{uuid}/replies`, l'uuid de CETTE page, vérifié par `surConv`).
+      const uIci = uuidIci();
+      const att = reponseDe('POST', uIci ? new RegExp(`(?:/api/v2/conversations/${conv}|/messaging/main/conversations/${uIci})/replies$`) : new RegExp(`/api/v2/conversations/${conv}/replies$`), 30000, d && d.cle);
       clic(b2.el);
-      const r = await att;
+      const r = repMessageNormale(await att, conv);
       if (!r) return { ok: false, code: 'sans-reponse', parti: true };
       if (r.captcha) return Object.assign(vuCaptcha(), { parti: true });
       if (!r.ok) return { ok: true, rep: r, vu: false };
@@ -666,8 +746,8 @@
     async offre(d) {
       const conv = String((d && d.conv) || ''), tx = String((d && d.tx) || ''), prix = Number(d && d.prix);
       if (!/^[1-9]\d{0,19}$/.test(conv) || !/^[1-9]\d{0,19}$/.test(tx) || !(prix > 0)) return { ok: false, code: 'etape' };
-      if (!new RegExp(`^/inbox/${conv}/?$`).test(location.pathname)) return { ok: false, code: 'identite', chemin: location.pathname };
-      const b = await attendreN('offre-bouton', () => { const x = parNom(RE_FAIRE_OFFRE, document, /make[-_]?offer|offer[-_]?(button|cta)/i, /accept|decline|reject|cancel/i); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
+      if (!(await attendreConv(conv, d, 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
+      const b = await attendreN('offre-bouton', () => { let x = parNom(RE_FAIRE_OFFRE, document, /make[-_]?offer|offer[-_]?(button|cta)/i, /accept|decline|reject|cancel/i); if (!x.el && !x.ambigu && T()) { const r = T().trouver('boutonOffre', {}); noterTrouve('boutonOffre', r); x = { el: r.el || null, ambigu: !!r.ambigu }; } return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (b.captcha) return vuCaptcha(); if (b.absent) return manque('offre-bouton'); if (b.el === 'AMBIGU') return manque('offre-bouton-ambigu');
       const avant = occurrencesPrix(prix);
       clic(b.el);
@@ -676,7 +756,8 @@
       if (inp.captcha) return vuCaptcha(); if (inp.absent) return manque('offre-prix'); if (inp.el === 'AMBIGU') return manque('offre-prix-ambigu');
       const okT = await saisir(inp.el, texteMontant(prix), { garderFocus: true });
       if (!okT) return { ok: false, code: 'valeur', manque: 'offre-prix' };
-      const s = ouAppris('offre-valider', parNom(RE_VALIDER_OFFRE, dl.el, /submit|confirm|send|offer/i, /cancel|close|annul/i, true));
+      let s = ouAppris('offre-valider', parNom(RE_VALIDER_OFFRE, dl.el, /submit|confirm|send|offer/i, /cancel|close|annul/i, true));
+      if (!s.el && !s.ambigu && T()) { const r = T().trouver('offreValider', {}); noterTrouve('offreValider', r); s = { el: r.el || null, ambigu: !!r.ambigu }; }
       if (s.ambigu) return manque('offre-valider-ambigu'); if (!s.el) return manque('offre-valider');
       if (captcha()) return vuCaptcha();
       ecouter();
@@ -692,7 +773,7 @@
     async repondreOffre(d) {
       const conv = String((d && d.conv) || ''), tx = String((d && d.tx) || ''), oid = String((d && d.oid) || ''), accepter = !!(d && d.accepter);
       if (!/^[1-9]\d{0,19}$/.test(conv) || !/^[1-9]\d{0,19}$/.test(tx) || !/^[1-9]\d{0,19}$/.test(oid)) return { ok: false, code: 'etape' };
-      if (!new RegExp(`^/inbox/${conv}/?$`).test(location.pathname)) return { ok: false, code: 'identite', chemin: location.pathname };
+      if (!(await attendreConv(conv, d, 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
       const re = accepter ? RE_ACCEPTER : RE_REFUSER, nom = accepter ? 'offre-accepter' : 'offre-refuser';
       const b = await attendreN(nom, () => { const x = parNom(re, document, accepter ? /accept/i : /decline|reject/i, accepter ? /decline|reject|cancel/i : /accept|cancel/i); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (b.captcha) return vuCaptcha(); if (b.absent) return manque(nom); if (b.el === 'AMBIGU') return manque(nom + '-ambigu');
@@ -816,7 +897,7 @@
     async bordereau(d) {
       const conv = String((d && d.conv) || ''), tx = String((d && d.tx) || ''), depot = d && d.depot ? String(d.depot) : '';
       if (!/^[1-9]\d{0,19}$/.test(conv) || !/^[1-9]\d{0,19}$/.test(tx)) return { ok: false, code: 'etape' };
-      if (!new RegExp(`^/inbox/${conv}/?$`).test(location.pathname)) return { ok: false, code: 'identite', chemin: location.pathname };
+      if (!(await attendreConv(conv, d, 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
       const b = await attendreN('bordereau-bouton', () => { const x = parNom(RE_BORDEREAU, document, /(shipping[-_]?label|label[-_]?(button|cta)|get[-_]?label)/i, /cancel|close|download|track/i); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (b.captcha) return vuCaptcha(); if (b.absent) return manque('bordereau-bouton'); if (b.el === 'AMBIGU') return manque('bordereau-bouton-ambigu');
       ecouter();
@@ -847,7 +928,7 @@
     async evaluation(d) {
       const conv = String((d && d.conv) || ''), texte = String((d && d.texte) || ''), meth = String((d && d.methode) || 'POST').toUpperCase(), ch = String((d && d.chemin) || '');
       if (!/^[1-9]\d{0,19}$/.test(conv) || !texte.trim() || !/^\/api\/v2\/[\w/-]+$/.test(ch) || !['POST', 'PUT'].includes(meth)) return { ok: false, code: 'etape' };
-      if (!new RegExp(`^/inbox/${conv}/?$`).test(location.pathname)) return { ok: false, code: 'identite', chemin: location.pathname };
+      if (!(await attendreConv(conv, d, 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
       const b = await attendreN('evaluation-bouton', () => { const x = parNom(RE_EVALUER, document, /(leave[-_]?)?feedback[-_]?(button|cta)|review[-_]?button/i, /cancel|close/i); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (b.captcha) return vuCaptcha(); if (b.absent) return manque('evaluation-bouton'); if (b.el === 'AMBIGU') return manque('evaluation-bouton-ambigu');
       clic(b.el);
@@ -877,7 +958,7 @@
       return x ? { ok: true, rep: x } : { ok: false, code: 'sans-reponse' };
     },
   };
-  globalThis.__vrmFormulaireV = 6;   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
+  globalThis.__vrmFormulaireV = 7;   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
   globalThis.__vrmFormulaireSel = SEL;
   globalThis.__vrmFormulaire = async (etape, d) => {
     if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(location.hostname)) return { ok: false, code: 'hors-vinted' };
@@ -885,6 +966,10 @@
     if (!f) return { ok: false, code: 'etape' };
     // 5.433 : les éléments appris pour CETTE étape (signatures seulement), posés par le fond à chaque appel.
     APPRIS = {}; try { const ap = d && d.appris && typeof d.appris === 'object' ? d.appris : {}; for (const k of Object.keys(ap).slice(0, 40)) if (/^[a-z-]{2,40}$/.test(k) && ap[k] && ap[k].sig) APPRIS[k] = { sig: ap[k].sig, confirme: ap[k].confirme === true }; } catch (_) { APPRIS = {}; }
-    try { return await f(d || {}); } catch (e) { if (e && e.vrmAConfirmer) return { ok: false, code: 'appris-a-confirmer', manque: String(e.vrmAConfirmer), chemin: location.pathname }; return { ok: false, code: 'erreur', raison: String((e && e.message) || e).slice(0, 120) }; }
+    // 5.440 : la mémoire de la couche de repérage (stratégie qui a marché, par élément et version de la page) passée par le fond.
+    MEMOIRE = {}; try { const m = d && d.memoire && typeof d.memoire === 'object' ? d.memoire : {}; for (const k of Object.keys(m).slice(0, 20)) if (/^[a-zA-Z]{2,30}$/.test(k) && /^[a-z]{2,20}$/.test(String(m[k] || ''))) MEMOIRE[k] = String(m[k]); } catch (_) {}
+    TROUVES.length = 0;
+    const avecTrouves = (o) => { try { if (o && typeof o === 'object' && TROUVES.length) { o.trouves = TROUVES.slice(); o.verPage = T() ? T().versionPage() : ''; } } catch (_) {} return o; };
+    try { return avecTrouves(await f(d || {})); } catch (e) { if (e && e.vrmAConfirmer) return { ok: false, code: 'appris-a-confirmer', manque: String(e.vrmAConfirmer), chemin: location.pathname }; return { ok: false, code: 'erreur', raison: String((e && e.message) || e).slice(0, 120) }; }
   };
 })();

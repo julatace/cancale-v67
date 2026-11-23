@@ -136,6 +136,44 @@
   .pastille { font: 500 13px/1.2 var(--vu-police); }
   .pastille .vu-btn { border-radius: 8px; font-size: 13px; }
   .chaine { font: 500 12px/1.3 var(--vu-police); }
+  /* ══ 5.440 (Julien, 23 nov. : « plus belle et plus compréhensible ») — LA FENÊTRE DES MESSAGES AUX FAVORIS ══
+     À qui on écrit (l'article, sa photo — jamais le pseudo de l'acheteur), l'étape en mots simples, « 2 envoyés · 1 sauté ·
+     2 restants », chaque ligne avec son état, « Pause » (le plein, à l'encre) et « Tout arrêter » (secondaire), « Réduire »
+     discret. Vert = fait, ambre = à regarder, gris = en attente ; aucun bleu, aucun titre en capitales. */
+  .fav .boite, .boite.fav { width: min(560px, 100%); gap: 16px; padding: 20px; border-radius: 16px; }
+  .fav-h { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+  .fav-h .t { flex: 1; min-width: 0; font: 600 15px/1.3 var(--vu-police); color: var(--vu-sur); }
+  .fav-h .vu-lien { min-height: 44px; padding: 0 4px; background: none; border: 0; font: 500 13px/1 var(--vu-police); color: var(--vu-sur-2); cursor: pointer; text-decoration: none; }
+  .fav-h .vu-lien:hover { color: var(--vu-sur); text-decoration: underline; text-underline-offset: 3px; }
+  .fav-cours { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 14px; align-items: center; padding: 12px; border-radius: 12px; background: var(--vu-plaque-2); box-shadow: inset 0 0 0 1px var(--vu-filet); }
+  .fav-cours .photo, .fav-cours .photo img, .fav-cours .photo .ph { width: 72px; height: 72px; }
+  .fav-cours .photo img, .fav-cours .photo .ph { border-radius: 10px; }
+  .fav-qui { font: 500 12px/1.3 var(--vu-police); color: var(--vu-sur-2); }
+  .fav-ti { font: 600 15px/1.3 var(--vu-police); color: var(--vu-sur); overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .fav-etape { margin-top: 4px; display: flex; align-items: center; gap: 8px; font: 500 13px/1.35 var(--vu-police); color: var(--vu-sur); font-variant-numeric: tabular-nums; }
+  .fav-etape .pu { width: 8px; height: 8px; border-radius: 999px; flex: none; background: var(--vu-barre); animation: vu-pouls 1.4s ease-in-out infinite; }
+  .fav-etape[data-fav-etape="confirmation"] .pu { animation: none; }
+  .fav-etape[data-fav-etape="attente"] .pu { background: var(--vu-socle); animation: none; box-shadow: inset 0 0 0 1.5px var(--vu-sur-2); }
+  .fav-prog { display: grid; gap: 8px; }
+  .fav-chiffres { display: flex; flex-wrap: wrap; gap: 4px 14px; font: 500 13px/1.3 var(--vu-police); color: var(--vu-sur-2); font-variant-numeric: tabular-nums; }
+  .fav-chiffres b { font: 700 20px/1.1 var(--vu-police); color: var(--vu-sur); letter-spacing: -.01em; margin-right: 4px; }
+  .fav-prog .vu-barre { height: 6px; }
+  .fav-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: min(34vh, 300px); overflow: auto; overscroll-behavior: contain; border-top: 1px solid var(--vu-filet); padding-top: 8px; }
+  .fav-l { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 48px; padding: 4px 2px; }
+  .fav-l img, .fav-l .ph { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; display: block; background: var(--vu-socle); }
+  .fav-l .lw { display: block; min-width: 0; overflow: hidden; }
+  .fav-l .lt { display: block; min-width: 0; font: 400 13px/1.3 var(--vu-police); color: var(--vu-sur); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fav-l .lr { display: block; font: 400 12px/1.3 var(--vu-police); color: var(--vu-sur-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fav-e { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 999px; font: 600 12px/1 var(--vu-police); white-space: nowrap; background: var(--vu-socle); color: var(--vu-sur-2); }
+  .fav-e[data-e="envoye"] { background: var(--vu-chg); color: var(--vu-chg-encre); }
+  .fav-e[data-e="saute"], .fav-e[data-e="pas"], .fav-e[data-e="verifier"] { background: var(--vu-ambre-fond); color: var(--vu-ambre); }
+  .fav-e[data-e="cours"] { background: var(--vu-plein); color: var(--vu-plein-encre); }
+  .fav-l[data-e="cours"] .lt { font-weight: 600; }
+  .fav .gestes { grid-template-columns: 1fr 1fr; }
+  .fav .gestes.seul { grid-template-columns: 1fr; }
+  .fav-fin-t { font: 700 20px/1.25 var(--vu-police); letter-spacing: -.01em; color: var(--vu-sur); }
+  @media (max-width: 560px) { .fav .boite, .boite.fav { width: 100%; min-height: 100%; border-radius: 0; align-content: start; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); } .fav .gestes { grid-template-columns: 1fr; } .fav-liste { max-height: none; } }
+  @media (prefers-reduced-motion: reduce) { .fav-etape .pu { animation: none; } }
 </style><div class="vu-racine" data-racine></div>`;
   U.monter(ombre);
   const racine = ombre.querySelector('[data-racine]');
@@ -337,6 +375,76 @@
     if (ar) { const t = arretDemande ? T('c_arret_en_cours') : T('c_tout_arreter'); if (ar.textContent !== t) ar.textContent = t; }
     minuter();
   }
+  // ══ 5.440 — LA FENÊTRE DES MESSAGES AUX FAVORIS (lignes de la file + étape en mots simples) ═════════════════════════
+  const favLignes = (a) => (a && a.sorte === 'favoris' && Array.isArray(a.lignes) && a.lignes.length ? a.lignes.slice(0, 15) : null);
+  const ETAPES_FAV = { autorisation: 'fa_e_preparation', cloche: 'fa_e_cloche', conversation: 'fa_e_conversation', verification: 'fa_e_verification', historique: 'fa_e_verification', attente_offre: 'fa_e_offre', offre: 'fa_e_offre', ecriture: 'fa_e_ecriture', envoi: 'fa_e_envoi', confirmation: 'fa_e_envoye' };
+  const RAISONS_FAV = ['annonce_indisponible', 'article_vendu', 'favori_trop_ancien', 'conversation_deja_contactee', 'conversation_existante', 'offre_sous_plancher', 'conversation_refusee', 'filtre', 'element_introuvable', 'identite_non_confirmee', 'onglet_vinted', 'compte_vinted_different', 'compte_vinted_absent', 'pause_vinted', 'vinted_robot', 'texte_refuse', 'texte_interdit', 'offre_refusee', 'offre_prix_inconnu', 'quota_extension', 'tout_arrete', 'autorisation_expiree', 'creation_non_confirmee', 'reponse_inconnue', 'offre_incertaine', 'historique_non_verifie'];
+  const pl = (n, un, plusieurs) => T(Number(n) === 1 ? un : plusieurs, { n: Number(n) || 0 });
+  function favCompte(l) {
+    const c = { envoye: 0, saute: 0, pas: 0, verifier: 0, reste: 0 };
+    for (const x of l) { if (x.etat === 'envoye') c.envoye++; else if (x.etat === 'saute') c.saute++; else if (x.etat === 'pas') c.pas++; else if (x.etat === 'verifier') c.verifier++; else c.reste++; }
+    return c;
+  }
+  function favEtapeHtml(a) {
+    const cours = Number(a.prochain) > Date.now() && !a.enCours ? Number(a.prochain) : 0;
+    if (cours) return `<div class="fav-etape" role="status" data-fav-etape="attente"><span class="pu" aria-hidden="true"></span><span data-action-dans="${cours}">${esc(T('a_ensuite', { dans: U.duree(cours - Date.now()) }))}</span></div>`;
+    const k = ETAPES_FAV[String(a.etapeFav || '')] || (a.enCours ? 'fa_e_preparation' : 'fa_e_attente');
+    const nom = String(a.etapeFav || (a.enCours ? 'autorisation' : 'attente'));
+    return `<div class="fav-etape" role="status" data-fav-etape="${esc(nom)}"><span class="pu" aria-hidden="true"></span><span>${esc(T(k))}</span></div>`;
+  }
+  function favLigneHtml(x) {
+    const e = ['envoye', 'saute', 'pas', 'verifier', 'cours', 'attente', 'annule'].includes(x.etat) ? x.etat : 'attente';
+    const raison = x.r && RAISONS_FAV.includes(x.r) && e !== 'envoye' && e !== 'cours' && e !== 'attente' ? T('fa_r_' + x.r) : '';
+    return `<li class="fav-l" data-e="${e}" data-fav-ligne="${esc(x.id || '')}">${vinted(x.photo) ? `<img src="${esc(x.photo)}" alt="" referrerpolicy="no-referrer" decoding="async" loading="lazy">` : '<span class="ph" aria-hidden="true"></span>'}`
+      + `<span class="lw"><span class="lt">${esc(x.titre || T('fa_article'))}</span>${raison ? `<span class="lr" data-fav-raison="${esc(x.r)}">${esc(raison)}</span>` : ''}</span>`
+      + `<span class="fav-e" data-e="${e}">${esc(T('fa_l_' + e))}</span></li>`;
+  }
+  // La fin, dite selon SA cause (jamais « terminé » pour un arrêt).
+  const finTitreFav = (a) => { const r = String((a.fin && a.fin.raison) || 'fini'); return r === 'fini' ? 'fa_fin' : r === 'arret' || r === 'tout_arrete' ? 'fa_fin_arret' : r === 'travail_ferme' ? 'fa_fin_onglet' : 'fa_fin_interrompu'; };
+  function favHtml(a, fin) {
+    const l = favLignes(a), c = favCompte(l), it = a.item || {}, total = l.length;
+    const faits = c.envoye + c.saute + c.pas + c.verifier, pc = total ? 100 * faits / total : 0;
+    const arret = fin && a.fin && a.fin.raison !== 'fini';
+    const chiffres = `<div class="fav-chiffres" data-fav-envoyes="${c.envoye}" data-fav-sautes="${c.saute + c.pas}" data-fav-restants="${c.reste}" data-fav-verifier="${c.verifier}"><span><b>${c.envoye}</b>${esc(pl(c.envoye, 'fa_envoye_1', 'fa_envoye_n').replace(/^\d+\s*/, ''))}</span><span><b>${c.saute + c.pas}</b>${esc(pl(c.saute + c.pas, 'fa_saute_1', 'fa_saute_n').replace(/^\d+\s*/, ''))}</span>${c.verifier ? `<span><b>${c.verifier}</b>${esc(pl(c.verifier, 'fa_verif_1', 'fa_verif_n').replace(/^\d+\s*/, ''))}</span>` : ''}${fin && !c.reste ? '' : `<span><b>${c.reste}</b>${esc(pl(c.reste, fin ? 'fa_nonenv_1' : 'fa_reste_1', fin ? 'fa_nonenv_n' : 'fa_reste_n').replace(/^\d+\s*/, ''))}</span>`}</div>`;
+    const tete = `<div class="fav-h"><span class="vu-point"${fin ? (arret ? ' data-k="arrete"' : '') : ''}></span><span class="t">${esc(T('f_titre'))}</span>${fin ? '' : `<button class="vu-lien" data-reduire>${esc(T('a_reduire'))}</button>`}</div>`;
+    const liste = `<ol class="fav-liste" aria-label="${esc(T('fa_liste'))}" data-fav-lignes="${total}">${l.map(favLigneHtml).join('')}</ol>`;
+    if (fin) {
+      return `<div class="voile fav" data-action-fav-fin="${esc((a.fin && a.fin.raison) || 'fini')}" role="dialog" aria-modal="true" aria-label="${esc(T('f_titre'))}"><div class="boite vu-coque vu-sur-coque fav">${tete}`
+        + `<div class="fav-fin-t" role="status">${esc(T(finTitreFav(a)))}</div><div class="fav-prog">${chiffres}</div>${liste}`
+        + `<div class="gestes seul"><button class="vu-btn vu-plein" data-fav-fermer>${esc(T('m3_fermer'))}</button></div></div></div>`;
+    }
+    const enPause = filePause === 'oui';
+    const geste1 = enPause ? `<button class="vu-btn vu-plein" data-fav-reprendre>${esc(T('a_reprendre'))}</button>` : `<button class="vu-btn vu-plein" data-pause-apres${pauseEnVol || filePause === 'apres' ? ' disabled' : ''}>${esc(filePause === 'apres' ? T('fa_pause_apres') : T('fa_pause'))}</button>`;
+    return `<div class="voile fav" data-action-plein data-action-fav data-lot="${esc(lotDe(a))}" role="dialog" aria-modal="true" aria-label="${esc(T('f_titre'))}"><div class="boite vu-coque vu-sur-coque fav">${tete}`
+      + `<div class="fav-cours" data-action-item="${esc(it.id || '')}"><div class="photo">${photoHtml(it, numDe(it))}</div><div style="min-width:0"><div class="fav-qui">${esc(T('fa_qui'))}</div><div class="fav-ti" data-action-ti>${esc(it.titre || T('fa_article'))}</div>${favEtapeHtml(a)}</div></div>`
+      + `<div class="fav-prog">${chiffres}${total ? U.barre(pc) : ''}</div>${liste}`
+      + `<div data-essai-zone>${essaiHtml(a)}</div>`
+      + `<div class="gestes">${geste1}<button class="vu-btn vu-sec" data-arreter>${esc(arretDemande ? T('c_arret_en_cours') : T('c_tout_arreter'))}</button></div>`
+      + `<div class="dit">${esc(T('fa_verrou'))}</div></div></div>`;
+  }
+  let favFerme = ''; try { favFerme = String(sessionStorage.getItem('vrm_fav_ferme') || ''); } catch (_) {}
+  function rendreFav(a, fin) {
+    const lot = lotDe(a);
+    if (fin && favFerme === lot) { vue = 'ferme'; hote.style.display = 'none'; poser(''); deverrouiller(); gel(false); return; }
+    const h = favHtml(a, fin);
+    if (fin) { deverrouiller(); gel(false); } else { verrouiller(); gel(true); }
+    const neuf = lot !== lotVu;
+    const v = fin ? 'favfin' : 'plein';
+    if (vue === v && racine.getAttribute('data-hf') === h) { minuter(); return; }
+    // Ce qui avait le focus (un bouton de la fenêtre) le garde après la mise à jour.
+    let focus = ''; try { const f = ombre.activeElement; focus = f ? ['data-pause-apres', 'data-arreter', 'data-reduire', 'data-fav-reprendre', 'data-fav-fermer'].find((k) => f.hasAttribute(k)) || '' : ''; } catch (_) {}
+    const entree = neuf && lot !== lotAvant && !fin;
+    racine.classList.toggle('anim', entree);
+    if (entree) setTimeout(() => racine.classList.remove('anim'), 450);
+    lotVu = lot; vue = v; poser(h); racine.setAttribute('data-hf', h);
+    try { const b = racine.querySelector(focus ? `[${focus}]` : (fin ? '[data-fav-fermer]' : '[data-pause-apres], [data-fav-reprendre], [data-arreter]')); if (b && (focus || !racine.contains(ombre.activeElement))) b.focus({ preventScroll: true }); } catch (_) {}
+    minuter();
+    brancher();
+    const fe = racine.querySelector('[data-fav-fermer]');
+    if (fe) fe.addEventListener('click', () => { favFerme = lot; try { sessionStorage.setItem('vrm_fav_ferme', lot); } catch (_) {} action = null; finA = 0; reduit = false; rendre(); });
+    const rp = racine.querySelector('[data-fav-reprendre]');
+    if (rp) rp.addEventListener('click', () => { rp.disabled = true; try { chrome.runtime.sendMessage({ from: 'vrm-action', action: 'fileGeste', quoi: 'reprendre' }, () => { void chrome.runtime.lastError; lireFilePause(); racine.removeAttribute('data-hf'); rendre(); }); } catch (_) { rp.disabled = false; } });
+  }
   function rendre() {
     accrocher();
     const a = action;
@@ -386,6 +494,7 @@
       rendreBilan(a);
       return;
     }
+    if (!a.actif && favLignes(a)) { clearInterval(minuteur); minuteur = null; finA = 0; rendreFav(a, true); return; }   // 5.440 : le bilan des favoris reste jusqu'à « Fermer »
     if (!a.actif) {
       // La fin : un ✓ (ou « Arrêté »), puis l'écran s'efface ; tout est rendu à la page.
       clearInterval(minuteur); minuteur = null;
@@ -404,6 +513,7 @@
       brancher();
       return;
     }
+    if (favLignes(a)) { rendreFav(a, false); return; }   // 5.440 : la fenêtre des messages aux favoris
     verrouiller();
     if (vue === 'plein' && !neuf) { gel(true); majPlein(a); return; }
     // Le premier dessin de l'écran plein pour ce lot (ou au retour d'un bandeau / d'une pastille).
@@ -542,6 +652,7 @@
     //    il reste affiché jusqu'à « Fermer » ou jusqu'à la prochaine annonce qui démarre.
     if (a && a.modif && a.modif.fin && Array.isArray(a.bilan) && a.bilan.length && !(a.actif && a.enCours) && lotModif && lotDe(a) === lotModif) { action = a; finA = 0; nulA = 0; rendre(); return; }
     if (vue === 'bilan' && action && !(a && a.actif && a.enCours)) return;
+    if (vue === 'favfin' && action && !(a && a.actif)) return;   // 5.440 : le bilan des favoris reste jusqu'à « Fermer »
     if (a && a.actif && a.enCours && a.modif && fermeDebut && Number(a.modif.debut) !== fermeDebut) fermeDebut = 0;
     // « Tout arrêter » vient d'être touché : un état lu AVANT l'arrêt ne rallume pas l'écran.
     if (a && a.actif && Date.now() - arretA < 5000) return;
