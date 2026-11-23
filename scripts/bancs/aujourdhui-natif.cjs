@@ -110,6 +110,9 @@ async function unEcran(nav, port, base, W, sombre) {
         // (19 nov., « applique ce que tu proposes ») L'objectif sous les tuiles ; « Personnaliser » coche une carte et elle vient.
         const ob = await pg.evaluate(() => { const o = document.querySelector('[data-v2-objectif]'); return o ? { e: o.getAttribute('data-v2-objectif'), pct: o.getAttribute('data-v2-objectif-pct'), t: o.textContent } : null; });
         dit(!!ob && ob.e === 'lu' && ob.pct === '61' && /1\s?840/.test(ob.t) && /3\s?000/.test(ob.t) && /11 jours/.test(ob.t), `O ${ou} : objectif « 1 840 € / 3 000 € · 61 % · il reste 11 jours »`, ob);
+        // (23 nov., lot objectif-mois) CE QUI RESTE : « encore 1 160 € · ≈ 10 ventes moyennes », lu sur ses data-* et son texte.
+        const re = await pg.evaluate(() => { const p = document.querySelector('[data-objectif-reste]'); return p ? { c: p.getAttribute('data-objectif-reste'), v: p.getAttribute('data-objectif-ventes-restantes'), t: p.textContent } : null; });
+        dit(!!re && re.c === '116000' && re.v === '10' && /1\s?160/.test(re.t) && /10 ventes moyennes/.test(re.t), `O2 ${ou} : « encore 1 160 € · ≈ 10 ventes moyennes »`, re);
         await pg.evaluate(() => localStorage.clear());
         await pg.goto(pg.url().replace(/&cartes=toutes|$/, '&cartes=toutes'), { waitUntil: 'load' }); await pg.waitForSelector(ECRAN, { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(700);
         const t2 = await pg.evaluate(() => ({ blocs: [...document.querySelectorAll('[data-v2-bloc]')].map((b) => b.getAttribute('data-v2-bloc')), courbe: (document.querySelector('[data-v2-courbe]') || { getAttribute: () => '' }).getAttribute('data-v2-courbe').split(',').length,
