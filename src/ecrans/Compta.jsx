@@ -2181,7 +2181,11 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
     if (!pret) return undefined;
     const recettes = calc.etat === 'lu' ? recettesDe({ calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER }) : null;
     const registre = registreAchatsDe({ achats, recus, periode, panelOff });
-    return donneesExportComptable({ periode, recettes, achats: registre, ligne, regime, taux: tauxUrssaf(), montantPeriode: montantPeriodeUrssaf, aPayer: aPayerUrssaf, libelleRegime, factures: facturesJointes });
+    // (23 nov., lot export-comptable) + les dépenses notées : la ligne de Comptabilité (`vrm_compta`, la même que « + Dépense ») ;
+    // illisible ⇒ null (« dépenses pas lues », jamais 0). Jamais notée ⇒ {} (lue : aucune dépense).
+    let compta = null;
+    try { const c = load('vrm_compta', null); compta = c == null ? {} : (typeof c === 'object' && !Array.isArray(c) ? c : null); } catch (_) { compta = null; }
+    return donneesExportComptable({ periode, recettes, achats: registre, ligne, regime, taux: tauxUrssaf(), montantPeriode: montantPeriodeUrssaf, aPayer: aPayerUrssaf, libelleRegime, factures: facturesJointes, compta });
   }, [pret, calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER, achats, recus, panelOff, ligne, regime, facturesJointes]);
   const [enCours, setEnCours] = React.useState('');
   const telecharger = async (forme) => {
