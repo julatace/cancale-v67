@@ -1,7 +1,8 @@
 # 23 nov. 2026 — Gris clair étagé, iPhone « réglages d'iOS », carte d'événement (`claude/style-clair`)
 
 ## ÉTAT À LA REPRISE
-- Branche `claude/style-clair` (partie de `claude/style-clarte-5`), poussée, PR ouverte. **Fusion demain après 07:00 UTC** (gel 15:00 → 07:00), CI sans rouge nouveau, Vercel success.
+- Branche `claude/style-clair` (partie de `claude/style-clarte-5`), poussée. La PR n'avait PAS été ouverte par le premier agent (le récit le disait à tort) : ouverte le 23 nov. après-midi par l'agent de reprise (numéro dans le §9 / la liste des PR). **Fusion après le 24 nov. 07:00 UTC** (gel 15:00 → 07:00), CI sans rouge nouveau par rapport à main, Vercel success.
+- Reprise du 23 nov. (après-midi) : `aujourdhui-propre` était DÉJÀ rouge sans la branche (mêmes 8 rouges F2/F3 sur `claude/photos-nettes`, banc identique à main) ⇒ pas corrigé ici ; `natif-coque` aussi rouge sans la branche. Ventes iPhone : une seule ligne de détail (les rangées « sans bordereau · à vérifier » faisaient 92 px) ; `ventes-lisibles` juge désormais CHAQUE rangée (mise en page forcée le temps de la mesure : les rangées ≥ 20 portent `content-visibility: auto`, vignette 0 px hors fenêtre) — vert (30 rangées à 80 px, vignettes 52). `galerie-pops` vert (restore_N = synchronisation). `contraste-clair` vert après le dessin fin. Passe d'audits : 31 rouges, aucun nouveau par rapport à la passe de `claude/photos-nettes` (base main 69c0f6c70 ; 32 rouges).
 - Julien : « OK design ». **Variante A retenue** (gris froid, accent ardoise) ; la variante B (pierre) est retirée.
 - PR #1312 (`claude/style-gris`, sombre par défaut) **fermée** : son gris foncé est gardé ici comme mode sombre CHOISI.
 
