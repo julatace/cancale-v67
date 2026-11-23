@@ -4479,7 +4479,7 @@ function vrmVerifVisible(sel) {
     if (!listes) return `<div class="val gris" role="status" data-listes-charge>${esc(TU('m_charge'))}</div>`;
     const m = listes.messages;
     if (!m) return `<div class="val gris" data-messages="pas_su">${esc(TU('m_pas_su'))}</div>`;
-    if (!m.liste.length) return m.site ? `<div class="val gris" data-messages="0" data-messages-site="${esc(m.site)}">${esc(m.nonlusSite != null ? TU('m_site_nonlus', { n: m.nonlusSite }) : TU('m_site_rien'))}</div>` : `<div class="val gris" data-messages="0">${esc(TU('m_aucun'))}</div>`;
+    if (!m.liste.length) return m.site ? `<div class="val gris" data-messages="0" data-messages-site="${esc(m.site)}">${esc(m.site === 'leboncoin' ? (m.nonlusSite != null ? TU('lb_nonlus', { n: m.nonlusSite }) + ' · ' : '') + TU('lb_conv_vide') : m.nonlusSite != null ? TU('m_site_nonlus', { n: m.nonlusSite }) : TU('m_site_rien'))}</div>` : `<div class="val gris" data-messages="0">${esc(TU('m_aucun'))}</div>`;
     const ici = ORIGINE_ICI && !LISTES ? ORIGINE_ICI : 'https://www.vinted.fr';
     const nl = m.liste.filter((x) => x.nonlu).length;
     const q = msgCherche.trim().toLowerCase();

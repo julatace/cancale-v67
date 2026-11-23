@@ -582,6 +582,7 @@
     lb_baisser: { fr: "Baisser le prix", en: "Lower the price", es: "Bajar el precio", it: "Abbassa il prezzo", de: "Preis senken" },
     lb_favoris_n: { fr: "{n} favori(s)", en: "{n} favourite(s)", es: "{n} favorito(s)", it: "{n} preferito/i", de: "{n} Favorit(en)" },
     lb_favoris_passu: { fr: "Favoris : — (ouvre « Statistiques » de l’annonce sur Leboncoin)", en: "Favourites: — (open the ad’s “Statistiques” on Leboncoin)", es: "Favoritos: — (abre «Statistiques» del anuncio en Leboncoin)", it: "Preferiti: — (apri «Statistiques» dell’annuncio su Leboncoin)", de: "Favoriten: — (öffne „Statistiques“ der Anzeige auf Leboncoin)" },
+    lb_nonlus: { fr: "{n} non lu(s)", en: "{n} unread", es: "{n} sin leer", it: "{n} non letto/i", de: "{n} ungelesen" },
     lb_conv_vide: { fr: "Aucune conversation lue. Ouvre « Messages » sur Leboncoin.", en: "No conversation read. Open “Messages” on Leboncoin.", es: "Ninguna conversación leída. Abre «Messages» en Leboncoin.", it: "Nessuna conversazione letta. Apri «Messages» su Leboncoin.", de: "Keine Unterhaltung gelesen. Öffne „Messages“ auf Leboncoin." },
     v6_ventes_jour: { fr: "Ventes du jour", en: "Sales today", es: "Ventas de hoy", it: "Vendite di oggi", de: "Verkäufe heute" },
     v6_a_expedier: { fr: "À expédier", en: "To ship", es: "Por enviar", it: "Da spedire", de: "Zu versenden" },
