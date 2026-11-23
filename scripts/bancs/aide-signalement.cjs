@@ -15,7 +15,8 @@ require('./_porte-banc.cjs');
 //      chaque page s'ouvre, la recherche filtre, aucune violation de CSP, rien ne
 //      déborde, le thème de l'app est suivi ;
 //  `SHOTS=dossier` range une capture par cas (à REGARDER, §6.2) ;
-//  `CAPTURES_AIDE=1` (re)fait les captures du centre d'aide (public/aide/captures/).
+//  (23 nov.) Les captures du centre d'aide (public/aide/captures/) sont faites par scripts/accueil-captures.cjs
+//  (mêmes écrans que la page d'accueil, apparence par défaut). `CAPTURES_AIDE=1` ne les refait plus ici.
 //  `LARGEURS=390,1512` / `THEMES=clair,sombre` restreignent.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -25,7 +26,7 @@ const RACINE = path.join(__dirname, '..', '..');
 const DIST = process.env.BANC_DIST || path.join(RACINE, 'dist');
 const PORT = Number(process.env.BANC_PORT) || 10131;
 const SHOTS = process.env.SHOTS || '';
-const CAPTURES = process.env.CAPTURES_AIDE === '1';
+const CAPTURES = false;   // (23 nov.) voir scripts/accueil-captures.cjs
 const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim()).filter(Boolean);
 const LARGEURS = liste('LARGEURS', '390,1512').map(Number);
 const THEMES = liste('THEMES', 'clair,sombre');

@@ -52,6 +52,8 @@ const CATALOGUE_VARIE = [
   ['Samba OG noire', 'Adidas', '39'], ['Jean droit brut', 'A.P.C.', 'W32'], ['Doudoune sans manches noire', 'Uniqlo', 'M'],
   ['Lunettes de soleil écaille', 'Persol', ''], ['Chemise en lin blanche', 'Arket', 'L'], ['Bottines en cuir marron', 'Clarks', '40'],
 ];
+// Écran de l'accueil → capture du centre d'aide (scripts/aide-contenu.cjs, `capture:`).
+const AIDE = { numeros: 'annonces.jpg', expedier: 'colis.jpg', retirer: 'a-retirer.jpg', compta: 'compta.jpg' };
 const SEUL = liste('SEUL', ECRANS.map((e) => e.nom).join(','));
 
 const srv = http.createServer((q, r) => {
@@ -118,6 +120,13 @@ async function capturer(nav, e, theme) {
   let r = {}; try { r = JSON.parse(fs.readFileSync(reg, 'utf8')); } catch (_) { r = {}; }
   r[`${e.nom}-${theme}.webp`] = { sha256: crypto.createHash('sha256').update(fs.readFileSync(webp)).digest('hex'), ecran: e.tab, largeur: e.w, modeExemple: true };
   fs.writeFileSync(reg, JSON.stringify(Object.fromEntries(Object.entries(r).sort()), null, 1) + '\n');
+  // (23 nov.) LES CAPTURES DU CENTRE D'AIDE (public/aide/captures/, 390 px de large, JPEG) sortent des MÊMES écrans,
+  // dans l'apparence PAR DÉFAUT de l'app (sombre gris-ardoise) : une seule source, elles ne divergent plus de l'accueil.
+  if (AIDE[e.nom] && theme === 'sombre' && !process.env.SORTIE) {
+    const jpg = path.join(RACINE, 'public', 'aide', 'captures', AIDE[e.nom]);
+    execFileSync('convert', [webp, '-resize', '390x', '-strip', '-quality', '74', '-interlace', 'Plane', jpg]);
+    console.log(`  aide/captures/${AIDE[e.nom]}`, Math.round(fs.statSync(jpg).size / 1024) + ' Ko');
+  }
   console.log(`${e.nom}-${theme}.webp`, Math.round(fs.statSync(webp).size / 1024) + ' Ko', erreurs.length ? 'erreurs : ' + erreurs.join(' | ') : '', sorties.length ? `(${sorties.length} requête(s) externe(s) coupée(s))` : '');
 }
 
