@@ -10913,7 +10913,30 @@ let __vmrAppelsFinis = false;
 // Qui veut savoir quand l'extension se manifeste (l'écran Réglages, l'accueil) :
 // la détection est asynchrone, un composant déjà affiché doit se redessiner.
 const __vmrExtSubs = new Set();
-const onVmrExt = (fn) => { __vmrExtSubs.add(fn); return () => __vmrExtSubs.delete(fn); };
+// (23 nov., bugs-totale §3.3) CE QUE L'EXTENSION A DIT, EN UNE EMPREINTE. Chaque message du pont (« ready » à chaque sonde, chaque
+// battement, chaque évènement de commande, chaque relecture du relais) prévenait TOUS les abonnés, même quand rien n'avait changé :
+// la pastille, la ligne de fraîcheur, les boutons d'extension, la file réseau, les photos bloquées… se redessinaient à chaque message
+// (des dizaines de composants, sur chaque écran gardé) : mesuré au banc rendus-repos, une validation React toutes les 1,3 s.
+// `onVmrExt` ne prévient donc un abonné que si l'empreinte a changé depuis SON dernier appel. L'empreinte réunit tout l'état que ces composants lisent ; inchangée ⇒ aucun rendu. La minute en cours en
+// fait partie : ce qui dépend de l'heure (« vivant il y a… ») avance au plus une minute en retard, comme avant au battement.
+var _sigExt = null;   // `var` et une fonction déclarée : appelables avant leur ligne (abonnés posés au chargement du module)
+function signatureExt() {
+  if (_sigExt !== null) return _sigExt;
+  let s;
+  try {
+    s = JSON.stringify([__vmrExtReady, __vmrExtVersion, __vmrPlusieurs, __vmrAppelsFinis, __vmrEtat === undefined ? 'u' : __vmrEtat, __vmrRates, __vmrJobs,
+      __vmrPerimePont, __relais === undefined ? 'u' : __relais, __extAilleurs === undefined ? 'u' : __extAilleurs, __lier, __sessExtEnVol, __sessExtPasAvant, __vmrPontUnique,
+      [...__vmrPontSeul].sort(), Math.floor(Date.now() / 60000)]);
+  } catch (_) { s = 'x' + Math.random(); }
+  _sigExt = s;
+  queueMicrotask(() => { _sigExt = null; });   // une empreinte par tour de messages, partagée par tous les abonnés
+  return s;
+}
+const onVmrExt = (fn) => {
+  let vu = null;
+  const g = () => { let s = null; try { s = signatureExt(); } catch (_) { s = null; } if (s !== null && s === vu) return; vu = s; fn(); };
+  __vmrExtSubs.add(g); return () => __vmrExtSubs.delete(g);
+};
 // ══ COMBIEN D'EXTENSIONS VRM RÉPONDENT DANS CETTE PAGE ? (5.165) ═══════════
 // Mesuré le 9 octobre (Chromium réel, vraies extensions) : avec une 5.143 ou une
 // 5.77 restée installée À CÔTÉ de la 5.164, CHAQUE commande et CHAQUE envoi de
@@ -20758,27 +20781,9 @@ function useEtapePont() {
 //     commune à toutes les ventes (extension absente, muette, en retard…) est
 //     dite UNE fois par l'écran (`raisonExtGlobale`) ; le bouton ne dit que ce
 //     qui le distingue (le compte Vinted à connecter).
-// (23 nov., bugs-totale §3.3) CE QUE L'EXTENSION A DIT, EN UNE EMPREINTE. Chaque message du pont (« ready » à chaque sonde, chaque
-// battement, chaque évènement de commande, chaque relecture du relais) prévenait TOUS les abonnés, même quand rien n'avait changé :
-// la pastille, la ligne de fraîcheur, les boutons d'extension… se redessinaient à chaque message (des dizaines de composants, sur
-// chaque écran gardé). L'empreinte réunit tout l'état que ces composants lisent ; inchangée ⇒ aucun rendu. La minute en cours en
-// fait partie : ce qui dépend de l'heure (« vivant il y a… ») avance au plus une minute en retard, comme avant au battement.
-let _sigExt = null;
-const signatureExt = () => {
-  if (_sigExt !== null) return _sigExt;
-  let s;
-  try {
-    s = JSON.stringify([__vmrExtReady, __vmrExtVersion, __vmrPlusieurs, __vmrAppelsFinis, __vmrEtat === undefined ? 'u' : __vmrEtat, __vmrRates, __vmrJobs,
-      __vmrPerimePont, __relais === undefined ? 'u' : __relais, __extAilleurs === undefined ? 'u' : __extAilleurs, __lier, __sessExtEnVol, __sessExtPasAvant, __vmrPontUnique,
-      [...__vmrPontSeul].sort(), Math.floor(Date.now() / 60000)]);
-  } catch (_) { s = 'x' + Math.random(); }
-  _sigExt = s;
-  queueMicrotask(() => { _sigExt = null; });   // une empreinte par tour de messages, partagée par tous les abonnés
-  return s;
-};
 function useExtVivante() {
   const [, force] = React.useReducer((n) => n + 1, 0);
-  React.useEffect(() => { let vu = signatureExt(); return onVmrExt(() => { const s = signatureExt(); if (s === vu) return; vu = s; force(); }); }, []);
+  React.useEffect(() => onVmrExt(force), []);
   React.useEffect(() => { demarrerRelais(); }, []);
   // (19 nov.) Aucune extension ici, à l'ordinateur : une du compte vit-elle ailleurs ? (une lecture, 10 min de mémoire)
   React.useEffect(() => { veillerExtAilleurs(); return onVmrExt(veillerExtAilleurs); }, []);
