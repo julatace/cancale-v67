@@ -2,7 +2,7 @@
 // recipients from native captures before passing targets here. No network IO
 // inside a CAS decision: a retry must never repeat a Vinted request.
 export class RefusFavoris extends Error { constructor(message,status=409){super(message);this.status=status;} }
-import {RAISONS_FAVORIS,bilanFavoris} from '../../src/favorisProgression.js';
+import {RAISONS_FAVORIS,bilanFavoris,ETAPE_ACCUSE,CAUSE_ACCUSE,refusLocal,REFUS_LOCAUX_MAX} from '../../src/favorisProgression.js';
 import {AUTO_FREINS,AUTO_PAUSE_MS,AUTO_ESSAIS,AUTO_AVANT_ECRITURE,DEMANDES_AUTO,RAISONS_DEMANDE,dansPlageAuto,ecartAutoMs} from '../../src/favorisAuto.js';
 const entier=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v);
 const clone=v=>structuredClone(v);
@@ -71,7 +71,7 @@ function vueAuto(d,g){
 export function vueFile(d,owner){
   const g=d?.groupes?.[owner];
   const auto=vueAuto(d,g);
-  return g?{...(auto?{auto}:{}),active:g.active,raison:g.raison||'',lot:g.lot||null,bilan:bilanFavoris(g.jobs.filter(x=>x.lot===g.lot)),intervalleMinutes:g.intervalleMinutes,intervalleMaxMinutes:g.intervalleMax||null,...(g.rythme?{rythme:g.rythme}:{}),prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot,traiteLe,envoyeLe,auto,ecrits,offre,pourcentage})=>({id,notificationId,etat,lot,traiteLe,envoyeLe,...(auto?{auto:true}:{}),...(raison?{raison}:{}),...(Number.isInteger(ecrits)?{ecrits}:{}),...(offre&&offre.mode?{offre:{mode:offre.mode,valeur:offre.valeur}}:Number.isInteger(pourcentage)?{offre:{mode:'pct',valeur:pourcentage}}:{})}))}:{...(auto?{auto}:{}),active:false,raison:'',prochain:null,jobs:[]};
+  return g?{...(auto?{auto}:{}),active:g.active,raison:g.raison||'',lot:g.lot||null,bilan:bilanFavoris(g.jobs.filter(x=>x.lot===g.lot)),intervalleMinutes:g.intervalleMinutes,intervalleMaxMinutes:g.intervalleMax||null,...(g.rythme?{rythme:g.rythme}:{}),prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot,traiteLe,envoyeLe,auto,ecrits,offre,pourcentage,etape,cause})=>({id,notificationId,etat,lot,traiteLe,envoyeLe,...(etape?{etape}:{}),...(cause?{cause}:{}),...(auto?{auto:true}:{}),...(raison?{raison}:{}),...(Number.isInteger(ecrits)?{ecrits}:{}),...(offre&&offre.mode?{offre:{mode:offre.mode,valeur:offre.valeur}}:Number.isInteger(pourcentage)?{offre:{mode:'pct',valeur:pourcentage}}:{})}))}:{...(auto?{auto}:{}),active:false,raison:'',prochain:null,jobs:[]};
 }
 // L'offre jointe (29 oct.) : {mode:'pct'|'euros'|'prix', valeur, arrondi}, ou rien.
 const offreValide=o=>o==null||(o&&typeof o==='object'&&['pct','euros','prix'].includes(o.mode)&&typeof o.valeur==='number'&&o.valeur>0&&o.valeur<=99999&&(o.mode!=='pct'||Number.isInteger(o.valeur)&&o.valeur<=99)&&typeof o.arrondi==='boolean');
@@ -148,7 +148,7 @@ export function reserverFile(d,{owner,maintenant,jeton,suivi=''}){
   d.prochainGlobal=g.prochain;
   return {data:d,valeur:{vue:vueFile(d,owner),travail:{...j,jeton,suivi}}};
 }
-export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=null,variante=null,apresMs=null}){
+export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=null,variante=null,apresMs=null,etape=null,cause=null}){
   d=initialiserFile(d);const e=d.enCours,g=d.groupes[owner];
   if(!e||e.owner!==owner||e.jeton!==jeton)return {valeur:vueFile(d,owner)};
   const j=g.jobs.find(x=>x.id===e.id);
@@ -160,9 +160,12 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
   if(resultat==='ignore'){
     d.tentatives=d.tentatives.filter(t=>t!==e.at);g.prochain=e.prochainAvant||0;d.prochainGlobal=e.globalAvant||0;
   }else{d.tentatives=d.tentatives.map(t=>t===e.at?fin:t);g.prochain=Math.max(g.prochain||0,fin+(Number.isSafeInteger(e.delai)?e.delai:j.intervalleMinutes*60000));d.prochainGlobal=g.prochain;}
-  const raisons=['article_vendu','ecran_inactif','compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue','onglet_vinted','offre_refusee','offre_prix_inconnu','offre_incertaine','conversation_existante','vinted_frein','vinted_robot','tout_arrete','trop_tard','annonce_indisponible','texte_interdit','texte_refuse','offre_sous_plancher','conversation_refusee'];
+  const raisons=['article_vendu','ecran_inactif','compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue','onglet_vinted','offre_refusee','offre_prix_inconnu','offre_incertaine','conversation_existante','vinted_frein','vinted_robot','tout_arrete','trop_tard','annonce_indisponible','texte_interdit','texte_refuse','offre_sous_plancher','conversation_refusee','element_introuvable','favori_trop_ancien'];
   if(raisons.includes(raison))j.raison=raison;
   j.etat=resultat;d.enCours=null;
+  // (22 nov.) L'étape et la classe de la cause, rangées sur la ligne (liste blanche : des noms de code, jamais un texte).
+  if(typeof etape==='string'&&ETAPE_ACCUSE.test(etape))j.etape=etape;else delete j.etape;
+  if(typeof cause==='string'&&CAUSE_ACCUSE.test(cause))j.cause=cause;else delete j.cause;
   // (5.369) Le n° de la version envoyée (1 à 5), pour « Ce que VRM a fait » — jamais le texte.
   if(resultat==='envoye'&&Number.isInteger(variante)&&variante>=1&&variante<=5)j.variante=variante;
   // Combien d'écritures sont parties chez Vinted (5.309) : 0 ⇒ rien n'est parti,
@@ -186,14 +189,18 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
     if(code&&DEMANDES_AUTO[code]&&g.auto.demande?.code!==code){g.auto.demande={code,at:fin};nouvelleDemande=code;}
     if(resultat==='envoye'&&g.auto.demande&&RAISONS_DEMANDE.includes(g.auto.demande.code))delete g.auto.demande;
   }
+  const refusLocalIci=!j.auto&&refusLocal({resultat,raison,ecrits:j.ecrits,cause:j.cause,etape:j.etape})&&(Number(g.refusLocaux)||0)<REFUS_LOCAUX_MAX-1;
+  if(resultat==='envoye')g.refusLocaux=0;
   const attendQuota=!j.auto&&resultat==='refuse'&&j.raison==='quota_extension'&&j.ecrits===0&&(Number(j.attentesQuota)||0)<QUOTA_ATTENTES_MAX;
   // (20 nov., ext. 5.410 `messagesmalins`) Vinted a refusé UNE version du texte : l'extension ne la tire plus jamais ;
   // s'il en reste d'autres, la file CONTINUE (au plus 2 refus de texte par lot, puis elle s'arrête et le dit).
   const autreVersion=!j.auto&&resultat==='refuse'&&j.raison==='texte_refuse'&&Array.isArray(j.variantes)&&j.variantes.length>0&&(Number(g.refusTexte)||0)<2;
   if(autreVersion){g.refusTexte=(Number(g.refusTexte)||0)+1;g.raison='Vinted a refusé une version de ton message : VRM ne la réutilise plus et continue avec tes autres versions.';if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
+  // (22 nov.) Un refus qui ne tient qu'à CE favori, rien d'écrit : il est sauté, la file CONTINUE (au plus REFUS_LOCAUX_MAX de suite).
+  else if(refusLocalIci){g.refusLocaux=(Number(g.refusLocaux)||0)+1;g.raison='Un favori n’a pas pu être ouvert sur Vinted (rien n’est parti pour lui) : VRM continue avec les suivants.';if(!g.jobs.some(x=>x.etat==='attente')){g.active=false;g.raison='Sélection traitée ou file arrêtée.';}}
   else if(attendQuota){j.etat='attente';delete j.raison;delete j.traiteLe;j.attentesQuota=(Number(j.attentesQuota)||0)+1;const att=Number.isSafeInteger(apresMs)&&apresMs>=5000&&apresMs<=3600000?apresMs:QUOTA_ATTENTE_MS;g.prochain=Math.max(e.prochainAvant||0,fin+att);d.prochainGlobal=g.prochain;g.raison='La limite d’actions de l’heure est atteinte : les messages suivants partent dès qu’une place se libère.';}
   else if(j.auto&&['envoye','ignore'].includes(resultat)){if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
-  else if(!['envoye','ignore'].includes(resultat)){g.active=false;g.raison=raison==='article_vendu'?'Article vendu : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='annonce_indisponible'?'Annonce réservée, masquée, fermée ou supprimée : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='ecran_inactif'?'Écran des favoris quitté avant le départ. Les messages restants ne sont pas envoyés.':raison==='vinted_robot'&&!j.auto?'Vinted a refusé l’envoi (protection anti-robot) : la file est en pause, rien ne part. Si Vinted affiche une vérification sur vinted.fr, fais-la ; puis « Reprendre » sur la carte VRM de vinted.fr (on reprend plus doucement pendant 24 h).':resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':RAISONS_FAVORIS[raison]?`${RAISONS_FAVORIS[raison]} Les messages restants ne sont pas envoyés.`:'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
+  else if(!['envoye','ignore'].includes(resultat)){g.active=false;g.raison=refusLocal({resultat,raison,ecrits:j.ecrits,cause:j.cause,etape:j.etape})?'La page de Vinted n’a pas montré ce que VRM attendait pour plusieurs favoris de suite : la file est arrêtée, rien n’est parti pour eux. Ouvre Vinted dans l’onglet de travail, vérifie que la cloche et la messagerie s’affichent, puis touche « Reprendre ».':raison==='article_vendu'?'Article vendu : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='annonce_indisponible'?'Annonce réservée, masquée, fermée ou supprimée : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='ecran_inactif'?'Écran des favoris quitté avant le départ. Les messages restants ne sont pas envoyés.':raison==='vinted_robot'&&!j.auto?'Vinted a refusé l’envoi (protection anti-robot) : la file est en pause, rien ne part. Si Vinted affiche une vérification sur vinted.fr, fais-la ; puis « Reprendre » sur la carte VRM de vinted.fr (on reprend plus doucement pendant 24 h).':resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':RAISONS_FAVORIS[raison]?`${RAISONS_FAVORIS[raison]} Les messages restants ne sont pas envoyés.`:'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
   else {if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;if(!g.active)g.raison='Sélection traitée ou file arrêtée.';}
   // (28 oct.) La file vient de se TERMINER (finie ou interrompue) : son bilan,
   // une seule fois (la transition active → inactive), pour la notification.

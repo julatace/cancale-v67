@@ -13,9 +13,9 @@
 .vrm-sel-compte .vrm-b { margin-left: auto; }
 .vrm-sel-liste { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 8px; }
 .vrm-sel-ligne { display: flex; align-items: center; gap: 10px; min-height: 72px; padding: 8px 10px; border-radius: 12px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); cursor: pointer; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-.vrm-sel-ligne[data-sel-coche="1"] { border-color: var(--vrm-accent, #0F6B4C); box-shadow: 0 0 0 1px var(--vrm-accent, #0F6B4C) inset; }
+.vrm-sel-ligne[data-sel-coche="1"] { border-color: var(--vrm-accent, #16181D); box-shadow: 0 0 0 1px var(--vrm-accent, #16181D) inset; }
 .vrm-sel-ligne[aria-disabled="true"] { cursor: default; opacity: .72; }
-.vrm-sel-case { width: 22px; height: 22px; flex-shrink: 0; accent-color: var(--vrm-accent, #0F6B4C); margin: 0; }
+.vrm-sel-case { width: 22px; height: 22px; flex-shrink: 0; accent-color: var(--vrm-accent, #16181D); margin: 0; }
 .vrm-sel-photo { width: 52px; height: 64px; border-radius: 12px; object-fit: cover; flex-shrink: 0; background: var(--vrm-bg, #F2F2F7); }
 .vrm-sel-centre { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .vrm-sel-nom { font-size: 15px; font-weight: 600; color: var(--vrm-ink, #38383A); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -39,7 +39,7 @@
 .vrm-act-paire { padding: 10px 12px; border-radius: 12px; border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--vrm-ink, #38383A); line-height: 1.45; }
 .vrm-act-paire[data-act-manque]:not([data-act-manque="0"]) { border-left: 3px solid var(--vrm-warn, #B25000); }
 .vrm-act-pb { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
-.vrm-act-pb a { min-height: 44px; display: inline-flex; align-items: center; color: var(--vrm-accent, #0F6B4C); font-weight: 600; text-decoration: none; }
+.vrm-act-pb a { min-height: 44px; display: inline-flex; align-items: center; color: var(--vrm-accent, #16181D); font-weight: 600; text-decoration: none; }
 .vrm-act-muet { color: var(--vrm-muted, #636366); }
 /* Republier à la main */
 .vrm-main-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }

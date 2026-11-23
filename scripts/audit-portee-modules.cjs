@@ -21,7 +21,7 @@ const GLOBAUX = new Set(Object.getOwnPropertyNames(globalThis).concat(`chrome br
   Request Response Headers importScripts clients registration caches crypto atob btoa console localStorage sessionStorage indexedDB
   Blob File FileReader FormData AbortController DOMParser MutationObserver IntersectionObserver ResizeObserver PerformanceObserver
   CustomEvent Event KeyboardEvent MouseEvent PointerEvent TouchEvent DragEvent InputEvent FocusEvent WheelEvent ErrorEvent
-  PromiseRejectionEvent StorageEvent BeforeUnloadEvent HashChangeEvent PopStateEvent DataTransfer ClipboardItem Image Option Audio
+  PromiseRejectionEvent StorageEvent BeforeUnloadEvent HashChangeEvent PopStateEvent DataTransfer ClipboardItem ClipboardEvent Image Option Audio
   HTMLElement HTMLInputElement HTMLTextAreaElement HTMLSelectElement HTMLCanvasElement HTMLImageElement HTMLVideoElement
   HTMLAnchorElement HTMLDialogElement HTMLButtonElement HTMLFormElement HTMLScriptElement HTMLLinkElement HTMLIFrameElement
   HTMLMediaElement SVGElement ShadowRoot Element Node NodeFilter Text DocumentFragment Range Selection getSelection CSS CSSStyleSheet

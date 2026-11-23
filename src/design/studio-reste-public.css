@@ -12,7 +12,7 @@
 /* Tarifs : la même lumière, le même plein d'encre. */
 :root:root .vt {
   --vt-fond: #F4F5F7; --vt-carte: #FFFFFF; --vt-encre: #1C1C20; --vt-gris: #3F5468; --vt-filet: rgb(54 54 60 / .12);
-  --vt-accent: #1C1C20; --vt-lien: #0B5139; --vt-teinte: #EBEDF0;
+  --vt-accent: #1C1C20; --vt-lien: #16181D; --vt-teinte: #EBEDF0;
   --vt-ombre: inset 0 1px 0 #fff, 0 0 0 .5px rgb(54 54 60 / .07), 0 1px 2px rgb(54 54 60 / .07), 0 12px 26px -14px rgb(54 54 60 / .30);
   --vt-lumiere: radial-gradient(90% 40% at 18% 0%, rgb(255 255 255 / .55), transparent 70%);
   --vt-encre-carte: linear-gradient(160deg, #27272B 0%, #1C1C20 100%);
@@ -20,16 +20,16 @@
 }
 :root:root[data-theme="dark"] .vt {
   --vt-fond: #27272B; --vt-carte: #27272B; --vt-encre: #F1F2F4; --vt-gris: #9CB0C6; --vt-filet: rgb(0 0 0 / .5);
-  --vt-accent: #F1F2F4; --vt-lien: #3FD49A; --vt-teinte: #131316; --vt-ombre: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8);
-  --vt-lumiere: radial-gradient(90% 40% at 18% 0%, rgb(63 212 154 / .10), transparent 70%);
+  --vt-accent: #F1F2F4; --vt-lien: #F4F4F5; --vt-teinte: #131316; --vt-ombre: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8);
+  --vt-lumiere: radial-gradient(90% 40% at 18% 0%, rgb(244 244 245 / .10), transparent 70%);
   --vt-encre-carte: linear-gradient(160deg, #323239 0%, #18181B 100%);
   background: linear-gradient(180deg, #27272B 0%, #1B1B1E 40%, #0F0F10 100%);
 }
 @media (prefers-color-scheme: dark) {
   :root:root:not([data-theme="light"]) .vt {
     --vt-fond: #27272B; --vt-carte: #27272B; --vt-encre: #F1F2F4; --vt-gris: #9CB0C6; --vt-filet: rgb(0 0 0 / .5);
-    --vt-accent: #F1F2F4; --vt-lien: #3FD49A; --vt-teinte: #131316; --vt-ombre: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8);
-    --vt-lumiere: radial-gradient(90% 40% at 18% 0%, rgb(63 212 154 / .10), transparent 70%);
+    --vt-accent: #F1F2F4; --vt-lien: #F4F4F5; --vt-teinte: #131316; --vt-ombre: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8);
+    --vt-lumiere: radial-gradient(90% 40% at 18% 0%, rgb(244 244 245 / .10), transparent 70%);
     --vt-encre-carte: linear-gradient(160deg, #323239 0%, #18181B 100%);
     background: linear-gradient(180deg, #27272B 0%, #1B1B1E 40%, #0F0F10 100%);
   }
@@ -48,8 +48,8 @@
    Contraste AA mesuré (banc verre-extension-site). Sans flou ou transparence réduite : opaque.
    ════════════════════════════════════════════════════════════════════════════ */
 :root:root .vt {
-  --vt-bleu: #0B5139;
-  --vt-fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(63 212 154 / .16) 0%, rgb(63 212 154 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(52 190 137 / .16) 0%, rgb(52 190 137 / 0) 70%), linear-gradient(170deg, #0B5139 0%, #0B5139 45%, #303036 100%);
+  --vt-bleu: #16181D;
+  --vt-fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(244 244 245 / .16) 0%, rgb(244 244 245 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(52 190 137 / .16) 0%, rgb(52 190 137 / 0) 70%), linear-gradient(170deg, #16181D 0%, #16181D 45%, #303036 100%);
   --vt-verre: rgb(249 250 251 / .9); --vt-verre-o: #D7DEE6; --vt-verre-bord: rgb(255 255 255 / .75);
   --vt-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 18px 40px -18px rgb(27 27 31 / .55);
   --vt-encre: #FFFFFF; --vt-gris: #F3F4F6; --vt-lien: #FFFFFF; --vt-accent: #FFFFFF; --vt-filet: rgb(255 255 255 / .16); --vt-teinte: rgb(255 255 255 / .16);
@@ -77,12 +77,12 @@
 :root:root .vt::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background-color: var(--vt-bleu); background-image: var(--vt-fond-bleu); }
 /* Les plaques de verre : l'encre (la nuit, le clair). */
 :root:root .vt :is(.vt-etat, .vt-offre:not(.vt-offre-pro), .vt-tableau, .vt-frise li, .vt-carte) {
-  --vt-encre: #1C1C20; --vt-gris: #3F5468; --vt-lien: #0B5139; --vt-accent: #1C1C20; --vt-filet: rgb(54 54 60 / .12); --vt-teinte: rgb(54 54 60 / .08);
+  --vt-encre: #1C1C20; --vt-gris: #3F5468; --vt-lien: #16181D; --vt-accent: #1C1C20; --vt-filet: rgb(54 54 60 / .12); --vt-teinte: rgb(54 54 60 / .08);
   color: var(--vt-encre); background: var(--vt-verre); -webkit-backdrop-filter: blur(26px) saturate(1.4); backdrop-filter: blur(26px) saturate(1.4);
   border: 1px solid var(--vt-verre-bord); box-shadow: var(--vt-verre-ombre);
 }
-:root:root[data-theme="dark"] .vt :is(.vt-etat, .vt-offre:not(.vt-offre-pro), .vt-tableau, .vt-frise li, .vt-carte) { --vt-encre: #F1F2F4; --vt-gris: #A9BBCF; --vt-lien: #3FD49A; --vt-accent: #F1F2F4; --vt-filet: rgb(255 255 255 / .08); --vt-teinte: rgb(255 255 255 / .07); }
-@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) .vt :is(.vt-etat, .vt-offre:not(.vt-offre-pro), .vt-tableau, .vt-frise li, .vt-carte) { --vt-encre: #F1F2F4; --vt-gris: #A9BBCF; --vt-lien: #3FD49A; --vt-accent: #F1F2F4; --vt-filet: rgb(255 255 255 / .08); --vt-teinte: rgb(255 255 255 / .07); } }
+:root:root[data-theme="dark"] .vt :is(.vt-etat, .vt-offre:not(.vt-offre-pro), .vt-tableau, .vt-frise li, .vt-carte) { --vt-encre: #F1F2F4; --vt-gris: #A9BBCF; --vt-lien: #F4F4F5; --vt-accent: #F1F2F4; --vt-filet: rgb(255 255 255 / .08); --vt-teinte: rgb(255 255 255 / .07); }
+@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) .vt :is(.vt-etat, .vt-offre:not(.vt-offre-pro), .vt-tableau, .vt-frise li, .vt-carte) { --vt-encre: #F1F2F4; --vt-gris: #A9BBCF; --vt-lien: #F4F4F5; --vt-accent: #F1F2F4; --vt-filet: rgb(255 255 255 / .08); --vt-teinte: rgb(255 255 255 / .07); } }
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) { :root:root .vt :is(.vt-etat, .vt-offre:not(.vt-offre-pro), .vt-tableau, .vt-frise li, .vt-carte) { background: var(--vt-verre-o); } }
 @media (prefers-reduced-transparency: reduce) { :root:root .vt :is(.vt-etat, .vt-offre:not(.vt-offre-pro), .vt-tableau, .vt-frise li, .vt-carte) { background: var(--vt-verre-o); -webkit-backdrop-filter: none; backdrop-filter: none; } }
 :root:root .vt .vt-offre-pro { border: 1px solid rgb(255 255 255 / .12); }
@@ -91,6 +91,6 @@
 @media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) .vt .vt-btn { background: #FFFFFF; color: #1C1C20; } }
 :root:root .vt .vt-btn.vt-btn-neutre, :root:root[data-theme="dark"] .vt .vt-btn.vt-btn-neutre { background: rgb(23 23 25 / .34); color: #FFFFFF; border: 1px solid rgb(255 255 255 / .34); box-shadow: inset 0 1px 0 rgb(255 255 255 / .12), 0 10px 22px -14px rgb(0 0 0 / .6); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); }
 @media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) .vt .vt-btn.vt-btn-neutre { background: rgb(23 23 25 / .34); color: #FFFFFF; } }
-:root:root .vt .vt-offre:not(.vt-offre-pro) .vt-inclus svg { color: #0B5139; }
-:root:root[data-theme="dark"] .vt .vt-offre:not(.vt-offre-pro) .vt-inclus svg { color: #3FD49A; }
-@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) .vt .vt-offre:not(.vt-offre-pro) .vt-inclus svg { color: #3FD49A; } }
+:root:root .vt .vt-offre:not(.vt-offre-pro) .vt-inclus svg { color: #16181D; }
+:root:root[data-theme="dark"] .vt .vt-offre:not(.vt-offre-pro) .vt-inclus svg { color: #F4F4F5; }
+@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) .vt .vt-offre:not(.vt-offre-pro) .vt-inclus svg { color: #F4F4F5; } }

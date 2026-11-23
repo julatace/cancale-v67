@@ -103,8 +103,8 @@ function juger(depot = {}, { sousAudits = true } = {}) {
   const blocClair = jet.slice(0, iSombre), blocSombre = jet.slice(iSombre);
   const val = (bloc, nom) => { const m = new RegExp('--n-' + nom + '\\s*:\\s*([^;]+);').exec(bloc); return m ? m[1].trim().toLowerCase() : null; };
   const attendus = [
-    [blocClair, 'clair', { accent: '#0f6b4c', fond: '#f1f3f6', carte: '#ffffff', bord: '#e4e4e7' }],
-    [blocSombre, 'sombre', { accent: '#3fd49a', fond: '#0f0f11', carte: '#18181b' }],
+    [blocClair, 'clair', { accent: '#16181d', fond: '#f4f4f2', carte: '#ffffff', bord: '#e5e4e0' }],   // (22 nov.) l'accent est l'encre (décision de Julien)
+    [blocSombre, 'sombre', { accent: '#f4f4f5', fond: '#0f0f11', carte: '#18181b' }],
   ];
   for (const [bloc, nom, att] of attendus) {
     for (const [k, v] of Object.entries(att)) dit(val(bloc, k) === v, `S2 --n-${k} (${nom}) vaut ${v}`, val(bloc, k));
@@ -114,7 +114,7 @@ function juger(depot = {}, { sousAudits = true } = {}) {
   }
   // S2 bis — themeMineral (les couleurs que lit le code d'avant) suit les jetons.
   const th = lire('src/themeMineral.js');
-  for (const [nomTheme, acc] of [['MINERAL', '#0f6b4c'], ['MINERAL_DARK', '#3fd49a']]) {
+  for (const [nomTheme, acc] of [['MINERAL', '#16181d'], ['MINERAL_DARK', '#f4f4f5']]) {
     const m = new RegExp('export const ' + nomTheme + '\\s*=\\s*Object\\.freeze\\(\\{([\\s\\S]*?)\\}\\);').exec(th);
     if (!dit(!!m, `S2 ${nomTheme} lisible dans themeMineral.js`)) continue;
     const a = (/\baccent\s*:\s*'(#[0-9a-fA-F]{6})'/.exec(m[1]) || [])[1];
@@ -125,7 +125,7 @@ function juger(depot = {}, { sousAudits = true } = {}) {
 
   // S3 — l'onglet actif : l'accent, sur son voile.
   const nat = sansCommentaires(lire('src/natif/natif.css'), true);
-  dit(/\.n-onglet\[aria-current="page"\]\s*\{[^}]*color:\s*var\(--n-accent\)/.test(nat), "S3 l'onglet actif est à l'accent (vert sapin)");
+  dit(/\.n-onglet\[aria-current="page"\]\s*\{[^}]*color:\s*var\(--n-accent\)/.test(nat), "S3 l'onglet actif est à l'accent (l'encre)");
   dit(/\.n-onglet\[aria-current="page"\]\s+\.n-onglet-icone\s*\{[^}]*background:\s*var\(--n-teinte\)/.test(nat), "S3 l'icône de l'onglet actif est posée sur le voile d'accent (--n-teinte)");
 
   // S5 — violet et rouge : les audits dédiés.
@@ -142,7 +142,7 @@ function mutations() {
   const cas = [
     ['un bleu vif dans une feuille', { 'src/natif/complements.css': lire('src/natif/complements.css') + '\n.x-mutation { color: #0068D6; }\n' }, /S1/],
     ['un bleu vif en rgb() dans un style en ligne', { 'src/mutation-vintex.jsx': "export const X = () => <b style={{ color: 'rgb(0, 113, 227)' }}/>;\n" }, /S1/],
-    ['l\'accent remis au bleu', { 'src/natif/jetons.css': jet.replace('--n-accent: #0F6B4C;', '--n-accent: #0068D6;') }, /S2 --n-accent \(clair\)/],
+    ['l\'accent remis au bleu', { 'src/natif/jetons.css': jet.replace('--n-accent: #16181D;', '--n-accent: #0068D6;') }, /S2 --n-accent \(clair\)/],
     ['le plein remis à l\'accent', { 'src/natif/jetons.css': jet.replace('--n-plein: #16181D;', '--n-plein: #0F6B4C;') }, /S2 le bouton plein \(clair\)/],
     ['l\'onglet actif en rose', { 'src/natif/natif.css': nat.replace('.n-onglet[aria-current="page"] { color: var(--n-accent);', '.n-onglet[aria-current="page"] { color: #C02D55;') }, /S3/],
     ['un titre en capitales (CSS)', { 'src/natif/complements.css': lire('src/natif/complements.css') + '\n.n-carte-titre-mutation { text-transform: uppercase; }\n' }, /S4/],
@@ -163,7 +163,7 @@ if (require.main === module) {
   for (const r of rouges.slice(0, 80)) console.log('❌ ' + r);
   if (rouges.length > 80) console.log(`… et ${rouges.length - 80} de plus`);
   let ok = rouges.length === 0;
-  console.log(ok ? '✅ audit-style-vintex : accent vert sapin, aucun bleu vif, aucun titre en capitales, ni violet ni rouge hors doublon' : `\n❌ audit-style-vintex : ${rouges.length} rouge(s)`);
+  console.log(ok ? '✅ audit-style-vintex : accent à l’encre (22 nov.), aucun bleu vif, aucun titre en capitales, ni violet ni rouge hors doublon' : `\n❌ audit-style-vintex : ${rouges.length} rouge(s)`);
   if (process.argv.includes('--mutation')) ok = mutations() && ok;
   process.exit(ok ? 0 : 1);
 }

@@ -81,8 +81,13 @@ async function auditerRepub() {
   // R1 — l'ordre exact, tout par la page (aucune requête-geste du service worker)
   { const f = monterRepub(); const r = await recreer(f);
     const s = pasNoms(f).join(' > ');
-    const attendu = 'ouvrirVente > photos > categorie > titre > description > marque > taille > couleurs > colis > etat > prix > brouillon > supprimer > formulairePret > publier';
-    dit(r && r.etape === 'fait' && r.methode === 'formulaire' && s === attendu, 'R1 — par défaut, le formulaire : Vends tes articles, photos, catégorie, titre, description, marque, taille, couleurs, colis, état, prix, brouillon, suppression, Ajouter', `${s} | ${JSON.stringify(r).slice(0, 300)}`);
+    // 5.437 (Julien, 22 nov.) : l'ORDRE des champs varie (la catégorie avant ce qui en dépend) ; les étapes autour ne bougent pas.
+    const l = pasNoms(f); const champs = l.slice(2, l.indexOf('brouillon'));
+    const attenduAutour = 'ouvrirVente > photos > … > brouillon > supprimer > formulairePret > publier';
+    const autour = [l[0], l[1], '…', ...l.slice(l.indexOf('brouillon'))].join(' > ');
+    const dep = ['marque', 'taille', 'couleurs', 'colis', 'etat'];
+    const okOrdre = [...champs].sort().join() === ['categorie', 'titre', 'description', 'marque', 'taille', 'couleurs', 'colis', 'etat', 'prix'].sort().join() && dep.every((k) => champs.indexOf(k) > champs.indexOf('categorie'));
+    dit(r && r.etape === 'fait' && r.methode === 'formulaire' && autour === attenduAutour && okOrdre, 'R1 — par défaut, le formulaire : Vends tes articles, photos, puis chaque champ (ordre variable, la catégorie avant marque / taille / couleurs / colis / état), brouillon, suppression, Ajouter', `${s} | ${JSON.stringify(r).slice(0, 300)}`);
     dit(gestesDirects(f).length === 0, 'R1b — aucun brouillon / suppression / mise en ligne / photo envoyé par le service worker : c’est la page qui envoie', JSON.stringify(gestesDirects(f).map((x) => x.chemin)));
     const nav = (f.j.navigations || []).map((x) => new URL(x.url).pathname);
     dit(JSON.stringify(nav) === JSON.stringify(['/items/9101/edit', '/items/9101', '/items/88001/edit']), 'R2 — les pages : « Modifier » de l’ancienne (lecture), l’ancienne (Supprimer), le brouillon (Ajouter)', JSON.stringify(nav));

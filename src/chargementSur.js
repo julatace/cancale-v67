@@ -29,6 +29,7 @@
 //     que le navigateur donne à un rechargement (Safari n'est pas Chrome). Une fois
 //     par version cible et par onglet (sessionStorage) : jamais une boucle.
 // ════════════════════════════════════════════════════════════════════════════
+import { noterSuspens } from './journalSuspens.js';
 import React from 'react';
 
 export const CLE_RECHARGE = 'vrm_recharge_version';
@@ -44,8 +45,17 @@ export function versionChargee() {
   } catch (_) { return null; }
 }
 // La version que le serveur sert MAINTENANT (index.html relu sans cache) ; null = pas su.
+// (22 nov., latence-totale) D'abord `/version-app.json` (60 octets, posé par vite.config.js `versionApp`) ; absent ou
+// illisible (ancien déploiement, page de repli) ⇒ index.html relu comme avant.
 export async function versionServeur(f = (typeof fetch === 'function' ? fetch : null)) {
   if (!f) return null;
+  try {
+    const r = await f('/version-app.json?_v=' + Date.now(), { cache: 'no-store', credentials: 'same-origin' });
+    const t = r && r.ok ? await r.text() : '';
+    const j = /^\s*\{/.test(t) ? JSON.parse(t) : null;
+    const m = j && typeof j.index === 'string' ? RE_PRINCIPAL.exec(j.index) : null;
+    if (m) return m[0];
+  } catch (_) { /* repli : index.html */ }
   try {
     const r = await f('/?_v=' + Date.now(), { cache: 'no-store', credentials: 'same-origin' });
     if (!r || !r.ok) return null;
@@ -191,11 +201,12 @@ export async function chargerSur(charger, { relance = 450, verifier = verifierMo
 // par React.lazy le reste (changer de type la remonterait, avec son état).
 export function lazySur(charger) {
   let module = null, encours = null;
-  const garder = (m) => { if (moduleValide(m)) module = m; return m; };
-  const L = React.lazy(() => (encours = encours || chargerSur(charger).then(garder, (e) => { encours = null; throw e; })));
+  const garder = (m) => { if (moduleValide(m)) module = m; noterSuspens('morceau-arrive', String(charger).slice(0, 90)); return m; };
+  const L = React.lazy(() => { if (!encours) { encours = chargerSur(charger).then(garder, (e) => { encours = null; throw e; }); try { encours.__vrmAttente = 'morceau ' + String(charger).slice(0, 90); } catch (_) {} } return encours; });
   function MorceauSur(props) {
     const voie = React.useRef(null);
     if (voie.current == null) voie.current = module ? 'direct' : 'lazy';
+    if (voie.current === 'lazy' && !module) noterSuspens('morceau-attendu', String(charger).slice(0, 90));
     return React.createElement(voie.current === 'direct' ? module.default : L, props);
   }
   // Précharger au repos : un échec ne dit rien (le rendu, lui, passera par `chargerSur` et sa relance).

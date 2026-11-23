@@ -45,6 +45,7 @@ import { cx } from './outils.js';
 import './jetons.css';
 import './natif.css';
 import './tableau.css';
+import './encre-tableaux.css';   // (22 nov. soir) design noir encre, tranche 2
 
 const PAR_PAGE = 100;
 const MEMO = (id) => 'vrm_tableau_' + id;

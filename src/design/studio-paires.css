@@ -23,7 +23,7 @@
   --sbp-feuille: var(--sb-porcelaine, #FFFFFF); --sbp-feuille2: var(--sb-porcelaine-2, #F9FAFB);
   --sbp-creux: var(--sb-creux, #EBEDF0);
   --sbp-encre: var(--sb-encre, #1C1C20); --sbp-encre2: var(--sb-encre-2, #3F5468);
-  --sbp-diode: var(--sb-diode, #0B5139); --sbp-lien: var(--sb-lien, #0B5139);
+  --sbp-diode: var(--sb-diode, #16181D); --sbp-lien: var(--sb-lien, #16181D);
   --sbp-ambre: var(--sb-ambre, #764300); --sbp-point: var(--sb-ambre-point, #E08A12);
   --sbp-o: var(--sb-o, 18 52 96);
   --sbp-socle: #F3F5F7;
@@ -49,7 +49,7 @@
   --sbp-feuille: var(--sb-porcelaine, #27272B); --sbp-feuille2: var(--sb-porcelaine-2, #212126);
   --sbp-creux: var(--sb-creux, #131316);
   --sbp-encre: var(--sb-encre, #F1F2F4); --sbp-encre2: var(--sb-encre-2, #9CB0C6);
-  --sbp-diode: var(--sb-diode, #3FD49A); --sbp-lien: var(--sb-lien, #3FD49A);
+  --sbp-diode: var(--sb-diode, #F4F4F5); --sbp-lien: var(--sb-lien, #F4F4F5);
   --sbp-ambre: var(--sb-ambre, #F2B65E); --sbp-point: var(--sb-ambre-point, #F2A33A);
   --sbp-o: var(--sb-o, 0 0 0);
   --sbp-socle: #2E2E34;
@@ -64,7 +64,7 @@
   --sbp-om-pose: var(--sb-ombre-pose, 0 .5px 1px rgb(0 0 0 / .5), 0 3px 6px -3px rgb(0 0 0 / .7));
   --sbp-om-tuile: var(--sb-ombre-plan, inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8));
   --sbp-om-haut: var(--sb-ombre-avant, inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95));
-  --sbp-halo: rgb(63 212 154 / .10);
+  --sbp-halo: rgb(244 244 245 / .10);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) :is([data-espace="paires"], .vrm-paires-selecteur, .vrm-fp, .vrm-main[data-ecran="annonces"], .vrm-main[data-ecran="garage"], .vrm-main[data-ecran="inventory"]) {
@@ -72,7 +72,7 @@
     --sbp-feuille: var(--sb-porcelaine, #27272B); --sbp-feuille2: var(--sb-porcelaine-2, #212126);
     --sbp-creux: var(--sb-creux, #131316);
     --sbp-encre: var(--sb-encre, #F1F2F4); --sbp-encre2: var(--sb-encre-2, #9CB0C6);
-    --sbp-diode: var(--sb-diode, #3FD49A); --sbp-lien: var(--sb-lien, #3FD49A);
+    --sbp-diode: var(--sb-diode, #F4F4F5); --sbp-lien: var(--sb-lien, #F4F4F5);
     --sbp-ambre: var(--sb-ambre, #F2B65E); --sbp-point: var(--sb-ambre-point, #F2A33A);
     --sbp-o: var(--sb-o, 0 0 0);
     --sbp-socle: #2E2E34;
@@ -87,7 +87,7 @@
     --sbp-om-pose: var(--sb-ombre-pose, 0 .5px 1px rgb(0 0 0 / .5), 0 3px 6px -3px rgb(0 0 0 / .7));
     --sbp-om-tuile: var(--sb-ombre-plan, inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8));
     --sbp-om-haut: var(--sb-ombre-avant, inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95));
-    --sbp-halo: rgb(63 212 154 / .10);
+    --sbp-halo: rgb(244 244 245 / .10);
   }
 }
 
@@ -756,10 +756,10 @@
 :root:root:root:root:root:root:root body .vrm-main [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes > .vrm-lvc-geste {
   all: unset; box-sizing: border-box !important; display: inline-flex !important; align-items: center !important; min-height: 44px !important; margin: -13px 0 !important; padding: 0 2px !important;
   max-width: none !important; white-space: nowrap !important; cursor: pointer !important; background: none !important; border: 0 !important; box-shadow: none !important;
-  font: 600 12.5px/18px var(--sbp-texte, var(--vrm-police)) !important; color: var(--sb-lien, var(--d-accent-texte, #0B5139)) !important; -webkit-tap-highlight-color: transparent;
+  font: 600 12.5px/18px var(--sbp-texte, var(--vrm-police)) !important; color: var(--sb-lien, var(--d-accent-texte, #16181D)) !important; -webkit-tap-highlight-color: transparent;
 }
 :root:root:root:root:root:root:root body .vrm-main [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes > .vrm-lvc-geste:active { opacity: .55 !important; }
-:root:root:root:root:root:root:root body .vrm-main [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes > .vrm-lvc-geste:focus-visible { outline: 2px solid var(--sb-diode, #0B5139) !important; outline-offset: 2px !important; border-radius: 6px !important; }
+:root:root:root:root:root:root:root body .vrm-main [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes > .vrm-lvc-geste:focus-visible { outline: 2px solid var(--sb-diode, #16181D) !important; outline-offset: 2px !important; border-radius: 6px !important; }
 /* Leur recherche, creusée ; leurs filtres, un plateau (actif = enfoncé + diode) : le dessin propre à l'espace Paires,
    le même que la liste Vinted (gardé à la fusion de la fondation : sans lui, Leboncoin et Vestiaire perdaient leur plateau). */
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-outils-champ { min-height: 44px !important; height: 44px !important; border-radius: 14px !important; border: 0 !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; }

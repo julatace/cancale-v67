@@ -382,11 +382,15 @@ async function auditer(S) {
 
   // ── J / T : sur le texte du vrai code ──
   {
-    const fichiers = fs.readdirSync(S.dossier).filter((x) => /\.js$/.test(x));
+    // 22 nov. (audit de l'extension) : une bibliothèque tierce minifiée (pdf-lib.min.js, sa licence à côté) n'est pas NOTRE code ; et
+    // `JSON.parse(JSON.stringify(x))` est une COPIE d'un objet déjà lu (elle ne lit aucune valeur venue d'ailleurs, elle ne peut pas
+    // lever sur du JSON) — les deux faisaient rougir J1 sans désigner un vrai `JSON.parse` nu.
+    const fichiers = fs.readdirSync(S.dossier).filter((x) => /\.js$/.test(x) && !/\.min\.js$/.test(x));
     const parse = [], rep = [];
+    const copieSeule = (ligne) => { const t = String(ligne || ''); return (t.match(/JSON\.parse\(/g) || []).length === (t.match(/JSON\.parse\(JSON\.stringify\(/g) || []).length; };
     for (const nom of fichiers) {
-      const src = lire(path.join(S.dossier, nom));
-      try { for (const l of parseHorsTry(src)) parse.push(nom + ':' + l); } catch (e) { parse.push(nom + ' illisible'); }
+      const src = lire(path.join(S.dossier, nom)), lignes = src.split('\n');
+      try { for (const l of parseHorsTry(src)) if (!copieSeule(lignes[Number(l) - 1])) parse.push(nom + ':' + l); } catch (e) { parse.push(nom + ' illisible'); }
       try { for (const l of reponsesSansReturnTrue(src)) rep.push(nom + ':' + l); } catch (e) { rep.push(nom + ' illisible'); }
     }
     dit(parse.length === 0, 'J1 aucun `JSON.parse` hors `try` dans l’extension (une valeur illisible ne fait plus lever une minuterie ni un geste)', parse.join(' · '));

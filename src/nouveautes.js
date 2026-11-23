@@ -28,8 +28,21 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (22 nov., latence-totale — Julien : « l'app bug beaucoup trop ») docs/passation/2026-11-22-latence.md
+  { id: 'onglets-plus-rapides', date: '2026-11-23', titre: 'Achats et Ventes s’ouvrent plus vite', phrase: 'Les longues listes de colis arrivent au fil du défilement.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (22 nov., lot achats-lot — Julien : « l'app comprend que c'est un lot, divise l'achat ») docs/passation/2026-11-22-achats-lot.md
+  { id: 'achats-lot-diviser', date: '2026-11-22', titre: 'Diviser un achat en plusieurs paires', phrase: 'Lot ou achat simple : chaque paire, son N° et son prix.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (22 nov., ext. 5.438) note de santé, compte précieux, relances, lots et brouillons seuls.
+  { id: 'sante-note', date: '2026-11-22', titre: 'Une note de santé par compte', phrase: 'Elle baisse ? La cadence ralentit seule, puis remonte.', tab: 'adistance', pour: 'tous', mode: 'tous' },
+  { id: 'compte-precieux', date: '2026-11-22', titre: 'Compte précieux : tout à la main', phrase: 'Cadence divisée par deux, rien en série ni d’automatique.', tab: 'adistance', pour: 'tous', mode: 'tous' },
+  { id: 'relances-lots-seuls', date: '2026-11-22', titre: 'Relances, lots et brouillons qui partent seuls', phrase: 'Éteints par défaut, réglés dans le panneau de l’extension.', tab: 'adistance', pour: 'tous', mode: 'tous' },
+  // (22 nov., ext. 5.437) docs/passation/2026-11-22-ext-5437.md
+  { id: 'prix-mini-publier', date: '2026-11-22', titre: 'Le prix minimum demandé à la publication', phrase: 'Rangé à côté du N°, la négociation descend vers lui, jamais dessous.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'nuit-aussi', date: '2026-11-22', titre: 'Tes automatisations tournent aussi la nuit', phrase: 'Mêmes plafonds et même rythme que le jour, ordinateur gardé éveillé.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (22 nov., ext. 5.436, Julien : « mes comptes à distance, comme Bleam Cloud mais sans risque de ban ») docs/passation/2026-11-22-a-distance.md
   { id: 'a-distance', date: '2026-11-22', titre: 'Tes comptes à distance, par ton ordinateur', phrase: 'Réponds, tranche une offre, relis un compte depuis ton iPhone.', tab: 'adistance', pour: 'tous', mode: 'tous' },
+  // (22 nov., Julien : « un mélange de 2 et 1 », « j'aime bien en noir ») docs/passation/2026-11-22-style-clarte.md
+  { id: 'style-encre', date: '2026-11-22', titre: 'Aujourd’hui en tableau de bord, en noir', phrase: 'Le bénéfice du mois en grand, le graphique, les gestes en disques.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (22 nov., choix 1, 23 et 27 de Julien) docs/passation/2026-11-22-apres-finale-app.md
   { id: 'reprise-appareil', date: '2026-11-22', titre: 'Reprendre sur l’autre appareil', phrase: 'La fiche ouverte sur l’iPhone, en haut d’Aujourd’hui sur l’ordinateur.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'plus-vue', date: '2026-11-22', titre: 'Annonces qui ne sont plus vues', phrase: '« Plus vue depuis 6 j » et « Republier » pour cette paire.', tab: 'annonces', pour: 'tous', mode: 'tous' },

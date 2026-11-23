@@ -352,7 +352,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
               {sitesFils.map((x) => <option key={x} value={x}>{NOM_SITE[x] || x}</option>)}
             </select> : null}
           </div> : null}
-          {fils.length ? <BarreOutils className="vrm-ms-msg-outils" valeur={cherche} onChange={setCherche} placeholder={tr('ms.msg.chercher')} label={tr('ms.msg.chercher')}
+          {fils.length || chargement ? <BarreOutils className="vrm-ms-msg-outils" valeur={cherche} onChange={setCherche} placeholder={tr('ms.msg.chercher')} label={tr('ms.msg.chercher')}
             data-msg-recherche="" champAttrs={{ 'data-msg-recherche': '', autoComplete: 'off', spellCheck: false, name: 'recherche-messages' }}/> : null}
           {/* (22 nov., « zéro saut ») Les questions « même fil ? » ne se posent qu'une fois TOUTES les sources lues et les paires des
               conversations Vinted relues (`pairesLues`) : avant, la liste sans ses N° en proposait 1 050, puis la ligne partait (−52 px). */}
@@ -378,7 +378,12 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
             })}
             {propositionsVues.length > 1 ? <p data-fil-propositions-autres={propositionsVues.length - 1} style={{ ...muted, margin: '-4px 0 10px' }}>{tr('messages.encore')} {propositionsVues.length - 1} {tr('messages.question')}{propositionsVues.length > 2 ? 's' : ''} {tr('messages.apresCelleCi')}</p> : null}
           </LigneAFaire>
-          {chargement && !fils.length ? <div role="status" data-fils-lecture="" style={{ ...muted, padding: '12px 0' }}>{tr('messages.lecture')}</div>
+          {/* (22 nov., 3e passe) Pendant la lecture, la recherche et les trois vues sont DÉJÀ posées (sans nombres) : rien ne
+              bouge quand la liste arrive, et l'écran montré n'est pas un blanc sous une seule ligne (banc couches-chargement,
+              Messages au 2e toucher : 0,3 s « vide » entre la copie et la liste). */}
+          {chargement && !fils.length ? <><div className="vg-ms-vues" data-msg-vues={vue}><Segmente libelle={tr('verre2.msg.filtre')} valeur={vue} onChange={setVue}
+              options={[['toutes', tr('verre2.msg.toutes')], ['offres', tr('verre2.msg.offres')], ['nonlues', tr('verre2.msg.nonLues')]].map(([k, l]) => ({ cle: k, libelle: l, attrs: { 'data-msg-vue': k, 'aria-pressed': vue === k ? 'true' : 'false' } }))}/></div>
+            <div role="status" data-fils-lecture="" style={{ ...muted, padding: '12px 0' }}>{tr('messages.lecture')}</div></>
             : !fils.length ? <div data-fils-vide="" style={{ ...muted, padding: '12px 0' }}>{tr('messages.aucuneConversationLue')}</div>
             : motCherche && !filsVus.length ? <div data-fils-rien="" className="vrm-ms-rien">{tr('ms.msg.rien', { x: cherche.trim() })}</div>
             : <><CompteurArnaque n={fils.filter((f) => { const d = f.dernier || f.convs[f.convs.length - 1]; return d && motifDeLApercu(d.apercu, d.deMoi); }).length}/>

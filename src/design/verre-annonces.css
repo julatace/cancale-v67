@@ -170,7 +170,7 @@
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-ann-c="age"].is-ambre { color: var(--sv-ambre) !important; font-weight: 700 !important; }
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-ann-c="place"] { grid-column: 9 !important; }
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .vrm-ann-compte-tete { grid-column: 1 / -1 !important; }
-  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant])[data-sb-choisie] { background: rgb(11 81 57 / .08) !important; box-shadow: inset 3px 0 0 #0B5139 !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant])[data-sb-choisie] { background: rgb(11 81 57 / .08) !important; box-shadow: inset 3px 0 0 #16181D !important; }
 }
 @media (min-width: 768px) and (max-width: 1399px) {
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > :is(.vrm-ann-th, .sb-rangee:not([data-sb-avant])) { grid-template-columns: 40px 66px minmax(0, 3fr) minmax(0, .55fr) minmax(0, .85fr) minmax(0, 1.1fr) minmax(0, .7fr) minmax(0, .7fr) 0 !important; }

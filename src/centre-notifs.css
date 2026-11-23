@@ -7,7 +7,7 @@
 .vrm-cn-cloche { position: relative; }
 .vrm-cn-pastille {
   position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
-  border-radius: 999px; background: var(--fu-bleu, #0F6B4C); color: #fff;
+  border-radius: 999px; background: var(--fu-bleu, #16181D); color: #fff;
   font: 700 11px/18px var(--vrm-police); text-align: center; font-variant-numeric: tabular-nums; pointer-events: none;
 }
 /* (5 nov., chantier H) La feuille est `SheetShell` (poignée, titre, croix, portail) :
@@ -20,7 +20,7 @@
 /* Un lien d'action : le texte bleu de l'app (accentTexte), cible 44 px, pas une boîte. */
 html body .vrm-cn-feuille button.vrm-cn-lien, html body button.vrm-cn-lien {
   flex: none; min-height: 44px; padding: 0 4px; border: 0 !important; background: transparent !important; box-shadow: none !important; cursor: pointer;
-  color: var(--vrm-accent-texte, #0B5139) !important; font: 600 15px/1 var(--vrm-police); white-space: nowrap;
+  color: var(--vrm-accent-texte, #16181D) !important; font: 600 15px/1 var(--vrm-police); white-space: nowrap;
 }
 html body button.vrm-cn-lien:active { opacity: .55; }
 .vrm-cn-bouton {
@@ -48,13 +48,13 @@ button.vrm-cn-ligne:active { background: var(--fu-remplir); }
 @media (hover: hover) and (pointer: fine) { button.vrm-cn-ligne:hover { background: color-mix(in srgb, var(--fu-remplir) 60%, transparent); } }
 .vrm-cn-ligne:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: -2px; }
 .vrm-cn-point { flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 999px; background: transparent; }
-.vrm-cn-ligne.is-non-lue .vrm-cn-point { background: var(--fu-bleu, #0F6B4C); }
+.vrm-cn-ligne.is-non-lue .vrm-cn-point { background: var(--fu-bleu, #16181D); }
 /* (8 nov.) L'icône de la famille, neutre ; le point bleu du « non lu » posé dessus. */
 .vrm-cn-ic { position: relative; flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; background: var(--fu-remplir); color: var(--fu-encre, #1d1d1f); }
 .vrm-cn-ic .vrm-cn-point { position: absolute; top: -3px; right: -3px; margin: 0; width: 10px; height: 10px; border: 2px solid var(--fu-carte, #fff); box-sizing: content-box; }
 .vrm-cn-ligne.is-retrait { padding-left: 54px; background: color-mix(in srgb, var(--fu-remplir) 35%, transparent); }
 .vrm-cn-ligne.is-retrait .vrm-cn-ic { display: none; }
-.vrm-cn-geste { margin-top: 2px; font: 600 13px/1.3 var(--vrm-police); color: var(--vrm-accent-texte, #0B5139); }
+.vrm-cn-geste { margin-top: 2px; font: 600 13px/1.3 var(--vrm-police); color: var(--vrm-accent-texte, #16181D); }
 .vrm-cn-chevron.is-ouvert { transform: rotate(90deg); }
 .vrm-cn-corps { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-cn-meta { display: flex; align-items: center; gap: 6px; font: 400 12px/1.3 var(--vrm-police); color: var(--fu-gris2); }

@@ -187,7 +187,7 @@
   :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-ledger-sale-frise .vrm-fu-frise { flex-wrap: wrap !important; }
   :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-fp-ligne-bouton {
     min-height: 44px !important; height: auto !important; padding: 0 8px 0 0 !important; background: transparent !important; border: 0 !important; box-shadow: none !important;
-    border-radius: 0 !important; font: 600 13px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-lien, #0F6B4C) !important; width: auto !important; justify-content: flex-start !important;
+    border-radius: 0 !important; font: 600 13px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-lien, #16181D) !important; width: auto !important; justify-content: flex-start !important;
   }
   :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-fp-ligne { margin-top: 0 !important; }
   /* Toutes les lignes de vente (aussi celles de « À envoyer », sans data-fu-forme) : pseudo et état jamais rognés. */

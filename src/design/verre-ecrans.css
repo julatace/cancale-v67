@@ -313,7 +313,7 @@
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle[data-bulle="acheteur"] { background: rgb(249 250 251 / .92) !important; color: #1C1C20 !important; border-bottom-left-radius: 6px !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle[data-bulle="moi"] { background: #E3E6EB !important; color: #1C1C20 !important; border-bottom-right-radius: 6px !important; }
 :root:root:root:root:root:root[data-theme="dark"] body .vrm-chat-panel .vrm-bulle[data-bulle="acheteur"] { background: rgb(47 47 53 / .96) !important; color: #F1F2F4 !important; }
-:root:root:root:root:root:root[data-theme="dark"] body .vrm-chat-panel .vrm-bulle[data-bulle="moi"] { background: #0B5139 !important; color: #F6F7F9 !important; }
+:root:root:root:root:root:root[data-theme="dark"] body .vrm-chat-panel .vrm-bulle[data-bulle="moi"] { background: #16181D !important; color: #F6F7F9 !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle .vrm-bulle-h { color: #3F5468 !important; font: 600 11px/1 var(--sb-police-texte, Inter, sans-serif) !important; opacity: 1 !important; }
 :root:root:root:root:root:root[data-theme="dark"] body .vrm-chat-panel .vrm-bulle .vrm-bulle-h { color: #B9CADD !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle-pied, :root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle-pied * { color: var(--sv-clair-2) !important; }

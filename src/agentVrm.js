@@ -37,7 +37,8 @@ function agReglage(o) {
     repondre: x.repondre !== false,
     essaiJours: agEnt(x.essaiJours, 0, AG_ESSAI_JOURS_MAX, AG_ESSAI_JOURS_DEFAUT),
     essaiJusqua: Number.isFinite(Number(x.essaiJusqua)) && Number(x.essaiJusqua) > 0 ? Number(x.essaiJusqua) : null,
-    heuresCalmes: de != null && a != null && de !== a ? { de, a } : { de: 22, a: 8 },
+    // 5.437 (Julien : pas de blocage la nuit) : plus d'heures calmes PAR DÉFAUT ; seulement celles qu'IL a posées.
+    heuresCalmes: de != null && a != null && de !== a ? { de, a } : null,
     // l'heure de SON dernier allumage : un arrêt sur un frein d'avant ne compte plus.
     allumeAt: Number.isFinite(Number(x.allumeAt)) && Number(x.allumeAt) > 0 ? Number(x.allumeAt) : null,
   };

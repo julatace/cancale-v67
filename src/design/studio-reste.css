@@ -102,7 +102,7 @@
   background-color: var(--sb-aplat) !important;
   background-image: radial-gradient(90% 40% at 18% 0%, rgb(255 255 255 / .55), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
 }
-:root[data-theme="dark"]:root:root:root:root:root body .vrm-cx[data-espace="autres"] { background-image: radial-gradient(90% 40% at 18% 0%, rgb(63 212 154 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important; }
+:root[data-theme="dark"]:root:root:root:root:root body .vrm-cx[data-espace="autres"] { background-image: radial-gradient(90% 40% at 18% 0%, rgb(244 244 245 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important; }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-marque { background: transparent !important; color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-aurore { display: none !important; }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-logo { min-height: 44px !important; }
@@ -481,7 +481,7 @@
   background-image: radial-gradient(90% 40% at 18% 0%, rgb(255 255 255 / .55), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
 }
 :root[data-theme="dark"]:root:root:root:root:root body .vrm-chat-panel {
-  background-image: radial-gradient(90% 40% at 18% 0%, rgb(63 212 154 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
+  background-image: radial-gradient(90% 40% at 18% 0%, rgb(244 244 245 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
 }
 :root:root:root:root:root:root body .vrm-chat-panel :is(.vrm-chat-tete, .vrm-chat-pied, .vrm-chat-entete, header, footer) { background: transparent !important; border-color: rgb(var(--sb-o) / .10) !important; }
 /* La barre d'outils de Messages : pas de bandeau derrière le champ. */

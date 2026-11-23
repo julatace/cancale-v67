@@ -23,8 +23,8 @@
   --v2-page-ambre: var(--n-ambre, #8A4B00);
   --v2-teinte-fond: rgb(11 81 57 / .10);
   --v2-teinte-fond-appui: rgb(11 81 57 / .18);
-  --v2-teinte-texte: #0B5139;        /* 6,9:1 sur la teinte posée sur le blanc */
-  --v2-lien: #0B5139;
+  --v2-teinte-texte: #16181D;        /* 6,9:1 sur la teinte posée sur le blanc */
+  --v2-lien: #16181D;
   /* Destructif : l'AMBRE (§7 — le rouge n'est QUE pour deux paires sous un même N° ; le « danger » de l'app est ambre). */
   --v2-danger: #8A4B00;
   --v2-anneau: 0 0 0 3px rgb(11 81 57 / .45);
@@ -46,8 +46,8 @@
   --v2-plein-fond: #F1F2F4;
   --v2-plein-fond-appui: #D3D8E0;
   --v2-plein-texte: #111114;
-  --v2-teinte-fond: rgb(63 212 154 / .16);
-  --v2-teinte-fond-appui: rgb(63 212 154 / .26);
+  --v2-teinte-fond: rgb(244 244 245 / .16);
+  --v2-teinte-fond-appui: rgb(244 244 245 / .26);
   --v2-teinte-texte: #BCC4CF;
   --v2-lien: #BCC4CF;
   --v2-danger: #F2B65E;
@@ -573,7 +573,7 @@ html[data-design="v2"][data-serie-ouverte] .v2t-liste { margin-bottom: calc(var(
 /* À l'ordinateur, la barre du haut collante (recherche, plateformes) est un verre PLEIN : jamais une demi-rangée dessous. */
 @layer vrm-finition {
   @media (min-width: 1024px) {
-    html[data-design="v2"]:root:root:root body .vrm-app-shell .vrm-main > .vrm-barre-haut { background: var(--sv-haut, #0B5139) !important;
+    html[data-design="v2"]:root:root:root body .vrm-app-shell .vrm-main > .vrm-barre-haut { background: var(--sv-haut, #16181D) !important;
       -webkit-backdrop-filter: blur(20px) saturate(180%) !important; backdrop-filter: blur(20px) saturate(180%) !important; box-shadow: 0 .5px 0 rgb(255 255 255 / .14) !important; }
   }
 }

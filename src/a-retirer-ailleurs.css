@@ -40,7 +40,7 @@
 .rx-gestes { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .rx-gestes:empty { display: none; }
 .rx-geste, .rx-lien { min-height: 44px; box-sizing: border-box; }
-.rx-lien { display: inline-flex; align-items: center; padding: 0 6px; font-size: 13.5px; font-weight: 600; color: var(--sb-lien, #0B5139); }
+.rx-lien { display: inline-flex; align-items: center; padding: 0 6px; font-size: 13.5px; font-weight: 600; color: var(--sb-lien, #16181D); }
 .rx-site.is-encours { opacity: .85; }
 .rx-site.is-encours .rx-marque { animation: rx-souffle 1.2s ease-in-out infinite; }
 @keyframes rx-souffle { 50% { opacity: .45; } }
@@ -58,5 +58,5 @@
    (`:root:root body .vrm-app-shell :is(.vrm-fu-carte, .vrm-fu-tete) :is(a, …) { color: #fff !important }`,
    pensé pour l'ancienne carte sombre) — mesuré au banc : « Ouvrir Vestiaire ↗ » blanc sur porcelaine.
    Ici la matière est claire (porcelaine) : le lien reprend sa couleur, plus spécifique. */
-:root:root:root:root body .rx a.rx-lien { color: var(--sb-lien, #0B5139) !important; }   /* (19 nov.) un :root de plus : la règle « blanc dans une carte Fusion » (jetons.css) avait la même force et passait après */
+:root:root:root:root body .rx a.rx-lien { color: var(--sb-lien, #16181D) !important; }   /* (19 nov.) un :root de plus : la règle « blanc dans une carte Fusion » (jetons.css) avait la même force et passait après */
 :root:root:root body .rx a.sb-touche.rx-geste { color: var(--sb-encre, #1C1C20) !important; text-decoration: none; }

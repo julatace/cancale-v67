@@ -44,5 +44,8 @@ export default {
   "fav.bilan.r.vinted_robot": "verifica anti-robot di Vinted",
   "fav.bilan.r.pause_vinted": "Vinted chiede di rallentare",
   "fav.bilan.r.offre_refusee": "offerta rifiutata da Vinted",
+  "fav.bilan.r.element_introuvable": "pulsante o campo non trovato nella pagina di Vinted",
+  "fav.bilan.r.identite_non_confirmee": "articolo o destinatario non confermato",
+  "fav.bilan.r.historique_non_verifie": "conversazione non verificata",
   "fav.bilan.r.autre": "altro rifiuto",
 };
