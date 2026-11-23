@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.440.0';
+const CODE_VERSION = '5.445.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -26823,19 +26823,19 @@ const STATUT_LBC = { active: 'en_vente', inactive: 'masque', paused: 'masque', d
 //    ses VENTES (`isSeller === true`) et ses ACHATS (`isSeller === false`) ; une ligne de la liste v3 sans détail n'a pas
 //    `isSeller` ⇒ son sens n'est PAS deviné (« pas su », comptée à part, jamais rangée en vente ni en achat, §5). Une
 //    vente « validation » dont le colis est `finished` est FINALISÉE (le panneau d'avant la disait « à expédier »).
-const lbcTxAnnulee = (o) => o.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((o.parcelStatus || '') + ' ' + (o.stepStatus || '') + ' ' + (o.stepLabel || ''));
-const lbcTxFinalisee = (o) => {
+function lbcTxAnnulee(o) { return o.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((o.parcelStatus || '') + ' ' + (o.stepStatus || '') + ' ' + (o.stepLabel || '')); }
+function lbcTxFinalisee(o) {
   if (o.parcelColor) return o.parcelColor === 'finished';
   if (o.parcelStatus) return /delivered|livr[ée]/i.test(o.parcelStatus);
   if (o.stepStatus === 'done') return true;
   if (o.stepStatus === 'cancelled') return false;
   return /paiement effectu|termin[ée]|finalis|cl[oô]tur|livr[ée]|colis re[çc]u|\bclos/i.test((o.stepLabel || '') + ' ' + (o.stepStatus || ''));
-};
-const lbcTxExpediee = (o) => {
+}
+function lbcTxExpediee(o) {
   const t = [o.parcelStatus, o.stepStatus, o.stepLabel].filter(Boolean).join(' ').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   if (/(?:a|avant) (?:envoyer|expedier)|attente (?:de |du )?(?:depot|expedition|prise en charge)/.test(t)) return false;
   return /in[_ -]?transit|out[_ -]?for[_ -]?delivery|shipped|dispatched|collected|en cours de livraison|colis (?:envoye|depose|remis)|expedie(?:e|s)?\b|pris en charge|collecte par/.test(t);
-};
+}
 // </lbc-tx-regle>
 const TRANSP_LBC = { mondial_relay: 'mondialrelay', mondialrelay: 'mondialrelay', shop2shop: 'shop2shop', colissimo: 'colissimo', chronopost: 'chronopost', relais_colis: 'relaiscolis', relaiscolis: 'relaiscolis', dpd: 'dpd', ups: 'ups' };
 // Une ligne de `lbc_ventes` ⇒ ce que le panneau montre. `sens` : 'vente' | 'achat' | null (pas su). L'état d'une VENTE :
