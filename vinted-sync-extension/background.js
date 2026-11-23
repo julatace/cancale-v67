@@ -18446,12 +18446,16 @@ async function reprendreParFormulaire(msg, acc, vb) {
 //    23 nov.). L'uuid connu (appris de la page) est ouvert directement ; sinon l'ancien n°, que Vinted peut renvoyer vers
 //    l'uuid. La page de vrm-formulaire.js vérifie ENSUITE l'identité (`surConv` : l'ancien n° lu par la page).
 const routeConvGeste = (d) => `/inbox/${RE_UUID_CONV.test(String(d.route || '')) ? d.route : d.conv}`;
-const reConvGeste = (d) => new RegExp(`^/inbox/(?:${d.conv}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/?$`);
+//    `re` (la page montrée est-elle la bonne ?) : l'ancien n° ou l'uuid CONNU seulement — une autre conversation uuid
+//    ouverte dans l'onglet fait naviguer. `reApres` (après la navigation) : Vinted peut renvoyer l'ancien n° vers son uuid ;
+//    la page le vérifie alors par l'ancien n° qu'elle a lu de Vinted.
+const reConvGeste = (d) => new RegExp(`^/inbox/(?:${d.conv}${RE_UUID_CONV.test(String(d.route || '')) ? '|' + d.route : ''})/?$`);
+const reConvApres = (d) => new RegExp(`^/inbox/(?:${d.conv}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/?$`);
 const GESTES_INTERFACE = Object.freeze({
-  ouvrir: { route: routeConvGeste, re: reConvGeste },
-  message: { route: routeConvGeste, re: reConvGeste },
-  offre: { route: routeConvGeste, re: reConvGeste },
-  'repondreOffre': { route: routeConvGeste, re: reConvGeste },
+  ouvrir: { route: routeConvGeste, re: reConvGeste, reApres: reConvApres },
+  message: { route: routeConvGeste, re: reConvGeste, reApres: reConvApres },
+  offre: { route: routeConvGeste, re: reConvGeste, reApres: reConvApres },
+  'repondreOffre': { route: routeConvGeste, re: reConvGeste, reApres: reConvApres },
   favoriOuvrir: { route: () => '/inbox', re: () => /^\/inbox(\/|$)/ },
   // 5.440 (`clocheauto`) : la cloche introuvable sur la messagerie ⇒ l'accueil de Vinted, où l'en-tête complet est toujours là.
   favoriAccueil: { route: () => '/', re: () => /^\/?$/ },
@@ -18460,8 +18464,8 @@ const GESTES_INTERFACE = Object.freeze({
   masquer: { route: (d) => `/items/${d.id}`, re: (d) => new RegExp(`^/items/${d.id}(?:-[^/]*)?/?$`) },
   supprimer: { route: (d) => `/items/${d.id}`, re: (d) => new RegExp(`^/items/${d.id}(?:-[^/]*)?/?$`) },
   prix: { route: (d) => `/items/${d.id}/edit`, re: (d) => new RegExp(`^/items/${d.id}/edit/?$`) },
-  bordereau: { route: routeConvGeste, re: reConvGeste },
-  evaluation: { route: routeConvGeste, re: reConvGeste },
+  bordereau: { route: routeConvGeste, re: reConvGeste, reApres: reConvApres },
+  evaluation: { route: routeConvGeste, re: reConvGeste, reApres: reConvApres },
   // 5.420 (`vacancesinterface`) : la page des réglages de Vinted où vit l'interrupteur (apprise de SON geste, sinon le profil).
   vacances: { route: (d) => pageVacancesSure(d.page), re: (d) => new RegExp(`^${pageVacancesSure(d.page)}/?$`) },   // lettres, tirets et / seulement (RE_PAGE_VACANCES)
 });
@@ -18513,7 +18517,7 @@ async function interfaceVinted(acc, geste, d, opts = {}) {
     const tab = ot.tabId;
     let chemin = ''; try { chemin = new URL(String((await chrome.tabs.get(tab)).url || '')).pathname; } catch (_) { chemin = ''; }
     if (!g.re(x).test(chemin)) {
-      if (!(await naviguerTravail(tab, `https://${domaine}${g.route(x)}`, g.re(x)))) { noterDiag('interface_navigation_ratee'); return { status: 0, ok: false, json: null, rienParti: true, sansPage: 'identite', raison: PHRASE_IDENTITE }; }
+      if (!(await naviguerTravail(tab, `https://${domaine}${g.route(x)}`, (g.reApres || g.re)(x)))) { noterDiag('interface_navigation_ratee'); return { status: 0, ok: false, json: null, rienParti: true, sansPage: 'identite', raison: PHRASE_IDENTITE }; }
       await wait(900 + Math.round(Math.random() * 1600));   // la page de Vinted finit de se montrer
     } else if (ot.cree) await wait(1500 + Math.round(Math.random() * 1500));
     // Le compte de l'onglet, revérifié JUSTE avant le geste (il a pu basculer pendant la navigation).
@@ -22005,6 +22009,20 @@ async function sequenceFavoriBleam(x) {
   fini.offreFaite = !!(o && o.ok && (o.json == null || o.json.code == null || Number(o.json.code) === 0));   // 5.417 : pour les statistiques par version
   return fini;
 }
+// 5.440 : la lecture d'une conversation de la nouvelle messagerie (mesurée le 23 nov. : `GET api.vinted.fr/messaging/main/
+//    conversations/{uuid}`), et sa traduction PRUDENTE dans la forme que la suite sait vérifier : l'ancien n° doit être
+//    celui-ci, une seule personne, un seul article ; des messages dont la forme n'est pas sue ⇒ « historique non vérifié »
+//    (jamais « vide ») ; le pseudo n'est pas lu (une variable {pseudo} fera refuser, rien ne part au hasard).
+function adresseMessagerieVinted(domaine,uuid){const d=String(domaine||'www.vinted.fr').toLowerCase().replace(/^www\./,'');return /^vinted\.(fr|com|it|de)$/.test(d)&&RE_UUID_CONV.test(String(uuid||''))?`https://api.${d}/messaging/main/conversations/${uuid}`:'';}
+function filDepuisMessagerie(j,convId,uuid,tx){
+  const c=j&&typeof j==='object'?(j.conversation&&typeof j.conversation==='object'?j.conversation:j):null;
+  if(!c||String(c.id||'')!==String(uuid)||String(Number(c.core_id_deprecated))!==String(convId))return null;
+  const ids=(l)=>(Array.isArray(l)?l:[]).map((x)=>x&&typeof x==='object'?String(x.id!=null?x.id:x.user_id!=null?x.user_id:x.item_id!=null?x.item_id:''):'').filter((v)=>/^[1-9]\d{0,19}$/.test(v));
+  const opp=ids(c.opposite_users),items=ids(c.data&&c.data.items);
+  if(opp.length!==1||items.length!==1||!Array.isArray(c.messages))return null;
+  const t=/^[1-9]\d{0,19}$/.test(String(tx||''))?String(tx):'';
+  return {id:String(convId),opposite_user:{id:opp[0]},item_id:items[0],...(t?{transaction:{id:t,item_id:items[0]}}:{}),allow_reply:c.allow_reply!==false,messages:c.messages.map(()=>({entity_type:'forme_inconnue'})),...(c.pagination&&c.pagination.has_next===true?{has_more:true}:{})};
+}
 // 5.440 : l'adresse de la liste de la cloche, sur l'hôte `api.` du domaine du compte (mesuré : www → 404, api → 200).
 function adresseClocheVinted(domaine){const d=String(domaine||'www.vinted.fr').toLowerCase().replace(/^www\./,'');return /^vinted\.(fr|com|it|de)$/.test(d)?`https://api.${d}/inbox-notifications/v1/notifications`:'/inbox-notifications/v1/notifications';}
 // Le chemin de la page complète des notifications, LU sur la page (« Voir tout » ou le lien de la cloche) et retenu.
@@ -22173,7 +22191,11 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   let c=cc,lu={status:creation.status,json:creation.json}; // (29 oct., revue) la pagination de la réponse de création est vérifiée aussi
   // 5.414 : la réponse de création est celle que la PAGE a reçue de Vinted (même preuve qu'avant) ; une conversation
   //    déjà là (aucune création vue) ou une réponse qui ne porte pas de quoi vérifier ⇒ le fil est RELU.
-  if(seqBleam||!cc||!filVerifiable(c)||String(cc.id)!==convId){noterDiag('favori_fil_relu');lu=await vintedPage(acc,'GET',`/api/v2/conversations/${convId}`,null,{timeoutMs:12000,travail:true});c=lu.json?.conversation;if(!frein)frein=freinFavoriAuto(lu);if(!lu.ok)return rep('refuse',lu.status,'identite_non_confirmee');}
+  if(seqBleam||!cc||!filVerifiable(c)||String(cc.id)!==convId){noterDiag('favori_fil_relu');lu=await vintedPage(acc,'GET',`/api/v2/conversations/${convId}`,null,{timeoutMs:12000,travail:true});c=lu.json?.conversation;if(!frein)frein=freinFavoriAuto(lu);
+    // 5.440 : l'ancienne lecture refusée pour une conversation de la NOUVELLE messagerie ⇒ sa lecture à elle (GET, même onglet),
+    //    acceptée seulement si Vinted y dit CET ancien n°, UNE personne, UN article (sinon rien ne part).
+    if(!lu.ok&&convRoute&&!frein){const ln=await vintedPage(acc,'GET',adresseMessagerieVinted(acc.domain,convRoute),null,{timeoutMs:12000,travail:true});if(!frein)frein=freinFavoriAuto(ln);const cn=ln.ok?filDepuisMessagerie(ln.json,convId,convRoute,creation.tx):null;if(cn){noterDiag('favori_fil_nouveau');lu={status:ln.status,ok:true,json:{conversation:cn}};c=cn;}else noterDiag('favori_fil_nouveau_illisible_'+(ln.status||0));}
+    if(!lu.ok)return rep('refuse',lu.status,'identite_non_confirmee');}
   // Both identities must be in the actual thread immediately before reply.
   const article=String(c?.transaction?.item_id||c?.transaction?.item?.id||c?.item?.id||c?.item_id||'');
   if(String(c?.id)!==convId||String(c?.opposite_user?.id)!==body.recipientId||article!==body.itemId||c?.allow_reply===false)return rep('refuse',lu.status,'identite_non_confirmee');

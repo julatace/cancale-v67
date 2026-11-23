@@ -270,7 +270,7 @@ try { const c = {}; vm.runInNewContext(bloc(BG, LR_A, LR_B) + '\n;globalThis.__f
   dit(N.notesDesLignes([rows[1]], T0)['111'].vieille === true, 'D8 une note de plus de 24 h est dite « ancienne »');
   }
   const caps = (/const EXT_CAPACITES = \{([^}]*)\}/.exec(app) || [])[1] || '';
-  dit(['santenote', 'precieux', 'relancesansachat', 'lotauto', 'brouillonsauto', 'demasquee'].every((k) => new RegExp(`\\b${k}: '5\\.438\\.0'`).test(caps)) && /const EXT_ATTENDUE = '5\.438\.0'/.test(app) && /const CODE_VERSION = '5\.438\.0'/.test(BG), 'D9 capacités 5.438.0, EXT_ATTENDUE et CODE_VERSION');
+  dit(['santenote', 'precieux', 'relancesansachat', 'lotauto', 'brouillonsauto', 'demasquee'].every((k) => new RegExp(`\\b${k}: '5\\.438\\.0'`).test(caps)) && (() => { const v = (re) => { const m = re.exec(app + '\n' + BG); return m ? m[1].split('.').map(Number) : null; }; const ok = (x) => !!x && (x[0] > 5 || (x[0] === 5 && x[1] >= 438)); return ok(v(/const EXT_ATTENDUE = '(\d+\.\d+\.\d+)'/)) && ok(v(/const CODE_VERSION = '(\d+\.\d+\.\d+)'/)); })(), 'D9 capacités 5.438.0, EXT_ATTENDUE et CODE_VERSION (5.438.0 ou plus, 5.440 : la version suivante)');
   dit(!/heure.{0,30}(nuit|22|23).{0,40}return 0/.test(BG.slice(BG.indexOf('async function lotFavorisAuto('), BG.indexOf('function brouillonAutoSuivant('))), 'D10 aucun blocage à la nuit dans les nouveaux moteurs (ils tournent la nuit, dans les plafonds)');
 
   console.log(`\n${ko ? '❌' : '✅'} audit-ext-5438 : ${ok} verts, ${ko} rouge(s)`);

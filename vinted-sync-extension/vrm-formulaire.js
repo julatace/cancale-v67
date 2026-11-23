@@ -438,6 +438,8 @@
     if (c) return c === String(conv);
     return RE_UUID.test(route) && route === u;
   }
+  // La page vient d'être ouverte : la relecture de la conversation par Vinted (qui dit l'ancien n°) peut arriver juste après.
+  async function attendreConv(conv, d, ms) { const fin = Date.now() + ms; for (;;) { if (surConv(conv, d)) return true; if (!uuidIci() || Date.now() > fin) return surConv(conv, d); await nap(200); } }
   // La réponse d'un message, ancienne ou nouvelle messagerie : 2xx ET la conversation dite par Vinted = celle-ci.
   function repMessageNormale(r, conv) {
     if (!r || !r.json || typeof r.json !== 'object') return r;
@@ -716,7 +718,7 @@
     async message(d) {
       const conv = String((d && d.conv) || ''), texte = String((d && d.texte) || '');
       if (!/^[1-9]\d{0,19}$/.test(conv) || !texte.trim()) return { ok: false, code: 'etape' };
-      if (!surConv(conv, d)) return { ok: false, code: 'identite', chemin: location.pathname };
+      if (!(await attendreConv(conv, d, 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
       const z = await attendreN('message-champ', () => { const x = composeur(); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (z.captcha) return vuCaptcha(); if (z.absent) return manque('message-champ'); if (z.el === 'AMBIGU') return manque('message-champ-ambigu');
       const champ = z.el;
@@ -744,7 +746,7 @@
     async offre(d) {
       const conv = String((d && d.conv) || ''), tx = String((d && d.tx) || ''), prix = Number(d && d.prix);
       if (!/^[1-9]\d{0,19}$/.test(conv) || !/^[1-9]\d{0,19}$/.test(tx) || !(prix > 0)) return { ok: false, code: 'etape' };
-      if (!surConv(conv, d)) return { ok: false, code: 'identite', chemin: location.pathname };
+      if (!(await attendreConv(conv, d, 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
       const b = await attendreN('offre-bouton', () => { let x = parNom(RE_FAIRE_OFFRE, document, /make[-_]?offer|offer[-_]?(button|cta)/i, /accept|decline|reject|cancel/i); if (!x.el && !x.ambigu && T()) { const r = T().trouver('boutonOffre', {}); noterTrouve('boutonOffre', r); x = { el: r.el || null, ambigu: !!r.ambigu }; } return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (b.captcha) return vuCaptcha(); if (b.absent) return manque('offre-bouton'); if (b.el === 'AMBIGU') return manque('offre-bouton-ambigu');
       const avant = occurrencesPrix(prix);
@@ -771,7 +773,7 @@
     async repondreOffre(d) {
       const conv = String((d && d.conv) || ''), tx = String((d && d.tx) || ''), oid = String((d && d.oid) || ''), accepter = !!(d && d.accepter);
       if (!/^[1-9]\d{0,19}$/.test(conv) || !/^[1-9]\d{0,19}$/.test(tx) || !/^[1-9]\d{0,19}$/.test(oid)) return { ok: false, code: 'etape' };
-      if (!surConv(conv, d)) return { ok: false, code: 'identite', chemin: location.pathname };
+      if (!(await attendreConv(conv, d, 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
       const re = accepter ? RE_ACCEPTER : RE_REFUSER, nom = accepter ? 'offre-accepter' : 'offre-refuser';
       const b = await attendreN(nom, () => { const x = parNom(re, document, accepter ? /accept/i : /decline|reject/i, accepter ? /decline|reject|cancel/i : /accept|cancel/i); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (b.captcha) return vuCaptcha(); if (b.absent) return manque(nom); if (b.el === 'AMBIGU') return manque(nom + '-ambigu');
@@ -895,7 +897,7 @@
     async bordereau(d) {
       const conv = String((d && d.conv) || ''), tx = String((d && d.tx) || ''), depot = d && d.depot ? String(d.depot) : '';
       if (!/^[1-9]\d{0,19}$/.test(conv) || !/^[1-9]\d{0,19}$/.test(tx)) return { ok: false, code: 'etape' };
-      if (!surConv(conv, d)) return { ok: false, code: 'identite', chemin: location.pathname };
+      if (!(await attendreConv(conv, d, 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
       const b = await attendreN('bordereau-bouton', () => { const x = parNom(RE_BORDEREAU, document, /(shipping[-_]?label|label[-_]?(button|cta)|get[-_]?label)/i, /cancel|close|download|track/i); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (b.captcha) return vuCaptcha(); if (b.absent) return manque('bordereau-bouton'); if (b.el === 'AMBIGU') return manque('bordereau-bouton-ambigu');
       ecouter();
@@ -926,7 +928,7 @@
     async evaluation(d) {
       const conv = String((d && d.conv) || ''), texte = String((d && d.texte) || ''), meth = String((d && d.methode) || 'POST').toUpperCase(), ch = String((d && d.chemin) || '');
       if (!/^[1-9]\d{0,19}$/.test(conv) || !texte.trim() || !/^\/api\/v2\/[\w/-]+$/.test(ch) || !['POST', 'PUT'].includes(meth)) return { ok: false, code: 'etape' };
-      if (!surConv(conv, d)) return { ok: false, code: 'identite', chemin: location.pathname };
+      if (!(await attendreConv(conv, d, 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
       const b = await attendreN('evaluation-bouton', () => { const x = parNom(RE_EVALUER, document, /(leave[-_]?)?feedback[-_]?(button|cta)|review[-_]?button/i, /cancel|close/i); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (b.captcha) return vuCaptcha(); if (b.absent) return manque('evaluation-bouton'); if (b.el === 'AMBIGU') return manque('evaluation-bouton-ambigu');
       clic(b.el);
