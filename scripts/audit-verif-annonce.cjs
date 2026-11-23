@@ -83,8 +83,9 @@ function app(ok) {
   const entre = (a, b) => { const i = s.indexOf(a); const j = i < 0 ? -1 : s.indexOf(b, i); return i < 0 || j < 0 ? '' : s.slice(i, j); };
   // Leboncoin : la fiche.
   const lbc = entre('const publier = async (confirme) => {', 'const basculerPhoto');
-  ok(/await verifierAvantPublication\(problemesAnnonce\(\{[^]*?\}, 'lbc'\)/.test(lbc) && lbc.indexOf('verifierAvantPublication') < lbc.indexOf('await envoyer('), 'B1 « Publier sur Leboncoin » vérifie (règle Leboncoin) AVANT l’envoi');
-  ok(/achat: q\.achat/.test(lbc) && /achat: \(\(\) => \{ try \{ return prixAchatDe\(e, load\('vinted_buyprice_by_num'/.test(s), 'B1b le prix d’achat est celui de la fiche du N° (prixAchatDe), jamais deviné');
+  // (20 nov., décision de Julien) la publication Leboncoin / Vestiaire se fait dans le PANNEAU de l'extension, qui vérifie l'annonce (règle src/verifAnnonce.js) avant SON dépôt : l'app n'envoie rien.
+  ok(!/cmd: 'lbcPublier'/.test(s) && /action="publier" site="leboncoin"/.test(s + fs.readFileSync(require('path').join(require('path').dirname(APP), 'ecrans', 'Leboncoin.jsx'), 'utf8')), 'B1 (20 nov.) « Publier sur Leboncoin » : dans l’extension (rien ne part d’ici)');
+  ok(/achat: \(\(\) => \{ try \{ return prixAchatDe\(e, load\('vinted_buyprice_by_num'/.test(s), 'B1b le prix d’achat est celui de la fiche du N° (prixAchatDe), jamais deviné');
   // eBay : les deux chemins.
   const ebP = entre('const publier = async (opts = {}) => {', 'const lab = {');
   ok(/verifierAvantPublication\(verifEbay\(b\.item\), \{ site: 'ebay' \}\)/.test(ebP) && ebP.indexOf('verifierAvantPublication') < ebP.indexOf("action: 'publish'"), 'B2 « Publier sur eBay » vérifie AVANT la publication');
@@ -93,7 +94,7 @@ function app(ok) {
   ok(/problemesAnnonce\(\{[^]*?\}, 'ebay'\)/.test(entre('const verifEbay = (item) => {', 'const [autoPub')), 'B2c avec la règle eBay');
   // Vestiaire.
   const vc = entre('const preparer = async (p) => {', 'const marquer = async (p) => {');
-  ok(/verifierAvantPublication\(problemesAnnonce\(\{[^]*?\}, 'vestiaire'\)/.test(vc) && vc.indexOf('verifierAvantPublication') < vc.indexOf("cmd: 'vcPreparer'"), 'B3 « Préparer sur Vestiaire » vérifie AVANT l’envoi');
+  ok(!/cmd: 'vcPreparer'/.test(s) && /action="publier" site="vestiaire"/.test(fs.readFileSync(require('path').join(require('path').dirname(APP), 'ecrans', 'Vestiaire.jsx'), 'utf8')), 'B3 (20 nov.) « Publier sur Vestiaire » : dans l’extension (rien ne part d’ici)');
   // Republier.
   // (intégration 11nov-g2) republier-programme : le lot se bâtit dans `lotVerif`, la vérification est `verifierLot`
   // (refaite au départ programmé) ; `lancerFile` l'attend AVANT de lancer.

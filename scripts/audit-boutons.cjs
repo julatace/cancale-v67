@@ -32,7 +32,10 @@ let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };
 
 // la règle de base
-const i = HTML.indexOf('button, a.vrm-btn {');
+// 19 nov. : le sélecteur laisse les composants natifs (`class="n-…"`) hors de la règle
+// (`button:where(:not(…)), a.vrm-btn`) — on cherche la règle par ce qu'elle vise.
+const mR = /(^|\n)\s*button(:where\([^{]*\))?, a\.vrm-btn \{/.exec(HTML);
+const i = mR ? mR.index : -1;
 const R = i < 0 ? '' : HTML.slice(i, HTML.indexOf('}', i));
 dit(R.length > 20, 'la règle de base des boutons existe');
 dit(/font-family:\s*inherit/.test(R), 'les boutons héritent de la police de l\'app',

@@ -102,8 +102,8 @@ const MUTATIONS = {
   const studio = sansCom(lire('src/StudioPhoto.jsx'));
   dit(/analyserPhoto/.test(studio) && /<AvisPhoto/.test(studio), 'F. le studio mesure chaque photo prise et l’affiche');
   dit(!/(flou|sombre|douteuse)[^;\n]{0,80}\?\s*false/.test(studio) && !/if\s*\([^)]*(flou|sombre|photoDouteuse)[^)]*\)\s*(\{\s*)?return/.test(studio), 'F. le studio range la photo quel que soit le verdict');
-  const cv = sansCom(lire('src/CreerSurVinted.jsx'));
-  dit(/<AvisPhoto/.test(cv), 'F. « Créer sur Vinted » montre l’avertissement sur chaque photo avant l’envoi');
+  // (20 nov., décision de Julien) « Créer sur Vinted » est dans l'extension (l'atelier de l'app est retiré) : l'avertissement reste au studio.
+  dit(!lire('src/CreerSurVinted.jsx'), 'F. (20 nov.) l’atelier « Créer sur Vinted » de l’app est retiré (l’avertissement vit au studio)');
   fin();
 })().catch((e) => { console.log('KO  exception : ' + (e && e.stack || e)); process.exit(1); });
 

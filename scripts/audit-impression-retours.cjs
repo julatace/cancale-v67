@@ -13,6 +13,7 @@
 //      bouton, « à envoyer », `vrm_colis_prets`), ils suivent les ventes dans le PDF (`lancerImpression`), un
 //      item de retour prend le cartouche RETOUR (`impIt.retour`), jamais le tampon choisi pour une vente.
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');
 const { prouver } = require('./_mutations-audit.cjs');
@@ -89,7 +90,7 @@ const importer = (p) => import('file://' + path.join(R, p));
     dit(/retoursChoisis\(/.test(li) && /choisiesV/.test(li), 'W4 `lancerImpression` ajoute les retours choisis aux ventes (jamais dans leur compte)');
     dit(/if \(it\.retour\) \{ impIt\.retour = true;/.test(app) && /choisir: it\.retour \? null/.test(app), 'W5 un item de retour prend le cartouche RETOUR (ni le tampon choisi d’une vente, ni l’aperçu)');
     dit(/const cartoucheTampon = \(bold, reg, numero, titre, v, retour = false\)/.test(app) && /if \(c\.cadre\)/.test(app), 'W6 le cartouche RETOUR existe (mot en grand, cadre noir)');
-    dit(/if \(!fiche\.actif && !retour\) return \{ mode: 'aucun'/.test(app), 'W7 en thermique, un retour n’est jamais « rien de tamponné »');
+    dit(/if \(!fiche\.actif && !retour\) return (?:fin\()?\{ mode: 'aucun'/.test(app), 'W7 en thermique, un retour n’est jamais « rien de tamponné »');
     dit(/retour: true \}\);/.test(corps('preparerRetourPdf') || app.slice(app.indexOf('const preparerRetourPdf'), app.indexOf('const imprimerRetourAchat'))), 'W8 « Imprimer le bordereau » de la carte prend le même cartouche RETOUR');
     dit(/<RetoursLot lignes=\{Lret\}/.test(app) && /<RetoursAImprimer r=\{retoursAchatRes\} lignes=\{Lr\}/.test(app), 'W9 la section « Retour · tu renvoies un achat » est rendue (Ventes et « Choisir »)');
   });

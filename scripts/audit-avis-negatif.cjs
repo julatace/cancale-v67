@@ -23,6 +23,7 @@
 //  M  MUTATIONS : chaque règle réaffaiblie ⇒ rouge.
 //  Données inventées (le dépôt est public).
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris)
 const fs = require('fs'), path = require('path'), os = require('os');
 const R = path.join(__dirname, '..');
@@ -313,7 +314,7 @@ async function batterieExtension(src, noter) {
     const app = lire('src/App.jsx').replace(/\/\/[^\n]*/g, '');
     const j = lire('src/AvisNegatifJournee.jsx');
     dit((/\.\.\.\(avisBasListe\.length \? \[\{ el: carteAvisBas\(\) \}\] : \[\]\)/.test(app) || (/'avis-bas': avisBasListe\.length \? \[carteAvisBas\(\)\] : \[\],/.test(app) && /'avis-bas': avisBasListe\.length \? 1 : 0/.test(app))) && /\+ \(avisBasListe\.length \? 1 : 0\)/.test(app), 'A1 la carte est dans « À faire » et comptée parmi les gestes');
-    dit(/select=a:data->alertes/.test(app) && /select=id,avis:data->payload->user_feedbacks/.test(app) && !/LIGNE_AVIS_BAS\}&select=data/.test(app), 'A2 lue en projection (alertes, avis, profil)');
+    dit((/select=a:data->alertes/.test(app) || (/lireAlertesAvisBas\(get\)/.test(app) && /select=a:data->alertes/.test(lire('src/lectureAvisBas.js')))) && /select=id,avis:data->payload->user_feedbacks/.test(app) && !/LIGNE_AVIS_BAS\}&select=data/.test(app), 'A2 lue en projection (alertes — la lecture partagée src/lectureAvisBas.js, 17 nov. —, avis, profil)');
     dit(/Lis l’avis sur Vinted\./.test(j) && /data-avis-texte-absent/.test(j), 'A3 sans texte rangé : « Lis l’avis sur Vinted. »');
     dit(/a\.vente \?/.test(j) && /lienVenteAvis\(a\.tx\)/.test(j), 'A4 « Voir la vente » seulement par le n° de transaction de l’avis');
     const sw = lire('public/sw.js');

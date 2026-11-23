@@ -15,7 +15,7 @@ const diff = (a, b) => { const la = JSON.stringify(a), lb = JSON.stringify(b); i
 dit(A.ventes === B.ventes, 'même base', `${A.ventes} / ${B.ventes}`);
 for (const tab of new Set([...Object.keys(A.ecrans), ...Object.keys(B.ecrans)])) {
   const a = A.ecrans[tab] || {}, b = B.ecrans[tab] || {};
-  for (const k of ['montants', 'comptes', 'attrs']) { const d = diff(a[k], b[k]); dit(!d, `${tab} · ${k} identiques (${(a[k] || []).length})`, d); }
+  for (const k of ['montants', 'comptes', 'attrs'].concat(a.identites || b.identites ? ['identites'] : [])) { const d = diff(a[k], b[k]); dit(!d, `${tab} · ${k} identiques (${(a[k] || []).length})`, d); }
 }
 for (const k of new Set([...Object.keys(A.publie), ...Object.keys(B.publie)])) { const d = diff(A.publie[k], B.publie[k]); dit(!d, `publié ${k} identique`, d); }
 dit(!(B.erreurs || []).length, 'aucune erreur', (B.erreurs || []).join(' | '));

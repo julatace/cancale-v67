@@ -125,6 +125,46 @@ export function messagesPourRecherche(lignes, garderCompte = () => true) {
   return out;
 }
 
+// ── (22 nov., ext. 5.435, Julien choix 2d) LES CONVERSATIONS LEBONCOIN ET VESTIAIRE DANS LA LOUPE ─────────────
+// « Leboncoin et Vestiaire à égalité avec Vinted » : leurs fils RANGÉS par l'extension (`lbc_fil_*`, `vc_fil_*` et la liste
+// `vc_messages`) entrent dans la recherche, comme les conversations Vinted : une entrée par (site, conversation), trouvée par
+// le titre de SON annonce et par SON N° — l'annonce reliée par IDENTITÉ (Leboncoin : l'annonce que la page dit, `annonce`,
+// puis son N° par `numLbc` ; Vestiaire : le produit du fil, puis le lien posé / la référence VRM), jamais par un titre.
+// Leboncoin ne dit pas qui écrit : aucun pseudo. Une lecture ratée (null) ⇒ null (la loupe dit « pas lus »), jamais [].
+//   lbcFils  [{ id: 'lbc_fil_{conv}', compte, da, annonce }] · lbcItems `lbc_listings.items` (null = pas lu : sans titre)
+//   vcFils   [{ id: 'vc_fil_{conv}', da, pid, ref }] · vcConvs `vc_messages.conversations` · vcLiens `vc_listings.liens`
+//   o.numLbc(ad, id) · o.numVc(pid, ref) · o.garder(site, compte) (comptes retirés)
+export function messagesAutresSitesPourRecherche({ lbcFils, lbcItems, vcFils, vcConvs, vcLiens } = {}, o = {}) {
+  if (!Array.isArray(lbcFils) && !Array.isArray(vcFils)) return null;
+  const garder = typeof o.garder === 'function' ? o.garder : () => true;
+  const out = [];
+  for (const r of Array.isArray(lbcFils) ? lbcFils : []) {
+    const m = /^lbc_fil_([\w-]{3,64})$/.exec(str(r && r.id));
+    if (!m) continue;
+    const compte = str(r.compte).replace(/^lbc-account:/, '');
+    if (!garder('leboncoin', compte)) continue;
+    const annonce = /^\d{6,12}$/.test(str(r.annonce)) ? str(r.annonce) : '';
+    const ad = annonce && lbcItems && typeof lbcItems === 'object' ? lbcItems[annonce] : null;
+    let numero = ''; try { numero = ad && typeof o.numLbc === 'function' ? str(o.numLbc(ad, annonce)) : ''; } catch (_) { numero = ''; }
+    out.push({ site: 'leboncoin', uid: compte, conv: m[1], tx: '', titre: ad ? str(ad.subject || ad.title) : '', pseudo: '', numero, annonce, date: str(r.da) });
+  }
+  const convs = vcConvs && typeof vcConvs === 'object' ? vcConvs : {};
+  const vus = new Set();
+  const vc = (conv, v, x) => {
+    if (!/^[\w-]{3,40}$/.test(conv) || vus.has(conv)) return;
+    const compte = str(v.compte);
+    if (!garder('vestiaire', compte)) return;
+    vus.add(conv);
+    const pid = str(v.productId || (x && x.pid));
+    const ref = str(v.ref || (x && x.ref));
+    let numero = ''; try { numero = typeof o.numVc === 'function' ? str(o.numVc(pid, ref, vcLiens || {})) : ''; } catch (_) { numero = ''; }
+    out.push({ site: 'vestiaire', uid: compte, conv, tx: '', titre: str(v.titre), pseudo: '', numero, annonce: pid, date: str((x && x.da) || v.date) });
+  };
+  for (const r of Array.isArray(vcFils) ? vcFils : []) { const m = /^vc_fil_([\w-]{3,40})$/.exec(str(r && r.id)); if (m) vc(m[1], convs[m[1]] || {}, r); }
+  for (const [conv, v] of Object.entries(convs)) if (v && typeof v === 'object') vc(conv, v, null);
+  return out;
+}
+
 // ── (9 nov.) LE CLAVIER DE LA LOUPE : où va la flèche ───────────────────────
 // n : nombre de lignes focalisables du panneau · i : la ligne qui a le focus (-1 =
 // le champ) · touche : 'ArrowDown' | 'ArrowUp' | 'Home' | 'End'. Rend l'indice

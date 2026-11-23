@@ -37,7 +37,10 @@ import { agregerDemarrage, CLE_MESURE_DEMARRAGE, CLE_MESURE_COUPEE } from '../..
 const NEUTRE = '00000000-0000-0000-0000-000000000000';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const cfg = (env) => ({ service: env.SUPABASE_SERVICE_KEY || '' });
-export const ETAPES_PN = ['bienvenue', 'plateformes', 'extension', 'comptes', 'numeros', 'historique', 'journee', 'abonnement'];
+// (20 nov.) Les six pages du parcours (src/parcoursNouveau/regle.js ETAPES_NOUVEAU) ; une position rangée avec
+// une étape du 15 nov. compte dans la page qui la remplace (la même table que ANCIENNES_ETAPES).
+export const ETAPES_PN = ['plateformes', 'extension', 'comptes', 'etiquetage', 'historique', 'pret'];
+const ANCIENNES_PN = { bienvenue: 'plateformes', numeros: 'etiquetage', journee: 'pret', abonnement: 'pret' };
 const STATUTS_PAYES = new Set(['active', 'past_due']);
 
 export const REQUETES = Object.freeze({
@@ -77,7 +80,7 @@ export function calculerParcours({ proprio, lu }) {
   const lignes = comptes.map((c) => {
     const ouvert = mains ? mains.has(c.id) : null;
     const pn = mains && mains.get(c.id);
-    const etape = pn ? (pn.fini === true ? 'fini' : (ETAPES_PN.includes(pn.etape) ? pn.etape : 'bienvenue')) : null;
+    const etape = pn ? (pn.fini === true ? 'fini' : (ETAPES_PN.includes(pn.etape) ? pn.etape : (ANCIENNES_PN[pn.etape] || 'plateformes'))) : null;
     const statut = abos ? (abos.get(c.id) || '') : null;
     return {
       semaine: semaineDe(c.cree),

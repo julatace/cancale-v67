@@ -161,6 +161,25 @@ export function lecturePeutPorterPrefixes(chemin, prefixes) {
 // Les préfixes déclarés par l'appelant d'une route (`init.vrmEcritLignes`), ou null.
 export const prefixesDeclares = (init) => (init && Array.isArray(init.vrmEcritLignes) && init.vrmEcritLignes.length && init.vrmEcritLignes.every((x) => typeof x === 'string' && x.length >= 4) ? init.vrmEcritLignes : null);
 
+// (22 nov., Julien : « je veux que tout soit beaucoup plus fluide ») LES LIGNES DES SITES — les annonces et commandes eBay,
+// Vestiaire, Leboncoin, et la liste des transactions — se relisaient à la chaîne à l'ouverture de Ma journée : mesuré au banc
+// fluidite-generale (390 tactile, CPU ×4, 4G, base au volume de la sienne), 219 lectures dont `ebay_listings` ×11 IDENTIQUES,
+// `lbc_ventes` (select=data, lourde) ×10, `vc_listings` ×9, `ebay_orders` ×8, `vinted_lbc_posted` ×7, `lbc_accounts` ×6 :
+// chaque écran, la cloche, le widget, l'agent les lisent chacun à son tour, plus de 2 s après le précédent. Ces lignes ne
+// changent que par une écriture (vidée ici, au départ et au retour) ou par l'extension (son signal `vrm:ext` vide tout) :
+// une lecture IDENTIQUE réussie leur sert donc `FENETRE_FOND_MS`, comme aux passages de fond. Le reste garde 2 s.
+const RE_LIGNE_SITE = /^(ebay_(listings|orders|programmees)(_[0-9a-f]{16})?|vc_(listings|ventes)|lbc_(ventes|accounts|listings|a_retirer)|vinted_lbc_posted)$/;
+export function ligneDeSite(chemin) {
+  const c = String(chemin || '');
+  const q = c.indexOf('?');
+  if ((q < 0 ? c : c.slice(0, q)) !== 'app_data') return false;
+  const f = filtresId(q < 0 ? '' : c.slice(q + 1));
+  if (!f || f.length !== 1) return false;
+  const v = f[0];
+  if (v.startsWith('eq.')) return RE_LIGNE_SITE.test(v.slice(3));
+  return v === 'like.harvest_%_txn_%' || v === 'like.harvest\\_%\\_txn\\_%';
+}
+
 // `fetchOrig` : la vraie fonction (injectable pour l'audit). Rend la fonction
 // qui la remplace, et `invalider`.
 export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
@@ -173,10 +192,17 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
   const cache = new Map();   // clé -> { gen, p, debut, fin }
   let gen = 0;
   const stats = { partagees: 0, parties: 0, get retenues() { return cache.size; } };
-  const invalider = () => { gen++; cache.clear(); };
+  // (20 nov., lectures-legeres) Ceux qui gardent une réponse plus longtemps (src/memoCourt.js) sont
+  // PRÉVENUS de chaque vidage — écriture vers la base ou une route, signal de l'extension. `abonner(chemin, f)` :
+  // `f()` est appelé quand une lecture de `chemin` (ce qui suit `/rest/v1/`) serait retirée du partage ; dans le
+  // doute (tout vidé), toujours.
+  const abonnes = new Set();
+  const prevenir = (touche) => { for (const a of abonnes) { try { if (!touche || touche(a.chemin)) a.f(); } catch (_) { try { a.f(); } catch (_e) {} } } };
+  const abonner = (chemin, f) => { if (typeof f !== 'function') return () => {}; const a = { chemin: String(chemin || ''), f }; abonnes.add(a); return () => abonnes.delete(a); };
+  const invalider = () => { gen++; cache.clear(); prevenir(null); };
   // Ne retire que les lectures qui peuvent porter l'une de ces lignes (une
   // lecture EN COURS retirée n'est plus resservie : `cache.get(cle) !== ent`).
-  const invaliderLignes = (ids) => { for (const k of [...cache.keys()]) if (lecturePeutPorter(k.slice(0, k.indexOf('\n')).slice(prefixe.length), ids)) cache.delete(k); };
+  const invaliderLignes = (ids) => { for (const k of [...cache.keys()]) if (lecturePeutPorter(k.slice(0, k.indexOf('\n')).slice(prefixe.length), ids)) cache.delete(k); prevenir((c) => lecturePeutPorter(c, ids)); };
   const origine = opts.origine != null ? opts.origine : (typeof location !== 'undefined' && location.origin ? location.origin : '');
   const estRouteApp = (u) => u.indexOf('/api/') === 0 || (!!origine && u.indexOf(origine + '/api/') === 0);
   const f = function (input, init) {
@@ -213,7 +239,7 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
       // harvest_*_orders_sold repartaient une seconde après.
       const pref = versRoute ? prefixesDeclares(init) : null;
       if (pref) {
-        const viderP = () => { for (const k of [...cache.keys()]) if (lecturePeutPorterPrefixes(k.slice(0, k.indexOf('\n')).slice(prefixe.length), pref)) cache.delete(k); };
+        const viderP = () => { for (const k of [...cache.keys()]) if (lecturePeutPorterPrefixes(k.slice(0, k.indexOf('\n')).slice(prefixe.length), pref)) cache.delete(k); prevenir((c) => lecturePeutPorterPrefixes(c, pref)); };
         viderP();
         const p = fetchOrig(input, init);
         Promise.resolve(p).then(viderP, viderP);
@@ -234,7 +260,8 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
       Promise.resolve(p).then(vider, vider);
       return p;
     }
-    if (requete || init && (init.signal || init.body != null || (init.cache && init.cache !== 'default'))) return fetchOrig(input, init);
+    // (22 nov.) Le signal posé par la borne des lectures (src/lectureBornee.js, `vrmBorne`) n'est pas celui d'un appelant : partagé.
+    if (requete || init && ((init.signal && init.vrmBorne !== true) || init.body != null || (init.cache && init.cache !== 'default'))) return fetchOrig(input, init);
     // Une requête pendue ne doit pas retenir sa réponse et ses en-têtes à vie.
     const date = maintenant();
     for (const [k, v] of cache)
@@ -242,7 +269,7 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
     const h = init && init.headers;
     const cle = url + '\n' + ENTETES_CLE.map((n) => lireEntete(h, n)).join('\n');
     const e = cache.get(cle);
-    const accepte = init && init.vrmFond === true ? fenetreFond : fenetre;
+    const accepte = (init && init.vrmFond === true) || ligneDeSite(url.slice(prefixe.length)) ? fenetreFond : fenetre;
     if (e && e.gen === gen && (e.fin == null ? maintenant() - e.debut < volMax : maintenant() - e.fin < accepte)) {
       stats.partagees++;
       return e.p.then((r) => r.clone());
@@ -263,7 +290,7 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
     }, () => { if (cache.get(cle) === ent) cache.delete(cle); });
     return p.then((r) => r.clone());
   };
-  return { fetch: f, invalider, stats };
+  return { fetch: f, invalider, stats, abonner };
 }
 
 // Installe la règle sur `window.fetch`, une fois.

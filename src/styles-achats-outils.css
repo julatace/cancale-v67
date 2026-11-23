@@ -5,12 +5,12 @@
 .vrm-aso-outils { display: flex; gap: 8px; margin: 0 0 14px; }
 .vrm-aso-outil {
   flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 0 12px; border: 0; border-radius: 999px; cursor: pointer;
-  background: var(--fu-carte, #fff); color: var(--fu-encre, #1d1d1f); box-shadow: var(--fu-ombre);
+  background: var(--fu-carte, #fff); color: var(--fu-encre, #1d1d1f); box-shadow: none;
   font: inherit; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
 }
 .vrm-aso-outil span { overflow: hidden; text-overflow: ellipsis; }
 .vrm-aso-outil small { font-size: 13px; font-weight: 600; color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
-.vrm-aso-outil:focus-visible, .vrm-aso-seg button:focus-visible, .vrm-aso-num:focus-visible, .vrm-aso-choisir:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 2px; }
+.vrm-aso-outil:focus-visible, .vrm-aso-seg button:focus-visible, .vrm-aso-num:focus-visible, .vrm-aso-choisir:focus-visible { outline: 2px solid var(--fu-bleu, #16181D); outline-offset: 2px; }
 
 .vrm-aso-feuille { max-width: 560px; }
 .vrm-aso-seg { display: flex; gap: 4px; padding: 3px; margin: 0 0 12px; background: var(--fu-piste, #e5e5ea); border-radius: 12px; overflow-x: auto; scrollbar-width: none; }
@@ -24,7 +24,7 @@
 
 .vrm-aso-couv { margin: 0 4px 12px; font-size: 13px; color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; line-height: 1.45; }
 .vrm-aso-bloc { white-space: nowrap; }
-.vrm-aso-liste { list-style: none; margin: 0 0 12px; padding: 0 12px; background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre); }
+.vrm-aso-liste { list-style: none; margin: 0 0 12px; padding: 0 12px; background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: none; }
 .vrm-aso-ligne { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; min-height: 60px; box-sizing: border-box; }
 .vrm-aso-ligne + .vrm-aso-ligne { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
 .vrm-aso-ligne.is-achat { grid-template-columns: 48px minmax(0, 1fr) auto; }
@@ -45,7 +45,7 @@
 .vrm-aso-sous .vrm-aso-num { min-height: 0; }
 .vrm-aso-sous-feuille { grid-column: 1 / -1; }
 
-.vrm-aso-carte { background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre); padding: 16px; margin: 0 0 16px; }
+.vrm-aso-carte { background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: none; padding: 16px; margin: 0 0 16px; }
 .vrm-aso-grand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .vrm-aso-grand b { font-size: 38px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
 .vrm-aso-grand span { font-size: 15px; color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
@@ -82,8 +82,8 @@
 /* ── (5 nov.) FOURNISSEURS : les personnes qu'il crée (src/fournisseurs.js) ──
    Même échelle Fusion ; l'ambre seulement pour un prix saisi à la main qui
    diffère de la part (un geste à faire : le garder ou le remplacer). */
-.vrm-fo-retour { all: unset; box-sizing: border-box; min-height: 44px; display: inline-flex; align-items: center; margin: 0 0 8px; padding: 0 4px; cursor: pointer; font-size: 15px; font-weight: 600; color: var(--fu-bleu, #0071e3); }
-.vrm-fo-retour:focus-visible, .vrm-fo-ouvrir:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 2px; }
+.vrm-fo-retour { all: unset; box-sizing: border-box; min-height: 44px; display: inline-flex; align-items: center; margin: 0 0 8px; padding: 0 4px; cursor: pointer; font-size: 15px; font-weight: 600; color: var(--fu-bleu, #16181D); }
+.vrm-fo-retour:focus-visible, .vrm-fo-ouvrir:focus-visible { outline: 2px solid var(--fu-bleu, #16181D); outline-offset: 2px; }
 .vrm-fo-vide { margin: 4px 4px 16px; font-size: 17px; line-height: 1.4; color: var(--fu-encre, #1d1d1f); }
 .vrm-aso-choisir.vrm-fo-ouvrir { grid-template-columns: minmax(0, 1fr) auto; }
 .vrm-fo-chevron { font-size: 22px; font-weight: 600; color: var(--fu-gris3, #aeaeb2); padding: 0 4px; }
@@ -94,9 +94,9 @@
   width: 100%; min-width: 0; min-height: 44px; box-sizing: border-box; border: 0; border-radius: 12px; padding: 10px 12px;
   background: var(--fu-case, #f2f2f7); color: var(--fu-encre, #1d1d1f); font: inherit; font-size: 17px; resize: vertical;
 }
-.vrm-fo-champ input:focus-visible, .vrm-fo-champ textarea:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 1px; }
+.vrm-fo-champ input:focus-visible, .vrm-fo-champ textarea:focus-visible { outline: 2px solid var(--fu-bleu, #16181D); outline-offset: 1px; }
 .vrm-fo-contact { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: baseline; }
-.vrm-fo-contact a { color: var(--fu-bleu, #0071e3); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.vrm-fo-contact a { color: var(--fu-bleu, #16181D); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
 .vrm-fo-note { flex-basis: 100%; white-space: pre-wrap; color: var(--fu-encre, #1d1d1f); }
 .vrm-fo-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
 .vrm-fo-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }

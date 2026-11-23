@@ -15,6 +15,8 @@ import { tr, langueCourante } from './i18n/index.js';
 import { alertesSeuils, alertesADire, texteSeuil } from './alertesSeuils.js';
 import { attrCible } from './cibleNotif.js';
 import './argent-plus-2.css';
+import { Carte, Rangee, Bouton } from './natif/index.js';
+import './natif/ecrans/argent.css';
 
 export function AlertesSeuils({ ligne, regime, activite = 'vente', vues, onCompris, now = null }) {
   // Tant que le registre n'est pas lu, on ne montre rien (une alerte déjà comprise ne doit pas clignoter).
@@ -24,26 +26,21 @@ export function AlertesSeuils({ ligne, regime, activite = 'vente', vues, onCompr
   }, [ligne, regime, activite, vues, now]);
   if (!liste.length) return null;
   const l = langueCourante();
+  // (20 nov., lot argent-natif) Au style natif §2 bis : UNE carte à filet, une rangée par seuil (le nom, où il en est en une
+  // ligne grise, la source en lien discret sous la ligne), « Compris » en bouton texte à droite. La phrase officielle n'est
+  // plus un paragraphe permanent : elle est le titre (survol, lecteur d'écran) du lien vers le texte officiel.
   return (
-    <section className="vrm-surface vrm-seuils-alertes" data-alertes-seuils={liste.length} data-cible={attrCible(['seuils'])} aria-label={tr('argentPlus.seuils.titre')}>
-      <div className="vrm-seuils-int">
-      <h2 className="vrm-seuils-titre">{tr('argentPlus.seuils.titre')}</h2>
+    <Carte titre={tr('argentPlus.seuils.titre')} className="vrm-seuils-alertes n-arg-seuils" attrs={{ 'data-alertes-seuils': liste.length, 'data-cible': attrCible(['seuils']), 'aria-label': tr('argentPlus.seuils.titre') }}>
       {liste.map((a) => {
         const t = texteSeuil(a, l);
         return (
-          <article key={a.cle} className="vrm-seuils-une" data-seuil={a.seuil} data-seuil-palier={a.palier} data-seuil-cle={a.cle} data-seuil-plateforme={a.plateforme || undefined} data-au-moins={a.auMoins ? '1' : undefined}>
-            <div className="vrm-seuils-texte">
-              <b className="vrm-seuils-nom">{t.titre}</b>
-              <span className="vrm-seuils-ou" data-seuil-ou="">{t.ou}</span>
-              <p className="vrm-seuils-phrase">{t.phrase}</p>
-              <a className="vrm-seuils-source" href={t.url} target="_blank" rel="noopener noreferrer" data-seuil-source={a.source ? a.source.url : ''}>{t.source}</a>
-            </div>
-            <button type="button" className="sb-touche vrm-seuils-compris" data-seuil-compris={a.cle} onClick={() => onCompris && onCompris(a.marquer)}>{tr('argentPlus.seuils.compris')}</button>
-          </article>
+          <Rangee key={a.cle} titre={t.titre} sousTitre={t.ou} sousLignes={2}
+            note={<a className="n-arg-lien" href={t.url} target="_blank" rel="noopener noreferrer" title={t.phrase} data-seuil-source={a.source ? a.source.url : ''}>{t.source}<span className="n-lu-seul"> — {t.phrase}</span></a>}
+            fin={<Bouton variante="texte" onClick={() => onCompris && onCompris(a.marquer)} attrs={{ 'data-seuil-compris': a.cle }}>{tr('argentPlus.seuils.compris')}</Bouton>}
+            attrs={{ 'data-seuil': a.seuil, 'data-seuil-palier': a.palier, 'data-seuil-cle': a.cle, 'data-seuil-plateforme': a.plateforme || undefined, 'data-au-moins': a.auMoins ? '1' : undefined }}/>
         );
       })}
-      </div>
-    </section>
+    </Carte>
   );
 }
 export default AlertesSeuils;

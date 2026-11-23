@@ -19,6 +19,7 @@
 //   node scripts/audit-publier-partout.cjs --prouve        chaque mutation doit rougir
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
@@ -58,7 +59,7 @@ const MUTATIONS = {
   'params-sync-oublie': ['app', "  'vrm_partout_params',\n", ''],
   // (11 nov. soir) « un prix modifié dans VRM change partout »
   'prix-sans-ajustement': ['prix', "return r ? prixPourSite(n, r) : n;", 'return n;'],
-  'vinted-envoye': ['prix', "dire(s.cle, { etat: 'propose', raison: null, prix: cible, avant: s.prix }); continue;", "if (typeof envoyer.vinted === 'function') { await envoyer.vinted(s, cible); } dire(s.cle, { etat: 'fait', prix: cible }); continue;"],
+  'vinted-propose': ['prix', "    if (s.mode === 'ext' && s.prix != null && cible > s.prix) {", "    if (s.mode === 'ext' && s.site === 'vinted') { dire(s.cle, { etat: 'propose', raison: null, prix: cible, avant: s.prix }); continue; }\n    if (s.mode === 'ext' && s.prix != null && cible > s.prix) {"],
   'relu-ignore': ['prix', "if (etat === 'fait' && relu != null && Math.round(relu * 100) !== Math.round(cible * 100))", 'if (false)'],
   'prix-reglage-oublie': ['app', "envoyer: ENVOIS_PRIX, surEtat, reglage: reglageP });", 'envoyer: ENVOIS_PRIX, surEtat });'],
 };
@@ -273,7 +274,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
     await essaie('J', async () => {
       console.log('── J. un prix modifié dans VRM change partout');
       const sites = [
-        { cle: 'vinted:1', site: 'vinted', id: '1', compte: '111', prix: 60, mode: 'propose' },
+        { cle: 'vinted:1', site: 'vinted', id: '1', compte: '111', prix: 60, mode: 'ext' },   // (19 nov.) par l'extension, plus « proposé »
         { cle: 'ebay:2', site: 'ebay', id: '2', prix: 60, mode: 'app' },
         { cle: 'leboncoin:3', site: 'leboncoin', id: '3', prix: 60, mode: 'site' },
         { cle: 'vestiaire:4', site: 'vestiaire', id: '4', prix: 60, mode: 'site' },
@@ -281,9 +282,12 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
       const appels = [];
       const envoyer = { vinted: async (s, p) => { appels.push(['vinted', p]); return { etat: 'fait' }; }, ebay: async (s, p) => { appels.push(['ebay', p]); return { etat: 'fait', prixRelu: p }; } };
       const r = await X.appliquerPrix({ sites, coches: new Set(sites.map((x) => x.cle)), prix: '50', envoyer, reglage: { ebay: { mode: 'eur', valeur: 5 }, leboncoin: { mode: 'pct', valeur: 10 } } });
-      dit(appels.length === 1 && appels[0][0] === 'ebay' && appels[0][1] === 55, 'J1 eBay reçoit SON ajustement (+5 € ⇒ 55 €) ; rien d\'autre n\'est envoyé d\'ici', appels);
+      const ae = appels.filter((a) => a[0] === 'ebay'), av = appels.filter((a) => a[0] === 'vinted');
+      dit(appels.length === 2 && ae.length === 1 && ae[0][1] === 55, 'J1 eBay reçoit SON ajustement (+5 € ⇒ 55 €) ; Leboncoin / Vestiaire en mode « site » ne sont jamais envoyés', appels);
       dit(r.res['ebay:2'].etat === 'fait' && r.res['ebay:2'].relu === true, 'J2 eBay relu après, au prix demandé', r.res['ebay:2']);
-      dit(r.res['vinted:1'].etat === 'propose' && r.res['vinted:1'].prix === 50, 'J3 Vinted : PROPOSÉ (son clic dans « Baisser le prix »), jamais envoyé', r.res['vinted:1']);
+      // (19 nov., décision de Julien : « c'est à l'extension de baisser les prix, c'est pas à moi ») « Appliquer » est SON clic :
+      // la baisse Vinted part UNE fois par l'envoi de l'extension, au prix tapé ; plus d'état « proposé » (audit-prix-attente.cjs).
+      dit(av.length === 1 && av[0][1] === 50 && r.res['vinted:1'].etat === 'fait' && r.res['vinted:1'].prix === 50, 'J3 Vinted (19 nov.) : la baisse PART sur « Appliquer », une fois, au prix tapé — plus de « proposé »', r.res['vinted:1']);
       dit(r.res['leboncoin:3'].etat === 'a-faire' && r.res['leboncoin:3'].prix === 55 && r.res['vestiaire:4'].prix === 50, 'J4 Leboncoin / Vestiaire : « à faire sur le site » avec LE prix à mettre (+10 % ⇒ 55 € ; Vestiaire = le prix tapé)', [r.res['leboncoin:3'], r.res['vestiaire:4']]);
       const r2 = await X.appliquerPrix({ sites, coches: new Set(['ebay:2']), prix: '50', envoyer: { ebay: async () => ({ etat: 'fait', prixRelu: 60 }) } });
       dit(r2.res['ebay:2'].etat === 'incertain', 'J5 eBay relu à un autre prix ⇒ « pas sûr », jamais « fait »', r2.res['ebay:2']);
@@ -295,7 +299,9 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
   const i = app.indexOf('function HotePublierPartout(');
   const hote = i >= 0 ? app.slice(i, app.indexOf('\n}\n', i)) : '';
   dit(!!hote, 'G1 l\'hôte HotePublierPartout existe');
-  dit(/cmd: 'lbcPublier'/.test(hote) && /valideAnnonceLbc\(/.test(hote) && /cmd: 'vcPreparer'/.test(hote) && /preparerBrouillonPartout/.test(hote), 'G2 chaque site par SA voie (lbcPublier + fiche, vcPreparer, brouillon eBay)');
+  // (20 nov., décision de Julien) Leboncoin et Vestiaire se publient dans le PANNEAU de l'extension (« Publier dans l'extension » sur
+  // leur case, src/PublierPartout.jsx) ; eBay garde sa voie (brouillon par l'API serveur).
+  dit(/leboncoin: refusSite,/.test(hote) && /vestiaire: refusSite,/.test(hote) && !/cmd: 'lbcPublier'|cmd: 'vcPreparer'/.test(hote) && /preparerBrouillonPartout/.test(hote), 'G2 (20 nov.) eBay par SA voie ; Leboncoin / Vestiaire : rien ne part d’ici (panneau de l’extension)');
   dit(!/action: 'publish'/.test(hote) && !/supprim|lbcSupprime/.test(hote), 'G3 l\'hôte ne publie rien sur eBay et ne supprime rien');
   dit(/raisonExtGlobale\(sansSouris, \{ cap: 'publication'/.test(hote) && /cap: 'vcpublier'/.test(hote), 'G4 les gardes d\'extension des voies (publication, vcpublier)');
   dit(/sitesPrixDe\(/.test(hote) && /enLigneSur\(/.test(hote), 'G5 « déjà en ligne » par sitesDuNumero (identité)');
@@ -310,8 +316,8 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
   dit(/\{ k: 'partout',/.test(src.actions || '') && /k==='partout'/.test(app), 'G11 en série : Annonces → Actions → « Publier partout… »');
   dit(/aussiSur\(\{ lbc:/.test(app) && /vcNumsAnn\.has\(cleNum\(num\)\)/.test(app), 'G12 pastilles « aussi sur » Leboncoin · eBay · Vestiaire sur l\'annonce');
   dit(/'vrm_partout_params',/.test(src.app || '') && /onParamAnnonce=/.test(hote) && /reglageParams\(/.test(hote), 'G13 les paramètres par défaut synchronisés, et par annonce');
-  dit(/publier: !finir && extSait\('vcauto'\) === 'ok'/.test(hote), 'G14 Vestiaire à finir ⇒ le dépôt s\'ouvre sans publier tout seul');
-  dit(/prixDe=\{\(site, p\)=>prixParSite\(site, p, reglageP\)\}/.test(app) && /reglage: reglageP \}\)/.test(app) && /<BaissePrixSerie annonces=\{baisseCoque\.annonces\} baisseInitiale=/.test(app), 'G16 « Changer le prix » : ajustement par site, Vinted proposé dans « Baisser le prix »');
+  dit(/<BoutonExtension className="vrm-ao-second" action="publier" site=\{x\.site\} ids=\{\[String\(l\.id\)\]\}/.test(fs.readFileSync(path.join(RACINE, 'src', 'PublierPartout.jsx'), 'utf8')), 'G14 (20 nov.) Leboncoin / Vestiaire : la case ouvre « Publier dans l’extension » sur CETTE annonce Vinted');
+  dit(/prixDe=\{\(site, p\) => prixParSite\(site, p, reglageP\)\}/.test(app) && /reglage: reglageP(?:, gardeConfirme)? \}\)/.test(app)   /* (22 nov.) + la confirmation de la garde du prix (5.432) */ && !/baisseCoque/.test(app) && /envoyer: envoisPrixVrm\(/.test(app), 'G16 « Changer le prix » : ajustement par site ; (19 nov.) Vinted part par l\'extension sur « Appliquer », la feuille « Baisser le prix » n\'est plus ouverte par-dessus');
   dit(/suiviPourPartout\(await chargerSuivi\(\)/.test(hote) && /doitSArreter: sv \? sv\.doitSArreter/.test(hote), 'G15 le suivi commun (SuiviTravail) branché, avec Pause / Arrêter');
 
   console.log(`\n${n - ko}/${n} vérifications vertes.`);

@@ -56,15 +56,14 @@
   --d-filet: rgba(60,60,67,.18);          /* le séparateur d'iOS, .5 px */
   --d-encre: #1D1D1F;
   --d-gris: #6E6E73;                      /* 4,5:1 sur le fond, 5:1 sur blanc */
-  --d-accent: var(--vrm-accent, #0071E3);
-  --d-accent-texte: var(--vrm-accent-texte, #0066CC);
+  --d-accent: var(--vrm-accent, #16181D);
+  --d-accent-texte: var(--vrm-accent-texte, #16181D);
   --d-ambre: var(--vrm-warn, #B25000);
   --d-point-ambre: #FF9F0A;               /* le point d'un geste (jamais un texte) */
   --d-defile: rgba(60,60,67,.28);         /* le pouce d'une barre de défilement */
 
   /* Ombres — toujours un décalage ET un flou ; deux couches (contact + diffusion). */
-  --d-ombre-carte: 0 .5px 1px rgba(0,0,0,.04), 0 4px 18px -6px rgba(0,0,0,.08);
-  --d-ombre-levee: 0 1px 2px rgba(0,0,0,.05), 0 10px 28px -8px rgba(0,0,0,.14);
+  --d-ombre-carte: 0 .5px 1px rgba(0,0,0,.04), 0 4px 18px -6px rgba(0,0,0,.08); 
   --d-ombre-flottant: 0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14);
 
   /* Mouvement — 150 à 250 ms, une sortie franche ; rien de tout ça en mouvement réduit. */
@@ -78,7 +77,7 @@
   --vrm-t34: var(--d-t-34); --vrm-t28: var(--d-t-28); --vrm-t22: var(--d-t-22); --vrm-t17: var(--d-t-17); --vrm-t15: var(--d-t-15); --vrm-t13: var(--d-t-13); --vrm-t11: var(--d-t-11);
   --r-num: var(--d-r-num); --r-ctrl: var(--d-r-ctrl); --r-case: var(--d-r-case); --r-carte: var(--d-r-carte); --r-sombre: var(--d-r-sombre); --r-pilule: var(--d-r-pilule);
   --fu-r-carte: var(--d-r-carte); --fu-r-sombre: var(--d-r-sombre); --fu-r-photo: var(--d-r-case);
-  --o-carte: var(--d-ombre-carte); --fu-ombre: var(--d-ombre-carte); --vrm-ombre-carte: var(--d-ombre-carte);
+  --o-carte: var(--d-ombre-carte); --fu-ombre: none; --vrm-ombre-carte: none;
   --o-flottant: var(--d-ombre-flottant);
   --vrm-sortie: var(--d-sortie); --vrm-ressort: var(--d-tiroir);
   --fu-remplir: var(--d-remplir); --fu-remplir-fort: var(--d-remplir-fort);
@@ -96,8 +95,7 @@
   --d-gris: #98989D;
   --d-point-ambre: #FF9F0A;
   --d-defile: rgba(235,235,245,.28);
-  --d-ombre-carte: 0 0 0 .5px rgba(255,255,255,.06);
-  --d-ombre-levee: 0 0 0 .5px rgba(255,255,255,.08), 0 12px 32px -8px rgba(0,0,0,.6);
+  --d-ombre-carte: 0 0 0 .5px rgba(255,255,255,.06); 
   --d-ombre-flottant: 0 0 0 .5px rgba(255,255,255,.08), 0 24px 56px rgba(0,0,0,.6);
 }
 
@@ -109,7 +107,7 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 :root { caret-color: var(--d-accent); accent-color: var(--d-accent); }
 /* La sélection : le bleu à 22 %, le texte reste à l'encre (lisible le jour comme la nuit). */
 :root body ::selection { background: color-mix(in srgb, var(--d-accent) 24%, transparent); color: inherit; }
-:root[data-theme="dark"] body ::selection { background: color-mix(in srgb, #0A84FF 42%, transparent); }
+:root[data-theme="dark"] body ::selection { background: color-mix(in srgb, #16181D 42%, transparent); }
 /* Les barres de défilement : fines, neutres, sans gouttière blanche sur le fond gris
    (Chrome sous Windows dessinait des barres grises épaisses dans les colonnes). */
 * { scrollbar-color: var(--d-defile) transparent; }
@@ -207,12 +205,12 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
    en « spezial… » sur une ligne : c'est le nom de la paire qu'on cherche des yeux. En 15/600,
    comme une rangée de « À retirer » : la même paire s'écrit pareil dans les trois onglets
    (en 17, « New Balance 550 taille 43 » ne tenait pas sur deux lignes à côté de ses gestes). */
-:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-titre {
+:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-titre {
   -webkit-line-clamp: 2 !important; line-clamp: 2; font-size: var(--d-t-15) !important; font-weight: 600 !important; line-height: 1.3 !important; letter-spacing: var(--d-ap-15) !important;
   overflow-wrap: break-word !important; hyphens: manual;
 }
-:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte [data-colis-dates] { font-size: var(--d-t-13) !important; font-weight: 400 !important; color: var(--d-gris); }
-:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte [data-colis-limite-texte] { font-weight: 600 !important; }
+:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte [data-colis-dates] { font-size: var(--d-t-13) !important; font-weight: 400 !important; color: var(--d-gris); }
+:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte [data-colis-limite-texte] { font-weight: 600 !important; }
 /* La vignette : un carré de 60, rayon 14 — et le LOGO DU TRANSPORTEUR posé dans son
    coin (comme le badge d'une app) quand il est LU ; rien lu, rien posé (jamais deviné). */
 :root:root body .vrm-app-shell .vrm-main .vrm-colis-carte .vrm-colis-photo { position: relative; overflow: visible !important; }
@@ -230,11 +228,11 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 .vrm-rpf-vignette > .vrm-colis-logo-transp > [data-transporteur-logo] { width: 18px !important; height: 18px !important; border-radius: var(--d-r-num) !important; }
 .vrm-rpf-vignette > :is(img, picture) { border-radius: inherit; }
 /* La vignette sans photo : un dessin à peine visible, pas un cadre. */
-:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-photo:not(:has(img)) { background: var(--d-case) !important; }
+:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-photo:not(:has(img)) { background: var(--d-case) !important; }
 
 /* 5.3 La frise : posée seulement quand une étape est faite (src/App.jsx). Son mot est
    en 12, le trait en 4 px — elle informe, elle ne pèse pas. */
-:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte > .vrm-colis-frise { margin-top: var(--d-e-3) !important; }
+:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte > .vrm-colis-frise { margin-top: var(--d-e-3) !important; }
 
 /* 5.4 L'en-tête d'un groupe (« Mondial Relay · 4 colis ») : 17/600, le logo en tuile. */
 :root:root body .vrm-app-shell .vrm-main .vrm-fu-groupe-transp { padding: var(--d-e-5) 4px var(--d-e-1); }
@@ -244,24 +242,24 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 /* 5.5 L'ordinateur : chaque colis est une RANGÉE (photo · titre et limite · frise ·
    gestes) au lieu d'une carte étirée sur 1 200 px dont la frise traversait l'écran. */
 @media (min-width: 1024px) {
-  :root:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):has(> .vrm-colis-frise) {
+  :root:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):has(> .vrm-colis-frise) {
     display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); column-gap: var(--d-e-6); align-items: center;
     padding: var(--d-e-3) 72px var(--d-e-3) var(--d-e-4) !important;
   }
-  :root:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):has(> .vrm-colis-frise) > :first-child { grid-column: 1; padding-right: 0 !important; }
-  :root:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > .vrm-colis-frise { grid-column: 2; grid-row: 1; margin: 0 !important; }
-  :root:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > .vrm-colis-actions { grid-column: 1 / -1; margin-top: 0 !important; }
-  :root:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > .vrm-colis-actions:not(:has(> :not(.vrm-rangee-bord))) { height: 0; }
-  :root:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-colis-actions > .vrm-rangee-bord { top: 50% !important; transform: translateY(-50%); }
-  :root:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-grille { gap: var(--d-e-2) !important; }
+  :root:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):has(> .vrm-colis-frise) > :first-child { grid-column: 1; padding-right: 0 !important; }
+  :root:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > .vrm-colis-frise { grid-column: 2; grid-row: 1; margin: 0 !important; }
+  :root:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > .vrm-colis-actions { grid-column: 1 / -1; margin-top: 0 !important; }
+  :root:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > .vrm-colis-actions:not(:has(> :not(.vrm-rangee-bord))) { height: 0; }
+  :root:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-colis-actions > .vrm-rangee-bord { top: 50% !important; transform: translateY(-50%); }
+  :root:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-grille { gap: var(--d-e-2) !important; }
   /* « Envoyés » : la même rangée — photo · titre et état · frise · « Suivre » / « Pas encore déposé ». */
-  :root:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye:has(> .vrm-colis-frise) {
+  :root:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye:has(> .vrm-colis-frise) {
     display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px) 176px; column-gap: var(--d-e-6); align-items: center;
     padding: var(--d-e-3) var(--d-e-4) !important;
   }
-  :root:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye > :first-child { grid-column: 1; }
-  :root:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye > .vrm-colis-frise { grid-column: 2; grid-row: 1; margin: 0 !important; }
-  :root:root:root body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye > .vrm-colis-actions { grid-column: 3; grid-row: 1; justify-self: end; margin: 0 !important; flex-wrap: nowrap !important; }
+  :root:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye > :first-child { grid-column: 1; }
+  :root:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye > .vrm-colis-frise { grid-column: 2; grid-row: 1; margin: 0 !important; }
+  :root:root:root body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye > .vrm-colis-actions { grid-column: 3; grid-row: 1; justify-self: end; margin: 0 !important; flex-wrap: nowrap !important; }
   /* (la 3e colonne est TOUJOURS réservée : les frises de toutes les rangées tombent l'une sous l'autre) */
   /* La carte sombre « Aujourd'hui » : le grand chiffre à gauche, ses cases à droite, sur
      une bande — elle occupait 250 px de haut pour quatre nombres. */
@@ -545,7 +543,7 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
    lecture vide n'est plus une grande carte blanche à l'ordinateur — Mail laisse
    le fond, un dessin et une phrase grise, rien d'autre. */
 :root:root body .vrm-boite, :root:root body .vrm-boite-feuille {
-  --bx-carte: var(--d-carte); --bx-ombre: var(--d-ombre-carte); --bx-doux: var(--d-gris); --bx-encre: var(--d-encre);
+  --bx-carte: var(--d-carte); --bx-ombre: none; --bx-doux: var(--d-gris); --bx-encre: var(--d-encre);
 }
 :root:root body .vrm-app-shell .vrm-main .vrm-boite-vide-lecture { background: transparent !important; box-shadow: none !important; padding-top: 120px !important; }
 :root:root body .vrm-app-shell .vrm-main .vrm-boite-vide-lecture p { font-size: var(--d-t-15) !important; color: var(--d-gris) !important; }
@@ -720,8 +718,9 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
   position: relative; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: var(--d-carte) !important;
   min-height: 60px !important; padding: 10px var(--d-e-4) !important; gap: var(--d-e-3) !important;
 }
-:root:root body .vrm-app-shell :not(.vrm-recherche-ligne) + .vrm-recherche-ligne { border-top-left-radius: var(--d-r-carte) !important; border-top-right-radius: var(--d-r-carte) !important; }
-:root:root body .vrm-app-shell .vrm-recherche-ligne:not(:has(+ .vrm-recherche-ligne)) { border-bottom-left-radius: var(--d-r-carte) !important; border-bottom-right-radius: var(--d-r-carte) !important; margin-bottom: var(--d-e-3) !important; }
+/* (21 nov., prio-recherche — Julien : « des rangées fines séparées par un filet, pas de cartes arrondies ») plus de coins
+   arrondis aux extrémités d'un groupe : une liste à plat, le dernier résultat garde son espace dessous. */
+:root:root body .vrm-app-shell .vrm-recherche-ligne:not(:has(+ .vrm-recherche-ligne)) { margin-bottom: var(--d-e-3) !important; }
 :root:root body .vrm-app-shell .vrm-recherche-ligne + .vrm-recherche-ligne::before {
   content: ''; position: absolute; top: 0; left: 64px; right: 0; height: .5px; background: var(--d-filet); pointer-events: none;
 }

@@ -2,7 +2,8 @@ require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  Banc — l'écran E-mails, DENSE comme Mail sur Mac (11 nov., lot emails-ecran)
 //  Julien : « les mails doivent être retravaillés, je n'aime pas trop, surtout
-//  sur ordi : tout fait trop gros ».
+//  sur ordi : tout fait trop gros ». (19 nov., lot emails-mail) Réécrit sur l'écran « comme Mail » : sans sélection
+//  la liste prend toute la place, le code de retrait est EN GRAND (demande du 19 nov.), deux volets à l'ouverture.
 //
 //  Ce banc MESURE les tailles RENDUES (taille calculée × zoom effectif : au
 //  téléphone, `.vrm-main` est à 80 %), à 1512×950 et 1280×800 (souris) et à
@@ -73,7 +74,7 @@ async function ouvrir(nav, base, route, { viewport, tactile, sombre }) {
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push('page: ' + e.message));
   // « Blocked script execution in 'about:srcdoc' » : le script d'initialisation du BANC, bloqué par le `sandbox` du cadre (voulu).
   pg.on('console', (m) => { if (/Blocked script execution in 'about:srcdoc'/.test(m.text())) return; if (m.type() === 'error' && !/Failed to load resource|net::ERR|favicon/i.test(m.text())) erreurs.push('console: ' + m.text().slice(0, 200)); });
-  await pg.addInitScript(([s, sombre]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_bienvenue_vue', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); } catch (_) {} }, [SESSION, sombre]);
+  await pg.addInitScript(([s, sombre]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_bienvenue_vue', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_banc_dom_ancien'); } catch (_) {} }, [SESSION, sombre]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   await pg.route('**/rest/v1/**', (r) => (r.request().method() !== 'GET' ? r.fulfill({ status: 201, body: '' }) : r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: '[]' })));
@@ -99,40 +100,29 @@ async function ouvrir(nav, base, route, { viewport, tactile, sombre }) {
 }
 
 // ── Les mesures de la LISTE (tailles rendues = calculée × zoom effectif) ─────
+// (19 nov., lot emails-mail) Sur l'écran « comme Mail » (classes `n-mail-*`) : la ligne = expéditeur, sujet, ce que VRM
+// a compris, date ; sans sélection la liste prend toute la place, un e-mail ouvert ⇒ deux volets.
 const mesurerListe = (pg) => pg.evaluate(() => {
   const z = (n) => (n && typeof n.currentCSSZoom === 'number' ? n.currentCSSZoom : 1);
   const px = (n, p = 'fontSize') => (n ? Math.round(parseFloat(getComputedStyle(n)[p]) * z(n) * 10) / 10 : null);
   const r = (n) => (n ? n.getBoundingClientRect() : null);
   const vh = window.innerHeight, vw = window.innerWidth;
   const h1 = [...document.querySelectorAll('.vrm-main h1')].find((n) => n.getBoundingClientRect().height > 0);
-  window.__h1 = h1 ? [h1.className, h1.parentElement.className, h1.textContent.slice(0, 20)].join(' | ') : '';
-  const lignes = [...document.querySelectorAll('.vrm-boite-ligne[data-boite-email]')].filter((n) => r(n).height > 0);
+  const lignes = [...document.querySelectorAll('.n-mail-ligne[data-boite-email]')].filter((n) => r(n).height > 0);
   const hauteurs = lignes.slice(0, 16).map((n) => r(n).height).sort((a, b) => a - b);
   const med = hauteurs.length ? Math.round(hauteurs[Math.floor(hauteurs.length / 2)]) : null;
-  // Une ligne est « visible » si elle tient ENTIÈRE dans la fenêtre (et dans sa colonne).
-  const col = document.querySelector('.vrm-boite-liste-col');
-  const bas = Math.min(vh, col ? r(col).bottom : vh);
-  const nav = document.querySelector('.vrm-nav-bas,.vrm-tabbar,nav[aria-label*="avigation"]');
-  const visibles = lignes.filter((n) => { const b = r(n); return b.top >= 0 && b.bottom <= bas + 0.5; }).length;
-  const quoi = document.querySelector('.vrm-boite-ligne[data-boite-email] .vrm-boite-quoi');
-  const ess = document.querySelector('.vrm-boite-ligne[data-boite-email] .vrm-boite-essentiel');
-  const pied = document.querySelector('.vrm-boite-ligne[data-boite-email] .vrm-boite-ligne-pied');
-  const heure = document.querySelector('.vrm-boite-ligne[data-boite-email] .vrm-boite-ligne-haut time');
-  const jour = document.querySelector('.vrm-boite-jour-titre');
-  const cherche = document.querySelector('.vrm-boite-cherche');
-  const pastille = document.querySelector('[data-boite-rubrique="tout"]');
-  const marque = document.querySelector('.vrm-boite-ligne[data-boite-email] .vrm-boite-marque');
-  const point = document.querySelector('.vrm-boite-point[data-boite-point="1"]');
+  const col = document.querySelector('[data-boite-liste-col]'), ecran = document.querySelector('[data-boite-emails]');
+  const cs = ecran ? getComputedStyle(ecran) : null; const utile = ecran ? r(ecran).width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) : 0;
+  const visibles = lignes.filter((n) => { const b = r(n); return b.top >= 0 && b.bottom <= vh + 0.5; }).length;
+  const l0 = lignes[0];
+  const de = l0 && l0.querySelector('.n-mail-de'), sujet = l0 && l0.querySelector('.n-mail-sujet'), compris = l0 && l0.querySelector('.n-mail-compris'), heure = l0 && l0.querySelector('.n-mail-date time');
   return {
-    vw, vh, nav: nav ? Math.round(r(nav).height) : 0,
-    titreEcran: px(h1), h1: window.__h1, listeLargeur: col ? Math.round(r(col).width) : null, listeBas: col ? Math.round(r(col).bottom) : null,
-    lignePolice: px(quoi), ligneInterligne: px(quoi, 'lineHeight'), extraitPolice: px(ess), piedPolice: px(pied), heurePolice: px(heure), jourPolice: px(jour),
-    ligneHauteur: med, premiereLigne: lignes[0] ? Math.round(r(lignes[0]).top) : null, visibles,
-    chercheHauteur: cherche ? Math.round(r(cherche).height) : null, pastilleHauteur: pastille ? Math.round(r(pastille).height) : null,
-    avatar: marque ? Math.round(r(marque).width) : null, pointNonLu: point ? Math.round(r(point).width) : null,
-    // La plus petite marge haute des 40 premières lignes : une règle générique qui l'écrase se voit ici.
+    vw, vh, titreEcran: px(h1), listeLargeur: col ? Math.round(r(col).width) : null, listePart: col && utile ? Math.round((r(col).width / utile) * 100) / 100 : null,
+    dePolice: px(de), sujetPolice: px(sujet), comprisPolice: px(compris), heurePolice: px(heure), jourPolice: px(document.querySelector('.n-mail-jour-titre')),
+    ligneHauteur: med, visibles, chercheHauteur: Math.round((r(document.querySelector('.n-mail-cherche')) || { height: 0 }).height), segHauteur: Math.round((r(document.querySelector('.n-mail-seg')) || { height: 0 }).height),
+    avatar: l0 ? Math.round(r(l0.querySelector('.n-mail-marque')).width) : null,
     margeMin: Math.min(...lignes.slice(0, 40).map((n) => parseFloat(getComputedStyle(n).paddingTop) * z(n))),
-    extraitUneLigne: ess ? Math.round(r(ess).height) <= Math.round(px(ess, 'lineHeight') * 1.3) : null,
+    comprisUneLigne: compris ? Math.round(r(compris).height) <= Math.round(px(compris, 'lineHeight') * 1.3) : null,
   };
 });
 // ── Les mesures de la LECTURE ouverte ────────────────────────────────────────
@@ -141,8 +131,7 @@ const mesurerLecture = (pg) => pg.evaluate(() => {
   const px = (n, p = 'fontSize') => (n ? Math.round(parseFloat(getComputedStyle(n)[p]) * z(n) * 10) / 10 : null);
   const r = (n) => (n ? n.getBoundingClientRect() : null);
   const lec = document.querySelector('[data-boite-lecture]');
-  const msg = document.querySelector('.vrm-boite-msg');
-  // Caractères par ligne : la largeur du texte ÷ la largeur moyenne d'un caractère français.
+  const msg = document.querySelector('.n-mail-msg');
   let car = null;
   const p = msg && msg.querySelector('p');
   if (p) {
@@ -151,15 +140,14 @@ const mesurerLecture = (pg) => pg.evaluate(() => {
     p.appendChild(s); const moy = s.getBoundingClientRect().width / s.textContent.length; s.remove();
     car = Math.round(r(p).width / moy);
   }
-  const f = document.querySelector('.vrm-boite-cadre-iframe');
+  const f = document.querySelector('.vrm-boite-cadre-iframe'), g = document.querySelector('.n-mail-gestes button'), col = document.querySelector('[data-boite-lecture-col]');
   return {
-    lectureLargeur: lec ? Math.round(r(lec).width) : null,
-    lecturePadding: lec ? px(lec, 'paddingLeft') : null,
-    titre: px(document.querySelector('.vrm-boite-titre')), deQui: px(document.querySelector('.vrm-boite-haut-de')),
-    sujet: px(document.querySelector('.vrm-boite-sujet')),
+    lectureLargeur: lec ? Math.round(r(lec).width) : null, colBas: col ? Math.round(r(col).bottom) : null,
+    titre: px(document.querySelector('.n-mail-sujet-grand')), deQui: px(document.querySelector('.n-mail-entete-txt b')),
     corps: px(msg), corpsInterligne: px(msg, 'lineHeight'), caracteres: car,
-    code: px(document.querySelector('.vrm-boite-billet-chiffres')), montant: px(document.querySelector('.vrm-boite-heros-montant b')),
-    geste: px(document.querySelector('.vrm-boite-gestes button')), gesteHauteur: (() => { const b = document.querySelector('.vrm-boite-gestes button'); return b ? Math.round(r(b).height) : null; })(),
+    code: px(document.querySelector('.n-mail-retrait-chiffres')), montant: px(document.querySelector('[data-boite-montant] dd')),
+    geste: px(g), gesteHauteur: g ? Math.round(r(g).height) : null,
+    comprisAvant: (() => { const h = document.querySelector('[data-boite-heros]'), o = document.querySelector('[data-boite-origine]'); return !!(h && o && (h.compareDocumentPosition(o) & 4)); })(),
     cadreEchelle: f ? f.getAttribute('data-cadre-echelle') : null, cadreLargeur: f ? Math.round(r(f).width) : null,
   };
 });
@@ -203,54 +191,59 @@ const mesurerLecture = (pg) => pg.evaluate(() => {
         console.log(`  📏 ${nom} : ${JSON.stringify({ liste: L, html: { echelle: Lh.cadreEchelle, cadre: Lh.cadreLargeur }, code: Lc.code, montant: Lh.montant, texte: { titre: Lt.titre, corps: Lt.corps, interligne: Lt.corpsInterligne, car: Lt.caracteres, largeur: Lt.lectureLargeur } })}`);
 
         if (ordi) {
-          dit(L.titreEcran <= 30, `${nom} : le titre de l'écran reste raisonnable (≤ 30 px)`, L.titreEcran);
-          dit(L.listeLargeur >= 340 && L.listeLargeur <= 420, `${nom} : la liste fait 340 à 420 px de large`, L.listeLargeur);
-          dit(L.lignePolice >= 13 && L.lignePolice <= 15, `${nom} : la ligne de liste est en 13–15 px`, L.lignePolice);
-          dit(L.extraitPolice >= 12 && L.extraitPolice <= 14 && L.piedPolice >= 11 && L.piedPolice <= 13, `${nom} : extrait 12–14 px, pied 11–13 px`, `${L.extraitPolice} / ${L.piedPolice}`);
-          dit(L.ligneHauteur <= 64, `${nom} : une ligne de liste fait au plus 64 px`, L.ligneHauteur);
+          dit(L.titreEcran <= 34, `${nom} : le titre de l'écran reste celui du natif (≤ 34 px)`, L.titreEcran);
+          // (19 nov.) Remplace « la liste fait 340 à 420 px » : sans sélection elle prend TOUTE la place (Julien : « quand je ne
+          // clique sur rien tout est regroupé à gauche, condensé »), 340–440 seulement quand un e-mail est ouvert (deux volets).
+          dit(L.listePart >= 0.92, `${nom} : sans sélection, la liste prend toute la largeur utile`, L.listePart);
+          dit(L.dePolice >= 13 && L.dePolice <= 17 && L.sujetPolice >= 13 && L.sujetPolice <= 17 && L.comprisPolice >= 13 && L.comprisPolice <= 15, `${nom} : expéditeur, sujet 13–17 px, « compris » 13–15 px`, `${L.dePolice} / ${L.sujetPolice} / ${L.comprisPolice}`);
+          dit(L.ligneHauteur <= 56, `${nom} : une rangée pleine largeur fait au plus 56 px`, L.ligneHauteur);
           dit(L.margeMin >= 5, `${nom} : chaque ligne garde sa marge (≥ 5 px en haut)`, L.margeMin);
-          dit(L.extraitUneLigne !== false, `${nom} : l'extrait tient sur une ligne`);
-          // Avant : 5 lignes entières à 1512×950, 2 à 1280×800 (mesuré sur le code d'avant).
-          dit(L.visibles >= (viewport.height >= 900 ? 8 : 6), `${nom} : au moins ${viewport.height >= 900 ? 8 : 6} e-mails visibles sans défiler (avant : ${viewport.height >= 900 ? 5 : 2})`, L.visibles);
-          dit(L.listeBas != null && L.listeBas <= viewport.height + 1 && L.listeBas >= viewport.height - 40, `${nom} : la boîte remplit la fenêtre (colonnes qui défilent seules)`, L.listeBas);
-          dit(Lt.titre <= 22 && Lt.titre >= 17, `${nom} : le titre de la lecture fait 17–22 px`, Lt.titre);
-          dit(Lt.corps >= 13 && Lt.corps <= 15, `${nom} : le corps du message est en 13–15 px`, Lt.corps);
-          dit(Lt.caracteres != null && Lt.caracteres <= 72, `${nom} : la lecture fait au plus 72 caractères par ligne`, Lt.caracteres);
-          dit(Lc.code != null && Lc.code <= 34, `${nom} : le code de retrait reste lisible sans crier (≤ 34 px)`, Lc.code);
+          dit(L.comprisUneLigne !== false, `${nom} : « ce que VRM a compris » tient sur une ligne`);
+          dit(L.visibles >= (viewport.height >= 900 ? 10 : 8), `${nom} : au moins ${viewport.height >= 900 ? 10 : 8} e-mails visibles sans défiler`, L.visibles);
+          dit(Lt.titre <= 24 && Lt.titre >= 17, `${nom} : le titre de la lecture fait 17–24 px`, Lt.titre);
+          dit(Lt.corps >= 15 && Lt.corps <= 17, `${nom} : le corps du message est en 15–17 px`, Lt.corps);
+          dit(Lt.caracteres != null && Lt.caracteres <= 75, `${nom} : la lecture fait au plus 75 caractères par ligne`, Lt.caracteres);
+          // (19 nov.) Remplace « le code ≤ 34 px » : le coordinateur et Julien veulent « le code de retrait en grand ».
+          dit(Lc.code != null && Lc.code >= 40, `${nom} : le code de retrait EN GRAND (≥ 40 px), dans « Ce que VRM a compris »`, Lc.code);
+          dit(Lc.comprisAvant && Lh.comprisAvant, `${nom} : « Ce que VRM a compris » avant le message d'origine`);
           dit(Lh.montant == null || Lh.montant <= 28, `${nom} : le montant ≤ 28 px`, Lh.montant);
-          dit(Lh.cadreEchelle === '1', `${nom} : l'e-mail HTML s'affiche à sa taille naturelle (échelle 1)`, Lh.cadreEchelle);
-          // Les gestes : ↓ ouvre le suivant, ↑ revient, Échap ferme — la liste reste à gauche.
+          dit(Lh.colBas != null && Lh.colBas <= viewport.height + 1, `${nom} : le volet de lecture tient dans la fenêtre (il défile seul)`, Lh.colBas);
+          dit(w < 1500 ? Lh.cadreEchelle != null && Number(Lh.cadreEchelle) <= 1 : Lh.cadreEchelle === '1', `${nom} : l'e-mail HTML ${w < 1500 ? 'tient dans le volet (échelle ≤ 1, jamais de côté)' : "s'affiche à sa taille naturelle (échelle 1)"}`, Lh.cadreEchelle);
           await pg.locator(`[data-boite-email="${ID.vente}"]`).first().click();
           await pg.locator(`[data-boite-lecture="${ID.vente}"]`).waitFor();
+          const deux = await pg.evaluate(() => { const c = document.querySelector('[data-boite-liste-col]'); return c ? Math.round(c.getBoundingClientRect().width) : 0; });
+          dit(deux >= 300 && deux <= 440, `${nom} : un e-mail ouvert ⇒ deux volets, la liste 300–440 px`, deux);
           await pg.keyboard.press('ArrowDown');
           const apres = await pg.locator('[data-boite-lecture]').first().getAttribute('data-boite-lecture').catch(() => null);
-          dit(apres === ID.retrait, `${nom} : ↓ ouvre l'e-mail suivant (1 touche au lieu de viser une ligne)`, apres && apres.slice(-6));
+          dit(apres === ID.retrait, `${nom} : ↓ ouvre l'e-mail suivant`, apres && apres.slice(-6));
           await pg.keyboard.press('ArrowUp');
           const avant = await pg.locator('[data-boite-lecture]').first().getAttribute('data-boite-lecture').catch(() => null);
           dit(avant === ID.vente, `${nom} : ↑ revient au précédent`);
           await pg.keyboard.press('Escape');
-          dit(!(await pg.locator('[data-boite-lecture]').count()), `${nom} : Échap ferme la lecture`);
+          dit(!(await pg.locator('[data-boite-lecture]').count()), `${nom} : Échap ferme la lecture (la liste reprend toute la place)`);
         } else {
-          dit(L.lignePolice >= 14 && L.lignePolice <= 17, `${nom} : la ligne de liste est en 14–17 px au doigt`, L.lignePolice);
+          dit(L.dePolice >= 14 && L.dePolice <= 17 && L.sujetPolice >= 14 && L.sujetPolice <= 17, `${nom} : expéditeur et sujet en 14–17 px au doigt`, `${L.dePolice} / ${L.sujetPolice}`);
           dit(L.margeMin >= 6, `${nom} : chaque ligne garde sa marge (≥ 6 px en haut)`, L.margeMin);
-          dit(L.ligneHauteur >= 44 && L.ligneHauteur <= 76, `${nom} : une ligne fait 44 à 76 px`, L.ligneHauteur);
-          dit(Lt.titre >= 18 && Lt.titre <= 24, `${nom} : le titre de la lecture fait 18–24 px (plus 28)`, Lt.titre);
+          dit(L.ligneHauteur >= 44 && L.ligneHauteur <= 84, `${nom} : une ligne fait 44 à 84 px (trois étages comme Mail)`, L.ligneHauteur);
+          dit(L.listePart >= 0.99, `${nom} : la liste prend toute la largeur`, L.listePart);
+          dit(Lt.titre >= 18 && Lt.titre <= 24, `${nom} : le titre de la lecture fait 18–24 px`, Lt.titre);
           dit(Lt.corps >= 15 && Lt.corps <= 17, `${nom} : le corps du message est en 15–17 px`, Lt.corps);
-          dit(Lc.code != null && Lc.code <= 38, `${nom} : le code de retrait ≤ 38 px`, Lc.code);
+          dit(Lc.code != null && Lc.code >= 40, `${nom} : le code de retrait EN GRAND (≥ 40 px)`, Lc.code);
           dit(Lt.gesteHauteur == null || Lt.gesteHauteur >= 44, `${nom} : le geste principal fait 44 px au doigt`, Lt.gesteHauteur);
           dit(Lh.cadreEchelle != null && Number(Lh.cadreEchelle) <= 1, `${nom} : l'e-mail HTML tient dans l'écran (jamais de côté)`, Lh.cadreEchelle);
-          // Les gestes : 1 toucher pour lire, 1 pour revenir.
           await pg.locator('[data-boite-fermer]').first().click();
           dit(!(await pg.locator('[data-boite-feuille]').count()), `${nom} : 1 toucher pour revenir à la liste`);
         }
-        // Rien de perdu : recherche, pastilles, compte, à vérifier, non lus, Relier ma boîte.
+        // Rien de perdu : recherche, segments, « ⋯ » (non lus, codes, offres, relier), compte.
+        await pg.locator('[data-v2-mail-plus]').click();
+        await pg.locator('[data-v2-mail-choix="relier"]').waitFor({ timeout: 5000 }).catch(() => {});
         const fonctions = await pg.evaluate(() => ({
-          recherche: !!document.querySelector('[data-boite-cherche-champ]'), tout: !!document.querySelector('[data-boite-rubrique="tout"]'),
-          codes: !!document.querySelector('[data-boite-rubrique="codes"]'), nonlus: !!document.querySelector('[data-boite-rubrique="nonlus"]'),
-          averifier: !!document.querySelector('[data-boite-rubrique="a-verifier"]'), compte: !!document.querySelector('[data-boite-adresse]'),
-          toutLu: !!document.querySelector('[data-boite-tout-lu]'), relier: !!document.querySelector('[data-boite-vue="relier"]'),
+          recherche: !!document.querySelector('[data-boite-cherche-champ]'), tout: !!document.querySelector('[data-boite-rubrique-v2="tout"]'), atraiter: !!document.querySelector('[data-boite-rubrique-v2="atraiter"]'),
+          codes: !!document.querySelector('[data-v2-mail-choix="codes"]'), nonlus: !!document.querySelector('[data-v2-mail-choix="nonlus"]'), offres: !!document.querySelector('[data-v2-mail-choix="offres"]'),
+          compte: !!document.querySelector('[data-boite-adresse], [data-v2-mail-compte-feuille] select'), relier: !!document.querySelector('[data-v2-mail-choix="relier"]'),
         }));
-        dit(Object.values(fonctions).every(Boolean), `${nom} : aucune fonction perdue (recherche, rubriques, non lus, à vérifier, compte, tout lu, relier)`, JSON.stringify(fonctions));
+        dit(Object.values(fonctions).every(Boolean), `${nom} : aucune fonction perdue (recherche, segments, non lus, codes, offres, compte, relier)`, JSON.stringify(fonctions));
+        await pg.keyboard.press('Escape');
         dit(!erreurs.length, `${nom} : aucune erreur JavaScript ni console`, erreurs.slice(0, 3).join(' | '));
         await ctx.close();
       });

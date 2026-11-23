@@ -75,7 +75,8 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '
   dit(en.ouvert === false && en.n === null && en.nVerif === 0, 'F publication pas lue ⇒ rien décidé (fermé, n inconnu)', JSON.stringify(en));
   dit(etatRepliRetirer({ ...pub3, urgents: 1 }, {}).presse === true, 'un retrait pressé est signalé (point ambre)');
   const app = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
-  const corps = (app.split('function RepliRetirerAchats(')[1] || '').split('\n}\n')[0];
+  // (20 nov., chasse-bugs) Depuis le filtre des sites, `RepliRetirerAchats` passe la main à `RepliRetirerAchatsTous` (sans filtre) : c'est lui qui décide.
+  const corps = ((app.split('function RepliRetirerAchatsTous(')[1] || app.split('function RepliRetirerAchats(')[1] || '')).split('\n}\n')[0];
   dit(/etatRepliRetirer\(pub, \{ choix, demande \}\)/.test(corps) && /choixApresBascule\(pub,/.test(corps), 'G RepliRetirerAchats passe par la règle (etatRepliRetirer, choixApresBascule)');
   console.log(`\n${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);

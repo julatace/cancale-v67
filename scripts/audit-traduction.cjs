@@ -33,11 +33,16 @@ const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 
 // Les écrans migrés : [fichier, fonctions (ou constantes) dont le texte passe par tr()].
 // `*` = tout le fichier. Ajouter ici chaque écran migré (méthode : docs/passation/2026-11-11-traduction.md).
+// (20 nov.) BaissePrixVestiaire, FavorisEtapes, FavorisSansVente retirés : leurs gestes se font dans l'extension (audit-actions-app).
 const MIGRES = [
   ['src/Accueil.jsx', ['*']],
+  ['src/RelierMaBoite.jsx', ['*']],   // (19 nov., emails-mail) « Relier ma boîte » accompagné
+  ['src/BoiteEmails.jsx', ['Compris', 'Lecture', 'Ligne', 'Pile', 'ARelier', 'Quarantaine', 'MessageOrigine', 'PuceCode']],   // (19 nov., emails-mail) E-mails comme Mail
+  ['src/communaute/Accompagnement.jsx', ['*']],
+  ['src/communaute/CoucouCarte.jsx', ['*']],   // (17 nov., carte-coucou) le coucou de la carte   // (17 nov., groupes-coucou) Communauté → Groupes : créer en trois étapes, le coucou
   ['src/JourneeStudio.jsx', ['*']],   // (14 nov., Studio) la grille Bento de Ma journée
   ['src/ARetirerAilleurs.jsx', ['*']],   // (15 nov., retrait-ailleurs) « À retirer ailleurs »
-  ['src/parcoursNouveau/ParcoursNouveau.jsx', ['*']],   // (15 nov., parcours nouveau) les huit étapes
+  ['src/parcoursNouveau/Demarrage.jsx', ['*']],   // (20 nov.) « Bien démarrer », le parcours en pages poussées
   ['src/parcoursNouveau/NouveauxComptes.jsx', ['*']],   // (15 nov., parcours nouveau) l'onglet du propriétaire
   ['src/ui/Accompagne.jsx', ['*']],   // (14 nov., lot accompagnement) la brique commune des quatre moments
   ['src/ImpressionSimple.jsx', ['*']],   // (14 nov., impression-simple) « Imprimer » en un toucher : les deux feuilles
@@ -64,7 +69,6 @@ const MIGRES = [
   // (11 nov., lot vestiaire-plus) Vestiaire : le parcours, les photos exigées, la baisse de prix, les offres.
   ['src/ParcoursVestiaire.jsx', ['*']],
   ['src/PhotosVestiaire.jsx', ['*']],
-  ['src/BaissePrixVestiaire.jsx', ['*']],
   ['src/OffresVestiaire.jsx', ['*']],
   ['src/composants/SuiviTravail.jsx', ['*']],   // (11 nov., lot suivi-travail)
   ['src/MainsLibres.jsx', ['*']],   // (14 nov., lot colis-plus 100) mains libres
@@ -73,11 +77,10 @@ const MIGRES = [
   ['src/TvaMargeCarte.jsx', ['*']],
   ['src/RangerAchat.jsx', ['*']],   // (11 nov., lot rangement-guide)
   ['src/AtelierArrivee.jsx', ['*']],   // (15 nov.) l'atelier « achat arrivé → en ligne »
-  ['src/FavorisEtapes.jsx', ['*']],   // (11 nov., lot favoris-clair)
-  ['src/FavorisSansVente.jsx', ['*']],   // (13 nov., lot 31) très aimées, pas vendues
   // (11 nov., lot prix-mini) Offres auto refait, et « Prix mini manquants ».
   ['src/OffresAuto.jsx', ['*']],
   ['src/PrixMiniManquants.jsx', ['*']],
+  ['src/PrixPartout.jsx', ['*']],   // (19 nov.) « Changer le prix » en UN geste (prix-sans-manuel)
   ['src/design/QuoiRepublier.jsx', ['*']],   // (11 nov., lot quoi-republier)
   // (14 nov., lot argent-choix) coller des prix, modèle et taille, déclaration annuelle.
   ['src/composants/CollerPrixAchat.jsx', ['*']],
@@ -100,6 +103,8 @@ const MIGRES = [
   ['src/composants/ChampRecherche.jsx', ['*']],
   ['src/LitigesEnCours.jsx', ['*']],
   ['src/LigneFraicheur.jsx', ['*']],
+  // (19 nov., lot completer-infos) L'atelier « Compléter ».
+  ['src/completer/Completer.jsx', ['*']],
 ];
 // Ce qui n'est PAS du texte à traduire (noms propres, marques, données, symboles).
 const PROPRES = /\b(?:VRM|Google|Discord|Vinted|Leboncoin|eBay|Vestiaire Collective|Scriptable|URSSAF|PDF|SIRET|SIREN|DAC7|ACRE|CFE)\b/g;

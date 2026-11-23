@@ -146,27 +146,28 @@ const sans = (s) => s.replace(/\/\/.*$/gm, '').replace(/^\s*#.*$/gm, '');
 
   // ── M. les 10 premières minutes ──
   console.log('\n── M. les 10 premières minutes, sans abus');
+  // (23 nov., intégration) Les étapes de « Bien démarrer » de main (plateformes, extension, comptes, etiquetage…) : la même règle, décalée d'un nom.
   await essaie('M', async () => {
     const M = await import(path.join(R, 'src', 'mesureDemarrage.js'));
-    const a = M.noterEtape(null, 'bienvenue', 0.4);
-    const b = M.noterEtape(a, 'plateformes', 44);
-    dit(JSON.stringify(b) === JSON.stringify({ v: 1, t: { bienvenue: 0, plateformes: 40 } }), 'rangé : l’étape et le temps (arrondi à 10 s), rien d’autre', b);
-    dit(M.noterEtape(b, 'plateformes', 999) === undefined, 'une étape déjà atteinte n’est jamais réécrite');
-    dit(M.noterEtape(b, 'extension', 50, { coupee: true }) === null, 'coupée : rien n’est écrit');
-    const c = M.noterEtape({ v: 1, t: { bienvenue: 0 }, email: 'x@exemple.invalid', pseudo: 'p', at: '2026-11-16' }, 'comptes', 99999);
-    dit(JSON.stringify(c) === JSON.stringify({ v: 1, t: { bienvenue: 0, comptes: M.PLAFOND_S } }), 'un champ en trop n’est jamais recopié ; le temps est plafonné à une heure', c);
-    dit(M.tempsDejaPasse({ t: { bienvenue: 0, plateformes: 40, extension: 300 } }, 'plateformes') === 40, 'repris dans le parcours : le temps déjà passé jusqu’à l’étape (jamais une date)');
+    const a = M.noterEtape(null, 'plateformes', 0.4);
+    const b = M.noterEtape(a, 'extension', 44);
+    dit(JSON.stringify(b) === JSON.stringify({ v: 1, t: { plateformes: 0, extension: 40 } }), 'rangé : l’étape et le temps (arrondi à 10 s), rien d’autre', b);
+    dit(M.noterEtape(b, 'extension', 999) === undefined, 'une étape déjà atteinte n’est jamais réécrite');
+    dit(M.noterEtape(b, 'comptes', 50, { coupee: true }) === null, 'coupée : rien n’est écrit');
+    const c = M.noterEtape({ v: 1, t: { plateformes: 0 }, email: 'x@exemple.invalid', pseudo: 'p', at: '2026-11-16' }, 'etiquetage', 99999);
+    dit(JSON.stringify(c) === JSON.stringify({ v: 1, t: { plateformes: 0, etiquetage: M.PLAFOND_S } }), 'un champ en trop n’est jamais recopié ; le temps est plafonné à une heure', c);
+    dit(M.tempsDejaPasse({ t: { plateformes: 0, extension: 40, comptes: 300 } }, 'extension') === 40, 'repris dans le parcours : le temps déjà passé jusqu’à l’étape (jamais une date)');
     const P = '11111111-1111-4111-8111-111111111111', N = '00000000-0000-0000-0000-000000000000';
     const u = (i) => `aaaaaaaa-aaaa-4aaa-8aaa-${String(i).padStart(12, '0')}`;
-    const rows = [0, 1, 2, 3].map((i) => ({ owner: u(i), md: { t: { bienvenue: 0, plateformes: 30 + i * 10 } } }));
-    rows.push({ owner: P, md: { t: { bienvenue: 0 } } }, { owner: N, md: { t: { bienvenue: 0 } } }, { owner: u(9), md: { t: { bienvenue: 0 } }, off: 'true' }, { owner: u(8), md: null });
+    const rows = [0, 1, 2, 3].map((i) => ({ owner: u(i), md: { t: { plateformes: 0, extension: 30 + i * 10 } } }));
+    rows.push({ owner: P, md: { t: { plateformes: 0 } } }, { owner: N, md: { t: { plateformes: 0 } } }, { owner: u(9), md: { t: { plateformes: 0 } }, off: 'true' }, { owner: u(8), md: null });
     const peu = M.agregerDemarrage(rows, { proprio: P });
     dit(peu.ok && peu.assez === false && !('n' in peu) && !('etapes' in peu), 'moins de 5 vendeurs mesurés (propriétaire, neutre, coupée, jamais mesuré écartés) : RIEN, pas même le nombre', peu);
-    rows.push({ owner: u(4), md: { t: { bienvenue: 0, plateformes: 80, extension: 300 } } });
+    rows.push({ owner: u(4), md: { t: { plateformes: 0, extension: 80, comptes: 300 } } });
     const ag = M.agregerDemarrage(rows, { proprio: P });
     const e = Object.fromEntries((ag.etapes || []).map((x) => [x.etape, x]));
-    dit(ag.assez === true && ag.n === 5 && e.bienvenue.atteinte === 5 && e.plateformes.atteinte === 5 && e.extension.atteinte === 1 && e.plateformes.mediane === 50 && e.extension.mediane === null, 'à 5 : des nombres PAR ÉTAPE ; un temps médian seulement si 5 l’ont atteinte', ag);
-    dit(ag.perte && ag.perte.apres === 'plateformes' && ag.perte.perdus === 4, 'l’étape qui perd le plus est nommée', ag.perte);
+    dit(ag.assez === true && ag.n === 5 && e.plateformes.atteinte === 5 && e.extension.atteinte === 5 && e.comptes.atteinte === 1 && e.extension.mediane === 50 && e.comptes.mediane === null, 'à 5 : des nombres PAR ÉTAPE ; un temps médian seulement si 5 l’ont atteinte', ag);
+    dit(ag.perte && ag.perte.apres === 'extension' && ag.perte.perdus === 4, 'l’étape qui perd le plus est nommée', ag.perte);
     const sortie = JSON.stringify(ag);
     dit(!/aaaaaaaa|owner|11111111/.test(sortie), 'aucun identifiant ne sort du regroupement');
     const PC = await import(path.join(R, 'api', '_lib', 'parcours-comptes.js'));

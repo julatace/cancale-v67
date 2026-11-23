@@ -26,7 +26,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 export const CLE_MESURE_DEMARRAGE = 'vrm_mesure_demarrage';
 export const CLE_MESURE_COUPEE = 'vrm_mesure_demarrage_coupee';
-export const ETAPES_MESUREES = Object.freeze(['bienvenue', 'plateformes', 'extension', 'comptes', 'numeros', 'historique', 'journee', 'abonnement', 'fini']);
+// (23 nov., intégration) Les étapes de « Bien démarrer » de main (src/parcoursNouveau/regle.js, refait le 20 nov.) + « fini ».
+export const ETAPES_MESUREES = Object.freeze(['plateformes', 'extension', 'comptes', 'etiquetage', 'historique', 'pret', 'fini']);
 export const SEUIL_ANONYMAT = 5;
 export const PLAFOND_S = 3600;
 const NEUTRE = '00000000-0000-0000-0000-000000000000';

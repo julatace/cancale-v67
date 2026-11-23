@@ -7,7 +7,7 @@
 .vrm-recherche { position: relative; flex: 0 1 420px; min-width: 220px; }
 .vrm-recherche > .vrm-barre-recherche { width: 100%; box-sizing: border-box; }
 .vrm-recherche[data-recherche-ouverte="1"] > .vrm-barre-recherche { box-shadow: 0 0 0 1px var(--vrm-line, #E5E5EA); }
-.vrm-barre-recherche:focus-within { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
+.vrm-barre-recherche:focus-within { outline: 2px solid var(--vrm-focus, #16181D); outline-offset: 2px; }
 .vrm-recherche-champ {
   flex: 1; min-width: 0; min-height: 44px; border: 0; background: transparent; color: var(--vrm-ink, inherit);
   font: inherit; font-size: 15px; padding: 0; outline: none; -webkit-appearance: none; appearance: none;
@@ -71,8 +71,8 @@ html .vrm-app-shell .vrm-recherche-champ:focus, html .vrm-app-shell .vrm-recherc
    Les deux `:not(#_)` donnent à cette règle le poids de deux identifiants. */
 html body [data-cible-eclaire][data-cible-eclaire]:not(#_):not(#_) {
   border-radius: 12px !important;
-  box-shadow: inset 0 0 0 2px var(--vrm-accent, #0071E3), 0 0 0 3px color-mix(in srgb, var(--vrm-accent, #0071E3) 16%, transparent) !important;
-  background-image: linear-gradient(color-mix(in srgb, var(--vrm-accent, #0071E3) 8%, transparent), color-mix(in srgb, var(--vrm-accent, #0071E3) 8%, transparent)) !important;
+  box-shadow: inset 0 0 0 2px var(--vrm-accent, #16181D), 0 0 0 3px color-mix(in srgb, var(--vrm-accent, #16181D) 16%, transparent) !important;
+  background-image: linear-gradient(color-mix(in srgb, var(--vrm-accent, #16181D) 8%, transparent), color-mix(in srgb, var(--vrm-accent, #16181D) 8%, transparent)) !important;
   scroll-margin: 96px 0 96px;
 }
 .vrm-cible-absente {
@@ -97,5 +97,5 @@ html body [data-cible-eclaire][data-cible-eclaire]:not(#_):not(#_) {
      élément collé : la bande se couvre du fond (une ombre pleine, sans rien
      intercepter), le contenu ne passe plus au-dessus de la barre. */
   .vrm-main > .vrm-barre-haut { box-shadow: 0 -32px 0 0 var(--vrm-bg, #FFFFFF); }
-  .vrm-main:has(> .vrm-barre-haut) { scroll-padding-top: 72px; }
+  .vrm-main[data-vrm-d2] { scroll-padding-top: 72px; }
 }

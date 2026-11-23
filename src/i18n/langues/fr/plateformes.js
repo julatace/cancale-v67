@@ -1,5 +1,18 @@
 // fr · plateformes et réglages (14 nov., refonte visible : Leboncoin, eBay, Vestiaire, Paramètres, connexion) — la source : fr/plateformes.js.
 export default {
+  "plateformes.lbc.relierVinted": "Relier à Vinted",
+  "plateformes.lbc.achatPartage": "Les deux annonces partageront le prix d’achat du même article.",
+  "plateformes.lbc.chercherVinted": "Titre, taille ou numéro",
+  "plateformes.lbc.annonceSansTitre": "Annonce sans titre",
+  "plateformes.lbc.achatNonRenseigne": "Achat non renseigné",
+  "plateformes.lbc.prixAchat": "Achat {prix}",
+  "plateformes.lbc.aucuneVinted": "Aucune annonce Vinted dans cette sélection.",
+  "plateformes.lbc.plusVinted": "Voir plus d’annonces",
+  "plateformes.lbc.confirmerLien": "Confirmer le lien",
+  "plateformes.lbc.lienIndisponible": "Ce lien ne peut plus être posé. Actualise la liste.",
+  "plateformes.lbc.lienConfirme": "Annonce reliée à l’article N°{numero}.",
+  "plateformes.lbc.retraitAilleurs": "Vendue sur {plateforme} · À retirer de Leboncoin",
+  "plateformes.lbc.lieeVinted": "Liée à Vinted",
   "plateformes.actualisation": "Actualisation…",
   "plateformes.actualiser": "Actualiser",
   "plateformes.mfa.comment": "Comment ?",

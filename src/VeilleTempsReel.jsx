@@ -4,7 +4,7 @@
 // Neutre (ni ambre ni rouge : aucun geste à faire) ; elle s'efface seule.
 import React from 'react';
 import './styles-temps-reel.css';
-import { creerVeille, ouvrirCanal, noterNeuf, ecouterNeuf, oublierNeuf, EVENEMENT, PERIODE_MS, PERIODE_REALTIME_MS } from './tempsReel.js';
+import { creerVeille, ouvrirCanal, noterNeuf, noterLue, ecouterNeuf, oublierNeuf, EVENEMENT, PERIODE_MS, PERIODE_REALTIME_MS } from './tempsReel.js';
 import { rythme } from './rythmeLectures.js';
 import { heureVu } from './copieLignes.js';
 import { trj } from './i18n/react.js';
@@ -32,6 +32,7 @@ export default function VeilleTempsReel({ uid, lireDepuis, urlBase, cleApi, jeto
     const veille = creerVeille({
       uid,
       lireDepuis: (x) => lire.current(x),
+      surLue: (at) => noterLue(at),
       diffuser: (d) => {
         try { window.dispatchEvent(new CustomEvent(EVENEMENT, { detail: d })); } catch (_) {}
         if ((d.quoi || []).some((q) => VISIBLES.has(q.quoi))) noterNeuf(d.at);
@@ -46,7 +47,7 @@ export default function VeilleTempsReel({ uid, lireDepuis, urlBase, cleApi, jeto
     Promise.resolve().then(() => (pret.current ? pret.current() : false)).then((oui) => {
       if (mort || oui !== true) return;
       try {
-        canal = ouvrirCanal({ url: urlBase, cleApi, uid, jeton: () => (jt.current ? jt.current() : null), surLigne: (r) => veille.recu(r),
+        canal = ouvrirCanal({ url: urlBase, cleApi, uid, jeton: () => (jt.current ? jt.current() : null), surLigne: (r) => { veille.recu(r); try { window.dispatchEvent(new CustomEvent('vrm:ligne', { detail: { id: String(r.id || '') } })); } catch (_) {} },   // (22 nov., à distance) l'identifiant seul, tout de suite (sans le budget de la veille)
           surEtat: (e) => { try { document.documentElement.setAttribute('data-temps-reel', e); } catch (_) {} } });
       } catch (_) {}
     }).catch(() => {});
