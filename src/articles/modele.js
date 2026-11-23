@@ -59,7 +59,8 @@ const dateLue = (d) => { if (d == null || d === '') return null; const n = Numbe
 const entier = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : null);
 // (21 nov., Julien : « quand un compte est ban je veux quand même voir les annonces qu'il y avait dessus ») `bloque` : la DERNIÈRE
 // annonce connue d'un compte Vinted bloqué (lue avant le blocage, ou sa fiche) — jamais « en ligne », hors de tout total.
-const RANG = { enligne: 0, masquee: 1, pause: 2, aconfirmer: 3, bloque: 4, brouillon: 5, vendue: 6, retiree: 7 };
+// (22 nov.) + la modération de Vestiaire (`corriger`, `attente`, `refusee` : présentes, PAS en ligne — api/_lib/vestiaire-regle.js).
+const RANG = { enligne: 0, masquee: 1, pause: 2, aconfirmer: 3, bloque: 4, corriger: 4.2, attente: 4.4, refusee: 4.6, brouillon: 5, vendue: 6, retiree: 7 };
 
 // ── CE QUE CHAQUE SITE PERMET (le tableau de parité : une seule source pour l'écran, le récit et l'audit) ──
 // 'oui' · 'lecture' (VRM le lit quand le site le donne) · 'extension' (geste joué par l'extension, capacité nommée) ·
@@ -210,7 +211,8 @@ export function construireArticles({ annonces, fiches = null, faits = null, acha
 }
 
 // ── FILTRER, TRIER, COMPTER (l'écran) ─────────────────────────────────────────
-export const ETATS_FILTRE = { enligne: ['enligne', 'masquee', 'pause', 'aconfirmer'], apublier: ['brouillon'], dorment: ['enligne'], bloque: ['bloque'], vendues: ['vendue'], retirees: ['retiree'] };
+// (22 nov.) Une annonce Vestiaire en attente de validation, à corriger ou refusée n'est PAS « en ligne » : rangée sous « À publier ».
+export const ETATS_FILTRE = { enligne: ['enligne', 'masquee', 'pause', 'aconfirmer'], apublier: ['brouillon', 'corriger', 'attente', 'refusee'], dorment: ['enligne'], bloque: ['bloque'], vendues: ['vendue'], retirees: ['retiree'] };
 // Les segments de l'écran (audit d'utilité du 19 nov. : « En ligne · À publier · Dorment ») ; vendues / retirées restent
 // filtrables (la fiche, la recherche), pas en segment.
 export const SEGMENTS = ['enligne', 'apublier', 'dorment'];
@@ -246,7 +248,7 @@ export function compterArticles(articles, opts = {}) {
 // (19 nov. soir, le tableau de travail) L'état d'un article pour le site et le compte choisis : le MEILLEUR état de SES annonces
 // de ce site / de ce compte (l'ordre RANG, celui de `construireArticles`) ; aucune annonce ⇒ null (l'article n'y est pas).
 // Cocher En ligne · Masquée · En pause · À confirmer = le segment « En ligne » (`filtrerArticles` etat 'enligne') : même nombre.
-export const STATUTS_TABLEAU = ['enligne', 'masquee', 'pause', 'aconfirmer', 'bloque', 'brouillon', 'vendue', 'retiree'];
+export const STATUTS_TABLEAU = ['enligne', 'masquee', 'pause', 'aconfirmer', 'bloque', 'corriger', 'attente', 'refusee', 'brouillon', 'vendue', 'retiree'];
 export const STATUTS_EN_LIGNE = ETATS_FILTRE.enligne;
 export function statutTableau(a, { site = 'tous', compte = '' } = {}) {
   const ann = arr(a && a.annonces).filter((x) => (site === 'tous' || x.site === site) && (!compte || str(x.compte) === str(compte)));

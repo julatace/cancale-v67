@@ -119,7 +119,8 @@ export function annoncesEbay(items, { numeroDe, vintedDe = null, propreDe = null
 }
 // Vestiaire. `items` : `vc_listings.items` ({ [productId]: it }). `etatDe(id, it)` : 'en-ligne'|'a-confirmer'|'vendue'|'retiree'|autre
 // (`etatAnnonceVcBrut`) ; `numeroDe(id, it)` : `numVcAnnonce` ; `vintedDe(id)` : `vrm_vc_liens[id].item`.
-const ETAT_VC = { 'en-ligne': 'enligne', 'a-confirmer': 'aconfirmer', vendue: 'vendue', retiree: 'retiree' };
+// (22 nov.) + la modération de Vestiaire : en attente de validation · à corriger · refusée (présentes, pas en ligne).
+const ETAT_VC = { 'en-ligne': 'enligne', 'a-confirmer': 'aconfirmer', vendue: 'vendue', retiree: 'retiree', attente: 'attente', corriger: 'corriger', refusee: 'refusee' };
 export function annoncesVestiaire(items, { etatDe, numeroDe, vintedDe = null, vieille = false } = {}) {
   const out = [];
   for (const [id, it] of Object.entries(items && typeof items === 'object' ? items : {})) {
