@@ -1,15 +1,10 @@
 // es · Litiges et retours, tous les sites, ventes et achats (23 nov., lot litiges-retours).
 export default {
   "lit2.titre": "Disputas y devoluciones",
-  "lit2.enCours": {
-    "one": "{n} en curso",
-    "other": "{n} en curso"
-  },
   "lit2.dontPresses": {
     "one": "{n} urgente",
     "other": "{n} urgentes"
   },
-  "lit2.auMoins": "al menos",
   "lit2.achats.titre": "Devoluciones de tus compras",
   "lit2.achats.vide": "Ninguna devolución de compra en curso",
   "lit2.achats.passu": "No se han podido leer tus devoluciones de compra",

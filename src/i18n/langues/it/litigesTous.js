@@ -1,15 +1,10 @@
 // it · Litiges et retours, tous les sites, ventes et achats (23 nov., lot litiges-retours).
 export default {
   "lit2.titre": "Controversie e resi",
-  "lit2.enCours": {
-    "one": "{n} in corso",
-    "other": "{n} in corso"
-  },
   "lit2.dontPresses": {
     "one": "{n} urgente",
     "other": "{n} urgenti"
   },
-  "lit2.auMoins": "almeno",
   "lit2.achats.titre": "Resi dei tuoi acquisti",
   "lit2.achats.vide": "Nessun reso d’acquisto in corso",
   "lit2.achats.passu": "Non è stato possibile leggere i resi dei tuoi acquisti",

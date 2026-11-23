@@ -192,10 +192,11 @@ const attendre = async (pg, sel, ms = 20000) => { await pg.waitForSelector(sel, 
             const s = document.querySelector('[data-retours-achat-section]');
             const lignes = [...document.querySelectorAll('[data-retour-achat-ligne]')];
             return { etat: s ? s.getAttribute('data-retours-achat-section') : null, melange: lignes.some((x) => x.hasAttribute('data-litige-carte')),
-              titre: !!document.querySelector('[data-litiges-ecran]') && /Litiges et retours/.test(document.body.innerText), site: !!document.querySelector('[data-litiges-site="vinted-achats"]') };
+              titre: !!document.querySelector('[data-litiges-ecran]') && /Litiges et retours/.test(document.body.innerText), site: !!document.querySelector('[data-litiges-site="vinted-achats"]'),
+              totaux: document.querySelectorAll('.vrm-lit-total').length };
           });
           dit(ra.etat === 'lu' || ra.etat === 'passu', `${nom} : la section « Retours de tes achats » est là (lue ou pas su)`, JSON.stringify(ra));
-          dit(!ra.melange && ra.titre && ra.site, `${nom} : titre « Litiges et retours », un retour d’achat jamais carte de vente, la ligne « Vinted · retours d’achat »`, JSON.stringify(ra));
+          dit(!ra.melange && ra.titre && ra.site && ra.totaux === 1, `${nom} : titre « Litiges et retours », un retour d’achat jamais carte de vente, la ligne « Vinted · retours d’achat », UN seul total`, JSON.stringify(ra));
           const m = Object.fromEntries((a ? a.modeles : []).map((x) => [x.cle, x]));
           dit(m['nike|dunk'] && m['nike|dunk'].n === '2' && m['nike|dunk'].ventes === '6' && m['nike|dunk'].auMoins === '1' && /au moins 2 sur 6/.test(m['nike|dunk'].txt), 'Retours par modèle : Dunk « au moins 2 sur 6 » (retours prouvés 440 ; la remboursée pas lue à part)', JSON.stringify(m['nike|dunk']));
           dit(m['adidas|samba'] && m['adidas|samba'].n === '1' && m['adidas|samba'].ventes === '1', 'Samba : « 1 sur 1 » (l’annulée n’est pas une vente)', JSON.stringify(m['adidas|samba']));

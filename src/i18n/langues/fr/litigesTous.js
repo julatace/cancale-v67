@@ -1,15 +1,10 @@
 // fr · Litiges et retours, tous les sites, ventes et achats (23 nov., lot litiges-retours) — la SOURCE.
 export default {
   "lit2.titre": "Litiges et retours",
-  "lit2.enCours": {
-    "one": "{n} en cours",
-    "other": "{n} en cours"
-  },
   "lit2.dontPresses": {
     "one": "dont {n} pressé",
     "other": "dont {n} pressés"
   },
-  "lit2.auMoins": "au moins",
   "lit2.achats.titre": "Retours de tes achats",
   "lit2.achats.vide": "Aucun retour d’achat en cours",
   "lit2.achats.passu": "Tes retours d’achat n’ont pas pu être lus",

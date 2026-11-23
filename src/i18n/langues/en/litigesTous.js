@@ -1,15 +1,10 @@
 // en · Litiges et retours, tous les sites, ventes et achats (23 nov., lot litiges-retours).
 export default {
   "lit2.titre": "Disputes and returns",
-  "lit2.enCours": {
-    "one": "{n} in progress",
-    "other": "{n} in progress"
-  },
   "lit2.dontPresses": {
     "one": "{n} urgent",
     "other": "{n} urgent"
   },
-  "lit2.auMoins": "at least",
   "lit2.achats.titre": "Returns of your purchases",
   "lit2.achats.vide": "No purchase return in progress",
   "lit2.achats.passu": "Your purchase returns could not be read",

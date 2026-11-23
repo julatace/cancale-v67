@@ -179,20 +179,18 @@ export default function LitigesEnCours({ r, bi, ra = null, Photo = null, entete 
     <div className="vrm-lit" data-litiges-ecran={r.etat} data-litiges-n={r.etat === 'lu' ? n : ''} data-litiges-partiel={partiel ? '1' : '0'}
       data-litiges-total={ra && ra.etat === 'lu' ? total : undefined} data-litiges-achats={ra ? achats.length : undefined} data-litiges-total-partiel={ra && ra.partiel ? '1' : undefined}>
       {entete}
-      {ra && ra.etat === 'lu' && total > 0 ? (
-        <p className="vrm-lit-total-tous" data-litiges-total-ligne="">
-          {ra.partiel ? tr('lit2.auMoins') + ' ' : ''}{tr('lit2.enCours', { n: total })}{ra.nPresses ? ' · ' + tr('lit2.dontPresses', { n: ra.nPresses }) : ''}
-        </p>
-      ) : null}
       {r.etat === 'encours' ? <p className="vrm-lit-note" role="status">{tr('stats.lectureVentes')}</p> : null}
       {r.etat === 'passu' ? <p className="vrm-lit-note" data-litiges-passu="">{tr('ventes.ventesOntPu2')}</p> : null}
-      {r.etat === 'lu' && n > 0 ? (
-        <div className="vrm-lit-resume" data-litiges-resume={n}>
-          {partiel ? <span>{tr('stats.moins2')}</span> : null}<b className="vrm-lit-total">{n}</b><span>{tr('ventes.cours')}</span>
+      {/* (23 nov., lot litiges-retours) UN nombre : avec l'assemblage tous sites, le total ventes + retours d'achat (« au moins »
+          dès qu'un site ou un sens n'est pas lu) ; jamais deux fois sur l'écran (§7). */}
+      {r.etat === 'lu' && (ra ? total > 0 : n > 0) ? (
+        <div className="vrm-lit-resume" data-litiges-resume={n} data-litiges-total-ligne={ra ? total : undefined}>
+          {(ra ? ra.partiel : partiel) ? <span>{tr('stats.moins2')}</span> : null}<b className="vrm-lit-total">{ra ? total : n}</b><span>{tr('ventes.cours')}</span>
+          {ra && ra.nPresses ? <span className="vrm-lit-presses">· {tr('lit2.dontPresses', { n: ra.nPresses })}</span> : null}
         </div>
       ) : null}
       {r.etat === 'lu' && n > 0 ? <div className="vrm-lit-grille">{r.cartes.map((c) => <Carte key={c.cle} c={c} Photo={Photo} onDossier={onDossier} onPasAPas={onPasAPas}/>)}</div> : null}
-      {r.etat === 'lu' && n === 0 ? (
+      {r.etat === 'lu' && n === 0 && !achats.length ? (
         <div className="vrm-lit-vide vrm-vide-dessin" data-litiges-vide={partiel ? 'partiel' : 'zero'}>
           <svg width="72" height="72" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="34" fill="currentColor" opacity=".10"/><path d="M22 37.5 31.5 47 50 26" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           <p className="vrm-lit-vide-titre">{partiel ? tr('ventes.aucunLitigeDans') : tr('ventes.aucunLitigeCours')}</p>

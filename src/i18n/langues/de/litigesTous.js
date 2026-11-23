@@ -1,15 +1,10 @@
 // de · Litiges et retours, tous les sites, ventes et achats (23 nov., lot litiges-retours).
 export default {
   "lit2.titre": "Streitfälle und Rücksendungen",
-  "lit2.enCours": {
-    "one": "{n} offen",
-    "other": "{n} offen"
-  },
   "lit2.dontPresses": {
     "one": "davon {n} dringend",
     "other": "davon {n} dringend"
   },
-  "lit2.auMoins": "mindestens",
   "lit2.achats.titre": "Rücksendungen deiner Käufe",
   "lit2.achats.vide": "Keine offene Rücksendung eines Kaufs",
   "lit2.achats.passu": "Deine Rücksendungen konnten nicht gelesen werden",
