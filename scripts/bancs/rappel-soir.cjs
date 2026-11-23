@@ -119,7 +119,7 @@ function projette(ligne, select) {
   const out = {};
   for (const item of select.split(',')) {
     const [alias, expr] = item.includes(':') ? item.split(/:(.+)/) : [item, item];
-    const morceaux = expr.split(/->>?/);
+    const morceaux = expr.split(/->>?/).map((k) => k.replace(/^"(.*)"$/, "$1"));   // `->"9006"` = la clé 9006, comme PostgREST
     const b = morceaux.shift();
     let v = b === 'meta' ? ligne.meta : b === 'data' ? ligne.data : ligne[b];
     if (morceaux.length) v = chemin(v, morceaux);
