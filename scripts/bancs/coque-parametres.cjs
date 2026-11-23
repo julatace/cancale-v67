@@ -35,6 +35,7 @@
 process.env.BANC_PORT = process.env.BANC_PORT || '9310';
 require('./_porte-banc.cjs');
 const path = require('path'), fs = require('fs');
+const { choisirApparence, basculerSombre } = require('./_choisir-apparence.cjs');   // (16 nov.) l'interrupteur « Mode sombre » est retiré : le geste vit dans « Apparence »
 const NV = require('./nouveau-vendeur.cjs');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const PORT = NV.PORT;
@@ -155,7 +156,7 @@ async function enTete(nav, { W, theme }) {
   // H1 (suite) — une sauvegarde qui rate : le nuage apparaît.
   await pg.route('**/rest/v1/**', (route) => { const m = route.request().method(); if (m === 'POST' || m === 'PATCH') return route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"indisponible"}' }); return route.fallback(); });
   await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' }); await attendre(3000);
-  await pg.locator('[data-reglage-sombre]').first().click().catch(() => {});   // un réglage SYNCHRONISÉ (vinted_dark)
+  await basculerSombre(pg);   // un réglage SYNCHRONISÉ (vinted_dark) : « Apparence → Clair / Sombre » (16 nov. : plus d'interrupteur)
   await pg.waitForFunction(() => { const b = document.querySelector('.vrm-app-header .vrm-sync-status'); return b && /error|refus/.test(b.getAttribute('data-sync-etat') || ''); }, null, { timeout: 15000 }).catch(() => {});
   const s2 = await sonde(pg);
   dit(s2.nuage.some((x) => x === 'error' || x === 'refus'), 'H1', `${T} une sauvegarde ratée (503) fait apparaître le nuage`, JSON.stringify(s2.nuage));

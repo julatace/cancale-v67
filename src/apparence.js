@@ -6,8 +6,11 @@
 //   · « Automatique » : suit le réglage de l'appareil (`prefers-color-scheme`) ;
 //   · « Le soir »     : sombre de 19 h à 7 h (heure de l'appareil), clair le jour.
 // Rangé dans `vrm_apparence` ('clair' | 'sombre' | 'auto' | 'soir'). Absent (tous
-// les appareils d'avant ce chantier) ⇒ le choix d'avant, lu dans `vinted_dark` :
-// rien ne change pour qui n'a pas touché au réglage.
+// les appareils d'avant ce chantier) ⇒ le choix d'avant, lu dans `vinted_dark`.
+// ⚠️ (16 nov., lot sombre-auto — décision de Julien : « le mode sombre suit
+// l'iPhone ; le choix manuel reste possible ») RIEN DE CHOISI ⇒ « Automatique ».
+// `vinted_dark` n'est écrit QUE par son geste (l'interrupteur, Apparence) : présent
+// (true OU false) = un choix explicite d'avant, gardé ; absent = jamais choisi ⇒ auto.
 //
 // ⚠️ LA MÊME RÈGLE AVANT LE PREMIER RENDU : `public/demarrage-theme.js` (un fichier
 // sans import, la CSP refuse tout script en ligne) en porte une COPIE ; le banc
@@ -17,7 +20,8 @@
 //
 // Module PUR (horloge et préférence du système passées en paramètre).
 
-export const APPARENCES = ['clair', 'sombre', 'auto', 'soir'];
+export const APPARENCES = ['auto', 'clair', 'sombre', 'soir'];   // (16 nov.) Automatique d'abord : le défaut
+export const APPARENCE_DEFAUT = 'auto';
 export const SOIR_DEBUT = 19;   // h : à partir de 19 h, sombre
 export const SOIR_FIN = 7;      // h : jusqu'à 7 h
 
@@ -37,7 +41,9 @@ export const PHRASES_APPARENCE = {
 // Le mode choisi : `vrm_apparence` s'il est valable, sinon le choix d'avant.
 export function apparenceDe(mode, ancienSombre) {
   if (APPARENCES.includes(mode)) return mode;
-  return ancienSombre === true ? 'sombre' : 'clair';
+  if (ancienSombre === true) return 'sombre';
+  if (ancienSombre === false) return 'clair';
+  return APPARENCE_DEFAUT;
 }
 
 export function estLeSoir(date) {

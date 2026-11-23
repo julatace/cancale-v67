@@ -1,4 +1,5 @@
 require('./_porte-banc.cjs');
+const { choisirApparence, basculerSombre } = require('./_choisir-apparence.cjs');   // (16 nov.) l'interrupteur « Mode sombre » est retiré : le geste vit dans « Apparence »
 // BANC — « Pourquoi le nuage en haut est barré ? » (Julien, 16 octobre).
 //
 // Le nuage barré = la dernière sauvegarde vers la base n'est pas partie. Avant :
@@ -56,9 +57,8 @@ const srv = http.createServer((q, r) => {
     await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
     await pg.waitForTimeout(3500);
     enPanne = true;
-    // L'interrupteur « Mode sombre » de Réglages (16 oct. : une ligne à interrupteur).
-    const bascule = pg.locator('[data-reglage-sombre]').first();
-    await bascule.click().catch(() => {});
+    // Un réglage SYNCHRONISÉ (vinted_dark) : « Apparence → Sombre / Clair » (16 nov. : l'interrupteur « Mode sombre » est retiré).
+    await basculerSombre(pg);
     await pg.waitForTimeout(2000);
     const etat1 = await pg.getAttribute('.vrm-sync-status', 'data-sync-etat').catch(() => null);
     dit(etat1 === 'error', 'la base refuse l’envoi : le nuage passe en erreur', String(etat1));
@@ -79,7 +79,7 @@ const srv = http.createServer((q, r) => {
     await pg.keyboard.press('Escape').catch(() => {});
     await pg.mouse.click(5, 900).catch(() => {});        // referme le panneau
     await pg.waitForTimeout(300);
-    await bascule.click().catch(() => {});
+    await basculerSombre(pg);   // (16 nov.) un autre réglage synchronisé : « Apparence » (l’interrupteur est retiré)
     await pg.waitForFunction(() => (document.querySelector('.vrm-sync-status') || {}).dataset?.syncEtat === 'error', null, { timeout: 6000 }).catch(() => {});
     enPanne = false;
     if (!(await pg.$('[data-sync-panneau]'))) await pg.click('.vrm-sync-status').catch(() => {});

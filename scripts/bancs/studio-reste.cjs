@@ -70,6 +70,7 @@ const ECRANS = {
 };
 // Les gestes d'avant qu'on a RETIRÉS EXPRÈS, chacun avec la place où il vit maintenant (Règles des boutons, note t25) :
 const RANGES = [
+  /^data-reglage-sombre=(on|off)$/,   // (16 nov., lot apparence-rangee — décidé par Julien) l'interrupteur « Mode sombre » doublait « Apparence » : data-apparence=clair|sombre (même catégorie)
   /^texte:\+ Nouvelle facture$/,   // le doublon de l'état vide de Factures : le geste est le plein en tête (data-fac-principal)
   // (16 nov.) Paramètres en catégories (maquette validée le 15 nov., docs/passation/2026-11-15-ecrans-verre-2.md) : ces rangées
   // nommées par leur TEXTE portent maintenant leur identité (`data-reglage-id`), le même geste dans sa catégorie :

@@ -33446,7 +33446,7 @@ export default function App() {
   //    double vérification) restaient CLAIRS dans une app réglée en sombre —
   //    sur un document déjà sombre (index.html lit `vinted_dark`). Même source.
   // (8 nov.) Le mode CHOISI (Clair · Sombre · Automatique · Le soir, src/apparence.js) : la même règle.
-  C = sombreEffectif(apparenceDe(load('vrm_apparence', null), load('vinted_dark', false)), { systemeSombre: systemeSombreMaintenant() }) ? THEMES.dark : THEMES.light;
+  C = sombreEffectif(apparenceDe(load('vrm_apparence', null), load('vinted_dark', null)), { systemeSombre: systemeSombreMaintenant() }) ? THEMES.dark : THEMES.light;
   // (14 nov., lot 120) Le lien temporaire de l'aide : sa page, SANS compte, en lecture seule (api/_lib/lien-aide.js).
   if (LIEN_AIDE_JETON) return <VueLienAide jeton={LIEN_AIDE_JETON}/>;
   if (MULTI_USER && !authState.ready) return <div data-demarrage-attente="" style={{minHeight:'100vh',background:C.bg}}/>;
@@ -34611,7 +34611,8 @@ function AppCoeur() {
     window.addEventListener('vrm:aller',onAller);
     return ()=>{ window.removeEventListener('vrm:aller',onAller); if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',onMsg); };
   },[]);
-  const [choixSombre,setChoixSombre]=useStateCle('vinted_dark', ()=>load('vinted_dark',false));
+  // (16 nov., lot sombre-auto) `null` = jamais choisi ⇒ Automatique (src/apparence.js) ; true/false = son choix.
+  const [choixSombre,setChoixSombre]=useStateCle('vinted_dark', ()=>load('vinted_dark',null));
   // (8 nov., « beauté ») L'APPARENCE CHOISIE : Clair · Sombre · Automatique (le système) · Le soir
   // (19 h–7 h). `vrm_apparence` absent ⇒ le choix d'avant (`vinted_dark`), rien ne change pour lui.
   // La règle (src/apparence.js) est la même que celle du script de démarrage (aucun flash) ;

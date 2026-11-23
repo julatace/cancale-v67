@@ -329,6 +329,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'ebay-a-traiter', date: '2026-11-16', titre: 'eBay À traiter : tâches et retours relus', phrase: 'Aucun retour s’écrit « aucun » ; un refus mène à la reconnexion.', tab: 'ebay_agent', pour: 'tous', mode: 'tous' },
   // (16 nov., Julien : « irréprochable, on ne peut pas se faire bloquer ») docs/passation/2026-11-16-favoris-offres-irreprochable.md
   { id: 'favoris-irreprochable', date: '2026-11-16', titre: 'Favoris et offres : encore plus prudents', phrase: 'Offre relue juste avant ; jamais deux fois le même texte.', tab: 'favoris', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot apparence-rangee) docs/passation/2026-11-16-apparence-rangee.md
+  { id: 'apparence-rangee', date: '2026-11-16', titre: 'Apparence et langue mieux rangées', phrase: 'Le mode sombre se choisit dans « Apparence » ; groupes titrés.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (16 nov., captures iPhone de Julien) docs/passation/2026-11-16-ventes-clair.md
   // (16 nov., Julien : « comme quand on reste appuyé sur une app sur iPhone ») docs/passation/2026-11-16-relier-glisser.md
   { id: 'relier-glisser', date: '2026-11-16', titre: 'Relier un achat en le glissant', phrase: 'Reste appuyé sur l’achat, pose-le sur la vente ou l’annonce.', tab: 'achats', pour: 'tous', mode: 'tous' },
@@ -344,6 +346,8 @@ export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot vente-email-absente) docs/passation/2026-11-16-vente-email-absente.md
   { id: 'vente-email-particulier', date: '2026-11-16', titre: 'Une vente vue par e-mail est dans Ventes', phrase: 'Même sur un compte particulier, avant que l’extension la lise.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'fiche-porte-achat', date: '2026-11-16', titre: 'Le « ? » d’« Achetée » ouvre la saisie', phrase: 'Et « Déplacer » est sous ⋯, sans « Tout voir ».', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot sombre-auto) docs/passation/2026-11-16-sombre-auto.md
+  { id: 'sombre-auto', date: '2026-11-16', titre: 'Le mode sombre suit ton iPhone', phrase: 'Automatique par défaut ; Clair ou Sombre restent au choix.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (16 nov., lot achats-qr) docs/passation/2026-11-16-achats-qr.md
   { id: 'achats-qr', date: '2026-11-16', titre: 'À retirer : le QR en un toucher', phrase: 'Bouton QR visible, jours justes, achat relié par ton clic.', tab: 'retraits', pour: 'tous', mode: 'tous' },
   // (16 nov., Julien : « j'ai demandé un retour […] ne me la propose pas ») docs/passation/2026-11-16-achats-retour.md

@@ -48,7 +48,8 @@ async function verifier({ src, dem, app }, bavard = true) {
   for (const mode of MODES) for (const ancien of [undefined, false, true]) for (const sys of [false, true]) for (let h = 0; h < 24; h++) {
     const stock = {}; if (mode !== undefined) stock.vrm_apparence = JSON.stringify(mode); if (ancien !== undefined) stock.vinted_dark = JSON.stringify(ancien);
     const d = new Date(2026, 10, 8, h, 30, 0);
-    const react = A.sombreEffectif(A.apparenceDe(mode === undefined ? null : mode, ancien === true), { date: d, systemeSombre: sys });
+    // (16 nov., lot sombre-auto) `vinted_dark` passé TEL QUEL (absent / false / true) : absent ⇒ Automatique.
+    const react = A.sombreEffectif(A.apparenceDe(mode === undefined ? null : mode, ancien === undefined ? null : ancien), { date: d, systemeSombre: sys });
     const r = lanceDemarrage(stock, h, sys);
     n++;
     if (r.erreur || (r.theme === 'dark') !== react) ecarts.push(`${mode}/${ancien}/${sys ? 'sys-sombre' : 'sys-clair'}/${h}h : React ${react ? 'sombre' : 'clair'}, démarrage ${r.erreur || r.theme}`);
@@ -64,17 +65,23 @@ async function verifier({ src, dem, app }, bavard = true) {
   const nuitDemarrage = ((html.match(/--vrm-verre-uni-nuit:\s*(#[0-9A-Fa-f]{6})/) || [])[1] || '').toUpperCase();
   dit(!!nuitDemarrage && String(r0.meta || '').toUpperCase() === nuitDemarrage && r0.theme === 'dark', `la barre d’état suit le thème choisi dès le démarrage (theme-color = le fond de nuit de l’écran de démarrage, ${nuitDemarrage || '?'})`, String(r0.meta));
   // 2. La règle.
-  const S = (mode, h, sys = false, ancien = false) => A.sombreEffectif(A.apparenceDe(mode, ancien), { date: new Date(2026, 10, 8, h, 0, 0), systemeSombre: sys });
+  const S = (mode, h, sys = false, ancien = null) => A.sombreEffectif(A.apparenceDe(mode, ancien), { date: new Date(2026, 10, 8, h, 0, 0), systemeSombre: sys });
   dit(S('soir', 19) && S('soir', 23) && S('soir', 0) && S('soir', 6), '« Le soir » : sombre de 19 h à 6 h 59');
   dit(!S('soir', 7) && !S('soir', 12) && !S('soir', 18), '« Le soir » : clair de 7 h à 18 h 59');
   dit(S('auto', 12, true) && !S('auto', 22, false), '« Automatique » : la préférence de l’appareil, jamais l’heure');
-  dit(S(null, 12, false, true) && !S(null, 22, true, false), 'rien de choisi ⇒ le choix d’avant (`vinted_dark`), ni l’heure ni le système');
+  dit(S(null, 12, false, true) && !S(null, 22, true, false), 'un ancien choix explicite (`vinted_dark` true OU false) est gardé, ni l’heure ni le système');
+  // (16 nov., lot sombre-auto — décision de Julien) Rien de choisi ⇒ Automatique : le système décide.
+  dit(A.apparenceDe(null, null) === 'auto' && A.apparenceDe(undefined, undefined) === 'auto' && S(null, 12, true) && !S(null, 22, false), 'rien de choisi ⇒ Automatique : suit l’appareil (sombre si l’iPhone est sombre, clair sinon)');
+  dit(A.APPARENCES[0] === 'auto', 'Automatique est le premier choix (le défaut)');
+  const dAbs = lanceDemarrage({}, 12, true), dAbs2 = lanceDemarrage({}, 12, false), dFaux = lanceDemarrage({ vinted_dark: 'false' }, 12, true);
+  dit(dAbs.theme === 'dark' && dAbs2.theme === 'light' && dFaux.theme === 'light', 'au démarrage : rien de choisi ⇒ la teinte du système ; « clair » choisi autrefois ⇒ clair même si le système est sombre');
   dit(S('sombre', 12) && !S('clair', 22, true), 'Clair et Sombre : toujours, quoi qu’il arrive');
   const w1 = A.ecrituresApparence('sombre'), w2 = A.ecrituresApparence('soir');
   dit(w1 && w1.vinted_dark === true && w1.vrm_apparence === 'sombre' && w2 && !('vinted_dark' in w2), 'un choix explicite écrit aussi `vinted_dark` ; « Le soir » ne le touche pas');
   const p18 = A.prochainChangement('soir', new Date(2026, 10, 8, 18, 30, 0)), p23 = A.prochainChangement('soir', new Date(2026, 10, 8, 23, 0, 0));
   dit(p18 === 30 * 60000 && p23 === 8 * 3600000 && A.prochainChangement('auto', new Date()) === null, '« Le soir » se recale à 19 h et à 7 h pile', `${p18} / ${p23}`);
   // 3. Le branchement dans l'app.
+  dit(/useStateCle\('vinted_dark', \(\)=>load\('vinted_dark',null\)\)/.test(app) && /apparenceDe\(load\('vrm_apparence', null\), load\('vinted_dark', null\)\)/.test(app), 'App.jsx lit `vinted_dark` ABSENT comme « jamais choisi » (null), aux deux endroits');
   dit((app.match(/sombreEffectif\(/g) || []).length >= 2, 'App.jsx applique la règle AVANT le cœur et DANS le cœur (une source)');
   dit(/'vinted_dark','vinted_stock_vinted',[\s\S]{0,200}'vrm_apparence'/.test(app), '`vrm_apparence` voyage entre ses appareils (comme `vinted_dark`)');
   dit(/visibilitychange/.test(app.slice(app.indexOf('apparence !== \'soir\'') - 50, app.indexOf('apparence !== \'soir\'') + 1200)), '« Le soir » se recale quand le téléphone revient au premier plan');
@@ -92,7 +99,10 @@ async function verifier({ src, dem, app }, bavard = true) {
       ['démarrage : automatique ignoré', (b) => ({ ...b, dem: b.dem.replace("if (mode === 'auto') return systeme === true;", '') })],
       ['règle : le soir finit à 8 h', (b) => ({ ...b, src: b.src.replace('SOIR_FIN = 7', 'SOIR_FIN = 8') })],
       ['règle : explicite n’écrit plus vinted_dark', (b) => ({ ...b, src: b.src.replace("if (mode === 'sombre') out.vinted_dark = true;", '') })],
-      ['règle : absent ⇒ clair', (b) => ({ ...b, src: b.src.replace("return ancienSombre === true ? 'sombre' : 'clair';", "return 'clair';") })],
+      ['règle : absent ⇒ clair', (b) => ({ ...b, src: b.src.replace("return APPARENCE_DEFAUT;", "return 'clair';") })],
+      ['règle : ancien « clair » oublié', (b) => ({ ...b, src: b.src.replace("if (ancienSombre === false) return 'clair';", '') })],
+      ['démarrage : absent ⇒ clair', (b) => ({ ...b, dem: b.dem.replace("ancien === false ? 'clair' : 'auto'", "'clair'") })],
+      ['app : vinted_dark lu false par défaut', (b) => ({ ...b, app: b.app.replace("useStateCle('vinted_dark', ()=>load('vinted_dark',null))", "useStateCle('vinted_dark', ()=>load('vinted_dark',false))") })],
       ['app : plus synchronisé', (b) => ({ ...b, app: b.app.replace("  'vrm_apparence',\n", '\n') })],
     ];
     let rates = 0;

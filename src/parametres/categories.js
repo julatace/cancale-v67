@@ -54,7 +54,11 @@ export const CATEGORIES = [
     { id: 'notifications', items: ['push', 'rappels', 'agenda', 'alertes', 'capte'] },
   ] },
   { id: 'apparence', ic: 'contraste', groupes: [
-    { id: 'langue', items: ['langue', 'apparence', 'sombre', 'zoom', 'taille-texte'] },
+    // (16 nov., lot apparence-rangee — décidé par Julien : « ranger Affichage ») Des groupes qui disent ce
+    // qu'ils rangent : l'apparence (thème, taille du texte, zoom), la langue, les écrans, le stream, les
+    // raccourcis. L'interrupteur « Mode sombre » (`sombre`) est retiré : il doublait « Apparence ».
+    { id: 'apparence', titre: 'parametres.g.apparence', items: ['apparence', 'taille-texte', 'zoom'] },
+    { id: 'langue', titre: 'parametres.g.langue', items: ['langue'] },
     { id: 'ecrans', titre: 'parametres.g.ecrans', items: ['affichage-mode', 'ma-journee', 'configuration', 'atelier'] },
     { id: 'stream', titre: 'parametres.g.stream', items: ['presentation', 'stream-on', 'stream'] },
     { id: 'raccourcis', titre: 'parametres.g.raccourcis', items: ['widget', 'raccourcis-siri', 'raccourcis-clavier'] },

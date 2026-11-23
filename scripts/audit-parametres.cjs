@@ -12,6 +12,9 @@
 //   5. « Organisation » reste joignable sous « Stock et rangement » (CLAUDE.md §3) ; la carte
 //      Photoroom n'est pas dans Paramètres (§3, « Détourage ») ;
 //   6. la clé « Sécurité des données » n'est plus écrite deux fois (la seconde gagnait).
+//   7. (16 nov., lot apparence-rangee — décidé par Julien) plus d'interrupteur « Mode sombre » en doublon
+//      d'« Apparence » ; « Apparence et langue » rangée en groupes TITRÉS (Apparence · Langue · Écrans…),
+//      chaque titre dans les cinq langues.
 //   node scripts/audit-parametres.cjs                 la règle du dépôt
 //   node scripts/audit-parametres.cjs --mutation=NOM  une règle réaffaiblie
 //   node scripts/audit-parametres.cjs --prouve        toutes les mutations : chacune doit rougir
@@ -36,6 +39,10 @@ const MUTATIONS = {
   // Un ancien lien perdu : l'abonnement n'est plus une rangée connue.
   'lien-abonnement': ['reg', "{ id:'abonnement', type:'panneau', nu:true, paresseux:true,", "{ id:'abonnement-x', type:'panneau', nu:true, paresseux:true,"],
   // « Organisation » quitte « Stock et rangement ».
+  // (16 nov.) L'interrupteur « Mode sombre » revient dans sa catégorie.
+  'sombre-remis': ['cat', "items: ['apparence', 'taille-texte', 'zoom']", "items: ['apparence', 'sombre', 'taille-texte', 'zoom']"],
+  // (16 nov.) Le premier groupe d'« Apparence et langue » redevient sans titre.
+  'groupe-sans-titre': ['cat', "{ id: 'apparence', titre: 'parametres.g.apparence', items:", "{ id: 'apparence', items:"],
   'organisation': ['cat', "{ id: 'stock', titre: 'reglages.groupe.stock', items: ['numeros', 'je-vends'], pied: 'stock' }", "{ id: 'stock', titre: 'reglages.groupe.stock', items: ['numeros', 'je-vends'] }"],
 };
 const arg = process.argv.slice(2);
@@ -144,6 +151,19 @@ const dit = (bon, quoi, detail) => { n++; if (!bon) ko++; console.log(`${bon ? '
   dit(!/Photoroom|data-photoroom|detourage/i.test(src.cat) && !/<CartePhotoroom|data-photoroom-cle/.test(R), 'aucune carte Photoroom / Détourage dans Paramètres (CLAUDE.md §3)');
   // ── Plus d'onglets.
   dit(!/role="tablist"[^\n]*data-onglets-reglages/.test(R), 'plus d’onglets Réglages · Mon compte · Abonnement : un premier écran de catégories');
+
+  // ── (16 nov.) « Mode sombre » retiré, « Apparence et langue » rangée.
+  const catApp = C.CATEGORIES.find((c) => c.id === 'apparence');
+  const nommeesApp = C.CATEGORIES.flatMap((c) => c.groupes.flatMap((g) => g.items));
+  dit(!nommeesApp.includes('sombre') && !/\{ id:'sombre', type:'switch'/.test(R) && !/data-reglage-sombre/.test(R), 'plus d’interrupteur « Mode sombre » : le choix vit dans « Apparence » seule', nommeesApp.filter((x) => x === 'sombre'));
+  const sansTitre = catApp ? catApp.groupes.filter((g) => !g.titre).map((g) => g.id) : ['(catégorie absente)'];
+  dit(!sansTitre.length && catApp.groupes.find((g) => g.items.includes('apparence')).titre === 'parametres.g.apparence', '« Apparence et langue » : chaque groupe a un titre, « Apparence » en tête', sansTitre);
+  const titresManquants = [];
+  for (const l of ['fr', 'en', 'es', 'it', 'de']) {
+    const t = fs.readFileSync(path.join(RACINE, 'src', 'i18n', 'langues', l, 'parametres.js'), 'utf8');
+    for (const g of (catApp ? catApp.groupes : [])) if (g.titre && g.titre.startsWith('parametres.') && !t.includes(`"${g.titre}"`)) titresManquants.push(`${l}:${g.titre}`);
+  }
+  dit(!titresManquants.length, 'les titres des groupes d’« Apparence et langue » existent dans les cinq langues', titresManquants);
 
   fs.rmSync(tmp, { recursive: true, force: true });
   console.log(`\n${ko ? '❌' : '✅'} audit-parametres : ${n - ko}/${n}`);
