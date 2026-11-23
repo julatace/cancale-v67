@@ -107,4 +107,5 @@ export default {
   "pm.luIlYa": {"one": "lu il y a {n} jour", "other": "lu il y a {n} jours"},
   "pm.comptes": "{n} comptes sur {m} lus",
   "pm.ouvrir": "Ouvre ton porte-monnaie Vinted",
+  "vt.nEtat": "{n} : {etat}",
 };

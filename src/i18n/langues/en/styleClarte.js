@@ -107,4 +107,5 @@ export default {
   "pm.luIlYa": {"one": "read {n} day ago", "other": "read {n} days ago"},
   "pm.comptes": "{n} of {m} accounts read",
   "pm.ouvrir": "Open your Vinted wallet",
+  "vt.nEtat": "{n}: {etat}",
 };

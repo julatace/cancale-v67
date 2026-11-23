@@ -211,12 +211,14 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
   // (23 nov., style-clarte-5 — §7 « une même phrase sur chaque ligne est UNE phrase ») L'état d'envoi (« Bordereau prêt »…) n'est
   // écrit sur la rangée que s'il ne vaut PAS pour toutes les rangées montrées ; sinon il est dit une fois, à côté du nombre.
   const sousDe = (r) => { const st = surEnvoyer ? statutEnvoyer(r) : statutRangee(r); return surEnvoyer ? (st === 'site' ? '' : tr('vt.st.' + st)) : (r.etat && r.etat.texte) || ''; };
-  const sousTous = rangsVus.length > 1 ? sousDe(rangsVus[0]) : '';
-  const sousCommun = !!sousTous && rangsVus.every((r) => sousDe(r) === sousTous) ? sousTous : '';
+  // L'état le PLUS FRÉQUENT (au moins deux rangées) se tait sur les rangées et se dit une fois en tête (« 24 · bordereau prêt ») ;
+  // seules les rangées qui en diffèrent gardent le leur — on lit l'exception, pas la règle répétée.
+  const compteSous = new Map(); for (const r of rangsVus) { const x = sousDe(r); if (x) compteSous.set(x, (compteSous.get(x) || 0) + 1); }
+  const [sousCommun, nCommun] = [...compteSous.entries()].sort((a, b) => b[1] - a[1])[0] || ['', 0];
   const lignes = erreur ? null : !lu ? undefined : rangsVus.map((r) => {
     const st = surEnvoyer ? statutEnvoyer(r) : statutRangee(r);
     const sousR = sousDe(r);
-    const sous = sousCommun ? '' : sousR;
+    const sous = sousCommun && nCommun >= 2 && sousR === sousCommun ? '' : sousR;
     return { cle: r.cle, r, titre: r.titre, photo: r.photo || '', image: r.photo && Photo ? <Photo src={r.photo} alt="" loading="lazy" decoding="async"/> : null,
       sous: joint(marqueTaille(r), sous), statut: st, statutLibelle: motStatut(r), nonCochable: !(r.coche && r.coche.possible), num: r.num, prix: r.prix, t: r.t, prixGrille: r.prix,
       texte: [r.titre, r.num ? 'n' + r.num + ' n°' + r.num + ' ' + r.num : '', r.taille, r.acheteur, r.compte, r.transporteur, r.suivi, sousR].filter(Boolean).join(' '),
@@ -262,7 +264,7 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
     <BoutonIcone libelle={tr('vt.outils')} icone={<Icon name="more" size={20}/>} onClick={onOutils} attrs={{ 'data-vn-plus': '' }}/>
   </> : filtre;
   const unite = (n) => [m.auMoins && surEnvoyer && n === rangs.length ? tr('vt.auMoins', { n }) : tr('tableau.ventes', { n }),
-    sousCommun ? (rangsVus.length === n ? tr('vt.tous', { etat: sousCommun.toLowerCase() }) : '') : '',
+    sousCommun && nCommun >= 2 && rangsVus.length === n ? (nCommun === n ? tr('vt.tous', { etat: sousCommun.toLowerCase() }) : tr('vt.nEtat', { n: nCommun, etat: sousCommun.toLowerCase() })) : '',
     aVerifierPartout ? tr('vt.limitesAVerifier', { n: nAVerifier }) : ''].filter(Boolean).join(' · ');
   const retours = surEnvoyer && E.retours.length ? <Groupe titre={tr('vn.retours')} attrs={{ 'data-vn-retours': String(E.retours.length) }}>
     {E.retours.map((l) => <Rangee key={l.cle} titre={l.titre || tr('retours.article')} plaque={l.num ? <Plaque numero={l.num}/> : null} sousTitre={l.vendeur ? tr('impr.retour.vendeur', { qui: l.vendeur }) : ''}
