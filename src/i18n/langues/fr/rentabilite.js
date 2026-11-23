@@ -54,5 +54,19 @@ export default {
   "rt.couv.autres": "{n} non reconnues (Autres)",
   "rt.regroupe": "Ce qui a été regroupé",
   "rt.regroupe.sous": "{n} groupes · pour l’affichage, jamais pour relier une paire",
-  "rt.regroupe.reste": "et {n} autres"
+  "rt.regroupe.reste": "et {n} autres",
+  "rt.axe.source": "Source",
+  "rs.tousAchats": "Tous tes achats, par où tu les as achetés",
+  "rs.auPlus": "au plus {p}",
+  "rs.rienRevendu": "rien revendu",
+  "rs.revendus": "{k} revendus sur {n}",
+  "rs.achetes": "{n} achetés",
+  "rs.taux": "{t} % revendus",
+  "rs.surDatees": "sur {n} datées",
+  "rs.pasSu": "Pas encore calculé : ouvre Achats une fois",
+  "rs.pasSaisie": "Source pas saisie",
+  "rs.couv": "Bénéfice moyen sur {k} des {n} reventes (prix d’achat connu)",
+  "rs.couv.sansAchat": "{n} ventes sans achat relié, dans aucune source",
+  "rs.couv.pasLu": "{n} reliées à un achat pas lu ici",
+  "rs.couv.vintedPasLus": "achats Vinted pas lus"
 };

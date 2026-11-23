@@ -54,5 +54,19 @@ export default {
   "rt.couv.autres": "{n} nicht erkannt (Andere)",
   "rt.regroupe": "Was zusammengefasst wurde",
   "rt.regroupe.sous": "{n} Gruppen · nur zur Anzeige, nie zum Verknüpfen",
-  "rt.regroupe.reste": "und {n} weitere"
+  "rt.regroupe.reste": "und {n} weitere",
+  "rt.axe.source": "Quelle",
+  "rs.tousAchats": "Alle deine Einkäufe, nach Einkaufsort",
+  "rs.auPlus": "höchstens {p}",
+  "rs.rienRevendu": "nichts weiterverkauft",
+  "rs.revendus": "{k} von {n} weiterverkauft",
+  "rs.achetes": "{n} gekauft",
+  "rs.taux": "{t} % weiterverkauft",
+  "rs.surDatees": "bei {n} datierten",
+  "rs.pasSu": "Noch nicht berechnet: öffne einmal Einkäufe",
+  "rs.pasSaisie": "Quelle nicht angegeben",
+  "rs.couv": "Durchschnittsgewinn bei {k} von {n} Weiterverkäufen (Einkaufspreis bekannt)",
+  "rs.couv.sansAchat": "{n} Verkäufe ohne verknüpften Einkauf, in keiner Quelle",
+  "rs.couv.pasLu": "{n} mit einem hier nicht gelesenen Einkauf verknüpft",
+  "rs.couv.vintedPasLus": "Vinted-Einkäufe nicht gelesen"
 };

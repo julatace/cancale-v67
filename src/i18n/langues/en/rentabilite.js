@@ -54,5 +54,19 @@ export default {
   "rt.couv.autres": "{n} not recognised (Other)",
   "rt.regroupe": "What was grouped",
   "rt.regroupe.sous": "{n} groups · display only, never to link a pair",
-  "rt.regroupe.reste": "and {n} more"
+  "rt.regroupe.reste": "and {n} more",
+  "rt.axe.source": "Source",
+  "rs.tousAchats": "All your purchases, by where you bought them",
+  "rs.auPlus": "at most {p}",
+  "rs.rienRevendu": "nothing resold",
+  "rs.revendus": "{k} resold of {n}",
+  "rs.achetes": "{n} bought",
+  "rs.taux": "{t}% resold",
+  "rs.surDatees": "over {n} dated",
+  "rs.pasSu": "Not calculated yet: open Purchases once",
+  "rs.pasSaisie": "Source not entered",
+  "rs.couv": "Average profit over {k} of {n} resales (purchase price known)",
+  "rs.couv.sansAchat": "{n} sales with no linked purchase, in no source",
+  "rs.couv.pasLu": "{n} linked to a purchase not read here",
+  "rs.couv.vintedPasLus": "Vinted purchases not read"
 };

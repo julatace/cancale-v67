@@ -10,14 +10,18 @@ import React from 'react';
 import { tr, nombre } from '../../i18n/index.js';
 import { Segmente, Colonne, Carte, Rangee } from '../index.js';
 import { AXES_MIEUX, TRIS_MIEUX } from '../../vendsMieux.js';
+// (23 nov., lot rentabilite-source) le 5e regroupement : la SOURCE de l'achat (src/rentabiliteSource.js, sur la publication
+// de « Tes meilleures sources » — aucune règle neuve ; `sources` : undefined lecture · null pas su · modèle).
+import { AXE_SOURCE } from '../../rentabiliteSource.js';
+const AXES = [...AXES_MIEUX, AXE_SOURCE];
 
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
 const MAX_LIGNES = 8;
 const lireChoix = (k, ok, d) => { try { const v = localStorage.getItem(k); return ok.includes(v) ? v : d; } catch (_) { return d; } };
 const garder = (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* rien */ } };
 
-export default function StatsVendsMieux({ mieux, sur = '', montant = (x) => String(x), lecture = false, raison = '' }) {
-  const [axe, setAxe] = React.useState(() => lireChoix('vrm_stats_mieux_axe', AXES_MIEUX, 'modele'));
+export default function StatsVendsMieux({ mieux, sur = '', montant = (x) => String(x), lecture = false, raison = '', sources = undefined }) {
+  const [axe, setAxe] = React.useState(() => lireChoix('vrm_stats_mieux_axe', AXES, 'modele'));
   const [tri, setTri] = React.useState(() => lireChoix('vrm_stats_mieux_tri', TRIS_MIEUX, 'marge'));
   const [voirRegroupe, setVoirRegroupe] = React.useState(false);
   const A = mieux ? mieux[axe] : null;
@@ -34,11 +38,12 @@ export default function StatsVendsMieux({ mieux, sur = '', montant = (x) => Stri
   const choix = (
     <div className="n-ps-mieux-choix">
       <Segmente libelle={tr('rt.axe')} valeur={axe} onChange={(x) => { setAxe(x); garder('vrm_stats_mieux_axe', x); setVoirRegroupe(false); }}
-        options={AXES_MIEUX.map((x) => ({ cle: x, libelle: tr('rt.axe.' + x) }))}/>
+        options={AXES.map((x) => ({ cle: x, libelle: tr('rt.axe.' + x) }))}/>
       <Segmente libelle={tr('rt.tri')} valeur={tri} onChange={(x) => { setTri(x); garder('vrm_stats_mieux_tri', x); }}
         options={TRIS_MIEUX.map((x) => ({ cle: x, libelle: tr('rt.tri.' + x) }))}/>
     </div>
   );
+  if (axe === AXE_SOURCE) return <ParSource S={sources} tri={tri} choix={choix} montant={montant} jours={jours}/>;
   const attente = lecture || mieux === undefined;
   return (
     <>
@@ -78,5 +83,45 @@ export default function StatsVendsMieux({ mieux, sur = '', montant = (x) => Stri
         </Carte>
       </Colonne>
     </>
+  );
+}
+
+// ── LE 5e REGROUPEMENT : LA SOURCE DE L'ACHAT (23 nov., lot rentabilite-source) ──
+// Tous ses achats (pas la fenêtre : la publication de « Tes meilleures sources » couvre tout, c'est dit en sous-titre).
+// Une rangée par source : le chiffre du tri à droite ; dessous, ce qui ne se redit pas (reventes, taux, délai).
+function ParSource({ S, tri, choix, montant, jours }) {
+  const parK = S ? new Map(S.groupes.map((g) => [g.k, g])) : null;
+  const ordre = S ? S.ordre[tri].map((k) => parK.get(k)).filter(Boolean) : [];
+  const signe = (c) => (c >= 0 ? '+' : '−') + montant(Math.abs(c) / 100);
+  const valeur = (g) => (tri === 'vitesse' ? (g.delai != null ? jours(g.delai) : '—')
+    : tri === 'volume' ? nombre(g.revendus)
+      : g.beneficeMoyen != null ? (g.partiel ? tr('rs.auPlus', { p: signe(g.beneficeMoyen) }) : signe(g.beneficeMoyen)) : '—');
+  const detail = (g) => (tri === 'marge' && g.beneficeMoyen != null && g.nBenef < g.revendus ? tr('rt.surN', { k: nombre(g.nBenef), n: nombre(g.revendus) })
+    : tri === 'marge' && g.beneficeMoyen == null ? (g.revendus ? tr('rt.sansPrix') : tr('rs.rienRevendu')) : '');
+  const sous = (g) => [tri !== 'volume' ? tr('rs.revendus', { k: nombre(g.revendus), n: nombre(g.articles) }) : tr('rs.achetes', { n: nombre(g.articles) }),
+    g.taux != null ? tr('rs.taux', { t: nombre(g.taux) }) : '',
+    tri !== 'vitesse' && g.delai != null ? tr('rt.delai', { d: jours(g.delai) }) + (g.nDelai < g.revendus ? ' · ' + tr('rs.surDatees', { n: nombre(g.nDelai) }) : '') : ''].filter(Boolean).join(' · ');
+  return (
+    <Colonne pleine>
+      <Carte titre={tr('rt.titre')} sousTitre={tr('rs.tousAchats')} className="n-ps-mieux"
+        attrs={{ 'data-ps-bloc': 'mieux', 'data-ps-mieux-axe': AXE_SOURCE, 'data-ps-mieux-tri': tri, 'aria-busy': S === undefined ? 'true' : undefined,
+          'data-ps-mieux-ordre': ordre.map((g) => g.k).join('|'), 'data-ps-mieux-n': S ? String(S.n) : '', 'data-ps-mieux-ncout': S ? String(S.nCout) : '' }}>
+        {choix}
+        <p className="n-ps-mieux-tete">{tr('rt.classement')}</p>
+        {S === undefined ? <Rangee titre={tr('v2.jour.lecture')}/> : !S ? <Rangee titre={tr('rs.pasSu')} attrs={{ 'data-ps-source-passu': '' }}/>
+          : ordre.length ? ordre.map((g) => (
+            <Rangee key={g.k} titre={g.pasSaisie ? tr('rs.pasSaisie') : g.nom} sousTitre={sous(g)} sousLignes={2} valeur={valeur(g)} valeurForte detailValeur={detail(g)}
+              attrs={{ 'data-ps-source': g.k, 'data-articles': String(g.articles), 'data-revendus': String(g.revendus), 'data-nbenef': String(g.nBenef),
+                'data-moyen': g.beneficeMoyen == null ? '' : String(g.beneficeMoyen), 'data-taux': g.taux == null ? '' : String(g.taux),
+                'data-delai': g.delai == null ? '' : String(g.delai), 'data-partiel': g.partiel ? '1' : '' }}/>
+          )) : <Rangee titre={tr('v2.ps.top.aucun')}/>}
+        {S ? <p className="n-ps-mieux-note" data-ps-mieux-couv="" data-ps-source-sansachat={String(S.sansAchat)}>{[
+          tr('rs.couv', { k: nombre(S.nCout), n: nombre(S.n) }),
+          S.sansAchat ? tr('rs.couv.sansAchat', { n: nombre(S.sansAchat) }) : '',
+          S.achatPasLu ? tr('rs.couv.pasLu', { n: nombre(S.achatPasLu) }) : '',
+          S.vintedLus ? '' : tr('rs.couv.vintedPasLus'),
+        ].filter(Boolean).join(' · ')}</p> : null}
+      </Carte>
+    </Colonne>
   );
 }
