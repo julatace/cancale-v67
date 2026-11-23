@@ -327,6 +327,7 @@ import VoirEmailColis from "../VoirEmailColis.jsx";
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "../litiges.js";
 import { ordreDesGroupes, ordonnerLot } from "../lotTransporteurs.js";
 import { trouverParScan, candidatsRetrait } from "../scanColis.js";
+import { suiteAchatScan, numerosDeLAchat, numerosVendus } from '../scanAchatSuite.js';
 import { chercherCodeDansEtiquettes } from "../etiquettesScan.js";
 // ⟦← App.jsx #66⟧
 import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau, resumeLot, nombreAImprimer, libelleImprimer, texteExclus } from "../lotSelection.js";
@@ -19667,6 +19668,17 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         marque: extractBrand(o.title || '') || '',
         signaler: o.conversation_id ? `https://www.vinted.fr/inbox/${encodeURIComponent(o.conversation_id)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`,
         details: () => detailsAchatScan(uid, tx),
+        // (23 nov., lot scan-achat) SON N° et le geste suivant (src/scanAchatSuite.js), lus AU MOMENT où la fiche
+        // s'affiche : les N° de CET achat par identité (son n° de transaction), sa case, la vente qui porte ce N°.
+        suite: () => {
+          const nums = numerosDeLAchat({ tx, fiches: numeros, rangees: load(CLE_FICHES_RANGEES, null), cleNum });
+          const vendus = numerosVendus({ ventes: Array.isArray(sales.items) ? sales.items : null, identiteAnnonce, fiches: numeros, corrections: saleOv, annulee: (v) => classifyOrderStatus(v.status) === 'cancelled', cleNum });
+          const m = load('vrm_meubles', null), s = load('vrm_slots', null);
+          return suiteAchatScan({ numeros: nums, slots: s && typeof s === 'object' && !Array.isArray(s) ? s : null, meubles: Array.isArray(m) ? m : null, vendus, cleNum });
+        },
+        lienVente: (vtx) => `?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(vtx)}`,
+        // « Déjà vendue ? Relier à une vente » : la feuille d'Achats (« Relier à une vente / annonce »), SON clic relie.
+        relierVente: () => setRelierDepuis({ tx }),
         ranger: () => { const e = entreeAvecPaye(o, suivis && suivis[0] ? { suivi: suivis[0] } : {}); if (!e) return; noterArrivees([e]); ouvrirAtelierArrivee([e]); },
         // (20 nov., lot arrivee-scan) L'achat pour l'écran d'arrivée (le scanner de l'arrivée) : le même que « J'ai retiré ».
         entree: () => entreeAvecPaye(o, suivis && suivis[0] ? { suivi: suivis[0] } : {}) };

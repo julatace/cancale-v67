@@ -27,6 +27,7 @@ import { useLectureCamera, raisonCamera, vibrer, creerBip, zoomDe, poserZoom } f
 import { lireSourcesColis, EV_RETROUVER_CODE, chercherCodeSources, sourcePrincipalePresente } from './retrouverColis.js';
 import { codeCherchable, normaliserCode } from './etiquettesScan.js';
 import { achatDuScan } from './arriveeAchat.js';
+import { achatParIdentite } from './scanAchatSuite.js';
 import { cleLigne, ouvrirLigne } from './ficheLigne.js';
 import './design/scanner-retrouver.css';
 
@@ -127,7 +128,48 @@ function LigneArticle({ a, Photo }) {
     </li>
   );
 }
-function FicheAchat({ e, lu, Photo, onOuvrir, onRanger, onPasCa }) {
+// (23 nov., lot scan-achat) SON N° et LE GESTE SUIVANT (src/scanAchatSuite.js) : le N° de CET achat (par son n° de
+// transaction), sa case (notée, sinon proposée par la règle du Stock), la vente qui porte déjà ce N°. Aucun N° n'est
+// « prévu » sans être servi : sans N° ⇒ « Numéroter » (l'écran d'arrivée le sert, pool d'abord, puis le montre).
+const caseCourte = (p) => (p ? tr('scan.a.caseCourte', { meuble: p.meuble || tr('scan.a.meuble'), r: p.rangee, c: p.colonne }) : '');
+const caseLongue = (p) => (p ? tr('arv.case.mots', { meuble: p.meuble || tr('scan.a.meuble'), r: p.rangee, c: p.colonne }) : '');
+function lireSuite(e) {
+  if (!e || typeof e.suite !== 'function') return { su: false };
+  try { const s = e.suite(); return s && typeof s === 'object' ? s : { su: false }; } catch (_) { return { su: false }; }
+}
+function BlocNumero({ s }) {
+  if (!s || !s.su) return null;
+  const nums = Array.isArray(s.numeros) ? s.numeros : [];
+  const places = Array.isArray(s.places) ? s.places : null;
+  const ton = s.etat === 'vendue' ? ' is-afaire' : s.etat === 'range' ? ' is-fait' : '';
+  const ligne = s.etat === 'aNumeroter' ? tr('scan.a.sansNum')
+    : s.etat === 'vendue' ? tr('scan.a.vendue', { num: s.vente.num })
+    : s.etat === 'range' ? (nums.length > 1 ? tr('scan.a.rangesN', { n: nums.length }) : tr('scan.a.range', { lieu: caseLongue(places && places[0]) }))
+    : places && nums.length === 1 && places[0] ? tr(places[0].propose ? 'scan.a.casePrevue' : 'scan.a.caseNotee', { lieu: caseLongue(places[0]) })
+    : s.aucunMeuble ? tr('scan.a.sansMeuble') : places ? tr('scan.a.sansCase') : '';
+  return (
+    <div className={'vrm-rtv-etat vrm-rtv-num' + ton} data-scan-a-suite={s.etat} data-scan-a-nums={nums.join(',')}
+      data-scan-a-case={places && places[0] ? `${places[0].meubleId}:${places[0].i}` : ''} data-scan-a-vente={s.etat === 'vendue' ? s.vente.tx : undefined}>
+      <span className="vrm-rtv-etat-point" aria-hidden="true"/>
+      <span className="vrm-rtv-etat-txt">
+        <b>{nums.length ? nums.map((n) => <span key={n} className="vrm-rtv-plaque is-petite" data-scan-a-num={n}><small>N°</small>{n}</span>) : null}{nums.length ? null : tr('scan.a.sonNum')}</b>
+        {ligne ? <small>{ligne}</small> : null}
+        {s.etat !== 'vendue' && places && nums.length > 1 ? nums.map((n, k) => <small key={'p' + n} data-scan-a-place={n}>{`N°${n} · ${places[k] ? caseLongue(places[k]) : tr('scan.a.sansCase')}`}</small>) : null}
+      </span>
+    </div>
+  );
+}
+// Le plein de la fiche : CE geste-là, un seul (« Numéroter », « Ranger en … », « Ouvrir la vente ») — rangé : aucun.
+function libellePlein(s) {
+  if (!s || !s.su) return tr('scan.a.ranger');
+  if (s.etat === 'aNumeroter') return tr('scan.a.numeroter');
+  if (s.etat === 'vendue') return tr('scan.r.ouvrir.vente');
+  if (s.etat === 'range') return '';
+  const p = Array.isArray(s.places) && s.numeros.length === 1 ? s.places[0] : null;
+  return p ? tr('scan.a.rangerEn', { lieu: caseCourte(p) }) : s.numeros.length > 1 ? tr('scan.a.rangerN', { n: s.numeros.length }) : tr('scan.a.rangerNum', { num: s.numeros[0] });
+}
+function FicheAchat({ e, lu, Photo, onOuvrir, onRanger, onPasCa, onRelierVente }) {
+  const suite = React.useMemo(() => lireSuite(e), [e]);
   const [det, setDet] = React.useState(() => (typeof e.details === 'function' ? undefined : null));
   React.useEffect(() => {
     if (typeof e.details !== 'function') return undefined;
@@ -153,7 +195,7 @@ function FicheAchat({ e, lu, Photo, onOuvrir, onRanger, onPasCa }) {
         <div className="vrm-rtv-achat-tete">
           <span className="vrm-rtv-photo is-tres-grande" aria-hidden="true">{photo && Photo ? <Photo src={photo} alt="" decoding="async" loading="lazy"/> : <Icone d={I_BOITE} taille={40}/>}</span>
           <div className="vrm-rtv-fiche-id">
-            {e.num ? <span className="vrm-rtv-plaque" data-scan-r-plaque={e.num}><small>N°</small>{e.num}</span> : null}
+            {e.num && !suite.su ? <span className="vrm-rtv-plaque" data-scan-r-plaque={e.num}><small>N°</small>{e.num}</span> : null}
             <span className="vrm-rtv-titre" data-scan-r-titre="">{titre || tr('scan.r.sansTitre')}</span>
             {taille || etatArticle ? <span className="vrm-rtv-sous" data-scan-a-taille={taille}>{[taille ? (/^\d/.test(String(taille)) ? tr('scan.r.taille', { t: taille }) : taille) : '', etatArticle].filter(Boolean).join(' · ')}</span> : null}
           </div>
@@ -179,7 +221,16 @@ function FicheAchat({ e, lu, Photo, onOuvrir, onRanger, onPasCa }) {
         </div>
       ) : null}
       <p className="vrm-rtv-lu" data-scan-r-lu={lu ? lu.suivi : ''}>{lu && lu.nom ? `${lu.nom} · ` : ''}{lu ? court(lu.suivi) : ''}</p>
-      {typeof e.ranger === 'function' ? <button type="button" className="vrm-rtv-plein" data-scan-a-ranger={e.cle} onClick={() => onRanger(e)}>{tr('scan.a.ranger')}</button> : null}
+      <BlocNumero s={suite}/>
+      {suite.su && suite.etat === 'vendue' ? (
+        <button type="button" className="vrm-rtv-plein" data-scan-a-plein="vente" data-scan-a-ouvrir-vente={suite.vente.tx}
+          onClick={() => onOuvrir({ sorte: 'vente', site: 'vinted', cle: 'v:' + suite.vente.tx, num: suite.vente.num, titre: e.titre || '', photo: e.photo || null, etat: '', lien: typeof e.lienVente === 'function' ? e.lienVente(suite.vente.tx) : '' })}>{libellePlein(suite)}</button>
+      ) : typeof e.ranger === 'function' && libellePlein(suite) ? (
+        <button type="button" className="vrm-rtv-plein" data-scan-a-ranger={e.cle} data-scan-a-plein={suite.su ? suite.etat : 'ranger'} onClick={() => onRanger(e)}>{libellePlein(suite)}</button>
+      ) : null}
+      {suite.su && suite.etat === 'aNumeroter' && suite.venteSu !== false && typeof e.relierVente === 'function' && onRelierVente ? (
+        <button type="button" className="vrm-rtv-touche vrm-rtv-large" data-scan-a-relier-vente={e.cle} onClick={() => onRelierVente(e)}>{tr('scan.a.relierVente')}</button>
+      ) : null}
       <div className="vrm-rtv-gestes">
         {e.signaler ? <a className="vrm-rtv-touche" data-scan-a-signaler={e.cle} href={e.signaler} target="_blank" rel="noreferrer">{tr('scan.a.signaler')}</a> : null}
         <button type="button" className="vrm-rtv-touche" data-scan-r-ouvrir={`${e.sorte}:${e.cle}`} onClick={() => onOuvrir(e)}>{ouvrirLib(e)}</button>
@@ -217,7 +268,11 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
     // (src/etiquettesScan.js) : une identité exacte. Trop court ⇒ jamais cherché.
     const cherchable = codeCherchable(brut);
     const code = normaliserCode(brut);
-    if (!lu && (arrivee || !cherchable || (!tape && dejaCherches.current.has(code)))) {
+    // (23 nov., lot scan-achat) Un n° TAPÉ (ou lu par la douchette) qui n'est pas un n° de suivi peut être le n° de
+    // TRANSACTION d'un achat ou le CODE DE RETRAIT d'un colis : une identité exacte (`achatParIdentite`), cherchée une
+    // fois les sources lues. Jamais pour une lecture de la caméra (un code quelconque ne doit rien ouvrir).
+    const idPossible = tape && normaliserN(brut).length >= 4;
+    if (!lu && !idPossible && (arrivee || !cherchable || (!tape && dejaCherches.current.has(code)))) {
       if (tape) { n.current += 1; setRes({ etat: 'pasReconnu', brut: String(brut), n: n.current, cherche: dejaCherches.current.has(code) }); vibrer([30, 60, 30]); bip.current(false); }
       else setIndice(court(brut));
       return;
@@ -225,17 +280,26 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
     setIndice('');
     const finir = (incomplet, Sf = null) => {
       const S = Sf || lireSourcesColis();
+      const parId = idPossible ? achatParIdentite(brut, S.enregistrements) : { etat: 'aucun' };
+      const luId = parId.etat !== 'aucun' ? { suivi: normaliserN(brut), nom: null, transporteur: null, forme: parId.par } : null;
+      const trouvesId = parId.etat === 'un' ? [parId.trouve] : parId.etat === 'plusieurs' ? parId.trouves : [];
       if (arrivee) {
         n.current += 1;
-        if (!lu) { if (tape) { setRes({ etat: 'pasReconnu', brut: String(brut), n: n.current }); vibrer([30, 60, 30]); bip.current(false); } else { setRes(null); setIndice(court(brut)); } return; }
-        const ra = achatDuScan(lu, S.enregistrements);
+        if (!lu && !luId) { if (tape) { setRes({ etat: 'pasReconnu', brut: String(brut), n: n.current }); vibrer([30, 60, 30]); bip.current(false); } else { setRes(null); setIndice(court(brut)); } return; }
+        let ra = lu ? achatDuScan(lu, S.enregistrements) : { etat: 'aucun', lu: null };
+        if (ra.etat !== 'un' && ra.etat !== 'plusieurs' && luId) {
+          const A = trouvesId.filter((x) => x.sorte === 'achat');
+          ra = A.length === 1 ? { etat: 'un', lu: luId, trouve: A[0] } : A.length > 1 ? { etat: 'plusieurs', lu: luId, trouves: A } : lu ? ra : { etat: 'sansAchat', lu: luId };
+        }
         const bon = ra.etat === 'un' || ra.etat === 'plusieurs';
         vibrer(bon ? 40 : [30, 60, 30]); bip.current(bon); setChoisi(null);
         setRes({ ...ra, brut: String(brut), n: n.current, manques: incomplet || !bon ? S.manques : [], incomplet: !!incomplet });
         if (ra.etat === 'un' && onArrivee) { const t = ra.trouve; setTimeout(() => { try { onArrivee(t, lu); } catch (_) {} }, 0); }
         return;
       }
-      const r = lu ? retrouverParSuivi(lu, S.enregistrements) : { etat: 'aucun', lu: null };
+      let r = lu ? retrouverParSuivi(lu, S.enregistrements) : { etat: 'aucun', lu: null };
+      if (r.etat !== 'un' && r.etat !== 'plusieurs' && luId) r = trouvesId.length === 1 ? { etat: 'un', lu: luId, trouve: trouvesId[0], parIdentite: parId.par } : { etat: 'plusieurs', lu: luId, trouves: trouvesId, parIdentite: parId.par };
+      const trouveR = r.etat === 'un' || r.etat === 'plusieurs';
       if (r.etat === 'aucun' && cherchable && S.chercheurs && S.chercheurs.length && !dejaCherches.current.has(code)) {
         setRes({ etat: 'attente', lu, brut: String(brut), n: n.current, etiquettes: true });
         chercherCodeSources(code, S.chercheurs).then((rc) => {
@@ -258,7 +322,7 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
         });
         return;
       }
-      if (!lu) {
+      if (!lu && !trouveR) {
         n.current += 1;
         if (tape) { setRes({ etat: 'pasReconnu', brut: String(brut), n: n.current }); vibrer([30, 60, 30]); bip.current(false); }
         else { setRes(null); setIndice(court(brut)); }
@@ -379,6 +443,8 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
   // (16 nov., lot scan-achat) « Ranger » : l'atelier d'arrivée s'ouvre une fois le scanner fermé (il le couvrirait).
   const ranger = (e) => { if (onFermer) onFermer(); setTimeout(() => { try { e.ranger(); } catch (_) {} }, 60); };
   // « Relier à un achat » : le n° lu part avec la demande ; SON clic dans la liste relie (src/relierColis.js).
+  // (23 nov.) « Déjà vendue ? Relier à une vente » : la feuille d'Achats s'ouvre sur CET achat, une fois le scanner fermé.
+  const relierVente = (e) => { if (onFermer) onFermer(); setTimeout(() => { try { e.relierVente(); } catch (_) {} }, 60); };
   const relier = (lu) => { if (!lu || !onRelier) return; if (onFermer) onFermer(); setTimeout(() => { try { onRelier({ suivi: lu.suivi, transporteur: lu.transporteur || '', nom: lu.nom || '' }); } catch (_) {} }, 60); };
   const pasCa = () => { setRes(null); setChoisi(null); setIndice(tr('scan.a.pasCaIndice')); };
   const montrer = arrivee ? null : res && res.etat === 'un' ? res.trouve : res && res.etat === 'plusieurs' && choisi ? choisi : null;
@@ -429,7 +495,7 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
               </div>
             ) : montrer ? <>
               {res.etat === 'plusieurs' ? <button type="button" className="vrm-rtv-lien vrm-rtv-retour" data-scan-r-liste-retour="" onClick={() => setChoisi(null)}>{tr('scan.r.plusieursRetour', { n: res.trouves.length })}</button> : null}
-              {montrer.sorte === 'achat' ? <FicheAchat e={montrer} lu={res.lu} Photo={Photo} onOuvrir={ouvrir} onRanger={ranger} onPasCa={pasCa}/> : <Fiche e={montrer} lu={res.lu} Photo={Photo} onOuvrir={ouvrir}/>}
+              {montrer.sorte === 'achat' ? <FicheAchat e={montrer} lu={res.lu} Photo={Photo} onOuvrir={ouvrir} onRanger={ranger} onPasCa={pasCa} onRelierVente={relierVente}/> : <Fiche e={montrer} lu={res.lu} Photo={Photo} onOuvrir={ouvrir}/>}
               {montrer.sorte === 'colis' && onRelier && res.lu ? <button type="button" className="vrm-rtv-touche" data-scan-a-relier={res.lu.suivi} onClick={() => relier(res.lu)}>{tr('scan.a.relier')}</button> : null}
             </> : res.etat === 'plusieurs' ? (
               <div className="vrm-rtv-plusieurs" data-scan-r-plusieurs={res.trouves.length}>
@@ -455,7 +521,10 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
                   <div><dt>{tr('scan.r.transporteur')}</dt><dd data-scan-r-transporteur={res.lu.transporteur || ''}>{res.lu.nom || tr('scan.r.transporteurInconnu')}</dd></div>
                   <div><dt>{tr('scan.r.numero')}</dt><dd className="vrm-rtv-mono" data-scan-r-suivi={res.lu.suivi}>{res.lu.suivi}</dd></div>
                 </dl>
-                {res.manques && res.manques.length ? <p className="vrm-rtv-msg-sous" data-scan-r-manques="">{tr('scan.r.manques', { quoi: res.manques.join(', ') })}</p> : <p className="vrm-rtv-msg-sous">{tr('acc.colis.retrouver.pasTrouve')}</p>}
+                {res.manques && res.manques.length ? <p className="vrm-rtv-msg-sous" data-scan-r-manques="">{tr('scan.r.manques', { quoi: res.manques.join(', ') })}</p> : <>
+                  <p className="vrm-rtv-msg-sous">{tr('acc.colis.retrouver.pasTrouve')}</p>
+                  <p className="vrm-rtv-msg-sous" data-scan-a-quoi-faire="">{tr('scan.a.quoiFaire')}</p>
+                </>}
                 {!res.incomplet && onRelier ? <button type="button" className="vrm-rtv-plein" data-scan-a-relier={res.lu.suivi} onClick={() => relier(res.lu)}>{tr('scan.a.relier')}</button> : null}
                 {onChercher ? <button type="button" className="vrm-rtv-touche" data-scan-r-chercher={res.lu.suivi} onClick={() => chercher(res.lu)}><Icone d={I_LOUPE} taille={18}/>{tr('scan.r.chercher')}</button> : null}
               </div>
