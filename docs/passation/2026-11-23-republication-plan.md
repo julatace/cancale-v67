@@ -133,40 +133,16 @@ journal `vrmTrouverJournal` / `trouve_rien_<élément>` dira, au premier vrai pa
 par SON clic (choix 102) reste le dernier recours pour la republication (comme aujourd'hui), à garder ou retirer
 selon ce que Julien décide (question ouverte de `favoris-auto`).
 
-### 3.2 Les vrais clics et la frappe (si §3 de CLAUDE.md le permet sur `main`)
-| geste | aujourd'hui | après |
-|---|---|---|
-| clic sur un bouton / option / ouvreur de liste | `el.click()` | `gesteHumain.clic(el)` : point aléatoire DANS la boîte (marges), trajectoire, `Input.dispatchMouseEvent` (moved → pressed → released) |
-| titre, prix, recherche catégorie/marque | setter natif + `input` lettre à lettre | `Input.dispatchKeyEvent` / `Input.insertText` par lettre, rythme `gesteHumain.frappe` (déjà 45–140 ms, hésitations) |
-| description | `paste` + setter (défaut) | `Input.insertText` d'un bloc (« collée ») ou frappe par rafales (son réglage) |
-| photos | `DataTransfer` sur l'`input[type=file]` | **inchangé** : `DOM.setFileInputFiles` n'est pas du domaine `Input` (hors décision) |
-| défilement vers l'élément | `scrollIntoView` | `Input.dispatchMouseEvent` type `mouseWheel` par crans, puis vérification que l'élément est dans la fenêtre |
-| case unisexe | clic sur son label | clic réel sur le label |
+### 3.2 Vrais clics et « rythme humain » — RETIRÉS du plan (23 nov.)
+Les vrais clics par `chrome.debugger` et tout rythme destiné à paraître humain auprès de Vinted ont été **refusés** :
+ils ne seront PAS faits. La republication garde ses gestes actuels (`vrm-formulaire.js`, clics `isTrusted:false` assumés,
+rythme d'aujourd'hui inchangé : 5–15 s entre deux champs, 15–40 s après la suppression, ordre des champs tiré, mise en
+ligne +1–3 min). Aucun intermède de navigation n'est ajouté. Le voile de l'onglet de travail reste tel quel.
 
-Conditions de sûreté propres à la republication :
-1. **Le voile de l'onglet de travail** retient tout évènement `isTrusted` (« ceux de VRM passent » parce qu'ils sont
-   `isTrusted:false`). Avec des clics réels, il bloquerait VRM **et** serait sous le pointeur (z-index max, plein
-   écran) : le clic réel tomberait sur le voile. ⇒ Le fond arme une **fenêtre de geste** (jeton, coordonnées, 1,5 s)
-   avant chaque `Input.*` : le voile passe `pointer-events:none` et laisse passer CE geste seulement, puis revient.
-   À vérifier dans le code de `favoris-auto` (même problème pour les favoris) — sinon c'est à poser ici.
-2. **Revérifier sous le pointeur** juste avant `mousePressed` : `document.elementFromPoint(x, y)` doit être l'élément
-   gagnant ou un de ses descendants ; sinon rien n'est cliqué (`selecteur`, `manque: 'masque'`). Indispensable pour
-   « Supprimer » et sa confirmation.
-3. Le débogueur ne s'attache **qu'à l'onglet de travail** (`{tabId}`), seulement pendant une paire, détaché dans un
-   `finally` ; une seule commande autorisée par un filtre (`Input.dispatchMouseEvent`, `Input.dispatchKeyEvent`,
-   `Input.insertText`) — tout autre domaine refusé et noté. Détaché par Chrome ou par lui (bandeau « … a commencé à
-   déboguer ») ⇒ arrêt propre de la paire, jamais de repli silencieux sur `el.click()` au milieu d'une paire.
-4. Onglet en arrière-plan : les évènements `Input` arrivent, mais le rendu peut être gelé ; la boîte de l'élément est
-   relue juste avant chaque geste (jamais une coordonnée gardée d'une étape à l'autre).
-
-### 3.3 Le rythme humain
-- Gardés tels quels : 5–15 s entre deux champs (jamais deux fois le même, ×2 en prudence), 15–40 s après la
-  suppression, ordre des champs tiré (catégorie avant ce qui en dépend), mise en ligne de la file +1–3 min.
-- Ajoutés : les délais de `gesteHumain` (non périodiques) pour le temps entre « ouvrir la liste » et « choisir »,
-  et entre deux paires de l'atelier **en plus** de SON espacement (jamais moins que SON réglage).
-- Intermèdes de navigation (lecture seule) : seulement **entre deux paires**, jamais entre le brouillon et la mise en
-  ligne d'une même paire (une paire supprimée et pas encore en ligne ne doit pas attendre plus que la pause prévue) ;
-  ils ne réservent aucune action et ne sautent aucune garde ; arrêtés par « Tout arrêter ».
+### 3.3 Ce qui reste de la phase 2
+1. Brancher chaque élément sur la couche commune de repérage (`vrm-trouver.js`, 5.441) — §3.1 — pour la robustesse.
+2. Confirmation de suppression à **bouton unique** (règle de la 5.441 : un seul gagnant, nom exact, dans LE dialogue).
+3. Rien d'autre ne change : ordre, gardes, budgets, champs retirés, requêtes de page (lectures GET).
 
 ### 3.4 Ce qui reste en requêtes de page (GET seulement)
 `item_upload/items/{id}` (recette vivante, 404/410, ancienne encore là ?), relecture du brouillon par « Reprendre »
@@ -176,9 +152,6 @@ Conditions de sûreté propres à la republication :
 | risque | parade |
 |---|---|
 | sélecteur faux sur un geste irréversible | un seul gagnant, contexte, `elementFromPoint`, mémoire jamais seule juge |
-| clic réel bloqué par le voile / tombé sur le voile | fenêtre de geste armée par le fond (3.2-1) ; banc qui rougit sans elle |
-| débogueur détaché au milieu | arrêt propre, étapes datées sur preuve, « Reprendre » (inchangé) |
-| bandeau du débogueur qui l'inquiète | dit dans l'écran plein (« VRM clique dans son onglet de travail ») |
 | double brouillon / double mise en ligne | verrous inchangés (`r{id}`, `b{draftId}`, `versBrouillon` en base) |
 | la page de Vinted différente du banc | journal de repérage + trace de forme ; **un essai réel d'une paire** avant toute série |
 | conflit avec `favoris-auto` | aucune modification de l'extension avant sa fusion ; vrai `git merge origin/main` |
@@ -188,10 +161,7 @@ Conditions de sûreté propres à la republication :
    trois variantes de formulaire Vinted) : chaque élément trouvé seul ; ambigu ⇒ rien ; **confirmation de suppression
    ambiguë ⇒ aucun clic** (rouge sur `main` aujourd'hui : le `find` prend le premier) ; « Annuler » jamais ; option
    par identifiant jamais par ressemblance. Mutations : retirer le contexte, accepter le premier, mémoire seule juge.
-2. `scripts/audit-repub-vrais-clics.cjs` (vrai `background.js` sur `_fond-vm.cjs`, faux `chrome.debugger` qui
-   enregistre) : seules les méthodes `Input.*` ; attaché à l'onglet de travail seulement ; détaché en fin de paire et
-   sur erreur ; point de clic dans la boîte ; `elementFromPoint` vérifié ; voile ouvert pour CE geste seulement.
-   Mutations : autre domaine, clic hors boîte, voile non armé, repli `el.click()`.
+2. (retiré : pas de vrais clics, pas d'audit `repub-vrais-clics`.)
 3. `audit-republication-parfaite` (43), `audit-recreer` (169), `audit-repub-copie-fidele`, `audit-repub-verifier`,
    `audit-tout-interface`, `audit-formulaire-rythme`, `audit-republier-*` : doivent rester verts sans être affaiblis
    (ordre A5/A6, gardes F, retirés G).
@@ -202,8 +172,6 @@ Conditions de sûreté propres à la republication :
 1. Le DOM réel du formulaire « Vendre », de la page d'une annonce et de la fenêtre de suppression aujourd'hui
    (relevé une fois le 20 nov., jamais depuis).
 2. Que Vinted accepte un brouillon et une mise en ligne faits par ce chemin (jamais tourné : compteurs à 0).
-3. Le comportement des évènements `Input` du débogueur dans un onglet épinglé en arrière-plan sur son Chrome / Orion
-   (Orion n'a pas `chrome.debugger` : le chemin d'aujourd'hui y reste).
 4. La recette de la première vraie paire (`2026-11-17-republication-parfaite.md` §7) reste le geste attendu.
 
 ## ÉTAT À LA REPRISE
@@ -220,3 +188,5 @@ Conditions de sûreté propres à la republication :
   suppression (bouton unique)** : ne pas le refaire ici, vérifier seulement qu'il couvre la republication (§3.1, audit 1).
 - La phase 2 attend la **fusion de la 5.441 sur `main`** (et non plus celle de `claude/favoris-auto`) ; le coordinateur
   relance cette branche à ce moment-là.
+- **23 nov. (coordinateur)** : vrais clics par `chrome.debugger` et rythme « humain » **refusés** — retirés du plan (§3.2).
+  Phase 2 = repérage commun (`vrm-trouver.js`) + confirmation de suppression à bouton unique, après la fusion de la 5.441.
