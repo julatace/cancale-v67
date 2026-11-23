@@ -22,4 +22,5 @@ export default {
   "ru.mod.toutVu": "All seen",
   "ru.mod.aria": "Listings gone from Vinted",
   "ru.mod.court": "Gone between {debut} and {fin}.",
+  "ru.ann.achatRelie": "Linked purchase",
 };

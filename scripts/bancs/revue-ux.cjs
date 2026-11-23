@@ -90,6 +90,26 @@ async function annonces(nav, b) {
   } finally { await ctx.close(); }
 }
 
+async function annoncesTel(nav, b) {
+  const { ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre: false, b, url: '/?tab=cat_annonces' });
+  try {
+    await pret(pg);
+    const m = await pg.evaluate(new Function(`${VIS}
+      const coupes = [...document.querySelectorAll('.n-segmente-libelle')].filter(vis).filter((x) => x.scrollWidth > x.clientWidth + 1).map((x) => x.innerText);
+      const o = (c) => { const m = String(c).match(/\\d+(\\.\\d+)?/g); if (!m || m.length < 3) return false; const [r, g, bb] = m.map(Number); const mx = Math.max(r, g, bb), mn = Math.min(r, g, bb); if (mx - mn < 60) return false; let h; if (mx === r) h = 60 * (((g - bb) / (mx - mn)) % 6); else if (mx === g) h = 60 * ((bb - r) / (mx - mn) + 2); else h = 60 * ((r - g) / (mx - mn) + 4); if (h < 0) h += 360; return h >= 15 && h <= 50; };
+      const ar = [...document.querySelectorAll('[data-ad-aregler], [data-ad-aregler] *')].filter(vis).filter((x) => { const c = getComputedStyle(x); return o(c.color) || o(c.backgroundColor); }).length;
+      return { coupes, ar };`));
+    dit(!m.coupes.length, `A22 390 : le segmenté d'Annonces n'est pas tronqué (${m.coupes.join(' | ')})`, m.coupes);
+    dit(m.ar === 0, 'A24 390 : « N à régler » sans orange', m.ar);
+    await pg.locator('[data-ad-gestes]').first().click({ timeout: 6000 }).catch(() => {});
+    await pg.waitForTimeout(900);
+    const g = await pg.evaluate(new Function(`${VIS} return [...document.querySelectorAll('[data-ad-geste]')].filter(vis).map((x) => x.getAttribute('data-ad-geste'));`));
+    dit(g.length > 0 && g[0] === 'relierAchat', `R16 390 : le « ⋯ » d'une annonce sans achat relié commence par « Relier un achat » (${g.join(', ')})`, g);
+    await pg.screenshot({ path: path.join(SHOTS, 'annonces-gestes-390.png') });
+    dit(!erreurs.length, 'Annonces 390 : aucune erreur d\'app', erreurs.join(' | '));
+  } finally { await ctx.close(); }
+}
+
 async function journee(nav, b) {
   const b2 = JSON.parse(JSON.stringify(b));
   b2.main[0].data.vrm_numeros_a_ecrire = { v: 1, items: [{ numero: '301' }, { numero: '302' }, { numero: '303' }] };
@@ -202,7 +222,7 @@ async function moderation(nav, b) {
   try {
     await pret(pg);
     await pg.waitForTimeout(1500);
-    const orange = `const orange = (c) => { const m = String(c).match(/\d+(\.\d+)?/g); if (!m || m.length < 3) return false; const [r, g, bb] = m.map(Number); if (m.length > 3 && Number(m[3]) === 0) return false; const mx = Math.max(r, g, bb), mn = Math.min(r, g, bb); if (mx - mn < 60) return false; let h; if (mx === r) h = 60 * (((g - bb) / (mx - mn)) % 6); else if (mx === g) h = 60 * ((bb - r) / (mx - mn) + 2); else h = 60 * ((r - g) / (mx - mn) + 4); if (h < 0) h += 360; return h >= 15 && h <= 50; };`;
+    const orange = `const orange = (c) => { const m = String(c).match(/\\d+(\\.\\d+)?/g); if (!m || m.length < 3) return false; const [r, g, bb] = m.map(Number); if (m.length > 3 && Number(m[3]) === 0) return false; const mx = Math.max(r, g, bb), mn = Math.min(r, g, bb); if (mx - mn < 60) return false; let h; if (mx === r) h = 60 * (((g - bb) / (mx - mn)) % 6); else if (mx === g) h = 60 * ((bb - r) / (mx - mn) + 2); else h = 60 * ((r - g) / (mx - mn) + 4); if (h < 0) h += 360; return h >= 15 && h <= 50; };`;
     const m = await pg.evaluate(new Function(`${VIS} ${orange}
       const zone = [...document.querySelectorAll('.vrm-moderation')].find(vis);
       const lignes = [...document.querySelectorAll('[data-moderation-disparues]')].filter(vis);
@@ -245,7 +265,7 @@ async function distinct() {
   b.rows.push({ id: 'push_journal_lu', data: { luJusqua: 1, lus: [] } });
   try {
     await distinct();
-    for (const [nom, f] of [['achats', () => achats(nav, b)], ['annonces', () => annonces(nav, b)], ['journee', () => journee(nav, b)], ['argent390', () => argent(nav, b, 390)], ['argent1512', () => argent(nav, b, 1512)],
+    for (const [nom, f] of [['achats', () => achats(nav, b)], ['annonces', () => annonces(nav, b)], ['annoncesTel', () => annoncesTel(nav, b)], ['journee', () => journee(nav, b)], ['argent390', () => argent(nav, b, 390)], ['argent1512', () => argent(nav, b, 1512)],
       ['extension', () => extension(nav, b)], ['moderation', () => moderation(nav, b)], ['stock', () => stockEtCloche(nav, b)], ['captures', () => notifsEtEmails(nav, b)]]) {
       console.log('\n── ' + nom);
       try { await f(); } catch (e) { dit(false, `${nom} : le banc a pu se dérouler`, String(e && e.message || e)); }

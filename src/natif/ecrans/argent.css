@@ -144,7 +144,7 @@
     font: var(--n-t-corps-fort); color: var(--n-encre); text-align: start; cursor: pointer; }
   .n-arg-recu-haut[data-arg-recu-pas-calcule] { align-items: center; gap: 8px; }
   .n-arg-recu-haut[data-arg-recu-pas-calcule] .n-arg-recu-geste { margin: 0; flex: 1 1 auto; width: auto; min-width: 0; }
-  .n-arg-recu-geste-point { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--n-ambre); }
+  .n-arg-recu-geste-point { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--n-encre-2); }   /* plus d’orange (23 nov.) */
   .n-arg-recu-geste-texte { flex: 1 1 auto; min-width: 0; }
   p.n-arg-recu-note[data-n-ton="ambre"] { color: var(--n-ambre); }
   .n-arg-vt-couverture { appearance: none; display: flex; align-items: center; gap: 6px; width: 100%; min-height: 44px; margin: 0; padding: 0 16px; border: 0; border-bottom: 1px solid var(--n-trait);

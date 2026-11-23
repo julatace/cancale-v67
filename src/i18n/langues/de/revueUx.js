@@ -22,4 +22,5 @@ export default {
   "ru.mod.toutVu": "Alles gesehen",
   "ru.mod.aria": "Von Vinted verschwundene Anzeigen",
   "ru.mod.court": "Verschwunden zwischen {debut} und {fin}.",
+  "ru.ann.achatRelie": "Verknüpfter Einkauf",
 };

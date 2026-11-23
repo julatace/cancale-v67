@@ -515,6 +515,11 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
       onRelier={(a) => { const x = a.annonces.find((y) => y.site !== 'vinted'); if (x) { try { window.dispatchEvent(new CustomEvent('vrm:liaison-ouvrir', { detail: { site: NOM_SITE[x.site], id: String(x.id), vue: null } })); } catch (_) {} } }}
+      // (23 nov., Julien : « pas de Relier à un achat dans le ⋯ d'une annonce, ce n'est pas normal ») La MÊME feuille que Ventes et Achats
+      // (« Relier achats et ventes », src/relierGlisser.js) ouverte sur CETTE annonce (son identifiant Vinted, `a:{id}`) : c'est SON
+      // toucher puis son « Oui » qui relient, jamais une ressemblance. Une annonce déjà reliée ouvre sa fiche (Délier, Reçu).
+      onRelierAchat={(a) => { if (a.achat != null && a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(a.numero) })); } catch (_) {} return; }
+        const v = a.annonces.find((y) => y.site === 'vinted' && y.id != null); try { window.__vrmRelierCible = { cible: v ? 'a:' + String(v.id) : '', at: Date.now() }; window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=achats' })); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:relier-ouvrir')); } catch (_) {} }, 300); } catch (_) {} }}
       onPublier={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} }}
       // (19 nov., fiche directe) Un toucher sur un article numéroté ouvre SA fiche complète (par son N°, l'identité de l'article).
       onFiche={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(a.numero) })); } catch (_) {} } }}

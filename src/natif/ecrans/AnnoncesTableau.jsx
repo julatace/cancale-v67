@@ -20,7 +20,7 @@ const TON = { corriger: 'ambre', attente: 'neutre', refusee: 'neutre', enligne: 
 const dateCourte = (ms) => { try { return new Date(ms).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (_) { return ''; } };
 
 export default function AnnoncesTableau({ articles, filtres = [], compte = '', majLe, onRafraichir = null, rafraichit = false, actions = [], onAction, onOuvrir,
-  saisir, onNumero = null, onPrix = null, onRelier = null, onFiche = null, plein = null, haut = null, pied = '', euros = (n) => String(n) + ' €',
+  saisir, onNumero = null, onPrix = null, onRelier = null, onRelierAchat = null, onFiche = null, plein = null, haut = null, pied = '', euros = (n) => String(n) + ' €',
   depuisTexte = () => '', nomSite = (s) => s, Icon = null, sites = [], onAutomatisations = null, onPublier = null, liaison = null, site = 'tous', Logo = null, dortDe = null, plusVueDe = null, Photo = null }) {
   // (20 nov.) La colonne et le filtre « Liaison » : l'état du lien de chaque article (Reliée · À relier · Que sur ce site), lu
   // dans src/liaisonEtat.js par l'écran (`liaison.de`). Un article seulement sur Vinted n'a rien à relier : « — ».
@@ -98,6 +98,7 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
   const acts = actions.map((x) => ({ cle: x.cle, libelle: x.libelle, courante: !!x.courante, aucune: tr('tableau.actionAucuneIci'),
     pour: x.pour ? (l) => x.pour(l.a) : null, juger: x.juger ? (ls) => x.juger(unParArticle(ls)) : null }));
   const menuLigne = (l) => (seulementBloque(l.a) ? [{ cle: 'fiche', libelle: tr('tableau.ouvrir'), onClick: () => onOuvrir(l.a) }] : [
+    ...(onRelierAchat && l.a.achat == null ? [{ cle: 'relierAchat', libelle: tr('ventes.relierAchat2'), onClick: () => onRelierAchat(l.a) }] : []),
     { cle: 'fiche', libelle: tr('tableau.ouvrir'), onClick: () => onOuvrir(l.a) },
     { cle: 'mini', libelle: tr('egalite.saisie.min'), onClick: () => saisir(l.a, 'min') },
     { cle: 'achat', libelle: tr('egalite.saisie.buyPrice'), onClick: () => saisir(l.a, 'buyPrice') },

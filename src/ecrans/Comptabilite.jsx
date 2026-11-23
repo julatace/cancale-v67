@@ -17259,8 +17259,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // ventes » (la même, `ouvrirGlisser`) ; Achats monté plus tard la prend à son arrivée (15 s). Rien n'est relié sans SON glisser puis son « Oui ».
   React.useEffect(() => {
     if (only !== 'achats') return undefined;
-    const f = () => { DEMANDE_GLISSER.at = 0; ouvrirGlisser(); };
-    if (DEMANDE_GLISSER.at && Date.now() - DEMANDE_GLISSER.at < 15000) f();
+    // (23 nov.) « Relier un achat » depuis le ⋯ d'une annonce : la feuille s'ouvre sur CETTE annonce (`window.__vrmRelierCible`, 15 s).
+    const f = () => { DEMANDE_GLISSER.at = 0; const c = window.__vrmRelierCible; window.__vrmRelierCible = null;
+      ouvrirGlisser(c && c.cible && Date.now() - c.at < 15000 ? { cible: c.cible } : null); };
+    if ((DEMANDE_GLISSER.at && Date.now() - DEMANDE_GLISSER.at < 15000) || (window.__vrmRelierCible && Date.now() - window.__vrmRelierCible.at < 15000)) f();
     window.addEventListener('vrm:relier-ouvrir', f);
     return () => window.removeEventListener('vrm:relier-ouvrir', f);
   }, [only]);   // eslint-disable-line react-hooks/exhaustive-deps
