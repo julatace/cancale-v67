@@ -16,7 +16,7 @@ import {lireBordereauVestiaire} from './bordereauVestiaire.js';
 import {lireParcours,garderParcours,noterChangements,viderParcours,motifRecherche,restaurerVue} from './parcoursQuotidien.js';
 import {stockageParcours,garderReprise} from './repriseEcran.js';
 // (11 nov., reprise-ecrans) La reprise SYNCHRONISÉE, par compte VRM (src/repriseSynchro.js).
-import { CLE_REPRISE_ECRANS, DELAI_ECRITURE as DELAI_REPRISE, DUREE_RECHERCHE as DUREE_RECHERCHE_REPRISE, lireCarte as lireCarteReprise, poserCarte as poserCarteReprise, cumulerPatch as cumulerPatchReprise, vueReprise, compteReprise, siteReprise, repriseLocale, ecranAOuvrir, vueSynchronisee, estRecherche as estRechercheVue, ecransDeVue, retenusAffiches } from './repriseSynchro.js';
+import { CLE_REPRISE_ECRANS, DELAI_ECRITURE as DELAI_REPRISE, DUREE_RECHERCHE as DUREE_RECHERCHE_REPRISE, lireCarte as lireCarteReprise, poserCarte as poserCarteReprise, cumulerPatch as cumulerPatchReprise, vueReprise, compteReprise, siteReprise, repriseLocale, ecranAOuvrir, vueSynchronisee, estRecherche as estRechercheVue, ecransDeVue, retenusAffiches, positionReprise } from './repriseSynchro.js';
 import {RecapSelection,CompteurListe,HistoriqueModifications} from './OutilsParcours.jsx';
 // ⟦→ ecrans/Comptabilite.jsx #2⟧
 import './selection-serie.css'; // (8 nov.) style de ./composants/SelectionSerie.jsx, gardé à sa place (son écran est chargé à la demande)
@@ -3835,7 +3835,7 @@ const SYNC_KEYS = [
   // (src/visuelsReseaux.js `reglagesValides` ; boutique vide par défaut).
   'vrm_visuels_reglages',
   // (11 nov., reprise-ecrans) Chaque écran se rouvre comme on l'a laissé, sur tous ses appareils :
-  // filtres, tri, recherche (10 min), compte par site, dernier écran (30 min) — src/repriseSynchro.js.
+  // filtres, tri, recherche (10 min), compte par site, dernier écran (12 h) — src/repriseSynchro.js.
   CLE_REPRISE_ECRANS,
   'vrm_vc_etiquettes','vrm_lbc_dates',
   // (11 nov., lot stats-categories) La catégorie qu'IL a choisie pour une vente sans
@@ -18308,7 +18308,8 @@ function MemoireDefilement({ ecran }) {
     if(!main) return;
     // (5 nov., reprise) La position est rangée sur l'APPAREIL (src/repriseEcran.js) :
     // l'app installée qu'iOS ferme puis rouvre retrouve aussi son défilement.
-    const owner=AUTH.user?.id||'';const st=stockageParcours();let gardee=0;try{if(st)gardee=Number(lireParcours(st,owner,'position:'+ecran,0))||0;}catch(_){}
+    // (16 nov., « Reprendre là où j'étais ») Gardée 12 h au plus, comme l'écran (`positionReprise`).
+    const owner=AUTH.user?.id||'';const st=stockageParcours();let gardee=0;try{gardee=positionReprise(st,owner,ecran);}catch(_){}
     // (17 nov., chasse-bugs — Julien : « quand j'ai déclaré, ça me met en plein milieu de la page ») La position gardée
     // ne vaut que pour la REPRISE (premier écran après l'ouverture) et le RETOUR par la barre/la colonne ; toute autre
     // arrivée (un geste, une carte, un segment, un retour arrière) ouvre EN HAUT — src/defilementNavigation.js.
@@ -34143,7 +34144,7 @@ function AppCoeur() {
   // `?tab=` reçu gagne : la reprise se tait et `goto` mène au lien. Rien de
   // lisible ⇒ Ma journée, comme avant.
   // (11 nov., reprise-ecrans) Et SUR N'IMPORTE QUEL APPAREIL : le plus frais de cet appareil
-  // et du compte (`vrm_reprise_ecrans`), s'il a moins de 30 min — sinon Ma journée. Un lien
+  // et du compte (`vrm_reprise_ecrans`), s'il a moins de 12 h (16 nov. ; 30 min avant) — sinon Ma journée. Un lien
   // `?tab=` reçu gagne toujours (ecranAOuvrir se tait).
   const [search0]=useState(()=>{ try{ return window.location.search||''; }catch(_){ return ''; } });
   const [reprise0]=useState(()=>{ try{ const owner=AUTH.user?.id||readSession()?.user?.id||''; const st=stockageParcours(); return ecranAOuvrir({ carte:carteReprise(), locale:st?repriseLocale(st,owner):null, ongletsOk:ONGLETS_LIENS, search:search0 }); }catch(_){ return null; } });
