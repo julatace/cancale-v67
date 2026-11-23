@@ -22,7 +22,7 @@ export default {
   "lit2.etape.recu-vendeur": "Ricevuto dal venditore",
   "lit2.avant": "Entro il {d}",
   "lit2.nonLue": "Scadenza non letta",
-  "lit2.geste.deposer": "Apri l’ordine su Vinted",
-  "lit2.geste.suivre": "Segui il reso su Vinted",
+  "lit2.geste.deposer": "Apri su Vinted",
+  "lit2.geste.suivre": "Segui su Vinted",
   "lit2.site.achats": "Vinted · resi d’acquisto"
 };

@@ -22,7 +22,7 @@ export default {
   "lit2.etape.recu-vendeur": "Recibido por el vendedor",
   "lit2.avant": "Antes del {d}",
   "lit2.nonLue": "Fecha límite no leída",
-  "lit2.geste.deposer": "Abrir el pedido en Vinted",
-  "lit2.geste.suivre": "Seguir la devolución en Vinted",
+  "lit2.geste.deposer": "Abrir en Vinted",
+  "lit2.geste.suivre": "Seguir en Vinted",
   "lit2.site.achats": "Vinted · devoluciones de compra"
 };
