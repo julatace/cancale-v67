@@ -57,8 +57,19 @@ export function sourcesConseiller({ o, valeurSel, live, L, maintenant = Date.now
     const T = lignesV && valeurSel ? parCompteEtSite({ lignes: lignesV, valeur: valeurSel, periodes: [p30] }) : null;
     comptes = T ? Object.values(T)[0] || [] : null;
   } catch (_) { comptes = null; }
+  // Le CA par période (« pourquoi mon CA baisse ? ») : la carte des chiffres, les MÊMES appels qu'Argent.
+  let chiffres = null;
+  try {
+    if (valeurSel) {
+      const per = (de, a) => ({ de, a, label: '' });
+      const val = (id, p) => { const x = valeurSel(id, p, SEL_TOUT) || {}; return x.valeur == null ? null : { valeur: x.valeur, auMoins: !!x.partiel }; };
+      const P = { j30: per(maintenant - 30 * JOUR, maintenant + 1), j30avant: per(maintenant - 60 * JOUR, maintenant - 30 * JOUR) };
+      chiffres = Object.fromEntries(Object.entries(P).map(([k, p]) => [k, { vendu: val('vendu', p), ventes: val('ventes', p), beneficeBrut: val('brut', p) }]));
+      chiffres.mois = { vendu: val('vendu', 'mois'), recu: val('recu', 'mois'), ventes: val('ventes', 'mois') };
+    }
+  } catch (_) { chiffres = null; }
   return {
-    colis, offres, seuils, baisses, stock, dorment, comptes,
+    chiffres, colis, offres, seuils, baisses, stock, dorment, comptes,
     aRacheter: M ? M.aRacheter : (mieux === undefined ? undefined : null),
     groupes: M ? M.groupes : (mieux === undefined ? undefined : null),
     ventesTs: Array.isArray(L90) ? L90.map((l) => l.ts) : (L90 === undefined ? undefined : null),
