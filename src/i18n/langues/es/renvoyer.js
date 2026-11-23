@@ -63,7 +63,6 @@ export default {
   // (23 nov., lot retours-suivi) la carte refaite : état court, frise horizontale, vrais boutons, « Pourquoi ? »
   "rt.pourquoi": "¿Por qué?",
   "rt.a.impression": "Preparando…",
-  "rt.a.ouvrir": "Abrir",
   "rt.a.imprimer": "Imprimir",
   "rt.a.depose": "Entregado",
   "rt.a.suivre": "Seguir",
@@ -72,7 +71,6 @@ export default {
   "rt.f.bordereau": "Etiqueta",
   "rt.f.attendu": "por descargar",
   "rt.f.depose": "Entregado",
-  "rt.f.parToi": "por ti",
   "rt.f.avant": "antes del {date}",
   "rt.f.revient": "Vuelve",
   "rt.f.route": "En camino",

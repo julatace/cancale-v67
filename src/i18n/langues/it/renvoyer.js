@@ -63,7 +63,6 @@ export default {
   // (23 nov., lot retours-suivi) la carte refaite : état court, frise horizontale, vrais boutons, « Pourquoi ? »
   "rt.pourquoi": "Perché?",
   "rt.a.impression": "Preparazione…",
-  "rt.a.ouvrir": "Apri",
   "rt.a.imprimer": "Stampa",
   "rt.a.depose": "Consegnato",
   "rt.a.suivre": "Traccia",
@@ -72,7 +71,6 @@ export default {
   "rt.f.bordereau": "Etichetta",
   "rt.f.attendu": "da scaricare",
   "rt.f.depose": "Consegnato",
-  "rt.f.parToi": "da te",
   "rt.f.avant": "entro il {date}",
   "rt.f.revient": "Torna",
   "rt.f.route": "In viaggio",

@@ -162,7 +162,7 @@ function texteEtapeRetour(e, c) {
   const pasVue = e.implicite ? tr('rt.f.datePasVue') : '';
   if (e.cle === 'bordereau') return { lib: tr('rt.f.bordereau'), det: e.etat === 'ici' ? tr('rt.f.attendu') : pasVue || nomTransp(e.transporteur) };
   if (e.cle === 'deposer') return e.etat === 'fait' || e.etat === 'saute'
-    ? { lib: tr('rt.f.depose'), det: pasVue || [dateCourte(e.at), e.parLui ? tr('rt.f.parToi') : ''].filter(Boolean).join(' · ') }
+    ? { lib: tr('rt.f.depose'), det: pasVue || [dateCourte(e.at), e.parLui ? tr('renv.et.parToi') : ''].filter(Boolean).join(' · ') }
     : { lib: tr('rt.f.depose'), det: e.etat === 'ici' && c && c.limiteJour ? tr('rt.f.avant', { date: dateCourte(c.limiteIso) }) : '' };
   if (e.cle === 'route') return { lib: tr(e.revient ? 'rt.f.revient' : 'rt.f.route'), det: pasVue };
   if (e.cle === 'livre') return { lib: tr(e.relais && e.etat === 'ici' ? 'rt.f.relais' : 'rt.f.livre'), det: pasVue || dateCourte(e.at) };
