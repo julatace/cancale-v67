@@ -243,4 +243,6 @@ export default {
   "rg2.fini.publiePasVue": "Noch nicht mit Nr. {num} gesehen.",
   "rg2.fini.journal": "Vermerkt unter „Was VRM getan hat“.",
   "rg2.fini.aucune": "Kein neues Angebot gelesen.",
+  "rg2.num.aucune": "Nr. nicht im Angebot geschrieben.",
+  "rg2.num.pose": "{num} · {ou}",
 };

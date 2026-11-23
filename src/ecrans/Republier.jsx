@@ -1264,9 +1264,9 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
   const ouvrirAncienne = () => { debut(); setOuvertes((o) => new Set(o).add('ancienne')); };
   const ouvrirVinted = () => { debut(); setOuvertes((o) => new Set(o).add('vinted')); if (ann.titre) copier('titre', ann.titre); };
   const gesteEtape = faitIci ? null
-    : etape === 'photos' ? (nPh > 0 ? <Bouton variante="primaire" icone="image" data-main-telecharger={nPh} data-rg-photos-pretes={pretes ? ph.fichiers.length : 0} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours) || !(ph && ph.fichiers && ph.fichiers.length) && !!(ph && !ph.encours && ph.rate)} onClick={enregistrer}>{libellePhotos}</Bouton> : null)
-    : etape === 'supprimer' ? <Bouton variante="primaire" icone="link" data-rg-ouvrir-ancienne="" href={ancienneUrl} target="_blank" rel="noopener noreferrer" onClick={ouvrirAncienne}>{tr('rg2.supprimer.ouvrir')}</Bouton>
-    : etape === 'creer' ? <Bouton variante="primaire" icone="link" data-main-ouvrir-vinted="" href={nouvelleUrl} target="_blank" rel="noopener noreferrer" onClick={ouvrirVinted}>{tr('rg2.creer.ouvrir')}</Bouton>
+    : etape === 'photos' ? (nPh > 0 ? <Bouton variante="primaire" plein icone="image" data-main-telecharger={nPh} data-rg-photos-pretes={pretes ? ph.fichiers.length : 0} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours) || !(ph && ph.fichiers && ph.fichiers.length) && !!(ph && !ph.encours && ph.rate)} onClick={enregistrer}>{libellePhotos}</Bouton> : null)
+    : etape === 'supprimer' ? <Bouton variante="primaire" plein icone="link" data-rg-ouvrir-ancienne="" href={ancienneUrl} target="_blank" rel="noopener noreferrer" onClick={ouvrirAncienne}>{tr('rg2.supprimer.ouvrir')}</Bouton>
+    : etape === 'creer' ? <Bouton variante="primaire" plein icone="link" data-main-ouvrir-vinted="" href={nouvelleUrl} target="_blank" rel="noopener noreferrer" onClick={ouvrirVinted}>{tr('rg2.creer.ouvrir')}</Bouton>
     : null;
   const suite = suivante ? { data: { 'data-main-suivant': suivante }, onClick: () => aller(suivante), lib: tr('rg2.suivant') }
     : !derniere && onSuivante ? { data: { 'data-main-suivante': `${rang.i + 2}/${rang.n}` }, onClick: () => onSuivante({ prix: regs.prix, titre: regs.titre }), lib: `${motsVendeur().Nom} ${rang.i + 2}/${rang.n}` }
@@ -1308,8 +1308,8 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
         <p className="rg2-muet" data-rg-copies={`${cvC.faits}/${cvC.n}`}>{tr('rg.creer.copies', { n: cvC.faits, m: cvC.n })}</p>
         {champs.map((c) => <ChampACopier key={c.k} k={c.k} valeur={c.v} copie={copie} copies={copies} copier={copier} multi={c.k === 'description'}/>)}
         <p className="rg2-muet" data-main-etiquette={ann.etiquette.pose ? ann.etiquette.place : (ann.etiquette.refus ? 'refus' : 'aucune')}>
-          {etq.place === 'aucune' && !ann.numeroEcritPose ? tr('rg.num.aucune')
-            : ann.etiquette.pose || ann.numeroEcritPose ? tr('rg.num.pose', { num: ann.etiquette.texte || `N°${paire.numero}`, ou: ann.etiquette.pose ? placeN.ou : tr('rg.num.fin') })
+          {etq.place === 'aucune' && !ann.numeroEcritPose ? tr('rg2.num.aucune')
+            : ann.etiquette.pose || ann.numeroEcritPose ? tr('rg2.num.pose', { num: ann.etiquette.texte || `N°${paire.numero}`, ou: ann.etiquette.pose ? placeN.ou : tr('rg.num.fin') })
             : ann.etiquette.refus === 'pas de numéro' ? tr('rg.num.sans')
             : <b>{tr('rg.num.refus', { raison: ann.etiquette.refus })}</b>}
         </p>
@@ -1383,7 +1383,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
       <div className="rg2-pied" data-rg-pied="">
         {iE > 0 ? <Bouton variante="discret" icone="undo" data-main-retour="" aria-label={tr('rg.retour')} onClick={() => aller(l[iE - 1])}>{tr('rg.retour')}</Bouton> : <span/>}
         {gesteEtape ? <Bouton variante="discret" {...suite.data} onClick={suite.onClick}>{suivante ? tr('rg2.passer') : suite.lib}</Bouton> : null}
-        {gesteEtape || <Bouton variante={faitIci ? 'primaire' : 'secondaire'} {...suite.data} onClick={suite.onClick}>{suite.lib}</Bouton>}
+        {gesteEtape || <Bouton variante={faitIci ? 'primaire' : 'secondaire'} plein {...suite.data} onClick={suite.onClick}>{suite.lib}</Bouton>}
       </div>
     </SheetShell>
   );
@@ -1525,8 +1525,8 @@ function PublierALaMain({ fiche, vue, onFini, onClose }) {
   const section = (k, enfants) => <section className="vrm-rm-section rg2-section" data-main-section={k} hidden={etape !== k} aria-labelledby={`vrm-pm-t-${k}`}><h3 className="rg2-titre" id={`vrm-pm-t-${k}`}>{tr(`rg.titre.${k}.${mode}`)}</h3>{enfants}</section>;
   const ouvrirVinted = () => { setOuvert(true); if (f.numero && !numEcrit) annoncerFicheAPublier(f).then(setResaFiche, () => setResaFiche({ ok: false })); const t0 = champs.find((c) => c.k === 'titre'); if (t0 && t0.v) copier('titre', t0.v); };
   const gesteEtape = faitIci ? null
-    : etape === 'photos' ? (nPh > 0 ? <Bouton variante="primaire" icone="image" data-main-telecharger={nPh} data-rg-photos-pretes={pretes ? ph.fichiers.length : 0} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours)} onClick={enregistrer}>{libelle}</Bouton> : null)
-    : etape === 'creer' ? <Bouton variante="primaire" icone="link" data-main-ouvrir-vinted="" href="https://www.vinted.fr/items/new" target="_blank" rel="noopener noreferrer" onClick={ouvrirVinted}>{tr('rg2.creer.ouvrir')}</Bouton>
+    : etape === 'photos' ? (nPh > 0 ? <Bouton variante="primaire" plein icone="image" data-main-telecharger={nPh} data-rg-photos-pretes={pretes ? ph.fichiers.length : 0} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours)} onClick={enregistrer}>{libelle}</Bouton> : null)
+    : etape === 'creer' ? <Bouton variante="primaire" plein icone="link" data-main-ouvrir-vinted="" href="https://www.vinted.fr/items/new" target="_blank" rel="noopener noreferrer" onClick={ouvrirVinted}>{tr('rg2.creer.ouvrir')}</Bouton>
     : null;
   const suite = suivante ? { data: { 'data-main-suivant': suivante }, onClick: () => setEtape(suivante), lib: tr('rg2.suivant') } : { data: { 'data-main-terminer': '' }, onClick: onClose, lib: tr(faitIci ? 'rg.terminer' : 'rg.fermer') };
   return (
@@ -1558,7 +1558,7 @@ function PublierALaMain({ fiche, vue, onFini, onClose }) {
       <div className="rg2-pied" data-rg-pied="">
         {iE > 0 ? <Bouton variante="discret" icone="undo" data-main-retour="" onClick={() => setEtape(l[iE - 1])}>{tr('rg.retour')}</Bouton> : <span/>}
         {gesteEtape ? <Bouton variante="discret" {...suite.data} onClick={suite.onClick}>{suivante ? tr('rg2.passer') : suite.lib}</Bouton> : null}
-        {gesteEtape || <Bouton variante={faitIci ? 'primaire' : 'secondaire'} {...suite.data} onClick={suite.onClick}>{suite.lib}</Bouton>}
+        {gesteEtape || <Bouton variante={faitIci ? 'primaire' : 'secondaire'} plein {...suite.data} onClick={suite.onClick}>{suite.lib}</Bouton>}
       </div>
     </SheetShell>
   );

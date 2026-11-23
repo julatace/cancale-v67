@@ -118,10 +118,10 @@ html body .rg2-feuille input.rg2-natif::-moz-range-thumb { width: 28px; height: 
   margin: 8px -16px -16px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
   background: var(--n-carte, #fff); border-top: .5px solid var(--n-trait, #E4E4E0);
 }
-.rg2-feuille .rg2-pied > .vrm-b-primaire, .rg2-feuille .rg2-pied > .vrm-b-secondaire { flex: 1; min-height: 50px; justify-content: center; border-radius: 14px; }
-.rg2-feuille .rg2-pied > .vrm-b-discret { flex: none; }
-/* Le plein de la feuille : la couleur du plein natif (gris-ardoise quand le design clair est posé), jamais un aplat noir à part. */
-.rg2-feuille .vrm-b-primaire { background: var(--n-plein, #16181D) !important; color: var(--n-sur-plein, #fff) !important; }
+.rg2-feuille .rg2-pied > :last-child { flex: 1; min-width: 0; }
+.rg2-feuille .rg2-pied > :last-child .n-bouton, .rg2-feuille .rg2-pied > .n-bouton:last-child { width: 100%; min-height: 50px; justify-content: center; border-radius: 14px; }
+.rg2-feuille .rg2-pied > :not(:last-child) { flex: none; }
+/* Le plein de la feuille suit le plein natif (`--n-plein`) : l'ardoise du design gris clair dès qu'il est sur main. */
 
 /* « Supprimée », « dans ta galerie » : la ligne de résultat, sans encadré. */
 .rg2-feuille .vrm-acc-apres { margin: 0; }

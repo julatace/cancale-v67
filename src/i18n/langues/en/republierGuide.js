@@ -243,4 +243,6 @@ export default {
   "rg2.fini.publiePasVue": "Not seen yet with No. {num}.",
   "rg2.fini.journal": "Noted in “What VRM did”.",
   "rg2.fini.aucune": "No new listing read.",
+  "rg2.num.aucune": "No. not written in the listing.",
+  "rg2.num.pose": "{num} · {ou}",
 };

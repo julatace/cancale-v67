@@ -152,7 +152,7 @@ const attendre = async (pg, f, ms = 8000) => { const t = Date.now(); let v; whil
 const pressePapier = (pg) => pg.evaluate(async () => { try { return await navigator.clipboard.readText(); } catch (_) { return null; } });
 const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel} summary`, (l) => l.filter((x) => { if (x.closest('[hidden]')) return false; const r = x.getBoundingClientRect(); return r.height && r.height < 43.5; }).map((x) => (x.getAttribute('aria-label') || x.textContent || x.tagName).trim().slice(0, 24)));
 // Les pleins VISIBLES dans la feuille (Studio : un par écran au plus).
-const pleins = (pg, sel) => pg.$$eval(`${sel} .vrm-b-primaire`, (l) => l.filter((x) => !x.closest('[hidden]') && !x.closest('details:not([open])') && x.getBoundingClientRect().height > 0).map((x) => x.textContent.trim().slice(0, 30)));
+const pleins = (pg, sel) => pg.$$eval(`${sel} [data-n-variante="plein"], ${sel} .vrm-b-primaire`, (l) => l.filter((x) => !x.closest('[hidden]') && !x.closest('details:not([open])') && x.getBoundingClientRect().height > 0).map((x) => x.textContent.trim().slice(0, 30)));
 const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySelector(${JSON.stringify(sel)}); if (!f) return null; const r = f.getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight - 150 && !document.getAnimations().some((a) => a.playState === 'running') ? 1 : null; })()`, 12000);
 const ls = (pg, k) => pg.evaluate((k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } }, k);
 const premierPlan = (pg) => pg.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
@@ -201,8 +201,8 @@ const premierPlan = (pg) => pg.evaluate(() => document.dispatchEvent(new Event('
           else { await pg.waitForTimeout(500); dit(dl.join(',') === 'VRM-42-01.jpg,VRM-42-02.jpg' && !parts.length, `R2 ${T} ordinateur : les 2 photos réglées téléchargées d’un toucher`, dl); }
           dit(apres && (tel ? /2 photos dans ta galerie/.test(apres) : /2 photos téléchargées/.test(apres)), `R2 ${T} après : le message le dit (${tel ? 'galerie' : 'téléchargements'}) — court depuis le 23 nov.`, apres);
           dit((await pg.getAttribute(`${F} [data-main-aller="photos"]`, 'data-rg-etat')) === 'fait', `R2 ${T} l’étape Photos est cochée`);
-          const suivPlein = await pg.evaluate(() => (document.querySelector('[data-repub-main] [data-main-suivant]') || {}).className || '');
-          dit(/vrm-b-primaire/.test(suivPlein) && (await pleins(pg, F)).length === 1, `F ${T} fait : « Suivant » devient LE plein (un seul)`, (await pleins(pg, F)).join(' | '));
+          const suivPlein = await pg.evaluate(() => { const x = document.querySelector('[data-repub-main] [data-main-suivant]'); return x ? (x.getAttribute('data-n-variante') || '') + ' ' + (x.className || '') : ''; });
+          dit(/plein|vrm-b-primaire/.test(suivPlein) && (await pleins(pg, F)).length === 1, `F ${T} fait : « Suivant » devient LE plein (un seul)`, (await pleins(pg, F)).join(' | '));
           await pg.screenshot({ path: nomF('2-photos-envoyees') });
           // ── R3 : supprimer l'ancienne, sur SON clic, chez Vinted ──
           await clic(pg, `${F} [data-main-suivant="supprimer"]`);

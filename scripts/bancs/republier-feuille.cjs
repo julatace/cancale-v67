@@ -140,14 +140,16 @@ const pleins = (pg, sel) => pg.$$eval(`${sel} .vrm-b-primaire`, (l) => l.filter(
 const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySelector(${JSON.stringify(sel)}); if (!f) return null; const r = f.getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight - 150 && !document.getAnimations().some((a) => a.playState === 'running') ? 1 : null; })()`, 12000);
 const ls = (pg, k) => pg.evaluate((k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } }, k);
 const premierPlan = (pg) => pg.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-// Ouvre « Republier à la main » sur UNE annonce (la vue Republier, sa case, « À la main »).
+// Ouvre « Republier à la main » sur UNE annonce, comme lui au téléphone et à l'ordinateur : Annonces, le « ⋯ » de la
+// rangée (les gestes de CETTE annonce), « Republier à la main ».
 const ouvrir = async (pg, id) => {
-  await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces&vue=republier`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForSelector('[data-selection-vue="republier"]', { timeout: 20000 });
-  for (let i = 0; i < 40; i++) { if (await pg.$(`[data-selection-annonce="${id}"]`)) break; await pg.waitForTimeout(250); }
-  await clic(pg, `[data-selection-annonce="${id}"] input`);
-  for (let k = 0; k < 3 && !(await attendre(pg, () => (document.querySelector('[data-republier-main-lancer]') ? 1 : null), 4000)); k++) await clic(pg, `[data-selection-annonce="${id}"] input`, false);
-  await clic(pg, '[data-republier-main-lancer]');
+  await pg.goto(`http://localhost:${PORT}/?tab=annonces`, { waitUntil: 'domcontentloaded' });
+  const g = `[data-ad-gestes="vinted#${id}"]`;
+  await pg.waitForSelector(g, { timeout: 25000 });
+  await clic(pg, g);
+  const r = pg.locator('button.n-rangee-corps', { hasText: 'Republier à la main' }).first();
+  await r.waitFor({ timeout: 8000 }).catch(() => {});
+  touchers++; await r.click({ timeout: 5000 }).catch(() => {});
   const F = `[data-repub-main="${id}"]`;
   const ok = await attendre(pg, (f) => (document.querySelector(f) ? 1 : null), 8000, F);
   if (ok) await poseeLa(pg, F);
@@ -181,7 +183,7 @@ const orangesDans = (pg, F) => pg.evaluate((f) => {
   return [...new Set(out)].slice(0, 6);
 }, F);
 // Les pleins VISIBLES dans la feuille.
-const pleinsVus = (pg, F) => pg.$$eval(`${F} .vrm-b-primaire`, (l) => l.filter((x) => !x.closest('[hidden]') && !x.closest('details:not([open])') && x.getBoundingClientRect().height > 0).map((x) => ({ t: x.textContent.trim().slice(0, 40), pied: !!x.closest('[data-rg-pied]') })));
+const pleinsVus = (pg, F) => pg.$$eval(`${F} [data-n-variante="plein"], ${F} .vrm-b-primaire`, (l) => l.filter((x) => !x.closest('[hidden]') && !x.closest('details:not([open])') && x.getBoundingClientRect().height > 0).map((x) => ({ t: x.textContent.trim().slice(0, 40), pied: !!x.closest('[data-rg-pied]') })));
 
 (async () => {
   let b;
@@ -212,7 +214,7 @@ const pleinsVus = (pg, F) => pg.$$eval(`${F} .vrm-b-primaire`, (l) => l.filter((
           dit(!!F, `H2 ${T} « À la main » s’ouvre sur l’annonce de 13 photos`);
           if (!F) throw new Error('feuille absente');
           const pret = await attendre(pg, (f) => { const x = document.querySelector(`${f} [data-main-telecharger]`); return x && x.getAttribute('data-rg-photos-pretes') === '13' ? 13 : null; }, 90000, F);
-          const pied = await pg.evaluate((f) => { const p = document.querySelector(`${f} [data-rg-pied]`); const t = p && p.querySelector('[data-main-telecharger]'); return p ? { geste: t ? t.textContent.trim() : '', plein: t ? /vrm-b-primaire/.test(t.className) : false, bas: Math.round(innerHeight - p.getBoundingClientRect().bottom) } : null; }, F);
+          const pied = await pg.evaluate((f) => { const p = document.querySelector(`${f} [data-rg-pied]`); const t = p && p.querySelector('[data-main-telecharger]'); return p ? { geste: t ? t.textContent.trim() : '', plein: t ? t.getAttribute('data-n-variante') === 'plein' || /vrm-b-primaire/.test(t.className) : false, bas: Math.round(innerHeight - p.getBoundingClientRect().bottom) } : null; }, F);
           dit(pret === 13 && pied && pied.plein && (tel ? /Enregistrer les 13 photos/.test(pied.geste) : /Télécharger les 13 photos/.test(pied.geste)), `H2 ${T} LE bouton plein, en bas : « ${tel ? 'Enregistrer' : 'Télécharger'} les 13 photos »`, pied);
           const pl = await pleinsVus(pg, F);
           dit(pl.length === 1 && pl[0].pied, `H2 ${T} un seul plein dans la feuille, et il est dans le pied`, pl);
@@ -287,7 +289,7 @@ const pleinsVus = (pg, F) => pg.$$eval(`${F} .vrm-b-primaire`, (l) => l.filter((
           await attendre(pg, (f) => { const x = document.querySelector(`${f} [data-main-telecharger]`); return x && x.getAttribute('data-rg-photos-pretes') === '13' ? 1 : null; }, 90000, F);
           await clic(pg, `${F} [data-rg-pied] [data-main-telecharger]`);
           const ap2 = await attendre(pg, (f) => { const a = document.querySelector(`${f} [data-acc-apres="republier.main"]`); return a ? a.textContent : null; }, 30000, F);
-          const suiv = await pg.evaluate((f) => { const s = document.querySelector(`${f} [data-rg-pied] [data-main-suivant]`); return s ? { t: s.textContent.trim(), plein: /vrm-b-primaire/.test(s.className) } : null; }, F);
+          const suiv = await pg.evaluate((f) => { const s = document.querySelector(`${f} [data-rg-pied] [data-main-suivant]`); return s ? { t: s.textContent.trim(), plein: s.getAttribute('data-n-variante') === 'plein' || /vrm-b-primaire/.test(s.className) } : null; }, F);
           dit(ap2 && /13 photos/.test(ap2) && mots(ap2) <= 8 && suiv && suiv.plein && /Suivant/.test(suiv.t), `H2 ${T} enregistrées : « 13 photos… » (court), puis « Suivant » devient LE plein du pied`, { ap2, suiv });
           if (tel) { const p = await pg.evaluate(() => window.__partages.slice(-1)[0] || null); dit(p && p.noms.length === 13 && p.geste, `H2 ${T} iPhone : UN partage de 13 fichiers, dans le geste`, p && p.noms.length); }
           await pg.screenshot({ path: nomF('4-photos-enregistrees') });
