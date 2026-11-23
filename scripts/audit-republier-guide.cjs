@@ -64,6 +64,11 @@ const MUTATIONS = {
   manque_tu: { f: 'guide', m: (s) => s.replace("const manque = connu ? Math.max(0, n - photos.length) : (source === 'couverture' ? null : 0);", 'const manque = 0;') },
   sans_double_toucher: { f: 'ecran', m: (s) => s.replace('onPointerUp={() => relache(c.cle)} onDoubleClick={() => neutreCle(c.cle)}', '') },
   hasard_curseur: { f: 'ecran', m: (s) => s.replace("const neutreCle = (cle) => poserRegs((x) => ({ photo: { ...x.photo, [cle]: PHOTO_NEUTRE[cle] } }));", "const neutreCle = (cle) => poserRegs((x) => ({ photo: { ...x.photo, [cle]: PHOTO_NEUTRE[cle] + (Math.random() - 0.5) / 100 } }));") },
+  // (23 nov.) « Supprimer » cochée sans preuve : l'absence d'une lecture partielle, ratée ou masquée prise pour « partie ».
+  absence_partielle: { f: 'guide', m: (s) => s.replace("if (!u || !complets || complets[u] !== true) return undefined;", '') },
+  absence_ko: { f: 'guide', m: (s) => s.replace("if (Array.isArray(ko) && ko.map(String).includes(u)) return undefined;", '') },
+  absence_masquee: { f: 'guide', m: (s) => s.replace("|| (Array.isArray(masquees) && masquees.some(meme))", '') },
+  glisser_perd: { f: 'guide', m: (s) => s.replace('const [x] = l.splice(a, 1); l.splice(b, 0, x);', 'l.splice(a, 1);') },
   cle_absente_it: { f: 'rg_it', m: (s) => s.replace(/\s*"rg\.supprimer\.ouvrir": "[^"]*",/, '') },
 };
 
@@ -103,8 +108,17 @@ async function auditer(src) {
     dit(a.photos === 'a-faire' && b.photos === 'fait' && c.photos === 'a-faire' && E({ photos: { n: 0 } }).photos === 'sans', 'A2 « Photos » cochée seulement quand TOUTES les photos prêtes sont envoyées (partage ou téléchargement réussi)', JSON.stringify([a.photos, b.photos, c.photos]));
     const s1 = E({ ancienneOuverte: true, ancienne: 'en-ligne' }), s2 = E({ ancienne: undefined, ancienneOuverte: true }), s3 = E({ ancienne: 'partie' });
     dit(s1.supprimer === 'ouvert' && s2.supprimer === 'ouvert' && s3.supprimer === 'fait', 'A3 « Supprimer » cochée seulement quand l’ancienne n’est plus dans la lecture ; le lien ouvert ou « pas su » ne valent pas « fait »', JSON.stringify([s1.supprimer, s2.supprimer, s3.supprimer]));
-    dit(G.etatAncienne('9102', null) === undefined && G.etatAncienne('9102', [{ id: 1 }], { erreur: true }) === undefined && G.etatAncienne('9102', [{ id: 9102 }]) === 'en-ligne' && G.etatAncienne('9102', [{ id: 9103 }]) === 'partie' && G.etatAncienne('', [{ id: 1 }]) === undefined,
+    dit(G.etatAncienne('9102', null) === undefined && G.etatAncienne('9102', [{ id: 1 }], { erreur: true }) === undefined && G.etatAncienne('9102', [{ id: 9102 }]) === 'en-ligne' && G.etatAncienne('', [{ id: 1 }]) === undefined,
       'A4 l’ancienne : lecture absente ou en erreur ⇒ « pas su » (jamais « partie »)');
+    // (23 nov., capture de Julien : « Supprimer » cochée à l'étape 1) L'ABSENCE ne prouve « partie » que sur une lecture
+    //  COMPLÈTE de CE compte, qui a répondu, l'annonce n'étant ni « à confirmer » ni masquée.
+    { const L = [{ id: 9103 }], ok = { uid: '111', complets: { 111: true } };
+      const r = [G.etatAncienne('9102', L), G.etatAncienne('9102', L, { uid: '111' }), G.etatAncienne('9102', L, { uid: '111', complets: {} }),
+        G.etatAncienne('9102', L, { ...ok, ko: ['111'] }), G.etatAncienne('9102', L, { ...ok, aConfirmer: [{ id: 9102 }] }), G.etatAncienne('9102', L, { ...ok, masquees: [{ id: '9102' }] }),
+        G.etatAncienne('9102', L, { uid: '222', complets: { 111: true } }), G.etatAncienne('9102', L, ok)];
+      dit(r.slice(0, 7).every((x) => x === undefined) && r[7] === 'partie', 'A4b « partie » seulement sur une lecture COMPLÈTE de CE compte (pas en échec, l’annonce ni à confirmer ni masquée) ; sinon « pas su »', JSON.stringify(r)); }
+    { const d = G.deplacerPhoto(['a', 'b', 'c', 'd'], 3, 0), e = G.photosRangees(['a', 'b', 'c'], ['c', 'x', 'a']);
+      dit(d.join('') === 'dabc' && G.deplacerPhoto(['a', 'b'], 0, 5).join('') === 'ab' && e.join('') === 'cab', 'A4c l’ordre choisi au glisser : rien perdu ni doublé, une photo neuve à la fin, une inconnue sortie', JSON.stringify([d, e])); }
     const c1 = E({ copies: 5, vintedOuvert: true }), c2 = E({ nouvelle: 'lie' }), c3 = E({ nouvelle: 'fait' });
     dit(c1.creer === 'ouvert' && c1.fini === 'a-faire' && c2.creer === 'fait' && c2.fini === 'ouvert' && c3.fini === 'fait', 'A5 « Créer » cochée quand la nouvelle est désignée par SON clic ; « Fini » quand le N° est relu dessus — des copies ne suffisent pas', JSON.stringify([c1, c2, c3]));
     dit(G.etapeConseillee('republier', b) === 'supprimer' && G.etapeConseillee('republier', { photos: 'fait', supprimer: 'fait', creer: 'fait', fini: 'fait' }) === 'fini', 'A6 l’étape conseillée : la première qui n’est pas faite');
