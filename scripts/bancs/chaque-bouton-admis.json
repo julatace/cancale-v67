@@ -10,7 +10,7 @@
   "raison": "La feuille « Actions » d'Annonces est une feuille d'actions : le geste choisi la ferme et ouvre le sien ; on revient à Annonces, pas au menu (comme sur iOS)."
  },
  {
-  "cle": "› Ma journée \\|\\|.*(Revoir la visite|Signaler un problème)",
+  "cle": "› [^|]+ \\|\\|.*\\|(Revoir la visite de cet écran|Signaler un problème)\\|",
   "defaut": "retour-ailleurs",
   "raison": "L'aide d'un écran (« ? ») se ferme d'abord quand on lance la visite ou « Signaler un problème » (décision du 14 nov., src/composants/AideEcran.jsx)."
  },
