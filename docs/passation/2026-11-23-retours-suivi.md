@@ -71,6 +71,25 @@ peut donc venir que du remboursement (qui l'implique) — d'où le cas de sa cap
    gratuite sûre par carte ; la carte des points existante, `CartePoints`, reste sur son bouton).
 6. « Quoi de neuf » : `retours-achat-suivi`. Textes en 5 langues (`rt.*` dans `src/i18n/langues/<l>/renvoyer.js`).
 
+## URGENT du soir : « le point relais n'est pas reconnu » (Vinted Go)
+
+Capture de Julien en production : « Point pas encore connu · Vinted Go · comptoir · adresse pas lue · fermé — ouvre demain à 8 h ·
+à retirer avant le 25 nov. », code et QR bien affichés.
+
+- **Mesuré (lecture seule)** : la ligne `email_track_vinted_{n°}` (e-mail Vinted Go « Rappel : récupère ton colis… ») porte
+  `lieu` = « Relais Vinted Go, <commerce>, <n° et rue> » — SANS code postal ni ville — et `horaires` (les plages du point). Cette
+  forme est récente : 2 e-mails (15 et 22 nov.) contre 23 « Consigne Vinted Go, … ». Aucune ligne de suivi Vinted (`harvest_*_suivi_*`)
+  pour ce n°.
+- **Cause** : `cleanLieu` (src/App.jsx, `TYPE_LIEU`) ne connaissait pas « Relais Vinted Go » comme TYPE ⇒ il devenait le NOM ;
+  `nomRelaisPropre` (src/relaisColis.js) l'écartait (que des mots de type) ⇒ le vrai nom (2e morceau) perdu ; sans code postal ⇒
+  point « inconnu », « adresse pas lue ». Les horaires venaient du MÊME e-mail : justes (lundi 18 h 04, fermé ; mardi 8 h).
+- **Correction** : « Relais Vinted Go » / « Relais Vinted » est un TYPE dans `TYPE_LIEU` (App.jsx) et `TYPE_EN_TETE`
+  (relaisColis.js). Résultat sur les 2 formes réelles : « Joubert Peintures · 10 Rue Du Bois Aurant », « Épicerie Saveurs
+  D'Ailleurs · 43 Rue du Lt François Fromentin » ; « Consigne Vinted Go, … 56000 Vannes » inchangé. La rue sans code postal est
+  déjà gérée (identité nom + rue ; recherche carte « texte » jugée par la règle existante).
+- **Preuves** : `scripts/audit-point-vinted-go.cjs` (V1–V4) vert, 3 rouges sur origin/main ; `--prouve` 2/2 mutations rouges ;
+  banc `retrait-point-c.cjs` K6 (la forme réelle, valeurs inventées) — voir « Preuves ».
+
 ## L'extension : ce qu'il faudrait (PAS fait aujourd'hui : 5.440–5.443 réservées ailleurs)
 
 Mesuré : `capterSuivisAchats` relit bien l'achat en retour (il n'est ni « livré » ni fini), mais le `journey_summary` lu
