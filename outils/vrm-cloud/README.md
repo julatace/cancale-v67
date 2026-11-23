@@ -4,13 +4,13 @@ Le navigateur charge automatiquement l’extension VRM du dépôt. Chaque profil
 
 ## Installer sur un VPS Linux
 
-Cloner le dépôt dans `~/vrm` sous un utilisateur Linux dédié. Depuis ce dossier, installer les dépendances Node, puis Chromium :
+Cloner la branche du pilote dans `~/vrm` sous un utilisateur Linux dédié. Installer Node.js 22 ou ultérieur. Avec cet utilisateur connecté à sa session Linux, lancer l’installeur :
 
 ```sh
-npm install
-npx playwright install --with-deps chromium
-node outils/vrm-cloud/lancer.mjs pilote --verifier
+bash outils/vrm-cloud/installer.sh
 ```
+
+L’installeur installe les dépendances selon le lockfile, récupère Chromium et vérifie hors ligne le chargement de l’extension. Il installe ensuite le service utilisateur. Playwright peut demander `sudo` pour les bibliothèques système. L’activation du service intervient après l’association du compte.
 
 Depuis le bureau privé du VPS, ouvrir le profil de test :
 
@@ -21,8 +21,6 @@ node outils/vrm-cloud/lancer.mjs pilote --connecter
 Le panneau de l’extension s’ouvre avec l’extension déjà chargée. Associer l’extension au compte VRM de test avec le parcours existant, puis ouvrir l’onglet Vinted et s’y connecter. Fermer Chromium avant de lancer le service. Le profil dans `~/.local/state/vrm-cloud/pilote` contient les sessions de connexion. Garder ce dossier privé, hors du dépôt.
 
 ```sh
-install -Dm644 outils/vrm-cloud/vrm-cloud@.service ~/.config/systemd/user/vrm-cloud@.service
-systemctl --user daemon-reload
 systemctl --user enable --now vrm-cloud@pilote.service
 journalctl --user -u vrm-cloud@pilote.service -f
 ```
