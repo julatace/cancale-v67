@@ -68,7 +68,7 @@ export function JourneeInstantanee({ snap, maintenant = null, ScreenHead = null,
           studio et l'affiche, aucune carte sombre qui basculerait au clair à l'arrivée des données. */}
       <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete sj-tete" aria-label="Ta journée — derniers chiffres connus" style={largeurOk && M.hauteur ? { minHeight: M.hauteur } : undefined}>
         <div className="vrm-day-hello vrm-fu-bonjour sj-bonjour">{hello}{M.prenom ? ' ' + M.prenom : ''}</div>
-        <h1 className="vrm-fu-titre-tete sj-titre">Ma journée</h1>
+        {/* (21 nov.) Un seul titre : « Aujourd’hui », celui de la coque (plus de « Ma journée » ici). */}
         {/* (16 nov.) « Mis à jour… » dans la tête, toujours (posé dans la tuile des cases, il recouvrait le dernier montant) */}
         {mention('vrm-ji-age vrm-ji-age-seule')}
         <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-ji-phrase="">{M.phrase && M.phrase.texte ? M.phrase.texte : 'Tes derniers chiffres, le temps de tout relire'}</p>

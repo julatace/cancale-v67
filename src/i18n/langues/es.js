@@ -1,15 +1,36 @@
 // ESPAÑOL — traducción de fr.js (la fuente). Mismas claves, mismas {variables}.
+import ecran_accessibilite from './es/accessibilite.js';   // (17 nov.) audit d'accessibilité
+import ecran_groupes from './es/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './es/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './es/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './es/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './es/journee.js';
 import ecran_confort from './es/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './es/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
+import ecran_emails_mail from './es/emailsMail.js';   // (19 nov.) E-mails comme Mail, « Relier ma boîte » accompagné
+import ecran_design_v2 from './es/designV2.js';   // (17 nov.) le nouveau design, en essai
+import ecran_argent_v2 from './es/argentV2.js';   // (17 nov., phase 2) Argent et Paramètres, nouveau design
+import ecran_v2_ventes from './es/v2ventes.js';   // (17 nov.) Ventes, nouveau design (phase 2)
 import ecran_correspondances from './es/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './es/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_depot from './es/depot.js';   // (21 nov., ext. 5.429) brouillons préparés, descriptions types, boost
 import ecran_avenir from './es/avenir.js';
+import ecran_journee_stats from './es/journeeStats.js';   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
+import ecran_rentabilite from './es/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
+import ecran_transp_depenses from './es/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
+import ecran_file_actions from './es/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
+import ecran_a_distance from './es/aDistance.js';   // (22 nov., ext. 5.436) « Mes comptes » à distance
+import ecran_apresFinale from './es/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
+import ecran_styleClarte from './es/styleClarte.js';   // (22 nov.) style et clarté : tableau de bord, état de l’extension
+import ecran_lotachat from './es/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
+import ecran_ext5438 from './es/ext5438.js';   // (22 nov.) ext. 5.438
+import ecran_ext5428 from './es/ext5428.js';   // (21 nov.) ext. 5.428   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
+import ecran_relier_retires from './es/relierRetires.js';   // (21 nov.) relier ce qui est chez moi, colis non retirés, remboursés hors dépenses
 import ecran_verre2 from './es/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './es/fiched.js';
+import ecran_egalite from './es/egalite.js';
+import ecran_tableau from './es/tableau.js';   // (19 nov. soir) le tableau de travail
+import ecran_publierAgent from './es/publierAgent.js';
 import ecran_ecrans_restes from './es/ecransRestes.js';   // (16 nov.) lot ecrans-restes : stock importé, date limite, loupe   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './es/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_transporteur_connu from './es/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
@@ -19,7 +40,9 @@ import ecran_serie_selection from './es/serieSelection.js';   // (16 nov.) la ba
 import ecran_scan_retrouver from './es/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './es/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './es/liaison.js';   // (15 nov.) La liaison achat ⇄ article
-import ecran_retrait_ailleurs from './es/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
+import ecran_completer from './es/completer.js';   // (19 nov.) L'atelier « Compléter »
+import ecran_retrait_ailleurs from './es/retraitAilleurs.js';
+import ecran_retirer_partout from './es/retirerPartout.js';   // (21 nov., ext. 5.426) « retirée partout »   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './es/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_parametres from './es/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
 import ecran_numeros_nouvelles from './es/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
@@ -61,19 +84,44 @@ import ecran_argentMieux from './es/argentMieux.js';   // (16 nov., argent-mieux
 import ecran_argentPlus from './es/argentPlus.js';   // (15 nov., lot argent-plus)
 import ecran_rechliste from './es/rechliste.js';
 import ecran_studio_paires from './es/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
-import ecran_republier_guide from './es/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
+import ecran_republier_guide from './es/republierGuide.js';
+import ecran_republication from './es/republication.js';   // (17 nov.) republier étape par étape (extension 5.408)   // (15 nov.) republier / publier à la main, guidés
+import ecran_prix_sans_manuel from './es/prixSansManuel.js';   // (19 nov.) « Changer le prix » en UN geste : l'extension baisse, ou la baisse attend
 import ecran_memePhoto from './es/memePhoto.js';   // (15 nov., lot meme-photo)
+import ecran_liaisonSites from './es/liaisonSites.js';   // (19 nov.) « Relier mes annonces »
 import ecran_fiabilite from './es/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_deuxComptes from './es/deuxComptes.js';   // (15 nov., lot deux-comptes)
+import ecran_ceQuiManque from './es/ceQuiManque.js';   // (20 nov.) chantier « ce qui manque »
+import ecran_compteBloque from './es/compteBloque.js';
+import ecran_annulees from './es/annulees.js';   // (22 nov., annulées + validation Vestiaire)
+import ecran_relancesVentes from './es/relancesVentes.js';   // (21 nov., ext. 5.425, relances)   // (19 nov., lot compte-bloque)
 import ecran_favorisSites from './es/favorisSites.js';   // (15 nov., lot favoris-sites)
+import ecran_vestiaireMessages from './es/vestiaireMessages.js';   // (21 nov., lot vestiaire-messages)
+import ecran_lbcVcInteresses from './es/lbcVcInteresses.js';   // (20 nov., lot lbc-vc-interesses)
 import ecran_etageres from './es/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './es/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './es/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
+import ecran_stock_rangement from './es/stockRangement.js';
+import ecran_arrivee_scan from './es/arriveeScan.js';
+import ecran_prio_recherche from './es/prioRecherche.js';   // (21 nov., lot prio-recherche)
+import ecran_roles_comptes from './es/rolesComptes.js';   // (20 nov., lot bleam-suite)   // (20 nov., lot arrivee-scan)
+import ecran_stock_etiquetage from './es/stockEtiquetage.js';   // (19 nov., lot stock-etiquetage)   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
+import ecran_demarrage from './es/demarrage.js';   // (20 nov.) « Bien démarrer » et « Tout va bien ? » en rangées
+import ecran_ux_reglages from './es/uxReglages.js';   // (21 nov.) Paramètres, e-mails, écrans vides, « Nouveau », « Bien démarrer » sur Aujourd'hui
+import ecran_natif from './es/natif.js';
+import ecran_menu_onglets from './es/menu.js';   // (21 nov., onglets-menu)
+import ecran_offres_photos from './es/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
+import ecran_actions_ext from './es/actionsExt.js';   // (20 nov.) « … dans l’extension »
+import ecran_extension from './es/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
+  ...ecran_accessibilite,
+  ...ecran_groupes,
   ...ecran_perso,
   ...ecran_ventesVerre,
   ...ecran_studio_paires,
   ...ecran_republier_guide,
+  ...ecran_republication,
+  ...ecran_prix_sans_manuel,
   ...ecran_etageres,
   ...ecran_journee_verre,
   ...ecran_arrivee,
@@ -578,6 +626,16 @@ export default {
   "reglages.profil.cloisonne": "Tus datos solo son visibles para ti.",
   "reglages.profil.pasCloisonne": "Conectado — separación de cuentas aún no activada.",
   "reglages.profil.pied": "Para saludarte en el inicio. Vacío: «Hola».",
+  "reglages.push.capte.titre": "Lo que capta la extensión",
+  "reglages.push.capte.note": "Vinted, Leboncoin, Vestiaire: una vez por evento, agrupadas si llegan varias en 2 min. Tus horas de calma cuentan.",
+  "reglages.push.capte.ventes": "Nueva venta",
+  "reglages.push.capte.ventesDesc": "«Venta: … · Imprimir la etiqueta», en cuanto la extensión la ve.",
+  "reglages.push.capte.offres": "Oferta recibida",
+  "reglages.push.capte.offresDesc": "«Oferta de 45 € · Responder».",
+  "reglages.push.capte.messages": "Mensaje recibido",
+  "reglages.push.capte.messagesDesc": "«Mensaje de @usuario · Responder», nunca el texto.",
+  "reglages.push.capte.on": "{quoi}: activado",
+  "reglages.push.capte.off": "{quoi}: desactivado",
   "reglages.push.desc": "Recibir un aviso en tu móvil de una venta, una oferta o un paquete.",
   "reglages.push.lib": "Notificaciones del móvil",
   "reglages.push.muets": { one: "{n} cuenta sin e-mail: sin notificación", other: "{n} cuentas sin e-mail: sin notificación" },
@@ -666,6 +724,7 @@ export default {
   "securite.tous": "Todas las cuentas",
   "securite.tous.detail": "El ajuste de partida de cada cuenta",
   "securite.propre": "Ajustado para esta cuenta",
+  "securite.nuit": "También de noche: tus automatizaciones siguen, con los mismos límites y el mismo ritmo que de día.",
   "securite.repos": "Descanso nocturno",
   "securite.repos.de": "De",
   "securite.repos.a": "a",
@@ -751,10 +810,6 @@ export default {
   "partout.entree": "Publicar en todas partes",
   "partout.exclues": {"one": "{n} anuncio elegido no se puede proponer (ya no está en Vinted, o sin N.º).", "other": "{n} anuncios elegidos no se pueden proponer (ya no están en Vinted, o sin N.º)."},
   "partout.aussiSur": "también en {sites}",
-  "prixPartout.propose": "Propuesto: confírmalo tú",
-  "prixPartout.relu": "Hecho ✓ comprobado",
-  "prixPartout.aMettre": "A poner: {prix}",
-  "prixPartout.baisser": "Bajar en Vinted",
   "partout.val.oui": "sí",
   "partout.val.non": "no",
   "partout.val.aucune": "ninguna (nunca un impulso)",
@@ -1648,7 +1703,7 @@ export default {
   "impression.tampon.num": "Solo N.º",
   "impression.tampon.num_titre": "N.º + título",
   "impression.tampon.num_titre_taille": "N.º + título + talla",
-  "impression.tampon.rien": "Nada",
+  "impression.tampon.rien": "Sin N.º (la mención queda)",
   "impression.tampon.pourquoi": "El título se oculta por defecto: la etiqueta va pegada al paquete, el transportista lo vería.",
   "impression.tampon.jamais": "Nunca sobre un código de barras, un QR o una dirección.",
   "impression.fiche": "Hoja de preparación",
@@ -2303,16 +2358,30 @@ export default {
   "instantane.arret.panne": "Sin releer: la base no responde. Estas cifras son las de tu última visita.",
   ...ecran_confort,
   ...ecran_studio,
+  ...ecran_design_v2,
+  ...ecran_emails_mail,
+  ...ecran_argent_v2,
+  ...ecran_v2_ventes,
   ...ecran_capte,
+  ...ecran_depot,
   ...ecran_retrait_ailleurs,
+  ...ecran_retirer_partout,
   ...ecran_vcventes,
   ...ecran_memePhoto,
+  ...ecran_liaisonSites,
   ...ecran_fiabilite,
   ...ecran_deuxComptes,
+  ...ecran_compteBloque,
+  ...ecran_relancesVentes,
+  ...ecran_annulees,
+  ...ecran_ceQuiManque,
   ...ecran_favorisSites,
+  ...ecran_lbcVcInteresses,
+  ...ecran_vestiaireMessages,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
+  ...ecran_completer,
   ...ecran_suivi_vente,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
@@ -2323,11 +2392,37 @@ export default {
   ...ecran_parametres,
   ...ecran_avenir,
   ...ecran_verre2,
+  ...ecran_journee_stats,
+  ...ecran_rentabilite,
+  ...ecran_transp_depenses,
+  ...ecran_file_actions,
+  ...ecran_ext5428,
+  ...ecran_lotachat,
+  ...ecran_ext5438,
+  ...ecran_a_distance,
+  ...ecran_apresFinale,
+  ...ecran_styleClarte,
+  ...ecran_relier_retires,
   ...ecran_fiched,
+  ...ecran_egalite,
+  ...ecran_tableau,
+  ...ecran_publierAgent,
   ...ecran_ecrans_restes,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,
   ...ecran_parcours_nouveau,
+  ...ecran_stock_rangement,
+  ...ecran_stock_etiquetage,
+  ...ecran_arrivee_scan,
+  ...ecran_prio_recherche,
+  ...ecran_roles_comptes,
+  ...ecran_demarrage,
+  ...ecran_ux_reglages,
+  ...ecran_natif,
+  ...ecran_menu_onglets,
+  ...ecran_extension,
+  ...ecran_actions_ext,
+  ...ecran_offres_photos,
   ...ecran_confiance_clients,
 };

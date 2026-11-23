@@ -133,11 +133,10 @@ const attendre = (ms = 30) => new Promise((r) => setTimeout(r, ms));
     const l = A.photosStudioPourVinted({ photos: [{ id: '1', img: J + '1', detoure: J + 'D' }, { id: '2', img: 'https://ailleurs.test/x.jpg' }, { id: '3', img: J + '3' }, null] });
     dit(Array.isArray(l) && l.length === 2 && l[0] === J + '1' && l[1] === J + '3', 'S1 · la photo D’ORIGINE du studio (jamais la détourée : Vestiaire seul, §3), data URL seulement, dans l’ordre', JSON.stringify(l));
     dit(A.photosStudioPourVinted(null).length === 0 && A.photosStudioPourVinted({ photos: [] }).length === 0, 'S2 · studio pas lu ou vide ⇒ rien de repris');
-    const cv = fs.readFileSync(path.join(RACINE, 'src', 'CreerSurVinted.jsx'), 'utf8');
+    // (20 nov., décision de Julien) « Créer sur Vinted » se fait dans le PANNEAU de l'extension : l'atelier de l'app
+    // (src/CreerSurVinted.jsx) est retiré ; la règle (photosStudioPourVinted, ci-dessus) reste, l'app ouvre le panneau sur le N°.
     const app = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
-    dit(/lireStudio\(f\.numero\)/.test(cv) && /\(Array\.isArray\(f\.photos\) && f\.photos\.length\)\) continue;/.test(cv) && /setPhotos\(\(p\) => \(\(p\[f\.id\] \|\| \[\]\)\.length \? p : \{ \.\.\.p, \[f\.id\]: l \}\)\)/.test(cv),
-      'S3 · seulement une fiche SANS photo, par SON N° (jamais un titre) ; une photo ajoutée entre-temps n’est jamais remplacée');
-    dit(/lireStudio=\{\(num\) => import\('\.\/studioPhoto\.js'\)\.then\(\(m\) => m\.lireStudio\(STUDIO_BASE, cleNum\(num\)\)\)\}/.test(app) && /data-creer-vinted-studio=/.test(cv), 'S4 · « Créer sur Vinted » lit SON studio (`studio_photos_{N°}`) et le dit sur la ligne');
+    dit(!fs.existsSync(path.join(RACINE, 'src', 'CreerSurVinted.jsx')) && /<FeuilleExtension action="creerVinted" ids=\{l\.map\(\(f\) => String\(f\.numero\)\)\}/.test(app), 'S3 · (20 nov.) « Créer sur Vinted » : la feuille ouvre le panneau sur les N° (jamais un titre)');
   });
 
   await essaie('C. branchements', async () => {

@@ -3,7 +3,7 @@
    Échelle fermée (jetons.css) : tailles 11·12·13·15·17·20, graisses 500-800,
    rayons 12·14·20·999. Une seule couleur d'accent (bleu), rare ; ambre = « à confirmer ».
    ═════════════════════════════════════════════════════════════════════════ */
-.vrm-of { background: var(--fu-carte); border-radius: var(--fu-r-carte); box-shadow: var(--fu-ombre); padding: 16px 16px 10px; display: flex; flex-direction: column; gap: 10px; color: var(--fu-encre); min-width: 0; margin-bottom: 12px; }
+.vrm-of { background: var(--fu-carte); border-radius: var(--fu-r-carte); box-shadow: none; padding: 16px 16px 10px; display: flex; flex-direction: column; gap: 10px; color: var(--fu-encre); min-width: 0; margin-bottom: 12px; }
 .vrm-of-titre { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
 .vrm-of-n, .vrm-pm-n { color: var(--fu-gris); font-weight: 700; margin-left: 2px; font-variant-numeric: var(--fu-chiffres); }
 /* (10 nov., lot P) Une espace AVANT le compte : le lecteur d'écran lisait « Sans achat relié3 ». (marge 6 px = 2 px + l'espace) */

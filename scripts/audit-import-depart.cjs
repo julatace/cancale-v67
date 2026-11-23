@@ -57,7 +57,7 @@ const vintedAvec = (stat) => (r) => {
 };
 const pagesLues = (j) => j.vinted.map((x) => { const u = new URL('https://x' + x.chemin); return u.pathname === '/api/v2/my_orders' ? `${u.searchParams.get('type')}:${u.searchParams.get('page')}` : null; }).filter(Boolean);
 const lect = (store) => ((store.vrmLectures || {})[UID] || []).length;
-const autresRien = () => { const at = Date.now(); return { vrmLecturesDues: { [UID]: { versement: { reste: 0, at }, preuve: { reste: 0, at }, retrait: { reste: 0, at }, releve: { reste: 0, at } } } }; };
+const autresRien = () => { const at = Date.now(); return { vrmLecturesDues: { [UID]: { versement: { reste: 0, at }, preuve: { reste: 0, at }, retrait: { reste: 0, at }, releve: { reste: 0, at }, suivi: { reste: 0, at } } } }; };   // (5.409) le suivi des achats expédiés est un lecteur prioritaire
 const uneHeurePlusTard = (f) => { delete f.store.vrmLectures; delete f.store.vrmImportLus; Object.assign(f.store, autresRien()); };
 const etat = (f) => ((f.store.vrmImport || {})[UID]) || null;
 const rangees = (f, type) => { const d = f.lignes[`harvest_${UID}_${type}`]; return d && d.payload && Array.isArray(d.payload.my_orders) ? d.payload.my_orders : []; };
@@ -181,7 +181,7 @@ async function controles(SRC, dit) {
     const f = fond({ store: {} });               // argent et colis : pas su ⇒ réserve entière (5 + 3 + 2 + 3)
     for (let i = 0; i < 4; i++) await f.ctx.tickImport();
     const n = pagesLues(f.j).length;
-    dit(n === 7, '10. argent et colis « pas su » : l’import s’arrête à 7 (20 − 13 réservées)', `${n} page(s)`);
+    dit(n === 4, '10. argent et colis « pas su » : l’import s’arrête à 4 (20 − 16 réservées, dont 3 pour le suivi des achats expédiés — 5.409)', `${n} page(s)`);
     dit(f.j.diags.includes('import_laisse_la_place') && etat(f).pause && etat(f).pause.cause === 'budget', '10. et il le dit (pause « budget »)');
     await f.ctx.capterDatesVersement(UID).catch(() => 0);
     dit(lect(f.store) <= 20, '10. le total reste sous 20', `lectures=${lect(f.store)}`);

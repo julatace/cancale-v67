@@ -179,8 +179,10 @@ async function verifier(mods = {}) {
 
   // ── B branchements
   const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
-  dit(/<ProgrammeRepubVeille\s*\/>/.test(APP), 'B1 la veille du départ est montée dans la coque');
-  dit(/reporterNumero\(a\.id, String\(r\.nouvelId\)\); noterRepubJournal\(a, r\.nouvelId/.test(sans(APP)) && !/noterRepubJournal\(a, [^)]*\)[^\n]*etape==='incertain'/.test(APP), 'B2 le journal n’est écrit que sur « fait » / « double » rendu par l’extension');
+  // (20 nov., décision de Julien) Les republications (programmées ou non) partent de l'EXTENSION : l'app ne lance plus rien —
+  // ni veille de départ, ni commande — et n'écrit donc plus de journal sur une réponse ; les programmations restent LUES (carte).
+  dit(!/<ProgrammeRepubVeille\s*\/>/.test(sans(APP)), 'B1 (20 nov.) aucune veille de départ dans l’app : la programmation part de l’extension');
+  dit(!/cmd:\s*'(recreerVinted|republierVinted|publierBrouillon)'/.test(sans(APP)) && !/noterRepubJournal\(a, r\.nouvelId/.test(sans(APP)), 'B2 (20 nov.) l’app n’envoie aucune republication et n’écrit aucun journal sur une réponse');
   dit(/pairesAuDepart\(programme, aFaireCalc\)/.test(REP) && /noterPasPartie\(programme, \[\{ cle: 'vide' \}\]\)/.test(REP), 'B3 l’atelier part avec les paires programmées seulement, et dit « pas partie » s’il n’en reste aucune');
   dit(/prendreDepart\(dd, p\.uid, p\.id, appareilId\)/.test(UI) && /pr\.appareil !== appareilId/.test(UI), 'B4 la veille n’ouvre l’atelier que si SON écriture a pris le départ');
   dit(/conditionsDepart\(\{ prog: p, ext: extPourDepart\(\), jauge, jour, occupe \}\)/.test(UI) && /if \(!c\.ok\) \{ await noterPasPartie\(p, c\.manques\); return; \}/.test(UI), 'B5 conditions vérifiées AU DÉPART ; une manque ⇒ « pas partie » + notification, rien ne part');

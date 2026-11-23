@@ -60,8 +60,18 @@ export function jeuExemple(now = Date.now(), { catalogue = null, origine = '' } 
   const B1 = [achat(0, RELAIS_ST, 'needs_action', 4), achat(1, 'Le vendeur a expédié la commande', 'waiting', 2), achat(2, 'Le vendeur a expédié la commande', 'waiting', 1)];
   const conv = (id, login, desc, unread, h) => ({ id, unread, updated_at: iso(h / 24), description: desc, opposite_user: { id: 5000 + id, login } });
   const vue = { at: iso(0) };
+  // (20 nov., écrans natifs) Les colonnes « Prix mini » et « Acheté » des tableaux et les « Faits » de la fiche : chaque
+  // annonce numérotée a un prix d'achat INVENTÉ (≈ 45 % du prix) ; six sur neuf ont un prix mini (le prix − 5 €), les
+  // autres montrent « — », la porte de « Compléter ». Rien n'est écrit ailleurs qu'en mémoire (src/modeExemple.js).
+  const ficheExemple = (a, i) => {
+    const prix = Math.round(Number((a.price && a.price.amount) || 0));
+    const f = { numero: String(i + 1) };
+    if (prix > 0) f.buyPrice = String(Math.round(prix * 0.45));
+    if (prix > 10 && i % 3 !== 2) f.min = String(prix - 5);
+    return f;
+  };
   const lignes = [
-    { id: 'main', data: { vrm_bienvenue_vue: vue, vrm_visite_vue: vue, vinted_annonce_numeros: Object.fromEntries([...A1, ...A2].slice(0, varie ? 12 : 9).map((a, i) => [a.id, { numero: String(i + 1) }])) } },
+    { id: 'main', data: { vrm_bienvenue_vue: vue, vrm_visite_vue: vue, vinted_annonce_numeros: Object.fromEntries([...A1, ...A2].slice(0, varie ? 12 : 9).map((a, i) => [a.id, ficheExemple(a, i)])) } },
     { id: 'harvest_111_listings', data: { capturedAt: iso(0.01), payload: { items: A1 } } },
     { id: 'harvest_222_listings', data: { capturedAt: iso(0.02), payload: { items: A2 } } },
     { id: 'harvest_111_orders_sold', data: { capturedAt: iso(0.01), payload: { my_orders: V1 } } },

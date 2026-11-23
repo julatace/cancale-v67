@@ -154,6 +154,8 @@ export const PREUVES_JOURNAL = {
   bordereaux: 'Le bordereau est rangé dans ta base',
   relais: 'Résultat écrit par l’extension dans la commande',
   extension: 'Noté par l’extension au moment du geste',
+  // (19 nov., ext. 5.409) L'issue d'une baisse de prix rangée en attente (`cmd_prix_*`).
+  prix_attente: 'Résultat écrit par l’extension dans la baisse de prix en attente',
   // (11 nov., 5.350) Ce que VINTED a fait, constaté par l'extension (jamais un geste de VRM).
   moderation: 'Constaté par l’extension en relisant ton dressing ou ton profil Vinted',
 };
@@ -223,6 +225,11 @@ export function evenementsJournal(sources) {
     const ev = evenementRelais(c);
     if (ev) out.push(ev);
   }
+  // (19 nov., ext. 5.409) Les baisses de prix rangées en attente : leur ISSUE (refusée, pas sûre, pas partie en 24 h…).
+  for (const c of s.prixAttente || []) {
+    const ev = evenementPrixAttente(c);
+    if (ev) out.push(ev);
+  }
   // (10 nov., lot G) Les gestes notés par l'extension 5.337 (`journal_vrm_{uid}_{navigateur}`).
   // Un geste déjà noté par sa propre ligne (commande du téléphone) n'est pas compté deux fois.
   const duTelephone = out.filter((e) => e.source === 'relais');
@@ -245,7 +252,7 @@ export function evenementsJournal(sources) {
 // (file des favoris) et le bordereau (rangé dans la base) ont déjà leur preuve.
 // Le compte vient de l'IDENTIFIANT de la ligne, jamais d'un champ libre.
 // (11 nov., extension 5.340) Le mode vacances posé / retiré : aucune autre ligne ne le note.
-const SORTES_EXTENSION = { offre_acceptee: 'offre_acceptee', offre_refusee: 'offre_refusee', contre_offre: 'offre_faite', reponse: 'message_envoye', baisse_prix: 'baisse_prix', modifiee: 'annonce_modifiee', vacances_on: 'vacances_pose', vacances_off: 'vacances_retire' };
+const SORTES_EXTENSION = { offre_acceptee: 'offre_acceptee', offre_refusee: 'offre_refusee', contre_offre: 'offre_faite', reponse: 'message_envoye', baisse_prix: 'baisse_prix', modifiee: 'annonce_modifiee', vacances_on: 'vacances_pose', vacances_off: 'vacances_retire', masquee: 'annonce_masquee', demasquee: 'annonce_demasquee' };   // (19 nov., 5.409) vendue ailleurs ⇒ masquée / vente annulée ⇒ démasquée, relu
 const numeroOk = (v) => (v != null && /^\d{1,20}$/.test(String(v)) ? String(v) : null);
 const prixOk = (v) => { const n = Number(v); return v != null && v !== '' && Number.isFinite(n) && n > 0 && n < 1e6 ? Math.round(n * 100) / 100 : null; };
 export function evenementsExtension(lignes) {
@@ -301,6 +308,26 @@ export function evenementRelais(c) {
   return null;
 }
 
+// (19 nov., ext. 5.409) Une baisse de prix RANGÉE (`cmd_prix_*`, src/prixAttente.js) : ce que l'extension a écrit
+// dans sa ligne. Une baisse FAITE sur Vinted est déjà notée par l'extension (`journal_vrm_*`, « Prix baissé ») :
+// elle n'entre pas deux fois. Entrent ici ce qu'aucune autre ligne ne dit : refusée (le prix avait changé, arrêt…),
+// pas partie en 24 h, pas sûre, et « faite » sur Leboncoin ou Vestiaire. En attente ou annulée ⇒ rien n'est parti, rien.
+const SITES_PRIX_ATTENTE = ['vinted', 'leboncoin', 'vestiaire'];
+export function evenementPrixAttente(c) {
+  if (!c) return null;
+  const site = String(c.site || ''), e = String(c.etat || '');
+  if (!SITES_PRIX_ATTENTE.includes(site)) return null;
+  const resultat = e === 'fait' ? (site === 'vinted' ? null : 'ok') : e === 'refuse' || e === 'expiree' ? 'refuse' : e === 'incertain' ? 'verifier' : null;
+  if (!resultat) return null;
+  const at = ms(c.finiLe) || ms(c.demandeLe);
+  if (!at) return null;
+  const ev = { at, type: resultat === 'ok' ? 'baisse_prix' : 'baisse_prix_attente', site, compte: /^\d{1,20}$/.test(String(c.uid || '')) ? String(c.uid) : null,
+    cle: site === 'vinted' ? { item: numeroOk(c.id), tx: null } : site === 'leboncoin' ? { lbc: numeroOk(c.id) } : { item: null, tx: null }, resultat, source: 'prix_attente' };
+  const de = prixOk(c.prixAvant), vers = prixOk(resultat === 'ok' && c.prixVu != null ? c.prixVu : c.prix);
+  if (de != null && vers != null) ev.prix = { de, vers };
+  return ev;
+}
+
 // ── La lecture (côté serveur) ───────────────────────────────────────────────
 // `lireVendeur(chemin)` lit AU NOM du vendeur (son jeton : RLS ne rend que SES
 // lignes). `lireService(chemin)` lit avec la clé de service — utilisé pour la
@@ -334,6 +361,8 @@ export async function lireJournal({ userId, lireVendeur, lireService, neutre }) 
   // (8 nov.) Les commandes du téléphone : le geste, jamais son corps (`args.body`
   // porte le texte d'un message) — projeté champ par champ.
   await lignes('relais', 'app_data?id=like.cmd_relais_*&select=cmd:data->>cmd,etat:data->>etat,demandeLe:data->>demandeLe,prisLe:data->>prisLe,finiLe:data->>finiLe,uid:data->args->>uid,tx:data->args->>tx,lbc:data->args->>id,methode:data->args->>method,endpoint:data->args->>endpoint&order=id.desc&limit=300', (r) => r);
+  // (19 nov., ext. 5.409) Les baisses de prix rangées en attente : scalaires seulement.
+  await lignes('prixAttente', 'app_data?id=like.cmd_prix_*&select=site:data->>site,etat:data->>etat,demandeLe:data->>demandeLe,finiLe:data->>finiLe,uid:data->args->>uid,id:data->args->>id,prix:data->>prix,prixAvant:data->>prixAvant,prixVu:data->>prixVu&order=id.desc&limit=200', (r) => r);
   // (10 nov., lot G) Les gestes notés par l'extension 5.337 : `e` seulement (jamais `data`).
   await lignes('extension', 'app_data?id=like.journal_vrm_*&select=id,e:data->e&limit=200', (r) => r);
   // (11 nov., 5.350) Les alertes de modération : `e` seulement.

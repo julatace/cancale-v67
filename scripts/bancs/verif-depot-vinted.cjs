@@ -19,7 +19,10 @@ const path = require('path'), fs = require('fs'), http = require('http'), os = r
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { faireFond } = require('../_fond-vm.cjs');
 const PORT = Number(process.env.BANC_PORT) || 4938;
-const CAP = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extension', 'vinted-capture.js'), 'utf8');
+// (5.406) BANC_RACINE : l'extension d'un autre arbre (captures « avant ») ; vrm-ui.js (la feuille commune) d'abord, comme le manifeste.
+const EXTD = path.join(process.env.BANC_RACINE ? path.resolve(process.env.BANC_RACINE) : path.join(__dirname, '..', '..'), 'vinted-sync-extension');
+const CAP = fs.readFileSync(path.join(EXTD, 'vinted-capture.js'), 'utf8');
+const UI = fs.existsSync(path.join(EXTD, 'vrm-ui.js')) ? fs.readFileSync(path.join(EXTD, 'vrm-ui.js'), 'utf8') : '';
 const fond = faireFond({});
 const D = { ecrit: true, ou: null, enLigne: new Set(['12']), buyByNum: { 12: '60' }, coupees: [] };
 
@@ -65,6 +68,7 @@ const encart = (pg) => pg.evaluate(() => { const h = document.querySelector('[da
       await pg.exposeFunction('__verif', (description, prix) => JSON.parse(JSON.stringify(fond.ctx.alertesDepotVinted({ description: description == null ? undefined : description, prix: prix == null ? undefined : prix }, D))));
       await pg.addInitScript(CHROME);
       await pg.goto(`http://localhost:${PORT}/items/new`);
+      if (UI) await pg.addScriptTag({ content: UI });
       await pg.addScriptTag({ content: CAP });
       // A — description sans N°.
       await pg.fill('textarea[name="description"]', 'Très belle paire, portée deux fois, boîte d’origine.');
@@ -82,7 +86,7 @@ const encart = (pg) => pg.evaluate(() => { const h = document.querySelector('[da
       const montants = textes.join(' ').match(/\d+(?:,\d+)?\s?€/g) || [];
       dit(montants.length === 2 && textes.every((t) => t.trim().split(/\s+/).length <= 12), 'C · aucun prix conseillé, 12 mots au plus', JSON.stringify(textes));
       await pg.waitForTimeout(300);
-      await pg.screenshot({ path: path.join(os.tmpdir(), `verif-depot-${vp.width}.png`), fullPage: true });
+      await pg.screenshot({ path: path.join(process.env.BANC_CAPTURES || os.tmpdir(), `verif-depot-${vp.width}.png`), fullPage: true });
       // D — « Ne plus me le dire » (dans une ombre fermée : on vise par coordonnées).
       const hote = await pg.$('[data-vrm-verif-depot]');
       const bb = hote ? await hote.boundingBox() : null;

@@ -52,7 +52,7 @@ html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-name { font-si
 html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-paire-t { font-size: 12px !important; color: var(--vrm-muted) !important; }
 html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-extrait { font-size: 13px !important; }
 html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-time { font-family: var(--vrm-police-mono) !important; font-size: 12px !important; color: var(--vrm-muted) !important; }
-html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-dot { background: var(--vrm-accent, #0071E3) !important; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-dot { background: var(--vrm-accent, #16181D) !important; }
 
 /* ── La fiche de la paire (volet de droite) ─────────────────────────── */
 html body .vrm-msg-fiche-ph { aspect-ratio: 5 / 4; width: 100%; border-radius: var(--vrm-r-md, 12px); background: var(--vrm-card2, var(--vrm-surface)); display: flex; align-items: center; justify-content: center; overflow: hidden; color: var(--vrm-muted); }
@@ -117,7 +117,7 @@ html body .vrm-chat-panel .vrm-chat-compose { display: flex !important; align-it
 html body .vrm-chat-panel .vrm-chat-compose > textarea { flex: 1; min-height: 46px !important; border-radius: 12px !important; border: 0 !important; background: var(--vrm-card2, var(--vrm-surface)) !important; padding: 13px 16px !important; font: 400 15px/1.35 var(--vrm-police, inherit) !important; resize: none !important; }
 html body .vrm-chat-panel .vrm-chat-compose > [data-mic-dictee] { width: 46px !important; height: 46px !important; min-height: 46px !important; border-radius: 50% !important; border: 0 !important; background: var(--vrm-card2, var(--vrm-surface)) !important; color: var(--vrm-ink) !important; }
 html body .vrm-chat-panel .vrm-chat-compose > [data-mic-dictee][aria-pressed="true"] { background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; }
-html body .vrm-chat-panel .vrm-chat-send { width: 46px !important; height: 46px !important; min-height: 46px !important; padding: 0 !important; border-radius: 50% !important; border: 0 !important; display: inline-flex !important; align-items: center; justify-content: center; background: var(--vrm-accent, #0071E3) !important; color: #fff !important; flex-shrink: 0; }
+html body .vrm-chat-panel .vrm-chat-send { width: 46px !important; height: 46px !important; min-height: 46px !important; padding: 0 !important; border-radius: 50% !important; border: 0 !important; display: inline-flex !important; align-items: center; justify-content: center; background: var(--vrm-accent, #16181D) !important; color: #fff !important; flex-shrink: 0; }
 html body .vrm-chat-panel .vrm-chat-send:disabled { opacity: .45 !important; }
 
 @media (max-width: 767px) {
@@ -192,7 +192,7 @@ html body .vrm-app-shell .vrm-main .vrm-pied-lien:not(#_) {
 }
 html body .vrm-pied-lien:active { opacity: .55; }
 @media (hover: hover) and (pointer: fine) { html body .vrm-pied-lien:hover { opacity: .7; } }
-html body .vrm-pied-lien:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; }
+html body .vrm-pied-lien:focus-visible { outline: 2px solid var(--vrm-accent, #16181D); outline-offset: 2px; }
 html body .vrm-pied-lien .vrm-pied-lien-n { font-weight: 400; font-size: 13px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
 html body .vrm-msg-more.vrm-pied-lien { display: flex !important; width: 100%; justify-content: center; margin-top: 4px; }
 html body .vrm-msg-retirees { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }

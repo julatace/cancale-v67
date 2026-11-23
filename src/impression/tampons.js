@@ -71,11 +71,14 @@ export const SUPPORTS = Object.freeze(['a4', 'planche4', '10x15', '10x10', '10x1
 const _objT = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
 const _finiT = (x) => typeof x === 'number' && Number.isFinite(x);
 // Un contenu lu : quatre booléens (un champ absent ⇒ `d`).
-const contenuLu = (x, d) => { const o = _objT(x) ? x : {}; const r = {}; for (const k of CONTENUS) r[k] = typeof o[k] === 'boolean' ? o[k] : d[k]; return r; };
+// (17 nov., lot tampon-qr) Julien : « ne donne pas la possibilité d'enlever créé par vrm ». La mention est TOUJOURS
+// posée : une case `mention: false` rangée avant (réglage, exception d'un type, ancien mode « rien ») est relue `true`.
+// Sa place suit la règle « juste au-dessus du code » (`placeMention` toujours 'qr', taille M, jamais posée à la main).
+const contenuLu = (x, d) => { const o = _objT(x) ? x : {}; const r = {}; for (const k of CONTENUS) r[k] = typeof o[k] === 'boolean' ? o[k] : d[k]; r.mention = true; return r; };
 const tailleLue = (x, d) => (x in TAILLES_TAMPON ? x : d);
 // Le mode d'avant (num · num_titre · num_titre_taille · rien) → les cases.
 export function contenuDuMode(mode) {
-  if (mode === 'rien') return { num: false, titre: false, taille: false, mention: false };
+  if (mode === 'rien') return { num: false, titre: false, taille: false, mention: true };
   if (mode === 'num') return { num: true, titre: false, taille: false, mention: true };
   if (mode === 'num_titre') return { num: true, titre: true, taille: false, mention: true };
   if (mode === 'num_titre_taille') return { num: true, titre: true, taille: true, mention: true };
@@ -84,7 +87,7 @@ export function contenuDuMode(mode) {
 // Les cases → le mode d'avant (pour la liste courte de Paramètres → Impression), ou null.
 export function modeDuContenu(c) {
   if (!c) return null;
-  if (!c.num && !c.titre && !c.taille) return c.mention ? null : 'rien';
+  if (!c.num && !c.titre && !c.taille) return 'rien';
   if (c.num && !c.titre && !c.taille) return 'num';
   if (c.num && c.titre && !c.taille) return 'num_titre';
   if (c.num && c.titre && c.taille) return 'num_titre_taille';
@@ -122,23 +125,21 @@ export function reglageTampons(brut, { impression = null, positions = null } = {
     const x = {};
     if (_objT(e.contenu)) x.contenu = contenuLu(e.contenu, C_A4);
     if (e.texte in TAILLES_TAMPON) x.texte = e.texte;
-    if (e.texteMention in TAILLES_TAMPON) x.texteMention = e.texteMention;
     if (PLACES_N.includes(e.place)) x.place = e.place;
-    if (PLACES_M.includes(e.placeMention)) x.placeMention = e.placeMention;
     if (Object.keys(x).length) types[id] = x;
   }
   const formes = {};
   if (_objT(brut.formes)) for (const [cle, f] of Object.entries(brut.formes)) {
     if (!_objT(f) || typeof cle !== 'string' || cle.length > 120) continue;
-    const n = placeLue(f.n), m = placeLue(f.m);
-    if (n || m) formes[cle] = { ...(n ? { n } : {}), ...(m ? { m } : {}) };
+    const n = placeLue(f.n);   // la mention n'a pas de place à la main (elle suit le code)
+    if (n) formes[cle] = { n };
   }
   return {
     v: 1,
     a4: contenuLu(brut.a4, C_A4), th: contenuLu(brut.th, C_TH),
-    texte: tailleLue(brut.texte, 'M'), texteMention: tailleLue(brut.texteMention, 'M'),
+    texte: tailleLue(brut.texte, 'M'), texteMention: 'M',
     place: PLACES_N.includes(brut.place) ? brut.place : 'auto',
-    placeMention: PLACES_M.includes(brut.placeMention) ? brut.placeMention : 'qr',
+    placeMention: 'qr',
     types, formes, migre: false,
   };
 }
@@ -164,18 +165,18 @@ export function familleDe({ retour = false, site = '', type = '' } = {}) {
 export function resoudreTampon(reg, { famille = 'autre', thermique = false } = {}) {
   const r = reg && reg.v === 1 && 'migre' in reg ? reg : _normT(reg);
   const ex = (r.types && r.types[famille]) || {};
-  const contenu = ex.contenu ? { ...ex.contenu } : { ...(thermique ? r.th : r.a4) };
-  const texte = ex.texte || r.texte, texteMention = ex.texteMention || r.texteMention;
+  const contenu = { ...(ex.contenu ? ex.contenu : (thermique ? r.th : r.a4)), mention: true };
+  const texte = ex.texte || r.texte, texteMention = 'M';
   return {
     famille, contenu,
     texte, k: TAILLES_TAMPON[texte] || 1,
     texteMention, kMention: TAILLES_TAMPON[texteMention] || 1,
-    place: ex.place || r.place, placeMention: ex.placeMention || r.placeMention,
-    sources: { contenu: ex.contenu ? 'type' : 'tous', texte: ex.texte ? 'type' : 'tous', texteMention: ex.texteMention ? 'type' : 'tous', place: ex.place ? 'type' : 'tous', placeMention: ex.placeMention ? 'type' : 'tous' },
+    place: ex.place || r.place, placeMention: 'qr',
+    sources: { contenu: ex.contenu ? 'type' : 'tous', texte: ex.texte ? 'type' : 'tous', texteMention: 'tous', place: ex.place ? 'type' : 'tous', placeMention: 'tous' },
   };
 }
 // Les places posées à la main pour une FORME (type · format · sens [· tourné] [· thermique]).
-export const placesDeForme = (reg, cle) => { const f = reg && reg.formes && reg.formes[cle]; return { n: f && f.n ? f.n : null, m: f && f.m ? f.m : null }; };
+export const placesDeForme = (reg, cle) => { const f = reg && reg.formes && reg.formes[cle]; return { n: f && f.n ? f.n : null, m: null }; };
 
 // Ce que le cartouche écrit, d'après les cases. `taille` : lue sur la vente (jamais
 // devinée) ; pas répétée si le titre la porte déjà.
@@ -202,17 +203,14 @@ export function avecChoix(reg, portee, patch, { support = 'a4' } = {}) {
     const n = { ...r };
     if (p.contenu) n[support === 'th' ? 'th' : 'a4'] = contenuLu({ ...(support === 'th' ? r.th : r.a4), ...p.contenu }, C_A4);
     if (p.texte in TAILLES_TAMPON) n.texte = p.texte;
-    if (p.texteMention in TAILLES_TAMPON) n.texteMention = p.texteMention;
     if (PLACES_N.includes(p.place)) n.place = p.place;
-    if (PLACES_M.includes(p.placeMention)) n.placeMention = p.placeMention;
     return reglageTampons(aEcrire(n));
   }
   if (!IDS_FAMILLES.includes(portee)) return r;
   const ex = { ...(r.types[portee] || {}) };
   if (p.contenu) ex.contenu = contenuLu({ ...(ex.contenu || (support === 'th' ? r.th : r.a4)), ...p.contenu }, C_A4);
-  for (const k of ['texte', 'texteMention']) if (p[k] in TAILLES_TAMPON) ex[k] = p[k];
+  if (p.texte in TAILLES_TAMPON) ex.texte = p.texte;
   if (PLACES_N.includes(p.place)) ex.place = p.place;
-  if (PLACES_M.includes(p.placeMention)) ex.placeMention = p.placeMention;
   return reglageTampons(aEcrire({ ...r, types: { ...r.types, [portee]: ex } }));
 }
 // « Comme tous les bordereaux » : l'exception d'un type retirée (ses places à la main restent).
@@ -226,8 +224,10 @@ export function avecPlace(reg, cle, quoi, place) {
   const r = _normT(reg);
   const f = { ...(r.formes[cle] || {}) };
   const p = placeLue(place);
-  if (p) f[quoi === 'm' ? 'm' : 'n'] = p; else delete f[quoi === 'm' ? 'm' : 'n'];
-  const formes = { ...r.formes }; if (f.n || f.m) formes[cle] = f; else delete formes[cle];
+  if (quoi === 'm') return r;   // (17 nov.) la mention ne se pose pas à la main : elle suit le code
+  if (p) f.n = p; else delete f.n;
+  delete f.m;
+  const formes = { ...r.formes }; if (f.n) formes[cle] = f; else delete formes[cle];
   return reglageTampons(aEcrire({ ...r, formes }));
 }
 // « Revenir au réglage d'origine » : tout ce que VRM fait sans réglage.

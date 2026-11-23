@@ -724,6 +724,24 @@ function clocheFavorisNative(activer=false,origine){
   // RÉPONSE (création) ou de l'ADRESSE (mise à jour `…/drafts/{id}`) : c'est ce
   // qui permet ensuite de le mettre en ligne depuis VRM sans rien deviner.
   // Lecture de ce que la page vient de faire : zéro requête de plus (§3).
+  // ── 5.414 (`toutinterface`) LA GRILLE DES TAILLES QUE LA PAGE A DEMANDÉE ─────────────────────────────
+  // VRM ne demande plus la grille par requête (`POST item_upload/attributes`) : il la LIT quand la page
+  // « Vendre » (la sienne, ou celle que VRM remplit dans l'onglet de travail) la reçoit. Catégorie prise du
+  // CORPS envoyé par la page (jamais devinée), 2xx seulement, 200 Ko au plus. Zéro requête de plus (§3).
+  const RE_GRILLE = /^\/api\/v\d+\/item_upload\/attributes\/?$/;
+  const noteGrille = (method, url, status, lireTexte, corps) => {
+    try {
+      if (String(method || '').toUpperCase() !== 'POST') return;
+      const st = Number(status); if (!(st >= 200 && st < 300)) return;
+      let U = null; try { U = new URL(url, location.origin); } catch (_) { return; }
+      if (!/(^|\.)vinted\.[a-z.]+$/i.test(U.hostname) || !RE_GRILLE.test(U.pathname)) return;
+      let c = null; try { c = JSON.parse(corpsTexte(corps) || 'null'); } catch (_) { c = null; }
+      const a = c && Array.isArray(c.attributes) ? c.attributes.filter((x) => x && x.code === 'category') : [];
+      const cat = a.length === 1 && Array.isArray(a[0].value) && a[0].value.length === 1 ? Number(a[0].value[0]) : 0;
+      if (!(cat > 0)) return;
+      Promise.resolve().then(lireTexte).then((tx) => { if (typeof tx === 'string' && tx.length <= 200000) post({ kind: 'grilleTailles', cat, body: tx, status: st }); }).catch(() => {});
+    } catch (_) {}
+  };
   const RE_BROUILLON = /^\/api\/v\d+\/item_upload\/drafts(?:\/(\d{4,15}))?\/?$/;
   // (29 oct., « elle n'a pas capté que j'avais fait passer un brouillon en ligne
   // à la main ») La mise en ligne d'un brouillon sur Vinted : `POST …/drafts/{id}/
@@ -1079,7 +1097,7 @@ function suiviLieuDe(o) {
     const d = suiviLieuDe(Object.assign({}, adr, { name: nom }));
     if (d) { rue = rue || d.rue; cp = cp || d.cp; ville = ville || d.ville; }
   } else if (typeof adr === 'string') {
-    const t = suiviTexteLieu(adr, 160);
+    const t = suiviTexteLieu(adr, 160).replace(/[,\s]+(?:France|FR)$/i, '');
     const m = /^(.*?)[,\s]+(\d{5})\s+([A-Za-zÀ-ÿ'’ -]{2,40})$/.exec(t);
     if (m) { rue = rue || m[1].replace(/[,\s]+$/, ''); cp = cp || m[2]; ville = ville || m[3].trim(); }
     else if (t && !rue) rue = t;
@@ -1093,6 +1111,10 @@ function relaisDestination(racine) {
   const marche = (v, prof, interdit) => {
     if (prof > 8 || !v || typeof v !== 'object') return;
     if (Array.isArray(v)) { for (const x of v.slice(0, 40)) marche(x, prof + 1, interdit); return; }
+    // (21 nov., 5.411) LA FORME PLATE de l'expédition d'une commande (`escrow_orders/{id}/shipment`, mesurée dans
+    // `panel_formes_suivi.escrow` : `pickup_point_name`, `pickup_point_address` — un texte — à côté de `carrier.name`) :
+    // le point de retrait est dit par le NOM DE LA CLÉ, sans objet parent. Même règle : nom exigé, l'adresse d'un commerce.
+    if (!interdit && typeof v.pickup_point_name === 'string') { const l = suiviLieuDe({ name: v.pickup_point_name, address: v.pickup_point_address }); if (l) vus.push(l); }
     for (const k of Object.keys(v).slice(0, 80)) {
       const x = v[k];
       if (!x || typeof x !== 'object') continue;
@@ -1119,6 +1141,24 @@ function arriveeEstimeeSuivi(racine) {
       if (!SUIVI_ESTIMEE.test(kl) || /(?:deadline|expir|limit|until|retrait)/.test(kl)) continue;
       const d = suiviDateIso(x);
       if (d) vues.add(d.slice(0, 10));
+    }
+  };
+  marche(racine, 0);
+  return vues.size === 1 ? [...vues][0] : null;
+}
+// (21 nov., 5.411) LA PÉRIODE D'ARRIVÉE que Vinted écrit dans le suivi : `journey_summary.estimated_detail.time_period`
+// (mesuré : un texte, à côté de `status` et `message`). Gardée telle quelle (60 caractères, ni e-mail ni téléphone) :
+// l'app la dit « prévu … (selon Vinted) », jamais comme une date sûre. Deux périodes différentes ⇒ `null`.
+function periodeEstimeeSuivi(racine) {
+  const vues = new Set();
+  const marche = (v, prof) => {
+    if (prof > 8 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) { for (const x of v.slice(0, 40)) marche(x, prof + 1); return; }
+    for (const k of Object.keys(v).slice(0, 80)) {
+      const x = v[k];
+      if (!x || typeof x !== 'object') continue;
+      if (suiviSnake(k) === 'estimated_detail' && !Array.isArray(x)) { const t = suiviTexteLieu(x.time_period, 60); if (t) vues.add(t); continue; }
+      if (!SUIVI_PARENT_DEPOT.test(suiviSnake(k))) marche(x, prof + 1);
     }
   };
   marche(racine, 0);
@@ -1219,7 +1259,13 @@ function nettoyerRelaisSuivi(r) {
         if (typeof j.message_code === 'string' && typeof j.code === 'number' && j.code !== 0) return;   // un refus de Vinted n'est pas une forme
         if (typeof j.code === 'string' && j.code && Object.keys(j).every((k) => /^(code|message|message_code|errors|error|status|details)$/.test(k))) return;   // 5.246 : refus à code texte (« UNAUTHORIZED »)
         const msg = { kind: 'suivi', quoi, id, forme: formeSuivi(j) };
-        if (quoi !== 'code') { msg.allege = allegerSuivi(j); const tc = txDuCorps(j); if (tc) msg.txCorps = tc; const rl = relaisDestination(j); if (rl) msg.relais = rl; }
+        if (quoi !== 'code') { msg.allege = allegerSuivi(j); const tc = txDuCorps(j); if (tc) msg.txCorps = tc; const rl = relaisDestination(j); if (rl) msg.relais = rl;
+          // (21 nov., 5.411) la période d'arrivée écrite par Vinted ; pour l'expédition d'une commande, le DESTINATAIRE (un
+          // identifiant de membre : le fond exige que ce soit le compte de l'onglet) et le nom du transporteur.
+          const pe = periodeEstimeeSuivi(j); if (pe) msg.periode = pe;
+          if (quoi === 'escrow') { const o = (j.shipment && typeof j.shipment === 'object' && !Array.isArray(j.shipment)) ? j.shipment : j;
+            if (/^\d{1,20}$/.test(String(o.receiver_id == null ? '' : o.receiver_id))) msg.receveur = String(o.receiver_id);
+            if (o.carrier && typeof o.carrier === 'object' && typeof o.carrier.name === 'string') msg.transp = o.carrier.name.slice(0, 60); } }
         post(msg);
       }).catch(() => {});
     } catch (_) {}
@@ -1297,6 +1343,7 @@ function nettoyerRelaisSuivi(r) {
             noteModification(method, url, res.status, corpsEnvoye);   // 22 oct.
             noteVacances(method, url, res.status, corpsEnvoye);   // 10 nov. (5.338)
             noteBrouillon(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 28 oct.
+            noteGrille(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 5.414
             noteCatalogueVinted(method, url, res.status, () => res.clone().text());
             noteCouleursVinted(method, url, res.status, () => res.clone().text());
             noteSuivi(method, url, res.status, () => res.clone().text());   // 5.214 : le suivi Vinted de ses achats
@@ -1343,6 +1390,7 @@ function nettoyerRelaisSuivi(r) {
             noteModification(this.__cancaleMethod, url, this.status, bodyArg);   // 22 oct.
             noteVacances(this.__cancaleMethod, url, this.status, bodyArg);   // 10 nov. (5.338)
             noteBrouillon(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 28 oct.
+            noteGrille(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 5.414
             noteCatalogueVinted(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });
             noteCouleursVinted(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });
             noteSuivi(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });   // 5.214

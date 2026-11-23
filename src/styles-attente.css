@@ -13,14 +13,15 @@
 /* Il arrive d'UN bloc, en fondu (opacité seule : un transform décalerait les
    feuilles en position fixe). `backwards`, jamais `both` (index.html). */
 .vrm-attente-pret { animation: vrm-attente-apparait .18s cubic-bezier(.22, 1, .36, 1) backwards; }
-@keyframes vrm-attente-apparait { from { opacity: 0; } to { opacity: 1; } }
+/* (22 nov., « zéro saut ») Le fondu part de 0,85 (comme le passage d’onglet) : parti de 0, sa première image restait vide au téléphone occupé (banc couches-chargement : un clignotement de ~100 ms). */
+@keyframes vrm-attente-apparait { from { opacity: .85; } to { opacity: 1; } }
 
 /* ── Les briques ─────────────────────────────────────────────────────────── */
 .vrm-squelette { display: block; padding-bottom: 8px; animation: vrm-sq-pouls 1.6s ease-in-out infinite alternate; }
 /* UNE seule pulsation, celle du squelette entier (un seul calque animé, jamais une
    animation par barre) ; à l'arrêt tant que l'écran de démarrage le couvre. */
-body:has(#vrm-demarrage:not([data-sortie])) .vrm-squelette { animation: none; }
-.vrm-sq-barre { display: block; flex: none; max-width: 100%; background: color-mix(in srgb, var(--vrm-ink, #1d1d1f) 8%, transparent); }
+body[data-vrm-d26]:not(#_) .vrm-squelette { animation: none; }
+.vrm-sq-barre { display: block; flex: none; max-width: 100%; background: color-mix(in srgb, var(--vrm-ink, #1d1d1f) 6%, transparent); }   /* (20 nov.) ≤ 6 % */
 .vrm-sq-carte { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px; box-sizing: border-box; border-radius: 20px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-hair, rgba(0, 0, 0, .06)); }
 .vrm-sq-carte > .vrm-sq-barre { max-width: min(100%, 320px); }
 .vrm-sq-carte.is-sombre { background: var(--fu-sombre, var(--vrm-carte-sombre, #1d1d1f)); border: 0; padding: 20px 18px 18px; border-radius: 20px; }

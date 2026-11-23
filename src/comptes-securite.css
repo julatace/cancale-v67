@@ -18,7 +18,7 @@ html body .vrm-app-shell .vrm-compte-puces .vrm-compte-puce {
   max-width: 220px; overflow: hidden; text-overflow: ellipsis;
 }
 html body .vrm-app-shell .vrm-compte-puces .vrm-compte-puce.is-actif { background: var(--fu-encre, #1d1d1f); color: var(--fu-carte, #fff); }
-html body .vrm-app-shell .vrm-compte-puces .vrm-compte-puce:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 2px; }
+html body .vrm-app-shell .vrm-compte-puces .vrm-compte-puce:focus-visible { outline: 2px solid var(--fu-bleu, #16181D); outline-offset: 2px; }
 @media (pointer: coarse) { html body .vrm-app-shell .vrm-compte-puces .vrm-compte-puce { min-height: 44px; padding: 0 16px; font-size: 15px; } }
 .vrm-compte-select-cache {
   position: absolute !important; left: 0; bottom: 0; width: 1px !important; height: 1px !important; opacity: 0.001;

@@ -77,7 +77,8 @@ const req = (j) => j.vinted.filter((x) => /user_feedbacks/.test(x.chemin));
     dit(req(p.j).length === 0, 'A6 · pause Vinted posée (429) ⇒ aucune requête', String(req(p.j).length));
 
     const bg = fs.readFileSync(SRC, 'utf8');
-    const visite = bg.indexOf('await capterSuivisAchats(uid);');
+    // (19 nov., 5.409) `capterSuivisAchats` est monté juste après les codes : l'ancre est la dernière étape de la visite qui précède les avis.
+    const visite = bg.indexOf('await envoyerNotifsSuivi();\n    // 5.319');
     dit(visite > 0 && /await capterAvis\(uid\);/.test(bg.slice(visite, visite + 400)), 'A7 · la visite sur Vinted appelle `capterAvis` (après l’argent et les colis)');
     const app = fs.readFileSync(APP, 'utf8');
     const cap = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(app);

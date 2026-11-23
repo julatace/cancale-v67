@@ -15,6 +15,7 @@ import './facture-tva.css';
 import { useLigneUrssaf, useProfilFiscal } from './App.jsx';
 import { useFicheFacturation, FicheFacturation } from './FacturePro.jsx';
 import { alerteSeuilTva, phrasesSeuilTva } from './seuilTvaFacture.js';
+import { BoutonBase } from './composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 const eur = (n) => `${Math.round(Number(n) || 0).toLocaleString('fr-FR').replace(/ | /g, ' ')} €`;
 const pct = (p) => `${String(Math.floor(p))} %`;
@@ -50,9 +51,9 @@ export default function SeuilTvaFactures({ deps }) {
           <span>{p.change}</span>
           {p.plus ? <span>{p.plus}</span> : null}
           {a.regime === '' ? <span data-seuil-tva-pas-choisi="">Ton régime de TVA n'est pas encore choisi.</span> : null}
-          <button type="button" className="vrm-b vrm-b-secondaire vrm-stva-porte" data-seuil-tva-porte="tva_regime" aria-expanded={ouvrir} onClick={() => setOuvrir((v) => !v)}>
+          <BoutonBase variante="secondaire" className="vrm-stva-porte" data-seuil-tva-porte="tva_regime" aria-expanded={ouvrir} onClick={() => setOuvrir((v) => !v)}>
             {ouvrir ? 'Fermer Ma facture' : 'Mon régime de TVA'}
-          </button>
+          </BoutonBase>
         </div>
       ) : (
         <p className="vrm-stva-calme" data-seuil-tva-texte="">

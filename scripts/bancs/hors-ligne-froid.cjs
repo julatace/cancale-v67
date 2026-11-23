@@ -49,7 +49,7 @@ const srv = http.createServer((q, r) => {
 // `stock` : ce que l'appareil porte AVANT l'ouverture (clé → valeur JSON ou texte).
 async function ouvrir(nav, viewport, stock) {
   const tactile = viewport.width < 600;
-  const ctx = await nav.newContext({ viewport, hasTouch: tactile, isMobile: tactile, serviceWorkers: 'block' });
+  const ctx = await nav.newContext({ viewport, hasTouch: tactile, isMobile: tactile, serviceWorkers: 'block', locale: 'fr-FR' });   // (20 nov., chasse-bugs-2) le téléphone de Julien est en français : sans locale, la page d'accueil (traduite le 11 nov.) disait « Sign in »
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   await pg.addInitScript(({ stock }) => {

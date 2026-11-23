@@ -154,7 +154,13 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   {
     const i = SRC.indexOf('const bordForItem = ');
     const corps = i < 0 ? '' : SRC.slice(i, SRC.indexOf('\n  };', i));
-    (corps && /txnItem\[/.test(corps) && !/normTitle|title/i.test(corps.replace(/\/\/[^\n]*/g, '')))
+    // (20 nov., bugs-terrain) `bordForItem` lit un INDEX (`indexBordsItem`) : la règle est jugée dans le corps ET dans l'index
+    // (transaction → annonce par `txnItem`, N° par `cleNum`), jamais un titre dans l'un ou l'autre.
+    const j = SRC.indexOf('const indexBordsItem = ');
+    const index = j < 0 ? '' : SRC.slice(j, SRC.indexOf('\n};', j));
+    const sans = (t) => t.replace(/\/\/[^\n]*/g, '');
+    const parIdentite = /txnItem\[/.test(corps) || (/indexBordsItem\(\s*\w+\s*,\s*txnItem\s*\)/.test(corps) && /cleT\[String\(bb\.transaction\)\]/.test(index) && /cleNum\(bb\.numero\)/.test(index));
+    (corps && parIdentite && !/normTitle|title/i.test(sans(corps)) && !/normTitle|title|subject/i.test(sans(index)))
       ? ok('bordereau ↔ annonce : par identité (N° ou transaction), jamais par titre')
       : nok('bordereau ↔ annonce : par identité seulement', corps ? 'un titre sert encore à décider' : 'bordForItem introuvable');
   }
@@ -597,6 +603,66 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   r && r.doubles === 0
     ? ok('50 achats identiques sans référence : aucun « achat saisi deux fois »')
     : nok('« achat saisi deux fois » doit se décider par référence (n° de transaction, commande, facture), jamais par ressemblance', JSON.stringify(r));
+}
+
+// ── 17. (21 nov., lot fiche-sites) « SUR LES SITES » DE LA FICHE ───────────────────────────────────────
+// Cinquante annonces Leboncoin, eBay et Vestiaire RIGOUREUSEMENT identiques à l'article (même titre), sans
+// référence, SKU ni lien : la fiche du N°12 ne dit « en ligne » sur AUCUN de ces sites (« pas publiée »), et la
+// seule annonce qui porte l'identité (« VRM-12 ») est la seule reliée. Les règles exécutées telles quelles
+// (src/prixPartout.js `sitesDuNumero`, src/ficheSites.js `rangeesSitesFiche`) ; le module de la fiche ne lit
+// aucun titre. La série depuis Achats ne relie rien sans SON « Oui » (audit-fiche-sites S8).
+{
+  const { execFileSync } = require('child_process');
+  const code = `
+    const PP = await import(${JSON.stringify(path.join(__dirname, '..', 'src', 'prixPartout.js'))});
+    const FS = await import(${JSON.stringify(path.join(__dirname, '..', 'src', 'ficheSites.js'))});
+    const T = ${JSON.stringify(TITRE)};
+    const lbc = {}, vc = {};
+    for (let i = 0; i < ${N}; i++) { lbc[String(3100000000 + i)] = { status: 'active', subject: T, price: 60 }; vc[String(41000 + i)] = { statut: 'published', titre: T, prix: 60 }; }
+    const ebay = Array.from({ length: ${N} }, (_, i) => ({ itemId: String(980000 + i), title: T, price: 60 }));
+    const cleNum = (v) => String(v == null ? '' : v).trim().toUpperCase();
+    const numLbc = (ad) => (/^VRM-(\\w+)$/.exec(String(ad.ref || '')) || [])[1] || '';
+    const numVc = (id, it) => (/^VRM-(\\w+)$/.exec(String(it.ref || '')) || [])[1] || '';
+    // eBay : \`toutSurLeNumero\` ne garde que les annonces dont le SKU désigne CE N° — aucune ici.
+    const rn = { annonces: [], annoncesEbay: [], manques: [] };
+    const r0 = PP.sitesDuNumero('12', { rn, fiches: {}, lbcItems: lbc, vcItems: vc }, { cleNum, numLbc, numVc });
+    const rangs = FS.rangeesSitesFiche(r0.sites.map((x) => ({ ...x, etat: 'en-ligne' })), { pasLus: [], publier: true });
+    lbc['3100000007'] = { ...lbc['3100000007'], ref: 'VRM-12' };
+    const r1 = PP.sitesDuNumero('12', { rn, fiches: {}, lbcItems: lbc, vcItems: vc }, { cleNum, numLbc, numVc });
+    console.log(JSON.stringify({ n0: r0.sites.length, etats: rangs.map((r) => r.site + ':' + r.etat).join(','), n1: r1.sites.map((x) => x.id).join(','), ebay: ebay.length }));`;
+  let r = null;
+  try { r = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8' }).trim().split('\n').pop()); } catch (e) { r = null; }
+  r && r.n0 === 0 && r.etats === 'vinted:pas-publiee,leboncoin:pas-publiee,ebay:pas-publiee,vestiaire:pas-publiee'
+    ? ok('la fiche d\'un N° parmi 50 annonces identiques sur trois sites : « pas publiée » partout (aucune liaison par le titre)')
+    : nok('« Sur les sites » doit relier une annonce par identité (référence, SKU, lien), jamais par son titre', JSON.stringify(r));
+  r && r.n1 === '3100000007'
+    ? ok('et la seule annonce qui porte « VRM-12 » est la seule reliée')
+    : nok('l\'annonce qui porte l\'identité du N° doit être reliée, et elle seule', JSON.stringify(r));
+  const srcFS = fs.readFileSync(path.join(__dirname, '..', 'src', 'ficheSites.js'), 'utf8').replace(/\/\/[^\n]*/g, '');
+  !/\.(titre|title|subject)\b/.test(srcFS)
+    ? ok('src/ficheSites.js ne lit aucun titre')
+    : nok('src/ficheSites.js ne doit lire aucun titre');
+}
+
+// ── 18. (22 nov., ext. 5.435, choix 2a) LEBONCOIN EN PAUSE, VESTIAIRE HORS LIGNE, SUR LA FICHE ───────────────────────
+{
+  const { execFileSync } = require('child_process');
+  const code = `
+    const FS = await import(${JSON.stringify(require('url').pathToFileURL(path.join(__dirname, '..', 'src', 'ficheSites.js')).href)});
+    const T = 'adidas spezial noir taille 38';
+    const lbc = {}, vc = {};
+    for (let i = 0; i < 50; i++) { lbc[String(3200000000 + i)] = { status: 'paused', subject: T, price: 60 }; vc[String(42000 + i)] = { statut: 'unpublished', titre: T, prix: 60 }; }
+    const o = { cleNum: (v) => String(v == null ? '' : v).trim().toUpperCase(), numLbc: (ad) => (/^VRM-(\\w+)$/.exec(String(ad.ref || '')) || [])[1] || '', numVc: (id, it) => (/^VRM-(\\w+)$/.exec(String(it.ref || '')) || [])[1] || '',
+      etatLbc: () => 'pause', etatVc: () => 'retiree' };
+    const r0 = FS.annoncesHorsLigneAutresSites('12', { lbcItems: lbc, vcItems: vc }, o);
+    lbc['3200000003'] = { ...lbc['3200000003'], ref: 'VRM-12' }; vc['42009'] = { ...vc['42009'], ref: 'VRM-12' };
+    const r1 = FS.annoncesHorsLigneAutresSites('12', { lbcItems: lbc, vcItems: vc }, o);
+    console.log(JSON.stringify({ n0: r0.length, n1: r1.map((x) => x.id + ':' + x.etat).join(',') }));`;
+  let r = null;
+  try { r = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8' }).trim().split('\n').pop()); } catch (e) { r = null; }
+  r && r.n0 === 0 && r.n1 === '3200000003:en-pause,42009:hors-ligne'
+    ? ok('50 annonces Leboncoin en pause et 50 Vestiaire hors ligne au même titre : aucune n\'est l\'article ; seule celle qui porte « VRM-12 » a sa rangée')
+    : nok('« en pause » / « hors ligne » doivent venir de l\'identité, jamais du titre', JSON.stringify(r));
 }
 
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
