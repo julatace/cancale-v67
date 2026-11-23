@@ -17601,7 +17601,7 @@ const BarreHautSlot = React.createContext(null);
 // les résultats tombent dans un panneau sous lui (`champ`, rendu par la coque).
 // (21 nov., ux-reglages, audit design n° 2 / 33 / 32) Paramètres et E-mails ont LEUR recherche sous le grand titre : à l'ordinateur
 // la barre du haut n'en pose pas une seconde (un écran, une recherche ; la loupe globale reste au clavier ailleurs).
-const ECRANS_RECHERCHE_PROPRE = ['settings', 'emails'];
+const ECRANS_RECHERCHE_PROPRE = ['settings', 'emails', 'annonces', 'cat_annonces'];   // (22 nov. soir) Annonces porte SA recherche : une seule à l'écran (⌘K et « / » ouvrent toujours celle de la coque)
 function BarreHaut({ champ, poserSlot }) {
   return (
     <div className="vrm-barre-haut" data-barre-haut="">
@@ -38510,7 +38510,7 @@ function AppCoeur() {
         {ordi && !troisVolets && tab !== 'ventes' && tab !== 'journee' && <BarreHaut champ={ECRANS_RECHERCHE_PROPRE.includes(tab) ? null : champRechercheOrdi} poserSlot={setSlotBarre}/>}
         {/* (19 nov., intégration) Trois volets (Ventes, Annonces natifs) : pas de barre du haut, mais la recherche (⌘K, « / »,
             « Tout sur le N° ») s'ouvre quand même — son panneau, gardé comme une feuille (banc garde-ecrans P5 à 1512). */}
-        {ordi && (troisVolets || tab === 'ventes' || tab === 'journee') && gsOpen ? <div className="vrm-recherche vrm-recherche-volets" data-recherche-zone="" data-recherche-ouverte="1" style={{ position: 'fixed', top: 12, left: 'calc(var(--n-l-laterale, 240px) + 24px)', right: 24, zIndex: 18500 }}><label className="vrm-barre-recherche" data-barre-recherche=""><Icon name="search" size={18}/>{champRecherche(false)}</label>{panneauRecherche}</div> : null}
+        {ordi && (troisVolets || tab === 'ventes' || tab === 'journee' || tab === 'annonces' || tab === 'cat_annonces') && gsOpen ? <div className="vrm-recherche vrm-recherche-volets" data-recherche-zone="" data-recherche-ouverte="1" style={{ position: 'fixed', top: 12, left: 'calc(var(--n-l-laterale, 240px) + 24px)', right: 24, zIndex: 18500 }}><label className="vrm-barre-recherche" data-barre-recherche=""><Icon name="search" size={18}/>{champRecherche(false)}</label>{panneauRecherche}</div> : null}
         <RepriseRetenue tab={tab} compteChoisi={!!compteSel&&compteSel!=='*'} effacerCompte={()=>setCompteSel('')}/>
         <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <CibleNotif tab={tab} sub={platSub}/>
