@@ -138,7 +138,7 @@ function vrmVerifVisible(sel) {
      sombre de Vinted, qui la rendait GRISE (capture de Julien, 15 nov.). */
   :host { all: initial;
     --fond: #000000; --carte: #1C1C1E; --bord: rgba(255,255,255,.10); --filet: rgba(255,255,255,.08); --texte: #F2F2F7; --doux: #98989F; --pale: #8E8E93;
-    --accent: #3FD49A; --ambre: #F2B65E; --survol: rgba(255,255,255,.06); --remplir: rgb(28 28 30 / .9); --verre: #1C1C1E;
+    --accent: #3FD49A; --ambre: #B9C4D0; --survol: rgba(255,255,255,.06); --remplir: rgb(28 28 30 / .9); --verre: #1C1C1E;
     --champ: rgb(0 0 0 / .22); --anneau: rgba(63,212,154,.35);
     --ombre: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95);
     --fond-carte: linear-gradient(180deg, #1C1C1E 0%, #141416 100%);
@@ -151,7 +151,7 @@ function vrmVerifVisible(sel) {
      choix connu, le système décide, comme avant. */
   @media (prefers-color-scheme: light) {
     :host(:not([data-theme="sombre"])) { --carte: #FFFFFF; --bord: rgba(60,60,67,.12); --filet: rgba(60,60,67,.10); --texte: #111114; --doux: #3C3C43; --pale: #6C6C70;
-      --accent: #0F6B4C; --ambre: #764300; --survol: rgba(60,60,67,.05); --remplir: rgb(255 255 255 / .82); --verre: #F2F2F7;
+      --accent: #0F6B4C; --ambre: #3D4B5B; --survol: rgba(60,60,67,.05); --remplir: rgb(255 255 255 / .82); --verre: #F2F2F7;
       --champ: #FFFFFF; --anneau: rgba(15,107,76,.25);
       --ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .10), 0 2px 5px rgb(60 60 67 / .08), 0 34px 60px -26px rgb(60 60 67 / .48);
       --fond-carte: linear-gradient(180deg, #F7F7F8 0%, #EDEDF0 100%);
@@ -161,7 +161,7 @@ function vrmVerifVisible(sel) {
       --plein-fond: radial-gradient(120% 90% at 50% 0%, #2C2C2E 0%, #111114 55%); --plein-encre: #FFFFFF; --plein-ombre: inset 0 .5px 0 rgb(255 255 255 / .25), 0 1px 2px rgb(60 60 67 / .25), 0 12px 22px -10px rgb(60 60 67 / .6); }
   }
   :host([data-theme="clair"]) { --carte: #FFFFFF; --bord: rgba(60,60,67,.12); --filet: rgba(60,60,67,.10); --texte: #111114; --doux: #3C3C43; --pale: #6C6C70;
-      --accent: #0F6B4C; --ambre: #764300; --survol: rgba(60,60,67,.05); --remplir: rgb(255 255 255 / .82); --verre: #F2F2F7;
+      --accent: #0F6B4C; --ambre: #3D4B5B; --survol: rgba(60,60,67,.05); --remplir: rgb(255 255 255 / .82); --verre: #F2F2F7;
       --champ: #FFFFFF; --anneau: rgba(15,107,76,.25);
       --ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .10), 0 2px 5px rgb(60 60 67 / .08), 0 34px 60px -26px rgb(60 60 67 / .48);
       --fond-carte: linear-gradient(180deg, #F7F7F8 0%, #EDEDF0 100%);
@@ -736,16 +736,16 @@ function vrmVerifVisible(sel) {
   .carte[data-grand] { --n-fond:#F2F2F7; --n-carte:#FFFFFF; --n-carte-2:#F2F2F7; --n-trait:rgb(60 60 67/.18); --n-encre:#111114; --n-encre-2:#6C6C70; --n-accent:#0F6B4C; --n-teinte:rgb(15 107 76/.10); --n-neutre:rgb(118 118 128/.12); --n-vert:#1F7A3A; --n-vert-fond:#E6F4EA; --n-teal:#2C6E73; --n-teal-fond:#E3F1F1;
     --vu-coque-uni:var(--n-fond); --vu-coque:none; --vu-sur:var(--n-encre); --vu-sur-2:var(--n-encre-2); --vu-plaque:var(--n-carte); --vu-plaque-2:var(--n-carte-2); --vu-encre:var(--n-encre); --vu-muet:var(--n-encre-2);
     --vu-filet:var(--n-trait); --vu-ombre:none; --vu-plein:#111114; --vu-plein-appui:#2C2C2E; --vu-plein-encre:#FFFFFF; --vu-plein-sur-plaque:#111114; --vu-plein-sur-plaque-encre:#FFFFFF;
-    --vu-teinte:var(--n-neutre); --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#E5E5EA; --vu-barre:var(--n-accent); --vu-ambre:#8A4B00;
+    --vu-teinte:var(--n-neutre); --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#E5E5EA; --vu-barre:var(--n-accent); --vu-ambre:#3D4B5B;
     position: fixed; top: 4vh; bottom: 4vh; right: 2vw; left: auto; width: min(1100px, 76vw) !important; max-height: none; height: auto; border-radius: 16px; border: 0;
     padding: 12px 20px 20px; background: var(--n-fond) !important; color: var(--n-encre); box-shadow: 0 8px 30px rgb(0 0 0/.12), 0 0 0 100vmax rgb(0 0 0/.28); overflow-y: auto; overscroll-behavior: contain; }
-  @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#3FD49A; --n-teinte:rgb(63 212 154/.16); --n-neutre:rgb(118 118 128/.24); --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.16); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.16); --vu-plein:#F2F2F7; --vu-plein-appui:#D1D1D6; --vu-plein-encre:#111114; --vu-plein-sur-plaque:#F2F2F7; --vu-plein-sur-plaque-encre:#111114; --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#2C2C2E; --vu-barre:var(--n-accent); --vu-ambre:#FFB340; } }
-  :host([data-theme="sombre"]) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#3FD49A; --n-teinte:rgb(63 212 154/.16); --n-neutre:rgb(118 118 128/.24); --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.16); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.16); --vu-plein:#F2F2F7; --vu-plein-appui:#D1D1D6; --vu-plein-encre:#111114; --vu-plein-sur-plaque:#F2F2F7; --vu-plein-sur-plaque-encre:#111114; --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#2C2C2E; --vu-barre:var(--n-accent); --vu-ambre:#FFB340; }
+  @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#3FD49A; --n-teinte:rgb(63 212 154/.16); --n-neutre:rgb(118 118 128/.24); --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.16); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.16); --vu-plein:#F2F2F7; --vu-plein-appui:#D1D1D6; --vu-plein-encre:#111114; --vu-plein-sur-plaque:#F2F2F7; --vu-plein-sur-plaque-encre:#111114; --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#2C2C2E; --vu-barre:var(--n-accent); --vu-ambre:#B9C4D0; } }
+  :host([data-theme="sombre"]) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#3FD49A; --n-teinte:rgb(63 212 154/.16); --n-neutre:rgb(118 118 128/.24); --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.16); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.16); --vu-plein:#F2F2F7; --vu-plein-appui:#D1D1D6; --vu-plein-encre:#111114; --vu-plein-sur-plaque:#F2F2F7; --vu-plein-sur-plaque-encre:#111114; --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#2C2C2E; --vu-barre:var(--n-accent); --vu-ambre:#B9C4D0; }
   @media (max-width: 760px) { .carte[data-grand] { top: 0; bottom: 0; right: 0; left: 0; width: 100vw !important; height: 100dvh; border-radius: 0; padding: max(8px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); box-shadow: none; } }
-  /* 5.410.2 : l'ambre (un geste à faire) défini dans les deux teintes — en sombre, #8A4B00 sur #1C1C1E ne se lisait pas. */
-  .carte[data-grand] { --n-ambre: #8A4B00; --n-ambre-fond: #FFF4DD; }
-  @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-ambre: #FFB340; --n-ambre-fond: rgb(255 159 10 / .18); } }
-  :host([data-theme="sombre"]) .carte[data-grand] { --n-ambre: #FFB340; --n-ambre-fond: rgb(255 159 10 / .18); }
+  /* 5.410.2 : l'ambre (un geste à faire) défini dans les deux teintes — en sombre, #3D4B5B sur #1C1C1E ne se lisait pas. */
+  .carte[data-grand] { --n-ambre: #3D4B5B; --n-ambre-fond: #ECEFF3; }
+  @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-ambre: #B9C4D0; --n-ambre-fond: rgb(185 196 208 / .18); } }
+  :host([data-theme="sombre"]) .carte[data-grand] { --n-ambre: #B9C4D0; --n-ambre-fond: rgb(185 196 208 / .18); }
   .carte[data-grand] .t5 { min-height: 52px; }
   .carte.on[data-grand] ~ .btn { display: none !important; }   /* 5.410.2 : le rond VRM ne recouvre plus le coin du panneau (son × ferme) */
   .carte[data-grand] .t5 .nom { font: 700 28px/34px -apple-system, "SF Pro Display", Inter, system-ui, sans-serif; max-width: 70%; color: var(--n-encre); }
@@ -783,6 +783,8 @@ function vrmVerifVisible(sel) {
   .frise10 li em { font-style: normal; font-size: 13px; color: var(--vu-encre); line-height: 1.4; overflow-wrap: anywhere; }
   .frise10 li[data-probleme] em { color: var(--vu-ambre); }
   .rang > .vu-btn[data-onglet-b] { margin-left: auto; flex: none; }
+  /* 24 nov. (Julien : « plus d'orange/ambre nulle part ») — « à faire » = GRAS + accent ardoise #3D4B5B ; le rouge reste au seul doublon de N°. */
+  [data-ton="ambre"], .ambre, .frise10 li[data-probleme] em, .frise10 li[data-probleme] b { font-weight: 700 !important; }
   [data-vc-offre] { padding: 8px 16px 14px; max-width: 420px; }
   .h10 { font-size: 13px; font-weight: 600; color: var(--vu-muet); margin: 4px 0 6px; }
   .ph5 { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 8px 0; }
@@ -842,7 +844,7 @@ function vrmVerifVisible(sel) {
   .lot5 { margin: 0 16px 12px; }
   .carte .lot5 .rang .me, .carte [data-rel] .rang .me, .carte [data-ag-decisions] .rang .me { white-space: normal; overflow: visible; text-overflow: clip; }
   .lot5-t { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0; }
-  .lot5 [data-ambre], .rangs [data-ambre], .note5[data-ambre] { color: var(--n-ambre, #8A4B00); }
+  .lot5 [data-ambre], .rangs [data-ambre], .note5[data-ambre] { color: var(--n-ambre, #3D4B5B); }
   .ag5-g { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 6px 0 10px; }
   @media (max-width: 520px) { .ag5-g { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .ag5-t { border: 1px solid var(--n-trait, rgb(60 60 67/.18)); border-radius: 10px; padding: 8px 10px; display: grid; }
@@ -894,7 +896,7 @@ function vrmVerifVisible(sel) {
   .cel5 { font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); font-variant-numeric: tabular-nums; }
   .lc5 { display: none; }
   .st5 { display: inline-block; padding: 2px 8px; border-radius: 6px; background: var(--n-carte-2); color: var(--n-encre-2); font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; }
-  .st5[data-statut="nouveau"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
+  .st5[data-statut="nouveau"] { background: var(--n-ambre-fond, #ECEFF3); color: var(--n-ambre, #3D4B5B); }
   li[data-coche] > .tr5, li[data-coche] > .case5 { background: var(--n-neutre); }
   @media (max-width: 760px) {
     .th5 { display: none; }
@@ -1050,7 +1052,7 @@ function vrmVerifVisible(sel) {
   .imp6:hover { background: var(--n-neutre); } .imp6:active { transform: scale(.97); } .imp6:disabled { opacity: .55; cursor: default; }
   .imp6:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
   .pas6 { font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
-  .imp-etat6 { padding: 8px 16px; } .imp-etat6[data-ton="ambre"] { color: var(--n-ambre, #8A4B00); }
+  .imp-etat6 { padding: 8px 16px; } .imp-etat6[data-ton="ambre"] { color: var(--n-ambre, #3D4B5B); }
   .revue6 { padding: 8px 16px 0; margin: 0; }
   .acc6 .imp-etat6 { padding: 4px 0; }
   .vte6 > span:first-child { min-width: 0; display: flex; flex-direction: column; gap: 2px; } .vte6 > span:first-child b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1058,13 +1060,13 @@ function vrmVerifVisible(sel) {
   @media (prefers-reduced-motion: reduce) { .imp6 { transition: none; } }
   .vu-transp { display: inline-flex; border-radius: 5px; overflow: hidden; flex: none; }
   .et6 { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--n-carte-2); color: var(--n-encre-2); font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; white-space: nowrap; }
-  .et6[data-ton="ambre"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
+  .et6[data-ton="ambre"] { background: var(--n-ambre-fond, #ECEFF3); color: var(--n-ambre, #3D4B5B); }
   /* 5.426 : « Vendue → retirée sur » — une rangée par paire, une étiquette douce par site (ambre = encore à retirer). */
   .rp6 .rp6-l > span { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   .rp6-sites { display: flex; flex-wrap: wrap; gap: 4px 6px; }
   .rp6-s { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--n-carte-2); color: var(--n-encre-2); font: 500 12px/18px -apple-system, Inter, system-ui, sans-serif; }
-  .rp6-s[data-ton="ambre"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
-  .note5[data-ton="ambre"] { color: var(--n-ambre, #8A4B00); }
+  .rp6-s[data-ton="ambre"] { background: var(--n-ambre-fond, #ECEFF3); color: var(--n-ambre, #3D4B5B); }
+  .note5[data-ton="ambre"] { color: var(--n-ambre, #3D4B5B); }
   .et6[data-statut="en_vente"] { background: var(--n-vert-fond); color: var(--n-vert); }
   .et6[data-statut="en_route"] { background: var(--n-teal-fond); color: var(--n-teal); }
   .et6[data-statut="finalisee"] { background: var(--n-vert-fond); color: var(--n-vert); }
@@ -1084,7 +1086,7 @@ function vrmVerifVisible(sel) {
   .cel6 .of6, .cel6 .rs6 { display: block; margin-top: 2px; font: 400 12px/16px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); white-space: normal; }
   .cel6[data-col="etat"] { white-space: normal; }
   .fav6-envoi { margin: 12px 16px 0; }
-  .fav6-file { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 12px 16px 0; padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
+  .fav6-file { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 12px 16px 0; padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--n-ambre-fond, #ECEFF3); color: var(--n-ambre, #3D4B5B); }
   .fav6-file > span { flex: 1 1 220px; display: flex; flex-direction: column; font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; }
   .fav6-file small { font-weight: 400; font-size: 13px; line-height: 18px; }
   .fav6-file .vu-btn { min-height: 44px; padding: 0 16px; border-radius: 12px; }
@@ -1110,7 +1112,7 @@ function vrmVerifVisible(sel) {
   .rl6-m small { color: var(--n-encre-2); font-size: 13px; }
   .rl6-m textarea { width: 100%; box-sizing: border-box; min-height: 88px; border-radius: 10px; border: 1px solid var(--n-trait); padding: 8px 10px; font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; background: var(--n-carte); color: var(--n-encre); }
   .rl6-m .ge5 .vu-btn { width: auto; min-height: 44px; }
-  .rl6-ko { margin: 6px 0 0 56px; color: var(--n-ambre, #8A4B00); }
+  .rl6-ko { margin: 6px 0 0 56px; color: var(--n-ambre, #3D4B5B); }
   .rl6-reg .champ6 input[type="number"] { max-width: 120px; min-height: 44px; }
   .rl6-reg textarea { min-height: 88px; }
   .rl6-reg select { min-height: 44px; }
@@ -1120,7 +1122,7 @@ function vrmVerifVisible(sel) {
   .tc6-seg { margin: 0 0 8px; display: flex; flex-wrap: wrap; }
   .tc6-seg button { flex: 1 1 auto; min-height: 44px; }
   .tc6-r { display: block; color: var(--n-encre-2); font-size: 12px; line-height: 16px; }
-  .tc6-r[data-urgent] { color: var(--n-ambre, #8A4B00); }
+  .tc6-r[data-urgent] { color: var(--n-ambre, #3D4B5B); }
   .tc6-pt { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: middle; }
   @media (max-width: 760px) { .rl6-m, .rl6-ko { margin-left: 0; } .rl6-t { flex-direction: column; align-items: stretch; gap: 8px; } .rl6-t .vu-btn { width: 100%; } .rl6-r { padding: 10px 8px; } .rl6-l { gap: 8px; } .rl6-l .v6 { align-self: flex-start; } }
   .ven6-seg button { flex: 1 1 auto; min-height: 44px; }
@@ -1248,7 +1250,7 @@ function vrmVerifVisible(sel) {
   /* 5.438 : la rangée « Note de santé » de l'Accueil se touche (elle mène à Santé) — une rangée, pas un bouton. */
   .rg6.sn6-b { width: 100%; background: none; border: 0; border-bottom: .5px solid var(--n-trait); border-radius: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; padding: 6px 0; min-height: 52px; }
   .rg6.sn6-b:active { background: var(--n-presse, rgba(0,0,0,.04)); }
-  .sn6-n[data-ton="ambre"] { color: var(--n-ambre, #8A4B00); }
+  .sn6-n[data-ton="ambre"] { color: var(--n-ambre, #3D4B5B); }
   [data-bm-section="lotFavoris"] .rg6 { flex-wrap: wrap; gap: 8px; } [data-bm-section="lotFavoris"] .rg6 .vu-seg { flex: 1 1 100%; }
   .rg6 .md6-g { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
   .rg6 .md6-g .vu-lien { min-height: 44px; display: inline-flex; align-items: center; }
@@ -1337,7 +1339,7 @@ function vrmVerifVisible(sel) {
   .q7-c { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .q7-c b { font-weight: 600; overflow-wrap: anywhere; }
   .q7-c small { color: var(--n-encre-2); font-size: 12.5px; overflow-wrap: anywhere; }
-  .q7-c .q7-essai { color: var(--vu-ambre, #b45309); }
+  .q7-c .q7-essai { color: var(--vu-ambre, #3D4B5B); }
   .q7-g { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; }
   .q7-g .vu-btn { min-height: 44px; }
   .q7-g .rond6[disabled] { opacity: .3; cursor: default; }
@@ -1374,7 +1376,7 @@ function vrmVerifVisible(sel) {
   .tu6 { appearance: none; border: 0; background: var(--n-carte-2); transition: background-color .16s ease; border-radius: 12px; padding: 12px 14px; text-align: left; cursor: pointer; color: var(--n-encre); }
   .tu6 span { display: block; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .tu6 b { display: block; font: 700 28px/34px -apple-system, Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
-  .tu6[data-ton="ambre"] b { color: var(--n-ambre, #8A4B00); }
+  .tu6[data-ton="ambre"] b { color: var(--n-ambre, #3D4B5B); }
   /* Au téléphone / Orion : la barre latérale devient une rangée défilante en haut ; le tableau, des rangées empilées. */
   @media (max-width: 760px) {
     .carte[data-grand] { top: 0 !important; bottom: 0 !important; left: 0 !important; right: 0 !important; border-radius: 0; }
@@ -1494,7 +1496,7 @@ function vrmVerifVisible(sel) {
      qui ne recouvre jamais le centre de la vérification ; la toucher rouvre le panneau. */
   .verif6 { position: fixed; top: var(--verif-haut, 12px); right: 12px; max-width: min(320px, calc(100vw - 24px)); min-height: 44px; padding: 10px 14px;
     display: flex; align-items: center; gap: 10px; text-align: left; border: 0; border-radius: 14px; cursor: pointer; pointer-events: auto;
-    background: #FFF4DD; color: #3D2600; font: 600 14px/1.35 -apple-system, "SF Pro Text", Inter, system-ui, sans-serif; box-shadow: 0 6px 20px rgb(0 0 0 / .22); }
+    background: #ECEFF3; color: #3D2600; font: 600 14px/1.35 -apple-system, "SF Pro Text", Inter, system-ui, sans-serif; box-shadow: 0 6px 20px rgb(0 0 0 / .22); }
   .verif6[hidden] { display: none !important; }
   .verif6 .pv { width: 8px; height: 8px; border-radius: 4px; background: #B26A00; flex: none; }
   .verif6[data-verif="faite"] { background: #FFFFFF; color: #111114; }
@@ -1510,16 +1512,16 @@ function vrmVerifVisible(sel) {
      accent vert sapin rare (onglet actif, interrupteurs, progression) ; aucun bleu, rouge seulement doublon de N°. */
   .carte[data-grand] { --n-fond:#F1F3F6; --n-carte:#FFFFFF; --n-carte-2:#F8F9FA; --n-trait:#E4E4E7; --n-filet:#EEF0F2; --n-encre:#16181D; --n-encre-2:#5F646C; --n-encre-3:#6E737B;
     --n-neutre:#F1F2F4; --n-vert:#17744A; --n-vert-fond:#DDF4E6; --n-vert-bord:#C3EAD2; --n-teal:#0D6A6B; --n-teal-fond:#DAF0F0; --n-teal-bord:#BCE3E3;
-    --n-ambre:#874600; --n-ambre-fond:#FFEBC4; --n-ambre-bord:#F8D79B; --n-gris:#4C525B; --n-gris-fond:#ECEEF1; --n-gris-bord:#DFE2E6;
+    --n-ambre:#3D4B5B; --n-ambre-fond:#ECEFF3; --n-ambre-bord:#CBD3DC; --n-gris:#4C525B; --n-gris-fond:#ECEEF1; --n-gris-bord:#DFE2E6;
     --n-ombre-xs:0 1px 2px rgb(16 24 40/.05); --n-ombre:0 1px 2px rgb(16 24 40/.04), 0 2px 6px rgb(16 24 40/.04); --n-police:var(--vu-police, Inter, -apple-system, system-ui, sans-serif);
     --vu-socle:var(--n-neutre); --vu-kraft:#F1F2F4; --vu-kraft-encre:#16181D; --vu-kraft-doux:#5F646C; --vu-kraft-bord:#E3E5E9; --vu-plein:#16181D; --vu-plein-sur-plaque:#16181D; }
   @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-fond:#0E0F11; --n-carte:#17181B; --n-carte-2:#1D1F23; --n-trait:#2C2F35; --n-filet:#24272C; --n-encre:#F2F3F5; --n-encre-2:#B0B4BB; --n-encre-3:#90959D;
     --n-neutre:#24272C; --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.14); --n-vert-bord:rgb(48 209 88/.28); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.14); --n-teal-bord:rgb(124 201 206/.28);
-    --n-ambre:#FFB340; --n-ambre-fond:rgb(255 159 10/.16); --n-ambre-bord:rgb(255 159 10/.32); --n-gris:#C3C7CE; --n-gris-fond:#24272C; --n-gris-bord:#33363D;
+    --n-ambre:#B9C4D0; --n-ambre-fond:rgb(185 196 208/.16); --n-ambre-bord:rgb(185 196 208/.32); --n-gris:#C3C7CE; --n-gris-fond:#24272C; --n-gris-bord:#33363D;
     --n-ombre-xs:none; --n-ombre:0 0 0 1px rgb(255 255 255/.02); --vu-kraft:#24272C; --vu-kraft-encre:#F2F3F5; --vu-kraft-doux:#A0A5AD; --vu-kraft-bord:#33363D; --vu-plein:#F2F3F5; --vu-plein-sur-plaque:#F2F3F5; } }
   :host([data-theme="sombre"]) .carte[data-grand] { --n-fond:#0E0F11; --n-carte:#17181B; --n-carte-2:#1D1F23; --n-trait:#2C2F35; --n-filet:#24272C; --n-encre:#F2F3F5; --n-encre-2:#B0B4BB; --n-encre-3:#90959D;
     --n-neutre:#24272C; --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.14); --n-vert-bord:rgb(48 209 88/.28); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.14); --n-teal-bord:rgb(124 201 206/.28);
-    --n-ambre:#FFB340; --n-ambre-fond:rgb(255 159 10/.16); --n-ambre-bord:rgb(255 159 10/.32); --n-gris:#C3C7CE; --n-gris-fond:#24272C; --n-gris-bord:#33363D;
+    --n-ambre:#B9C4D0; --n-ambre-fond:rgb(185 196 208/.16); --n-ambre-bord:rgb(185 196 208/.32); --n-gris:#C3C7CE; --n-gris-fond:#24272C; --n-gris-bord:#33363D;
     --n-ombre-xs:none; --n-ombre:0 0 0 1px rgb(255 255 255/.02); --vu-kraft:#24272C; --vu-kraft-encre:#F2F3F5; --vu-kraft-doux:#A0A5AD; --vu-kraft-bord:#33363D; --vu-plein:#F2F3F5; --vu-plein-sur-plaque:#F2F3F5; }
   /* La petite carte et la question (hors du grand panneau) : la même plaque N° fine. */
   .plaque { height: 20px; padding: 0 6px; border-radius: 5px; clip-path: none; box-shadow: inset 0 0 0 1px var(--vu-kraft-bord); font-weight: 600; font-size: 12px; line-height: 20px; }

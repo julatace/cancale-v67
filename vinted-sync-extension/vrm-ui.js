@@ -1936,19 +1936,19 @@
     --vu-ombre:0 .5px 0 rgb(0 0 0/.05),0 1px 2px rgb(0 0 0/.06),0 10px 24px -14px rgb(0 0 0/.22);
     --vu-plein:#111114;--vu-plein-appui:#2C2C2E;--vu-plein-encre:#FFFFFF;--vu-plein-sur-plaque:#111114;--vu-plein-sur-plaque-encre:#FFFFFF;
     --vu-teinte:rgb(118 118 128/.12);--vu-teinte-appui:rgb(118 118 128/.22);--vu-teinte-encre:#111114;--vu-lien:#111114;--vu-anneau:0 0 0 3px rgb(15 107 76/.35);
-    --vu-ambre:#8A4B00;--vu-ambre-point:#E08A12;--vu-ok:#1F7A3A;--vu-socle:#E5E5EA;--vu-barre:#0F6B4C;
+    --vu-ambre:#3D4B5B;--vu-ambre-point:#3D4B5B;--vu-ok:#1F7A3A;--vu-socle:#E5E5EA;--vu-barre:#0F6B4C;
     --vu-kraft:#F1F2F4;--vu-kraft-encre:#16181D;--vu-kraft-doux:#5F646C;--vu-kraft-bord:#E3E5E9;
     --vu-voile:rgb(0 0 0/.42);--vu-toast:#111114;--vu-toast-encre:#F2F2F7;
-    --vu-chg:#E6F4EA;--vu-chg-encre:#1F5A33;--vu-ambre-fond:#FFF4DD;`;
+    --vu-chg:#E6F4EA;--vu-chg-encre:#1F5A33;--vu-ambre-fond:#ECEFF3;`;
   const NUIT = `--vu-coque-uni:#0E0F11;--vu-coque:#0E0F11;
     --vu-sur:#F2F3F5;--vu-sur-2:#B0B4BB;--vu-plaque:#17181B;--vu-plaque-2:#1D1F23;--vu-encre:#F2F3F5;--vu-muet:#B0B4BB;--vu-filet:#2C2F35;
     --vu-ombre:0 0 0 .5px rgb(255 255 255/.06),0 12px 26px -14px rgb(0 0 0/.85);
     --vu-plein:#F2F2F7;--vu-plein-appui:#D1D1D6;--vu-plein-encre:#111114;--vu-plein-sur-plaque:#F2F2F7;--vu-plein-sur-plaque-encre:#111114;
     --vu-teinte:rgb(118 118 128/.24);--vu-teinte-appui:rgb(118 118 128/.34);--vu-teinte-encre:#F2F2F7;--vu-lien:#F2F2F7;--vu-anneau:0 0 0 3px rgb(63 212 154/.45);
-    --vu-ambre:#FFB340;--vu-ambre-point:#F2A33A;--vu-ok:#7FD39A;--vu-socle:#2C2C2E;--vu-barre:#3FD49A;
+    --vu-ambre:#B9C4D0;--vu-ambre-point:#B9C4D0;--vu-ok:#7FD39A;--vu-socle:#2C2C2E;--vu-barre:#3FD49A;
     --vu-kraft:#24272C;--vu-kraft-encre:#F2F3F5;--vu-kraft-doux:#B0B4BB;--vu-kraft-bord:#33363D;
     --vu-voile:rgb(0 0 0/.62);--vu-toast:#F2F2F7;--vu-toast-encre:#111114;
-    --vu-chg:rgb(48 209 88/.16);--vu-chg-encre:#7FD39A;--vu-ambre-fond:rgb(255 179 64/.16);`;
+    --vu-chg:rgb(48 209 88/.16);--vu-chg-encre:#7FD39A;--vu-ambre-fond:rgb(185 196 208/.16);`;
   const CSS = `
   :host, .vu-racine { ${JOUR} }
   @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])), .vu-racine:not([data-theme="clair"]) { ${NUIT} } }
@@ -2002,7 +2002,7 @@
   .vu-sur-coque .vu-barre > i { background: var(--vu-sur); }
   /* Le point d'état : neutre quand tout va bien (§7), ambre pour un geste, creux pour une pause. */
   .vu-point { display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: #7FD39A; flex: none; box-shadow: 0 0 0 3px rgb(127 211 154/.22); }
-  .vu-point[data-k="geste"] { background: var(--vu-ambre-point); box-shadow: 0 0 0 3px rgb(224 138 18/.25); }
+  .vu-point[data-k="geste"] { background: var(--vu-ambre-point); box-shadow: 0 0 0 3px rgb(61 75 91/.25); }
   .vu-point[data-k="pause"], .vu-point[data-k="prudence"], .vu-point[data-k="attente"], .vu-point[data-k="reseau"], .vu-point[data-k="arrete"] { background: transparent; box-shadow: inset 0 0 0 2px currentColor; }
   /* Le bandeau fin (une nouvelle version) et la ligne secondaire. */
   .vu-bandeau { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 4px 4px 14px; border-radius: 14px; background: var(--vu-teinte); color: var(--vu-sur); font: 600 13px/1.3 var(--vu-police); }
@@ -2016,7 +2016,7 @@
   /* 5.430 — l'étiquette de NOTE d'un acheteur : douce, neutre ; ambre seulement quand il y a quelque chose à surveiller. */
   .vu-note { display: inline-flex; align-items: center; flex: none; height: 22px; padding: 0 8px; border-radius: 999px; background: var(--vu-socle); color: var(--vu-muet);
     font: 600 12px/1 var(--vu-police); white-space: nowrap; font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
-  .vu-note[data-k="ambre"] { color: var(--vu-ambre); background: rgb(224 138 18/.13); }
+  .vu-note[data-k="ambre"] { color: var(--vu-ambre); background: rgb(61 75 91/.13); }
   /* 5.430 — un texte TRADUIT sur l'appareil, sous l'original : un filet à gauche, la provenance en petit. */
   .vu-trad { margin: 6px 0 0; padding: 2px 0 2px 10px; border-left: 2px solid var(--vu-filet); font: 400 14px/1.4 var(--vu-police); white-space: pre-wrap; overflow-wrap: anywhere; }
   .vu-trad small { display: block; margin-top: 3px; font-size: 12px; color: var(--vu-muet); }

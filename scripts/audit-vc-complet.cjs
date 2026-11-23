@@ -229,8 +229,19 @@ async function partieH() {
   dit(ok, 'H1 · achat : « à retirer » seulement quand le texte de Vinted le dit (règle AT_RELAY) ; `needs_action` seul n’est PAS « à retirer »', '');
 }
 
+// ── I · plus d'orange ni d'ambre dans l'extension (Julien, 24 nov. : « à faire » = gras + accent ardoise #3D4B5B) ──
+async function partieI() {
+  const dossier = path.dirname(F.src);
+  const AMBRES = /#(8A4B00|874600|764300|E08A12|FFF4DD|FFEBC4|F8D79B|FFB340|F2B65E|F2A33A|B45309|D97706|FF9500|FF9F0A|F59E0B)\b|rgb\(\s*(224 138 18|255 159 10|255 179 64)/i;
+  const fautes = [];
+  for (const f of fs.readdirSync(dossier).filter((x) => /\.(js|html|css)$/.test(x) && !/\.min\./.test(x))) {
+    fs.readFileSync(path.join(dossier, f), 'utf8').split('\n').forEach((l, i) => { if (AMBRES.test(l)) fautes.push(`${f}:${i + 1}`); });
+  }
+  dit(!fautes.length, 'I1 · aucune couleur orange/ambre dans l’extension (l’accent « à faire » est l’ardoise #3D4B5B, en gras)', fautes.slice(0, 8).join(' '));
+}
+
 (async () => {
-  for (const [nom, fn] of [['A', partieA], ['B', partieB], ['C', partieC], ['D', partieD], ['E', partieE], ['F', partieF], ['G', partieG], ['H', partieH]]) {
+  for (const [nom, fn] of [['I', partieI], ['A', partieA], ['B', partieB], ['C', partieC], ['D', partieD], ['E', partieE], ['F', partieF], ['G', partieG], ['H', partieH]]) {
     try { await fn(); } catch (e) { dit(false, `${nom} : l’audit a tourné jusqu’au bout`, String((e && e.stack) || e).slice(0, 400)); }
   }
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s) sur ${n}` : `\n✅ Vestiaire complet : ${n} contrôles verts`);

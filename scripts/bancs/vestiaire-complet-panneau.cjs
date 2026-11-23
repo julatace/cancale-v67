@@ -7,7 +7,7 @@
 //  et 390 px au doigt, clair et sombre ; captures dans `captures/vestiaire-complet`. On juge :
 //   · la barre : Articles · Ventes (plus « Commandes ») · Messagerie, et « Achats » ;
 //   · Articles : l'annonce « En cours d'examen » a SON statut dans le filtre ;
-//   · Ventes : photo, réf., prix et « pour vous », l'état de la règle (« En litige · Vestiaire examine » en ambre,
+//   · Ventes : photo, réf., prix et « pour vous », l'état de la règle (« En litige · Vestiaire examine » signalé (gras + accent),
 //     « Livrée · évaluation en cours », « Annulée ») ; la fiche montre la FRISE datée et le texte de Vestiaire ;
 //   · Achats : Vestiaire « aucun achat » daté ; Leboncoin : « VRM ne lit pas encore » (jamais « aucun ») ;
 //   · Messagerie : les conversations ; Favoris : « Faire une offre » seulement avec la recette apprise, prix tapé,
@@ -119,10 +119,13 @@ const debord = (pg) => pg.evaluate(() => { const c = document.getElementById('vr
         dit(st.some((x) => /^examen:En cours d’examen 1$/.test(x)) && !st.some((x) => /^refusee:/.test(x)), `${T} : Articles — « En cours d’examen » a SON statut (1) ; les statuts absents ne s’affichent pas`, JSON.stringify(st));
         // Ventes
         await clic(t.pg, '[data-onglet-b="ventes"]');
-        const v = await R(t.pg, () => { const r = document.getElementById('vrm-badge').shadowRoot; return Array.from(r.querySelectorAll('[data-vc-etat]')).map((b) => ({ id: b.getAttribute('data-vente'), etat: b.getAttribute('data-vc-etat'), txt: b.innerText.replace(/\s+/g, ' '), img: !!b.querySelector('img.vig'), ton: (b.querySelector('.et6') || {}).getAttribute ? b.querySelector('.et6').getAttribute('data-ton') : null })); });
+        const v = await R(t.pg, () => { const r = document.getElementById('vrm-badge').shadowRoot; return Array.from(r.querySelectorAll('[data-vc-etat]')).map((b) => ({ id: b.getAttribute('data-vente'), etat: b.getAttribute('data-vc-etat'), txt: b.innerText.replace(/\s+/g, ' '), img: !!b.querySelector('img.vig'), ton: (b.querySelector('.et6') || {}).getAttribute ? b.querySelector('.et6').getAttribute('data-ton') : null, coul: b.querySelector('.et6') ? getComputedStyle(b.querySelector('.et6')).color : '', gras: b.querySelector('.et6') ? Number(getComputedStyle(b.querySelector('.et6')).fontWeight) : 0 })); });
         await cap('ventes');
         const l = v.find((x) => x.id === '70000010') || {};
-        dit(v.length === 3 && l.etat === 'litige' && /En litige · Vestiaire examine/.test(l.txt) && l.ton === 'ambre' && /Réf\. 70000010/.test(l.txt) && /209,52 €/.test(l.txt) && /pour vous 203,23 €/.test(l.txt) && l.img, `${T} : Ventes — photo, réf., prix et « pour vous », « En litige · Vestiaire examine » en ambre`, JSON.stringify(v));
+        // 24 nov. (Julien : « plus d'orange/ambre nulle part ») : « à faire » = gras + accent ardoise, jamais une teinte orange.
+        const orange = (c) => { const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c || ''); return !!m && +m[1] - +m[3] > 60 && +m[1] > +m[2]; };
+        dit(l.gras >= 700 && !orange(l.coul), `${T} : « En litige » : en gras, accent ardoise — aucune teinte orange`, JSON.stringify({ c: l.coul, g: l.gras }));
+        dit(v.length === 3 && l.etat === 'litige' && /En litige · Vestiaire examine/.test(l.txt) && l.ton === 'ambre' && /Réf\. 70000010/.test(l.txt) && /209,52 €/.test(l.txt) && /pour vous 203,23 €/.test(l.txt) && l.img, `${T} : Ventes — photo, réf., prix et « pour vous », « En litige · Vestiaire examine » signalé (gras + accent)`, JSON.stringify(v));
         dit((v.find((x) => x.id === '70000011') || {}).etat === 'livree_controle' && /Livrée · évaluation en cours/.test((v.find((x) => x.id === '70000011') || {}).txt) && /Annulée/.test((v.find((x) => x.id === '70000012') || {}).txt) && !v.some((x) => /À expédier|En route/.test(x.txt)), `${T} : Ventes — plus aucun « À expédier » ni « En route » faux`, JSON.stringify(v.map((x) => x.txt)));
         await clic(t.pg, '[data-fiche-b="v:70000010"]');
         const fr = await R(t.pg, () => { const r = document.getElementById('vrm-badge').shadowRoot; return { n: r.querySelectorAll('[data-vc-frise] li').length, pb: r.querySelectorAll('[data-vc-frise] li[data-probleme]').length, txt: (r.querySelector('[data-vc-frise]') || {}).innerText || '', note: !!r.querySelector('[data-vc-litige]') }; });
