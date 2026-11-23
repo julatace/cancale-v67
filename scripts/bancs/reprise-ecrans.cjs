@@ -19,8 +19,12 @@
 //       retrouve le tri par défaut.
 //   P4  l'iPhone va sur Ventes ⇒ « Finalisées » repris et dit.
 //   P5  un lien profond (`?tab=achats`) gagne toujours sur l'écran repris.
-//   P6  plus de 30 min ⇒ Ma journée ; une recherche quittée depuis plus de
+//   P6  plus de 12 h (13 h) ⇒ Ma journée ; une recherche quittée depuis plus de
 //       10 min ne revient pas ; le filtre, lui, revient.
+//   P7  (16 nov., « Reprendre là où j'étais », 12 h au lieu de 30 min) un dernier
+//       écran laissé il y a 11 h ⇒ il rouvre (Ventes, son filtre) ;
+//   P8  on fait défiler Ventes, on recharge ⇒ même écran, même position ; un lien
+//       profond reçu ensuite gagne encore.
 //
 //  §6.1 : rouge sur le build d'avant (`BANC_DIST=<dist d'avant>`), vert après.
 //  Lancer : npm run build && node scripts/bancs/reprise-ecrans.cjs   (BANC_CAPTURES=<dossier>)
@@ -41,6 +45,8 @@ function fabriquer() {
   const items = IDS.map((id, i) => ({ id: Number(id), title: `Air Max ${i + 1} taille 4${i}`, brand_title: 'Nike', size_title: '4' + i, status: 'Très bon état', price: { amount: String(50 + i) + '.0', currency_code: 'EUR' }, is_closed: false, is_hidden: false, is_draft: false, created_at_ts: frais((i + 3) * 86400000), photos: [] }));
   const fiches = {}; IDS.forEach((id, i) => { fiches[id] = { numero: String(i + 1), numberedAt: frais((i + 2) * 86400000), auto: false, manuelAt: frais((i + 2) * 86400000), title: items[i].title }; });
   const vente = (k, statut) => ({ transaction_id: 9100 + k, title: `Air Max vendue ${k}`, price: { amount: String(60 + k), currency_code: 'EUR' }, status: statut, date: frais((k + 1) * 86400000) });
+  // 25 ventes de plus : Ventes défile sur l'iPhone (P8).
+  const plus = Array.from({ length: 25 }, (_, i) => vente(10 + i, 'Commande finalisée'));
   return H.creerBase({
     accounts: [{ id: 1, vinted_user_id: UID, login: 'vendeur_reprise', domain: 'www.vinted.fr', updated_at: frais(3600e3), created_at: frais(60 * 86400000) }],
     lignes: [
@@ -48,7 +54,7 @@ function fabriquer() {
       { id: `harvest_${UID}_listings`, data: { capturedAt: frais(60e3), nItems: items.length, payload: { items, pagination: { total_entries: items.length } } } },
       { id: `harvest_${UID}_enligne`, data: { capturedAt: frais(60e3), complet: true, n: items.length, ids: items.map((x) => x.id), items: items.map((x) => ({ id: x.id, title: x.title })) } },
       { id: `harvest_${UID}_profile`, data: { capturedAt: frais(60e3), payload: { user: { id: Number(UID), login: 'vendeur_reprise' } } } },
-      { id: `harvest_${UID}_orders_sold`, data: { capturedAt: frais(60e3), nItems: 3, payload: { my_orders: [vente(1, 'Commande finalisée'), vente(2, 'Commande finalisée'), vente(3, 'Le paiement a été validé')] } } },
+      { id: `harvest_${UID}_orders_sold`, data: { capturedAt: frais(60e3), nItems: 28, payload: { my_orders: [vente(1, 'Commande finalisée'), vente(2, 'Commande finalisée'), vente(3, 'Le paiement a été validé'), ...plus] } } },
     ],
   });
 }
@@ -57,7 +63,9 @@ const ecran = (pg) => pg.evaluate(() => (document.querySelector('main.vrm-main')
 const attendreEcran = (pg, t, ms = 12000) => H.attendre(async () => (await ecran(pg)) === t, ms);
 const capture = async (pg, nom) => { try { await pg.screenshot({ path: path.join(CAPT, nom + '.png') }); } catch (_) {} };
 const aller = async (pg, id) => {
-  const b = pg.locator(`[data-nav-entree="${id}"]`).first();
+  // (16 nov.) L'entrée VISIBLE (sur l'iPhone, la barre du bas ; une entrée cachée — barre latérale,
+  // carte hors écran — ne mène nulle part).
+  const b = pg.locator(`[data-nav-entree="${id}"]:visible`).first();
   if (await b.count()) { await b.click().catch(() => {}); return attendreEcran(pg, id, 8000); }
   return false;
 };
@@ -112,7 +120,7 @@ const bandeau = (pg) => pg.evaluate(() => (document.querySelector('[data-reprise
   const B = await H.appareil(nav, base, { nom: 'B', vp: { width: 390, height: 844 } });
   const pB = await B.ouvrir('B'); errs.push(pB.errs);
   await pB.pg.goto(srv.url + '/', { waitUntil: 'domcontentloaded' });
-  dit(await attendreEcran(pB.pg, 'annonces', 15000), 'P2 : l’iPhone neuf s’ouvre sur Annonces (posé il y a < 30 min sur l’ordinateur)', await ecran(pB.pg));
+  dit(await attendreEcran(pB.pg, 'annonces', 15000), 'P2 : l’iPhone neuf s’ouvre sur Annonces (posé il y a quelques minutes sur l’ordinateur)', await ecran(pB.pg));
   await H.attendre(async () => (await triAnnonces(pB.pg)) === 'recent', 8000);
   dit((await triAnnonces(pB.pg)) === 'recent', 'P2 : le tri « Plus récentes » est repris', await triAnnonces(pB.pg));
   dit((await rechercheAnnonces(pB.pg)) === 'Air Max 3', 'P2 : la recherche (quittée il y a < 10 min) est reprise', String(await rechercheAnnonces(pB.pg)));
@@ -154,12 +162,12 @@ const bandeau = (pg) => pg.evaluate(() => (document.querySelector('[data-reprise
   await capture(pC.pg, 'P5-lien-profond');
 
   // ── P6 · LES DURÉES ─────────────────────────────────────────────────────────
-  // Plus aucun geste en attente, puis l'horloge : le dernier écran a 31 min, la
+  // Plus aucun geste en attente, puis l'horloge : le dernier écran a 13 h, la
   // recherche a été quittée il y a 11 min, le filtre de Ventes a 2 jours.
   await pB.pg.waitForTimeout(3000);
   const m = H.dataMain(base);
   const c6 = JSON.parse(JSON.stringify(m.vrm_reprise_ecrans || {}));
-  if (c6.ecran) c6.ecran.at = Date.now() - 31 * 60000;
+  if (c6.ecran) c6.ecran.at = Date.now() - 13 * 3600e3;
   if (c6.vues && c6.vues['annonces-recherche']) c6.vues['annonces-recherche'].at = Date.now() - 11 * 60000;
   if (c6.vues && c6.vues['ventes-filtre']) c6.vues['ventes-filtre'].at = Date.now() - 2 * 86400000;
   m.vrm_reprise_ecrans = c6;
@@ -167,15 +175,63 @@ const bandeau = (pg) => pg.evaluate(() => (document.querySelector('[data-reprise
   const pD = await D.ouvrir('D'); errs.push(pD.errs);
   await pD.pg.goto(srv.url + '/', { waitUntil: 'domcontentloaded' });
   await pD.pg.waitForTimeout(7000);
-  dit((await ecran(pD.pg)) === 'journee', 'P6 : un dernier écran de plus de 30 min ⇒ Ma journée', await ecran(pD.pg));
+  dit((await ecran(pD.pg)) === 'journee', 'P6 : un dernier écran de 13 h ⇒ Ma journée', await ecran(pD.pg));
   await capture(pD.pg, 'P6-journee');
-  await aller(pD.pg, 'annonces');
-  await H.attendre(async () => (await rechercheAnnonces(pD.pg)) !== null, 8000);
-  dit((await rechercheAnnonces(pD.pg)) === '', 'P6 : une recherche quittée il y a 11 min ne revient pas', JSON.stringify(await rechercheAnnonces(pD.pg)));
+  // (16 nov.) Par le lien (la barre du bas de Ma journée ne mène pas toujours à Annonces dans ce banc, cf. récit) :
+  // un lien `?tab=` fait taire la reprise d'ÉCRAN, pas celle des vues — c'est la recherche qui est jugée ici.
+  await pD.pg.goto(srv.url + '/?tab=annonces', { waitUntil: 'domcontentloaded' });
+  const surAnnonces = await attendreEcran(pD.pg, 'annonces', 15000);
+  await H.attendre(async () => (await rechercheAnnonces(pD.pg)) !== null, 15000);
+  dit((await rechercheAnnonces(pD.pg)) === '', 'P6 : une recherche quittée il y a 11 min ne revient pas', JSON.stringify(await rechercheAnnonces(pD.pg)) + ' · écran ' + (await ecran(pD.pg)) + (surAnnonces ? '' : ' (barre : pas arrivé)'));
+  await capture(pD.pg, 'P6-annonces');
   await aller(pD.pg, 'ventes');
   await H.attendre(async () => (await pD.pg.locator('button[aria-pressed="true"]', { hasText: /^Finalisées$/ }).count()) > 0, 8000);
   dit((await pD.pg.locator('button[aria-pressed="true"]', { hasText: /^Finalisées$/ }).count()) > 0, 'P6 : le filtre de Ventes (2 jours) revient, dit à l’écran');
   await capture(pD.pg, 'P6-ventes-filtre');
+
+  // ── P7 · 11 H PLUS TARD, L'ÉCRAN ROUVRE ─────────────────────────────────────
+  await pD.pg.waitForTimeout(3000);
+  const m7 = H.dataMain(base);
+  const c7 = JSON.parse(JSON.stringify(m7.vrm_reprise_ecrans || {}));
+  c7.ecran = { tab: 'ventes', sub: 'vinted', at: Date.now() - 11 * 3600e3 };
+  m7.vrm_reprise_ecrans = c7;
+  const E = await H.appareil(nav, base, { nom: 'E', vp: { width: 390, height: 844 } });
+  const pE = await E.ouvrir('E'); errs.push(pE.errs);
+  await pE.pg.goto(srv.url + '/', { waitUntil: 'domcontentloaded' });
+  dit(await attendreEcran(pE.pg, 'ventes', 15000), 'P7 : un dernier écran laissé il y a 11 h ⇒ il rouvre (Ventes)', await ecran(pE.pg));
+  await H.attendre(async () => (await pE.pg.locator('button[aria-pressed="true"]', { hasText: /^Finalisées$/ }).count()) > 0, 8000);
+  dit((await pE.pg.locator('button[aria-pressed="true"]', { hasText: /^Finalisées$/ }).count()) > 0, 'P7 : avec son filtre « Finalisées »');
+  await capture(pE.pg, 'P7-iphone-11h-ventes');
+
+  // ── P8 · LE DÉFILEMENT, PUIS UN LIEN ────────────────────────────────────────
+  await pE.pg.waitForTimeout(2500);
+  const haut = await pE.pg.evaluate(() => { const m = document.querySelector('main.vrm-main'); return m ? m.scrollHeight - m.clientHeight : 0; });
+  const vise = Math.min(700, Math.floor(haut * 0.6));
+  dit(vise >= 200, 'P8 : Ventes défile sur l’iPhone', `${haut} px de défilement`);
+  await pE.pg.mouse.move(195, 500);
+  await pE.pg.evaluate((y) => { const m = document.querySelector('main.vrm-main'); m.scrollTop = y; m.dispatchEvent(new Event('scroll')); }, vise);
+  await pE.pg.waitForTimeout(800);
+  await pE.pg.reload({ waitUntil: 'domcontentloaded' });
+  dit(await attendreEcran(pE.pg, 'ventes', 15000), 'P8 : rechargé ⇒ même écran (Ventes)', await ecran(pE.pg));
+  await H.attendre(async () => Math.abs((await pE.pg.evaluate(() => document.querySelector('main.vrm-main')?.scrollTop || 0)) - vise) < 30, 8000);
+  const y8 = await pE.pg.evaluate(() => document.querySelector('main.vrm-main')?.scrollTop || 0);
+  dit(Math.abs(y8 - vise) < 30, 'P8 : rechargé ⇒ même position de défilement', `${Math.round(y8)} px pour ${vise}`);
+  await capture(pE.pg, 'P8-iphone-recharge-position');
+  await pE.pg.goto(srv.url + '/?tab=achats', { waitUntil: 'domcontentloaded' });
+  await pE.pg.waitForTimeout(5000);
+  dit((await ecran(pE.pg)) === 'achats', 'P8 : un lien ?tab=achats reçu ensuite gagne sur la reprise', await ecran(pE.pg));
+
+  // ── P9 · L'ORDINATEUR 1512, 11 H APRÈS ───────────────────────────────────────
+  await pE.pg.waitForTimeout(3000);
+  const m9 = H.dataMain(base);
+  const c9 = JSON.parse(JSON.stringify(m9.vrm_reprise_ecrans || {}));
+  c9.ecran = { tab: 'annonces', at: Date.now() - 11 * 3600e3 };
+  m9.vrm_reprise_ecrans = c9;
+  const F9 = await H.appareil(nav, base, { nom: 'F', vp: { width: 1512, height: 900 } });
+  const pF = await F9.ouvrir('F'); errs.push(pF.errs);
+  await pF.pg.goto(srv.url + '/', { waitUntil: 'domcontentloaded' });
+  dit(await attendreEcran(pF.pg, 'annonces', 15000), 'P9 : l’ordinateur rouvre Annonces laissé il y a 11 h', await ecran(pF.pg));
+  await capture(pF.pg, 'P9-ordinateur-11h-annonces');
 
   const toutes = errs.flat().filter((e) => !/ResizeObserver|Failed to fetch|NetworkError|Load failed/.test(e));
   dit(!toutes.length, 'aucune erreur de page', toutes.slice(0, 3).join(' | '));
