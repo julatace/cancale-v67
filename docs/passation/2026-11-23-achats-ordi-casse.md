@@ -32,7 +32,7 @@ L1 aucun vide à gauche (le texte visible commence à moins de 15 % de la largeu
 toute la largeur ; L3 colonne Article visible entière ; L4 aucune cellule prix / date coupée ; L5 le titre de
 l'écran ni rogné ni couvert.
 
-Résultats : build d'origin/main : **38 rouges** sur la passe complète (tous sur Achats : tableau à 460 px du bord,
+Résultats : build d'origin/main, Achats à 1 100 / 1 280 / 1 512 : **27 rouges** (tableau à 460 px du bord,
 340 / 800 px à 1 100 ; prix, date, statut hors du cadre) — la capture « bas » reproduit celle de Julien. Après :
 **264 bons, 0 rouge**. Aujourd'hui, Annonces, Ventes, Argent, Stock : verts avant comme après sur cette base (le vide
 d'Aujourd'hui et le titre d'Annonces rogné signalés par un autre agent ne se reproduisent pas ici ; à mesurer sur
