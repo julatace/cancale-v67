@@ -60,6 +60,19 @@ d'un achat), l'image était une petite vignette agrandie, pixelisée.
   range une plus grande taille de la photo d'achat — une lecture Vinted NEUVE (budget de
   lecture 20/h) : pas fait ici, à décider avec Julien.
 
+## Résultats (23 nov., ~13 h UTC)
+
+- `audit-photo-taille` vert (10) ; mutations `jamais-plus-grand` (3 rouges), `toujours-pleine` (2),
+  `facteur-1` (1). `audit-visionneuse` 19 verts, `audit-photos-vinted` vert (PERMIS : `PhotoVintedBase`),
+  `audit-quoi-de-neuf` vert.
+- Banc `photos-nettes` : 11/11 vert ; sur l'arbre de `main` (git archive) : N1 ROUGE — visionneuse
+  150 px pour 390 pt (×0,38) ; après : 800 px (×2,05). Captures regardées (N1 avant/après, N3).
+- Banc `photos-achats` (V) : 13 rouges AVANT et APRÈS, identiques (préexistants, machine chargée).
+- Erreur préexistante vue sur Achats avant ET après : « Failed to read the 'localStorage' property… »
+  (pas de ce lot ; le banc l'écarte en le disant).
+
 ## ÉTAT À LA REPRISE
 
-Voir la fin du fichier (résultats, PR).
+PR #1323 (`claude/photos-nettes`). Si elle n'est pas fusionnée : comparer sa CI à celle du dernier
+commit de main, vrai `git merge origin/main`, fusionner. Ensuite, à décider avec Julien : faire ranger
+par l'extension une plus grande taille de la photo d'achat (lecture Vinted neuve, budget 20/h).
