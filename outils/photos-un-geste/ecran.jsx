@@ -7,9 +7,12 @@ import { createRoot } from 'react-dom/client';
 import { ajouterSourceApp } from '../../src/i18n/index.js';
 import frNatif from '../../src/i18n/langues/fr.js';
 import StudioPhoto from '../../src/StudioPhoto.jsx';
+import { ICON_PATHS } from 'vrm-icones-app';
+import { poserIcone } from '../../src/natif/index.js';
 import '../../src/styles-boutons.css';
 
 ajouterSourceApp(frNatif);
+poserIcone(({ name, size = 24 }) => { const d = ICON_PATHS[name]; if (!d) return null; return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>; });
 const P = new URLSearchParams(location.search);
 const sombre = P.get('theme') === 'dark';
 document.documentElement.setAttribute('data-theme', sombre ? 'dark' : 'light');

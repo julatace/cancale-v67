@@ -31,6 +31,7 @@ import { motsVendeur } from './profilVendeur.js';
 // (23 nov., lot photos-un-geste) lumière, recadrage, fond uniforme — dans la page, sans IA ni envoi (src/ameliorerPhoto.js).
 import { ameliorerDataUrl, REGLAGES_DEFAUT } from './ameliorerPhoto.js';
 import { tr } from './i18n/index.js';
+import { Bouton as BoutonN, Glyphe } from './natif/index.js';   // (23 nov.) le bouton commun : icône + verbe court
 const CLE_REGLAGES_GESTE = 'vrm_studio_un_geste';
 const lireReglagesGeste = () => { try { const v = JSON.parse(localStorage.getItem(CLE_REGLAGES_GESTE) || 'null'); return v && typeof v === 'object' ? { ...REGLAGES_DEFAUT, ...v } : { ...REGLAGES_DEFAUT }; } catch (_) { return { ...REGLAGES_DEFAUT }; } };
 import { lirePhotoroom, cleUtilisable, raisonSansPhotoroom, detourerAvecPhotoroom } from './photoroomCle.js';
@@ -276,17 +277,18 @@ export default function StudioPhoto({ C, paires, base, onClose, initiale = null,
           {Array.isArray(photos) && photos.length ? (
             <div data-ug-panneau="" data-ug-n={String(photos.length)} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', margin: '0 0 10px', background: C.card }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{tr('ug.titre')}</div>
-              <div style={{ fontSize: 12, color: C.muted, margin: '2px 0 8px', lineHeight: 1.4 }}>{tr('ug.sous')}</div>
+              <div style={{ fontSize: 12, color: C.muted, margin: '2px 0 8px' }}>{tr('ug.sous')}</div>
               <div role="group" aria-label={tr('ug.titre')} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                {['lumiere', 'recadrage', 'fond'].map((k) => (
-                  <button key={k} type="button" className={B.sp} aria-pressed={reglagesGeste[k] ? 'true' : 'false'} data-ug-reglage={k} data-ug-on={reglagesGeste[k] ? '1' : '0'} disabled={!!occupe} onClick={() => basculerReglage(k)}
-                    style={reglagesGeste[k] ? { borderColor: C.text, fontWeight: 600 } : undefined}>{(reglagesGeste[k] ? '✓ ' : '') + tr('ug.r.' + k)}</button>
+                {[['lumiere', 'sun'], ['recadrage', 'gabarit'], ['fond', 'image']].map(([k, ic]) => (
+                  <BoutonN key={k} variante={reglagesGeste[k] ? 'teinte' : 'texte'} icone={<Glyphe nom={reglagesGeste[k] ? 'check' : ic}/>} indisponible={!!occupe} onClick={() => basculerReglage(k)}
+                    attrs={{ 'aria-pressed': reglagesGeste[k] ? 'true' : 'false', 'data-ug-reglage': k, 'data-ug-on': reglagesGeste[k] ? '1' : '0' }}>{tr('ug.r.' + k)}</BoutonN>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button type="button" className={B.s} data-ug-lancer="" disabled={!!occupe} onClick={ameliorerTout}>{occupe === 'geste' ? tr('ug.bouton.encours') : tr('ug.bouton', { n: photos.length })}</button>
-                {photos.some((x) => x.ameliore) ? <button type="button" className={B.d} data-ug-original="" disabled={!!occupe} onClick={revenirOriginal}>{tr('ug.revenir')}</button> : null}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <BoutonN variante="teinte" icone={<Glyphe nom="spark"/>} chargement={occupe === 'geste'} indisponible={!!occupe && occupe !== 'geste'} onClick={ameliorerTout} attrs={{ 'data-ug-lancer': '' }}>{tr('ug.bouton', { n: photos.length })}</BoutonN>
+                {photos.some((x) => x.ameliore) ? <BoutonN variante="texte" icone={<Glyphe nom="undo"/>} indisponible={!!occupe} onClick={revenirOriginal} attrs={{ 'data-ug-original': '' }}>{tr('ug.revenir')}</BoutonN> : null}
               </div>
+              <details className="vrm-repli" data-ug-pourquoi="" style={{ marginTop: 8, fontSize: 12, color: C.muted }}><summary>{tr('ug.pourquoi')}</summary><p style={{ margin: '6px 0 0', lineHeight: 1.5 }}>{tr('ug.pourquoi.texte')}</p></details>
             </div>
           ) : null}
           {photos === undefined ? <div style={{ fontSize: 13, color: C.muted }}>Lecture…</div>

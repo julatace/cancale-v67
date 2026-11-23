@@ -14,8 +14,8 @@ const path = require('path');
 const { lancer, REGLES_PAGE } = require('./_harnais-lots.cjs');
 lancer({ lot: 'photos-un-geste', url: '/?base=lu', parcours: async (pg, { W, th, SHOTS, dit }) => {
   await pg.waitForSelector('[data-ug-panneau]', { timeout: 15000 });
-  const a = await pg.evaluate(() => ({ n: document.querySelector('[data-ug-panneau]').getAttribute('data-ug-n'), r: [...document.querySelectorAll('[data-ug-reglage]')].map((x) => x.getAttribute('data-ug-reglage') + ':' + x.getAttribute('data-ug-on')), b: document.querySelector('[data-ug-lancer]').textContent }));
-  dit(a.n === '3' && a.r.join() === 'lumiere:1,recadrage:1,fond:1' && /Améliorer les 3 photos/.test(a.b), `G1 ${W} ${th} : trois réglages allumés, « Améliorer les 3 photos »`, a);
+  const a = await pg.evaluate(() => ({ n: document.querySelector('[data-ug-panneau]').getAttribute('data-ug-n'), r: [...document.querySelectorAll('[data-ug-reglage]')].map((x) => x.getAttribute('data-ug-reglage') + ':' + x.getAttribute('data-ug-on')), b: document.querySelector('[data-ug-lancer]').textContent, pq: !!document.querySelector('[data-ug-pourquoi] summary') }));
+  dit(a.n === '3' && a.r.join() === 'lumiere:1,recadrage:1,fond:1' && /Améliorer les 3/.test(a.b) && a.pq, `G1 ${W} ${th} : trois réglages allumés, « Améliorer les 3 », détail sous « Pourquoi ? »`, a);
   const r0 = await pg.evaluate(REGLES_PAGE, '[data-ug-panneau] button');
   dit(!r0.deborde && !r0.nan && r0.petites === 0, `G5 ${W} ${th} : rien ne déborde, aucun NaN, cibles ≥ 44`, r0);
   await pg.screenshot({ path: path.join(SHOTS, `studio-avant-${W}-${th}.png`), fullPage: true });
@@ -37,7 +37,7 @@ lancer({ lot: 'photos-un-geste', url: '/?base=lu', parcours: async (pg, { W, th,
   const c = await pg.evaluate(() => ({ e: window.__ECRITURES, n: (window.__LIGNE || { photos: [] }).photos.filter((p) => p.ameliore).length, vues: document.querySelectorAll('[data-ug-ameliore]').length }));
   dit(c.e === 2 && c.n === 0 && c.vues === 0, `G4 ${W} ${th} : « Revenir aux originaux » retire les versions améliorées`, c);
   await pg.goto(pg.url().replace('base=lu', 'base=ko')); await pg.waitForSelector('[data-ug-lancer]');
-  await pg.click('[data-ug-lancer]'); await pg.waitForFunction(() => /base n’a pas répondu/.test((document.querySelector('[data-studio-msg]') || {}).textContent || ''), null, { timeout: 20000 }).catch(() => {});
+  await pg.click('[data-ug-lancer]'); await pg.waitForFunction(() => /Pas enregistré/.test((document.querySelector('[data-studio-msg]') || {}).textContent || ''), null, { timeout: 20000 }).catch(() => {});
   const d = await pg.evaluate(() => ({ e: window.__ECRITURES, vues: document.querySelectorAll('[data-ug-ameliore]').length, msg: (document.querySelector('[data-studio-msg]') || {}).textContent || '' }));
-  dit(d.e === 0 && d.vues === 0 && /rien n’a été enregistré/.test(d.msg), `G4b ${W} ${th} : écriture refusée ⇒ rien rangé, et c’est dit`, d);
+  dit(d.e === 0 && d.vues === 0 && /Pas enregistré/.test(d.msg), `G4b ${W} ${th} : écriture refusée ⇒ rien rangé, et c’est dit`, d);
 } });
