@@ -43,14 +43,16 @@ export default {
   "parametres.alerte.base": "die Datenbank antwortet nicht",
   "parametres.alerte.comptes": { one: "{n} Konto nicht neu gelesen", other: "{n} Konten nicht neu gelesen" },
   "parametres.alerte.extension": { one: "Erweiterung auf {n} Gerät aktualisieren", other: "Erweiterung auf {n} Geräten aktualisieren" },
-  "parametres.appExt.titre": "Browser mit der VRM-Erweiterung",
-  "parametres.appExt.sous": "Die für dieses Konto gelesen haben. „Überall abmelden“ schließt auch die Erweiterung.",
-  "parametres.appExt.passu": "Ich konnte deine Browser nicht lesen – versuche es gleich noch einmal.",
+  "parametres.appExt.titre": "Browser mit der Erweiterung",
+  "parametres.appExt.sous": "Die für dieses Konto lesen.",
+  "parametres.appExt.passu": "Browser nicht gelesen.",
   "parametres.appExt.reessayer": "Erneut versuchen",
-  "parametres.appExt.aucun": "Kein Browser mit der Erweiterung für dieses Konto.",
+  "parametres.appExt.aucun": "Kein Browser mit der Erweiterung.",
   "parametres.appExt.sansNom": "Browser",
   "parametres.appExt.version": "Version {v}",
   "parametres.appExt.vue": "gesehen {quand}",
   "parametres.appExt.jamais": "Datum nicht gelesen",
-  "parametres.appExt.active": "Aktiv"
+  "parametres.appExt.active": "Aktiv",
+  "parametres.appExt.pourquoi": "Warum?",
+  "parametres.appExt.pourquoi.texte": "Jeder Browser, in dem die VRM-Erweiterung für dieses Konto läuft, mit Version und letzter Lesung. „Überall abmelden“ schließt auch die Erweiterung."
 };

@@ -5,6 +5,7 @@
 // Aucun geste ici : « Se déconnecter partout » ferme aussi l'extension (c'est dit). Aucun import d'App.jsx (props).
 import React from 'react';
 import { tr } from './i18n/index.js';
+import { Bouton, Glyphe } from './natif/index.js';   // le bouton commun : icône + verbe court
 import { requeteNavigateurs, navigateursExtension } from './appareilsExtension.js';
 
 export default function NavigateursExtension({ owner = '', lireTout, quand = (t) => new Date(t).toLocaleString() }) {
@@ -22,10 +23,11 @@ export default function NavigateursExtension({ owner = '', lireTout, quand = (t)
       <div className="vrm-sec-ligne"><div className="vrm-sec-corps">
         <span className="vrm-sec-titre">{tr('parametres.appExt.titre')}</span>
         <span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{tr('parametres.appExt.sous')}</span>
+        <details className="vrm-repli" data-ext-pourquoi=""><summary>{tr('parametres.appExt.pourquoi')}</summary><span className="vrm-sec-sous" style={{ whiteSpace: 'normal', display: 'block' }}>{tr('parametres.appExt.pourquoi.texte')}</span></details>
       </div></div>
       {L === undefined ? <div className="vrm-sec-vide">…</div>
         : L === null ? <div className="vrm-sec-ligne" data-ext-navigateurs-erreur=""><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{tr('parametres.appExt.passu')}</span></div>
-            <button type="button" className="vrm-sec-bouton" onClick={lire}>{tr('parametres.appExt.reessayer')}</button></div>
+            <Bouton variante="teinte" icone={<Glyphe nom="sync"/>} onClick={lire} attrs={{ 'data-ext-reessayer': '' }}>{tr('parametres.appExt.reessayer')}</Bouton></div>
         : !L.length ? <div className="vrm-sec-ligne"><div className="vrm-sec-corps"><span className="vrm-sec-sous">{tr('parametres.appExt.aucun')}</span></div></div>
         : L.map((a) => (
           <div key={a.id} className="vrm-sec-ligne" data-ext-navigateur={a.id} data-ext-active={a.active == null ? '' : a.active ? '1' : '0'}>

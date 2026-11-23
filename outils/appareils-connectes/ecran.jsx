@@ -7,7 +7,7 @@ import { createRoot } from 'react-dom/client';
 import { ICON_PATHS } from 'vrm-icones-app';
 import { ajouterSourceApp } from '../../src/i18n/index.js';
 import frNatif from '../../src/i18n/langues/fr.js';
-import { poserIcone, Page } from '../../src/natif/index.js';
+import { poserIcone, Page } from '../../src/natif/index.js';   // poserIcone : les glyphes du bouton commun
 import NavigateursExtension from '../../src/NavigateursExtension.jsx';
 import '../../src/comptes-securite.css';
 

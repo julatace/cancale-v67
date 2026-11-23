@@ -43,14 +43,16 @@ export default {
   "parametres.alerte.base": "la base non risponde",
   "parametres.alerte.comptes": { one: "{n} account non riletto", other: "{n} account non riletti" },
   "parametres.alerte.extension": { one: "estensione da aggiornare su {n} dispositivo", other: "estensione da aggiornare su {n} dispositivi" },
-  "parametres.appExt.titre": "Browser con l’estensione VRM",
-  "parametres.appExt.sous": "Quelli che hanno letto per questo account. «Esci ovunque» chiude anche l’estensione.",
-  "parametres.appExt.passu": "Non sono riuscito a leggere i tuoi browser: riprova tra poco.",
+  "parametres.appExt.titre": "Browser con l’estensione",
+  "parametres.appExt.sous": "Quelli che leggono per questo account.",
+  "parametres.appExt.passu": "Browser non letti.",
   "parametres.appExt.reessayer": "Riprova",
-  "parametres.appExt.aucun": "Nessun browser con l’estensione per questo account.",
+  "parametres.appExt.aucun": "Nessun browser con l’estensione.",
   "parametres.appExt.sansNom": "Browser",
   "parametres.appExt.version": "versione {v}",
   "parametres.appExt.vue": "visto {quand}",
   "parametres.appExt.jamais": "data non letta",
-  "parametres.appExt.active": "Attiva"
+  "parametres.appExt.active": "Attiva",
+  "parametres.appExt.pourquoi": "Perché?",
+  "parametres.appExt.pourquoi.texte": "Ogni browser in cui l’estensione VRM funziona per questo account, la versione e l’ultima lettura. «Esci ovunque» chiude anche l’estensione."
 };

@@ -43,14 +43,16 @@ export default {
   "parametres.alerte.base": "la base no responde",
   "parametres.alerte.comptes": { one: "{n} cuenta sin releer", other: "{n} cuentas sin releer" },
   "parametres.alerte.extension": { one: "extensión que actualizar en {n} aparato", other: "extensión que actualizar en {n} aparatos" },
-  "parametres.appExt.titre": "Navegadores con la extensión VRM",
-  "parametres.appExt.sous": "Los que leyeron para esta cuenta. «Cerrar sesión en todas partes» también cierra la extensión.",
-  "parametres.appExt.passu": "No pude leer tus navegadores: inténtalo de nuevo en un momento.",
+  "parametres.appExt.titre": "Navegadores con la extensión",
+  "parametres.appExt.sous": "Los que leen para esta cuenta.",
+  "parametres.appExt.passu": "Navegadores no leídos.",
   "parametres.appExt.reessayer": "Reintentar",
-  "parametres.appExt.aucun": "Ningún navegador con la extensión para esta cuenta.",
+  "parametres.appExt.aucun": "Ningún navegador con la extensión.",
   "parametres.appExt.sansNom": "Navegador",
   "parametres.appExt.version": "versión {v}",
   "parametres.appExt.vue": "visto {quand}",
   "parametres.appExt.jamais": "fecha no leída",
-  "parametres.appExt.active": "Activa"
+  "parametres.appExt.active": "Activa",
+  "parametres.appExt.pourquoi": "¿Por qué?",
+  "parametres.appExt.pourquoi.texte": "Cada navegador donde funciona la extensión VRM para esta cuenta, su versión y su última lectura. «Cerrar sesión en todas partes» también cierra la extensión."
 };

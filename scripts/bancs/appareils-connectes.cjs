@@ -22,6 +22,6 @@ lancer({ lot: 'appareils-connectes', url: '/?base=lu', parcours: async (pg, { W,
   dit(!r.deborde && !r.nan, `A4 ${W} ${th} : rien ne déborde, aucun NaN`, r);
   await pg.screenshot({ path: path.join(SHOTS, `navigateurs-${W}-${th}.png`), fullPage: true });
   await pg.goto(pg.url().replace('base=lu', 'base=passu')); await pg.waitForSelector('[data-ext-navigateurs="pas-su"]', { timeout: 10000 }).catch(() => {});
-  const p = await pg.evaluate(() => ({ e: !!document.querySelector('[data-ext-navigateurs-erreur]'), b: [...document.querySelectorAll('button')].some((b) => /Réessayer/.test(b.textContent)), aucun: /Aucun navigateur/.test(document.body.innerText) }));
+  const p = await pg.evaluate(() => ({ e: !!document.querySelector("[data-ext-navigateurs-erreur]"), b: !!document.querySelector("[data-ext-reessayer]"), aucun: /Aucun navigateur/.test(document.body.innerText) }));
   dit(p.e && p.b && !p.aucun, `A4b ${W} ${th} : pas su ⇒ la phrase et « Réessayer », jamais « aucun »`, p);
 } });
