@@ -61,7 +61,7 @@ const DANS_LA_PAGE = () => {
   const auBruit = (cible, n) => { C.bruit.add(cible); C.lieux.add(lieu(n)); };
   const note = (type, d) => { try { C.evts.push({ type, d: String(d == null ? '' : d).slice(0, 200) }); } catch (_) {} };
   // Les sorties vers l'extérieur : constatées, jamais suivies.
-  const fauxFenetre = () => ({ close() {}, focus() {}, print() { note('imprimer', 'fenêtre'); }, postMessage() {}, closed: false, location: { href: '', replace() {}, assign() {} }, document: { open() {}, write() {}, close() {}, title: '', body: { innerHTML: '', appendChild() {} }, head: { appendChild() {} }, createElement: (t) => document.createElement(t) }, addEventListener() {}, opener: null });
+  const fauxFenetre = () => ({ close() {}, focus() {}, print() { note('imprimer', 'fenêtre'); }, postMessage() {}, closed: false, location: { href: '', replace() {}, assign() {} }, document: { open() {}, write() { note('ecrire', 'document'); }, close() {}, title: '', body: { innerHTML: '', appendChild() {} }, head: { appendChild() {} }, createElement: (t) => document.createElement(t) }, addEventListener() {}, opener: null });
   try { window.open = (u) => { note('ouvrir', u); return fauxFenetre(); }; } catch (_) {}
   try { window.print = () => note('imprimer', 'page'); } catch (_) {}
   try { if (navigator.clipboard) { navigator.clipboard.writeText = (t) => { note('copier', t); return Promise.resolve(); }; navigator.clipboard.write = () => { note('copier', 'objet'); return Promise.resolve(); }; } } catch (_) {}
@@ -440,7 +440,7 @@ async function parcourir(nav, relancer, ICI, vue, R) {
         for (const v of (apres ? apres.evts : [])) {
           if (v.type === 'lien' && /^CASSÉ|^https?:\/\/[^/]*$|undefined|null|\/\/$/.test(v.d) && !/^https?:\/\/[a-z0-9.-]+\.[a-z]{2,}\/?$/i.test(v.d)) await defaut('lien-casse', v.d);
           if (v.type === 'lien-local' && !fs.existsSync(path.join(B.DIST, decodeURIComponent(v.d)))) await defaut('lien-casse', 'fichier absent du site : ' + v.d);
-          if ((v.type === 'ouvrir') && (!v.d || /undefined|null/.test(v.d))) await defaut('lien-casse', 'fenêtre ouverte sans adresse valable : « ' + v.d + ' »');
+          if ((v.type === 'ouvrir') && (!v.d || /undefined|null/.test(v.d)) && !(apres.evts || []).some((x) => x.type === 'ecrire')) await defaut('lien-casse', 'fenêtre ouverte sans adresse valable : « ' + v.d + ' »');
         }
         const errs = erreursVraies().slice(nErr);
         if (errs.length) await defaut('erreur', errs.slice(0, 2).join(' ¦ '));
