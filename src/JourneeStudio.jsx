@@ -37,7 +37,8 @@ export function MontantAffiche({ texte }) {
   const s = String(texte == null ? '' : texte);
   const m = /^(.*?)[\s  ]*€$/.exec(s);
   if (!m) return <bdi className="sb-nb">{s}</bdi>;
-  return <bdi className="sb-nb">{m[1]}<sup className="sb-eur">€</sup></bdi>;
+  // (23 nov.) Marqué « montant » : le mode présentation (et l'œil) le cachent en bloc (src/modeStream.js).
+  return <bdi className="sb-nb vrm-sensible" data-stream-type="montant">{m[1]}<sup className="sb-eur">€</sup></bdi>;
 }
 
 // La plaque gravée du N° (`.sb-plaque`). `double` : deux paires sous ce N° — le seul rouge (§5).
