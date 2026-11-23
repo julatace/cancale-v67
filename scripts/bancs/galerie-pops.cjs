@@ -89,7 +89,9 @@ async function proprietaire(nav, W, b, attendu) {
   }
   dit(!manques.length, `${T} P2 chaque exemple s'affiche (${n})`, manques.join(', '));
   dit(new Set(vus).size >= 5, `${T} P2 plusieurs familles passent (${[...new Set(vus)].join(',')})`);
-  const pendant = o.ecrits.slice(avant).filter((x) => !temoin.has(x) || /^PUSH/.test(x));
+  // Les points de restauration automatiques de l'app (`restore_N`, toutes les N minutes, sans rapport avec ce qu'on regarde) sont
+  // de la synchronisation, comme le témoin ; tout le reste écrit pendant la galerie serait SON écriture.
+  const pendant = o.ecrits.slice(avant).filter((x) => (!temoin.has(x) && !/^(POST|PATCH) restore_\d+$/.test(x)) || /^PUSH/.test(x));
   dit(!pendant.length, `${T} P3 la galerie n'écrit rien en base et n'envoie aucune notification (hors la synchronisation que l'app fait sans elle : ${[...temoin].join(', ') || 'rien'})`, pendant.join(' ¦ '));
   await o.pg.click('.n-galerie [aria-label="Fermer"]');
   await o.pg.waitForTimeout(400);
