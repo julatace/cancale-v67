@@ -2223,3 +2223,8 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1373)
 - **23 nov. · Revue UX (`claude/revue-ux`)** : Achats iPhone liste d'abord (retraits à 0 tus, gestes rares dans « ⋯ », « Filtres »), Relier distinct (n° court + heure), fiche « Prix d'achat » en ligne, sélection Annonces à un toucher, Argent une ligne ambre, verdict extension, logos (audit). `docs/passation/2026-11-23-revue-ux.md`. Geste : aucun.
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1341)
+- **23 nov. · Retours d'achat suivis ; À retirer en C, choisie (`claude/retours-suivi`, après #1326)** : étape plus loin ⇒ précédentes « faites, date pas vue » ; point Vinted Go nommé (« Relais Vinted Go, … »), sinon le transporteur en titre ; en-tête sur une ligne, logo entier, plus d'orange (nuit comprise). `2026-11-23-retours-suivi.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1373)
+- **24 nov. · Chargement sans tirets (`claude/livrable`)** : un chiffre EN COURS de lecture se dessine en squelette (composants natifs : héros, tuiles, cases, rangées d'Argent), « — » et sa raison rendus au bout de 15 s ; pas su = « — » dit, inchangé ; ⚠️ un banc sans `BANC_DESIGN_V2=defaut` voit l'ancien DOM. `2026-11-24-livrable.md`. Geste : aucun.

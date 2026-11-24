@@ -895,7 +895,7 @@ import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, te
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import { ecrireEmailsLus } from "./emailsLusEcriture.js";
 // ⟦→ ecrans/Comptabilite.jsx #63⟧
-import {ResponsiveChatPortal} from "./ChatPortal.jsx";
+import {ResponsiveChatPortal, telFil} from "./ChatPortal.jsx";
 import "./ebay-interface.css";
 const _ecranEbay = (nom) => aLaDemande(() => import("./ebayGestion.jsx").then((m) => ({ default: m[nom] })));
 const EbayCommande = _ecranEbay("EbayCommande"), EbayMessages = _ecranEbay("EbayMessages"), EbayOffres = _ecranEbay("EbayOffres"), EbayAgent = _ecranEbay("EbayAgent");
@@ -16667,7 +16667,7 @@ function CadreFil({ etiquette, onFermer, refPanneau, attrs, children }) {
   return (
     <ResponsiveChatPortal><div className="vrm-chat-overlay vrm-chat-inline">
       <FermeAuRetour fermer={onFermer}/>
-      <div ref={refPanneau} className="vrm-chat-panel" role="dialog" aria-label={etiquette} {...(attrs || {})} style={{display:'flex',flexDirection:'column',background:C.bg,overflow:'hidden'}}>{children}</div>
+      <div ref={refPanneau} className="vrm-chat-panel" role="dialog" aria-label={etiquette} aria-modal={telFil() ? 'true' : undefined} {...(attrs || {})} style={{display:'flex',flexDirection:'column',background:C.bg,overflow:'hidden'}}>{children}</div>
     </div></ResponsiveChatPortal>
   );
 }
@@ -29475,7 +29475,9 @@ const titleCasePR = (s) => s.toLowerCase().replace(/(^|[^a-zà-ÿ0-9])([a-zà-ÿ
 // HOCHE ». Le nom pris était « *Consigne Vinted Go* » : deux consignes de deux
 // enseignes dans un même bloc, et la même consigne dans deux blocs. On retire le
 // gras, le type générique en tête (gardé dans `type`) et un nom répété.
-const TYPE_LIEU = /^(?:point\s+relais|point\s+de\s+retrait|consigne(?:\s+vinted\s*go|\s+pick-?up|\s+automatique)?|locker(?:\s*24\s*\/?\s*7)?|casier)\b\s*[:\-–]?\s*/i;
+// (23 nov., Julien : « comment ça le point relais n'est pas reconnu ») Vinted Go écrit aussi « Relais Vinted Go, Joubert Peintures,
+// 10 Rue Du Bois Aurant » (mesuré, 2 e-mails) : « Relais Vinted Go » est le TYPE, le nom suit — sans quoi le nom était perdu (point « pas encore connu »).
+const TYPE_LIEU = /^(?:relais\s+vinted(?:\s*go)?|point\s+relais|point\s+de\s+retrait|consigne(?:\s+vinted\s*go|\s+pick-?up|\s+automatique)?|locker(?:\s*24\s*\/?\s*7)?|casier)\b\s*[:\-–]?\s*/i;
 const cleanLieu = (raw) => {
   let s = String(raw || '').replace(/®|™|©/g, ' ').replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
   if (!s) return { nom: '', adresse: '', display: '', type: '' };

@@ -103,7 +103,7 @@ import { indexRecusParTransaction, recuDeLAchat, bilanRecusAchat } from '../../a
 import { etatRetrait, estAVerifier, urgenceTri, GARDE_MAX_J, limiteEstimee } from '../../api/_lib/retrait-colis.js';
 import { DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction, TEXTE_ESTIMEE_DEPASSEE, heureCourte as heureCourteJ } from '../../api/_lib/limite-envoi.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from '../photosArticles.js';
-import { ResponsiveChatPortal } from '../ChatPortal.jsx';
+import { ResponsiveChatPortal, telFil } from '../ChatPortal.jsx';
 import { installerExtensionIci, estAndroid, pageExtensionsIci } from '../navigateurExtension.js';
 import { enregistrerSourceColis, ouvrirRetrouver, EV_RELIER_COLIS } from '../retrouverColis.js';
 import { etatCopies } from '../copieLignes.js';
@@ -12626,6 +12626,24 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       .then((r) => { if (vivant) setRetoursTrack(Array.isArray(r) ? r : null); }, () => { if (vivant) setRetoursTrack(null); });
     return () => { vivant = false; };
   }, [suivisRetours.join(','), retoursTrackTic]);
+  // (23 nov., lot retours-suivi — Julien : « fais le suivi des colis retournés ») LE SUIVI D'UN RETOUR SE MET À JOUR TOUT
+  // SEUL. Avant, les bordereaux et remboursements n'étaient lus qu'au montage, les e-mails du transporteur seulement sur
+  // `vrm:transp-maj` (la lecture serveur chez les transporteurs, abandonnée) : un e-mail Mondial Relay rangé pendant que
+  // l'écran était ouvert ne faisait rien avancer. Maintenant : un e-mail de retour rangé par le serveur (bordereau, avis,
+  // remboursement : `vrm:neuf` « retours », src/tempsReel.js) relit les retours ; un e-mail de colis (« colis ») relit les
+  // faits du transporteur ; le retour sur l'app (après 20 s ailleurs) relit les deux. Projections scalaires seulement
+  // (les mêmes lecteurs) ; une lecture ratée ne vide rien (les lecteurs gardent la valeur d'avant jusqu'à leur réponse).
+  useEffect(() => {
+    let cache = Date.now();
+    const relire = (retours, faits) => {
+      if (retours) { RETOURS_ACHAT_CACHE.v = undefined; RETOURS_ACHAT_CACHE.at = 0; setRetoursVersion((n) => n + 1); }
+      if (faits) setRetoursTrackTic((n) => n + 1);
+    };
+    const neuf = (e) => { const q = e && e.detail && Array.isArray(e.detail.quoi) ? e.detail.quoi.map((x) => x && x.quoi) : []; relire(q.includes('retours'), q.includes('colis') || q.includes('retours')); };
+    const vis = () => { if (document.visibilityState === 'hidden') { cache = Date.now(); return; } if (Date.now() - cache >= 20000) { cache = Date.now(); relire(true, true); } };
+    try { window.addEventListener('vrm:neuf', neuf); document.addEventListener('visibilitychange', vis); } catch (_) {}
+    return () => { try { window.removeEventListener('vrm:neuf', neuf); document.removeEventListener('visibilitychange', vis); } catch (_) {} };
+  }, []);
   // (15 nov., lot retours) « Déposé » : SON clic (une carte « À renvoyer » ⇒ { cle: date }), synchronisé.
   const [retoursDeposes, setRetoursDeposes] = useStateCle('vrm_retours_deposes', () => load('vrm_retours_deposes', {}));
   // (15 nov., refonte-journee) « C'est réglé » : SON clic archive un retour sans nouvelles ({ cle: date }), synchronisé.
@@ -21344,7 +21362,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const rendreConversation=()=>openConv && (
 <ResponsiveChatPortal><div className={curSub==='messages'?'vrm-chat-overlay vrm-chat-inline':'vrm-chat-overlay'} onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
   <FermeAuRetour fermer={()=>setOpenConv(null)}/>
-          <div className="vrm-chat-panel" role="dialog" aria-label="Conversation Vinted" onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div className="vrm-chat-panel" role="dialog" aria-label={tr('a11y.conversationSur',{site:'Vinted'})} aria-modal={curSub!=='messages'||telFil()?'true':undefined} onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             {/* (16 oct.) En-tête de messagerie : retour à gauche (au doigt, c'est
                 là qu'on le cherche), la personne et la paire, l'actualisation à
                 droite. La source (« lu sur Vinted ») passe dans l'infobulle. */}

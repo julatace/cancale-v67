@@ -84,7 +84,7 @@ function FilLeboncoin({ conv, nom, envoi, annonce = false, onFerme }) {
     </div>
   );
   return (
-    <CadreFil etiquette="Conversation Leboncoin" onFermer={onFerme} attrs={{ 'data-lbc-fil-ouvert': conv }}>
+    <CadreFil etiquette={tr('a11y.conversationSur', { site: 'Leboncoin' })} onFermer={onFerme} attrs={{ 'data-lbc-fil-ouvert': conv }}>
       <TeteFil onFermer={onFerme} nom={nom || 'Leboncoin'} titre="" compte="Leboncoin"/>
       <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {fil && fil.messages ? <AlerteArnaque site="leboncoin" lien={lien} messages={fil.messages}/> : null}
@@ -243,7 +243,7 @@ function ConversationsLeboncoin() {
         <div className="vrm-chat-column">{filChoisi ? (
           <FilLeboncoin key={filChoisi.conv} conv={filChoisi.conv} nom={nomDe(filChoisi.compte)} envoi={d.envoi} annonce={!!filChoisi.ap || Number(filChoisi.n) > 0} onFerme={() => setOuvertConv('')}/>
         ) : choisi ? (
-          <CadreFil etiquette="Messages Leboncoin" onFermer={() => setOuvert('')} attrs={{ 'data-lbc-fil': choisi.id }}>
+          <CadreFil etiquette={tr('a11y.conversationSur', { site: 'Leboncoin' })} onFermer={() => setOuvert('')} attrs={{ 'data-lbc-fil': choisi.id }}>
             <TeteFil onFermer={() => setOuvert('')} nom={choisi.nom} titre={choisi.type ? 'compte ' + choisi.type : ''} compte="Leboncoin"/>
             <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div data-lbc-fil-texte="absent" style={{ fontSize: 13, color: C.muted, lineHeight: 1.55, textAlign: 'center', padding: '24px 8px' }}>
