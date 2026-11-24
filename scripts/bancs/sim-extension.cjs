@@ -136,7 +136,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     // 5.450 : un captcha après l'ouverture redevient « à vérifier »
     'captcha-incertain': ['background.js', "if(creation.incertain)return creation.robot?rep('refuse',0,'vinted_robot'):rep('incertain',0,'creation_non_confirmee');", "if(creation.incertain)return rep('incertain',0,'creation_non_confirmee');"],
     // 5.450 : un 429 redevient un « frein » vague
-    '429-frein': ['background.js', "  if (r.status === 429) return 'pause_vinted';\n", ""],
+    '429-frein': ['background.js', "  if (r.status === 429) return 'pause_vinted';\n  if (r.status === 403) return 'vinted_frein';", "  if (r.status === 429 || r.status === 403) return 'vinted_frein';"],
     'commande-acheteur': ['background.js', "if(!acheteur||!attendu||acheteur!==String(attendu.recipientId))return non('commande_autre_acheteur');", ''],
   };
   const MUT = arg('--mutation');
