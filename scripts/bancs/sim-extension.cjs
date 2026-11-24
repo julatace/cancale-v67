@@ -445,9 +445,11 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       // La fin par le temps (10 min passées : l'heure de fin ramenée dans le passé).
       const fin = await dansSW(async () => { const x = await chrome.storage.local.get('vrmObservation'); const s = x.vrmObservation; s.fin = Date.now() - 1000; await chrome.storage.local.set({ vrmObservation: s }); return commandeObservation({ quoi: 'etat' }); });
       dit(fin && fin.actif === false && fin.raison === 'delai', 'au bout des 10 min, l’observation s’arrête seule', JSON.stringify(fin));
-      const apres = ev.length; await vt.click('#cloche').catch(() => {}); await attendre(2500);
-      const n2 = await dansSW(async () => ((await chrome.storage.local.get('vrmObservationEv')).vrmObservationEv || []).length);
-      dit(n2 === apres || n2 === env.n, 'arrêtée : plus rien n’est noté', `${apres} → ${n2}`);
+      await attendre(1000);
+      const nEv = () => dansSW(async () => ((await chrome.storage.local.get('vrmObservationEv')).vrmObservationEv || []).length);
+      const n1 = await nEv(); await vt.click('#cloche').catch(() => {}); await attendre(3000);
+      const n2 = await nEv();
+      dit(n2 === n1, 'arrêtée : plus rien n’est noté (un clic sur la cloche ensuite)', `${n1} → ${n2}`);
     }
     // ══ C1 : la carte du logo sur vinted.fr (compte relié, « Tout va bien ») ════════════════════════════════════════
     if (veut('C1')) {
