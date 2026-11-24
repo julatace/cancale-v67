@@ -24,7 +24,8 @@ import '../ventes-lisibles.css';
 import { useARegler } from '../../designV2/useARegler.js';
 import { groupesDe, atelierCompleter } from '../../designV2/aRegler.js';   // (21 nov.) vignettes lisibles, titre entier, gestes de l'achat
 import { ParPaquets } from '../../composants/ParPaquets.jsx';
-import { Trajet } from '../Jeu.jsx';   // (24 nov., visuel-jeu) le trajet du colis en piste, étapes PROUVÉES   // (22 nov., latence) 70 colis à envoyer posés par paquets
+import { Trajet } from '../Jeu.jsx';   // (24 nov., visuel-jeu) le trajet du colis en piste, étapes PROUVÉES
+import { RelierAnnonceMail } from './RelierAnnonceMail.jsx';   // (24 nov.) « Relier à l'annonce » d'une vente vue par e-mail   // (22 nov., latence) 70 colis à envoyer posés par paquets
 
 const joint = (...x) => x.filter(Boolean).join(' · ');
 // Les morceaux d'une méta qui peut passer à la ligne : chacun reste entier (« à vérifier » ne se coupe jamais en deux).
@@ -91,7 +92,9 @@ function RangeeColis({ r, g, Icon, Photo, choisie, onOuvrir }) {
       sousTitre={morceaux(!r.num && r.numAttendu ? tr('vn.numAttente') : '', ...marqueTailleM(r), sansBordereau(r) ? tr('vt.sansBordMeta') : '',
         ech ? <span className="n-vt-limite" data-vt-limite-rangee="" data-vt-ambre={r.echeance && r.echeance.ambre ? '1' : undefined}>{ech}</span> : '')} sousLignes={2}
       note={ligneTel(r, null)}
-      pied={piedAchat(r, Icon)}
+      // (24 nov., vente-mail-annonce) Une vente vue par e-mail sans annonce reliée : UN geste, « Relier à l'annonce » (à la place de
+      // l'achat : sans annonce, il n'y a pas encore de paire à qui relier un achat). Reliée par son clic : « Délier ».
+      pied={r.gestes && r.gestes.relierAnnonce ? <RelierAnnonceMail ra={r.gestes.relierAnnonce} r={r} Photo={Photo} Icon={Icon}/> : piedAchat(r, Icon)}
       selection={{ cochee: r.coche.on, indisponible: !r.coche.possible, libelle: tr(r.coche.possible ? 'vv.coche.label' : 'vv.coche.sansBordereau', { titre: r.titre }),
         onChange: () => g.basculer(r.coche.cle), attrs: { 'data-vn-coche': r.cle } }}
       // Pas de chevron : la rangée entière s'ouvre (comme une liste en mode choix) ; le titre garde ses deux lignes entières.
@@ -152,6 +155,7 @@ function DetailVente({ r, g, Icon, Logo, Photo, Generer }) {
           attrs={{ 'data-etape': e.cle, 'data-fait': e.fait ? '1' : '0' }}/>)}
       </Groupe> : null}
       <Groupe attrs={{ 'data-vn-gestes': r.cle }}>
+        {G.relierAnnonce ? <RelierAnnonceMail ra={G.relierAnnonce} r={r} Photo={Photo} Icon={Icon} rangee/> : null}
         {r.achat ? <Rangee icone={<Icon name="relier" size={22}/>} titre={r.achat.relie ? tr('vt.achatRelie', { prix: r.achat.prix || '—' }) : tr('vt.relier')} fin="chevron"
           onClick={r.achat.ouvrir} attrs={{ 'data-vn-geste': 'relier-achat', 'data-vt-relier': r.achat.relie ? 'relie' : 'libre' }}/> : null}
         {G.imprimer ? <Rangee icone={<Icon name="printer" size={22}/>} titre={tr(G.facture ? 'vn.g.imprimerFacture' : 'vn.g.imprimer')} onClick={(ev) => G.imprimer(ev)} attrs={{ 'data-vn-geste': 'imprimer' }}/> : null}

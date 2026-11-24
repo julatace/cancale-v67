@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (24 nov., vente-mail-annonce — Julien : « la vente a été détectée par les mails […] l'annonce n'a pas encore été supprimée ») docs/passation/2026-11-24-vente-mail-annonce.md
+  { id: 'vente-mail-annonce', date: '2026-11-24', titre: 'Vendue par e-mail : l’annonce quitte « en ligne »', phrase: 'La vente prend son N°, sinon « Relier à l’annonce ».', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (24 nov., ext. 5.440.2 — Julien : « Sauté · Favori trop ancien » pour des favoris de la veille) docs/passation/2026-11-24-favoris-ancien.md
   { id: 'favoris-ancien', date: '2026-11-24', titre: 'Favoris : plus de « trop ancien » à tort', phrase: 'Les notifications sont lues jusqu’au bout avant de sauter un favori.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (24 nov., style-graphite — Julien : « un peu plus foncé en gris […] améliore tous les boutons […] change de style pour l'iPhone ») docs/passation/2026-11-24-style-graphite.md
