@@ -21,7 +21,10 @@ const P = require('./design-passe.cjs');
 const { base, srv, PORT, chromium } = P;
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d ? ' — ' + String(d).slice(0, 500) : '')); } };
-const CHIFFRES = '.n-tuile-valeur, .n-heros-valeur, .n-heros-trio-v, .n-heros-trio-case dd, .n-cc-valeur, .n-arg-l-val, .n-arg-recu-n';
+// Le reçu d'Argent (`.n-arg-recu-n`) n'est PAS jugé ici : tant que Ventes n'a pas publié le mois, il est « pas su » et
+// le dit (« ouvre Ventes », raison `absente`, §5) — selon l'instant, la publication arrive ou non pendant la mesure.
+// Sa lecture (`undefined` / préparation en cours) passe bien en squelette (src/ecrans/Compta.jsx, `recuEnLecture`).
+const CHIFFRES = '.n-tuile-valeur, .n-heros-valeur, .n-heros-trio-v, .n-heros-trio-case dd, .n-cc-valeur, .n-arg-l-val';
 function mesure(CH) {
   const vu = (el) => { const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1 || r.bottom < 0 || r.top > innerHeight) return false;
     const cs = getComputedStyle(el); if (cs.visibility === 'hidden') return false;
