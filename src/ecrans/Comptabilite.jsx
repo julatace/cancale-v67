@@ -5606,7 +5606,23 @@ function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   };
   // Les cartes (« Personnaliser », `vrm_aujourdhui_cartes`) et les lectures du journal se font DANS le morceau d'Aujourd'hui
   // (src/aujourdhui/Branche.jsx) : l'app ne lui passe que ses outils de lecture et d'écriture (budget de démarrage).
-  return <AujourdhuiV2 {...reste} onNav={onNav} calculer={calculer} outils={OUTILS_AUJOURDHUI}
+  // (23 nov., Julien : « le montant en attente du porte-monnaie Vinted ») LE PORTE-MONNAIE : les soldes LUS par l'extension
+  // (`fetchWalletEscrow` : lignes harvest_*_billing, « Montant en attente » = escrow / pending_balance, « Montant disponible » =
+  // main / balance ; jamais additionnés l'un à l'autre), compte par compte, avec l'âge de la plus vieille lecture. Aucun compte lu
+  // ⇒ `null` (la carte dit « — · ouvre ton porte-monnaie Vinted », jamais 0 €). Partiel ⇒ « au moins … · N comptes sur M lus ».
+  const porteMonnaie = (() => {
+    if (!live) return undefined;
+    const pc = Array.isArray(live.walletParCompte) ? live.walletParCompte : null;
+    if (!pc || !pc.length) return null;
+    const choisis = Array.isArray(live.comptesCa) ? new Set(live.comptesCa.map((c) => String(c.uid))) : null;   // les comptes non écartés (§5 : un compte exclu n'entre dans aucun total)
+    const lus = pc.filter((x) => (x.attente != null || x.dispo != null) && (!choisis || choisis.has(String(x.uid))));
+    if (!lus.length) return null;
+    const somme = (k) => { const v = lus.filter((x) => x[k] != null); return v.length ? v.reduce((t, x) => t + Number(x[k] || 0), 0) : null; };
+    const total = Array.isArray(live.comptesCa) ? live.comptesCa.length : null;
+    const jours = lus.map((x) => x.jours).filter((j) => Number.isFinite(j));
+    return { attente: somme('attente'), dispo: somme('dispo'), n: lus.length, m: total != null && total >= lus.length ? total : null, jours: jours.length ? Math.max(...jours) : null };
+  })();
+  return <AujourdhuiV2 {...reste} onNav={onNav} calculer={calculer} outils={OUTILS_AUJOURDHUI} porteMonnaie={porteMonnaie}
     onSaisirPrix={() => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}
     onMessages={() => { if (onNav) onNav('messages'); }} onJournal={() => { if (onNav) onNav('settings'); }}/>;
 }
