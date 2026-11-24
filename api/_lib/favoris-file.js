@@ -215,7 +215,7 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
   if(attendNotif){j.etat='attente';delete j.raison;delete j.traiteLe;j.attentesNotif=(Number(j.attentesNotif)||0)+1;
     // Les AUTRES favoris passent d'abord (ce favori repart en fin de file) ; seul, il attend NOTIF_ATTENTE_MS.
     if(g.jobs.some(x=>x!==j&&x.etat==='attente')){g.jobs.splice(g.jobs.indexOf(j),1);g.jobs.push(j);}else{g.prochain=Math.max(g.prochain||0,fin+NOTIF_ATTENTE_MS);d.prochainGlobal=g.prochain;}
-    g.raison='Un favori n’a pas été trouvé sur la page des notifications de Vinted : rien n’est parti pour lui, VRM le réessaie après les autres (sinon, ouvre la page des notifications sur vinted.fr).';}
+    g.raison='Notification d’un favori en recherche : rien n’est parti pour lui, VRM le réessaie seul après les autres.';}
   else if(autreVersion){g.refusTexte=(Number(g.refusTexte)||0)+1;g.raison='Vinted a refusé une version de ton message : VRM ne la réutilise plus et continue avec tes autres versions.';if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
   // (22 nov.) Un refus qui ne tient qu'à CE favori, rien d'écrit : il est sauté, la file CONTINUE (au plus REFUS_LOCAUX_MAX de suite).
   else if(refusLocalIci){g.refusLocaux=(Number(g.refusLocaux)||0)+1;

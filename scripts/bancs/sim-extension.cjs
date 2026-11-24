@@ -140,7 +140,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     // (5.440.2) la liste de la cloche jugée sur sa PREMIÈRE page (absente ⇒ « trop ancien »), comme la 5.440.1
     'liste-premiere-page': ['background.js', 'for(let page=2;;page++){', 'for(let page=2;;page++){ix.bout=true;return {bout:true};'],
     // (5.440.2) la page complète déclarée lue sans attendre la suite (≈ la 5.440.1 : 1,4 s sans changement)
-    'page-sans-attente': ['vrm-formulaire.js', 'while (Date.now() - t0 < 4000) {', 'while (Date.now() - t0 < 300) {'],
+    'sans-lien-direct': ['background.js', 'if(page&&!profond){noterDiag(\'favori_lien_direct\');', 'if(false){'],
   };
   const MUT = arg('--mutation');
   if (MUT) { const m = MUTATIONS[MUT]; if (!m) { console.log('mutation inconnue'); process.exit(2); } const f = path.join(EXT, m[0]); const t = fs.readFileSync(f, 'utf8'); if (t.split(m[1]).length !== 2) { console.log(`❌ mutation ${MUT} : ancre introuvable`); process.exit(2); } fs.writeFileSync(f, t.replace(m[1], m[2])); console.log(`(mutation « ${MUT} »)`); }
@@ -199,16 +199,17 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       if (F1 === 'F1X') for (let k = 4; k <= 6; k++) { FAVORIS.push({ nid: `n-000${k}`, itemId: String(91010000 + k), userId: String(3000000 + k), login: `acheteur_${k}` }); ANNONCES.push({ id: 91010000 + k, titre: `Paire simulée ${k}`, prix: 50 + k }); }
       const N = FAVORIS.length;
       for (const [i, f] of FAVORIS.entries()) f.forme = F1 === 'F1W' || T ? 'web' : F1 === 'F1M' ? (i === 1 ? 'web' : 'app') : 'app';
-      if (F1 === 'F1X') console.log('\n── F1X. 6 favoris (liens web) : 2 dans la cloche ; 12 autres notifications ; les 4 autres seulement sur la page complète, après défilement (10 lignes, puis la suite en 2 s)');
+      if (F1 === 'F1X') console.log('\n── F1X. 6 favoris (liens web), onglet de travail en ARRIÈRE-PLAN : 2 dans la cloche ; 20 autres notifications ; les 4 autres seulement en page 2 de la liste de Vinted');
       else if (T) console.log(`\n── ${F1}. (24 nov., Julien : « Sauté · Favori trop ancien » pour des favoris de la veille) liens web ; ${F1 === 'F1T' ? 17 : 25} notifications plus récentes avant les 3 favoris ; la cloche n’en montre que 5 ; la page complète 15, puis la suite au défilement (2 s)${F1 === 'F1T2' ? ' ; les favoris sur la page 2 de l’API' : ''}`);
       if (T) {} else if (F1 === 'F1W' || F1 === 'F1M') console.log(`\n── ${F1}. trois favoris, liens ${F1 === 'F1W' ? 'web (/items/N/want_it/new?offering_id=N)' : 'mêlés (app, web, app)'}`); else console.log(F1 === 'F1P' ? '\n── F1P. ancienne relecture refusée (commande), message avec {pseudo}' : F1 === 'F1' ? '\n── F1. trois favoris lancés depuis la carte (l’ancienne relecture répond, comme mesuré le 21 nov.)' : '\n── F1E. les mêmes, l’ancienne relecture REFUSÉE : nouvelle messagerie, identité par la commande');
       await reset();
-      if (F1 === 'F1X') Object.assign(V.st, { avant: 0, intercale: { apres: 2, n: 12 }, paginer: true, clocheN: 2, pageTaille: 10, suiteMs: 2000 }); seed();
+      if (F1 === 'F1X') Object.assign(V.st, { avant: 0, intercale: { apres: 2, n: 20 }, paginer: true, clocheN: 2, pageTaille: 10, suiteMs: 2000 }); seed();
       if (T && F1 !== 'F1X') Object.assign(V.st, { avant: F1 === 'F1T' ? 17 : 25, paginer: true, clocheN: 5, pageTaille: 15, suiteMs: 2000 });
       if (F1 === 'F1E' || F1 === 'F1P') V.st.ancienneConv = 404;
       if (F1 === 'F1E') REGLAGES.message = MSG_SIMPLE;
       if (F1 === 'F1P') console.log('   (F1P : la même chose avec un message qui porte {pseudo})');
       const { ap, r } = await lancer(FAVORIS.map((f) => f.nid));
+      if (T) await vt.bringToFront().catch(() => {});   // l'onglet de Julien devant : l'onglet de travail reste en ARRIÈRE-PLAN
       dit(ap && ap.ok, 'l’aperçu est relu chez VRM', JSON.stringify(ap).slice(0, 300));
       dit(r && r.ok, 'la file part (son clic « Lancer »)', JSON.stringify(r).slice(0, 400));
       let vuFen = false;
@@ -221,7 +222,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       note(`durée ${Math.round((Date.now() - t0) / 1000)} s`);
       const ecr = ecrituresVinted();
       const inq = ecr.filter((e) => /inquiries$/.test(e.p)), msgs = ecr.filter((e) => /\/replies$/.test(e.p)), offres = ecr.filter((e) => /\/offers$/.test(e.p));
-      const envT = (jobs() || []).filter((x) => x.etat === 'envoye').length, E = T ? envT : N;
+      const E = N;
       dit(!!res, 'la file se termine', JSON.stringify(parItem()));
       dit(inq.length === E && inq.every((e) => e.uid === UID), E + ' conversations ouvertes PAR LA PAGE, au nom du compte de l’onglet', inq.map((e) => e.corps).join(' | '));
       dit(msgs.length === E && msgs.every((e) => { let t = ''; try { t = String(JSON.parse(e.corps).content || ''); } catch (_) {} return e.uid === UID && /ton favori est toujours dispo/.test(t) && !/[{}]/.test(t); }), N + ' messages envoyés par la page', msgs.map((e) => e.corps.slice(0, 80)).join(' | '));
@@ -232,10 +233,10 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       const b = FP.bilanFavoris(jobs());
       const f = res && res.f;
       note(`bilan VRM ${JSON.stringify(b)} · carte ${JSON.stringify(f && f.f && f.f.file)}`);
-      dit(T ? b.envoyes >= (F1 === 'F1X' ? 2 : 0) && jobs().every((x) => x.etat === 'envoye' || (x.etat === 'refuse' && x.raison === 'notification_pas_trouvee' && x.ecrits === 0)) : b.envoyes === N, T ? `VRM : ${b.envoyes}/${N} envoyés, les autres « pas trouvé sur la page : ouvre la page des notifications sur vinted.fr », rien d’écrit pour eux` : `VRM : ${N} envoyés`, JSON.stringify(parItem()));
+      dit(b.envoyes === N, `VRM : ${N}/${N} envoyés`, JSON.stringify(parItem()));
       if (F1 === 'F1X') { const ordre = inq.map((e) => { try { return String(JSON.parse(e.corps).item_id || ''); } catch (_) { return ''; } }); const pages = V.st.req.filter((e) => e.page && /^\/member\/notifications/.test(e.p)).length;
-        dit(ordre.length >= 2 && JSON.stringify(ordre) === JSON.stringify(FAVORIS.slice(0, ordre.length).map((f) => f.itemId)), 'du plus récent au plus ancien (ceux de la cloche d’abord)', JSON.stringify(ordre));
-        dit(pages >= 1, 'la page complète ouverte pour les favoris plus bas que la cloche', 'pages complètes : ' + pages); }
+        dit(JSON.stringify(ordre) === JSON.stringify(FAVORIS.map((f) => f.itemId)), 'du plus récent au plus ancien (ceux de la cloche d’abord)', JSON.stringify(ordre));
+        dit(V.st.req.some((e) => e.page && /want_it/.test(e.p)) && pages === 0, 'les 4 plus bas : leur adresse ouverte directement (aucune page complète, aucun défilement)', 'pages complètes : ' + pages); }
       if (T) dit(!jobs().some((x) => x.raison === 'favori_trop_ancien'), 'aucun favori « trop ancien » (la liste de Vinted les contient, de la veille)', JSON.stringify(parItem()));
       const fenL = f && f.a && Array.isArray(f.a.lignes) ? f.a.lignes : [];
       dit(fenL.length === N && fenL.filter((l) => l.etat === 'envoye').length === b.envoyes, `la fenêtre : ${N} lignes, autant « envoyé » que chez VRM`, JSON.stringify(fenL.map((l) => l.etat)));
