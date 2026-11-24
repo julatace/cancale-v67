@@ -8,8 +8,9 @@ import { offresSansReponse } from '../offresSansReponse.js';
 import { photosEnDouble, numerosEnExemplaires, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
 import OffresSansReponseListe from '../natif/ecrans/OffresSansReponse.jsx';
 import { BoutonExtension, RangeeExtension, FeuilleExtension } from '../BoutonExtension.jsx';
-import { ComposerReponse, GestesOffreVinted, BadgeLectureSeule, remplirReponse, texteRaison as texteRaisonAgir } from '../agir/Agir.jsx';
-import { republierDansApp } from '../agir/porte.js';
+import { ComposerReponse, GestesOffreVinted, BadgeLectureSeule, remplirReponse, texteRaison as texteRaisonAgir, issueTexte as issueTexteAgir } from '../agir/Agir.jsx';
+import { republierDansApp, envoyerSerie, usePeutAgir as usePeutAgirC, agirOuPanneau as agirOuPanneauC, agirMaintenant as agirMaintenantC, envoyerGeste as envoyerGesteC } from '../agir/porte.js';
+import BaisseSerie from '../agir/BaisseSerie.jsx';   // (24 nov., lot agir-tout)
 // (24 nov.) Republier DEPUIS VRM : la file si l'extension a CE compte dans un onglet, sinon le panneau (gardé, il dit pourquoi).
 const confirmerRepubAgir = (n) => askConfirm({ title: n > 1 ? tr('agir.republier') + ' · ' + n : tr('agir.republier'), desc: tr('agir.republier.confirmer'), ok: tr('agir.republier.oui') });
 const numDeAnnonceAgir = (id) => { try { const f = (load('vinted_annonce_numeros', {}) || {})[String(id)]; return f && f.numero ? String(f.numero).slice(0, 12) : ''; } catch (_) { return ''; } };
@@ -880,7 +881,9 @@ async function verserPhotosVrmExtension() {
 // ⟦← App.jsx #130⟧
 function FeuilleAnnoncesExtension({ action, site = 'vinted', annonces, onFermer, titre = '' }) {
   const l = (annonces || []).filter((a) => a && a.id != null);
-  return <FeuilleExtension action={action} site={site} titre={titre} ids={l.map((a) => String(a.id))} onFermer={onFermer} attrs={{ 'data-feuille-annonces-ext': l.length }}>
+  // (24 nov., lot agir-tout) Le compte des annonces, s'il n'y en a qu'un (la porte le juge) ; plusieurs ⇒ le compte de l'onglet.
+  const u1 = [...new Set(l.map((a) => String(a.uid || '')))];
+  return <FeuilleExtension action={action} site={site} compte={u1.length === 1 && u1[0] ? u1[0] : '*'} titre={titre} ids={l.map((a) => String(a.id))} onFermer={onFermer} attrs={{ 'data-feuille-annonces-ext': l.length }}>
     <Natif.Groupe>{l.slice(0, 40).map((a) => <Natif.Rangee key={String(a.uid || '') + ':' + a.id} titre={a.titre || a.title || tr('actionsExt.sansTitre')} sousTitre={a.compte || ''}
       plaque={a.numero ? <Natif.Plaque numero={a.numero}/> : null}
       valeur={[prixLigneExt(a.prix), a.cible != null ? '→ ' + prixLigneExt(a.cible) : ''].filter(Boolean).join(' ')} attrs={{ 'data-annonce-ext': String(a.id) }}/>)}
@@ -4121,9 +4124,16 @@ const rechaufferQr = async (photo) => {
   } catch (_) {}
 };
 // ⟦← App.jsx #214⟧
-function FavorisDansExtension({ nomCompte = '' }) {
+function FavorisDansExtension({ nomCompte = '', uid = '' }) {
+  // (24 nov., lot agir-tout) « Envoyer aux favoris » DEPUIS VRM : la file des favoris de l'extension (5.440.1 : SES réglages,
+  // les favoris cochables, plancher, 15/h, cloche par identité) lancée au nom de CE compte, après SA confirmation. Sans
+  // extension sur ce compte : la rangée du panneau, gardée, dit pourquoi.
+  const ok = usePeutAgirC('vinted', uid, 'favoris', 'file').ok;
+  const lancer = async () => { const r = await agirOuPanneauC({ site: 'vinted', compte: uid, geste: 'favoris', distGeste: 'favoris', args: { ids: [] },
+    confirmer: () => askConfirm({ title: tr('agir.favoris.titre', { compte: nomCompte || '' }), desc: tr('agir.favoris.desc'), ok: tr('agir.favoris.oui') }), textes: { issue: issueTexteAgir } }); void r; };
   return <Natif.Groupe titre={tr('actionsExt.favoris.titre')} pied={tr('actionsExt.favoris.pied')} attrs={{ 'data-favoris-panneau': '' }}>
-    <RangeeExtension action="favoris" sousTitre={nomCompte}/>
+    {ok ? <Natif.Rangee titre={tr('agir.favoris.lancer')} sousTitre={nomCompte} fin="chevron" onClick={lancer} attrs={{ 'data-agir-favoris': uid, 'data-agir': 'ok' }}/>
+      : <RangeeExtension action="favoris" compte={uid || '*'} sousTitre={nomCompte}/>}
     <RangeeExtension action="automatisations" ids={['favoris']} libelle={tr('actionsExt.favoris.auto')}/>
   </Natif.Groupe>;
 }
@@ -6421,9 +6431,19 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // résultat qui n'est pas « supprimée » arrête tout et se dit.
   const [lbcSupprEnVol, setLbcSupprEnVol] = useState(false);
   // (20 nov., décision de Julien) Supprimer de Leboncoin : dans le panneau de l'extension, sur ces annonces (par identité).
+  // (24 nov., lot agir-tout) DEPUIS VRM : UNE confirmation « sans retour » qui nomme chaque N°, puis une commande `supprimer`
+  // par annonce (la file, au nom du compte de CHAQUE annonce) ; ce qui ne passe pas la porte : le panneau (gardé).
   const supprimerLbcJournee = (liste) => {
-    const ids = (Array.isArray(liste) ? liste : []).filter((r) => r && r.id).map((r) => String(r.id));
-    if (ids.length) ouvrirPanneau({ site: 'leboncoin', page: 'annonces', ids, action: 'supprimer' });
+    const l = (Array.isArray(liste) ? liste : []).filter((r) => r && r.id).map((r) => ({ id: String(r.id), compte: String(r.compte || r.account || r.lbcUser || '').replace(/^lbc-account:/i, ''), numero: String(r.numero || ''), titre: String(r.titre || r.title || r.subject || '') }));
+    if (!l.length) return;
+    (async () => {
+      const ok = l.filter((x) => agirMaintenantC('leboncoin', x.compte, 'supprimer', 'file').ok), reste = l.filter((x) => !ok.includes(x));
+      if (ok.length && await askConfirm({ title: tr('agir.lbc.supprimerTitre', { n: ok.map((x) => x.numero).filter(Boolean).join(', ') }), desc: tr('agir.lbc.sansRetour'), ok: tr('agir.lbc.supprimerOui'), danger: true })) {
+        let n = 0; for (const x of ok) { const r = await envoyerGesteC({ site: 'leboncoin', compte: x.compte, geste: 'supprimer', distGeste: 'supprimer', args: { id: x.id, numero: x.numero, titre: x.titre }, num: x.numero, confirme: true }); if (r.ok) n++; }
+        if (n) toast(tr('agir.baisse.parti', { n }));
+      }
+      if (reste.length) { const c1 = [...new Set(reste.map((x) => x.compte))]; ouvrirPanneau({ site: 'leboncoin', compte: c1.length === 1 && c1[0] ? c1[0] : '*', page: 'annonces', ids: reste.map((x) => x.id), action: 'supprimer' }); }
+    })();
   };
   const repondreCycle = async (c, choix) => {
     if (!c || cycleEnVol) return;
@@ -21267,6 +21287,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const panneau = () => ouvrirPanneau({ site:'vinted', compte: u1.length===1 ? u1[0] : '*', page:a.page, ids:choisies.map(x=>String(x.id)), action:a.action });
       if (k==='recreer') { republierAgir(choisies.filter(x=>x.etat==='en-ligne').map(x=>({ compte:String(x.uid), id:String(x.id), num:numDeAnnonceAgir(x.id) })), panneau); return; }
       panneau(); return; }
+    // (24 nov., lot agir-tout) Masquer / afficher sur Vinted DEPUIS VRM : une commande par annonce, par la porte.
+    if (k==='masquer' || k==='afficher') { (async () => { const r = await envoyerSerie('masquer', k, choisies.map(x=>({ compte:String(x.uid), id:String(x.id), args:{ id:String(x.id) }, num:numDeAnnonceAgir(x.id) })));
+      if (r.n) toast(tr('agir.envoi.ici') + (r.n>1?' · '+r.n:'') + (r.refusees?' · '+tr('agir.badge')+' '+r.refusees:'')); else if (r.deja) toast(tr('agir.envoi.deja')); else { const t = texteRaisonAgir(r.verdict); if (t) toast(t); } })(); return; }
     if (k==='main') { const a=choisies[0]; if (a) { setRepubMainFile(choisies.length>1 ? { liste:choisies, i:0 } : null); setRepubMainOuvert(a); } return; }
     if (k==='mini') { setMiniSel(choisies); return; }
     // (11 nov.) « Publier partout » sur les annonces cochées : la même feuille, par leur N°.
@@ -28207,7 +28230,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         <div hidden={zoneFav==='offres'} style={{display:zoneFav==='offres'?'none':undefined}}>
         {/* (20 nov., décision de Julien) Les messages aux favoris (choisir, écrire, envoyer, mode automatique) se font dans le
             panneau de l'extension sur vinted.fr. L'app ne les envoie plus : l'ancien écran (src/FavorisVinted.jsx) est retiré. */}
-        <FavorisDansExtension nomCompte={favorisCompte?accNameOf(favorisCompte):''}/>
+        <FavorisDansExtension nomCompte={favorisCompte?accNameOf(favorisCompte):''} uid={favorisCompte?String(favorisCompte.vinted_user_id):''}/>
         </div>
         </div>
         <div className="vrm-message-workspace" hidden={zoneMessages!=='conversations'} style={{display:zoneMessages==='conversations'?undefined:'none'}}><div className="vrm-inbox-column">
@@ -32248,7 +32271,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       {baisseSel && (
         // (20 nov., décision de Julien) « Baisser le prix » en série se fait dans l'extension : la feuille montre les
         // annonces choisies (prix lu, prix conseillé) et ouvre le panneau sur elles. L'ancien atelier est retiré.
-        <FeuilleAnnoncesExtension action="baisser" annonces={baisseSel} onFermer={()=>{ setBaisseSel(null); setBaisseSelInit(null); setQdSel(new Set()); }}/>
+        // (24 nov., lot agir-tout) DEPUIS VRM : −X %, une commande `prix` par annonce (file, par la porte) ; une annonce d'un compte
+        // ouvert nulle part reste visible en lecture seule.
+        <BaisseSerie annonces={baisseSel} onFermer={()=>{ setBaisseSel(null); setBaisseSelInit(null); setQdSel(new Set()); }}/>
       )}
       {repubMainOuvert && (()=>{
         const p = repubMainOuvert; const s = repubMain[String(p.ancienId||p.id)] || null;

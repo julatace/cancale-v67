@@ -25,7 +25,7 @@ import './designV2/argent-v2.css'; // (8 nov.) style de ./composants/SelectionSe
 import { estCommandePlateforme, estEcriturePlateforme, refusPanneau, ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from './actionsExtension.js';   // (20 nov., décision de Julien) aucun geste de plateforme dans l'app
 import { poserExtensionIci, ouvrirPanneau } from './ouvrirPanneau.js';
 import { poserFaitsAgir, poserEnvoiAgir } from './agir/porte.js';
-import { texteRaison as texteRaisonAgir } from './agir/Agir.jsx';   // (24 nov., lot agir-si-connecte) LA porte de tous les gestes
+import { texteRaison as texteRaisonAgir, CreerVintedAgir, publierLbcDepuisVrm, EbayLectureSeule } from './agir/Agir.jsx';   // (24 nov., lot agir-si-connecte) LA porte de tous les gestes
 import { requeteConnexions } from './connexions/connexions.js';
 import { lirePresences as lirePresencesAgir, nouvelleCommandeDistance as commandeDistanceAgir, deposerCommandeDistance as deposerDistanceAgir } from './aDistance.js';
 import { CLE_DISCRETION as CLE_DISCRETION_AGIR } from './discretion.js';
@@ -1788,7 +1788,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.440.1';
+const EXT_ATTENDUE = '5.450.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -2200,7 +2200,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { favorislienapp: '5.440.1', favoriscommande: '5.440.1', reperage: '5.440.0', clocheauto: '5.440.0', messagerieuuid: '5.440.0', fenetrefavoris: '5.440.0', vcmoderation: '5.439.0', prixminipublier: '5.437.0', negointelligente: '5.437.0', formulairerythme: '5.437.0', descriptioncoller: '5.437.0', favorisautobilan: '5.437.0', repubverification: '5.437.0', nuitaussi: '5.437.0', santenote: '5.438.0', precieux: '5.438.0', relancesansachat: '5.438.0', lotauto: '5.438.0', brouillonsauto: '5.438.0', demasquee: '5.438.0', adistance: '5.436.0', sauvegardereglages: '5.436.0', lbcoffres: '5.436.0', retoursautres: '5.436.0', noteacheteur: '5.430.0', traductionlocale: '5.430.0', alertemasquee: '5.428.0', courbeannonce: '5.428.0', endirect: '5.428.0', retirerpartout: '5.426.0', relances: '5.425.0', triconversations: '5.425.0', publieraussi: '5.424.0', depotprepare: '5.429.0', ordrephotos: '5.429.0', suiviboost: '5.429.0', depotpanneau: '5.429.0', gardeprix: '5.432.0', prixpartout: '5.432.0', pushcapte: '5.422.0', repubprogramme: '5.422.0', reponsesrapides: '5.421.0', lotfavoris: '5.421.0', relanceoffres: '5.421.0', agentvrm: '5.421.0', modifavantapres: '5.423.0', filevisible: '5.433.0', pauseapres: '5.433.0', reessai: '5.433.0', apprisclic: '5.433.0', retoursuivi: '5.431.0', bordereauxunpdf: '5.420.0', vacancesinterface: '5.420.0', favorisreponses: '5.420.0', santecomptes: '5.420.0', favorisetapes: '5.420.0', ventesfavoris: '5.420.0', relaisprevu: '5.411.0', vcecrireui: '5.412.0', vcfilpanneau: '5.412.0', vcaimespanneau: '5.412.0', panneautelephone: '5.413.0', toutinterface: '5.414.0', connexionsimple: '5.415.0', lbcinterface: '5.416.0', favorisperso2: '5.417.0', favorisenvoi9: '5.419.0', commandeslot: '5.419.0', ongletravail: '5.410.5', marquelu: '5.410.5', repubformulaire: '5.410.3', favorisbleam: '5.410.3', apresvente: '5.410.4', stockauto: '5.410.4', cyclevie: '5.410.4', sauvegardeauto: '5.410.4', dressingplus: '5.410.4', negotranches: '5.410.4', favfiltres: '5.410.4', panneaureste: '5.410.2', imprimerpanneau: '5.410.2', vcdatemise: '5.410.0', baissevc: '5.410.0', lbcinteresses: '5.410.0', lbcecrireinteresses: '5.410.0', repubfidele: '5.410.0', repubverif: '5.410.0', messagesmalins: '5.410.0', panneaucomplet: '5.410.0', lienpanneau: '5.410.0', lbcpubliee: '5.409.0', vcpubliee: '5.409.0', masquercarte: '5.409.0', baisselbc: '5.409.0', contreoffres: '5.409.0', repondrecarte: '5.409.0', publierfiche: '5.409.0', listesvinted: '5.409.0', lbcformulaire: '5.409.0', vcrelu: '5.409.0', captejournal: '5.409.0', etatici: '5.409.0', suivicolis: '5.409.0', comptebloque: '5.409.0', prixattente: '5.409.0', baisseregle: '5.409.0', masquerailleurs: '5.409.0', repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { agirtout: '5.450.0', favorislienapp: '5.440.1', favoriscommande: '5.440.1', reperage: '5.440.0', clocheauto: '5.440.0', messagerieuuid: '5.440.0', fenetrefavoris: '5.440.0', vcmoderation: '5.439.0', prixminipublier: '5.437.0', negointelligente: '5.437.0', formulairerythme: '5.437.0', descriptioncoller: '5.437.0', favorisautobilan: '5.437.0', repubverification: '5.437.0', nuitaussi: '5.437.0', santenote: '5.438.0', precieux: '5.438.0', relancesansachat: '5.438.0', lotauto: '5.438.0', brouillonsauto: '5.438.0', demasquee: '5.438.0', adistance: '5.436.0', sauvegardereglages: '5.436.0', lbcoffres: '5.436.0', retoursautres: '5.436.0', noteacheteur: '5.430.0', traductionlocale: '5.430.0', alertemasquee: '5.428.0', courbeannonce: '5.428.0', endirect: '5.428.0', retirerpartout: '5.426.0', relances: '5.425.0', triconversations: '5.425.0', publieraussi: '5.424.0', depotprepare: '5.429.0', ordrephotos: '5.429.0', suiviboost: '5.429.0', depotpanneau: '5.429.0', gardeprix: '5.432.0', prixpartout: '5.432.0', pushcapte: '5.422.0', repubprogramme: '5.422.0', reponsesrapides: '5.421.0', lotfavoris: '5.421.0', relanceoffres: '5.421.0', agentvrm: '5.421.0', modifavantapres: '5.423.0', filevisible: '5.433.0', pauseapres: '5.433.0', reessai: '5.433.0', apprisclic: '5.433.0', retoursuivi: '5.431.0', bordereauxunpdf: '5.420.0', vacancesinterface: '5.420.0', favorisreponses: '5.420.0', santecomptes: '5.420.0', favorisetapes: '5.420.0', ventesfavoris: '5.420.0', relaisprevu: '5.411.0', vcecrireui: '5.412.0', vcfilpanneau: '5.412.0', vcaimespanneau: '5.412.0', panneautelephone: '5.413.0', toutinterface: '5.414.0', connexionsimple: '5.415.0', lbcinterface: '5.416.0', favorisperso2: '5.417.0', favorisenvoi9: '5.419.0', commandeslot: '5.419.0', ongletravail: '5.410.5', marquelu: '5.410.5', repubformulaire: '5.410.3', favorisbleam: '5.410.3', apresvente: '5.410.4', stockauto: '5.410.4', cyclevie: '5.410.4', sauvegardeauto: '5.410.4', dressingplus: '5.410.4', negotranches: '5.410.4', favfiltres: '5.410.4', panneaureste: '5.410.2', imprimerpanneau: '5.410.2', vcdatemise: '5.410.0', baissevc: '5.410.0', lbcinteresses: '5.410.0', lbcecrireinteresses: '5.410.0', repubfidele: '5.410.0', repubverif: '5.410.0', messagesmalins: '5.410.0', panneaucomplet: '5.410.0', lienpanneau: '5.410.0', lbcpubliee: '5.409.0', vcpubliee: '5.409.0', masquercarte: '5.409.0', baisselbc: '5.409.0', contreoffres: '5.409.0', repondrecarte: '5.409.0', publierfiche: '5.409.0', listesvinted: '5.409.0', lbcformulaire: '5.409.0', vcrelu: '5.409.0', captejournal: '5.409.0', etatici: '5.409.0', suivicolis: '5.409.0', comptebloque: '5.409.0', prixattente: '5.409.0', baisseregle: '5.409.0', masquerailleurs: '5.409.0', repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -5372,6 +5372,8 @@ const prixLigneExt = (n) => (n == null || !isFinite(Number(n)) ? '' : String(Mat
 function FeuilleCreerVinted({ fiches, onFermer }) {
   const l = (fiches || []).filter((f) => f && f.numero);
   return <FeuilleExtension action="creerVinted" ids={l.map((f) => String(f.numero))} onFermer={onFermer} attrs={{ 'data-creer-vinted': l.length }}>
+    {/* (24 nov., lot agir-tout) DEPUIS VRM, un brouillon par fiche, sur le compte choisi (la file, par la porte). */}
+    <CreerVintedAgir fiches={l}/>
     <Natif.Groupe>{l.slice(0, 30).map((f) => <Natif.Rangee key={f.id || f.numero} titre={f.titre || tr('actionsExt.sansTitre')} plaque={<Natif.Plaque numero={f.numero}/>}/>)}</Natif.Groupe>
   </FeuilleExtension>;
 }
@@ -23757,14 +23759,32 @@ poserEnvoiAgir({ deposer: async ({ geste, site, compte, args, confirme, num, ava
   if (r) { try { window.dispatchEvent(new CustomEvent('vrm:agir-envoye', { detail: { id: c.id, geste, site, compte } })); } catch (_) {} }
   return r ? { id: c.id } : null;
 } });
+const nomsEbayAgir = {};
 function SourceAgir({ comptesVinted }) {
   useExtVivante();
   const sansSouris = useSansSouris();
   const [presences, setPresences] = useState(undefined);
   const [appareils, setAppareils] = useState(undefined);
   const [autres] = useComptesAutresSites(true);
-  const comptesEbay = useComptesEbay();
   const [tic, setTic] = useState(0);
+  const [ebayJetons, setEbayJetons] = useState(undefined);
+  useEffect(() => {
+    let mort = false;
+    const lireEbay = async () => {
+      let j = null; try { const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'status' }) }); j = r.ok ? await r.json() : null; } catch (_) { j = null; }
+      if (mort) return;
+      if (!j || j.ok !== true) { setEbayJetons((x) => (x === undefined ? null : x)); return; }
+      const m = {};
+      if (Array.isArray(j.comptes)) for (const c of j.comptes) { const ref = refCompteEbay(c); if (!ref) continue; m[ref] = c.relie !== true ? false : (c.jeton && c.jeton.etat === 'expire') ? 'expire' : true; nomsEbayAgir[ref] = c.pseudo || ''; }
+      else if (j.connected === true) m.principal = j.jeton && j.jeton.etat === 'expire' ? 'expire' : true;
+      setEbayJetons(m);
+    };
+    lireEbay();
+    const t = setInterval(lireEbay, 10 * 60000);
+    const f = () => lireEbay();
+    window.addEventListener('vrm:ebay-comptes', f);
+    return () => { mort = true; clearInterval(t); window.removeEventListener('vrm:ebay-comptes', f); };
+  }, []);
   useEffect(() => {
     let mort = false, enVol = false;
     const lire = async () => {
@@ -23788,13 +23808,17 @@ function SourceAgir({ comptesVinted }) {
     // Un geste refusé par la porte (le panneau, le pont) : la raison et le geste, dits — rien n'est parti.
     const fr = (e) => { const t = texteRaisonAgir(e && e.detail); if (t) { try { toast(t); } catch (_) {} } };
     window.addEventListener('vrm:agir-refus', fr);
-    return () => { mort = true; clearInterval(m1); clearInterval(m2); clearInterval(m3); if (typeof off === 'function') off(); window.removeEventListener('vrm:agir-envoye', fe); window.removeEventListener('vrm:agir-refus', fr); };
+    const fd = (e) => { const t = e && e.detail && e.detail.texte; if (t) { try { toast(String(t)); } catch (_) {} } };
+    window.addEventListener('vrm:agir-dire', fd);
+    return () => { mort = true; clearInterval(m1); clearInterval(m2); clearInterval(m3); if (typeof off === 'function') off(); window.removeEventListener('vrm:agir-envoye', fe); window.removeEventListener('vrm:agir-refus', fr); window.removeEventListener('vrm:agir-dire', fd); };
   }, []);
   useEffect(() => {
-    const noms = { vinted: {}, leboncoin: {}, vestiaire: {}, ebay: {} };
+    const noms = { vinted: {}, leboncoin: {}, vestiaire: {}, ebay: { ...nomsEbayAgir } };
     for (const a of Array.isArray(comptesVinted) ? comptesVinted : []) if (a && a.vinted_user_id != null) noms.vinted[String(a.vinted_user_id)] = String(a.login || '');
     for (const site of ['leboncoin', 'vestiaire']) for (const c of Array.isArray(autres && autres[site]) ? autres[site] : []) if (c && c.id != null) noms[site][String(c.id).replace(/^lbc-account:/i, '')] = nomCompteLie(c);
-    const ebay = Array.isArray(comptesEbay) ? Object.fromEntries(comptesEbay.filter((c) => c && c.ref && !c.implicite).map((c) => [c.ref, true])) : undefined;
+    // (24 nov., lot agir-tout) eBay : l'ÉTAT DU JETON lu chez la route (`status` : relié, jeton ok · bientôt · expiré), jamais
+    // le jeton. true = gestes permis · 'expire' = lecture seule + « Reconnecter eBay » · false = pas relié · absent = pas su.
+    const ebay = ebayJetons === undefined ? undefined : ebayJetons === null ? {} : ebayJetons;
     const brut = load(CLE_DISCRETION_AGIR, null);
     const tout = brut && typeof brut === 'object' && brut.tout && typeof brut.tout === 'object' ? brut.tout : null;
     poserFaitsAgir({ ...faitsExtensionApp(sansSouris), presences, appareils, toutArrete: tout && tout.on === true ? { on: true, at: Number(tout.at) || 0 } : null, ebay, noms });
@@ -25074,7 +25098,10 @@ function HotePublierAilleurs({ comptes, num, site, sitesVus, manquesLecture, lec
     const id = String(paire.id), at = Date.now();
     // (20 nov., décision de Julien) Leboncoin et Vestiaire : la publication se fait dans le panneau de l'extension, sur le
     // site, depuis CETTE annonce Vinted (son identifiant) ; eBay reste ici (API serveur, pas de panneau).
-    if (sx === 'leboncoin' || sx === 'vestiaire') { ouvrirPanneau({ site: sx, page: 'publier', ids: [id], action: 'publier' }); onFermer(); return; }
+    // (24 nov., lot agir-tout) Leboncoin DEPUIS VRM (la file, compte Leboncoin ouvert par une extension connectée) ; Vestiaire
+    // reste au panneau : VRM n'y clique jamais « Publier » à sa place (il relit et publie lui-même).
+    if (sx === 'leboncoin') { publierLbcDepuisVrm(id, { panneau: () => ouvrirPanneau({ site: sx, page: 'publier', ids: [id], action: 'publier' }) }); onFermer(); return; }
+    if (sx === 'vestiaire') { ouvrirPanneau({ site: sx, page: 'publier', ids: [id], action: 'publier' }); onFermer(); return; }
     if (sx === 'ebay') { DEMANDE_EBAY_PAIRE.id = id; DEMANDE_EBAY_PAIRE.at = at; onNav && onNav('ebay_annonces'); }
     // L'écran du site est rendu d'abord ; la feuille se ferme ensuite (son retour
     // d'historique ne doit pas ramener l'écran d'avant — même piège que « qui dorment »).
@@ -32076,7 +32103,7 @@ async function retirerUnSiteRA(site, art) {
       if (!__raLbcOuvert || Date.now() - __raLbcOuvert > 10000) {
         __raLbcOuvert = Date.now();
         const ids = [...new Set(Object.values(sitesRA()).filter((x) => x.s && x.s.moyen === 'lbc' && x.s.id).map((x) => String(x.s.id)))];
-        ouvrirPanneau({ site: 'leboncoin', page: 'annonces', ids: ids.length ? ids : [String(site.id)], action: 'supprimer' });
+        ouvrirPanneau({ site: 'leboncoin', compte: String(site.compte || '').replace(/^lbc-account:/i, '') || '*', page: 'annonces', ids: ids.length ? ids : [String(site.id)], action: 'supprimer' });
       }
       const rep = { accepte: false, code: 'panneau', raison: tr('actionsExt.phrase', { site: 'Leboncoin' }) };
       if (rep) {
@@ -37991,6 +38018,8 @@ function AppCoeur() {
               attrs={{ 'data-ebay-vue': ebayVueEff }}
               options={comptesEbay.map((c) => ({ val: c.ref, nom: nomCompteEbay(c) + (typeCompteEbayTexte(c) ? ` · ${typeCompteEbayTexte(c)}` : '') + (siteCompteEbayTexte(c) ? ` · ${siteCompteEbayTexte(c)}` : '') }))} />
           )}
+          {/* (24 nov., lot agir-tout) Jeton eBay expiré / compte pas relié : lecture seule, dit, « Reconnecter eBay ». */}
+          <EbayLectureSeule compte={ebayVueEff || 'principal'} onReconnecter={allerComptesEbay}/>
           {/* (15 nov., eBay complet 2) LE TABLEAU eBAY et ses sections (lecture seule) : à expédier (la règle `colisEbay`,
               par compte), offres, messages, versé ce mois, « À faire », argent, trafic, santé — chacun mène à sa section. */}
           {(sec==='tableau'||sec==='argent'||sec==='sante'||sec==='trafic')&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=>{

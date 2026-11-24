@@ -17,6 +17,8 @@
 //  sinon `vrm_articles_sites` sous l'identifiant de l'annonce de SON site), relus juste avant : carte pas lue ⇒ rien.
 //  Les actions passent par l'écran Annonces Vinted d'hier (monté, caché) : `demanderActionAnnonces`.
 // ══════════════════════════════════════════════════════════════════════════
+import { agirMaintenant, envoyerSerie, dire, republierDansApp } from '../agir/porte.js';   // (24 nov., lot agir-tout)
+import { texteRaison } from '../agir/Agir.jsx';
 import { useComptesBloques } from '../compteBloqueEtat.js';
 import { etatLienLu, propositionLu, relierDepuisListe, queSurCeSite, ouvrirLiaison, abonnerLiaison, demanderLiaison } from '../liaisonEtat.js';   // (20 nov.) relier depuis la liste
 import React from 'react';
@@ -363,7 +365,10 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   };
   const plusVueDe = (a) => { if (!releves || !a) return null; let m = null; for (const x of a.annonces) { const j = plusVueAnnonce(x); if (j != null && (m == null || j > m)) m = j; } return m; };
   // « Republier » d'une annonce plus vue : la feuille Avant | Après de CETTE paire dans le panneau (5.429, `republier-direct`).
-  const republierUne = (x) => { const A = ACTIONS_EXTENSION.republierMaintenant; ouvrirPanneau({ site: 'vinted', compte: String(x.compte || x.uid || '*'), page: A.page, ids: [String(x.id)], action: A.action }); };   // (24 nov.) gardé par la porte
+  const republierUne = (x) => { const A = ACTIONS_EXTENSION.republierMaintenant; const compte = String(x.compte || x.uid || ''); (async () => {   // (24 nov., lot agir-tout) depuis VRM, sinon le panneau gardé
+    const r = await republierDansApp([{ compte, id: String(x.id) }], confirmerRepub);
+    if (r.ok) { dire(tr('agir.envoi.ici')); return; }
+    if (!r.annule) ouvrirPanneau({ site: 'vinted', compte: compte || '*', page: A.page, ids: [String(x.id)], action: A.action }); })(); };
   const plusVuesHorsPrio = React.useMemo(() => {
     if (!modele || !releves || !prio) return [];
     const dans = new Set(prio.liste.map((l) => 'vinted#' + l.annonce.id));
@@ -376,7 +381,13 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   const lignesPrio = prio ? (qPrio ? prio.liste.filter((l) => [l.article.titre, l.numero ? 'n' + l.numero + ' ' + l.numero : '', l.annonce.pseudo].join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(qPrio)) : prio.liste) : [];
   const selPrio = usePrioSelection(lignesPrio);
   // SON toucher sur « Republier N » : l'atelier Republier du PANNEAU de l'extension, sur vinted.fr, ces annonces cochées. Rien ne part d'ici.
-  const republierPrio = ({ ids }) => { const a = ACTIONS_EXTENSION.republier; ouvrirPanneau({ site: 'vinted', page: a.page, ids, action: a.action }); };
+  // (24 nov., lot agir-tout) « Republier N » DEPUIS VRM (la file, UNE confirmation, au nom du compte de la sélection) ;
+  // la porte dit non ⇒ le panneau (gardé lui aussi, il dit pourquoi).
+  const confirmerRepub = (n) => askConfirm({ title: n > 1 ? tr('agir.republier') + ' · ' + n : tr('agir.republier'), desc: tr('agir.republier.confirmer'), ok: tr('agir.republier.oui') });
+  const republierPrio = ({ ids, compte }) => { const a = ACTIONS_EXTENSION.republier; (async () => {
+    const r = await republierDansApp((ids || []).map((id) => ({ compte: String(compte || ''), id: String(id) })), confirmerRepub);
+    if (r.ok) { dire(tr('agir.envoi.ici') + (r.n > 1 ? ' · ' + r.n : '')); return; }
+    if (!r.annule) ouvrirPanneau({ site: 'vinted', compte: compte ? String(compte) : '*', page: a.page, ids, action: a.action }); })(); };
   const priorite = {
     n: prio ? prio.liste.length : undefined,
     plein: prio && lignesPrio.length ? <PleinRepublier lignes={lignesPrio} coches={selPrio.coches} onRepublier={republierPrio}/> : null,
@@ -436,9 +447,14 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
       pour: (a) => lbcEnLigne(a).length > 0,
       juger: (sel) => (!sel.length ? { ok: false, raison: tr('egalite.selection.aucune') } : { ok: true }) });
   const pauserLbc = (choisis) => {
-    const ids = choisis.flatMap((a) => lbcEnLigne(a).map((x) => String(x.id)));
-    if (!ids.length) return;
-    ouvrirPanneau({ site: 'leboncoin', page: 'annonces', ids, action: 'pause' });
+    const l = choisis.flatMap((a) => lbcEnLigne(a).map((x) => ({ id: String(x.id), compte: String(x.compte || '').replace(/^lbc-account:/i, ''), numero: a.numero || '' })));
+    if (!l.length) return;
+    // (24 nov., lot agir-tout) DEPUIS VRM, compte par compte (la file, par la porte) ; ce qui n'y passe pas : le panneau (gardé).
+    (async () => {
+      const ok = l.filter((x) => agirMaintenant('leboncoin', x.compte, 'pause', 'file').ok), reste = l.filter((x) => !ok.includes(x));
+      if (ok.length) { const r = await envoyerSerie('pause', 'pause', ok.map((x) => ({ site: 'leboncoin', compte: x.compte, num: x.numero, args: { id: x.id } }))); dire(r.n ? tr('agir.envoi.ici') + (r.n > 1 ? ' · ' + r.n : '') : (texteRaison(r.verdict) || tr('agir.envoi.base'))); }
+      if (reste.length) { const c1 = [...new Set(reste.map((x) => x.compte))]; ouvrirPanneau({ site: 'leboncoin', compte: c1.length === 1 && c1[0] ? c1[0] : '*', page: 'annonces', ids: reste.map((x) => x.id), action: 'pause' }); }
+    })();
   };
   const onAction = (k, choisis) => {
     if (k === 'prixSites') { const a = choisis[0]; if (a && a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } return; }

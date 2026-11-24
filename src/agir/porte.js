@@ -73,3 +73,27 @@ export async function republierDansApp(annonces, confirmer) {
   }
   return { ok: n > 0, n, refusees: l0.length - ok.length };
 }
+
+// (24 nov., lot agir-tout) UN geste par annonce, en série, chacun par la porte au nom du compte de SON annonce.
+// `liste` : [{ site, compte, id, args, num?, avant? }]. Rend { n, refusees, deja, verdict } (verdict du premier refus).
+export async function envoyerSerie(geste, distGeste, liste) {
+  let n = 0, refusees = 0, deja = 0, verdict = null;
+  for (const a of Array.isArray(liste) ? liste : []) {
+    const r = await envoyerGeste({ site: a.site || 'vinted', compte: String(a.compte || ''), geste, distGeste, args: a.args, num: a.num || '', avant: a.avant == null ? null : a.avant });
+    if (r.ok) n++; else if (r.raison === 'deja') deja++; else { refusees++; if (!verdict && r.verdict) verdict = r.verdict; }
+  }
+  return { n, refusees, deja, verdict };
+}
+
+// (24 nov., lot agir-tout) UN geste lancé d'un écran qui avait le panneau : la FILE si la porte le permet pour CE compte
+// (avec SA confirmation quand `confirmer` est donné), sinon l'ancien chemin `panneau()` (gardé lui aussi, il dit pourquoi).
+// L'issue est DITE par l'app (`vrm:agir-dire`). Rend l'issue de `envoyerGeste`, ou { panneau: true }, ou { annule: true }.
+export const dire = (texte) => { try { window.dispatchEvent(new CustomEvent('vrm:agir-dire', { detail: { texte } })); } catch (_) {} };
+export async function agirOuPanneau({ site, compte, geste, distGeste, args, num = '', avant = null, confirmer = null, panneau = null, textes = {} }) {
+  const v = agirMaintenant(site, compte, geste, 'file');
+  if (!v.ok) { if (typeof panneau === 'function') { panneau(); return { panneau: true }; } return { ok: false, verdict: v }; }
+  if (typeof confirmer === 'function') { let oui = false; try { oui = await confirmer(); } catch (_) { oui = false; } if (!oui) return { annule: true }; }
+  const r = await envoyerGeste({ site, compte, geste, distGeste, args, num, avant, confirme: typeof confirmer === 'function' });
+  if (textes && typeof textes.issue === 'function') { try { dire(textes.issue(r)); } catch (_) {} }
+  return r;
+}

@@ -47,14 +47,14 @@ export const GESTES_AGIR = Object.freeze({
   vinted: Object.freeze({
     repondre: { cap: 'messagerie', dist: 'repondre' },
     offre: { cap: 'messagerie', dist: 'accepter' },        // accepter · refuser · contre-offre (même capacité, même voie)
-    favoris: { cap: 'favoris', dist: null },
+    favoris: { cap: 'favoris', dist: 'favoris', distCap: 'agirtout' },
     republier: { cap: 'republierpage', dist: 'republier' },
     baisser: { cap: 'baisseprix', dist: 'prix' },
     prix: { cap: 'baisseprix', dist: null },               // changer / remettre un prix (une hausse ne part jamais par la file)
     masquer: { cap: 'masquercarte', dist: 'masquer' },
-    vacances: { cap: 'vacances', dist: null },
-    creer: { cap: 'creervinted', dist: null },
-    publier: { cap: 'creervinted', dist: null },
+    vacances: { cap: 'vacances', dist: 'vacances', distCap: 'agirtout' },
+    creer: { cap: 'creervinted', dist: 'creer', distCap: 'agirtout' },
+    publier: { cap: 'creervinted', dist: 'creer', distCap: 'agirtout' },
     bordereau: { cap: 'commande', dist: 'bordereau' },
     automatisations: { cap: 'panneaucomplet', dist: null },
   }),
@@ -62,19 +62,19 @@ export const GESTES_AGIR = Object.freeze({
     repondre: { cap: 'lbcrepondre', dist: 'repondre' },
     baisser: { cap: 'lbcprix', dist: 'prix' },
     prix: { cap: 'lbcprix', dist: null },
-    pause: { cap: 'lbcinterface', dist: null },
-    supprimer: { cap: 'lbcsupprime', dist: null },
-    publier: { cap: 'publication', dist: null },
+    pause: { cap: 'lbcinterface', dist: 'pause', distCap: 'agirtout' },
+    supprimer: { cap: 'lbcsupprime', dist: 'supprimer', distCap: 'agirtout' },
+    publier: { cap: 'publication', dist: 'publier', distCap: 'agirtout' },
     favoris: { cap: 'lbcecrireinteresses', dist: null },
     automatisations: { cap: 'panneaucomplet', dist: null },
   }),
   vestiaire: Object.freeze({
     repondre: { cap: 'vcrepondre', dist: 'repondre' },
-    offre: { cap: 'vcoffrerepondre', dist: null },
+    offre: { cap: 'vcoffrerepondre', dist: 'offre', distCap: 'agirtout' },
     baisser: { cap: 'vcprix', dist: 'prix' },
     prix: { cap: 'vcprix', dist: null },
     publier: { cap: 'vcpublier', dist: null },
-    favoris: { cap: 'vcaimes', dist: null },
+    favoris: { cap: 'vcaimes', dist: 'aimes', distCap: 'agirtout' },
     automatisations: { cap: 'panneaucomplet', dist: null },
   }),
 });
@@ -142,6 +142,7 @@ export function peutAgir(f, { site, compte, geste, par = '' } = {}) {
     if (!compteValide('ebay', compte)) return non('compte', base, 'ouvrir-comptes');
     const j = F.ebay && typeof F.ebay === 'object' ? F.ebay[str(compte)] : undefined;
     if (j === true) return { ok: true, voie: 'api', par: null };
+    if (j === 'expire') return non('ebay-expire', base, 'reconnecter-ebay');   // (24 nov., lot agir-tout) jeton expiré ⇒ « Reconnecter eBay »
     if (j === false) return non('ebay-jeton', base, 'relier-ebay');
     return non('ebay-passu', base, null);
   }
@@ -158,7 +159,8 @@ export function peutAgir(f, { site, compte, geste, par = '' } = {}) {
 
   const caps = F.capacites || {};
   const exige = caps[g.cap] || F.attendue || '9999.0.0';
-  const exigeDist = caps.adistance || '9999.0.0';
+  // Le geste par la file : `adistance`, et la version où CE geste est entré dans la file (`distCap`, 5.450).
+  const exigeDist = [caps.adistance || '9999.0.0', g.distCap ? (caps[g.distCap] || '9999.0.0') : '0.0.0'].sort(cmpVersion).pop();
   const presences = F.presences;
   const ext = F.ext || {};
   const nav = navIci(F);

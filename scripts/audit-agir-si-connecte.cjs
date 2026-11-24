@@ -28,6 +28,13 @@ const MUTATIONS = {
   'envoi-sans-porte': ['agir/porte.js', "if (!v.ok) return { ok: false, raison: v.raison, verdict: v };", ""],
   'panneau-sans-porte': ['ouvrirPanneau.js', "if (!v.ok) { try { window.dispatchEvent(new CustomEvent('vrm:agir-refus', { detail: v })); } catch (_) {} return null; }", ""],
   'bouton-sans-porte': ['BoutonExtension.jsx', "const v = usePeutAgir(c.site, compte, gesteDe(action), 'panneau');\n  const porte = { 'data-agir': v.ok ? 'ok' : 'lecture', 'data-agir-site': c.site, 'data-agir-geste': gesteDe(action), 'data-agir-raison': v.ok ? undefined : v.raison };\n  const ouvrir", "const v = { ok: true };\n  const porte = {};\n  const ouvrir"],
+  // 5.450 (lot agir-tout)
+  'bg-sans-retour-oublie': ['BG', "cmd: 'lbcSupprime', id: a.id, confirme: true, sansRetour: true,", "cmd: 'lbcSupprime', id: a.id, confirme: true,"],
+  'bg-favoris-tous': ['BG', "const choix = cochables.filter((x) => !voulus || voulus.has(String(x.id)))", "const choix = (Array.isArray(ap.liste) ? ap.liste : []).filter((x) => x && x.id)"],
+  'favoris-sans-confirmation': ['aDistance.js', "const ADIST_CONFIRMER = ['accepter', 'republier', 'favoris', 'supprimer'];", "const ADIST_CONFIRMER = ['accepter', 'republier'];"],
+  'ebay-expire-ok': ['agir/peutAgir.js', "if (j === 'expire') return non('ebay-expire', base, 'reconnecter-ebay');", "if (j === 'expire') return { ok: true, voie: 'api', par: null };"],
+  'distcap-ignore': ['agir/peutAgir.js', "g.distCap ? (caps[g.distCap] || '9999.0.0') : '0.0.0'", "'0.0.0'"],
+  'prix-sans-porte': ['PrixPartout.jsx', "const enFile = (s) => s.site !== 'ebay' && s.mode === 'ext' && s.prix != null && agirMaintenant(s.site, s.compte, 'baisser', 'file').ok;", "const enFile = (s) => s.site !== 'ebay' && s.mode === 'ext' && s.prix != null;"],
   'composer-vinted-retire': ['ecrans/Comptabilite.jsx', '<ComposerReponse site="vinted"', '<BoutonExtension action="repondre" site="vinted"'],
 };
 if (process.argv.includes('--prouve')) {
@@ -39,11 +46,12 @@ if (process.argv.includes('--prouve')) {
     const dst = path.join(tmp, 'src');
     // Copie légère : seulement ce que l'audit lit (jamais node_modules).
     fs.mkdirSync(dst, { recursive: true });
-    for (const x of ['agir', 'extension', 'aDistance.js', 'ouvrirPanneau.js', 'BoutonExtension.jsx', 'ecrans', 'i18n']) fs.cpSync(path.join(RACINE, 'src', x), path.join(dst, x), { recursive: true });
-    const f = path.join(dst, fic); const s = fs.readFileSync(f, 'utf8');
+    for (const x of ['agir', 'extension', 'aDistance.js', 'ouvrirPanneau.js', 'BoutonExtension.jsx', 'ecrans', 'i18n', 'PrixPartout.jsx', 'OffresVestiaire.jsx', 'AimesVestiaire.jsx', 'annoncesActions.js', 'App.jsx', 'gardePrix.js']) fs.cpSync(path.join(RACINE, 'src', x), path.join(dst, x), { recursive: true });
+    const bgDst = path.join(tmp, 'background.js'); fs.copyFileSync(path.join(RACINE, 'vinted-sync-extension', 'background.js'), bgDst);
+    const f = fic === 'BG' ? bgDst : path.join(dst, fic); const s = fs.readFileSync(f, 'utf8');
     if (!s.includes(a)) { console.log(`❌ mutation ${nom} : texte introuvable`); rate++; fs.rmSync(tmp, { recursive: true, force: true }); continue; }
     fs.writeFileSync(f, s.replace(a, b));
-    const r = spawnSync(process.execPath, [__filename], { encoding: 'utf8', env: { ...process.env, AGIR_SRC: dst } });
+    const r = spawnSync(process.execPath, [__filename], { encoding: 'utf8', env: { ...process.env, AGIR_SRC: dst, AGIR_BG: bgDst } });
     const rouges = String(r.stdout).split('\n').filter((l) => l.includes('❌'));
     const bon = r.status !== 0 && rouges.length > 0; if (!bon) rate++;
     console.log(`${bon ? '✅' : '❌'} mutation « ${nom} » : ${bon ? 'rouge — ' + rouges[0].trim() : 'RESTE VERTE'}`);
@@ -68,18 +76,18 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const T = Date.now();
   const CAPS = { messagerie: '5.135.0', favoris: '5.217.0', republierpage: '5.277.0', baisseprix: '5.336.0', masquercarte: '5.409.0', vacances: '5.338.0', creervinted: '5.367.0',
     commande: '5.129.0', panneaucomplet: '5.410.0', lbcrepondre: '5.318.0', lbcprix: '5.368.0', lbcinterface: '5.416.0', lbcsupprime: '5.291.0', publication: '5.160.0',
-    lbcecrireinteresses: '5.410.0', vcrepondre: '5.295.0', vcoffrerepondre: '5.319.0', vcprix: '5.368.0', vcpublier: '5.235.0', vcaimes: '5.393.0', adistance: '5.436.0' };
+    lbcecrireinteresses: '5.410.0', vcrepondre: '5.295.0', vcoffrerepondre: '5.319.0', vcprix: '5.368.0', vcpublier: '5.235.0', vcaimes: '5.393.0', adistance: '5.436.0', agirtout: '5.450.0' };
   const MOI = '0f0e0d0c-0000-4000-8000-000000000001';
   // 50 comptes Vinted, TOUS nommés « boutique » (les mêmes titres partout) : seule l'identité (uid) les distingue.
   const UIDS = Array.from({ length: 50 }, (_, i) => String(41000001 + i));
   const A = UIDS[0], B = UIDS[1];
   const noms = { vinted: Object.fromEntries(UIDS.map((u) => [u, 'boutique'])), leboncoin: { lbcA: 'boutique', lbcB: 'boutique' }, vestiaire: { vcA: 'boutique', vcB: 'boutique' } };
   const ICI = 'aaaaaaaaaaaaaaaa', ORDI = 'bbbbbbbbbbbbbbbb';
-  const presence = (id, comptes, ver = '5.448.0', age = 30000) => ({ id, atMs: T - age, allume: age < 180000, ver, nav: 'chrome', sys: 'mac', comptes, retenues: [], enCours: '', rt: '' });
+  const presence = (id, comptes, ver = '5.450.0', age = 30000) => ({ id, atMs: T - age, allume: age < 180000, ver, nav: 'chrome', sys: 'mac', comptes, retenues: [], enCours: '', rt: '' });
   // CE navigateur : extension branchée à CE compte VRM, onglet Vinted sur A.
-  const extIci = (uidOnglet = A, version = '5.448.0') => ({ present: true, appelsFinis: true, installeeIci: true, version, plusieurs: [], perime: false,
+  const extIci = (uidOnglet = A, version = '5.450.0') => ({ present: true, appelsFinis: true, installeeIci: true, version, plusieurs: [], perime: false,
     etat: { ok: true, vrm: { connecte: true, user_id: MOI, email: 'x@y.z' }, vinted: uidOnglet ? { uid: uidOnglet, login: 'boutique' } : null, ici: { appareil: ICI } } });
-  const faits = (plus = {}) => ({ maintenant: T, attendue: '5.448.0', capacites: CAPS, telephone: false, brancheEnCours: false, moi: { id: MOI, email: 'x@y.z' },
+  const faits = (plus = {}) => ({ maintenant: T, attendue: '5.450.0', capacites: CAPS, telephone: false, brancheEnCours: false, moi: { id: MOI, email: 'x@y.z' },
     ext: extIci(), presences: [presence(ICI, [{ site: 'vinted', id: A, nom: 'boutique' }, { site: 'leboncoin', id: 'lbcA', nom: 'boutique' }, { site: 'vestiaire', id: 'vcA', nom: 'boutique' }])],
     appareils: [], toutArrete: null, ebay: { principal: true }, noms, ...plus });
   const GESTES = P.GESTES_AGIR;
@@ -137,7 +145,14 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(P.peutAgir(Fd, { site: 'vinted', compte: B, geste: 'repondre', par: 'file' }).voie === 'distance', 'iPhone : B ouvert sur l\'ordinateur allumé ⇒ répondre part à distance');
   dit(P.peutAgir(Fd, { site: 'vinted', compte: A, geste: 'repondre', par: 'file' }).ok === false, 'iPhone : A ouvert nulle part ⇒ lecture seule');
   dit(P.peutAgir(Fd, { site: 'vinted', compte: B, geste: 'repondre', par: 'panneau' }).ok === false, 'iPhone : le panneau (geste de CE navigateur) est en lecture seule');
-  dit(P.peutAgir(Fd, { site: 'vinted', compte: B, geste: 'vacances', par: 'file' }).raison === 'ici-seulement', 'un geste sans équivalent à distance (vacances) : « se fait sur l\'ordinateur »');
+  dit(P.peutAgir(Fd, { site: 'vinted', compte: B, geste: 'automatisations', par: 'file' }).raison === 'ici-seulement', 'un geste sans équivalent à distance (réglages du panneau) : « se fait sur l\'ordinateur »');
+  // 5.450 : les gestes ajoutés à la file exigent la 5.450 sur l'ordinateur ; la réponse (5.436) reste permise avec une 5.448.
+  const F448 = faits({ ext: Fd.ext, presences: [presence(ORDI, [{ site: 'vinted', id: B }, { site: 'leboncoin', id: 'lbcB' }, { site: 'vestiaire', id: 'vcB' }], '5.448.0')] });
+  const nouveaux = [['vinted', B, 'favoris'], ['vinted', B, 'vacances'], ['vinted', B, 'creer'], ['leboncoin', 'lbcB', 'pause'], ['leboncoin', 'lbcB', 'supprimer'], ['leboncoin', 'lbcB', 'publier'], ['vestiaire', 'vcB', 'offre'], ['vestiaire', 'vcB', 'favoris']];
+  dit(nouveaux.every(([si, co, g]) => P.peutAgir(F448, { site: si, compte: co, geste: g, par: 'file' }).raison === 'retard') && P.peutAgir(F448, { site: 'vinted', compte: B, geste: 'repondre', par: 'file' }).ok,
+    'ordinateur en 5.448 : les gestes de la 5.450 (favoris, vacances, brouillon, pause/supprimer/publier Leboncoin, offres/aimés Vestiaire) en lecture seule (« mets à jour »), répondre permis');
+  const F450 = faits({ ext: Fd.ext, presences: [presence(ORDI, [{ site: 'vinted', id: B }, { site: 'leboncoin', id: 'lbcB' }, { site: 'vestiaire', id: 'vcB' }], '5.450.0')] });
+  dit(nouveaux.every(([si, co, g]) => P.peutAgir(F450, { site: si, compte: co, geste: g, par: 'file' }).voie === 'distance'), 'ordinateur en 5.450 : ces gestes partent à distance');
   const eteint = faits({ ext: Fd.ext, presences: [presence(ORDI, [{ site: 'vinted', id: B, nom: 'boutique' }], '5.448.0', 10 * 60000)] });
   dit(P.peutAgir(eteint, { site: 'vinted', compte: B, geste: 'repondre', par: 'file' }).ok === false, 'ordinateur éteint (présence de 10 min) ⇒ lecture seule');
 
@@ -163,6 +178,58 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(Porte.agirMaintenant('vinted', A, 'repondre').ok === false, 'aucun fait posé (app qui démarre) ⇒ lecture seule, jamais « ok » par défaut');
   dit(P.peutAgir(faits(), { site: 'ebay', compte: 'principal', geste: 'x' }).voie === 'api' && !P.peutAgir(faits({ ebay: {} }), { site: 'ebay', compte: 'principal', geste: 'x' }).ok
     && P.peutAgir(faits({ ebay: undefined }), { site: 'ebay', compte: 'principal', geste: 'x' }).raison === 'ebay-passu', 'eBay : gardé par SON jeton (relié ⇒ api ; pas relié ou pas su ⇒ lecture seule), jamais par l\'extension');
+
+  // ── 4 bis. 5.450 : la RÈGLE de la file (src/aDistance.js, recopiée dans background.js) et le VRAI background.js ─────
+  const nc = (o) => D.nouvelleCommandeDistance(Object.assign({ owner: MOI, alea: 'agirtout' }, o));
+  const permises = [
+    ['favoris', 'vinted', A, { ids: ['notif-1', 'notif-2'], texte: 'Bonjour, une offre pour vous', taux: 10 }, true],
+    ['vacances', 'vinted', A, { vacances: true }, false],
+    ['creer', 'vinted', A, { fiche: { id: 'fiche-12', numero: '12', titre: 'Nike P-6000', description: 'Très bon état', prix: 80, photos: ['https://images1.vinted.net/t/1.jpg'] } }, false],
+    ['pause', 'leboncoin', 'lbcA', { id: '2900000001' }, false],
+    ['supprimer', 'leboncoin', 'lbcA', { id: '2900000001', numero: 'B125', titre: 'Jordan 4' }, true],
+    ['publier', 'leboncoin', 'lbcA', { id: '91010001' }, false],
+    ['offre', 'vestiaire', 'vcA', { nego: '123456', geste: 'contre', prix: 90 }, false],
+    ['aimes', 'vestiaire', 'vcA', { produit: '445566', prix: 90, prixAvant: 100 }, false],
+  ];
+  const cmds = permises.map(([geste, site, compte, args, conf]) => nc({ geste, site, compte, args, confirme: conf }));
+  dit(cmds.every((c) => c && !D.adistCommande(c.data).refus), '5.450 : les 8 gestes ajoutés font une commande que la règle accepte', JSON.stringify(cmds.map((c) => c && c.data.geste)));
+  dit(nc({ geste: 'supprimer', site: 'leboncoin', compte: 'lbcA', args: { id: '2900000001' } }) === null && nc({ geste: 'favoris', site: 'vinted', compte: A, args: {} }) === null,
+    'supprimer (sans retour) et écrire aux favoris SANS sa confirmation ⇒ aucune commande');
+  dit(nc({ geste: 'creer', site: 'vinted', compte: A, args: { fiche: { id: 'f', photos: ['data:image/jpeg;base64,AAAA'] } } }) === null
+    && nc({ geste: 'aimes', site: 'vestiaire', compte: 'vcA', args: { produit: '445566', prix: 110, prixAvant: 100 } }) === null
+    && nc({ geste: 'supprimer', site: 'vinted', compte: A, args: { id: '91010001' } }) === null && nc({ geste: 'publier', site: 'vestiaire', compte: 'vcA', args: { id: '1' } }) === null,
+    'refusés : photo en base64 dans la file, offre aux aimés à la HAUSSE, supprimer sur Vinted, publier sur Vestiaire (VRM n\'y clique jamais « Publier »)');
+  // Le VRAI background.js : chaque geste par SON chemin du clic, avec les marques de SA confirmation.
+  let bg = null;
+  try {
+    const { faireFond } = require('./_fond-vm.cjs');
+    const BG = process.env.AGIR_BG || path.join(RACINE, 'vinted-sync-extension', 'background.js');
+    bg = faireFond({ src: BG, lignes: {}, store: { vrmCloisonne: true }, connecte: A, comptes: [{ vinted_user_id: A, login: 'boutique', domain: 'www.vinted.fr', access_token: 'j' }], onglets: [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }] });
+  } catch (e) { bg = null; }
+  if (bg && typeof bg.ctx.distanceExecuter === 'function') {
+    const vus = [];
+    bg.ctx.executerCommande = async (msg) => { vus.push(msg); return { accepte: true, etape: 'fait' }; };
+    bg.ctx.apercuCarteFrais = async () => ({ ok: true, apercu: { reglages: { r: 1 }, liste: [{ id: 'notif-1', cochable: true, itemId: '91010001' }, { id: 'notif-2', cochable: false }, { id: 'notif-3', cochable: true, itemId: '91010002' }] } });
+    const lances = [];
+    bg.ctx.favorisCarte = async (msg, sender) => { lances.push({ msg, sender }); return { ok: true }; };
+    const issues = [];
+    for (const c of cmds) { const d = c.data; issues.push(await bg.ctx.distanceExecuter(bg.ctx.adistCommande(d), d)); }
+    const par = (cmd) => vus.find((m) => m.cmd === cmd) || {};
+    dit(issues.every((i) => i && i.etat === 'fait'), 'background.js : les 8 gestes s\'exécutent (issue « fait »)', JSON.stringify(issues));
+    dit(par('vacancesVinted').uid === A && par('vacancesVinted').vacances === true && par('creerVintedFiche').uid === A && par('creerVintedFiche').confirme === true,
+      'vacances et brouillon : le chemin du clic existant, au nom du compte de la commande', JSON.stringify([par('vacancesVinted'), par('creerVintedFiche').uid]));
+    dit(par('lbcPause').id === '2900000001' && par('lbcSupprime').confirme === true && par('lbcSupprime').sansRetour === true && par('lbcPublier').id === '91010001',
+      'Leboncoin : pause, suppression (confirmée, sans retour), publication par leurs chemins', JSON.stringify([par('lbcPause'), par('lbcSupprime'), par('lbcPublier')]));
+    dit(par('vcOffre').nego === '123456' && par('vcOffre').geste === 'contre' && par('vcOffre').prixCents === 9000 && par('vcOffreAimes').prixCents === 9000 && par('vcOffreAimes').avantCents === 10000,
+      'Vestiaire : contre-offre et offre aux aimés par leurs chemins (recettes apprises), prix en centimes', JSON.stringify([par('vcOffre'), par('vcOffreAimes')]));
+    const l = lances[0];
+    dit(lances.length === 1 && l.msg.quoi === 'lancer' && l.msg.confirme === true && l.msg.uid === A && JSON.stringify(l.msg.selection) === '["notif-1"]' && l.msg.taux === 10 && /vinted\.fr/.test(l.sender.tab.url),
+      'favoris : la file 5.440.1 lancée au nom du compte, SEULEMENT les favoris choisis ET cochables', JSON.stringify(l && l.msg));
+    // Le tri de la file : un geste Leboncoin pour un compte qui n'est PAS celui de l'onglet n'est pas parti.
+    const p = await bg.ctx.distPeutPartir(bg.ctx.adistCommande(cmds[4].data), [{ site: 'leboncoin', id: 'autre' }]);
+    const p2 = await bg.ctx.distPeutPartir(bg.ctx.adistCommande(cmds[4].data), []);
+    dit(p.attend === 'autre-compte' && p2.attend === 'absent', 'la file : supprimer sur un autre compte Leboncoin ou sans onglet ⇒ attend, rien ne part', JSON.stringify([p, p2]));
+  } else dit(false, 'background.js : distanceExecuter (5.450) se charge dans le vm');
 
   // ── 5. Le panneau (ouvrirPanneau) est gardé ─────────────────────────────────────────────────────────────
   const ouverts = [], refus = [];
@@ -199,6 +266,19 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const AG = sansCommentaires(lire('agir/Agir.jsx'));
   dit(/usePeutAgir\(site, compte, 'repondre', 'file'\)/.test(AG) && /disabled=\{!v\.ok\}/.test(AG), 'le champ « Répondre » éteint (visible) quand la porte dit non');
   dit(/onClick=\{v\.ok \? onClick : undefined\}/.test(AG), 'BoutonAgir : un toucher éteint n\'appelle jamais le geste');
+  // ── 5.450 (lot agir-tout) : les écrans qui envoient DEPUIS VRM ─────────────────────────────────────────────────
+  const src = (r) => sansCommentaires(lire(r));
+  const PP = src('PrixPartout.jsx'), OV = lire('OffresVestiaire.jsx'), AV = lire('AimesVestiaire.jsx'), RG = src('ecrans/Reglages.jsx'), AP = src('App.jsx'), AA = src('annoncesActions.js'), LB = src('ecrans/Leboncoin.jsx'), EG = src('ecrans/AnnoncesEgalite.jsx');
+  dit(/agirMaintenant\(s\.site, s\.compte, 'baisser', 'file'\)/.test(PP) && /distGeste: 'prix'/.test(PP), 'Changer le prix : la baisse Vinted / Leboncoin / Vestiaire part par la file, au nom du compte de l\'annonce');
+  dit(/<BaisseSerie /.test(CPT) && /envoyerSerie\('baisser', 'prix'/.test(sansCommentaires(lire('agir/BaisseSerie.jsx'))), 'Baisser en série : une commande `prix` par annonce');
+  dit(/k: 'masquer'/.test(AA) && /k: 'afficher'/.test(AA) && /envoyerSerie\('masquer', k,/.test(CPT), 'Masquer / afficher sur Vinted depuis la sélection d\'annonces');
+  dit(/pauseLbcAgir\(r,/.test(LB) && /supprimerLbcAgir\(r, \{ confirmer: askConfirm/.test(LB) && /publierLbcDepuisVrm\(/.test(LB) && /envoyerSerie\('pause', 'pause'/.test(EG), 'Leboncoin : pause, suppression (confirmée), publication depuis VRM');
+  dit(/distGeste: 'offre'/.test(OV) && /distGeste: 'aimes'/.test(AV), 'Vestiaire : offres et offre aux aimés depuis VRM');
+  dit(/<VacancesAgir comptes=/.test(RG) && /<CreerVintedAgir fiches=/.test(AP) && /distGeste: 'favoris'/.test(CPT), 'Vinted : vacances, créer un brouillon, envoyer aux favoris depuis VRM');
+  dit(/<EbayLectureSeule compte=/.test(AP) && /action: 'status'/.test(AP), 'eBay : l\'état du jeton lu, lecture seule + « Reconnecter eBay »');
+  const Fe = faits({ ebay: { principal: 'expire', autre: false } });
+  const ve = P.peutAgir(Fe, { site: 'ebay', compte: 'principal', geste: 'x' }), vf = P.peutAgir(Fe, { site: 'ebay', compte: 'autre', geste: 'x' });
+  dit(!ve.ok && ve.raison === 'ebay-expire' && ve.geste === 'reconnecter-ebay' && !vf.ok && vf.raison === 'ebay-jeton', 'eBay : jeton expiré ⇒ lecture seule + Reconnecter ; pas relié ⇒ lecture seule', JSON.stringify([ve, vf]));
   // Les textes : tr() dans les 5 langues, mêmes clés.
   const cles = (l) => { const s = lire(`i18n/langues/${l}/agir.js`); return new Set([...s.matchAll(/"(agir\.[^"]+)"/g)].map((m) => m[1])); };
   const fr = cles('fr');

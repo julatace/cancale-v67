@@ -10,7 +10,7 @@
 import React from 'react';
 import { tr } from '../i18n/index.js';
 import { Bouton, Feuille } from '../natif/index.js';
-import { usePeutAgir, useCompteAgir, envoyerGeste } from './porte.js';
+import { usePeutAgir, useCompteAgir, envoyerGeste, agirOuPanneau, useFaitsAgir as useFaitsAgirA, envoyerSerie as envoyerSerieA, agirMaintenant as agirMaintenantA, faitsAgir as faitsAgirA } from './porte.js';
 import { NOMS_SITES_AGIR } from './peutAgir.js';
 import './agir.css';
 
@@ -39,7 +39,7 @@ export function BadgeLectureSeule({ site, compte }) {
 }
 
 // La ligne de l'issue d'un envoi : « Parti vers l'extension » · « Déjà en attente » · « Pas envoyé ».
-function issueTexte(r) {
+export function issueTexte(r) {
   if (!r) return '';
   if (r.ok) return tr(r.voie === 'distance' ? 'agir.envoi.distance' : 'agir.envoi.ici');
   if (r.raison === 'deja') return tr('agir.envoi.deja');
@@ -111,5 +111,108 @@ export function BoutonRepublierAgir({ compte, id, num = '', libelle = '' }) {
         <p className="vrm-agir-feuille-p">{tr('agir.republier.confirmer')}</p>
       </Feuille> : null}
     </span>
+  );
+}
+
+// ── (24 nov., lot agir-tout) LES GESTES LEBONCOIN DEPUIS VRM ─────────────────────────────────────────────────────────
+// Le compte d'une annonce Leboncoin, par SON identité (`compte` / `account` / `lbcUser`, « lbc-account: » retiré) ; '' = pas su.
+export const compteLbcDe = (r) => String((r && (r.compte || r.account || r.lbcUser)) || '').replace(/^lbc-account:/i, '');
+// `confirmer({ titre, desc, ok, danger })` : la boîte de l'app (askConfirm) ; `panneau()` : l'ancien chemin (gardé).
+export function pauseLbcAgir(r, { panneau } = {}) {
+  return agirOuPanneau({ site: 'leboncoin', compte: compteLbcDe(r), geste: 'pause', distGeste: 'pause', args: { id: String(r.id) }, num: String(r.numero || ''), panneau, textes: { issue: issueTexte } });
+}
+export function supprimerLbcAgir(r, { confirmer, panneau } = {}) {
+  return agirOuPanneau({ site: 'leboncoin', compte: compteLbcDe(r), geste: 'supprimer', distGeste: 'supprimer', num: String(r.numero || ''), panneau, textes: { issue: issueTexte },
+    args: { id: String(r.id), numero: String(r.numero || ''), titre: String(r.titre || r.title || r.subject || '') },
+    // SA confirmation « sans retour » (la même exigence que l'extension, `sansRetour`) : sans elle, rien ne part.
+    confirmer: () => (typeof confirmer === 'function' ? confirmer({ title: tr('agir.lbc.supprimerTitre', { n: String(r.numero || '') }), desc: tr('agir.lbc.sansRetour'), ok: tr('agir.lbc.supprimerOui'), danger: true }) : Promise.resolve(false)) });
+}
+export function publierLbcAgir({ id, compte, numero = '' }, { panneau } = {}) {
+  return agirOuPanneau({ site: 'leboncoin', compte, geste: 'publier', distGeste: 'publier', args: { id: String(id) }, num: String(numero || ''), panneau, textes: { issue: issueTexte } });
+}
+
+// ── (24 nov., lot agir-tout) MODE VACANCES DEPUIS VRM ────────────────────────────────────────────────────────────────
+// Par compte Vinted : « Mettre en vacances » / « Retirer » — UNE commande `vacances` (la file ; l'extension lit l'état
+// `is_on_holiday` avant, le RELIT après, geste rejoué seulement s'il a été APPRIS sur SON propre geste vinted.fr).
+export function VacancesAgir({ comptes = [] }) {
+  const [issue, setIssue] = React.useState({});
+  const l = (Array.isArray(comptes) ? comptes : []).filter((a) => a && /^\d{1,20}$/.test(String(a.vinted_user_id || '')));
+  const partir = async (uid, on) => { const r = await envoyerGeste({ site: 'vinted', compte: uid, geste: 'vacances', distGeste: 'vacances', args: { vacances: on } }); setIssue((x) => ({ ...x, [uid]: r })); };
+  if (!l.length) return null;
+  return (
+    <div className="vrm-agir-vacances" data-agir-vacances={l.length} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {l.map((a) => { const uid = String(a.vinted_user_id), r = issue[uid]; return (
+        <div key={uid} data-agir-vacances-compte={uid} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <b className="vrm-sensible">{a.label || a.login || uid} <BadgeLectureSeule site="vinted" compte={uid}/></b>
+          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <BoutonAgir site="vinted" compte={uid} geste="vacances" par="file" taille="compact" onClick={() => partir(uid, true)} attrs={{ 'data-agir-vacances-on': uid }}>{tr('agir.vacances.on')}</BoutonAgir>
+            <BoutonAgir site="vinted" compte={uid} geste="vacances" par="file" taille="compact" variante="texte" onClick={() => partir(uid, false)} attrs={{ 'data-agir-vacances-off': uid }}>{tr('agir.vacances.off')}</BoutonAgir>
+          </span>
+          {r ? <small className="vrm-agir-issue" role="status" data-agir-issue={r.ok ? 'ok' : r.raison || 'non'}>{issueTexte(r)}</small> : null}
+        </div>); })}
+    </div>
+  );
+}
+
+// ── (24 nov., lot agir-tout) « CRÉER SUR VINTED » DEPUIS VRM ──────────────────────────────────────────────────────────
+// UN brouillon par fiche (la file `creer` ⇒ `creerVintedFiche`, le chemin du clic : compte de l'onglet, 45/h, N° lié à
+// l'identifiant rendu ; IL publie). La fiche voyage LÉGÈRE : ses champs texte et les ADRESSES https de ses photos (une photo
+// gardée seulement dans le navigateur ne voyage pas : la fiche est dite « à créer depuis l'ordinateur »).
+export function ficheLegere(f) {
+  if (!f || typeof f !== 'object') return null;
+  const photos = (Array.isArray(f.photos) ? f.photos : []).map((p) => (typeof p === 'string' ? p : p && (p.url || p.src))).filter((u) => typeof u === 'string' && /^https:\/\//.test(u) && u.length <= 600).slice(0, 20);
+  if (!photos.length) return null;
+  const o = {};
+  for (const [k, v] of Object.entries(f)) if (k !== 'photos' && (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') && String(v).length <= 4000) o[k] = v;
+  o.id = String(f.id || f.numero || ''); o.photos = photos;
+  try { if (JSON.stringify(o).length > 28000) return null; } catch (_) { return null; }
+  return o;
+}
+export function CreerVintedAgir({ fiches = [] }) {
+  const faits = useFaitsAgirA();
+  const [issue, setIssue] = React.useState(null);
+  const l = (fiches || []).filter((f) => f && f.numero);
+  const legeres = l.map(ficheLegere).filter(Boolean);
+  const comptes = Object.entries((faits && faits.noms && faits.noms.vinted) || {});
+  return (
+    <div className="vrm-agir-creer" data-agir-creer={legeres.length} style={{ margin: '0 var(--n-marge, 16px) 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {comptes.map(([uid, nom]) => (
+        <BoutonAgir key={uid} site="vinted" compte={uid} geste="creer" par="file" attrs={{ 'data-agir-creer-compte': uid }}
+          onClick={async () => setIssue(await envoyerSerieA('creer', 'creer', legeres.map((f) => ({ site: 'vinted', compte: uid, num: String(f.numero || ''), args: { fiche: f } }))))}>
+          {tr('agir.creer.sur', { n: legeres.length, compte: nom || uid })}</BoutonAgir>))}
+      {legeres.length < l.length ? <small data-agir-creer-lourdes={l.length - legeres.length}>{tr('agir.creer.lourdes', { n: l.length - legeres.length })}</small> : null}
+      {issue ? <small className="vrm-agir-issue" role="status" data-agir-issue={issue.n ? 'ok' : 'non'}>{issue.n ? tr('agir.baisse.parti', { n: issue.n }) : (texteRaison(issue.verdict) || tr('agir.envoi.base'))}</small> : null}
+    </div>
+  );
+}
+
+// ── (24 nov., lot agir-tout) PUBLIER SUR LEBONCOIN DEPUIS VRM ─────────────────────────────────────────────────────────
+// Leboncoin publie au nom du compte de l'onglet : le compte Leboncoin choisi est celui qu'une extension connectée a ouvert
+// (la porte, voie file) ; aucun ⇒ le panneau (gardé). `id` : l'identifiant de l'annonce Vinted source (la paire, §5).
+export function compteLbcOuvertAgir(faits) {
+  const noms = (faits && faits.noms && faits.noms.leboncoin) || {};
+  const ids = new Set(Object.keys(noms));
+  for (const p of Array.isArray(faits && faits.presences) ? faits.presences : []) for (const c of p.comptes || []) if (c && c.site === 'leboncoin') ids.add(String(c.id).replace(/^lbc-account:/i, ''));
+  for (const id of ids) if (agirMaintenantA('leboncoin', id, 'publier', 'file').ok) return id;
+  return '';
+}
+export function publierLbcDepuisVrm(id, { panneau, numero = '' } = {}) {
+  const compte = compteLbcOuvertAgir(faitsAgirA());
+  if (!compte) { if (typeof panneau === 'function') panneau(); return Promise.resolve({ panneau: true }); }
+  return publierLbcAgir({ id, compte, numero }, { panneau });
+}
+
+// ── (24 nov., lot agir-tout) eBAY : LE JETON ─────────────────────────────────────────────────────────────────────────
+// Jeton expiré ou compte pas relié ⇒ lecture seule : les données eBay restent, une ligne grise dit pourquoi, UN bouton
+// « Reconnecter eBay ». Pas su ⇒ rien (les écrans eBay disent déjà leurs refus).
+export function EbayLectureSeule({ compte = 'principal', onReconnecter = null }) {
+  const v = usePeutAgir('ebay', compte, 'x');
+  if (v.ok || (v.raison !== 'ebay-expire' && v.raison !== 'ebay-jeton')) return null;
+  return (
+    <div className="vrm-agir-ebay" role="status" data-agir-ebay={v.raison} data-agir-compte={String(compte)} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '8px 0', padding: '10px 12px', borderRadius: 12, background: 'var(--n-inactif, rgba(118,118,128,0.12))', color: 'var(--n-encre-2, #6e6e73)' }}>
+      <span className="vrm-agir-badge"><span aria-hidden="true" className="vrm-agir-badge-point"/>{tr('agir.badge')}</span>
+      <span style={{ flex: 1, minWidth: 160 }}>{texteRaison(v)}</span>
+      {onReconnecter ? <Bouton variante="teinte" taille="compact" onClick={onReconnecter} attrs={{ 'data-agir-ebay-reconnecter': '' }}>{tr('agir.ebay.reconnecter')}</Bouton> : null}
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 import { PlateformesSetting } from '../App.jsx';
+import { VacancesAgir } from '../agir/Agir.jsx';   // (24 nov., lot agir-tout)
 import { fusion3 } from '../fusionNuage.js';
 import { modifierLigneCas, ecrireDifference } from '../ligneCas.js';
 import { signalDelai } from '../compatSafari.js';
@@ -2209,7 +2210,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (10 nov., lot O) Tous ses comptes en vacances puis rouverts, compte par compte, sur SON clic (src/ModeVacances.jsx).
       // (11 nov., lot securite-vinted) Julien : « faire comme Vintex, pour ne pas se faire bannir » — une phrase par compte, ses réglages, « Tout arrêter » (src/SecuriteComptes.jsx).
       { id:'securite-comptes', type:'panneau', ic:'sleep', lib:tr('reglages.securite.lib'), desc:tr('reglages.securite.desc'), data:{ 'data-reglage-securite-comptes':'' }, el:<SecuriteComptes comptes={comptes||[]}/> },
-      { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<div data-vacances-panneau="" style={{ padding: '8px 0' }}><BoutonExtension action="vacances" large/></div> },
+      { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<div data-vacances-panneau="" style={{ padding: '8px 0' }}><VacancesAgir comptes={comptes||[]}/></div> },   // (24 nov., lot agir-tout) depuis VRM, compte par compte
       // (12 nov., ext. 5.370) La discrétion : plafond par jour, vérification demandée par Vinted, freins des 7 jours (src/Discretion.jsx).
       { id:'discretion', type:'panneau', ic:'pin', lib:tr('reglages.discretion.lib'), desc:tr('reglages.discretion.desc'), data:{ 'data-reglage-discretion':'' }, el:<PanneauDiscretion uids={(comptes||[]).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean)} nomCompte={(u) => { const a = (comptes||[]).find((x) => String(x && x.vinted_user_id) === String(u)); return (a && (a.label || a.login)) || null; }}/> },
       // (12 nov., sécurité des comptes) Un zip par compte Vinted, fait dans le navigateur, envoyé nulle part (src/CopieAnnonces.jsx).
