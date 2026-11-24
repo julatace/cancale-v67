@@ -17,6 +17,7 @@
 //  AUCUNE règle ici : tout arrive calculé (src/aujourdhui/modele.js, les cartes de Ma journée dans src/App.jsx).
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
+import { Anneau, TuilePaire, revele, useArrive } from '../Jeu.jsx';   // (24 nov., visuel-jeu) l'anneau des colis prêts, les ventes en tuiles
 import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site de chaque colis
 import { tr, nombre, localeCourante } from '../../i18n/index.js';
 import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segmente, Colonnes, Colonne, Carte, Tuiles, Tuile, Pastille, Faits, Fait, Feuille, Courbe, Progression, Champ, ListeOrdonnee, Editable, Toast, useOrdinateur, GrapheJours, Etincelle, Repartition, Heros, ActionsRondes, CasesChiffres } from '../index.js';
@@ -268,6 +269,7 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
   const rien = pret && n === 0 && nRet === 0;
   const point = retraits && Array.isArray(retraits.points) ? retraits.points[0] : null;
   const lignesV = ventes && ventes.etat === 'lu' && Array.isArray(ventes.lignes) ? ventes.lignes.slice(0, 5) : [];
+  const ventesArrivent = useArrive(lignesV.length > 0, 'journee-ventes');   // (24 nov., « sans latence ») déjà connues au montage ⇒ là d'un coup
   // « Argent à venir » : seulement s'il est lu ET qu'il y en a (« 0 € à venir » n'apprend rien).
   const aVenirLu = !!aVenir && aVenir.valeur != null && aVenir.valeur > 0;
   const image = (src, taille) => (src && Photo ? <Photo className="n-vignette" data-n-taille={taille} src={src} alt="" width={taille} height={taille} loading="lazy" decoding="async"/> : <Vignette taille={taille} icone={<Icon name="cintre" size={22}/>}/>);
@@ -298,7 +300,11 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
           {/* (22 nov. soir, maquettes de Julien) DEUX CASES côte à côte : « 6 à envoyer » (l'échéance qui presse en ambre) |
               « 3 à retirer » (le point relais). Les mêmes nombres, les mêmes repères (`data-v2-cj-ligne`), le même toucher. */}
           <CasesChiffres attrs={{ 'data-n-colis-duo': '' }} cases={[
+            // (24 nov., visuel-jeu) L'ANNEAU des bordereaux prêts sur les colis à envoyer — les MÊMES nombres que la phrase
+            // (`affiche.prets`, Comptabilite.jsx) ; pas lu ⇒ anneau en pointillé « — », jamais 0 ni plein ; rien à envoyer ⇒ pas d'anneau.
             { cle: 'envoyer', icone: <Icon name="truck" size={18}/>, libelle: tr('v2.envoyer.titre'), valeur: lecture || n == null ? '—' : nombre(n), sous: envSous, tonSous: alerteEnv ? 'ambre' : undefined,
+              visuel: lecture || n === 0 ? null : <Anneau valeur={n != null && affiche && affiche.prets ? affiche.prets.n : null} total={n} taille={40} epaisseur={5} centre={<Icon name="printer" size={15}/>}
+                fait={!!(affiche && affiche.prets && affiche.prets.exact)} libelle={n != null && affiche && affiche.prets ? tr('jeu.anneauPrets', { n: affiche.prets.n, total: n }) : tr('jeu.pasSu')} className="n-cc-anneau"/>,
               onClick: () => onColis && onColis(null), attrs: { 'data-v2-cj-ligne': 'envoyer', 'data-v2-cj-n': n == null ? '' : String(n), 'data-v2-ecart': (affiche && affiche.sous) || '', 'data-v2-alerte': alerteEnv ? 'poster' : undefined } },
             { cle: 'retirer', icone: <Icon name="pin" size={18}/>, libelle: tr('v2.retirer.titre'), valeur: lecture || nRet == null ? '—' : nombre(nRet), sous: retSous,
               tonSous: retraits && retraits.premier && retraits.premier.ambre ? 'ambre' : point && point.lieu && nRet > 0 ? 'lieu' : undefined,
@@ -358,10 +364,18 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
     ),
     ventes: () => (
       <Carte titre={tr('v2.dv.titre')} attrs={{ 'data-v2-bloc': 'ventes', 'data-v2-dernieres': String(lignesV.length) }}>
-        {lignesV.map((l) => (
-          <Rangee key={l.cle} vignette={image(l.photo, 44)} titre={l.titre || tr('v2.dv.vente', { site: l.site })} lignes={2} plaque={<>{l.site ? <LogoSite site={String(l.site).toLowerCase()} taille={16}/> : null}{l.num ? <Plaque numero={l.num}/> : null}</>}
-            sousTitre={[l.site, ilYaCourt(l.ts)].filter(Boolean).join(' · ')} valeur={l.prix} valeurForte onClick={l.ouvrir || onVentes} attrs={{ 'data-v2-vente': l.cle }}/>
-        ))}
+        {/* (24 nov., visuel-jeu — « comme un inventaire ») Les dernières ventes en TUILES : la photo (celle que la source a trouvée
+            par identité), l'étiquette du N°, le prix et « il y a » dessous ; défilement de côté au téléphone. */}
+        {lignesV.length ? <div className="n-inventaire" data-n-jeu="ventes" role="list">
+          {lignesV.map((l, k) => (
+            <button key={l.cle} type="button" role="listitem" {...revele(k, 'n-inventaire-case', ventesArrivent)} onClick={l.ouvrir || onVentes} data-v2-vente={l.cle} data-n-vente-tx={l.tx || undefined}
+              aria-label={[l.titre || tr('v2.dv.vente', { site: l.site }), l.num ? 'N°' + l.num : '', l.prix, ilYaCourt(l.ts)].filter(Boolean).join(' · ')}>
+              <TuilePaire photo={l.photo || ''} numero={l.num || ''} icone={l.photo ? '' : 'cash'} genre="vente" Icon={Icon} taille="xl" Photo={Photo}/>
+              <span className="n-inventaire-prix">{l.site ? <LogoSite site={String(l.site).toLowerCase()} taille={14}/> : null}<span>{l.prix || '—'}</span></span>
+              <span className="n-inventaire-quand">{ilYaCourt(l.ts)}</span>
+            </button>
+          ))}
+        </div> : null}
         {aVenirLu && !aPilotage ? <Rangee titre={tr('v2.dv.aVenir')} valeur={(aVenir.partiel ? tr('journee.moins') + ' ' : '') + aVenir.texte} fin="chevron" onClick={aVenir.ouvrir} attrs={{ 'data-v2-avenir': cents(aVenir.valeur) }}/> : null}
       </Carte>
     ),
