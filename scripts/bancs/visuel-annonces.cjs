@@ -148,7 +148,7 @@ async function cas(nav, nom, opts, theme) {
   const t = theme === 'sombre' ? '&theme=dark' : '';
   // 1. Contenu qui ARRIVE (lecture 700 ms) : squelette, puis cascade courte, CLS.
   const { ctx, pg, erreurs } = await ouvrir(nav, opts, `?n=${N}&arrivee=700${t}`);
-  await pg.waitForSelector('[data-ad-carte][data-eg-article]', { state: 'attached', timeout: 60000 });
+  await pg.waitForSelector('[data-ad-carte][data-eg-article], [data-ad-rangee][data-eg-article]', { state: 'attached', timeout: 60000 });
   await pg.waitForFunction(() => window.__premiere, null, { timeout: 30000 });   // la 1re image qui la montre (rAF), pas l'instant du sélecteur
   const prem = await pg.evaluate(() => window.__premiere);
   const casc = (await pg.evaluate(() => window.__cascade)) || { n: 0, pas: 0, total: 0, duree: 0 };
@@ -196,7 +196,7 @@ async function cas(nav, nom, opts, theme) {
     await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(100);
     // Le 1er contenu dans le DOM (MutationObserver : le travail de l'app) et à l'image suivante (rAF : rapporté, la machine est chargée).
     const tap = await pg.evaluate(async () => { const s = document.querySelector('[data-eg-segment="dorment"]') || document.querySelector('[data-eg-segment]:not([aria-checked="true"])');
-      const pret = () => { const e = document.querySelector('[data-eg-ecran]'); return e && e.getAttribute('data-eg-etat') !== 'enligne' && (document.querySelector('[data-ad-carte]') || document.querySelector('.n-vide')); };
+      const pret = () => { const e = document.querySelector('[data-eg-ecran]'); return e && e.getAttribute('data-eg-etat') !== 'enligne' && (document.querySelector('[data-ad-carte], [data-ad-rangee]') || document.querySelector('.n-vide')); };
       let dom = null; const mo = new MutationObserver(() => { if (dom == null && pret()) dom = performance.now() - t0; }); mo.observe(document.body, { subtree: true, childList: true, attributes: true });
       const t0 = performance.now(); s.click(); if (pret()) dom = performance.now() - t0;
       const image = await new Promise((ok) => { const v = () => { if (pret()) ok(performance.now() - t0); else if (performance.now() - t0 > 3000) ok(9999); else requestAnimationFrame(v); }; requestAnimationFrame(v); });
@@ -208,10 +208,10 @@ async function cas(nav, nom, opts, theme) {
       await new Promise((ok) => setTimeout(ok, 150)); const l = [...document.querySelectorAll('[data-ad-rangee][data-eg-article]')]; const r = { n, vus: l.length, avecN: l.filter((x) => x.getAttribute('data-eg-numero')).length, h: Math.round(b.height) };
       document.querySelector('[data-ad-puce="sansnum"]').click(); await new Promise((ok) => setTimeout(ok, 150)); return r; });
     dit(!p1.absente && p1.vus === p1.n && p1.avecN === 0 && p1.h >= 44, `P puce « Sans N° » : ${p1.vus} rangée(s) = son nombre (${p1.n}), aucune avec N°, cible ${p1.h} px`, p1);
-    const p2 = await pg.evaluate(async () => { document.querySelector('[data-ad-tri]').click(); await new Promise((ok) => setTimeout(ok, 250)); const t = document.querySelector('[data-ad-tri-choix="prixHaut"]'); if (!t) return { menu: false }; t.click();
-      await new Promise((ok) => setTimeout(ok, 250)); const v = [...document.querySelectorAll('[data-eg-groupe]')][0]; const prix = [...v.querySelectorAll('[data-ad-rangee] .n-ar-prix')].map((e) => parseFloat(e.textContent.replace(/\s/g, '').replace(',', '.'))).filter((x) => !isNaN(x));
-      const r = { n: prix.length, ordonne: prix.every((x, i) => !i || x <= prix[i - 1]), tri: document.querySelector('[data-ad-tri]').getAttribute('data-ad-tri') };
-      document.querySelector('[data-ad-tri]').click(); await new Promise((ok) => setTimeout(ok, 250)); document.querySelector('[data-ad-tri-choix="recent"]').click(); await new Promise((ok) => setTimeout(ok, 250)); return r; });
+    await pg.click('[data-ad-tri]'); await pg.click('[data-ad-tri-choix="prixHaut"]'); await pg.waitForTimeout(500);
+    const p2 = await pg.evaluate(() => { const v = [...document.querySelectorAll('[data-eg-groupe]')][0]; const prix = [...v.querySelectorAll('[data-ad-rangee] .n-ar-prix')].map((e) => parseFloat(e.textContent.replace(/\s/g, '').replace(',', '.'))).filter((x) => !isNaN(x));
+      return { n: prix.length, ordonne: prix.every((x, i) => !i || x <= prix[i - 1]), tri: document.querySelector('[data-ad-tri]').getAttribute('data-ad-tri'), feuille: !!document.querySelector('[data-ad-menu-tri]') }; });
+    await pg.click('[data-ad-tri]'); await pg.click('[data-ad-tri-choix="recent"]'); await pg.waitForTimeout(600);
     dit(p2.n > 3 && p2.ordonne && p2.tri === 'prixHaut', `P tri « Prix décroissant » : ${p2.n} prix dans l'ordre`, p2);
     const row = await pg.$('[data-ad-rangee][data-eg-article] .n-ar-glisse'); const bb = await row.boundingBox();
     await pg.mouse.move(bb.x + bb.width - 70, bb.y + bb.height / 2); await pg.mouse.down(); for (let k = 1; k <= 8; k++) await pg.mouse.move(bb.x + bb.width - 70 - k * 28, bb.y + bb.height / 2 + 1); await pg.mouse.up(); await pg.waitForTimeout(350);
@@ -225,12 +225,12 @@ async function cas(nav, nom, opts, theme) {
   // 2. Contenu DÉJÀ connu : aucun squelette, aucune cascade, cartes dès la 1re image.
   const k = await ouvrir(nav, opts, `?n=${N}&arrivee=0${t}`);
   await k.pg.waitForTimeout(200);
-  const connu = await k.pg.evaluate(() => ({ os: window.__os, prem: window.__premiere, revele: document.querySelectorAll('[data-ad-carte][data-n-revele]').length }));
+  const connu = await k.pg.evaluate(() => ({ os: window.__os, prem: window.__premiere, revele: document.querySelectorAll('[data-ad-carte][data-n-revele], [data-ad-rangee][data-n-revele]').length }));
   dit(connu.os === 0 && connu.revele === 0 && connu.prem && connu.prem.op === 1 && connu.prem.anim === 'none', `S contenu déjà connu : aucun squelette (${connu.os} images), aucune cascade (${connu.revele}), carte pleine à la 1re image`, connu);
   await k.ctx.close();
   // 3. Mouvement réduit : rien ne bouge, les photos se montrent sans fondu.
   const r = await ouvrir(nav, opts, `?n=${N}&arrivee=500${t}`, { reducedMotion: 'reduce' });
-  await r.pg.waitForSelector('[data-ad-carte][data-eg-article]', { state: 'attached', timeout: 60000 }); await r.pg.waitForTimeout(80);
+  await r.pg.waitForSelector('[data-ad-carte][data-eg-article], [data-ad-rangee][data-eg-article]', { state: 'attached', timeout: 60000 }); await r.pg.waitForTimeout(80);
   const mr = await r.pg.evaluate(MESURE);
   dit(mr.animees === 0 && mr.imgsCachees === 0, `M mouvement réduit : ${mr.animees} carte animée, ${mr.imgsCachees} photo masquée`, mr.animees);
   await r.ctx.close();

@@ -194,7 +194,8 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   // `useArrive` (Jeu.jsx) : déjà montrée une fois dans la session (retour sur l'onglet) ⇒ plus jamais de cascade.
   const arriveeSession = useArrive(Array.isArray(articles), 'annonces');
   const enArrivee = arriveeSession && Array.isArray(articles) && articles === arrivee.current.liste;
-  const debutDe = (cle) => { let n = 0; for (const g of groupes) { if (g.cle === cle) return n; if (!replis.has(g.cle)) n += Math.min(g.articles.length, 4); } return n; };
+  // La cascade continue d'un compte au suivant : chacun compte les cases de SA 1re fenêtre (5 rangées ; 2 colonnes en « Détaillé »).
+  const debutDe = (cle) => { let n = 0; for (const g of groupes) { if (g.cle === cle) return n; if (!replis.has(g.cle)) n += Math.min(g.articles.length, vueTel === 'grille' ? 10 : 5); } return n; };
   const resteGroupes = groupes.reduce((n, g) => n + Math.max(0, g.articles.length - max), 0);
   const A = action ? actions.find((x) => x.cle === action) : null;
   const cochable = (a) => !A || !A.pour || A.pour(a);
@@ -412,6 +413,8 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
       <Page titre={tr('egalite.titre')} plein={plein} attrs={{ 'data-eg-ecran': '', 'data-eg-site': filtre.site, 'data-eg-etat': filtre.etat, 'data-eg-selection': A ? A.cle : undefined, 'data-eg-vue': ordinateur ? 'tableau' : 'liste', 'data-ad-vue': vueG ? 'grille' : 'liste' }}
         recherche={barreHaut}>
         {tete}
+        {/* Pendant la lecture, la rangée des puces est déjà là (même hauteur) : rien ne saute à l'arrivée. */}
+        {!A && !enPrio && articles === undefined && !ordinateur ? <div className="n-ad-puces" aria-hidden="true" data-ad-puces-os="">{[96, 84, 110].map((w, k) => <span key={k} className="n-ad-puce"><span className="n-ad-puce-pilule n-os" style={{ width: w }}/></span>)}</div> : null}
         {!A && !enPrio && Array.isArray(articles) && liste.length ? <div className="n-ad-puces" role="toolbar" aria-label={tr('inv.puces')} data-ad-puces="">
           <button type="button" className="n-ad-puce" data-ad-tri={tri} aria-haspopup="dialog" onClick={() => setMenuTri(true)}><span className="n-ad-puce-pilule">{Icon ? <Icon name="filter" size={15}/> : null}{tr('inv.tri.' + tri)}</span></button>
           {[['sansnum', liste.filter((a) => !a.numero).length], ['aconfirmer', liste.filter((a) => a.annonces.some((x) => x.etat === 'aconfirmer')).length]].filter(([, k]) => k > 0 || puce)
