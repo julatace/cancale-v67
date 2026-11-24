@@ -148,6 +148,8 @@ const capture = async (pg, nom, sel) => { if (!SHOTS) return; fs.mkdirSync(SHOTS
       const vis = '[data-v2-argent-fait="attente"]';
       // Le design que voit Julien (VRM natif) pour A : sans ce choix, la garde réseau des bancs (_garde-reseau.cjs, chargée par la
       // CI) sert le DOM d'avant le 17 nov., où l'argent à venir n'est plus là où un vendeur le voit. B et C gardent l'échafaudage.
+      // (La page neuve est encore about:blank, sans stockage : une première ouverture de l'app, le choix, puis la vraie.)
+      if (!/^http/.test(pg.url())) await aller(pg, 'compta', null, 300);
       await pg.evaluate(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} });
       await aller(pg, 'compta', vis, 3000);
       await pg.waitForFunction((s) => [...document.querySelectorAll(s)].some((e) => e.getClientRects().length && e.getAttribute('data-v2-argent-valeur')), vis, { timeout: 15000 }).catch(() => {});

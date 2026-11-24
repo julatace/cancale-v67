@@ -21,7 +21,7 @@ catch (_) { PW = require('playwright'); }
 const { lancer, estWebkit } = require('./_navigateur.cjs');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
-const DIST = path.join(__dirname, '..', '..', 'dist');
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');   // (24 nov.) BANC_DIST : un autre dist/ (preuve avant/après)
 const PORT = Number(process.env.BANC_PORT || 4421);
 const SHOTS = process.env.SHOTS || '';
 const JEU = process.env.JR_JEU || 'base';
@@ -307,9 +307,12 @@ const ouvrir = async (b, vp, sombre) => {
           const fermerFiche = async () => { await pg.keyboard.press('Escape').catch(() => {}); const f = pg.locator('[role="dialog"] [aria-label^="Fermer"]').filter({ visible: true }).last(); if (await f.count()) await f.click({ timeout: 3000 }).catch(() => {}); await pg.waitForFunction(() => ![...document.querySelectorAll('[data-rp-detail]')].some((x) => x.getClientRects().length), null, { timeout: 8000 }).catch(() => {}); };
           await fermerFiche();
           // (24 nov., main-vert) La règle nomme DEUX gestes : ouvrir (la ligne) et « J'ai retiré ». Le rond « code en grand »
-          // (`va-rond-code`, 15 nov.) s'aligne sur le CODE qu'il agrandit, pas sur eux : il n'entre pas dans cette règle.
-          const gestes=await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-rang :is(.vrm-rpf-ouvrir, .vrm-rpf-retire)').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return r.top+r.height/2;}));
-          dit(gestes.length===2&&gestes.every(y=>Math.abs(y-gestes[0])<2),'ouvrir et retrait restent côte à côte',JSON.stringify(gestes));
+          // (`va-rond-code`, 15 nov.) s'aligne sur le CODE qu'il agrandit : il n'entre pas dans cette règle. « Ouvrir » est
+          // devenu la ligne entière (titre, code, n°, délai : 3 à 4 lignes) : côte à côte = « J'ai retiré » À DROITE de la ligne,
+          // dans sa hauteur (jamais dessous) — le centre d'une ligne de 170 px ne dit plus rien.
+          const gestes=await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-rang :is(.vrm-rpf-ouvrir, .vrm-rpf-retire)').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return {c:e.classList.contains('vrm-rpf-retire')?'retire':'ouvrir',t:Math.round(r.top),b:Math.round(r.bottom),l:Math.round(r.left),r:Math.round(r.right)};}));
+          const go=gestes.find((g)=>g.c==='ouvrir'), gr=gestes.find((g)=>g.c==='retire');
+          dit(gestes.length===2&&go&&gr&&gr.l>=go.r-2&&gr.t>=go.t-2&&gr.b<=go.b+2,'ouvrir et retrait restent côte à côte',JSON.stringify(gestes));
           await pg.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw Error('refus');}}}));
           await pg.locator('[data-cc-carte*="9301"] [data-rp-titre]').first().click();
           await pg.waitForFunction(() => [...document.querySelectorAll('[data-rp-detail]')].some((d) => d.getClientRects().length), null, { timeout: 15000 }).catch(() => {});
