@@ -33,7 +33,7 @@ const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Mat
 const coupe = (t) => { const m = /^(.*?)[\s  ]*€$/.exec(String(t)); return m ? [m[1], '€'] : [String(t), '']; };
 // (24 nov.) Le grand chiffre : l'espace fine des milliers (U+202F, celle de `montant`) gardée dans le texte, mais posée dans
 // une boîte de largeur fixe — à 30 px, la police la rendait presque nulle (« 1794 € » à côté de « 2 028 € »).
-const milliers = (t) => String(t).split('\u202f').flatMap((p, i) => (i ? [<span key={i} className="n-arg-millier">{'\u202f'}</span>, p] : [p]));
+const milliers = (t) => String(t).split('\u202f').flatMap((p, i) => (i ? [<span key={'millier-' + i} className="n-arg-millier">{'\u202f'}</span>, p] : [p]));
 const majuscule = (t) => { const x = String(t || ''); return x ? x.charAt(0).toLocaleUpperCase() + x.slice(1) : x; };
 const signe = (m, montant) => (m > 0 ? '+' : m < 0 ? '−' : '') + montant(Math.abs(m));
 

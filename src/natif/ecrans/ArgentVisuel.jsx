@@ -60,7 +60,7 @@ export function CouvertureBarre({ k, n }) {
   if (!(n > 0) || !(k >= 0)) return null;
   return (
     <span className="n-agv-couv" role="img" aria-label={tr('agv.couvAria', { k, n })} data-agv-couv={`${k}/${n}`}>
-      {n <= 24 ? Array.from({ length: n }, (_, i) => <i key={i} data-plein={i < k ? '1' : undefined}/>)
+      {n <= 24 ? Array.from({ length: n }, (_, i) => <i key={'case-' + i} data-plein={i < k ? '1' : undefined}/>)
         : <span className="n-agv-couv-continu"><span style={{ width: ((k / n) * 100).toFixed(1) + '%' }}/></span>}
     </span>
   );
