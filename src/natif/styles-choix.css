@@ -1,0 +1,137 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   LA FAMILLE DE BOUTONS DES STYLES À ESSAYER (24 nov. 2026, Julien : « améliore tous les boutons pour que tout soit
+   beaucoup plus beau », « essaye un peu de changer de style pour l'iPhone » ; puis dix styles à essayer DANS l'app).
+   docs/passation/2026-11-24-style-graphite.md
+   • Écrite UNE fois. Chaque style ne change que des jetons (`--n-*` et `--g-*`, src/natif/styles-choix-jetons.css,
+     fabriqué par scripts/styles-generer.cjs). Aucune règle de mise en page par écran.
+   • Ne s'applique que sous un style choisi (`data-style` sur la racine, ou sur une tuile d'aperçu). Le style « Actuel »
+     (aucun attribut) ne voit RIEN de ce fichier.
+   • Hors couche (`@layer`) exprès : les feuilles natives sont en couche, ce fichier passe après elles sans `!important`.
+   • Rien d'orange : « à faire » = l'ardoise du style + le gras ; vert = fait ; rouge = deux paires sous un N° seulement.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── le fond, les cartes : regroupées par le TON, pas par un filet ── */
+:root[data-style]:not([data-style=""]) body,
+:root[data-style]:not([data-style=""]) .n-coque { background-color: var(--n-fond); background-image: var(--g-fond-image); background-attachment: fixed; }
+:root[data-theme="dark"][data-style]:not([data-style=""]) body,
+:root[data-theme="dark"][data-style]:not([data-style=""]) .n-coque { background-image: var(--n-fond-degrade); }
+[data-style]:not([data-style=""]) .n-groupe-carte,
+[data-style]:not([data-style=""]) .n-carte-corps,
+[data-style]:not([data-style=""]) .n-tuile { border-color: transparent; box-shadow: var(--g-carte-ombre); border-radius: var(--n-r-carte); }
+[data-style]:not([data-style=""]) .n-groupe-carte { -webkit-backdrop-filter: var(--g-verre); backdrop-filter: var(--g-verre); }
+[data-style]:not([data-style=""]) .n-grand-titre { font-family: var(--g-titre-police); font-weight: var(--g-titre-poids); font-size: 30px; line-height: 36px; letter-spacing: -.4px; padding-bottom: 12px; }
+[data-style]:not([data-style=""]) .n-barre-centre { font-family: var(--g-titre-police); }
+
+/* ── LE BOUTON PLEIN : encre/ardoise, 48–52, relief doux (reflet intérieur + petite ombre), enfoncé 0,97 plus foncé, 80 ms ── */
+[data-style]:not([data-style=""]) .n-bouton {
+  border-radius: var(--g-r-bouton) / calc(var(--g-r-bouton) + (var(--n-cible) - var(--n-h-controle)) / 2);
+  box-shadow: none; background-color: var(--g-second-fond); color: var(--g-second-texte); font-weight: 600;
+  transition: transform var(--n-duree-appui) ease-out, background-color var(--n-duree-appui) ease-out, box-shadow var(--n-duree-appui) ease-out, color var(--n-duree-appui) ease-out;
+}
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="plein"] {
+  min-height: var(--g-h-plein); border-block-width: 0; border-radius: var(--g-r-bouton);
+  background-color: var(--n-plein); color: var(--n-sur-plein); box-shadow: var(--g-plein-relief); font-weight: 600; font-size: 15px; letter-spacing: -.1px;
+}
+[data-style]:not([data-style=""]) .n-bouton:active,
+[data-style]:not([data-style=""]) .n-bouton[data-n-force="appui"] { filter: none; transform: scale(var(--g-appui)); background-color: var(--g-second-appui); }
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="plein"]:active,
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="plein"][data-n-force="appui"] {
+  background-color: var(--g-plein-appui); box-shadow: var(--g-plein-relief-appui); transform: translate3d(0, var(--g-descente), 0) scale(var(--g-appui));
+}
+/* secondaire : un fond teinté, aucun filet */
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="teinte"],
+[data-style]:not([data-style=""]) .n-bouton:not([data-n-variante]),
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="contour"] { box-shadow: none; }
+/* tertiaire : un bouton texte (avec son icône), à l'accent */
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="texte"],
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="destructif"] { background-color: transparent; color: var(--n-accent); }
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="texte"]:active,
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="destructif"]:active { background-color: var(--n-appui); color: var(--n-encre); }
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="destructif"][data-n-arme] { background-color: var(--n-ambre-fond); color: var(--n-encre); box-shadow: none; }
+[data-style]:not([data-style=""]) .n-bouton[data-n-ton="ambre"] { color: var(--n-encre); }
+[data-style]:not([data-style=""]) .n-bouton[data-n-ton="ambre"][data-n-variante="teinte"] { box-shadow: none; }
+[data-style]:not([data-style=""]) .n-bouton[aria-disabled="true"] { transform: none; background-color: var(--n-inactif); color: var(--n-sur-inactif); box-shadow: none; }
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="texte"][aria-disabled="true"] { background-color: transparent; }
+[data-style]:not([data-style=""]) .n-bouton:focus-visible { outline: none; box-shadow: var(--g-anneau); }
+
+/* ── les boutons ronds (icône seule, 44) ── */
+[data-style]:not([data-style=""]) .n-bouton-icone-seule,
+[data-style]:not([data-style=""]) .n-tb-rond.n-bouton-icone-seule { border-radius: 50%; background: var(--g-second-fond); color: var(--n-encre); box-shadow: none;
+  transition: transform var(--n-duree-appui) ease-out, background-color var(--n-duree-appui) ease-out; }
+[data-style]:not([data-style=""]) .n-bouton-icone-seule:active,
+[data-style]:not([data-style=""]) .n-bouton-icone-seule[data-n-force="appui"] { transform: scale(.92); background: var(--g-second-appui); }
+[data-style]:not([data-style=""]) .n-bouton-icone-seule[aria-pressed="true"] { background: var(--n-plein); color: var(--n-sur-plein); }
+
+/* ── les étiquettes d'état : pilules teintées calmes, un pictogramme devant, la couleur par le SENS ── */
+[data-style]:not([data-style=""]) .n-pastille { border-radius: var(--g-r-chip); box-shadow: none; height: 22px; padding: 0 9px; gap: 5px; font-weight: 600; }
+[data-style]:not([data-style=""]) .n-pastille[data-n-ton="ambre"]::before,
+[data-style]:not([data-style=""]) .n-pastille[data-n-ton="accent"]::before {
+  content: ""; flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+}
+[data-style]:not([data-style=""]) .n-onglet-pastille::before,
+[data-style]:not([data-style=""]) .n-coin-pastille::before { content: none; }
+[data-style]:not([data-style=""]) .n-onglet-pastille,
+[data-style]:not([data-style=""]) .n-coin-pastille { height: 18px; padding: 0 5px; }
+/* le N° (plaque) : le ton du style (papier : l'étiquette kraft) */
+[data-style]:not([data-style=""]) .n-plaque { background: var(--g-plaque-fond); color: var(--g-plaque-texte); box-shadow: none; }
+[data-style]:not([data-style=""]) .n-plaque[data-n-doublon] { background: var(--n-doublon); color: var(--n-sur-doublon); }
+
+/* ── le champ (« Prix d'achat € », la recherche) : creusé, libellé net, anneau au focus ── */
+[data-style]:not([data-style=""]) .n-recherche { background-color: var(--g-champ-fond); box-shadow: var(--g-champ-ombre); border-radius: var(--g-r-bouton) / calc(var(--g-r-bouton) + (var(--n-cible) - var(--n-h-controle)) / 2); }
+[data-style]:not([data-style=""]) .n-recherche:focus-within { outline: none; box-shadow: var(--g-champ-ombre), var(--g-anneau); }
+[data-style]:not([data-style=""]) .vrm-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(.n-recherche-champ),
+[data-style]:not([data-style=""]) .n-feuille input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-style]:not([data-style=""]) .vrm-main textarea {
+  background-color: var(--g-champ-fond); box-shadow: var(--g-champ-ombre); border-color: transparent; color: var(--n-encre); border-radius: var(--g-r-bouton);
+  transition: box-shadow var(--n-duree-appui) ease-out;
+}
+[data-style]:not([data-style=""]) .vrm-main input::placeholder,
+[data-style]:not([data-style=""]) .n-feuille input::placeholder { color: var(--n-encre-2); opacity: 1; }
+[data-style]:not([data-style=""]) .vrm-main input:focus,
+[data-style]:not([data-style=""]) .n-feuille input:focus,
+[data-style]:not([data-style=""]) .vrm-main textarea:focus { outline: none; box-shadow: var(--g-champ-ombre), var(--g-anneau); }
+
+/* ── le contrôle segmenté : un rail creusé, le curseur en relief ── */
+[data-style]:not([data-style=""]) .n-segmente { background: var(--g-champ-fond); box-shadow: var(--g-champ-ombre); border-radius: var(--g-r-bouton); height: 40px; }
+[data-style]:not([data-style=""]) .n-segmente-curseur { border-radius: calc(var(--g-r-bouton) - 3px); background: var(--n-curseur); box-shadow: 0 1px 2px rgb(0 0 0 / .12), 0 2px 6px -2px rgb(0 0 0 / .12); }
+[data-style]:not([data-style=""]) .n-segmente-choix[aria-checked="true"] { font-weight: 600; }
+
+/* ── les rangées : l'appui se VOIT (le retour « comme un toucher ») ── */
+[data-style]:not([data-style=""]) .n-rangee-corps { transition: transform var(--n-duree-appui) ease-out; }
+[data-style]:not([data-style=""]) .n-rangee[data-n-touche] .n-rangee-corps:active { transform: scale(.985); }
+
+/* ── la barre d'onglets : translucide, floutée, l'onglet actif en capsule ── */
+[data-style]:not([data-style=""]) .n-onglets { background: var(--n-barre); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-top: 0; box-shadow: 0 -1px 0 rgb(0 0 0 / .06); }
+[data-style]:not([data-style=""]) .n-onglet[aria-current="page"] { color: var(--n-encre); }
+[data-style]:not([data-style=""]) .n-onglet[aria-current="page"] .n-onglet-icone { background: var(--g-second-fond); color: var(--n-encre); border-radius: 999px; }
+[data-style]:not([data-style=""]) .n-onglet:active .n-onglet-icone { transform: scale(.88); }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-style]:not([data-style=""]) .n-bouton:active,
+  [data-style]:not([data-style=""]) .n-bouton-icone-seule:active,
+  [data-style]:not([data-style=""]) .n-rangee[data-n-touche] .n-rangee-corps:active { transform: none; }
+}
+
+/* ── LES TUILES D'APERÇU (Paramètres → Apparence → Style) : une rangée et un bouton, dessinés par les jetons du style ── */
+.g-styles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 4px 0; }
+@media (min-width: 700px) { .g-styles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.g-tuile {
+  appearance: none; -webkit-appearance: none; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 44px;
+  margin: 0; padding: 10px; border: 0; border-radius: 16px; background: var(--n-fond); background-image: var(--g-fond-image, none); color: var(--n-encre);
+  font: var(--n-t-corps); text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / .08); transition: transform 80ms ease-out;
+}
+.g-tuile:active { transform: scale(.97); }
+.g-tuile[aria-checked="true"] { box-shadow: inset 0 0 0 2px var(--n-encre); }
+.g-tuile:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+.g-tuile-rangee { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: var(--n-r-carte, 12px); background: var(--n-carte); box-shadow: var(--g-carte-ombre, none); }
+.g-tuile-photo { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 7px; background: var(--n-carte-2); }
+.g-tuile-lignes { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 auto; }
+.g-tuile-ligne { display: block; height: 6px; border-radius: 3px; background: var(--n-encre); opacity: .85; width: 80%; }
+.g-tuile-ligne + .g-tuile-ligne { background: var(--n-encre-2); opacity: .6; width: 55%; }
+.g-tuile-chip { flex: 0 0 auto; width: 18px; height: 10px; border-radius: var(--g-r-chip, 999px); background: var(--n-vert-fond); box-shadow: inset 0 0 0 1px var(--n-vert); }
+.g-tuile-plein { display: block; height: 22px; border-radius: var(--g-r-bouton, 8px); background: var(--n-plein); box-shadow: var(--g-plein-relief, none); }
+.g-tuile-nom { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; font: 600 14px/18px var(--n-police); color: var(--n-encre); }
+.g-tuile-coche { font: 600 12px/16px var(--n-police); color: var(--n-encre-2); }
+.g-tuile[data-style=""] { --n-fond: #DFE1E5; --n-carte: #FAFAFB; --n-carte-2: #E9EBEE; --n-encre: #1D1D1F; --n-encre-2: #50535B; --n-plein: #3D4B5B; --n-vert: #17744A; --n-vert-fond: #DDF4E6; --n-accent: #3D4B5B; --g-fond-image: none; --g-carte-ombre: 0 1px 2px rgb(26 26 30 / .04), 0 2px 6px rgb(26 26 30 / .04); --g-plein-relief: none; --g-r-bouton: 8px; --n-r-carte: 12px; --g-r-chip: 999px; }
+:root[data-theme="dark"] .g-tuile[data-style=""] { --n-fond: #1C1C20; --n-carte: #2A2A2F; --n-carte-2: #323238; --n-encre: #FFFFFF; --n-encre-2: #B8B8C0; --n-plein: #FFFFFF; --n-vert: #7BE8BE; --n-vert-fond: rgb(63 212 154 / .14); --n-accent: #F4F4F5; }
