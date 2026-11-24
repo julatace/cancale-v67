@@ -1,86 +1,100 @@
 {
  "bureau-clair.webp": {
-  "sha256": "4f086406df1044413a64fc03c42d43a794c5ccf1874bd18d28824a3b661751b2",
+  "sha256": "810c37fba6173ce56514649d3a7f278f13ccda8a1741f553358d7dfb6438cf64",
   "ecran": "journee",
   "largeur": 1440,
-  "modeExemple": true
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
  },
  "bureau-sombre.webp": {
-  "sha256": "b16f9eeb25b65b6512925fa0b66227806d5b7107351b6a05fcbe8070787f7e4a",
+  "sha256": "b28265ec84f79c00c665df479b86d87d2615e6e0bdd7acf0635073dcb2145945",
   "ecran": "journee",
   "largeur": 1440,
-  "modeExemple": true
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
  },
  "compta-clair.webp": {
-  "sha256": "33930b6b53d991296ffc1d72629025880b0c723d75979f5c1473e3ba561f5bfa",
+  "sha256": "a4467eadb3de19c6279153a4ae0017437323e70b480b70b26f7fa324868c23de",
   "ecran": "ventes",
   "largeur": 390,
-  "modeExemple": true
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
  },
  "compta-sombre.webp": {
-  "sha256": "af07910895852a9203cd2710ee15cf6c70a8b11b569e154b843f8a856f6fa344",
+  "sha256": "2a763f21c071cb6a2b7416a7f8621fecab46e7b06c3d004605172ddc53c0cdc2",
   "ecran": "ventes",
   "largeur": 390,
-  "modeExemple": true
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
  },
  "expedier-clair.webp": {
-  "sha256": "d6e393e5fe8e1fc9e84329d3fc177ffdf602f77e99d19c798e89440dda55184d",
+  "sha256": "5956595a7172e13439e5663ab489d42a33a74e8f4b4f15f02bb47d1f05740348",
   "ecran": "ventes",
   "largeur": 390,
-  "modeExemple": true
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
  },
  "expedier-sombre.webp": {
-  "sha256": "b07f2fa81054c85bd8dbed46c1ad647744f3aa55b031da5e65072087eec1d238",
+  "sha256": "34aa2a00fd8e4891b92874b1234726a149496c7645790029542a148ed6a58d13",
   "ecran": "ventes",
   "largeur": 390,
-  "modeExemple": true
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
  },
  "journee-clair.webp": {
-  "sha256": "02f236e5739085e59dd3f7f5c1f25e6362ab53f88371efb43a304768a2313966",
+  "sha256": "57d9c83d758112d1ea02ba5dc0ea5431f00132d36ad2d146dcc124a70b51d525",
   "ecran": "journee",
   "largeur": 390,
-  "modeExemple": true
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
  },
  "journee-sombre.webp": {
-  "sha256": "8e01e7f27b42a65ec109e8f100e9e6d900e392e6eea5b12c7702ce12efb043c1",
+  "sha256": "b2ab7b4f188e5ccb8f348787a8401b2cd6fcee480247d684b84dc18d9a7d9ad3",
   "ecran": "journee",
   "largeur": 390,
-  "modeExemple": true
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
  },
  "messages-clair.webp": {
-  "sha256": "4037b0b5658979e99039456e54f2ec463a3951b468ee4a443c6ef2db1665fca6",
+  "sha256": "05c9f1d9e121af7e403d3c03ea27efca41a88264cbab65ad75145d3486013cf9",
   "ecran": "messages",
   "largeur": 390,
-  "modeExemple": true
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
  },
  "messages-sombre.webp": {
-  "sha256": "8a36ebaca9f1ff71d3a2b98fa5b2491050df8a430dff7b60642b6fb4f8ca2816",
+  "sha256": "a209fb4e897a9de9bd7ae7f70484fce0f1d7b67fcfa2cf7f71939ebf27da567e",
   "ecran": "messages",
   "largeur": 390,
-  "modeExemple": true
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
  },
  "numeros-clair.webp": {
-  "sha256": "2ad01a3a3bd6ff66f72c8ae3e72757ff45356267b2fe85256c4bd3e1401b7267",
+  "sha256": "857701f1e27ab1ee6d68cf3198cf530315e7ef4c174fb29a2df12be6d7a3dd5d",
   "ecran": "annonces",
   "largeur": 390,
-  "modeExemple": true
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
  },
  "numeros-sombre.webp": {
-  "sha256": "e6be39e9907c26acf261ba5570d5637e34171444adde46ab4e43eefed8cc9905",
+  "sha256": "cba64f848e8f1b2f2e214fbe0e9946c33a8347e2be715a4610841b1eda09d410",
   "ecran": "annonces",
   "largeur": 390,
-  "modeExemple": true
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
  },
  "retirer-clair.webp": {
-  "sha256": "ef31b4cf89ec7a89c08705f8e80ab3fb28546b15fd9b3780f6c83d07f02ed2d0",
+  "sha256": "6d49840eb9bae1cb3dd829f458c47597d5bd1b6eeb2a14ec14b12dc07e9fcb5e",
   "ecran": "achats",
   "largeur": 390,
-  "modeExemple": true
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
  },
  "retirer-sombre.webp": {
-  "sha256": "8cec38271c519856d647ccc711546a4f90dae18988f207dcc1494b60ae31400a",
+  "sha256": "71953db9708e4e9f2fd188d25bf97024702145677d4c1f3a245f1c4130b3fa4b",
   "ecran": "achats",
   "largeur": 390,
-  "modeExemple": true
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
  }
 }

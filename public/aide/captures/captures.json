@@ -1,0 +1,30 @@
+{
+ "a-retirer.jpg": {
+  "sha256": "6856dfcf8a2d3006a8558555f50392797b653e4fafb211253c3b7547b99dde29",
+  "ecran": "achats",
+  "depuis": "accueil/retirer-clair.webp",
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
+ },
+ "annonces.jpg": {
+  "sha256": "39111413bb7e24275c1d6ee368683912aa12fa12b0a1a4ab93903af0d55bfd54",
+  "ecran": "annonces",
+  "depuis": "accueil/numeros-clair.webp",
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
+ },
+ "colis.jpg": {
+  "sha256": "0f0bfb3e20cf6e06727e89fd289917cfc0f3b9c2ee5ec931f1dab2993360a7e1",
+  "ecran": "ventes",
+  "depuis": "accueil/expedier-clair.webp",
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
+ },
+ "compta.jpg": {
+  "sha256": "b05dde3c42fc1511a02ae57c7c6fe7832d1b0ec58b4b30dbbfc7e80c0ce628c9",
+  "ecran": "ventes",
+  "depuis": "accueil/compta-clair.webp",
+  "modeExemple": true,
+  "design": "70a4b80e8c021e89"
+ }
+}

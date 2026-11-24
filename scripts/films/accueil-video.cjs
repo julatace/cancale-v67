@@ -72,8 +72,11 @@ const PLANS = [
   { tab: 'ventes', async jouer(f, dire) {
     dire('ventes');
     await f.jouer(0.4);
-    await f.viser('[data-lot-ouvrir]', { zoom: 1.38, dur: 1.0, dy: 140 });
-    await f.jouer(1.2);
+    // (24 nov., gris clair) « Choisir les bordereaux » est rangé derrière « ⋯ » de Ventes (audit d'utilité du 19 nov.) :
+    // on ouvre le menu, puis le choix — la même feuille qu'avant.
+    await f.viser('[data-vn-plus]', { zoom: 1.38, dur: 1.0, dy: 140 });
+    await f.jouer(0.8);
+    await f.toucher('[data-vn-plus]', { apres: 0.6 });
     await f.toucher('[data-lot-ouvrir]', { apres: 0.6 });
     await f.jouer(3.4); f.cle('ventes');
     f.repos_(0.8); await f.jouer(2.4);
@@ -92,8 +95,9 @@ const PLANS = [
   { tab: 'annonces', async jouer(f, dire) {
     dire('numero');
     await f.jouer(0.4);
-    await f.defilerVers('[data-carte-annonce="7115"]', { marge: 120, dur: 1.2 });
-    await f.viser('[data-carte-annonce="7115"]', { zoom: 1.38, dur: 1.0 });
+    // (24 nov.) Les listes arrivent par paquets et la rangée d'annonce est `data-eg-article` : le N°4, déjà à l'écran.
+    await f.defilerVers('[data-eg-article="vinted#7103"]', { marge: 120, dur: 1.2 });
+    await f.viser('[data-eg-article="vinted#7103"]', { zoom: 1.38, dur: 1.0 });
     await f.jouer(4.0); f.cle('numero');
     f.repos_(0.8); await f.jouer(1.6);
     dire('fin');
@@ -146,6 +150,10 @@ async function tourner() {
   if (ok && process.env.PUBLIER) {
     fs.mkdirSync(PUBLIC, { recursive: true });
     for (const x of ['mp4', 'jpg', ...LANGUES.map((l) => `${l}.vtt`)]) fs.copyFileSync(path.join(dossier, `film-45s.${x}`), path.join(PUBLIC, `film-45s.${x}`));
+    // (23 nov.) Le registre du tournage : empreintes des fichiers publiés et du DESIGN de l'app au tournage
+    // (scripts/audit-captures-a-jour.cjs rougit si les jetons changent sans retourner le film).
+    const h = (x) => require('crypto').createHash('sha256').update(fs.readFileSync(path.join(PUBLIC, `film-45s.${x}`))).digest('hex');
+    fs.writeFileSync(path.join(PUBLIC, 'film-45s.json'), JSON.stringify({ mp4: h('mp4'), jpg: h('jpg'), design: require('../_empreinte-design.cjs').empreinteDesign(), modeExemple: true, duree: Number(duree.toFixed(1)) }, null, 1) + '\n');
   }
   return ok;
 }
