@@ -31,7 +31,7 @@ const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim
 const THEMES = liste('THEMES', 'clair,sombre');
 const LARGEURS = liste('LARGEURS', '390,1512').map(Number);
 const CAPTURES = process.env.CAPTURES !== '0';
-const SEUL = process.env.SEULEMENT || '';   // `SEULEMENT=messages` : seulement Messages (et sa conversation)
+const SEUL = process.env.SEULEMENT || '';   // `SEULEMENT=messages` ou `loupe` : seulement ce passage
 
 const jour = (d) => { const x = new Date(Date.now() + d * 864e5); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
 const base = () => {
@@ -134,7 +134,7 @@ const dit = (ok, quoi, detail = '') => { if (!ok) ROUGES++; const l = `${ok ? '�
       }
       // Messages
       // Messages, puis « Offres », puis une conversation qui porte une offre Vinted (sa carte d'offre : le cadre doré du 24 nov.).
-      { const m = await visible('[data-n-coque-messages]') || await visible('[data-n-entree="messages"]');
+      if (!SEUL || SEUL === 'messages') { const m = await visible('[data-n-coque-messages]') || await visible('[data-n-entree="messages"]');
         if (m) {
           await m.click().catch(() => {}); await pg.waitForTimeout(2500); await juger('messages');
           const off = await visible('[data-msg-vue="offres"]'); if (off) { await off.click().catch(() => {}); await pg.waitForTimeout(1200); await juger('messages-offres'); }
@@ -163,12 +163,13 @@ const dit = (ok, quoi, detail = '') => { if (!ok) ROUGES++; const l = `${ok ? '�
         }
       } else dit(false, `${W} ${th} · parametres : écran introuvable`);
       // La loupe (sans rien taper, puis un N°)
-      if (!SEUL) await aller('journee');
-      const loupe = pg.locator('[data-recherche-loupe]:visible, [data-n-tete-loupe]:visible, [data-n-recherche]:visible, .vrm-global-search input:visible').first();
-      if (!SEUL && await loupe.count()) {
+      if (SEUL !== 'messages') await aller('journee');
+      let loupe = pg.locator('[data-recherche-loupe]:visible, [data-n-tete-loupe]:visible, [data-n-recherche]:visible, .vrm-global-search input:visible').first();
+      if (SEUL !== 'messages' && !(await loupe.count())) { await aller('ventes'); loupe = pg.locator('[data-recherche-loupe]:visible, [data-n-tete-loupe]:visible').first(); }   // 1512 : Aujourd'hui n'a pas toujours la loupe
+      if (SEUL !== 'messages' && await loupe.count()) {
         await loupe.click().catch(() => {}); await pg.waitForTimeout(2500); await juger('loupe');
         await pg.keyboard.type('12', { delay: 40 }).catch(() => {}); await pg.waitForTimeout(1500); await juger('loupe-resultats');
-      } else if (!SEUL) dit(false, `${W} ${th} · loupe : introuvable`);
+      } else if (SEUL !== 'messages') dit(false, `${W} ${th} · loupe : introuvable`);
       if (o.erreurs.length) dit(false, `${W} ${th} : erreur JS`, o.erreurs.slice(0, 3).join(' | '));
       await o.ctx.close();
     }
