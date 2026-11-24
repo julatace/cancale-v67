@@ -23,6 +23,7 @@ l'ordinateur. **Le défaut ne change pas** : sans choix, aucun attribut, aucune 
 | Menthe | gris froid, accent menthe rare |
 | Studio | blanc pur, noir franc, angles nets (rayon 4), titres 800 |
 | Arcade | gros boutons en relief (ombre portée « marche » de 4 px), enfoncement plus marqué (0,94 + descente de 3 px), cartes 24 |
+| **Monochrome** (ajouté le 24 nov. au soir, direction préférée de Julien ; PREMIÈRE tuile après « Actuel ») | page gris #ECEDF0, cartes blanches à filet #E5E7EB + ombre douce, plein NOIR texte blanc, vert #22C55E seulement en point/aplat (jamais un texte vert sur clair), cartes 24, boutons 12 ; secondaire blanc à contour d'encre 1,5 px, liens soulignés, icônes sur un rond gris à contour #6B7280 (≥ 3:1), champs blancs à contour, N° en plaque noire ; nuit inversée (plein blanc, cartes #161618). Police du système (pas de police web dans ce lot) |
 
 ## Comment c'est fait (un style ne coûte aucun JavaScript)
 - **Une table, un générateur** : `scripts/styles-generer.cjs` porte la palette (clair, sombre) et la forme (rayons, hauteur du
@@ -45,6 +46,12 @@ l'ordinateur. **Le défaut ne change pas** : sans choix, aucun attribut, aucune 
   pas) : `second`, `champ`, `rond`, `lien`, `rangee`. Posé sur « Relier » / « + prix » (`celluleAchat.jsx`), la rangée
   d'annonce, son « ⋯ », l'en-tête de compte et « N à régler » (`Annonces*.jsx`). Dans le style actuel, les « liens discrets »
   de Ventes (`complements.css`) restent identiques (`:where(:root:not([data-style]))`, spécificité inchangée).
+- **Champs optionnels de la table (Monochrome)** : `contour`, `limite`, `douce`, `point`/`surPoint`, `bordCarte` et les formes
+  `second: 'contour'`, `rond: 'plaque'`, `champ: 'contour'`, `liens: 'souligne'`, `plaque: 'encre'`, `profondeur: 'mono'`. Ils
+  émettent des jetons de plus (`--g-second-contour`, `--g-rond-fond/-contour`, `--g-onglet-fond`, `--g-puce-fond`,
+  `--g-lien-deco`, `--g-point`) que `styles-choix.css` lit avec un repli ÉGAL à la valeur d'avant : les dix autres blocs du
+  fichier fabriqué n'ont pas changé d'un octet. Le générateur contrôle en plus chaque contour ≥ 3:1 (carte, fond, aplat) et
+  refuse un `vert` (texte « fait ») qui ne serait pas l'encre sur clair ; `--prouve` : 5 mutations.
 - `src/natif/styleChoix.js` (`STYLES`, `choisirStyle`, `styleLu`) ; `public/demarrage-theme.js` pose `data-style` avant le
   premier rendu (même clé, même liste).
 
