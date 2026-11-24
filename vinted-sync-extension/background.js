@@ -22103,7 +22103,7 @@ function lienFavoriProfond(v){
   }catch(_){return null;}
 }
 // La FORME d'un lien de notification inconnu (pour le diagnostic) : le schéma et le gabarit du chemin, jamais une valeur.
-function formeLienFavori(v){const s=String(v||'');const m=/^([a-z][a-z0-9+.-]{0,20}):/i.exec(s);return ((m?m[1].toLowerCase():'rel')+'_'+s.replace(/^[a-z][a-z0-9+.-]{0,20}:\/*/i,'').split(/[?#]/)[0].replace(/\d+/g,'n').replace(/[^a-z_/n]/gi,'').replace(/\//g,'_')).slice(0,40);}
+function formeLienFavori(v){const s=String(v||'');const m=/^([a-z][a-z0-9+.-]{0,20}):/i.exec(s);return ((m?m[1].toLowerCase():'rel')+'_'+s.replace(/^[a-z][a-z0-9+.-]{0,20}:\/{0,}/i,'').split(/[?#]/)[0].replace(/\d+/g,'n').replace(/[^a-z_/n]/gi,'').replace(/\//g,'_')).slice(0,40);}
 // 5.440 : l'adresse de la liste de la cloche, sur l'hôte `api.` du domaine du compte (mesuré : www → 404, api → 200).
 function adresseClocheVinted(domaine){const d=String(domaine||'www.vinted.fr').toLowerCase().replace(/^www\./,'');return /^vinted\.(fr|com|it|de)$/.test(d)?`https://api.${d}/inbox-notifications/v1/notifications`:'/inbox-notifications/v1/notifications';}
 // Le chemin de la page complète des notifications, LU sur la page (« Voir tout » ou le lien de la cloche) et retenu.
