@@ -23,7 +23,7 @@ import './selection-serie.css'; // (8 nov.) style de ./composants/SelectionSerie
 import './designV2/design-v2.css'; // (8 nov.) style de ./composants/SelectionSerie.jsx, gardé à sa place (son écran est chargé à la demande)
 import './designV2/argent-v2.css'; // (8 nov.) style de ./composants/SelectionSerie.jsx, gardé à sa place (son écran est chargé à la demande)
 import { estCommandePlateforme, estEcriturePlateforme, refusPanneau, ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from './actionsExtension.js';   // (20 nov., décision de Julien) aucun geste de plateforme dans l'app
-import { poserExtensionIci, ouvrirPanneau } from './ouvrirPanneau.js';
+import { poserExtensionIci, ouvrirPanneau, lienPanneau } from './ouvrirPanneau.js';
 import { GrilleMenu, CarteCompte } from './natif/GrilleMenu.jsx';   // (21 nov., onglets-menu) l'écran « Menu » en tuiles
 import { BoutonExtension, RangeeExtension, FeuilleExtension } from './BoutonExtension.jsx';
 // ⟦→ ecrans/Comptabilite.jsx #3⟧
@@ -1598,6 +1598,7 @@ import { NotePaireVue } from './NotePaire.jsx';
 import { SITES_PUBLIER, apercuEnvoi, manquesEnvoi, etatsPaire, partoutLeMeme, lienVu, chercherPaires, enLigneSur } from "./publierAilleurs.js";
 import { CLE_PRIX_PARTOUT, reglagePrix, CLE_PARAMS_PARTOUT, reglageParams, lignePartout, planPartout, executerPartout, aussiSur, texteAussiSur } from "./publierPartout.js";
 import { suiviPourPartout } from "./publierPartoutSuivi.js";
+import { fraisSite } from "./calculetteAchat.js";
 import { CLE_CORRESPONDANCES, lireMemoire as lireCorrespondances, retenir as retenirCorrespondance, TABLE_VINTED } from "./correspondances.js";   // (15 nov.) Vinted → Leboncoin · eBay · Vestiaire
 import { CLE_DEFAUTS_EBAY as CLE_DEFAUTS_EBAY_PP, defautsDepuis as defautsEbayDepuis, resume as resumeReglagesEbayPP } from "./ebay/parametres.js";
 // ⟦→ ecrans/Comptabilite.jsx #103⟧   // (15 nov., eBay complet 2) le CA eBay daté au versement
@@ -25144,6 +25145,148 @@ function HoteRemiseSoldes({ comptes, onFermer }) {
     <Natif.Bouton variante="texte" large onClick={() => { for (const so of proposes) ecrire((e) => garderSolde(e, so.id)); onFermer(); }}>{tr('actionsExt.garderSoldes')}</Natif.Bouton>
   </FeuilleExtension>;
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// « METTRE AUSSI SUR… » — 1 PAIRE → 4 SITES (24 nov., choix de Julien ; règle : src/publier/quatreSites.js)
+// ══════════════════════════════════════════════════════════════════════════════
+// UNE annonce Vinted (par son N°, la paire de la source partagée `useEbayPaires`, EN LIGNE sur Vinted) :
+// la fiche partagée, chaque site possible ou dit, UN « Créer », l'état en direct. Les voies EXISTANTES :
+//   · Leboncoin + Vestiaire : le panneau de l'extension sur vinted.fr, « Publier aussi sur… » pré-ouvert
+//     (`lienPanneau({ action: 'aussi', sites, pct })`, 5.451 ; avant : l'annonce pré-cochée, il choisit le geste) —
+//     rien ne part d'ici (décision du 20 nov.), l'extension relit tout et attend SA confirmation ;
+//   · eBay : un brouillon (`preparerBrouillonPartout`, SKU VRM-{n°}, aucun port — §2.8), mis en ligne depuis ses
+//     brouillons (frais, prix relu chez eBay).
+// Le prix Vinted est RELU (dressing du compte de la paire) avant chaque envoi : changé ⇒ ce site s'arrête.
+// Vendue (prouvée) : rien à créer — la question « Vendue sur X — retirer de Y et Z ? » + le bloc existant.
+const MettreAussiSurL = aLaDemande(() => import('./MettreAussiSur.jsx'), true);
+const SUIVI_Q4_MS = 15000;
+function HoteMettreAussiSur({ comptes, num, numData, onFermer }) {
+  const { paires, pret } = useEbayPaires(comptes);
+  useExtVivante();
+  useRA();
+  // La règle (src/publier/quatreSites.js, et l'agent de publication qu'elle reprend) arrive avec la feuille, pas avec l'app.
+  const [Q, setQ] = React.useState(null);
+  React.useEffect(() => { let vivant = true; import('./publier/quatreSites.js').then((m) => { if (vivant) setQ(m); }, () => {}); return () => { vivant = false; }; }, []);
+  const SITES_QUATRE = Q ? Q.SITES_QUATRE : ['leboncoin', 'vestiaire', 'ebay'];
+  const [comptesSites] = useComptesAutresSites(true);
+  const [autres, setAutres] = React.useState(undefined);
+  const relire = React.useCallback(async () => {
+    try { _lbcAnnoncesSession = null; _lbcListingsEnCours = null; } catch (_) {}
+    const [lbc, vc] = await Promise.all([lbcListingsSession().catch(() => null),
+      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`).catch(() => null)]);
+    const vcL = Array.isArray(vc) ? (vc[0] || {}) : null;
+    setAutres({ lbcItems: lbc ? lbc.items || {} : null, lbcPubliees: lbc ? lbc.publiees || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {} });
+  }, []);
+  React.useEffect(() => { relire(); }, [relire]);
+  const k = num ? cleNum(num) : '';
+  const paire = pret && Array.isArray(paires) ? (paires.find((p) => !p.chezMoi && cleNum(p.num) === k) || null) : undefined;
+  const source = React.useMemo(() => {
+    if (!paire || !Q) return null;
+    const f = (load('vinted_annonce_numeros', {}) || {})[String(paire.id)] || {};
+    let achat = null; try { achat = prixAchatDe(f, load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achat = null; }
+    const mini = f.min != null && String(f.min).trim() !== '' ? Number(String(f.min).replace(/\s|€/g, '').replace(',', '.')) : null;
+    const r = Q.formeDepuisVinted(paire, { prixMini: Number.isFinite(mini) ? mini : null, achat: Number.isFinite(Number(achat)) ? Number(achat) : null });
+    return r.ok ? r.forme : null;
+  }, [paire, Q]);
+  const [forme, setForme] = React.useState(null);
+  React.useEffect(() => { if (source && !forme) setForme(source); }, [source, forme]);
+  const [coches, setCoches] = React.useState({ leboncoin: true, vestiaire: true, ebay: true });
+  const [etats, setEtats] = React.useState({});
+  const [occupe, setOccupe] = React.useState(false);
+  // « Vendue sur X » : le plan PROUVÉ de « retirer ailleurs » pour CE N° (jamais un titre).
+  let question = null;
+  try { const l = k ? listeRA(k) : null; question = Q && l && l.articles && l.articles.length ? Q.questionRetrait(l.articles[0]) : null; } catch (_) { question = null; }
+  // Déjà sur ce site ? Par identité (`sitesPrixDe` → `enLigneSur`) : true · false · null (pas su).
+  const vus = React.useMemo(() => {
+    if (!paire || !numData || autres === undefined) return { deja: { leboncoin: undefined, vestiaire: undefined, ebay: undefined }, liens: {} };
+    const { rn } = rechercheParNumero(String(paire.num), numData, comptes);
+    if (!rn || rn.etat === 'invalide') return { deja: { leboncoin: null, vestiaire: null, ebay: null }, liens: {} };
+    const r = sitesPrixDe(String(paire.num), rn, autres);
+    const deja = {}, liens = {};
+    for (const s of SITES_QUATRE) { deja[s] = enLigneSur(s, r.sites, r.manques); liens[s] = lienVu(s, r.sites); }
+    return { deja, liens };
+  }, [paire, numData, autres, comptes]);
+  const ext = { aussi: extSait('publieraussi'), lien: extSait('aussilien') };
+  // L'état « figé » de chaque case au moment de « Créer » (un site qui vient d'être créé n'est pas « déjà là »).
+  const dispo = React.useMemo(() => {
+    const out = {};
+    if (!Q) return out;
+    for (const s of SITES_QUATRE) out[s] = Q.dispoSite(s, { comptes: comptesSites, ext, deja: vus.deja, vendue: !!question });
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Q, comptesSites, vus, ext.aussi, ext.lien, !!question]);
+  const frais = React.useMemo(() => ({
+    leboncoin: fraisSite('leboncoin'), vestiaire: fraisSite('vestiaire'),
+    ebay: fraisSite('ebay', { ebayCommandes: numData && Array.isArray(numData.ebayCommandes) ? numData.ebayCommandes : null, commandeEbayEngagee }),
+  }), [numData]);
+  const prix = {};
+  if (forme && Q) for (const s of SITES_QUATRE) prix[s] = Q.prixSite(forme, s, frais[s]);
+  const identites = forme ? Object.fromEntries(SITES_QUATRE.filter((s) => dispo[s] && dispo[s].possible).map((s) => [s, tr('q4.id.' + s, { n: forme.source.numero })])) : null;
+  // L'état en direct : tant qu'un site attend (panneau, brouillon), la liste du site est relue par identité.
+  const attend = SITES_QUATRE.some((s) => etats[s] && (etats[s].etat === 'panneau' || etats[s].etat === 'brouillon'));
+  React.useEffect(() => {
+    if (!attend) return undefined;
+    const t = setInterval(() => { relire(); }, SUIVI_Q4_MS);
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj') relire(); };
+    window.addEventListener('vrm:ext', f);
+    return () => { clearInterval(t); window.removeEventListener('vrm:ext', f); };
+  }, [attend, relire]);
+  React.useEffect(() => {
+    if (!attend) return;
+    setEtats((x) => { let ch = false; const n = { ...x }; for (const s of SITES_QUATRE) { const e = Q ? Q.etatSuivi(x[s], vus.deja[s], vus.liens[s]) : x[s]; if (e !== x[s]) { n[s] = e; ch = true; } } return ch ? n : x; });
+  }, [vus, attend]);
+  // Le prix Vinted RELU : le dressing du compte de la paire (la même lecture que la source partagée).
+  const relirePrix = async () => {
+    if (!paire) return null;
+    const cpt = Array.isArray(comptes) ? comptes.filter((a) => !paire.uid || String(a && a.vinted_user_id) === String(paire.uid)) : null;
+    const lu = await lireAnnoncesVintedEnLigne(cpt && cpt.length ? cpt : comptes).catch(() => null);
+    if (!lu || !(lu.enLigne instanceof Set)) return null;
+    if (!lu.enLigne.has(String(paire.id))) return 'absente';
+    const p = lu.prix && lu.prix[String(paire.id)];
+    return p == null ? null : Number(p);
+  };
+  const creer = async () => {
+    if (!forme || occupe || !Q) return;
+    const plan = Q.planQuatre(coches, dispo);
+    if (!plan.length) return;
+    // L'onglet du panneau s'ouvre SUR SON TOUCHER (un onglet ouvert après une lecture serait bloqué) ; il ne reçoit
+    // son adresse qu'après la relecture du prix — prix changé ⇒ il se referme, rien n'est ouvert sur Vinted.
+    let onglet = null;
+    if (plan.some((p) => p.voie === 'panneau')) { try { onglet = window.open('', '_blank'); } catch (_) { onglet = null; } }
+    setOccupe(true);
+    const envoyer = {
+      panneau: async (pas) => {
+        const url = lienPanneau({ site: 'vinted', page: 'publier', ids: [forme.source.id], action: ext.lien === 'ok' ? 'aussi' : 'publier', sites: pas.sites,
+          pct: Object.fromEntries(pas.sites.map((s) => [s, forme.prix[s] ? forme.prix[s].pct : 0])) });
+        if (!onglet || onglet.closed) return { accepte: false, code: 'onglet' };
+        try { onglet.location.href = url; onglet.opener = null; } catch (_) { return { accepte: false, code: 'onglet' }; }
+        return { accepte: true, etat: 'panneau' };
+      },
+      ebay: async () => {
+        const e = Q.envoiSite('ebay', forme, frais.ebay);
+        if (!e.ok) return { accepte: false, code: e.code };
+        let r = null;
+        try {
+          const m = await import('./ecrans/Ebay.jsx');
+          r = await m.preparerBrouillonPartout({ ...paire, title: e.envoi.titre, desc: e.envoi.description, photos: e.envoi.photos, taille: e.envoi.taille, etat: e.envoi.etat, marque: e.envoi.marque },
+            { prix: e.envoi.prix, titre: e.envoi.titre });
+        } catch (_) { r = { accepte: false, code: 'charge' }; }
+        return r && r.accepte ? { accepte: true, etat: 'brouillon', code: r.deja ? 'deja' : '' } : { accepte: false, code: (r && r.code) || 'refus', raison: (r && r.raison) || '' };
+      },
+    };
+    try {
+      const res = await Q.executerQuatre({ plan, forme, relirePrix, envoyer, surEtat: (s, e) => setEtats((x) => ({ ...x, [s]: e })) });
+      if (onglet && !SITES_QUATRE.some((s) => res[s] && res[s].etat === 'panneau')) { try { onglet.close(); } catch (_) {} }
+      if (res.ebay && res.ebay.etat === 'brouillon') { try { window.dispatchEvent(new CustomEvent('vrm:ebay-maj')); } catch (_) {} }
+    } finally { setOccupe(false); }
+  };
+  const lecture = !Q || paire === undefined || (paire && !forme);
+  return <MettreAussiSurL ouverte lecture={lecture && !question} forme={question ? null : forme} modifies={forme && source && Q ? Q.champsModifies(forme, source) : []}
+    dispo={dispo} prix={prix} coches={coches} etats={etats} question={question} identites={identites} occupe={occupe}
+    retrait={question ? <BlocARetirerAilleurs numero={k} PhotoVinted={PhotoVinted}/> : null}
+    onCocher={(s, v) => setCoches((x) => ({ ...x, [s]: !!v }))}
+    onModifier={(champ, v) => setForme((f) => (Q ? Q.modifierForme(f, champ, v) : f))}
+    onCreer={creer} onFermer={onFermer} Photo={(p) => <PhotoVinted src={p.src} alt="" loading="lazy"/>}/>;
+}
 function HotePublierPartout({ comptes, nums, numData, onFermer }) {
   const { paires, pret } = useEbayPaires(comptes);
   useExtVivante();
@@ -35076,6 +35219,9 @@ function AppCoeur() {
   useEffect(()=>{const ouvrir=e=>{const n=e&&e.detail; if(typeof n!=='string'||!n.trim()||n.length>64)return; setPrixNum(n.trim());};window.addEventListener('vrm:prix-partout',ouvrir);return()=>window.removeEventListener('vrm:prix-partout',ouvrir);},[]);
   // (5 nov.) « PUBLIER AILLEURS » : { num (null = choisir l'article), site (mis en avant) }.
   const [pubAil,setPubAil]=useState(null);
+  // (24 nov.) « Mettre aussi sur… » — 1 paire → 4 sites (HoteMettreAussiSur). `vrm:mettre-aussi` { num }.
+  const [mettreAussi,setMettreAussi]=useState(null);
+  useEffect(()=>{const ouvrir=e=>{const d=(e&&e.detail)||{}; const n=typeof d.num==='string'&&d.num.trim()&&d.num.length<=64?d.num.trim():null; if(n) setMettreAussi({num:n,at:Date.now()});};window.addEventListener('vrm:mettre-aussi',ouvrir);return()=>window.removeEventListener('vrm:mettre-aussi',ouvrir);},[]);
   useEffect(()=>{const ouvrir=e=>{const d=(e&&e.detail)||{}; const n=typeof d.num==='string'&&d.num.trim()&&d.num.length<=64?d.num.trim():null; const st=['leboncoin','vestiaire','ebay'].includes(d.site)?d.site:null; setPubAil({num:n,site:st});};window.addEventListener('vrm:publier-ailleurs',ouvrir);return()=>window.removeEventListener('vrm:publier-ailleurs',ouvrir);},[]);
   // (11 nov.) « PUBLIER PARTOUT » : les N° des annonces Vinted (une, ou la sélection d'Annonces).
   const [pubPartout,setPubPartout]=useState(null);
@@ -35089,7 +35235,7 @@ function AppCoeur() {
   // APRÈS son premier dessin — la fiche paraît d'abord, les lectures suivent (1 000 articles : ouverture < 150 ms).
   const [ficheLigneActive,setFicheLigneActive]=useState(null);
   const [venteMainOuverte,setVenteMainOuverte]=useState(false);   // (14 nov., 160) la feuille lit l'histoire des N° comme la fiche
-  const besoinNumData=venteMainOuverte||gsOpen||!!ficheNum||!!ficheLigneActive||!!prixNum||!!(pubAil&&pubAil.num)||!!pubPartout||!!ecartsOuvert;   // (14 nov., argent-prix) « Prix d’un site à l’autre » lit les sites de chaque N°
+  const besoinNumData=venteMainOuverte||gsOpen||!!ficheNum||!!ficheLigneActive||!!prixNum||!!(pubAil&&pubAil.num)||!!mettreAussi||!!pubPartout||!!ecartsOuvert;   // (14 nov., argent-prix) « Prix d’un site à l’autre » lit les sites de chaque N°
   // Les lectures en plus (coffre, offres, reçu, Leboncoin, Vestiaire) du N° ouvert.
   const [ficheExtra,setFicheExtra]=useState(null);
   // (15 nov., fiche D) L'ACHAT PROPOSÉ d'une paire VENDUE sans achat relié : la règle de src/liaisonAchat.js
@@ -38740,7 +38886,7 @@ function AppCoeur() {
             siVendue={(prixC, achatC) => { const v = beneficeSiVendue(prixC / 100, achatC != null ? { buyPrice: String(achatC / 100) } : {}); return { ...v, raison: '' }; }} relier={relierFiche} achatRelie={achatRelieFiche} onFermer={fermer}
             onRepublier={(n)=>{ fermer(); setGsOpen(false); lancerActionRecherche({ id: 'republier-num', num: String(n) }); }} onRetour={depuis || ficheDeLoupe.current !== String(numF) ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
-            onPrix={(n, surValeur)=>{ prixFocus.current = !!surValeur; setPrixNum(String(n)); }} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
+            onPrix={(n, surValeur)=>{ prixFocus.current = !!surValeur; setPrixNum(String(n)); }} onPublierAilleurs={(n)=>setMettreAussi({ num: String(n), at: Date.now() })} neuve={neuve}
             onPrixAchat={(pp)=>{ if (pp && pp.idFiche) setAchatFiche({ tx: 'fiche:' + pp.idFiche, item: pp.idFiche, num: String(pp.num || ''), sous: pp.titre ? String(pp.titre).slice(0, 34) : 'prix d’achat' }); }}
             onSource={(src)=>{ fermer(); setGsOpen(false);
               // (9 nov.) « Ouvrir dans … » : l'écran d'où vient l'étape, sur SON objet (par identité).
@@ -38972,6 +39118,9 @@ function AppCoeur() {
         </GardeEcran>}
         {remiseOuverte && <GardeEcran nom="remise-soldes" feuille resetKey={String(remiseOuverte)} onFermer={()=>setRemiseOuverte(null)}>
           <HoteRemiseSoldes comptes={vintedAccounts} onFermer={()=>setRemiseOuverte(null)}/>
+        </GardeEcran>}
+        {mettreAussi && <GardeEcran nom="mettre-aussi" feuille resetKey={String(mettreAussi.at)} onFermer={()=>setMettreAussi(null)}>
+          <HoteMettreAussiSur comptes={vintedAccounts} num={mettreAussi.num} numData={numData} onFermer={()=>setMettreAussi(null)}/>
         </GardeEcran>}
         {pubPartout && <GardeEcran nom="partout" feuille resetKey={String(pubPartout.at)} onFermer={()=>setPubPartout(null)}>
           <HotePublierPartout comptes={vintedAccounts} nums={pubPartout.nums} numData={numData} onFermer={()=>setPubPartout(null)}/>

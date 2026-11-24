@@ -20,13 +20,24 @@ export const DOMAINES_PANNEAU = {
 
 const propre = (v) => String(v == null ? '' : v).trim().slice(0, 120);
 
-export function lienPanneau({ site = 'vinted', page = '', ids = [], action = '' } = {}) {
+// (24 nov., « Mettre aussi sur… », ext. 5.451) `sites` et `pct` (facultatifs, ajoutés sans rien renommer) : pour
+// `action=aussi`, les sites PRÉ-COCHÉS de « Publier aussi sur… » (leboncoin, vestiaire) et le « +N % » de chacun
+// (0, 5, 10, 15, 20 — les choix de la voie). Une extension plus ancienne les ignore (elle pré-sélectionne l'annonce).
+const SITES_AUSSI_LIEN = ['leboncoin', 'vestiaire'];
+const PCT_LIEN = [0, 5, 10, 15, 20];
+export function lienPanneau({ site = 'vinted', page = '', ids = [], action = '', sites = [], pct = null } = {}) {
   const base = DOMAINES_PANNEAU[site] || DOMAINES_PANNEAU.vinted;
   const liste = (Array.isArray(ids) ? ids : ids == null ? [] : [ids]).map(propre).filter(Boolean).slice(0, 200);
   const q = ['vrm=panneau'];
   if (propre(page)) q.push('page=' + encodeURIComponent(propre(page)));
   if (liste.length) q.push('ids=' + liste.map(encodeURIComponent).join(','));
   if (propre(action)) q.push('action=' + encodeURIComponent(propre(action)));
+  const ss = (Array.isArray(sites) ? sites : []).filter((x) => SITES_AUSSI_LIEN.includes(x));
+  if (ss.length) q.push('sites=' + [...new Set(ss)].join(','));
+  if (pct && typeof pct === 'object') {
+    const pp = ss.filter((x) => PCT_LIEN.includes(Number(pct[x])) && Number(pct[x]) > 0).map((x) => x + ':' + Number(pct[x]));
+    if (pp.length) q.push('pct=' + pp.join(','));
+  }
   return base + '?' + q.join('&');
 }
 
