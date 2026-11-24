@@ -3,7 +3,10 @@
 //  Récit : docs/passation/2026-11-24-vitesse.md.
 //
 //    node scripts/bancs/vitesse-iphone.cjs <dist> [port]
-//      CPU=4 · PASSES=3 · JSON=<fichier> · ETAPES=froid,onglets,vente,defilement,recherche · RENDUS=1 (validations React)
+//      CPU=4 · PASSES=3 · JSON=<fichier> · ETAPES=froid,onglets,vente,defilement,recherche,rechachats · RENDUS=1 (validations React)
+//      PROFIL=froid,onglet:achats,vente (profil par fonction ; build non minifié conseillé) · CAPTURES=<dossier>
+//    node scripts/bancs/vitesse-iphone.cjs <distA>,<distB>[,…]   ⇒ mode AB : les builds mesurés en alternance, geste par geste
+//      (froid et onglets ; TOURS=4), médianes par build — la seule comparaison honnête sur une machine partagée.
 //      VOLUME=julien (défaut : 15 comptes, 2 600 ventes, 2 700 achats, 1 100 annonces — compté sur SA base le 24 nov.,
 //      lecture seule, nombres seulement) · VOLUME=banc (la base des autres bancs : 7 comptes, 1 500 / 800 / 1 200).
 //
@@ -30,20 +33,27 @@ const VOLUMES = {
   banc: { volumeReel: true, qr: true, ventes: 1500, achats: 800, annonces: 1200 },
 };
 const base = fabriquer(VOLUMES[process.env.VOLUME || 'julien']);
-const DIST = path.resolve(process.argv[2] || path.join(RACINE, 'dist'));
 const PORT = +(process.argv[3] || process.env.BANC_PORT || 21000 + Math.floor(Math.random() * 8000));
 const PASSES = +(process.env.PASSES || 3), CPU = +(process.env.CPU || 4), RTT = 150, DEBIT = 9e6 / 8;
 const ETAPES = String(process.env.ETAPES || 'froid,onglets,vente,defilement,recherche').split(',');
 const PHOTO = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAGUlEQVR4nGOs6FnAQApgIkn1qIZRDUNKAwA3KwHEWgvY/wAAAABJRU5ErkJggg==', 'base64');
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.json': 'application/json', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.webp': 'image/webp' };
 const gz = new Map();
-const srv = http.createServer((q, r) => {
-  let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
-  const p = path.join(DIST, f); if (!p.startsWith(DIST) || !fs.existsSync(p)) { r.writeHead(404); return r.end(); }
-  const t = types[path.extname(p)] || 'application/octet-stream'; const cache = /^\/assets\//.test(f) ? 'public, max-age=31536000, immutable' : 'no-cache';
-  if (/javascript|css|html|json|svg/.test(t)) { if (!gz.has(p)) gz.set(p, zlib.gzipSync(fs.readFileSync(p), { level: 6 })); r.writeHead(200, { 'content-type': t, 'content-encoding': 'gzip', 'cache-control': cache }); return r.end(gz.get(p)); }
-  r.writeHead(200, { 'content-type': t, 'cache-control': cache }); r.end(fs.readFileSync(p));
-}).listen(PORT);
+// AB=1 : `<distA>,<distB>,…` — les builds mesurés DANS LE MÊME TEMPS, geste par geste en alternance (A, B, B, A…), pour que
+// la charge de la machine (partagée) pèse pareil sur chacun ; médianes par build. Sinon un build.
+const DISTS = String(process.argv[2] || path.join(RACINE, 'dist')).split(',').map((d) => path.resolve(d));
+const BASE_URL = new Map();   // page → son serveur
+function serveur(dist, port) {
+  return http.createServer((q, r) => {
+    let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
+    const p = path.join(dist, f); if (!p.startsWith(dist) || !fs.existsSync(p)) { r.writeHead(404); return r.end(); }
+    const t = types[path.extname(p)] || 'application/octet-stream'; const cache = /^\/assets\//.test(f) ? 'public, max-age=31536000, immutable' : 'no-cache';
+    if (/javascript|css|html|json|svg/.test(t)) { if (!gz.has(p)) gz.set(p, zlib.gzipSync(fs.readFileSync(p), { level: 6 })); r.writeHead(200, { 'content-type': t, 'content-encoding': 'gzip', 'cache-control': cache }); return r.end(gz.get(p)); }
+    r.writeHead(200, { 'content-type': t, 'cache-control': cache }); r.end(fs.readFileSync(p));
+  }).listen(port);
+}
+const SRVS = DISTS.map((d, i) => serveur(d, PORT + i));
+const srv = { close: () => SRVS.forEach((x) => x.close()) };
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const med = (L) => { const a = L.filter((x) => x != null).sort((x, y) => x - y); return a.length ? a[Math.floor((a.length - 1) / 2)] : null; };
 const centile = (L, p) => { const a = L.slice().sort((x, y) => x - y); return a.length ? a[Math.min(a.length - 1, Math.floor(a.length * p))] : null; };
@@ -122,13 +132,17 @@ async function onglets(pg, R) {
 async function vente(pg, R) {
   await pg.locator(`[data-n-onglet="ventes"]`).first().tap({ timeout: 30000 }).catch(() => {});
   await pg.waitForFunction(ecranPret, 'ventes', { timeout: 60000, polling: 200 }).catch(() => {}); await calme(pg, 1500, 20000);
+  // « En route » : une vente touchée ouvre son détail (« À envoyer » coche la vente pour le lot).
+  const seg = pg.locator('#root .vrm-main').getByText(/^En route/).first();
+  if (await seg.count()) { await seg.tap().catch(() => {}); await calme(pg, 1500, 20000); }
   for (let i = 0; i < 3; i++) {
-    const cible = await pg.evaluate(() => { for (const e of document.querySelectorAll('#root .vrm-main .n-rangee')) { const r = e.getBoundingClientRect(); if (r.height < 40 || r.top < 160 || r.bottom > innerHeight - 120) continue; if (e.closest('[data-copie-ecran],button[aria-pressed]')) continue; const x = r.left + Math.min(r.width / 2, 170), y = r.top + r.height / 2; const h = document.elementFromPoint(x, y); if (e.contains(h) && !h.closest('input,a')) return { x, y }; } return null; });
+    const cible = await pg.evaluate(() => { for (const e of document.querySelectorAll('#root .vrm-main .n-rangee')) { if (!e.querySelector('.n-rangee-chevron')) continue; const r = e.getBoundingClientRect(); if (r.height < 40 || r.top < 160 || r.bottom > innerHeight - 120) continue; if (e.closest('[data-copie-ecran],button[aria-pressed]')) continue; const x = r.left + Math.min(r.width / 2, 170), y = r.top + r.height / 2; const h = document.elementFromPoint(x, y); if (e.contains(h) && !h.closest('input,a')) return { x, y }; } return null; });
     if (!cible) { console.log('    vente : aucune rangée à toucher'); return; }
     await calme(pg, 800, 10000); await rendus(pg); const m0 = await metr(); const pf = i === 1 && await profilDebut('vente');
     await pg.touchscreen.tap(cible.x, cible.y);
     const ouvert = () => [...document.querySelectorAll('[data-n-poussee]:not([data-n-etat="sortie"]) .n-rangee, [data-n-poussee]:not([data-n-etat="sortie"]) [data-vn-geste]')].some((x) => { const r = x.getBoundingClientRect(); return r.height > 20 && r.left < innerWidth - 20 && r.right > 20; });
-    const ms = await jusqua(pg, ouvert, null, 10000); const cout = ecart(m0, await metr()); await profilFin('vente', pf); const rd = await rendus(pg);
+    const ms = await jusqua(pg, ouvert, null, 10000);
+    if (process.env.CAPTURES) { await pg.screenshot({ path: path.join(process.env.CAPTURES, 'vente-' + i + '.png') }).catch(() => {}); console.log('      ' + JSON.stringify(await pg.evaluate(() => [...document.querySelectorAll('[data-n-poussee]')].map((x) => ({ etat: x.getAttribute('data-n-etat'), r: x.getBoundingClientRect().toJSON(), n: x.querySelectorAll('*').length, cls: x.className })))).slice(0, 600)); } const cout = ecart(m0, await metr()); await profilFin('vente', pf); const rd = await rendus(pg);
     await calme(pg, 800, 10000);
     // Le retour : le bouton « ‹ Ventes » de la page poussée.
     const ret = await pg.evaluate(() => { const b = [...document.querySelectorAll('[data-n-poussee]:not([data-n-etat="sortie"]) .n-barre-retour')].find((x) => x.getClientRects().length); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
@@ -152,7 +166,7 @@ async function defiler(pg, cdp, R) {
   console.log(`    défilement Annonces : image médiane ${m} ms · p95 ${p95} ms · pire ${pire} ms · défilé ${r.haut} px · ${r.noeuds} nœuds`);
 }
 async function recherche(pg, R) {
-  await pg.goto(`http://localhost:${PORT}/?tab=annonces`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`${BASE_URL.get(pg)}/?tab=annonces`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(ecranPret, 'annonces', { timeout: 60000, polling: 200 }).catch(() => {}); await calme(pg, 3000, 40000);
   const champ = pg.locator('#root .vrm-main input[type="search"]:visible').first();
   if (!(await champ.count())) { console.log('    recherche : aucun champ'); return; }
@@ -191,21 +205,56 @@ async function rechercheAchats(pg, R) {
   }
 }
 
+// ── AB : plusieurs builds, mêmes gestes, en alternance ──
+async function modeAB(nav) {
+  const R = DISTS.map(() => ({ froid: [], onglets: {}, cout: {} })); const erreurs = [];
+  const ORDRE = ['annonces', 'ventes', 'achats', 'compta', 'journee']; const TOURS = +(process.env.TOURS || 4);
+  for (let p = 0; p < PASSES; p++) {
+    const P = [];
+    for (let i = 0; i < DISTS.length; i++) { const ctx = await contexte(nav); const pg = await ctx.newPage(); BASE_URL.set(pg, `http://localhost:${PORT + i}`); pg.on('pageerror', (e) => erreurs.push(e.message.slice(0, 160))); const cdp = await cdpDe(pg); await cdp.send('Performance.enable').catch(() => {}); P.push({ i, ctx, pg, cdp }); }
+    const ordre = (k) => (k % 2 ? P.slice().reverse() : P);
+    for (const x of ordre(p)) { await x.pg.goto(`${BASE_URL.get(x.pg)}/?tab=journee`, { waitUntil: 'commit', timeout: 120000 });
+      const fin = Date.now() + 90000; let t = null; while (Date.now() < fin) { t = await x.pg.evaluate(() => window.__pret).catch(() => null); if (t != null) break; await attendre(100); }
+      R[x.i].froid.push(t == null ? null : Math.round(t)); await calme(x.pg, 2000, 40000); }
+    for (const x of P) for (const o of ORDRE) { await x.pg.locator(`[data-n-onglet="${CLE(o)}"]`).first().tap({ timeout: 30000 }).catch(() => {}); await x.pg.waitForFunction(ecranPret, o, { timeout: 60000, polling: 200 }).catch(() => {}); await calme(x.pg, 1500, 20000); }
+    let k = 0;
+    for (let tour = 0; tour < TOURS; tour++) for (const o of ORDRE) for (const x of ordre(k++)) {
+      CDP = x.cdp; await calme(x.pg, 1000, 15000); const m0 = await metr();
+      await x.pg.locator(`[data-n-onglet="${CLE(o)}"]`).first().tap({ timeout: 30000 }).catch(() => {});
+      const ms = await jusqua(x.pg, ecranPret, o); const cout = ecart(m0, await metr());
+      (R[x.i].onglets[o] = R[x.i].onglets[o] || []).push(ms); (R[x.i].cout[o] = R[x.i].cout[o] || []).push(cout);
+      await calme(x.pg, 800, 15000);
+    }
+    for (const x of P) await x.ctx.close();
+    console.log(`  passe ${p + 1} faite (charge ${os.loadavg()[0].toFixed(1)})`);
+  }
+  const out = DISTS.map((d, i) => ({ build: path.basename(d), froid: med(R[i].froid),
+    onglets: Object.fromEntries(Object.entries(R[i].onglets).map(([o, L]) => [o, med(L)])),
+    script: Object.fromEntries(Object.entries(R[i].cout).map(([o, L]) => [o, med(L.map((c) => c && c.script))])),
+    style: Object.fromEntries(Object.entries(R[i].cout).map(([o, L]) => [o, med(L.map((c) => c && c.style))])) }));
+  for (const x of out) console.log('AB ' + JSON.stringify(x));
+  if (process.env.JSON) fs.writeFileSync(process.env.JSON, JSON.stringify({ out, R }, null, 1));
+  console.log(erreurs.length ? `❌ erreurs de page : ${[...new Set(erreurs)].slice(0, 3).join(' | ')}` : '✅ aucune erreur de page');
+}
+
 (async () => {
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--explicitly-allowed-ports=' + PORT] });
+  if (DISTS.length > 1) { const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--explicitly-allowed-ports=' + DISTS.map((_, i) => PORT + i).join(',')] });
+    console.log(`Banc vitesse-iphone AB · ${DISTS.map((d) => path.basename(d)).join(' / ')} · CPU ×${CPU} · volume ${process.env.VOLUME || 'julien'} · ${PASSES} passe(s) · charge ${os.loadavg()[0].toFixed(1)}`);
+    try { await modeAB(nav); } finally { await nav.close(); srv.close(); } return; }
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--explicitly-allowed-ports=' + DISTS.map((_, i) => PORT + i).join(',')] });
   const R = { froid: [], rouvert: [], longuesFroid: [], onglets: {}, venteOuvrir: [], venteRetour: [], defile: [], frappe: [], frappeListe: [], rechAchats: [], rendus: {}, cout: {} };
   const erreurs = [];
-  console.log(`Banc vitesse-iphone · ${path.relative(process.cwd(), DIST) || DIST} · CPU ×${CPU} · volume ${process.env.VOLUME || 'julien'} · ${PASSES} passe(s) · charge ${os.loadavg()[0].toFixed(1)}`);
+  console.log(`Banc vitesse-iphone · ${DISTS.map((d) => path.basename(d)).join(' / ')} · CPU ×${CPU} · volume ${process.env.VOLUME || 'julien'} · ${PASSES} passe(s) · charge ${os.loadavg()[0].toFixed(1)}`);
   try {
     for (let p = 0; p < PASSES; p++) {
       console.log(`  passe ${p + 1}`);
-      const ctx = await contexte(nav); const pg = await ctx.newPage(); pg.on('pageerror', (e) => erreurs.push(e.message.slice(0, 160)));
+      const ctx = await contexte(nav); const pg = await ctx.newPage(); BASE_URL.set(pg, `http://localhost:${PORT}`); pg.on('pageerror', (e) => erreurs.push(e.message.slice(0, 160)));
       const cdp = await cdpDe(pg); CDP = cdp; await cdp.send('Performance.enable').catch(() => {});
       // Froid, puis rouvert (même appareil : service worker, copies d'écran).
       for (const sorte of ['froid', 'rouvert']) {
         if (sorte === 'rouvert') await calme(pg, 3000, 30000), await attendre(6000);
         const pf = p === 0 && await profilDebut(sorte);
-        await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'commit', timeout: 120000 });
+        await pg.goto(`${BASE_URL.get(pg)}/?tab=journee`, { waitUntil: 'commit', timeout: 120000 });
         const fin = Date.now() + 90000; let t = null; while (Date.now() < fin) { t = await pg.evaluate(() => window.__pret).catch(() => null); if (t != null) break; await attendre(100); }
         const lt = await pg.evaluate((tp) => Math.round((window.__lt || []).filter((x) => tp == null || x[0] < tp).reduce((a, x) => a + x[1], 0)), t).catch(() => null);
         await profilFin(sorte, pf);
