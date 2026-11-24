@@ -47,9 +47,28 @@ L'apparition passe par l'aide partagée de visuel-jeu (`useArrive(pret, cle)`, `
 
 ## 5. Preuves — `scripts/bancs/visuel-argent.cjs`
 
-`npm run build && node scripts/bancs/visuel-argent.cjs` (390 tactile et 1512, clair et sombre ; `SHOTS=`, `VIDEO=`).
-Résultats : voir §6.
+`npm run build && node scripts/bancs/visuel-argent.cjs` (390 tactile et 1512, clair et sombre ; `SHOTS=`, `VIDEO=`,
+`PARTIES=argent,reduit,messages,parametres`, `SEUL=pur` pour les pièces seules). Tout passe par `lourd.sh` sur la machine partagée.
 
-## 6. Résultats et ce qui reste
+- **Ce build** : Argent + mouvement réduit + Messages **130 verts, 0 rouge** ; Paramètres **29 verts, 0 rouge** (4 tailles/thèmes) ;
+  pièces seules **9/9**.
+- **Rouge sur la base** (`111a7d86e`, visuel-jeu sans ce lot, construit à part et servi par `BANC_DIST`) : **11 rouges** — anneau,
+  jauges, cartes, barres absents ; Messages 0 tuile sur 80, aucun avatar de compte ; Paramètres 0 médaillon, interrupteurs sans bord ni trait.
+- **Mutations** (pièces seules, chacune ⇒ rouge puis fichier restauré) : jauge « pas su » rendue 0 ; anneau « pas su » rendu 0 ;
+  le « ≥ » d'un minimum retiré ; couverture décalée d'une case.
+- Le banc a trouvé, en route : l'avatar de l'acheteur pris pour la paire dans l'ancienne rangée v2 (retiré) ; l'orange du point
+  « Tout va bien ? » la nuit (corrigé) ; les médaillons et les interrupteurs écrasés par la couche « verre » (déplacés dans la
+  première couche `vrm-vintex`) ; le logo Google (marque, `data-marque`, gardé).
+- **Toucher → premier contenu d'Argent** (rapporté ; rouge seulement avec `BANC_T_STRICT=1`) : revisite 83–120 ms (base : 162 ms au
+  même endroit), première ouverture 161–574 ms — c'est le montage de tout l'écran (Comptabilite), pas ce lot ; de l'écran monté à
+  Mois rendu : 3–13 ms. La réaction au toucher : 1–2 ms.
+- Film du chargement : `scratchpad/visuel-argent/argent-chargement.mp4` (Argent arrive d'un coup, sans « 0 » ni bloc vide).
 
-(rempli à la fin du lot)
+## 6. Ce qui reste
+
+- Bancs voisins (même machine, même heure) : `argent-vintex` 46/0, `textes-visibles` 16/0 ; `argent-mois`, `argent-a-venir`,
+  `argent-mieux` (Déclarer), `messages-*`, `parametres-refonte` rouges — comparés à la base au §7 (ajouté quand la comparaison a tourné).
+- `audit-traduction` 45/0, `audit-urssaf`, `audit-chiffres`, `audit-quoi-de-neuf` verts. Le relevé 35/35 (`chiffres-volume`) n'a pas
+  tourné (machine saturée) : ce lot n'appelle que des propriétaires existants, aucune somme neuve.
+- À l'ordinateur, la valeur « Micro-entrepre… » de la colonne Paramètres est coupée (d'avant ce lot).
+- `revele` de visuel-jeu ne se rejouait plus à la revisite dans Argent (vérifié par le banc : 0 animation à la revisite).
