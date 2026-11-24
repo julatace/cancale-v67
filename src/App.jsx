@@ -4299,7 +4299,9 @@ let _idFeuille = 0;
 // passent EN HAUT de l'écran tant qu'une feuille l'est — en bas, ils couvraient
 // les boutons du pied de la feuille (« Annuler / Supprimer »).
 const _feuillesSubs = new Set();
-const _notifierFeuilles = () => { _feuillesSubs.forEach((fn) => { try { fn(); } catch (_) {} }); };
+// (24 nov., morceaux-perimes) Le nombre de feuilles ouvertes, publié pour `momentSur` (src/chargementSur.js) :
+// une page restée sur une ancienne version ne se recharge jamais avec une feuille ouverte.
+const _notifierFeuilles = () => { try { window.__vrmFeuilles = _feuillesOuvertes.length; } catch (_) {} _feuillesSubs.forEach((fn) => { try { fn(); } catch (_) {} }); };
 const abonnerFeuilles = (fn) => { _feuillesSubs.add(fn); return () => _feuillesSubs.delete(fn); };
 const uneFeuilleOuverte = () => _feuillesOuvertes.length > 0;
 const _histoOnglet = { tab: null, sub: null };
