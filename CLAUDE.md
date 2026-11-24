@@ -484,6 +484,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **24 nov. · Français du démarrage 79,96 → 73,6 Ko** (budget 80 inchangé) : l'accueil des nouveaux à la demande. `2026-11-24-francais-demarrage.md`. Geste : aucun.
 - **24 nov. · Bugs terrain (`claude/bugs-terrain-24nov`)** : mesuré (Vercel 0 erreur/72 h ; 3 plantages app/72 h dont `Icon` déjà corrigé) ; une photo Leboncoin n'est plus demandée par `fetch` (refusée par `connect-src` : `src/lisibleParLaPage.js`, `audit-lecture-csp`) ; restent : morceaux périmés au téléphone (~15/jour), suivi `escrow` de l'extension jamais reconnu. `2026-11-24-bugs-terrain.md`. Geste : aucun.
 - **24 nov. · CI ≈ 222 → ≈ 121 min-machine par PR, job le plus long 68 → 17 min (`claude/ci-rapide`)** : mêmes contrôles (`python3 -I scripts/ci-controles.py --diff origin/main`), bancs 3 à la fois (`BANCS_PARALLELE`), ventes-e2, accessibilite et budget-vitesse en morceaux, parts rééquilibrées, `dist/` partagé pour les écrans ; la part 2/3 (annulée à 45 min à chaque PR) finit. `2026-11-24-ci-rapide.md`. Geste : aucun.
 - **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
