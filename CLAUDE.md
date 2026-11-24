@@ -397,6 +397,7 @@ Vinted est un **objet** `{amount}` ; les données vivent sous `data.payload`).
    (`_porte-banc.cjs`) sur le playwright du chemin absolu ; un banc rouge en masse ⇒
    regarder d'abord la capture (écran de connexion ?) et `df -h /` (disque plein).
 
+⚠️ **CI (24 nov.)** : les bancs d'une part tournent 3 à la fois (`BANCS_PARALLELE`, chacun son port et son navigateur) ; un banc long se coupe en morceaux de SA variable (`ventes-e2@SCENARIOS=jeu,exclu`, `accessibilite@BANC_LARGEUR=390`, `budget-vitesse@ECRANS=…`) ; avant de toucher un workflow, `python3 -I scripts/ci-controles.py --diff origin/main` doit dire « identiques » (rien de retiré, rien de rendu non bloquant). Récit : `docs/passation/2026-11-24-ci-rapide.md`.
 ⚠️⚠️ **Plusieurs sessions mergent sur `main` en même temps** : amener `main` par un
 **vrai `git merge origin/main`**, jamais `-s ours` ; après, `git diff origin/main --stat`
 ne montre que ses fichiers. **Commiter AVANT toute manipulation de branche.** Une
@@ -483,10 +484,10 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **24 nov. · Dix styles à essayer (`claude/style-graphite`)** : Paramètres → Apparence → Style, 11 tuiles d'aperçu (Actuel + Graphite, Ardoise, Pierre, Encre, Papier, Verre, Nuit, Menthe, Studio, Arcade), clair et sombre, un toucher applique ; jetons fabriqués et contrôlés (`scripts/styles-generer.cjs`, ≥ 4,5:1, zéro orange), famille de boutons commune en couche `vrm-styles` (`src/natif/styles-choix.css`, `data-n-famille` pour un bouton de composant) ; le défaut inchangé. Banc `styles-choix`. `2026-11-24-style-graphite.md`. Geste : essayer les styles sur l'iPhone, dire lequel garder.
+- **24 nov. · Styles au choix (`claude/style-graphite`, PR #1380)** : Paramètres → Apparence → Style, tuiles (Actuel + 11 styles dont Monochrome), clair/sombre, un toucher applique ; jetons par `scripts/styles-generer.cjs` (table, AA, zéro orange), famille de boutons `src/natif/styles-choix.css`. Banc `styles-choix`. `2026-11-24-style-graphite.md`. Geste : essayer, dire lequel garder.
 - **24 nov. · Visuel « jeu vidéo » (`claude/visuel-jeu`)** : pop-ups en notifications de jeu (photo par identité, étiquette N°, médaillon, ressort, balayage, « +2 », vente fêtée) ; disparues en grille ; anneau des colis prêts ; ventes en tuiles ; pièces `src/natif/Jeu.jsx` (README `src/natif/visuel/`). `2026-11-24-visuel-jeu.md`. Geste : regarder la galerie des pop-ups sur l'iPhone.
-- **24 nov. · Morceaux périmés (`claude/morceaux-perimes`)** : la page ouverte pendant une mise en ligne ne repart plus — elle fait ranger les fichiers de SA version au repos (`src/reserveMorceaux.js`), le ménage du service worker garde ceux d'une page ouverte ; un écran introuvable recharge SUR cet écran, jamais pendant une saisie ou une feuille (sinon page cachée) ; un 404 /assets/ de la prod porte `immutable`. Banc `morceaux-perimes`, audit. `2026-11-24-morceaux-perimes.md`. Geste : aucun.
-- **23 nov. · Gris clair étagé (`claude/style-clair`)** : variante A validée (gris froid, accent ardoise), sombre = gris choisi ; iPhone compact ; dessin fin ; pop-up d'événement + galerie du propriétaire. `docs/passation/2026-11-23-style-clair.md`. Geste : essayer le pop-up sur un vrai iPhone.
+- **24 nov. · Français du démarrage 79,96 → 73,6 Ko** (budget 80 inchangé) : l'accueil des nouveaux à la demande. `2026-11-24-francais-demarrage.md`. Geste : aucun.
+- **24 nov. · Bugs terrain (`claude/bugs-terrain-24nov`)** : mesuré (Vercel 0 erreur/72 h ; 3 plantages app/72 h dont `Icon` déjà corrigé) ; une photo Leboncoin n'est plus demandée par `fetch` (refusée par `connect-src` : `src/lisibleParLaPage.js`, `audit-lecture-csp`) ; restent : morceaux périmés au téléphone (~15/jour), suivi `escrow` de l'extension jamais reconnu. `2026-11-24-bugs-terrain.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
