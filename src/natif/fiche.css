@@ -58,6 +58,10 @@
   }
   .nf-etiquette[data-nf-ton="ambre"] { background: var(--n-ambre-fond); color: var(--n-ambre); }
   .nf-etiquette[data-nf-ton="doublon"] { background: var(--n-doublon); color: var(--n-sur-doublon); }
+  /* (24 nov., vente-mail-annonce) « Pourquoi ? » : un lien discret à côté de la ligne d'état « pas su » ; sa raison en gris clair. */
+  .nf-pourquoi { display: inline-flex; align-items: center; min-height: 26px; padding: 2px 4px; border: 0; background: none; color: var(--n-encre-2); font: var(--n-t-legende); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; position: relative; }
+  .nf-pourquoi::after { content: ""; position: absolute; inset: -9px -6px; }   /* la cible au doigt : 44 px */
+  .nf-pourquoi-texte { margin: 8px 0 0; color: var(--n-encre-2); font: var(--n-t-legende); line-height: 1.4; }
 
   /* ── 3. Le prix en très grand, ses pastilles ── */
   .nf-prixbloc { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; row-gap: 0; padding: 10px var(--n-marge) 4px; }
