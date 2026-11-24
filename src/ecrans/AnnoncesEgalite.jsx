@@ -53,12 +53,12 @@ import { lireSupprimes } from '../comptesSupprimes.js';   // (21 nov.) un compte
 
 const JOUR = 24 * 3600 * 1000;
 const ACTIONS = [
-  { cle: 'recreer', libelle: 'egalite.action.republier', icone: 'sync', etats: ['enligne'], robot: true },
+  { cle: 'recreer', libelle: 'egalite.action.republier', icone: 'sync', etats: ['enligne'], robot: true, courante: true },
   { cle: 'main', libelle: 'egalite.action.main', icone: 'pencil', etats: ['enligne', 'masquee', 'brouillon'] },
   { cle: 'versBrouillon', libelle: 'egalite.action.versBrouillon', icone: 'archive', etats: ['enligne'], robot: true },
   { cle: 'enLigne', libelle: 'egalite.action.enLigne', icone: 'play', etats: ['brouillon'], robot: true },
-  { cle: 'baisser', libelle: 'egalite.action.baisser', icone: 'tag', etats: ['enligne'] },
-  { cle: 'partout', libelle: 'egalite.action.partout', icone: 'link', etats: ['enligne'], tousSites: true },
+  { cle: 'baisser', libelle: 'egalite.action.baisser', icone: 'tag', etats: ['enligne'], courante: true },
+  { cle: 'partout', libelle: 'egalite.action.partout', icone: 'link', etats: ['enligne'], tousSites: true, courante: true },
   // (19 nov., publier-agent) « Publier sur… » : l'agent sans IA remplit chaque site depuis la fiche article neutre (src/publier/).
   { cle: 'agent', libelle: 'agent.action', icone: 'link', etats: ['enligne'], tousSites: true },
 ];
@@ -421,7 +421,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     return { ok: true };
   };
   const actions = ACTIONS.map((A) => ({
-    cle: A.cle, libelle: tr(A.libelle), icone: A.icone, phrase: A.cle === 'agent' ? tr('agent.action.phrase') : tr('egalite.action.' + cleActionTr[A.cle] + '.phrase'),
+    cle: A.cle, libelle: tr(A.libelle), icone: A.icone, courante: !!A.courante, phrase: A.cle === 'agent' ? tr('agent.action.phrase') : tr('egalite.action.' + cleActionTr[A.cle] + '.phrase'),
     pour: (a) => (A.tousSites ? !!a.numero && a.annonces.some((x) => x.etat === 'enligne') : (() => { const v = vintedDe(a); return !!v && A.etats.includes(v.etat); })()),
     juger: (sel) => {
       if (!sel.length) return { ok: false, raison: tr('egalite.selection.aucune') };
@@ -522,6 +522,11 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
       onRelier={(a) => { const x = a.annonces.find((y) => y.site !== 'vinted'); if (x) { try { window.dispatchEvent(new CustomEvent('vrm:liaison-ouvrir', { detail: { site: NOM_SITE[x.site], id: String(x.id), vue: null } })); } catch (_) {} } }}
+      // (23 nov., Julien : « pas de Relier à un achat dans le ⋯ d'une annonce, ce n'est pas normal ») La MÊME feuille que Ventes et Achats
+      // (« Relier achats et ventes », src/relierGlisser.js) ouverte sur CETTE annonce (son identifiant Vinted, `a:{id}`) : c'est SON
+      // toucher puis son « Oui » qui relient, jamais une ressemblance. Une annonce déjà reliée ouvre sa fiche (Délier, Reçu).
+      onRelierAchat={(a) => { if (a.achat != null && a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(a.numero) })); } catch (_) {} return; }
+        const v = a.annonces.find((y) => y.site === 'vinted' && y.id != null); try { window.__vrmRelierCible = { cible: v ? 'a:' + String(v.id) : '', at: Date.now() }; window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=achats' })); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:relier-ouvrir')); } catch (_) {} }, 300); } catch (_) {} }}
       onPublier={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} }}
       // (19 nov., fiche directe) Un toucher sur un article numéroté ouvre SA fiche complète (par son N°, l'identité de l'article).
       onFiche={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(a.numero) })); } catch (_) {} } }}

@@ -21,7 +21,8 @@ import ecran_transp_depenses from './es/transpDepenses.js';   // (21 nov.) Trans
 import ecran_file_actions from './es/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_a_distance from './es/aDistance.js';   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './es/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
-import ecran_styleClarte from './es/styleClarte.js';   // (22 nov.) style et clarté : tableau de bord, état de l’extension
+import ecran_styleClarte from './es/styleClarte.js';
+import ecran_revueUx from './es/revueUx.js';   // (23 nov.) revue UX   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './es/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './es/ext5438.js';   // (22 nov.) ext. 5.438
 import ecran_observation from './es/observation.js';   // (24 nov.) ext. 5.440.3 « Observer Vinted »
@@ -2412,6 +2413,7 @@ export default {
   ...ecran_a_distance,
   ...ecran_apresFinale,
   ...ecran_styleClarte,
+  ...ecran_revueUx,
   ...ecran_relier_retires,
   ...ecran_fiched,
   ...ecran_vente_mail,
