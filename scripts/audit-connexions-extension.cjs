@@ -27,17 +27,18 @@ const MUTATIONS = {
   // le code d'arrêt brut (texte de page) est montré tel quel
   'arret-brut': ["code: ARRETS.includes(str(a.code)) ? str(a.code) : 'autre'", "code: str(a.code)"],
   // un compte jamais lu est dit « relu » (pas su = 0)
+  'connecte-vieux': ['const recent = maintenant - best.at < CONNECTE_MS', 'const recent = true || maintenant - best.at < CONNECTE_MS', 'etatConnexionCompte.js'],
   'jamais-frais': ["const relu = at == null ? (Array.isArray(navigateurs) ? 'jamais' : 'passu')", "const relu = at == null ? 'frais'"],
 };
 if (process.argv.includes('--prouve')) {
   const base = spawnSync(process.execPath, [__filename], { encoding: 'utf8' });
   let rate = base.status === 0 ? 0 : 1;
   console.log(`${base.status === 0 ? '✅' : '❌'} code tel quel : ${base.status === 0 ? 'vert' : 'ROUGE'}`);
-  for (const [nom, [a, b]] of Object.entries(MUTATIONS)) {
+  for (const [nom, [a, b, fic = 'connexions.js']] of Object.entries(MUTATIONS)) {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cnx-mut-'));
     fs.cpSync(path.join(RACINE, 'src', 'connexions'), path.join(tmp, 'connexions'), { recursive: true });
     fs.cpSync(path.join(RACINE, 'src', 'extension'), path.join(tmp, 'extension'), { recursive: true });
-    const f = path.join(tmp, 'connexions', 'connexions.js'); const s = fs.readFileSync(f, 'utf8');
+    const f = path.join(tmp, 'connexions', fic); const s = fs.readFileSync(f, 'utf8');
     if (!s.includes(a)) { console.log(`❌ mutation ${nom} : texte introuvable`); rate++; continue; }
     fs.writeFileSync(f, s.replace(a, b));
     const r = spawnSync(process.execPath, [__filename], { encoding: 'utf8', env: { ...process.env, CNX_SRC: tmp } });
@@ -139,6 +140,17 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '�
   dit(capt.alerte && capt.alerte.code === 'arret' && capt.alerte.cle === 'cnx.alerte.verification', 'Aujourd’hui : une vérification demandée par Vinted passe en premier', JSON.stringify(capt.alerte));
   const rien = R.vueConnexions({ rows: [rows[0]], attendue: '5.448.0', maintenant: T, comptes: { vinted: [{ id: A, nom: 'boutique_a' }] }, lus: { vinted: { [A]: T } }, jauges: {} });
   dit(rien.alerte === null, 'Aujourd’hui : tout va bien ⇒ rien');
+
+  // 10. La règle par compte (porte `peutAgir`, branche claude/agir-si-connecte).
+  const E = await import(path.join(SRC, 'connexions', 'etatConnexionCompte.js'));
+  const ec = (o) => E.etatConnexionCompte({ rows, attendue: '5.448.0', maintenant: T, ...o });
+  dit(ec({ compte: A }).connecte === true && ec({ compte: A }).par.id === 'aaaaaaaaaaaaaaaa' && ec({ compte: A }).aJour === true, 'compte vu il y a 3 min par un Chrome à jour : connecté', JSON.stringify(ec({ compte: A })));
+  dit(ec({ compte: B }).connecte === false && ec({ compte: B }).raison === 'pas-vu', 'compte vu il y a 40 min : PAS connecté (30 min)', JSON.stringify(ec({ compte: B })));
+  dit(ec({ compte: '49999999' }).connecte === false && ec({ compte: '49999999' }).raison === 'jamais', 'compte jamais vu : pas connecté');
+  dit(E.etatConnexionCompte({ compte: A, rows: null }).connecte === null && E.etatConnexionCompte({ compte: A, rows: undefined }).raison === 'lecture', 'lecture ratée / en cours : null (pas su), jamais true');
+  dit(ec({ site: 'leboncoin', compte: 'lbc1' }).connecte === null && ec({ site: 'leboncoin', compte: 'lbc1' }).siteVuAt === T - 2 * H, 'Leboncoin : le compte n’est pas publié ⇒ null (pas su), le site vu il y a 2 h');
+  const vieux = E.etatConnexionCompte({ compte: C, rows: [{ ...rows[1], vus: { vinted: { [C]: T - 60000 } } }], attendue: '5.448.0', maintenant: T });
+  dit(vieux.connecte === true && vieux.aJour === false && vieux.installer === '5.448.0' && vieux.raison === 'ancienne', 'connecté par une extension ancienne : aJour false, version à installer', JSON.stringify(vieux));
 
   console.log(`\n${ok} verts, ${ko} rouges.`);
   process.exit(ko ? 1 : 0);
