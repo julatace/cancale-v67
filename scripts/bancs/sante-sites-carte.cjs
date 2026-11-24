@@ -4,7 +4,7 @@
 //  Julien : « l'extension doit être intelligente ». Le VRAI vrm-badge.js (faux `chrome` : il répond ce que dirait le
 //  service worker, dont la règle `santeSites` est exécutée par scripts/audit-ext-adaptatif.cjs sur le VRAI background.js).
 //   H1  tout va bien ⇒ « Vinted : tout marche. », sans couleur ;
-//   H2  un problème ⇒ « … ne marche plus … Geste : … », en AMBRE (un geste à faire, §7), dans la carte ;
+//   H2  un problème ⇒ « … ne marche plus … Geste : … », à l'ENCRE en gras — aucun orange ni ambre (Julien, 23 nov.) ;
 //   H3  « pas encore vu » ⇒ aucune ligne (rien à dire) ;
 //   H4  carte Leboncoin (sans les quatre lignes) ⇒ la ligne y est aussi.
 //  390 px au doigt et 1512 px, clair et sombre ; captures dans captures/sante-sites-carte. Tout est inventé.
@@ -62,7 +62,7 @@ const lire = (pg) => pg.evaluate(() => {
   const h = document.getElementById('vrm-badge'); if (!h || !h.shadowRoot) return null;
   const r = h.shadowRoot; const l = r.querySelector('[data-sante-site]'); const carte = r.querySelector('.carte');
   const b = r.querySelector('.btn') ? r.querySelector('.btn').getBoundingClientRect() : null;
-  return { l: !!l, k: l ? l.getAttribute('data-sante-site') : null, texte: l ? l.textContent.trim() : '', visible: !!(l && l.getClientRects().length), couleur: l ? getComputedStyle(l).color : '', encre: carte ? getComputedStyle(carte).color : '', btn: b ? { x: b.left, y: b.top, w: b.width, h: b.height } : null, debord: document.documentElement.scrollWidth > window.innerWidth, q4: !!r.querySelector('[data-q4-bloc]'), cls: carte ? carte.className : '', txt: carte ? String(carte.innerText || '').slice(0, 300) : '' };
+  return { l: !!l, k: l ? l.getAttribute('data-sante-site') : null, texte: l ? l.textContent.trim() : '', visible: !!(l && l.getClientRects().length), couleur: l ? getComputedStyle(l).color : '', gras: l ? Number(getComputedStyle(l).fontWeight) : 0, encre: carte ? getComputedStyle(carte).color : '', btn: b ? { x: b.left, y: b.top, w: b.width, h: b.height } : null, debord: document.documentElement.scrollWidth > window.innerWidth, q4: !!r.querySelector('[data-q4-bloc]'), cls: carte ? carte.className : '', txt: carte ? String(carte.innerText || '').slice(0, 300) : '' };
 });
 const montrer = async (pg, mobile) => {
   let a = await lire(pg);
@@ -72,6 +72,8 @@ const montrer = async (pg, mobile) => {
   else { await pg.mouse.move(5, 5); await pg.waitForTimeout(80); await pg.mouse.move(a.btn.x + a.btn.w / 2, a.btn.y + a.btn.h / 2); await pg.waitForTimeout(60); await pg.mouse.click(a.btn.x + a.btn.w / 2, a.btn.y + a.btn.h / 2); }
   await pg.waitForTimeout(400);
 };
+// Une couleur calculée « orange / ambre » : teinte 15–55°, saturée, pas grise.
+function orange(c) { const m = /rgba?\((\d+), ?(\d+), ?(\d+)/.exec(String(c || '')); if (!m) return false; const [r, g, b] = [m[1], m[2], m[3]].map(Number).map((x) => x / 255); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; if (d < 0.2) return false; let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360; return h >= 15 && h <= 55; }
 const OK = { ok: true, k: 'ok', t: 'Vinted : tout marche.' };
 const KO = { ok: false, k: 'element', nom: 'envoyer', t: "VRM ne trouve plus le bouton « Envoyer » sur la page Vinted (Vinted a changé sa page). Geste : fais-le toi-même sur vinted.fr cette fois, et touche « Envoyer un rapport » dans la fenêtre de l'extension." };
 (async () => {
@@ -87,9 +89,18 @@ const KO = { ok: false, k: 'element', nom: 'envoyer', t: "VRM ne trouve plus le 
       await t.ctx.close();
       t = await ouvrir(nav, base({ santeSite: KO }), { scheme, largeur, hauteur, mobile }); await montrer(t.pg, mobile);
       a = await lire(t.pg); await cap(t.pg, 'ko-' + nom);
-      dit(a && a.visible && a.k === 'element' && /ne trouve plus le bouton « Envoyer »/.test(a.texte) && /Geste : /.test(a.texte) && a.couleur !== a.encre && !a.debord, `H2 ${nom} : le problème et SON geste, en ambre, rien ne déborde`, JSON.stringify(a));
+      dit(a && a.visible && a.k === 'element' && /ne trouve plus le bouton « Envoyer »/.test(a.texte) && /Geste : /.test(a.texte) && a.gras >= 600 && !a.debord, `H2 ${nom} : le problème et SON geste, en gras, rien ne déborde`, JSON.stringify(a));
+      dit(a && !orange(a.couleur) && a.couleur === a.encre, `H2 ${nom} : à l'encre, AUCUN orange ni ambre (décision du 23 nov.)`, a && a.couleur);
       dit(!t.erreurs.length, `${nom} : aucune erreur de page`, t.erreurs.join(' | '));
       await t.ctx.close();
+    }
+    for (const scheme of ['light', 'dark']) {
+      const KOL = { ok: false, k: 'element', nom: 'envoyer', t: "Leboncoin : le bouton « Envoyer » ne marche plus (la page a changé). Geste : fais ce geste une fois toi-même sur leboncoin.fr, dans ce Chrome (VRM réapprend), puis touche « Envoyer un rapport »." };
+      const tl = await ouvrir(nav, base({ plateforme: 'leboncoin', site: { nom: 'vendeur_lbc' }, lbc: { annonces: { n: 12 }, ventes: { n: 2 } }, santeSite: KOL }), { scheme });
+      await montrer(tl.pg, false);
+      const al = await lire(tl.pg); await cap(tl.pg, 'lbc-' + scheme);
+      dit(al && al.visible && /^Leboncoin : le bouton « Envoyer » ne marche plus/.test(al.texte) && al.gras >= 600 && !orange(al.couleur) && al.couleur === al.encre, `H4 Leboncoin ${scheme} : la ligne est là, à l'encre en gras, aucun orange`, JSON.stringify(al));
+      await tl.ctx.close();
     }
     let t = await ouvrir(nav, base({ santeSite: { ok: null, k: 'pas-vu', t: 'Vinted : pas encore vu dans ce Chrome.' } })); await montrer(t.pg, false);
     let a = await lire(t.pg);

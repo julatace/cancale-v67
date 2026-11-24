@@ -5898,7 +5898,7 @@ function vrmVerifVisible(sel) {
   // les mêmes marques `data-q4*` (bancs), « pas su » ⇒ « — ». Le nom de la fonction reste
   // `quatreLignes` (capacité `carte4`).
   // 5.448 (`santesites`) : la ligne de santé seule (carte Leboncoin, qui n'a pas les quatre lignes).
-  function ligneSante(e) { const sa = e && e.santeSite; return sa && typeof sa.t === 'string' && sa.k !== 'pas-vu' ? `<div class="ligne" data-sante-site="${esc(sa.k)}" style="padding:10px 16px;font-size:13px;line-height:1.4${sa.ok === false ? ';color:var(--ambre)' : ''}">${esc(sa.t)}</div>` : ''; }
+  function ligneSante(e) { const sa = e && e.santeSite; return sa && typeof sa.t === 'string' && sa.k !== 'pas-vu' ? `<div class="ligne" data-sante-site="${esc(sa.k)}" style="padding:10px 16px;font-size:13px;line-height:1.4${sa.ok === false ? ';font-weight:600' : ''}">${esc(sa.t)}</div>` : ''; }
   function quatreLignes(e, r) {
     const site = e.site || {}, f = e.flux || {};
     let compte = site.nom || (site.id && e.plateforme !== 'leboncoin' ? 'n° ' + site.id : '');
@@ -5924,9 +5924,9 @@ function vrmVerifVisible(sel) {
     const morceaux = [];
     if (j) morceaux.push(`<span data-q4="jauge" data-q4-h="${Number(j.h) || 0}" data-q4-maxh="${Number(j.maxH) || 0}" data-q4-j="${Number(j.j) || 0}" data-q4-maxj="${Number(j.maxJ) || ''}" data-q4-complet="${j.complet ? '1' : '0'}"><b>${esc(TU(j.complet ? 'c_heure' : 'c_heure_min', { n: nbFr(j.h), max: nbFr(j.maxH) }))}</b> · ${esc(TU('c_jour', { n: nbFr(j.j), max: j.maxJ ? nbFr(j.maxJ) : '—' }))}</span>`);
     if (lu || morceaux.length) morceaux.push(`<span data-q4="lu" data-q4-at="${lu || ''}">${lu ? esc(TU('c_lu', { quand: depuis(lu) })) : '—'}</span>`);
-    // 5.448 (`santesites`) : la santé de CE site en une ligne — « tout marche » ou « X ne marche plus : fais Y » (ambre).
+    // 5.448 (`santesites`) : la santé de CE site en une ligne — « tout marche » ou « X ne marche plus : fais Y » (encre, en gras ; jamais d'orange : décision de Julien du 23 nov.).
     const sa = e && e.santeSite;
-    if (sa && typeof sa.t === 'string' && sa.k !== 'pas-vu') morceaux.push(`<span data-sante-site="${esc(sa.k)}"${sa.ok === false ? ' style="color:var(--ambre)"' : ''}>${esc(sa.t)}</span>`);
+    if (sa && typeof sa.t === 'string' && sa.k !== 'pas-vu') morceaux.push(`<span data-sante-site="${esc(sa.k)}"${sa.ok === false ? ' style="font-weight:600"' : ''}>${esc(sa.t)}</span>`);
     const c = e && e.capture;
     if (c && c.phrase) {
       const lien = c.lien && /^https:\/\/www\.vinted\.fr\//.test(String(c.lien)) ? String(c.lien) : '';
