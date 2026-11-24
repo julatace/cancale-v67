@@ -169,8 +169,12 @@ export function EtagereTrophees({ total = null, Icon = null, paliers = PALIERS_V
 //   • Les images des tuiles : sur le gris du squelette ; une image déjà en cache s'affiche tout de suite, une image qui se
 //     charge arrive en fondu de 160 ms (jamais de flash blanc).
 export const REVELE_PAS = 15, REVELE_MAX = 8;   // 8 × 15 ms = 120 ms au plus
-export function useArrive(pret) {
-  const auMontage = React.useRef(!!pret);
+// `cle` (facultatif) : le nom de ce contenu ; une fois montré, il ne se ré-anime plus de toute la session, même si l'écran
+// est démonté puis remonté et que ses données repassent un instant par « en lecture » (retour sur l'onglet = d'un coup).
+const DEJA_MONTRES = new Set();
+export function useArrive(pret, cle = '') {
+  const auMontage = React.useRef(!!pret || (!!cle && DEJA_MONTRES.has(cle)));
+  React.useEffect(() => { if (pret && cle) DEJA_MONTRES.add(cle); }, [pret, cle]);
   return !!pret && !auMontage.current;
 }
 export const revele = (i = 0, className = '', arrive = true) => {

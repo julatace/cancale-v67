@@ -55,7 +55,7 @@ Julien, 24 nov. : d'abord « pas d'un coup en bloc », puis « fais quelque chos
 
 Une aide partagée par les trois lots visuels, dans `src/natif/Jeu.jsx` (exportée aussi par `src/natif/index.js`). Elle n'ajoute **jamais** d'attente.
 
-1. **Ce qui est déjà connu s'affiche d'un coup**, à la première image, sans fondu : cache, visite d'avant. `const arrive = useArrive(donneesPretes)` est faux si les données étaient là au montage.
+1. **Ce qui est déjà connu s'affiche d'un coup**, à la première image, sans fondu : cache, visite d'avant. `const arrive = useArrive(donneesPretes, 'nom-du-bloc')` est faux si les données étaient là au montage, ou si ce bloc a déjà été montré pendant la session : au retour sur l'onglet, tout est là d'un coup.
 2. **Squelette seulement quand rien n'est connu** : `<SqueletteInventaire n/>`, `<SqueletteTuile taille/>`, ou `<Attente/>`. Il a la forme exacte de ce qui arrive (CLS ≤ 0,02).
 3. **Seul un contenu qui ARRIVE s'anime** : `{...revele(i, 'ma-classe', arrive)}`, ou `<Revele i={i} arrive={arrive}>`.
    - Le premier élément (i = 0) n'attend jamais.
