@@ -132,13 +132,13 @@ const ouvrirVente = async (pg, tx, groupe = 'tous') => {
   await l.waitFor({ timeout: 10000 });
   await l.scrollIntoViewIfNeeded();
   await l.click();
-  await pg.locator(`[data-vn-parcours="${tx}"]`).first().waitFor({ state: 'visible', timeout: 10000 });
+  await pg.locator(`[data-vn-parcours="v:${tx}"]`).first().waitFor({ state: 'visible', timeout: 10000 });
   await pg.waitForTimeout(400);
   return tx;
 };
 // La piste rendue dans le tiroir, et ce qui l'entoure.
 const lirePiste = (pg, id) => pg.evaluate((id) => {
-  const d = document.querySelector(`[data-vn-parcours="${id}"]`); if (!d) return null;
+  const d = document.querySelector(`[data-vn-parcours="v:${id}"]`); if (!d) return null;
   const p = d.querySelector('[data-envoi-parcours]');
   const vw = window.innerWidth;
   const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };

@@ -140,7 +140,7 @@ function DetailVente({ r, g, Icon, Logo, Photo, Generer }) {
           <Fait libelle={tr('vv.fiche.pourToi')} valeur={(route ? (r.pourToi ? r.prix : '') : d.pourToi) || null} detail={!route && d.sansFrais ? tr('vv.fiche.sansFrais') : ''}/>
           {!route ? <Fait libelle={tr('vv.col.limite')} valeur={texteEcheance(r.echeance) || null} ton={r.echeance && r.echeance.ambre ? 'ambre' : 'neutre'} detail={r.echeance && r.echeance.sorte === 'estimee' ? tr('vv.ech.estimee') : ''}/> : null}
           {!route ? <Fait libelle={tr('vv.col.ou')} valeur={textePlace(r.place) || null}/> : null}
-          <Fait libelle={tr('vv.col.transport')} valeur={r.transporteur || null} detail={route ? r.suivi : texteBordereau(r.bordereau)}/>
+          <Fait libelle={tr('vv.col.transport')} valeur={r.transporteur || null} detail={route ? (r.envoi ? '' : r.suivi) : texteBordereau(r.bordereau)}/>   {/* (24 nov.) la piste dit le n° (un nombre une fois, §7) */}
           <Fait libelle={tr('vn.f.acheteur')} valeur={r.acheteur || null}/>
         </Faits>
       </Groupe>
