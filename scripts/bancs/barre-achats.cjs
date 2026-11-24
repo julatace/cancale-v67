@@ -137,7 +137,7 @@ const CHAMP_ANNONCES = '[data-ann-recherche] input, input[aria-label="Rechercher
 const ecran = (pg) => pg.evaluate((CHAMP_ANNONCES) => {
   const m = document.querySelector('.vrm-main');
   const t = document.querySelector('[data-tache]');
-  const actif = document.querySelector('.vrm-tabbar > [aria-current="page"]');
+  const actif = document.querySelector('nav[data-n-onglets] > [aria-current="page"]');
   return {
     ecran: m ? m.getAttribute('data-ecran') : '',
     site: t ? t.getAttribute('data-tache-site') : '',
@@ -155,7 +155,7 @@ const ecran = (pg) => pg.evaluate((CHAMP_ANNONCES) => {
 
 // ── Gestes ──────────────────────────────────────────────────────────────────
 const toucher = async (pg, sel) => { const l = pg.locator(sel).first(); if (!(await l.count())) { console.log(`     (absent : ${sel})`); return false; } await l.tap({ timeout: 5000 }).catch(() => l.click({ timeout: 3000 }).catch(() => {})); await pg.waitForTimeout(700);
-  await pg.waitForFunction(() => !document.querySelector('.vrm-tabbar[data-en-cours]'), null, { timeout: 4000 }).catch(() => {}); await pg.waitForTimeout(300); return true; };
+  await pg.waitForFunction(() => !document.querySelector('nav[data-n-onglets][data-en-cours]'), null, { timeout: 4000 }).catch(() => {}); await pg.waitForTimeout(300); return true; };
 const cliquer = async (pg, sel) => { const l = pg.locator(sel).first(); if (!(await l.count())) { console.log(`     (absent : ${sel})`); return false; } await l.click({ timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(900); return true; };
 // Un VRAI glisser de doigt : des touchers envoyés au NAVIGATEUR (CDP Input.dispatchTouchEvent), pas des
 // événements fabriqués dans la page — le navigateur défile lui-même une rangée ou la page, comme au doigt.
@@ -181,17 +181,17 @@ const balayerEvenements = (pg, x0, x1, y) => pg.evaluate(([x0, x1, y]) => {
 // L'onglet allumé (barre au téléphone, colonne à l'ordinateur) et l'écran affiché.
 const etat = (pg) => pg.evaluate(() => {
   const m = document.querySelector('.vrm-main');
-  const barre = document.querySelector('.vrm-tabbar > [aria-current="page"]');
-  const rail = document.querySelector('.vrm-sidebar [data-nav-entree][aria-current="page"]');
+  const barre = document.querySelector('nav[data-n-onglets] > [aria-current="page"]');
+  const rail = document.querySelector('[data-n-laterale] [data-nav-entree][aria-current="page"]');
   return { ecran: m ? m.getAttribute('data-ecran') : '', barre: barre ? barre.getAttribute('data-nav-entree') : '', rail: rail ? rail.getAttribute('data-nav-entree') : '',
-    nBarreActifs: document.querySelectorAll('.vrm-tabbar > [aria-current="page"]').length, histo: history.length, st: history.state || {}, scrollX: Math.round(window.scrollX), mainX: m ? Math.round(m.scrollLeft) : -1 };
+    nBarreActifs: document.querySelectorAll('nav[data-n-onglets] > [aria-current="page"]').length, histo: history.length, st: history.state || {}, scrollX: Math.round(window.scrollX), mainX: m ? Math.round(m.scrollLeft) : -1 };
 });
 // La barre mesurée : entrées (boutons d'onglet ET disque), boîtes, libellés, toucher au centre.
 const mesureBarre = (pg) => pg.evaluate(() => {
-  const nav = document.querySelector('.vrm-tabbar'); if (!nav || !nav.offsetWidth) return null;
+  const nav = document.querySelector('nav[data-n-onglets]'); if (!nav || !nav.offsetWidth) return null;
   const items = [...nav.querySelectorAll(':scope > button, :scope > .sb-disque, :scope > [data-disque]')].filter((x, i, a) => a.indexOf(x) === i && x.offsetWidth > 0);
   const entrees = items.map((x) => {
-    const q = x.getBoundingClientRect(); const lab = x.querySelector('.vrm-nav-label');
+    const q = x.getBoundingClientRect(); const lab = x.querySelector('.n-onglet-libelle');
     const hit = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
     return { id: x.getAttribute('data-nav-entree') || (x.classList.contains('sb-disque') ? 'disque' : '?'), x: q.left, r: q.right, w: Math.round(q.width), h: Math.round(q.height),
       coupe: lab ? lab.scrollWidth > lab.clientWidth + 1 : false, lib: lab ? lab.textContent : '', police: lab ? parseFloat(getComputedStyle(lab).fontSize) : 0, touche: !!hit && x.contains(hit) };
@@ -202,12 +202,14 @@ const mesureBarre = (pg) => pg.evaluate(() => {
 });
 
 // (17 nov., Julien : « Le + dégueulasse ») Plus de disque : cinq onglets, également espacés.
-const ATTENDU_BARRE = ['journee', 'paires', 'achats', 'ventes', 'compta'];
+// (24 nov., main-vert) La barre NATIVE (src/natif/BarreOnglets.jsx, `ORDRE_NATIF` d'App.jsx, 19 nov.) : Aujourd'hui · Annonces · Ventes · Achats · Argent.
+const ATTENDU_BARRE = ['journee', 'paires', 'ventes', 'achats', 'compta'];
 // Chaque écran et l'onglet qui DOIT s'allumer (barre ; à l'ordinateur, l'entrée de la colonne).
 const ECRANS = [
   { lien: 'journee', barre: 'journee', rail: 'journee' },
   { lien: 'annonces', barre: 'paires', rail: 'annonces' },
-  { lien: 'garage', barre: 'paires', rail: 'garage' },
+  // (21 nov., onglets-menu) Stock a quitté « Paires » : sa tuile vit dans le Menu ⇒ AUCUN onglet de la barre allumé (src/navPaires.js).
+  { lien: 'garage', barre: '', rail: 'garage' },
   { lien: 'achats', barre: 'achats', rail: 'achats' },
   { lien: 'ventes', barre: 'ventes', rail: 'ventes' },
   { lien: 'compta', barre: 'compta', rail: 'compta' },
@@ -259,7 +261,7 @@ const ECRANS = [
         const nombres = m ? m.badges.map(([, n]) => n).filter((n) => /^\d+$/.test(n)) : [];
         dit(new Set(m ? m.badges.map(([k]) => k) : []).size === (m ? m.badges.length : 0), `A3 ${qui} : une pastille par onglet au plus`, JSON.stringify(m && m.badges));
         // A10 · (17 nov.) plus de disque « + » : rien entre Achats et Ventes, cinq onglets de même largeur.
-        const sansDisque = await pg.evaluate(() => { const n = document.querySelector('.vrm-tabbar'); const t = [...n.querySelectorAll(':scope > .vrm-tab')].map((b) => Math.round(b.getBoundingClientRect().width));
+        const sansDisque = await pg.evaluate(() => { const n = document.querySelector('nav[data-n-onglets]'); const t = [...n.querySelectorAll(':scope > .n-onglet')].map((b) => Math.round(b.getBoundingClientRect().width));
           return { disque: !!document.querySelector('[data-sb-disque], .sb-disque'), largeurs: t }; });
         // « Aujourd'hui » garde sa part ×1,25 (son libellé, studio.css) ; les quatre autres sont égaux, sans trou.
         const [l0, ...lr] = sansDisque.largeurs;
@@ -267,7 +269,7 @@ const ECRANS = [
         // A4 · l'onglet allumé = l'écran, pour chaque écran (au toucher de la barre).
         const vus = [];
         for (const id of ['paires', 'achats', 'ventes', 'compta', 'journee']) {
-          await toucher(pg, `.vrm-tabbar [data-nav-entree="${id}"]`);
+          await toucher(pg, `nav[data-n-onglets] [data-nav-entree="${id}"]`);
           const e = await etat(pg); vus.push({ id, ...e });
         }
         dit(vus.every((v) => v.barre === v.id && v.nBarreActifs === 1 && (v.id === 'paires' ? ['annonces', 'garage'].includes(v.ecran) : v.ecran === v.id)), `A4 ${qui} : toucher un onglet ⇒ cet écran, cet onglet seul allumé`, JSON.stringify(vus.map((v) => [v.id, v.ecran, v.barre, v.nBarreActifs])));
@@ -275,7 +277,7 @@ const ECRANS = [
         const h0 = vus[0].histo, hN = vus[vus.length - 1].histo;
         dit(hN === h0 && vus.every((v) => v.histo === h0), `A5 ${qui} : passer d'un onglet de la barre à l'autre n'ajoute aucune entrée d'historique (le glisser-retour ne montre pas l'onglet d'avant)`, JSON.stringify(vus.map((v) => v.histo)));
         // A6 · glisser sur le contenu (milieu ET bord, doigt réel puis touchers de page) ne change jamais d'écran.
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="compta"]');
+        await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="compta"]');
         const avant6 = await etat(pg);
         const y = Math.round((await pg.evaluate(() => innerHeight)) * 0.45);
         await glisserDoigt(pg, 300, y, -260, 0); await glisserDoigt(pg, 40, y, 260, 0);
@@ -285,7 +287,7 @@ const ECRANS = [
         dit(avant6.ecran === 'compta' && apres6.ecran === 'compta' && apres6.barre === 'compta', `A6 ${qui} : glisser de côté sur Argent (milieu, bord) ne change pas d'écran`, JSON.stringify({ avant: avant6.ecran, apres: apres6.ecran, barre: apres6.barre }));
         dit(apres6.scrollX === 0 && apres6.mainX === 0, `A6 ${qui} : l'écran ne bouge pas de côté`, JSON.stringify({ x: apres6.scrollX, main: apres6.mainX }));
         // A7 · un glisser vertical fait défiler la page, jamais de côté.
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
+        await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="ventes"]');
         await glisserDoigt(pg, 200, Math.round(y * 1.2), 40, -300);
         const e7 = await etat(pg); const defile = await pg.evaluate(() => Math.round(document.querySelector('.vrm-main').scrollTop));
         dit(e7.ecran === 'ventes' && e7.scrollX === 0 && e7.mainX === 0 && defile > 20, `A7 ${qui} : un glisser vertical (un peu de biais) défile, l'écran ne part jamais de côté`, JSON.stringify({ ...e7, st: undefined, defile }));
@@ -295,9 +297,9 @@ const ECRANS = [
         await pg.evaluate(() => { document.querySelector('.vrm-main').scrollTop = 0; }); await pg.waitForTimeout(200);
         let rangee = null;
         for (const id of ['ventes', 'paires', 'achats', 'compta', 'journee']) {
-          if (id !== 'ventes') await toucher(pg, `.vrm-tabbar [data-nav-entree="${id}"]`);
+          if (id !== 'ventes') await toucher(pg, `nav[data-n-onglets] [data-nav-entree="${id}"]`);
           rangee = await pg.evaluate(() => {
-            const nav = document.querySelector('.vrm-tabbar').getBoundingClientRect().top;
+            const nav = document.querySelector('nav[data-n-onglets]').getBoundingClientRect().top;
             for (const n of document.querySelectorAll('.vrm-main *')) {
               const cs = getComputedStyle(n); if (!/(auto|scroll)/.test(cs.overflowX) || n.scrollWidth <= n.clientWidth + 20) continue;
               const r = n.getBoundingClientRect(); if (r.height < 24 || r.top < 60 || r.bottom > nav - 4 || r.width < 120) continue;
@@ -313,20 +315,22 @@ const ECRANS = [
           const e8 = await etat(pg);
           dit(x1 > x0 + 10 && e8.ecran === rangee.ecran, `A8 ${qui} : une rangée qui défile de côté (${rangee.cls}) défile au doigt, même écran`, JSON.stringify({ x0, x1, ecran: e8.ecran, ...rangee }));
         } else dit(false, `A8 ${qui} : une rangée qui défile de côté trouvée sur un écran de la barre`);
-        // A9 · le retour reste entier pour le reste : un écran du menu revient d'où on l'a ouvert ; une feuille se ferme.
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="compta"]');
-        const ouvreMenu = (await pg.locator('[data-menu-ecrans]:visible').count()) ? '[data-menu-ecrans]' : '[data-profil-tete]';
+        // A9 · le retour reste entier pour le reste : un écran du menu revient d'où on l'a ouvert.
+        // (24 nov., main-vert) Depuis onglets-menu (21 nov.) le menu est un ÉCRAN (`menu`, ouvert par la photo du compte,
+        // [data-n-coque-plus]) : « retour » depuis le Menu revient à Argent ; un écran ouvert DEPUIS le Menu y revient.
+        await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="compta"]');
+        const ouvreMenu = '[data-n-coque-plus]';
         await toucher(pg, ouvreMenu);
-        const feuille = await pg.evaluate(() => !!document.querySelector('.vrm-sheet, [data-menu-profil]'));
+        const feuille = (await etat(pg).catch(() => ({ ecran: '' }))).ecran === 'menu';
         await pg.goBack({ timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(800);
         const e9a = await etat(pg).catch(() => ({ ecran: 'perdu' }));
-        const fermee = await pg.evaluate(() => !document.querySelector('.vrm-sheet [data-nav-entree="messages"], [data-menu-profil] [data-nav-entree="messages"]')).catch(() => false);
-        dit(feuille && e9a.ecran === 'compta' && fermee, `A9 ${qui} : « retour » avec le menu ouvert le ferme et reste sur Argent`, JSON.stringify({ feuille, ecran: e9a.ecran, fermee }));
-        await toucher(pg, ouvreMenu); await toucher(pg, '.vrm-sheet [data-nav-entree="messages"], [data-menu-profil] [data-nav-entree="messages"]');
+        const fermee = e9a.ecran !== 'menu';
+        dit(feuille && e9a.ecran === 'compta' && fermee && e9a.barre === 'compta', `A9 ${qui} : « retour » depuis le Menu revient à Argent, allumé`, JSON.stringify({ feuille, ecran: e9a.ecran, barre: e9a.barre }));
+        await toucher(pg, ouvreMenu); await toucher(pg, '[data-n-menu] [data-nav-entree="emails"]');
         const e9b = await etat(pg);
         await pg.goBack({ timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(900);
         const e9c = await etat(pg).catch(() => ({ ecran: 'perdu' }));
-        dit(e9b.ecran === 'messages' && e9c.ecran === 'compta' && e9c.barre === 'compta', `A9 ${qui} : Messages (menu) puis « retour » ⇒ Argent, allumé`, JSON.stringify({ ouvert: e9b.ecran, retour: e9c.ecran, barre: e9c.barre }));
+        dit(e9b.ecran === 'emails' && e9c.ecran === 'menu', `A9 ${qui} : E-mails (ouvert du Menu) puis « retour » ⇒ le Menu`, JSON.stringify({ ouvert: e9b.ecran, retour: e9c.ecran }));
         dit(errs.length === 0, `A ${qui} : aucune erreur de page`, errs.join(' | '));
         await ctx.close();
       });
@@ -346,13 +350,13 @@ const ECRANS = [
           if (c.lien === 'achats') await capture(pg, `achats-${mode}`);
           if (pg0) await pg0.close().catch(() => {}); pg0 = pg;
         }
-        const attendu = (v) => mode === 'tel' ? (v.vu === (v.ecran || v.lien) && v.barre === v.barre_ && v.n === 1) : (v.vu === (v.ecran || v.lien) && v.rail === v.rail_);
+        const attendu = (v) => mode === 'tel' ? (v.vu === (v.ecran || v.lien) && v.barre === v.barre_ && v.n === (v.barre_ ? 1 : 0)) : (v.vu === (v.ecran || v.lien) && v.rail === v.rail_);
         const ko = vus.map((v) => ({ ...v, barre_: ECRANS.find((c) => c.lien === v.lien).barre, rail_: ECRANS.find((c) => c.lien === v.lien).rail, barre: v.barre })).filter((v) => !attendu(v));
         dit(!ko.length, `L ${qui} : chaque lien ?tab= (anciens compris) ⇒ son écran, et l'onglet allumé est le sien`, JSON.stringify(ko.map((v) => [v.lien, v.vu, mode === 'tel' ? v.barre : v.rail])));
         if (mode === 'ordi') {
-          const rail = await pg0.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].map((x) => x.getAttribute('data-nav-entree')));
+          const rail = await pg0.evaluate(() => [...document.querySelectorAll('[data-n-laterale] [data-nav-entree]')].map((x) => x.getAttribute('data-nav-entree')));
           dit(rail.includes('achats') && rail.filter((x) => x === 'achats').length === 1, `L ${qui} : Achats est dans la colonne, une fois`, JSON.stringify(rail));
-          dit(!(await pg0.locator('.vrm-tabbar').count()) || !(await pg0.locator('.vrm-tabbar:visible').count()), `L ${qui} : pas de barre du bas à l'ordinateur`);
+          dit(!(await pg0.locator('nav[data-n-onglets]').count()) || !(await pg0.locator('nav[data-n-onglets]:visible').count()), `L ${qui} : pas de barre du bas à l'ordinateur`);
         } else {
           // Le sélecteur de « Paires » ne porte plus Achats (Annonces · Stock) ; sur Achats, aucun sélecteur.
           const { pg } = await ouvrirPage(ctx, '?tab=annonces');
