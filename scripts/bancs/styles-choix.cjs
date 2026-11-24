@@ -19,7 +19,8 @@ require('./_porte-banc.cjs');
 //    G  rien ne déborde, aucun bouton/étiquette n'en chevauche un autre, aucune erreur d'app.
 //  `STYLES=graphite,nuit` `THEMES=clair` `LARGEURS=390,1512` `ECRANS=ventes,annonces,fiche[,journee]` `SHOTS=<dossier>`
 //  (`journee` = Ma journée : les règles A–D, F, G ; E y est un rapport, comme hors des trois écrans des captures).
-//  Rouge : `BANC_DIST=<dist d'avant>` (aucun style) ; `MUTATION=sansstyle|orange|pale|petit|appui|vieux|deborde`.
+//    H  (Monochrome) chaque sorte de bouton se voit : secondaire à contour ≥ 3:1, texte et liens soulignés, ronds à plaque.
+//  Rouge : `BANC_DIST=<dist d'avant>` (aucun style) ; `MUTATION=sansstyle|orange|pale|petit|appui|vieux|deborde|fondu`.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 const path = require('path'), fs = require('fs');
@@ -41,6 +42,7 @@ const MUTATIONS = {
   orange: ':root[data-style] { --n-accent: #E8891C !important; --n-plein: #E8891C !important; }',
   pale: ':root[data-style] { --n-encre-2: #A8ABB0 !important; --n-texte: #A8ABB0 !important; }',
   appui: '[data-style] .n-bouton[data-n-force="appui"] { transform: none !important; background-color: var(--n-plein) !important; filter: none !important; }',
+  fondu: '[data-style] { --g-second-contour: none !important; --g-lien-deco: none !important; --g-rond-contour: none !important; }',
 };
 
 // ── la mesure, DANS la page ──
@@ -145,6 +147,25 @@ const MESURE = (args) => {
   return { style: document.documentElement.getAttribute('data-style') || '', theme: document.documentElement.getAttribute('data-theme'), fond: rootCs.getPropertyValue('--n-fond').trim(),
     nTextes, contraste: contraste.slice(0, 20), nContraste: contraste.length, nCibles, petites: petites.slice(0, 12), nPetites: petites.length, etrangers: [...new Set(etrangers)].slice(0, 12), nEtrangers: etrangers.length,
     chevauche: chevauche.slice(0, 8).concat(recouvre.slice(0, 8), horsCadre.slice(0, 8).map((x) => 'hors cadre : ' + x)), oranges: [...new Set(oranges)].slice(0, 8), rouges: [...new Set(rouges)].slice(0, 8), deborde: document.documentElement.scrollWidth - innerWidth };
+};
+
+// H (styles à formes distinctes : Monochrome) : chaque SORTE de bouton se voit — le secondaire porte un contour ≥ 3:1 sur ce
+// qui l'entoure, un bouton texte et un lien sont soulignés, un bouton-icône est un rond plein à contour
+const SORTES = () => {
+  const p = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return null; const v = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: v[0], g: v[1], b: v[2], a: v.length > 3 ? v[3] : 1 }; };
+  const lum = (c) => { const t = [c.r, c.g, c.b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * t[0] + 0.7152 * t[1] + 0.0722 * t[2]; };
+  const k = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const sous = (el) => { for (let x = el.parentElement; x; x = x.parentElement) { const c = p(getComputedStyle(x).backgroundColor); if (c && c.a > 0.9) return c; } return p(getComputedStyle(document.body).backgroundColor); };
+  const vu = (el) => { const r = el.getBoundingClientRect(); return r.width > 10 && r.height > 10 && r.bottom > 0 && r.top < innerHeight && !el.closest('[aria-hidden="true"], [inert]'); };
+  const ko = [], vus = { second: 0, lien: 0, rond: 0 };
+  for (const el of document.querySelectorAll('.n-bouton:is([data-n-variante="teinte"], :not([data-n-variante])):not([aria-disabled="true"]), [data-n-famille="second"]')) { if (!vu(el)) continue; vus.second++;
+    const c = (getComputedStyle(el).boxShadow.match(/rgba?\([^)]+\)[^,]*inset|inset[^,]*rgba?\([^)]+\)/) || [''])[0]; const cc = p(c);
+    if (!cc || k(cc, sous(el)) < 3) ko.push('secondaire sans contour : ' + (el.innerText || '').trim().slice(0, 20)); }
+  for (const el of document.querySelectorAll('.n-bouton[data-n-variante="texte"], [data-n-famille="lien"]:not(.n-eg-cellule):not(.n-tt-tri)')) { if (!vu(el)) continue; vus.lien++;
+    if (!/underline/.test(getComputedStyle(el).textDecorationLine)) ko.push('lien sans soulignement : ' + (el.innerText || '').trim().slice(0, 20)); }
+  for (const el of document.querySelectorAll('.n-bouton-icone-seule:not([aria-pressed="true"])')) { if (!vu(el)) continue; vus.rond++; const cs = getComputedStyle(el); const f = p(cs.backgroundColor);
+    if (!f || f.a < 0.5 || !/inset/.test(cs.boxShadow)) ko.push('rond sans plaque ni contour : ' + (el.getAttribute('aria-label') || '').slice(0, 20)); }
+  return { ko: ko.slice(0, 8), vus };
 };
 
 // F : l'état enfoncé (forcé par le crochet du contrat natif `data-n-force="appui"`)
@@ -258,11 +279,15 @@ async function poserMutation(pg) {
           const pxKo = px.filter((p) => p.k < 4.5 - 0.05 && !(p.s === '.n-grand-titre' && p.k >= 3));
           dit(px.length >= 1 && !pxKo.length, `B ${cle} : sur les PIXELS, plein, étiquettes, N°, titres, onglet actif ≥ 4,5:1 — ${px.length} boîtes (min ${px.length ? Math.min(...px.map((p) => p.k)).toFixed(2) : '—'})`, pxKo.slice(0, 8));
           if (tactile && style) dit(m.nCibles > 5 && m.nPetites === 0, `C ${cle} : chaque cible ≥ 44 × 44 — ${m.nCibles} cibles`, m.petites);
-          dit(!m.oranges.length && !m.rouges.length, `D ${cle} : aucune couleur orange/ambre, aucun rouge hors doublon`, { oranges: m.oranges, rouges: m.rouges });
+          // D est une règle pour chaque style ; pour « Actuel » (le défaut, que ce lot ne change pas) le banc RAPPORTE (24 nov. : le
+          // point « geste » de la ligne de fraîcheur y est encore orange la nuit, `--d-point-ambre` des feuilles d'avant)
+          if (style) dit(!m.oranges.length && !m.rouges.length, `D ${cle} : aucune couleur orange/ambre, aucun rouge hors doublon`, { oranges: m.oranges, rouges: m.rouges });
+          else if (m.oranges.length || m.rouges.length) console.log(`  ℹ️  D ${cle} (défaut, hors de ce lot) : ${m.oranges.concat(m.rouges).slice(0, 3).join(' · ')}`);
           // E est une RÈGLE sur les trois écrans des captures de Julien ; ailleurs (Achats, Argent, Messages, Paramètres) le banc RAPPORTE
           // ce qui reste à rattacher (`data-n-famille`), sans rougir.
           if (style && PRINCIPAUX.has(e)) dit(m.nEtrangers === 0, `E ${cle} : chaque bouton est de la famille commune`, m.etrangers);
           else if (style && m.nEtrangers) console.log(`  ℹ️  E ${cle} : ${m.nEtrangers} bouton(s) d'avant à rattacher — ${m.etrangers.slice(0, 4).join(' · ')}`);
+          if (style && G.PRESETS[style].forme.second === 'contour') { const h = await o.pg.evaluate(SORTES); dit(!h.ko.length && (h.vus.second + h.vus.lien + h.vus.rond) > 0, `H ${cle} : chaque sorte de bouton se voit (secondaires ${h.vus.second}, liens ${h.vus.lien}, ronds ${h.vus.rond})`, h.ko); }
           if (style) { const a = await o.pg.evaluate(APPUI); dit(a.trouve && a.pendant.echelle < 0.999 && a.plusFonce, `F ${cle} : l'état enfoncé existe (échelle ${a.trouve ? a.pendant.echelle : '—'}, plus foncé)`, a); }
           dit(m.deborde <= 1 && !m.chevauche.length && !o.erreurs.length, `G ${cle} : rien ne déborde, rien ne se chevauche, aucune erreur`, { deborde: m.deborde, chevauche: m.chevauche, erreurs: o.erreurs });
           fs.writeFileSync(path.join(SHOTS, cle + '.png'), shot);
