@@ -73,7 +73,24 @@ Banc `scripts/bancs/visuel-annonces.cjs` (page `outils/visuel-annonces/`, esbuil
 600 annonces inventées sur 3 comptes + 1 Leboncoin, photos servies 600 ms en retard), 390 tactile et 1512, clair et sombre.
 Voir « Résultats » ci-dessous.
 
-## Résultats
+## Résultats (2e direction, la LISTE)
+
+Banc `visuel-annonces` (4 variantes, 600 annonces) : **96 verts, 0 rouge** au dernier passage complet avant les âges
+réalistes (le passage suivant, avec la vérification de l'âge inconnu en défilant, est dans le rapport final). Mesures :
+- liste virtualisée : 14–23 rangées montées sur 200 ; squelette à la place exacte ; CLS 0 à la lecture ET au défilement ;
+- cascade sur ce qu'on VOIT : 15 ms par rangée, 90 ms au total, fondu 160 ms, 1re rangée sans délai ; contenu connu : rien ;
+- toucher un segment : 31 ms dans la page ; défilement 95e centile 62–72 ms (charge 6–8 sur 4 cœurs) ;
+- praticité : « Sans N° » (n = son nombre, 44 px), « Prix décroissant » (ordonné), glisser ⇒ « Baisser »/« Republier »
+  (≥ 44, lancé sur CETTE annonce), « ⋯ » ⇒ « Copier le lien » + « Baisser le prix » ;
+- prix à la taille du titre (15 px), demi-gras (600) ; âge inconnu ⇒ aucune horloge.
+
+**Bancs voisins** : build ✅ ; textes-visibles ✅ (16/0) ; annonces-dressing ✅ (après deux mises à jour assumées :
+la bascule d'affichage vit dans « ⋯ », la vignette 56–64 au lieu de 52 — décision de Julien) ; stock-etageres : le
+rouge du doublon que l'habit du Stock masquait est réparé ; restent K1/K4/K5 et H, **les mêmes 7 rouges sur l'arbre de
+base** `origin/claude/style-clair` (vérifié : worktree de base, build, même banc) ⇒ rouges de main, pas de ce lot ;
+annonces-grille : vise l'ancien écran `.vrm-ann-grid` (non touché).
+
+## Résultats (1re direction)
 
 Branche (après fusion de `claude/visuel-jeu` à jour, `useArrive`/`revele` « sans latence ») : **78 verts, 0 rouge**
 (390 et 1512, clair et sombre, 600 annonces) :
