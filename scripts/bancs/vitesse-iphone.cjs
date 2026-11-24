@@ -170,9 +170,30 @@ async function recherche(pg, R) {
   console.log(`    recherche : lettre affichée ${L.join(' · ')} ms (médiane ${med(L)}, pire ${Math.max(...L)}) · liste à jour ${liste} ms après la dernière lettre`);
 }
 
+// La recherche d'Achats (écran léger) : de la valeur posée (un « input ») à la liste filtrée (le nombre de rangées change).
+async function rechercheAchats(pg, R) {
+  await pg.locator(`[data-n-onglet="achats"]`).first().tap({ timeout: 30000 }).catch(() => {});
+  await pg.waitForFunction(ecranPret, 'achats', { timeout: 60000, polling: 200 }).catch(() => {}); await calme(pg, 2000, 30000);
+  for (const v of ['1', '12']) {
+    const r = await pg.evaluate((v) => new Promise((fini) => {
+      const champ = [...document.querySelectorAll('#root .vrm-main input[type="search"]')].find((x) => x.getBoundingClientRect().height > 0);
+      if (!champ) return fini(null);
+      const compte = () => document.querySelectorAll('#root .vrm-main .n-rangee, #root .vrm-main [data-tt-ligne], #root .vrm-main .vrm-buy-row').length;
+      const n0 = compte(); const t0 = performance.now();
+      const mo = new MutationObserver(() => { if (compte() !== n0) { mo.disconnect(); fini({ ms: Math.round(performance.now() - t0), natif: !!champ.closest('[data-n-recherche]') }); } });
+      mo.observe(document.querySelector('#root .vrm-main'), { childList: true, subtree: true });
+      setTimeout(() => { mo.disconnect(); fini({ ms: null, natif: !!champ.closest('[data-n-recherche]') }); }, 5000);
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(champ, v); champ.dispatchEvent(new Event('input', { bubbles: true }));
+    }), v);
+    await calme(pg, 1000, 10000);
+    if (r) R.rechAchats.push(r.ms);
+    console.log(`    recherche Achats « ${v} » : liste filtrée ${r && r.ms != null ? r.ms + ' ms' : 'PAS VUE'}${r ? (r.natif ? ' (champ natif)' : ' (autre champ)') : ' (aucun champ)'}`);
+  }
+}
+
 (async () => {
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--explicitly-allowed-ports=' + PORT] });
-  const R = { froid: [], rouvert: [], longuesFroid: [], onglets: {}, venteOuvrir: [], venteRetour: [], defile: [], frappe: [], frappeListe: [], rendus: {}, cout: {} };
+  const R = { froid: [], rouvert: [], longuesFroid: [], onglets: {}, venteOuvrir: [], venteRetour: [], defile: [], frappe: [], frappeListe: [], rechAchats: [], rendus: {}, cout: {} };
   const erreurs = [];
   console.log(`Banc vitesse-iphone · ${path.relative(process.cwd(), DIST) || DIST} · CPU ×${CPU} · volume ${process.env.VOLUME || 'julien'} · ${PASSES} passe(s) · charge ${os.loadavg()[0].toFixed(1)}`);
   try {
@@ -195,6 +216,7 @@ async function recherche(pg, R) {
       if (ETAPES.includes('onglets')) await onglets(pg, R);
       if (ETAPES.includes('vente')) await vente(pg, R);
       if (ETAPES.includes('defilement')) await defiler(pg, cdp, R);
+      if (ETAPES.includes('rechachats')) await rechercheAchats(pg, R);
       if (ETAPES.includes('recherche')) await recherche(pg, R);
       await ctx.close();
     }
@@ -204,7 +226,7 @@ async function recherche(pg, R) {
     onglets: Object.fromEntries(Object.entries(R.onglets).map(([k, L]) => [k, med(L)])),
     venteOuvrir: med(R.venteOuvrir), venteRetour: med(R.venteRetour),
     defileP95: med(R.defile.map((x) => x.p95)), defilePire: med(R.defile.map((x) => x.pire)), defileMed: med(R.defile.map((x) => x.med)),
-    frappeMed: med(R.frappe), frappeP95: centile(R.frappe, 0.95), frappeListe: med(R.frappeListe),
+    frappeMed: med(R.frappe), frappeP95: centile(R.frappe, 0.95), frappeListe: med(R.frappeListe), rechAchats: med(R.rechAchats),
     cout: Object.fromEntries(Object.entries(R.cout).map(([k, L]) => [k, { script: med(L.map((x) => x && x.script)), style: med(L.map((x) => x && x.style)), page: med(L.map((x) => x && x.page)) }])),
     rendus: Object.fromEntries(Object.entries(R.rendus).map(([k, L]) => [k, med(L)])), charge: os.loadavg()[0].toFixed(1),
   };
