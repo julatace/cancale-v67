@@ -30,6 +30,7 @@ const MUTATIONS = {
   'bouton-sans-porte': ['BoutonExtension.jsx', "const v = usePeutAgir(c.site, compte, gesteDe(action), 'panneau');\n  const porte = { 'data-agir': v.ok ? 'ok' : 'lecture', 'data-agir-site': c.site, 'data-agir-geste': gesteDe(action), 'data-agir-raison': v.ok ? undefined : v.raison };\n  const ouvrir", "const v = { ok: true };\n  const porte = {};\n  const ouvrir"],
   // 5.450 (lot agir-tout)
   'bg-sans-retour-oublie': ['BG', "cmd: 'lbcSupprime', id: a.id, confirme: true, sansRetour: true,", "cmd: 'lbcSupprime', id: a.id, confirme: true,"],
+  'bg-apres-vente-2e-copie': ['BG', "    if (v.prouvee !== true) continue;", "    if (!String(v.statut || '') && !v.code) continue;"],
   'bg-favoris-tous': ['BG', "const choix = cochables.filter((x) => !voulus || voulus.has(String(x.id)))", "const choix = (Array.isArray(ap.liste) ? ap.liste : []).filter((x) => x && x.id)"],
   'favoris-sans-confirmation': ['aDistance.js', "const ADIST_CONFIRMER = ['accepter', 'republier', 'favoris', 'supprimer'];", "const ADIST_CONFIRMER = ['accepter', 'republier'];"],
   'ebay-expire-ok': ['agir/peutAgir.js', "if (j === 'expire') return non('ebay-expire', base, 'reconnecter-ebay');", "if (j === 'expire') return { ok: true, voie: 'api', par: null };"],
