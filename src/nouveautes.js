@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (24 nov., lot gains-reels — choisi par Julien) docs/passation/2026-11-24-gains-reels.md
+  { id: 'gains-reels', date: '2026-11-24', titre: 'Ce que tu gagnes vraiment', phrase: 'Par paire, modèle, source et compte, avec le délai de vente.', tab: 'stats', pour: 'tous', mode: 'tous' },
   // (23 nov., lot rentabilite-source) docs/passation/2026-11-23-rentabilite-source.md
   { id: 'rentabilite-source', date: '2026-11-23', titre: 'Rentabilité par source d’achat', phrase: 'Bénéfice moyen, taux de revente et délai, par lieu d’achat.', tab: 'stats', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md

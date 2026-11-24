@@ -14,13 +14,14 @@ import { FENETRES, SEGMENTS_STATS } from '../../aujourdhui/pilotage.js';
 import { ilYaCourt } from './Aujourdhui.jsx';
 import StatsTransporteurs from './StatsTransporteurs.jsx';
 import StatsVendsMieux from './StatsVendsMieux.jsx';
+import StatsGains from './StatsGains.jsx';   // (24 nov., lot gains-reels)
 import './stats.css';
 
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
 
 // `M` : le modèle de `statsFenetre` (ou null tant que rien n'est calculé) ; `etats` : { ventes, journal, releve } ∈
 // 'encours' | 'passu' | 'lu' ; `montant(x)` : « 1 284 € » ; `seg`/`setSeg`, `f`/`setF` : le segment et la fenêtre.
-export default function StatsPilotage({ M = null, etats = {}, montant = (x) => String(x), seg = 'pilotage', setSeg, f = '30', setF, Icon, onNav = null, onJournal = null, onDorment = null, automatisations = null, onAutomatisations = null, transporteurs = null, etatsTransp = {}, nonRetires = null, sources = undefined }) {
+export default function StatsPilotage({ M = null, etats = {}, montant = (x) => String(x), seg = 'pilotage', setSeg, f = '30', setF, Icon, onNav = null, onJournal = null, onDorment = null, automatisations = null, onAutomatisations = null, transporteurs = null, etatsTransp = {}, nonRetires = null, sources = undefined, gains = undefined }) {
   const [jour, setJour] = React.useState(null);
   const lecture = (k) => (etats[k] || 'encours') === 'encours';
   // (22 nov., chasse P1-5) Le « pas su » dit CE qui n'est pas lu : « ventes pas encore lues » se lisait sur le journal de
@@ -172,7 +173,7 @@ export default function StatsPilotage({ M = null, etats = {}, montant = (x) => S
             <Segmente libelle={tr('v2.stats.periode')} valeur={f} onChange={(x) => { setJour(null); setF(x); }} options={FENETRES.map((x) => ({ cle: x, libelle: tr('v2.ps.court.' + x) }))}/>
           </div>
         </Colonne>
-        {seg === 'finances' ? finances : seg === 'transporteurs' ? <StatsTransporteurs T={transporteurs} etats={etatsTransp} NR={nonRetires} f={f}/> : pilotage}
+        {seg === 'finances' ? finances : seg === 'gains' ? <StatsGains G={gains} sur={sur} montant={montant} Icon={Icon}/> : seg === 'transporteurs' ? <StatsTransporteurs T={transporteurs} etats={etatsTransp} NR={nonRetires} f={f}/> : pilotage}
       </Colonnes>
     </section>
   );

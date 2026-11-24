@@ -15676,10 +15676,15 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       if (versements === undefined) return;
       const r0 = chargerPublie('vrm_stats_ventes', null);
       const releveSur = garderDatesConnues(releve, r0 && Array.isArray(r0.l) ? r0.l : null);
-      if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releveSur))) save('vrm_stats_ventes', { v: 1, l: releveSur, at: Date.now() });
+      // (24 nov., lot gains-reels) Les commandes eBay payées dans une AUTRE devise que l'euro : hors du relevé (jamais
+      // converties, `montantRecuEbay`), mais COMPTÉES pour que « Ce que tu gagnes vraiment » les dise. Les mêmes filtres
+      // que `ventesAutresBenefice` (payée, engagée, compte pas écarté). eBay pas lu ⇒ null (pas su), jamais 0.
+      const ebayHorsEuro = Array.isArray(ebayCmd) ? ebayCmd.filter((o) => o && o.orderId && String(o.orderPaymentStatus || '').toUpperCase() === 'PAID' && commandeEbayEngagee(o)
+        && !(excluAutre && excluAutre('ebay', o)) && /^devise /.test(montantRecuEbay(o).raison || '')).length : null;
+      if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releveSur) && (r0.ebayHorsEuro ?? null) === ebayHorsEuro)) save('vrm_stats_ventes', { v: 1, l: releveSur, ebayHorsEuro, at: Date.now() });
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice, ventesVc, versements, excluAutre, lotsTx, lotLiens, forfaitSig]);
+  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice, ventesVc, versements, excluAutre, lotsTx, lotLiens, forfaitSig, ebayCmd]);
 
   // ── Achats HORS VINTED (brocante, fournisseur, particulier…) ──────────
   // Paires/objets achetés ailleurs que sur Vinted. Saisie manuelle : désignation,

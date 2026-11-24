@@ -22,6 +22,7 @@ import ecran_depot from './fr/depot.js';   // (21 nov., ext. 5.429) brouillons p
 import ecran_avenir from './fr/avenir.js';
 import ecran_journee_stats from './fr/journeeStats.js';   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_rentabilite from './fr/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
+import ecran_gains from './fr/gains.js';   // (24 nov.) ce que tu gagnes vraiment
 import ecran_transp_depenses from './fr/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './fr/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_a_distance from './fr/aDistance.js';   // (22 nov., ext. 5.436) « Mes comptes » à distance
@@ -2406,6 +2407,7 @@ export default {
   ...ecran_verre2,
   ...ecran_journee_stats,
   ...ecran_rentabilite,
+  ...ecran_gains,
   ...ecran_transp_depenses,
   ...ecran_file_actions,
   ...ecran_ext5428,
