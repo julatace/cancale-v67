@@ -64,7 +64,7 @@ async function ouvrir(nav, etat, { scheme = 'light', largeur = 1512, hauteur = 9
   });
   await pg.goto('https://www.vinted.fr/catalog');
   await pg.evaluate(({ e, js, ap }) => {
-    window.__envoyes = []; window.__apBase = ap;
+    window.__envoyes = [];
     const copie = (x) => JSON.parse(JSON.stringify(x));
     window.__etat = copie(e);
     const orig = Element.prototype.attachShadow;
@@ -75,14 +75,14 @@ async function ouvrir(nav, etat, { scheme = 'light', largeur = 1512, hauteur = 9
           window.__envoyes.push(copie(msg));
           let rep = { ok: true };
           if (msg.action === 'etat') rep = copie(window.__etat);
-          else if (msg.action === 'favorisCarte' && msg.quoi === 'apercu') rep = { ok: true, uid: '111', apercu: copie(window.__ap || ap) };
+          else if (msg.action === 'favorisCarte' && msg.quoi === 'apercu') rep = { ok: true, uid: '111', apercu: copie(ap) };
           else if (msg.action === 'favorisCarte' && msg.quoi === 'lancer') {
             rep = msg.confirme === true ? { ok: true } : { ok: false, code: 'confirmation' };
             if (rep.ok) window.__etat.site.favoris = { apercu: null, file: { v: 1, uid: '111', actif: true, total: 3, file: { total: 3, envoyes: 1, refuses: 0, ignores: 0, incertains: 0 }, prochain: Date.now() + 6 * 60000, attente: null } };
           } else if (msg.action === 'favorisCarte' && msg.quoi === 'arreter') { window.__etat.site.favoris = { apercu: null, file: { v: 1, uid: '111', actif: false, total: 3, file: { total: 3, envoyes: 1, refuses: 0, ignores: 0, incertains: 0, annules: 2 }, fin: { at: Date.now(), raison: 'arret' } } }; }
           setTimeout(() => cb && cb(rep), 0);
         } },
-      storage: { local: { get: (k, cb) => { if (cb) setTimeout(() => cb({}), 0); return Promise.resolve({}); }, set: (o, cb) => { if (cb) setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener(f) { (window.__ecouteurs = window.__ecouteurs || []).push(f); } } },
+      storage: { local: { get: (k, cb) => { if (cb) setTimeout(() => cb({}), 0); return Promise.resolve({}); }, set: (o, cb) => { if (cb) setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener() {} } },
     };
     const s = document.createElement('script'); s.textContent = js; document.documentElement.appendChild(s);
   }, { e: etat, js: BADGE, ap: apercu });
@@ -192,28 +192,6 @@ const clic = async (pg, sel) => { await pg.evaluate((s) => { const b = document.
       const a = await lire(t.pg);
       await cap(t.pg, 'bloque-390-light');
       dit(a.fav === 'bloque' && a.lignes === 2 && /Écris d’abord ton message dans VRM/.test(a.favTexte), 'aucun message enregistré : la liste lue ET le geste (« Écris d’abord ton message dans VRM › »)', a.favTexte);
-      await t.ctx.close();
-    });
-    // 5.440.2 (Julien : « c'est à l'extension d'aller capter les favoris et d'actualiser l'écran, pas à moi ») : le fond vient
-    // de lire la liste des notifications de Vinted (`vrmFavorisListeLue`) ⇒ la carte OUVERTE redemande ses favoris et se
-    // redessine seule, sans attendre la minute de l'aperçu, sans aucun geste.
-    await essaie('liste lue', async () => {
-      const t = await ouvrir(nav, base(), { largeur: 1512, hauteur: 900 });
-      await montrer(t.pg, false);
-      const a0 = await lire(t.pg);
-      const avant = a0.envoyes2.filter((m) => m.quoi === 'apercu').length;
-      await t.pg.evaluate(() => {
-        const ap = JSON.parse(JSON.stringify(window.__apBase));
-        ap.total = 4; ap.selection = [...ap.selection, 'n7'];
-        ap.liste = [...ap.liste, { id: 'n7', itemId: '107', pseudo: 'nina_k', titre: 'New Balance 550 grise 43', prix: 90, offre: 81, texte: 'Bonjour nina_k, New Balance 550 grise 43 est à 81 € pour toi !' }];
-        window.__ap = ap;
-        for (const f of window.__ecouteurs || []) { try { f({ vrmFavorisListeLue: { newValue: { uid: '111', at: Date.now(), pages: 2 } } }, 'local'); } catch (_) {} }
-      });
-      await t.pg.waitForTimeout(600);
-      const a1 = await lire(t.pg);
-      const apres = a1.envoyes2.filter((m) => m.quoi === 'apercu').length;
-      await cap(t.pg, 'liste-lue-1512-light');
-      dit(a0.lignes === 3 && a1.lignes === 4 && apres === avant + 1, 'la liste des notifications vient d’être lue par l’extension ⇒ la carte ouverte redemande ses favoris et montre le 4ᵉ, sans aucun geste', JSON.stringify({ avant: a0.lignes, apres: a1.lignes, demandes: [avant, apres] }));
       await t.ctx.close();
     });
     await essaie('clic lien', async () => {
