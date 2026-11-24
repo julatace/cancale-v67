@@ -13,7 +13,6 @@ export default {
   "ru.stock.auMoins": "{n}+",
   "ru.mod.disparues": {"one": "{n} listing disappeared from {compte}", "other": "{n} listings disappeared from {compte}"},
   "ru.mod.titreFeuille": "Disappeared listings · {compte}",
-  "ru.mod.phrase": "Between {debut} and {fin}, these listings left Vinted. VRM saw no sale and no deletion: Vinted may have removed them.",
   "ru.mod.annonceId": "Listing {id}",
   "ru.mod.menu": "More actions for this listing",
   "ru.mod.moi": "I deleted it myself",
@@ -21,7 +20,6 @@ export default {
   "ru.mod.messages": "Open my Vinted messages",
   "ru.mod.toutVu": "All seen",
   "ru.mod.aria": "Listings gone from Vinted",
-  "ru.mod.court": "Gone between {debut} and {fin}",
   "ru.ann.achatRelie": "Linked purchase",
   "ru.rp.bientot": {"one": "Soon at the pickup point · {n} on the way", "other": "Soon at the pickup point · {n} on the way"},
 };

@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (24 nov., moderation-carte réconciliée avec la revue UX — Julien : « c'est moche ») src/AlerteModeration.jsx
+  { id: 'annonces-disparues-groupees', date: '2026-11-24', titre: 'Annonces disparues : leurs photos et un geste', phrase: 'Une ligne par compte ; touche-la : photos, N°, quoi faire.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (24 nov., ext. 5.440.3 — Julien : « capte absolument tout ce que fait Bleam ») docs/passation/2026-11-24-observation-vinted.md
   { id: 'observer-vinted', date: '2026-11-24', titre: 'Observer Vinted pendant un envoi', phrase: 'Le chemin de la page Vinted noté 10 min, sans tes données.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (24 nov., vente-mail-annonce — Julien : « la vente a été détectée par les mails […] l'annonce n'a pas encore été supprimée ») docs/passation/2026-11-24-vente-mail-annonce.md
