@@ -93,7 +93,7 @@ export default function ObservationVinted() {
                 : frise === null ? <Rangee titre="—" sousTitre={tr('obs.app.frisePasLue')}/>
                 : (
                   <ol className="n-ext-observation-frise" data-observation-frise={frise.length}>
-                    {frise.map((p, i) => <li key={i} data-obs-ton={p.ton}><time>{heureS(p.t)}</time> <span>{p.texte}{p.fois > 1 ? ` ×${p.fois}` : ''}</span></li>)}
+                    {frise.map((p) => <li key={p.id} data-obs-ton={p.ton}><time>{heureS(p.t)}</time> <span>{p.texte}{p.fois > 1 ? ` ×${p.fois}` : ''}</span></li>)}
                   </ol>
                 )
             ) : null}

@@ -51,7 +51,7 @@ export function phraseObservation(e) {
   return null;
 }
 
-// Les entrées dites, dans l'ordre ; deux requêtes identiques qui se suivent (la même lecture deux fois) ⇒ « ×2 ».
+// Les entrées dites, dans l'ordre (chacune son `id` : heure + rang) ; deux requêtes identiques qui se suivent (la même lecture deux fois) ⇒ « ×2 ».
 export function frisePhrases(ev) {
   const out = [];
   for (const e of Array.isArray(ev) ? ev : []) {
@@ -59,7 +59,7 @@ export function frisePhrases(ev) {
     if (!p) continue;
     const prec = out[out.length - 1];
     if (prec && prec.texte === p.texte && p.ton === 'requete') { prec.fois = (prec.fois || 1) + 1; continue; }
-    out.push({ t: Number(e.t) || null, ...p });
+    out.push({ t: Number(e.t) || null, id: `${Number(e.t) || 0}-${out.length}`, ...p });   // identité : l'heure de l'entrée et son rang dans la frise
   }
   return out;
 }
