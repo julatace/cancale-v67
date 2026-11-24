@@ -66,8 +66,12 @@ L'apparition passe par l'aide partagée de visuel-jeu (`useArrive(pret, cle)`, `
 
 ## 6. Ce qui reste
 
-- Bancs voisins (même machine, même heure) : `argent-vintex` 46/0, `textes-visibles` 16/0 ; `argent-mois`, `argent-a-venir`,
-  `argent-mieux` (Déclarer), `messages-*`, `parametres-refonte` rouges — comparés à la base au §7 (ajouté quand la comparaison a tourné).
+- Bancs voisins (même machine, même heure) : `argent-vintex` 46/0, `textes-visibles` 16/0, `argent-natif` 494 verts (arrêté par
+  le délai de la machine, aucun rouge de fond). **Aucun rouge nouveau** : les rouges sont les MÊMES sur la base (banc de la base
+  sur le build de la base) — `argent-mois` 16 (Ventes · Vinted « À venir », écran « Argent à venir »), `argent-a-venir` 13,
+  `argent-mieux` 6 (Déclarer : « Copier », libellés), `messages-naturel` 25, `messages-volets` 2, `messages-sites-naturel` 26,
+  `messages-lisibles` 11, `parametres-refonte` 10/21 (toucher une catégorie : délai dépassé). Ils jugent l'ancien DOM ; à reporter
+  sur les `data-*` du design (passation du 23 nov. §4.6).
 - `audit-traduction` 45/0, `audit-urssaf`, `audit-chiffres`, `audit-quoi-de-neuf` verts. Le relevé 35/35 (`chiffres-volume`) n'a pas
   tourné (machine saturée) : ce lot n'appelle que des propriétaires existants, aucune somme neuve.
 - À l'ordinateur, la valeur « Micro-entrepre… » de la colonne Paramètres est coupée (d'avant ce lot).
