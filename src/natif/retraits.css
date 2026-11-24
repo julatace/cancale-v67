@@ -351,6 +351,7 @@
   .n-rp-point-neuf { display: inline-block; width: 8px; height: 8px; border-radius: 4px; background: var(--n-accent); margin-inline-end: 6px; vertical-align: 2px; }
   /* Contenu pas lu : une vignette neutre (l'icône à l'encre douce), une ligne courte. */
   .n-rp[data-rp-variante="c"] .n-rp-vignette[data-rp-photo="0"] { background: var(--n-carte-2); color: var(--n-encre-2); }
+  .n-rp-ouverture-jour { white-space: nowrap; }
   .n-rp-pas-lu-pourquoi { display: block; }
   .n-rp-pas-lu-pourquoi .n-pourquoi { padding: 0; }
 }

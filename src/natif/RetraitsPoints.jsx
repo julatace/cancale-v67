@@ -294,7 +294,7 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc, variant
           {lien && !c ? <a className="n-rp-itineraire" href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">{Icon ? <Icon name="pin" size={15}/> : null}<span>{tr('retraits.v.itineraire')}</span></a> : null}
         </div> : null}
         {/* (24 nov., retrait-parfait) L'OUVERTURE sur sa propre ligne (elle passe à la ligne si besoin, l'adresse reste sur une). */}
-        {horaires && ouv ? <p className="n-rp-ouverture n-rp-horaires" data-rp-horaires="" data-rp-ouverture={ouv.etat} data-rp-horaires-jour={ouv.jour || ''}>{horaires}</p> : null}
+        {horaires && ouv ? <p className="n-rp-ouverture n-rp-horaires" data-rp-horaires="" data-rp-ouverture={ouv.etat} data-rp-horaires-jour={ouv.jour || ''}>{ouv.phrase}{ouv.phrase && ouv.jour ? ' · ' : ''}{ouv.jour ? <span className="n-rp-ouverture-jour">{tr('retraits.p.aujourdhui', { h: ouv.jour })}</span> : null}</p> : null}
       </header>
       {colis.length ? <ul className="n-rp-liste">
         {comptes.map((x) => <LigneColis key={x.cle || x.id} x={x} aides={aides} Photo={Photo} Icon={Icon} nouveaux={nouveaux} guichet={guichet} avecLimite={avecLimite} loc={loc}/>)}

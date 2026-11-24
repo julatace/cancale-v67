@@ -161,7 +161,7 @@ const toucher = (pg, sel) => pg.evaluate((s) => { const e = document.querySelect
       const brest = pts.find((p) => p.codes.includes('7788'));
       dit(!!brest && brest.verif.length === 1 && brest.verif[0].m === 'depasse' && brest.verif[0].geste, `P6 « à vérifier » visible, raison « ${brest && brest.verif[0] && brest.verif[0].txt} », un geste`, brest && brest.verif);
       // J — LES DÉFAUTS DES CAPTURES DE JULIEN (24 nov., production, iPhone) : jugés sur le rendu.
-      const J = await pg.evaluate(() => {
+      const JX = await pg.evaluate(() => {
         const vis = (e) => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
         const R = (e) => e.getBoundingClientRect();
         const rp = document.querySelector('.n-rp');
@@ -177,20 +177,23 @@ const toucher = (pg, sel) => pg.evaluate((s) => { const e = document.querySelect
         const pasLu = [...document.querySelectorAll('[data-rp-pas-lu]')].filter(vis).map((e) => ({ n: e.textContent.trim().length, pourquoi: !!e.parentElement.querySelector('[data-rp-pas-lu-pourquoi] details') }));
         return { noms, adresses, logos, pastillesNouveau, points, jargon, traits, pasLu };
       });
-      dit(J.noms.every((n) => n === 1), `J1 chaque nom de point sur UNE ligne (${J.noms.join(',')})`);
-      dit(J.logos.every((d) => d <= 12), `J1 le logo aligné sur le nom (${J.logos.join(',')} px)`, J.logos);
-      dit(J.adresses.length >= 5 && J.adresses.every((a) => !a.coupe), `J2 aucune adresse coupée (${J.adresses.length})`, J.adresses.filter((a) => a.coupe));
-      dit(J.pastillesNouveau === 0 && J.points.every((w) => w <= 10), `J3 « Nouveau » : aucune pastille, un point discret (${J.points.join(',') || 'aucun'})`);
-      dit(J.jargon.length === 0, `J4 aucun jargon (« pas dit », « pas lue », « ouvre vinted.fr ») à l'écran`, J.jargon);
-      dit(J.traits === 0, `J5 plus de traits inégaux : la frise se dit (« Au point · 24 nov. »)`, J.traits);
-      dit(J.pasLu.every((x) => x.n <= 25 && x.pourquoi), `J6 contenu pas lu : une ligne courte, le geste sous « Pourquoi ? » (${J.pasLu.map((x) => x.n).join(',') || 'aucun'})`, J.pasLu);
+      dit(JX.noms.every((n) => n === 1), `J1 chaque nom de point sur UNE ligne (${JX.noms.join(',')})`);
+      dit(JX.logos.every((d) => d <= 12), `J1 le logo aligné sur le nom (${JX.logos.join(',')} px)`, JX.logos);
+      dit(JX.adresses.length >= 5 && JX.adresses.every((a) => !a.coupe), `J2 aucune adresse coupée (${JX.adresses.length})`, JX.adresses.filter((a) => a.coupe));
+      dit(JX.pastillesNouveau === 0 && JX.points.every((w) => w <= 10), `J3 « Nouveau » : aucune pastille, un point discret (${JX.points.join(',') || 'aucun'})`);
+      dit(JX.jargon.length === 0, `J4 aucun jargon (« pas dit », « pas lue », « ouvre vinted.fr ») à l'écran`, JX.jargon);
+      dit(JX.traits === 0, `J5 plus de traits inégaux : la frise se dit (« Au point · 24 nov. »)`, JX.traits);
+      dit(JX.pasLu.every((x) => x.n <= 25 && x.pourquoi), `J6 contenu pas lu : une ligne courte, le geste sous « Pourquoi ? » (${JX.pasLu.map((x) => x.n).join(',') || 'aucun'})`, JX.pasLu);
       // J7 — un message (« Nouveau code de retrait · … ») ne recouvre aucun contenu.
       await pg.evaluate(() => { const e = document.querySelector('[data-rp-point]:nth-of-type(2)') || document.querySelector('[data-rp-point]'); if (e) e.scrollIntoView({ block: 'end' }); window.dispatchEvent(new CustomEvent('vrm:toast', { detail: { texte: 'Nouveau code de retrait · Mondial Relay Le Tabac Banc', ton: 'info' } })); });
       await pg.waitForTimeout(700);
       const tst = await pg.evaluate(() => {
         const t = document.querySelector('.vrm-toast'); if (!t) return { absent: true };
         const r = t.getBoundingClientRect();
-        const sous = [...document.querySelectorAll('[data-rp-colis], [data-rp-point] .n-rp-tete, .n-rp-actions .n-bouton')].filter((e) => { const q = e.getBoundingClientRect(); return q.width && q.bottom > r.top + 1 && q.top < r.bottom - 1 && q.right > r.left && q.left < r.right; }).length;
+        // Recouvert = un contenu VISIBLE dans la zone qui défile (pas seulement sous elle, coupé par son bord) sous le message.
+        let sc = document.querySelector('.n-rp'); while (sc && sc !== document.documentElement && !(/(auto|scroll)/.test(getComputedStyle(sc).overflowY) && sc.scrollHeight > sc.clientHeight + 2)) sc = sc.parentElement;
+        const bas = sc && sc !== document.documentElement ? Math.min(innerHeight, sc.getBoundingClientRect().bottom) : innerHeight;
+        const sous = [...document.querySelectorAll('[data-rp-colis], [data-rp-point] .n-rp-tete, .n-rp-actions .n-bouton')].filter((e) => { const q = e.getBoundingClientRect(); const haut = Math.max(q.top, r.top), fin = Math.min(q.bottom, r.bottom, bas); return q.width && fin > haut + 1 && q.right > r.left && q.left < r.right; }).length;
         return { place: (t.closest('.vrm-toasts') || { getAttribute: () => '' }).getAttribute('data-toasts-place'), sous };
       });
       dit(!tst.absent && tst.sous === 0, `J7 le message ne recouvre aucun contenu (place « ${tst.place} », ${tst.sous} recouvert)`, tst);
@@ -212,6 +215,23 @@ const toucher = (pg, sel) => pg.evaluate((s) => { const e = document.querySelect
       dit(haut.coupes.length === 0, `J8 le haut d'Achats : rien de coupé au bord ni tronqué`, haut.coupes);
       dit(haut.sansPoint == null || /^\d+ en route$/.test(haut.sansPoint), `J8 « N en route » (« ${haut.sansPoint} »)`);
       await pg.screenshot({ path: path.join(SHOTS, `haut-${W}-${th}.png`) });
+      // J9 — la bande d'Achats sous les retraits (capture 2 de Julien) : « Relier achats et ventes », « Modifier », les chiffres,
+      // les onglets (« Annu… »), « À renvoyer » : rien de coupé, rien sous la barre du bas une fois défilé.
+      const bande = await pg.evaluate(async () => {
+        const vis = (e) => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden' && parseFloat(getComputedStyle(e).opacity) > 0.05;
+        const h = document.querySelector('[data-achats-hero]') || document.querySelector('[data-glisser-ouvrir="achats"]');
+        if (!h) return { absent: true };
+        h.scrollIntoView({ block: 'center' }); await new Promise((r) => setTimeout(r, 500));
+        let barre = innerHeight; for (let q = document.elementFromPoint(innerWidth / 2, innerHeight - 20); q && q !== document.body; q = q.parentElement) { const r = q.getBoundingClientRect(); if (r.height < 220 && r.width > innerWidth * 0.6) barre = Math.min(barre, r.top); }
+        const main = document.querySelector('.vrm-main') || document.body;
+        const coupes = [...main.querySelectorAll('button, a, [role="tab"], h1, h2, h3, [data-achats-hero] *, .vrm-seg *, [class*="segment"] *')].filter(vis).filter((e) => { const r = e.getBoundingClientRect(); if (r.bottom < 0 || r.top > barre || r.height < 4) return false;
+          if (e.closest('[data-rp-point], .n-gc, .vrm-toasts, [data-defile-x], .n-rangee-defile, .n-barre-onglets, nav')) return false;
+          const cs = getComputedStyle(e); const deborde = r.right > innerWidth + 1 || r.left < -1; const tronque = (cs.textOverflow === 'ellipsis' || cs.overflow === 'hidden' || cs.overflowX === 'hidden') && e.scrollWidth > e.clientWidth + 2 && (e.innerText || '').trim().length > 2;
+          return deborde || tronque; }).map((e) => (e.innerText || e.getAttribute('aria-label') || '').toString().trim().slice(0, 40) || e.className);
+        return { coupes: [...new Set(coupes)].slice(0, 12) };
+      });
+      dit(!bande.absent && bande.coupes.length === 0, `J9 la bande d'Achats (Relier, chiffres, onglets) : rien de coupé`, bande);
+      await pg.screenshot({ path: path.join(SHOTS, `bande-${W}-${th}.png`) });
       await pg.evaluate(() => { const e = document.querySelector('.n-rp'); if (e) e.scrollIntoView({ block: 'start' }); });
       await pg.waitForTimeout(400);
       await pg.screenshot({ path: path.join(SHOTS, `liste-${W}-${th}.png`) });
@@ -264,11 +284,12 @@ const toucher = (pg, sel) => pg.evaluate((s) => { const e = document.querySelect
       dit(ferme2 && await pg.evaluate(() => window.__marqueBanc === 1), `G5 « Fermer » ferme la feuille, même page (${ferme2})`);
       // P4 bis : 10:00 ⇒ ouvert
       await pg.clock.setFixedTime(new Date(T1000));
-      await pg.reload({ waitUntil: 'domcontentloaded' });
+      await pg.goto(`http://localhost:${PORT}/?tab=achats`, { waitUntil: 'domcontentloaded' });
       await attendre(pg, (n) => document.querySelectorAll('[data-rp-point] [data-rp-colis]').length >= n, 45000, COLIS.length - 1);
       await pg.waitForTimeout(800);
       const pts2 = await pg.evaluate(releve);
       const vg2 = pts2.find((p) => p.codes.includes('551234') || p.codes.includes('552345'));
+      if (!vg2) await pg.screenshot({ path: path.join(SHOTS, `p4-10h-${W}-${th}.png`) });
       dit(!!vg2 && vg2.ouverture === 'ouvert' && /ferme à 12 h/.test(vg2.horaires), `P4 10:00 ⇒ ouvert, ferme à 12 h (« ${vg2 && vg2.horaires} »)`, vg2 && vg2.horaires);
       // H1 — hors ligne
       await ctx.setOffline(true);
