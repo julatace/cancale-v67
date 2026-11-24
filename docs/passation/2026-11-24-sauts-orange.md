@@ -13,7 +13,7 @@ rien n'est caché (« un colis caché est un colis perdu »), « pas su » ne de
 
 | écran | cause mesurée | correctif |
 |---|---|---|
-| **Achats, à l'arrivée** (CLS 0,53) | les achats lus seuls dessinaient « À vérifier » ; les e-mails de suivi lus ensuite ajoutaient « Mode relais » et la section des codes AU-DESSUS (+46 px, défilement décalé de ~320 px) | `src/ecrans/Comptabilite.jsx` : `retraitsPrets` — la colonne « À retirer » et « Mode relais » attendent les DEUX sources (e-mails de suivi ET achats). Pendant la lecture, la place dit « Je lis tes colis… » ; une lecture ratée dit « Réessayer » ; une attente trop longue (`colisAttenteLongue`) montre ce qui est lu (jamais un colis caché faute d'une seconde source). Même règle que la version « natif » (`QuandLuV2`). |
+| **Achats, à l'arrivée** (CLS 0,53) | les achats lus seuls dessinaient « À vérifier » ; les e-mails de suivi lus ensuite ajoutaient « Mode relais » et la section des codes AU-DESSUS (+46 px, défilement décalé de ~320 px) | `src/ecrans/Comptabilite.jsx` : `retraitsPrets` — la colonne « À retirer » et « Mode relais » attendent les DEUX sources (e-mails de suivi ET achats). Pendant la lecture, la place dit « Je lis tes colis… » et TIENT une hauteur d'écran (sinon la liste des achats, dessinée dessous, était poussée hors de l'écran : CLS 0,58 vu au 2ᵉ passage) — sauf si la dernière publication `vrm_colis_retirer` disait 0 colis ; une lecture ratée dit « Réessayer » ; une attente trop longue (`colisAttenteLongue`) montre ce qui est lu (jamais un colis caché faute d'une seconde source). Même règle que la version « natif » (`QuandLuV2`). |
 | **La loupe** (CLS 0,12) | « Dernières ventes » (déjà en mémoire) se dessinait seule, puis « Colis à retirer » (lu ensuite) arrivait au-dessus | `src/App.jsx` : les suggestions (colis, ventes, actions, aide) n'arrivent qu'une fois la lecture de la loupe faite (`gsData`), d'un coup ; avant, une ligne « Lecture… » à la marge du premier titre (aucun décalage de 16 px). |
 | **Argent** (CLS 0,21) | « Tes seuils de l'année » (DAC7) se décide sur la ligne publiée par Ventes + le régime + « Compris » ; prête après le reste, elle s'insérait en tête | `src/ecrans/Compta.jsx` : prête à l'ouverture d'Argent ⇒ en tête, comme avant ; pas encore prête ⇒ elle prend sa place EN BAS du résumé (sous ce qui est déjà dessiné). À la prochaine ouverture, elle revient en tête. Jamais cachée. |
 | **Fin d'Achats** (CLS jusqu'à 0,94) | deux causes : (a) la liste « À vérifier » se pose par paquets (`ParPaquets`) et chaque paquet poussait la suite (Safari n'ancre pas le défilement) ; (b) les blocs du bas (achats eBay, Leboncoin/Vestiaire, sources, « pour acheter », hors plateforme) montraient un squelette de 320 px remplacé par 76–184 px : la page raccourcissait sous le doigt | (a) `src/composants/ParPaquets.jsx` : la sentinelle TIENT la place des rangées pas encore posées (hauteur moyenne mesurée × reste) ; (b) ces blocs passent en `aLaDemandeDiscret` (rien pendant le chargement, la règle du 17 nov. « jamais un squelette au milieu d'une liste »). |
@@ -22,8 +22,14 @@ rien n'est caché (« un colis caché est un colis perdu »), « pas su » ne de
 
 ## 2. L'orange (décision de Julien du 23 nov. : aucun orange ni ambre, jour ET nuit ; rouge au seul doublon)
 
-- **646 couleurs orange/ambre écrites à la main** dans `src/` (feuilles des écrans d'hier, palettes JS, repli
+- **646 couleurs orange/ambre écrites à la main** (et 14 « or terne » de plus après élargissement de la règle : le liseré
+  `rgb(178 106 0 / .5)` de la **carte d'offre Vinted de Messages** — signalé par le coordinateur, compté dans les 646 —, #AD9658
+  de la raison d'un bordereau, le kraft doux des étiquettes N°) dans `src/` (feuilles des écrans d'hier, palettes JS, repli
   `var(--x, #B25000)`), plus 13 dans les pages publiques (`public/` : aide, état, statut, mentions, récupération).
+- Codemod refait une fois (v2) après relecture : la v1 réécrivait aussi les commentaires et posait l'ardoise sombre sous un
+  texte sombre (étiquette kraft du N°, pastille de la barre d'onglets). La v2 laisse les commentaires, suit le contexte nuit
+  bloc par bloc, envoie une teinte claire (clarté ≥ 60 %) vers `--n-ambre-fond`/`--n-ambre-bord`, et met `--n-sur-ambre` sous
+  tout texte posé sur un aplat `--n-ambre`.
 - Remplacées par les jetons de `src/natif/jetons.css` : `var(--n-ambre)` (l'ardoise #3D4B5B le jour, l'encre claire
   #F4F4F5 la nuit), `--n-ambre-fond` pour les teintes pâles, `color-mix(… N %, transparent)` pour les transparences, et
   `--n-sur-ambre` pour un texte blanc posé sur un aplat. Palettes : `themeMineral.js` (nuit : `warn`/`danger`/`gold`
@@ -33,15 +39,17 @@ rien n'est caché (« un colis caché est un colis perdu »), « pas su » ne de
   MARQUES (logos des transporteurs `transporteursVisuels.js`, Leboncoin, eBay `natif/logo-site.css`, Google), les objets
   réels du stock 3D (parquet, carton kraft : `Room3D.jsx`, meubles du garage), les couleurs choisies par lui (sa
   facture, un visuel, la couleur d'une paire `couleurPhoto.js`).
-- **Audit** `scripts/audit-sans-orange.cjs` (règle partagée `scripts/_couleurs-orange.cjs` : teinte 15–55°, saturation
-  ≥ 40 %, clarté 15–96 %) : chaque source de `src/` et `public/`, hors commentaires. Avant : **646 refus** ; après : 0.
+- **Audit** `scripts/audit-sans-orange.cjs` (règle partagée `scripts/_couleurs-orange.cjs` : teinte 15–55°, clarté 15–96 %,
+  saturation ≥ 40 % — ou ≥ 25 % jusqu'à 85 % de clarté, l'or terne) : chaque source de `src/` et `public/`, hors commentaires. Avant : **646 refus** ; après : 0.
   Mutation : un `.x{color:#B25000}` ajouté ⇒ rouge ; la règle affaiblie (teinte ≤ 16°) ⇒ rouge (témoins).
 - **Banc rendu** `scripts/bancs/sans-orange.cjs` : chaque écran principal (Aujourd'hui, Annonces, Ventes, Achats,
   Argent, Statistiques, Stock, Messages, Paramètres et CHACUNE de ses sections, la loupe vide et avec un N°), 390 tactile
   et 1512, clair et sombre ; couleur CALCULÉE de tout ce qui se voit (texte, fond, bords, contour, ombre, dégradé,
   fill/stroke SVG, ::before/::after). Écartés : logos (`[data-transporteur-logo]`, `.n-logo-site`, `[data-logo]`), photos.
-  Avant (390 clair) : rouge sur Paramètres « Tout va bien ? Pas tout à fait » (#5E3900) et le logo Google (marque, depuis
-  `data-logo`).
+  Ouvre aussi Messages → « Offres » → une conversation (`SEULEMENT=messages` pour ce seul passage). ⚠️ La base inventée n'a
+  aucune offre EN ATTENTE : la carte d'offre (`.vrm-chat-offre`) n'est pas rendue par le banc — c'est l'audit des sources qui
+  tient son liseré. Avant (390 clair, build intermédiaire) : rouge sur Paramètres « Tout va bien ? Pas tout à fait »
+  (#5E3900) et le logo Google (marque, depuis `data-logo`).
 
 ## 3. Les trois petits défauts vus sur les captures
 
