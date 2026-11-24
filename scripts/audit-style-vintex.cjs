@@ -103,18 +103,22 @@ function juger(depot = {}, { sousAudits = true } = {}) {
   const blocClair = jet.slice(0, iSombre), blocSombre = jet.slice(iSombre);
   const val = (bloc, nom) => { const m = new RegExp('--n-' + nom + '\\s*:\\s*([^;]+);').exec(bloc); return m ? m[1].trim().toLowerCase() : null; };
   const attendus = [
-    [blocClair, 'clair', { accent: '#16181d', fond: '#f4f4f2', carte: '#ffffff', bord: '#e5e4e0' }],   // (22 nov.) l'accent est l'encre (décision de Julien)
-    [blocSombre, 'sombre', { accent: '#f4f4f5', fond: '#0f0f11', carte: '#18181b' }],
+    [blocClair, 'clair', { accent: '#3d4b5b', fond: '#dfe1e5', carte: '#fafafb', bord: '#cbced4' }],   // (23 nov., Julien) gris clair étagé, accent ardoise — plus de noir
+    [blocSombre, 'sombre', { accent: '#f4f4f5', fond: '#1c1c20', carte: '#2a2a2f' }],   // (23 nov., Julien) la nuit = le gris de vrm.center
   ];
   for (const [bloc, nom, att] of attendus) {
     for (const [k, v] of Object.entries(att)) dit(val(bloc, k) === v, `S2 --n-${k} (${nom}) vaut ${v}`, val(bloc, k));
-    dit(val(bloc, 'plein') === val(bloc, 'encre'), `S2 le bouton plein (${nom}) est à l'encre (--n-plein = --n-encre)`, `${val(bloc, 'plein')} / ${val(bloc, 'encre')}`);
+    // (23 nov.) Le plein : à l'ARDOISE (l'accent) en clair — plus jamais un aplat noir ; à l'encre la nuit.
+    if (nom === 'clair') dit(val(bloc, 'plein') === val(bloc, 'accent'), `S2 le bouton plein (${nom}) est à l'ardoise (--n-plein = --n-accent, jamais noir)`, `${val(bloc, 'plein')} / ${val(bloc, 'accent')}`);
+    else dit(val(bloc, 'plein') === val(bloc, 'encre'), `S2 le bouton plein (${nom}) est à l'encre (--n-plein = --n-encre)`, `${val(bloc, 'plein')} / ${val(bloc, 'encre')}`);
+    // (23 nov., « j'aime pas le orange ») « à faire » n'est plus orange : l'ambre du clair EST l'accent.
+    if (nom === 'clair') dit(val(bloc, 'ambre') === val(bloc, 'accent'), `S2 plus d'orange (${nom}) : --n-ambre = --n-accent`, val(bloc, 'ambre'));
     COULEUR.lastIndex = 0; let m;
     while ((m = COULEUR.exec(bloc))) { const rgb = m[1] ? hex6(m[1]) : [+m[2], +m[3], +m[4]]; dit(!estBleuVif(rgb) && !estViolet(rgb), `S2 aucun jeton ${nom} n'est bleu ni violet`, m[0]); }
   }
   // S2 bis — themeMineral (les couleurs que lit le code d'avant) suit les jetons.
   const th = lire('src/themeMineral.js');
-  for (const [nomTheme, acc] of [['MINERAL', '#16181d'], ['MINERAL_DARK', '#f4f4f5']]) {
+  for (const [nomTheme, acc] of [['MINERAL', '#3d4b5b'], ['MINERAL_DARK', '#f4f4f5']]) {
     const m = new RegExp('export const ' + nomTheme + '\\s*=\\s*Object\\.freeze\\(\\{([\\s\\S]*?)\\}\\);').exec(th);
     if (!dit(!!m, `S2 ${nomTheme} lisible dans themeMineral.js`)) continue;
     const a = (/\baccent\s*:\s*'(#[0-9a-fA-F]{6})'/.exec(m[1]) || [])[1];
@@ -142,8 +146,9 @@ function mutations() {
   const cas = [
     ['un bleu vif dans une feuille', { 'src/natif/complements.css': lire('src/natif/complements.css') + '\n.x-mutation { color: #0068D6; }\n' }, /S1/],
     ['un bleu vif en rgb() dans un style en ligne', { 'src/mutation-vintex.jsx': "export const X = () => <b style={{ color: 'rgb(0, 113, 227)' }}/>;\n" }, /S1/],
-    ['l\'accent remis au bleu', { 'src/natif/jetons.css': jet.replace('--n-accent: #16181D;', '--n-accent: #0068D6;') }, /S2 --n-accent \(clair\)/],
-    ['le plein remis à l\'accent', { 'src/natif/jetons.css': jet.replace('--n-plein: #16181D;', '--n-plein: #0F6B4C;') }, /S2 le bouton plein \(clair\)/],
+    ['l\'accent remis au bleu', { 'src/natif/jetons.css': jet.replace('--n-accent: #3D4B5B;', '--n-accent: #0068D6;') }, /S2 --n-accent \(clair\)/],
+    ['le plein remis au noir', { 'src/natif/jetons.css': jet.replace('--n-plein: #3D4B5B;', '--n-plein: #16181D;') }, /S2 le bouton plein \(clair\)/],
+    ['l\'orange revenu', { 'src/natif/jetons.css': jet.replace('--n-ambre: #3D4B5B;', '--n-ambre: #874600;') }, /S2 plus d'orange/],
     ['l\'onglet actif en rose', { 'src/natif/natif.css': nat.replace('.n-onglet[aria-current="page"] { color: var(--n-accent);', '.n-onglet[aria-current="page"] { color: #C02D55;') }, /S3/],
     ['un titre en capitales (CSS)', { 'src/natif/complements.css': lire('src/natif/complements.css') + '\n.n-carte-titre-mutation { text-transform: uppercase; }\n' }, /S4/],
     ['un titre en capitales (JSX)', { 'src/mutation-vintex.jsx': "export const X = () => <b style={{ textTransform: 'uppercase' }}>À envoyer</b>;\n" }, /S4/],
@@ -163,7 +168,7 @@ if (require.main === module) {
   for (const r of rouges.slice(0, 80)) console.log('❌ ' + r);
   if (rouges.length > 80) console.log(`… et ${rouges.length - 80} de plus`);
   let ok = rouges.length === 0;
-  console.log(ok ? '✅ audit-style-vintex : accent à l’encre (22 nov.), aucun bleu vif, aucun titre en capitales, ni violet ni rouge hors doublon' : `\n❌ audit-style-vintex : ${rouges.length} rouge(s)`);
+  console.log(ok ? '✅ audit-style-vintex : gris clair étagé, accent ardoise, plus d’orange (23 nov.), aucun bleu vif, aucun titre en capitales, ni violet ni rouge hors doublon' : `\n❌ audit-style-vintex : ${rouges.length} rouge(s)`);
   if (process.argv.includes('--mutation')) ok = mutations() && ok;
   process.exit(ok ? 0 : 1);
 }

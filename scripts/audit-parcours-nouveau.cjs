@@ -37,7 +37,7 @@ const MUTATIONS = {
   'reponse-tous': ['api/_lib/signalement.js', "  if (String(utilisateur.id).toLowerCase() !== proprio) return { code: 403, corps: { ok: false, raison: 'proprietaire' } };\n  const id = String((corps && corps.id) || '');\n  if (!ID_SIG.test(id))", "  const id = String((corps && corps.id) || '');\n  if (!ID_SIG.test(id))"],
   'suivi-tous': ['api/_lib/signalement.js', '&data->>de=eq.${uid}&select=${SELECT_SUIVI}', '&select=${SELECT_SUIVI}'],
   'vercel-cadre-tous': ['vercel.json', "frame-ancestors 'self'", "frame-ancestors *"],
-  'aide-ancien-chemin': ['scripts/aide-contenu.cjs', "**Paramètres → Ventes et colis → Imprimante et bordereaux**", "**Réglages → Impression**"],
+  'aide-ancien-chemin': ['scripts/aide-contenu.cjs', "**Paramètres → Ventes et colis → Imprimante et étiquettes**", "**Réglages → Impression**"],
 };
 
 const arg = process.argv.slice(2);

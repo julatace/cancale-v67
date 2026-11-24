@@ -117,6 +117,8 @@ import ecran_menu_onglets from './fr/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './fr/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
 import ecran_actions_ext from './fr/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './fr/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
+import ecran_accompagnement_demarrage from './fr/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
+import ecran_debutant from './fr/debutant.js';   // (24 nov.) « Ta première semaine », le parcours du débutant
 export default {
   ...ecran_accessibilite,
   ...ecran_groupes,
@@ -598,8 +600,8 @@ export default {
   "reglages.historique.lib": "Mon historique",
   "reglages.import.desc": "À partir de quelle date VRM relit tes anciens e-mails.",
   "reglages.import.lib": "Import des e-mails Vinted",
-  "reglages.imprimante.desc": "Le papier de ton imprimante, pour des bordereaux à la bonne taille.",
-  "reglages.imprimante.lib": "Imprimante et bordereaux",
+  "reglages.imprimante.desc": "Le papier de ton imprimante, pour des étiquettes d’envoi à la bonne taille.",
+  "reglages.imprimante.lib": "Imprimante et étiquettes",
   "reglages.imprimante.normale": "Normale · A4",
   "reglages.imprimante.thermique": "Thermique · {papier}",
   "reglages.je-vends.desc": "Ce que tu vends : les mots et les exemples suivent.",
@@ -2423,6 +2425,7 @@ export default {
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,
+  ...ecran_accompagnement_demarrage,
   ...ecran_parcours_nouveau,
   ...ecran_stock_rangement,
   ...ecran_stock_etiquetage,
@@ -2436,4 +2439,5 @@ export default {
   ...ecran_extension,
   ...ecran_actions_ext,
   ...ecran_offres_photos,
+  ...ecran_debutant,
 };

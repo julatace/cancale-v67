@@ -112,6 +112,8 @@ import ecran_menu_onglets from './es/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './es/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
 import ecran_actions_ext from './es/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './es/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
+import ecran_accompagnement_demarrage from './es/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
+import ecran_debutant from './es/debutant.js';   // (24 nov.) « Ta première semaine », le parcours du débutant
 export default {
   ...ecran_accessibilite,
   ...ecran_groupes,
@@ -2418,6 +2420,7 @@ export default {
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,
+  ...ecran_accompagnement_demarrage,
   ...ecran_parcours_nouveau,
   ...ecran_stock_rangement,
   ...ecran_stock_etiquetage,
@@ -2431,4 +2434,5 @@ export default {
   ...ecran_extension,
   ...ecran_actions_ext,
   ...ecran_offres_photos,
+  ...ecran_debutant,
 };

@@ -1,0 +1,15 @@
+/* « Ta première semaine » (24 nov., lot debutant) — la phrase et le geste sous l'étape courante. Neutre, aucune couleur d'alerte. */
+[data-premiere-semaine] { max-width: 680px; }
+[data-premiere-semaine] .n-rangee-pied { justify-content: flex-start; padding-bottom: 12px; }
+[data-premiere-semaine] .vrm-ps-geste { display: grid; justify-items: start; gap: 10px; text-align: start; width: 100%; }
+[data-premiere-semaine] .vrm-ps-phrase { margin: 0; font-size: 15px; line-height: 1.4; color: var(--n-encre-2, inherit); }
+[data-premiere-semaine] .vrm-ps-geste .n-pourquoi { margin: 0; }
+[data-premiere-semaine] .vrm-ps-exemple { display: flex; justify-content: center; padding: 4px 0 2px; }
+[data-premiere-semaine] .vrm-ps-exemple .n-bouton { min-height: 44px; }
+/* Annonces : la ligne qui explique le N° tant qu'aucune annonce n'en a (lot debutant). */
+.vrm-ann-debutant { margin: 0 16px 12px; padding: 10px 14px; border-radius: 12px; background: var(--n-carte, #fff); box-shadow: 0 0 0 .5px var(--n-bord, rgba(0,0,0,.08)); }
+.vrm-ann-debutant > p { margin: 0 0 2px; font-size: 15px; line-height: 1.45; color: var(--n-encre, inherit); }
+/* Ventes : le mot « bordereau » expliqué à un compte neuf (lot debutant). */
+.vrm-vt-debutant { margin: 6px 16px 10px; font-size: 14px; line-height: 1.4; color: var(--n-encre-2, inherit); }
+/* Argent : « recettes », le mot de l'URSSAF, expliqué à un compte neuf (lot debutant). */
+.vg-a-urssaf-mot { margin: 8px 0 0; padding: 0 16px 12px; font-size: 14px; line-height: 1.4; color: var(--n-encre-2, inherit); }

@@ -330,9 +330,12 @@ export const publicationColisFraiche = (pub, maintenant = Date.now()) => !!pub &
 // (11 nov., états vides) Aucun compte relié, PROUVÉ par la coque (`sources.sansCompte`) : un chiffre
 // qu'on attend ou qu'on n'a pas lu ne le sera jamais ⇒ « aucun compte relié », pas « lecture… ».
 // Toujours « — » (jamais 0) ; une valeur connue (saisie à la main) reste telle quelle.
-export const sansCompteSur = (v, sources) => (sources && sources.sansCompte && v && v.valeur == null && !v.hors
-  && (v.raison === 'encours' || v.raison === 'pasSu' || v.raison === 'publication' || v.raison === 'colis')
-  ? { ...v, raison: 'sansCompte' } : v);
+// (24 nov., lot debutant) Et un « 0 » calculé sur des listes VIDES faute de compte n'est pas un zéro lu : « 0 € vendu en
+// novembre » à quelqu'un qui n'a encore rien relié est un « pas su » déguisé (§5) ⇒ « — », « aucun compte relié ».
+export const sansCompteSur = (v, sources) => (sources && sources.sansCompte && v && !v.hors
+  && ((v.valeur == null && (v.raison === 'encours' || v.raison === 'pasSu' || v.raison === 'publication' || v.raison === 'colis' || v.raison === 'absente' || v.raison === 'annonces'))
+    || v.valeur === 0)
+  ? { ...v, valeur: null, partiel: false, raison: 'sansCompte' } : v);
 export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date.now()) => {
   const S = sources || {};
   const locaux = S.locaux || null;

@@ -58,6 +58,8 @@ export default {
   "glo.archive.def": "An old archived number. It is never given to another item.",
   "glo.pasSu.mot": "—",
   "glo.pasSu.def": "VRM does not know this number yet: not read, or read too long ago. It is never zero.",
+  "glo.recettes.mot": "takings",
+  "glo.recettes.def": "The URSSAF word for the money from your sales, counted on the day the platform pays it to you.",
   "cj.tete": "Tip of the day · {n} of {total}",
   "cj.voir": "See",
   "cj.fermer": "Put the tip away for today",

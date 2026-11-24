@@ -58,6 +58,8 @@ export default {
   "glo.archive.def": "Un número antiguo archivado. Nunca se da a otro artículo.",
   "glo.pasSu.mot": "—",
   "glo.pasSu.def": "VRM aún no sabe esta cifra: sin leer o leída hace demasiado. Nunca es cero.",
+  "glo.recettes.mot": "ingresos",
+  "glo.recettes.def": "La palabra de la URSSAF para el dinero de tus ventas, contado el día en que la plataforma te lo paga.",
   "cj.tete": "Consejo del día · {n} de {total}",
   "cj.voir": "Ver",
   "cj.fermer": "Guardar el consejo por hoy",

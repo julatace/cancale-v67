@@ -18,6 +18,7 @@ export const MOTS_GLOSSAIRE = Object.freeze([
   'bordereau',     // VRM le génère et récupère son PDF
   'archive',       // « B… » : un ancien numéro ne se redonne jamais (013)
   'pasSu',         // « — » : pas su ne vaut pas 0
+  'recettes',      // (24 nov., lot debutant) le mot de l'URSSAF : l'argent reçu des ventes, daté au versement (§5) — jamais « encaissé »
 ]);
 export const MOTS_MAX_DEF = 22;
 export const estMot = (m) => MOTS_GLOSSAIRE.includes(m);

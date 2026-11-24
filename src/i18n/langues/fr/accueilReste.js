@@ -59,6 +59,8 @@ export default {
   "glo.archive.def": "Un ancien numéro mis en archive. Il ne se redonne jamais à un autre article.",
   "glo.pasSu.mot": "—",
   "glo.pasSu.def": "VRM ne sait pas encore ce chiffre : lecture pas faite ou trop ancienne. Ce n’est jamais zéro.",
+  "glo.recettes.mot": "recettes",
+  "glo.recettes.def": "Le mot de l’URSSAF pour l’argent de tes ventes, compté le jour où la plateforme te le verse.",
   "cj.tete": "Conseil du jour · {n} sur {total}",
   "cj.voir": "Voir",
   "cj.fermer": "Ranger le conseil pour aujourd’hui",

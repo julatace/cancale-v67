@@ -151,7 +151,7 @@ async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, 
   await pg.locator('[data-imprimante-reglage]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
   // Au doigt, les panneaux sont des sous-écrans : on ouvre le nôtre.
   if (!(await pg.locator('[data-imprimante-reglage]').first().isVisible().catch(() => false))) {
-    await pg.getByText('Imprimante et bordereaux', { exact: false }).first().click({ timeout: 4000 }).catch(() => {});
+    await pg.getByText(/Imprimante et (bordereaux|étiquettes)/).first().click({ timeout: 4000 }).catch(() => {});
     await pg.waitForTimeout(800);
   }
   const res = { nom, erreurs, lectures };

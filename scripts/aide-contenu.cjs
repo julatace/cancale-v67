@@ -124,7 +124,7 @@ const ARTICLES = [
         'Sur ordinateur, avec l’extension, VRM peut aussi **générer** le bordereau Vinted depuis l’app.',
         'Leboncoin : **Imprimer le bordereau**, tamponné du titre et du numéro.',
         'eBay : c’est l’acheteur qui paie le port. eBay fournit l’étiquette prépayée ; VRM n’achète jamais d’étiquette avec ton argent.',
-        'Imprimante : normale (A4) ou thermique, à choisir dans **Paramètres → Ventes et colis → Imprimante et bordereaux**.',
+        'Imprimante : normale (A4) ou thermique, à choisir dans **Paramètres → Ventes et colis → Imprimante et étiquettes**.',
       ] },
       { titre: 'La date limite', id: 'limite' },
       'La date limite d’envoi est celle de l’e-mail de la plateforme (heure de Paris). Sans cet e-mail, VRM montre une **estimation** (la vente plus 7 jours) — jamais « en retard » sur une estimation.',
@@ -258,7 +258,7 @@ const ARTICLES = [
       { liste: [
         '**Mon compte** : profil, **Mon abonnement**, connexion, double vérification, équipe.',
         '**Mes plateformes** : tes comptes Vinted, Leboncoin, Vestiaire, **Comptes eBay**, plateformes affichées, **Mon adresse VRM** et tes e-mails.',
-        '**Ventes et colis** : **Imprimante et bordereaux**, colis, modèles d’annonce.',
+        '**Ventes et colis** : **Imprimante et étiquettes**, colis, modèles d’annonce.',
         '**Stock et numéros** : **Numéros de rangement** (qui numérote), ce que tu vends, Organisation.',
         '**Argent** : statut, URSSAF, prix d’achat, objectif du mois.',
         '**Notifications** : **Notifications du téléphone**, rappels, agenda.',

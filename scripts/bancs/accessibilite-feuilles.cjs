@@ -35,7 +35,7 @@ const CIBLES = [
   { id: 'parametres-reglage', nom: 'Paramètres · sous-écran « Imprimante et bordereaux »', tab: 'settings', ctx: '.vrm-main',
     ouvrir: async (pg, tel) => {
       if (tel) { await toucher(pg, '[data-categorie-ouvrir="ventes"]', tel); await pg.waitForSelector('[data-categorie-ouverte]:not([data-categorie-ouverte=""])', { timeout: 10000 }); }
-      const b = pg.locator('.vrm-main button, .vrm-main [role="button"]').filter({ hasText: /Imprimante et bordereaux/ }).filter({ visible: true }).first();
+      const b = pg.locator('.vrm-main button, .vrm-main [role="button"]').filter({ hasText: /Imprimante et (bordereaux|étiquettes)/ }).filter({ visible: true }).first();
       await b.scrollIntoViewIfNeeded().catch(() => {}); if (tel) await b.tap(); else await b.click();
       await pg.waitForSelector('[data-sous-ecran-ouvert]:not([data-sous-ecran-ouvert=""])', { timeout: 10000 });
     },

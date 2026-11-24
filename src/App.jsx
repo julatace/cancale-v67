@@ -781,7 +781,7 @@ const Bienvenue = aLaDemandeFeuille(() => import('./Bienvenue.jsx'));
 import VisiteBulles from "./VisiteBulles.jsx";
 // (14 nov., accueil des nouveaux, le reste : idées 133 134 136 139 140 145 147) — src/accueilReste/.
 import { poserOutilsAccueil } from "./accueilReste/deps.js";
-import { AccueilResteJournee, VisiteEcranHote } from "./accueilReste/AccueilReste.jsx";
+import { AccueilResteJournee, VisiteEcranHote, Mot } from "./accueilReste/AccueilReste.jsx";
 // ⟦→ ecrans/Comptabilite.jsx #51⟧
 import { ajouterAuRegistre, decisionRepublie, disparuesDuCompte, empreintesDe, majEmpreintesFiches, majAttente as majAttenteRepub, CLE_PHOTOS_VRM, CLE_EMPREINTES_FICHES, CLE_REPUB_REPONSES, CLE_REPUB_ATTENTE } from "./republieTelephone.js";
 import { numeroNeufPermis, lectureCompleteAnnonce, annoncesANumeroter, reserveEnDesaccord, marquerNouveau, marquerEcrit, aEcrireNouveaux, listeNumeros, demandesNumero, propositionNumero, modeNumerotation } from "./numerosNouvelles.js";
@@ -1473,8 +1473,11 @@ import './styles-mode-depot.css'; // (8 nov.) style de ./ModeDepot.jsx, gardé �
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
 import { CLE_NOUVEAUTES_VUES, CLE_NOUVEAU_FEUILLE } from './nouveautesCle.js';
-import { etapesBienDemarrer, bienDemarrerAMontrer, CLE_BIEN_DEMARRER, reglageMasque as reglageMasqueBD } from './bienDemarrer/regle.js';   // (21 nov., ux-reglages) « Bien démarrer 3/5 »
+import { etapesPremiereSemaine, preuvesTables, premiereSemaineAMontrer, semaineEnCours, lireReglageSemaine, reglageMasqueSemaine, reglageFinSemaine, nombreFaitesSemaine, CLE_PREMIERE_SEMAINE } from './premiereSemaine/regle.js';   // (24 nov., lot debutant) « Ta première semaine »
+import PremiereSemaine from './premiereSemaine/PremiereSemaine.jsx';
+import { etapesBienDemarrer, bienDemarrerAMontrer, CLE_BIEN_DEMARRER, DEBUT_BIEN_DEMARRER, reglageMasque as reglageMasqueBD } from './bienDemarrer/regle.js';   // (21 nov., ux-reglages) « Bien démarrer 3/5 »
 import BienDemarrer from './bienDemarrer/BienDemarrer.jsx';
+import Accompagnement from './bienDemarrer/Accompagnement.jsx';   // (23 nov., lot demarrage-guide) l'accompagnement animé, étape par étape
 // (20 nov., iphone-rapide) LA LISTE « QUOI DE NEUF » HORS DU DÉMARRAGE (src/nouveautes.js, ~20 Ko compressés) : la carte
 // ne se montre qu'une fois le nuage lu (`pret`, plus bas) ; la liste et ses règles arrivent avec le premier rendu du
 // crochet. Pas encore là ⇒ rien à montrer (le même « [] » qu'avant le nuage) ; les règles sont les MÊMES fonctions.
@@ -1553,7 +1556,9 @@ import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEc
 // (6 nov., vitesse 2) PrixPartout : à la demande (sa feuille de style est déjà plus haut).
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
 import EtatComptes from "./EtatComptes.jsx";   // (22 nov., style-clarte) la liste groupée des comptes (feuille d'état de l'extension)
-import { LogoSite as LogoSiteRang } from "./natif/LogoSite.jsx";   // (21 nov., prio-recherche) le logo du site sur chaque résultat de la recherche
+import { LogoSite as LogoSiteRang } from "./natif/LogoSite.jsx";
+import { PopEvenements } from "./natif/PopEvenements.jsx";
+import { GaleriePops } from "./natif/GaleriePops.jsx";   // (23 nov.) « Voir tous les pop-ups », propriétaire seulement   // (23 nov., Julien : « un beau pop-up ») la carte d'un événement qui arrive, app ouverte   // (21 nov., prio-recherche) le logo du site sur chaque résultat de la recherche
 import { viderNombresAnnonces } from "./plateformes/nombresAnnonces.js";   // (20 nov.) les nombres par site de `FiltreSites` (retiré) ne sont plus lus ici
 // (6 nov., vitesse 2) PublierAilleurs : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./styles-publier-ailleurs.css";
@@ -3942,6 +3947,7 @@ const SYNC_KEYS = [
   // (11 nov.) « Quoi de neuf » (src/nouveautes.js) : les nouveautés vues ({ vues: { [id]: iso } }), par compte VRM.
   CLE_NOUVEAUTES_VUES,
   CLE_NOUVEAU_FEUILLE,   // (21 nov., ux-reglages) la feuille « Nouveau » déjà montrée
+  CLE_PREMIERE_SEMAINE,   // (24 nov., lot debutant) « Ta première semaine » rangée (× ou les trois faites)
   CLE_BIEN_DEMARRER,   // (21 nov., ux-reglages) « Bien démarrer » masqué (son ×)
   // (8 nov.) « Plus tard » sur une étape du parcours ou la question de la numérotation : { [cle]: iso }, 7 jours.
   'vrm_parcours_plus_tard',
@@ -15715,9 +15721,10 @@ function CarteNumerosAEcrire() {
   const court = nums.length > 6 ? `N° ${nums.slice(0, 6).join(', ')} +${nums.length - 6}` : listeNumeros(nums);
   return (
     <Natif.Carte titre={tr('nn.carte.titre', { n: items.length })} attrs={{ 'data-numeros-a-ecrire-journee': String(items.length) }}>
-      <Natif.Rangee icone={<Icon name="tag" size={22}/>} titre={ouvert ? listeNumeros(nums) : court} lignes={ouvert ? 6 : 2} sousTitre={tr('nn.carte.sous')}
+      <Natif.Rangee icone={<Icon name="tag" size={22}/>} titre={ouvert ? listeNumeros(nums) : court} lignes={ouvert ? 6 : 2}
         valeur={nums.length > 6 ? tr(ouvert ? 'nn.carte.masquer' : 'nn.carte.voir') : null} onClick={nums.length > 6 ? () => setOuvert(!ouvert) : null} attrs={{ 'data-numeros-voir': ouvert ? '1' : '0', 'aria-expanded': nums.length > 6 ? (ouvert ? 'true' : 'false') : undefined }}/>
-      <Natif.Rangee titre={tr('nn.stock.ecrit')} onClick={() => { save(CLE_A_ECRIRE, { v: 1, items: [] }); setD({ v: 1, items: [] }); }} attrs={{ 'data-numeros-ecrits': 'journee' }}/>
+      {/* (23 nov., « pas assez de beaux boutons ») « C'est écrit » : un vrai bouton (icône + verbe), plus de phrase d'instruction. */}
+      <Natif.Actions elements={[{ cle: 'ecrit', icone: <Icon name="check" size={18}/>, libelle: tr('nn.stock.ecrit'), onClick: () => { save(CLE_A_ECRIRE, { v: 1, items: [] }); setD({ v: 1, items: [] }); }, attrs: { 'data-numeros-ecrits': 'journee' } }]}/>
     </Natif.Carte>
   );
 }
@@ -16477,6 +16484,7 @@ const ICON_PATHS = {
   // (15 nov.) « Nouveaux comptes » (le propriétaire) : un téléphone et la personne qui arrive.
   nouveauCompte: <><rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><circle cx="12" cy="10" r="2.4"/><path d="M8.6 16.4a3.6 3.6 0 0 1 6.8 0"/></>,
   ampoule: <><path d="M9.5 17.5h5"/><path d="M10.5 20.5h3"/><path d="M12 3.5a5.8 5.8 0 0 0-3.4 10.5c.6.5.9 1.1.9 1.8v.2h5v-.2c0-.7.3-1.3.9-1.8A5.8 5.8 0 0 0 12 3.5Z"/></>,
+  pile:   <><rect x="4" y="9" width="16" height="11" rx="3"/><path d="M6.5 6h11M9 3h6"/></>,   // (23 nov.) des cartes empilées : « Voir tous les pop-ups »
 };
 // Tuile d'icône façon réglages iOS : un carré arrondi teinté, une icône au
 // trait dedans. C'est ce détail qui sépare un écran de réglages d'une liste de
@@ -18163,7 +18171,7 @@ function Toaster() {
   }, []);
   React.useEffect(() => { if (!list.length) { raisons.current.survol = false; raisons.current.focus = false; suspendre(); } }, [list.length]);
   // (23 nov.) Un message court demandé par un module sans accès à `toast` (et par les bancs) : `vrm:toast` { texte }.
-  React.useEffect(() => { const f = (e) => { const t = e && e.detail && e.detail.texte; if (typeof t === 'string' && t.trim() && t.length <= 300) toast(t); }; window.addEventListener('vrm:toast', f); return () => window.removeEventListener('vrm:toast', f); }, []);
+  React.useEffect(() => { const f = (e) => { const t = e && e.detail && e.detail.texte; const ton = e && e.detail && ['ok','err','info'].includes(e.detail.ton) ? e.detail.ton : undefined; if (typeof t === 'string' && t.trim() && t.length <= 300) toast(t, ton); }; window.addEventListener('vrm:toast', f); return () => window.removeEventListener('vrm:toast', f); }, []);
   // (19 nov., fiche directe) Une fiche ouverte pose sa zone (src/natif/zoneMessages.js) : la pile s'y range DANS le flux, en
   // haut de la fiche — elle la pousse, elle ne la couvre jamais. Une feuille ouverte par-dessus garde la place d'avant (en haut).
   const zoneFiche = useZoneMessages();
@@ -21993,34 +22001,104 @@ function GuideDemarrageApp(props) {
   // une fois ce parcours fini (eBay à côté de Leboncoin, par exemple).
   const relierListe = sansVinted && aRelier.length > 0 ? <section className="vrm-choix-plateformes" data-guide-sites="" aria-label="Relier mes plateformes"><h2 style={{fontSize:17,margin:'0 0 8px'}}>Relie tes comptes</h2><p className="vrm-cp-note">Tes plateformes sont prêtes. Voici comment faire arriver tes données.</p><ul style={{fontSize:13,lineHeight:1.6,paddingLeft:18}}>{aRelier.map(id => <li key={id}><b>{nomPlateforme(id)}</b> : {id === 'ebay' ? 'Paramètres → Comptes eBay → Relier un compte.' : `ouvre ton compte sur ${id === 'leboncoin' ? 'leboncoin.fr' : 'vestiairecollective.com'} dans le navigateur avec l’extension VRM.`}</li>)}</ul><Bouton variante="secondaire" onClick={()=>props.onNav?.('settings')}>Ouvrir les paramètres</Bouton></section> : null;
   return <><LangueDetecteeCarte save={save}/><AlerteDejaRelie lire={lireLitigesVinted} comptes={props.comptes} contact={contactEmail()} onChangerCompte={changerCompteVrm} ou="journee"/>
-    <CarteParcoursApp comptes={props.comptes} plein={!!props.plein} sinon={relierListe}/></>;
+    {/* (24 nov., lot debutant) « Ta première semaine » à l'écran : elle porte LE geste ; pas de second parcours. */}
+    {props.sansParcours ? null : <CarteParcoursApp comptes={props.comptes} plein={!!props.plein} sinon={relierListe}/>}</>;
 }
 // (21 nov., ux-reglages — Julien : « Bien démarrer 3/5 avec barre, comme Bleam ») LA CARTE D'AUJOURD'HUI (src/bienDemarrer/) :
 // les PREUVES, lues par les chemins de toujours (aucune nouvelle requête) — l'extension de CE navigateur (`useExtVivante`),
 // la liste des comptes LUE, le dressing ou les ventes LUS, le pool de N°, le statut fiscal (`useRegimeFiscal`). Rien n'est
 // coché par un toucher. Le « × » range `vrm_bien_demarrer` (SYNC_KEYS). Julien (propriétaire, compte d'avant) ne la voit pas.
-function BienDemarrerApp({ comptes, comptesLus, lecture, numeros, onNav }) {
-  useLangue();
+// (24 nov., lot debutant) Les étapes de « Bien démarrer », sorties en hook : « Ta première semaine » ouvre le MÊME
+// accompagnement animé (src/bienDemarrer/Accompagnement.jsx) sur l'étape « extension » ou « compte ».
+function useEtapesBienDemarrer({ comptes, comptesLus, lecture, numeros }) {
   const proprio = useEstProprietaire();
   const ext = useExtVivante();
   const regime = useRegimeFiscal();
-  const [reglage, setReglage] = useStateCle(CLE_BIEN_DEMARRER, () => load(CLE_BIEN_DEMARRER, null));
   const nComptes = Array.isArray(comptes) ? comptes.length : null;
+  // (23 nov., lot demarrage-guide) Un compte Leboncoin, Vestiaire ou eBay relié compte aussi (lu par le chemin de
+  // Paramètres → Mes comptes, seulement pour un compte NOUVEAU : jamais pour le propriétaire) ; l'accompagnement ouvert.
+  const nouveauCompte = proprio === false && String((AUTH.user && AUTH.user.created_at) || '').slice(0, 10) >= DEBUT_BIEN_DEMARRER;
+  const [autresLus] = useComptesAutresSites(nouveauCompte);
+  const listes = [autresLus.leboncoin, autresLus.vestiaire, autresLus.ebay];
+  const autres = listes.some((x) => Array.isArray(x) && x.length > 0) ? true : listes.every((x) => Array.isArray(x)) ? false : null;
   const etapes = etapesBienDemarrer({
     extension: ext.present ? true : null,
-    comptes: comptesLus ? nComptes > 0 : null,
-    lecture: comptesLus && nComptes === 0 ? false : lecture,
+    comptes: comptesLus ? nComptes > 0 : null, autres,
+    lecture: comptesLus && nComptes === 0 ? (autres === true ? true : false) : lecture,
     numeros, fiscal: regime === undefined ? null : regime != null,
   }).map((e) => (e.cle === 'lecture' && e.etat !== 'fait' && nComptes === 0 ? { ...e, etat: 'afaire', attente: 'uxr.bd.lectureAttend' } : e.cle === 'lecture' && e.etat !== 'fait' && nComptes > 0 ? { ...e, attente: 'uxr.bd.enCours' } : e.cle === 'extension' && e.etat === 'passu' ? { ...e, etat: 'afaire' } : e));
+  return { etapes, proprio, autres, nComptes };
+}
+const allerEtapeBienDemarrer = (onNav, cle) => {
+  if (!onNav) return;
+  if (cle === 'extension' || cle === 'lecture') return onNav('extension');
+  if (cle === 'compte') return onNav('vintedaccounts');
+  if (cle === 'numeros') return onNav('annonces');
+  if (cle === 'fiscal') { DEMANDE_REGLAGE_SOUS.id = 'regime'; onNav('settings'); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} }, 60); }
+};
+function BienDemarrerApp({ comptes, comptesLus, lecture, numeros, onNav }) {
+  useLangue();
+  const { etapes, proprio } = useEtapesBienDemarrer({ comptes, comptesLus, lecture, numeros });
+  const [reglage, setReglage] = useStateCle(CLE_BIEN_DEMARRER, () => load(CLE_BIEN_DEMARRER, null));
+  const [guide, setGuide] = React.useState(null);
   if (!bienDemarrerAMontrer({ etapes, reglage, proprietaire: proprio, inscritLe: AUTH.user && AUTH.user.created_at, exemple: exempleActif() })) return null;
-  const allerA = (cle) => {
-    if (!onNav) return;
-    if (cle === 'extension' || cle === 'lecture') return onNav('extension');
-    if (cle === 'compte') return onNav('vintedaccounts');
-    if (cle === 'numeros') return onNav('annonces');
-    if (cle === 'fiscal') { DEMANDE_REGLAGE_SOUS.id = 'regime'; onNav('settings'); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} }, 60); }
+  const allerA = (cle) => allerEtapeBienDemarrer(onNav, cle);
+  return <>
+    <BienDemarrer etapes={etapes} Icon={Icon} onEtape={allerA} onGuider={setGuide} onMasquer={() => { const v = reglageMasqueBD(); save(CLE_BIEN_DEMARRER, v); setReglage(v); }}/>
+    {guide ? <Accompagnement ouverte Icon={Icon} etapes={etapes} cle={guide} setCle={setGuide} nav={boutiqueIci().nav} mobile={mobileIci()}
+      onGeste={(cle) => { setGuide(null); allerA(cle); }} onFermer={() => setGuide(null)}/> : null}
+  </>;
+}
+// ── « TA PREMIÈRE SEMAINE » (24 nov., lot debutant) ──────────────────────────────────────────────────────────
+// Julien : « imagine un débutant achat-revente qui ne connaît pas du tout le site ». UNE carte en tête d'Aujourd'hui,
+// trois étapes prouvées (src/premiereSemaine/regle.js) : relier son compte, noter un prix d'achat, numéroter une paire.
+// Les preuves, par les chemins de toujours (aucune requête neuve) : la liste des comptes LUE par la coque (+ les autres
+// sites, déjà lus par « Bien démarrer » pour un compte neuf), les tables synchronisées des fiches. Tant qu'elle est là,
+// elle REMPLACE les autres cartes de démarrage (rendu `sinon(actif)`), et les visites en bulles attendent
+// (`semaineEnCours`, src/accueilReste/AccueilReste.jsx). « Me guider » ouvre l'accompagnement de « Bien démarrer ».
+// `carte={false}` : seulement le relais `sinon(actif)` (la carte est déjà posée plus haut sur l'écran).
+function usePremiereSemaine({ comptes, comptesLus }) {
+  const [, maj] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (!k || ['vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_vc_numeros', CLE_PREMIERE_SEMAINE].includes(k)) maj(); };
+    window.addEventListener('vrm:save', f);
+    const off = onCloudReady(maj);
+    return () => { window.removeEventListener('vrm:save', f); if (typeof off === 'function') off(); };
+  }, []);
+  const pret = isCloudReady();
+  const bd = useEtapesBienDemarrer({ comptes, comptesLus, lecture: null, numeros: null });
+  const tables = preuvesTables(pret ? { fiches: load('vinted_annonce_numeros', {}), parNum: load('vinted_buyprice_by_num', {}), vc: load('vrm_vc_numeros', {}) } : {});
+  const compte = comptesLus && Array.isArray(comptes) ? (comptes.length > 0 || bd.autres === true ? true : bd.autres === false ? false : (comptes.length > 0 ? true : false)) : null;
+  const etapes = etapesPremiereSemaine({ compte, prix: tables.prix, numero: tables.numero });
+  const reglage = pret ? load(CLE_PREMIERE_SEMAINE, null) : { masque: 'pas-pret' };
+  const actif = pret && premiereSemaineAMontrer({ etapes, reglage: lireReglageSemaine(reglage), proprietaire: bd.proprio, creeLe: AUTH.user && AUTH.user.created_at, exemple: exempleActif() });
+  return { actif, etapes, bd, nFaites: nombreFaitesSemaine(etapes) };
+}
+function PremiereSemaineApp({ comptes, comptesLus, onNav, carte = true, sinon = null }) {
+  useLangue();
+  const { actif, etapes, bd, nFaites } = usePremiereSemaine({ comptes, comptesLus });
+  const [guide, setGuide] = React.useState(null);
+  // Les trois faites sous ses yeux : rangé « fin » (la carte ne revient plus, sur aucun appareil).
+  React.useEffect(() => {
+    if (!carte || !isCloudReady() || nFaites < etapes.length) return;
+    const r = lireReglageSemaine(load(CLE_PREMIERE_SEMAINE, null));
+    if (!r && semaineEnCours({ creeLe: AUTH.user && AUTH.user.created_at, proprietaire: bd.proprio, exemple: exempleActif() })) save(CLE_PREMIERE_SEMAINE, reglageFinSemaine());
+  }, [carte, nFaites]); // eslint-disable-line react-hooks/exhaustive-deps
+  const suite = typeof sinon === 'function' ? sinon(actif) : null;
+  if (!carte || !actif) return suite;
+  const geste = (cle) => {
+    if (cle === 'compte') { const e = bd.etapes.find((x) => (x.cle === 'extension' || x.cle === 'compte') && x.etat !== 'fait'); setGuide(e ? e.cle : 'compte'); return; }
+    if (onNav) onNav('annonces');
   };
-  return <BienDemarrer etapes={etapes} Icon={Icon} onEtape={allerA} onMasquer={() => { const v = reglageMasqueBD(); save(CLE_BIEN_DEMARRER, v); setReglage(v); }}/>;
+  const sansCompte = Array.isArray(comptes) && comptes.length === 0 && bd.autres !== true;
+  return <>
+    <PremiereSemaine etapes={etapes} Icon={Icon} Mot={Mot} onGeste={geste}
+      onMasquer={() => save(CLE_PREMIERE_SEMAINE, reglageMasqueSemaine())}
+      onExemple={sansCompte && !bacASableEtape() ? () => entrerModeExemple() : null}/>
+    {guide ? <Accompagnement ouverte Icon={Icon} etapes={bd.etapes} cle={guide} setCle={setGuide} nav={boutiqueIci().nav} mobile={mobileIci()}
+      onGeste={(cle) => { setGuide(null); allerEtapeBienDemarrer(onNav, cle); }} onFermer={() => setGuide(null)}/> : null}
+    {suite}
+  </>;
 }
 // ── LE PARCOURS D'UN NOUVEAU, BRANCHÉ (15 nov., src/parcoursNouveau/) ───────────
 // Les PREUVES de chaque étape, lues par les chemins de toujours (aucune nouvelle requête
@@ -32557,6 +32635,8 @@ function lireProprietaire() {
 }
 // `true` seulement si la base (ou, en panne, la dernière lecture de cet
 // appareil) dit propriétaire ; `false` sinon — y compris pendant la lecture.
+// (23 nov.) La galerie des pop-ups : montée pour le PROPRIÉTAIRE de l'installation seulement (rien d'autre ne l'écoute).
+function GaleriePopsCoque() { const proprio = useEstProprietaire(); return <GaleriePops autorise={proprio === true} Icon={Icon}/>; }
 function useEstProprietaire() {
   const uid = (AUTH.user && AUTH.user.id) || '';
   const [v, setV] = useState(() => (PROPRIO_ETAT.uid === uid && typeof PROPRIO_ETAT.v === 'boolean') ? PROPRIO_ETAT.v : proprietaireMemorise(uid) === true);
@@ -33539,7 +33619,7 @@ export default function App() {
   //    double vérification) restaient CLAIRS dans une app réglée en sombre —
   //    sur un document déjà sombre (index.html lit `vinted_dark`). Même source.
   // (8 nov.) Le mode CHOISI (Clair · Sombre · Automatique · Le soir, src/apparence.js) : la même règle.
-  C = sombreEffectif(apparenceDe(load('vrm_apparence', null), load('vinted_dark', false)), { systemeSombre: systemeSombreMaintenant() }) ? THEMES.dark : THEMES.light;
+  C = sombreEffectif(apparenceDe(load('vrm_apparence', null), load('vinted_dark', null)), { systemeSombre: systemeSombreMaintenant() }) ? THEMES.dark : THEMES.light;
   // (14 nov., lot 120) Le lien temporaire de l'aide : sa page, SANS compte, en lecture seule (api/_lib/lien-aide.js).
   if (LIEN_AIDE_JETON) return <VueLienAide jeton={LIEN_AIDE_JETON}/>;
   if (MULTI_USER && !authState.ready) return <div data-demarrage-attente="" style={{minHeight:'100vh',background:C.bg}}/>;
@@ -34704,7 +34784,7 @@ function AppCoeur() {
     window.addEventListener('vrm:aller',onAller);
     return ()=>{ window.removeEventListener('vrm:aller',onAller); if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',onMsg); };
   },[]);
-  const [choixSombre,setChoixSombre]=useStateCle('vinted_dark', ()=>load('vinted_dark',false));
+  const [choixSombre,setChoixSombre]=useStateCle('vinted_dark', ()=>load('vinted_dark',null));   // (23 nov.) null = jamais choisi ⇒ sombre par défaut (src/apparence.js)
   // (8 nov., « beauté ») L'APPARENCE CHOISIE : Clair · Sombre · Automatique (le système) · Le soir
   // (19 h–7 h). `vrm_apparence` absent ⇒ le choix d'avant (`vinted_dark`), rien ne change pour lui.
   // La règle (src/apparence.js) est la même que celle du script de démarrage (aucun flash) ;
@@ -34785,6 +34865,23 @@ function AppCoeur() {
   const [cellColors,setCellColors]=useStateCle('vinted_colors', ()=>load('vinted_colors',{}));
   const [invoices,setInvoices]=useStateCle('vinted_invoices', ()=>load('vinted_invoices',[]));
   const [vintedAccounts,setVintedAccounts]=useState([]);
+  // (23 nov.) La photo d'une carte d'événement (src/natif/PopEvenements.jsx) PAR IDENTITÉ seulement : le n° de transaction de
+  // son adresse (`tx`, ventes puis achats des comptes) ou son n° de conversation (`conv`, la boîte du compte `compte`) — les
+  // copies déjà captées (aucun appel à Vinted) ; rien trouvé ⇒ `null`, la carte garde l'icône.
+  const comptesPhotoRef=useRef([]); comptesPhotoRef.current=vintedAccounts;
+  const photoEvenement=React.useCallback(async (e)=>{
+    try{
+      const q=new URLSearchParams(String((e&&e.url)||'').split('?')[1]||'');
+      const tx=q.get('tx'), conv=q.get('conv'), compte=q.get('compte');
+      if(!tx&&!conv) return null;
+      const uids=compte&&/^\d{1,20}$/.test(compte)?[compte]:(comptesPhotoRef.current||[]).map(a=>String(a&&a.vinted_user_id||'')).filter(u=>/^\d{1,20}$/.test(u)).slice(0,20);
+      for(const uid of uids){
+        if(tx) for(const cote of ['sold','purchased']){ const p=await fetchHarvestOrders(uid,cote); const o=(p&&Array.isArray(p.my_orders)?p.my_orders:[]).find(x=>x&&String(x.transaction_id)===tx); if(o){ const u=orderPhoto(o); if(u) return u; } }
+        if(conv){ const h=await fetchHarvest(uid,'inbox'); const c=(h&&Array.isArray(h.conversations)?h.conversations:[]).find(x=>x&&String(x.id)===conv); if(c){ const u=photoArticle({photos:c.item_photos}); if(u) return u; } }
+      }
+    }catch(_){}
+    return null;
+  },[]);
   const [accountLabels]=useStateCle('vinted_account_labels', ()=>load('vinted_account_labels',{}));
   const [inventory,setInventory]=useStateCle('vinted_inventory', ()=>load('vinted_inventory',[]));
   // §5.49 : inventaire synchronisé lu au montage → froid sur un appareil neuf.
@@ -38689,6 +38786,8 @@ function AppCoeur() {
       {/* (20 nov., Julien : « même les écrans de chargement sont atroces ») Plus de barre bleue de progression en haut : elle
           restait à 80 % tant qu'UNE lecture traînait (4G) et faisait « site web ». Le compteur `onBusy` reste (diagnostic). */}
       <Toaster/>
+      {AUTH.user && <PopEvenements Icon={Icon} photoDe={photoEvenement}/>}
+      {AUTH.user && <GaleriePopsCoque/>}
       {/* (11 nov., lot centre-aide) L'aide ouverte depuis la loupe. Rien ne s'ouvre seul. */}
       <CentreAide/>
       <PiluleAnnulerCoque/>
@@ -38781,7 +38880,8 @@ function AppCoeur() {
         paddingBottom: ordi ? 40 : 20}, 'data-n-volets': troisVolets ? 'trois' : undefined }}>
         <Natif.ContexteCoque.Provider value={contexteCoque}>
         {/* (19 nov.) Ventes (À envoyer, En route) porte SA recherche — N°, titre, acheteur, scanner dans le champ — : une seule à l'écran. */}
-        {(!ordi || ECRANS_NATIFS.has(tab) || tab === 'journee') && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sansRecherche={(tab === 'ventes' && ongletColis !== 'toutes') || ECRANS_AVEC_RECHERCHE.has(tab) || (tab === 'compta' && platSub === 'factures')} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
+        {/* (23 nov.) À l'ordinateur, Aujourd'hui a SON en-tête (titre, date, « Mis à jour », relire, loupe, cloche : src/natif/ecrans/Aujourdhui.jsx) : la coque n'en pose pas un second. */}
+        {(!ordi || ECRANS_NATIFS.has(tab)) && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sansRecherche={(tab === 'ventes' && ongletColis !== 'toutes') || ECRANS_AVEC_RECHERCHE.has(tab) || (tab === 'compta' && platSub === 'factures')} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
           rechercheOuverte={gsOpen} ouvrirRecherche={ouvrirRecherche} scanner={()=>ouvrirRetrouver('disque')} streamVisible={!!reglesStream.bouton}
           // (11 nov., gardé le 19 nov.) L'APPUI LONG sur le champ de recherche ouvre la loupe ET écoute (dictée, sans clé) ;
           // le relâcher ne la referme pas. Mêmes gestes que l'ancienne loupe de l'en-tête, posés sur le champ natif.
@@ -39310,7 +39410,7 @@ export { oublierReglageMontage };   // (11 nov., intégration) la lecture gardé
 // // (16 nov., lot tampons-parametres)
 export { poserPresentation, usePresentation };
 export { annoncerFicheAPublier, sortieCaseStock, texteAvecDescentes, pushNotif, ANNONCES_RETIREES, AUTH_REDIRECT, RECHERCHE_OUVERTURE, BUILD_ID, Badge, BrandMark, Btn, CE_QUE_VOIT_UN_MEMBRE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_LBC_CIBLE, DEMANDE_REGLAGE_SOUS, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, INVENTAIRE_FEUILLE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, EQUIPE_NON_INSTALLE_TXT, EbayCommande, FiltresVentes, GuideReglage, IMPR_MODES, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, NOM_PLAT_STOCK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVc, PiedSansEnvoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, RapidesConv, RecapFrise, SEL_EBAY_ANNONCES, SUPABASE_KEY, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, URL_ITEM_EBAY, ZOOM_KEY, __vmrNotifier, _failedLocalSaves, _fichesEbayMemo, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aRetirerDeLbcEbay, aRetirerDeLbcVinted, actionEquipe, ageCourtVc, allerComptesEbay, annonceLbcALui, applyZoom, authSetPassword, authSignOut, avecRetour, beneficeDesJours, beneficeDuMoisPub, brouillonsParametres, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, comptaChargesMois, compteEcarte, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesStockEcartes, contexteSignalement, EcrireSupportFeuille, dansVueEbay, dateCourteVc, debutPeriode, decalerPeriode, delaiDemandeEmail, demanderQuestionRepub, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, doublesVenteEbay, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireLigneAccompagnement, estRelaisApple, etatEnClair, eurEbay, extEnRetard, fetchHarvestOrders, fetchProInvoices, fetchVintedAccounts, fichesPourEbay, fmtDate, ilYaBr, ilYaCourt, imprimanteChoisie, jumellesParPhoto, lbcDescription, lbcEuro, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, lienEbay, lignesRecu, lireAbonnement, lireAchatsLies, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDressings, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireModelesRanges, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireVentesVestiaire, logoFacture, makeChallenge, makeVerifier, mapMailError, marquerEbay, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, nomAppareil, numerosDejaVendus, numerosVendusEbay, numerosVendusVc, onSyncChange, ouVenduesTexte, ouvrirRecherchePhoto, ouvrirStripe, placeDansMeubles, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prixLisible, providerEnabled, questionRepubOk, readZoom, rechercheParNumero, recuAvecADater, refLbcPresente, regleEngage, reglesEngagees, repondreSansDepenses, reponsesRapidesPartagees, retraitsEbayAutoPermis, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, texteCentimesRecu, textePerime, texteReglesQuiRestent, tod, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useRegimeFiscal, useReglesStream, useSecondesRestantes, useStream, useVentesCoque, useVentesVestiaire, useMotsArticle, useExemplesVendeur, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcSetter, verifierAvantPublication, vmrAuthEtat, writeSession, xmlEsc, ymCompta, ymCourant, zoneEtiquette, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, DEMANDE_RETOUR_EBAY, seDeconnecter, ecrireCopieLocale, verifierMessageAvantEnvoi, demanderActionAnnonces, confirmerOffresAuto };
-export { BienDemarrerApp };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
+export { BienDemarrerApp, PremiereSemaineApp };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { RepriseAppareil };   // (22 nov., choix n° 23) lu par ecrans/Comptabilite.jsx (Aujourd'hui)
 export { NET_VENTES };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { CLE_FORFAIT_EMBALLAGE };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx

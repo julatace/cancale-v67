@@ -22,6 +22,8 @@ import { etatLienLu, propositionLu, relierDepuisListe, queSurCeSite, ouvrirLiais
 import React from 'react';
 import { lazySur } from '../chargementSur.js';
 import { tr } from '../i18n/index.js';
+import { Mot } from '../accueilReste/AccueilReste.jsx';   // (24 nov., lot debutant) le « N° » qui s'explique au toucher
+import { Pourquoi as PourquoiAE } from '../natif/Actions.jsx';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
 import { Bouton as BoutonNatifAE } from '../natif/Bouton.jsx';   // (21 nov., ux-reglages) le geste de l'état vide
 import { LogoSite } from '../SelecteurSites.jsx';   // (20 nov.) le logo du site dans l'en-tête de chaque compte
@@ -508,9 +510,16 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     lot: (ls) => { const cles = ls.filter((l) => l && l.prop && l.prop.niveau === 'sur').map((l) => `${l.site}:${l.id}`); if (cles.length) ouvrirLiaison({ vue: 'lot', cles }); },
     Photo: (src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>,
   };
+  // (24 nov., lot debutant) Des annonces arrivées, AUCUNE n'a encore de N° (sur tous ses sites) : le mot expliqué en une ligne
+  // (le « N° » se touche : sa définition), le détail et le geste sous « Pourquoi ? ». Disparaît dès le premier N° posé.
+  const tous = modele && Array.isArray(modele.articles) ? modele.articles : null;
+  const sansAucunNumero = !!tous && tous.length > 0 && !tous.some((a) => a && a.numero);
   return (
     <>
-    <VueAnnonces priorite={priorite} photoDouble={photoDouble} plusVueDe={plusVueDe} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={(s) => <LogoSite site={s}/>} dortDe={dortDe} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>}
+    <VueAnnonces avant={sansAucunNumero ? <div className="vrm-ann-debutant" data-mot-explique="numero" data-ann-sans-numero={tous.length}>
+      <p>{tr('ann.deb.avant')} <Mot k="numero"/> {tr('ann.deb.apres')}</p>
+      <PourquoiAE attrs={{ 'data-ann-deb-pourquoi': '' }}>{tr('ps.numero.pourquoi')} {tr('ann.deb.geste')}</PourquoiAE>
+    </div> : null} priorite={priorite} photoDouble={photoDouble} plusVueDe={plusVueDe} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={(s) => <LogoSite site={s}/>} dortDe={dortDe} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>}
       onCompleter={(sujet) => { try { window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet, num: '', lot: false, at: Date.now() } })); } catch (_) {} }} liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
