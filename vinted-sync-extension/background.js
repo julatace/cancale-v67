@@ -43387,6 +43387,9 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
   // (1er nov., 5.296) Le tableau de bord pro qui rend `Ads: []` (Total 0) est une
   // liste VIDE, pas un format inconnu.
   if(/\/classifieds\/analysis\/list/i.test(String(url||''))&&data&&Array.isArray(data.Ads)&&data.Ads.length===0)return {ok:true,etat:'liste-vide',nombre:0,photos:0};
+  // 5.448 (`adaptatif`) : SA liste « Mes annonces » d'une forme que VRM ne reconnaît plus : rien n'est rangé (ci-dessus),
+  //    la forme est dans `lbc_recon` ; le compteur rend la panne visible dans le diagnostic (comme `forme_inconnue_*` sur Vinted).
+  if (listeMoi) noterDiag('lbc_forme_inconnue_mes_annonces');
   return {ok:true,etat:'aucune-annonce-reconnue',nombre:0,photos:0};
 }
 // Télécharge les photos d'une paire en FICHIERS (fini les onglets). Rangées dans
