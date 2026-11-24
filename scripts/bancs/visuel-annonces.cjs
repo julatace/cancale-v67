@@ -55,7 +55,7 @@ const servir = () => new Promise((ok) => { const s = http.createServer((req, res
   const u = decodeURIComponent(req.url.split('?')[0]);
   const ph = /^\/photo\/(\d+)\.svg$/.exec(u);
   if (ph) { const i = Number(ph[1]); setTimeout(() => { res.writeHead(200, { 'content-type': 'image/svg+xml', 'cache-control': 'no-store' });
-    res.end(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="hsl(${(i * 47) % 360},14%,${55 + (i % 4) * 6}%)"/><ellipse cx="200" cy="250" rx="150" ry="60" fill="hsl(${(i * 47 + 180) % 360},16%,32%)"/><text x="20" y="40" font-size="28" fill="#fff">${i}</text></svg>`); }, RETARD); return; }
+    res.end(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="hsl(${(i * 47) % 360},14%,${55 + (i % 4) * 6}%)"/><ellipse cx="200" cy="250" rx="150" ry="60" fill="hsl(${(i * 47 + 180) % 360},16%,32%)"/></svg>`); }, RETARD); return; }
   if (/^\/brands\//.test(u)) { res.writeHead(200, { 'content-type': 'image/svg+xml' }); res.end('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle cx="5" cy="5" r="5"/></svg>'); return; }
   const f = path.join(DOSSIER, u === '/' ? 'index.html' : u.replace(/^\/+/, ''));
   if (!f.startsWith(DOSSIER) || !fs.existsSync(f)) { res.writeHead(404); res.end(); return; }
@@ -75,6 +75,7 @@ const MESURE = () => {
   const cartes = [...document.querySelectorAll('[data-ad-carte][data-eg-article]')];
   r.nCartes = cartes.length; r.nVisibles = cartes.filter((c) => vis(c.getBoundingClientRect())).length;
   const g = document.querySelector('[data-inv-grille]'); r.grille = !!g; r.nGrille = g ? Number(g.getAttribute('data-inv-n')) : 0; r.hGrille = g ? Math.round(g.getBoundingClientRect().height) : 0;
+  r.logosRepetes = document.querySelector('[data-eg-groupe]') ? cartes.filter((c) => c.querySelectorAll('.n-ad-ligne .n-logo-site, .n-ad-ligne [data-logo]').length === 1).length : 0;
   r.tuiles = cartes.filter((c) => c.querySelector('.n-tuile-paire')).length; r.avatars = cartes.filter((c) => c.querySelector('[data-inv-avatar]')).length; r.pastilles = cartes.filter((c) => c.querySelector('.n-inv-stat')).length;
   r.carres = cartes.slice(0, 12).map((c) => { const b = (c.querySelector('.n-ad-photo') || c).getBoundingClientRect(); return Math.abs(b.width - b.height) <= 1.5 ? 1 : Math.round(b.width) + 'x' + Math.round(b.height); });
   const att = window.__attendu || {};
@@ -156,7 +157,8 @@ async function cas(nav, nom, opts, theme) {
   const cls = await pg.evaluate(() => window.__cls);
   dit(erreurs.length === 0, `aucune erreur de page`, erreurs);
   dit(m.grille && m.nCartes > 0 && m.nCartes < Math.min(N, 200) && m.hGrille > 1000, `G grille virtualisée : ${m.nCartes} cartes montées sur ${m.nGrille} (hauteur réservée ${m.hGrille} px)`, m);
-  dit(m.tuiles === m.nCartes && m.avatars === m.nCartes && m.pastilles > m.nCartes / 2, `G tuiles d'inventaire (${m.tuiles}) · ronds de compte (${m.avatars}) · pastilles vues/favoris (${m.pastilles})`);
+  // Le compte est dit UNE fois : dans l'intertitre au téléphone (liste rangée par compte), sur la tuile à l'ordinateur (non rangée).
+  dit(m.tuiles === m.nCartes && m.avatars === (nom === 'tel' ? 0 : m.nCartes) && m.pastilles > m.nCartes / 2 && m.logosRepetes === 0, `G tuiles d'inventaire (${m.tuiles}) · ronds de compte sur les tuiles (${m.avatars}, ${nom === 'tel' ? 'aucun : dit dans l\'intertitre' : 'une par tuile'}) · vues/favoris dans la bande (${m.pastilles}) · logo de site répété ${m.logosRepetes}`, m.avatars);
   dit(m.carres.every((x) => x === 1), `G photos carrées`, m.carres);
   dit(m.identite.length === 0, `I chaque carte montre la photo de SON identifiant (${m.nCartes} vérifiées)`, m.identite.slice(0, 4));
   // Le leurre : on défile jusqu'à voir ses deux cartes (la grille est virtualisée : elles ne sont montées que près de l'écran).

@@ -24,7 +24,6 @@
   .n-inv-photo .n-tuile-vide { border-radius: 0; }
   /* L'étiquette du N° : un peu plus grande sur une tuile d'inventaire, posée en bas à gauche, sans sortir de la carte. */
   .n-inv-photo .n-tuile-paire > .n-etiq { left: 8px; bottom: 10px; font-size: 14px; line-height: 18px; padding: 2px 8px 2px 14px; }
-  .n-inv-photo > .n-inv-plaque { position: absolute; left: 8px; bottom: 10px; z-index: 3; }
 
   /* Les ronds des comptes (en haut à droite) — teintés par identité, jamais orange. */
   .n-inv-avatars { position: absolute; top: 8px; right: 8px; z-index: 3; display: inline-flex; flex-direction: row-reverse; }
@@ -38,14 +37,19 @@
   .n-inv-avatar-plus { --n-av: var(--n-carte); color: var(--n-encre); font-size: 11px; }
   .n-inv-avatar-petit { width: 20px; height: 20px; font-size: 10px; }
 
-  /* Vues et favoris : deux pastilles « verre » en bas à droite, le nombre à côté de l'icône. */
-  /* (empilées : l'étiquette du N° garde toute la largeur du bas, même sur une tuile de 170 px) */
-  .n-inv-stats { position: absolute; right: 8px; bottom: 10px; z-index: 3; display: inline-flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-  .n-inv-stat { display: inline-flex; align-items: center; gap: 3px; height: 22px; padding: 0 7px 0 6px; border-radius: 11px; font: 600 12px/1 var(--n-police); font-variant-numeric: tabular-nums;
-    color: #1D1D1F; background: rgb(255 255 255 / .92); box-shadow: 0 1px 3px rgb(0 0 0 / .16); }
+  /* (24 nov., retouches) La BANDE claire du bas de la photo : l'étiquette du N° à gauche, vues et favoris à droite en texte
+     + icône. Elle ne pose rien SUR la chaussure (au milieu de la photo) ; verre clair le jour, gris profond la nuit. */
+  .n-inv-bande { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; height: 32px; padding: 0 8px; display: flex; align-items: center; gap: 6px;
+    background: rgb(255 255 255 / .86); box-shadow: 0 -.5px 0 rgb(29 29 31 / .08); }
+  :root[data-theme="dark"] .n-inv-bande { background: rgb(28 28 30 / .84); box-shadow: 0 -.5px 0 rgb(255 255 255 / .08); }
+  .n-inv-bande > .n-etiq { flex: none; font-size: 13px; line-height: 16px; }
+  .n-inv-espace { flex: 1 1 auto; min-width: 0; }
+  .n-inv-stats { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+  .n-inv-stat { display: inline-flex; align-items: center; gap: 3px; font: 600 12px/1 var(--n-police); font-variant-numeric: tabular-nums; color: #1D1D1F; }
   .n-inv-stat svg { flex: none; color: #3D4B5B; }
-  :root[data-theme="dark"] .n-inv-stat { color: #F4F4F5; background: rgb(28 28 30 / .82); }
+  :root[data-theme="dark"] .n-inv-stat { color: #F4F4F5; }
   :root[data-theme="dark"] .n-inv-stat svg { color: #C9D2DE; }
+  .n-inv-bande > .n-inv-plaque { position: static; flex: none; }
 
   /* L'état, calme : en haut à gauche, une pastille seulement quand ce n'est pas « en ligne ». */
   .n-ad-carte.n-inv .n-ad-bandeau { left: 8px; right: auto; top: 8px; bottom: auto; max-width: calc(100% - 56px); padding: 3px 9px; border-radius: 11px; font: 600 12px/16px var(--n-police);

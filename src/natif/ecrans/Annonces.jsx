@@ -319,7 +319,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   const articleGestes = gestesDe ? liste.find((x) => x.cle === gestesDe) || null : null;
   const gestesOuverts = articleGestes ? lesGestes(articleGestes) : [];
   const carte = (a, cleCompte, rv = null) => (
-    <CarteAnnonce key={a.cle + '|' + cleCompte} a={a} revele={rv} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon}
+    <CarteAnnonce key={a.cle + '|' + cleCompte} a={a} revele={rv} groupe onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon}
       Photo={Photo} dort={dortDe && !A ? dortDe(a) : null} plusVue={plusVueDe && !A ? plusVueDe(a) : null}
       selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), onBascule: () => basculer(a) } : null}
       attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined, 'data-eg-compte': cleCompte }}/>
