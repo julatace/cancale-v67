@@ -1,5 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { liensLbcLus } from '../App.jsx';   // (24 nov., lot lbc-numero-ecrit) les liens Leboncoin LUS (+ le N° écrit en fin de description, src/lbcNumeroEcrit.js)
 import { ordreRecent, quandEbay } from '../ordreRecent.js';
 import DansFiche, { useLigneIci } from '../DansFiche.jsx';
 import { attrsFicheLigne, ouvrirLigne } from '../ficheLigne.js';
@@ -4351,7 +4352,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     autres: Object.values(brouillons && typeof brouillons === 'object' ? brouillons : {}).map((d) => d && { numero: d.numero, id: d.pairId }),
     enLigne,
     vendusVinted, commandes, ventesLbc, itemsLbc: lbcItems,
-    liensLbc: load('vrm_lbc_liens', {}) || {}, ventesVc: ventesVcDv,
+    liensLbc: liensLbcLus(), ventesVc: ventesVcDv,
   }), [fiches, brouillons, enLigne, vendusVinted, commandes, ventesLbc, lbcItems, ventesVcDv]);
   // Une vente Leboncoin qui ne se relie pas sans son annonce : on lit les
   // annonces (une fois par session, comme le tableau de bord) — `null` = pas su.

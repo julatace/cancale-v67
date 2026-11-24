@@ -26,6 +26,8 @@
 // ══════════════════════════════════════════════════════════════════════════
 import { construireLiaison, compteurLiaison, propositionsDe, opsRelier, opsRelierLot, opsDelier, opsPlusTard, opsPropre, opsGarder, appliquerSurCartes, verifierLien, cleAnnonce, CLE_LIAISON, CLES_LIENS } from './liaisonSites.js';
 
+import { PREUVE_NUMERO_ECRIT, cleNonEcrit } from './lbcNumeroEcrit.js';
+
 export const DUREE_ANNULER_LIEN = 10000;   // ms : « Annuler » reste 10 s après un lien (puis « Délier », depuis l'annonce ou la fiche)
 
 export function creerLiaison(deps) {
@@ -85,6 +87,19 @@ export function creerLiaison(deps) {
     return { ok: true, faits: r.faits, restes: r.restes };
   }
   function delier({ annonce } = {}) {
+    // (24 nov., lot lbc-numero-ecrit) Reliée par le N° ÉCRIT à la fin de sa description (aucun lien posé) : « Délier » =
+    // « pas la même paire » pour CE N°, retenu dans le journal (`nonEcrit:Leboncoin:<id>`) — sinon la lecture la referait.
+    // Annulable 10 s comme un lien ; un autre N° écrit plus tard se relit (seul CE N° est écarté).
+    const parEcrit = annonce && annonce.plateforme === 'Leboncoin' && Array.isArray(annonce.identites) ? annonce.identites.find((i) => i && i.sorte === PREUVE_NUMERO_ECRIT && i.numero) : null;
+    if (parEcrit) {
+      const C = cartes();
+      if (!C.lbc || !C.journal) return { refus: 'pas-su' };
+      if (!Object.prototype.hasOwnProperty.call(C.lbc, String(annonce.id))) {
+        const k = cleNonEcrit(String(annonce.id)), n = cleNum(parEcrit.numero);
+        jouer(tr('lia.fait.delie', { numero: n }), [{ k: CLE_LIAISON, type: 'cle', id: k, apres: { numero: n, at: new Date().toISOString() }, avant: C.journal[k] }]);
+        return { ok: true, numero: n };
+      }
+    }
     const r = opsDelier({ annonce, cartes: cartes(), cle: cleNum });
     if (!r.ops) return r;
     jouer(tr('lia.fait.delie', { numero: r.numero }), r.ops);

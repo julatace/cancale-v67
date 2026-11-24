@@ -1,4 +1,5 @@
 import { PlateformesSetting } from '../App.jsx';
+import { liensLbcLus } from '../App.jsx';   // (24 nov., lot lbc-numero-ecrit) les liens Leboncoin LUS (+ le N° écrit en fin de description, src/lbcNumeroEcrit.js)
 import { fusion3 } from '../fusionNuage.js';
 import { modifierLigneCas, ecrireDifference } from '../ligneCas.js';
 import { signalDelai } from '../compatSafari.js';
@@ -4416,7 +4417,7 @@ function NumeroEcritSetting({ onAnnonces }) {
       if (l && Array.isArray(jv) && Array.isArray(ja)) {
         const items = l.items || {}, ventes = (jv[0] && jv[0].v) || {};
         const prouves = new Set([...comptesLbcProuves(ventes, items), ...comptesLbcSession((ja[0] && ja[0].a) || {})]);
-        const vendues = annoncesLbcVendues(ventes); const liens = load('vrm_lbc_liens', {}) || {};
+        const vendues = annoncesLbcVendues(ventes); const liens = liensLbcLus();
         const ads = Object.values(items).filter((ad) => ad && ad.id != null && annonceLbcALui(ad, prouves) && annonceLbcEnVente(ad, vendues));
         out.leboncoin = apercuNumeroEcrit(ads.map((ad) => { const li = liens[String(ad.id)]; return { id: String(ad.id), site: 'leboncoin', titre: ad.subject || '', lecture: lectureEcriteLbc(ad), connu: li != null && String(li).trim() ? cleNum(li) : '', presente: true }; }), { reprenable: rep });
       } else out.leboncoin = null;
