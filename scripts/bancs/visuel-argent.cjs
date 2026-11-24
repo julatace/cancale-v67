@@ -71,6 +71,8 @@ const ORANGE = (racines) => {
   const rendu = (e) => { if (!e.getClientRects().length) return false; for (let x = e; x; x = x.parentElement) { if (x.hidden) return false; const cs = getComputedStyle(x); if (cs.display === 'none' || cs.visibility === 'hidden') return false; } return true; };
   for (const sel of racines) for (const r of document.querySelectorAll(sel)) for (const el of [r, ...r.querySelectorAll('*')]) {
     if (!rendu(el) || el.closest('[data-logo-site], .vrm-logo-site')) continue;
+    // Un logo de MARQUE (le « G » de Google, `data-marque`) garde ses couleurs officielles.
+    if (el.closest('[data-marque]')) continue;
     const cs = getComputedStyle(el); for (const p of ['color', 'backgroundColor', 'borderTopColor', 'borderLeftColor', 'boxShadow', 'fill', 'stroke', 'backgroundImage', 'outlineColor']) juger(el, p, cs[p]);
     for (const ps of ['::before', '::after']) { const c2 = getComputedStyle(el, ps); if (c2.content && c2.content !== 'none') for (const p of ['backgroundColor', 'backgroundImage', 'boxShadow', 'color']) juger(el, ps + p, c2[p]); } }
   return [...new Set(out)].slice(0, 10);

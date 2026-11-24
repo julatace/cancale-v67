@@ -4,6 +4,8 @@
       sarcelle, acier, vert, bleu-ardoise.
    2. Les interrupteurs CLAIRS : éteint = une piste bordée (≥ 3:1) avec un petit rond ; allumé = l'ardoise avec un trait
       blanc (les « étiquettes d'interrupteur » d'iOS). Rien d'autre ne change (mêmes boutons, mêmes data-*). */
+/* Dans la première couche déclarée (`vrm-vintex`) : la colonne de l'ordinateur pose son fond « verre » en `!important` (vrm-verre). */
+@layer vrm-vintex {
 :root:root:root:root:root:root:root:root:root:root body [data-pm-cat] {
   --pm-m1: #5A6B7E; --pm-m2: #3D4B5B;
   display: grid !important; place-items: center !important; flex: none !important; width: 32px !important; height: 32px !important; border-radius: 9px !important;
@@ -20,6 +22,7 @@
 :root:root:root:root:root:root:root:root:root:root body [data-pm-cat="apparence"] { --pm-m1: #4F6D8F; --pm-m2: #33506F; }
 :root:root:root:root:root:root:root:root:root:root body [data-pm-cat="notifications"] { --pm-m1: #5E6F86; --pm-m2: #44546A; }
 :root:root:root:root:root:root:root:root:root:root body [data-pm-cat="aide"] { --pm-m1: #707784; --pm-m2: #4E5563; }
+}
 
 /* Les interrupteurs et le point d'alerte, dans Paramètres seulement. Dans la PREMIÈRE couche déclarée (`vrm-vintex`,
    index.html) : pour des `!important`, la première couche l'emporte sur les suivantes (la règle « verre » est dans vrm-verre). */
