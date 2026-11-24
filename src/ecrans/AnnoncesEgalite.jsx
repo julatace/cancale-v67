@@ -355,8 +355,8 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     // (24 nov., vitesse-lectures-toucher) Les relevés partent quand l'écran est CALME (`requestIdleCallback`, au plus 3 s ;
     // sans lui, Safari : 1,5 s) — ils ne prennent plus le réseau ni le processeur pendant les premières images de l'écran.
     const lire = () => { if (!mort) lireRelevesEnLigne(STUDIO_BASE, JSON.parse(sigEnLigne)).then((r) => { if (!mort) setReleves(r); }).catch(() => {}); };
-    const t = setTimeout(() => { try { if (typeof requestIdleCallback === 'function') { idle = requestIdleCallback(lire, { timeout: 3000 }); return; } } catch (_) {} setTimeout(lire, 900); }, 600);
-    return () => { mort = true; clearTimeout(t); try { if (idle) cancelIdleCallback(idle); } catch (_) {} };
+    const t = setTimeout(() => { try { if (typeof window.requestIdleCallback === 'function') { idle = window.requestIdleCallback(lire, { timeout: 3000 }); return; } } catch (_) {} setTimeout(lire, 900); }, 600);
+    return () => { mort = true; clearTimeout(t); try { if (idle) window.cancelIdleCallback(idle); } catch (_) {} };
   }, [sigEnLigne]);
   const plusVueAnnonce = (x) => {
     if (!releves || !x || x.site !== 'vinted' || x.etat !== 'enligne') return null;
