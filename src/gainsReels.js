@@ -79,9 +79,10 @@ export function gainsAxe(lignes, axe) {
 // fois dans les deux listes. « À racheter » : les meilleurs scores (score non nul), 3 au plus.
 function finirClassement(A) {
   const classes = A.groupes.filter((g) => g.classable).sort((a, b) => b.netMoyen - a.netMoyen || b.nNet - a.nNet || (a.nom < b.nom ? -1 : 1));
-  const meilleurs = classes.slice(0, PODIUM);
+  // Meilleurs et moins bons se partagent les classables (jamais le même deux fois ; un seul classable ⇒ rien à comparer).
+  const meilleurs = classes.slice(0, Math.min(PODIUM, Math.floor(classes.length / 2)));
   const pris = new Set(meilleurs.map((g) => g.k));
-  const moinsBons = classes.slice().reverse().filter((g) => !pris.has(g.k)).slice(0, PODIUM);
+  const moinsBons = classes.slice().reverse().filter((g) => !pris.has(g.k)).slice(0, meilleurs.length);
   const aRacheter = A.groupes.filter((g) => g.score != null).sort((a, b) => b.score - a.score || b.nNet - a.nNet || (a.nom < b.nom ? -1 : 1)).slice(0, PODIUM);
   // La liste : net moyen connu d'abord (le plus haut), puis le reste par nombre ; « Autres » toujours en dernier.
   const liste = A.groupes.slice().sort((a, b) => (a.autres - b.autres) || ((a.netMoyen == null) - (b.netMoyen == null))
@@ -104,9 +105,9 @@ export function gainsPaires(lignes) {
   const connues = paires.filter((p) => p.net != null);
   const assez = connues.length >= MIN_CLASSEMENT;
   const tri = connues.slice().sort((a, b) => b.net - a.net || b.ts - a.ts);
-  const meilleurs = assez ? tri.slice(0, PODIUM) : [];
+  const meilleurs = assez ? tri.slice(0, Math.min(PODIUM, Math.floor(tri.length / 2))) : [];
   const pris = new Set(meilleurs.map((p) => p.k));
-  const moinsBons = assez ? tri.slice().reverse().filter((p) => !pris.has(p.k)).slice(0, PODIUM) : [];
+  const moinsBons = assez ? tri.slice().reverse().filter((p) => !pris.has(p.k)).slice(0, meilleurs.length) : [];
   const sansAchat = paires.filter((p) => p.net == null).sort((a, b) => b.ts - a.ts);
   return { n, nNet: connues.length, ecartees, paires, meilleurs: meilleurs.map((p) => p.k), moinsBons: moinsBons.map((p) => p.k), sansAchat: sansAchat.map((p) => p.k), classables: connues.length };
 }
