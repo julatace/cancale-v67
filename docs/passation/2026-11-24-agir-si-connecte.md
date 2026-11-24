@@ -119,7 +119,7 @@ Paramètres → Connexions de l'extension (chaque compte).
   `--prouve` : 11 mutations, toutes rouges. Sur `origin/main` : rouge (la porte n'existe pas).
 - `scripts/bancs/agir-si-connecte.cjs` (vraie app, 390 tactile et 1512, clair et sombre) : Messages (badge sur B seul ; fil
   de B lisible, champ et offre éteints avec la raison, un toucher ne dépose rien ; fil de A allumé, un envoi dépose UNE
-  commande au nom de A), Annonces (badge sur B), Ventes (les deux comptes visibles), Paramètres → Connexions (badge sur B).
+  commande au nom de A), Annonces (badge sur B, téléphone et tableau), Ventes (les deux comptes visibles), Paramètres → Connexions (badge sur B) — 52 verts.
   Captures regardées.
 - `audit-actions-app` mis à la règle du 24 nov. (répondre = `ComposerReponse` ; le bouton passe par la porte) : 24 verts,
   12 mutations rouges. Voisins : traduction, quoi-de-neuf, connexions-extension, a-distance, tdz, coherence, identite verts.
