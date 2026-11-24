@@ -34063,7 +34063,7 @@ function FeuilleNouveauApp({ onNav, retenu = false }) {
   const [calme, setCalme] = React.useState(false);
   const [essai, setEssai] = React.useState(0);   // une autre feuille (ou la visite) devant : on réessaie plus tard, sans rien ranger
   React.useEffect(() => {
-    let idle = 0; const t = setTimeout(() => { try { idle = window.requestIdleCallback ? window.requestIdleCallback(() => setCalme(true), { timeout: 4000 }) : setTimeout(() => setCalme(true), 200); } catch (_) { setCalme(true); } }, 2500);
+    let idle = 0; const t = setTimeout(() => { try { idle = typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback(() => setCalme(true), { timeout: 4000 }) : setTimeout(() => setCalme(true), 200); } catch (_) { setCalme(true); } }, 2500);
     return () => { clearTimeout(t); try { if (idle && window.cancelIdleCallback) window.cancelIdleCallback(idle); } catch (_) {} };
   }, []);
   const ids = q.aVoir.map((n) => n.id).join(',');
