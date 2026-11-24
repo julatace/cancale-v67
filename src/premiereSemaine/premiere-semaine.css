@@ -11,3 +11,5 @@
 .vrm-ann-debutant > p { margin: 0 0 2px; font-size: 15px; line-height: 1.45; color: var(--n-encre, inherit); }
 /* Ventes : le mot « bordereau » expliqué à un compte neuf (lot debutant). */
 .vrm-vt-debutant { margin: 4px 4px 10px; font-size: 14px; line-height: 1.4; color: var(--n-encre-2, inherit); }
+/* Argent : « recettes », le mot de l'URSSAF, expliqué à un compte neuf (lot debutant). */
+.vg-a-urssaf-mot { margin: 8px 0 0; padding: 0 16px 12px; font-size: 14px; line-height: 1.4; color: var(--n-encre-2, inherit); }

@@ -25,4 +25,6 @@ export default {
   "ann.deb.apres": "für seinen Karton.",
   "ann.deb.geste": "Tippe auf eine Anzeige: Nr. und Einkaufspreis trägst du in ihrem Blatt ein.",
   "vt.deb.bordereau": ": das, was du auf dein Paket klebst.",
+  "arg.deb.avant": "Für die URSSAF meldest du deine",
+  "arg.deb.apres": ".",
 };

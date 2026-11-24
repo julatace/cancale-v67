@@ -26,4 +26,6 @@ export default {
   "ann.deb.apres": "à écrire sur sa boîte.",
   "ann.deb.geste": "Touche une annonce : son N° et son prix d’achat se notent dans sa fiche.",
   "vt.deb.bordereau": ": l’étiquette à coller sur ton colis.",
+  "arg.deb.avant": "Pour l’URSSAF, tu déclares tes",
+  "arg.deb.apres": ".",
 };

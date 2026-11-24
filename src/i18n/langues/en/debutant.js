@@ -25,4 +25,6 @@ export default {
   "ann.deb.apres": "to write on its box.",
   "ann.deb.geste": "Tap a listing: its No. and purchase price go in its sheet.",
   "vt.deb.bordereau": ": what you stick on your parcel.",
+  "arg.deb.avant": "For URSSAF, you declare your",
+  "arg.deb.apres": ".",
 };

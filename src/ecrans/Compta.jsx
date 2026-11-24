@@ -1,5 +1,8 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { Mot } from '../accueilReste/AccueilReste.jsx';   // (24 nov., lot debutant) « recettes » expliqué au toucher
+import { OUTILS as OUTILS_ACCUEIL } from '../accueilReste/deps.js';
+import { compteNeuf } from '../premiereSemaine/regle.js';
 import { LigneDatesVersement } from '../composants/LigneDatesVersement.jsx';   // (15 nov., 5.390) « Dates de versement : l’extension les récupère », aucun geste
 import '../natif/ecrans/argent-pont.css';   // (20 nov., lot argent-natif) titres des cartes d'avant au style §2 bis
 import { CLE_FOURNISSEURS, lireRegistre } from '../fournisseurs.js';
@@ -3840,6 +3843,9 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
           {cotis != null && P.ca != null ? <small className="vg-a-petit vg-a-urssaf-pied">{tr('verre2.argent.tauxDe', { taux: tauxTxt, ca: montant(P.ca) })}</small> : null}
         </button>
         {aNoter.length ? <Bouton variante="secondaire" className="vg-a-declare" data-urssaf-cest-declare={aNoter[0]} onClick={() => demanderDeclaration(aNoter[0], onNav)}>{tr('compta.aiDeclare')}</Bouton> : null}
+        {/* (24 nov., lot debutant) Un compte NEUF : le mot de l'URSSAF, « recettes », se touche (sa définition : l'argent reçu des
+            ventes, daté au versement). Hors du bouton de la case (jamais un bouton dans un bouton). */}
+        {compteNeuf(OUTILS_ACCUEIL.creeLe()) && !OUTILS_ACCUEIL.exemple() ? <p className="vg-a-urssaf-mot" data-mot-explique="recettes">{tr('arg.deb.avant')} <Mot k="recettes"/>{tr('arg.deb.apres')}</p> : null}
       </div>
     </section>
   );

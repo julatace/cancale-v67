@@ -364,6 +364,8 @@ async function parcours(nav, W, theme) {
     await capture(o.pg, nomCap('D7', 'argent'));
     juger(T('D7'), 'Argent (premier mois)', r, {});
     dit(!/encaiss/i.test(r.texte), `${T('D7')} Argent : jamais « encaissé »`);
+    dit(await o.pg.evaluate(() => [...document.querySelectorAll('[data-mot-explique="recettes"] [data-glossaire="recettes"]')].some((e) => e.getClientRects().length)), `${T('D7')} Argent : « recettes » (le mot de l'URSSAF) se touche et s'explique`);
+    dit(!/régime\s*:\s*micro|micro-entrepreneur(?! \?)/i.test(r.texte) || /choisis ton statut/i.test(r.texte), `${T('D7')} Argent : le statut n'est jamais deviné (« choisis ton statut »)`);
     await o.ctx.close();
   }
   // D8 — Paramètres, l'aide (le « ? » d'Aujourd'hui), l'abonnement.

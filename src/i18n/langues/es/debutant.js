@@ -25,4 +25,6 @@ export default {
   "ann.deb.apres": "para escribir en su caja.",
   "ann.deb.geste": "Toca un anuncio: su N.º y su precio de compra se anotan en su ficha.",
   "vt.deb.bordereau": ": lo que pegas en tu paquete.",
+  "arg.deb.avant": "Para la URSSAF, declaras tus",
+  "arg.deb.apres": ".",
 };

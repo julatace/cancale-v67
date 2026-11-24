@@ -58,6 +58,8 @@ export default {
   "glo.archive.def": "Un vecchio numero archiviato. Non viene mai dato a un altro articolo.",
   "glo.pasSu.mot": "—",
   "glo.pasSu.def": "VRM non conosce ancora questo numero: non letto o letto troppo tempo fa. Non è mai zero.",
+  "glo.recettes.mot": "incassi",
+  "glo.recettes.def": "La parola dell’URSSAF per il denaro delle tue vendite, contato il giorno in cui la piattaforma te lo versa.",
   "cj.tete": "Consiglio del giorno · {n} di {total}",
   "cj.voir": "Vedi",
   "cj.fermer": "Metti via il consiglio per oggi",

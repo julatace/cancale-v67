@@ -58,6 +58,8 @@ export default {
   "glo.archive.def": "Eine alte, archivierte Nummer. Sie wird nie an einen anderen Artikel vergeben.",
   "glo.pasSu.mot": "—",
   "glo.pasSu.def": "VRM kennt diese Zahl noch nicht: nicht gelesen oder zu lange her. Sie ist nie null.",
+  "glo.recettes.mot": "Einnahmen",
+  "glo.recettes.def": "Das URSSAF-Wort für das Geld aus deinen Verkäufen, gezählt am Tag, an dem die Plattform es dir auszahlt.",
   "cj.tete": "Tipp des Tages · {n} von {total}",
   "cj.voir": "Ansehen",
   "cj.fermer": "Tipp für heute ausblenden",
