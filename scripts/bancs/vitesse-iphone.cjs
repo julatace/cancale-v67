@@ -126,7 +126,13 @@ const ecart = (a, b) => (a && b ? { script: Math.round((b.script - a.script) * 1
 
 async function onglets(pg, R) {
   const ORDRE = ['annonces', 'ventes', 'achats', 'compta', 'journee'];
-  for (const o of ORDRE) { await pg.locator(`[data-n-onglet="${CLE(o)}"]`).first().tap({ timeout: 30000 }).catch(() => {}); await pg.waitForFunction(ecranPret, o, { timeout: 60000, polling: 200 }).catch(() => {}); await calme(pg, 1500, 20000); }
+  // 1re visite de chaque onglet. PROFIL=visite1:<onglet> : le profil du montage (récit §5 quater, recopié le 24 nov.) ;
+  // CALCULS=1 : les gros calculs faits pendant la visite, par écran (`window.__vrmCalculs`, src/calculParesseux.js).
+  for (const o of ORDRE) { const pf = await profilDebut('visite1:' + o); await pg.evaluate((pile) => { window.__vrmCalculs = {}; window.__vrmPiles = []; window.__vrmCalculsPile = pile; }, process.env.CALCULS === 'pile').catch(() => {});
+    await pg.locator(`[data-n-onglet="${CLE(o)}"]`).first().tap({ timeout: 30000 }).catch(() => {}); await pg.waitForFunction(ecranPret, o, { timeout: 60000, polling: 200 }).catch(() => {});
+    await profilFin('visite1:' + o, pf); await calme(pg, 1500, 20000);
+    if (process.env.CALCULS) console.log(`      calculs 1re visite ${o} : ${JSON.stringify(await pg.evaluate(() => window.__vrmCalculs || null).catch(() => null))}`);
+    if (process.env.CALCULS === 'pile') for (const x of await pg.evaluate(() => window.__vrmPiles || []).catch(() => [])) console.log('        ' + x.join(' · ').slice(0, 900)); }
   for (let tour = 0; tour < 2; tour++) for (const o of ORDRE) {
     await calme(pg, 1000, 15000); await rendus(pg); const m0 = await metr(); const pf = tour === 1 && await profilDebut('onglet:' + o);
     await pg.locator(`[data-n-onglet="${CLE(o)}"]`).first().tap({ timeout: 30000 }).catch(() => {});
