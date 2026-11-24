@@ -305,7 +305,7 @@ import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from
 import { TeteGroupeCompte, useDepliesComptes, ListeParCompte } from './GroupesComptes.jsx';
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : DiagnosticLeboncoin (était importé en statique)
 const DiagnosticLeboncoin = aLaDemandeDiscret(() => import('./DiagnosticLeboncoin.jsx'));
-const AchatsSiteLazy = aLaDemande(() => import('./achats/AchatsSite.jsx'));   // (20 nov.) les achats Leboncoin / Vestiaire, disposition Vinted
+const AchatsSiteLazy = aLaDemandeDiscret(() => import('./achats/AchatsSite.jsx'));   // (24 nov., sauts-orange) un bloc DANS Achats : rien pendant le chargement (le squelette de 320 px, remplacé par 76, déplaçait la fin d'Achats)   // (20 nov.) les achats Leboncoin / Vestiaire, disposition Vinted
 import { BandeChiffres } from './ui/index.js';   // (14 nov., refonte des sites) la bande de chiffres des listes
 import './plateformes/plateformes.css';   // (14 nov., refonte visible) Leboncoin, eBay, Vestiaire, Paramètres, connexion
 import './design/studio-reste.css';   // (14 nov., Studio bleu clair) Argent, Messages, Paramètres, Communauté, E-mails, connexion, feuilles
@@ -895,7 +895,10 @@ import {ResponsiveChatPortal} from "./ChatPortal.jsx";
 import "./ebay-interface.css";
 const _ecranEbay = (nom) => aLaDemande(() => import("./ebayGestion.jsx").then((m) => ({ default: m[nom] })));
 const EbayCommande = _ecranEbay("EbayCommande"), EbayMessages = _ecranEbay("EbayMessages"), EbayOffres = _ecranEbay("EbayOffres"), EbayAgent = _ecranEbay("EbayAgent");
-const EbayEvaluations = _ecranEbay("EbayEvaluations"), EbayRetours = _ecranEbay("EbayRetours"), EbayPromotion = _ecranEbay("EbayPromotion"), EbayAchats = _ecranEbay("EbayAchats");
+const EbayEvaluations = _ecranEbay("EbayEvaluations"), EbayRetours = _ecranEbay("EbayRetours"), EbayPromotion = _ecranEbay("EbayPromotion");
+// (24 nov., sauts-orange — banc parcours-iphone) Les achats eBay sont un bloc posé EN BAS d'Achats : pendant le chargement, rien
+// (`aLaDemandeDiscret`), jamais le squelette de 320 px qui, remplacé par 76 px, déplaçait la fin d'Achats (CLS 0,94).
+const EbayAchats = aLaDemandeDiscret(() => import("./ebayGestion.jsx").then((m) => ({ default: m.EbayAchats })));
 // (6 nov., vitesse 2) RechercheEbay : à la demande ; sa règle pure `repereAdmis` vit dans repereEbay.js.
 import {repereAdmis} from "./repereEbay.js";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";

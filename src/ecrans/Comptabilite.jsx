@@ -571,13 +571,13 @@ const PreparerFiche = aLaDemande(() => import('../depot/PreparerFiche.jsx'));   
 const OffresAuto = aLaDemande(() => import('../OffresAuto.jsx'));
 const AchatsOutils = aLaDemande(() => import('../AchatsOutils.jsx'));
 // (11 nov.) « Tes meilleures sources » dans Achats (src/MeilleuresSources.jsx, la même carte qu'Argent).
-const MeilleuresSources = aLaDemande(() => import('../MeilleuresSources.jsx'));
+const MeilleuresSources = aLaDemandeDiscret(() => import('../MeilleuresSources.jsx'));   // (24 nov., sauts-orange) un bloc EN BAS d'Achats : rien pendant le chargement (le squelette de 320 px déplaçait la fin)
 // (16 nov., lot relier-glisser) « Relier en glissant » : achats d'un côté, annonces / ventes sans achat de l'autre.
 const RelierGlisser = aLaDemande(() => import('../RelierGlisser.jsx'), true);
 // (19 nov., lot completer-infos) L'atelier « Compléter » : UNE porte pour ce qui manque à un article (src/completer/).
 const Completer = aLaDemande(() => import('../completer/Completer.jsx'), true);
 // ⟦← App.jsx #40⟧
-const AchatsPlus = aLaDemande(() => import('../AchatsPlus.jsx'));
+const AchatsPlus = aLaDemandeDiscret(() => import('../AchatsPlus.jsx'));   // (24 nov., sauts-orange) idem
 const CataloguePrive = aLaDemande(() => import('../CataloguePrive.jsx'));
 // ⟦← App.jsx #41⟧
 // ⟦→ ecrans/Compta.jsx #4⟧
@@ -605,7 +605,7 @@ const ImportDepart = aLaDemande(() => import('../ImportDepart.jsx'));
 // ⟦← App.jsx #47⟧
 const PhotoEditor = aLaDemande(() => import('./PhotoEditor.jsx').then((m) => ({ default: m.PhotoEditor })), true);
 // ⟦← App.jsx #48⟧
-const AchatsHorsPlateforme = aLaDemande(() => import('./Achats.jsx').then((m) => ({ default: m.AchatsHorsPlateforme })));
+const AchatsHorsPlateforme = aLaDemandeDiscret(() => import('./Achats.jsx').then((m) => ({ default: m.AchatsHorsPlateforme })));
 // (11 nov., lot achats-auto) Achats Leboncoin / eBay / Vestiaire lus dans les e-mails (src/AchatsParEmail.jsx).
 const AchatsParEmail = aLaDemande(() => import('../AchatsParEmail.jsx'));
 // ⟦← App.jsx #49⟧
