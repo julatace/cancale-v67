@@ -2208,3 +2208,9 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., vente-mail-annonce)
 - **23 nov. · Gris clair étagé (`claude/style-clair`)** : variante A validée (gris froid, accent ardoise), sombre = gris choisi ; iPhone compact ; dessin fin ; pop-up d'événement + galerie du propriétaire. `docs/passation/2026-11-23-style-clair.md`. Geste : essayer le pop-up sur un vrai iPhone.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1377)
+- **24 nov. · Bugs terrain (`claude/bugs-terrain-24nov`)** : mesuré (Vercel 0 erreur/72 h ; 3 plantages app/72 h dont `Icon` déjà corrigé) ; une photo Leboncoin n'est plus demandée par `fetch` (refusée par `connect-src` : `src/lisibleParLaPage.js`, `audit-lecture-csp`) ; restent : morceaux périmés au téléphone (~15/jour), suivi `escrow` de l'extension jamais reconnu. `2026-11-24-bugs-terrain.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1377)
+- **24 nov. · Français du démarrage 79,96 → 73,6 Ko** (budget 80 inchangé) : l'accueil des nouveaux à la demande. `2026-11-24-francais-demarrage.md`. Geste : aucun.
