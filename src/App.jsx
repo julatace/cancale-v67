@@ -30418,8 +30418,13 @@ function useSourcesCarte(liveStats) {
   const prep = useEnPreparation(CLES_PREPAREES);
   // (11 nov., états vides) Aucun compte relié, PROUVÉ par la coque : « aucun compte relié », pas « lecture… ».
   const sansCompte = React.useContext(SansCompteCarte);
+  // (24 nov., livrable-2) La coque n'a pas encore ses ventes : l'écran qui publie (Ventes, `usePreparation`) n'a pas
+  // encore pu commencer — une publication absente est alors EN LECTURE, jamais « pas calculé / pas lu / ouvre Ventes »
+  // (mesuré : Argent les disait 5 à 10 s à l'ouverture, puis les chiffres arrivaient). Pas su = la coque a répondu ET
+  // personne ne prépare.
+  const coqueEnCours = venduEtat(liveStats) === 'encours';
   // (6 nov.) Jamais publié mais un écran ouvert le prépare : « lecture… » (src/preparations.js).
-  const etat = pub ? 'lu' : (pret && !prep.has('vrm_benefice_jours') ? 'passu' : 'encours');
+  const etat = pub ? 'lu' : (pret && !prep.has('vrm_benefice_jours') && !coqueEnCours ? 'passu' : 'encours');
   return React.useMemo(() => ({
     sansCompte: !!sansCompte,
     // (6 nov., onglets A) TROIS ÉTATS (§5) : la coque pas encore revenue (`liveStats` absent, ou
@@ -30430,8 +30435,8 @@ function useSourcesCarte(liveStats) {
     beneficeDe: (p) => ({ B: beneficeDe({ pub, compta, ligneUrssaf, regime }, p), etat }),
     joursBenef: pub, etatBenef: etat, ligneUrssaf, colisAPoster, colisARetirer, dorment, live: liveStats || null,
     // (6 nov.) Une publication absente que l'écran ouvert est en train de préparer : « lecture… ».
-    enPreparation: { dorment: prep.has('vrm_paires_dorment'), retirer: prep.has('vrm_colis_retirer'), urssaf: prep.has('vinted_urssaf_mois') },
-  }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep, sansCompte]);
+    enPreparation: { dorment: prep.has('vrm_paires_dorment') || coqueEnCours, retirer: prep.has('vrm_colis_retirer') || coqueEnCours, urssaf: prep.has('vinted_urssaf_mois') || coqueEnCours || !pret },
+  }), [liveStats, pub, pret, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep, sansCompte, coqueEnCours]);
 }
 // ⟦→ ecrans/Comptabilite.jsx #248⟧
 const OUTILS_AUJOURDHUI = { load, save, onCloudReady, lireTout, entete: () => enTeteSession(), uid: () => AUTH.user?.id || '', extras: lireExtrasRepartition, enLigne: dateMiseEnLigneMs, vue: demanderVue, aVenir: ouvrirArgentAVenir, cle: CLE_CARTES_AUJOURDHUI };

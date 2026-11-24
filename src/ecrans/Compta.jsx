@@ -1,6 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
-import { useEnPreparation } from '../preparations.js';   // (24 nov., livrable) le reçu d'Argent en lecture
+import { useEnPreparation } from '../preparations.js';   // (24 nov., livrable-2) « Pas encore calculé » seulement quand c'est vrai
 import { LigneDatesVersement } from '../composants/LigneDatesVersement.jsx';   // (15 nov., 5.390) « Dates de versement : l’extension les récupère », aucun geste
 import '../natif/ecrans/argent-pont.css';   // (20 nov., lot argent-natif) titres des cartes d'avant au style §2 bis
 import { CLE_FOURNISSEURS, lireRegistre } from '../fournisseurs.js';
@@ -3853,7 +3853,6 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
 //   · disponible et en attente : `valeurChiffre('dispo' | 'attente')` (le porte-monnaie lu, l'argent à venir) ;
 //   · les versements du mois : le livre des recettes (`recettesDe`, la lecture de « Registres »), daté au versement.
 // Rien n'est recalculé ; aucun chiffre n'est écrit deux fois sur l'écran.
-const CLES_RECU_ARGENT = ['vinted_urssaf_mois'];
 function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
   const liveCoque = React.useContext(LiveStatsCarte);
   const S = useSourcesCarte(liveStats || liveCoque);
@@ -3866,13 +3865,9 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
   const moisLong = new Date().toLocaleDateString(localeCourante(), { month: 'long' });
   const Q = questionsArgent({ vendu: v('vendu'), recu: v('recu'), benefice: v('benefice'), prevision: P, profil, raisonCourte, mois, dateCourte: dateArgentCourte });
   const qR = Q.find((x) => x.id === 'recu'), qB = Q.find((x) => x.id === 'benefice'), qV = Q.find((x) => x.id === 'vendu');
-  const prepRecu = useEnPreparation(CLES_RECU_ARGENT);
   const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
   // La phrase de l'affiche : la note de la MÊME règle (le manque, les ventes à dater), sinon « au jour du versement ».
-  // (24 nov., livrable) La ligne du reçu pas encore LUE (`undefined`) ou qu'un écran ouvert prépare : « lecture… » (le chiffre
-  // en squelette, src/natif/outils.js), jamais « ouvre Ventes » le temps du chargement — comme Ma journée (`prepVerse`).
-  const recuEnLecture = qR.valeur == null && qR.raison === 'absente' && (S.ligneUrssaf === undefined || prepRecu.has('vinted_urssaf_mois'));
-  const phrase = recuEnLecture ? tr('v2.jour.lecture') : qR.valeur == null ? (qR.note || tr('v2.ar.pasSu')) : qR.note ? qR.note : tr('v2.ar.auVersement');
+  const phrase = qR.valeur == null ? (qR.note || tr('v2.ar.pasSu')) : qR.note ? qR.note : tr('v2.ar.auVersement');
   // Les six mois : le mois en cours = l'affiche (la même valeur) ; avant, la ligne publiée, mois par mois.
   const barres = (() => {
     const d = new Date(); const out = [];
@@ -4535,6 +4530,7 @@ const portesCloture = ({ onNav }) => ({
   seuils: () => viserCompta('[data-micro-repli]'),
   export: (annee) => { DEMANDE_COMMANDE.export = Date.now(); DEMANDE_COMMANDE.exportPeriode = String(annee); try { window.dispatchEvent(new Event('vrm:export-comptable')); } catch (_) {} },
 });
+const CLES_PUB_ARGENT = ['vinted_urssaf_mois'];
 function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, comptesLus = false, vue = 'resume', allerVue = null, argentNav = null }) {
   const [data, setData] = React.useState(() => {
     try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; }
@@ -4825,6 +4821,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // (30 oct.) « Se calcule dans Ventes » était écrit ~9 fois sur cet écran : la cause
   // se dit UNE fois ici, avec le geste ; les cartes ne gardent que « — ».
   const ligneComptaPub = useLigneUrssaf();
+  // (24 nov., livrable-2) « Pas encore calculé · Ouvrir Ventes » seulement quand c'est VRAI : pas tant que la coque lit ses
+  // ventes ou que Ventes prépare la publication (src/preparations.js) — le même état que les chiffres (useSourcesCarte).
+  const prepPubArgent = useEnPreparation(CLES_PUB_ARGENT);
+  const pubEnLecture = !ligneComptaPub && (!liveStats || !Array.isArray(liveStats.venduLignes) && !liveStats.venduPasSu || prepPubArgent.has('vinted_urssaf_mois'));
   const designV2 = useDesignV2();
   return (
     <div className="vrm-finance-page vrm-fu-ecran vrm-argent" data-espace="argent" data-argent-ecran={vue} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -4832,7 +4832,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           « Argent » et ses quatre segments. Chaque segment montre SES cartes ; les autres restent
           montées (`hidden` : mêmes lectures, mêmes états, mêmes data-*), jamais supprimées. */}
       {vue !== 'factures' ? <ScreenHead titreCoque icon="euro" title={L.argent} phrase="compta" sous={argentNav} desc="Ce que tu as vendu, reçu, gagné, et ce que tu dois déclarer." /> : null}
-      {vue !== 'factures' && !ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
+      {vue !== 'factures' && !ligneComptaPub && !pubEnLecture && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
         {/* (2 nov.) Un compte neuf, sans compte Vinted : « ouvre Ventes » ne menait
             nulle part (Ventes n'a rien à publier). La cause vraie et son geste —
             seulement quand la liste des comptes est LUE (pas su ≠ aucun). */}
