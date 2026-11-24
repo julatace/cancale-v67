@@ -31,6 +31,9 @@ import './argent.css';
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
 // « 1 107 € » ⇒ [« 1 107 », « € »] : l'unité est posée à côté du chiffre.
 const coupe = (t) => { const m = /^(.*?)[\s  ]*€$/.exec(String(t)); return m ? [m[1], '€'] : [String(t), '']; };
+// (24 nov.) Le grand chiffre : l'espace fine des milliers (U+202F, celle de `montant`) gardée dans le texte, mais posée dans
+// une boîte de largeur fixe — à 30 px, la police la rendait presque nulle (« 1794 € » à côté de « 2 028 € »).
+const milliers = (t) => String(t).split('\u202f').flatMap((p, i) => (i ? [<span key={i} className="n-arg-millier">{'\u202f'}</span>, p] : [p]));
 const signe = (m, montant) => (m > 0 ? '+' : m < 0 ? '−' : '') + montant(Math.abs(m));
 
 // Une rangée de chiffre : libellé (et sa ligne grise) à gauche, montant à droite. Toute la rangée se touche.
@@ -101,7 +104,7 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
             <div className="n-arg-recu-ligne">
               <div className="n-arg-recu-chiffre" data-arg-montant="" data-n-vide={n == null ? '1' : undefined}>
                 {partiel && valeur != null ? <span className="n-arg-recu-moins">{tr('journee.moins')}</span> : null}
-                <span className="n-arg-recu-n">{n == null ? TIRET : n}</span>{u ? <span className="n-arg-recu-u">{u}</span> : null}
+                <span className="n-arg-recu-n">{n == null ? TIRET : milliers(n)}</span>{u ? <span className="n-arg-recu-u">{u}</span> : null}
               </div>
               {/* L'anneau vers SON objectif du mois (src/objectifMois.js) : pas d'objectif ⇒ rien ; pas su ⇒ pointillé, « — ». */}
               <AnneauObjectif o={objectif} montant={montant} nombre={nombre}/>

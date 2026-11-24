@@ -37,6 +37,7 @@
   /* Les montants en chiffres TABULAIRES : l'espace fine des milliers (U+202F) se voit aussi derrière un « 1 » étroit
      (« 1 794 € » se lisait « 1794 € » à côté de « 2 028 € »). */
   .n-arg-vx .n-arg-recu-chiffre, .n-arg-vx .n-arg-m6-v, .n-agv-obj .n-anneau-centre { font-variant-numeric: tabular-nums; }
+  .n-arg-millier { display: inline-block; width: .22em; overflow: hidden; }
 
   /* ── Les chiffres du mois : une petite barre sous Vendu et Bénéfice, la couverture des prix sous le bénéfice. ── */
   .n-arg-l-visuel { display: flex; align-items: center; gap: 8px; margin-top: 4px; min-width: 0; }
