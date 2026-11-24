@@ -156,7 +156,10 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   // alors éteint) : un appelant de plus, le même bouton. La règle : chaque emploi est la déclaration, un `onRemettre=`
   // (le bouton de la carte) ou « Paire revenue » — jamais un appel au rendu.
   const emplois = sansCom.split("\n").filter((l) => /remettreDepuisCarte/.test(l));
-  const permis = (e) => /const remettreDepuisCarte = async/.test(e) || /onRemettre=\{remettreDepuisCarte\}/.test(e) || /await remettreDepuisCarte\(retour\)/.test(e);
+  // (24 nov., main-vert) Le suivi des retours de Ventes (Comptabilite, `vr.g.recu`) rend ses gestes comme des ACTIONS
+  // `{ cle, libelle, onClick }` (un bouton) : un emploi de plus, lui aussi au toucher — jamais au rendu.
+  const permis = (e) => /const remettreDepuisCarte = async/.test(e) || /onRemettre=\{remettreDepuisCarte\}/.test(e) || /await remettreDepuisCarte\(retour\)/.test(e)
+    || /\{ cle: '[a-z-]+', libelle: (?:tr\('[\w.]+'\)|'[^']*'), onClick: \(\) => remettreDepuisCarte\(l\) \}/.test(e);
   dit(emplois.every(permis) && appels >= 3 && /onRemettre=\{remettreDepuisCarte\}/.test(app) && /onClick=\{\(\) => onRemettre\(l\)\}/.test(app)
     && /onRevenue=\{async \(\) => \{ if \(retour && !retour\.remis\) await remettreDepuisCarte\(retour\)/.test(app) && /onClick=\{faireRevenue\}/.test(rl),
     '3h rien sans tap : chaque appelant est un bouton (« Remettre en stock », « Paire revenue »)', String(appels) + ' ' + emplois.filter((e) => !permis(e)).join(' | '));
