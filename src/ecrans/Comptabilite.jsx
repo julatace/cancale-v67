@@ -36,6 +36,7 @@ import { SqLignes } from '../Squelette.jsx';
 import { usePreparation, useEnPreparation } from '../preparations.js';
 import { souvenir, retenir } from '../memoireEcrans.js';
 import { TeteStudio, BoutonPlein, Rond, TuilesFiltres } from '../design/StudioVentes.jsx';
+import { indexSuivis } from '../indexSuivis.js';
 import { sortiParSuivis, sortiParSuivi, suiviDeLigne, lienSuivi, codePostalLu, nouvelleVinted, transporteurDeForme, colisInternational, suiviValide, TRANSPORTEURS_SAISIE, normaliserCodePostal, idSuiviManuel, finDeCommandeAchat, txAchatsEnRetour, achatEnRetour, fusionTransporteur, ligneDuTransporteur, ligneDeSuiviTransporteur, leverGarde, incidentDeSuivis, incidentDeLigne, repartiAffichable, nomTransporteurSuivi } from '../../api/_lib/suivi-colis.js';
 import { repriseNumerosRecreation, tableRecrees, archivesAEcrire } from '../repriseNumero.js';
 import { etatAnnonceVinted, raisonPasSelectionnable, actionsPossibles, raisonCommune, ACTIONS_TUILES, ETATS_ANNONCE, liensRepubMain, fusionLiensRecrees, candidatsNouvelle, etatSuiviMain, minisSelection, ecritureMini } from '../annoncesActions.js';
@@ -21007,7 +21008,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // titre (§5). Les trois sources : la ligne du transporteur (`depart_` d'une vente, `transp_`
   // d'un achat), l'e-mail du MÊME n°, Vinted (l'état de la transaction, lu et daté). La règle :
   // api/_lib/suivi-commandes.js. « Pas su » n'est jamais une incohérence.
-  const emailDuSuivi = (k) => { if (!k || !Array.isArray(tracking)) return null; for (const t of tracking) if (t && suiviDeLigne(t) === k) return t; return null; };
+  // (24 nov., vitesse) Par un INDEX (n° → première ligne de suivi qui le porte, dans l'ordre de `tracking`), bâti une fois par
+  // liste de suivis : avant, chaque appel relisait toute la liste et re-normalisait chaque n° (sujet compris) — appelé pour
+  // chaque vente de « En route », de la frise et de « À envoyer », le coût grandissait comme ventes × e-mails de suivi.
+  // Même réponse : la PREMIÈRE ligne dont `suiviDeLigne` vaut `k` (banc `audit-suivis-index`).
+  const emailDuSuivi = (k) => { if (!k || !Array.isArray(tracking)) return null; return indexSuivis(tracking).get(k) || null; };
   const msOu = (v) => { if (Number.isFinite(v)) return v; const x = Date.parse(String(v || '')); return Number.isFinite(x) ? x : null; };
   const vintedDeTx = (tx) => {
     const e = etatTxn(tx); if (!e) return null;
