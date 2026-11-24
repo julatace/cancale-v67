@@ -190,7 +190,7 @@ async function ouvrirConv(pg, uid) {
       if (!COURT) {
         // ── Annonces : le badge sur le groupe de B, pas sur A
         await pg.goto('https://vrm.center/?tab=annonces', { waitUntil: 'domcontentloaded' });
-        const an = await attendreQue(pg, () => { const b = [...document.querySelectorAll('[data-agir-badge]')].map((x) => x.getAttribute('data-agir-compte')); return document.querySelector('[data-ad-repli]') ? { b, groupes: [...document.querySelectorAll('[data-ad-repli]')].map((x) => x.getAttribute('data-ad-repli')) } : null; }, null, 40000);
+        const an = await attendreQue(pg, () => { const b = [...document.querySelectorAll('[data-agir-badge]')].map((x) => x.getAttribute('data-agir-compte')); return (document.querySelector('[data-ad-repli]') || /Nike P-6000/.test(document.body.innerText || '')) && b.length ? { b } : null; }, null, 40000);
         await attendre(800); await photo(pg, `annonces-${nom}`);
         dit(!!an && an.b.includes(B) && !an.b.includes(A), 'Annonces : « Lecture seule » sur le groupe de atelier_b, pas sur boutique_a', JSON.stringify(an));
         // ── Ventes : la liste reste visible pour les deux comptes
