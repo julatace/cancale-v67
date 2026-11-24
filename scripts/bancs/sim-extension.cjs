@@ -63,7 +63,8 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
   const V = fauxVinted({ jetonVinted, lireJwt });
   // ── La file du SERVEUR (vraies règles), un état par simulation ─────────────────────────────────────────────
   const S = { d: null, appels: [] };
-  const REGLAGES = { version: 1, envoisActifs: false, message: 'Bonjour {pseudo}, ton favori est toujours dispo !', offreMode: 'pct', pourcentage: 10, arrondi: false, intervalleMinutes: 0 };
+  const MSG_PSEUDO = 'Bonjour {pseudo}, ton favori est toujours dispo !', MSG_SIMPLE = 'Bonjour, ton favori est toujours dispo !';
+  const REGLAGES = { version: 1, envoisActifs: false, message: MSG_PSEUDO, offreMode: 'pct', pourcentage: 10, arrondi: false, intervalleMinutes: 0 };
   const apercu = () => ({ etat: 'pret', total: FAVORIS.length, raison: '', reglages: REGLAGES,
     tous: FAVORIS.map((f) => ({ id: f.nid, notificationId: f.nid, itemId: f.itemId, recipientId: f.userId, cochable: true, envoi: 'a_envoyer', titre: (ANNONCES.find((a) => String(a.id) === f.itemId) || {}).titre, photo: `https://images1.vinted.net/t/${f.itemId}/f800/photo.jpeg` })),
     liste: FAVORIS.map((f) => f.nid) });
@@ -174,16 +175,18 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     const jobs = () => (vue().jobs || []);
     const parItem = () => Object.fromEntries(jobs().map((x) => [String(x.itemId || String(x.id || '').split(':')[0]), `${x.etat}${x.raison ? ':' + x.raison : ''}${x.cause ? '/' + x.cause : ''}${x.etape ? '@' + x.etape : ''}`]));
     const reset = async () => {
-      S.d = null; V.st.req = []; V.st.ancienneConv = 200; V.st.forcer = []; V.st.captchaSur = null; V.st.commande = {}; V.st.convs.clear(); seed();
+      S.d = null; V.st.req = []; V.st.ancienneConv = 200; REGLAGES.message = MSG_PSEUDO; V.st.forcer = []; V.st.captchaSur = null; V.st.commande = {}; V.st.convs.clear(); seed();
       await dansSW(async () => { await chrome.storage.local.remove(['vrmFavorisCarte', 'vrmActionEnCours', 'vrmPauseVinted', 'vrmCaptcha', 'vrmFavorisApercu', 'vrmTextesRecents', 'vrmToutArrete']); });
     };
 
     // ══ F1 : 3 favoris, identité par la commande ═════════════════════════════════════════════════════════════════
-    for (const F1 of ['F1', 'F1W', 'F1M', 'F1E']) if (veut(F1)) {
+    for (const F1 of ['F1', 'F1W', 'F1M', 'F1E', 'F1P']) if (veut(F1)) {
       for (const [i, f] of FAVORIS.entries()) f.forme = F1 === 'F1W' ? 'web' : F1 === 'F1M' ? (i === 1 ? 'web' : 'app') : 'app';
-      if (F1 === 'F1W' || F1 === 'F1M') console.log(`\n── ${F1}. trois favoris, liens ${F1 === 'F1W' ? 'web (/items/N/want_it/new?offering_id=N)' : 'mêlés (app, web, app)'}`); else console.log(F1 === 'F1' ? '\n── F1. trois favoris lancés depuis la carte (l’ancienne relecture répond, comme mesuré le 21 nov.)' : '\n── F1E. les mêmes, l’ancienne relecture REFUSÉE : nouvelle messagerie, identité par la commande');
+      if (F1 === 'F1W' || F1 === 'F1M') console.log(`\n── ${F1}. trois favoris, liens ${F1 === 'F1W' ? 'web (/items/N/want_it/new?offering_id=N)' : 'mêlés (app, web, app)'}`); else console.log(F1 === 'F1P' ? '\n── F1P. ancienne relecture refusée (commande), message avec {pseudo}' : F1 === 'F1' ? '\n── F1. trois favoris lancés depuis la carte (l’ancienne relecture répond, comme mesuré le 21 nov.)' : '\n── F1E. les mêmes, l’ancienne relecture REFUSÉE : nouvelle messagerie, identité par la commande');
       await reset();
-      if (F1 === 'F1E') V.st.ancienneConv = 404;
+      if (F1 === 'F1E' || F1 === 'F1P') V.st.ancienneConv = 404;
+      if (F1 === 'F1E') REGLAGES.message = MSG_SIMPLE;
+      if (F1 === 'F1P') console.log('   (F1P : la même chose avec un message qui porte {pseudo})');
       const { ap, r } = await lancer(FAVORIS.map((f) => f.nid));
       dit(ap && ap.ok, 'l’aperçu est relu chez VRM', JSON.stringify(ap).slice(0, 300));
       dit(r && r.ok, 'la file part (son clic « Lancer »)', JSON.stringify(r).slice(0, 400));
@@ -199,9 +202,9 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       const inq = ecr.filter((e) => /inquiries$/.test(e.p)), msgs = ecr.filter((e) => /\/replies$/.test(e.p)), offres = ecr.filter((e) => /\/offers$/.test(e.p));
       dit(!!res, 'la file se termine', JSON.stringify(parItem()));
       dit(inq.length === 3 && inq.every((e) => e.uid === UID), '3 conversations ouvertes PAR LA PAGE, au nom du compte de l’onglet', inq.map((e) => e.corps).join(' | '));
-      dit(msgs.length === 3 && msgs.every((e) => e.uid === UID && /Bonjour/.test(e.corps)), '3 messages envoyés par la page', msgs.map((e) => e.corps.slice(0, 80)).join(' | '));
+      dit(msgs.length === 3 && msgs.every((e) => e.uid === UID && /ton favori est toujours dispo/.test(e.corps) && !/[{}]/.test(e.corps)), '3 messages envoyés par la page', msgs.map((e) => e.corps.slice(0, 80)).join(' | '));
       dit(offres.length === 3, '3 offres (réduction de 10 %) envoyées par la page', offres.map((e) => e.p + ' ' + e.corps).join(' | '));
-      if (F1 === 'F1E') dit(V.st.req.some((e) => /escrow-orders/.test(e.p)), 'la commande escrow est relue (identité par la commande)', V.st.req.filter((e) => e.h === 'api.vinted.fr').map((e) => e.m + ' ' + e.p).slice(0, 12).join(' '));
+      if (F1 === 'F1E' || F1 === 'F1P') dit(V.st.req.some((e) => /escrow-orders/.test(e.p)), 'la commande escrow est relue (identité par la commande)', V.st.req.filter((e) => e.h === 'api.vinted.fr').map((e) => e.m + ' ' + e.p).slice(0, 12).join(' '));
       dit(ecr.every((e) => !e.origine.startsWith('chrome-extension')), 'aucune écriture partie du service worker (toutes de la page)', ecr.map((e) => e.origine).join(','));
       for (const cv of V.st.convs.values()) { const ordre = [...cv.messages.map(() => 'm'), ...cv.offres.map(() => 'o')]; void ordre; }
       const b = FP.bilanFavoris(jobs());
@@ -211,13 +214,13 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       const fenL = f && f.a && Array.isArray(f.a.lignes) ? f.a.lignes : [];
       dit(fenL.length === 3 && fenL.every((l) => l.etat === 'envoye'), 'la fenêtre : 3 lignes « envoyé »', JSON.stringify(fenL.map((l) => l.etat)));
       dit(f && f.f && f.f.file && Number(f.f.file.envoyes) === b.envoyes, 'les nombres de la carte = ceux de VRM', JSON.stringify(f && f.f && f.f.file));
-      const tw = ctx.pages().find((p) => /vinted\.fr\/inbox\//.test(p.url())); if (tw) await shot(tw, F1 + '-fin');
+      const tw = ctx.pages().find((p) => /vinted\.fr\/inbox\//.test(p.url())); if (tw) await shot(tw, F1 + '-fin'); await vt.bringToFront().catch(() => {}); await attendre(800); await shot(vt, F1 + '-onglet-de-julien');
     }
     // ══ F2/F3/F4 : un désaccord sur la commande ⇒ ce favori n'est pas envoyé, la file continue ══════════════════════
     for (const [nom, desaccord, quoi] of [['F2', { buyer: '3999999' }, 'un AUTRE acheteur'], ['F3', { item: '91019999' }, 'un AUTRE article'], ['F4', { conv: '01a1fdff-0000-7000-a000-000000000000' }, 'une AUTRE conversation']]) {
       if (!veut(nom)) continue;
       console.log(`\n── ${nom}. la commande du 2ᵉ favori dit ${quoi}`);
-      await reset(); V.st.ancienneConv = 404;
+      await reset(); V.st.ancienneConv = 404; REGLAGES.message = MSG_SIMPLE;
       // Le désaccord ne vaut que pour la conversation du 2ᵉ favori.
       const cmd0 = V.st.commande; void cmd0;
       Object.defineProperty(V.st, 'commande', { configurable: true, get() { const cours = [...V.st.convs.values()].pop(); return cours && cours.itemId === FAVORIS[1].itemId ? desaccord : {}; } });
@@ -317,6 +320,62 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       dit(parConv.every((n) => n <= 1), 'aucun message envoyé deux fois', JSON.stringify(parConv));
       dit(!jobs().some((x) => x.etat === 'reserve'), 'aucune réservation laissée en suspens chez VRM', JSON.stringify(parItem()));
       void res;
+    }
+    // ══ L1 : Leboncoin — le compte et ses annonces lus par la page (lbc-inject → lbc-relay → fond) ══════════════
+    if (veut('L1')) {
+      console.log('\n── L1. Leboncoin : la page lit le compte privé et « Mes annonces »');
+      const LBC = 'aaaa1111-0000-4000-8000-000000000001';
+      await ctx.route('https://www.leboncoin.fr/**', (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><html lang="fr"><head><title>leboncoin (simulation)</title></head><body><h1>Mes annonces</h1></body></html>' }));
+      await ctx.route('https://api.leboncoin.fr/**', (r) => { const u = r.request().url(); return r.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': 'https://www.leboncoin.fr', 'access-control-allow-credentials': 'true' },
+        body: JSON.stringify(u.includes('/counter') ? { unread: 2 } : /\/members\/me\/account/.test(u) ? { account: { account_id: LBC, type: 'private' }, member: { account_id: LBC, nickname: { value: 'Vendeur banc' } } } : u.includes('/myads') ? { ads: [{ list_id: 123, subject: 'Nike Air Max 90 blanche', price: [40], images: { urls: ['https://img.leboncoin.fr/photo-banc.jpg'] }, status: 'active' }] } : {}) }); });
+      const pl = await page('https://www.leboncoin.fr/compte/part/mes-annonces');
+      await attendre(1500);
+      await pl.evaluate(async (id) => { await fetch(`https://api.leboncoin.fr/api/messaging/proxy/api/hal/${id}/counter`, { credentials: 'include' }); await fetch('https://api.leboncoin.fr/api/account/v1/members/me/account', { credentials: 'include' }); await fetch('https://api.leboncoin.fr/api/adfinder/v2/myads', { credentials: 'include' }); }, LBC).catch(() => {});
+      const lus = await attendreQue(async () => { const a = M.ligne('lbc_accounts'), l = M.ligne('lbc_listings'); return a && l ? { a, l } : null; }, 20000, 500);
+      dit(!!lus && lus.a.owner === U.id, 'Leboncoin : le compte est rangé sous CE vendeur', JSON.stringify(M.lignes().map((r) => r.id).filter((x) => /lbc/.test(x))));
+      const it = lus && lus.l.data && lus.l.data.items && lus.l.data.items['123'];
+      dit(!!it && Array.isArray(it.images) && it.images.length === 1, 'Leboncoin : l’annonce et sa photo sont rangées', JSON.stringify(lus && lus.l.data).slice(0, 300));
+      await shot(pl, 'L1-leboncoin');
+      await pl.close().catch(() => {});
+    }
+    // ══ V1 : Vestiaire — le compte de l'onglet lu dans la page, les compteurs de « Mes articles » ═════════════════
+    if (veut('V1')) {
+      console.log('\n── V1. Vestiaire : le compte de l’onglet (page) et les compteurs de « Mes articles »');
+      const nd = { props: { pageProps: { dehydratedState: { queries: [{ queryKey: ['user.user'], state: { status: 'success', data: { id: 4242001 } } }] } } } };
+      await ctx.route('https://www.vestiairecollective.com/**', (r) => r.fulfill({ contentType: 'text/html', body: `<!doctype html><html lang="fr"><head><title>Vestiaire (simulation)</title></head><body><h1>Mes articles</h1><script id="__NEXT_DATA__" type="application/json">${JSON.stringify(nd)}</script></body></html>` }));
+      await ctx.route('https://apiv2.vestiairecollective.com/**', (r) => r.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': 'https://www.vestiairecollective.com', 'access-control-allow-credentials': 'true' }, body: JSON.stringify(/products\/count/.test(r.request().url()) ? { data: { productOnSale: 3, productWaitingPicture: 0, productWaitingValidation: 1, productSold: 2, productRefused: 0, productUnreceived: 0 } } : {}) }));
+      const pv = await page('https://www.vestiairecollective.com/members/profile/selling/');
+      await attendre(2500);
+      await pv.evaluate(() => fetch('https://apiv2.vestiairecollective.com/users/me/products/count', { credentials: 'include' })).catch(() => {});
+      const vs = await attendreQue(async () => M.ligne('vc_session'), 20000, 500);
+      dit(!!vs && vs.data && vs.data.id === '4242001' && vs.owner === U.id, 'Vestiaire : le compte de l’onglet est rangé (`vc_session`, canal de la page)', JSON.stringify(vs && vs.data).slice(0, 200));
+      await attendre(2500);
+      note('lignes Vestiaire : ' + M.lignes().map((r) => r.id).filter((x) => /^vc_/.test(x)).join(' '));
+      await shot(pv, 'V1-vestiaire');
+      await pv.close().catch(() => {});
+    }
+    // ══ C1 : la carte du logo sur vinted.fr (compte relié, « Tout va bien ») ════════════════════════════════════════
+    if (veut('C1')) {
+      console.log('\n── C1. la carte du logo sur vinted.fr');
+      const pc = await page('https://www.vinted.fr/inbox');
+      await attendre(3500);
+      const etat = await pc.evaluate(() => { const h = document.querySelector('#vrm-badge, [id^="vrm-badge"], vrm-badge'); return { hote: !!h, id: h && h.id }; }).catch(() => null);
+      dit(!!etat && etat.hote, 'la carte du logo est posée sur la page Vinted', JSON.stringify(etat));
+      await shot(pc, 'C1-logo');
+      // Le logo touché : la carte s'ouvre.
+      const box = await pc.evaluate(() => { const h = document.querySelector('#vrm-badge, [id^="vrm-badge"], vrm-badge'); if (!h) return null; const r = h.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2, w: r.width, h: r.height }; }).catch(() => null);
+      if (box && box.w > 0) { await pc.mouse.click(box.x, box.y); await attendre(2500); await shot(pc, 'C1-carte-ouverte'); }
+      // La carte vit dans une racine FERMÉE : « Oui, capter ce compte » est touché à sa place à l'écran (au-dessus du logo).
+      if (box && box.w > 0) { await pc.mouse.click(box.x - 168, box.y - 122); await attendre(3000); await shot(pc, 'C1-apres-oui'); }
+      const question = await dansSW(async () => { const x = await chrome.storage.local.get(null); return Object.keys(x).filter((k) => /capt|ignor|confirm/i.test(k)).reduce((o, k) => (o[k] = x[k], o), {}); });
+      note('après « Oui » : ' + JSON.stringify(question).slice(0, 400));
+      if (box && box.w > 0) { await pc.mouse.move(box.x, box.y); await pc.mouse.click(box.x, box.y); await attendre(2500); await shot(pc, 'C1-carte-compte'); }
+      const texte = await pc.evaluate(() => { const h = document.getElementById('vrm-badge'); const r = h && h.shadowRoot; return r ? r.textContent.replace(/\s+/g, ' ').slice(0, 600) : '(racine fermée)'; }).catch(() => '');
+      note('carte : ' + texte);
+      const capte = await dansSW(async () => { try { return await compteNonCapte('111'); } catch (e) { return 'err ' + e.message; } });
+      dit(capte === false, 'après « Oui », le compte est capté dans ce navigateur', JSON.stringify(capte));
+      note('logo : ' + JSON.stringify(box));
+      await pc.close().catch(() => {});
     }
   } catch (e) { dit(false, 'la simulation a levé', e && e.stack); }
   finally {
