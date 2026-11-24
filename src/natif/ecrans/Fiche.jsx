@@ -161,7 +161,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
           </div> : null}
           {plein || aActions ? <div className="nf-actions" data-nf-un={plein ? undefined : '1'}>
             {plein ? <Bouton variante="plein" icone={plein.icone ? rendre.icone(plein.icone, 20) : null} onClick={plein.onClick} attrs={{ 'data-fd-plein': '', ...(plein.attrs || {}) }}>{plein.libelle}</Bouton> : null}
-            {aActions ? <button type="button" className="nf-choisir" onClick={() => setMenu(true)} aria-haspopup="dialog" aria-label={T.choisirAction} data-fd-actions-ouvrir="">
+            {aActions ? <button type="button" className="nf-choisir" onClick={() => setMenu(true)} aria-haspopup="dialog" aria-label={`${T.actionsCourt} — ${T.choisirAction}`} data-fd-actions-ouvrir="">
               <span className="nf-choisir-long">{T.choisirAction}</span><span className="nf-choisir-court" aria-hidden="true">{T.actionsCourt}</span><span className="nf-choisir-fleche" aria-hidden="true"><Glyphe nom="chevron" taille={16}/></span></button> : null}
           </div> : null}
           {ligneSeule ? <p className="nf-situe" data-nf-ton={ligneSeule.ambre ? 'ambre' : 'neutre'} data-fd-ligne-action="" {...(ligneSeule.attrs || {})}>{[ligneSeule.titre, ligneSeule.valeur].filter(Boolean).join(' · ')}</p> : null}
