@@ -22104,32 +22104,75 @@ function lienFavoriProfond(v){
 }
 // La FORME d'un lien de notification inconnu (pour le diagnostic) : le schéma et le gabarit du chemin, jamais une valeur.
 function formeLienFavori(v){const s=String(v||'');const m=/^([a-z][a-z0-9+.-]{0,20}):/i.exec(s);return ((m?m[1].toLowerCase():'rel')+'_'+s.replace(/^[a-z][a-z0-9+.-]{0,20}:\/{0,}/i,'').split(/[?#]/)[0].replace(/\d+/g,'n').replace(/[^a-z_/n]/gi,'').replace(/\//g,'_')).slice(0,40);}
-// 5.440.2 : la liste de la cloche lue page après page jusqu'à la ligne d'un favori (par son id de notification) ou jusqu'à la
-//    DERNIÈRE page que Vinted annonce (`pagination.total_pages`, `current_page`) — lecture seule, même onglet, une page à la
-//    fois. Rend { n, rang, page } (trouvée), { bout:true } (lue jusqu'au bout sans elle : la SEULE preuve de « trop ancien »),
-//    {} (pas au bout : plus de CLOCHE_PAGES_MAX pages, ou une page illisible), { frein } (429/403/captcha), { sansPage }.
+// 5.440.2 : la liste de la cloche lue page après page jusqu'à la ligne d'un favori ou jusqu'à la DERNIÈRE page que Vinted
+//    annonce (`pagination.total_pages`, `current_page`) — lecture seule, même onglet, une page à la fois.
+//    Julien (24 nov. : « si les favoris sont dans la cloche, rends l'extension intelligente ») : la liste est INDEXÉE une
+//    fois (`vrmIndexCloche` : chaque page lue, chaque ligne par son id ET par ses deux identités article + personne tirées
+//    de son lien, web `/items/N/want_it/new?offering_id=U` ou d'application `vintedfr://messaging?item_id=&user_id=`) ;
+//    les favoris suivants de la file y vont DIRECTEMENT (la page où est leur ligne) au lieu de tout relire. L'index ne vaut
+//    que 10 min, pour CE compte, et tant que la tête de la liste n'a pas changé (Vinted ne l'a pas rafraîchie) ; sinon il
+//    est relu. Rend { n, rang, page } (trouvée), { bout:true } (TOUTE la liste lue sans elle : la seule preuve qu'elle n'y
+//    est plus), {} (pas au bout : plus de CLOCHE_PAGES_MAX pages, ou une page illisible), { frein }, { sansPage }.
 //    Une réponse SANS `pagination` est une liste d'une page (ce que Vinted rend tout entier).
-const CLOCHE_PAGES_MAX=6;
-async function listeClocheJusqua(acc,premiere,notificationId){
-  const cherche=String(notificationId||'');let rep=premiere,page=1,rang=0;
-  for(;;){
-    const l=rep&&rep.ok&&rep.json&&Array.isArray(rep.json.notifications)?rep.json.notifications:null;
-    if(!l)return {};
-    const i=l.findIndex(x=>x&&String(x.id)===cherche);
-    if(i>=0)return {n:l[i],rang:rang+i,page};
-    rang+=l.length;
-    const pg=rep.json.pagination&&typeof rep.json.pagination==='object'?rep.json.pagination:null;
-    if(!pg)return {bout:true};
-    const tot=Number(pg.total_pages),cur=Number(pg.current_page)||page,pp=Number(pg.per_page);
-    if(!l.length||(Number.isInteger(tot)&&tot>=0&&cur>=tot))return {bout:true};
-    if(!Number.isInteger(tot))return {};
-    if(page>=CLOCHE_PAGES_MAX)return {};
-    page=cur+1;
+const CLOCHE_PAGES_MAX=6,INDEX_CLOCHE='vrmIndexCloche',INDEX_CLOCHE_MS=10*60000,TAILLE_CLOCHE='vrmTailleCloche';
+// Combien de lignes la cloche de Vinted montre (relevé quand une ligne n'y était pas) ; 24 h, puis relu.
+async function lireTailleCloche(){try{const t=(await chrome.storage.local.get(TAILLE_CLOCHE))[TAILLE_CLOCHE];return t&&Date.now()-Number(t.at)<86400000&&Number.isInteger(t.n)?t.n:0;}catch(_){return 0;}}
+async function poserTailleCloche(n){if(Number.isInteger(n)&&n>0&&n<200)try{await chrome.storage.local.set({[TAILLE_CLOCHE]:{n,at:Date.now()}});}catch(_){}}
+function identiteLienNotif(link){
+  const p=lienFavoriProfond(link);if(p)return {item:p.itemId,user:p.userId};
+  try{const u=new URL(String(link||''),'https://www.vinted.fr');const m=/^\/items\/([1-9]\d{0,19})(?:-[^/]*)?\/want_it(?:\/new)?\/?$/.exec(u.pathname);if(!m)return null;
+    const q=u.searchParams,ks=[...new Set([...q.keys()])];if(ks.some(k=>q.getAll(k).length!==1))return null;
+    const qui=['offering_id','receiver_id','user_id'].filter(k=>q.has(k));if(qui.length!==1||ks.some(k=>/_id$/i.test(k)&&k!==qui[0]&&k!=='item_id'))return null;
+    if(q.has('item_id')&&q.get('item_id')!==m[1])return null;const us=q.get(qui[0]);return /^[1-9]\d{0,19}$/.test(us)&&us!==m[1]?{item:m[1],user:us}:null;}catch{return null;}
+}
+// La ligne de CE favori dans une page : par son id de notification, sinon par ses DEUX identités (une seule ligne).
+function ligneDuFavori(l,cherche,cible){
+  const i=l.findIndex(x=>x&&String(x.id)===cherche);if(i>=0)return i;
+  if(!cible||!cible.itemId||!cible.recipientId)return -1;
+  const k=l.map((x,j)=>{const t=x&&identiteLienNotif(x.link);return t&&t.item===String(cible.itemId)&&t.user===String(cible.recipientId)?j:-1;}).filter(j=>j>=0);
+  return k.length===1?k[0]:-1;
+}
+const teteCloche=l=>(Array.isArray(l)?l:[]).slice(0,5).map(x=>String(x&&x.id||'')).join('|');
+async function listeClocheJusqua(acc,premiere,notificationId,cible){
+  const cherche=String(notificationId||''),uid=String(acc&&acc.vinted_user_id||'');
+  const l1=premiere&&premiere.ok&&premiere.json&&Array.isArray(premiere.json.notifications)?premiere.json.notifications:null;
+  if(!l1)return {};
+  // L'index de la liste (pages déjà lues), s'il est encore celui de CETTE liste.
+  let ix=null;try{ix=(await chrome.storage.local.get(INDEX_CLOCHE))[INDEX_CLOCHE]||null;}catch(_){ix=null;}
+  if(!ix||ix.uid!==uid||!(Date.now()-Number(ix.at)<INDEX_CLOCHE_MS)||ix.tete!==teteCloche(l1)||typeof ix.pages!=='object'){ix={uid,at:Date.now(),tete:teteCloche(l1),pages:{},bout:false,tot:null,pp:null};}
+  const garder=async()=>{try{await chrome.storage.local.set({[INDEX_CLOCHE]:ix});}catch(_){}};
+  const pg1=premiere.json.pagination&&typeof premiere.json.pagination==='object'?premiere.json.pagination:null;
+  ix.pages['1']=l1.map(x=>({id:String(x&&x.id||''),link:typeof (x&&x.link)==='string'?x.link:''}));
+  if(pg1){const t=Number(pg1.total_pages),pp=Number(pg1.per_page);if(Number.isInteger(t))ix.tot=t;if(Number.isInteger(pp)&&pp>0&&pp<=100)ix.pp=pp;}
+  const rangDe=(page,i)=>{let r=0;for(let k=1;k<page;k++)r+=(ix.pages[String(k)]||[]).length||(ix.pp||20);return r+i;};
+  let i=ligneDuFavori(l1,cherche,cible);
+  if(i>=0){await garder();return {n:l1[i],rang:i,page:1};}
+  if(!pg1||!l1.length||(Number.isInteger(ix.tot)&&ix.tot<=1)){ix.bout=true;await garder();return {bout:true};}
+  if(!Number.isInteger(ix.tot)){await garder();return {};}
+  const lire=async(page)=>{
     await new Promise(ok=>setTimeout(ok,600+Math.round(Math.random()*900)));
-    const q=`?page=${page}`+(Number.isInteger(pp)&&pp>0&&pp<=100?`&per_page=${pp}`:'');
-    rep=await vintedPage(acc,'GET',adresseClocheVinted(acc.domain)+q,null,{timeoutMs:12000,travail:true,chemin:'/inbox'});
-    const f=freinFavoriAuto(rep);if(f)return {frein:f,status:rep.status};
-    if(rep.sansPage)return {sansPage:true};
+    const r=await vintedPage(acc,'GET',adresseClocheVinted(acc.domain)+`?page=${page}`+(ix.pp?`&per_page=${ix.pp}`:''),null,{timeoutMs:12000,travail:true,chemin:'/inbox'});
+    const f=freinFavoriAuto(r);if(f)return {frein:f,status:r.status};if(r.sansPage)return {sansPage:true};
+    const l=r.ok&&r.json&&Array.isArray(r.json.notifications)?r.json.notifications:null;if(!l)return {illisible:true};
+    ix.pages[String(page)]=l.map(x=>({id:String(x&&x.id||''),link:typeof (x&&x.link)==='string'?x.link:''}));
+    const pg=r.json.pagination;if(pg&&Number.isInteger(Number(pg.total_pages)))ix.tot=Number(pg.total_pages);
+    return {l};
+  };
+  // 1. L'index connaît déjà sa page : elle seule est relue (la ligne y est-elle toujours ?).
+  for(const [k,lst] of Object.entries(ix.pages)){if(k==='1')continue;if(ligneDuFavori(lst,cherche,cible)>=0){
+    const r=await lire(Number(k));if(r.frein||r.sansPage)return r;
+    if(r.l){const j=ligneDuFavori(r.l,cherche,cible);if(j>=0){noterDiag('favori_index_cloche');await garder();return {n:r.l[j],rang:rangDe(Number(k),j),page:Number(k)};}}
+    break;}}
+  // 2. L'index a déjà été lu jusqu'au bout sans elle (même liste, il y a moins de 10 min) : elle n'y est pas.
+  if(ix.bout&&!Object.values(ix.pages).some(lst=>ligneDuFavori(lst,cherche,cible)>=0)){noterDiag('favori_index_cloche_bout');return {bout:true};}
+  // 3. Sinon, les pages suivantes une à une (celles que l'index n'a pas encore), jusqu'à elle ou jusqu'au bout.
+  for(let page=2;;page++){
+    if(Number.isInteger(ix.tot)&&page>ix.tot){ix.bout=true;await garder();return {bout:true};}
+    if(page>CLOCHE_PAGES_MAX){await garder();return {};}
+    const r=await lire(page);if(r.frein||r.sansPage){await garder();return r;}
+    if(!r.l){await garder();return {};}
+    const j=ligneDuFavori(r.l,cherche,cible);if(j>=0){await garder();return {n:r.l[j],rang:rangDe(page,j),page};}
+    if(!r.l.length){ix.bout=true;await garder();return {bout:true};}
   }
 }
 // 5.440 : l'adresse de la liste de la cloche, sur l'hôte `api.` du domaine du compte (mesuré : www → 404, api → 200).
@@ -22243,7 +22286,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     //    lue page après page (GET, même onglet, `pagination` de Vinted) jusqu'à la ligne de CE favori ou jusqu'à sa DERNIÈRE
     //    page ; au-delà de `CLOCHE_PAGES_MAX` pages sans la trouver, rien n'est conclu (« pas encore trouvée », le favori
     //    attend). Seule une liste lue jusqu'au bout sans lui prouve qu'il est trop ancien pour Vinted.
-    const lc=liste?await listeClocheJusqua(acc,cl,body.notificationId):null;
+    const lc=liste?await listeClocheJusqua(acc,cl,body.notificationId,{itemId:body.itemId,recipientId:body.recipientId}):null;
     if(lc&&lc.frein){if(!frein)frein=lc.frein;return rep('refuse',lc.status);}
     if(lc&&lc.sansPage)return rep('refuse',0,'onglet_vinted');
     if(lc&&!lc.n&&lc.bout){noterDiag('favori_trop_ancien');return rep('ignore',cl.status,'favori_trop_ancien');}
@@ -22272,7 +22315,13 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   }
   const page=lienBrut&&!profond?pageFavoriNative(lienBrut,acc.domain||'www.vinted.fr'):null;
   if(lienBrut&&!profond&&(!page||page.itemId!==body.itemId||(destinataireLienFavori(page)&&destinataireLienFavori(page)!==body.recipientId))){noterDiag(page?'favori_lien_autre':'favori_lien_forme_'+formeLienFavori(lienBrut));return rep('refuse',0,'identite_non_confirmee','lien_autre');}
-  let creation=await interfaceVinted(acc,'favoriOuvrir',{lien:page?page.url:'',itemId:body.itemId,receiverId:body.recipientId,favori:true});
+  // 5.440.2 (Julien : « rends l'extension intelligente ») : la ligne de CE favori est plus bas dans la liste que ce que la
+  //    cloche montre (taille relevée au tour précédent) ⇒ directement la page complète, sans rouvrir la cloche pour rien.
+  const tailleCloche=await lireTailleCloche();
+  let creation=rangCloche>=0&&tailleCloche>0&&rangCloche>=tailleCloche
+    ?(noterDiag('favori_direct_page'),{ok:false,rienParti:true,absent:true,voirTout:await pageNotifsConnue()})
+    :await interfaceVinted(acc,'favoriOuvrir',{lien:page?page.url:'',itemId:body.itemId,receiverId:body.recipientId,favori:true});
+  if(creation&&creation.cloche&&creation.absent&&Number.isInteger(creation.lignes)&&creation.lignes>0)await poserTailleCloche(creation.lignes);
   // 5.440 (`clocheauto`, Julien, 23 nov. : « l'app doit s'adapter toute seule ») : la cloche introuvable sur la messagerie
   //    ⇒ l'ACCUEIL de Vinted (l'en-tête complet y est toujours), sans rien demander ; toujours introuvable ⇒ la page complète
   //    des notifications (chemin lu sur la page, sinon le connu) ; plus jamais « touche le bouton ».
@@ -37204,7 +37253,7 @@ ${lettre[1]}`;
   // src/favorisProgression.js
   var RAISONS_LOCALES = Object.freeze(["notification_pas_trouvee", "element_introuvable", "identite_non_confirmee", "historique_non_verifie"]);
   var RAISONS_SAUT = Object.freeze(["favori_trop_ancien", "annonce_indisponible", "article_vendu", "conversation_deja_contactee", "conversation_existante", "offre_sous_plancher", "conversation_refusee"]);
-  var MOTS_SAUT = Object.freeze({ favori_trop_ancien: "trop anciens pour Vinted", annonce_indisponible: "vendus ou indisponibles", conversation_deja_contactee: "déjà en conversation", offre_sous_plancher: "offre sous le prix mini", conversation_refusee: "conversation refusée par Vinted", autre: "autres" });
+  var MOTS_SAUT = Object.freeze({ favori_trop_ancien: "pas trouvés dans tes notifications", annonce_indisponible: "vendus ou indisponibles", conversation_deja_contactee: "déjà en conversation", offre_sous_plancher: "offre sous le prix mini", conversation_refusee: "conversation refusée par Vinted", autre: "autres" });
   var MOTS_REFUS = Object.freeze({ notification_pas_trouvee: "notification du favori pas encore trouvée sur la page Vinted", element_introuvable: "bouton ou champ introuvable sur la page de Vinted", identite_non_confirmee: "article ou destinataire pas confirmé", historique_non_verifie: "conversation pas vérifiée", texte_interdit: "texte contenant un lien, un e-mail, un téléphone ou un paiement hors Vinted", texte_refuse: "texte refusé par Vinted", vinted_robot: "vérification anti-robot de Vinted", pause_vinted: "Vinted demande de ralentir", vinted_frein: "Vinted demande de ralentir", offre_refusee: "offre refusée par Vinted", autre: "autre refus" });
   function phraseBilanFavoris(b, mot) {
     if (!b) return "";

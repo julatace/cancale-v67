@@ -87,6 +87,14 @@ export const exige5281=j=>/[{}]/.test(String(j?.message||'')+(Array.isArray(j?.v
 // (12 nov., ext. 5.369) `variantes` : ses autres versions du message (2 à 5), copiées dans
 // chaque tentative ; l'extension en tire une, jamais celle du message précédent.
 const variantesValides=v=>Array.isArray(v)&&v.length>=1&&v.length<=4&&v.every(x=>typeof x==='string'&&x.trim()&&x.length<=2000);
+// 5.440.2 (Julien, 24 nov. : « traite d'abord les favoris dont la ligne est visible, puis va chercher les plus anciens ») :
+// la file part des favoris les PLUS RÉCENTS (date de leur notification chez Vinted, la plus récente d'abord — ceux que la
+// cloche montre), puis les plus anciens ; une date inconnue garde sa place relative, après les datés. Tri stable.
+export function ordreRecents(targets,dateDe){
+  const l=(Array.isArray(targets)?targets:[]).map((t,i)=>{const v=Date.parse(String(dateDe(t)||''));return {t,i,v:Number.isFinite(v)?v:null};});
+  l.sort((a,b)=>a.v!=null&&b.v!=null?(b.v-a.v)||(a.i-b.i):a.v!=null?-1:b.v!=null?1:a.i-b.i);
+  return l.map(x=>x.t);
+}
 export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMinutes,intervalleMax=null,maintenant,lot=String(maintenant),pourcentage=null,offre=null,rythme=null,plage=null}){
   const ry=RYTHMES_FAVORIS[rythme]?rythme:null;
   const pl=ry==='prudent'?null:plageValide(plage);

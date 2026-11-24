@@ -744,7 +744,9 @@
         let ouverteDepuis = p ? Date.now() : 0;
         const t = await trouver(8000, async () => { p = panneauCloche(); if (p && !ouverteDepuis) ouverteDepuis = Date.now(); return p && Date.now() - ouverteDepuis > 2500 ? 'fini' : ''; });
         if (t.captcha) return vuCaptcha(); if (t.ambigu) return manque('favori-notification-ambigue');
-        if (t.absent) return absent({ cloche: !!p, voirTout: (p && p.voirTout) || '' });
+        // 5.440.2 : combien de lignes la cloche montre (lignes de favori ou de notification visibles) — le fond s'en sert pour
+        //    aller DIRECTEMENT à la page complète quand la ligne d'un favori est plus bas dans la liste de Vinted.
+        if (t.absent) { const vues = [...document.querySelectorAll('a[href*="/want_it"], a[href*="receiver_id="], a[href*="offering_id="], a[href*="/items/"]')].filter((x) => visible(x) && !x.closest('header, footer, [role="banner"]')).length; return absent({ cloche: !!p, voirTout: (p && p.voirTout) || '', lignes: vues }); }
         l = { el: t.el };
       }
       // 2. La ligne du favori (le lien porte l'article ET la personne) : un clic ; la page ouvre la conversation.

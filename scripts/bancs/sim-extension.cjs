@@ -83,7 +83,9 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       if (req.method === 'GET') r = { valeur: FF.vueFile(FF.initialiserFile(S.d), owner) };
       else if (c.action === 'apercu') return j(200, { ok: true, uid: UID, apercu: apercu(), serveur: maintenant });
       else if (c.action === 'lancer') {
-        const targets = (c.selection || []).map((nid) => { const f = FAVORIS.find((x) => x.nid === nid); return f && { notificationId: f.nid, itemId: f.itemId, recipientId: f.userId, initiator: f.login }; }).filter(Boolean);
+        const targets0 = (c.selection || []).map((nid) => { const f = FAVORIS.find((x) => x.nid === nid); return f && { notificationId: f.nid, itemId: f.itemId, recipientId: f.userId, initiator: f.login }; }).filter(Boolean);
+        // La file part des favoris les plus récents (règle du serveur, `ordreRecents`), dates de la liste simulée.
+        const targets = FF.ordreRecents ? FF.ordreRecents(targets0, (t) => { const i = FAVORIS.findIndex((x) => x.nid === t.notificationId); return i >= 0 ? new Date(Date.now() - (i + 1) * 600000).toISOString() : null; }) : targets0;
         r = FF.lancerFile(S.d, { owner, targets, message: REGLAGES.message, intervalleMinutes: 0, maintenant, lot: crypto.randomUUID(), pourcentage: 10, offre: { mode: 'pct', valeur: 10, arrondi: false }, rythme: null, plage: { min: 20000, max: 21000 } });
       } else if (c.action === 'suivant') r = FF.reserverFile(S.d, { owner, maintenant, jeton: crypto.randomUUID(), suivi: crypto.randomUUID() });
       else if (c.action === 'consommer') r = FF.consommerFile(S.d, { owner, jeton: c.jeton, maintenant });
@@ -136,7 +138,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     // l'acheteur de la commande n'est plus comparé
     'commande-acheteur': ['background.js', "if(!acheteur||!attendu||acheteur!==String(attendu.recipientId))return non('commande_autre_acheteur');", ''],
     // (5.440.2) la liste de la cloche jugée sur sa PREMIÈRE page (absente ⇒ « trop ancien »), comme la 5.440.1
-    'liste-premiere-page': ['background.js', 'if(page>=CLOCHE_PAGES_MAX)return {};', 'return {bout:true};'],
+    'liste-premiere-page': ['background.js', 'for(let page=2;;page++){', 'for(let page=2;;page++){ix.bout=true;return {bout:true};'],
     // (5.440.2) la page complète déclarée lue sans attendre la suite (≈ la 5.440.1 : 1,4 s sans changement)
     'page-sans-attente': ['vrm-formulaire.js', 'while (Date.now() - t0 < 4000) {', 'while (Date.now() - t0 < 300) {'],
   };
@@ -176,7 +178,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     const lancer = async (sel) => {
       const tabId = await dansSW(async () => { const t = await chrome.tabs.query({ url: 'https://www.vinted.fr/*' }); return t.length ? t[0].id : null; });
       const ap = await dansSW(async ([uid, tabId]) => favorisCarte({ quoi: 'apercu', uid }, { tab: await chrome.tabs.get(tabId) }), [UID, tabId]);
-      const r = await dansSW(async ([uid, tabId, sel, reg]) => favorisCarte({ quoi: 'lancer', uid, confirme: true, selection: sel, reglages: reg, items: sel.map((n) => ({ itemId: ({ 'n-0001': '91010001', 'n-0002': '91010002', 'n-0003': '91010003' })[n], notificationId: n, photo: `https://images1.vinted.net/t/${n}/f800/photo.jpeg`, titre: 'Paire ' + n.slice(-1) })) }, { tab: await chrome.tabs.get(tabId) }), [UID, tabId, sel, REGLAGES]);
+      const r = await dansSW(async ([uid, tabId, sel, reg]) => favorisCarte({ quoi: 'lancer', uid, confirme: true, selection: sel, reglages: reg, items: sel.map((n) => ({ itemId: (FAVORIS.find((x) => x.nid === n) || {}).itemId, notificationId: n, photo: `https://images1.vinted.net/t/${n}/f800/photo.jpeg`, titre: 'Paire ' + n.slice(-1) })) }, { tab: await chrome.tabs.get(tabId) }), [UID, tabId, sel, REGLAGES]);
       return { ap, r };
     };
     const vue = () => FF.vueFile(FF.initialiserFile(S.d), U.id);
@@ -189,13 +191,20 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     };
 
     // ══ F1 : 3 favoris, identité par la commande ═════════════════════════════════════════════════════════════════
-    for (const F1 of ['F1', 'F1W', 'F1M', 'F1E', 'F1P', 'F1T', 'F1T2']) if (veut(F1)) {
-      const T = F1 === 'F1T' || F1 === 'F1T2';
+    for (const F1 of ['F1', 'F1W', 'F1M', 'F1E', 'F1P', 'F1T', 'F1T2', 'F1X']) if (veut(F1)) {
+      const T = F1 === 'F1T' || F1 === 'F1T2' || F1 === 'F1X';
+      // F1X (Julien, 24 nov. : « si les favoris sont dans la cloche, rends l'extension intelligente ») : 6 favoris, la cloche
+      // n'en montre que 2, les 4 autres seulement sur la page complète (3 lignes, puis la suite au défilement) ⇒ 6/6.
+      FAVORIS.splice(3); ANNONCES.splice(3);
+      if (F1 === 'F1X') for (let k = 4; k <= 6; k++) { FAVORIS.push({ nid: `n-000${k}`, itemId: String(91010000 + k), userId: String(3000000 + k), login: `acheteur_${k}` }); ANNONCES.push({ id: 91010000 + k, titre: `Paire simulée ${k}`, prix: 50 + k }); }
+      const N = FAVORIS.length;
       for (const [i, f] of FAVORIS.entries()) f.forme = F1 === 'F1W' || T ? 'web' : F1 === 'F1M' ? (i === 1 ? 'web' : 'app') : 'app';
-      if (T) console.log(`\n── ${F1}. (24 nov., Julien : « Sauté · Favori trop ancien » pour des favoris de la veille) liens web ; ${F1 === 'F1T' ? 17 : 25} notifications plus récentes avant les 3 favoris ; la cloche n’en montre que 5 ; la page complète 15, puis la suite au défilement (2 s)${F1 === 'F1T2' ? ' ; les favoris sur la page 2 de l’API' : ''}`);
+      if (F1 === 'F1X') console.log('\n── F1X. 6 favoris (liens web) : 2 dans la cloche, 4 seulement sur la page complète (3 lignes, puis la suite au défilement, 2 s)');
+      else if (T) console.log(`\n── ${F1}. (24 nov., Julien : « Sauté · Favori trop ancien » pour des favoris de la veille) liens web ; ${F1 === 'F1T' ? 17 : 25} notifications plus récentes avant les 3 favoris ; la cloche n’en montre que 5 ; la page complète 15, puis la suite au défilement (2 s)${F1 === 'F1T2' ? ' ; les favoris sur la page 2 de l’API' : ''}`);
       if (T) {} else if (F1 === 'F1W' || F1 === 'F1M') console.log(`\n── ${F1}. trois favoris, liens ${F1 === 'F1W' ? 'web (/items/N/want_it/new?offering_id=N)' : 'mêlés (app, web, app)'}`); else console.log(F1 === 'F1P' ? '\n── F1P. ancienne relecture refusée (commande), message avec {pseudo}' : F1 === 'F1' ? '\n── F1. trois favoris lancés depuis la carte (l’ancienne relecture répond, comme mesuré le 21 nov.)' : '\n── F1E. les mêmes, l’ancienne relecture REFUSÉE : nouvelle messagerie, identité par la commande');
       await reset();
-      if (T) Object.assign(V.st, { avant: F1 === 'F1T' ? 17 : 25, paginer: true, clocheN: 5, pageTaille: 15, suiteMs: 2000 });
+      if (F1 === 'F1X') Object.assign(V.st, { avant: 0, paginer: true, clocheN: 2, pageTaille: 3, suiteMs: 2000 }); seed();
+      if (T && F1 !== 'F1X') Object.assign(V.st, { avant: F1 === 'F1T' ? 17 : 25, paginer: true, clocheN: 5, pageTaille: 15, suiteMs: 2000 });
       if (F1 === 'F1E' || F1 === 'F1P') V.st.ancienneConv = 404;
       if (F1 === 'F1E') REGLAGES.message = MSG_SIMPLE;
       if (F1 === 'F1P') console.log('   (F1P : la même chose avec un message qui porte {pseudo})');
@@ -213,23 +222,27 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       const ecr = ecrituresVinted();
       const inq = ecr.filter((e) => /inquiries$/.test(e.p)), msgs = ecr.filter((e) => /\/replies$/.test(e.p)), offres = ecr.filter((e) => /\/offers$/.test(e.p));
       dit(!!res, 'la file se termine', JSON.stringify(parItem()));
-      dit(inq.length === 3 && inq.every((e) => e.uid === UID), '3 conversations ouvertes PAR LA PAGE, au nom du compte de l’onglet', inq.map((e) => e.corps).join(' | '));
-      dit(msgs.length === 3 && msgs.every((e) => { let t = ''; try { t = String(JSON.parse(e.corps).content || ''); } catch (_) {} return e.uid === UID && /ton favori est toujours dispo/.test(t) && !/[{}]/.test(t); }), '3 messages envoyés par la page', msgs.map((e) => e.corps.slice(0, 80)).join(' | '));
-      dit(offres.length === 3, '3 offres (réduction de 10 %) envoyées par la page', offres.map((e) => e.p + ' ' + e.corps).join(' | '));
+      dit(inq.length === N && inq.every((e) => e.uid === UID), N + ' conversations ouvertes PAR LA PAGE, au nom du compte de l’onglet', inq.map((e) => e.corps).join(' | '));
+      dit(msgs.length === N && msgs.every((e) => { let t = ''; try { t = String(JSON.parse(e.corps).content || ''); } catch (_) {} return e.uid === UID && /ton favori est toujours dispo/.test(t) && !/[{}]/.test(t); }), N + ' messages envoyés par la page', msgs.map((e) => e.corps.slice(0, 80)).join(' | '));
+      dit(offres.length === N, N + ' offres (réduction de 10 %) envoyées par la page', offres.map((e) => e.p + ' ' + e.corps).join(' | '));
       if (F1 === 'F1E' || F1 === 'F1P') dit(V.st.req.some((e) => /escrow-orders/.test(e.p)), 'la commande escrow est relue (identité par la commande)', V.st.req.filter((e) => e.h === 'api.vinted.fr').map((e) => e.m + ' ' + e.p).slice(0, 12).join(' '));
       dit(ecr.every((e) => !e.origine.startsWith('chrome-extension')), 'aucune écriture partie du service worker (toutes de la page)', ecr.map((e) => e.origine).join(','));
       for (const cv of V.st.convs.values()) { const ordre = [...cv.messages.map(() => 'm'), ...cv.offres.map(() => 'o')]; void ordre; }
       const b = FP.bilanFavoris(jobs());
       const f = res && res.f;
       note(`bilan VRM ${JSON.stringify(b)} · carte ${JSON.stringify(f && f.f && f.f.file)}`);
-      dit(b.envoyes === 3, 'VRM : 3 envoyés', JSON.stringify(parItem()));
+      dit(b.envoyes === N, `VRM : ${N} envoyés`, JSON.stringify(parItem()));
+      if (F1 === 'F1X') { const ordre = inq.map((e) => { try { return String(JSON.parse(e.corps).item_id || ''); } catch (_) { return ''; } }); const pages = V.st.req.filter((e) => e.page && /^\/member\/notifications/.test(e.p)).length;
+        dit(JSON.stringify(ordre) === JSON.stringify(FAVORIS.map((f) => f.itemId)), 'du plus récent au plus ancien (ceux de la cloche d’abord)', JSON.stringify(ordre));
+        dit(pages >= 1 && pages <= 4, 'la page complète ouverte pour les favoris plus bas que la cloche (et pas pour ceux de la cloche)', 'pages complètes : ' + pages); }
       if (T) dit(!jobs().some((x) => x.raison === 'favori_trop_ancien'), 'aucun favori « trop ancien » (la liste de Vinted les contient, de la veille)', JSON.stringify(parItem()));
       const fenL = f && f.a && Array.isArray(f.a.lignes) ? f.a.lignes : [];
-      dit(fenL.length === 3 && fenL.every((l) => l.etat === 'envoye'), 'la fenêtre : 3 lignes « envoyé »', JSON.stringify(fenL.map((l) => l.etat)));
+      dit(fenL.length === N && fenL.every((l) => l.etat === 'envoye'), `la fenêtre : ${N} lignes`+'  « envoyé »', JSON.stringify(fenL.map((l) => l.etat)));
       dit(f && f.f && f.f.file && Number(f.f.file.envoyes) === b.envoyes, 'les nombres de la carte = ceux de VRM', JSON.stringify(f && f.f && f.f.file));
       const tw = ctx.pages().find((p) => /vinted\.fr\/inbox\//.test(p.url())); if (tw) await shot(tw, F1 + '-fin'); await vt.bringToFront().catch(() => {}); await attendre(800); await shot(vt, F1 + '-onglet-de-julien');
     }
     // ══ F2/F3/F4 : un désaccord sur la commande ⇒ ce favori n'est pas envoyé, la file continue ══════════════════════
+    FAVORIS.splice(3); ANNONCES.splice(3);
     for (const [nom, desaccord, quoi] of [['F2', { buyer: '3999999' }, 'un AUTRE acheteur'], ['F3', { item: '91019999' }, 'un AUTRE article'], ['F4', { conv: '01a1fdff-0000-7000-a000-000000000000' }, 'une AUTRE conversation']]) {
       if (!veut(nom)) continue;
       console.log(`\n── ${nom}. la commande du 2ᵉ favori dit ${quoi}`);
