@@ -21,6 +21,7 @@ require('./_porte-banc.cjs');
 //    F7  un autre compte dans l'onglet ⇒ rien ne part.
 //    F8  l'onglet de travail fermé en cours de route ⇒ la file s'arrête chez VRM, rien de plus.
 //    F9  l'extension rechargée en cours de route ⇒ rien ne part deux fois.
+//    O1  (5.440.3) « Observer Vinted » : un envoi à la main (cloche, ligne, message, offre), la frise relue dans la base.
 //    F1T / F1T2 (24 nov., 5.440.2) : 17 (25) notifications plus récentes avant les 3 favoris, la cloche n'en montre que 5,
 //        la page complète 15 puis la suite au défilement (2 s) ; F1T2 : les favoris sur la page 2 de l'API. 5.440.1 :
 //        « Sauté · Favori trop ancien » (le cas de Julien) ; 5.440.2 : 3/3 envoyés.
@@ -381,6 +382,72 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       note('lignes Vestiaire : ' + M.lignes().map((r) => r.id).filter((x) => /^vc_/.test(x)).join(' '));
       await shot(pv, 'V1-vestiaire');
       await pv.close().catch(() => {});
+    }
+    // ══ O1 (24 nov., 5.440.3) : « Observer Vinted » — un envoi À LA MAIN (vrais clics de Playwright), la frise relue ══
+    if (veut('O1')) {
+      console.log('\n── O1. « Observer Vinted (10 min) » : cloche, ligne du favori, message et offre tapés à la main ; la frise');
+      await reset(); FAVORIS.splice(3); for (const f of FAVORIS) f.forme = 'app';
+      const SECRET_MSG = 'Coucou acheteuse_un, ta Nike Cortez est encore là à 45 € !';
+      await vt.goto('https://www.vinted.fr/inbox', { waitUntil: 'domcontentloaded' }).catch(() => {});
+      await attendre(1500);
+      const d0 = await dansSW(async () => commandeObservation({ quoi: 'demarrer' }));
+      dit(d0 && d0.ok && d0.actif === true && d0.fin - d0.debut === 600000, 'allumé pour 10 min (son geste)', JSON.stringify(d0));
+      await attendre(1200);
+      const avant = V.st.req.length;
+      // Un clic qui n'est PAS de lui (script) : noté `conf:false`.
+      await vt.evaluate(() => { document.getElementById('cloche').click(); }).catch(() => {});
+      await attendre(900);
+      await vt.evaluate(() => { document.getElementById('cloche').click(); }).catch(() => {});   // refermée
+      await attendre(600);
+      // À la main : la cloche, la ligne du 1er favori, le message, l'offre.
+      await vt.click('#cloche'); await attendre(1400);
+      await vt.click('#lignes a.rang'); 
+      await vt.waitForURL(/\/inbox\/[0-9a-f-]{36}/, { timeout: 10000 }).catch(() => {});
+      await vt.waitForSelector('textarea', { timeout: 10000 }).catch(() => {});
+      await vt.click('textarea'); await vt.keyboard.type(SECRET_MSG, { delay: 5 });
+      await vt.click('form button[type=submit]'); await attendre(1200);
+      await vt.click('#offreB'); await attendre(500); await vt.fill('[role=dialog] input', '45'); await vt.click('#prop'); await attendre(1500);
+      await shot(vt, 'O1-apres-envoi');
+      await attendre(2500);
+      const env = await dansSW(async () => commandeObservation({ quoi: 'envoyer' }));
+      dit(env && env.ok && env.n > 0 && /^observation_vinted_111_[0-9a-f]{16}$/.test(String(env.ligne)), '« Envoyer l’observation » : la ligne observation_vinted_{compte}_{navigateur} est écrite', JSON.stringify(env));
+      const ligne = M.lignes().find((r) => /^observation_vinted_111_/.test(r.id));
+      const d = ligne && ligne.data, ev = (d && d.ev) || [];
+      note('frise (' + ev.length + ') : ' + ev.map((e) => e.k === 'req' ? `${e.m} ${e.h}${e.p} ${e.st}` : e.k === 'clic' ? `clic(${e.conf ? 'lui' : 'script'}) ${e.tag}${e.aria ? ' «' + e.aria + '»' : ''}${e.href ? ' ' + e.href : ''}` : e.k === 'page' ? `page ${e.p}` : `${e.k} ${e.n != null ? e.n : e.lignes}`).join(' · ').slice(0, 3000));
+      const i = (f) => ev.findIndex(f);
+      const iScript = i((e) => e.k === 'clic' && e.conf === false && e.aria === 'notifications');
+      const iCloche = i((e) => e.k === 'clic' && e.conf === true && e.aria === 'notifications' && e.entete && e.entete.n >= 3 && e.entete.i >= 1);
+      const iNotifs = i((e) => e.k === 'notifs' && e.n === 3 && (e.formes || []).includes('vintedfr://messaging?item_id={id}&user_id={id}&portal=fr') && e.sortes && e.sortes['20'] === 3);
+      const iLignes = i((e) => e.k === 'cloche' && e.lignes >= 3 && (e.formes || []).includes('/inbox/want_it/new?receiver_id={id}&item_id={id}'));
+      const iLigne = i((e) => e.k === 'clic' && e.conf === true && e.href === '/inbox/want_it/new?receiver_id={id}&item_id={id}' && e.tid === 'notification-item');
+      const iInq = i((e) => e.k === 'req' && e.m === 'POST' && e.h === 'api.vinted.fr' && e.p === '/messaging/main/inquiries' && e.st === 201 && (e.corps || []).includes('item_id:string') && (e.corps || []).includes('receiver_id:string') && e.rep && e.rep.conversation_id === 'string');
+      const iPage = i((e) => e.k === 'page' && e.p === '/inbox/{uuid}');
+      const iRelu = i((e) => e.k === 'req' && e.m === 'GET' && e.p === '/messaging/main/conversations/{uuid}' && e.st === 200 && e.rep && e.rep['conversation.core_id_deprecated'] === 'number');
+      const iZone = i((e) => e.k === 'clic' && e.conf === true && e.tag === 'textarea' && e.tid === 'conversation-message-input');
+      const iRep = i((e) => e.k === 'req' && e.m === 'POST' && e.p === '/messaging/main/conversations/{uuid}/replies' && e.st === 201 && JSON.stringify(e.corps) === '["content:string"]');
+      const iOffre = i((e) => e.k === 'req' && e.m === 'POST' && e.h === '' && e.p === '/api/v2/transactions/{id}/offers' && e.st === 200 && (e.corps || []).includes('offer.price:string'));
+      dit(iScript >= 0, 'un clic de script sur la cloche est noté « pas de lui » (isTrusted false)', iScript);
+      dit(iCloche >= 0, 'ouvre la cloche : clic de LUI, « notifications », sa place dans l’en-tête', JSON.stringify(ev[iCloche] || null));
+      dit(iNotifs >= 0, 'la liste de la cloche lue par la page : 3 lignes, liens d’application (forme), sorte 20', JSON.stringify(ev.filter((e) => e.k === 'notifs')).slice(0, 400));
+      dit(iLignes >= 0, 'les lignes visibles de la cloche : leur nombre et la forme de leur lien', JSON.stringify(ev.filter((e) => e.k === 'cloche')).slice(0, 400));
+      dit(iLigne > iCloche, 'clic sur la ligne du favori (lien want_it, data-testid)', JSON.stringify(ev[iLigne] || null));
+      dit(iInq > iLigne, 'POST api.vinted.fr/messaging/main/inquiries 201 — clés du corps (item_id, receiver_id), forme de la réponse', JSON.stringify(ev[iInq] || null));
+      dit(iPage > iLigne, 'la page /inbox/{uuid}', iPage);
+      dit(iRelu > iInq, 'GET …/messaging/main/conversations/{uuid} 200 (core_id_deprecated : nombre)', JSON.stringify(ev[iRelu] || null).slice(0, 300));
+      dit(iZone > iPage, 'clic dans le champ du message (balise, data-testid — jamais ce qui est tapé)', JSON.stringify(ev[iZone] || null));
+      dit(iRep > iZone, 'POST …/conversations/{uuid}/replies 201, corps « content:string » seulement', JSON.stringify(ev[iRep] || null));
+      dit(iOffre > iPage, 'POST /api/v2/transactions/{id}/offers 200, corps offer.price:string', JSON.stringify(ev[iOffre] || null));
+      const brut = JSON.stringify(d || {});
+      const fuites = [SECRET_MSG, 'Coucou', 'Cortez', 'acheteuse_un', 'acheteur_deux', '91010001', '3000001', ...[...V.st.convs.values()].flatMap((c) => [c.uuid, String(c.core), String(c.tx)]), 'access_token', 'rt-111', 'anon-sim'].filter((x) => brut.includes(x));
+      dit(!fuites.length, 'aucune valeur dans la ligne : ni le message tapé, ni pseudo, ni identifiant, ni uuid, ni jeton', fuites.join(' | '));
+      const ecritPage = V.st.req.slice(avant).filter((e) => e.m !== 'GET' && !e.page && e.m !== 'OPTIONS');
+      dit(ecritPage.length === 3 && ecritPage.every((e) => e.origine === 'https://www.vinted.fr'), 'Vinted n’a reçu que les 3 écritures de la page (ses clics) — aucune de l’observation', ecritPage.map((e) => e.m + ' ' + e.p + ' ' + e.origine).join(' | '));
+      // La fin par le temps (10 min passées : l'heure de fin ramenée dans le passé).
+      const fin = await dansSW(async () => { const x = await chrome.storage.local.get('vrmObservation'); const s = x.vrmObservation; s.fin = Date.now() - 1000; await chrome.storage.local.set({ vrmObservation: s }); return commandeObservation({ quoi: 'etat' }); });
+      dit(fin && fin.actif === false && fin.raison === 'delai', 'au bout des 10 min, l’observation s’arrête seule', JSON.stringify(fin));
+      const apres = ev.length; await vt.click('#cloche').catch(() => {}); await attendre(2500);
+      const n2 = await dansSW(async () => ((await chrome.storage.local.get('vrmObservationEv')).vrmObservationEv || []).length);
+      dit(n2 === apres || n2 === env.n, 'arrêtée : plus rien n’est noté', `${apres} → ${n2}`);
     }
     // ══ C1 : la carte du logo sur vinted.fr (compte relié, « Tout va bien ») ════════════════════════════════════════
     if (veut('C1')) {
