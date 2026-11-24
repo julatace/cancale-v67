@@ -7,7 +7,7 @@
 //   · scripts/modeles-email.cjs — les six modèles de compte Supabase
 //     (supabase/templates/*.html, à coller dans Supabase).
 // Un e-mail n'a pas de `backdrop-filter` : le « verre » se rend par
-//   1. un FOND gris clair (couleur unie #F4F4F2 — ce que montre un client qui
+//   1. un FOND gris clair (couleur unie #DFE1E5 — ce que montre un client qui
 //      retire les images de fond — et le dégradé de la page en image de fond) ;
 //   2. en tête, sur le bleu : le logo (image hébergée sur vrm.center, jamais en
 //      base64) + le mot « VRM », puis le TITRE en blanc ;
@@ -20,9 +20,9 @@
 // / `[data-ogsb]` (Outlook.com) : gris-ardoise, carte grise, texte clair.
 // (23 nov., Julien : « tous les tutos doivent ressembler à l'application », puis « toute l'app en
 // gris clair ») : le BLEU de la première forme est remplacé par le GRIS CLAIR de l'app
-// (src/natif/jetons.css : fond #F4F4F2, carte blanche, encre #16181D, filet #E5E4E0) ; titre et
-// pied à l'encre sur le gris ; le lien À L'ENCRE et SOULIGNÉ (aucun bleu vif : audit-style-vintex) ;
-// le plein à l'encre. La nuit (choix du client mail) : les valeurs graphite de l'app.
+// (src/natif/jetons.css, gris clair étagé du 23 nov. : fond #DFE1E5, carte #FAFAFB, encre #1D1D1F,
+// filet #E1E3E7, accent ardoise #3D4B5B) ; titre et pied à l'encre sur le gris ; le lien à l'ARDOISE et
+// SOULIGNÉ (aucun bleu vif, aucun orange : audit-style-vintex) ; le plein à l'encre. La nuit (choix du client mail) : les valeurs graphite de l'app.
 // Les clés `bleu` / `surBleu` gardent leur nom (= « le fond » / « le texte posé sur le fond »).
 // Contrastes : calculés sur ces jetons par scripts/audit-emails-verre.cjs (F8), ≥ 4,5:1 partout.
 // ════════════════════════════════════════════════════════════════════════════
@@ -31,11 +31,11 @@ export const VERRE = Object.freeze({
   largeur: 600,
   police: "Inter,-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",
   policeCode: "'SF Mono',ui-monospace,Menlo,Consolas,'Liberation Mono',monospace",
-  bleu: '#F4F4F2',                      // le fond uni (repli sans image) : le gris clair de l'app (--n-fond)
-  degrade: 'linear-gradient(180deg,#FAFAF8 0%,#F4F4F2 45%,#EDEDEA 100%)',
-  carte: '#FFFFFF', encre: '#16181D', gris: '#5F636A', filet: '#E5E4E0', puits: '#F4F4F2', lien: '#16181D',
-  plein: '#16181D', pleinMot: '#FFFFFF',
-  surBleu: '#16181D', surBleu2: '#5F636A',
+  bleu: '#DFE1E5',                      // le fond uni (repli sans image) : le gris clair de l'app (--n-fond)
+  degrade: 'linear-gradient(180deg,#E9EBEE 0%,#DFE1E5 45%,#D4D7DC 100%)',
+  carte: '#FAFAFB', encre: '#1D1D1F', gris: '#50535B', filet: '#E1E3E7', puits: '#E9EBEE', lien: '#3D4B5B',
+  plein: '#1D1D1F', pleinMot: '#FFFFFF',
+  surBleu: '#1D1D1F', surBleu2: '#50535B',
   ombre: '0 1px 2px rgba(22,24,29,.06),0 8px 24px -12px rgba(22,24,29,.12)',
   logo: 'https://vrm.center/vrm-logo-v5-192.png',
   // La nuit (Apple Mail, iOS, Outlook) : les valeurs de l'app la nuit (fond, carte #2A2A2F, texte blanc).
