@@ -1554,7 +1554,9 @@ import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEc
 // (6 nov., vitesse 2) PrixPartout : à la demande (sa feuille de style est déjà plus haut).
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
 import EtatComptes from "./EtatComptes.jsx";   // (22 nov., style-clarte) la liste groupée des comptes (feuille d'état de l'extension)
-import { LogoSite as LogoSiteRang } from "./natif/LogoSite.jsx";   // (21 nov., prio-recherche) le logo du site sur chaque résultat de la recherche
+import { LogoSite as LogoSiteRang } from "./natif/LogoSite.jsx";
+import { PopEvenements } from "./natif/PopEvenements.jsx";
+import { GaleriePops } from "./natif/GaleriePops.jsx";   // (23 nov.) « Voir tous les pop-ups », propriétaire seulement   // (23 nov., Julien : « un beau pop-up ») la carte d'un événement qui arrive, app ouverte   // (21 nov., prio-recherche) le logo du site sur chaque résultat de la recherche
 import { viderNombresAnnonces } from "./plateformes/nombresAnnonces.js";   // (20 nov.) les nombres par site de `FiltreSites` (retiré) ne sont plus lus ici
 // (6 nov., vitesse 2) PublierAilleurs : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./styles-publier-ailleurs.css";
@@ -1779,7 +1781,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.440.0';
+const EXT_ATTENDUE = '5.440.1';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -2191,7 +2193,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { reperage: '5.440.0', clocheauto: '5.440.0', messagerieuuid: '5.440.0', fenetrefavoris: '5.440.0', vcmoderation: '5.439.0', prixminipublier: '5.437.0', negointelligente: '5.437.0', formulairerythme: '5.437.0', descriptioncoller: '5.437.0', favorisautobilan: '5.437.0', repubverification: '5.437.0', nuitaussi: '5.437.0', santenote: '5.438.0', precieux: '5.438.0', relancesansachat: '5.438.0', lotauto: '5.438.0', brouillonsauto: '5.438.0', demasquee: '5.438.0', adistance: '5.436.0', sauvegardereglages: '5.436.0', lbcoffres: '5.436.0', retoursautres: '5.436.0', noteacheteur: '5.430.0', traductionlocale: '5.430.0', alertemasquee: '5.428.0', courbeannonce: '5.428.0', endirect: '5.428.0', retirerpartout: '5.426.0', relances: '5.425.0', triconversations: '5.425.0', publieraussi: '5.424.0', depotprepare: '5.429.0', ordrephotos: '5.429.0', suiviboost: '5.429.0', depotpanneau: '5.429.0', gardeprix: '5.432.0', prixpartout: '5.432.0', pushcapte: '5.422.0', repubprogramme: '5.422.0', reponsesrapides: '5.421.0', lotfavoris: '5.421.0', relanceoffres: '5.421.0', agentvrm: '5.421.0', modifavantapres: '5.423.0', filevisible: '5.433.0', pauseapres: '5.433.0', reessai: '5.433.0', apprisclic: '5.433.0', retoursuivi: '5.431.0', bordereauxunpdf: '5.420.0', vacancesinterface: '5.420.0', favorisreponses: '5.420.0', santecomptes: '5.420.0', favorisetapes: '5.420.0', ventesfavoris: '5.420.0', relaisprevu: '5.411.0', vcecrireui: '5.412.0', vcfilpanneau: '5.412.0', vcaimespanneau: '5.412.0', panneautelephone: '5.413.0', toutinterface: '5.414.0', connexionsimple: '5.415.0', lbcinterface: '5.416.0', favorisperso2: '5.417.0', favorisenvoi9: '5.419.0', commandeslot: '5.419.0', ongletravail: '5.410.5', marquelu: '5.410.5', repubformulaire: '5.410.3', favorisbleam: '5.410.3', apresvente: '5.410.4', stockauto: '5.410.4', cyclevie: '5.410.4', sauvegardeauto: '5.410.4', dressingplus: '5.410.4', negotranches: '5.410.4', favfiltres: '5.410.4', panneaureste: '5.410.2', imprimerpanneau: '5.410.2', vcdatemise: '5.410.0', baissevc: '5.410.0', lbcinteresses: '5.410.0', lbcecrireinteresses: '5.410.0', repubfidele: '5.410.0', repubverif: '5.410.0', messagesmalins: '5.410.0', panneaucomplet: '5.410.0', lienpanneau: '5.410.0', lbcpubliee: '5.409.0', vcpubliee: '5.409.0', masquercarte: '5.409.0', baisselbc: '5.409.0', contreoffres: '5.409.0', repondrecarte: '5.409.0', publierfiche: '5.409.0', listesvinted: '5.409.0', lbcformulaire: '5.409.0', vcrelu: '5.409.0', captejournal: '5.409.0', etatici: '5.409.0', suivicolis: '5.409.0', comptebloque: '5.409.0', prixattente: '5.409.0', baisseregle: '5.409.0', masquerailleurs: '5.409.0', repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { favorislienapp: '5.440.1', favoriscommande: '5.440.1', reperage: '5.440.0', clocheauto: '5.440.0', messagerieuuid: '5.440.0', fenetrefavoris: '5.440.0', vcmoderation: '5.439.0', prixminipublier: '5.437.0', negointelligente: '5.437.0', formulairerythme: '5.437.0', descriptioncoller: '5.437.0', favorisautobilan: '5.437.0', repubverification: '5.437.0', nuitaussi: '5.437.0', santenote: '5.438.0', precieux: '5.438.0', relancesansachat: '5.438.0', lotauto: '5.438.0', brouillonsauto: '5.438.0', demasquee: '5.438.0', adistance: '5.436.0', sauvegardereglages: '5.436.0', lbcoffres: '5.436.0', retoursautres: '5.436.0', noteacheteur: '5.430.0', traductionlocale: '5.430.0', alertemasquee: '5.428.0', courbeannonce: '5.428.0', endirect: '5.428.0', retirerpartout: '5.426.0', relances: '5.425.0', triconversations: '5.425.0', publieraussi: '5.424.0', depotprepare: '5.429.0', ordrephotos: '5.429.0', suiviboost: '5.429.0', depotpanneau: '5.429.0', gardeprix: '5.432.0', prixpartout: '5.432.0', pushcapte: '5.422.0', repubprogramme: '5.422.0', reponsesrapides: '5.421.0', lotfavoris: '5.421.0', relanceoffres: '5.421.0', agentvrm: '5.421.0', modifavantapres: '5.423.0', filevisible: '5.433.0', pauseapres: '5.433.0', reessai: '5.433.0', apprisclic: '5.433.0', retoursuivi: '5.431.0', bordereauxunpdf: '5.420.0', vacancesinterface: '5.420.0', favorisreponses: '5.420.0', santecomptes: '5.420.0', favorisetapes: '5.420.0', ventesfavoris: '5.420.0', relaisprevu: '5.411.0', vcecrireui: '5.412.0', vcfilpanneau: '5.412.0', vcaimespanneau: '5.412.0', panneautelephone: '5.413.0', toutinterface: '5.414.0', connexionsimple: '5.415.0', lbcinterface: '5.416.0', favorisperso2: '5.417.0', favorisenvoi9: '5.419.0', commandeslot: '5.419.0', ongletravail: '5.410.5', marquelu: '5.410.5', repubformulaire: '5.410.3', favorisbleam: '5.410.3', apresvente: '5.410.4', stockauto: '5.410.4', cyclevie: '5.410.4', sauvegardeauto: '5.410.4', dressingplus: '5.410.4', negotranches: '5.410.4', favfiltres: '5.410.4', panneaureste: '5.410.2', imprimerpanneau: '5.410.2', vcdatemise: '5.410.0', baissevc: '5.410.0', lbcinteresses: '5.410.0', lbcecrireinteresses: '5.410.0', repubfidele: '5.410.0', repubverif: '5.410.0', messagesmalins: '5.410.0', panneaucomplet: '5.410.0', lienpanneau: '5.410.0', lbcpubliee: '5.409.0', vcpubliee: '5.409.0', masquercarte: '5.409.0', baisselbc: '5.409.0', contreoffres: '5.409.0', repondrecarte: '5.409.0', publierfiche: '5.409.0', listesvinted: '5.409.0', lbcformulaire: '5.409.0', vcrelu: '5.409.0', captejournal: '5.409.0', etatici: '5.409.0', suivicolis: '5.409.0', comptebloque: '5.409.0', prixattente: '5.409.0', baisseregle: '5.409.0', masquerailleurs: '5.409.0', repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -4298,7 +4300,9 @@ let _idFeuille = 0;
 // passent EN HAUT de l'écran tant qu'une feuille l'est — en bas, ils couvraient
 // les boutons du pied de la feuille (« Annuler / Supprimer »).
 const _feuillesSubs = new Set();
-const _notifierFeuilles = () => { _feuillesSubs.forEach((fn) => { try { fn(); } catch (_) {} }); };
+// (24 nov., morceaux-perimes) Le nombre de feuilles ouvertes, publié pour `momentSur` (src/chargementSur.js) :
+// une page restée sur une ancienne version ne se recharge jamais avec une feuille ouverte.
+const _notifierFeuilles = () => { try { window.__vrmFeuilles = _feuillesOuvertes.length; } catch (_) {} _feuillesSubs.forEach((fn) => { try { fn(); } catch (_) {} }); };
 const abonnerFeuilles = (fn) => { _feuillesSubs.add(fn); return () => _feuillesSubs.delete(fn); };
 const uneFeuilleOuverte = () => _feuillesOuvertes.length > 0;
 const _histoOnglet = { tab: null, sub: null };
@@ -15718,9 +15722,10 @@ function CarteNumerosAEcrire() {
   const court = nums.length > 6 ? `N° ${nums.slice(0, 6).join(', ')} +${nums.length - 6}` : listeNumeros(nums);
   return (
     <Natif.Carte titre={tr('nn.carte.titre', { n: items.length })} attrs={{ 'data-numeros-a-ecrire-journee': String(items.length) }}>
-      <Natif.Rangee icone={<Icon name="tag" size={22}/>} titre={ouvert ? listeNumeros(nums) : court} lignes={ouvert ? 6 : 2} sousTitre={tr('nn.carte.sous')}
+      <Natif.Rangee icone={<Icon name="tag" size={22}/>} titre={ouvert ? listeNumeros(nums) : court} lignes={ouvert ? 6 : 2}
         valeur={nums.length > 6 ? tr(ouvert ? 'nn.carte.masquer' : 'nn.carte.voir') : null} onClick={nums.length > 6 ? () => setOuvert(!ouvert) : null} attrs={{ 'data-numeros-voir': ouvert ? '1' : '0', 'aria-expanded': nums.length > 6 ? (ouvert ? 'true' : 'false') : undefined }}/>
-      <Natif.Rangee titre={tr('nn.stock.ecrit')} onClick={() => { save(CLE_A_ECRIRE, { v: 1, items: [] }); setD({ v: 1, items: [] }); }} attrs={{ 'data-numeros-ecrits': 'journee' }}/>
+      {/* (23 nov., « pas assez de beaux boutons ») « C'est écrit » : un vrai bouton (icône + verbe), plus de phrase d'instruction. */}
+      <Natif.Actions elements={[{ cle: 'ecrit', icone: <Icon name="check" size={18}/>, libelle: tr('nn.stock.ecrit'), onClick: () => { save(CLE_A_ECRIRE, { v: 1, items: [] }); setD({ v: 1, items: [] }); }, attrs: { 'data-numeros-ecrits': 'journee' } }]}/>
     </Natif.Carte>
   );
 }
@@ -16480,6 +16485,7 @@ const ICON_PATHS = {
   // (15 nov.) « Nouveaux comptes » (le propriétaire) : un téléphone et la personne qui arrive.
   nouveauCompte: <><rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><circle cx="12" cy="10" r="2.4"/><path d="M8.6 16.4a3.6 3.6 0 0 1 6.8 0"/></>,
   ampoule: <><path d="M9.5 17.5h5"/><path d="M10.5 20.5h3"/><path d="M12 3.5a5.8 5.8 0 0 0-3.4 10.5c.6.5.9 1.1.9 1.8v.2h5v-.2c0-.7.3-1.3.9-1.8A5.8 5.8 0 0 0 12 3.5Z"/></>,
+  pile:   <><rect x="4" y="9" width="16" height="11" rx="3"/><path d="M6.5 6h11M9 3h6"/></>,   // (23 nov.) des cartes empilées : « Voir tous les pop-ups »
 };
 // Tuile d'icône façon réglages iOS : un carré arrondi teinté, une icône au
 // trait dedans. C'est ce détail qui sépare un écran de réglages d'une liste de
@@ -18166,7 +18172,7 @@ function Toaster() {
   }, []);
   React.useEffect(() => { if (!list.length) { raisons.current.survol = false; raisons.current.focus = false; suspendre(); } }, [list.length]);
   // (23 nov.) Un message court demandé par un module sans accès à `toast` (et par les bancs) : `vrm:toast` { texte }.
-  React.useEffect(() => { const f = (e) => { const t = e && e.detail && e.detail.texte; if (typeof t === 'string' && t.trim() && t.length <= 300) toast(t); }; window.addEventListener('vrm:toast', f); return () => window.removeEventListener('vrm:toast', f); }, []);
+  React.useEffect(() => { const f = (e) => { const t = e && e.detail && e.detail.texte; const ton = e && e.detail && ['ok','err','info'].includes(e.detail.ton) ? e.detail.ton : undefined; if (typeof t === 'string' && t.trim() && t.length <= 300) toast(t, ton); }; window.addEventListener('vrm:toast', f); return () => window.removeEventListener('vrm:toast', f); }, []);
   // (19 nov., fiche directe) Une fiche ouverte pose sa zone (src/natif/zoneMessages.js) : la pile s'y range DANS le flux, en
   // haut de la fiche — elle la pousse, elle ne la couvre jamais. Une feuille ouverte par-dessus garde la place d'avant (en haut).
   const zoneFiche = useZoneMessages();
@@ -32560,6 +32566,8 @@ function lireProprietaire() {
 }
 // `true` seulement si la base (ou, en panne, la dernière lecture de cet
 // appareil) dit propriétaire ; `false` sinon — y compris pendant la lecture.
+// (23 nov.) La galerie des pop-ups : montée pour le PROPRIÉTAIRE de l'installation seulement (rien d'autre ne l'écoute).
+function GaleriePopsCoque() { const proprio = useEstProprietaire(); return <GaleriePops autorise={proprio === true} Icon={Icon}/>; }
 function useEstProprietaire() {
   const uid = (AUTH.user && AUTH.user.id) || '';
   const [v, setV] = useState(() => (PROPRIO_ETAT.uid === uid && typeof PROPRIO_ETAT.v === 'boolean') ? PROPRIO_ETAT.v : proprietaireMemorise(uid) === true);
@@ -33542,7 +33550,7 @@ export default function App() {
   //    double vérification) restaient CLAIRS dans une app réglée en sombre —
   //    sur un document déjà sombre (index.html lit `vinted_dark`). Même source.
   // (8 nov.) Le mode CHOISI (Clair · Sombre · Automatique · Le soir, src/apparence.js) : la même règle.
-  C = sombreEffectif(apparenceDe(load('vrm_apparence', null), load('vinted_dark', false)), { systemeSombre: systemeSombreMaintenant() }) ? THEMES.dark : THEMES.light;
+  C = sombreEffectif(apparenceDe(load('vrm_apparence', null), load('vinted_dark', null)), { systemeSombre: systemeSombreMaintenant() }) ? THEMES.dark : THEMES.light;
   // (14 nov., lot 120) Le lien temporaire de l'aide : sa page, SANS compte, en lecture seule (api/_lib/lien-aide.js).
   if (LIEN_AIDE_JETON) return <VueLienAide jeton={LIEN_AIDE_JETON}/>;
   if (MULTI_USER && !authState.ready) return <div data-demarrage-attente="" style={{minHeight:'100vh',background:C.bg}}/>;
@@ -34707,7 +34715,7 @@ function AppCoeur() {
     window.addEventListener('vrm:aller',onAller);
     return ()=>{ window.removeEventListener('vrm:aller',onAller); if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',onMsg); };
   },[]);
-  const [choixSombre,setChoixSombre]=useStateCle('vinted_dark', ()=>load('vinted_dark',false));
+  const [choixSombre,setChoixSombre]=useStateCle('vinted_dark', ()=>load('vinted_dark',null));   // (23 nov.) null = jamais choisi ⇒ sombre par défaut (src/apparence.js)
   // (8 nov., « beauté ») L'APPARENCE CHOISIE : Clair · Sombre · Automatique (le système) · Le soir
   // (19 h–7 h). `vrm_apparence` absent ⇒ le choix d'avant (`vinted_dark`), rien ne change pour lui.
   // La règle (src/apparence.js) est la même que celle du script de démarrage (aucun flash) ;
@@ -34788,6 +34796,23 @@ function AppCoeur() {
   const [cellColors,setCellColors]=useStateCle('vinted_colors', ()=>load('vinted_colors',{}));
   const [invoices,setInvoices]=useStateCle('vinted_invoices', ()=>load('vinted_invoices',[]));
   const [vintedAccounts,setVintedAccounts]=useState([]);
+  // (23 nov.) La photo d'une carte d'événement (src/natif/PopEvenements.jsx) PAR IDENTITÉ seulement : le n° de transaction de
+  // son adresse (`tx`, ventes puis achats des comptes) ou son n° de conversation (`conv`, la boîte du compte `compte`) — les
+  // copies déjà captées (aucun appel à Vinted) ; rien trouvé ⇒ `null`, la carte garde l'icône.
+  const comptesPhotoRef=useRef([]); comptesPhotoRef.current=vintedAccounts;
+  const photoEvenement=React.useCallback(async (e)=>{
+    try{
+      const q=new URLSearchParams(String((e&&e.url)||'').split('?')[1]||'');
+      const tx=q.get('tx'), conv=q.get('conv'), compte=q.get('compte');
+      if(!tx&&!conv) return null;
+      const uids=compte&&/^\d{1,20}$/.test(compte)?[compte]:(comptesPhotoRef.current||[]).map(a=>String(a&&a.vinted_user_id||'')).filter(u=>/^\d{1,20}$/.test(u)).slice(0,20);
+      for(const uid of uids){
+        if(tx) for(const cote of ['sold','purchased']){ const p=await fetchHarvestOrders(uid,cote); const o=(p&&Array.isArray(p.my_orders)?p.my_orders:[]).find(x=>x&&String(x.transaction_id)===tx); if(o){ const u=orderPhoto(o); if(u) return u; } }
+        if(conv){ const h=await fetchHarvest(uid,'inbox'); const c=(h&&Array.isArray(h.conversations)?h.conversations:[]).find(x=>x&&String(x.id)===conv); if(c){ const u=photoArticle({photos:c.item_photos}); if(u) return u; } }
+      }
+    }catch(_){}
+    return null;
+  },[]);
   const [accountLabels]=useStateCle('vinted_account_labels', ()=>load('vinted_account_labels',{}));
   const [inventory,setInventory]=useStateCle('vinted_inventory', ()=>load('vinted_inventory',[]));
   // §5.49 : inventaire synchronisé lu au montage → froid sur un appareil neuf.
@@ -38692,6 +38717,8 @@ function AppCoeur() {
       {/* (20 nov., Julien : « même les écrans de chargement sont atroces ») Plus de barre bleue de progression en haut : elle
           restait à 80 % tant qu'UNE lecture traînait (4G) et faisait « site web ». Le compteur `onBusy` reste (diagnostic). */}
       <Toaster/>
+      {AUTH.user && <PopEvenements Icon={Icon} photoDe={photoEvenement}/>}
+      {AUTH.user && <GaleriePopsCoque/>}
       {/* (11 nov., lot centre-aide) L'aide ouverte depuis la loupe. Rien ne s'ouvre seul. */}
       <CentreAide/>
       <PiluleAnnulerCoque/>
@@ -38784,7 +38811,8 @@ function AppCoeur() {
         paddingBottom: ordi ? 40 : 20}, 'data-n-volets': troisVolets ? 'trois' : undefined }}>
         <Natif.ContexteCoque.Provider value={contexteCoque}>
         {/* (19 nov.) Ventes (À envoyer, En route) porte SA recherche — N°, titre, acheteur, scanner dans le champ — : une seule à l'écran. */}
-        {(!ordi || ECRANS_NATIFS.has(tab) || tab === 'journee') && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sansRecherche={(tab === 'ventes' && ongletColis !== 'toutes') || ECRANS_AVEC_RECHERCHE.has(tab) || (tab === 'compta' && platSub === 'factures')} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
+        {/* (23 nov.) À l'ordinateur, Aujourd'hui a SON en-tête (titre, date, « Mis à jour », relire, loupe, cloche : src/natif/ecrans/Aujourdhui.jsx) : la coque n'en pose pas un second. */}
+        {(!ordi || ECRANS_NATIFS.has(tab)) && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sansRecherche={(tab === 'ventes' && ongletColis !== 'toutes') || ECRANS_AVEC_RECHERCHE.has(tab) || (tab === 'compta' && platSub === 'factures')} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
           rechercheOuverte={gsOpen} ouvrirRecherche={ouvrirRecherche} scanner={()=>ouvrirRetrouver('disque')} streamVisible={!!reglesStream.bouton}
           // (11 nov., gardé le 19 nov.) L'APPUI LONG sur le champ de recherche ouvre la loupe ET écoute (dictée, sans clé) ;
           // le relâcher ne la referme pas. Mêmes gestes que l'ancienne loupe de l'en-tête, posés sur le champ natif.
