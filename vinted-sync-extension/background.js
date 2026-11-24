@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.440.2';
+const CODE_VERSION = '5.440.3';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4131,6 +4131,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       reparerExtension(tid).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', raison: 'La réparation n’a pas pu se faire. Réessaie.' }));
       return true;
     }
+    // 5.440.3 : « Observer Vinted (10 min) » — allumer, arrêter, envoyer, l'état (carte du logo ou fenêtre).
+    if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'observation') {
+      commandeObservation(msg).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', raison: 'L’extension n’a pas pu le faire. Réessaie.' }));
+      return true;
+    }
     if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'rapport') {
       envoyerRapport().then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', raison: 'Rapport pas envoyé. Réessaie.' }));
       return true;
@@ -5173,6 +5178,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   } else if (msg.kind === 'writereq' && msg.url) {
     storeWriteReq(domain,msg.method,msg.url,msg.body,msg.contexteFavori,sender?.frameId>0?null:sender?.tab?.id).then(()=>sendResponse({ok:true}),()=>sendResponse({ok:false}));
     return true;
+  } else if (msg.kind === 'observation' && Array.isArray(msg.ev)) {
+    // 5.440.3 : la frise de « Observer Vinted » (formes seulement), rebâtie entrée par entrée (`entreeObservation`).
+    recevoirObservation(domain, msg.ev, sender).catch(() => {});
   } else if (msg.kind === 'seen_urls' && Array.isArray(msg.paths)) {
     storeSeenUrls(domain, msg.paths, msg.reponses, msg.conversation);
   } else if (msg.kind === 'suppression' && msg.itemId) {
@@ -12654,6 +12662,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-session') lance('session', () => loadSession().then(s => { if (s) return authToken(); }));
   else if (a.name === 'vrm-reseau') lance('reseau', () => viderFilesEnAttente());   // 5.376 : et les captures en attente   // 5.371 : la file « en attente de réseau »
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
+  else if (a.name === OBS_ALARME) lance('observation', () => arreterObservation('delai'));   // 5.440.3 : « Observer Vinted », 10 min passées
   else if (String(a.name || '').startsWith(ATELIER_PROG_ALARME)) lance('atelierprog', () => atelierProgDepart(String(a.name).slice(ATELIER_PROG_ALARME.length)));   // 5.422 : la republication qu'IL a programmée
   else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierprog', () => atelierProgTick()); lance('atelierrepub', () => atelierRepubTick()); lance('depot', () => depotTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('distance', () => distanceTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('retirerpartout', () => retirerPartoutTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('relancesauto', () => relancesAutoTick()); lance('relanceslot', () => relancesLotTick()); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); lance('pushcapte', () => pushCapteTick()); lance('eveil', () => eveilTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
@@ -26229,8 +26238,10 @@ async function construireRapport() {
     pauses: { vinted: pause, toutArrete: !!(local.vrmToutArrete && local.vrmToutArrete.on === true), republication: heure(local[REPUB_TEMOIN]) },
   };
 }
-async function envoyerRapport() {
+async function envoyerRapport(extra = null) {
   const corps = await construireRapport();
+  // 5.440.3 : « Envoyer l'observation » — le rapport dit qu'une observation est rangée (nombre, début, fin), jamais la frise.
+  if (extra && extra.observation && typeof extra.observation === 'object') corps.observation = { n: Math.max(0, Math.min(OBS_MAX, Math.floor(Number(extra.observation.n) || 0))), debut: Number(extra.observation.debut) || null, fin: Number(extra.observation.fin) || null };
   const session = await authToken().catch(() => null);
   if (!session || !session.access_token) return { ok: false, code: 'sans-session', raison: 'Connecte d’abord l’extension à VRM.' };
   try {
@@ -26239,6 +26250,250 @@ async function envoyerRapport() {
     if (r && r.status === 429) return { ok: false, code: 'trop', raison: 'Déjà plusieurs rapports cette heure. Réessaie plus tard.' };
     return { ok: false, code: 'refus', raison: 'vrm.center n’a pas pris le rapport. Réessaie.' };
   } catch (_) { return { ok: false, code: 'reseau', raison: 'Pas de réseau : rapport pas envoyé.' }; }
+}
+
+// ═══ « OBSERVER VINTED (10 MIN) » (24 nov., 5.440.3) ═════════════════════════════════════════════════════════════════
+// Julien : Bleam réussit les messages aux favoris là où VRM a perdu le chemin (nouvelle messagerie, liens profonds,
+// cloche limitée aux dernières lignes) — « refais-moi une extension qui capte absolument tout ce que fait Bleam ».
+// On ne lit, ne copie ni n'ouvre AUCUN autre outil : on regarde ce que fait la PAGE de Vinted dans SON onglet pendant
+// qu'il envoie, à la main ou avec un autre outil, un message ou une offre à un favori. inject.js note une FRISE de
+// formes (voir `<observation-regle>`) ; ICI chaque entrée est REBÂTIE champ par champ (liste blanche, la même règle
+// rejouée) avant d'être gardée : un champ inconnu tombe, une chaîne qui n'a pas la forme attendue tombe.
+//  · allumé seulement sur SON geste (carte du logo, ou VRM → Paramètres → État des connexions) ; 10 min au plus,
+//    « Arrêter » à tout moment ; 2 000 entrées au plus (au-delà : arrêt, « limite ») ;
+//  · gardé dans `chrome.storage.local` (`vrmObservation`, `vrmObservationEv`), publié dans la ligne DÉDIÉE
+//    `observation_vinted_{compte}_{navigateur}` (un seul écrivain par ligne, jamais `main`), écrite pendant
+//    l'observation (au plus toutes les 15 s), à l'arrêt, et sur « Envoyer l'observation » — qui envoie AUSSI un rapport
+//    de l'extension (`envoyerRapport`, sa liste blanche) disant qu'une observation est là (nombre, début, fin) ;
+//  · AUCUNE requête vers Vinted, aucun clic, aucune touche (CLAUDE.md §3 inchangé) — on ne fait que regarder.
+const OBS_CLE = 'vrmObservation', OBS_EV = 'vrmObservationEv', OBS_LIGNE = 'observation_vinted_';
+const OBS_MS = 10 * 60000, OBS_MAX = 2000, OBS_ALARME = 'vrm-observation-fin';
+const OBS_SORTES = ['page', 'req', 'clic', 'notifs', 'cloche', 'defile'];
+const OBS_TYPES = /^(?:string|number|boolean|null|array|object|form|blob|binaire|flux|texte|undefined)$/;
+// <observation-regle> (24 nov., 5.440.3) — la MÊME dans la page (inject.js) et dans le fond (background.js).
+// « Observer Vinted » ne garde d'une adresse, d'un lien, d'une étiquette que leur FORME : un identifiant devient
+// {id} / {uuid}, une valeur de paramètre {v} (sauf un petit nombre ou une valeur d'énumération connue), un morceau
+// d'adresse qui suit un identifiant ({id}-nike-air…) {id}-{slug}, ce qui suit /member/ {x}, un nom accessible qui
+// n'est pas fait de mots d'interface connus {texte}. Idempotente : la page l'applique, le fond la rejoue.
+const OBS_MOTS = new Set(('notifications notification notifs messages message messagerie boite inbox envoyer send voir tout all see view '
+  + 'fermer close menu rechercher recherche search favoris favori favorites favourites likes profil profile retour back accueil home '
+  + 'faire une un offre offer make proposer propose vendre sell plus more suivant next precedent previous ouvrir open cloche bell '
+  + 'compte account parametres settings deconnexion logout aide help conversation conversations repondre reply valider confirmer '
+  + 'confirm annuler cancel ok oui non yes no le la les de des du a the of to et and mon ma mes ton ta tes my your nouveau nouvelle '
+  + 'new lire read marquer comme lu mark as photo photos article articles item items prix price catalogue catalog membre member '
+  + 'notificaciones mensajes enviar ver todo cerrar buscar favoritos perfil notifiche messaggi invia vedi tutto chiudi cerca '
+  + 'preferiti profilo benachrichtigungen nachrichten senden alle anzeigen schliessen suchen favoriten angebot machen mehr '
+  + 'acheter buy commande order commandes orders dressing wardrobe abonnements').split(' '));
+function obsSegment(s, avant) {
+  let x = String(s == null ? '' : s);
+  if (!x) return x;
+  x = x.replace(/\d{4,}/g, '{id}');
+  if (/^\{(?:id|uuid|hex|x|slug)\}$/.test(x)) return x;
+  if (/^\{id\}[-_.]/.test(x)) return '{id}-{slug}';
+  if (/^(?:member|members|user|users|profile|u)$/i.test(String(avant || '')) && !/^(?:notifications|settings|general|edit|items|favourite_list|favorites|wallet|personalization|signup|login|messages)$/.test(x)) return '{x}';
+  if (x.length > 40 || !/^[A-Za-z0-9_.{}-]+$/.test(x)) return '{x}';
+  return x;
+}
+function obsChemin(p) {
+  const parts = String(cheminNormalise(String(p == null ? '' : p).split(/[?#]/)[0])).split('/');
+  return parts.map((s, i) => (i === 0 ? s : obsSegment(s, parts[i - 1]))).join('/').slice(0, 200);
+}
+function obsCle(k) { const t = String(k == null ? '' : k); return /^[A-Za-z_$][\w$.[\]-]{0,39}$/.test(t) && !/\d{4,}/.test(t) ? t : '{x}'; }
+function obsValeur(k, v) {
+  const x = String(v == null ? '' : v);
+  if (x === '' || /^\{(?:id|uuid|v)\}$/.test(x) || /^\d{1,3}$/.test(x)) return x;
+  if (/^\d+$/.test(x)) return '{id}';
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x)) return '{uuid}';
+  if (/^(?:portal|type|source|tab|scope|order|sort|sort_by|status|filter|view|mode|lang|locale|currency)$/i.test(String(k)) && /^[a-z_]{1,20}$/.test(x)) return x;
+  return '{v}';
+}
+// Une forme déjà faite (« api.vinted.fr/inbox/{uuid}?page=2 », « vintedfr://messaging?item_id={id} », « /inbox/{uuid} »)
+// repassée à la règle : ce qui n'a pas cette forme n'est pas gardé.
+function obsFormeSure(s) {
+  const t = String(s == null ? '' : s).slice(0, 400);
+  if (t === '{tiers}') return t;
+  const m = /^((?:[a-z][a-z0-9+.-]{0,20}:\/\/[a-z0-9.-]{0,40})|(?:[a-z0-9-]{1,30}\.){0,3}vinted\.[a-z]{2,3}(?:\.[a-z]{2})?)?(\/[^?#]*)?(?:\?([^#]*))?$/i.exec(t);
+  if (!m) return undefined;
+  const tete = m[1] ? (/^javascript:/i.test(m[1]) ? null : m[1].toLowerCase()) : '';
+  if (tete === null) return undefined;
+  const q = String(m[3] || '').split('&').filter(Boolean).slice(0, 10).map((p) => { const i = p.indexOf('='); const k = obsCle(i < 0 ? p : p.slice(0, i)); return k + '=' + obsValeur(k, i < 0 ? '' : p.slice(i + 1)); });
+  return (tete + obsChemin(m[2] || '') + (q.length ? '?' + q.join('&') : '')).slice(0, 300);
+}
+function obsLien(v, origine) {
+  let u, o0 = '';
+  try { o0 = new URL(String(origine || 'https://www.vinted.fr')).hostname; } catch (_) { o0 = ''; }
+  try { u = new URL(String(v == null ? '' : v), origine || 'https://www.vinted.fr'); } catch (_) { return undefined; }
+  let tete = '';
+  if (/^https?:$/.test(u.protocol)) tete = u.hostname === o0 ? '' : (/(?:^|\.)vinted\.[a-z.]{2,6}$/i.test(u.hostname) ? u.hostname : '{tiers}');
+  else if (/^[a-z][a-z0-9+.-]{0,20}:$/.test(u.protocol) && u.protocol !== 'javascript:' && u.protocol !== 'data:' && u.protocol !== 'blob:') tete = u.protocol + '//' + (/^[a-z0-9.-]{0,40}$/i.test(u.hostname) ? u.hostname : 'x');
+  else return undefined;
+  if (tete === '{tiers}') return tete;
+  const q = []; for (const [k, val] of u.searchParams) { if (q.length >= 10) break; const ck = obsCle(k); q.push(ck + '=' + obsValeur(ck, val)); }
+  let p = u.pathname; try { p = decodeURIComponent(p); } catch (_) {}
+  return obsFormeSure(tete + obsChemin(p) + (q.length ? '?' + q.join('&') : ''));
+}
+function obsAria(s) {
+  const t = String(s == null ? '' : s).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ß/g, 'ss');
+  if (!t) return undefined;
+  const mots = t.split(/[\s'’,.:;!?()«»"/|·-]+/).filter(Boolean);
+  if (!mots.length || mots.length > 5 || !mots.every((w) => OBS_MOTS.has(w))) return '{texte}';
+  return mots.join(' ');
+}
+function obsTestid(s) {
+  const t = String(s == null ? '' : s).slice(0, 80).replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '{uuid}').replace(/\d{3,}/g, '{id}');
+  return /^[A-Za-z0-9_{}.:-]{1,60}$/.test(t) ? t : (t ? '{x}' : undefined);
+}
+// </observation-regle>
+// UNE entrée, rebâtie. `o` = le n° d'onglet (1, 2, 3… : un autre outil peut travailler dans son propre onglet).
+function entreeObservation(e, o) {
+  if (!e || typeof e !== 'object' || !OBS_SORTES.includes(e.k)) return null;
+  const t = Number(e.t);
+  if (!Number.isSafeInteger(t) || t < 1.5e12) return null;
+  const x = { t, k: e.k };
+  if (Number.isInteger(o) && o >= 1 && o <= 50) x.o = o;
+  const ent = (v, max = 100000) => (Number.isSafeInteger(Number(v)) && Number(v) >= 0 && Number(v) <= max ? Number(v) : undefined);
+  const forme = (v) => (typeof v === 'string' ? obsFormeSure(v) : undefined);
+  const formes = (l) => (Array.isArray(l) ? l.slice(0, 8).map(forme).filter(Boolean) : []);
+  const cles = (l) => (Array.isArray(l) ? l.slice(0, 10).map(obsCle) : []);
+  const corps = (l) => (Array.isArray(l) ? l.slice(0, 40).map((s) => { const m = /^(.{1,120}):([a-z]{1,12})$/.exec(String(s || '')); if (!m || !OBS_TYPES.test(m[2])) return null; const ch = m[1] === '(racine)' ? m[1] : m[1].split('.').map((p) => { const a = /^(.*?)((?:\[\])*)$/.exec(p); return obsCle(a[1]) + a[2]; }).join('.'); return ch + ':' + m[2]; }).filter(Boolean) : []);
+  if (e.k === 'page') { const p = obsFormeSure(String(e.p || '')); if (p === undefined) return null; x.p = p; x.q = cles(e.q); return x; }
+  if (e.k === 'req') {
+    const m = String(e.m || '').toUpperCase(); if (!/^(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/.test(m)) return null;
+    const h = String(e.h == null ? '' : e.h).toLowerCase();
+    if (h && !/^(?:[a-z0-9-]{1,30}\.){0,3}(?:vinted\.[a-z]{2,3}(?:\.[a-z]{2})?|captcha-delivery\.com|datadome\.co)$/.test(h)) return null;
+    const p = obsFormeSure(String(e.p || '')); if (p === undefined) return null;
+    Object.assign(x, { via: e.via === 'xhr' ? 'xhr' : 'fetch', m, h, p, st: ent(e.st, 999) || 0, q: cles(e.q), corps: corps(e.corps) });
+    if (ent(e.ms, 600000) !== undefined) x.ms = ent(e.ms, 600000);
+    if (typeof e.ct === 'string' && /^[a-z]+\/[a-z0-9.+-]{1,40}$/.test(e.ct)) x.ct = e.ct;
+    if (e.rep && typeof e.rep === 'object' && !Array.isArray(e.rep)) {
+      const r = {}; for (const k of Object.keys(e.rep).slice(0, 30)) { const ck = String(k).split('.').map(obsCle).join('.'); const ty = String(e.rep[k]); if (OBS_TYPES.test(ty)) r[ck.slice(0, 82)] = ty; }
+      x.rep = r;
+    }
+    return x;
+  }
+  if (e.k === 'clic') {
+    x.conf = e.conf === true;
+    x.tag = /^[a-z][a-z0-9-]{0,19}$/.test(String(e.tag || '')) ? String(e.tag) : 'x';
+    if (/^[a-z]{1,20}$/.test(String(e.role || ''))) x.role = e.role;
+    if (e.tid != null) { const v = obsTestid(e.tid); if (v) x.tid = v; }
+    if (e.aria != null) { const v = obsAria(e.aria); if (v) x.aria = v; }
+    if (typeof e.ouvert === 'boolean') x.ouvert = e.ouvert;
+    if (e.popup === true) x.popup = true;
+    if (Array.isArray(e.anc)) { const a = e.anc.slice(0, 4).map(obsTestid).filter(Boolean); if (a.length) x.anc = a; }
+    if (e.entete && typeof e.entete === 'object') { const i = ent(e.entete.i, 500), n = ent(e.entete.n, 500); if (i !== undefined && n !== undefined) x.entete = { i, n }; }
+    if (e.href != null) { const v = forme(e.href); if (v) x.href = v; }
+    if (/^[a-z]{1,12}$/.test(String(e.type || ''))) x.type = e.type;
+    return x;
+  }
+  if (e.k === 'notifs') {
+    x.n = ent(e.n, 10000) || 0; x.formes = formes(e.formes);
+    const s = {}; if (e.sortes && typeof e.sortes === 'object') for (const k of Object.keys(e.sortes).slice(0, 20)) if (/^\d{1,4}$/.test(k) && ent(e.sortes[k], 10000) !== undefined) s[k] = ent(e.sortes[k], 10000);
+    x.sortes = s;
+    for (const k of ['page', 'pp', 'tp']) if (ent(e[k], 100000) !== undefined) x[k] = ent(e[k], 100000);
+    return x;
+  }
+  if (e.k === 'cloche' || e.k === 'defile') {
+    x.lignes = ent(e.lignes, 10000) || 0; x.formes = formes(e.formes);
+    if (e.k === 'cloche') x.pourquoi = e.pourquoi === 'page' ? 'page' : 'clic';
+    else if (ent(e.avant, 10000) !== undefined) x.avant = ent(e.avant, 10000);
+    return x;
+  }
+  return null;
+}
+let _chaineObs = Promise.resolve();
+function surObs(fn) { const p = _chaineObs.then(fn, fn); _chaineObs = p.then(() => {}, () => {}); return p; }
+async function lireObsBrut() { try { const x = await chrome.storage.local.get([OBS_CLE, OBS_EV]); return { s: x[OBS_CLE] || null, ev: Array.isArray(x[OBS_EV]) ? x[OBS_EV] : [] }; } catch (_) { return { s: null, ev: [] }; } }
+// Ce que la carte et l'app montrent : l'état, jamais la frise.
+function vueObservation(s, n) {
+  if (!s || typeof s !== 'object') return { actif: false, n: 0 };
+  return { actif: s.actif === true && Number(s.fin) > Date.now(), debut: Number(s.debut) || null, fin: Number(s.fin) || null, raison: s.raison || '', n: Number(n) || 0, ecritAt: Number(s.ecritAt) || null, envoyeAt: Number(s.envoyeAt) || null, ligne: s.ligne || null };
+}
+// Fin par le temps : constatée à chaque lecture (le service worker a pu dormir), puis la ligne écrite une dernière fois.
+async function finObsSiEchue() {
+  const { s } = await lireObsBrut();
+  if (s && s.actif === true && !(Number(s.fin) > Date.now())) { s.actif = false; s.raison = 'delai'; await chrome.storage.local.set({ [OBS_CLE]: s }); return true; }
+  return false;
+}
+async function demarrerObservation() {
+  return surObs(async () => {
+    const t = Date.now();
+    let uid = null; try { uid = await avecDelai(compteConnecte('www.vinted.fr'), 2500, null); } catch (_) { uid = null; }
+    const s = { actif: true, debut: t, fin: t + OBS_MS, raison: '', uid: /^\d{1,20}$/.test(String(uid || '')) ? String(uid) : null, onglets: {}, ecritAt: null, envoyeAt: null, ligne: null };
+    await chrome.storage.local.set({ [OBS_CLE]: s, [OBS_EV]: [] });
+    try { chrome.alarms && chrome.alarms.create(OBS_ALARME, { when: s.fin + 1000 }); } catch (_) {}
+    noterDiag('observation_debut');
+    return Object.assign({ ok: true }, vueObservation(s, 0));
+  });
+}
+async function arreterObservation(raison = 'manuel') {
+  const r = await surObs(async () => {
+    const { s, ev } = await lireObsBrut();
+    if (!s) return { ok: true, actif: false, n: 0 };
+    if (s.actif === true) { s.actif = false; s.raison = Number(s.fin) > Date.now() ? raison : 'delai'; await chrome.storage.local.set({ [OBS_CLE]: s }); }
+    try { chrome.alarms && chrome.alarms.clear(OBS_ALARME); } catch (_) {}
+    return Object.assign({ ok: true }, vueObservation(s, ev.length));
+  });
+  await ecrireLigneObservation().catch(() => null);
+  return r;
+}
+let _obsMinut = null;
+async function recevoirObservation(domain, ev, sender) {
+  return surObs(async () => {
+    await finObsSiEchue();
+    const { s, ev: l } = await lireObsBrut();
+    if (!s || s.actif !== true) return { actif: false };
+    const tab = sender && sender.tab && Number.isInteger(sender.tab.id) ? String(sender.tab.id) : '?';
+    if (!s.onglets || typeof s.onglets !== 'object') s.onglets = {};
+    if (!s.onglets[tab]) s.onglets[tab] = Object.keys(s.onglets).length + 1;
+    let pris = 0;
+    for (const e of (Array.isArray(ev) ? ev : []).slice(0, 100)) {
+      const x = entreeObservation(e, s.onglets[tab]);
+      if (!x || x.t < s.debut - 5000 || x.t > s.fin + 5000) continue;
+      if (l.length >= OBS_MAX) { s.actif = false; s.raison = 'limite'; break; }
+      l.push(x); pris++;
+    }
+    l.sort((a, b) => a.t - b.t);
+    await chrome.storage.local.set({ [OBS_CLE]: s, [OBS_EV]: l });
+    if (s.actif !== true) { try { chrome.alarms && chrome.alarms.clear(OBS_ALARME); } catch (_) {} setTimeout(() => { ecrireLigneObservation().catch(() => null); }, 0); }
+    else if (!_obsMinut) _obsMinut = setTimeout(() => { _obsMinut = null; ecrireLigneObservation().catch(() => null); }, 15000);
+    return { actif: s.actif === true, pris };
+  });
+}
+// La ligne `observation_vinted_{compte}_{navigateur}` : la frise entière, rebâtie une seconde fois (rien qui ne passe la règle).
+async function ecrireLigneObservation() {
+  await finObsSiEchue().catch(() => false);
+  const { s, ev } = await lireObsBrut();
+  if (!s || !ev.length) return { ok: false, code: 'vide' };
+  const moi = await idNavigateur();
+  if (!moi) return { ok: false, code: 'navigateur' };
+  let uid = s.uid; if (!uid) { try { uid = await activeAccountId('www.vinted.fr'); } catch (_) { uid = null; } }
+  const compte = /^\d{1,20}$/.test(String(uid || '')) ? String(uid) : 'inconnu';
+  const id = `${OBS_LIGNE}${compte}_${moi}`;
+  const e2 = ev.map((x) => entreeObservation(x, x && x.o)).filter(Boolean);
+  const data = { v: 1, uid: compte, nav: moi, ver: CODE_VERSION, at: new Date().toISOString(), debut: Number(s.debut) || null, fin: Number(s.fin) || null, actif: s.actif === true && Number(s.fin) > Date.now(), raison: s.raison || '', n: e2.length, max: OBS_MAX, onglets: Object.keys(s.onglets || {}).length, ev: e2 };
+  let ok = false;
+  try { ok = (await supabaseUpsert('app_data', [{ id, data }], 'id', null, { rejeu: true })) === true; } catch (_) { ok = false; }
+  await surObs(async () => { const x = await lireObsBrut(); if (x.s && x.s.debut === s.debut) { x.s.ecritAt = ok ? Date.now() : x.s.ecritAt; x.s.ligne = id; await chrome.storage.local.set({ [OBS_CLE]: x.s }); } });
+  if (!ok) noterDiag('observation_ecriture_ratee');
+  return { ok, id, n: e2.length };
+}
+// « Envoyer l'observation » : la ligne écrite tout de suite, puis un rapport de l'extension qui la signale.
+async function envoyerObservation() {
+  const w = await ecrireLigneObservation();
+  if (!w.ok) return { ok: false, code: w.code || 'ecriture', raison: w.code === 'vide' ? 'Rien d’observé pour l’instant : allume « Observer Vinted », puis fais ton envoi sur Vinted.' : 'L’observation n’a pas pu être enregistrée. Réessaie.' };
+  const { s } = await lireObsBrut();
+  const r = await envoyerRapport({ observation: { n: w.n, debut: Number(s && s.debut) || null, fin: Number(s && s.fin) || null } }).catch(() => ({ ok: false }));
+  await surObs(async () => { const x = await lireObsBrut(); if (x.s) { x.s.envoyeAt = Date.now(); await chrome.storage.local.set({ [OBS_CLE]: x.s }); } });
+  return { ok: true, n: w.n, ligne: w.id, rapport: r && r.ok === true };
+}
+async function commandeObservation(msg) {
+  const quoi = String((msg && msg.quoi) || 'etat');
+  if (quoi === 'demarrer') return demarrerObservation();
+  if (quoi === 'arreter') return arreterObservation('manuel');
+  if (quoi === 'envoyer') return envoyerObservation();
+  if (await finObsSiEchue().catch(() => false)) await ecrireLigneObservation().catch(() => null);
+  const { s, ev } = await lireObsBrut();
+  return Object.assign({ ok: true }, vueObservation(s, ev.length));
 }
 
 // ── 5. LA FILE « EN ATTENTE DE RÉSEAU » ──────────────────────────────────────
@@ -28008,6 +28263,8 @@ async function executerCommande(msg) {
   }
   // 5.371 : « Envoyer un rapport » depuis « Tout va bien ? » de l'app, et la file
   //    « en attente de réseau » (annuler un geste).
+  // 5.440.3 : « Observer Vinted » depuis VRM (Paramètres → État des connexions).
+  if (msg && msg.cmd === 'observation') { const r = await commandeObservation(msg); return r && r.ok ? Object.assign({ accepte: true, etape: 'fait' }, r) : { accepte: false, code: (r && r.code) || 'refus', raison: (r && r.raison) || 'pas fait' }; }
   if (msg && msg.cmd === 'rapportExtension') { const r = await envoyerRapport(); return r.ok ? { accepte: true, etape: 'fait', at: r.at } : { accepte: false, code: r.code, raison: r.raison }; }
   if (msg && msg.cmd === 'fileReseauAnnuler') { const r = await annulerFileReseau(String(msg.id || '')); return r.ok ? { accepte: true, etape: 'fait' } : { accepte: false, code: r.code || 'inconnu', raison: 'ce geste n’est plus en attente' }; }
   // 11 nov. (5.366) : « Tout arrêter » / « Relancer » depuis VRM — tout de suite dans CE navigateur
