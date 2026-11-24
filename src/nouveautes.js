@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (24 nov., quatre-sites — Julien : « 1 paire → 4 sites ») docs/passation/2026-11-24-quatre-sites.md
+  { id: 'mettre-aussi-sur', date: '2026-11-24', titre: 'Une annonce Vinted sur trois autres sites', phrase: 'Fiche d’une paire → Ailleurs : Leboncoin, Vestiaire et eBay en un geste.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (24 nov., lbc-numero-ecrit — Julien : « Oui, relie par le N° ») docs/passation/2026-11-24-lbc-numero-ecrit.md
   { id: 'lbc-numero-ecrit', date: '2026-11-24', titre: 'Leboncoin : relié par le N° écrit', phrase: 'Finis la description par « N°132 » : l’annonce rejoint la paire 132.', tab: 'leboncoin', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md
