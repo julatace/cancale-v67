@@ -54,5 +54,21 @@ export default {
   "rt.couv.autres": "{n} non riconosciute (Altro)",
   "rt.regroupe": "Cosa è stato raggruppato",
   "rt.regroupe.sous": "{n} gruppi · solo per la vista, mai per collegare un paio",
-  "rt.regroupe.reste": "e altri {n}"
+  "rt.regroupe.reste": "e altri {n}",
+  "rt.axe.source": "Fonte",
+  "rs.tousAchats": "Tutti i tuoi acquisti, per fonte",
+  "rs.auPlus": "al massimo {p}",
+  "rs.rienRevendu": "niente rivenduto",
+  "rs.revendus": "{k} rivenduti su {n}",
+  "rs.achetes": "{n} acquistati",
+  "rs.taux": "{t}% rivenduti",
+  "rs.surDatees": "su {n} datate",
+  "rs.pasSu": "Non ancora calcolato: apri Acquisti",
+  "rs.pasSaisie": "Fonte non indicata",
+  "rs.couv": "Media su {k} di {n} rivendite",
+  "rs.couv.sansAchat": "{n} vendite senza acquisto collegato",
+  "rs.couv.pasLu": "{n} acquisti non letti qui",
+  "rs.couv.vintedPasLus": "acquisti Vinted non letti",
+  "rs.pourquoi": "Perché?",
+  "rs.pourquoi.texte": "Una vendita conta per una fonte solo se è collegata al suo acquisto (il n. di transazione, o il numero scritto sull’acquisto), mai dal titolo. L’utile medio copre solo le rivendite con prezzo d’acquisto noto; il tasso = rivenduti ÷ acquistati; il tempo va dall’acquisto alla vendita. Copre tutti gli acquisti, non il periodo scelto."
 };
