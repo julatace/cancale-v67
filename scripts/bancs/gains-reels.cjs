@@ -61,7 +61,7 @@ const NATIF = () => {
   construire();
   const port = Number(process.env.BANC_PORT || 4797);
   const srv = await servir(DOSSIER, port);
-  const nav = await chromium.launch({ args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     for (const W of LARGEURS) for (const th of THEMES) {
       const tel = W < 600, sombre = th === 'sombre';
