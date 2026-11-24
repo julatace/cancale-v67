@@ -20,7 +20,7 @@
 import React from 'react';
 import { lireTout, load, save, onCloudReady, lirePreuvesVenteVinted, Icon, PhotoVinted } from './App.jsx';
 import { Actions, Pourquoi } from './natif/Actions.jsx';
-import { TuilePaire } from './natif/Jeu.jsx';   // (24 nov., visuel-jeu) les disparues en GRILLE de photos, comme un inventaire
+import { TuilePaire, revele } from './natif/Jeu.jsx';   // (24 nov., visuel-jeu) les disparues en GRILLE de photos, comme un inventaire
 import { SELECT_MODERATION, LIGNE_MODERATION_VU, alertesActives, texteEvenement, evenementsDesLignes } from './moderationVinted.js';
 import { tr, date as dateLoc } from './i18n/index.js';
 import './styles-alerte-moderation.css';
@@ -73,13 +73,14 @@ function GroupeDisparues({ compte, evts, nom, fiches, seul, enTete, marquerVu })
       {/* (24 nov., visuel-jeu — Julien : « c'est pas visuel ») LA GRILLE : chaque disparue est une tuile — la photo de SA fiche
           (identifiant d'annonce, jamais un titre), son étiquette N° ; sans fiche, le médaillon et l'identifiant ; « Vu » dessous. */}
       <ul className="vrm-mod-lignes vrm-mod-grille" data-n-jeu="moderation">
-        {vues.map((e) => {
+        {vues.map((e, k) => {
           const f = e.a ? fiches[e.a] : null;
           const num = f && f.numero != null && f.numero !== '' ? String(f.numero) : null;
           const ph = photoDeFiche(f);
+          const rv = revele(k, 'vrm-mod-ligne vrm-mod-case');
           const etiquette = num ? 'N°' + num : tr('mod5428.articleId', { id: e.a || '' });
           return (
-            <li key={e.cle} className="vrm-mod-ligne vrm-mod-case" data-moderation-sorte="disparue" data-moderation-compte={e.compte} data-moderation-item={e.a || undefined} data-moderation-photo={ph ? '1' : '0'}>
+            <li key={e.cle} className={rv.className} style={rv.style} data-n-revele="" data-moderation-sorte="disparue" data-moderation-compte={e.compte} data-moderation-item={e.a || undefined} data-moderation-photo={ph ? '1' : '0'}>
               <TuilePaire photo={ph} numero={num || ''} icone="image" Icon={Icon} taille="xl" Photo={PhotoVinted} className="vrm-mod-tuile" attrsN={{ 'data-moderation-num': num || undefined }}/>
               {num ? null : <span className="vrm-mod-id">{etiquette}</span>}
               <button type="button" className="vrm-mod-vu" data-moderation-vu={e.cle} aria-label={tr('modc.vuDe', { article: etiquette })} onClick={() => marquerVu([e.cle])}><Icon name="check" size={14}/><span>{tr('modc.vu')}</span></button>

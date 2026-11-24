@@ -78,5 +78,3 @@
 .vrm-mod-case .vrm-mod-tuile .n-tuile-img { width: 100% !important; height: 100% !important; object-fit: cover; }
 .vrm-mod-case .vrm-mod-id { font-size: 12px; line-height: 16px; color: var(--n-encre-2, #50535B); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .vrm-mod-case .vrm-mod-vu { display: inline-flex; align-items: center; justify-content: center; gap: 4px; align-self: stretch; }
-@media (prefers-reduced-motion: no-preference) { .vrm-mod-case { animation: vrm-mod-case-entre 420ms var(--n-jeu-ressort, ease-out) both; } .vrm-mod-case:nth-child(2) { animation-delay: 40ms; } .vrm-mod-case:nth-child(3) { animation-delay: 80ms; } .vrm-mod-case:nth-child(4) { animation-delay: 120ms; } .vrm-mod-case:nth-child(5) { animation-delay: 160ms; } }
-@keyframes vrm-mod-case-entre { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }

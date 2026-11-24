@@ -146,6 +146,9 @@ async function reduit(nav, d) {
   const e = await etatCarte(o.pg);
   const conf = await o.pg.evaluate(() => document.querySelectorAll('.n-confettis').length);
   dit(!!e && e.anim === 'n-pop-fondu' && e.tuileAnim === 'none' && conf === 0, `${T} J4 mouvement réduit : un fondu, aucune pluie, la tuile ne rebondit pas`, JSON.stringify({ anim: e && e.anim, tuile: e && e.tuileAnim, conf }));
+  await o.pg.waitForSelector('[data-n-revele]', { timeout: 20000 }).catch(() => {});
+  const rv = await o.pg.evaluate(() => [...document.querySelectorAll('[data-n-revele]')].map((x) => getComputedStyle(x).animationName));
+  dit(rv.length > 0 && rv.every((a) => a === 'none'), `${T} J9 mouvement réduit : les tuiles sont là d'un coup (aucune apparition)`, JSON.stringify(rv));
   await o.ctx.close();
 }
 
@@ -208,6 +211,9 @@ async function journee(nav, W, theme, d) {
   dit(!croise.length && r.photos.length > 0, `${T} J8 chaque tuile montre la photo de SA vente (${r.photos.length} tuiles ; le leurre au même titre ne prête pas la sienne)`, JSON.stringify(croise.length ? croise : r.photos).slice(0, 300));
   const orange = await pg.evaluate(ORANGE);
   dit(!orange.length, `${T} J3 aucune couleur orange calculée`, orange.join(' ¦ '));
+  // J9 — « pas d'un coup en bloc » : chaque tuile a son apparition, 30 ms d'écart, plafonnée (≤ 240 ms).
+  const rv = await pg.evaluate(() => [...document.querySelectorAll('[data-n-jeu="ventes"] [data-n-revele]')].map((x) => [getComputedStyle(x).animationName, parseFloat(getComputedStyle(x).animationDelay) * 1000]));
+  dit(rv.length > 0 && rv.every(([a, dl]) => a === 'n-revele' && dl <= 240) && (rv.length < 2 || Math.abs(rv[1][1] - rv[0][1] - 30) < 1), `${T} J9 les tuiles apparaissent l'une après l'autre (30 ms, ≤ 240 ms)`, JSON.stringify(rv));
   await capture(pg, `aujourdhui-${W}-${theme}`);
   const bloc = await pg.$('[data-v2-bloc="ventes"]'); if (bloc && SHOTS) { await bloc.scrollIntoViewIfNeeded(); await pg.waitForTimeout(500); await capture(pg, `aujourdhui-ventes-${W}-${theme}`); }
   dit(!(await pg.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)), `${T} J6 rien ne déborde`);
