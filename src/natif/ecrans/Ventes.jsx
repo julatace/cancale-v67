@@ -23,7 +23,10 @@ import { morceauxMarqueTaille } from '../../ventes/marqueTaille.js';
 import '../ventes-lisibles.css';
 import { useARegler } from '../../designV2/useARegler.js';
 import { groupesDe, atelierCompleter } from '../../designV2/aRegler.js';   // (21 nov.) vignettes lisibles, titre entier, gestes de l'achat
-import { ParPaquets } from '../../composants/ParPaquets.jsx';   // (22 nov., latence) 70 colis à envoyer posés par paquets
+import { ParPaquets } from '../../composants/ParPaquets.jsx';
+import { Mot } from '../../accueilReste/AccueilReste.jsx';   // (24 nov., lot debutant) le mot « bordereau » expliqué au toucher
+import { OUTILS } from '../../accueilReste/deps.js';
+import { compteNeuf } from '../../premiereSemaine/regle.js';   // (22 nov., latence) 70 colis à envoyer posés par paquets
 
 const joint = (...x) => x.filter(Boolean).join(' · ');
 // Les morceaux d'une méta qui peut passer à la ligne : chacun reste entier (« à vérifier » ne se coupe jamais en deux).
@@ -184,7 +187,7 @@ const STATUTS_ENVOYER = ['pret', 'attente', 'imprime', 'site'];
 const statutEnvoyer = (r) => (r.bordereau === 'pret' || r.bordereau === 'attente' || r.bordereau === 'imprime' ? r.bordereau : 'site');
 const rangLimite = (e) => (!e ? null : e.ambre ? 0 : e.sorte === 'lue' ? 1 : 2);
 
-function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantRoute, apresListe, filtre, onOutils }) {
+function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantRoute, apresListe, filtre, onOutils, debut = null }) {
   const [choisie, setChoisie] = React.useState(null);
   const [majLe, setMajLe] = React.useState(undefined);
   // (20 nov. soir) Un filtre « Site » DISCRET, dans le menu de filtres du tableau (pas de barre) ; « Tous » par défaut.
@@ -277,7 +280,7 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
         onOuvrir={(l) => setChoisie((c) => (c === l.cle ? null : l.cle))} ligneChoisie={ouverte ? ouverte.cle : ''}
         menuLigne={(l) => [{ cle: 'ouvrir', libelle: tr('tableau.ouvrirVente'), onClick: () => setChoisie(l.cle) },
           ...(l.r.lienSuivi ? [{ cle: 'suivre', libelle: tr('vv.volet.suivre'), onClick: () => { try { window.open(l.r.lienSuivi, '_blank', 'noopener'); } catch (_) {} } }] : [])]}
-        unite={unite} placeholder={tr('vt.chercher')} avantOutils={segment} haut={<>{avant}{surEnvoyer ? null : avantRoute}</>} outilsPlus={outilsPlus}
+        unite={unite} placeholder={tr('vt.chercher')} avantOutils={segment} haut={<>{surEnvoyer ? debut : null}{avant}{surEnvoyer ? null : avantRoute}</>} outilsPlus={outilsPlus}
         pied={surEnvoyer && E.bordsPasSu ? tr('vt.bordsPasSu') : ''} grille={false}
         vide={tr(surEnvoyer ? 'v2v.vide.envoyer' : 'v2v.vide.route')} pasSu={tr('v2v.erreur')} Icon={Icon} iconeVide={surEnvoyer ? 'box' : 'truck'}
         actionPasSu={g.relire ? <Bouton variante="texte" onClick={g.relire} attrs={{ 'data-vt-reessayer': '' }}>{tr('commun.reessayer')}</Bouton> : null}
@@ -311,6 +314,10 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
   const nRegler = React.useMemo(() => { try { return pubRegler && pubRegler.groupes ? groupesDe('ventes', pubRegler.groupes, { completer: atelierCompleter() }).length : 0; } catch (_) { return 0; } }, [pubRegler]);
   const presseRegler = React.useMemo(() => { try { return !!(pubRegler && pubRegler.groupes && groupesDe('ventes', pubRegler.groupes, { completer: atelierCompleter() }).some((x) => x.ambre)); } catch (_) { return false; } }, [pubRegler]);
   const E = m.envoyer, R = m.route;
+  // (24 nov., lot debutant) Un compte NEUF (≤ 30 j) qui a des colis à envoyer : le mot « bordereau » (celui de Vinted)
+  // expliqué en une ligne, le mot se touche (glossaire). Rien d'autre ; disparaît avec la première semaine du compte.
+  const ligneBordereau = E.rangs.length > 0 && compteNeuf(OUTILS.creeLe()) && !OUTILS.exemple()
+    ? <p className="vrm-vt-debutant" data-mot-explique="bordereau"><Mot k="bordereau"/> {tr('vt.deb.bordereau')}</p> : null;
   const fg = (f) => () => { setFeuilleGestes(false); if (f) f(); };
   const surEnvoyer = m.onglet === 'envoyer', surRoute = m.onglet === 'envoyes';
   React.useEffect(() => { setChoisie(null); }, [m.onglet]);
@@ -379,7 +386,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
   </>;
   if (ordinateur && m.onglet !== 'toutes') {
     return <>
-      <VentesBureau m={m} g={g} Icon={Icon} Logo={Logo} Photo={Photo} Generer={Generer} segment={<div className="n-vt-segment">{segment}</div>} avant={avant} avantRoute={avantRoute} apresListe={apresListe}
+      <VentesBureau m={m} g={g} Icon={Icon} Logo={Logo} Photo={Photo} Generer={Generer} segment={<div className="n-vt-segment">{segment}</div>} debut={ligneBordereau} avant={avant} avantRoute={avantRoute} apresListe={apresListe}
         filtre={filtre} onOutils={() => setFeuilleGestes(true)}/>
       {children}
       {feuilles}
@@ -395,6 +402,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
         recherche={m.onglet !== 'toutes' ? <ChampRecherche valeur={q} onChange={setQ} placeholder={tr('v2v.rechercher')} libelle={tr('v2v.rechercher')} onScanner={g.retrouver} attrs={{ 'data-vn-champ': '' }}/> : null}>
         {/* (20 nov.) Le segmenté reste collé sous la barre de titre, sur un fond opaque : jamais caché, rien ne passe dessus. */}
         <div className="n-vn-colle" data-vn-colle="">{segment}</div>
+        {surEnvoyer ? ligneBordereau : null}
         {/* (21 nov., capture iPhone de Julien : « À RÉGLER · 2 », « RETOURS ET LITIGES · 10 », « RETOURS À IMPRIMER » en titres empilés)
             Au téléphone : UNE ligne d'accès discrète, qui ouvre une feuille avec « À régler » et « Retours et litiges » (les mêmes blocs,
             les mêmes gestes, ouverts). Les retours à IMPRIMER rejoignent la liste des colis (ils partent avec le même plein). */}

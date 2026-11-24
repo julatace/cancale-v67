@@ -176,6 +176,9 @@ const INSPECTE = (pg, { tel, jargon }) => pg.evaluate(({ tel, jargon }) => {
     const el = n.parentElement; if (!el || !vis(el) || el.closest('script, style, [data-glossaire], [data-mot-explique], [data-n-pourquoi], .n-pourquoi, details, [data-jargon-assume]')) continue;
     for (const [mot, src, fl] of jargon) {
       if (!new RegExp(src, fl).test(n.nodeValue)) continue;
+      // Le mot expliqué à l'écran (`[data-mot-explique=mot]`, ou le mot du glossaire qui se touche) suffit.
+      const cle = { bordereau: 'bordereau', versement: 'versement' }[mot];
+      if (cle && [...document.querySelectorAll(`[data-mot-explique="${cle}"], [data-glossaire="${cle}"]`)].some(vis)) continue;
       // Une explication dans la même carte (bulle d'aide, « Pourquoi ? ») suffit.
       const carte = el.closest('section, article, .vrm-card, [role="dialog"], li') || el.parentElement;
       if (carte && carte.querySelector('[data-glossaire], [data-mot-explique], [data-n-pourquoi], .n-pourquoi, [data-infopop], details')) continue;
@@ -336,6 +339,7 @@ async function parcours(nav, W, theme) {
     await capture(o.pg, nomCap('D5', 'aujourdhui'));
     juger(T('D5'), 'Aujourd’hui (annonces arrivées)', r, {});
     await aller(o, 'annonces');
+    await o.pg.waitForSelector('[data-mot-explique="numero"]', { timeout: 8000 }).catch(() => {});
     r = await INSP(o);
     await capture(o.pg, nomCap('D5', 'annonces'));
     juger(T('D5'), 'Annonces (3 premières)', r, {});

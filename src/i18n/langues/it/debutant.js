@@ -24,4 +24,5 @@ export default {
   "ann.deb.avant": "Ogni paio riceve un",
   "ann.deb.apres": "da scrivere sulla scatola.",
   "ann.deb.geste": "Tocca un annuncio: il suo N° e il prezzo d’acquisto si annotano nella sua scheda.",
+  "vt.deb.bordereau": ": ciò che attacchi sul pacco.",
 };

@@ -24,4 +24,5 @@ export default {
   "ann.deb.avant": "Cada par recibe un",
   "ann.deb.apres": "para escribir en su caja.",
   "ann.deb.geste": "Toca un anuncio: su N.º y su precio de compra se anotan en su ficha.",
+  "vt.deb.bordereau": ": lo que pegas en tu paquete.",
 };

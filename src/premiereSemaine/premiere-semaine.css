@@ -9,3 +9,5 @@
 /* Annonces : la ligne qui explique le N° tant qu'aucune annonce n'en a (lot debutant). */
 .vrm-ann-debutant { margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--n-carte, #fff); box-shadow: 0 0 0 .5px var(--n-bord, rgba(0,0,0,.08)); }
 .vrm-ann-debutant > p { margin: 0 0 2px; font-size: 15px; line-height: 1.45; color: var(--n-encre, inherit); }
+/* Ventes : le mot « bordereau » expliqué à un compte neuf (lot debutant). */
+.vrm-vt-debutant { margin: 4px 4px 10px; font-size: 14px; line-height: 1.4; color: var(--n-encre-2, inherit); }

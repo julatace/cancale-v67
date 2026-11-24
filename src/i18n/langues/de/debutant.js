@@ -24,4 +24,5 @@ export default {
   "ann.deb.avant": "Jedes Paar bekommt eine",
   "ann.deb.apres": "für seinen Karton.",
   "ann.deb.geste": "Tippe auf eine Anzeige: Nr. und Einkaufspreis trägst du in ihrem Blatt ein.",
+  "vt.deb.bordereau": ": das, was du auf dein Paket klebst.",
 };
