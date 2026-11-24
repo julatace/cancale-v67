@@ -13,7 +13,6 @@ export default {
   "ru.stock.auMoins": "{n}+",
   "ru.mod.disparues": {"one": "{n} Anzeige ist aus {compte} verschwunden", "other": "{n} Anzeigen sind aus {compte} verschwunden"},
   "ru.mod.titreFeuille": "Verschwundene Anzeigen · {compte}",
-  "ru.mod.phrase": "Zwischen {debut} und {fin} sind diese Anzeigen von Vinted verschwunden. VRM hat weder Verkauf noch Löschung gesehen: Vinted hat sie vielleicht entfernt.",
   "ru.mod.annonceId": "Anzeige {id}",
   "ru.mod.menu": "Weitere Aktionen für diese Anzeige",
   "ru.mod.moi": "Ich habe sie selbst gelöscht",
@@ -21,7 +20,6 @@ export default {
   "ru.mod.messages": "Meine Vinted-Nachrichten öffnen",
   "ru.mod.toutVu": "Alles gesehen",
   "ru.mod.aria": "Von Vinted verschwundene Anzeigen",
-  "ru.mod.court": "Verschwunden zwischen {debut} und {fin}",
   "ru.ann.achatRelie": "Verknüpfter Einkauf",
   "ru.rp.bientot": {"one": "Bald am Abholpunkt · {n} unterwegs", "other": "Bald am Abholpunkt · {n} unterwegs"},
 };
