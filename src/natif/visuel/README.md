@@ -48,3 +48,24 @@ Grilles :
 6. **Listes longues** : pas d'animation par rangée au-delà des 5 premières, et les images prennent leur bonne taille (`Photo={PhotoVinted}`).
 7. **Textes** : tout passe par `tr()` (`src/i18n/langues/*/visuelJeu.js`, cinq langues). Cibles au doigt ≥ 44 px. Clair et sombre.
 8. **Affichage seulement** : aucune règle métier ne change. Un nombre vient de son propriétaire unique (§5).
+
+## L'apparition progressive (Julien, 24 nov. : « pas d'un coup en bloc »)
+
+Les trois lots visuels utilisent UNE seule aide, dans `src/natif/Jeu.jsx` (`src/natif/index.js` l'exporte aussi).
+
+Avant les données :
+- Pose le squelette de la FORME finale : `<SqueletteInventaire n={5}/>` pour une rangée d'inventaire, `<SqueletteTuile taille="xl"/>` pour une tuile, `<Attente/>` (`src/natif/Attente.jsx`) pour des rangées.
+- Les mêmes tailles qu'à l'arrivée : rien ne bouge, CLS ≤ 0,02.
+
+Quand les données arrivent :
+- Pose `{...revele(i)}` sur le i-ème élément, ou enveloppe-le dans `<Revele i={i}>`.
+- Chaque élément arrive en fondu + 4 px, 30 ms après le précédent, plafonné au 8ᵉ (240 ms au plus).
+- L'animation ne touche que `transform` et `opacity` : aucun décalage de mise en page. L'élément est lisible dès la première image (opacité de départ 0,35).
+- Avec `prefers-reduced-motion: reduce`, l'apparition est immédiate.
+
+Les images :
+- `TuilePaire` pose la photo sur le gris du squelette et la fait apparaître en fondu une fois chargée (`data-n-tuile-charge`).
+- Pas de flash blanc.
+- Une image déjà en cache ne refait pas le fondu.
+
+Pour une liste longue, ne pose `revele` que sur les premiers éléments visibles : au-delà du 8ᵉ, ils arrivent ensemble.
