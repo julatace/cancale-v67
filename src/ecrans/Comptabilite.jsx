@@ -360,7 +360,9 @@ import { phraseDuJour } from "../phraseJour.js";
 // ⟦← App.jsx #74⟧
 import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "../recapVente.js";
 import { auCentreDeVerification } from "../verificationArticle.js";
-import { preuvesFriseVinted, bifurcationVente, friseProuvee } from "../friseProuvee.js";   // (10 nov., lot BE) la frise d'une vente, étape par étape
+import { preuvesFriseVinted, bifurcationVente, friseProuvee } from "../friseProuvee.js";
+import { parcoursEnvoi, groupesEnvois } from '../../api/_lib/suivi-envoi.js';   // (24 nov., lot suivi-ventes) le suivi d'un envoi, du dépôt au versement
+import { ParcoursEnvoi, MesEnvois, ListeEnvois } from '../SuiviEnvoi.jsx';   // (10 nov., lot BE) la frise d'une vente, étape par étape
 import FriseVente from "../FriseVente.jsx";
 import { sourceDeVente, horsParNumero, publierSources } from "../sourceAchats.js";
 import { bilanSources, publierMeilleures, lireMeilleures } from "../meilleuresSources.js";   // (11 nov.) tes meilleures sources   // (10 nov., lot BG) d'où viennent mes achats
@@ -9712,7 +9714,22 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const frise = friseProuvee({ preuves, bifurcation: bif, geste, verification: !bif && auCentreDeVerification(o) });
     const verse = annulee ? null : preuves.versee.lu ? 'date' : preuves.finalisee.lu ? 'oui' : 'non';
     const cle = frise.etapes.map((e) => e.cle + ':' + e.etat + ':' + (e.t || '') + (e.cours ? ':c' : '') + (e.source ? ':' + e.source : '')).join(',') + '|' + (bif ? [bif.genre, bif.sous, bif.geste ? 1 : 0].join(':') : '') + '|' + verse;
-    return { frise, verse, bordereau: preuves.bordereau.lu, cle };
+    return { frise, verse, bordereau: preuves.bordereau.lu, cle, preuves, bif, suivi };
+  };
+  // ── (24 nov., lot suivi-ventes) LE SUIVI D'UN ENVOI (api/_lib/suivi-envoi.js) : Déposé → En route → Au point
+  // → Retiré → Commande finalisée. Les MÊMES preuves que la frise (ci-dessus), plus la ligne lue chez le
+  // transporteur pour le n° de SON bordereau — aucune si ce n° est ambigu (deux ventes, ou aussi un achat).
+  const parcoursEnvoiDe = (o, litige = null, fp = null) => {
+    const f = fp || friseProuveeDe(o, litige);
+    const tx = String(o.transaction_id);
+    const su = f.suivi || '';
+    const amb = !!(su && ambigusFrise && ambigusFrise.has(su));
+    const dep = su && !amb && vcLoc0.departs instanceof Map ? (vcLoc0.departs.get(su) || null) : null;
+    const trp = transporteurVente(bordParTx[tx] || null, tx) || null;
+    const pc = parcoursEnvoi({ preuves: f.preuves, depart: dep, venteMs: o.date || null, bifurcation: f.bif, suivi: su, carrier: (trp && trp.cle) || '', maintenant: Date.now() });
+    const lien = su ? lienSuivi((trp && (trp.cle || trp.nom)) || '', su) : null;
+    const cle = [pc.groupe || '', pc.danger || '', pc.suivi, ...pc.etapes.map((e) => e.cle + ':' + e.etat + ':' + (e.t || '') + ':' + (e.limite || '') + ':' + (e.nom || '')), pc.retour ? pc.retour.libelle : ''].join('|');
+    return { pc, trp, lien, cle };
   };
   const toggleShipDone = (o) => { const k = o && o.transaction_id!=null ? String(o.transaction_id) : null; if(!k) return; setShipDone(prev=>{ const u={...prev}; if(u[k]) delete u[k]; else u[k]=Date.now(); save('vinted_ship_done',u); return u; }); };
   // « ✓ Colis fait » : LE geste (la vente ET son bordereau). Le bouton de la
@@ -18882,11 +18899,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // (10 nov., lot BE) la frise prouvée du récapitulatif (ses preuves arrivent après le premier rendu).
     const frisePv = friseProuveeDe(o, litige);
     deps.push(frisePv.cle);
+    // (24 nov., lot suivi-ventes) le suivi de l'envoi (le point, sa date limite, le danger) — lu après le premier rendu.
+    let envPv = null; try { envPv = parcoursEnvoiDe(o, litige, frisePv); } catch (_) { envPv = null; }
+    deps.push(envPv ? envPv.cle : '');
     // (11 nov., lot ventes-lot) le résumé du lot (articles, N°, parts, achats) — lu après le premier rendu.
     const lot = lotDeVente(o);
     deps.push(lot ? JSON.stringify([lot.lu, lot.attente, lot.passu, lot.n, lot.mode, (lot.articles || []).map((a) => [a.item, a.num, a.par, a.part, a.achat, a.conflit ? 1 : 0])]) : '');
     deps.push(serieVentes.actif ? (serieVentes.estCoche(tx) ? 2 : 1) : 0);   // (lot actions-serie) coché ⇒ la ligne se redessine
-    return { deps, e, baseE, photo, sourcesPhoto, ov, hidden, etatArticle, litige, frisePv, lot };
+    return { deps, e, baseE, photo, sourcesPhoto, ov, hidden, etatArticle, litige, frisePv, envPv, lot };
   };
   // ── (10 nov., lots BB et BI) « LITIGES EN COURS » ET « RETOURS PAR MODÈLE » ─────────────
   // Les lignes de VENTE de `litigesSuivis` (src/litiges.js, la règle unique) avec les preuves
@@ -19576,6 +19596,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const [tourneeDepot, setTourneeDepot] = useState(false);
   // (9 nov.) Colis → Envoyés : la pastille de transporteur choisie (« tous » par défaut).
   const [filtreEnvoyes, setFiltreEnvoyes] = useState('tous');
+  const [groupeEnvoi, setGroupeEnvoi] = useState('tous');   // (24 nov., lot suivi-ventes) « Mes envois » : un groupe ouvert, ou la liste
   // (lot AJ) La pastille de transporteur de « À envoyer » (un filtre, jamais un ordre).
   const [filtreEnvoyer, setFiltreEnvoyer] = useState('tous');
   // (15 nov., Ventes « Verre dépoli ») Les colis COCHÉS pour l'impression en lot : null = rien touché (la règle du lot,
@@ -24757,7 +24778,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   {/* (10 nov., lot BE) LA FRISE PROUVÉE : sept étapes, chacune seulement si SA preuve est lue
                       (src/friseProuvee.js) — jamais déduite ; litige / retour / annulation en bifurcation.
                       Elle remplace ici la frise de la ligne (4 segments, inchangée sur la ligne). */}
-                  {pre.frisePv ? <FriseVente frise={pre.frisePv.frise} transporteur={trRecap} verse={pre.frisePv.verse} bordereau={pre.frisePv.bordereau} cle={txL}/> : null}
+                  {/* (24 nov., lot suivi-ventes) Le colis PARTI : la piste de l'envoi (Déposé → En route → Au point → Retiré
+                      → Commande finalisée), chacune avec SA date lue, le point, sa date limite, le danger, le retour — elle
+                      REMPLACE la frise ici (une piste, jamais deux : les mêmes dates ne s'écrivent pas deux fois, §7). Avant
+                      le départ, la frise reste (bordereau, geste « à déposer »). */}
+                  {pre.envPv && pre.envPv.pc.groupe ? <ParcoursEnvoi parcours={pre.envPv.pc} transporteur={pre.envPv.trp || trRecap} lien={pre.envPv.lien} cle={txL}/>
+                    : pre.frisePv ? <FriseVente frise={pre.frisePv.frise} transporteur={trRecap} verse={pre.frisePv.verse} bordereau={pre.frisePv.bordereau} cle={txL}/> : null}
                 </section>
                 {lot ? <ArticlesLotVente lot={lot} devise={devise || 'EUR'} tx={txL} onRelier={hidden || st === 'cancelled' ? null : relierArticleLot}/> : null}
                 <section className="vrm-recap-argent" aria-label={tr('ventes.argent')}>
@@ -30483,8 +30509,34 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             <CartesRetourRecu res={retoursSuivis} site={siteColis} onRemettre={remettreDepuisCarte}/>
             <RetoursEnCoursBloc res={retoursSuivis} site={siteColis} nomCompte={accNameOf} plusieursComptes={(accounts||[]).length>1} onRecu={basculerRetourRecu} onRemettre={remettreEnStock} onMasquer={masquerRetour} onAnnulerRemise={annulerRemise} onRemettreEnLigne={remettreRetourEnLigne}/>
           </>;
+          // (24 nov., lot suivi-ventes) « MES ENVOIS » (api/_lib/suivi-envoi.js) : chaque vente Vinted PARTIE des 45 derniers
+          // jours, rangée par la DERNIÈRE étape lue — en route · au point, pas retiré (date limite la plus proche d'abord) ·
+          // retiré, argent en attente · argent versé. Une tuile ouvre son groupe (toucher une ligne ouvre la vente) ; le nombre
+          // dit sa couverture (lus chez un transporteur). Les retours restent dans le bloc des retours, au-dessus.
+          const mesItems = [];
+          if (voitSite('vinted') && Array.isArray(sales.items)) for (const o of sales.items) {
+            if (!o || o.transaction_id == null) continue;
+            const txE = String(o.transaction_id);
+            if (hiddenSales.has(txE) || retoursTx.has(txE)) continue;
+            const jE = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
+            if (jE != null && jE > LIMITE_ENVOYES_J) continue;
+            let rE = null; try { rE = parcoursEnvoiDe(o, litigeDeVente(litigesSuivis, o)); } catch (_) { rE = null; }
+            if (!rE || !rE.pc.groupe) continue;
+            const bE = bordsParTxn[txE] || null;
+            mesItems.push({ cle: 'v:' + txE, tx: txE, titre: o.title || tr('envois.etape.depose'), photo: orderPhoto(o) || '', num: (bE ? numForBord(bE) : '') || (effEntry(o)?.numero || ''), parcours: rE.pc, transporteur: rE.trp });
+          }
+          const grEnv = groupesEnvois(mesItems);
+          const choixEnv = groupeEnvoi !== 'tous' && Array.isArray(grEnv[groupeEnvoi]) ? groupeEnvoi : 'tous';
+          const ouvrirEnvoi = (it) => { try { const a = attrsFicheLigne({ contexte: 'vente', site: 'vinted', cle: 'v' + it.tx, tx: it.tx, nums: it.num ? [String(it.num)] : [], photo: typeof it.photo === 'string' ? it.photo : '', titre: it.titre || '' });
+            const el = document.createElement('div'); for (const [k, v] of Object.entries(a)) el.setAttribute(k, v); const x = lireLigne(el); if (x) ouvrirLigne(x); } catch (_) {} };
+          const mesEnvoisBloc = <>
+            <MesEnvois groupes={grEnv} choix={choixEnv} onChoix={setGroupeEnvoi}/>
+            {choixEnv !== 'tous' ? <ListeEnvois items={grEnv[choixEnv]} Photo={PhotoVinted} numero={(n) => <Numero n={n} taille="petit"/>} onOuvrir={ouvrirEnvoi}/> : null}
+          </>;
+          // Un groupe ouvert remplace la liste (un colis n'est jamais dit deux fois sur l'écran, §7).
+          if (choixEnv !== 'tous') return <>{retoursHaut}{mesEnvoisBloc}</>;
           const L = listeEnvoyes().filter((x) => !(x.site === 'vinted' && x.o && retoursTx.has(String(x.o.transaction_id))));
-          if (!L.length) return <>{retoursHaut}<div className="vrm-colis-vide-envoi" data-colis-envoyes="0" data-colis-partis="0"><span className="vrm-colis-vide-titre">Aucun colis envoyé</span><span className="vrm-colis-vide-sous">Ces {LIMITE_ENVOYES_J} derniers jours. Un colis « Déposé » arrive ici.</span></div></>;
+          if (!L.length) return <>{retoursHaut}{mesEnvoisBloc}<div className="vrm-colis-vide-envoi" data-colis-envoyes="0" data-colis-partis="0"><span className="vrm-colis-vide-titre">Aucun colis envoyé</span><span className="vrm-colis-vide-sous">Ces {LIMITE_ENVOYES_J} derniers jours. Un colis « Déposé » arrive ici.</span></div></>;
           const plusieursComptes = (accounts || []).length > 1;
           // (9 nov., Julien : « mets le plus récent en haut, comme pour tous les onglets ») UNE liste,
           // la plus récente en haut (src/colisEnvoyes.js : prise en charge lue, sinon « Colis fait »,
@@ -30506,7 +30558,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           const cleVoletR = grandR ? (voletVente && LT.some((x) => String(x.cle) === voletVente) ? voletVente : (LT[0] ? String(LT[0].cle) : null)) : null;
           let voletSelR = null, nVusR = 0;
           return (
-            <>{retoursHaut}<section className="vrm-colis-envoyes" data-cible="colonne:partis" data-colis-envoyes={L.length} data-colis-partis={L.length} data-partis-coches={postes.length} data-cc-colonne="partis" data-au-relais={nbAuRelais} data-envoyes-tri="recent" data-envoyes-filtre={filtreT}>
+            <>{retoursHaut}{mesEnvoisBloc}<section className="vrm-colis-envoyes" data-cible="colonne:partis" data-colis-envoyes={L.length} data-colis-partis={L.length} data-partis-coches={postes.length} data-cc-colonne="partis" data-au-relais={nbAuRelais} data-envoyes-tri="recent" data-envoyes-filtre={filtreT}>
               {pastillesT.length > 1 && (
                 <div className="vrm-rangee vrm-filtres" role="group" aria-label="Filtrer par transporteur" data-envoyes-filtres="" style={{display:'flex',gap:6,marginBottom:10}}>
                   <button type="button" aria-pressed={filtreT === 'tous'} data-envoyes-filtre-choix="tous" data-envoyes-filtre-n={L.length} onClick={() => setFiltreEnvoyes('tous')} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Tous · {L.length}</button>

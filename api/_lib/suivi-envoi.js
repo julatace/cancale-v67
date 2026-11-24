@@ -103,7 +103,8 @@ export function parcoursEnvoi({ preuves = {}, depart = null, venteMs = null, bif
   liste.forEach((e) => { e.cours = e.cle === enCours; });
   // Le danger : le colis attend au point, pas retiré ; la règle de « Colis en danger ».
   const danger = t && etatT === 'disponible' && etapes.retire.etat !== 'fait' && !retour ? dangerDuDepart(t, maintenant) : null;
-  const groupe = retour ? 'retour'
+  // Un retour ne range le colis dans « Retour » que s'il était PARTI (une vente annulée avant l'envoi n'est pas un envoi).
+  const groupe = retour ? (ici >= 0 ? 'retour' : null)
     : etapes.argent.etat === 'fait' ? 'argent'
     : etapes.retire.etat === 'fait' ? 'retire'
     : etapes.aupoint.etat === 'fait' ? 'aupoint'
