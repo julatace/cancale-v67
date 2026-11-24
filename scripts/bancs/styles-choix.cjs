@@ -134,7 +134,8 @@ const MESURE = (args) => {
 const APPUI = () => {
   const vu = (el) => { const r = el.getBoundingClientRect(); return r.width > 10 && r.height > 10 && r.top < innerHeight && r.bottom > 0; };
   const b = [...document.querySelectorAll('.vrm-main .n-bouton[data-n-variante="plein"]:not([aria-disabled="true"]), [data-fiche-paire] .n-bouton[data-n-variante="plein"]:not([aria-disabled="true"])')].find(vu)
-    || [...document.querySelectorAll('.vrm-main .n-bouton:not([aria-disabled="true"]), [data-fiche-paire] .n-bouton:not([aria-disabled="true"])')].find(vu);
+    || [...document.querySelectorAll('.vrm-main .n-bouton:not([aria-disabled="true"]), [data-fiche-paire] .n-bouton:not([aria-disabled="true"])')].find(vu)
+    || [...document.querySelectorAll('.vrm-main [data-n-famille="second"], .vrm-main [data-n-famille="rangee"]')].find(vu);
   if (!b) return { trouve: false };
   b.style.transition = 'none';
   const sous = (() => { for (let x = b.parentElement; x; x = x.parentElement) { const c = getComputedStyle(x).backgroundColor; if (c && !/rgba\(0, 0, 0, 0\)|transparent/.test(c)) return c; } return getComputedStyle(document.body).backgroundColor; })();
@@ -148,7 +149,9 @@ const APPUI = () => {
 
 // B (pixels) : les boîtes à juger sur la capture
 const BOITES = () => {
-  const vu = (el) => { const r = el.getBoundingClientRect(); return r.width > 6 && r.height > 6 && r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth && !el.closest('[aria-hidden="true"]'); };
+  // à l'écran ET au-dessus de tout (une fiche posée par-dessus la liste cache la liste)
+  const vu = (el) => { const r = el.getBoundingClientRect(); if (!(r.width > 6 && r.height > 6 && r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth && !el.closest('[aria-hidden="true"]'))) return false;
+    const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!t && (el.contains(t) || t.contains(el)); };
   const sel = ['.n-bouton[data-n-variante="plein"] .n-bouton-libelle', '.n-pastille', '.n-plaque', '.n-grand-titre', '.n-rangee-titre', '.n-onglet[aria-current="page"] .n-onglet-libelle', '.n-segmente-choix[aria-checked="true"] .n-segmente-libelle', '.n-bouton[data-n-variante="teinte"] .n-bouton-libelle'];
   const out = [];
   for (const s of sel) { let n = 0; for (const el of document.querySelectorAll(s)) { if (!vu(el) || n >= 3) continue; const t = (el.innerText || '').trim(); if (t.length < 1) continue;
@@ -209,7 +212,10 @@ async function poserMutation(pg) {
         console.log(`\n── ${cle}`);
         const o = await ouvrir(nav, { W, sombre, style, url: '/?tab=' + (e === 'fiche' ? 'annonces' : e), b });
         try {
-          await o.pg.waitForSelector('.vrm-main', { timeout: 45000 }).catch(() => {}); await o.pg.waitForTimeout(5000);
+          await o.pg.waitForSelector('.vrm-main', { timeout: 45000 }).catch(() => {});
+          // la liste CHARGÉE (des N° à l'écran), pas son squelette : la machine des bancs est lente
+          await o.pg.waitForFunction(() => document.querySelectorAll('.vrm-main .n-plaque').length >= 3, null, { timeout: 60000 }).catch(() => {});
+          await o.pg.waitForTimeout(2500);
           if (e === 'fiche') {
             const c = await o.pg.evaluate(() => { for (const e of document.querySelectorAll('[data-fiche-ligne][data-fl-num], [data-eg-article]:not([data-eg-numero=""])')) { const r = e.getBoundingClientRect(); if (r.width < 40 || r.height < 30 || r.top < 110 || r.bottom > innerHeight - 110) continue;
               const x = Math.min(innerWidth - 8, r.left + Math.min(r.width * 0.5, 190)), y = r.top + r.height / 2; const t = document.elementFromPoint(x, y); if (t && e.contains(t)) return { x, y }; } return null; });

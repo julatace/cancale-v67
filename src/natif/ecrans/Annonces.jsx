@@ -325,7 +325,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
     const trace = bloque ? g.articles.map(traceDe).filter((t) => t && t.le != null).sort((x, y) => y.le - x.le)[0] || null : null;
     return (
       <div className="n-ad-tete-compte" data-ad-bloque={bloque ? '1' : undefined}>
-        <button type="button" className="n-ad-compte" aria-expanded={ouvertG ? 'true' : 'false'} onClick={() => basculerRepli(g.cle)} data-ad-repli={g.cle}>
+        <button type="button" className="n-ad-compte" data-n-famille="rangee" aria-expanded={ouvertG ? 'true' : 'false'} onClick={() => basculerRepli(g.cle)} data-ad-repli={g.cle}>
           {Logo && g.site ? <span className="n-eg-compte-logo" aria-hidden="true">{Logo(g.site)}</span> : null}
           <span className="n-ad-compte-nom">{titre}<span className="n-ad-compte-n"> · {n}</span></span>
           {g.site ? <span className="n-eg-sr"> · {nomSite(g.site)} · {tr('egalite.groupe.n', { n })}</span> : null}
@@ -347,7 +347,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   // (21 nov., 2e passe) « À régler » et « Mis à jour » sur UNE ligne fine : « Mis à jour il y a 18 min · ● 24 à régler › · ⟳ ».
   const nRegler = sujets.reduce((t, x) => t + x.n, 0);
   const aReglerTel = sujets.length ? (
-    <button type="button" className="n-ad-afaire n-ad-aregler" data-ad-aregler={String(nRegler)} aria-label={tr('egalite.aRegler') + ' · ' + sujets.map((x) => x.libelle).join(' · ')}
+    <button type="button" className="n-ad-afaire n-ad-aregler" data-n-famille="lien" data-ad-aregler={String(nRegler)} aria-label={tr('egalite.aRegler') + ' · ' + sujets.map((x) => x.libelle).join(' · ')}
       onClick={() => (sujets.length === 1 ? sujets[0].go() : setReglerTel(true))}>
       <span className="n-ad-point" aria-hidden="true"/><span className="n-ad-afaire-texte">{tr('egalite.d.aReglerN', { n: nRegler })}</span><Glyphe nom="chevron" taille={14}/>
     </button>) : null;

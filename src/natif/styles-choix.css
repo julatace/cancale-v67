@@ -32,7 +32,7 @@
 [data-style]:not([data-style=""]) .n-carte-corps,
 [data-style]:not([data-style=""]) .n-tuile { border-color: transparent; box-shadow: var(--g-carte-ombre); border-radius: var(--n-r-carte); }
 [data-style]:not([data-style=""]) .n-groupe-carte { -webkit-backdrop-filter: var(--g-verre); backdrop-filter: var(--g-verre); }
-[data-style]:not([data-style=""]) .n-grand-titre { font-family: var(--g-titre-police); font-weight: var(--g-titre-poids); font-size: 30px; line-height: 36px; letter-spacing: -.4px; padding-bottom: 12px; }
+[data-style]:not([data-style=""]) .n-grand-titre { font-family: var(--g-titre-police); font-weight: var(--g-titre-poids); font-size: 32px; line-height: 36px; letter-spacing: -.02em; padding-bottom: 12px; }
 [data-style]:not([data-style=""]) .n-barre-centre { font-family: var(--g-titre-police); }
 
 /* ── LE BOUTON PLEIN : encre/ardoise, 48–52, relief doux (reflet intérieur + petite ombre), enfoncé 0,97 plus foncé, 80 ms ── */
@@ -61,7 +61,9 @@
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="texte"],
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="destructif"] { background-color: transparent; color: var(--n-accent); }
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="texte"]:active,
-[data-style]:not([data-style=""]) .n-bouton[data-n-variante="destructif"]:active { background-color: var(--n-appui); color: var(--n-encre); }
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="texte"][data-n-force="appui"],
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="destructif"]:active,
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="destructif"][data-n-force="appui"] { background-color: var(--n-appui); color: var(--n-encre); }
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="destructif"][data-n-arme] { background-color: var(--n-ambre-fond); color: var(--n-encre); box-shadow: none; }
 [data-style]:not([data-style=""]) .n-bouton[data-n-ton="ambre"] { color: var(--n-encre); }
 [data-style]:not([data-style=""]) .n-bouton[data-n-ton="ambre"][data-n-variante="teinte"] { box-shadow: none; }
@@ -70,9 +72,10 @@
 [data-style]:not([data-style=""]) .n-bouton:focus-visible { outline: none; box-shadow: var(--g-anneau); }
 
 /* ── les boutons propres à un composant partagé, rattachés à la famille par `data-n-famille` (attribut seul : le style
-   actuel ne change pas) : « second » = le secondaire teinté ; « champ » = un champ creusé qu'on touche (« + prix »).
-   36 dessinés dans une zone de 44 (bordure transparente), comme `.n-bouton`. ── */
-[data-style]:not([data-style=""]) [data-n-famille] {
+   actuel ne change pas) : « second » = le secondaire teinté ; « champ » = un champ creusé qu'on touche (« + prix ») ;
+   « rond » = l'icône seule (⋯), discrète au repos ; « lien » = le tertiaire (texte + chevron) ; « rangee » = une rangée
+   entière qu'on touche. Les deux premiers : 40 dessinés dans une zone de 44 (bordure transparente), comme `.n-bouton`. ── */
+[data-style]:not([data-style=""]) :is([data-n-famille="second"], [data-n-famille="champ"]) {
   position: relative; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   min-height: var(--n-cible); min-width: var(--n-cible); margin: 0; padding: 0 12px;
   border: 0; border-block: calc((var(--n-cible) - var(--n-h-controle)) / 2) solid transparent; background-clip: padding-box;
@@ -82,9 +85,18 @@
 }
 [data-style]:not([data-style=""]) [data-n-famille="second"] { background-color: var(--g-second-fond); color: var(--n-encre); box-shadow: none; }
 [data-style]:not([data-style=""]) [data-n-famille="champ"] { background-color: var(--g-champ-fond); color: var(--n-encre-2); box-shadow: var(--g-champ-ombre); font-weight: 500; }
-[data-style]:not([data-style=""]) [data-n-famille]:active,
-[data-style]:not([data-style=""]) [data-n-famille][data-n-force="appui"] { transform: scale(var(--g-appui)); background-color: var(--g-second-appui); }
-[data-style]:not([data-style=""]) [data-n-famille]:focus-visible { outline: none; box-shadow: var(--g-anneau); }
+[data-style]:not([data-style=""]) :is([data-n-famille="second"], [data-n-famille="champ"]):active,
+[data-style]:not([data-style=""]) :is([data-n-famille="second"], [data-n-famille="champ"])[data-n-force="appui"] { transform: scale(var(--g-appui)); background-color: var(--g-second-appui); }
+[data-style]:not([data-style=""]) [data-n-famille="rond"] { border-radius: 50%; transition: transform var(--g-relache) var(--g-courbe), background-color var(--g-relache) var(--g-courbe); }
+[data-style]:not([data-style=""]) [data-n-famille="rond"]:active,
+[data-style]:not([data-style=""]) [data-n-famille="rond"][data-n-force="appui"] { transform: scale(.92); background-color: var(--n-appui); }
+[data-style]:not([data-style=""]) [data-n-famille="lien"] { color: var(--n-encre); font-weight: 600; transition: transform var(--g-relache) var(--g-courbe), opacity var(--g-relache) var(--g-courbe); }
+[data-style]:not([data-style=""]) [data-n-famille="lien"]:active,
+[data-style]:not([data-style=""]) [data-n-famille="lien"][data-n-force="appui"] { transform: scale(var(--g-appui)); opacity: .6; }
+[data-style]:not([data-style=""]) [data-n-famille="rangee"] { transition: transform var(--g-relache) var(--g-courbe), background-color var(--g-relache) var(--g-courbe); }
+[data-style]:not([data-style=""]) [data-n-famille="rangee"]:active,
+[data-style]:not([data-style=""]) [data-n-famille="rangee"][data-n-force="appui"] { transform: scale(.985); background-color: var(--n-appui); }
+[data-style]:not([data-style=""]) :is([data-n-famille="second"], [data-n-famille="champ"]):focus-visible { outline: none; box-shadow: var(--g-anneau); }
 [data-style]:not([data-style=""]) [data-n-famille] .n-vt-relier-rond { width: auto; height: auto; background: none; box-shadow: none; color: inherit; }
 
 /* ── les boutons ronds (icône seule, 44) ── */
@@ -139,6 +151,9 @@
 [data-style]:not([data-style=""]) .n-onglet[aria-current="page"] .n-onglet-icone { background: var(--g-second-fond); color: var(--n-encre); border-radius: 999px; }
 [data-style]:not([data-style=""]) .n-onglet:active .n-onglet-icone { transform: scale(.88); }
 
+@media (prefers-reduced-transparency: reduce) {
+  [data-style]:not([data-style=""]) .n-onglets, [data-style]:not([data-style=""]) .n-groupe-carte { -webkit-backdrop-filter: none; backdrop-filter: none; background-color: var(--n-fond); }
+}
 @media (prefers-reduced-motion: reduce) {
   [data-style]:not([data-style=""]) .n-bouton:active,
   [data-style]:not([data-style=""]) .n-bouton-icone-seule:active,
