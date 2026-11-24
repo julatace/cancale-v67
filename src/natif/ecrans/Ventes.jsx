@@ -68,7 +68,7 @@ const echeanceCourte = (e) => (!e ? '' : e.code !== 'date' ? e.texte : e.sorte =
 // (21 nov., « comme la page Commandes de Vintex », version empilée) Au téléphone, la ligne SOUS le titre : le prix (gras), l'étiquette
 // d'état, le logo du transporteur, la date limite — le titre garde toute la largeur (jamais coupé à 20 caractères).
 const ligneTel = (r, fin) => <span className="n-vt-valeur n-vt-ligne" data-vt-ligne="">{r.prix ? <span className="n-vt-ligne-prix" data-vt-prix="">{r.prix}</span> : null}{etiquetteTel(r)}{logoTel(r)}{fin ? <span className="n-vt-ligne-fin">{fin}</span> : null}</span>;
-const piedAchat = (r, Icon) => (r.achat ? <GestesAchat a={{ ...r.achat, titre: r.achat.titre || r.titre }} Icon={Icon}/> : null);
+const piedAchat = (r, Icon) => (r.achat ? <GestesAchat a={{ ...r.achat, titre: r.achat.titre || r.titre }} Icon={Icon} court replie/> : null);
 // (20 nov. soir, plus de sélecteur de plateforme) Le logo du SITE de la vente, devant le N° (au téléphone comme dans le volet).
 const avecSite = (r, plaque) => (r && r.site ? <>{<LogoSite site={r.site} taille={20}/>}{plaque}</> : plaque);
 const logoTel = (r) => (r.transporteurCle ? <span className="n-vt-logo" data-vt-transporteur={r.transporteurCle} title={r.transporteur || ''}>{logoTr(r, 22)}</span> : null);
@@ -117,7 +117,7 @@ function RangeeRoute({ r, Icon, Photo, choisie, onOuvrir }) {
       pied={piedAchat(r, Icon)}
       selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)}
       actions={r.lienSuivi ? [{ cle: 'suivre', libelle: tr('vn.b.suivre'), icone: <Icon name="truck" size={20}/>, onClick: () => { try { window.open(r.lienSuivi, '_blank', 'noopener'); } catch (_) {} }, franc: true }] : null}
-      attrs={{ 'data-vn-route': r.cle, 'data-vn-num': r.num, 'data-vn-etape': String((r.etapes || []).filter((e) => e.fait).length) }}
+      className="n-vt-rang" attrs={{ 'data-vn-route': r.cle, 'data-vn-num': r.num, 'data-vn-etape': String((r.etapes || []).filter((e) => e.fait).length) }}
     />
   );
 }
@@ -212,17 +212,27 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
   const rangsVus = siteF === 'toutes' ? rangs : rangs.filter((r) => r.site === siteF);
   const filtresSite = sitesVus.length > 1 ? [{ cle: 'site', libelle: tr('tableau.col.site'), valeur: siteF, onChange: setSiteF,
     options: [{ cle: 'toutes', libelle: tr('tableau.site.tous') }, ...sitesVus.map((x) => ({ cle: x, libelle: Logo && Logo.nom ? Logo.nom(x) : x, n: rangs.filter((r) => r.site === x).length }))] }] : [];
+  // (23 nov., style-clarte-5 — §7 « une même phrase sur chaque ligne est UNE phrase ») L'état d'envoi (« Bordereau prêt »…) n'est
+  // écrit sur la rangée que s'il ne vaut PAS pour toutes les rangées montrées ; sinon il est dit une fois, à côté du nombre.
+  const sousDe = (r) => { const st = surEnvoyer ? statutEnvoyer(r) : statutRangee(r); return surEnvoyer ? (st === 'site' ? '' : tr('vt.st.' + st)) : (r.etat && r.etat.texte) || ''; };
+  // L'état le PLUS FRÉQUENT (au moins deux rangées) se tait sur les rangées et se dit une fois en tête (« 24 · bordereau prêt ») ;
+  // seules les rangées qui en diffèrent gardent le leur — on lit l'exception, pas la règle répétée.
+  const compteSous = new Map(); for (const r of rangsVus) { const x = sousDe(r); if (x) compteSous.set(x, (compteSous.get(x) || 0) + 1); }
+  const [sousCommun, nCommun] = [...compteSous.entries()].sort((a, b) => b[1] - a[1])[0] || ['', 0];
   const lignes = erreur ? null : !lu ? undefined : rangsVus.map((r) => {
     const st = surEnvoyer ? statutEnvoyer(r) : statutRangee(r);
-    const sous = surEnvoyer ? (st === 'site' ? '' : tr('vt.st.' + st)) : (r.etat && r.etat.texte) || '';
+    const sousR = sousDe(r);
+    const sous = sousCommun && nCommun >= 2 && sousR === sousCommun ? '' : sousR;
     return { cle: r.cle, r, titre: r.titre, photo: r.photo || '', image: r.photo && Photo ? <Photo src={r.photo} alt="" loading="lazy" decoding="async"/> : null,
       sous: joint(marqueTaille(r), sous), statut: st, statutLibelle: motStatut(r), nonCochable: !(r.coche && r.coche.possible), num: r.num, prix: r.prix, t: r.t, prixGrille: r.prix,
-      texte: [r.titre, r.num ? 'n' + r.num + ' n°' + r.num + ' ' + r.num : '', r.taille, r.acheteur, r.compte, r.transporteur, r.suivi, sous].filter(Boolean).join(' '),
+      texte: [r.titre, r.num ? 'n' + r.num + ' n°' + r.num + ' ' + r.num : '', r.taille, r.acheteur, r.compte, r.transporteur, r.suivi, sousR].filter(Boolean).join(' '),
       attrs: surEnvoyer
         ? { 'data-vn-rang': r.cle, 'data-vn-bordereau': r.bordereau || '', 'data-vn-limite': r.echeance ? r.echeance.sorte : '', 'data-vn-limite-code': r.echeance ? r.echeance.code : '', 'data-vn-num': r.num, 'data-vn-prix': r.prix, 'data-vt-site': r.site, 'data-vt-statut': 'envoyer', 'data-vt-transporteur': r.transporteurCle || '' }
         : { 'data-vt-site': r.site, 'data-vn-route': r.cle, 'data-vn-num': r.num, 'data-vn-etape': String((r.etapes || []).filter((e) => e.fait).length), 'data-vt-statut': st, 'data-vt-transporteur': r.transporteurCle || '' } };
   });
   const presses = surEnvoyer ? rangs.filter((r) => r.echeance && r.echeance.ambre).length : 0;
+  const nAVerifier = surEnvoyer ? rangsVus.filter((r) => r.echeance && r.echeance.code === 'estimee-depassee').length : 0;
+  const aVerifierPartout = nAVerifier >= 2;
   const colonnes = [
     // (20 nov. soir) Tout est mélangé : une colonne « Site » ÉTROITE, le logo seul (le nom au survol).
     { cle: 'site', libelle: tr('tableau.col.site'), titreCourt: true, tri: (l) => l.r.site || null, rendu: (l) => (l.r.site ? <LogoSite site={l.r.site} taille={18} nom={Logo && Logo.nom ? Logo.nom(l.r.site) : l.r.site}/> : null) },
@@ -234,11 +244,14 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
     // (20 nov.) Tableau étroit (1280 px, Site + Achat en plus) : la date de vente se replie (src/natif/tableau.css, requête de conteneur)
     // pour que le titre garde ≥ 200 px ; la date LIMITE reste.
     { cle: 'date', libelle: tr('tableau.col.date'), num: true, tri: (l) => l.t, rendu: (l) => dateCourte(l.t) },
-    { cle: 'transporteur', libelle: tr('tableau.col.transporteur'), tri: (l) => l.r.transporteur || null,
+    // (23 nov.) Une colonne vide sur TOUTES les rangées montrées (aucun transporteur lu) ne se montre pas (`replieVide`).
+    { cle: 'transporteur', libelle: tr('tableau.col.transporteur'), replieVide: true, tri: (l) => l.r.transporteur || null,
       rendu: (l) => (l.r.transporteur ? <span className="n-tt-transporteur" data-transporteur={l.r.transporteurCle || ''}>{logoTr(l.r)}<span>{l.r.transporteur}</span></span> : null) },
     { cle: 'statut', libelle: tr('tableau.col.statut'), tri: (l) => l.statut },
     ...(surEnvoyer ? [{ cle: 'limite', apresStatut: true, libelle: tr('vt.col.limite'), titreCourt: presses > 0 ? tr('vt.col.limiteN', { n: presses }) : '', tri: (l) => rangLimite(l.r.echeance),
-      rendu: (l) => { const t = texteEcheance(l.r.echeance); return t ? <span className="n-vt-limite" data-vt-ambre={l.r.echeance.ambre ? '1' : undefined}>{t}</span> : null; } }] : []),
+      // (23 nov.) « à vérifier » (aucune date lue) répété sur chaque rangée ne disait rien : la case reste vide (« — » du tableau) et
+      // l'en-tête dit combien sont à vérifier ; une date lue ou estimée s'écrit comme avant.
+      rendu: (l) => { const e = l.r.echeance; const t = e && e.code === 'estimee-depassee' && aVerifierPartout ? '' : texteEcheance(e); return t ? <span className="n-vt-limite" data-vt-ambre={e.ambre ? '1' : undefined}>{t}</span> : null; } }] : []),
   ];
   const statuts = surEnvoyer
     ? STATUTS_ENVOYER.map((c) => ({ cle: c, libelle: tr('vt.st.' + c), ton: 'ambre' }))
@@ -254,7 +267,9 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
     {filtre}
     <BoutonIcone libelle={tr('vt.outils')} icone={<Icon name="more" size={20}/>} onClick={onOutils} attrs={{ 'data-vn-plus': '' }}/>
   </> : filtre;
-  const unite = (n) => (m.auMoins && surEnvoyer && n === rangs.length ? tr('vt.auMoins', { n }) : tr('tableau.ventes', { n }));
+  const unite = (n) => [m.auMoins && surEnvoyer && n === rangs.length ? tr('vt.auMoins', { n }) : tr('tableau.ventes', { n }),
+    sousCommun && nCommun >= 2 && rangsVus.length === n ? (nCommun === n ? tr('vt.tous', { etat: sousCommun.toLowerCase() }) : tr('vt.nEtat', { n: nCommun, etat: sousCommun.toLowerCase() })) : '',
+    aVerifierPartout ? tr('vt.limitesAVerifier', { n: nAVerifier }) : ''].filter(Boolean).join(' · ');
   const retours = surEnvoyer && E.retours.length ? <Groupe titre={tr('vn.retours')} attrs={{ 'data-vn-retours': String(E.retours.length) }}>
     {E.retours.map((l) => <Rangee key={l.cle} titre={l.titre || tr('retours.article')} plaque={l.num ? <Plaque numero={l.num}/> : null} sousTitre={l.vendeur ? tr('impr.retour.vendeur', { qui: l.vendeur }) : ''}
       selection={{ cochee: l.on, libelle: tr('impr.retour.caseAria', { qui: l.num ? tr('retours.numero', { n: l.num }) : (l.titre || tr('retours.article')) }), onChange: () => g.basculerRetour(l.cle), attrs: { 'data-retour-coche': l.cle } }}
@@ -292,6 +307,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
   const [choisie, setChoisie] = React.useState(null);
   const [feuillePlateforme, setFeuillePlateforme] = React.useState(false);
   const [feuilleGestes, setFeuilleGestes] = React.useState(false);
+  const [seulSans, setSeulSans] = React.useState(false);   // (23 nov.) « N sans bordereau » filtre la liste
   const [feuilleAvant, setFeuilleAvant] = React.useState(false);
   const ordinateur = useOrdinateur();
   // Combien « À régler » en a pour Ventes : la MÊME publication et la même règle que le bloc (src/designV2/aRegler.js `groupesDe`).
@@ -315,7 +331,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
     ? <Bouton variante="plein" icone={<Icon name="printer" size={20}/>} chargement={P.occupe} indisponible={!P.dispo && !P.occupe}
         raison={P.raison ? tr('vn.plein.' + P.raison) : ''} onClick={g.imprimer}
         attrs={{ 'data-vn-plein': String(P.n), 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': P.nVentes, 'data-impr-lot': P.nVentes, 'data-impr-retours-coches': P.nRetours }}>
-        {P.n > 0 ? tr('vv.imprimer.n', { n: P.n }) : tr('v2v.imprimer')}
+        {P.n > 0 ? tr('vt.imprimerN', { n: P.n }) : tr('v2v.imprimer')}
       </Bouton>
     : null;
   // Les retours à imprimer (étiquettes retour) : des rangées de la MÊME liste, cochables, sans titre de groupe à elles.
@@ -323,7 +339,9 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
     sousTitre={joint(tr('vn.retourEtiquette'), l.vendeur ? tr('impr.retour.vendeur', { qui: l.vendeur }) : '')}
     selection={{ cochee: l.on, libelle: tr('impr.retour.caseAria', { qui: l.num ? tr('retours.numero', { n: l.num }) : (l.titre || tr('retours.article')) }), onChange: () => g.basculerRetour(l.cle), attrs: { 'data-retour-coche': l.cle } }}
     attrs={{ 'data-lot-retour': l.tx, 'data-vn-retours': String(E.retours.length) }}/>) : null;
-  const ecart = joint(E.ecart.coches ? tr('vn.e.coches', { n: E.ecart.coches }) : '', E.ecart.sans ? tr('v2v.ecart.sans', { n: E.ecart.sans }) : '');   // (20 nov.) plus de « N à déposer » : le départ est constaté par le suivi (décision « 4 oui »)
+  // (23 nov., revue UX P1 #5) « N sans bordereau » n'est plus un chiffre gris dans l'en-tête : une rangée ambre « À faire » qui FILTRE la
+  // liste sur ces colis (le toucher suivant remet tout) ; « N cochés » reste dans l'en-tête (il vit avec le bouton d'impression).
+  const ecart = joint(E.ecart.coches ? tr('vn.e.coches', { n: E.ecart.coches }) : '');   // (20 nov.) plus de « N à déposer » : le départ est constaté par le suivi (décision « 4 oui »)
   // (audit d'utilité du 19 nov.) Plus de grand chiffre : le segment porte le nombre. L'en-tête de la liste dit ce que
   // le nombre ne dit pas — ce qui part à l'impression, ce qui attend son bordereau, ce qui presse (« au moins » si le
   // compte est partiel, §5 : un total partiel ne se présente jamais comme complet).
@@ -395,11 +413,15 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
             : E.erreur && !E.rangs.length ? <Vide icone={<Icon name="cloudOff" size={40}/>} phrase={tr('v2v.erreur')}
                 action={g.relire ? <Bouton variante="texte" onClick={g.relire} attrs={{ 'data-vt-reessayer': '' }}>{tr('commun.reessayer')}</Bouton> : null}/>
             : !E.rangs.length ? <Vide icone={<Icon name="box" size={40}/>} phrase={tr('v2v.vide.envoyer')}/>
-            : <Groupe titre={teteListe} action={actionPlateforme} attrs={{ 'data-vn-liste': 'envoyer', 'data-vn-n': String(E.rangs.length), 'data-vn-affiche': m.nEnv == null ? '' : String(m.nEnv) }}>
-                <ParPaquets items={rangs} rendre={(r) => <RangeeColis key={r.cle} r={r} g={g} Icon={Icon} Photo={Photo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>}/>
+            : <>{E.ecart.sans > 0 ? <Groupe attrs={{ 'data-vn-sans-ligne': String(E.ecart.sans) }}>
+                <Rangee icone={<Icon name="printer" size={22}/>} ton="ambre" titre={seulSans ? tr('vt.sansTout') : tr('vt.sansAFaire', { n: E.ecart.sans })} fin="chevron"
+                  onClick={() => setSeulSans(!seulSans)} attrs={{ 'data-vn-sans-filtre': seulSans ? '1' : '0', 'aria-pressed': seulSans ? 'true' : 'false' }}/>
+              </Groupe> : null}
+              <Groupe titre={teteListe} action={actionPlateforme} attrs={{ 'data-vn-liste': 'envoyer', 'data-vn-n': String(E.rangs.length), 'data-vn-affiche': m.nEnv == null ? '' : String(m.nEnv) }}>
+                <ParPaquets items={seulSans ? rangs.filter(sansBordereau) : rangs} rendre={(r) => <RangeeColis key={r.cle} r={r} g={g} Icon={Icon} Photo={Photo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>}/>
                 {!rangs.length ? <Vide phrase={tr('v2v.vide.recherche', { q: q.trim() })}/> : null}
                 {retoursTel}
-              </Groupe>}
+              </Groupe></>}
           {!E.rangs.length && filtre ? <Groupe nu>{filtre}</Groupe> : null}
           {!E.rangs.length && E.retours.length ? <Groupe titre={tr('vn.retours')} attrs={{ 'data-vn-retours': String(E.retours.length) }}>{retoursTel}</Groupe> : null}
           {apresListe}

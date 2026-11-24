@@ -261,6 +261,19 @@ const avecNotif = (url, n) => {
 // L'image n'arrive que prouvée (la photo de l'e-mail de CETTE vente).
 const cheminApp = (u) => (typeof u === 'string' && u.startsWith('/') && !u.startsWith('//') ? u : '/');
 const ICONE_VRM = '/vrm-icon-v5-192.png', BADGE_VRM = '/vrm-badge-96.png';
+const SAFARI = (() => { try { const u = String(self.navigator && self.navigator.userAgent || ''); return /AppleWebKit/.test(u) && !/Chrome|Chromium|CriOS|Edg|OPR|Android/.test(u); } catch (_) { return false; } })();
+async function montrerDansApp(ev) {
+  try {
+    const fen = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const c = fen.find((x) => { try { return estCoquille(new URL(x.url)) && x.visibilityState === 'visible' && x.focused !== false; } catch (_) { return false; } });
+    if (!c) return false;
+    return await new Promise((ok) => {
+      const canal = new MessageChannel(); const t = setTimeout(() => ok(false), 800);
+      canal.port1.onmessage = (m) => { clearTimeout(t); ok(!!(m && m.data && m.data.montree)); };
+      try { c.postMessage({ type: 'vrm-evenement', ev }, [canal.port2]); } catch (_) { clearTimeout(t); ok(false); }
+    });
+  } catch (_) { return false; }
+}
 self.addEventListener('push', event => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (_) { data = { body: event.data ? event.data.text() : '' }; }
@@ -294,7 +307,15 @@ self.addEventListener('push', event => {
     if (data.tagGroupe && genre && self.registration.getNotifications) {
       try { for (const n of await self.registration.getNotifications()) if (n.data && n.data.genre === genre) n.close(); } catch (_) {}
     }
+    // (23 nov., Julien : « quand une vente arrive […] je veux un beau pop-up, là c'est moche ») L'app OUVERTE ET AU PREMIER
+    // PLAN montre elle-même la carte (src/natif/PopEvenements.jsx) avec les MÊMES données : titre, texte, adresse, photo
+    // prouvée, geste. Elle répond « montrée » sur le canal ; sans réponse en 800 ms (écran de connexion, app pas montée),
+    // la notification du système part comme avant. Safari (iPhone, Mac) exige une notification à chaque envoi : elle part
+    // puis se referme aussitôt quand l'app l'a montrée.
+    const montree = await montrerDansApp({ title, body: opts.body, url: opts.data.url, image: opts.image || null, genre, tag, actions: actions.map((x) => ({ title: x.title, url: opts.data.actions[x.action] })) });
+    if (montree && !SAFARI) return;
     await self.registration.showNotification(title, opts);
+    if (montree && self.registration.getNotifications) { try { for (const n of await self.registration.getNotifications({ tag })) n.close(); } catch (_) {} }
   })());
 });
 
