@@ -32,7 +32,7 @@ export { validerAutoFavoris } from './src/favorisAuto.js';
 export { ficheArticle, planSite, envoiPour, retenirReponses } from './src/publier/agent.js';
 export { feuilleAussi, relireFormulaire, dejaAussi, friseAussi, lienAnnonce, reponsesAgent, pointureExacte, prixAussi, PCT_AUSSI, NOM_SITE_AUSSI, SITES_AUSSI } from './src/publier/aussi.js';
 export { paireVerif, resumeVerif, lancerPermis, partiraPas, reponsesDe } from './src/repubVerif.js';
-export { phraseBilanFavoris } from './src/favorisProgression.js';
+export { phraseBilanFavoris, RAISONS_SAUT } from './src/favorisProgression.js';
 export { manquesDepot, photosDepot, payloadDepot, ordreRelu, ordrePhotos } from './src/depot/regles.js';`;
 const out = esbuild.buildSync({ stdin: { contents: entree, resolveDir: R, loader: 'js' }, bundle: true, format: 'iife', globalName: '__gardesApp', write: false, platform: 'neutral', target: 'es2020', legalComments: 'none', charset: 'utf8' });
 const code = out.outputFiles[0].text.trim();
