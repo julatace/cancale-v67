@@ -18143,6 +18143,16 @@ function majSanteSites() {
   })();
   return _santeSitesEnVol;
 }
+// 5.448 (`rapportreperage`) : les 20 derniers ARRÊTS (site, geste, raison en code — jamais un texte de page, jamais un
+//    pseudo), pour « Envoyer un rapport » : avec le journal de repérage, la panne se lit sans rien demander à Julien.
+const ARRETS_DERNIERS = 'vrmArrets', ARRETS_MAX = 20;
+async function noterArret(site, geste, code) {
+  try {
+    const l = (await chrome.storage.local.get(ARRETS_DERNIERS))[ARRETS_DERNIERS];
+    const x = (Array.isArray(l) ? l : []).concat([{ site: String(site).slice(0, 10), geste: String(geste || '').replace(/[^a-zA-Z-]/g, '').slice(0, 24), code: String(code || '').replace(/[^a-z0-9-]/g, '').slice(0, 40), at: Date.now() }]).slice(-ARRETS_MAX);
+    await chrome.storage.local.set({ [ARRETS_DERNIERS]: x });
+  } catch (_) {}
+}
 // ══ 5.440 — uuid de la nouvelle messagerie ↔ ancien n° de la conversation (appris de la page, jamais deviné) ══════════
 const CONV_ROUTES = 'vrmConvRoutes', CONV_ROUTES_MAX = 300;
 const RE_UUID_CONV = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -18661,6 +18671,7 @@ async function interfaceVinted(acc, geste, d, opts = {}) {
     if ((geste === 'favoriOuvrir' || geste === 'favoriListe' || geste === 'favoriAccueil') && r.ok && !r.conv) { try { const m = /^\/inbox\/([1-9]\d{0,19})\/?$/.exec(new URL(String((await chrome.tabs.get(tab)).url || '')).pathname); if (m) r.conv = m[1]; } catch (_) {} }
     if (r.ok && r.json && r.json.conversation && ID_INTERFACE.test(String(r.json.conversation.id)) && !r.conv) r.conv = String(r.json.conversation.id);
     noterDiag(`interface_${geste}_${r.ok ? (r.vu === false && ['message', 'offre'].includes(geste) ? 'pas_vu' : 'ok') : r.rienParti ? 'rien_' + String(r.manque || r.sansPage || 'parti').replace(/[^a-z-]/g, '').slice(0, 30) : 'incertain'}`);
+    if (!r.ok && r.rienParti) noterArret('vinted', geste, String(r.manque || r.sansPage || 'rien'));
     if (r.ok && r.vu === false && ['message', 'offre', 'masquer', 'vacances'].includes(geste)) noterCarnet(uid, 'pasvu');   // 5.420 : la santé du compte le compte
     // 5.438 (`santenote`) : Vinted a RÉPONDU non (4xx hors 401/403/429, déjà comptés ailleurs ; ou un refus dans une réponse 2xx) —
     //    jamais un « rien n'est parti » de VRM, jamais un doute : seulement SA réponse lue.
@@ -26136,7 +26147,7 @@ function etiquetteRapport(s) {
 async function construireRapport() {
   const t = Date.now();
   let local = {};
-  try { local = await chrome.storage.local.get([DIAG_BUF, 'vrmFlux', 'vrmDiagRecents', 'vrmFileReseau', REPUB_TEMOIN, 'vrmToutArrete']); } catch (_) { local = {}; }
+  try { local = await chrome.storage.local.get([DIAG_BUF, 'vrmFlux', 'vrmDiagRecents', 'vrmFileReseau', REPUB_TEMOIN, 'vrmToutArrete', TROUVE_JOURNAL, ARRETS_DERNIERS]); } catch (_) { local = {}; }
   const heure = (x) => { const n = Number(x); return n > 0 && n <= t + 60000 ? n : null; };
   const flux = {};
   for (const [pf, f] of Object.entries(local.vrmFlux || {})) {
@@ -26169,6 +26180,10 @@ async function construireRapport() {
     flux, compteurs, erreurs,
     files: { commandes: parEtape, reseau: fileReseau },
     pauses: { vinted: pause, toutArrete: !!(local.vrmToutArrete && local.vrmToutArrete.on === true), republication: heure(local[REPUB_TEMOIN]) },
+    // 5.448 (`rapportreperage`) : le journal de repérage (élément, stratégies essayées et leurs comptes) et les derniers
+    //    arrêts (site, geste, code) — des ÉTIQUETTES seulement (`etiquetteRapport`), jamais un texte de page ni un pseudo.
+    reperage: (Array.isArray(local[TROUVE_JOURNAL]) ? local[TROUVE_JOURNAL] : []).slice(-40).map((x) => ({ site: etiquetteRapport(x && (x.site || 'vinted')), nom: etiquetteRapport(x && x.nom), etape: etiquetteRapport(x && x.etape), at: heure(x && x.at), ambigu: !!(x && x.ambigu), essais: (Array.isArray(x && x.essais) ? x.essais : []).slice(0, 8).map((q) => ({ s: etiquetteRapport(q && q.s), n: Math.max(0, Math.min(999, Math.floor(Number(q && q.n) || 0))) })) })),
+    arrets: (Array.isArray(local[ARRETS_DERNIERS]) ? local[ARRETS_DERNIERS] : []).slice(-ARRETS_MAX).map((x) => ({ site: etiquetteRapport(x && x.site), geste: etiquetteRapport(String((x && x.geste) || '').toLowerCase()), code: etiquetteRapport(x && x.code), at: heure(x && x.at) })),
   };
 }
 async function envoyerRapport() {
@@ -39877,6 +39892,7 @@ async function repondreVestiaire(msg) {
       await new Promise((ok) => setTimeout(ok, 2000));
       try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'vcEcrireUI', conv, texte, compte: o.compte }, { frameId: 0 }), 45000 + texte.length * 250, null); } catch (_) { rep = null; }
     }
+    if (rep && rep.ok === true && !rep.statut && rep.erreur) noterArret('vc', 'message', rep.erreur);
     if (!rep || rep.ok !== true) { noterDiag('vc_ecrire_muet'); return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si le message est parti : regarde la conversation sur Vestiaire avant de renvoyer" }; }
     const e = String(rep.erreur || '');
     if (rep.defi === true || e === 'verification') {
@@ -41731,6 +41747,7 @@ async function gesteLbcInterface(quoi, compte, url, ordre, budgetMs) {
         try { rep = await avecDelai(chrome.tabs.sendMessage(t.id, Object.assign({}, ordre, { from: 'vrm-fond', action: 'lbcGesteUI', quoi, compte }), { frameId: 0 }), budgetMs, null); } catch (_) { rep = null; }
       }
     }
+    if (rep && rep.ok === true && !rep.statut && rep.erreur) noterArret('lbc', quoi, rep.erreur);
     return { rep };
   } finally { try { await chrome.tabs.remove(t.id); } catch (_) {} }
 }

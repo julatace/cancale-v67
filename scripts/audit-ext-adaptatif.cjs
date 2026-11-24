@@ -20,6 +20,7 @@
 //   S1–S5  la SANTÉ par site (`santeSites`) : « pas encore vu » / « tout marche » / « X ne marche plus : Geste … » ; une
 //       forme de réponse changée passe avant (« … attend la correction ») ; chaque nouveau problème dit UNE fois (notification) ;
 //   R1–R4  la page pas prête se rattrape seule : rechargée UNE fois, le même ordre repart ; jamais après un clic final ;
+//   T   « Envoyer un rapport » porte le journal de repérage et les 20 derniers arrêts (étiquettes, jamais un texte) ;
 //   G1  garde-fous §3 inchangés : `vintedPage` refuse toute méthode ≠ GET ; aucun `chrome.debugger`, aucune
 //       permission `debugger` ; plafond 50/h et réserve 5 ; 15/h favoris.
 //  `--prouve` : chaque règle réaffaiblie doit faire rougir l'audit.
@@ -44,6 +45,7 @@ if (process.argv.includes('--prouve')) {
     ['notifRepetee', 'src', "        if (dits[site] === cle) continue;\n", ''],
     ['formeTaisee', 'src', "    if (site === 'vc') { const c = st.vrmVcCapte || {};", "    if (false) { const c = st.vrmVcCapte || {};"],
     ['jamaisGueri', 'src', "const ok = el[e.nom]; if (ok && Number(ok.at || 0) > Number(e.at || 0)) continue;", 'const ok = null;'],
+    ['rapportSansReperage', 'src', "    reperage: (Array.isArray(local[TROUVE_JOURNAL])", "    sansReperage: (Array.isArray(local[TROUVE_JOURNAL])"],
     ['trouverApres', 'manifeste', '"vrm-trouver.js",\n        "lbc-ecrire.js"', '"lbc-ecrire.js",\n        "vrm-trouver.js"'],
   ];
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-ext-adaptatif-'));
@@ -159,6 +161,21 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
     dit(/^Vinted a changé sa page des ventes : VRM ne la lit plus et n'en range rien de faux ; il attend la correction/.test(v.vinted.t) && v.vinted.k === 'forme', 'S5 une réponse de forme changée passe AVANT un bouton : « Vinted a changé sa page des ventes : VRM attend la correction »', v.vinted.t);
     dit(/^Vestiaire a changé sa page/.test(v.vc.t) && notifs.some((x) => x.id === 'vrm-sante-vc'), 'S5 Vestiaire : forme inconnue dite (ligne + une notification)', JSON.stringify(v.vc));
     dit(notifs.filter((x) => x.id === 'vrm-sante-vinted').length === 2, 'S5 la forme de Vinted est un NOUVEAU problème : dit une fois de plus, pas davantage', JSON.stringify(notifs.map((x) => x.id)));
+  }
+  // ── T : « Envoyer un rapport » porte le journal de repérage et les derniers arrêts — jamais un texte, jamais un pseudo ──
+  {
+    const g = faireFond({ src: F.src, connecte: '3175765377' });
+    g.store.vrmTrouverJournal = [{ site: 'lbc', nom: 'envoyer', etape: 'message', at: Date.now() - 1000, ambigu: true, essais: [{ s: 'nom', n: 2 }, { s: 'testid', n: 0 }] }, { site: 'vc', nom: 'Bonjour sophie_b', etape: 'x', at: Date.now(), essais: [] }];
+    await g.ctx.noterArret('vinted', 'supprimer', 'supprimer-confirmation-ambigu');
+    await g.ctx.noterArret('lbc', 'message', 'Bonjour Sophie 06 12 34 56 78');
+    const r = await g.ctx.construireRapport();
+    const txt = JSON.stringify(r);
+    dit(Array.isArray(r.reperage) && r.reperage.some((x) => x.site === 'lbc' && x.nom === 'envoyer' && x.ambigu === true && x.essais.some((q) => q.s === 'nom' && q.n === 2)), 'T le rapport porte le journal de repérage (site, élément, stratégies et comptes)', JSON.stringify(r.reperage));
+    dit(Array.isArray(r.arrets) && r.arrets.some((x) => x.site === 'vinted' && x.geste === 'supprimer' && x.code === 'supprimer-confirmation-ambigu'), 'T le rapport porte les derniers arrêts (site, geste, code)', JSON.stringify(r.arrets));
+    dit(!/Bonjour|sophie|Sophie|06 12/.test(txt), 'T jamais un texte de page ni un pseudo (étiquettes seulement)', txt.slice(0, 400));
+    const S = await import(path.join(__dirname, '..', 'api', '_lib', 'rapport-extension.js'));
+    const n = S.normaliserRapportExt(r, Date.now());
+    dit(n && Array.isArray(n.reperage) && n.reperage.length === r.reperage.length && Array.isArray(n.arrets) && n.arrets.length === r.arrets.length && !/Bonjour|sophie/.test(JSON.stringify(n)), 'T le serveur les garde (liste blanche, étiquettes)', JSON.stringify(n && { a: n.arrets, r: n.reperage }).slice(0, 300));
   }
   // ── R : la page pas prête se rattrape seule (Leboncoin, Vestiaire), une fois, jamais après un geste ──
   {
