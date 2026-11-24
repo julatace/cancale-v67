@@ -9,7 +9,7 @@
 // Tout ce qui part passe par `envoyerGeste` (src/agir/porte.js) ⇒ la file `cmd_dist_*` exécutée par l'extension.
 import React from 'react';
 import { tr } from '../i18n/index.js';
-import { Bouton, Feuille } from '../natif/index.js';
+import { Bouton, Feuille, Glyphe } from '../natif/index.js';
 import { usePeutAgir, useCompteAgir, envoyerGeste, agirOuPanneau, useFaitsAgir as useFaitsAgirA, envoyerSerie as envoyerSerieA, agirMaintenant as agirMaintenantA, faitsAgir as faitsAgirA } from './porte.js';
 import { NOMS_SITES_AGIR } from './peutAgir.js';
 import './agir.css';
@@ -23,11 +23,34 @@ export function texteRaison(v) {
   return tr(v.cle || 'agir.raison.passu', vars);
 }
 
-export function BoutonAgir({ site, compte, geste, par = '', onClick, children, variante = 'teinte', icone = null, large = false, taille = 'normal', attrs = null, className = '' }) {
+// (24 nov., lot messages-pro) `decrit` : l'id d'un bandeau qui dit DÉJÀ la raison (une fois par écran, CLAUDE.md §7) ⇒ le
+// bouton éteint ne la répète pas dessous ; le lecteur d'écran la lit quand même (aria-describedby vers le bandeau).
+export function BoutonAgir({ site, compte, geste, par = '', onClick, children, variante = 'teinte', icone = null, large = false, taille = 'normal', attrs = null, className = '', decrit = '' }) {
   const v = usePeutAgir(site, compte, geste, par);
-  const a = { 'data-agir': v.ok ? 'ok' : 'lecture', 'data-agir-site': site, 'data-agir-geste': geste, 'data-agir-raison': v.ok ? undefined : v.raison, 'data-agir-voie': v.ok ? v.voie : undefined, ...(attrs || {}) };
-  return <Bouton variante={variante} icone={icone} large={large} taille={taille} className={className} indisponible={!v.ok} raison={v.ok ? '' : texteRaison(v)}
+  const a = { 'data-agir': v.ok ? 'ok' : 'lecture', 'data-agir-site': site, 'data-agir-geste': geste, 'data-agir-raison': v.ok ? undefined : v.raison, 'data-agir-voie': v.ok ? v.voie : undefined,
+    ...(!v.ok && decrit ? { 'aria-describedby': decrit } : {}), ...(attrs || {}) };
+  return <Bouton variante={variante} icone={icone} large={large} taille={taille} className={className} indisponible={!v.ok} raison={v.ok || decrit ? '' : texteRaison(v)}
     onClick={v.ok ? onClick : undefined} attrs={a}>{children}</Bouton>;
+}
+
+// (24 nov., lot messages-pro — Julien : « ça fait encore beaucoup trop vieux ») LE bandeau « Lecture seule » d'une
+// conversation : UNE fois, en tête du fil, la raison de la porte (`peutAgir`, la même phrase qu'avant) et, quand le geste
+// est d'ouvrir le site, « Ouvrir Vinted ». Les boutons éteints dessous ne la répètent pas (`decrit`). Rien n'est envoyé
+// d'ici : ouvrir le site est un lien. La porte dit oui pour répondre ET pour l'offre ⇒ rien (ou `repli`, l'ancienne note).
+export const idBandeau = (site, conv) => `vrm-mp-ro-${site}-${String(conv || '').replace(/[^A-Za-z0-9_-]/g, '')}`;
+export function BandeauLectureSeule({ site, compte, conv, lien = '', gestes = ['repondre'], repli = null }) {
+  const v1 = usePeutAgir(site, compte, gestes[0], 'file');
+  const v2 = usePeutAgir(site, compte, gestes[1] || gestes[0], 'file');
+  const v = !v1.ok ? v1 : (!v2.ok ? v2 : null);
+  if (!v) return repli;
+  const nom = NOMS_SITES_AGIR[site] || '';
+  return (
+    <div className="vrm-mp-bandeau" role="status" id={idBandeau(site, conv)} data-mp-bandeau={site} data-agir-raison={v.raison} data-agir-compte={String(compte == null ? '' : compte)}>
+      <span className="vrm-mp-bandeau-ic" aria-hidden="true"><Glyphe nom="lock" taille={16}/></span>
+      <span className="vrm-mp-bandeau-t"><b>{tr('agir.badge')}</b><span data-mp-raison="">{texteRaison(v)}</span></span>
+      {lien && v.geste === 'ouvrir-site' ? <a className="vrm-mp-bandeau-a" href={lien} target="_blank" rel="noreferrer" data-mp-ouvrir={site} data-n-famille="second">{tr('mpro.ouvrir', { site: nom })}</a> : null}
+    </div>
+  );
 }
 
 export function BadgeLectureSeule({ site, compte }) {
@@ -36,6 +59,14 @@ export function BadgeLectureSeule({ site, compte }) {
   const raison = texteRaison(e.raison);
   return <span className="vrm-agir-badge" data-agir-badge="lecture" data-agir-site={site} data-agir-compte={String(compte == null ? '' : compte)} title={raison} aria-label={tr('agir.badge') + ' · ' + raison}>
     <span aria-hidden="true" className="vrm-agir-badge-point"/>{tr('agir.badge')}</span>;
+}
+
+// (24 nov., lot messages-pro) Montre ses enfants seulement si la porte laisse agir pour CES gestes (sinon le bandeau
+// « Lecture seule » parle déjà : la raison n'est pas dite deux fois).
+export function SiAgir({ site, compte, gestes = ['repondre'], children }) {
+  const v1 = usePeutAgir(site, compte, gestes[0], 'file');
+  const v2 = usePeutAgir(site, compte, gestes[1] || gestes[0], 'file');
+  return v1.ok && v2.ok ? children : null;
 }
 
 // La ligne de l'issue d'un envoi : « Parti vers l'extension » · « Déjà en attente » · « Pas envoyé ».
@@ -47,27 +78,47 @@ export function issueTexte(r) {
   return tr('agir.envoi.base');
 }
 
-export function ComposerReponse({ site, compte, conv, max = 2000, onEnvoye = null }) {
+// (24 nov., lot messages-pro) Le champ « Répondre » d'une messagerie de 2026 : une pilule qui grandit avec le texte (jusqu'à
+// 5 lignes), le bouton d'envoi rond (une icône, nommé pour le lecteur d'écran), la zone sûre de l'iPhone respectée.
+// `puces` : SES réponses rapides en puces défilantes au-dessus (un toucher REMPLIT le champ, rien ne part) — seulement quand
+// on peut répondre. Lecture seule : PAS de champ géant gris — une barre fine qui dit pourquoi ; si un bandeau le dit déjà
+// en tête du fil (`decrit` = son id), la barre ne le répète pas (la raison une fois par écran).
+export function ComposerReponse({ site, compte, conv, max = 2000, onEnvoye = null, puces = null, decrit = '' }) {
   const [texte, setTexte] = React.useState('');
   const [issue, setIssue] = React.useState(null);
+  const champ = React.useRef(null);
   const v = usePeutAgir(site, compte, 'repondre', 'file');
   // Une réponse rapide touchée (src/ReponsesRapidesApp.jsx) remplit CE champ — rien ne part avant « Envoyer ».
   React.useEffect(() => {
-    const f = (e) => { const d = e && e.detail; if (d && d.site === site && String(d.conv) === String(conv) && typeof d.texte === 'string') setTexte(d.texte.slice(0, max)); };
+    const f = (e) => { const d = e && e.detail; if (d && d.site === site && String(d.conv) === String(conv) && typeof d.texte === 'string') { setTexte(d.texte.slice(0, max)); try { if (champ.current) champ.current.focus({ preventScroll: true }); } catch (_) {} } };
     window.addEventListener('vrm:agir-remplir', f);
     return () => window.removeEventListener('vrm:agir-remplir', f);
   }, [site, conv, max]);
+  // La pilule suit le texte (1 à 5 lignes), sans saut : la hauteur se mesure après le rendu.
+  React.useLayoutEffect(() => { const t = champ.current; if (!t) return; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 132) + 'px'; }, [texte, v.ok]);
   const envoyer = async () => {
     const t = texte.trim(); if (!t) return;
     const r = await envoyerGeste({ site, compte, geste: 'repondre', distGeste: 'repondre', args: { conv: String(conv), texte: t } });
     setIssue(r);
     if (r.ok) { setTexte(''); if (onEnvoye) { try { onEnvoye(r); } catch (_) {} } }
   };
+  const nom = NOMS_SITES_AGIR[site] || '';
+  const attrs = { 'data-agir-composer': site, 'data-agir-compte': String(compte == null ? '' : compte), 'data-agir': v.ok ? 'ok' : 'lecture' };
+  if (!v.ok) return (
+    <div className="vrm-agir-composer vrm-mp-compose vrm-mp-compose-ro" {...attrs} aria-describedby={decrit || undefined}>
+      <span className="vrm-mp-compose-ro-ic" aria-hidden="true"><Glyphe nom="lock" taille={15}/></span>
+      <span className="vrm-mp-compose-ro-t" data-mp-compose-ro={decrit ? 'bandeau' : 'raison'}>{decrit ? tr('mpro.compose.ro') : texteRaison(v)}</span>
+    </div>
+  );
   return (
-    <div className="vrm-agir-composer" data-agir-composer={site} data-agir-compte={String(compte == null ? '' : compte)} data-agir={v.ok ? 'ok' : 'lecture'}>
-      <textarea value={texte} onChange={(e) => setTexte(e.target.value.slice(0, max))} rows={2} maxLength={max} disabled={!v.ok}
-        aria-label={tr('agir.repondre.place', { site: NOMS_SITES_AGIR[site] || '' })} placeholder={v.ok ? tr('agir.repondre.place', { site: NOMS_SITES_AGIR[site] || '' }) : tr('agir.badge')}/>
-      <BoutonAgir site={site} compte={compte} geste="repondre" par="file" variante="plein" onClick={envoyer} attrs={{ 'data-agir-envoyer': site }}>{tr('agir.repondre.envoyer')}</BoutonAgir>
+    <div className="vrm-agir-composer vrm-mp-compose" {...attrs}>
+      {puces}
+      <div className="vrm-mp-compose-l">
+        <textarea ref={champ} value={texte} onChange={(e) => setTexte(e.target.value.slice(0, max))} rows={1} maxLength={max} className="vrm-mp-champ"
+          aria-label={tr('agir.repondre.place', { site: nom })} placeholder={tr('agir.repondre.place', { site: nom })}/>
+        <BoutonAgir site={site} compte={compte} geste="repondre" par="file" variante="plein" className="vrm-mp-envoyer" icone={<Glyphe nom="send" taille={18}/>}
+          onClick={texte.trim() ? envoyer : undefined} attrs={{ 'data-agir-envoyer': site, 'aria-label': tr('agir.repondre.envoyer'), 'data-mp-vide': texte.trim() ? undefined : '1' }}><span className="vrm-sr">{tr('agir.repondre.envoyer')}</span></BoutonAgir>
+      </div>
       {issue ? <p className="vrm-agir-issue" role="status" data-agir-issue={issue.ok ? 'ok' : issue.raison || 'non'}>{issueTexte(issue)}</p> : null}
     </div>
   );
@@ -77,17 +128,22 @@ const eur = (n) => { const x = Number(n); return Number.isFinite(x) ? x.toLocale
 
 // Les gestes d'une offre Vinted reçue (5.135 → file 5.436) : Accepter vend la paire ⇒ SA confirmation (§2.10) ;
 // Refuser part en un toucher ; Proposer N € seulement quand N vient de SON prix mini (`contreOffreMini`).
-export function GestesOffreVinted({ compte, tx, oid, conv, prix, contre = null }) {
+// (24 nov., lot messages-pro) La paire de gestes d'une carte d'offre de 2026 : « Refuser » (second) et « Accepter N € »
+// (LE geste, plein) côte à côte ; « Proposer N € » en geste discret dessous (tertiaire). Mêmes gestes, mêmes data-* ;
+// Accepter DEMANDE toujours (il vend la paire). `decrit` : l'id du bandeau « Lecture seule » (la raison n'est pas répétée).
+export function GestesOffreVinted({ compte, tx, oid, conv, prix, contre = null, decrit = '' }) {
   const [issue, setIssue] = React.useState(null);
   const [confirmer, setConfirmer] = React.useState(false);
-  const base = { site: 'vinted', compte, geste: 'offre' };
-  const partir = async (distGeste, args, confirme = false) => setIssue(await envoyerGeste({ ...base, distGeste, args, confirme }));
+  const base = { site: 'vinted', compte, geste: 'offre', decrit };
+  const partir = async (distGeste, args, confirme = false) => setIssue(await envoyerGeste({ site: 'vinted', compte, geste: 'offre', distGeste, args, confirme }));
   const ids = { tx: String(tx), oid: String(oid), ...(conv != null ? { conv: String(conv) } : {}) };
   return (
-    <div className="vrm-agir-offre" data-agir-offre={String(oid)}>
-      {contre != null ? <BoutonAgir {...base} par="file" variante="plein" onClick={() => partir('contreOffre', { tx: String(tx), prix: contre, ...(conv != null ? { conv: String(conv) } : {}) })} attrs={{ 'data-agir-contre': String(contre) }}>{tr('agir.offre.contre', { prix: eur(contre) })}</BoutonAgir> : null}
-      <BoutonAgir {...base} par="file" variante={contre != null ? 'teinte' : 'plein'} onClick={() => setConfirmer(true)} attrs={{ 'data-agir-accepter': String(prix) }}>{tr('agir.offre.accepter', { prix: eur(prix) })}</BoutonAgir>
-      <BoutonAgir {...base} par="file" variante="texte" onClick={() => partir('refuser', ids)} attrs={{ 'data-agir-refuser': '' }}>{tr('agir.offre.refuser')}</BoutonAgir>
+    <div className="vrm-agir-offre vrm-mp-gestes" data-agir-offre={String(oid)}>
+      <div className="vrm-mp-gestes-l">
+        <BoutonAgir {...base} par="file" variante="teinte" className="vrm-mp-refuser" onClick={() => partir('refuser', ids)} attrs={{ 'data-agir-refuser': '' }}>{tr('agir.offre.refuser')}</BoutonAgir>
+        <BoutonAgir {...base} par="file" variante="plein" className="vrm-mp-accepter" icone={<Glyphe nom="check" taille={17}/>} onClick={() => setConfirmer(true)} attrs={{ 'data-agir-accepter': String(prix) }}>{tr('agir.offre.accepter', { prix: eur(prix) })}</BoutonAgir>
+      </div>
+      {contre != null ? <BoutonAgir {...base} par="file" variante="texte" className="vrm-mp-contre" onClick={() => partir('contreOffre', { tx: String(tx), prix: contre, ...(conv != null ? { conv: String(conv) } : {}) })} attrs={{ 'data-agir-contre': String(contre) }}>{tr('agir.offre.contre', { prix: eur(contre) })}</BoutonAgir> : null}
       {issue ? <p className="vrm-agir-issue" role="status" data-agir-issue={issue.ok ? 'ok' : issue.raison || 'non'}>{issueTexte(issue)}</p> : null}
       {confirmer ? <Feuille ouverte titre={tr('agir.offre.accepter', { prix: eur(prix) })} onFermer={() => setConfirmer(false)}
         pied={<Bouton variante="plein" onClick={() => { setConfirmer(false); partir('accepter', { ...ids, prix }, true); }} attrs={{ 'data-agir-accepter-confirmer': '' }}>{tr('agir.offre.confirmerOui')}</Bouton>}>

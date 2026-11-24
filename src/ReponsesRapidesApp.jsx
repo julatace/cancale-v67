@@ -12,11 +12,21 @@ import { rrPropositions } from './reponsesRapides.js';
 import { risquesMessage } from './messageSur.js';
 
 // (24 nov., lot agir-si-connecte) `onChoisir(texte)` : une réponse touchée REMPLIT le champ « Répondre » de VRM (rien ne part).
-export default function ReponsesRapidesApp({ messages = [], vars = {}, partie = false, reglage = null, site = 'vinted', bouton = null, onChoisir = null }) {
+export default function ReponsesRapidesApp({ messages = [], vars = {}, partie = false, reglage = null, site = 'vinted', bouton = null, onChoisir = null, puces = false }) {
   const r = useMemo(() => rrPropositions({ messages, reglage, vars, partie, langueUi: langueCourante(), sur: (t) => !risquesMessage(String(t || ''), site).length, hasard: () => 0 }),
     [messages, reglage, vars, partie, site]);
   const l = r.propositions || [];
   if (!l.length) return null;
+  // (24 nov., lot messages-pro) `puces` : une rangée de puces qui défile au doigt, au-dessus du champ — la puce porte le
+  // NOM de la réponse (« Taille »), le texte entier va dans le champ au toucher (rien ne part). Une réponse qu'il manque
+  // une info pour remplir est une puce éteinte, sa raison en titre (jamais cachée).
+  if (puces) return (
+    <div className="vrm-mp-puces" data-rr-app={l.length} data-rr-puces="" role="group" aria-label={tr('rr.app.titre')}>
+      {l.map((p) => p.texte
+        ? <button key={p.cat} type="button" className="vrm-mp-rr" data-rr-app-cat={p.cat} data-rr-app-remplir="" data-n-famille="second" title={p.texte} onClick={onChoisir ? () => onChoisir(p.texte) : undefined}>{tr('rr.app.cat.' + p.cat)}</button>
+        : <button key={p.cat} type="button" className="vrm-mp-rr" data-rr-app-manque={p.manque || ''} aria-disabled="true" title={tr('rr.app.manque', { cat: tr('rr.app.cat.' + p.cat) })}>{tr('rr.app.cat.' + p.cat)}</button>)}
+    </div>
+  );
   return (
     <div className="vrm-aide-rep" data-rr-app={l.length} role="group" aria-label={tr('rr.app.titre')}>
       <p className="vrm-aide-rep-q">{tr('rr.app.titre')}</p>

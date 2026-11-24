@@ -8,7 +8,8 @@ import { offresSansReponse } from '../offresSansReponse.js';
 import { photosEnDouble, numerosEnExemplaires, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
 import OffresSansReponseListe from '../natif/ecrans/OffresSansReponse.jsx';
 import { BoutonExtension, RangeeExtension, FeuilleExtension } from '../BoutonExtension.jsx';
-import { ComposerReponse, GestesOffreVinted, BadgeLectureSeule, remplirReponse, texteRaison as texteRaisonAgir, issueTexte as issueTexteAgir } from '../agir/Agir.jsx';
+import { ComposerReponse, GestesOffreVinted, BadgeLectureSeule, remplirReponse, texteRaison as texteRaisonAgir, issueTexte as issueTexteAgir, BandeauLectureSeule, SiAgir, idBandeau } from '../agir/Agir.jsx';
+import { CarteOffre } from '../agir/CarteOffre.jsx';   // (24 nov., lot messages-pro) la carte d'offre du fil
 import { republierDansApp, envoyerSerie, usePeutAgir as usePeutAgirC, agirOuPanneau as agirOuPanneauC, agirMaintenant as agirMaintenantC, envoyerGeste as envoyerGesteC } from '../agir/porte.js';
 import BaisseSerie from '../agir/BaisseSerie.jsx';   // (24 nov., lot agir-tout)
 // (24 nov.) Republier DEPUIS VRM : la file si l'extension a CE compte dans un onglet, sinon le panneau (gardé, il dit pourquoi).
@@ -21344,7 +21345,32 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       blocs: [{ cle:'rangement', lib:'Rangée', val: fc.rangement }, { cle:'attention', lib:'Attention', val: attention.join(' · ') }],
       lien: fc.url ? { href: fc.url, texte: 'Voir l’annonce sur Vinted ↗' } : null }}/>;
   };
-  const rendreConversation=()=>openConv && (
+  // (24 nov., lot messages-pro) LA CARTE D'OFFRE DU FIL : la même offre (`offreDuFil` : tx + offer_request_id, §5), le
+  // même prix mini (par l'item_id), le même plancher (`plancherDeItem`), les mêmes gestes (`GestesOffreVinted`, la porte) —
+  // montrés en UNE carte posée dans le fil à la place de l'évènement de l'offre (comme Vinted), plus dans le pied qui
+  // écrasait la conversation. Rien n'est accepté tout seul : Accepter DEMANDE (il vend la paire).
+  const carteOffreDuFil=()=>{
+    if(!openConv||openConv.loading||openConv.error||offrePartieDuFil(openConv)) return null;
+    const off=offreDuFil(openConv); if(!off) return null;
+    const itemF = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.item_id;
+    const minF = itemF!=null ? Number(String((numeros[String(itemF)]||{}).min ?? '').replace(',','.')) : NaN;
+    const mini = Number.isFinite(minF)&&minF>0 ? minF : null;
+    const auDessusMini = !!(mini!=null && off.prix >= mini);
+    const pc=paireDeConv(String(openConv.acc?.vinted_user_id||''),openConv.convId,openConv.conversation);
+    const contreMini = pc && (pc.devise||'EUR')==='EUR' ? contreOffreMini(off.prix, pc.prix, mini) : null;
+    const uid=String(openConv.acc?.vinted_user_id||'');
+    const afficheCompare=prixAnnoncePourOffre(listings.items,itemF,uid);
+    const evt=(openConv.messages||[]).find(m=>m&&m.kind==='offer'&&m.offre&&String(m.offre.oid)===String(off.oid));
+    const decrit=idBandeau('vinted',openConv.convId);
+    return { oid:String(off.oid), el:(
+      <div className="vrm-chat-offre-traiter vrm-mp-offre-fil" data-cible="offre" data-offre="attente" data-offre-au-dessus-mini={auDessusMini?String(Math.round(mini)):undefined} data-offre-mini={mini!=null?String(mini):undefined} data-offre-contre={contreMini!=null?String(contreMini):undefined}>
+        <CarteOffre qui={openConv.header?.login||''} offre={off.prix} affiche={afficheCompare} mini={mini} fmt={fmtE} quand={evt&&evt.ts||null}
+          plancher={<LignePlancher plancher={plancherDeItem(itemF,pc?.devise)} puce offre={off.prix} mini={mini} ambre={C.warn} onSaisir={annonceParId.get(String(itemF))?()=>saisirPrixAnnonce(annonceParId.get(String(itemF))):null}/>}
+          gestes={<div className="vrm-chat-offre-actions" data-offre-app={String(openConv.convId||'')}><GestesOffreVinted compte={String(openConv.acc?.vinted_user_id||'')} tx={off.tx} oid={off.oid} conv={openConv.convId} prix={off.prix} contre={contreMini!=null&&contreMini>=1?contreMini:null} decrit={decrit}/></div>}/>
+        {offreMsg && (offreMsg.err ? <AccEchec geste="offre.vinted" erreur={offreMsg.err}/> : <AccApres geste="offre.vinted" texte={offreMsg.ok} ensuite={null}/>)}
+      </div>) };
+  };
+  const rendreConversation=()=>{ if(!openConv) return openConv; const carteOffre=carteOffreDuFil(); let carteOffrePosee=false; return (
 <ResponsiveChatPortal><div className={curSub==='messages'?'vrm-chat-overlay vrm-chat-inline':'vrm-chat-overlay'} onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
   <FermeAuRetour fermer={()=>setOpenConv(null)}/>
           <div className="vrm-chat-panel" role="dialog" aria-label="Conversation Vinted" onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -21360,6 +21386,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               {/* (5 nov., revue 3.8) Un fil en panne a SON « Réessayer » : l'icône de relecture se tait. */}
               {!openConv.error&&<button className="vrm-icon-control vrm-chat-sync" type="button" aria-label={openConv.refreshing?"Actualisation en cours":"Actualiser la conversation"} disabled={openConv.loading||openConv.refreshing} aria-busy={!!openConv.refreshing} onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>}
             </TeteFil>
+            {/* (24 nov., lot messages-pro) LECTURE SEULE dite UNE fois, en tête du fil (la raison de la porte + « Ouvrir Vinted ») :
+                les gestes éteints dessous ne la répètent pas, le champ devient une barre fine. */}
+            {!openConv.loading && !openConv.error && openConv.convId && <BandeauLectureSeule site="vinted" compte={String(openConv.acc?.vinted_user_id||'')} conv={openConv.convId} gestes={['repondre','offre']} lien={`https://www.vinted.fr/inbox/${openConv.convId}`}/>}
             {/* (21 nov., ext. 5.430) La NOTE de l'acheteur (la conversation la porte : feedback_reputation, review_count) ; à
                 SON seuil ou moins, la phrase dit que VRM n'accepte jamais seul — c'est à lui. */}
             {!openConv.loading && !openConv.error && openConv.conversation?.opposite_user && (()=>{ const regNa = bleamDe(load('vinted_bleam', null), String(openConv.acc?.vinted_user_id||'')).noteAcheteurs;
@@ -21428,6 +21457,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 const j = m.ts ? cleJour(m.ts) : null;
                 const jPrec = (()=>{ for (let k=i-1;k>=0;k--) { const x=openConv.messages[k]; if (x.ts && visible(x)) return cleJour(x.ts); } return null; })();
                 const sep = j && j!==jPrec ? <div className="vrm-chat-jour" data-jour-sep={j} style={{color:C.muted,background:C.card2||C.card}}>{libelleJour(m.ts)}</div> : null;
+                // (24 nov., lot messages-pro) L'offre à trancher : SA carte prend la place de son évènement (même oid).
+                if (m.kind==='offer' && carteOffre && m.offre && String(m.offre.oid)===carteOffre.oid && !carteOffrePosee) { carteOffrePosee=true; return <React.Fragment key={i}>{sep}{carteOffre.el}</React.Fragment>; }
                 return <React.Fragment key={i}>{sep}{(
                 m.kind==='offer'
                   ? (()=>{
@@ -21461,6 +21492,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:12}}/>:null;})}</div>}
                       </>}/>
               )}</React.Fragment>; })}
+              {carteOffre && !carteOffrePosee ? carteOffre.el : null}
               {/* (21 nov., ext. 5.430) Navigateur sans traducteur intégré : UNE ligne dit pourquoi il n'y a pas « Traduire ». */}
               {!openConv.loading && !openConv.error && <TraductionAbsente textes={(openConv.messages||[]).filter((m)=>m && !m.mine && m.kind!=='event' && m.kind!=='offer' && m.body).slice(-6).map((m)=>String(m.body))}/>}
               {/* (11 nov.) L'ENVOI SE VOIT DANS LE FIL : la bulle « Envoi… » pendant, « Envoyé ✓ » quand Vinted l'a
@@ -21488,83 +21520,24 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 {/* Lecture seule : CE fil-ci, nommé par son compte (ce qui le
                     distingue) — la raison générale est dite une fois au-dessus
                     de la liste (§7). */}
-                {ro && (
+                {/* (24 nov., lot messages-pro) Quand la porte est fermée, le bandeau du haut dit déjà « Lecture seule » : cette
+                    note ne se montre que si la porte, elle, laisse agir (la raison une fois par écran). */}
+                {ro && <SiAgir site="vinted" compte={String(openConv.acc?.vinted_user_id||'')} gestes={['repondre','offre']}>
                   <div className="vrm-chat-note" data-conv-lecture-seule={String(openConv.acc.vinted_user_id)} style={{color:C.text}}>
                     <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="eye" size={14}/></span>
                     <span><b>Lecture seule</b> — pour répondre, ouvre vinted.fr connecté sur <b>{accName(openConv.acc)}</b> {msgRelais ? 'dans le navigateur de ton ordinateur' : NAV.dansNu} (il est sur {msgNomActif()||(msgRelais?'aucun compte':'un autre compte')}).</span>
                   </div>
-                )}
-                {/* ── L'OFFRE (5.135) : trancher celle de l'acheteur, ou en faire
-                    une. Par l'extension, sur le compte connecté dans Chrome. */}
-                {(()=>{
-                  // (29 oct.) Une offre dont l'annonce est PROUVÉE partie (une lecture
-                  // complète du dressing, faite après l'offre, ne la montre plus) :
-                  // plus d'Accepter / Refuser — dit, avec la raison (`offreDuFil`).
-                  // (revue) UNE voix : « Annonce plus en vente » est dit par la bande
-                  // d'état en haut ; ce bloc porte la raison et LE geste (le bouton
-                  // de l'en-tête n'a qu'une icône sur téléphone).
-                  const offCapturee = offrePartieDuFil(openConv);
-                  const off = offCapturee ? null : offreDuFil(openConv);
-                  if (offCapturee) return (
+                </SiAgir>}
+                {/* (24 nov., lot messages-pro) L'offre « annonce partie » reste ici ; l'offre à trancher est une carte DANS le fil
+                    (`carteOffreDuFil`), à la place de l'évènement de l'offre — le pied ne garde que les réponses et le champ. */}
+                {(()=>{ const offCapturee = offrePartieDuFil(openConv); if (!offCapturee) return null; return (
                     <div className="vrm-chat-offre vrm-chat-offre-info" data-cible="offre" data-offre="annonce-partie" style={{background:C.bg,border:`1px solid ${C.border}`}}>
                       <div className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(offCapturee.prix)}</b></div>
                       <div className="vrm-chat-offre-p" style={{color:C.muted}}>Annonce plus dans ton dressing : offre plus acceptable.</div>
                       <button type="button" className="vrm-chat-offre-retirer" data-offre-retirer="" onClick={()=>retirerConvDeLaListe(openConv)} style={{color:C.text,borderColor:C.border}}>Retirer de la liste</button>
                     </div>
-                  );
-                  const tx = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.id;
-                  if (!off && !tx) return null;
-                  // (27 oct.) Prix mini posé sur CETTE annonce (par identité, l'item_id,
-                  // §5). Une offre ≥ mini est pré-approuvée : l'Accepter est mis en avant.
-                  // Rien n'est accepté tout seul — c'est TON tap (garde stricte, §3).
-                  const itemF = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.item_id;
-                  const minF = itemF!=null ? Number(String((numeros[String(itemF)]||{}).min ?? '').replace(',','.')) : NaN;
-                  const auDessusMini = !!(off && isFinite(minF) && minF>0 && off.prix >= minF);
-                  const pc=paireDeConv(String(openConv.acc?.vinted_user_id||''),openConv.convId,openConv.conversation);
-                  // (3 nov.) « Proposer X € » : X depuis SON prix mini seulement (`contreOffreMini`).
-                  const contreMini = off && pc && (pc.devise||'EUR')==='EUR' ? contreOffreMini(off.prix, pc.prix, isFinite(minF)&&minF>0?minF:null) : null;
-                  const etat = msgRelais ? 'ok' : extSait('messagerie');
-                  // (20 nov.) Plus d'extension requise ici : l'offre se tranche dans le panneau. Sans offre, rien à montrer.
-                  void etat; void contreMini;
-                  if (!off) return null;
-                  return (
-                    <div className="vrm-chat-offre" data-cible={off?'offre':undefined} data-offre={off?'attente':'libre'} data-offre-ro={ro?'1':undefined} style={{background:C.bg,border:`1px solid ${C.border}`,opacity:ro?0.55:1}}>
-                      {/* (31 oct., maquettes Messages) LA CARTE D'OFFRE : « Offre de X € — ton
-                          mini : Y € » (le mini posé à côté du N°, par identité), puis
-                          Refuser · contre-offre proposée · Accepter. Les MÊMES gestes
-                          qu'avant (`actionOffre`) : Accepter demande confirmation, la
-                          contre-offre ne fait que REMPLIR le prix — rien ne part sans
-                          « Envoyer l'offre ». Aucun geste automatique (§3). */}
-                      {off && (()=>{
-                        const mini = Number.isFinite(minF)&&minF>0 ? minF : null;
-                        const contre = contreMini;
-                        const afficheCompare=prixAnnoncePourOffre(listings.items,itemF,String(openConv.acc?.vinted_user_id||''));
-                        return (
-                        <div className="vrm-chat-offre-l vrm-chat-offre-traiter" data-offre-au-dessus-mini={auDessusMini?String(Math.round(minF)):undefined} data-offre-mini={mini!=null?String(mini):undefined} data-offre-contre={contre!=null?String(contre):undefined}>
-                          <ResumeOffre affiche={afficheCompare} offre={off.prix} mini={mini} fmt={fmtE} titre={pc?.titre||''} photo={pc?.photo?<PhotoVinted src={pc.photo} size={44}/>:null} qui={openConv.header?.login||''} verre/>
-                          {/* (9 nov., lot F) Le plancher : prix d'achat SAISI + frais connus — jamais un prix conseillé. */}
-                          <LignePlancher plancher={plancherDeItem(itemF,pc?.devise)} offre={off.prix} mini={mini} ambre={C.warn} onSaisir={annonceParId.get(String(itemF))?()=>saisirPrixAnnonce(annonceParId.get(String(itemF))):null}/>
-                          <AccAvant geste="offre.vinted"/>
-                          {/* (15 nov., maquette « Verre dépoli » validée : « le plein va à Proposer N € ») Quand une
-                              contre-offre est calculée depuis SON prix mini, « Proposer N € » est le plein, en tête ;
-                              « Accepter N € » et « Refuser » en touches dessous. Sans prix mini : comme avant (Accepter
-                              reste le plein, il DEMANDE confirmation). Les mêmes gestes (`actionOffre`), les mêmes data-*. */}
-                          {/* (20 nov., décision de Julien) Accepter, refuser, contre-offre : dans le panneau de l'extension, sur CETTE conversation. */}
-                          {/* (24 nov., Julien : « faire absolument tout si l'extension est connectée ») Accepter (confirmé, il vend la
-                              paire) · Refuser · Proposer N € (N depuis SON prix mini) DEPUIS VRM, par la porte : l'extension qui a
-                              CE compte dans un onglet l'exécute (file `cmd_dist_*`, chemin du clic, garde stricte, 50/h). Sinon : visible,
-                              éteint, la raison et le geste. Identité : tx + offer_request_id (`offreDuFil`), jamais un titre. */}
-                          <div className="vrm-chat-offre-actions" data-offre-app={String(openConv.convId||'')}>
-                            <GestesOffreVinted compte={String(openConv.acc?.vinted_user_id||'')} tx={off.tx} oid={off.oid} conv={openConv.convId} prix={off.prix} contre={contreMini!=null&&contreMini>=1?contreMini:null}/>
-                          </div>
-                        </div>);
-                      })()}
-
-                      {/* (14 nov., lot accompagnement) Le résultat en mots, ou la raison et le geste — plus de rouge (§7 : le rouge est au doublon de N°). */}
-                      {offreMsg && (offreMsg.err ? <AccEchec geste="offre.vinted" erreur={offreMsg.err}/> : <AccApres geste="offre.vinted" texte={offreMsg.ok} ensuite={null}/>)}
-                    </div>
-                  );
-                })()}
+                  ); })()}
+                {offreMsg && !carteOffre && (offreMsg.err ? <AccEchec geste="offre.vinted" erreur={offreMsg.err}/> : <AccApres geste="offre.vinted" texte={offreMsg.ok} ensuite={null}/>)}
                 {openConv.conversation?.allow_reply===false && <div role="status" style={{fontSize:12,color:C.muted,marginBottom:8}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
                 {msgRelais && !ro && <EtatRelaisConv vinted={msgRelaisVinted}/>}
                 {replyNotice&&<div className="vrm-chat-retour" role="status">{replyNotice}</div>}
@@ -21578,18 +21551,19 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     L'app montre le fil (lecture) ; elle n'envoie plus rien. */}
                 {/* (21 nov., ext. 5.421) SES réponses rapides : la question repérée par mots-clés (sans IA), SA réponse remplie
                     par l'IDENTITÉ de l'annonce de la conversation ; elle attend son toucher « Envoyer » dans le panneau. */}
-                {(()=>{ const itR = openConv.conversation?.transaction?.item_id; const annR = itR!=null ? annonceParId.get(String(itR)) : null;
+                {/* (24 nov., lot messages-pro) Répondre DEPUIS VRM si l'extension a CE compte (l'uid du fil) dans un onglet : SES
+                    réponses rapides en puces au-dessus d'une pilule ; sinon une barre fine (la raison est dans le bandeau du haut). */}
+                <div className="vrm-chat-foot-ext" data-vinted-repondre="app">{openConv.conversation?.allow_reply===false ? null : <ComposerReponse site="vinted" compte={String(openConv.acc?.vinted_user_id||'')} conv={String(openConv.convId||'')} decrit={idBandeau('vinted',openConv.convId)}
+                  puces={(()=>{ const itR = openConv.conversation?.transaction?.item_id; const annR = itR!=null ? annonceParId.get(String(itR)) : null;
                   const pR = annR && annR.price!=null && annR.price!=='' ? Number(annR.price) : null;
                   const varsR = { pseudo: openConv.header?.login||'', article: (annR && annR.title) || openConv.conversation?.transaction?.item_title || '', taille: (annR && (annR.size || annR.size_title)) || '', prix: isFinite(pR)&&pR>0 ? pR : null, prix_mini: itR!=null ? Number(String((numeros[String(itR)]||{}).min ?? '').replace(',','.')) || null : null };
                   const filR = (openConv.messages||[]).filter((m)=>m && m.kind!=='event' && m.kind!=='offer').map((m)=>({ deMoi: !!m.mine, texte: String(m.body||'') }));
-                  return <ReponsesRapidesAppP messages={filR} vars={varsR} partie={!!offrePartieDuFil(openConv)} reglage={load('vrm_reponses_rapides', null)} onChoisir={(t)=>remplirReponse('vinted', String(openConv.convId||''), t)}/>; })()}
-                {/* (24 nov.) Répondre DEPUIS VRM si l'extension a CE compte (l'uid du fil) dans un onglet ; sinon lecture seule, dite. */}
-                <div className="vrm-chat-foot-ext" data-vinted-repondre="app">{openConv.conversation?.allow_reply===false ? null : <ComposerReponse site="vinted" compte={String(openConv.acc?.vinted_user_id||'')} conv={String(openConv.convId||'')}/>}</div>
+                  return <ReponsesRapidesAppP puces messages={filR} vars={varsR} partie={!!offrePartieDuFil(openConv)} reglage={load('vrm_reponses_rapides', null)} onChoisir={(t)=>remplirReponse('vinted', String(openConv.convId||''), t)}/>; })()}/>}</div>
               </div>
             ); })()}
           </div>
         </div></ResponsiveChatPortal>
-  );
+  ); };
 
   const chargerRetraitsMulti = async () => {
     const owner = AUTH.user?.id;
