@@ -100,18 +100,17 @@ jobs:
           # (BANCS_PARALLELE) : la part 2 dépassait 45 min et était annulée à chaque PR —
           # accessibilite et barre-achats n'avaient plus tourné depuis des jours. Liste
           # complète, avant/après : python3 -I scripts/ci-controles.py --diff origin/main (docs/passation/2026-11-24-ci-rapide.md).
-          # ventes-e2 (~19 min seul) est lancé en TROIS morceaux (`banc@SCENARIOS=…`, ses propres
-          # scénarios, tous couverts : scripts/ci-controles.py le vérifie). Parts équilibrées à
-          # ~12 min de travail chacune (3 ouvriers), durées mesurées le 24 nov.
-          # budget-vitesse (11 nov.) : lectures, octets, doublons, lignes entières et JS par
-          # écran principal, contre scripts/budget-vitesse.json (~5 min). Lancé SEUL avant les
-          # autres (BANCS_SEULS, défaut de lancer-bancs) : il compte des lectures « jusqu'au calme ».
+          # Les bancs longs sont lancés en MORCEAUX de leur propre variable de choix
+          # (`banc@VAR=…`, tous couverts : scripts/ci-controles.py le vérifie) : ventes-e2 (~19 min
+          # seul) par SCENARIOS, accessibilite (~19 min) par BANC_LARGEUR, budget-vitesse (> 20 min,
+          # arrêté à sa durée maximale le 24 nov. : ses derniers écrans n'étaient jamais jugés)
+          # par ECRANS. Parts équilibrées à ~15 min (3 ouvriers), durées mesurées en CI le 24 nov.
           - part: 1
-            lot: budget-vitesse ventes-e2@SCENARIOS=jeu,exclu statut-colis ventes-ligne-propre annonces-actions journee-coherence garde-ecrans colis-retirer-propre retraits-suivi
+            lot: budget-vitesse@ECRANS=journee,ventes,annonces,achats budget-vitesse@ECRANS=garage,messages,compta,emails accessibilite@BANC_LARGEUR=390 defilement-navigation imprimer-compte-exact annonces-actions barre-achats journee-coherence retraits-suivi
           - part: 2
-            lot: navigation-tache chiffres-coherents accessibilite defilement-navigation nouveau-vendeur barre-achats morceau-perime
+            lot: accessibilite@BANC_LARGEUR=1512 ventes-e2@SCENARIOS=annul,ko ventes-e2@SCENARIOS=egal,gros,vide accessibilite-clavier chiffres-coherents ventes-ligne-propre garde-ecrans
           - part: 3
-            lot: ventes-e2@SCENARIOS=annul,ko ventes-e2@SCENARIOS=egal,gros,vide argent-mois accessibilite-clavier imprimer-compte-exact iphone-reprise achats-annules
+            lot: navigation-tache ventes-e2@SCENARIOS=jeu,exclu argent-mois nouveau-vendeur iphone-reprise morceau-perime statut-colis colis-retirer-propre achats-annules
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

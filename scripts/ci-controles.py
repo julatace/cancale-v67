@@ -147,6 +147,21 @@ def controles_de_ligne(ref, ligne, env, boucle):
     return res
 
 
+def defaut_de(ref, banc, var):
+    """Ce que le banc fait SANS la variable : l'ensemble que ses morceaux doivent couvrir."""
+    src = lire(ref, f'scripts/bancs/{banc}.cjs') or ''
+    d = re.search(r"liste\('" + var + r"',\s*'([^']*)'\)", src)            # liste('SCENARIOS', 'a,b')
+    if d:
+        return set(d.group(1).split(','))
+    if var == 'BANC_LARGEUR':                                                # [390, 1512].filter((l) => !process.env.BANC_LARGEUR …
+        d = re.search(r'\[([\d,\s]+)\]\.filter\(\(\w+\) => !process\.env\.BANC_LARGEUR', src)
+        return set(x.strip() for x in d.group(1).split(',')) if d else None
+    if var == 'ECRANS':                                                      # const ECRANS = [ ['journee', …], … ];
+        d = re.search(r'const ECRANS = \[(.*?)\n\];', src, re.S)
+        return set(re.findall(r"^\s*\['(\w+)',", d.group(1), re.M)) if d else None
+    return None
+
+
 def lister(ref):
     lignes = set()
     for nom in lister_dossier(ref, '.github/workflows'):
@@ -185,9 +200,7 @@ def lister(ref):
                                 continue
                             lignes.add(f'{wnom} · {sorte} · {quoi} · {regl or "-"} · {b_step}')
             for (b, var, regl, b_step), vus in morceaux.items():
-                src = lire(ref, f'scripts/bancs/{b}.cjs') or ''
-                d = re.search(r"liste\('" + var + r"',\s*'([^']*)'\)", src)
-                defaut = set(d.group(1).split(',')) if d else None
+                defaut = defaut_de(ref, b, var)
                 if defaut is not None and defaut <= vus:
                     lignes.add(f'{wnom} · banc · {b} · {regl or "-"} · {b_step}')
                 else:

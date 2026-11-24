@@ -22,9 +22,11 @@
 //                     (DUREES_CI). Mesuré en CI le 24 nov. : un banc passe la moitié de son
 //                     temps à ATTENDRE (attentes fixes, délais de 30 s des rouges connus), pas
 //                     à calculer — c'est ce temps-là que le parallèle récupère.
-//   BANCS_SEULS       bancs lancés SEULS, avant les autres (défaut : budget-vitesse, qui
-//                     compte des lectures « jusqu'au calme » : un processeur partagé pourrait
-//                     changer l'ordre d'arrivée des réponses).
+//   BANCS_SEULS       bancs lancés SEULS, avant les autres (défaut : aucun). Essayé le 24 nov.
+//                     sur budget-vitesse : seul ou avec deux autres bancs, il rend les MÊMES
+//                     lignes rouges (il est fait pour une machine de CI partagée : aucune durée
+//                     jugée, chaque mesure prise sur le meilleur de 3 essais) — et seul, il
+//                     gardait deux ouvriers sur trois à ne rien faire pendant 20 min.
 //   nom@VAR=v1,v2     (24 nov.) un MORCEAU d'un banc : le même banc lancé avec SA variable
 //                     de choix (ex. `ventes-e2@SCENARIOS=jeu,annul` et
 //                     `ventes-e2@SCENARIOS=exclu,ko,egal,gros,vide`) pour en faire tourner
@@ -52,16 +54,19 @@ const noms = process.argv.slice(2).length ? process.argv.slice(2) : LOT;
 const BASE = Number(process.env.BANCS_PORT_BASE) || 10000;
 const TIMEOUT_MS = (Number(process.env.BANCS_TIMEOUT_S) || 1200) * 1000;
 const PARALLELE = Math.max(1, Math.floor(Number(process.env.BANCS_PARALLELE) || 1));
-const SEULS = String(process.env.BANCS_SEULS == null ? 'budget-vitesse' : process.env.BANCS_SEULS).split(/[\s,]+/).filter(Boolean);
-// Durées mesurées en CI (secondes, Chromium, un banc à la fois, 24 nov. — runs 45351147777,
-// 45347995549, 45346082002). Ne servent qu'à l'ORDRE de départ (les plus longs d'abord) ;
-// un banc absent compte pour 120 s. Aucune ne borne ni ne juge un banc.
+const SEULS = String(process.env.BANCS_SEULS || '').split(/[\s,]+/).filter(Boolean);
+// Durées mesurées en CI (secondes, Chromium) : un banc à la fois le 24 nov. au matin (runs
+// 45351147777, 45347995549, 45346082002), puis 3 à la fois (run 45368327532 : accessibilite
+// 1158 s, budget-vitesse arrêté à 1200 s — ni l'un ni l'autre n'avait fini depuis des jours,
+// la part 2/3 était annulée avant). Ne servent qu'à l'ORDRE de départ (les plus longs
+// d'abord) ; un banc absent compte pour 120 s. Aucune ne borne ni ne juge un banc.
 const DUREES_CI = {
-  'ventes-e2': 1160, 'navigation-tache': 721, 'argent-mois': 566, 'chiffres-coherents': 357, 'accessibilite-clavier': 346,
-  'accessibilite': 340, 'budget-vitesse': 309, 'defilement-navigation': 249, 'imprimer-compte-exact': 246, 'nouveau-vendeur': 226,
-  'statut-colis': 226, 'ventes-ligne-propre': 202, 'annonces-actions': 174, 'iphone-reprise': 153, 'morceau-perime': 124,
-  'journee-coherence': 117, 'achats-annules': 104, 'garde-ecrans': 98, 'colis-retirer-propre': 51, 'retraits-suivi': 47,
-  'tout-imprimer': 27, 'connexion-claire': 16, 'barre-depuis-journee': 15,
+  'budget-vitesse': 1200, 'accessibilite': 1158, 'ventes-e2': 1710, 'navigation-tache': 754, 'argent-mois': 577,
+  'accessibilite-clavier': 370, 'chiffres-coherents': 365, 'defilement-navigation': 311, 'nouveau-vendeur': 294,
+  'ventes-ligne-propre': 276, 'imprimer-compte-exact': 233, 'iphone-reprise': 179, 'annonces-actions': 173,
+  'morceau-perime': 170, 'barre-achats': 141, 'statut-colis': 119, 'journee-coherence': 107, 'garde-ecrans': 59,
+  'colis-retirer-propre': 54, 'achats-annules': 48, 'retraits-suivi': 44, 'tout-imprimer': 27, 'connexion-claire': 16,
+  'barre-depuis-journee': 15,
 };
 // Les bancs ROUGES CONNUS (scripts/audits-exceptions.json, clé `bancs`) : chacun dit
 // SES lignes rouges connues (`rouges`, une expression régulière sur la ligne). Le banc
