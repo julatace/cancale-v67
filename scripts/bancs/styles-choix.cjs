@@ -38,7 +38,6 @@ const dit = (c, m, d) => { if (c) { ok++; if (!process.env.CALME) console.log(' 
 const MUTATIONS = {
   orange: ':root[data-style] { --n-accent: #E8891C !important; --n-plein: #E8891C !important; }',
   pale: ':root[data-style] { --n-encre-2: #A8ABB0 !important; --n-texte: #A8ABB0 !important; }',
-  petit: '[data-style] .n-bouton, [data-style] .n-bouton-icone-seule { min-height: 30px !important; height: 30px !important; width: auto !important; min-width: 30px !important; border-block-width: 0 !important; }',
   appui: '[data-style] .n-bouton[data-n-force="appui"] { transform: none !important; background-color: var(--n-plein) !important; filter: none !important; }',
   deborde: '.vrm-main { min-width: 520px !important; }',
 };
@@ -208,6 +207,8 @@ async function ouvrir(nav, { W, sombre, style, url, b }) {
 async function poserMutation(pg) {
   if (MUT === 'sansstyle') await pg.evaluate(() => document.documentElement.removeAttribute('data-style'));
   if (MUTATIONS[MUT]) await pg.addStyleTag({ content: MUTATIONS[MUT] });
+  // « petit » : posé EN LIGNE (une feuille ajoutée perd devant les `!important` en couche de l'accessibilité)
+  if (MUT === 'petit') await pg.evaluate(() => { for (const b of document.querySelectorAll('.n-bouton, .n-bouton-icone-seule, [data-n-famille="second"], [data-n-famille="champ"]')) { for (const [p, v] of [['min-height', '30px'], ['height', '30px'], ['min-width', '30px'], ['border-top-width', '0'], ['border-bottom-width', '0']]) b.style.setProperty(p, v, 'important'); } });
   if (MUT === 'vieux') await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) { const b = document.createElement('button'); b.className = 'vrm-btn vrm-btn-sec'; b.textContent = 'Ancien bouton'; b.style.cssText = 'display:block;min-height:44px;min-width:120px;margin:8px'; m.prepend(b); } });
 }
 
