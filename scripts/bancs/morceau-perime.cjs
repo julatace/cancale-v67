@@ -32,12 +32,11 @@ const base = () => ({ lignes: JSON.parse(JSON.stringify(NV.JEU_LIGNES)), comptes
 
 // E-mails : dans la barre latérale à l'ordinateur ; au téléphone, dans le menu de l'avatar (choix n° 61 du 14 nov. :
 // plus de « Plus » dans la barre — le menu du haut porte Messages, Stock, E-mails…).
-async function versEmails(pg, tel) {
-  if (!tel) { await pg.locator('.vrm-sidebar [data-nav-entree="emails"]').first().click(); return; }
-  const tete = pg.locator('[data-profil-tete]').filter({ visible: true }).first();
-  if (await tete.count()) { await tete.click(); await pg.waitForTimeout(500); }
-  const tuile = pg.locator('[data-menu-profil] [data-nav-entree="emails"], [data-nav-entree="emails"]:visible').first();
-  if (await tuile.count()) await tuile.click();
+// (24 nov., morceaux-perimes) Le chemin par le menu de l'avatar ou la barre latérale n'aboutissait plus (l'écran restait
+// « journee », sur main aussi) : E-mails est ouvert comme le fait l'app elle-même pour un lien (`vrm:aller`). La règle jugée
+// est inchangée — un écran DEMANDÉ dont le morceau n'existe plus ⇒ UN rechargement vers la nouvelle version.
+async function versEmails(pg) {
+  await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=emails' }))).catch(() => {});
 }
 async function scenario(nav, { W, panne, jsSeul = false }) {
   const T = `[${W}px ${panne ? 'panne' : jsSeul ? 'déploiement, CSS déjà là' : 'déploiement'}]`;
@@ -98,7 +97,7 @@ async function scenario(nav, { W, panne, jsSeul = false }) {
   await o.pg.waitForTimeout(3000);
   // La mise en ligne.
   etat.deploye = true; etat.nouvelle = !panne;
-  await versEmails(o.pg, tel);
+  await versEmails(o.pg);
   await o.pg.waitForTimeout(5000);
   await o.pg.waitForLoadState('domcontentloaded').catch(() => {});
   await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
@@ -106,7 +105,7 @@ async function scenario(nav, { W, panne, jsSeul = false }) {
   // Après le rechargement, l'app peut être revenue ailleurs : on rouvre E-mails.
   const surEmails = await o.pg.evaluate(() => (document.querySelector('.vrm-main') || { getAttribute: () => '' }).getAttribute('data-ecran') === 'emails');
   if (!surEmails) {
-    await versEmails(o.pg, tel);
+    await versEmails(o.pg);
     await o.pg.waitForTimeout(2500);
   }
   await o.pg.waitForTimeout(4000);   // la file des plantages part vers la base 3 s après
