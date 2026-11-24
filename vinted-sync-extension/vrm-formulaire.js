@@ -411,9 +411,44 @@
     //    peut donc dire la personne par `receiver_id` OU `user_id` (une seule des deux, avec éventuellement `portal`) — toujours
     //    les DEUX identités exactes du favori, sur vinted.fr même.
     const natif = (v) => { try { const u = new URL(v, location.href); const q = u.searchParams; const ks = [...q.keys()].filter((k) => k !== 'portal').sort().join(','); const qui = ks === 'item_id,receiver_id' ? 'receiver_id' : ks === 'item_id,user_id' ? 'user_id' : ''; if (!qui || q.getAll('item_id').length !== 1 || q.getAll(qui).length !== 1 || q.getAll('portal').length > 1) return false; return u.origin === location.origin && q.get('item_id') === itemId && q.get(qui) === receiverId; } catch (_) { return false; } };
-    const l = [...document.querySelectorAll('a[href]')].filter((a) => visible(a) && ((attendu && norme(a.href) === attendu) || natif(a.href)));
+    const l = [...document.querySelectorAll('a[href]')].filter((a) => visible(a) && ((attendu && norme(a.href) === attendu) || natif(a.href) || identiteLigneFavori(a.href, itemId, receiverId)));
     return l.length === 1 ? { el: l[0] } : { el: null, ambigu: l.length > 1 };
   }
+  // 5.440.2 (Julien, 24 nov. 17:45 : « Sauté · Favori trop ancien » pour des favoris de 0 à 2 jours, rangs 1, 2 et 4 de la
+  //    liste de Vinted) : la ligne d'un favori se reconnaît par ses DEUX identités, quelle que soit la forme exacte de son
+  //    adresse sur la page — l'article (`/items/N/…` ou `item_id=N`) ET la personne (`offering_id`, `receiver_id` ou
+  //    `user_id`, une seule clé, une seule valeur), sur vinted.fr même, dans une adresse de favori (`want_it`) ou la
+  //    forme native `?item_id=&receiver_id=`. Un autre paramètre d'identité (`…_id`) qui n'est pas l'un des deux ⇒ refusée
+  //    (une autre personne, un autre article) ; un paramètre de suivi (`ref`, `source`…) ne change pas qui elle désigne.
+  //    Jamais un titre, jamais un pseudo.
+  function identiteLigneFavori(href, itemId, receiverId) {
+    try {
+      const u = new URL(href, location.href); if (u.origin !== location.origin) return false;
+      const q = u.searchParams, ks = [...new Set([...q.keys()])];
+      if (ks.some((k) => q.getAll(k).length !== 1)) return false;
+      const m = /^\/items\/([1-9]\d{0,19})(?:-[^/]*)?\/want_it(?:\/new)?\/?$/.exec(u.pathname);
+      const favori = !!m || /^\/(?:inbox\/)?want_it(?:\/new)?\/?$/.test(u.pathname);
+      if (!favori) return false;
+      const article = m ? m[1] : q.get('item_id');
+      if (m && q.has('item_id') && q.get('item_id') !== m[1]) return false;
+      const qui = ['offering_id', 'receiver_id', 'user_id'].filter((k) => q.has(k));
+      if (qui.length !== 1) return false;
+      if (ks.some((k) => /_id$/i.test(k) && k !== 'item_id' && k !== qui[0])) return false;
+      return article === itemId && q.get(qui[0]) === receiverId && itemId !== receiverId;
+    } catch (_) { return false; }
+  }
+  // Les lignes de notification montrées (pour savoir si la page en a chargé assez) : un lien de favori, d'article ou une ligne native.
+  const lignesNotif = () => [...document.querySelectorAll('a[href*="/want_it"], a[href*="receiver_id="], a[href*="offering_id="], a[href*="/items/"], [data-testid*="notification" i]')].filter((x) => !x.closest('header, footer, [role="banner"]')).length;
+  // Le bouton qui charge la suite de la liste (« Afficher plus »…), seul ; jamais une ligne, jamais un lien.
+  const RE_PLUS = /^(?:afficher plus|voir plus|charger plus|plus de notifications|show more|load more|see more|view more|mostrar m[aá]s|ver m[aá]s|cargar m[aá]s|mostra altro|carica altro|vedi altro|mehr anzeigen|mehr laden|weitere laden)$/;
+  const boutonPlus = () => { const l = [...document.querySelectorAll('button, [role="button"]')].filter((b) => visible(b) && actif(b) && !deVrm(b) && RE_PLUS.test(norm(nomAcc(b)))); return l.length === 1 ? l[0] : null; };
+  // Le bloc qui défile (la liste peut vivre dans un conteneur, pas dans la fenêtre) : l'ancêtre défilant de la dernière ligne.
+  const blocDefilant = () => {
+    const l = [...document.querySelectorAll('a[href*="/want_it"], a[href*="/items/"], [data-testid*="notification" i]')].filter(visible);
+    let e = l.length ? l[l.length - 1].parentElement : null;
+    while (e && e !== document.body && e !== document.documentElement) { try { const st = getComputedStyle(e); if (/(auto|scroll)/.test(st.overflowY) && e.scrollHeight > e.clientHeight + 4) return e; } catch (_) {} e = e.parentElement; }
+    return null;
+  };
   async function attendreChemin(re, ms) {
     let r = null; try { r = re instanceof RegExp ? re : new RegExp(String(re || '^/')); } catch (_) { return { ok: false }; }
     const fin = Date.now() + ms;
@@ -645,23 +680,48 @@
       };
       const absent = (extra) => Object.assign(manque('favori-notification'), { absent: true }, extra || {});
       if (!l.el && d && d.liste === true) {
-        // La page complète des notifications : on la fait défiler (lecture seule, bornée) jusqu'à la ligne.
-        // (La suite se charge au défilement : on remonte d'un cran puis on redescend tout en bas, pour que la page le voie
-        //  même si elle y était déjà ; « plus rien ne vient » = ni la hauteur ni le nombre de liens ne bougent.)
-        let tours = 0, vu = '', stable = 0;
-        const t = await trouver(25000, async () => {
-          const h = document.documentElement.scrollHeight, etat = h + ':' + document.querySelectorAll('a[href]').length;
-          stable = etat === vu ? stable + 1 : 0; vu = etat;
-          if (tours >= 8 && stable >= 3) return 'fini';
-          if (stable >= 7) return 'fini';
-          if ((stable === 2 || tours === 0) && tours < 8) { tours++; try { window.scrollTo(0, Math.max(0, h - window.innerHeight - 240)); window.scrollTo(0, h); } catch (_) {} }
-          return '';
-        });
+        // La page complète des notifications : lue (lecture seule) jusqu'à la ligne, en chargeant la SUITE autant qu'il faut.
+        // ⚠️ 5.440.2 (Julien, 24 nov. : « Sauté · Favori trop ancien » pour des favoris de la veille) : avant, la lecture
+        //    s'arrêtait dès que la page ne bougeait plus pendant ~1,4 s, en ne faisant défiler que la FENÊTRE — une liste qui
+        //    vit dans un conteneur, ou dont la suite met plus de temps à venir, était déclarée « lue » sans l'être. Désormais :
+        //    la fenêtre ET le bloc qui défile, le bouton « Afficher plus » s'il est seul, une attente de 4 s pour chaque
+        //    suite ; la lecture ne s'arrête que (a) ligne trouvée, (b) trois tentatives de suite sans rien de nouveau (le
+        //    BOUT), ou (c) 90 s. Le fond ne conclut JAMAIS « trop ancien » de cette lecture (voir `executerMessageFavori`) :
+        //    seule la liste de Vinted lue jusqu'à sa dernière page le prouve.
+        let compte = lignesNotif(), hauteur = 0, sansRien = 0, fin = 'temps';
+        const tFin = Date.now() + 90000;
+        const t = await (async () => {
+          for (;;) {
+            if (captcha()) return { captcha: true };
+            const x = lienFavoriVisible(lien, itemId, receiverId);
+            if (x.ambigu) return { ambigu: true };
+            if (x.el) return { el: x.el };
+            if (sansRien >= 3) { fin = 'bout'; return { absent: true }; }
+            if (Date.now() > tFin) { fin = 'temps'; return { absent: true }; }
+            // Charger la suite : bas de la fenêtre et du bloc qui défile (un cran plus haut d'abord, pour que la page le voie), puis « Afficher plus ».
+            const b = blocDefilant();
+            try { const h = document.documentElement.scrollHeight; window.scrollTo(0, Math.max(0, h - window.innerHeight - 240)); window.scrollTo(0, h); } catch (_) {}
+            if (b) { try { b.scrollTop = Math.max(0, b.scrollHeight - b.clientHeight - 240); b.scrollTop = b.scrollHeight; b.dispatchEvent(new Event('scroll')); } catch (_) {} }
+            await nap(250);
+            const p = boutonPlus(); if (p) { try { p.click(); } catch (_) {} }
+            // La suite attendue 4 s au plus (relue toutes les 200 ms) : nouvelles lignes ou page plus haute.
+            const t0 = Date.now(); let neuf = false;
+            while (Date.now() - t0 < 4000) {
+              if (captcha()) return { captcha: true };
+              const y = lienFavoriVisible(lien, itemId, receiverId); if (y.el || y.ambigu) break;
+              const n = lignesNotif(), h2 = document.documentElement.scrollHeight + (b ? b.scrollHeight : 0);
+              if (n > compte || (hauteur && h2 > hauteur)) { neuf = true; compte = Math.max(compte, n); hauteur = h2; break; }
+              hauteur = hauteur || h2;
+              await nap(200);
+            }
+            sansRien = neuf ? 0 : sansRien + 1;
+          }
+        })();
         if (t.captcha) return vuCaptcha(); if (t.ambigu) return manque('favori-notification-ambigue');
         // 5.440 : « absent » ne se dit que sur une VRAIE liste de notifications (au moins une ligne de favori ou de notification
         //    native) ; une page qui n'en montre aucune n'est pas la liste (adresse changée, page d'erreur) ⇒ nommé, rien sauté.
         if (t.absent && !document.querySelector('a[href*="/want_it/"], a[href*="receiver_id="], a[href*="offering_id="], [data-testid*="notification" i]')) return manque('notifications-introuvables');
-        if (t.absent) return absent({ liste: true });
+        if (t.absent) return absent({ liste: true, fin, lignes: compte });
         try { t.el.scrollIntoView({ block: 'center' }); } catch (_) {}
         l = { el: t.el };
       } else if (!l.el) {
@@ -973,7 +1033,7 @@
       return x ? { ok: true, rep: x } : { ok: false, code: 'sans-reponse' };
     },
   };
-  globalThis.__vrmFormulaireV = 7.2;   // 5.440.1 : 7.2 (conversation ouverte relue de l'adresse à chaque tour) ; 7.1 (ligne du favori par `user_id`)   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
+  globalThis.__vrmFormulaireV = 7.3;   // 5.440.2 : 7.3 (ligne du favori par ses deux identités, page complète lue jusqu'au bout)   // 5.440.1 : 7.2 (conversation ouverte relue de l'adresse à chaque tour) ; 7.1 (ligne du favori par `user_id`)   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
   globalThis.__vrmFormulaireSel = SEL;
   globalThis.__vrmFormulaire = async (etape, d) => {
     if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(location.hostname)) return { ok: false, code: 'hors-vinted' };

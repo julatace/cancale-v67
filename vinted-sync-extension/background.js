@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.440.1';
+const CODE_VERSION = '5.440.2';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -22104,6 +22104,34 @@ function lienFavoriProfond(v){
 }
 // La FORME d'un lien de notification inconnu (pour le diagnostic) : le schéma et le gabarit du chemin, jamais une valeur.
 function formeLienFavori(v){const s=String(v||'');const m=/^([a-z][a-z0-9+.-]{0,20}):/i.exec(s);return ((m?m[1].toLowerCase():'rel')+'_'+s.replace(/^[a-z][a-z0-9+.-]{0,20}:\/{0,}/i,'').split(/[?#]/)[0].replace(/\d+/g,'n').replace(/[^a-z_/n]/gi,'').replace(/\//g,'_')).slice(0,40);}
+// 5.440.2 : la liste de la cloche lue page après page jusqu'à la ligne d'un favori (par son id de notification) ou jusqu'à la
+//    DERNIÈRE page que Vinted annonce (`pagination.total_pages`, `current_page`) — lecture seule, même onglet, une page à la
+//    fois. Rend { n, rang, page } (trouvée), { bout:true } (lue jusqu'au bout sans elle : la SEULE preuve de « trop ancien »),
+//    {} (pas au bout : plus de CLOCHE_PAGES_MAX pages, ou une page illisible), { frein } (429/403/captcha), { sansPage }.
+//    Une réponse SANS `pagination` est une liste d'une page (ce que Vinted rend tout entier).
+const CLOCHE_PAGES_MAX=6;
+async function listeClocheJusqua(acc,premiere,notificationId){
+  const cherche=String(notificationId||'');let rep=premiere,page=1,rang=0;
+  for(;;){
+    const l=rep&&rep.ok&&rep.json&&Array.isArray(rep.json.notifications)?rep.json.notifications:null;
+    if(!l)return {};
+    const i=l.findIndex(x=>x&&String(x.id)===cherche);
+    if(i>=0)return {n:l[i],rang:rang+i,page};
+    rang+=l.length;
+    const pg=rep.json.pagination&&typeof rep.json.pagination==='object'?rep.json.pagination:null;
+    if(!pg)return {bout:true};
+    const tot=Number(pg.total_pages),cur=Number(pg.current_page)||page,pp=Number(pg.per_page);
+    if(!l.length||(Number.isInteger(tot)&&tot>=0&&cur>=tot))return {bout:true};
+    if(!Number.isInteger(tot))return {};
+    if(page>=CLOCHE_PAGES_MAX)return {};
+    page=cur+1;
+    await new Promise(ok=>setTimeout(ok,600+Math.round(Math.random()*900)));
+    const q=`?page=${page}`+(Number.isInteger(pp)&&pp>0&&pp<=100?`&per_page=${pp}`:'');
+    rep=await vintedPage(acc,'GET',adresseClocheVinted(acc.domain)+q,null,{timeoutMs:12000,travail:true,chemin:'/inbox'});
+    const f=freinFavoriAuto(rep);if(f)return {frein:f,status:rep.status};
+    if(rep.sansPage)return {sansPage:true};
+  }
+}
 // 5.440 : l'adresse de la liste de la cloche, sur l'hôte `api.` du domaine du compte (mesuré : www → 404, api → 200).
 function adresseClocheVinted(domaine){const d=String(domaine||'www.vinted.fr').toLowerCase().replace(/^www\./,'');return /^vinted\.(fr|com|it|de)$/.test(d)?`https://api.${d}/inbox-notifications/v1/notifications`:'/inbox-notifications/v1/notifications';}
 // Le chemin de la page complète des notifications, LU sur la page (« Voir tout » ou le lien de la cloche) et retenu.
@@ -22120,7 +22148,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   // (5.309, mode auto) `ecrits` = combien d'écritures sont PARTIES chez Vinted : 0 ⇒
   // rien n'est parti, le serveur peut laisser le mode auto reprendre ce favori.
   // (5.369) `variante` = le n° de la version envoyée (1 à 5), rendu au serveur pour le journal (jamais le texte).
-  let ecrits=0,frein='',variante=null,attente=null,apresMs=0,lienCloche='';
+  let ecrits=0,frein='',variante=null,attente=null,apresMs=0,lienCloche='',rangCloche=-1;
   // (5.406) `apresMs` : un refus d'ATTENTE (discrétion, plafond de l'heure, sécurité du compte) dit
   // au serveur QUAND réessayer — le vrai temps de la garde, plus les 10 min fixes d'avant.
   // 22 nov. (Julien : « 2 refusés : autre refus », impossible de dire quelle étape) : chaque accusé porte l'ÉTAPE où la
@@ -22209,9 +22237,18 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     if(cl.sansPage)return rep('refuse',0,'onglet_vinted');
     if(frein)return rep('refuse',cl.status);
     const liste=cl.ok&&cl.json&&Array.isArray(cl.json.notifications)?cl.json.notifications:null;
-    if(liste&&!liste.some(n=>n&&String(n.id)===String(body.notificationId))){noterDiag('favori_trop_ancien');return rep('ignore',cl.status,'favori_trop_ancien');}
     if(!liste)noterDiag('favori_cloche_illisible_'+(cl.status||0));
-    if(liste){const n=liste.find(x=>x&&String(x.id)===String(body.notificationId));if(n&&typeof n.link==='string')lienCloche=n.link;}
+    // ⚠️ 5.440.2 (Julien, 24 nov. 17:45, tomj606 : « Sauté · Favori trop ancien » pour des favoris de 0 à 2 jours) : « trop
+    //    ancien » ne se dit plus sur la PREMIÈRE page de la liste (20 lignes chez Vinted, toutes sortes mêlées). La liste est
+    //    lue page après page (GET, même onglet, `pagination` de Vinted) jusqu'à la ligne de CE favori ou jusqu'à sa DERNIÈRE
+    //    page ; au-delà de `CLOCHE_PAGES_MAX` pages sans la trouver, rien n'est conclu (« pas encore trouvée », le favori
+    //    attend). Seule une liste lue jusqu'au bout sans lui prouve qu'il est trop ancien pour Vinted.
+    const lc=liste?await listeClocheJusqua(acc,cl,body.notificationId):null;
+    if(lc&&lc.frein){if(!frein)frein=lc.frein;return rep('refuse',lc.status);}
+    if(lc&&lc.sansPage)return rep('refuse',0,'onglet_vinted');
+    if(lc&&!lc.n&&lc.bout){noterDiag('favori_trop_ancien');return rep('ignore',cl.status,'favori_trop_ancien');}
+    if(lc&&!lc.n){noterDiag('favori_cloche_pas_au_bout');return rep('refuse',0,'notification_pas_trouvee','favori_absent:liste-pas-au-bout');}
+    if(lc&&lc.n){if(typeof lc.n.link==='string')lienCloche=lc.n.link;rangCloche=lc.rang;if(lc.page>1)noterDiag('favori_cloche_page_'+Math.min(lc.page,9));}
     await pauseFavori('cloche',uid);
   }
   // ⚠️⚠️ 5.414 (`toutinterface`, Julien, 21 nov. : « on ne fait plus les requêtes ») : la conversation n'est plus créée par une
@@ -22252,8 +22289,11 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     noterDiag('favori_voir_tout');
     await pauseFavori('cloche',uid);
     if(creation.voirTout)await retenirPageNotifs(creation.voirTout);
-    creation=await interfaceVinted(acc,'favoriListe',{lien:page?page.url:'',itemId:body.itemId,receiverId:body.recipientId,page:pageNotificationsSure(creation.voirTout||await pageNotifsConnue()),favori:true});
-    if(creation.rienParti&&!creation.pause&&(creation.absent===true||creation.sansPage==='identite')){noterDiag('favori_absent_cloche');return rep('ignore',0,'favori_trop_ancien');}
+    creation=await interfaceVinted(acc,'favoriListe',{lien:page?page.url:'',itemId:body.itemId,receiverId:body.recipientId,page:pageNotificationsSure(creation.voirTout||await pageNotifsConnue()),rang:rangCloche,favori:true});
+    // ⚠️ 5.440.2 : une ligne que la PAGE ne montre pas n'est PAS « trop ancienne » — la liste de Vinted (lue plus haut jusqu'à
+    //    sa dernière page) est la seule preuve de l'âge. Pas trouvée sur la page ⇒ rien n'est écrit, et le favori ATTEND un
+    //    nouvel essai (« notification pas encore trouvée ») : jamais sauté pour ça.
+    if(creation.rienParti&&!creation.pause&&(creation.absent===true||creation.sansPage==='identite')){noterDiag('favori_absent_page_'+(creation.fin==='bout'?'bout':creation.fin==='temps'?'temps':'autre'));return rep('refuse',0,'notification_pas_trouvee',rangCloche>=0?'favori_absent:ligne-pas-montree':'favori_absent:liste-pas-lue');}
   }
   if(creation.envoye&&partie(creation))ecrits++;
   if(creation.rienParti&&!creation.pause)return rep('refuse',0,raisonFavoriInterface(creation),causeFavoriInterface(creation));
@@ -37162,10 +37202,10 @@ ${lettre[1]}`;
   }
 
   // src/favorisProgression.js
-  var RAISONS_LOCALES = Object.freeze(["element_introuvable", "identite_non_confirmee", "historique_non_verifie"]);
+  var RAISONS_LOCALES = Object.freeze(["notification_pas_trouvee", "element_introuvable", "identite_non_confirmee", "historique_non_verifie"]);
   var RAISONS_SAUT = Object.freeze(["favori_trop_ancien", "annonce_indisponible", "article_vendu", "conversation_deja_contactee", "conversation_existante", "offre_sous_plancher", "conversation_refusee"]);
   var MOTS_SAUT = Object.freeze({ favori_trop_ancien: "trop anciens pour Vinted", annonce_indisponible: "vendus ou indisponibles", conversation_deja_contactee: "déjà en conversation", offre_sous_plancher: "offre sous le prix mini", conversation_refusee: "conversation refusée par Vinted", autre: "autres" });
-  var MOTS_REFUS = Object.freeze({ element_introuvable: "bouton ou champ introuvable sur la page de Vinted", identite_non_confirmee: "article ou destinataire pas confirmé", historique_non_verifie: "conversation pas vérifiée", texte_interdit: "texte contenant un lien, un e-mail, un téléphone ou un paiement hors Vinted", texte_refuse: "texte refusé par Vinted", vinted_robot: "vérification anti-robot de Vinted", pause_vinted: "Vinted demande de ralentir", vinted_frein: "Vinted demande de ralentir", offre_refusee: "offre refusée par Vinted", autre: "autre refus" });
+  var MOTS_REFUS = Object.freeze({ notification_pas_trouvee: "notification du favori pas encore trouvée sur la page Vinted", element_introuvable: "bouton ou champ introuvable sur la page de Vinted", identite_non_confirmee: "article ou destinataire pas confirmé", historique_non_verifie: "conversation pas vérifiée", texte_interdit: "texte contenant un lien, un e-mail, un téléphone ou un paiement hors Vinted", texte_refuse: "texte refusé par Vinted", vinted_robot: "vérification anti-robot de Vinted", pause_vinted: "Vinted demande de ralentir", vinted_frein: "Vinted demande de ralentir", offre_refusee: "offre refusée par Vinted", autre: "autre refus" });
   function phraseBilanFavoris(b, mot) {
     if (!b) return "";
     const m = (c, f) => typeof mot === "function" && mot(c, f) || (f === "saut" ? MOTS_SAUT : MOTS_REFUS)[c] || c;

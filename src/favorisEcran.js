@@ -125,6 +125,7 @@ export const RAISONS_ECRAN={
   arrete:{texte:'envoi arrêté avant de partir'},
   annule:{texte:'retiré de l’envoi avant de partir'},
   trop_ancien:{texte:'favori trop ancien pour Vinted (plus dans la cloche)'},
+  notif_pas_trouvee:{texte:'notification du favori pas encore trouvée sur la page Vinted (rien n’est parti)',geste:'Renvoie-le : VRM relit toute la liste des notifications.'},
   verifie:{texte:'vérifié par toi sur Vinted, envoi non confirmé'},
   interrompu:{texte:'interrompu avant l’envoi'},
 };
@@ -136,7 +137,7 @@ const CODE_RAISON={
   destinataire_non_prouve:'destinataire',identite_non_confirmee:'destinataire',
   expire:'expire',essais_epuises:'essais_epuises',offre_refusee:'offre_refusee',offre_prix_inconnu:'offre_prix_inconnu',offre_incertaine:'offre_incertaine',creation_non_confirmee:'ouverture',
   quota_extension:'limite_heure',pause_vinted:'vinted_frein',tout_arrete:'tout_arrete',trop_tard:'interrompu',vinted_frein:'vinted_frein',vinted_robot:'vinted_robot',vinted_refus:'vinted_refus',
-  historique_non_verifie:'historique',favori_trop_ancien:'trop_ancien',ecran_inactif:'ecran_quitte',onglet_vinted:'onglet_vinted',
+  historique_non_verifie:'historique',favori_trop_ancien:'trop_ancien',notification_pas_trouvee:'notif_pas_trouvee',ecran_inactif:'ecran_quitte',onglet_vinted:'onglet_vinted',
   compte_vinted_absent:'compte_vinted_absent',compte_vinted_different:'compte_vinted_different',
   extension_indisponible:'extension',session_extension:'session_extension',autorisation_expiree:'arrete',
 };
