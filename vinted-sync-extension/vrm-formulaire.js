@@ -25,7 +25,7 @@
 //  formulaire et la réponse attendue.
 // ════════════════════════════════════════════════════════════════════════════
 (() => {
-  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 8) return;
+  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 9) return;
   const SEL = Object.freeze({
     vendre: 'a[data-testid="header-upload-item-button"]',
     photos: 'input[data-testid="add-photos-input"]',
@@ -200,24 +200,46 @@
       const t = setTimeout(() => fin(null), ms);
     });
   }
-  // Une option d'une liste : d'abord son identifiant dans `data-testid` / `id`, sinon son libellé EXACT.
+  // Une option d'une liste : d'abord son identifiant de Vinted dans `data-testid` / `id` (`-{id}` final), sinon son libellé
+  //  EXACT — jamais par ressemblance. 5.447 (`repubreperage`) : UNE seule option (deux sans lien entre elles ⇒ 'AMBIGU', rien
+  //  n'est cliqué ; une option et son propre contenu ne font qu'une), et cherchée DANS la liste ouverte (`racine`).
   function option(racine, id, libelle) {
     const r = racine || document;
+    const unique = (l) => { const ext = l.filter((el) => !l.some((x) => x !== el && x.contains(el))); return ext.length === 1 ? ext[0] : (ext.length > 1 ? 'AMBIGU' : null); };
     if (id != null && String(id) !== '') {
       const s = String(id);
-      const parId = [...r.querySelectorAll('[data-testid],[id]')].find((el) => {
-        const t = el.getAttribute('data-testid') || '', i = el.id || '';
-        return (new RegExp(`(^|[-_])${s}$`).test(t) || new RegExp(`(^|[-_])${s}$`).test(i)) && visible(el);
-      });
-      if (parId) return parId;
+      if (!/^\d{1,9}$/.test(s)) return null;
+      const re = new RegExp(`(^|[-_])${s}$`);
+      const parId = [...r.querySelectorAll('[data-testid],[id]')].filter((el) => (re.test(el.getAttribute('data-testid') || '') || re.test(el.id || '')) && visible(el));
+      const u = unique(parId);
+      if (u) return u;
     }
     if (libelle) {
       const n = norm(libelle);
       const feuilles = [...r.querySelectorAll('li, div, span, button, label')].filter((el) => visible(el) && norm(el.textContent) === n);
       const plusFin = feuilles.filter((el) => !feuilles.some((x) => x !== el && el.contains(x)));
       if (plusFin.length === 1) return plusFin[0].closest('[role="button"],button,li,[data-testid]') || plusFin[0];
+      if (plusFin.length > 1) return 'AMBIGU';
     }
     return null;
+  }
+  // 5.447 : la liste OUVERTE d'une recherche (catégorie, marque) — le plus proche parent de la recherche qui porte des
+  //  options (jamais au-delà du formulaire de vente) ; sinon le bloc de liste qui l'entoure ; sinon la recherche elle-même.
+  function listeDe(rech) {
+    try {
+      const form = T() && T().formVente ? T().formVente() : document;
+      let e = rech && rech.parentElement;
+      for (let k = 0; e && k < 6 && e !== form && e !== document.body; k++, e = e.parentElement) {
+        if (e.querySelector('[role="option"], li, [data-testid*="row" i], [data-testid*="option" i]')) return e;
+      }
+      return (rech && rech.closest('[role="listbox"], [role="dialog"], [data-testid*="dropdown" i]')) || (rech && rech.parentElement) || null;
+    } catch (_) { return null; }
+  }
+  // 5.447 : UN seul élément pour un sélecteur fait d'un identifiant de Vinted (option de taille, de couleur, d'état) ; deux ⇒ 'AMBIGU'.
+  function seul(sel, racine, voir) {
+    let l = []; try { l = [...(racine || document).querySelectorAll(sel)].filter((el) => !deVrm(el) && (!voir || visible(el))); } catch (_) { l = []; }
+    const ext = l.filter((el) => !l.some((x) => x !== el && x.contains(el)));
+    return ext.length === 1 ? ext[0] : (ext.length > 1 ? 'AMBIGU' : null);
   }
   // ══ 5.433 (`apprisclic`, Julien, 21 nov., choix n° 102) — LES BOUTONS APPRIS DE SON VRAI CLIC ══════════════════════════
   //  Un élément attendu absent (Vinted a changé sa page) : le fond lui a fait TOUCHER le bon bouton une fois (vrm-appris.js,
@@ -472,20 +494,43 @@
   const TROUVES = [];
   let MEMOIRE = {};
   function noterTrouve(nom, r) { try { if (!r) return; TROUVES.push({ nom, s: r.el ? String(r.strategie || '') : '', ambigu: !!r.ambigu, essais: (r.essais || []).map((e) => ({ s: e.s, n: e.n })).slice(0, 8) }); if (TROUVES.length > 12) TROUVES.shift(); } catch (_) {} }
+  // ══ 5.447 (`repubreperage`) — LES ÉLÉMENTS DE LA REPUBLICATION PAR LA COUCHE COMMUNE (vrm-trouver.js) ══════════════════
+  //  `reperer(nomCouche, nomManque, avant, ms, ctx)` : l'élément par `__vrmTrouver.attendre` (plusieurs stratégies, son
+  //  contexte, UN gagnant ; la stratégie retenue passe devant à égalité, jamais pour un geste irréversible). Rend :
+  //   · { el } — le gagnant ; · { el: 'AMBIGU' } — deux candidats : RIEN n'est cliqué, l'étape le dit ;
+  //   · rien trouvé ⇒ l'élément appris de SON clic (choix 102 : unique, visible ; un geste irréversible seulement confirmé
+  //     par lui, `clic` le refuse sinon), puis { absent } ;
+  //   · { captcha } — une vérification visible : arrêt avant tout.
+  //  Sans la couche (un paquet sans vrm-trouver.js) : la règle d'avant (`avant`, sélecteur relevé le 20 nov.).
+  async function reperer(nomT, nomManque, avant, ms, ctx) {
+    const t = T();
+    if (!t || !Array.isArray(t.elements) || !t.elements.includes(nomT)) return attendreN(nomManque, avant, ms == null ? 15000 : ms);
+    const r = await t.attendre(nomT, Object.assign({ prefere: MEMOIRE[nomT] || '' }, ctx || {}), ms == null ? 15000 : ms, captcha);
+    if (r.captcha) return { captcha: true };
+    noterTrouve(nomT, r);
+    if (r.el) return { el: r.el, strategie: r.strategie || '' };
+    if (r.ambigu) return { el: 'AMBIGU', ambigu: true };
+    const a = APPRIS[nomManque] ? apprisEl(nomManque) : null;
+    if (a === 'AMBIGU') return { el: 'AMBIGU', ambigu: true };
+    if (a) return { el: a, appris: true };
+    return { absent: true };
+  }
+  // L'issue commune d'un repérage : captcha, absent ou en double ⇒ l'arrêt nommé (rien n'est touché), sinon null.
+  const issue = (x, nom) => (x.captcha ? vuCaptcha() : x.absent ? manque(nom) : x.el === 'AMBIGU' ? manque(nom + '-ambigu') : null);
   const ETAPES = {
-    async etat() { return { ok: true, chemin: location.pathname, captcha: captcha(), formulaire: !!document.querySelector(SEL.titre) }; },
+    async etat() { return { ok: true, chemin: location.pathname, captcha: captcha(), formulaire: !!(T() && T().elements.includes('titre') ? T().trouver('titre', {}).el : document.querySelector(SEL.titre)) }; },
     async ouvrirVente() {
-      const a = await attendreN('vendre', SEL.vendre); if (a.captcha) return vuCaptcha(); if (a.absent) return manque('vendre');
+      const a = await reperer('vendre', 'vendre', SEL.vendre); { const x = issue(a, 'vendre'); if (x) return x; }
       clic(a.el);
-      const f = await attendreN('titre', SEL.titre, 30000); if (f.captcha) return vuCaptcha(); if (f.absent) return manque('titre');
+      const f = await reperer('titre', 'titre', SEL.titre, 30000); { const x = issue(f, 'titre'); if (x) return x; }
       return { ok: true, chemin: location.pathname };
     },
     async formulairePret() {
-      const f = await attendreN('titre', SEL.titre, 30000); if (f.captcha) return vuCaptcha(); if (f.absent) return manque('titre');
+      const f = await reperer('titre', 'titre', SEL.titre, 30000); { const x = issue(f, 'titre'); if (x) return x; }
       return { ok: true, chemin: location.pathname };
     },
     async photos(d) {
-      const a = await attendreN('photos', SEL.photos); if (a.captcha) return vuCaptcha(); if (a.absent) return manque('photos');
+      const a = await reperer('photos', 'photos', SEL.photos); { const x = issue(a, 'photos'); if (x) return x; }
       const liste = Array.isArray(d && d.photos) ? d.photos : [];
       if (!liste.length) return { ok: false, code: 'photos-absentes' };
       ecouter();
@@ -515,52 +560,57 @@
       const q = d && d.quoi;
       if (captcha()) return vuCaptcha();
       if (q === 'titre' || q === 'description' || q === 'prix') {
-        const a = await attendre(SEL[q]); if (a.captcha) return vuCaptcha(); if (a.absent) return manque(q);
+        const a = await reperer(q, q, SEL[q]); { const x = issue(a, q); if (x) return x; }
         const v = q === 'prix' ? String(d.valeur).replace('.', ',') : String(d.valeur);
         // 5.437 : titre et prix lettre par lettre (rythme variable) ; la description collée (défaut) ou tapée par rafales.
         const ok = q === 'description' && d.mode !== 'taper' ? await coller(a.el, v) : await saisir(a.el, v, { rythme: q === 'description' ? 'rafales' : 'lettres' });
         return ok ? { ok: true } : { ok: false, code: 'valeur', manque: q };
       }
       if (q === 'categorie') {
-        const a = await attendreN('categorie', SEL.categorie); if (a.captcha) return vuCaptcha(); if (a.absent) return manque('categorie');
+        const a = await reperer('categorie', 'categorie', SEL.categorie); { const x = issue(a, 'categorie'); if (x) return x; }
         clic(a.el);
-        const s = await attendreN('categorie-recherche', SEL.categorieRecherche); if (s.captcha) return vuCaptcha(); if (s.absent) return manque('categorie-recherche');
+        const s = await reperer('categorieRecherche', 'categorie-recherche', SEL.categorieRecherche); { const x = issue(s, 'categorie-recherche'); if (x) return x; }
         await saisir(s.el, String(d.recherche || d.nom || ''), { rythme: 'lettres' });
-        const o = await attendreN('categorie-option', () => { const l = document.querySelector(SEL.categorieListe) || document; return option(l, d.id, d.nom); }, 15000);
-        if (o.captcha) return vuCaptcha(); if (o.absent) return manque('categorie-option');
+        // 5.447 : l'option DANS la liste ouverte (celle de la recherche), par l'identifiant de Vinted ; deux ⇒ rien n'est cliqué.
+        const o = await attendreN('categorie-option', () => { const l = document.querySelector(SEL.categorieListe) || listeDe(s.el) || document; return option(l, d.id, d.nom); }, 15000);
+        { const x = issue(o, 'categorie-option'); if (x) return x; }
         clic(o.el);
         return { ok: true };
       }
       if (q === 'marque') {
-        const a = await attendreN('marque', SEL.marque); if (a.captcha) return vuCaptcha(); if (a.absent) return manque('marque');
+        const a = await reperer('marque', 'marque', SEL.marque); { const x = issue(a, 'marque'); if (x) return x; }
         if (norm(a.el.value) && norm(a.el.value) === norm(d.nom)) return { ok: true, deja: true };
         clic(a.el);
-        const s = await attendreN('marque-recherche', SEL.marqueRecherche); if (s.captcha) return vuCaptcha(); if (s.absent) return manque('marque-recherche');
+        const s = await reperer('marqueRecherche', 'marque-recherche', SEL.marqueRecherche); { const x = issue(s, 'marque-recherche'); if (x) return x; }
         await saisir(s.el, String(d.nom || ''), { rythme: 'lettres' });
-        const o = await attendreN('marque-option', () => option(document, d.id, d.nom), 15000); if (o.captcha) return vuCaptcha(); if (o.absent) return manque('marque-option');
+        // 5.447 : l'option dans la liste de la RECHERCHE de marque (avant : toute la page — un « -53 » d'une autre liste comptait).
+        const o = await attendreN('marque-option', () => option(listeDe(s.el) || document, d.id, d.nom), 15000); { const x = issue(o, 'marque-option'); if (x) return x; }
         clic(o.el);
         return { ok: true };
       }
       if (q === 'taille') {
-        const a = await attendreN('taille', SEL.taille); if (a.captcha) return vuCaptcha(); if (a.absent) return manque('taille');
+        const a = await reperer('taille', 'taille', SEL.taille); { const x = issue(a, 'taille'); if (x) return x; }
+        if (!/^\d{1,9}$/.test(String(d.id))) return manque('taille-option');
         clic(a.el);
-        const o = await attendreN('taille-option', () => [...document.querySelectorAll(`[data-testid$="-grid-option-${String(d.id)}"]`)].find(visible) || null);
-        if (o.captcha) return vuCaptcha(); if (o.absent) return manque('taille-option');
+        const o = await attendreN('taille-option', () => seul(`[data-testid$="-grid-option-${String(d.id)}"]`, document, true));
+        { const x = issue(o, 'taille-option'); if (x) return x; }
         clic(o.el);
         return { ok: true };
       }
       if (q === 'couleurs') {
-        const a = await attendreN('couleur', SEL.couleur); if (a.captcha) return vuCaptcha(); if (a.absent) return manque('couleur');
+        const a = await reperer('couleur', 'couleur', SEL.couleur); { const x = issue(a, 'couleur'); if (x) return x; }
         clic(a.el);
         for (const id of (Array.isArray(d.ids) ? d.ids : []).slice(0, 2)) {
-          const o = await attendreN('couleur-option', `[data-testid="filter-grid-option-${String(id)}"]`); if (o.captcha) return vuCaptcha(); if (o.absent) return manque('couleur-option');
+          if (!/^\d{1,9}$/.test(String(id))) return manque('couleur-option');
+          const o = await attendreN('couleur-option', () => seul(`[data-testid="filter-grid-option-${String(id)}"]`)); { const x = issue(o, 'couleur-option'); if (x) return x; }
           if (o.el.getAttribute('aria-checked') === 'true' || o.el.getAttribute('aria-selected') === 'true') continue;
           clic(o.el); await nap(400);
         }
         return { ok: true };
       }
       if (q === 'colis') {
-        const a = await attendreN('colis', `#package_type_selector_${String(d.id)}`); if (a.captcha) return vuCaptcha(); if (a.absent) return manque('colis');
+        if (!/^\d{1,6}$/.test(String(d.id))) return manque('colis');
+        const a = await reperer('colis', 'colis', `#package_type_selector_${String(d.id)}`, 15000, { id: String(d.id) }); { const x = issue(a, 'colis'); if (x) return x; }
         clic(a.el);
         return { ok: true };
       }
@@ -572,9 +622,10 @@
         return a.el.checked === (d.valeur === true) ? { ok: true } : { ok: false, code: 'valeur', manque: 'unisexe' };
       }
       if (q === 'etat') {
-        const a = await attendreN('etat', SEL.etat); if (a.captcha) return vuCaptcha(); if (a.absent) return manque('etat');
+        const a = await reperer('etat', 'etat', SEL.etat); { const x = issue(a, 'etat'); if (x) return x; }
+        if (!/^\d{1,9}$/.test(String(d.id))) return manque('etat-option');
         clic(a.el);
-        const o = await attendreN('etat-option', `#condition-${String(d.id)}, [data-testid="condition-${String(d.id)}"]`); if (o.captcha) return vuCaptcha(); if (o.absent) return manque('etat-option');
+        const o = await attendreN('etat-option', () => seul(`#condition-${String(d.id)}, [data-testid="condition-${String(d.id)}"]`)); { const x = issue(o, 'etat-option'); if (x) return x; }
         clic(o.el);
         return { ok: true };
       }
@@ -582,7 +633,8 @@
     },
     // Les trois gestes qui écrivent chez Vinted : la page envoie, VRM lit la réponse.
     async brouillon(d) {
-      const b = await attendreN('brouillon', SEL.brouillon); if (b.captcha) return vuCaptcha(); if (b.absent) return manque('brouillon');
+      // 5.447 : un geste qui écrit chez Vinted — UN seul bouton (data-testid relevé ou nom exact), dans le formulaire de vente.
+      const b = await reperer('brouillon', 'brouillon', SEL.brouillon); { const x = issue(b, 'brouillon'); if (x) return x; }
       ecouter();
       const att = reponseDe('POST', /\/api\/v2\/item_upload\/drafts\/?$/, 60000, d && d.cle);
       clic(b.el);
@@ -592,7 +644,7 @@
     async supprimer(d) {
       // 5.414 : la page montrée est celle de CETTE annonce (son identifiant dans l'adresse), sinon rien n'est touché.
       if (!new RegExp(`^/items/${String(d && d.id)}(?:-[^/]*)?/?$`).test(location.pathname)) return { ok: false, code: 'identite', chemin: location.pathname };
-      const b = await attendreN('supprimer', SEL.supprimer, 20000); if (b.captcha) return vuCaptcha(); if (b.absent) return manque('supprimer');
+      const b = await reperer('supprimer', 'supprimer', SEL.supprimer, 20000); { const x = issue(b, 'supprimer'); if (x) return x; }
       ecouter();
       const att = reponseDe('POST', new RegExp(`/api/v2/items/${String(d && d.id)}/delete$`), 60000, d && d.cle);
       clic(b.el);
@@ -600,7 +652,8 @@
       //    seule visible) et doit être UN seul bouton au nom EXACT (5 langues) ou au data-testid de confirmation — jamais le
       //    premier bouton qui CONTIENT « supprimer / confirmer / delete », jamais « Annuler ». Deux candidats ⇒ rien n'est
       //    cliqué (`supprimer-confirmation-ambigue`) : l'annonce n'est pas supprimée, c'est dit.
-      const c = await attendreN('supprimer-confirmation', confirmationSuppression, 15000);
+      //    5.447 : par la couche commune (`supprimerConfirmation`, nom EXACT seulement, dans LA fenêtre, un seul au-dessus du seuil).
+      const c = await reperer('supprimerConfirmation', 'supprimer-confirmation', confirmationSuppression, 15000);
       if (c.el === 'AMBIGU') return manque('supprimer-confirmation-ambigue');
       if (c.captcha) return vuCaptcha(); if (c.absent) return manque('supprimer-confirmation');
       clic(c.el);
@@ -608,7 +661,7 @@
       return r ? (r.captcha ? Object.assign(vuCaptcha(), { parti: true }) : { ok: true, rep: r }) : { ok: false, code: 'sans-reponse', parti: true };
     },
     async publier(d) {
-      const b = await attendreN('ajouter', SEL.ajouter, 30000); if (b.captcha) return vuCaptcha(); if (b.absent) return manque('ajouter');
+      const b = await reperer('ajouter', 'ajouter', SEL.ajouter, 30000); { const x = issue(b, 'ajouter'); if (x) return x; }
       ecouter();
       const att = reponseDe('POST', new RegExp(`/api/v2/item_upload/drafts/${String(d && d.draftId)}/completion$`), 60000, d && d.cle);
       clic(b.el);
@@ -817,8 +870,8 @@
       if (!/^\d{4,15}$/.test(id)) return { ok: false, code: 'etape' };
       if (!new RegExp(`^/items/${id}(?:-[^/]*)?/?$`).test(location.pathname)) return { ok: false, code: 'identite', chemin: location.pathname };
       const re = voulu ? RE_MASQUER : RE_AFFICHER, nom = voulu ? 'masquer' : 'afficher';
-      const b = await attendreN(nom, () => { const x = parNom(re, document, voulu ? /(^|[-_])hide([-_]|$)/i : /(^|[-_])(show|unhide)([-_]|$)/i, voulu ? /unhide|show/i : /(^|[-_])hide([-_]|$)/i); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
-      if (b.captcha) return vuCaptcha(); if (b.absent) return manque(nom); if (b.el === 'AMBIGU') return manque(nom + '-ambigu');
+      const b = await reperer(nom, nom, () => { const x = parNom(re, document, voulu ? /(^|[-_])hide([-_]|$)/i : /(^|[-_])(show|unhide)([-_]|$)/i, voulu ? /unhide|show/i : /(^|[-_])hide([-_]|$)/i); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
+      { const x = issue(b, nom); if (x) return x; }
       ecouter();
       const att = reponseDe('PUT', new RegExp(`/api/v2/items/${id}/is_hidden$`), 30000, d && d.cle);
       clic(b.el);
@@ -877,15 +930,15 @@
       const id = String((d && d.id) || ''), prix = Number(d && d.prix);
       if (!/^\d{4,15}$/.test(id) || !(prix > 0)) return { ok: false, code: 'etape' };
       if (!new RegExp(`^/items/${id}/edit/?$`).test(location.pathname)) return { ok: false, code: 'identite', chemin: location.pathname };
-      const a = await attendreN('prix', SEL.prix, 30000); if (a.captcha) return vuCaptcha(); if (a.absent) return manque('prix');
-      const b0 = await attendreN('enregistrer', SEL.ajouter, 15000); if (b0.captcha) return vuCaptcha(); if (b0.absent) return manque('enregistrer');
+      const a = await reperer('prix', 'prix', SEL.prix, 30000); { const x = issue(a, 'prix'); if (x) return x; }
+      const b0 = await reperer('enregistrer', 'enregistrer', SEL.ajouter, 15000); { const x = issue(b0, 'enregistrer'); if (x) return x; }
       if (d && typeof d.titre === 'string' && d.titre.trim()) {
-        const t = await attendreN('titre', SEL.titre); if (t.captcha) return vuCaptcha(); if (t.absent) return manque('titre');
+        const t = await reperer('titre', 'titre', SEL.titre); { const x = issue(t, 'titre'); if (x) return x; }
         if (!(await saisir(t.el, d.titre))) return { ok: false, code: 'valeur', manque: 'titre' };
       }
       if (!(await saisir(a.el, texteMontant(prix)))) return { ok: false, code: 'valeur', manque: 'prix' };
       if (captcha()) return vuCaptcha();
-      const b = await attendreN('enregistrer', SEL.ajouter, 15000); if (b.captcha) return vuCaptcha(); if (b.absent) return manque('enregistrer');
+      const b = await reperer('enregistrer', 'enregistrer', SEL.ajouter, 15000); { const x = issue(b, 'enregistrer'); if (x) return x; }
       ecouter();
       // 5.423 (`modifavantapres`) : la preuve « nouveau prix tapé » — le champ montre EXACTEMENT le nouveau prix avant « Enregistrer ».
       const tape = Math.round(Number(String(a.el.value || '').replace(/[\s€]/g, '').replace(',', '.')) * 100) === Math.round(prix * 100);
@@ -979,7 +1032,7 @@
       return x ? { ok: true, rep: x } : { ok: false, code: 'sans-reponse' };
     },
   };
-  globalThis.__vrmFormulaireV = 8;   // 5.441 : 8 (confirmation de suppression à bouton unique)   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
+  globalThis.__vrmFormulaireV = 9;   // 5.447 : 9 (republication par la couche commune de repérage)   // 5.441 : 8 (confirmation de suppression à bouton unique)   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
   globalThis.__vrmFormulaireSel = SEL;
   globalThis.__vrmFormulaire = async (etape, d) => {
     if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(location.hostname)) return { ok: false, code: 'hors-vinted' };

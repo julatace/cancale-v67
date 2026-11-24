@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (24 nov., ext. 5.447) docs/passation/2026-11-24-republication-reperage.md
+  { id: 'repub-reperage', date: '2026-11-24', titre: 'Republier : VRM retrouve seul chaque bouton', phrase: 'Un bouton en double ou introuvable : rien ne part, c’est dit.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., ext. 5.441) docs/passation/2026-11-23-favoris-541.md
   { id: 'relances-texte-neuf', date: '2026-11-23', titre: 'Relance : jamais deux fois le même message', phrase: 'Une même personne ne reçoit jamais deux fois le même texte.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md

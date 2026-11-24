@@ -119,7 +119,10 @@ async function ouvrir(b, o = {}) {
   return { ctx, pg, errs };
 }
 // Le service worker, joué ici : il injecte le VRAI fichier puis appelle UNE étape.
+// 5.447 : comme le service worker, la couche de repérage (vrm-trouver.js) d'abord, puis le formulaire.
+const TROUVER_SRC = arg('--trouver') || path.join(EXT, 'vrm-trouver.js');
 async function etape(pg, e, d) {
+  if (fs.existsSync(TROUVER_SRC)) await pg.addScriptTag({ content: fs.readFileSync(TROUVER_SRC, 'utf8') });
   await pg.addScriptTag({ content: fs.readFileSync(FORM_SRC, 'utf8') });
   const t0 = Date.now();
   const r = await pg.evaluate(([e2, d2]) => globalThis.__vrmFormulaire(e2, d2), [e, d || {}]);

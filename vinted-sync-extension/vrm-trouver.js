@@ -25,12 +25,11 @@
 //  Injecté dans le monde de la PAGE (avant vrm-formulaire.js). Il ne clique RIEN, ne lit
 //  ni n'envoie aucune requête : il désigne un élément, le geste reste à l'étape appelante.
 //
-//  Pour la republication (la suite annoncée par Julien), les éléments à brancher ensuite
-//  sont listés dans docs/passation/2026-11-23-favoris-auto.md (« vendre », « titre »,
-//  « photos », « brouillon », « ajouter », « supprimer », « confirmer la suppression »…).
+//  5.447 : la republication y est branchée (vendre, champs, listes, brouillon, ajouter, supprimer et
+//  sa confirmation, enregistrer, masquer / afficher) — docs/passation/2026-11-24-republication-reperage.md.
 // ════════════════════════════════════════════════════════════════════════════
 (() => {
-  if (globalThis.__vrmTrouver && globalThis.__vrmTrouverV === 2) return;
+  if (globalThis.__vrmTrouver && globalThis.__vrmTrouverV === 3) return;
   const norm = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, ' ').trim();
   const deVrm = (el) => { try { return !!(el && el.closest && el.closest('#vrm-travail, [data-vrm-hote], #vrm-action-gel, [data-vrm]')); } catch (_) { return false; } };
   const visible = (el) => {
@@ -91,6 +90,212 @@
     } catch (_) { return false; }
   }
   const leDialogue = () => { const l = [...document.querySelectorAll('[role="dialog"], [aria-modal="true"], [data-testid*="modal" i]')].filter((x) => visible(x)); const fin = l.filter((el) => !l.some((x) => x !== el && el.contains(x))); return fin.length === 1 ? fin[0] : null; };
+
+  // ══ 5.447 (`repubreperage`, Julien, 23 nov. : « l'extension doit pouvoir tout faire sur Vinted ») — LE FORMULAIRE DE VENTE
+  //  Les éléments de la republication (vendre, champs, listes, brouillon, ajouter, supprimer + sa confirmation, enregistrer,
+  //  masquer / afficher) ont plusieurs stratégies comme la cloche, chacune dans SON contexte :
+  //   · le formulaire de vente (le `form` qui porte l'entrée des photos, sinon le `main`) — jamais la recherche du site, jamais
+  //     un champ d'une fenêtre (le prix d'une offre) ;
+  //   · la liste ouverte pour une recherche (catégorie, marque) ;
+  //   · LA fenêtre ouverte (une seule) pour la confirmation de suppression.
+  //  ⚠️ Un geste IRRÉVERSIBLE (`irreversible: true` : brouillon, ajouter, enregistrer, supprimer, sa confirmation) ne se fait
+  //  que sur UN SEUL candidat reconnu par une stratégie FORTE (data-testid relevé exact, ou nom EXACT en 5 langues) :
+  //   · `unique` : un second candidat au-dessus du seuil, même moins bien noté ⇒ `ambigu`, rien n'est cliqué ;
+  //   · la mémoire (la stratégie qui a gagné la dernière fois) ne départage JAMAIS un geste irréversible ;
+  //   · un data-testid partiel n'y compte que comme indice (sous le seuil seul).
+  const RE_SEARCH = /search|recherche|cerca|buscar|such/i;
+  const horsFormulaire = (el) => { try { return !!el.closest('header, [role="banner"], [role="search"], footer, nav') || dansDialogue(el) || /^(search)$/i.test(attr(el, 'type')) || /(^|[-_])search([-_]|$)|search[-_]?(text|input|bar)/i.test(attr(el, 'name') + ' ' + el.id + ' ' + attr(el, 'data-testid')); } catch (_) { return true; } };
+  // Le formulaire de vente : le `form` qui porte l'entrée des photos (un seul), sinon le `main` (un seul), sinon la page.
+  function formVente() {
+    try {
+      const forms = [...new Set([...document.querySelectorAll('input[type="file"]')].filter((x) => !deVrm(x)).map((x) => x.closest('form')).filter(Boolean))];
+      if (forms.length === 1) return forms[0];
+      const mains = [...document.querySelectorAll('main, [role="main"]')].filter((x) => !deVrm(x) && visible(x));
+      const ext = mains.filter((m) => !mains.some((x) => x !== m && x.contains(m)));
+      if (ext.length === 1) return ext[0];
+    } catch (_) {}
+    return document;
+  }
+  // Le libellé d'un champ : `label[for]`, sinon le `label` qui l'entoure (son texte propre), sinon aria-label.
+  function libelle(el) {
+    try {
+      if (el.id) { const l = document.querySelector(`label[for="${CSS.escape(el.id)}"]`); if (l) return norm(l.textContent); }
+      const l = el.closest('label');
+      if (l) { let t = ''; for (const n of l.childNodes) if (n.nodeType === 3 || (n.nodeType === 1 && !n.matches('input, textarea, select, [role="listbox"]') && !n.querySelector('input, textarea, select'))) t += ' ' + (n.textContent || ''); return norm(t); }
+      return norm(attr(el, 'aria-label'));
+    } catch (_) { return ''; }
+  }
+  // La liste ouverte (catégorie, marque…) : un bloc de liste visible qui porte la recherche.
+  const dansListe = (el) => { try { return !!el.closest('[role="listbox"], [role="dialog"], [role="menu"], [data-testid*="dropdown" i], [class*="dropdown" i], [data-testid*="select" i]'); } catch (_) { return false; } };
+  const L = {
+    titre: /^(titre|title|titolo|titulo|titel)$/,
+    description: /^(description|decris ton article|describe your item|descrizione|descripcion|beschreibung|artikelbeschreibung)$/,
+    prix: /^(prix|price|prezzo|precio|preis)$/,
+    categorie: /^(categorie|category|categoria|kategorie)$/,
+    marque: /^(marque|brand|marca|marke)$/,
+    taille: /^(taille|size|taglia|talla|grosse|groesse)$/,
+    couleur: /^(couleur|couleurs|color|colour|colors|colours|colore|colori|farbe|farben)$/,
+    etat: /^(etat|condition|condizioni|stato|estado|zustand)$/,
+    vendre: /^(vends tes articles|vendre|vends|vendre maintenant|sell now|sell|sell your items|vendi|vendi ora|vender|vende ya|vender ahora|verkaufen|jetzt verkaufen)$/,
+    brouillon: /^(sauvegarder le brouillon|enregistrer le brouillon|enregistrer comme brouillon|save draft|save as draft|salva bozza|salva come bozza|guardar borrador|guardar como borrador|als entwurf speichern|entwurf speichern)$/,
+    ajouter: /^(ajouter|publier|mettre en ligne|upload|publish|add|pubblica|carica|subir|publicar|hochladen|veroffentlichen)$/,
+    enregistrer: /^(enregistrer|sauvegarder|mettre a jour|enregistrer les modifications|save|save changes|update|salva|salva modifiche|aggiorna|guardar|guardar cambios|actualizar|speichern|anderungen speichern|aktualisieren)$/,
+    supprimer: /^(supprimer|supprimer l'article|supprimer l'annonce|delete|delete item|delete listing|elimina|elimina articolo|eliminar|eliminar articulo|loschen|artikel loschen)$/,
+    confirmer: /^(supprimer|confirmer|oui|oui, supprimer|confirmer et supprimer|supprimer l'article|supprimer l'annonce|confirmer la suppression|delete|confirm|yes|yes, delete|confirm and delete|delete item|delete listing|confirm deletion|elimina|elimina articolo|conferma|si, elimina|conferma ed elimina|eliminar|eliminar articulo|confirmar|si, eliminar|confirmar y eliminar|loschen|artikel loschen|bestatigen|ja, loschen|bestatigen und loschen)$/,
+    masquer: /^(masquer|masquer l'article|masquer l'annonce|hide|hide item|nascondi|nascondi l'articolo|ocultar|ocultar articulo|ausblenden|artikel ausblenden)$/,
+    afficher: /^(afficher|afficher l'article|afficher l'annonce|rendre visible|show|show item|unhide|mostra|mostra l'articolo|mostrar|mostrar articulo|einblenden|anzeigen|artikel einblenden)$/,
+    annuler: /^(annuler|non|ne pas supprimer|fermer|retour|cancel|no|close|back|keep|annulla|chiudi|cancelar|cerrar|abbrechen|schliessen|zuruck)$/,
+  };
+  // La fenêtre ouverte pour la confirmation de suppression : un VRAI dialogue (rôle ou aria-modal), le plus intérieur, UN seul
+  //  visible ; s'il n'y en a aucun, une fenêtre `data-testid*=modal` seule ; sinon rien (deux fenêtres ⇒ aucune).
+  function fenetreSuppression() {
+    const vrais = [...document.querySelectorAll('[role="dialog"], [aria-modal="true"]')].filter((x) => visible(x));
+    const int = vrais.filter((el) => !vrais.some((x) => x !== el && el.contains(x)));
+    if (int.length === 1) return int[0];
+    if (vrais.length) return null;
+    return leDialogue();
+  }
+  // Un champ du formulaire de vente (titre, description, prix) : id / name / data-testid / libellé exact.
+  const champ = (cle, id, reTestid) => ({
+    candidats: 'input, textarea, [contenteditable="true"]',
+    racine: () => formVente(),
+    garder: (el) => !horsFormulaire(el) && !el.disabled && !el.readOnly && !/^(file|hidden|checkbox|radio|submit|button)$/i.test(attr(el, 'type')),
+    strategies: [
+      ['id', 5, (el) => el.id === id],
+      ['name', 4, (el) => attr(el, 'name') === id],
+      ['testid', 4, (el) => reTestid.test(attr(el, 'data-testid'))],
+      ['label', 4, (el) => L[cle].test(libelle(el))],
+    ],
+    bonus: () => 0,
+    seuil: 4,
+  });
+  // Un « ouvreur » de liste du formulaire (catégorie, marque, taille, couleur, état) : il ouvre la liste, rien n'est écrit.
+  const ouvreur = (cle, id, reTestid) => ({
+    candidats: 'input, button, [role="button"], [role="combobox"], [aria-haspopup]',
+    racine: () => formVente(),
+    garder: (el) => !horsFormulaire(el) && !RE_SEARCH.test(el.id + ' ' + attr(el, 'data-testid') + ' ' + attr(el, 'name')) && !/^(file|hidden|checkbox|radio)$/i.test(attr(el, 'type')),
+    strategies: [
+      ['id', 5, (el) => el.id === id],
+      ['testid', 4, (el) => reTestid.test(attr(el, 'data-testid'))],
+      ['label', 4, (el) => L[cle].test(libelle(el))],
+      ['name', 3, (el) => attr(el, 'name') === id || attr(el, 'name') === id + '_id'],
+    ],
+    bonus: () => 0,
+    seuil: 4,
+  });
+  // La recherche d'une liste ouverte (catégorie, marque) : visible, DANS la liste, jamais la recherche du site.
+  const recherche = (id, reTestid) => ({
+    candidats: 'input',
+    garder: (el) => !el.closest('header, [role="banner"], [role="search"], footer, nav') && !el.disabled && !/^(file|hidden|checkbox|radio|submit)$/i.test(attr(el, 'type')),
+    strategies: [
+      ['id', 5, (el) => el.id === id],
+      ['testid', 4, (el) => reTestid.test(attr(el, 'data-testid'))],
+      ['liste', 3, (el) => dansListe(el) && (attr(el, 'type') === 'search' || RE_SEARCH.test(attr(el, 'placeholder') + ' ' + attr(el, 'aria-label') + ' ' + el.id + ' ' + attr(el, 'data-testid')))],
+    ],
+    bonus: () => 0,
+    seuil: 3,
+  });
+  // Un bouton d'un geste IRRÉVERSIBLE : data-testid relevé EXACT ou nom EXACT (5 langues), un seul au-dessus du seuil.
+  const irreversible = (racine, testid, reNom, reTestidPartiel, garder) => ({
+    candidats: 'button, [role="button"], a[href], input[type="submit"]',
+    racine,
+    garder: (el) => actif(el) && !deVrm(el) && garder(el),
+    strategies: [
+      ['testid', 5, (el) => !!testid && attr(el, 'data-testid') === testid],
+      ['nom', 5, (el) => reNom.test(norm(nomAcc(el) || attr(el, 'value')))],
+      ['indice', 1, (el) => !!reTestidPartiel && reTestidPartiel.test(attr(el, 'data-testid'))],
+    ],
+    bonus: () => 0,
+    seuil: 5,
+    unique: true,
+    irreversible: true,
+  });
+  const REPUB = {
+    vendre: {
+      candidats: 'a[href], button, [role="button"]',
+      garder: (el) => !el.closest('footer') && !dansDialogue(el),
+      strategies: [
+        ['testid', 5, (el) => attr(el, 'data-testid') === 'header-upload-item-button'],
+        ['lien', 4, (el) => el.tagName === 'A' && /^\/items\/new$/.test(chemin(el))],
+        ['nom', 4, (el) => L.vendre.test(norm(nomAcc(el)))],
+        ['indice', 2, (el) => /upload[-_]?item|sell[-_]?(button|cta)/i.test(attr(el, 'data-testid'))],
+      ],
+      bonus: (el) => (enTete(el) ? 1 : 0),
+      seuil: 4,
+    },
+    titre: champ('titre', 'title', /^title(--input)?$|(^|[-_])title[-_]?input$/),
+    description: champ('description', 'description', /^description(--input)?$|(^|[-_])description[-_]?input$/),
+    prix: champ('prix', 'price', /^price(-input)?(--input)?$|(^|[-_])price[-_]?input/),
+    // L'entrée des photos est souvent CACHÉE (un bouton la déclenche) : comptée même sans boîte, jamais une entrée de VRM.
+    photos: {
+      candidats: 'input[type="file"]',
+      cache: true,
+      racine: () => formVente(),
+      garder: (el) => !el.disabled && !el.closest('header, [role="banner"], footer') && !dansDialogue(el),
+      strategies: [
+        ['testid', 5, (el) => attr(el, 'data-testid') === 'add-photos-input'],
+        ['indice', 3, (el) => /photo|image|picture/i.test(attr(el, 'data-testid') + ' ' + attr(el, 'name') + ' ' + el.id)],
+        ['image', 2, (el) => /image/i.test(attr(el, 'accept')) && el.multiple],
+      ],
+      bonus: () => 0,
+      seuil: 2,
+    },
+    categorie: ouvreur('categorie', 'category', /^catalog-select-dropdown-input$|(^|[-_])(category|catalog)[-_](select|input)/),
+    categorieRecherche: recherche('catalog-search-input', /catalog[-_]?search|search[-_]?catalog/i),
+    marque: ouvreur('marque', 'brand', /(^|[-_])brand[-_](select|input)|^brand(--input)?$/),
+    marqueRecherche: recherche('brand-search-input', /brand[-_]?search|search[-_]?brand/i),
+    taille: ouvreur('taille', 'size', /size[-_].*(grid|select)[-_]?input|^size(--input)?$/),
+    couleur: ouvreur('couleur', 'color', /^colou?r[-_](select[-_])?(dropdown[-_])?input|^colou?r(--input)?$/),
+    etat: ouvreur('etat', 'condition', /condition[-_].*(list|select)[-_]?input|^condition(--input)?$/),
+    // Le format du colis : l'option de Vinted par SON identifiant (`ctx.id`), une seule.
+    colis: {
+      candidats: 'input, button, [role="radio"], [role="button"], label',
+      cache: true,
+      racine: () => formVente(),
+      garder: (el) => !el.closest('header, [role="banner"], footer') && !dansDialogue(el),
+      strategies: [
+        ['id', 5, (el, c) => /^\d{1,6}$/.test(String(c.id)) && el.id === 'package_type_selector_' + c.id],
+        ['testid', 5, (el, c) => /^\d{1,6}$/.test(String(c.id)) && new RegExp(`^package[-_]type[-_]selector[-_]${c.id}(--input)?$`).test(attr(el, 'data-testid'))],
+      ],
+      bonus: () => 0,
+      seuil: 5,
+      unique: true,
+    },
+    brouillon: irreversible(() => formVente(), 'upload-form-save-draft-button', L.brouillon, /save[-_]?draft|draft[-_]?button/i,
+      (el) => !horsFormulaire(el) && !/cancel|annul|delete|remove/i.test(attr(el, 'data-testid'))),
+    ajouter: irreversible(() => formVente(), 'upload-form-save-button', L.ajouter, /upload[-_]form[-_]save|submit/i,
+      (el) => !horsFormulaire(el) && !/draft|cancel|annul|delete|remove|photo/i.test(attr(el, 'data-testid')) && !L.brouillon.test(norm(nomAcc(el)))),
+    enregistrer: irreversible(() => formVente(), 'upload-form-save-button', L.enregistrer, /upload[-_]form[-_]save|submit/i,
+      (el) => !horsFormulaire(el) && !/draft|cancel|annul|delete|remove|photo/i.test(attr(el, 'data-testid')) && !L.brouillon.test(norm(nomAcc(el)))),
+    // « Supprimer » de la page de CETTE annonce (l'étape vérifie l'adresse) : hors fenêtre, hors en-tête.
+    supprimer: irreversible(() => document, 'item-delete-button', L.supprimer, /(^|[-_])delete([-_]|$)/i,
+      (el) => !dansDialogue(el) && !el.closest('header, [role="banner"], footer') && !/cancel|confirm|modal/i.test(attr(el, 'data-testid'))),
+    // La confirmation : DANS la fenêtre ouverte (une seule), nom EXACT ; jamais « Annuler / Ne pas supprimer ».
+    supprimerConfirmation: irreversible(() => fenetreSuppression(), '', L.confirmer, /delete[-_]?(modal[-_]?)?confirm|confirm[-_]?(delete|deletion|button)/i,
+      (el) => !/cancel|close|annul|dismiss|back|keep/i.test(attr(el, 'data-testid')) && !L.annuler.test(norm(nomAcc(el)))),
+    masquer: {
+      candidats: 'button, [role="button"], a[href]',
+      garder: (el) => actif(el) && !dansDialogue(el) && !el.closest('header, [role="banner"], footer') && !/unhide|show/i.test(attr(el, 'data-testid')),
+      strategies: [
+        ['nom', 5, (el) => L.masquer.test(norm(nomAcc(el)))],
+        ['testid', 4, (el) => /(^|[-_])hide([-_]|$)/i.test(attr(el, 'data-testid'))],
+      ],
+      bonus: () => 0,
+      seuil: 4,
+      unique: true,
+    },
+    afficher: {
+      candidats: 'button, [role="button"], a[href]',
+      garder: (el) => actif(el) && !dansDialogue(el) && !el.closest('header, [role="banner"], footer') && !/(^|[-_])hide([-_]|$)/i.test(attr(el, 'data-testid')),
+      strategies: [
+        ['nom', 5, (el) => L.afficher.test(norm(nomAcc(el)))],
+        ['testid', 4, (el) => /(^|[-_])(show|unhide)([-_]|$)/i.test(attr(el, 'data-testid'))],
+      ],
+      bonus: () => 0,
+      seuil: 4,
+      unique: true,
+    },
+  };
 
   // ── Le catalogue des éléments. Chaque stratégie : [nom, poids, test(candidat, ctx)]. ─────────────
   const ELEMENTS = {
@@ -174,6 +379,7 @@
       bonus: () => 0,
       seuil: 5,
     },
+    ...REPUB,
   };
 
   // La version de la page (le numéro de build que Vinted sert) : la mémoire est rangée par version.
@@ -192,7 +398,7 @@
     if (!def) return { el: null, nom, inconnu: true, essais: [] };
     let racine = document;
     if (def.racine) { racine = def.racine(); if (!racine) return { el: null, nom, essais: [{ s: 'racine', n: 0 }] }; }
-    const tous = [...racine.querySelectorAll(def.candidats)].slice(0, 4000).filter((el) => visible(el) && (!def.garder || def.garder(el, c)));
+    const tous = [...racine.querySelectorAll(def.candidats)].slice(0, 4000).filter((el) => (def.cache ? el.isConnected && !deVrm(el) : visible(el)) && (!def.garder || def.garder(el, c)));
     const essais = def.strategies.map(([s]) => ({ s, n: 0 }));
     const notes = [];
     for (const el of tous) {
@@ -200,13 +406,16 @@
       def.strategies.forEach(([s, poids, test], i) => { let ok = false; try { ok = !!test(el, c); } catch (_) { ok = false; } if (ok) { score += poids; vues.push(s); essais[i].n++; } });
       if (!vues.length) continue;
       score += def.bonus ? def.bonus(el, c) : 0;
-      if (c.prefere && vues.includes(c.prefere)) score += 0.5;   // la stratégie qui a marché la dernière fois : à égalité, elle passe devant
+      // La stratégie qui a marché la dernière fois : à égalité, elle passe devant — JAMAIS pour un geste irréversible (5.447).
+      if (c.prefere && !def.irreversible && vues.includes(c.prefere)) score += 0.5;
       notes.push({ el, score, vues });
     }
     // Un candidat qui CONTIENT un autre candidat retenu : l'élément cliquable le plus extérieur seul (une icône dans son bouton).
     const ok = notes.filter((x) => x.score >= def.seuil);
     const ext = ok.filter((x) => !ok.some((y) => y !== x && y.el.contains(x.el)));
     if (!ext.length) return { el: null, nom, essais, vus: notes.length };
+    // 5.447 : un élément `unique` (gestes irréversibles) — un SECOND candidat au-dessus du seuil, même moins bien noté ⇒ ambigu.
+    if (def.unique && ext.length > 1) return { el: null, nom, ambigu: true, essais, n: ext.length };
     const max = Math.max(...ext.map((x) => x.score));
     const meilleurs = ext.filter((x) => x.score === max);
     if (meilleurs.length !== 1) return { el: null, nom, ambigu: true, essais, n: meilleurs.length };
@@ -235,6 +444,6 @@
     });
   }
 
-  globalThis.__vrmTrouver = { trouver, attendre, versionPage, elements: Object.keys(ELEMENTS), RE_CLOCHE, RE_VOIR_TOUT: LANGUES.voirTout };
-  globalThis.__vrmTrouverV = 2;   // 5.441 : la position de la cloche (entre l'enveloppe et le cœur)
+  globalThis.__vrmTrouver = { trouver, attendre, versionPage, formVente, elements: Object.keys(ELEMENTS), irreversibles: Object.keys(ELEMENTS).filter((k) => ELEMENTS[k].irreversible), RE_CLOCHE, RE_VOIR_TOUT: LANGUES.voirTout };
+  globalThis.__vrmTrouverV = 3;   // 5.447 : le formulaire de vente (republication) ; 5.441 : 2, la position de la cloche
 })();
