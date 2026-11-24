@@ -355,7 +355,7 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
           <Cote src={a.photo} Photo={Photo} legende={siteCompte(a)} sous={a.titre}/>
           {article ? <Cote src={article.photo} Photo={Photo} legende={<><Plaque numero={article.numero}/> {origineTxt(article)}</>} sous={article.titre}/> : null}
         </Face>
-        <p className="n-lia-phrase" data-liaison-fiche-etat={entree.etat}>
+        <p className="n-lia-phrase" data-liaison-fiche-etat={entree.etat} data-liaison-preuve={entree.etat === 'relie' && entree.preuve ? entree.preuve : undefined}>
           {entree.etat === 'propre' ? (entree.numero ? tr('liaE.seuleNumero', { site: a.plateforme, numero: entree.numero }) : tr('liaE.seule', { site: a.plateforme })) : entree.etat === 'aVerifier' ? tr('liaE.aVerifier') : tr('liaE.relie', { numero: entree.numero })}
           {entree.etat === 'relie' && entree.preuve ? <span className="n-lia-legende-sous">{faits(tr('lia.preuve.' + entree.preuve), dateCourte(entree.lieLe))}</span> : null}
         </p>
