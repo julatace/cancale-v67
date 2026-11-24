@@ -28,11 +28,27 @@
 //  Pour la republication (la suite annoncée par Julien), les éléments à brancher ensuite
 //  sont listés dans docs/passation/2026-11-23-favoris-auto.md (« vendre », « titre »,
 //  « photos », « brouillon », « ajouter », « supprimer », « confirmer la suppression »…).
+//
+//  ══ 5.448 (`adaptatif`, 24 nov.) — TOUS LES SITES ══════════════════════════════════════════
+//  Julien : « elle doit pouvoir marcher sur tous les sites, s'adapter » ; « hors de question
+//  qu'il y ait encore une erreur ». La même couche sert maintenant Vinted, Leboncoin, Vestiaire
+//  et eBay, dans le monde de la PAGE (Vinted) comme dans le monde ISOLÉ des scripts de contenu
+//  (Leboncoin, Vestiaire, eBay) — elle ne lit que le DOM :
+//   · une TABLE PAR SITE (`ctx.site` ou « site.élément ») : Vinted (+ vendre, titre, description,
+//     prix, photos, brouillon, publier, enregistrer, supprimer, confirmer la suppression),
+//     Leboncoin (champ du message, « Envoyer », champ du prix), Vestiaire (champ du message,
+//     « Envoyer »), eBay (titre, description, prix, référence) ;
+//   · `souple(sig)` : un geste APPRIS (la « signature » de son propre clic : balise, quelques
+//     attributs, le mot du bouton) que la page a un peu changé — un attribut renommé, une classe —
+//     est retrouvé par ce qui reste : chaque morceau de la signature encore vrai donne des points,
+//     le mot du bouton (ou son nom accessible) est EXIGÉ quand il a été appris, et le meilleur
+//     gagne s'il est SEUL ; sinon rien ;
+//   · ne clique RIEN, ne lit ni n'envoie aucune requête (inchangé).
 // ════════════════════════════════════════════════════════════════════════════
 (() => {
-  if (globalThis.__vrmTrouver && globalThis.__vrmTrouverV === 1) return;
+  if (globalThis.__vrmTrouver && globalThis.__vrmTrouverV >= 2) return;
   const norm = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, ' ').trim();
-  const deVrm = (el) => { try { return !!(el && el.closest && el.closest('#vrm-travail, [data-vrm-hote], #vrm-action-gel, [data-vrm]')); } catch (_) { return false; } };
+  const deVrm = (el) => { try { return !!(el && el.closest && el.closest('#vrm-travail, [data-vrm-hote], #vrm-action-gel, [data-vrm], #vrm-badge, [id^="vrm-"]')); } catch (_) { return false; } };
   const visible = (el) => {
     try {
       if (!el || !el.isConnected || deVrm(el)) return false;
@@ -65,6 +81,24 @@
   const enTete = (el) => { try { if (el.closest('header, [role="banner"], [data-testid*="header" i]')) return true; const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= 140; } catch (_) { return false; } };
   const chemin = (a) => { try { const u = new URL(a.href, location.href); return u.origin === location.origin ? u.pathname.replace(/\/+$/, '') : ''; } catch (_) { return ''; } };
   // Un compteur (« 3 », « 9+ ») posé dans l'élément : la cloche et l'enveloppe en portent un.
+  // 5.448 : le LIBELLÉ d'un champ (ce que la page dit de lui) : nom accessible, <label>, indication, nom, identifiant.
+  const libelle = (el) => {
+    let t = '';
+    try {
+      const ids = attr(el, 'aria-labelledby').trim().split(/\s+/).filter(Boolean);
+      for (const i of ids) { const x = document.getElementById(i); if (x) t += ' ' + (x.textContent || ''); }
+      t += ' ' + attr(el, 'aria-label');
+      if (el.labels && el.labels.length) for (const l of el.labels) t += ' ' + (l.textContent || '');
+      else { const l = el.closest && el.closest('label'); if (l) t += ' ' + (l.textContent || ''); }
+    } catch (_) {}
+    return norm(t);
+  };
+  const indication = (el) => norm(attr(el, 'placeholder') + ' ' + attr(el, 'aria-placeholder') + ' ' + attr(el, 'data-placeholder'));
+  const cles = (el) => norm([attr(el, 'name'), el.id || '', attr(el, 'data-testid'), attr(el, 'data-qa-id'), attr(el, 'data-test'), attr(el, 'data-cy')].join(' '));
+  // Un champ de RECHERCHE ou de FILTRE n'est jamais un champ de dépôt (le prix d'une paire tombé dans « Prix max », mesuré).
+  const RE_PAS_DEPOT = /recherch|search|\bmin\b|\bmax\b|_min\b|_max\b|min_|max_|filtr|filter|\btri\b|sort|code.?postal|zip|mot.?cl|keyword|_nkw|\bq\b/;
+  const horsDepot = (el) => { try { return !!el.closest('header, footer, nav, [role="search"], [role="banner"], [role="navigation"], #gh') || RE_PAS_DEPOT.test(cles(el) + ' ' + indication(el) + ' ' + norm(attr(el, 'aria-label')) + ' ' + norm(attr(el, 'type'))); } catch (_) { return true; } };
+  const saisissable = (el) => !el.disabled && !el.readOnly && attr(el, 'type') !== 'hidden';
   const compteur = (el) => { try { return [...el.querySelectorAll('span, div, sup')].some((x) => /^\d{1,3}\+?$/.test(String(x.textContent || '').trim()) && x.children.length === 0); } catch (_) { return false; } };
 
   const LANGUES = {
@@ -75,6 +109,13 @@
   const RE_ENVOYER = /^(envoyer|envoyer le message|send|send message|invia|invia messaggio|enviar|enviar mensaje|senden|nachricht senden)$/;
   const RE_FAIRE_OFFRE = /^(faire une offre|proposer un prix|proposer une offre|make an offer|offer a price|fai un'offerta|fare un'offerta|proponi un prezzo|hacer una oferta|haz una oferta|proponer un precio|preis vorschlagen|angebot machen|ein angebot machen)$/;
   const RE_VALIDER_OFFRE = /^(proposer|envoyer|envoyer l'offre|faire l'offre|faire une offre|proposer l'offre|offer|send|send offer|make offer|make an offer|submit|invia|invia offerta|proponi|enviar|enviar oferta|ofrecer|senden|angebot senden|anbieten)$/;
+  // 5.448 : les noms exacts des boutons de la republication et du dépôt (5 langues, accents et casse retirés).
+  const RE_VENDRE = /^(vends tes articles|vendre|vends|vends maintenant|sell now|sell|sell your items|vendi|vendi ora|vendi subito|vender|vende ya|vende ahora|verkaufen|jetzt verkaufen)$/;
+  const RE_BROUILLON = /^(enregistrer (le |en |comme )?brouillon|sauvegarder (le |en |comme )?brouillon|brouillon|save (as )?(a )?draft|save draft|salva (come )?bozza|salva bozza|guardar (como )?borrador|guardar borrador|als entwurf speichern|entwurf speichern)$/;
+  const RE_PUBLIER = /^(ajouter|publier|mettre en ligne|upload|add|add item|publish|post|list item|carica|pubblica|aggiungi|subir|publicar|anadir|hochladen|veroffentlichen|hinzufugen)$/;
+  const RE_ENREGISTRER = /^(enregistrer|enregistrer les modifications|sauvegarder|mettre a jour|save|save changes|update|salva|salva modifiche|aggiorna|guardar|guardar cambios|actualizar|speichern|anderungen speichern|aktualisieren)$/;
+  const RE_SUPPRIMER = /^(supprimer|supprimer l'article|supprimer l'annonce|delete|delete item|delete listing|elimina|elimina articolo|elimina l'articolo|eliminar|eliminar articulo|eliminar el articulo|loschen|artikel loschen)$/;
+  const RE_CONFIRMER_SUPPRESSION = /^(supprimer|oui, supprimer|confirmer|confirmer la suppression|supprimer l'article|delete|yes, delete|confirm|delete item|elimina|si, elimina|conferma|eliminar|si, eliminar|confirmar|loschen|ja, loschen|bestatigen)$/;
   const RE_PLACEHOLDER_MSG = /(ecris|ecrire|message|write|type|scrivi|messaggio|escribe|mensaje|schreib|nachricht)/;
   const dansDialogue = (el) => { try { return !!el.closest('[role="dialog"],[aria-modal="true"]'); } catch (_) { return false; } };
   const leDialogue = () => { const l = [...document.querySelectorAll('[role="dialog"], [aria-modal="true"], [data-testid*="modal" i]')].filter((x) => visible(x)); const fin = l.filter((el) => !l.some((x) => x !== el && el.contains(x))); return fin.length === 1 ? fin[0] : null; };
@@ -158,7 +199,122 @@
       bonus: () => 0,
       seuil: 5,
     },
+
+    // ── 5.448 : la republication et le dépôt (Vinted). Un sélecteur fixe (data-testid, #id) passe toujours en premier
+    //    dans vrm-formulaire.js ; ces tables prennent le relais quand Vinted l'a renommé. ──────────────────────────
+    // « Vendre » de l'en-tête (le lien vers le formulaire de dépôt).
+    vendre: {
+      candidats: 'a[href], button, [role="button"]',
+      garder: (el) => !dansDialogue(el) && !el.closest('footer'),
+      strategies: [
+        ['lien', 4, (el) => el.tagName === 'A' && /^\/items\/new$/.test(chemin(el))],
+        ['nom', 4, (el) => RE_VENDRE.test(norm(nomAcc(el)))],
+        ['testid', 4, (el) => /upload[-_]?item|sell[-_]?(button|cta|now)/.test(norm(attr(el, 'data-testid')))],
+      ],
+      bonus: (el) => (enTete(el) ? 1 : 0),
+      seuil: 4,
+    },
+    titre: champ({ cle: /(^|[\s_-])title($|[\s_-])/, lib: /^(titre|title|titolo|titulo|titel)\b/, sauf: /sub|sous/ }),
+    description: champ({ cle: /description/, lib: /^(description|decris ton article|descrizione|descripcion|beschreibung)\b/, zone: true }),
+    prix: champ({ cle: /(^|[\s_-])price($|[\s_-])|^prix$/, lib: /^(prix|price|prezzo|precio|preis)\b/, nombre: true }),
+    // Le champ des photos : un <input type="file"> (caché par la page derrière son bouton : `cache`).
+    photos: {
+      candidats: 'input[type="file"]',
+      cache: true,
+      garder: (el) => !el.disabled && !el.closest('header, footer, [role="search"]'),
+      strategies: [
+        ['testid', 4, (el) => /photo|image|picture|upload/.test(cles(el))],
+        ['accepte', 3, (el) => /image/.test(norm(attr(el, 'accept')))],
+        ['multiple', 1, (el) => el.hasAttribute('multiple')],
+      ],
+      bonus: () => 0,
+      seuil: 3,
+    },
+    brouillon: bouton({ nom: RE_BROUILLON, testid: /draft/, sauf: /delete|supprim|cancel|annul/ }),
+    publier: bouton({ nom: RE_PUBLIER, testid: /(save|submit|publish|upload)[-_]?(button|cta)|upload[-_]?form[-_]?save/, sauf: /draft|brouillon|delete|cancel|annul|photo/, soumettre: true }),
+    enregistrer: bouton({ nom: RE_ENREGISTRER, testid: /(save|submit)[-_]?(button|cta|changes)|upload[-_]?form[-_]?save/, sauf: /draft|brouillon|delete|cancel|annul|photo/, soumettre: true }),
+    // « Supprimer » de la page de l'annonce (l'étape vérifie avant que la page est celle de CETTE annonce).
+    supprimer: bouton({ nom: RE_SUPPRIMER, testid: /(^|[-_])delete([-_]|$)|delete[-_]?(button|item|cta)|item[-_]?delete/, sauf: /cancel|annul|photo|image/, seuil: 4 }),
+    // « Supprimer » / « Confirmer » de la fenêtre de confirmation : DANS la seule fenêtre ouverte, jamais « Annuler ».
+    supprimerConfirmer: Object.assign(bouton({ nom: RE_CONFIRMER_SUPPRESSION, testid: /delete|confirm|supprim/, sauf: /cancel|annul|close|ferme|back|retour/, seuil: 4, dialogue: true }), { racine: () => leDialogue() }),
   };
+
+  // ── Fabriques : un BOUTON (nom accessible EXACT en 5 langues, data-testid, mots interdits) et un CHAMP (clés, libellé,
+  //    indication) — même règle partout : plusieurs stratégies, un seuil, un seul gagnant. ──────────────────────────
+  function bouton(o) {
+    return {
+      candidats: 'button, [role="button"], input[type="submit"], a[href]',
+      garder: (el) => actif(el) && (o.dialogue || !dansDialogue(el)) && !el.closest('header, footer, nav, [role="search"]') && !(o.sauf && o.sauf.test(norm(attr(el, 'data-testid') + ' ' + nomAcc(el) + ' ' + attr(el, 'value')))),
+      strategies: [
+        ['nom', 5, (el) => o.nom.test(norm(nomAcc(el) || attr(el, 'value')))],
+        ['testid', 4, (el) => !!o.testid && o.testid.test(norm(attr(el, 'data-testid') + ' ' + attr(el, 'data-qa-id') + ' ' + attr(el, 'data-test')))],
+        ['soumettre', 1, (el) => !!o.soumettre && attr(el, 'type') === 'submit'],
+      ],
+      bonus: () => 0,
+      seuil: o.seuil || 5,
+    };
+  }
+  function champ(o) {
+    return {
+      candidats: o.zone ? 'textarea, [contenteditable="true"], [role="textbox"]' : 'input, textarea',
+      garder: (el) => saisissable(el) && !dansDialogue(el) && !horsDepot(el) && !/^(checkbox|radio|file|submit|button|image|hidden|range|color)$/i.test(attr(el, 'type')) && !(o.sauf && o.sauf.test(cles(el) + ' ' + libelle(el))),
+      strategies: [
+        ['cle', 4, (el) => o.cle.test(cles(el))],
+        ['libelle', 4, (el) => o.lib.test(libelle(el))],
+        ['indication', 2, (el) => o.lib.test(indication(el))],
+        ['genre', 1, (el) => (o.zone ? el.tagName === 'TEXTAREA' || el.isContentEditable === true : o.nombre ? /^(decimal|numeric)$/.test(attr(el, 'inputmode')) || attr(el, 'type') === 'number' : el.tagName === 'INPUT')],
+      ],
+      bonus: () => 0,
+      seuil: 4,
+    };
+  }
+
+  // ── 5.448 : LES AUTRES SITES. Mêmes règles ; seuls les noms, les contextes et les exclusions changent. ───────────
+  const CHAMP_MESSAGE_COMMUN = {
+    candidats: 'textarea, [contenteditable="true"], [role="textbox"]',
+    garder: (el) => !dansDialogue(el) && saisissable(el) && !/search|recherche/i.test(attr(el, 'type') + ' ' + attr(el, 'name') + ' ' + attr(el, 'data-testid') + ' ' + attr(el, 'data-qa-id') + ' ' + attr(el, 'aria-label')) && !el.closest('header, [role="banner"], [role="search"]'),
+    strategies: [
+      ['testid', 4, (el) => /(message|conversation|reply|composer|chat|messaging)/.test(cles(el))],
+      ['indication', 3, (el) => RE_PLACEHOLDER_MSG.test(indication(el) + ' ' + norm(attr(el, 'aria-label')))],
+      ['zone', 2, (el) => el.tagName === 'TEXTAREA' || el.isContentEditable === true],
+      ['formulaire', 1, (el) => !!el.closest('form')],
+    ],
+    bonus: () => 0,
+    seuil: 3,
+  };
+  const SITES = {
+    vinted: ELEMENTS,
+    lbc: {
+      champMessage: CHAMP_MESSAGE_COMMUN,
+      envoyer: ELEMENTS.envoyer,
+      champPrix: champ({ cle: /(^|[\s_-])(price|prix)($|[\s_-])/, lib: /^(prix|price|prezzo|precio|preis)\b/, nombre: true }),
+    },
+    vc: {
+      champMessage: CHAMP_MESSAGE_COMMUN,
+      envoyer: ELEMENTS.envoyer,
+    },
+    ebay: {
+      titre: champ({ cle: /(^|[\s_-])title($|[\s_-])|^titre$/, lib: /^(titre|title|titolo|titulo|titel)\b/, sauf: /sub|sous/ }),
+      description: champ({ cle: /description/, lib: /^(description|descrizione|descripcion|beschreibung)\b/, zone: true }),
+      prix: champ({ cle: /(^|[\s_-])(price|prix|startprice|binprice)($|[\s_-])|buy.?it.?now|start.?price/, lib: /^(prix|price|prezzo|precio|preis|sofort-kaufen)\b/, nombre: true }),
+      sku: champ({ cle: /(^|[\s_-])sku($|[\s_-])|custom.?label/, lib: /^(sku|reference|etiquette personnalisee|custom label|etichetta personalizzata|etiqueta personalizada|bestandseinheit)\b/ }),
+    },
+  };
+  // Le site d'une page (le nom d'hôte) : la table à prendre quand l'appelant ne l'a pas dit.
+  function siteIci() {
+    const h = String((typeof location !== 'undefined' && location.hostname) || '');
+    if (/(^|\.)leboncoin\.fr$/.test(h)) return 'lbc';
+    if (/(^|\.)vestiairecollective\.com$/.test(h)) return 'vc';
+    if (/(^|\.)ebay\.[a-z.]+$/.test(h)) return 'ebay';
+    return 'vinted';
+  }
+  function definition(nom, c) {
+    let site = c.site || '', n = String(nom || '');
+    if (n.includes('.')) { const [a, b] = n.split('.'); site = a; n = b; }
+    if (!site) site = SITES.vinted[n] ? 'vinted' : siteIci();
+    const t = SITES[site];
+    return t && Object.prototype.hasOwnProperty.call(t, n) ? t[n] : null;
+  }
 
   // La version de la page (le numéro de build que Vinted sert) : la mémoire est rangée par version.
   function versionPage() {
@@ -171,12 +327,13 @@
 
   // UN passage : les candidats, leurs points, le gagnant s'il est seul.
   function trouver(nom, ctx) {
-    const def = ELEMENTS[nom];
     const c = ctx || {};
+    const def = definition(nom, c);
     if (!def) return { el: null, nom, inconnu: true, essais: [] };
     let racine = document;
     if (def.racine) { racine = def.racine(); if (!racine) return { el: null, nom, essais: [{ s: 'racine', n: 0 }] }; }
-    const tous = [...racine.querySelectorAll(def.candidats)].slice(0, 4000).filter((el) => visible(el) && (!def.garder || def.garder(el, c)));
+    const vu = def.cache ? (el) => !!(el && el.isConnected && !deVrm(el)) : visible;
+    const tous = [...racine.querySelectorAll(def.candidats)].slice(0, 4000).filter((el) => vu(el) && (!def.garder || def.garder(el, c)));
     const essais = def.strategies.map(([s]) => ({ s, n: 0 }));
     const notes = [];
     for (const el of tous) {
@@ -219,6 +376,48 @@
     });
   }
 
-  globalThis.__vrmTrouver = { trouver, attendre, versionPage, elements: Object.keys(ELEMENTS), RE_CLOCHE, RE_VOIR_TOUT: LANGUES.voirTout };
-  globalThis.__vrmTrouverV = 1;
+  // ══ 5.448 — UN GESTE APPRIS QUE LA PAGE A UN PEU CHANGÉ (`souple`) ═══════════════════════════════════════════
+  //  `sig` = { tag, attrs: { data-testid, name, role, type, aria-label… }, mot?, ce? } (la signature de SON propre geste,
+  //  lbc-ecrire.js / vc-ecrire.js / vrm-appris.js). La recherche exacte (tous les attributs, le mot) n'a rien vu ou en a
+  //  vu plusieurs : ici chaque morceau ENCORE vrai donne des points — la balise 2, un attribut stable 2 (aria-label 3),
+  //  le mot du bouton 4, le nom accessible égal au mot 4 —, un candidat doit garder AU MOINS la moitié des points
+  //  possibles et son MOT (ou son nom accessible) quand il en avait un ; le meilleur gagne s'il est SEUL. `dans` borne la
+  //  recherche (la rangée de l'annonce). Rien n'est cliqué ici.
+  const ATTRS_SIG = ['data-testid', 'data-test', 'data-qa-id', 'data-cy', 'name', 'role', 'type', 'aria-label'];
+  function souple(sig, ctx) {
+    const c = ctx || {};
+    const essais = [{ s: 'balise', n: 0 }, { s: 'attribut', n: 0 }, { s: 'mot', n: 0 }];
+    if (!sig || typeof sig !== 'object' || !/^[a-z][a-z0-9-]{0,20}$/.test(String(sig.tag || ''))) return { el: null, nom: 'appris', essais };
+    const attrs = Object.entries(sig.attrs || {}).filter(([k, v]) => ATTRS_SIG.includes(k) && typeof v === 'string' && v);
+    const mot = sig.mot ? norm(sig.mot) : '';
+    const max = 2 + attrs.reduce((t, [k]) => t + (k === 'aria-label' ? 3 : 2), 0) + (mot ? 4 : 0);
+    const famille = /^(button|a|div|span|li|label|input|summary)$/.test(sig.tag) && !sig.ce && sig.tag !== 'input' ? 'button, [role="button"], [role="menuitem"], [role="option"], a[href], label, summary, ' + sig.tag : sig.tag === 'textarea' || sig.ce ? 'textarea, [contenteditable="true"], [role="textbox"]' : sig.tag;
+    const racine = c.dans && c.dans.querySelectorAll ? c.dans : document;
+    let tous = [];
+    try { tous = [...racine.querySelectorAll(famille)].slice(0, 4000).filter((el) => visible(el) && (sig.ce ? el.isContentEditable === true : true) && (!c.garder || c.garder(el))); } catch (_) { tous = []; }
+    const notes = [];
+    for (const el of tous) {
+      let score = 0, motOk = false;
+      if (el.tagName.toLowerCase() === sig.tag) { score += 2; essais[0].n++; }
+      for (const [k, v] of attrs) if (attr(el, k) === v) { score += k === 'aria-label' ? 3 : 2; essais[1].n++; }
+      if (mot) {
+        const t = norm(String(el.textContent || '').slice(0, 60)), n = norm(nomAcc(el));
+        if (t === mot) { score += 4; motOk = true; essais[2].n++; }
+        else if (n === mot) { score += 4; motOk = true; essais[2].n++; }
+      }
+      if (mot && !motOk) continue;                 // un bouton appris par son mot ne se reconnaît jamais sans lui
+      if (score * 2 < max || score < 4) continue;   // au moins la moitié de ce qu'il était, et plus que la seule balise
+      notes.push({ el, score });
+    }
+    // Un conteneur qui porte le même mot qu'un candidat plus intérieur au moins aussi bien noté : l'intérieur seul (c'est lui qui écoute le clic).
+    const ext = notes.filter((x) => !notes.some((y) => y !== x && x.el.contains(y.el) && y.score >= x.score));
+    if (!ext.length) return { el: null, nom: 'appris', essais, vus: notes.length };
+    const best = Math.max(...ext.map((x) => x.score));
+    const g = ext.filter((x) => x.score === best);
+    if (g.length !== 1) return { el: null, nom: 'appris', ambigu: true, essais, n: g.length };
+    return { el: g[0].el, nom: 'appris', strategie: 'souple', score: best, max, essais };
+  }
+
+  globalThis.__vrmTrouver = { trouver, attendre, souple, versionPage, siteIci, elements: Object.keys(ELEMENTS), sites: Object.fromEntries(Object.entries(SITES).map(([k, v]) => [k, Object.keys(v)])), RE_CLOCHE, RE_VOIR_TOUT: LANGUES.voirTout };
+  globalThis.__vrmTrouverV = 2;
 })();

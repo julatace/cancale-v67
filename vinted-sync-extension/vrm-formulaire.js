@@ -234,8 +234,11 @@
   function apprisEl(nom) {
     const sp = APPRIS[nom];
     if (!sp || !sp.sig || !globalThis.__vrmAppris) return null;
-    const t = globalThis.__vrmAppris.trouver(sp.sig);
+    let t = globalThis.__vrmAppris.trouver(sp.sig);
     if (t.ambigu) return 'AMBIGU';
+    // 5.448 (`adaptatif`) : le geste appris que Vinted a un peu changé (un attribut renommé) — retrouvé par ce qui en reste,
+    //    SEUL et avec son mot ; sinon rien. Il reste « appris » (la confirmation d'un geste irréversible est toujours exigée).
+    if (!t.el && T() && T().souple) { const r = T().souple(sp.sig, {}); if (r.ambigu) return 'AMBIGU'; if (r.el) { noterTrouve('appris', r); t = { el: r.el }; } }
     if (t.el && !deVrm(t.el) && visible(t.el)) { VIA_APPRIS.set(t.el, nom); return t.el; }
     return null;
   }
@@ -245,14 +248,27 @@
     const a = APPRIS[nom] ? apprisEl(nom) : null;
     return a === 'AMBIGU' ? { el: null, ambigu: true } : { el: a || null, ambigu: false };
   }
-  // `attendre` avec, à défaut du deviné, l'élément appris (unique et visible).
-  function attendreN(nom, sel, ms, racine) {
-    if (!APPRIS[nom]) return attendre(sel, ms, racine);
-    return attendre(() => {
+  // `attendre` avec, à défaut du deviné, l'élément appris (unique et visible) ; puis (5.448, `adaptatif`) la couche de
+  // repérage : plusieurs stratégies (nom exact en 5 langues, data-testid partiel, libellé du champ…), UN seul gagnant.
+  // Deux candidats au même score ⇒ rien n'est rendu (l'étape s'arrête, « introuvable ou en double », rien n'est cliqué).
+  const TABLE_N = { vendre: 'vendre', titre: 'titre', description: 'description', prix: 'prix', photos: 'photos', brouillon: 'brouillon', ajouter: 'publier', enregistrer: 'enregistrer', supprimer: 'supprimer', 'supprimer-confirmation': 'supprimerConfirmer' };
+  async function attendreN(nom, sel, ms, racine) {
+    const tn = TABLE_N[nom];
+    if (!APPRIS[nom] && !tn) return attendre(sel, ms, racine);
+    let dernier = null;
+    const r = await attendre(() => {
       let el = null; try { el = typeof sel === 'function' ? sel() : (racine || document).querySelector(sel); } catch (_) { el = null; }
       if (el) return el;
-      return apprisEl(nom);
+      if (APPRIS[nom]) { const a = apprisEl(nom); if (a) return a; }
+      const t = tn ? T() : null;
+      if (t && t.sites && Array.isArray(t.sites.vinted) && t.sites.vinted.includes(tn)) {
+        const x = t.trouver(tn, { site: 'vinted', prefere: MEMOIRE[tn] || '' }); dernier = x;
+        if (x.el) return x.el;
+      }
+      return null;
     }, ms);
+    if (dernier) { noterTrouve(tn, dernier); if (r.absent && dernier.ambigu) r.ambigu = true; }
+    return r;
   }
   const clic = (el) => {
     // 5.433 : un élément APPRIS d'un geste irréversible, pas encore confirmé par lui ⇒ RIEN n'est cliqué.
@@ -495,7 +511,7 @@
       const q = d && d.quoi;
       if (captcha()) return vuCaptcha();
       if (q === 'titre' || q === 'description' || q === 'prix') {
-        const a = await attendre(SEL[q]); if (a.captcha) return vuCaptcha(); if (a.absent) return manque(q);
+        const a = await attendreN(q, SEL[q]); if (a.captcha) return vuCaptcha(); if (a.absent) return manque(q);
         const v = q === 'prix' ? String(d.valeur).replace('.', ',') : String(d.valeur);
         // 5.437 : titre et prix lettre par lettre (rythme variable) ; la description collée (défaut) ou tapée par rafales.
         const ok = q === 'description' && d.mode !== 'taper' ? await coller(a.el, v) : await saisir(a.el, v, { rythme: q === 'description' ? 'rafales' : 'lettres' });
@@ -577,17 +593,20 @@
       const att = reponseDe('POST', new RegExp(`/api/v2/items/${String(d && d.id)}/delete$`), 60000, d && d.cle);
       clic(b.el);
       // La confirmation de Vinted : un bouton de la fenêtre qui s'ouvre (jamais « Annuler »).
+      // 5.448 (`adaptatif`) : geste IRRÉVERSIBLE ⇒ un seul gagnant. Avant, le PREMIER bouton dont le texte CONTENAIT
+      //    « supprimer » / « confirmer » était cliqué (« Ne pas supprimer » aussi) ; deux candidats ⇒ rien n'est cliqué.
       const c = await attendreN('supprimer-confirmation', () => {
         const dlg = [...document.querySelectorAll('[role="dialog"],[data-testid*="modal"]')].filter(visible);
-        for (const m of dlg) {
-          const bs = [...m.querySelectorAll('button')].filter(visible);
-          const parId = bs.find((x) => /delete|confirm|supprim/i.test(x.getAttribute('data-testid') || '') && !/cancel|annul|close/i.test(x.getAttribute('data-testid') || ''));
-          if (parId) return parId;
-          const parTexte = bs.find((x) => /supprimer|confirmer|delete|confirm|eliminar|elimina|löschen/i.test(x.textContent || '') && !/annuler|cancel|annulla|cancelar|abbrechen/i.test(x.textContent || ''));
-          if (parTexte) return parTexte;
-        }
-        return null;
+        const fins = dlg.filter((el) => !dlg.some((x) => x !== el && el.contains(x)));
+        if (fins.length !== 1) return null;
+        const bs = [...fins[0].querySelectorAll('button')].filter((x) => visible(x) && actif(x));
+        const interdit = (x) => /cancel|annul|close|back/i.test((x.getAttribute('data-testid') || '') + ' ' + norm(nomAcc(x)));
+        const parId = bs.filter((x) => /delete|confirm|supprim/i.test(x.getAttribute('data-testid') || '') && !interdit(x));
+        if (parId.length === 1) return parId[0];
+        if (parId.length > 1) return null;
+        return null;   // le nom exact (5 langues) : la couche de repérage, `supprimerConfirmer`
       }, 15000);
+      if (c.ambigu) return manque('supprimer-confirmation-ambigu');
       if (c.captcha) return vuCaptcha(); if (c.absent) return manque('supprimer-confirmation');
       clic(c.el);
       const r = await att;

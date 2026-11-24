@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.440.0';
+const CODE_VERSION = '5.448.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4498,6 +4498,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
+    // 5.448 (`adaptatif`) : ce que la couche de repérage a vu sur Leboncoin, Vestiaire ou eBay (le gagnant, ou les stratégies
+    //    essayées et leurs comptes — jamais un texte de la page) ⇒ la mémoire de CE site et le journal. Le site est celui de
+    //    l'ONGLET qui parle (pas celui que le message dit), cadre principal seulement.
+    if (msg && msg.action === 'trouveJournal' && (msg.from === 'cancale-lbc' || msg.from === 'cancale-vc' || msg.from === 'cancale-ebay')) {
+      (async () => {
+        let site = '';
+        try { const h = new URL((sender && sender.tab && sender.tab.url) || '').hostname; site = /(^|\.)leboncoin\.fr$/i.test(h) ? 'lbc' : /(^|\.)vestiairecollective\.com$/i.test(h) ? 'vc' : /(^|\.)ebay\.[a-z.]+$/i.test(h) ? 'ebay' : ''; } catch (_) {}
+        if (!site || (sender && sender.frameId > 0) || !sender || sender.id !== chrome.runtime.id) { sendResponse({ ok: false }); return; }
+        await retenirTrouves(String(msg.etape || '').slice(0, 20), { trouves: Array.isArray(msg.trouves) ? msg.trouves.slice(0, 12) : [], verPage: msg.verPage }, site).catch(() => {});
+        sendResponse({ ok: true });
       })();
       return true;
     }
@@ -14942,10 +14955,10 @@ async function grilleParPage(uid, acc, cat) {
     let chemin = ''; try { chemin = new URL(String((await chrome.tabs.get(ot.tabId)).url || '')).pathname; } catch (_) { chemin = ''; }
     if (!/^\/items\/new\/?$/.test(chemin) && !(await naviguerTravail(ot.tabId, `https://${domaine}/items/new`, /\/items\/new/))) return { raison: RAISON_ONGLET_VINTED };
     const fp = await etapeFormulaire(acc, ot.tabId, 'formulairePret');
-    if (!fp.ok) return { raison: fp.code === 'captcha' ? PHRASE_CAPTCHA : PHRASE_SELECTEUR(fp.manque || fp.code) };
+    if (!fp.ok) return { raison: fp.code === 'captcha' ? PHRASE_CAPTCHA : `${PHRASE_SELECTEUR(fp.manque || fp.code)}. ${gesteElement(fp.manque || fp.code)}` };
     const nc = await nomCategorieVinted(cat);
     const o = await etapeFormulaire(acc, ot.tabId, 'grille', { id: cat, nom: nc && nc.nom, recherche: nc && nc.nom });
-    if (!o.ok || !o.rep) return { raison: o.code === 'captcha' ? PHRASE_CAPTCHA : o.code === 'selecteur' ? PHRASE_SELECTEUR(o.manque) : "Vinted n'a pas rendu la liste des tailles" };
+    if (!o.ok || !o.rep) return { raison: o.code === 'captcha' ? PHRASE_CAPTCHA : o.code === 'selecteur' ? `${PHRASE_SELECTEUR(o.manque)}. ${gesteElement(o.manque)}` : "Vinted n'a pas rendu la liste des tailles" };
     return { status: Number(o.rep.status) || 0, ok: !!o.rep.ok, json: o.rep.json };
   } finally { _grilleEnCours = null; fin(); }
 }
@@ -18025,24 +18038,31 @@ async function apprendreElement(acc, tabId, nom) {
 //  Aucune question à Julien : c'est une mémoire, pas un apprentissage par son clic.
 const ETAPES_SANS_APPRENDRE = new Set(['favoriOuvrir', 'favoriListe', 'favoriAccueil']);
 const TROUVE_CLE = 'vrmTrouve', TROUVE_JOURNAL = 'vrmTrouverJournal', TROUVE_JOURNAL_MAX = 40;
-async function memoireTrouver() {
-  try { const m = (await chrome.storage.local.get(TROUVE_CLE))[TROUVE_CLE]; if (!m || typeof m !== 'object' || !m.el) return {}; const out = {}; for (const k of Object.keys(m.el).slice(0, 20)) { const e = m.el[k]; if (e && /^[a-z]{2,20}$/.test(String(e.s || '')) && (!m.ver || !e.ver || e.ver === m.ver)) out[k] = e.s; } return out; } catch (_) { return {}; }
+// 5.448 (`adaptatif`) : une mémoire PAR SITE (Vinted garde sa clé d'avant ; `vrmTrouve_lbc`, `_vc`, `_ebay`), chacune rangée
+//    par version de la page de CE site ; un seul journal, chaque entrée porte son site.
+const SITES_TROUVER = new Set(['vinted', 'lbc', 'vc', 'ebay']);
+const cleTrouveSite = (site) => (!site || site === 'vinted' ? TROUVE_CLE : TROUVE_CLE + '_' + site);
+async function memoireTrouver(site) {
+  const TROUVE_CLE_S = cleTrouveSite(site);
+  try { const m = (await chrome.storage.local.get(TROUVE_CLE_S))[TROUVE_CLE_S]; if (!m || typeof m !== 'object' || !m.el) return {}; const out = {}; for (const k of Object.keys(m.el).slice(0, 20)) { const e = m.el[k]; if (e && /^[a-z]{2,20}$/.test(String(e.s || '')) && (!m.ver || !e.ver || e.ver === m.ver)) out[k] = e.s; } return out; } catch (_) { return {}; }
 }
-async function retenirTrouves(etape, o) {
+async function retenirTrouves(etape, o, siteDit) {
   if (!o || typeof o !== 'object' || !Array.isArray(o.trouves) || !o.trouves.length) return;
+  const site = SITES_TROUVER.has(siteDit) ? siteDit : 'vinted';
+  const TROUVE_CLE_S = cleTrouveSite(site), pre = site === 'vinted' ? '' : site + '_';
   const ver = String(o.verPage || '').slice(0, 40);
-  let m = null; try { m = (await chrome.storage.local.get(TROUVE_CLE))[TROUVE_CLE]; } catch (_) { return; }
+  let m = null; try { m = (await chrome.storage.local.get(TROUVE_CLE_S))[TROUVE_CLE_S]; } catch (_) { return; }
   if (!m || typeof m !== 'object' || !m.el) m = { v: 1, ver, el: {} };
   if (ver && m.ver && m.ver !== ver) m = { v: 1, ver, el: {} };   // une autre version de Vinted : la mémoire repart de zéro
   if (ver) m.ver = ver;
   const journal = [];
   for (const t of o.trouves.slice(0, 12)) {
     const nom = String((t && t.nom) || '').replace(/[^a-zA-Z]/g, '').slice(0, 30); if (!nom) continue;
-    if (t.s && /^[a-z]{2,20}$/.test(t.s)) { m.el[nom] = { s: t.s, ver, at: Date.now() }; noterDiag('trouve_' + nom + '_' + t.s); }
-    else { noterDiag((t.ambigu ? 'trouve_ambigu_' : 'trouve_rien_') + nom); journal.push({ nom, etape: String(etape || '').slice(0, 20), at: Date.now(), ambigu: !!t.ambigu, essais: (Array.isArray(t.essais) ? t.essais : []).slice(0, 8).map((e) => ({ s: String((e && e.s) || '').slice(0, 20), n: Math.max(0, Math.min(999, Number(e && e.n) || 0)) })) }); }
+    if (t.s && /^[a-z]{2,20}$/.test(t.s)) { m.el[nom] = { s: t.s, ver, at: Date.now() }; noterDiag('trouve_' + pre + nom + '_' + t.s); }
+    else { noterDiag((t.ambigu ? 'trouve_ambigu_' : 'trouve_rien_') + pre + nom); journal.push({ site, nom, etape: String(etape || '').slice(0, 20), at: Date.now(), ambigu: !!t.ambigu, essais: (Array.isArray(t.essais) ? t.essais : []).slice(0, 8).map((e) => ({ s: String((e && e.s) || '').slice(0, 20), n: Math.max(0, Math.min(999, Number(e && e.n) || 0)) })) }); }
   }
   try {
-    await chrome.storage.local.set({ [TROUVE_CLE]: m });
+    await chrome.storage.local.set({ [TROUVE_CLE_S]: m });
     if (journal.length) { const j = (await chrome.storage.local.get(TROUVE_JOURNAL))[TROUVE_JOURNAL]; const l = (Array.isArray(j) ? j : []).concat(journal).slice(-TROUVE_JOURNAL_MAX); await chrome.storage.local.set({ [TROUVE_JOURNAL]: l }); }
   } catch (_) {}
 }
@@ -18054,7 +18074,7 @@ async function retenirRouteConv(conv, route) {
   try { const m = (await chrome.storage.local.get(CONV_ROUTES))[CONV_ROUTES] || {}; m[String(conv)] = { r: String(route), at: Date.now() }; const k = Object.keys(m).sort((a, b) => (m[b].at || 0) - (m[a].at || 0)); for (const x of k.slice(CONV_ROUTES_MAX)) delete m[x]; await chrome.storage.local.set({ [CONV_ROUTES]: m }); } catch (_) {}
 }
 async function routeDeConv(conv) { try { const m = (await chrome.storage.local.get(CONV_ROUTES))[CONV_ROUTES]; const e = m && m[String(conv)]; return e && RE_UUID_CONV.test(String(e.r || '')) ? String(e.r) : ''; } catch (_) { return ''; } }
-const PHRASE_PAS_PRETE = (m, n) => `${PHRASE_ELEMENT(m)} (${n} nouveaux essais faits). « Reprendre » quand la page est chargée.`;
+const PHRASE_PAS_PRETE = (m, n) => `${quoiElement(m)}, même après ${n} nouveaux essais : rien n'est parti. ${gesteElement(m)}`;
 async function etapeFormulaire(acc, tabId, etape, d) {
   // AUCUNE écriture hors file (choix n° 97) : une étape qui touche la page sans action en cours y entre elle-même (elle
   // n'attend jamais : file occupée par un autre compte, ou en pause ⇒ refusée, rien n'est parti).
@@ -18106,7 +18126,7 @@ async function arretFormulaire(uid, acc) {
   { const fr = await lireFreinRepub(uid); if (fr) return { code: 'frein-refus', raison: phraseFreinRepub(fr) }; }
   return null;
 }
-const PHRASE_SELECTEUR = (m) => `Vinted a changé sa page (élément « ${String(m || '?')} » introuvable) : VRM s'arrête proprement`;
+const PHRASE_SELECTEUR = (m) => quoiElement(m);
 // Les valeurs de la fiche, telles que le formulaire les demande (identifiants de Vinted).
 function champsFormulaire(item) {
   const it = item && typeof item === 'object' ? item : {};
@@ -18219,7 +18239,7 @@ async function recreerParFormulaire(c) {
   const arret = async () => arretFormulaire(uid, acc);
   const stopAvant = (s) => fin({ accepte: false, code: s.code, raison: `${s.raison} — rien n'a été créé ni supprimé, ton annonce est intacte.` });
   const echecAvant = (o) => fin(o.code === 'captcha' ? { accepte: false, code: 'verification', raison: `${PHRASE_CAPTCHA} Rien n'a été créé ni supprimé, ton annonce est intacte.` }
-    : o.code === 'selecteur' ? { accepte: true, etape: 'echec', code: 'selecteur', manque: o.manque, raison: `${PHRASE_SELECTEUR(o.manque)} — rien n'a été créé ni supprimé, ton annonce est intacte.` }
+    : o.code === 'selecteur' ? { accepte: true, etape: 'echec', code: 'selecteur', manque: o.manque, raison: `${PHRASE_SELECTEUR(o.manque)} — rien n'a été créé ni supprimé, ton annonce est intacte. ${gesteElement(o.manque)}` }
       : o.code === 'refus' ? { accepte: true, etape: 'echec', raison: `Vinted a refusé une photo (${o.status || 0}) — rien n'a été créé ni supprimé, ton annonce est intacte.` }
         : { accepte: true, etape: 'echec', raison: `le formulaire de Vinted n'a pas répondu (${o.code || 'onglet'}) — rien n'a été créé ni supprimé, ton annonce est intacte.` });
   // 3. L'annonce ENREGISTRÉE dans VRM avant tout geste (même forme que la méthode directe : « Reprendre » la relit).
@@ -18335,7 +18355,7 @@ async function supprimerParFormulaire(acc, uid, id, tab, draftId, versB) {
   const o = await etapeFormulaire(acc, tab, 'supprimer', { id, cle: 's' + id });
   const pas = (cause, raison) => majVersBrouillon(uid, id, { etat: versB ? 'fait' : 'a-publier', draftId, supprime: false, cause }).then(() => ({ ok: false, parti: false, r: { accepte: true, etape: 'echec', draftId, raison } }));
   if (!o.ok && o.code === 'captcha' && !o.parti) return pas('verification', `${PHRASE_CAPTCHA} L'ancienne annonce n'a PAS été supprimée ; le brouillon attend.`);
-  if (!o.ok && o.code === 'selecteur') return pas('formulaire-selecteur', `${PHRASE_SELECTEUR(o.manque)} — l'ancienne annonce n'a PAS été supprimée ; le brouillon attend (« Reprendre »).`);
+  if (!o.ok && o.code === 'selecteur') return pas('formulaire-selecteur', `${PHRASE_SELECTEUR(o.manque)} — l'ancienne annonce n'a PAS été supprimée ; le brouillon attend (« Reprendre »). ${gesteElement(o.manque)}`);
   const rd = o.rep || null;
   if (!rd || !rd.status || rd.status >= 500) {
     await poserVerrouRecreer(id);
@@ -18361,11 +18381,11 @@ async function publierParFormulaire(acc, uid, id, tab, draftId, j) {
   if (await lireVerrouRecreer('b' + draftId)) { await majVersBrouillon(uid, id, { etat: 'mise-en-ligne-incertaine', draftId }); return { parti: false, r: { accepte: true, etape: 'incertain', draftId, raison: "une autre mise en ligne de ce brouillon est partie sans réponse claire — VRM n'en renvoie pas une seconde. Regarde ton dressing." } }; }
   etapeRepub(id, 'en-ligne');
   if (!(await naviguerTravail(tab, `https://${domaine}/items/${draftId}/edit`, new RegExp(`/items/${draftId}/edit`)))) { await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: "l'onglet de Vinted n'a pas ouvert le brouillon — il n'a pas été mis en ligne : « Reprendre » le fait, sans en créer un autre." } }; }
-  { const f = await etapeFormulaire(acc, tab, 'formulairePret'); if (!f.ok) { await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: 'formulaire-' + (f.code || 'ko') }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, ...(f.code === 'captcha' ? { code: 'verification' } : {}), raison: f.code === 'captcha' ? `${PHRASE_CAPTCHA} Le brouillon attend.` : `${PHRASE_SELECTEUR(f.manque)} — le brouillon attend (« Reprendre »).` } }; } }
+  { const f = await etapeFormulaire(acc, tab, 'formulairePret'); if (!f.ok) { await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: 'formulaire-' + (f.code || 'ko') }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, ...(f.code === 'captcha' ? { code: 'verification' } : {}), raison: f.code === 'captcha' ? `${PHRASE_CAPTCHA} Le brouillon attend.` : `${PHRASE_SELECTEUR(f.manque)} — le brouillon attend (« Reprendre »). ${gesteElement(f.manque)}` } }; } }
   await pauseFormulaire('champ', uid);
   await poserVerrouRecreer('b' + draftId);
   const o = await etapeFormulaire(acc, tab, 'publier', { draftId, cle: 'p' + draftId });
-  if (!o.ok && !o.parti && (o.code === 'captcha' || o.code === 'selecteur')) { await leverVerrouRecreer('b' + draftId); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, ...(o.code === 'captcha' ? { code: 'verification' } : {}), raison: o.code === 'captcha' ? `${PHRASE_CAPTCHA} Le brouillon attend.` : `${PHRASE_SELECTEUR(o.manque)} — le brouillon attend (« Reprendre »).` } }; }
+  if (!o.ok && !o.parti && (o.code === 'captcha' || o.code === 'selecteur')) { await leverVerrouRecreer('b' + draftId); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, ...(o.code === 'captcha' ? { code: 'verification' } : {}), raison: o.code === 'captcha' ? `${PHRASE_CAPTCHA} Le brouillon attend.` : `${PHRASE_SELECTEUR(o.manque)} — le brouillon attend (« Reprendre »). ${gesteElement(o.manque)}` } }; }
   const rc = o.rep || null;
   if (!rc || !rc.status || rc.status >= 500) {
     noterDiag('formulaire_mise_en_ligne_incertaine');
@@ -18486,7 +18506,28 @@ const GESTES_INTERFACE = Object.freeze({
 const ID_INTERFACE = /^[1-9]\d{0,19}$/;
 // Le chemin de « Voir tout » : lettres, chiffres, tirets, / — et il parle de notifications ; sinon la page connue.
 function pageNotificationsSure(p) { const c = String(p || '').replace(/\/+$/, ''); return /^\/[\w\-/]{1,80}$/.test(c) && /notif/i.test(c) && !/\.\./.test(c) ? c : '/member/notifications'; }
-const PHRASE_ELEMENT = (m) => `Vinted a changé sa page (élément « ${String(m || '?')} » introuvable ou en double) : VRM s'arrête proprement, rien n'est parti.`;
+// 5.448 (`adaptatif`) — CHAQUE ARRÊT DIT, EN MOTS SIMPLES, CE QUI MANQUE ET LE SEUL GESTE À FAIRE. Avant : « élément
+//    « message-envoyer » introuvable ou en double » (un nom de code, aucun geste). Maintenant : le bouton par SON nom à
+//    l'écran (`LIBELLES_APPRIS`), « introuvable » ou « deux boutons pareils » (VRM ne choisit jamais), « rien n'est parti »,
+//    puis UN geste : un bouton que VRM sait apprendre ⇒ relancer, il demandera de le toucher une fois ; un bouton des
+//    messages aux favoris (jamais appris) ou un autre ⇒ « Envoyer un rapport » (la fenêtre de l'extension), et le faire
+//    soi-même sur vinted.fr en attendant. Une vérification anti-robot n'est jamais un élément manquant (PHRASE_CAPTCHA).
+function phraseElement(m) {
+  const brut = String(m || '').toLowerCase();
+  const ambigu = /-ambigue?$/.test(brut);
+  const nom = brut.replace(/-(ambigue?|a-confirmer)$/, '');
+  const LIB_FAVORIS = { cloche: 'la cloche des notifications', 'favori-notification': 'la notification du favori', 'notifications-introuvables': 'la liste des notifications', 'conversation-pas-ouverte': 'la conversation' };
+  const lib = LIBELLES_APPRIS[nom] ? `le bouton « ${LIBELLES_APPRIS[nom]} »` : LIB_FAVORIS[nom] || (nom && nom !== 'geste' ? `l'élément « ${nom} »` : 'le bon élément');
+  const quoi = ambigu ? `VRM voit deux ${LIBELLES_APPRIS[nom] ? `boutons « ${LIBELLES_APPRIS[nom]} »` : 'éléments pareils'} sur la page Vinted et ne choisit jamais à ta place` : `VRM ne trouve plus ${lib} sur la page Vinted (Vinted a changé sa page)`;
+  const geste = APPRENABLES.has(nom) && !ambigu
+    ? "Geste : relance ; si VRM ne le retrouve toujours pas, il te demandera de toucher ce bouton UNE fois dans l'onglet de travail, puis il s'en souviendra."
+    : "Geste : fais-le toi-même sur vinted.fr cette fois, et touche « Envoyer un rapport » dans la fenêtre de l'extension : la correction arrive avec la prochaine version.";
+  return `${quoi} : rien n'est parti. ${geste}`;
+}
+const PHRASE_ELEMENT = (m) => phraseElement(m);
+// Le même texte en deux morceaux pour les phrases qui disent elles-mêmes ce qui n'est pas parti (republication, brouillon).
+const quoiElement = (m) => phraseElement(m).split(" : rien n'est parti. ")[0];
+const gesteElement = (m) => phraseElement(m).split(" : rien n'est parti. ")[1] || '';
 const PHRASE_IDENTITE = "la page de Vinted ne montre pas la bonne conversation / la bonne annonce : VRM s'arrête, rien n'est parti.";
 // Les codes d'une étape qui s'arrête AVANT le geste (rien n'a été cliqué) : certain, « rien n'est parti ».
 const AVANT_LE_GESTE = new Set(['selecteur', 'identite', 'captcha', 'etape', 'valeur', 'hors-vinted', 'script', 'onglet', 'photos-absentes', 'hors-file']);
@@ -18887,7 +18928,7 @@ async function creerVintedFiche(msg, suivi) {
     if (ot.refus) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage({ sansPage: ot.refus === 'travail-ferme' ? 'onglet' : ot.refus, travailFerme: ot.refus === 'travail-ferme' }) };
     const tab = ot.tabId, domaine = acc.domain || 'www.vinted.fr';
     if (!(await naviguerTravail(tab, `https://${domaine}/items/new`, /\/items\/new/))) return { accepte: false, code: 'onglet-vinted', raison: RAISON_ONGLET_VINTED };
-    const echecF = (o) => (o.code === 'captcha' ? { accepte: false, code: 'verification', raison: `${PHRASE_CAPTCHA} Rien n’a été créé sur Vinted.` } : o.code === 'selecteur' ? { accepte: true, etape: 'echec', code: 'selecteur', manque: o.manque, raison: `${PHRASE_SELECTEUR(o.manque)} — rien n’a été créé sur Vinted.` } : { accepte: true, etape: 'echec', raison: `le formulaire de Vinted n'a pas répondu (${o.code || 'onglet'}) — rien n’a été créé sur Vinted.` });
+    const echecF = (o) => (o.code === 'captcha' ? { accepte: false, code: 'verification', raison: `${PHRASE_CAPTCHA} Rien n’a été créé sur Vinted.` } : o.code === 'selecteur' ? { accepte: true, etape: 'echec', code: 'selecteur', manque: o.manque, raison: `${PHRASE_SELECTEUR(o.manque)} — rien n’a été créé sur Vinted. ${gesteElement(o.manque)}` } : { accepte: true, etape: 'echec', raison: `le formulaire de Vinted n'a pas répondu (${o.code || 'onglet'}) — rien n’a été créé sur Vinted.` });
     let o = await etapeFormulaire(acc, tab, 'formulairePret'); if (!o.ok) return echecF(o);
     o = await etapeFormulaire(acc, tab, 'photos', { photos: ph.photos }); if (!o.ok) return o.code === 'refus' ? { accepte: true, etape: 'echec', raison: `Vinted n’a pas accepté une photo (${o.status || 0}) — rien n’a été créé sur Vinted` } : echecF(o);
     const envoyes = Array.isArray(o.envoyes) ? o.envoyes : null;   // 5.429 : chaque fichier ↔ l'identifiant rendu par Vinted
