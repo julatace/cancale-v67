@@ -58,8 +58,8 @@ sur… » dans le menu du panneau (un toucher de plus).
   R retrait seulement prouvé et jamais fait par l'hôte, I 50 annonces au même titre, L lien + extension qui
   n'ouvre que la feuille). **Rouge sur `origin/main`** (la règle n'existe pas : 0 ✅ · 1 ❌) et **13/13 mutations
   détectées** (`--prouve`).
-- `scripts/bancs/quatre-sites.cjs` : 390 tactile et 1512, clair et sombre — feuille, Leboncoin sans extension grisé,
-  Vestiaire « déjà en ligne » par lien posé, prix changé ⇒ eBay arrêté sans brouillon, « Créer » ⇒ UN brouillon N°13
+- `scripts/bancs/quatre-sites.cjs` (**60 ✅ · 0 ❌**) : 390 tactile et 1512, clair et sombre — feuille, Leboncoin sans extension grisé,
+  Vestiaire « déjà en ligne » par lien posé, prix changé ⇒ eBay arrêté sans brouillon (le banc a trouvé que la relecture lisait la réponse gardée : corrigé, `force`), « Créer » ⇒ UN brouillon N°13
   sans port, eBay pas relié ⇒ grisé. Captures regardées (voir le récit de la PR).
 - `npm run build`, audits voisins (voir la PR).
 

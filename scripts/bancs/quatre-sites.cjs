@@ -232,8 +232,11 @@ const brouillons = () => { const r = LIGNES.find((x) => x.id === 'ebay_brouillon
         dit(e2.etat === 'arrete' && e2.etatCode === 'prix-change' && brouillons().length === avant && !POSTS.some((p) => /ebay_brouillons/.test(p.url)),
           `${nomVp} · C · prix Vinted changé (70 → 65) ⇒ eBay arrêté, AUCUN brouillon écrit`, JSON.stringify([e2, brouillons().length]));
         await capture(pg, `q4-prix-change-${nomVp}`);
-        it.price = { amount: '70', currency_code: 'EUR' };
+        it.price = { amount: '70', currency_code: 'EUR' }; LISTINGS.capturedAt = new Date().toISOString();
         await fermer(pg);
+        // La page rechargée : la mémoire de l'app repart de la base (70 €), comme un nouvel essai de sa part.
+        await aller(pg, 'tab=annonces');
+        await pg.waitForSelector('[data-sb-avant-cle]', { timeout: 30000 }).catch(() => {});
         // D. « Créer » ⇒ un brouillon eBay au N°13.
         await ouvrir(pg, '13');
         await pg.click('[data-q4-creer]');
