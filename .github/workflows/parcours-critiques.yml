@@ -74,6 +74,8 @@ jobs:
         run: node scripts/tests/outils-articles-vinted-interface.cjs
       - name: Vérifier le bilan de synchronisation
         run: node scripts/tests/bilan-synchronisation-interface.cjs
+      - name: Vérifier la recherche (la lettre d'abord, écran lourd appris)
+        run: node scripts/tests/recherche-lettre-interface.cjs
       - name: Vérifier les relectures de conversation
         run: node scripts/tests/conversation-relecture-interface.cjs
       - name: Vérifier les brouillons des annonces

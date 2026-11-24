@@ -36,7 +36,7 @@
 //    Exemple :
 //      <ChampRecherche valeur={q} onChange={setQ} placeholder="N°, titre, acheteur" onScanner={ouvrirScanner}/>
 import React from 'react';
-import { createPortal } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import { tr } from '../i18n/index.js';
 import { FermeAuRetourUi, retourDisponible } from '../ui/retour.jsx';
 import { cx, mouvementReduit, portailNatif, useDernier } from './outils.js';
@@ -49,7 +49,8 @@ export const ContexteCoque = React.createContext(null);
 // lettre tapée dans la recherche d'Annonces re-rendait tout l'écran AVANT d'afficher la lettre (124 à 750 ms par lettre).
 // Le champ garde sa propre valeur (la lettre s'affiche à l'image suivante) ; l'écran reçoit la valeur APRÈS cette image
 // (rAF puis tâche, 100 ms au plus sans image) — des lettres tapées plus vite que l'écran ne se rend sont envoyées ensemble
-// (la dernière valeur seulement). Entrée, l'effacement et la sortie du champ envoient tout de suite. Ce que l'écran reçoit
+// (la dernière valeur seulement). Seulement pour un écran LOURD, appris à la première lettre (voir `lourd`) : un écran léger
+// reçoit chaque lettre tout de suite, comme avant. Entrée, l'effacement et la sortie du champ envoient tout de suite. Ce que l'écran reçoit
 // est inchangé (la même valeur, dans le même ordre) ; une valeur posée par l'écran (effacée, coupée) remplace celle du champ.
 // Pas une transition React : une transition retenue ailleurs retiendrait la recherche (latence, 22 nov.).
 function useValeurDiffere(valeur, onChange) {
@@ -59,8 +60,20 @@ function useValeurDiffere(valeur, onChange) {
   const surChange = useDernier(onChange);
   const plan = React.useRef({ image: 0, tache: 0, filet: 0, v: null });
   const annuler = React.useCallback(() => { const p = plan.current; if (p.image) cancelAnimationFrame(p.image); if (p.tache) clearTimeout(p.tache); if (p.filet) clearTimeout(p.filet); p.image = p.tache = p.filet = 0; }, []);
-  const envoyer = React.useCallback((v) => { annuler(); plan.current.v = null; recue.current = v; if (surChange.current) surChange.current(v); }, [annuler, surChange]);
-  const vider = React.useCallback(() => { const v = plan.current.v; if (v != null) envoyer(v); }, [envoyer]);
+  // L'écran est-il LOURD ? Appris sur lui, au temps de SON rendu (rendu tout de suite, `flushSync`, puis mesuré) : plus de
+  // 50 ms ⇒ lourd (les lettres suivantes sont différées) ; un envoi différé rendu en moins de 25 ms ⇒ léger (les lettres
+  // repartent pendant le geste, comme avant : un écran léger — Achats — trouve sa rangée sans attendre une image de plus).
+  const lourd = React.useRef(false);
+  const envoyer = React.useCallback((v, differe = false, mesure = true) => {
+    annuler(); plan.current.v = null; recue.current = v;
+    const f = surChange.current; if (!f) return;
+    if (!mesure) { f(v); return; }
+    const t0 = performance.now();
+    flushSync(() => { f(v); });
+    const d = performance.now() - t0;
+    if (!differe && d > 50) lourd.current = true; else if (differe && d < 25) lourd.current = false;
+  }, [annuler, surChange]);
+  const vider = React.useCallback(() => { const v = plan.current.v; if (v != null) envoyer(v, true); }, [envoyer]);
   const planifier = React.useCallback((v) => {
     const p = plan.current; p.v = v;
     if (p.image || p.tache || p.filet) return;
@@ -68,8 +81,13 @@ function useValeurDiffere(valeur, onChange) {
     p.image = requestAnimationFrame(ensuite);
     p.filet = setTimeout(ensuite, 100);
   }, [vider]);
-  React.useEffect(() => () => { vider(); annuler(); }, [vider, annuler]);
-  const changer = (v) => { setLocale(v); planifier(v); };
+  React.useEffect(() => () => { const v = plan.current.v; annuler(); if (v != null) envoyer(v, true, false); }, [envoyer, annuler]);
+  const changer = (v) => {
+    setLocale(v);
+    const p = plan.current;
+    if (!lourd.current && !p.image && !p.tache && !p.filet) envoyer(v);
+    else planifier(v);
+  };
   return { locale, changer, envoyer, vider };
 }
 
