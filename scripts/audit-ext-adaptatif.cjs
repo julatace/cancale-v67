@@ -17,6 +17,9 @@
 //       aucun texte) et le compteur `trouve_rien_<site>_<élément>` ;
 //   J3  un message d'un cadre (iframe) ou d'un autre site n'écrit rien ;
 //   J4  une nouvelle version de la page d'un site vide la mémoire de CE site seulement ;
+//   S1–S5  la SANTÉ par site (`santeSites`) : « pas encore vu » / « tout marche » / « X ne marche plus : Geste … » ; une
+//       forme de réponse changée passe avant (« … attend la correction ») ; chaque nouveau problème dit UNE fois (notification) ;
+//   R1–R4  la page pas prête se rattrape seule : rechargée UNE fois, le même ordre repart ; jamais après un clic final ;
 //   G1  garde-fous §3 inchangés : `vintedPage` refuse toute méthode ≠ GET ; aucun `chrome.debugger`, aucune
 //       permission `debugger` ; plafond 50/h et réserve 5 ; 15/h favoris.
 //  `--prouve` : chaque règle réaffaiblie doit faire rougir l'audit.
@@ -36,6 +39,11 @@ if (process.argv.includes('--prouve')) {
     ['memoireMelangee', 'src', "const cleTrouveSite = (site) => (!site || site === 'vinted' ? TROUVE_CLE : TROUVE_CLE + '_' + site);", 'const cleTrouveSite = (site) => TROUVE_CLE;'],
     ['siteDuMessage', 'src', "if (!site || (sender && sender.frameId > 0) || !sender || sender.id !== chrome.runtime.id) { sendResponse({ ok: false }); return; }", "site = site || String(msg.site || ''); if (!site) { sendResponse({ ok: false }); return; }"],
     ['sansJournal', 'src', "if (journal.length) { const j = (await chrome.storage.local.get(TROUVE_JOURNAL))[TROUVE_JOURNAL];", "if (false) { const j = (await chrome.storage.local.get(TROUVE_JOURNAL))[TROUVE_JOURNAL];"],
+    ['repriseApresGeste', 'src', "return !!(rep && rep.ok === true && !rep.statut && rep.geste !== true && rep.envoye !== true && rep.tape !== true && CODES_PAGE_PAS_PRETE.has(String(rep.erreur || '')));", "return !!(rep && rep.ok === true && !rep.statut);"],
+    ['sansReprise', 'src', "    if (repriseSeule(rep)) {\n      noterDiag('lbc_reprise_'", "    if (false) {\n      noterDiag('lbc_reprise_'"],
+    ['notifRepetee', 'src', "        if (dits[site] === cle) continue;\n", ''],
+    ['formeTaisee', 'src', "    if (site === 'vc') { const c = st.vrmVcCapte || {};", "    if (false) { const c = st.vrmVcCapte || {};"],
+    ['jamaisGueri', 'src', "const ok = el[e.nom]; if (ok && Number(ok.at || 0) > Number(e.at || 0)) continue;", 'const ok = null;'],
     ['trouverApres', 'manifeste', '"vrm-trouver.js",\n        "lbc-ecrire.js"', '"lbc-ecrire.js",\n        "vrm-trouver.js"'],
   ];
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-ext-adaptatif-'));
@@ -120,6 +128,61 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
     dit(st.vrmTrouve_lbc && st.vrmTrouve_lbc.ver === 'buildB' && !st.vrmTrouve_lbc.el.champMessage && st.vrmTrouve_lbc.el.champPrix && st.vrmTrouve_ebay && st.vrmTrouve_ebay.el.titre && st.vrmTrouve_ebay.el.titre.s === 'libelle', 'J4 une nouvelle version de Leboncoin vide la mémoire de Leboncoin seulement (eBay garde la sienne)', JSON.stringify({ lbc: st.vrmTrouve_lbc, ebay: st.vrmTrouve_ebay }));
     const mem = await c.memoireTrouver('lbc');
     dit(mem && mem.champPrix === 'cle' && !mem.champMessage, 'J4 la mémoire relue par site', JSON.stringify(mem));
+  }
+  // ── S : la santé par site (une ligne) et la notification UNE fois ──
+  {
+    const g = faireFond({ src: F.src, connecte: '3175765377' });
+    const notifs = [];
+    g.ctx.chrome.notifications = { create: (id, o, cb) => { notifs.push({ id, o }); if (cb) cb(id); } };
+    const st = g.store, maintenant = Date.now();
+    let v = await g.ctx.santeSites();
+    dit(v && v.ebay && v.ebay.k === 'pas-vu' && /pas encore vu/.test(v.ebay.t), 'S1 un site jamais vu ici ⇒ « pas encore vu dans ce Chrome » (pas « tout marche »)', JSON.stringify(v && v.ebay));
+    st.vrmTrouve_lbc = { v: 1, ver: 'b', el: { champMessage: { s: 'indication', ver: 'b', at: maintenant - 1000 } } };
+    v = await g.ctx.santeSites();
+    dit(v.lbc.ok === true && v.lbc.t === 'Leboncoin : tout marche.', 'S1 Leboncoin vu, rien de cassé ⇒ « Leboncoin : tout marche. »', JSON.stringify(v.lbc));
+    st.vrmTrouverJournal = [{ site: 'lbc', nom: 'envoyer', etape: 'message', at: maintenant - 500, ambigu: false, essais: [] }, { site: 'vinted', nom: 'supprimerConfirmer', etape: 'supprimer', at: maintenant - 400, ambigu: true, essais: [] }];
+    await g.ctx.majSanteSites();
+    v = st.vrmSanteSites && st.vrmSanteSites.sites;
+    dit(v && v.lbc.ok === false && /Leboncoin : le bouton « Envoyer » ne marche plus/.test(v.lbc.t) && /Geste : fais ce geste une fois toi-même sur leboncoin\.fr/.test(v.lbc.t), 'S2 « Envoyer » introuvable sur Leboncoin ⇒ « … ne marche plus. Geste : … »', JSON.stringify(v && v.lbc));
+    dit(v && v.vinted.ok === false && /deux boutons « Confirmer et supprimer »/.test(v.vinted.t) && /Geste : /.test(v.vinted.t), 'S2 Vinted : la confirmation en double, dite avec son geste', JSON.stringify(v && v.vinted));
+    const n1 = notifs.length;
+    await g.ctx.majSanteSites(); await g.ctx.majSanteSites();
+    dit(n1 === 2 && notifs.length === 2 && notifs.every((x) => /^vrm-sante-/.test(x.id)), 'S3 chaque nouveau problème est dit UNE fois (notification), jamais répété', JSON.stringify(notifs.map((x) => x.id)));
+    st.vrmTrouve_lbc.el.envoyer = { s: 'nom', ver: 'b', at: maintenant };
+    await g.ctx.majSanteSites();
+    v = st.vrmSanteSites.sites;
+    dit(v.lbc.ok === true && !st.vrmSanteSites.dits.lbc, 'S4 l’élément retrouvé depuis ⇒ « tout marche » revient (le journal plus ancien ne compte plus)', JSON.stringify(v.lbc));
+    st.vrmFormesVues = { '3175765377': { orders_sold: { at: maintenant, sig: 'x' } } };
+    st.vrmVcCapte = { annonces: { at: maintenant, n: 0, inconnu: true } };
+    await g.ctx.majSanteSites();
+    v = st.vrmSanteSites.sites;
+    dit(/^Vinted a changé sa page des ventes : VRM ne la lit plus et n'en range rien de faux ; il attend la correction/.test(v.vinted.t) && v.vinted.k === 'forme', 'S5 une réponse de forme changée passe AVANT un bouton : « Vinted a changé sa page des ventes : VRM attend la correction »', v.vinted.t);
+    dit(/^Vestiaire a changé sa page/.test(v.vc.t) && notifs.some((x) => x.id === 'vrm-sante-vc'), 'S5 Vestiaire : forme inconnue dite (ligne + une notification)', JSON.stringify(v.vc));
+    dit(notifs.filter((x) => x.id === 'vrm-sante-vinted').length === 2, 'S5 la forme de Vinted est un NOUVEAU problème : dit une fois de plus, pas davantage', JSON.stringify(notifs.map((x) => x.id)));
+  }
+  // ── R : la page pas prête se rattrape seule (Leboncoin, Vestiaire), une fois, jamais après un geste ──
+  {
+    const vmm = require('vm');
+    const essai = async (reponses) => {
+      const g = faireFond({ src: F.src, connecte: '3175765377' });
+      const c2 = g.ctx; const envois = []; let recharges = 0;
+      c2.chrome.tabs.create = async (o) => ({ id: 77, url: o.url });
+      c2.chrome.tabs.remove = async () => {};
+      c2.chrome.tabs.get = async () => ({ id: 77, status: 'complete' });
+      c2.chrome.tabs.reload = async () => { recharges++; };
+      c2.chrome.tabs.sendMessage = async (id, m) => { if (m.action === 'lbcEcrirePret') return { ok: true, canal: true }; envois.push(m.action); return reponses[Math.min(envois.length - 1, reponses.length - 1)]; };
+      vmm.runInContext("attendreSessionOnglet = async () => ({ compte: 'lbc-account:moi1' }); _fileCourante = { uid: 'lbc:moi1' };", c2);
+      const r = await vmm.runInContext("gesteLbcInterface('message', 'moi1', 'https://www.leboncoin.fr/messages/id/abc', { conv: 'abc', texte: 'x' }, 5000)", c2);
+      return { r, envois, recharges };
+    };
+    const a1 = await essai([{ ok: true, statut: 0, erreur: 'conversation-pas-chargee' }, { ok: true, statut: 200, confirme: true }]);
+    dit(a1.recharges === 1 && a1.envois.length === 2 && a1.r.rep && a1.r.rep.statut === 200, 'R1 Leboncoin : conversation pas encore chargée (rien parti) ⇒ onglet rechargé UNE fois, le même ordre repart et passe', JSON.stringify(a1));
+    const a2 = await essai([{ ok: true, statut: 0, erreur: 'conversation-pas-chargee' }, { ok: true, statut: 0, erreur: 'conversation-pas-chargee' }]);
+    dit(a2.recharges === 1 && a2.envois.length === 2 && a2.r.rep.erreur === 'conversation-pas-chargee', 'R2 toujours pas prête ⇒ arrêt après UN nouvel essai (borné), la raison d’avant', JSON.stringify(a2));
+    const a3 = await essai([{ ok: true, statut: 0, erreur: 'pas-vu', geste: true, envoye: true }]);
+    dit(a3.recharges === 0 && a3.envois.length === 1, 'R3 un clic final fait (« pas vu ») ⇒ JAMAIS relancé (aucun geste deux fois)', JSON.stringify(a3));
+    const a4 = await essai([{ ok: true, statut: 0, erreur: 'champ-ambigu' }]);
+    dit(a4.recharges === 0 && a4.envois.length === 1, 'R4 un élément ambigu n’est pas « pas prêt » : arrêt, pas de nouvel essai', JSON.stringify(a4));
   }
   console.log(`\n${ko ? '❌' : '✅'} extension adaptative (fond) : ${ok} bon(s), ${ko} défaut(s)`);
   process.exit(ko ? 1 : 0);

@@ -5897,6 +5897,8 @@ function vrmVerifVisible(sel) {
   // secondaire (jauge de l'heure et du jour · lu · capté) — la même source qu'avant (le fond),
   // les mêmes marques `data-q4*` (bancs), « pas su » ⇒ « — ». Le nom de la fonction reste
   // `quatreLignes` (capacité `carte4`).
+  // 5.448 (`santesites`) : la ligne de santé seule (carte Leboncoin, qui n'a pas les quatre lignes).
+  function ligneSante(e) { const sa = e && e.santeSite; return sa && typeof sa.t === 'string' && sa.k !== 'pas-vu' ? `<div class="ligne" data-sante-site="${esc(sa.k)}"${sa.ok === false ? ' style="color:var(--vu-ambre)"' : ''}>${esc(sa.t)}</div>` : ''; }
   function quatreLignes(e, r) {
     const site = e.site || {}, f = e.flux || {};
     let compte = site.nom || (site.id && e.plateforme !== 'leboncoin' ? 'n° ' + site.id : '');
@@ -5922,6 +5924,9 @@ function vrmVerifVisible(sel) {
     const morceaux = [];
     if (j) morceaux.push(`<span data-q4="jauge" data-q4-h="${Number(j.h) || 0}" data-q4-maxh="${Number(j.maxH) || 0}" data-q4-j="${Number(j.j) || 0}" data-q4-maxj="${Number(j.maxJ) || ''}" data-q4-complet="${j.complet ? '1' : '0'}"><b>${esc(TU(j.complet ? 'c_heure' : 'c_heure_min', { n: nbFr(j.h), max: nbFr(j.maxH) }))}</b> · ${esc(TU('c_jour', { n: nbFr(j.j), max: j.maxJ ? nbFr(j.maxJ) : '—' }))}</span>`);
     if (lu || morceaux.length) morceaux.push(`<span data-q4="lu" data-q4-at="${lu || ''}">${lu ? esc(TU('c_lu', { quand: depuis(lu) })) : '—'}</span>`);
+    // 5.448 (`santesites`) : la santé de CE site en une ligne — « tout marche » ou « X ne marche plus : fais Y » (ambre).
+    const sa = e && e.santeSite;
+    if (sa && typeof sa.t === 'string' && sa.k !== 'pas-vu') morceaux.push(`<span data-sante-site="${esc(sa.k)}"${sa.ok === false ? ' style="color:var(--vu-ambre)"' : ''}>${esc(sa.t)}</span>`);
     const c = e && e.capture;
     if (c && c.phrase) {
       const lien = c.lien && /^https:\/\/www\.vinted\.fr\//.test(String(c.lien)) ? String(c.lien) : '';
@@ -6259,7 +6264,7 @@ function vrmVerifVisible(sel) {
       const liste = listesHtml(e, parametres5);
       poserHtml(contenu, vxHtml(e, `<div class="gestes">${liste}</div>`, extras));
     } else poserHtml(contenu, `<button class="fermer" data-fermer-carte title="${esc(TU('c_fermer'))}" aria-label="${esc(TU('c_fermer'))}">×</button>${lbcVisible ? `<div class="t5"><b class="nom">VRM</b></div>` : tete5}
-      ${lbcVisible ? `<div class="lbc5"><div class="ligne lbc-tete"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>${lbcLignes}${ligneCapture(e)}</div>` : ''}
+      ${lbcVisible ? `<div class="lbc5"><div class="ligne lbc-tete"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>${lbcLignes}${ligneSante(e)}${ligneCapture(e)}</div>` : ''}
       ${principal}
       ${sous5}
       ${majHtml(e.maj)}
@@ -7227,7 +7232,7 @@ function vrmVerifVisible(sel) {
       const o = ch.vrmOAuthEtat && ch.vrmOAuthEtat.newValue;
       if (o && o.etat === 'erreur' && formulaireEl) { direEtat(''); direErreur(o.message || 'La connexion n’a pas abouti.'); }
       if (ch.vrmApparence) { const m = ch.vrmApparence.newValue; modeApparence = ['clair', 'sombre', 'auto', 'soir'].includes(m) ? m : null; appliquerTeinte(); }
-      if (ch.vrmFavorisCarte || ch.vrmFavorisApercu || ch.vrmPauseVinted || ch.vrmFreinRepub || ch.vrmSession || ch.vrmFlux || ch.vrmVcCapte || ch.vrmBascule || ch.vrmLbcCompte || ch.vrmChoixComptes || ch.vrmLoginsVus || ch.vrmLogins) rafraichir();
+      if (ch.vrmFavorisCarte || ch.vrmFavorisApercu || ch.vrmPauseVinted || ch.vrmFreinRepub || ch.vrmSession || ch.vrmFlux || ch.vrmVcCapte || ch.vrmSanteSites || ch.vrmBascule || ch.vrmLbcCompte || ch.vrmChoixComptes || ch.vrmLoginsVus || ch.vrmLogins) rafraichir();
     });
   } catch (_) {}
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { appliquerTeinte(); rafraichir(); } });

@@ -23,7 +23,8 @@
 //    L4  aucun champ ⇒ « champ-introuvable », rien tapé, le journal (`trouveJournal`, site de l'onglet) est envoyé ;
 //    L5  suppression (3 étapes apprises, data-qa-id renommés) ⇒ la rangée de CETTE annonce, puis le menu, puis la
 //        confirmation ; l'autre annonce n'est jamais touchée ;
-//    L6  la confirmation de suppression en double ⇒ arrêt « etape-ambigue », la suppression ne part pas.
+//    L6  la confirmation de suppression en double ⇒ arrêt « etape-ambigue », la suppression ne part pas ;
+//    L7  un bouton aux attributs appris mais au MOT différent (« Signaler ») n'est jamais pris pour « Envoyer ».
 //   VESTIAIRE
 //    C1  champ et bouton appris renommés ⇒ retrouvés, le message part ;
 //    C2  deux champs pareils ⇒ rien n'est tapé ;   C3  aucun champ ⇒ « champ-introuvable », journal envoyé.
@@ -264,6 +265,10 @@ const valeurs = (pg) => pg.evaluate(() => Object.fromEntries([...document.queryS
       const jr = p.envois.find((m) => m.action === 'trouveJournal');
       const e = jr && jr.trouves.find((x) => x.nom === 'champMessage');
       dit(!!e && e.s === '' && e.essais.length >= 3 && !JSON.stringify(jr).includes('Bonjour'), 'L4 le journal part au fond : l’élément, chaque stratégie et son compte — jamais le texte', JSON.stringify(jr));
+    });
+    // L7 : un bouton qui garde les attributs appris (data-qa-id, type) mais pas le MOT (« Signaler ») n'est jamais pris pour « Envoyer ».
+    await msgLbc('L7', '<form><textarea name="body" placeholder="Écrivez votre message"></textarea><button type="submit" data-qa-id="send-button" data-signaler>Signaler</button><button type="button" aria-label="Envoyer" data-envoi>➤</button></form>', UI_LBC_MSG, async (r, p) => {
+      dit(r.confirme === true && p.envoye.length === 1, 'L7 « Signaler » garde les attributs appris mais pas le mot ⇒ jamais pris ; le vrai « Envoyer » (son nom) part', JSON.stringify({ r, p }));
     });
     const supLbc = async (nom, dialogue, juge) => cas(nom, async () => {
       const t = await ouvrir(b, 'https://www.leboncoin.fr/compte/part/mes-annonces', PAGE_LBC_SUP({ dialogue }));

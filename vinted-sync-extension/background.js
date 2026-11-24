@@ -3143,6 +3143,7 @@ function signalerForme(uid, d) {
       if (!ok) return;
       u[d.type] = { at: Date.now(), sig }; st[String(uid)] = u;
       await chrome.storage.local.set({ [FORMES_VUES]: st });
+      majSanteSites().catch(() => {});
     } catch (_) {}
   });
 }
@@ -3159,6 +3160,7 @@ function formeRevenue(uid, type) {
       delete u[type]; st[String(uid)] = u;
       await chrome.storage.local.set({ [FORMES_VUES]: st });
       noterDiag(`forme_revenue_${type}`);
+      majSanteSites().catch(() => {});
     } catch (_) {}
   });
 }
@@ -18065,6 +18067,81 @@ async function retenirTrouves(etape, o, siteDit) {
     await chrome.storage.local.set({ [TROUVE_CLE_S]: m });
     if (journal.length) { const j = (await chrome.storage.local.get(TROUVE_JOURNAL))[TROUVE_JOURNAL]; const l = (Array.isArray(j) ? j : []).concat(journal).slice(-TROUVE_JOURNAL_MAX); await chrome.storage.local.set({ [TROUVE_JOURNAL]: l }); }
   } catch (_) {}
+  majSanteSites().catch(() => {});
+}
+// ══ 5.448 (`santesites`) — UNE LIGNE PAR SITE : « tout marche » / « X ne marche plus : fais Y » ══════════════════
+//  Julien : « l'extension doit être intelligente ». Ce que l'extension SAIT déjà, lu sans aucune requête :
+//   · le journal de la couche de repérage (`vrmTrouverJournal`) : un élément introuvable ou en double, et PAS retrouvé
+//     depuis (la mémoire du site, `vrmTrouve*`, garde l'heure du dernier succès de chaque élément) — 7 jours au plus ;
+//   · une RÉPONSE de forme changée : Vinted (`vrmFormesVues`, posées par `signalerForme`, retirées par `formeRevenue`),
+//     Vestiaire (`vrmVcCapte[…].inconnu`), Leboncoin (`vrmLbcForme`, sa liste « Mes annonces ») — rien n'a été rangé.
+//  Verdict : une forme changée d'abord (« Vinted a changé sa page des ventes : VRM attend la correction »), puis un
+//  élément (le bouton par son nom, et LE geste), sinon « tout marche » ; rien jamais vu ici ⇒ « pas encore vu ici ».
+//  Chaque NOUVEAU problème d'un site est dit UNE fois par une notification de l'ordinateur (là où Chrome le permet) ;
+//  la ligne reste dans la carte tant qu'il dure. Jamais un silence, jamais une alarme répétée.
+const SANTE_SITES = 'vrmSanteSites', SANTE_JOURNAL_MS = 7 * 864e5;
+const NOMS_SITES_SANTE = { vinted: 'Vinted', lbc: 'Leboncoin', vc: 'Vestiaire', ebay: 'eBay' };
+const LIB_ELEMENTS_SITES = {
+  lbc: { champMessage: 'le champ du message', envoyer: 'le bouton « Envoyer »', champPrix: 'le champ du prix', appris: 'un bouton appris' },
+  vc: { champMessage: 'le champ du message', envoyer: 'le bouton « Envoyer »', appris: 'un bouton appris' },
+  ebay: { titre: 'le champ du titre', description: 'le champ de la description', prix: 'le champ du prix', sku: 'le champ de la référence' },
+};
+// La table de vrm-trouver.js ↔ le nom de l'étape (celui des phrases de Vinted).
+const TABLE_VERS_MANQUE = { supprimerConfirmer: 'supprimer-confirmation', publier: 'ajouter', champMessage: 'message-champ', envoyer: 'message-envoyer', boutonOffre: 'offre-bouton', offreValider: 'offre-valider' };
+const FORMES_PAGES_SANTE = { listings: 'sa page des annonces', orders_sold: 'sa page des ventes', orders_purchased: 'sa page des achats', inbox: 'sa messagerie', transaction: 'le détail des ventes', conversation: 'ses conversations', profile: 'la page du profil', billing: 'le porte-monnaie' };
+function verdictElement(site, nom, ambigu) {
+  const n = NOMS_SITES_SANTE[site];
+  if (site === 'vinted') { const m = TABLE_VERS_MANQUE[nom] || nom; return { k: 'element', nom, t: `${quoiElement(m + (ambigu ? '-ambigu' : ''))}. ${gesteElement(m + (ambigu ? '-ambigu' : ''))}` }; }
+  const lib = (LIB_ELEMENTS_SITES[site] || {})[nom] || `l'élément « ${nom} »`;
+  const geste = site === 'ebay' ? 'Geste : remplis-le toi-même sur eBay cette fois, puis touche « Envoyer un rapport » dans la fenêtre de l’extension.'
+    : `Geste : fais ce geste une fois toi-même sur ${site === 'lbc' ? 'leboncoin.fr' : 'vestiairecollective.com'}, dans ce Chrome (VRM réapprend), puis touche « Envoyer un rapport ».`;
+  return { k: 'element', nom, t: `${n} : ${lib} ${ambigu ? 'est en double sur la page (VRM ne choisit jamais)' : 'ne marche plus (la page a changé)'}. ${geste}` };
+}
+async function santeSites() {
+  let st = {};
+  try { st = await chrome.storage.local.get([TROUVE_JOURNAL, TROUVE_CLE, TROUVE_CLE + '_lbc', TROUVE_CLE + '_vc', TROUVE_CLE + '_ebay', FORMES_VUES, 'vrmVcCapte', 'vrmLbcForme', 'vrmFlux']); } catch (_) { return null; }
+  const t = Date.now(), out = {};
+  const journal = Array.isArray(st[TROUVE_JOURNAL]) ? st[TROUVE_JOURNAL] : [];
+  for (const site of ['vinted', 'lbc', 'vc', 'ebay']) {
+    const n = NOMS_SITES_SANTE[site];
+    const mem = st[cleTrouveSite(site)], el = (mem && mem.el) || {};
+    let v = null;
+    // 1. une réponse de forme changée (rien n'est rangé) — la plus grave : des données manquent.
+    if (site === 'vinted') { const fv = st[FORMES_VUES] || {}; for (const uid of Object.keys(fv)) for (const ty of Object.keys(fv[uid] || {})) if (!v) v = { k: 'forme', nom: ty, t: `Vinted a changé ${FORMES_PAGES_SANTE[ty] || 'une page'} : VRM ne la lit plus et n'en range rien de faux ; il attend la correction (la prochaine version). Geste : touche « Envoyer un rapport » dans la fenêtre de l’extension.` }; }
+    if (site === 'vc') { const c = st.vrmVcCapte || {}; const q = Object.keys(c).find((k) => c[k] && c[k].inconnu === true); if (q) v = { k: 'forme', nom: q, t: `Vestiaire a changé sa page (${q}) : VRM ne la lit plus et n'en range rien de faux ; il attend la correction. Geste : touche « Envoyer un rapport » dans la fenêtre de l’extension.` }; }
+    if (site === 'lbc' && st.vrmLbcForme && t - Number(st.vrmLbcForme.at || 0) < SANTE_JOURNAL_MS) v = { k: 'forme', nom: 'mes-annonces', t: "Leboncoin a changé ta page « Mes annonces » : VRM ne la lit plus et n'en range rien de faux ; il attend la correction. Geste : touche « Envoyer un rapport » dans la fenêtre de l’extension." };
+    // 2. un élément introuvable ou en double, pas retrouvé depuis.
+    if (!v) {
+      const siens = journal.filter((e) => e && (e.site || 'vinted') === site && t - Number(e.at || 0) < SANTE_JOURNAL_MS).sort((a, b) => Number(b.at) - Number(a.at));
+      for (const e of siens) { const ok = el[e.nom]; if (ok && Number(ok.at || 0) > Number(e.at || 0)) continue; v = verdictElement(site, String(e.nom || ''), !!e.ambigu); break; }
+    }
+    const vu = Object.keys(el).length || journal.some((e) => (e && (e.site || 'vinted')) === site) || (site === 'vinted' && st.vrmFlux && st.vrmFlux.vinted) || (site === 'vc' && st.vrmVcCapte && Object.keys(st.vrmVcCapte).length) || (site === 'lbc' && st.vrmFlux && st.vrmFlux.leboncoin);
+    out[site] = v ? Object.assign({ ok: false }, v) : vu ? { ok: true, k: 'ok', t: `${n} : tout marche.` } : { ok: null, k: 'pas-vu', t: `${n} : pas encore vu dans ce Chrome.` };
+  }
+  return out;
+}
+// Recalcule, range, et dit UNE fois chaque nouveau problème (même site, même cause ⇒ jamais deux fois).
+let _santeSitesEnVol = null;
+function majSanteSites() {
+  if (_santeSitesEnVol) return _santeSitesEnVol;
+  _santeSitesEnVol = (async () => {
+    try {
+      const v = await santeSites(); if (!v) return null;
+      let avant = {}; try { avant = (await chrome.storage.local.get(SANTE_SITES))[SANTE_SITES] || {}; } catch (_) { avant = {}; }
+      const dits = Object.assign({}, avant.dits || {});
+      for (const site of Object.keys(v)) {
+        const x = v[site]; if (x.ok !== false) { delete dits[site]; continue; }
+        const cle = x.k + ':' + x.nom;
+        if (dits[site] === cle) continue;
+        dits[site] = cle;
+        noterDiag('sante_' + site + '_' + x.k);
+        try { if (chrome.notifications && chrome.notifications.create) chrome.notifications.create('vrm-sante-' + site, { type: 'basic', iconUrl: 'icon-128.png', title: 'VRM · ' + NOMS_SITES_SANTE[site], message: String(x.t).slice(0, 240), priority: 0 }, () => { void chrome.runtime.lastError; }); } catch (_) {}
+      }
+      await chrome.storage.local.set({ [SANTE_SITES]: { at: Date.now(), sites: v, dits } });
+      return v;
+    } catch (_) { return null; } finally { _santeSitesEnVol = null; }
+  })();
+  return _santeSitesEnVol;
 }
 // ══ 5.440 — uuid de la nouvelle messagerie ↔ ancien n° de la conversation (appris de la page, jamais deviné) ══════════
 const CONV_ROUTES = 'vrmConvRoutes', CONV_ROUTES_MAX = 300;
@@ -25255,6 +25332,7 @@ async function noterVcCapte(quoi, ok, n, extra) {
     const cur = (await chrome.storage.local.get('vrmVcCapte')).vrmVcCapte || {};
     if (ok) cur[quoi] = Object.assign({ at: Date.now(), n: Number(n) || 0 }, extra && extra.inconnu ? { inconnu: true } : {});
     await chrome.storage.local.set({ vrmVcCapte: cur });
+    if (ok) majSanteSites().catch(() => {});
     await noterFlux('vestiaire', ok);
   } catch (_) {}
 }
@@ -26255,7 +26333,10 @@ async function etatSite(url,tabId) {
   if (plateforme === 'vinted' && site && site.id && vrm && vrm.connecte === true && site.choix !== 'non') site.favoris = await favorisPourCarte(String(site.id), true).catch(() => null);
   // 5.377 : le réglage « Dire ce que l'extension capte » (true · false · null = pas su).
   const capteCoupeEtat = await capteCoupe();
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu, toutArrete, maj, aReparer, enAttenteReseau, secu, liens, capture, capteCoupe: capteCoupeEtat };
+  // 5.448 (`santesites`) : la ligne de santé de CE site (« tout marche » / « X ne marche plus : fais Y ») — `null` = pas su.
+  const santeToutes = await avecDelai(santeSites(), 400, null).catch(() => null);
+  const santeSite = santeToutes ? santeToutes[{ vinted: 'vinted', leboncoin: 'lbc', vestiaire: 'vc', ebay: 'ebay' }[plateforme]] || null : null;
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu, toutArrete, maj, aReparer, enAttenteReseau, secu, liens, capture, capteCoupe: capteCoupeEtat, santeSite };
 }
 // ══ 5.376 — « PLUS SIMPLE POUR TOUT LE MONDE » : CE QUI MANQUE, EN UNE PHRASE ══
 // Julien : « que ce soit beaucoup mieux et beaucoup plus simple pour tout le
@@ -27452,6 +27533,8 @@ async function etatPourApp() {
       avecDelai(etatIciPourApp(uid && !vintedPasSu ? String(uid) : ''), 900, null).catch(() => null).then((ici) => ({ ici })),
       // 5.420 (`santecomptes`) : la santé de chaque compte de CE navigateur (le dernier calcul de 30 s au plus) — `null` = pas su.
       avecDelai(santeComptes(), 250, null).catch(() => null).then((sante) => ({ sante })),
+      // 5.448 (`santesites`) : une ligne par site (« tout marche » / « X ne marche plus : fais Y ») — `null` = pas su.
+      avecDelai(santeSites(), 250, null).catch(() => null).then((sitesSante) => ({ sitesSante })),
       // 5.433 (`filevisible`) : la file des actions de CE navigateur (ce qui passe, ce qui attend, la pause) — `null` = pas su.
       avecDelai(vueFileApp(), 250, null).catch(() => null).then((file) => ({ file })),
       // 5.428 (`endirect`) : ce que fait l'extension en ce moment — `null` = pas su.
@@ -39787,6 +39870,13 @@ async function repondreVestiaire(msg) {
     const depuis = Number(cpt.at) || (Date.now() - 5);   // SES places (X8)
     let rep = null;
     try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'vcEcrireUI', conv, texte, compte: o.compte }, { frameId: 0 }), 45000 + texte.length * 250, null); } catch (_) { rep = null; }
+    // 5.448 (`repriseseule`) : la messagerie de SON onglet n'avait pas fini de se charger (rien tapé) ⇒ 2 s, puis le même
+    //    ordre UNE fois de plus (son onglet n'est jamais rechargé : il peut y être en train d'écrire).
+    if (repriseSeule(rep)) {
+      noterDiag('vc_reprise_' + String(rep.erreur).replace(/[^a-z-]/g, '').slice(0, 30));
+      await new Promise((ok) => setTimeout(ok, 2000));
+      try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'vcEcrireUI', conv, texte, compte: o.compte }, { frameId: 0 }), 45000 + texte.length * 250, null); } catch (_) { rep = null; }
+    }
     if (!rep || rep.ok !== true) { noterDiag('vc_ecrire_muet'); return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si le message est parti : regarde la conversation sur Vestiaire avant de renvoyer" }; }
     const e = String(rep.erreur || '');
     if (rep.defi === true || e === 'verification') {
@@ -41585,6 +41675,25 @@ async function noterUiLbc(msg) {
 // Le geste, dans un ONGLET DE TRAVAIL ouvert à l'adresse apprise. `{ rien: true, … }` = rien n'est parti (certain) ;
 // `{ rep }` = la réponse de lbc-ecrire.js (null : muet — on ne SAIT PAS).
 const SORTE_LBC_FILE = { pause: 'pause', supprime: 'retrait', prix: 'prix', repondre: 'message' };
+// ══ 5.448 (`repriseseule`) — LA PAGE PAS PRÊTE SE RATTRAPE SEULE ═══════════════════════════════════════════════════
+//  Julien : « l'extension doit être intelligente ». Une page de travail qui n'a pas encore dit son compte, dont le canal
+//  ne répond pas, ou dont la conversation n'est pas encore chargée n'est PAS une panne : l'onglet est rechargé (Leboncoin)
+//  ou réinterrogé (Vestiaire) UNE fois, puis l'ordre repart — seulement quand la page a répondu « rien n'est parti »
+//  (aucun clic, rien tapé). Sinon, l'arrêt d'avant, avec sa phrase et son geste. Aucune requête au site, aucun geste
+//  de plus : la même commande, dans la même place du plafond.
+const CODES_PAGE_PAS_PRETE = new Set(['page-muette', 'canal', 'conversation-pas-chargee', 'compte-pas-su', 'autre-conversation']);
+function repriseSeule(rep) {
+  return !!(rep && rep.ok === true && !rep.statut && rep.geste !== true && rep.envoye !== true && rep.tape !== true && CODES_PAGE_PAS_PRETE.has(String(rep.erreur || '')));
+}
+async function rechargerOnglet(tabId) {
+  try { await chrome.tabs.reload(tabId); } catch (_) { return false; }
+  for (const fin = Date.now() + 15000; Date.now() < fin;) {
+    let t = null; try { t = await chrome.tabs.get(tabId); } catch (_) { return false; }
+    if (t && t.status === 'complete') return true;
+    await new Promise((ok) => setTimeout(ok, 300));
+  }
+  return false;
+}
 async function gesteLbcInterface(quoi, compte, url, ordre, budgetMs) {
   // 5.433 (`filevisible`) : le geste entre dans la file (une étape de l'action en cours de CE compte, ou une action à lui).
   const uidF = 'lbc:' + String(compte || '').replace(/[^\w-]/g, '').slice(0, 30);
@@ -41596,19 +41705,32 @@ async function gesteLbcInterface(quoi, compte, url, ordre, budgetMs) {
   try { t = await chrome.tabs.create({ url, active: false }); } catch (_) { t = null; }
   if (!t || t.id == null) return { rien: true, code: 'onglet', raison: "VRM n'a pas pu ouvrir l'onglet Leboncoin de travail — rien n'est parti" };
   try {
-    const c = await attendreSessionOnglet(t.id, LBC_PAUSE_ATTENTE_SESSION_MS);
+    let c = await attendreSessionOnglet(t.id, LBC_PAUSE_ATTENTE_SESSION_MS);
+    // 5.448 : la page n'a pas encore dit son compte ⇒ rechargée UNE fois, la session relue.
+    if (!c || c.ambigue || !c.compte) { noterDiag('lbc_reprise_session'); if (await rechargerOnglet(t.id)) c = await attendreSessionOnglet(t.id, LBC_PAUSE_ATTENTE_SESSION_MS); }
     if (!c || c.ambigue || !c.compte) return { rien: true, code: 'session', raison: "Leboncoin ne m'a pas dit quel compte est connecté dans l'onglet de travail — ouvre leboncoin.fr connecté sur le bon compte, puis réessaie (rien n'est parti)" };
     if (c.compte !== 'lbc-account:' + compte) return { rien: true, code: 'autre-compte', autre: idCompteLbc(c.compte) };
-    let pret = false;
-    for (const fin = Date.now() + LBC_UI_PRET_MS; Date.now() < fin;) {
-      let r = null;
-      try { r = await avecDelai(chrome.tabs.sendMessage(t.id, { from: 'vrm-fond', action: 'lbcEcrirePret' }, { frameId: 0 }), 2000, null); } catch (_) { r = null; }
-      if (r && r.ok === true && r.canal === true) { pret = true; break; }
-      await new Promise((ok) => setTimeout(ok, 500));
-    }
+    const attendrePret = async () => {
+      for (const fin = Date.now() + LBC_UI_PRET_MS; Date.now() < fin;) {
+        let r = null;
+        try { r = await avecDelai(chrome.tabs.sendMessage(t.id, { from: 'vrm-fond', action: 'lbcEcrirePret' }, { frameId: 0 }), 2000, null); } catch (_) { r = null; }
+        if (r && r.ok === true && r.canal === true) return true;
+        await new Promise((ok) => setTimeout(ok, 500));
+      }
+      return false;
+    };
+    let pret = await attendrePret();
+    if (!pret) { noterDiag('lbc_reprise_canal'); if (await rechargerOnglet(t.id)) pret = await attendrePret(); }
     if (!pret) return { rien: true, code: 'canal', raison: "la page Leboncoin de travail ne répond pas à VRM — recharge leboncoin.fr, puis réessaie (rien n'est parti)" };
     let rep = null;
     try { rep = await avecDelai(chrome.tabs.sendMessage(t.id, Object.assign({}, ordre, { from: 'vrm-fond', action: 'lbcGesteUI', quoi, compte }), { frameId: 0 }), budgetMs, null); } catch (_) { rep = null; }
+    // 5.448 : la page a répondu « pas prête, rien n'est parti » ⇒ rechargée UNE fois, le même ordre repart.
+    if (repriseSeule(rep)) {
+      noterDiag('lbc_reprise_' + String(rep.erreur).replace(/[^a-z-]/g, '').slice(0, 30));
+      if (await rechargerOnglet(t.id) && await attendrePret()) {
+        try { rep = await avecDelai(chrome.tabs.sendMessage(t.id, Object.assign({}, ordre, { from: 'vrm-fond', action: 'lbcGesteUI', quoi, compte }), { frameId: 0 }), budgetMs, null); } catch (_) { rep = null; }
+      }
+    }
     return { rep };
   } finally { try { await chrome.tabs.remove(t.id); } catch (_) {} }
 }
@@ -43382,14 +43504,14 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
   const quota = detectLbcQuota(data);
   // Recon : un échantillon du corps (tronqué) + l'URL, pour inspecter la vraie forme.
   await storeLbcRecon({ url, quota: quota || undefined, sample: { url, at: new Date().toISOString(), found: found.length, quota, body: String(body).slice(0, 9000) } },owner);
-  if (found.length) return await storeLbcListings(url, found,owner);
+  if (found.length) { if (listeMoi) { try { await chrome.storage.local.remove('vrmLbcForme'); } catch (_) {} majSanteSites().catch(() => {}); } return await storeLbcListings(url, found,owner); }
   if(listeMoi&&sessListe&&(Array.isArray(data?.ads)||Array.isArray(data?.data?.ads))&&racine.length===0)return {ok:true,etat:'liste-vide',nombre:0,photos:0};
   // (1er nov., 5.296) Le tableau de bord pro qui rend `Ads: []` (Total 0) est une
   // liste VIDE, pas un format inconnu.
   if(/\/classifieds\/analysis\/list/i.test(String(url||''))&&data&&Array.isArray(data.Ads)&&data.Ads.length===0)return {ok:true,etat:'liste-vide',nombre:0,photos:0};
   // 5.448 (`adaptatif`) : SA liste « Mes annonces » d'une forme que VRM ne reconnaît plus : rien n'est rangé (ci-dessus),
   //    la forme est dans `lbc_recon` ; le compteur rend la panne visible dans le diagnostic (comme `forme_inconnue_*` sur Vinted).
-  if (listeMoi) noterDiag('lbc_forme_inconnue_mes_annonces');
+  if (listeMoi) { noterDiag('lbc_forme_inconnue_mes_annonces'); try { await chrome.storage.local.set({ vrmLbcForme: { at: Date.now() } }); } catch (_) {} majSanteSites().catch(() => {}); }
   return {ok:true,etat:'aucune-annonce-reconnue',nombre:0,photos:0};
 }
 // Télécharge les photos d'une paire en FICHIERS (fini les onglets). Rangées dans
