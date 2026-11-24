@@ -25234,15 +25234,18 @@ function HoteMettreAussiSur({ comptes, num, numData, onFermer }) {
     if (!attend) return;
     setEtats((x) => { let ch = false; const n = { ...x }; for (const s of SITES_QUATRE) { const e = Q ? Q.etatSuivi(x[s], vus.deja[s], vus.liens[s]) : x[s]; if (e !== x[s]) { n[s] = e; ch = true; } } return ch ? n : x; });
   }, [vus, attend]);
-  // Le prix Vinted RELU : le dressing du compte de la paire (la même lecture que la source partagée).
+  // Le prix Vinted RELU : le dressing du compte de la paire, lu À NEUF dans la base (`force` : jamais la réponse gardée
+  // en mémoire — le banc l'a prouvé, une lecture gardée rendait l'ancien prix). Une lecture ratée ⇒ null (pas su).
   const relirePrix = async () => {
-    if (!paire) return null;
-    const cpt = Array.isArray(comptes) ? comptes.filter((a) => !paire.uid || String(a && a.vinted_user_id) === String(paire.uid)) : null;
-    const lu = await lireAnnoncesVintedEnLigne(cpt && cpt.length ? cpt : comptes).catch(() => null);
-    if (!lu || !(lu.enLigne instanceof Set)) return null;
-    if (!lu.enLigne.has(String(paire.id))) return 'absente';
-    const p = lu.prix && lu.prix[String(paire.id)];
-    return p == null ? null : Number(p);
+    if (!paire || !Array.isArray(comptes)) return null;
+    const cpt = comptes.filter((a) => a && a.vinted_user_id && (!paire.uid || String(a.vinted_user_id) === String(paire.uid)));
+    if (!cpt.length) return null;
+    const lus = await Promise.all(cpt.map((a) => fetchHarvest(a.vinted_user_id, 'listings', { force: true }).catch(() => undefined)));
+    if (lus.some((L) => !(L && Array.isArray(L.items)))) return null;
+    const it = lus.flatMap((L) => L.items).find((x) => x && String(x.id) === String(paire.id));
+    if (!it || !isOnlineListing(it)) return 'absente';
+    const p = Number(it.price && typeof it.price === 'object' ? it.price.amount : it.price);
+    return Number.isFinite(p) && p > 0 ? p : null;
   };
   const creer = async () => {
     if (!forme || occupe || !Q) return;

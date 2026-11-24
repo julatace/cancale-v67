@@ -134,7 +134,7 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     dit(!pl.ok && pl.code === 'sous-plancher', 'P4 — eBay : jamais sous le plancher (prix mini)', JSON.stringify(pl));
     const fr = Q.prixSite(f, 'ebay', FRAIS.ebay), fv = Q.prixSite(f, 'vestiaire', FRAIS.vestiaire);
     dit(fr.ok && fr.frais.montant === 7.61 && fr.net === 51.39 && fv.frais.etat === 'pasLu' && fv.frais.montant === null, 'P5 — les frais : eBay au taux lu (12,9 %), Vestiaire « pas lus » (jamais 0)', JSON.stringify([fr, fv]));
-    dit(/relirePrix/.test(hote) && /lireAnnoncesVintedEnLigne/.test(hote) && /executerQuatre/.test(hote), 'P6 — l’hôte relit le prix (dressing du compte) et passe par executerQuatre'); }
+    dit(/relirePrix/.test(hote) && /fetchHarvest\([^)]*'listings', \{ force: true \}\)/.test(hote) && /executerQuatre/.test(hote), 'P6 — l’hôte relit le prix À NEUF (dressing du compte, `force`, jamais la réponse gardée) et passe par executerQuatre'); }
 
   // ── U : rien vers un compte pas relié ──
   { const base = { comptes: { leboncoin: [{ id: 'a' }], vestiaire: [{ id: 'b' }], ebay: [{ id: 'principal' }] }, ext: { aussi: 'ok', lien: 'ok' }, deja: { leboncoin: false, vestiaire: false, ebay: false } };

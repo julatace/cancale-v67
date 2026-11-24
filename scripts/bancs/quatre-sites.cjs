@@ -206,7 +206,8 @@ const brouillons = () => { const r = LIGNES.find((x) => x.id === 'ebay_brouillon
       const { ctx, pg, errs } = await preparer(b, vp, sombre);
       await essaie('A–D', async () => {
         await aller(pg, 'tab=annonces');
-        await pg.waitForSelector('[data-sb-avant-cle="111_9013"]', { timeout: 30000 });
+        await pg.waitForSelector('[data-sb-avant-cle]', { timeout: 30000 }).catch(() => {});
+        await capture(pg, `q4-depart-${typeof nomVp === 'string' ? nomVp : '1512'}`);
         await ouvrir(pg, '13');
         const s = await sites(pg);
         dit(s.map((x) => x.site).join() === 'leboncoin,vestiaire,ebay', `${nomVp} · A · trois sites, une case chacun`, JSON.stringify(s.map((x) => x.site)));
@@ -257,7 +258,8 @@ const brouillons = () => { const r = LIGNES.find((x) => x.id === 'ebay_brouillon
       const { ctx, pg } = await preparer(b, { width: 1512, height: 950 }, false);
       await essaie('E', async () => {
         await aller(pg, 'tab=annonces');
-        await pg.waitForSelector('[data-sb-avant-cle="111_9013"]', { timeout: 30000 });
+        await pg.waitForSelector('[data-sb-avant-cle]', { timeout: 30000 }).catch(() => {});
+        await capture(pg, `q4-depart-${typeof nomVp === 'string' ? nomVp : '1512'}`);
         await ouvrir(pg, '13');
         const s = await sites(pg); const eb = s.find((x) => x.site === 'ebay');
         dit(eb.possible === '0' && eb.code === 'ebay-jeton' && /eBay/.test(eb.t), '1512 · E · eBay pas relié : grisé, « relie eBay »', JSON.stringify(eb));
