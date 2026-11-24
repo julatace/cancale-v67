@@ -18153,10 +18153,18 @@ function Toaster() {
     const vis = () => { raisons.current.cache = document.visibilityState === 'hidden'; suspendre(); };
     document.addEventListener('visibilitychange', vis);
     const vv = window.visualViewport;
+    // (24 nov., vitesse) Posée seulement quand elle CHANGE, et jamais « 0px » sur une racine qui ne la porte pas (les feuilles la
+    // lisent avec `0px` par défaut : `var(--vrm-clavier, 0px)`). Une variable de la racine qui change invalide le style de TOUT
+    // le document : posée à 0 au montage puis à chaque défilement de `visualViewport`, elle coûtait un recalcul complet au
+    // démarrage (profil, banc vitesse-iphone, 390 ×4) ; même rendu.
+    let posee = document.documentElement.style.getPropertyValue('--vrm-clavier') || '';
     const clavier = () => {
       if (!vv) return;
       const h = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
-      document.documentElement.style.setProperty('--vrm-clavier', (h > 80 ? h : 0) + 'px');
+      const v = h > 80 ? h + 'px' : '';
+      if (v === posee) return;
+      posee = v;
+      if (v) document.documentElement.style.setProperty('--vrm-clavier', v); else document.documentElement.style.removeProperty('--vrm-clavier');
     };
     if (vv) { vv.addEventListener('resize', clavier); vv.addEventListener('scroll', clavier); clavier(); }
     return () => {
