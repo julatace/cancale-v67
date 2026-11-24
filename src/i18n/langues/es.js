@@ -24,10 +24,12 @@ import ecran_apresFinale from './es/apresFinale.js';   // (22 nov.) après la fi
 import ecran_styleClarte from './es/styleClarte.js';   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './es/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './es/ext5438.js';   // (22 nov.) ext. 5.438
+import ecran_observation from './es/observation.js';   // (24 nov.) ext. 5.440.3 « Observer Vinted »
 import ecran_ext5428 from './es/ext5428.js';   // (21 nov.) ext. 5.428   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_relier_retires from './es/relierRetires.js';   // (21 nov.) relier ce qui est chez moi, colis non retirés, remboursés hors dépenses
 import ecran_verre2 from './es/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './es/fiched.js';
+import ecran_vente_mail from './es/venteMail.js';   // (24 nov.) la vente vue par e-mail et son annonce
 import ecran_egalite from './es/egalite.js';
 import ecran_tableau from './es/tableau.js';   // (19 nov. soir) le tableau de travail
 import ecran_publierAgent from './es/publierAgent.js';
@@ -2406,11 +2408,13 @@ export default {
   ...ecran_ext5428,
   ...ecran_lotachat,
   ...ecran_ext5438,
+  ...ecran_observation,
   ...ecran_a_distance,
   ...ecran_apresFinale,
   ...ecran_styleClarte,
   ...ecran_relier_retires,
   ...ecran_fiched,
+  ...ecran_vente_mail,
   ...ecran_egalite,
   ...ecran_tableau,
   ...ecran_publierAgent,

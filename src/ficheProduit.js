@@ -31,6 +31,8 @@ export function situation(p, sites = []) {
   const v = etape(p, 'vente');
   if (v && v.etat === 'fait') return 'vendue';
   if (v && v.etat === 'passu') return 'passu';
+  // (24 nov., vente-mail-annonce) Vendue d'après l'e-mail de vente (son annonce désignée par une identité), Vinted pas encore relu.
+  if (v && v.etat === 'mail') return 'vendue-mail';
   const enLigne = (sites || []).filter((s) => s && s.etat === 'en-ligne').length;
   if (enLigne || (p.resume && p.resume.siVendue)) return 'en-vente';
   return 'stock';
@@ -67,7 +69,9 @@ export function ligneEtat(p, { sites = [], etat = null, dateCourte = (x) => x, a
     if (p.aPoster && action !== 'bordereau') return { cle: prix != null ? 'fd.etat.vendueEnvoyer' : 'fd.etat.vendueEnvoyerSansPrix', vars: { prix }, ambre: true };
     return { cle: prix != null && d != null ? 'fd.etat.vendueLe' : prix != null ? 'fd.etat.vendue' : 'fd.etat.vendueSansPrix', vars: { prix, date: d != null ? dateCourte(d) : '' }, ambre: false };
   }
-  if (s === 'passu') return { cle: 'fd.etat.passu', vars: {}, ambre: false };
+  // (24 nov.) « Pas su » se dit UNE fois, ici, neutre, avec « Pourquoi ? » (`pourquoi`) — les faits ne le redisent pas (« — » seul).
+  if (s === 'passu') return { cle: 'fd.etat.passu', vars: {}, ambre: false, pourquoi: 'fd.pourquoi.passu' };
+  if (s === 'vendue-mail') return { cle: 'fd.etat.vendueMail', vars: {}, ambre: false, pourquoi: 'fd.pourquoi.vendueMail' };
   if (s === 'en-vente') {
     const enL = (sites || []).filter((x) => x && x.etat === 'en-ligne');
     const sv = r.siVendue || null;
@@ -128,6 +132,9 @@ function joursDepuisSites(sites, maintenant) {
 // Rend [{ cle, lib, cents | texte | jours | date, signe, partiel, raison, porte, large }] — rien de calculé ici.
 const RAISON_BENEF = (r) => (r.achat == null ? 'fd.r.sansAchat' : /écartée|convertie|annonce en /.test(str(r.raisonBenef)) ? 'fd.r.devise'
   : /pas lues/.test(str(r.raisonBenef)) ? 'fd.r.ventesPasLues' : /prix de vente/.test(str(r.raisonBenef)) ? 'fd.r.prixIllisible' : 'fd.r.fraisIllisibles');
+// (24 nov.) Les situations dont la ligne d'état dit déjà le « pas su » (avec « Pourquoi ? ») : leurs faits manquants s'écrivent « — »
+// seul, jamais la même raison trois fois (capture de Julien : « Ventes pas encore lues », « — pas lu », « bénéfice — ventes pas lues »).
+const MUET = ['passu', 'vendue-mail'];
 export function faitsFiche(p, { sites = [], etat = null, taille = '', peut = {}, relie = false, maintenant = Date.now() } = {}) {
   if (!p || p.double) return [];
   const r = p.resume || {};
@@ -141,7 +148,7 @@ export function faitsFiche(p, { sites = [], etat = null, taille = '', peut = {},
     const memePrix = enL.length > 0 && enL.every((x) => x.prix != null && x.prix === enL[0].prix);
     const prix = sv && sv.prix != null ? sv.prix : (memePrix ? enL[0].prix : null);
     out.push({ cle: 'prix', lib: 'fd.f.prix', cents: prix, raison: prix == null ? (enL.length > 1 ? 'fd.r.deuxPrix' : 'fd.r.pasLu') : '', porte: peut.prix ? 'prix' : null });
-  } else out.push({ cle: 'prix', lib: 'fd.f.prix', cents: null, raison: s === 'passu' ? 'fd.r.pasLu' : 'fd.r.pasEnVente' });
+  } else out.push({ cle: 'prix', lib: 'fd.f.prix', cents: null, raison: MUET.includes(s) ? '' : 'fd.r.pasEnVente' });
   // ACHETÉ — la porte de la saisie (ou du choix de l'achat) quand il manque.
   out.push({ cle: 'achat', lib: 'fd.f.achete', cents: r.achat != null ? r.achat : null, raison: r.achat == null ? (s === 'vendue' ? 'fd.r.pasRelie' : 'fd.r.pasSaisi') : '',
     porte: p.ancienNumero ? null : relie ? 'lien' : peut.achat ? 'achat' : (r.achat == null && peut.relier ? 'relier' : null) });
@@ -151,7 +158,7 @@ export function faitsFiche(p, { sites = [], etat = null, taille = '', peut = {},
     const sv = r.siVendue;
     out.push({ cle: 'si-vendue', lib: 'fd.f.siVendue', cents: sv.benefice != null ? sv.benefice : null, signe: true, partiel: sv.etat === 'partiel' && sv.benefice != null,
       raison: sv.benefice == null ? (/deux fois/.test(str(sv.raison)) ? 'fd.r.deuxPrix' : /annonce en /.test(str(sv.raison)) ? 'fd.r.devise' : r.achat == null ? 'fd.r.sansAchat' : 'fd.r.fraisIllisibles') : '', brut: sv.benefice == null ? (sv.raison || '') : '' });
-  } else out.push({ cle: 'benefice', lib: 'fd.f.benefice', cents: null, signe: true, raison: s === 'passu' ? 'fd.r.ventesPasLues' : 'fd.r.pasVendue' });
+  } else out.push({ cle: 'benefice', lib: 'fd.f.benefice', cents: null, signe: true, raison: MUET.includes(s) ? '' : 'fd.r.pasVendue' });
   // TAILLE — celle de la fiche ou de l'annonce (lue par l'écran) ; pas dite ⇒ « — ».
   out.push({ cle: 'taille', lib: 'fd.f.taille', texte: str(taille), raison: str(taille) ? '' : 'fd.r.pasDite' });
   // VENDUE LE / EN LIGNE DEPUIS — une date LUE, sinon « — ».
@@ -159,7 +166,7 @@ export function faitsFiche(p, { sites = [], etat = null, taille = '', peut = {},
     const e = etape(p, 'vente'); const d = premiereDate(e); const t = d != null ? d : ms(e && e.date);
     out.push({ cle: 'quand', lib: 'fd.f.vendueLe', date: t, raison: t == null ? 'fd.r.dateNonLue' : '' });
   } else if (s === 'en-vente') { const j = joursEnLigne(etat) || joursDepuisSites(sites, maintenant); out.push({ cle: 'quand', lib: 'fd.f.enLigne', jours: j ? j.n : null, auMoins: !!(j && j.auMoins), raison: j ? '' : 'fd.r.dateNonLue' }); }
-  else out.push({ cle: 'quand', lib: 'fd.f.enLigne', jours: null, raison: s === 'passu' ? 'fd.r.pasLu' : 'fd.r.pasEnLigne' });
+  else out.push({ cle: 'quand', lib: 'fd.f.enLigne', jours: null, raison: MUET.includes(s) ? '' : 'fd.r.pasEnLigne' });
   // PRIX MINI (une offre est acceptée dès ce prix) — pour UNE annonce en ligne qui peut le porter (`miniPorte` : dit par
   // l'écran ; aujourd'hui la fiche d'une annonce Vinted). Deux annonces qui le portent ⇒ rien de choisi.
   const v1 = enL.filter((x) => x.miniPorte);

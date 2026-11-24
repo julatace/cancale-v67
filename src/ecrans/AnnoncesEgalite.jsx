@@ -27,6 +27,7 @@ import { Bouton as BoutonNatifAE } from '../natif/Bouton.jsx';   // (21 nov., ux
 import { LogoSite } from '../SelecteurSites.jsx';   // (20 nov.) le logo du site dans l'en-tête de chaque compte
 import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES, statutTableau, comptesDesArticles, SITES } from '../articles/modele.js';
 import { annoncesVinted, annoncesLeboncoin, annoncesEbay, annoncesVestiaire, annoncesVintedVendues } from '../articles/sources.js';
+import { venduesParMail, LIENS_VENTE_MAIL } from '../venteMailAnnonce.js';   // (24 nov.) l'annonce vendue par e-mail
 import { photoArticle } from '../photosArticles.js';
 import { groupesParCompte } from '../natif/ecrans/annoncesComptes.js';   // (22 nov.) le nombre de rangées d'un site (filtre Site)   // (22 nov.) la photo d'une vente Vinted (« Vendue »)
 import { CLE_VUES_LUES, noterVuesLues, vuesFavorisEnLigne, publierVuesFavoris, lectureUtile } from '../vuesFavoris.js';
@@ -35,7 +36,7 @@ import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
 import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, photoKey, STUDIO_BASE } from '../App.jsx';
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, lireVentesEmail, photoKey, STUDIO_BASE } from '../App.jsx';
 import { ouvrirPanneau } from '../ouvrirPanneau.js';
 // (22 nov., choix n° 35) « Photo en double » : la règle d'identité par le FICHIER photo exact (src/photoEnDouble.js).
 import { photosEnDouble, numerosEnExemplaires, refuserGroupe, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
@@ -256,13 +257,19 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
       // (21 nov.) Un compte bloqué : ses fiches arrivent en second temps, après les preuves de vente (la liste ne les attend pas).
       // (22 nov., Julien : « j'ai fait 3 ventes mais pas que sur Leboncoin ») … et les annonces Vinted VENDUES : prouvées
       // (<preuve-vente-regle>), reliées à leur vente par le n° de transaction (jamais le titre) — `annoncesVintedVendues`.
-      if (r) Promise.all([lirePreuvesVenteVinted().catch(() => null), fetchTxnItemIds().catch(() => ({})), ventesLuesBientot()]).then(([p, txnItem, ventes]) => {
+      if (r) Promise.all([lirePreuvesVenteVinted().catch(() => null), fetchTxnItemIds().catch(() => ({})), ventesLuesBientot(), lireVentesEmail().catch(() => null)]).then(([p, txnItem, ventes, mails]) => {
         const plus = r.bloques && r.bloques.length ? tracesFiches(r.bloques, p) : [];
         const vendues = annoncesVintedVendues({ ventes, txnItem, vendus: p && p.vendus instanceof Set ? p.vendus : null, comptes: (r.vendusCtx || {}).comptes, dressing: (r.vendusCtx || {}).dressing, photoDe: (o) => photoArticle(o) || null });
-        if (!plus.length && !vendues.length) return;
+        // (24 nov., vente-mail-annonce) L'annonce EN LIGNE qu'un e-mail de vente désigne (son clic, ou la photo exacte — la règle
+        // de src/venteMailAnnonce.js, la même que Ventes et la fiche), lue avant l'e-mail : « Vendue · par e-mail, en attente de
+        // Vinted » — hors d'« En ligne » et des totaux, rien de supprimé ; la relecture du dressing fait foi ensuite.
+        const parMail = venduesParMail({ ventes: mails, annonces: r.annonces.filter((x) => x && x.site === 'vinted' && x.etat === 'enligne').map((x) => ({ id: String(x.id), uid: String(x.compte || ''), photo: x.photo, lu: x.lu })),
+          liens: load(LIENS_VENTE_MAIL, {}) || {}, fiches: load('vinted_annonce_numeros', {}) || {} });
+        if (!plus.length && !vendues.length && !parMail.size) return;
         const parId = new Map(vendues.map((v) => [v.id, v]));
         // Une annonce déjà là (« retirée », trace) et PROUVÉE vendue devient « vendue » ; les autres s'ajoutent.
-        const annonces = r.annonces.map((x) => (x && x.site === 'vinted' && parId.has(String(x.id)) ? { ...x, etat: 'vendue', bloque: null, venduLe: parId.get(String(x.id)).venduLe } : x));
+        const annonces = r.annonces.map((x) => (x && x.site === 'vinted' && parId.has(String(x.id)) ? { ...x, etat: 'vendue', bloque: null, venduLe: parId.get(String(x.id)).venduLe }
+          : x && x.site === 'vinted' && x.etat === 'enligne' && parMail.has(String(x.id)) ? { ...x, etat: 'vendue', venteMail: true, bloque: null, venduLe: parMail.get(String(x.id)).t } : x));
         const deja = new Set(annonces.filter((x) => x && x.site === 'vinted').map((x) => String(x.id)));
         const complet = { ...r, annonces: [...annonces, ...plus.filter((x) => !parId.has(String(x.id))), ...vendues.filter((v) => !deja.has(v.id))] };
         if (_derniereLecture.lu === r) _derniereLecture.lu = complet;
@@ -273,7 +280,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cleComptes, cleBloques, tic]);
   React.useEffect(() => {
-    const f = (e) => { const k = e && e.detail && e.detail.k; if ([CLE_ARTICLES, 'vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', 'vrm_slots', CLE_PHOTO_DOUBLE_NON, 'vinted_bleam'].includes(k)) setTic((t) => t + 1); };
+    const f = (e) => { const k = e && e.detail && e.detail.k; if ([CLE_ARTICLES, LIENS_VENTE_MAIL, 'vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', 'vrm_slots', CLE_PHOTO_DOUBLE_NON, 'vinted_bleam'].includes(k)) setTic((t) => t + 1); };
     const g = (e) => { const d = e && e.detail; if (d && d.type === 'maj') setTic((t) => t + 1); };
     // Une lecture arrivée après sa borne (`borneLecture`) : une relecture, une seule à la fois (le minuteur les regroupe).
     let tr2 = 0; const h = () => { clearTimeout(tr2); tr2 = setTimeout(() => setTic((t) => t + 1), 300); };
@@ -352,7 +359,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   React.useEffect(() => {
     if (!sigEnLigne || sigEnLigne === '{}') return undefined;
     let mort = false;
-    const t = setTimeout(() => { lireRelevesEnLigne(STUDIO_BASE, JSON.parse(sigEnLigne)).then((r) => { if (!mort) setReleves(r); }).catch(() => {}); }, 600);
+    const t = setTimeout(() => { let sig = null; try { sig = JSON.parse(sigEnLigne); } catch (_) { return; } lireRelevesEnLigne(STUDIO_BASE, sig).then((r) => { if (!mort) setReleves(r); }).catch(() => {}); }, 600);
     return () => { mort = true; clearTimeout(t); };
   }, [sigEnLigne]);
   const plusVueAnnonce = (x) => {
@@ -510,7 +517,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   };
   return (
     <>
-    <VueAnnonces priorite={priorite} photoDouble={photoDouble} plusVueDe={plusVueDe} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={(s) => <LogoSite site={s}/>} dortDe={dortDe} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>}
+    <VueAnnonces parMail={modele && Array.isArray(modele.articles) ? modele.articles.filter((a) => a && a.venteMail) : null} priorite={priorite} photoDouble={photoDouble} plusVueDe={plusVueDe} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={(s) => <LogoSite site={s}/>} dortDe={dortDe} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>}
       onCompleter={(sujet) => { try { window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet, num: '', lot: false, at: Date.now() } })); } catch (_) {} }} liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}

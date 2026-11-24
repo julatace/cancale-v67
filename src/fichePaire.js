@@ -43,7 +43,7 @@ export function fusionEntreeVente(base, ov, buyByNum) {
   return avecPrixParNum(m);
 }
 
-const ETAT_ANN = { 'en-ligne': 'en ligne', 'a-confirmer': 'pas revue récemment (lecture ancienne)', masquee: 'masquée par Vinted', 'plus-en-ligne': 'plus en ligne', passu: 'pas encore lue' };
+const ETAT_ANN = { 'en-ligne': 'en ligne', 'a-confirmer': 'pas revue récemment (lecture ancienne)', masquee: 'masquée par Vinted', 'plus-en-ligne': 'plus en ligne', passu: 'pas encore lue', 'vendue-mail': 'vendue · par e-mail, en attente de Vinted' };
 
 // rn : le résultat de `toutSurLeNumero` · d : { fiches, saleOv, buyByNum,
 //   stats ({ [idAnnonce]: { vues, favoris } } ou null = pas lu), versements
@@ -140,7 +140,11 @@ export function parcoursPaire(rn, d = {}, o = {}) {
   // elle est vendue — la vente, le colis et l'argent disent « pas su ».
   const ventesInconnues = !lignesV.length && ['tes ventes Vinted', 'le lien vente → annonce de Vinted', 'tes ventes Leboncoin', 'tes commandes eBay'].some(manque);
   const siteVendu = venteV ? 'Vinted' : venteL ? 'Leboncoin' : venteE ? 'eBay' : null;
-  if (lignesV.length) etapes.push({ cle: 'vente', etat: siteVendu ? 'fait' : 'absent', titre: siteVendu ? `Vendue sur ${siteVendu}` : 'Vente annulée', lignes: lignesV, date: venteV ? venteV.date : null });
+  // (24 nov., vente-mail-annonce) Aucune vente lue, mais l'e-mail de vente désigne SON annonce (identité : son clic ou la photo
+  // exacte — src/venteMailAnnonce.js) : « vendue · par e-mail, en attente de Vinted » — pas « pas su », pas « en vente ».
+  const parMail = !lignesV.length && rn.annonces.some((a) => a.etat === 'vendue-mail');
+  if (parMail) etapes.push({ cle: 'vente', etat: 'mail', titre: 'Vendue', detail: 'par e-mail, en attente de Vinted' });
+  else if (lignesV.length) etapes.push({ cle: 'vente', etat: siteVendu ? 'fait' : 'absent', titre: siteVendu ? `Vendue sur ${siteVendu}` : 'Vente annulée', lignes: lignesV, date: venteV ? venteV.date : null });
   else if (ventesInconnues) etapes.push({ cle: 'vente', etat: 'passu', titre: 'Vente', detail: 'tes ventes pas toutes lues' });
   else etapes.push({ cle: 'vente', etat: 'absent', titre: 'Vente', detail: 'pas encore vendue' });
 

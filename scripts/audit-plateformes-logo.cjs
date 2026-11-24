@@ -176,10 +176,13 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const rec = { 1: new Date(2026, 9, 5, 10).getTime(), 2: null, 3: new Date(2026, 9, 20, 10).getTime() };
   const mk = (t) => (/nike/i.test(t) ? 'Nike' : /adidas/i.test(t) ? 'Adidas' : null);
   const ids = (r) => r.liste.map((a) => a.transaction_id).join();
-  dit(ids(SA.tousAchatsLibresDetail({ achats: A, liens: new Map(), prixMin: '40', prixMax: '90' })) === '2,1', 'C1 prix payé entre deux bornes (incluses)');
-  const d = SA.tousAchatsLibresDetail({ achats: A, liens: new Map(), recuDu: '2026-10-01', recuAu: '2026-10-10', receptionDe: (a) => rec[a.transaction_id] });
+  // (24 nov., main-vert) Depuis le lot relier-retires (21 nov.), un achat pas CHEZ LUI n'est pas reliable (`chezMoiDe`, jugé
+  // ailleurs : audit-relier-retires). Ici on juge les FILTRES : les quatre achats sont posés chez lui.
+  const chez = () => ({ chez: true });
+  dit(ids(SA.tousAchatsLibresDetail({ achats: A, liens: new Map(), chezMoiDe: chez, prixMin: '40', prixMax: '90' })) === '2,1', 'C1 prix payé entre deux bornes (incluses)');
+  const d = SA.tousAchatsLibresDetail({ achats: A, liens: new Map(), chezMoiDe: chez, recuDu: '2026-10-01', recuAu: '2026-10-10', receptionDe: (a) => rec[a.transaction_id] });
   dit(ids(d) === '1' && d.sansReception === 1, 'C2 date de réception LUE ; une réception pas lue n’est pas gardée, elle est comptée à part', JSON.stringify(d));
-  dit(ids(SA.tousAchatsLibresDetail({ achats: A, liens: new Map(), marque: 'nike', marqueDe: mk, taille: '42' })) === '1', 'C3 marque et taille lues du titre');
+  dit(ids(SA.tousAchatsLibresDetail({ achats: A, liens: new Map(), chezMoiDe: chez, marque: 'nike', marqueDe: mk, taille: '42' })) === '1', 'C3 marque et taille lues du titre');
   dit(!SA.tousAchatsLibres({ achats: A, liens: new Map() }).some((a) => a.transaction_id === 4), 'C4 un achat remboursé n’est jamais proposé');
   const f = SA.filtresAchats(A, null, mk);
   dit(f.marques.join() === 'Adidas,Nike' && f.tailles.join() === '42,43', 'C5 les marques et tailles présentes, pour les filtres rapides', JSON.stringify(f));
@@ -193,7 +196,9 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   // (20 nov. soir, Julien : « tu vas aussi enlever les onglets par plateforme ») Plus AUCUN sélecteur de plateforme dans les
   // onglets (ni FiltreSites, ni le sélecteur global) ; l'écran Colis seul garde SelecteurSites ; chaque rangée porte le logo
   // de son site (src/natif/LogoSite.jsx), dans Ventes, Annonces et Aujourd'hui.
-  const VENTES = fs.readFileSync(path.join(SRC, 'natif', 'ecrans', 'Ventes.jsx'), 'utf8'), ANN = fs.readFileSync(path.join(SRC, 'natif', 'ecrans', 'Annonces.jsx'), 'utf8');
+  const VENTES = fs.readFileSync(path.join(SRC, 'natif', 'ecrans', 'Ventes.jsx'), 'utf8'), ANN = fs.readFileSync(path.join(SRC, 'natif', 'ecrans', 'Annonces.jsx'), 'utf8')
+    // (24 nov., main-vert) les rangées d'Annonces sont rendues par AnnoncesCartes.jsx (importé par Annonces.jsx) : lues avec lui.
+    + (/from '\.\/AnnoncesCartes\.jsx'/.test(fs.readFileSync(path.join(SRC, 'natif', 'ecrans', 'Annonces.jsx'), 'utf8')) ? '\n' + fs.readFileSync(path.join(SRC, 'natif', 'ecrans', 'AnnoncesCartes.jsx'), 'utf8') : '');
   dit((APP.match(/<SelecteurSites id=/g) || []).length >= 1 && !/SelecteurSiteCoque|function FiltreSites\(|data-selecteur-site/.test(APP) && !fs.existsSync(path.join(SRC, 'natif', 'SelecteurSite.jsx')) && !/<select\b[^>]*data-site/.test(APP)
     && /<LogoSite site=\{r\.site\}/.test(VENTES) && /<LogoSite key=\{x\} site=\{x\}/.test(ANN), 'D2 aucun sélecteur de plateforme dans les onglets ; le logo du site sur chaque rangée');
   dit(/data-vente-compte=\{compte\|\|undefined\}/.test(APP) && /data-fu-compte="">· <CompteVente compte=\{compte\}/.test(APP) && /<CompteVente compte=\{compte\} plateforme=\{plateforme\} ou="ligne"\/>/.test(APP) && /Vendue sur <CompteVente compte=\{compte\}/.test(APP), 'D3 la ligne de vente porte le compte (repliée, carte Fusion, détail), écrit par UN composant (`CompteVente`)');
