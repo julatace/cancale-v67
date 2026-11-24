@@ -39,4 +39,38 @@ Styles : `src/agir/agir.css` (classes neuves `vrm-mp-*`, que les couches d'avant
 puces), grille de 4 pt, cibles 44 px, clair et sombre. Textes : `mpro.*` dans `src/i18n/langues/{fr,en,es,it,de}/messagesPro.js`.
 
 ## Preuves
-Voir la section « Résultats » ci-dessous (remplie à la fin du lot).
+- `scripts/bancs/messages-pro.cjs` (vraie app, faux Supabase à état, 390 tactile et 1512, clair et sombre ; A connecté +
+  offre + prix d'achat 40 € + 6 € de frais confirmés · B lecture seule + offre + prix d'achat inconnu — l'état exact de la
+  capture de Julien · A sans offre, fil de 30 messages) : **116 verts, 0 rouge**. Jugé sur les data-* et la base :
+  raison écrite UNE fois (bandeau) et aucune `[data-n-raison]` sous les boutons ; « Ouvrir Vinted » ; Accepter/Refuser
+  éteints ; barre fine (aucun champ) ; « Ajouter le prix d'achat » et AUCUNE marge sans prix d'achat ; « +24 € de marge »
+  (2400 centimes) avec ; carte dans le fil ; une bulle au moins visible ; aucun orange dans les couleurs CALCULÉES (texte,
+  fond, bords, ombre, contour) ; cibles ≥ 44 px ; aucun débordement ; toucher Refuser/Accepter/Proposer/Envoyer sur B ⇒
+  aucune `cmd_dist_*` ni confirmation ; une puce remplit le champ sans rien envoyer ; Accepter ouvre SA confirmation et
+  rien ne part avant « Oui, accepter » (puis UNE commande au nom de A, pour CETTE offre) ; Envoyer ⇒ UNE `repondre`.
+- **Rouge sur la base** (build de `claude/agir-tout` + main) : 10 rouges sur 29 en 390 clair — raison ×3, pas de bandeau,
+  champ géant, pas de carte dans le fil, **le fil écrasé (28 px, 0 bulle visible)**, l'orange du bord
+  (`rgba(178,106,0,.5)`), pas de marge, pas de puces.
+- `--prouve` : 7 mutations du build (raison répétée, champ en lecture seule, marge sans prix d'achat, Accepter sans
+  confirmation, orange, petites cibles, débordement), **toutes rouges**.
+- `scripts/bancs/agir-si-connecte.cjs` mis à la nouvelle forme (la raison lue dans le bandeau, la barre au lieu du champ
+  éteint ; la mutation « champ-allume » visée sur la barre) ; `audit-agir-si-connecte` : 62 verts (le contrôle du champ
+  éteint devient « lecture seule ⇒ une barre, envoi par la porte »).
+- Audits : traduction 45 verts (5 langues, `mpro.*`), plancher-stock 35 verts (la ligne du fil passe toujours par
+  `<LignePlancher plancher={plancherDeItem(itemF,pc?.devise)} … puce>`), quoi-de-neuf vert (et l'ordre cassé par la fusion
+  de visuel-jeu remis), icônes vertes, actions-app vert.
+
+## Pièges trouvés en route (pour la suite)
+- Les couches d'avant peignent la bulle REÇUE par variables (`--v2-socle`, `--d-bulle-autre`, `--sb-porcelaine`…) qui
+  valent le gris du fond en clair : la bulle était invisible (mesuré `rgb(223,225,229)`). Corrigé en posant ces variables
+  sur la rangée reçue seulement (`agir.css`, fin).
+- L'heure de SA bulle est forcée en blanc par `n-anciens` (!important en couche) : invisible sur la bulle blanche du mode
+  sombre. Corrigé par `-webkit-text-fill-color` (la couleur peinte), sans toucher la couche.
+- `.vrm-chat-panel button { min-height: 40px }` (styles-mineral) bat une classe seule : les cibles neuves sont écrites
+  `.vrm-chat-panel button.vrm-mp-…`.
+
+## Reste / limites
+- À 1512 le champ garde un rayon de 12 px (une couche de bureau) au lieu de la pilule ; le reste est identique.
+- La carte « annonce partie » (offre plus acceptable) reste l'ancienne, dans le pied (rare) ; Leboncoin et Vestiaire ont
+  le nouveau champ (pilule / barre qui dit la raison une fois) mais pas encore de bandeau en tête de leur fil.
+- Geste de Julien : aucun. Regarder la capture avant/après.
