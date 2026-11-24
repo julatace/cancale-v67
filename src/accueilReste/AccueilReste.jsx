@@ -15,7 +15,7 @@ import { trj } from '../i18n/react.js';
 import { OUTILS, useAides, useCle } from './deps.js';
 import { aideActive, basculerAide, noterVisiteVue, oublierVisites, noterTrouveVu, fermerConseil, lireAides } from './aides.js';
 import { propositionCartons, reponseCartons } from './cartonsNumeros.js';
-import { lignesTrouve, carteTrouve, lireSansNumero, importPret } from './trouveChezToi.js';
+import { lignesTrouve, carteTrouve, lireSansNumero, importPret, CLE_PUB_SANS_NUMERO } from './trouveChezToi.js';
 import { conseilDuJour, jourLocal } from './conseilDuJour.js';
 import { estMot, cleMot, cleDef, entreesGlossaire } from './glossaire.js';
 import { bilanEssai, SECONDES_PAR } from './essaiBilan.js';
@@ -263,7 +263,10 @@ export function AccueilResteJournee({ apercu, poolVide, reprenable, porteurs, ui
   const colisAposter = useCle('vrm_colis_aposter', null);
   const urssafMois = useCle('vinted_urssaf_mois', null);
   const [, setTic] = React.useState(0);
-  React.useEffect(() => { const f = () => setTic((t) => t + 1); window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
+  // (23 nov., bugs-totale §3.3) Relu seulement quand SA publication change (`vrm_trouve_sans_numero`, lue dans le stockage plus
+  // bas) : chaque `vrm:save` de N'IMPORTE quelle clé (une capture en écrit plusieurs par minute) refaisait la carte entière.
+  // Les autres lectures ont leur propre abonnement (`useCle`, `useAides`).
+  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k && k !== CLE_PUB_SANS_NUMERO) return; setTic((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   const [imp, setImp] = React.useState(undefined);
   const uids = (Array.isArray(comptes) ? comptes : []).map((c) => String((c && c.vinted_user_id) || '')).filter(Boolean).join(',');
   React.useEffect(() => { let v = true; if (!uids) { setImp({}); return undefined; } lireImportDepart(uids.split(','), OUTILS.lireTout).then((x) => { if (v) setImp(x); }).catch(() => { if (v) setImp(null); }); return () => { v = false; }; }, [uids]);
