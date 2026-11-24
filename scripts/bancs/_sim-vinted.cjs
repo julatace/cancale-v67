@@ -32,7 +32,7 @@ function fauxVinted({ jetonVinted, lireJwt }) {
     // sortes (baisses de prix…) PLUS RÉCENTES que les favoris ; l'API paginée (`paginer` : 20 par page, `page`, `per_page`) ;
     // la cloche ne montre que les `clocheN` dernières ; la page complète en montre `pageTaille`, puis charge la suite au
     // défilement en `suiteMs` ms (lignes chargées à la demande).
-    avant: 0, paginer: false, clocheN: 0, pageTaille: 20, suiteMs: 0,
+    avant: 0, intercale: null, paginer: false, clocheN: 0, pageTaille: 20, suiteMs: 0,
   };
   const cookieUid = (req) => {
     const m = /(?:^|;\s*)access_token_web=([^;]+)/.exec(String(req.headers.cookie || ''));
@@ -50,14 +50,19 @@ function fauxVinted({ jetonVinted, lireJwt }) {
   };
   const notifs = (uid) => {
     const c = st.comptes[uid]; if (!c) return [];
-    const autres = Array.from({ length: st.avant }, (_, i) => ({ id: `n-prix-${i + 1}`, body: 'Le prix d’un article que tu aimes a baissé', link: `/items/${92000000 + i}`, photo: null, is_read: true, user_id: null,
-      entry_type: 720, photo_type: 'item', subject_id: 92000000 + i, updated_at: new Date(Date.now() - (i + 1) * 60000).toISOString(), small_photo_url: null }));
-    return autres.concat((c.favoris || []).map((f, i) => ({
+    const autre = (i) => ({ id: `n-prix-${i + 1}`, body: 'Le prix d’un article que tu aimes a baissé', link: `/items/${92000000 + i}`, photo: null, is_read: true, user_id: null,
+      entry_type: 720, photo_type: 'item', subject_id: 92000000 + i, small_photo_url: null });
+    const favs = (c.favoris || []).map((f) => ({
       id: f.nid, body: `${f.login} a ajouté ton article à ses favoris`, link: lienNotif(f),
       photo: { id: Number(f.itemId) * 10, url: `https://images1.vinted.net/t/${f.itemId}/f800/photo.jpeg` }, is_read: false, user_id: Number(f.userId),
-      entry_type: 20, photo_type: 'item', subject_id: Number(f.itemId), updated_at: new Date(Date.now() - (i + 1) * 600000).toISOString(),
+      entry_type: 20, photo_type: 'item', subject_id: Number(f.itemId),
       small_photo_url: `https://images1.vinted.net/t/${f.itemId}/f100/photo.jpeg`,
-    })));
+    }));
+    // `avant` notifications d'autres sortes avant tous les favoris ; `intercale` {apres, n} : n autres après les `apres` premiers.
+    let k = 0; const l = Array.from({ length: st.avant }, () => autre(k++));
+    favs.forEach((f, i) => { if (st.intercale && i === st.intercale.apres) for (let j = 0; j < st.intercale.n; j++) l.push(autre(k++)); l.push(f); });
+    // Les dates suivent l'ordre de la liste (la plus récente d'abord), comme chez Vinted.
+    return l.map((x, i) => Object.assign(x, { updated_at: new Date(Date.now() - (i + 1) * 300000).toISOString() }));
   };
   // Les deux formes MESURÉES du lien d'une notification de favori : le lien d'application (angeled92 depuis le 23 nov.)
   // et l'adresse web d'avant (les autres comptes).
@@ -156,7 +161,7 @@ function PAGE(st, uid) {
 body{margin:0;font-family:system-ui,sans-serif;background:#f6f6f6;color:#111}header{display:flex;gap:14px;align-items:center;height:60px;padding:0 20px;background:#fff;border-bottom:1px solid #ddd}
 header .logo{color:#09b1ba;font-weight:700;font-size:24px;margin-right:auto}header button,header a{min-width:44px;height:44px;display:inline-grid;place-items:center;background:none;border:0;color:#111;text-decoration:none;font-size:15px}
 #pan{position:absolute;top:60px;right:20px;width:380px;background:#fff;border:1px solid #ccc;box-shadow:0 6px 20px #0002;display:none;z-index:5}#pan.on{display:block}
-.rang{display:block;padding:12px;border-bottom:1px solid #eee;color:#111;text-decoration:none}main{padding:20px;max-width:760px}#fil p{background:#fff;border-radius:8px;padding:8px 12px;margin:6px 0}
+.rang{display:block;padding:12px;border-bottom:1px solid #eee;color:#111;text-decoration:none}#tout .rang{min-height:96px}main{padding:20px;max-width:760px}#fil p{background:#fff;border-radius:8px;padding:8px 12px;margin:6px 0}
 textarea{width:420px;min-height:44px;display:block;margin:8px 0}.btn{height:44px;padding:0 16px;border-radius:6px;border:1px solid #09b1ba;background:#09b1ba;color:#fff}
 [role=dialog]{position:fixed;top:120px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid #999;padding:20px;width:320px;z-index:9}
 </style></head><body>
