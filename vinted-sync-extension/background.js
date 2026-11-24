@@ -11362,7 +11362,8 @@ async function rangerSuiviUn(uid, tx, contrat, source, forme) {
     const sv = unionNumerosSuivi(r0 && r0.sv, nt ? nt.liste.map((e) => e.n) : []);
     const tv = [...new Set(String((r0 && r0.tv) || '').split(',').filter((c) => /^[A-Z][A-Z0-9_.:-]{1,39}$/.test(c)).concat(nt ? nt.liste.map((e) => e.code).filter(Boolean) : []))].slice(0, 8);
     const listeNeuve = !!(nt && !(r0 && r0.sl)) || sv.length > svAvant.length;
-    const numeroNeuf = !!((contrat.suivi && (!r0 || contrat.suivi !== r0.nu)) || (r0 && contrat.transporteur && !r0.tr)) || listeNeuve;
+    // 5.449 : le transporteur lu sur l'expédition d'une commande (forme mesurée, sans étape ni point) ouvre la ligne de CET achat.
+    const numeroNeuf = !!((contrat.suivi && (!r0 || contrat.suivi !== r0.nu)) || (r0 && contrat.transporteur && !r0.tr) || (!r0 && source === 'escrow' && contrat.transporteur)) || listeNeuve;
     if (!dec.ecrire && !(numeroNeuf || relaisNeuf || (lieuChange && avant && (avant.etapes.length || avant.dernier)))) { noterDiag(`suivi_${dec.raison}`); return false; }
     const garde = !dec.ecrire;
     const etapesE = garde ? (avant ? avant.etapes : []) : dec.etapes, dernierE = garde ? (avant ? avant.dernier : null) : dec.dernier;
@@ -11415,6 +11416,31 @@ function relaisDestinationEscrow(m, uid) {
   if (rc && rc !== String(uid)) { noterDiag('suivi_relais_pas_le_destinataire'); return null; }
   return rel;
 }
+// ⚠️⚠️ 5.449 (24 nov.) LA FORME RÉELLE DE L'EXPÉDITION D'UNE COMMANDE, SANS POINT. MESURÉ (vraie base, lecture seule,
+//    `harvest_*_seen_urls` → `conversation.req["GET /api/v2/escrow_orders/{id}/shipment"].tete`, 4 comptes, les deux
+//    hôtes www et core) : un objet PLAT, `id`, `code`, `type`, `status`, `sender_id`, `receiver_id`, `entry_type`,
+//    `shipping_order_id` (nombres), `carrier` {`name`, `icon` (textes), `reservation_link`, `drop_off_point_url`,
+//    `drop_off_map_available`}, et `pickup_type`, `to_address_id`, `pickup_point_name`, `pickup_point_address` à `null`
+//    (livraison à domicile, ou point pas encore choisi). Aucune étape, aucun n° : la 5.411 n'acceptait cette réponse que
+//    si elle portait un point ⇒ `suivi_forme_inattendue_escrow` = `suivi_vu_escrow` sur CHAQUE appareil (5.410 → 5.440),
+//    et le transporteur de ces achats n'était JAMAIS rangé. Cette forme-là, EXACTEMENT (mêmes clés, mêmes types, rien de
+//    plus), est reconnue ; toute autre reste « inattendue » (sa forme notée, rien rangé).
+const FORME_ESCROW_MESUREE = Object.freeze({
+  id: ['number'], code: ['number'], type: ['number'], status: ['number'], sender_id: ['number'], receiver_id: ['number'], entry_type: ['number'],
+  shipping_order_id: ['number', 'null'], pickup_type: ['number', 'null'], to_address_id: ['number', 'null'],
+  pickup_point_name: ['string', 'null'], pickup_point_address: ['string', 'null'],
+  'carrier.name': ['string'], 'carrier.icon': ['string', 'null'], 'carrier.reservation_link': ['string', 'null'],
+  'carrier.drop_off_point_url': ['string', 'null'], 'carrier.drop_off_map_available': ['boolean', 'null'],
+});
+function formeEscrowMesuree(forme) {
+  const f = nettoyerFormeSuivi(forme), cles = Object.keys(f), attendues = Object.keys(FORME_ESCROW_MESUREE);
+  if (cles.length !== attendues.length) return false;
+  for (const k of attendues) {
+    if (f[k] === undefined) return false;
+    if (!String(f[k]).split('|').every((t) => FORME_ESCROW_MESUREE[k].includes(t))) return false;
+  }
+  return true;
+}
 const transporteurEscrow = (t) => { const s = suiviTexteLieu(t, 60); return s && !/^\d+$/.test(s) ? s : null; };
 const periodePropre = (t) => suiviTexteLieu(t, 60) || null;
 // La transaction (achat de CE compte) dont la commande est `oid` : lue dans SES transactions rangées
@@ -11459,6 +11485,14 @@ async function noterSuiviPage(domain, msg) {
     //    sans étape, qui ne range QUE le lieu et le transporteur (`relaisDestinationEscrow`).
     const relaisPage = relaisDestinationEscrow(quoi === 'escrow' ? { relais: msg.relais, receveur: msg.receveur } : { relais: msg.relais }, uid);
     if (!contrat && quoi === 'escrow' && relaisPage) contrat = { etapes: [], dernier: null, transporteur: transporteurEscrow(msg.transp), suivi: null };
+    // 5.449 : la forme RÉELLE sans point (mesurée, `formeEscrowMesuree`) : le transporteur d'un ACHAT de ce compte — le
+    //    destinataire (`receiver_id`, toujours donné dans cette forme) doit être le compte de l'onglet, sinon c'est une
+    //    vente (le colis part chez l'acheteur) : rien rangé, et ce n'est pas une forme inattendue.
+    if (!contrat && quoi === 'escrow' && formeEscrowMesuree(forme)) {
+      if (String(msg.receveur == null ? '' : msg.receveur) !== String(uid)) { await rangerFormeSuivi(quoi, forme, 'reconnue'); noterDiag('suivi_escrow_pas_le_destinataire'); return false; }
+      const tr = transporteurEscrow(msg.transp);
+      if (tr) { contrat = { etapes: [], dernier: null, transporteur: tr, suivi: null }; noterDiag('suivi_escrow_forme_mesuree'); }
+    }
     // (31 oct., 5.295) le point relais de destination (relu par la règle, rien
     // d'autre ne passe) et l'arrivée estimée (sur le contenu allégé : ses dates
     // gardent leur nom de clé).
@@ -31039,7 +31073,9 @@ async function capterSuivisAchats(uid) {
               const ex = (re.json.shipment && typeof re.json.shipment === 'object' && !Array.isArray(re.json.shipment)) ? re.json.shipment : re.json;
               const autreTx = ex.transaction_id != null && String(ex.transaction_id) !== tx;
               const rel = autreTx ? null : relaisDestinationEscrow({ relais: relaisDestination(re.json), receveur: ex.receiver_id }, uid);
-              await rangerFormeSuivi('escrow', formeSuivi(re.json), rel ? 'reconnue' : 'inconnue');
+              const fe = formeSuivi(re.json), mesuree = !autreTx && formeEscrowMesuree(fe) && String(ex.receiver_id) === String(uid);
+              await rangerFormeSuivi('escrow', fe, rel || mesuree ? 'reconnue' : 'inconnue');
+              if (!rel && mesuree && !contrat.transporteur && ex.carrier && typeof ex.carrier === 'object') { contrat.transporteur = transporteurEscrow(ex.carrier.name); noterDiag('suivi_escrow_forme_mesuree'); }
               if (rel) { contrat.relais = rel; if (!contrat.transporteur && ex.carrier && typeof ex.carrier === 'object') contrat.transporteur = transporteurEscrow(ex.carrier.name); noterDiag('suivi_relais_lu_commande'); }
               else noterDiag(autreTx ? 'suivi_relais_autre_transaction' : 'suivi_relais_pas_dit');
             } else { noterDiag(`suivi_relais_refuse_${(re && re.status) || 0}`); if (memoApresEchec(memo, tx, re, SUIVI_RETRY_MS)) arretRelais = true; }
