@@ -113,13 +113,21 @@ par `chrome.debugger`, rythme « humain » pour paraître humain, pilotage clavi
 Leboncoin / Vestiaire (« pas-appris ») le reste : la toute première fois, Julien le fait à la main (décision du 21 nov.).
 
 ## 5. Preuves
-- `scripts/bancs/ext-adaptatif.cjs` — 28 verts : Vinted V1–V5, Leboncoin L1–L6, Vestiaire C1–C3, eBay E1–E4 (bonne
-  cible trouvée sur 2–3 variantes plausibles, page ambiguë ⇒ rien cliqué / rien rempli, page vide ⇒ journal, message).
-  **Rouge sur origin/main** (voir la PR) ; `--prouve` : 6 mutations, 6 rouges. Captures regardées (V3, L5, E3…).
-- `scripts/audit-ext-adaptatif.cjs` — VRAI `background.js` (`_fond-vm.cjs`) : manifeste, phrases (quoi + geste,
-  jamais un nom de code), mémoire et journal par site, garde-fous §3 ; `--prouve` 7/7 rouges.
-- Audits voisins relancés : `audit-ext-cloche-favoris`, `audit-lbc-interface`, `audit-coherence`, `audit-extension-zip`,
-  `audit-quoi-de-neuf`, banc `cloche-favoris`, `npm run build`.
+- `scripts/bancs/ext-adaptatif.cjs` — **29 verts** : Vinted V1–V5, Leboncoin L1–L7, Vestiaire C1–C3, eBay E1–E4. Sur
+  l'extension d'origin/main : **4 bons, 24 défauts** (dont V3 : la suppression part sur le PREMIER bouton d'une fenêtre
+  ambiguë). `--prouve` : 6 mutations, 6 rouges. Captures regardées (V3, L5, E3).
+- `scripts/audit-ext-adaptatif.cjs` — VRAI `background.js` (`_fond-vm.cjs`) : **48 verts** (manifeste, phrases, mémoire et
+  journal par site, santé S1–S5, rapport T, version dépassée V0–V4, contrôle des onglets A1–A4, champs `ext_appareil` X,
+  reprise R1–R4, garde-fous G1) ; sur le background d'origin/main : rouge (lève) ; `--prouve` : 17 mutations, 17 rouges.
+- `scripts/bancs/sante-sites-carte.cjs` — **13 verts** (390 / 1512, clair / sombre ; « tout marche » sans couleur, le
+  problème et son geste en ambre) ; rouge sur origin/main (5 / 8) ; captures regardées.
+- Voisins verts : audit-coherence, audit-extension-zip, audit-ext-boutique, audit-quoi-de-neuf, audit-lbc-interface,
+  audit-ext-cloche-favoris, audit-ext-arrets-formulaire, audit-comme-bleam, audit-tout-interface, audit-vc-ecrire,
+  audit-lbc-supprimer, audit-lbc-plus-vue-pause, audit-familles-extension, audit-formulaire-rythme, audit-garde-prix,
+  audit-ext-contrat-messages, audit-couleur-panneau, audit-extension-feuille, audit-confiance, audit-cloisonnement,
+  audit-offres-auto, audit-vc-messages ; banc cloche-favoris ; `npm run build`.
+- Champs publiés dans `ext_appareil_*` pour l'app (codes seulement) : `sante` { site: { k, nom } }, `arret` { site, geste,
+  code, at }, `servie`, `depassee`.
 
 ## 6. À essayer par Julien (le banc ne remplace pas le vrai site)
 Voir le rapport de fin de lot (liste des gestes, site par site). En bref : republier une annonce Vinted (suppression +
