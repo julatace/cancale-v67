@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (24 nov., lot debutant) docs/passation/2026-11-24-debutant.md
+  { id: 'premiere-semaine', date: '2026-11-24', titre: 'Ta première semaine, en trois étapes', phrase: 'Relier ton compte, un prix d’achat, un premier N°.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov., lot demarrage-guide) docs/passation/2026-11-23-demarrage-guide.md
   { id: 'demarrage-accompagne', date: '2026-11-24', titre: 'Bien démarrer : guidé pas à pas', phrase: 'Une courte animation par étape, et la reprise où tu t’es arrêté.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md
