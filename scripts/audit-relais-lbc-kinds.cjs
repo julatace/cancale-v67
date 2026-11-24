@@ -39,6 +39,7 @@ const exemple = {
   lbccatalogue: { url: 'u', body: '{}' },
   lbcenvoi: { url: 'u', methode: 'POST', cles: ['a'] },
   lbcpaths: { paths: ['GET a → 200 [json]'] },
+  lbcphotoorigine: { fichier: 'ab'.repeat(20), code: 'cd'.repeat(32) },   // (24 nov., ext-anciens-lots) le code d'origine d'une photo envoyée
   lbcschema: { endpoint: 'e', cles: ['a'] },
   lbcmsgcompteur: { userId: 'abc', unread: 2 },
   lbclistecomplete: { owner: 'o', ids: ['1'], total: 1 },
