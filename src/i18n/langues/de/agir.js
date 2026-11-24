@@ -27,6 +27,7 @@ export default {
   "agir.raison.aucune": "Verbinde die Erweiterung mit {compte}: öffne {site} in Chrome",
   "agir.raison.autre-compte": "Tab auf {autre}: öffne {site} mit {compte}",
   "agir.raison.pas-ouvert": "Verbinde die Erweiterung mit {compte}: öffne {site} in Chrome",
+  "agir.rr.note": "Tippe auf eine Antwort: sie füllt das Feld.",
   "agir.badge": "Nur lesen",
   "agir.repondre.place": "Deine Antwort auf {site}…",
   "agir.repondre.envoyer": "Senden",

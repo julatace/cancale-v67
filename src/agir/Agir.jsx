@@ -15,6 +15,8 @@ import { NOMS_SITES_AGIR } from './peutAgir.js';
 import './agir.css';
 
 // La phrase d'un « non » : la raison ET le geste, en une phrase (« Connecte l'extension sur shop_x : ouvre Vinted dans Chrome »).
+export const remplirReponse = (site, conv, texte) => { try { window.dispatchEvent(new CustomEvent('vrm:agir-remplir', { detail: { site, conv: String(conv), texte } })); } catch (_) {} };
+
 export function texteRaison(v) {
   if (!v || v.ok) return '';
   const vars = { compte: '—', site: 'Vinted', autre: '', version: '?', attendue: '', ou: '', ...(v.vars || {}) };
@@ -49,6 +51,12 @@ export function ComposerReponse({ site, compte, conv, max = 2000, onEnvoye = nul
   const [texte, setTexte] = React.useState('');
   const [issue, setIssue] = React.useState(null);
   const v = usePeutAgir(site, compte, 'repondre', 'file');
+  // Une réponse rapide touchée (src/ReponsesRapidesApp.jsx) remplit CE champ — rien ne part avant « Envoyer ».
+  React.useEffect(() => {
+    const f = (e) => { const d = e && e.detail; if (d && d.site === site && String(d.conv) === String(conv) && typeof d.texte === 'string') setTexte(d.texte.slice(0, max)); };
+    window.addEventListener('vrm:agir-remplir', f);
+    return () => window.removeEventListener('vrm:agir-remplir', f);
+  }, [site, conv, max]);
   const envoyer = async () => {
     const t = texte.trim(); if (!t) return;
     const r = await envoyerGeste({ site, compte, geste: 'repondre', distGeste: 'repondre', args: { conv: String(conv), texte: t } });

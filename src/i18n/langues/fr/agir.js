@@ -27,6 +27,7 @@ export default {
   "agir.raison.aucune": "Connecte l'extension sur {compte} : ouvre {site} dans Chrome",
   "agir.raison.autre-compte": "Onglet sur {autre} : ouvre {site} sur {compte}",
   "agir.raison.pas-ouvert": "Connecte l'extension sur {compte} : ouvre {site} dans Chrome",
+  "agir.rr.note": "Touche une réponse : elle remplit le champ.",
   "agir.badge": "Lecture seule",
   "agir.repondre.place": "Ta réponse sur {site}…",
   "agir.repondre.envoyer": "Envoyer",

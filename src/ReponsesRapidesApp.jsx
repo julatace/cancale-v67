@@ -11,7 +11,8 @@ import { tr, langueCourante } from './i18n/index.js';
 import { rrPropositions } from './reponsesRapides.js';
 import { risquesMessage } from './messageSur.js';
 
-export default function ReponsesRapidesApp({ messages = [], vars = {}, partie = false, reglage = null, site = 'vinted', bouton = null }) {
+// (24 nov., lot agir-si-connecte) `onChoisir(texte)` : une réponse touchée REMPLIT le champ « Répondre » de VRM (rien ne part).
+export default function ReponsesRapidesApp({ messages = [], vars = {}, partie = false, reglage = null, site = 'vinted', bouton = null, onChoisir = null }) {
   const r = useMemo(() => rrPropositions({ messages, reglage, vars, partie, langueUi: langueCourante(), sur: (t) => !risquesMessage(String(t || ''), site).length, hasard: () => 0 }),
     [messages, reglage, vars, partie, site]);
   const l = r.propositions || [];
@@ -20,9 +21,11 @@ export default function ReponsesRapidesApp({ messages = [], vars = {}, partie = 
     <div className="vrm-aide-rep" data-rr-app={l.length} role="group" aria-label={tr('rr.app.titre')}>
       <p className="vrm-aide-rep-q">{tr('rr.app.titre')}</p>
       {l.map((p) => p.texte
-        ? <p key={p.cat} data-rr-app-cat={p.cat} style={{ margin: '4px 0', fontSize: 14, lineHeight: '19px' }}><small style={{ display: 'block', opacity: 0.7 }}>{tr('rr.app.cat.' + p.cat)}</small>{p.texte}</p>
+        ? (onChoisir
+          ? <button key={p.cat} type="button" className="vrm-rr-choix" data-rr-app-cat={p.cat} data-rr-app-remplir="" onClick={() => onChoisir(p.texte)} style={{ display: 'block', width: '100%', textAlign: 'left', margin: '4px 0', padding: '8px 10px', minHeight: 44, fontSize: 14, lineHeight: '19px', font: 'inherit', color: 'inherit', background: 'var(--n-carte, transparent)', border: '1px solid var(--n-filet, rgba(60,60,67,0.18))', borderRadius: 12, cursor: 'pointer' }}><small style={{ display: 'block', opacity: 0.7 }}>{tr('rr.app.cat.' + p.cat)}</small>{p.texte}</button>
+          : <p key={p.cat} data-rr-app-cat={p.cat} style={{ margin: '4px 0', fontSize: 14, lineHeight: '19px' }}><small style={{ display: 'block', opacity: 0.7 }}>{tr('rr.app.cat.' + p.cat)}</small>{p.texte}</p>)
         : <p key={p.cat} data-rr-app-manque={p.manque || ''} style={{ margin: '4px 0', fontSize: 13, opacity: 0.75 }}>{tr('rr.app.manque', { cat: tr('rr.app.cat.' + p.cat) })}</p>)}
-      {l.some((p) => p.texte) ? <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.7 }} data-rr-app-note="">{tr('rr.app.note')}</p> : null}
+      {l.some((p) => p.texte) ? <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.7 }} data-rr-app-note="">{onChoisir ? tr('agir.rr.note') : tr('rr.app.note')}</p> : null}
       {bouton}
     </div>
   );

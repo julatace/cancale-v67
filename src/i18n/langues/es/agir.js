@@ -27,6 +27,7 @@ export default {
   "agir.raison.aucune": "Conecta la extensión en {compte}: abre {site} en Chrome",
   "agir.raison.autre-compte": "Pestaña en {autre}: abre {site} con {compte}",
   "agir.raison.pas-ouvert": "Conecta la extensión en {compte}: abre {site} en Chrome",
+  "agir.rr.note": "Toca una respuesta: rellena el campo.",
   "agir.badge": "Solo lectura",
   "agir.repondre.place": "Tu respuesta en {site}…",
   "agir.repondre.envoyer": "Enviar",

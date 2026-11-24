@@ -116,8 +116,16 @@ const attendreQue = async (pg, f, arg, ms = 40000) => { const t0 = Date.now(); w
 const ORANGE = () => [...document.querySelectorAll('[data-agir], [data-agir-badge], [data-agir-composer] *')].some((x) => { for (const p of ['color', 'background-color']) { const m = /rgba?\((\d+), (\d+), (\d+)/.exec(getComputedStyle(x)[p]); if (m && +m[1] > 180 && +m[2] > 80 && +m[2] < 170 && +m[3] < 70) return true; } return false; });
 
 async function ouvrirConv(pg, uid) {
-  await pg.evaluate((u) => { const x = document.querySelector(`[data-conv-compte="${u}"]`); if (x) (x.querySelector('button, [role="button"]') || x).click(); }, uid).catch(() => {});
-  return attendreQue(pg, () => { const c = document.querySelector('[data-agir-composer="vinted"]'); return c ? { agir: c.getAttribute('data-agir'), compte: c.getAttribute('data-agir-compte') } : null; }, null, 30000);
+  // Le toucher est rejoué tant que le fil de CE compte n'est pas ouvert (la liste peut se redessiner après une relecture).
+  const t0 = Date.now();
+  while (Date.now() - t0 < 40000) {
+    presenceFraiche();
+    const v = await pg.evaluate((u) => { const c = document.querySelector('[data-agir-composer="vinted"]'); if (c && c.getAttribute('data-agir-compte') === u) return { agir: c.getAttribute('data-agir'), compte: u };
+      const x = document.querySelector(`[data-msg-groupe="vinted:${u}"] button[data-fil]`); if (x) x.click(); return null; }, uid).catch(() => null);
+    if (v) return v;
+    await attendre(1200);
+  }
+  return null;
 }
 
 (async () => {
@@ -140,7 +148,7 @@ async function ouvrirConv(pg, uid) {
       if (process.env.DEBUG) pg.on('pageerror', (e) => console.log('   PAGEERROR', String(e).slice(0, 300)));
       // ── Messages : la liste, le badge par compte
       await pg.goto('https://vrm.center/?tab=messages', { waitUntil: 'domcontentloaded' });
-      const liste = await attendreQue(pg, ({ A, B }) => { const a = document.querySelector(`[data-conv-compte="${A}"]`), b = document.querySelector(`[data-conv-compte="${B}"]`); if (!a || !b) return null;
+      const liste = await attendreQue(pg, ({ A, B }) => { const a = document.querySelector(`[data-msg-groupe="vinted:${A}"]`), b = document.querySelector(`[data-msg-groupe="vinted:${B}"]`); if (!a || !b) return null;
         const badges = [...document.querySelectorAll('[data-agir-badge]')].map((x) => x.getAttribute('data-agir-compte'));
         return badges.length ? { badges } : null; }, { A, B });
       await attendre(600); await photo(pg, `messages-liste-${nom}`);
@@ -163,7 +171,7 @@ async function ouvrirConv(pg, uid) {
       dit(orB === false, 'aucun orange sur les gestes éteints', orB);
       // ── Le fil de A : champ allumé ; un envoi part par la file (une commande au nom de A)
       await pg.goto('https://vrm.center/?tab=messages', { waitUntil: 'domcontentloaded' });
-      await attendreQue(pg, ({ A }) => !!document.querySelector(`[data-conv-compte="${A}"]`), { A });
+      await attendreQue(pg, ({ A }) => !!document.querySelector(`[data-msg-groupe="vinted:${A}"] button[data-fil]`), { A });
       const fa = await ouvrirConv(pg, A);
       await attendreQue(pg, () => { const c = document.querySelector('[data-agir-composer="vinted"]'); return c && c.getAttribute('data-agir') === 'ok'; }, null, 20000);
       await photo(pg, `messages-A-${nom}`);

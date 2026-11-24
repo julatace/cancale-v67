@@ -11,3 +11,4 @@
 .vrm-agir-issue { margin: 0; font-size: 13px; color: var(--n-encre-2, #6e6e73); }
 .vrm-agir-feuille-p { margin: 0 var(--n-marge, 16px) 12px; color: var(--n-encre-2, #6e6e73); }
 .vrm-agir-repub { display: inline-flex; flex-direction: column; gap: 4px; }
+.vrm-chat-offre-actions > .vrm-agir-offre { grid-column: 1 / -1; }

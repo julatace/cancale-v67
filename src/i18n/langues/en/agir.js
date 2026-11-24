@@ -27,6 +27,7 @@ export default {
   "agir.raison.aucune": "Connect the extension on {compte}: open {site} in Chrome",
   "agir.raison.autre-compte": "Tab on {autre}: open {site} on {compte}",
   "agir.raison.pas-ouvert": "Connect the extension on {compte}: open {site} in Chrome",
+  "agir.rr.note": "Tap a reply: it fills the box.",
   "agir.badge": "Read only",
   "agir.repondre.place": "Your reply on {site}…",
   "agir.repondre.envoyer": "Send",

@@ -27,6 +27,7 @@ export default {
   "agir.raison.aucune": "Collega l'estensione su {compte}: apri {site} in Chrome",
   "agir.raison.autre-compte": "Scheda su {autre}: apri {site} con {compte}",
   "agir.raison.pas-ouvert": "Collega l'estensione su {compte}: apri {site} in Chrome",
+  "agir.rr.note": "Tocca una risposta: riempie il campo.",
   "agir.badge": "Sola lettura",
   "agir.repondre.place": "La tua risposta su {site}…",
   "agir.repondre.envoyer": "Invia",

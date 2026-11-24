@@ -8,7 +8,7 @@ import { offresSansReponse } from '../offresSansReponse.js';
 import { photosEnDouble, numerosEnExemplaires, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
 import OffresSansReponseListe from '../natif/ecrans/OffresSansReponse.jsx';
 import { BoutonExtension, RangeeExtension, FeuilleExtension } from '../BoutonExtension.jsx';
-import { ComposerReponse, GestesOffreVinted, BadgeLectureSeule, texteRaison as texteRaisonAgir } from '../agir/Agir.jsx';
+import { ComposerReponse, GestesOffreVinted, BadgeLectureSeule, remplirReponse, texteRaison as texteRaisonAgir } from '../agir/Agir.jsx';
 import { republierDansApp } from '../agir/porte.js';
 // (24 nov.) Republier DEPUIS VRM : la file si l'extension a CE compte dans un onglet, sinon le panneau (gardé, il dit pourquoi).
 const confirmerRepubAgir = (n) => askConfirm({ title: n > 1 ? tr('agir.republier') + ' · ' + n : tr('agir.republier'), desc: tr('agir.republier.confirmer'), ok: tr('agir.republier.oui') });
@@ -21559,7 +21559,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   const pR = annR && annR.price!=null && annR.price!=='' ? Number(annR.price) : null;
                   const varsR = { pseudo: openConv.header?.login||'', article: (annR && annR.title) || openConv.conversation?.transaction?.item_title || '', taille: (annR && (annR.size || annR.size_title)) || '', prix: isFinite(pR)&&pR>0 ? pR : null, prix_mini: itR!=null ? Number(String((numeros[String(itR)]||{}).min ?? '').replace(',','.')) || null : null };
                   const filR = (openConv.messages||[]).filter((m)=>m && m.kind!=='event' && m.kind!=='offer').map((m)=>({ deMoi: !!m.mine, texte: String(m.body||'') }));
-                  return <ReponsesRapidesAppP messages={filR} vars={varsR} partie={!!offrePartieDuFil(openConv)} reglage={load('vrm_reponses_rapides', null)}/>; })()}
+                  return <ReponsesRapidesAppP messages={filR} vars={varsR} partie={!!offrePartieDuFil(openConv)} reglage={load('vrm_reponses_rapides', null)} onChoisir={(t)=>remplirReponse('vinted', String(openConv.convId||''), t)}/>; })()}
                 {/* (24 nov.) Répondre DEPUIS VRM si l'extension a CE compte (l'uid du fil) dans un onglet ; sinon lecture seule, dite. */}
                 <div className="vrm-chat-foot-ext" data-vinted-repondre="app">{openConv.conversation?.allow_reply===false ? null : <ComposerReponse site="vinted" compte={String(openConv.acc?.vinted_user_id||'')} conv={String(openConv.convId||'')}/>}</div>
               </div>
