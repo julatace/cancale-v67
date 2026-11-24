@@ -168,7 +168,7 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
    {rows && ((pages!=null && page<pages) || (pages==null && rows.length>=50*page)) && <button type="button" disabled={busy} onClick={()=>charger(page+1)} style={{...S.button,marginTop:10}}>Charger la suite</button>}
    <p style={{fontSize:11,color:C.muted}}>Échanges remontés par eBay sur les 90 derniers jours.</p>
   </div><div className="vrm-chat-column">
-   {selected?<CadreFil etiquette={tr('a11y.conversationSur',{site:'eBay'})} onFermer={fermerConversation} refPanneau={chatPanel}>
+   {selected?<CadreFil etiquette={trEbt('a11y.conversationSur',{site:'eBay'})} onFermer={fermerConversation} refPanneau={chatPanel}>
     <TeteFil onFermer={fermerConversation} libelleFermer="Fermer la conversation eBay" nom={selected.sender || 'Acheteur'} sensible titre={selected.titre || selected.subject} compte="eBay"/>
     {codes.length>0 && <div style={{display:'flex',flexWrap:'wrap',gap:6,padding:8}}>{codes.map(code=><button key={code} type="button" aria-label={`Copier le code eBay ${code}`} style={S.button} onClick={async()=>{try{await navigator.clipboard.writeText(code);setCodeCopie(code);}catch(_){setCodeCopie('erreur');}}}>{code} · {codeCopie===code?'Copié':'Copier'}</button>)}{codeCopie==='erreur' && <span role="status" style={{fontSize:11}}>Copie indisponible. Le code reste visible.</span>}</div>}
     <div style={{padding:'0 16px 8px',flexShrink:0}}><input type="search" aria-label="Rechercher dans la conversation eBay" placeholder="Rechercher un message ou un code…" value={historySearch} onChange={e=>setHistorySearch(e.target.value)} style={S.input}/></div>
