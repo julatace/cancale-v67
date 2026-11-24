@@ -135,3 +135,26 @@ Lecture honnête :
 ## 6. Gestes de Julien
 
 Aucun.
+
+## 7. PR B : lectures datées de la 1re visite (24 nov. soir, branche `claude/vitesse-lectures-toucher`, PAS de PR)
+
+Le crochet `LECTURES=1` du banc `vitesse-iphone` est maintenant dans le banc. Il écrit chaque lecture de la base pendant une
+1re visite, datée depuis le toucher. Mesure : build de la PR A, 1 passe, iPhone 390 ×4, volume de Julien, charge 18,7.
+
+| 1re visite | prêt à | lectures | 1re vague | vagues avant « prêt » |
+|---|---|---|---|---|
+| Annonces | +5,2 s | 52 | +2,0 s (21 lectures) | +3,6–3,75 s (`harvest_%_txn_%` relu, étiquettes, `ebay_versements`, coffre) · +4,5–5,05 s (`harvest_%_txn_%` une 3e fois, `orders_sold`, brouillons) |
+| Achats | +6,0 s | 76 | +3,9 s (25 lectures) | aucune autre : « prêt » arrive 2 s après la 1re vague (du calcul) |
+| Ventes | +2,9 s | 41 | — | — |
+
+Ce que ça dit :
+- **Achats** : 3,9 s de montage avant la PREMIÈRE lecture, puis 2 s de calcul sur les données arrivées. Les lectures partent
+  tard parce que le montage est long, pas l'inverse. Les lancer au toucher gagnerait au plus le temps d'une vague (~0,2 s au
+  banc) : le levier reste le calcul (`pickupUnion` 4 fois par instance, `cartesColis` à chaque rendu — §5).
+- **Annonces** : `harvest_%_txn_%` (la même requête) part 3 fois (+2,0 · +3,6 · +4,5 s). Chaque vague attend un rendu (calcul),
+  pas la précédente sur le réseau. Partager cette lecture (`src/lecturesPartagees.js`, `FENETRE_MS` 2 s : les relectures
+  arrivent après la fenêtre) et lancer la 1re vague au toucher sont les deux gestes à essayer.
+- Après « prêt », Annonces relit `vinted_suivi_{compte}` compte par compte, une requête à la fois (15 lectures de +5,7 à
+  +11 s). Cela ne retarde pas « prêt », mais ces lectures occupent le réseau pendant les premières secondes à l'écran.
+
+Pas fait : le code de PR B. Aucun AB : il n'y a pas encore de changement à comparer.
