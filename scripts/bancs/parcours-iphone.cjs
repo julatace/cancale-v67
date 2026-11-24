@@ -48,7 +48,8 @@ const CHARGE = (() => { try { const os = require('os'); return (os.loadavg()[0] 
 // n'arrivent plus après « À vérifier » : la colonne attend ses deux sources), la loupe (les suggestions attendent leur
 // lecture), Argent (« Tes seuils de l'année » prise à l'ouverture en tête, sinon en bas du résumé). Un saut qui revient sur
 // ces écrans est ROUGE.
-const SAUTS_CONNUS = /^(onglet-achats-bas)$/;
+// La fin d'Achats aussi (la réserve de ParPaquets, les blocs du bas sans squelette). Plus AUCUN saut connu.
+const SAUTS_CONNUS = /(?!)/;
 const STRICT = process.env.CI === 'true' || process.env.SEUIL_STRICT === '1';
 const LENT = { ms: 0 };
 const PANNE = { re: null };   // une lecture qui échoue (500) : Argent « pas encore calculé »
