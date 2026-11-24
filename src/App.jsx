@@ -780,7 +780,9 @@ const Bienvenue = aLaDemandeFeuille(() => import('./Bienvenue.jsx'));
 import VisiteBulles from "./VisiteBulles.jsx";
 // (14 nov., accueil des nouveaux, le reste : idées 133 134 136 139 140 145 147) — src/accueilReste/.
 import { poserOutilsAccueil } from "./accueilReste/deps.js";
-import { AccueilResteJournee, VisiteEcranHote } from "./accueilReste/AccueilReste.jsx";
+// (24 nov., francais-demarrage) La visite des écrans (bulles, 2,2 s après l'arrivée sur un écran) : à la demande, hors
+// du démarrage avec son français (≈ 6 Ko compressés). Elle ne rend rien avant de partir : aucune place à réserver.
+const VisiteEcranHote = aLaDemandeDiscret(() => import("./accueilReste/AccueilReste.jsx").then((m) => ({ default: m.VisiteEcranHote })));
 // ⟦→ ecrans/Comptabilite.jsx #51⟧
 import { ajouterAuRegistre, decisionRepublie, disparuesDuCompte, empreintesDe, majEmpreintesFiches, majAttente as majAttenteRepub, CLE_PHOTOS_VRM, CLE_EMPREINTES_FICHES, CLE_REPUB_REPONSES, CLE_REPUB_ATTENTE } from "./republieTelephone.js";
 import { numeroNeufPermis, lectureCompleteAnnonce, annoncesANumeroter, reserveEnDesaccord, marquerNouveau, marquerEcrit, aEcrireNouveaux, listeNumeros, demandesNumero, propositionNumero, modeNumerotation } from "./numerosNouvelles.js";
@@ -829,6 +831,7 @@ import { ID_SATISFACTION } from "./satisfaction.js";
 import { SignalerProbleme as SignalerProblemeBase, SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRecus } from "./composants/SignalerProbleme.jsx";
 import { EcrireSupport as EcrireSupportBase, EcrireSupportFeuille as EcrireSupportFeuilleBase } from "./composants/EcrireSupport.jsx";   // (13 nov., lot 55) « Écrire au support »
 import * as photosVinted from "./photosVinted.js";
+import { lisibleParLaPage } from "./lisibleParLaPage.js";
 import { MINERAL, MINERAL_DARK, variablesTheme } from "./themeMineral.js";
 import { motsInsecables } from "./motsInsecables.jsx";   // (14 nov.) un modèle « xt-6 » ne se coupe pas au trait d'union
 import { apparenceDe, sombreEffectif, prochainChangement, ecrituresApparence } from "./apparence.js";
@@ -12170,6 +12173,8 @@ async function lirePhotoVisuel(u) {
     return null;
   }
   if (!/^https:\/\//.test(u)) return null;
+  // (24 nov., bugs-terrain) Une photo d'un hôte que `connect-src` refuse (Leboncoin) : jamais lue (src/lisibleParLaPage.js).
+  if (!lisibleParLaPage(u)) return null;
   try {
     const r = await fetch(u, { mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
     if (!r.ok) return null;
@@ -14703,7 +14708,7 @@ const noircirPage = async (PL, d, W, H, seuil) => {
 // elle ne se lit pas (hors ligne, image refusée) : la fiche part sans photo.
 const photoNoirePourFiche = async (url) => {
   try {
-    if (!url || typeof document === 'undefined') return null;
+    if (!url || typeof document === 'undefined' || !lisibleParLaPage(url)) return null;
     const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null; const t = setTimeout(() => { try { ctl && ctl.abort(); } catch (_) {} }, 5000);
     const rep = await fetch(url, { mode: 'cors', signal: ctl ? ctl.signal : undefined }).finally(() => clearTimeout(t));
     if (!rep.ok) return null;

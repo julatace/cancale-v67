@@ -73,7 +73,6 @@ import { Numero } from '../composants/Numero.jsx';
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { GardeEcran } from '../composants/GardeEcran.jsx';
 import { L, Lbas, VERBES, PAS_SU } from '../libelles.js';
-import { AccueilResteJournee } from '../accueilReste/AccueilReste.jsx';
 import { ajouterAuRegistre, decisionRepublie, disparuesDuCompte, empreintesDe, majEmpreintesFiches, majAttente as majAttenteRepub, CLE_PHOTOS_VRM, CLE_EMPREINTES_FICHES, CLE_REPUB_REPONSES, CLE_REPUB_ATTENTE } from '../republieTelephone.js';
 import { numeroNeufPermis, lectureCompleteAnnonce, annoncesANumeroter, reserveEnDesaccord, marquerNouveau, aEcrireNouveaux, listeNumeros, demandesNumero } from '../numerosNouvelles.js';
 import { ChiffreConseil } from '../Conseils.jsx';
@@ -604,6 +603,9 @@ const JaugeActions = aLaDemande(() => import('../JaugeActions.jsx'));
 const VeilleJourneeParesseux = lazySur(() => import('../VeilleJournee.jsx'));
 const VeilleJournee = () => <GardeEcran nom="journee:veille"><Suspense fallback={null}><VeilleJourneeParesseux/></Suspense></GardeEcran>;
 const ImportDepart = aLaDemande(() => import('../ImportDepart.jsx'));
+// (24 nov., francais-demarrage) Les cartes de l'accueil (src/accueilReste/), EN BAS de Ma journée : à la demande,
+// hors du démarrage avec leur français. Rien pendant le chargement (elles sont sous tout le reste : rien ne bouge au-dessus).
+const AccueilResteJournee = aLaDemandeDiscret(() => import('../accueilReste/AccueilReste.jsx').then((m) => ({ default: m.AccueilResteJournee })));
 // ⟦← App.jsx #47⟧
 const PhotoEditor = aLaDemande(() => import('./PhotoEditor.jsx').then((m) => ({ default: m.PhotoEditor })), true);
 // ⟦← App.jsx #48⟧

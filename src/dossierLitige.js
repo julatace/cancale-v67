@@ -1,4 +1,5 @@
 import { jourParis } from './dateParis.js';
+import { lisibleParLaPage } from './lisibleParLaPage.js';
 // ═══════════════════════════════════════════════════════════════════════════
 // LE DOSSIER DE LITIGE EN UN PDF (10 nov., lot BJ)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -229,7 +230,8 @@ export async function pdfDossierLitige(contenu, { PDFLib = null, images = {}, bo
 // Un autre format (webp…) passe par un canvas en JPEG ; une erreur ⇒ null (« pas
 // récupérée », dit dans le PDF). Aucune requête vers un autre hôte que celui de la photo.
 export async function imageEnOctets(src) {
-  if (!src) return null;
+  // (24 nov., bugs-terrain) Un hôte que `connect-src` refuse (photo Leboncoin) : « pas récupérée », sans requête refusée.
+  if (!src || !lisibleParLaPage(src)) return null;
   try {
     const r = await fetch(src);
     if (!r.ok) return null;
