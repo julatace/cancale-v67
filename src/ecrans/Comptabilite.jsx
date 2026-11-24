@@ -29086,7 +29086,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   return (
                     <div className="sb-tete-hote vv-tete" id={ID_SECTION_COLIS.ventes} data-colis-section="ventes" data-colis-barre="" data-sb-studio={colisDans} data-sb-tuiles={tuilesTete ? '1' : '0'} data-vv-toutes={toutesSeules ? '1' : '0'}>
                       {rechV}
-                      <div className="vrm-colis-onglets vv-onglets" data-colis-onglet={toutesSeules ? 'toutes' : onglet} data-colis-total={vue.total}>
+                      <div className="vrm-colis-onglets vv-onglets" data-colis-onglet={toutesSeules ? 'toutes' : onglet} data-colis-total={colisDans === 'ventes' ? undefined /* (24 nov.) la section de Ventes ne calcule plus les colis à retirer : pas de total de toutes les colonnes */ : vue.total}>
                         <SegmentVentes valeur={toutesSeules ? 'toutes' : onglet} nEnv={nEnv} envAmbre={urgentEnv} nRoute={nEnvoyes} onChoix={(v) => onOngletColis && onOngletColis(v)}/>
                       </div>
                       {!toutesSeules && onglet === 'envoyer' ? <HeroVentes n={nTete} auMoins={envPartiel && nTete != null ? tr('sv.auMoins') : ''}
@@ -29235,7 +29235,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 onChoix={(x)=>{ if (x === 'leboncoin' && onColisLeboncoin) { onColisLeboncoin(); return; } setSiteColis(x); }}/>
             </DansBarreHaut>}
             {!colisDans && siteColis !== 'toutes' && sitesPresents && !sitesPresents.has(siteColis) && !vue.parSite[siteColis] ? <OngletManque site={siteColis} onglet="colis" onNav={onNav}/> : null}
-            <div className="vrm-colis-onglets" data-colis-onglet={onglet} data-colis-total={vue.total}>
+            <div className="vrm-colis-onglets" data-colis-onglet={onglet} data-colis-total={colisDans === 'ventes' ? undefined /* (24 nov.) la section de Ventes ne calcule plus les colis à retirer : pas de total de toutes les colonnes */ : vue.total}>
               {/* (3 nov., Julien : « je veux des colis ENVOYÉS, et dans un autre onglet ») Trois onglets, iOS :
                   À envoyer · Envoyés · À retirer — les nombres d'envoi et de retrait sont CEUX de Ma journée,
                   de la cloche et du widget (`vrm_colis_aposter` / `vrm_colis_retirer`). */}
