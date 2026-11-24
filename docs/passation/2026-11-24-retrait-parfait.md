@@ -51,6 +51,30 @@ porte `limiteAt` sans `limite`** aujourd'hui (le cas corrigé plus bas est donc 
    `limiteAt`) était muette. Désormais `limite || limiteAt` (toutes deux lues ; jamais `limiteVers` ni la garde).
 5. Textes en 5 langues (`retraits.g.*`, `retraits.p.aujourdhui`), « Quoi de neuf » `retrait-comptoir`.
 
+## Les 2 captures iPhone de Julien (production, 24 nov. midi : « regarde c'est moche, corrige »)
+
+Ce qu'elles montraient (production = `main`, variante « b ») et ce que cette branche (sur #1341, variante C) fait — chaque point a
+son contrôle dans `retrait-parfait.cjs` (J1–J9) :
+- nom du point sur 2 lignes + pastille d'échéance flottante ⇒ nom sur UNE ligne, échéance en texte calme dessous (J1, et #1341) ;
+- logo décalé ⇒ centré sur le nom (J1) ;
+- adresse coupée (« Saint-Méloir-des-Ondes ») ⇒ jamais coupée, elle passe à la ligne ; l'ouverture a sa propre ligne (J2 ;
+  `retrait-point-c` K7 passe de « une ligne » à « deux lignes au plus, entière ») ;
+- « Contenu pas encore lu · ouvre vinted.fr sur shop_cancale » à côté d'une case grise ⇒ vignette neutre, « Contenu pas encore lu »,
+  le geste sous « Pourquoi ? » (J6) ;
+- pastilles « Nouveau » ⇒ un point discret avant le titre (J3) ;
+- « Transporteur pas dit · comptoir », « limite pas lue » ⇒ rien d'écrit pour ce qu'on ne sait pas (J4) ;
+- traits de progression différents d'un colis à l'autre (ils ne s'allument que sur une date LUE) ⇒ la frise se DIT, « Au point ·
+  24 nov. » ; les cinq étapes restent pour le lecteur d'écran (J5) ;
+- le message « Nouveau code de retrait » posé sur le contenu ⇒ sur `main` depuis le 23 nov. (style-clarte-4) il se range dans la place
+  du bas, dans le flux : il ne recouvre plus rien (J7, mesuré sur la zone visible) ;
+- haut d'Achats : « Relier achats et ventes » coupé au bord, « Modifier » seul au-dessus d'un chiffre, bande serrée, onglets coupés
+  (« Annu… ») ⇒ au téléphone (`src/styles-achats-photos.css`, fin) les gestes dans la marge, la bande en carte (Modifier discret sur
+  la ligne du mois, Dépensé en grand, trois colonnes égales sous un filet), les onglets sur toute la ligne (✓ et « ⋯ » dessous)
+  (J8, J9). ⚠️ Ces règles sont dans la couche `vrm-premium` : une déclaration `!important` d'une couche passe devant toute
+  déclaration `!important` hors couche (mesuré : hors couche, la règle « correspondait » et ne s'appliquait pas) ;
+- « En route · point pas encore dit 21 » ⇒ « 21 en route » (#1341, J8) ;
+- « À renvoyer 2 » à moitié sous la barre : c'est le défilement (la section suit, entière, une fois défilée — K12 du banc C).
+
 ## Preuves
 
 - `scripts/audit-retrait-rappel-exact.cjs` E1–E4 (la règle EXÉCUTÉE) : vert ; `--prouve` 4/4 mutations rouges (`limite-estimee`,
