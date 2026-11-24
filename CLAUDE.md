@@ -397,6 +397,7 @@ Vinted est un **objet** `{amount}` ; les données vivent sous `data.payload`).
    (`_porte-banc.cjs`) sur le playwright du chemin absolu ; un banc rouge en masse ⇒
    regarder d'abord la capture (écran de connexion ?) et `df -h /` (disque plein).
 
+⚠️ **CI (24 nov.)** : les bancs d'une part tournent 3 à la fois (`BANCS_PARALLELE`, chacun son port et son navigateur) ; un banc long se coupe en morceaux de SA variable (`ventes-e2@SCENARIOS=jeu,exclu`, `accessibilite@BANC_LARGEUR=390`, `budget-vitesse@ECRANS=…`) ; avant de toucher un workflow, `python3 -I scripts/ci-controles.py --diff origin/main` doit dire « identiques » (rien de retiré, rien de rendu non bloquant). Récit : `docs/passation/2026-11-24-ci-rapide.md`.
 ⚠️⚠️ **Plusieurs sessions mergent sur `main` en même temps** : amener `main` par un
 **vrai `git merge origin/main`**, jamais `-s ours` ; après, `git diff origin/main --stat`
 ne montre que ses fichiers. **Commiter AVANT toute manipulation de branche.** Une
@@ -483,6 +484,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **24 nov. · CI ≈ 222 → ≈ 121 min-machine par PR, job le plus long 68 → 17 min (`claude/ci-rapide`)** : mêmes contrôles (`python3 -I scripts/ci-controles.py --diff origin/main`), bancs 3 à la fois (`BANCS_PARALLELE`), ventes-e2, accessibilite et budget-vitesse en morceaux, parts rééquilibrées, `dist/` partagé pour les écrans ; la part 2/3 (annulée à 45 min à chaque PR) finit. `2026-11-24-ci-rapide.md`. Geste : aucun.
 - **24 nov. · Morceaux périmés (`claude/morceaux-perimes`)** : la page ouverte pendant une mise en ligne ne repart plus — elle fait ranger les fichiers de SA version au repos (`src/reserveMorceaux.js`), le ménage du service worker garde ceux d'une page ouverte ; un écran introuvable recharge SUR cet écran, jamais pendant une saisie ou une feuille (sinon page cachée) ; un 404 /assets/ de la prod porte `immutable`. Banc `morceaux-perimes`, audit. `2026-11-24-morceaux-perimes.md`. Geste : aucun.
 - **23 nov. · Gris clair étagé (`claude/style-clair`)** : variante A validée (gris froid, accent ardoise), sombre = gris choisi ; iPhone compact ; dessin fin ; pop-up d'événement + galerie du propriétaire. `docs/passation/2026-11-23-style-clair.md`. Geste : essayer le pop-up sur un vrai iPhone.
 - **23 nov. (nuit) · Favoris 5.440.1** : la cloche de son compte porte un lien d'application (`vintedfr://messaging?item_id&user_id`) que la 5.440 refusait avant tout clic (« Conversation pas vérifiée ») ; reconnu par ses DEUX identités, identité par la commande si la conversation n'a pas d'article, un refus local saute CE favori (compteur remis à zéro à chaque envoi/Reprendre), phrase entière, un mot par état. `2026-11-23-favoris-identite.md`. Geste : installer la 5.440.1, relancer, dire ce que dit chaque ligne.
