@@ -179,7 +179,7 @@ async function film(nav, d) {
 async function anneauPasSu() {
   const esb = require(path.join(__dirname, '..', '..', 'node_modules', 'esbuild'));
   const sortie = path.join(require('os').tmpdir(), `banc-jeu-${process.pid}.cjs`);
-  esb.buildSync({ stdin: { contents: "export { Anneau } from './src/natif/Jeu.jsx'; export { renderToStaticMarkup } from 'react-dom/server'; export { createElement } from 'react';", resolveDir: path.join(__dirname, '..', '..'), loader: 'js' },
+  esb.buildSync({ stdin: { contents: "export { Anneau, Trajet } from './src/natif/Jeu.jsx'; export { renderToStaticMarkup } from 'react-dom/server'; export { createElement } from 'react';", resolveDir: path.join(__dirname, '..', '..'), loader: 'js' },
     bundle: true, outfile: sortie, format: 'cjs', platform: 'node', loader: { '.css': 'empty', '.js': 'jsx' }, jsx: 'automatic', logLevel: 'error' });
   const m = require(sortie); try { fs.unlinkSync(sortie); } catch (_) {}
   const rendre = (p) => m.renderToStaticMarkup(m.createElement(m.Anneau, p));
@@ -189,6 +189,11 @@ async function anneauPasSu() {
   }
   const su = rendre({ valeur: 6, total: 30 });
   dit(/data-n-anneau-su="1"/.test(su) && /data-n-anneau-part="0.200"/.test(su) && /n-anneau-plein/.test(su), '[anneau] J7 6 sur 30 ⇒ 0,2 rempli', su.slice(0, 200));
+  // Le trajet : aucune étape prouvée ⇒ piste en pointillé, AUCUN camion (« pas su » ne dit pas « au départ ») ; 2 prouvées ⇒ le camion sur la 2e.
+  const tr0 = m.renderToStaticMarkup(m.createElement(m.Trajet, { etapes: [{ cle: 'depose', fait: false, ici: false }, { cle: 'enroute', fait: false, ici: false }, { cle: 'livre', fait: false, ici: false }, { cle: 'valide', fait: false, ici: false }], Icon: () => null }));
+  dit(/data-n-trajet-su="0"/.test(tr0) && !/n-trajet-pion/.test(tr0), '[trajet] J7 aucune étape prouvée ⇒ pointillé, aucun camion', tr0.slice(0, 160));
+  const tr2 = m.renderToStaticMarkup(m.createElement(m.Trajet, { etapes: [{ cle: 'depose', fait: true }, { cle: 'enroute', fait: true, ici: true }, { cle: 'livre', fait: false }, { cle: 'valide', fait: false }], Icon: () => null }));
+  dit(/data-n-trajet="1"/.test(tr2) && /--n-trajet-part:0\.333/.test(tr2), '[trajet] J7 deux étapes prouvées ⇒ le camion sur la 2e (1/3 de la piste)', tr2.slice(0, 200));
 }
 // J8 — Aujourd'hui : l'anneau des colis prêts dit les MÊMES nombres que la case ; les dernières ventes en tuiles.
 async function journee(nav, W, theme, d) {
