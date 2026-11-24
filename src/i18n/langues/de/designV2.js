@@ -448,6 +448,7 @@ export default {
   "retraits.g.details": "Details",
   "retraits.g.colis": "Paket",
   "retraits.p.aujourdhui": "heute {h}",
+  "retraits.c.pasLuCourt": "Inhalt noch nicht gelesen",
   "retraits.p.rienIci": "Hier gibt es gerade nichts abzuholen",
   "retraits.p.enRouteVers": "Unterwegs zu diesem Punkt",
   "retraits.p.prevuAuj": "heute erwartet",

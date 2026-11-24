@@ -160,6 +160,58 @@ const toucher = (pg, sel) => pg.evaluate((s) => { const e = document.querySelect
       // P6
       const brest = pts.find((p) => p.codes.includes('7788'));
       dit(!!brest && brest.verif.length === 1 && brest.verif[0].m === 'depasse' && brest.verif[0].geste, `P6 « à vérifier » visible, raison « ${brest && brest.verif[0] && brest.verif[0].txt} », un geste`, brest && brest.verif);
+      // J — LES DÉFAUTS DES CAPTURES DE JULIEN (24 nov., production, iPhone) : jugés sur le rendu.
+      const J = await pg.evaluate(() => {
+        const vis = (e) => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
+        const R = (e) => e.getBoundingClientRect();
+        const rp = document.querySelector('.n-rp');
+        const cartes = [...document.querySelectorAll('[data-rp-point]')].filter(vis);
+        const noms = cartes.map((c) => { const n = c.querySelector('.n-rp-nom'); const lh = parseFloat(getComputedStyle(n).lineHeight) || 20; return Math.round(R(n).height / lh); });
+        const adresses = cartes.map((c) => c.querySelector('[data-rp-adresse]')).filter(Boolean).map((a) => { const t = a.querySelector('.n-rp-adresse-txt') || a; const cs = getComputedStyle(t);
+          return { coupe: t.scrollWidth > t.clientWidth + 1 || (cs.textOverflow === 'ellipsis' && cs.overflow !== 'visible' && t.scrollWidth > t.clientWidth) || R(t).right > R(a.closest('[data-rp-point]')).right + 1, txt: t.textContent }; });
+        const logos = cartes.map((c) => { const l = c.querySelector('.n-rp-logo'), t = c.querySelector('.n-rp-nom'); return l && t ? Math.round(Math.abs((R(l).top + R(l).height / 2) - (R(t).top + R(t).height / 2))) : 99; });
+        const pastillesNouveau = [...document.querySelectorAll('.n-rp .n-rp-etiquette')].filter(vis).filter((e) => /nouveau/i.test(e.textContent)).length;
+        const points = [...document.querySelectorAll('[data-rp-nouveau]')].filter(vis).map((e) => Math.round(R(e).width));
+        const jargon = rp ? (rp.innerText.match(/pas dit|pas lue|limite pas|ouvre vinted\.fr/gi) || []) : ['absent'];
+        const traits = [...document.querySelectorAll('.n-rp .n-rp-trajet')].filter(vis).length;
+        const pasLu = [...document.querySelectorAll('[data-rp-pas-lu]')].filter(vis).map((e) => ({ n: e.textContent.trim().length, pourquoi: !!e.parentElement.querySelector('[data-rp-pas-lu-pourquoi] details') }));
+        return { noms, adresses, logos, pastillesNouveau, points, jargon, traits, pasLu };
+      });
+      dit(J.noms.every((n) => n === 1), `J1 chaque nom de point sur UNE ligne (${J.noms.join(',')})`);
+      dit(J.logos.every((d) => d <= 12), `J1 le logo aligné sur le nom (${J.logos.join(',')} px)`, J.logos);
+      dit(J.adresses.length >= 5 && J.adresses.every((a) => !a.coupe), `J2 aucune adresse coupée (${J.adresses.length})`, J.adresses.filter((a) => a.coupe));
+      dit(J.pastillesNouveau === 0 && J.points.every((w) => w <= 10), `J3 « Nouveau » : aucune pastille, un point discret (${J.points.join(',') || 'aucun'})`);
+      dit(J.jargon.length === 0, `J4 aucun jargon (« pas dit », « pas lue », « ouvre vinted.fr ») à l'écran`, J.jargon);
+      dit(J.traits === 0, `J5 plus de traits inégaux : la frise se dit (« Au point · 24 nov. »)`, J.traits);
+      dit(J.pasLu.every((x) => x.n <= 25 && x.pourquoi), `J6 contenu pas lu : une ligne courte, le geste sous « Pourquoi ? » (${J.pasLu.map((x) => x.n).join(',') || 'aucun'})`, J.pasLu);
+      // J7 — un message (« Nouveau code de retrait · … ») ne recouvre aucun contenu.
+      await pg.evaluate(() => { const e = document.querySelector('[data-rp-point]:nth-of-type(2)') || document.querySelector('[data-rp-point]'); if (e) e.scrollIntoView({ block: 'end' }); window.dispatchEvent(new CustomEvent('vrm:toast', { detail: { texte: 'Nouveau code de retrait · Mondial Relay Le Tabac Banc', ton: 'info' } })); });
+      await pg.waitForTimeout(700);
+      const tst = await pg.evaluate(() => {
+        const t = document.querySelector('.vrm-toast'); if (!t) return { absent: true };
+        const r = t.getBoundingClientRect();
+        const sous = [...document.querySelectorAll('[data-rp-colis], [data-rp-point] .n-rp-tete, .n-rp-actions .n-bouton')].filter((e) => { const q = e.getBoundingClientRect(); return q.width && q.bottom > r.top + 1 && q.top < r.bottom - 1 && q.right > r.left && q.left < r.right; }).length;
+        return { place: (t.closest('.vrm-toasts') || { getAttribute: () => '' }).getAttribute('data-toasts-place'), sous };
+      });
+      dit(!tst.absent && tst.sous === 0, `J7 le message ne recouvre aucun contenu (place « ${tst.place} », ${tst.sous} recouvert)`, tst);
+      await pg.screenshot({ path: path.join(SHOTS, `message-${W}-${th}.png`) });
+      await pg.evaluate(() => { document.querySelectorAll('.vrm-toast').forEach((b) => b.click()); });
+      // J8 — le HAUT d'Achats : rien n'est coupé au bord, aucun onglet tronqué (« Annu… »), « N en route ».
+      await pg.evaluate(() => { let e = document.querySelector('.n-rp'); while (e && e !== document.documentElement) { if (/(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 2) { e.scrollTop = 0; break; } e = e.parentElement; } window.scrollTo(0, 0); });
+      await pg.waitForTimeout(500);
+      const haut = await pg.evaluate(() => {
+        const vis = (e) => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden' && parseFloat(getComputedStyle(e).opacity) > 0.05;
+        const main = document.querySelector('.vrm-main') || document.body;
+        const coupes = [...main.querySelectorAll('button, a, [role="tab"], h1, h2, h3, [data-achats-hero] *')].filter(vis).filter((e) => { const r = e.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight) return false;
+          if (e.closest('[data-rp-point], .n-gc, .vrm-toasts, [data-defile-x], .n-rangee-defile')) return false;
+          const cs = getComputedStyle(e); const deborde = r.right > innerWidth + 1 || r.left < -1; const tronque = (cs.textOverflow === 'ellipsis' || cs.overflow === 'hidden') && e.scrollWidth > e.clientWidth + 2 && (e.innerText || '').trim().length > 2;
+          return deborde || tronque; }).map((e) => (e.innerText || e.getAttribute('aria-label') || e.className || '').toString().trim().slice(0, 40));
+        const sp = document.querySelector('[data-rp-sans-point] > summary');
+        return { coupes: [...new Set(coupes)].slice(0, 10), sansPoint: sp ? sp.innerText.replace(/\s+/g, ' ').trim() : null };
+      });
+      dit(haut.coupes.length === 0, `J8 le haut d'Achats : rien de coupé au bord ni tronqué`, haut.coupes);
+      dit(haut.sansPoint == null || /^\d+ en route$/.test(haut.sansPoint), `J8 « N en route » (« ${haut.sansPoint} »)`);
+      await pg.screenshot({ path: path.join(SHOTS, `haut-${W}-${th}.png`) });
       await pg.evaluate(() => { const e = document.querySelector('.n-rp'); if (e) e.scrollIntoView({ block: 'start' }); });
       await pg.waitForTimeout(400);
       await pg.screenshot({ path: path.join(SHOTS, `liste-${W}-${th}.png`) });

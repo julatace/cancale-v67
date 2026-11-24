@@ -448,6 +448,7 @@ export default {
   "retraits.g.details": "Details",
   "retraits.g.colis": "Parcel",
   "retraits.p.aujourdhui": "today {h}",
+  "retraits.c.pasLuCourt": "Contents not read yet",
   "retraits.p.rienIci": "Nothing to collect here yet",
   "retraits.p.enRouteVers": "On the way to this point",
   "retraits.p.prevuAuj": "expected today",

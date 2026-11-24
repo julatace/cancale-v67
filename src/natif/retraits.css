@@ -328,7 +328,10 @@
 .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-billet-code .n-rp-code-btn { min-height: 44px; justify-content: flex-end; }
 /* (23 nov. au soir) Hors couche, après la règle hors couche du 21 nov. (« l'adresse passe à la ligne ») : en C, « adresse · horaires »
    tient sur une ligne (l'adresse se coupe, les horaires restent entiers). */
-.n-rp[data-rp-variante="c"] .n-rp-tete .n-rp-adresse { white-space: nowrap; }
+.n-rp[data-rp-variante="c"] .n-rp-tete .n-rp-adresse { white-space: normal; }
+/* (24 nov., retrait-parfait — capture de Julien : « Saint-Méloir-des-Ondes » coupé) L'adresse n'est JAMAIS coupée : elle passe à la
+   ligne, entière (l'ouverture a sa propre ligne dessous). */
+.n-rp[data-rp-variante="c"] .n-rp-tete .n-rp-adresse-txt { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
 @layer vrm-natif {
   /* (24 nov., retrait-parfait) La date limite LUE de chaque colis (plusieurs colis, dates différentes) ; le geste unique d'un
      « à vérifier » (« Retiré », bouton au trait, 44 px au doigt) ; l'ouverture du point d'après ses horaires lus. */
@@ -340,4 +343,14 @@
   @media (pointer: coarse) { .n-rp-verif-geste { min-height: var(--n-cible); } }
   .n-rp[data-rp-variante="c"] .n-rp-tete .n-rp-ouverture { box-sizing: border-box; width: 100%; padding-left: 48px; white-space: normal; flex: none; font: var(--n-t-legende); color: var(--n-encre-2); }
   .n-rp[data-rp-variante="c"] .n-rp-tete .n-rp-horaires[data-rp-ouverture="ouvert"] { color: var(--n-encre); font-weight: 600; }
+  /* (24 nov., capture de Julien : « les tirets ne sont pas pareils d'un colis à l'autre ») En C, la frise se DIT (« Au point · 24 nov. ») :
+     les cinq traits (allumés seulement par une date lue, donc inégaux) restent pour le lecteur d'écran, plus à l'œil. */
+  .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-trajet { display: none; }
+  .n-rp[data-rp-variante="c"] .n-rp-frise { padding-left: 56px; }
+  /* « Nouveau » : un point discret avant le titre, plus une pastille. */
+  .n-rp-point-neuf { display: inline-block; width: 8px; height: 8px; border-radius: 4px; background: var(--n-accent); margin-inline-end: 6px; vertical-align: 2px; }
+  /* Contenu pas lu : une vignette neutre (l'icône à l'encre douce), une ligne courte. */
+  .n-rp[data-rp-variante="c"] .n-rp-vignette[data-rp-photo="0"] { background: var(--n-carte-2); color: var(--n-encre-2); }
+  .n-rp-pas-lu-pourquoi { display: block; }
+  .n-rp-pas-lu-pourquoi .n-pourquoi { padding: 0; }
 }

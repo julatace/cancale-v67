@@ -140,10 +140,14 @@ function Contenu({ x, c, rg, photo, aides, prix, neuf, Icon = null }) {
         {relie && c.nb ? <span className="n-rp-lot-n" data-rp-lot={c.nb}>×{c.nb}</span> : null}
       </span>
       <span className="n-rp-colis-texte">
+        {/* (24 nov., capture de Julien) « Nouveau » n'est plus une pastille : un point discret avant le titre (dit au lecteur d'écran). */}
+        {neuf ? <span className="n-rp-point-neuf" data-rp-nouveau="" role="img" aria-label={tr('v2.passe.nouveau')}/> : null}
         {titre ? <span className="n-rp-colis-titre v2-passe-titre" data-rp-titre="">{titre}</span> : null}
-        {pasLu ? <span className={'n-rp-pas-lu' + (titre ? '' : ' is-seul')} data-rp-pas-lu="" data-v2-contenu="pas-lu" data-v2-contenu-raison={c.raison} data-v2-contenu-compte={c.compte || undefined}>{phrase}</span> : null}
+        {/* (24 nov., capture de Julien : « Contenu pas encore lu · ouvre vinted.fr sur shop_cancale ») UNE ligne courte ; le geste
+            (ouvrir vinted.fr sur tel compte) sous « Pourquoi ? ». */}
+        {pasLu ? <span className={'n-rp-pas-lu' + (titre ? '' : ' is-seul')} data-rp-pas-lu="" data-v2-contenu="pas-lu" data-v2-contenu-raison={c.raison} data-v2-contenu-compte={c.compte || undefined}>{tr('retraits.c.pasLuCourt')}</span> : null}
+        {pasLu && phrase ? <span className="n-rp-pas-lu-pourquoi" data-rp-pas-lu-pourquoi=""><Pourquoi>{phrase}</Pourquoi></span> : null}
         <span className="n-rp-colis-meta">
-          {neuf ? <span className="n-rp-etiquette" data-n-ton="vert" data-rp-nouveau="">{tr('v2.passe.nouveau')}</span> : null}
           {x.num ? <span className="n-rp-num" data-rp-num={x.num}><Plaque numero={x.num}/></span> : null}
           {relie && c.nb ? <span className="n-rp-etiquette" data-n-ton="neutre">{tr('retraits.c.lot', { n: c.nb })}</span> : null}
           {retour ? <span className="n-rp-etiquette" data-n-ton="neutre" data-rp-retour={c.tx}>{phrase}</span> : null}
@@ -256,12 +260,13 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc, variant
   // C : la ligne sous le nom = « transporteur · consigne · avant le 24 nov. » — le transporteur seulement s'il n'est pas déjà le titre,
   // « comptoir » (le cas courant) seulement pour le lecteur d'écran ; l'échéance LUE en texte calme (plus de pastille).
   const c = variante === 'c';
-  const sousTitre = c ? [nomDe === 'point' ? (nomT || (colis.length ? tr('retraits.v.transpInconnu') : '')) : '', p.consigne && sorte ? sorte : ''].filter(Boolean).join(' · ')
+  // (24 nov., capture de Julien : « Transporteur pas dit · comptoir », « limite pas lue ») En C, ce qu'on ne sait pas ne s'écrit pas.
+  const sousTitre = c ? [nomDe === 'point' ? nomT : '', p.consigne && sorte ? sorte : ''].filter(Boolean).join(' · ')
     : [nomT || (colis.length ? tr('retraits.v.transpInconnu') : ''), sorte].filter(Boolean).join(' · ');
   const echeance = !colis.length ? null
     : !comptes.length ? { cle: 'verif', presse: true, texte: tr('retraits.v.nVerif', { n: verif.length }) }
     : rebours ? { cle: rebours.cle, presse: !!rebours.ambre, texte: c ? texteEcheance(rebours, loc) : texteEtatPoint(rebours, loc) }
-    : { cle: 'pas-lu', presse: false, texte: tr('retraits.v.limitePasLue') };
+    : c ? null : { cle: 'pas-lu', presse: false, texte: tr('retraits.v.limitePasLue') };
   // Plusieurs colis : chaque rangée dit sa date limite seulement si elles DIFFÈRENT (sinon l'en-tête la dit, une fois).
   const joursLus = new Set(colis.map((x) => { const r = rangeeRetrait(x); return r && r.limite && r.limite.source === 'lue' ? r.limite.jour : ''; }).filter(Boolean));
   const avecLimite = colis.length > 1 && joursLus.size > 1;
