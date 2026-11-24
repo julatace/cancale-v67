@@ -154,7 +154,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
               {quandF && suDe(quandF, quandV) ? <span className="nf-etiquette" {...attrsFait(quandF, true, null)}>{T.libelle(quandF.lib) + ' ' + quandV}{quandF.auMoins ? ' ' + T.auMoins : ''}</span> : null}
               {tailleF && suDe(tailleF, valeurDe(tailleF)) ? <span className="nf-etiquette" data-nf-taille="" {...attrsFait(tailleF, true, null)}>{T.libelle(tailleF.lib) + ' ' + valeurDe(tailleF)}</span> : null}
               {suiteEtat}
-              {etat && etat.pourquoi && T.pourquoi ? <button type="button" className="nf-pourquoi" aria-expanded={pourquoi ? 'true' : 'false'} onClick={() => setPourquoi((v) => !v)} data-fd-pourquoi={etat.pourquoi}>{T.pourquoi}</button> : null}
+              {etat && etat.pourquoi && T.pourquoi ? <Bouton variante="texte" className="nf-pourquoi" onClick={() => setPourquoi((v) => !v)} attrs={{ 'aria-expanded': pourquoi ? 'true' : 'false', 'data-fd-pourquoi': etat.pourquoi }}>{T.pourquoi}</Bouton> : null}
             </div>
             {/* (24 nov., vente-mail-annonce) La raison du « pas su », UNE fois, sur demande — gris clair, jamais orange. */}
             {etat && etat.pourquoi && pourquoi ? <p className="nf-pourquoi-texte" data-fd-pourquoi-texte="">{T.raison(etat.pourquoi)}</p> : null}
