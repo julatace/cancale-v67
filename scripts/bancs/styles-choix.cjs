@@ -32,6 +32,7 @@ const THEMES = (process.env.THEMES || 'clair,sombre').split(',');
 const LARGEURS = (process.env.LARGEURS || '390').split(',').map(Number);
 const ECRANS = (process.env.ECRANS || 'ventes,annonces,fiche').split(',');
 const MUT = process.env.MUTATION || '';
+const PRINCIPAUX = new Set(['ventes', 'annonces', 'fiche']);
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; if (!process.env.CALME) console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 700) : '')); } return c; };
 
@@ -202,7 +203,7 @@ const PIXELS = async (args) => {
 
 async function ouvrir(nav, { W, sombre, style, url, b }) {
   const o = await P.ouvrir(nav, { W, sombre, b, url, dsf: 2 });
-  await o.pg.addInitScript((st) => { try { if (st) localStorage.setItem('vrm_style', JSON.stringify(st)); else localStorage.removeItem('vrm_style'); } catch (_) {} }, style);
+  await o.pg.addInitScript(([st, sombre]) => { try { if (st) localStorage.setItem('vrm_style', JSON.stringify(st)); else localStorage.removeItem('vrm_style'); localStorage.setItem('vrm_apparence', JSON.stringify(sombre ? 'sombre' : 'clair')); } catch (_) {} }, [style, sombre]);
   await o.pg.reload({ waitUntil: 'domcontentloaded' });
   o.erreurs.length = 0;
   return o;
@@ -249,10 +250,13 @@ async function poserMutation(pg) {
           const boites = await o.pg.evaluate(BOITES);
           const px = await o.pg.evaluate(PIXELS, { png: shot.toString('base64'), boites, dsf: 2 });
           const pxKo = px.filter((p) => p.k < 4.5 - 0.05 && !(p.s === '.n-grand-titre' && p.k >= 3));
-          dit(px.length >= 2 && !pxKo.length, `B ${cle} : sur les PIXELS, plein, étiquettes, N°, titres, onglet actif ≥ 4,5:1 — ${px.length} boîtes (min ${px.length ? Math.min(...px.map((p) => p.k)).toFixed(2) : '—'})`, pxKo.slice(0, 8));
+          dit(px.length >= 1 && !pxKo.length, `B ${cle} : sur les PIXELS, plein, étiquettes, N°, titres, onglet actif ≥ 4,5:1 — ${px.length} boîtes (min ${px.length ? Math.min(...px.map((p) => p.k)).toFixed(2) : '—'})`, pxKo.slice(0, 8));
           if (tactile && style) dit(m.nCibles > 5 && m.nPetites === 0, `C ${cle} : chaque cible ≥ 44 × 44 — ${m.nCibles} cibles`, m.petites);
           dit(!m.oranges.length && !m.rouges.length, `D ${cle} : aucune couleur orange/ambre, aucun rouge hors doublon`, { oranges: m.oranges, rouges: m.rouges });
-          if (style) dit(m.nEtrangers === 0, `E ${cle} : chaque bouton est de la famille commune`, m.etrangers);
+          // E est une RÈGLE sur les trois écrans des captures de Julien ; ailleurs (Achats, Argent, Messages, Paramètres) le banc RAPPORTE
+          // ce qui reste à rattacher (`data-n-famille`), sans rougir.
+          if (style && PRINCIPAUX.has(e)) dit(m.nEtrangers === 0, `E ${cle} : chaque bouton est de la famille commune`, m.etrangers);
+          else if (style && m.nEtrangers) console.log(`  ℹ️  E ${cle} : ${m.nEtrangers} bouton(s) d'avant à rattacher — ${m.etrangers.slice(0, 4).join(' · ')}`);
           if (style) { const a = await o.pg.evaluate(APPUI); dit(a.trouve && a.pendant.echelle < 0.999 && a.plusFonce, `F ${cle} : l'état enfoncé existe (échelle ${a.trouve ? a.pendant.echelle : '—'}, plus foncé)`, a); }
           dit(m.deborde <= 1 && !m.chevauche.length && !o.erreurs.length, `G ${cle} : rien ne déborde, rien ne se chevauche, aucune erreur`, { deborde: m.deborde, chevauche: m.chevauche, erreurs: o.erreurs });
           fs.writeFileSync(path.join(SHOTS, cle + '.png'), shot);

@@ -95,6 +95,9 @@
   [data-style]:not([data-style=""]) .n-ar-liste { margin: 0 var(--n-marge) 8px; border: 0; border-radius: var(--n-r-carte); overflow: hidden; box-shadow: var(--g-carte-ombre); }
   [data-style]:not([data-style=""]) .n-ar-titre { font-weight: 500; letter-spacing: -.1px; }
 }
+/* le tableau de travail (ordinateur) : ses boutons d'outils dans la famille (teintés, sans filet ; les icônes en ronds) */
+[data-style]:not([data-style=""]) .n-tt-bouton { border-color: transparent; }
+[data-style]:not([data-style=""]) .n-tt-bouton[data-n-famille="rond"] { background-color: transparent; }
 /* la fiche : « Actions ▾ » à la hauteur du plein, les faits (« achat · Ajouter ») en puces teintées */
 [data-style]:not([data-style=""]) .nf-choisir[data-n-famille="second"] { min-height: var(--g-h-plein); box-shadow: none; font-weight: 600; }
 [data-style]:not([data-style=""]) .nf-pastille .nf-pi { min-height: 32px; background: var(--g-second-fond); box-shadow: none; border-radius: var(--g-r-chip); }
