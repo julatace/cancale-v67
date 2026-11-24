@@ -79,7 +79,9 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
 function executerModule(texte) {
   if (!texte) return null;
   const noms = [];
-  const corps = texte.replace(/^export (const|function|let) (\w+)/gm, (_, k, n) => { noms.push(n); return `${k} ${n}`; }).replace(/^export default \w+;?$/gm, '');
+  // (24 nov., lot agir-si-connecte) la porte importée par ouvrirPanneau.js : remplacée par un « oui » (le lien seul est jugé ici ;
+  // la porte est jugée par scripts/audit-agir-si-connecte.cjs).
+  const corps = texte.replace(/^import \{ agirMaintenant \} from '\.\/agir\/porte\.js';$/m, "const agirMaintenant = () => ({ ok: true });").replace(/^export (const|function|let) (\w+)/gm, (_, k, n) => { noms.push(n); return `${k} ${n}`; }).replace(/^export default \w+;?$/gm, '');
   try { return new Function(`${corps}\nreturn { ${noms.join(', ')} };`)(); } catch (e) { return { erreur: String(e) }; }
 }
 
@@ -146,6 +148,9 @@ function juger(t) {
   const SEL = (reg && reg.PANNEAU_DE_SELECTION) || {};
   const sansBouton = Object.keys(A).filter((k) => {
     if (new RegExp(`action=["']${k}["']`).test(tout) || new RegExp(`'data-vrm-panneau':\\s*'${k}'`).test(tout) || Object.values(SEL).includes(k)) return false;
+    // (24 nov., Julien : « répondre à mes messages […] dans l'application si l'extension est connectée ») répondre se fait DEPUIS
+    // VRM, par la porte (src/agir/Agir.jsx `ComposerReponse`) — plus par le panneau.
+    if (k === 'repondre' && /<ComposerReponse site="vinted"/.test(tout) && /<ComposerReponse site="leboncoin"/.test(tout) && /<ComposerReponse site="vestiaire"/.test(tout)) return false;
     if (new RegExp(`'${k}'`).test((/const act = [^;]+;/.exec(tout) || [''])[0])) return false;
     return !new RegExp(`ouvrirPanneau\\(\\{[^}]*page:\\s*'${A[k].page}'[^}]*action:\\s*'${A[k].action}'`).test(tout);
   });
@@ -157,7 +162,7 @@ function juger(t) {
   const fr = t.dico.fr || '';
   verif(/"actionsExt\.phrase":\s*"s’ouvre sur \{site\} avec l’extension"/.test(fr), 'B3 la phrase discrète dit « s\'ouvre sur {site} avec l\'extension »');
   const bouton = sansCommentaires(t.src['src/BoutonExtension.jsx'] || '');
-  verif(/ouvrirPanneau\(c\)/.test(bouton) && /data-vrm-panneau-lien/.test(bouton) && /extensionIci\(\)/.test(bouton), 'B4 le bouton ouvre le lien du panneau, le porte (data-vrm-panneau-lien) et dit la phrase sans extension ici');
+  verif(/ouvrirPanneau\(\{ \.\.\.c, compte \}\)/.test(bouton) && /usePeutAgir\(/.test(bouton) && /data-vrm-panneau-lien/.test(bouton) && /extensionIci\(\)/.test(bouton), 'B4 le bouton ouvre le lien du panneau, le porte (data-vrm-panneau-lien) et dit la phrase sans extension ici');
 
   // L. le lien
   const op = executerModule(t.src['src/ouvrirPanneau.js']);

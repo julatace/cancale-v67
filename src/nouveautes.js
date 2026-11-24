@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (24 nov., agir-si-connecte) Julien : « faire absolument tout si l'extension est connectée ». docs/passation/2026-11-24-agir-si-connecte.md
+  { id: 'agir-si-connecte', date: '2026-11-24', titre: 'Répondre et republier depuis VRM', phrase: 'Si l’extension a ce compte ouvert ; sinon, lecture seule.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (24 nov., connexions-extension) Paramètres → Connexions de l'extension.
   { id: 'connexions-extension', date: '2026-11-24', titre: 'Chaque navigateur et chaque compte, en clair', phrase: 'Version, vu quand, ce qu’il lit, et quoi faire.', tab: 'connexions', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md
