@@ -21,6 +21,7 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //                                 (plateforme agréée de facturation électronique) :
 //                                 statut · connecter · deconnecter · envoyer ·
 //                                 relire — voir api/_lib/superpdp.js
+//   /api/compte?mode=claude       (GET/POST, session) SA clé Claude, rangée chiffrée (« Demande à VRM », api/_lib/claude-cle.js)
 //   /api/compte?mode=photoroom    (GET/POST, session) SA clé Photoroom, rangée
 //                                 chiffrée dans le coffre : statut (4 derniers
 //                                 caractères, date) · poser · verifier · retirer
@@ -82,6 +83,7 @@ import { sbCle } from './_lib/cle.js';
 import { lirePhoto } from './_lib/photos.js';
 import { routeSuperPdp } from './_lib/superpdp.js';
 import { routePhotoroom } from './_lib/photoroom-cle.js';
+import { routeClaude } from './_lib/claude-cle.js';   // (23 nov.) la clé Claude DU VENDEUR (« Demande à VRM »)
 import { routeFacturePro } from './_lib/facture-pro.js';
 import { routeFactureAutre } from './_lib/facture-autres.js';
 import { routeEntreprise } from './_lib/entreprise.js';
@@ -2022,6 +2024,14 @@ async function superpdp(req, res) {
   return routeSuperPdp(req, res, { vendeur, corps, acces: await accesVendeur(vendeur.id) });
 }
 
+// ── (23 nov.) La clé Claude du vendeur (« Demande à VRM ») : la session d'abord (api/_lib/claude-cle.js)
+async function claude(req, res) {
+  const vendeur = await vendeurExige(req, res);
+  if (!vendeur) return;
+  const corps = req.method === 'POST' ? await lireCorpsJson(req) : null;
+  return routeClaude(req, res, { vendeur, corps, acces: await accesVendeur(vendeur.id), cloisonnee: await baseCloisonnee() });
+}
+
 // ── La clé Photoroom du vendeur : la session d'abord (api/_lib/photoroom-cle.js)
 async function photoroom(req, res) {
   const vendeur = await vendeurExige(req, res);
@@ -2372,6 +2382,7 @@ export default async function handler(req, res) {
   if (mode === 'superpdp') return (m === 'GET' || m === 'POST') ? superpdp(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'facture-autre') return m === 'POST' ? factureAutre(req, res) : repondre(res, 405, { erreur: 'POST' });
   if (mode === 'facture-pro') return (m === 'GET' || m === 'POST') ? facturePro(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'claude') return (m === 'GET' || m === 'POST') ? claude(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'photoroom') return (m === 'GET' || m === 'POST') ? photoroom(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'equipe') return (m === 'GET' || m === 'POST') ? equipe(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'communaute') return (m === 'GET' || m === 'POST') ? communaute(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
