@@ -62,7 +62,7 @@ import { versementsParReleve, relevesNonVerifies } from '../versementReleve.js';
 import { masqueesParCompte } from '../annoncesMasquees.js';
 import { rythmeVendu, ecartPct, stockQuiDort } from '../statsVentes.js';
 import React, { useState, useMemo, useEffect, useRef, Suspense } from 'react';
-import { useMemoParesseux, useLecteurParesseux, paresseux, compterCalcul } from '../calculParesseux.js';
+import { useMemoParesseux, useLecteurParesseux, paresseux, compterCalcul, useMemeContenu, useCalculParVersion } from '../calculParesseux.js';
 import { useAttenteDepassee } from '../attenteBornee.js';   // (22 nov., chasse P2-5)
 import { lazySur } from '../chargementSur.js';
 import { createPortal } from 'react-dom';
@@ -6837,11 +6837,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // `fetchEmailBordereaux` projette déjà le champ `suivi` (§23).
   // ⚠️ Déclaré ICI, juste après `emailBords`, donc AVANT tout ce qui le lit —
   // un `useMemo` s'exécute immédiatement (piège TDZ, §19).
-  const suivisEnvoyes = useMemo(() => {
+  // (24 nov., vitesse-lectures-toucher) Les bordereaux relus aux MÊMES n° gardent le même ensemble (`useMemeContenu`) : ce qui
+  // le lit (`pickupUnion`, `txSuivisColis`…) ne repart plus à chaque relecture.
+  const suivisEnvoyes = useMemeContenu(useMemo(() => {
     const set = new Set();
     for (const b of (emailBords || [])) if (b && b.suivi) set.add(String(b.suivi).trim().toUpperCase());
     return set;
-  }, [emailBords]);
+  }, [emailBords]));
   // ── LE BORDEREAU DE CHAQUE VENTE (E1, 30 sept.) ─────────────────────────
   // « Le bordereau à côté de chaque vente, à côté du prix si possible. » Relié
   // par le n° de TRANSACTION, une identité (§5) : 165 bordereaux sur 166 la
@@ -8541,7 +8543,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // Pas su (bordereaux pas lus) ⇒ rien n'est écarté.
   const txRetourAchat = useMemo(() => txAchatsEnRetour(retoursAchatLus ? retoursAchatLus.bords : null, { demandes: retoursAchatLus ? retoursAchatLus.demandes : null, achats: buysBase }), [retoursAchatLus, buysBase]);
   const auRelaisVus = useMemo(() => buysBase.filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buysBase, pickupDone]);
-  const vintedToPickup = useMemo(() => auRelaisVus.filter(o => !achatEnRetour(o, txRetourAchat)), [auRelaisVus, txRetourAchat]);
+  const vintedToPickup = useMemeContenu(useMemo(() => auRelaisVus.filter(o => !achatEnRetour(o, txRetourAchat)), [auRelaisVus, txRetourAchat]));
   // (23 oct.) LES ACHATS QUI PEUVENT RELIER UN COLIS D'E-MAIL À SA COMMANDE (le
   // n° de suivi lu dans la transaction, une identité, §5) : ceux au point relais
   // ET — seulement s'il y a un colis d'e-mail en attente — ceux achetés depuis
@@ -8559,7 +8561,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // décompressées sur Ma journée au lieu de 3 (§4.4), pour aucun lien (0 des
   // 1 290 transactions réelles ne porte de n° de suivi). Un retour écrit par le
   // transporteur n'élargit rien non plus.
-  const txSuivisColis = useMemo(() => {
+  const txSuivisColis = useMemeContenu(useMemo(() => {
     const s = new Set(vintedToPickup.map(o => String(o.transaction_id)));
     let plusAncien = Infinity;
     // (revue adverse du 5 nov.) + les colis lus dans ses comptes Mondial Relay (`trackingRetrait`) :
@@ -8575,7 +8577,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const depuis = plusAncien - 21 * 86400000;
     for (const o of buysBase) { const d = Date.parse((o && o.date) || ''); if (Number.isFinite(d) && d >= depuis) s.add(String(o.transaction_id)); }
     return s;
-  }, [buysBase, vintedToPickup, trackingRetrait, collected, suivisEnvoyes]);
+  }, [buysBase, vintedToPickup, trackingRetrait, collected, suivisEnvoyes]));
   // « Colis à retirer » = UN SEUL compteur, l'UNION des deux signaux, dédoublonnée
   // par titre : (1) email transporteur (porte le CODE de retrait) + (2) statut
   // Vinted « déposé en point relais ». ⚠️ Avant on prenait « email OU Vinted »
@@ -19270,9 +19272,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // paires sous un N° » reste partout (le seul risque irréversible, §5).
   const voitSite = (s) => siteColis === 'toutes' || siteColis === s;
   // (20 nov., bugs-terrain) Calculée UNE fois par rendu (comme `expeditions`) : appelée jusqu'à 4 fois dans le même rendu
-  // (profil de Ventes au volume de sa base : ~1 à 2 s). La mémoire tombe à la fin de la tâche (microtâche) : jamais d'un rendu à l'autre.
-  let _cartesColisMemo = null;
-  const cartesColis = () => { if (_cartesColisMemo) return _cartesColisMemo; const r = cartesColisCalc(); _cartesColisMemo = r; queueMicrotask(() => { _cartesColisMemo = null; }); return r; };
+  // (profil de Ventes au volume de sa base : ~1 à 2 s).
+  // (24 nov., vitesse-lectures-toucher) PAR VERSION DES DONNÉES (`useCalculParVersion`, src/calculParesseux.js) : refaite
+  // seulement quand l'une des données qu'elle lit change (la liste ci-dessous, vérifiée par
+  // scripts/audit-calcul-par-version.cjs), et au plus toutes les 60 s (elle lit l'heure). Mesuré à la 1re visite d'Achats :
+  // 13 à 18 calculs par écran, un à chaque rendu. `reglesNumeros()` : les règles de numérotation (lues hors de l'état).
+  const cartesColis = useCalculParVersion(() => cartesColisCalc(), () => [accounts, bordLinks, bordsHidden, bordsShipped, bordsVenteEmailParTx, buyByNum, buysBase, colisDans, colisEb, colisEmailSources, colisRelais, ecranCalcul, emailBords, evsTransp, hiddenSales, imgMortes, indexSuivisAchats, labelsCaptes, labelsPrets, lbcVentes, nArticlesTx, numeros, numerosByPhoto, numerosByPhotoDir, onlineAnnonceIds, panelBordsDone, partisVinted, pickupUnion, retoursSuivis, saleOv, sales, shipDone, shippedSuivis, soldByTxn, tracking, trackingRetrait, transpMap, txnItem, txnLink, vcBrut, vcEtat, vcLoc0, ventesEmailParTx, reglesNumeros()], 'cartesColis', ecranCalcul);
   const cartesColisCalc = () => { compterCalcul('cartesColis', ecranCalcul);
     const L = [];
     const nomAvecTaille = (titre, o) => { const t = String(titre || '').trim(); const e = o ? effEntry(o) : null; const tl = e && e.taille ? String(e.taille) : ''; return tl && !tailleDansTitre(t, tl) ? `${t} · ${tl}` : t; };
@@ -20642,8 +20647,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const LIMITE_ENVOYES_J = 45;
   // (20 nov., bugs-terrain) Calculée UNE fois par rendu (comme `expeditions`) : appelée jusqu'à 4 fois dans le même rendu
   // (profil de Ventes au volume de sa base : ~1 à 2 s). La mémoire tombe à la fin de la tâche (microtâche) : jamais d'un rendu à l'autre.
-  let _listeEnvoyesMemo = null;
-  const listeEnvoyes = () => { if (_listeEnvoyesMemo) return _listeEnvoyesMemo; const r = listeEnvoyesCalc(); _listeEnvoyesMemo = r; queueMicrotask(() => { _listeEnvoyesMemo = null; }); return r; };
+  // (24 nov., vitesse-lectures-toucher) Par version des données, comme `cartesColis` (liste vérifiée par
+  // scripts/audit-calcul-par-version.cjs ; au plus 60 s).
+  const listeEnvoyes = useCalculParVersion(() => listeEnvoyesCalc(), () => [LIMITE_ENVOYES_J, bordLinks, bordParTx, bordsHidden, bordsParTxn, bordsPrinted, bordsShipped, bordsVenteEmailParTx, buyByNum, cochesNonPartis, colisEmailSources, ecranCalcul, emailBords, hiddenSales, labelsCaptes, lbcLu, lbcVentes, numeros, numerosByPhoto, numerosByPhotoDir, onlineAnnonceIds, ordSearchDiff, panelBordsDone, partisVinted, periode, saleOv, sales, shipDone, shippedSuivis, siteColis, soldByTxn, tracking, transpMap, txnItem, txnLink, vcEtat, vcLoc0, ventesEmailParTx, versements, reglesNumeros()], 'listeEnvoyes', ecranCalcul);
   const listeEnvoyesCalc = () => { compterCalcul('listeEnvoyes', ecranCalcul);
     const out = [];
     try {

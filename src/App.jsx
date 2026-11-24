@@ -932,6 +932,7 @@ import { lireCodeColis } from "./scanColis.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 // ⟦→ ecrans/Comptabilite.jsx #67⟧
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
+import { memeContenu } from './calculParesseux.js';
 import { creerMemoCourt } from "./memoCourt.js";   // (20 nov., lectures-legeres) lectures lourdes servies 20 s aux voisines
 import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
@@ -5401,7 +5402,10 @@ function useSystemeSombre(ecouter) {
 function useStateCle(k, init) {
   const [v, setV] = React.useState(init);
   const initRef = React.useRef(init); initRef.current = init;
-  React.useEffect(() => onCleRelue(k, () => { try { setV(initRef.current()); } catch (_) {} }), [k]);
+  // (24 nov., vitesse-lectures-toucher) Une clé relue au MÊME contenu garde sa valeur (même identité) : avant, chaque relecture
+  // du nuage rendait un objet neuf et relançait tous les calculs qui la lisent (`pickupUnion` sur Achats, mesuré). Un contenu
+  // différent passe comme avant (src/calculParesseux.js, `memeContenu`).
+  React.useEffect(() => onCleRelue(k, () => { try { const n = initRef.current(); setV((p) => (memeContenu(p, n) ? p : n)); } catch (_) {} }), [k]);
   return [v, setV];
 }
 const emettreClesRelues = (cles) => {

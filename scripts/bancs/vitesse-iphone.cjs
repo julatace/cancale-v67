@@ -131,13 +131,15 @@ async function onglets(pg, R) {
   const ORDRE = ['annonces', 'ventes', 'achats', 'compta', 'journee'];
   // 1re visite de chaque onglet. PROFIL=visite1:<onglet> : le profil du montage (récit §5 quater, recopié le 24 nov.) ;
   // CALCULS=1 : les gros calculs faits pendant la visite, par écran (`window.__vrmCalculs`, src/calculParesseux.js).
-  for (const o of ORDRE) { const pf = await profilDebut('visite1:' + o); await pg.evaluate((pile) => { window.__vrmCalculs = {}; window.__vrmPiles = []; window.__vrmCalculsPile = pile; }, process.env.CALCULS === 'pile').catch(() => {});
+  for (const o of ORDRE) { const pf = await profilDebut('visite1:' + o); await pg.evaluate((pile) => { window.__vrmCalculs = {}; window.__vrmCalculsMs = {}; window.__vrmPiles = []; window.__vrmCalculsPile = pile === 'pile'; window.__vrmDeps = []; window.__vrmCalculsDeps = pile === 'deps'; }, process.env.CALCULS || '').catch(() => {});
     LECTURES_EN_COURS = process.env.LECTURES ? [] : null; const tTap = Date.now();
     await pg.locator(`[data-n-onglet="${CLE(o)}"]`).first().tap({ timeout: 30000 }).catch(() => {}); await pg.waitForFunction(ecranPret, o, { timeout: 60000, polling: 200 }).catch(() => {});
     await profilFin('visite1:' + o, pf);
     if (LECTURES_EN_COURS) { const d = Date.now() - tTap; await calme(pg, 1500, 20000); const L = LECTURES_EN_COURS; LECTURES_EN_COURS = null;
       console.log(`      lectures 1re visite ${o} (prêt à +${d} ms) : ${L.length}`); for (const [t, m, u] of L) console.log(`        +${t - tTap} ${m} ${u}`); } await calme(pg, 1500, 20000);
     if (process.env.CALCULS) console.log(`      calculs 1re visite ${o} : ${JSON.stringify(await pg.evaluate(() => window.__vrmCalculs || null).catch(() => null))}`);
+    if (process.env.CALCULS) console.log(`      durée des calculs 1re visite ${o} (ms, processeur ralenti) : ${JSON.stringify(await pg.evaluate(() => window.__vrmCalculsMs || null).catch(() => null))}`);
+    if (process.env.CALCULS === 'deps') console.log(`      dépendances changées (rang) : ${JSON.stringify(await pg.evaluate(() => window.__vrmDeps || []).catch(() => []))}`);
     if (process.env.CALCULS === 'pile') for (const x of await pg.evaluate(() => window.__vrmPiles || []).catch(() => [])) console.log('        ' + x.join(' · ').slice(0, 900)); }
   for (let tour = 0; tour < 2; tour++) for (const o of ORDRE) {
     await calme(pg, 1000, 15000); await rendus(pg); const m0 = await metr(); const pf = tour === 1 && await profilDebut('onglet:' + o);
