@@ -184,7 +184,7 @@ const ouvrir = async (b, vp, sombre) => {
             // (11 nov., lot DJ3) « À retirer » est la section de tête d'Achats : plus d'onglet ni de grande carte ;
             // le nombre est celui de SA liste (`data-cc-n`) et de la pastille d'Achats.
             pub, onglet: (document.querySelector('[data-cc-colonne="retirer"]') || { getAttribute: () => null }).getAttribute('data-cc-n'),
-            carte: ((document.querySelector('[data-nav-entree="achats"] .vrm-nav-badge-n') || {}).textContent || '').replace(/\D/g, '') || null,
+            carte: ((document.querySelector('[data-nav-entree="achats"] .vrm-nav-badge-n, [data-nav-entree="achats"] .n-pastille') || {}).textContent || '').replace(/\D/g, '') || null,
             idents: lignes.map((l) => l.getAttribute('data-cc-carte')),
             comptes: lignes.filter((l) => !l.hasAttribute('data-hors-compte')).length,
             points: [...document.querySelectorAll('.vrm-rpf-section:not(.is-repli) .vrm-rpf-point')].map((p) => ({ cle: p.getAttribute('data-relais-point'), nom: (p.querySelector('.vrm-rpf-nom') || {}).textContent, adr: (p.querySelector('[data-relais-adresse]') || {}).textContent || '', h: (() => { const a = p.querySelector('.vrm-rpf-nom'), d = p.querySelector('[data-relais-adresse]'); if (!d) return 0; const ra = a.getBoundingClientRect(), rd = d.getBoundingClientRect(); return rd.top >= ra.bottom - 2 && a.scrollWidth <= a.clientWidth + 1 && rd.height <= 24 ? 0 : 99; })(), n: p.querySelectorAll('[data-cc-carte]').length, inconnu: p.classList.contains('is-inconnu') })),

@@ -114,7 +114,7 @@ async function scenario(nav, { W, panne, jsSeul = false }) {
     let file = [], compte = null;
     try { file = JSON.parse(localStorage.getItem('vrm_plantages_attente') || '[]'); } catch (_) {}
     try { compte = JSON.parse(localStorage.getItem('vrm_morceaux_perimes') || 'null'); } catch (_) {}
-    const nav = document.querySelector('.vrm-mobile-nav, .vrm-sidebar');
+    const nav = document.querySelector('nav[data-n-onglets], [data-n-laterale], .vrm-mobile-nav, .vrm-sidebar');   // (24 nov., main-vert) la barre NATIVE (téléphone) et la colonne native (ordinateur)
     return { file: file.map((x) => x.message), compte, ecran: (document.querySelector('.vrm-main') || { getAttribute: () => '' }).getAttribute('data-ecran'),
       souci: /n'a pas pu s'afficher/.test(t), dernierFilet: /L'application n'a pas pu démarrer/.test(t), nav: !!(nav && nav.getBoundingClientRect().height) };
   });

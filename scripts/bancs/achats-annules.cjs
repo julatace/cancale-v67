@@ -51,8 +51,19 @@ const toucher = async (pg, sel, tel) => { const l = pg.locator(sel).filter({ vis
       const a = await mesure(pg);
       if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `achats-annules-${W}-tous.png`) });
       dit(!a.annuleVu && a.autresVus, `[${W}] A1 sous « Tous », l’achat annulé n’est pas montré (les autres oui)`, JSON.stringify(a));
-      dit(a.ong.annules === '1', `[${W}] A2 « Annulés » porte son nombre (1)`, JSON.stringify(a.ong));
-      const la = await toucher(pg, '[data-achats-onglet="annules"]', tel);
+      // (24 nov., main-vert) À l'ordinateur, Achats est le TABLEAU DE TRAVAIL (src/natif/ecrans/AchatsTableau.jsx) : « Annulés » est
+      // un statut du filtre « Statut » ([data-tt-ouvre="statut"], case [data-tt-statut="annule"] et son nombre [data-tt-n]).
+      let la;
+      if (!tel && !Object.keys(a.ong).length) {
+        await toucher(pg, '[data-tt-ouvre="statut"]', tel);
+        const nAnnul = await pg.evaluate(() => { const c = document.querySelector('[data-tt-statut="annule"] [data-tt-n]'); return c ? c.getAttribute('data-tt-n') : null; });
+        dit(nAnnul === '1', `[${W}] A2 « Annulés » porte son nombre (1)`, JSON.stringify({ statut: nAnnul }));
+        la = await toucher(pg, '[data-tt-statut="annule"] input', tel);
+        await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(600);
+      } else {
+        dit(a.ong.annules === '1', `[${W}] A2 « Annulés » porte son nombre (1)`, JSON.stringify(a.ong));
+        la = await toucher(pg, '[data-achats-onglet="annules"]', tel);
+      }
       const b = await mesure(pg);
       if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `achats-annules-${W}-annules.png`) });
       dit(la && b.annuleVu && !b.autresVus, `[${W}] A3 « Annulés » choisi : l’achat annulé seul`, JSON.stringify(b));
