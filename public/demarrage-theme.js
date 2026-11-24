@@ -9,7 +9,7 @@
 (function () {
   // Le haut du dégradé de l'écran de démarrage (clair, bleu-nuit) : `--sv-haut` de src/design/studio-verre.css
   // (16 nov., intégration : l'écran de chargement reprend les valeurs FINALES du verre, plus la proposition 9).
-  var BOOT_CLAIR = '#F4F4F2', BOOT_NUIT = '#0F0F11';   // (22 nov.) les jetons du 2e jet (src/natif/jetons.css)   // (19 nov., « VRM natif ») le fond de la page, `--n-fond` (plus le haut du dégradé bleu)
+  var BOOT_CLAIR = '#DFE1E5', BOOT_NUIT = '#1C1C20';   // (23 nov.) clair = le gris clair de l'app, nuit = le gris de vrm.center   // (22 nov.) les jetons du 2e jet (src/natif/jetons.css)   // (19 nov., « VRM natif ») le fond de la page, `--n-fond` (plus le haut du dégradé bleu)
   function lire(k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   function sombreAuDemarrage(mode, ancien, heure, systeme) {
     if (mode !== 'clair' && mode !== 'sombre' && mode !== 'auto' && mode !== 'soir') mode = ancien === true ? 'sombre' : 'clair';

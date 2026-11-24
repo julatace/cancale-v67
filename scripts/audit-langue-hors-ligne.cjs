@@ -89,7 +89,7 @@ async function rangesPour(source, langue) {
     const garde = await vm.runInContext('(async () => { const c = await caches.open(CACHE); return nomsGardesHorsLigne(c); })()', m.ctx);
     dit(LISTE.langues.en.every((f) => garde.includes(f)) && !garde.includes(LISTE.langues.es[0]), '4. la purge garde les morceaux de la langue dite, pas les autres', garde.filter((k) => /\/(en|es|it|de)/.test(k)).join(', '));
     const vite = fs.readFileSync(path.join(RACINE, 'vite.config.js'), 'utf8');
-    dit(/langues\[l\] = langues\[l\] \|\| \[\]\)\.push/.test(vite) && /JSON\.stringify\(\{ v: 1, fichiers, langues \}\)/.test(vite) && /\(en\|es\|it\|de\)\(\?:-accueil\)\?\\\.js\$/.test(vite), '6. le build range les dictionnaires étrangers à part');
+    dit(/langues\[l\] = langues\[l\] \|\| \[\]\)\.push/.test(vite) && /JSON\.stringify\(\{ v: 1, fichiers, langues(?:, [a-z]+)* \}\)/.test(vite) && /\(en\|es\|it\|de\)\(\?:-accueil\)\?\\\.js\$/.test(vite), '6. le build range les dictionnaires étrangers à part');
     // la liste du build, si un build est là
     const hl = path.join(RACINE, 'dist', 'hors-ligne-assets.json');
     if (fs.existsSync(hl)) {
