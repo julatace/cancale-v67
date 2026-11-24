@@ -127,7 +127,7 @@ function FilFusionne({ fil, vintedDe, lireVinted, ebayDe, onRepondre, onDelier, 
   const via = parConv ? conversationDeReponse(fil, messages) : null;
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55, textAlign: 'center', padding: '20px 0' };
   return (
-    <CadreFil etiquette="Fil de messages" onFermer={onFermer} attrs={{ 'data-fil-fusionne': fil.cle, 'data-fil-n': String(fil.convs.length) }}>
+    <CadreFil etiquette={tr('a11y.filMessages')} onFermer={onFermer} attrs={{ 'data-fil-fusionne': fil.cle, 'data-fil-n': String(fil.convs.length) }}>
       <TeteFil onFermer={onFermer} nom={nomDe(fil)} titre={fil.num ? `N°${fil.num}` : ''} compte={fil.plateformes.map((p) => NOM_SITE[p]).join(' · ')}/>
       <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {parConv ? <AlerteArnaque site={fil.plateformes.length === 1 ? fil.plateformes[0] : ''} messages={messages}/> : null}
@@ -421,7 +421,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                             data-fil={f.cle} data-fil-convs={String(f.convs.length)} data-fil-sites={f.plateformes.join(',')} data-fil-num={f.num || undefined} data-nonlu={f.nonLu === true ? '1' : undefined}
                             data-fil-at={f.at != null ? String(f.at) : ''} data-fil-offre={offre ? String(offre.prix) : undefined}
                             data-cible={attrCible(...f.convs.flatMap((c) => [['conv', c.conv], c.compte != null && c.compte !== '' ? ['conv', String(c.compte).replace(/^lbc-account:/, ''), c.conv] : null]).filter(Boolean))}
-                            onClick={() => ouvrir(f)} aria-label={`Ouvrir le fil ${nomF}`}>
+                            onClick={() => ouvrir(f)}>
                             {/* (24 nov., visuel-argent) La PAIRE en tuile (sa photo vient de la fiche reliée PAR IDENTITÉ, `convVinted` ⇒
                                 `paire.photo` ; jamais l'avatar de l'acheteur ; sans photo, un médaillon) et l'AVATAR DU COMPTE (l'initiale du
                                 groupe) sur son coin — au téléphone comme à l'ordinateur (la vignette de droite est devenue cette tuile). */}

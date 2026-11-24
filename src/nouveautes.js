@@ -32,6 +32,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'visuel-argent', date: '2026-11-24', titre: 'Argent en un coup d’œil', phrase: 'Anneau de l’objectif, seuils en jauges, à venir en cartes.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (24 nov., visuel-jeu — Julien : « c'est pas visuel, hésite pas à faire des designs comme jeu vidéo ») docs/passation/2026-11-24-visuel-jeu.md
   { id: 'visuel-jeu', date: '2026-11-24', titre: 'Pop-ups et ventes en grandes photos', phrase: 'La paire en grand, son N°, une petite fête par vente.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (24 nov., wcag-aa — Julien : plugin fairmind-design, accessibilité) docs/passation/2026-11-24-wcag-aa.md
+  { id: 'wcag-aa-24nov', date: '2026-11-24', titre: 'Plus lisible, aussi avec un lecteur d’écran', phrase: 'Le bilan se lit la nuit ; feuilles et messages sont bien annoncés.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (24 nov., moderation-carte réconciliée avec la revue UX — Julien : « c'est moche ») src/AlerteModeration.jsx
   { id: 'annonces-disparues-groupees', date: '2026-11-24', titre: 'Annonces disparues : leurs photos et un geste', phrase: 'Une ligne par compte ; touche-la : photos, N°, quoi faire.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (24 nov., ext. 5.440.3 — Julien : « capte absolument tout ce que fait Bleam ») docs/passation/2026-11-24-observation-vinted.md
@@ -46,6 +48,10 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'favoris-identite', date: '2026-11-23', titre: 'Messages aux favoris : le nouveau lien de Vinted', phrase: 'Un favori pas confirmé est dit et sauté, la file continue.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md
   { id: 'vente-email-partout', date: '2026-11-23', titre: 'Une vente reçue par e-mail se voit partout', phrase: 'Ventes, Ma journée et Colis, avant même le passage de l’extension.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (23 nov. au soir, lot retours-suivi — Julien : « le transporteur inconnu, le logo mal mis ») docs/passation/2026-11-23-retours-suivi.md
+  { id: 'retraits-point-clair', date: '2026-11-23', titre: 'Points relais nommés, plus clairs, sans orange', phrase: 'Le nom du point Vinted Go, son logo, sa date limite.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot retours-suivi — Julien : « fais le suivi des colis retournés ») docs/passation/2026-11-23-retours-suivi.md
+  { id: 'retours-achat-suivi', date: '2026-11-23', titre: 'Tes retours suivis jusqu’au remboursement', phrase: 'Chaque étape cochée, mise à jour toute seule, boutons clairs.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov., photos-nettes — Julien : « toutes les photos sont floues ») docs/passation/2026-11-23-photos-nettes.md
   { id: 'photos-nettes', date: '2026-11-23', titre: 'Photos plus nettes, surtout en grand', phrase: 'La plus grande taille connue s’affiche dès qu’elle est chargée.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov., ext. 5.440 — Julien : « l'app doit s'adapter toute seule au bouton favoris ») docs/passation/2026-11-23-favoris-auto.md
