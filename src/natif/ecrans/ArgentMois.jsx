@@ -87,10 +87,10 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
             </div>
             <div className="n-arg-recu-chiffre" data-arg-montant="" data-n-vide={n == null ? '1' : undefined}>
               {partiel && valeur != null ? <span className="n-arg-recu-moins">{tr('journee.moins')}</span> : null}
-              <span className="n-arg-recu-n">{n == null ? TIRET : n}</span>{u ? <span className="n-arg-recu-u">{u}</span> : null}
+              <span className="n-arg-recu-n" {...attrsAttente(attenteDe(null, n != null, phrase), 'valeur')}>{n == null ? TIRET : n}</span>{u ? <span className="n-arg-recu-u">{u}</span> : null}
             </div>
             {/* Le manque (la note de la MÊME règle), en une ligne ; sans manque, rien (la datation est dans le « ? »). */}
-            {note || valeur == null ? <p className="n-arg-recu-note" data-arg-recu-note="">{phrase}</p> : null}
+            {note || valeur == null ? <p className="n-arg-recu-note" data-arg-recu-note="" {...attrsAttente(attenteDe(null, n != null, phrase), 'note')}>{phrase}</p> : null}
           </div>
           {sansBarres ? null : (
             <ol className="n-arg-mois6" aria-label={tr('v2.ar.graphe')} data-arg-mois={String(barres.length)}

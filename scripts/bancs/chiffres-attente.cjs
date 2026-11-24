@@ -30,7 +30,8 @@ function mesure(CH) {
     return !el.closest('[hidden],[aria-hidden="true"]:not([data-fu-case-chiffre]),.vrm-sr-seul'); };
   const peint = (el) => { const c = getComputedStyle(el).webkitTextFillColor || ''; return !/rgba\(\d+, \d+, \d+, 0\)|transparent/.test(c); };
   const racine = document.body;
-  const tirets = [...racine.querySelectorAll(CH)].filter((el) => el.textContent.trim() === '—' && vu(el) && peint(el)).map((el) => el.className || el.tagName);
+  const feuille = (el) => ![...el.children].some((c) => c.textContent.trim() === '—');   // le « — » lui-même, pas sa case
+  const tirets = [...racine.querySelectorAll(CH)].filter((el) => el.textContent.trim() === '—' && feuille(el) && vu(el) && peint(el)).map((el) => el.className || el.tagName);
   const raisons = [];
   const w = document.createTreeWalker(racine, NodeFilter.SHOW_TEXT);
   while (w.nextNode()) { const t = w.currentNode.textContent.trim(); const el = w.currentNode.parentElement;
