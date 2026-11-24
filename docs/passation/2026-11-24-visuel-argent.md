@@ -76,3 +76,17 @@ L'apparition passe par l'aide partagée de visuel-jeu (`useArrive(pret, cle)`, `
   tourné (machine saturée) : ce lot n'appelle que des propriétaires existants, aucune somme neuve.
 - À l'ordinateur, la valeur « Micro-entrepre… » de la colonne Paramètres est coupée (d'avant ce lot).
 - `revele` de visuel-jeu ne se rejouait plus à la revisite dans Argent (vérifié par le banc : 0 animation à la revisite).
+
+## 7. Retouches du coordinateur (24 nov., soir)
+
+1. **Un seul format de nombre.** `montant()` (src/format.js) écrit déjà « 1 794 € » (espace fine U+202F) partout ; derrière
+   un « 1 » étroit en chiffres proportionnels, l'espace ne se voyait pas (« 1794 € » à côté de « 2 028 € »). Le grand chiffre,
+   les six mois et le centre de l'anneau passent en chiffres tabulaires. Banc **F** : tout montant de 4 chiffres ou plus porte
+   l'espace, et ces éléments sont en `tabular-nums`.
+2. **Juin–août à « 0 € » n'étaient PAS de vrais zéros.** `recuPublieEntre` rend 0 pour un mois absent de la ligne publiée ; la
+   base d'exemple n'a aucune vente lue avant septembre. Un mois passé à 0 € n'est plus un zéro que si l'historique lu le couvre :
+   une vente lue AVANT ce mois (la règle `couvert` de `valeurObjectifMois`, src/design/carteChiffres.js). Sinon « — » et une piste
+   vide. Un reçu > 0 reste une lecture. Le calcul ne change pas : c'est l'affichage d'un « pas su ». Banc **Z** (attribut
+   `data-arg-m6-couvert`) ; mutation (la règle retirée ⇒ juin–août « 0 € ») ⇒ **rouge**.
+3. **Les chiffres ne bougent pas.** `chiffres-volume` (base par défaut), build de base (main + visuel-jeu) contre ce build :
+   **35/35 relevés identiques** ; `audit-chiffres` et `audit-urssaf` verts. Lancés par `lourd-prio.sh`.
