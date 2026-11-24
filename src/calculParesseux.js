@@ -51,3 +51,14 @@ export function useMemoParesseux(fn, deps, nom, ecran) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   return useMemo(() => paresseux(fn, nom, ecran), deps);
 }
+
+// La même chose pour une valeur qui n'est pas un objet simple (une `Map`, une liste) : rend une FONCTION de lecture,
+// même identité tant que les dépendances ne changent pas ; le calcul tourne au premier appel, une fois.
+export function lecteurParesseux(fn, nom, ecran) {
+  let fait = false, v;
+  return () => { if (!fait) { v = fn(); fait = true; compterCalcul(nom, ecran); } return v; };
+}
+export function useLecteurParesseux(fn, deps, nom, ecran) {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => lecteurParesseux(fn, nom, ecran), deps);
+}

@@ -62,7 +62,7 @@ import { versementsParReleve, relevesNonVerifies } from '../versementReleve.js';
 import { masqueesParCompte } from '../annoncesMasquees.js';
 import { rythmeVendu, ecartPct, stockQuiDort } from '../statsVentes.js';
 import React, { useState, useMemo, useEffect, useRef, Suspense } from 'react';
-import { useMemoParesseux, paresseux, compterCalcul } from '../calculParesseux.js';
+import { useMemoParesseux, useLecteurParesseux, paresseux, compterCalcul } from '../calculParesseux.js';
 import { useAttenteDepassee } from '../attenteBornee.js';   // (22 nov., chasse P2-5)
 import { lazySur } from '../chargementSur.js';
 import { createPortal } from 'react-dom';
@@ -14484,7 +14484,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // `pickupUnion` a reliée à CETTE commande (conversation, n° de suivi, code), sinon la
   // conversation, sinon le n° de suivi de la commande. Une ligne que la règle sait finie
   // (retirée, repartie) est rendue avec `horsRetrait` : elle ne dit plus « à retirer ».
-  const colisParTx = useMemo(() => {
+  // (24 nov., vitesse-ecran-montre) Une fonction de lecture paresseuse (src/calculParesseux.js) : elle lisait `pickupUnion`
+  // sur tous les écrans, Annonces compris.
+  const colisParTx = useLecteurParesseux(() => {
     const m = new Map();
     const vus = new Set((pickupUnion.emailList || []).map(colisKey));
     for (const [k, c] of (pickupUnion.cmdParColis || new Map())) { const t = (pickupUnion.emailList || []).find((x) => colisKey(x) === k); if (t && c) m.set(String(c.transaction_id), t); }
@@ -14497,8 +14499,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       m.set(String(o.transaction_id), vus.has(colisKey(t)) ? t : { ...t, horsRetrait: true });
     }
     return m;
-  }, [pickupUnion, buysBase, trackingRetrait, indexSuivisAchats]);
-  const trackForBuy = (o) => (o ? colisParTx.get(String(o.transaction_id)) || null : null);
+  }, [pickupUnion, buysBase, trackingRetrait, indexSuivisAchats], 'colisParTx', ecranCalcul);
+  const trackForBuy = (o) => (o ? colisParTx().get(String(o.transaction_id)) || null : null);
   // Étape de suivi d'un achat (payé → expédié → au relais → reçu) à partir du
   // statut Vinted + de l'email transporteur. step: 1=payé 2=transit 3=relais 4=reçu.
   // ⚠️ « AU RELAIS » AVANT « REÇU » (4 octobre). « La livraison n'a pas encore
@@ -14513,7 +14515,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // le transporteur qui le dit retiré par SON n° (`pickupUnion.txFinis`), livré ; au point relais (statut, ou suivi « disponible »)
   // ⇒ pas chez lui. PUBLIÉ par n° de transaction : la règle pondérée (src/liaisonAchat.js), la liste « Choisir un achat »
   // (src/suggestionsAchat.js) et toutes les feuilles de liaison la consultent ; sans elle, le statut seul (jamais plus permissif).
-  const chezMoiParTx = useMemo(() => {
+  // (24 nov., vitesse-ecran-montre) Paresseux aussi : PUBLIÉ comme une fonction de lecture (src/achatChezMoi.js), calculé au
+  // premier achat consulté (une feuille de liaison, une rangée d'Achats) — pas au montage de chaque écran.
+  const chezMoiParTx = useLecteurParesseux(() => {
     const arrivees = lireArriveesANumeroter();
     const m = new Map();
     const noter = (o) => {
@@ -14524,12 +14528,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     };
     for (const o of (buysBase || [])) noter(o);
     for (const o of (Array.isArray(purchasesPick.items) ? purchasesPick.items : [])) noter(o);
-    publierChezMoi(m);
     return m;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buysBase, purchasesPick.items, pickupDone, pickupUnion, colisParTx]);
+  }, [buysBase, purchasesPick.items, pickupDone, pickupUnion, colisParTx], 'chezMoiParTx', ecranCalcul);
+  publierChezMoi(chezMoiParTx);   // au rendu, comme avant (le dernier écran rendu publie) — la règle lit la fonction
   // L'état d'un achat (la publication, sinon le statut seul) : ce que les feuilles de liaison montrent.
-  const chezMoiDe = (a) => (a && a.transaction_id != null && chezMoiParTx.has(String(a.transaction_id)) ? chezMoiParTx.get(String(a.transaction_id)) : etatAchatChezMoi(a));
+  const chezMoiDe = (a) => (a && a.transaction_id != null && chezMoiParTx().has(String(a.transaction_id)) ? chezMoiParTx().get(String(a.transaction_id)) : etatAchatChezMoi(a));
   // Statut précis d'une VENTE (pour l'afficher clairement) : à expédier → en
   // transit → livrée → vendue (finalisée). Se base sur le texte Vinted + l'enum
   // machine transaction_user_status. N'affecte PAS la compta (classifyOrderStatus).
