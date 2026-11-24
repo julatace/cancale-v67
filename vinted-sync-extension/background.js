@@ -26298,7 +26298,7 @@ function obsChemin(p) {
   const parts = String(cheminNormalise(String(p == null ? '' : p).split(/[?#]/)[0])).split('/');
   return parts.map((s, i) => (i === 0 ? s : obsSegment(s, parts[i - 1]))).join('/').slice(0, 200);
 }
-function obsCle(k) { const t = String(k == null ? '' : k); return /^[A-Za-z_$][\w$.[\]-]{0,39}$/.test(t) && !/\d{4,}/.test(t) ? t : '{x}'; }
+function obsCle(k) { const t = String(k == null ? '' : k); return /^[A-Za-z_$][\w$.[\]-]{0,39}$/.test(t) && !/\d{2,}/.test(t) ? t : '{x}'; }   // deux chiffres de suite : un identifiant, un pseudo (« lea_92 »), jamais un nom de champ
 function obsValeur(k, v) {
   const x = String(v == null ? '' : v);
   if (x === '' || /^\{(?:id|uuid|v)\}$/.test(x) || /^\d{1,3}$/.test(x)) return x;

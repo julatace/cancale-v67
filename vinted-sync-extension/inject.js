@@ -627,7 +627,7 @@ function clocheFavorisNative(activer=false,origine){
     const parts = String(cheminNormalise(String(p == null ? '' : p).split(/[?#]/)[0])).split('/');
     return parts.map((s, i) => (i === 0 ? s : obsSegment(s, parts[i - 1]))).join('/').slice(0, 200);
   }
-  function obsCle(k) { const t = String(k == null ? '' : k); return /^[A-Za-z_$][\w$.[\]-]{0,39}$/.test(t) && !/\d{4,}/.test(t) ? t : '{x}'; }
+  function obsCle(k) { const t = String(k == null ? '' : k); return /^[A-Za-z_$][\w$.[\]-]{0,39}$/.test(t) && !/\d{2,}/.test(t) ? t : '{x}'; }   // deux chiffres de suite : un identifiant, un pseudo (« lea_92 »), jamais un nom de champ
   function obsValeur(k, v) {
     const x = String(v == null ? '' : v);
     if (x === '' || /^\{(?:id|uuid|v)\}$/.test(x) || /^\d{1,3}$/.test(x)) return x;
@@ -817,7 +817,7 @@ function clocheFavorisNative(activer=false,origine){
       let lecture; try { lecture = lireTexte(); } catch (_) { obsPousser(e); return; }
       Promise.resolve(lecture).then((t) => {
         let j; try { if (typeof t === 'string' && t.length < 3000000) j = JSON.parse(t); } catch (_) { j = undefined; }
-        if (j !== undefined) e.rep = formeTete(j);
+        if (j !== undefined) { const f = formeTete(j), r = {}; for (const k of Object.keys(f)) r[String(k).split('.').map(obsCle).join('.')] = f[k]; e.rep = r; }
         obsPousser(e);
         if (estNotifs && j) obsNotifs(j, u);
       }, () => obsPousser(e));
