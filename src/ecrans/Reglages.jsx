@@ -2388,6 +2388,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (11 nov., agent2-cloisonnement) Le parcours d'un nouveau vendeur joué sur des comptes FICTIFS (src/simulationCompte.js) : propriétaire seul.
       // (15 nov.) « Ce que voit un nouveau » : l'aperçu en bac à sable et où s'arrêtent les vrais inscrits (403 à tout autre compte).
       proprioInst && { id:'nouveaux-comptes', type:'panneau', nu:true, ic:'nouveauCompte', lib:tr('nc.lib'), desc:tr('nc.desc'), data:{ 'data-reglage-nouveaux-comptes':'' }, el:<NouveauxComptes entetes={enTeteSession}/> },
+      // (23 nov., Julien) « Voir tous les pop-ups » : chaque carte d'événement du registre des notifications, en exemple (src/natif/GaleriePops.jsx).
+      proprioInst && { id:'galerie-pops', type:'panneau', nu:true, ic:'pile', lib:tr('gal.lib'), desc:tr('gal.desc'), data:{ 'data-reglage-galerie-pops':'' }, el:<div className="vrm-galerie-ouvrir" style={{padding:'8px 16px 12px'}}><Bouton variant="secondary" onClick={()=>{ try{ window.dispatchEvent(new Event('vrm:galerie-pops')); }catch(_){} }} data-galerie-ouvrir="">{tr('gal.ouvrir')}</Bouton></div> },
       proprioInst && { id:'simulation-compte', type:'panneau', nu:true, ic:'home', lib:tr('reglages.simulation.lib'), desc:tr('reglages.simulation.desc'), data:{ 'data-reglage-simulation-compte':'' }, el:<SimulationCompte/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:tr('reglages.depannage.lib'),desc:tr('reglages.depannage.desc'),el:<div className="vrm-settings-help">
       <details data-aide-statut=""><summary>{tr('reglages.depannage.statut.q')}</summary><p>{tr('reglages.depannage.statut.r')}</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>{tr('reglages.depannage.statut.bouton')}</Bouton></details>
@@ -2620,6 +2622,12 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const resultats = q ? filtrerReglages((designV2 ? catsV2 : categories).flatMap((c) => c.groupes.map((g) => ({ id: g.id, titre: [titreCat(c.id), g.titreCle ? tr(g.titreCle) : (g.titre || '')].filter(Boolean).join(' · '), items: g.items }))), q) : null;
   const nTrouves = resultats ? resultats.reduce((n, g) => n + g.items.length, 0) : 0;
   const catOuverte = etroit && cat ? (designV2 ? catsV2.find((c) => c.id === idV2(cat)) : categories.find((c) => c.id === cat)) || null : null;
+  // (22 nov., bugs-totale) La barre du haut du téléphone disait « ‹ Menu » au-dessus du « ‹ Paramètres » de la page (deux
+  // retours, deux destinations). Une page de Paramètres ouverte le dit à la barre, qui porte alors SON retour (le même
+  // libellé, le geste retour) ; celui de la page se tait au téléphone (styles-reglages.css).
+  const pageReglages = etroit && !q && (ouvert || catOuverte) ? (ouvert ? titreRetour : tr('ecran.settings')) : '';
+  React.useEffect(() => { try { window.__vrmPageReglages = pageReglages || ''; window.dispatchEvent(new Event('vrm:page-reglages')); } catch (_) {} }, [pageReglages]);
+  React.useEffect(() => () => { try { window.__vrmPageReglages = ''; window.dispatchEvent(new Event('vrm:page-reglages')); } catch (_) {} }, []);
 
   return (
     <div ref={racine} className="vrm-set vrm-pm" data-espace="autres" data-reglages-disposition={etroit ? 'telephone' : 'ordinateur'} data-sous-ecran-ouvert={ouvert ? ouvert.id : ''}
@@ -2638,6 +2646,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {signaler && <SignalerProblemeFeuille onClose={()=>setSignaler(false)}/>}
       {support && <EcrireSupportFeuille depuis="reglages" onClose={()=>setSupport(false)}/>}
       {feuilleAdresseVrm && <FeuilleAdresseVrm headers={sbAuth} FermeAuRetour={FermeAuRetour} proprio={proprioInst===true} onBoite={()=>setTab('emails')} onFermer={()=>setFeuilleAdresseVrm(false)}/>}
+      {/* (22 nov., bugs-totale) Au téléphone, une catégorie ou un panneau ouvert est une page POUSSÉE : le geste retour de
+          l'iPhone la referme (avant : il quittait Paramètres pour le Menu, la catégorie perdue). UNE entrée tant qu'une page
+          est ouverte (passer de la catégorie à un de ses panneaux n'en ajoute pas ; le retour revient d'un cran). */}
+      {etroit && !q && (ouvert || catOuverte) ? <FermeAuRetour fermer={() => { if (ouvert) fermerSous(); else fermerCategorie(); }}/> : null}
       {ouvert ? (
         // ── LE PANNEAU D'UN RÉGLAGE : « ‹ sa catégorie » (téléphone) ou « ‹ Paramètres » ──
         // (21 nov., ux-reglages, audit design n° 34) UN retour : « ‹ Paramètres » (ou « ‹ sa catégorie ») en texte accent,

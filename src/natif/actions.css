@@ -1,0 +1,16 @@
+/* ── src/natif/actions.css — les boutons d'action communs et « Pourquoi ? » (23 nov.) ── */
+@layer vrm-natif {
+  .n-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 12px 14px; }
+  .n-actions[data-n-actions="1"] { grid-template-columns: minmax(0, max-content); }
+  .n-actions[data-n-actions="4"], .n-actions[data-n-actions="5"], .n-actions[data-n-actions="6"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (min-width: 1024px) { .n-actions[data-n-actions="4"], .n-actions[data-n-actions="5"], .n-actions[data-n-actions="6"] { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); } }
+  .n-actions .n-bouton-bloc { display: flex; width: 100%; min-width: 0; }
+  .n-actions .n-bouton { width: 100%; justify-content: center; gap: 6px; min-height: 40px; border-radius: 12px; font: var(--n-t-controle); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @media (pointer: coarse) { .n-actions .n-bouton { min-height: var(--n-cible); } }
+  .n-pourquoi { margin: 0; padding: 0 14px 10px; }
+  .n-pourquoi > summary { display: inline-flex; align-items: center; min-height: var(--n-cible); list-style: none; cursor: pointer; font: var(--n-t-second-fort); color: var(--n-encre-2); }
+  .n-pourquoi > summary::-webkit-details-marker { display: none; }
+  .n-pourquoi > summary::after { content: '›'; margin-inline-start: 4px; transition: transform 150ms ease-out; }
+  .n-pourquoi[open] > summary::after { transform: rotate(90deg); }
+  .n-pourquoi-texte { font: var(--n-t-second); color: var(--n-encre-2); padding-bottom: 4px; }
+}
