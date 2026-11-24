@@ -31,7 +31,7 @@ const MOD = ['Nike Air Max 1 bleu', 'adidas Handball Spezial noir', 'Nike SB Dun
 const MARQ = ['Nike', 'adidas', 'Nike SB', 'Nike', 'Salomon', 'New Balance'];
 const photo = (i) => (i % 11 === 7 ? null : `/photo/${i}.svg`);
 const item = (i, extra = {}) => ({ id: String(10000 + i), title: MOD[i % MOD.length] + ' taille ' + (38 + (i % 8)), photo: photo(i), price: 27 + (i * 7) % 160 + (i % 3 ? 0 : 0.5), size: String(38 + (i % 8)),
-  condition: 'Très bon état', brand: MARQ[i % MARQ.length], createdTs: NOW - ((i * 5) % 50) * J, favourites: i % 4 === 3 ? undefined : (i * 3) % 41, views: (i * 13) % 1400, url: 'https://www.vinted.fr/items/' + (10000 + i), ...extra });
+  condition: 'Très bon état', brand: MARQ[i % MARQ.length], createdTs: i % 13 === 5 ? undefined : NOW - (((i * 7) % 61) * J + (i % 5) * 3600e3),   // âges variés ; 1 sur 13 inconnu (pas d'horloge) favourites: i % 4 === 3 ? undefined : (i * 3) % 41, views: (i * 13) % 1400, url: 'https://www.vinted.fr/items/' + (10000 + i), ...extra });
 const lues = Array.from({ length: N }, (_, i) => item(i));
 // Le LEURRE : deux annonces du 1er compte affiché portent le MÊME titre, chacune SA photo.
 const L0 = Math.floor(N / 3) * 2; lues[L0].title = lues[L0 + 1].title = 'Nike Air Max 90 blanc taille 42'; lues[L0].createdTs = lues[L0 + 1].createdTs = NOW - 60e3;   // en tête de liste
@@ -50,6 +50,7 @@ const M = construireArticles({ annonces, fiches, faits: {}, achatsParNum: {}, sl
 // La photo ATTENDUE de chaque article : celle de SON identifiant d'annonce (jamais d'un titre).
 const parId = new Map(annonces.map((x) => [String(x.id), x.photo || (lues.find((y) => y.id === String(x.id)) || {}).photo || null]));
 window.__attendu = {}; for (const a of M.articles) { const id = a.annonces[0] && a.annonces[0].id; window.__attendu[a.cle] = id != null ? (parId.get(String(id)) || null) : null; }
+window.__sansAge = M.articles.filter((a) => a.depuis == null).map((a) => a.cle);
 window.__leurre = M.articles.filter((a) => a.titre === 'Nike Air Max 90 blanc taille 42').map((a) => a.cle);
 const euros = (x) => (Math.round(x * 100) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' €';
 const opts = { maintenant: NOW, seuil: 30 };
