@@ -41,9 +41,12 @@ function poser(base, { photo = true } = {}) {
       is_closed: false, is_hidden: false, is_draft: false, favourite_count: 42, view_count: 120, created_at_ts: new Date(Date.now() - 86400000).toISOString(),
       photo: { url: photoAnnonce(i), high_resolution: { timestamp: Math.floor((Date.now() - 86400000) / 1000) } } });
     const n = i === ICI_I ? '262' : String(900 + i);
-    fiches[id] = { num: n, numero: n, photo: photoAnnonce(i), photoK: `${dossier(i)}/${fichier(i)}`.toLowerCase(), size: '36', price: '84.0', accountId: uid, numberedAt: new Date(Date.now() - 20 * 3600000).toISOString() };
+    fiches[id] = { num: n, numero: n, title: TITRE, photo: photoAnnonce(i), photoK: `${dossier(i)}/${fichier(i)}`.toLowerCase(), size: '36', price: '84.0', accountId: uid, numberedAt: new Date(Date.now() - 20 * 3600000).toISOString() };
   }
   lst.data.nItems = lst.data.payload.items.length;
+  // La lecture publique du même compte (`harvest_{uid}_enligne`, complète) : même heure que le dressing, mêmes annonces en ligne.
+  const pub = base.rows.find((r) => r.id === `harvest_${uid}_enligne`);
+  if (pub) { pub.data.capturedAt = lst.data.capturedAt; for (let i = 0; i < N; i++) { pub.data.ids.push(idAnnonce(i)); pub.data.items.push({ id: idAnnonce(i), title: TITRE }); } pub.data.n = pub.data.ids.length; }
   const quand = new Date(Date.now() - 40 * 60000).toISOString();
   base.rows.push({ id: `email_sale_tx${TX}`, data: { type: 'vente', transaction: String(TX), uid: String(uid), receivedAt: quand, designation: TITRE, prix: '77.00', photo: photo ? photoMail(ICI_I) : '', pro: true } });
   base.rows.push({ id: `email_bord_${TX}`, data: { type: 'bordereau', filename: `bordereau-${TX}.pdf`, transaction: String(TX), uid: String(uid), receivedAt: new Date(Date.now() - 10 * 60000).toISOString(), article: TITRE, modele: TITRE, taille: '36',
@@ -66,9 +69,11 @@ async function lire(nav, ICI, vue, opts) {
   poser(base, opts);
   const { ctx, pg, J } = await B.ouvrir(nav, vue, base);
   const cap = (n) => pg.screenshot({ path: path.join(SORTIE, `${ETQ}-${vue}-${opts.photo ? 'photo' : 'sansphoto'}-${n}.png`) }).catch(() => {});
-  await B.demarrer(pg, ICI, 'ventes');
+  // Comme chez lui : l'app ouverte, Annonces déjà lues (la liste « en ligne » est connue de l'écran Ventes), puis Ventes.
+  await B.demarrer(pg, ICI, 'annonces');
   await pg.locator('[data-toast-numeros] .n-toast-action').click({ timeout: 1500 }).catch(() => {});
-  await pg.waitForTimeout(9000);
+  await pg.waitForTimeout(7000);
+  await B.aller(pg, 'ventes', 9000);
   // La vente dans « À envoyer » : en haut de la liste (la date limite la range) — on la fait venir à l'écran pour la capture.
   await pg.evaluate((T) => { const r = [...document.querySelectorAll('[data-vn-rang]')].find((e) => (e.innerText || '').includes(T)); if (r) r.scrollIntoView({ block: 'center' }); }, TITRE).catch(() => {});
   await pg.waitForTimeout(600);
@@ -99,15 +104,21 @@ async function lire(nav, ICI, vue, opts) {
     }
   }
   await B.aller(pg, 'annonces', 9000);
-  const t = await texte(pg);
-  out.annonces = { autry: t.split(TITRE).length - 1, parMail: /par e-mail, en attente de Vinted/.test(t), seg: await pg.evaluate(() => { const s = document.querySelector('[data-eg-segment="enligne"]'); return s ? (s.getAttribute('data-eg-segment-n') || s.innerText) : null; }).catch(() => null) };
+  // Le haut d'Annonces (le groupe « Vendue · par e-mail » s'il y est), puis la recherche « Autry » : combien EN LIGNE.
+  await pg.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
+  out.vendues = await pg.evaluate(() => [...document.querySelectorAll('[data-vm-annonce]')].map((e) => e.getAttribute('data-vm-annonce-num'))).catch(() => []);
+  out.seg = await pg.evaluate(() => { const s = document.querySelector('[data-eg-segment="enligne"]'); return s ? (s.getAttribute('data-eg-segment-n') || s.innerText) : null; }).catch(() => null);
   await cap('5-annonces');
-  // L'onglet « Vendues » (là où elle est rangée).
-  await pg.locator('[data-eg-segment="vendues"]').click({ timeout: 3000 }).catch(() => {});
-  await pg.waitForTimeout(1500);
-  const tv = await texte(pg);
-  out.vendues = { autry: tv.split(TITRE).length - 1, parMail: /par e-mail, en attente de Vinted/.test(tv) };
-  await cap('6-annonces-vendues');
+  const champ = pg.locator('input[type="search"], input[placeholder*="titre"]').first();
+  await champ.fill('Autry').catch(() => {});
+  await pg.waitForTimeout(2500);
+  for (let k = 0; k < 8; k++) { await pg.mouse.wheel(0, 3000).catch(() => {}); await pg.waitForTimeout(300); }
+  const t = await texte(pg);
+  const vm = await pg.evaluate(() => [...document.querySelectorAll('[data-vm-annonce]')].length).catch(() => 0);
+  out.annonces = { autry: t.split(TITRE).length - 1 - vm, n262: (t.match(/N° ?262\b/g) || []).length };
+  await pg.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
+  await cap('6-annonces-autry');
+  await champ.fill('').catch(() => {});
   // La fiche du N° 262.
   await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: '262' })));
   await pg.waitForTimeout(9000);
@@ -128,7 +139,7 @@ async function main() {
       console.log(JSON.stringify(p));
       dit(vue, 'photo exacte : la vente e-mail reçoit le N° de SON annonce (262), pas un autre des 50', p.v && p.v.num === '262', JSON.stringify(p.v));
       dit(vue, 'photo exacte : Annonces · En ligne ne la montre plus (49 Autry sur 50)', p.annonces && p.annonces.autry === 49, JSON.stringify(p.annonces));
-      dit(vue, 'photo exacte : Annonces · Vendues la dit « par e-mail, en attente de Vinted »', p.vendues && p.vendues.autry >= 1 && p.vendues.parMail, JSON.stringify(p.vendues));
+      dit(vue, 'photo exacte : Annonces la dit « Vendue · par e-mail, en attente de Vinted » (N° 262)', Array.isArray(p.vendues) && p.vendues.length === 1 && p.vendues[0] === '262', JSON.stringify([p.vendues, p.seg]));
       dit(vue, 'photo exacte : la fiche N° 262 dit « vendue · par e-mail »', p.fiche && p.fiche.etat === 'fd.etat.vendueMail', JSON.stringify(p.fiche));
       dit(vue, 'la fiche ne répète pas « pas lu »', p.fiche && p.fiche.pasLu === 0 && p.fiche.ventesPasLues === 0, JSON.stringify(p.fiche));
       const s = await lire(nav, ICI, vue, { photo: false });
