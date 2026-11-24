@@ -132,8 +132,10 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
             sous={vendu.valeur == null ? (vendu.note || tr('v2.ar.pasSu')) : vendu.partiel ? tr('journee.moins') : ''} attrs={{ 'data-arg-vendu': cents(vendu.valeur) }}/> : null}
           {B ? <Ligne libelle={B.l} valeur={B.pasSu ? null : B.v} onClick={geste ? geste.onClick : B.onClick}
             sous={prix || sousBenef} tonSous={geste ? 'ambre' : 'neutre'}
-            visuel={<><BarreChiffre part={partDe(bV)} partiel={!!(B.auMoins || B.connu || B.brut)} ton="vert" neuf={neufL} rang={1} attrs={{ 'data-agv-barre': 'benefice' }}/>
-              {geste && kn ? <CouvertureBarre k={kn[0]} n={kn[1]}/> : null}</>}
+            // Des prix d'achat manquent : le bénéfice n'est pas comparable au vendu ⇒ la COUVERTURE (k prix connus sur n) à la place
+            // de la barre ; sinon la barre du bénéfice, à l'échelle du vendu.
+            visuel={geste && kn ? <CouvertureBarre k={kn[0]} n={kn[1]}/>
+              : <BarreChiffre part={partDe(bV)} partiel={!!(B.auMoins || B.connu || B.brut)} ton="vert" neuf={neufL} rang={1} attrs={{ 'data-agv-barre': 'benefice' }}/>}
             attrs={{ 'data-v2-argent-fait': 'benefice', 'data-v2-argent-valeur': B.cents, 'data-v2-pas-su': B.pasSu ? '' : undefined, 'data-benef-notion': B.connu ? 'connu' : B.brut ? 'brut' : 'benefice', 'data-arg-net-connu': B.connu ? `${B.nCout}/${B.n}` : undefined,
               'data-v2-argent-geste': geste ? String(geste.n) : undefined, 'data-v2-principal': geste ? geste.id : undefined }}/> : null}
           {fait(F.attente, tr('arn.aVenir'))}

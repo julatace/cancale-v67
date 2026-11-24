@@ -45,7 +45,7 @@ export function LigneConversation({ photo, Photo, Icon = null, nom, compte = '',
       attrs={{ 'data-v2-conv': '', 'aria-current': actif ? 'true' : undefined, ...(revele ? { style: revele.style } : {}), ...attrs }}>
       <span className="v2m-point" aria-hidden="true" data-v2-conv-point={nonLu ? '1' : '0'}/>
       <span className="v2m-tuile" aria-hidden="true" data-v2-conv-vignette={photo ? '' : undefined}>
-        <TuilePaire photo={photo || ''} Photo={Photo} Icon={Icon} icone="chat" genre="message" taille="m"/>
+        <TuilePaire photo={photo || ''} Photo={Photo} Icon={Icon} icone={photo ? '' : 'chat'} genre="message" taille="m"/>
         {compte ? <span className="v2m-compte-av vrm-sensible" data-stream-type="compte" data-v2-conv-compte-av="" title={compte}>{initiale(compte)}</span> : null}
       </span>
       <span className="v2m-txt">

@@ -32,7 +32,7 @@
   .n-arg-vx .n-arg-m6-plein { background: color-mix(in srgb, var(--n-accent) 38%, var(--n-carte-2)); }
   .n-arg-vx .n-arg-m6[data-courant] .n-arg-m6-plein { background: var(--n-accent); }
   .n-arg-vx .n-arg-m6[data-arg-m6-partiel] .n-arg-m6-plein { background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgb(255 255 255 / .38) 4px 7px); }
-  .n-arg-vx .n-arg-m6[data-arg-m6-v=""] .n-arg-m6-piste { background: transparent; box-shadow: inset 0 0 0 1px var(--n-bord); border: 0; background-image: repeating-linear-gradient(90deg, var(--n-bord) 0 3px, transparent 3px 7px); background-size: 100% 1px; background-position: 0 50%; background-repeat: no-repeat; box-shadow: none; }
+  .n-arg-vx .n-arg-m6[data-arg-m6-v=""] .n-arg-m6-piste { background: repeating-linear-gradient(90deg, var(--n-bord) 0 3px, transparent 3px 7px) 0 50% / 100% 1px no-repeat; }
   .n-arg-vx .n-arg-m6 { min-height: 34px; }
 
   /* ── Les chiffres du mois : une petite barre sous Vendu et Bénéfice, la couverture des prix sous le bénéfice. ── */
@@ -43,10 +43,10 @@
   .n-agv-barre[data-agv-ton="vert"] .n-agv-barre-plein { background: var(--n-vert); }
   .n-agv-barre[data-agv-ton="encre"] .n-agv-barre-plein { background: color-mix(in srgb, var(--n-accent) 45%, var(--n-carte-2)); }
   .n-agv-barre[data-agv-partiel] .n-agv-barre-plein { background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgb(255 255 255 / .4) 4px 7px); }
-  .n-agv-couv { display: inline-flex; align-items: center; gap: 2px; flex: 0 1 auto; min-width: 0; max-width: 100%; flex-wrap: nowrap; }
+  .n-agv-couv { display: inline-flex; align-items: center; gap: 2px; flex: 1 1 auto; min-width: 0; max-width: 100%; flex-wrap: nowrap; }
   .n-agv-couv > i { display: block; width: 6px; height: 10px; border-radius: 2px; background: var(--n-carte-2); box-shadow: inset 0 0 0 1px var(--n-bord); }
   .n-agv-couv > i[data-plein] { background: var(--n-vert); box-shadow: none; }
-  .n-agv-couv-continu { display: block; width: 120px; height: 6px; border-radius: var(--n-r-rond); background: var(--n-carte-2); overflow: hidden; }
+  .n-agv-couv-continu { display: block; width: 100%; max-width: 220px; min-width: 60px; height: 6px; border-radius: var(--n-r-rond); background: var(--n-carte-2); overflow: hidden; }
   .n-agv-couv-continu > span { display: block; height: 100%; background: var(--n-vert); }
 
   /* ── Les seuils de l'année ── */

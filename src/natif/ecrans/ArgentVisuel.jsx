@@ -98,9 +98,9 @@ export function JaugesSeuils({ J, annee, montant, etat = 'lu' }) {
   const neuf = useArriveeNeuve('argent-seuils', etat !== 'encours');
   const nomP = tr('agv.plafond'), nomT = tr('agv.tva');
   return (
-    <Carte titre={tr('agv.seuils', { annee })} className="n-agv-seuils" attrs={{ 'data-agv-seuils': etat === 'encours' ? 'encours' : J ? 'lu' : 'passu', 'data-agv-ca': J ? String(Math.round(J.ca * 100)) : '' }}>
+    <Carte titre={tr('agv.seuils', { annee: String(annee) })} className="n-agv-seuils" attrs={{ 'data-agv-seuils': etat === 'encours' ? 'encours' : J ? 'lu' : 'passu', 'data-agv-ca': J ? String(Math.round(J.ca * 100)) : '' }}>
       <div className="n-agv-seuils-ca" data-agv-anime={neuf ? '1' : undefined}>
-        <span className="n-agv-seuils-ca-lib">{tr('agv.recuAnnee', { annee })}</span>
+        <span className="n-agv-seuils-ca-lib">{tr('agv.recuAnnee', { annee: String(annee) })}</span>
         <span className="n-agv-seuils-ca-v" data-arg-montant="" data-n-vide={J ? undefined : '1'}>{J ? (J.partiel ? tr('journee.moins') + ' ' : '') + montant(J.ca) : TIRET}</span>
       </div>
       {etat === 'encours' ? <div className="n-agv-squelette-jauges" aria-hidden="true"><i/><i/></div> : (<>

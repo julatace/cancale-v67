@@ -96,9 +96,9 @@ async function rest(route, b) {
   const r = servir(lignes, decodeURIComponent(metaVersData(req.url())), req.headers());
   return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': r.range || '0-0/0' }, body: JSON.stringify(r.body) });
 }
-async function ouvrir(nav, { W, sombre, b, url, sansSession = false, api = null, dsf = 1 }) {
+async function ouvrir(nav, { W, sombre, b, url, sansSession = false, api = null, dsf = 1, video = '' }) {
   const tel = W < 600;
-  const ctx = await nav.newContext({ ...(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: dsf } : { viewport: { width: 1512, height: 950 }, deviceScaleFactor: dsf }), colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris' });
+  const ctx = await nav.newContext({ ...(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: dsf } : { viewport: { width: 1512, height: 950 }, deviceScaleFactor: dsf }), colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris', ...(video ? { recordVideo: { dir: video, size: tel ? { width: 390, height: 844 } : { width: 1512, height: 950 } } } : {}) });
   const pg = await ctx.newPage();
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e.message || e).slice(0, 200)));
