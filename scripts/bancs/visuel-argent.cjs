@@ -208,7 +208,8 @@ async function argent(nav, taille, sombre) {
     else { const bv = m.benef ? Number(m.benef) / 100 : null; const mx = Math.max(vendu / 100, bv || 0); dit(Math.abs(Number(m.barreV) - (vendu / 100) / mx) < 0.002, `O ${ou} barre du vendu = vendu / max(vendu, bénéfice)`, m); }
     dit(!m.zeros.length, `S ${ou} aucun « 0 » posé à la place d'un nombre`, m.zeros);
     const nonCouverts = m.m6.filter((x) => x.couvert === '0');
-    dit(m.m6.length === 6 && nonCouverts.every((x) => x.v === '' && /^—/.test(x.texte.trim())), `Z ${ou} un mois que l'historique lu ne couvre pas dit « — », jamais « 0 € » (${nonCouverts.map((x) => x.ym).join(', ') || 'aucun'})`, m.m6);
+    // Un argent REÇU ce mois-là (> 0) est une lecture ; seul un ZÉRO non couvert devient « — ».
+    dit(m.m6.length === 6 && nonCouverts.every((x) => (x.v === '' && /^—/.test(x.texte.trim())) || Number(x.v) > 0), `Z ${ou} un mois que l'historique lu ne couvre pas dit « — », jamais « 0 € » (${nonCouverts.map((x) => x.ym + '=' + (x.v || '—')).join(', ') || 'aucun'})`, m.m6);
     dit(!m.sansEspace.length && !m.nonTab.length, `F ${ou} un seul format : espace des milliers partout, chiffres tabulaires`, { sansEspace: m.sansEspace, nonTab: m.nonTab });
     // C — aucune couleur orange.
     const orange = await pg.evaluate(ORANGE, ['[data-argent-vue="resume"]']);
