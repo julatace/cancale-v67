@@ -50,6 +50,6 @@
    bouton GARDE ses 44 px (la cible au doigt) mais n'en prend que sa ligne dans la mise en page (marges négatives). */
 @layer vrm-vintex {
   @media (max-width: 1023px) {
-    html body .n-heros-trio .n-heros-trio-porte.n-heros-trio-porte { display: flex !important; margin-block: -12px !important; }
+    html body .n-heros-trio .n-heros-trio-porte.n-heros-trio-porte { display: flex !important; align-items: center !important; margin-block: -12px !important; }
   }
 }

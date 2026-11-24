@@ -482,10 +482,10 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **24 nov. · Livrable 2 (`claude/livrable-2`)** : Argent ne dit plus « pas calculé / ouvre Ventes » pendant la lecture (publication pas encore relue = en lecture) ; Ventes sans ligne coupée ; Aujourd'hui sans saut (places tenues, 0 px mesuré à 390 et 1512). `2026-11-24-livrable.md` (Suite). Geste : aucun.
 - **24 nov. · Chargement sans tirets (`claude/livrable`)** : un chiffre EN COURS de lecture se dessine en squelette (composants natifs : héros, tuiles, cases, rangées d'Argent), « — » et sa raison rendus au bout de 15 s ; pas su = « — » dit, inchangé ; ⚠️ un banc sans `BANC_DESIGN_V2=defaut` voit l'ancien DOM. `2026-11-24-livrable.md`. Geste : aucun.
 - **23 nov. · Gris clair étagé (`claude/style-clair`)** : variante A validée (gris froid, accent ardoise), sombre = gris choisi ; iPhone compact ; dessin fin ; pop-up d'événement + galerie du propriétaire. `docs/passation/2026-11-23-style-clair.md`. Geste : essayer le pop-up sur un vrai iPhone.
 - **23 nov. · Isolement + colis en direct** : RLS prouvée par vendeur (0 ligne d'un autre, 8 vendeurs) ; un bordereau reçu par e-mail paraît sur Colis sans changer d'écran (veille `bordereaux`). `docs/passation/2026-11-23-isolement-temps-reel.md`. Geste : aucun.
-- **23 nov. · Bugs (`claude/bugs-totale`)** : vente par e-mail partout — le bordereau reçu d'une vente pas relue (particulier : vente sans n°) fait le colis (Colis, Ma journée, jamais Ventes ni CA), la photo exacte tranche la fenêtre ambiguë ; colis à retirer sans photo (`Icon`) ; boucle de rendus : `onVmrExt` ne prévient que sur changement d'empreinte (11 → 6 validations/10 s au téléphone, banc `rendus-repos`). `2026-11-22-bugs-totale.md`. Geste : aucun.
 - **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier

@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (24 nov., livrable-2) docs/passation/2026-11-24-livrable.md (Suite)
+  { id: 'aujourdhui-sans-saut', date: '2026-11-24', titre: 'Aujourd’hui ne bouge plus au chargement', phrase: 'Chaque carte tient sa place avant ses chiffres.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (24 nov., livrable — Julien : « écran de chargement etc., tout doit être parfait ») docs/passation/2026-11-24-livrable.md
   { id: 'chargement-squelette', date: '2026-11-24', titre: 'Ouverture plus calme, sans tirets', phrase: 'Les chiffres en lecture se dessinent à leur place.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md
