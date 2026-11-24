@@ -1,3 +1,4 @@
+import { noterPhotos } from './photoTaille.js';
 // Les photos sont reliées par l'identité d'annonce, jamais par son titre.
 const adresse = (value, profondeur = 0) => {
   if (profondeur > 5) return null;
@@ -60,7 +61,11 @@ export function demandesPhotosVentes(commandes,annonces,identites,archives,trans
 export function photosTransactionsLues(rows,demandes){
  const out={};
  for(const row of rows || []){
-  const key=demandes.get(row.id),photo=photoArticle({photo:row.photo}) || photoArticle({photo:row.photoItem});
+  // (23 nov., photos-nettes) MESURÉ : la transaction rangée n'a ni `item_photo` ni `item` — la photo est sous
+  // `order.items[0].photos[0]` (url f800 + thumbnails). Prise seulement pour UN article (un lot n'a pas UNE photo).
+  const nb=Number(row.nb),photoOrdre=row.photoOrdre && (!(nb>1)) ? row.photoOrdre : null;
+  if(photoOrdre)noterPhotos(photoOrdre);
+  const key=demandes.get(row.id),photo=photoArticle({photo:row.photo}) || photoArticle({photo:row.photoItem}) || photoArticle({photo:photoOrdre});
   if(key && photo)out[key]={photo};
  }
  return out;
