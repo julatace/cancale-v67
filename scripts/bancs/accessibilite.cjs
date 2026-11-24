@@ -39,15 +39,27 @@ const { dit, essaie } = A;
 const FEUILLES = [
   { id: 'fiche', nom: 'fiche d’une paire', tab: 'annonces', ctx: '[role="dialog"]',
     ouvrir: (pg) => pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: '12' }))) },
-  { id: 'vente', nom: 'fiche d’une vente', url: '?tab=ventes&site=vinted', ctx: '[role="dialog"]',
-    ouvrir: (pg) => pg.locator('.vrm-ledger-sale-toggle').first().click() },
+  // (24 nov., main-vert) Ventes natif : une vente Vinted se touche dans la liste « Tous » (VentesListeTel) et ouvre SA fiche.
+  // Ventes natif : toucher le TITRE d'une vente ouvre SA fiche (téléphone : page poussée, role=dialog ; ordinateur : la fiche
+  // dans le volet de Ventes aside[data-vn-detail]). Le titre, pas la ligne : la ligne porte aussi la case et le champ « Payé ».
+  { id: 'vente', nom: 'fiche d’une vente', url: '?tab=ventes', ctx: '[role="dialog"][data-n-poussee], aside[data-vn-detail], [role="dialog"]',
+    ouvrir: async (pg) => { const sel = '.vrm-main [data-vn-liste] .n-rangee-titre, .vrm-main tr[data-tt-ligne] .n-tt-article-titre, .vrm-main [data-toutes-vente] .n-rangee-titre'; await pg.waitForSelector(sel, { timeout: 15000 }).catch(() => {}); await pg.locator(sel).filter({ visible: true }).first().click(); },
+    // ordinateur : la vente s'ouvre dans le VOLET de Ventes (`aside[data-vn-detail]`, src/natif/ecrans/Ventes.jsx).
+    pret: (pg) => pg.evaluate(() => !!document.querySelector('[data-n-poussee][role="dialog"], aside[data-vn-detail]')) },
   { id: 'achat', nom: 'Nouvel achat', url: '?tab=achats&achat=1', ctx: 'main', ouvrir: async () => {},
     pret: (pg) => pg.evaluate(() => /Ce que tu as acheté/.test(document.body.innerText)) },
+  // (24 nov., main-vert) « Tout imprimer » = le bouton « Imprimer » des colis prêts (`data-colis-barre-btn="imprimer"`), qui ouvre
+  // l'APERÇU AVANT IMPRESSION (src/impression/ApercuAvantImpression.jsx, `data-impr-apercu`) ; « Imprimer » de l'aperçu = la suite.
   { id: 'lot', nom: '« Tout imprimer »', tab: 'cat_bord', attente: 8000, ctx: '[role="dialog"]',
-    ouvrir: (pg) => pg.locator('button[data-lot-ouvrir="1"]').first().click() },
-  { id: 'confirmation', nom: 'confirmation avant impression', tab: 'cat_bord', attente: 8000, ctx: '.vrm-confirmation',
-    ouvrir: async (pg) => { await pg.locator('button[data-lot-ouvrir="1"]').first().click(); await pg.waitForTimeout(900); await pg.locator('button[data-lot-imprimer]').first().click(); },
-    pret: (pg) => pg.evaluate(() => !!document.querySelector('.vrm-confirmation')) },
+    ouvrir: (pg) => pg.locator('[data-colis-barre-btn="imprimer"]').filter({ visible: true }).first().click() },
+  { id: 'confirmation', nom: 'confirmation avant impression', tab: 'cat_bord', attente: 8000, ctx: '[role="dialog"]',
+    ouvrir: async (pg) => { await pg.locator('[data-colis-barre-btn="imprimer"]').filter({ visible: true }).first().click();
+      // Premier « Imprimer » d'un vendeur : « Ton imprimante » (une seule fois, src/ImpressionSimple.jsx) — on choisit la première.
+      await pg.waitForSelector('[data-impr-papier-choix], [data-impr-apercu-imprimer]', { timeout: 15000 }).catch(() => {});
+      if (await pg.locator('[data-impr-papier-choix]').filter({ visible: true }).count()) { await pg.locator('[data-impr-papier-choix]').filter({ visible: true }).first().click(); await pg.waitForTimeout(900); }
+      await pg.waitForSelector('[data-impr-apercu-imprimer]:not([disabled]):not([aria-disabled="true"])', { timeout: 20000 }).catch(() => {});
+      if (await pg.locator('[data-impr-apercu-imprimer]').filter({ visible: true }).count()) await pg.locator('[data-impr-apercu-imprimer]').filter({ visible: true }).first().click({ timeout: 5000 }); },
+    pret: (pg) => pg.evaluate(() => !!document.querySelector('.vrm-confirmation, [data-impr-apercu]')) },
 ];
 const dialogues = (pg) => pg.evaluate(() => [...document.querySelectorAll('[role="dialog"],[role="alertdialog"]')].filter((e) => e.getClientRects().length).length);
 
@@ -107,10 +119,15 @@ async function main() {
         if (largeur < 700) continue;
         await essaie(`${T} feuille « ? »`, async () => {
           const { pg, ctx, errs } = await A.ouvrir(b, { largeur, sombre, tab: 'journee' });
-          const avant = await pg.evaluate(() => {
+          // (24 nov., main-vert, instable) Le bouton focalisé avant pouvait être REMPLACÉ par le rendu suivant de Ma journée (focus
+          // perdu ⇒ « avant: false », puis Échap tombait à côté) : on attend l'app démarrée, puis que le focus TIENNE sur le bouton.
+          await M.attendreDemarrage(pg);
+          await pg.waitForFunction(() => {
             const c = [...document.querySelectorAll('main button:not([disabled])')].find((e) => e.getClientRects().length);
-            if (!c) return null; c.setAttribute('data-banc-avant', '1'); c.focus(); return document.activeElement === c;
-          });
+            if (!c) return false; if (document.activeElement !== c) { document.querySelectorAll('[data-banc-avant]').forEach((x) => x.removeAttribute('data-banc-avant')); c.setAttribute('data-banc-avant', '1'); c.focus(); return false; }
+            return true;
+          }, null, { timeout: 15000, polling: 300 }).catch(() => {});
+          const avant = await pg.evaluate(() => { const c = document.querySelector('[data-banc-avant]'); return !!c && document.activeElement === c; });
           await pg.keyboard.press('Shift+?'); await pg.waitForTimeout(800);
           const ouverte = await pg.evaluate(() => !!document.querySelector('[data-raccourcis-clavier]'));
           dit(avant && ouverte, `${T} C la feuille des raccourcis s'ouvre (un bouton focalisé avant)`, JSON.stringify({ avant, ouverte }));
