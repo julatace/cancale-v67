@@ -46,6 +46,16 @@ export function BoutonExtension({ action, site = 'vinted', ids = [], variante = 
   );
 }
 
+// (24 nov., livrable) LA LIGNE ENTIÈRE est le geste (une liste d'annonces, une action chacune) : la même phrase
+// « Écrire aux favoris dans l'extension » n'est plus répétée sous chaque ligne — elle est le nom (lu) du bouton ;
+// la carte la dit UNE fois (`PhraseExtension` à son pied).
+export function LigneExtension({ action, site = 'vinted', ids = [], className = '', onOuvert = null, attrs = null, children = null }) {
+  const c = cibleDe(action, site, ids);
+  const url = lienPanneau(c);
+  const ouvrir = (e) => { if (e && e.stopPropagation) e.stopPropagation(); ouvrirPanneau(c); if (onOuvert) { try { onOuvert(url); } catch (_) {} } };
+  return <button type="button" className={className} onClick={ouvrir} title={tr(c.cle, { site: NOMS_SITES[c.site] })} {...attrsDe(action, c, url, attrs)}>{children}</button>;
+}
+
 export function RangeeExtension({ action, site = 'vinted', ids = [], libelle = '', sousTitre = '', onOuvert = null, attrs = null }) {
   const c = cibleDe(action, site, ids);
   const url = lienPanneau(c);

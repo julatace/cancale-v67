@@ -108,7 +108,7 @@ function Chiffres({ chiffres, p, setP, objectif = null, onSaisirPrix = null, onV
         'data-v2-jour-vendu': etat === 'lu' && stats ? cents(stats.jour.vendu.valeur) : '', 'data-v2-jour-ventes': etat === 'lu' && stats && stats.jour.ventes.valeur != null ? String(stats.jour.ventes.valeur) : '' }}>
       <Tuile libelle={tr('v2.stats.ca')} valeur={n} unite={u} detail={etat === 'encours' ? tr('v2.jour.lecture') : detailV} onClick={ouvrir} graphe={etincelle('v')} attrs={{ 'data-v2-stat': 'vendu' }}/>
       <Tuile libelle={tr('v2.stats.ventes')} valeur={S && S.ventes.valeur != null ? nombre(S.ventes.valeur) : null}
-        detail={S && S.ventes.valeur == null ? note(S.ventes) : (S && S.ventes.partiel ? tr('journee.moins') : '')} onClick={ouvrir} graphe={etincelle('n')} attrs={{ 'data-v2-stat': 'ventes' }}/>
+        detail={S && S.ventes.valeur == null ? note(S.ventes) : (S && S.ventes.partiel ? tr('journee.moins') : '')} onClick={ouvrir} graphe={etincelle('n')} enCours={etat === 'encours'} attrs={{ 'data-v2-stat': 'ventes' }}/>
       {benef('brut', Br, tr('v2.stats.beneficeBrut'), detailBr)}
       {benef('net', Nt, tr('v2.stats.beneficeNet'), detailNt)}
     </Tuiles>

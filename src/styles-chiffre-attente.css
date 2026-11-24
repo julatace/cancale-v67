@@ -4,38 +4,43 @@
    secondes, puis le chiffre — l'écran « clignotait » de tirets.
 
    Trois états (CLAUDE.md §5) tenus :
-     · EN COURS (la première lecture n'est pas revenue, aucune erreur) ⇒ `data-attente` posé par l'écran :
-       « valeur » sur le chiffre (barre pâle à sa place), « note » sur sa raison (cachée, place gardée), « case » sur
-       une case entière de la carte des chiffres (src/design/CarteStats.jsx) ;
+     · EN COURS (sa raison est « lecture… ») ⇒ `data-chiffre-attente` posé par les composants natifs (src/natif/outils.js
+       `attenteDe` : <Tuile>, <Heros> et son trio, <CasesChiffres>, les rangées d'Argent) : « valeur » sur le chiffre
+       (barre pâle à sa place), « note » sur sa raison (invisible, place gardée : rien ne saute à l'arrivée) ;
      · PAS SU (`null`) ⇒ jamais de squelette : « — » et sa raison, comme avant ;
      · une valeur ⇒ le chiffre.
    Le « — » reste dans la page (lecteur d'écran, `data-*` des bancs) : seul son DESSIN change.
    Une lecture qui ne revient pas ne laisse pas un squelette éternel : au bout de 15 s (`vrm-attente-fin`), le « — » et
    sa raison reviennent d'eux-mêmes, sans script (une animation posée quand l'attribut arrive).
-   Hors couche et sans `!important` : l'animation de fin doit pouvoir rendre la main (une déclaration `!important`
-   l'en empêcherait) ; hors couche, ces règles passent déjà devant toutes les règles normales des couches.
    ════════════════════════════════════════════════════════════════════════════ */
-[data-attente="valeur"],
-[data-attente="case"] [data-fu-case-chiffre] {
-  display: inline-block;
-  min-width: 2.4em;
-  border-radius: 6px;
-  -webkit-text-fill-color: transparent;
-  background-color: var(--n-squelette, rgb(60 60 67 / .06));
-  background-image: linear-gradient(90deg, transparent 0%, var(--n-squelette-reflet, transparent) 50%, transparent 100%);
-  background-size: 220% 100%;
-  background-repeat: no-repeat;
-  animation: vrm-attente-reflet 1.8s cubic-bezier(.4, 0, .2, 1) infinite, vrm-attente-fin 0s linear 15s forwards;
-}
-[data-attente="note"],
-[data-attente="case"] .vrm-fu-case-raison,
-.vg-argent [data-argent-raison="encours"] .vrm-argent-w-note {
-  visibility: hidden;
-  animation: vrm-attente-note 0s linear 15s forwards;
+/* `!important` dans la PREMIÈRE couche (vrm-vintex, index.html) : le grand chiffre du jour porte un remplissage
+   `!important` des couches du studio. Une animation ne peut pas défaire un `!important` : elle anime les VARIABLES
+   que ces déclarations lisent (`--vrm-att-*`), et la fin rend la main au bout de 15 s. */
+@layer vrm-vintex {
+  html body [data-chiffre-attente="valeur"][data-chiffre-attente] {
+    --vrm-att-encre: transparent;
+    --vrm-att-fond: var(--n-squelette, rgb(60 60 67 / .06));
+    --vrm-att-reflet: linear-gradient(90deg, transparent 0%, var(--n-squelette-reflet, transparent) 50%, transparent 100%);
+    display: inline-block !important;
+    min-width: 2.4em !important;
+    border-radius: 6px !important;
+    -webkit-text-fill-color: var(--vrm-att-encre) !important;
+    color: inherit;
+    background-color: var(--vrm-att-fond) !important;
+    background-image: var(--vrm-att-reflet) !important;
+    background-size: 220% 100% !important;
+    background-repeat: no-repeat !important;
+    animation: vrm-attente-reflet 1.8s cubic-bezier(.4, 0, .2, 1) infinite, vrm-attente-fin 0s linear 15s forwards !important;
+  }
+  html body [data-chiffre-attente="note"][data-chiffre-attente] {
+    --vrm-att-op: 0;
+    opacity: var(--vrm-att-op) !important;
+    animation: vrm-attente-note 0s linear 15s forwards !important;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html body [data-chiffre-attente="valeur"][data-chiffre-attente] { --vrm-att-reflet: none; animation: vrm-attente-fin 0s linear 15s forwards !important; }
+  }
 }
 @keyframes vrm-attente-reflet { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-@keyframes vrm-attente-fin { to { -webkit-text-fill-color: currentcolor; background-color: transparent; background-image: none; } }
-@keyframes vrm-attente-note { to { visibility: visible; } }
-@media (prefers-reduced-motion: reduce) {
-  [data-attente="valeur"], [data-attente="case"] [data-fu-case-chiffre] { animation: vrm-attente-fin 0s linear 15s forwards; background-image: none; }
-}
+@keyframes vrm-attente-fin { to { --vrm-att-encre: currentcolor; --vrm-att-fond: transparent; --vrm-att-reflet: none; } }
+@keyframes vrm-attente-note { to { --vrm-att-op: 1; } }

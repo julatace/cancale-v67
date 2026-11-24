@@ -88,6 +88,8 @@ function base() {
 async function rest(route, b) {
   // (24 nov., livrable) `BANC_LENT=ms` : chaque réponse de la base tenue ce délai — pour REGARDER les états de chargement.
   if (Number(process.env.BANC_LENT) > 0) await new Promise((ok) => setTimeout(ok, Number(process.env.BANC_LENT)));
+  // (24 nov., livrable) `BANC_PANNE=1` : la base répond 503 à tout — pour REGARDER l'écran de panne.
+  if (process.env.BANC_PANNE) return route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"indisponible"}' });
   const req = route.request(), m = req.method();
   const u = decodeURIComponent(req.url());
   if (/\/rest\/v1\/rpc\//.test(u)) return route.fulfill({ status: 200, contentType: 'application/json', body: 'null' });

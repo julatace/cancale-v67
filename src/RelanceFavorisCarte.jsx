@@ -7,7 +7,7 @@
 import React from 'react';
 import { tr } from './i18n/index.js';
 import { gesteRelance } from './relanceFavoris.js';
-import { BoutonExtension } from './BoutonExtension.jsx';
+import { LigneExtension, PhraseExtension } from './BoutonExtension.jsx';
 import './styles-vendre-plus.css';
 
 export default function RelanceFavorisCarte({ res, cap, version, onGeste, Photo }) {
@@ -21,23 +21,33 @@ export default function RelanceFavorisCarte({ res, cap, version, onGeste, Photo 
           const g = gesteRelance(c, { cap, version });
           const num = c.numero ? `N°${c.numero}` : (c.titre || tr('rf.sansNum'));
           const bloque = g && g.bloque && c.plateforme !== 'vinted' ? (g.bloque === 'extension' ? tr('rf.bloque.extension', { v: g.version || '' }) : tr('rf.bloque.compte')) : '';
+          const corps = <>
+            {c.photo && Photo ? <Photo src={c.photo} alt="" className="vrm-rf-photo" loading="lazy"/> : <span className="vrm-rf-photo" aria-hidden="true"/>}
+            <span className="vrm-rf-texte">
+              <b>{tr('rf.carte.' + c.plateforme, { n: c.personnes, num })}</b>
+              <span className="vrm-rf-sous">{tr(c.offresLues ? 'rf.depuis' : 'rf.depuisPasLues', { j: c.depuisJ })}</span>
+              {bloque ? <span className="vrm-rf-bloque" data-rf-bloque={g.bloque}>{bloque}</span> : null}
+            </span>
+          </>;
+          // (20 nov., décision de Julien) Vinted : l'offre aux favoris se fait dans le panneau de l'extension — (24 nov., livrable)
+          // la LIGNE ENTIÈRE l'ouvre (chevron), plus un bouton « Écrire aux favoris dans l'extension » répété sous chaque ligne.
+          if (g && c.plateforme === 'vinted') return (
+            <li key={c.cle} className="vrm-rf-ligne is-geste" data-rf-ligne={c.cle} data-rf-personnes={c.personnes} data-rf-depuis={c.depuisJ} data-rf-plateforme={c.plateforme}>
+              <LigneExtension className="vrm-rf-ligne-bouton" action="favoris" ids={[String(c.id || '')]} attrs={{ 'data-rf-geste': g.k }}>
+                {corps}<svg className="vrm-rf-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+              </LigneExtension>
+            </li>
+          );
           return (
             <li key={c.cle} className="vrm-rf-ligne" data-rf-ligne={c.cle} data-rf-personnes={c.personnes} data-rf-depuis={c.depuisJ} data-rf-plateforme={c.plateforme}>
-              {c.photo && Photo ? <Photo src={c.photo} alt="" className="vrm-rf-photo" loading="lazy"/> : <span className="vrm-rf-photo" aria-hidden="true"/>}
-              <span className="vrm-rf-texte">
-                <b>{tr('rf.carte.' + c.plateforme, { n: c.personnes, num })}</b>
-                <span className="vrm-rf-sous">{tr(c.offresLues ? 'rf.depuis' : 'rf.depuisPasLues', { j: c.depuisJ })}</span>
-                {bloque ? <span className="vrm-rf-bloque" data-rf-bloque={g.bloque}>{bloque}</span> : null}
-              </span>
-              {/* (20 nov., décision de Julien) Vinted : l'offre aux favoris se fait dans le panneau de l'extension. eBay reste ici. */}
-              {g && c.plateforme === 'vinted' ? <BoutonExtension className="sb-touche vrm-rf-geste" action="favoris" ids={[String(c.id || '')]} attrs={{ 'data-rf-geste': g.k }}/>
-                : g ? <button type="button" className="sb-touche vrm-rf-geste" data-rf-geste={g.k} disabled={!!g.bloque} onClick={() => onGeste && onGeste(c, g.k)}>{tr('rf.geste.' + g.k)}</button> : null}
+              {corps}
+              {g ? <button type="button" className="sb-touche vrm-rf-geste" data-rf-geste={g.k} disabled={!!g.bloque} onClick={() => onGeste && onGeste(c, g.k)}>{tr('rf.geste.' + g.k)}</button> : null}
             </li>
           );
         })}
       </ul>
       {reste ? <p className="vrm-rf-note" data-rf-reste={reste}>{tr('rf.plus', { n: reste })}</p> : null}
-      <p className="vrm-rf-note">{tr('rf.note')}</p>
+      <p className="vrm-rf-note">{tr('rf.note')}{res.cartes.some((c) => c.plateforme === 'vinted') ? <> <PhraseExtension site="vinted"/></> : null}</p>
     </section>
   );
 }

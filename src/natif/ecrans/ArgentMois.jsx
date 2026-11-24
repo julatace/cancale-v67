@@ -22,6 +22,7 @@
 import React from 'react';
 import { tr } from '../../i18n/index.js';
 import { Carte, Plaque, Attente, useOrdinateur, TIRET } from '../index.js';
+import { attenteDe, attrsAttente } from '../outils.js';
 import { AideArgent } from './AideArgent.jsx';
 import './argent.css';
 
@@ -32,13 +33,14 @@ const signe = (m, montant) => (m > 0 ? '+' : m < 0 ? '−' : '') + montant(Math.
 
 // Une rangée de chiffre : libellé (et sa ligne grise) à gauche, montant à droite. Toute la rangée se touche.
 function Ligne({ libelle, valeur, sous = null, tonSous = 'neutre', onClick = null, chevron = true, attrs = null, attrsValeur = null }) {
+  const att = attenteDe(null, valeur != null, sous);   // (24 nov., livrable) en lecture : un squelette, jamais « — · lecture… »
   const corps = (
     <>
       <span className="n-arg-l-textes">
         <span className="n-arg-l-lib">{libelle}</span>
-        {sous ? <span className="n-arg-l-sous" data-n-ton={tonSous}>{sous}</span> : null}
+        {sous ? <span className="n-arg-l-sous" data-n-ton={tonSous} {...attrsAttente(att, 'note')}>{sous}</span> : null}
       </span>
-      <span className="n-arg-l-val" data-arg-montant="" data-n-vide={valeur == null ? '1' : undefined} {...(attrsValeur || {})}>{valeur == null ? TIRET : valeur}</span>
+      <span className="n-arg-l-val" data-arg-montant="" data-n-vide={valeur == null ? '1' : undefined} {...(attrsValeur || {})} {...attrsAttente(att, 'valeur')}>{valeur == null ? TIRET : valeur}</span>
       {onClick && chevron ? <span className="n-arg-l-chev" aria-hidden="true"/> : null}
     </>
   );
