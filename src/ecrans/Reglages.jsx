@@ -2200,7 +2200,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (11 nov., lot sante-comptes) Chaque compte Vinted : en forme / à surveiller, LA raison et LE geste, chaque point lisible (src/SanteComptes.jsx).
       { id:'santecomptes', type:'panneau', ic:'star', lib:tr('reglages.santecomptes.lib'), desc:tr('reglages.santecomptes.desc'), data:{ 'data-reglage-santecomptes':'' }, el:<SanteComptes variante="reglages" comptes={comptes||[]}/> },
       // (22 nov., ext. 5.436) « Mes comptes » : chaque compte et ton ordinateur, les gestes à distance (src/aDistance/).
-      { id:'adistance', type:'nav', ic:'users', lib:tr('nav.adistance'), desc:tr('adist.reglages.desc'), data:{ 'data-reglage-adistance':'' }, onClick:()=>setTab('adistance') },
+      { id:'adistance', type:'nav', ic:'ordi', lib:tr('nav.adistance'), desc:tr('adist.reglages.desc'), data:{ 'data-reglage-adistance':'' }, onClick:()=>setTab('adistance') },
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:tr('reglages.liens.desc'), onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:tr('reglages.connexions.lib'), desc:tr('reglages.connexions.desc'), titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (11 nov., lot import-depart) Tout l'historique Vinted (ventes, achats), lu par l'extension ; « Tout récupérer » pour le compte de l'onglet.
@@ -2216,7 +2216,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:tr('reglages.ebay.lib'), desc:tr('reglages.ebay.desc'), el:ebayCompte },
       // (20 nov. soir) Les rangées par plateforme ont quitté la barre de gauche : les recherches et alertes eBay s'ouvrent d'ici.
-      ebayCompte && { id:'ebay-recherches', type:'nav', ic:'search', lib:tr('ebay.recherches.titre'), desc:'', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:ebay-recherches')); } catch (_) {} }, data:{ 'data-reglage-ebay-recherches':'' } },
+      ebayCompte && { id:'ebay-recherches', type:'nav', ic:'jumelles', lib:tr('ebay.recherches.titre'), desc:'', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:ebay-recherches')); } catch (_) {} }, data:{ 'data-reglage-ebay-recherches':'' } },
     ]},
     { id:'emails-reglages', titre:tr('reglages.groupe.emails-reglages'), items:[
       // (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : l'ancien sous-écran est devenu

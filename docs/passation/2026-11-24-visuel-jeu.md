@@ -121,10 +121,21 @@ J10 a été rouge sur un vrai défaut. Au retour sur Aujourd'hui, les ventes ref
 
 Correction : `useArrive(pret, cle)` retient les blocs déjà montrés pendant la session. Ils reviennent d'un coup.
 
+## État des bancs à la remise
+
+- **`visuel-jeu`** : dernière passe complète sur le build à jour, 81 verts et 2 rouges, tous deux J10 « au retour ». C'était le banc qui se trompait : au retour, une tuile sans apparition n'a pas d'attribut `data-n-revele`, et le banc cherchait cet attribut.
+  - Banc corrigé : il juge les tuiles elles-mêmes.
+  - Le retour a été REGARDÉ : les tuiles sont là d'un coup (capture `aujourdhui-retour-390-clair`).
+  - La passe complète qui suit cette correction attendait encore son créneau de `lourd.sh` à la remise. Sa sortie arrivera dans `scratchpad/visuel-jeu/vj-final.log`.
+- **`moderation-carte`** : 397 verts, 0 rouge (après le correctif « N°132 » d'un seul tenant).
+- **`galerie-pops`** : vert, 24 exemples.
+
 ## Ce qui reste
 
-À faire par moi :
-- Ventes / Achats en tuiles, et À retirer en carte de trajet.
+À faire :
+- Achats en tuiles.
+- Ventes « À envoyer » en tuiles. La rangée garde sa `Plaque` (le rouge du doublon) : la tuile n'a pas d'étiquette de doublon.
+- À retirer : déjà un « billet » avec sa frise (20–21 nov.), non retouché ici.
 
 Lancé par le coordinateur, deux autres agents sur ces pièces :
 - Annonces + Stock ;

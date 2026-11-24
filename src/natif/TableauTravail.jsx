@@ -168,6 +168,13 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     }).map((x) => x.l);
   }, [filtrees, colTri, tri]);
   const visibles = affichees.slice(0, max);
+  // (23 nov., revue UX P2) Le nombre d'un intertitre de groupe = ses lignes AFFICHÉES (après recherche et filtres), sur le même
+  // compte que « N annonces » en tête : une seule règle de comptage. `g.titre` peut être une fonction (n, total) ⇒ nœud.
+  const nGroupe = React.useMemo(() => { if (!groupe) return null; const m = new Map(), t = new Map();
+    for (const l of affichees) { const g = groupe(l); if (g) m.set(g.cle, (m.get(g.cle) || 0) + 1); }
+    for (const l of liste) { const g = groupe(l); if (g) t.set(g.cle, (t.get(g.cle) || 0) + 1); }
+    return { n: (k) => m.get(k) || 0, total: (k) => t.get(k) || 0 }; }, [affichees, liste, groupe]);
+  const titreGroupe = (g) => (typeof g.titre === 'function' ? g.titre(nGroupe ? nGroupe.n(g.cle) : 0, nGroupe ? nGroupe.total(g.cle) : 0) : g.titre);
   // ── LE TABLEAU TIENT DANS SA LARGEUR (21 nov.) ────────────────────────────────────────────────────────────────────────
   // 1) Une colonne `replieVide` vide sur TOUTES les lignes (`vide(l)`, sinon sa valeur de tri absente) ne se montre pas : un
   //    « — » répété 82 fois ne dit rien (elle reste dans « Colonnes », où son choix la rend).
@@ -208,6 +215,11 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   const toutBasculer = () => { if (pilote) { onCocher(cochables.filter((l) => sel.has(l.cle) === toutCoche).map((l) => l.cle), !toutCoche); return; } setSel(toutCoche ? new Set() : new Set(cochables.map((l) => l.cle))); };
   const quitter = () => { setSel(new Set()); setAction(null); };
   const lancer = () => { if (!A || !jugement.ok || !onAction) return; const c = choisies; quitter(); onAction(A.cle, c); };
+  // (23 nov., revue UX #13) À l'ordinateur, la barre de sélection porte les actions COURANTES en boutons directs : un toucher lance
+  // l'action sur ce qui est coché (la même règle `pour` / `juger`, le même `onAction`) ; les autres sous « ⋯ ». Plus de « Lancer ».
+  const jugerPour = (X) => { const c = liste.filter((l) => sel.has(l.cle) && !l.grise && !l.nonCochable && (!X.pour || X.pour(l)));
+    const j = X.juger ? X.juger(c) : { ok: c.length > 0, raison: '' }; return { c, ok: !!(j && j.ok) && c.length > 0, raison: (j && j.raison) || (c.length ? '' : (X.aucune || tr('tableau.actionAucune'))) }; };
+  const lancerDirect = (X) => { const j = jugerPour(X); if (!j.ok || !onAction) return; quitter(); onAction(X.cle, j.c); };
   const choisirAction = (cle) => { setAction(cle); setMenu(''); const X = actions.find((x) => x.cle === cle); if (X && X.pour) setSel((s) => new Set([...s].filter((k) => { const l = liste.find((y) => y.cle === k); return l && !l.grise && X.pour(l); }))); };
   const ouvrir = (l) => { if (A && !ordinateur) { basculer(l); return; } if (onOuvrir) onOuvrir(l); };
 
@@ -304,7 +316,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   const recherche = <ChampRecherche valeur={q} onChange={setQ} placeholder={placeholder || tr('tableau.chercher')} libelle={placeholder || tr('tableau.chercher')} attrs={{ 'data-tt-champ': '' }}/>;
   const outils = (
     <div className="n-tt-outils" data-tt-outils="">
-      {actions.length ? outil('action', A ? A.libelle : tr('tableau.choisirAction'), corpsActions, { actif: !!A, attrs: { 'data-tt-action-choisie': A ? A.cle : '' } }) : null}
+      {actions.length && !(ordinateur && cases && !pilote) ? outil('action', A ? A.libelle : tr('tableau.choisirAction'), corpsActions, { actif: !!A, attrs: { 'data-tt-action-choisie': A ? A.cle : '' } }) : null}
       <div className="n-tt-recherche" data-tt-recherche="" ref={refChamp}>{recherche}</div>
       {statuts.length ? outil('statut', nStatuts ? tr('tableau.statutN', { n: nStatuts }) : tr('tableau.statut'), corpsStatut, { icone: ic('filter', 16), actif: nStatuts > 0 }) : null}
       {filtres.map((f) => outil('filtre:' + f.cle, libFiltre(f), corpsFiltre(f), { actif: f.options[0] && f.valeur !== f.options[0].cle, attrs: { 'data-tt-filtre': f.cle, 'data-tt-filtre-valeur': f.valeur } }))}
@@ -324,13 +336,16 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   );
 
   // ── le tableau (ordinateur) ───────────────────────────────────────────────────────────────────────────────────────
+  // (24 nov., main-vert) `titreCourt: true` = une colonne SANS titre visible (les logos parlent d'eux-mêmes) : avant, `true`
+  // se rendait vide et le bouton de tri n'avait AUCUN nom (axe button-name, colonne Site). Son nom est alors `libelle`.
+  const titreVu = (c) => (c.titreCourt === true ? '' : (c.titreCourt || c.libelle));
   const enTete = (c) => {
     const actif = tri && tri.cle === c.cle;
     return (
       <th key={c.cle} scope="col" className="n-tt-th" data-tt-th={c.cle} data-tt-num={c.num ? '1' : undefined} aria-sort={actif ? (tri.sens === 'asc' ? 'ascending' : 'descending') : undefined}>
-        {c.tri !== false ? <button type="button" data-n-famille="lien" className="n-tt-tri" data-tt-trier={c.cle} onClick={() => trier(c)}>
-          <span>{c.titreCourt || c.libelle}</span><span className="n-tt-tri-signe" data-tt-sens={actif ? tri.sens : ''} aria-hidden="true">{actif ? (tri.sens === 'asc' ? '↑' : '↓') : '↕'}</span>
-        </button> : <span className="n-tt-th-texte">{c.titreCourt || c.libelle}</span>}
+        {c.tri !== false ? <button type="button" data-n-famille="lien" className="n-tt-tri" data-tt-trier={c.cle} onClick={() => trier(c)} aria-label={titreVu(c) ? undefined : c.libelle} title={titreVu(c) ? undefined : c.libelle}>
+          <span>{titreVu(c)}</span><span className="n-tt-tri-signe" data-tt-sens={actif ? tri.sens : ''} aria-hidden="true">{actif ? (tri.sens === 'asc' ? '↑' : '↓') : '↕'}</span>
+        </button> : <span className="n-tt-th-texte" aria-label={titreVu(c) ? undefined : c.libelle}>{titreVu(c)}</span>}
       </th>
     );
   };
@@ -352,7 +367,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
             const g = groupe && !colTri ? groupe(l) : null;
             const gAvant = g && i > 0 ? groupe(visibles[i - 1]) : null;
             const inter = g && (!gAvant || gAvant.cle !== g.cle) ? <tr key={'g:' + g.cle} className="n-tt-intertitre" data-tt-groupe={g.cle}>
-              <th scope="colgroup" colSpan={(cases ? 2 : 1) + colsVues.length + (menuLigne ? 1 : 0)} className="n-tt-intertitre-th">{g.titre}</th></tr> : null;
+              <th scope="colgroup" colSpan={(cases ? 2 : 1) + colsVues.length + (menuLigne ? 1 : 0)} className="n-tt-intertitre-th">{titreGroupe(g)}</th></tr> : null;
             const coche = sel.has(l.cle); const grise = !cochable(l) && (A || l.grise); const m = menuDe(l); const st = statutDe(l);
             return (<React.Fragment key={l.cle}>{inter}
               <tr className="n-tt-tr" tabIndex={0} data-tt-ligne={l.cle} data-tt-statut-ligne={l.statut || ''} data-tt-coche={coche && !pilote ? '1' : undefined} data-tt-grise={grise ? '1' : undefined}
@@ -421,15 +436,31 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
 
   // ── la barre de sélection : « N sélectionnés · {Action} » (LE plein de l'écran tant qu'elle est là) ──────────────
   const nSel = choisies.length;
+  // Les actions courantes : celles que l'écran marque `courante` (sinon les trois premières) ; les autres dans « ⋯ ».
+  const marquees = actions.filter((x) => x.courante);
+  const directes = (marquees.length ? marquees : actions.slice(0, 3)).slice(0, 3);
+  const autres = actions.filter((x) => !directes.includes(x));
+  const corpsAutres = (
+    <div className="n-tt-pop-liste" role="menu" aria-label={tr('tableau.plusActions')}>
+      {autres.map((X) => { const j = jugerPour(X);
+        return <ChoixMenu key={X.cle} choisi={false} libelle={tr('tableau.lancer', { action: X.libelle, n: j.c.length })} indisponible={!j.ok} raison={j.ok ? '' : j.raison}
+          onClick={() => { setMenu(''); lancerDirect(X); }} attrs={{ 'data-tt-action': X.cle, 'data-tt-action-directe': X.cle }}/>; })}
+    </div>
+  );
   const barreSel = !pilote && (nSel > 0 || A) ? (
     <div className="n-tt-barre-sel" data-tt-barre-sel={String(nSel)} role="region" aria-label={tr('tableau.selection', { n: nSel })}>
       <span className="n-tt-barre-texte" data-tt-n-sel={String(nSel)}>{tr('tableau.selection', { n: nSel })}</span>
       <button type="button" className="n-tt-lien" data-tt-deselect="" onClick={quitter}>{tr('tableau.deselect')}</button>
       <span className="n-tt-espace"/>
-      {ordinateur ? outil('action-bas', A ? A.libelle : tr('tableau.choisirAction'), corpsActions, { haut: true, droite: true, actif: !!A, attrs: { 'data-tt-action-bas': A ? A.cle : '' } })
+      {ordinateur && !A ? <>
+        {directes.map((X, i) => { const j = jugerPour(X);
+          return <Bouton key={X.cle} variante={i === 0 ? 'plein' : 'teinte'} indisponible={!j.ok} raison={j.ok ? '' : j.raison} onClick={() => lancerDirect(X)}
+            attrs={{ 'data-tt-action-directe': X.cle, 'data-tt-lancer-n': String(j.c.length), ...(i === 0 ? { 'data-v2-principal': 'tableau' } : {}) }}>{tr('tableau.lancer', { action: X.libelle, n: j.c.length })}</Bouton>; })}
+        {autres.length ? outil('action-bas', tr('tableau.plusActions'), corpsAutres, { haut: true, droite: true, attrs: { 'data-tt-action-bas': '' } }) : null}
+      </> : ordinateur ? outil('action-bas', A.libelle, corpsActions, { haut: true, droite: true, actif: true, attrs: { 'data-tt-action-bas': A.cle } })
         : <Bouton variante="teinte" onClick={() => setMenu('action')} attrs={{ 'data-tt-action-bas': A ? A.cle : '' }}>{A ? A.libelle : tr('tableau.choisirAction')}</Bouton>}
-      <Bouton variante="plein" indisponible={!A || !jugement.ok} raison={!A ? tr('tableau.choisisAction') : !jugement.ok ? (jugement.raison || tr('tableau.cocheDAbord')) : ''} onClick={lancer}
-        attrs={{ 'data-tt-lancer': A ? A.cle : '', 'data-tt-lancer-n': String(nSel), 'data-v2-principal': 'tableau' }}>{A ? tr('tableau.lancer', { action: A.libelle, n: nSel }) : tr('tableau.lancerSans', { n: nSel })}</Bouton>
+      {ordinateur && !A ? null : <Bouton variante="plein" indisponible={!A || !jugement.ok} raison={!A ? tr('tableau.choisisAction') : !jugement.ok ? (jugement.raison || tr('tableau.cocheDAbord')) : ''} onClick={lancer}
+        attrs={{ 'data-tt-lancer': A ? A.cle : '', 'data-tt-lancer-n': String(nSel), 'data-v2-principal': 'tableau' }}>{A ? tr('tableau.lancer', { action: A.libelle, n: nSel }) : tr('tableau.lancerSans', { n: nSel })}</Bouton>}
     </div>
   ) : null;
 

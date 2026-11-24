@@ -11,16 +11,19 @@
 // Paramètres → « Ce que VRM a fait ».
 // Pas su (lecture ratée) ⇒ rien : jamais d'alerte sur « pas su ». Une « disparue »
 // dont la vente est PROUVÉE n'est pas une alerte (lue seulement s'il y en a une).
-// (23 nov., lot moderation-carte — Julien sur une capture : « c'est moche ») Ni ambre ni orange (décision du 23 nov.) :
-// gris clair, accent ardoise (`--n-accent`, `--n-teinte`). Les « disparues » d'un compte sont UN groupe : le compte et la
-// fenêtre dits UNE fois dans l'en-tête, l'explication UNE fois sous « Pourquoi ? », UN bouton « Vérifier sur Vinted » ;
-// chaque ligne : la photo de SA fiche (identifiant d'annonce, jamais un titre), le N°, un titre court, « Vu ».
-// La règle (ce qui est « disparue », la vente prouvée, « C'est vu ») est inchangée : src/moderationVinted.js.
+// (24 nov., réconciliation #1321 × #1346 — Julien : « c'est moche ») UNE carte : la base de la revue UX (#1321 : une
+// ligne compacte par compte, photos empilées, la feuille aux grandes photos) + ce que le lot moderation-carte (#1346)
+// faisait mieux : le compte et la fenêtre (« entre le … et le … ») dits UNE fois sur la ligne, l'explication UNE fois
+// sous « Pourquoi ? », le N° en pastille sur SA photo (identifiant d'annonce, jamais un titre), 6 photos puis « Voir les
+// N autres », le geste toujours visible (pied de la feuille), tous les textes par tr(), ni ambre ni orange ni trait de
+// bord (gris clair, accent ardoise). Le rouge reste aux deux paires sous un N° (§7). Cibles 44 px.
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { lireTout, load, save, onCloudReady, lirePreuvesVenteVinted, Icon, PhotoVinted } from './App.jsx';
-import { Actions, Pourquoi } from './natif/Actions.jsx';
-import { TuilePaire, revele } from './natif/Jeu.jsx';   // (24 nov., visuel-jeu) les disparues en GRILLE de photos, comme un inventaire
+import { lireTout, load, save, onCloudReady, lirePreuvesVenteVinted, PhotoVinted, Icon } from './App.jsx';
+import { Feuille, Bouton } from './natif/index.js';
+import { Pourquoi } from './natif/Actions.jsx';
+import { poserComptesFeuille } from './moderationFeuille.js';
+import { ArretModerationCompte } from './Discretion.jsx';
 import { SELECT_MODERATION, LIGNE_MODERATION_VU, alertesActives, texteEvenement, evenementsDesLignes } from './moderationVinted.js';
 import { tr, date as dateLoc } from './i18n/index.js';
 import './styles-alerte-moderation.css';
@@ -39,8 +42,6 @@ export function texteMasquee(e, { numero = null, nom = '' } = {}) {
     detail: raison + ' · ' + conseil + (e.r ? '' : ' ' + tr('mod5428.prudence')), geste: tr('mod5428.ouvrir'), lien: e.a ? `https://www.vinted.fr/items/${e.a}` : 'https://www.vinted.fr/inbox' };
 }
 
-// La photo d'une annonce : celle de SA fiche (`vinted_annonce_numeros[id].photo`), par identifiant — jamais par titre.
-const photoDeFiche = (f) => (f && (typeof f.photo === 'string' ? f.photo : (f.photo && f.photo.url))) || '';
 const jourCourt = (ms) => dateLoc(ms, { day: 'numeric', month: 'short' }).replace(/\.$/, '');
 // La fenêtre d'un groupe, dite une fois : « entre le 21 nov et le 23 nov » (ou « le 23 nov »).
 export function fenetreGroupe(evts) {
@@ -50,60 +51,20 @@ export function fenetreGroupe(evts) {
   const j1 = jourCourt(de), j2 = jourCourt(a);
   return j1 === j2 ? tr('modc.le', { jour: j2 }) : tr('modc.entre', { de: j1, a: j2 });
 }
-// Les « disparues », groupées par compte (le plus récent d'abord ; `liste` est déjà triée du plus récent au plus ancien).
-export function groupesDisparues(liste) {
-  const m = new Map();
-  for (const e of liste || []) { if (!e || e.s !== 'disparue') continue; if (!m.has(e.compte)) m.set(e.compte, []); m.get(e.compte).push(e); }
-  return [...m.entries()].map(([compte, evts]) => ({ compte, evts }));
-}
-const LIGNES_VISIBLES = 5;
-// « 5 annonces disparues · shop_cancale » : le « · » ne commence jamais une ligne (espaces insécables autour).
+// La photo d'une annonce : celle de SA fiche (`vinted_annonce_numeros[id].photo`), par identifiant — jamais par titre.
+const photoDeFiche = (f) => (f && (typeof f.photo === 'string' ? f.photo : (f.photo && f.photo.url))) || '';
+// « 5 annonces ont disparu de shop_cancale » : jamais un « · » en début de ligne.
 const insecable = (t) => String(t || '').replace(/ · /g, '\u00a0·\u00a0');
-
-function GroupeDisparues({ compte, evts, nom, fiches, seul, enTete, marquerVu }) {
-  const [tout, setTout] = React.useState(false);
-  const n = evts.length;
-  const vues = tout ? evts : evts.slice(0, LIGNES_VISIBLES);
-  const reste = n - vues.length;
-  const titre = insecable(nom ? tr('modc.disparues', { n, compte: nom }) : tr('modc.disparuesSansCompte', { n }));
-  return (
-    <div className="vrm-mod-groupe" data-moderation-groupe="disparue" data-moderation-compte={compte} data-moderation-n={n}>
-      {enTete ? null : <h3 className="vrm-mod-groupe-titre" data-moderation-groupe-titre="">{titre}</h3>}
-      <div className="vrm-mod-groupe-quand" data-moderation-fenetre="">{fenetreGroupe(evts)}</div>
-      {/* (24 nov., visuel-jeu — Julien : « c'est pas visuel ») LA GRILLE : chaque disparue est une tuile — la photo de SA fiche
-          (identifiant d'annonce, jamais un titre), son étiquette N° ; sans fiche, le médaillon et l'identifiant ; « Vu » dessous. */}
-      <ul className="vrm-mod-lignes vrm-mod-grille" data-n-jeu="moderation">
-        {vues.map((e, k) => {
-          const f = e.a ? fiches[e.a] : null;
-          const num = f && f.numero != null && f.numero !== '' ? String(f.numero) : null;
-          const ph = photoDeFiche(f);
-          const rv = revele(k, 'vrm-mod-ligne vrm-mod-case');
-          const etiquette = num ? 'N°' + num : tr('mod5428.articleId', { id: e.a || '' });
-          return (
-            <li key={e.cle} className={rv.className} style={rv.style} data-n-revele={rv["data-n-revele"]} data-moderation-sorte="disparue" data-moderation-compte={e.compte} data-moderation-item={e.a || undefined} data-moderation-photo={ph ? '1' : '0'}>
-              <TuilePaire photo={ph} numero={num || ''} icone="image" Icon={Icon} taille="xl" Photo={PhotoVinted} className="vrm-mod-tuile" attrsN={{ 'data-moderation-num': num || undefined }}/>
-              {num ? null : <span className="vrm-mod-id">{etiquette}</span>}
-              <button type="button" className="vrm-mod-vu" data-moderation-vu={e.cle} aria-label={tr('modc.vuDe', { article: etiquette })} onClick={() => marquerVu([e.cle])}><Icon name="check" size={14}/><span>{tr('modc.vu')}</span></button>
-            </li>
-          );
-        })}
-      </ul>
-      {reste > 0 ? <button type="button" className="vrm-mod-plus" data-moderation-plus={reste} onClick={() => setTout(true)}>{tr('modc.voirAutres', { n: reste })}</button> : null}
-      <Pourquoi attrs={{ 'data-moderation-pourquoi': 'disparue' }}>{tr('modc.pourquoiDisparue', { n })}</Pourquoi>
-      <Actions className="vrm-mod-actions" attrs={{ 'data-moderation-actions': 'disparue' }} elements={[
-        { cle: 'verifier', icone: <Icon name="chat" size={18}/>, libelle: tr('modc.verifier'), attrs: { 'data-moderation-geste': 'disparue' },
-          onClick: () => { try { window.open('https://www.vinted.fr/inbox', '_blank', 'noopener,noreferrer'); } catch (_) {} } },
-        seul || n < 2 ? null : { cle: 'toutvu', icone: <Icon name="check" size={18}/>, libelle: tr('modc.toutVu'), attrs: { 'data-moderation-groupe-vu': compte }, onClick: () => marquerVu(evts.map((e) => e.cle)) },
-      ]}/>
-    </div>
-  );
-}
+const PHOTOS_VISIBLES = 6;
 
 export default function AlerteModeration({ comptes = [] }) {
   const [rows, setRows] = React.useState(undefined);
   const [vu, setVu] = React.useState(() => load(LIGNE_MODERATION_VU, {}) || {});
   const [vendues, setVendues] = React.useState(null);
   const [maintenant, setMaintenant] = React.useState(() => Date.now());
+  const [feuille, setFeuille] = React.useState('');   // (23 nov.) le compte dont la feuille des annonces disparues est ouverte
+  const [menuA, setMenuA] = React.useState('');       // l'annonce dont le petit menu est ouvert
+  const [toutes, setToutes] = React.useState(false);  // « Voir les N autres » dans la feuille
   React.useEffect(() => {
     let mort = false;
     const lire = () => lireTout(`id=like.moderation_vinted_*&select=${SELECT_MODERATION}`, { strict: true })
@@ -129,13 +90,25 @@ export default function AlerteModeration({ comptes = [] }) {
     lirePreuvesVenteVinted().then((p) => { if (!mort) setVendues(p && p.vendus instanceof Set ? p.vendus : false); }, () => { if (!mort) setVendues(false); });
     return () => { mort = true; };
   }, [aDisparue, vendues]);
+  // (23 nov.) Les comptes dont les annonces disparues sont expliquées ici (la feuille) : le bandeau « Vinted a modéré ce compte »
+  // de ces comptes se range dans la feuille (src/moderationFeuille.js). La MÊME règle que la liste ci-dessous.
+  const comptesDisp = Array.isArray(rows) ? [...new Set(alertesActives(rows, { vu, maintenant, vendues: vendues || null })
+    .filter((e) => e.s === 'disparue' && (!uids.size || uids.has(e.compte))).map((e) => e.compte))].sort().join(',') : '';
+  React.useEffect(() => { poserComptesFeuille(comptesDisp ? comptesDisp.split(',') : []); return () => poserComptesFeuille([]); }, [comptesDisp]);
   if (!Array.isArray(rows)) return null;                      // en cours ou pas su : rien
   // (19 nov., lot compte-bloque) « compte fermé » a sa carte à lui, avec la question (src/CompteBloque.jsx).
   const liste = alertesActives(rows, { vu, maintenant, vendues: vendues || null }).filter((e) => (!uids.size || uids.has(e.compte)) && e.s !== 'banni');
   // (22 nov., ext. 5.438, choix 3) Une annonce que Vinted ne masque PLUS (sa fin `f`, posée par la lecture complète du
   // dressing qui la voit visible) est DITE trois jours, une fois (« C'est vu » la range : clé `{cle}:f`) — jamais devinée.
   const revenues = (evenementsDesLignes(rows) || []).filter((e) => e.s === 'masquee' && Number(e.f) > 0 && maintenant - Number(e.f) < 3 * 864e5 && !(vu[e.cle + ':f'] != null) && (!uids.size || uids.has(e.compte)));
-  if (!liste.length && !revenues.length) return null;
+  // (23 nov., Julien : « montre-moi les PHOTOS des annonces supprimées au lieu de dire ça, et fais un pop-up ») Les annonces
+  // DISPARUES d'un compte : UNE ligne compacte (photos empilées, « 5 annonces ont disparu de shop_cancale »), le détail dans une
+  // feuille. La photo, le titre, le prix et le N° viennent de la fiche de CET identifiant d'annonce (`vinted_annonce_numeros`,
+  // clé = l'id Vinted) — jamais d'une ressemblance ; sans fiche : une vignette neutre et « l'annonce {id} ».
+  const disparues = liste.filter((e) => e.s === 'disparue');
+  const autres = liste.filter((e) => e.s !== 'disparue');
+  const groupes = [...disparues.reduce((m, e) => { const g = m.get(e.compte) || []; g.push(e); m.set(e.compte, g); return m; }, new Map()).entries()];
+  if (!autres.length && !revenues.length && !groupes.length) return null;
   const fiches = load('vinted_annonce_numeros', {}) || {};
   const labels = load('vinted_account_labels', {}) || {};
   const nomDe = (uid) => labels[uid] || ((comptes || []).find((a) => String(a && a.vinted_user_id) === String(uid)) || {}).login || '';
@@ -148,19 +121,82 @@ export default function AlerteModeration({ comptes = [] }) {
     save(LIGNE_MODERATION_VU, garde);
     setVu(garde);
   };
-  const groupes = groupesDisparues(liste);
-  const autres = liste.filter((e) => e.s !== 'disparue');
-  // Une seule section (un compte, rien d'autre) : son en-tête EST le titre de la carte (dit une fois).
-  const seul = groupes.length === 1 && !autres.length && !revenues.length;
-  const titreCarte = seul ? insecable(nomDe(groupes[0].compte) ? tr('modc.disparues', { n: groupes[0].evts.length, compte: nomDe(groupes[0].compte) }) : tr('modc.disparuesSansCompte', { n: groupes[0].evts.length }))
-    : !liste.length ? tr('mod5438.titreVisible') : tr('modc.titre', { n: liste.length });
+  const ficheDe = (a) => (a && fiches[a]) || null;
+  const prixDe = (f) => { const p = f && f.price; const v = p && typeof p === 'object' ? p.amount : p; const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
+  const euros = (n) => (n == null ? '' : n.toLocaleString('fr-FR', { maximumFractionDigits: n % 1 ? 2 : 0 }) + ' €');
+  const ligneDisparues = ([u, evts]) => {
+    const photos = evts.map((e) => photoDeFiche(ficheDe(e.a))).filter(Boolean).slice(0, 3);
+    const nom = nomDe(u) || ('#' + u);
+    return (
+      <button key={'d:' + u} type="button" className="vrm-mod-disp" data-moderation-disparues={String(evts.length)} data-moderation-groupe="disparue" data-moderation-compte={u} data-moderation-n={evts.length}
+        aria-haspopup="dialog" onClick={() => { setFeuille(u); setToutes(false); setMenuA(''); }}>
+        <span className="vrm-mod-pile" aria-hidden="true" data-moderation-pile={String(photos.length)}>
+          {photos.length ? photos.map((ph, i) => <span key={ph + i} className="vrm-mod-pile-ph" style={{ zIndex: 3 - i }}><PhotoVinted src={ph} alt="" loading="lazy" decoding="async" repli={null}/></span>)
+            : <span className="vrm-mod-pile-ph vrm-mod-pile-vide"><Icon name="image" size={18}/></span>}
+          <span className="vrm-mod-pile-n" data-moderation-pastille="">{evts.length}</span>
+        </span>
+        <span className="vrm-mod-disp-texte">
+          <span className="vrm-mod-disp-titre" data-moderation-groupe-titre="">{insecable(tr('ru.mod.disparues', { n: evts.length, compte: nom }))}</span>
+          <span className="vrm-mod-disp-quand" data-moderation-fenetre="">{fenetreGroupe(evts)}</span>
+        </span>
+        <span className="vrm-mod-chev" aria-hidden="true"><Icon name="chevron" size={18}/></span>
+      </button>
+    );
+  };
+  const groupeOuvert = feuille ? (groupes.find(([u]) => u === feuille) || null) : null;
+  const feuilleDisparues = groupeOuvert ? (() => {
+    const [u, evts] = groupeOuvert;
+    const vues = toutes ? evts : evts.slice(0, PHOTOS_VISIBLES);
+    const reste = evts.length - vues.length;
+    return (
+      <Feuille ouverte onFermer={() => { setFeuille(''); setMenuA(''); }} titre={tr('ru.mod.titreFeuille', { compte: nomDe(u) || ('#' + u) })}
+        attrs={{ 'data-moderation-feuille': u, 'data-moderation-feuille-n': String(evts.length) }}
+        pied={<div className="vrm-mod-gestes">
+          {/* LE geste : ouvrir la messagerie Vinted (Vinted y dit pourquoi il a retiré une annonce). Toujours visible. */}
+          <Bouton variante="plein" large icone={<Icon name="chat" size={18}/>} onClick={() => { try { window.open('https://www.vinted.fr/inbox', '_blank', 'noopener,noreferrer'); } catch (_) {} }} attrs={{ 'data-moderation-geste': 'disparue', 'data-href': 'https://www.vinted.fr/inbox' }}>{tr('ru.mod.messages')}</Bouton>
+          <Bouton variante="teinte" large icone={<Icon name="check" size={18}/>} onClick={() => { marquerVu(evts.map((e) => e.cle)); setFeuille(''); }} attrs={{ 'data-moderation-tout-vu': 'feuille', 'data-moderation-groupe-vu': u }}>{tr('ru.mod.toutVu')}</Bouton>
+        </div>}>
+        {/* La fenêtre (≤ 8 mots, la même source que la ligne : `fenetreGroupe`) ; l'explication entière sous « Pourquoi ? », une fois. */}
+        <p className="vrm-mod-phrase" data-moderation-phrase="">{fenetreGroupe(evts)}</p>
+        <div className="vrm-mod-pourquoi"><Pourquoi attrs={{ 'data-moderation-pourquoi': 'disparue' }}>{tr('modc.pourquoiDisparue', { n: evts.length })}</Pourquoi></div>
+        <ArretModerationCompte uid={u}/>
+        <ul className="vrm-mod-grille" data-moderation-grille={String(evts.length)}>
+          {vues.map((e) => { const f = ficheDe(e.a); const ph = photoDeFiche(f); const px = prixDe(f); const num = f && f.numero != null && f.numero !== '' ? String(f.numero) : null;
+            return (
+              <li key={e.cle} className="vrm-mod-case" data-moderation-case={e.a} data-moderation-item={e.a || undefined} data-moderation-photo={ph ? '1' : '0'}>
+                <span className="vrm-mod-case-ph">
+                  {ph ? <PhotoVinted src={ph} alt="" loading="lazy" decoding="async" repli={null}/> : <span className="vrm-mod-case-vide" aria-hidden="true"><Icon name="image" size={28}/></span>}
+                  {num ? <b className="vrm-mod-num" data-moderation-num={num}>{'N°' + num}</b> : null}
+                </span>
+                <span className="vrm-mod-case-titre">{(f && f.title) || tr('ru.mod.annonceId', { id: e.a })}</span>
+                {px != null ? <span className="vrm-mod-case-pied">{euros(px)}</span> : null}
+                <button type="button" className="vrm-mod-case-menu" aria-label={tr('ru.mod.menu')} aria-expanded={menuA === e.cle} data-moderation-menu={e.a} onClick={() => setMenuA(menuA === e.cle ? '' : e.cle)}><Icon name="more" size={20}/></button>
+                {menuA === e.cle ? <span className="vrm-mod-case-choix" role="menu">
+                  <button type="button" role="menuitem" data-moderation-moi={e.cle} onClick={() => { marquerVu([e.cle, e.cle + ':moi']); setMenuA(''); }}>{tr('ru.mod.moi')}</button>
+                  <button type="button" role="menuitem" data-moderation-vu={e.cle} onClick={() => { marquerVu([e.cle]); setMenuA(''); }}>{tr('ru.mod.vu')}</button>
+                </span> : null}
+              </li>
+            ); })}
+        </ul>
+        {reste > 0 ? <button type="button" className="vrm-mod-plus" data-moderation-plus={reste} onClick={() => setToutes(true)}>{tr('modc.voirAutres', { n: reste })}</button> : null}
+      </Feuille>
+    );
+  })() : null;
+  if (!autres.length && !revenues.length) return (
+    <section className="vrm-moderation vrm-moderation-compacte" data-moderation={liste.length} aria-label={tr('ru.mod.aria')}>
+      {groupes.map(ligneDisparues)}
+      {feuilleDisparues}
+    </section>
+  );
   return (
     <section className="vrm-moderation" data-moderation={liste.length} aria-label={tr('modc.aria')}>
+      {groupes.map(ligneDisparues)}
+      {feuilleDisparues}
       <div className="vrm-moderation-tete">
-        <h2 className="vrm-moderation-titre">{titreCarte}</h2>
+        <h2 className="vrm-moderation-titre">{!autres.length ? tr('mod5438.titreVisible') : autres.length > 1 ? tr('modc.titre', { n: autres.length }) : tr('modc.titreUn')}</h2>
+        {/* « Tout est vu » de la carte range TOUT ce qu'elle montre, disparues comprises (sinon la carte reste). */}
         {liste.length + revenues.length > 1 ? <button type="button" className="vrm-lien-action vrm-moderation-tout" data-moderation-tout-vu="" onClick={() => marquerVu(liste.map((e) => e.cle).concat(revenues.map((e) => e.cle + ':f')))}>{tr('modc.toutVu')}</button> : null}
       </div>
-      {groupes.map((g) => <GroupeDisparues key={g.compte} compte={g.compte} evts={g.evts} nom={nomDe(g.compte)} fiches={fiches} seul={seul} enTete={seul} marquerVu={marquerVu}/>)}
       {autres.map((e) => {
         const num = e.a && fiches[e.a] && fiches[e.a].numero ? fiches[e.a].numero : null;
         const t = e.s === 'masquee' ? texteMasquee(e, { numero: num, nom: nomDe(e.compte) }) : texteEvenement(e, { numero: num, nom: nomDe(e.compte) });

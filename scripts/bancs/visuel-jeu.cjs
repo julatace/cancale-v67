@@ -239,11 +239,12 @@ async function journee(nav, W, theme, d) {
     });
     // Les ventes reviennent (déjà montrées pendant la session) : elles n'ont AUCUN fondu, même arrivées après la 1re image.
     // (les blocs sous le pli se montent quand on y descend) on descend jusqu'aux dernières ventes, comme le doigt
-    for (let k = 0; k < 12 && !(await pg.$('[data-n-jeu="ventes"] [data-n-revele]')); k++) { await pg.mouse.wheel(0, 700); await pg.evaluate(() => { for (const el of [document.scrollingElement, ...document.querySelectorAll('.vrm-main, [data-n-defile]')]) if (el) el.scrollTop += 700; }); await pg.waitForTimeout(250); }
-    await pg.waitForSelector('[data-n-jeu="ventes"] [data-n-revele]', { timeout: 5000 }).catch(() => {});
+    for (let k = 0; k < 12 && !(await pg.$('[data-n-jeu="ventes"] .n-inventaire-case')); k++) { await pg.mouse.wheel(0, 700); await pg.evaluate(() => { for (const el of [document.scrollingElement, ...document.querySelectorAll('.vrm-main, [data-n-defile]')]) if (el) el.scrollTop += 700; }); await pg.waitForTimeout(250); }
+    await pg.waitForSelector('[data-n-jeu="ventes"] .n-inventaire-case', { timeout: 5000 }).catch(() => {});
     // Une animation QUI JOUE (getAnimations, état « running ») — l'écran peut rester monté derrière l'onglet : ses tuiles
     // gardent leur nom d'animation, finie depuis longtemps ; seul ce qui bouge encore au retour compte.
-    if (t) t.anims = await pg.evaluate(() => [...document.querySelectorAll('[data-n-jeu="ventes"] [data-n-revele]')].map((x) => (x.getAnimations ? x.getAnimations() : []).some((a) => a.playState === 'running') ? 'joue' : 'none'));
+    if (t) t.anims = await pg.evaluate(() => [...document.querySelectorAll('[data-n-jeu="ventes"] .n-inventaire-case')].map((x) => (x.getAnimations ? x.getAnimations() : []).some((a) => a.playState === 'running') ? 'joue' : 'none'));
+    if (t) t.blocs = await pg.evaluate(() => [...document.querySelectorAll('[data-v2-bloc]')].map((x) => x.getAttribute('data-v2-bloc') + (x.getBoundingClientRect().height > 0 ? '' : '(caché)')).join(','));
     await capture(pg, `aujourdhui-retour-${W}-${theme}`);
     dit(!!t && t.ms != null && t.ms < 1500, `${T} J10 du toucher au premier contenu : ${t && t.ms} ms (banc logiciel swiftshader, machine partagée : seuil 1,5 s ; le vrai budget est < 100 ms pour l'état appuyé)`, JSON.stringify(t));
     dit(!!t && (t.anims || []).length > 0 && t.anims.every((a) => a === 'none'), `${T} J10 au retour, les ventes déjà connues sont là d'un coup (aucun fondu)`, JSON.stringify(t));

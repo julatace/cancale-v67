@@ -2218,5 +2218,14 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1377)
 - **24 nov. · Français du démarrage 79,96 → 73,6 Ko** (budget 80 inchangé) : l'accueil des nouveaux à la demande. `2026-11-24-francais-demarrage.md`. Geste : aucun.
 
-## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., style-graphite, 2e fusion)
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1386)
 - **24 nov. · Favoris 5.440.2 (`claude/favoris-ancien`)** : « trop ancien » faux (rangs 1, 2, 4 de la liste) ⇒ liste de Vinted indexée et lue jusqu'au bout, ligne pas montrée ⇒ son adresse native ouverte (onglet en arrière-plan), sinon « en recherche ». `2026-11-24-favoris-ancien.md`. Geste : installer 5.440.2.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1386)
+- **24 nov. · Vente vue par e-mail ↔ son annonce (`claude/vente-mail-annonce`)** : l'annonce EN LIGNE qu'un e-mail de vente du même compte désigne (SON clic « Relier à l'annonce », sinon l'image exacte dossier+fichier ; dressing lu avant l'e-mail) passe « Vendue · par e-mail, en attente de Vinted » (hors d'« en ligne » et des totaux, rien supprimé) et la vente reçoit son N° ; « Délier » défait ; fiche « pas su » dite une fois + « Pourquoi ? ». `src/venteMailAnnonce.js`, `2026-11-24-vente-mail-annonce.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion de #1346 dans visuel-jeu)
+- **23 nov. · Revue UX (`claude/revue-ux`)** : Achats iPhone liste d'abord (retraits à 0 tus, gestes rares dans « ⋯ », « Filtres »), Relier distinct (n° court + heure), fiche « Prix d'achat » en ligne, sélection Annonces à un toucher, Argent une ligne ambre, verdict extension, logos (audit). `docs/passation/2026-11-23-revue-ux.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion de #1346 dans visuel-jeu)
+- **24 nov. · Observer Vinted (ext. 5.440.3, `claude/observation-vinted`)** : interrupteur 10 min (carte du logo, page Extension) ; la page note pages, requêtes (clés et types), clics (`isTrusted`), cloche — formes seulement, rebâties par le fond, ligne `observation_vinted_{compte}_{nav}`, « Envoyer l'observation » ; rien envoyé à Vinted. `2026-11-24-observation-vinted.md`. Geste : installer, Observer, un envoi (Bleam ou main), Envoyer l'observation.
