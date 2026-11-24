@@ -92,7 +92,7 @@ export default {
   "pil.t.sur": "sur {c}",
   "pil.a.publier": "Publier",
   "pil.a.relier": "Relier",
-  "nn.carte.titre": {"one": "{n} nouveau N° à écrire sur ton carton", "other": "{n} nouveaux N° à écrire sur tes cartons"},
+  "nn.carte.titre": {"one": "{n} nouveau N° à écrire sur son rangement", "other": "{n} nouveaux N° à écrire sur leurs rangements"},
   "nn.carte.sous": "Écris-les, puis touche « C’est écrit ».",
   "nn.carte.voir": "Voir les N°",
   "nn.carte.masquer": "Replier",
