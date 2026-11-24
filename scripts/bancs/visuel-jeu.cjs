@@ -238,7 +238,9 @@ async function journee(nav, W, theme, d) {
         if (r && r.height > 0) ok({ ms: Math.round(performance.now() - t0) }); else if (performance.now() - t0 > 5000) ok({ ms: null }); else requestAnimationFrame(f); }; f(); });
     });
     // Les ventes reviennent (déjà montrées pendant la session) : elles n'ont AUCUN fondu, même arrivées après la 1re image.
-    await pg.waitForSelector('[data-n-jeu="ventes"] [data-n-revele]', { timeout: 15000 }).catch(() => {});
+    // (les blocs sous le pli se montent quand on y descend) on descend jusqu'aux dernières ventes, comme le doigt
+    for (let k = 0; k < 12 && !(await pg.$('[data-n-jeu="ventes"] [data-n-revele]')); k++) { await pg.mouse.wheel(0, 700); await pg.evaluate(() => { for (const el of [document.scrollingElement, ...document.querySelectorAll('.vrm-main, [data-n-defile]')]) if (el) el.scrollTop += 700; }); await pg.waitForTimeout(250); }
+    await pg.waitForSelector('[data-n-jeu="ventes"] [data-n-revele]', { timeout: 5000 }).catch(() => {});
     // Une animation QUI JOUE (getAnimations, état « running ») — l'écran peut rester monté derrière l'onglet : ses tuiles
     // gardent leur nom d'animation, finie depuis longtemps ; seul ce qui bouge encore au retour compte.
     if (t) t.anims = await pg.evaluate(() => [...document.querySelectorAll('[data-n-jeu="ventes"] [data-n-revele]')].map((x) => (x.getAnimations ? x.getAnimations() : []).some((a) => a.playState === 'running') ? 'joue' : 'none'));
