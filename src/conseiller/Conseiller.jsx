@@ -141,13 +141,13 @@ export function CarteConseils({ liste, onGeste, onToutVoir = null, Icon = null }
 
 // L'écran « Conseiller » : la phrase du jour en tête, « Demande à VRM » juste dessous (passé en `demande`), puis trois
 // groupes — à faire aujourd'hui · pour gagner plus · à savoir — en deux colonnes à l'ordinateur, à la suite au téléphone.
-export function EcranConseiller({ liste, etat = 'lu', onGeste, Icon = null, Photo = null, demande = null }) {
+export function EcranConseiller({ liste, etat = 'lu', onGeste, Icon = null, Photo = null, demande = null, plan = null }) {
   const lecture = etat === 'encours';
   const G = grouper(liste);
   const S = syntheseDuJour(liste);
   const groupe = (k) => (G[k].length ? <Groupe key={k} titre={tr('cons.groupe.' + k)} attrs={{ 'data-cons-groupe': k, 'data-cons-groupe-n': String(G[k].length) }}>
     {G[k].map((c) => <LigneConseil key={c.id} c={c} onGeste={onGeste} Icon={Icon} Photo={Photo} ecran/>)}</Groupe> : null);
-  const vide = !lecture && (!Array.isArray(liste) || !liste.length);
+  const vide = !lecture && (!Array.isArray(liste) || !liste.length) && !plan;
   // (23 nov., Julien : « un vrai accompagnement ») la présentation animée au PREMIER passage ; « Revoir » la rouvre.
   const [pres, setPres] = React.useState(() => !presentationVue());
   return (
@@ -161,7 +161,7 @@ export function EcranConseiller({ liste, etat = 'lu', onGeste, Icon = null, Phot
       {vide ? <Groupe attrs={{ 'data-cons-groupe': 'vide' }}><Vide icone={Icon ? <Icon name="check" size={36}/> : null} phrase={tr('cons.vide')} detail={tr('cons.videSous')}/></Groupe> : null}
       {!lecture && !vide ? <Colonnes className="n-cons-colonnes">
         <Colonne>{groupe('faire')}{groupe('savoir')}</Colonne>
-        <Colonne>{groupe('gagner')}</Colonne>
+        <Colonne>{plan}{groupe('gagner')}</Colonne>
       </Colonnes> : null}
     </section>
   );

@@ -12,7 +12,7 @@ import { lireValeurStock } from '../coutVente.js';
 import { vendsMieux } from '../vendsMieux.js';
 import { parCompteEtSite } from '../aujourdhui/modele.js';
 import { lignesReleve } from '../aujourdhui/lectures.js';
-import { CLE_PUB_BAISSES, lirePub } from './publications.js';
+import { CLE_PUB_BAISSES, CLE_PUB_PLAN, lirePub } from './publications.js';
 
 const JOUR = 86400000;
 const SEL_TOUT = { site: 'toutes', compte: null, periode: null };
@@ -37,6 +37,9 @@ export function sourcesConseiller({ o, valeurSel, live, L, maintenant = Date.now
     if (regime !== undefined && ligne) seuils = alertesADire(alertesSeuils({ ligne, now: new Date(maintenant), regime, activite: opts && opts.activite === 'services' ? 'services' : 'vente' }), vues && typeof vues === 'object' ? vues : {});
   } catch (_) { seuils = null; }
   const baisses = uid ? lirePub(CLE_PUB_BAISSES, uid) : null;
+  // (24 nov.) Le plan du matin des paires qui dorment (publié par Annonces, src/conseiller/planDorment.js) : cru s'il a moins de 24 h.
+  const planPub = uid ? lirePub(CLE_PUB_PLAN, uid) : null;
+  const plan = planPub && Number.isFinite(Number(planPub.at)) && maintenant - Number(planPub.at) <= 24 * 3600000 && Number(planPub.at) <= maintenant + 60000 ? planPub : null;
   const VS = uid ? lireValeurStock(uid) : null;
   const stock = VS ? { n: VS.n, nPrix: VS.nPrix, centimes: VS.centimes, partiel: VS.partiel } : null;
   // Le relevé (Statistiques) sur 90 jours : quoi racheter, ce qui ne rapporte pas, le jour où ça vend.
@@ -69,7 +72,7 @@ export function sourcesConseiller({ o, valeurSel, live, L, maintenant = Date.now
     }
   } catch (_) { chiffres = null; }
   return {
-    chiffres, colis, offres, seuils, baisses, stock, dorment, comptes,
+    chiffres, colis, offres, seuils, baisses, stock, dorment, comptes, plan,
     aRacheter: M ? M.aRacheter : (mieux === undefined ? undefined : null),
     groupes: M ? M.groupes : (mieux === undefined ? undefined : null),
     ventesTs: Array.isArray(L90) ? L90.map((l) => l.ts) : (L90 === undefined ? undefined : null),

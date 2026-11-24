@@ -30462,8 +30462,9 @@ function ConseillerApp({ liveStats, onNav }) {
   const live = liveStats || liveCoque;
   const S = useSourcesCarte(live);
   const valeurSel = React.useCallback((id, p, sel) => sansCompteSur(valeurChiffre(id, { id, p }, S, sel, REGLES_CARTE, Date.now()), S), [S]);
-  return <ConseillerV2 valeurSel={valeurSel} live={live} outils={OUTILS_AUJOURDHUI} Icon={Icon} onNav={onNav}
-    onSaisirPrix={() => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}/>;
+  return <ConseillerV2 valeurSel={valeurSel} live={live} outils={OUTILS_AUJOURDHUI} Icon={Icon} onNav={onNav} Photo={PhotoVinted}
+    onSaisirPrix={() => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}
+    onEbay={(id) => { DEMANDE_EBAY_PAIRE.id = String(id); DEMANDE_EBAY_PAIRE.at = Date.now(); if (onNav) onNav('ebay_annonces'); }}/>;   // (24 nov.) plan des paires qui dorment
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // (10 nov., lot BC) « MA SEMAINE » — l'écran du bilan de la semaine.

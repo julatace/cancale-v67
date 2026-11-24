@@ -133,3 +133,9 @@
 /* Au téléphone, la comparaison des comptes prend toute la ligne (légendes lisibles), le bouton passe dessous, à droite. */
 .n-cons-duo-legende > span:last-child { white-space: nowrap; flex: 0 0 auto; }
 @media (max-width: 599px) { .n-cons-pied { flex-wrap: wrap; row-gap: 10px; } .n-cons-pied > .n-cons-duo { flex: 1 1 100%; margin-right: 0; } }
+/* (24 nov.) Plan du matin : une phrase, puis une paire par rangée et LE bouton de son action, à droite. Aucun orange. */
+.n-plan-phrase { margin: 0 0 4px; padding-inline: 16px; font: var(--n-t-legende); color: var(--n-encre-2); }
+.n-plan-explication { margin: 0 16px 8px; }
+.n-plan-pied { display: flex; justify-content: flex-end; min-width: 0; }
+.n-plan-pied .n-bouton { flex-shrink: 0; white-space: nowrap; }
+@media (max-width: 599px) { .n-plan-pied .n-bouton { flex: 1 1 100%; } }

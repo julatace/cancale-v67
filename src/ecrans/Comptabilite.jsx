@@ -6,7 +6,8 @@ import { ouvrirPanneau } from '../ouvrirPanneau.js';
 // (22 nov., choix n° 33 et 35 de Julien) Les offres reçues restées sans réponse, la même photo sur deux annonces en ligne.
 import { offresSansReponse, publierOffresSansReponse } from '../offresSansReponse.js';
 import { photosEnDouble, numerosEnExemplaires, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
-import { publierBaisses } from '../conseiller/publications.js';   // (23 nov.) Conseiller
+import { publierBaisses, publierPlan } from '../conseiller/publications.js';   // (23 nov.) Conseiller · (24 nov.) plan des paires qui dorment
+import { planDuMatin } from '../conseiller/planDorment.js';
 import OffresSansReponseListe from '../natif/ecrans/OffresSansReponse.jsx';
 import { BoutonExtension, RangeeExtension, FeuilleExtension } from '../BoutonExtension.jsx';
 import { lienAnnonceLeboncoin, etatAnnonceLeboncoin } from '../etatAnnonceLeboncoin.js';
@@ -6510,6 +6511,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // ne trompe pas ; une fausse pastille verte, si). Le « sur quel COMPTE LBC »
   // reste gaté sur la capture de ses propres annonces LBC (lbc_accounts vide).
   const [lbcPosted, setLbcPosted] = useState(() => new Set());
+  // (24 nov., plan des paires qui dorment) la marque « publiée sur Leboncoin » LUE ? Sans lecture, « pas sur Leboncoin » n'est pas su.
+  const [lbcPostedLu, setLbcPostedLu] = useState(false);
   // (20 oct.) « Aussi sur Leboncoin » = EN VENTE là-bas. Une paire marquée publiée
   // dont la vente Leboncoin est PROUVÉE (la même règle que l'écran Leboncoin,
   // `annoncesLbcVendues` → `doublesVenteLbc`) n'y est plus en vente : la pastille
@@ -6533,6 +6536,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // (identité, §5), lu une fois (la ligne est petite). Illisible ⇒ Set vide :
   // aucune pastille eBay, jamais une fausse.
   const [ebayNums, setEbayNums] = useState(() => new Set());
+  const [ebayNumsLu, setEbayNumsLu] = useState(false);   // (24 nov.) lue ⇒ « pas sur eBay » est un fait
   // (28 oct.) Les annonces eBay EN LIGNE avec leur N° (SKU, identité) — pour le
   // Stock : une paire qui n'est QUE sur eBay est chez lui aussi. `null` = pas su.
   const [ebayStock, setEbayStock] = useState(null);
@@ -6549,13 +6553,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   useEffect(() => { let stop = false; (async () => {
     const lu = await lireEbayEnLigne();
     if (!lu || stop) return;
-    setEbayNums(lu.nums);
+    setEbayNums(lu.nums); setEbayNumsLu(true);
     setEbayStock(lu.liste);
   })(); return () => { stop = true; }; }, []);
   // (11 nov., « Publier partout ») Les N° EN LIGNE sur Vestiaire, par IDENTITÉ (`numeroVcIdentite` :
   // lien posé par VRM, référence VRM-{n°}, N° donné au produit) — la même règle que `sitesDuNumero`.
   // Illisible ⇒ Set vide : aucune pastille Vestiaire, jamais une fausse.
   const [vcNumsAnn, setVcNumsAnn] = useState(() => new Set());
+  const [vcNumsLu, setVcNumsLu] = useState(false);   // (24 nov.) lue ⇒ « pas sur Vestiaire » est un fait
   // (11 nov., intégration) Lue seulement là où les pastilles se montrent (Annonces) : sur Achats ou Ma
   // journée, elle doublait la lecture de `vc_listings` d'un autre écran (budget-vitesse).
   const besoinVcAnn = !only || only === 'annonces';
@@ -6568,7 +6573,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       if (!it || !/^(published|online|active)$/i.test(String(it.statut || '').trim())) continue;
       const k = numeroVcIdentite(id, it, d.liens || {}); if (k) out.add(k);
     }
-    setVcNumsAnn(out);
+    setVcNumsAnn(out); setVcNumsLu(true);
   })(); return () => { stop = true; }; }, [besoinVcAnn]);
   useEffect(() => { (async () => {
     try {
@@ -6577,7 +6582,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const rows = await r.json();
       const ids = (rows && rows[0] && rows[0].data && rows[0].data.ids) || [];
       const postedDepuis = (rows && rows[0] && rows[0].data && rows[0].data.updatedAt) || '';
-      if (Array.isArray(ids)) setLbcPosted(new Set(ids.map(String)));
+      if (Array.isArray(ids)) { setLbcPosted(new Set(ids.map(String))); setLbcPostedLu(true); }
       if (!Array.isArray(ids) || !ids.length) return;
       const vr = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });   // (22 nov.) projetée (§4.4)
       if (!vr.ok) return;
@@ -13144,6 +13149,30 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // seulement annonces LUES ; aucun calcul de plus.
   const photosBaisses = useMemo(() => { const out = []; for (const it of annBase) { if (out.length >= 4) break; const d = decisionsBaisse.get(String(it && it.id)); const u = it && it.photo && it.photo.url; if (d && d.decision === 'baisser' && typeof u === 'string' && u) out.push(u); } return out; }, [annBase, decisionsBaisse]);
   useEffect(() => { publierBaisses(nBaissesConseillees, { owner: AUTH.user?.id || '', lu: Array.isArray(listings.items), photos: photosBaisses }); }, [nBaissesConseillees, listings.items, photosBaisses]);
+  // (24 nov., Julien : « paires qui dorment → plan ») LE PLAN DU MATIN, publié pour le Conseiller (src/conseiller/planDorment.js) :
+  // les MÊMES annonces en ligne (`annBase`), leurs vues / favoris / âge LUS, SES bornes (prix d'achat saisi, plancher
+  // achat + frais, son prix mini), la dernière baisse lue, où elle est déjà (lu ⇒ fait ; pas lu ⇒ null). Rien n'est
+  // envoyé ici : le Conseiller montre le plan, chaque action passe par le chemin gardé existant, sur SON toucher.
+  const planMatin = useMemo(() => {
+    if (!Array.isArray(listings.items)) return null;
+    const journal = load(CLE_PRIX_LUS, null), histo = load('vinted_prix_historique', []) || [];
+    const sitesAff = PROFIL_VENDEUR.uid === (AUTH.user?.id || '') && Array.isArray(PROFIL_VENDEUR.plateformes) ? PROFIL_VENDEUR.plateformes : null;
+    const ext = (c) => (extSait(c) === 'ok' ? '' : 'ext:' + (EXT_CAPACITES[c] || ''));
+    const lignes = annBase.map((it) => {
+      const id = String(it.id), e = numeros[it.id] || {}, num = e.numero ? String(e.numero) : '';
+      const pv = plancherVente(fusionEntreeVente(e, null, buyByNum));
+      return { id, uid: String((it._acc && it._acc.vinted_user_id) || ''), compte: (it._acc && (it._acc.login || it._acc.username)) || '', numero: num, photo: photoArticle(it) || '',
+        prix: it.price, age: listedAgeDays(it), vues: Number.isFinite(it.views) ? it.views : null, favoris: Number.isFinite(it.favourites) ? it.favourites : null,
+        achat: prixAchatDe(e, buyByNum), plancherVente: pv && pv.plancher != null ? pv.plancher : null, mini: e.min != null && String(e.min).trim() !== '' ? e.min : null,
+        derniereBaisse: derniereBaisseLue(id, journal, histo),
+        surLbc: lbcAussi.has(id) ? true : (lbcPostedLu ? false : null),
+        surEbay: num ? (ebayNums.has(cleNum(num)) ? true : (ebayNumsLu ? false : null)) : null,
+        surVc: num ? (vcNumsAnn.has(cleNum(num)) ? true : (vcNumsLu ? false : null)) : null };
+    });
+    return planDuMatin(lignes, { bloque: { favoris: ext('favoris'), republier: ext('republierpage'), baisser: ext('baisseprix'), prix: ext('baisseprix') }, sites: sitesAff, maintenant: Date.now() });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annBase, listings.items, numeros, buyByNum, listingDates, lbcAussi, lbcPostedLu, ebayNums, ebayNumsLu, vcNumsAnn, vcNumsLu]);
+  useEffect(() => { if (planMatin) publierPlan(planMatin, { owner: AUTH.user?.id || '', lu: Array.isArray(listings.items) }); }, [planMatin, listings.items]);
   const lignesBc = useMemo(() => {
     if (!bcOuvert) return undefined;
     if (!Array.isArray(listings.items)) return null;
