@@ -282,33 +282,33 @@ const toucher = (pg, sel) => pg.evaluate((s) => { const e = document.querySelect
       await toucher(pg, '[data-gc-fermer]');
       const ferme2 = await attendre(pg, () => !document.querySelector('[data-gc]'), 4000);
       dit(ferme2 && await pg.evaluate(() => window.__marqueBanc === 1), `G5 « Fermer » ferme la feuille, même page (${ferme2})`);
-      // P4 bis : 10:00 ⇒ ouvert
-      await pg.clock.setFixedTime(new Date(T1000));
-      await pg.goto(`http://localhost:${PORT}/?tab=achats`, { waitUntil: 'domcontentloaded' });
-      await attendre(pg, (n) => document.querySelectorAll('[data-rp-point] [data-rp-colis]').length >= n, 45000, COLIS.length - 1);
-      await pg.waitForTimeout(800);
-      const pts2 = await pg.evaluate(releve);
+      // P4 bis : 10:00 ⇒ un contexte NEUF à l'heure fixée (l'horloge d'une page déjà ouverte ne se déplace pas sûrement).
+      dit(!erreurs.length, 'aucune erreur de page (9 h 10)', erreurs.slice(0, 3));
+      await ctx.close();
+      const o2 = await monter(nav, W, th, b, T1000);
+      const pg2 = o2.pg;
+      const pts2 = await pg2.evaluate(releve);
       const vg2 = pts2.find((p) => p.codes.includes('551234') || p.codes.includes('552345'));
-      if (!vg2) await pg.screenshot({ path: path.join(SHOTS, `p4-10h-${W}-${th}.png`) });
+      if (!vg2) await pg2.screenshot({ path: path.join(SHOTS, `p4-10h-${W}-${th}.png`) });
       dit(!!vg2 && vg2.ouverture === 'ouvert' && /ferme à 12 h/.test(vg2.horaires), `P4 10:00 ⇒ ouvert, ferme à 12 h (« ${vg2 && vg2.horaires} »)`, vg2 && vg2.horaires);
       // H1 — hors ligne
-      await ctx.setOffline(true);
-      await pg.waitForTimeout(400);
-      await toucher(pg, '[data-rp-code="551234"] [data-v2-en-grand], [data-rp-code="551234"] [data-rp-billet]');
+      await o2.ctx.setOffline(true);
+      await pg2.waitForTimeout(400);
+      await toucher(pg2, '[data-rp-code="551234"] [data-v2-en-grand], [data-rp-code="551234"] [data-rp-billet]');
       await attendre(pg, () => !!document.querySelector('[data-gc]'), 5000);
-      await pg.waitForTimeout(800);
-      g = await pg.evaluate(guichet);
+      await pg2.waitForTimeout(800);
+      g = await pg2.evaluate(guichet);
       dit(!!g && g.horsLigne === '1' && g.bandeHL && g.ici && g.ici.texteCode === '551234' && g.ici.qr && g.ici.qr.charge, `H1 hors ligne : la feuille le dit, le code et le QR lu sont là (${g && g.ici && g.ici.texteCode})`, g);
-      await pg.screenshot({ path: path.join(SHOTS, `hors-ligne-${W}-${th}.png`) });
-      await toucher(pg, '[data-gc-fermer]'); await pg.waitForTimeout(500);
-      await toucher(pg, '[data-rp-code="345678"] [data-v2-en-grand], [data-rp-code="345678"] [data-rp-billet]');
+      await pg2.screenshot({ path: path.join(SHOTS, `hors-ligne-${W}-${th}.png`) });
+      await toucher(pg2, '[data-gc-fermer]'); await pg2.waitForTimeout(500);
+      await toucher(pg2, '[data-rp-code="345678"] [data-v2-en-grand], [data-rp-code="345678"] [data-rp-billet]');
       await attendre(pg, () => !!document.querySelector('[data-gc]'), 5000);
-      await pg.waitForTimeout(1500);
-      g = await pg.evaluate(guichet);
+      await pg2.waitForTimeout(1500);
+      g = await pg2.evaluate(guichet);
       dit(!!g && g.ici && g.ici.texteCode === '345678' && (g.ici.qrKo || (g.ici.qr && (g.ici.qr.etat === 'reserve' || g.ici.qr.charge))), `H1 hors ligne, QR hébergé : la réserve, sinon « donne le code » — jamais une image cassée (${g && g.ici && (g.ici.qrKo ? 'dit' : g.ici.qr && g.ici.qr.etat)})`, g && g.ici);
-      await ctx.setOffline(false);
-      dit(!erreurs.length, 'aucune erreur de page', erreurs.slice(0, 3));
-      await ctx.close();
+      await o2.ctx.setOffline(false);
+      dit(!o2.erreurs.length, 'aucune erreur de page (10 h)', o2.erreurs.slice(0, 3));
+      await o2.ctx.close();
     }
   } catch (e) { dit(false, 'le banc a rencontré une erreur', String(e && e.stack || e)); }
   await nav.close(); srv.close();
