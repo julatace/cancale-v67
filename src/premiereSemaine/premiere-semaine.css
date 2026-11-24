@@ -1,0 +1,8 @@
+/* « Ta première semaine » (24 nov., lot debutant) — la phrase et le geste sous l'étape courante. Neutre : aucun ambre. */
+[data-premiere-semaine] .vrm-ps-geste { display: grid; gap: 10px; padding: 2px 0 6px; }
+[data-premiere-semaine] .vrm-ps-phrase { margin: 0; font-size: 15px; line-height: 1.4; color: var(--n-texte-2, inherit); }
+[data-premiere-semaine] .vrm-ps-exemple { display: flex; justify-content: center; padding: 4px 0 2px; }
+[data-premiere-semaine] .vrm-ps-exemple .n-bouton { min-height: 44px; }
+/* Annonces : la ligne qui explique le N° tant qu'aucune annonce n'en a (lot debutant). */
+.vrm-ann-debutant { margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--n-carte, var(--vrm-card, #fff)); box-shadow: 0 0 0 .5px var(--n-bord, rgba(0,0,0,.08)); }
+.vrm-ann-debutant > p { margin: 0 0 2px; font-size: 15px; line-height: 1.45; color: var(--n-encre, inherit); }

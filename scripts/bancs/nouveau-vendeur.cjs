@@ -227,7 +227,11 @@ const INSPECTE = (pg, tel) => pg.evaluate((tel) => {
     const r = e.getBoundingClientRect();
     if (r.bottom < 0 || r.top > innerHeight * 3) continue;
     if (e.tagName === 'A' && getComputedStyle(e).display === 'inline') continue; // lien dans une phrase
-    if (r.height < 43.5 || r.width < 43.5) petits.push(`${(e.innerText || e.getAttribute('aria-label') || e.tagName).trim().replace(/\s+/g, ' ').slice(0, 30)} ${Math.round(r.width)}×${Math.round(r.height)}` + (window.__bancSonde ? ' <' + e.outerHTML.slice(0, 220) + ' | parent ' + (e.parentElement && e.parentElement.className) + '>' : ''));
+    // (24 nov., lot debutant) La zone de toucher RÉELLE : un ::before / ::after posé en absolu qui déborde le bouton
+    // (`inset: -8px -4px`) reçoit le toucher du bouton — elle compte (Ventes : « Relier », « + prix »).
+    const zone = (el) => { const b = el.getBoundingClientRect(); let h = b.height, w = b.width; for (const ps of ['::before', '::after']) { const s = getComputedStyle(el, ps); if (s.content === 'none' || s.position !== 'absolute' || s.pointerEvents === 'none') continue; const px = (v) => (/px$/.test(v) ? parseFloat(v) : 0); const t = px(s.top), bo = px(s.bottom), l = px(s.left), ri = px(s.right); if (s.top !== 'auto' && s.bottom !== 'auto') h = Math.max(h, b.height - t - bo); if (s.left !== 'auto' && s.right !== 'auto') w = Math.max(w, b.width - l - ri); } return { height: h, width: w }; };
+    const z = zone(e);
+    if (z.height < 43.5 || z.width < 43.5) petits.push(`${(e.innerText || e.getAttribute('aria-label') || e.tagName).trim().replace(/\s+/g, ' ').slice(0, 30)} ${Math.round(r.width)}×${Math.round(r.height)}` + (window.__bancSonde ? ' <' + e.outerHTML.slice(0, 220) + ' | parent ' + (e.parentElement && e.parentElement.className) + '>' : ''));
   }
   // Une carte « écran vide » collée à ce qui suit (aucun espace entre les deux).
   const colles = [];

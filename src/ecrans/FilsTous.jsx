@@ -164,7 +164,9 @@ function useEbayTous() {
     if (!comptes.length) { setD({ items: [], messages: new Map(), aucun: true }); return; }
     const res = await Promise.all(comptes.map(async (c) => { const ref = c.ref || 'principal'; const { j } = await appelEbay({ action: 'messages', page: 1, ...corpsCompteEbay(ref) }); return { ref, j }; }));
     if (stop) return;
-    if (res.some((r) => !(r.j && r.j.ok && Array.isArray(r.j.messages)))) { setD(null); return; }
+    // (24 nov., lot debutant) Aucun compte eBay RELIÉ (seulement le principal sous-entendu, `implicite`) et la lecture refusée :
+    // ce n'est pas « eBay : pas pu lire » (une panne dite à un débutant qui n'a jamais eu eBay), c'est « aucun compte ».
+    if (res.some((r) => !(r.j && r.j.ok && Array.isArray(r.j.messages)))) { setD(comptes.every((c) => c && c.implicite) ? { items: [], messages: new Map(), aucun: true } : null); return; }
     const messages = new Map(), items = [];
     for (const { ref, j } of res) for (const m of j.messages) { items.push({ m, compte: ref }); messages.set(ref + ':' + m.id, { m, compte: ref }); }
     setD({ items, messages });

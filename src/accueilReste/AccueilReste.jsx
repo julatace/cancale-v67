@@ -23,6 +23,7 @@ import { appelVisible, CLE_APPEL, lireAppel, ecritureAppel, lienReservation } fr
 import { ONGLET_VERS_ECRAN, etapesVisite, visiteAuto, gesteUrgent, ECRANS_VISITE } from './visiteEcrans.js';
 import { CLE_NUMERO_ECRIT } from '../numeroEcrit.js';
 import VisiteBulles from '../VisiteBulles.jsx';
+import { semaineEnCours, CLE_PREMIERE_SEMAINE } from '../premiereSemaine/regle.js';
 import { lireImportDepart } from '../importDepart.js';
 import './accueil-reste.css';
 import { BoutonBase } from '../composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
@@ -96,6 +97,9 @@ export function VisiteEcranHote({ tab, z = 20000, arrivee = false }) {
     if (!ecran || enCours) return undefined;
     const ctx = { creeLe: OUTILS.creeLe(), exemple: OUTILS.exemple(), arrivee };
     if (!visiteAuto(aides, ecran, ctx)) return undefined;
+    // (24 nov., lot debutant) Pendant « Ta première semaine » (compte neuf, carte ni finie ni rangée), aucune bulle ne part
+    // seule : la carte d'Aujourd'hui porte LE geste ; la visite reste sur SON geste (« ? » → « Revoir la visite »).
+    if (semaineEnCours({ reglage: OUTILS.load(CLE_PREMIERE_SEMAINE, null), creeLe: OUTILS.creeLe(), exemple: OUTILS.exemple() })) return undefined;
     // Laisser l'écran se poser (ses données, ses boutons), puis revérifier : aucune
     // feuille, aucun geste urgent, au moins un bouton présent.
     const t = setTimeout(() => {
@@ -257,7 +261,8 @@ function ConseilJour({ c, onFermer }) {
 // `poolVide` : aucun N° donné ; `reprenable`, `porteurs` : les garde-fous de l'app ;
 // `uid` : le compte VRM ; `comptes` : les comptes Vinted lus ; `dressingLu` : une liste
 // d'annonces lue ; `onAller(geste)` : la navigation d'« À trancher » (tab, onglet, cible, vue).
-export function AccueilResteJournee({ apercu, poolVide, reprenable, porteurs, uid, comptes, dressingLu, onAller, exemple = false }) {
+// (24 nov., lot debutant) `debutant` : « Ta première semaine » est à l'écran ⇒ pas de conseil du jour en plus (une chose à la fois).
+export function AccueilResteJournee({ apercu, poolVide, reprenable, porteurs, uid, comptes, dressingLu, onAller, exemple = false, debutant = false }) {
   const [aides, ecrire] = useAides();
   const reglageEcrit = useCle(CLE_NUMERO_ECRIT, null);
   const colisAposter = useCle('vrm_colis_aposter', null);
@@ -289,7 +294,7 @@ export function AccueilResteJournee({ apercu, poolVide, reprenable, porteurs, ui
       {p.etat === 'question' ? <CarteCartons p={p} onRepondre={repondre} enCours={enCours} /> : null}
       {modeTrouve === 'liste' || modeTrouve === 'rien' ? <CarteTrouve r={r} mode={modeTrouve} onAller={aller} onNoter={() => ecrire((x) => noterTrouveVu(x))} /> : null}
       {!exemple ? <CarteEssai bilan={bilan} appel={appel} /> : null}
-      {c ? <ConseilJour c={c} onFermer={() => ecrire((x) => fermerConseil(x, jourLocal()))} /> : null}
+      {c && !debutant ? <ConseilJour c={c} onFermer={() => ecrire((x) => fermerConseil(x, jourLocal()))} /> : null}
     </div>
   );
 }

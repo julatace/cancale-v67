@@ -1071,7 +1071,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         {lecture && !aa.su && <div className="vrm-s2d-resume-l" data-stock-passu="">{tr('stock.annoncesLues')}{manqueTxt ? ` (${manqueTxt})` : ''}{tr('stock.rienPerduOuvre')} {NAV.dans}.</div>}
         {/* (9 nov., lot AI — Julien : « ça fait très moche ») UNE ligne courte (rangées · à ranger, et le
             signal de ce qui manque) ; la phrase d'avant, entière, dans sa pop-up. Ambre : un geste à faire. */}
-        {aa && aa.su && <InfoPop nom="stock-resume" titre={tr('stock.annoncesActuelles')} className="vrm-s2d-resume-l"
+        {/* (24 nov., lot debutant) Aucun compte relié : le bouton « Relier un compte » ci-dessus suffit (une action, pas trois phrases). */}
+        {aa && aa.su && !(comptesLus && Array.isArray(accounts) && accounts.length === 0) && <InfoPop nom="stock-resume" titre={tr('stock.annoncesActuelles')} className="vrm-s2d-resume-l"
           ton={nAConf > 0 || aa.manque.length > 0 || aa.vcVieille ? 'ambre' : 'neutre'}
           attrs={{ 'data-stock-resume-court': '' }}
           puces={nAffiche > 0
@@ -1363,7 +1364,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {blocHorsLigne}
     {blocResume}
     <StockExplication sneakers={motsStock.nom === 'paire'} />
-    {aa && aa.su && !aa.n && <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{aa.auMoins ? tr('stock.aucuneAnnonceLue2') : tr('stock.aucuneAnnonceLigne2')}</Card>}
+    {aa && aa.su && !aa.n && !(comptesLus && Array.isArray(accounts) && accounts.length === 0) && <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{aa.auMoins ? tr('stock.aucuneAnnonceLue2') : tr('stock.aucuneAnnonceLigne2')}</Card>}
   </>);
 
   // (5 nov.) Ce qui est sorti TOUT SEUL des meubles (colis parti) : dit, avec
