@@ -173,12 +173,12 @@ function cablage(parler) {
   dit(/<PlanDuMatin /.test(br) && /agirPlan\(l/.test(br) && /verdictPorte\(l, PORTE/.test(br), 'G4 l’écran Conseiller montre le plan, chaque toucher passe par agirPlan et la porte');
   dit(!/fetch\(|save\(|localStorage\.setItem/.test(sansCommentaires(lire('src/conseiller/PlanDorment.jsx')) + sansCommentaires(lire('src/conseiller/planGestes.js')) + sansCommentaires(lire('src/conseiller/planDorment.js'))), 'G5 rien n’est lu ni écrit par le plan ni par ses gestes');
   const pd = lire('src/conseiller/PlanDorment.jsx');
-  const cles = [...new Set([...pd.matchAll(/tr\('(cplan\.[\w.]+)'/g)].map((m) => m[1]).filter((k) => !k.endsWith('.')))];
-  const dyn = ['cplan.a.favoris', 'cplan.a.republier', 'cplan.a.prix', 'cplan.r.vues', 'cplan.r.favoris', 'cplan.r.sansFavoris'];
+  const cles = [...new Set([...pd.matchAll(/'(cplan\.[\w.]+)'/g)].map((m) => m[1]))];
+  const dyn = ['cplan.cpAFavoris', 'cplan.cpARepublier', 'cplan.cpAPrix', 'cplan.cpRVues', 'cplan.cpRFavoris', 'cplan.cpRSansFavoris'];
   for (const lg of ['fr', 'en', 'es', 'it', 'de']) {
     const t = lire(`src/i18n/langues/${lg}/conseiller.js`);
     const manque = [...cles, ...dyn].filter((k) => !t.includes(`"${k}"`));
-    dit(cles.length > 8 && !manque.length, `G6 ${lg} : toutes les phrases du plan (${cles.length + dyn.length})${manque.length ? ' — manque ' + manque.join(', ') : ''}`);
+    dit(cles.length > 20 && !manque.length, `G6 ${lg} : toutes les phrases du plan (${cles.length + dyn.length})${manque.length ? ' — manque ' + manque.join(', ') : ''}`);
   }
   dit(!/#(?:f[0-9a-f]{2}[0-9a-f]00|ff8|ffa|f97316|fb923c)/i.test(lire('src/conseiller/conseiller.css').split('(24 nov.) Plan du matin')[1] || 'x') && /\.n-plan-pied/.test(lire('src/conseiller/conseiller.css')), 'G7 aucun orange dans le style du plan');
   return ko;

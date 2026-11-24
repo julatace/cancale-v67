@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (24 nov., Julien : « paires qui dorment → plan ») docs/passation/2026-11-24-paires-dorment.md
+  { id: 'plan-dorment', date: '2026-11-24', titre: 'Le plan du matin des paires qui dorment', phrase: 'Une action par paire, sur tes chiffres, validée d’un toucher.', tab: 'conseiller', pour: 'tous', mode: 'tous' },
   // (23 nov., Julien : « un agent intégré dans l'app qui conseille ») docs/passation/2026-11-23-conseiller.md
   { id: 'demande-vrm', date: '2026-11-23', titre: 'Demande à VRM, avec ta clé Claude', phrase: 'Pose ta question : la réponse cite tes chiffres, toi tu décides.', tab: 'conseiller', pour: 'tous', mode: 'tous' },
   { id: 'conseiller', date: '2026-11-23', titre: 'Le Conseiller : tes conseils du jour', phrase: 'Chaque conseil chiffré, sa preuve, et un bouton pour agir.', tab: 'conseiller', pour: 'tous', mode: 'tous' },

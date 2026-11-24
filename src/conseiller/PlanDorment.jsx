@@ -10,28 +10,31 @@ import { tr, monnaie, nombre } from '../i18n/index.js';
 const eur = (v) => (v == null || !Number.isFinite(Number(v)) ? '—' : monnaie(Number(v), 'EUR'));
 const ICONE = { baisser: 'tag', favoris: 'heart', republier: 'sync', prix: 'pencil', lbc: 'shop', vestiaire: 'shop', ebay: 'shop' };
 const SITE = { lbc: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
+// Les clés écrites en entier (une clé lue par préfixe ou suffixe part au démarrage : audit-francais-differe).
+const CLE_ACTION = { favoris: 'cplan.cpAFavoris', republier: 'cplan.cpARepublier', prix: 'cplan.cpAPrix' };
+const CLE_RAISON = { vues: 'cplan.cpRVues', favoris: 'cplan.cpRFavoris', sansFavoris: 'cplan.cpRSansFavoris' };
 
 // Le verbe du bouton (≤ 4 mots).
 export function texteAction(a) {
   if (!a) return '';
-  if (a.k === 'baisser') return tr('cplan.aBaisser', { prix: eur(a.sugg) });
-  if (a.k === 'lbc' || a.k === 'vestiaire' || a.k === 'ebay') return tr('cplan.aAilleurs', { site: SITE[a.k] });
-  return tr('cplan.a.' + a.k);
+  if (a.k === 'baisser') return tr('cplan.cpABaisser', { prix: eur(a.sugg) });
+  if (a.k === 'lbc' || a.k === 'vestiaire' || a.k === 'ebay') return tr('cplan.cpAAilleurs', { site: SITE[a.k] });
+  return tr(CLE_ACTION[a.k] || 'cplan.cpARepublier');
 }
 // Pourquoi CETTE action (≤ 5 mots).
-const raison = (a) => tr('cplan.r.' + ((a && a.pourquoi) || 'vues'));
+const raison = (a) => tr(CLE_RAISON[(a && a.pourquoi) || 'vues'] || 'cplan.cpRVues');
 
 function LignePlan({ l, onAgir, verdict, Icon, Photo }) {
   const a = l.action || {};
   const v = verdict ? verdict(l) : { ok: true };
-  const bloque = a.bloque ? tr('cplan.bloqueExt') : (!v.ok ? (v.texte || tr('cplan.bloqueCompte')) : '');
+  const bloque = a.bloque ? tr('cplan.cpBloqueExt') : (!v.ok ? (v.texte || tr('cplan.cpBloqueCompte')) : '');
   const vues = l.vues == null ? '—' : nombre(l.vues), fav = l.favoris == null ? '—' : nombre(l.favoris);
   return (
     <Rangee
       vignette={<Vignette taille={56} image={Photo && l.photo ? <Photo src={l.photo} alt="" width={56} height={56} loading="lazy" decoding="async"/> : null} src={Photo ? '' : l.photo}/>}
       plaque={l.numero ? <Plaque numero={l.numero}/> : null}
-      titre={tr('cplan.depuis', { n: l.age, j: nombre(l.age) })}
-      sousTitre={tr('cplan.chiffres', { vues, fav, nv: l.vues || 0, nf: l.favoris || 0 }) + ' · ' + raison(a)}
+      titre={tr('cplan.cpDepuis', { n: l.age, j: nombre(l.age) })}
+      sousTitre={tr('cplan.cpChiffres', { vues, fav, nv: l.vues || 0, nf: l.favoris || 0 }) + ' · ' + raison(a)}
       lignes={1}
       attrs={{ 'data-plan-ligne': l.cle, 'data-plan-action': a.k, 'data-plan-sugg': a.sugg == null ? '' : String(a.sugg), 'data-plan-bloque': bloque ? '1' : '' }}
       pied={<div className="n-plan-pied">
@@ -48,21 +51,21 @@ export function PlanDuMatin({ plan, onAgir, verdict = null, Icon = null, Photo =
   if (!plan || typeof plan !== 'object') return null;
   const L = Array.isArray(plan.lignes) ? plan.lignes : [];
   const S = plan.seuils || {};
-  const phrase = plan.etat === 'peu' ? tr('cplan.peu', { n: S.n || 0, min: S.min || 0 })
-    : plan.etat !== 'su' ? tr('cplan.passu')
-    : L.length ? tr('cplan.sous', { n: L.length }) : tr('cplan.rien');
+  const phrase = plan.etat === 'peu' ? tr('cplan.cpPeu', { n: S.n || 0, min: S.min || 0 })
+    : plan.etat !== 'su' ? tr('cplan.cpPassu')
+    : L.length ? tr('cplan.cpSous', { n: L.length }) : tr('cplan.cpRien');
   return (
-    <Groupe titre={tr('cplan.entete')} attrs={{ 'data-cons-groupe': 'plan', 'data-plan-etat': plan.etat, 'data-plan-n': String(L.length), 'data-plan-seuils': JSON.stringify(S) }}
+    <Groupe titre={tr('cplan.cpEntete')} attrs={{ 'data-cons-groupe': 'plan', 'data-plan-etat': plan.etat, 'data-plan-n': String(L.length), 'data-plan-seuils': JSON.stringify(S) }}
       action={<BoutonIcone libelle={ouvert ? tr('cons.replier') : tr('cons.btnPq')} icone={Icon ? <Icon name="info" size={20}/> : null} actif={ouvert} onClick={() => setOuvert((x) => !x)}
         attrs={{ 'aria-expanded': ouvert ? 'true' : 'false', 'aria-controls': idPq, 'data-plan-pourquoi': '' }}/>}>
       <p className="n-plan-phrase">{phrase}</p>
       {ouvert ? <div className="n-cons-explication n-plan-explication" id={idPq} data-plan-explication="">
         <div className="n-cons-textes">
-          {plan.etat === 'su' ? <p>{tr('cplan.pq.seuil', { vues: nombre(S.vuesJour), fav: nombre(S.favorisJour), n: S.n })}</p> : null}
-          <p>{tr('cplan.pq.age')}</p>
-          <p>{tr('cplan.pq.actions')}</p>
-          {plan.passu > 0 ? <p>{tr('cplan.pq.passu', { n: plan.passu })}</p> : null}
-          <p>{tr('cplan.pq.effet')}</p>
+          {plan.etat === 'su' ? <p>{tr('cplan.cpPqSeuil', { vues: nombre(S.vuesJour), fav: nombre(S.favorisJour), n: S.n })}</p> : null}
+          <p>{tr('cplan.cpPqAge')}</p>
+          <p>{tr('cplan.cpPqActions')}</p>
+          {plan.passu > 0 ? <p>{tr('cplan.cpPqPassu', { n: plan.passu })}</p> : null}
+          <p>{tr('cplan.cpPqEffet')}</p>
         </div>
       </div> : null}
       {L.map((l) => <LignePlan key={l.cle} l={l} onAgir={onAgir} verdict={verdict} Icon={Icon} Photo={Photo}/>)}
