@@ -90,6 +90,22 @@ Avant : « Vinted a changé sa page (élément « message-envoyer » introuvable
 Les phrases de la republication et du brouillon (`PHRASE_SELECTEUR`, `PHRASE_PAS_PRETE`) portent le même geste à la fin.
 Leboncoin et Vestiaire gardaient déjà des phrases simples avec leur geste (« refais ce geste une fois à la main ») : inchangées.
 
+## 3 bis. « L'extension doit être intelligente » (demandes du coordinateur, même lot 5.448.0)
+
+Mesuré d'abord (vraie base, lecture seule) : 22 lignes `ext_appareil_*` ; sur les 48 dernières heures, ses navigateurs
+tournaient sur **5.409.0, 5.410.1, 5.410.7, 5.410.8, 5.418.0, 5.436.0, 5.438.0, 5.439.0, 5.440.0** (Chrome · Mac surtout,
+un Orion · Mac en 5.409, un Chrome · Linux en 5.440). Les noms d'appareils ne sont pas rangés (`nav` · `systeme` seulement).
+
+| demande | ce qui est livré | fonction | preuve |
+|---|---|---|---|
+| (1) se rattraper seule | Leboncoin : session pas dite, canal muet, conversation pas chargée, compte pas su ⇒ l'onglet de travail est **rechargé UNE fois** et le même ordre repart ; Vestiaire : la même réponse « pas prête » ⇒ 2 s puis UN nouvel essai (son onglet n'est jamais rechargé). Seulement quand la page a dit « rien n'est parti » (aucun clic, rien tapé) ; un clic final « pas vu » n'est JAMAIS rejoué. Vinted avait déjà ses nouveaux essais et sa navigation vers la bonne page (`etapeFormulaire`, `GESTES_INTERFACE`). | `repriseSeule`, `rechargerOnglet` | audit R1–R4 |
+| (2) forme changée | Vinted l'avait (`formeDouteuse` : rien rangé, forme gardée, « Vinted a changé… »). Vestiaire (`inconnu`) et Leboncoin (« Mes annonces » de forme inconnue : `lbc_forme_inconnue_mes_annonces`, `vrmLbcForme`) le disent maintenant aussi : ligne de santé « X a changé … : VRM attend la correction » + une notification, une fois. | `santeSites`, `majSanteSites` | audit S5 |
+| (3) reprise après interruption | **pas de nouveau code** : les mécanismes existants sont ceux qu'il faut — messages aux favoris : jeton du serveur, chaque favori une fois, attente reprise par un worker neuf (`reprendreMessagesFavoris`) ; republication : `reprendreRepub` / verrou de recréation ; Vestiaire et Leboncoin « intéressés » : `reprendreOffresAimesVc`, `reprendreInteressesLbc`. Un geste « incertain » n'est jamais rejoué (la règle `issueUiLbc`, inchangée). | — | audits existants (`audit-favoris-auto`, `audit-comme-bleam`…) verts |
+| (4) santé par site | une ligne par site : « Vinted : tout marche. » / « … ne marche plus … Geste : … » (ambre) / rien si jamais vu ici ; en tête du grand panneau de la carte, et dans la carte Leboncoin ; chaque NOUVEAU problème dit une fois par une notification de l'ordinateur ; aussi dans l'état rendu à l'app (`sitesSante`). | `santeSites` | audit S1–S5, banc `sante-sites-carte` (13 verts ; rouge sur main) |
+| (5) version dépassée | « Tout va bien ? » de l'app nommait DÉJÀ chaque navigateur et sa version, avec « Installer la X » (`fiab.ext.appareil`, `garde-capture.js`) — inchangé. Nouveau côté extension : `vrm.center/extension-version.json` porte `regles` (geste → version où sa règle a changé ; aujourd'hui `vinted:supprimer` → 5.448.0). Une extension ≥ 5.448 devenue dépassée **lit toujours** mais ne fait pas un geste dont la règle a changé : rien ne part, la phrase dit sa version, celle à installer et LE geste. La carte disait déjà « Version X disponible · Mettre à jour » (`majHtml`). ⚠️ Les versions d'AVANT la 5.448 ne lisent pas `regles` : elles ne se protègent pas (impossible sans les mettre à jour). | `regleDepassee` | audit V0–V4 |
+| (6) contrôle au démarrage | 20 s après le démarrage ou une mise à jour : chaque onglet Vinted / Leboncoin / Vestiaire / eBay est sondé (DOM du monde isolé, aucune requête) ; scripts de VRM absents ⇒ rechargé UNE fois s'il est en fond et n'est pas un formulaire ou une messagerie ; sinon « recharge cet onglet » (ligne de santé + notification). | `autoControleOnglets` | audit A1–A4 |
+| (7) rapport | « Envoyer un rapport » porte le journal de repérage (40) et les 20 derniers arrêts (site, geste, code) — étiquettes seulement (`etiquetteRapport`), jamais un texte de page ni un pseudo ; le serveur (`api/_lib/rapport-extension.js`) les garde par la même liste blanche. | `noterArret` | audit T |
+
 ## 4. Ce qui n'a PAS changé (§3)
 Compte de l'onglet, 50 actions/h avec réserve 5, 15/h favoris, une action à la fois, pause 429/403, arrêt sur une
 vérification visible, `vintedPage` GET seulement (aucune écriture fabriquée par VRM). **Refusé et pas fait** : vrais clics
