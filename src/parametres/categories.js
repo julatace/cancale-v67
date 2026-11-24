@@ -66,7 +66,7 @@ export const CATEGORIES = [
     { id: 'etat', items: ['toutvabien', 'sante', 'statut', 'depannage'] },
     { id: 'aide', titre: 'reglages.groupe.aide', items: ['centre-aide', 'support', 'signaler', 'mes-signalements', 'quoi-de-neuf'] },
     { id: 'revoir', titre: 'parametres.g.revoir', items: ['bien-demarrer', 'visite', 'bilan-minute', 'premier-colis', 'aides-accueil', 'conseils', 'conseils-revoir'] },
-    { id: 'proprietaire', titre: 'parametres.g.proprietaire', items: ['pilotage', 'nouveaux-comptes', 'paiements', 'signalements', 'demandes-aide', 'simulation-compte'] },
+    { id: 'proprietaire', titre: 'parametres.g.proprietaire', items: ['pilotage', 'nouveaux-comptes', 'paiements', 'signalements', 'demandes-aide', 'simulation-compte', 'galerie-pops'] },
   ] },
   // « Sécurité des données » : le panneau expert (§5, vocabulaire technique assumé) TEL QUEL,
   // et ce qui touche aux données elles-mêmes (sauvegarde, retour en arrière, corbeille, confidentialité).
