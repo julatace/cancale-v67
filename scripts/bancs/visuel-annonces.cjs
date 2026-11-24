@@ -180,10 +180,13 @@ async function cas(nav, nom, opts, theme) {
   dit(m.cibles.length === 0, `T cibles ≥ 44 px`, m.cibles.slice(0, 6));
   await pg.screenshot({ path: path.join(SHOTS, `${nom}-${theme}.png`) });
   // F : le défilement — 95e centile du temps d'image.
+  const clsAvant = await pg.evaluate(() => window.__cls);
   const f = await pg.evaluate(async () => { const d = []; let der = performance.now(); const fin = der + 2500; const el = document.scrollingElement; await new Promise((ok) => { const pas = () => { const t = performance.now(); d.push(t - der); der = t; el.scrollTop += 45; if (t < fin) requestAnimationFrame(pas); else ok(); }; requestAnimationFrame(pas); });
     d.shift(); d.sort((a, b) => a - b); return { p95: Math.round(d[Math.floor(d.length * 0.95)] * 10) / 10, n: d.length, y: el.scrollTop }; });
   await pg.waitForTimeout(150);
   const m2 = await pg.evaluate(MESURE);
+  const clsDefile = (await pg.evaluate(() => window.__cls)) - clsAvant;
+  dit(clsDefile <= 0.02, `L CLS pendant le défilement (rangées montées et démontées) : ${clsDefile.toFixed(4)} (≤ 0,02)`);
   // Rapporté, jamais jugé seul : la machine du banc est partagée (charge mesurée à côté) ; la virtualisation, elle, est jugée.
   console.log(`  ℹ️  F charge de la machine ${require('os').loadavg()[0].toFixed(1)} sur ${require('os').cpus().length} cœurs`);
   dit(f.n > 0, `F défilement ${f.y} px : 95e centile du temps d'image ${f.p95} ms (${f.n} images)`, f);
