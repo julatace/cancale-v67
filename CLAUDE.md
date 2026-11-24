@@ -398,6 +398,7 @@ Vinted est un **objet** `{amount}` ; les données vivent sous `data.payload`).
    (`_porte-banc.cjs`) sur le playwright du chemin absolu ; un banc rouge en masse ⇒
    regarder d'abord la capture (écran de connexion ?) et `df -h /` (disque plein).
 
+⚠️ **CI (24 nov.)** : les bancs d'une part tournent 3 à la fois (`BANCS_PARALLELE`, chacun son port et son navigateur) ; un banc long se coupe en morceaux de SA variable (`ventes-e2@SCENARIOS=jeu,exclu`, `accessibilite@BANC_LARGEUR=390`, `budget-vitesse@ECRANS=…`) ; avant de toucher un workflow, `python3 -I scripts/ci-controles.py --diff origin/main` doit dire « identiques » (rien de retiré, rien de rendu non bloquant). Récit : `docs/passation/2026-11-24-ci-rapide.md`.
 ⚠️⚠️ **Plusieurs sessions mergent sur `main` en même temps** : amener `main` par un
 **vrai `git merge origin/main`**, jamais `-s ours` ; après, `git diff origin/main --stat`
 ne montre que ses fichiers. **Commiter AVANT toute manipulation de branche.** Une
@@ -488,6 +489,8 @@ sans la fonction.
 - **24 nov. · Agir si connecté (`claude/agir-si-connecte`)** : répondre (3 sites), offres Vinted, republier depuis VRM ; chaque bouton d'action passe par `peutAgir` ; badge « Lecture seule ». `2026-11-24-agir-si-connecte.md`. Geste : aucun.
 - **24 nov. · Connexions de l'extension (`claude/connexions-extension`)** : Paramètres → « Connexions de l'extension » : chaque navigateur (nom, version « à jour » ou « 5.418 → 5.440 », vu quand, comptes lus, dernier problème + son geste), chaque compte (lu par qui, quand, jauge 50/h), vieilles installations repliées ; une ligne sur Aujourd'hui seulement si un geste attend ; champs 5.448 (`sante`, `arret`, `servie`) lus présents, sinon « — ». `2026-11-24-connexions-extension.md`. Geste : aucun.
 - **24 nov. · Simulations de bout en bout (`claude/ext-simulations`, ext. 5.449.0)** : la vraie extension chargée contre des sites simulés aux formes mesurées (`scripts/bancs/sim-extension.cjs`) ; suivi des achats : l'expédition d'une commande à sa forme réelle (sans point) n'est plus « inattendue », le transporteur est rangé (`audit-suivi-escrow-forme`). `2026-11-24-simulations-extension.md`. Geste : aucun.
+- **24 nov. · CI ≈ 222 → ≈ 121 min-machine par PR, job le plus long 68 → 17 min (`claude/ci-rapide`)** : mêmes contrôles (`python3 -I scripts/ci-controles.py --diff origin/main`), bancs 3 à la fois (`BANCS_PARALLELE`), ventes-e2, accessibilite et budget-vitesse en morceaux, parts rééquilibrées, `dist/` partagé pour les écrans ; la part 2/3 (annulée à 45 min à chaque PR) finit. `2026-11-24-ci-rapide.md`. Geste : aucun.
+- **24 nov. · Morceaux périmés (`claude/morceaux-perimes`)** : la page ouverte pendant une mise en ligne ne repart plus — elle fait ranger les fichiers de SA version au repos (`src/reserveMorceaux.js`), le ménage du service worker garde ceux d'une page ouverte ; un écran introuvable recharge SUR cet écran, jamais pendant une saisie ou une feuille (sinon page cachée) ; un 404 /assets/ de la prod porte `immutable`. Banc `morceaux-perimes`, audit. `2026-11-24-morceaux-perimes.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
