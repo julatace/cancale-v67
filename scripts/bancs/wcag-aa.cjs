@@ -173,7 +173,9 @@ async function saboter(pg) {
   if (MUT === 'noms') await pg.addStyleTag({ content: ':root:root:root:root:root:root:root:root body .vrm-plus-groupe .vrm-ui-ligne{content-visibility:auto!important}' });
   if (MUT === 'libelle') await pg.evaluate(() => { for (const b of document.querySelectorAll('button.vg-fil')) b.setAttribute('aria-label', 'Ouvrir le fil ' + (b.querySelector('b') || b).textContent); });
   if (MUT === 'filnom') await pg.addStyleTag({ content: ':root:root:root:root:root:root body .vg-fil{content-visibility:auto!important}' });
-  if (MUT === 'anneau') await pg.addStyleTag({ content: '@layer banc{:focus-visible{outline-color:rgba(127,127,127,.35)!important}}' });
+  // Anneau pâle (≈ 1,5:1 sur clair comme sur sombre), quelle que soit sa forme (contour ou ombre). Posé EN LIGNE au focus :
+  // l'anneau de l'app est un !important dans une @layer, qu'aucune feuille ajoutée après ne bat (une style en ligne, si).
+  if (MUT === 'anneau') await pg.evaluate(() => document.addEventListener('focusin', (e) => { const t = e.target; if (!t || !t.style) return; t.style.setProperty('outline-color', 'rgba(127,127,127,.35)', 'important'); t.style.setProperty('box-shadow', '0 0 0 2px rgba(127,127,127,.35)', 'important'); }, true));
 }
 
 async function axe(pg, racine) {
@@ -197,6 +199,8 @@ async function anneaux(pg, n = 40) {
     await pg.keyboard.press('Tab'); await pg.waitForTimeout(40);
     const info = await pg.evaluate(() => {
       const e = document.activeElement; if (!e || e === document.body) return null;
+      // un conteneur focalisé PAR L'APP (tabindex=-1 : feuille, bilan) n'est pas un arrêt de Tab ⇒ pas compté
+      if (e.tabIndex < 0) return { horsVue: true };
       const r = e.getBoundingClientRect(); if (r.width < 2 || r.height < 2 || r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) return { horsVue: true };
       const cs = getComputedStyle(e);
       const parse = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
@@ -215,21 +219,25 @@ async function anneaux(pg, n = 40) {
     if (!info || info.horsVue) continue;
     // Le fond SOUS l'anneau : l'anneau rendu transparent, la bande juste à l'extérieur de l'élément (pixels).
     if (info.couleur) {
-      await pg.addStyleTag({ content: '[data-banc-focus]{outline-color:transparent!important;box-shadow:none!important}' }).then((h) => pg.evaluate((h) => { h.id = 'banc-sans-anneau'; }, h));
-      const buf = await pg.screenshot({ clip: { x: Math.max(0, info.x - 8), y: Math.max(0, info.y - 8), width: Math.min(info.w + 16, 1512), height: Math.min(info.h + 16, 950) } }).catch(() => null);
-      await pg.evaluate(() => { const s = document.getElementById('banc-sans-anneau'); if (s) s.remove(); });
-      if (buf) info.fond = await pg.evaluate(async ({ b64, ext }) => {
+      // Effacé EN LIGNE (l'anneau de l'app est un !important dans une @layer : une feuille ajoutée ne le bat pas).
+      await pg.evaluate(() => { const e = document.querySelector('[data-banc-focus]'); if (!e) return; e.dataset.bancAvant = e.getAttribute('style') || ''; e.style.setProperty('outline-color', 'transparent', 'important'); e.style.setProperty('box-shadow', 'none', 'important'); });
+      // Le cadre de capture borné à la fenêtre ; la couronne de 1 à 5 px mesurée HORS de la boîte, côtés visibles seulement.
+      const VW = pg.viewportSize().width, VH = pg.viewportSize().height;
+      const x0 = Math.max(0, Math.floor(info.x - 8)), y0 = Math.max(0, Math.floor(info.y - 8)), x1 = Math.min(VW, Math.ceil(info.x + info.w + 8)), y1 = Math.min(VH, Math.ceil(info.y + info.h + 8));
+      const buf = x1 - x0 >= 2 && y1 - y0 >= 2 ? await pg.screenshot({ clip: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } }).catch(() => null) : null;
+      await pg.evaluate(() => { const e = document.querySelector('[data-banc-focus]'); if (!e) return; const a = e.dataset.bancAvant; if (a) e.setAttribute('style', a); else e.removeAttribute('style'); delete e.dataset.bancAvant; });
+      if (buf) info.fond = await pg.evaluate(async ({ b64, l, t, r, b }) => {
         const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
         const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0);
         const d = x.getImageData(0, 0, c.width, c.height).data, px = [];
         // la couronne de 2 à 5 px autour de la boîte (là où l'anneau se dessine)
         for (let yy = 0; yy < c.height; yy++) for (let xx = 0; xx < c.width; xx++) {
-          const dx = Math.max(ext - xx, xx - (c.width - 1 - ext), 0), dy = Math.max(ext - yy, yy - (c.height - 1 - ext), 0), dist = Math.max(dx, dy);
+          const dist = Math.max(l - xx, xx - r, t - yy, yy - b);
           if (dist >= 1 && dist <= 5) { const i = (yy * c.width + xx) * 4; px.push([d[i], d[i + 1], d[i + 2]]); }
         }
         const lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
         px.sort((a, b) => lum(a) - lum(b)); return px.length ? px[Math.floor(px.length / 2)] : null;
-      }, { b64: buf.toString('base64'), ext: Math.min(8, info.x, info.y) });
+      }, { b64: buf.toString('base64'), l: info.x - x0, t: info.y - y0, r: info.x + info.w - x0, b: info.y + info.h - y0 });
     }
     await pg.evaluate(() => { const e = document.querySelector('[data-banc-focus]'); if (e) e.removeAttribute('data-banc-focus'); });
     out.push(info);
