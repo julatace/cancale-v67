@@ -31530,15 +31530,17 @@ function identNumeroEcritLbc(items, siens) {
 }
 // Lit ses annonces et ses comptes, calcule, publie (src/lbcNumeroEcrit.js). Une lecture ratée ⇒ rien publié
 // (aucun lien par le N° écrit, jamais « rien d'écrit »). Un changement prévient les lecteurs des liens.
-let _numEcritEnVol = null, _numEcritAt = 0, _numEcritEssai = 0, _numEcritEcoute = false, _numEcritEmet = false;
+let _numEcritEnVol = null, _numEcritAt = 0, _numEcritEssai = 0, _numEcritEcoute = false, _numEcritEmet = false, _numEcritMinuteur = null;
+// Ses comptes prouvés, gardés 5 min (une sauvegarde de fiche ne relit pas la base) ; une capture Leboncoin les périme.
+let _numEcritSiens = null;
 function chargerNumerosEcritsLbc(force = false) {
   if (!isCloudReady() || !AUTH.user?.id) return Promise.resolve(null);
   if (!_numEcritEcoute) {
     _numEcritEcoute = true;
     try {
-      const relance = () => { _numEcritAt = 0; setTimeout(() => chargerNumerosEcritsLbc(true), 80); };
+      const relance = () => { _numEcritAt = 0; clearTimeout(_numEcritMinuteur); _numEcritMinuteur = setTimeout(() => chargerNumerosEcritsLbc(true), 120); };
       window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (_numEcritEmet) return; if (['vrm_lbc_liens', 'vinted_annonce_numeros', 'vrm_fiches_neuves', 'vrm_articles_sites', CLE_LIAISON, CLE_FUSIONS].includes(k)) relance(); });
-      window.addEventListener('vrm:ext', (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'lbc') relance(); });
+      window.addEventListener('vrm:ext', (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'lbc') { _numEcritSiens = null; relance(); } });
     } catch (_) {}
   }
   if (_numEcritEnVol) return _numEcritEnVol;
@@ -31546,11 +31548,13 @@ function chargerNumerosEcritsLbc(force = false) {
   const qui = AUTH.user.id;
   _numEcritEssai = Date.now();
   const p = (async () => {
+    const garde = _numEcritSiens && _numEcritSiens.qui === qui && Date.now() - _numEcritSiens.t < 300000 ? _numEcritSiens : null;
     const [ls, ra, rv] = await Promise.all([lbcListingsSession(),
-      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=accounts:data->accounts`).catch(() => null),
-      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`).catch(() => null)]);
-    if (!ls || !ls.items || !Array.isArray(ra) || !Array.isArray(rv) || AUTH.user?.id !== qui) return null;
-    const siens = new Set([...comptesLbcSession((ra[0] && ra[0].accounts) || {}), ...comptesLbcProuves((rv[0] && rv[0].ventes) || {}, ls.items)].map(idCompteLbcApp));
+      garde ? null : lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=accounts:data->accounts`).catch(() => null),
+      garde ? null : lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`).catch(() => null)]);
+    if (!ls || !ls.items || (!garde && (!Array.isArray(ra) || !Array.isArray(rv))) || AUTH.user?.id !== qui) return null;
+    const siens = garde ? garde.siens : new Set([...comptesLbcSession((ra[0] && ra[0].accounts) || {}), ...comptesLbcProuves((rv[0] && rv[0].ventes) || {}, ls.items)].map(idCompteLbcApp));
+    if (!garde) _numEcritSiens = { qui, t: Date.now(), siens };
     const ident = identNumeroEcritLbc(ls.items, siens);
     if (!ident.lu) return null;
     _numEcritAt = Date.now();
