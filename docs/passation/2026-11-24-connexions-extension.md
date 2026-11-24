@@ -84,11 +84,20 @@ et rien ne dit qu'un onglet Vinted était ouvert ailleurs à ce moment. Pas de n
   dont un pas relu depuis 24 h, Leboncoin). `--prouve` : **9 mutations, 9 rouges** (`passu-ok`, `sante-ok`, `doublon`,
   `anciens`, `alerte-absent`, `select-data`, `arret-brut`, `connecte-vieux`, `jamais-frais`). Sur origin/main : le module n'existe pas.
 - `scripts/bancs/connexions-extension.cjs` : la page rendue à 390 tactile et 1512, clair et sombre, puis Aujourd'hui (la
-  ligne et « Voir »), Paramètres (l'entrée), et « tout va bien ⇒ aucune ligne ». Voir l'ÉTAT ci-dessous pour les chiffres.
+  ligne et « Voir »), Paramètres (l'entrée), et « tout va bien ⇒ aucune ligne » : **70 verts, 0 rouge** (dont « aucun texte
+  visible de plus de 8 mots », « aucun texte ambre », cibles ≥ 44 px, aucun débordement). `--prouve` (mutations du BUILD) :
+  `version-ok` rouge (10), `sante-ok` rouge (8). Captures regardées (390 clair/sombre, 1512 clair/sombre, Aujourd'hui).
+  Sur origin/main : l'onglet `connexions` n'existe pas (absent d'`ONGLETS_LIENS`) ⇒ la page ne se monte pas, le banc
+  rougit à son premier contrôle (pas relancé sur un build de main : machine saturée, charge 37).
+- `textes-visibles` (ECRANS=connexions,journee) : 4 verts, plafonds `connexions@390/1512` posés à 0.
 - Audits voisins : `traduction` 45 verts, `coherence` vert, `quoi-de-neuf` vert, `icones` vert, `fonctions-api` vert.
 
 ## ÉTAT À LA REPRISE
 
-Voir la fin de ce fichier (complétée après le banc).
+- PR #1357 (base main), à fusionner APRÈS #1326 (style-clair, d'où part la branche) et #1342 (appareils-connectes ;
+  sa carte « Navigateurs avec l'extension VRM » dans Sécurité reste : elle sert « Se déconnecter partout », celle-ci
+  sert le diagnostic). Pas fusionnée.
+- Quand la 5.448 arrive sur main : `santesites: '5.448.0'` dans `EXT_CAPACITES` (voir plus haut).
+- Pas fait : la notification « navigateur plus vu » (raison plus haut) ; la jauge PAR navigateur (aucune identité commune).
 
 Geste de Julien : aucun (la page lit ce que ses extensions publient déjà ; les champs 5.448 s'allumeront seuls avec la 5.448).
