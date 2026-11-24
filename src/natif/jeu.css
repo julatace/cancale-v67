@@ -1,0 +1,72 @@
+/* ── src/natif/jeu.css — le langage « jeu vidéo » (24 nov., src/natif/Jeu.jsx) ───────────────────────────────────────────
+   Vivant, pas criard : les couleurs de l'app (ardoise, vert « fait », argent), un papier neutre pour l'étiquette du N°
+   (saturation ≤ 15 % : jamais orange, ni de jour ni de nuit), des ressorts courts. `prefers-reduced-motion` ⇒ rien ne bouge. */
+@layer vrm-natif {
+  :root {
+    /* Un ressort (raideur 300, amortissement 22 : 7 % de dépassement, 600 ms) et un plus vif pour un tampon (17 %). */
+    --n-jeu-ressort: cubic-bezier(.34, 1.36, .5, 1);
+    --n-jeu-tampon: cubic-bezier(.3, 1.7, .5, 1);
+    --n-jeu-c1: #3D4B5B; --n-jeu-c2: #17744A; --n-jeu-c3: #AEB4BE; --n-jeu-c4: #FFFFFF;
+    --n-jeu-papier: #F3F1EC; --n-jeu-papier-encre: #26272B; --n-jeu-papier-bord: rgb(38 39 43 / .16);
+    --n-jeu-medaille: #FFFFFF; --n-jeu-medaille-encre: #3D4B5B;
+  }
+  @supports (animation-timing-function: linear(0, 1)) {
+    :root {
+      --n-jeu-ressort: linear(0, 0.059, 0.197, 0.371, 0.548, 0.707, 0.839, 0.938, 1.007, 1.049, 1.07, 1.076, 1.071, 1.06, 1.047, 1.034, 1.022, 1.012, 1.004, 0.999, 0.996, 0.995, 0.994, 0.995, 0.995, 0.996, 0.998, 0.998, 0.999, 1);
+      --n-jeu-tampon: linear(0, 0.07, 0.241, 0.456, 0.674, 0.864, 1.01, 1.107, 1.159, 1.173, 1.159, 1.129, 1.092, 1.054, 1.022, 0.997, 0.981, 0.972, 0.97, 0.973, 0.978, 0.985, 0.991, 0.997, 1.001, 1.003, 1.002, 1.001, 1);
+    }
+  }
+  :root[data-theme="dark"] { --n-jeu-c1: #C9D2DE; --n-jeu-c2: #7BE8BE; --n-jeu-c3: #8A8A94; --n-jeu-c4: #FFFFFF; --n-jeu-medaille: #3A3A41; --n-jeu-medaille-encre: #F4F4F5; }
+
+  /* ── L'étiquette du N° : un papier à œillet, le numéro à l'encre, tabulaire. ── */
+  .n-etiq { display: inline-flex; align-items: baseline; gap: 2px; padding: 2px 7px 2px 13px; border-radius: 4px 6px 6px 4px; position: relative;
+    background: var(--n-jeu-papier); color: var(--n-jeu-papier-encre); box-shadow: inset 0 0 0 1px var(--n-jeu-papier-bord), 0 1px 2px rgb(0 0 0 / .18);
+    font: 700 13px/16px var(--n-police); font-variant-numeric: tabular-nums; letter-spacing: -.01em; white-space: nowrap;
+    clip-path: polygon(6px 0, 100% 0, 100% 100%, 6px 100%, 0 50%); }
+  .n-etiq-trou { position: absolute; left: 5px; top: 50%; width: 4px; height: 4px; margin-top: -2px; border-radius: 50%; background: rgb(38 39 43 / .28); }
+  .n-etiq-pre { font-size: 10px; font-weight: 600; opacity: .72; }
+
+  /* ── La tuile d'une paire : photo carrée, coins doux, l'étiquette posée en bas à gauche, le médaillon en haut à droite. ── */
+  .n-tuile-paire { position: relative; display: inline-grid; flex: 0 0 auto; width: var(--n-tuile-t, 72px); height: var(--n-tuile-t, 72px); border-radius: 14px; isolation: isolate; }
+  .n-tuile-paire[data-n-tuile="m"] { --n-tuile-t: 56px; border-radius: 12px; }
+  .n-tuile-paire[data-n-tuile="xl"] { --n-tuile-t: 96px; border-radius: 16px; }
+  .n-tuile-img, .n-tuile-vide { grid-area: 1 / 1; width: 100%; height: 100%; border-radius: inherit; }
+  .n-tuile-img { object-fit: cover; background: var(--n-carte-2); box-shadow: inset 0 0 0 1px var(--n-trait); -webkit-user-drag: none; user-select: none; }
+  .n-tuile-vide { display: grid; place-items: center; color: var(--n-accent);
+    background: linear-gradient(150deg, color-mix(in srgb, var(--n-carte) 70%, var(--n-teinte)) 0%, var(--n-carte-2) 100%); box-shadow: inset 0 0 0 1px var(--n-trait); }
+  .n-tuile-paire[data-n-tuile-genre="vente"] .n-tuile-vide { color: var(--n-vert); background: linear-gradient(150deg, var(--n-vert-fond), var(--n-carte-2)); }
+  .n-tuile-badge { position: absolute; top: -6px; right: -6px; z-index: 2; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%;
+    background: var(--n-jeu-medaille); color: var(--n-jeu-medaille-encre); box-shadow: 0 0 0 2px var(--n-carte), 0 2px 6px rgb(0 0 0 / .18); }
+  .n-tuile-paire[data-n-tuile-genre="vente"] .n-tuile-badge { background: var(--n-vert); color: #FFFFFF; }
+  :root[data-theme="dark"] .n-tuile-paire[data-n-tuile-genre="vente"] .n-tuile-badge { color: #0B2A1D; }
+  .n-tuile-paire > .n-etiq { position: absolute; left: -4px; bottom: 6px; z-index: 2; transform: rotate(-4deg); transform-origin: left center; }
+  .n-tuile-paire[data-n-tuile="m"] > .n-etiq { font-size: 11px; line-height: 14px; bottom: 4px; }
+
+  /* ── Les confettis : partis du centre, ils s'envolent et retombent, 1 s. ── */
+  .n-confettis { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; z-index: 3; }
+  .n-confettis > i { position: absolute; left: -3px; top: -4px; width: 6px; height: 9px; border-radius: 1.5px; background: var(--c); opacity: 0;
+    box-shadow: 0 0 0 .5px rgb(0 0 0 / .12); animation: n-jeu-eclat var(--d, 1100ms) cubic-bezier(.2, .7, .3, 1) var(--t, 0ms) forwards; }
+  .n-confettis > i[data-f="1"] { width: 5px; height: 5px; border-radius: 50%; }
+  .n-confettis > i[data-f="2"] { width: 3px; height: 11px; }
+  @keyframes n-jeu-eclat {
+    0% { opacity: 0; transform: translate(0, 0) rotate(0) scale(.4); }
+    12% { opacity: 1; }
+    60% { opacity: 1; transform: translate(var(--x), var(--y)) rotate(calc(var(--r) * .7)) scale(1); }
+    100% { opacity: 0; transform: translate(calc(var(--x) * 1.08), calc(var(--y) + 34px)) rotate(var(--r)) scale(.9); }
+  }
+
+  /* ── L'anneau ── */
+  .n-anneau { position: relative; display: inline-grid; place-items: center; flex: 0 0 auto; }
+  .n-anneau > svg { grid-area: 1 / 1; overflow: visible; }
+  .n-anneau-fond { stroke: var(--n-carte-2); }
+  .n-anneau[data-n-anneau-su="0"] .n-anneau-fond { stroke: var(--n-bord); }
+  .n-anneau-plein { stroke: var(--n-accent); transition: stroke-dashoffset 700ms var(--n-jeu-ressort); }
+  .n-anneau[data-n-anneau-fait] .n-anneau-plein { stroke: var(--n-vert); }
+  .n-anneau-centre { grid-area: 1 / 1; font: 700 15px/1 var(--n-police); font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  .n-anneau[data-n-anneau-su="0"] .n-anneau-centre { color: var(--n-encre-2); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .n-confettis { display: none; }
+    .n-anneau-plein { transition: none; }
+  }
+}
