@@ -206,7 +206,8 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     const BG = process.env.AGIR_BG || path.join(RACINE, 'vinted-sync-extension', 'background.js');
     bg = faireFond({ src: BG, lignes: {}, store: { vrmCloisonne: true }, connecte: A, comptes: [{ vinted_user_id: A, login: 'boutique', domain: 'www.vinted.fr', access_token: 'j' }], onglets: [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }] });
   } catch (e) { bg = null; }
-  if (bg && typeof bg.ctx.distanceExecuter === 'function') {
+  if (cmds.some((c) => !c)) dit(false, 'background.js : les gestes 5.450 ne peuvent pas être joués (la règle les refuse)');
+  else if (bg && typeof bg.ctx.distanceExecuter === 'function') {
     const vus = [];
     bg.ctx.executerCommande = async (msg) => { vus.push(msg); return { accepte: true, etape: 'fait' }; };
     bg.ctx.apercuCarteFrais = async () => ({ ok: true, apercu: { reglages: { r: 1 }, liste: [{ id: 'notif-1', cochable: true, itemId: '91010001' }, { id: 'notif-2', cochable: false }, { id: 'notif-3', cochable: true, itemId: '91010002' }] } });

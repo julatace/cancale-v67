@@ -150,6 +150,7 @@ function juger(t) {
     if (new RegExp(`action=["']${k}["']`).test(tout) || new RegExp(`'data-vrm-panneau':\\s*'${k}'`).test(tout) || Object.values(SEL).includes(k)) return false;
     // (24 nov., Julien : « répondre à mes messages […] dans l'application si l'extension est connectée ») répondre se fait DEPUIS
     // VRM, par la porte (src/agir/Agir.jsx `ComposerReponse`) — plus par le panneau.
+    if (k === 'vacances' && /<VacancesAgir comptes=/.test(tout)) return false;   // (24 nov., lot agir-tout) depuis VRM, compte par compte
     if (k === 'repondre' && /<ComposerReponse site="vinted"/.test(tout) && /<ComposerReponse site="leboncoin"/.test(tout) && /<ComposerReponse site="vestiaire"/.test(tout)) return false;
     if (new RegExp(`'${k}'`).test((/const act = [^;]+;/.exec(tout) || [''])[0])) return false;
     return !new RegExp(`ouvrirPanneau\\(\\{[^}]*page:\\s*'${A[k].page}'[^}]*action:\\s*'${A[k].action}'`).test(tout);
@@ -182,7 +183,9 @@ function juger(t) {
 
   // Y. eBay reste
   const pp = sansCommentaires(t.src['src/PrixPartout.jsx'] || '');
-  verif(/sites\.filter\(\(s\) => s\.site === 'ebay'\)\.map\(\(s\) => s\.cle\)/.test(pp) && /s\.site !== 'ebay'/.test(pp) && /'data-vrm-panneau': 'changerPrix'/.test(pp), 'Y1 « Changer le prix » : eBay se coche et s\'applique ici, les autres sites ouvrent le panneau');
+  // (24 nov., lot agir-tout) Les autres sites se cochent aussi quand la porte permet la file pour le compte de l'annonce
+  // (`enFile`, une BAISSE par `cmd_dist_*`) ; sinon ils ouvrent le panneau, gardé.
+  verif(/sites\.filter\(\(s\) => s\.site === 'ebay' \|\| enFile\(s\)\)\.map\(\(s\) => s\.cle\)/.test(pp) && /s\.site !== 'ebay' && !enFile\(s\)/.test(pp) && /'data-vrm-panneau': 'changerPrix'/.test(pp), 'Y1 « Changer le prix » : eBay et les baisses permises par la porte se cochent et s\'appliquent ici, les autres sites ouvrent le panneau');
   verif(/action: 'revise'/.test(t.src['src/prixPartout.js'] || ''), 'Y2 eBay passe toujours par la route serveur (revise)');
   verif(/x\.site !== 'ebay'/.test(sansCommentaires(t.src['src/PublierPartout.jsx'] || '')), 'Y3 « Publier partout » garde la case eBay, Leboncoin/Vestiaire ouvrent le panneau');
   return { ok, ko };
@@ -201,7 +204,8 @@ const MUTATIONS = {
   'format du lien changé': (t) => { t.src['src/ouvrirPanneau.js'] = t.src['src/ouvrirPanneau.js'].replace(".join(',')", ".join(';')"); },
   'commande nouvelle pas classée': (t) => { t.fond += "\nif (cmd === 'vintedMasquerTout') {}\n"; },
   'écran Automatisations remonté': (t) => { t.src['src/App.jsx'] += "\nconst AutomatisationsLazy = aLaDemande(() => import('./automatisations/Branchement.jsx'));\n"; },
-  'bouton manquant (vacances)': (t) => { t.src['src/ecrans/Reglages.jsx'] = t.src['src/ecrans/Reglages.jsx'].replace('action="vacances"', 'action="automatisations"'); },
+  // (24 nov., lot agir-tout) les vacances se font depuis VRM (`VacancesAgir`) : la mutation retire ce chemin.
+  'bouton manquant (vacances)': (t) => { t.src['src/ecrans/Reglages.jsx'] = t.src['src/ecrans/Reglages.jsx'].replace('<VacancesAgir comptes=', '<VacancesRetire comptes='); },
 };
 
 if (args.includes('--mutation')) {
