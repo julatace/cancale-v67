@@ -183,13 +183,16 @@ const srv = http.createServer((q, r) => {
 });
 srv.on('error', (e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance avec BANC_PORT=…'); process.exit(1); });
 
-async function ouvrir(b, vp, tab) {
+async function ouvrir(b, vp, tab, natif = false) {
   const tel = vp.width < 600;
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.clock.install({ time: maintenant });
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', JSON.stringify(true)); } catch (_) {} });
+  // (24 nov., main-vert) `natif` : le design que voit Julien (VRM natif) — sans ce choix, la garde réseau des bancs (chargée par la CI)
+  // sert le DOM d'avant le 17 nov. (échafaudage) ; Ma journée y est jugée là où le vendeur la voit.
+  if (natif) await pg.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_banc_dom_ancien'); } catch (_) {} });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
     const u = r.request().url();
     if (/\/rest\/v1\//.test(u)) return r.fallback();
@@ -253,13 +256,16 @@ async function widget() {
       console.log(`── ${T} px`);
       const toutes = [];
       // Ma journée
-      { const { ctx, pg, errs } = await ouvrir(b, vp, 'journee');
+      { const { ctx, pg, errs } = await ouvrir(b, vp, 'journee', true);
         // (24 nov., main-vert) Ma journée NATIVE (src/natif/ecrans/Aujourdhui.jsx) : « Imprimer N » est LE plein de la carte Colis
         // (`data-v2-principal` = les bordereaux reçus pas encore imprimés, `data-v2-principal-exact`) ; l'ancienne case
         // `data-journee-a-imprimer` n'est plus rendue. Même règle : N exact, jamais les prêts déjà imprimés.
         const AI = '[data-journee-a-imprimer], [data-v2-principal]';
-        await attendre(pg, (AI) => { const e = document.querySelector('[data-tuile="envoyer"]'); const a = [...document.querySelectorAll(AI)].find((x) => x.getClientRects().length); return e && e.getAttribute('data-n') && a && (a.getAttribute('data-exact') === '1' || a.getAttribute('data-v2-principal-exact') === '1'); }, AI, 40000);
-        const n = await attr(pg, '[data-tuile="envoyer"]', 'data-n');
+        // « À envoyer » : la case de la carte Colis (`data-v2-cj-ligne="envoyer"`, `data-v2-cj-n`) — l'ancienne tuile `data-tuile`.
+        const ENV = '[data-tuile="envoyer"], [data-v2-cj-ligne="envoyer"]';
+        const nEnv = (pg) => pg.evaluate((ENV) => { const e = [...document.querySelectorAll(ENV)].find((x) => x.getClientRects().length) || document.querySelector(ENV); return e ? (e.getAttribute('data-n') || e.getAttribute('data-v2-cj-n') || null) : null; }, ENV);
+        await attendre(pg, ([AI, ENV]) => { const e = [...document.querySelectorAll(ENV)].find((x) => x.getClientRects().length) || document.querySelector(ENV); const a = [...document.querySelectorAll(AI)].find((x) => x.getClientRects().length); return e && (e.getAttribute('data-n') || e.getAttribute('data-v2-cj-n')) && a && (a.getAttribute('data-exact') === '1' || a.getAttribute('data-v2-principal-exact') === '1'); }, [AI, ENV], 40000);
+        const n = await nEnv(pg);
         dit(n === String(ATT.envoyer), `${T} E Ma journée : ${ATT.envoyer} colis à envoyer`, n);
         const { ai, ex } = await pg.evaluate((AI) => { const a = [...document.querySelectorAll(AI)].find((x) => x.getClientRects().length); return a ? { ai: a.getAttribute('data-journee-a-imprimer') || a.getAttribute('data-v2-principal'), ex: a.getAttribute('data-exact') || a.getAttribute('data-v2-principal-exact') } : { ai: null, ex: null }; }, AI);
         dit(ai === String(ATT.imprimer) && ex === '1', `${T} I Ma journée : ${ATT.imprimer} à imprimer (pas encore imprimés), exact — jamais les prêts déjà imprimés`, `${ai} exact=${ex}`);

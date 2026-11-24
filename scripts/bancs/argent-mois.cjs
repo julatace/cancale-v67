@@ -146,6 +146,9 @@ const capture = async (pg, nom, sel) => { if (!SHOTS) return; fs.mkdirSync(SHOTS
       // même règle `argentAVenir`) porte le total VISIBLE et ouvre l'écran « Argent à venir ». Ventes n'a plus de sélecteur de
       // plateforme : la part Vinted est jugée sur la rangée Vinted de cet écran (`data-av-site`, `data-eur`, `data-n`).
       const vis = '[data-v2-argent-fait="attente"]';
+      // Le design que voit Julien (VRM natif) pour A : sans ce choix, la garde réseau des bancs (_garde-reseau.cjs, chargée par la
+      // CI) sert le DOM d'avant le 17 nov., où l'argent à venir n'est plus là où un vendeur le voit. B et C gardent l'échafaudage.
+      await pg.evaluate(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} });
       await aller(pg, 'compta', vis, 3000);
       await pg.waitForFunction((s) => [...document.querySelectorAll(s)].some((e) => e.getClientRects().length && e.getAttribute('data-v2-argent-valeur')), vis, { timeout: 15000 }).catch(() => {});
       const A = await pg.evaluate((s) => { const e = [...document.querySelectorAll(s)].find((x) => x.getClientRects().length); return e ? { valeur: e.getAttribute('data-v2-argent-valeur'), pasSu: e.hasAttribute('data-v2-pas-su') } : null; }, vis);
@@ -177,8 +180,10 @@ const capture = async (pg, nom, sel) => { if (!SHOTS) return; fs.mkdirSync(SHOTS
       dit(T.vp.width > 500 || (await deborde(pg)) <= 1, 'A : aucun débordement à 390 px');
       await capture(pg, `A-ventes-tous-${T.nom}`, '[data-argent-a-venir-ecran]');
       await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);
+      await pg.evaluate(() => { try { localStorage.removeItem('vrm_design_v2'); } catch (_) {} });
     });
     await essaie(`B ${T.nom}`, async () => {
+      await pg.evaluate(() => { try { localStorage.removeItem('vrm_design_v2'); } catch (_) {} });   // l'échafaudage d'avant pour B et C (même si A s'est arrêté)
       // (11 nov.) Depuis Ma journée v2 (9 nov., 60febc6f, docs/passation/2026-11-09-journee-v2.md) la carte
       // « Semaine du … » est FUSIONNÉE dans la frise de la tête sombre : « Semaine du … » se touche et montre
       // la semaine passée (même règle `journalSemaine`, même période que le bilan du lundi). Les règles

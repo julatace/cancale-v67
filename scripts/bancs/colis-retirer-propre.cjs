@@ -306,8 +306,10 @@ const ouvrir = async (b, vp, sombre) => {
           // (17 nov.) La fiche fermée, la ligne retrouve ses gestes (DansFiche les prête à la fiche le temps qu'elle est ouverte).
           const fermerFiche = async () => { await pg.keyboard.press('Escape').catch(() => {}); const f = pg.locator('[role="dialog"] [aria-label^="Fermer"]').filter({ visible: true }).last(); if (await f.count()) await f.click({ timeout: 3000 }).catch(() => {}); await pg.waitForFunction(() => ![...document.querySelectorAll('[data-rp-detail]')].some((x) => x.getClientRects().length), null, { timeout: 8000 }).catch(() => {}); };
           await fermerFiche();
-          const gestes=await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-rang button').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return r.top+r.height/2;}));
-          dit(gestes.every(y=>Math.abs(y-gestes[0])<2),'ouvrir et retrait restent côte à côte');
+          // (24 nov., main-vert) La règle nomme DEUX gestes : ouvrir (la ligne) et « J'ai retiré ». Le rond « code en grand »
+          // (`va-rond-code`, 15 nov.) s'aligne sur le CODE qu'il agrandit, pas sur eux : il n'entre pas dans cette règle.
+          const gestes=await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-rang :is(.vrm-rpf-ouvrir, .vrm-rpf-retire)').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return r.top+r.height/2;}));
+          dit(gestes.length===2&&gestes.every(y=>Math.abs(y-gestes[0])<2),'ouvrir et retrait restent côte à côte',JSON.stringify(gestes));
           await pg.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw Error('refus');}}}));
           await pg.locator('[data-cc-carte*="9301"] [data-rp-titre]').first().click();
           await pg.waitForFunction(() => [...document.querySelectorAll('[data-rp-detail]')].some((d) => d.getClientRects().length), null, { timeout: 15000 }).catch(() => {});
