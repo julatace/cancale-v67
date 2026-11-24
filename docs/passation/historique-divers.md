@@ -2229,3 +2229,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion de #1346 dans visuel-jeu)
 - **24 nov. · Observer Vinted (ext. 5.440.3, `claude/observation-vinted`)** : interrupteur 10 min (carte du logo, page Extension) ; la page note pages, requêtes (clés et types), clics (`isTrusted`), cloche — formes seulement, rebâties par le fond, ligne `observation_vinted_{compte}_{nav}`, « Envoyer l'observation » ; rien envoyé à Vinted. `2026-11-24-observation-vinted.md`. Geste : installer, Observer, un envoi (Bleam ou main), Envoyer l'observation.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1341)
+- **23 nov. · Retours d'achat suivis ; À retirer en C, choisie (`claude/retours-suivi`, après #1326)** : étape plus loin ⇒ précédentes « faites, date pas vue » ; point Vinted Go nommé (« Relais Vinted Go, … »), sinon le transporteur en titre ; en-tête sur une ligne, logo entier, plus d'orange (nuit comprise). `2026-11-23-retours-suivi.md`. Geste : aucun.
