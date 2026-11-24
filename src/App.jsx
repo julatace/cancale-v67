@@ -18610,7 +18610,7 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null,
         <button type="button" className="n-laterale-compte" data-nav-compte="" data-nav-compte-ouvre="parametres" data-nav-entree="settings" data-n-entree="settings" aria-current={tab === 'settings' ? 'page' : undefined}
           aria-label={`${nomCoque.texte} ${sousCompte} — ${tr('menu.parametres')}`} onClick={() => { revenirSurOnglet(); ouvrirEntree(ONGLET_PARAMETRES, setTab); }}>
           <PastilleProfil owner={uid} headers={enTeteSession} nom={nomCompte} email={mail} taille={30} className="vrm-sensible"/>
-          <span className="n-laterale-compte-textes"><span className="n-laterale-compte-nom vrm-sensible">{nomCoque.texte}</span><span className="n-laterale-compte-sous" data-lat-sous="">{sousCompte}</span></span>
+          <span className="n-laterale-compte-textes"><span className="n-laterale-compte-nom vrm-sensible">{nomCoque.texte}</span>{' '}<span className="n-laterale-compte-sous" data-lat-sous="">{sousCompte}</span></span>
         </button>
       </>) : boiteOutils}/>
   );

@@ -287,10 +287,15 @@ const ECRANS = [
         dit(avant6.ecran === 'compta' && apres6.ecran === 'compta' && apres6.barre === 'compta', `A6 ${qui} : glisser de côté sur Argent (milieu, bord) ne change pas d'écran`, JSON.stringify({ avant: avant6.ecran, apres: apres6.ecran, barre: apres6.barre }));
         dit(apres6.scrollX === 0 && apres6.mainX === 0, `A6 ${qui} : l'écran ne bouge pas de côté`, JSON.stringify({ x: apres6.scrollX, main: apres6.mainX }));
         // A7 · un glisser vertical fait défiler la page, jamais de côté.
-        await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="ventes"]');
+        // (24 nov., main-vert) Sur un écran de la barre ASSEZ LONG pour défiler (depuis #1326, Ventes de ce jeu tient dans
+        // l'écran ⇒ rien à défiler) : Ventes d'abord, sinon le premier onglet qui défile. La règle ne change pas.
+        let id7 = '';
+        for (const id of ['ventes', 'achats', 'paires', 'compta', 'journee']) { await toucher(pg, `nav[data-n-onglets] [data-nav-entree="${id}"]`); if (await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); return !!m && m.scrollHeight - m.clientHeight > 200; })) { id7 = id; break; } }
+        await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; }); await pg.waitForTimeout(300);
+        const ecran7 = (await etat(pg)).ecran;
         await glisserDoigt(pg, 200, Math.round(y * 1.2), 40, -300);
         const e7 = await etat(pg); const defile = await pg.evaluate(() => Math.round(document.querySelector('.vrm-main').scrollTop));
-        dit(e7.ecran === 'ventes' && e7.scrollX === 0 && e7.mainX === 0 && defile > 20, `A7 ${qui} : un glisser vertical (un peu de biais) défile, l'écran ne part jamais de côté`, JSON.stringify({ ...e7, st: undefined, defile }));
+        dit(!!id7 && e7.ecran === ecran7 && e7.scrollX === 0 && e7.mainX === 0 && defile > 20, `A7 ${qui} : un glisser vertical (un peu de biais) défile, l'écran ne part jamais de côté (${id7 || 'aucun onglet assez long'})`, JSON.stringify({ ...e7, st: undefined, defile }));
         const ob = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); return { main: getComputedStyle(m).overscrollBehaviorX, html: getComputedStyle(document.documentElement).overscrollBehaviorX }; });
         dit(ob.main === 'none' && ob.html === 'none', `A7 ${qui} : aucun rebond de côté (overscroll-behavior-x: none sur la page et le contenu)`, JSON.stringify(ob));
         // A8 · une rangée qui défile de côté (filtres, rangées) défile toujours au doigt, sans changer d'écran.
