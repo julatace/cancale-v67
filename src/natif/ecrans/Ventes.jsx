@@ -23,7 +23,8 @@ import { morceauxMarqueTaille } from '../../ventes/marqueTaille.js';
 import '../ventes-lisibles.css';
 import { useARegler } from '../../designV2/useARegler.js';
 import { groupesDe, atelierCompleter } from '../../designV2/aRegler.js';   // (21 nov.) vignettes lisibles, titre entier, gestes de l'achat
-import { ParPaquets } from '../../composants/ParPaquets.jsx';   // (22 nov., latence) 70 colis à envoyer posés par paquets
+import { ParPaquets } from '../../composants/ParPaquets.jsx';
+import { Trajet } from '../Jeu.jsx';   // (24 nov., visuel-jeu) le trajet du colis en piste, étapes PROUVÉES   // (22 nov., latence) 70 colis à envoyer posés par paquets
 
 const joint = (...x) => x.filter(Boolean).join(' · ');
 // Les morceaux d'une méta qui peut passer à la ligne : chacun reste entier (« à vérifier » ne se coupe jamais en deux).
@@ -110,7 +111,8 @@ function RangeeRoute({ r, Icon, Photo, choisie, onOuvrir }) {
       plaque={avecSite(r, r.num ? <Plaque numero={r.num}/> : null)}
       sousTitre={morceaux(...marqueTailleM(r), texteEtape(r.etapes))} sousLignes={2}
       ton={r.etat.ambre ? 'ambre' : 'neutre'}
-      note={ligneTel(r, null)}
+      // (24 nov., visuel-jeu) Le trajet dessiné sous la phrase : les MÊMES étapes prouvées (`etapesRoute`), le camion sur la dernière.
+      note={<>{ligneTel(r, null)}<Trajet etapes={r.etapes} Icon={Icon} libelles={Object.fromEntries((r.etapes || []).map((e) => [e.cle, tr('vv.route.' + e.cle)]))}/></>}
       pied={piedAchat(r, Icon)}
       selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)}
       actions={r.lienSuivi ? [{ cle: 'suivre', libelle: tr('vn.b.suivre'), icone: <Icon name="truck" size={20}/>, onClick: () => { try { window.open(r.lienSuivi, '_blank', 'noopener'); } catch (_) {} }, franc: true }] : null}

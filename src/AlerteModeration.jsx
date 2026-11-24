@@ -80,7 +80,7 @@ function GroupeDisparues({ compte, evts, nom, fiches, seul, enTete, marquerVu })
           const rv = revele(k, 'vrm-mod-ligne vrm-mod-case');
           const etiquette = num ? 'N°' + num : tr('mod5428.articleId', { id: e.a || '' });
           return (
-            <li key={e.cle} className={rv.className} style={rv.style} data-n-revele="" data-moderation-sorte="disparue" data-moderation-compte={e.compte} data-moderation-item={e.a || undefined} data-moderation-photo={ph ? '1' : '0'}>
+            <li key={e.cle} className={rv.className} style={rv.style} data-n-revele={rv["data-n-revele"]} data-moderation-sorte="disparue" data-moderation-compte={e.compte} data-moderation-item={e.a || undefined} data-moderation-photo={ph ? '1' : '0'}>
               <TuilePaire photo={ph} numero={num || ''} icone="image" Icon={Icon} taille="xl" Photo={PhotoVinted} className="vrm-mod-tuile" attrsN={{ 'data-moderation-num': num || undefined }}/>
               {num ? null : <span className="vrm-mod-id">{etiquette}</span>}
               <button type="button" className="vrm-mod-vu" data-moderation-vu={e.cle} aria-label={tr('modc.vuDe', { article: etiquette })} onClick={() => marquerVu([e.cle])}><Icon name="check" size={14}/><span>{tr('modc.vu')}</span></button>
