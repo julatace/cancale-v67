@@ -386,6 +386,8 @@
     return c;
   }
   function favEtapeHtml(a) {
+    // 5.450 : Vinted a demandé une pause (429) ⇒ « En pause (Vinted) jusqu'à 14:32 », jamais « En attente du prochain favori ».
+    if (a.attente === 'pause') { const j = Number(a.pauseVintedJusqua) || 0; return `<div class="fav-etape" role="status" data-fav-etape="pause-vinted"><span class="pu" aria-hidden="true"></span><span>${esc(j > Date.now() ? T('fa_e_pause_vinted', { h: new Date(j).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }) : T('fa_e_pause_vinted_sans'))}</span></div>`; }
     const cours = Number(a.prochain) > Date.now() && !a.enCours ? Number(a.prochain) : 0;
     if (cours) return `<div class="fav-etape" role="status" data-fav-etape="attente"><span class="pu" aria-hidden="true"></span><span data-action-dans="${cours}">${esc(T('a_ensuite', { dans: U.duree(cours - Date.now()) }))}</span></div>`;
     const k = ETAPES_FAV[String(a.etapeFav || '')] || (a.enCours ? 'fa_e_preparation' : 'fa_e_attente');

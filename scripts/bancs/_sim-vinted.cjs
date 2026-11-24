@@ -27,6 +27,7 @@ function fauxVinted({ jetonVinted, lireJwt }) {
     commande: {},         // réglages de la commande servie (désaccords) : { buyer, item, conv, cote }
     ancienneConv: 200,    // GET www /api/v2/conversations/{core} pour une conversation de la nouvelle messagerie
     lienWeb: 'receiver_id',
+    sansLogin: false,     // (5.450) la nouvelle messagerie ne donne pas le pseudo de l'acheteur
     n: 0,
   };
   const cookieUid = (req) => {
@@ -57,7 +58,7 @@ function fauxVinted({ jetonVinted, lireJwt }) {
   const lienNotif = (f) => f.forme === 'web' ? `/items/${f.itemId}/want_it/new?offering_id=${f.userId}` : `vintedfr://messaging?item_id=${f.itemId}&user_id=${f.userId}&portal=fr`;
   st.lienNotif = lienNotif;
   const convJson = (cv) => ({ conversation: {
-    id: cv.uuid, core_id_deprecated: cv.core, conversation_type: 'inquiry', allow_reply: true, is_read: true, opposite_users: [{ id: Number(cv.buyer), login: cv.login, photo: null }],
+    id: cv.uuid, core_id_deprecated: cv.core, conversation_type: 'inquiry', allow_reply: true, is_read: true, opposite_users: [Object.assign({ id: Number(cv.buyer), photo: null }, st.sansLogin ? {} : { login: cv.login })],
     data: { id: 'd-' + cv.core, order_id: cv.order, escrow_order_id: cv.order, transaction_id: cv.tx },
     messages: cv.messages.map((m) => ({ id: m.id, entity_type: 'message', data: { body: m.texte }, sender_id: Number(m.de), created_at: m.at })),
   } });

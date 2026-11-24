@@ -131,6 +131,12 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     // la conversation ouverte gardée d'un tour à l'autre (la 5.440.1 d'avant le 24 nov.)
     'conv-garde': ['vrm-formulaire.js', "        conv = memeQuAvant ? '' : ici; route = memeQuAvant ? '' : rIci;", '        if (ici) conv = ici; if (rIci) route = rIci;'],
     // l'acheteur de la commande n'est plus comparé
+    // 5.450 : le pseudo n'est plus lu dans la nouvelle messagerie
+    'pseudo-oublie': ['background.js', "opposite_user:{id:opp[0],...(login?{login}:{})}", "opposite_user:{id:opp[0]}"],
+    // 5.450 : un captcha après l'ouverture redevient « à vérifier »
+    'captcha-incertain': ['background.js', "if(creation.incertain)return creation.robot?rep('refuse',0,'vinted_robot'):rep('incertain',0,'creation_non_confirmee');", "if(creation.incertain)return rep('incertain',0,'creation_non_confirmee');"],
+    // 5.450 : un 429 redevient un « frein » vague
+    '429-frein': ['background.js', "  if (r.status === 429) return 'pause_vinted';\n", ""],
     'commande-acheteur': ['background.js', "if(!acheteur||!attendu||acheteur!==String(attendu.recipientId))return non('commande_autre_acheteur');", ''],
   };
   const MUT = arg('--mutation');
@@ -177,16 +183,17 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     const jobs = () => (vue().jobs || []);
     const parItem = () => Object.fromEntries(jobs().map((x) => [String(x.itemId || String(x.id || '').split(':')[0]), `${x.etat}${x.raison ? ':' + x.raison : ''}${x.cause ? '/' + x.cause : ''}${x.etape ? '@' + x.etape : ''}`]));
     const reset = async () => {
-      S.d = null; V.st.req = []; V.st.ancienneConv = 200; REGLAGES.message = MSG_PSEUDO; V.st.forcer = []; V.st.captchaSur = null; V.st.commande = {}; V.st.convs.clear(); seed();
+      S.d = null; V.st.req = []; V.st.ancienneConv = 200; V.st.sansLogin = false; REGLAGES.message = MSG_PSEUDO; V.st.forcer = []; V.st.captchaSur = null; V.st.commande = {}; V.st.convs.clear(); seed();
       await dansSW(async () => { await chrome.storage.local.remove(['vrmFavorisCarte', 'vrmActionEnCours', 'vrmPauseVinted', 'vrmCaptcha', 'vrmFavorisApercu', 'vrmTextesRecents', 'vrmToutArrete']); });
     };
 
     // ══ F1 : 3 favoris, identité par la commande ═════════════════════════════════════════════════════════════════
-    for (const F1 of ['F1', 'F1W', 'F1M', 'F1E', 'F1P']) if (veut(F1)) {
+    for (const F1 of ['F1', 'F1W', 'F1M', 'F1E', 'F1P', 'F1N']) if (veut(F1)) {
       for (const [i, f] of FAVORIS.entries()) f.forme = F1 === 'F1W' ? 'web' : F1 === 'F1M' ? (i === 1 ? 'web' : 'app') : 'app';
       if (F1 === 'F1W' || F1 === 'F1M') console.log(`\n── ${F1}. trois favoris, liens ${F1 === 'F1W' ? 'web (/items/N/want_it/new?offering_id=N)' : 'mêlés (app, web, app)'}`); else console.log(F1 === 'F1P' ? '\n── F1P. ancienne relecture refusée (commande), message avec {pseudo}' : F1 === 'F1' ? '\n── F1. trois favoris lancés depuis la carte (l’ancienne relecture répond, comme mesuré le 21 nov.)' : '\n── F1E. les mêmes, l’ancienne relecture REFUSÉE : nouvelle messagerie, identité par la commande');
       await reset();
-      if (F1 === 'F1E' || F1 === 'F1P') V.st.ancienneConv = 404;
+      if (F1 === 'F1E' || F1 === 'F1P' || F1 === 'F1N') V.st.ancienneConv = 404;
+      if (F1 === 'F1N') { V.st.sansLogin = true; console.log('   (F1N : {pseudo}, et la nouvelle messagerie NE dit PAS le pseudo ⇒ version neutre, jamais un nom)'); }
       if (F1 === 'F1E') REGLAGES.message = MSG_SIMPLE;
       if (F1 === 'F1P') console.log('   (F1P : la même chose avec un message qui porte {pseudo})');
       const { ap, r } = await lancer(FAVORIS.map((f) => f.nid));
@@ -205,6 +212,13 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       dit(!!res, 'la file se termine', JSON.stringify(parItem()));
       dit(inq.length === 3 && inq.every((e) => e.uid === UID), '3 conversations ouvertes PAR LA PAGE, au nom du compte de l’onglet', inq.map((e) => e.corps).join(' | '));
       dit(msgs.length === 3 && msgs.every((e) => { let t = ''; try { t = String(JSON.parse(e.corps).content || ''); } catch (_) {} return e.uid === UID && /ton favori est toujours dispo/.test(t) && !/[{}]/.test(t); }), '3 messages envoyés par la page', msgs.map((e) => e.corps.slice(0, 80)).join(' | '));
+      // 5.450 : {pseudo} — le pseudo de CETTE conversation (lu dans `opposite_users`), sinon la version neutre ; jamais un autre nom.
+      if (F1 === 'F1P' || F1 === 'F1N') {
+        const textes = msgs.map((e) => { let t = ''; try { t = String(JSON.parse(e.corps).content || ''); } catch (_) {} const cv = [...V.st.convs.values()].find((c) => e.p.includes(c.uuid) || e.p.includes(String(c.core))); return { t, login: cv ? cv.login : '' }; });
+        const noms = FAVORIS.map((f) => f.login);
+        dit(textes.length === 3 && textes.every((x) => F1 === 'F1P' ? x.t.startsWith('Bonjour ' + x.login + ',') : (x.t.startsWith('Bonjour,') && !noms.some((n) => x.t.includes(n)))),
+          F1 === 'F1P' ? '{pseudo} = le pseudo de CETTE conversation (nouvelle messagerie)' : 'pseudo pas dit ⇒ « Bonjour, … » sans aucun nom', JSON.stringify(textes));
+      }
       dit(offres.length === 3, '3 offres (réduction de 10 %) envoyées par la page', offres.map((e) => e.p + ' ' + e.corps).join(' | '));
       if (F1 === 'F1E' || F1 === 'F1P') dit(V.st.req.some((e) => /escrow-orders/.test(e.p)), 'la commande escrow est relue (identité par la commande)', V.st.req.filter((e) => e.h === 'api.vinted.fr').map((e) => e.m + ' ' + e.p).slice(0, 12).join(' '));
       dit(ecr.every((e) => !e.origine.startsWith('chrome-extension')), 'aucune écriture partie du service worker (toutes de la page)', ecr.map((e) => e.origine).join(','));
@@ -254,6 +268,14 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       const f = await fenetre();
       note(`file VRM ${JSON.stringify(parItem())} · attente carte ${f.f && f.f.attente}`);
       dit(!jobs().some((x) => x.etat === 'envoye'), 'aucun favori compté envoyé', JSON.stringify(parItem()));
+      // 5.450 : la ligne du favori dit « Pas envoyé · Vinted demande une pause » ; la fenêtre « En pause (Vinted) jusqu'à … ».
+      const f5 = await attendreQue(async () => { const x = await fenetre(); return x.a && x.a.attente === 'pause' ? x : null; }, 30000, 1000) || f;
+      const l5 = f5.a && Array.isArray(f5.a.lignes) ? f5.a.lignes : [];
+      dit(l5.some((l) => l.etat === 'pas' && l.r === 'pause_vinted') && !l5.some((l) => l.r === 'vinted_frein'), 'la ligne : « Pas envoyé · Vinted demande une pause »', JSON.stringify(l5.map((l) => [l.etat, l.r])));
+      dit(f5.a && f5.a.attente === 'pause' && Number(f5.a.pauseVintedJusqua) > Date.now(), 'la fenêtre : « En pause (Vinted) jusqu’à … » (l’heure de la pause posée)', JSON.stringify(f5.a && { attente: f5.a.attente, jusqua: f5.a.pauseVintedJusqua }));
+      const tw5 = ctx.pages().find((p) => /vinted\.fr/.test(p.url()));
+      const etape5 = tw5 ? await tw5.evaluate(() => { const h = document.querySelector('vrm-action, #vrm-action-hote'); const r = h && h.shadowRoot; const e = (r || document).querySelector('[data-fav-etape]'); return e ? { k: e.getAttribute('data-fav-etape'), t: e.textContent } : null; }).catch(() => null) : null;
+      note(`étape affichée ${JSON.stringify(etape5)}`);
       const tw = ctx.pages().find((p) => /vinted\.fr/.test(p.url())); if (tw) await shot(tw, 'F5-pause');
     }
     // ══ F6 : captcha ══════════════════════════════════════════════════════════════════════════════════════════════
@@ -267,6 +289,9 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       const msgs = ecrituresVinted().filter((e) => /\/replies$|\/offers$/.test(e.p));
       dit(!!robot && (robot.f.robot || robot.f.attente === 'verification'), 'la file est en pause « vérification »', JSON.stringify(robot && { robot: robot.f.robot, attente: robot.f.attente, actif: robot.f.actif, fin: robot.f.fin }));
       dit(msgs.length === 0, 'aucun message ni offre après le captcha', msgs.map((e) => e.p).join(' '));
+      // 5.450 : le favori arrêté par le captcha dit « Pas envoyé · Vinted demande une vérification », jamais « à vérifier ».
+      const l6 = robot && robot.a && Array.isArray(robot.a.lignes) ? robot.a.lignes : ((await fenetre()).a || {}).lignes || [];
+      dit(l6.some((l) => l.etat === 'pas' && l.r === 'vinted_robot') && !l6.some((l) => l.etat === 'verifier'), 'la ligne : « Pas envoyé · Vinted demande une vérification »', JSON.stringify(l6.map((l) => [l.etat, l.r])));
       dit(ecrituresVinted().filter((e) => /inquiries$/.test(e.p)).length <= 1, 'pas d’autre conversation ouverte ensuite', ecrituresVinted().map((e) => e.p).join(' '));
       const tw = ctx.pages().find((p) => /vinted\.fr\/inbox\//.test(p.url())); if (tw) await shot(tw, 'F6-captcha');
       V.st.captchaSur = null;

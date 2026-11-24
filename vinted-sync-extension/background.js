@@ -21715,6 +21715,25 @@ function choisirMessageFavori(x) {
     const v = cands[Math.min(cands.length - 1, Math.max(0, Math.floor((Number.isFinite(h) ? h : 0) * cands.length)))];
     return { ok: true, source, cas: g.cas, regle: g.regle, version: v, possibles: possibles.length };
   }
+  // 5.450 : le SEUL manque est le pseudo (la nouvelle messagerie ne l'a pas dit) ⇒ la version NEUTRE : la même, sans
+  //    {pseudo} / {username} / {prénom} (« Bonjour {pseudo}, … » ⇒ « Bonjour, … ») — jamais un autre nom, jamais refusé pour ça.
+  if (manques.size && [...manques].every((k) => k === 'pseudo' || k === 'prenom') && !val.pseudo) {
+    const neutre = (m) => String(m).replace(/[ \t]*\{(?:pseudo|username|prénom|prenom)\}/g, '').replace(/ +([,.!?])/g, '$1');
+    for (const g of groupes) {
+      const possibles = [];
+      for (const v of g.versions) {
+        const mod = neutre(v.modele);
+        if (fpErreurTexte(mod) || fpManque(mod, val).length) continue;
+        const texte = fpPreremplir(mod, val);
+        if (!texte.trim() || !sur(texte) || refusee(v.modele)) continue;
+        possibles.push(Object.assign({}, v, { modele: mod, texte, neutre: true }));
+      }
+      if (!possibles.length) continue;
+      const h = Number(tirer());
+      const v = possibles[Math.min(possibles.length - 1, Math.max(0, Math.floor((Number.isFinite(h) ? h : 0) * possibles.length)))];
+      return { ok: true, source, cas: g.cas, regle: g.regle, version: v, possibles: possibles.length, neutre: true };
+    }
+  }
   if (manques.size && !vuInterdit) return { ok: false, source, raison: 'variable', manque: [...manques] };
   return { ok: false, source, raison: groupes.some((g) => g.versions.length) ? 'texte_interdit' : 'aucun_message', manque: [...manques] };
 }
@@ -22073,7 +22092,11 @@ function filDepuisMessagerie(j,convId,uuid,tx,cmd=null,attendu=null){
   if(!items.length&&!(c.data&&Array.isArray(c.data.items))&&cmd){const k=identiteParCommande(c,cmd,uuid,attendu);if(!k.ok)return null;items=[k.itemId];}
   if(opp.length!==1||items.length!==1||!Array.isArray(c.messages))return null;
   const t=/^[1-9]\d{0,19}$/.test(String(tx||''))?String(tx):'';
-  return {id:String(convId),opposite_user:{id:opp[0]},item_id:items[0],...(t?{transaction:{id:t,item_id:items[0]}}:{}),allow_reply:c.allow_reply!==false,messages:c.messages.map(()=>({entity_type:'forme_inconnue'})),...(c.pagination&&c.pagination.has_next===true?{has_more:true}:{})};
+  // 5.450 : le pseudo de l'acheteur, LU dans la nouvelle messagerie (`opposite_users[].login`, forme mesurée) quand il y est —
+  //    jamais deviné ; absent ⇒ pas de login (un message à {pseudo} part alors en version neutre, jamais avec un autre nom).
+  const oppL=(Array.isArray(c.opposite_users)?c.opposite_users:[]).find((x)=>x&&typeof x==='object'&&String(x.id)===opp[0]);
+  const login=oppL&&typeof oppL.login==='string'&&/^[\w.\-]{1,80}$/.test(oppL.login)?oppL.login:'';
+  return {id:String(convId),opposite_user:{id:opp[0],...(login?{login}:{})},item_id:items[0],...(t?{transaction:{id:t,item_id:items[0]}}:{}),allow_reply:c.allow_reply!==false,messages:c.messages.map(()=>({entity_type:'forme_inconnue'})),...(c.pagination&&c.pagination.has_next===true?{has_more:true}:{})};
 }
 // ══ 5.440.1 — L'IDENTITÉ PAR LA COMMANDE (nouvelle messagerie sans `data.items`) ══════════════════════════════════════
 //  Mesuré le 23 nov. (relevé passif de la page, formes seulement) : `GET api.vinted.fr/messaging/main/conversations/{uuid}`
@@ -22292,7 +22315,8 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   if(creation.envoye&&partie(creation))ecrits++;
   if(creation.rienParti&&!creation.pause)return rep('refuse',0,raisonFavoriInterface(creation),causeFavoriInterface(creation));
   if(creation.pause)return rep('refuse',0,creation.robot?'vinted_robot':'pause_vinted');
-  if(creation.incertain)return rep('incertain',0,'creation_non_confirmee');
+  // 5.450 : un captcha APRÈS l'ouverture de la conversation (`robot` sur une création incertaine) : rien n'est tapé ⇒ « pas envoyé · Vinted demande une vérification », plus « à vérifier ».
+  if(creation.incertain)return creation.robot?rep('refuse',0,'vinted_robot'):rep('incertain',0,'creation_non_confirmee');
   // (5.410) Vinted REFUSE d'ouvrir la conversation (400/404/422 : acheteur qui a bloqué, compte fermé, annonce
   // retirée) — certain, rien d'écrit chez lui : ce favori est SAUTÉ, la file continue. 401/403/429 : comme avant.
   if(!creation.ok&&[400,404,422].includes(creation.status)&&!frein){noterDiag('favori_conversation_refusee_'+creation.status);return rep('ignore',creation.status,'conversation_refusee');}
@@ -22824,6 +22848,8 @@ async function poserActionEnCours(st) {
     fait: Number(fi.envoyes) || 0, total: Number(fi.total) || Number(st.total) || 0, pas: (Number(fi.refuses) || 0) + (Number(fi.ignores) || 0) + (Number(fi.incertains) || 0),
     enCours: !!st.enCours, prochain: Number(st.prochain) || null, quoi: String(st.quoi || ''), attente: String(st.attente || ''),
     verification: st.attente === 'verification', robot: !!st.robot, robotAt: st.robot ? Number(st.robot.at) || null : null, item,
+    // 5.450 : « En pause (Vinted) jusqu'à … » — l'heure de la pause POSÉE (`vrmPauseVinted`), jamais devinée.
+    pauseVintedJusqua: st.attente === 'pause' ? await (async () => { try { const p = await pauseVinted(); return p && Number(p.jusqua) > Date.now() ? Number(p.jusqua) : null; } catch (_) { return null; } })() : null,
     // Les 3 suivants (photo, titre), dans l'ordre de la file : ni passés ni en cours.
     suivants: (Array.isArray(st.items) ? st.items : []).filter((x) => !(Array.isArray(st.passes) && st.passes.includes(x.id)) && !(item && item.id === x.id)).slice(0, 3) });
 }
@@ -24919,7 +24945,9 @@ function freinFavoriAuto(r) {
   let txt = '';
   try { txt = r.json == null ? '' : JSON.stringify(r.json).slice(0, 4000); } catch (_) {}
   if (/captcha|datadome|\bautomat|\brobot|\bbots?\b|unusual activity|activit[ée] inhabituelle|\bsuspicious/i.test(txt)) return 'vinted_robot';   // `\b` : une clé `is_suspicious` n'est pas un mot
-  if (r.status === 429 || r.status === 403) return 'vinted_frein';
+  // 5.450 : un 429 EST « Vinted demande une pause » (la pause est posée) : dit tel quel sur la ligne du favori, pas un frein vague.
+  if (r.status === 429) return 'pause_vinted';
+  if (r.status === 403) return 'vinted_frein';
   return '';
 }
 // Mesuré sur Vintex (29 oct., 9 favoris) : création → transaction 3,2–6,0 s ;
