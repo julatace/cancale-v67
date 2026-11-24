@@ -55,10 +55,11 @@ prenait le premier venu. Taille / couleur / état : un seul élément pour l'ide
   « Ajouter » / deux « Supprimer » ⇒ rien · R5 confirmation (bonne, deux, nom non exact, jamais Annuler) · R6 mémoire sans
   voix pour l'irréversible (mais pour « Vendre » oui) · R7 options par identifiant, jamais par ressemblance, dans leur liste
   · R8 élément absent ⇒ arrêt nommé.
-- **Rouge sur le code d'avant** : PREUVE_AVANT
-- **Mutations** (`--prouve`) : PREUVE_MUTATIONS
+- **Rouge sur le code d'avant** : `AUDIT_EXT=<arbre>` sur `origin/main` (5.440) : **17 rouges** (R0, R1 ×3, R2 V3, R3, R4, R4b, R5b–e, R6, R7c…) ; sur la 5.441 de #1327 : **14 rouges** (R0, R1 ×3, R2 V3, R3, R4, R4b, R5d, R6, R7c…) — l'ancien code clique le premier « Sauvegarder le brouillon », le premier « Ajouter », le premier « Supprimer », et ne trouve plus rien quand les data-testid changent.
+- **Mutations** (`--prouve`) : 9/9 rouges — `unique-retire` (R3, R4, R4b), `memoire-juge` (R6 en plus), `fenetre-oubliee` (R1 : la confirmation cherchée dans toute la page), `nom-contient` (R5d), `hors-formulaire-aveugle` (R1, R2 : le prix de la fenêtre d'offre), `vrm-compte` (R1, R2 : le voile de VRM), `sans-couche` (R2, R3, R4), `libelle-premier` (R7b), `option-partout` (R2, R7c). `PROUVE_SEUL=a,b` pour n'en rejouer que certaines (≈ 1 min 20 chacune).
 - Banc `scripts/bancs/repub-formulaire.cjs` : injecte maintenant `vrm-trouver.js` avant le formulaire, comme le service
-  worker. BANC_RESULTAT
+  worker. Ajouts B11–B13 à 390 et 1512 (titre trouvé, stratégie rendue au fond ; deux brouillons ⇒ rien ; data-testid disparu ⇒ le brouillon par son nom exact) : verts ; captures regardées (le voile « Republication 0 sur 1 », la page de banc dessous ; une balise viewport ajoutée à la fausse page, sinon le téléphone était dessiné à 980 px). ⚠️ **B7/B8 rouges AVANT ce lot aussi** (même résultat sur la tête de la branche avant tout changement) : le second vrai clic du banc atteint `HTML` sous le voile — pas touché ici, à regarder par le lot du voile (`vrm-action.js`).
+- Audits verts sans affaiblissement : coherence, quoi-de-neuf, formulaire-rythme, tout-interface, ext-arrets-formulaire, comme-bleam, republication-parfaite, recreer, repub-copie-fidele, repub-verifier, ext-cloche-favoris, offres-auto, extension-zip.
 - Banc `suppression-confirmation.cjs` (5.441, sans la couche : la règle de repli) : 5/5 inchangé.
 
 ## 3. Ce qui reste invérifiable sans lui — premier essai réel : UNE paire, avec Julien
