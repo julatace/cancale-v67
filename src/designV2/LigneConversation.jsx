@@ -15,10 +15,11 @@ import { Etiquette } from './Signature.jsx';
 import './design-v2.css';
 import './messages-v2.css';
 
-export function GroupeConversations({ titre, sous = '', attrs = {}, children }) {
+// `badge` (24 nov., lot agir-si-connecte) : « Lecture seule » du compte quand l'extension ne l'a dans aucun onglet.
+export function GroupeConversations({ titre, sous = '', badge = null, attrs = {}, children }) {
   return (
     <section className="v2m-groupe" {...attrs}>
-      <h2 className="v2m-groupe-titre"><span className="v2m-groupe-nom vrm-sensible" data-stream-type="compte">{titre}</span>{sous ? <span className="v2m-groupe-sous">{sous}</span> : null}</h2>
+      <h2 className="v2m-groupe-titre"><span className="v2m-groupe-nom vrm-sensible" data-stream-type="compte">{titre}</span>{badge}{sous ? <span className="v2m-groupe-sous">{sous}</span> : null}</h2>
       <div className="v2m-carte">{children}</div>
     </section>
   );

@@ -1,0 +1,13 @@
+/* (24 nov., lot agir-si-connecte) La porte : un badge gris clair « Lecture seule », le champ « Répondre », les gestes
+   d'une offre. Gris étagé, AUCUN orange (décision du 23 nov.) ; l'accent n'est pas utilisé ici. */
+.vrm-agir-badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  line-height: 18px; color: var(--n-encre-2, #6e6e73); background: var(--n-inactif, rgba(118,118,128,0.12)); white-space: nowrap; vertical-align: middle; }
+.vrm-agir-badge-point { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.55; }
+.vrm-agir-composer { display: flex; flex-direction: column; gap: 8px; padding: 8px 0 0; }
+.vrm-agir-composer textarea { width: 100%; box-sizing: border-box; min-height: 64px; font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--n-filet, rgba(60,60,67,0.18)); background: var(--n-carte, #fff); color: var(--n-encre, #1d1d1f); resize: vertical; }
+.vrm-agir-composer textarea:disabled { background: var(--n-inactif, rgba(118,118,128,0.12)); color: var(--n-encre-2, #6e6e73); }
+.vrm-agir-offre { display: flex; flex-direction: column; gap: 8px; }
+.vrm-agir-issue { margin: 0; font-size: 13px; color: var(--n-encre-2, #6e6e73); }
+.vrm-agir-feuille-p { margin: 0 var(--n-marge, 16px) 12px; color: var(--n-encre-2, #6e6e73); }
+.vrm-agir-repub { display: inline-flex; flex-direction: column; gap: 4px; }

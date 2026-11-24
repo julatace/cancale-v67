@@ -24,6 +24,12 @@ import './designV2/design-v2.css'; // (8 nov.) style de ./composants/SelectionSe
 import './designV2/argent-v2.css'; // (8 nov.) style de ./composants/SelectionSerie.jsx, gardé à sa place (son écran est chargé à la demande)
 import { estCommandePlateforme, estEcriturePlateforme, refusPanneau, ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from './actionsExtension.js';   // (20 nov., décision de Julien) aucun geste de plateforme dans l'app
 import { poserExtensionIci, ouvrirPanneau } from './ouvrirPanneau.js';
+import { poserFaitsAgir, poserEnvoiAgir } from './agir/porte.js';
+import { texteRaison as texteRaisonAgir } from './agir/Agir.jsx';   // (24 nov., lot agir-si-connecte) LA porte de tous les gestes
+import { requeteConnexions } from './connexions/connexions.js';
+import { lirePresences as lirePresencesAgir, nouvelleCommandeDistance as commandeDistanceAgir, deposerCommandeDistance as deposerDistanceAgir } from './aDistance.js';
+import { CLE_DISCRETION as CLE_DISCRETION_AGIR } from './discretion.js';
+
 import { GrilleMenu, CarteCompte } from './natif/GrilleMenu.jsx';   // (21 nov., onglets-menu) l'écran « Menu » en tuiles
 import { BoutonExtension, RangeeExtension, FeuilleExtension } from './BoutonExtension.jsx';
 // ⟦→ ecrans/Comptabilite.jsx #3⟧
@@ -23730,6 +23736,72 @@ function useComptesEbay() {
   }, []);
   return c;
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// (24 nov., lot agir-si-connecte) LA SOURCE DE LA PORTE — Julien : « faire absolument tout si l'extension est connectée ;
+// si l'extension n'est pas connectée sur un compte, on peut voir les données mais on ne peut pas agir dessus ».
+// Rassemble UNE fois les faits (le pont de CE navigateur, les présences `presence_*` de ses navigateurs, les lignes
+// `ext_appareil_*` pour `depassee` / `arret` (5.448), « Tout arrêter », les comptes eBay reliés, les noms des comptes)
+// et les pose dans src/agir/porte.js ; chaque bouton d'action lit `peutAgir` (src/agir/peutAgir.js). Lectures
+// projetées seulement (jamais `select=data`), relues toutes les 45 s / 2 min et à chaque signe de l'extension.
+// L'envoi (`poserEnvoiAgir`) : UNE commande de la file « À distance » (`cmd_dist_*`, src/aDistance.js), exécutée par
+// l'extension qui a CE compte dans son onglet, par le chemin du clic et tous ses garde-fous (§3).
+// ═══════════════════════════════════════════════════════════════════════════
+const depAgir = () => ({ base: `${SUPABASE_URL}/rest/v1`, entetes: (x) => sbAuth(x), ligne: (l) => withOwner(l), conflit: SB_CONFLICT });
+const aleaAgir = () => { try { const b = new Uint8Array(6); crypto.getRandomValues(b); return Array.from(b, (x) => x.toString(36).padStart(2, '0')).join('').slice(0, 8); } catch (_) { return Math.random().toString(36).slice(2, 10); } };
+poserEnvoiAgir({ deposer: async ({ geste, site, compte, args, confirme, num, avant }) => {
+  const owner = AUTH.user && AUTH.user.id;
+  const c = commandeDistanceAgir({ geste, site, compte, args, owner, confirme, num, avant, alea: aleaAgir() });
+  if (!c) return null;
+  const r = await deposerDistanceAgir(depAgir(), c).catch(() => null);
+  if (r && r.deja) return { deja: r.deja };
+  if (r) { try { window.dispatchEvent(new CustomEvent('vrm:agir-envoye', { detail: { id: c.id, geste, site, compte } })); } catch (_) {} }
+  return r ? { id: c.id } : null;
+} });
+function SourceAgir({ comptesVinted }) {
+  useExtVivante();
+  const sansSouris = useSansSouris();
+  const [presences, setPresences] = useState(undefined);
+  const [appareils, setAppareils] = useState(undefined);
+  const [autres] = useComptesAutresSites(true);
+  const comptesEbay = useComptesEbay();
+  const [tic, setTic] = useState(0);
+  useEffect(() => {
+    let mort = false, enVol = false;
+    const lire = async () => {
+      if (enVol) return; enVol = true;
+      try {
+        const p = await lirePresencesAgir(depAgir()).catch(() => null);
+        if (!mort) setPresences((x) => (p === null && Array.isArray(x) ? x : p));   // une relecture ratée ne fait pas oublier
+      } finally { enVol = false; }
+    };
+    const lireApp = async () => {
+      const q = requeteConnexions((AUTH.user && AUTH.user.id) || '');
+      if (!q) { if (!mort) setAppareils(null); return; }
+      let rows = null; try { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${q}&limit=40`, { headers: sbAuth(), cache: 'no-store' }); rows = r.ok ? await r.json() : null; } catch (_) { rows = null; }
+      if (!mort) setAppareils((x) => (Array.isArray(rows) ? rows : Array.isArray(x) ? x : null));
+    };
+    lire(); lireApp();
+    const m1 = setInterval(lire, 45000), m2 = setInterval(lireApp, 120000), m3 = setInterval(() => setTic((t) => t + 1), 20000);
+    const off = onVmrExt(() => { lire(); });
+    const fe = () => { setTimeout(lire, 4000); };
+    window.addEventListener('vrm:agir-envoye', fe);
+    // Un geste refusé par la porte (le panneau, le pont) : la raison et le geste, dits — rien n'est parti.
+    const fr = (e) => { const t = texteRaisonAgir(e && e.detail); if (t) { try { toast(t); } catch (_) {} } };
+    window.addEventListener('vrm:agir-refus', fr);
+    return () => { mort = true; clearInterval(m1); clearInterval(m2); clearInterval(m3); if (typeof off === 'function') off(); window.removeEventListener('vrm:agir-envoye', fe); window.removeEventListener('vrm:agir-refus', fr); };
+  }, []);
+  useEffect(() => {
+    const noms = { vinted: {}, leboncoin: {}, vestiaire: {}, ebay: {} };
+    for (const a of Array.isArray(comptesVinted) ? comptesVinted : []) if (a && a.vinted_user_id != null) noms.vinted[String(a.vinted_user_id)] = String(a.login || '');
+    for (const site of ['leboncoin', 'vestiaire']) for (const c of Array.isArray(autres && autres[site]) ? autres[site] : []) if (c && c.id != null) noms[site][String(c.id).replace(/^lbc-account:/i, '')] = nomCompteLie(c);
+    const ebay = Array.isArray(comptesEbay) ? Object.fromEntries(comptesEbay.filter((c) => c && c.ref && !c.implicite).map((c) => [c.ref, true])) : undefined;
+    const brut = load(CLE_DISCRETION_AGIR, null);
+    const tout = brut && typeof brut === 'object' && brut.tout && typeof brut.tout === 'object' ? brut.tout : null;
+    poserFaitsAgir({ ...faitsExtensionApp(sansSouris), presences, appareils, toutArrete: tout && tout.on === true ? { on: true, at: Number(tout.at) || 0 } : null, ebay, noms });
+  });
+  void tic;
+  return null;
+}
 // ── eBAY SE RELIT TOUT SEUL (20 octobre) ────────────────────────────────────
 // Julien : « pour eBay ça doit se relire tout seul ou se rafraîchir à
 // l'ouverture de l'app, mais je dois rien avoir à faire ». Avant, les
@@ -38702,6 +38774,8 @@ function AppCoeur() {
       // doigts ou que je glisse ») PLUS AUCUN CHANGEMENT D'ONGLET AU DOIGT. On change d'écran par la
       // barre du bas (ou les flèches ← → du clavier sur ordinateur). Ne pas remettre de balayage.
 >
+      {/* (24 nov.) La source de la porte « agir seulement si l'extension est connectée » (rien n'est dessiné). */}
+      <SourceAgir comptesVinted={accountsLoaded && !baseKO ? vintedAccounts : []}/>
       {/* (17 nov., accessibilité WCAG 2.4.1) Le lien d'évitement : invisible tant qu'on ne tabule pas, il mène au contenu. */}
       <a href="#vrm-contenu" className="vrm-aller-contenu" data-aller-contenu="" onClick={(e)=>{ e.preventDefault(); const m=document.getElementById('vrm-contenu'); if(m){ m.setAttribute('tabindex','-1'); try{ m.focus({preventScroll:true}); }catch(_){} } }}>{tr('a11y.allerContenu')}</a>
       {ordi ? <LateraleNative nComptes={Array.isArray(vintedAccounts) && accountsLoaded && !baseKO ? vintedAccounts.length : null} reduite={lateraleReduite} onReduire={poserLateraleReduite} tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesStables}

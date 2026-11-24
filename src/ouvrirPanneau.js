@@ -18,6 +18,24 @@ export const DOMAINES_PANNEAU = {
   vestiaire: 'https://fr.vestiairecollective.com/',
 };
 
+// (24 nov., lot agir-si-connecte) LA PORTE, aussi ici (défense en profondeur derrière les boutons) : le panneau ne
+// s'ouvre que si l'extension de CE navigateur a le compte visé dans son onglet (src/agir/peutAgir.js, voie 'panneau').
+// `compte` absent = '*' (« le compte de l'onglet ») : le panneau agit au nom de SON onglet et sa garde refuse le reste.
+// Refusé ⇒ rien ne s'ouvre, l'événement `vrm:agir-refus` porte la raison (l'app la dit).
+import { agirMaintenant } from './agir/porte.js';
+export function gesteDuPanneau(page, action) {
+  const p = String(page || ''), a = String(action || '');
+  if (p === 'prix') return a === 'baisser' ? 'baisser' : 'prix';
+  if (p === 'republier') return 'republier';
+  if (p === 'publier') return a === 'creer' || a === 'deposer' ? 'creer' : 'publier';
+  if (p === 'annonces') return a === 'supprimer' ? 'supprimer' : 'pause';
+  if (p === 'messages') return 'repondre';
+  if (p === 'offres') return 'offre';
+  if (p === 'favoris') return 'favoris';
+  if (p === 'vacances') return 'vacances';
+  return 'automatisations';
+}
+
 const propre = (v) => String(v == null ? '' : v).trim().slice(0, 120);
 
 export function lienPanneau({ site = 'vinted', page = '', ids = [], action = '' } = {}) {
@@ -34,6 +52,9 @@ export function lienPanneau({ site = 'vinted', page = '', ids = [], action = '' 
 export function ouvrirPanneau(opts) {
   const url = lienPanneau(opts);
   if (typeof window === 'undefined') return url;
+  const o = opts || {};
+  const v = agirMaintenant(o.site || 'vinted', o.compte == null || o.compte === '' ? '*' : o.compte, gesteDuPanneau(o.page, o.action), 'panneau');
+  if (!v.ok) { try { window.dispatchEvent(new CustomEvent('vrm:agir-refus', { detail: v })); } catch (_) {} return null; }
   let w = null;
   try { w = window.open(url, '_blank'); } catch (_) { w = null; }
   if (w) { try { w.opener = null; } catch (_) {} return url; }

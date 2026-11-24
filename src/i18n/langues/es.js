@@ -20,6 +20,7 @@ import ecran_rentabilite from './es/rentabilite.js';   // (21 nov.) rentabilité
 import ecran_transp_depenses from './es/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './es/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_a_distance from './es/aDistance.js';
+import ecran_agir from './es/agir.js';   // (24 nov.) agir seulement si l'extension est connectée
 import ecran_connexions_ext from './es/connexions.js';   // (24 nov.) « Connexions de l'extension »   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './es/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
 import ecran_styleClarte from './es/styleClarte.js';   // (22 nov.) style et clarté : tableau de bord, état de l’extension
@@ -2409,6 +2410,7 @@ export default {
   ...ecran_ext5438,
   ...ecran_a_distance,
   ...ecran_connexions_ext,
+  ...ecran_agir,
   ...ecran_apresFinale,
   ...ecran_styleClarte,
   ...ecran_relier_retires,

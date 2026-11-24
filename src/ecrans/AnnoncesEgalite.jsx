@@ -363,7 +363,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   };
   const plusVueDe = (a) => { if (!releves || !a) return null; let m = null; for (const x of a.annonces) { const j = plusVueAnnonce(x); if (j != null && (m == null || j > m)) m = j; } return m; };
   // « Republier » d'une annonce plus vue : la feuille Avant | Après de CETTE paire dans le panneau (5.429, `republier-direct`).
-  const republierUne = (x) => { const A = ACTIONS_EXTENSION.republierMaintenant; ouvrirPanneau({ site: 'vinted', page: A.page, ids: [String(x.id)], action: A.action }); };
+  const republierUne = (x) => { const A = ACTIONS_EXTENSION.republierMaintenant; ouvrirPanneau({ site: 'vinted', compte: String(x.compte || x.uid || '*'), page: A.page, ids: [String(x.id)], action: A.action }); };   // (24 nov.) gardé par la porte
   const plusVuesHorsPrio = React.useMemo(() => {
     if (!modele || !releves || !prio) return [];
     const dans = new Set(prio.liste.map((l) => 'vinted#' + l.annonce.id));
