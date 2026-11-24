@@ -14248,7 +14248,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // (24 nov., vitesse-lectures-toucher) Resté vide et relu VIDE : on garde l'objet d'avant (même identité). Avant, chaque
     // `{}` relu était un objet neuf et relançait tout ce qui le lit (mesuré : `pickupUnion` et `retoursEnCours` sur Achats).
     const pareil = (avant, lu) => (memeContenu(avant, lu) ? avant : lu);
-    setSavedPoints(p => vide(p) ? pareil(p, load('vrm_points_relais', [])) : p);
+    setSavedPoints(p => vide(p) ? load('vrm_points_relais', []) : p);
     setBuyByNum(n => vide(n) ? pareil(n, load('vinted_buyprice_by_num', {})) : n);
     setPickupDone(n => vide(n) ? pareil(n, load('vinted_pickup_done', {})) : n);
     setShipDone(n => vide(n) ? pareil(n, load('vinted_ship_done', {})) : n);
