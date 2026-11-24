@@ -136,7 +136,7 @@ Lecture honnête :
 
 Aucun.
 
-## 7. PR B : lectures datées de la 1re visite (24 nov. soir, branche `claude/vitesse-lectures-toucher`, PAS de PR)
+## 7. PR B : lectures datées de la 1re visite (24 nov. soir, branche `claude/vitesse-lectures-toucher`)
 
 Le crochet `LECTURES=1` du banc `vitesse-iphone` est maintenant dans le banc. Il écrit chaque lecture de la base pendant une
 1re visite, datée depuis le toucher. Mesure : build de la PR A, 1 passe, iPhone 390 ×4, volume de Julien, charge 18,7.
@@ -157,4 +157,50 @@ Ce que ça dit :
 - Après « prêt », Annonces relit `vinted_suivi_{compte}` compte par compte, une requête à la fois (15 lectures de +5,7 à
   +11 s). Cela ne retarde pas « prêt », mais ces lectures occupent le réseau pendant les premières secondes à l'écran.
 
-Pas fait : le code de PR B. Aucun AB : il n'y a pas encore de changement à comparer.
+(Le code de PR B : §8.)
+
+## 8. PR B : le code (24 nov. nuit, branche `claude/vitesse-lectures-toucher`)
+
+Repris d'un agent arrêté (ses deux commits + son travail non commité, commité tel quel puis vérifié). Mesuré d'abord
+(`vitesse-iphone`, `CALCULS=deps` : à chaque calcul fait, les dépendances qui ont CHANGÉ — nouveau crochet, et les durées
+par calcul, `window.__vrmCalculsMs`), puis corrigé.
+
+### Ce qui relançait les calculs d'Achats
+- `pickupUnion` 5 fois par instance (3 instances) : 3 fois sur des entrées dont seule l'IDENTITÉ changeait. Le montage de
+  chaque écran rejoue `onCloudReady` (le nuage est déjà là ⇒ tout de suite) : `setPickupDone(n => vide(n) ? load(…) : n)` rendait
+  un `{}` NEUF pour un `{}` vide, `setNumeros(load(…))` un objet neuf identique ; `suivisEnvoyes`, `txSuivisColis`,
+  `vintedToPickup` recalculés sur les mêmes n°. ⇒ `memeContenu` / `useMemeContenu` (src/calculParesseux.js) : un contenu
+  identique garde l'objet d'avant (Set : mêmes éléments ; liste : mêmes objets ; objet simple : même JSON ; dans le doute,
+  la valeur neuve passe). Appliqué à `useStateCle` (relecture d'une clé), aux deux blocs `onCloudReady` de `Comptabilite`
+  (fiches, ventes masquées, colis retirés, bordereaux…), à `suivisEnvoyes`, `vintedToPickup`, `txSuivisColis`,
+  `annoncesVendues`. Après : **2 fois par instance** (le 1er rendu, l'arrivée des e-mails de suivi).
+- `cartesColis` et `listeEnvoyes` : une fois PAR RENDU (11 à 18 fois, ~1,1 s cumulée sur Achats ×4). ⇒ `useCalculParVersion` :
+  gardé tant que ses données ne changent pas (la liste de tout ce qu'il lit, 43 et 39 liaisons, au plus 60 s car il lit
+  l'heure). La liste est vérifiée par `scripts/audit-calcul-par-version.cjs`, qui refait l'analyse des lectures (Babel) :
+  une donnée lue absente de `cle()` ⇒ rouge. Deux identités neuves à chaque rendu empêchaient la garde : `useVcLocal()`
+  (objet neuf, maintenant le même tant que son contenu ne change pas) et `infosAchatsLues` (`{}` neuf ⇒ `INFOS_ACHATS_AUCUNE`).
+  Après : 4 calculs sur Achats, 6 sur Ventes.
+
+### Annonces
+- La liste des transactions projetée : lue UNE fois (rejointe en cours, gardée 10 min, oubliée au signal de l'extension et au
+  retour du réseau), lancée au toucher (agent précédent). `lireTout` : la 1re page demande le nombre estimé de lignes
+  (`Prefer: count=estimated`), les pages suivantes partent ENSEMBLE (une page ratée ⇒ reprise une par une ; seule une page
+  courte dit « fini »).
+- `lirePreuvesVenteVinted` : les bordereaux (`harvest_%_label_%`) partent avec les transactions au lieu d'après (ils n'en
+  dépendent pas) — les ventes à juger partent ~1 s plus tôt.
+- Les relevés « plus vue » (`vinted_suivi_{compte}`) : plusieurs comptes par lecture (`lireSeriesComptes`, 60 annonces au
+  plus, `id=in.(…)`, projeté), deux à la fois, partis quand l'écran est calme (`requestIdleCallback`, Safari : 1,5 s).
+  15 lectures → 3 au volume de Julien. Un paquet raté ⇒ ses comptes « pas su » (aucune étiquette).
+- Pas fait : lancer au toucher toute la 1re vague d'Annonces (une vingtaine de lectures de composants différents ; il
+  faudrait recopier leurs adresses exactes). La 2e page du coffre attend encore la 1re (il faut le nombre de lignes).
+
+### Preuves
+- `chiffres-volume` (A = PR A `076f9f462`, G = cette branche) : **35/35 relevés identiques, 12/12 publications identiques**.
+- Garde `scripts/bancs/calculs-ecran-montre.cjs` (15 comptes : 3 pages de transactions) + PLAFOND (une fois par version des
+  données) + relevés groupés + pages ensemble : **rouge sur A** (9 défauts : `pickupUnion` 4, `cartesColis` 12/15,
+  `listeEnvoyes` 15, pages l'une après l'autre, 15 relevés pour 180 annonces), **vert sur G** (2 · 4 · 6 · 5, 3 relevés),
+  **rouge par mutation** (build M : `useMemeContenu` et `useCalculParVersion` réaffaiblis, 7 annonces par relevé : 4 défauts).
+- `audit-calcul-par-version` (nouveau), `audit-tdz`, `audit-magasin-groupe` 7/7, `audit-memo-court` 21/21,
+  `audit-apres-finale-app` 40/40 : verts. Audits qui lisaient le texte changé, suivis (mêmes règles) : `audit-identite`,
+  `audit-qr-capture-mr`, `audit-memo-court`, `audit-apres-finale-app`. Les autres audits rouges le sont aussi sur A.
+- AB : §8 bis.
