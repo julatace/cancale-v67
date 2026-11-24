@@ -5,7 +5,8 @@
    côté (jamais la couleur seule), le détail au survol (`title`). */
 @layer vrm-natif {
   .n-gr > .n-carte-corps > .n-segmente, .n-gr .n-carte-corps > [role="radiogroup"] { margin: 4px 16px 8px; }
-  .n-gr .n-tuiles { margin: 4px 0 0; }
+  .n-gr .n-tuiles { margin: 4px 16px 0; }
+  @media (min-width: 700px) { .n-gr .n-tuiles-grille { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   .n-gr-tete { margin: 14px 16px 4px; font: var(--n-t-second-fort); color: var(--n-encre); }
   .n-gr-note { margin: 6px 16px 10px; font: var(--n-t-legende); color: var(--n-encre-2); }
   .n-gr-manque { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 8px 16px; }
