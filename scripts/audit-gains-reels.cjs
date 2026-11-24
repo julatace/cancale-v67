@@ -198,10 +198,10 @@ const SOURCES = { at: Date.now(), sansAchat: 4, achatPasLu: 0, vintedLus: true, 
   const attr = (h, a) => { const m = h.match(new RegExp(a + '="([^"]*)"')); return m ? m[1] : null; };
   dit(attr(H, 'data-gr-net') === String(totalNet) && attr(H, 'data-gr-nnet') === String(connues.length) && attr(H, 'data-gr-n') === String(eur.length), 'V1 la vue montre le net total et sa couverture (data-gr-*)');
   const txt = H.replace(/<[^>]+>/g, ' ');
-  dit(txt.includes(I18N.tr('gr.sur', { k: String(connues.length), n: String(eur.length) })), 'V2 partiel ⇒ « sur K des N ventes » écrit à côté du total', txt.slice(0, 200));
+  dit(txt.includes(I18N.tr('gr.sur', { k: connues.length, n: eur.length })), 'V2 partiel ⇒ « sur K des N ventes » écrit à côté du total', txt.slice(0, 200));
   dit(!/au moins/i.test(txt), 'V3 jamais « au moins » sur un bénéfice (une paire au prix inconnu peut être à perte)');
-  dit(attr(H, 'data-gr-sansachat') === String(G.total.sansAchat) && /data-gr-saisir/.test(H) && txt.includes(I18N.tr('gr.sansAchat', { n: String(G.total.sansAchat) })), 'V4 le manque est NOMMÉ (« N ventes sans prix d’achat ») avec le bouton « Saisir »');
-  dit(txt.includes(I18N.tr('gr.ecartees', { n: '1' })) && txt.includes(I18N.tr('gr.horsEuro', { n: '2' })), 'V5 autre devise : écartée ET dite (Vinted, eBay)');
+  dit(attr(H, 'data-gr-sansachat') === String(G.total.sansAchat) && /data-gr-saisir/.test(H) && txt.includes(I18N.tr('gr.sansAchat', { n: G.total.sansAchat })), 'V4 le manque est NOMMÉ (« N ventes sans prix d’achat ») avec le bouton « Saisir »');
+  dit(txt.includes(I18N.tr('gr.ecartees', { n: 1 })) && txt.includes(I18N.tr('gr.horsEuro', { n: 2 })) && /1 vente écartée/.test(txt), 'V5 autre devise : écartée ET dite (Vinted, eBay)');
   dit(attr(H, 'data-gr-meilleurs') === G.modele.meilleurs.join('|') && !/data-gr-groupe="new balance\|550"[^>]*data-gr-meilleurs/.test(H), 'V6 la vue range exactement ce que le module classe');
   const Hp = html('paire');
   dit((Hp.match(/data-gr-porte="1"/g) || []).length === Math.min(5, G.total.sansAchat), 'V7 par paire : chaque vente sans prix d’achat est une porte de saisie');

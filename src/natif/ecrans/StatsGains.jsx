@@ -36,22 +36,22 @@ export default function StatsGains({ G, sur = '', montant = (x) => String(x), Ic
     <>
       <Tuiles attrs={{ 'data-gr-tuiles': '' }}>
         <Tuile libelle={tr('gr.gagne')} valeur={Tt && Tt.net != null ? signe(Tt.net) : null}
-          detail={!Tt ? (attente ? tr('v2.jour.lecture') : tr('gr.pasSu')) : Tt.net == null ? (Tt.n ? tr('gr.aucunAchat') : tr('gr.aucuneVente')) : Tt.partiel ? tr('gr.sur', { k: nombre(Tt.nNet), n: nombre(Tt.n) }) : tr('gr.toutes', { n: nombre(Tt.n) })}
+          detail={!Tt ? (attente ? tr('v2.jour.lecture') : tr('gr.pasSu')) : Tt.net == null ? (Tt.n ? tr('gr.aucunAchat') : tr('gr.aucuneVente')) : Tt.partiel ? tr('gr.sur', { k: Tt.nNet, n: Tt.n }) : tr('gr.toutes', { n: Tt.n })}
           attrs={{ 'data-gr-net': Tt ? c(Tt.net) : '', 'data-gr-n': Tt ? String(Tt.n) : '', 'data-gr-nnet': Tt ? String(Tt.nNet) : '', 'data-gr-partiel': Tt && Tt.partiel ? '1' : '' }}/>
         <Tuile libelle={tr('gr.parPaire')} valeur={Tt && Tt.netMoyen != null ? signe(Tt.netMoyen) : null}
           detail={Tt && Tt.netMoyen != null && Tt.caNet ? tr('gr.marge', { p: nombre(Math.round((Tt.net / Tt.caNet) * 100)) }) : ''} attrs={{ 'data-gr-moyen': Tt ? c(Tt.netMoyen) : '' }}/>
         <Tuile libelle={tr('gr.delai')} valeur={Tt && Tt.delaiMoyen != null ? jours(Tt.delaiMoyen) : null}
-          detail={Tt && Tt.delaiMoyen != null ? tr('gr.datees', { k: nombre(Tt.nDelai), n: nombre(Tt.n) }) : Tt ? tr('gr.pasDatees') : ''} attrs={{ 'data-gr-delai': Tt && Tt.delaiMoyen != null ? String(Tt.delaiMoyen) : '' }}/>
+          detail={Tt && Tt.delaiMoyen != null ? (Tt.nDelai < Tt.n ? tr('gr.datees', { k: Tt.nDelai, n: Tt.n }) : '') : Tt ? tr('gr.pasDatees') : ''} attrs={{ 'data-gr-delai': Tt && Tt.delaiMoyen != null ? String(Tt.delaiMoyen) : '' }}/>
       </Tuiles>
       {Tt && Tt.sansAchat > 0 ? (
         <div className="n-gr-manque" data-gr-sansachat={String(Tt.sansAchat)}>
-          <p>{tr('gr.sansAchat', { n: nombre(Tt.sansAchat) })}</p>
+          <p>{tr('gr.sansAchat', { n: Tt.sansAchat })}</p>
           <Actions elements={[{ cle: 'saisir', icone: ic('pencil'), libelle: tr('gr.saisir'), onClick: saisirTout, plein: true, attrs: { 'data-gr-saisir': '' } }]}/>
         </div>
       ) : null}
       {Tt && (Tt.ecartees > 0 || Tt.horsEuro > 0) ? (
         <p className="n-gr-note" data-gr-ecartees={String(Tt.ecartees)} data-gr-horseuro={Tt.horsEuro == null ? '' : String(Tt.horsEuro)}>
-          {[Tt.ecartees > 0 ? tr('gr.ecartees', { n: nombre(Tt.ecartees) }) : '', Tt.horsEuro > 0 ? tr('gr.horsEuro', { n: nombre(Tt.horsEuro) }) : ''].filter(Boolean).join(' · ')}
+          {[Tt.ecartees > 0 ? tr('gr.ecartees', { n: Tt.ecartees }) : '', Tt.horsEuro > 0 ? tr('gr.horsEuro', { n: Tt.horsEuro }) : ''].filter(Boolean).join(' · ')}
         </p>
       ) : null}
     </>
@@ -59,7 +59,7 @@ export default function StatsGains({ G, sur = '', montant = (x) => String(x), Ic
 
   return (
     <Colonne pleine>
-      <Carte titre={tr('gr.titre')} sousTitre={vue === 'source' ? tr('gr.source.periode') : sur} className="n-gr"
+      <Carte titre={tr('gr.titre')} sousTitre={sur} className="n-gr"
         attrs={{ 'data-ps-bloc': 'gains', 'data-gr-vue': vue, 'aria-busy': attente ? 'true' : undefined }}>
         {segments}
         {haut}
@@ -101,7 +101,7 @@ function VueGroupes({ A, vue, signe, jours }) {
   if (!A) return <Rangee titre={tr(vue === 'source' ? 'rs.pasSu' : 'gr.pasSu')} attrs={{ 'data-gr-passu': '' }}/>;
   const parK = new Map(A.groupes.map((g) => [g.k, g]));
   const nom = (g) => (g.pasSaisie ? tr('rs.pasSaisie') : g.autres ? tr('gr.autres') : g.nom);
-  const sous = (g) => [tr('gr.ventes', { n: nombre(g.n) }), g.netMoyen != null && g.nNet < g.n ? tr('gr.surK', { k: nombre(g.nNet) }) : '',
+  const sous = (g) => [tr('gr.ventes', { n: g.n }), g.netMoyen != null && g.nNet < g.n ? tr('gr.surK', { k: g.nNet }) : '',
     g.delaiMoyen != null ? tr(vue === 'source' ? 'gr.delaiAchat' : 'gr.venduEn', { d: jours(g.delaiMoyen) }) : ''].filter(Boolean).join(' · ');
   const moyen = (g) => (g.netMoyen == null ? '—' : g.partiel ? tr('rs.auPlus', { p: signe(g.netMoyen) }) : signe(g.netMoyen));
   const rang = (g) => <Rangee key={g.k} titre={nom(g)} sousTitre={sous(g)} sousLignes={2} valeur={moyen(g)} valeurForte detailValeur={tr('gr.parPaireCourt')}
@@ -110,12 +110,13 @@ function VueGroupes({ A, vue, signe, jours }) {
   const max = Math.max(1, ...liste.map((g) => Math.abs(g.netMoyen || 0)));
   return (
     <>
+      {vue === 'source' ? <p className="n-gr-note" data-gr-source-tout="">{tr('gr.source.periode')}</p> : null}
       {vue !== 'compte' ? (
         <>
           <p className="n-gr-tete">{tr('gr.racheter')}</p>
           <div data-gr-racheter={A.aRacheter.join('|')}>
             {A.aRacheter.length ? A.aRacheter.map((k) => { const g = parK.get(k); return (
-              <Rangee key={k} titre={nom(g)} sousLignes={2} sousTitre={[signe(g.netMoyen) + ' ' + tr('gr.parPaireCourt'), tr(vue === 'source' ? 'gr.delaiAchat' : 'gr.venduEn', { d: jours(g.delaiMoyen) }), tr('gr.ventes', { n: nombre(g.nNet) })].join(' · ')}
+              <Rangee key={k} titre={nom(g)} sousLignes={2} sousTitre={[signe(g.netMoyen) + ' ' + tr('gr.parPaireCourt'), tr(vue === 'source' ? 'gr.delaiAchat' : 'gr.venduEn', { d: jours(g.delaiMoyen) }), tr('gr.ventes', { n: g.nNet })].join(' · ')}
                 valeur={tr('rt.parJour', { p: signe(Math.round(g.score * 100)) })} valeurForte attrs={{ 'data-gr-racheter-k': k, 'data-gr-score': c(g.score * 100) }}/>
             ); }) : <Rangee titre={tr('gr.racheter.rien', { n: MIN_CLASSEMENT })}/>}
           </div>
@@ -138,7 +139,7 @@ function VueGroupes({ A, vue, signe, jours }) {
           })}
         </ul>
       ) : <Rangee titre={tr('v2.ps.top.aucun')}/>}
-      {vue === 'source' && A.sansAchat ? <p className="n-gr-note" data-gr-source-sansachat={String(A.sansAchat)}>{tr('rs.couv.sansAchat', { n: nombre(A.sansAchat) })}</p> : null}
+      {vue === 'source' && A.sansAchat ? <p className="n-gr-note" data-gr-source-sansachat={String(A.sansAchat)}>{tr('rs.couv.sansAchat', { n: A.sansAchat })}</p> : null}
     </>
   );
 }
