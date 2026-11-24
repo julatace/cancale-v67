@@ -44,6 +44,10 @@ nommément (un autre ajout reste refusé) :
   · 5.420.0 (21 nov., ext-5420, « bordereaux en un seul PDF ») : `pdf-lib.min.js` (pdf-lib 1.17.1, MIT, le fichier
     dist tel quel), `pdf-lib.LICENSE.txt` (ses licences) et `vrm-pdf.js` (l'assembleur) membres du paquet, injectés À LA
     DEMANDE par background.js (`chrome.scripting.executeScript`, `files`, aucun bloc du manifeste) — rien d'autre.
+  · (24 nov., lot agir-tout 5.450, rouges du job CI « regles ») membres RÉELS de la base commune, publiés partout,
+    approuvés nommément : `lbc-ecrire.js` et `vc-ecrire.js` (écrire sur Leboncoin / Vestiaire), `vrm-appris.js` (les
+    gestes appris), `vrm-depot.js` et `vrm-depot-aussi.js` (le dépôt préparé), `vrm-trouver.js` (le repérage commun) —
+    rien d'autre.
 """
 from pathlib import Path
 import zipfile
@@ -56,7 +60,7 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
     AJOUTS_COMMUNS = [  # blocs de la base commune approuvés après la 5.319 (sans compat-orion.js)
         ['vrm-regles-achat.js', 'vinted-infos.js'],
     ]
-    membres_attendus = set(ancien.namelist()) | {'oauth-retour.js'} | {n for b in AJOUTS_COMMUNS for n in b} | {'vrm-mots.js'} | {'vrm-ui.js', 'vrm-action.js'} | {'vrm-dressing.js', 'vrm-formulaire.js'} | {'pdf-lib.min.js', 'pdf-lib.LICENSE.txt', 'vrm-pdf.js'}
+    membres_attendus = set(ancien.namelist()) | {'oauth-retour.js'} | {n for b in AJOUTS_COMMUNS for n in b} | {'vrm-mots.js'} | {'vrm-ui.js', 'vrm-action.js'} | {'vrm-dressing.js', 'vrm-formulaire.js'} | {'pdf-lib.min.js', 'pdf-lib.LICENSE.txt', 'vrm-pdf.js'} | {'lbc-ecrire.js', 'vc-ecrire.js', 'vrm-appris.js', 'vrm-depot-aussi.js', 'vrm-depot.js', 'vrm-trouver.js'}
     assert membres_attendus == noms, f'Membres ajoutés ou retirés : {sorted(membres_attendus ^ noms)}'
     version = json.loads(nouveau.read('manifest.json'))['version']
     attendue = json.loads((ext/'manifest.json').read_text('utf8'))['version']
@@ -109,6 +113,24 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
     assert sorted(orion_mots) == avec_mots, f'{MOTS} : blocs Orion {sorted(orion_mots)} ≠ blocs communs {avec_mots}'
     for c in commun['content_scripts']:
         c['js'] = sans_mots(c['js'])
+    # (24 nov., 5.450) Les membres RÉELS approuvés nommément : chaque bloc Orion qui en porte un est EXACTEMENT un bloc de la
+    # base commune (mêmes pages, même moment, mêmes scripts dans le même ordre) précédé de compat-orion.js ; puis ils sont
+    # retirés des deux côtés (un bloc qui n'en avait que ceux-là disparaît) — le reste est jugé exactement comme avant.
+    NOUVEAUX = {'lbc-ecrire.js', 'vc-ecrire.js', 'vrm-appris.js', 'vrm-depot-aussi.js', 'vrm-depot.js', 'vrm-trouver.js'}
+    _bloc = lambda c: json.dumps({**c, 'js': c['js']}, sort_keys=True)
+    _communs = {_bloc(c) for c in commun['content_scripts']}
+    for c in m_nouveau['content_scripts']:
+        if NOUVEAUX & set(c['js']):
+            assert c['js'][0] == 'compat-orion.js' and _bloc({**c, 'js': c['js'][1:]}) in _communs, f'Bloc Orion {c["js"]} : pas exactement un bloc de la base commune'
+    def _retirer(blocs, pre):
+        out = []
+        for c in blocs:
+            js = [x for x in c['js'] if x not in NOUVEAUX]
+            if js == pre and js != c['js']: continue
+            out.append({**c, 'js': js})
+        return out
+    m_nouveau['content_scripts'] = _retirer(m_nouveau['content_scripts'], ['compat-orion.js'])
+    commun['content_scripts'] = _retirer(commun['content_scripts'], [])
     # Hôtes que la base commune a RETIRÉS depuis la référence (jamais ajoutés).
     hotes_communs = set(commun.get('host_permissions', [])) | {h for c in commun['content_scripts'] for h in c['matches']}
     retires = {h for h in m_ancien['permissions'] if h.startswith('https://') and h not in hotes_communs}
