@@ -146,9 +146,14 @@ async function suivre(pg, segs) {
       await pg.waitForTimeout(800);
       r = await pg.evaluate(TROUVER, { nom, premier: true, dernier });
     }
-    // Un écran chargé à la demande (« Chargement… ») : on le laisse arriver, 9 s au plus.
+    // Un écran chargé à la demande (« Chargement… ») : on le laisse arriver, 9 s au plus. Sous charge, un toucher
+    // pendant un rendu peut se perdre : si le nom d'AVANT est encore à l'écran, on le touche une seconde fois.
     for (let k = 0; !r.trouve && i > 0 && k < 6; k++) {
       await pg.waitForTimeout(1500);
+      if (k === 2) {
+        const avant = await pg.evaluate(TROUVER, { nom: segs[i - 1], premier: i - 1 === 0, dernier: false });
+        if (avant.trouve && avant.cliquable) await pg.locator('[data-banc-chemin]').first().click({ timeout: 4000 }).catch(() => {});
+      }
       r = await pg.evaluate(TROUVER, { nom, premier: false, dernier });
     }
     // Un SITE (« Annonces → Leboncoin ») : il se choisit dans le menu de plateforme en tête de l'écran, qui n'apparaît
@@ -181,7 +186,8 @@ async function suivre(pg, segs) {
   });
   try { await new Promise((res, rej) => { srv.once('error', rej); srv.listen(PORT, res); }); }
   catch (e) { console.log(`❌ port ${PORT} pris — relance ce banc seul`); process.exit(1); }
-  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] });
+  const lancer = () => chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] });
+  let nav = await lancer();
   try {
     const partiels = [];
     const erreurs = [];
@@ -189,6 +195,7 @@ async function suivre(pg, segs) {
     let ctx = null, pg = null;
     const nouvellePage = async () => {
       if (ctx) await ctx.close().catch(() => {});
+      if (!nav.isConnected()) { console.log('   (le navigateur s’est fermé : relancé)'); nav = await lancer(); }
       ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
       pg = await ctx.newPage();
       pg.on('pageerror', (e) => erreurs.push(e.message));
