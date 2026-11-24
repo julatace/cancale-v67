@@ -85,6 +85,7 @@ export default {
   "retraits.m.doute": "Forse lo stesso pacco di un altro · da verificare",
   "retraits.m.autre": "Da verificare",
   "retraits.m.horsCompte": "Non contato in «da ritirare»: codice e QR restano finché nulla prova che è stato ritirato o rispedito.",
+  "retraits.m.horsCompteCourt": "Non contato in «da ritirare».",
   "retraits.v.nVerif": {"one": "{n} da verificare", "other": "{n} da verificare"},
   "retraits.v.qrEnGrand": "Mostra il QR in grande",
   "retraits.c.taille": "Taglia {t}",
@@ -422,6 +423,10 @@ export default {
   // (21 nov.) Colis à retirer : prévision par point relais (ext. 5.411)
   "retraits.p.consigne": "locker",
   "retraits.p.comptoir": "banco",
+  "retraits.p.pointRelais": "Punto di ritiro",
+  "retraits.p.echAuj": "ultimo giorno oggi",
+  "retraits.p.echDemain": "ultimo giorno domani",
+  "retraits.p.echAvant": "entro il {date}",
   "retraits.p.rienIci": "Niente da ritirare qui per ora",
   "retraits.p.enRouteVers": "In arrivo a questo punto",
   "retraits.p.prevuAuj": "previsto oggi",
