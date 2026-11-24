@@ -99,17 +99,19 @@ jobs:
           # (scripts/lancer-bancs.cjs, DUREES_CI) et lancés 3 à la fois dans chaque part
           # (BANCS_PARALLELE) : la part 2 dépassait 45 min et était annulée à chaque PR —
           # accessibilite et barre-achats n'avaient plus tourné depuis des jours. Liste
-          # complète, avant/après : node scripts/ci-controles.cjs (docs/passation/2026-11-24-ci-rapide.md).
-          # Part 1 : ventes-e2 (~19 min seul) occupe un ouvrier, les deux autres prennent le reste.
-          - part: 1
-            lot: ventes-e2 accessibilite defilement-navigation imprimer-compte-exact nouveau-vendeur ventes-ligne-propre iphone-reprise garde-ecrans
+          # complète, avant/après : python3 -I scripts/ci-controles.py --diff origin/main (docs/passation/2026-11-24-ci-rapide.md).
+          # ventes-e2 (~19 min seul) est lancé en TROIS morceaux (`banc@SCENARIOS=…`, ses propres
+          # scénarios, tous couverts : scripts/ci-controles.py le vérifie). Parts équilibrées à
+          # ~12 min de travail chacune (3 ouvriers), durées mesurées le 24 nov.
           # budget-vitesse (11 nov.) : lectures, octets, doublons, lignes entières et JS par
           # écran principal, contre scripts/budget-vitesse.json (~5 min). Lancé SEUL avant les
           # autres (BANCS_SEULS, défaut de lancer-bancs) : il compte des lectures « jusqu'au calme ».
+          - part: 1
+            lot: budget-vitesse ventes-e2@SCENARIOS=jeu,exclu statut-colis ventes-ligne-propre annonces-actions journee-coherence garde-ecrans colis-retirer-propre retraits-suivi
           - part: 2
-            lot: budget-vitesse navigation-tache chiffres-coherents statut-colis morceau-perime journee-coherence
+            lot: navigation-tache chiffres-coherents accessibilite defilement-navigation nouveau-vendeur barre-achats morceau-perime
           - part: 3
-            lot: argent-mois accessibilite-clavier annonces-actions barre-achats achats-annules colis-retirer-propre retraits-suivi
+            lot: ventes-e2@SCENARIOS=annul,ko ventes-e2@SCENARIOS=egal,gros,vide argent-mois accessibilite-clavier imprimer-compte-exact iphone-reprise achats-annules
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -177,9 +179,10 @@ jobs:
           BANCS_PORT_BASE: '10030'
           BANCS_TIMEOUT_S: '1800'
           LARGEURS: '390'
-          # (24 nov., ci-rapide) Les mêmes 11 bancs, 3 à la fois (37 à 67 min l'un après l'autre).
+          # (24 nov., ci-rapide) Les mêmes 11 bancs, 3 à la fois (37 à 67 min l'un après l'autre) ;
+          # ventes-e2 (16 min sous WebKit) en trois morceaux de scénarios.
           BANCS_PARALLELE: '3'
-        run: node scripts/lancer-bancs.cjs connexion-claire journee-coherence ventes-e2 colis-retirer-propre retraits-suivi tout-imprimer iphone-reprise nouveau-vendeur defilement-navigation ventes-ligne-propre barre-depuis-journee
+        run: node scripts/lancer-bancs.cjs connexion-claire journee-coherence ventes-e2@SCENARIOS=jeu,exclu ventes-e2@SCENARIOS=annul,ko ventes-e2@SCENARIOS=egal,gros,vide colis-retirer-propre retraits-suivi tout-imprimer iphone-reprise nouveau-vendeur defilement-navigation ventes-ligne-propre barre-depuis-journee
 
   e2e-extension:
     # (11 nov.) L'APP ET LA VRAIE EXTENSION ENSEMBLE : un vrai Chromium (nouveau

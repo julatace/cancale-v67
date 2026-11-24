@@ -25,6 +25,12 @@
 //   BANCS_SEULS       bancs lancés SEULS, avant les autres (défaut : budget-vitesse, qui
 //                     compte des lectures « jusqu'au calme » : un processeur partagé pourrait
 //                     changer l'ordre d'arrivée des réponses).
+//   nom@VAR=v1,v2     (24 nov.) un MORCEAU d'un banc : le même banc lancé avec SA variable
+//                     de choix (ex. `ventes-e2@SCENARIOS=jeu,annul` et
+//                     `ventes-e2@SCENARIOS=exclu,ko,egal,gros,vide`) pour en faire tourner
+//                     les morceaux à la fois. Les morceaux d'un banc doivent couvrir TOUT son
+//                     défaut (scripts/ci-controles.py le vérifie) ; l'exception d'un banc
+//                     (audits-exceptions.json) vaut pour chacun de ses morceaux.
 // Sans argument : le lot de la CI (LOT ci-dessous).
 // ═══════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -76,13 +82,19 @@ const lignesRouges = (sortie) => sortie.split('\n').map((l) => l.replace(/^\s+/,
   .filter((l) => /^(❌|KO)\s/.test(l) && !/défaut\(s\)|rouge\(s\)|échec\(s\)|contrôle\(s\)|banc\(s\)/.test(l))
   .map((l) => l.replace(/^(❌|KO)\s+/, ''));
 
+// « ventes-e2@SCENARIOS=jeu,annul » ⇒ { banc: 'ventes-e2', env: { SCENARIOS: 'jeu,annul' } }.
+const morceau = (nom) => {
+  const m = /^([a-z0-9-]+)@([A-Z][A-Z0-9_]*)=([^@\s]+)$/.exec(nom);
+  return m ? { banc: m[1], env: { [m[2]]: m[3] } } : { banc: nom, env: {} };
+};
 function lancer(nom, port) {
   return new Promise((resolve) => {
     const debut = Date.now();
-    const fichier = path.join(RACINE, 'scripts', 'bancs', nom + '.cjs');
+    const { banc, env: envMorceau } = morceau(nom);
+    const fichier = path.join(RACINE, 'scripts', 'bancs', banc + '.cjs');
     if (!fs.existsSync(fichier)) { resolve({ nom, code: 2, ms: 0, sortie: 'banc introuvable : ' + fichier }); return; }
     const enfant = spawn(process.execPath, [fichier], {
-      cwd: RACINE, env: avecGarde(Object.assign({}, process.env, { BANC_PORT: String(port), PORT: String(port) })), stdio: ['ignore', 'pipe', 'pipe'], detached: true,
+      cwd: RACINE, env: avecGarde(Object.assign({}, process.env, envMorceau, { BANC_PORT: String(port), PORT: String(port) })), stdio: ['ignore', 'pipe', 'pipe'], detached: true,
     });
     let sortie = '';
     // (24 nov.) Ligne par ligne : plusieurs bancs à la fois écrivent dans le même journal,
@@ -107,11 +119,14 @@ function lancer(nom, port) {
 (async () => {
   // Chaque banc garde le port de SON rang dans la liste (comme avant), quel que soit l'ordre de départ.
   const taches = noms.map((nom, k) => ({ nom, port: BASE + k + 1, k }));
+  // Durée attendue d'un morceau : celle du banc entier, partagée entre ses morceaux.
+  const nMorceaux = {}; for (const t of taches) { const b = morceau(t.nom).banc; nMorceaux[b] = (nMorceaux[b] || 0) + 1; }
+  const duree = (t) => { const b = morceau(t.nom).banc; return (DUREES_CI[b] || 120) / nMorceaux[b]; };
   const res = new Array(taches.length);
   const debutLot = Date.now();
   const seuls = PARALLELE > 1 ? taches.filter((t) => SEULS.includes(t.nom)) : [];
   const file = taches.filter((t) => !seuls.includes(t))
-    .sort((a, b) => PARALLELE > 1 ? ((DUREES_CI[b.nom] || 120) - (DUREES_CI[a.nom] || 120)) || (a.k - b.k) : a.k - b.k);
+    .sort((a, b) => PARALLELE > 1 ? (duree(b) - duree(a)) || (a.k - b.k) : a.k - b.k);
   if (PARALLELE > 1) console.log(`${taches.length} banc(s), ${PARALLELE} à la fois${seuls.length ? ` (seul(s) d'abord : ${seuls.map((t) => t.nom).join(', ')})` : ''}.`);
   // (24 nov.) Combien le processeur a travaillé pendant le lot (Linux, /proc/stat) : la mesure
   // qui dit si l'on peut lancer plus de bancs à la fois sans les ralentir. Rien n'en dépend.
@@ -125,13 +140,14 @@ function lancer(nom, port) {
   console.log('\n── Bilan des bancs' + (process.env.NAVIGATEUR ? ` (${process.env.NAVIGATEUR})` : ''));
   for (const r of res) {
     const vert = r.code === 0 && !r.tropLong;
-    const exc = EXC[r.nom];
+    const exc = EXC[r.nom] || EXC[morceau(r.nom).banc];
     const rouges = vert ? [] : lignesRouges(r.sortie);
     r.connu = !vert && !r.tropLong && exc && rouges.length > 0 && rouges.every((l) => exc.re.test(l));
     console.log(`${vert ? 'OK ' : r.connu ? 'KO*' : 'KO '} ${r.nom.padEnd(24)} ${(r.ms / 1000).toFixed(0).padStart(4)} s${r.tropLong ? ' (arrêté : trop long)' : r.code ? ` (code ${r.code})` : ''}`);
     if (r.connu) console.log(`     rouge connu (${rouges.length} ligne(s)) — ${exc.raison} (depuis le ${exc.depuis})`);
     else if (!vert && exc) console.log(`     ⚠️ des lignes rouges NOUVELLES, hors de l'exception : ${rouges.filter((l) => !exc.re.test(l)).slice(0, 3).join(' ¦ ')}`);
-    if (vert && exc) console.log(`     ⚠️ exception à retirer de scripts/audits-exceptions.json : ${r.nom} est VERT`);
+    const toutVert = res.filter((x) => morceau(x.nom).banc === morceau(r.nom).banc).every((x) => x.code === 0 && !x.tropLong);
+    if (vert && exc && toutVert) console.log(`     ⚠️ exception à retirer de scripts/audits-exceptions.json : ${r.nom} est VERT`);
   }
   clearInterval(sonde);
   const cpu1 = lireCpu();

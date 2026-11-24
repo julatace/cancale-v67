@@ -124,8 +124,16 @@ def controles_de_ligne(ref, ligne, env, boucle):
             elif f0.endswith('lancer-bancs.cjs'):
                 nav = env_l.get('NAVIGATEUR', 'chromium')
                 regl = ','.join(f'{k}={env_l[k]}' for k in ('LARGEURS', 'THEMES') if k in env_l)
+                moteur = nav + (' ' + regl if regl else '')
+                # « banc@VAR=a,b » : un MORCEAU du banc, rendu tel quel ici ; `lister` le compte
+                # entier seulement si les morceaux du MÊME job (toutes ses parts) couvrent tout
+                # le défaut de VAR, lu dans le banc (`liste('VAR', 'défaut')`).
                 for b in fichiers[1:]:
-                    res.append(('banc', b, nav + (' ' + regl if regl else '')))
+                    m = re.match(r'^([a-z0-9-]+)@([A-Z][A-Z0-9_]*)=(\S+)$', b)
+                    if m:
+                        res.append(('morceau', (m.group(1), m.group(2), frozenset(m.group(3).split(','))), moteur))
+                    else:
+                        res.append(('banc', b, moteur))
             else:
                 regl = ','.join(f'{k}={v}' for k, v in sorted(env_l.items()) if k in ('NAVIGATEUR', 'LARGEURS') or k.startswith('VRM_MESSAGES'))
                 for f in (fichiers if test else fichiers[:1]):
@@ -153,6 +161,7 @@ def lister(ref):
             continue
         wnom = wf.get('name', nom)
         for jid, job in (wf.get('jobs') or {}).items():
+            morceaux = {}
             for mat in matrices(job):
                 bloquant = 'non bloquant' if str(subst(job.get('continue-on-error', False), mat)).lower() == 'true' else 'bloquant'
                 env_job = {k: subst(v, mat) for k, v in (job.get('env') or {}).items()}
@@ -170,7 +179,20 @@ def lister(ref):
                     script = re.sub(r'if \[ "([^"]*)" = "([^"]*)" \]; then(.*?)\n\s*fi', lambda m: m.group(3) if m.group(1) == m.group(2) else '', script, flags=re.S)
                     for l in commandes(script):
                         for sorte, quoi, regl in controles_de_ligne(ref, l, env, boucle):
+                            if sorte == 'morceau':
+                                b, var, vals = quoi
+                                morceaux.setdefault((b, var, regl, b_step), set()).update(vals)
+                                continue
                             lignes.add(f'{wnom} · {sorte} · {quoi} · {regl or "-"} · {b_step}')
+            for (b, var, regl, b_step), vus in morceaux.items():
+                src = lire(ref, f'scripts/bancs/{b}.cjs') or ''
+                d = re.search(r"liste\('" + var + r"',\s*'([^']*)'\)", src)
+                defaut = set(d.group(1).split(',')) if d else None
+                if defaut is not None and defaut <= vus:
+                    lignes.add(f'{wnom} · banc · {b} · {regl or "-"} · {b_step}')
+                else:
+                    manque = ','.join(sorted((defaut or set()) - vus)) or 'défaut illisible'
+                    lignes.add(f'{wnom} · banc · {b} · {regl or "-"} {var} INCOMPLET (manque {manque}) · {b_step}')
     return sorted(lignes)
 
 
