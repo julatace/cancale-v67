@@ -110,8 +110,11 @@ const TROUVER = ({ nom, premier, dernier }) => {
   const CLIC = 'button,a,[role=button],[role=tab],[role=menuitem],[role=option],[role=link],summary,label,[tabindex]';
   const tous = [...document.querySelectorAll('body *')].filter((e) => !e.closest('[aria-hidden="true"]') && (premier || !barre || !barre.contains(e)));
   const correspond = (e) => {
-    if (norm(e.getAttribute('aria-label')) === voulu || norm(e.getAttribute('title')) === voulu) return true;
-    const lignes = String(e.innerText || '').split('\n').map(norm).filter(Boolean);
+    // Un compteur porte son nombre après son nom (« À retirer : 0 », « Reçus · 3 ») : c'est le nom qui compte.
+    const sansNombre = (x) => x.replace(/\s*[:·]\s*[\d—–-][\d\s—–-]*$/, '').trim();
+    const aria = sansNombre(norm(e.getAttribute('aria-label')));
+    if (aria === voulu || norm(e.getAttribute('title')) === voulu) return true;
+    const lignes = String(e.innerText || '').split('\n').map((x) => sansNombre(norm(x))).filter(Boolean);
     if (!(lignes.length > 0 && lignes.length <= 4)) return false;
     // Le dernier nom peut continuer la phrase (« … → Mon abonnement le dit ») : le nom affiché en est le DÉBUT.
     return lignes.includes(voulu) || (dernier && lignes.some((l) => l.length >= 4 && voulu.startsWith(l + ' ')));
@@ -180,19 +183,26 @@ async function suivre(pg, segs) {
   catch (e) { console.log(`❌ port ${PORT} pris — relance ce banc seul`); process.exit(1); }
   const nav = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] });
   try {
-    const ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
-    const pg = await ctx.newPage();
     const partiels = [];
-    const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
-    await pg.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_acces_direct', '1');
-      // Les quatre sites affichés (« Où vends-tu ? ») : sinon Annonces et Ventes ne montrent que Vinted, et un chemin
-      // « Annonces → Leboncoin » serait jugé faux pour une préférence, pas pour un écran.
-      localStorage.setItem('vrm_plateformes_affichees', JSON.stringify({ sites: ['vinted', 'leboncoin', 'ebay', 'vestiaire'], at: Date.now() })); } catch (_) {} }, SESSION);
-    // (§6.6) Playwright prend la DERNIÈRE route d'abord : le « tout le reste coupé » d'abord.
-    await pg.route(/^https?:\/\/(?!localhost)/i, (r) => r.abort());
-    await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
-    await pg.route('**/rest/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: /vinted_accounts/.test(decodeURIComponent(r.request().url())) ? JSON.stringify(COMPTES) : '[]' }));
-    await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+    const erreurs = [];
+    // Une page neuve (aussi après un plantage de l'onglet : machine partagée, mémoire juste — un banc ne meurt pas).
+    let ctx = null, pg = null;
+    const nouvellePage = async () => {
+      if (ctx) await ctx.close().catch(() => {});
+      ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
+      pg = await ctx.newPage();
+      pg.on('pageerror', (e) => erreurs.push(e.message));
+      await pg.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_acces_direct', '1');
+        // Les quatre sites affichés (« Où vends-tu ? ») : sinon Annonces et Ventes ne montrent que Vinted, et un chemin
+        // « Annonces → Leboncoin » serait jugé faux pour une préférence, pas pour un écran.
+        localStorage.setItem('vrm_plateformes_affichees', JSON.stringify({ sites: ['vinted', 'leboncoin', 'ebay', 'vestiaire'], at: Date.now() })); } catch (_) {} }, SESSION);
+      // (§6.6) Playwright prend la DERNIÈRE route d'abord : le « tout le reste coupé » d'abord.
+      await pg.route(/^https?:\/\/(?!localhost)/i, (r) => r.abort());
+      await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
+      await pg.route('**/rest/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: /vinted_accounts/.test(decodeURIComponent(r.request().url())) ? JSON.stringify(COMPTES) : '[]' }));
+      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+    };
+    await nouvellePage();
     // Le premier écran doit être l'app (pas la porte, pas la connexion) — sinon tout rougirait pour rien.
     await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
     const app = await pg.waitForSelector('nav[data-n-onglets]', { timeout: 60000 }).then(() => true, () => false);
@@ -205,14 +215,19 @@ async function suivre(pg, segs) {
       console.log(await pg.evaluate(() => document.body.innerText));
       await pg.screenshot({ path: process.env.SONDE_IMAGE || '/tmp/chemins-aide-sonde.png' });
     } else if (app) for (const c of liste) {
-      const r = await suivre(pg, c.segs);
+      let r = null;
+      for (let essai = 0; essai < 2 && !r; essai++) {
+        try { r = await suivre(pg, c.segs); }
+        catch (e) { if (!/crash|closed|Target/i.test(String(e && e.message))) throw e; console.log(`   (l’onglet a planté sur « ${c.segs.join(' → ')} » : page neuve)`); await nouvellePage(); }
+      }
+      if (!r) r = { bon: false, ou: 0, vu: 'l’onglet a planté deux fois' };
       const nom = c.segs.join(' → ');
       if (r.bon && r.site != null && r.site < c.segs.length) partiels.push(`${nom} (jugé jusqu’à « ${c.segs[r.site - 1]} », un site ensuite)`);
       dit(r.bon, nom, r.bon ? '' : `« ${c.segs[r.ou]} » introuvable${r.ou ? ' après « ' + c.segs.slice(0, r.ou).join(' → ') + ' »' : ' (ni dans la barre du bas, ni dans le menu)'}\n   → écrit dans ${c.ou.slice(0, 3).join(' ; ')}${c.ou.length > 3 ? ` (+${c.ou.length - 3})` : ''}\n   → l’écran montrait : ${r.vu || '—'}`);
     }
     if (partiels.length) console.log(`ℹ️  ${partiels.length} chemin(s) passent par un site (base vide, pas de menu de plateforme) :\n   ${partiels.join('\n   ')}`);
     dit(!erreurs.length, 'aucune erreur de page', erreurs.slice(0, 3).join(' | '));
-    await ctx.close();
+    await ctx.close().catch(() => {});
   } catch (e) { dit(false, 'le banc s’exécute', String(e && e.message || e).slice(0, 200)); }
   finally {
     await nav.close(); srv.close();
