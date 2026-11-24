@@ -19,18 +19,18 @@
 
 /* ── 0. Les jetons, LUS chez la fondation (alias --sbp-* ; les replis ne servent que si studio.css manquait) ─── */
 :is([data-espace="paires"], .vrm-paires-selecteur, .vrm-fp, .vrm-main[data-ecran="annonces"], .vrm-main[data-ecran="garage"], .vrm-main[data-ecran="inventory"]) {
-  --sbp-haut: var(--sb-haut, #EEF6FD); --sbp-bas: var(--sb-bas, #C6DDF0); --sbp-aplat: var(--sb-aplat, #D5E8F6);
-  --sbp-feuille: var(--sb-porcelaine, #FFFFFF); --sbp-feuille2: var(--sb-porcelaine-2, #F7FAFD);
-  --sbp-creux: var(--sb-creux, #E4EEF7);
-  --sbp-encre: var(--sb-encre, #0C1D30); --sbp-encre2: var(--sb-encre-2, #3F5468);
-  --sbp-diode: var(--sb-diode, #0060CC); --sbp-lien: var(--sb-lien, #0055B8);
+  --sbp-haut: var(--sb-haut, #F4F5F7); --sbp-bas: var(--sb-bas, #D5DAE1); --sbp-aplat: var(--sb-aplat, #E1E5EA);
+  --sbp-feuille: var(--sb-porcelaine, #FFFFFF); --sbp-feuille2: var(--sb-porcelaine-2, #F9FAFB);
+  --sbp-creux: var(--sb-creux, #EBEDF0);
+  --sbp-encre: var(--sb-encre, #1C1C20); --sbp-encre2: var(--sb-encre-2, #3F5468);
+  --sbp-diode: var(--sb-diode, #16181D); --sbp-lien: var(--sb-lien, #16181D);
   --sbp-ambre: var(--sb-ambre, #764300); --sbp-point: var(--sb-ambre-point, #E08A12);
   --sbp-o: var(--sb-o, 18 52 96);
-  --sbp-socle: #F1F5F9;
+  --sbp-socle: #F3F5F7;
   --sbp-plan: rgb(255 255 255 / .80);
   --sbp-puits: rgb(255 255 255 / .46);
   --sbp-puits-sh: inset 0 1px 2px rgb(var(--sbp-o) / .13), inset 0 0 0 .5px rgb(var(--sbp-o) / .08);
-  --sbp-k-bg: linear-gradient(180deg, #FFFFFF, #F3F7FB);
+  --sbp-k-bg: linear-gradient(180deg, #FFFFFF, #F6F7F8);
   --sbp-k-sh: inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--sbp-o) / .14), 0 1px 1.5px rgb(var(--sbp-o) / .08), 0 4px 9px -5px rgb(var(--sbp-o) / .26);
   --sbp-k-in: inset 0 1px 2px rgb(var(--sbp-o) / .20), inset 0 0 0 .5px rgb(var(--sbp-o) / .12);
   --sbp-pl-sh: inset 0 .5px 1px rgb(var(--sbp-o) / .26), inset 0 0 0 .5px rgb(var(--sbp-o) / .08), 0 .5px 0 rgb(255 255 255 / .9);
@@ -45,18 +45,18 @@
   --sbp-e-avant: var(--sb-e-avant, 360ms cubic-bezier(.2,.9,.25,1));
 }
 :root[data-theme="dark"] :is([data-espace="paires"], .vrm-paires-selecteur, .vrm-fp, .vrm-main[data-ecran="annonces"], .vrm-main[data-ecran="garage"], .vrm-main[data-ecran="inventory"]) {
-  --sbp-haut: var(--sb-haut, #15263D); --sbp-bas: var(--sb-bas, #060E19); --sbp-aplat: var(--sb-aplat, #0C1829);
-  --sbp-feuille: var(--sb-porcelaine, #16273C); --sbp-feuille2: var(--sb-porcelaine-2, #122135);
-  --sbp-creux: var(--sb-creux, #091320);
-  --sbp-encre: var(--sb-encre, #EAF2FB); --sbp-encre2: var(--sb-encre-2, #9CB0C6);
-  --sbp-diode: var(--sb-diode, #4AA3FF); --sbp-lien: var(--sb-lien, #6CB4FF);
+  --sbp-haut: var(--sb-haut, #27272B); --sbp-bas: var(--sb-bas, #0F0F10); --sbp-aplat: var(--sb-aplat, #19191C);
+  --sbp-feuille: var(--sb-porcelaine, #27272B); --sbp-feuille2: var(--sb-porcelaine-2, #212126);
+  --sbp-creux: var(--sb-creux, #131316);
+  --sbp-encre: var(--sb-encre, #F1F2F4); --sbp-encre2: var(--sb-encre-2, #9CB0C6);
+  --sbp-diode: var(--sb-diode, #F4F4F5); --sbp-lien: var(--sb-lien, #F4F4F5);
   --sbp-ambre: var(--sb-ambre, #F2B65E); --sbp-point: var(--sb-ambre-point, #F2A33A);
   --sbp-o: var(--sb-o, 0 0 0);
-  --sbp-socle: #1C2E46;
-  --sbp-plan: rgb(20 35 54 / .82);
+  --sbp-socle: #2E2E34;
+  --sbp-plan: rgb(35 35 39 / .82);
   --sbp-puits: rgb(0 0 0 / .22);
   --sbp-puits-sh: inset 0 1px 2px rgb(0 0 0 / .55), 0 .5px 0 rgb(255 255 255 / .06);
-  --sbp-k-bg: linear-gradient(180deg, #1D3049, #172840);
+  --sbp-k-bg: linear-gradient(180deg, #303036, #29292E);
   --sbp-k-sh: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .55), 0 4px 10px -5px rgb(0 0 0 / .8);
   --sbp-k-in: inset 0 1px 3px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .5);
   --sbp-pl-sh: inset 0 1px 1.5px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .4), 0 .5px 0 rgb(255 255 255 / .07);
@@ -64,22 +64,22 @@
   --sbp-om-pose: var(--sb-ombre-pose, 0 .5px 1px rgb(0 0 0 / .5), 0 3px 6px -3px rgb(0 0 0 / .7));
   --sbp-om-tuile: var(--sb-ombre-plan, inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8));
   --sbp-om-haut: var(--sb-ombre-avant, inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95));
-  --sbp-halo: rgb(110 160 230 / .10);
+  --sbp-halo: rgb(244 244 245 / .10);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) :is([data-espace="paires"], .vrm-paires-selecteur, .vrm-fp, .vrm-main[data-ecran="annonces"], .vrm-main[data-ecran="garage"], .vrm-main[data-ecran="inventory"]) {
-    --sbp-haut: var(--sb-haut, #15263D); --sbp-bas: var(--sb-bas, #060E19); --sbp-aplat: var(--sb-aplat, #0C1829);
-    --sbp-feuille: var(--sb-porcelaine, #16273C); --sbp-feuille2: var(--sb-porcelaine-2, #122135);
-    --sbp-creux: var(--sb-creux, #091320);
-    --sbp-encre: var(--sb-encre, #EAF2FB); --sbp-encre2: var(--sb-encre-2, #9CB0C6);
-    --sbp-diode: var(--sb-diode, #4AA3FF); --sbp-lien: var(--sb-lien, #6CB4FF);
+    --sbp-haut: var(--sb-haut, #27272B); --sbp-bas: var(--sb-bas, #0F0F10); --sbp-aplat: var(--sb-aplat, #19191C);
+    --sbp-feuille: var(--sb-porcelaine, #27272B); --sbp-feuille2: var(--sb-porcelaine-2, #212126);
+    --sbp-creux: var(--sb-creux, #131316);
+    --sbp-encre: var(--sb-encre, #F1F2F4); --sbp-encre2: var(--sb-encre-2, #9CB0C6);
+    --sbp-diode: var(--sb-diode, #F4F4F5); --sbp-lien: var(--sb-lien, #F4F4F5);
     --sbp-ambre: var(--sb-ambre, #F2B65E); --sbp-point: var(--sb-ambre-point, #F2A33A);
     --sbp-o: var(--sb-o, 0 0 0);
-    --sbp-socle: #1C2E46;
-    --sbp-plan: rgb(20 35 54 / .82);
+    --sbp-socle: #2E2E34;
+    --sbp-plan: rgb(35 35 39 / .82);
     --sbp-puits: rgb(0 0 0 / .22);
     --sbp-puits-sh: inset 0 1px 2px rgb(0 0 0 / .55), 0 .5px 0 rgb(255 255 255 / .06);
-    --sbp-k-bg: linear-gradient(180deg, #1D3049, #172840);
+    --sbp-k-bg: linear-gradient(180deg, #303036, #29292E);
     --sbp-k-sh: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .55), 0 4px 10px -5px rgb(0 0 0 / .8);
     --sbp-k-in: inset 0 1px 3px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .5);
     --sbp-pl-sh: inset 0 1px 1.5px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .4), 0 .5px 0 rgb(255 255 255 / .07);
@@ -87,7 +87,7 @@
     --sbp-om-pose: var(--sb-ombre-pose, 0 .5px 1px rgb(0 0 0 / .5), 0 3px 6px -3px rgb(0 0 0 / .7));
     --sbp-om-tuile: var(--sb-ombre-plan, inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8));
     --sbp-om-haut: var(--sb-ombre-avant, inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95));
-    --sbp-halo: rgb(110 160 230 / .10);
+    --sbp-halo: rgb(244 244 245 / .10);
   }
 }
 
@@ -569,7 +569,7 @@
     border-radius: 28px !important; animation: sbp-plan var(--sbp-e-avant) both;
   }
   :root:root:root:root:root body .vrm-fp.sb-plan .vrm-fp-poignee { display: none !important; }
-  :root:root:root:root:root body:has(.vrm-fp.sb-plan) .vrm-main:is([data-ecran="annonces"], [data-ecran="garage"], [data-ecran="inventory"]) { padding-right: calc(min(460px, 42vw) + 24px) !important; }
+  :root:root:root:root:root body[data-vrm-d14]:not(._) .vrm-main:is([data-ecran="annonces"], [data-ecran="garage"], [data-ecran="inventory"]) { padding-right: calc(min(460px, 42vw) + 24px) !important; }
 }
 @keyframes sbp-plan { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 
@@ -603,7 +603,7 @@
 :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils-champ {
   min-height: 44px !important; height: 44px !important; border-radius: 14px !important; border: 0 !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; color: var(--sbp-encre2) !important;
 }
-:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils-champ input { background: transparent !important; color: var(--sbp-encre) !important; font: 500 15px/1 var(--sbp-texte) !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils-champ input { background: transparent !important; color: var(--sbp-encre) !important; font: 500 16px/1 var(--sbp-texte) !important; }
 :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils-champ input::placeholder { color: var(--sbp-encre2) !important; opacity: 1 !important; }
 :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils :is(.vrm-ui-icone, button) { background: transparent !important; box-shadow: none !important; color: var(--sbp-encre2) !important; }
 /* « • À faire · N › » : un lien, pas une carte. */
@@ -756,14 +756,14 @@
 :root:root:root:root:root:root:root body .vrm-main [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes > .vrm-lvc-geste {
   all: unset; box-sizing: border-box !important; display: inline-flex !important; align-items: center !important; min-height: 44px !important; margin: -13px 0 !important; padding: 0 2px !important;
   max-width: none !important; white-space: nowrap !important; cursor: pointer !important; background: none !important; border: 0 !important; box-shadow: none !important;
-  font: 600 12.5px/18px var(--sbp-texte, var(--vrm-police)) !important; color: var(--sb-lien, var(--d-accent-texte, #0055B8)) !important; -webkit-tap-highlight-color: transparent;
+  font: 600 12.5px/18px var(--sbp-texte, var(--vrm-police)) !important; color: var(--sb-lien, var(--d-accent-texte, #16181D)) !important; -webkit-tap-highlight-color: transparent;
 }
 :root:root:root:root:root:root:root body .vrm-main [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes > .vrm-lvc-geste:active { opacity: .55 !important; }
-:root:root:root:root:root:root:root body .vrm-main [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes > .vrm-lvc-geste:focus-visible { outline: 2px solid var(--sb-diode, #0060CC) !important; outline-offset: 2px !important; border-radius: 6px !important; }
+:root:root:root:root:root:root:root body .vrm-main [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes > .vrm-lvc-geste:focus-visible { outline: 2px solid var(--sb-diode, #16181D) !important; outline-offset: 2px !important; border-radius: 6px !important; }
 /* Leur recherche, creusée ; leurs filtres, un plateau (actif = enfoncé + diode) : le dessin propre à l'espace Paires,
    le même que la liste Vinted (gardé à la fusion de la fondation : sans lui, Leboncoin et Vestiaire perdaient leur plateau). */
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-outils-champ { min-height: 44px !important; height: 44px !important; border-radius: 14px !important; border: 0 !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; }
-:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-outils-champ input { background: transparent !important; color: var(--sbp-encre) !important; font: 500 15px/1 var(--sbp-texte) !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-outils-champ input { background: transparent !important; color: var(--sbp-encre) !important; font: 500 16px/1 var(--sbp-texte) !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-icone { width: 44px !important; height: 44px !important; border-radius: 50% !important; background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; border: 0 !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtres { display: inline-flex !important; gap: 2px !important; padding: 3px !important; border-radius: 14px !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; margin-top: 8px !important; max-width: 100% !important; overflow-x: auto !important; scrollbar-width: none !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtre { height: 38px !important; min-height: 38px !important; padding: 0 13px !important; border: 0 !important; border-radius: 11px !important; background: transparent !important; box-shadow: none !important; color: var(--sbp-encre2) !important; font: 600 14px/1 var(--sbp-texte) !important; position: relative !important; }
@@ -818,7 +818,7 @@
    se posait 6 s sur ces gestes et prenait le toucher (banc studio-paires « ⋯ ⇒ la fiche »). Le temps qu'une paire est
    montée, les messages passent EN HAUT, comme quand une feuille est ouverte. */
 @media (max-width: 760px) {
-  body:has([data-espace="paires"] [data-sb-avant="1"]) .vrm-toasts[data-toasts-place="bas"] { top: calc(12px + env(safe-area-inset-top)) !important; bottom: auto !important; }
+  body[data-vrm-d15]:not(._) .vrm-toasts[data-toasts-place="bas"] { top: calc(12px + env(safe-area-inset-top)) !important; bottom: auto !important; }
 }
 }
 
@@ -832,7 +832,7 @@
    Vignettes : dans le flux de la carte. */
 :root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-lien { display: inline-flex !important; align-items: center !important; gap: 6px !important; align-self: flex-start !important;
   min-height: 44px !important; padding: 0 12px !important; border-radius: 22px !important; font: 600 13px/1.2 Inter, system-ui, sans-serif !important; white-space: nowrap !important; }
-:root:root:root:root:root:root body [data-espace="paires"] button.vrm-ann-relier { border: 1px solid rgb(12 29 48 / .14) !important; background: rgb(255 255 255 / .55) !important; color: var(--sv-encre, #0c1d30) !important; cursor: pointer !important; }
+:root:root:root:root:root:root body [data-espace="paires"] button.vrm-ann-relier { border: 1px solid rgb(28 28 32 / .14) !important; background: rgb(255 255 255 / .55) !important; color: var(--sv-encre, #1C1C20) !important; cursor: pointer !important; }
 :root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-achetee { padding: 0 !important; color: var(--sv-encre-2, #4a5868) !important; font-weight: 550 !important; }
 @media (max-width: 767px) {
   :root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-ann-lien) { height: auto !important; grid-template-rows: 20px 19px auto !important; padding-top: 10px !important; padding-bottom: 8px !important; content-visibility: visible !important; }

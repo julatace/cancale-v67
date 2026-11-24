@@ -190,4 +190,13 @@ export default {
   "accueil.moment.extension.point1": "Solo actúa en nombre de la cuenta abierta en tu pestaña, 50 acciones por hora como máximo.",
   "accueil.moment.extension.point2": "Ninguna eliminación sin tu confirmación; sus automatismos siguen apagados hasta que los actives.",
   "accueil.offres.sansAbonnement": "Sin suscripción (prueba terminada o cancelada), tus datos se quedan: VRM se abre en vista previa — el inicio de cada lista, el resto difuminado, sin acciones. No se borra nada.",
+  // (20 nov., affichage instantané) La mention de la copie d’un écran, peinte AVANT l’app (src/CopieEcran.jsx).
+  "natif.copie.misAJour": "Actualizado {age}",
+  "natif.copie.instant": "ahora mismo",
+  "natif.copie.minutes": {"one": "hace {n} min", "other": "hace {n} min"},
+  "natif.copie.heures": {"one": "hace {n} h", "other": "hace {n} h"},
+  "natif.copie.miseAJour": "Actualizando…",
+  "natif.copie.pasAJour": "Sin actualizar",
+  "natif.copie.reessayer": "Reintentar",
+  "natif.copie.nom": "Última copia de esta pantalla, actualizando",
 };

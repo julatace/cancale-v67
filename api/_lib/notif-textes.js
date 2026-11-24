@@ -45,6 +45,9 @@ export const FAMILLES = [
   // (11 nov., lot alertes-ebay) Une nouvelle annonce eBay pour une recherche dont IL a
   // allumé l'alerte (api/_lib/ebay-alertes.js) : une notification par passage, groupée.
   { id: 'alertesebay', titre: 'Alertes d’achat eBay', def: true },
+  // (17 nov., Julien : « que les personnes puissent se faire coucou ») Quelqu'un d'un de tes
+  // groupes d'accompagnement t'a fait coucou (api/_lib/coucou.js) : une fois par coucou.
+  { id: 'communaute', titre: 'Coucous de la communauté', def: true },
 ];
 
 // Catégorie (le mot que chaque route passe à `pushCategorieActive` et à
@@ -75,6 +78,8 @@ export const FAMILLE_DE = {
   veille: 'rappels',
   // (11 nov.) « Me le rappeler » : un rappel que le vendeur a posé LUI-MÊME (api/_lib/rappels-perso.js).
   rappel: 'rappels',
+  // (16 nov., lot abonnement-clair) Le rappel 3 jours avant un prélèvement de l'abonnement (api/_lib/rappel-prelevement.js).
+  abonnement: 'rappels',
   // (8 nov.) Un compte relié pour la première fois (api/_lib/compte-relie.js) : une fois par compte.
   compte: 'comptes',
   // (11 nov.) Vinted a masqué / fait disparaître / limite (api/_lib/moderation-notif.js).
@@ -83,6 +88,8 @@ export const FAMILLE_DE = {
   avis: 'avis',
   // (11 nov.) Les alertes d'achat eBay (api/_lib/ebay-alertes.js).
   alerteebay: 'alertesebay',
+  // (17 nov.) Un coucou reçu dans un groupe d'accompagnement (api/_lib/coucou.js).
+  coucou: 'communaute',
 };
 // Un type NEUF hérite du réglage de la famille d'où il sort tant qu'il n'est pas
 // posé lui-même : il avait coupé « Ventes », la double vente reste coupée ; il
@@ -125,6 +132,24 @@ export function familleActive(prefs, fam) {
   if (typeof f === 'boolean') return f;
   const cats = Object.keys(FAMILLE_DE).filter((c) => FAMILLE_DE[c] === fam);
   return cats.some((c) => decisionNotif(p, c));
+}
+
+// ── (21 nov., ext. 5.422, lot `pushcapte`) CE QUE L'EXTENSION CAPTE ─────────
+// Julien : « quand l'extension capte une nouvelle vente, une offre reçue, un message
+// reçu, envoie une notification à mes appareils ; réglage par type, allumé par défaut
+// pour vente et offre ». Rangé dans `push_prefs.capte = { ventes, offres, messages }`
+// (Paramètres → Notifications) ; la famille (Ventes, Offres, Messages) décide AVANT :
+// famille coupée ⇒ rien, quel que soit ce réglage (api/_lib/push-capte.js).
+export const CAPTE_TYPES = [
+  { id: 'ventes', cat: 'vente', def: true },
+  { id: 'offres', cat: 'offre', def: true },
+  { id: 'messages', cat: 'message', def: false },
+];
+export function capteActif(prefs, id) {
+  const c = prefs && typeof prefs === 'object' && prefs.capte && typeof prefs.capte === 'object' ? prefs.capte : {};
+  if (typeof c[id] === 'boolean') return c[id];
+  const t = CAPTE_TYPES.find((x) => x.id === id);
+  return t ? t.def : false;
 }
 
 // ── HEURES CALMES ET REGROUPEMENT (5 nov.) ─────────────────────────────────

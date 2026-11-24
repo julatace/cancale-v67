@@ -33,7 +33,7 @@ const importer = async (fichier, muter = (s) => s, remplacer = {}) => {
 
 (async () => {
   const prouve = process.argv.includes('--prouve');
-  const app = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+  const app = require('./_source-app.cjs').sourceApp(R);   // (24 nov.) le moteur vit dans src/ecrans/Comptabilite.jsx : le texte de l'app RECOLLÉ
   const stats = await import('file://' + path.join(R, 'src', 'statsVentes.js'));
   const aDater = await import('file://' + path.join(R, 'src', 'aDaterAnnee.js'));
   // La clé du rythme et le calcul du CA de l'année, LUS dans App.jsx (la règle telle qu'écrite).

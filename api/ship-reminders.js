@@ -24,6 +24,7 @@ import './_lib/sans-bruit.js';
 import crypto from 'node:crypto';
 import { sendPushToAll, pushCategorieActive, prefsDuVendeur, vidangerResume, instantNotif, instantCalme } from './_lib/push.js';
 import { CLE_RAPPELS, MEMO_RAPPELS, lireRappels, rappelsDus, memoApres, texteRappel, texteRappels, lienRappel, TAG_RAPPEL } from './_lib/rappels-perso.js';
+import { LIGNE_PROGRAMME as LIGNE_REPUB_PROG, MEMO_PROGRAMME as MEMO_REPUB_PROG, programmesManques, memoApres as memoRepubApres, texteManque as texteRepubManque, cleManque as cleRepubManque, URL_REPUBLIER, FENETRE_DEPART_MS as FENETRE_REPUB_MS, MARGE_APPAREIL_MS as MARGE_REPUB_MS, MAX_AGE_MS as AGE_REPUB_MS } from './_lib/repub-programme-notif.js';
 import { CLE_REMISES, MEMO_REMISES, lireRemises, remisesDues, memoRemisesApres, texteRappelRemise, texteRappelsRemise, TAG_REMISE, instantRemise } from './_lib/remises-main-propre.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
 import { reglageCalme, reglageSoir, soirALHeure, reglageJours, dansHeuresCalmes } from './_lib/notif-textes.js';
@@ -31,7 +32,11 @@ import { lireJournal, lireLu } from './_lib/journal-notifs.js';
 import { DESTINATIONS, lienNotif } from './_lib/lien-notif.js';
 import { passageFacturesAuto } from './_lib/factures-auto.js';
 // (revue du 5 nov.) Les textes des rappels soir et « offres au mini » : un propriétaire, celui de l'aperçu.
-import { texteSoir, texteOffresMini, texteRetourRappel, texteRetourDepose, texteRetourLivre } from './_lib/notif-apercus.js';
+import { texteSoir, texteOffresMini, texteRetourRappel, texteRetourDepose, texteRetourLivre, texteVendu } from './_lib/notif-apercus.js';
+// (16 nov., lot plateformes-restes) « Vendu ! » pour Leboncoin, eBay et Vestiaire, d'après ce que VRM lit déjà.
+import { MEMO_VENTES_SITES, ventesDesSites, ventesANotifier, donneesVendu } from './_lib/ventes-sites-notif.js';
+import { lbcAnnulee as lbcAnnuleeServeur } from './_lib/ventes-regle.js';
+import { etatCommandeEbay as etatCommandeEbayServeur } from './_lib/ebay-etat-commande.js';
 import { passeNotifsRetours } from './_lib/retour-notifs.js';   // (15 nov., lot retour-parfait)
 import { ID_RETOURS_DEPOSES_CHAMP } from './_lib/retour-suivi.js';
 import { modifierCas } from './_lib/suivi-vinted.js';
@@ -55,7 +60,7 @@ import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/eba
 // (1er nov., audit A4) Les colis Leboncoin et Vestiaire à poster, et les ventes
 // Vestiaire du bilan : les règles de l'app (un propriétaire, importé).
 import { resumeColisSites } from './_lib/colis-sites.js';
-import { ventesVcDe, numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
+import { ventesVcDe, numerosVcAvecLiens, vcVenteAnnulee as vcVenteAnnuleeServeur, dateVenteVc as dateVenteVcServeur } from './_lib/vestiaire-regle.js';
 import { SELECT_DEPART_META, departsParSuivi, txVintedParties } from './_lib/depart-colis.js';
 import { ventesPartiesParPreuve, lirePreuvesDepart } from './_lib/depart-vente.js';
 import { colisVentesEmailServeur, reqVentesEmail, txsDeCommandes } from './_lib/colis-ventes-email.js';
@@ -68,10 +73,11 @@ import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS, MAX_DEPARTS_CRON } from
 import { passageSauvegarde, stockageSupabase, sourceCle } from './_lib/sauvegarde-quotidienne.js';   // (12 nov., agent2-fiabilite-prod)
 import { accesVendeur } from './_lib/abonnement.js';
 import { passageRelances, configurationRelances, adresseDuCompte } from './_lib/relances-essai.js';
+import { passageRappelsPrelevement } from './_lib/rappel-prelevement.js';   // (16 nov.) abonnement sans surprise : 3 jours avant chaque prélèvement
 import { passageClientsPartis } from './_lib/clients-partis.js';
 import { passageSuppressionsPrevues } from './_lib/suppression-differee.js';   // (13 nov., lot 51) « Supprimer mon compte » : 30 jours de grâce
 // (8 nov.) Le bilan du mois par e-mail, pour qui l'a ACTIVÉ (api/_lib/bilan-mois.js).
-import { bilanMoisVendeur, partBilan, ID_CHOIX as ID_CHOIX_BILAN_MOIS, ID_ENVOIS as ID_ENVOIS_BILAN_MOIS } from './_lib/bilan-mois.js';
+import { bilanMoisVendeur, partBilan, ID_CHOIX as ID_CHOIX_BILAN_MOIS, ID_ENVOIS as ID_ENVOIS_BILAN_MOIS, MAIN_RESUME as MAIN_RESUME_MOIS } from './_lib/bilan-mois.js';
 // (15 nov., lot argent-plus) Le bilan de fin de mois en NOTIFICATION, et les seuils de l'année (80 % puis 100 %).
 import { passeBilanMoisPush, passeSeuilsPush, ID_BILAN_PUSH, ID_SEUILS, MAIN_ARGENT } from './_lib/argent-passes.js';
 import { envoyerSmtp } from './_lib/smtp.js';
@@ -80,6 +86,7 @@ import { lireMentions } from './_lib/mentions-legales.js';
 // (8 nov.) Un compte qui n'arrive plus ALORS QUE l'extension travaille : la règle (api/_lib/garde-capture.js).
 import { notifierComptesRelies } from './_lib/compte-relie.js';
 import { notifierModeration } from './_lib/moderation-notif.js';
+import { notifierComptesBloques } from './_lib/compte-bloque-notif.js';
 import { notifierAvisBas } from './_lib/avis-negatif.js';   // (11 nov.) le filet des avis négatifs
 import { demandesDuCron as demandesPrixAchat } from './_lib/prix-achat-demande.js';   // (11 nov., saisie rapide)
 // (9 nov.) Le transporteur des anciens bordereaux, relu dans le texte de leur e-mail.
@@ -269,7 +276,10 @@ async function lireCommandesEbay() {
   });
 }
 // (2 nov., soir) + Vestiaire : « Colis fait » et les N° donnés aux annonces (src/numerosVestiaire.js).
-const MAIN_BILAN = [MAIN_MOTS, 'vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vrm_comptes_exclus', 'vrm_cycle_decisions'];
+// (16 nov., lot ecrans-restes) + `vrm_ventes_importees` : les ventes passées importées d'un autre outil (Paramètres →
+// Importer) — comptées par le bilan comme dans l'app (`importees`, la même règle refabriquée, api/_lib/ventes-regle.js).
+// (21 nov., lot personnel-compta) + `vrm_roles_comptes` : un compte PERSONNEL sort des totaux du bilan (src/rolesComptes.js).
+const MAIN_BILAN = [MAIN_MOTS, 'vinted_accounts_hidden', 'vrm_roles_comptes', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vrm_comptes_exclus', 'vrm_ventes_importees', 'vrm_cycle_decisions'];
 const ensemble = (v) => new Set(Array.isArray(v) ? v.map(String) : []);
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
@@ -326,6 +336,7 @@ async function lireDonneesBilan() {
     comptes, commandes,
     masquesTx: mm ? new Set() : null,   // (29 oct.) une vente ne se masque plus
     masquesComptes: mm ? ensemble(mm.vinted_accounts_hidden) : null,
+    roles: mm ? objet(mm.vrm_roles_comptes) : null,   // (21 nov.) le rôle des comptes : « perso » hors des totaux
     exclusAutres: mm ? objet(mm.vrm_comptes_exclus) : null,
     panneau: panneau === undefined ? null : objet(panneau),
     regle: regle || null,
@@ -343,6 +354,8 @@ async function lireDonneesBilan() {
     // `null` = illisible (le bilan le NOMME) ; ligne absente = aucune vente.
     vestiaire: (vcV === undefined || vcL === undefined) ? null : ventesVcDe({ ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((mm && mm.vrm_vc_numeros) || {}, mm && mm.vrm_vc_liens) }),
     main: mm,
+    // (16 nov.) Ses ventes importées (un tableau ; absent ⇒ aucune). `main` illisible ⇒ `null`, le bilan le NOMME.
+    importees: mm ? (Array.isArray(mm.vrm_ventes_importees) ? mm.vrm_ventes_importees : []) : null,
   };
 }
 
@@ -539,7 +552,7 @@ async function retraitsDuJour(maintenant = Date.now(), jourCible = 0) {
   if (!candidats.length) return { liste: [], txsPar: new Map() };
   const [relaisRow, suivisV, suivisM] = await Promise.all([
     getRow('panel_colis_relais'),
-    fetchPaginated(scoped('app_data?id=like.harvest_%25_suivi_%25&select=id,tx:meta->>tx,suivi:meta->>suivi')),
+    fetchPaginated(scoped('app_data?id=like.harvest_%25_suivi_%25&select=id,tx:meta->>tx,suivi:meta->>suivi,sv:meta->>suivisVinted,sl:meta->>suivisLusAt')),
     fetchPaginated(scoped('app_data?id=like.colis_suivi_%25&select=id,suivi:meta->>suivi,tx:meta->>tx,uid:meta->>uid')),
   ]);
   const liens = liensDesLignes(suivisV, suivisM);
@@ -849,6 +862,8 @@ async function bilanDuMoisVendeur(maintenant = Date.now(), lireDonnees = lireDon
     ecrireEnvois: (data) => ecrireDedup(ID_ENVOIS_BILAN_MOIS, data),
     lireDonnees,
     lirePub: async () => { const m = await getRowProjete('main', ['vrm_benefice_jours']); return m === undefined ? undefined : (m && m.vrm_benefice_jours) || null; },
+    // (22 nov., résumé du mois) Les colis à retirer publiés par l'app et les réglages URSSAF : `main` PROJETÉ (§4.4).
+    lireMain: () => getRowProjete('main', MAIN_RESUME_MOIS),
     adresse: () => adresseDuCompte(owner),
     envoyer: (m) => envoyerSmtp({ hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE,
       de: process.env.RELANCES_EXPEDITEUR, nomDe: 'VRM', ...m }),
@@ -1050,6 +1065,10 @@ async function traiterVendeurApresRelecture() {
     // le filet (une fois par événement, la mémoire du serveur décide).
     let moderation = null;
     try { const r = await notifierModeration(); moderation = { envoye: r.envoye, n: r.n, raison: r.raison }; } catch (e) { moderation = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+    // (19 nov., lot compte-bloque) « Vinted a bloqué … » / « … est débloqué » : le filet (et le seul chemin
+    // d'une extension d'avant la 5.409, qui range l'état du profil sans appeler la route).
+    let comptesBloques = null;
+    try { const r = await notifierComptesBloques(); comptesBloques = { envoye: r.envoye, n: r.n, raison: r.raison }; } catch (e) { comptesBloques = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
     // (11 nov., lot avis-negatif) UN AVIS ≤ SEUIL, extension sans réseau au moment de sa lecture : le filet.
     let avisBas = null;
     try { const r = await notifierAvisBas(); avisBas = { envoye: r.envoye, n: r.n, raison: r.raison }; } catch (e) { avisBas = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
@@ -1096,7 +1115,7 @@ async function traiterVendeurApresRelecture() {
     // (1er nov., audit A4) Les ventes Vestiaire : leur date limite, la règle de Colis.
     const vcR = t ? t.vestiaire : resumeColisSites({ vc: d.vc }).vestiaire;
     const vcDus = vcR ? vcR.overdue + vcR.today + vcR.tomorrow : 0;
-    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: vintedSkip + ' — aucune notification envoyée' };
+    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: vintedSkip + ' — aucune notification envoyée' };
 
     const c = vintedSkip ? null : compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
     // ⚠️ (revue du 22 oct.) `overdue` = une limite LUE (email du bordereau, ou
@@ -1115,19 +1134,19 @@ async function traiterVendeurApresRelecture() {
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedupLu = await getRow('ship_reminder_dedup');
     // (11 nov., M81) un mémo illisible n'est pas « jamais notifié » : rien ne part.
-    if (dedupLu === undefined) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: 'mémo illisible — rien', total };
+    if (dedupLu === undefined) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: 'mémo illisible — rien', total };
     const memeJour = (d) => !!d && d.date === today && d.total === total && (d.nePasPoster || 0) === nePasPoster;
-    if (memeJour(dedupLu)) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: 'déjà notifié', total };
+    if (memeJour(dedupLu)) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       // (11 nov., B130) réservé AVANT l'envoi : deux passages ⇒ une seule notification.
       const res = await reserverDedup('ship_reminder_dedup', memeJour, () => ({ date: today, total, nePasPoster }));
-      if (!res.reserve) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: res.raison === 'deja' ? 'déjà notifié' : 'mémo illisible — rien', total };
+      if (!res.reserve) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: res.raison === 'deja' ? 'déjà notifié' : 'mémo illisible — rien', total };
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, vestiaireDus: vcDus, nePasPoster, vinted: c });
       // (11 nov.) Des colis dus aujourd'hui (ou en retard) : urgent — il passe un jour calme.
       await sendPushToAll({ cat: 'expedier', ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}), ...(overdue + dueToday > 0 ? { urgent: true } : {}) });
     } else await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
-    return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, overdue, aVerifier, dueToday, dueTomorrow, total,
+    return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, overdue, aVerifier, dueToday, dueTomorrow, total,
       ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
       ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, vestiaire: vcR ? { aPoster: vcR.total, dus: vcDus } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }
@@ -1493,6 +1512,51 @@ async function passageGroupe(maintenant = Date.now()) {
   }
   return { fait: true, fenetres: aVider.length, resumes: envoyes, echecs, budgetAtteint, bilans: bilans.slice(0, 50) };
 }
+// (16 nov., lot plateformes-restes) « VENDU ! » LEBONCOIN, eBAY, VESTIAIRE — api/_lib/ventes-sites-notif.js.
+// Une vente NOUVELLE vue dans ce que VRM lit déjà (lbc_ventes, ebay_orders*, vc_ventes) sonne UNE fois
+// (mémo `vrm_ventes_sites_vues` écrit AVANT l'envoi, puis le tag réservé dans `push_dedup`) ; la 1re
+// lecture d'un compte ne sonne jamais (l'historique). Une lecture ratée ⇒ rien d'écrit, rien d'envoyé.
+async function notifsVentesSites(maintenant = Date.now()) {
+  try {
+    const [memo, lbcL, ebay, vcV, vcL, mm] = await Promise.all([
+      getRow(MEMO_VENTES_SITES), getRowProjete('lbc_ventes', ['ventes']), lireCommandesEbay(),
+      getRowProjete('vc_ventes', ['ventes', 'lectures']), getRowProjete('vc_listings', ['liens']), getRowProjete('main', ['vrm_vc_numeros', 'vrm_vc_liens']),
+    ]);
+    if (memo === undefined) return { etat: 'memo-illisible' };
+    const vcLu = vcV === undefined || vcL === undefined || mm === undefined ? null
+      : vcV && vcV.ventes ? ventesVcDe({ ventes: vcV.ventes, lectures: vcV.lectures || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((mm && mm.vrm_vc_numeros) || {}, mm && mm.vrm_vc_liens) }) : null;
+    const parSite = ventesDesSites({ lbc: lbcL && lbcL.ventes ? lbcL.ventes : null, ebay, vestiaire: vcLu },
+      { lbcAnnulee: lbcAnnuleeServeur, etatCommandeEbay: etatCommandeEbayServeur, vcVenteAnnulee: vcVenteAnnuleeServeur, dateVenteVc: dateVenteVcServeur });
+    const r = ventesANotifier(memo, parSite, maintenant);
+    const change = JSON.stringify(r.memoApres.vus) !== JSON.stringify((memo && memo.vus) || {}) || JSON.stringify(r.memoApres.comptes) !== JSON.stringify((memo && memo.comptes) || {});
+    if (!change) return { etat: 'rien', n: 0 };
+    if (!(await ecrireDedup(MEMO_VENTES_SITES, r.memoApres))) return { etat: 'memo-non-ecrit', n: r.nouvelles.length };
+    if (!r.nouvelles.length) return { etat: 'rien', premieres: r.premieres, n: 0 };
+    if (!(await pushCategorieActive('vente'))) return { etat: 'coupe', n: r.nouvelles.length };
+    let envoyees = 0;
+    for (const v of r.nouvelles.slice(0, 10)) {
+      const res = await modifierCas('push_dedup', (d) => { const ks = (d && Array.isArray(d.keys)) ? d.keys.filter((x) => typeof x === 'string') : []; if (ks.includes(v.tag)) return undefined; return { ...(d || {}), keys: [v.tag, ...ks].slice(0, 300) }; });
+      if (res !== true) continue;                                  // déjà sonnée (e-mail Vestiaire) ou pas su : rien
+      const url = v.site === 'vestiaire' ? DESTINATIONS.vcVente({ id: v.id }) : v.site === 'leboncoin' ? lienNotif('ventes', { site: 'leboncoin', cible: 'lbcvente', tx: v.id }) : lienNotif('ventes', { site: 'ebay' });
+      await sendPushToAll({ ...texteVendu(donneesVendu(v)), tag: v.tag, url, cat: 'vente' });
+      envoyees++;
+    }
+    return { etat: 'envoye', n: r.nouvelles.length, envoyees };
+  } catch (e) { return { etat: 'echec' }; }
+}
+async function passageVentesSites(maintenant = Date.now()) {
+  const debut = Date.now();
+  const lignes = await fetchPaginated('app_data?or=(id.eq.lbc_ventes,id.eq.vc_ventes,id.like.ebay_orders*)&select=owner');
+  if (!lignes) return { fait: false, raison: 'pas su' };
+  const owners = [...new Set(lignes.map((x) => x && x.owner && String(x.owner)).filter((o) => o && o !== PROPRIETAIRE_NEUTRE))];
+  let envoyees = 0, echecs = 0, budgetAtteint = false;
+  for (let i = 0; i < owners.length; i += VENDEURS_EN_PARALLELE) {
+    if (Date.now() - debut > 90000) { budgetAtteint = true; break; }
+    const out = await Promise.all(owners.slice(i, i + VENDEURS_EN_PARALLELE).map((o) => contexteVendeur.run({ owner: o }, () => notifsVentesSites(maintenant)).catch(() => ({ etat: 'echec' }))));
+    out.forEach((r) => { if (r && r.envoyees) envoyees += r.envoyees; if (r && r.etat === 'echec') echecs += 1; });
+  }
+  return { fait: true, vendeurs: owners.length, envoyees, echecs, budgetAtteint };
+}
 // (11 nov., lot lbc-plus) LES REMISES EN MAIN PROPRE (api/_lib/remises-main-propre.js) :
 // UNE notification une heure avant le rendez-vous qu'IL a posé (jamais proposé par VRM).
 // Seuls les vendeurs dont `main.data->>vrm_remise_fin` est à venir sont visités (une
@@ -1532,6 +1596,43 @@ async function passageRemises(maintenant = instantNotif()) {
   for (let i = 0; i < owners.length; i += VENDEURS_EN_PARALLELE) {
     if (Date.now() - debut > 120000) { budgetAtteint = true; break; }
     const out = await Promise.all(owners.slice(i, i + VENDEURS_EN_PARALLELE).map((o) => contexteVendeur.run({ owner: o }, () => rappelsRemisesSur(maintenant)).catch(() => ({ etat: 'echec' }))));
+    out.forEach((r) => { if (r && r.etat === 'envoye') envoyees += 1; if (r && r.etat === 'echec') echecs += 1; });
+  }
+  return { fait: true, vendeurs: owners.length, envoyees, echecs, budgetAtteint };
+}
+// (16 nov., lot extension-restes) LA REPUBLICATION PROGRAMMÉE QU'AUCUN APPAREIL N'A LANCÉE
+// (api/_lib/repub-programme-notif.js) : seuls les vendeurs dont l'index de `vrm_repub_programme`
+// (`prochaineFin`, posé par l'app) est passé depuis plus de 15 min et moins de 24 h sont visités
+// (filtre de la base, §4.4) ; la ligne lue PROJETÉE sur `attentes` seule (jamais les réglages) ;
+// le mémo `repub_programme_notif` lu en trois états (illisible ⇒ rien) et écrit AVANT l'envoi,
+// confirmé. Famille « Rappels » coupée ⇒ rien. Le serveur ne lance rien, n'écrit jamais la ligne.
+async function repubProgrammeSur(maintenant = instantNotif()) {
+  try {
+    const l = await getRowProjete(LIGNE_REPUB_PROG, ['attentes']);
+    if (l === undefined) return { etat: 'pas-su' };
+    const attentes = l && Array.isArray(l.attentes) ? l.attentes : [];
+    const memo = await getRow(MEMO_REPUB_PROG);
+    if (memo === undefined) return { etat: 'memo-illisible' };
+    const envoyes = memo && memo.envoyes;
+    const dus = programmesManques(attentes, envoyes, maintenant);
+    if (!dus || !dus.length) return { etat: 'rien-de-du' };
+    if (!(await pushCategorieActive('rappel'))) return { etat: 'coupe', n: dus.length };
+    if (!(await ecrireDedup(MEMO_REPUB_PROG, { envoyes: memoRepubApres(envoyes, dus, maintenant), at: new Date(maintenant).toISOString() }))) return { etat: 'memo-non-ecrit', n: dus.length };
+    const t = texteRepubManque(dus);
+    const envoi = await sendPushToAll({ cat: 'rappel', title: t.title, body: t.body, tag: 'repub-prog-' + dus.map((a) => a.id).sort().join('-').slice(0, 60), cle: 'repub-prog-' + dus.map(cleRepubManque).sort().join('|').slice(0, 120), url: URL_REPUBLIER });
+    return { etat: 'envoye', n: dus.length, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
+  } catch (e) { return { etat: 'echec' }; }
+}
+async function passageRepubProgramme(maintenant = instantNotif()) {
+  const debut = Date.now();
+  const avant = new Date(maintenant - MARGE_REPUB_MS).toISOString(), apres = new Date(maintenant - AGE_REPUB_MS + FENETRE_REPUB_MS).toISOString();
+  const lignes = await fetchPaginated(`app_data?id=eq.${LIGNE_REPUB_PROG}&and=(data->>prochaineFin.lt.${encodeURIComponent(avant)},data->>prochaineFin.gt.${encodeURIComponent(apres)})&select=owner`);
+  if (!lignes) return { fait: false, raison: 'pas su' };
+  const owners = [...new Set(lignes.map((x) => x && x.owner && String(x.owner)).filter(Boolean))];
+  let envoyees = 0, echecs = 0, budgetAtteint = false;
+  for (let i = 0; i < owners.length; i += VENDEURS_EN_PARALLELE) {
+    if (Date.now() - debut > 60000) { budgetAtteint = true; break; }
+    const out = await Promise.all(owners.slice(i, i + VENDEURS_EN_PARALLELE).map((o) => contexteVendeur.run({ owner: o }, () => repubProgrammeSur(maintenant)).catch(() => ({ etat: 'echec' }))));
     out.forEach((r) => { if (r && r.etat === 'envoye') envoyees += 1; if (r && r.etat === 'echec') echecs += 1; });
   }
   return { fait: true, vendeurs: owners.length, envoyees, echecs, budgetAtteint };
@@ -1786,7 +1887,13 @@ async function passageDuCron(req, res, moment, bailEtat) {
     // des remises en main propre. Un échec de l'un n'empêche pas l'autre.
     let remises = null;
     try { remises = await passageRemises(instantNotif()); } catch (e) { remises = { fait: false, raison: String((e && e.message) || e).slice(0, 120) }; }
-    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'groupe', ...r, remises });
+    // (16 nov.) Et la republication programmée qu'aucun appareil n'a lancée (un échec n'empêche rien d'autre).
+    let repubProg = null;
+    try { repubProg = await passageRepubProgramme(instantNotif()); } catch (e) { repubProg = { fait: false, raison: String((e && e.message) || e).slice(0, 120) }; }
+    // (16 nov., lot plateformes-restes) « Vendu ! » Leboncoin, eBay, Vestiaire : le même passage de 15 min.
+    let ventesSites = null;
+    try { ventesSites = await passageVentesSites(Date.now()); } catch (e) { ventesSites = { fait: false, raison: String((e && e.message) || e).slice(0, 120) }; }
+    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'groupe', ...r, remises, repubProg, ventesSites });
     return;
   }
   // (11 nov., lot alertes-ebay) `?moment=alertes` : les ALERTES D'ACHAT eBAY, et RIEN d'autre —
@@ -1843,6 +1950,10 @@ async function passageDuCron(req, res, moment, bailEtat) {
     if (soir && !horaire) { try { sauvegarde = await sauvegardeDuJour(90000); } catch (e) { sauvegarde = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; } }
     let relances = null;
     if (!soir && !reveil) { try { relances = await passageRelances({ jusqua: debutCron + RELANCES_JUSQUA_MS }); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    // (16 nov., lot abonnement-clair) Le rappel 3 jours avant chaque prélèvement (renouvellement, fin d'essai) :
+    // date et montant LUS chez Stripe (api/_lib/rappel-prelevement.js) ; sans STRIPE_SECRET_KEY rien ne part (dit).
+    let rappelsPrelevement = null;
+    if (!soir && !reveil) { try { rappelsPrelevement = await passageRappelsPrelevement({ jusqua: debutCron + RELANCES_JUSQUA_MS + 30000, pousser: (owner, n) => contexteVendeur.run({ owner }, () => sendPushToAll(n)) }); } catch (e) { rappelsPrelevement = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
     // (8 nov.) La part du plafond d'e-mails laissée au bilan du mois : 300 par jour
     // pour tout VRM (Brevo gratuit, `VRM_EMAILS_PAR_JOUR`), moins les e-mails de
     // l'essai déjà partis, 150 au plus (api/_lib/bilan-mois.js `partBilan`).
@@ -1925,7 +2036,7 @@ async function passageDuCron(req, res, moment, bailEtat) {
     const { bilans, echecs } = lot;
     res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(bailEtat === 'pas-su' ? { bail: 'pas-su' } : {}), ...(soir ? { moment: 'soir', ...(horaire ? { passage: 'heure' } : {}) } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
       lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, reportes: lot.reportes, curseur: lot.curseur },
-      bilans, ...(sondes ? { sondes } : {}), ...(sauvegarde ? { sauvegarde } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}), ...(suppressionsPrevues ? { suppressionsPrevues } : {}), ...(controleInst ? { controleInstallation: controleInst } : {}) });
+      bilans, ...(sondes ? { sondes } : {}), ...(sauvegarde ? { sauvegarde } : {}), ...(relances ? { relances } : {}), ...(rappelsPrelevement ? { rappelsPrelevement } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}), ...(suppressionsPrevues ? { suppressionsPrevues } : {}), ...(controleInst ? { controleInstallation: controleInst } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition

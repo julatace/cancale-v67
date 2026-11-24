@@ -1,6 +1,7 @@
 import React from 'react';
 import { PLATEFORMES } from './plateformes.js';
 import './styles-choix-plateformes.css';
+import { BoutonBase } from './composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 export default function ChoixPlateformes({ valeur, relies = {}, pret, onChoix, initial = false }) {
   const [choix, setChoix] = React.useState(valeur);
   const [modifie, setModifie] = React.useState(false);
@@ -16,13 +17,13 @@ export default function ChoixPlateformes({ valeur, relies = {}, pret, onChoix, i
     </button>)}</div>
     <p className="vrm-cp-note">Tu pourras en ajouter dans Paramètres → Affichage → Mes plateformes. Connecter un compte avec l’extension l’affiche aussi automatiquement. Masquer une plateforme ne supprime aucune donnée et ne change aucun total.</p>
     {erreur ? <p role="alert">{erreur}</p> : null}
-    <button className="vrm-b vrm-b-primaire" type="button" disabled={!pret || occupe} aria-busy={occupe || undefined} onClick={async () => {
+    <BoutonBase variante="primaire" disabled={!pret || occupe} aria-busy={occupe || undefined} onClick={async () => {
       if (enCours.current) return;
       if (!choix.length && !Object.values(relies).some(v => v === true)) { setErreur('Choisis au moins une plateforme pour continuer.'); return; }
       enCours.current = true; setOccupe(true);
       try { await onChoix(choix); setModifie(false); setErreur(''); }
       catch (_) { setErreur('Le choix n’a pas pu être enregistré. Tes sélections sont conservées ; réessaie.'); }
       finally { enCours.current = false; setOccupe(false); }
-    }}>{occupe ? 'Enregistrement…' : pret ? initial ? 'Continuer avec ces plateformes' : 'Enregistrer mes plateformes' : 'Chargement de tes préférences…'}</button>
+    }}>{occupe ? 'Enregistrement…' : pret ? initial ? 'Continuer avec ces plateformes' : 'Enregistrer mes plateformes' : 'Chargement de tes préférences…'}</BoutonBase>
   </section>;
 }

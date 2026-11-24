@@ -132,6 +132,7 @@ async function ouvrir(ctx, tab, etiquette) {
   // le temps que l'app passe à demander, recevoir, calculer et rendre ses données, réseau mis à part.
   { const tFin = (process.env.COMPLET ? tComplet : null) ?? tPret; res.donnees_ms = tFin != null && reqs.length ? tFin - reqs[0].t : null; }
   if (process.env.RENDUS) res.rendus = await pg.evaluate((tp) => ({ commits: (window.__commits || []).filter(t => t <= tp).length, compta: (window.__compta || []).filter(t => parseInt(t, 10) <= tp).join(' '), comptaTout: (window.__compta || []).length, comptaParent: (window.__compta || []).filter(t => /p$/.test(t)).length, commitsTout: (window.__commits || []).length }), tPret || 1e9).catch(() => null);
+  if (process.env.POURQUOI) res.pourquoi = await pg.evaluate(() => window.__pourquoi || []).catch(() => null);
   if (process.env.EVAL) res.eval = await pg.evaluate(process.env.EVAL).catch(e => String(e));
   if (process.env.ETATS) res.etats = etats.map(x => x.t + ':' + x.e).join(' ; ');
   if (process.env.DETAIL) {
@@ -151,6 +152,9 @@ async function ouvrir(ctx, tab, etiquette) {
       window.__lt = []; new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lt.push([Math.round(e.startTime), Math.round(e.duration)]); }).observe({ type: 'longtask', buffered: true });
     });
     if (process.env.JALONS) await ctx.addInitScript(() => { window.addEventListener('vrm:save', (e) => { try { const k = e && e.detail && e.detail.k; if (k) performance.mark('vrm:save:' + (e.detail.distant ? '~' : '') + k); } catch (_) {} }); });
+    // POURQUOI=<fichier.js> (17 nov.) : un crochet React posé avant l'app qui note, à chaque rendu validé de
+    // `Comptabilite`, les états (useState/useReducer) qui ont changé — leur rang et un aperçu (jamais la valeur).
+    if (process.env.POURQUOI) await ctx.addInitScript({ path: process.env.POURQUOI });
     if (process.env.RENDUS) await ctx.addInitScript(() => {
       window.__commits = []; window.__compta = [];
       const estCompta = (p) => p && typeof p === 'object' && 'only' in p && 'accounts' in p && 'garageGrid' in p;

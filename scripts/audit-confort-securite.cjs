@@ -393,7 +393,8 @@ const jwt = (o) => `${b64u({ alg: 'HS256' })}.${b64u(o)}.signature`;
     ok(P.apercuAnnonce({}, null, []).prix === '—', 'P1 pas de prix ⇒ « — »');
     const src = sansCommentaires(lire('src/apercuAnnonce.js') + lire('src/ApercuAnnonce.jsx'));
     ok(!/fetch\(|vinted\.fr|XMLHttpRequest|envoyer\(/.test(src), 'P2 aucune requête Vinted (rendu local)');
-    ok(/data-creer-vinted-apercu/.test(lire('src/CreerSurVinted.jsx')), 'P3 « Aperçu » sur chaque fiche de « Créer sur Vinted »');
+    // (20 nov.) l'atelier « Créer sur Vinted » est retiré (dans l'extension) : sa feuille liste les fiches, par N°.
+    ok(/data-creer-vinted/.test(lire('src/App.jsx')) && /<Natif\.Plaque numero=\{f\.numero\}\/>/.test(lire('src/App.jsx')), 'P3 « Créer sur Vinted » montre chaque fiche (N°, titre) avant d’ouvrir l’extension');
   }
   // ═══ M · 130 ═══
   {

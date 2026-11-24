@@ -45,7 +45,7 @@ export const CATEGORIES = [
   ] },
   { id: 'stock', ic: 'tag', groupes: [
     // « Stock et rangement » : le titre d'avant, et le lien « Organisation » dessous (CLAUDE.md §3).
-    { id: 'stock', titre: 'reglages.groupe.stock', items: ['numeros', 'je-vends'], pied: 'stock' },
+    { id: 'stock', titre: 'reglages.groupe.stock', items: ['etiquetage', 'numeros', 'je-vends'], pied: 'stock' },
   ] },
   { id: 'argent', ic: 'euro', groupes: [
     { id: 'compta', items: ['regime', 'prixachat', 'masques', 'objectif-mois'] },
@@ -56,7 +56,7 @@ export const CATEGORIES = [
   { id: 'apparence', ic: 'contraste', groupes: [
     { id: 'langue', items: ['langue', 'apparence', 'sombre', 'zoom', 'taille-texte'] },
     { id: 'ecrans', titre: 'parametres.g.ecrans', items: ['affichage-mode', 'ma-journee', 'configuration', 'atelier'] },
-    { id: 'stream', titre: 'parametres.g.stream', items: ['stream-on', 'stream'] },
+    { id: 'stream', titre: 'parametres.g.stream', items: ['presentation', 'stream-on', 'stream'] },
     { id: 'raccourcis', titre: 'parametres.g.raccourcis', items: ['widget', 'raccourcis-siri', 'raccourcis-clavier'] },
   ] },
   { id: 'securite-comptes', ic: 'shield', groupes: [
@@ -65,7 +65,7 @@ export const CATEGORIES = [
   { id: 'aide', ic: 'help', groupes: [
     { id: 'etat', items: ['toutvabien', 'sante', 'statut', 'depannage'] },
     { id: 'aide', titre: 'reglages.groupe.aide', items: ['centre-aide', 'support', 'signaler', 'mes-signalements', 'quoi-de-neuf'] },
-    { id: 'revoir', titre: 'parametres.g.revoir', items: ['visite', 'bilan-minute', 'premier-colis', 'aides-accueil', 'conseils', 'conseils-revoir'] },
+    { id: 'revoir', titre: 'parametres.g.revoir', items: ['bien-demarrer', 'visite', 'bilan-minute', 'premier-colis', 'aides-accueil', 'conseils', 'conseils-revoir'] },
     { id: 'proprietaire', titre: 'parametres.g.proprietaire', items: ['pilotage', 'nouveaux-comptes', 'paiements', 'signalements', 'demandes-aide', 'simulation-compte'] },
   ] },
   // « Sécurité des données » : le panneau expert (§5, vocabulaire technique assumé) TEL QUEL,
@@ -134,9 +134,9 @@ export function rangerParCategorie(groupes) {
 export const SECTIONS_ANCIENNES = { notifications: 'push', supprimer: 'fermer', demandesaide: 'demandes-aide', rappels: 'rappels', appareils: 'appareils', importer: 'importer', toutvabien: 'toutvabien', sante: 'sante', santecomptes: 'santecomptes', discretion: 'discretion' };
 export const LIENS_PROFONDS = [
   // `?tab=settings&reglage=…` (src/aideFiches.js `REGLAGES_AIDE`, et les liens écrits dans l'app)
-  'push', 'agenda', 'vacances', 'numeros', 'modeles', 'imprimante', 'regime', 'apparence', 'stream', 'zoom', 'corbeille',
+  'push', 'agenda', 'vacances', 'etiquetage', 'numeros', 'modeles', 'imprimante', 'regime', 'apparence', 'stream', 'zoom', 'corbeille',
   'verifier', 'toutvabien', 'connexions', 'depannage', 'appareils', 'double', 'equipe', 'abonnement', 'widget',
-  'mes-plateformes', 'mes-signalements', 'nouveaux-comptes',
+  'mes-plateformes', 'mes-signalements', 'nouveaux-comptes', 'presentation',
   // `DEMANDE_REGLAGE_SOUS` posé ailleurs (cloche, conseils, ligne de fraîcheur, santé, MFA, sections)
   'sante', 'santecomptes', 'discretion', 'rappels', 'importer', 'demandes-aide', 'fermer', 'signalements', 'ebay', 'securite-comptes', 'historique', 'copieannonces', 'journal-vrm', 'tes-donnees',
 ];

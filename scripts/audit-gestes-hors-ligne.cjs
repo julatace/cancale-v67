@@ -1,3 +1,4 @@
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // ════════════════════════════════════════════════════════════════════════════
 //  LES GESTES HORS LIGNE (src/gestesHorsLigne.js) — EXÉCUTÉS (11 nov.)
 //

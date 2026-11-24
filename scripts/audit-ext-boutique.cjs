@@ -201,7 +201,7 @@ function fond({ enLigne = true, servie = '9.0.0', manifeste = {}, ...o } = {}) {
     dit(r && r.enAttente === true && r.code === 'en-attente-reseau' && file.length === 1 && f.j.vinted.length === 0, 'E hors ligne au départ ⇒ le geste attend (rien n’est parti vers Vinted)', JSON.stringify({ r, file: file.length, vinted: f.j.vinted.length }));
     const vue = f.ctx.vueFileReseau(file);
     dit(!/Bonjour|dispo/.test(JSON.stringify(vue)) && vue[0].sorte && vue[0].exp - vue[0].at === 24 * H, 'E ce que voit l’app : sorte et heures (24 h), jamais le texte', JSON.stringify(vue));
-    const acc = await f.ctx.executerPourApp({ uid: UID, method: 'PUT', endpoint: '/api/v2/transactions/5/offer_requests/6/accept', confirme: true }, { origin: 'https://vrm.center' });
+    const acc = await f.ctx.executerPourApp({ uid: UID, method: 'PUT', endpoint: '/api/v2/transactions/5/offer_requests/6/accept', confirme: true, avisVu: true }, { origin: 'https://vrm.center' });
     dit(acc && acc.code === 'hors-ligne' && (f.store.vrmFileReseau || []).length === 1, 'E accepter une offre (vend la paire) n’est JAMAIS gardé pour plus tard', JSON.stringify(acc));
     const lec = await f.ctx.executerPourApp({ uid: UID, method: 'GET', endpoint: '/api/v2/conversations/42' }, { origin: 'https://vrm.center' });
     dit(!(lec && lec.enAttente) && (f.store.vrmFileReseau || []).length === 1, 'E une lecture n’est pas gardée', JSON.stringify(lec));
@@ -213,6 +213,7 @@ function fond({ enLigne = true, servie = '9.0.0', manifeste = {}, ...o } = {}) {
     // Le bon compte : il part par la même porte.
     f.ctx.compteConnecte = async () => UID;
     f.ctx.vintedPage = async () => ({ status: 200, ok: true, json: { id: 1 }, viaPage: true });
+    f.ctx.interfaceVinted = async () => ({ status: 200, ok: true, json: { id: 1 }, viaPage: true, vu: true });   // 5.414 : le geste par la page
     f.ctx.attendreEcriture = async () => ({ ok: true });
     const v2 = await f.ctx.viderFileReseau();
     dit(v2 && v2.parti === 1 && (f.store.vrmFileReseau || []).length === 0, 'E bon compte ⇒ le geste part et quitte la file', JSON.stringify({ v2, file: f.store.vrmFileReseau }));

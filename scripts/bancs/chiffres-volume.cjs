@@ -51,22 +51,46 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
 
 (async () => {
   const base = fabriquer({ volumeReel: true, ventes: Number(process.env.VENTES) || 0 });
+  // (20 nov., lectures-legeres) `FORME=reelle` : commandes à la forme de SA base (`_commandes-forme`) ;
+  // `SESSION=1` : connecté, base cloisonnée, et `/api/compte?mode=commandes-lire` = la VRAIE route
+  // (`_route-commandes`, exécutée ici) ; `ROUTE=panne` : sa base répond 500 (l'app doit retomber sur la
+  // lecture d'avant) ; `ROUTE=absente` : 404 (un déploiement sans la route).
+  if (process.env.FORME === 'reelle') require(path.join(__dirname, '_commandes-forme.cjs')).formeReelle(base);
+  const SESSION = process.env.SESSION ? { access_token: 'aaa.bbb.banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'banc@exemple.fr' } } : null;
+  const executer = SESSION ? require(path.join(__dirname, '_route-commandes.cjs')).routeCommandes({ base, repondre, uid: SESSION.user.id, panne: process.env.ROUTE === 'panne' ? 'base' : null }) : null;
+  const routeVue = [];
   const b = await chromium.launch({ executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] }).catch(() => chromium.launch());
   const res = { ventes: Number(process.env.VENTES) || 0, ecrans: {}, publie: {}, erreurs: [] };
   try {
     // (16 nov., vitesse-moteur) CAPTURES=<préfixe> : une capture par écran relevé ; LARGEUR=390 (tactile) ; SOMBRE=1.
     const larg = Number(process.env.LARGEUR) || 1512, tel = larg < 600;
     const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: larg, height: tel ? 844 : 982 }, ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
-    await ctx.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, !!process.env.SOMBRE);
+    if (SESSION) await ctx.addInitScript(([s, sombre]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); localStorage.setItem('schema_cloisonne', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, [SESSION, !!process.env.SOMBRE]);
+    else await ctx.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, !!process.env.SOMBRE);
     let derniere = Date.now();
     await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
     await ctx.route('**/rest/v1/**', async (route) => {
       const rq = route.request(); derniere = Date.now();
       if (rq.method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' });
-      const h = await rq.allHeaders(); const rep = repondre(rq.url(), h.range, base);
+      const h = await rq.allHeaders();
+      if (SESSION && /select=owner\b/.test(decodeURIComponent(rq.url()))) return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      const rep = repondre(rq.url(), h.range, base);
       return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { ...(rep.headers || {}) }, body: JSON.stringify(rep.body) });
     });
-    await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+    await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: !SESSION ? '{}' : r.request().url().includes('mode=confidentialite') ? JSON.stringify({ ok: true, uid: SESSION.user.id })
+      : r.request().url().includes('mode=abonnement') ? JSON.stringify({ ok: true, proprietaire: true, acces: true, statut: 'active', configure: true })
+      : r.request().url().includes('mode=equipe') ? JSON.stringify({ ok: false, erreur: 'non-installe' }) : '{}' }));
+    if (SESSION) {
+      await ctx.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(/\/auth\/v1\/user/.test(r.request().url()) ? { id: SESSION.user.id, email: SESSION.user.email, aud: 'authenticated', role: 'authenticated', email_confirmed_at: '2026-01-01T00:00:00Z', identities: [], app_metadata: { provider: 'email' }, user_metadata: {} } : /factors|aal/.test(r.request().url()) ? { currentLevel: 'aal1', nextLevel: 'aal1', all: [], totp: [] } : { access_token: SESSION.access_token, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
+      await ctx.route('**/api/compte?mode=commandes-lire*', async (route) => {
+        derniere = Date.now();
+        if (process.env.ROUTE === 'absente') { routeVue.push(404); return route.fulfill({ status: 404, contentType: 'text/html', body: '<html>404</html>' }); }
+        const h = await route.request().allHeaders();
+        const rep = await executer(route.request().url(), { authorization: h.authorization, 'accept-encoding': 'gzip' });
+        routeVue.push(rep.status); derniere = Date.now();
+        return route.fulfill({ status: rep.status, contentType: 'application/json', body: rep.clair });
+      });
+    }
     const pg = await ctx.newPage();
     pg.on('pageerror', (e) => res.erreurs.push(e.message.slice(0, 200)));
     for (const tab of ONGLETS) {
@@ -75,15 +99,58 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
       derniere = Date.now(); const fin = Date.now() + 120000;
       while (Date.now() - derniere < 4000 && Date.now() < fin) await attendre(250);
       await attendre(1500);
+      // (22 nov., latence-totale) Les longues listes se posent PAR PAQUETS (src/composants/ParPaquets.jsx), la suite venant
+      // quand le bas de la liste approche. Pour relever tout ce que l'écran PEUT montrer (sur un build d'avant, posé d'un coup,
+      // comme d'après) : chaque partie fermée qui porte une suite (un repli <details>, un bloc `hidden`, `display: none`) est
+      // ouverte LE TEMPS du relevé, chaque liste amenée à son bas tant qu'un paquet reste à poser, puis tout est refermé
+      // tel quel avant de lire (le texte visible reste celui de l'écran).
+      await pg.evaluate(() => { window.__vrmOuverts = []; });
+      for (let i = 0; i < 160; i++) {
+        const reste = await pg.evaluate(() => { const m = document.querySelector('.vrm-main') || document.body; const O = window.__vrmOuverts;
+          const S = [...m.querySelectorAll('[data-par-paquets]')];
+          for (const x of S) {
+            for (let e = x.parentElement; e && e !== m; e = e.parentElement) {
+              if (e.localName === 'details' && !e.open) { O.push(['details', e]); e.open = true; }
+              if (e.hidden) { O.push(['hidden', e]); e.hidden = false; }
+              if (getComputedStyle(e).display === 'none') { O.push(['style', e, e.style.display]); e.style.display = 'block'; }
+            }
+            try { x.scrollIntoView({ block: 'end' }); } catch (_) {}
+          }
+          return S.length; }).catch(() => 0);
+        if (process.env.DEBUG_PAQUETS) console.log('paquets ' + tab + ' ' + i + ' : ' + reste);
+        if (!reste) break;
+        await attendre(200);
+      }
+      await pg.evaluate(() => { for (const [k, e, v] of (window.__vrmOuverts || []).reverse()) { if (k === 'details') e.open = false; else if (k === 'hidden') e.hidden = true; else e.style.display = v; } window.__vrmOuverts = []; window.scrollTo(0, 0); const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; }).catch(() => {});
+      { derniere = Date.now(); const fin2 = Date.now() + 60000; while (Date.now() - derniere < 2500 && Date.now() < fin2) await attendre(250); await attendre(800); }
       res.ecrans[tab] = await pg.evaluate(() => {
         const main = document.querySelector('.vrm-main') || document.body;
         const texte = (main.innerText || '').replace(/[\u00a0\u202f]/g, ' ');
         const montants = texte.match(/-?\d[\d ]*(?:,\d{1,2})? ?€/g) || [];
         const comptes = texte.match(/\b\d[\d ]* (?:ventes?|achats?|colis|annonces?|paires?|comptes?|bordereaux?)\b/g) || [];
         const attrs = [];
-        for (const e of main.querySelectorAll('*')) for (const a of e.attributes) if (a.name.startsWith('data-') && /^-?\d+(?:[.,]\d+)?$/.test(a.value)) attrs.push(a.name + '=' + a.value);
+        // (20 nov., bugs-terrain) Les attributs d'UN élément dans l'ordre de leur NOM : leur ordre dans le DOM dit seulement à quel
+        // rendu chacun a été posé (un attribut posé par un second rendu passe en dernier), pas un chiffre.
+        for (const e of main.querySelectorAll('*')) attrs.push(...[...e.attributes].filter((a) => a.name.startsWith('data-') && /^-?\d+(?:[.,]\d+)?$/.test(a.value)).map((a) => a.name + '=' + a.value).sort());
         return { montants, comptes, attrs };
       });
+      // (22 nov., P1 — Annonces virtualisée) L'IDENTITÉ de chaque rangée : article ↔ N° ↔ sites, relevée en faisant défiler
+      // TOUTE la liste (une liste virtualisée ne pose que les rangées visibles : on les relève toutes, au fil du défilement).
+      if (/^annonces/.test(tab)) {
+        const vus = new Map();
+        for (let i = 0; i < 400; i++) {
+          const r = await pg.evaluate(() => {
+            const L = [...document.querySelectorAll('[data-eg-article]')].map((e) => [e.getAttribute('data-eg-article'), (e.getAttribute('data-eg-numero') || '') + '|' + (e.getAttribute('data-eg-sites') || '') + '|' + (e.getAttribute('data-eg-compte') || '')]);
+            const avant = window.scrollY; const zone = [...document.querySelectorAll('.vrm-main, .vrm-main *')].find((x) => x.scrollHeight > x.clientHeight + 40 && /auto|scroll/.test(getComputedStyle(x).overflowY)) || document.scrollingElement;
+            const a0 = zone.scrollTop; zone.scrollTop = a0 + Math.max(300, zone.clientHeight * 0.8); window.scrollBy(0, 600);
+            return { L, bouge: zone.scrollTop !== a0 || window.scrollY !== avant };
+          });
+          for (const [k, v] of r.L) vus.set(k, v);
+          if (!r.bouge) break;
+          await attendre(120);
+        }
+        res.ecrans[tab].identites = [...vus.entries()].sort((x, y) => (x[0] < y[0] ? -1 : 1)).map(([k, v]) => k + '=' + v);
+      }
       if (process.env.CAPTURES) await pg.screenshot({ path: `${process.env.CAPTURES}-${tab}.png` }).catch(() => {});
     }
     const ls = await pg.evaluate(() => Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)])));
@@ -92,5 +159,6 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
   } finally { await b.close(); srv.close(); }
   const s = JSON.stringify(res, null, 1);
   if (SORTIE) fs.writeFileSync(SORTIE, s);
+  if (SESSION) console.log(`route des commandes : ${routeVue.length} appel(s) ${JSON.stringify(routeVue.reduce((m, x) => ((m[x] = (m[x] || 0) + 1), m), {}))}`);
   console.log(`chiffres relevés : ${Object.entries(res.ecrans).map(([t, e]) => `${t} ${e.montants.length} € · ${e.comptes.length} n · ${e.attrs.length} data`).join(' | ')} · publiés ${Object.keys(res.publie).length} · erreurs ${res.erreurs.length}`);
 })();

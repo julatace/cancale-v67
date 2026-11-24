@@ -8,29 +8,29 @@
    rangée. Récit : docs/passation/2026-11-15-refonte-ventes.md.
    ════════════════════════════════════════════════════════════════════════════ */
 :root {
-  --vv-ligne: rgb(12 29 48 / .10);
-  --vv-coche-bord: rgb(12 29 48 / .30);
-  --vv-plein: #0C1D30;
+  --vv-ligne: rgb(28 28 32 / .10);
+  --vv-coche-bord: rgb(28 28 32 / .30);
+  --vv-plein: #1C1C20;
   --vv-plein-t: #FFFFFF;
   --vv-touche: rgb(255 255 255 / .72);
-  --vv-touche-b: rgb(12 29 48 / .12);
-  --vv-tui: rgb(12 29 48 / .06);
+  --vv-touche-b: rgb(28 28 32 / .12);
+  --vv-tui: rgb(28 28 32 / .06);
   --vv-am-bg: #FFE2B8;
   --vv-am-t: #5E3900;
-  --vv-seg-on: rgb(247 250 253 / .96);
+  --vv-seg-on: rgb(249 250 251 / .96);
   --vv-stp-vide: #FFFFFF;
 }
 :root[data-theme="dark"] {
   --vv-ligne: rgb(255 255 255 / .10);
   --vv-coche-bord: rgb(255 255 255 / .34);
-  --vv-plein: #EEF4FB;
-  --vv-plein-t: #0C1D30;
+  --vv-plein: #F3F4F6;
+  --vv-plein-t: #1C1C20;
   --vv-touche: rgb(255 255 255 / .08);
   --vv-touche-b: rgb(255 255 255 / .14);
   --vv-tui: rgb(255 255 255 / .08);
   --vv-am-bg: rgb(240 164 60 / .20);
   --vv-am-t: #FFD99E;
-  --vv-seg-on: rgb(238 244 251 / .95);
+  --vv-seg-on: rgb(243 244 246 / .95);
   --vv-stp-vide: rgb(255 255 255 / .10);
 }
 
@@ -40,7 +40,7 @@
 :root:root:root:root:root:root:root:root body .vv-onglets { display: block !important; margin: 12px 0 0 !important; padding: 0 !important; background: transparent !important; border: 0 !important; box-shadow: none !important; }
 :root:root:root:root:root:root:root:root body .vv-seg {
   display: flex !important; padding: 3px !important; border-radius: 17px !important; gap: 0 !important;
-  background: rgb(10 38 76 / .30) !important; border: 1px solid rgb(255 255 255 / .26) !important;
+  background: rgb(40 40 46 / .30) !important; border: 1px solid rgb(255 255 255 / .26) !important;
   -webkit-backdrop-filter: blur(18px) !important; backdrop-filter: blur(18px) !important; box-shadow: none !important;
 }
 :root:root:root:root:root:root:root:root body .vv-seg-b {
@@ -48,12 +48,12 @@
   border-radius: 14px !important; border: 0 !important; background: transparent !important; color: #FFFFFF !important; box-shadow: none !important;
   font: 600 14px/1 Inter, system-ui, sans-serif !important; white-space: nowrap !important; padding: 0 8px !important; cursor: pointer; transition: background-color .2s, box-shadow .2s;
 }
-:root:root:root:root:root:root:root:root body .vv-seg-b.is-on { background: var(--vv-seg-on) !important; color: #0C1D30 !important; box-shadow: 0 4px 10px -4px rgb(8 26 50 / .45) !important; }
+:root:root:root:root:root:root:root:root body .vv-seg-b.is-on { background: var(--vv-seg-on) !important; color: #1C1C20 !important; box-shadow: 0 4px 10px -4px rgb(27 27 31 / .45) !important; }
 :root:root:root:root:root:root:root:root body .vv-seg-n {
   font-style: normal !important; font-size: 11.5px !important; font-weight: 750 !important; min-width: 20px !important; height: 20px !important; padding: 0 6px !important; border-radius: 10px !important;
   display: inline-grid !important; place-items: center !important; background: rgb(255 255 255 / .13) !important; color: inherit !important; font-variant-numeric: tabular-nums;
 }
-:root:root:root:root:root:root:root:root body .vv-seg-b.is-on .vv-seg-n { background: rgb(12 29 48 / .08) !important; }
+:root:root:root:root:root:root:root:root body .vv-seg-b.is-on .vv-seg-n { background: rgb(28 28 32 / .08) !important; }
 :root:root:root:root:root:root:root:root body .vv-seg-n.is-ambre { background: #FFE2B8 !important; color: #5E3900 !important; }
 
 /* ── 2. LE GRAND CHIFFRE posé sur le fond ─────────────────────────────────────── */
@@ -73,8 +73,8 @@
 :root:root:root:root:root:root:root:root body .vv-hero-sous .sb-tete-ambre { color: var(--sv-clair-ambre) !important; font-weight: 700 !important; }
 :root:root:root:root:root:root:root:root body .vv-hero-sous .sb-tete-ambre::before { content: none !important; }
 :root:root:root:root:root:root:root:root body .vv-hero-ronds { display: flex !important; gap: 8px !important; flex: none !important; align-self: flex-start !important; }
-:root:root:root:root:root:root:root:root body .vv-hero-ronds .sb-rond { width: 44px !important; height: 44px !important; min-width: 44px !important; background: rgb(10 38 76 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; box-shadow: none !important; }
-:root:root:root:root:root:root:root:root body .vv-hero-ronds .sb-rond.is-actif { background: rgb(247 250 253 / .96) !important; color: #0C1D30 !important; }
+:root:root:root:root:root:root:root:root body .vv-hero-ronds .sb-rond { width: 44px !important; height: 44px !important; min-width: 44px !important; background: rgb(40 40 46 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; box-shadow: none !important; }
+:root:root:root:root:root:root:root:root body .vv-hero-ronds .sb-rond.is-actif { background: rgb(249 250 251 / .96) !important; color: #1C1C20 !important; }
 /* Les tuiles-filtres (Avant demain, transporteurs) : derrière « … » ; dites quand un filtre est posé. */
 :root:root:root:root:root:root:root:root body .vv-filtres[data-actif="0"] { display: none !important; }
 :root:root:root:root:root:root:root:root[data-colis-outils] body .vv-filtres { display: block !important; }
@@ -97,7 +97,7 @@
 :root:root:root:root:root:root:root:root body .vv-liste .vv-rang-autre > .vrm-colis-carte { flex: 1 1 auto !important; min-width: 0 !important; padding-left: 11px !important; }
 :root:root:root:root:root:root:root:root body .vv-liste .vv-rang-l { align-items: center !important; gap: 11px !important; }
 :root:root:root:root:root:root:root:root body .vv-liste .vrm-colis-photo {
-  width: 52px !important; height: 52px !important; min-width: 52px !important; border-radius: 13px !important; border: 0 !important; box-shadow: 0 4px 10px -4px rgb(8 26 50 / .40) !important; background: #FFFFFF !important; position: relative !important;
+  width: 52px !important; height: 52px !important; min-width: 52px !important; border-radius: 13px !important; border: 0 !important; box-shadow: 0 4px 10px -4px rgb(27 27 31 / .40) !important; background: #FFFFFF !important; position: relative !important;
 }
 :root:root:root:root:root:root:root:root body .vv-liste .vrm-colis-photo img { object-fit: cover !important; object-position: 50% 56% !important; }
 /* Le transporteur est écrit à droite (maquette) : le logo du coin de la photo se tait. La frise et les gestes vivent dans la fiche. */
@@ -106,7 +106,7 @@
 :root:root:root:root:root:root:root:root body .vv-l1 { display: flex !important; align-items: center !important; gap: 8px !important; min-width: 0 !important; color: var(--sv-encre) !important; }
 :root:root:root:root:root:root:root:root body .vv-cpt { font-size: 12px !important; font-weight: 600 !important; color: var(--sv-encre-2) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; }
 :root:root:root:root:root:root:root:root body .vv-liste .vrm-colis-titre {
-  display: block !important; -webkit-line-clamp: unset !important; font-size: 14.5px !important; font-weight: 650 !important; letter-spacing: -.015em !important; line-height: 1.3 !important;
+  display: block !important; -webkit-line-clamp: unset !important; font-size: 14.5px !important; font-weight: 600 !important; letter-spacing: -.015em !important; line-height: 1.3 !important;
   margin-top: 5px !important; color: var(--sv-encre) !important;
   /* (16 nov., bancs-rouges-b) Le titre se lit EN ENTIER (demande de Julien du 11 nov., banc colis-a-leur-place T) :
      la maquette n'avait que des titres courts ; un vrai titre (« Nike Air Max 95 Icons Yellow Stone taille 41… »)
@@ -165,8 +165,8 @@
 :root:root:root:root:root:root:root:root body .sb-btn-plein.vv-plein {
   width: 100% !important; height: 52px !important; min-height: 52px !important; border-radius: 16px !important; aspect-ratio: auto !important;
   display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 10px !important; padding: 0 18px !important;
-  background: var(--vv-plein) !important; color: var(--vv-plein-t) !important; border: 0 !important; font: 650 15.5px/1 Inter, system-ui, sans-serif !important;
-  box-shadow: 0 10px 20px -10px rgb(8 26 50 / .70) !important; cursor: pointer;
+  background: var(--vv-plein) !important; color: var(--vv-plein-t) !important; border: 0 !important; font: 600 15.5px/1 Inter, system-ui, sans-serif !important;
+  box-shadow: 0 10px 20px -10px rgb(27 27 31 / .70) !important; cursor: pointer;
 }
 :root:root:root:root:root:root:root:root body .sb-btn-plein.vv-plein .sb-btn-plein-mot { font: inherit !important; color: inherit !important; white-space: nowrap !important; }
 :root:root:root:root:root:root:root:root body .sb-btn-plein.vv-plein:disabled { opacity: .55 !important; cursor: default; }
@@ -190,13 +190,13 @@
   :root:root:root:root:root:root:root:root body .vv-tab-tete span { font-size: 12px !important; font-weight: 700 !important; color: var(--sv-encre-2) !important; }
   :root:root:root:root:root:root:root:root body .vv-tab-tete span:last-child { text-align: right !important; }
   :root:root:root:root:root:root:root:root body .vv-liste .vrm-colis-carte { padding: 12px 14px !important; border-radius: 16px !important; margin-top: 6px !important; min-height: 0 !important; }
-  :root:root:root:root:root:root:root:root body .vv-liste .vrm-colis-carte:hover { background: rgb(0 96 204 / .05) !important; }
+  :root:root:root:root:root:root:root:root body .vv-liste .vrm-colis-carte:hover { background: rgb(11 81 57 / .05) !important; }
   :root:root:root:root:root:root:root:root body .vv-liste .vv-rang-l { display: grid !important; grid-template-columns: 24px 48px 2.1fr .8fr 1.1fr .9fr .8fr !important; gap: 16px !important; align-items: center !important; }
   :root:root:root:root:root:root:root:root body .vv-liste .vrm-colis-photo { width: 48px !important; height: 48px !important; min-width: 48px !important; border-radius: 12px !important; }
   :root:root:root:root:root:root:root:root body .vv-liste :is(.vv-l3, .vv-ou, .vv-end) { display: none !important; }
   :root:root:root:root:root:root:root:root body .vv-liste .vv-cols { display: contents !important; }
   :root:root:root:root:root:root:root:root body .vv-col { min-width: 0 !important; }
-  :root:root:root:root:root:root:root:root body .vv-col b { display: block !important; font-size: 14.5px !important; font-weight: 650 !important; color: var(--sv-encre) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+  :root:root:root:root:root:root:root:root body .vv-col b { display: block !important; font-size: 14.5px !important; font-weight: 600 !important; color: var(--sv-encre) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
   :root:root:root:root:root:root:root:root body .vv-col b.vv-am { color: var(--sv-ambre) !important; }
   :root:root:root:root:root:root:root:root body .vv-col span { display: block !important; font-size: 12.5px !important; font-weight: 550 !important; color: var(--sv-encre-2) !important; margin-top: 2px !important; white-space: nowrap !important; }
   :root:root:root:root:root:root:root:root body .vv-col-r { text-align: right !important; }
@@ -211,16 +211,16 @@
 :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="ventes"] .vrm-colis-envoye {
   padding: 12px 14px 10px !important; border-radius: 22px !important; background: var(--sv-verre) !important; border: 1px solid var(--sv-bord) !important; box-shadow: var(--sv-ombre) !important;
 }
-:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="ventes"] .vrm-colis-envoye .vrm-colis-photo { width: 48px !important; height: 48px !important; min-width: 48px !important; border-radius: 12px !important; background: #FFFFFF !important; box-shadow: 0 4px 10px -4px rgb(8 26 50 / .40) !important; }
+:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="ventes"] .vrm-colis-envoye .vrm-colis-photo { width: 48px !important; height: 48px !important; min-width: 48px !important; border-radius: 12px !important; background: #FFFFFF !important; box-shadow: 0 4px 10px -4px rgb(27 27 31 / .40) !important; }
 :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="ventes"] .vrm-colis-envoye :is(.vrm-badge-transporteur, .vrm-colis-logo-transp, [data-badge-transporteur], .vrm-colis-frise) { display: none !important; }
-:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="ventes"] .vrm-colis-envoye .vrm-colis-titre { font-size: 14.5px !important; font-weight: 650 !important; margin-top: 5px !important; color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="ventes"] .vrm-colis-envoye .vrm-colis-titre { font-size: 14.5px !important; font-weight: 600 !important; margin-top: 5px !important; color: var(--sv-encre) !important; }
 :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="ventes"] .vrm-colis-envoye [data-colis-envoye-etat] { font-size: 12.5px !important; font-weight: 600 !important; margin-top: 2px !important; }
 :root:root:root:root:root:root:root:root body .vv-pas4 { list-style: none !important; display: grid !important; grid-template-columns: repeat(4, 1fr) !important; margin: 12px 2px 2px !important; padding: 0 !important; position: relative !important; }
 :root:root:root:root:root:root:root:root body .vv-pas4::before { content: "" !important; position: absolute !important; left: 12.5% !important; right: 12.5% !important; top: 5px !important; height: 2px !important; background: var(--vv-coche-bord) !important; opacity: .55 !important; }
 :root:root:root:root:root:root:root:root body .vv-pas4 li { display: flex !important; flex-direction: column !important; align-items: center !important; gap: 5px !important; position: relative !important; margin: 0 !important; }
 :root:root:root:root:root:root:root:root body .vv-pas4 i { width: 12px !important; height: 12px !important; border-radius: 50% !important; background: var(--vv-stp-vide) !important; box-shadow: inset 0 0 0 2px var(--vv-coche-bord) !important; z-index: 1 !important; }
 :root:root:root:root:root:root:root:root body .vv-pas4 li.is-fait i { background: var(--vv-plein) !important; box-shadow: none !important; }
-:root:root:root:root:root:root:root:root body .vv-pas4 li.is-ici i { background: #0060CC !important; box-shadow: 0 0 0 4px rgb(0 96 204 / .22) !important; }
+:root:root:root:root:root:root:root:root body .vv-pas4 li.is-ici i { background: #16181D !important; box-shadow: 0 0 0 4px rgb(11 81 57 / .22) !important; }
 :root:root:root:root:root:root:root:root body .vv-pas4 b { font-size: 11.5px !important; font-weight: 600 !important; color: var(--sv-encre-2) !important; white-space: nowrap !important; }
 :root:root:root:root:root:root:root:root body .vv-pas4 li.is-fait b { color: var(--sv-encre) !important; }
 
@@ -230,7 +230,7 @@
 :root:root:root:root:root:root:root:root body .vv-duo { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
 :root:root:root:root:root:root:root:root body .vv-duo-c { padding: 10px 14px !important; border-radius: 16px !important; background: rgb(255 255 255 / .55) !important; border: 1px solid rgb(255 255 255 / .8) !important; }
 :root:root:root:root:root:root:root:root[data-theme="dark"] body .vv-duo-c { background: rgb(255 255 255 / .06) !important; border-color: rgb(255 255 255 / .10) !important; }
-:root:root:root:root:root:root:root:root body .vv-duo-c > span { display: block !important; font-size: 12px !important; font-weight: 650 !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vv-duo-c > span { display: block !important; font-size: 12px !important; font-weight: 600 !important; color: var(--sv-encre-2) !important; }
 :root:root:root:root:root:root:root:root body .vv-duo-c > b { display: block !important; font-size: 22px !important; font-weight: 750 !important; letter-spacing: -.03em !important; margin-top: 2px !important; color: var(--sv-encre) !important; font-variant-numeric: tabular-nums !important; }
 :root:root:root:root:root:root:root:root body .vv-duo-c > small { display: block !important; font-size: 11.5px !important; font-weight: 550 !important; color: var(--sv-encre-2) !important; margin-top: 1px !important; }
 :root:root:root:root:root:root:root:root body .vv-fiche-st { padding: 10px 16px 8px !important; border-radius: 16px !important; background: rgb(255 255 255 / .55) !important; border: 1px solid rgb(255 255 255 / .8) !important; }
@@ -240,7 +240,7 @@
 :root:root:root:root:root:root:root:root body .vv-stp > i { width: 20px !important; height: 20px !important; border-radius: 50% !important; display: grid !important; place-items: center !important; background: var(--vv-stp-vide) !important; box-shadow: inset 0 0 0 2px var(--vv-coche-bord) !important; color: var(--vv-plein-t) !important; font-style: normal !important; }
 :root:root:root:root:root:root:root:root body .vv-stp.is-fait > i { background: var(--vv-plein) !important; box-shadow: none !important; }
 :root:root:root:root:root:root:root:root body .vv-stp.is-geste > i { background: #FFE2B8 !important; box-shadow: inset 0 0 0 2px #B26A00 !important; }
-:root:root:root:root:root:root:root:root body .vv-stp > b { font-size: 13.5px !important; font-weight: 650 !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vv-stp > b { font-size: 13.5px !important; font-weight: 600 !important; color: var(--sv-encre-2) !important; }
 :root:root:root:root:root:root:root:root body .vv-stp:is(.is-fait, .is-ici) > b { color: var(--sv-encre) !important; }
 :root:root:root:root:root:root:root:root body .vv-stp > span { font-size: 12px !important; font-weight: 600 !important; color: var(--sv-encre-2) !important; text-align: right !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; }
 :root:root:root:root:root:root:root:root body .vv-stp.is-geste > span { color: var(--sv-ambre) !important; font-weight: 700 !important; }
@@ -251,7 +251,7 @@
 :root:root:root:root:root:root:root:root body .vv-fiche-ou-t span { font-size: 13px !important; font-weight: 550 !important; color: var(--sv-encre-2) !important; margin-top: 1px !important; }
 :root:root:root:root:root:root:root:root body .vv-tui { width: 40px !important; height: 40px !important; border-radius: 12px !important; display: grid !important; place-items: center !important; background: var(--vv-tui) !important; color: var(--sv-encre) !important; flex: none !important; }
 :root:root:root:root:root:root:root:root body .vv-tui.is-ambre { background: var(--vv-am-bg) !important; color: var(--vv-am-t) !important; }
-:root:root:root:root:root:root:root:root body .vv-tui.is-ac { background: rgb(0 96 204 / .10) !important; color: var(--sv-lien) !important; }
+:root:root:root:root:root:root:root:root body .vv-tui.is-ac { background: rgb(11 81 57 / .10) !important; color: var(--sv-lien) !important; }
 :root:root:root:root:root:root:root:root body .vv-touche { flex: none !important; min-height: 44px !important; padding: 0 16px !important; border-radius: 14px !important; background: var(--vv-touche) !important; border: 1px solid var(--vv-touche-b) !important; color: var(--sv-encre) !important; font: 600 14px/1 Inter, system-ui, sans-serif !important; cursor: pointer; }
 :root:root:root:root:root:root:root:root body .vv-touche:disabled { opacity: .6 !important; cursor: default; }
 :root:root:root:root:root:root:root:root body .vv-am { color: var(--sv-ambre) !important; font-weight: 700 !important; }
@@ -264,11 +264,11 @@
 :root:root:root:root:root:root:root:root body .sb-tete[data-sb-tete="achats"] .sb-tete-chiffre { display: flex !important; align-items: baseline !important; gap: 6px !important; margin: 0 !important; }
 :root:root:root:root:root:root:root:root body .sb-tete[data-sb-tete="achats"] .sb-chiffre-affiche { font: 750 17px/1.2 Inter, system-ui, sans-serif !important; letter-spacing: -.02em !important; color: var(--sv-clair) !important; }
 :root:root:root:root:root:root:root:root body .sb-tete[data-sb-tete="achats"] .sb-chiffre-affiche::before { content: "· " !important; }
-:root:root:root:root:root:root:root:root body .sb-tete[data-sb-tete="achats"] .sb-tete-lib { font-size: 13.5px !important; font-weight: 650 !important; color: var(--sv-clair) !important; }
+:root:root:root:root:root:root:root:root body .sb-tete[data-sb-tete="achats"] .sb-tete-lib { font-size: 13.5px !important; font-weight: 600 !important; color: var(--sv-clair) !important; }
 :root:root:root:root:root:root:root:root body .sb-tete[data-sb-tete="achats"] .sb-tete-ambre { font-size: 13.5px !important; color: var(--sv-clair-ambre) !important; }
 :root:root:root:root:root:root:root:root body .sb-tete[data-sb-tete="achats"] .sb-tete-ronds { order: 3 !important; margin-left: auto !important; }
-:root:root:root:root:root:root:root:root body .sb-tete[data-sb-tete="achats"] .sb-rond { background: rgb(10 38 76 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; box-shadow: none !important; }
-:root:root:root:root:root:root:root:root body .va-code-lib { display: block !important; font-size: 12px !important; font-weight: 650 !important; color: var(--sv-encre-2) !important; margin: 2px 0 0 !important; flex-basis: 100% !important; }
+:root:root:root:root:root:root:root:root body .sb-tete[data-sb-tete="achats"] .sb-rond { background: rgb(40 40 46 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; box-shadow: none !important; }
+:root:root:root:root:root:root:root:root body .va-code-lib { display: block !important; font-size: 12px !important; font-weight: 600 !important; color: var(--sv-encre-2) !important; margin: 2px 0 0 !important; flex-basis: 100% !important; }
 :root:root:root:root:root:root:root:root body .vrm-rpf-comptoir { flex-wrap: wrap !important; }
 :root:root:root:root:root:root:root:root body .vrm-rpf-code-gros.sb-plaque--grande {
   background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; height: auto !important; min-height: 34px !important;
@@ -279,26 +279,26 @@
   background: var(--vv-touche) !important; border: 1px solid var(--vv-touche-b) !important; color: var(--sv-encre) !important; cursor: pointer; padding: 0 !important;
 }
 /* La feuille « Montre ce code au comptoir » : claire, presque opaque (on la montre à quelqu'un). */
-.va-voile { position: fixed; inset: 0; z-index: 2147482000; background: rgb(4 12 26 / .46); display: flex; align-items: flex-end; justify-content: center; }
+.va-voile { position: fixed; inset: 0; z-index: 2147482000; background: rgb(14 14 16 / .46); display: flex; align-items: flex-end; justify-content: center; }
 :root:root:root:root:root:root:root:root body .va-feuille {
   position: relative !important; width: 100% !important; max-width: 520px !important; max-height: 92vh !important; overflow: auto !important; box-sizing: border-box !important;
   padding: 8px 20px calc(24px + env(safe-area-inset-bottom)) !important; border-radius: 30px 30px 0 0 !important; text-align: center !important;
   background: var(--sv-feuille) !important; -webkit-backdrop-filter: blur(30px) saturate(1.4) !important; backdrop-filter: blur(30px) saturate(1.4) !important;
-  border-top: 1px solid var(--sv-feuille-bord) !important; box-shadow: 0 -24px 60px -16px rgb(4 12 26 / .6) !important; color: var(--sv-encre) !important; font-family: Inter, system-ui, sans-serif !important;
+  border-top: 1px solid var(--sv-feuille-bord) !important; box-shadow: 0 -24px 60px -16px rgb(14 14 16 / .6) !important; color: var(--sv-encre) !important; font-family: Inter, system-ui, sans-serif !important;
 }
 @media (min-width: 700px) { .va-voile { align-items: center; } :root:root:root:root:root:root:root:root body .va-feuille { border-radius: 30px !important; } }
-:root:root:root:root:root:root:root:root body .va-grab { display: block !important; width: 38px !important; height: 5px !important; border-radius: 3px !important; background: rgb(12 29 48 / .20) !important; margin: 0 auto 6px !important; }
+:root:root:root:root:root:root:root:root body .va-grab { display: block !important; width: 38px !important; height: 5px !important; border-radius: 3px !important; background: rgb(28 28 32 / .20) !important; margin: 0 auto 6px !important; }
 :root:root:root:root:root:root:root:root body .va-fx { position: absolute !important; right: 16px !important; top: 16px !important; width: 44px !important; height: 44px !important; border-radius: 50% !important; display: grid !important; place-items: center !important; background: var(--vv-touche) !important; border: 1px solid var(--vv-touche-b) !important; color: var(--sv-encre) !important; cursor: pointer; }
-:root:root:root:root:root:root:root:root body .va-fc-t { font-size: 15px !important; font-weight: 650 !important; color: var(--sv-encre-2) !important; margin: 22px 0 0 !important; }
+:root:root:root:root:root:root:root:root body .va-fc-t { font-size: 15px !important; font-weight: 600 !important; color: var(--sv-encre-2) !important; margin: 22px 0 0 !important; }
 :root:root:root:root:root:root:root:root body .va-fc-code { display: flex !important; justify-content: center !important; gap: 6px !important; margin-top: 16px !important; flex-wrap: wrap !important; }
-:root:root:root:root:root:root:root:root body .va-fc-code i { width: 44px !important; height: 62px !important; border-radius: 12px !important; display: grid !important; place-items: center !important; background: #FFFFFF !important; border: 1px solid rgb(12 29 48 / .14) !important; box-shadow: 0 2px 0 rgb(12 29 48 / .06) !important; font: 750 34px/1 Inter, system-ui, sans-serif !important; font-style: normal !important; color: #0C1D30 !important; }
+:root:root:root:root:root:root:root:root body .va-fc-code i { width: 44px !important; height: 62px !important; border-radius: 12px !important; display: grid !important; place-items: center !important; background: #FFFFFF !important; border: 1px solid rgb(28 28 32 / .14) !important; box-shadow: 0 2px 0 rgb(28 28 32 / .06) !important; font: 750 34px/1 Inter, system-ui, sans-serif !important; font-style: normal !important; color: #1C1C20 !important; }
 :root:root:root:root:root:root:root:root body .va-fc-l { display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; margin: 12px 0 0 !important; font-size: 12.5px !important; font-weight: 600 !important; color: var(--sv-encre-2) !important; }
-:root:root:root:root:root:root:root:root body .va-fc-b { margin-top: 20px !important; text-align: left !important; border-radius: 18px !important; background: rgb(255 255 255 / .6) !important; border: 1px solid rgb(12 29 48 / .08) !important; }
+:root:root:root:root:root:root:root:root body .va-fc-b { margin-top: 20px !important; text-align: left !important; border-radius: 18px !important; background: rgb(255 255 255 / .6) !important; border: 1px solid rgb(28 28 32 / .08) !important; }
 :root:root:root:root:root:root:root:root[data-theme="dark"] body .va-fc-b { background: rgb(255 255 255 / .06) !important; border-color: rgb(255 255 255 / .10) !important; }
 :root:root:root:root:root:root:root:root body .va-fc-rw { display: flex !important; align-items: center !important; gap: 12px !important; min-height: 64px !important; padding: 10px 14px !important; }
 :root:root:root:root:root:root:root:root body .va-fc-rw + .va-fc-rw { border-top: 1px solid var(--vv-ligne) !important; }
 :root:root:root:root:root:root:root:root body .va-fc-mid { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; flex-direction: column !important; }
-:root:root:root:root:root:root:root:root body .va-fc-mid b { font-size: 15px !important; font-weight: 650 !important; color: var(--sv-encre) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+:root:root:root:root:root:root:root:root body .va-fc-mid b { font-size: 15px !important; font-weight: 600 !important; color: var(--sv-encre) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
 :root:root:root:root:root:root:root:root body .va-fc-mid span { font-size: 12.5px !important; font-weight: 550 !important; color: var(--sv-encre-2) !important; margin-top: 2px !important; }
 :root:root:root:root:root:root:root:root body .va-fc-end { flex: none !important; font-size: 14px !important; font-weight: 700 !important; color: var(--sv-encre) !important; }
 :root:root:root:root:root:root:root:root body .va-fc-ph { flex: none !important; width: 40px !important; height: 40px !important; border-radius: 11px !important; overflow: hidden !important; display: block !important; }
@@ -330,8 +330,8 @@
 
 /* Les tuiles-filtres derrière « … » : la posée est ENFONCÉE (porcelaine, ombre en creux) et sa diode s'allume. */
 :root:root:root:root:root:root:root:root body .vv-filtres .sb-tuile { background: var(--sv-verre) !important; box-shadow: var(--sv-ombre) !important; }
-:root:root:root:root:root:root:root:root body .vv-filtres .sb-tuile.is-actif { background: var(--vv-seg-on) !important; box-shadow: inset 0 2px 6px rgb(8 26 50 / .28) !important; }
-:root:root:root:root:root:root:root:root body .vv-filtres .sb-tuile.is-actif :is(.sb-tuile-lib, .sb-tuile-chiffre, .sb-tuile-unite) { color: #0C1D30 !important; }
+:root:root:root:root:root:root:root:root body .vv-filtres .sb-tuile.is-actif { background: var(--vv-seg-on) !important; box-shadow: inset 0 2px 6px rgb(27 27 31 / .28) !important; }
+:root:root:root:root:root:root:root:root body .vv-filtres .sb-tuile.is-actif :is(.sb-tuile-lib, .sb-tuile-chiffre, .sb-tuile-unite) { color: #1C1C20 !important; }
 
 /* Le lien « Vinted » d'une carte « À renvoyer » est posé sur le VERRE : l'encre du lien, plus le blanc du fond (4,5:1). */
 :root:root:root:root:root:root:root:root body .vrm-ret-carte .vrm-ret-lien { color: var(--sv-lien) !important; }
@@ -358,13 +358,13 @@
 :root:root:root:root:root:root:root:root body .vv-propose-achat { display: flex !important; gap: 12px !important; align-items: center !important; min-width: 0 !important; }
 :root:root:root:root:root:root:root:root body .vv-propose-photo { width: 48px !important; height: 48px !important; border-radius: 12px !important; object-fit: cover !important; flex: none !important; }
 :root:root:root:root:root:root:root:root body .vv-propose-mid { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; flex-direction: column !important; gap: 1px !important; }
-:root:root:root:root:root:root:root:root body .vv-propose-mot { font-size: 12px !important; font-weight: 650 !important; color: var(--sv-encre-2) !important; }
-:root:root:root:root:root:root:root:root body .vv-propose-titre { font-size: 14.5px !important; font-weight: 650 !important; color: var(--sv-encre) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+:root:root:root:root:root:root:root:root body .vv-propose-mot { font-size: 12px !important; font-weight: 600 !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vv-propose-titre { font-size: 14.5px !important; font-weight: 600 !important; color: var(--sv-encre) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
 :root:root:root:root:root:root:root:root body :is(.vv-propose-sous, .vv-propose-pourquoi) { font-size: 12.5px !important; font-weight: 550 !important; color: var(--sv-encre-2) !important; }
 :root:root:root:root:root:root:root:root body .vv-propose-gestes { display: flex !important; flex-wrap: wrap !important; gap: 8px !important; align-items: center !important; }
 :root:root:root:root:root:root:root:root body .vv-propose-gestes .vv-touche { display: inline-flex !important; align-items: center !important; gap: 6px !important; }
 :root:root:root:root:root:root:root:root body .vv-propose-relier { flex: 1 1 160px !important; justify-content: center !important; font-weight: 700 !important; color: var(--sv-lien) !important; }
-:root:root:root:root:root:root:root:root body .vv-propose-saisir { min-height: 44px !important; padding: 0 6px !important; color: var(--sv-lien) !important; font-weight: 650 !important; background: transparent !important; border: 0 !important; }
+:root:root:root:root:root:root:root:root body .vv-propose-saisir { min-height: 44px !important; padding: 0 6px !important; color: var(--sv-lien) !important; font-weight: 600 !important; background: transparent !important; border: 0 !important; }
 
 /* (15 nov., banc verre) Les mots d'attente de « Toutes les ventes » sont posés sur le FOND : l'encre claire. */
 :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="ventes"] .vrm-ventes-toutes :is(.vrm-toutes-etats > div, .vrm-toutes-vide > p) { color: var(--sv-clair-2) !important; }
@@ -373,10 +373,19 @@
    case ; les achats à droite. Le rail est celui de la coque (claude/refonte-journee). ── */
 :root:root:root:root:root:root:root:root body .vrm-rpf-code-gros .va-c { font-style: normal !important; }
 @media (min-width: 1100px) {
-  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] { display: grid !important; grid-template-columns: minmax(360px, 440px) minmax(0, 1fr) !important; column-gap: 20px !important; row-gap: 0 !important; align-items: start !important; }
+  /* (23 nov., achats-ordi-casse — capture de Julien) Depuis le 19 nov. la liste d'Achats à l'ordinateur est le TABLEAU DE TRAVAIL
+     (`.n-tt-ordi`) : il lui faut toute la largeur. Les deux colonnes le serraient dans la colonne de droite (≈ 60 %) : colonne
+     Article sortie du cadre, prix rognés, moitié gauche vide sous les codes dès qu'on défile (le design le garde TOUJOURS ouvert).
+     Avec le tableau, pas de grille : les codes « À retirer » passent au-dessus, pleine largeur (banc largeur-ordi). */
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"]:not(:has(.n-tt-ordi)) { display: grid !important; grid-template-columns: minmax(360px, 440px) minmax(0, 1fr) !important; column-gap: 20px !important; row-gap: 0 !important; align-items: start !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] > * { grid-column: 1 / -1 !important; min-width: 0 !important; }
-  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] > .vrm-achats-retirer-repli[data-retirer-repli="ouvert"] { grid-column: 1 !important; grid-row: 3 / 40 !important; }
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] > .vrm-achats-retirer-repli[data-retirer-repli="ouvert"] { grid-column: 1 !important; grid-row: 4 / 40 !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"]:has(> .vrm-achats-retirer-repli[data-retirer-repli="ouvert"]) > .vrm-achats-retirer-repli ~ * { grid-column: 2 !important; }
+  /* (22 nov., style-clarte — « Achats : en-tête vide à droite ») « À régler » passe AU-DESSUS des deux colonnes (rangée 3) ; les codes
+     (gauche) et les achats (droite) commencent ensemble, rangée 4 — avant, « À régler » tombait sous la colonne des codes et
+     repoussait les achats 500 px plus bas, laissant le haut droit vide. */
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"]:has(> .vrm-achats-retirer-repli[data-retirer-repli="ouvert"]) > [data-v2-regler] { grid-column: 1 / -1 !important; grid-row: 3 !important; }
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"]:has(> .vrm-achats-retirer-repli[data-retirer-repli="ouvert"]) > .vrm-achats-retirer-repli ~ .vrm-market-space { grid-row: 4 / 40 !important; }
   /* La colonne des codes est étroite : la ligne d'un colis passe sur deux étages (le texte et le code ; puis les gestes). */
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-rang { display: flex !important; flex-wrap: wrap !important; row-gap: 10px !important; column-gap: 10px !important; align-items: center !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-ouvrir { flex: 1 1 100% !important; min-width: 0 !important; }
@@ -385,7 +394,11 @@
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-code-gros.sb-plaque--grande { display: flex !important; gap: 6px !important; letter-spacing: 0 !important; min-height: 62px !important; margin: 6px 0 4px !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-code-gros .va-c {
     width: 44px !important; height: 62px !important; border-radius: 12px !important; display: grid !important; place-items: center !important; background: #FFFFFF !important;
-    border: 1px solid rgb(12 29 48 / .14) !important; box-shadow: 0 2px 0 rgb(12 29 48 / .06) !important; font: 750 34px/1 Inter, system-ui, sans-serif !important; color: #0C1D30 !important;
+    border: 1px solid rgb(28 28 32 / .14) !important; box-shadow: 0 2px 0 rgb(28 28 32 / .06) !important; font: 750 34px/1 Inter, system-ui, sans-serif !important; color: #1C1C20 !important;
   }
 }
 }
+
+/* (17 nov., chasse-bugs) « N colis : transporteur pas encore lu » dans la liste, sous ses colonnes (rien de nouveau : la même ligne discrète). */
+:root:root:root:root:root:root:root:root body .vv-pas-lus:empty { display: none !important; }
+:root:root:root:root:root:root:root:root body .vv-pas-lus > .vrm-colis-pas-lus { margin: 0 !important; padding: 6px 16px 2px !important; }

@@ -10,7 +10,7 @@
 //   3. la garde des rechargements : une fois par version cible, trois en dix minutes au plus ;
 //   4. `estErreurMorceau` reconnaît les messages relevés dans le journal des plantages ;
 //   5. le rechargement OUBLIE la coquille du service worker (sinon A ▸ A ▸ B, mesuré) ;
-//   6. l'écran de démarrage : le dégradé EXACT de la proposition 9 (`.d9`), la barre d'état
+//   6. l'écran de démarrage : le fond natif `--n-fond` (20 nov., plus de dégradé), la barre d'état
 //      assortie (demarrage-theme.js), le manifeste, aucun script en ligne.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -77,30 +77,26 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
 
   // 6. l'écran de démarrage
   const html = fs.readFileSync(path.join(R, 'index.html'), 'utf8');
-  // (16 nov., intégration vague B) Le dégradé de l'écran de démarrage = celui de l'app, valeur pour valeur : les
-  // jetons FINAUX de src/design/studio-verre.css (`--sv-haut/milieu/bas`, `--sv-reflet`, `--sv-reflet-2`, clair
-  // puis sombre), composés comme le `::before` de la coque. Plus la proposition 9 : le verre a été réglé depuis.
-  const css = fs.readFileSync(path.join(R, 'src', 'design', 'studio-verre.css'), 'utf8');
-  const jeton = (nom, k) => { const all = [...css.matchAll(new RegExp('--sv-' + nom + ':\\s*([^;]+);', 'g'))].map((m) => m[1].trim()); return all[k] || ''; };
-  const rgba = (v) => { const m = /^rgb\((\d+) (\d+) (\d+) \/ (\.\d+)\)$/.exec(v); return m ? [`rgba(${m[1]},${m[2]},${m[3]},${String(Number(m[4]))})`, `rgba(${m[1]},${m[2]},${m[3]},0)`] : ['?', '?']; };
-  const compose = (k) => { const [r1, r1z] = rgba(jeton('reflet', k)), [r2, r2z] = rgba(jeton('reflet-2', k));
-    return [`radial-gradient(120% 60% at 15% 0%,${r1.replace(',0.', ',.')} 0%,${r1z} 55%)`, `radial-gradient(70% 45% at 100% 38%,${r2.replace(',0.', ',.')} 0%,${r2z} 70%)`, `radial-gradient(80% 50% at 0% 78%,${r2.replace(',0.', ',.')} 0%,${r2z} 70%)`,
-      `linear-gradient(170deg,${jeton('haut', k)} 0%,${jeton('milieu', k)} 45%,${jeton('bas', k)} 100%)`].join(','); };
-  const fond = (/--vrm-verre-fond:([^;]+);/.exec(html) || [])[1] || '';
-  const fondNuit = (/--vrm-verre-fond-nuit:([^;]+);/.exec(html) || [])[1] || '';
-  dit(fond === compose(0) && fondNuit === compose(1), 'le dégradé de l\'écran de démarrage = celui de l\'app (studio-verre.css), clair et sombre, valeur pour valeur', fond.slice(0, 120) + ' ≠ ' + compose(0).slice(0, 120));
-  dit(/--vrm-verre-fond-nuit:radial-gradient/.test(html) && /html\[data-theme="dark"\] #vrm-demarrage\{background:var\(--vrm-verre-fond-nuit\)/.test(html), 'le bleu-nuit en sombre');
+  // (20 nov., intégration 20nov) « VRM natif » (19 nov., docs/design/NATIF.md) : plus de dégradé ni de verre. L'écran
+  // de démarrage, la barre d'état pendant le démarrage et le manifeste sont au FOND DE LA PAGE, `--n-fond` de
+  // src/natif/jetons.css (clair, puis sombre), valeur pour valeur. Remplace la règle du 16 nov. (studio-verre.css).
+  const jetons = fs.readFileSync(path.join(R, 'src', 'natif', 'jetons.css'), 'utf8');
+  const nFond = [...jetons.matchAll(/--n-fond:\s*(#[0-9A-Fa-f]{6})\s*;/g)].map((m) => m[1].toUpperCase());
+  const clairN = nFond[0] || '?', nuitN = nFond[1] || '?';
+  const val = (nom) => ((new RegExp('--' + nom + ':([^;]+);').exec(html) || [])[1] || '').trim();
+  dit(val('vrm-verre-fond') === 'none' && val('vrm-verre-fond-nuit') === 'none' && val('vrm-verre-uni').toUpperCase() === clairN && val('vrm-verre-uni-nuit').toUpperCase() === nuitN,
+    'l\'écran de démarrage est au fond de la page natif (`--n-fond`), clair et sombre, sans dégradé', [val('vrm-verre-fond'), val('vrm-verre-uni'), val('vrm-verre-uni-nuit')].join(' / ') + ' ≠ none / ' + clairN + ' / ' + nuitN);
+  dit(/html\[data-theme="dark"\] #vrm-demarrage\{background:var\(--vrm-verre-uni-nuit\)/.test(html), 'le fond sombre en sombre');
   dit(/#vrm-demarrage \.vrm-boot-rail>span\{[^}]*width:calc\(var\(--vrm-boot-p\) \* 100%\)/.test(html) && !/%<\/|\d+ ?%\s*<\/span/.test((/<div id="vrm-demarrage"[\s\S]*?\n<\/div>/.exec(html) || [''])[0]), 'la progression suit les jalons (--vrm-boot-p), aucun pourcentage écrit');
   dit(/animation:vrmBootLent \.4s ease 8s forwards/.test(html), 'la phrase « lente » et « Recharger » au-delà de 8 s');
   const boot = (/<div id="vrm-demarrage"[\s\S]*?\n<\/div>/.exec(html) || [''])[0];
   dit(!/<script(?![^>]*type="application\/ld\+json")[^>]*>[^<]+<\/script>/.test(html) && !/\son[a-z]+=/.test(boot), 'aucun script en ligne, aucun gestionnaire en ligne (CSP)');
   const theme = fs.readFileSync(path.join(R, 'public', 'demarrage-theme.js'), 'utf8');
   const clair = (/BOOT_CLAIR = '(#[0-9A-F]{6})'/.exec(theme) || [])[1], nuit = (/BOOT_NUIT = '(#[0-9A-F]{6})'/.exec(theme) || [])[1];
-  dit(clair === jeton('haut', 0) && nuit === jeton('haut', 1) && /data-vrm-boot/.test(theme), 'la barre d\'état prend le haut du dégradé (`--sv-haut`) pendant le démarrage', clair + ' / ' + nuit);
-  dit(new RegExp('<meta name="theme-color" content="' + clair + '"').test(html), 'la balise theme-color d\'index.html part déjà de ce bleu (avant tout script)');
+  dit(clair === clairN && nuit === nuitN && /data-vrm-boot/.test(theme), 'la barre d\'état prend le fond natif (`--n-fond`) pendant le démarrage', clair + ' / ' + nuit);
+  dit(new RegExp('<meta name="theme-color" content="' + clair + '"').test(html), 'la balise theme-color d\'index.html part déjà de ce fond (avant tout script)');
   const man = JSON.parse(fs.readFileSync(path.join(R, 'public', 'manifest.webmanifest'), 'utf8'));
-  const bleuFonce = (c) => { const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(c || ''); return !!m && parseInt(m[3], 16) - parseInt(m[1], 16) >= 60; };
-  dit(bleuFonce(man.background_color) && man.theme_color === clair, 'manifeste : fond de lancement bleu, couleur du thème = haut du dégradé', man.background_color + ' / ' + man.theme_color);
+  dit(String(man.background_color).toUpperCase() === clairN && String(man.theme_color).toUpperCase() === clairN, 'manifeste : fond de lancement et couleur du thème = fond natif clair (`--n-fond`), plus de bleu', man.background_color + ' / ' + man.theme_color);
 
   console.log(ko ? `\n❌ audit-ouverture : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ audit-ouverture : ${ok} vert(s)`);
   process.exit(ko ? 1 : 0);

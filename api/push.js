@@ -7,12 +7,18 @@
 //   POST { action:'retrait', tx }            → l'extension a lu un code de retrait neuf (5.204)
 //   POST { action:'suivi', tx, uid }         → l'extension a vu une étape de plus dans le
 //                                              suivi Vinted d'un achat (5.214, _lib/suivi-vinted.js)
+//   POST { action:'retour', tx, uid }        → (21 nov., ext. 5.431) une étape de plus du colis RETOUR d'une
+//                                              vente : « Retour arrivé · Remettre en ligne ? », une fois, sur
+//                                              l'arrivée PROUVÉE (_lib/retour-vente-notif.js)
 //   POST { action:'comptes' }                → l'app a vu un compte relié pour la première fois :
 //                                              la route RELIT les comptes elle-même (rien du corps)
 //                                              et notifie une fois par compte (_lib/compte-relie.js)
 //   POST { action:'moderation' }             → l'extension a rangé « Vinted a masqué / fait disparaître /
 //                                              limite » (5.350) : la route RELIT les lignes, une fois par
 //                                              événement, regroupé (_lib/moderation-notif.js)
+//   POST { action:'comptebloque' }           → (19 nov., ext. 5.409) le profil d'un compte a changé
+//                                              bloqué ⇔ actif : la route RELIT tout, « Vinted a bloqué … » /
+//                                              « … est débloqué », une fois (_lib/compte-bloque-notif.js)
 //   POST { action:'avis', uid }              → (11 nov.) l'extension vient de lire les avis de CE
 //                                              compte : la route RELIT la ligne et sonne une fois
 //                                              par avis ≤ seuil (_lib/avis-negatif.js)
@@ -21,6 +27,14 @@
 //   POST { action:'prixachat', ventes }      → (11 nov.) des ventes PROUVÉES sans prix d'achat :
 //                                              chaque transaction est RELUE ici, une notification
 //                                              une fois par vente, jamais la nuit (_lib/prix-achat-demande.js)
+//   POST { action:'capte', evenements }      → (21 nov., ext. 5.422) l'extension vient de capter une vente,
+//                                              une offre ou un message NOUVEAUX : des IDENTITÉS seulement
+//                                              ({ s, p, c, id }) ; chaque objet est RELU ici, une fois par
+//                                              objet, regroupé (_lib/push-capte.js)
+//   POST { action:'distance', id }          → (22 nov., ext. 5.436) un geste commandé À DISTANCE a son issue : la route
+//                                              RELIT `cmd_dist_{id}` de CE vendeur, une notification par issue (_lib/distance-notif.js)
+//   POST { action:'retraits' }               → (21 nov., ext. 5.426) un retrait « vendue ⇒ retirée partout » pas fait
+//                                              depuis 30 min : la route RELIT `vrm_retraits_partout` (_lib/retraits-retard-notif.js)
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
@@ -30,13 +44,18 @@ import { contexteVendeur } from './_lib/owner.js';
 import { utilisateurDe } from './_lib/session.js';
 import { notifierRetraitConversation } from './email-inbound.js';
 import { notifierSuiviVinted } from './_lib/suivi-vinted.js';
+import { notifierRetourVente } from './_lib/retour-vente-notif.js';
 import { corsExtension } from './_lib/cors-extension.js';
 import { notifierComptesRelies } from './_lib/compte-relie.js';
 import { notifierModeration } from './_lib/moderation-notif.js';
+import { notifierComptesBloques } from './_lib/compte-bloque-notif.js';
 import { notifierAvisBas } from './_lib/avis-negatif.js';
 import { notifierVerificationVinted } from './_lib/verification-vinted.js';
 import { notifierAlertesDuVendeur } from './_lib/veille-chiffres.js';
 import { notifierPrixAchat } from './_lib/prix-achat-demande.js';
+import { notifierCapte } from './_lib/push-capte.js';
+import { notifierRetraitsEnRetard } from './_lib/retraits-retard-notif.js';
+import { notifierDistance } from './_lib/distance-notif.js';
 
 // Ce que l'app montrera tel quel : pas de vocabulaire d'informaticien, et un
 // geste (§2.7). Ce n'est pas le téléphone qui est en cause — il ne faut surtout
@@ -116,6 +135,13 @@ async function traiter(req, res) {
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
       return;
     }
+    // (21 nov., ext. 5.431, lot 77) LE COLIS RETOUR D'UNE VENTE a une étape de plus : la route relit tout et ne
+    // sonne qu'à l'ARRIVÉE prouvée (transporteur, e-mail du même n°), une fois par retour.
+    if (body.action === 'retour') {
+      const r = await notifierRetourVente(body.tx, body.uid);
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
     // (8 nov.) UN COMPTE RELIÉ POUR LA PREMIÈRE FOIS : « 🔗 shop_x est relié à VRM ».
     // Le corps ne dit rien (ni compte, ni nom) : tout est relu ici, au nom de CE vendeur.
     if (body.action === 'comptes') {
@@ -127,6 +153,13 @@ async function traiter(req, res) {
     // tout est relu ici, au nom de CE vendeur, une fois par événement.
     if (body.action === 'moderation') {
       const r = await notifierModeration();
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (19 nov., lot compte-bloque) LE PROFIL D'UN COMPTE A CHANGÉ (bloqué ⇔ actif) : le corps ne dit
+    // rien, tout est relu ici, au nom de CE vendeur, une fois par blocage / par remise.
+    if (body.action === 'comptebloque') {
+      const r = await notifierComptesBloques();
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
       return;
     }
@@ -153,9 +186,26 @@ async function traiter(req, res) {
       return;
     }
     // (11 nov., saisie rapide) « Vendu 80 € · N°124 : combien tu l'avais payée ? »
+    if (body.action === 'distance') {
+      const r = await notifierDistance(body.id);
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    if (body.action === 'retraits') {
+      const r = await notifierRetraitsEnRetard();
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
     if (body.action === 'prixachat') {
       const r = await notifierPrixAchat(body);
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (21 nov., ext. 5.422, `pushcapte`) « Vente : … · Imprimer le bordereau », « Offre de 45 € · Répondre » :
+    // le corps ne porte que des identités ; tout est relu ici, au nom de CE vendeur (api/_lib/push-capte.js).
+    if (body.action === 'capte') {
+      const r = await notifierCapte(body);
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n || 0, ...(r.deja ? { deja: r.deja } : {}), ...(r.coupe ? { coupe: r.coupe } : {}), ...(r.rien ? { rien: r.rien } : {}), ...(r.calme ? { calme: true } : {}) } : { erreur: r.raison });
       return;
     }
     if (body.action === 'subscribe') {

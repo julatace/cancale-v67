@@ -1,0 +1,261 @@
+// ════════════════════════════════════════════════════════════════════════════
+//  RELIER EN GLISSANT — LES RÈGLES (16 nov., lot relier-glisser)
+// ════════════════════════════════════════════════════════════════════════════
+// Julien : « Quand je veux relier un achat à une annonce ou à une vente, faire comme quand on
+// reste appuyé sur une app sur iPhone : ça vibre, et après tu places [l'achat] sur la vente ou
+// l'annonce. Sinon une liste, ça peut être aussi simple. »
+//
+// L'écran (src/RelierGlisser.jsx) : en haut (téléphone) ou à gauche (ordinateur) ses ACHATS
+// LIBRES, les « très probables » d'abord ; en bas / à droite les ANNONCES et VENTES sans achat
+// relié. Appui long (~400 ms) sur un achat : il se soulève, suit le doigt ; lâché sur une cible ⇒
+// confirmation en une ligne ⇒ relié par l'IDENTITÉ de la ligne (n° de transaction de l'achat,
+// identifiant de l'annonce / n° de la vente), annulable 5 s. Lâché ailleurs ⇒ rien.
+//
+// Règles (§5) : rien n'est relié sans SON geste (le glisser PUIS « Oui ») ; seuls les achats
+// LIBRES sont proposés (`tousAchatsLibres` : pas déjà reliés — un lot jusqu'à son nombre —, ni
+// annulés, ni en retour / litige / remboursés, src/achatsHorsRelier.js) ; une vente ou annonce déjà
+// reliée n'est pas une cible (les listes « sans achat relié » seulement).
+//
+// VIBRATION : `navigator.vibrate` n'existe PAS dans Safari iOS (ni en web app installée : WebKit
+// ne l'a jamais livrée : table de compatibilité de MDN, « Safari on iOS : non »). Elle n'est
+// appelée QUE si elle existe (Android / Chrome) ; ailleurs le « soulèvement » (agrandissement,
+// ombre, petite oscillation) est le seul retour. Aucun texte ne promet une vibration.
+//
+// Module PUR : exécuté par scripts/audit-relier-glisser.cjs.
+import { tousAchatsLibres, tousAchatsLibresDetail, foinAchat } from './suggestionsAchat.js';
+
+export const DELAI_APPUI_MS = 400;     // appui long (iPhone : ~0,5 s pour soulever une icône)
+export const SEUIL_DEFILEMENT_PX = 10; // un doigt qui bouge plus avant le délai = un défilement
+export const SEUIL_SOURIS_PX = 6;      // à la souris, un glisser franc démarre sans attendre
+export const BORD_DEFILEMENT_PX = 56;  // la zone près du bord qui fait défiler la liste cible
+export const VITESSE_MAX_PX = 18;      // px par image au bord même
+export const ATTENTE_BORD_MS = 300;    // le doigt doit RESTER près du bord : le traverser ne fait rien défiler
+
+// ── L'appui : une petite machine d'états ────────────────────────────────────
+// etat : null · { phase: 'appui', x0, y0, t0, souris } · { phase: 'leve', … } · { phase: 'defile' }
+// evt  : { type: 'bouge', x, y, t } · { type: 'temps', t }
+// Rend l'état suivant. Un doigt qui bouge AVANT le délai défile (jamais un glisser) ; la souris
+// peut glisser tout de suite (aucun défilement au doigt à protéger).
+export function appuiSuivant(etat, evt) {
+  if (!etat || !evt) return etat;
+  if (etat.phase === 'appui') {
+    if (evt.type === 'temps') return evt.t - etat.t0 >= DELAI_APPUI_MS ? { ...etat, phase: 'leve' } : etat;
+    if (evt.type === 'bouge') {
+      const d = Math.hypot(evt.x - etat.x0, evt.y - etat.y0);
+      if (etat.souris) return d >= SEUIL_SOURIS_PX ? { ...etat, phase: 'leve' } : etat;
+      if (d > SEUIL_DEFILEMENT_PX) return evt.t - etat.t0 >= DELAI_APPUI_MS ? { ...etat, phase: 'leve' } : { phase: 'defile' };
+      return evt.t - etat.t0 >= DELAI_APPUI_MS ? { ...etat, phase: 'leve' } : etat;
+    }
+  }
+  return etat;
+}
+
+// ── Le défilement automatique près du bord de la liste cible ────────────────
+// y : la position du doigt ; haut / bas : les bords de la liste (px de la fenêtre).
+// Rend px par image : négatif vers le haut, positif vers le bas, 0 au milieu (ou hors liste).
+export function vitesseBord(y, haut, bas) {
+  if (!Number.isFinite(y) || !Number.isFinite(haut) || !Number.isFinite(bas) || bas - haut < 2 * BORD_DEFILEMENT_PX) return 0;
+  if (y < haut || y > bas) return 0;                    // hors de la liste : jamais (entrer par le haut ne la fait pas remonter)
+  if (y < haut + BORD_DEFILEMENT_PX) return -Math.round(VITESSE_MAX_PX * Math.min(1, (haut + BORD_DEFILEMENT_PX - y) / BORD_DEFILEMENT_PX));
+  if (y > bas - BORD_DEFILEMENT_PX) return Math.round(VITESSE_MAX_PX * Math.min(1, (y - (bas - BORD_DEFILEMENT_PX)) / BORD_DEFILEMENT_PX));
+  return 0;
+}
+
+// ── Les deux listes ─────────────────────────────────────────────────────────
+// achats      : ses achats lus (`undefined` en cours) ; liens : `liensParAchat`
+// tresProbables : { [tx]: [{ key, niveau }] } (`liaison.parAchat`, src/liaisonAchat.js) — marquées en tête
+// cibles      : [{ key, genre: 'annonce' | 'vente', … }] (déjà « sans achat relié »)
+// Rend { achats: [{ a, tx, propose: key | '' }], cibles } (`achats` undefined pendant la lecture).
+export function listesGlisser({ achats, liens, tresProbables = null, cibles = [] } = {}) {
+  const cs = (Array.isArray(cibles) ? cibles : []).filter((c) => c && c.key);
+  const cles = new Set(cs.map((c) => String(c.key)));
+  if (!Array.isArray(achats)) return { achats: achats === null ? null : undefined, cibles: cs };
+  const libres = tousAchatsLibres({ achats, liens });
+  const out = libres.map((a) => {
+    const tx = String(a.transaction_id);
+    const p = tresProbables && Array.isArray(tresProbables[tx]) ? tresProbables[tx].find((x) => x && x.niveau === 'tres-probable' && cles.has(String(x.key))) : null;
+    return { a, tx, propose: p ? String(p.key) : '' };
+  });
+  // Les « très probables » d'abord (l'ordre des dates gardé à l'intérieur de chaque groupe).
+  out.sort((x, y) => (x.propose ? 0 : 1) - (y.propose ? 0 : 1));
+  return { achats: out, cibles: cs };
+}
+
+// ── (19 nov., Julien, sur son Mac) Les filtres et « Très probable » au bon moment ────────────────────────────
+// « je ne vois pas pourquoi il y a "Très probable" de marqué alors que je n'ai sélectionné aucune annonce » ⇒ un achat
+// n'est MARQUÉ que pour la vente / l'annonce CHOISIE (`cle`), et ceux-là viennent en tête ; rien de choisi : aucune
+// marque, l'ordre de `listesGlisser` gardé. `tresProbables` : { [tx]: [{ key, niveau }] } (src/liaisonAchat.js).
+export function marquerPour(liste, tresProbables = null, cle = '') {
+  if (!Array.isArray(liste)) return liste;
+  const k = String(cle || '');
+  const pour = (x) => !!(k && tresProbables && Array.isArray(tresProbables[x.tx]) && tresProbables[x.tx].some((p) => p && p.niveau === 'tres-probable' && String(p.key) === k));
+  const out = liste.map((x) => ({ ...x, pour: pour(x) }));
+  if (k) out.sort((x, y) => (x.pour ? 0 : 1) - (y.pour ? 0 : 1));   // tri stable : l'ordre des dates gardé dans chaque groupe
+  return out;
+}
+// « je veux un filtre avec les articles que j'ai déjà reliés » : les achats DÉJÀ reliés (`pris` de la même règle que les
+// libres — jamais les annulés ni les hors-relier), du plus récent au plus ancien. Montrés à part, jamais proposés.
+export function achatsRelies({ achats, liens } = {}) {
+  if (!Array.isArray(achats)) return achats === null ? null : undefined;
+  return tousAchatsLibresDetail({ achats, liens }).pris.map((a) => ({ a, tx: String(a.transaction_id), relie: true }));
+}
+// « à droite, un filtre annonces en ligne / vendues » : `genre` de la cible ('annonce' = en ligne, 'vente' = vendue).
+export function compterCibles(cibles) {
+  const cs = Array.isArray(cibles) ? cibles : [];
+  return { toutes: cs.length, annonce: cs.filter((c) => c && c.genre === 'annonce').length, vente: cs.filter((c) => c && c.genre === 'vente').length };
+}
+export function filtrerCibles(cibles, filtre = 'toutes') {
+  const cs = Array.isArray(cibles) ? cibles : [];
+  return filtre === 'annonce' || filtre === 'vente' ? cs.filter((c) => c && c.genre === filtre) : cs;
+}
+
+// ── (19 nov., Julien : « une barre de recherche pour retrouver les ventes et les achats quand on relie ») ──────────
+// Chaque MOT tapé doit se trouver dans la ligne (sans accents ni majuscules) ; « contient », jamais un rapprochement.
+// Achats : le même foin que « Tous mes achats » (`foinAchat` : titre, marque, taille « 42 » / « taille 42 » / « t42 »,
+// prix « 24,63 », date « 12/10 » ou « octobre », compte, vendeur, n° de transaction).
+const motsDe = (q) => String(q || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/).filter(Boolean);
+export function chercherAchats(liste, q = '', aides = {}) {
+  if (!Array.isArray(liste)) return liste;
+  const mots = motsDe(q); if (!mots.length) return liste;
+  return liste.filter((x) => { const foin = foinAchat(x.a, aides); return mots.every((m) => foin.includes(m)); });
+}
+// Ventes et annonces : N° (« 215 », « n°215 »), titre, taille, prix et date écrits sur la ligne, « vendue » / « en vente ».
+export function chercherCibles(cibles, q = '') {
+  const cs = Array.isArray(cibles) ? cibles : [];
+  const mots = motsDe(q); if (!mots.length) return cs;
+  const foin = (c) => { const t = String(c.taille || '').replace(',', '.'); const n = String(c.num || '');
+    return motsDe([c.titre, n, n ? 'n°' + n : '', n ? 'n' + n : '', t, t.replace('.', ','), t ? 'taille ' + t : '', t ? 't' + t : '', c.sous, c.genre === 'vente' ? 'vendue vendu' : 'en vente en ligne'].filter(Boolean).join(' ')).join(' '); };
+  return cs.filter((c) => { const f = foin(c); return mots.every((m) => f.includes(m)); });
+}
+
+// ── La phrase de confirmation (une ligne) ───────────────────────────────────
+// « Relier N°215 à cet achat de 24,63 € ? » ; sans N° : le titre de la cible ; lot : le prix sera demandé.
+// `t` : la fonction de traduction ; `montant(n)` : l'euro écrit.
+export function phraseConfirmation({ cible, prix = null, lot = false } = {}, t, montant) {
+  const qui = cible && cible.num ? `N°${cible.num}` : `« ${String((cible && cible.titre) || '').slice(0, 40)} »`;
+  if (lot) return t('glisser.confirmerLot', { qui });
+  if (prix != null && Number.isFinite(Number(prix))) return t('glisser.confirmer', { qui, prix: montant(Number(prix)) });
+  return t('glisser.confirmerSansPrix', { qui });
+}
+
+// ── Les opérations d'une liaison (un geste annulable : src/gesteAnnulable.js) ──
+// cible : { genre, id (annonce), tx (vente), idf (annonce vendue) } ; w : l'écriture de « Relier »
+// ({ buyPrice, buyFromId, buyFrom }) ; fiches / ventes / prixParNum : les valeurs COURANTES.
+// L'annonce (ou l'annonce vendue) porte le lien sur SA fiche ; une vente sans fiche, sur la vente.
+// Rend [] si rien ne peut être écrit (cible sans identité).
+// (16 nov., ajout de Julien : « le bénéfice avec la facture d'achat à portée de main ») La MÊME écriture sert toutes les
+// liaisons (liste, propositions, glisser) : `ficheNeuve` — l'annonce sans fiche (pas encore numérotée) reçoit sa fiche
+// (champs de l'annonce + le lien), retirée par « Annuler » ; `autres` — « Déplacer ici » : les détenteurs d'avant
+// (`ecrituresDeplacer`) déliés dans le MÊME geste, rendus par « Annuler ».
+export function opsRelierGlisse({ cible, w, fiches = {}, ventes = {}, prixParNum = {}, ficheNeuve = null, autres = [] } = {}) {
+  if (!cible || !w || w.buyFromId == null || String(w.buyFromId) === '') return [];
+  const ops = [];
+  for (const x of (Array.isArray(autres) ? autres : [])) {
+    if (!x || !x.patch || x.cle == null) continue;
+    const k = String(x.cle);
+    if (x.ou === 'fiche') { const f0 = fiches[k]; if (!f0 || typeof f0 !== 'object') continue; const av = {}; for (const c of Object.keys(x.patch)) av[c] = f0[c]; ops.push({ k: 'vinted_annonce_numeros', type: 'champs', id: k, apres: x.patch, avant: av }); }
+    else if (x.ou === 'vente') { const v0 = ventes[k]; const ap = { ...(v0 && typeof v0 === 'object' ? v0 : {}), ...x.patch }; for (const c of Object.keys(ap)) if (ap[c] == null || String(ap[c]).trim() === '') delete ap[c];
+      ops.push({ k: 'vinted_sale_overrides', type: 'cle', id: k, apres: Object.keys(ap).length ? ap : undefined, avant: v0 && typeof v0 === 'object' ? v0 : undefined }); }
+  }
+  const idFiche = cible.genre === 'annonce' ? cible.id : cible.idf;
+  const f = idFiche != null && String(idFiche) !== '' ? fiches[String(idFiche)] : null;
+  const champs = { buyPrice: w.buyPrice, buyFromId: w.buyFromId, buyFrom: w.buyFrom };
+  if (f && typeof f === 'object') {
+    ops.push({ k: 'vinted_annonce_numeros', type: 'champs', id: String(idFiche), apres: champs, avant: { buyPrice: f.buyPrice, buyFromId: f.buyFromId, buyFrom: f.buyFrom } });
+    const n = String(f.numero == null ? '' : f.numero).trim();
+    if (n && w.buyPrice != null && String(w.buyPrice).trim() !== '') ops.push({ k: 'vinted_buyprice_by_num', type: 'cle', id: n, apres: String(w.buyPrice), avant: prixParNum[n] });
+    return ops;
+  }
+  if (cible.genre === 'annonce' && idFiche != null && String(idFiche) !== '' && ficheNeuve && typeof ficheNeuve === 'object') {
+    ops.push({ k: 'vinted_annonce_numeros', type: 'cle', id: String(idFiche), apres: { ...ficheNeuve, ...champs }, avant: undefined });
+    return ops;
+  }
+  if (cible.genre === 'vente' && cible.tx != null && String(cible.tx) !== '') {
+    const tx = String(cible.tx), cur = ventes[tx];
+    const apres = { ...(cur && typeof cur === 'object' ? cur : {}), ...champs };
+    for (const k of Object.keys(apres)) if (apres[k] == null || String(apres[k]).trim() === '') delete apres[k];
+    ops.push({ k: 'vinted_sale_overrides', type: 'cle', id: tx, apres, avant: cur && typeof cur === 'object' ? cur : undefined });
+  }
+  return ops.some((o) => o.apres && o.apres.buyFromId != null) ? ops : [];
+}
+
+// La vibration : seulement là où elle existe. Rend true si elle a été demandée.
+export function vibrerSiPossible(nav = (typeof navigator !== 'undefined' ? navigator : null), ms = 12) {
+  try { if (nav && typeof nav.vibrate === 'function') return nav.vibrate(ms) !== false; } catch (_) {}
+  return false;
+}
+
+// ── Le résultat d'une liaison, dit tout de suite (16 nov., ajout de Julien) ──
+// « Achat relié · Bénéfice +22,57 € » : la règle de la ligne de vente (`beneficeLigneVente` → `beneficePaire`,
+// src/beneficeLigne.js) sur l'entrée APRÈS la liaison ; une annonce pas vendue : au prix affiché. Frais pas
+// confirmés ⇒ « au plus » (la règle) ; prix ou achat pas lus ⇒ « — ». `t` : traduction ; `ligne`, `texte` : la règle.
+export function texteApresLiaison({ genre = 'vente', prix = null, entree = null } = {}, t, ligne, texte) {
+  const r = typeof ligne === 'function' ? ligne(prix, entree || {}) : null;
+  const b = r && r.benefice != null ? texte(r) : '—';
+  // (16 nov., reprise) La pilule montre le bénéfice EN ENTIER : « Achat relié » en titre, le bénéfice dessous (deux lignes
+  // au plus, jamais coupé par « … ») ; `texte` (la phrase entière) reste ce que VoiceOver annonce.
+  return { texte: t(genre === 'annonce' ? 'liaison.relieAffiche' : 'liaison.relieBenef', { benef: b }),
+    titre: t('liaison.relieTitre', {}), sous: t(genre === 'annonce' ? 'liaison.relieSousAffiche' : 'liaison.relieSous', { benef: b }), benefice: r && r.benefice != null ? r.benefice : null, etat: r ? r.etat : 'prix' };
+}
+
+// ── (20 nov., Julien : « trie de la plus récente à la plus ancienne, des deux côtés ; des filtres plateforme, marque,
+//    taille ; ne me propose jamais un achat pas encore livré ») ─────────────────────────────────────────────────────
+// LE TRI : la date la plus récente d'abord, des deux côtés (achat : la date de la commande ; vente : la date de vente ;
+// annonce : sa mise en ligne). Une ligne sans date lisible va À LA FIN (jamais devinée), l'ordre d'avant gardé entre elles.
+const dateMsDe = (v) => { if (v == null || v === '') return null; const n = typeof v === 'number' ? v : Date.parse(String(v)); if (!Number.isFinite(n) || n <= 0) return null; return n < 1e12 ? n * 1000 : n; };
+export function plusRecentDabord(liste, dateDe) {
+  if (!Array.isArray(liste)) return liste;
+  return liste.map((x, i) => ({ x, i, d: dateMsDe(typeof dateDe === 'function' ? dateDe(x) : null) }))
+    .sort((p, q) => (p.d == null) - (q.d == null) || (q.d || 0) - (p.d || 0) || p.i - q.i).map((p) => p.x);
+}
+// LES ACHATS QU'ON PEUT RELIER : seulement ceux qu'il A (reçus ou retirés). `recuDe(a)` : la règle de l'app (l'étape
+// « Arrivé » de `etapeAchat` : transaction finalisée, commande livrée, retrait prouvé par le transporteur — un colis encore
+// au point relais, en route ou payé n'y est pas). « Pas su » (pas de règle, ou une règle qui ne rend pas `true`) ⇒ écarté :
+// une paire qu'il n'a pas encore ne se relie pas à une annonce (§5 : « pas su » ne vaut pas « oui »).
+export function seulementRecus(liste, recuDe) {
+  if (!Array.isArray(liste) || typeof recuDe !== 'function') return liste;
+  return liste.filter((x) => { try { return recuDe(x && x.a ? x.a : x) === true; } catch (_) { return false; } });
+}
+// LES FACETTES : plateforme, marque, taille — des DEUX côtés, chacune lue par son getter (jamais devinée : une ligne sans
+// marque lue n'a pas de marque, elle sort quand une marque est choisie). Rend les choix présents avec leur nombre, triés
+// (plateformes dans l'ordre des sites, marques par nombre puis nom, tailles en nombre).
+export const FACETTES = ['site', 'marque', 'taille'];
+export const ORDRE_SITES = ['vinted', 'leboncoin', 'ebay', 'vestiaire'];
+const normFacette = (k, v) => { const s = String(v == null ? '' : v).trim(); if (!s) return ''; return k === 'marque' ? s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '') : k === 'taille' ? s.replace(',', '.').replace(/\s+/g, ' ') : s.toLowerCase(); };
+const valeurTaille = (t) => { const m = /(\d+(?:\.\d+)?)/.exec(String(t)); return m ? Number(m[1]) : Infinity; };
+export function facettesDe(liste, lire = {}) {
+  const out = {};
+  for (const k of FACETTES) {
+    const f = typeof lire[k] === 'function' ? lire[k] : null; const m = new Map();
+    if (f) for (const x of (Array.isArray(liste) ? liste : [])) { let v = ''; try { v = f(x); } catch (_) { v = ''; } const c = normFacette(k, v); if (!c) continue; const e = m.get(c) || { cle: c, libelle: String(v).trim(), n: 0 }; e.n++; m.set(c, e); }
+    const vals = [...m.values()];
+    if (k === 'site') vals.sort((a, b) => (ORDRE_SITES.indexOf(a.cle) + 1 || 99) - (ORDRE_SITES.indexOf(b.cle) + 1 || 99));
+    else if (k === 'taille') vals.sort((a, b) => valeurTaille(a.cle) - valeurTaille(b.cle) || a.cle.localeCompare(b.cle, 'fr'));
+    else vals.sort((a, b) => b.n - a.n || a.libelle.localeCompare(b.libelle, 'fr'));
+    out[k] = vals;
+  }
+  return out;
+}
+// Garder les lignes qui ont EXACTEMENT la valeur choisie de chaque facette (''/absente = toutes). « contient » n'existe pas ici :
+// « Nike » ne prend pas « Nike SB » s'il est lu « Nike SB » (deux marques), et une taille « 42 » ne prend pas « 42,5 ».
+export function filtrerFacettes(liste, choix = {}, lire = {}) {
+  if (!Array.isArray(liste)) return liste;
+  const actives = FACETTES.filter((k) => choix && choix[k] && typeof lire[k] === 'function');
+  if (!actives.length) return liste;
+  return liste.filter((x) => actives.every((k) => { let v = ''; try { v = lire[k](x); } catch (_) { v = ''; } return normFacette(k, v) === normFacette(k, choix[k]); }));
+}
+// Un choix gardé qui n'existe plus dans la liste (achat relié depuis, marque partie) tombe : jamais une liste vide sans raison.
+export function choixValides(choix = {}, facettes = {}) {
+  const out = {};
+  for (const k of FACETTES) { const v = choix && choix[k]; if (v && Array.isArray(facettes[k]) && facettes[k].some((f) => f.cle === normFacette(k, v))) out[k] = normFacette(k, v); }
+  return out;
+}
+// Les choix GARDÉS (par appareil : un confort, jamais une donnée) — `vrm_relier_filtres` { achats: {…}, cibles: {…} }.
+export const CLE_FILTRES = 'vrm_relier_filtres';
+export function lireFiltresGardes(stock = (typeof localStorage !== 'undefined' ? localStorage : null)) {
+  try { const v = JSON.parse((stock && stock.getItem(CLE_FILTRES)) || 'null'); if (v && typeof v === 'object') return { achats: v.achats && typeof v.achats === 'object' ? v.achats : {}, cibles: v.cibles && typeof v.cibles === 'object' ? v.cibles : {} }; } catch (_) {}
+  return { achats: {}, cibles: {} };
+}
+export function garderFiltres(f, stock = (typeof localStorage !== 'undefined' ? localStorage : null)) {
+  try { if (stock) stock.setItem(CLE_FILTRES, JSON.stringify({ achats: f && f.achats ? f.achats : {}, cibles: f && f.cibles ? f.cibles : {} })); } catch (_) {}
+}

@@ -16,9 +16,10 @@ const { build } = require("esbuild"),
       resolveDir: root,
       loader: "jsx",
       contents: `import __vrmFrApp from'./src/i18n/langues/fr.js';import{ajouterSourceApp as __vrmSource}from'./src/i18n/index.js';__vrmSource(__vrmFrApp);/* (13 nov.) le français de l'app, comme App.jsx le pose (traduction) */
-import React,{useState,useEffect,useRef}from'react';import{createRoot}from'react-dom/client';import EspaceEmails from'./src/EspaceEmails.jsx';import SuiviReceptionEmails from'./src/ReceptionEmails.jsx';import{normAdresse,ADRESSE_COLLECTRICE}from'./api/_lib/proprietaire-email.js';import{EtatPanne}from'./src/composants/EtatPanne.jsx';import{ChampRecherche}from'./src/composants/ChampRecherche.jsx';import{PAS_SU,L,VERBES}from'./src/libelles.js';
+import React,{useState,useEffect,useRef}from'react';import{BoutonBase}from'./src/composants/Bouton.jsx';import{createRoot}from'react-dom/client';import EspaceEmails from'./src/EspaceEmails.jsx';import SuiviReceptionEmails from'./src/ReceptionEmails.jsx';import{normAdresse,ADRESSE_COLLECTRICE}from'./api/_lib/proprietaire-email.js';import{EtatPanne}from'./src/composants/EtatPanne.jsx';import{ChampRecherche}from'./src/composants/ChampRecherche.jsx';import{PAS_SU,L,VERBES}from'./src/libelles.js';
 const C={text:'#223d41',muted:'#647676',bg:'#f2f5f0',card:'#fff',border:'#dce4de',accent:'#315e62',warn:'#946d27',danger:'#a33c36',onAccent:'#fff'};
 const useStateCle=(k,f)=>useState(f),load=()=>({}),save=()=>{},onCloudReady=()=>()=>{},JournalEmails=()=>null,Avancement=()=>null,compteAvancement=()=>'',phrasePersonne=()=>null,askText=async()=>'',SUPABASE_URL='',SB_CONFLICT='',withOwner=x=>x,enTeteSession=()=>({}),demanderPreuveAdresse=async()=>({etat:null}),estAdresseCollectrice=()=>false;
+/* (21 nov.) le relais Bouton de App.jsx (EmailsSetting l'utilise depuis la refonte), sans icônes */const Bouton=(props)=> <BoutonBase {...props} rendreIcone={()=>null}/>;
 const AUTH={user:{id:'a'}},DEMANDE_ADRESSES={on:false},Icon=()=> <span aria-hidden="true">·</span>,REGLAGE_PAS_LU='Lecture indisponible';
 const PREUVE_LIGNE={prouvee:{t:'Confirmée'},attente:{t:'À confirmer',geste:'Confirmer'}};
 window.q={emails:Array.from({length:13},(_,i)=>({id:'q'+i,sujet:'Colis à retirer '+i,raison:i===12?'Motif exceptionnel':'Adresse à confirmer'})),cloisonnee:true};

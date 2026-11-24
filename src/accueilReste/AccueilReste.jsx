@@ -15,7 +15,7 @@ import { trj } from '../i18n/react.js';
 import { OUTILS, useAides, useCle } from './deps.js';
 import { aideActive, basculerAide, noterVisiteVue, oublierVisites, noterTrouveVu, fermerConseil, lireAides } from './aides.js';
 import { propositionCartons, reponseCartons } from './cartonsNumeros.js';
-import { lignesTrouve, carteTrouve, lireSansNumero, importPret } from './trouveChezToi.js';
+import { lignesTrouve, carteTrouve, lireSansNumero, importPret, CLE_PUB_SANS_NUMERO } from './trouveChezToi.js';
 import { conseilDuJour, jourLocal } from './conseilDuJour.js';
 import { estMot, cleMot, cleDef, entreesGlossaire } from './glossaire.js';
 import { bilanEssai, SECONDES_PAR } from './essaiBilan.js';
@@ -25,6 +25,7 @@ import { CLE_NUMERO_ECRIT } from '../numeroEcrit.js';
 import VisiteBulles from '../VisiteBulles.jsx';
 import { lireImportDepart } from '../importDepart.js';
 import './accueil-reste.css';
+import { BoutonBase } from '../composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 const FEUILLES = '[aria-modal="true"], .vrm-visite, .vrm-bienvenue, .vrm-menu-voile, .vrm-garde-feuille, .vrm-conseil-bulle, [data-parcours], [data-configuration-ouverte]';
 const feuilleOuverte = () => { try { return !!document.querySelector(FEUILLES); } catch (_) { return false; } };
@@ -139,12 +140,12 @@ function CarteCartons({ p, onRepondre, enCours }) {
             {montres.map((l) => <li key={l.id} data-cartons-lu={l.id} data-cartons-num={l.cle}><span className="vrm-ar-num">{tr('glo.numero.mot')}{l.cle}</span><span className="vrm-ar-quoi">{l.titre}</span></li>)}
           </ul>
         ) : null}
-        {p.lus.length > 5 && !tout ? <button type="button" className="vrm-b vrm-b-discret vrm-ar-plus" data-cartons-tout="" onClick={() => setTout(true)}>{tr('cartons.voirTout', { n: p.lus.length })}</button> : null}
+        {p.lus.length > 5 && !tout ? <BoutonBase variante="discret" className="vrm-ar-plus" data-cartons-tout="" onClick={() => setTout(true)}>{tr('cartons.voirTout', { n: p.lus.length })}</BoutonBase> : null}
         {p.archives.length || p.ambigus ? <p className="vrm-ar-note" data-cartons-ecartes="">{tr('cartons.ecartes', { n: p.archives.length + p.ambigus })}</p> : null}
         <p className="vrm-ar-note" data-cartons-attente="">{tr('cartons.attente')}</p>
         <div className="vrm-ar-gestes">
-          <button type="button" className="vrm-b vrm-b-primaire" data-cartons-oui="" disabled={enCours} onClick={() => onRepondre(true)}>{tr('cartons.oui')}</button>
-          <button type="button" className="vrm-b vrm-b-discret" data-cartons-non="" disabled={enCours} onClick={() => onRepondre(false)}>{tr('cartons.non')}</button>
+          <BoutonBase variante="primaire"  data-cartons-oui="" disabled={enCours} onClick={() => onRepondre(true)}>{tr('cartons.oui')}</BoutonBase>
+          <BoutonBase variante="discret"  data-cartons-non="" disabled={enCours} onClick={() => onRepondre(false)}>{tr('cartons.non')}</BoutonBase>
         </div>
       </div>
     </section>
@@ -167,13 +168,13 @@ function CarteTrouve({ r, mode, onAller, onNoter }) {
                   <b>{Number.isInteger(l.n) ? (l.n > 0 ? trj(`trouve.${l.cle}`, { n: l.n, mot: <Mot k={MOT_LIGNE[l.cle]} /> }) : trj(`trouve.${l.cle}.zero`, { mot: <Mot k={MOT_LIGNE[l.cle]} /> })) : '—'}</b>
                   {Number.isInteger(l.n) ? null : <small>{tr(`trouve.${l.cle}.nom`)} · {tr(l.n === null ? 'trouve.ancien' : 'trouve.pasCompte')}</small>}
                 </span>
-                {l.n > 0 ? <button type="button" className="vrm-b vrm-b-secondaire vrm-ar-geste" data-trouve-geste={l.geste.cle} onClick={() => onAller(l.geste)}>{tr(`trouve.geste.${l.geste.cle}`)}</button> : null}
+                {l.n > 0 ? <BoutonBase variante="secondaire" className="vrm-ar-geste" data-trouve-geste={l.geste.cle} onClick={() => onAller(l.geste)}>{tr(`trouve.geste.${l.geste.cle}`)}</BoutonBase> : null}
               </li>
             ))}
           </ul>
         )}
         {r.partiel && mode !== 'rien' ? <p className="vrm-ar-note" data-trouve-au-moins="">{tr('trouve.auMoins')}</p> : null}
-        <div className="vrm-ar-gestes"><button type="button" className="vrm-b vrm-b-discret" data-trouve-noter="" onClick={onNoter}>{tr('trouve.noter')}</button></div>
+        <div className="vrm-ar-gestes"><BoutonBase variante="discret"  data-trouve-noter="" onClick={onNoter}>{tr('trouve.noter')}</BoutonBase></div>
       </div>
     </section>
   );
@@ -262,7 +263,10 @@ export function AccueilResteJournee({ apercu, poolVide, reprenable, porteurs, ui
   const colisAposter = useCle('vrm_colis_aposter', null);
   const urssafMois = useCle('vinted_urssaf_mois', null);
   const [, setTic] = React.useState(0);
-  React.useEffect(() => { const f = () => setTic((t) => t + 1); window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
+  // (23 nov., bugs-totale §3.3) Relu seulement quand SA publication change (`vrm_trouve_sans_numero`, lue dans le stockage plus
+  // bas) : chaque `vrm:save` de N'IMPORTE quelle clé (une capture en écrit plusieurs par minute) refaisait la carte entière.
+  // Les autres lectures ont leur propre abonnement (`useCle`, `useAides`).
+  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k && k !== CLE_PUB_SANS_NUMERO) return; setTic((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   const [imp, setImp] = React.useState(undefined);
   const uids = (Array.isArray(comptes) ? comptes : []).map((c) => String((c && c.vinted_user_id) || '')).filter(Boolean).join(',');
   React.useEffect(() => { let v = true; if (!uids) { setImp({}); return undefined; } lireImportDepart(uids.split(','), OUTILS.lireTout).then((x) => { if (v) setImp(x); }).catch(() => { if (v) setImp(null); }); return () => { v = false; }; }, [uids]);
@@ -320,7 +324,7 @@ export function ReglagesAidesAccueil({ proprietaire = false }) {
       <Interrupteur a="conseil" />
       <div className="vrm-ar-reglage">
         <span className="vrm-ar-rang-texte"><b>{tr('aides.revoir')}</b><small>{tr('aides.revoir.desc')}</small></span>
-        <button type="button" className="vrm-b vrm-b-secondaire" data-aide-revoir-visites="" onClick={() => { ecrire((x) => oublierVisites(x)); setDit(tr('aides.revoir.ok')); }}>{tr('aides.revoir.geste')}</button>
+        <BoutonBase variante="secondaire"  data-aide-revoir-visites="" onClick={() => { ecrire((x) => oublierVisites(x)); setDit(tr('aides.revoir.ok')); }}>{tr('aides.revoir.geste')}</BoutonBase>
       </div>
       <GlossaireListe />
       {appel ? <CarteEssai bilan={null} appel={appel} /> : null}
@@ -329,7 +333,7 @@ export function ReglagesAidesAccueil({ proprietaire = false }) {
           <label htmlFor="vrm-ar-appel-lien" className="vrm-ar-rang-texte"><b>{tr('appel.reglage')}</b><small>{tr('appel.reglage.desc')}</small></label>
           <div className="vrm-ar-champ">
             <input id="vrm-ar-appel-lien" type="url" inputMode="url" autoComplete="off" spellCheck={false} placeholder="https://" value={lien} onChange={(e) => { setLien(e.target.value); setDit(''); }} data-appel-champ="" />
-            <button type="button" className="vrm-b vrm-b-secondaire" data-appel-enregistrer="" onClick={enregistrer}>{tr('appel.enregistrer')}</button>
+            <BoutonBase variante="secondaire"  data-appel-enregistrer="" onClick={enregistrer}>{tr('appel.enregistrer')}</BoutonBase>
           </div>
         </div>
       ) : null}
@@ -342,5 +346,5 @@ export function ReglagesAidesAccueil({ proprietaire = false }) {
 export function RevoirVisite({ cle, onAvant }) {
   const [aides] = useAides();
   if (!ECRANS_VISITE.includes(cle) || lireAides(aides).off.visite) return null;
-  return <button type="button" className="vrm-b vrm-b-secondaire vrm-ar-revoir" data-visite-revoir={cle} onClick={() => { if (onAvant) onAvant(); rejouerVisite(cle); }}>{tr('aides.revoirEcran')}</button>;
+  return <BoutonBase variante="secondaire" className="vrm-ar-revoir" data-visite-revoir={cle} onClick={() => { if (onAvant) onAvant(); rejouerVisite(cle); }}>{tr('aides.revoirEcran')}</BoutonBase>;
 }

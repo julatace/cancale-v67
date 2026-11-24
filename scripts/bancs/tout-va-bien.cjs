@@ -19,7 +19,7 @@ require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : l
 const path = require('path'), fs = require('fs'), http = require('http');
 const { metaVersData } = require('./_meta.cjs');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
-const DIST = path.join(__dirname, '..', '..', 'dist');
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = 4391;
 const CAPT = process.env.BANC_CAPTURES || path.join(__dirname, 'captures');
 fs.mkdirSync(CAPT, { recursive: true });
@@ -157,7 +157,10 @@ async function scenario(b, scen, largeur, sombre) {
   const page = pg.locator('[data-tout-va-bien]').first();
   await pg.waitForFunction(() => { const e = document.querySelector('[data-tout-va-bien]'); return e && e.getAttribute('data-tout-va-bien') !== 'lecture'; }, null, { timeout: 20000 }).catch(() => {});
   await page.scrollIntoViewIfNeeded().catch(() => {});
-  const resume = await page.locator('[data-tvb-resume]').innerText().catch(() => '');
+  // (20 nov.) Les comptes un par un et les appareils sont derrière « Détails » (src/ToutVaBien.jsx, points d'abord) : on les déplie.
+  const det = page.locator('[data-tvb-details="ferme"] .n-rangee-corps');
+  if (await det.count()) { await det.first().click({ timeout: 10000 }).catch(async (e) => { await pg.screenshot({ path: path.join(CAPT, `tout-va-bien-RATE-details-${nom}.png`) }); throw e; }); await pg.waitForTimeout(300); }
+  const resume = (await page.locator('[data-tvb-resume]').first().innerText().catch(() => '')).split('\n')[0].trim();
   if (scen === 'panne') {
     const r222 = page.locator('[data-tvb-compte="vinted:222"]');
     dit(await r222.getAttribute('data-tvb-etat') === 'panne', `${nom} : second_compte est en panne sur la page`);
@@ -165,19 +168,19 @@ async function scenario(b, scen, largeur, sombre) {
     dit(/réseau coupé/.test(t222) && /1,0 Mo/.test(t222) && /tes ventes/.test(t222), `${nom} : cause lue (code, famille, taille)`, t222);
     dit((await r222.locator('[data-tvb-geste]').count()) === 1, `${nom} : UN geste sur la rangée`);
     dit(await page.locator('[data-tvb-compte="vinted:111"]').getAttribute('data-tvb-etat') === 'ok', `${nom} : shop_test « À jour »`);
-    dit(/choses? à voir/.test(resume) && !/Tout est à jour/.test(resume), `${nom} : le résumé dit ce qu’il y a à voir`, resume);
+    dit(/choses? à (voir|régler)/.test(resume) && !/Tout (est à jour|va bien)/.test(resume), `${nom} : le résumé dit ce qu’il y a à voir`, resume);
     dit(/Orion · iPhone/.test(await page.innerText()) && /Chrome · Mac/.test(await page.innerText()), `${nom} : chaque appareil nommé`);
     const inconnu = page.locator('[data-tvb-appareil="inconnu"]');
     dit((await inconnu.count()) === 1, `${nom} : l’extension 5.322 sans appareil est dite`);
     if (await inconnu.count()) {
-      await inconnu.locator('button').click();
+      await inconnu.locator('button').click({ timeout: 10000 }).catch(async (e) => { await pg.screenshot({ path: path.join(CAPT, `tout-va-bien-RATE-${nom}.png`) }); throw e; });
       dit((await inconnu.locator('a[href="/VRM-extension.zip"]').count()) === 1 && (await inconnu.locator('a[href="/VRM-Orion.xpi"]').count()) === 1 && (await inconnu.locator('li').count()) === 6, `${nom} : les deux paquets et leurs gestes`);
     }
   } else if (scen === 'ok') {
-    dit(resume === 'Tout est à jour', `${nom} : « Tout est à jour »`, resume);
+    dit(resume === 'Tout va bien', `${nom} : « Tout va bien »`, resume);
     dit(!(await page.locator('[data-forme-vinted]').count()), `${nom} : aucune ligne « Vinted a changé »`);
   } else if (scen === 'forme') {
-    dit(resume === 'Vinted a changé une page' && (await page.locator('[data-forme-vinted="tvb"] [data-forme-page="ventes"]').count()) === 1, `${nom} : Tout va bien ? dit « Vinted a changé une page » et la ligne des ventes`, resume);
+    dit(resume === 'Tout va bien' && (await page.locator('[data-tvb-point="forme"]').count()) === 1 && (await page.locator('[data-forme-vinted="tvb"] [data-forme-page="ventes"]').count()) === 1, `${nom} : Tout va bien ? dit « Vinted a changé une page » et la ligne des ventes`, resume);
   } else {
     dit(/pas pu tout vérifier/.test(resume) && !/Tout est à jour/.test(resume), `${nom} : pas su ⇒ jamais « Tout est à jour »`, resume);
   }

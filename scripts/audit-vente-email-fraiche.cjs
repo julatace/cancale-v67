@@ -35,13 +35,17 @@ if (process.argv.includes('--prouve')) {
     // (16 nov.) La régression vue par Julien : l'e-mail d'un compte PARTICULIER (sans n°) écarté.
     'vente sans n° écartée (avant le 16 nov.)': [['src/venteEmailFraiche.js', 'if (!tx && !RE_ID_VENTE_EMAIL.test(id)) return null;', 'if (!tx) return null;']],
     'vente sans n° sans ligne prouvée': [['src/venteEmailFraiche.js', 'if (!tx && !RE_ID_VENTE_EMAIL.test(id)) return null;', '']],
-    'fenêtre ambiguë retirée': [['src/venteEmailFraiche.js', 'if (!p.tx && derniereLue.get(p.uid) >= p.t - FENETRE_AMBIGUE_MS) continue;', '']],
+    'fenêtre ambiguë retirée': [['src/venteEmailFraiche.js', "if (!p.tx && derniereLue.get(p.uid) >= p.t - FENETRE_AMBIGUE_MS && !autreQueLaFenetre(luesParUid.get(p.uid), p.t, clePhotoVente(m.photo))) continue;", '']],
+    // (23 nov.) La photo tranche la fenêtre ambiguë : seulement un fichier connu des deux côtés, et différent.
+    'fenêtre : la photo tranche toujours': [['src/venteEmailFraiche.js', 'return fen.every((x) => x.ph && x.ph !== ph);', 'return true;']],
+    'fenêtre : une vente sans photo vaut « autre »': [['src/venteEmailFraiche.js', 'return fen.every((x) => x.ph && x.ph !== ph);', 'return fen.every((x) => x.ph !== ph);']],
+    'fenêtre : le fichier comparé sans le chemin': [['src/venteEmailFraiche.js', "return m ? m[1] : '';", "return m ? 'x' : '';"]],
     'requête qui exige un n°': [['src/venteEmailFraiche.js', "return 'id=like.email_sale_*&meta->>type=eq.vente'", "return 'id=like.email_sale_*&meta->>type=eq.vente&meta->>transaction=neq.'"]],
     'tout type admis (un statut entre)': [['src/venteEmailFraiche.js', "if (String(m.type || '') !== 'vente') return null;", '']],
     'compte non lié admis': [['src/venteEmailFraiche.js', 'const acc = parUid.get(p.uid); if (!acc) continue;', "const acc = parUid.get(p.uid) || { vinted_user_id: p.uid };"]],
     'compte écarté admis': [['src/venteEmailFraiche.js', "if (typeof ecarte === 'function' && ecarte(p.uid)) continue;", '']],
     'deux lignes pour un n°': [['src/venteEmailFraiche.js', "const ajout = fraiches.filter((o) => o && !connues.has(String(o.transaction_id)));", 'const ajout = fraiches.filter(Boolean);']],
-    'la liste de Ventes sans les ventes e-mail': [['src/App.jsx', 'let arr = (ventesListe || [])', 'let arr = (sales.items || [])']],
+    'la liste de Ventes sans les ventes e-mail': [['src/ecrans/Comptabilite.jsx', 'let arr = (ventesListe || [])', 'let arr = (sales.items || [])']],
     'le CA déclaré reçoit les ventes e-mail': [['src/ecrans/Compta.jsx', 'const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, vestiaire, masquee', 'const decl = ventesDeclarables({ vinted: ventesVendu || ventes, lbc, ebay, vestiaire, masquee']],
     'ventes en retard jamais dites': [['src/fraicheurComptes.js', 'return v != null && a != null && a - v > RETARD_VENTES_MS;', 'return false;']],
   });
@@ -121,6 +125,16 @@ const APP = charge(['classifyOrderStatus', 'venteFinalisee', 'tsCommande', 'mont
   // L'e-mail en retard sur une lecture : une vente de CE compte lue, datée 10 min avant l'e-mail ⇒ pas su.
   const lue10 = { ...venteV(70000050, A, 0.4), date: new Date(Date.parse(h(0.2)) - 10 * 60000).toISOString() };
   dit(n([sansN()], { ventes: [...ventes, lue10], lectures: { ...lectures, 9001: Date.parse(h(0.25)) } }) === 0, 'F10 une vente de ce compte lue juste avant l’e-mail (fenêtre ambiguë) ⇒ rien, jamais deviné', '');
+  // (23 nov.) La PHOTO tranche la fenêtre (§5, identité 2 : le fichier exact ; mesuré : 7 sur 7 identiques, octet pour octet).
+  const PH = (k) => `https://images1.vinted.net/t/0${k}_00c8e_Inventee${k}AbCdEfGh/150x210/8317116${k}.jpeg?s=9aec${k}`;
+  const lec = { ...lectures, 9001: Date.parse(h(0.25)) };
+  dit(n([sansN({ photo: PH(1) })], { ventes: [...ventes, { ...lue10, photo: { url: PH(1).replace('images1.', 'images.').replace(/\?s=.*/, '?s=autre') } }], lectures: lec }) === 0, 'F11 fenêtre ambiguë, la vente lue porte le MÊME fichier photo (autre hôte, autre signature) ⇒ c’est elle : rien', '');
+  dit(n([sansN({ photo: PH(1) })], { ventes: [...ventes, { ...lue10, photo: { url: PH(2) } }], lectures: lec }) === 1, 'F11 fenêtre ambiguë, la vente lue a un AUTRE fichier photo ⇒ ce n’est pas elle : la vente e-mail entre', '');
+  dit(n([sansN({ photo: PH(1) })], { ventes: [...ventes, { ...lue10, photo: PH(2) }], lectures: lec }) === 1, 'F11 la photo de la commande en adresse simple : pareil', '');
+  dit(n([sansN({ photo: PH(1) })], { ventes: [...ventes, { ...lue10 }], lectures: lec }) === 0, 'F11 la vente lue de la fenêtre SANS photo ⇒ pas su : rien', '');
+  dit(n([sansN({ photo: '' })], { ventes: [...ventes, { ...lue10, photo: { url: PH(2) } }], lectures: lec }) === 0, 'F11 l’e-mail SANS photo ⇒ pas su : rien', '');
+  dit(n([sansN({ photo: PH(1) })], { ventes: [...ventes, { ...lue10, photo: { url: PH(2) } }, { ...lue10, transaction_id: 70000051, photo: { url: PH(1) } }], lectures: lec }) === 0, 'F11 deux ventes dans la fenêtre, l’une au même fichier ⇒ rien', '');
+  dit(n([sansN({ photo: PH(1) })], { ventes: [...ventes, { ...lue10, photo: { url: 'https://exemple.invalid/t/01_00c8e_Inventee1AbCdEfGh/150x210/83171161.jpeg' } }], lectures: lec }) === 0, 'F11 une adresse qui n’est pas une photo de Vinted ne tranche rien', '');
   dit(n([sansN()], { ventes: [...ventes, { ...lue10, _acc: B }], lectures: { ...lectures, 9001: Date.parse(h(0.25)) } }) === 1, 'F10 la même vente lue sur un AUTRE compte ne gêne pas', '');
   dit(n([sansN()], { ecarte: (u) => u === '9001' }) === 0 && n([sansN()], { ko: ['9001'] }) === 0 && n([sansN({ uid: '9999' })]) === 0, 'F10 sans n° : compte écarté, pas lu, non lié ⇒ rien (b inchangée)', '');
   dit(M && typeof M.requeteVentesEmail === 'function' && !/transaction=/.test(M.requeteVentesEmail(T0)) && /select=id,/.test(M.requeteVentesEmail(T0)) && !/select=data/.test(M.requeteVentesEmail(T0)), 'F10 la lecture projetée n’exige plus de n° et porte l’identifiant de la ligne', M && M.requeteVentesEmail && M.requeteVentesEmail(T0));
@@ -178,7 +192,7 @@ const APP = charge(['classifyOrderStatus', 'venteFinalisee', 'tsCommande', 'mont
   // (8 nov., bordereau des e-mails) Sans son bordereau, une vente e-mail n'a aucun geste d'envoi ; AVEC le
   // bordereau du MÊME n° de transaction, elle est le colis de Colis (`estColisEmail`, src/bordereauVenteEmail.js) :
   // « à expédier » et « Imprimer » — jamais « Déposé » ni « en transit » (audit-bordereau-des-email).
-  dit(/const peutDeposer = !o\._venteEmail &&/.test(S) && /if \(o\._venteEmail && vFilter === 'aexpedier'\) return estColisEmail\(o\);/.test(S) && /if \(o\._venteEmail && vFilter === 'transit'\) return false;/.test(S), 'F8 une vente e-mail n\'a aucun geste d\'envoi (« à expédier » seulement avec SON bordereau) et n\'est jamais « en transit »', '');
+  dit(/const (?:peutDeposer|aDeposerVente) = !o\._venteEmail &&/.test(S) && /if \(o\._venteEmail && vFilter === 'aexpedier'\) return estColisEmail\(o\);/.test(S) && /if \(o\._venteEmail && vFilter === 'transit'\) return false;/.test(S), 'F8 une vente e-mail n\'a aucun geste d\'envoi (« à expédier » seulement avec SON bordereau) et n\'est jamais « en transit »', '');
   const modSrc = sansCommentaires(fs.existsSync(path.join(R, 'src', 'venteEmailFraiche.js')) ? fs.readFileSync(path.join(R, 'src', 'venteEmailFraiche.js'), 'utf8') : '');
   dit(modSrc.length > 0 && !/numero|bord/i.test(modSrc), 'F8 la règle ne lit aucun N° (ni d\'un bordereau, ni du titre) : le N° passe par l\'identité', '');
   dit(/select=id,type:meta->>type,tx:meta->>transaction/.test(modSrc) && !/select=data/.test(modSrc), 'F8 lecture projetée (`meta->>`), jamais `select=data`', '');
@@ -200,7 +214,10 @@ const APP = charge(['classifyOrderStatus', 'venteFinalisee', 'tsCommande', 'mont
     const l5 = F.ligneFraicheur({ ...c, ventesLu: Date.parse('2026-11-03T08:05:00Z') }, { maintenant: maint, dans: 'dans Orion' });
     dit(/ventes relues le 3 nov\. 9 h 05/.test(l5.bloque), 'F9 plus vieux qu\'hier ⇒ « le 3 nov. 9 h 05 »', l5.bloque);
   } else dit(false, 'F9 `ligneFraicheur` se charge', '');
-  dit(/data-fraicheur-ventes-retard=/.test(S) && /ventesLu: capsDetail/.test(S), 'F9 le panneau passe la date des ventes et des annonces de chaque compte', '');
+  // (22 nov., style-clarte) Les rangées du panneau sont dessinées par src/EtatComptes.jsx (liste groupée) : l'attribut y vit ;
+  // l'app lui passe toujours la date des ventes de chaque compte (`ventesLu: capsDetail`).
+  const SEC = (() => { try { return require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'EtatComptes.jsx'), 'utf8'); } catch (_) { return ''; } })();
+  dit(/'data-fraicheur-ventes-retard'|data-fraicheur-ventes-retard=/.test(S + SEC) && /ventesLu: capsDetail/.test(S), 'F9 le panneau passe la date des ventes et des annonces de chaque compte', '');
 
   console.log(ko ? `\n❌ ${ko} contrôle(s) en échec` : '\n✅ vente e-mail fraîche : tout est vert');
   process.exit(ko ? 1 : 0);

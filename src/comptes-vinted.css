@@ -1,6 +1,7 @@
 /* (13 nov., lot 36-27) « Tes comptes Vinted » — src/ComptesVinted.jsx. Neutre (§7) : aucune couleur. */
 .vrm-stats-vitrine .vrm-cv-carte .vrm-sv-carte-tete { align-items: center; flex-wrap: wrap; }
 .vrm-cv-periode { flex: 0 0 auto; }
+html body .vrm-cv-periode button, html body .vrm-cv-periode [role="radio"] { min-width: 44px; min-height: 44px; }
 .vrm-cv-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
 .vrm-cv-table th, .vrm-cv-table td { padding: 9px 6px; border-top: 1px solid var(--vrm-line); text-align: right; font-size: 14px; color: var(--vrm-ink); vertical-align: top; overflow-wrap: anywhere; }
 .vrm-cv-table thead th { border-top: 0; font-size: 12px; font-weight: 600; color: var(--vrm-muted); line-height: 1.25; }
@@ -8,6 +9,7 @@
 .vrm-cv-table tbody th { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-cv-table td { font-weight: 400; }
 .vrm-cv-table td:last-child, .vrm-cv-table th:last-child { padding-right: 0; }
+.vrm-cv-vrm { display: block; margin-top: 2px; font-size: 12px; line-height: 1.3; color: var(--vrm-muted); }
 .vrm-cv-notes { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
 .vrm-cv-notes .vrm-sv-note { margin: 0; }
 /* Téléphone : un compte = une ligne de quatre chiffres sous son nom (libellé au-dessus du chiffre). */
@@ -20,3 +22,7 @@
   .vrm-cv-carte .vrm-cv-table td { padding: 0; border: 0; text-align: left; font-size: 15px; font-weight: 600; }
   .vrm-cv-table td::before { content: attr(data-lib); display: block; font-size: 11px; font-weight: 400; color: var(--vrm-muted); line-height: 1.3; margin-bottom: 2px; }
 }
+/* (20 nov., chasse-bugs-2) Dans l'espace Argent, la règle des segments (`… .vrm-seg .vrm-seg-btn { min-width: 0 !important }`, couche
+   antérieure : aucune spécificité ne la bat) ramenait « 30 j » / « 90 j » à 40 px de large au doigt. Le segment, lui, prend la place de
+   trois cibles de 44 px : ses boutons (`flex: 1 1 auto`) s'étirent à 44 px au moins (banc parcours-chasse). */
+html body .vrm-cv-periode { min-width: 156px; }

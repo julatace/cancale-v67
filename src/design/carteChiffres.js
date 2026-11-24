@@ -400,7 +400,17 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
     const R = regles.beneficeDesJours(pub.jours, new Date(B.de), new Date(B.a == null ? maintenant + 86400000 : B.a));
     if (id === 'finalisees') return { valeur: R.n, partiel: false, manque: [], hors: '', p, raison: '' };
     const CB = regles.chiffreBrut(R);
-    return { valeur: CB.valeur, partiel: !!CB.partiel, manque: [], hors: '', p, raison: CB.valeur == null ? 'achats' : '', couverture: CB.partiel ? `${CB.nCout} sur ${CB.n}` : '', attrs: CB.attrs };
+    // (22 nov., bugs-totale) Les ventes EN COURS publiées à part (`pub.encours`, la même règle) : le brut et l'après-frais
+    // des ventes FAITES (finalisées + en cours) de la période, pour Ma journée (une vente du jour n'est jamais finalisée le
+    // jour même). Le chiffre « brut » d'Argent, lui, reste celui des finalisées.
+    let vendus = null;
+    if (pub.encours && typeof pub.encours === 'object') {
+      const R2 = regles.beneficeDesJours(pub.encours, new Date(B.de), new Date(B.a == null ? maintenant + 86400000 : B.a));
+      const T = { n: R.n + R2.n, nCout: R.nCout + R2.nCout, brut: Math.round((R.brut + R2.brut) * 100) / 100, net: R.net == null || R2.net == null ? null : Math.round((R.net + R2.net) * 100) / 100 };
+      const cb = regles.chiffreBrut(T), cn = regles.chiffreApresFrais ? regles.chiffreApresFrais(T) : { valeur: null };
+      vendus = { n: T.n, nCout: T.nCout, enCours: R2.n, brut: cb.valeur, partiel: !!cb.partiel, net: cn.valeur };
+    }
+    return { valeur: CB.valeur, partiel: !!CB.partiel, manque: [], hors: '', p, raison: CB.valeur == null ? 'achats' : '', couverture: CB.partiel ? `${CB.nCout} sur ${CB.n}` : '', attrs: CB.attrs, n: R.n, vendus };
   }
   if (id === 'recu') {
     const ym = `${new Date(maintenant).getFullYear()}-${String(new Date(maintenant).getMonth() + 1).padStart(2, '0')}`;

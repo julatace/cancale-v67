@@ -20,7 +20,8 @@
 //          la même vente re-cliquée garde son numéro ; deux ventes, deux numéros ;
 //   S6     50 ventes identiques (titre, prix, minute) : chaque facture porte SA vente ;
 //   S7     la règle d'annulation Leboncoin est celle de l'app, au caractère près ;
-//   S8     rien ne part par e-mail ; l'app ne montre la facture que sur une VENTE prouvée.
+//   S8     rien ne part par e-mail ; l'app ne montre la facture que sur une VENTE prouvée ;
+//   S10    (16 nov.) une commande eBay à deux articles : une facture, deux lignes (route).
 'use strict';
 const path = require('path');
 const fs = require('fs');
@@ -105,7 +106,17 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.status = (c) => {
   v = S.venteEbay(eb('12-34567-89012'));
   dit(v.ok && v.centimes === 8000 && v.acheteurPropose && v.acheteurPropose.nom === 'Jean Banc' && /69001 Lyon/.test(v.acheteurPropose.adresse), 'S2 eBay : prix de l’article (sans le port), acheteur de CETTE commande proposé', JSON.stringify(v));
   dit(S.venteEbay(eb('12-34567-89012', { lineItems: [{ title: 'x', quantity: 1, lineItemCost: { value: '80.00', currency: 'GBP' } }] })).code === 'devise', 'S2 commande en GBP ⇒ pas de facture (VRM reste en euros, jamais converti)');
-  dit(S.venteEbay(eb('12-34567-89012', { lineItems: [{ title: 'a', quantity: 1, lineItemCost: { value: '1', currency: 'EUR' } }, { title: 'b', quantity: 1, lineItemCost: { value: '1', currency: 'EUR' } }] })).code === 'articles', 'S2 plusieurs articles ⇒ pas de facture (dit)');
+  // (16 nov., lot plateformes-restes) Une commande à plusieurs lignes : UNE facture, une ligne par article.
+  const deux = [{ title: 'Adidas Samba', quantity: 1, lineItemCost: { value: '60.00', currency: 'EUR' } }, { title: 'Nike Dunk', quantity: 1, lineItemCost: { value: '45.50', currency: 'EUR' } }];
+  v = S.venteEbay(eb('12-34567-89012', { lineItems: deux }));
+  dit(v.ok && v.centimes === 10550 && Array.isArray(v.lignes) && v.lignes.length === 2 && v.lignes[0].centimes === 6000 && v.lignes[1].centimes === 4550 && v.lignes[1].designation === 'Nike Dunk', 'S2 plusieurs articles ⇒ une facture, une ligne par article (somme = prix)', JSON.stringify(v).slice(0, 300));
+  dit(S.venteEbay(eb('12-34567-89012', { lineItems: [deux[0], { ...deux[1], lineItemCost: { value: '45.50', currency: 'GBP' } }] })).code === 'devise', 'S2 plusieurs articles dont UN en livres ⇒ toute la commande refusée (jamais une facture partielle)');
+  dit(S.venteEbay(eb('12-34567-89012', { lineItems: [deux[0], { ...deux[1], lineItemCost: null }] })).code === 'prix', 'S2 plusieurs articles dont UN sans prix lu ⇒ refusée');
+  dit(S.venteEbay(eb('12-34567-89012', { lineItems: [deux[0], { ...deux[1], quantity: 2 }] })).code === 'articles', 'S2 un article en plusieurs exemplaires ⇒ refusée (dit)');
+  dit(S.venteEbay(eb('12-34567-89012', { lineItems: [deux[0], { ...deux[1], title: '' }] })).code === 'articles', 'S2 plusieurs articles dont UN sans titre ⇒ refusée');
+  dit(S.venteEbay(eb('12-34567-89012', { lineItems: [] })).code === 'articles', 'S2 aucun article lu ⇒ pas de facture');
+  dit(!('lignes' in S.venteEbay(eb('12-34567-89012'))), 'S2 un seul article : la facture d’avant (aucune ligne ajoutée)');
+  dit(Array.isArray(S.venteFacture(v, { nom: 'X', adresse: 'Y' }, '').lignes) && S.venteFacture(v, { nom: 'X', adresse: 'Y' }, '').lignes.length === 2, 'S2 les lignes passent dans la vente facturée (`venteFacture`)');
   dit(S.venteEbay(eb('12-34567-89012', { orderPaymentStatus: 'PENDING' })).code === 'paiement', 'S2 pas encore payée ⇒ pas de facture');
   dit(S.venteEbay(eb('12-34567-89012', { cancelStatus: { cancelState: 'CANCELED' } })).code === 'annulee', 'S2 annulée ⇒ pas de facture');
   dit(S.venteEbay(eb('12-34567-89012', { buyer: { username: 'x' } })).acheteurPropose === null, 'S2 acheteur absent de la commande ⇒ rien proposé (jamais inventé)');
@@ -243,6 +254,12 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.status = (c) => {
   dit(/mode === 'facture-autre'/.test(lire('api/compte.js')), 'S8 la route est servie par api/compte.js (aucune fonction api/ de plus)');
   const nApi = fs.readdirSync(path.join(racine, 'api')).filter((f) => f.endsWith('.js')).length;
   dit(nApi <= 12, `S8 ${nApi} fonctions api/ (12 au plus)`);
+
+  // ── S10 (16 nov.) LA ROUTE, UNE COMMANDE eBay À DEUX ARTICLES ───────────
+  raz(); base.set(cle(A, 'ebay_orders'), { orders: [eb('55-00000-00002', { lineItems: deux })], complet: true });
+  r = await appel({ action: 'emettre', confirme: true, plateforme: 'ebay', ref: '55-00000-00002', acheteur: ACH });
+  const lg = r.corps && r.corps.facture && r.corps.facture.contenu && r.corps.facture.contenu.lignes;
+  dit(r.code === 200 && Array.isArray(lg) && lg.length === 2 && lg[0].designation === 'Adidas Samba' && lg[1].designation === 'Nike Dunk' && lg.reduce((s2, l) => s2 + l.total, 0) === r.corps.facture.contenu.totaux.ht && r.corps.facture.contenu.totaux.ttc === 10550, 'S10 eBay deux articles : une facture, deux lignes, total = prix des articles relus', JSON.stringify(r.corps).slice(0, 400));
 
   console.log(`\n${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);

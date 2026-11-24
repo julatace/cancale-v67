@@ -37,7 +37,7 @@ const norm = (v) => String(v == null ? '' : v).toUpperCase().replace(/[\s -]+/g
 const texte = (v, max = 200) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const dateIso = (v) => { const s = texte(v, 40); return s && Number.isFinite(Date.parse(s)) ? s : ''; };
 // Le même filtre que l'app (`codeRetrait`, App.jsx) : au plus deux lettres devant 3 à 10 chiffres.
-export const codeRetraitMr = (v) => { const c = String(v == null ? '' : v).trim().toUpperCase(); return /^[A-Z]{0,2}\d{3,10}$/.test(c) ? c : ''; };
+export const codeRetraitMr = (v) => { const c = String(v == null ? '' : v).trim().toUpperCase(); return /^[A-Z]{0,2}\d{3,10}$/.test(c) || /^(?=(?:[A-HJ-NP-Z]*\d){2})(?=\d*[A-HJ-NP-Z])[A-HJ-NP-Z0-9]{5,10}$/.test(c) ? c : ''; };   // (19 nov.) copie d'api/_lib/forme-code-retrait.js (module sans import), comparée par audit-retraits-parfaits
 // L'état écrit par l'extension ⇒ le statut d'une ligne de suivi (celui des e-mails).
 const STATUTS = { en_route: 'transit', disponible: 'available', retire: 'delivered', retour: 'retour' };
 const LIBELLES = { transit: 'En route vers le point relais', available: 'Disponible au point relais', delivered: 'Retiré', retour: 'Retourné à l’expéditeur' };

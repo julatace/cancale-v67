@@ -36,14 +36,14 @@
 @media (prefers-reduced-motion: reduce) { :root:root:root body :is(.vg-a-vendu, .vg-a-case, .vg-a-case-corps, .vg-a-venir-btn, .vg-av-groupe-tete):active { transform: none; } }
 /* Les teintes des étapes (maquette) : ambre = à envoyer (un geste), encre = en route, ardoise = livrée, hachuré = versement. */
 :root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-envoyer { background: #B26A00 !important; }
-:root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-route { background: #0C1D30 !important; }
+:root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-route { background: #1C1C20 !important; }
 :root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-livree { background: #5E7A96 !important; }
-:root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille):is(.is-versement, .is-pm) { background: repeating-linear-gradient(45deg, rgb(12 29 48 / .26) 0 4px, rgb(12 29 48 / .08) 4px 8px) !important; }
+:root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille):is(.is-versement, .is-pm) { background: repeating-linear-gradient(45deg, rgb(28 28 32 / .26) 0 4px, rgb(28 28 32 / .08) 4px 8px) !important; }
 :root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-autre { background: #A9B9CB !important; }
 :root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-envoyer { background: #F0A43C !important; }
-:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-route { background: #EAF2FB !important; }
+:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-route { background: #F1F2F4 !important; }
 :root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-livree { background: #7F9BB8 !important; }
-:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille):is(.is-versement, .is-pm) { background: repeating-linear-gradient(45deg, rgb(234 242 251 / .34) 0 4px, rgb(234 242 251 / .10) 4px 8px) !important; }
+:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille):is(.is-versement, .is-pm) { background: repeating-linear-gradient(45deg, rgb(241 242 244 / .34) 0 4px, rgb(241 242 244 / .10) 4px 8px) !important; }
 :root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) .vrm-av-pastille { width: 9px !important; height: 9px !important; border-radius: 3px !important; box-shadow: none !important; flex: none; }
 :root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) .vrm-av-pastille.is-bloquee { background: transparent !important; box-shadow: inset 0 0 0 1.5px var(--sv-encre-2) !important; }
 :root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) .vg-av-barre { display: flex !important; gap: 3px !important; height: 10px !important; border-radius: 0 !important; overflow: visible !important; background: none !important; margin: 0 !important; }
@@ -116,7 +116,7 @@
 }
 :root:root:root:root:root:root:root:root body .vrm-fs.vg-av :is(.vrm-fs-titre, .vrm-fs-tete h2, .vrm-fs-tete h1, .vrm-fs-head h2, h2.vrm-fs-titre) { color: var(--sv-clair) !important; }
 :root:root:root:root:root:root:root:root body .vrm-fs.vg-av .vrm-fs-poignee { background: rgb(255 255 255 / .45) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fs.vg-av .vrm-fs-croix-rond { background: rgb(10 38 76 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; }
+:root:root:root:root:root:root:root:root body .vrm-fs.vg-av .vrm-fs-croix-rond { background: rgb(40 40 46 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; }
 :root:root:root body .vg-av .vrm-av-corps { gap: 14px !important; color: var(--sv-clair); }
 :root:root:root body .vg-av-affiche { gap: 6px !important; padding: 4px 4px 2px; }
 :root:root:root body .vg-av-affiche .vg-av-sous { font: 600 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: 0 !important; text-transform: none !important; color: var(--sv-clair) !important; }
@@ -137,12 +137,12 @@
 :root:root:root body .vg-av-groupe-eur { flex: none; font: 750 14.5px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; font-variant-numeric: tabular-nums; }
 :root:root:root body .vg-av-groupe-eur .sb-prix { font: inherit !important; }
 :root:root:root body .vg-av-groupe-eur .sb-eur { font: inherit !important; vertical-align: baseline !important; }
-:root:root:root body .vg-av-plus { flex: none; font: 650 12.5px/1 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-lien) !important; }
+:root:root:root body .vg-av-plus { flex: none; font: 600 12.5px/1 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-lien) !important; }
 :root:root:root body .vg-av-date { display: block; margin: -2px 0 4px 18px; font: 550 12px/1.35 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; }
 :root:root:root body .vg-av-ventes { margin: 0 !important; padding: 0 !important; list-style: none; }
-:root:root:root body .vg-av-vente { display: flex !important; align-items: center; gap: 10px !important; min-height: 48px !important; padding: 0 !important; border-top: 1px solid rgb(12 29 48 / .10) !important; }
+:root:root:root body .vg-av-vente { display: flex !important; align-items: center; gap: 10px !important; min-height: 48px !important; padding: 0 !important; border-top: 1px solid rgb(28 28 32 / .10) !important; }
 :root:root:root[data-theme="dark"] body .vg-av-vente { border-top-color: rgb(255 255 255 / .10) !important; }
-:root:root:root body .vg-av-vente .vrm-av-vente-titre { font: 650 13.5px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; }
+:root:root:root body .vg-av-vente .vrm-av-vente-titre { font: 600 13.5px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; }
 :root:root:root body .vg-av-vente .vrm-av-vente-meta { display: flex !important; align-items: center; gap: 5px; margin-top: 1px; font: 600 12px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
 :root:root:root body .vg-av-vente .sb-prix { font: 700 13.5px/1 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; flex: none; }
 :root:root:root body .vg-av-vente .sb-prix .sb-eur { font: inherit !important; vertical-align: baseline !important; }
@@ -152,13 +152,13 @@
 :root:root:root body .vg-av-plaque.is-vide { width: 0; padding: 0 !important; margin-right: -10px; }
 :root:root:root body .vg-av-pm .vg-av-groupe-tete { cursor: default; }
 :root:root:root body .vg-av-pm { padding-bottom: 4px; }
-:root:root:root body .vg-av-note { margin: 0 !important; padding: 9px 0 4px; border-top: 1px solid rgb(12 29 48 / .10); font: 550 12.5px/1.4 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+:root:root:root body .vg-av-note { margin: 0 !important; padding: 9px 0 4px; border-top: 1px solid rgb(28 28 32 / .10); font: 550 12.5px/1.4 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
 :root:root:root[data-theme="dark"] body .vg-av-note { border-top-color: rgb(255 255 255 / .10); }
 :root:root:root body .vg-av-note-bas { border-top: 0; padding-top: 2px; }
 :root:root:root body .vg-av .vg-av-recu { grid-template-columns: 1fr !important; gap: 6px !important; }
 :root:root:root body .vg-av .vg-av-recu-case { flex-direction: row !important; align-items: baseline !important; gap: 8px !important; padding: 12px 14px !important; border-radius: 18px !important;
   background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; color: var(--sv-encre) !important; }
-:root:root:root body .vg-av .vg-av-recu-case .vrm-av-trois-l { flex: 1; color: var(--sv-encre) !important; font-weight: 650 !important; }
+:root:root:root body .vg-av .vg-av-recu-case .vrm-av-trois-l { flex: 1; color: var(--sv-encre) !important; font-weight: 600 !important; }
 :root:root:root body .vg-av .vg-av-recu-case b { order: 3; font-size: 15px !important; font-weight: 750 !important; }
 :root:root:root body .vg-av .vg-av-recu-case .vrm-av-trois-aide { order: 2; color: var(--sv-encre-2) !important; }
 :root:root:root body .vg-av :is(.vrm-av-trois-note, .vrm-av-h:not(.vg-sr), .vrm-av-note) { color: var(--sv-clair-2) !important; }
@@ -173,14 +173,14 @@
    icône, l'interrupteur à l'encre). */
 :root:root:root:root:root:root:root body .vrm-pm .vrm-set-recherche.vrm-champ-recherche {
   height: 48px !important; min-height: 48px !important; border-radius: 24px !important; padding: 0 6px 0 16px !important; margin: 0 !important;
-  background: rgb(247 250 253 / .97) !important; background-image: none !important; border: 1px solid var(--sv-bord) !important; box-shadow: 0 12px 28px -14px rgb(8 26 50 / .6) !important;
+  background: rgb(249 250 251 / .97) !important; background-image: none !important; border: 1px solid var(--sv-bord) !important; box-shadow: 0 12px 28px -14px rgb(27 27 31 / .6) !important;
 }
-:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-set-recherche.vrm-champ-recherche { background: rgb(18 33 54 / .97) !important; }
-:root:root:root:root:root:root:root body .vrm-pm .vrm-set-recherche .vrm-champ-recherche-saisie { font: 500 15.5px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; background: transparent !important; box-shadow: none !important; border: 0 !important; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-set-recherche.vrm-champ-recherche { background: rgb(34 34 38 / .97) !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-set-recherche .vrm-champ-recherche-saisie { font: 500 16px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; background: transparent !important; box-shadow: none !important; border: 0 !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vrm-set-recherche .vrm-champ-recherche-loupe { color: var(--sv-encre-2) !important; }
 /* « Tout va bien ? · N choses à régler » : l'ambre plein de la maquette (fond #FFE7C4, encre #5E3900), une pastille de cœur. */
 :root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte-liste { margin: 0 !important; padding: 0 !important; border-radius: 20px !important; overflow: hidden;
-  background: #FFE7C4 !important; background-image: none !important; border: 1px solid rgb(178 106 0 / .25) !important; box-shadow: 0 14px 30px -18px rgb(8 26 50 / .6) !important; }
+  background: #FFE7C4 !important; background-image: none !important; border: 1px solid rgb(178 106 0 / .25) !important; box-shadow: 0 14px 30px -18px rgb(27 27 31 / .6) !important; }
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-pm-alerte-liste { background: #4D3410 !important; border-color: rgb(240 164 60 / .45) !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte { min-height: 64px !important; padding: 10px 14px 10px 10px !important; gap: 12px !important; background: transparent !important; color: #5E3900 !important; }
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-pm-alerte { color: #FFD99E !important; }
@@ -194,19 +194,19 @@
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-racine { margin: 0 0 24px !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-cats { display: flex; flex-direction: column; gap: 10px; margin: 0; }
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-moi { display: flex !important; align-items: center; gap: 12px; width: 100%; min-height: 68px; padding: 12px 14px 12px 12px !important; text-align: left; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
-:root:root:root:root:root:root:root body .vrm-pm .vg-pm-av { width: 44px; height: 44px; flex: none; border-radius: 50%; display: grid; place-items: center; overflow: hidden; background: #0C1D30; color: #FFFFFF !important; font: 750 17px/1 var(--sb-police-texte, Inter, sans-serif); }
-:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vg-pm-av { background: #EAF2FB; color: #0C1D30 !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-av { width: 44px; height: 44px; flex: none; border-radius: 50%; display: grid; place-items: center; overflow: hidden; background: #1C1C20; color: #FFFFFF !important; font: 750 17px/1 var(--sb-police-texte, Inter, sans-serif); }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vg-pm-av { background: #F1F2F4; color: #1C1C20 !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-moi-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-moi-txt b { font: 700 15.5px/1.25 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre) !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-moi-txt span { margin-top: 1px; font: 550 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-:root:root:root:root:root:root:root body .vrm-pm .vg-pm-moi-val { flex: none; font: 750 11.5px/1 var(--sb-police-texte, Inter, sans-serif); padding: 4px 9px; border-radius: 8px; background: rgb(12 29 48 / .07); color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-moi-val { flex: none; font: 750 11.5px/1 var(--sb-police-texte, Inter, sans-serif); padding: 4px 9px; border-radius: 8px; background: rgb(28 28 32 / .07); color: var(--sv-encre) !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-moi .vrm-set-chev { stroke: var(--sv-encre-2) !important; flex: none; }
 /* Les tuiles */
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-grille { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-tuile { display: flex !important; flex-direction: column; align-items: flex-start; min-width: 0; min-height: 112px; padding: 12px 12px 11px !important; border-radius: 20px !important; text-align: left; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
 :root:root:root:root:root:root:root body .vrm-pm :is(.vg-pm-tuile, .vg-pm-moi):active { transform: scale(.97); }
 @media (prefers-reduced-motion: reduce) { :root:root:root:root:root:root:root body .vrm-pm :is(.vg-pm-tuile, .vg-pm-moi):active { transform: none; } }
-:root:root:root:root:root:root:root body .vrm-pm .vg-pm-tuile-ic { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none; background: rgb(12 29 48 / .06); color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vg-pm-tuile-ic { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none; background: rgb(28 28 32 / .06); color: var(--sv-encre) !important; }
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vg-pm-tuile-ic { background: rgb(255 255 255 / .08); }
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-tuile-nom { display: block; margin-top: 10px; font: 700 13.5px/1.25 var(--sb-police-texte, Inter, sans-serif); letter-spacing: -.01em; color: var(--sv-encre) !important; overflow-wrap: anywhere; hyphens: none; }
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-tuile-val { display: block; max-width: 100%; margin-top: auto; padding-top: 4px; font: 600 12px/1.25 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -214,7 +214,7 @@
 /* Une catégorie, un panneau : le rond « ‹ » (verre fumé), le surtitre, le grand titre en blanc */
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-nav { display: flex !important; align-items: center; gap: 12px; min-height: 52px; margin: 0 0 4px !important; flex-wrap: wrap; }
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-retour { width: 44px !important; height: 44px !important; min-width: 44px !important; padding: 0 !important; margin: 0 !important; border-radius: 50% !important; display: grid !important; place-items: center;
-  background: rgb(10 38 76 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; flex: none; }
+  background: rgb(40 40 46 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; flex: none; }
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-retour svg { width: 10px; height: 17px; margin-left: -2px; }
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-nav-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 :root:root:root:root:root:root:root body .vrm-pm .vg-pm-nav-txt small { font: 600 12.5px/1.25 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-clair) !important; }
@@ -226,42 +226,35 @@
 :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-liste { border-radius: 22px !important; overflow: hidden; padding: 0 !important; }
 :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-ic { display: none !important; }
 :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-ligne { min-height: 62px !important; padding: 10px 14px !important; gap: 12px !important; }
-:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-ligne + .vrm-set-ligne { border-top: 1px solid rgb(12 29 48 / .10) !important; box-shadow: none !important; }
+:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-ligne + .vrm-set-ligne { border-top: 1px solid rgb(28 28 32 / .10) !important; box-shadow: none !important; }
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-ligne + .vrm-set-ligne { border-top-color: rgb(255 255 255 / .10) !important; }
-:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-lib > b { font: 650 15px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: -.015em !important; }
+:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-lib > b { font: 600 15px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: -.015em !important; }
 :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-desc { font: 550 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; margin-top: 2px !important; color: var(--sv-encre-2) !important; }
-:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-val { font: 650 14px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="telephone"] .vrm-pm-cat .vrm-set-val { font: 600 14px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vrm-switch[aria-checked="true"]::before { background: var(--sv-encre) !important; }
-:root:root:root:root:root:root:root body .vrm-pm .vrm-switch[aria-checked="false"]::before { background: rgb(12 29 48 / .16) !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-switch[aria-checked="false"]::before { background: rgb(28 28 32 / .16) !important; }
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-switch[aria-checked="false"]::before { background: rgb(255 255 255 / .18) !important; }
-:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-switch[aria-checked="true"]::after { background: #0C1D30 !important; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-switch[aria-checked="true"]::after { background: #1C1C20 !important; }
 
 /* ══ 4. MESSAGES (maquettes « ms1 » et « ms2 ») ══════════════════════════════
    La liste : « Toutes · Offres · Non lues » en verre fumé (l'actif en porcelaine), puis UN verre par compte, le compte
    de l'onglet d'abord (son badge), du plus récent au plus ancien dedans ; une rangée = la photo de la paire (44, rayon
    12), le pseudo, l'heure (et le point bleu d'un non lu), la plaque N° et le dernier mot — une offre en ambre. */
-:root:root:root:root:root body .vg-ms-vues { display: flex; padding: 3px; margin: 12px 0 2px; border-radius: 17px; background: rgb(10 38 76 / .30); border: 1px solid rgb(255 255 255 / .26); }
-:root:root:root:root:root body .vg-ms-vue { flex: 1; min-width: 0; height: 44px; min-height: 44px !important; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 6px !important; border: 0 !important; border-radius: 14px !important;
-  background: transparent !important; background-image: none !important; box-shadow: none !important; color: #FFFFFF !important; font: 600 14px/1 var(--sb-police-texte, Inter, sans-serif) !important; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-:root:root:root:root:root body .vg-ms-vue.is-on { background: rgb(247 250 253 / .96) !important; color: #0C1D30 !important; box-shadow: 0 4px 10px -4px rgb(8 26 50 / .45) !important; }
-:root:root:root:root:root[data-theme="dark"] body .vg-ms-vue.is-on { background: rgb(238 244 251 / .95) !important; }
-:root:root:root:root:root body .vg-ms-n { font-style: normal; font: 750 11.5px/20px var(--sb-police-texte, Inter, sans-serif); min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; display: inline-grid; place-items: center; background: rgb(255 255 255 / .12); }
-:root:root:root:root:root body .vg-ms-vue.is-on .vg-ms-n { background: rgb(12 29 48 / .08); }
-:root:root:root:root:root body .vg-ms-n.is-ambre { background: #FFE2B8 !important; color: #5E3900 !important; }
+:root:root:root:root:root body .vg-ms-vues { margin: 12px 0 2px; }   /* (20 nov.) les vues = le Segmente natif : plus de verre fumé ni de puces faites main */
 :root:root:root:root:root body .vg-ms-groupe { margin: 0; }
 :root:root:root:root:root body .vg-ms-groupe-h { display: flex; align-items: center; gap: 7px; margin: 16px 4px 8px; color: var(--sv-clair) !important; font: 750 15px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: 0 !important; text-transform: none !important; }
 :root:root:root:root:root body .vg-ms-groupe-h b { font: inherit; color: inherit !important; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 :root:root:root:root:root body .vg-ms-logo { display: inline-flex; color: var(--sv-clair) !important; flex: none; }
 :root:root:root:root:root body .vg-ms-logo svg, :root:root:root:root:root body .vg-ms-logo img { height: 13px; width: auto; }
-:root:root:root:root:root body .vg-ms-onglet { flex: none; font: 650 11.5px/1.2 var(--sb-police-texte, Inter, sans-serif); padding: 3px 8px; border-radius: 8px; background: rgb(8 28 56 / .42); border: 1px solid rgb(255 255 255 / .3); color: #FFFFFF !important; }
+:root:root:root:root:root body .vg-ms-onglet { flex: none; font: 600 11.5px/1.2 var(--sb-police-texte, Inter, sans-serif); padding: 3px 8px; border-radius: 8px; background: rgb(30 30 34 / .42); border: 1px solid rgb(255 255 255 / .3); color: #FFFFFF !important; }
 :root:root:root:root:root body .vrm-msg-list.vg-ms-liste { padding: 0 !important; overflow: hidden; border: 0 !important; border-radius: 22px !important; }
 :root:root:root:root:root body .vg-fil { display: flex !important; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 9px 14px 9px 12px !important; margin: 0; border: 0 !important; border-radius: 0 !important;
   background: transparent !important; background-image: none !important; box-shadow: none !important; color: var(--sv-encre) !important; text-align: left; font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
   content-visibility: auto; contain-intrinsic-size: auto 64px; }
-:root:root:root:root:root body .vg-fil + .vg-fil { border-top: 1px solid rgb(12 29 48 / .10) !important; }
+:root:root:root:root:root body .vg-fil + .vg-fil { border-top: 1px solid rgb(28 28 32 / .10) !important; }
 :root:root:root:root:root[data-theme="dark"] body .vg-fil + .vg-fil { border-top-color: rgb(255 255 255 / .10) !important; }
-:root:root:root:root:root body .vg-fil:active, :root:root:root:root:root body .vg-fil.is-current { background: rgb(12 29 48 / .05) !important; }
-:root:root:root:root:root body .vg-fil-ph { width: 44px; height: 44px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: rgb(12 29 48 / .06); color: var(--sv-encre-2) !important; font: 700 16px/1 var(--sb-police-texte, Inter, sans-serif); box-shadow: 0 4px 10px -4px rgb(8 26 50 / .4); }
+:root:root:root:root:root body .vg-fil:active, :root:root:root:root:root body .vg-fil.is-current { background: rgb(28 28 32 / .05) !important; }
+:root:root:root:root:root body .vg-fil-ph { width: 44px; height: 44px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: rgb(28 28 32 / .06); color: var(--sv-encre-2) !important; font: 700 16px/1 var(--sb-police-texte, Inter, sans-serif); box-shadow: 0 4px 10px -4px rgb(27 27 31 / .4); }
 :root:root:root:root:root body .vg-fil-ph img { width: 44px; height: 44px; object-fit: cover; display: block; }
 :root:root:root:root:root body .vg-fil-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 :root:root:root:root:root body .vg-fil-1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0; }
@@ -280,7 +273,7 @@
    l'extension) : sans `!important`, les règles hors couche gagnaient (grille 3 colonnes, « Accepter 1… » coupé, le plein
    en touche blanche, « 10 0 € »). Banc messages-volets, captures 390 et 1512 vérifiées. */
 :root:root:root:root:root body .vrm-chat-offre .vrm-chat-offre-actions.vg-offre-gestes { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
-:root:root:root:root:root body .vrm-chat-offre .vg-offre-gestes .vg-offre-plein { grid-column: 1 / -1 !important; height: 52px !important; min-height: 52px !important; border-radius: 16px !important; font: 650 15.5px/1 var(--sb-police-texte, Inter, sans-serif) !important;  background: var(--sv-encre) !important; background-image: none !important; color: var(--sv-feuille) !important; border-color: transparent !important; box-shadow: none !important; }
+:root:root:root:root:root body .vrm-chat-offre .vg-offre-gestes .vg-offre-plein { grid-column: 1 / -1 !important; height: 52px !important; min-height: 52px !important; border-radius: 16px !important; font: 600 15.5px/1 var(--sb-police-texte, Inter, sans-serif) !important;  background: var(--sv-encre) !important; background-image: none !important; color: var(--sv-feuille) !important; border-color: transparent !important; box-shadow: none !important; }
 :root:root:root:root:root body .vrm-chat-offre .vg-offre-gestes .vrm-chat-btn:not(.vg-offre-plein) { height: 48px !important; min-height: 48px !important; border-radius: 14px !important; font: 600 14.5px/1 var(--sb-police-texte, Inter, sans-serif) !important; }
 :root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp .vrm-offre-comparer-corps { display: flex !important; flex-wrap: wrap !important; align-items: baseline !important; column-gap: 12px !important; row-gap: 4px !important; }
 :root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp .vrm-offre-article { display: none !important; }
@@ -302,7 +295,7 @@
 :root:root:root:root:root:root body .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-head-n, .vrm-chat-head-n *) { color: var(--sv-clair) !important; font-weight: 750 !important; letter-spacing: -.02em; }
 :root:root:root:root:root:root body .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-head-s, .vrm-chat-head-s *) { color: var(--sv-clair-2) !important; }
 :root:root:root:root:root:root body .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-back, .vrm-chat-sync, .vrm-chat-retirer) {
-  background: rgb(10 38 76 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; box-shadow: none !important; }
+  background: rgb(40 40 46 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; box-shadow: none !important; }
 :root:root:root:root:root:root body .vrm-chat-panel > .vrm-chat-head .vrm-chat-back { width: 44px; height: 44px; border-radius: 50% !important; display: grid !important; place-items: center; flex: none; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire {
   margin: 4px 16px 0 !important; padding: 10px 14px 10px 10px !important; border: 0 !important; border-radius: 22px !important;
@@ -311,26 +304,26 @@
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire-ph { grid-area: ph; width: 44px !important; height: 44px !important; border-radius: 11px !important; overflow: hidden; margin-right: 3px; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire-t { display: contents !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire-numero { grid-area: num; justify-self: start; }
-:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire-n { grid-area: nom; min-width: 0; font: 650 14px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire-n { grid-area: nom; min-width: 0; font: 600 14px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire-l { grid-area: ligne; min-width: 0; font: 600 12px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire-prix { font-weight: 750; color: var(--sv-encre) !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-history { background: transparent !important; }
-:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-jour { align-self: center; font: 650 12px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: #FFFFFF !important; padding: 3px 10px !important; border-radius: 10px !important; background: rgb(8 28 56 / .42) !important; border: 0 !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-jour { align-self: center; font: 600 12px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: #FFFFFF !important; padding: 3px 10px !important; border-radius: 10px !important; background: rgb(30 30 34 / .42) !important; border: 0 !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle { border-radius: 18px !important; padding: 9px 13px 7px !important; font: 500 14.5px/1.35 var(--sb-police-texte, Inter, sans-serif) !important; box-shadow: none !important; }
-:root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle[data-bulle="acheteur"] { background: rgb(247 250 253 / .92) !important; color: #0C1D30 !important; border-bottom-left-radius: 6px !important; }
-:root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle[data-bulle="moi"] { background: #D3E6FB !important; color: #0C1D30 !important; border-bottom-right-radius: 6px !important; }
-:root:root:root:root:root:root[data-theme="dark"] body .vrm-chat-panel .vrm-bulle[data-bulle="acheteur"] { background: rgb(28 46 72 / .96) !important; color: #EAF2FB !important; }
-:root:root:root:root:root:root[data-theme="dark"] body .vrm-chat-panel .vrm-bulle[data-bulle="moi"] { background: #1E4A80 !important; color: #F2F7FD !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle[data-bulle="acheteur"] { background: rgb(249 250 251 / .92) !important; color: #1C1C20 !important; border-bottom-left-radius: 6px !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle[data-bulle="moi"] { background: #E3E6EB !important; color: #1C1C20 !important; border-bottom-right-radius: 6px !important; }
+:root:root:root:root:root:root[data-theme="dark"] body .vrm-chat-panel .vrm-bulle[data-bulle="acheteur"] { background: rgb(47 47 53 / .96) !important; color: #F1F2F4 !important; }
+:root:root:root:root:root:root[data-theme="dark"] body .vrm-chat-panel .vrm-bulle[data-bulle="moi"] { background: #16181D !important; color: #F6F7F9 !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle .vrm-bulle-h { color: #3F5468 !important; font: 600 11px/1 var(--sb-police-texte, Inter, sans-serif) !important; opacity: 1 !important; }
 :root:root:root:root:root:root[data-theme="dark"] body .vrm-chat-panel .vrm-bulle .vrm-bulle-h { color: #B9CADD !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle-pied, :root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle-pied * { color: var(--sv-clair-2) !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-offre { border-radius: 22px !important; padding: 14px !important; color: var(--sv-encre) !important;
   background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; border: 1.5px solid rgb(178 106 0 / .5) !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-offre.vrm-chat-offre-info { border-color: var(--sv-bord) !important; }
-:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-foot { background: rgb(247 250 253 / .86) !important; -webkit-backdrop-filter: blur(26px); backdrop-filter: blur(26px); border-top: 1px solid rgb(255 255 255 / .9) !important; }
-:root:root:root:root:root:root[data-theme="dark"] body .vrm-chat-panel .vrm-chat-foot { background: rgb(16 30 50 / .86) !important; border-top-color: rgb(255 255 255 / .14) !important; }
-:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-rapide { background: #FFFFFF !important; color: #0C1D30 !important; border: 1px solid rgb(12 29 48 / .12) !important; border-radius: 22px !important; font: 600 13px/1 var(--sb-police-texte, Inter, sans-serif) !important; min-height: 44px; padding: 0 12px !important; box-shadow: none !important; }
-:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-compose > textarea { background: #FFFFFF !important; border: 1px solid rgb(12 29 48 / .14) !important; border-radius: 22px !important; color: #0C1D30 !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-foot { background: rgb(249 250 251 / .86) !important; -webkit-backdrop-filter: blur(26px); backdrop-filter: blur(26px); border-top: 1px solid rgb(255 255 255 / .9) !important; }
+:root:root:root:root:root:root[data-theme="dark"] body .vrm-chat-panel .vrm-chat-foot { background: rgb(31 31 35 / .86) !important; border-top-color: rgb(255 255 255 / .14) !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-rapide { background: #FFFFFF !important; color: #1C1C20 !important; border: 1px solid rgb(28 28 32 / .12) !important; border-radius: 22px !important; font: 600 13px/1 var(--sb-police-texte, Inter, sans-serif) !important; min-height: 44px; padding: 0 12px !important; box-shadow: none !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-compose > textarea { background: #FFFFFF !important; border: 1px solid rgb(28 28 32 / .14) !important; border-radius: 22px !important; color: #1C1C20 !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-send { border-radius: 50% !important; }
 
 /* ══ 5. LA FICHE D'UNE PAIRE (maquette « fp ») : sur le bleu, la paire en verre (photo 96, plaque, titre), les chiffres
@@ -340,13 +333,13 @@
   color: var(--sv-clair) !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-poignee { background: rgb(255 255 255 / .45) !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tete :is(.vrm-fp-retour, .vrm-fp-fermer) {
-  background: rgb(10 38 76 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; box-shadow: none !important; }
+  background: rgb(40 40 46 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; box-shadow: none !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tete .vrm-fp-retour { border-radius: 22px !important; min-height: 44px; padding: 0 14px 0 8px !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tete .vrm-fp-fermer { width: 44px; height: 44px; border-radius: 50% !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) :is(.vrm-fp-heros, .vrm-fp-tuile, .vrm-fp-etat, .vrm-fp-histo-num, .vrm-fp-parcours, .vrm-fp-actions-carte, .vrm-fp-sans-paire, .vrm-fp-note-privee, .vg-fp-sites) {
   background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; border: 0 !important; border-radius: 22px !important; color: var(--sv-encre) !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-heros { display: flex !important; align-items: center; gap: 14px; padding: 10px 14px 10px 10px !important; }
-:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-heros-photo { width: 96px !important; height: 96px !important; flex: none; border-radius: 18px !important; overflow: hidden; box-shadow: 0 6px 14px -8px rgb(8 26 50 / .55) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-heros-photo { width: 96px !important; height: 96px !important; flex: none; border-radius: 18px !important; overflow: hidden; box-shadow: 0 6px 14px -8px rgb(27 27 31 / .55) !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-heros-photo :is(img, svg) { width: 100% !important; height: 100% !important; object-fit: cover; border-radius: 18px; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-quoi { display: flex !important; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-quoi .vrm-fp-titre { font: 750 17px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: -.02em; color: var(--sv-encre) !important; }
@@ -362,14 +355,14 @@
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-parcours { padding: 10px 14px 6px !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-outils { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-outils > button { height: 48px !important; min-height: 48px !important; border-radius: 14px !important; padding: 0 8px !important; font: 600 13.5px/1.15 var(--sb-police-texte, Inter, sans-serif) !important;
-  background: rgb(247 250 253 / .86) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .8) !important; color: #0C1D30 !important; box-shadow: none !important; }
-:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fp:not(.sb-plan) .vrm-fp-outils > button { background: rgb(255 255 255 / .08) !important; border-color: rgb(255 255 255 / .14) !important; color: #EAF2FB !important; }
+  background: rgb(249 250 251 / .86) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .8) !important; color: #1C1C20 !important; box-shadow: none !important; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fp:not(.sb-plan) .vrm-fp-outils > button { background: rgb(255 255 255 / .08) !important; border-color: rgb(255 255 255 / .14) !important; color: #F1F2F4 !important; }
 /* La ligne par site (une par annonce : le site, son compte et son état ; le prix à droite) */
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-sites { margin: 10px 0 0; padding: 2px 14px !important; }
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-site { display: flex; align-items: center; gap: 12px; min-height: 52px; }
-:root:root:root:root:root:root:root body .vrm-fp .vg-fp-site + .vg-fp-site { border-top: 1px solid rgb(12 29 48 / .10); }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-site + .vg-fp-site { border-top: 1px solid rgb(28 28 32 / .10); }
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fp .vg-fp-site + .vg-fp-site { border-top-color: rgb(255 255 255 / .10); }
-:root:root:root:root:root:root:root body .vrm-fp .vg-fp-site-logo { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none; background: rgb(12 29 48 / .06); color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-site-logo { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none; background: rgb(28 28 32 / .06); color: var(--sv-encre) !important; }
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-site-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-site-txt b { font: 700 14px/1.25 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre) !important; }
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-site-txt small { font: 550 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -377,8 +370,8 @@
 
 /* La plaque N° de la paire dans le fil (le fil est un portail, hors de la coque : la plaque claire de la couche n'y arrive pas). */
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire :is(.vrm-num, .sb-plaque) {
-  background: linear-gradient(#FFFFFF, #EDF2F7) !important; border: 1px solid rgb(12 29 48 / .18) !important; box-shadow: 0 1px 2px rgb(8 26 50 / .30), inset 0 -1px 0 rgb(12 29 48 / .05) !important;
-  color: #0C1D30 !important; text-shadow: 0 1px 0 #FFFFFF !important; font-weight: 750 !important; }
+  background: linear-gradient(#FFFFFF, #F0F2F4) !important; border: 1px solid rgb(28 28 32 / .18) !important; box-shadow: 0 1px 2px rgb(27 27 31 / .30), inset 0 -1px 0 rgb(28 28 32 / .05) !important;
+  color: #1C1C20 !important; text-shadow: 0 1px 0 #FFFFFF !important; font-weight: 750 !important; }
 :root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire :is(.vrm-num, .sb-plaque) * { color: inherit !important; }
 
 @media (min-width: 768px) {
@@ -392,21 +385,21 @@
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuile > span { order: 0 !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuile > b { order: 1 !important; margin-top: 3px !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuile > :is(small, button) { order: 2 !important; }
-:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuile > button { min-height: 44px; padding: 0 !important; color: var(--sv-lien) !important; font: 650 13px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; background: none !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuile > button { min-height: 44px; padding: 0 !important; color: var(--sv-lien) !important; font: 600 13px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; background: none !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-etat { padding: 12px 14px !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-etat :is(.vrm-fp-etat-grille, .vrm-fp-etat-l) { background: transparent !important; background-image: none !important; box-shadow: none !important; border: 0 !important; padding-left: 0 !important; padding-right: 0 !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-etat :is(dt, small) { color: var(--sv-encre-2) !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-etat :is(dd, b) { color: var(--sv-encre) !important; }
-:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-raccourcis button { color: #FFFFFF !important; background: rgb(10 38 76 / .24) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .32) !important; box-shadow: none !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-raccourcis button { color: #FFFFFF !important; background: rgb(40 40 46 / .24) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .32) !important; box-shadow: none !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-outils { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)) !important; }
 :root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-outils button { height: auto !important; min-height: 48px !important; white-space: normal !important; text-align: center; border-radius: 14px !important; padding: 6px 8px !important; font: 600 13.5px/1.15 var(--sb-police-texte, Inter, sans-serif) !important;
-  background: rgb(247 250 253 / .86) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .8) !important; color: #0C1D30 !important; box-shadow: none !important; width: 100%; }
-:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fp:not(.sb-plan) .vrm-fp-outils button { background: rgb(255 255 255 / .08) !important; border-color: rgb(255 255 255 / .14) !important; color: #EAF2FB !important; }
+  background: rgb(249 250 251 / .86) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .8) !important; color: #1C1C20 !important; box-shadow: none !important; width: 100%; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fp:not(.sb-plan) .vrm-fp-outils button { background: rgb(255 255 255 / .08) !important; border-color: rgb(255 255 255 / .14) !important; color: #F1F2F4 !important; }
 
 /* Paramètres à l'ordinateur : ce qui est posé sur le fond (le titre d'une catégorie, le titre et le pied d'un groupe) en
    encre claire — le sombre y tombait sous 3:1 sur le bleu (vu en capture, 1512). */
 :root:root:root:root:root:root:root body .vrm-pm :is(.vrm-pm-cat-h, .vrm-pm-cat > .vrm-pm-expert) { color: var(--sv-clair) !important; }
-:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-cat-h .vrm-pm-cat-ic { background: rgb(10 38 76 / .24) !important; border: 1px solid rgb(255 255 255 / .32); color: #FFFFFF !important; box-shadow: none !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-cat-h .vrm-pm-cat-ic { background: rgb(40 40 46 / .24) !important; border: 1px solid rgb(255 255 255 / .32); color: #FFFFFF !important; box-shadow: none !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vrm-pm-cat .vrm-set-groupe > .vrm-set-titre { color: var(--sv-clair) !important; font-weight: 700 !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vrm-pm-cat .vrm-set-groupe > .vrm-set-pied, :root:root:root:root:root:root:root body .vrm-pm .vrm-pm-cat .vrm-set-groupe > .vrm-set-pied * { color: var(--sv-clair-2) !important; }
 
@@ -416,7 +409,9 @@
 @media (min-width: 1024px) {
   /* ARGENT · Résumé : trois colonnes — Reçu · Bénéfice puis les mois (ComptaFusion) ; l'à venir détaillé ; l'URSSAF puis le
      détail (bénéfice, vendu et reçu, rapports…). Le chiffre « vendu » au-dessus, en affiche. */
-  :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"]:not([hidden]) { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr) minmax(0, .92fr); column-gap: 20px; row-gap: 16px; align-items: start; }
+  /* (20 nov., lot argent-natif) Le Mois est natif (src/natif/ecrans/ArgentMois.jsx, sa propre grille de cartes) : le segment
+     redevient une PILE ; la grille à trois colonnes d'avant rangeait le Mois dans une colonne de 250 px. */
+  :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"]:not([hidden]) { display: flex !important; flex-direction: column; gap: 16px; }
   :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] > * { min-width: 0; margin: 0 !important; }
   :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] > .vrm-argent-q.vg-argent { display: contents !important; }
   :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] .vg-a-vendu { grid-column: 1 / -1; grid-row: 1; flex-direction: row !important; align-items: baseline !important; gap: 12px; padding: 0 4px !important; }
@@ -438,9 +433,9 @@
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ligne { min-height: 56px !important; border-radius: 16px !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ligne .vrm-set-desc { display: none !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ligne .vrm-set-val { display: inline !important; font: 500 15px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
-  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] { background: #FFFFFF !important; box-shadow: 0 8px 20px -12px rgb(8 26 50 / .5) !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] { background: #FFFFFF !important; box-shadow: 0 8px 20px -12px rgb(27 27 31 / .5) !important; }
   :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] { background: rgb(255 255 255 / .12) !important; }
-  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ic { background: rgb(12 29 48 / .06) !important; color: var(--sv-encre) !important; box-shadow: none !important; border-radius: 12px !important; width: 36px !important; height: 36px !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ic { background: rgb(28 28 32 / .06) !important; color: var(--sv-encre) !important; box-shadow: none !important; border-radius: 12px !important; width: 36px !important; height: 36px !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > :not(.vrm-set-groupe) { grid-column: 1 / -1; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat-h { margin: 0 !important; font: 750 30px/1.15 var(--sb-police-affiche, Inter, sans-serif) !important; letter-spacing: -.03em !important; }
@@ -456,22 +451,20 @@
   :root:root:root:root:root:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > .vrm-set-groupe > .vrm-set-pied [data-derniere-sauvegarde="ancienne"] { color: var(--sv-ambre) !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > .vrm-set-groupe > .vrm-set-liste { background: transparent !important; background-image: none !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-ligne { padding-left: 0 !important; padding-right: 0 !important; min-height: 60px !important; }
-  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-ligne + .vrm-set-ligne { border-top: 1px solid rgb(12 29 48 / .10) !important; box-shadow: none !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-ligne + .vrm-set-ligne { border-top: 1px solid rgb(28 28 32 / .10) !important; box-shadow: none !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-ligne .vrm-set-ic { display: none !important; }
-  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-lib > b { font: 650 16px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; }
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-lib > b { font: 600 16px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-desc { font: 500 13.5px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
 
   /* MESSAGES : trois verres — la liste, le fil (sur le bleu, en verre), comme la maquette. */
   :root:root:root:root:root body [data-fils-tous] .vrm-message-workspace { gap: 16px !important; background: none !important; box-shadow: none !important; }
   :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column { padding: 16px !important; border-radius: 26px !important;
     background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; }
-  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-vues { background: rgb(12 29 48 / .06) !important; border-color: transparent !important; }
-  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-vue:not(.is-on) { color: var(--sv-encre) !important; }
   :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-groupe-h, :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-groupe-h * { color: var(--sv-encre) !important; }
-  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-onglet { background: rgb(12 29 48 / .07) !important; border-color: transparent !important; color: var(--sv-encre-2) !important; }
+  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-onglet { background: rgb(28 28 32 / .07) !important; border-color: transparent !important; color: var(--sv-encre-2) !important; }
   :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vrm-msg-list.vg-ms-liste { background: none !important; background-image: none !important; box-shadow: none !important; }
   :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-fil { border-radius: 16px !important; border-top: 0 !important; }
-  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-fil.is-current { background: #FFFFFF !important; box-shadow: 0 8px 20px -12px rgb(8 26 50 / .5) !important; }
+  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-fil.is-current { background: #FFFFFF !important; box-shadow: 0 8px 20px -12px rgb(27 27 31 / .5) !important; }
   :root:root:root:root:root[data-theme="dark"] body [data-fils-tous] .vrm-inbox-column .vg-fil.is-current { background: rgb(255 255 255 / .10) !important; }
   :root:root:root:root:root body [data-fils-tous] .vrm-chat-column { border-radius: 26px !important; overflow: hidden;
     background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; }
@@ -483,7 +476,7 @@
   /* (16 nov., intégration) Sur le verre de l'ordinateur, ce qui était écrit pour le bleu (blanc) se lit à l'encre : « Traduire »
      sous une bulle (1,39:1) et les ronds de la tête (‹, Retirer, ⟳ : blanc sur verre, 2,4:1) — banc studio-reste S4. */
   :root:root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-panel .vrm-bulle-pied, :root:root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-panel .vrm-bulle-pied * { color: var(--sv-lien) !important; }
-  :root:root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-back, .vrm-chat-sync, .vrm-chat-retirer) { background: rgb(12 29 48 / .07) !important; border-color: transparent !important; color: var(--sv-encre) !important; }
+  :root:root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-back, .vrm-chat-sync, .vrm-chat-retirer) { background: rgb(28 28 32 / .07) !important; border-color: transparent !important; color: var(--sv-encre) !important; }
   :root:root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-back, .vrm-chat-sync, .vrm-chat-retirer) * { color: inherit !important; }
 
   /* LA FICHE : un plan large (comme la page de la maquette) en trois colonnes — la paire ; ses sites, ses chiffres, l'état ;
@@ -526,13 +519,13 @@
   background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; color: var(--sv-encre) !important; }
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-hist h3 { margin: 0 0 2px !important; }
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-hist-l { display: grid; grid-template-columns: 52px 10px 1fr; align-items: center; gap: 10px; min-height: 28px; }
-:root:root:root:root:root:root:root body .vrm-fp .vg-fp-hist-l span { font: 650 12px/1.2 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; }
-:root:root:root:root:root:root:root body .vrm-fp .vg-fp-hist-l i { width: 8px; height: 8px; border-radius: 50%; background: rgb(12 29 48 / .3); }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-hist-l span { font: 600 12px/1.2 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-hist-l i { width: 8px; height: 8px; border-radius: 50%; background: rgb(28 28 32 / .3); }
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fp .vg-fp-hist-l i { background: rgb(255 255 255 / .35); }
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-hist-l b { font: 600 13px/1.3 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-plus { margin-top: 10px; }
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-plus > summary { list-style: none; display: flex; align-items: center; justify-content: center; min-height: 48px; border-radius: 14px; cursor: pointer;
-  background: rgb(10 38 76 / .24); border: 1px solid rgb(255 255 255 / .32); color: #FFFFFF !important; font: 600 14.5px/1 var(--sb-police-texte, Inter, sans-serif); }
+  background: rgb(40 40 46 / .24); border: 1px solid rgb(255 255 255 / .32); color: #FFFFFF !important; font: 600 14.5px/1 var(--sb-police-texte, Inter, sans-serif); }
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-plus > summary::-webkit-details-marker { display: none; }
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-plus[open] > summary { margin-bottom: 12px; }
 :root:root:root:root:root:root:root body .vrm-fp .vg-fp-plus > :not(summary) { margin-bottom: 12px; }

@@ -1,0 +1,21 @@
+// fr · « Après la finale » (22 nov.) : Statistiques d’un compte neuf, reprendre sur l’autre appareil, annonces plus vues — docs/passation/2026-11-22-apres-finale-app.md
+export default {
+  "af.stats.vide": "Tes statistiques arriveront avec tes premières ventes.",
+  "af.stats.videDetail": "Relie un compte : VRM lira tes ventes et tes annonces.",
+  "af.stats.pasSu": "Je n’ai pas pu lire tes comptes.",
+  "af.stats.pasSuDetail": "Rien n’est perdu : réessaie dans un instant.",
+  "af.stats.reessayer": "Réessayer",
+  "af.rep.titre": "Reprendre : {titre}",
+  "af.rep.sous": "Ouvert sur {sur} à {heure}",
+  "af.rep.sur.iphone": "l’iPhone",
+  "af.rep.sur.ipad": "la tablette",
+  "af.rep.sur.telephone": "le téléphone",
+  "af.rep.sur.ordinateur": "l’ordinateur",
+  "af.rep.masquer": "Masquer",
+  "af.rep.numero": "N° {n}",
+  "af.rep.taille": "{titre} taille {taille}",
+  "af.pv.etiquette": "Plus vue depuis {n} j",
+  "af.pv.raison": "plus vue depuis {n} j",
+  "af.pv.section": "Plus vues depuis {n} j ou plus",
+  "af.pv.reglage": "Plus vue après",
+};

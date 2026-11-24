@@ -35,6 +35,7 @@
 //  Hors de ce mécanisme (tout autre écran), rien ne change.
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
+import { noterSuspens } from './journalSuspens.js';
 import { espaceDe } from './design/espace.js';
 import { createPortal } from 'react-dom';
 
@@ -50,7 +51,12 @@ export const AGE_MAX_CACHE_MS = 10 * 60 * 1000;
 // d'UN écran (repliée / dépliée), réécrites à chaque montage de Comptabilite.
 // (11 nov., reprise-ecrans) + `vrm_reprise_ecrans` : l'écran ouvert et les filtres retenus,
 // réécrits à CHAQUE changement d'écran — sans elle, aucun écran ne resterait jamais gardé.
-export const CLES_NEUTRES = ['vinted_analyse_open', 'vinted_tips_open', 'vinted_off_open', 'vrm_reprise_ecrans'];
+// (17 nov., onglets rapides — Julien : « beaucoup trop long entre les onglets, c'est catastrophique ») + `vrm_a_trancher` :
+// les publications « À trancher » (src/aTrancher.js) que CHAQUE écran réécrit en passant (Ma journée et la coque publient
+// la même source) faisaient remonter Achats et Ventes à CHAQUE retour — mesuré (banc onglets-rapides, 390 ×4) : 7 à 11 s
+// de calcul au lieu de l'écran gardé. Son seul lecteur (`useATrancher`) l'écoute en direct (`vrm:save`) : un écran gardé
+// qui le montre se met à jour à son retour, rien n'y est périmé.
+export const CLES_NEUTRES = ['vinted_analyse_open', 'vinted_tips_open', 'vinted_off_open', 'vrm_reprise_ecrans', 'vrm_a_trancher'];
 // Signaux de données (même sans sauvegarde) : l'écran caché ne les a pas suivis.
 const SIGNAUX = ['vrm:transp-maj', 'vrm:ebay-maj', 'vrm:suivis-relire', 'vrm:suivis-manuels', 'vrm:nuage-relu', 'vrm-prefixe', 'vrm-numero-ecrit'];
 
@@ -62,9 +68,12 @@ let poses = false;
 function poserEcoutes() {
   if (poses || typeof window === 'undefined') return;
   poses = true;
-  window.addEventListener('vrm:save', (e) => { const d = e && e.detail; if (!d || !d.k || d.distant || !CLES_NEUTRES.includes(d.k)) perimer(); });
+  // (22 nov.) `__vrmPerimes` (diagnostic, bornée à 40) : la clé qui a rendu les écrans gardés périmés — banc fluidite-generale.
+  const noter = (k) => { try { const L = window.__vrmPerimes || (window.__vrmPerimes = []); L.push(String(k || '?')); if (L.length > 40) L.shift(); } catch (_) {} };
+  window.addEventListener('vrm:save', (e) => { const d = e && e.detail; if (d && d.inchange === true) return; if (!d || !d.k || d.distant || !CLES_NEUTRES.includes(d.k)) { noter(d && d.k); perimer(); } });
+  window.addEventListener('vrm:ext', (e) => { const d = e && e.detail; if (d && d.type === 'maj') noter('ext'); });
   window.addEventListener('vrm:ext', (e) => { const d = e && e.detail; if (d && d.type === 'maj') perimer(); });
-  for (const n of SIGNAUX) window.addEventListener(n, perimer);
+  for (const n of SIGNAUX) window.addEventListener(n, () => { noter(n); perimer(); });
   let cacheA = 0;
   try { document.addEventListener('visibilitychange', () => { if (document.hidden) cacheA = Date.now(); else { if (cacheA && Date.now() - cacheA >= 20000) perimer(); cacheA = 0; } }); } catch (_) {}
 }
@@ -90,10 +99,38 @@ export const estCache = (v) => !!(v && !v.actif);
 const MontreCtx = React.createContext(true);
 export const useEcranGardeMontre = () => React.useContext(MontreCtx);
 
+// ── LE GEL, SANS JAMAIS RETENIR UNE TRANSITION (22 nov., P0 — Julien : « l'app bug beaucoup trop ») ─────────────────────
+//  Geler = lancer une promesse qui ne se résout jamais dans une limite <Suspense>. Sans danger quand la limite montre DÉJÀ
+//  son attente (React n'a rien à cacher) ou quand le rendu est URGENT (React pose l'attente tout de suite). Mais lancée
+//  dans une TRANSITION (un toucher d'onglet) sur une limite qui montre encore l'écran, elle la retient POUR TOUJOURS :
+//  React ne remplace jamais un contenu montré par une attente dans une transition, il attend la promesse — l'onglet
+//  s'allume, l'écran ne change plus, et chaque toucher suivant (toutes les transitions sont rendues ensemble) bute au même
+//  endroit (banc fluidite-generale, mutation `gel-transition` : 10/10 bloqués). Donc ici, deux cas seulement lancent :
+//   · `etat.repli` — l'attente de la limite est POSÉE (couche `Repli`, effet de mise en page) : rien à cacher ;
+//   · `etat.permis` — le rendu URGENT que l'écran demande lui-même en se cachant (`geler()`, mise à jour posée dans un
+//     effet de mise en page, rendue de façon synchrone avant la fin de la validation).
+//  Tout autre rendu qui le trouverait à geler (une transition, une vague de lectures) le REND tel quel (son dernier élément :
+//  rien ne change, rien n'est recalculé) et demande le gel urgent juste après sa validation. Aucune promesse sans fin
+//  n'atteint plus jamais une transition.
 const JAMAIS = new Promise(() => {});
-function Gel({ fige, children }) { if (fige) throw JAMAIS; return children; }
-// Caché : on ne re-rend pas avec les nouvelles props de la coque (l'écran garde son dernier rendu).
-const GelMemo = React.memo(Gel, (a, b) => !b.actif && a.fige === b.fige);
+try { JAMAIS.__vrmAttente = 'gel'; } catch (_) {}   // diagnostic : la promesse reconnue par le banc (fluidite-generale ATTENTES)
+function Repli({ etat }) {
+  React.useLayoutEffect(() => { etat.repli = true; return () => { etat.repli = false; }; }, [etat]);
+  return null;
+}
+function Gel({ fige, etat, tab = '', children }) {
+  React.useLayoutEffect(() => { if (etat.aGeler) { etat.aGeler = false; etat.geler(); } });
+  if (fige) {
+    if (etat.repli || etat.permis) { noterSuspens('gel', tab + (etat.repli ? '' : ' · urgent')); throw JAMAIS; }
+    // Un rendu qui n'est pas le gel urgent veut cacher un écran encore MONTRÉ : jamais (il retiendrait la transition).
+    noterSuspens('gel-refuse', tab);
+    try { window.__vrmGelRefuse = (window.__vrmGelRefuse || 0) + 1; } catch (_) {}
+    etat.aGeler = true;
+  }
+  return children;
+}
+// Caché : on ne re-rend pas avec les nouvelles props de la coque (l'écran garde son dernier rendu). `n` : un gel redemandé.
+const GelMemo = React.memo(Gel, (a, b) => !b.actif && a.fige === b.fige && a.n === b.n);
 
 // ── Le même écran, au même état ? ─────────────────────────────────────────
 //  La coque refait l'élément de l'écran à chacun de ses rendus (fonctions en
@@ -140,7 +177,8 @@ export function egalRendu(a, b, budget = { n: 20000 }, pile = null) {
 
 function Vivant({ tab = '', actif, hote, evincer, children }) {
   const dernier = React.useRef(null);
-  let rendu = children;
+  // Caché : le DERNIER élément montré (jamais `null`) — un rendu qui traverse l'écran caché sans le geler n'y change rien.
+  let rendu = actif ? children : dernier.current;
   if (actif) {
     if (dernier.current && egalRendu(dernier.current, children)) rendu = dernier.current;
     else if (dernier.current && typeof window !== 'undefined' && window.__vrmGardeDebug) { const pile = { chemin: [], ecart: '' }; egalRendu(dernier.current, children, undefined, pile); (window.__vrmGardeEcarts = window.__vrmGardeEcarts || []).push(pile.ecart); }
@@ -154,13 +192,21 @@ function Vivant({ tab = '', actif, hote, evincer, children }) {
   // (14 nov., Studio bleu clair) La racine de l'écran gardé porte son ESPACE (src/design/espace.js) : studio.css y règle l'aplat.
   const [conteneur] = React.useState(() => { const d = document.createElement('div'); d.className = 'vrm-ecran-vivant'; if (tab) d.setAttribute('data-espace', espaceDe(tab)); return d; });
   const [fige, setFige] = React.useState(false);
+  const [n, setN] = React.useState(0);
   const dejaMontre = React.useRef(false);
+  // L'état du gel (objet stable) : `geler()` pose la demande URGENTE (appelée depuis un effet de mise en page : React la
+  // rend de façon synchrone avant la fin de la validation, seule fenêtre où `permis` est vrai).
+  const [gel] = React.useState(() => {
+    const g = { repli: false, permis: false, aGeler: false, geler: null };
+    g.geler = () => { g.permis = true; setN((x) => x + 1); Promise.resolve().then(() => { g.permis = false; }); };
+    return g;
+  });
   return (
     <VivantCtx.Provider value={vivant.current}>
       <MontreCtx.Provider value={actif}>
-        <Attacheur actif={actif} hote={hote} conteneur={conteneur} vivant={vivant.current} setFige={setFige} dejaMontre={dejaMontre} evincer={evincer}/>
-        <React.Suspense fallback={null}>
-          <GelMemo fige={fige && !actif} actif={actif}>{createPortal(rendu, conteneur)}</GelMemo>
+        <Attacheur actif={actif} hote={hote} conteneur={conteneur} vivant={vivant.current} setFige={setFige} gel={gel} dejaMontre={dejaMontre} evincer={evincer}/>
+        <React.Suspense fallback={<Repli etat={gel}/>}>
+          <GelMemo fige={fige && !actif} actif={actif} tab={tab} etat={gel} n={n}>{createPortal(rendu, conteneur)}</GelMemo>
         </React.Suspense>
       </MontreCtx.Provider>
     </VivantCtx.Provider>
@@ -189,7 +235,7 @@ function feuilleOuverte(conteneur) {
 // Premier enfant de `Vivant` : ses effets de mise en page passent AVANT ceux de
 // l'écran (ordre de l'arbre) — l'écran qui revient est déjà dans la page quand
 // il se mesure.
-function Attacheur({ actif, hote, conteneur, vivant, setFige, dejaMontre, evincer }) {
+function Attacheur({ actif, hote, conteneur, vivant, setFige, gel, dejaMontre, evincer }) {
   const evincerRef = React.useRef(evincer); evincerRef.current = evincer;
   React.useLayoutEffect(() => {
     vivant.actif = actif;
@@ -201,8 +247,10 @@ function Attacheur({ actif, hote, conteneur, vivant, setFige, dejaMontre, evince
       if (feuilleOuverte(conteneur) || conteneur.querySelector('[data-garde-ecran]')) { evincerRef.current(); return; }
       if (conteneur.parentNode) conteneur.parentNode.removeChild(conteneur);
     }
-    setFige(!actif);
-  }, [actif, hote, conteneur, vivant, setFige]);
+    // Se cacher : le gel URGENT (`permis` le temps de ce rendu synchrone). Se montrer : dégelé.
+    if (actif) setFige(false);
+    else { gel.permis = true; setFige(true); Promise.resolve().then(() => { gel.permis = false; }); }
+  }, [actif, hote, conteneur, vivant, setFige, gel]);
   React.useEffect(() => {
     if (!actif) return;
     if (dejaMontre.current) for (const fn of [...vivant.retours]) { try { fn(); } catch (_) {} }
@@ -221,7 +269,10 @@ export function EcransGardes({ ecran, cle = '', pret = true, children }) {
   const [, forcer] = React.useState(0);
   const e = etat.current;
   if (e.cle !== cle) { e.liste = []; e.dernier = null; e.cle = cle; PRETS.clear(); }
-  const gardable = ECRANS_GARDABLES.includes(ecran);
+  // (19 nov.) Un banc de mesure peut essayer une autre liste sur le MÊME build (`window.__VRM_ECRANS_GARDABLES`, onglets-trace GARDES=…).
+  const gardables = (typeof window !== 'undefined' && Array.isArray(window.__VRM_ECRANS_GARDABLES)) ? window.__VRM_ECRANS_GARDABLES : ECRANS_GARDABLES;
+  const maxGardes = (typeof window !== 'undefined' && window.__VRM_MAX_GARDES > 0) ? window.__VRM_MAX_GARDES : MAX_GARDES;
+  const gardable = gardables.includes(ecran);
   // Décidé UNE fois par changement d'écran (rendu rejoué ⇒ même décision).
   if (e.dernier !== ecran) {
     const parti = e.liste.find((x) => x.tab === e.dernier);
@@ -233,7 +284,7 @@ export function EcransGardes({ ecran, cle = '', pret = true, children }) {
       if (!ici) e.liste.push({ tab: ecran, cle: ecran + '#' + (++e.n), quitte: 0, gen: generation });
       PRETS.delete(ecran);
       // Au-delà de MAX_GARDES, le plus anciennement quitté part (l'ordre de la liste ne bouge pas).
-      while (e.liste.length > MAX_GARDES) {
+      while (e.liste.length > maxGardes) {
         const v = e.liste.filter((x) => x.tab !== ecran).sort((a, b) => a.quitte - b.quitte)[0];
         e.liste = e.liste.filter((x) => x !== v); PRETS.delete(v.tab);
       }

@@ -89,10 +89,14 @@ export function limiteDuJour(jour, mois, recuLe) {
   const d = Number(jour), m = moisVinted(mois);
   const r = Date.parse(str(recuLe));
   if (!Number.isInteger(d) || d < 1 || d > 31 || m == null || !isFinite(r)) return null;
-  let y = new Date(r).getUTCFullYear();
+  const y0 = new Date(r).getUTCFullYear();
   const midi = (yy) => Date.UTC(yy, m, d, 12);
-  if (new Date(midi(y)).getUTCDate() !== d) return null;            // 31 avril
-  if (midi(y) < r - 2 * 86400000) y += 1;                           // décembre → janvier
+  // (20 nov., chasse-bugs) L'année la PLUS PROCHE de la réception (décembre → janvier, et l'inverse). Avant : toute date
+  // passée de plus de 2 jours sautait à l'an prochain — « d'ici le 16 nov. » lu le 20 nov. devenait le 16 nov. 2027
+  // (mesuré, audit-retours-emails E2) : un retour en retard affiché « dans un an ».
+  let y = y0;
+  for (const yy of [y0 - 1, y0 + 1]) if (Math.abs(midi(yy) - r) < Math.abs(midi(y) - r)) y = yy;
+  if (new Date(midi(y)).getUTCDate() !== d) return null;            // 31 avril (29 février d'une autre année)
   const finUtc = Date.UTC(y, m, d, 23, 59, 59);
   const ms = finUtc - decalageParis(midi(y)) * 60000;
   const jourIso = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;

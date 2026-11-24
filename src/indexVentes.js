@@ -17,7 +17,7 @@
 //     « il y a N jours » selon la règle de chaque appelant (`j == null`, `NaN > 45` est faux…).
 //   · `filtreParVersion(items, nom, garder, ver)` : les ventes pour lesquelles `garder(o)` est vrai,
 //     gardé tant que `ver` ne change pas. Seulement pour une règle PURE de la vente et de `ver`
-//     (ex. `aExpedier` : la vente et `TXN_ETATS.ver`, rien d'autre — lot vitesse-volume).
+//     (ex. `aExpedier` : la vente et `TXN_ETATS.ver`, montée par `noterEtatsTxn` quand une ligne change).
 //   · `parTransaction(items)` : n° de transaction (texte) ⇒ positions dans la liste.
 //
 //  La mémoire est gardée PAR LISTE (WeakMap : une liste relue est un objet neuf ⇒ index neuf ;

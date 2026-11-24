@@ -24,14 +24,14 @@
 }
 :root:root body .vrm-ms-plus {
   all: unset; box-sizing: border-box !important; display: flex !important; align-items: center !important; justify-content: center !important;
-  min-height: 44px !important; width: 100% !important; cursor: pointer !important; font: 600 15px/1.2 var(--vrm-police) !important; color: var(--d-accent-texte, #0066CC) !important;
+  min-height: 44px !important; width: 100% !important; cursor: pointer !important; font: 600 15px/1.2 var(--vrm-police) !important; color: var(--d-accent-texte, #16181D) !important;
 }
-:root:root body [data-ms-vise="1"] { outline: 2px solid var(--d-accent, #0071E3) !important; outline-offset: 4px !important; border-radius: 12px !important; transition: outline-color 1.2s ease-out !important; }
+:root:root body [data-ms-vise="1"] { outline: 2px solid var(--d-accent, #16181D) !important; outline-offset: 4px !important; border-radius: 12px !important; transition: outline-color 1.2s ease-out !important; }
 /* La phrase d'explication sous le titre disparaît : le « ? » suffit, à côté du titre (AJOUT 3.8). */
-:root:root body :is(.vrm-ms-stock, [data-tache-tete="messages"], .vrm-main:has([data-boite-emails]) .vrm-tache-tete[data-titre-ecran-grand]) .vrm-phrase-ecran { font-size: 0 !important; line-height: 0 !important; margin: 0 !important; min-height: 0 !important; }
-:root:root body :is(.vrm-ms-stock, [data-tache-tete="messages"], .vrm-main:has([data-boite-emails]) .vrm-tache-tete[data-titre-ecran-grand]) .vrm-phrase-ecran > * { font-size: 15px !important; line-height: 1 !important; }
-:root:root body :is([data-tache-tete="messages"], .vrm-main:has([data-boite-emails]) .vrm-tache-tete[data-titre-ecran-grand]) { display: flex !important; align-items: center !important; flex-wrap: wrap !important; gap: 4px 8px !important; }
-:root:root body :is([data-tache-tete="messages"], .vrm-main:has([data-boite-emails]) .vrm-tache-tete[data-titre-ecran-grand]) > h1 { margin-bottom: 0 !important; }
+:root:root body :is(.vrm-ms-stock, [data-tache-tete="messages"], .vrm-main[data-vrm-d34] .vrm-tache-tete[data-titre-ecran-grand]) .vrm-phrase-ecran { font-size: 0 !important; line-height: 0 !important; margin: 0 !important; min-height: 0 !important; }
+:root:root body :is(.vrm-ms-stock, [data-tache-tete="messages"], .vrm-main[data-vrm-d34] .vrm-tache-tete[data-titre-ecran-grand]) .vrm-phrase-ecran > * { font-size: 15px !important; line-height: 1 !important; }
+:root:root body :is([data-tache-tete="messages"], .vrm-main[data-vrm-d34] .vrm-tache-tete[data-titre-ecran-grand]) { display: flex !important; align-items: center !important; flex-wrap: wrap !important; gap: 4px 8px !important; }
+:root:root body :is([data-tache-tete="messages"], .vrm-main[data-vrm-d34] .vrm-tache-tete[data-titre-ecran-grand]) > h1 { margin-bottom: 0 !important; }
 
 /* ── STOCK ──────────────────────────────────────────────────────────────── */
 :root:root body .vrm-ms-stock { gap: 12px !important; }
@@ -46,10 +46,10 @@
 :root:root body .vrm-ms-stock-resume .vrm-s2d-resume > .vrm-ui-bande { flex: 1 1 100% !important; }
 :root:root body .vrm-ms-stock-resume .vrm-s2d-resume > .vrm-pop-ligne { flex: 1 1 auto !important; min-width: 120px !important; width: auto !important; }
 :root:root body .vrm-ms-stock-resume .vrm-s2d-resume > .vrm-s2d-filtres { flex: 0 1 auto !important; min-width: 0 !important; width: auto !important; margin-left: auto !important; }
-:root:root body .vrm-ms-stock-resume .vrm-ui-menu-compte { background: none !important; border: 0 !important; box-shadow: none !important; color: var(--d-accent-texte, #0066CC) !important; }
+:root:root body .vrm-ms-stock-resume .vrm-ui-menu-compte { background: none !important; border: 0 !important; box-shadow: none !important; color: var(--d-accent-texte, #16181D) !important; }
 :root:root body .vrm-ms-stock-resume .vrm-ui-menu-compte > svg { color: currentColor !important; }
 :root:root body .vrm-ms-tete-outils { display: flex !important; align-items: center !important; gap: 0 !important; }
-:root:root body .vrm-ms-tete-outils .vrm-ui-icone { color: var(--d-accent-texte, #0066CC) !important; }
+:root:root body .vrm-ms-tete-outils .vrm-ui-icone { color: var(--d-accent-texte, #16181D) !important; }
 /* la bande : le fond de la page, pas de carte */
 :root:root body .vrm-ms-stock-resume { margin: 0 !important; padding: 0 !important; background: none !important; box-shadow: none !important; }
 /* (14 nov., intégration) plus de `flex-direction: column` ici : il écrasait la règle du haut (bande sur sa ligne, puis les
@@ -71,13 +71,13 @@
 :root:root body .vrm-ms-stock-resume .vrm-pop-chip.is-ambre { background: var(--d-pastille-ambre-fond, rgba(255,159,10,.14)) !important; color: var(--d-pastille-ambre, #B25000) !important; }
 :root:root body .vrm-ms-stock-resume .vrm-s2d-filtres { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 8px !important; margin: 0 !important; padding: 0 !important; background: none !important; }
 :root:root body .vrm-ms-stock-resume .vrm-s2d-filtres > .vrm-ui-filtres { flex: 1 1 auto !important; margin-right: 0 !important; }
-/* la recherche : un vrai champ de 36 px, collé en haut */
+/* la recherche : un vrai champ, collé en haut — (20 nov., chasse-bugs-2) 44 px : à 40 px elle passait sous la cible du doigt (banc parcours-chasse) */
 :root:root body .vrm-ms-stock [data-stock-recherche] { background: var(--d-fond-atelier, var(--d-fond)) !important; padding: 6px 0 !important; top: 0 !important; margin: 0 -16px !important; padding-left: 16px !important; padding-right: 16px !important; }
 :root:root body .vrm-ms-stock [data-stock-recherche] input[type="search"] {
-  min-height: 0 !important; height: 40px !important; padding-top: 0 !important; padding-bottom: 0 !important; border: 0 !important; border-radius: 12px !important;
+  min-height: 0 !important; height: 44px !important; padding-top: 0 !important; padding-bottom: 0 !important; border: 0 !important; border-radius: 12px !important;
   background: var(--d-remplir, rgba(118,118,128,.12)) !important; font-size: 17px !important; box-shadow: none !important;
 }
-:root:root body .vrm-ms-stock [data-stock-recherche] input[type="search"]:focus { box-shadow: 0 0 0 2px var(--d-accent, #0071E3) !important; }
+:root:root body .vrm-ms-stock [data-stock-recherche] input[type="search"]:focus { box-shadow: 0 0 0 2px var(--d-accent, #16181D) !important; }
 /* la liste : rangées de 68 px, vignette 52, un groupe blanc, filets indentés après la photo */
 :root:root body .vrm-ms-stock .vrm-ms-rangee {
   display: flex !important; align-items: center !important; gap: 12px !important; flex-wrap: nowrap !important;
@@ -107,7 +107,7 @@
 :root:root body .vrm-ms-stock .vrm-ms-sous .vrm-note-rangee::before { content: ' · '; }
 :root:root body .vrm-ms-geste {
   all: unset; box-sizing: border-box !important; flex: none !important; min-height: 44px !important; min-width: 44px !important; padding: 0 4px !important;
-  display: grid !important; place-items: center !important; cursor: pointer !important; font: 600 15px/1 var(--vrm-police) !important; color: var(--d-accent-texte, #0066CC) !important;
+  display: grid !important; place-items: center !important; cursor: pointer !important; font: 600 15px/1 var(--vrm-police) !important; color: var(--d-accent-texte, #16181D) !important;
   transition: transform var(--d-m-appui, 100ms) ease-out !important; -webkit-tap-highlight-color: transparent;
 }
 :root:root body .vrm-ms-geste:active { transform: var(--d-appui, scale(.97)) !important; }
@@ -165,7 +165,7 @@
 :root:root body .vrm-chat-panel .vrm-chat-head img, :root:root body .vrm-chat-panel .vrm-chat-head .vrm-chat-head-ph { width: 36px !important; height: 36px !important; border-radius: 10px !important; }
 :root:root body .vrm-chat-panel .vrm-chat-head-n { font: 600 17px/22px var(--vrm-police) !important; letter-spacing: -.012em !important; }
 :root:root body .vrm-chat-panel .vrm-chat-head-s { font: 400 13px/17px var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; }
-:root:root body .vrm-chat-panel .vrm-chat-back { color: var(--d-accent-texte, #0066CC) !important; min-width: 44px !important; min-height: 44px !important; }
+:root:root body .vrm-chat-panel .vrm-chat-back { color: var(--d-accent-texte, #16181D) !important; min-width: 44px !important; min-height: 44px !important; }
 :root:root body .vrm-chat-panel .vrm-chat-history { padding: 12px 12px 16px !important; gap: 4px !important; background: transparent !important; }
 :root:root body .vrm-chat-panel .vrm-bulle-l { display: flex !important; flex-direction: column !important; align-items: flex-start !important; margin: 2px 0 !important; }
 :root:root body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi { align-items: flex-end !important; }
@@ -191,7 +191,7 @@
 :root:root body .vrm-chat-panel .vrm-chat-send.vrm-chat-send {
   flex: none !important; width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; margin: 0 -4px -3px 0 !important; padding: 0 !important;
   border-radius: 50% !important; border: 0 !important; display: grid !important; place-items: center !important; color: #fff !important;
-  background: radial-gradient(circle, var(--d-accent, #0071E3) 17.5px, transparent 18px) !important;   /* 36 px dessinés, 44 au doigt */
+  background: radial-gradient(circle, var(--d-accent, #16181D) 17.5px, transparent 18px) !important;   /* 36 px dessinés, 44 au doigt */
   transition: transform var(--d-m-appui, 100ms) ease-out, opacity 120ms ease !important;
 }
 :root:root body .vrm-chat-panel .vrm-chat-send.vrm-chat-send:disabled { opacity: .35 !important; }
@@ -225,7 +225,7 @@
 :root:root body [data-tache-tete="messages"] { justify-content: flex-start !important; text-align: left !important; flex-direction: row !important; align-items: center !important; }
 :root:root body [data-tache-tete="messages"] > h1 { width: auto !important; flex: 0 1 auto !important; text-align: left !important; }
 /* ── E-MAILS — la boîte comme Mail : la liste d'abord, des rangées de 64–72 px, le code de retrait à droite ── */
-:root:root body .vrm-main:has([data-boite-emails]) .vrm-tache-tete[data-titre-ecran-grand] { justify-content: flex-start !important; }
+:root:root body .vrm-main[data-vrm-d34] .vrm-tache-tete[data-titre-ecran-grand] { justify-content: flex-start !important; }
 :root:root body .vrm-boite.vrm-boite { gap: 0 !important; }
 :root:root body .vrm-boite .vrm-boite-vues.vrm-boite-vues {
   display: inline-flex !important; width: auto !important; align-self: flex-start !important; gap: 2px !important; padding: 2px !important; margin: 0 0 10px !important;
@@ -253,8 +253,8 @@
 :root:root body .vrm-boite .vrm-boite-rubriques.vrm-boite-rubriques > button[aria-pressed="true"] { background: var(--d-encre, #1D1D1F) !important; color: var(--d-carte, #fff) !important; box-shadow: none !important; }
 :root:root body .vrm-boite .vrm-boite-rubriques .vrm-boite-n { font-weight: 400 !important; opacity: .7 !important; background: none !important; padding: 0 !important; color: inherit !important; font-variant-numeric: tabular-nums !important; }
 :root:root body .vrm-boite .vrm-boite-ligne-outils.vrm-boite-ligne-outils { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 8px !important; min-height: 36px !important; margin: 0 !important; }
-:root:root body .vrm-boite .vrm-boite-compte.vrm-boite-compte select { min-height: 44px !important; height: 44px !important; padding: 0 22px 0 2px !important; border: 0 !important; background: transparent !important; box-shadow: none !important; font: 600 15px/1 var(--vrm-police) !important; color: var(--d-accent-texte, #0066CC) !important; }
-:root:root body .vrm-boite .vrm-boite-compte .vrm-boite-compte-chevron { color: var(--d-accent-texte, #0066CC) !important; }
+:root:root body .vrm-boite .vrm-boite-compte.vrm-boite-compte select { min-height: 44px !important; height: 44px !important; padding: 0 22px 0 2px !important; border: 0 !important; background: transparent !important; box-shadow: none !important; font: 600 15px/1 var(--vrm-police) !important; color: var(--d-accent-texte, #16181D) !important; }
+:root:root body .vrm-boite .vrm-boite-compte .vrm-boite-compte-chevron { color: var(--d-accent-texte, #16181D) !important; }
 :root:root body .vrm-boite .vrm-boite-liste.vrm-boite-liste { background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; display: flex !important; flex-direction: column !important; gap: 4px !important; }
 :root:root body .vrm-boite .vrm-boite-jour-titre.vrm-boite-jour-titre { font: 400 13px/18px var(--vrm-police) !important; text-transform: none !important; letter-spacing: 0 !important; color: var(--d-gris, #6E6E73) !important; margin: 10px 4px 6px !important; padding: 0 !important; background: none !important; }
 :root:root body .vrm-boite .vrm-boite-jour > ul { background: var(--d-surface-atelier, #fff) !important; border-radius: 16px !important; overflow: hidden !important; box-shadow: var(--d-ombre-douce, none) !important; margin: 0 !important; padding: 0 !important; border: 0 !important; }
@@ -272,20 +272,20 @@
 :root:root body .vrm-boite .vrm-boite-ligne .vrm-boite-essentiel { font: 400 15px/19px var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; display: block !important; -webkit-line-clamp: unset !important; }
 :root:root body .vrm-boite .vrm-boite-ligne .vrm-boite-ligne-pied { font: 400 13px/16px var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; flex-wrap: nowrap !important; min-width: 0 !important; }
 :root:root body .vrm-boite .vrm-boite-ligne .vrm-boite-geste { font: 600 13px/17px var(--vrm-police) !important; padding: 0 !important; background: none !important; border: 0 !important; }
-:root:root body .vrm-boite .vrm-boite-ligne .vrm-boite-point[data-boite-point="1"] { width: 9px !important; height: 9px !important; border-radius: 50% !important; background: var(--d-accent, #0071E3) !important; }
+:root:root body .vrm-boite .vrm-boite-ligne .vrm-boite-point[data-boite-point="1"] { width: 9px !important; height: 9px !important; border-radius: 50% !important; background: var(--d-accent, #16181D) !important; }
 :root:root body .vrm-boite .vrm-boite-item > .vrm-boite-puce-code.vrm-boite-puce-code {
   position: absolute !important; right: 12px !important; left: auto !important; width: auto !important; max-width: 120px !important; top: 50% !important; bottom: auto !important; transform: translateY(-50%) !important; z-index: 3 !important; margin: 0 !important;
   min-height: 44px !important; height: 44px !important; padding: 0 10px 0 12px !important; border-radius: 12px !important; gap: 6px !important;
   background: var(--d-pastille-neutre-fond, rgba(118,118,128,.12)) !important; border: 0 !important; box-shadow: none !important;
 }
 :root:root body .vrm-boite .vrm-boite-puce-code .vrm-boite-puce-chiffres { font: 700 17px/1 var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; letter-spacing: .02em !important; color: var(--d-encre, #1D1D1F) !important; }
-:root:root body .vrm-boite .vrm-boite-plus.vrm-boite-plus { min-height: 44px !important; margin: 8px 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; font: 600 15px/1 var(--vrm-police) !important; color: var(--d-accent-texte, #0066CC) !important; }
+:root:root body .vrm-boite .vrm-boite-plus.vrm-boite-plus { min-height: 44px !important; margin: 8px 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; font: 600 15px/1 var(--vrm-police) !important; color: var(--d-accent-texte, #16181D) !important; }
 
 :root:root body .vrm-boite .vrm-boite-compte.vrm-boite-compte { flex: 0 1 auto !important; width: auto !important; position: relative !important; display: inline-flex !important; align-items: center !important; }
 :root:root body .vrm-boite .vrm-boite-compte.vrm-boite-compte select { width: auto !important; max-width: 62vw !important; -webkit-appearance: none !important; appearance: none !important; }
 :root:root body .vrm-boite .vrm-boite-compte .vrm-boite-compte-chevron { position: absolute !important; right: 4px !important; left: auto !important; pointer-events: none !important; }
 :root:root body .vrm-app-shell .vrm-main header.vrm-tache-tete.vrm-market-heading:is([data-tache-tete="messages"], [data-titre-ecran-grand]):is([data-tache-tete="messages"], :has(~ * [data-boite-emails])),
-:root:root body .vrm-app-shell .vrm-main:has([data-boite-emails]) header.vrm-tache-tete.vrm-market-heading[data-titre-ecran-grand] {
+:root:root body .vrm-app-shell .vrm-main[data-vrm-d34] header.vrm-tache-tete.vrm-market-heading[data-titre-ecran-grand] {
   display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; justify-content: flex-start !important; gap: 8px !important;
 }
 :root:root body .vrm-app-shell .vrm-main header.vrm-tache-tete.vrm-market-heading:is([data-tache-tete="messages"], [data-titre-ecran-grand]) > h1 { flex: none !important; width: auto !important; white-space: nowrap !important; hyphens: none !important; }
@@ -311,7 +311,7 @@
 :root:root body :is(.vrm-ms-geste, .vrm-ms-plus, .vrm-ms-afaire-liste button):focus-visible,
 :root:root body .vrm-chat-panel .vrm-chat-send.vrm-chat-send:focus-visible,
 :root:root body .vrm-boite .vrm-boite-rubriques.vrm-boite-rubriques > button:focus-visible,
-:root:root body .vrm-main .vrm-msg-list .vrm-inbox-row.vrm-inbox-row:focus-visible { outline: 2px solid var(--d-accent, #0071E3) !important; outline-offset: -2px !important; border-radius: 10px !important; }
+:root:root body .vrm-main .vrm-msg-list .vrm-inbox-row.vrm-inbox-row:focus-visible { outline: 2px solid var(--d-accent, #16181D) !important; outline-offset: -2px !important; border-radius: 10px !important; }
 @media (hover: hover) and (pointer: fine) {
   :root:root body :is(.vrm-ms-geste, .vrm-ms-plus):hover { text-decoration: underline !important; text-underline-offset: 3px !important; }
   :root:root body .vrm-main .vrm-msg-list .vrm-inbox-row.vrm-inbox-row:not(.is-current):hover,
@@ -322,4 +322,8 @@
 :root:root body .vrm-ms-stock-resume .vrm-pop-chips { margin: 0 !important; padding: 0 !important; }
 :root:root body .vrm-ms-stock-resume .vrm-s2d-filtres { flex-wrap: nowrap !important; }
 
+/* (22 nov., bugs-totale) La bulle portait `max-width: 78 %` DANS une colonne (`.vrm-bulle-l`) déjà bornée à 78 % et taillée sur
+   son contenu : 78 % de 78 % d'une largeur ajustée, « Bonjour » passait sur deux lignes (« Bonj / our »). La colonne garde la
+   borne ; la bulle prend toute la colonne. */
+:root:root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle-l > .vrm-bulle.vrm-bulle { max-width: 100% !important; }
 }

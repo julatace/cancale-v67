@@ -1,0 +1,36 @@
+/* ── src/natif/encre-tableaux.css — le design « noir encre », tranche 2 (22 nov. soir, maquettes de Julien) ──────────────
+   Ventes, Annonces (TableauTravail) et la fiche d'une annonce : rangées denses, en-tête du tableau sur un gris très clair,
+   cadre à bord fin, barre de sélection NOIRE avec le plein en blanc, la fiche au prix énorme. Jetons seulement. Aucune
+   fonction ne change : la disposition. */
+@layer vrm-natif {
+  /* Le tableau : une carte à bord fin, l'en-tête sur un gris très clair, des rangées de 60 (vignette 40). */
+  .n-tt-ordi .n-tt-cadre { border: 1px solid var(--n-bord); box-shadow: var(--n-ombre-xs, none); }
+  .n-tt-ordi .n-tt-th { height: 40px; background: var(--n-carte-2); font-weight: 600; }
+  .n-tt-ordi .n-tt-th:first-child { border-top-left-radius: var(--n-r-carte); }
+  .n-tt-ordi .n-tt-th:last-child { border-top-right-radius: var(--n-r-carte); }
+  .n-tt-ordi .n-tt-td { height: 60px; }
+  .n-tt-ordi .n-tt-article .n-vignette { width: 40px; height: 40px; border-radius: 10px; }
+  .n-tt-ordi .n-tt-article-titre { font-weight: 600; }
+  .n-tt-ordi .n-tt-td[data-tt-col="prix"] { font-weight: 700; }
+
+  /* LA BARRE DE SÉLECTION : un bandeau à l'encre (« 4 cochés »), le plein en blanc. */
+  .n-tt-barre-sel { background: var(--n-heros); border-color: transparent; color: var(--n-sur-heros); box-shadow: 0 1px 2px rgb(0 0 0 / .12), 0 12px 32px rgb(0 0 0 / .22); }
+  .n-tt-barre-sel .n-tt-barre-texte { color: var(--n-sur-heros); }
+  .n-tt-barre-sel .n-tt-lien { color: var(--n-sur-heros-2); }
+  .n-tt-barre-sel .n-tt-lien:hover, .n-tt-barre-sel .n-tt-lien:focus-visible { background: rgb(255 255 255 / .10); color: var(--n-sur-heros); }
+  .n-tt-barre-sel .n-tt-bouton { background: rgb(255 255 255 / .08); color: var(--n-sur-heros); border-color: rgb(255 255 255 / .18); }
+  .n-tt-barre-sel .n-tt-bouton:hover { background: rgb(255 255 255 / .14); }
+  .n-tt-barre-sel .n-bouton[data-n-variante="plein"] { background: #FFFFFF; color: var(--n-heros); }
+  .n-tt-barre-sel .n-bouton[data-n-variante="teinte"] { background: rgb(255 255 255 / .12); color: var(--n-sur-heros); }
+  :root[data-theme="dark"] .n-tt-barre-sel { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .10); }
+
+  /* LA FICHE D'UNE ANNONCE : le titre gros, le prix énorme (maquette « 89 € prix mini 75 € »). */
+  .nf[data-nf-ordi] .nf-titre { font: 750 28px/34px var(--n-police); letter-spacing: -.025em; }
+  .nf[data-nf-ordi] .nf-prix-valeur { font: 750 44px/48px var(--n-police); letter-spacing: -.035em; }
+  .nf-prix-valeur { font-weight: 750; }
+  .nf[data-nf-ordi] .nf-photo { border-radius: 20px; }
+}
+
+/* (22 nov. soir) Annonces porte SA recherche : la barre du haut de la coque, sans champ et sans filtre posé dans son emplacement,
+   ne laisse plus une bande vide au-dessus du tableau (hors couche : elle doit l'emporter sur la règle de la coque). */
+.vrm-barre-haut:not(:has(.vrm-barre-recherche)):not(:has(.vrm-barre-haut-ronds)):has(> .vrm-barre-haut-droite:empty) { display: none; }

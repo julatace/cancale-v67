@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VRM — outil du revendeur",
-  "version": "5.393.0",
+  "version": "5.440.0",
   "description": "Relie tes comptes Vinted, Leboncoin, eBay et Vestiaire à VRM : annonces, ventes, colis et bordereaux, depuis ton navigateur.",
   "homepage_url": "https://vrm.center",
   "minimum_chrome_version": "111",
@@ -12,7 +12,9 @@
     "scripting",
     "tabs",
     "downloads",
-    "contextMenus"
+    "contextMenus",
+    "power",
+    "notifications"
   ],
   "host_permissions": [
     "https://*.vinted.fr/*",
@@ -26,6 +28,8 @@
     "https://vrm.center/*",
     "https://*.ebay.fr/*",
     "https://*.ebay.com/*",
+    "https://i.ebayimg.com/*",
+    "https://*.vestiairecollective.com/*",
     "https://www.mondialrelay.be/*",
     "https://www.mondialrelay.fr/*",
     "https://ws.chronopost.fr/*",
@@ -70,6 +74,7 @@
         "https://*.vinted.de/*"
       ],
       "js": [
+        "vrm-ui.js",
         "vrm-mots.js",
         "vinted-capture.js"
       ],
@@ -84,9 +89,12 @@
         "https://*.vinted.de/*"
       ],
       "js": [
+        "vrm-ui.js",
         "vrm-mots.js",
         "vrm-regles-achat.js",
-        "vinted-infos.js"
+        "vinted-infos.js",
+        "vrm-action.js",
+        "vrm-dressing.js"
       ],
       "run_at": "document_idle",
       "all_frames": false
@@ -137,6 +145,18 @@
         "https://*.leboncoin.fr/*"
       ],
       "js": [
+        "lbc-ecrire.js",
+        "vrm-depot-aussi.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://*.leboncoin.fr/*"
+      ],
+      "js": [
+        "vrm-ui.js",
         "vrm-mots.js",
         "lbc.js"
       ],
@@ -148,6 +168,7 @@
         "https://*.ebay.fr/*"
       ],
       "js": [
+        "vrm-ui.js",
         "ebay.js"
       ],
       "run_at": "document_idle",
@@ -179,8 +200,11 @@
         "https://*.vestiairecollective.com/*"
       ],
       "js": [
+        "vrm-ui.js",
         "vrm-mots.js",
-        "vc-depot.js"
+        "vc-depot.js",
+        "vc-ecrire.js",
+        "vrm-depot-aussi.js"
       ],
       "run_at": "document_idle",
       "all_frames": false
@@ -210,7 +234,9 @@
         "https://*.vestiairecollective.com/*"
       ],
       "js": [
+        "vrm-ui.js",
         "vrm-mots.js",
+        "vrm-depot.js",
         "vrm-badge.js"
       ],
       "run_at": "document_idle",

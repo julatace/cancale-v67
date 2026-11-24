@@ -9,7 +9,8 @@
 //  lignes vides, n° en double — et exige le MÊME résultat, dans le MÊME ordre, qu'avec la liste entière.
 //  Il vérifie aussi qu'App.jsx passe bien par l'index aux endroits prévus.
 //  --prouve : mutations (fenêtre trop étroite, spéciales oubliées, ordre de la liste perdu, version
-//  ignorée) ⇒ chacune doit faire rougir le contrôle.
+//  ignorée ; 24 nov. : la vraie `aExpedier` / `noterEtatsTxn` / `venteSortieDuStock` qui oublient la
+//  version) ⇒ chacune doit faire rougir le contrôle.
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path');
 const fs = require('fs');
@@ -81,11 +82,58 @@ function base(n, graine) {
     }
     if (prouve) { const rouge = ko > avant; ko = avant; dit(rouge, `mutation « ${nom} » ⇒ rouge`); }
   }
-  // App.jsx passe par l'index (un retour en arrière ne passerait pas inaperçu).
-  const app = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+  // App.jsx passe par l'index (un retour en arrière ne passerait pas inaperçu). (24 nov.) Le moteur vit dans
+  // src/ecrans/Comptabilite.jsx depuis le découpage : le texte de l'app RECOLLÉ (`_source-app.cjs`) est lu.
+  const { sourceApp } = require('./_source-app.cjs');
+  const app = sourceApp(R);
   dit((app.match(/recentesOuSansDate\(sales\.items, /g) || []).length === 2, 'App.jsx : « Envoyés » et les cartes « Partis » lisent la fenêtre par l\'index');
-  dit(/filtreParVersion\(sales\.items \|\| \[\], 'aExpedier', aExpedier, TXN_ETATS\.ver \|\| 0\)/.test(app), 'App.jsx : les ventes à expédier gardées par version de TXN_ETATS');
+  dit(/filtreParVersion\(sales\.items \|\| \[\], 'aExpedier', aExpedier, TXN_ETATS\.ver \|\| 0\)/.test(app), 'App.jsx : les ventes à expédier gardées par la version de TXN_ETATS');
   dit(/parTransaction\(sales\.items\)/.test(app), 'App.jsx : la preuve de départ lue par n° de transaction');
+
+  // (24 nov.) LA VRAIE RÈGLE, EXÉCUTÉE : `aExpedier` et `venteSortieDuStock` gardent leur réponse par vente tant que la
+  // version (`TXN_ETATS.ver`) ne bouge pas. Après la fusion avec main (18 nov., src/versionDonnees.js), `noterEtatsTxn`
+  // (réécrite par main) ne montait plus `TXN_ETATS.ver`, seulement `toucherMemoire()` : une vente jugée « à expédier » le restait après qu'une lecture des
+  // transactions l'a dite finalisée / annulée (colis fantôme dans « À envoyer »). Ici : une vente jugée, PUIS son état
+  // lu (450 finalisée), PUIS rejugée ⇒ la réponse doit changer.
+  {
+    const vm = require('vm');
+    const extraire = (nom) => {
+      const m = new RegExp('^(?:const|let) ' + nom + '\\b.*$', 'm').exec(app);
+      if (!m) throw new Error(nom + ' introuvable');
+      const lignes = app.slice(m.index).split('\n'); let bal = 0, out = [];
+      for (const l of lignes) { out.push(l); for (const c of l.replace(/\/\/.*$/, '')) { if ('({['.includes(c)) bal++; else if (')}]'.includes(c)) bal--; } if (bal <= 0 && /;\s*(\/\/.*)?$/.test(l)) break; }
+      return out.join('\n');
+    };
+    const NOMS = ['TXN_ETATS', 'isAwaitingShipStatus', 'PAS_UN_ENVOI', 'tusDe', 'needsBordereau', 'etatTxn', 'txnBloqueEnvoi', 'COLIS_DEJA_BOUGE', 'noterEtatsTxn', 'aExpedier', 'classifyOrderStatus', 'venteQuiRevient', 'COLIS_PARTI_VINTED', 'venteSortieDuStock'];
+    const vd = await import('file://' + path.join(R, 'src', 'versionDonnees.js'));
+    const essaisR = prouve ? [
+      ['aExpedier ignore la version', (t) => t.replace(/(const aExpedier = [\s\S]*?const ver = )TXN_ETATS\.ver \|\| 0;/, '$10;')],
+      ['noterEtatsTxn ne monte plus la version', (t) => t.replace('TXN_ETATS.ver = (TXN_ETATS.ver || 0) + 1;', '')],
+      ['venteSortieDuStock ignore la version', (t) => t.replace(/(const venteSortieDuStock = [\s\S]*?const ver = )TXN_ETATS\.ver \|\| 0;/, '$10;')],
+    ] : [['code tel quel', (t) => t]];
+    for (const [nom, muter] of essaisR) {
+      const avant = ko;
+      let code;
+      try { code = muter(NOMS.map(extraire).join('\n')); } catch (e) { dit(false, `[${nom}] la règle se lit dans l'app — ${e.message}`); continue; }
+      const ctx = { versionMemoire: vd.versionMemoire, toucherMemoire: vd.toucherMemoire, String, Number, isFinite, WeakMap, Map, console };
+      vm.createContext(ctx);
+      vm.runInContext(code + '\n;globalThis.__r = { TXN_ETATS, noterEtatsTxn, aExpedier, venteSortieDuStock };', ctx);
+      const { noterEtatsTxn, aExpedier, venteSortieDuStock } = ctx.__r;
+      const v = { transaction_id: 990001, status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action' };
+      const a1 = aExpedier(v);
+      noterEtatsTxn([{ tx: '990001', s: 450, ss: 'Commande finalisée' }]);
+      const a2 = aExpedier(v);
+      dit(a1 === true && a2 === false, `[${nom}] aExpedier : « à expédier » (${a1}), puis la transaction lue finalisée ⇒ plus à expédier (${a2})`);
+      // `venteSortieDuStock` lit `aExpedier` : « remis » avec une action demandée est encore « à expédier » (pas sorti) ;
+      // la transaction lue finalisée, ce n'est plus à expédier et « remis » dit le colis parti ⇒ sorti du stock.
+      const w = { transaction_id: 990003, status: 'Colis remis au point relais', transaction_user_status: 'needs_action' };
+      const w1 = venteSortieDuStock(w);
+      noterEtatsTxn([{ tx: '990003', s: 450, ss: 'Commande finalisée' }]);
+      const w2 = venteSortieDuStock(w);
+      dit(w1 === false && w2 === true, `[${nom}] venteSortieDuStock : à expédier ⇒ reste (${w1}) ; transaction lue finalisée ⇒ sortie (${w2})`);
+      if (prouve) { const rouge = ko > avant; ko = avant; dit(rouge, `mutation « ${nom} » ⇒ rouge`); }
+    }
+  }
   console.log(ko ? `\n❌ ${ko} rouge(s)` : '\n✅ index des ventes : mêmes lignes, même ordre');
   process.exit(ko ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

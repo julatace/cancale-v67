@@ -386,7 +386,10 @@ export function lignePartout(paire, ctx = {}) {
         for (const d of corr.demandes) corrDemandes.push('corr:' + d.champ);
         // Une catégorie que la voie ne retrouve pas seule (réponse, mémoire, ou table hors de sa règle) : à choisir là-bas.
         const aFaire = [];
-        if (!corr.posee) for (const k of ['univers', 'categorie', 'sous']) if (corr.valeurs[k]) aFaire.push(`${k === 'sous' ? 'Sous-catégorie' : NOM_C[k]} « ${corr.valeurs[k]} »`);
+        // (16 nov., lot plateformes-restes) Une extension qui REÇOIT la catégorie (`vccategorie`, 5.399) pose un
+        // choix entier (univers + catégorie + sous-catégorie) s'il existe tel quel sur Vestiaire : plus « à finir ».
+        const portee = !!ctx.vcCategorie && !corr.demandes.length && !!(corr.valeurs.univers && corr.valeurs.categorie && corr.valeurs.sous);
+        if (!corr.posee && !portee) for (const k of ['univers', 'categorie', 'sous']) if (corr.valeurs[k]) aFaire.push(`${k === 'sous' ? 'Sous-catégorie' : NOM_C[k]} « ${corr.valeurs[k]} »`);
         for (const d of corr.demandes) aFaire.push(d.champ === 'sous' ? 'Sous-catégorie' : (NOM_C[d.champ] || d.champ));
         finir = [...new Set([...finir.filter((x) => !/^(Catégorie|Univers)$/.test(x)), ...aFaire])];
       }
@@ -480,7 +483,8 @@ export async function executerPartout({ plan, envoyer = {}, attendre, surEtat, d
       continue;
     }
     if (str(r.etape) === 'fait') { dire(e.cle, { etat: 'publie' }); continue; }
-    const finir = arr(e.finir);
+    // (16 nov.) + ce que l'extension rend à finir (Vestiaire : la catégorie choisie introuvable telle quelle).
+    const finir = [...new Set([...arr(e.finir), ...arr(r.finir)])];
     if (e.site === 'vestiaire' && finir.length) {
       dire(e.cle, { etat: 'a-finir', raison: 'à finir sur Vestiaire : ' + finir.join(', '), finir });
       arrete[e.site] = 'pas envoyé : le dépôt précédent est à finir sur Vestiaire';

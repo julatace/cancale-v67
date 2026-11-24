@@ -234,7 +234,8 @@ async function banc(R, { silencieux = false } = {}) {
       dit(boutons(g.html) === 0, 'gabarit : un bouton sans URL sûre ne se dessine pas');
       const vide = G.gabaritMail({ titre: 't', paras: ['p'], bouton: { mot: 'Ouvrir', url: 'https://vrm.center' }, pied: { texte: 'x' } , editeur: { nom: null, adresse: null } });
       const plein = G.gabaritMail({ titre: 't', paras: ['p'], bouton: { mot: 'Ouvrir', url: 'https://vrm.center' }, pied: { texte: 'x' }, editeur: { nom: 'Éditeur inventé', forme: 'EI', adresse: '1 rue inventée' } });
-      dit(((vide.html.split(PIED)[1] || '').match(/<p class="vv-pied"/g) || []).length === 2 && vide.texte.split('—\n')[1].split('\n').length === 1 && !/Éditeur inventé/.test(vide.html) && /Éditeur inventé · EI/.test(plein.html) && /1 rue inventée/.test(plein.texte), 'gabarit : l’identité de l’éditeur au pied seulement si elle est remplie (rien d’inventé)');
+      // (17 nov.) + la signature « Envoyé par VRM… · vrm.center » (qui envoie) : 3 paragraphes, 2 lignes de texte.
+      dit(((vide.html.split(PIED)[1] || '').match(/<p class="vv-pied"/g) || []).length === 3 && vide.texte.split('—\n')[1].split('\n').length === 2 && /Envoyé par VRM/.test(vide.texte) && !/Éditeur inventé/.test(vide.html) && /Éditeur inventé · EI/.test(plein.html) && /1 rue inventée/.test(plein.texte), 'gabarit : l’identité de l’éditeur au pied seulement si elle est remplie (rien d’inventé)');
       dit(/Le bouton ne marche pas \?/.test(plein.html.split(PIED)[1] || '') && /https:\/\/vrm\.center/.test(plein.texte), 'gabarit : le lien en clair de secours, au pied (et dans le texte brut)');
       dit(/data-vv="plein"[^>]*bgcolor="#0C1D30"/.test(plein.html) && /line-height:48px/.test(plein.html) && !/#(7c3aed|8b5cf6|a855f7|6d28d9)/i.test(plein.html), 'gabarit : UN plein d’encre de 48 px (Verre dépoli), aucun violet');
     });

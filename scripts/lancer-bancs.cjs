@@ -28,8 +28,10 @@ const RACINE = path.join(__dirname, '..');
 const LOT = ['nouveau-vendeur', 'navigation-tache', 'ventes-e2', 'colis-retirer-propre', 'statut-colis',
   'annonces-actions', 'journee-coherence', 'iphone-reprise', 'argent-mois', 'garde-ecrans', 'morceau-perime',
   'chiffres-coherents', 'retraits-suivi', 'budget-vitesse', 'accessibilite', 'accessibilite-clavier',
-  'barre-achats',    // (16 nov.) la barre du bas : Achats dedans, aucun glisser entre onglets
-  'volume-budget'];
+  'barre-achats',   // (16 nov.) la barre du bas : Achats dedans, aucun glisser entre onglets
+  'design-v2-chargement',   // (17 nov.) nouveau design : chargement immobile (CLS ≤ 0,02) et l'AIR (marges, rangées, sections)
+  'barre-onglets',   // (17 nov.) les cinq styles de la barre d'onglets : onglet allumé, cibles, coupes, place gardée, contraste, réglage
+  'volume-budget'];   // (16 nov., vitesse-volume) 20 000 ventes, 2 s après les données
 const noms = process.argv.slice(2).length ? process.argv.slice(2) : LOT;
 const BASE = Number(process.env.BANCS_PORT_BASE) || 10000;
 const TIMEOUT_MS = (Number(process.env.BANCS_TIMEOUT_S) || 1200) * 1000;

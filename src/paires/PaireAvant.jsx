@@ -18,6 +18,12 @@
 //     et marque la rangée dont la fiche est ouverte (`data-sb-choisie`, ordinateur).
 // Aucune identité n'est décidée ici : la clé est celle que la liste a posée sur la rangée
 // (`data-sb-avant-cle`), et la fiche s'ouvre par la ligne elle-même (`lireLigne`, src/ficheLigne.js).
+// ⚠️⚠️ (19 nov. 2026, « fiche directe » — décision de Julien, docs/passation/2026-11-19-fiche-directe.md) « Je dois cliquer
+// sur la paire puis cliquer sur les points pour avoir des informations. Ce n'est pas normal. » La rangée NE MONTE PLUS :
+// au téléphone, UN toucher ouvre directement LA fiche (`clicAvant` ⇒ `ouvrirFicheDe`), qui montre d'un coup les chiffres
+// que portait la carte (prix, acheté, jours en ligne, favoris, place) et ses gestes (Baisser le prix, Republier, Voir sur
+// le site). Ne pas rétablir l'étape intermédiaire. L'hôte reste pour désigner, à l'ordinateur, la rangée dont la fiche
+// est ouverte (`data-sb-choisie`) ; le magasin `ouvrirAvant` n'est plus appelé par un toucher.
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { abonner as abonnerFiche, ligneOuverte, ouvrirLigne, lireLigne, toucheLeCorps } from '../ficheLigne.js';
@@ -43,11 +49,13 @@ export function clicAvant(e) {
   if (t.closest('[data-sb-avant-corps]')) return;   // la partie ouverte garde ses gestes
   if (!estTelephone()) return;                       // ordinateur : la fiche s'ouvre en plan à droite
   const cle = row.getAttribute('data-sb-avant-cle');
-  const ouverte = _cle === cle;
-  // Fermée, la rangée entière est le geste (aucun bouton dedans) ; ouverte, ses contrôles (N°, photo) gardent le leur.
-  if (ouverte && row.hasAttribute('data-fiche-ligne') && !toucheLeCorps(t, row)) return;
-  e.preventDefault();   // HoteFicheLigne ne l'ouvre pas en fiche : elle monte ici
-  if (ouverte) fermerAvant(); else ouvrirAvant(cle);
+  // (19 nov., fiche directe) La rangée entière est le geste : UN toucher ouvre LA fiche de la paire (par la ligne
+  // elle-même : son identité). `preventDefault` : la photo d'une rangée est un lien vers le site — au téléphone, la
+  // toucher ouvre la fiche (le lien est dans la fiche, rangée du site), et HoteFicheLigne ne l'ouvre pas une 2e fois.
+  if (!row.hasAttribute('data-fiche-ligne')) return;
+  e.preventDefault();
+  if (_cle != null) fermerAvant();
+  ouvrirFicheDe(cle);
 }
 
 // « ⋯ » : LA fiche de la paire, par la ligne elle-même (son identité, jamais son titre).
@@ -96,7 +104,11 @@ export function PaireAvantHote({ rendre }) {
   // Changer d'écran ferme la carte (la clé ne survit pas à la liste).
   React.useEffect(() => () => fermerAvant(), []);
   if (!cle || !place) return null;
+  // (16 nov.) Un hôte qui ne connaît pas cette rangée (Leboncoin, eBay, Vestiaire, Stock ont le leur) ne pose rien :
+  // jamais une seconde carte, ni un corps vide, dans la place d'une rangée qui n'est pas la sienne.
+  const contenu = rendre(cle, fermerAvant);
+  if (contenu == null) return null;
   return createPortal(<div className="sb-avant-corps" data-sb-avant-corps={cle}>
-    {rendre(cle, fermerAvant)}
+    {contenu}
   </div>, place);
 }

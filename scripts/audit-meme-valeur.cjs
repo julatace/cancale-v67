@@ -72,7 +72,7 @@ const DIFFERENTS = () => [
     dit(M.gardeSiMeme(g1, g2) === g1 && M.gardeSiMeme(g1, g3) === g3, `[${nom}] 20 000 liens : identiques gardés, un seul changé ⇒ la neuve`);
     if (prouve) { const rouge = ko > avant; ko = avant; dit(rouge, `mutation « ${nom} » ⇒ rouge`); }
   }
-  const app = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+  const app = require('./_source-app.cjs').sourceApp(R);   // (24 nov.) le moteur vit dans src/ecrans/Comptabilite.jsx : le texte de l'app RECOLLÉ
   dit(/onCleRelue\(k, \(\) => \{ try \{ const n = initRef\.current\(\); setV\(\(avant\) => gardeSiMeme\(avant, n\)\);/.test(app), 'App.jsx : `useStateCle` garde la valeur relue à l\'identique');
   dit(/setTxnItem\(\(avant\) => gardeSiMeme\(avant, m\)\)/.test(app), 'App.jsx : le n° de transaction ⇒ annonce relu à l\'identique garde sa valeur');
   dit(!/setGeo\(prev =>/.test(app) && !/const \[geo, setGeo\] = useState\(\(\) => load\('vrm_geo_cache_v2'/.test(app), 'App.jsx : le cache de géocodage n\'est plus un état du moteur (aucun rendu ne le lisait)');

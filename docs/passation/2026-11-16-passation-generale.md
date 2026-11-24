@@ -53,75 +53,38 @@ refontes de design du 14 au 16 nov. (Studio bleu, Inter, Verre dépoli, écrans 
 
 ---
 
-## 2. PRÊT mais PAS ENCORE EN LIGNE — PR ouvertes, dans la file de fusion
+## 2. PRÊT mais PAS ENCORE EN LIGNE — état de la file (mis à jour par le train, 17 nov.)
 
-Le « train de mise en ligne » (un agent) les fusionnait une par une. **Ordre de priorité décidé :**
+**Toute la file a été fusionnée sur `main`** (une par une, chaque fois : vrai `git merge origin/main`, CI comparée à `main`
+job par job / audit par audit / banc par banc, aucun rouge nouveau ; statut Vercel `success` vérifié) :
 
-1. **#1199** `claude/relier-fiable` — liaison achat ↔ vente fiable : seulement « très probable »
-   (taille + couleur + modèle, couleur lue sur l'annonce, le titre ou la photo sur l'appareil, sans IA),
-   exclusive (un achat ⇄ un article) ; mesuré sur sa base : 986 → 9 propositions affichées, 161 → 0
-   ventes proposées sous plusieurs achats, 4 → 0 fausses ; fiche → Argent : « Délier » et « Reçu » ;
-   Annonces : puce « Relier un achat ». À relancer avant fusion : bancs achats-liaison et ventes-verre.
-2. **#1204** `claude/bancs-rouges-a` — compteur « 2 changements » faux à l'ouverture d'Achats ;
-   prix d'achat impossible à saisir dans la fiche D (le « ? » ouvre la saisie) ; lien `?tab=trancher` ;
-   titre de panneau Paramètres doublé ; politique de confidentialité (Base Adresse Nationale).
-   **ARBITRAGE** : elle remet « Retirer de la case » dans la feuille ⋯ de la fiche — **NE PAS le garder**
-   (décision de Julien : la case s'allume dans le Stock, pas de bouton) ; « Déplacer » peut rester.
-3. **#1203** `claude/bancs-rouges-b` — titres de colis plus coupés par « … » ; Achats « au moins 0 € » →
-   « — » ; focus qui revient sur la ligne touchée ; noms accessibles ; e2e-extension et WebKit iphone-reprise R verts.
-4. **#1197** `claude/retirer-case-compact` — Stock : la case d'une paire vendue encore rangée est en
-   surbrillance (toucher = sortir, annulable) ; **sortie automatique du Stock quand l'expédition est
-   prouvée** (`src/stockSortie.js`, `partieDuStock`) ; plus aucun bloc « Vendues à sortir » / « Retirer
-   de la case » / « Je l'ai sortie ». **La carte « La paire à sortir » de Ma journée est SUPPRIMÉE**
-   (décision finale de Julien à 15 h 40 : « tu ne l'as pas enlevée »).
-5. **#1193** `claude/personnalisation-simple` — « Modifier ma journée » simple (3 groupes, interrupteur,
-   ↑↓ et glisser, enregistré tout de suite, 281 → 106 mots). Au merge : retirer la carte « paire à sortir »
-   de l'éditeur (cf. #1197) et ignorer sans erreur les préférences qui la contiennent.
-6. **#1202** `claude/ventes-clair` — Ventes plus clair : 1re vente à 640 px au lieu de 982 ; bande du mois
-   lisible ; plus de compteurs répétés ; « N choses à regarder » repliable ; vente sur 3 lignes ; **plus de
-   « ⋯ » : toucher la vente ouvre sa fiche** ; puce « Prix d'achat ? » seulement si manque ; « Imprimer »
-   et « Déposé » en ronds compacts ; corrigé le 16 au soir pour l'ordinateur (lignes ≤ 96 px, ff539538c).
-7. **#1206** `claude/favoris-offres-irreprochable` (extension **5.398.0**) — revue anti-blocage :
-   arrêt anti-robot dans `requeteVinted` pour toutes les voies ; « Tout arrêter » coupe un message en
-   cours ; offre auto relue juste avant le geste ; annonce réservée/masquée/vendue ⇒ rien ; favori refusé
-   jamais repris ; pause jamais pile une minute ; jamais deux fois le même texte (salutation variée).
-   Règles de Julien inchangées (50/h, 3–20 min, rythme « comme Vintex », pas de plafond 10/60 min).
-8. **#1187** `claude/ebay-a-traiter` — « Compte eBay mal désigné » (vrai défaut : `compte:'principal'`
-   refusé + action `agent` supprimée) → action `taches` ; « Réponse eBay illisible pour les retours »
-   (réponse vide = aucun retour) ; bouton « Reconnecter mon compte eBay ».
-9. **#1184** `claude/ecrans-restes` — stock importé visible ; date limite d'envoi dans la fiche et la loupe ;
-   N° de tous les articles d'un lot tamponnés ; MFA « plus tard » synchronisé ; iPad/900 px ; code mort retiré.
-10. **#1195** `claude/vitesse-lectures` — lectures en double (Messages, Ma journée) ; accueil 37,7 → 25,8 Ko ;
-    veille temps réel étendue à Messages Vinted, Leboncoin, Vestiaire, e-mails.
-11. **#1194** `claude/impression-retours` — bordereaux de RETOUR imprimés avec les ventes, cartouche
-    « RETOUR · Achat renvoyé · pas une vente », jamais comptés dans « à envoyer » (demande de Julien :
-    « bien préciser que c'est un retour et pas une vente »).
-12. **#1185** `claude/compta-donnees` — notification URSSAF → « Déclarer » ; comparer-et-échanger sur
-    les réglages ; file par clé ; dates à l'heure de Paris ; facture « Envoyer avec VRM » ; partenaires :
-    commission proportionnelle au remboursement partiel (**migration 043 modifiée : à recoller en entier**).
-13. **#1182** `claude/transporteurs-suivi` — suivi Mondial Relay des colis VENDUS (sans clé) ; **suivi
-    Colissimo/UPS par clé RETIRÉ entièrement** (décision de Julien : « on laisse tomber, on garde le suivi
-    de Vinted ») ; variables Vercel `LAPOSTE_OKAPI_KEY`, `UPS_CLIENT_*` plus lues.
-14. **#1188** `claude/plateformes-restes` (extension 5.397 → **passera 5.399**) — « Vendu ! » notifié pour
-    Leboncoin, eBay, Vestiaire (une fois, jamais l'historique) ; douchette eBay/Leboncoin ; facture eBay
-    multi-lignes ; catégorie Vestiaire envoyée ; règle unique « finalisé / CA » Vestiaire.
-15. **#1190** `claude/extension-restes` (extension 5.395 → **passera 5.400**) — « Mondial Relay by InPost » ;
-    photos eBay pour « même photo » ; anti-arnaque dans « Tous » ; avis bas dans la santé des comptes ;
-    notification « republication programmée pas partie » ; « Publier cette fiche » réserve le N° ;
-    photos du studio dans « Créer sur Vinted » ; « N acceptées par VRM ».
-16. **#1205** `claude/design-restes` — toucher une rangée Leboncoin/eBay/Vestiaire/Stock monte la paire
-    en place ; contrastes ; meuble glissé au doigt.
-17. **#1200** `claude/vitesse-volume` — accélérations (même chiffres) ; décision : poser `budget-volume.json`
-    au niveau actuel (garde anti-régression), l'objectif 2 s reste écrit comme cible, pas bloquant.
-18. **#1210** `claude/regles-achat-recopie` — recopie `vrm-regles-achat.js` : à faire partir **dans la
-    dernière version d'extension fusionnée** (5.400).
+| PR | branche | commit de fusion | note |
+|---|---|---|---|
+| #1192 | ventes-selection | c2ce5a69 | banc ventes-selection : reprise « À envoyer » posée aussi dans le nuage du banc (96/96, clair et sombre) |
+| #1201 | barre-achats | 8d8196d3 | banc barre-achats 85/85 en local (jamais fini en CI : Bancs 2 coupé à 45 min) |
+| #1199 | relier-fiable | ec97a8bf | liaisonAchat : préparation par achat (stabilite-iphone) + couleur titre/photo relue à chaque appel |
+| #1204 | bancs-rouges-a | dc0e2c56 | fiche D : porte de saisie du prix + Reçu/Délier ; pas de « Retirer de la case » dans la fiche |
+| #1203 | bancs-rouges-b | 2fb27f67 | |
+| #1197 | retirer-case-compact | 7aa01c1e | défaut réel trouvé au train (relecture du Stock qui écrasait les cases, 390 px) corrigé avant fusion |
+| #1193 | personnalisation-simple | bbefcd18 | « La paire à sortir » SUPPRIMÉE (catalogue, Ma journée ; réglage ancien ignoré) |
+| #1202 | ventes-clair | e1df61a7 | H ≤ 96 px à l'ordinateur et L (plaque N°) corrigés par le lot avant fusion |
+| #1206 | favoris-offres-irreprochable | 0da4fd2b | extension **5.398.0** |
+| #1187 | ebay-a-traiter | 1d076458 | |
+| #1184 | ecrans-restes | bfc7b247 | requête Messages 744–999 px recopiée de la règle de coque ; test lot-preparation-reprise |
+| #1195 | vitesse-lectures | f64caa26 | |
+| #1194 | impression-retours | 883177c2 | audits portés sur la règle des retours (signature ventes + retours, pas de tampon de N° sur un retour) |
+| #1182 | transporteurs-suivi | dd73a254 | texte affiché neutre (audit-vendeur-neutre) |
+| #1188 | plateformes-restes | 9dafad76 | extension **5.399.0** (5.397 sur la branche) ; finalisé Vestiaire « au moins » |
+| #1185 | compta-donnees | 91c330c2 | import en double (build) et test isolation-comptes (fabrique modifierCle) corrigés |
+| #1190 | extension-restes | 188929c7 | extension **5.400.0** (5.395 sur la branche) + recopie des règles d'achat de #1210 ; Orion garde le manifeste de référence |
+| #1205 | design-restes | (cette PR) | dernière de la file |
 
-**Versions d'extension** : servie ≥ 5.385 ; réservées 5.394 (traduction-restes, en pause), 5.396
-(extension-robuste, en pause), 5.398 (#1206), 5.399/5.400 (train), 5.401 (photo-identite, en pause).
-Fichier de réservation : voir l'ancien scratchpad ; règle : une version au-dessus de toute version servie
-et réservée ; zip régénéré en UN dossier ; `EXT_CAPACITES` à la version réelle de fusion.
-
----
+Non fusionnées : **#1200** (vitesse-volume) — FERMÉE par un autre agent (« ne pas fusionner en l'état ») ; **#1210** — son contenu
+est entré dans #1190 (à fermer). Rouges encore sur `main` (déjà là, sans lien avec la file) : audits notifs-redaction,
+vendeur-generaliste, vocabulaire-article ; bancs accessibilite-clavier, annonces-actions, chiffres-coherents, colis-retirer-propre,
+iphone-reprise, retraits-suivi, nouveau-vendeur ; Bancs 2 toujours coupé à 45 min ; banc ecrans-restes C3 (Paramètres :
+la ligne « Pas encore synchronisé » reste « en cours » 90 s quand la base refuse d'écrire).
+Geste de Julien : installer l'extension **5.400.0** (remplacer le dossier, ⟳ dans chaque Chrome ; Orion : VRM-Orion-dossier.zip).
 
 ## 3. COMMENCÉ puis MIS EN PAUSE (limite d'usage) — à reprendre sur la branche
 
