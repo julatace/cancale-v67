@@ -57,6 +57,12 @@ self.addEventListener('message', event => {
     })().catch(() => {}));
     return;
   }
+  // (24 nov., morceaux-perimes) Une page dit la version qu'elle fait tourner et ses fichiers
+  // (src/reserveMorceaux.js) : le ménage (`purgerAncienneVersion`) ne les retire pas tant qu'elle est ouverte.
+  if (event.data && event.data.type === 'VRM_GARDER_VERSION' && event.source && event.source.id) {
+    event.waitUntil(noterPage(event.source.id, event.data.version, event.data.fichiers).catch(() => {}));
+    return;
+  }
   if (event.data && event.data.type === 'STORE_PDF') {
     pdfStore[event.data.id] = event.data.base64;
     if (event.ports[0]) event.ports[0].postMessage({ ok: true });
@@ -80,12 +86,47 @@ async function purgerAncienneVersion(res) {
   const cache = await caches.open(CACHE);
   const avant = await cache.match(REPERE);
   if (avant && (await avant.text()) === principal) return;
-  const garder = new Set([...noms, ...(await nomsGardesHorsLigne(cache))]);
+  const garder = new Set([...noms, ...(await nomsGardesHorsLigne(cache)), ...(await nomsDesPagesOuvertes(cache))]);
   for (const r of await cache.keys()) {
     const p = new URL(r.url).pathname;
     if (p.startsWith('/assets/') && !garder.has(p)) await cache.delete(r);
   }
   await cache.put(REPERE, new Response(principal));
+}
+
+// ── (24 nov., morceaux-perimes) LES FICHIERS D'UNE PAGE ENCORE OUVERTE ─────────────
+// Une page restée sur une ancienne version (l'iPhone : des heures en arrière-plan ; un 2e onglet) demande
+// plus tard un écran jamais ouvert : son fichier n'existe plus sur le serveur (Vercel ne sert que la mise
+// en ligne courante — mesuré : 404). Le ménage ci-dessus ne garde plus seulement la nouvelle version : il
+// garde aussi les fichiers de chaque page OUVERTE (dite par elle, `VRM_GARDER_VERSION`), tant qu'elle
+// l'est. Une page fermée ⇒ sa ligne part au ménage suivant, ses fichiers avec. Au plus 8 pages notées.
+const CLE_PAGES = '/__vrm_pages';
+const RE_FICHIER_PAGE = /^\/assets\/[A-Za-z0-9._-]+\.(?:js|css|woff2)$/;
+async function lirePages(cache) {
+  try { const r = await cache.match(CLE_PAGES); const j = r ? await r.json() : null; return j && typeof j === 'object' && !Array.isArray(j) ? j : {}; } catch (_) { return {}; }
+}
+async function noterPage(id, version, fichiers) {
+  if (typeof id !== 'string' || !id || typeof version !== 'string' || !Array.isArray(fichiers)) return;
+  const cache = await caches.open(CACHE);
+  const pages = await lirePages(cache);
+  pages[id] = { v: version.slice(0, 80), f: fichiers.filter((n) => typeof n === 'string' && RE_FICHIER_PAGE.test(n)).slice(0, 600), at: Date.now() };
+  const ids = Object.keys(pages).sort((a, b) => pages[b].at - pages[a].at).slice(0, 8);
+  const garde = {}; for (const k of ids) garde[k] = pages[k];
+  await cache.put(CLE_PAGES, new Response(JSON.stringify(garde), { headers: { 'content-type': 'application/json' } }));
+}
+// Les fichiers des pages encore ouvertes ; les pages fermées sont oubliées au passage.
+async function nomsDesPagesOuvertes(cache) {
+  try {
+    const pages = await lirePages(cache);
+    const ouvertes = new Set((await self.clients.matchAll({ type: 'window', includeUncontrolled: true })).map((c) => c.id));
+    const garde = {}, noms = [];
+    for (const [id, p] of Object.entries(pages)) {
+      if (!ouvertes.has(id) || !p || !Array.isArray(p.f)) continue;
+      garde[id] = p; noms.push(...p.f);
+    }
+    await cache.put(CLE_PAGES, new Response(JSON.stringify(garde), { headers: { 'content-type': 'application/json' } }));
+    return noms;
+  } catch (_) { return []; }
 }
 
 // ── La coquille de l'app (11 nov., lot app-installable) ──────────────────────
