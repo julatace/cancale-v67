@@ -62,13 +62,3 @@ span.vrm-bc-case { width: 44px; height: 22px; }
   .vrm-rf-texte { flex: 1 1 calc(100% - 50px); }
   .vrm-rf-geste { flex: 1 1 100%; margin-left: 50px; }
 }
-
-/* (24 nov., livrable) La ligne ENTIÈRE est le geste Vinted (src/RelanceFavorisCarte.jsx) : plus un bouton
-   « Écrire aux favoris dans l'extension » répété sous chaque ligne ; un chevron, la phrase dite une fois au pied. */
-.vrm-rf-ligne.is-geste { padding: 0; }
-.vrm-rf-ligne-bouton { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; min-height: 56px; margin: 0; padding: 6px 8px 6px 0;
-  border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; border-radius: 10px; }
-.vrm-rf-ligne-bouton:active { background: var(--n-appui, rgb(60 60 67 / .06)); }
-.vrm-rf-ligne-bouton:focus-visible { outline: 2px solid var(--sb-diode, #16181D); outline-offset: 2px; }
-.vrm-rf-chevron { flex: none; color: var(--n-encre-3, #8E8E93); }
-.vrm-rf-note .n-bouton-raison { display: inline; }
