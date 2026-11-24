@@ -74,7 +74,7 @@ async function contexte(nav) {
   await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
   await ctx.route(/^https:\/\/images\d*\.vinted\.net\//i, async (r) => { await attendre(RTT); return r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PHOTO }).catch(() => {}); });
   await ctx.route('**/rest/v1/**', async (route) => { const rq = route.request();
-    if (process.env.LECTURES && LECTURES_EN_COURS) LECTURES_EN_COURS.push([Date.now(), rq.method(), decodeURIComponent(rq.url().replace(/^.*\/rest\/v1\//, '')).slice(0, 140)]);
+    if (process.env.LECTURES && LECTURES_EN_COURS) LECTURES_EN_COURS.push([Date.now(), rq.method(), decodeURIComponent(rq.url().replace(/^.*\/rest\/v1\//, '')).slice(0, +process.env.LECTURES > 1 ? +process.env.LECTURES : 140) + (rq.headers().range ? ' [' + rq.headers().range + ']' : '')]);
     if (rq.method() !== 'GET') { await attendre(RTT); return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' }).catch(() => {}); }
     const h = await rq.allHeaders(); const rep = repondre(rq.url(), h.range, base); const body = JSON.stringify(rep.body);
     await attendre(RTT + Math.round(body.length / DEBIT * 1000)); return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { ...(rep.headers || {}) }, body }).catch(() => {}); });

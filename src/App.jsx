@@ -29732,11 +29732,41 @@ const beneficeDuMoisPub = ({ pub, compta, ligneUrssaf, regime }, ym, jusqua = nu
 //     sur celles-là, et la couverture est écrite À CÔTÉ (§5).
 // Une vente annulée, remboursée ou revenue ne compte pas ; un compte exclu non
 // plus (`compteEcarte`, comme le CA). Lecture ratée ⇒ « pas pu lire », jamais 0.
-let _repartCache = null;      // { at, txn: {tx: {cc}} | null, items: {id: {...}} | null, dates: {} | null }
+// (24 nov., vitesse-lectures-toucher) UNE LECTURE À LA FOIS, GARDÉE 10 MIN (src/memoCourt.js). Mesuré à la 1re visite
+// d'Annonces (banc vitesse-iphone, LECTURES=1) : la liste des transactions projetée partait TROIS fois (+2,0 · +3,6 · +4,5 s) —
+// chaque lecteur arrivait avant que la précédente ait rempli le cache (une lecture ~1 200 lignes décompressées, plusieurs
+// secondes au téléphone). Maintenant : une lecture EN COURS est rejointe ; finie et COMPLÈTE, elle sert 10 min au même vendeur ;
+// oubliée à toute écriture qui peut toucher ses lignes et à tout signal de l'extension (la ligne a changé de version), au
+// retour du réseau et à `onCloudReady`. Une lecture dont une partie est « pas su » n'est jamais gardée (le suivant relit).
+const _memoExtras = creerMemoCourt({ dureeMs: 10 * 60 * 1000 });
+try {
+  const lpX = typeof window !== 'undefined' ? window.__vrmLecturesPartagees : null;
+  if (lpX && typeof lpX.abonner === 'function') {
+    lpX.abonner('app_data?id=like.harvest_%25_txn_%25', () => _memoExtras.oublier());
+    lpX.abonner('app_data?id=like.harvest_%25_listings', () => _memoExtras.oublier());
+    lpX.abonner('app_data?id=eq.vinted_listing_dates', () => _memoExtras.oublier());
+  }
+  if (typeof window !== 'undefined') { window.addEventListener('vrm:ext', () => _memoExtras.oublier()); window.addEventListener('online', () => _memoExtras.oublier()); }
+} catch (_) {}
+onCloudReady(() => _memoExtras.oublier());
 const lireExtrasRepartition = async () => {
   const owner = AUTH.user?.id;
   if (!owner) return {txn:null,items:null,dates:null};
-  if (_repartCache?.owner === owner && Date.now() - _repartCache.at < 10 * 60 * 1000) return _repartCache;
+  const r = await _memoExtras.lire(owner, async () => { const x = await lireExtrasRepartitionNeuve(owner); return x && x.txn && x.items && x.dates ? x : { ...(x || {}), _passu: true }; }).catch(() => null);
+  if (!r) return {txn:null,items:null,dates:null};
+  if (r._passu) { _memoExtras.oublier(); const { _passu, ...reste } = r; return { txn: null, items: null, dates: null, ...reste }; }
+  return r;
+};
+// (24 nov., vitesse-lectures-toucher) LA LECTURE PART AU TOUCHER : le doigt posé sur l'onglet Annonces lance la lecture (la
+// même, rejointe par l'écran quand il se monte) au lieu d'attendre ~2 s de montage. Une lecture, pas une écriture : rien
+// d'autre ne change. Sans session, rien ne part.
+try {
+  if (typeof document !== 'undefined') document.addEventListener('pointerdown', (e) => {
+    try { const t = e.target && e.target.closest ? e.target.closest('[data-n-onglet]') : null;
+      if (t && t.getAttribute('data-n-onglet') === 'paires' && t.getAttribute('aria-current') !== 'page' && AUTH.user?.id) lireExtrasRepartition().catch(() => {}); } catch (_) {}
+  }, { capture: true, passive: true });
+} catch (_) {}
+const lireExtrasRepartitionNeuve = async (owner) => {
   const [pays, items, dates, txnItems] = await Promise.all([
     // Le pays n'est pas dans `meta` : cette lecture décompresse le détail de
     // transaction — partagée avec les analyses de l’accueil, une fois
@@ -29764,8 +29794,7 @@ const lireExtrasRepartition = async () => {
     }
   }
   if (AUTH.user?.id !== owner) return {txn:null,items:null,dates:null};
-  _repartCache = { owner, at: Date.now(), txn, items: idx, dates };
-  return _repartCache;
+  return { owner, at: Date.now(), txn, items: idx, dates };
 };
 // ⟦→ ecrans/Stats.jsx #14⟧
 const nomPays = (cc) => {

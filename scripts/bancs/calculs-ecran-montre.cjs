@@ -55,7 +55,7 @@ const ATTENDU = {
 
 (async () => {
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--explicitly-allowed-ports=' + PORT] });
-  const fautes = [], erreurs = [], vus = {}, ecrits = new Set();
+  const fautes = [], erreurs = [], vus = {}, ecrits = new Set(), lecturesExtras = [];
   try {
     const ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'fr-FR', serviceWorkers: 'block',
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1' });
@@ -71,6 +71,7 @@ const ATTENDU = {
     await ctx.route('**/rest/v1/**', async (route) => { const rq = route.request();
       if (rq.method() !== 'GET') { try { const b = JSON.parse(rq.postData() || 'null'); for (const x of [].concat(b || [])) if (x && x.id) ecrits.add(String(x.id)); } catch (_) {}
         return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' }).catch(() => {}); }
+      if (/harvest_%25_txn_%25&select=tx:meta-%3E%3Eid,cc:|harvest_%_txn_%&select=tx:meta->>id,cc:/.test(rq.url())) lecturesExtras.push(Date.now());
       const h = await rq.allHeaders(); const rep = repondre(rq.url(), h.range, base);
       return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { ...(rep.headers || {}) }, body: JSON.stringify(rep.body) }).catch(() => {}); });
     await ctx.route('**/api/**', (r) => { const u = r.request().url();
@@ -107,6 +108,10 @@ const ATTENDU = {
       console.log(`  publication ${k} : ${ok ? 'posée' : 'ABSENTE'}`);
       if (!ok) fautes.push(`publication ${k} absente après le parcours`);
     }
+    // (24 nov., vitesse-lectures-toucher) La liste des transactions projetée (`lireExtrasRepartition`, src/App.jsx) part UNE
+    // fois pour tout le parcours (une lecture en cours est rejointe, gardée 10 min) : elle partait 2 à 3 fois.
+    console.log(`  lectures de la liste des transactions (pays, acheteur) : ${lecturesExtras.length}`);
+    if (lecturesExtras.length > 1) fautes.push(`la liste des transactions projetée est lue ${lecturesExtras.length} fois (une seule attendue)`);
     // `widget_stats` est écrit dans la base par la coque (src/App.jsx), pas rangé sur l'appareil.
     console.log(`  publication widget_stats : ${ecrits.has('widget_stats') ? 'écrite' : 'ABSENTE'}`);
     if (!ecrits.has('widget_stats')) fautes.push('publication widget_stats jamais écrite');
