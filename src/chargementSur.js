@@ -29,7 +29,21 @@
 //     que le navigateur donne à un rechargement (Safari n'est pas Chrome). Une fois
 //     par version cible et par onglet (sessionStorage) : jamais une boucle.
 // ════════════════════════════════════════════════════════════════════════════
+//  (24 nov., morceaux-perimes) Mesuré au banc scripts/bancs/morceaux-perimes.cjs (récit :
+//  docs/passation/2026-11-24-morceaux-perimes.md) :
+//   • une page dont TOUS les fichiers sont dans la réserve du service worker traverse une mise en
+//     ligne sans rien voir (P1, P2) — le défaut vient d'une page dont la réserve n'est pas finie
+//     (la réserve du service worker attend 15 s puis range ≈ 340 fichiers un par un ; sur l'iPhone
+//     le service worker peut être endormi avant). D'où `reserveMorceaux.js` : la PAGE fait ranger
+//     les fichiers de SA version, au repos, tant que le serveur les a encore ;
+//   • le rechargement d'un morceau introuvable ramenait sur Aujourd'hui (l'adresse ne porte plus
+//     l'écran) : il repart maintenant SUR l'écran demandé (`adresseDeRetour`) ;
+//   • il partait même au milieu d'une saisie ou d'une feuille ouverte, et un simple préchargement
+//     de fond raté (`vite:preloadError`, raison « preload ») rechargeait la page sous les yeux :
+//     désormais seulement à un moment SÛR (`momentSur`) ; sinon (et pour un préchargement de fond),
+//     il attend que la page soit CACHÉE (invisible), et l'écran demandé dit « Mettre à jour VRM ».
 import { noterSuspens } from './journalSuspens.js';
+import { estSaisie } from './miseAJour.js';
 import React from 'react';
 
 export const CLE_RECHARGE = 'vrm_recharge_version';
@@ -97,11 +111,37 @@ export async function oublierCoquille() {
   } catch (_) {}
 }
 
+// (24 nov.) Un moment SÛR pour relire la page : aucun champ de texte en cours, aucune feuille ouverte
+// (src/App.jsx `FermeAuRetour` publie `__vrmFeuilles` ; une boîte `aria-modal` compte aussi). Pur sur `doc`/`win`.
+export function momentSur(doc = (typeof document !== 'undefined' ? document : null), win = (typeof window !== 'undefined' ? window : null)) {
+  if (!doc) return false;
+  try {
+    if (estSaisie(doc.activeElement)) return false;
+    if (win && Number(win.__vrmFeuilles) > 0) return false;
+    if (doc.querySelector('[aria-modal="true"]')) return false;
+    if (win && win.history && win.history.state && win.history.state.vrmFeuille) return false;
+  } catch (_) { return false; }
+  return true;
+}
+// (24 nov.) L'adresse à relire : celle de l'écran OUVERT (history.state.vrmTab, posé par la coque à chaque
+// onglet), sinon l'adresse telle quelle. Sans ça, l'adresse nettoyée (`/`) ramenait sur Aujourd'hui après le
+// rechargement — Julien touchait Réglages et retombait sur l'accueil. Pur (exécuté par les audits).
+export function adresseDeRetour(loc, etat) {
+  const chemin = (loc && loc.pathname) || '/';
+  const search = String((loc && loc.search) || '');
+  if (/[?&]tab=/.test(search)) return null;
+  const t = etat && typeof etat.vrmTab === 'string' ? etat.vrmTab : '';
+  if (!/^[a-z][a-z0-9_]{1,30}$/.test(t)) return null;
+  const q = new URLSearchParams(search.replace(/^\?/, ''));
+  q.set('tab', t);
+  return chemin + '?' + q.toString() + ((loc && loc.hash) || '');
+}
 // Relit la page vers la version `cible`, proprement. `force` (le bouton de Julien) passe outre la garde.
 export async function rechargerVersNouvelle({ cible = '', raison = '', force = false } = {}) {
   if (!force && !rechargementPermis(lireNote(), cible)) return false;
   if (!noterRechargement(cible, raison) && !force) return false;
   try { window.dispatchEvent(new CustomEvent('vrm:rechargement', { detail: { cible, raison } })); } catch (_) {}
+  try { const a = adresseDeRetour(window.location, window.history.state); if (a) window.history.replaceState(window.history.state, '', a); } catch (_) {}
   // La coquille n'est oubliée qu'EN LIGNE (sinon on jetterait la seule page qui s'ouvre sans réseau).
   const enLigne = !(typeof navigator !== 'undefined' && navigator.onLine === false);
   if (enLigne) await Promise.race([oublierCoquille(), new Promise((r) => setTimeout(r, 1500))]);
@@ -111,19 +151,37 @@ export async function rechargerVersNouvelle({ cible = '', raison = '', force = f
 
 // Un morceau introuvable : est-ce une page d'une ANCIENNE version (le serveur en sert une autre) ?
 // Oui ⇒ rechargement propre (true). Pas su, même version, hors ligne, déjà rechargé ⇒ false.
-let enCours = null;
-export function verifierMorceauPerime(raison = 'morceau') {
-  if (enCours) return enCours;
-  enCours = (async () => {
+// (24 nov.) Rechargée TOUT DE SUITE seulement pour un écran que Julien vient de demander (« morceau ») et à un
+// moment sûr. Un préchargement de fond (« preload ») ou un moment pas sûr (texte en cours, feuille ouverte) :
+// rien sous ses yeux — la page se relira quand elle sera CACHÉE (il a changé d'app, l'écran est éteint), si le
+// moment est alors sûr ; l'écran demandé, lui, dit « Mettre à jour VRM » (son geste). Rien n'est jamais perdu.
+let quandCachee = null;
+export function rechargerQuandCachee(cible, raison) {
+  if (typeof document === 'undefined' || quandCachee) return;
+  quandCachee = () => {
+    if (document.visibilityState !== 'hidden' || !momentSur()) return;
+    document.removeEventListener('visibilitychange', quandCachee); quandCachee = null;
+    rechargerVersNouvelle({ cible, raison: raison + '-cachee' });
+  };
+  document.addEventListener('visibilitychange', quandCachee);
+}
+// La version du serveur, relue UNE fois pour les appels proches (le préchargement raté et l'écran qui relance
+// son morceau arrivent ensemble) ; la décision, elle, est prise pour CHAQUE appel (sa raison compte).
+let serveurEnCours = null;
+const serveurPartage = () => {
+  if (!serveurEnCours) { serveurEnCours = versionServeur().catch(() => null); serveurEnCours.finally(() => { setTimeout(() => { serveurEnCours = null; }, 2000); }); }
+  return serveurEnCours;
+};
+export async function verifierMorceauPerime(raison = 'morceau') {
+  try {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
     const actuelle = versionChargee();
     if (!actuelle) return false;
-    const serveur = await versionServeur();
+    const serveur = await serveurPartage();
     if (!serveur || serveur === actuelle) return false;
-    return rechargerVersNouvelle({ cible: serveur, raison });
-  })().catch(() => false);
-  enCours.finally(() => { setTimeout(() => { enCours = null; }, 2000); });
-  return enCours;
+    if (raison !== 'morceau' || !momentSur()) { rechargerQuandCachee(serveur, raison); return false; }
+    return await rechargerVersNouvelle({ cible: serveur, raison });
+  } catch (_) { return false; }
 }
 
 // L'erreur d'un morceau que rien n'a pu charger : les garde-fous la montrent comme « Mettre à jour VRM ».
