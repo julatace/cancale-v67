@@ -104,6 +104,9 @@ export function memeContenu(a, b) {
       return true;
     }
     if (Object.getPrototypeOf(a) !== Object.prototype || Object.getPrototypeOf(b) !== Object.prototype) return false;
+    // Pas le même nombre de clés ⇒ différent, sans rien sérialiser (à l'ouverture, `{}` puis la fiche du nuage : le texte
+    // entier des fiches n'est pas fabriqué pour rien, une fois par écran qui l'écoute).
+    if (Object.keys(a).length !== Object.keys(b).length) return false;
     return JSON.stringify(a) === JSON.stringify(b);   // objet simple (une clé synchronisée) : même texte = même contenu
   } catch (_) { return false; }
 }
