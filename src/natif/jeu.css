@@ -24,7 +24,7 @@
     font: 700 13px/16px var(--n-police); font-variant-numeric: tabular-nums; letter-spacing: -.01em; white-space: nowrap;
     clip-path: polygon(6px 0, 100% 0, 100% 100%, 6px 100%, 0 50%); }
   .n-etiq-trou { position: absolute; left: 5px; top: 50%; width: 4px; height: 4px; margin-top: -2px; border-radius: 50%; background: rgb(38 39 43 / .28); }
-  .n-etiq-pre { font-size: 10px; font-weight: 600; opacity: .72; }
+  .n-etiq-pre { font-size: 10px; font-weight: 600; opacity: .72; margin-right: 1px; }
 
   /* ── La tuile d'une paire : photo carrée, coins doux, l'étiquette posée en bas à gauche, le médaillon en haut à droite. ── */
   .n-tuile-paire { position: relative; display: inline-grid; flex: 0 0 auto; width: var(--n-tuile-t, 72px); height: var(--n-tuile-t, 72px); border-radius: 14px; isolation: isolate; }
