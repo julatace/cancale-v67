@@ -90,6 +90,9 @@ export const texteRembourse = ({ montant = null, article = '' } = {}) => fabriqu
 export const texteRetourRappel = ({ article = '', limite = '', quand = 'veille', heure = true, jour = '' } = {}) => fabrique('retourRappel', { article, limite, quand, heure, jour });
 // (23 nov., « Colis en danger ») Le colis d'une vente au point relais de l'acheteur, qui repart à la date LUE (api/_lib/colis-danger.js).
 export const texteColisDanger = ({ article = '', limite = '' } = {}) => fabrique('colisDanger', { article, limite });
+// (24 nov., lot suivi-ventes) Le colis d'une vente lu chez le transporteur : au point (son nom LU), retiré (api/_lib/suivi-envoi.js).
+export const texteEnvoiPoint = ({ article = '', lieu = '' } = {}) => fabrique('envoiPoint', { article, lieu });
+export const texteEnvoiRetire = ({ article = '' } = {}) => fabrique('envoiRetire', { article });
 
 // Le rappel du cron « offres au-dessus de ton prix mini » (api/ship-reminders.js).
 export const texteOffresMini = (n) => ({
@@ -232,6 +235,14 @@ export const APERCUS_NOTIF = {
     quoi: 'Ton acheteur n’a pas retiré son colis Vinted Go : la veille et le jour où il repart.',
     exemples: [
       { ...texteColisDanger({ article: 'Air Max 90 blanche T42', limite: '2026-11-12T10:34:00Z' }), mene: 'Ventes · la vente, ouverte' },
+    ],
+  },
+  // (24 nov.) Le colis d'une VENTE, lu chez le transporteur : au point de l'acheteur, puis retiré.
+  envois: {
+    quoi: 'Ton colis vendu est arrivé au point de l’acheteur, puis il l’a retiré : une fois par étape, lu chez le transporteur.',
+    exemples: [
+      { ...texteEnvoiPoint({ article: 'Air Max 90 blanche T42', lieu: 'Tabac du Centre' }), mene: 'Ventes · la vente, ouverte' },
+      { ...texteEnvoiRetire({ article: 'Air Max 90 blanche T42' }), mene: 'Ventes · la vente, ouverte' },
     ],
   },
   // (17 nov.) Un coucou reçu dans un groupe : le vrai texte (api/_lib/coucou.js), sans contenu.

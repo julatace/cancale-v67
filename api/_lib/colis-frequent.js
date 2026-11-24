@@ -29,7 +29,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import crypto from 'crypto';
 import { RYTHME_MS, CADENCE_COLIS_MS, MARGE_RYTHME_MS } from './transporteurs.js';
-import { RYTHME_DANGER_MS } from './depart-colis.js';
+import { RYTHME_DANGER_MS, RYTHME_SUIVI_MS, FENETRE_DEPART_J } from './depart-colis.js';
 export { CADENCE_COLIS_MS, MARGE_RYTHME_MS };
 
 export const PREMIERE_LECTURE_MS = 24 * 3600000;   // un e-mail « disponible » de moins d'un jour
@@ -59,6 +59,11 @@ export function requetesColisDus(maintenant = Date.now()) {
     // (23 nov., « Colis en danger ») Un colis VENDU au point relais de l'acheteur dont la date de départ est LUE
     // (Vinted Go) : relu toutes les 2 h, pour savoir s'il est retiré avant de prévenir (api/_lib/colis-danger.js).
     `app_data?id=like.depart_vinted_*&meta->>etat=eq.disponible&meta->>limiteSure=eq.true&or=(meta->>clos.is.null,meta->>clos.eq.false)&meta->>essai=lt.${avant(RYTHME_DANGER_MS)}&select=owner`,
+    // (24 nov., lot suivi-ventes) Un colis VENDU pris en charge, pas encore arrivé au bout (en route, au point) : relu
+    // à son rythme (6 h, `RYTHME_SUIVI_MS`) aussi entre les crons de 6 h et 19 h — « au point » et « retiré » se
+    // savent dans l'heure. Seulement les 21 jours de la fenêtre du départ (`FENETRE_DEPART_J`) : un vieux colis
+    // jamais clos ne fait plus visiter son vendeur.
+    `app_data?id=like.depart_*&meta->>etat=in.(en_route,disponible)&meta->>priseAt=gte.${encodeURIComponent(iso(maintenant - FENETRE_DEPART_J * 86400000))}&or=(meta->>clos.is.null,meta->>clos.eq.false)&meta->>essai=lt.${avant(RYTHME_SUIVI_MS)}&select=owner`,
   ];
 }
 // Les vendeurs à visiter : l'union des réponses ; `null` si UNE requête n'a pas répondu.

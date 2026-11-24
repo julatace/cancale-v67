@@ -44,6 +44,20 @@ export function ventesParSuivi(bords) {
   return m;
 }
 
+// (24 nov., lot suivi-ventes) LE SEUIL D'UNE LIGNE `depart_` seule — la règle de « Colis en danger », exportée pour
+// que Ventes (le parcours d'un envoi, api/_lib/suivi-envoi.js) dise le MÊME danger que la notification, sans
+// seconde règle : Vinted Go, « disponible », date LUE, lecture fraîche, pas clos, date pas passée ; 'jour' · 'veille' · null.
+// L'IDENTITÉ (le n° d'UNE vente, ni retour ni achat) reste à l'appelant.
+export function dangerDuDepart(t, maintenant = Date.now(), { auj = jourParis(maintenant), demain = jourParis(maintenant + 86400000) } = {}) {
+  if (!limiteDepartLue(t) || t.clos) return null;
+  const lu = msDe(t.lu);
+  if (lu == null || lu > maintenant + 60000 || maintenant - lu > FRAICHEUR_DANGER_MS) return null;
+  const lim = msDe(t.limiteAt);
+  if (lim == null || lim <= maintenant) return null;
+  const j = jourParis(lim);
+  return j === auj ? 'jour' : j === demain ? 'veille' : null;
+}
+
 // departs : Map n° → ligne `depart_` ; bords : bordereaux de vente ; autres : Set des n° de retours
 // et d'achats. Rend [{ seuil, cle, suivi, tx, article, limiteAt }].
 export function colisEnDanger({ departs, bords, autres = new Set(), maintenant = Date.now() } = {}) {
@@ -52,17 +66,12 @@ export function colisEnDanger({ departs, bords, autres = new Set(), maintenant =
   const auj = jourParis(maintenant), demain = jourParis(maintenant + 86400000);
   const out = [];
   for (const [k, t] of departs) {
-    if (!limiteDepartLue(t) || t.clos) continue;
     if (autres && autres.has(k)) continue;
     const v = ventes.get(k);
     if (!v) continue;
-    const lu = msDe(t.lu);
-    if (lu == null || lu > maintenant + 60000 || maintenant - lu > FRAICHEUR_DANGER_MS) continue;
-    const lim = msDe(t.limiteAt);
-    if (lim == null || lim <= maintenant) continue;
-    const j = jourParis(lim);
-    const seuil = j === auj ? 'jour' : j === demain ? 'veille' : null;
+    const seuil = dangerDuDepart(t, maintenant, { auj, demain });
     if (!seuil) continue;
+    const lim = msDe(t.limiteAt);
     out.push({ seuil, cle: cleDanger(seuil, k), suivi: k, tx: v.tx, article: v.article, limiteAt: new Date(lim).toISOString() });
   }
   return out;

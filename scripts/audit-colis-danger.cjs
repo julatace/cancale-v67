@@ -33,12 +33,12 @@ const MUTATIONS = {
   'date-pas-projetee': [['api/_lib/depart-colis.js', ",limite:meta->>limite,limiteAt:meta->>limiteAt,limiteSure:meta->>limiteSure';", "';"]],
   'relu-6h': [['api/_lib/depart-colis.js', 'return e + (limiteDepartLue(t) ? RYTHME_DANGER_MS : pris', 'return e + (false ? RYTHME_DANGER_MS : pris']],
   'pas-visite-frequent': [['api/_lib/colis-frequent.js', "    `app_data?id=like.depart_vinted_*&meta->>etat=eq.disponible", "    `app_data?id=like.rien_*&meta->>etat=eq.disponible"]],
-  'lecture-vieille-sonne': [['api/_lib/colis-danger.js', ' || maintenant - lu > FRAICHEUR_DANGER_MS) continue;', ') continue;']],
+  'lecture-vieille-sonne': [['api/_lib/colis-danger.js', ' || maintenant - lu > FRAICHEUR_DANGER_MS) return null;', ') return null;']],
   'retour-ou-achat-sonne': [['api/_lib/colis-danger.js', '    if (autres && autres.has(k)) continue;\n', '']],
   'n-partage-sonne': [['api/_lib/colis-danger.js', '  for (const k of doubles) m.delete(k);\n', '']],
   'annulee-sonne': [['api/_lib/colis-danger.js', "    if (!b || b.annulee === true || b.annulee === 'true') continue;", '    if (!b) continue;']],
   'mauvais-jour': [['api/_lib/colis-danger.js', "j === demain ? 'veille' : null", "j !== auj ? 'veille' : null"]],
-  'passee-sonne': [['api/_lib/colis-danger.js', '    if (lim == null || lim <= maintenant) continue;', '    if (lim == null) continue;']],
+  'passee-sonne': [['api/_lib/colis-danger.js', '  if (lim == null || lim <= maintenant) return null;', '  if (lim == null) return null;']],
   'deux-fois': [['api/_lib/colis-danger.js', '    if (r === false) { deja++; continue; }\n', '']],
   'pas-su-envoie': [['api/_lib/colis-danger.js', "  if (![bords, retours, achats].every(Array.isArray)) return { fait: false, raison: 'lecture ratée — rien envoyé' };", "  if (!Array.isArray(bords)) return { fait: false, raison: 'x' };"]],
   'reglage-ignore': [['api/_lib/colis-danger.js', "  if (!(await active())) return { fait: true, raison: 'désactivé par le vendeur', n: 0 };\n", '']],
@@ -228,7 +228,7 @@ const VGS = (n) => 'VGS' + String(9000000000000 + n);
     const ap = Ap.apercuFamille('colisdanger');
     dit(!!ap && ap.exemples.length >= 1 && /Préviens ton acheteur/.test(ap.exemples[0].body), 'T4 l’aperçu de Paramètres sort de la VRAIE fabrique');
     const reg = fs.readFileSync(path.join(R, 'src', 'ecrans', 'Reglages.jsx'), 'utf8');
-    dit(/ids: \['poster', 'arrives', 'colisdanger'\]/.test(reg), 'T4 rangée dans le groupe « Colis » de Paramètres → Notifications');
+    dit(/ids: \['poster', 'arrives', 'colisdanger'[,\]]/.test(reg), 'T4 rangée dans le groupe « Colis » de Paramètres → Notifications');
   });
 
   // ── C. la vraie route ───────────────────────────────────────────────────────
@@ -251,7 +251,8 @@ const VGS = (n) => 'VGS' + String(9000000000000 + n);
     dit(dedup.includes(`colis-danger-veille-${n}`), 'C2 la notification est réservée dans `push_dedup` (veille, ce n°)', JSON.stringify(dedup));
     const journal = JSON.stringify(base.get(`${A}|push_journal`) || {});
     const vu = envois.join('\n') + journal;
-    dit(envois.length === 1 && /Préviens ton acheteur/.test(envois[0]) && /Colis pas encore retiré/.test(envois[0]), 'C2 elle sonne sur son téléphone, avec le geste « Préviens ton acheteur »', vu.slice(0, 300));
+    const envoisDanger = envois.filter((x) => /Colis pas encore retiré/.test(x));   // (24 nov.) « au point » (lot suivi-ventes) peut sonner aussi : une autre famille
+    dit(envoisDanger.length === 1 && /Préviens ton acheteur/.test(envoisDanger[0]), 'C2 elle sonne sur son téléphone, avec le geste « Préviens ton acheteur »', vu.slice(0, 300));
     const avant = envois.length, dedup1 = dedup.length;
     base.set(`${A}|depart_vinted_${n}`, { ...apres, essai: iso(NOW - 3 * H) });
     await go();

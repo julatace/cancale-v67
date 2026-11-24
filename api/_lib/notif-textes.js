@@ -51,6 +51,9 @@ export const FAMILLES = [
   // (23 nov., Julien : « te prévient avant qu'il reparte ») Le colis d'une VENTE attend l'acheteur au point
   // relais (Vinted Go) et va repartir à la date LUE chez le transporteur (api/_lib/colis-danger.js).
   { id: 'colisdanger', titre: 'Colis en danger', def: true },
+  // (24 nov., lot suivi-ventes) Le colis d'une VENTE, lu chez le transporteur : arrivé au point de l'acheteur,
+  // puis retiré par lui — une fois par colis et par étape (api/_lib/suivi-envoi.js).
+  { id: 'envois', titre: 'Suivi de tes envois', def: true },
 ];
 
 // Catégorie (le mot que chaque route passe à `pushCategorieActive` et à
@@ -95,6 +98,8 @@ export const FAMILLE_DE = {
   coucou: 'communaute',
   // (23 nov.) Un colis vendu pas encore retiré, la veille et le jour où il repart (api/_lib/colis-danger.js).
   colisdanger: 'colisdanger',
+  // (24 nov.) Le colis d'une vente au point de l'acheteur, puis retiré (api/_lib/suivi-envoi.js).
+  envoi: 'envois',
 };
 // Un type NEUF hérite du réglage de la famille d'où il sort tant qu'il n'est pas
 // posé lui-même : il avait coupé « Ventes », la double vente reste coupée ; il
