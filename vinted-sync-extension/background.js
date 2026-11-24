@@ -297,6 +297,9 @@ function ouvrirVRMDepuis(urlActive, opts) {
 }
 // Le clic sur l'icône (nommé : un banc peut le jouer — Playwright ne touche pas la barre de Chrome).
 async function surClicIcone(tab) {
+  // 5.446 (lot ext-anciens-lots, revue basse 90) : sans menu (Orion) et sans session EN MÉMOIRE, la
+  //   fenêtre de connexion s'ouvre TOUT DE SUITE, dans le geste (`openPopup` le perd après un `await`).
+  if (sansMenuIcone() && !(VRM_SESSION && VRM_SESSION.access_token)) { try { const r = chrome.action.openPopup(); if (r && typeof r.catch === 'function') r.catch(() => {}); return; } catch (_) {} }
   // Le clic n'arrive ici que si le popup est vide, donc si une session
   // existe. Si elle a expiré entre-temps, on remet la fenêtre de connexion.
   const e = await authEtat().catch(() => ({ connecte: true }));
@@ -1412,7 +1415,20 @@ async function withOwner(row) {
 async function appDataConflict() { return 'owner,id'; }
 
 // Dernier csrf-token vu par domaine (fourni par inject.js).
+// 5.446 (lot ext-anciens-lots ; revue, basse 79) : recopié dans `chrome.storage.session` (§4.9 : une variable de
+//   module meurt avec le worker — au réveil, `x-csrf-token: ''` jusqu'à la page suivante).
+//   Session : effacé à la fermeture du navigateur ; c'est un jeton que la page a déjà.
 const lastCsrfByDomain = {};
+const CSRF_STORE = 'vrmCsrf';
+try { const S = chrome.storage && chrome.storage.session; if (S) S.get(CSRF_STORE).then((o) => { const v = o && o[CSRF_STORE]; if (v && typeof v === 'object') for (const [d, t] of Object.entries(v)) if (!lastCsrfByDomain[d] && typeof t === 'string' && t.length <= 400) lastCsrfByDomain[d] = t; }).catch(() => {}); } catch (_) {}
+// Rend vrai si le jeton a CHANGÉ (basse 102 : seulement alors on relit le compte).
+function noterCsrf(domain, csrf) {
+  const d = String(domain || ''), t = String(csrf || '').slice(0, 400);
+  if (!d || !t || lastCsrfByDomain[d] === t) return false;
+  lastCsrfByDomain[d] = t;
+  try { const S = chrome.storage && chrome.storage.session; if (S) S.set({ [CSRF_STORE]: Object.assign({}, lastCsrfByDomain) }).catch(() => {}); } catch (_) {}
+  return true;
+}
 
 // --- Utilitaires -----------------------------------------------------------
 
@@ -2221,12 +2237,19 @@ async function captureAllAccounts() {
 // ── JOURNAL D'ACTIVITÉ (l'« interface quand je fais des actions ») ───────────
 // Petit fil des dernières choses faites par l'extension, montré dans le panneau
 // VRM. Anneau de 15 événements dans chrome.storage.local (léger, local).
-async function logActivity(text) {
-  try {
-    const cur = (await chrome.storage.local.get('vrmActivity')).vrmActivity || [];
+// 5.446 (lot ext-anciens-lots ; revue, basse 86) : une écriture à la fois (chaîne de module) — deux événements
+// simultanés ne s'écrasent plus ; une lecture ratée n'écrit rien (le fil n'est pas vidé).
+let _chaineActivite = Promise.resolve();
+function logActivity(text) {
+  const suite = _chaineActivite.then(async () => {
+    let cur;
+    try { cur = (await chrome.storage.local.get('vrmActivity')).vrmActivity || []; } catch (_) { return; }
+    if (!Array.isArray(cur)) cur = [];
     cur.unshift({ t: Date.now(), text: String(text || '').slice(0, 90) });
-    await chrome.storage.local.set({ vrmActivity: cur.slice(0, 15) });
-  } catch (_) {}
+    try { await chrome.storage.local.set({ vrmActivity: cur.slice(0, 15) }); } catch (_) {}
+  });
+  _chaineActivite = suite.then(() => {}, () => {});
+  return suite.catch(() => {});
 }
 
 // --- Capture passive des donnees ------------------------------------------
@@ -2269,7 +2292,10 @@ let _diagFlushAt = 0;
 function majTampon(fn) {
   _diagChaine = _diagChaine.then(async () => {
     let buf = {};
-    try { const s = await chrome.storage.local.get(DIAG_BUF); buf = (s && s[DIAG_BUF]) || {}; } catch (_) {}
+    // 5.446 (lot ext-anciens-lots ; revue, basse 84) : stockage illisible ⇒ rien n'est écrit (avant : `{}` réécrit
+    // par-dessus le tampon existant, ses compteurs perdus). Ce compteur-ci est perdu, pas les autres.
+    try { const s = await chrome.storage.local.get(DIAG_BUF); buf = (s && s[DIAG_BUF]) || {}; } catch (_) { return; }
+    if (!buf || typeof buf !== 'object') buf = {};
     buf.n = buf.n || {}; buf.rates = buf.rates || {};
     fn(buf);
     try { await chrome.storage.local.set({ [DIAG_BUF]: buf }); } catch (_) {}
@@ -2281,6 +2307,17 @@ function majTampon(fn) {
   return _diagChaine;
 }
 
+const DIAG_N_MAX = 600, DIAG_RATES_MAX = 80;
+// Les compteurs les plus grands, et toujours ceux qu'on vient d'ajouter (`neufs`).
+function bornerCompteurs(n, neufs, max) {
+  const cles = Object.keys(n || {});
+  if (cles.length <= max) return n;
+  const garde = new Set(Object.keys(neufs || {}));
+  const reste = cles.filter((k) => !garde.has(k)).sort((a, b) => (Number(n[b]) || 0) - (Number(n[a]) || 0));
+  for (const k of reste) { if (garde.size >= max) break; garde.add(k); }
+  const out = {}; for (const k of cles) if (garde.has(k)) out[k] = n[k];
+  return out;
+}
 // Envoie le tampon en base et ne le vide QUE si l'écriture a abouti.
 async function viderTampon(buf) {
   const aDesN = Object.keys(buf.n || {}).length, aDesR = Object.keys(buf.rates || {}).length;
@@ -2290,20 +2327,26 @@ async function viderTampon(buf) {
   // (5.362 : la ligne de DIAGNOSTIC reste en lire-fusionner-réécrire — la passer en
   //  comparer-et-échanger, comme `seen_urls` et les statuts d'offres, est noté dans
   //  le récit ; deux Chrome peuvent encore s'y perdre quelques compteurs, rien d'autre.)
-  const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
-  if (rows === null) return;
+  // 5.446 (lot ext-anciens-lots ; revue, moyenne 71 et basse 85) : COMPARER-ET-ÉCHANGER sur `data.rev`
+  //  (`modifierLigneCas`) — deux Chrome ne s'écrasent plus leurs compteurs ; et la ligne
+  //  est BORNÉE : 600 compteurs au plus (les plus grands gardés, ceux de ce tampon toujours),
+  //  80 échantillons (les plus récents). « Pas su » (lecture ou écriture ratée, devancé) ⇒
+  //  le tampon local n'est PAS vidé.
   const ver = (() => { try { return String(chrome.runtime.getManifest().version || ''); } catch (_) { return ''; } })();
-  const okDiag = await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: ((d) => {
+  const okDiag = await modifierLigneCas('panel_diag_capture', (d) => {
     const tout = Object.assign({}, d || {}); delete tout.rev;
     const n = { ...(tout.n || {}) };
     for (const k in buf.n) n[k] = (n[k] || 0) + buf.n[k];
+    const nBorne = bornerCompteurs(n, buf.n, DIAG_N_MAX);
     // 5.362 (moyenne 49) : les anciens échantillons perdent leur `tete` (un morceau du corps).
-    const rates = {};
+    let rates = {};
     for (const [k, v] of Object.entries(Object.assign({}, tout.rates || {}, buf.rates || {}))) { if (v && typeof v === 'object') { const c = Object.assign({}, v); delete c.tete; rates[k] = c; } }
-    return { ...tout, n, rates, majAt: new Date().toISOString(),
+    const cr = Object.keys(rates);
+    if (cr.length > DIAG_RATES_MAX) rates = Object.fromEntries(cr.map((k) => [k, rates[k]]).sort((a, b) => String(b[1].at || '').localeCompare(String(a[1].at || ''))).slice(0, DIAG_RATES_MAX));
+    return { ...tout, n: nBorne, rates, majAt: new Date().toISOString(),
       ...(ver ? { ver, verAt: new Date().toISOString() } : {}), verCode: CODE_VERSION };
-  })((rows[0] && rows[0].data) || {}) }], 'id');
-  if (okDiag === false) return;
+  });
+  if (okDiag !== true) return;
   buf.n = {}; buf.rates = {};
   try { await chrome.storage.local.set({ [DIAG_BUF]: buf }); } catch (_) {}
 }
@@ -4525,7 +4568,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'getPending') {
             const g = await chrome.storage.local.get('vrmPendingEbay');
             const p = g && g.vrmPendingEbay;
-            sendResponse({ ok: true, ad: (p && p.at && (Date.now() - p.at) < 30 * 60 * 1000) ? p.ad : null }); return;
+            const ad = (p && p.at && (Date.now() - p.at) < 30 * 60 * 1000) ? p.ad : null;
+            // 5.446 (lot ext-anciens-lots ; revue, moyenne 65) : la paire ne se remplit QUE dans l'onglet ouvert pour
+            // elle (`ebay:{id}`.tabId) — deux onglets eBay ne la remplissent plus deux fois.
+            sendResponse({ ok: true, ad: ad && (await ongletDuDepot('ebay:' + String(ad.id), sender)) ? ad : null }); return;
           }
           // ⚠️ JE N'AI JAMAIS VU LE FORMULAIRE eBAY. Plutôt que de deviner ses
           //    champs, l'extension me les RAPPORTE depuis son navigateur : c'est
@@ -4541,9 +4587,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const prev = await sbGet('app_data?id=eq.panel_ebay_form&select=data');
             if (prev === null) { sendResponse({ ok: false, error: 'lecture' }); return; }   // « pas su » ≠ « rien »
             const cur = (prev && prev[0] && prev[0].data) || {};
-            const etapes = Object.assign({}, cur.etapes || {});
-            etapes[String(msg.etape || msg.url || Object.keys(etapes).length)] =
-              { url: msg.url, fields: msg.fields.slice(0, 150), selects: (msg.selects || []).slice(0, 30), fichiers: msg.fichiers || 0, at: new Date().toISOString() };
+            let etapes = Object.assign({}, cur.etapes || {});
+            // 5.446 (lot ext-anciens-lots ; revue, basse 99) : la clé est NORMALISÉE (chemin sans requête ni chiffres,
+            //   120 signes) et la ligne BORNÉE à 24 étapes (les plus récentes), comme Vestiaire.
+            const cleEtape = String(msg.etape || (() => { try { return new URL(String(msg.url || '')).pathname; } catch (_) { return String(msg.url || ''); } })() || Object.keys(etapes).length).replace(/\d{3,}/g, '{n}').slice(0, 120);
+            etapes[cleEtape] =
+              { url: String(msg.url || '').split('?')[0].slice(0, 300), fields: msg.fields.slice(0, 150), selects: (msg.selects || []).slice(0, 30), fichiers: Number(msg.fichiers) || 0, at: new Date().toISOString() };
+            const cles = Object.keys(etapes);
+            if (cles.length > 24) etapes = Object.fromEntries(cles.map((k) => [k, etapes[k]]).sort((a, b) => String((b[1] && b[1].at) || '').localeCompare(String((a[1] && a[1].at) || ''))).slice(0, 24));
             await supabaseUpsert('app_data', [{ id: 'panel_ebay_form', data: { ...cur, url: msg.url, fields: msg.fields.slice(0, 150), etapes, at: new Date().toISOString() } }], 'id');
             sendResponse({ ok: true }); return;
           }
@@ -5128,11 +5179,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             //    ouverte (un dépôt abandonné, puis relancé ailleurs) la reprenait
             //    au premier retour sur l'onglet — et publiait une seconde fois.
             //    Sans onglet connu (dépôt lancé autrement) : comme avant.
+            //    5.446 (lot ext-anciens-lots ; revue, basse 101) : et SEULEMENT là — sans onglet retenu pour ce dépôt
+            //    (dépôt fermé, abandonné, jamais ouvert par VRM), aucun onglet ne la reçoit.
             let ad = frais ? p.ad : null;
-            if (ad && sender && sender.tab && sender.tab.id != null) {
-              const job = (await lireCmds())['lbc:' + String(ad.id)];
-              if (job && job.tabId != null && job.tabId !== sender.tab.id) ad = null;
-            }
+            if (ad && !(await ongletDuDepot('lbc:' + String(ad.id), sender))) ad = null;
             sendResponse({ ok: true, ad }); return;
           }
           sendResponse({ ok: false, error: 'action inconnue' });
@@ -5164,9 +5214,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   //    marque tient le canal pour douteux.
   if (PAGE_SORTES_PREUVE.has(String(msg.kind || '')) && canalPageDouteux(msg)) { noterDiag('page_canal_douteux_' + String(msg.kind).slice(0, 20)); return; }
   if (msg.kind === 'csrf' && msg.csrf) {
-    lastCsrfByDomain[domain] = msg.csrf;
-    // On rattache le csrf au compte actif (mise a jour legere).
-    captureDomain(domain);
+    // On rattache le csrf au compte actif (mise a jour legere) — 5.446 (basse 102) :
+    // seulement quand le jeton CHANGE (avant : à chaque requête de la page qui le portait).
+    if (noterCsrf(domain, msg.csrf)) captureDomain(domain);
   } else if (msg.kind === 'harvest' && msg.body) {
     storeHarvest(domain,msg.type,msg.id,msg.body,msg.url,sender?.frameId>0?null:sender?.tab?.id,msg.method,msg.httpStatus).then(()=>sendResponse({recu:true}),()=>sendResponse({recu:false}));
     return true;
@@ -5597,7 +5647,7 @@ async function rangerSuppressions() {
 //     un titre. Inconnu ⇒ rien.
 const RESA_LIGNE = 'panel_num_reserves';
 const RESA_ATTENTE_MS = 3 * 3600e3;
-const RESA_ITEMS_MAX = 400;
+const RESA_ITEMS_MAX = 400, RESA_ITEMS_DUR = 2000, RESA_ITEMS_JOURS = 30;
 const RESA_LOCAL = 'vrmNumResaOnglets';
 let _chaineResa = Promise.resolve();
 const unResaALaFois = (fn) => { const p = _chaineResa.then(fn, fn); _chaineResa = p.catch(() => {}); return p; };
@@ -5643,7 +5693,11 @@ function resaPropre(data, maintenant) {
   for (const h of Object.values(haut)) attente[h.n] = h.v;
   const its = Object.entries((data && data.items) || {}).filter(([id, v]) => /^\d{4,15}$/.test(id) && v && v.numero);
   its.sort((a, b) => String(b[1].at || '').localeCompare(String(a[1].at || '')));
-  for (const [id, v] of its.slice(0, RESA_ITEMS_MAX)) items[id] = v;
+  // 5.446 (lot ext-anciens-lots ; revue, basse 92) : une liaison annonce → N° de moins de 30 jours n'est JAMAIS
+  //   coupée par la borne (l'app ne l'a peut-être pas encore reprise) — les 400 plus récentes
+  //   comme avant, plus toutes celles du mois, 2 000 au plus (une ligne qui reste légère).
+  const recent = Date.now() - RESA_ITEMS_JOURS * 86400000;
+  its.forEach(([id, v], i) => { if (i < RESA_ITEMS_MAX || (i < RESA_ITEMS_DUR && Date.parse(String(v.at || '')) >= recent)) items[id] = v; });
   return { attente, items };
 }
 async function lireResa() {
@@ -12696,8 +12750,28 @@ function afficherRappelLbc(version){
   }
   bloc.append(titre,texte,actions);(document.body||document.documentElement)?.appendChild(bloc);
 }
+// 5.446 (lot ext-anciens-lots ; revue, moyenne 66) : Vinted et Vestiaire aussi. Après une mise à jour, leurs onglets
+//   ouverts gardent les scripts de l'ANCIENNE version, orphelins (captures muettes) — et le
+//   capteur de la page ne peut pas être reposé sans recharger (son canal privé est remis UNE
+//   fois, au chargement). La page n'est JAMAIS rechargée à sa place : le même encart lui dit
+//   de recharger, c'est son clic.
+function afficherRappelSite(version, site){
+  if(document.querySelector('[data-vrm-maj-site]'))return;
+  const bloc=document.createElement('aside');bloc.setAttribute('data-vrm-maj-site',String(site||''));bloc.setAttribute('data-vrm-maj-version',version);bloc.setAttribute('role','status');
+  Object.assign(bloc.style,{position:'fixed',left:'16px',bottom:'76px',zIndex:'2147483647',maxWidth:'calc(100vw - 32px)',width:'320px',boxSizing:'border-box',padding:'14px',background:'#203d47',color:'#fff',borderRadius:'12px',boxShadow:'0 6px 24px #0004',font:'13px/1.5 system-ui,sans-serif'});
+  const titre=document.createElement('b');titre.textContent='VRM · Mise à jour '+version;
+  const texte=document.createElement('p');texte.textContent='Recharge cet onglet '+site+' pour que VRM le lise à nouveau.';texte.style.margin='6px 0 10px';
+  const actions=document.createElement('div');Object.assign(actions.style,{display:'flex',gap:'8px'});
+  for(const [lib,agir]of [['Recharger '+site,()=>location.reload()],['Plus tard',()=>bloc.remove()]]){
+    const b=document.createElement('button');b.type='button';b.textContent=lib;Object.assign(b.style,{minHeight:'44px',padding:'7px 10px',border:'1px solid #ffffff66',borderRadius:'8px',background:'transparent',color:'#fff',font:'600 12px system-ui,sans-serif',cursor:'pointer'});b.onclick=agir;actions.appendChild(b);
+  }
+  bloc.append(titre,texte,actions);(document.body||document.documentElement)?.appendChild(bloc);
+}
 async function rappelerMiseAJourLbc(){
   try{const tabs=await chrome.tabs.query({url:['https://*.leboncoin.fr/*']});for(const t of tabs||[])try{await chrome.scripting.executeScript({target:{tabId:t.id},func:afficherRappelLbc,args:[CODE_VERSION]});}catch(_){}}catch(_){}
+  for(const [site,urls] of [['Vinted',['https://*.vinted.fr/*','https://*.vinted.com/*','https://*.vinted.it/*','https://*.vinted.de/*']],['Vestiaire',['https://*.vestiairecollective.com/*']]]){
+    try{const tabs=await chrome.tabs.query({url:urls});for(const t of tabs||[])try{await chrome.scripting.executeScript({target:{tabId:t.id,frameIds:[0]},func:afficherRappelSite,args:[CODE_VERSION,site]});}catch(_){}}catch(_){}
+  }
 }
 chrome.runtime.onInstalled.addListener((details) => { fullSync(); if (raisonReinjecte(details)){reinjecterPont();rappelerMiseAJourLbc();} });
 chrome.runtime.onStartup.addListener(() => { fullSync(); try { distanceReveil('demarrage').catch(() => {}); } catch (_) {} });   // 5.436 : Chrome relancé ⇒ présence et file à distance tout de suite
@@ -12763,6 +12837,9 @@ function surAlarme(a) {
   else if (a.name === 'vrm-versement') { lance('versement', () => tickVersements()); lance('bordereaux', () => tickBordereaux()); }   // 5.376 : les bordereaux qui manquent
   // 5.344 : l'historique de départ, onglet Vinted ouvert (voir `tickImport`).
   else if (a.name === 'vrm-import') { lance('import', () => tickImport()); lance('importsites', () => tickImportSites()); }   // 5.365 : et Leboncoin / Vestiaire
+  // 5.446 (lot ext-anciens-lots ; basse 94) : le passage « une minute après la visite », par alarme (survit au worker).
+  else if (a.name === 'vrm-import-bientot') { _importMinuteur = null; lance('import', () => tickImport()); }
+  else if (a.name === 'vrm-importsites-bientot') { _impSiteMinuteur = null; lance('importsites', () => tickImportSites()); }
   // 5.358 : l'empreinte des photos de ses annonces (voir `tickEmpreintes`).
   else if (a.name === 'vrm-empreintes') lance('empreintes', () => tickEmpreintes());
   // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
@@ -14137,6 +14214,9 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg, pseudo = '',
   // 5.410.4 : aussi après une acceptation, SON message d'acceptation (versions au hasard, {price} = le prix accepté).
   const sorteMsg = quoi === 'accept' ? 'accepte' : 'refus';
   if ((quoi === 'reject' || quoi === 'accept') && r && r.ok && conv && versionsRefus.length) {
+    // 5.446 (lot ext-anciens-lots, revue basse 96) : la SECONDE requête revérifie le compte de l'onglet
+    //   et la pause 429/403 (le geste a pu poser une pause, ou le compte basculer) — sans prendre de place.
+    if (await garde(uid, acc, { compter: false, sorte: 'offre' })) { noterDiag('offre_auto_message_garde'); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
     const c2 = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
     if (!c2.ok) { noterDiag('offre_auto_refus_message_' + (c2.code === 'stockage' ? 'stockage' : 'plafond')); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
     const version = choisirVariante(versionsRefus, await varianteDerniere(uid, sorteMsg));
@@ -14230,7 +14310,11 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
     if (!offres.length) return 0;
     const st = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
     const limite = Date.now() - 7 * 86400000;
-    for (const k in st) if (!st[k] || st[k] < limite) delete st[k];
+    // 5.446 (lot ext-anciens-lots ; revue, basse 95) : un mémo de plus de 7 jours n'est effacé que si l'offre n'est
+    //   PLUS en attente dans la lecture d'aujourd'hui — sinon une offre restée ouverte plus d'une
+    //   semaine aurait été traitée une seconde fois.
+    const encoreLa = new Set(offres.map((o) => String(o.oid)));
+    for (const k in st) if (!st[k] || (st[k] < limite && !encoreLa.has(String(k)))) delete st[k];
     let faites = 0;
     const pv = (await chrome.storage.local.get('vrmOffresPrevues')).vrmOffresPrevues || {};
     for (const k in pv) if (!pv[k] || st[k] || pv[k].at < Date.now() - 2 * 86400000) delete pv[k];
@@ -14312,7 +14396,8 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
       // 5.356 : le mémo RELU juste avant le geste (jamais l'instantané du début).
       const stFrais = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
       if (stFrais[o.oid]) { st[o.oid] = stFrais[o.oid]; continue; }
-      for (const k in stFrais) if (!st[k]) st[k] = stFrais[k];
+      // 5.446 (lot ext-anciens-lots, revue basse 95) : la relecture ne ramène pas un mémo purgé (plus de 7 j ET offre partie).
+      for (const k in stFrais) if (!st[k] && !(stFrais[k] < limite && !encoreLa.has(String(k)))) st[k] = stFrais[k];
       // (5.398) Une PREUVE que l'annonce n'est plus disponible (vendue, réservée, masquée,
       //    fermée, supprimée — dernier dressing capté de ce compte, suppressions vues) : jamais
       //    une acceptation (elle vendrait une paire qui n'est plus là). Dit une fois par offre ;
@@ -27749,6 +27834,16 @@ async function ongletOuvert(tabId) {
   if (tabId == null || !chrome.tabs || typeof chrome.tabs.get !== 'function') return undefined;
   try { const t = await chrome.tabs.get(Number(tabId)); return t && t.id != null ? t : null; } catch (_) { return null; }
 }
+// 5.446 (lot ext-anciens-lots, revue moyenne 65 et basse 101) : la page qui demande la paire en dépôt
+// est-elle l'onglet que VRM a ouvert POUR elle (`vrmCmds[jobId].tabId`) ? Pas de commande, pas d'onglet
+// retenu, onglet inconnu ou lecture ratée ⇒ non (« pas su » ne vaut pas « oui »).
+async function ongletDuDepot(jobId, sender) {
+  const tab = sender && sender.tab && sender.tab.id;
+  if (tab == null) return false;
+  let job = null;
+  try { job = (await lireCmds())[jobId] || null; } catch (_) { return false; }
+  return !!(job && job.tabId != null && job.tabId === tab);
+}
 // Un onglet de dépôt fermé ⇒ le dépôt est abandonné, l'app le sait aussitôt.
 async function depotOngletFerme(tabId) {
   const cmds = await lireCmds();
@@ -28004,6 +28099,9 @@ async function executerCommande(msg) {
   BORD_EN_COURS.add(jobId);
   let parti = false;                              // vrai dès que la file a pris le relais
   let acc = null;
+  // 5.446 (lot ext-anciens-lots ; revue, basse 91) : la place réservée pour la génération est RENDUE si aucune
+  //   génération ne part (refus à son tour dans la file, PDF déjà là chez Vinted).
+  const recuBord = {};
   try {
     // ⚠️⚠️ L'ACCUSÉ NE DÉPEND PLUS D'UNE BASE LENTE (revue du 9 octobre). La liste
     //    des comptes et « ce PDF est-il déjà rangé ? » se lisaient SANS délai
@@ -28041,7 +28139,7 @@ async function executerCommande(msg) {
         return { accepte: false, code: 'lot',
                  raison: `${BORD_MAX_PAR_VISITE} bordereaux demandés ces ${Math.round(BORD_CMD_FENETRE_MS / 60000)} dernières minutes sur ce compte — jamais plus d'affilée chez Vinted. La suite dans ${min} min.` };
       }
-      const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, sorte: 'bordereau' });
+      const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, sorte: 'bordereau', recu: recuBord });
       if (stop) return await refusDe(stop);
       await noterBordereauCommande(uid);
       return null;
@@ -28051,6 +28149,7 @@ async function executerCommande(msg) {
     parti = true;
   } finally { if (!parti) BORD_EN_COURS.delete(jobId); }
   // L'exécution part dans la file ; l'app reçoit l'accusé TOUT DE SUITE.
+  let genere = false;
   avecVinted(async () => {
     // 5.162 : un 429/403 reçu EN ROUTE arrête la commande sur place, avec la
     // raison — pas une génération ni une insistance de plus.
@@ -28077,6 +28176,7 @@ async function executerCommande(msg) {
         if (await arretSiPause()) return;
         if (!connu.t) {
           await majCmd(jobId, { etape: 'generation' });
+          genere = true;
           const g = await genererBordereau(uid, tx, { gardeFaite: true });
           if (!g.ok && !g.deja) {
             if (await arretSiPause()) return;
@@ -28100,7 +28200,10 @@ async function executerCommande(msg) {
       }
     } catch (e) {
       await majCmd(jobId, { etape: 'echec', code: 'erreur', raison: String(e && e.message || e).slice(0, 120) });
-    } finally { BORD_EN_COURS.delete(jobId); }
+    } finally {
+      BORD_EN_COURS.delete(jobId);
+      if (!genere && recuBord.at) { try { await rendreActions(String(uid), recuBord.at, 1); } catch (_) {} }
+    }
   });
   return { accepte: true, jobId, etape: 'file', vivant: true };
 }
@@ -31672,9 +31775,23 @@ async function publierImport(uid, st) {
 let _importEnCours = null;
 // UN passage d'import pour le compte `uid` (celui de l'onglet). Rend le nombre
 // de pages lues. `opts.force` : « Tout récupérer » (repart de la page 1).
+// 5.446 (lot ext-anciens-lots ; revue, basse 93) : un import à la fois (une requête Vinted à la fois, §3) — mais une
+//   demande pour un AUTRE compte n'est plus perdue (« 0 » sans le dire) : elle passe APRÈS
+//   celui en cours (une seule en attente par compte).
+let _importCompte = null;
+const _importApres = new Map();
 function importerHistorique(uid, opts = {}) {
-  if (_importEnCours) { try { noterDiag('import_deja_en_cours'); } catch (_) {} return _importEnCours.then(() => 0, () => 0); }
-  _importEnCours = importerHistoriqueUn(uid, opts).catch(() => 0).finally(() => { _importEnCours = null; });
+  const u = String(uid);
+  if (_importEnCours) {
+    if (_importCompte === u) { try { noterDiag('import_deja_en_cours'); } catch (_) {} return _importEnCours.then(() => 0, () => 0); }
+    if (_importApres.has(u)) return _importApres.get(u);
+    try { noterDiag('import_autre_compte_apres'); } catch (_) {}
+    const p = _importEnCours.then(() => 0, () => 0).then(() => { _importApres.delete(u); return importerHistorique(u, opts); });
+    _importApres.set(u, p);
+    return p;
+  }
+  _importCompte = u;
+  _importEnCours = importerHistoriqueUn(uid, opts).catch(() => 0).finally(() => { _importEnCours = null; _importCompte = null; });
   return _importEnCours;
 }
 // 5.375 : ce que dit un refus de la garde, dans l'état (pause ou souci).
@@ -31840,8 +31957,13 @@ async function importerAnnonces(uid, acc, st) {
 // Après une visite : un passage 1 min plus tard (la rafale de la visite est
 // passée). Un seul minuteur ; le service worker endormi ⇒ l'alarme de 5 min.
 let _importMinuteur = null;
+// 5.446 (lot ext-anciens-lots ; revue, basse 94) : par une ALARME d'une minute (elle survit au service worker,
+//   §4.9) quand le navigateur en a ; sinon le minuteur d'avant (rattrapé par l'alarme de 5 min).
 function planifierImport() {
-  try { if (_importMinuteur) return; _importMinuteur = setTimeout(() => { _importMinuteur = null; tickImport(); }, 60000); } catch (_) {}
+  try {
+    if (chrome.alarms && typeof chrome.alarms.create === 'function') { if (_importMinuteur) return; _importMinuteur = true; chrome.alarms.create('vrm-import-bientot', { delayInMinutes: 1 }); return; }
+    if (_importMinuteur) return; _importMinuteur = setTimeout(() => { _importMinuteur = null; tickImport(); }, 60000);
+  } catch (_) {}
 }
 // Le passage de fond (alarme `vrm-import`, 5 min) : onglet vinted.fr ouvert, le
 // compte de son cookie, une session VRM, aucune pause, une base qui répond, un
@@ -32181,8 +32303,12 @@ async function importerSiteUn(site, compte, opts) {
   return n;
 }
 let _impSiteMinuteur = null;
+// 5.446 (lot ext-anciens-lots, revue basse 94) : par une ALARME d'une minute (elle survit au worker, §4.9).
 function planifierImportSites() {
-  try { if (_impSiteMinuteur) return; _impSiteMinuteur = setTimeout(() => { _impSiteMinuteur = null; tickImportSites(); }, 60000); } catch (_) {}
+  try {
+    if (chrome.alarms && typeof chrome.alarms.create === 'function') { if (_impSiteMinuteur) return; _impSiteMinuteur = true; chrome.alarms.create('vrm-importsites-bientot', { delayInMinutes: 1 }); return; }
+    if (_impSiteMinuteur) return; _impSiteMinuteur = setTimeout(() => { _impSiteMinuteur = null; tickImportSites(); }, 60000);
+  } catch (_) {}
 }
 // Le passage de fond (alarme `vrm-import`) : chaque compte ouvert dans un onglet
 // Leboncoin / Vestiaire qui a un modèle et quelque chose à lire — un à la fois.
@@ -37760,6 +37886,9 @@ async function sbGetMemo(query) {
   // à Vinted un bordereau qui existe déjà. `sbGetTout` rend `null` si une page
   // échoue, comme `sbGet` sur un échec.
   const p = /[?&]id=like\./.test(query) ? sbGetTout(query) : sbGet(query);
+  // 5.446 (lot ext-anciens-lots ; revue, basse 82) : les entrées périmées partent à chaque insertion (la carte ne
+  //   grossit plus pendant toute la vie du worker), 200 au plus.
+  { const t = Date.now(); for (const [k, v] of _memoVisite) if (!v || t - v.at >= VISITE_MEMO_MS) _memoVisite.delete(k); while (_memoVisite.size >= 200) _memoVisite.delete(_memoVisite.keys().next().value); }
   _memoVisite.set(cle, { at: Date.now(), p });
   const resultat=await p;return (await loadSession())?.user_id===session.user_id?resultat:null;
 }
@@ -40041,6 +40170,7 @@ async function repondreOffreVestiaire(msg) {
     const statut = (rep && Number(rep.statut)) || 0;
     if (!rep || rep.ok !== true) {
       if (rep && rep.code === 'invalide') { await rendreActions('vc:' + ot.compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'geste refusé par la page — rien n’est parti' }; }
+      if (rep && rep.code === 'canal') { await rendreActions('vc:' + ot.compte, depuis, 1); return { accepte: false, code: 'canal', raison: "recharge la page Vestiaire, puis réessaie — rien n'est parti" }; }   // 5.446 (lot ext-anciens-lots) : pas de canal privé — rien n’est parti
       noterDiag('vc_offre_muet');
       return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si ta réponse est partie : regarde l'offre sur Vestiaire avant de recommencer" };
     }
@@ -40291,6 +40421,7 @@ async function deroulerAimesVc() {
       let rep = null;
       try { rep = await avecDelai(chrome.tabs.sendMessage(ot.tabId, { from: 'vrm-fond', action: 'vcOffre', geste: 'favori', produit, acheteur: k, prixCents: prix, recette, compte: ot.compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
       const statut = (rep && Number(rep.statut)) || 0;
+      if (rep && rep.code === 'canal') { await rendreActions('vc:' + ot.compte, depuis, 1); await noter(null); await finir('arret', "recharge la page Vestiaire, puis réessaie — rien n'est parti"); break; }   // 5.446 (lot ext-anciens-lots) : pas de canal privé — rien n’est parti
       if (!rep || rep.ok !== true) { noterDiag('vc_aime_muet'); await noter('incertaine'); f.suivi.incertaines++; await finir('arret', "l'onglet Vestiaire n'a pas répondu — regarde sur Vestiaire avant de recommencer"); break; }
       if (!statut) {
         const e = String(rep.erreur || '');
@@ -40420,6 +40551,7 @@ async function baisserPrixVestiaire(msg) {
     const statut = (rep && Number(rep.statut)) || 0;
     if (!rep || rep.ok !== true) {
       if (rep && rep.code === 'invalide') { await rendreActions('vc:' + ot.compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'baisse refusée par la page — rien n’est parti' }; }
+      if (rep && rep.code === 'canal') { await rendreActions('vc:' + ot.compte, depuis, 1); return { accepte: false, code: 'canal', raison: "recharge la page Vestiaire, puis réessaie — rien n'est parti" }; }   // 5.446 (lot ext-anciens-lots) : pas de canal privé — rien n’est parti
       noterDiag('vc_prix_muet');
       return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si le prix a changé : regarde l'annonce sur Vestiaire avant de recommencer" };
     }
