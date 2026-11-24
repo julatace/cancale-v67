@@ -120,7 +120,7 @@ export function PopEvenements({ Icon, photoDe = null }) {
   const fermer = React.useCallback((id) => { setVues((v) => { const n = v.filter((x) => x.id !== id); if (n.length < 2) setDeplie(false); return n; }); setTimeout(servir, 50); }, [servir]);
   if (typeof document === 'undefined') return null;
   return createPortal(
-    <div className="n-pops" aria-live="polite" aria-label={tr('pop.region')} data-n-pops={vues.length} data-n-pops-tenue={tenue ? '1' : undefined}
+    <div className="n-pops" role="region" aria-live="polite" aria-label={tr('pop.region')} data-n-pops={vues.length} data-n-pops-tenue={tenue ? '1' : undefined}
       onMouseEnter={() => setSouris(true)} onMouseLeave={() => setSouris(false)}
       onFocus={(x) => { let clavier = false; try { clavier = x.target.matches(':focus-visible'); } catch (_) {} if (clavier) setFocus(true); }} onBlur={(x) => { if (!x.currentTarget.contains(x.relatedTarget)) setFocus(false); }}
       onTouchStart={() => setDoigt(true)} onTouchEnd={() => setTimeout(() => setDoigt(false), 1200)} onTouchCancel={() => setDoigt(false)}
