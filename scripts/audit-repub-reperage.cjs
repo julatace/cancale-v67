@@ -38,8 +38,8 @@ const MUTATIONS = [
   ['unique-retire', 'vrm-trouver.js', [["    if (def.unique && ext.length > 1) return", "    if (false && def.unique && ext.length > 1) return"]]],
   ['memoire-juge', 'vrm-trouver.js', [["    if (def.unique && ext.length > 1) return", "    if (false && def.unique && ext.length > 1) return"], ["if (c.prefere && !def.irreversible && vues.includes(c.prefere))", "if (c.prefere && vues.includes(c.prefere))"]]],
   ['fenetre-oubliee', 'vrm-trouver.js', [["supprimerConfirmation: irreversible(() => fenetreSuppression(),", "supprimerConfirmation: irreversible(() => document,"]]],
-  ['nom-contient', 'vrm-trouver.js', [["    confirmer: /^(supprimer|confirmer|", "    confirmer: /(supprimer|confirmer|"]]],
-  ['hors-formulaire-aveugle', 'vrm-trouver.js', [["  const horsFormulaire = (el) => { try { return", "  const horsFormulaire = (el) => { try { return false &&"]]],
+  ['nom-contient', 'vrm-trouver.js', [["    confirmer: /^(supprimer|confirmer|", "    confirmer: /(supprimer|confirmer|"], ["bestatigen und loschen)$/,", "bestatigen und loschen)/,"]]],
+  ['hors-formulaire-aveugle', 'vrm-trouver.js', [["  const horsFormulaire = (el) => { try { return", "  const horsFormulaire = (el) => { try { return false; return"]]],
   ['vrm-compte', 'vrm-trouver.js', [["      if (!el || !el.isConnected || deVrm(el)) return false;", "      if (!el || !el.isConnected) return false;"]]],
   ['sans-couche', 'vrm-formulaire.js', [["    if (!t || !Array.isArray(t.elements) || !t.elements.includes(nomT)) return attendreN(", "    if (true || !t || !Array.isArray(t.elements) || !t.elements.includes(nomT)) return attendreN("]]],
   ['libelle-premier', 'vrm-formulaire.js', [["      if (plusFin.length === 1) return plusFin[0].closest('[role=\"button\"],button,li,[data-testid]') || plusFin[0];", "      if (plusFin.length >= 1) return plusFin[0].closest('[role=\"button\"],button,li,[data-testid]') || plusFin[0];"]]],
@@ -48,7 +48,8 @@ const MUTATIONS = [
 if (process.argv.includes('--prouve')) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'repub-reperage-'));
   let bien = true;
-  for (const [nom, fichier, paires] of MUTATIONS) {
+  const seules = (process.env.PROUVE_SEUL || '').split(',').filter(Boolean);
+  for (const [nom, fichier, paires] of MUTATIONS.filter(([n]) => !seules.length || seules.includes(n))) {
     const d = path.join(tmp, nom); fs.mkdirSync(d);
     for (const f of ['vrm-trouver.js', 'vrm-formulaire.js']) fs.copyFileSync(path.join(EXT, f), path.join(d, f));
     let c = fs.readFileSync(path.join(d, fichier), 'utf8'), trouve = true;
