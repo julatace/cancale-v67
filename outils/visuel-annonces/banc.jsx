@@ -31,7 +31,7 @@ const MOD = ['Nike Air Max 1 bleu', 'adidas Handball Spezial noir', 'Nike SB Dun
 const MARQ = ['Nike', 'adidas', 'Nike SB', 'Nike', 'Salomon', 'New Balance'];
 const photo = (i) => (i % 11 === 7 ? null : `/photo/${i}.svg`);
 const item = (i, extra = {}) => ({ id: String(10000 + i), title: MOD[i % MOD.length] + ' taille ' + (38 + (i % 8)), photo: photo(i), price: 27 + (i * 7) % 160 + (i % 3 ? 0 : 0.5), size: String(38 + (i % 8)),
-  condition: 'Très bon état', brand: MARQ[i % MARQ.length], createdTs: i % 13 === 5 ? undefined : NOW - (((i * 7) % 61) * J + (i % 5) * 3600e3), /* âges variés ; 1 sur 13 inconnu (pas d'horloge) */ favourites: i % 4 === 3 ? undefined : (i * 3) % 41, views: (i * 13) % 1400, url: 'https://www.vinted.fr/items/' + (10000 + i), ...extra });
+  condition: 'Très bon état', brand: MARQ[i % MARQ.length], createdTs: i % 13 === 5 ? undefined : NOW - (((i * 7) % 61 + 1) * J + (i % 5) * 3600e3), /* âges variés ; 1 sur 13 inconnu (pas d'horloge) */ favourites: i % 4 === 3 ? undefined : (i * 3) % 41, views: (i * 13) % 1400, url: 'https://www.vinted.fr/items/' + (10000 + i), ...extra });
 const lues = Array.from({ length: N }, (_, i) => item(i));
 // Le LEURRE : deux annonces du 1er compte affiché portent le MÊME titre, chacune SA photo.
 const L0 = Math.floor(N / 3) * 2; lues[L0].title = lues[L0 + 1].title = 'Nike Air Max 90 blanc taille 42'; lues[L0].createdTs = lues[L0 + 1].createdTs = NOW - 60e3;   // en tête de liste

@@ -168,10 +168,13 @@ async function cas(nav, nom, opts, theme) {
   dit(m.carres.every((x) => x === 1), `G photos carrées${nom === 'tel' ? ' (60 px)' : ''}`, m.carres);
   dit(m.identite.length === 0, `I chaque carte montre la photo de SON identifiant (${m.nCartes} vérifiées)`, m.identite.slice(0, 4));
   // Le leurre : on défile jusqu'à voir ses deux cartes (la grille est virtualisée : elles ne sont montées que près de l'écran).
-  m.leurre = await pg.evaluate(async () => { const el = document.scrollingElement; const vus = {}; const k = window.__leurre || [];
-    for (let y = 0; y <= el.scrollHeight && Object.keys(vus).length < k.length; y += innerHeight * 0.8) { el.scrollTop = y; await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
-      for (const c of k) { const x = document.querySelector(`[data-eg-article="${CSS.escape(c)}"] :is(.n-ad-photo, .n-ar-photo) img`); if (x && !vus[c]) vus[c] = new URL(x.getAttribute('src'), location.href).pathname; } }
+  m.leurre = await pg.evaluate(async () => { const el = document.scrollingElement; const vus = {}; const k = window.__leurre || []; const sans = new Set(window.__sansAge || []); window.__ageVu = { n: 0, horloge: 0 };
+    for (let y = 0; y <= el.scrollHeight && (Object.keys(vus).length < k.length || window.__ageVu.n < 3); y += innerHeight * 0.8) { el.scrollTop = y; await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+      for (const c of k) { const x = document.querySelector(`[data-eg-article="${CSS.escape(c)}"] :is(.n-ad-photo, .n-ar-photo) img`); if (x && !vus[c]) vus[c] = new URL(x.getAttribute('src'), location.href).pathname; }
+      for (const r of document.querySelectorAll('[data-eg-article]')) if (sans.has(r.getAttribute('data-eg-article')) && !r.dataset.vuAge) { r.dataset.vuAge = '1'; window.__ageVu.n++; if (r.querySelector('[data-ad-stat="jours"]')) window.__ageVu.horloge++; } }
     el.scrollTop = 0; await new Promise((ok) => setTimeout(ok, 400)); return k.map((c) => vus[c] || null); });
+  const ageVu = await pg.evaluate(() => window.__ageVu);
+  dit(ageVu.n > 0 && ageVu.horloge === 0, `G âge inconnu ⇒ aucune horloge, jamais « 0 j » (${ageVu.n} annonces sans date vues en défilant)`, ageVu);
   dit(m.leurre.length === 2 && m.leurre[0] && m.leurre[1] && m.leurre[0] !== m.leurre[1], `I le leurre au même titre : deux photos différentes, chacune la sienne`, m.leurre);
   dit(m.etiq.length === 0, `I l'étiquette du N° dit le N° de SA fiche`, m.etiq.slice(0, 4));
   dit(prem && prem.op >= 0.35 && prem.delai === 0, `S la 1re carte est lisible dès sa 1re image, sans délai (opacité ${prem && prem.op}, délai ${prem && prem.delai})`, prem);
