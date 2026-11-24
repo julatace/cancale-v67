@@ -22062,15 +22062,82 @@ async function sequenceFavoriBleam(x) {
 //    celui-ci, une seule personne, un seul article ; des messages dont la forme n'est pas sue ⇒ « historique non vérifié »
 //    (jamais « vide ») ; le pseudo n'est pas lu (une variable {pseudo} fera refuser, rien ne part au hasard).
 function adresseMessagerieVinted(domaine,uuid){const d=String(domaine||'www.vinted.fr').toLowerCase().replace(/^www\./,'');return /^vinted\.(fr|com|it|de)$/.test(d)&&RE_UUID_CONV.test(String(uuid||''))?`https://api.${d}/messaging/main/conversations/${uuid}`:'';}
-function filDepuisMessagerie(j,convId,uuid,tx){
+function filDepuisMessagerie(j,convId,uuid,tx,cmd=null,attendu=null){
   const c=j&&typeof j==='object'?(j.conversation&&typeof j.conversation==='object'?j.conversation:j):null;
   if(!c||String(c.id||'')!==String(uuid)||String(Number(c.core_id_deprecated))!==String(convId))return null;
   const ids=(l)=>(Array.isArray(l)?l:[]).map((x)=>x&&typeof x==='object'?String(x.id!=null?x.id:x.user_id!=null?x.user_id:x.item_id!=null?x.item_id:''):'').filter((v)=>/^[1-9]\d{0,19}$/.test(v));
-  const opp=ids(c.opposite_users),items=ids(c.data&&c.data.items);
+  const opp=ids(c.opposite_users);
+  let items=ids(c.data&&c.data.items);
+  // 5.440.1 : une conversation de la nouvelle messagerie SANS `data.items` mais avec `data.escrow_order_id` (mesuré le 23 nov.) :
+  //    l'article et l'acheteur ne sont pris que dans LA commande de CETTE conversation (`identiteParCommande`), jamais devinés.
+  if(!items.length&&!(c.data&&Array.isArray(c.data.items))&&cmd){const k=identiteParCommande(c,cmd,uuid,attendu);if(!k.ok)return null;items=[k.itemId];}
   if(opp.length!==1||items.length!==1||!Array.isArray(c.messages))return null;
   const t=/^[1-9]\d{0,19}$/.test(String(tx||''))?String(tx):'';
   return {id:String(convId),opposite_user:{id:opp[0]},item_id:items[0],...(t?{transaction:{id:t,item_id:items[0]}}:{}),allow_reply:c.allow_reply!==false,messages:c.messages.map(()=>({entity_type:'forme_inconnue'})),...(c.pagination&&c.pagination.has_next===true?{has_more:true}:{})};
 }
+// ══ 5.440.1 — L'IDENTITÉ PAR LA COMMANDE (nouvelle messagerie sans `data.items`) ══════════════════════════════════════
+//  Mesuré le 23 nov. (relevé passif de la page, formes seulement) : `GET api.vinted.fr/messaging/main/conversations/{uuid}`
+//  peut porter `data.order_id` / `data.escrow_order_id` (textes) et AUCUN `data.items` ; la page lit alors
+//  `GET api.vinted.fr/escrow-orders/api/v2/escrow-orders/{id}` → `escrow_order.{id (nombre), items[], buyer_id (nombre),
+//  conversation_id (texte), current_user_side (texte)}`. La sous-forme de `items[]` n'a JAMAIS été relevée.
+//  TOUT doit concorder, sinon rien ne part : l'uuid de la conversation, le n° de commande de la conversation, l'acheteur
+//  (= le destinataire du favori, et l'unique personne en face), le côté vendeur, et l'article du favori — lu seulement dans
+//  un champ d'identifiant plausible (`item_id`, `item.id`, ou `id` d'une ligne qui n'a ni l'un ni l'autre), comparé
+//  exactement. Une forme inconnue ⇒ refus nommé et sa FORME (clés et types, jamais une valeur) notée pour le prochain essai.
+function idCommandeConv(j){const c=j&&typeof j==='object'?(j.conversation&&typeof j.conversation==='object'?j.conversation:j):null;const d=c&&c.data&&typeof c.data==='object'?c.data:null;if(!d||Array.isArray(d.items))return '';const v=d.escrow_order_id;return (typeof v==='string'||typeof v==='number')&&/^[1-9]\d{0,19}$/.test(String(v))?String(v):'';}
+function adresseCommandeVinted(domaine,id){const d=String(domaine||'www.vinted.fr').toLowerCase().replace(/^www\./,'');return /^vinted\.(fr|com|it|de)$/.test(d)&&/^[1-9]\d{0,19}$/.test(String(id||''))?`https://api.${d}/escrow-orders/api/v2/escrow-orders/${id}`:'';}
+const formeCles=(o)=>o&&typeof o==='object'&&!Array.isArray(o)?Object.keys(o).sort().slice(0,12).map((k)=>String(k).replace(/[^a-z_]/gi,'').slice(0,20)+':'+(Array.isArray(o[k])?'a':o[k]===null?'n':(typeof o[k])[0])).join(','):(Array.isArray(o)?'tableau':typeof o);
+function articleLigneCommande(x){
+  if(typeof x==='number'||typeof x==='string')return {forme:typeof x};
+  if(!x||typeof x!=='object'||Array.isArray(x))return {forme:'autre'};
+  const num=(v)=>(typeof v==='number'&&Number.isSafeInteger(v)&&v>0)||(typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v))?String(v):'';
+  if('item_id' in x)return num(x.item_id)?{id:num(x.item_id)}:{forme:formeCles(x)};
+  if(x.item&&typeof x.item==='object'&&!Array.isArray(x.item))return num(x.item.id)?{id:num(x.item.id)}:{forme:formeCles(x)};
+  if('item' in x)return {forme:formeCles(x)};
+  return num(x.id)?{id:num(x.id)}:{forme:formeCles(x)};
+}
+function identiteParCommande(conv,cmd,uuid,attendu){
+  const e=cmd&&typeof cmd==='object'?(cmd.escrow_order&&typeof cmd.escrow_order==='object'?cmd.escrow_order:null):null;
+  const non=(raison,forme)=>({ok:false,raison,...(forme?{forme}:{})});
+  if(!e)return non('commande_absente',formeCles(cmd));
+  const d=conv&&conv.data&&typeof conv.data==='object'?conv.data:{};
+  if(typeof e.conversation_id!=='string'||e.conversation_id!==String(uuid))return non('commande_autre_conversation');
+  if(String(e.id)!==String(d.escrow_order_id)||!/^[1-9]\d{0,19}$/.test(String(e.id)))return non('commande_autre_numero');
+  if(String(e.current_user_side||'')!=='seller')return non('commande_pas_vendeur');
+  const acheteur=(typeof e.buyer_id==='number'||typeof e.buyer_id==='string')&&/^[1-9]\d{0,19}$/.test(String(e.buyer_id))?String(e.buyer_id):'';
+  if(!acheteur||!attendu||acheteur!==String(attendu.recipientId))return non('commande_autre_acheteur');
+  const opp=(Array.isArray(conv.opposite_users)?conv.opposite_users:[]).map((x)=>x&&typeof x==='object'&&x.id!=null?String(x.id):'');
+  if(opp.length&&(opp.length!==1||opp[0]!==acheteur))return non('commande_autre_personne');
+  if(!Array.isArray(e.items)||!e.items.length)return non('commande_sans_article',formeCles(e));
+  const lus=e.items.slice(0,20).map(articleLigneCommande);
+  const inc=lus.find((x)=>!x.id);if(inc)return non('commande_article_forme',inc.forme);
+  if(lus.length!==1)return non('commande_plusieurs_articles');
+  if(lus[0].id!==String(attendu.itemId))return non('commande_autre_article');
+  return {ok:true,itemId:lus[0].id,acheteur};
+}
+// 5.440.1 : un texte borné SANS le couper au milieu (à la dernière fin de phrase sous la borne) — jamais « … touche « ».
+function texteEntier(t, max) { const x = String(t || '').replace(/\s+/g, ' ').trim(); if (x.length <= max) return x; const c = x.slice(0, max); const i = Math.max(c.lastIndexOf('. '), c.lastIndexOf('.» '), c.lastIndexOf('» ')); return (i > 40 ? c.slice(0, i + 1) : c.replace(/\s+\S*$/, '')).trim() + '…'; }
+// La forme inconnue (clés et types, JAMAIS une valeur) : un compteur du diagnostic (`panel_diag_capture`) et les 10 dernières
+//    en local (`vrmFormesFavori`), pour que le prochain essai dise ce que Vinted a rendu.
+async function noterFormeFavori(quoi,raison,forme){
+  const f=String(forme||'').replace(/[^a-z0-9_:,]/gi,'').slice(0,90),k=`favori_forme_${String(quoi).replace(/[^a-z]/g,'')}_${String(raison||'').replace(/[^a-z_]/g,'').slice(0,30)}:${f}`;
+  noterDiag(k);
+  try{const l=(await chrome.storage.local.get('vrmFormesFavori')).vrmFormesFavori;await chrome.storage.local.set({vrmFormesFavori:[...(Array.isArray(l)?l:[]),{k,at:Date.now()}].slice(-10)});}catch(_){}
+}
+// Un lien d'APPLICATION de Vinted (`vintedfr://messaging?item_id=N&user_id=N&portal=fr`, mesuré le 23 nov.) : les deux
+//    identités, et rien d'autre (clés exactes, une fois chacune, chiffres) ; sinon null.
+function lienFavoriProfond(v){
+  try{const s=String(v||'');if(s.length>400)return null;const m=/^vinted([a-z]{2})?:\/\/messaging\/?\?([^#]*)$/i.exec(s);if(!m)return null;
+    // Lu à la main (clé=valeur, sans décodage : seules des lettres, des chiffres et `_` sont permis).
+    const q={};for(const part of m[2].split('&')){const kv=/^([a-z_]{1,20})=([a-z0-9]{1,20})$/i.exec(part);if(!kv||kv[1] in q)return null;q[kv[1]]=kv[2];}
+    if(Object.keys(q).some((k)=>!['item_id','user_id','portal'].includes(k)))return null;
+    const it=q.item_id,us=q.user_id;if(!/^[1-9]\d{0,19}$/.test(String(it||''))||!/^[1-9]\d{0,19}$/.test(String(us||''))||it===us)return null;
+    if('portal' in q&&!/^[a-z]{2,8}$/.test(q.portal))return null;
+    return {itemId:it,userId:us};
+  }catch(_){return null;}
+}
+// La FORME d'un lien de notification inconnu (pour le diagnostic) : le schéma et le gabarit du chemin, jamais une valeur.
+function formeLienFavori(v){const s=String(v||'');const m=/^([a-z][a-z0-9+.-]{0,20}):/i.exec(s);return ((m?m[1].toLowerCase():'rel')+'_'+s.replace(/^[a-z][a-z0-9+.-]{0,20}:\/{0,}/i,'').split(/[?#]/)[0].replace(/\d+/g,'n').replace(/[^a-z_/n]/gi,'').replace(/\//g,'_')).slice(0,40);}
 // 5.440 : l'adresse de la liste de la cloche, sur l'hôte `api.` du domaine du compte (mesuré : www → 404, api → 200).
 function adresseClocheVinted(domaine){const d=String(domaine||'www.vinted.fr').toLowerCase().replace(/^www\./,'');return /^vinted\.(fr|com|it|de)$/.test(d)?`https://api.${d}/inbox-notifications/v1/notifications`:'/inbox-notifications/v1/notifications';}
 // Le chemin de la page complète des notifications, LU sur la page (« Voir tout » ou le lien de la cloche) et retenu.
@@ -22189,8 +22256,19 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   // Le lien capté (s'il est connu) doit porter CET article et CE destinataire ; sans lien, seule la ligne native
   // `?item_id=&receiver_id=` aux DEUX identités du favori est acceptée par la page.
   const lienBrut=lienCloche||(typeof body.notificationId==='string'&&body.notificationId?await lienDuFavori(uid,body.notificationId):null);
-  const page=lienBrut?pageFavoriNative(lienBrut,acc.domain||'www.vinted.fr'):null;
-  if(lienBrut&&(!page||page.itemId!==body.itemId||(destinataireLienFavori(page)&&destinataireLienFavori(page)!==body.recipientId))){noterDiag('favori_lien_autre');return rep('refuse',0,'identite_non_confirmee');}
+  // 5.440.1 (Julien, 23 nov. 19:44 : « Conversation pas vérifiée — rien n'est parti ») : MESURÉ dans la vraie base, les
+  //    notifications de favori de son compte portent depuis le 23 nov. 09:05 un lien d'APPLICATION
+  //    `vintedfr://messaging?item_id=N&user_id=N&portal=fr` (plus `/items/N/want_it/new?offering_id=N`). La 5.440 ne le
+  //    reconnaissait pas comme une page et refusait AVANT tout clic (`favori_lien_autre`). Ce lien porte les DEUX identités :
+  //    l'article et la personne doivent être EXACTEMENT ceux du favori ; alors la page cherche la ligne native par ces deux
+  //    identités (aucune adresse à suivre). Une autre identité ⇒ rien ne part, comme avant.
+  const profond=lienBrut?lienFavoriProfond(lienBrut):null;
+  if(profond){
+    if(profond.itemId!==body.itemId||profond.userId!==body.recipientId){noterDiag('favori_lien_profond_autre');return rep('refuse',0,'identite_non_confirmee','lien_autre');}
+    noterDiag('favori_lien_profond');
+  }
+  const page=lienBrut&&!profond?pageFavoriNative(lienBrut,acc.domain||'www.vinted.fr'):null;
+  if(lienBrut&&!profond&&(!page||page.itemId!==body.itemId||(destinataireLienFavori(page)&&destinataireLienFavori(page)!==body.recipientId))){noterDiag(page?'favori_lien_autre':'favori_lien_forme_'+formeLienFavori(lienBrut));return rep('refuse',0,'identite_non_confirmee','lien_autre');}
   let creation=await interfaceVinted(acc,'favoriOuvrir',{lien:page?page.url:'',itemId:body.itemId,receiverId:body.recipientId,favori:true});
   // 5.440 (`clocheauto`, Julien, 23 nov. : « l'app doit s'adapter toute seule ») : la cloche introuvable sur la messagerie
   //    ⇒ l'ACCUEIL de Vinted (l'en-tête complet y est toujours), sans rien demander ; toujours introuvable ⇒ la page complète
@@ -22242,7 +22320,11 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   if(seqBleam||!cc||!filVerifiable(c)||String(cc.id)!==convId){noterDiag('favori_fil_relu');lu=await vintedPage(acc,'GET',`/api/v2/conversations/${convId}`,null,{timeoutMs:12000,travail:true});c=lu.json?.conversation;if(!frein)frein=freinFavoriAuto(lu);
     // 5.440 : l'ancienne lecture refusée pour une conversation de la NOUVELLE messagerie ⇒ sa lecture à elle (GET, même onglet),
     //    acceptée seulement si Vinted y dit CET ancien n°, UNE personne, UN article (sinon rien ne part).
-    if(!lu.ok&&convRoute&&!frein){const ln=await vintedPage(acc,'GET',adresseMessagerieVinted(acc.domain,convRoute),null,{timeoutMs:12000,travail:true});if(!frein)frein=freinFavoriAuto(ln);const cn=ln.ok?filDepuisMessagerie(ln.json,convId,convRoute,creation.tx):null;if(cn){noterDiag('favori_fil_nouveau');lu={status:ln.status,ok:true,json:{conversation:cn}};c=cn;}else noterDiag('favori_fil_nouveau_illisible_'+(ln.status||0));}
+    if(!lu.ok&&convRoute&&!frein){const ln=await vintedPage(acc,'GET',adresseMessagerieVinted(acc.domain,convRoute),null,{timeoutMs:12000,travail:true});if(!frein)frein=freinFavoriAuto(ln);let cmd=null;const idCmd=ln.ok?idCommandeConv(ln.json):'';
+      // 5.440.1 : pas d'article dans la conversation, une commande à la place ⇒ SA commande relue (GET, même onglet), identité par identité.
+      if(idCmd&&!frein){const lc=await vintedPage(acc,'GET',adresseCommandeVinted(acc.domain,idCmd),null,{timeoutMs:12000,travail:true});if(!frein)frein=freinFavoriAuto(lc);cmd=lc.ok?lc.json:null;
+        if(cmd){const k=identiteParCommande(ln.json.conversation||ln.json,cmd,convRoute,{itemId:body.itemId,recipientId:body.recipientId});noterDiag('favori_commande_'+(k.ok?'ok':k.raison));if(k.forme)await noterFormeFavori('commande',k.raison,k.forme);}else noterDiag('favori_commande_illisible_'+(lc.status||0));}
+      const cn=ln.ok?filDepuisMessagerie(ln.json,convId,convRoute,creation.tx,cmd,{itemId:body.itemId,recipientId:body.recipientId}):null;if(cn){noterDiag('favori_fil_nouveau');lu={status:ln.status,ok:true,json:{conversation:cn}};c=cn;}else noterDiag('favori_fil_nouveau_illisible_'+(ln.status||0));}
     if(!lu.ok)return rep('refuse',lu.status,'identite_non_confirmee');}
   // Both identities must be in the actual thread immediately before reply.
   const article=String(c?.transaction?.item_id||c?.transaction?.item?.id||c?.item?.id||c?.item_id||'');
@@ -22719,6 +22801,8 @@ function lignesFavoris(st) {
   return items.map((x) => {
     const j = x.n ? jobs.get(String(x.n)) : null;
     let etat = j ? (ETATS_LIGNE_FAV[String(j[1])] || 'attente') : 'attente';
+    // 5.440.1 : la MÊME règle que le bilan (`bilanFavoris`) : un refus pour une raison de saut (vendu, déjà contacté…) est « sauté ».
+    if (etat === 'pas' && GARDES_APP.RAISONS_SAUT.includes(String(j[2] || ''))) etat = 'saute';
     if (etat === 'attente' && cours && cours === x.id && String(st.cours || '') === String(x.n || '')) etat = 'cours';
     const r = j && etat !== 'envoye' ? String(j[2] || '').replace(/^filtre_.*/, 'filtre').replace(/[^a-z_]/g, '').slice(0, 40) : '';
     return { id: x.id, photo: x.photo || '', titre: x.titre || '', etat, ...(r ? { r } : {}), ...(j && j[3] ? { offre: 1 } : {}) };
@@ -22785,7 +22869,7 @@ async function finirActionEnCours(raison, st) {
   const fi = (st && st.file) || {};
   const lignesF = st ? lignesFavoris(st) : null;
   await poserAction(Object.assign({}, a, lignesF ? { lignes: lignesF } : {}, { actif: false, enCours: false, prochain: null, etapeFav: '', fait: st ? (Number(fi.envoyes) || a.fait || 0) : a.fait,
-    verification: raison === 'robot' || raison === 'verification', fin: { at: Date.now(), raison: String(raison || 'fini') } }));
+    verification: raison === 'robot' || raison === 'verification', fin: { at: Date.now(), raison: String(raison || 'fini'), ...(st && st.fin && st.fin.code ? { code: st.fin.code, refus: st.fin.refus || '', n: Number(st.fin.n) || 0 } : {}) } }));
 }
 // ══ 5.433 (`filevisible`, Julien, 21 nov., choix n° 97 et 99) — UNE SEULE FILE VISIBLE, ET « PAUSE APRÈS CELLE-CI » ═════
 // « Toutes les actions d'écriture de l'extension passent par UNE file persistante que le panneau montre : position,
@@ -24707,7 +24791,11 @@ async function tickFavorisCarte() {
       { const jb = jobsDuLot(g.json.vue, st.sel); if (jb) st.jobs = jb; }
       if (!g.json.vue.active) {
         st.actif = false; st.attente = null; st.prochain = null;
-        st.fin = { at: Date.now(), raison: g.json.vue.raison ? 'interrompu' : 'fini', texte: String(g.json.vue.raison || '').slice(0, 240), bilan: g.json.vue.bilan ? String(GARDES_APP.phraseBilanFavoris(g.json.vue.bilan) || '').slice(0, 300) : '' };
+        // 5.440.1 : la raison gardée ENTIÈRE (avant : coupée à 240 signes, « … puis touche « ») et son CODE (traduit par la fenêtre) ;
+        //    « Sélection traitée » (`traitee`) est une fin, pas une interruption.
+        { const v = g.json.vue, code = /^(local_saute|locaux_suite|traitee)$/.test(String(v.raisonCode || '')) ? String(v.raisonCode) : '';
+          st.fin = { at: Date.now(), raison: v.raison && code !== 'traitee' ? 'interrompu' : 'fini', texte: texteEntier(v.raison, 600), ...(code ? { code, refus: String(v.raisonRefus || '').replace(/[^a-z_]/g, '').slice(0, 40), n: Number(v.raisonN) || 0 } : {}), bilan: g.json.vue.bilan ? String(GARDES_APP.phraseBilanFavoris(g.json.vue.bilan) || '').slice(0, 300) : '' };
+        }
         await poserEtatFavorisCarte(st);
         logActivity(`💬 Messages aux favoris (carte) : ${st.file ? st.file.envoyes : 0} envoyé(s)`);
         return;
@@ -34588,6 +34676,7 @@ var __gardesApp = (() => {
     LIGNE_PROGRAMME: () => LIGNE_PROGRAMME,
     NOM_SITE_AUSSI: () => NOM_SITE_AUSSI,
     PCT_AUSSI: () => PCT_AUSSI,
+    RAISONS_SAUT: () => RAISONS_SAUT,
     SITES_AUSSI: () => SITES_AUSSI,
     apercuRepub: () => apercuRepub,
     avisAcceptationManuelle: () => avisAcceptationManuelle,
@@ -37122,7 +37211,7 @@ ${lettre[1]}`;
     };
     const p = [`${b.envoyes} envoyé${b.envoyes > 1 ? "s" : ""}`];
     if (b.sautes) p.push(`${b.sautes} sauté${b.sautes > 1 ? "s" : ""} (${liste(b.parSaut, "saut")})`);
-    if (b.refuses) p.push(`${b.refuses} refusé${b.refuses > 1 ? "s" : ""} : ${liste(b.parRefus, "refus")}`);
+    if (b.refuses) p.push(`${b.refuses} pas envoyé${b.refuses > 1 ? "s" : ""} : ${liste(b.parRefus, "refus")}`);
     if (b.incertains) p.push(`${b.incertains} à vérifier sur Vinted`);
     return p.join(" · ");
   }
