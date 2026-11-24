@@ -185,6 +185,12 @@ const SOURCES = { at: Date.now(), sansAchat: 4, achatPasLu: 0, vintedLus: true, 
   GR.gainsReels({ lignes, bilan: SOURCES });
   dit(JSON.stringify(lignes) === avant, 'G20 rien n’est écrit dans le relevé (le modèle ne relie aucune vente, ne pose aucun prix)');
 
+  // Le module n'est lu que par les statistiques (jamais par une règle d'identité, de N° ou de prix d'achat).
+  const importeurs = [];
+  const parcourir = (d) => { for (const e of fs.readdirSync(path.join(R, d), { withFileTypes: true })) { const f = path.join(d, e.name); if (e.isDirectory()) parcourir(f); else if (/\.jsx?$/.test(e.name) && /from ['"][./]+(?:[^'"]*\/)?gainsReels\.js['"]/.test(fs.readFileSync(path.join(R, f), 'utf8'))) importeurs.push(f); } };
+  parcourir('src');
+  dit(importeurs.sort().join() === ['src/aujourdhui/StatsBranche.jsx', 'src/natif/ecrans/StatsGains.jsx'].join(), 'G21 gainsReels.js n’est importé que par Statistiques (aucune identité n’en dépend)', importeurs);
+
   // ── La vue rendue ──
   const montantTxt = (x) => (Math.round(x * 100) / 100).toFixed(2).replace('.', ',') + ' €';
   const html = (vue) => { global.localStorage = { getItem: (k) => (k === 'vrm_stats_gains_vue' ? vue : null), setItem() {}, removeItem() {} }; return renderToStaticMarkup(React.createElement(StatsGains, { G, sur: '30 jours', montant: montantTxt })); };

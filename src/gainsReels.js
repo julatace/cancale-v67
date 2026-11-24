@@ -25,7 +25,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { classementRapporte } from './ceQuiRapporte.js';
 import { netDeVenteRangee } from './coutReel.js';
-import { versClassement } from './vendsMieux.js';
 import { scoreRachat, MIN_RACHAT } from './quoiRacheter.js';
 import { rentabiliteParSource } from './rentabiliteSource.js';
 
@@ -48,8 +47,12 @@ export function delaiLigne(l) {
 
 // Une ligne pour `classementRapporte` dont le « prix d'achat » est TOUT ce que la vente a coûté (vente − net) : le brut
 // du classement est alors la somme des nets. Net pas su ⇒ coût pas su (la ligne compte dans `n`, pas dans `nCout`).
+// La forme de `classementRapporte` (celle de `versClassement`, src/vendsMieux.js — non importé : ce module-là reste aux
+// seuls écrans de statistiques, audit-rentabilite C3) : le modèle SÛR déjà posé par la lecture du relevé, jamais recalculé.
 function pourClassement(l) {
-  const c = versClassement(l), net = netLigne(l);
+  const m = l && l.modele && typeof l.modele === 'object' && l.modele.cle ? { cle: String(l.modele.cle), nom: String(l.modele.nom || l.modele.cle) } : null;
+  const c = { plateforme: l.plateforme, compte: l.compte, id: l.id, ts: l.ts, eur: l.eur, devise: l.devise, titre: l.titre || '', marque: l.marqueLue || l.marque || '', taille: l.taille || '', modeleSur: m, enLigne: l.enLigne };
+  const net = netLigne(l);
   return { ...c, achat: net == null ? null : (Math.round(Number(l.eur) * 100) - net) / 100 };
 }
 
