@@ -125,8 +125,13 @@
     display: grid; grid-template-columns: auto auto auto auto minmax(0, 1fr) auto; grid-template-areas: "site compte compte compte compte prix" "site vues fav date . etat";
     align-items: center; column-gap: 10px; row-gap: 0; min-height: 56px; padding: 8px 16px; box-sizing: border-box; color: var(--n-encre); text-decoration: none;
   }
-  a.nf-site { -webkit-tap-highlight-color: transparent; }
-  a.nf-site:active { background: var(--n-appui); }
+  /* (24 nov., main-vert) la rangée porte un vrai lien DANS sa cellule, étendu à toute la rangée (la rangée reste role="row") */
+  .nf-site[data-nf-lien] { position: relative; -webkit-tap-highlight-color: transparent; }
+  .nf-site[data-nf-lien]:active { background: var(--n-appui); }
+  .nf-site-lien { color: inherit; text-decoration: none; display: contents; }
+  .nf-site-lien::after { content: ""; position: absolute; inset: 0; }
+  .nf-site-lien:focus-visible::after { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .nf-site[data-nf-lien] .nf-geste { position: relative; z-index: 1; }
   .nf-site + .nf-site { box-shadow: inset 0 .5px 0 var(--n-trait); }
   .nf-site-tete { display: none; }
   .nf-c-site { grid-area: site; display: inline-flex; align-items: center; gap: 10px; min-width: 0; font: var(--n-t-corps-fort); }

@@ -88,11 +88,11 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
     const benef = f.cle === 'benefice' || f.cle === 'si-vendue';
     // La pastille se voit à 32 px ; le bouton qui la porte fait 44 (la cible au doigt).
     const contenu = <span className="nf-pi">{su
-      ? <>{benef ? null : <span className="nf-pastille-lib">{court}</span>}<span className="nf-pastille-val">{v}</span>{f.partiel ? <span className="nf-pastille-lib">{T.auPlus}</span> : null}</>
-      : <><span className="nf-pastille-lib">{court}</span>{manque(f, porte)}</>}</span>;
+      ? <>{benef ? null : <><span className="nf-pastille-lib">{court}</span>{' '}</>}<span className="nf-pastille-val">{v}</span>{f.partiel ? <span className="nf-pastille-lib">{T.auPlus}</span> : null}</>
+      : <><span className="nf-pastille-lib">{court}</span>{' '}{manque(f, porte)}</>}</span>;
     const ton = benef && su && f.cents != null ? (f.cents < 0 ? 'negatif' : 'positif') : su ? 'neutre' : porte ? 'porte' : 'vide';
     return porte
-      ? <button key={f.cle} type="button" className="nf-pastille" data-nf-ton={ton} onClick={() => toucherFait(f)} aria-label={T.libelle(f.lib) + ' ' + (su ? v : T.ajouter)} {...a}>{contenu}</button>
+      ? <button key={f.cle} type="button" className="nf-pastille" data-nf-ton={ton} onClick={() => toucherFait(f)} aria-label={(benef && su ? '' : court + ' ') + (su ? v : T.ajouter) + ' — ' + T.libelle(f.lib)} {...a}>{contenu}</button>
       : <span key={f.cle} className="nf-pastille" data-nf-ton={ton} {...a}>{contenu}</span>;
   };
   const pastilles = PASTILLES.map(fait).filter(Boolean);
@@ -207,12 +207,15 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
               </div>
               {rangees.map((s, i) => {
                 const lien = s.lien || '';
-                const Tag = lien ? 'a' : 'div';
+                // (24 nov., main-vert) La rangée reste une RANGÉE du tableau (`div role="row"`) ; le lien est un vrai <a> DANS sa
+                // cellule, étendu à toute la rangée par CSS (fiche.css `.nf-site-lien::after`) — avant, `<a role="row">` perdait
+                // son rôle de lien pour un lecteur d'écran (axe aria-allowed-role).
+                const Tag = 'div';
                 const vide = s.etat === 'pas-publiee' || s.etat === 'pas-su';
-                return <Tag key={s.site + i} className="nf-site" role="row" {...(lien ? { href: lien, target: '_blank', rel: 'noreferrer', 'data-fiche-site-lien': '' } : {})}
+                return <Tag key={s.site + i} className="nf-site" role="row" data-nf-lien={lien ? '1' : undefined}
                   data-fiche-site={s.site} data-fiche-site-etat={s.etat} data-fiche-site-premiere={s.premiere ? '1' : undefined} data-fiche-site-raison={s.raison || undefined}
                   data-fiche-site-jours={s.jours != null ? String(s.jours) : undefined} data-nf-vide-site={vide ? '1' : undefined} data-nf-geste={s.publier && publierSur ? '1' : undefined}>
-                  <span role="cell" className="nf-c-site"><span className="nf-logo">{rendre.logo(s.site)}</span><span className="nf-site-nom">{T.site(s.site)}</span></span>
+                  <span role="cell" className="nf-c-site">{lien ? <a className="nf-site-lien" href={lien} target="_blank" rel="noreferrer" data-fiche-site-lien="" aria-label={T.site(s.site)}><span className="nf-logo">{rendre.logo(s.site)}</span><span className="nf-site-nom">{T.site(s.site)}</span></a> : <><span className="nf-logo">{rendre.logo(s.site)}</span><span className="nf-site-nom">{T.site(s.site)}</span></>}</span>
                   <span role="cell" className="nf-c-compte"><span className="nf-compte-site">{T.site(s.site) + (s.compte ? ' · ' : '')}</span>{s.compte || <span className="nf-compte-vide">—</span>}{vide ? <span className="nf-compte-etat">{T.etatSite(s)}</span> : null}</span>
                   <span role="cell" className="nf-c-num nf-c-prix" data-nf-vide={s.prix != null ? undefined : '1'}>{s.prix != null ? T.euros(s.prix) : '—'}</span>
                   <span role="cell" className="nf-c-num nf-c-vues" data-nf-vide={Number.isFinite(s.vues) ? undefined : '1'}>{nb(s.vues)}</span>
