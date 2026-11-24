@@ -12626,6 +12626,24 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       .then((r) => { if (vivant) setRetoursTrack(Array.isArray(r) ? r : null); }, () => { if (vivant) setRetoursTrack(null); });
     return () => { vivant = false; };
   }, [suivisRetours.join(','), retoursTrackTic]);
+  // (23 nov., lot retours-suivi — Julien : « fais le suivi des colis retournés ») LE SUIVI D'UN RETOUR SE MET À JOUR TOUT
+  // SEUL. Avant, les bordereaux et remboursements n'étaient lus qu'au montage, les e-mails du transporteur seulement sur
+  // `vrm:transp-maj` (la lecture serveur chez les transporteurs, abandonnée) : un e-mail Mondial Relay rangé pendant que
+  // l'écran était ouvert ne faisait rien avancer. Maintenant : un e-mail de retour rangé par le serveur (bordereau, avis,
+  // remboursement : `vrm:neuf` « retours », src/tempsReel.js) relit les retours ; un e-mail de colis (« colis ») relit les
+  // faits du transporteur ; le retour sur l'app (après 20 s ailleurs) relit les deux. Projections scalaires seulement
+  // (les mêmes lecteurs) ; une lecture ratée ne vide rien (les lecteurs gardent la valeur d'avant jusqu'à leur réponse).
+  useEffect(() => {
+    let cache = Date.now();
+    const relire = (retours, faits) => {
+      if (retours) { RETOURS_ACHAT_CACHE.v = undefined; RETOURS_ACHAT_CACHE.at = 0; setRetoursVersion((n) => n + 1); }
+      if (faits) setRetoursTrackTic((n) => n + 1);
+    };
+    const neuf = (e) => { const q = e && e.detail && Array.isArray(e.detail.quoi) ? e.detail.quoi.map((x) => x && x.quoi) : []; relire(q.includes('retours'), q.includes('colis') || q.includes('retours')); };
+    const vis = () => { if (document.visibilityState === 'hidden') { cache = Date.now(); return; } if (Date.now() - cache >= 20000) { cache = Date.now(); relire(true, true); } };
+    try { window.addEventListener('vrm:neuf', neuf); document.addEventListener('visibilitychange', vis); } catch (_) {}
+    return () => { try { window.removeEventListener('vrm:neuf', neuf); document.removeEventListener('visibilitychange', vis); } catch (_) {} };
+  }, []);
   // (15 nov., lot retours) « Déposé » : SON clic (une carte « À renvoyer » ⇒ { cle: date }), synchronisé.
   const [retoursDeposes, setRetoursDeposes] = useStateCle('vrm_retours_deposes', () => load('vrm_retours_deposes', {}));
   // (15 nov., refonte-journee) « C'est réglé » : SON clic archive un retour sans nouvelles ({ cle: date }), synchronisé.
