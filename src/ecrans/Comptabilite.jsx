@@ -19989,7 +19989,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const boutonCalculette = <Bouton variante="secondaire" icone="euro" data-achats-calculette="" onClick={() => { try { window.dispatchEvent(new Event('vrm:calculette')); } catch (_) {} }}>{tr('achats.calculette')}</Bouton>;
   // (16 nov., lot relier-glisser) « Relier en glissant » depuis Achats.
   const boutonGlisser = <Bouton variante="secondaire" icone="link" data-glisser-ouvrir="achats" onClick={()=>ouvrirGlisser()}>{tr('glisser.entree')}</Bouton>;
-  const gestesRetraitAchats = pickupUnion.total > 0
+  // (24 nov., vitesse-ecran-montre) Une fonction : lue par la tête d'Achats seulement (elle forçait `pickupUnion` partout).
+  const gestesRetraitAchats = () => pickupUnion.total > 0
     ? <div className="vrm-achats-gestes" data-achats-gestes="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{boutonScanRetrait}
         <Bouton variante="secondaire" icone="qr" data-relais-ouvrir={pickupUnion.total} data-achats-relais="" aria-label="Mode relais : les codes de retrait en très grand" onClick={() => setRelaisOuvert(true)}>Mode relais</Bouton></div>
     : boutonScanRetrait;
@@ -25292,7 +25293,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         {/* (9 nov., lot V) « Scanner » au point relais : la caméra lit le colis ⇒ l'achat qui porte CE n°
             de suivi ou CE code de retrait (src/scanColis.js), « J'ai retiré » sur SON toucher. */}
         {!dansPlateforme && (modeRetraits
-          ? <ScreenHead icon="qr" title={tr('achats.colisRetirer2')} desc="Les colis à aller chercher : code de retrait, date limite, point relais." right={gestesRetraitAchats}/>
+          ? <ScreenHead icon="qr" title={tr('achats.colisRetirer2')} desc="Les colis à aller chercher : code de retrait, date limite, point relais." right={gestesRetraitAchats()}/>
           : <ScreenHead icon="bag" title={tr('historiqueSites.type.achats')} desc="En route, reçus, et le prix payé." right={<div className="vrm-achats-gestes" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{boutonCalculette}{boutonGlisser}{gestesRetraitAchats}</div>}/>)}
         {/* (9 nov.) Pas dans Colis → À retirer : ce bloc y est rendu SOUS la liste (avant « Argent à vérifier ») et Colis porte
             déjà « Scanner » en tête de l'onglet (mode retrait) ; il ne reste que dans l'espace plateforme → Achats. */}

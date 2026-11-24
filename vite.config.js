@@ -194,7 +194,7 @@ const prechargerApp = () => ({
   },
 });
 export default defineConfig({
-  plugins: [francaisDiffere(), react(), allegerIndex(), versionEtat(), versionApp(), prechargerApp(), listeHorsLigne(), nomsCourts()],
+  plugins: [francaisDiffere(), react(), allegerIndex(), versionEtat(), versionApp(), prechargerApp(), listeHorsLigne(), ...(process.env.VRM_PROFIL ? [] : [nomsCourts()])],
   // (20 nov., affichage instantané) `VRM_COPIE_MUTATION=compte|panne` : la MUTATION des bancs copie-ecran (rouge attendu) ;
   // vide en production (le code mutant disparaît au build).
   define: { __BUILD__: JSON.stringify(BUILD), __VRM_COPIE_MUTATION__: JSON.stringify(process.env.VRM_COPIE_MUTATION || '') },
