@@ -24,7 +24,7 @@ require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heure
 //      langue choisie, aria-modal="true" quand elle recouvre l'écran (et pas quand c'est un volet).
 //   H  3.1.1 <html lang> suit la langue choisie (`vrm_langue` = en / de) — et « fr » sans choix.
 //
-//  BANC_MUTATION=pops|contraste|gris|noms|libelle|feuille|anneau|lang ré-affaiblit une correction après l'ouverture : le
+//  BANC_MUTATION=pops|contraste|gris|noms|libelle|filnom|feuille|anneau|lang ré-affaiblit une correction après l'ouverture : le
 //  banc doit sortir ROUGE (`--prouve` les joue toutes et exige chacune rouge).
 //  Variables : BANC_PORT, BANC_DIST, CAPTURES=<dossier>, LARGEURS=390,1512, THEMES=clair,sombre,
 //  ECRANS=journee,…, QUOI=ecrans,feuilles,langue.
@@ -40,7 +40,7 @@ const M = require('./_a11y-mesure.cjs');
 if (process.argv.includes('--prouve')) {
   // Chaque mutation doit faire sortir le banc ROUGE (sinon le contrôle ne peut pas échouer).
   const { spawnSync } = require('child_process');
-  const MUTS = { pops: 'ECRANS=journee LARGEURS=390 THEMES=clair QUOI=ecrans', contraste: 'ECRANS=journee LARGEURS=1512 THEMES=sombre QUOI=ecrans', gris: 'ECRANS=journee LARGEURS=1512 THEMES=clair QUOI=ecrans', noms: 'ECRANS=achats LARGEURS=390 THEMES=clair QUOI=ecrans', libelle: 'ECRANS=messages LARGEURS=390 THEMES=clair QUOI=ecrans', anneau: 'ECRANS=ventes LARGEURS=1512 THEMES=sombre QUOI=ecrans', feuille: 'QUOI=feuilles LARGEURS=390 THEMES=clair', lang: 'QUOI=langue' };
+  const MUTS = { pops: 'ECRANS=journee LARGEURS=390 THEMES=clair QUOI=ecrans', contraste: 'ECRANS=journee LARGEURS=1512 THEMES=sombre QUOI=ecrans', gris: 'ECRANS=journee LARGEURS=1512 THEMES=clair QUOI=ecrans', noms: 'ECRANS=achats LARGEURS=390 THEMES=clair QUOI=ecrans', libelle: 'ECRANS=messages LARGEURS=390 THEMES=clair QUOI=ecrans', filnom: 'ECRANS=messages LARGEURS=390 THEMES=clair QUOI=ecrans', anneau: 'ECRANS=ventes LARGEURS=1512 THEMES=sombre QUOI=ecrans', feuille: 'QUOI=feuilles LARGEURS=390 THEMES=clair', lang: 'QUOI=langue' };
   let bon = 0;
   for (const [m, env] of Object.entries(MUTS)) {
     const e = { ...process.env, BANC_MUTATION: m }; for (const kv of env.split(' ')) { const [k, v] = kv.split('='); e[k] = v; }
@@ -172,6 +172,7 @@ async function saboter(pg) {
   if (MUT === 'gris') await pg.addStyleTag({ content: '.vrm-an,.vrm-an-voile{--an-gris:#6E6E73!important}' });
   if (MUT === 'noms') await pg.addStyleTag({ content: ':root:root:root:root:root:root:root:root body .vrm-plus-groupe .vrm-ui-ligne{content-visibility:auto!important}' });
   if (MUT === 'libelle') await pg.evaluate(() => { for (const b of document.querySelectorAll('button.vg-fil')) b.setAttribute('aria-label', 'Ouvrir le fil ' + (b.querySelector('b') || b).textContent); });
+  if (MUT === 'filnom') await pg.addStyleTag({ content: ':root:root:root:root:root:root body .vg-fil{content-visibility:auto!important}' });
   if (MUT === 'anneau') await pg.addStyleTag({ content: '@layer banc{:focus-visible{outline-color:rgba(127,127,127,.35)!important}}' });
 }
 
@@ -315,7 +316,10 @@ async function anneaux(pg, n = 40) {
       await essaie(`${T} G ${F.nom}`, async () => {
         const { ctx, pg, erreurs } = await ouvrir(nav, { W, sombre, url: `/?tab=${F.tab}`, langue });
         await F.ouvrir(pg);
-        await pg.waitForTimeout(1200); await finir(pg);
+        // La feuille ATTENDUE (pas un délai fixe) : la liste peut se re-rendre juste après le toucher ⇒ un second toucher.
+        const vue = () => pg.waitForFunction((sel) => [...document.querySelectorAll(sel)].some((x) => x.getClientRects().length), F.sel, { timeout: 6000 }).then(() => true, () => false);
+        if (!await vue()) { await F.ouvrir(pg).catch(() => {}); await vue(); }
+        await pg.waitForTimeout(400); await finir(pg);
         if (MUT === 'feuille') await pg.evaluate((sel) => { for (const d of document.querySelectorAll(sel)) d.removeAttribute('aria-modal'); }, F.sel);
         const d = await pg.evaluate((sel) => {
           const e = [...document.querySelectorAll(sel)].filter((x) => x.getClientRects().length).pop(); if (!e) return null;

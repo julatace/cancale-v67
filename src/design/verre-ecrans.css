@@ -250,7 +250,9 @@
 :root:root:root:root:root body .vrm-msg-list.vg-ms-liste { padding: 0 !important; overflow: hidden; border: 0 !important; border-radius: 22px !important; }
 :root:root:root:root:root body .vg-fil { display: flex !important; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 9px 14px 9px 12px !important; margin: 0; border: 0 !important; border-radius: 0 !important;
   background: transparent !important; background-image: none !important; box-shadow: none !important; color: var(--sv-encre) !important; text-align: left; font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
-  content-visibility: auto; contain-intrinsic-size: auto 64px; }
+  /* (24 nov., WCAG 4.1.2) Plus de `content-visibility:auto` : hors écran, Chrome laissait ces rangées SANS NOM pour un
+     lecteur d'écran (banc wcag-aa D). La liste s'arrête à 80 fils (FilsTous) : rien à économiser. */
+  content-visibility: visible; }
 :root:root:root:root:root body .vg-fil + .vg-fil { border-top: 1px solid rgb(28 28 32 / .10) !important; }
 :root:root:root:root:root[data-theme="dark"] body .vg-fil + .vg-fil { border-top-color: rgb(255 255 255 / .10) !important; }
 :root:root:root:root:root body .vg-fil:active, :root:root:root:root:root body .vg-fil.is-current { background: rgb(28 28 32 / .05) !important; }
