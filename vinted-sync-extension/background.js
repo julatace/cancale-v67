@@ -22145,8 +22145,12 @@ async function listeClocheJusqua(acc,premiere,notificationId,cible){
   if(!l1)return {};
   // L'index de la liste (pages déjà lues), s'il est encore celui de CETTE liste.
   let ix=null;try{ix=(await chrome.storage.local.get(INDEX_CLOCHE))[INDEX_CLOCHE]||null;}catch(_){ix=null;}
+  const ix0=ix&&typeof ix==='object'?{uid:ix.uid,tete:ix.tete,pages:ix.pages&&typeof ix.pages==='object'?Object.assign({},ix.pages):null}:null;
   if(!ix||ix.uid!==uid||!(Date.now()-Number(ix.at)<INDEX_CLOCHE_MS)||ix.tete!==teteCloche(l1)||typeof ix.pages!=='object'){ix={uid,at:Date.now(),tete:teteCloche(l1),pages:{},bout:false,tot:null,pp:null};}
-  const garder=async()=>{try{await chrome.storage.local.set({[INDEX_CLOCHE]:ix});}catch(_){}};
+  // 5.440.2 : la liste lue est SIGNALÉE (`vrmFavorisListeLue`) quand elle est neuve (tête changée) ou qu'une page de plus a été
+  //    lue : la carte ouverte sur vinted.fr redemande ses favoris à VRM et se redessine seule.
+  const neuve=!ix0||ix0.uid!==uid||ix0.tete!==teteCloche(l1);
+  const garder=async()=>{try{const lues=Object.keys(ix.pages).length;await chrome.storage.local.set({[INDEX_CLOCHE]:ix,...(neuve||lues>(ix0&&ix0.pages?Object.keys(ix0.pages).length:0)?{vrmFavorisListeLue:{uid,at:Date.now(),pages:lues}}:{})});}catch(_){}};
   const pg1=premiere.json.pagination&&typeof premiere.json.pagination==='object'?premiere.json.pagination:null;
   ix.pages['1']=l1.map(x=>({id:String(x&&x.id||''),link:typeof (x&&x.link)==='string'?x.link:''}));
   if(pg1){const t=Number(pg1.total_pages),pp=Number(pg1.per_page);if(Number.isInteger(t))ix.tot=t;if(Number.isInteger(pp)&&pp>0&&pp<=100)ix.pp=pp;}

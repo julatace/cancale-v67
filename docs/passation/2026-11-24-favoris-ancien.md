@@ -63,6 +63,10 @@ la cause précise ne se prouve que sur son compte. La 5.440.2 rend le résultat 
    ceux que la cloche montre — puis les plus anciens.
 7. **Directement la page complète** : quand la cloche n'a pas montré une ligne, VRM retient combien elle en montre
    (`vrmTailleCloche`, 24 h) ; un favori plus bas dans la liste de Vinted va droit à la page complète.
+7 bis. **L'écran se redessine seul** : quand le fond a lu la liste (neuve, ou une page de plus), il pose
+   `vrmFavorisListeLue` ; la carte / le panneau ouverts sur vinted.fr redemandent aussitôt leurs favoris à VRM (sans attendre
+   la minute de l'aperçu) — banc `scripts/bancs/favoris-liste-lue.cjs` (vert ; rouge sur 5.440.1 et par mutation), audit K3c.
+   NB : l'écran Favoris de l'APP est retiré depuis le 20 nov. (Messages → Favoris renvoie au panneau de l'extension).
 8. Inchangé : clics dans la page seulement (ni `chrome.debugger`, ni souris ni clavier réels, ni rythme « humain »), 15/h,
    50/h réserve 5, une à la fois, pause 429/403, arrêt au captcha.
 

@@ -28,6 +28,7 @@ const RACINE = path.join(__dirname, '..');
 const argBg = (() => { const i = process.argv.indexOf('--bg'); return i > 0 ? process.argv[i + 1] : ''; })();
 let BG = argBg ? path.resolve(argBg) : path.join(RACINE, 'vinted-sync-extension', 'background.js');
 const MUTATIONS = {
+  'sans-signal': ["...(neuve||lues>(ix0&&ix0.pages?Object.keys(ix0.pages).length:0)?{vrmFavorisListeLue:{uid,at:Date.now(),pages:lues}}:{})", ""],
   'sans-lien-direct': ["if(page&&!profond){noterDiag('favori_lien_direct');", "if(false){"],
   'liste-premiere-page': ["for(let page=2;;page++){", "for(let page=2;;page++){ix.bout=true;return {bout:true};"],
   'page-trop-ancien': ["return rep('refuse',0,'notification_pas_trouvee',rangCloche>=0?", "return rep('ignore',0,'favori_trop_ancien',rangCloche>=0?"],
@@ -154,7 +155,8 @@ const jouer = (f) => f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON }).cat
   { const f = monter({ cloche: 'nulle-part' }, (pg) => lst(pg === 1 ? ['n-x1', 'n-x2'] : ['n-x3'], pg, 2)); const r = await jouer(f);
     dit(r && r.json && r.json.resultat === 'ignore' && r.json.raison === 'favori_trop_ancien' && seq(f) === '' && f.lectures.length === 2 && pas(f).length === 0, 'K3b la liste de Vinted lue jusqu’à sa DERNIÈRE page (2/2) sans lui ⇒ sauté, « pas trouvé dans tes notifications », sans rien ouvrir', `${seq(f)} ${f.lectures.join(' ')} ${pas(f)} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 200)}`); }
   { const f = monter({ cloche: 'absente' }, (pg) => lst(pg === 1 ? ['n-x1', 'n-x2'] : ['n-x3', 'n-banc'], pg, 3)); const r = await jouer(f);
-    dit(r && r.json && r.json.resultat === 'envoye' && seq(f) === 'CMO' && f.lectures.length === 2 && /[?&]page=2(&|$)/.test(f.lectures[1]), 'K3c sur la PAGE 2 de la liste de Vinted ⇒ trouvé (page 2 lue, pas la 3), le message part', `${seq(f)} ${f.lectures.join(' ')} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 200)}`); }
+    dit(r && r.json && r.json.resultat === 'envoye' && seq(f) === 'CMO' && f.lectures.length === 2 && /[?&]page=2(&|$)/.test(f.lectures[1]), 'K3c sur la PAGE 2 de la liste de Vinted ⇒ trouvé (page 2 lue, pas la 3), le message part', `${seq(f)} ${f.lectures.join(' ')} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 200)}`);
+    dit(f.store.vrmFavorisListeLue && f.store.vrmFavorisListeLue.uid === UID && f.store.vrmFavorisListeLue.pages === 2, 'K3c la liste lue est SIGNALÉE (`vrmFavorisListeLue`, 2 pages) : la carte ouverte se redessine seule', JSON.stringify(f.store.vrmFavorisListeLue)); }
   { const f = monter({ cloche: 'nulle-part' }, (pg) => lst(['n-x' + pg], pg, 40)); const r = await jouer(f);
     dit(r && r.json && r.json.resultat === 'refuse' && r.json.raison === 'notification_pas_trouvee' && seq(f) === '' && f.lectures.length <= 6, 'K3d 40 pages annoncées, pas trouvé dans les 6 lues ⇒ PAS « trop ancien » : il attend, au plus 6 lectures', `${f.lectures.length} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 200)}`); }
   { const f = monter({ cloche: 'absente' }, (pg) => ({ notifications: [{ id: 'autre-id', entry_type: 20, link: '/items/101/want_it/new?offering_id=201' }], pagination: { current_page: 1, total_pages: 1 } })); const r = await jouer(f);
