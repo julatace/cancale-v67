@@ -90,7 +90,16 @@ relevé avec un montant `null` et sont comptées « écartées ». Aucun total e
 
 ## Banc
 
-(rempli après la passe)
+`node scripts/bancs/gains-reels.cjs` (via `lourd.sh`) : **56 verts, 0 rouge** (390 tactile et 1512, clair et sombre).
+B1 net total et couverture = recompte à part depuis les ventes inventées (compte écarté, GBP, non finalisée hors) ;
+B2 « sur K des N ventes », jamais « au moins », autre devise dite, manque nommé ; B3 « Saisir » et chaque vente sans
+prix d'achat émettent `vrm:completer` (sujet achat, SON N°) ; B4 rien de classé sous 3 ventes (550, Leboncoin 2
+reventes, « pas saisie ») ; B5 natif (pas de carte dans une carte, aucun débordement, cibles ≥ 44, ni NaN) dans les
+quatre vues ; B6 en lecture et pas su : « — », jamais 0 €.
+Captures REGARDÉES. Défauts vus et corrigés : « 1 ventes écartées » (pluriels `one/other`, nombres passés bruts à
+`tr`), « Saisir » à 40 px, « sur 22 des 22 datées » (dit seulement quand il manque des dates), sous-titre « tous tes
+achats » au-dessus des tuiles de la période (déplacé dans la vue Source), tuile « Délai moyen » seule sur sa ligne au
+téléphone (pleine largeur).
 
 ## Ce qui reste
 
