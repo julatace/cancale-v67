@@ -75,13 +75,13 @@ export function Confettis({ n = 18, graine = 1, duree = 1100 }) {
     let h = (graine * 9301 + 49297) % 233280; const alea = () => { h = (h * 9301 + 49297) % 233280; return h / 233280; };
     return Array.from({ length: n }, (_, i) => {
       const a = (i / n) * Math.PI * 2 + alea() * 0.5, d = 46 + alea() * 70;
-      return { x: Math.round(Math.cos(a) * d), y: Math.round(Math.sin(a) * d * 0.7 - 18), r: Math.round(alea() * 540 - 270), c: TEINTES[i % TEINTES.length], f: i % 3, t: Math.round(alea() * 120) };
+      return { id: `eclat-${graine}-${i}`, x: Math.round(Math.cos(a) * d), y: Math.round(Math.sin(a) * d * 0.7 - 18), r: Math.round(alea() * 540 - 270), c: TEINTES[i % TEINTES.length], f: i % 3, t: Math.round(alea() * 120) };
     });
   }, [n, graine]);
   if (!vivant) return null;
   return (
     <span className="n-confettis" aria-hidden="true" data-n-confettis={n}>
-      {eclats.map((e, i) => <i key={i} data-f={e.f} style={{ '--x': e.x + 'px', '--y': e.y + 'px', '--r': e.r + 'deg', '--c': e.c, '--t': e.t + 'ms', '--d': duree + 'ms' }}/>)}
+      {eclats.map((e) => <i key={e.id} data-f={e.f} style={{ '--x': e.x + 'px', '--y': e.y + 'px', '--r': e.r + 'deg', '--c': e.c, '--t': e.t + 'ms', '--d': duree + 'ms' }}/>)}
     </span>
   );
 }
@@ -136,7 +136,7 @@ export function CarteQuete({ icone = 'check', Icon = null, titre = '', verbe = '
 // Le compteur des quêtes faites : « ✓ 3 faites aujourd'hui » (rien sous 1).
 export function QuetesFaites({ n = 0, Icon = null }) {
   if (!(n > 0)) return null;
-  return <span className="n-quetes-faites" data-n-quetes-faites={n} key={n}>{Icon ? <Icon name="check" size={14}/> : null}{tr('jeu.faites', { n })}</span>;
+  return <span className="n-quetes-faites" data-n-quetes-faites={n} key={'faites-' + n}>{Icon ? <Icon name="check" size={14}/> : null}{tr('jeu.faites', { n })}</span>;
 }
 
 // ── Le TROPHÉE : un palier RÉEL atteint (1re vente, 10, 100…) — calme, une étagère, jamais une relance. `atteint` faux ⇒ la
@@ -186,14 +186,20 @@ export function Revele({ i = 0, arrive = true, as: Balise = 'div', className = '
   const p = revele(i, className, arrive);
   return <Balise {...reste} className={p.className} style={p.style ? { ...(reste.style || {}), ...p.style } : reste.style} data-n-revele={p['data-n-revele']}>{children}</Balise>;
 }
+// Une case d'inventaire qui se TOUCHE (la photo, l'étiquette N°, le prix dessous) : le bouton de la famille « jeu »,
+// avec son apparition (`revele`). Les écrans propres passent par elle, jamais par un <button> brut.
+export function CaseInventaire({ i = 0, arrive = true, onClick, attrs = null, children }) {
+  const p = revele(i, 'n-inventaire-case', arrive);
+  return <button type="button" role="listitem" className={p.className} style={p.style} data-n-revele={p['data-n-revele']} onClick={onClick} {...(attrs || {})}>{children}</button>;
+}
 export function SqueletteTuile({ taille = 'l', className = '' }) {
   return <span className={cx('n-tuile-paire n-tuile-os', className)} data-n-tuile={taille} aria-hidden="true"><span className="n-os n-tuile-os-fond"/></span>;
 }
 export function SqueletteInventaire({ n = 4 }) {
   return (
     <div className="n-inventaire" aria-busy="true" data-n-inventaire-os={n}>
-      {Array.from({ length: n }, (_, k) => (
-        <span key={k} className="n-inventaire-case" aria-hidden="true">
+      {Array.from({ length: n }, (_, k) => 'os-' + k).map((id) => (
+        <span key={id} className="n-inventaire-case" aria-hidden="true">
           <SqueletteTuile taille="xl"/>
           <span className="n-os" style={{ width: '50%', height: 14, margin: '3px 0' }}/>
           <span className="n-os" style={{ width: '70%', height: 10, margin: '3px 0' }}/>
