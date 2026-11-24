@@ -269,7 +269,7 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
   const rien = pret && n === 0 && nRet === 0;
   const point = retraits && Array.isArray(retraits.points) ? retraits.points[0] : null;
   const lignesV = ventes && ventes.etat === 'lu' && Array.isArray(ventes.lignes) ? ventes.lignes.slice(0, 5) : [];
-  const ventesArrivent = useArrive(lignesV.length > 0);   // (24 nov., « sans latence ») déjà connues au montage ⇒ là d'un coup
+  const ventesArrivent = useArrive(lignesV.length > 0, 'journee-ventes');   // (24 nov., « sans latence ») déjà connues au montage ⇒ là d'un coup
   // « Argent à venir » : seulement s'il est lu ET qu'il y en a (« 0 € à venir » n'apprend rien).
   const aVenirLu = !!aVenir && aVenir.valeur != null && aVenir.valeur > 0;
   const image = (src, taille) => (src && Photo ? <Photo className="n-vignette" data-n-taille={taille} src={src} alt="" width={taille} height={taille} loading="lazy" decoding="async"/> : <Vignette taille={taille} icone={<Icon name="cintre" size={22}/>}/>);

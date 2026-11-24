@@ -49,23 +49,25 @@ Grilles :
 7. **Textes** : tout passe par `tr()` (`src/i18n/langues/*/visuelJeu.js`, cinq langues). Cibles au doigt ≥ 44 px. Clair et sombre.
 8. **Affichage seulement** : aucune règle métier ne change. Un nombre vient de son propriétaire unique (§5).
 
-## L'apparition progressive (Julien, 24 nov. : « pas d'un coup en bloc »)
+## L'apparition progressive, SANS LATENCE
 
-Les trois lots visuels utilisent UNE seule aide, dans `src/natif/Jeu.jsx` (`src/natif/index.js` l'exporte aussi).
+Julien, 24 nov. : d'abord « pas d'un coup en bloc », puis « fais quelque chose sans latence ».
 
-Avant les données :
-- Pose le squelette de la FORME finale : `<SqueletteInventaire n={5}/>` pour une rangée d'inventaire, `<SqueletteTuile taille="xl"/>` pour une tuile, `<Attente/>` (`src/natif/Attente.jsx`) pour des rangées.
-- Les mêmes tailles qu'à l'arrivée : rien ne bouge, CLS ≤ 0,02.
+Une aide partagée par les trois lots visuels, dans `src/natif/Jeu.jsx` (exportée aussi par `src/natif/index.js`). Elle n'ajoute **jamais** d'attente.
 
-Quand les données arrivent :
-- Pose `{...revele(i)}` sur le i-ème élément, ou enveloppe-le dans `<Revele i={i}>`.
-- Chaque élément arrive en fondu + 4 px, 30 ms après le précédent, plafonné au 8ᵉ (240 ms au plus).
-- L'animation ne touche que `transform` et `opacity` : aucun décalage de mise en page. L'élément est lisible dès la première image (opacité de départ 0,35).
-- Avec `prefers-reduced-motion: reduce`, l'apparition est immédiate.
+1. **Ce qui est déjà connu s'affiche d'un coup**, à la première image, sans fondu : cache, visite d'avant. `const arrive = useArrive(donneesPretes, 'nom-du-bloc')` est faux si les données étaient là au montage, ou si ce bloc a déjà été montré pendant la session : au retour sur l'onglet, tout est là d'un coup.
+2. **Squelette seulement quand rien n'est connu** : `<SqueletteInventaire n/>`, `<SqueletteTuile taille/>`, ou `<Attente/>`. Il a la forme exacte de ce qui arrive (CLS ≤ 0,02).
+3. **Seul un contenu qui ARRIVE s'anime** : `{...revele(i, 'ma-classe', arrive)}`, ou `<Revele i={i} arrive={arrive}>`.
+   - Le premier élément (i = 0) n'attend jamais.
+   - Chacun des suivants : 15 ms d'écart, 120 ms au plus.
+   - Fondu + 3 px en 160 ms, sur `transform` et `opacity` seulement.
+   - Avec mouvement réduit : rien.
+4. **Toucher < 100 ms** : l'état appuyé est immédiat (transition 80 ms au plus) et la navigation part tout de suite.
+5. **Aucune animation d'entrée d'écran au-delà de 200 ms.** Les pop-ups et la fête de la vente ne bloquent rien, elles gardent leur ressort.
+6. **Images** : posées sur le gris du squelette.
+   - Une image déjà en cache s'affiche tout de suite (`data-n-tuile-charge="deja"`), vérifié avant la première peinture.
+   - Une image qui se charge arrive en fondu de 160 ms : jamais de flash blanc.
 
-Les images :
-- `TuilePaire` pose la photo sur le gris du squelette et la fait apparaître en fondu une fois chargée (`data-n-tuile-charge`).
-- Pas de flash blanc.
-- Une image déjà en cache ne refait pas le fondu.
-
-Pour une liste longue, ne pose `revele` que sur les premiers éléments visibles : au-delà du 8ᵉ, ils arrivent ensemble.
+Banc : `scripts/bancs/visuel-jeu.cjs`.
+- J9 : la 1re tuile n'attend pas, 15 ms d'écart, ≤ 120 ms, fondu ≤ 200 ms ; mouvement réduit ⇒ aucune apparition.
+- J10 : temps du toucher au premier contenu ; au retour sur l'écran, les données connues sont là d'un coup.
