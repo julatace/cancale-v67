@@ -313,6 +313,53 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
     });
     await t2.ctx.close();
   }
+  // ── Z (5.440.1, Julien 23 nov. 19:44) : « … puis touche « » coupé, « plusieurs favoris de suite » après UN refus, et « 1 sauté »
+  //    / « 1 refusé » / « 1 pas envoyé » pour le MÊME favori. La file est jouée par la VRAIE file du serveur (3 refus d'identité
+  //    de suite sur 5) ; le panneau montre la fin ET la file en pause : la phrase ENTIÈRE finit par « Reprendre », les nombres
+  //    viennent de la règle du bilan, un mot par état (pas envoyé · en attente), jamais « sauté » ni « refusé » pour eux.
+  const { favZ, finZ } = await (async () => {
+    const F = await import(pathToFileURL(path.join(RACINE, 'api', '_lib', 'favoris-file.js')).href);
+    const P = await import(pathToFileURL(path.join(RACINE, 'src', 'favorisProgression.js')).href);
+    const C = await import(pathToFileURL(path.join(RACINE, 'api', '_lib', 'favoris-carte.js')).href);
+    let d = null, now = T0 - 30 * MIN, n = 0; const maj = (x) => { if (x.data) d = x.data; return x.valeur; };
+    const notifs = Array.from({ length: 8 }, (_, i) => ({ id: 'z' + i, user_id: 800 + i, body: `acheteur_${i} a ajouté ton article à ses favoris.`, link: `/items/${7100 + i}/want_it/new?offering_id=${800 + i}`, created_at: new Date(T0 - (i + 1) * 20 * MIN).toISOString() }));
+    maj(F.lancerFile(d, { owner: 'o', targets: notifs.slice(0, 5).map((x, i) => ({ itemId: String(7100 + i), recipientId: String(800 + i), notificationId: x.id, initiator: 'favourite' })), message: 'Bonjour', intervalleMinutes: 0, maintenant: now, lot: 'LZ' }));
+    let vue = null;
+    for (let i = 0; i < 3; i++) { now += 60000; const jeton = `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`; maj(F.reserverFile(d, { owner: 'o', maintenant: now, jeton, suivi: 's' })); maj(F.consommerFile(d, { owner: 'o', jeton, maintenant: now })); maj(F.verifierReservation(d, { owner: 'o', jeton, maintenant: now }));
+      const t = P.traduireResultatFavori({ ok: false, data: { resultat: 'refuse', raison: 'identite_non_confirmee', ecrits: 0, etape: 'conversation', cause: 'lien_autre' } });
+      vue = maj(F.terminerFile(d, { owner: 'o', jeton, resultat: t.resultat, raison: t.raison, maintenant: now + 1000, ecrits: 0, etape: t.etape, cause: t.cause })); }
+    const items = notifs.map((_, i) => ({ id: 7100 + i, title: 'Nike Air Max 1 bleu taille 4' + i, price: { amount: '60.0', currency_code: 'EUR' }, photo: { url: img('z' + i) } }));
+    const ap = C.apercuCarte({ prefs: { version: 1, envoisActifs: false, message: 'Bonjour', pourcentage: 5, offreMode: 'pct', intervalleMinutes: 1 }, capture: { payload: { notifications: notifs }, domain: 'www.vinted.fr' }, vue, dressing: { cap: new Date(T0 - 10 * MIN).toISOString(), pg: { total_entries: 8 }, items }, prouve: () => true, maintenant: T0 });
+    const carte = C.resumeFileCarte(vue, T0);
+    const fin = { at: Date.now(), raison: 'interrompu', texte: vue.raison, code: vue.raisonCode, refus: vue.raisonRefus, n: vue.raisonN, bilan: P.phraseBilanFavoris(vue.bilan) };
+    return { favZ: ap, finZ: { actif: false, total: 5, file: carte, fin } };
+  })();
+  for (const o of TAILLES) {
+    const T = o.T + ' Z', N = (x) => o.T.replace(' ', '-') + '-Z-' + x;
+    console.log('\n' + T);
+    const t = await ouvrir(nav, Object.assign({}, o, { AP: favZ }));
+    await essaie(T, async () => {
+      await t.pg.evaluate(({ base, st }) => { const e = JSON.parse(JSON.stringify(base)); e.site.favoris.file = st; window.__etat = e; for (const f of (window.__ecoutes || [])) try { f({}, 'local'); } catch (_) {} }, { base: ETAT, st: finZ });
+      await montrer(t.pg, o.mobile); await clic(t.pg, '.side6 [data-onglet-b="favoris"]'); await t.pg.waitForTimeout(500);
+      const z = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot, q = (s) => r.querySelector(s);
+        const fin = q('[data-fav="fini"]'), ban = q('[data-fav6-file]');
+        const vis = (el) => !!(el && el.getClientRects().length);
+        const deb = (el) => { if (!el) return 0; const b = el.getBoundingClientRect(); return [...el.querySelectorAll('*')].filter((x) => { const c = x.getBoundingClientRect(); return c.width && c.right > b.right + 1; }).length; };
+        return { fin: fin ? fin.innerText : '', comptes: fin && q('[data-fav="fini"] [data-fav-comptes]') ? q('[data-fav="fini"] [data-fav-comptes]').getAttribute('data-fav-comptes') : '', raison: q('[data-fav-raison-fin]') ? q('[data-fav-raison-fin]').innerText : '',
+          bilan: q('[data-fav-bilan]') ? q('[data-fav-bilan]').innerText : '', ban: ban ? ban.innerText : '', banRaison: q('[data-fav6-file-raison]') ? q('[data-fav6-file-raison]').innerText : '', banK: ban ? ban.getAttribute('data-fav6-file') + ':' + ban.getAttribute('data-fav6-attente') : '',
+          visibles: vis(fin) && vis(ban), deborde: deb(fin) + deb(ban), larg: innerWidth, sw: document.documentElement.scrollWidth }; });
+      if (process.env.DEBUG_Z) console.log(JSON.stringify({ etat: favZ.etat, raison: favZ.raison, file: favZ.file, ban: z.ban }).slice(0, 900));
+      const fini = (x) => /« Reprendre »\.$/.test(String(x).trim());
+      dit(fini(z.raison) && /^Interrompu : 3 favoris de suite ne sont pas partis \(le dernier : article ou destinataire pas confirmé\)/.test(z.raison) && !/plusieurs/.test(z.raison), `${T} : la fin dit « 3 favoris de suite … (le dernier : article ou destinataire pas confirmé) » ENTIÈRE, finie par « Reprendre »`, z.raison);
+      dit(fini(z.banRaison) && z.banK === 'pause:2', `${T} : la file en pause (2 en attente) répète la phrase ENTIÈRE, finie par « Reprendre »`, z.banK + ' ' + z.banRaison);
+      dit(z.comptes === '3:0:2:0' && /3 pas envoyés · 2 en attente/.test(z.fin) && !/sauté|refusé|pas envoyé\(s\)/.test(z.fin.split('\n').slice(0, 2).join(' ')), `${T} : les nombres de la règle du bilan, un mot par état : « 0 envoyé · 3 pas envoyés · 2 en attente »`, z.comptes + ' | ' + z.fin.split('\n').slice(0, 2).join(' / '));
+      dit(/^0 envoyé · 3 pas envoyés : article ou destinataire pas confirmé$/.test(z.bilan), `${T} : le bilan dit « pas envoyés » (plus « refusé »)`, z.bilan);
+      dit(z.visibles && !z.deborde && z.sw <= z.larg, `${T} : tout est visible, rien ne déborde`, JSON.stringify({ v: z.visibles, d: z.deborde, sw: z.sw, l: z.larg }));
+      dit(!t.erreurs.length, `${T} : aucune erreur de page`, JSON.stringify(t.erreurs));
+      await cap(t.pg, N('fin-pause'));
+    });
+    await t.ctx.close();
+  }
   await nav.close();
   console.log(ko ? `\n❌ panneau-favoris-tableau : ${ko} rouge(s) sur ${ok + ko}` : `\n✅ panneau-favoris-tableau : ${ok} contrôles`);
   process.exit(ko ? 1 : 0);
