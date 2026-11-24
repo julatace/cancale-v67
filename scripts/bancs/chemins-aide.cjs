@@ -225,7 +225,11 @@ async function suivre(pg, segs) {
       let r = null;
       for (let essai = 0; essai < 2 && !r; essai++) {
         try { r = await suivre(pg, c.segs); }
-        catch (e) { if (!/crash|closed|Target/i.test(String(e && e.message))) throw e; console.log(`   (l’onglet a planté sur « ${c.segs.join(' → ')} » : page neuve)`); await nouvellePage(); }
+        catch (e) {
+          if (!/crash|closed|Target/i.test(String(e && e.message))) throw e;
+          console.log(`   (l’onglet a planté sur « ${c.segs.join(' → ')} » : page neuve)`);
+          try { await nouvellePage(); } catch (_) { await nav.close().catch(() => {}); nav = await lancer(); await nouvellePage(); }
+        }
       }
       if (!r) r = { bon: false, ou: 0, vu: 'l’onglet a planté deux fois' };
       const nom = c.segs.join(' → ');
