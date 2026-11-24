@@ -21,8 +21,9 @@
   --n-h-controle: 40px; --n-h-rangee: 60px; --n-marge: 16px;
   --g-courbe: cubic-bezier(.23, 1, .32, 1); --g-relache: 160ms; --g-enfonce: 80ms;
   --g-reflet: linear-gradient(180deg, rgb(255 255 255 / .10) 0%, rgb(255 255 255 / 0) 55%);
+  --g-voile: rgb(0 0 0 / .07);   /* l'appui d'un bouton SANS fond : un voile, qui fonce quel que soit ce qu'il y a dessous */
 }
-:root[data-theme="dark"][data-style]:not([data-style=""]), :root[data-theme="dark"] [data-style]:not([data-style=""]) { --g-reflet: linear-gradient(180deg, rgb(255 255 255 / .18) 0%, rgb(255 255 255 / 0) 60%); }
+:root[data-theme="dark"][data-style]:not([data-style=""]), :root[data-theme="dark"] [data-style]:not([data-style=""]) { --g-reflet: linear-gradient(180deg, rgb(255 255 255 / .18) 0%, rgb(255 255 255 / 0) 60%); --g-voile: rgb(255 255 255 / .10); }
 /* ── le fond, les cartes : regroupées par le TON, pas par un filet ── */
 :root[data-style]:not([data-style=""]) body,
 :root[data-style]:not([data-style=""]) .n-coque { background-color: var(--n-fond); background-image: var(--g-fond-image); background-attachment: fixed; }
@@ -63,7 +64,7 @@
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="texte"]:active,
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="texte"][data-n-force="appui"],
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="destructif"]:active,
-[data-style]:not([data-style=""]) .n-bouton[data-n-variante="destructif"][data-n-force="appui"] { background-color: var(--n-appui); color: var(--n-encre); }
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="destructif"][data-n-force="appui"] { background-color: var(--g-voile); color: var(--n-encre); }
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="destructif"][data-n-arme] { background-color: var(--n-ambre-fond); color: var(--n-encre); box-shadow: none; }
 [data-style]:not([data-style=""]) .n-bouton[data-n-ton="ambre"] { color: var(--n-encre); }
 [data-style]:not([data-style=""]) .n-bouton[data-n-ton="ambre"][data-n-variante="teinte"] { box-shadow: none; }
@@ -75,30 +76,41 @@
    actuel ne change pas) : « second » = le secondaire teinté ; « champ » = un champ creusé qu'on touche (« + prix ») ;
    « rond » = l'icône seule (⋯), discrète au repos ; « lien » = le tertiaire (texte + chevron) ; « rangee » = une rangée
    entière qu'on touche. Les deux premiers : 40 dessinés dans une zone de 44 (bordure transparente), comme `.n-bouton`. ── */
+/* la matière (fond, rayon, appui) vaut pour tous ; la TAILLE est celle du composant (un bouton posé dans une rangée la
+   reçoit ci-dessous) */
 [data-style]:not([data-style=""]) :is([data-n-famille="second"], [data-n-famille="champ"]) {
-  position: relative; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: var(--n-cible); min-width: var(--n-cible); margin: 0; padding: 0 12px;
-  border: 0; border-block: calc((var(--n-cible) - var(--n-h-controle)) / 2) solid transparent; background-clip: padding-box;
-  border-radius: var(--g-r-bouton) / calc(var(--g-r-bouton) + (var(--n-cible) - var(--n-h-controle)) / 2);
-  font: var(--n-t-second-fort); cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
-  transition: transform var(--n-duree-appui) ease-out, background-color var(--n-duree-appui) ease-out;
+  border-radius: var(--g-r-bouton); cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform var(--g-relache) var(--g-courbe), background-color var(--g-relache) var(--g-courbe);
 }
-/* dans une rangée de liste (Ventes : « Relier · + prix » sur la ligne du prix), le dessin est plus bas (30) : la zone
-   de 44 déborde en transparent, sans recouvrir le texte de la ligne du dessus */
-[data-style]:not([data-style=""]) .n-vt-achat :is([data-n-famille="second"], [data-n-famille="champ"]) { border-block-width: 7px; padding-inline: 10px; }
+/* Ventes : « Relier · + prix » sur la ligne du prix — dessinés à 30 dans une zone de 44 (bordure transparente), la ligne
+   du prix grandit à 32 et la paire de boutons s'y centre : rien ne recouvre la ligne du dessus */
+[data-style]:not([data-style=""]) .n-vt-achat :is([data-n-famille="second"], [data-n-famille="champ"]) {
+  position: relative; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: var(--n-cible); min-width: var(--n-cible); margin: 0; padding: 0 10px; font: var(--n-t-second-fort);
+  border: 0; border-block: 7px solid transparent; background-clip: padding-box; border-radius: var(--g-r-bouton) / calc(var(--g-r-bouton) + 7px);
+}
+[data-style]:not([data-style=""]) .n-vt-rang .n-rangee-corps { padding-block: 8px; }
+[data-style]:not([data-style=""]) .n-vt-rang .n-rangee-note { min-height: 32px; align-items: center; }
+[data-style]:not([data-style=""]) .n-rangee.n-vt-rang > .n-rangee-pied { bottom: 2px; }
+/* la fiche : « Actions ▾ » à la hauteur du plein, les faits (« achat · Ajouter ») en puces teintées */
+[data-style]:not([data-style=""]) .nf-choisir[data-n-famille="second"] { min-height: var(--g-h-plein); box-shadow: none; font-weight: 600; }
+[data-style]:not([data-style=""]) .nf-pastille .nf-pi { min-height: 32px; background: var(--g-second-fond); box-shadow: none; border-radius: var(--g-r-chip); }
+[data-style]:not([data-style=""]) button.nf-pastille:active .nf-pi { background: var(--g-second-appui); }
+[data-style]:not([data-style=""]) [data-n-famille="puce"] { transition: transform var(--g-relache) var(--g-courbe); }
+[data-style]:not([data-style=""]) [data-n-famille="puce"]:active, [data-style]:not([data-style=""]) [data-n-famille="puce"][data-n-force="appui"] { transform: scale(var(--g-appui)); }
 [data-style]:not([data-style=""]) [data-n-famille="second"] { background-color: var(--g-second-fond); color: var(--n-encre); box-shadow: none; }
 [data-style]:not([data-style=""]) [data-n-famille="champ"] { background-color: var(--g-champ-fond); color: var(--n-encre-2); box-shadow: var(--g-champ-ombre); font-weight: 500; }
 [data-style]:not([data-style=""]) :is([data-n-famille="second"], [data-n-famille="champ"]):active,
 [data-style]:not([data-style=""]) :is([data-n-famille="second"], [data-n-famille="champ"])[data-n-force="appui"] { transform: scale(var(--g-appui)); background-color: var(--g-second-appui); }
 [data-style]:not([data-style=""]) [data-n-famille="rond"] { border-radius: 50%; transition: transform var(--g-relache) var(--g-courbe), background-color var(--g-relache) var(--g-courbe); }
 [data-style]:not([data-style=""]) [data-n-famille="rond"]:active,
-[data-style]:not([data-style=""]) [data-n-famille="rond"][data-n-force="appui"] { transform: scale(.92); background-color: var(--n-appui); }
+[data-style]:not([data-style=""]) [data-n-famille="rond"][data-n-force="appui"] { transform: scale(.92); background-color: var(--g-voile); }
 [data-style]:not([data-style=""]) [data-n-famille="lien"] { color: var(--n-encre); font-weight: 600; transition: transform var(--g-relache) var(--g-courbe), opacity var(--g-relache) var(--g-courbe); }
 [data-style]:not([data-style=""]) [data-n-famille="lien"]:active,
 [data-style]:not([data-style=""]) [data-n-famille="lien"][data-n-force="appui"] { transform: scale(var(--g-appui)); opacity: .6; }
 [data-style]:not([data-style=""]) [data-n-famille="rangee"] { transition: transform var(--g-relache) var(--g-courbe), background-color var(--g-relache) var(--g-courbe); }
 [data-style]:not([data-style=""]) [data-n-famille="rangee"]:active,
-[data-style]:not([data-style=""]) [data-n-famille="rangee"][data-n-force="appui"] { transform: scale(.985); background-color: var(--n-appui); }
+[data-style]:not([data-style=""]) [data-n-famille="rangee"][data-n-force="appui"] { transform: scale(.985); background-color: var(--g-voile); }
 [data-style]:not([data-style=""]) :is([data-n-famille="second"], [data-n-famille="champ"]):focus-visible { outline: none; box-shadow: var(--g-anneau); }
 [data-style]:not([data-style=""]) [data-n-famille] .n-vt-relier-rond { width: auto; height: auto; background: none; box-shadow: none; color: inherit; }
 
@@ -108,7 +120,7 @@
 [data-style]:not([data-style=""]) .n-tb-rond.n-bouton-icone-seule { border-radius: 50%; background: var(--g-second-fond); color: var(--n-encre); box-shadow: none;
   transition: transform var(--n-duree-appui) ease-out, background-color var(--n-duree-appui) ease-out; }
 [data-style]:not([data-style=""]) .n-bouton-icone-seule:active,
-[data-style]:not([data-style=""]) .n-bouton-icone-seule[data-n-force="appui"] { transform: scale(.92); background: var(--g-second-appui); }
+[data-style]:not([data-style=""]) .n-bouton-icone-seule[data-n-force="appui"] { transform: scale(.92); background: var(--g-voile); }
 [data-style]:not([data-style=""]) .n-bouton-icone-seule[aria-pressed="true"] { background: var(--n-plein); color: var(--n-sur-plein); }
 
 /* ── les étiquettes d'état : pilules teintées calmes, un pictogramme devant, la couleur par le SENS ── */

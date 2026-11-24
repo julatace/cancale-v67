@@ -74,7 +74,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
     const su = suDe(prixF, prixV);
     const corps = su ? <span className="nf-prix-valeur">{prixV}</span> : <span className="nf-prix-manque">{'— '}{prixF.raison ? T.raison(prixF.raison) : ''}</span>;
     const a = attrsFait(prixF, su, prixPorte);
-    return prixPorte ? <button type="button" className="nf-prix" onClick={() => toucherFait(prixF)} aria-label={T.libelle(prixF.lib) + ' ' + (prixV || '')} {...a}>{corps}</button>
+    return prixPorte ? <button type="button" className="nf-prix" data-n-famille="lien" onClick={() => toucherFait(prixF)} aria-label={T.libelle(prixF.lib) + ' ' + (prixV || '')} {...a}>{corps}</button>
       : <span className="nf-prix" {...a}>{corps}</span>;
   })() : null;
   const pastille = (f) => {
@@ -92,7 +92,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
       : <><span className="nf-pastille-lib">{court}</span>{manque(f, porte)}</>}</span>;
     const ton = benef && su && f.cents != null ? (f.cents < 0 ? 'negatif' : 'positif') : su ? 'neutre' : porte ? 'porte' : 'vide';
     return porte
-      ? <button key={f.cle} type="button" className="nf-pastille" data-nf-ton={ton} onClick={() => toucherFait(f)} aria-label={T.libelle(f.lib) + ' ' + (su ? v : T.ajouter)} {...a}>{contenu}</button>
+      ? <button key={f.cle} type="button" className="nf-pastille" data-n-famille="puce" data-nf-ton={ton} onClick={() => toucherFait(f)} aria-label={T.libelle(f.lib) + ' ' + (su ? v : T.ajouter)} {...a}>{contenu}</button>
       : <span key={f.cle} className="nf-pastille" data-nf-ton={ton} {...a}>{contenu}</span>;
   };
   const pastilles = PASTILLES.map(fait).filter(Boolean);
@@ -125,7 +125,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
       <div className="nf-cadre">
       <div className="nf-defile" ref={defile} onScroll={surDefile} data-fiche-heros-photo={photos.length ? '1' : '0'} data-fd-photo-agrandir={photos.length}>
         {photos.length ? photos.map((s, i) => (
-          <button key={s + i} type="button" className="nf-photo" onClick={() => setGrand(i)} aria-label={photos.length > 1 ? T.photoN(i + 1, photos.length) : T.agrandir}>{rendre.photo(s)}</button>
+          <button key={s + i} type="button" className="nf-photo" data-n-famille="rangee" onClick={() => setGrand(i)} aria-label={photos.length > 1 ? T.photoN(i + 1, photos.length) : T.agrandir}>{rendre.photo(s)}</button>
         )) : <span className="nf-photo nf-photo-vide"><Glyphe nom="image" taille={48}/></span>}
       </div>
       {A ? <span className="nf-plaque" data-fiche-grand-num=""><Plaque numero={A.num} doublon={A.double} grand/></span>
@@ -161,7 +161,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
           </div> : null}
           {plein || aActions ? <div className="nf-actions" data-nf-un={plein ? undefined : '1'}>
             {plein ? <Bouton variante="plein" icone={plein.icone ? rendre.icone(plein.icone, 20) : null} onClick={plein.onClick} attrs={{ 'data-fd-plein': '', ...(plein.attrs || {}) }}>{plein.libelle}</Bouton> : null}
-            {aActions ? <button type="button" className="nf-choisir" onClick={() => setMenu(true)} aria-haspopup="dialog" aria-label={T.choisirAction} data-fd-actions-ouvrir="">
+            {aActions ? <button type="button" className="nf-choisir" data-n-famille="second" onClick={() => setMenu(true)} aria-haspopup="dialog" aria-label={T.choisirAction} data-fd-actions-ouvrir="">
               <span className="nf-choisir-long">{T.choisirAction}</span><span className="nf-choisir-court" aria-hidden="true">{T.actionsCourt}</span><span className="nf-choisir-fleche" aria-hidden="true"><Glyphe nom="chevron" taille={16}/></span></button> : null}
           </div> : null}
           {ligneSeule ? <p className="nf-situe" data-nf-ton={ligneSeule.ambre ? 'ambre' : 'neutre'} data-fd-ligne-action="" {...(ligneSeule.attrs || {})}>{[ligneSeule.titre, ligneSeule.valeur].filter(Boolean).join(' · ')}</p> : null}
@@ -184,7 +184,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
                 const valeur = su ? <span className="nf-valeur">{v}</span> : manque(f, porte);
                 return <div key={f.cle} className="nf-ligne">
                   <dt className="nf-lib">{T.libelle(f.lib)}</dt>
-                  <dd className="nf-val">{porte ? <button type="button" className="nf-val-touche" onClick={() => toucherFait(f)} {...a}>{valeur}</button> : <span {...a}>{valeur}</span>}</dd>
+                  <dd className="nf-val">{porte ? <button type="button" className="nf-val-touche" data-n-famille="lien" onClick={() => toucherFait(f)} {...a}>{valeur}</button> : <span {...a}>{valeur}</span>}</dd>
                 </div>;
               })}
             </dl>

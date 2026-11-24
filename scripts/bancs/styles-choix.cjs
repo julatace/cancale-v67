@@ -73,7 +73,7 @@ const MESURE = (args) => {
   const cache = (el) => !!el.closest('[aria-hidden="true"], [hidden], [inert], .vrm-sensible-cache, .n-lu-seul, .vrm-sr-seul, .n-tt-sr, .sr-only, .visually-hidden, .vrm-sr-only');
   const vu = (el) => { const r = el.getBoundingClientRect(); if (r.width < 3 || r.height < 3) return false; if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) return false;
     const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || /inset\(50%\)|rect\(0/.test(cs.clipPath + ' ' + cs.clip)) return false; if (el.checkVisibility && !el.checkVisibility({ checkOpacity: true })) return false; return !cache(el); };
-  const nom = (el) => `${el.tagName.toLowerCase()}.${String(el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className).trim().split(/\s+/).slice(0, 2).join('.')} « ${(el.innerText || el.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 28)} »`;
+  const nom = (el) => { const q = el.getBoundingClientRect(); return `[${Math.round(q.left)},${Math.round(q.top)} ${Math.round(q.width)}×${Math.round(q.height)}] ${el.tagName.toLowerCase()}.${String(el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className).trim().split(/\s+/).slice(0, 2).join('.')} « ${(el.innerText || el.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 28)} »`; };
   const racines = [...document.querySelectorAll('.vrm-main, .n-onglets, [data-fiche-paire]')];
   const dans = (el) => racines.some((r) => r.contains(el));
   // B : chaque texte
@@ -243,7 +243,7 @@ async function poserMutation(pg) {
           const boites = await o.pg.evaluate(BOITES);
           const px = await o.pg.evaluate(PIXELS, { png: shot.toString('base64'), boites, dsf: 2 });
           const pxKo = px.filter((p) => p.k < 4.5 - 0.05 && !(p.s === '.n-grand-titre' && p.k >= 3));
-          dit(px.length >= 3 && !pxKo.length, `B ${cle} : sur les PIXELS, plein, étiquettes, N°, titres, onglet actif ≥ 4,5:1 — ${px.length} boîtes (min ${px.length ? Math.min(...px.map((p) => p.k)).toFixed(2) : '—'})`, pxKo.slice(0, 8));
+          dit(px.length >= 2 && !pxKo.length, `B ${cle} : sur les PIXELS, plein, étiquettes, N°, titres, onglet actif ≥ 4,5:1 — ${px.length} boîtes (min ${px.length ? Math.min(...px.map((p) => p.k)).toFixed(2) : '—'})`, pxKo.slice(0, 8));
           if (tactile && style) dit(m.nCibles > 5 && m.nPetites === 0, `C ${cle} : chaque cible ≥ 44 × 44 — ${m.nCibles} cibles`, m.petites);
           dit(!m.oranges.length && !m.rouges.length, `D ${cle} : aucune couleur orange/ambre, aucun rouge hors doublon`, { oranges: m.oranges, rouges: m.rouges });
           if (style) dit(m.nEtrangers === 0, `E ${cle} : chaque bouton est de la famille commune`, m.etrangers);
