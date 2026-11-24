@@ -47,11 +47,16 @@ La règle `<observation-regle>` (identifiant ⇒ `{id}`/`{uuid}`, `{id}-nike-…
 `portal=fr` —, clé à deux chiffres de suite ⇒ `{x}`, un autre site ⇒ `{tiers}`) est **la même, texte pour texte**, dans
 `inject.js` et `background.js`.
 
-Exemple de frise (simulation O1) : *clic (script) « notifications » · GET api.vinted.fr/inbox-notifications/v1/notifications
-200 · notifs 3 · clic (lui) « notifications » (en-tête 2/3) · notifs 3 (liens `vintedfr://messaging?item_id={id}&user_id={id}&portal=fr`)
-· cloche 3 lignes · clic (lui) `/inbox/want_it/new?receiver_id={id}&item_id={id}` · POST api.vinted.fr/messaging/main/inquiries
-201 (corps `item_id:string`, `receiver_id:string`) · page `/inbox/{uuid}` · GET …/messaging/main/conversations/{uuid} 200 · clic
-textarea · POST …/conversations/{uuid}/replies 201 (`content:string`) · POST /api/v2/transactions/{id}/offers 200.*
+Exemple de frise (simulation O1, 22 entrées, telle que rangée) : *page /inbox · clic (script) « notifications » · GET
+api.vinted.fr/inbox-notifications/v1/notifications 200 · notifs 3 · cloche 3 · clic (script) « notifications » · clic (lui)
+« notifications » · GET …/notifications 200 · notifs 3 (liens `vintedfr://messaging?item_id={id}&user_id={id}&portal=fr`) · cloche
+3 (`/inbox/want_it/new?receiver_id={id}&item_id={id}`) · clic (lui) a `/inbox/want_it/new?receiver_id={id}&item_id={id}` · POST
+api.vinted.fr/messaging/main/inquiries 201 (`item_id:string`, `receiver_id:string`) · GET …/messaging/main/conversations/{uuid} 200 ·
+page /inbox/{uuid} · clic (lui) textarea · clic (lui) « envoyer » · POST …/conversations/{uuid}/replies 201 (`content:string`) · clic
+(lui) button · clic (lui) button · POST /api/v2/transactions/{id}/offers 200 (`offer.price:string`).*
+Dans VRM : « ouvre la cloche · liste de la cloche lue · 3 lignes · liens messaging (app) · clic sur la ligne (lien want_it) · POST
+api.vinted.fr messaging/main/inquiries 201 · page /inbox/{uuid} · … ».
+
 
 ### 3. Le rangement (background.js)
 - Chaque entrée est **rebâtie champ par champ** (`entreeObservation` : liste blanche, la règle rejouée ; un champ inconnu,
@@ -75,10 +80,12 @@ compte les requêtes de la page (seulement les siennes).
   ce que la page relaie · D rien dans la ligne, le fond rebâtit un message forgé · E aucune requête de plus, éteinte = muette,
   heure de fin passée = muette. Mutations (`--mutation`) : `valeur-parametre`, `slug`, `aria` (règle partagée affaiblie ⇒ C
   et D rouges), `corps-valeur`, `texte-clic` (page seule ⇒ C rouge, le fond tient D), `fond-brut` (le fond ne rebâtit plus ⇒
-  D rouge), `sans-fin` (la page ne s'éteint plus ⇒ E rouge). Résultats : voir la PR.
+  D rouge), `sans-fin` (la page ne s'éteint plus ⇒ E rouge). **24 verts ; les 7 mutations rougissent** (aria 4, corps-valeur 4,
+  fond-brut 6, sans-fin 1, slug 4, texte-clic 2, valeur-parametre 4 rouges).
 - `scripts/bancs/sim-extension.cjs --seul O1` : la VRAIE extension chargée, Vinted simulé ; un envoi À LA MAIN (clics de
   Playwright : cloche, ligne du favori, champ, message tapé, Envoyer, offre) ; la frise relue dans la fausse base : chaque
-  étape attendue, dans l'ordre ; aucune valeur ; arrêt au bout des 10 min ; arrêtée = muette.
+  étape attendue, dans l'ordre ; aucune valeur ; arrêt au bout des 10 min ; arrêtée = muette. **19 verts** (`BANC_PORT=4893`
+  si un autre banc tient le port 4797).
 - `audit-coherence` (capacité `observation` ⇒ `commandeObservation`), `audit-endpoints-vus`, `audit-extension-zip`,
   `audit-extension-navigateurs`, `audit-traduction`, `audit-quoi-de-neuf`, build.
 
