@@ -21002,6 +21002,32 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   };
   // « En route » en entier pour l'écran natif : pas lu ⇒ `lu: false` (jamais une liste vide qui dirait « aucun colis ») ; les
   // retours suivis sortent de la liste (la règle du bloc d'avant) ; le filtre par transporteur et l'ordre « le plus récent en haut ».
+  // ── (24 nov., lot suivi-ventes) « MES ENVOIS » (api/_lib/suivi-envoi.js) : chaque vente Vinted PARTIE des 45 derniers jours,
+  // rangée par la DERNIÈRE étape lue — en route · au point, pas retiré (date limite la plus proche d'abord) · retiré, argent en
+  // attente · argent versé. Les retours restent dans leur bloc. Chaque élément porte aussi la forme d'une ligne d'« En route »
+  // (`x`, celle de `listeEnvoyesCalc`) : un groupe choisi EST la liste d'« En route » (jamais une seconde liste, §7).
+  const mesEnvoisCalc = () => {
+    if (!voitSite('vinted') || !Array.isArray(sales.items)) return null;
+    const retoursTx = new Set(((retoursSuivis && retoursSuivis.etat === 'lu') ? [...retoursSuivis.lignes, ...retoursSuivis.remises] : []).filter((l) => l.plateforme === 'vinted').map((l) => String(l.tx)));
+    for (const tx of ((retoursSuivis && retoursSuivis.dejaRepubliees) || [])) retoursTx.add(String(tx));
+    const items = [];
+    for (const o of sales.items) {
+      if (!o || o.transaction_id == null) continue;
+      const txE = String(o.transaction_id);
+      if (hiddenSales.has(txE) || retoursTx.has(txE)) continue;
+      const jE = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
+      if (jE != null && jE > LIMITE_ENVOYES_J) continue;
+      let rE = null; try { rE = parcoursEnvoiDe(o, litigeDeVente(litigesSuivis, o)); } catch (_) { rE = null; }
+      if (!rE || !rE.pc.groupe) continue;
+      const bE = bordsParTxn[txE] || null;
+      const pv = preuvesFriseDe(o);
+      const num = (bE ? numForBord(bE) : '') || (effEntry(o)?.numero || '');
+      const x = { cle: 'v:' + txE, site: 'vinted', type: 'parti', o, b: bE, st: venteStage(o), j: jE, rang: 2, photo: orderPhoto(o), titre: o.title || 'Vente', num, tr: rE.trp,
+        lues: { imprime: !!(bE && isBordPrinted(bE)), depose: true, enroute: !!(pv && pv.bougeLu), livre: !!(pv && pv.livreeLue), valide: !!(pv && pv.finalisee) } };
+      items.push({ cle: x.cle, tx: txE, titre: x.titre, photo: x.photo || '', num, parcours: rE.pc, transporteur: rE.trp, lien: rE.lien, x });
+    }
+    return { gr: groupesEnvois(items), items };
+  };
   const routeNatif = () => {
     if (voitSite('vinted') && !Array.isArray(sales.items)) return { lu: false, erreur: !!sales.error, rangs: [], total: null };
     const retoursTx = new Set(((retoursSuivis && retoursSuivis.etat === 'lu') ? [...retoursSuivis.lignes, ...retoursSuivis.remises] : []).filter((l) => l.plateforme === 'vinted').map((l) => String(l.tx)));
@@ -21009,6 +21035,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const L = listeEnvoyes().filter((x) => !(x.site === 'vinted' && x.o && retoursTx.has(String(x.o.transaction_id))));
     const { liste: LF } = filtrerEnvoyes(L, filtreEnvoyes);
     const plusieurs = (accounts || []).length > 1;
+    // (24 nov.) Un groupe de « Mes envois » choisi : la liste d'« En route » est CE groupe (argent versé compris).
+    const meN = groupeEnvoi !== 'tous' ? mesEnvoisCalc() : null;
+    if (meN && Array.isArray(meN.gr[groupeEnvoi])) return { lu: true, erreur: false, rangs: rangsRouteNatif(meN.gr[groupeEnvoi].map((it) => it.x), (x) => sousEnvoye(x, plusieurs)), total: L.length, groupe: groupeEnvoi };
     return { lu: true, erreur: false, rangs: rangsRouteNatif(rangerEnvoyes(LF), (x) => sousEnvoye(x, plusieurs)), total: L.length };
   };
   // « En route » : la MÊME liste (`listeEnvoyes`, rangée par `rangerEnvoyes` : le plus récent en haut), ses étapes prouvées.
@@ -21024,6 +21053,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       t: [o && o.date, x.v && x.v.date, x.lo && x.lo.date, x.t], suivi: su,
       lienSuivi: su ? trackUrl((x.tr && x.tr.cle) || '', su) : '',
       fiche: attrsFicheLigne({ contexte: 'colis', site: x.site, cle: 'c' + (tx || cle), nums: x.num ? [x.num] : [], tx, photo: typeof x.photo === 'string' ? x.photo : '', titre: x.titre || '' }),
+      // (24 nov., lot suivi-ventes) La piste de l'envoi (api/_lib/suivi-envoi.js) pour le détail : Vinted seulement.
+      envoi: x.site === 'vinted' && o ? (() => { try { const rE = parcoursEnvoiDe(o, litigeDeVente(litigesSuivis, o)); return rE.pc.groupe ? { parcours: rE.pc, transporteur: rE.trp, lien: rE.lien } : null; } catch (_) { return null; } })() : null,
       gestes: {
         pasDepose: x.type === 'coche' ? () => { if (x.o && isShipDone(x.o)) toggleShipDone(x.o); if (x.b && isBordShippedManual(x.b)) unmarkBordShipped(x.b); }
           : x.type === 'vc' && !x.depart ? () => marquerVc('vrm_vc_colis_done', x.v.id, false) : null,
@@ -29044,7 +29075,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     // (20 nov., Julien : « 4 litiges avec 2 écritures différentes ») Les retours ne sont plus deux blocs d'avant
                     // (`CartesRetourRecu` + `RetoursEnCoursBloc`) au-dessus de « En route » : UN groupe « Retours et litiges · N »
                     // (src/natif/ecrans/RetoursVentes.jsx), replié sous « À régler », les mêmes lignes et les mêmes gestes.
-                    const avantRouteN = null;
+                    // (24 nov., lot suivi-ventes) « Mes envois » en tête d'« En route » : quatre tuiles, un groupe choisi EST la liste.
+                    const meV = onglet === 'envoyes' && !toutesSeules ? mesEnvoisCalc() : null;
+                    const avantRouteN = meV ? <MesEnvois groupes={meV.gr} choix={groupeEnvoi} onChoix={setGroupeEnvoi}/> : null;
                     // (21 nov., ext. 5.425, `relances`) « À relancer » : les listes FAITES par l'extension (`vrm_relances_{uid}`, projetées ;
                     // jamais `select=data`) ; l'app les montre, « Relancer » ouvre le panneau (Commandes → À relancer).
                     const lireRelancesVentes = () => lireTout('id=like.vrm_relances_*&select=id,l:data->liste,at:data->>listeAt,c:data->>compte');
@@ -29057,7 +29090,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     const nRetoursEnRoute = (retoursRangsN || []).filter((r) => !r.ancien && (r.etape === 'enroute' || r.etape === 'transit' || r.etape === 'point')).length;
                     const retoursN = !baseKO ? <RetoursVentes rangs={retoursRangsN} enRoute={nRetoursEnRoute} passSu={retoursSuivis && retoursSuivis.etat === 'passu' ? tr('vr.passu') : ''} Icon={Icon} Photo={PhotoVinted} ouvertDefaut={!ordiCompta}/> : null;
                     return (<div id={ID_SECTION_COLIS.ventes} data-colis-section="ventes" data-colis-barre="" data-colis-onglet={toutesSeules ? 'toutes' : onglet}>
-                      <VentesNatif m={ventesNatifRef.current.m} g={{ ...ventesNatifRef.current.g, fiche: ficheDe }} Icon={Icon} Logo={{ nom: nomPlateforme }} Photo={PhotoVinted} plateforme={filtreNatif}
+                      <VentesNatif m={ventesNatifRef.current.m} g={{ ...ventesNatifRef.current.g, fiche: ficheDe, parcours: (r) => (r && r.envoi ? <ParcoursEnvoi parcours={r.envoi.parcours} transporteur={r.envoi.transporteur} lien={r.envoi.lien} cle={r.tx || r.cle}/> : null) }} Icon={Icon} Logo={{ nom: nomPlateforme }} Photo={PhotoVinted} plateforme={filtreNatif}
                         Generer={BoutonGenererNatif} avantRoute={avantRouteN} nRetoursAvant={(retoursRangsN || []).length + ((retoursSuivis && retoursSuivis.etat === 'passu') ? 1 : 0)} avant={!baseKO ? <><ARegler onglet="ventes" Icon={Icon} Photo={PhotoVinted} ouvertDefaut={!ordiCompta}/>{retoursN}{ordiCompta ? relancesN : null}</> : null} relances={!baseKO && !ordiCompta ? relancesN : null}/>
                       <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
                     </div>);
@@ -30513,20 +30546,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           // jours, rangée par la DERNIÈRE étape lue — en route · au point, pas retiré (date limite la plus proche d'abord) ·
           // retiré, argent en attente · argent versé. Une tuile ouvre son groupe (toucher une ligne ouvre la vente) ; le nombre
           // dit sa couverture (lus chez un transporteur). Les retours restent dans le bloc des retours, au-dessus.
-          const mesItems = [];
-          if (voitSite('vinted') && Array.isArray(sales.items)) for (const o of sales.items) {
-            if (!o || o.transaction_id == null) continue;
-            const txE = String(o.transaction_id);
-            if (hiddenSales.has(txE) || retoursTx.has(txE)) continue;
-            const jE = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
-            if (jE != null && jE > LIMITE_ENVOYES_J) continue;
-            let rE = null; try { rE = parcoursEnvoiDe(o, litigeDeVente(litigesSuivis, o)); } catch (_) { rE = null; }
-            if (!rE || !rE.pc.groupe) continue;
-            const bE = bordsParTxn[txE] || null;
-            mesItems.push({ cle: 'v:' + txE, tx: txE, titre: o.title || tr('envois.etape.depose'), photo: orderPhoto(o) || '', num: (bE ? numForBord(bE) : '') || (effEntry(o)?.numero || ''), parcours: rE.pc, transporteur: rE.trp });
-          }
-          const grEnv = groupesEnvois(mesItems);
-          const choixEnv = groupeEnvoi !== 'tous' && Array.isArray(grEnv[groupeEnvoi]) ? groupeEnvoi : 'tous';
+          const meC = mesEnvoisCalc();
+          const grEnv = meC ? meC.gr : null;
+          const choixEnv = grEnv && groupeEnvoi !== 'tous' && Array.isArray(grEnv[groupeEnvoi]) ? groupeEnvoi : 'tous';
           const ouvrirEnvoi = (it) => { try { const a = attrsFicheLigne({ contexte: 'vente', site: 'vinted', cle: 'v' + it.tx, tx: it.tx, nums: it.num ? [String(it.num)] : [], photo: typeof it.photo === 'string' ? it.photo : '', titre: it.titre || '' });
             const el = document.createElement('div'); for (const [k, v] of Object.entries(a)) el.setAttribute(k, v); const x = lireLigne(el); if (x) ouvrirLigne(x); } catch (_) {} };
           const mesEnvoisBloc = <>

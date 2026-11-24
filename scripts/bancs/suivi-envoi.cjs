@@ -9,7 +9,7 @@
 //   2. 8005 Chrono Relais Europe (jamais lu chez le transporteur), Vinted « Commande livrée ! » ⇒ « Retiré » d'après
 //      Vinted SANS date ; « Au point » pas su ;
 //   3. 8004 finalisée (450) ⇒ l'argent coché à la date du versement LUE ;
-//   4. 7002 pas encore partie ⇒ la frise d'avant (le geste), pas de piste ;
+//   4. (7002 pas encore partie : dans aucun groupe — le compte de « Mes envois » le prouve) ;
 //   5. « Mes envois » : 1 en route · 1 au point · 2 retirés · 1 argent versé ; « 3 sur 5 lus chez le transporteur » ;
 //      la tuile « au point » ouvre sa liste (le point, la date limite, le danger) ;
 //   6. aucun orange (teintes calculées), aucun débordement, cibles de 44 px au téléphone, aucune erreur d'app.
@@ -107,27 +107,38 @@ const ouvrir = async (b, vp, sombre) => {
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
-  await pg.locator('.vrm-sale-row[data-tx] .vrm-ledger-sale-toggle').first().waitFor({ timeout: 40000 });
-  await pg.waitForTimeout(1500);
+  try { await pg.locator('[data-vn="ventes"]').first().waitFor({ timeout: 40000 }); }
+  catch (e) { if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, 'echec-ouverture.png') }); console.log('DOM : ' + (await pg.evaluate(() => document.body.innerText.slice(0, 600))).replace(/\s+/g, ' ')); throw e; }
+  await pg.locator('button, [role="radio"], [role="tab"]').filter({ hasText: /^En route/ }).first().click({ timeout: 10000 });
+  await pg.locator('[data-mes-envois]').first().waitFor({ timeout: 20000 });
+  await pg.waitForTimeout(800);
   return { ctx, pg, errs };
 };
 
-const ouvrirVente = async (pg, tx) => {
-  const t = pg.locator(`.vrm-sale-row[data-tx="${tx}"] .vrm-ledger-sale-toggle`).first();
-  if (await t.getAttribute('aria-expanded') !== 'true') {
-    const croix = pg.locator('.vrm-ledger-drawer-host:not([hidden]) .vrm-recap-fermer');
-    if (await croix.count()) { await croix.first().click(); await pg.locator('.vrm-ledger-drawer-host:not([hidden])').first().waitFor({ state: 'detached', timeout: 4000 }).catch(() => {}); await pg.waitForTimeout(150); }
-  }
-  await t.scrollIntoViewIfNeeded();
-  if (await t.getAttribute('aria-expanded') !== 'true') await t.click();
-  const id = await t.getAttribute('aria-controls');
-  await pg.locator(`[id="${id}"]`).waitFor({ state: 'visible', timeout: 8000 });
-  await pg.waitForTimeout(500);
-  return id;
+// Ventes natif → En route : un groupe de « Mes envois » (ou aucun), puis la rangée de la vente (par SA transaction) ; la fiche.
+const choisirGroupe = async (pg, g) => {
+  const retour = pg.locator('.n-poussee .n-barre-retour:visible').first();
+  if (await retour.count()) { await retour.click().catch(() => {}); await pg.waitForTimeout(500); }
+  const cur = await pg.evaluate(() => { const t = document.querySelector('[data-mes-envois-groupe][aria-pressed="true"]'); return t ? t.getAttribute('data-mes-envois-groupe') : 'tous'; });
+  if (cur === g) return;
+  if (cur !== 'tous') { await pg.click(`[data-mes-envois-groupe="${cur}"]`); await pg.waitForTimeout(300); }
+  if (g !== 'tous') { await pg.click(`[data-mes-envois-groupe="${g}"]`); await pg.waitForTimeout(500); }
+};
+const ouvrirVente = async (pg, tx, groupe = 'tous') => {
+  const retour = pg.locator('.n-poussee .n-barre-retour:visible').first();
+  if (await retour.count()) { await retour.click().catch(() => {}); await pg.waitForTimeout(500); }
+  await choisirGroupe(pg, groupe);
+  const l = pg.locator(`[data-vn-route="v:${tx}"]`).first();
+  await l.waitFor({ timeout: 10000 });
+  await l.scrollIntoViewIfNeeded();
+  await l.click();
+  await pg.locator(`[data-vn-parcours="${tx}"]`).first().waitFor({ state: 'visible', timeout: 10000 });
+  await pg.waitForTimeout(400);
+  return tx;
 };
 // La piste rendue dans le tiroir, et ce qui l'entoure.
 const lirePiste = (pg, id) => pg.evaluate((id) => {
-  const d = document.getElementById(id); if (!d) return null;
+  const d = document.querySelector(`[data-vn-parcours="${id}"]`); if (!d) return null;
   const p = d.querySelector('[data-envoi-parcours]');
   const vw = window.innerWidth;
   const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
@@ -135,7 +146,7 @@ const lirePiste = (pg, id) => pg.evaluate((id) => {
   const petites = p ? [...p.querySelectorAll('a, button')].filter(vis).map((e) => e.getBoundingClientRect().height).filter((h) => h < 43.5) : [];
   const hors = [...d.querySelectorAll('*')].filter((e) => vis(e) && !e.closest('svg') && e.getBoundingClientRect().right > vw + 1).map((e) => String(e.className || e.tagName).slice(0, 30));
   return {
-    piste: !!p, frise: !!d.querySelector('[data-recap-frise]'), groupe: p && p.getAttribute('data-envoi-groupe'), danger: p && p.getAttribute('data-envoi-danger'),
+    piste: !!p, frise: !!document.querySelector(`[data-vn-etapes="v:${id}"]`), groupe: p && p.getAttribute('data-envoi-groupe'), danger: p && p.getAttribute('data-envoi-danger'),
     limite: (p && p.querySelector('[data-envoi-limite]') || { getAttribute: () => null }).getAttribute('data-envoi-limite'),
     lieu: (p && p.querySelector('[data-envoi-lieu]') || {}).textContent || '', suivi: (p && p.querySelector('[data-envoi-suivi]') || { getAttribute: () => null }).getAttribute('data-envoi-suivi'),
     lien: !!(p && p.querySelector('a[data-envoi-suivi][href^="https://"]')), logo: !!(p && p.querySelector('.vrm-env-logo [data-transporteur-logo], .vrm-env-logo svg, .vrm-env-logo span')),
@@ -164,9 +175,9 @@ const et = (r, c) => r.etapes.find((e) => e.cle === c) || {};
       const tel = vp.width < 600;
       const nf = nom.replace(/\s+/g, '-');
       await essaie('8002 au point Vinted Go', async () => {
-        const id = await ouvrirVente(pg, '8002');
+        const id = await ouvrirVente(pg, '8002', 'tous');
         const r = await lirePiste(pg, id);
-        dit(r.piste && !r.frise, '8002 parti : la piste de l’envoi REMPLACE la frise (une seule piste)', `piste ${r.piste} frise ${r.frise}`);
+        dit(r.piste && !r.frise, '8002 parti : la piste de l’envoi REMPLACE les étapes de la fiche (une seule piste)', `piste ${r.piste} frise ${r.frise}`);
         dit(r.groupe === 'aupoint' && et(r, 'aupoint').etat === 'fait' && /Consigne Test Centre/.test(r.lieu), '8002 « Au point » fait, le nom du point LU', JSON.stringify([r.groupe, et(r, 'aupoint'), r.lieu]));
         dit(r.limite === String(Date.parse(LIMITE_8002)) && r.danger === 'veille' && r.dangerTxt.length > 0, '8002 « à retirer avant » = la date LUE ; « Colis en danger » (veille) dit sur la ligne', JSON.stringify([r.limite, r.danger, r.dangerTxt]));
         dit(et(r, 'retire').etat === 'passu' && et(r, 'argent').etat === 'passu' && et(r, 'retire').t === '', '8002 « Retiré » et l’argent : « pas encore su », aucune date', JSON.stringify([et(r, 'retire'), et(r, 'argent')]));
@@ -178,29 +189,20 @@ const et = (r, c) => r.etapes.find((e) => e.cle === c) || {};
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `envoi-8002-${nf}.png`) });
       });
       await essaie('8005 Chrono Relais Europe', async () => {
-        const r = await lirePiste(pg, await ouvrirVente(pg, '8005'));
+        const r = await lirePiste(pg, await ouvrirVente(pg, '8005', 'retire'));
         dit(et(r, 'retire').etat === 'fait' && et(r, 'retire').source === 'vinted' && et(r, 'retire').t === '' && et(r, 'aupoint').etat === 'passu', '8005 jamais lu chez le transporteur : « Retiré » d’après Vinted, sans date inventée ; « Au point » pas su', JSON.stringify(r.etapes));
       });
       await essaie('8003 Chronopost retiré', async () => {
-        const r = await lirePiste(pg, await ouvrirVente(pg, '8003'));
+        const r = await lirePiste(pg, await ouvrirVente(pg, '8003', 'retire'));
         dit(r.groupe === 'retire' && et(r, 'aupoint').etat === 'fait' && et(r, 'retire').etat === 'fait' && et(r, 'retire').source === 'transporteur' && et(r, 'argent').etat === 'passu', '8003 Chronopost : au point puis retiré (dates lues), argent en attente', JSON.stringify(r.etapes));
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `envoi-8003-${nf}.png`) });
       });
       await essaie('8004 finalisée', async () => {
-        const r = await lirePiste(pg, await ouvrirVente(pg, '8004'));
+        const r = await lirePiste(pg, await ouvrirVente(pg, '8004', 'argent'));
         dit(r.groupe === 'argent' && et(r, 'argent').etat === 'fait', '8004 commande finalisée (450) ⇒ argent versé', JSON.stringify(et(r, 'argent')));
       });
-      await essaie('7002 pas partie', async () => {
-        const r = await lirePiste(pg, await ouvrirVente(pg, '7002'));
-        dit(!r.piste && r.frise, '7002 pas encore partie : la frise d’avant (le geste), aucune piste', `piste ${r.piste} frise ${r.frise}`);
-      });
       await essaie('Mes envois', async () => {
-        const croix = pg.locator('.vrm-ledger-drawer-host:not([hidden]) .vrm-recap-fermer');
-        if (await croix.count()) { await croix.first().click(); await pg.waitForTimeout(300); }
-        await pg.locator('[data-colis-onglet-choix="envoyes"]').first().waitFor({ timeout: 15000 });
-        await pg.click('[data-colis-onglet-choix="envoyes"]');
-        await pg.locator('[data-mes-envois]').first().waitFor({ timeout: 10000 });
-        await pg.waitForTimeout(400);
+        await choisirGroupe(pg, 'tous');
         const L = await pg.evaluate(() => { const s = document.querySelector('[data-mes-envois]'); const g = {}; for (const t of s.querySelectorAll('[data-mes-envois-groupe]')) g[t.getAttribute('data-mes-envois-groupe')] = Number(t.getAttribute('data-mes-envois-n'));
           const petites = [...s.querySelectorAll('button')].map((e) => e.getBoundingClientRect().height).filter((h) => h < 43.5);
           return { n: s.getAttribute('data-mes-envois'), couv: s.getAttribute('data-mes-envois-couverture') || (s.querySelector('[data-mes-envois-couverture]') || {}).getAttribute?.('data-mes-envois-couverture'), g, petites, deb: document.documentElement.scrollWidth - window.innerWidth }; });
@@ -208,16 +210,14 @@ const et = (r, c) => r.etapes.find((e) => e.cle === c) || {};
         dit(L.n === '5' && L.couv === '3/5', 'Mes envois : la couverture « 3 sur 5 lus chez le transporteur »', JSON.stringify([L.n, L.couv]));
         if (tel) dit(!L.petites.length, 'Mes envois : tuiles de 44 px au moins', L.petites.join(','));
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `mes-envois-${nf}.png`) });
-        await pg.click('[data-mes-envois-groupe="aupoint"]');
-        await pg.locator('[data-mes-envois-liste]').first().waitFor({ timeout: 5000 });
-        const G = await pg.evaluate(() => [...document.querySelectorAll('[data-mes-envois-ligne]')].map((e) => ({ tx: e.getAttribute('data-mes-envois-ligne'), danger: e.getAttribute('data-envoi-danger'), phrase: (e.querySelector('[data-envoi-phrase]') || {}).textContent || '', h: e.getBoundingClientRect().height })));
-        dit(G.length === 1 && G[0].tx === '8002' && G[0].danger === 'veille' && /Consigne Test Centre/.test(G[0].phrase), 'la tuile « au point » ouvre SA liste : le point, la date limite, le danger', JSON.stringify(G));
-        dit(G.every((x) => x.h >= 44), 'chaque ligne fait 44 px au moins', JSON.stringify(G.map((x) => x.h)));
-        const o = await oranges(pg, '[data-mes-envois], [data-mes-envois-liste]');
+        await choisirGroupe(pg, 'aupoint');
+        const G = await pg.evaluate(() => [...document.querySelectorAll('[data-vn-route]')].map((e) => ({ cle: e.getAttribute('data-vn-route'), h: e.getBoundingClientRect().height })).filter((x) => x.h > 0));
+        dit(G.length === 1 && G[0].cle === 'v:8002', 'la tuile « au point » : la liste d’« En route » devient CE groupe (une seule liste)', JSON.stringify(G));
+        const o = await oranges(pg, '[data-mes-envois]');
         dit(!o.length, 'Mes envois : aucun orange (couleurs calculées)', o.join(' | '));
         dit(L.deb <= 1, 'Mes envois : aucun débordement horizontal', `${L.deb}px`);
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `mes-envois-aupoint-${nf}.png`) });
-        await pg.click('[data-mes-envois-groupe="aupoint"]');
+        await choisirGroupe(pg, 'tous');
       });
       dit(!errs.length, 'aucune erreur d’app', errs.join(' | ').slice(0, 300));
       await ctx.close();
