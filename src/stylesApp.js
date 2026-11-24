@@ -77,3 +77,5 @@ import './styles-ecrans-gardes.css';
 import './styles-messages-naturel.css';
 // Les composants partagés gardent le dernier mot sur la coque.
 import './styles-composants.css';
+// (24 nov., livrable) Un chiffre EN COURS de lecture se dessine en squelette à sa place (jamais « — · lecture… »).
+import './styles-chiffre-attente.css';

@@ -86,6 +86,8 @@ function base() {
   return b;
 }
 async function rest(route, b) {
+  // (24 nov., livrable) `BANC_LENT=ms` : chaque réponse de la base tenue ce délai — pour REGARDER les états de chargement.
+  if (Number(process.env.BANC_LENT) > 0) await new Promise((ok) => setTimeout(ok, Number(process.env.BANC_LENT)));
   const req = route.request(), m = req.method();
   const u = decodeURIComponent(req.url());
   if (/\/rest\/v1\/rpc\//.test(u)) return route.fulfill({ status: 200, contentType: 'application/json', body: 'null' });

@@ -58,7 +58,11 @@ const affiche = (x, fmt, grand) => {
   // (3 nov.) Jamais « ≥ » sur une case : le chiffre seul, « au moins » dans son titre (`titreDe`).
   return grand ? <><span className="vrm-fu-borne">au moins</span>{corps}</> : corps;
 };
-const attrsDeValeur = (x, page) => ({
+// (24 nov., livrable) EN COURS DE LECTURE (`raison: 'encours'`, jamais « pas su ») : le chiffre se dessine en
+// squelette à sa place (src/styles-chiffre-attente.css) — plus de « — · lecture… » qui clignote avant les données. Le « — »
+// reste dans la page (lecteur d'écran, bancs) ; au bout de 15 s sans réponse, le « — » et sa raison reviennent.
+const attrsDeValeur = (x, page, attente = 'case') => ({
+  'data-attente': x.valeur == null && x.raison === 'encours' ? attente : undefined,
   'data-carte-chiffre': x.place.id,
   'data-carte-p': x.p && typeof x.p === 'string' ? x.p : x.p ? 'plage' : '',
   'data-carte-valeur': centimes(x.valeur, x.def && x.def.type),
@@ -222,7 +226,7 @@ export default function CarteStats({ owner = '', page, sel, sources, regles, reg
         data-carte-defaut={V.defaut ? '1' : '0'} {...(extra.attrs || {})}
         surtitre={V.perimetre}
         action={modifier}
-        grandAttrs={{ ...attrsDeValeur(g, page), ...(g.attrs || {}), ...(g.def && g.def.local && g.def.attrs ? g.def.attrs : {}), title: titreDe(g), ...(plus(g) || {}) }}
+        grandAttrs={{ ...attrsDeValeur(g, page, 'valeur'), ...(g.attrs || {}), ...(g.def && g.def.local && g.def.attrs ? g.def.attrs : {}), title: titreDe(g), ...(plus(g) || {}) }}
         valeur={affiche(g, fmt, true)}
         sous={sous || <span className="vrm-fu-sous-nom">{g.def ? (g.def.local ? (g.def.court || g.def.nom) : g.def.court) : ''}{aide ? <button type="button" className="vrm-fu-aide" data-carte-aide={page} aria-label="D’où viennent ces chiffres ?" title="D’où viennent ces chiffres ?" onClick={() => setAideOuverte(true)}><span aria-hidden="true">?</span></button> : null}</span>}
         courbe={courbe && courbe.length > 1 ? courbe : null}

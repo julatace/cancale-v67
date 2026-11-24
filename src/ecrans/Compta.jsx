@@ -3777,7 +3777,7 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
   // (16 nov.) Le nom d'une case = son texte visible (WCAG 2.5.3 : un aria-label différent cachait le chiffre lu) ;
   // la phrase complète (« au moins », la question) reste en `title`.
   const chiffre = (q, affiche = false) => (
-    <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined}>
+    <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined} data-attente={q.valeur == null && !q.texte && q.raison === 'encours' ? 'valeur' : undefined}>
       {q.valeur != null ? <>{q.partiel ? <small>{tr('journee.moins')} </small> : null}{affiche ? sommeAffiche(somme(q.valeur)) : somme(q.valeur)}</> : (q.texte || '—')}
     </b>
   );

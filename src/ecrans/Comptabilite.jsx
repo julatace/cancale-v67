@@ -5518,11 +5518,11 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, onSemain
         <div className="vrm-jv2-corps">
           <div className="vrm-jv2-chiffre">
             {vSel == null
-              ? <div className="vrm-fu-grand vrm-jv2-grand is-vide" data-jv2-vendu="">—</div>
+              ? <div className="vrm-fu-grand vrm-jv2-grand is-vide" data-jv2-vendu="" data-attente={J.vendu.raison === 'encours' ? 'valeur' : undefined}>—</div>
               : vSel === 0
                 ? <div className="vrm-jv2-grand is-zero" data-jv2-vendu="0">{tr('journee.rienVendu')}</div>
                 : <GrandChiffre className="vrm-fu-grand vrm-jv2-grand" data-jv2-vendu={String(Math.round(vSel * 100))} data-partiel={J.vendu.partiel ? '1' : undefined}>{J.vendu.partiel ? <span className="vrm-fu-borne">{tr('journee.moins')} </span> : null}<MontantAffiche texte={montant(vSel)}/></GrandChiffre>}
-            <p className="vrm-jv2-faits">
+            <p className="vrm-jv2-faits" data-attente={J.ventes.valeur == null && J.ventes.raison === 'encours' ? 'note' : undefined}>
               {/* (15 nov., refonte-journee) « vendu aujourd'hui · 1 vente » : le chiffre dit de QUAND il parle (la maquette). */}
               {!semaine && vSel != null && vSel > 0 ? <span className="vrm-jv2-quoi" data-jv2-quoi="">{(sel === 0 ? tr('journee.venduAuj') : sel === 1 ? tr('journee.venduHier') : tr('journee.venduLe', { quand: dateJourFr(jSel.d) })) + ' · '}</span> : null}
               <span data-journal-case="ventes" data-valeur={J.ventes.valeur == null ? '' : String(J.ventes.valeur)} data-partiel={J.ventes.partiel ? '1' : undefined}>{faitVentes}</span>
@@ -22677,12 +22677,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         // de charger ». Un compte non exclu pas lu = « pas su », comme les ventes.
         const achatsKO = !!buys.error || (Array.isArray(buys.failedUids) ? buys.failedUids : []).some(u => !acctOff(u));
         const T = [
-          { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', pasSu: loading || pasLuComptes || (accounts.length>0 && sales.items==null) || ((ko || colisEb === null || colisAutres.leboncoin === null || colisAutres.vestiaire === null) && !(tuiles.envoyer && tuiles.envoyer.n)) },
+          // (24 nov., livrable) `enCours` : « pas su » parce que la PREMIÈRE lecture n'est pas revenue (aucune erreur) —
+          // la tuile se dessine en squelette (src/styles-chiffre-attente.css) au lieu de « — · Pas encore lu ».
+          { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', enCours: (loading || pasLuComptes || (accounts.length>0 && sales.items==null)) && !sales.error, pasSu: loading || pasLuComptes || (accounts.length>0 && sales.items==null) || ((ko || colisEb === null || colisAutres.leboncoin === null || colisAutres.vestiaire === null) && !(tuiles.envoyer && tuiles.envoyer.n)) },
           // (revue du 23 oct.) E-mails de suivi pas encore lus (ou lecture ratée)
           // ⇒ « — » : un total fait des seuls colis vus par Vinted est partiel.
-          { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'retraits', titrePasSu: trackingKO ? "E-mails de suivi pas lus — ouvre Colis pour réessayer" : null, pasSu: loading || pasLuComptes || tracking === null || (accounts.length>0 && (buys.items==null || achatsKO) && !(tuiles.retirer && tuiles.retirer.n)) },
-          { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null || (convs.error && !(convs.items||[]).length) },   // (20 nov., chasse-bugs) lecture ratée (`[]` + error) : « — », jamais « Aucun message non lu »
-          { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null || (listings.error && !(listings.items||[]).length) },
+          { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'retraits', enCours: (loading || pasLuComptes || tracking === null || (accounts.length>0 && buys.items==null)) && !trackingKO && !achatsKO, titrePasSu: trackingKO ? "E-mails de suivi pas lus — ouvre Colis pour réessayer" : null, pasSu: loading || pasLuComptes || tracking === null || (accounts.length>0 && (buys.items==null || achatsKO) && !(tuiles.retirer && tuiles.retirer.n)) },
+          { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', enCours: (loading || convs.items == null) && !convs.error, pasSu: loading || convs.items == null || (convs.error && !(convs.items||[]).length) },   // (20 nov., chasse-bugs) lecture ratée (`[]` + error) : « — », jamais « Aucun message non lu »
+          { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', enCours: (loading || listings.items == null) && !listings.error, pasSu: loading || listings.items == null || (listings.error && !(listings.items||[]).length) },
         ];
         // ── (3 nov., Julien : « les PHOTOS en tout petit, superposées ») LES PHOTOS DE CHAQUE
         // CASE, PAR IDENTITÉ SEULEMENT (§5) : la photo que porte la vente / l'achat / la
@@ -23987,7 +23989,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               // Cachée par lui, revenue parce qu'elle est urgente (`visT(id).force`) : la tuile le dit.
               const forceDit = (x) => visT(x.id).force ? <span className="sj-sous-l is-ambre" data-jp-urgent="">{tr('journee.afficheeCarUrgent')}</span> : null;
               const sous = (x) => { const so = sousCase(x); return so ? <span className={'sj-sous-l' + (so.ambre ? ' is-ambre' : '')} data-sous-ligne={so.cle}>{so.texte}</span> : null; };
-              const pasSuTexte = (x) => <span className="sj-sous-l">{x.titrePasSu || tr('sj.pasLu')}</span>;
+              const pasSuTexte = (x) => <span className="sj-sous-l" data-attente={x.enCours ? 'note' : undefined}>{x.titrePasSu || tr('sj.pasLu')}</span>;
+              const attenteN = (x) => (x && x.pasSu && x.enCours ? 'valeur' : undefined);
               const lienPied = (txt, f, attrs) => <div className="sj-pied"><LienJ onClick={f} attrs={attrs}>{txt}</LienJ></div>;
               const echeance = (t) => {
                 if (!t || t.daysLeft == null) return { txt: '', ambre: false };
@@ -24026,7 +24029,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   attrs: { ...attrsCase(xE), 'data-sj-titre': `${n} colis ${Lbas.aEnvoyer}`, 'data-sj-geste': em && em.n > 0 ? VERBES.imprimer : VERBES.voir }, vide: !xE.pasSu && n === 0,
                   tasse: { n: xE.pasSu ? '—' : String(n), l: tr('sj.t.aEnvoyer') },
                   face: (<>
-                    <b className="sj-n sj-n-grand">{xE.pasSu ? '—' : n}</b>
+                    <b className="sj-n sj-n-grand" data-attente={attenteN(xE)}>{xE.pasSu ? '—' : n}</b>
                     {n > 0 ? <PileVignettes className="sj-pile" srcs={photosCase.envoyer} n={n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="truck" size={20}/>}/> : null}
                     {/* (15 nov., refonte-journee) Les plaques N° des premiers colis (par identité) et la date du plus pressé. */}
                     {n > 0 && plaquesE.length ? <span className="sj-v-plaques" data-sj-plaques={String(plaquesE.length)}>{plaquesE.map((c) => <PlaqueJ key={c.cle} num={c.num}/>)}</span> : null}
@@ -24049,7 +24052,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   plein,
                   deplie: (<>
                     <div className="sj-deplie-affiche">
-                      <div><b className="sj-n sj-n-grand">{xE.pasSu ? '—' : n}</b>
+                      <div><b className="sj-n sj-n-grand" data-attente={attenteN(xE)}>{xE.pasSu ? '—' : n}</b>
                         <p className="sj-sous">{xE.pasSu ? pasSuTexte(xE) : <span className="sj-sous-l">{n === 0 ? tr('sj.rienAEnvoyer') : em ? tr(em.exact === false ? 'sj.pretsAuMoins' : 'sj.prets', { n: em.n }) : tr('sj.colis', { n })}</span>}{sous(xE)}</p></div>
                       {!ordiJournee && plein ? plein : null}
                     </div>
@@ -24073,7 +24076,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 const estOffre = (c) => /\boffre\b|\d\s?€/i.test(String(c.description || ''));
                 out.simples.push({ id: 'messages', lib: xM.pasSu ? tr('sj.l.messages') : tr('sj.v.messagesN', { n }), aria: tr('sj.aria.messages', { n: xM.pasSu ? '—' : n }), attrs: attrsCase(xM), vide: !xM.pasSu && n === 0 && !ailleurs,
                   tasse: { n: xM.pasSu ? '—' : String(n), l: tr('sj.t.messages') },
-                  face: (<><b className="sj-n">{xM.pasSu ? '—' : n}</b>
+                  face: (<><b className="sj-n" data-attente={attenteN(xM)}>{xM.pasSu ? '—' : n}</b>
                     {/* (15 nov., refonte-journee) Les deux dernières conversations non lues : le pseudo, puis sa phrase (une offre à l'ambre). */}
                     {nonLues.length ? <span className="sj-v-convs" data-sj-convs={String(Math.min(2, nonLues.length))}>{nonLues.slice(0, 2).map((c, k) => (
                       <span key={String(c.id || k)} className="sj-v-conv"><b>{(c.opposite_user && c.opposite_user.login) || tr('sj.conversation')}</b>
@@ -24120,7 +24123,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 const n = nDe(xP);
                 out.simples.push({ id: 'prix', lib: tr('sj.l.prixBaisser'), aria: tr('sj.aria.prixBaisser', { n: xP.pasSu ? '—' : n }), attrs: attrsCase(xP), vide: !xP.pasSu && n === 0,
                   tasse: { n: xP.pasSu ? '—' : String(n), l: tr('sj.t.prixBaisser') },
-                  face: <b className="sj-n">{xP.pasSu ? '—' : n}</b>,
+                  face: <b className="sj-n" data-attente={attenteN(xP)}>{xP.pasSu ? '—' : n}</b>,
                   deplie: (<>
                     {repriceList.length ? <div className="sj-liste" role="list">{repriceList.slice(0, 6).map((r) => (
                       <RangeeJ key={String(r.it && r.it.id)} num={(numeros[String(r.it && r.it.id)] || {}).numero || ''} photo={photoArticle(r.it)} Photo={PhotoVinted} icone={<Icon name="tag" size={18}/>}
@@ -24150,7 +24153,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 const soR = !xR.pasSu && comptes.length && n > 0 ? sous(xR) : null;
                 out.retirer = { id: 'retirer', lib: xR.pasSu ? tr('sj.l.aRetirer') : soR ? <>{tr('sj.l.aRetirerN', { n })} · {soR}</> : tr('sj.l.aRetirerN', { n }), aria: tr('sj.aria.aRetirer', { n: xR.pasSu ? '—' : n }), attrs: { ...attrsCase(xR), 'data-sj-titre': `${n} colis ${Lbas.aRetirer}`, 'data-sj-geste': VERBES.voir }, vide: !xR.pasSu && n === 0,
                   tasse: { n: xR.pasSu ? '—' : String(n), l: tr('sj.t.aRetirer') },
-                  face: xR.pasSu ? <><b className="sj-n">—</b><span className="sj-sous">{pasSuTexte(xR)}</span></>
+                  face: xR.pasSu ? <><b className="sj-n" data-attente={attenteN(xR)}>—</b><span className="sj-sous">{pasSuTexte(xR)}</span></>
                     : n === 0 ? <><b className="sj-n">0</b><span className="sj-sous"><span className="sj-sous-l">{tr('sj.rienARetirer')}</span></span></>
                     : comptes.length ? <span className="sj-codes" data-sj-codes={String(comptes.length)}>{comptes.slice(0, 2).map((c, k) => (
                         <span key={k} className="sj-code">{plaque(c)}<span className="sj-code-ou vrm-sensible" data-stream-type="adresse">{String(c.lieu || '').split(/[\n,]/)[0].trim() || nomTr(c) || ''}</span></span>))}</span>
