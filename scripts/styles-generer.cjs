@@ -67,7 +67,6 @@ const ORDRE = Object.keys(PRESETS);
 
 // ── les jetons dérivés d'une palette ──
 function jetons(p, f, sombre) {
-  const rouge = sombre ? '#FF7A6E' : '#BF2A21';
   const v = p.vert;
   const vertFond = sombre ? rgba(v, 0.16) : melange(p.carte, v, 0.12);
   const ardoiseFond = sombre ? rgba(p.accent, 0.16) : melange(p.carte, p.accent, 0.11);
@@ -80,7 +79,6 @@ function jetons(p, f, sombre) {
     '--n-accent': p.accent, '--n-plein': p.plein, '--n-sur-plein': p.surPlein,
     '--n-teinte': ardoiseFond, '--n-sur-teinte': p.encre,
     '--n-ambre': p.accent, '--n-ambre-fond': ardoiseFond, '--n-ambre-bord': 'transparent', '--n-sur-ambre': rapport(p.accent, '#FFFFFF') >= 4.5 ? '#FFFFFF' : '#000000',
-    '--n-doublon': rouge, '--n-sur-doublon': sombre ? '#1A0000' : '#FFFFFF',
     '--n-vert': v, '--n-vert-fond': vertFond, '--n-vert-bord': 'transparent',
     '--n-teal': p.accent, '--n-teal-fond': ardoiseFond, '--n-teal-bord': 'transparent',
     '--n-gris': p.encre2, '--n-gris-fond': encreFond, '--n-gris-bord': 'transparent',

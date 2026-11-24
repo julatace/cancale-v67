@@ -21,8 +21,6 @@
   --n-ambre-fond: #E0E2E5;
   --n-ambre-bord: transparent;
   --n-sur-ambre: #FFFFFF;
-  --n-doublon: #BF2A21;
-  --n-sur-doublon: #FFFFFF;
   --n-vert: #17653F;
   --n-vert-fond: #D9E4E1;
   --n-vert-bord: transparent;
@@ -95,8 +93,6 @@
   --n-ambre-fond: rgb(180 191 204 / 0.16);
   --n-ambre-bord: transparent;
   --n-sur-ambre: #000000;
-  --n-doublon: #FF7A6E;
-  --n-sur-doublon: #1A0000;
   --n-vert: #80D9A9;
   --n-vert-fond: rgb(128 217 169 / 0.16);
   --n-vert-bord: transparent;
@@ -170,8 +166,6 @@
   --n-ambre-fond: #DEE4EA;
   --n-ambre-bord: transparent;
   --n-sur-ambre: #FFFFFF;
-  --n-doublon: #BF2A21;
-  --n-sur-doublon: #FFFFFF;
   --n-vert: #15603F;
   --n-vert-fond: #D8E4E3;
   --n-vert-bord: transparent;
@@ -244,8 +238,6 @@
   --n-ambre-fond: rgb(163 186 211 / 0.16);
   --n-ambre-bord: transparent;
   --n-sur-ambre: #000000;
-  --n-doublon: #FF7A6E;
-  --n-sur-doublon: #1A0000;
   --n-vert: #7DD3A6;
   --n-vert-fond: rgb(125 211 166 / 0.16);
   --n-vert-bord: transparent;
@@ -319,8 +311,6 @@
   --n-ambre-fond: #E5E3E0;
   --n-ambre-bord: transparent;
   --n-sur-ambre: #FFFFFF;
-  --n-doublon: #BF2A21;
-  --n-sur-doublon: #FFFFFF;
   --n-vert: #1F6140;
   --n-vert-fond: #DDE3DD;
   --n-vert-bord: transparent;
@@ -393,8 +383,6 @@
   --n-ambre-fond: rgb(206 198 187 / 0.16);
   --n-ambre-bord: transparent;
   --n-sur-ambre: #000000;
-  --n-doublon: #FF7A6E;
-  --n-sur-doublon: #1A0000;
   --n-vert: #86D2A6;
   --n-vert-fond: rgb(134 210 166 / 0.16);
   --n-vert-bord: transparent;
@@ -468,8 +456,6 @@
   --n-ambre-fond: #E3E3E3;
   --n-ambre-bord: transparent;
   --n-sur-ambre: #FFFFFF;
-  --n-doublon: #BF2A21;
-  --n-sur-doublon: #FFFFFF;
   --n-vert: #0B5A33;
   --n-vert-fond: #E2EBE7;
   --n-vert-bord: transparent;
@@ -542,8 +528,6 @@
   --n-ambre-fond: rgb(255 255 255 / 0.16);
   --n-ambre-bord: transparent;
   --n-sur-ambre: #000000;
-  --n-doublon: #FF7A6E;
-  --n-sur-doublon: #1A0000;
   --n-vert: #8BE3B3;
   --n-vert-fond: rgb(139 227 179 / 0.16);
   --n-vert-bord: transparent;
@@ -617,8 +601,6 @@
   --n-ambre-fond: #E4E4E2;
   --n-ambre-bord: transparent;
   --n-sur-ambre: #FFFFFF;
-  --n-doublon: #BF2A21;
-  --n-sur-doublon: #FFFFFF;
   --n-vert: #1E5E3C;
   --n-vert-fond: #E0E6DF;
   --n-vert-bord: transparent;
@@ -691,8 +673,6 @@
   --n-ambre-fond: rgb(198 208 221 / 0.16);
   --n-ambre-bord: transparent;
   --n-sur-ambre: #000000;
-  --n-doublon: #FF7A6E;
-  --n-sur-doublon: #1A0000;
   --n-vert: #8DD0A8;
   --n-vert-fond: rgb(141 208 168 / 0.16);
   --n-vert-bord: transparent;
@@ -766,8 +746,6 @@
   --n-ambre-fond: #E2E5E9;
   --n-ambre-bord: transparent;
   --n-sur-ambre: #FFFFFF;
-  --n-doublon: #BF2A21;
-  --n-sur-doublon: #FFFFFF;
   --n-vert: #17623E;
   --n-vert-fond: #DBE6E3;
   --n-vert-bord: transparent;
@@ -840,8 +818,6 @@
   --n-ambre-fond: rgb(181 195 214 / 0.16);
   --n-ambre-bord: transparent;
   --n-sur-ambre: #000000;
-  --n-doublon: #FF7A6E;
-  --n-sur-doublon: #1A0000;
   --n-vert: #82D6AA;
   --n-vert-fond: rgb(130 214 170 / 0.16);
   --n-vert-bord: transparent;
@@ -915,8 +891,6 @@
   --n-ambre-fond: #DFE6F1;
   --n-ambre-bord: transparent;
   --n-sur-ambre: #FFFFFF;
-  --n-doublon: #BF2A21;
-  --n-sur-doublon: #FFFFFF;
   --n-vert: #15613E;
   --n-vert-fond: #DAE6E5;
   --n-vert-bord: transparent;
@@ -989,8 +963,6 @@
   --n-ambre-fond: rgb(147 182 238 / 0.16);
   --n-ambre-bord: transparent;
   --n-sur-ambre: #000000;
-  --n-doublon: #FF7A6E;
-  --n-sur-doublon: #1A0000;
   --n-vert: #83D8AD;
   --n-vert-fond: rgb(131 216 173 / 0.16);
   --n-vert-bord: transparent;
@@ -1064,8 +1036,6 @@
   --n-ambre-fond: #DDE8E7;
   --n-ambre-bord: transparent;
   --n-sur-ambre: #FFFFFF;
-  --n-doublon: #BF2A21;
-  --n-sur-doublon: #FFFFFF;
   --n-vert: #17623E;
   --n-vert-fond: #DAE6E2;
   --n-vert-bord: transparent;
@@ -1138,8 +1108,6 @@
   --n-ambre-fond: rgb(134 222 197 / 0.16);
   --n-ambre-bord: transparent;
   --n-sur-ambre: #000000;
-  --n-doublon: #FF7A6E;
-  --n-sur-doublon: #1A0000;
   --n-vert: #86DEC5;
   --n-vert-fond: rgb(134 222 197 / 0.16);
   --n-vert-bord: transparent;
@@ -1213,8 +1181,6 @@
   --n-ambre-fond: #E3E3E3;
   --n-ambre-bord: transparent;
   --n-sur-ambre: #FFFFFF;
-  --n-doublon: #BF2A21;
-  --n-sur-doublon: #FFFFFF;
   --n-vert: #0E5A34;
   --n-vert-fond: #E2EBE7;
   --n-vert-bord: transparent;
@@ -1287,8 +1253,6 @@
   --n-ambre-fond: rgb(255 255 255 / 0.16);
   --n-ambre-bord: transparent;
   --n-sur-ambre: #000000;
-  --n-doublon: #FF7A6E;
-  --n-sur-doublon: #1A0000;
   --n-vert: #8FE0B5;
   --n-vert-fond: rgb(143 224 181 / 0.16);
   --n-vert-bord: transparent;
@@ -1362,8 +1326,6 @@
   --n-ambre-fond: #E2E6EC;
   --n-ambre-bord: transparent;
   --n-sur-ambre: #FFFFFF;
-  --n-doublon: #BF2A21;
-  --n-sur-doublon: #FFFFFF;
   --n-vert: #14613D;
   --n-vert-fond: #DCE6E3;
   --n-vert-bord: transparent;
@@ -1436,8 +1398,6 @@
   --n-ambre-fond: rgb(166 191 230 / 0.16);
   --n-ambre-bord: transparent;
   --n-sur-ambre: #000000;
-  --n-doublon: #FF7A6E;
-  --n-sur-doublon: #1A0000;
   --n-vert: #86D9AE;
   --n-vert-fond: rgb(134 217 174 / 0.16);
   --n-vert-bord: transparent;
