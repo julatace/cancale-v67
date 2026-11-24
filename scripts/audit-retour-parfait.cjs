@@ -36,7 +36,9 @@ const MUTATIONS = {
   'rattrapage-sans-condition': [['api/email-rattacher.js', "&meta->>pdfLu=is.null&select=id`", "&select=id`"]],
   'rattrapage-absent': [['api/email-rattacher.js', "  try { t = await transporteursRetours({ owner, lire, lireLigne, ecrireSi }); }", "  try { t = { ok: true, passu: false, faits: [] }; }"]],
   'rattrapage-relit-toujours': [['api/_lib/reclasser-retours.js', "  + '&meta->>_pdf=eq.true&meta->>pdfLu=is.null'", "  + '&meta->>_pdf=eq.true'"], ['api/_lib/reclasser-retours.js', "  if (data.pdfLu != null && data.pdfLu !== '') return null;\n", '']],
-  'etape-cochee-sans-preuve': [['src/retoursAchat.js', "  const passe = (i) => (rf > i ? 'fait' : 'saute');", "  const passe = () => 'fait';"]],
+  // (23 nov., lot retours-suivi — Julien : « une étape postérieure prouvée implique les précédentes ») :
+  'etape-impliquee-oubliee': [['src/retoursAchat.js', "  const impl = () => (voyage ? 'fait' : 'saute');", "  const impl = () => 'saute';"]],
+  'implique-sans-voyage': [['src/retoursAchat.js', "  const voyage = c.etape !== 'rembourse' || (!(remb && remb.partiel) && !!(c.pdf || c.source === 'bordereau' || c.depose || f));", "  const voyage = true;"]],
   'rappel-apres-son-clic': [['api/_lib/retour-notifs.js', "    if (lui) continue;\n", '']],
   'rappel-mauvais-jour': [['api/_lib/retour-notifs.js', "if (moment === 'soir' && jour === demain)", "if (moment === 'soir' && jour === auj)"]],
   'depose-vieux-sonne': [['api/_lib/retour-notifs.js', "if (!lui && dep != null && maintenant - dep <= NOTIF_RETOUR_AGE_MAX_MS && maintenant >= dep)", "if (!lui && dep != null)"]],
@@ -204,7 +206,19 @@ const ligneBord = (tx, suivi, article, lim, recu, pdfB64, extra = {}) => ({ type
     const eR = RA.etapesRetour(c);
     dit(c.etape === 'rembourse' && eR.every((e) => e.etat === 'fait') && eR[4].montant === 34.32, 'C3 l’e-mail « … a été remboursée » ⇒ « Remboursé · 34,32 € », toutes les étapes cochées (chacune prouvée)', JSON.stringify(eR));
     c = avance({ remb: [{ tx: TX_AUTRY, montant: '34.32', at: '2026-11-24T10:00:00Z' }] });
-    dit(c.etape === 'rembourse' && RA.etapesRetour(c).map((e) => e.etat).join() === 'fait,saute,saute,saute,fait', 'C4 remboursé SANS aucun fait du transporteur : déposé / en route / livré ne sont PAS cochés (grisés : rien ne les prouve)', RA.etapesRetour(c).map((e) => e.etat).join());
+    // (23 nov., lot retours-suivi) Julien, sur sa capture (« Remboursé ✓ » mais « En route ○ · Livré ○ ») : une étape postérieure
+    // PROUVÉE implique les précédentes — faites, « date pas vue » (`implicite`, `at` nul) : jamais une date inventée.
+    const eI = RA.etapesRetour(c);
+    dit(c.etape === 'rembourse' && eI.map((e) => e.etat + (e.implicite ? '*' : '')).join() === 'fait,fait*,fait*,fait*,fait' && eI.slice(1, 4).every((e) => !e.at),
+      'C4 remboursé (bordereau reçu, aucun fait du transporteur) : déposé / en route / livré au vendeur FAITS, « date pas vue », aucune date inventée', JSON.stringify(eI));
+    const cP = avance({ montantDe: () => 34.32, remb: [{ tx: TX_AUTRY, montant: '5.00', at: '2026-11-24T10:00:00Z' }] });
+    const cA = RA.retoursAchat({ ...base, bords: [], achats: [{ transaction_id: Number(TX_AUTRY), title: AUTRY, status: 'Retour initié', price: { amount: '34.32' } }], remb: [{ tx: TX_AUTRY, montant: '34.32', at: '2026-11-24T10:00:00Z' }] }).cartes.find((x) => x.tx === TX_AUTRY);
+    dit(cP && cP.rembourse.partiel && RA.etapesRetour(cP).map((e) => e.etat).join() === 'fait,saute,saute,saute,fait' && cA && cA.etape === 'rembourse' && RA.etapesRetour(cA).map((e) => e.etat).join() === 'saute,saute,saute,saute,fait',
+      'C4 le remboursement ne prouve PAS que le colis a voyagé (remboursement PARTIEL, ou aucun bordereau ni dépôt ni fait) : étapes du colis grisées, rien de coché', JSON.stringify([cP && RA.etapesRetour(cP).map((e) => e.etat), cA && RA.etapesRetour(cA).map((e) => e.etat)]));
+    const cM = avance({ track: [...trackN, { suivi: SUIVI_AUTRY, status: 'transit', emailAt: '2026-11-20T09:12:00.000Z', carrier: 'chronopost' }], remb: [{ tx: TX_AUTRY, montant: '34.32', at: '2026-11-24T10:00:00Z' }] });
+    const eM = RA.etapesRetour(cM);
+    dit(eM.map((e) => e.etat + (e.implicite ? '*' : '')).join() === 'fait,fait,fait*,fait*,fait' && eM[1].at === '2026-11-20T09:12:00.000Z' && !eM[3].at,
+      'C4 le cas de Julien (Mondial Relay : « en transit » lu, puis remboursé) : déposé DATÉ, en route et livré « date pas vue »', JSON.stringify(eM));
     c = avance({ deposes: { ['r:' + TX_AUTRY]: '2026-11-21T08:00:00Z' } });
     dit(c.etape === 'depose' && RA.etapesRetour(c)[1].parLui === true && RA.etapesRetour(c)[1].etat === 'fait', 'C4 « Déposé » de SA main (aucun fait lu) : étape notée « par toi », la carte n’invente rien de plus', JSON.stringify(RA.etapesRetour(c)[1]));
     // Les e-mails du transporteur pas encore LUS : aucun retour qui a un n° n'est dit « à déposer » en tête (Nike est peut-être parti).
