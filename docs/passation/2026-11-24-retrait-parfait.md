@@ -79,8 +79,12 @@ son contrôle dans `retrait-parfait.cjs` (J1–J9) :
 
 - `scripts/audit-retrait-rappel-exact.cjs` E1–E4 (la règle EXÉCUTÉE) : vert ; `--prouve` 4/4 mutations rouges (`limite-estimee`,
   `heure-muette` = le code d'avant, `jour-utc`, `cle-sans-seuil`).
-- Banc `scripts/bancs/retrait-parfait.cjs` (390 tactile / 1512, clair / sombre, heure fixée 07:10 puis 10:00 Paris) : P1–P6, G1–G5,
-  H1 — voir le résultat chiffré en bas.
+- Banc `scripts/bancs/retrait-parfait.cjs` (390 tactile / 1512, clair / sombre, heure fixée 07:10 puis 10:00 Paris) : P1–P6, J1–J9,
+  G1–G5, H1 — **160 verts, 0 rouge** ; sur la pointe de #1341 (b343c07fc, bâtie à part) : **10 rouges** (P3, P4, P5, P6, J2, J5, J6, G1…)
+  puis le banc s'arrête (pas de comptoir). Captures regardées (390 / 1512, clair / sombre) à côté de celles de Julien.
+- H1 (hors ligne) : l'app passe Achats sur sa vue hors ligne (photo de la dernière lecture complète) — les 6 codes y sont, « Au
+  comptoir » s'ouvre, écran allumé ; quand la liste reste montée, le comptoir dit « Hors ligne · codes gardés ici ».
+- `retrait-point-c` (K2 « Montrer » sur chaque point, K7 l'adresse entière) : 39 verts, 0 rouge (390 et 1512 clair).
 - `retrait-point-c` K2 suit la règle neuve (« Montrer » sur chaque point qui a un code).
 - Audits intouchables, inchangés et verts : `audit-retrait`, `audit-codes-retrait`, `audit-retrait-preuves`, `audit-retraits-fiables`,
   `audit-retraits-irreprochables`, `audit-retrait-fiable`, `audit-retrait-qr`, `audit-retrait-vinted-go`, `audit-point-vinted-go`,
