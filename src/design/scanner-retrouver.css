@@ -246,3 +246,6 @@ html[data-scan-retrouver] body .vrm-app-shell { visibility: hidden !important; }
 .vrm-rtv-rangee .vrm-rtv-mono { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .vrm-rtv-colonne { width: min(100%, 520px); display: flex; flex-direction: column; align-items: stretch; }
 .vrm-rtv-colonne > .vrm-rtv-outils { width: 100%; }
+.vrm-rtv-rafale-tete b { flex: 1 1 auto; min-width: 0; }
+.vrm-rtv-rafale-tete .vrm-rtv-lien { flex: none; width: auto; min-height: 44px; padding: 0 4px; }
+.vrm-rtv.a-rafale .vrm-rtv-aide { display: none; }

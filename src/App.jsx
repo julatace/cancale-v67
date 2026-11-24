@@ -38721,6 +38721,10 @@ function AppCoeur() {
           {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
           {((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}
           <BoutonPresentation/>
+          {/* (24 nov., lot scanner-universel) Le scanner universel, à l'ordinateur aussi (webcam ou douchette) : sur chaque écran. */}
+          <button className="vrm-hbtn" type="button" data-n-tete-scanner="" data-scan-universel="tete" aria-label={tr('scan.u.bouton')} title={tr('scan.u.bouton')} onClick={() => ouvrirRetrouver('tete')}>
+            <Icon name="scan" size={21}/>
+          </button>
         </>}/> : null}
       <PastillePresentation/>
       {/* (20 nov., Julien : « même les écrans de chargement sont atroces ») Plus de barre bleue de progression en haut : elle
@@ -38839,7 +38843,7 @@ function AppCoeur() {
         {ordi && !troisVolets && tab !== 'ventes' && tab !== 'journee' && <BarreHaut champ={null} ronds={<RondsBarreHaut onChercher={ouvrirRecherche}/>} poserSlot={setSlotBarre}/>}
         {/* (19 nov., intégration) Trois volets (Ventes, Annonces natifs) : pas de barre du haut, mais la recherche (⌘K, « / »,
             « Tout sur le N° ») s'ouvre quand même — son panneau, gardé comme une feuille (banc garde-ecrans P5 à 1512). */}
-        {ordi && gsOpen ? <div className="vrm-recherche vrm-recherche-volets" data-recherche-zone="" data-recherche-ouverte="1" style={{ position: 'fixed', top: 12, left: 'calc(var(--n-l-laterale, 240px) + 24px)', right: 24, zIndex: 18500 }}><label className="vrm-barre-recherche" data-barre-recherche=""><Icon name="search" size={18}/>{champRecherche(false)}</label>{panneauRecherche}</div> : null}
+        {ordi && gsOpen ? <div className="vrm-recherche vrm-recherche-volets" data-recherche-zone="" data-recherche-ouverte="1" style={{ position: 'fixed', top: 12, left: 'calc(var(--n-l-laterale, 240px) + 24px)', right: 24, zIndex: 18500 }}><label className="vrm-barre-recherche" data-barre-recherche=""><Icon name="search" size={18}/>{champRecherche(false)}<BoutonScanRecherche/></label>{panneauRecherche}</div> : null}
         <RepriseRetenue tab={tab} compteChoisi={!!compteSel&&compteSel!=='*'} effacerCompte={()=>setCompteSel('')}/>
         <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <CibleNotif tab={tab} sub={platSub}/>

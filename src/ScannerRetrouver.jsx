@@ -554,10 +554,11 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
     if (x.etat === 'un' && x.trouve) { if (x.trouve.sorte === 'achat') { setRafale(false); setRes(x); return; } ouvrir(x.trouve); return; }
     if (x.etat === 'plusieurs') { setRafale(false); setChoisi(null); setRes(x); }
   };
-  const genreBandeau = bandeau && res && res.brut === bandeau.code ? genreLu(res) : '';
+  const derniere = rafale && liste.length ? liste[0] : null;
+  const genreBandeau = bandeau && res && res.brut === bandeau.code ? genreLu(res) : bandeau && derniere && derniere.brut === bandeau.code ? genreLu(derniere) : '';
 
   return createPortal(
-    <div className={'vrm-rtv' + (res && res.etat !== 'attente' ? ' a-resultat' : '') + (sansCam ? ' sans-camera' : '')} role="dialog" aria-modal="true" aria-label={arrivee ? tr('arv.scan.titre') : tr('scan.r.titre')} data-scan-arrivee={arrivee ? '' : undefined}
+    <div className={'vrm-rtv' + (res && res.etat !== 'attente' ? ' a-resultat' : '') + (rafale && !arrivee && liste.length ? ' a-rafale' : '') + (sansCam ? ' sans-camera' : '')} role="dialog" aria-modal="true" aria-label={arrivee ? tr('arv.scan.titre') : tr('scan.r.titre')} data-scan-arrivee={arrivee ? '' : undefined}
       data-scan-r="" data-scan-r-camera={camera} data-scan-r-etat={res ? res.etat : ''} data-scan-r-n={res ? res.n : 0} style={{ zIndex }}>
       {children}
       <div className="vrm-rtv-vue" aria-hidden="true">
@@ -565,7 +566,7 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
         <span className="vrm-rtv-voile"/>
       </div>
       <header className="vrm-rtv-tete">
-        <h2 className="vrm-rtv-h">{arrivee ? tr('arv.scan.titre') : tr('scan.r.titre')}</h2>
+        <h2 className="vrm-rtv-h">{arrivee ? tr('arv.scan.titre') : auto ? tr('scan.u.bouton') : tr('scan.r.titre')}</h2>
         <button type="button" className="vrm-rtv-rond" data-scan-r-fermer="" aria-label={tr('scan.r.fermer')} onClick={onFermer}><Icone d={I_FERMER} taille={20}/></button>
       </header>
       {!sansCam ? (

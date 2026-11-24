@@ -256,10 +256,9 @@ const communs = async (pg, nom) => {
 const ouvrirScanner = async (pg, tel) => {
   if (tel) { await pg.waitForSelector('[data-n-tete-scanner]', { timeout: 30000 }); await pg.waitForTimeout(1500); await pg.click('[data-n-tete-scanner]'); }
   else {
-    await pg.waitForSelector('[data-recherche-scanner], button[data-recherche-loupe]', { timeout: 30000 }); await pg.waitForTimeout(1500);
-    const vu = await pg.evaluate(() => { const e = document.querySelector('[data-recherche-scanner]'); return !!e && e.getClientRects().length > 0; });
-    if (!vu) { await pg.click('button[data-recherche-loupe]'); await pg.waitForTimeout(400); }
-    await pg.evaluate(() => document.querySelector('[data-recherche-scanner]').click());
+    // À l'ordinateur : l'icône Scanner des outils de la barre latérale (sur chaque écran).
+    await pg.waitForSelector('[data-n-outils] [data-n-tete-scanner]', { timeout: 30000 }); await pg.waitForTimeout(1500);
+    await pg.click('[data-n-outils] [data-n-tete-scanner]');
   }
   await pg.waitForSelector('[data-scan-r]', { timeout: 10000 });
 };
