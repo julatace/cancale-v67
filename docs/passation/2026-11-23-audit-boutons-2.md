@@ -46,6 +46,9 @@ titre rogné à 1512 (agent dédié).
 | `retrouver-libre.cjs` (rond libre sur Ventes · eBay « À traiter ») | 3 OK / 1 KO (390 : au centre « Offres ») | 4 OK / 0 KO |
 | `retour-relier-ebay.cjs` (Ventes en trois retours) | 4 OK / 2 KO (settings · settings · settings, aux deux tailles) | 6 OK / 0 KO |
 
+Rejoué sur l'arbre fusionné du 24 à 16 h (gris clair) : les deux bancs verts, la capture regardée. ⚠️ L'autotest y a été
+une fois ROUGE sur la machine saturée (un fautif pas attrapé à temps), vert au second passage sans rien changer : sous
+forte charge, le relancer avant de conclure.
 Capture regardée (390, après) : le rond sur sa ligne, à droite, au-dessus des segments ; « Offres » lisible et libre.
 ⚠️ Reste au téléphone un retour « à vide » : Comptes eBay → (retour) Paramètres → (retour) Paramètres → (retour) Ventes
 (l'entrée de l'écran Paramètres posée avec la demande « ebay »). Plus de piège, mais un geste de trop : à reprendre si
