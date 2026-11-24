@@ -131,8 +131,8 @@ const guichet = () => !!document.querySelector('.vrm-qr-view, [data-qr-view], [d
         `K1 trois RANGÉES compactes dans leur carte, le code entier à droite en chasse fixe (${tous.map((x) => x.code + ' ' + x.taille + 'px ' + x.haut + 'px').join(' · ')})`, tous);
       dit(!!r6 && !!r6.qr && r6.qr.w >= 40 && /255, 255, 255/.test(r6.qr.fond), `K1 le QR en vignette sur blanc (${r6 && r6.qr && r6.qr.w} px)`, r6 && r6.qr);
       const it = (p) => p.btns.filter((x) => x.cle === 'itineraire'), co = (p) => p.btns.filter((x) => x.cle === 'code');
-      dit(it(marche).length === 1 && it(tabac).length === 1 && co(tabac).length === 1 && co(marche).length === 0 && [...marche.btns, ...tabac.btns].every((x) => x.dans && x.h >= (doigt ? 44 : 36) && x.txt.split(/\s+/).length <= 2),
-        `K2 « Itinéraire » sur chaque point, « Code » seulement au tabac (un colis), vrais boutons dans la carte`, [marche.btns, tabac.btns]);
+      dit(it(marche).length === 1 && it(tabac).length === 1 && co(tabac).length === 1 && co(marche).length === 1 && [...marche.btns, ...tabac.btns].every((x) => x.dans && x.h >= (doigt ? 44 : 36) && x.txt.split(/\s+/).length <= 3),
+        `K2 « Itinéraire » et « Montrer le(s) code(s) » sur chaque point (24 nov., retrait-parfait : le comptoir du point), vrais boutons dans la carte`, [marche.btns, tabac.btns]);
       dit(r.pleins === 1, `K2 un seul plein sur l’écran (${r.pleins})`);
       dit(r.oranges && r.oranges.length === 0, 'K3 aucun orange ni ambre dans « À retirer »', r.oranges);
       const vg = r.points.find((p) => /Droguerie Banc/i.test(p.nom));

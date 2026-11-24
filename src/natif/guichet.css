@@ -29,7 +29,7 @@
   /* La zone du code : BLANC, encre noire, dans les deux modes. */
   .n-gc-blanc { background: #FFFFFF; color: #000000; border-radius: 18px; padding: 18px 14px 16px; display: flex; flex-direction: column; align-items: center; gap: 14px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
   .n-gc-code-bloc { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; }
-  .n-gc-code-mot { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #6E6E73; }
+  .n-gc-code-mot { font-size: 12px; font-weight: 600; color: #6E6E73; }
   .n-gc-code { display: flex; justify-content: center; flex-wrap: wrap; gap: .32em; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums;
     font-size: clamp(44px, 15vw, 76px); font-weight: 700; line-height: 1.05; letter-spacing: .02em; color: #000000; background: none; padding: 0; }
   .n-gc-code.is-long { font-size: clamp(30px, 9vw, 52px); }
