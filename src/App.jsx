@@ -5669,9 +5669,11 @@ const chargerPublie = (k, def) => (Object.prototype.hasOwnProperty.call(_saveEnA
 // (jamais le défaut : une lecture ratée n'écrit rien, src/depensesRapides.js `ecrireDepense`). Absente ⇒ null.
 const lireComptaPourEcrire = () => {
   if (Object.prototype.hasOwnProperty.call(_saveEnAttente, 'vrm_compta')) return _saveEnAttente.vrm_compta;
-  const t = localStorage.getItem('vrm_compta');
+  // (24 nov., main-vert) Lecture et analyse sous `try` : une ligne illisible (ou un stockage qui lève) LÈVE toujours, mais nommée.
+  let t, p;
+  try { t = localStorage.getItem('vrm_compta'); } catch (_) { throw new Error('vrm_compta illisible (stockage)'); }
   if (t == null || t === '') return null;
-  const p = JSON.parse(t);
+  try { p = JSON.parse(t); } catch (_) { throw new Error('vrm_compta illisible'); }
   if (p !== null && (typeof p !== 'object' || Array.isArray(p))) throw new Error('vrm_compta illisible');
   return p;
 };
