@@ -18438,8 +18438,13 @@ function MemoireDefilement({ ecran }) {
     // quitté compris (13 186 éléments en quittant Achats, ~6 000 en quittant Annonces : 0,8 à 2,3 s au ×4), pour un écran
     // retiré juste après. `haut` = la dernière position connue (lue ici une fois, puis à chaque défilement) : le départ,
     // un toucher et le minuteur la reprennent sans rien forcer. Même règle, mêmes valeurs (banc defilement-navigation).
-    let haut=main.scrollTop;
-    if(cible===0 && haut!==0 && (MemoireDefilement.sortie==null || Math.abs(haut-MemoireDefilement.sortie)<2)){ main.scrollTop=0; haut=0; }
+    // (24 nov., vitesse) ET À L'ARRIVÉE NON PLUS : la première lecture (et la remise à 0) attend l'image qui suit (rAF :
+    // avant qu'elle soit peinte, rien ne se voit à la mauvaise place), quand le style et la mise en page de l'écran posé sont
+    // faits une fois pour toutes. Mesuré (profil, banc vitesse-iphone, 390 ×4, volume de Julien) : lue ici, au milieu de la
+    // validation, `main.scrollTop` forçait le style et la mise en page de tout l'écran revenu (Achats : ~590 ms, Ventes :
+    // ~150 ms), refaits ensuite par les écritures des effets qui suivent. Jusqu'à cette image, `haut` = la dernière position
+    // connue (celle laissée en partant).
+    let haut=MemoireDefilement.sortie==null?0:MemoireDefilement.sortie;
     let position=cible, restauration=cible>0, arrete=false;   // rien à tenir à 0
     // On ne s'arrête pas au premier succès : l'écran peut se raccourcir le temps
     // d'un chargement (le navigateur ramène alors la position à 0). On tient la
@@ -18463,7 +18468,12 @@ function MemoireDefilement({ ecran }) {
     // ne voyait jamais l'écran grandir, et la position retombait à 0.
     let image=0;
     const boucle=()=>{ restaurer(); if(!arrete&&restauration) image=requestAnimationFrame(boucle); };
-    boucle();
+    image=requestAnimationFrame(()=>{
+      if(arrete) return;
+      haut=main.scrollTop;
+      if(cible===0 && haut!==0 && (MemoireDefilement.sortie==null || Math.abs(haut-MemoireDefilement.sortie)<2)){ main.scrollTop=0; haut=0; }
+      boucle();
+    });
     // Au premier écran après une ouverture, les données arrivent du nuage : on
     // tient la position plus longtemps (6 s), sauf geste de la personne.
     const tenir=MemoireDefilement.dejaRendu?2500:6000; MemoireDefilement.dejaRendu=true;
