@@ -39,7 +39,6 @@ const MUTATIONS = {
   orange: ':root[data-style] { --n-accent: #E8891C !important; --n-plein: #E8891C !important; }',
   pale: ':root[data-style] { --n-encre-2: #A8ABB0 !important; --n-texte: #A8ABB0 !important; }',
   appui: '[data-style] .n-bouton[data-n-force="appui"] { transform: none !important; background-color: var(--n-plein) !important; filter: none !important; }',
-  deborde: '.vrm-main { min-width: 520px !important; }',
 };
 
 // ── la mesure, DANS la page ──
@@ -126,6 +125,9 @@ const MESURE = (args) => {
       const w = Math.min(d.r, q.right) - Math.max(d.l, q.left), h = Math.min(d.b, q.bottom) - Math.max(d.t, q.top);
       if (w > 3 && h > 3) { recouvre.push(`${nom(el)} sur ${nom(t)}`); break; } }
   }
+  // G (ter) : un bouton, une étiquette, un N° coupé par le bord de l'écran (le défilement de l'écran le cache : scrollWidth ne le voit pas)
+  const horsCadre = [];
+  for (const el of document.querySelectorAll('.n-bouton, [data-n-famille="second"], [data-n-famille="champ"], .n-pastille, .n-plaque, .n-segmente')) { if (!dans(el) || !vu(el)) continue; const q = el.getBoundingClientRect(); if (q.right > innerWidth + 1 || q.left < -1) horsCadre.push(nom(el)); }
   // D : orange / ambre ; rouge hors doublon
   const oranges = [], rouges = [];
   const LOGO = '.n-logo-site, [class*="logo"], [data-site-logo], img, picture, video, canvas, [data-n-doublon], [data-n-ton="doublon"], .vrm-logo';
@@ -138,7 +140,7 @@ const MESURE = (args) => {
   const rootCs = getComputedStyle(document.documentElement);
   return { style: document.documentElement.getAttribute('data-style') || '', theme: document.documentElement.getAttribute('data-theme'), fond: rootCs.getPropertyValue('--n-fond').trim(),
     nTextes, contraste: contraste.slice(0, 20), nContraste: contraste.length, nCibles, petites: petites.slice(0, 12), nPetites: petites.length, etrangers: [...new Set(etrangers)].slice(0, 12), nEtrangers: etrangers.length,
-    chevauche: chevauche.slice(0, 8).concat(recouvre.slice(0, 8)), oranges: [...new Set(oranges)].slice(0, 8), rouges: [...new Set(rouges)].slice(0, 8), deborde: document.documentElement.scrollWidth - innerWidth };
+    chevauche: chevauche.slice(0, 8).concat(recouvre.slice(0, 8), horsCadre.slice(0, 8).map((x) => 'hors cadre : ' + x)), oranges: [...new Set(oranges)].slice(0, 8), rouges: [...new Set(rouges)].slice(0, 8), deborde: document.documentElement.scrollWidth - innerWidth };
 };
 
 // F : l'état enfoncé (forcé par le crochet du contrat natif `data-n-force="appui"`)
@@ -209,6 +211,7 @@ async function poserMutation(pg) {
   if (MUTATIONS[MUT]) await pg.addStyleTag({ content: MUTATIONS[MUT] });
   // « petit » : posé EN LIGNE (une feuille ajoutée perd devant les `!important` en couche de l'accessibilité)
   if (MUT === 'petit') await pg.evaluate(() => { for (const b of document.querySelectorAll('.n-bouton, .n-bouton-icone-seule, [data-n-famille="second"], [data-n-famille="champ"]')) { for (const [p, v] of [['min-height', '30px'], ['height', '30px'], ['min-width', '30px'], ['border-top-width', '0'], ['border-bottom-width', '0']]) b.style.setProperty(p, v, 'important'); } });
+  if (MUT === 'deborde') await pg.evaluate(() => { const b = document.querySelector('.vrm-main .n-bouton, .vrm-main [data-n-famille="second"]'); if (b) b.style.setProperty('min-width', '640px', 'important'); });
   if (MUT === 'vieux') await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) { const b = document.createElement('button'); b.className = 'vrm-btn vrm-btn-sec'; b.textContent = 'Ancien bouton'; b.style.cssText = 'display:block;min-height:44px;min-width:120px;margin:8px'; m.prepend(b); } });
 }
 
