@@ -40,7 +40,7 @@ export function traduireResultatFavori(r){
   return {resultat,raison,ecrits,...(variante?{variante}:{}),...(apresMs?{apresMs}:{}),...(etape?{etape}:{}),...(cause?{cause}:{})};
 }
 export const ETAPE_ACCUSE=/^(?:autorisation|cloche|conversation|verification|historique|ecriture|attente_message|attente_offre|offre|envoi|confirmation)$/;
-export const CAUSE_ACCUSE=/^(?:element_absent|favori_absent|page_autre|compte|onglet|file|garde|frein|captcha|autorisation|http_[1-5]\d\d)(?::[a-z][a-z-]{1,39})?$/;
+export const CAUSE_ACCUSE=/^(?:element_absent|favori_absent|page_autre|lien_autre|compte|onglet|file|garde|frein|captcha|autorisation|http_[1-5]\d\d)(?::[a-z][a-z-]{1,39})?$/;
 // (22 nov., Julien : « 0 envoyé · 2 refusés : autre refus », la file arrêtée pour un bouton introuvable) UN favori refusé
 // sans RIEN d'écrit, pour une cause qui ne tient qu'à LUI (la page n'a pas montré son bouton, son fil n'a pas pu être
 // vérifié, Vinted a répondu 4xx pour lui seul), est SAUTÉ : la file continue. Les causes GLOBALES arrêtent toujours
@@ -76,6 +76,15 @@ export function bilanFavoris(jobs){
   }
   return b;
 }
+// 5.440.1 (Julien, 23 nov. : « plusieurs favoris de suite » après UN refus, et la phrase coupée « puis touche « ») : la raison
+//    d'une file qui saute ou s'arrête pour des refus LOCAUX, dite par SON code (l'extension la traduit, `raisonCode`) — UN
+//    favori nommé par sa raison, « N de suite » seulement quand il y en a eu N. Toujours terminée par le nom du bouton.
+export function phraseRaisonFile(code,{refus='autre',n=REFUS_LOCAUX_MAX}={}){
+  const mot=MOTS_REFUS[refus]||MOTS_REFUS.autre;
+  if(code==='local_saute')return `Un favori n’est pas parti (${mot}) : rien n’est parti pour lui, VRM continue avec les suivants.`;
+  if(code==='locaux_suite')return `${Number(n)>1?`${Number(n)} favoris de suite ne sont pas partis`:'Un favori n’est pas parti'} (le dernier : ${mot}) : la file est en pause, rien n’est parti pour eux. Ouvre Vinted dans l’onglet de travail, vérifie que la cloche et la messagerie s’affichent, puis touche « Reprendre ».`;
+  return '';
+}
 // La phrase du bilan. `mot(code, famille)` traduit un code (l'écran passe tr()) ; sans lui, le français de la règle.
 export function phraseBilanFavoris(b,mot){
   if(!b)return '';
@@ -83,7 +92,8 @@ export function phraseBilanFavoris(b,mot){
   const liste=(o,f)=>{const e=Object.entries(o);return e.map(([c,n])=>e.length>1?`${n} ${m(c,f)}`:m(c,f)).join(', ');};
   const p=[`${b.envoyes} envoyé${b.envoyes>1?'s':''}`];
   if(b.sautes)p.push(`${b.sautes} sauté${b.sautes>1?'s':''} (${liste(b.parSaut,'saut')})`);
-  if(b.refuses)p.push(`${b.refuses} refusé${b.refuses>1?'s':''} : ${liste(b.parRefus,'refus')}`);
+  // 5.440.1 : UN mot par état, partout (fenêtre de vinted.fr, panneau, app) : « pas envoyé » (plus « refusé »).
+  if(b.refuses)p.push(`${b.refuses} pas envoyé${b.refuses>1?'s':''} : ${liste(b.parRefus,'refus')}`);
   if(b.incertains)p.push(`${b.incertains} à vérifier sur Vinted`);
   return p.join(' · ');
 }

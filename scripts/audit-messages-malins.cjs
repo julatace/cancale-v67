@@ -17,7 +17,7 @@
 //    M7  Vinted refuse d'ouvrir la conversation (422) : sauté, rien écrit
 //    M8  un frein (429) sur le message n'est jamais pris pour un refus de texte
 //    M9  la file : un refus de texte avec d'autres versions continue (2 au plus), sinon arrêt dit ;
-//        un favori sauté ne l'arrête pas ; le bilan « 12 envoyés · 2 sautés (…) · 1 refusé : … »
+//        un favori sauté ne l'arrête pas ; le bilan « 12 envoyés · 2 sautés (…) · 1 pas envoyé : … » (5.440.1 : un mot par état)
 //    M10 la copie de la règle dans l'extension est celle de src/messageSur.js (fabriquée par script)
 //  `--prouve` : rouge sur origin/main ET par mutation.
 // ════════════════════════════════════════════════════════════════════════════
@@ -116,9 +116,9 @@ async function auditer() {
       let k = 0, t;
       for (const [res, rai] of [...Array(2)].map(() => ['ignore', 'annonce_indisponible']).concat([['refuse', 'texte_refuse']], [...Array(12)].map(() => ['envoye', '']))) { k++; t = tour(d, k, res, rai); d = avance(t.data); if (k === 1) dit(t.valeur.active === true, 'M9d — un favori sauté (annonce vendue) n’arrête pas la file', JSON.stringify({ a: t.valeur.active })); }
       const ph = P.phraseBilanFavoris((t.valeur.fin && t.valeur.fin.bilan) || t.valeur.bilan);
-      dit(ph === '12 envoyés · 2 sautés (vendus ou indisponibles) · 1 refusé : texte refusé par Vinted', 'M9e — le bilan : « 12 envoyés · 2 sautés (vendus ou indisponibles) · 1 refusé : texte refusé par Vinted »', ph);
+      dit(ph === '12 envoyés · 2 sautés (vendus ou indisponibles) · 1 pas envoyé : texte refusé par Vinted', 'M9e — le bilan : « 12 envoyés · 2 sautés (vendus ou indisponibles) · 1 pas envoyé : texte refusé par Vinted »', ph);
       const b2 = P.bilanFavoris([{ etat: 'refuse', raison: 'texte_interdit' }, { etat: 'envoye' }]);
-      dit(/1 refusé : texte contenant un lien/.test(P.phraseBilanFavoris(b2)), 'M9f — un texte interdit est nommé dans le bilan (« texte contenant un lien, un e-mail… »)', P.phraseBilanFavoris(b2)); } }
+      dit(/1 pas envoyé : texte contenant un lien/.test(P.phraseBilanFavoris(b2)), 'M9f — un texte interdit est nommé dans le bilan (« texte contenant un lien, un e-mail… »)', P.phraseBilanFavoris(b2)); } }
 
   // M10 — la copie de la règle
   { let rc = 0; try { cp.execFileSync(process.execPath, [path.join(__dirname, 'recopier-message-sur.cjs'), '--verifier'], { stdio: 'pipe' }); } catch (e) { rc = e.status || 1; }
