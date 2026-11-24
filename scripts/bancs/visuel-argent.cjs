@@ -356,8 +356,11 @@ async function parametres(nav, taille, sombre) {
     await pg.evaluate(() => { const e = document.querySelector('[data-categorie-ouvrir="notifications"]'); if (e) e.click(); });
     await pg.waitForTimeout(1500);
     const s = await pg.evaluate(() => { const L = [...document.querySelectorAll('.vrm-pm .vrm-switch, .vrm-pm .vrm-ios-switch')].filter((e) => e.getClientRects().length);
-      return { n: L.length, eteints: L.filter((e) => e.getAttribute('aria-checked') !== 'true').map((e) => getComputedStyle(e, '::before').boxShadow).slice(0, 4) }; });
-    dit(s.n === 0 || s.eteints.every((b) => /rgb\((138, 141, 148|142, 142, 150)\)/.test(b)), `P ${ou} un interrupteur éteint a son bord visible (≥ 3:1) (${s.n} interrupteurs)`, s);
+      const av = (e) => getComputedStyle(e, '::before');
+      return { n: L.length, eteints: L.filter((e) => e.getAttribute('aria-checked') !== 'true').map((e) => ({ bord: av(e).boxShadow, glyphe: /radial-gradient/.test(av(e).backgroundImage) })),
+        allumes: L.filter((e) => e.getAttribute('aria-checked') === 'true').map((e) => ({ glyphe: /linear-gradient/.test(av(e).backgroundImage), fond: av(e).backgroundColor })) }; });
+    dit(s.n > 0 && s.eteints.every((x) => /rgb\((138, 141, 148|142, 142, 150)\)/.test(x.bord) && x.glyphe), `P ${ou} un interrupteur éteint : bord visible (≥ 3:1) et son petit rond (${s.n} interrupteurs)`, s);
+    dit(s.allumes.every((x) => x.glyphe), `P ${ou} un interrupteur allumé porte son trait « allumé »`, s);
     await pg.screenshot({ path: path.join(SHOTS, `parametres-notif-${taille}-${sombre ? 'sombre' : 'clair'}.png`) });
     dit(!erreurs.length, `${ou} aucune erreur JS`, erreurs);
   } catch (e) { dit(false, `${ou} le contrôle est allé au bout`, String(e && e.stack || e).slice(0, 500)); }

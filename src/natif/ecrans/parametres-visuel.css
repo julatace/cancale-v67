@@ -21,7 +21,9 @@
 :root:root:root:root:root:root:root:root:root:root body [data-pm-cat="notifications"] { --pm-m1: #5E6F86; --pm-m2: #44546A; }
 :root:root:root:root:root:root:root:root:root:root body [data-pm-cat="aide"] { --pm-m1: #707784; --pm-m2: #4E5563; }
 
-/* Les interrupteurs, dans Paramètres seulement (au-dessus de la règle « verre » : 7 :root). */
+/* Les interrupteurs et le point d'alerte, dans Paramètres seulement. Dans la PREMIÈRE couche déclarée (`vrm-vintex`,
+   index.html) : pour des `!important`, la première couche l'emporte sur les suivantes (la règle « verre » est dans vrm-verre). */
+@layer vrm-vintex {
 html:root:root:root:root:root:root:root:root body .vrm-pm :is(.vrm-switch, .vrm-ios-switch)[aria-checked]:not([aria-checked="true"])::before { background: radial-gradient(circle, transparent 0 3.2px, #8A8D94 3.4px 4.8px, transparent 5px) right 7px center / 12px 12px no-repeat, rgb(28 28 32 / .10) !important; box-shadow: inset 0 0 0 1.5px #8A8D94 !important; }
 html:root:root:root:root:root:root:root:root body .vrm-pm :is(.vrm-switch, .vrm-ios-switch)[aria-checked="true"]::before { background: linear-gradient(#FFFFFF, #FFFFFF) 13px 50% / 2px 11px no-repeat, var(--n-accent, #3D4B5B) !important; box-shadow: none !important; }
 html:root:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm :is(.vrm-switch, .vrm-ios-switch)[aria-checked]:not([aria-checked="true"])::before { background: radial-gradient(circle, transparent 0 3.2px, #8E8E96 3.4px 4.8px, transparent 5px) right 7px center / 12px 12px no-repeat, rgb(255 255 255 / .12) !important; box-shadow: inset 0 0 0 1.5px #8E8E96 !important; }
@@ -31,3 +33,4 @@ html:root:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm :is
 :root:root:root:root:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte .vrm-pm-alerte-point::after,
 :root:root:root:root:root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte-point:not(.vg-pm-alerte-ic) { background: var(--n-accent, #3D4B5B) !important; }
 :root:root:root:root:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-pm-alerte-point.vg-pm-alerte-ic { color: var(--n-accent, #F4F4F5) !important; }
+}
