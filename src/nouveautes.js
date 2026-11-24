@@ -32,6 +32,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'suivi-envois', date: '2026-11-24', titre: 'Tes colis vendus, du dépôt au versement', phrase: 'Au point, retiré, argent versé : chaque étape lue, datée.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (23 nov., colis-danger — Julien : « te prévient avant qu'il reparte ») docs/passation/2026-11-23-colis-danger.md
   { id: 'colis-en-danger', date: '2026-11-23', titre: 'Colis pas retiré : VRM te prévient', phrase: 'Vinted Go : la veille et le jour où il repart.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (23 nov. soir, ext. 5.440.1 — Julien : « 0 envoyé · 1 sauté », phrase coupée) docs/passation/2026-11-23-favoris-identite.md
+  { id: 'favoris-identite', date: '2026-11-23', titre: 'Messages aux favoris : le nouveau lien de Vinted', phrase: 'Un favori pas confirmé est dit et sauté, la file continue.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md
   { id: 'vente-email-partout', date: '2026-11-23', titre: 'Une vente reçue par e-mail se voit partout', phrase: 'Ventes, Ma journée et Colis, avant même le passage de l’extension.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov., photos-nettes — Julien : « toutes les photos sont floues ») docs/passation/2026-11-23-photos-nettes.md
