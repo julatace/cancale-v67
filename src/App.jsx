@@ -9249,6 +9249,7 @@ const CARRIERS = {
   relaiscolis:  { name: 'Relais Colis',  short: 'RC', bg: '#1D1D1F', fg: '#fff', retrait: 'code' },
   colissimo:    { name: 'La Poste',      short: 'LP', bg: '#FFCD00', fg: '#111', retrait: 'home' },
   amazon:       { name: 'Amazon',        short: 'AZ', bg: '#2C2C2E', fg: '#FF9900', retrait: 'code' },
+  colisprive:   { name: 'Colis Privé',   short: 'CP', bg: '#EE7203', fg: '#fff', retrait: 'auto' },
   shop2shop:    { name: 'Shop2Shop',     short: 'S2S', bg: '#16181D', fg: '#fff', retrait: 'code' },
   inpost:       { name: 'InPost',        short: 'IP', bg: '#C8105F', fg: '#fff', retrait: 'code' },
   dpd:          { name: 'DPD',           short: 'DPD', bg: '#414042', fg: '#fff', retrait: 'auto' },
@@ -9346,6 +9347,7 @@ const carrierKey = (raw) => {
   if (/\bups\b/.test(s)) return 'ups';
   if (/vinted/.test(s)) return 'vinted';
   if (/relais\s*colis|relaiscolis/.test(s)) return 'relaiscolis';
+  if (/colis\s*priv/.test(s)) return 'colisprive';   // (23 nov., revue UX) avant « coliss » : Colis Privé avait le logo de Colissimo… ou rien
   if (/coliss|la\s*poste|laposte/.test(s)) return 'colissimo';
   if (/shop\s*2\s*shop|shop2shop/.test(s)) return 'shop2shop';
   if (/\bdpd\b/.test(s)) return 'dpd';
@@ -21492,6 +21494,23 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   // (loupe · cloche · compte, trois icônes au plus) : son ÉTAT est publié (`ETAT_ACTIONS_VU`) pour le point
   // posé sur la photo du compte, et son panneau s'ouvre depuis le menu du compte (`vrm:etat-actions-ouvrir`).
   // Même information, même panneau, même geste : rien de retiré.
+  // (23 nov., revue UX #16) UN verdict en tête du panneau, jamais trois phrases qui se contredisent (« pas ouverte » + « Lecture
+  // seule » + « 3 comptes à jour ») : extension absente ICI mais vivante ailleurs et tous les comptes relus ⇒ « Tout est à jour
+  // (3 comptes) » ; vivante ailleurs, des comptes à relire ⇒ « N comptes à relire » ; absente partout ⇒ « Sur ce navigateur :
+  // installe l'extension ». Les comptes : la MÊME règle que la liste dessous (EtatComptes : une ligne `geste` = à relire).
+  const verdictExt = (() => {
+    if (st.niveau !== 'lecture') return { cle: st.niveau, texte: '' };
+    const lus = !encoursComptes && !passuComptes.length && Array.isArray(lignesComptes) ? lignesComptes : null;
+    const aRelire = lus ? lus.filter((c) => c && c.geste).length : null;
+    const actifs = lus ? lus.filter((c) => c && !c.geste && c.etat !== 'banni').length : null;
+    const ailleurs = !!(st.glob && st.glob.ailleurs) || !!st.relais || (code === 'telephone' && rl.niveau !== 'perime' && rl.niveau !== 'passu' && rl.niveau !== 'hors');
+    if (code === 'absente' || code === 'telephone') {
+      if (ailleurs && lus && aRelire === 0 && actifs > 0) return { cle: 'ajour', texte: tr('ru.ext.toutAJour', { n: actifs }) };
+      if (ailleurs && lus && aRelire > 0) return { cle: 'arelire', texte: tr('ru.ext.aRelire', { n: aRelire }) };
+      if (!ailleurs && code === 'absente') return { cle: 'installer', texte: tr('ru.ext.installer') };
+    }
+    return { cle: 'lecture', texte: 'Lecture seule pour l’instant' };
+  })();
   React.useEffect(() => { publierEtatActions({ ton, point, nom: nomPastille }); }, [ton, point, nomPastille]);
   React.useEffect(() => { const f = () => setOuvert(true); window.addEventListener('vrm:etat-actions-ouvrir', f); return () => window.removeEventListener('vrm:etat-actions-ouvrir', f); }, []);
   return (
@@ -21530,9 +21549,9 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
             boxShadow: '0 1px 2px rgba(0,0,0,.10),0 16px 40px rgba(0,0,0,.18)' }}>
           <div className="vrm-etat-tete" data-etat-tete>
             {!ordi ? <button type="button" className="vrm-etat-fermer" data-etat-fermer="" aria-label="Fermer" onClick={() => setOuvert(false)}><Icon name="close" size={15}/></button> : null}
-            <span className="vrm-etat-icone" aria-hidden="true"><Icon name={st.niveau === 'ok' ? 'check' : st.niveau === 'verif' ? 'sync' : 'eye'} size={17}/></span>
-            <div className="vrm-etat-titre">
-              {st.niveau === 'ok' ? (st.relais ? 'Tu peux agir sur Vinted d’ici, via ton ordinateur' : 'Tu peux agir sur Vinted depuis VRM') : st.niveau === 'verif' ? "Je vérifie l'extension…" : 'Lecture seule pour l’instant'}
+            <span className="vrm-etat-icone" aria-hidden="true"><Icon name={st.niveau === 'ok' || verdictExt.cle === 'ajour' ? 'check' : st.niveau === 'verif' ? 'sync' : 'eye'} size={17}/></span>
+            <div className="vrm-etat-titre" data-etat-verdict={verdictExt.cle}>
+              {st.niveau === 'ok' ? (st.relais ? 'Tu peux agir sur Vinted d’ici, via ton ordinateur' : 'Tu peux agir sur Vinted depuis VRM') : st.niveau === 'verif' ? "Je vérifie l'extension…" : verdictExt.texte}
             </div>
           </div>
           {/* (29 oct.) UNE ligne courte ; le détail derrière ⓘ (Julien : « arrête
