@@ -116,7 +116,7 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
                 const h = x.v > 0 && max > 0 ? Math.max(2, Math.round((x.v / max) * 100)) : 0;
                 return (
                   <li key={x.cle} className="n-arg-m6" data-arg-m6={x.cle} data-arg-m6-v={cents(x.v)} data-courant={x.courant ? '1' : undefined}
-                    data-arg-m6-partiel={x.partiel ? '1' : undefined} data-arg-m6-adater={x.aDater > 0 ? String(x.aDater) : undefined} title={x.aDater > 0 ? tr('arn.aDaterPourquoi') : undefined}>
+                    data-arg-m6-partiel={x.partiel ? '1' : undefined} data-arg-m6-couvert={x.couvert === false ? '0' : '1'} data-arg-m6-adater={x.aDater > 0 ? String(x.aDater) : undefined} title={x.aDater > 0 ? tr('arn.aDaterPourquoi') : undefined}>
                     <span className="n-arg-m6-nom">{x.long.replace(/\s+\d{4}$/, '')}</span>
                     <span className="n-arg-m6-piste" aria-hidden="true"><span className={'n-arg-m6-plein' + (neuf6 ? ' n-agv-pousse' : '')} style={{ width: h + '%', ...(neuf6 ? { animationDelay: retard(i) + 'ms' } : {}) }}/></span>
                     <span className="n-arg-m6-v" data-arg-montant="">{x.v == null ? TIRET : (x.partiel ? tr('journee.moins') + ' ' : '') + montant(x.v)}{x.aDater > 0 ? <span className="n-arg-m6-adater">{tr('arn.aDaterN', { n: x.aDater })}</span> : null}</span>

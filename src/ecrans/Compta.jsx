@@ -3884,7 +3884,12 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
       const nAD = AD && AD.parMois && typeof AD.parMois === 'object' ? (Number(AD.parMois[ym]) || 0) : 0;
       const finM = new Date(de.getFullYear(), de.getMonth() + 1, 1).getTime();
       const dansPeriode = !!(AD && !AD.parMois && Number(AD.n) > 0 && Number(AD.de) < finM && Number(AD.a) >= de.getTime());
-      out.push({ cle: ym, l: de.toLocaleDateString(localeCourante(), { month: 'narrow' }), long: de.toLocaleDateString(localeCourante(), { month: 'long', year: 'numeric' }), v: R.valeur == null || (R.valeur === 0 && !R.partiel && (nAD > 0 || dansPeriode)) ? null : R.valeur, partiel: !!R.partiel || (R.valeur != null && (nAD > 0 || dansPeriode)), aDater: nAD, courant: k === 0 });
+      // (24 nov., visuel-argent — « rien lu ne vaut pas rien », §5) Un mois passé à 0 € n'est un VRAI zéro que si l'historique
+      // lu le couvre : une vente lue AVANT ce mois (la règle `couvert` de `valeurObjectifMois`, src/design/carteChiffres.js).
+      // Sinon l'historique commence peut-être après : « — » et une piste vide, jamais « 0 € ».
+      const couvert = k === 0 || !!(S.vendu && Array.isArray(S.vendu.lignes) && S.vendu.lignes.some((l) => Number(l.ts) < de.getTime()));
+      const zeroNonCouvert = k > 0 && R.valeur === 0 && !couvert;
+      out.push({ cle: ym, l: de.toLocaleDateString(localeCourante(), { month: 'narrow' }), long: de.toLocaleDateString(localeCourante(), { month: 'long', year: 'numeric' }), v: R.valeur == null || zeroNonCouvert || (R.valeur === 0 && !R.partiel && (nAD > 0 || dansPeriode)) ? null : R.valeur, partiel: !!R.partiel || (R.valeur != null && (nAD > 0 || dansPeriode)), aDater: nAD, courant: k === 0, couvert });
       // ⚠️ « au moins 0 € » ne se dit jamais (§5) : un mois à 0 € reçu dont des ventes sont à dater se dit « — · N à dater ».
     }
     return out;

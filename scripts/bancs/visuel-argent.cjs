@@ -116,7 +116,12 @@ const MESURE_ARGENT = () => {
   const benef = g('[data-v2-argent-fait="benefice"]');
   const mois = g('[data-v2-argent-mois]');
   const zeros = mois ? [...mois.querySelectorAll('.n-anneau-centre, .n-agv-jauge-pct, .n-agv-seuils-ca-v')].map((e) => e.innerText.trim()).filter((t) => /^0(?:[,.]0+)?\s?(?:%|€)?$/.test(t)) : [];
-  return { rendu: !!mois, vendu: a(g('[data-arg-vendu]'), 'data-arg-vendu'), obj: obj ? { etat: a(obj, 'data-agv-objectif'), pct: a(obj, 'data-agv-objectif-pct'), cible: a(obj, 'data-agv-objectif-cible'), su: a(ann, 'data-n-anneau-su'), part: a(ann, 'data-n-anneau-part'), plein: !!obj.querySelector('.n-anneau-plein'), centre: obj.querySelector('.n-anneau-centre') ? obj.querySelector('.n-anneau-centre').innerText.trim() : '' } : null,
+  // Z — un mois passé que l'historique lu ne couvre pas (aucune vente lue avant lui) : « — », jamais « 0 € ».
+  const m6 = [...document.querySelectorAll('[data-arg-m6]')].map((e) => ({ ym: a(e, 'data-arg-m6'), v: a(e, 'data-arg-m6-v'), couvert: a(e, 'data-arg-m6-couvert'), texte: (e.querySelector('.n-arg-m6-v') || {}).textContent || '' }));
+  // F — un même format partout : tout montant de 4 chiffres ou plus porte l'espace des milliers, en chiffres tabulaires.
+  const sansEspace = mois ? [...mois.querySelectorAll('[data-arg-montant], .n-anneau-centre')].map((e) => e.textContent.trim()).filter((t) => /\d{4,}/.test(t.replace(/[.,]\d+/g, ''))) : [];
+  const nonTab = ['.n-arg-recu-chiffre', '.n-arg-m6-v'].filter((sel) => { const e = g(sel); return e && !/tabular-nums/.test(getComputedStyle(e).fontVariantNumeric); });
+  return { m6, sansEspace, nonTab, rendu: !!mois, vendu: a(g('[data-arg-vendu]'), 'data-arg-vendu'), obj: obj ? { etat: a(obj, 'data-agv-objectif'), pct: a(obj, 'data-agv-objectif-pct'), cible: a(obj, 'data-agv-objectif-cible'), su: a(ann, 'data-n-anneau-su'), part: a(ann, 'data-n-anneau-part'), plein: !!obj.querySelector('.n-anneau-plein'), centre: obj.querySelector('.n-anneau-centre') ? obj.querySelector('.n-anneau-centre').innerText.trim() : '' } : null,
     seuils: seuils ? { etat: a(seuils, 'data-agv-seuils'), ca: a(seuils, 'data-agv-ca'), plafond: j('plafond'), tva: j('tva') } : null,
     cartes, attente: attente ? a(attente, 'data-v2-argent-valeur') : null, couts: couts ? a(couts, 'data-v2-argent-valeur') : null, couv: a(couv, 'data-agv-couv'),
     barreV: barreV ? a(barreV, 'data-agv-barre-part') : null, barreB: barreB ? a(barreB, 'data-agv-barre-part') : null, benef: a(benef, 'data-v2-argent-valeur'), zeros };
@@ -202,6 +207,9 @@ async function argent(nav, taille, sombre) {
     if (m.couv) dit(m.couv === m.couts, `O ${ou} couverture des prix = « couts » (${m.couts})`, m);
     else { const bv = m.benef ? Number(m.benef) / 100 : null; const mx = Math.max(vendu / 100, bv || 0); dit(Math.abs(Number(m.barreV) - (vendu / 100) / mx) < 0.002, `O ${ou} barre du vendu = vendu / max(vendu, bénéfice)`, m); }
     dit(!m.zeros.length, `S ${ou} aucun « 0 » posé à la place d'un nombre`, m.zeros);
+    const nonCouverts = m.m6.filter((x) => x.couvert === '0');
+    dit(m.m6.length === 6 && nonCouverts.every((x) => x.v === '' && /^—/.test(x.texte.trim())), `Z ${ou} un mois que l'historique lu ne couvre pas dit « — », jamais « 0 € » (${nonCouverts.map((x) => x.ym).join(', ') || 'aucun'})`, m.m6);
+    dit(!m.sansEspace.length && !m.nonTab.length, `F ${ou} un seul format : espace des milliers partout, chiffres tabulaires`, { sansEspace: m.sansEspace, nonTab: m.nonTab });
     // C — aucune couleur orange.
     const orange = await pg.evaluate(ORANGE, ['[data-argent-vue="resume"]']);
     dit(!orange.length, `C ${ou} aucune couleur orange calculée dans Argent`, orange);
