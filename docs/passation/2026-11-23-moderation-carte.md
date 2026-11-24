@@ -23,3 +23,28 @@ la disparue déplacée sur le groupe). `textes-visibles` journee 2/2, `audit-tra
 `audit-alerte-moderation`, `audit-icones`, `audit-coherence` verts.
 
 **À fusionner APRÈS #1326** (`claude/style-clair`) : la branche part de sa tête.
+
+## 24 nov. — réconciliée avec la revue UX (#1321, déjà sur main) : UNE carte
+
+**Pourquoi** : #1321 (sur main) et ce lot refaisaient la même carte autrement ; le train butait sur le fond. Rendus
+côte à côte (même base inventée, 390/1512, clair/sombre) : #1321 était plus VISUEL (une ligne par compte, photos
+empilées, feuille aux grandes photos — le style « pop-up » qu'il a validé) mais la ligne ne disait pas QUAND, l'explication
+était un « ⓘ », le N° se perdait sous le titre, le bouton tombait sous le pli à 390, le « ⋯ » faisait 36 px, et le reste
+de la carte gardait l'ambre et des textes en dur ; ce lot était plus CLAIR mais une liste de lignes grises.
+
+**Gardé de #1321 (base)** : la ligne compacte par compte (photos empilées), la feuille aux photos, « ⋯ » par annonce
+(« Je l'ai supprimée moi-même » / « C'est vu »), « Ouvrir mes messages Vinted » (`data-href` vinted.fr/inbox),
+« Tout est vu » du compte, `ArretModerationCompte` et `src/moderationFeuille.js` (une explication, pas deux).
+
+**Pris de ce lot** : la fenêtre « entre le … et le … » une fois sur la ligne (et en tête de la feuille, même source
+`fenetreGroupe`) ; l'explication une fois sous « Pourquoi ? » (`modc.pourquoiDisparue`) ; le N° en pastille SUR la
+photo de SA fiche (identifiant) ; 6 photos puis « Voir les N autres » ; ni ambre ni trait de bord sur toute la carte
+(masquée, limitée, « à nouveau visible ») ; tous les textes par `tr()` (`modc.titre`, `modc.titreUn`, `modc.toutVu`,
+`modc.aria`) ; cibles 44 px (« ⋯ » 44). Nouveau : la pastille du nombre sur la pile (à l'encre), la pile légèrement
+inclinée, le geste au PIED de la feuille (toujours visible). « Tout est vu » de la carte range tout ce qu'elle montre,
+disparues comprises (sinon la carte restait). Clés retirées : `modc.disparues`, `modc.disparuesSansCompte`,
+`modc.verifier`, `modc.vu`, `modc.vuDe`, `ru.mod.court`, `ru.mod.phrase`.
+
+**Bancs** : `moderation-carte` adapté (les mêmes règles jugées sur la ligne PUIS dans la feuille ; 30 ⇒ 6 + « Voir les
+24 autres ») 493 verts, rouge par mutation (« ⋯ » à 36 px ; compte répété sur chaque case) ; `alerte-moderation` 92
+verts (la disparue jugée dans la feuille) ; `revue-ux` 45 verts.

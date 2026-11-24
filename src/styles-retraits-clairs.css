@@ -83,9 +83,10 @@
   :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-point:not(.vrm-rpf-verifier) > .vrm-rpf-tete .vrm-rpf-nom { grid-column: 1 / -1 !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-point:not(.vrm-rpf-verifier) > .vrm-rpf-tete .vrm-rpf-n { grid-row: 3 !important; grid-column: 1 / -1 !important; }
 }
-/* « Argent à vérifier » sous la liste : la liste garde 12 px de marge basse, la section n'ajoute que le reste (28 px
-   d'air entre deux sections, comme partout ; il en mesurait 41 — banc colis-retirer-propre, 20–40 px). */
-:root:root body .vrm-app-shell .vrm-main .vrm-colis-section[data-colis-hote="achats"]:has(.vrm-rpf) [data-colis-retraits] [data-rp-section="argent"] { margin-top: 15px !important; }
+/* « Argent à vérifier » sous la liste : 28 px d'air entre deux sections, comme partout (banc colis-retirer-propre, 20–40 px).
+   (24 nov., main-vert) La liste ne garde plus ses 12 px de marge basse (« En route » repliée est la dernière section) : les
+   15 px d'ici ne laissaient que 15 px d'air (mesuré). 28 px pleins — 40 au plus si la marge de la liste revenait. */
+:root:root body .vrm-app-shell .vrm-main .vrm-colis-section[data-colis-hote="achats"]:has(.vrm-rpf) [data-colis-retraits] [data-rp-section="argent"] { margin-top: 28px !important; }
 
 /* ── (12 nov., finitions — Julien, iPhone : « c'est moche l'affichage ») LE DÉPLI D'UN COLIS EST UNE FICHE ──────
    Lignes étiquetées alignées (Arrivé · À retirer avant · Compte · Vérifié) : l'étiquette dans une colonne fixe, la

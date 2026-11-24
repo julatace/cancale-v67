@@ -34,7 +34,7 @@ export default {
   "nn.reglage.moi.phrase": "VRM ne donne aucun N° : il lit celui écrit dans l’annonce, et te demande un N° pour chaque nouvelle annonce qui n’en a pas.",
   "nn.reglage.toast.vrm": "C’est noté : VRM numérote les nouvelles annonces et te le dit.",
   "nn.reglage.toast.moi": "C’est noté : VRM ne donne plus de N°, il lit le tien et te demande les manquants.",
-  "nn.stock.titre": "À écrire sur tes cartons · {n}",
+  "nn.stock.titre": "À écrire sur tes rangements · {n}",
   "nn.stock.pied": "Les N° que VRM vient de donner. Une fois écrits, touche « C’est écrit ».",
   "nn.stock.ecrit": "C’est écrit",
 };

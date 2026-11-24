@@ -203,7 +203,9 @@ const charger = (noms, ctx) => {
     dit(d.vc && d.vc.ca == null && /pas lues/.test(d.vc.note), 'Vestiaire illisible ⇒ « pas lues », jamais « pas encore de vente »', JSON.stringify(d.vc));
     const e = ligne([], lbcV);
     dit(e.lbc && e.lbc.ca == null && /prix inconnu/.test(e.lbc.note), 'Leboncoin : un prix inconnu n’est plus 0 € (« — » et dit)', JSON.stringify(e.lbc));
-    dit(/<Dashboard [^>]*ventesVc=\{ventesVcCoque\}/.test(APPc), 'la coque passe les ventes Vestiaire aux Statistiques');
+    // (24 nov., main-vert) `<Dashboard pilotage={… <StatsPilotageApp …/> …}` : un `>` vit dans ses props ⇒ la balise se lit jusqu'à la fin de sa garde.
+    const iDash = APPc.indexOf('<Dashboard '), baliseDash = iDash >= 0 ? APPc.slice(iDash, APPc.indexOf('</GardeEcran>', iDash)) : '';
+    dit(/\sventesVc=\{ventesVcCoque\}/.test(baliseDash), 'la coque passe les ventes Vestiaire aux Statistiques');
   });
 
   console.log('\n── G2 / D2 · Les dates écrites');

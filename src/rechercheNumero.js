@@ -45,6 +45,7 @@ export const lireNumeroCherche = (q, o, series = []) => {
 //   fiches       { [idAnnonce]: { numero, title, photo, accountId, reattribue, … } }
 //   pool         numéros servis (`vinted_used_numeros`)
 //   enLigne      Set d'ids d'annonces en ligne · aConfirmer : Set d'ids « à confirmer »
+//                · venduesMail : Set d'ids vendus d'après l'e-mail de vente, Vinted pas encore relu (24 nov.)
 //                · masquees : Set d'ids masqués par Vinted (paires présentes, 22 oct.)
 //   comptesOk    Set des comptes que la recherche regarde (null = tous)
 //   ventes       commandes Vinted vendues · txnItem { tx: idAnnonce } · saleOv { tx: { numero } }
@@ -75,7 +76,8 @@ export const toutSurLeNumero = (q, d, o, series = []) => {
       if (r && meme(r.de) && !meme(f.numero)) reattribues.push({ sens: 'parti', id: String(id), de: str(r.de), vers: str(f.numero), ecrit: !!r.ecrit, title: f.title || '' });
       if (!meme(f.numero)) continue;
       if (D.comptesOk && f.accountId && !D.comptesOk.has(String(f.accountId))) continue;
-      const etat = D.enLigne == null ? 'passu' : D.enLigne.has(String(id)) ? 'en-ligne' : (D.aConfirmer && D.aConfirmer.has(String(id))) ? 'a-confirmer' : (D.masquees && D.masquees.has(String(id))) ? 'masquee' : 'plus-en-ligne';
+      // (24 nov.) `venduesMail` : vendue d'après l'e-mail de vente (src/venteMailAnnonce.js), Vinted pas encore relu — plus « en ligne ».
+      const etat = D.enLigne == null ? 'passu' : (D.venduesMail && D.venduesMail.has(String(id))) ? 'vendue-mail' : D.enLigne.has(String(id)) ? 'en-ligne' : (D.aConfirmer && D.aConfirmer.has(String(id))) ? 'a-confirmer' : (D.masquees && D.masquees.has(String(id))) ? 'masquee' : 'plus-en-ligne';
       annonces.push({ id: String(id), title: f.title || '', photo: f.photo || null, price: f.price || null, etat, accountId: f.accountId || null });
       if (r && meme(r.vers)) reattribues.push({ sens: 'arrive', id: String(id), de: str(r.de), vers: str(f.numero), ecrit: !!r.ecrit, title: f.title || '' });
     }
