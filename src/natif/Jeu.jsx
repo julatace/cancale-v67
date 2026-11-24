@@ -22,8 +22,8 @@ export function EtiquetteN({ numero, className = '', attrs = null }) {
   return (
     <span className={cx('n-etiq', className)} data-n-etiq={n} role="img" aria-label={tr('natif.plaque.numero', { numero: n })} {...(attrs || {})}>
       <span className="n-etiq-trou" aria-hidden="true"/>
-      <span className="n-etiq-pre" aria-hidden="true">{tr('natif.plaque.prefixe')}</span>
-      <span className="n-etiq-n" aria-hidden="true">{n}</span>
+      {/* « N° » et le numéro dans UN élément en ligne : le texte se lit « N°132 », d'un seul tenant (lecteur, copie, bancs) */}
+      <span className="n-etiq-n" aria-hidden="true"><span className="n-etiq-pre">{tr('natif.plaque.prefixe')}</span>{n}</span>
     </span>
   );
 }
