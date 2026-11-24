@@ -376,6 +376,7 @@ async function film(nav) {
 (async () => {
   J = await import(pathToFileURL(path.join(__dirname, '..', '..', 'src', 'microEntreprise.js')).href);
   await pasSu();
+  if (process.env.SEUL === 'pur') { console.log(`\n${ko ? '❌' : '✅'} visuel-argent (pièces seules) : ${ok} verts, ${ko} rouges`); process.exit(ko ? 1 : 0); }
   await new Promise((r) => P.srv.listen(P.PORT, r));
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   try {
