@@ -178,7 +178,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     const lancer = async (sel) => {
       const tabId = await dansSW(async () => { const t = await chrome.tabs.query({ url: 'https://www.vinted.fr/*' }); return t.length ? t[0].id : null; });
       const ap = await dansSW(async ([uid, tabId]) => favorisCarte({ quoi: 'apercu', uid }, { tab: await chrome.tabs.get(tabId) }), [UID, tabId]);
-      const r = await dansSW(async ([uid, tabId, sel, reg]) => favorisCarte({ quoi: 'lancer', uid, confirme: true, selection: sel, reglages: reg, items: sel.map((n) => ({ itemId: (FAVORIS.find((x) => x.nid === n) || {}).itemId, notificationId: n, photo: `https://images1.vinted.net/t/${n}/f800/photo.jpeg`, titre: 'Paire ' + n.slice(-1) })) }, { tab: await chrome.tabs.get(tabId) }), [UID, tabId, sel, REGLAGES]);
+      const r = await dansSW(async ([uid, tabId, sel, reg, ids]) => favorisCarte({ quoi: 'lancer', uid, confirme: true, selection: sel, reglages: reg, items: sel.map((n) => ({ itemId: ids[n], notificationId: n, photo: `https://images1.vinted.net/t/${n}/f800/photo.jpeg`, titre: 'Paire ' + n.slice(-1) })) }, { tab: await chrome.tabs.get(tabId) }), [UID, tabId, sel, REGLAGES, Object.fromEntries(FAVORIS.map((f) => [f.nid, f.itemId]))]);
       return { ap, r };
     };
     const vue = () => FF.vueFile(FF.initialiserFile(S.d), U.id);
