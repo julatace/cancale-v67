@@ -23885,7 +23885,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 const titreLu = o && !(o._venteEmail && String(o.title || '') === 'Vente Vinted') ? String(o.title || '') : '';
                 const titre = titreLu || String((an && an.title) || (fiche && fiche.title) || '') || (x.plateforme === 'Vinted' ? tr('v2.dv.enLecture') : '');
                 const photo = (o ? orderPhoto(o) : null) || (an ? orderPhoto(an) : null) || (fiche && fiche.photo) || null;
-                return { cle: x.cle, site: x.plateforme, ts: x.ts, prix: montant(x.eur), titre, photo, num,
+                return { cle: x.cle, tx: x.tx != null ? String(x.tx) : '', site: x.plateforme, ts: x.ts, prix: montant(x.eur), titre, photo, num,
                   ouvrir: num ? () => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: num })); } catch (_) {} } : () => { if (onNav) onNav('cat_ventes'); } };
               });
               return { etat: 'lu', lignes };

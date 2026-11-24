@@ -90,3 +90,54 @@ export function Anneau({ valeur = null, total = null, taille = 56, epaisseur = 6
     </span>
   );
 }
+
+// ── La QUÊTE : une chose à faire, comme une carte de quête — l'icône (médaillon), UN verbe, le nombre restant ; `fait` ⇒ la
+// coche s'anime (trait qui se dessine, médaillon vert, petite pluie) puis la carte se replie dans le compteur « fait »
+// (`onReplie`, après 900 ms). `restant` inconnu (null) ⇒ « — », jamais 0. Le geste appartient à l'écran (`onClick`).
+export function CarteQuete({ icone = 'check', Icon = null, titre = '', verbe = '', restant = null, fait = false, onClick = null, onReplie = null, attrs = null, className = '' }) {
+  const [replie, setReplie] = React.useState(false);
+  React.useEffect(() => {
+    if (!fait) { setReplie(false); return undefined; }
+    const t = setTimeout(() => { setReplie(true); if (onReplie) onReplie(); }, mouvementReduit() ? 0 : 900);
+    return () => clearTimeout(t);
+  }, [fait, onReplie]);
+  if (replie) return null;
+  const su = restant != null && Number.isFinite(Number(restant));
+  return (
+    <div className={cx('n-quete', className)} data-n-quete-fait={fait ? '1' : undefined} data-n-quete-su={su ? '1' : '0'} {...(attrs || {})}>
+      <span className="n-quete-med" aria-hidden="true">
+        {fait ? <svg className="n-quete-coche" width="22" height="22" viewBox="0 0 22 22"><path d="M5 11.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          : (Icon ? <Icon name={icone} size={20}/> : null)}
+        {fait ? <Confettis n={12} duree={900}/> : null}
+      </span>
+      <span className="n-quete-corps">
+        <span className="n-quete-titre">{titre}</span>
+        <span className="n-quete-reste">{fait ? tr('jeu.fait') : su ? tr('jeu.restant', { n: Number(restant) }) : '—'}</span>
+      </span>
+      {!fait && onClick && verbe ? <button type="button" className="n-quete-geste" onClick={onClick}>{verbe}</button> : null}
+    </div>
+  );
+}
+
+// Le compteur des quêtes faites : « ✓ 3 faites aujourd'hui » (rien sous 1).
+export function QuetesFaites({ n = 0, Icon = null }) {
+  if (!(n > 0)) return null;
+  return <span className="n-quetes-faites" data-n-quetes-faites={n} key={n}>{Icon ? <Icon name="check" size={14}/> : null}{tr('jeu.faites', { n })}</span>;
+}
+
+// ── Le TROPHÉE : un palier RÉEL atteint (1re vente, 10, 100…) — calme, une étagère, jamais une relance. `atteint` faux ⇒ la
+// silhouette grisée ; `valeur` inconnue ⇒ on ne dit rien (l'écran ne rend pas le trophée).
+export const PALIERS_VENTES = [1, 10, 50, 100, 250, 500, 1000];
+export function Trophee({ palier, atteint = false, Icon = null, libelle = '' }) {
+  return (
+    <span className="n-trophee" data-n-trophee={palier} data-n-trophee-atteint={atteint ? '1' : '0'} role="img" aria-label={libelle || tr('jeu.trophee', { n: palier })}>
+      <span className="n-trophee-med" aria-hidden="true">{Icon ? <Icon name={atteint ? 'star' : 'lock'} size={18}/> : null}</span>
+      <span className="n-trophee-n" aria-hidden="true">{palier}</span>
+    </span>
+  );
+}
+// L'étagère : les paliers de ventes ; `total` = un nombre LU (sinon null ⇒ rien n'est rendu : « pas su » ne dit pas « 0 trophée »).
+export function EtagereTrophees({ total = null, Icon = null, paliers = PALIERS_VENTES }) {
+  if (!Number.isFinite(total)) return null;
+  return <span className="n-etagere" data-n-etagere={total}>{paliers.map((p) => <Trophee key={p} palier={p} atteint={total >= p} Icon={Icon}/>)}</span>;
+}

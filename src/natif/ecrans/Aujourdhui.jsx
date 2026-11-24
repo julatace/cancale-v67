@@ -367,11 +367,11 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
             par identité), l'étiquette du N°, le prix et « il y a » dessous ; défilement de côté au téléphone. */}
         {lignesV.length ? <div className="n-inventaire" data-n-jeu="ventes" role="list">
           {lignesV.map((l) => (
-            <button key={l.cle} type="button" role="listitem" className="n-inventaire-case" onClick={l.ouvrir || onVentes} data-v2-vente={l.cle}
+            <button key={l.cle} type="button" role="listitem" className="n-inventaire-case" onClick={l.ouvrir || onVentes} data-v2-vente={l.cle} data-n-vente-tx={l.tx || undefined}
               aria-label={[l.titre || tr('v2.dv.vente', { site: l.site }), l.num ? 'N°' + l.num : '', l.prix, ilYaCourt(l.ts)].filter(Boolean).join(' · ')}>
-              <TuilePaire photo={l.photo || ''} numero={l.num || ''} icone="cash" genre="vente" Icon={Icon} taille="xl" Photo={Photo}/>
-              <span className="n-inventaire-prix">{l.prix || '—'}</span>
-              <span className="n-inventaire-quand">{[l.site, ilYaCourt(l.ts)].filter(Boolean).join(' · ')}</span>
+              <TuilePaire photo={l.photo || ''} numero={l.num || ''} icone={l.photo ? '' : 'cash'} genre="vente" Icon={Icon} taille="xl" Photo={Photo}/>
+              <span className="n-inventaire-prix">{l.site ? <LogoSite site={String(l.site).toLowerCase()} taille={14}/> : null}<span>{l.prix || '—'}</span></span>
+              <span className="n-inventaire-quand">{ilYaCourt(l.ts)}</span>
             </button>
           ))}
         </div> : null}

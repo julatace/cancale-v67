@@ -81,10 +81,11 @@ async function pops(nav, W, theme, d) {
   await poser(pg, { title: `Vendu 65 € · ${titre}`, body: 'mon_compte · Prépare le colis', tag: `sale-${d.vraie.transaction_id}`, url: `/?tab=sales&tx=${d.vraie.transaction_id}&compte=${d.uid}`, actions: [{ title: 'Voir la vente', url: '/?tab=sales' }] });
   await pg.waitForTimeout(300);
   const enVol = await pg.evaluate(ORANGE);
+  const eclats = await pg.evaluate(() => document.querySelectorAll('.n-pop[data-n-pop-rang="0"] .n-confettis > i').length);
   let e = null; for (let k = 0; k < 20; k++) { e = await etatCarte(pg); if (e && e.photo === '1') break; await pg.waitForTimeout(250); }
   dit(!!e && e.photo === '1' && e.src.includes(`/t/${d.vraie.item_id}/`), `${T} J1 la vente montre la photo de SA transaction (article ${d.vraie.item_id})`, e && e.src);
   dit(!!e && !e.src.includes('990000002'), `${T} J1 le leurre au même titre n'est jamais pris`, e && e.src);
-  dit(!!e && e.genre === 'vente' && (W && theme) && e.anim === 'n-pop-entre' && e.confettis > 0, `${T} J4 la vente arrive sur son ressort avec sa pluie (${e && e.anim}, ${e && e.confettis} éclats)`, JSON.stringify(e));
+  dit(!!e && e.genre === 'vente' && (W && theme) && e.anim === 'n-pop-entre' && eclats > 0, `${T} J4 la vente arrive sur son ressort avec sa pluie (${e && e.anim}, ${eclats} éclats)`, JSON.stringify(e));
   dit(!enVol.length, `${T} J3 aucune couleur orange pendant la fête (confettis en vol)`, enVol.join(' ¦ '));
   if (W === 390 && theme === 'clair') await capture(pg, `pop-vente-fete-${W}-${theme}`);
   await pg.waitForTimeout(1400);
@@ -191,17 +192,20 @@ async function journee(nav, W, theme, d) {
   const o = await ouvrir(nav, W, theme === 'sombre', d.b);
   const pg = o.pg;
   await pg.waitForSelector('[data-v2-cj-ligne="envoyer"]', { timeout: 20000 }).catch(() => {});
-  await pg.waitForTimeout(2500);
+  for (let k = 0; k < 40; k++) { const s = await pg.evaluate(() => { const x = document.querySelector('[data-v2-cj-ligne="envoyer"] .n-cc-sous'); return x ? x.textContent : ''; }); if (s && !/lecture/i.test(s)) break; await pg.waitForTimeout(500); }
+  await pg.waitForTimeout(800);
   const r = await pg.evaluate(() => {
     const c = document.querySelector('[data-v2-cj-ligne="envoyer"]'); const a = c && c.querySelector('.n-anneau');
     const sous = c && c.querySelector('.n-cc-sous');
     return { n: c && c.getAttribute('data-v2-cj-n'), su: a && a.getAttribute('data-n-anneau-su'), part: a && a.getAttribute('data-n-anneau-part'), sous: sous ? sous.textContent : '',
-      tuiles: document.querySelectorAll('[data-n-jeu="ventes"] .n-tuile-paire').length, photos: [...document.querySelectorAll('[data-n-jeu="ventes"] .n-tuile-img')].map((i) => i.getAttribute('src') || '') };
+      tuiles: document.querySelectorAll('[data-n-jeu="ventes"] .n-tuile-paire').length, photos: [...document.querySelectorAll('[data-n-jeu="ventes"] [data-v2-vente]')].map((b) => { const i = b.querySelector('.n-tuile-img'); return [b.getAttribute('data-n-vente-tx') || '', i ? i.getAttribute('src') || '' : '']; }) };
   });
   const n = Number(r.n), m = /(\d+) pas encore prêt/.exec(r.sous);
   const attendu = n > 0 && m ? (n - Number(m[1])) / n : null;
   dit(!!r.su && (attendu == null ? true : Math.abs(Number(r.part) - attendu) < 0.002), `${T} J8 l'anneau des colis dit les nombres de la case (${r.part} ; ${r.n} colis, « ${r.sous} »)`, JSON.stringify(r));
-  dit(!r.photos.some((u) => u.includes('990000002')), `${T} J8 aucune tuile ne montre la photo du leurre`);
+  // La photo d'une tuile est celle de SA vente : le leurre (une vente au même titre) ne prête jamais sa photo à la vraie, ni l'inverse.
+  const croise = r.photos.filter(([cle, u]) => (u.includes('/t/990000002/') && !cle.includes('990000001')) || (u.includes(`/t/${d.vraie.item_id}/`) && !cle.includes(String(d.vraie.transaction_id))));
+  dit(!croise.length && r.photos.length > 0, `${T} J8 chaque tuile montre la photo de SA vente (${r.photos.length} tuiles ; le leurre au même titre ne prête pas la sienne)`, JSON.stringify(croise.length ? croise : r.photos).slice(0, 300));
   const orange = await pg.evaluate(ORANGE);
   dit(!orange.length, `${T} J3 aucune couleur orange calculée`, orange.join(' ¦ '));
   await capture(pg, `aujourdhui-${W}-${theme}`);

@@ -88,7 +88,7 @@
     display: flex; flex-direction: column; gap: 2px; min-width: 0; min-height: 44px; touch-action: manipulation; }
   .n-inventaire-case .n-tuile-paire { --n-tuile-t: 104px; width: 100%; height: auto; aspect-ratio: 1 / 1; margin-bottom: 4px; }
   .n-inventaire-case .n-tuile-img { width: 100% !important; height: 100% !important; }
-  .n-inventaire-prix { font: 700 15px/20px var(--n-police); font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  .n-inventaire-prix { display: flex; align-items: center; gap: 5px; font: 700 15px/20px var(--n-police); font-variant-numeric: tabular-nums; color: var(--n-encre); }
   .n-inventaire-quand { font: 400 12px/16px var(--n-police); color: var(--n-encre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .n-inventaire-case:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 3px; border-radius: 16px; }
   @media (prefers-reduced-motion: no-preference) {
@@ -99,4 +99,28 @@
   .n-cc { position: relative; }
   .n-cc-visuel { position: absolute; top: 10px; right: 10px; pointer-events: none; }
   .n-cc-anneau .n-anneau-centre { color: var(--n-encre-2); display: grid; place-items: center; }
+}
+
+/* ── (24 nov.) Quête, compteur « fait », trophées ── */
+@layer vrm-natif {
+  .n-quete { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: var(--n-carte); box-shadow: inset 0 0 0 1px var(--n-trait), var(--n-ombre-carte); }
+  .n-quete-med { position: relative; width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; color: #FFFFFF;
+    background: radial-gradient(120% 90% at 30% 10%, rgb(255 255 255 / .28), transparent 55%), linear-gradient(150deg, #5A6B7E, #3D4B5B); }
+  .n-quete[data-n-quete-fait] .n-quete-med { background: radial-gradient(120% 90% at 30% 10%, rgb(255 255 255 / .28), transparent 55%), linear-gradient(150deg, #2E9466, #17744A); animation: n-pop-badge 520ms var(--n-jeu-tampon) both; }
+  .n-quete-coche path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: n-quete-trait 360ms ease-out 80ms forwards; }
+  @keyframes n-quete-trait { to { stroke-dashoffset: 0; } }
+  .n-quete-corps { display: flex; flex-direction: column; min-width: 0; }
+  .n-quete-titre { font: var(--n-t-corps-fort); color: var(--n-encre); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-quete-reste { font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  .n-quete-geste { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--n-plein); color: var(--n-sur-plein); font: var(--n-t-controle); font-weight: 600; cursor: pointer; position: relative; }
+  .n-quete-geste::after { content: ''; position: absolute; inset: -4px; }
+  .n-quete[data-n-quete-fait] { animation: n-quete-replie 300ms ease-in 650ms both; }
+  @keyframes n-quete-replie { to { opacity: 0; transform: scale(.94); } }
+  .n-quetes-faites { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 10px; border-radius: 999px; background: var(--n-vert-fond); color: var(--n-vert); font: var(--n-t-legende-fort); animation: n-pop-badge 460ms var(--n-jeu-tampon) both; }
+  .n-etagere { display: flex; flex-wrap: wrap; gap: 10px; }
+  .n-trophee { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; min-width: 44px; }
+  .n-trophee-med { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #FFFFFF; background: radial-gradient(120% 90% at 30% 10%, rgb(255 255 255 / .35), transparent 55%), linear-gradient(150deg, #8A95A5, #4C5A73); box-shadow: 0 2px 6px rgb(29 29 31 / .16); }
+  .n-trophee[data-n-trophee-atteint="0"] .n-trophee-med { background: var(--n-carte-2); color: var(--n-encre-3); box-shadow: inset 0 0 0 1px var(--n-trait); }
+  .n-trophee-n { font: var(--n-t-legende-fort); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  @media (prefers-reduced-motion: reduce) { .n-quete[data-n-quete-fait], .n-quete[data-n-quete-fait] .n-quete-med, .n-quetes-faites { animation: none; } .n-quete-coche path { animation: none; stroke-dashoffset: 0; } }
 }
