@@ -189,6 +189,9 @@
 :root[data-style]:not([data-style=""]) .n-grand-titre { font-family: var(--g-titre-police); font-weight: var(--g-titre-poids); font-size: 32px; line-height: 36px; letter-spacing: -.02em; padding-bottom: 12px; }
 :root[data-style]:not([data-style=""]) .n-barre-centre { font-family: var(--g-titre-police); }
 
+/* ── l'icône d'une carte d'alerte d'avant (« N nouveaux N° à écrire ») était ambre (`--vrm-warn`) : l'ardoise du style ── */
+:root[data-style]:not([data-style=""]) .vrm-alerte-icone { color: var(--n-accent); background: var(--g-second-fond); }
+
 /* ── LES TUILES D'APERÇU (Paramètres → Apparence → Style) : une rangée et un bouton, dessinés par les jetons du style ── */
 .g-styles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 4px 0; }
 @media (min-width: 700px) { .g-styles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
