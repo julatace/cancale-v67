@@ -127,6 +127,7 @@ export function useCalculParVersion(fn, cle, nom, ecran, { dureeMs = 60000 } = {
   return () => {
     const k = cle(); const e = r.current; const t = Date.now();
     if (e && t - e.at < dureeMs && e.k.length === k.length && e.k.every((x, i) => Object.is(x, k[i]))) return e.v;
+    try { const w = typeof window !== 'undefined' ? window : null; if (w && w.__vrmCalculsDeps) (w.__vrmDeps || (w.__vrmDeps = [])).push([nom, String(ecran || '?'), !e ? 'premier' : e.k.length !== k.length ? 'longueur' : (k.map((x, i) => (Object.is(x, e.k[i]) ? -1 : i)).filter((i) => i >= 0).join(',') || 'temps')]); } catch (_) {}
     const t0 = maintenantMs(); const v = fn(); compterDuree(nom, ecran, maintenantMs() - t0);
     r.current = { k, v, at: t };
     return v;
