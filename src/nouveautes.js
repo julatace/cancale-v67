@@ -28,6 +28,12 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (23 nov., ext. 5.441) docs/passation/2026-11-23-favoris-541.md
+  { id: 'relances-texte-neuf', date: '2026-11-23', titre: 'Relance : jamais deux fois le même message', phrase: 'Une même personne ne reçoit jamais deux fois le même texte.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (23 nov., ext. 5.440 — Julien : « l'app doit s'adapter toute seule au bouton favoris ») docs/passation/2026-11-23-favoris-auto.md
+  { id: 'favoris-sans-geste', date: '2026-11-23', titre: 'Messages aux favoris : plus aucun geste demandé', phrase: 'VRM trouve seul la cloche de Vinted et montre chaque envoi.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (23 nov., audit « chaque bouton marche ») docs/passation/2026-11-23-audit-boutons.md
+  { id: 'boutons-reveilles', date: '2026-11-23', titre: 'Les boutons qui ne faisaient rien, réparés', phrase: 'Poignée des feuilles, retour au téléphone, Échap, menu des achats.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., latence-totale — Julien : « l'app bug beaucoup trop ») docs/passation/2026-11-22-latence.md
   { id: 'onglets-plus-rapides', date: '2026-11-23', titre: 'Achats et Ventes s’ouvrent plus vite', phrase: 'Les longues listes de colis arrivent au fil du défilement.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées » ; « sur Vestiaire, voir quand une annonce est en attente de validation ») docs/passation/2026-11-22-annulees-vc.md
@@ -313,9 +319,13 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'impression-retours', date: '2026-11-16', titre: 'Tes retours s’impriment avec tes envois', phrase: 'Tamponnés RETOUR en grand, comptés à part des ventes.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., lot vitesse-lectures) docs/passation/2026-11-16-vitesse-lectures.md
   { id: 'veille-sites', date: '2026-11-16', titre: 'Leboncoin, Vestiaire, messages : à jour tout seuls', phrase: 'Ce que l’extension lit arrive sans recharger, même sur iPhone.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (16 nov., Julien : « Reprendre là où j'étais ») docs/passation/2026-11-16-reprendre-ou-jetais.md
+  { id: 'reprendre-12h', date: '2026-11-16', titre: 'VRM rouvre là où tu étais', phrase: 'Même écran, même filtre, même position, jusqu’à 12 h après.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., lot ecrans-restes) docs/passation/2026-11-16-ecrans-restes.md
   { id: 'stock-importe-visible', date: '2026-11-16', titre: 'Ton stock importé se voit au Stock', phrase: 'Sous son N°, avec l’emplacement de ton fichier ; la loupe le trouve.', tab: 'garage', pour: 'tous', mode: 'tous' },
   { id: 'fiche-date-limite', date: '2026-11-16', titre: 'La fiche dit avant quand poster', phrase: 'La date limite du bordereau, sinon l’estimation, comme Colis.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot abonnement-clair) docs/passation/2026-11-16-abonnement-clair.md
+  { id: 'abonnement-rappel', date: '2026-11-16', titre: 'Un rappel 3 jours avant chaque prélèvement', phrase: 'Date et montant lus chez Stripe ; Gérer ou Résilier en un toucher.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (16 nov., ebay-a-traiter) docs/passation/2026-11-16-ebay-a-traiter.md
   { id: 'ebay-a-traiter', date: '2026-11-16', titre: 'eBay À traiter : tâches et retours relus', phrase: 'Aucun retour s’écrit « aucun » ; un refus mène à la reconnexion.', tab: 'ebay_agent', pour: 'tous', mode: 'tous' },
   // (16 nov., Julien : « irréprochable, on ne peut pas se faire bloquer ») docs/passation/2026-11-16-favoris-offres-irreprochable.md
