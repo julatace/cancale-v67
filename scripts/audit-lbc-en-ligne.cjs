@@ -176,7 +176,8 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   await essaie('catalogue', async () => {
     const E = await import(pathToFileURL(path.join(tmp, 'src/etatAnnonceLeboncoin.js')).href);
     const r = E.etatAnnonceLeboncoin({ id: '1', status: 'active' }, [], null, () => true);
-    dit(r.etat === 'aconfirmer' && r.label === 'À confirmer', 'catalogue « Mes annonces » : une annonce que la règle ne confirme pas est « À confirmer », pas « Active »', r);
+    // (24 nov., main-vert) Le mot a changé (« Pas revue récemment ») : on juge l'ÉTAT et que le libellé ne dit pas « en ligne ».
+    dit(r.etat === 'aconfirmer' && !!r.label && !/active|en ligne/i.test(r.label), 'catalogue « Mes annonces » : une annonce que la règle ne confirme pas est « À confirmer », pas « Active »', r);
     const r2 = E.etatAnnonceLeboncoin({ id: '1', status: 'active' }, [], null, () => false);
     dit(r2.etat === 'active', 'catalogue : confirmée ⇒ « Active »', r2);
     const r3 = E.etatAnnonceLeboncoin({ id: '1', status: 'deleted' }, [], null, () => true);

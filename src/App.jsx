@@ -5677,9 +5677,11 @@ const chargerPublie = (k, def) => (Object.prototype.hasOwnProperty.call(_saveEnA
 // (jamais le défaut : une lecture ratée n'écrit rien, src/depensesRapides.js `ecrireDepense`). Absente ⇒ null.
 const lireComptaPourEcrire = () => {
   if (Object.prototype.hasOwnProperty.call(_saveEnAttente, 'vrm_compta')) return _saveEnAttente.vrm_compta;
-  const t = localStorage.getItem('vrm_compta');
+  // (24 nov., main-vert) Lecture et analyse sous `try` : une ligne illisible (ou un stockage qui lève) LÈVE toujours, mais nommée.
+  let t, p;
+  try { t = localStorage.getItem('vrm_compta'); } catch (_) { throw new Error('vrm_compta illisible (stockage)'); }
   if (t == null || t === '') return null;
-  const p = JSON.parse(t);
+  try { p = JSON.parse(t); } catch (_) { throw new Error('vrm_compta illisible'); }
   if (p !== null && (typeof p !== 'object' || Array.isArray(p))) throw new Error('vrm_compta illisible');
   return p;
 };
@@ -16463,6 +16465,9 @@ const ICON_PATHS = {
   // (8 nov.) L'apparence (Réglages → Affichage) : un disque à moitié plein.
   contraste: <><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/></>,
   search: <><circle cx="10.8" cy="10.8" r="6.8"/><path d="m15.8 15.8 4.4 4.4"/></>,
+  // (24 nov., main-vert) « Mes comptes à distance » et « Recherches eBay » ont chacun leur dessin dans Paramètres (une icône par rangée).
+  ordi:   <><rect x="4" y="5" width="16" height="11" rx="1.6"/><path d="M2.5 19h19"/></>,
+  jumelles: <><circle cx="7" cy="15.5" r="3.5"/><circle cx="17" cy="15.5" r="3.5"/><path d="M10.5 15.5h3"/><path d="M4.2 13 6.5 5.5h2.6l1.2 7"/><path d="M19.8 13 17.5 5.5h-2.6l-1.2 7"/></>,
   gear:   <><circle cx="12" cy="12" r="3.2"/><path d="M19.6 14.4a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></>,
   cloud:  <><path d="M17.5 18.5H7a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 11.4 1.6 3.7 3.7 0 0 1-.3 7.4Z"/></>,
   cloudOff:<><path d="M17.5 18.5H7a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 8.3-2.9"/><path d="m3 3 18 18"/></>,
@@ -18624,9 +18629,9 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null,
       pied={uid ? (<>
         {boiteOutils}
         <button type="button" className="n-laterale-compte" data-nav-compte="" data-nav-compte-ouvre="parametres" data-nav-entree="settings" data-n-entree="settings" aria-current={tab === 'settings' ? 'page' : undefined}
-          aria-label={`${nomCoque.texte} — ${tr('menu.parametres')}`} onClick={() => { revenirSurOnglet(); ouvrirEntree(ONGLET_PARAMETRES, setTab); }}>
+          aria-label={`${nomCoque.texte} ${sousCompte} — ${tr('menu.parametres')}`} onClick={() => { revenirSurOnglet(); ouvrirEntree(ONGLET_PARAMETRES, setTab); }}>
           <PastilleProfil owner={uid} headers={enTeteSession} nom={nomCompte} email={mail} taille={30} className="vrm-sensible"/>
-          <span className="n-laterale-compte-textes"><span className="n-laterale-compte-nom vrm-sensible">{nomCoque.texte}</span><span className="n-laterale-compte-sous" data-lat-sous="">{sousCompte}</span></span>
+          <span className="n-laterale-compte-textes"><span className="n-laterale-compte-nom vrm-sensible">{nomCoque.texte}</span>{' '}<span className="n-laterale-compte-sous" data-lat-sous="">{sousCompte}</span></span>
         </button>
       </>) : boiteOutils}/>
   );
@@ -34088,7 +34093,7 @@ function FeuilleNouveauApp({ onNav, retenu = false }) {
   const [calme, setCalme] = React.useState(false);
   const [essai, setEssai] = React.useState(0);   // une autre feuille (ou la visite) devant : on réessaie plus tard, sans rien ranger
   React.useEffect(() => {
-    let idle = 0; const t = setTimeout(() => { try { idle = window.requestIdleCallback ? window.requestIdleCallback(() => setCalme(true), { timeout: 4000 }) : setTimeout(() => setCalme(true), 200); } catch (_) { setCalme(true); } }, 2500);
+    let idle = 0; const t = setTimeout(() => { try { idle = typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback(() => setCalme(true), { timeout: 4000 }) : setTimeout(() => setCalme(true), 200); } catch (_) { setCalme(true); } }, 2500);
     return () => { clearTimeout(t); try { if (idle && window.cancelIdleCallback) window.cancelIdleCallback(idle); } catch (_) {} };
   }, []);
   const ids = q.aVoir.map((n) => n.id).join(',');

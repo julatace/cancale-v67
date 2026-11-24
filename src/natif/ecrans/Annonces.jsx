@@ -225,7 +225,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   // Une cellule du tableau : la valeur, ou « — » qui se touche et ouvre SA saisie.
   const cellule = (a, cle, valeur, onModifier) => (
     <td className="n-eg-td" data-eg-col={cle} data-eg-vide={valeur == null ? '1' : undefined}>
-      {onModifier && !A ? <button type="button" className="n-eg-cellule" data-eg-modifier={cle} aria-label={tr('egalite.modifier', { quoi: tr('egalite.col.' + cle), article: a.titre })} onClick={(e) => { e.stopPropagation(); onModifier(); }}>{valeur == null ? '—' : valeur}</button>
+      {onModifier && !A ? <button type="button" className="n-eg-cellule" data-eg-modifier={cle} aria-label={(valeur == null ? '— · ' : typeof valeur === 'string' || typeof valeur === 'number' ? String(valeur) + ' · ' : '') + tr('egalite.modifier', { quoi: tr('egalite.col.' + cle), article: a.titre })} onClick={(e) => { e.stopPropagation(); onModifier(); }}>{valeur == null ? '—' : valeur}</button>
         : <span className="n-eg-valeur">{valeur == null ? '—' : valeur}</span>}
     </td>
   );
@@ -245,7 +245,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
                 {A ? <td className="n-eg-td n-eg-td-case"><input type="checkbox" className="n-eg-coche" checked={sel.has(a.cle)} disabled={!!grise} aria-label={a.titre} onChange={() => basculer(a)} onClick={(e) => e.stopPropagation()}/></td> : null}
                 <td className="n-eg-td n-eg-td-article" data-eg-col="article"><Vignette src={a.photo || ''} alt="" taille={44}/><span className="n-eg-article"><span className="n-eg-article-titre">{a.titre || tr('egalite.sansTitre')}</span>
                   <span className="n-eg-article-sous">{[a.taille ? tr('egalite.taille', { t: a.taille }) : '', a.condition, a.etat !== 'enligne' ? etatMot(a.etat, a) : ''].filter(Boolean).join(' · ') || ' '}</span></span></td>
-                <td className="n-eg-td" data-eg-col="numero">{a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : (onNumero && !A ? <button type="button" className="n-eg-cellule" data-eg-modifier="numero" aria-label={tr('egalite.modifier', { quoi: tr('egalite.col.numero'), article: a.titre })} onClick={(e) => { e.stopPropagation(); onNumero(a); }}>—</button> : <span className="n-eg-valeur">—</span>)}</td>
+                <td className="n-eg-td" data-eg-col="numero">{a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : (onNumero && !A ? <button type="button" className="n-eg-cellule" data-eg-modifier="numero" aria-label={'— · ' + tr('egalite.modifier', { quoi: tr('egalite.col.numero'), article: a.titre })} onClick={(e) => { e.stopPropagation(); onNumero(a); }}>—</button> : <span className="n-eg-valeur">—</span>)}</td>
                 <td className="n-eg-td" data-eg-col="sites"><span className="n-eg-sites">{a.sites.map((s) => nomSite(s)).join(' · ')}</span>
                   {a.aRelier ? <span className="n-eg-arelier" data-eg-arelier="">{tr('egalite.aRelier')}</span> : (a.annonces.length === 1 && a.annonces[0].pseudo ? <span className="n-eg-article-sous">{a.annonces[0].pseudo}</span> : null)}</td>
                 {cellule(a, 'prix', a.prix != null ? euros(a.prix) : null, onPrix ? () => onPrix(a) : null)}
@@ -355,7 +355,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   // (21 nov., 2e passe) « À régler » et « Mis à jour » sur UNE ligne fine : « Mis à jour il y a 18 min · ● 24 à régler › · ⟳ ».
   const nRegler = sujets.reduce((t, x) => t + x.n, 0);
   const aReglerTel = sujets.length ? (
-    <button type="button" className="n-ad-afaire n-ad-aregler" data-ad-aregler={String(nRegler)} aria-label={tr('egalite.aRegler') + ' · ' + sujets.map((x) => x.libelle).join(' · ')}
+    <button type="button" className="n-ad-afaire n-ad-aregler" data-ad-aregler={String(nRegler)} aria-label={tr('egalite.d.aReglerN', { n: nRegler }) + ' · ' + sujets.map((x) => x.libelle).join(' · ')}
       onClick={() => (sujets.length === 1 ? sujets[0].go() : setReglerTel(true))}>
       <span className="n-ad-point" aria-hidden="true"/><span className="n-ad-afaire-texte">{tr('egalite.d.aReglerN', { n: nRegler })}</span><Glyphe nom="chevron" taille={14}/>
     </button>) : null;

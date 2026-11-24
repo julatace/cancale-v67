@@ -20105,10 +20105,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const composerLot = async (lignes, format, tampons, { apercu = false, pas = null, places = null } = {}) => {
     const items = [], raisons = {};
     // (22 nov., défaut « Argent bloqué ») Les étiquettes lues pendant la composition : UN signal à la fin (`avecRafaleEtiquettes`).
-    const lues = await avecRafaleEtiquettes(async () => { const L = []; for (const l of lignes) L.push(await lireOctetsLigne(l)); return L; });
+    // (24 nov., main-vert) La progression avance APRÈS la lecture de CHAQUE bordereau (dans la boucle de lecture) — depuis
+    // le 22 nov. elle ne bougeait qu'une fois TOUT lu (0 sur 50, puis 50 d'un coup ; banc lot-preparation-reprise).
+    const lues = await avecRafaleEtiquettes(async () => { const L = []; for (const l of lignes) { L.push(await lireOctetsLigne(l)); if (pas) pas(L.length); } return L; });
     for (const [i, l] of lignes.entries()) {
       const o = lues[i];
-      if (pas) pas(i + 1);
       if (!o.buf) { raisons[l.cle] = o.raison; continue; }
       items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: o.buf, invBytes: o.invBytes, cle: l.cle, site: l.site, ligne: l, retour: estRetour(l), tampon: !estRetour(l) && TAMPONS_IMPR.includes((tampons || {})[l.cle]) ? tampons[l.cle] : null, places: places && places[l.cle] ? places[l.cle] : null });
     }
@@ -21138,7 +21139,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // rougit si un nom manque (`--ecrire` réécrit la liste). Même règle, même résultat : seulement moins souvent calculé.
   const cleVerifier = useRef(null);
   const commandesAVerifier = () => {
-    const cle = /* ⟦cle-verifier⟧ */ [bordLinks, bordParTx, bordsHidden, bordsParTxn, bordsPrinted, bordsShipped, bordsVenteEmailParTx, buyByNum, buysBase, cochesNonPartis, colisParTx, emailBords, hiddenSales, indexSuivisAchats, labelsCaptes, lbcLu, lbcVentes, numeros, numerosByPhoto, numerosByPhotoDir, onlineAnnonceIds, ordSearchDiff, panelBordsDone, partisVinted, periode, pickupUnion, saleOv, sales, shipDone, shippedSuivis, siteColis, soldByTxn, tracking, transpMap, txRetourAchat, txnItem, txnLink, vcEtat, ventesEmail, ventesEmailParTx, versements, C, _pdfEtiquettes, vcLoc0.departs, versionMemoire(), Math.floor(Date.now() / 10000)] /* ⟦/cle-verifier⟧ */;
+    const cle = /* ⟦cle-verifier⟧ */ [bordLinks, bordParTx, bordsHidden, bordsParTxn, bordsPrinted, bordsShipped, bordsVenteEmailParTx, buyByNum, buysBase, cochesNonPartis, colisEmailSources, colisParTx, emailBords, hiddenSales, indexSuivisAchats, labelsCaptes, lbcLu, lbcVentes, numeros, numerosByPhoto, numerosByPhotoDir, onlineAnnonceIds, ordSearchDiff, panelBordsDone, partisVinted, periode, pickupUnion, saleOv, sales, shipDone, shippedSuivis, siteColis, soldByTxn, tracking, transpMap, txRetourAchat, txnItem, txnLink, vcEtat, ventesEmailParTx, versements, C, _pdfEtiquettes, vcLoc0.departs, versionMemoire(), Math.floor(Date.now() / 10000), ventesEmail] /* ⟦/cle-verifier⟧ */;
     const m = cleVerifier.current;
     if (m && m.cle.length === cle.length && m.cle.every((x, i) => Object.is(x, cle[i])) && stockageInchange(m.lu)) return m.r;
     const { r, lu } = suivreStockage(commandesAVerifierCalc);
@@ -23479,7 +23480,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 const l = liaisonJ && liaisonJ.lu ? liaisonJ.file.filter((x) => !x.plusTard) : [];
                 return (
                   <button key="meme-photo" type="button" className="vrm-day-task vrm-fu-tache" data-journee-meme-photo={l.map((x) => x.cle).join(' ')} data-journee-liaison="" data-n={String(memeJ.n)}
-                    title={`${memeJ.titre}\n${memeJ.detail}`} aria-label={`${memeJ.titre} — ${memeJ.detail}`} onClick={() => ouvrirLiaison()}>
+                    title={`${memeJ.titre}\n${memeJ.detail}`} onClick={() => ouvrirLiaison()}>
                     <PileVignettes srcs={l.map((x) => x.annonce.photo)} n={memeJ.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="image" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{memeJ.titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="meme-photo">{memeJ.detail}</span></span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
@@ -23945,7 +23946,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               colis={nE ? colisJournee.map((c) => ({ ...c, fl: attrsFicheLigne({ contexte: 'journee', site: c.site, cle: 'j' + c.cle, nums: c.num ? [String(c.num)] : [], tx: c.site === 'vinted' ? String(c.cle).slice(2) : '', item: c.idAnnonce || '', photo: typeof c.photo === 'string' ? c.photo : '', titre: c.titre || '', prix: c.prix || '' }) })) : []}
               retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ, prevision: lu(xR) && xR.t.prevision ? xR.t.prevision : null }}
               groupes={baseKO ? null : groupesJ} alerte={alerteJ} ventes={dernieresJ}
-              plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimerCourt'), faire: () => { poserPendingBordPrint('imprimer'); if (onNav) onNav(xE.tab); } } : null}
+              plein={nPrets > 0 ? { n: nPrets, exact: !(em && em.exact === false), txt: tr('v2.imprimerCourt'), faire: () => { poserPendingBordPrint('imprimer'); if (onNav) onNav(xE.tab); } } : null}
               onScanner={() => ouvrirRetrouver('journee')}
               // (23 nov., style-clarte-3) « Publier » : le parcours existant (choisir l'article dans la feuille, `vrm:publier-ailleurs`) ;
               // « Relier » : Achats et sa feuille « Relier achats et ventes » (la même que son bouton).
@@ -29027,6 +29028,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         rangs: rangsNV, ecart: ecartNomme(rangsNV, nCochesV), plein: pleinImprimer({ nC: nCochesV, nR: nNR, occupe: !!batchBusy || !!imprBusy, total: resLot.total + Lret.length }),
                         retours: Lret.map((l) => ({ cle: l.cle, tx: l.tx, num: l.num || '', titre: l.titre || '', vendeur: l.vendeur || '', on: choixNR.has(l.cle) })),
                         format: formatLot, autres: resLot.autres, aPreparer: (nEnv || 0) > 0, aEmballer: nPrets > 0,
+                        // (24 nov., main-vert — règle du 17 nov., chasse-bugs) « Choisir » NOMME ce qui ne part pas (« N°43 attend son
+                        // bordereau ») : les colis Vinted de la liste sans ligne de lot (aucun bordereau reçu), puis les exclus du lot —
+                        // comme le pied d'avant (`vvHorsLotRef`), que l'écran natif ne calculait plus.
+                        exclus: (() => { const vus = new Set(); const hors = rangsNV.filter((r) => r && r.site === 'vinted' && !(r.coche && r.coche.cle)).map((r) => ({ cle: r.cle, num: r.num, titre: r.titre, raison: 'sansBordereau' }));
+                          const X = [...hors, ...resumeLot(Ltous, choixNV).exclus].filter((x) => x && !vus.has(x.cle) && vus.add(x.cle)); return X.length ? texteExclus(tr, X) : ''; })(),
                         bordsPasSu: !!(voitSite('vinted') && emailBordsKO && emailBords === null) },
                       route: onglet === 'envoyes' && !toutesSeules ? routeNatif() : null },
                     g: { onglet: (v) => onOngletColis && onOngletColis(v),

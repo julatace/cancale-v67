@@ -27,6 +27,8 @@ const RACINE = path.join(__dirname, '..');
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e && e.stack || e).split('\n').slice(0, 2).join(' ')); } };
+// (24 nov., main-vert) App.jsx découpé (src/ecrans/*.jsx) : « l'app » se lit recollée (_source-app.cjs).
+const { sourceApp } = require('./_source-app.cjs');
 const lire = (rel) => { try { return fs.readFileSync(path.join(RACINE, rel), 'utf8'); } catch (_) { return ''; } };
 const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
 
@@ -210,7 +212,7 @@ const MUTATIONS = [
     dit(P.signaturePlan() === 'libre', 'passer à Pro rend tout immédiatement (signature libre)');
   });
   await essaie('câblage App.jsx', async () => {
-    const app = sansCommentaires(lire('src/App.jsx'));
+    const app = sansCommentaires(sourceApp(RACINE));
     const compta = sansCommentaires(lire('src/ecrans/Compta.jsx'));
     // (9 nov., suites serveur) La règle est PURE (`compteEcarteRegle`, la règle de l'offre en
     // argument — recopiée telle quelle dans api/_lib/ventes-regle.js) ; `compteEcarte` lui passe
@@ -222,7 +224,9 @@ const MUTATIONS = [
     dit(/exclu: \(o\) => compteEcarteChoix\(o && o\._uid/.test(compta), 'Compta → registre des achats : les achats des comptes d’achat comptent');
     dit((/const isHidden = \(o\) => hiddenSales\.has\(String\(o\.transaction_id\)\) \|\| venteOffOf\(o\);/.test(app) || (/const isHiddenCalcul = \(o\) => hiddenSales\.has\(String\(o\.transaction_id\)\) \|\| venteOffOf\(o\);/.test(app) && /const isHidden = \(o\) => \{[^\n]*isHiddenCalcul\(o\)[^\n]*\};/.test(app))) && /const venteOffOf = \(o\) => acctOffOf\(o\) \|\| horsPlanOf\(o\);/.test(app),
       'listes de ventes, colis à envoyer, CA : hors offre écarté (`isHidden`)');
-    dit(/exclu: venteOffOf, excluAutre, versements, declare: declUrssaf/.test(app), 'CA déclaré (URSSAF) : les ventes hors offre n’y entrent pas');
+    // (24 nov., main-vert) 5.410.4 : le CA déclaré écarte AUSSI un compte personnel (`venteOffDeclareOf` = hors offre OU personnel).
+    dit((/exclu: venteOffOf, excluAutre, versements, declare: declUrssaf/.test(app)
+      || (/exclu: venteOffDeclareOf, excluAutre, versements(?:: versements \|\| \{\})?, declare: declUrssaf/.test(app) && /const venteOffDeclareOf = \(o\) => venteOffOf\(o\) \|\| /.test(app))), 'CA déclaré (URSSAF) : les ventes hors offre n’y entrent pas');
     dit(/<VentesHorsPlan /.test(app) && /<BandeauCompteVendeur /.test(app), 'Ventes : l’aperçu des ventes hors offre est rendu ; la coque porte la feuille « Quel compte vend ? »');
     dit(/<React\.Fragment key=\{sigPlan\}>\{children\}<\/React\.Fragment>/.test(app), 'quand la règle change, l’app se remonte (chaque total se recalcule)');
     // Les gardes de sécurité ne sont PAS bridées : double vente, annulées, litiges, stock.
@@ -458,7 +462,7 @@ const MUTATIONS = [
     stop();
   });
   await essaie('câblage App.jsx (autres plateformes)', async () => {
-    const app = sansCommentaires(lire('src/App.jsx'));
+    const app = sansCommentaires(sourceApp(RACINE));
     const plans = sansCommentaires(lire('src/abonnement/PlansSoloPro.jsx'));
     const reg = sansCommentaires(lire('src/ecrans/Reglages.jsx'));
     dit(/return React\.useMemo\(\(\) => excluAutreDe\(v, reglePlanCourante\(\)\), \[v, sig\]\);/.test(app), 'les totaux (`useExcluAutre`, Ventes, Compta, Stats, coque) passent l’offre au prédicat des autres plateformes');
