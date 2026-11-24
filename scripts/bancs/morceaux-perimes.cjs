@@ -93,6 +93,8 @@ const srv = http.createServer((q, r) => {
       : { ok: true, pret: true };
     return servi(r, 200, { 'content-type': 'application/json', 'cache-control': 'no-store' }, JSON.stringify(corps));
   }
+  // P3 : la réserve « pas encore faite » (réseau lent) — la liste demandée par la page n'arrive pas.
+  if (site.reserveEnRetard && f === '/hors-ligne-assets.json' && /[?&]_v=/.test(q.url)) return;
   if (f === '/' || !path.extname(f)) f = '/index.html';
   const p = path.join(site.dist, f);
   const absent = !p.startsWith(site.dist) || !fs.existsSync(p) || fs.statSync(p).isDirectory();
@@ -292,7 +294,8 @@ const ECRANS = ['settings', 'dashboard', 'emails', 'communaute', 'garage', 'sema
   // ── P3 : la mise en ligne tombe avant que la réserve ait fini ──────────────
   if (veut('P3')) await essaie('P3', async () => {
     const n = 'P3';
-    site.dist = DIST_A;
+    // La réserve n'a pas fini (ni celle du service worker, endormi, ni celle de la page, sa liste en route).
+    site.dist = DIST_A; site.swEndormi = true; site.reserveEnRetard = true;
     const ctx = await contexte();
     const { pg, vu } = await nouvellePage(ctx);
     await pg.goto(URL0, { waitUntil: 'commit' });
@@ -319,7 +322,7 @@ const ECRANS = ['settings', 'dashboard', 'emails', 'communaute', 'garage', 'sema
     // Les préchargements de fond de A, ratés avant le rechargement, sont comptés (la production les compte) : ici les
     // fichiers n'existent plus NULLE PART, c'est attendu ; seul ce que Julien voit est jugé.
     juger(n, vu, await etatPage(pg), { compte: false });
-    await ctx.close();
+    await ctx.close(); site.swEndormi = false; site.reserveEnRetard = false;
   });
 
   // ── P4 : un texte en cours quand un préchargement de fond rate ─────────────
