@@ -85,7 +85,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       else if (c.action === 'lancer') {
         const targets0 = (c.selection || []).map((nid) => { const f = FAVORIS.find((x) => x.nid === nid); return f && { notificationId: f.nid, itemId: f.itemId, recipientId: f.userId, initiator: f.login }; }).filter(Boolean);
         // La file part des favoris les plus récents (règle du serveur, `ordreRecents`), dates de la liste simulée.
-        const targets = FF.ordreRecents ? FF.ordreRecents(targets0, (t) => { const i = FAVORIS.findIndex((x) => x.nid === t.notificationId); return i >= 0 ? new Date(Date.now() - (i + 1) * 600000).toISOString() : null; }) : targets0;
+        const targets = FF.ordreRecents ? FF.ordreRecents(targets0, (t) => { const i = FAVORIS.findIndex((x) => x.nid === t.notificationId); return i >= 0 ? new Date(Date.now() - (i + 1) * 300000).toISOString() : null; }) : targets0;
         r = FF.lancerFile(S.d, { owner, targets, message: REGLAGES.message, intervalleMinutes: 0, maintenant, lot: crypto.randomUUID(), pourcentage: 10, offre: { mode: 'pct', valeur: 10, arrondi: false }, rythme: null, plage: { min: 20000, max: 21000 } });
       } else if (c.action === 'suivant') r = FF.reserverFile(S.d, { owner, maintenant, jeton: crypto.randomUUID(), suivi: crypto.randomUUID() });
       else if (c.action === 'consommer') r = FF.consommerFile(S.d, { owner, jeton: c.jeton, maintenant });
@@ -186,7 +186,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     const jobs = () => (vue().jobs || []);
     const parItem = () => Object.fromEntries(jobs().map((x) => [String(x.itemId || String(x.id || '').split(':')[0]), `${x.etat}${x.raison ? ':' + x.raison : ''}${x.cause ? '/' + x.cause : ''}${x.etape ? '@' + x.etape : ''}`]));
     const reset = async () => {
-      S.d = null; V.st.req = []; V.st.ancienneConv = 200; Object.assign(V.st, { avant: 0, paginer: false, clocheN: 0, pageTaille: 20, suiteMs: 0 }); REGLAGES.message = MSG_PSEUDO; V.st.forcer = []; V.st.captchaSur = null; V.st.commande = {}; V.st.convs.clear(); seed();
+      S.d = null; V.st.req = []; V.st.ancienneConv = 200; Object.assign(V.st, { avant: 0, intercale: null, paginer: false, clocheN: 0, pageTaille: 20, suiteMs: 0 }); REGLAGES.message = MSG_PSEUDO; V.st.forcer = []; V.st.captchaSur = null; V.st.commande = {}; V.st.convs.clear(); seed();
       await dansSW(async () => { await chrome.storage.local.remove(['vrmFavorisCarte', 'vrmActionEnCours', 'vrmPauseVinted', 'vrmCaptcha', 'vrmFavorisApercu', 'vrmTextesRecents', 'vrmToutArrete']); });
     };
 
@@ -199,11 +199,11 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       if (F1 === 'F1X') for (let k = 4; k <= 6; k++) { FAVORIS.push({ nid: `n-000${k}`, itemId: String(91010000 + k), userId: String(3000000 + k), login: `acheteur_${k}` }); ANNONCES.push({ id: 91010000 + k, titre: `Paire simulée ${k}`, prix: 50 + k }); }
       const N = FAVORIS.length;
       for (const [i, f] of FAVORIS.entries()) f.forme = F1 === 'F1W' || T ? 'web' : F1 === 'F1M' ? (i === 1 ? 'web' : 'app') : 'app';
-      if (F1 === 'F1X') console.log('\n── F1X. 6 favoris (liens web) : 2 dans la cloche, 4 seulement sur la page complète (3 lignes, puis la suite au défilement, 2 s)');
+      if (F1 === 'F1X') console.log('\n── F1X. 6 favoris (liens web) : 2 dans la cloche ; 12 autres notifications ; les 4 autres seulement sur la page complète, après défilement (10 lignes, puis la suite en 2 s)');
       else if (T) console.log(`\n── ${F1}. (24 nov., Julien : « Sauté · Favori trop ancien » pour des favoris de la veille) liens web ; ${F1 === 'F1T' ? 17 : 25} notifications plus récentes avant les 3 favoris ; la cloche n’en montre que 5 ; la page complète 15, puis la suite au défilement (2 s)${F1 === 'F1T2' ? ' ; les favoris sur la page 2 de l’API' : ''}`);
       if (T) {} else if (F1 === 'F1W' || F1 === 'F1M') console.log(`\n── ${F1}. trois favoris, liens ${F1 === 'F1W' ? 'web (/items/N/want_it/new?offering_id=N)' : 'mêlés (app, web, app)'}`); else console.log(F1 === 'F1P' ? '\n── F1P. ancienne relecture refusée (commande), message avec {pseudo}' : F1 === 'F1' ? '\n── F1. trois favoris lancés depuis la carte (l’ancienne relecture répond, comme mesuré le 21 nov.)' : '\n── F1E. les mêmes, l’ancienne relecture REFUSÉE : nouvelle messagerie, identité par la commande');
       await reset();
-      if (F1 === 'F1X') Object.assign(V.st, { avant: 0, paginer: true, clocheN: 2, pageTaille: 3, suiteMs: 2000 }); seed();
+      if (F1 === 'F1X') Object.assign(V.st, { avant: 0, intercale: { apres: 2, n: 12 }, paginer: true, clocheN: 2, pageTaille: 10, suiteMs: 2000 }); seed();
       if (T && F1 !== 'F1X') Object.assign(V.st, { avant: F1 === 'F1T' ? 17 : 25, paginer: true, clocheN: 5, pageTaille: 15, suiteMs: 2000 });
       if (F1 === 'F1E' || F1 === 'F1P') V.st.ancienneConv = 404;
       if (F1 === 'F1E') REGLAGES.message = MSG_SIMPLE;
@@ -234,7 +234,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       dit(b.envoyes === N, `VRM : ${N} envoyés`, JSON.stringify(parItem()));
       if (F1 === 'F1X') { const ordre = inq.map((e) => { try { return String(JSON.parse(e.corps).item_id || ''); } catch (_) { return ''; } }); const pages = V.st.req.filter((e) => e.page && /^\/member\/notifications/.test(e.p)).length;
         dit(JSON.stringify(ordre) === JSON.stringify(FAVORIS.map((f) => f.itemId)), 'du plus récent au plus ancien (ceux de la cloche d’abord)', JSON.stringify(ordre));
-        dit(pages >= 1 && pages <= 4, 'la page complète ouverte pour les favoris plus bas que la cloche (et pas pour ceux de la cloche)', 'pages complètes : ' + pages); }
+        dit(pages >= 1 && pages <= 6, 'la page complète ouverte pour les favoris plus bas que la cloche (et pas pour ceux de la cloche)', 'pages complètes : ' + pages); }
       if (T) dit(!jobs().some((x) => x.raison === 'favori_trop_ancien'), 'aucun favori « trop ancien » (la liste de Vinted les contient, de la veille)', JSON.stringify(parItem()));
       const fenL = f && f.a && Array.isArray(f.a.lignes) ? f.a.lignes : [];
       dit(fenL.length === N && fenL.every((l) => l.etat === 'envoye'), `la fenêtre : ${N} lignes`+'  « envoyé »', JSON.stringify(fenL.map((l) => l.etat)));
