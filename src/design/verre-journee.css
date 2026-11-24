@@ -55,6 +55,11 @@
 :root:root:root:root:root:root body .sj-journee .vrm-jv2-faits > span:not(.vrm-jv2-quoi):not([data-journal-case="ventes"]) { display: none !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-jv2-faits > :is(.vrm-jv2-quoi, [data-journal-case="ventes"]) { display: inline !important; visibility: visible !important; position: static !important; width: auto !important; height: auto !important; clip: auto !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-jv2-pile-bouton { width: 84px !important; height: 64px !important; margin: 0 0 2px !important; }
+/* (24 nov., sauts-orange — capture du parcours iPhone) Les vignettes (68 px, posées pour le bouton de 112 px d'hier) débordaient
+   du bouton de 84 × 64 : la pile touchait le bord droit de l'écran et la fin de « … · 3 ventes ». Elles tiennent DANS le bouton
+   (rotation comprise), et la phrase garde 16 px d'air. */
+:root:root:root:root:root:root:root body .sj-journee .vrm-jv2-pile .vrm-pile-v { width: 52px !important; height: 52px !important; left: 10px !important; top: 6px !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-jv2-corps { column-gap: 16px !important; padding-right: 8px !important; }
 /* La semaine : des barres de 8 px (la plus haute à 40 px), la lettre dessous ; le jour choisi en blanc plein. Chaque jour
    reste une touche de 44 px (la règle des 44 px au doigt). */
 :root:root:root:root:root:root body .sj-journee .vrm-jv2-frise { align-items: end !important; }

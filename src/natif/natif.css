@@ -162,7 +162,9 @@
   }
   .n-fait-case { min-width: 0; display: flex; }
   .n-fait {
-    box-sizing: border-box; display: flex; flex-direction: column; align-items: flex-start; justify-content: center;
+    /* (24 nov., sauts-orange) En HAUT de sa case : centrée, une case sans légende (« Vendu ») descendait à côté d'une case
+       qui en a une (« Pour toi · sans frais ») — les deux libellés n'étaient plus à la même hauteur. */
+    box-sizing: border-box; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start;
     min-width: 0; width: 100%; min-height: var(--n-cible); margin: 0; padding: 0; border: 0; background: transparent;
     color: var(--n-encre); text-align: start; letter-spacing: normal;
   }

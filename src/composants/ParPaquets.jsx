@@ -12,10 +12,12 @@
 //  `marge` px sous la fenêtre). Rien n'est caché ni compté autrement :
 //  le total reste écrit par l'en-tête de la liste, la rangée qui manque arrive avant que le doigt
 //  l'atteigne. Hors navigateur (rendu sans fenêtre) : tout est posé, comme avant.
+//  (24 nov.) La sentinelle TIENT la place des rangées pas encore posées (hauteur moyenne mesurée × reste) : un paquet ne
+//  pousse plus ce qui est dessous.
 //  ⚠️ Le repère ne porte aucun nombre (`data-par-paquets=""`) : le banc chiffres-volume relève les
 //  nombres des attributs `data-*`, un compteur de paquets y passerait pour un chiffre de l'écran.
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 export const PAQUET_INITIAL = 16;
 export const PAQUET_PAS = 24;
@@ -50,7 +52,23 @@ export function useParPaquets(total, { initial = PAQUET_INITIAL, pas = PAQUET_PA
     return () => { fini = true; if (image) cancelAnimationFrame(image); window.removeEventListener('scroll', bientot, { capture: true }); window.removeEventListener('resize', bientot); document.removeEventListener('toggle', bientot, true); };
   }, [reste, n, pas, marge]);
   const montres = sansFenetre ? (total || 0) : Math.min(n, total || 0);
-  const sentinelle = reste ? <div ref={ref} className="vrm-par-paquets" data-par-paquets="" aria-hidden="true" style={{ height: 1 }}/> : null;
+  // (24 nov., sauts-orange — banc parcours-iphone : « en bas d'Achats, la liste qui s'allonge déplace la fin », CLS jusqu'à 0,94)
+  // La place des rangées PAS ENCORE posées est tenue : la sentinelle a la hauteur des `reste` rangées, à la hauteur moyenne des
+  // rangées déjà posées (mesurée, du haut de la première au haut de la sentinelle : écarts compris). Un paquet qui arrive prend
+  // la place de la réserve au lieu de pousser ce qui est dessous (Safari n'a pas d'ancrage du défilement). Rien n'est caché :
+  // la réserve est vide, et la rangée arrive avant que le doigt l'atteigne, comme avant.
+  const [reserve, setReserve] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!reste || !el || !el.getClientRects().length) { if (!reste && reserve) setReserve(0); return; }
+    let premier = el, k = 0;
+    while (k < montres && premier.previousElementSibling) { premier = premier.previousElementSibling; k++; }
+    if (!k) return;
+    const d = el.getBoundingClientRect().top - premier.getBoundingClientRect().top;
+    const h = d > 0 ? Math.round((d / k) * reste) : 0;
+    if (Math.abs(h - reserve) > 2) setReserve(h);
+  });
+  const sentinelle = reste ? <div ref={ref} className="vrm-par-paquets" data-par-paquets="" aria-hidden="true" style={{ height: Math.max(1, reserve) }}/> : null;
   return [montres, sentinelle];
 }
 

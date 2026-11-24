@@ -4099,7 +4099,10 @@ function ComptaFusion({ compta, onNav }) {
       {!mois6.some((m) => m.v != null && m.n > 0) ? (
         <section className="vrm-fu-panneau vrm-fu-mois6-vide" aria-label={tr('compta.beneficeBrutVentes')} data-fu-mois6={mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',')} data-fu-mois6-vide="">
           <div className="vrm-fu-panneau-tete"><h3>{tr('compta.6DerniersMois')}</h3><span data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></div>
-          <p className="vrm-fu-note">{mois6.some((m) => m.n > 0) ? <>{tr('compta.encorePrixAchat')} <Bouton variante="discret" data-fu-mois6-porte="" onClick={() => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}>{tr('compta.saisir')}</Bouton></> : tr('compta.aucuneVenteFinalisee')}</p>
+          {/* (24 nov., sauts-orange — capture du parcours iPhone) « Les saisir » DANS la phrase étirait la ligne (bouton de 44 px) et
+              écartait les deux lignes du texte : le geste a SA rangée, sous la phrase (même bouton, même data-*). */}
+          <p className="vrm-fu-note">{mois6.some((m) => m.n > 0) ? tr('compta.encorePrixAchat') : tr('compta.aucuneVenteFinalisee')}</p>
+          {mois6.some((m) => m.n > 0) ? <Bouton variante="discret" data-fu-mois6-porte="" onClick={() => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}>{tr('compta.saisir')}</Bouton> : null}
         </section>
       ) : (
       <section className="vrm-fu-panneau" aria-label={tr('compta.beneficeBrutVentes')} data-fu-mois6={mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',')}>

@@ -44,12 +44,14 @@ const IPHONE = PW.devices['iPhone 15'];
 const CHARGE = (() => { try { const os = require('os'); return (os.loadavg()[0] / os.cpus().length).toFixed(1) + ' par cœur'; } catch (_) { return '?'; } })();
 // Les sauts de mise en page TROUVÉS le 24 nov. et pas corrigés (docs/passation/2026-11-24-parcours-iphone.md) : rapportés,
 // pas rouges. Cette liste ne fait que RACCOURCIR : un saut corrigé en sort.
-//  · Achats : la section des codes de retrait (e-mails du transporteur) arrive APRÈS « À vérifier » et la pousse ;
-//    en bas d'Achats, la liste qui s'allonge ; · la loupe : « Colis à retirer » arrive après « Dernières ventes » ;
-//    · Argent : la carte « Tes seuils de l'année » (DAC7) arrive après le reste et le pousse.
-const SAUTS_CONNUS = /^(onglet-achats|onglet-achats-bas|achats|a-retirer|loupe|lent-achats|onglet-compta|argent|lent-compta)$/;
+// (24 nov., lot sauts-orange — docs/passation/2026-11-24-sauts-orange.md) CORRIGÉS et sortis : Achats (les codes de retrait
+// n'arrivent plus après « À vérifier » : la colonne attend ses deux sources), la loupe (les suggestions attendent leur
+// lecture), Argent (« Tes seuils de l'année » prise à l'ouverture en tête, sinon en bas du résumé). Un saut qui revient sur
+// ces écrans est ROUGE.
+const SAUTS_CONNUS = /^(onglet-achats-bas)$/;
 const STRICT = process.env.CI === 'true' || process.env.SEUIL_STRICT === '1';
 const LENT = { ms: 0 };
+const PANNE = { re: null };   // une lecture qui échoue (500) : Argent « pas encore calculé »
 
 // La base : celle du volume + deux colis arrivés au point relais avec leur code (forme des e-mails de suivi, comme
 // hors-reseau.cjs) — sans eux « À retirer » est vide et le code en grand n'est jamais rendu.
@@ -165,7 +167,7 @@ const note = (quoi) => { rapport.push('ℹ️  ' + quoi); console.log('   ℹ️
     const npg = ctx.newPage.bind(ctx);
     ctx.newPage = async (...x) => {
       const pg = await npg(...x); const r0 = pg.route.bind(pg);
-      pg.route = (url, h, ...y) => r0(url, async (route, req) => { if (LENT.ms && /\/rest\/v1\/|\/api\//.test(route.request().url())) await new Promise((ok) => setTimeout(ok, LENT.ms)); return h(route, req); }, ...y);
+      pg.route = (url, h, ...y) => r0(url, async (route, req) => { if (PANNE.re && PANNE.re.test(decodeURIComponent(route.request().url()))) return route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }); if (LENT.ms && /\/rest\/v1\/|\/api\//.test(route.request().url())) await new Promise((ok) => setTimeout(ok, LENT.ms)); return h(route, req); }, ...y);
       await pg.addInitScript(TEMOIN);
       return pg;
     };
@@ -341,6 +343,25 @@ const note = (quoi) => { rapport.push('ℹ️  ' + quoi); console.log('   ℹ️
       await geste('lent-recharge', () => pg.reload({ waitUntil: 'domcontentloaded' }), { quoi: 'la coque dessinée', f: () => !!document.querySelector('.n-onglets') }, { lent: LENT.ms + 1500 });
       for (const id of ['achats', 'compta', 'journee']) await geste(`lent-${id}`, tap(`.n-onglet[data-n-onglet="${id}"]`), surOnglet(id));
       LENT.ms = 0;
+      // 14. (24 nov., lot sauts-orange — trouvé par le lot tutos) Argent PAS ENCORE CALCULÉ (les ventes ne se lisent pas) avec un
+      // statut choisi : la carte URSSAF est basse (ni montant ni pied) et « J'ai déclaré » couvrait « avant le 30 nov. ».
+      // P7 bis : le bouton ne couvre aucun texte de sa carte (et P7 : aucun texte sur un autre).
+      await pg.evaluate(() => { try { localStorage.setItem('vinted_regime', JSON.stringify('micro')); localStorage.setItem('vinted_urssaf_freq', JSON.stringify('mensuel')); localStorage.removeItem('vinted_urssaf_mois'); } catch (_) {} });
+      PANNE.re = /orders|vinted_urssaf_mois|ventes/;
+      await geste('argent-pas-calcule', () => pg.goto(pg.url().replace(/\?.*$/, '') + '?tab=compta', { waitUntil: 'domcontentloaded' }), { quoi: 'la carte URSSAF', f: () => !!document.querySelector('.vg-a-urssaf') }, { lent: 8000 });
+      await pg.waitForTimeout(1500);
+      const urs = await pg.evaluate(() => {
+        const c = document.querySelector('.vg-a-urssaf'); if (!c) return { etat: 'pas de carte' };
+        const b = c.querySelector('.vg-a-declare'); if (!b) return { etat: c.getAttribute('data-argent-urssaf') || '', bouton: false };
+        const rb = b.getBoundingClientRect(); const sur = [];
+        for (const el of c.querySelectorAll('*')) { if (el === b || b.contains(el) || ![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue;
+          const rg = document.createRange(); rg.selectNodeContents(el);
+          for (const r of rg.getClientRects()) { const w = Math.min(r.right, rb.right) - Math.max(r.left, rb.left), h = Math.min(r.bottom, rb.bottom) - Math.max(r.top, rb.top); if (w > 2 && h > 2) { sur.push((el.innerText || '').trim().slice(0, 24)); break; } } }
+        return { etat: c.getAttribute('data-argent-urssaf') || '', bouton: true, pied: !!c.querySelector('.vg-a-urssaf-pied'), sur };
+      });
+      dit(urs.bouton === true && urs.pied === false, 'argent-pas-calcule : la carte URSSAF est dans l\'état voulu (statut choisi, rien de calculé, « J\'ai déclaré » montré)', JSON.stringify(urs));
+      dit(urs.bouton === true && urs.sur.length === 0, 'argent-pas-calcule : « J\'ai déclaré » ne couvre aucun texte de sa carte (P7 bis)', (urs.sur || []).join(' | '));
+      PANNE.re = null;
       await o.ctx.close();
     }
   } finally { await nav.close(); P.srv.close(); }
