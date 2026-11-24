@@ -6367,6 +6367,7 @@ const _indexBordsListeVide = [];
 // (23 nov.) La demande « ouvre Relier » d'Aujourd'hui, prise par Achats à son arrivée (voir `ouvrirGlisser`).
 const DEMANDE_GLISSER = { at: 0 };
 function demanderRelier(onNav) { DEMANDE_GLISSER.at = Date.now(); if (onNav) onNav('achats'); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:relier-ouvrir')); } catch (_) {} }, 0); }
+const INFOS_ACHATS_AUCUNE = Object.freeze({});   // (24 nov.) « rien à lire » : un seul objet vide, jamais modifié
 function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false, colisDans = null, completer = null, onCompleterFermer = null, sectionsAutres = null }) {
   // (20 nov., bugs-terrain) LES LECTURES ASYNCHRONES DU MOTEUR, RENDUES PAR VAGUES. Mesuré (12 comptes, processeur ×4) : ~40
   // rendus par moteur en 42 s, un par lecture qui arrive. Dans ce moteur, un `setState` appelé HORS d'un geste (réponse
@@ -11473,7 +11474,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   //   laissée en ligne** (la règle du titre n'en attrapait aucune que l'identité
   //   rate). Quand l'identité ne dit rien, on ne retire pas : mieux vaut un blanc
   //   qu'un faux.
-  const annoncesVendues = useMemo(() => {
+  // (24 nov., vitesse-lectures-toucher) Les mêmes annonces ⇒ le même ensemble (`useMemeContenu`) : `retoursEnCours` ne repart
+  // plus quand les ventes relues désignent les mêmes annonces.
+  const annoncesVendues = useMemeContenu(useMemo(() => {
     const ids = new Set();
     for (const o of (sales.items || [])) {
       if (classifyOrderStatus(o.status) === 'cancelled') continue;   // retour/remboursement : la paire revient
@@ -11487,7 +11490,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     }
     return ids;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, txnItem, numeros, lotsTx, lotLiens]);
+  }, [sales.items, txnItem, numeros, lotsTx, lotLiens]));
   // (3 nov., choix n° 3) Les N° remis en stock après un retour (« Retour reçu ? » → « Remettre en
   // stock ») : posés par l'effet qui suit `retoursSuivis` (plus bas), lus par la publication ci-dessous.
   // (13 nov., point 29) `null` = pas encore su (la publication attend : une lecture en cours ne
@@ -16760,7 +16763,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // déclaré par lui) : jamais son prix entier proposé à un article (src/achatsSourcing.js).
   const [lotsDeclares, setLotsDeclares] = useStateCle('vrm_lots_declares', () => load('vrm_lots_declares', {}) || {});
   const [repartitionsLots, setRepartitionsLots] = useStateCle('vrm_repartitions_lots', () => load('vrm_repartitions_lots', {}) || {});
-  const infosAchatsLues = infosTxAchats !== undefined ? infosTxAchats : (demandesSuivis === '' && Array.isArray(buys.items) ? {} : undefined);
+  // (24 nov., vitesse-lectures-toucher) « Rien à lire » = TOUJOURS le même objet vide (`INFOS_ACHATS_AUCUNE`) : un `{}` neuf à
+  // chaque rendu relançait ce qui le lit (`nArticlesTx`, puis `cartesColis` à chaque rendu — mesuré, CALCULS=deps).
+  const infosAchatsLues = infosTxAchats !== undefined ? infosTxAchats : (demandesSuivis === '' && Array.isArray(buys.items) ? INFOS_ACHATS_AUCUNE : undefined);
   // (5 nov.) La date de RÉCEPTION lue d'un achat (livraison lue ou « Je l'ai retiré »), pour filtrer « Relier un achat ».
   // ⚠️ (5 nov., relecture) « Relier un achat » s'ouvre surtout depuis VENTES et ANNONCES, où les
   //    transactions d'achat ne sont PAS lues (`demandesSuivis` ne lit que sur Achats, et

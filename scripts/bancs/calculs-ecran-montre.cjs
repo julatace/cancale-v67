@@ -15,6 +15,8 @@
 //    3. LES PUBLICATIONS (§5, un seul propriétaire) sont toujours posées par leur écran : `vrm_colis_retirer`,
 //       `vrm_colis_aposter`, `widget_stats`, `vrm_atelier_achats`, `vinted_nums_physiques`.
 //  Rouge sur le code d'avant (aucun compteur) et par mutation (`useMemoParesseux` rendu immédiat : le récit dit comment).
+//  (24 nov., vitesse-lectures-toucher) + PLAFOND : un calcul refait au plus une fois par version des données ; les relevés
+//  « plus vue » lus à plusieurs comptes par lecture (rouge sur le code d'avant : 5 et 11 à 18 calculs, 7 lectures).
 //  iPhone 390 tactile, base inventée (`_base-volume`, rien de réel), sans ralentissement (on compte, on ne chronomètre pas).
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -46,6 +48,15 @@ const INTERDIT = {
   'achats:outils': ['cartesColis', 'listeEnvoyes', 'retoursEnCours', 'achatsPourAtelier'],
   'bordereaux:achats': ['listeEnvoyes', 'achatsPourAtelier'],
 };
+// (24 nov., vitesse-lectures-toucher) Onglet → au PLUS combien de fois un calcul est refait par instance pendant sa 1re
+// visite. Mesuré sur le code d'avant (Achats, volume de Julien) : `pickupUnion` 5 fois par instance (3 fois sur des entrées
+// relues à l'identique), `cartesColis` 11 à 18 fois (une fois par rendu). Maintenant : une fois par VERSION des données
+// (src/calculParesseux.js, `useMemeContenu`, `useCalculParVersion`) — une arrivée de données = un calcul.
+const PLAFOND = {
+  achats: { pickupUnion: 3, cartesColis: 5 },
+  ventes: { cartesColis: 5, listeEnvoyes: 5 },
+  journee: { pickupUnion: 3, listeEnvoyes: 5 },
+};
 // Onglet → calculs qui DOIVENT rester faits pendant sa 1re visite (là où ils sont lus), par instance.
 const ATTENDU = {
   annonces: { retoursEnCours: ['annonces'] },
@@ -55,7 +66,7 @@ const ATTENDU = {
 
 (async () => {
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--explicitly-allowed-ports=' + PORT] });
-  const fautes = [], erreurs = [], vus = {}, ecrits = new Set(), lecturesExtras = [], pagesTxn = [];
+  const fautes = [], erreurs = [], vus = {}, ecrits = new Set(), lecturesExtras = [], pagesTxn = [], lecturesSuivi = [];
   try {
     const ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'fr-FR', serviceWorkers: 'block',
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1' });
@@ -71,6 +82,7 @@ const ATTENDU = {
     await ctx.route('**/rest/v1/**', async (route) => { const rq = route.request();
       if (rq.method() !== 'GET') { try { const b = JSON.parse(rq.postData() || 'null'); for (const x of [].concat(b || [])) if (x && x.id) ecrits.add(String(x.id)); } catch (_) {}
         return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' }).catch(() => {}); }
+      { const u = decodeURIComponent(rq.url()); if (/[?&]id=(eq|in)\.\(?vinted_suivi_/.test(u) && /data->items->>i\d/.test(u)) lecturesSuivi.push((u.match(/data->items->>i\d+/g) || []).length); }
       const estTxn = /harvest_%25_txn_%25&select=tx:meta-%3E%3Eid,cc:|harvest_%_txn_%&select=tx:meta->>id,cc:/.test(rq.url());
       const deTxn = estTxn ? +((rq.headers().range || '0-').split('-')[0] || 0) : -1;
       if (estTxn) pagesTxn.push(['dem', deTxn, Date.now()]);
@@ -103,6 +115,9 @@ const ATTENDU = {
       for (const [nom, parInstance] of Object.entries(C)) for (const [inst, n] of Object.entries(parInstance || {})) {
         if ((INTERDIT[inst] || []).includes(nom) && n > 0) fautes.push(`${o} : « ${nom} » calculé ${n} fois par l'instance « ${inst} », qui ne le lit pas`);
       }
+      for (const [nom, max] of Object.entries(PLAFOND[o] || {})) for (const [inst, n] of Object.entries(C[nom] || {})) {
+        if (n > max) fautes.push(`${o} : « ${nom} » refait ${n} fois par « ${inst} » (au plus ${max} : une fois par version des données)`);
+      }
       for (const [nom, insts] of Object.entries(ATTENDU[o] || {})) for (const inst of insts) {
         if (!((C[nom] || {})[inst] > 0)) fautes.push(`${o} : « ${nom} » n'est plus calculé par « ${inst} », qui le lit (compteur absent ou nul)`);
       }
@@ -124,6 +139,13 @@ const ATTENDU = {
       console.log(`  pages de la liste des transactions : ${pagesTxn.filter((x) => x[0] === 'dem').map((x) => x[1]).join(' · ')}${dem2 && ren1 ? ` · 3e demandée ${dem2[2] - ren1[2]} ms après la 2e rendue` : ''}`);
       if (!dem2 || !ren1) fautes.push('la liste des transactions n\'a pas trois pages au banc : rien à juger sur les pages');
       else if (dem2[2] >= ren1[2]) fautes.push(`les pages de \`lireTout\` partent l'une après l'autre (3e demandée ${dem2[2] - ren1[2]} ms après la 2e rendue)`); }
+    // (24 nov.) LES RELEVÉS « PLUS VUE » (`vinted_suivi_{compte}`, src/plusVueLecture.js) : plusieurs comptes par lecture,
+    // 60 annonces au plus — avant, une lecture par compte (7 au banc), l'une après l'autre.
+    { const nAnn = lecturesSuivi.reduce((a, x) => a + x, 0), mini = Math.ceil(nAnn / 60);
+      console.log(`  relevés « plus vue » : ${lecturesSuivi.length} lecture(s) pour ${nAnn} annonces (${mini} au moins)`);
+      if (!lecturesSuivi.length) fautes.push('aucun relevé « plus vue » lu au banc : rien à juger');
+      else if (lecturesSuivi.length > mini) fautes.push(`relevés « plus vue » : ${lecturesSuivi.length} lectures pour ${nAnn} annonces (${mini} suffisent : plusieurs comptes par lecture)`);
+      if (lecturesSuivi.some((x) => x > 60)) fautes.push('une lecture de relevés porte plus de 60 annonces'); }
     if (lecturesExtras.length > 1) fautes.push(`la liste des transactions projetée est lue ${lecturesExtras.length} fois (une seule attendue)`);
     // `widget_stats` est écrit dans la base par la coque (src/App.jsx), pas rangé sur l'appareil.
     console.log(`  publication widget_stats : ${ecrits.has('widget_stats') ? 'écrite' : 'ABSENTE'}`);

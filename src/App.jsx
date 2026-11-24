@@ -29007,11 +29007,14 @@ function ventesParCompteDe(lignes, uids) {
 const lirePreuvesVenteVinted = async (opts = {}) => {
   try {
     // (20 nov., lectures-legeres) `lireTxnPreuves` : la famille gardée des transactions, sous les noms d'ici.
-    const rows = await lireTxnPreuves(opts);
-    if (rows === null) return null;
     // Les bordereaux (une ligne par vente, tous comptes, `_latest` écarté par
     // la règle) : deux scalaires de `meta`, jamais le PDF (§4.4).
-    const bords = await lireTout('id=like.harvest_%25_label_%25&select=id,tx:meta->>tx,it:meta->>item', { strict: true });
+    // (24 nov., vitesse-lectures-toucher) LES DEUX LECTURES PARTENT ENSEMBLE : les bordereaux ne dépendent pas des
+    // transactions. Mesuré à la 1re visite d'Annonces (banc vitesse-iphone, LECTURES=1) : ils partaient après les trois pages
+    // des transactions (+1,6 → +2,9 s), et les ventes à juger encore après (+3,8 s). Mêmes lectures, même règle : l'une
+    // « pas su » ⇒ « pas su ».
+    const [rows, bords] = await Promise.all([lireTxnPreuves(opts), lireTout('id=like.harvest_%25_label_%25&select=id,tx:meta->>tx,it:meta->>item', { strict: true }).catch(() => null)]);
+    if (rows === null) return null;
     if (bords === null) return null;
     const comptes = Array.isArray(opts.comptes) ? [...new Set(opts.comptes.map(String).filter((u) => /^\d+$/.test(u)))] : null;
     const ordres = (uids) => lireTout(`id=in.(${uids.map((u) => `harvest_${u}_orders_sold`).join(',')})&select=id,v:data->payload->my_orders`, { strict: true });
