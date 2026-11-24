@@ -166,6 +166,10 @@
 [data-style]:not([data-style=""]) .n-segmente { background: var(--g-champ-fond); box-shadow: var(--g-champ-ombre); border-radius: var(--g-r-bouton); height: 40px; }
 [data-style]:not([data-style=""]) .n-segmente-curseur { border-radius: calc(var(--g-r-bouton) - 3px); background: var(--n-curseur); box-shadow: 0 1px 2px rgb(0 0 0 / .12), 0 2px 6px -2px rgb(0 0 0 / .12); }
 [data-style]:not([data-style=""]) .n-segmente-choix[aria-checked="true"] { font-weight: 600; }
+/* chaque choix est une cible de 44 (« 7 j · 30 j · Mois » de Ma journée en faisait 43) ; dans la carte du haut de Ma journée,
+   le choix posé sur le curseur du style se lit à l'encre de la carte (il prenait la couleur de la carte : 1,1:1 la nuit) */
+[data-style]:not([data-style=""]) .n-segmente-choix { min-width: var(--n-cible); }
+[data-style]:not([data-style=""]) .n-heros-action .n-segmente-choix[aria-checked="true"] { color: var(--n-sur-heros); }
 
 /* ── les rangées : l'appui se VOIT (le retour « comme un toucher ») ── */
 [data-style]:not([data-style=""]) .n-rangee-corps { transition: transform var(--n-duree-appui) ease-out; }
@@ -195,6 +199,10 @@
 
 /* ── l'icône d'une carte d'alerte d'avant (« N nouveaux N° à écrire ») était ambre (`--vrm-warn`) : l'ardoise du style ── */
 :root[data-style]:not([data-style=""]) .vrm-alerte-icone { color: var(--n-accent); background: var(--g-puce-fond, var(--g-second-fond)); }
+
+/* ── le point de la ligne de fraîcheur « un geste à faire » était ambre la nuit (`--vrm-warn`) : l'ardoise du style (hors
+   couche : la feuille d'avant n'est pas en couche) ── */
+:root[data-style]:not([data-style=""]) .vrm-fraicheur-point[data-ton="geste"] { background: var(--n-accent); }
 
 /* ── LES TUILES D'APERÇU (Paramètres → Apparence → Style) : une rangée et un bouton, dessinés par les jetons du style ── */
 .g-styles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 4px 0; }

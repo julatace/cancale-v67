@@ -31,7 +31,7 @@ fs.mkdirSync(SHOTS, { recursive: true });
 const STYLES = (process.env.STYLES || G.ORDRE.join(',')).split(',');
 const THEMES = (process.env.THEMES || 'clair,sombre').split(',');
 const LARGEURS = (process.env.LARGEURS || '390').split(',').map(Number);
-const ECRANS = (process.env.ECRANS || 'ventes,annonces,fiche').split(',');
+const ECRANS = (process.env.ECRANS || 'journee,ventes,annonces,fiche').split(',');
 const MUT = process.env.MUTATION || '';
 const PRINCIPAUX = new Set(['ventes', 'annonces', 'fiche']);
 let ok = 0, ko = 0;
