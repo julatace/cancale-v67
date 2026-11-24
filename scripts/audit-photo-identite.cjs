@@ -241,7 +241,7 @@ let ID_C1 = null;
     // ── S1 : l'app ──
     { const APP = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
       const ch = /async function chargerMemePhoto[\s\S]*?\n}\n/.exec(APP);
-      dit(!!ch && /identitesParCode\(\{[\s\S]*liensLbc: load\('vrm_lbc_liens', \{\}\) \|\| \{\}/.test(ch[0]) && /poserIdentitesPhoto\(/.test(ch[0]) && /autres: autresVus/.test(ch[0]) && !/\bsave\(|ecrireCopieLocale\(|method: 'POST'/.test(ch[0].replace(/empreintesEbayPage[^\n]*/g, '')),
+      dit(!!ch && /identitesParCode\(\{[\s\S]*liensLbc: liensLbcPoses\(\)/.test(ch[0]) && /function liensLbcPoses\(\) \{ return load\('vrm_lbc_liens', \{\}\) \|\| \{\}; \}/.test(APP) && /poserIdentitesPhoto\(/.test(ch[0]) && /autres: autresVus/.test(ch[0]) && !/\bsave\(|ecrireCopieLocale\(|method: 'POST'/.test(ch[0].replace(/empreintesEbayPage[^\n]*/g, '')),
         'S1 · l’identité est calculée depuis SES liens posés, publiée, montrée à « Relier mes annonces », et jamais écrite (aucun save, copie locale ni POST dans le calcul)');
       const tout = [APP, ...fs.readdirSync(path.join(RACINE, 'src', 'ecrans')).filter((f) => /\.jsx?$/.test(f)).map((f) => fs.readFileSync(path.join(RACINE, 'src', 'ecrans', f), 'utf8'))].join('\n');
       dit(!/(save|ecrireCopieLocale|vcPoser)\([^)\n]*liensLbcLus\(\)/.test(tout) && !/(save|ecrireCopieLocale)\([^)\n]*avecPhotoLbc/.test(tout), 'S1 · les liens LUS (avec la photo) ne sont jamais réécrits');
@@ -252,7 +252,7 @@ let ID_C1 = null;
       dit(lecteurs >= 25 && anti.every((x) => tout.includes(x)), `S1 · les lecteurs d’identité lisent les liens AVEC la photo (${lecteurs} lectures : à retirer, ventes croisées, N° des sites, bénéfice)`, anti.filter((x) => !tout.includes(x)).join(' | '));
       // Chaque lecture des liens POSÉS seuls doit être d'une sorte permise : les N° déjà pris (un N° reconnu par la photo est
       // déjà celui d'une fiche Vinted), la définition, le calcul lui-même, ses gestes (écrire part de ses liens posés).
-      const PERMIS = [/\.forEach\(add\)/, /out\.push\(n\)/, /portes\.add\(cleNum\(n\)\)/, /est déjà relié sur Leboncoin/, /function liensLbcAvecPhoto|function liensLbcLus/, /liensLbc: load\('vrm_lbc_liens', \{\}\) \|\| \{\}, refus/,
+      const PERMIS = [/\.forEach\(add\)/, /out\.push\(n\)/, /portes\.add\(cleNum\(n\)\)/, /est déjà relié sur Leboncoin/, /function liensLbcAvecPhoto|function liensLbcPoses/,
         /sans = load\('vrm_lbc_pas_de_paire'/, /\[String\(id\)\]: String\(n\)/, /const avant = \(load\('vrm_lbc_liens'/, /ecrireCopieLocale\('vrm_lbc_liens'/, /avecPhotoLbc\(\{ \.\.\.\(main\.vrm_lbc_liens/];
       const brutes = tout.split('\n').filter((l) => /load\(['"]vrm_lbc_liens['"], *\{\}\)/.test(l) && !/^\s*\/\//.test(l));
       const horsRegle = brutes.filter((l) => !PERMIS.some((re) => re.test(l)));

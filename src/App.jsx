@@ -24590,7 +24590,9 @@ const lireOriginesPhotos = async () => {
 function identPhotoDuCompte() { const i = lireIdentitesPhoto(); return i && i.owner && i.owner === AUTH.user?.id ? i : null; }
 // LES LIENS LUS : ses liens (posés, défaits) d'abord, puis la photo d'origine. Pour LIRE une identité seulement —
 // une écriture part toujours de `load('vrm_lbc_liens')` (jamais la photo recopiée en base).
-function liensLbcLus() { return liensLbcAvecPhoto(load('vrm_lbc_liens', {}) || {}, identPhotoDuCompte()); }
+// Ses liens POSÉS seuls (une clé présente, même vide, est SA décision) : ce que la règle du code relit, jamais réécrit d'ici.
+function liensLbcPoses() { return load('vrm_lbc_liens', {}) || {}; }
+function liensLbcLus() { return liensLbcAvecPhoto(liensLbcPoses(), identPhotoDuCompte()); }
 function avecPhotoLbc(m) { return liensLbcAvecPhoto(m, identPhotoDuCompte()); }
 const lireEmpreintesSites = async () => {
   try {
@@ -24781,7 +24783,7 @@ async function chargerMemePhoto(force = false, { sansEbay = false } = {}) {
     const fichesN = {};
     for (const [id, f] of Object.entries(load('vinted_annonce_numeros', {}) || {})) if (f && f.numero != null && String(f.numero).trim()) fichesN[id] = String(f.numero);
     const ident = identitesParCode({ vinted: origines ? origines.vinted : null, lbcImages: origines ? origines.lbc : null, fiches: fichesN, autres: ext.autres,
-      liensLbc: load('vrm_lbc_liens', {}) || {}, refus: load(CLE_REFUS_MEME_PHOTO, {}) || {}, numerosDouteux: douteux, cleRefus: (pf, id, n) => cleRefusMemePhoto(pf, id, n, cleNum), cle: cleNum });
+      liensLbc: liensLbcPoses(), refus: load(CLE_REFUS_MEME_PHOTO, {}) || {}, numerosDouteux: douteux, cleRefus: (pf, id, n) => cleRefusMemePhoto(pf, id, n, cleNum), cle: cleNum });
     poserIdentitesPhoto(ident.lu ? { ...ident, owner } : null);
     const autresVus = autresAvecIdentites(ext.autres, ident);
     const res0 = propositionsMemePhoto({ vinted, autres: ext.autres, empreintes, refus: load(CLE_REFUS_MEME_PHOTO, {}) || {}, numerosDouteux: douteux, cle: cleNum, verifs });
