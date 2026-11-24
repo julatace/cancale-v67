@@ -151,6 +151,7 @@
     if (!trouves.length) return;
     send({ action: 'trouveJournal', etape: 'depot', trouves: trouves.slice(0, 12), verPage: TT() ? TT().versionPage() : '' });
   }
+  try { window.__vrmEbayTest = { champAdapte, champsARemplir, rendreJournalEbay }; } catch (_) {}   // les bancs seulement (monde isolé : la page ne le voit pas)
   function remplirChamp(nom, motifs, val) {
     const el = champAdapte(nom, motifs);
     const ok = setField(el, val);
