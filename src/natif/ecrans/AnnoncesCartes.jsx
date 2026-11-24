@@ -103,6 +103,7 @@ export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, e
         {plusVue != null && !bandeau ? <span className="n-ad-conseil" data-ad-conseil="plusvue" data-ad-plusvue={String(plusVue)}><span className="n-ad-point" aria-hidden="true"/>{tr('af.pv.etiquette', { n: plusVue })}</span> : null}
         {dort != null && plusVue == null && !bandeau ? <span className="n-ad-conseil" data-ad-conseil="dort"><span className="n-ad-point" aria-hidden="true"/>{tr('egalite.d.conseil.dort', { n: dort })}</span> : null}
         {selection ? <span className="n-ad-coche" data-ad-coche={selection.cochee ? '1' : '0'} aria-hidden="true">{selection.cochee ? <Glyphe nom="check" taille={18}/> : null}</span> : <AvatarsComptes comptes={comptes}/>}
+        {!selection && comptes.length ? <span className="n-inv-statut" data-inv-statut={a.etat} role="img" aria-label={statutMot} title={statutMot}/> : null}
         {!trace && (a.favoris != null || a.vues != null) ? <span className="n-inv-stats">
           {a.favoris != null ? <span className="n-inv-stat" data-ad-stat="favoris" aria-label={tr('egalite.favoris', { n: a.favoris })}>{ic('heart')}<span aria-hidden="true">{a.favoris}</span></span> : null}
           {a.vues != null ? <span className="n-inv-stat" data-ad-stat="vues" aria-label={tr('egalite.vues', { n: a.vues })}>{ic('eye')}<span aria-hidden="true">{a.vues}</span></span> : null}
@@ -114,7 +115,6 @@ export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, e
         <span className="n-ad-ligne">
           {a.sites.map((x) => <LogoSite key={x} site={x} taille={16} nom={nomSite(x)}/>)}
           <span className="n-ad-prix" data-ad-prix={a.prix != null ? '1' : '0'}>{a.prix != null ? euros(a.prix) : '—'}</span>
-          <span className="n-inv-statut" data-inv-statut={a.etat} role="img" aria-label={statutMot} title={statutMot}/>
           <span className="n-ad-espace"/>
           {onGestes && !selection ? <BoutonPlus a={a} onGestes={onGestes} className="n-ad-plus"/> : null}
         </span>

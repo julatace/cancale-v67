@@ -39,9 +39,10 @@
   .n-inv-avatar-petit { width: 20px; height: 20px; font-size: 10px; }
 
   /* Vues et favoris : deux pastilles « verre » en bas à droite, le nombre à côté de l'icône. */
-  .n-inv-stats { position: absolute; right: 8px; bottom: 10px; z-index: 3; display: inline-flex; gap: 4px; }
+  /* (empilées : l'étiquette du N° garde toute la largeur du bas, même sur une tuile de 170 px) */
+  .n-inv-stats { position: absolute; right: 8px; bottom: 10px; z-index: 3; display: inline-flex; flex-direction: column; align-items: flex-end; gap: 4px; }
   .n-inv-stat { display: inline-flex; align-items: center; gap: 3px; height: 22px; padding: 0 7px 0 6px; border-radius: 11px; font: 600 12px/1 var(--n-police); font-variant-numeric: tabular-nums;
-    color: #1D1D1F; background: rgb(255 255 255 / .9); box-shadow: 0 1px 3px rgb(0 0 0 / .16); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+    color: #1D1D1F; background: rgb(255 255 255 / .92); box-shadow: 0 1px 3px rgb(0 0 0 / .16); }
   .n-inv-stat svg { flex: none; color: #3D4B5B; }
   :root[data-theme="dark"] .n-inv-stat { color: #F4F4F5; background: rgb(28 28 30 / .82); }
   :root[data-theme="dark"] .n-inv-stat svg { color: #C9D2DE; }
@@ -60,11 +61,14 @@
   .n-ad-carte.n-inv .n-ad-trace { font: 400 12px/16px var(--n-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .n-ad-carte.n-inv .n-ad-ligne { margin-top: 2px; gap: 6px; height: var(--n-cible); justify-content: flex-start; }
   .n-ad-carte.n-inv .n-ad-ligne > .n-logo-site, .n-ad-carte.n-inv .n-ad-ligne > [data-logo] { flex: none; }
-  .n-ad-carte.n-inv .n-ad-prix { font: 700 16px/20px var(--n-police); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-  .n-ad-carte.n-inv .n-ad-plus { margin: 0 -10px 0 0; }
-  .n-inv-statut { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--n-encre-3); }
+  .n-ad-carte.n-inv .n-ad-prix { font: 700 15px/20px var(--n-police); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .n-ad-carte.n-inv .n-ad-plus { margin: 0 -8px 0 0; }
+  /* L'état en « présence » sur le rond du compte (vert : en ligne ; anneau : à confirmer ; gris : masquée, en pause). */
+  .n-inv-avatars { padding-bottom: 0; }
+  .n-inv-photo .n-inv-statut { position: absolute; top: 26px; right: 6px; z-index: 4; box-shadow: 0 0 0 2px var(--n-carte); }
+  .n-inv-statut { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--n-encre-3); }
   .n-inv-statut[data-inv-statut="enligne"] { background: var(--n-vert); }
-  .n-inv-statut[data-inv-statut="aconfirmer"] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--n-encre-2); }
+  .n-inv-statut[data-inv-statut="aconfirmer"] { background: var(--n-carte); box-shadow: inset 0 0 0 2px var(--n-encre-2), 0 0 0 2px var(--n-carte); }
 
   /* Appui : la carte s'enfonce à peine (feedback < 100 ms, 120 ms ease-out). */
   @media (prefers-reduced-motion: no-preference) {

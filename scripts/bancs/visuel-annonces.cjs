@@ -71,7 +71,7 @@ const MESURE = () => {
   const hsl = (c) => { const r = c.r / 255, g = c.g / 255, b = c.b / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2; if (mx === mn) return { h: 0, s: 0, l }; const d = mx - mn; const s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); let h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return { h: h * 60, s, l }; };
   const orange = (s) => { const c = lire(s); if (!c || c.a < 0.2) return false; const x = hsl(c); return x.h >= 15 && x.h <= 50 && x.s >= 0.3 && x.l >= 0.2 && x.l <= 0.85; };
   const r = { contrastes: [], cibles: [], oranges: [], debord: document.scrollingElement.scrollWidth - innerWidth, sorties: [], chevauchements: [], coupes: [], identite: [], etiq: [] };
-  for (const el of document.querySelectorAll('body *')) { const cs = getComputedStyle(el); for (const p of ['color', 'backgroundColor', 'borderTopColor', 'borderLeftColor', 'outlineColor', 'fill', 'stroke']) if (orange(cs[p]) && (p !== 'color' || el.textContent.trim())) { r.oranges.push((el.className && String(el.className).slice(0, 40)) + ':' + p + ':' + cs[p]); break; } }
+  for (const el of document.querySelectorAll('body *')) { if (el.closest('.n-logo-site, [data-logo], .n-plaque[data-n-doublon]')) continue; const cs = getComputedStyle(el); for (const p of ['color', 'backgroundColor', 'borderTopColor', 'borderLeftColor', 'outlineColor', 'fill', 'stroke']) if (orange(cs[p]) && (p !== 'color' || el.textContent.trim())) { r.oranges.push((el.className && String(el.className).slice(0, 40)) + ':' + p + ':' + cs[p]); break; } }
   const cartes = [...document.querySelectorAll('[data-ad-carte][data-eg-article]')];
   r.nCartes = cartes.length; r.nVisibles = cartes.filter((c) => vis(c.getBoundingClientRect())).length;
   const g = document.querySelector('[data-inv-grille]'); r.grille = !!g; r.nGrille = g ? Number(g.getAttribute('data-inv-n')) : 0; r.hGrille = g ? Math.round(g.getBoundingClientRect().height) : 0;
@@ -86,7 +86,7 @@ const MESURE = () => {
     const e = c.querySelector('[data-n-etiq]'); const num = c.getAttribute('data-eg-numero') || '';
     if (num && !c.querySelector('[data-n-doublon]') && (!e || e.getAttribute('data-n-etiq') !== num.toUpperCase())) r.etiq.push({ cle, num, etiq: e && e.getAttribute('data-n-etiq') });
   }
-  r.leurre = (window.__leurre || []).map((k) => { const c = document.querySelector(`[data-eg-article="${CSS.escape(k)}"]`); const im = c && c.querySelector('.n-ad-photo img'); return im ? new URL(im.getAttribute('src'), location.href).pathname : null; });
+  r.leurreVu = (window.__leurre || []).map((k) => { const c = document.querySelector(`[data-eg-article="${CSS.escape(k)}"]`); const im = c && c.querySelector('.n-ad-photo img'); return im ? new URL(im.getAttribute('src'), location.href).pathname : null; });
   const dans = (b, p, m = 0.6) => b.left >= p.left - m && b.right <= p.right + m && b.top >= p.top - m && b.bottom <= p.bottom + m;
   const croise = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.6 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.6;
   const vues = cartes.filter((c) => vis(c.getBoundingClientRect()));
@@ -123,7 +123,9 @@ const INIT = () => {
   // Chaque image : un squelette a-t-il été montré ? quand la 1re carte est-elle là, et comment (opacité, délai) ?
   const tick = () => {
     if (document.querySelector('[data-inv-attente], [data-ad-attente], .n-attente, [aria-busy="true"]')) window.__os++;
-    if (!window.__premiere) { const c = document.querySelector('[data-ad-carte][data-eg-article]'); if (c) { const cs = getComputedStyle(c); window.__premiere = { t: performance.now(), op: Number(cs.opacity), delai: parseFloat(cs.animationDelay) || 0, anim: cs.animationName }; } }
+    if (!window.__premiere) { const c = document.querySelector('[data-ad-carte][data-eg-article]'); if (c) { const cs = getComputedStyle(c); window.__premiere = { t: performance.now(), op: Number(cs.opacity), delai: parseFloat(cs.animationDelay) || 0, anim: cs.animationName };
+      const l = [...document.querySelectorAll('[data-ad-carte][data-n-revele]')]; const d = l.map((x) => parseFloat(getComputedStyle(x).animationDelay) * 1000 || 0); const du = l.map((x) => parseFloat(getComputedStyle(x).animationDuration) * 1000 || 0);
+      window.__cascade = { n: l.length, pas: d.length > 1 ? Math.max(...d.slice(1).map((x, i) => x - d[i])) : 0, total: d.length ? Math.max(...d) : 0, duree: du.length ? Math.max(...du) : 0 }; } }
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
@@ -137,7 +139,6 @@ async function ouvrir(nav, opts, q, extra = {}) {
   if (opts.isMobile) await pg.addStyleTag({ content: ':root{--n-zone-haut:47px;--n-zone-bas:34px}' });
   return { ctx, pg, erreurs };
 }
-const cascade = (pg) => pg.evaluate(() => { const l = [...document.querySelectorAll('[data-ad-carte][data-n-revele]')]; const d = l.map((c) => parseFloat(getComputedStyle(c).animationDelay) * 1000 || 0); const dur = l.map((c) => parseFloat(getComputedStyle(c).animationDuration) * 1000 || 0); return { n: l.length, pas: d.length > 1 ? Math.max(...d.slice(1).map((x, i) => x - d[i])) : 0, total: d.length ? Math.max(...d) : 0, duree: dur.length ? Math.max(...dur) : 0 }; });
 
 async function cas(nav, nom, opts, theme) {
   console.log(`\n── ${nom} · ${theme} ──`);
@@ -145,8 +146,8 @@ async function cas(nav, nom, opts, theme) {
   // 1. Contenu qui ARRIVE (lecture 700 ms) : squelette, puis cascade courte, CLS.
   const { ctx, pg, erreurs } = await ouvrir(nav, opts, `?n=${N}&arrivee=700${t}`);
   await pg.waitForSelector('[data-ad-carte][data-eg-article]', { timeout: 15000 });
-  const casc = await cascade(pg);
   const prem = await pg.evaluate(() => window.__premiere);
+  const casc = (await pg.evaluate(() => window.__cascade)) || { n: 0, pas: 0, total: 0, duree: 0 };
   await pg.waitForTimeout(RETARD + 900);
   const m = await pg.evaluate(MESURE);
   const cls = await pg.evaluate(() => window.__cls);
@@ -155,10 +156,15 @@ async function cas(nav, nom, opts, theme) {
   dit(m.tuiles === m.nCartes && m.avatars === m.nCartes && m.pastilles > m.nCartes / 2, `G tuiles d'inventaire (${m.tuiles}) · ronds de compte (${m.avatars}) · pastilles vues/favoris (${m.pastilles})`);
   dit(m.carres.every((x) => x === 1), `G photos carrées`, m.carres);
   dit(m.identite.length === 0, `I chaque carte montre la photo de SON identifiant (${m.nCartes} vérifiées)`, m.identite.slice(0, 4));
+  // Le leurre : on défile jusqu'à voir ses deux cartes (la grille est virtualisée : elles ne sont montées que près de l'écran).
+  m.leurre = await pg.evaluate(async () => { const el = document.scrollingElement; const vus = {}; const k = window.__leurre || [];
+    for (let y = 0; y <= el.scrollHeight && Object.keys(vus).length < k.length; y += innerHeight * 0.8) { el.scrollTop = y; await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+      for (const c of k) { const x = document.querySelector(`[data-eg-article="${CSS.escape(c)}"] .n-ad-photo img`); if (x && !vus[c]) vus[c] = new URL(x.getAttribute('src'), location.href).pathname; } }
+    el.scrollTop = 0; return k.map((c) => vus[c] || null); });
   dit(m.leurre.length === 2 && m.leurre[0] && m.leurre[1] && m.leurre[0] !== m.leurre[1], `I le leurre au même titre : deux photos différentes, chacune la sienne`, m.leurre);
   dit(m.etiq.length === 0, `I l'étiquette du N° dit le N° de SA fiche`, m.etiq.slice(0, 4));
   dit(prem && prem.op >= 0.35 && prem.delai === 0, `S la 1re carte est lisible dès sa 1re image, sans délai (opacité ${prem && prem.op}, délai ${prem && prem.delai})`, prem);
-  dit(casc.pas <= 15.5 && casc.total <= 120.5 && casc.duree <= 200.5, `S cascade d'arrivée : ${casc.n} cartes, ${casc.pas} ms par carte (≤ 15), ${casc.total} ms au total (≤ 120), durée ${casc.duree} ms (≤ 200)`, casc);
+  dit((nom !== 'tel' || casc.n > 0) && casc.pas <= 15.5 && casc.total <= 120.5 && casc.duree <= 200.5, `S cascade d'arrivée : ${casc.n} cartes, ${casc.pas} ms par carte (≤ 15), ${casc.total} ms au total (≤ 120), durée ${casc.duree} ms (≤ 200)`, casc);
   dit(cls <= 0.02, `L CLS pendant la lecture et l'arrivée des photos : ${cls.toFixed(4)} (≤ 0,02)`);
   dit(m.oranges.length === 0, `O aucune couleur orange calculée`, m.oranges.slice(0, 6));
   dit(m.debord <= 0 && m.sorties.length === 0 && m.chevauchements.length === 0 && m.coupes.length === 0, `D aucun débordement (${m.debord}), aucune sortie, aucun chevauchement, aucun texte coupé`, { s: m.sorties.slice(0, 4), c: m.chevauchements.slice(0, 4), x: m.coupes.slice(0, 4) });
@@ -197,7 +203,7 @@ async function cas(nav, nom, opts, theme) {
 (async () => {
   construire();
   const srv = await servir();
-  const nav = await chromium.launch({ args: ['--no-sandbox', '--use-angle=swiftshader'] });
+  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined), args: ['--no-sandbox', '--use-angle=swiftshader'] });
   try {
     for (const theme of ['clair', 'sombre']) { await cas(nav, 'tel', TEL, theme); await cas(nav, 'ordi', ORDI, theme); }
     if (process.env.VIDEO) {

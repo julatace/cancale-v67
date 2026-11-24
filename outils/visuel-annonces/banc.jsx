@@ -33,7 +33,7 @@ const item = (i, extra = {}) => ({ id: String(10000 + i), title: MOD[i % MOD.len
   condition: 'Très bon état', brand: MARQ[i % MARQ.length], createdTs: NOW - ((i * 5) % 50) * J, favourites: i % 4 === 3 ? undefined : (i * 3) % 41, views: (i * 13) % 1400, url: '', ...extra });
 const lues = Array.from({ length: N }, (_, i) => item(i));
 // Le LEURRE : 10000 et 10001 portent le MÊME titre, chacune SA photo.
-lues[0].title = lues[1].title = 'Nike Air Max 90 blanc taille 42';
+lues[0].title = lues[1].title = 'Nike Air Max 90 blanc taille 42'; lues[0].createdTs = lues[1].createdTs = NOW - 60e3;   // en tête de liste
 const tiers = Math.floor(N / 3);
 const comptes = [
   { uid: '111', pseudo: 'atelier.nord', ok: true, lu: NOW - 18 * 60e3, enLigne: lues.slice(0, tiers - 3), aConfirmer: lues.slice(tiers - 3, tiers - 1), masquees: lues.slice(tiers - 1, tiers), brouillons: [] },
