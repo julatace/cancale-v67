@@ -60,7 +60,24 @@ l'ordinateur. **Le défaut ne change pas** : sans choix, aucun attribut, aucune 
 - Résultats : voir « État à la reprise ».
 
 ## État à la reprise
-(rempli en fin de lot)
+- PR #1380 (base `main`), **à fusionner APRÈS #1326 et #1355** (la branche part des deux). Pas fusionnée.
+- Banc `styles-choix`, build de la branche : **537 verts, 0 rouge** — 10 styles + « Actuel » × clair/sombre × 390 × Ventes,
+  Annonces, fiche, + les tuiles (11, à l'écran, « Nuit » appliqué sans recharger et rangé, « Actuel » revient, cibles ≥ 44).
+- Rouge prouvé : chaque mutation rougit sa règle (`sansstyle` A, `orange` D, `pale` B, `petit` C, `appui` F, `vieux` E,
+  `deborde` G) ; sur le build d'avant (visuel-jeu, aucun style) : A, C, E, F rouges.
+- 1512 (Graphite) et Achats / Argent / Messages / Paramètres : voir « Reste » (la famille n'est une RÈGLE que sur les trois
+  écrans des captures ; ailleurs le banc RAPPORTE les boutons d'avant à rattacher).
+- Poids du démarrage : 1 541 Ko compressés (build d'avant : 1 530 Ko ; budget 2 008) — +11 Ko de CSS, aucun JavaScript par style.
+- Audits verts : styles-generer (--verifier, --prouve), traduction, style-vintex, rouge-doublon, quoi-de-neuf, apparence,
+  coque-tablette, ouverture, icones, poids-demarrage.
+- Planches de revue (hors dépôt, pour le coordinateur) : `planche-<style>.png` et `avant-apres-graphite.png` dans le
+  dossier scratchpad `graphite/` de la session.
+- ⚠️ Pièges rencontrés : (1) le pont `coque-native.css` (`all: revert-layer` avec un identifiant) efface toute règle HORS
+  couche sur un contrôle natif ⇒ la famille vit en couche `vrm-styles` ; (2) la police d'un `h1` est imposée par des
+  `!important` (couche `n-anciens`, et `html :where(h1)`) qui LISENT `--ap-police` / `--vrm-police` ⇒ on pose ces variables
+  sur le titre ; (3) `complements.css` met « Relier · + prix » en liens par des `!important` en couche ⇒ scopés au style
+  actuel par `:where(:root:not([data-style]))` (spécificité inchangée) ; (4) un plein noir (Encre, Studio, Papier) ne peut
+  pas foncer : il s'éclaircit enfoncé (règle du générateur, luminance < 0,02).
 
 ## Reste
 - Écrans plus anciens (Achats, Argent, Messages, Paramètres) : jetons et composants natifs suivent ; les boutons d'avant
