@@ -27,3 +27,8 @@
 .q4 .q4-photo-x::before { content: ''; position: absolute; z-index: -1; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 11px; background: rgba(29, 29, 31, .62); }
 .q4 .q4-retrait { margin: 4px 16px 12px; padding: 12px 14px; border-radius: var(--n-r-carte); background: var(--n-carte-2); border: 1px solid var(--n-bord); }
 .q4 .q4-question { margin: 0 0 10px; font-size: 17px; line-height: 22px; font-weight: 600; color: var(--n-encre); }
+/* Les champs : la règle globale des champs de l'app gagnait (hauteur, rayon) — même parade que .vrm-plus-champ. */
+:root:root:root body .q4 .q4-champ input, :root:root:root body .q4 .q4-champ textarea, :root:root:root body .q4 .q4-prix-ebay input {
+  min-height: 44px !important; padding: 10px 12px !important; border-radius: 10px !important; border: 1px solid var(--n-bord) !important;
+  background: var(--n-carte) !important; color: var(--n-encre) !important; font-size: 16px !important; line-height: 22px !important; box-sizing: border-box !important; }
+:root:root:root body .q4 .q4-prix-ebay input { width: 7em !important; }
