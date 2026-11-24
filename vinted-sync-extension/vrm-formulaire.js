@@ -664,7 +664,11 @@
       //     chemin de « Voir tout » : le fond ouvre la page complète et rappelle l'étape (`liste`) ;
       //   · sur la page complète, pas trouvée après l'avoir fait défiler     ⇒ `absent` : ce favori est SAUTÉ, la file continue.
       // Seule la ligne dont le lien porte CET article ET CETTE personne est cliquée — jamais une autre notification.
-      let l = lienFavoriVisible(lien, itemId, receiverId);
+      // 5.440.2 (`direct`) : le fond a OUVERT l'adresse native de CE favori dans l'onglet de travail (le lien de sa notification,
+      //    lu dans la liste de Vinted, article ET personne vérifiés) ; c'est la page de Vinted qui ouvre la conversation —
+      //    aucune ligne à chercher, aucun clic, aucun défilement (rien ne dépend du rendu d'un onglet en arrière-plan).
+      const direct = !!(d && d.direct === true);
+      let l = direct ? { el: null } : lienFavoriVisible(lien, itemId, receiverId);
       if (l.ambigu) return manque('favori-notification-ambigue');
       const trouver = async (ms, pendant) => {
         const fin = Date.now() + ms;
@@ -679,7 +683,7 @@
         }
       };
       const absent = (extra) => Object.assign(manque('favori-notification'), { absent: true }, extra || {});
-      if (!l.el && d && d.liste === true) {
+      if (direct) { /* l'adresse est déjà ouverte : la suite attend la conversation */ } else if (!l.el && d && d.liste === true) {
         // La page complète des notifications : lue (lecture seule) jusqu'à la ligne, en chargeant la SUITE autant qu'il faut.
         // ⚠️ 5.440.2 (Julien, 24 nov. : « Sauté · Favori trop ancien » pour des favoris de la veille) : avant, la lecture
         //    s'arrêtait dès que la page ne bougeait plus pendant ~1,4 s, en ne faisant défiler que la FENÊTRE — une liste qui
@@ -700,8 +704,12 @@
             if (Date.now() > tFin) { fin = 'temps'; return { absent: true }; }
             // Charger la suite : bas de la fenêtre et du bloc qui défile (un cran plus haut d'abord, pour que la page le voie), puis « Afficher plus ».
             const b = blocDefilant();
+            // ⚠️ Aucun événement fabriqué (`dispatchEvent` ⇒ isTrusted:false, une preuve d'automatisation, CLAUDE.md §3) : seules
+            //    les positions sont posées (fenêtre, bloc qui défile) ; c'est le NAVIGATEUR qui envoie son propre « scroll ».
+            //    Onglet de travail en arrière-plan : le navigateur peut ne rien envoyer (aucun rendu) ⇒ la suite ne vient pas,
+            //    le favori n'est PAS trouvé sur cette page : le fond ouvre alors son adresse native (`favoriLien`), sans défilement.
             try { const h = document.documentElement.scrollHeight; window.scrollTo(0, Math.max(0, h - window.innerHeight - 240)); window.scrollTo(0, h); } catch (_) {}
-            if (b) { try { b.scrollTop = Math.max(0, b.scrollHeight - b.clientHeight - 240); b.scrollTop = b.scrollHeight; b.dispatchEvent(new Event('scroll')); } catch (_) {} }
+            if (b) { try { b.scrollTop = Math.max(0, b.scrollHeight - b.clientHeight - 240); b.scrollTop = b.scrollHeight; } catch (_) {} }
             await nap(250);
             const p = boutonPlus(); if (p) { try { p.click(); } catch (_) {} }
             // La suite attendue 4 s au plus (relue toutes les 200 ms) : nouvelles lignes ou page plus haute.
@@ -755,8 +763,8 @@
       //    n° que la page a lu de Vinted (`__vrmConvCore`), jamais deviné.
       let rep = null, repVue = false;
       reponseDe('POST', /(?:\/api\/v2\/conversations|\/messaging\/main\/inquiries)\/?$/, 25000, d && d.cle).then((x) => { rep = x; repVue = true; });
-      const _cheminAvantClic = location.pathname;
-      clic(l.el);
+      const _cheminAvantClic = direct ? '' : location.pathname;
+      if (!direct) clic(l.el);
       // ⚠️ 24 nov. (simulation de bout en bout, vraie extension) : `conv` et `route` sont relus de l'adresse ACTUELLE à chaque
       //    tour, jamais gardés d'un tour d'avant. Avant : à partir du 2ᵉ favori, l'onglet de travail montrait la conversation
       //    PRÉCÉDENTE ; une fois l'adresse passée au nouvel uuid mais sa relecture pas encore reçue (`coeurDe` inconnu), `conv`
@@ -792,6 +800,8 @@
     async favoriListe(d) { return ETAPES.favoriOuvrir(Object.assign({}, d || {}, { liste: true })); },
     // 5.440 : la même étape depuis l'accueil de Vinted (l'en-tête complet), quand la messagerie ne montre pas la cloche.
     async favoriAccueil(d) { return ETAPES.favoriOuvrir(Object.assign({}, d || {}, { liste: false })); },
+    // 5.440.2 : l'adresse native du favori ouverte par le fond ⇒ la conversation que la page ouvre elle-même.
+    async favoriLien(d) { return ETAPES.favoriOuvrir(Object.assign({}, d || {}, { direct: true })); },
     async message(d) {
       const conv = String((d && d.conv) || ''), texte = String((d && d.texte) || '');
       if (!/^[1-9]\d{0,19}$/.test(conv) || !texte.trim()) return { ok: false, code: 'etape' };

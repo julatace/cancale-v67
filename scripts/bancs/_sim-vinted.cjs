@@ -192,8 +192,16 @@ textarea{width:420px;min-height:44px;display:block;margin:8px 0}.btn{height:44px
       if (r3.ok) { const p = document.createElement('p'); p.textContent = t; fil.appendChild(p); m.querySelector('textarea').value = ''; }
     };
   };
+  // L'adresse d'un favori ouverte directement (comme au clic de sa ligne) : la page ouvre la conversation elle-même
+  // (relevé passif du 23 nov. : /inbox/want_it puis POST …/inquiries 201).
+  const ouvrirFavori = async (u) => {
+    const iw = (u.pathname.match(/^\\/items\\/(\\d+)\\//) || [])[1];
+    const r = await api('/messaging/main/inquiries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: iw || u.searchParams.get('item_id'), receiver_id: u.searchParams.get('receiver_id') || u.searchParams.get('user_id') || u.searchParams.get('offering_id') }) });
+    if (!r.ok) return; const j = await r.json(); history.pushState({}, '', '/inbox/' + j.conversation_id); return route();
+  };
   const route = () => {
     captcha();
+    if (/want_it/.test(location.pathname)) return ouvrirFavori(new URL(location.href));
     const u = (location.pathname.match(/^\\/inbox\\/([0-9a-f-]{36})/) || [])[1];
     if (u) return rendreFil(u);
     if (/^\\/member\\/notifications/.test(location.pathname)) { m.innerHTML = '<h1>Notifications</h1><div id="tout"></div><div id="bas" style="height:40px"></div>'; return pageComplete(document.getElementById('tout')); }
@@ -223,11 +231,7 @@ textarea{width:420px;min-height:44px;display:block;margin:8px 0}.btn{height:44px
     const a = e.target.closest && e.target.closest('a'); if (!a || a.target) return;
     const u = new URL(a.href); if (u.origin !== location.origin) return;
     e.preventDefault(); pan.classList.remove('on'); cl.setAttribute('aria-expanded', 'false');
-    if (/want_it/.test(u.pathname)) {
-      const iw = (u.pathname.match(/^\\/items\\/(\\d+)\\//) || [])[1];
-      const r = await api('/messaging/main/inquiries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: iw || u.searchParams.get('item_id'), receiver_id: u.searchParams.get('receiver_id') || u.searchParams.get('user_id') || u.searchParams.get('offering_id') }) });
-      if (!r.ok) return; const j = await r.json(); history.pushState({}, '', '/inbox/' + j.conversation_id); return route();
-    }
+    if (/want_it/.test(u.pathname)) return ouvrirFavori(u);
     history.pushState({}, '', u.pathname + u.search); route();
   }, true);
   addEventListener('popstate', route); route();

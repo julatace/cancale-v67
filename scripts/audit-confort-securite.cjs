@@ -32,7 +32,7 @@ const { webcrypto } = require('crypto');
 const RACINE = path.join(__dirname, '..');
 
 const FICHIERS = ['api/_lib/qr-connexion.js', 'api/_lib/lien-aide.js', 'src/lienAideProjection.js', 'src/codeLocal.js', 'src/inventaireTournant.js',
-  'src/journeeSelonHeure.js', 'src/atelierEcran.js', 'src/dossierLitige.js', 'src/dateParis.js', 'src/apercuAnnonce.js', 'src/carteMerci.js'];
+  'src/journeeSelonHeure.js', 'src/atelierEcran.js', 'src/dossierLitige.js', 'src/lisibleParLaPage.js', 'src/dateParis.js', 'src/apercuAnnonce.js', 'src/carteMerci.js'];
 // [fichier, ancre, remplacement]
 const MUTATIONS = {
   'qr-sans-clic': ['api/_lib/qr-connexion.js', "if (!l) return { status: 200, body: { ok: true, etat: 'attente', exp: tk.exp } };", "if (!l) { const s0 = await auth.session('u-julien', 'j@exemple.test'); return { status: 200, body: { ok: true, etat: 'connecte', session: s0 } }; }"],
