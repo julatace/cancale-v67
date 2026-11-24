@@ -9,7 +9,7 @@ export default {
   "vis.journee.chiffres.t": "Your numbers",
   "vis.journee.chiffres.p": "Tap a number: VRM tells you where it comes from.",
   "vis.journee.loupe.t": "Everything about a No.",
-  "vis.journee.loupe.p": "Type a No.: the item, its sale, its parcel.",
+  "vis.journee.loupe.p": "Type a No.: the pair, its sale, its parcel.",
   "vis.journee.aide.t": "A question?",
   "vis.journee.aide.p": "Every screen’s “?”: video, steps and answers.",
   "vis.annonces.cherche.t": "Find a listing",

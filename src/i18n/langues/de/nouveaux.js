@@ -31,7 +31,7 @@ export default {
   "nouveaux.bilan.matin.geste.texte": "Eine Zeile pro Sache, und was zu tun ist.",
   "nouveaux.bilan.commencer": "Meinen Tag starten",
   "nouveaux.reglage.bilan.lib": "Meine Bilanz in einer Minute ansehen",
-  "nouveaux.reglage.bilan.desc": "Verkäufe des Jahres, Pakete, Artikel online.",
+  "nouveaux.reglage.bilan.desc": "Verkäufe des Jahres, Pakete, Paare online.",
   "nouveaux.reglage.colis.lib": "Erstes Paket nochmal ansehen",
   "nouveaux.reglage.colis.desc": "Drucken, kleben, abgeben, verfolgen.",
   "nouveaux.colis.surtitre": "Dein erstes Paket · {i} von {n}",

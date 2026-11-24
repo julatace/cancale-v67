@@ -9,7 +9,7 @@ export default {
   "vis.journee.chiffres.t": "Tus cifras",
   "vis.journee.chiffres.p": "Toca una cifra: VRM te dice de dónde viene.",
   "vis.journee.loupe.t": "Todo sobre un N.º",
-  "vis.journee.loupe.p": "Escribe un N.º: el artículo, su venta, su paquete.",
+  "vis.journee.loupe.p": "Escribe un N.º: el par, su venta, su paquete.",
   "vis.journee.aide.t": "¿Una pregunta?",
   "vis.journee.aide.p": "El «?» de cada pantalla: vídeo, gestos y respuestas.",
   "vis.annonces.cherche.t": "Encontrar un anuncio",

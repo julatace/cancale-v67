@@ -31,7 +31,7 @@ export default {
   "nouveaux.bilan.matin.geste.texte": "Una línea por cosa, y qué hacer.",
   "nouveaux.bilan.commencer": "Empezar mi día",
   "nouveaux.reglage.bilan.lib": "Volver a ver mi balance en un minuto",
-  "nouveaux.reglage.bilan.desc": "Ventas del año, paquetes, artículos publicados.",
+  "nouveaux.reglage.bilan.desc": "Ventas del año, paquetes, pares publicados.",
   "nouveaux.reglage.colis.lib": "Volver a ver el primer paquete",
   "nouveaux.reglage.colis.desc": "Imprimir, pegar, entregar, seguir.",
   "nouveaux.colis.surtitre": "Tu primer paquete · {i} de {n}",

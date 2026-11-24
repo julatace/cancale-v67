@@ -31,7 +31,7 @@ export default {
   "nouveaux.bilan.matin.geste.texte": "One line per thing, and what to do.",
   "nouveaux.bilan.commencer": "Start my day",
   "nouveaux.reglage.bilan.lib": "See my one-minute summary again",
-  "nouveaux.reglage.bilan.desc": "This year’s sales, parcels, items listed.",
+  "nouveaux.reglage.bilan.desc": "This year’s sales, parcels, pairs listed.",
   "nouveaux.reglage.colis.lib": "See the first parcel guide again",
   "nouveaux.reglage.colis.desc": "Print, stick, drop off, track.",
   "nouveaux.colis.surtitre": "Your first parcel · {i} of {n}",
