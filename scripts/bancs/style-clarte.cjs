@@ -6,7 +6,8 @@ require('./_porte-banc.cjs');
 //    C1 Aujourd'hui : la carte héros (bénéfice du mois) + le graphique (7 barres par défaut, 30 au choix) + le trio ;
 //    C2 aucune tuile n'écrit un LIEN comme valeur (« Ouvrir Ventes », « Compléter ») ;
 //    C3 au téléphone, les cartes d'Aujourd'hui sont à 16 px du bord (plus le cadre qui doublait la marge : 32 px) ;
-//    C4 l'accent est l'encre (décision du 22 nov.) : --n-accent rendu = rgb(22, 24, 29) (nuit : rgb(244, 244, 245)) ;
+//    C4 l'accent est l'ARDOISE (23 nov., Julien : « j'aime pas le noir, je veux du gris clair » — remplace l'encre du 22 nov.) :
+//       --n-accent rendu = rgb(61, 75, 91) (nuit : rgb(244, 244, 245)) ;
 //    C5 une seule ligne « extension » sur Aujourd'hui quand rien ne tourne (pas le groupe « En direct » + un autre message) ;
 //    C6 la feuille « Ton extension » : ≤ 520 px de large à l'ordinateur, les comptes en groupes (À relire / À jour / …),
 //       chaque rangée garde ses data-fraicheur-* ;
@@ -47,7 +48,7 @@ async function journee(nav, b, W, sombre) {
     dit(m.heros && m.barres === 7 && m.trio === 3, `C1 ${t} : la carte héros, 7 barres (fenêtre 7 j), le trio`, m);
     dit(!m.tuiles.some((x) => /^(Ouvrir Ventes|Compléter)$/i.test(x)), `C2 ${t} : aucune tuile n'écrit un lien comme valeur`, m.tuiles);
     if (W < 600) dit(m.cartes.length > 0 && m.cartes.every((x) => x >= 12 && x <= 20), `C3 ${t} : les cartes à 16 px du bord (pas 32)`, m.cartes);
-    dit(m.accRendu === (sombre ? 'rgb(244, 244, 245)' : 'rgb(22, 24, 29)'), `C4 ${t} : l'accent est l'encre`, m.accRendu);
+    dit(m.accRendu === (sombre ? 'rgb(244, 244, 245)' : 'rgb(61, 75, 91)'), `C4 ${t} : l'accent est l'ardoise (jamais noir)`, m.accRendu);
     dit(!m.enDirectTitre || !m.court, `C5 ${t} : « En direct » sans en-tête quand rien ne tourne (une ligne)`, m);
     // C5 bis (23 nov., style-clarte-3) « jamais une carte vide en tête » : sans action en cours, « En direct » n'est jamais une carte /
     // un groupe pleine largeur — rien (lecture, rien en cours) ou une PUCE de moins de 70 % de la largeur et de 48 px de haut au plus.
@@ -56,7 +57,8 @@ async function journee(nav, b, W, sombre) {
       return g.map((x) => { const r = x.getBoundingClientRect(); const code = x.getAttribute('data-direct'); const vis = x.getClientRects().length > 0;
         const enfant = x.querySelector('button, .n-rangee'); const re = enfant ? enfant.getBoundingClientRect() : r;
         return { code, vis, carte: x.matches('.n-groupe, .n-carte') || !!x.querySelector('.n-groupe-liste, .n-carte-corps'), w: Math.round(re.width), h: Math.round(re.height), lc: Math.round(lc) }; }); });
-    dit(dx.length >= 1 && dx.every((d) => ['action', 'verification', 'arret', 'pause', 'muette'].includes(d.code) || !d.vis || (!d.carte && d.w <= d.lc * 0.8 && d.h <= 48)), `C5 bis ${t} : « En direct » rien ou une puce (pas de carte pleine largeur)`, dx);
+    // (23 nov., Julien : « on n'a jamais d'extension sur iPhone ») Au téléphone, « En direct » n'est plus rendu sur Aujourd'hui : rien = conforme.
+    dit((W < 600 ? dx.length === 0 : dx.length >= 1) && dx.every((d) => ['action', 'verification', 'arret', 'pause', 'muette'].includes(d.code) || !d.vis || (!d.carte && d.w <= d.lc * 0.8 && d.h <= 48)), `C5 bis ${t} : « En direct » rien ou une puce (pas de carte pleine largeur)`, dx);
     dit(m.imprimer && m.disques.length >= 3 && m.disques.every(([w, h]) => w >= 44 && h >= 44), `C7 ${t} : Imprimer = le plein des disques ; chaque disque ≥ 44`, m.disques);
     dit(m.deborde <= 1, `C8 ${t} : rien ne déborde`, m.deborde);
     await pg.screenshot({ path: path.join(SHOTS, `journee-${W}-${sombre ? 'sombre' : 'clair'}.png`) });
@@ -81,13 +83,14 @@ async function journee(nav, b, W, sombre) {
       await pg.screenshot({ path: path.join(SHOTS, `relier-${W}.png`) });
       await pg.goto(pg.url().replace(/\?.*$/, '') + '?tab=journee').catch(() => {}); await pret(pg);
     }
-    // C14 (23 nov., style-clarte-4) Les N° neufs à écrire : une CARTE en ligne (sous les gestes, avant Colis), jamais un toast flottant ;
+    // C14 (23 nov., style-clarte-4) Les N° neufs à écrire : une CARTE en ligne, jamais un toast flottant ; à l'ordinateur sous les gestes
+    // avant Colis, au TÉLÉPHONE après Colis (23 nov., Julien : « premier écran = l'essentiel », Colis visible sans défiler) ;
     // un message court se range DANS le flux au-dessus de la barre (téléphone) : aucun chiffre ni bouton recouvert.
     {
       const nn = await pg.evaluate(() => { const c = document.querySelector('[data-numeros-a-ecrire-journee]'); const a = document.querySelector('.n-actions-rondes'); const k = document.querySelector('[data-n-colis-duo]');
         const y = (e) => (e ? Math.round(e.getBoundingClientRect().top) : null);
-        return { carte: !!c, n: c ? c.getAttribute('data-numeros-a-ecrire-journee') : null, ordre: c && a && k ? y(a) < y(c) && y(c) < y(k) : null, flotte: !!document.querySelector('[data-toast-numeros] .n-toast') }; });
-      dit(nn.carte && nn.ordre && !nn.flotte, `C14 ${t} : les N° neufs = une carte en ligne entre les gestes et Colis, aucun toast flottant`, nn);
+        return { carte: !!c, n: c ? c.getAttribute('data-numeros-a-ecrire-journee') : null, ordre: c && a && k ? (innerWidth < 600 ? y(a) < y(k) && y(k) < y(c) : y(a) < y(c) && y(c) < y(k)) : null, flotte: !!document.querySelector('[data-toast-numeros] .n-toast') }; });
+      dit(nn.carte && nn.ordre && !nn.flotte, `C14 ${t} : les N° neufs = une carte en ligne (ordinateur : entre les gestes et Colis ; téléphone : après Colis), aucun toast flottant`, nn);
       await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:toast', { detail: { texte: 'Banc : un message court pour vérifier sa place, assez long pour tenir deux lignes au téléphone.' } })));
       await pg.waitForSelector('.vrm-toast', { timeout: 4000 }).catch(() => {});
       await pg.waitForTimeout(400);

@@ -1553,7 +1553,9 @@ import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEc
 // (6 nov., vitesse 2) PrixPartout : à la demande (sa feuille de style est déjà plus haut).
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
 import EtatComptes from "./EtatComptes.jsx";   // (22 nov., style-clarte) la liste groupée des comptes (feuille d'état de l'extension)
-import { LogoSite as LogoSiteRang } from "./natif/LogoSite.jsx";   // (21 nov., prio-recherche) le logo du site sur chaque résultat de la recherche
+import { LogoSite as LogoSiteRang } from "./natif/LogoSite.jsx";
+import { PopEvenements } from "./natif/PopEvenements.jsx";
+import { GaleriePops } from "./natif/GaleriePops.jsx";   // (23 nov.) « Voir tous les pop-ups », propriétaire seulement   // (23 nov., Julien : « un beau pop-up ») la carte d'un événement qui arrive, app ouverte   // (21 nov., prio-recherche) le logo du site sur chaque résultat de la recherche
 import { viderNombresAnnonces } from "./plateformes/nombresAnnonces.js";   // (20 nov.) les nombres par site de `FiltreSites` (retiré) ne sont plus lus ici
 // (6 nov., vitesse 2) PublierAilleurs : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./styles-publier-ailleurs.css";
@@ -1674,7 +1676,9 @@ import "./design/verre-argent.css";   // (16 nov., lot argent-mieux) Argent lisi
 import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
 // ⟦→ ecrans/Comptabilite.jsx #109⟧
 // (21 nov., lot journee-stats) Statistiques · Pilotage et Finances (7 · 30 · 90 j) : le morceau et son modèle (src/aujourdhui/pilotage.js).
-const StatsPilotageV2 = aLaDemandeDiscret(() => import("./aujourdhui/StatsBranche.jsx"));   // l'écran + son modèle (src/aujourdhui/modele.js)
+const StatsPilotageV2 = aLaDemandeDiscret(() => import("./aujourdhui/StatsBranche.jsx"));
+// (23 nov.) Le Conseiller (src/conseiller/) : l'écran et ses règles, à la demande.
+const ConseillerV2 = aLaDemandeDiscret(() => import("./conseiller/Branche.jsx"));   // l'écran + son modèle (src/aujourdhui/modele.js)
 // (19 nov.) « À régler » : chaque chose à faire dans SON onglet — le bloc à la demande, la publication (pastilles) au démarrage.
 const ARegler = aLaDemandeDiscret(() => import("./designV2/ARegler.jsx"));
 import { useARegler } from "./designV2/useARegler.js";
@@ -15715,9 +15719,10 @@ function CarteNumerosAEcrire() {
   const court = nums.length > 6 ? `N° ${nums.slice(0, 6).join(', ')} +${nums.length - 6}` : listeNumeros(nums);
   return (
     <Natif.Carte titre={tr('nn.carte.titre', { n: items.length })} attrs={{ 'data-numeros-a-ecrire-journee': String(items.length) }}>
-      <Natif.Rangee icone={<Icon name="tag" size={22}/>} titre={ouvert ? listeNumeros(nums) : court} lignes={ouvert ? 6 : 2} sousTitre={tr('nn.carte.sous')}
+      <Natif.Rangee icone={<Icon name="tag" size={22}/>} titre={ouvert ? listeNumeros(nums) : court} lignes={ouvert ? 6 : 2}
         valeur={nums.length > 6 ? tr(ouvert ? 'nn.carte.masquer' : 'nn.carte.voir') : null} onClick={nums.length > 6 ? () => setOuvert(!ouvert) : null} attrs={{ 'data-numeros-voir': ouvert ? '1' : '0', 'aria-expanded': nums.length > 6 ? (ouvert ? 'true' : 'false') : undefined }}/>
-      <Natif.Rangee titre={tr('nn.stock.ecrit')} onClick={() => { save(CLE_A_ECRIRE, { v: 1, items: [] }); setD({ v: 1, items: [] }); }} attrs={{ 'data-numeros-ecrits': 'journee' }}/>
+      {/* (23 nov., « pas assez de beaux boutons ») « C'est écrit » : un vrai bouton (icône + verbe), plus de phrase d'instruction. */}
+      <Natif.Actions elements={[{ cle: 'ecrit', icone: <Icon name="check" size={18}/>, libelle: tr('nn.stock.ecrit'), onClick: () => { save(CLE_A_ECRIRE, { v: 1, items: [] }); setD({ v: 1, items: [] }); }, attrs: { 'data-numeros-ecrits': 'journee' } }]}/>
     </Natif.Carte>
   );
 }
@@ -16476,7 +16481,10 @@ const ICON_PATHS = {
   invite: <><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M18.5 8v6M15.5 11h6"/></>,
   // (15 nov.) « Nouveaux comptes » (le propriétaire) : un téléphone et la personne qui arrive.
   nouveauCompte: <><rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><circle cx="12" cy="10" r="2.4"/><path d="M8.6 16.4a3.6 3.6 0 0 1 6.8 0"/></>,
+  // (23 nov.) Le Conseiller : une ampoule et une étincelle (src/conseiller/).
+  conseiller: <><path d="M9.5 17.5h5"/><path d="M10.5 20.5h3"/><path d="M11 4a5.6 5.6 0 0 0-2.4 10c.6.5.9 1.1.9 1.8v.2h5v-.2c0-.7.3-1.3.9-1.8.4-.3.7-.7 1-1.1"/><path d="M18 3v4M16 5h4"/></>,
   ampoule: <><path d="M9.5 17.5h5"/><path d="M10.5 20.5h3"/><path d="M12 3.5a5.8 5.8 0 0 0-3.4 10.5c.6.5.9 1.1.9 1.8v.2h5v-.2c0-.7.3-1.3.9-1.8A5.8 5.8 0 0 0 12 3.5Z"/></>,
+  pile:   <><rect x="4" y="9" width="16" height="11" rx="3"/><path d="M6.5 6h11M9 3h6"/></>,   // (23 nov.) des cartes empilées : « Voir tous les pop-ups »
 };
 // Tuile d'icône façon réglages iOS : un carré arrondi teinté, une icône au
 // trait dedans. C'est ce détail qui sépare un écran de réglages d'une liste de
@@ -16935,6 +16943,7 @@ const BAR_GROUPE={
 function titreEcran(tab) {
   if (tab === 'journee') return tr('nav.journee');
   if (tab === 'semaine') return tr('ecran.semaine');
+  if (tab === 'conseiller') return tr('cons.ecran');
   if (tab === 'menu') return tr('menu.titre');
   const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
@@ -16956,7 +16965,7 @@ function titreEcran(tab) {
 // onglets : un ancien chemin vers elles (lien `?tab=`, `vrm:aller`, `setTab`) ouvre l'écran
 // qui les porte, sur la bonne vue — [onglet, vue demandée] (`setTab`).
 const VUES_DEPLACEES = { republier: ['cat_annonces', 'republier'], favoris: ['cat_msg', 'favoris'] };
-const ONGLETS_LIENS=['menu','extension','adistance',...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','colis','cat_msg','cat_expedition','garage','organisation','communaute','parrainage','emails','invoices','masques','automatisations','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+const ONGLETS_LIENS=['menu','extension','adistance',...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','conseiller','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','colis','cat_msg','cat_expedition','garage','organisation','communaute','parrainage','emails','invoices','masques','automatisations','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
@@ -18163,7 +18172,7 @@ function Toaster() {
   }, []);
   React.useEffect(() => { if (!list.length) { raisons.current.survol = false; raisons.current.focus = false; suspendre(); } }, [list.length]);
   // (23 nov.) Un message court demandé par un module sans accès à `toast` (et par les bancs) : `vrm:toast` { texte }.
-  React.useEffect(() => { const f = (e) => { const t = e && e.detail && e.detail.texte; if (typeof t === 'string' && t.trim() && t.length <= 300) toast(t); }; window.addEventListener('vrm:toast', f); return () => window.removeEventListener('vrm:toast', f); }, []);
+  React.useEffect(() => { const f = (e) => { const t = e && e.detail && e.detail.texte; const ton = e && e.detail && ['ok','err','info'].includes(e.detail.ton) ? e.detail.ton : undefined; if (typeof t === 'string' && t.trim() && t.length <= 300) toast(t, ton); }; window.addEventListener('vrm:toast', f); return () => window.removeEventListener('vrm:toast', f); }, []);
   // (19 nov., fiche directe) Une fiche ouverte pose sa zone (src/natif/zoneMessages.js) : la pile s'y range DANS le flux, en
   // haut de la fiche — elle la pousse, elle ne la couvre jamais. Une feuille ouverte par-dessus garde la place d'avant (en haut).
   const zoneFiche = useZoneMessages();
@@ -18681,7 +18690,10 @@ function groupesMenu({ tab, setTab, badges, sites, taille = 22, ordi = false }) 
   // (22 nov. soir, maquettes de Julien) À l'ordinateur, « Notifications » est rangée dans Gestion (sous Messages) ; au téléphone, dans Aide.
   const notifs = { cle: 'notifications', libelle: tr('menu.notifications'), icone: <Icon name="bell2" size={taille}/>, onChoisir: ouvrirCentreNotifs, attrs: { 'data-n-plus-entree': 'notifications', 'data-n-notifs': '' } };
   return [...tete,
-    { titre: tr('menu.groupe.gestion'), cle: 'gestion', tuiles: [vus.has('garage') || tab === 'garage' ? tuile('garage') : null, ordi ? tuile('messages') : null, ordi ? notifs : null, tuile('emails')].filter(Boolean) },
+    { titre: tr('menu.groupe.gestion'), cle: 'gestion', tuiles: [
+      // (23 nov.) Le Conseiller : les conseils du jour et « Demande à VRM » (src/conseiller/).
+      { cle: 'conseiller', libelle: tr('cons.ecran'), icone: <Icon name="conseiller" size={taille}/>, actif: tab === 'conseiller', onChoisir: () => { revenirSurOnglet(); if (setTab) setTab('conseiller'); }, attrs: { 'data-nav-entree': 'conseiller', 'data-n-plus-entree': 'conseiller' } },
+      vus.has('garage') || tab === 'garage' ? tuile('garage') : null, ordi ? tuile('messages') : null, ordi ? notifs : null, tuile('emails')].filter(Boolean) },
     { titre: tr('menu.groupe.extension'), cle: 'extension', pied: ordi ? '' : tr('menu.extensionPied'), tuiles: [
       { cle: 'favoris-ext', libelle: tr('menu.favoris'), icone: <Icon name="heart" size={taille}/>, onChoisir: () => ouvrirPanneau({ site: 'vinted', page: 'favoris' }), attrs: { 'data-n-plus-entree': 'favoris-ext', 'data-n-panneau': 'favoris' } },
       { cle: 'automatisations-ext', libelle: tr('menu.automatisations'), icone: <Icon name="spark" size={taille}/>, valeur: n > 0 ? tr('menu.actives', { n }) : '', onChoisir: () => ouvrirPanneau({ site: 'vinted', page: 'automatisations' }), attrs: { 'data-n-plus-entree': 'automatisations-ext', 'data-n-panneau': 'automatisations', 'data-auto-actives': String(n) } }] },
@@ -30426,7 +30438,7 @@ function useSourcesCarte(liveStats) {
   }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep, sansCompte]);
 }
 // ⟦→ ecrans/Comptabilite.jsx #248⟧
-const OUTILS_AUJOURDHUI = { load, save, onCloudReady, lireTout, entete: () => enTeteSession(), uid: () => AUTH.user?.id || '', extras: lireExtrasRepartition, enLigne: dateMiseEnLigneMs, vue: demanderVue, aVenir: ouvrirArgentAVenir, cle: CLE_CARTES_AUJOURDHUI };
+const OUTILS_AUJOURDHUI = { load, save, onCloudReady, lireTout, entete: () => enTeteSession(), uid: () => AUTH.user?.id || '', extras: lireExtrasRepartition, enLigne: dateMiseEnLigneMs, vue: demanderVue, aVenir: ouvrirArgentAVenir, cle: CLE_CARTES_AUJOURDHUI, regime: () => (isCloudReady() ? regimeFiscal() : undefined) };   // (23 nov.) regime : les seuils du Conseiller
 // ⟦→ ecrans/Comptabilite.jsx #249⟧
 // (21 nov., lot journee-stats) STATISTIQUES · PILOTAGE ET FINANCES — la question au propriétaire (`valeurChiffre` sur les
 // sources de la carte des chiffres : les MÊMES que Ma journée et Argent), les ventes de la coque et les outils de lecture ;
@@ -30442,6 +30454,17 @@ function StatsPilotageApp({ liveStats, onNav }) {
   return <StatsPilotageV2 valeurSel={valeurSel} live={live} outils={OUTILS_AUJOURDHUI} montant={somme} Icon={Icon} onNav={onNav} automatisations={auto}
     onAutomatisations={() => { try { ouvrirPanneau({ site: 'vinted', page: 'automatisations' }); } catch (_) { if (onNav) onNav('settings'); } }}
     onDorment={() => { demanderVue('dorment'); if (onNav) onNav('cat_annonces'); }}/>;
+}
+// (23 nov.) LE CONSEILLER — la même question au propriétaire et les mêmes outils que Ma journée et Statistiques ;
+// les règles et les sources vivent dans src/conseiller/ (une fonction de sources pour la carte et l'écran). Aucune règle ici.
+function ConseillerApp({ liveStats, onNav }) {
+  const liveCoque = React.useContext(LiveStatsCarte);
+  const live = liveStats || liveCoque;
+  const S = useSourcesCarte(live);
+  const valeurSel = React.useCallback((id, p, sel) => sansCompteSur(valeurChiffre(id, { id, p }, S, sel, REGLES_CARTE, Date.now()), S), [S]);
+  return <ConseillerV2 valeurSel={valeurSel} live={live} outils={OUTILS_AUJOURDHUI} Icon={Icon} onNav={onNav} Photo={PhotoVinted}
+    onSaisirPrix={() => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}
+    onEbay={(id) => { DEMANDE_EBAY_PAIRE.id = String(id); DEMANDE_EBAY_PAIRE.at = Date.now(); if (onNav) onNav('ebay_annonces'); }}/>;   // (24 nov.) plan des paires qui dorment
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // (10 nov., lot BC) « MA SEMAINE » — l'écran du bilan de la semaine.
@@ -32557,6 +32580,8 @@ function lireProprietaire() {
 }
 // `true` seulement si la base (ou, en panne, la dernière lecture de cet
 // appareil) dit propriétaire ; `false` sinon — y compris pendant la lecture.
+// (23 nov.) La galerie des pop-ups : montée pour le PROPRIÉTAIRE de l'installation seulement (rien d'autre ne l'écoute).
+function GaleriePopsCoque() { const proprio = useEstProprietaire(); return <GaleriePops autorise={proprio === true} Icon={Icon}/>; }
 function useEstProprietaire() {
   const uid = (AUTH.user && AUTH.user.id) || '';
   const [v, setV] = useState(() => (PROPRIO_ETAT.uid === uid && typeof PROPRIO_ETAT.v === 'boolean') ? PROPRIO_ETAT.v : proprietaireMemorise(uid) === true);
@@ -33539,7 +33564,7 @@ export default function App() {
   //    double vérification) restaient CLAIRS dans une app réglée en sombre —
   //    sur un document déjà sombre (index.html lit `vinted_dark`). Même source.
   // (8 nov.) Le mode CHOISI (Clair · Sombre · Automatique · Le soir, src/apparence.js) : la même règle.
-  C = sombreEffectif(apparenceDe(load('vrm_apparence', null), load('vinted_dark', false)), { systemeSombre: systemeSombreMaintenant() }) ? THEMES.dark : THEMES.light;
+  C = sombreEffectif(apparenceDe(load('vrm_apparence', null), load('vinted_dark', null)), { systemeSombre: systemeSombreMaintenant() }) ? THEMES.dark : THEMES.light;
   // (14 nov., lot 120) Le lien temporaire de l'aide : sa page, SANS compte, en lecture seule (api/_lib/lien-aide.js).
   if (LIEN_AIDE_JETON) return <VueLienAide jeton={LIEN_AIDE_JETON}/>;
   if (MULTI_USER && !authState.ready) return <div data-demarrage-attente="" style={{minHeight:'100vh',background:C.bg}}/>;
@@ -34704,7 +34729,7 @@ function AppCoeur() {
     window.addEventListener('vrm:aller',onAller);
     return ()=>{ window.removeEventListener('vrm:aller',onAller); if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',onMsg); };
   },[]);
-  const [choixSombre,setChoixSombre]=useStateCle('vinted_dark', ()=>load('vinted_dark',false));
+  const [choixSombre,setChoixSombre]=useStateCle('vinted_dark', ()=>load('vinted_dark',null));   // (23 nov.) null = jamais choisi ⇒ sombre par défaut (src/apparence.js)
   // (8 nov., « beauté ») L'APPARENCE CHOISIE : Clair · Sombre · Automatique (le système) · Le soir
   // (19 h–7 h). `vrm_apparence` absent ⇒ le choix d'avant (`vinted_dark`), rien ne change pour lui.
   // La règle (src/apparence.js) est la même que celle du script de démarrage (aucun flash) ;
@@ -34785,6 +34810,23 @@ function AppCoeur() {
   const [cellColors,setCellColors]=useStateCle('vinted_colors', ()=>load('vinted_colors',{}));
   const [invoices,setInvoices]=useStateCle('vinted_invoices', ()=>load('vinted_invoices',[]));
   const [vintedAccounts,setVintedAccounts]=useState([]);
+  // (23 nov.) La photo d'une carte d'événement (src/natif/PopEvenements.jsx) PAR IDENTITÉ seulement : le n° de transaction de
+  // son adresse (`tx`, ventes puis achats des comptes) ou son n° de conversation (`conv`, la boîte du compte `compte`) — les
+  // copies déjà captées (aucun appel à Vinted) ; rien trouvé ⇒ `null`, la carte garde l'icône.
+  const comptesPhotoRef=useRef([]); comptesPhotoRef.current=vintedAccounts;
+  const photoEvenement=React.useCallback(async (e)=>{
+    try{
+      const q=new URLSearchParams(String((e&&e.url)||'').split('?')[1]||'');
+      const tx=q.get('tx'), conv=q.get('conv'), compte=q.get('compte');
+      if(!tx&&!conv) return null;
+      const uids=compte&&/^\d{1,20}$/.test(compte)?[compte]:(comptesPhotoRef.current||[]).map(a=>String(a&&a.vinted_user_id||'')).filter(u=>/^\d{1,20}$/.test(u)).slice(0,20);
+      for(const uid of uids){
+        if(tx) for(const cote of ['sold','purchased']){ const p=await fetchHarvestOrders(uid,cote); const o=(p&&Array.isArray(p.my_orders)?p.my_orders:[]).find(x=>x&&String(x.transaction_id)===tx); if(o){ const u=orderPhoto(o); if(u) return u; } }
+        if(conv){ const h=await fetchHarvest(uid,'inbox'); const c=(h&&Array.isArray(h.conversations)?h.conversations:[]).find(x=>x&&String(x.id)===conv); if(c){ const u=photoArticle({photos:c.item_photos}); if(u) return u; } }
+      }
+    }catch(_){}
+    return null;
+  },[]);
   const [accountLabels]=useStateCle('vinted_account_labels', ()=>load('vinted_account_labels',{}));
   const [inventory,setInventory]=useStateCle('vinted_inventory', ()=>load('vinted_inventory',[]));
   // §5.49 : inventaire synchronisé lu au montage → froid sur un appareil neuf.
@@ -38689,6 +38731,8 @@ function AppCoeur() {
       {/* (20 nov., Julien : « même les écrans de chargement sont atroces ») Plus de barre bleue de progression en haut : elle
           restait à 80 % tant qu'UNE lecture traînait (4G) et faisait « site web ». Le compteur `onBusy` reste (diagnostic). */}
       <Toaster/>
+      {AUTH.user && <PopEvenements Icon={Icon} photoDe={photoEvenement}/>}
+      {AUTH.user && <GaleriePopsCoque/>}
       {/* (11 nov., lot centre-aide) L'aide ouverte depuis la loupe. Rien ne s'ouvre seul. */}
       <CentreAide/>
       <PiluleAnnulerCoque/>
@@ -38781,7 +38825,8 @@ function AppCoeur() {
         paddingBottom: ordi ? 40 : 20}, 'data-n-volets': troisVolets ? 'trois' : undefined }}>
         <Natif.ContexteCoque.Provider value={contexteCoque}>
         {/* (19 nov.) Ventes (À envoyer, En route) porte SA recherche — N°, titre, acheteur, scanner dans le champ — : une seule à l'écran. */}
-        {(!ordi || ECRANS_NATIFS.has(tab) || tab === 'journee') && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sansRecherche={(tab === 'ventes' && ongletColis !== 'toutes') || ECRANS_AVEC_RECHERCHE.has(tab) || (tab === 'compta' && platSub === 'factures')} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
+        {/* (23 nov.) À l'ordinateur, Aujourd'hui a SON en-tête (titre, date, « Mis à jour », relire, loupe, cloche : src/natif/ecrans/Aujourdhui.jsx) : la coque n'en pose pas un second. */}
+        {(!ordi || ECRANS_NATIFS.has(tab)) && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sansRecherche={(tab === 'ventes' && ongletColis !== 'toutes') || ECRANS_AVEC_RECHERCHE.has(tab) || (tab === 'compta' && platSub === 'factures')} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
           rechercheOuverte={gsOpen} ouvrirRecherche={ouvrirRecherche} scanner={()=>ouvrirRetrouver('disque')} streamVisible={!!reglesStream.bouton}
           // (11 nov., gardé le 19 nov.) L'APPUI LONG sur le champ de recherche ouvre la loupe ET écoute (dictée, sans clé) ;
           // le relâcher ne la referme pas. Mêmes gestes que l'ancienne loupe de l'en-tête, posés sur le champ natif.
@@ -39178,6 +39223,7 @@ function AppCoeur() {
         {/* (20 nov., précision de Julien) L'écran Automatisations de l'app est RETIRÉ : les automatisations se règlent dans le
             panneau de l'extension (Paramètres → « Automatisations · dans l'extension »). Un ancien lien `?tab=automatisations` y mène. */}
         {tab==='automatisations' && <GardeEcran nom="automatisations"><RedirigeAutomatisations onRetour={()=>setTab('settings')}/></GardeEcran>}
+        {tab==='conseiller'&&<GardeEcran nom="conseiller"><ConseillerApp liveStats={liveStatsVus} onNav={setTab}/></GardeEcran>}
         {tab==='semaine'&&<GardeEcran nom="semaine"><EcranMaSemaine liveStats={liveStatsVus} onNav={setTab} entete={<ScreenHead icon="chart" title="Ma semaine"/>}/></GardeEcran>}
         {/* (11 nov., lot DJ4) Plus d'écran « À trancher » : `?tab=trancher` ouvre Ma journée, la carte ouverte (VUES_DEPLACEES). */}
         {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} argentNav={<ArgentNav seg="factures" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>}/></GardeEcran>}

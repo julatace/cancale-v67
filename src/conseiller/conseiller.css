@@ -1,0 +1,141 @@
+/* (23 nov.) L'écran Conseiller — jetons natifs seulement (src/natif/jetons.css), aucune couleur en dur. */
+.n-cons { display: flex; flex-direction: column; gap: calc(var(--n-marge) * 1.25); }
+/* La phrase du jour : la première chose lue, en grand, à l'encre. */
+.n-cons-tete { padding: 4px var(--n-marge) 0; display: flex; flex-direction: column; gap: 4px; max-width: 1120px; }
+.n-cons-phrase { margin: 0; font: var(--n-t-section); color: var(--n-encre); text-wrap: balance; }
+.n-cons-sous { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+.n-cons-colonnes { align-items: start; }
+/* Sous chaque conseil : le mini-visuel à gauche, LE bouton du geste à droite. */
+.n-cons-pied { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
+.n-cons-plaques, .n-cons-photos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.n-cons-photos .n-vignette { border-radius: var(--n-r-vignette); }
+.n-cons-plus { font: var(--n-t-legende-fort); color: var(--n-encre-2); }
+.n-cons-barre { display: block; max-width: 220px; }
+.n-cons-barre .n-progres-ligne { justify-content: flex-end; }
+/* La semaine des ventes : sept bâtons (paliers de 10 %), le meilleur jour à l'encre, les autres en gris. */
+.n-cons-semaine { display: inline-flex; gap: 6px; align-items: flex-end; height: 40px; }
+.n-cons-jour { display: inline-flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; height: 100%; width: 12px; }
+.n-cons-baton { display: block; width: 8px; border-radius: 2px; background: var(--n-gris-bord); min-height: 2px; }
+.n-cons-jour[data-actif] .n-cons-baton { background: var(--n-encre); }
+.n-cons-initiale { font: var(--n-t-legende); font-size: 10px; line-height: 1; color: var(--n-encre-2); }
+.n-cons-baton[data-h="0"] { height: 2px; } .n-cons-baton[data-h="1"] { height: 3px; } .n-cons-baton[data-h="2"] { height: 6px; }
+.n-cons-baton[data-h="3"] { height: 8px; } .n-cons-baton[data-h="4"] { height: 11px; } .n-cons-baton[data-h="5"] { height: 14px; }
+.n-cons-baton[data-h="6"] { height: 16px; } .n-cons-baton[data-h="7"] { height: 19px; } .n-cons-baton[data-h="8"] { height: 22px; }
+.n-cons-baton[data-h="9"] { height: 25px; } .n-cons-baton[data-h="10"] { height: 28px; }
+/* Deux comptes : deux traits proportionnels, le meilleur à l'encre. */
+.n-cons-duo { display: flex; flex-direction: column; gap: 4px; width: 160px; max-width: 100%; }
+.n-cons-trait { display: block; height: 6px; border-radius: 3px; background: var(--n-gris-bord); }
+.n-cons-trait[data-actif] { background: var(--n-encre); }
+.n-cons-trait[data-w="0"] { width: 2%; } .n-cons-trait[data-w="1"] { width: 10%; } .n-cons-trait[data-w="2"] { width: 20%; }
+.n-cons-trait[data-w="3"] { width: 30%; } .n-cons-trait[data-w="4"] { width: 40%; } .n-cons-trait[data-w="5"] { width: 50%; }
+.n-cons-trait[data-w="6"] { width: 60%; } .n-cons-trait[data-w="7"] { width: 70%; } .n-cons-trait[data-w="8"] { width: 80%; }
+.n-cons-trait[data-w="9"] { width: 90%; } .n-cons-trait[data-w="10"] { width: 100%; }
+/* « Aujourd'hui » : le titre en gras (la pastille d'accent est à côté) — jamais d'orange (Julien, 23 nov.). */
+.n-rangee[data-cons-ton="aujourdhui"] .n-rangee-titre { font-weight: 700; }
+.n-cons-gestes { display: inline-flex; gap: 4px; align-items: center; flex: 0 0 auto; }
+/* « Pourquoi ? » : l'explication de la règle, et son visuel rejoué en mouvement (aucun mouvement si l'appareil le demande). */
+.n-cons-explication { margin-top: 8px; padding: 12px; border-radius: var(--n-r-carte); background: var(--n-fond); display: flex; gap: 12px; align-items: center; }
+.n-cons-explication p { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); flex: 1 1 auto; min-width: 0; }
+.n-cons-anime { flex: 0 0 auto; }
+@media (prefers-reduced-motion: no-preference) {
+  .n-cons-anime .n-cons-baton { animation: n-cons-pousse 700ms cubic-bezier(.2, .8, .2, 1) both; transform-origin: bottom; }
+  .n-cons-anime .n-cons-jour:nth-child(2) .n-cons-baton { animation-delay: 60ms; } .n-cons-anime .n-cons-jour:nth-child(3) .n-cons-baton { animation-delay: 120ms; }
+  .n-cons-anime .n-cons-jour:nth-child(4) .n-cons-baton { animation-delay: 180ms; } .n-cons-anime .n-cons-jour:nth-child(5) .n-cons-baton { animation-delay: 240ms; }
+  .n-cons-anime .n-cons-jour:nth-child(6) .n-cons-baton { animation-delay: 300ms; } .n-cons-anime .n-cons-jour:nth-child(7) .n-cons-baton { animation-delay: 360ms; }
+  .n-cons-anime .n-cons-trait, .n-cons-anime .n-progres-plein { animation: n-cons-remplit 800ms cubic-bezier(.2, .8, .2, 1) both; transform-origin: left; }
+  .n-cons-anime .n-plaque, .n-cons-anime .n-vignette { animation: n-cons-arrive 420ms cubic-bezier(.2, .8, .2, 1) both; }
+  .n-cons-anime .n-plaque:nth-child(2), .n-cons-anime .n-vignette:nth-child(2) { animation-delay: 90ms; }
+  .n-cons-anime .n-plaque:nth-child(3), .n-cons-anime .n-vignette:nth-child(3) { animation-delay: 180ms; }
+  .n-cons-explication { animation: n-cons-arrive 260ms ease-out both; }
+}
+@keyframes n-cons-pousse { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes n-cons-remplit { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes n-cons-arrive { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* ── La présentation animée (src/conseiller/Presentation.jsx) — jetons seulement, mouvement CSS, rien si mouvement réduit. ── */
+.n-pres { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 4px var(--n-marge) 8px; }
+.n-pres-titre { margin: 8px 0 0; font: var(--n-t-section); color: var(--n-encre); }
+.n-pres-phrase { margin: 0; font: var(--n-t-corps); color: var(--n-encre-2); max-width: 34ch; }
+.n-pres-points { display: flex; gap: 0; }
+.n-pres-pt { width: 44px; height: 44px; border: 0; background: none; display: grid; place-items: center; cursor: pointer; }
+.n-pres-pt span { width: 8px; height: 8px; border-radius: 4px; background: var(--n-gris-bord); transition: width var(--n-duree) ease; }
+.n-pres-pt[data-actif] span { width: 22px; background: var(--n-accent); }
+.n-pres-scene { position: relative; width: 260px; max-width: 100%; height: 150px; border-radius: var(--n-r-carte); background: var(--n-fond); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.n-pres-trait { display: block; height: 6px; border-radius: 3px; background: var(--n-gris-bord); }
+.n-pres-trait[data-l="long"] { width: 100px; } .n-pres-trait[data-l="moyen"] { width: 72px; } .n-pres-trait[data-l="court"] { width: 56px; background: var(--n-gris-fond); }
+/* 1 · un conseil : trois rangées arrivent, la première porte la pastille d'accent. */
+.n-pres-carte { flex-direction: column; gap: 8px; padding: 12px; }
+.n-pres-ligne { display: flex; align-items: center; gap: 8px; width: 220px; padding: 8px; border-radius: 10px; background: var(--n-carte); box-shadow: var(--n-ombre-xs); }
+.n-pres-rond { width: 18px; height: 18px; border-radius: 9px; background: var(--n-gris-fond); flex: 0 0 auto; }
+.n-pres-traits { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; }
+.n-pres-pastille { width: 22px; height: 10px; border-radius: 5px; background: var(--n-teinte, var(--n-accent)); }
+.n-pres-bouton { width: 30px; height: 14px; border-radius: 7px; background: var(--n-gris-fond); }
+/* 2 · les sources : trois écrans, des points qui coulent vers le chiffre. */
+.n-pres-sources { gap: 18px; }
+.n-pres-colonne { display: flex; flex-direction: column; gap: 6px; }
+.n-pres-source { font: var(--n-t-legende-fort); color: var(--n-encre); background: var(--n-carte); border-radius: 8px; padding: 4px 8px; box-shadow: var(--n-ombre-xs); }
+.n-pres-flux { position: relative; width: 50px; height: 60px; }
+.n-pres-point { position: absolute; left: 0; width: 6px; height: 6px; border-radius: 3px; background: var(--n-accent); opacity: 0; }
+.n-pres-point[data-k="0"] { top: 8px; } .n-pres-point[data-k="1"] { top: 27px; } .n-pres-point[data-k="2"] { top: 46px; }
+.n-pres-cible { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; background: var(--n-carte); border-radius: 10px; padding: 10px; box-shadow: var(--n-ombre-xs); }
+.n-pres-cible .n-pres-trait[data-l="long"] { width: 60px; }
+.n-pres-chiffre { font: var(--n-t-section); color: var(--n-encre); font-variant-numeric: tabular-nums; }
+/* 3 · le toucher : un doigt vient, une onde part du bouton. */
+.n-pres-gros-bouton { font: var(--n-t-controle); color: var(--n-encre); background: var(--n-carte); border-radius: var(--n-r-bouton); padding: 10px 18px; box-shadow: var(--n-ombre-xs); }
+.n-pres-doigt { position: absolute; width: 26px; height: 26px; border-radius: 13px; background: var(--n-encre-3); opacity: .55; left: 50%; top: 50%; margin: -4px 0 0 4px; }
+.n-pres-onde { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 20px; border: 2px solid var(--n-accent); opacity: 0; }
+/* 4 · la question : le texte se tape, la réponse apparaît. */
+.n-pres-question { flex-direction: column; gap: 12px; }
+.n-pres-champ { display: flex; align-items: center; width: 220px; height: 34px; padding: 0 10px; border-radius: var(--n-r-bouton); background: var(--n-carte); box-shadow: inset 0 0 0 1px var(--n-bord); overflow: hidden; }
+.n-pres-tape { font: var(--n-t-legende); color: var(--n-encre); white-space: nowrap; overflow: hidden; display: inline-block; max-width: 100%; }
+.n-pres-curseur { width: 1px; height: 16px; background: var(--n-encre); margin-left: 1px; }
+.n-pres-reponse { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; width: 220px; padding: 10px; border-radius: 10px; background: var(--n-carte); box-shadow: var(--n-ombre-xs); }
+@media (prefers-reduced-motion: no-preference) {
+  .n-pres { animation: n-cons-arrive 300ms ease-out both; }
+  .n-pres-ligne { animation: n-cons-arrive 500ms cubic-bezier(.2, .8, .2, 1) both; }
+  .n-pres-ligne[data-k="1"] { animation-delay: 400ms; } .n-pres-ligne[data-k="2"] { animation-delay: 800ms; }
+  .n-pres-pastille { animation: n-pres-bat 1.2s ease-in-out 1.2s 2 both; }
+  .n-pres-point { animation: n-pres-coule 1.6s ease-in-out infinite; }
+  .n-pres-point[data-k="1"] { animation-delay: .35s; } .n-pres-point[data-k="2"] { animation-delay: .7s; }
+  .n-pres-chiffre { animation: n-cons-arrive 400ms ease-out 1.4s both; }
+  .n-pres-doigt { animation: n-pres-doigt 2.2s cubic-bezier(.2, .8, .2, 1) infinite; }
+  .n-pres-onde { animation: n-pres-onde 2.2s ease-out infinite; }
+  .n-pres-tape { animation: n-pres-tape 2.2s steps(30, end) .3s both; }
+  .n-pres-curseur { animation: n-pres-clignote .9s steps(1) infinite; }
+  .n-pres-reponse { animation: n-cons-arrive 500ms ease-out 2.7s both; }
+}
+@keyframes n-pres-bat { 50% { transform: scale(1.25); } }
+@keyframes n-pres-coule { 0% { opacity: 0; transform: translateX(0); } 20% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(44px); } }
+@keyframes n-pres-doigt { 0% { transform: translate(40px, 36px); opacity: 0; } 30% { opacity: .55; } 45% { transform: translate(0, 0) scale(1); } 52% { transform: translate(0, 0) scale(.82); } 60%, 100% { transform: translate(0, 0) scale(1); opacity: .55; } }
+@keyframes n-pres-onde { 0%, 50% { opacity: 0; transform: scale(.6); } 55% { opacity: .9; } 100% { opacity: 0; transform: scale(2.2); } }
+@keyframes n-pres-tape { from { max-width: 0; } to { max-width: 100%; } }
+@keyframes n-pres-clignote { 50% { opacity: 0; } }
+/* (23 nov., Julien : « trop de texte ») la preuve vit sous « Pourquoi ? » : d'abord elle (à l'encre), puis la règle. */
+.n-cons-textes { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-width: 0; }
+.n-cons-textes p { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+.n-cons-textes .n-cons-preuve { color: var(--n-encre); font: var(--n-t-legende-fort); }
+/* (23 nov., captures) le visuel à gauche, le bouton à droite et jamais coupé ; « Demande à VRM » à la largeur des colonnes. */
+.n-cons-pied > [data-cons-visuel] { margin-right: auto; }
+.n-cons-pied .n-bouton { flex-shrink: 0; white-space: nowrap; }
+.n-cons-photos { flex-wrap: nowrap; }
+@media (min-width: 1024px) { .n-cons-demande, .n-cons-tete { box-sizing: border-box; width: 100%; max-width: 1120px; padding-inline: 8px; } }
+/* Le bas d'un conseil : la ligne visuel + bouton, puis (dépliée) l'explication — l'une sous l'autre, jamais côte à côte. */
+.n-cons-bas { display: flex; flex-direction: column; width: 100%; min-width: 0; }
+/* (23 nov., coordinateur) Les jauges : toute la largeur utile, le plein à la vraie proportion, une légende qui dit ce qu'elles mesurent. */
+.n-cons-barre, .n-cons-duo { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-width: 0; max-width: none; width: auto; margin-right: 12px; }
+.n-cons-barre-libelle, .n-cons-duo-legende { font: var(--n-t-legende); color: var(--n-encre-2); display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
+.n-cons-duo-nom { font: var(--n-t-legende-fort); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.n-cons-duo-ligne { display: flex; flex-direction: column; gap: 4px; }
+.n-cons-jauge { display: block; width: 100%; height: 8px; }
+.n-cons-jauge-piste { fill: var(--n-gris-fond); }
+.n-cons-jauge-plein { fill: var(--n-encre); }
+.n-cons-jauge-second { fill: var(--n-encre-3); }
+@media (prefers-reduced-motion: no-preference) { .n-cons-anime .n-cons-jauge-plein, .n-cons-anime .n-cons-jauge-second { animation: n-cons-remplit 800ms cubic-bezier(.2, .8, .2, 1) both; transform-box: fill-box; transform-origin: left; } }
+/* Au téléphone, la comparaison des comptes prend toute la ligne (légendes lisibles), le bouton passe dessous, à droite. */
+.n-cons-duo-legende > span:last-child { white-space: nowrap; flex: 0 0 auto; }
+@media (max-width: 599px) { .n-cons-pied { flex-wrap: wrap; row-gap: 10px; } .n-cons-pied > .n-cons-duo { flex: 1 1 100%; margin-right: 0; } }
+/* (24 nov.) Plan du matin : une phrase, puis une paire par rangée et LE bouton de son action, à droite. Aucun orange. */
+.n-plan-phrase { margin: 0 0 4px; padding-inline: 16px; font: var(--n-t-legende); color: var(--n-encre-2); }
+.n-plan-explication { margin: 0 16px 8px; }
+.n-plan-pied { display: flex; justify-content: flex-end; min-width: 0; }
+.n-plan-pied .n-bouton { flex-shrink: 0; white-space: nowrap; }
+@media (max-width: 599px) { .n-plan-pied .n-bouton { flex: 1 1 100%; } }

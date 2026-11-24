@@ -22,6 +22,11 @@ import { lireValeurStock } from '../coutVente.js';
 import { lireStockValeur, EVT_STOCK_VALEUR } from '../stockValeurAffiche.js';
 import { lireVuesFavoris, EVT_VUES_FAVORIS } from '../vuesFavoris.js';
 import { lirePriorite, rangeeAujourdhui, EVT_REPUB_PRIORITE } from '../republierPriorite.js';   // (21 nov., prio-recherche)
+import { sourcesConseiller } from '../conseiller/sources.js';   // (23 nov.) « Conseils du jour » : les mêmes sources que l'écran Conseiller
+import { conseils as conseilsDe } from '../conseiller/regles.js';
+import { faireGeste } from '../conseiller/gestes.js';
+import { EVT_PUB_CONSEILLER } from '../conseiller/publications.js';
+import { EVT_OSR } from '../offresSansReponse.js';
 
 const SEL_TOUT = { site: 'toutes', compte: null, periode: null };
 const JOUR = 86400000;
@@ -63,7 +68,7 @@ function cartesEnPlus({ valeurSel, objectif: O, live, maintenant, regles, benefi
     const couv = brut != null && Number.isFinite(Bb.n) && nV != null && nV > Bb.n ? `${Bb.n}/${nV}` : '';
     const ecart = V.valeur != null && !V.partiel && A.valeur != null && !A.partiel && A.valeur > 0 ? Math.round(((V.valeur - A.valeur) / A.valeur) * 100) : null;
     return { vendu: V.valeur == null ? null : V.valeur, partiel: !!V.partiel, raison: V.valeur == null ? raisonCourte(V) : '', ventes: N.valeur == null ? null : N.valeur, ventesPartiel: !!N.partiel,
-      brut, brutCouv: couv, ecart };
+      brut, brutCouv: couv, ecart, manque: nV != null && Number.isFinite(Bb.n) ? Math.max(0, nV - Bb.n) : null };
   };
   courbe.fenetres = { 7: fen(7), 30: fen(30), mois: fen('mois') };
   courbe.joursMois = new Date(maintenant).getDate();   // le nombre de jours du mois écoulés (la fenêtre « Mois » du graphique)
@@ -120,7 +125,10 @@ function cartesEnPlus({ valeurSel, objectif: O, live, maintenant, regles, benefi
   const prevision = previsionMois({ vendu: lignesV, manque: live && live.venduManque, nonComptees: live && live.venduNonComptees, releve: Array.isArray(releve) ? releve : null, maintenant });
   const dorment = v('dorment');
   const avenir = v('attente');
-  return { chiffresPlus: { stats, moisAvant, ouvrirPeriode }, courbe, comptes, objectif, stats2: { stock, vues, parPeriode, ecoulement, prevision,
+  // (23 nov.) LES CONSEILS DU JOUR (src/conseiller/) : la même fonction de sources que l'écran Conseiller ; pas su ⇒ aucun conseil.
+  let conseils = [];
+  try { conseils = conseilsDe(sourcesConseiller({ o: outils, valeurSel, live, L: { releve, extras }, maintenant }), maintenant); } catch (_) { conseils = []; }
+  return { conseils, chiffresPlus: { stats, moisAvant, ouvrirPeriode }, courbe, comptes, objectif, stats2: { stock, vues, parPeriode, ecoulement, prevision,
     dorment: { valeur: dorment.valeur == null ? null : dorment.valeur, partiel: !!dorment.partiel, raison: dorment.valeur == null ? raisonCourte(dorment) : '' },
     avenir: { valeur: avenir.valeur == null ? null : avenir.valeur, partiel: !!avenir.partiel, raison: avenir.valeur == null ? raisonCourte(avenir) : '' } } };
 }
@@ -132,8 +140,8 @@ export default function AujourdhuiBranche({ calculer = null, alerte = null, vent
   const cartes = useCartes(outils);
   // Une publication neuve d'Annonces (valeur au prix affiché, vues et favoris) redessine la carte, sans relire.
   const [, publie] = React.useReducer((x) => x + 1, 0);
-  React.useEffect(() => { window.addEventListener(EVT_STOCK_VALEUR, publie); window.addEventListener(EVT_VUES_FAVORIS, publie); window.addEventListener(EVT_REPUB_PRIORITE, publie);
-    return () => { window.removeEventListener(EVT_STOCK_VALEUR, publie); window.removeEventListener(EVT_VUES_FAVORIS, publie); window.removeEventListener(EVT_REPUB_PRIORITE, publie); }; }, []);
+  React.useEffect(() => { window.addEventListener(EVT_STOCK_VALEUR, publie); window.addEventListener(EVT_VUES_FAVORIS, publie); window.addEventListener(EVT_REPUB_PRIORITE, publie); window.addEventListener(EVT_PUB_CONSEILLER, publie); window.addEventListener(EVT_OSR, publie);
+    return () => { window.removeEventListener(EVT_STOCK_VALEUR, publie); window.removeEventListener(EVT_VUES_FAVORIS, publie); window.removeEventListener(EVT_REPUB_PRIORITE, publie); window.removeEventListener(EVT_PUB_CONSEILLER, publie); window.removeEventListener(EVT_OSR, publie); }; }, []);
   const L = useLectures(outils);
   let plus = {};
   try { plus = typeof calculer === 'function' ? (calculer(Mo) || {}) : {}; } catch (_) { plus = {}; /* pas su ⇒ l'écran dit « — » */ }
@@ -144,9 +152,12 @@ export default function AujourdhuiBranche({ calculer = null, alerte = null, vent
   const maintenant = Date.now();
   const capte = L.capte === undefined || !outils ? undefined : L.capte ? lu(() => Mo.capteDuJour(Mo.fusionner(L.capte), maintenant)) : null;
   const vrm = L.journal === undefined || !outils ? undefined : lu(() => Mo.vrmDuJour(L.journal, maintenant));
-  return <Aujourdhui {...reste} {...plus} teteDroite={reste.Icon ? <TeteDroite Icon={reste.Icon}/> : null} enDirect={<><EnDirect lieu="journee"/><LigneOrdinateur onNav={reste.onNav} Icon={reste.Icon}/></>} alerte={a} ventes={v} capte={capte} vrm={vrm} cartes={cartes}
+  return <Aujourdhui {...reste} {...plus} teteDroite={reste.Icon ? <TeteDroite Icon={reste.Icon}/> : null} enDirect={<EnDirect lieu="journee"/>} ligneOrdi={<LigneOrdinateur onNav={reste.onNav} Icon={reste.Icon}/>} alerte={a} ventes={v} capte={capte} vrm={vrm} cartes={cartes}
     onDorment={outils && outils.vue ? () => { outils.vue('dorment'); if (reste.onNav) reste.onNav('cat_annonces'); } : null}
     aRepublier={(() => { const r = outils && outils.uid ? rangeeAujourdhui(lirePriorite(outils.uid())) : null;
       return r && outils.vue ? { ...r, ouvrir: () => { outils.vue('arepublier'); try { window.dispatchEvent(new CustomEvent('vrm:vue', { detail: 'arepublier' })); } catch (_) {} if (reste.onNav) reste.onNav('cat_annonces'); } } : null; })()}
-    onAVenir={outils && outils.aVenir ? () => outils.aVenir() : null}/>;
+    onAVenir={outils && outils.aVenir ? () => outils.aVenir() : null}
+    onGesteConseil={(g) => faireGeste(g, { onNav: reste.onNav, vue: outils && outils.vue, onSaisirPrix: reste.onSaisirPrix,
+      onDorment: outils && outils.vue ? () => { outils.vue('dorment'); if (reste.onNav) reste.onNav('cat_annonces'); } : null })}
+    onConseiller={reste.onNav ? () => reste.onNav('conseiller') : null}/>;
 }

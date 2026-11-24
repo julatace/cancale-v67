@@ -1,0 +1,168 @@
+# 23 nov. 2026 — Le Conseiller (« Conseils du jour » et « Demande à VRM »)
+
+Branche `claude/conseiller`. Demande de Julien : « on doit vraiment avoir un agent intégré dans l'app qui conseille,
+qui est incroyable ».
+
+## ÉTAT À LA REPRISE
+- **Tranche 1 (sans IA)** : branche `claude/conseiller` — règles, sources, carte d'Aujourd'hui, écran `conseiller`, tuile
+  Menu › Gestion, publication des baisses par Annonces, i18n 5 langues, Quoi de neuf, CLAUDE.md §9. PR #1316 (ouverte, pas fusionnée).
+- **Tranche 2 (« Demande à VRM »)** : branche `claude/conseiller-ia` (contient la tranche 1) — clé Claude du vendeur
+  dans le coffre (`/api/compte?mode=claude`, `api/_lib/claude-cle.js`), question par `/api/ai?mode=conseiller`
+  (`api/_lib/conseiller-ia.js`), écran `src/conseiller/DemandeVRM.jsx`. PR #1318 (ouverte, pas fusionnée). Fusion seulement après la règle temporaire du
+  23 nov. (aucune fusion entre 15:00 UTC et le 24 nov. 07:00 UTC sans accord du coordinateur).
+- **Pas mesuré sur la vraie base** : aucune réponse réelle d'Anthropic n'a été appelée (aucune clé de vendeur ici) —
+  la forme de la sortie structurée de Haiku 5.5 est celle de la documentation ; la première vraie question le dira
+  (`reason: 'parse'` si elle diffère, facturée et dite).
+
+## La conception
+
+### Tranche 1 — le conseiller SANS IA, gratuit, pour tous (la base)
+Un moteur de règles PUR (`src/conseiller/regles.js`, aucun React, aucune lecture) qui reçoit les sorties des
+PROPRIÉTAIRES existants (§5 « une seule règle par notion ») et rend 0 à 10 conseils, classés par urgence. Chaque conseil :
+`{ id, rang, ton, titre, preuve, geste: { cible, libelle }, chiffres }` — un titre court chiffré, la preuve (« pourquoi »,
+les nombres d'où il vient, avec leur couverture), UN geste qui ouvre l'écran VRM où il le fait LUI-MÊME (rien ne part
+du conseiller). Un conseil sans données suffisantes ne s'affiche pas (pas su ⇒ rien, jamais un conseil deviné).
+
+Les sources (toutes déjà calculées ailleurs, jamais recalculées) — rassemblées par `src/conseiller/sources.js`, LA même
+fonction pour la carte d'Aujourd'hui et l'écran Conseiller (mêmes chiffres partout) :
+
+| conseil | propriétaire (même source que l'écran) | seuil pour parler |
+|---|---|---|
+| colis à envoyer avant la limite | `vrm_colis_aposter.liste` (Ventes, règle `limiteExpedition`), publication < 12 h | une date limite LUE (jamais l'estimation vente + 7 j) qui tombe aujourd'hui ou demain |
+| offres qui attendent | `vrm_offres_sans_reponse` (écran Offres sans réponse) | n ≥ 1, publication < 24 h |
+| seuils URSSAF / DAC7 | `alertesSeuils` + `alertesADire` (la règle d'Argent, registre « Compris ») | un palier 80 % ou 100 % pas encore compris |
+| paires à baisser | `vrm_baisses_conseillees` (publiée par Annonces : `decisionsBaisse`, règle `baisseConseillee` / `conseilPrix` — 30 j en ligne, −10 % au plus, jamais sous achat + 10 %) | n ≥ 1, publication < 24 h |
+| prix d'achat à saisir | `lireValeurStock` (publication d'Annonces : n, nPrix) | au moins 1 paire en ligne sans prix d'achat |
+| quoi racheter | `vendsMieux` → `quoiRacheter.prioritaires` (Statistiques › Finances), 90 j | 3 ventes reliées ET datées, bénéfice moyen > 0 |
+| ce qui ne rapporte pas | `classementRapporte` (même classement), 90 j | 3 ventes au prix d'achat connu, bénéfice moyen ≤ 0 |
+| paires qui dorment | `valeurChiffre('dorment')` (la carte des chiffres) | 5 paires ou plus |
+| le jour où ça vend | relevé des ventes (dates LUES), 90 j | 40 ventes datées ; le meilleur jour ≥ 1,3 × la moyenne |
+| le compte qui vend le mieux | `parCompteEtSite` (Statistiques), 30 j | 2 comptes ou plus ; le 1er ≥ 5 ventes et ≥ 1,5 × le 2e |
+
+**Respect du §3 (refus du 11 oct.)** : aucun prix conseillé à la MISE EN LIGNE (la baisse ne vise que les paires en ligne
+depuis 30 j, règle existante) ; pas de badge « bonne affaire » ; pas de saisonnalité (un jour de la SEMAINE n'est pas une
+saison : aucune comparaison de mois ou d'année) ; pas d'« acheteurs fidèles » (le conseiller ne lit aucun acheteur) ;
+pas d'alerte « achat jamais arrivé », « argent bloqué », messages sans réponse depuis 24 h, évaluations à laisser.
+Les offres : le conseil OUVRE la liste ; accepter / contre-offrir se fait à son clic dans le panneau (§3).
+
+**Place** : une carte « Conseils du jour » sur Aujourd'hui (3 au plus, « Tout voir » ⇒ l'écran) ; l'écran « Conseiller »
+(onglet `conseiller`, icône `conseiller`, tuile dans Menu › Gestion), iPhone et ordinateur, composants natifs (jetons
+`--n-*`), aucun style en ligne.
+
+### Tranche 2 — « Demande à VRM » (question libre, IA avec la clé DU VENDEUR seulement, §2.9)
+- Clé Claude collée par LUI dans l'écran Conseiller (« Ta clé Claude »), envoyée UNE fois, vérifiée chez Anthropic
+  (`GET /v1/models`, gratuit), CHIFFRÉE dans le coffre (`api/_lib/coffre.js`, usage `claude-v1`, ligne `claude_cle`),
+  jamais renvoyée au navigateur (il n'apprend que : posée, 4 derniers caractères, date) — le modèle de la clé Photoroom.
+- Route : un mode de `api/ai.js` (`mode=conseiller`) — aucune 13e fonction. Pas de clé du vendeur ⇒ 200
+  `{ ok:false, reason:'no-key' }` et l'écran se tait, dit pourquoi et montre les conseils sans IA. **La clé du serveur
+  n'est JAMAIS utilisée pour ce mode, même pour le propriétaire** (il colle la sienne comme les autres).
+- L'IA ne voit que des AGRÉGATS déjà calculés par VRM (le même `sources.js` que les écrans : totaux, classements par
+  modèle, comptes, conseils) — aucun nom d'acheteur, aucun message, aucune adresse. Elle doit citer ses chiffres et ne
+  fait aucune action : elle peut proposer un geste parmi une liste FERMÉE (les gestes des conseils) que l'app affiche en
+  bouton ; c'est SON toucher qui agit.
+- Modèle : `claude-haiku-5-5` (le plus économique de la génération actuelle, demande « économique » de Julien) ;
+  coût affiché : estimation avant la question (taille du contexte envoyé × prix), coût réel après (usage rendu).
+
+## Ce qui est fait — tranche 1
+- `src/conseiller/regles.js` (PUR) : 10 règles, seuils nommés (`SEUILS`), liste fermée des gestes (`GESTES`), classement par
+  urgence (`IDS`), 3 sur la carte (`MAX_CARTE`). Colis : « aujourd'hui » seulement si TOUS le sont, sinon « d'ici demain,
+  dont N aujourd'hui » ; une limite passée est dite comme telle.
+- `src/conseiller/sources.js` : LA fonction de sources (carte et écran) ; `src/conseiller/publications.js` : Annonces publie
+  `vrm_baisses_conseillees` = le `nBaissesConseillees` qu'il affiche (annonces lues seulement, par compte VRM).
+- `src/conseiller/Conseiller.jsx` : `CarteConseils` (aucune carte sans conseil) et `EcranConseiller` ; `gestes.js` : chaque
+  geste OUVRE un écran (Colis, Messages › Offres, Argent, Annonces › Qui dorment, saisie des prix, Statistiques).
+- App : onglet `conseiller` (ONGLETS_LIENS, titre, `ConseillerApp` à la demande), icône `conseiller`, tuile du Menu ;
+  `OUTILS_AUJOURDHUI.regime` (le régime fiscal lu, jamais deviné).
+
+## Preuves — tranche 1
+- `node scripts/audit-conseiller.cjs` : **50 verts** ; `--mutation=toutes` : **18/18** vues (colis estimée / loin /
+  « aujourd'hui », offres périmées, baisses à 0, prix complets, seuils de rachat et de « ne rapporte pas », « Autres »
+  nommé, dorment, jour de la semaine (seuil, écart, ventes de plus de 90 j), compte seul / écart, seuil déjà compris,
+  publication d'un autre compte, publication de Ventes périmée). B1–B6 exécutent les VRAIS propriétaires (vendsMieux,
+  alertesSeuils, parCompteEtSite, publications) et comparent leurs nombres à ceux du conseil.
+- `scripts/bancs/conseiller.cjs` (390 tactile, 1512, clair, sombre ; bases lue et vide) : **48 verts** ; mutations
+  `carte5`, `cartevide` rouges. Captures regardées (écran 390 clair, 1512 sombre, carte).
+- Rouge sur le code d'avant : `src/conseiller/` n'existe pas sur `origin/main` (l'audit et le banc ne se construisent pas).
+
+## Ce qui est fait — tranche 2 (« Demande à VRM », branche `claude/conseiller-ia`)
+- `api/_lib/claude-cle.js` + `/api/compte?mode=claude` : poser (vérifiée chez Anthropic par la liste des modèles, gratuite ;
+  refusée ⇒ rien rangé), état (posée · …4 derniers · date), retirer (confirmé, toujours possible). Chiffrée dans le coffre
+  (usage `claude-v1`), jamais en clair, jamais rendue au navigateur ; base pas cloisonnée ⇒ rien.
+- `api/_lib/conseiller-ia.js` + `/api/ai?mode=conseiller` (passe AVANT la clé du serveur) : session, abonnement, SA clé du
+  coffre seulement (aucune clé du corps, jamais `AI_API_KEY`) ; contexte NETTOYÉ (nombres, textes ≤ 80, aucune clé qui nomme
+  un acheteur / un message / une adresse, ≤ 12 000 caractères) ; Claude Haiku 5.5, effort bas, sortie structurée
+  `{reponse, chiffres[], geste}` ; geste hors liste fermée ⇒ « aucun » ; refus / sortie illisible dits (`facture: true`) ;
+  coût réel rendu (jetons × prix publics). Appel en HTTP brut comme le reste de `api/ai.js` (pas de SDK dans le projet).
+- `src/conseiller/contexte.js` (agrégats seulement : conseils, CA 30 j / 30 j d'avant / mois, modèles 90 j, comptes 30 j,
+  stock) et `src/conseiller/DemandeVRM.jsx` (clé masquée, estimation du coût avant, réponse + chiffres + coût après, geste
+  en bouton ; aucune requête sans clé posée).
+
+## Preuves — tranche 2
+- `node scripts/audit-conseiller-ia.cjs` : **19 verts** ; `--mutation=toutes` **8/8** (clé du serveur, clé du corps,
+  filtre du contexte, geste libre, « pas su » = aucune clé, clé refusée rangée, clé en clair, écran sans garde).
+- Passe du banc `scripts/bancs/_conseiller-ia.cjs` (I1 sans clé : aucune requête ; I2 une question ⇒ une requête, agrégats
+  seuls, réponse, coût, geste au toucher) : **écrite, pas encore lancée** (machine saturée, consigne du coordinateur
+  jusqu'à 15:30 UTC).
+
+## Ce qui reste (après 15:30 UTC, puis fusion le 24 nov. après 07:00 UTC avec l'accord du coordinateur)
+1. `npx vite build` des deux branches ; `node scripts/bancs/conseiller.cjs` sur `claude/conseiller-ia` (avec la passe IA) ;
+   mutations du banc `MUTATION=carte5|cartevide` ; passe complète `AUDITS_PARALLELE=2 node scripts/lancer-audits.cjs`.
+2. Comparer la CI des PR à celle du dernier commit de main ; fusionner #tranche1 puis #tranche2 ; vérifier « Vercel ».
+3. Mesure réelle manquante : une vraie question avec une vraie clé (forme de la réponse structurée de Haiku 5.5).
+## Retour du coordinateur (23 nov., 11 h UTC) : « encore une simple liste » ⇒ ce qui a changé
+1. **La phrase du jour** en tête (`syntheseDuJour`) : « 3 gestes à faire aujourd'hui · 130 € d'offres en attente · 4 pistes
+   pour gagner plus ». La SEULE somme dite est celle qu'une source donne entière : la somme des offres en attente, publiée par
+   Messages (`publierOffresSansReponse` : `somme`, `nSomme`) et dite seulement si CHAQUE offre a son montant lu. Aucun « gain
+   potentiel » de baisse n'est inventé (aucune source ne le donne : une baisse ne prouve aucune vente).
+2. **Trois groupes** (`CATEGORIES`, `grouper`) : à faire aujourd'hui (colis, offres, prix d'achat) · pour gagner plus (baisses,
+   racheter, ne rapporte pas, dorment) · à savoir (seuil, jour, compte).
+3. **§7** : l'ambre SEULEMENT pour un colis dont la limite lue tombe aujourd'hui (ou est passée) ; offres, seuil, prix : neutres.
+4. **Mini-visuels** (`c.visuel`, posé par la règle) : N° des colis (plaques), photos de SES annonces (offres, baisses — publiées
+   par Messages et Annonces, 4 au plus), barre du seuil, barre des prix saisis, semaine des ventes (7 bâtons), deux comptes.
+5. **Gestes en boutons** à la règle commune (`Bouton variante="teinte" taille="compact"`, sous le texte via `pied`).
+6. **« Demande à VRM » en haut** (tranche 2) : le champ toujours visible, 3 questions toutes prêtes ; sans clé, un toucher
+   ouvre la carte de la clé et RIEN ne part.
+7. **1512** : deux colonnes (`Colonnes` : à faire + à savoir | pour gagner plus) ; 390 : à la suite.
+Preuves : `audit-conseiller` 58 verts (A8 : ambre, groupes, phrase, somme entière ou rien, visuels ; mutations
+`ambre_demain`, `ambre_partout`, `somme_partielle` vues) ; banc K6–K10 et I0–I3 écrits — **à lancer après 15:30 UTC** avec les
+captures avant / après (`docs/design/avant-apres/conseiller-{avant,apres}.png`).
+
+## Retour de Julien (23 nov., via le coordinateur) : « je n'aime pas l'orange, plus clair, un vrai accompagnement, du motion design »
+- **Aucun orange** dans le Conseiller : `ton: 'aujourdhui'` (règle) ⇒ titre en gras + `Pastille ton="accent"` « Aujourd'hui » ;
+  plus aucun `ton="ambre"` (audit C5 le refuse dans Conseiller.jsx, conseiller.css, Presentation.jsx, DemandeVRM.jsx, demande.css).
+  L'apparence (fond gris clair, cartes blanches, texte foncé) vient des jetons `--n-*` que pose l'agent design pour toute
+  l'app : re-fusionner `origin/main` quand ils arrivent, rien à changer ici (aucune couleur en dur).
+- **« Pourquoi ? »** sur chaque conseil (bouton texte à côté du geste) : l'explication de LA règle (`cons.<id>.pourquoi`, 5
+  langues) et le visuel du conseil rejoué en mouvement (bâtons qui poussent, barres qui se remplissent, N° et photos qui
+  arrivent) ; rien si mouvement réduit.
+- **Présentation animée** (`src/conseiller/Presentation.jsx`) au premier passage sur l'écran : 4 étapes de 4,5 s (≈ 18 s) —
+  un conseil · d'où viennent les chiffres · rien ne part sans toi · pose ta question — scènes en CSS pur, « Passer »,
+  points touchables (44 px), « Revoir la présentation » ; mouvement réduit : aucune animation, aucun défilement automatique.
+  « Vu » sur l'appareil (`vrm_conseiller_presentation_vue`, une commodité d'affichage, jamais une donnée).
+- Banc : K6 (aucun orange, gras + pastille), K11 (« Pourquoi ? »), P1–P3 (présentation) ; mutations `pourquoi`, `presauto`,
+  `orange`. **À lancer après 15:30 UTC.**
+
+## Vérifications lourdes (23 nov., après 15:31 UTC)
+- `npx vite build` (branche `claude/conseiller-ia`) : vert.
+- Banc `conseiller` : **90 verts** (tranche 1) et **134 verts** (tranche 2, avec « Demande à VRM »), 390 tactile et 1512,
+  clair et sombre. Mutations du banc : **9/9 rouges** (carte5, cartevide, ambre, colonne, boutontexte, tropdetexte,
+  pourquoi, presauto, orange). Captures regardées ; trois défauts vus et corrigés (« Pourquoi ? » écrasait le bouton, bouton
+  étiré sans visuel, Demande à VRM plus large que les colonnes ; coût de l'IA coupé).
+- Passe complète `lancer-audits` : 797 verts, 37 rouges ; les 37 relancés sur `origin/main` : **34 déjà rouges sur main**,
+  **3 de ce lot, corrigés** (pluriels-croises, rentabilite C3 — sources du Conseiller admises comme lecteur de vendsMieux,
+  francais-differe — clés renommées pour ne plus charger au démarrage : 80,9 → 79,8 Ko) ; bancs (`verif_visuel`/`verif_dark`
+  rendent `conseiller`). `poids-demarrage` est rouge sur main aussi (pas de `dist/` dans l'arbre).
+- CI : `comptes-et-reception` rouge sur la PR ET sur le dernier commit de main (même pas : `audit-parcours-production`) ;
+  le reste en file d'attente (CI saturée). Fusion : pas avant le 24 nov. 07:00 UTC (consigne du coordinateur).
+- Captures : `docs/design/avant-apres/conseiller-{390,1512}-{avant,apres}.png`, `conseiller-presentation.png`.
+
+## Jauges (retour du coordinateur, 23 nov. soir)
+- Défaut vu sur `conseiller-1512-apres.png` : barres « 83 % » / « 82 % » remplies à ~15 % sur une piste de ~45 px. Cause :
+  la `Progression` native (paliers `data-n-h`) posée dans une case étroite. Remplacée par une jauge SVG (viewBox 0–100 : la
+  largeur du plein EST le pourcentage), sur toute la largeur utile, légendée : « 83 % des prix d'achat connus », « 82 % du
+  seuil de TVA » (micro, TVA majorée selon le seuil). Comptes : deux barres légendées (compte · N ventes en 30 j) ; au
+  téléphone elles prennent la ligne entière.
+- Banc **K12** : plein ≈ pourcentage ± 3 %, piste ≥ 40 % de la rangée, libellé qui dit le nombre et ce qu'il mesure ; deux
+  barres légendées pour les comptes. **Rouge sur le code d'avant** (K12 × 2 sur l'arbre `git archive` avant le correctif),
+  **vert après** (banc complet 142 verts), mutation `jauge` (plein ÷ 6) **rouge**.
+- Au passage : `audit-traduction` (clé de seuil écrite en clair ; la présentation n'emprunte plus une clé de la tranche 2).
