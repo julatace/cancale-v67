@@ -41,7 +41,7 @@ html {
   --ap-teinte: var(--n-teinte, rgb(11 81 57 / .12));
   --ap-ambre: var(--n-ambre, #8A4B00);
   --ap-ambre-fond: var(--n-ambre-fond, #FFF4DD);
-  --ap-ambre-point: #FF9500;
+  --ap-ambre-point: var(--n-accent, #3D4B5B);   /* (23 nov.) plus d orange */
   --ap-matiere: rgb(249 249 249 / .94);
   --ap-flou: saturate(180%) blur(20px);
   --ap-ombre-wallet: 0 8px 30px rgb(0 0 0 / .12);
