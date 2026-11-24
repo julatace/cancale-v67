@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (24 nov., sauts-orange — le robot de la journée iPhone : « la mise en page saute », « encore de l'orange ») docs/passation/2026-11-24-sauts-orange.md
+  { id: 'sans-sauts-orange', date: '2026-11-24', titre: 'Écrans stables au chargement, plus d’orange', phrase: 'Achats, Argent et la loupe ne bougent plus sous ton doigt.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (24 nov., parcours-iphone — Julien : « elle bug trop encore ») docs/passation/2026-11-24-parcours-iphone.md
   { id: 'comptoir-retour', date: '2026-11-24', titre: 'Code au comptoir : le retour le ferme', phrase: 'Sur iPhone, le geste retour ne quitte plus VRM.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov., Julien : « tous les tutos doivent ressembler à l'application ») docs/passation/2026-11-23-tutos-design.md
