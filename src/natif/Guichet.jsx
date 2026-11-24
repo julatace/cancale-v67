@@ -140,8 +140,14 @@ export function Guichet({ point, colis = [], depart = '', aides, Photo, Icon, Lo
   // La page dessous ne défile plus tant que la feuille est ouverte.
   React.useEffect(() => { const h = document.documentElement; const avant = h.style.overflow; h.style.overflow = 'hidden'; return () => { h.style.overflow = avant; }; }, []);
   React.useLayoutEffect(() => { const r = rail.current; if (r && i0) r.scrollLeft = i0 * r.clientWidth; }, []);   // eslint-disable-line react-hooks/exhaustive-deps
-  const surDefile = () => { const r = rail.current; if (!r || !r.clientWidth) return; const k = Math.round(r.scrollLeft / r.clientWidth); if (k !== idx && k >= 0 && k < n) setIdx(k); };
-  const aller = (k) => { const r = rail.current; if (!r || k < 0 || k >= n) return; setIdx(k); try { r.scrollTo({ left: k * r.clientWidth, behavior: 'smooth' }); } catch (_) { r.scrollLeft = k * r.clientWidth; } };
+  // Le colis affiché suit le défilement (le doigt) ; pendant un défilement lancé par ‹ › il ne bouge pas, puis il est relu à
+  // l'arrêt (sinon un événement de défilement intermédiaire remettait l'ancien numéro).
+  const verrou = React.useRef(0);
+  const relire = () => { const r = rail.current; if (!r || !r.clientWidth) return; const k = Math.round(r.scrollLeft / r.clientWidth); if (k >= 0 && k < n) setIdx(k); };
+  const surDefile = () => { if (Date.now() < verrou.current) return; relire(); };
+  const aller = (k) => { const r = rail.current; if (!r || k < 0 || k >= n) return; setIdx(k); verrou.current = Date.now() + 900;
+    try { r.scrollTo({ left: k * r.clientWidth, behavior: 'smooth' }); } catch (_) { r.scrollLeft = k * r.clientWidth; }
+    setTimeout(() => { verrou.current = 0; const q = rail.current; if (q && Math.abs(q.scrollLeft - k * q.clientWidth) > 2) q.scrollLeft = k * q.clientWidth; relire(); }, 950); };
   const retirer = (x) => { const cle = x.cle || x.id; let id = null; try { id = aides.retirer ? aides.retirer(x) : null; } catch (_) { id = null; } setEtats((e) => ({ ...e, [cle]: { fait: true, id: id == null ? null : id } })); };
   const annuler = (x) => { const cle = x.cle || x.id; const e = etats[cle]; if (e && e.id != null && aides.annuler) { try { aides.annuler(e.id); } catch (_) {} } setEtats((s) => { const u = { ...s }; delete u[cle]; return u; }); };
   const transp = ((point && point.transporteurs) || [])[0] || '';

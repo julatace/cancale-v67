@@ -412,7 +412,7 @@
     height: 44px !important; min-height: 44px !important; margin: -10px -6px -10px 0 !important; padding: 0 6px !important; font-size: var(--d-t-13, 13px) !important; color: var(--n-encre-2, #6E6E73) !important; }
   :root:root:root:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-sous { padding: 0 0 4px !important; }
   :root:root:root:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) { margin-top: 8px !important; padding-top: 10px !important; border-top: 1px solid var(--n-trait, rgba(0,0,0,.08)) !important; min-width: 0 !important; }
-  :root:root:root:root:root:root body .vrm-main .vrm-achats-barre { flex-wrap: wrap !important; justify-content: flex-end !important; row-gap: 4px !important; }
+  :root:root:root:root:root:root body .vrm-main .vrm-achats-barre { flex-wrap: wrap !important; justify-content: flex-end !important; row-gap: 4px !important; padding-left: 16px !important; padding-right: 16px !important; box-sizing: border-box !important; max-width: 100% !important; }
   :root:root:root:root:root:root body .vrm-main .vrm-achats-barre > .vrm-seg { flex: 1 1 100% !important; min-width: 0 !important; max-width: 100% !important; overflow: visible !important; display: flex !important; }
   :root:root:root:root:root:root body .vrm-main .vrm-achats-barre > .vrm-seg > .vrm-seg-btn { flex: 1 1 0 !important; min-width: 0 !important; padding-left: 4px !important; padding-right: 4px !important; justify-content: center !important; }
 }

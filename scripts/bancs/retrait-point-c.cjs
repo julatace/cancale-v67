@@ -142,7 +142,7 @@ const guichet = () => !!document.querySelector('.vrm-qr-view, [data-qr-view], [d
       dit(r.deb <= 1, `K5 rien ne déborde (${r.deb})`);
       // K7–K12 (23 nov. au soir, capture de Julien)
       dit(!!vg && vg.horaires && vg.nomLignes === 1, `K7 le point réel (Vinted Go, sans code postal, horaires) est nommé « ${vg && vg.nom} », horaires dits, titre sur ${vg && vg.nomLignes} ligne`, vg && { horaires: vg.horaires, nomLignes: vg.nomLignes });
-      dit(r.points.every((p) => p.nomLignes === 1 && p.adrLignes <= 1 && p.horairesEntiers), `K7 chaque point : nom sur une ligne, « adresse · horaires » sur une ligne au plus, horaires entiers (${r.points.map((p) => p.nomLignes + '/' + p.adrLignes).join(' ')})`, r.points.map((p) => [p.nom, p.nomLignes, p.adrLignes, p.horairesEntiers]));
+      dit(r.points.every((p) => p.nomLignes === 1 && p.adrLignes <= 2 && p.horairesEntiers), `K7 chaque point : nom sur une ligne, l’adresse ENTIÈRE (deux lignes au plus, 24 nov. : jamais coupée), horaires entiers (${r.points.map((p) => p.nomLignes + '/' + p.adrLignes).join(' ')})`, r.points.map((p) => [p.nom, p.nomLignes, p.adrLignes, p.horairesEntiers]));
       const logos = r.points.map((p) => p.logo).filter(Boolean);
       dit(logos.length === r.points.length && logos.every((l) => l.ecart <= 3) && new Set(logos.map((l) => l.w + 'x' + l.h)).size === 1 && logos.every((l) => l.tuile === l.w),
         `K7 chaque logo centré sur son titre (écarts ${logos.map((l) => l.ecart).join(',')} px), même boîte (${[...new Set(logos.map((l) => l.w + 'x' + l.h))].join(' / ')}), le logo ENTIER la remplit (${logos.map((l) => l.tuile).join(',')})`, logos);

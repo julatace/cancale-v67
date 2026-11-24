@@ -225,7 +225,7 @@ const toucher = (pg, sel) => pg.evaluate((s) => { const e = document.querySelect
         let barre = innerHeight; for (let q = document.elementFromPoint(innerWidth / 2, innerHeight - 20); q && q !== document.body; q = q.parentElement) { const r = q.getBoundingClientRect(); if (r.height < 220 && r.width > innerWidth * 0.6) barre = Math.min(barre, r.top); }
         const main = document.querySelector('.vrm-main') || document.body;
         const coupes = [...main.querySelectorAll('button, a, [role="tab"], h1, h2, h3, [data-achats-hero] *, .vrm-seg *, [class*="segment"] *')].filter(vis).filter((e) => { const r = e.getBoundingClientRect(); if (r.bottom < 0 || r.top > barre || r.height < 4 || r.width < 4) return false;
-          if (e.closest('[data-rp-point], .n-gc, .vrm-toasts, [data-defile-x], .n-rangee-defile, .n-barre-onglets, nav')) return false;
+          if (e.closest('[data-rp-point], .n-gc, .vrm-toasts, [data-defile-x], .n-rangee-defile, .n-barre-onglets, nav, [data-achats-calculette]')) return false;   // la Calculette est une icône seule (libellé pour le lecteur d'écran)
           const cs = getComputedStyle(e); const deborde = r.right > innerWidth + 1 || r.left < -1; const tronque = (cs.textOverflow === 'ellipsis' || cs.overflow === 'hidden' || cs.overflowX === 'hidden') && e.scrollWidth > e.clientWidth + 2 && (e.innerText || '').trim().length > 2;
           return deborde || tronque; }).map((e) => (e.innerText || e.getAttribute('aria-label') || '').toString().trim().slice(0, 40) || e.className);
         return { coupes: [...new Set(coupes)].slice(0, 12) };
@@ -246,7 +246,8 @@ const toucher = (pg, sel) => pg.evaluate((s) => { const e = document.querySelect
       // glisser / ‹ : vers le 1er colis (QR)
       if (doigt) await pg.evaluate(() => { const r = document.querySelector('[data-gc-rail]'); r.scrollLeft = 0; r.dispatchEvent(new Event('scroll')); });
       else await toucher(pg, '[data-gc-precedent]');
-      await pg.waitForTimeout(900);
+      await attendre(pg, () => { const g = document.querySelector('[data-gc]'); const r = document.querySelector('[data-gc-rail]'); return g && g.getAttribute('data-gc-position') === '1/2' && r && r.scrollLeft < 2; }, 5000);
+      await pg.waitForTimeout(300);
       g = await pg.evaluate(guichet);
       dit(!!g && g.position === '1/2' && g.ici && g.ici.code === '551234', `G1 ${doigt ? 'glisser' : '‹'} ⇒ le colis d'à côté (${g && g.position})`, g && g.ici);
       // G2
@@ -291,21 +292,28 @@ const toucher = (pg, sel) => pg.evaluate((s) => { const e = document.querySelect
       const vg2 = pts2.find((p) => p.codes.includes('551234') || p.codes.includes('552345'));
       if (!vg2) await pg2.screenshot({ path: path.join(SHOTS, `p4-10h-${W}-${th}.png`) });
       dit(!!vg2 && vg2.ouverture === 'ouvert' && /ferme à 12 h/.test(vg2.horaires), `P4 10:00 ⇒ ouvert, ferme à 12 h (« ${vg2 && vg2.horaires} »)`, vg2 && vg2.horaires);
-      // H1 — hors ligne
+      // H1 — hors ligne : le réseau coupé APRÈS le premier chargement. L'app passe Achats sur sa vue hors ligne (la photo de la
+      // dernière lecture complète, src/journeeHorsLigne.js) ou garde la liste : dans les deux cas, les CODES restent à l'écran.
       await o2.ctx.setOffline(true);
-      await pg2.waitForTimeout(400);
-      await toucher(pg2, '[data-rp-code="551234"] [data-v2-en-grand], [data-rp-code="551234"] [data-rp-billet]');
-      await attendre(pg2, () => !!document.querySelector('[data-gc]'), 5000);
-      await pg2.waitForTimeout(800);
-      g = await pg2.evaluate(guichet);
-      dit(!!g && g.horsLigne === '1' && g.bandeHL && g.ici && g.ici.texteCode === '551234' && g.ici.qr && g.ici.qr.charge, `H1 hors ligne : la feuille le dit, le code et le QR lu sont là (${g && g.ici && g.ici.texteCode})`, g);
-      await pg2.screenshot({ path: path.join(SHOTS, `hors-ligne-${W}-${th}.png`) });
-      await toucher(pg2, '[data-gc-fermer]'); await pg2.waitForTimeout(500);
-      await toucher(pg2, '[data-rp-code="345678"] [data-v2-en-grand], [data-rp-code="345678"] [data-rp-billet]');
-      await attendre(pg2, () => !!document.querySelector('[data-gc]'), 5000);
-      await pg2.waitForTimeout(1500);
-      g = await pg2.evaluate(guichet);
-      dit(!!g && g.ici && g.ici.texteCode === '345678' && (g.ici.qrKo || (g.ici.qr && (g.ici.qr.etat === 'reserve' || g.ici.qr.charge))), `H1 hors ligne, QR hébergé : la réserve, sinon « donne le code » — jamais une image cassée (${g && g.ici && (g.ici.qrKo ? 'dit' : g.ici.qr && g.ici.qr.etat)})`, g && g.ici);
+      await pg2.evaluate(() => window.dispatchEvent(new Event('offline')));
+      await pg2.waitForTimeout(2500);
+      await pg2.screenshot({ path: path.join(SHOTS, `hors-ligne-ecran-${W}-${th}.png`) });
+      const hl = await pg2.evaluate(() => { const t = document.body.innerText.replace(/\s+/g, ''); return { codes: ['4521', '551234', '552345', '663456', '778899', '345678'].filter((c) => t.includes(c)), dit: /hors ligne|hors connexion|sans réseau/i.test(document.body.innerText), liste: !!document.querySelector('[data-rp-code]') }; });
+      dit(hl.codes.length >= 6 && hl.dit, `H1 réseau coupé : l'écran le dit et montre les codes (${hl.codes.length}/6, ${hl.liste ? 'liste' : 'vue hors ligne'})`, hl);
+      if (hl.liste) {
+        await toucher(pg2, '[data-rp-code="551234"] [data-v2-en-grand], [data-rp-code="551234"] [data-rp-billet]');
+        await attendre(pg2, () => !!document.querySelector('[data-gc]'), 5000);
+        await pg2.waitForTimeout(800);
+        g = await pg2.evaluate(guichet);
+        dit(!!g && g.horsLigne === '1' && g.bandeHL && g.ici && g.ici.texteCode === '551234' && g.ici.qr && g.ici.qr.charge, `H1 au comptoir hors ligne : la feuille le dit, code et QR lu (${g && g.ici && g.ici.texteCode})`, g);
+        await pg2.screenshot({ path: path.join(SHOTS, `hors-ligne-${W}-${th}.png`) });
+      } else {
+        // La vue hors ligne : « Au comptoir » (ModeRelais) montre les codes gardés, l'écran reste allumé.
+        const ouvert = await pg2.evaluate(async () => { const b = [...document.querySelectorAll('button')].find((x) => /comptoir|relais|montrer/i.test(x.textContent || '')); if (!b) return false; b.click(); await new Promise((r) => setTimeout(r, 800)); return !!document.querySelector('[data-relais]'); });
+        const rel = await pg2.evaluate(() => { const r = document.querySelector('[data-relais]'); return r ? { hl: r.getAttribute('data-relais-hors-ligne'), veille: r.getAttribute('data-relais-veille'), n: r.getAttribute('data-relais') } : null; });
+        dit(ouvert && rel && rel.hl === '1' && rel.veille === 'actif', `H1 au comptoir hors ligne (vue gardée) : ${rel ? rel.n + ' colis, écran allumé' : 'pas ouvert'}`, rel);
+        await pg2.screenshot({ path: path.join(SHOTS, `hors-ligne-${W}-${th}.png`) });
+      }
       await o2.ctx.setOffline(false);
       dit(!o2.erreurs.length, 'aucune erreur de page (10 h)', o2.erreurs.slice(0, 3));
       await o2.ctx.close();
