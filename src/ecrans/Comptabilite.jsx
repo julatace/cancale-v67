@@ -23931,7 +23931,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 const titreLu = o && !(o._venteEmail && String(o.title || '') === 'Vente Vinted') ? String(o.title || '') : '';
                 const titre = titreLu || String((an && an.title) || (fiche && fiche.title) || '') || (x.plateforme === 'Vinted' ? tr('v2.dv.enLecture') : '');
                 const photo = (o ? orderPhoto(o) : null) || (an ? orderPhoto(an) : null) || (fiche && fiche.photo) || null;
-                return { cle: x.cle, site: x.plateforme, ts: x.ts, prix: montant(x.eur), titre, photo, num,
+                return { cle: x.cle, tx: x.tx != null ? String(x.tx) : '', site: x.plateforme, ts: x.ts, prix: montant(x.eur), titre, photo, num,
                   ouvrir: num ? () => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: num })); } catch (_) {} } : () => { if (onNav) onNav('cat_ventes'); } };
               });
               return { etat: 'lu', lignes };
@@ -23951,7 +23951,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 lecture={(Array.isArray(listings.items) && listings.items.length > 0) || (Array.isArray(sales.items) && sales.items.length > 0) ? true : null}
                 numeros={(usedNumeros || []).length > 0 || Object.values(numeros || {}).some((e) => e && String(e.numero || '').trim())}/></> : null}
               pret={baseKO || [xE, xR, xM, xP].every((x) => !!x && !x.pasSu)}
-              affiche={{ n: nE, pasSu: nE == null, sous: ecart, ambre: colisJournee.some((c) => c.e && c.e.ambre) }}
+              affiche={{ n: nE, pasSu: nE == null, sous: ecart, ambre: colisJournee.some((c) => c.e && c.e.ambre), prets: nE == null || !em ? null : { n: nPrets, exact: em.exact !== false } }}
               // (19 nov., fiche directe) Un colis de la bande désigne un article : le toucher ouvre SA fiche, par identité (son N°,
               // le n° de transaction de SA vente, l'identifiant de son annonce — src/ficheLigne.js), jamais par son titre.
               colis={nE ? colisJournee.map((c) => ({ ...c, fl: attrsFicheLigne({ contexte: 'journee', site: c.site, cle: 'j' + c.cle, nums: c.num ? [String(c.num)] : [], tx: c.site === 'vinted' ? String(c.cle).slice(2) : '', item: c.idAnnonce || '', photo: typeof c.photo === 'string' ? c.photo : '', titre: c.titre || '', prix: c.prix || '' }) })) : []}

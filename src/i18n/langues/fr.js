@@ -31,6 +31,8 @@ import ecran_apresFinale from './fr/apresFinale.js';   // (22 nov.) après la fi
 import ecran_styleClarte from './fr/styleClarte.js';   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './fr/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './fr/ext5438.js';   // (22 nov.) ext. 5.438
+import ecran_moderationCarte from './fr/moderationCarte.js';
+import ecran_visuelJeu from './fr/visuelJeu.js';   // (24 nov.) le langage « jeu vidéo »   // (23 nov.) « Vinted a agi » regroupée
 import ecran_ext5428 from './fr/ext5428.js';   // (21 nov.) ext. 5.428   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_relier_retires from './fr/relierRetires.js';   // (21 nov.) relier ce qui est chez moi, colis non retirés, remboursés hors dépenses
 import ecran_verre2 from './fr/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
@@ -2413,6 +2415,8 @@ export default {
   ...ecran_ext5428,
   ...ecran_lotachat,
   ...ecran_ext5438,
+  ...ecran_moderationCarte,
+  ...ecran_visuelJeu,
   ...ecran_a_distance,
   ...ecran_connexions_ext,
   ...ecran_agir,
