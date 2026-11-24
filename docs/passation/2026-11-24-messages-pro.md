@@ -60,6 +60,11 @@ puces), grille de 4 pt, cibles 44 px, clair et sombre. Textes : `mpro.*` dans `s
   `<LignePlancher plancher={plancherDeItem(itemF,pc?.devise)} … puce>`), quoi-de-neuf vert (et l'ordre cassé par la fusion
   de visuel-jeu remis), icônes vertes, actions-app vert.
 
+- Voisins, même build avant/après (le build de la base contre celui-ci) : messagerie 15 rouges / 15, messages-volets 2 / 2,
+  plancher-stock 2 / 2, messages-sites 13 / 13, messages-naturel 25 / 25 — **les mêmes avant et après** (déjà rouges sur la
+  base : les gestes d'offre ont changé de forme avec #1364, `data-offre-geste` n'existe plus) ; textes-visibles 18 verts
+  (plafonds inchangés) ; messages-lisibles n'a rien rendu dans le temps imparti. `--prouve` d'agir-si-connecte : 2/2 rouges.
+
 ## Pièges trouvés en route (pour la suite)
 - Les couches d'avant peignent la bulle REÇUE par variables (`--v2-socle`, `--d-bulle-autre`, `--sb-porcelaine`…) qui
   valent le gris du fond en clair : la bulle était invisible (mesuré `rgb(223,225,229)`). Corrigé en posant ces variables
