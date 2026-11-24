@@ -219,6 +219,7 @@ function mesurer() {
       await attendreQue(pg, () => !!document.querySelector('[data-mp-bandeau]') && !!document.querySelector('[data-mp-offre]'), null, 20000);
       await attendre(900); await photo(pg, `B-lecture-offre-${nom}`);
       const mb = await pg.evaluate(mesurer).catch((e) => ({ err: String(e) }));
+      if (process.env.PROBE) console.log(await pg.evaluate(fs.readFileSync(process.env.PROBE, 'utf8')).catch((e) => String(e)));
       dit(fb && fb.agir === 'lecture', `${nom} B : la porte dit « lecture seule »`, JSON.stringify(fb));
       dit(mb && mb.bandeaux === 1 && mb.fois === 1 && mb.raisonsBoutons === 0 && /atelier_b/.test(mb.raison), `${nom} B : la raison écrite UNE fois (le bandeau), aucune sous les boutons`, JSON.stringify(mb && { b: mb.bandeaux, f: mb.fois, rb: mb.raisonsBoutons, r: mb.raison }));
       dit(mb && mb.ouvrir, `${nom} B : « Ouvrir Vinted » dans le bandeau`);

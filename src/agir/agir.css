@@ -96,3 +96,8 @@
 .vrm-chat-panel { --sb-porcelaine: var(--n-carte); --sb-porcelaine-2: var(--n-carte); --sb-creux: var(--n-carte); --sb-r-champ: 22px; }
 /* Le bouton d'envoi est ROND : ses jetons de rayon et de relief posés sur lui (les couches qui les lisent suivent). */
 .vrm-mp-compose .n-bouton.vrm-mp-envoyer { --n-r-bouton: 50%; --n-r-plein: 50%; --g-r-bouton: 50%; --g-plein-relief: none; --g-plein-relief-appui: none; }
+/* La bulle REÇUE : les couches d'avant la peignent par variables (--v2-socle, --d-bulle-autre, --sb-porcelaine, --vrm-card2…)
+   qui valent le gris du fond en clair ⇒ bulle invisible (mesuré : rgb(223,225,229) = --n-fond). Sur SA rangée seulement,
+   ces variables prennent la carte claire : la bulle de l'autre personne redevient une bulle (comme iMessage, WhatsApp). */
+.vrm-chat-panel .vrm-bulle-l:not(.vrm-bulle-moi) { --v2-socle: var(--n-carte); --d-bulle-autre: var(--n-carte); --sb-porcelaine: var(--n-carte); --sb-porcelaine-2: var(--n-carte);
+  --vrm-card2: var(--n-carte); --vrm-surface: var(--n-carte); }
