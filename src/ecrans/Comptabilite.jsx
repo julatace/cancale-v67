@@ -14669,6 +14669,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [achatsAffiches, selEff, modeRetraits, depComptes.deplies, depComptes.maxCompte, achatsMax]);
   const [achatsOutilsOuverts, setAchatsOutilsOuverts] = useState(false);
+  const [detailRetraitsTel, setDetailRetraitsTel] = useState(false);   // (23 nov., revue UX #7) le détail des retraits demandé par « ⋯ » (téléphone)
   // ── ACHATS · ACTIONS RAPIDES (note interne + menu « … ») ──────────────────
   // Note interne par achat (synchronisée, clé = transaction_id) + menu groupant
   // les actions (attestation d'achat / remboursement, étiquette SKU, masquer).
@@ -17346,8 +17347,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // ventes » (la même, `ouvrirGlisser`) ; Achats monté plus tard la prend à son arrivée (15 s). Rien n'est relié sans SON glisser puis son « Oui ».
   React.useEffect(() => {
     if (only !== 'achats') return undefined;
-    const f = () => { DEMANDE_GLISSER.at = 0; ouvrirGlisser(); };
-    if (DEMANDE_GLISSER.at && Date.now() - DEMANDE_GLISSER.at < 15000) f();
+    // (23 nov.) « Relier un achat » depuis le ⋯ d'une annonce : la feuille s'ouvre sur CETTE annonce (`window.__vrmRelierCible`, 15 s).
+    const f = () => { DEMANDE_GLISSER.at = 0; const c = window.__vrmRelierCible; window.__vrmRelierCible = null;
+      ouvrirGlisser(c && c.cible && Date.now() - c.at < 15000 ? { cible: c.cible } : null); };
+    if ((DEMANDE_GLISSER.at && Date.now() - DEMANDE_GLISSER.at < 15000) || (window.__vrmRelierCible && Date.now() - window.__vrmRelierCible.at < 15000)) f();
     window.addEventListener('vrm:relier-ouvrir', f);
     return () => window.removeEventListener('vrm:relier-ouvrir', f);
   }, [only]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -20105,10 +20108,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const composerLot = async (lignes, format, tampons, { apercu = false, pas = null, places = null } = {}) => {
     const items = [], raisons = {};
     // (22 nov., défaut « Argent bloqué ») Les étiquettes lues pendant la composition : UN signal à la fin (`avecRafaleEtiquettes`).
-    const lues = await avecRafaleEtiquettes(async () => { const L = []; for (const l of lignes) L.push(await lireOctetsLigne(l)); return L; });
+    // (24 nov., main-vert) La progression avance APRÈS la lecture de CHAQUE bordereau (dans la boucle de lecture) — depuis
+    // le 22 nov. elle ne bougeait qu'une fois TOUT lu (0 sur 50, puis 50 d'un coup ; banc lot-preparation-reprise).
+    const lues = await avecRafaleEtiquettes(async () => { const L = []; for (const l of lignes) { L.push(await lireOctetsLigne(l)); if (pas) pas(L.length); } return L; });
     for (const [i, l] of lignes.entries()) {
       const o = lues[i];
-      if (pas) pas(i + 1);
       if (!o.buf) { raisons[l.cle] = o.raison; continue; }
       items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: o.buf, invBytes: o.invBytes, cle: l.cle, site: l.site, ligne: l, retour: estRetour(l), tampon: !estRetour(l) && TAMPONS_IMPR.includes((tampons || {})[l.cle]) ? tampons[l.cle] : null, places: places && places[l.cle] ? places[l.cle] : null });
     }
@@ -21138,7 +21142,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // rougit si un nom manque (`--ecrire` réécrit la liste). Même règle, même résultat : seulement moins souvent calculé.
   const cleVerifier = useRef(null);
   const commandesAVerifier = () => {
-    const cle = /* ⟦cle-verifier⟧ */ [bordLinks, bordParTx, bordsHidden, bordsParTxn, bordsPrinted, bordsShipped, bordsVenteEmailParTx, buyByNum, buysBase, cochesNonPartis, colisParTx, emailBords, hiddenSales, indexSuivisAchats, labelsCaptes, lbcLu, lbcVentes, numeros, numerosByPhoto, numerosByPhotoDir, onlineAnnonceIds, ordSearchDiff, panelBordsDone, partisVinted, periode, pickupUnion, saleOv, sales, shipDone, shippedSuivis, siteColis, soldByTxn, tracking, transpMap, txRetourAchat, txnItem, txnLink, vcEtat, ventesEmail, ventesEmailParTx, versements, C, _pdfEtiquettes, vcLoc0.departs, versionMemoire(), Math.floor(Date.now() / 10000)] /* ⟦/cle-verifier⟧ */;
+    const cle = /* ⟦cle-verifier⟧ */ [bordLinks, bordParTx, bordsHidden, bordsParTxn, bordsPrinted, bordsShipped, bordsVenteEmailParTx, buyByNum, buysBase, cochesNonPartis, colisEmailSources, colisParTx, emailBords, hiddenSales, indexSuivisAchats, labelsCaptes, lbcLu, lbcVentes, numeros, numerosByPhoto, numerosByPhotoDir, onlineAnnonceIds, ordSearchDiff, panelBordsDone, partisVinted, periode, pickupUnion, saleOv, sales, shipDone, shippedSuivis, siteColis, soldByTxn, tracking, transpMap, txRetourAchat, txnItem, txnLink, vcEtat, ventesEmailParTx, versements, C, _pdfEtiquettes, vcLoc0.departs, versionMemoire(), Math.floor(Date.now() / 10000), ventesEmail] /* ⟦/cle-verifier⟧ */;
     const m = cleVerifier.current;
     if (m && m.cle.length === cle.length && m.cle.every((x, i) => Object.is(x, cle[i])) && stockageInchange(m.lu)) return m.r;
     const { r, lu } = suivreStockage(commandesAVerifierCalc);
@@ -23479,7 +23483,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 const l = liaisonJ && liaisonJ.lu ? liaisonJ.file.filter((x) => !x.plusTard) : [];
                 return (
                   <button key="meme-photo" type="button" className="vrm-day-task vrm-fu-tache" data-journee-meme-photo={l.map((x) => x.cle).join(' ')} data-journee-liaison="" data-n={String(memeJ.n)}
-                    title={`${memeJ.titre}\n${memeJ.detail}`} aria-label={`${memeJ.titre} — ${memeJ.detail}`} onClick={() => ouvrirLiaison()}>
+                    title={`${memeJ.titre}\n${memeJ.detail}`} onClick={() => ouvrirLiaison()}>
                     <PileVignettes srcs={l.map((x) => x.annonce.photo)} n={memeJ.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="image" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{memeJ.titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="meme-photo">{memeJ.detail}</span></span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
@@ -23945,7 +23949,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               colis={nE ? colisJournee.map((c) => ({ ...c, fl: attrsFicheLigne({ contexte: 'journee', site: c.site, cle: 'j' + c.cle, nums: c.num ? [String(c.num)] : [], tx: c.site === 'vinted' ? String(c.cle).slice(2) : '', item: c.idAnnonce || '', photo: typeof c.photo === 'string' ? c.photo : '', titre: c.titre || '', prix: c.prix || '' }) })) : []}
               retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ, prevision: lu(xR) && xR.t.prevision ? xR.t.prevision : null }}
               groupes={baseKO ? null : groupesJ} alerte={alerteJ} ventes={dernieresJ}
-              plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimerCourt'), faire: () => { poserPendingBordPrint('imprimer'); if (onNav) onNav(xE.tab); } } : null}
+              plein={nPrets > 0 ? { n: nPrets, exact: !(em && em.exact === false), txt: tr('v2.imprimerCourt'), faire: () => { poserPendingBordPrint('imprimer'); if (onNav) onNav(xE.tab); } } : null}
               onScanner={() => ouvrirRetrouver('journee')}
               // (23 nov., style-clarte-3) « Publier » : le parcours existant (choisir l'article dans la feuille, `vrm:publier-ailleurs`) ;
               // « Relier » : Achats et sa feuille « Relier achats et ventes » (la même que son bouton).
@@ -25292,7 +25296,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         {/* (11 nov., lot DJ3) « Scanner » au point relais vit dans la barre de la section « À retirer », en tête
             d'Achats (une fois) : ici, la calculette seule. */}
         {/* (14 nov., refonte Achats) La calculette vit dans la barre de recherche quand la liste a des achats (une barre d'outils). */}
-        {dansPlateforme && !modeRetraits && !achatsVidePur ? <div className="vrm-achats-scan" data-achats-scan="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{(!(buysBase.length>0 && aFilter!=='attente') || ordiAchats) ? boutonCalculette : null}{boutonGlisser}</div> : null}
+        {dansPlateforme && !modeRetraits && !achatsVidePur ? <div className="vrm-achats-scan" data-achats-scan="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{ordiAchats ? <>{boutonCalculette}{boutonGlisser}</> : null}</div> : null}
         {/* (3 nov.) LA carte d'Achats parle d'ACHATS (jamais « Vendu · mois ») : Dépensé du mois (la règle de la
             case « Dépensé » plus bas — hors annulés, `montantCommande` — sur le mois en cours), En route et Reçus
             (les nombres des onglets, `phaseReception`), À retirer (`vrm_colis_retirer`). Aucun nombre recalculé. */}
@@ -25334,6 +25338,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         {!retraitsOutils && <ExtEnRetard onNav={onNav}/>}
         {/* (5 nov., revue 2.16) Fournisseurs · Délai · Lots rangés derrière « … » : une seule carte de
             chiffres en tête, les outils à un geste (src/AchatsOutils.jsx, inchangé). */}
+        {/* (23 nov., revue UX #7) Au téléphone, « ⋯ » porte aussi les gestes rares qui étaient posés au-dessus de la liste : Relier achats
+            et ventes, le détail des retraits, la calculette (mêmes gestes, mêmes chemins). */}
+        {!modeRetraits && !baseKO && achatsOutilsOuverts && !ordiAchats && dansPlateforme ? <Natif.Groupe attrs={{ 'data-achats-plus-gestes': '' }}>
+          <Natif.Rangee icone={<Icon name="link" size={20}/>} titre={tr('glisser.entree')} fin="chevron" onClick={() => ouvrirGlisser()} attrs={{ 'data-glisser-ouvrir': 'achats' }}/>
+          <Natif.Rangee icone={<Icon name="qr" size={20}/>} titre={tr('v2.passe.detail')} fin="chevron" onClick={() => { setDetailRetraitsTel(true); setTimeout(() => { try { const el = document.querySelector('[data-v2-detail-retraits]'); if (el) { el.style.scrollMarginTop = '96px'; el.scrollIntoView({ block: 'start' }); } } catch (_) {} }, 120); }} attrs={{ 'data-achats-detail-retraits': '' }}/>
+          <Natif.Rangee icone={<Icon name="euro" size={20}/>} titre={tr('achats.calculette')} fin="chevron" onClick={() => { try { window.dispatchEvent(new Event('vrm:calculette')); } catch (_) {} }} attrs={{ 'data-achats-calculette': '' }}/>
+        </Natif.Groupe> : null}
         {!modeRetraits && !baseKO && achatsOutilsOuverts && <div className="vrm-achats-outils" id="vrm-achats-outils" data-achats-outils="ouverts">
           <AchatsOutils fournisseurs={asoFournisseurs ? { ...asoFournisseurs, actions: foActions } : asoFournisseurs} delai={asoDelai} lots={asoLots} achatsDeclarables={asoDeclarables} fichesLibres={asoFichesLibres}
           onOuvrir={setAsoOuvert} onRelier={asoRelier} onRepartir={asoRepartir} onAnnulerRepartition={asoAnnuler} onDeclarerLot={asoDeclarerLot}
@@ -25477,7 +25488,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label={tr('achats.rechercherAchat')} value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder={tr('achats.titreVendeur')}
             style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/><MicDictee nu titre={tr('achats.chercherVoixNumero')} onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></label>
         )}
-        {ordiAchats ? null : <PeriodePicker value={periode} onChange={setPeriode} titre={tr('achats.periodeAchats')} datation="Date d’achat"/>}{dansPlateforme && !modeRetraits ? boutonCalculette : null}</div>}
+        {/* (23 nov., revue UX #9) Au téléphone, UN bouton nommé « Filtres » (la période des achats) ; la calculette passe dans « ⋯ ». */}
+        {ordiAchats ? null : <span className="vrm-achats-filtre-btn" data-achats-filtres-btn={periode && (periode.from || periode.to) ? '1' : '0'}><PeriodePicker value={periode} onChange={setPeriode} titre={tr('achats.periodeAchats')} datation="Date d’achat" vide={tr('ru.achats.filtres')}/></span>}</div>}
         {/* ── LES CHIFFRES DE L'ACHAT (l'écran n'en avait AUCUN) ─────────────────
             « C'est mon métier, fais ça comme un pro. » L'écran Ventes porte
             quatre chiffres depuis toujours ; Achats, zéro — alors que l'achat,
@@ -26618,7 +26630,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 <div className="vrm-buy-title" style={{color:C.text}} title={o.title}>{o.title}</div>
                 {/* (10 nov., lot AN) Une rangée DA6 : titre · sous-ligne (compte, date, depuis, N°) · une rangée de
                     pastilles (l'état, le reçu, la facture jointe). L'état n'est plus un point de couleur. */}
-                <div className="vrm-buy-meta" style={{color:C.muted}}>
+                {/* (23 nov., capture de Julien : « 12 nov. · · Relais », « 13 nov.   ·  N°247 ») La sous-ligne se construit des
+                    seuls morceaux présents, un séparateur unique entre eux (`data-sep="js"` éteint les séparateurs dessinés en CSS). */}
+                <div className="vrm-buy-meta" data-sep="js" style={{color:C.muted}}>
                   {/* (5 nov., revue 2.16) Achats : le compte en mots, sans pastille de couleur (hors palette). */}
                   {!unCompte && !achatsGroupees && <AcctTag acc={o._acc} name={accNameOf(o._acc)} pastille={false}/>}
                   <span style={{whiteSpace:'nowrap'}}>{o.date?dateFr(o.date, new Date(o.date).getFullYear()===new Date().getFullYear() ? {day:'numeric',month:'short'} : {day:'numeric',month:'short',year:'numeric'}):''}
@@ -26631,7 +26645,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       (`arriveLe`, relié par identité) ; pas lue ⇒ rien d'écrit. */}
                   {!cancelled && !st.retour && st.step===3 && (()=>{ const a=Date.parse((tk&&tk.arriveLe)||''); if(!Number.isFinite(a)) return null; const j=Math.max(0,Math.floor((Date.now()-a)/86400000)); return <span data-achat-au-relais={j} style={{fontWeight:400,color:C.muted,whiteSpace:'normal'}}> {tr('achats.relais')} {j===0?tr('achats.depuisAujourdHui'):tr('achats.depuis', { j: String(j) })}</span>; })()}
                   {!cancelled && !st.retour && st.step>=1 && st.step<3 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:500,color:tard?C.warn:C.muted,whiteSpace:'normal'}}> {tr('achats.depuis2')} {j} j{tard?tr('achats.relanceVendeur'):''}</span>; })()}</span>
-                  {tk && tk.lieu && st.step===3 && <span style={{color:C.text}} title={tk.lieu}>· {(cleanLieu(tk.lieu).nom || tk.lieu)}</span>}
+                  {tk && tk.lieu && st.step===3 && <span style={{color:C.text}} title={tk.lieu}>{(cleanLieu(tk.lieu).nom || tk.lieu)}</span>}
                   {numA!=null && <span title={tr('achats.numeroArticleLien')} style={{fontWeight:600,color:C.text}}>N°{numA}</span>}
                   {o._fromEmail && <span title={tr('achats.reconstitueeDepuisEmail')} style={{fontSize:11,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:12,padding:'0 6px'}}>{tr('achats.email')}</span>}
                 </div>
@@ -26747,12 +26761,18 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 {achatMenu===tid && (<>
                   {/* (23 nov., robot chaque-bouton) Le geste retour (et Échap) referme le menu, sans quitter Achats. */}
                   <FermeAuRetour fermer={close}/>
+                  {/* (23 nov., capture iPhone de Julien : le menu flottait sur la liste et passait sous la barre d'onglets) Au
+                      téléphone, une FEUILLE d'actions qui monte du bas (portail) ; à l'ordinateur, le menu d'avant. */}
+                  {!ordiCompta ? <Natif.Feuille ouverte onFermer={close} titre={o.title || tr('achats.plusActionsAchat')} attrs={{ 'data-achat-feuille': tid }}>
+                    <div role="menu" className="vrm-buy-menu-feuille" data-achat-menu-feuille={tid}>{itemsMenu}</div>
+                  </Natif.Feuille> : <>
                   <div onClick={close} style={{position:'fixed',inset:0,zIndex:40}}/>
                   {/* (23 nov., robot chaque-bouton) Ouvert sur un achat bas dans l'écran, le menu passait SOUS la barre d'onglets
                       (« Diviser », « Copier le prix »… invisibles) : à l'ouverture, l'écran défile juste assez pour le montrer. */}
                   <div role="menu" className="vrm-buy-menu" ref={(el)=>{ if(!el || el.dataset.vu) return; el.dataset.vu='1'; requestAnimationFrame(()=>{ try { const r=el.getBoundingClientRect(); const barre=document.querySelector('.n-onglets,[data-n-onglets]'); const bas=barre && barre.getClientRects().length ? barre.getBoundingClientRect().top - 8 : window.innerHeight - 8; if (r.bottom > bas) { el.style.scrollMarginBottom = Math.max(0, Math.round(window.innerHeight - bas)) + 'px'; el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } } catch (_) {} }); }} style={{background:C.card,border:`1px solid ${C.border}`,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.18)'}}>
                     {itemsMenu}
                   </div>
+                  </>}
                 </>)}
                 {/* (14 nov., proposition 62) Les MÊMES gestes, dans « Actions » de la fiche ouverte depuis cet achat. */}
                 <DansFiche cle={flAchat['data-fiche-ligne']} seulementFiche>
@@ -29027,6 +29047,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         rangs: rangsNV, ecart: ecartNomme(rangsNV, nCochesV), plein: pleinImprimer({ nC: nCochesV, nR: nNR, occupe: !!batchBusy || !!imprBusy, total: resLot.total + Lret.length }),
                         retours: Lret.map((l) => ({ cle: l.cle, tx: l.tx, num: l.num || '', titre: l.titre || '', vendeur: l.vendeur || '', on: choixNR.has(l.cle) })),
                         format: formatLot, autres: resLot.autres, aPreparer: (nEnv || 0) > 0, aEmballer: nPrets > 0,
+                        // (24 nov., main-vert — règle du 17 nov., chasse-bugs) « Choisir » NOMME ce qui ne part pas (« N°43 attend son
+                        // bordereau ») : les colis Vinted de la liste sans ligne de lot (aucun bordereau reçu), puis les exclus du lot —
+                        // comme le pied d'avant (`vvHorsLotRef`), que l'écran natif ne calculait plus.
+                        exclus: (() => { const vus = new Set(); const hors = rangsNV.filter((r) => r && r.site === 'vinted' && !(r.coche && r.coche.cle)).map((r) => ({ cle: r.cle, num: r.num, titre: r.titre, raison: 'sansBordereau' }));
+                          const X = [...hors, ...resumeLot(Ltous, choixNV).exclus].filter((x) => x && !vus.has(x.cle) && vus.add(x.cle)); return X.length ? texteExclus(tr, X) : ''; })(),
                         bordsPasSu: !!(voitSite('vinted') && emailBordsKO && emailBords === null) },
                       route: onglet === 'envoyes' && !toutesSeules ? routeNatif() : null },
                     g: { onglet: (v) => onOngletColis && onOngletColis(v),
@@ -29346,8 +29371,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     {avecColis || avecAttendus || enRouteV2.some((l) => !l.point) ? null : etatLecture}
                     {/* (20 nov., Julien : « Colis à retirer beaucoup plus visuel ») UNE CARTE PAR POINT (src/natif/RetraitsPoints.jsx) :
                         les mêmes points (`pointsARetirer`), les mêmes gestes ; le prix payé de l'achat relié par identité, les horaires LUS. */}
-                    {avecColis || avecAttendus || enRouteV2.some((l) => !l.point) ? <RetraitsPoints points={parPoint.points || []} Icon={Icon} Photo={photoCarte} Logo={LogoTransporteur}
-                      enRouteSansPoint={((groupesRelais && groupesRelais.sansRelais) || []).filter(() => voitSite('vinted'))} extRelais={extSait('relaisprevu')}
+                    {/* (23 nov., revue UX #7/#8) Rien à retirer ni attendu sous un point : au téléphone, plus de titre « À retirer », de carte
+                        « Rien à retirer » ni de rangée « En route · point pas encore dit » — la bande dit « 0 À retirer » et « 60 En route »
+                        (le même nombre une fois, §7) ; l'onglet « En route » liste ces achats. */}
+                    {!ordiAchats && !avecColis && !avecAttendus ? <span hidden data-achats-retraits-tus={String(enRouteV2.filter((l) => !l.point).length)}/>
+                      : avecColis || avecAttendus || enRouteV2.some((l) => !l.point) ? <RetraitsPoints points={parPoint.points || []} Icon={Icon} Photo={photoCarte} Logo={LogoTransporteur}
+                      enRouteSansPoint={ordiAchats ? ((groupesRelais && groupesRelais.sansRelais) || []).filter(() => voitSite('vinted')) : []} extRelais={extSait('relaisprevu')} compact={!ordiAchats}
                       titre={tr('sv.titre.retirer')} scanner={{ label: tr('sv.scanner.retrait'), ouvrir: () => setScanOuvert(scanRetraitBarre ? 'retrait' : 'envoi') }}
                       aides={{ titre: titreRetrait,
                         nomTransporteur: (k) => (CARRIERS[k] && CARRIERS[k].name) || '',
@@ -29359,7 +29388,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         qrSrc: (x) => { const t = (x.src && x.src.t) || null; return t ? qrVivant(t) : ''; },
                         enGrand: (x) => { const f = qrRetrait(x); if (f) return f; const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
                           if (!x.code) return null; return () => openQrView(t ? (codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : ligneRetraitVinted(o)); } }}/>
-                      : (!videSite && (toutLuRet || essentielLu) && !baseKO ? <RienARetirer/> : null)}
+                      : (!videSite && (toutLuRet || essentielLu) && !baseKO && ordiAchats ? <RienARetirer/> : null)}
                     {/* (17 nov.) Plus de « Aucun colis à aller chercher » ici : « À retirer · 0 » le dit déjà en tête, et cette ligne
                         posée après « En route » le poussait (banc design-v2-chargement). */}
                     {/* (21 nov.) Les achats en route sont DANS la liste des points : sous LEUR point (« En route vers ce point »), ou repliés à la fin
@@ -29369,7 +29398,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
 
                     {/* (20 nov., bugs-terrain) Le détail replié n'est RENDU qu'ouvert : fermé, ses lignes (LigneRetraitF) se recalculaient à
                         chaque rendu d'Achats — 7,9 s de calcul sur 25 s au profil (volume de sa base, processeur ×4). */}
-                    {ancienne && ancienne !== videSite ? <DetailsRepliOuvert className="vrm-repli" attrs={{ 'data-v2-detail-retraits': '' }} resume={tr('v2.passe.detail')}>{ancienne}</DetailsRepliOuvert> : null}
+                    {/* (23 nov., revue UX #7) Au téléphone, le détail se demande par « ⋯ » (il n'est plus posé au-dessus de la liste). */}
+                    {ancienne && ancienne !== videSite && (ordiAchats || detailRetraitsTel) ? <DetailsRepliOuvert className="vrm-repli" attrs={{ 'data-v2-detail-retraits': '' }} resume={tr('v2.passe.detail')}>{ancienne}</DetailsRepliOuvert> : null}
                   </div></QuandLuV2>; })()}
                 {/* (8 nov., retraits) LES COLIS SORTIS DE « À RETIRER », AVEC LA RAISON LUE ET SA DATE (§5 : un colis
                     caché est un colis perdu). Le transporteur, l'e-mail ou la commande Vinted ont dit retiré, livré ou

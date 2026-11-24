@@ -26,6 +26,7 @@ import { nomCompteLie } from '../comptesLies.js';
 import { useComptesBloques, choixComptesBloquesChange } from '../compteBloqueEtat.js';
 import { CLE_COMPTES_BLOQUES, cbPhase, choixPose } from '../compteBloque.js';
 import EnDirect from './EnDirect.jsx';   // (21 nov., ext. 5.428) « En direct »
+import ObservationVinted from './ObservationVinted.jsx';   // (24 nov., ext. 5.440.3) « Observer Vinted (10 min) »
 import './extension.css';
 
 const NOMS_NAV = { chrome: 'Chrome', edge: 'Edge', opera: 'Opera', firefox: 'Firefox', orion: 'Orion' };
@@ -295,6 +296,10 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
             valeur={a.aJour ? tr('ext.aJour') : tr('ext.enRetard')} attrs={{ 'data-ext-appareil': a.id, 'data-ext-a-jour': a.aJour ? '1' : '0' }}/>)}
         </Groupe>
       ) : null}
+
+      {/* (24 nov., ext. 5.440.3 `observation`) « Observer Vinted (10 min) » : le chemin de la page Vinted pendant un envoi à un
+          favori (à la main ou avec un autre outil), formes seulement ; la frise en lecture seule. */}
+      {!chargement ? <ObservationVinted/> : null}
     </Page>
   );
 }

@@ -24,8 +24,13 @@ import '../fiche.css';
 import '../encre-tableaux.css';   // (22 nov. soir) la fiche au prix énorme
 
 const HISTOIRE_REPLIEE = 3;
-const PASTILLES = ['mini', 'achat', 'benefice', 'si-vendue'];
-const TABLEAU = ['taille', 'quand', 'place', 'interet'];   // la taille SUE se lit dans l'en-tête (une étiquette) : le tableau ne la redit pas
+// (23 nov., revue UX #11) Le prix d'achat et le prix mini ne sont plus des puces noyées à côté du prix : deux VRAIES lignes en tête
+// d'« Informations », un champ « — € » qui se tape sur place ; la puce du bénéfice reste à côté du prix (elle se recalcule à la saisie).
+const PASTILLES = ['benefice', 'si-vendue'];
+// (23 nov., revue UX #12) Vues et favoris se lisent UNE fois : dans « Sur les sites » (une colonne chacun). La ligne « intérêt »
+// d'Informations ne vient que quand ce tableau n'est pas rendu (paire en double).
+const TABLEAU = ['achat', 'mini', 'taille', 'quand', 'place', 'interet'];   // la taille SUE se lit dans l'en-tête (une étiquette) : le tableau ne la redit pas
+const LIB_LIGNE = { achat: 'ru.fiche.prixAchat', mini: 'fd.f.mini' };
 
 // Le champ tapé SUR PLACE (prix d'achat, prix mini) : 17 px (l'iPhone ne zoome pas), Entrée ou quitter = écrire, Échap = rien.
 function Champ({ libelle, depart, onValider, onFin }) {
@@ -89,11 +94,11 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
     const benef = f.cle === 'benefice' || f.cle === 'si-vendue';
     // La pastille se voit à 32 px ; le bouton qui la porte fait 44 (la cible au doigt).
     const contenu = <span className="nf-pi">{su
-      ? <>{benef ? null : <span className="nf-pastille-lib">{court}</span>}<span className="nf-pastille-val">{v}</span>{f.partiel ? <span className="nf-pastille-lib">{T.auPlus}</span> : null}</>
-      : <><span className="nf-pastille-lib">{court}</span>{manque(f, porte)}</>}</span>;
+      ? <>{benef ? null : <><span className="nf-pastille-lib">{court}</span>{' '}</>}<span className="nf-pastille-val">{v}</span>{f.partiel ? <span className="nf-pastille-lib">{T.auPlus}</span> : null}</>
+      : <><span className="nf-pastille-lib">{court}</span>{' '}{manque(f, porte)}</>}</span>;
     const ton = benef && su && f.cents != null ? (f.cents < 0 ? 'negatif' : 'positif') : su ? 'neutre' : porte ? 'porte' : 'vide';
     return porte
-      ? <button key={f.cle} type="button" className="nf-pastille" data-nf-ton={ton} onClick={() => toucherFait(f)} aria-label={T.libelle(f.lib) + ' ' + (su ? v : T.ajouter)} {...a}>{contenu}</button>
+      ? <button key={f.cle} type="button" className="nf-pastille" data-nf-ton={ton} onClick={() => toucherFait(f)} aria-label={(benef && su ? '' : court + ' ') + (su ? v : T.ajouter) + ' — ' + T.libelle(f.lib)} {...a}>{contenu}</button>
       : <span key={f.cle} className="nf-pastille" data-nf-ton={ton} {...a}>{contenu}</span>;
   };
   const pastilles = PASTILLES.map(fait).filter(Boolean);
@@ -106,7 +111,8 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
 
   // ── 5. Le tableau des informations ──
   // La taille et la date SUES sont des étiquettes de l'en-tête : le tableau ne les redit pas (pas sues, il dit pourquoi).
-  const lignesInfos = TABLEAU.map(fait).filter((f) => f && !((f.cle === 'taille' || f.cle === 'quand') && suDe(f, valeurDe(f))));
+  const sitesRendus = !!(A && !A.double);
+  const lignesInfos = TABLEAU.map(fait).filter((f) => f && !((f.cle === 'taille' || f.cle === 'quand') && suDe(f, valeurDe(f))) && !(f.cle === 'interet' && sitesRendus));
 
   // ── 7. L'histoire ──
   const tous = histoire ? histoire.lignes : [];
@@ -154,7 +160,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
               {quandF && suDe(quandF, quandV) ? <span className="nf-etiquette" {...attrsFait(quandF, true, null)}>{T.libelle(quandF.lib) + ' ' + quandV}{quandF.auMoins ? ' ' + T.auMoins : ''}</span> : null}
               {tailleF && suDe(tailleF, valeurDe(tailleF)) ? <span className="nf-etiquette" data-nf-taille="" {...attrsFait(tailleF, true, null)}>{T.libelle(tailleF.lib) + ' ' + valeurDe(tailleF)}</span> : null}
               {suiteEtat}
-              {etat && etat.pourquoi && T.pourquoi ? <button type="button" className="nf-pourquoi" aria-expanded={pourquoi ? 'true' : 'false'} onClick={() => setPourquoi((v) => !v)} data-fd-pourquoi={etat.pourquoi}>{T.pourquoi}</button> : null}
+              {etat && etat.pourquoi && T.pourquoi ? <Bouton variante="texte" className="nf-pourquoi" onClick={() => setPourquoi((v) => !v)} attrs={{ 'aria-expanded': pourquoi ? 'true' : 'false', 'data-fd-pourquoi': etat.pourquoi }}>{T.pourquoi}</Bouton> : null}
             </div>
             {/* (24 nov., vente-mail-annonce) La raison du « pas su », UNE fois, sur demande — gris clair, jamais orange. */}
             {etat && etat.pourquoi && pourquoi ? <p className="nf-pourquoi-texte" data-fd-pourquoi-texte="">{T.raison(etat.pourquoi)}</p> : null}
@@ -165,10 +171,33 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
           </div> : null}
           {plein || aActions ? <div className="nf-actions" data-nf-un={plein ? undefined : '1'}>
             {plein ? <Bouton variante="plein" icone={plein.icone ? rendre.icone(plein.icone, 20) : null} onClick={plein.onClick} attrs={{ 'data-fd-plein': '', ...(plein.attrs || {}) }}>{plein.libelle}</Bouton> : null}
-            {aActions ? <button type="button" className="nf-choisir" onClick={() => setMenu(true)} aria-haspopup="dialog" aria-label={T.choisirAction} data-fd-actions-ouvrir="">
+            {aActions ? <button type="button" className="nf-choisir" onClick={() => setMenu(true)} aria-haspopup="dialog" aria-label={`${T.actionsCourt} — ${T.choisirAction}`} data-fd-actions-ouvrir="">
               <span className="nf-choisir-long">{T.choisirAction}</span><span className="nf-choisir-court" aria-hidden="true">{T.actionsCourt}</span><span className="nf-choisir-fleche" aria-hidden="true"><Glyphe nom="chevron" taille={16}/></span></button> : null}
           </div> : null}
           {ligneSeule ? <p className="nf-situe" data-nf-ton={ligneSeule.ambre ? 'ambre' : 'neutre'} data-fd-ligne-action="" {...(ligneSeule.attrs || {})}>{[ligneSeule.titre, ligneSeule.valeur].filter(Boolean).join(' · ')}</p> : null}
+          {/* (23 nov., revue UX #11) Informations juste sous le prix et les actions : le prix d'achat et le prix mini se voient sans défiler. */}
+          {lignesInfos.length ? <section className="nf-section" aria-label={T.infos}>
+            <h3 className="nf-section-titre">{T.infos}</h3>
+            <dl className="nf-tableau" data-nf-infos="">
+              {lignesInfos.map((f) => {
+                const v = valeurDe(f); const su = suDe(f, v); const porte = porteDe(f);
+                const a = attrsFait(f, su, porte);
+                const prixSaisi = porte === 'achat' || porte === 'mini';
+                const lib = T.libelle(LIB_LIGNE[f.cle] || f.lib);
+                // Prix d'achat / prix mini : un CHAMP « — € » (ou la valeur) qui s'ouvre sur place au premier toucher.
+                if (prixSaisi && edition === f.cle) return <div key={f.cle} className="nf-ligne" data-nf-ligne-prix={f.cle}>
+                  <dt className="nf-lib">{lib}</dt>
+                  <dd className="nf-val"><span data-nf-saisie="" {...a}><Champ libelle={lib} depart={f.cents == null ? '' : String(f.cents / 100).replace('.', ',')} onValider={(t) => portes[porte](f, t)} onFin={() => setEdition(null)}/></span></dd>
+                </div>;
+                const valeur = prixSaisi ? <span className="nf-champ-faux" data-nf-champ={su ? 'plein' : 'vide'}>{su ? v : '— €'}</span>
+                  : su ? <span className="nf-valeur">{v}</span> : manque(f, porte);
+                return <div key={f.cle} className="nf-ligne" data-nf-ligne-prix={prixSaisi || f.cle === 'achat' || f.cle === 'mini' ? f.cle : undefined}>
+                  <dt className="nf-lib">{lib}</dt>
+                  <dd className="nf-val">{porte ? <button type="button" className="nf-val-touche" onClick={() => toucherFait(f)} aria-label={lib + ' ' + (su ? v : T.ajouter)} {...a}>{valeur}</button> : <span {...a}>{valeur}</span>}</dd>
+                </div>;
+              })}
+            </dl>
+          </section> : null}
           {proposition ? <Groupe titre={T.achatPropose} attrs={{ 'data-fd-action-contexte': '' }}>
             <Rangee vignette={rendre.vignette(proposition.photo)} titre={proposition.titre} lignes={2} sousTitre={proposition.sous} attrs={proposition.attrs}/>
             {proposition.onAutre ? <Rangee titre={T.autreAchat} fin="chevron" onClick={proposition.onAutre} attrs={{ 'data-fd-relier-autre': '' }}/> : null}
@@ -179,20 +208,6 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
           {blocs.sansPaire || null}
           {blocs.questions ? <Herite nu attrs={{ 'data-fd-questions': '' }}>{blocs.questions}</Herite> : null}
 
-          {lignesInfos.length ? <section className="nf-section" aria-label={T.infos}>
-            <h3 className="nf-section-titre">{T.infos}</h3>
-            <dl className="nf-tableau" data-nf-infos="">
-              {lignesInfos.map((f) => {
-                const v = valeurDe(f); const su = suDe(f, v); const porte = porteDe(f);
-                const a = attrsFait(f, su, porte);
-                const valeur = su ? <span className="nf-valeur">{v}</span> : manque(f, porte);
-                return <div key={f.cle} className="nf-ligne">
-                  <dt className="nf-lib">{T.libelle(f.lib)}</dt>
-                  <dd className="nf-val">{porte ? <button type="button" className="nf-val-touche" onClick={() => toucherFait(f)} {...a}>{valeur}</button> : <span {...a}>{valeur}</span>}</dd>
-                </div>;
-              })}
-            </dl>
-          </section> : null}
 
           {A && !A.double ? (() => {
             // (21 nov., fiche-sites) « Sur les sites » : UNE rangée par site (Vinted, Leboncoin, eBay, Vestiaire — src/ficheSites.js),
@@ -211,12 +226,15 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
               </div>
               {rangees.map((s, i) => {
                 const lien = s.lien || '';
-                const Tag = lien ? 'a' : 'div';
+                // (24 nov., main-vert) La rangée reste une RANGÉE du tableau (`div role="row"`) ; le lien est un vrai <a> DANS sa
+                // cellule, étendu à toute la rangée par CSS (fiche.css `.nf-site-lien::after`) — avant, `<a role="row">` perdait
+                // son rôle de lien pour un lecteur d'écran (axe aria-allowed-role).
+                const Tag = 'div';
                 const vide = s.etat === 'pas-publiee' || s.etat === 'pas-su';
-                return <Tag key={s.site + i} className="nf-site" role="row" {...(lien ? { href: lien, target: '_blank', rel: 'noreferrer', 'data-fiche-site-lien': '' } : {})}
+                return <Tag key={s.site + i} className="nf-site" role="row" data-nf-lien={lien ? '1' : undefined}
                   data-fiche-site={s.site} data-fiche-site-etat={s.etat} data-fiche-site-premiere={s.premiere ? '1' : undefined} data-fiche-site-raison={s.raison || undefined}
                   data-fiche-site-jours={s.jours != null ? String(s.jours) : undefined} data-nf-vide-site={vide ? '1' : undefined} data-nf-geste={s.publier && publierSur ? '1' : undefined}>
-                  <span role="cell" className="nf-c-site"><span className="nf-logo">{rendre.logo(s.site)}</span><span className="nf-site-nom">{T.site(s.site)}</span></span>
+                  <span role="cell" className="nf-c-site">{lien ? <a className="nf-site-lien" href={lien} target="_blank" rel="noreferrer" data-fiche-site-lien="" aria-label={T.site(s.site)}><span className="nf-logo">{rendre.logo(s.site)}</span><span className="nf-site-nom">{T.site(s.site)}</span></a> : <><span className="nf-logo">{rendre.logo(s.site)}</span><span className="nf-site-nom">{T.site(s.site)}</span></>}</span>
                   <span role="cell" className="nf-c-compte"><span className="nf-compte-site">{T.site(s.site) + (s.compte ? ' · ' : '')}</span>{s.compte || <span className="nf-compte-vide">—</span>}{vide ? <span className="nf-compte-etat">{T.etatSite(s)}</span> : null}</span>
                   <span role="cell" className="nf-c-num nf-c-prix" data-nf-vide={s.prix != null ? undefined : '1'}>{s.prix != null ? T.euros(s.prix) : '—'}</span>
                   <span role="cell" className="nf-c-num nf-c-vues" data-nf-vide={Number.isFinite(s.vues) ? undefined : '1'}>{nb(s.vues)}</span>

@@ -351,7 +351,10 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
   const filtre = plateforme ? <Bouton variante="texte" onClick={() => setFeuillePlateforme(true)} attrs={{ 'data-vn-plateforme': plateforme.cle }}>{plateforme.cle === 'toutes' ? tr('vn.filtrer') : plateforme.libelle}</Bouton> : null;
   const actionPlateforme = <>{filtre}{surEnvoyer || g.sections ? <BoutonIcone libelle={tr('vn.plus')} icone={<Icon name="more" size={22}/>} onClick={() => setFeuilleGestes(true)} attrs={{ 'data-vn-plus': '' }}/> : null}</>;
   const segment = <Segmente libelle={tr('vv.seg.label')} valeur={m.onglet} onChange={g.onglet}
-    options={[{ cle: 'envoyer', libelle: tr('vv.seg.expedier'), n: m.nEnv || undefined }, { cle: 'envoyes', libelle: tr('vv.seg.route'), n: m.nRoute || undefined }, { cle: 'toutes', libelle: tr('vn.terminees') }]}/>;
+    options={[{ cle: 'envoyer', libelle: tr('vv.seg.expedier'), n: m.nEnv || undefined, attrs: { 'data-colis-onglet-choix': 'envoyer', 'data-colis-onglet-n': m.nEnv != null ? String(m.nEnv) : '' } },
+      { cle: 'envoyes', libelle: tr('vv.seg.route'), n: m.nRoute || undefined, attrs: { 'data-colis-onglet-choix': 'envoyes', 'data-colis-onglet-n': m.nRoute != null ? String(m.nRoute) : '' } }, { cle: 'toutes', libelle: tr('vn.terminees'), attrs: { 'data-colis-onglet-choix': 'toutes' } }]}/>;
+  // (24 nov., main-vert) Les repères d'avant (`data-colis-onglet-choix`, `data-colis-onglet-n`, VentesVerre) remis sur le segmenté
+  // natif : la visite guidée (src/accueilReste/visiteEcrans.js, cible « envoyer ») et les bancs les touchent ; le natif les avait perdus.
   // (20 nov.) À l'ordinateur, « À envoyer » et « En route » sont le TABLEAU DE TRAVAIL (VentesBureau) ; « Terminées » est déjà le
   // tableau de VentesToutes (src/natif/ecrans/VentesTableau.jsx) : ici, seulement le segmenté au-dessus de lui.
   // (21 nov., ventes-lisibles — captures iPhone de Julien) Le menu « ⋯ » de Ventes porte aussi ce qui était posé SUR la liste : « Où sont
@@ -360,7 +363,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
   const corpsOutils = <>
     <Groupe attrs={{ 'data-vn-outils': '' }}>
         <Rangee icone={<Icon name="printer" size={22}/>} titre={tr('vv.format')} valeur={tr('impr.format.' + E.format)} fin="chevron" onClick={fg(g.format)} attrs={{ 'data-impr-format': E.format }}/>
-        <Rangee icone={<Icon name="check" size={22}/>} titre={E.autres > 0 ? tr('impr.choisirAutres', { n: E.autres }) : tr('vv.choisir')} fin="chevron" onClick={fg(g.choisir)} attrs={{ 'data-lot-ouvrir': '1' }}/>
+        <Rangee icone={<Icon name="check" size={22}/>} titre={E.exclus ? tr('impr.exclu.choisir', { liste: E.exclus }) : E.autres > 0 ? tr('impr.choisirAutres', { n: E.autres }) : tr('vv.choisir')} fin="chevron" onClick={fg(g.choisir)} attrs={{ 'data-lot-ouvrir': '1', 'data-impr-autres': String(E.autres || 0) }}/>
         <Rangee icone={<Icon name="scan" size={22}/>} titre={tr('sv.scanner.envoi')} fin="chevron" onClick={fg(g.scanner)} attrs={{ 'data-vn-outil': 'scanner' }}/>
         {g.stock ? <Rangee icone={<Icon name="home" size={22}/>} titre={tr(g.stock.n > 1 ? 'vn.o.stockN' : 'vn.o.stock1')} fin="chevron" onClick={fg(g.stock.ouvrir)} attrs={{ 'data-colis-stock': String(g.stock.n) }}/> : null}
         {/* (21 nov., lot relier-code) « N ventes sans achat » : la feuille « Lier à un achat », vente après vente. */}
