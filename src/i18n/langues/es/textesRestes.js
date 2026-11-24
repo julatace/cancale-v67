@@ -51,4 +51,7 @@ export default {
   "porte.dateHeure": "{date} a las {heure}",
   "porte.deconnecter": "Cerrar sesión",
   "reglages.liens.lib": "Cuentas vinculadas",
+  "reglages.action.associer": "Asociar una dirección",
+  "reglages.action.aConfirmer": {"one": "{n} dirección por confirmar", "other": "{n} direcciones por confirmar"},
+  "reglages.action.verifier": "Comprobar",
 };

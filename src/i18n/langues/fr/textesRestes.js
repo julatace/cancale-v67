@@ -52,4 +52,7 @@ export default {
   "porte.dateHeure": "{date} à {heure}",
   "porte.deconnecter": "Se déconnecter",
   "reglages.liens.lib": "Comptes liés",
+  "reglages.action.associer": "Associer une adresse",
+  "reglages.action.aConfirmer": {"one": "{n} adresse à confirmer", "other": "{n} adresses à confirmer"},
+  "reglages.action.verifier": "Vérifier",
 };

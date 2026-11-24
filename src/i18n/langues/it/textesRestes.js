@@ -51,4 +51,7 @@ export default {
   "porte.dateHeure": "{date} alle {heure}",
   "porte.deconnecter": "Esci",
   "reglages.liens.lib": "Account collegati",
+  "reglages.action.associer": "Associa un indirizzo",
+  "reglages.action.aConfirmer": {"one": "{n} indirizzo da confermare", "other": "{n} indirizzi da confermare"},
+  "reglages.action.verifier": "Verifica",
 };

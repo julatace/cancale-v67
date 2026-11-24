@@ -51,4 +51,7 @@ export default {
   "porte.dateHeure": "{date} um {heure}",
   "porte.deconnecter": "Abmelden",
   "reglages.liens.lib": "Verknüpfte Konten",
+  "reglages.action.associer": "Adresse zuordnen",
+  "reglages.action.aConfirmer": {"one": "{n} Adresse zu bestätigen", "other": "{n} Adressen zu bestätigen"},
+  "reglages.action.verifier": "Prüfen",
 };

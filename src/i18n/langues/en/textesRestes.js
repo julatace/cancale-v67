@@ -51,4 +51,7 @@ export default {
   "porte.dateHeure": "{date}, {heure}",
   "porte.deconnecter": "Sign out",
   "reglages.liens.lib": "Linked accounts",
+  "reglages.action.associer": "Link an address",
+  "reglages.action.aConfirmer": {"one": "{n} address to confirm", "other": "{n} addresses to confirm"},
+  "reglages.action.verifier": "Check",
 };
