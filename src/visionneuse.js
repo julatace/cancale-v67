@@ -19,6 +19,10 @@
 //     affiche déjà.
 
 export const EVT_VISIONNEUSE = 'vrm:visionneuse';
+// (23 nov., photos-nettes) Les tailles connues de chaque photo vue ici sont notées par src/photoTaille.js, qui
+// s'inscrit à son chargement (aucun import d'ici vers lui : ce module reste autonome, exécuté seul par son audit).
+let _noterTailles = null;
+export function noterTaillesAvec(f) { _noterTailles = typeof f === 'function' ? f : null; }
 export const TAILLE_MIN_VIGNETTE = 32;
 
 // La clé d'un fichier photo — recopie de `photoKey` (App.jsx) : même fichier, même clé,
@@ -41,6 +45,7 @@ export function photosDeLArticle(it) {
   const L = listes.find((l) => Array.isArray(l) && l.length) || [];
   const out = [], vus = new Set();
   for (const p of L.slice(0, 30)) {
+    if (_noterTailles) { try { _noterTailles(p); } catch (_) {} }   // (23 nov., photos-nettes) src/photoTaille.js
     let grande = '', autres = [];
     if (typeof p === 'string') grande = adresse(p);
     else if (p && typeof p === 'object') {
