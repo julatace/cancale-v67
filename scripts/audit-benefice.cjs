@@ -305,7 +305,7 @@ essaie('le code', () => {
   dit(!/pas encore ton bénéfice net/.test(src), 'la phrase « ce n’est donc pas encore ton bénéfice net » a disparu');
   // (19 oct., suite) Leboncoin et eBay : la même règle, et aucune ressemblance.
   dit(/for \(const x of \(autresBenefice \|\| \[\]\)\)[^\n]*ajouterVenteBenefice\(acc, x\.eur, x\.achat, x\.frais, x\.plateforme\)/.test(t), 'l’écran Ventes ajoute Leboncoin et eBay par la même règle');
-  const pubJ = pubI >= 0 ? src.slice(Math.max(0, pubI - 2500), pubI) : '';
+  const pubJ = pubI >= 0 ? src.slice(Math.max(0, pubI - 4000), pubI) : '';   // (23 nov., bugs-totale) + les ventes en cours publiées à part : le bloc a grandi
   dit(/for \(const x of autresBenefice\)/.test(pubJ) && /ajouterVenteBenefice\(jours\[k\][^\n]*x\.plateforme\)/.test(pubJ), 'la publication par jour aussi');
   dit(/if \(!Array\.isArray\(autresBenefice\)\) return;/.test(pubJ), 'Leboncoin ou eBay pas lus ⇒ rien n’est publié (aucune publication partielle)');
   const va = corps('ventesAutresBenefice') + corps('numeroLbcIdentite') + corps('ficheUniqueDuNumero');
