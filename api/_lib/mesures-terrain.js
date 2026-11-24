@@ -139,9 +139,10 @@ export async function recevoirMesures({ corps, jetonEntete = '', verifierJeton, 
   // rien aux mesures (et l'inverse).
   // (15 nov., lot fiabilite-auto) Les plantages des AUTRES vendeurs seulement : ceux du
   // propriétaire ne comptent pour aucune « personne touchée » (il a son propre journal).
+  // (16 nov., lot anti-bug) … mais ils sont RANGÉS (à part, `proprio` par type) : seul vendeur actif, Julien
+  // voyait des bugs et le journal restait vide (rien rangé depuis le 12 nov.). Jamais notifiés pour lui (ses types n'ont aucune « personne », ni ouverture bloquée).
   const deProprio = String(u.id).toLowerCase() === String(proprio).toLowerCase();
-  if (deProprio && !lot) return { code: 200, corps: { ok: true, jour, mesures: 0, alertes: { fait: false, raison: 'proprietaire' } } };
-  const alertes = evts.length && !deProprio ? await recevoirAlertesPlantages({ evenements: evts, empreinte: emp, proprio, env, fetcher, pousser: pousser ? (n) => pousser(n, proprio) : null, maintenant }) : null;
+  const alertes = evts.length ? await recevoirAlertesPlantages({ evenements: evts, empreinte: emp, proprio, env, fetcher, pousser: pousser ? (n) => pousser(n, proprio) : null, maintenant, deProprio }) : null;
   const avecAlertes = (o) => (alertes ? { ...o, alertes: { fait: alertes.fait, ...(alertes.fait ? { due: alertes.due } : { raison: alertes.raison }) } } : o);
   if (!lot) return alertes && alertes.fait ? { code: 200, corps: avecAlertes({ ok: true, jour, mesures: 0 }) } : { code: alertes && alertes.raison === 'plafond-du-jour' ? 429 : 503, corps: avecAlertes({ ok: false, raison: (alertes && alertes.raison) || 'base' }) };
   const id = idEclat(jour, eclatDe(emp));   // l'éclat de CET appareil ce jour-là

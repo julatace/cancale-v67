@@ -170,7 +170,9 @@ export function noterPlantage(err, contexte = {}) {
       // (15 nov., lot fiabilite-auto) Rattrapé par le rechargement : compté à part, rien de plus.
       // Revenu APRÈS le rechargement (ou vu par le dernier filet) : l'app ne s'ouvre pas — le
       // propriétaire le sait (anonyme), sans attendre.
-      if (!dExtension && morceauBloquant(contexte)) passerAlerte({ message, ecran: contexte.ecran, origine: 'ouverture', version: contexte.version, appareil: navigateurIci() });
+      // (16 nov., lot anti-bug) Rattrapé ou non, il part aussi (anonyme, origine « morceau ») : compté
+      // seulement dans les temps réels, il n'apparaissait jamais dans le journal des plantages.
+      if (!dExtension) passerAlerte({ message, ecran: contexte.ecran, origine: morceauBloquant(contexte) ? 'ouverture' : 'morceau', version: contexte.version, appareil: navigateurIci() });
       return null;
     }
     if (!message || BRUIT.test(message)) return null;
@@ -265,8 +267,13 @@ export function ecouterPlantages(contexte) {
     });
     window.addEventListener('unhandledrejection', (ev) => {
       const r = ev && ev.reason;
-      if (!r || !(r instanceof Error)) return;   // un rejet sans Error est rarement un défaut, et ne dit rien
-      noterPlantage(r, Object.assign({ origine: 'promesse' }, contexte && contexte()));
+      if (r == null) return;
+      // (16 nov., lot anti-bug) Un rejet sans Error (une chaîne, un objet `{message}`) partait sans trace :
+      // il est noté aussi, NETTOYÉ comme le reste (jamais un objet entier : son message ou son type).
+      const err = r instanceof Error ? r
+        : (typeof r === 'string' ? { message: r }
+          : (r && typeof r === 'object' && typeof r.message === 'string' ? { message: r.message } : { message: 'Rejet sans message (' + (Object.prototype.toString.call(r).slice(8, -1) || typeof r) + ')' }));
+      noterPlantage(err, Object.assign({ origine: 'promesse' }, contexte && contexte()));
     });
   } catch (_) {}
 }

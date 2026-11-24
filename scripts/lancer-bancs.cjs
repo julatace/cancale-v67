@@ -42,8 +42,12 @@ const EXC = (() => {
   try {
     const j = JSON.parse(fs.readFileSync(path.join(__dirname, 'audits-exceptions.json'), 'utf8'));
     const out = {};
+    // (16 nov., lot anti-bug) `navigateur` (facultatif) : l'exception ne vaut QUE sous ce moteur (« webkit ») ;
+    // sans lui, sous Chromium seulement. Les bancs WebKit deviennent bloquants pour toute ligne rouge NOUVELLE.
+    const ici = String(process.env.NAVIGATEUR || 'chromium').toLowerCase();
     for (const e of (Array.isArray(j.bancs) ? j.bancs : [])) {
       if (!e || !e.banc || !e.raison || !e.depuis || !e.rouges) throw new Error('exception de banc mal formée (banc, raison, depuis, rouges) : ' + JSON.stringify(e));
+      if (String(e.navigateur || 'chromium').toLowerCase() !== ici) continue;
       out[e.banc] = Object.assign({}, e, { re: new RegExp(e.rouges) });
     }
     return out;

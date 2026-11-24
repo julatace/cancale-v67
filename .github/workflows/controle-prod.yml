@@ -23,7 +23,8 @@ concurrency:
 jobs:
   controle:
     name: vrm.center s'ouvre proprement
-    runs-on: ubuntu-latest
+    # (16 nov., lot anti-bug) Épinglé : le WebKit de Playwright est construit pour Ubuntu 24.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +47,17 @@ jobs:
           echo "VRM_CHROMIUM_PATH=$(node -e 'console.log(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
       - name: Ouvrir vrm.center (iPhone et ordinateur, lecture seule)
         if: steps.attente.outputs.deploye == 'true'
+        run: node scripts/controle-prod-navigateur.cjs
+      # (16 nov., lot anti-bug) Le même contrôle dans WebKit, le moteur de Safari (l'iPhone de Julien).
+      - name: Installer WebKit
+        if: steps.attente.outputs.deploye == 'true'
+        run: |
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-vrm-retries >/dev/null
+          for essai in 1 2 3 4; do npx playwright install --with-deps webkit && break; [ "$essai" = 4 ] && exit 1; sleep $((essai * 20)); sudo apt-get update || true; done
+      - name: Ouvrir vrm.center sous WebKit (Safari, lecture seule)
+        if: steps.attente.outputs.deploye == 'true'
+        env:
+          NAVIGATEUR: webkit
         run: node scripts/controle-prod-navigateur.cjs
       - name: Sonde publique (page, /api/sante, extension servie, manifeste, service worker)
         if: steps.attente.outputs.deploye == 'true'

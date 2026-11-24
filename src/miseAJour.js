@@ -17,15 +17,25 @@
 
 export const CLE_MAJ_REFUSEE = 'vrm_maj_refusee';
 export const CACHEE_LONGTEMPS_MS = 10 * 60 * 1000;
+// (16 nov., lot anti-bug) Julien : « plus d'écran blanc après une mise à jour ». Une page restée sur l'ANCIENNE
+// version finit par demander un morceau que le serveur n'a plus. Elle se recharge donc aussi, ouverte et
+// visible, AU BON MOMENT : aucun champ en cours, aucune feuille ouverte, et rien touché depuis
+// `CALME_MS` (on ne recharge jamais sous le doigt). Sinon : « Nouvelle version · Mettre à jour », comme avant.
+// L'écran courant est gardé (src/repriseEcran.js), une fois par version (src/chargementSur.js : jamais une boucle).
+export const CALME_MS = 30 * 1000;
 
 // 'rien' · 'recharger' · 'proposer'
-export function decisionMaj({ actuelle, serveur, demarrageVisible = false, saisieEnCours = false, cacheeDepuisMs = null, refusee = null } = {}) {
+export function decisionMaj({ actuelle, serveur, demarrageVisible = false, saisieEnCours = false, cacheeDepuisMs = null, refusee = null, feuilleOuverte = false, calmeDepuisMs = null } = {}) {
   if (!serveur || !actuelle || serveur === actuelle) return 'rien';
   if (!saisieEnCours && demarrageVisible) return 'recharger';
   if (!saisieEnCours && typeof cacheeDepuisMs === 'number' && cacheeDepuisMs >= CACHEE_LONGTEMPS_MS) return 'recharger';
   if (refusee && refusee === serveur) return 'rien';
+  if (!saisieEnCours && !feuilleOuverte && typeof calmeDepuisMs === 'number' && calmeDepuisMs >= CALME_MS) return 'recharger';
   return 'proposer';
 }
+
+// Une feuille, un panneau ou une confirmation ouverts (portails de l'app) : on ne recharge pas dessous.
+export const SELECTEUR_FEUILLE = '.vrm-sheet, [role="dialog"], [aria-modal="true"], [data-garde-feuille]';
 
 // Un champ en cours de saisie : un texte touché, jamais une case à cocher.
 export function estSaisie(el) {

@@ -39,9 +39,13 @@ const controle = (nom, ok, detail) => {
   const { BRUIT, estMorceauPerime } = await import(require('url').pathToFileURL(path.join(RACINE, 'src', 'plantages.js')).href);
   let pw;
   try { pw = require(path.join(RACINE, 'node_modules', 'playwright')); } catch (_) { pw = require('playwright'); }
+  // (16 nov., lot anti-bug) `NAVIGATEUR=webkit` : le même contrôle dans le moteur de Safari (l'iPhone de
+  // Julien) — le workflow le joue après Chromium. WebKit n'a ni `--no-sandbox` ni chemin imposé.
+  const WEBKIT = String(process.env.NAVIGATEUR || '').toLowerCase() === 'webkit';
   const exe = process.env.VRM_CHROMIUM_PATH || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined);
-  const nav = await pw.chromium.launch({ executablePath: exe, args: ['--no-sandbox'] });
-  console.log(`Contrôle de ${ORIGINE} dans un navigateur — sans session, sans rien écrire.\n`);
+  const nav = WEBKIT ? await pw.webkit.launch() : await pw.chromium.launch({ executablePath: exe, args: ['--no-sandbox'] });
+  const MOTEUR = WEBKIT ? 'WebKit (Safari)' : 'Chromium';
+  console.log(`Contrôle de ${ORIGINE} dans ${MOTEUR} — sans session, sans rien écrire.\n`);
 
   // /api/sante
   try {
@@ -58,8 +62,10 @@ const controle = (nom, ok, detail) => {
   let ecrituresBloquees = 0;
   for (const [qui, opts] of APPAREILS) {
     for (const [page, chemin] of [['accueil', '/'], ['app (?tab=journee)', '/?tab=journee']]) {
-      const T = `[${qui}] ${page}`;
-      const ctx = await nav.newContext({ ...opts, locale: 'fr-FR', serviceWorkers: 'block' });
+      const T = `[${MOTEUR} · ${qui}] ${page}`;
+      // WebKit refuse `isMobile` : l'iPhone y est dit par la largeur, le toucher et l'agent.
+      const o2 = WEBKIT ? Object.fromEntries(Object.entries(opts).filter(([k]) => k !== 'isMobile')) : opts;
+      const ctx = await nav.newContext({ ...o2, locale: 'fr-FR', serviceWorkers: 'block' });
       const pg = await ctx.newPage();
       const erreurs = [], consoleErr = [], assets = [];
       pg.on('pageerror', (e) => erreurs.push(String(e && e.message || e).slice(0, 200)));
@@ -104,8 +110,10 @@ const controle = (nom, ok, detail) => {
   await nav.close();
   console.log(`\n${ecrituresBloquees} requête(s) d’écriture bloquée(s) avant de partir (le contrôle n’écrit rien).`);
   if (echecs.length) {
-    console.log(`\n❌ ${echecs.length} contrôle(s) en échec sur ${ORIGINE}. Revenir en arrière : Vercel → projet → Deployments → le déploiement d’avant → « Instant Rollback » (docs/passation/2026-11-06-filets-anti-bug.md).`);
+    const geste = 'REMETTRE LA VERSION D’AVANT : Vercel → projet → Deployments → le déploiement d’avant (« Ready ») → ⋯ → « Instant Rollback » ; ou GitHub → Actions → « Revenir à la version d’avant » → Run workflow (écrire OUI). Rien n’a été annulé tout seul.';
+    console.log(`\n❌ ${echecs.length} contrôle(s) en échec sur ${ORIGINE} (${MOTEUR}). ${geste} (docs/passation/2026-11-06-filets-anti-bug.md)`);
+    if (process.env.GITHUB_ACTIONS) console.log(`::error title=vrm.center ne s’ouvre pas proprement (${MOTEUR})::${echecs.length} contrôle(s) en échec. ${geste}`);
     process.exit(1);
   }
-  console.log(`\n✅ ${ORIGINE} s’ouvre proprement dans un navigateur (iPhone et ordinateur).`);
+  console.log(`\n✅ ${ORIGINE} s’ouvre proprement dans ${MOTEUR} (iPhone et ordinateur).`);
 })().catch((e) => { console.log('❌ le contrôle a levé : ' + ((e && e.stack) || e)); process.exit(1); });

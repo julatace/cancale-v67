@@ -308,6 +308,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'tampons-mention-qr', date: '2026-11-16', titre: '« Créé par vrm.center » au-dessus du QR', phrase: 'Visible même sous le scotch ; réglable dans Paramètres → Imprimante.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (16 nov., lot argent-mieux) docs/passation/2026-11-16-argent-mieux.md
   { id: 'argent-lisible', date: '2026-11-16', titre: 'Argent : tout se lit, clair ou sombre', phrase: 'Les ventes pas comptées tiennent en une ligne par raison.', tab: 'argent', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot anti-bug) docs/passation/2026-11-16-anti-bug.md
+  { id: 'maj-au-calme', date: '2026-11-16', titre: 'Les mises à jour arrivent sans écran blanc', phrase: 'VRM se recharge au calme, jamais pendant une saisie.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (16 nov.) docs/passation/2026-11-16-design-restes.md
   { id: 'paire-monte-sites', date: '2026-11-16', titre: 'Leboncoin, eBay, Vestiaire : la paire monte', phrase: 'Touche une annonce : prix, jours, favoris et prix d’achat sur place.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (16 nov., lot extension-restes, extension 5.395) docs/passation/2026-11-16-extension-restes.md
