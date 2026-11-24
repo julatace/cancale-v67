@@ -176,7 +176,7 @@
   background: rgb(249 250 251 / .97) !important; background-image: none !important; border: 1px solid var(--sv-bord) !important; box-shadow: 0 12px 28px -14px rgb(27 27 31 / .6) !important;
 }
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-set-recherche.vrm-champ-recherche { background: rgb(34 34 38 / .97) !important; }
-:root:root:root:root:root:root:root body .vrm-pm .vrm-set-recherche .vrm-champ-recherche-saisie { font: 500 15.5px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; background: transparent !important; box-shadow: none !important; border: 0 !important; }
+:root:root:root:root:root:root:root body .vrm-pm .vrm-set-recherche .vrm-champ-recherche-saisie { font: 500 16px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; background: transparent !important; box-shadow: none !important; border: 0 !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vrm-set-recherche .vrm-champ-recherche-loupe { color: var(--sv-encre-2) !important; }
 /* « Tout va bien ? · N choses à régler » : l'ambre plein de la maquette (fond #FFE7C4, encre #5E3900), une pastille de cœur. */
 :root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte-liste { margin: 0 !important; padding: 0 !important; border-radius: 20px !important; overflow: hidden;

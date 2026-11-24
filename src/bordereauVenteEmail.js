@@ -116,3 +116,51 @@ export function phraseImprimeSansNumero(registre, tx, numero) {
   const n = String(numero == null ? '' : numero).trim();
   return n ? `${MENTION_IMPRIME_SANS_NUM} — écris N° ${n} sur l’étiquette` : `${MENTION_IMPRIME_SANS_NUM} — à écrire à la main`;
 }
+
+// ── (23 nov., bugs-totale §3.2) LE BORDEREAU REÇU D'UNE VENTE PAS ENCORE RELUE ─────────────────────────────────────────────
+// Mesuré (lecture seule, 23 nov.) : l'e-mail de vente d'un compte PARTICULIER ne porte jamais de n° de transaction (0 sur 13),
+// mais l'e-mail du BORDEREAU qui le suit, oui (`email_bord_{tx}`, `transaction`, et l'`uid` du compte de RÉCEPTION rangé par le
+// serveur). La vente e-mail sans n° ne peut donc jamais retrouver son bordereau (aucune identité commune, jamais le titre) : le
+// colis restait invisible dans Colis et Ma journée jusqu'au passage de l'extension.
+// ⇒ Le bordereau lui-même devient le COLIS à envoyer (jamais une vente : il n'entre dans aucun total — la vente e-mail compte
+//   déjà le CA, une fois), aux MÊMES conditions que la vente e-mail (src/venteEmailFraiche.js) :
+//   (a) un n° de transaction numérique ; (b) l'uid d'un compte LIÉ, pas écarté, dont la liste a été lue (« pas su » ⇒ rien) ;
+//   (c) n° absent de la liste ET bordereau arrivé APRÈS la dernière lecture de cette liste (la lecture fait foi : une vente
+//   annulée, un compte supprimé ne laissent aucun bordereau fantôme) ; reçu depuis moins de `maxJours`. Un n° déjà porté par
+//   une vente e-mail (avec n°) ⇒ rien de plus (c'est elle qui fait le colis). Rend des lignes à la forme d'une commande,
+//   marquées `_venteEmail` et `_bordSeul` ; `colisVentesEmail` les relie ensuite à LEUR bordereau par ce n°.
+export const STATUT_BORD_EMAIL = 'Bordereau reçu par e-mail, vente pas encore relue sur Vinted';
+export function ventesDuBordereauSeul({ bords, comptes, ecarte, ko, lectures, ventes, dejaTx, maintenant = Date.now(), maxJours = 21 } = {}) {
+  if (!Array.isArray(bords) || !Array.isArray(ventes)) return [];
+  const parUid = new Map();
+  for (const a of (Array.isArray(comptes) ? comptes : [])) { const u = String((a && a.vinted_user_id) || '').trim(); if (u) parUid.set(u, a); }
+  const pasSu = new Set((Array.isArray(ko) ? ko : []).map(String));
+  const connues = new Set();
+  for (const o of ventes) if (o && !o._venteEmail && o.transaction_id != null) connues.add(String(o.transaction_id));
+  const deja = dejaTx instanceof Set ? dejaTx : new Set();
+  const out = new Map();
+  for (const b of bords) {
+    if (!b) continue;
+    const tx = String(b.transaction == null ? '' : b.transaction).trim();
+    if (!/^\d{6,20}$/.test(tx)) continue;                                   // (a)
+    const uid = String(b.uid == null ? '' : b.uid).trim();
+    const acc = /^\d+$/.test(uid) ? parUid.get(uid) : null; if (!acc) continue; // (b) compte lié
+    if (typeof ecarte === 'function' && ecarte(uid)) continue;
+    if (pasSu.has(uid)) continue;
+    const lu = lectures ? Number(lectures[uid]) : NaN; if (!Number.isFinite(lu)) continue;
+    const t = Date.parse(String(b.receivedAt || '')); if (!Number.isFinite(t)) continue;
+    if (!(t > lu)) continue;                                                // (c) la lecture fait foi
+    if (maintenant - t > maxJours * 86400000) continue;
+    if (connues.has(tx) || deja.has(tx) || out.has(tx)) continue;
+    out.set(tx, {
+      transaction_id: tx,
+      title: String(b.article || '').trim() || 'Vente Vinted',
+      price: { amount: null, currency_code: 'EUR' },
+      date: new Date(t).toISOString(),
+      status: STATUT_BORD_EMAIL,
+      _venteEmail: true, _fromEmail: true, _bordSeul: true, _txMail: tx,
+      _acc: acc, _lectureVentes: lu, _t: t,
+    });
+  }
+  return [...out.values()].sort((a, b) => b._t - a._t);
+}
