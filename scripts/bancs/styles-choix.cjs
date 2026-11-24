@@ -265,15 +265,23 @@ async function poserMutation(pg) {
       const o = await ouvrir(nav, { W: 390, sombre: false, style: '', url: '/?tab=settings', b });
       try {
         await o.pg.waitForSelector('.vrm-main', { timeout: 45000 }).catch(() => {}); await o.pg.waitForTimeout(4000);
-        const ouvre = await o.pg.$('[data-reglage-apparence]'); if (ouvre) { await ouvre.tap().catch(() => ouvre.click()); await o.pg.waitForTimeout(1200); }
+        // Paramètres → « Apparence et langue » → « Apparence » : on touche ce qui est à l'écran jusqu'à voir les tuiles
+        const tuileVue = () => o.pg.evaluate(() => { const t = document.querySelector('[data-style-tuile="nuit"]'); if (!t) return false; t.scrollIntoView({ block: 'center' }); const r = t.getBoundingClientRect(); return r.width > 20 && r.height > 20; });
+        for (let i = 0; i < 4 && !(await tuileVue()); i++) {
+          await o.pg.evaluate(() => { const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 10 && r.height > 10; };
+            const c = [...document.querySelectorAll('[data-reglage-apparence]')].find(vis) || [...document.querySelectorAll('button, [role="button"], a')].find((e) => vis(e) && /^Apparence( et langue)?$/i.test((e.innerText || '').trim().split('\n')[0]));
+            if (c) { c.scrollIntoView({ block: 'center' }); c.click(); } });
+          await o.pg.waitForTimeout(1200);
+        }
+        dit(await tuileVue(), `T les tuiles sont À L'ÉCRAN dans Paramètres → Apparence`);
         const n = await o.pg.$$eval('[data-style-tuile]', (x) => x.length);
         dit(n === 11, `T Paramètres → Apparence : 11 tuiles d'aperçu (Actuel + 10 styles)`, n);
         const t = await o.pg.$('[data-style-tuile="nuit"]');
-        if (t) { await t.scrollIntoViewIfNeeded(); await t.tap(); await o.pg.waitForTimeout(300); }
+        if (t) { const c = await t.evaluate((e) => { e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await o.pg.touchscreen.tap(c.x, c.y); await o.pg.waitForTimeout(300); }
         const apres = await o.pg.evaluate(() => ({ st: document.documentElement.getAttribute('data-style'), lu: localStorage.getItem('vrm_style'), fond: getComputedStyle(document.documentElement).getPropertyValue('--n-fond').trim() }));
         dit(apres.st === 'nuit' && apres.lu === '"nuit"' && apres.fond.toUpperCase() === G.PRESETS.nuit.clair.fond, `T un toucher sur « Nuit » l'applique tout de suite (sans recharger) et le range`, apres);
         await o.pg.screenshot({ path: path.join(SHOTS, 'tuiles-nuit.png') });
-        const a = await o.pg.$('[data-style-tuile="actuel"]'); if (a) { await a.scrollIntoViewIfNeeded(); await a.tap(); await o.pg.waitForTimeout(300); }
+        const a = await o.pg.$('[data-style-tuile="actuel"]'); if (a) { const c = await a.evaluate((e) => { e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await o.pg.touchscreen.tap(c.x, c.y); await o.pg.waitForTimeout(300); }
         const retour = await o.pg.evaluate(() => ({ st: document.documentElement.getAttribute('data-style'), lu: localStorage.getItem('vrm_style'), fond: getComputedStyle(document.documentElement).getPropertyValue('--n-fond').trim() }));
         dit(retour.st === null && retour.lu === null && /^#DFE1E5$/i.test(retour.fond), `T « Actuel » revient au défaut en un toucher`, retour);
         const tailles = await o.pg.$$eval('[data-style-tuile]', (x) => x.map((e) => { const r = e.getBoundingClientRect(); return Math.min(r.width, r.height); }));
