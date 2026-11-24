@@ -3113,6 +3113,10 @@ function vrmVerifVisible(sel) {
       });
     } catch (_) { favEnVol = false; }
   }
+  // 5.440.2 (Julien : « c'est à l'extension d'aller capter les favoris et d'actualiser l'écran, pas à moi ») : dès que le
+  //    fond a lu la liste des notifications de Vinted (`vrmFavorisListeLue`), la liste des favoris de la carte ouverte est
+  //    redemandée à VRM et redessinée — sans attendre la minute de l'aperçu, sans aucun geste.
+  try { chrome.storage.onChanged.addListener((ch, zone) => { if (zone !== 'local' || !ch.vrmFavorisListeLue) return; apercuFavAt = 0; if (!LISTES && vivant() && carte.classList.contains('on')) rendre(); }); } catch (_) {}
   function brancherFavoris(e) {
     const uid = e && e.site && e.site.id ? String(e.site.id) : '';
     const demander = (quoi, extra, fin) => {
