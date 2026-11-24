@@ -76,8 +76,13 @@ relu la vente (la ligne de Ventes disparaît, l'annonce reste à dire jusqu'à l
   lit aucun titre — vert. `audit-enligne`, `audit-enligne-public-vide`, `audit-vente-email-fraiche`, `audit-bordereau-des-email`,
   `audit-photo-vente-email`, `audit-traduction`, `audit-recherche-numero` : verts. `audit-preuve-vente` : 1 rouge
   **déjà sur main** (extension, `ventesApresVente`, rien de touché ici).
-- Banc `scripts/bancs/vente-mail-annonce.cjs` (390 tactile ; `ETIQUETTE=avant|apres`, `BANC_DIST`) — résultats et captures :
-  voir la PR.
+- Banc `scripts/bancs/vente-mail-annonce.cjs` (390 tactile ; `ETIQUETTE=avant|apres`, `BANC_DIST`) — 50 « Autry 36 »
+  identiques, la forme mesurée, Annonces lues puis Ventes (comme chez lui). **Avant** (build d'un `main` du 24 nov. après #1310) :
+  4 OK / 9 KO — reproduit ses captures (« N° en attente », N° 262 encore en ligne, fiche « En vente », aucun geste pour relier).
+  **Après** : 12 OK / 1 KO, ce KO étant le banc lui-même (il attendait 50 propositions, le compte en a 62 en ligne, la feuille en
+  montre 60 dont la bonne) — contrôle corrigé (« 50 à 60, dont la bonne »). Captures regardées : Ventes « N° 262 · Délier »,
+  Annonces groupe gris « Vendue · par e-mail, en attente de Vinted » en haut, « 262 » cherché ⇒ aucune annonce en ligne, la feuille
+  « Quelle annonce est vendue ? », la fiche « Vendue · par e-mail… · Pourquoi ? » sans « pas lu ». Aucune erreur de console.
 
 ## ÉTAT À LA REPRISE
 - PR ouverte, pas fusionnée (consigne). Geste de Julien : aucun (la vente reliée apparaît dès la mise en ligne ; sans photo dans
