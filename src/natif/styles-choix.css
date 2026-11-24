@@ -6,10 +6,23 @@
      fabriqué par scripts/styles-generer.cjs). Aucune règle de mise en page par écran.
    • Ne s'applique que sous un style choisi (`data-style` sur la racine, ou sur une tuile d'aperçu). Le style « Actuel »
      (aucun attribut) ne voit RIEN de ce fichier.
-   • Hors couche (`@layer`) exprès : les feuilles natives sont en couche, ce fichier passe après elles sans `!important`.
+   • En couche `vrm-styles`, nommée APRÈS `vrm-natif` (ce fichier est importé après elle) : elle passe devant le natif sans
+     `!important`, et le pont src/coque-native.css (`all: revert-layer`, sans couche) renvoie les contrôles natifs aux couches
+     — donc à celle-ci. Une règle hors couche serait effacée par ce renvoi (mesuré : le plein enfoncé gardait sa couleur).
+     Les tuiles d'aperçu (bas du fichier) restent hors couche : ce sont des boutons d'écran.
    • Rien d'orange : « à faire » = l'ardoise du style + le gras ; vert = fait ; rouge = deux paires sous un N° seulement.
    ══════════════════════════════════════════════════════════════════════════ */
 
+@layer vrm-styles {
+/* ── l'échelle (grille de 4) : texte 15 au doigt, contrôles DESSINÉS 40 dans une zone de 44, rangées 60, une courbe nette ── */
+[data-style]:not([data-style=""]) {
+  --n-t-corps: 400 15px/20px var(--n-police); --n-t-corps-fort: 600 15px/20px var(--n-police); --n-t-controle: 600 15px/20px var(--n-police);
+  --n-t-second: 400 13px/18px var(--n-police); --n-t-second-fort: 600 13px/18px var(--n-police); --n-t-legende-fort: 600 12px/16px var(--n-police);
+  --n-h-controle: 40px; --n-h-rangee: 60px; --n-marge: 16px;
+  --g-courbe: cubic-bezier(.23, 1, .32, 1); --g-relache: 160ms; --g-enfonce: 80ms;
+  --g-reflet: linear-gradient(180deg, rgb(255 255 255 / .10) 0%, rgb(255 255 255 / 0) 55%);
+}
+:root[data-theme="dark"][data-style]:not([data-style=""]), :root[data-theme="dark"] [data-style]:not([data-style=""]) { --g-reflet: linear-gradient(180deg, rgb(255 255 255 / .18) 0%, rgb(255 255 255 / 0) 60%); }
 /* ── le fond, les cartes : regroupées par le TON, pas par un filet ── */
 :root[data-style]:not([data-style=""]) body,
 :root[data-style]:not([data-style=""]) .n-coque { background-color: var(--n-fond); background-image: var(--g-fond-image); background-attachment: fixed; }
@@ -26,17 +39,19 @@
 [data-style]:not([data-style=""]) .n-bouton {
   border-radius: var(--g-r-bouton) / calc(var(--g-r-bouton) + (var(--n-cible) - var(--n-h-controle)) / 2);
   box-shadow: none; background-color: var(--g-second-fond); color: var(--g-second-texte); font-weight: 600;
-  transition: transform var(--n-duree-appui) ease-out, background-color var(--n-duree-appui) ease-out, box-shadow var(--n-duree-appui) ease-out, color var(--n-duree-appui) ease-out;
+  transition: transform var(--g-relache) var(--g-courbe), background-color var(--g-relache) var(--g-courbe), box-shadow var(--g-relache) var(--g-courbe), color var(--g-relache) var(--g-courbe);
 }
+/* enfoncer est immédiat (80 ms), relâcher plus doux (160 ms) */
+[data-style]:not([data-style=""]) :is(.n-bouton, .n-bouton-icone-seule, [data-n-famille]):active { transition-duration: var(--g-enfonce); }
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="plein"] {
   min-height: var(--g-h-plein); border-block-width: 0; border-radius: var(--g-r-bouton);
-  background-color: var(--n-plein); color: var(--n-sur-plein); box-shadow: var(--g-plein-relief); font-weight: 600; font-size: 15px; letter-spacing: -.1px;
+  background-color: var(--n-plein); background-image: var(--g-reflet); color: var(--n-sur-plein); box-shadow: var(--g-plein-relief); font-weight: 600; font-size: 16px; letter-spacing: -.2px;
 }
 [data-style]:not([data-style=""]) .n-bouton:active,
 [data-style]:not([data-style=""]) .n-bouton[data-n-force="appui"] { filter: none; transform: scale(var(--g-appui)); background-color: var(--g-second-appui); }
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="plein"]:active,
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="plein"][data-n-force="appui"] {
-  background-color: var(--g-plein-appui); box-shadow: var(--g-plein-relief-appui); transform: translate3d(0, var(--g-descente), 0) scale(var(--g-appui));
+  background-color: var(--g-plein-appui); background-image: none; box-shadow: var(--g-plein-relief-appui); transform: translate3d(0, var(--g-descente), 0) scale(var(--g-appui));
 }
 /* secondaire : un fond teinté, aucun filet */
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="teinte"],
@@ -128,6 +143,7 @@
   [data-style]:not([data-style=""]) .n-bouton:active,
   [data-style]:not([data-style=""]) .n-bouton-icone-seule:active,
   [data-style]:not([data-style=""]) .n-rangee[data-n-touche] .n-rangee-corps:active { transform: none; }
+}
 }
 
 /* ── LES TUILES D'APERÇU (Paramètres → Apparence → Style) : une rangée et un bouton, dessinés par les jetons du style ── */
