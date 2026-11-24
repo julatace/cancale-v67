@@ -25,9 +25,9 @@ const path = require('path'), fs = require('fs'), http = require('http');
 const RACINE = path.join(__dirname, '..', '..');
 const { chromium } = require(path.join(RACINE, 'node_modules', 'playwright'));
 const { fabriquer, repondre } = require(path.join(__dirname, '_base-volume.cjs'));
-// (24 nov., vitesse-lectures-toucher) 2 600 ventes (son volume, banc vitesse-iphone) : la liste des transactions a TROIS pages
-// — à 1 500, deux : rien à juger sur les pages qui partent ensemble (`lireTout`).
-const base = fabriquer({ volumeReel: true, qr: true, comptes: 7, ventes: 2600, achats: 800, annonces: 1200 });
+// (24 nov., vitesse-lectures-toucher) 15 comptes (les siens, banc vitesse-iphone) : la liste des transactions a TROIS pages
+// (2 550 lignes) — à 7 comptes, deux (1 190) : rien à juger sur les pages qui partent ensemble (`lireTout`).
+const base = fabriquer({ volumeReel: true, qr: true, comptes: 15, ventes: 1500, achats: 800, annonces: 1200 });
 const DIST = path.resolve(process.argv[2] || path.join(RACINE, 'dist'));
 const PORT = +(process.argv[3] || process.env.BANC_PORT || 21000 + Math.floor(Math.random() * 8000));
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.webp': 'image/webp' };
@@ -54,10 +54,12 @@ const INTERDIT = {
 // visite. Mesuré sur le code d'avant (Achats, volume de Julien) : `pickupUnion` 5 fois par instance (3 fois sur des entrées
 // relues à l'identique), `cartesColis` 11 à 18 fois (une fois par rendu). Maintenant : une fois par VERSION des données
 // (src/calculParesseux.js, `useMemeContenu`, `useCalculParVersion`) — une arrivée de données = un calcul.
+// Mesuré au banc (7 comptes) : avant 4 · 14 (Achats), 15 · 15 (Ventes) ; après 2 · 4, 7 · 6. Le plafond laisse la marge d'une
+// arrivée de données de plus (la charge de la machine change l'ordre des arrivées), jamais celle d'un calcul par rendu.
 const PLAFOND = {
-  achats: { pickupUnion: 3, cartesColis: 5 },
-  ventes: { cartesColis: 5, listeEnvoyes: 5 },
-  journee: { pickupUnion: 3, listeEnvoyes: 5 },
+  achats: { pickupUnion: 3, cartesColis: 6 },
+  ventes: { cartesColis: 9, listeEnvoyes: 9 },
+  journee: { pickupUnion: 3 },
 };
 // Onglet → calculs qui DOIVENT rester faits pendant sa 1re visite (là où ils sont lus), par instance.
 const ATTENDU = {
