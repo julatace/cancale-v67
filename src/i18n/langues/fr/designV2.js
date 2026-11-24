@@ -85,6 +85,7 @@ export default {
   "retraits.m.doute": "Peut-être le même colis qu’un autre · à vérifier",
   "retraits.m.autre": "À vérifier",
   "retraits.m.horsCompte": "Pas compté dans « à retirer » : code et QR gardés tant que rien ne prouve qu’il est retiré ou reparti.",
+  "retraits.m.horsCompteCourt": "Pas compté dans « à retirer ».",
   "retraits.v.nVerif": {"one": "{n} à vérifier", "other": "{n} à vérifier"},
   "retraits.v.qrEnGrand": "Afficher le QR en grand",
   "retraits.c.taille": "Taille {t}",
@@ -422,6 +423,10 @@ export default {
   // (21 nov.) Colis à retirer : prévision par point relais (ext. 5.411)
   "retraits.p.consigne": "consigne",
   "retraits.p.comptoir": "comptoir",
+  "retraits.p.pointRelais": "Point relais",
+  "retraits.p.echAuj": "dernier jour aujourd’hui",
+  "retraits.p.echDemain": "dernier jour demain",
+  "retraits.p.echAvant": "avant le {date}",
   "retraits.p.rienIci": "Rien à retirer ici pour l’instant",
   "retraits.p.enRouteVers": "En route vers ce point",
   "retraits.p.prevuAuj": "prévu aujourd’hui",
