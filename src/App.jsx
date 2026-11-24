@@ -933,7 +933,7 @@ import { lireCodeColis } from "./scanColis.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 // ⟦→ ecrans/Comptabilite.jsx #67⟧
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
-import { memeContenu } from './calculParesseux.js';
+import { memeContenu, nuageCharge } from './calculParesseux.js';
 import { creerMemoCourt } from "./memoCourt.js";   // (20 nov., lectures-legeres) lectures lourdes servies 20 s aux voisines
 import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
@@ -4947,7 +4947,7 @@ const reprendreSyncMaintenant = () => { if (_repriseT) { clearTimeout(_repriseT)
 // c'est ce qui faisait « changer » les numéros entre deux connexions).
 let _cloudReady = false;
 let _cloudReadyListeners = [];
-const markCloudReady = () => { if (_cloudReady) return; _cloudReady = true; try { globalThis.__vrmNuagePret = true; } catch (_) {} _cloudReadyListeners.forEach(fn => { try { fn(); } catch (_) {} }); _cloudReadyListeners = []; };
+const markCloudReady = () => { if (_cloudReady) return; _cloudReady = true; try { globalThis.__vrmNuagePret = true; } catch (_) {} setTimeout(nuageCharge, 0); _cloudReadyListeners.forEach(fn => { try { fn(); } catch (_) {} }); _cloudReadyListeners = []; };
 const onCloudReady = (fn) => { if (_cloudReady) { try { fn(); } catch (_) {} return () => {}; } _cloudReadyListeners.push(fn); return () => { _cloudReadyListeners = _cloudReadyListeners.filter(f => f !== fn); }; };
 const isCloudReady = () => _cloudReady;
 // (21 nov., lot rentabilite) LE FORFAIT D'EMBALLAGE (src/beneficePaire.js `poserForfaitEmballage`) : relu au démarrage,

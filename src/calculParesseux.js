@@ -88,8 +88,14 @@ export function useLecteurParesseux(fn, deps, nom, ecran) {
 // (`suivisEnvoyes`, `txSuivisColis`), une liste recalculée sur les mêmes commandes (`vintedToPickup`), une clé synchronisée
 // relue telle quelle (`collected`, `pickupDone`). Ce test rend VRAI seulement quand le CONTENU est le même ; dans le doute
 // (forme inconnue, contenu illisible), FAUX : la nouvelle valeur passe, comme avant. Rien n'est deviné.
+// (25 nov., à froid) PENDANT L'ARRIVÉE DU PREMIER NUAGE, on ne compare pas : tout change de toute façon (l'appareil passe de
+// « rien » aux données), et comparer coûtait à l'ouverture (AB, récit §8 ter). La comparaison sert APRÈS le premier
+// chargement complet (`nuageCharge()`, posé par App.jsx juste après `onCloudReady`) : un écran qui se monte, une relecture.
+let _nuageCharge = false;
+export function nuageCharge() { _nuageCharge = true; }
 export function memeContenu(a, b) {
   if (Object.is(a, b)) return true;
+  if (!_nuageCharge) return false;
   if (a == null || b == null || typeof a !== 'object' || typeof b !== 'object') return false;
   try {
     if (a instanceof Set || b instanceof Set) {
