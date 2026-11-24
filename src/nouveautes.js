@@ -42,8 +42,6 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'visuel-jeu', date: '2026-11-24', titre: 'Pop-ups et ventes en grandes photos', phrase: 'La paire en grand, son N°, une petite fête par vente.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov., moderation-carte — Julien sur une capture : « c'est moche ») src/AlerteModeration.jsx
   { id: 'annonces-disparues-groupees', date: '2026-11-23', titre: 'Annonces disparues : une carte claire par compte', phrase: 'Le compte et les dates dits une fois, un seul bouton.', tab: 'journee', pour: 'tous', mode: 'tous' },
-  // (23 nov. soir, ext. 5.440.1 — Julien : « 0 envoyé · 1 sauté », phrase coupée) docs/passation/2026-11-23-favoris-identite.md
-  { id: 'favoris-identite', date: '2026-11-23', titre: 'Messages aux favoris : le nouveau lien de Vinted', phrase: 'Un favori pas confirmé est dit et sauté, la file continue.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md
   { id: 'vente-email-partout', date: '2026-11-23', titre: 'Une vente reçue par e-mail se voit partout', phrase: 'Ventes, Ma journée et Colis, avant même le passage de l’extension.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov., photos-nettes — Julien : « toutes les photos sont floues ») docs/passation/2026-11-23-photos-nettes.md
