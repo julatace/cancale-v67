@@ -73,8 +73,10 @@ pas de pied), puis **P7 bis** — le bouton ne couvre aucun texte de sa carte.
 
 - Avant / après : `BANC_DIST` = build de la base (`origin/claude/parcours-iphone` + fusions, avant correctifs).
 - Mutations : voir chaque section (audit, P7 bis, `SAUTS_CONNUS`).
-- Bancs lancés : `parcours-iphone`, `sans-orange` (390/1512, clair/sombre), `textes-visibles`, voisins (`recherche-partout`,
-  `ventes-verre`) ; `npm run build`. Les résultats exacts sont dans la PR.
+- Bancs : `parcours-iphone` 76 verts / 0 rouge (sur le build de base : rouge P7 bis) ; `sans-orange` 88 verts, 0 orange
+  (sur le build de base, à 390 : 16 rouges) — 2 rouges de navigation : le banc ne trouve pas la loupe à 1512 (à reprendre) ;
+  `textes-visibles` 16/16, `recherche-partout` 48/48 ; `ventes-verre` 54 rouges, LES MÊMES sur le build de base (déjà rouge
+  avant ce lot) ; `npm run build` vert.
 - Machine partagée (≈ 13 agents, charge 7 à 46 par cœur, mémoire et disque au plus bas) : un build a été tué par le
   manque de mémoire ; P10 (vitesse) n'est que rapporté ici.
 
