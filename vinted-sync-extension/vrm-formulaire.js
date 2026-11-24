@@ -700,7 +700,10 @@
             if (Date.now() > tFin) { fin = 'temps'; return { absent: true }; }
             // Charger la suite : bas de la fenêtre et du bloc qui défile (un cran plus haut d'abord, pour que la page le voie), puis « Afficher plus ».
             const b = blocDefilant();
-            try { const h = document.documentElement.scrollHeight; window.scrollTo(0, Math.max(0, h - window.innerHeight - 240)); window.scrollTo(0, h); } catch (_) {}
+            // L'onglet de travail est souvent en ARRIÈRE-PLAN : le navigateur n'y rend aucune image, et l'événement « scroll »
+            // qu'il enverrait au rendu suivant n'arrive pas — la liste ne charge jamais sa suite. La position est posée, puis
+            // l'événement « scroll » (jamais un geste de souris ni de clavier) est envoyé à la page pour qu'elle la relise.
+            try { const h = document.documentElement.scrollHeight; window.scrollTo(0, Math.max(0, h - window.innerHeight - 240)); window.scrollTo(0, h); window.dispatchEvent(new Event('scroll')); document.dispatchEvent(new Event('scroll')); } catch (_) {}
             if (b) { try { b.scrollTop = Math.max(0, b.scrollHeight - b.clientHeight - 240); b.scrollTop = b.scrollHeight; b.dispatchEvent(new Event('scroll')); } catch (_) {} }
             await nap(250);
             const p = boutonPlus(); if (p) { try { p.click(); } catch (_) {} }
