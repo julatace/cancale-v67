@@ -2196,3 +2196,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Lignes déplacées de CLAUDE.md §9 (23 nov. soir, train de mise en ligne), telles quelles
 - **23 nov. · Conseiller (`claude/conseiller`)** : conseils du jour sans IA (Aujourd'hui + écran `conseiller`, `src/conseiller/`). `docs/passation/2026-11-23-conseiller.md`. Geste : aucun.
+
+## Ligne déplacée de CLAUDE.md §9 (24 nov., paires-dorment), telle quelle
+- **23 nov. · Photos nettes (`claude/photos-nettes`)** : chaque photo Vinted prend la plus petite taille DÉJÀ LUE du même fichier qui donne 2 px réels par point (`src/photoTaille.js`) ; visionneuse progressive (petite puis grande) ; aucune adresse fabriquée (chaque taille a sa signature). Achats : souvent 150x210 seule. `docs/passation/2026-11-23-photos-nettes.md`. Geste : aucun.

@@ -482,10 +482,10 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **24 nov. · Paires qui dorment → plan (`claude/paires-dorment`)** : chaque matin dans le Conseiller, ≤ 8 paires (en ligne ≥ 14 j, le quart le plus bas de SES vues ou favoris par jour, pas su ⇒ jamais) et UNE action chacune par le chemin gardé ; seuils mesurés en base. `2026-11-24-paires-dorment.md`. Geste : aucun.
 - **23 nov. · Gris clair étagé (`claude/style-clair`)** : variante A validée (gris froid, accent ardoise), sombre = gris choisi ; iPhone compact ; dessin fin ; pop-up d'événement + galerie du propriétaire. `docs/passation/2026-11-23-style-clair.md`. Geste : essayer le pop-up sur un vrai iPhone.
 - **23 nov. · Isolement + colis en direct** : RLS prouvée par vendeur (0 ligne d'un autre, 8 vendeurs) ; un bordereau reçu par e-mail paraît sur Colis sans changer d'écran (veille `bordereaux`). `docs/passation/2026-11-23-isolement-temps-reel.md`. Geste : aucun.
 - **23 nov. · Bugs (`claude/bugs-totale`)** : vente par e-mail partout — le bordereau reçu d'une vente pas relue (particulier : vente sans n°) fait le colis (Colis, Ma journée, jamais Ventes ni CA), la photo exacte tranche la fenêtre ambiguë ; colis à retirer sans photo (`Icon`) ; boucle de rendus : `onVmrExt` ne prévient que sur changement d'empreinte (11 → 6 validations/10 s au téléphone, banc `rendus-repos`). `2026-11-22-bugs-totale.md`. Geste : aucun.
-- **23 nov. · Photos nettes (`claude/photos-nettes`)** : chaque photo Vinted prend la plus petite taille DÉJÀ LUE du même fichier qui donne 2 px réels par point (`src/photoTaille.js`) ; visionneuse progressive (petite puis grande) ; aucune adresse fabriquée (chaque taille a sa signature). Achats : souvent 150x210 seule. `docs/passation/2026-11-23-photos-nettes.md`. Geste : aucun.
 - **23 nov. · Demande à VRM (`claude/conseiller-ia`)** : IA sur la clé Claude DU VENDEUR seule (coffre). Geste : aucun.
 - **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
 
