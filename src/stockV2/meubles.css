@@ -9,24 +9,24 @@
 @layer vrm-natif {
   :root {
     --sm-papier: #FBFAF6; --sm-papier-encre: #15171A;
-    --sm-bati-ciel: #AEB7C5; --sm-bati-ardoise: #7F8FA3; --sm-bati-sable: #CDB68C; --sm-bati-sauge: #9DB394;
+    --sm-bati-ciel: #AEB7C5; --sm-bati-ardoise: #7F8FA3; --sm-bati-sable: #CDB68C; --sm-bati-sauge: #9DB394;   /* orange-permis : la teinte « sable » d'un meuble, choisie par lui (un objet réel) */
     --sm-fond-ciel: #E3E6EB; --sm-fond-ardoise: #D3D9E1; --sm-fond-sable: var(--n-ambre-fond); --sm-fond-sauge: #DDE6D8;
     --sm-trou: rgb(17 17 20 / .07);
     --sm-kraft: var(--n-ambre-fond); --sm-blanc: #FFFFFF; --sm-ardoise: #A4B4C6; --sm-sable: var(--n-ambre-fond); --sm-sauge: #B7CCAE; --sm-ciel: #CBD1D9; --sm-lagon: #A2D1CC;
     --sm-bord: rgb(17 17 20 / .22);
   }
   :root[data-theme="dark"] {
-    --sm-bati-ciel: #3E5672; --sm-bati-ardoise: #4A5463; --sm-bati-sable: #6B5B3E; --sm-bati-sauge: #4C5E48;
+    --sm-bati-ciel: #3E5672; --sm-bati-ardoise: #4A5463; --sm-bati-sable: #6B5B3E; --sm-bati-sauge: #4C5E48;   /* orange-permis : la teinte « sable » d'un meuble, choisie par lui (un objet réel) */
     --sm-fond-ciel: #1F2B39; --sm-fond-ardoise: #23272E; --sm-fond-sable: #2E2A22; --sm-fond-sauge: #232B22;
     --sm-trou: rgb(0 0 0 / .35);
-    --sm-kraft: #B89A6C; --sm-blanc: #D9DCE1; --sm-ardoise: #7F90A3; --sm-sable: #BFA97A; --sm-sauge: #8FA587; --sm-ciel: #87A6C2; --sm-lagon: #79A8A3;
+    --sm-kraft: #B89A6C; --sm-blanc: #D9DCE1; --sm-ardoise: #7F90A3; --sm-sable: #BFA97A; --sm-sauge: #8FA587; --sm-ciel: #87A6C2; --sm-lagon: #79A8A3;   /* orange-permis : le carton kraft et les teintes de meubles choisies par lui (objets réels) */
     --sm-bord: rgb(0 0 0 / .45);
   }
 
   /* ── LE MEUBLE ─────────────────────────────────────────────────────────── */
   .sm-meuble { --sm-bati: var(--sm-bati-ciel); --sm-fond: var(--sm-fond-ciel); width: 100%; box-sizing: border-box; }
   .sm-meuble[data-sm-couleur="ardoise"] { --sm-bati: var(--sm-bati-ardoise); --sm-fond: var(--sm-fond-ardoise); }
-  .sm-meuble[data-sm-couleur="sable"] { --sm-bati: var(--sm-bati-sable); --sm-fond: var(--sm-fond-sable); }
+  .sm-meuble[data-sm-couleur="sable"] { --sm-bati: var(--sm-bati-sable); --sm-fond: var(--sm-fond-sable); }   /* orange-permis : la teinte « sable » d'un meuble, choisie par lui (un objet réel) */
   .sm-meuble[data-sm-couleur="sauge"] { --sm-bati: var(--sm-bati-sauge); --sm-fond: var(--sm-fond-sauge); }
   /* Le bâti : deux montants, un chapeau, un socle — les tablettes sont le bas de chaque étage. */
   .sm-bati { background: var(--sm-bati); border-radius: 8px 8px 4px 4px; padding: 6px 6px 0; box-sizing: border-box; }

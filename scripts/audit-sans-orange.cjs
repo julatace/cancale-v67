@@ -61,8 +61,8 @@ for (const f of [...fichiers(path.join(RACINE, 'src')), ...fichiers(path.join(RA
 }
 
 // La règle elle-même : elle DOIT reconnaître l'orange d'hier et laisser le rouge du doublon, l'ardoise, l'encre.
-const temoins = [['#B25000', true], ['#FFC266', true], ['#FFF4E5', true], ['rgba(255,149,0,.16)', true], ['rgb(255 196 0 / .12)', true], ['#E08A12', true], ['#764300', true],
-  ['#BF2A21', false], ['#FF7A6E', false], ['#3D4B5B', false], ['#F4F4F5', false], ['#1D1D1F', false], ['#DFE1E5', false], ['rgba(255,149,0,.05)', false]];
+const temoins = [['#B25000', true], ['#FFC266', true], ['#FFF4E5', true], ['rgba(255,149,0,.16)', true], ['rgb(255 196 0 / .12)', true], ['#E08A12', true], ['#764300', true], ['#AD9658', true],
+  ['#BF2A21', false], ['#FF7A6E', false], ['#3D4B5B', false], ['#F4F4F5', false], ['#1D1D1F', false], ['#DFE1E5', false], ['rgba(255,149,0,.05)', false], ['#9A846C', false], ['#2A2116', false]];
 const regleOk = temoins.every(([t, o]) => { R.RE_COULEUR.lastIndex = 0; const m = R.RE_COULEUR.exec(t); return m && m[0] === t && R.estOrange(R.lire(t)) === o; });
 
 console.log(`\n${regleOk ? '✅' : '❌'} la règle reconnaît l'orange d'hier (#B25000, #FFC266, #FFF4E5…) et laisse le rouge du doublon, l'ardoise, l'encre`);

@@ -2,11 +2,12 @@
 //  LA RÈGLE « ORANGE / AMBRE » (24 nov., lot sauts-orange) — partagée par l'audit des sources
 //  (scripts/audit-sans-orange.cjs) et le banc rendu (scripts/bancs/sans-orange.cjs, sa copie dans la page).
 //  Décision de Julien du 23 nov. : aucun orange ni ambre, le jour et la nuit ; le rouge au seul doublon de N°.
-//  Orange = teinte 15°–55°, saturation ≥ 40 %, clarté 15 %–96 % (les teintes pâles comme #FFF4E5 comptent).
+//  Orange = teinte 15°–55°, clarté 15 %–96 %, saturation ≥ 40 % — ou ≥ 25 % jusqu'à 85 % de clarté (l'or terne : le
+//  liseré #AD9658, le kraft doux #6B5A40) ; les teintes pâles comme #FFF4E5 comptent.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 const hsl = (r, g, b) => { r /= 255; g /= 255; b /= 255; const M = Math.max(r, g, b), m = Math.min(r, g, b); const l = (M + m) / 2; if (M === m) return { h: 0, s: 0, l }; const d = M - m; const s = l > 0.5 ? d / (2 - M - m) : d / (M + m); let h = M === r ? (g - b) / d + (g < b ? 6 : 0) : M === g ? (b - r) / d + 2 : (r - g) / d + 4; return { h: h * 60, s, l }; };
-const estOrange = (c) => { if (!c || (c.a != null && c.a < 0.1)) return false; const x = hsl(c.r, c.g, c.b); return x.h >= 15 && x.h <= 55 && x.s >= 0.4 && x.l >= 0.15 && x.l <= 0.96; };
+const estOrange = (c) => { if (!c || (c.a != null && c.a < 0.1)) return false; const x = hsl(c.r, c.g, c.b); return x.h >= 15 && x.h <= 55 && x.l >= 0.15 && x.l <= 0.96 && (x.s >= 0.4 || (x.s >= 0.25 && x.l <= 0.85)); };
 // Un littéral de couleur dans un texte source : #rgb, #rrggbb, #rrggbbaa, rgb()/rgba() (virgules ou espaces, « / a »).
 const RE_COULEUR = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F\w])|rgba?\(\s*\d{1,3}(?:\.\d+)?\s*[, ]\s*\d{1,3}(?:\.\d+)?\s*[, ]\s*\d{1,3}(?:\.\d+)?\s*(?:[,/]\s*[\d.]+%?\s*)?\)/g;
 const lire = (t) => {

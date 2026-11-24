@@ -6,14 +6,14 @@
 :root {
   --v2-kraft: var(--n-ambre-fond);
   --v2-kraft-encre: #2A2116;
-  --v2-kraft-doux: #6B5A40;
+  --v2-kraft-doux: #50535B;
   --v2-kraft-bord: rgb(42 33 22 / .22);
   --v2-kraft-trou: var(--v2-carte, #FFFFFF);
 }
 :root[data-theme="dark"] {
   --v2-kraft: #3A3226;
   --v2-kraft-encre: var(--n-ambre);
-  --v2-kraft-doux: #CDBB9C;
+  --v2-kraft-doux: #B8B8C0;
   --v2-kraft-bord: color-mix(in srgb, var(--n-ambre) 22%, transparent);
   --v2-kraft-trou: #27272B;
 }

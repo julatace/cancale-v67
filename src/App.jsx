@@ -25854,7 +25854,7 @@ const saveRoomPlan = async (data, base, opts = {}) => {
 // colonne). `build` = quel constructeur 3D utiliser.
 const FURN_TYPES = {
   metal:   { label: 'Étagère métal', emoji: '🗄️', w: 1.2, h: 0.5, rows: 5, cols: 2, color: '#AEAEB2', h3d: 1.25, build: 'metal', cases: 'pile' },
-  bois:    { label: 'Étagère bois',  emoji: '📚', w: 1.2, h: 0.45, rows: 4, cols: 2, color: '#b08a5f', h3d: 1.2, build: 'metal', bois: true, cases: 'pile' },
+  bois:    { label: 'Étagère bois',  emoji: '📚', w: 1.2, h: 0.45, rows: 4, cols: 2, color: '#b08a5f', h3d: 1.2, build: 'metal', bois: true, cases: 'pile' },   // orange-permis : le bois d'une étagère (un objet réel dessiné)
   bacs:    { label: 'Étagère à bacs', emoji: '🧺', w: 1.2, h: 0.45, rows: 4, cols: 3, color: '#AEAEB2', h3d: 1.25, build: 'metal', bacs: true, cases: 'pile' },
   cintres: { label: 'Portant à cintres', emoji: '👕', w: 1.5, h: 0.5, rows: 1, cols: 8, color: '#8E8E93', h3d: 1.1, build: 'portant', cases: 'cintre' },
   table:   { label: 'Table',   emoji: '🪵', w: 2, h: 1, rows: 1, cols: 3, color: '#8E8E93', h3d: 0.5, build: 'table', cases: 'pile' },
@@ -25866,7 +25866,7 @@ const FURN_TYPES = {
   etagere: { label: 'Étagère', emoji: '📚', w: 3, h: 1, rows: 4, cols: 3, color: '#8E8E93', h3d: 1.8, build: 'etagere', hidden: true },
   casier:  { label: 'Casiers', emoji: '🔲', w: 2, h: 1, rows: 3, cols: 3, color: '#8E8E93', h3d: 1.6, build: 'etagere', hidden: true },
   grille:  { label: 'Grille de boîtes', emoji: '🔳', w: 2, h: 0.5, rows: 3, cols: 4, cell: 0.5, color: '#c9a24b', h3d: 1.5, build: 'grille', hidden: true },   // orange-permis : bois, carton, lumière du garage 3D (des objets réels dessinés)
-  armoire: { label: 'Armoire', emoji: '🚪', w: 2, h: 1, rows: 2, cols: 2, color: '#b08a5f', h3d: 1.9, build: 'armoire', hidden: true },
+  armoire: { label: 'Armoire', emoji: '🚪', w: 2, h: 1, rows: 2, cols: 2, color: '#b08a5f', h3d: 1.9, build: 'armoire', hidden: true },   // orange-permis : le bois d'une armoire (un objet réel dessiné)
   penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#8E8E93', h3d: 1.6, build: 'penderie', hidden: true },
   portant: { label: 'Portant', emoji: '👗', w: 2, h: 1, rows: 1, cols: 5, color: '#8E8E93', h3d: 1.6, build: 'penderie', hidden: true },
   carton:  { label: 'Boîte à empiler', emoji: '📦', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#c9a24b', h3d: 0.34, build: 'carton', box: true, hidden: true },   // orange-permis : bois, carton, lumière du garage 3D (des objets réels dessinés)

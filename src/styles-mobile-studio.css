@@ -27,7 +27,7 @@
  .vrm-main .vrm-sales-workbar>.vrm-rangee{grid-column:1 / -1;grid-row:2;}
  .vrm-main .vrm-sales-workbar>.vrm-rangee>button{border:0!important;background:#E5E5EA!important;color:#636366!important;min-height:32px!important;font-size:11px!important;padding-inline:11px!important;border-radius:6px!important;}
  .vrm-main .vrm-sales-workbar>.vrm-rangee>button[aria-pressed=true]{background:var(--vrm-ink)!important;color:var(--vrm-bg)!important;box-shadow:0 2px 4px #1D1D1F14;}
- .vrm-main [data-raison-bord]{background:#E5E5EA!important;border-left:2px solid #ad9658!important;border-radius:0 8px 8px 0!important;padding:7px 9px!important;font-size:11px!important;line-height:1.4!important;}
+ .vrm-main [data-raison-bord]{background:#E5E5EA!important;border-left:2px solid var(--n-ambre)!important;border-radius:0 8px 8px 0!important;padding:7px 9px!important;font-size:11px!important;line-height:1.4!important;}
  .vrm-main [data-raison-bord] .vrm-label-help>summary{min-height:24px!important;padding:4px 0 0!important;font-size:11px!important;}
  .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{padding:12px 12px 0!important;border-radius:20px!important;background:linear-gradient(135deg,#FFFFFF,#ffffff)!important;border:1px solid var(--vrm-line)!important;box-shadow:0 5px 14px #1D1D1F07,0 1px 1px #1D1D1F05;gap:0!important;margin-bottom:12px;}
  .vrm-main .vrm-ventes-liste .vrm-sale-overview{grid-template-columns:76px minmax(0,1fr)!important;grid-template-rows:auto auto auto;gap:3px 12px!important;}

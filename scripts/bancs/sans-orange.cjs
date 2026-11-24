@@ -11,7 +11,7 @@
 //  Messages, le menu, Paramètres et CHACUNE de ses sections, la loupe), 390 tactile ET 1512, clair ET sombre, et
 //  lit la couleur CALCULÉE (getComputedStyle) de tout ce qui se voit : texte, fond, bords, contour, ombre, dégradé,
 //  trait et remplissage SVG, et les pseudo-éléments ::before/::after. Une couleur est ORANGE/AMBRE quand sa teinte
-//  est entre 15° et 55°, sa saturation ≥ 40 %, sa clarté entre 15 % et 96 % et son opacité ≥ 0,1 (les teintes pâles
+//  est entre 15° et 55°, sa saturation ≥ 40 % (≥ 25 % pour un or terne jusqu'à 85 % de clarté), sa clarté entre 15 % et 96 % et son opacité ≥ 0,1 (les teintes pâles
 //  #FFF4E5 comptent). Le rouge du doublon (teinte < 15°) n'est pas de l'orange. Seuls écartés : les LOGOS des
 //  transporteurs et des sites (une marque, pas l'app) et les photos. Une seule touche ⇒ ROUGE.
 //
@@ -31,6 +31,7 @@ const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim
 const THEMES = liste('THEMES', 'clair,sombre');
 const LARGEURS = liste('LARGEURS', '390,1512').map(Number);
 const CAPTURES = process.env.CAPTURES !== '0';
+const SEUL = process.env.SEULEMENT || '';   // `SEULEMENT=messages` : seulement Messages (et sa conversation)
 
 const jour = (d) => { const x = new Date(Date.now() + d * 864e5); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
 const base = () => {
@@ -54,7 +55,7 @@ function chercherOrange() {
   const toutes = (s) => { const out = []; const re = /color\(srgb [^)]+\)|rgba?\([^)]+\)/g; let m; while ((m = re.exec(String(s || '')))) { const c = rgba(m[0]); if (c) out.push(c); } return out; };
   const hsl = (c) => { const r = c.r / 255, g = c.g / 255, b = c.b / 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); const l = (mx + mn) / 2; if (mx === mn) return { h: 0, s: 0, l }; const d = mx - mn; const s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); const h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return { h: h * 60, s, l }; };
   const hex = (c) => '#' + [c.r, c.g, c.b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('').toUpperCase();
-  const orange = (c) => { if (!c || c.a < 0.1) return false; const h = hsl(c); return h.h >= 15 && h.h <= 55 && h.s >= 0.4 && h.l >= 0.15 && h.l <= 0.96; };
+  const orange = (c) => { if (!c || c.a < 0.1) return false; const h = hsl(c); return h.h >= 15 && h.h <= 55 && h.l >= 0.15 && h.l <= 0.96 && (h.s >= 0.4 || (h.s >= 0.25 && h.l <= 0.85)); };   // = scripts/_couleurs-orange.cjs (l'or terne #AD9658 compte)
   // Écartés : une MARQUE (logo d'un transporteur, d'un site), une photo, une vignette — pas la palette de l'app.
   const LOGO = '[data-logo], [data-logo-transporteur], [data-transporteur-logo], .n-logo-site, [class*="logo-transp"], [class*="vrm-logo-site"], [class*="LogoTransporteur"], [data-site-logo], img, picture, video, canvas';
   const nom = (el) => {
@@ -128,7 +129,7 @@ const dit = (ok, quoi, detail = '') => { if (!ok) ROUGES++; const l = `${ok ? '�
         if (!l) return false;
         await l.click().catch(() => {}); await pg.waitForTimeout(2500); return true;
       };
-      for (const [ecran, cle] of [['aujourdhui', 'journee'], ['annonces', 'paires'], ['ventes', 'ventes'], ['achats', 'achats'], ['argent', 'compta'], ['stock', 'garage']]) {
+      if (!SEUL) for (const [ecran, cle] of [['aujourdhui', 'journee'], ['annonces', 'paires'], ['ventes', 'ventes'], ['achats', 'achats'], ['argent', 'compta'], ['stock', 'garage']]) {
         if (await aller(cle)) await juger(ecran); else dit(false, `${W} ${th} · ${ecran} : écran introuvable`);
       }
       // Messages
@@ -137,18 +138,19 @@ const dit = (ok, quoi, detail = '') => { if (!ok) ROUGES++; const l = `${ok ? '�
         if (m) {
           await m.click().catch(() => {}); await pg.waitForTimeout(2500); await juger('messages');
           const off = await visible('[data-msg-vue="offres"]'); if (off) { await off.click().catch(() => {}); await pg.waitForTimeout(1200); await juger('messages-offres'); }
-          const fil = await visible('[data-fil-offre]:not([data-fil-offre=""]):not([data-fil-offre="0"])') || await visible('[data-fil]');
+          let fil = await visible('[data-fil-offre]:not([data-fil-offre=""]):not([data-fil-offre="0"])');
+          if (!fil) { const t = await visible('[data-msg-vue="toutes"]'); if (t) { await t.click().catch(() => {}); await pg.waitForTimeout(1200); } fil = await visible('[data-fil-offre]:not([data-fil-offre=""]):not([data-fil-offre="0"])') || await visible('[data-fil]'); }
           if (fil) { await fil.click().catch(() => {}); await pg.waitForTimeout(3000); await juger('messages-conversation'); await pg.goBack().catch(() => {}); await pg.waitForTimeout(800); }
           else dit(false, `${W} ${th} · messages : aucune conversation à ouvrir`);
           await pg.goBack().catch(() => {}); await pg.waitForTimeout(800);
         } }
       // Argent → Statistiques (le segment)
-      if (await aller('compta')) {
+      if (!SEUL && await aller('compta')) {
         const stats = await visible('[data-argent-seg="stats"], [data-section="stats"], .vrm-seg-btn:has-text("Statistiques")');
         if (stats) { await stats.click().catch(() => {}); await pg.waitForTimeout(1500); await juger('statistiques'); }
       }
       // Paramètres et chacune de ses sections
-      if (await aller('settings')) {
+      if (SEUL) { /* rien */ } else if (await aller('settings')) {
         await juger('parametres');
         const sections = await pg.evaluate(() => [...document.querySelectorAll('[data-categorie-ouvrir]')].map((x) => x.getAttribute('data-categorie-ouvrir')));
         for (const s of sections) {
@@ -160,9 +162,9 @@ const dit = (ok, quoi, detail = '') => { if (!ok) ROUGES++; const l = `${ok ? '�
         }
       } else dit(false, `${W} ${th} · parametres : écran introuvable`);
       // La loupe (sans rien taper, puis un N°)
-      await aller('journee');
+      if (!SEUL) await aller('journee');
       const loupe = pg.locator('[data-recherche-loupe], [data-n-tete-loupe]').first();
-      if (await loupe.count()) {
+      if (!SEUL && await loupe.count()) {
         await loupe.click().catch(() => {}); await pg.waitForTimeout(2500); await juger('loupe');
         await pg.keyboard.type('12', { delay: 40 }).catch(() => {}); await pg.waitForTimeout(1500); await juger('loupe-resultats');
       }

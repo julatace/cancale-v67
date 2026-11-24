@@ -17,14 +17,14 @@
 :root[data-theme="dark"] [data-couleur="ciel"]    { --etag-fond: #323239; --etag-bord: #838995; }
 :root[data-theme="dark"] [data-couleur="lagon"]   { --etag-fond: #15403C; --etag-bord: #3F9D93; }
 :root[data-theme="dark"] [data-couleur="sauge"]   { --etag-fond: #263B22; --etag-bord: #6F9A5D; }
-:root[data-theme="dark"] [data-couleur="sable"]   { --etag-fond: #3D3322; --etag-bord: #B08F55; }
+:root[data-theme="dark"] [data-couleur="sable"]   { --etag-fond: #3D3322; --etag-bord: #B08F55; }   /* orange-permis : la couleur « sable » d'une étagère, choisie par lui */
 :root[data-theme="dark"] [data-couleur="terre"]   { --etag-fond: #3A2C24; --etag-bord: #9A7562; }
 :root[data-theme="dark"] [data-couleur="ardoise"] { --etag-fond: #2A323C; --etag-bord: #7A8797; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) [data-couleur="ciel"]    { --etag-fond: #323239; --etag-bord: #838995; }
   :root:not([data-theme="light"]) [data-couleur="lagon"]   { --etag-fond: #15403C; --etag-bord: #3F9D93; }
   :root:not([data-theme="light"]) [data-couleur="sauge"]   { --etag-fond: #263B22; --etag-bord: #6F9A5D; }
-  :root:not([data-theme="light"]) [data-couleur="sable"]   { --etag-fond: #3D3322; --etag-bord: #B08F55; }
+  :root:not([data-theme="light"]) [data-couleur="sable"]   { --etag-fond: #3D3322; --etag-bord: #B08F55; }   /* orange-permis : la couleur « sable » d'une étagère, choisie par lui */
   :root:not([data-theme="light"]) [data-couleur="terre"]   { --etag-fond: #3A2C24; --etag-bord: #9A7562; }
   :root:not([data-theme="light"]) [data-couleur="ardoise"] { --etag-fond: #2A323C; --etag-bord: #7A8797; }
 }

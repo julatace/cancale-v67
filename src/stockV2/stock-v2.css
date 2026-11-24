@@ -217,7 +217,7 @@
 
 /* ══ LA SIGNATURE (17 nov., brief « SIGNATURE ») : l'ÉTIQUETTE KRAFT — une place est une étiquette de carton, en plus grand
    que celle du N° (kraft clair #E9DCC4 / nuit #3A3226, encre, coin coupé, œillet percé) ; et le MOUVEMENT « fait ». ══ */
-.sr-kraft { --sr-kraft: var(--v2-kraft, var(--n-ambre-fond)); --sr-kraft-encre: var(--v2-kraft-encre, #2A2116); --sr-kraft-muet: var(--v2-kraft-doux, #6B5A40); background: var(--sr-kraft) !important; color: var(--sr-kraft-encre) !important;
+.sr-kraft { --sr-kraft: var(--v2-kraft, var(--n-ambre-fond)); --sr-kraft-encre: var(--v2-kraft-encre, #2A2116); --sr-kraft-muet: var(--v2-kraft-doux, #50535B); background: var(--sr-kraft) !important; color: var(--sr-kraft-encre) !important;
   clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%); border-radius: 6px; box-shadow: inset 0 0 0 .5px var(--v2-kraft-bord, rgb(42 33 22 / .22)); position: relative; }
 /* L'œillet percé, à gauche (la géométrie de l'étiquette N° partagée, src/designV2/signature.css, en plus grand). */
 .sr-kraft::before { content: ""; position: absolute; left: 10px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: var(--sr-trou, var(--v2-kraft-trou, #FFFFFF)); box-shadow: inset 0 0 0 .5px var(--v2-kraft-bord, rgb(42 33 22 / .22)); }
