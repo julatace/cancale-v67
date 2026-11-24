@@ -279,7 +279,7 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
 
       {!etapesFaites ? (
         <Groupe titre={tr('ext.groupe.premier')} attrs={{ 'data-ext-groupe': 'premier' }}>
-          {vm.etapes.map((e) => <Rangee key={e.cle} titre={tr('ext.etape.' + e.cle)} valeur={e.fait === true ? tr('ext.etape.vu') : e.fait === null ? tr('ext.etape.encours') : tr('ext.etape.attente')} valeurForte={e.fait === true}
+          {vm.etapes.map((e) => <Rangee key={e.cle} titre={tr('ext.etape.' + e.cle)} lignes={2} valeur={e.fait === true ? tr('ext.etape.vu') : e.fait === null ? tr('ext.etape.encours') : tr('ext.etape.attente')} valeurForte={e.fait === true}
             fin={e.fait === true ? 'coche' : null} attrs={{ 'data-ext-etape': e.cle, 'data-ext-fait': e.fait === true ? '1' : e.fait === null ? '?' : '0' }}/>)}
         </Groupe>
       ) : null}
