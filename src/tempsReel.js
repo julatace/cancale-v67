@@ -80,8 +80,13 @@ const REGLES = [
   // (23 nov., lot retours-suivi) Un e-mail de RETOUR d'achat rangé par le serveur (bordereau de retour, « Retourne ta
   // commande », remboursement) : Achats → « À renvoyer » relit ses retours (projection scalaire) ; l'app n'écrit jamais ces lignes.
   [/^email_(?:bordretour|retourdemande|rembachat)_[A-Za-z0-9_.-]{1,80}$/, 'retours'],
+  // (23 nov., « tous les colis en temps réel » — Julien) Un BORDEREAU reçu par e-mail (`email_bord_{tx}`, écrit par
+  // api/email-inbound.js) : Colis / Ventes / Ma journée relisent la liste des bordereaux (`fetchEmailBordereaux`,
+  // scalaires) — sans ceci, une vente à expédier arrivée pendant que l'écran est ouvert n'y paraissait qu'en
+  // changeant d'écran. Relire n'écrit rien (aucune boucle).
+  [/^email_bord_[A-Za-z0-9_.-]{3,80}$/, 'bordereaux'],
 ];
-const SANS_COMPTE = new Set(['transp', 'lbc', 'vestiaire', 'emails', 'colis', 'retrait', 'retours']);
+const SANS_COMPTE = new Set(['transp', 'lbc', 'vestiaire', 'emails', 'colis', 'retrait', 'retours', 'bordereaux']);
 export function quoiDe(id) {
   const s = String(id == null ? '' : id);
   for (const [re, quoi] of REGLES) { const m = re.exec(s); if (m) return { quoi, uid: SANS_COMPTE.has(quoi) ? null : m[1] }; }
