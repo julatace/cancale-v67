@@ -118,6 +118,13 @@ async function lire(nav, ICI, vue, opts) {
   out.annonces = { autry: t.split(TITRE).length - 1 - vm, n262: (t.match(/N° ?262\b/g) || []).length };
   await pg.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
   await cap('6-annonces-autry');
+  // Le N° cherché : « 262 » EN LIGNE (hors du groupe « par e-mail »).
+  await champ.fill('262').catch(() => {});
+  await pg.waitForTimeout(2500);
+  out.annonces.enLigne262 = await pg.evaluate((T) => { const tous = (document.querySelector('.vrm-main') || document.body).innerText.replace(/\s+/g, ' ');
+    const vm = [...document.querySelectorAll('[data-vm-annonce]')].map((e) => e.innerText.replace(/\s+/g, ' ')).join(' ');
+    return tous.split(T).length - 1 - (vm.split(T).length - 1); }, TITRE).catch(() => null);
+  await cap('6b-annonces-262');
   await champ.fill('').catch(() => {});
   // La fiche du N° 262.
   await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: '262' })));
@@ -138,7 +145,7 @@ async function main() {
       const p = await lire(nav, ICI, vue, { photo: true });
       console.log(JSON.stringify(p));
       dit(vue, 'photo exacte : la vente e-mail reçoit le N° de SON annonce (262), pas un autre des 50', p.v && p.v.num === '262', JSON.stringify(p.v));
-      dit(vue, 'photo exacte : Annonces · En ligne ne la montre plus (49 Autry sur 50)', p.annonces && p.annonces.autry === 49, JSON.stringify(p.annonces));
+      dit(vue, 'photo exacte : Annonces · En ligne ne la montre plus (« 262 » cherché : aucune annonce en ligne)', p.annonces && p.annonces.enLigne262 === 0, JSON.stringify(p.annonces));
       dit(vue, 'photo exacte : Annonces la dit « Vendue · par e-mail, en attente de Vinted » (N° 262)', Array.isArray(p.vendues) && p.vendues.length === 1 && p.vendues[0] === '262', JSON.stringify([p.vendues, p.seg]));
       dit(vue, 'photo exacte : la fiche N° 262 dit « vendue · par e-mail »', p.fiche && p.fiche.etat === 'fd.etat.vendueMail', JSON.stringify(p.fiche));
       dit(vue, 'la fiche ne répète pas « pas lu »', p.fiche && p.fiche.pasLu === 0 && p.fiche.ventesPasLues === 0, JSON.stringify(p.fiche));
@@ -149,7 +156,7 @@ async function main() {
       dit(vue, 'la feuille propose les annonces du compte (au plus 8), dont la bonne', s.feuille && s.feuille.n > 0 && s.feuille.n <= 8 && s.feuille.ids.includes(String(idAnnonce(ICI_I))), JSON.stringify(s.feuille));
       dit(vue, 'son toucher relie : N° 262', s.apresRelier && s.apresRelier.num === '262' && s.apresRelier.delier, JSON.stringify(s.apresRelier));
       dit(vue, '« Délier » défait : plus de N°, « Relier » revient', s.apresDelier && !s.apresDelier.num && s.apresDelier.relier, JSON.stringify(s.apresDelier));
-      dit(vue, 'reliée par son clic : Annonces · En ligne ne la montre plus', s.annonces && s.annonces.autry === 49, JSON.stringify(s.annonces));
+      dit(vue, 'reliée par son clic : Annonces · En ligne ne la montre plus', s.annonces && s.annonces.enLigne262 === 0, JSON.stringify(s.annonces));
       for (const [k, x] of [['photo', p], ['sans photo', s]]) dit(vue, `aucune erreur (${k})`, !x.err.length, x.err.slice(0, 3).join(' ¦ '));
     }
   } finally { await nav.close(); srv.close(); }
