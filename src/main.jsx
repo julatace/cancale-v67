@@ -203,6 +203,9 @@ const comptableDemande = /[?&]comptable=/.test(window.location.search || '');
 const VueComptable = lazySur(() => import('./VueComptable.jsx'));
 // (15 nov.) LA PAGE D'UN PARTENAIRE (`/pa/<jeton>` → `?espace-partenaire=`) : lecture seule, sans l'app ni session (src/VuePartenaire.jsx).
 const partenaireDemande = /[?&]espace-partenaire=/.test(window.location.search || '');
+// (16 nov., lot partage-aidant) LA PAGE DE L'AIDANT (`/a/<jeton>` → `?aidant=`) : le stock en lecture seule, sans l'app ni session (src/VueAidant.jsx).
+const aidantDemande = /[?&]aidant=/.test(window.location.search || '');
+const VueAidant = lazySur(() => import('./VueAidant.jsx'));
 const VuePartenaire = lazySur(() => import('./VuePartenaire.jsx'));
 // (14 nov., ouverture instantanée) LES DERNIERS CHIFFRES DE MA JOURNÉE, PEINTS AVANT L'APP.
 // src/ouvertureInstantanee.js décide (rien que ce que la porte hors ligne laisserait voir, pour CE
@@ -213,7 +216,7 @@ const VuePartenaire = lazySur(() => import('./VuePartenaire.jsx'));
 // ses règles vivent dans le morceau à part (rien de plus à télécharger pour la page d'accueil).
 const apercuPossible = (() => {
   try {
-    if (filmDemande || comptableDemande || partenaireDemande || pageTarifs() || exempleActif()) return false;
+    if (filmDemande || comptableDemande || partenaireDemande || aidantDemande || pageTarifs() || exempleActif()) return false;
     const s = JSON.parse(window.localStorage.getItem('vrm_session') || 'null');
     const uid = s && s.user && typeof s.user.id === 'string' ? s.user.id : '';
     // Les traces que la décision exigera (src/ouvertureInstantanee.js) : sans l'une d'elles, aucun morceau
@@ -237,7 +240,7 @@ const apercuPeint = apercuPossible
 // public/demarrage-app.js, seule son exécution attend la peinture).
 // (15 nov.) Le morceau arrivé est un JALON de la progression de l'écran de démarrage (src/demarrage.js).
 const telechargerApp = () => { try { import('./App.jsx').then(() => etapeDemarrage('telechargee'), () => {}); } catch (_) {} };
-if (!filmDemande && !comptableDemande && !partenaireDemande && versApp()) { if (apercuPossible) apercuPeint.then(telechargerApp); else telechargerApp(); }
+if (!filmDemande && !comptableDemande && !partenaireDemande && !aidantDemande && versApp()) { if (apercuPossible) apercuPeint.then(telechargerApp); else telechargerApp(); }
 
 const FondApp = DemarrageVRM;
 function Racine() {
@@ -250,6 +253,7 @@ function Racine() {
   }, []);
   if (comptableDemande) return <React.Suspense fallback={null}><VueComptable /></React.Suspense>;
   if (partenaireDemande) return <React.Suspense fallback={null}><VuePartenaire /></React.Suspense>;
+  if (aidantDemande) return <React.Suspense fallback={null}><VueAidant /></React.Suspense>;
   if (filmDemande) return <React.Suspense fallback={<FondApp />}><Film /></React.Suspense>;
   if (pageTarifs()) return <React.Suspense fallback={<FondApp />}><Tarifs /></React.Suspense>;
   if (vue === 'accueil') {

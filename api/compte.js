@@ -98,6 +98,8 @@ import { traiterAppareils, lireJournal } from './_lib/securite-compte.js';
 import { verifierNouvelAppareil } from './_lib/appareil-nouveau.js';   // (10 nov., lot H)
 import { traiterAgenda } from './_lib/agenda-ics.js';
 import { traiterCatalogue, langueVisiteur, CSP_CATALOGUE } from './_lib/catalogue-prive.js';   // (14 nov., lot messages-achats-plus) le catalogue privé                 // (10 nov., lot H)
+import { traiterAidant } from './_lib/aidant-lien.js';   // (16 nov., lot partage-aidant) le stock en lecture seule pour un aidant sans compte
+import { prendreDebit } from './_lib/debit-vendeur.js';
 import { traiterComptable } from './_lib/comptable-lien.js';   // (14 nov., lot argent-prix — 115) le lien lecture seule pour son comptable                 // (10 nov., lot H)
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { verifierConfirmation, verifierMotDePasse, inventaire, lireProprietaire, noterJournal, mailSuppression, FENETRE_RECENTE_MS, MOT_CONFIRMATION } from './_lib/suppression-compte.js';
@@ -1528,6 +1530,29 @@ async function comptable(req, res) {
   res.setHeader('X-Robots-Tag', 'noindex');
   return repondre(res, r.status, r.body);
 }
+// (16 nov., lot partage-aidant) Le lien de l'aidant : `j` = le jeton (sans session, GET seulement, le stock
+// projeté, débit limité par adresse ET par jeton) ; sinon la session du vendeur (créer, publier, couper).
+// Règle : api/_lib/aidant-lien.js.
+async function aidant(req, res) {
+  const jeton = req.query && req.query.j != null ? String(req.query.j) : null;
+  let user = null, corps = null;
+  if (jeton == null) {
+    user = await vendeurExige(req, res);
+    if (!user) return;
+    if (req.method === 'POST') {
+      corps = await lireCorpsJson(req);
+      if (!corps || typeof corps !== 'object' || Array.isArray(corps)) return repondre(res, 400, { erreur: 'corps-invalide' });
+    }
+  }
+  const ip = String((req.headers && (req.headers['x-forwarded-for'] || req.headers['x-real-ip'])) || '').split(',')[0].trim().slice(0, 64) || 'inconnue';
+  const debit = (cleJeton) => prendreDebit('aidant', 'ip:' + ip).ok && prendreDebit('aidant', 'j:' + cleJeton).ok;
+  const r = await traiterAidant({ base: SUPABASE_URL, cle: process.env.SUPABASE_SERVICE_KEY || '', env: process.env, methode: req.method, jeton, user, corps, debit });
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  if (r.status === 429) res.setHeader('Retry-After', '60');
+  return repondre(res, r.status, r.body);
+}
 async function journalVrm(req, res) {
   const u = await vendeurExige(req, res);
   if (!u) return;
@@ -2427,6 +2452,7 @@ export default async function handler(req, res) {
   if (mode === 'catalogue') return (m === 'GET' || m === 'POST') ? catalogue(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'agenda') return (m === 'GET' || m === 'POST') ? agenda(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'comptable') return (m === 'GET' || m === 'POST') ? comptable(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'aidant') return (m === 'GET' || m === 'POST') ? aidant(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'journal') return m === 'GET' ? journalVrm(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   // (5 nov.) Les e-mails de l'essai gratuit : état, choix, lien de désinscription.
   if (mode === 'relances') return (m === 'GET' || m === 'POST') ? relances(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });

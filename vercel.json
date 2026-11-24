@@ -40,6 +40,11 @@
       "permanent": false
     },
     {
+      "source": "/a/:jeton([A-Za-z0-9_.-]{40,80})",
+      "destination": "/?aidant=:jeton",
+      "permanent": false
+    },
+    {
       "source": "/p/:code([A-Za-z0-9]{3,16})",
       "destination": "/?partenaire=:code",
       "permanent": false

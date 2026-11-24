@@ -1,6 +1,7 @@
 // DEUTSCH — Übersetzung von fr.js (der Quelle). Gleiche Schlüssel, gleiche {Variablen}.
 import ecran_accessibilite from './de/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './de/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
+import ecran_aidant from './de/aidant.js';   // (16 nov.) partager le stock avec un aidant
 import ecran_suivi_vente from './de/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './de/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './de/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
@@ -118,6 +119,7 @@ import ecran_extension from './de/extension.js';   // (19 nov., demande H) la pa
 export default {
   ...ecran_accessibilite,
   ...ecran_groupes,
+  ...ecran_aidant,
   ...ecran_perso,
   ...ecran_ventesVerre,
   ...ecran_studio_paires,

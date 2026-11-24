@@ -1,0 +1,17 @@
+/* (16 nov., lot partage-aidant) La page de l'aidant : une liste lisible au téléphone, clair et sombre. */
+:root { --aid-fond: #f5f5f7; --aid-carte: #ffffff; --aid-encre: #1d1d1f; --aid-gris: #6e6e73; --aid-filet: rgba(0, 0, 0, .1); --aid-accent: #16181D; --aid-sur-accent: #FFFFFF; }   /* (23 nov.) noir encre : le bouton plein à l'encre */
+@media (prefers-color-scheme: dark) { :root { --aid-fond: #000000; --aid-carte: #1c1c1e; --aid-encre: #f5f5f7; --aid-gris: #a1a1a6; --aid-filet: rgba(255, 255, 255, .14); --aid-accent: #F4F4F5; --aid-sur-accent: #16181D; } }
+html, body { background: var(--aid-fond) !important; color-scheme: light dark; }   /* cette feuille ne se charge que pour la page de l’aidant */
+.vrm-aid { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; color: var(--aid-encre); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif; }
+.vrm-aid h1 { font-size: 28px; margin: 8px 0 4px; color: var(--aid-encre); }
+.vrm-aid-note { color: var(--aid-gris); font-size: 15px; margin: 4px 0 14px; }
+.vrm-aid-champ { width: 100%; box-sizing: border-box; min-height: 44px; font-size: 16px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--aid-filet); background: var(--aid-carte); color: var(--aid-encre); margin-bottom: 12px; }
+.vrm-aid-bouton { min-height: 44px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--aid-accent); color: var(--aid-sur-accent); font: inherit; font-weight: 600; }
+.vrm-aid-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.vrm-aid-ligne { display: flex; align-items: center; gap: 12px; padding: 10px; background: var(--aid-carte); border: 1px solid var(--aid-filet); border-radius: 14px; min-height: 64px; }
+.vrm-aid-photo { width: 56px; height: 56px; flex-shrink: 0; border-radius: 10px; overflow: hidden; background: var(--aid-filet); }
+.vrm-aid-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-aid-textes { display: flex; flex-direction: column; min-width: 0; }
+.vrm-aid-num { font-size: 17px; font-variant-numeric: tabular-nums; }
+.vrm-aid-titre { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-aid-lieu { font-size: 14px; font-weight: 600; color: var(--aid-accent); }

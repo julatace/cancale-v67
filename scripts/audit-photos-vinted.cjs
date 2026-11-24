@@ -140,6 +140,8 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
     // La liste FERMÉE des <img> qui ne peuvent PAS montrer une photo Vinted.
     // Clé : « fonction englobante :: source » ; une source inconnue est rouge.
     const PERMIS = {
+      // (23 nov., intégration de partage-aidant) la page publique de l'aidant (sans compte, sans la coque ni l'extension) :
+      'VueAidant :: it.photo': 'page de l’aidant (/a/…), hors de l’app : aucune coque PhotoVinted ni extension ; la photo vient de la projection serveur (api/_lib/aidant-lien.js) et part sans référent (referrerPolicy="no-referrer" posé) ; cassée ⇒ la case reste vide, le N° et l’emplacement restent écrits',
       // (intégration g1) sources nées des lots alertes-ebay, gros-lot, pas-en-ligne :
       // (intégration 11nov-g2) lot annonce-vinted :
       'CreerSurVinted :: u': 'photos de « Créer sur Vinted » : choisies par le vendeur et réduites dans la page en data:image/jpeg (photoReduite), ou les photos de SA fiche ; aucune photo Vinted lue par l’<img>',

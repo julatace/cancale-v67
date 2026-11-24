@@ -18,6 +18,7 @@
 export const DEBITS = {
   widget: { parMinute: 12, parHeure: 120 },      // le widget iPhone se rafraîchit ~4 fois par heure
   commandes: { parMinute: 40, parHeure: 400 },   // l'extension : quelques envois par compte et par visite
+  aidant: { parMinute: 20, parHeure: 200 },      // (16 nov.) le lien de l'aidant (route publique) : par adresse et par jeton
 };
 const MAX_CLES = 5000;   // mémoire bornée : au-delà, les plus anciennes clés partent
 const fenetres = new Map();

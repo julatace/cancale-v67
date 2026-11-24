@@ -6,6 +6,7 @@
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
 import ecran_accessibilite from './fr/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './fr/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
+import ecran_aidant from './fr/aidant.js';   // (16 nov.) partager le stock avec un aidant
 import ecran_suivi_vente from './fr/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './fr/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './fr/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
@@ -123,6 +124,7 @@ import ecran_extension from './fr/extension.js';   // (19 nov., demande H) la pa
 export default {
   ...ecran_accessibilite,
   ...ecran_groupes,
+  ...ecran_aidant,
   ...ecran_perso,
   ...ecran_ventesVerre,
   ...ecran_studio_paires,
