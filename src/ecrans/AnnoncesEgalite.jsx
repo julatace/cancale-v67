@@ -18,6 +18,7 @@
 //  Les actions passent par l'écran Annonces Vinted d'hier (monté, caché) : `demanderActionAnnonces`.
 // ══════════════════════════════════════════════════════════════════════════
 import { useComptesBloques } from '../compteBloqueEtat.js';
+import { liensLbcLus } from '../App.jsx';   // (24 nov., lot ext-anciens-lots) les liens Leboncoin LUS (+ photo d'origine, src/photoIdentite.js)
 import { etatLienLu, propositionLu, relierDepuisListe, queSurCeSite, ouvrirLiaison, abonnerLiaison, demanderLiaison } from '../liaisonEtat.js';   // (20 nov.) relier depuis la liste
 import React from 'react';
 import { lazySur } from '../chargementSur.js';
@@ -149,7 +150,7 @@ export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis 
   // Leboncoin
   if (ls && ls.items && Array.isArray(vr)) {
     const vendues = annoncesLbcVendues((vr[0] && vr[0].ventes) || {});
-    const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
+    const liens = { ...liensLbcLus() };
     const noms = Array.isArray(annu) ? annuaireLbc((annu[0] && annu[0].a) || {}) : null;
     // (20 nov.) Seules SES annonces : compte prouvé par une vente ou une session vue, ou référence VRM (`annonceLbcALui`).
     const prouves = new Set([...comptesLbcProuves((vr[0] && vr[0].ventes) || {}, ls.items), ...(Array.isArray(annu) ? comptesLbcSession((annu[0] && annu[0].a) || {}) : [])]);

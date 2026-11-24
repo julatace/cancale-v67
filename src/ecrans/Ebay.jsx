@@ -1,6 +1,7 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { ordreRecent, quandEbay } from '../ordreRecent.js';
+import { liensLbcLus } from '../App.jsx';   // (24 nov., lot ext-anciens-lots) les liens Leboncoin LUS (+ photo d'origine, src/photoIdentite.js)
 import DansFiche, { useLigneIci } from '../DansFiche.jsx';
 import { attrsFicheLigne, ouvrirLigne } from '../ficheLigne.js';
 import { attrsAvantSite, basculerAvant, PaireAvantSiteHote } from '../paires/PaireAvantSite.jsx';   // (16 nov.) la rangée touchée monte à sa place
@@ -4351,7 +4352,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     autres: Object.values(brouillons && typeof brouillons === 'object' ? brouillons : {}).map((d) => d && { numero: d.numero, id: d.pairId }),
     enLigne,
     vendusVinted, commandes, ventesLbc, itemsLbc: lbcItems,
-    liensLbc: load('vrm_lbc_liens', {}) || {}, ventesVc: ventesVcDv,
+    liensLbc: liensLbcLus(), ventesVc: ventesVcDv,
   }), [fiches, brouillons, enLigne, vendusVinted, commandes, ventesLbc, lbcItems, ventesVcDv]);
   // Une vente Leboncoin qui ne se relie pas sans son annonce : on lit les
   // annonces (une fois par session, comme le tableau de bord) — `null` = pas su.

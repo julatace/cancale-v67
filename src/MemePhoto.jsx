@@ -55,18 +55,14 @@ export function LigneMemePhotoNumero({ numero, cle, charger }) {
   const res = useMemePhoto(charger);
   const k = typeof cle === 'function' ? cle(numero) : String(numero || '');
   const l = k && res && res.lu && res.parNumero ? res.parNumero.get(k) || [] : [];
-  // (16 nov., lot photo-identite-sites) Reconnue par la photo : « Aussi sur Leboncoin · même photo » (rien à faire : neutre).
+  // (24 nov., lot ext-anciens-lots, repris de #1219) Reconnue par la PHOTO D'ORIGINE (le même fichier, src/photoOrigine.js) :
+  // « Aussi sur Leboncoin · reconnue par la photo d'origine » — rien à faire (ton neutre), la limite dans le titre.
   const rec = k && res && res.reconnuesParNumero ? res.reconnuesParNumero.get(k) || [] : [];
-  const sitesRec = [...new Set(rec.map((p) => p.annonce.plateforme))];
-  // Par le CODE d'origine (exact) : la ligne le dit, avec sa limite (les applis mobiles ne sont pas vues).
-  const parCode = rec.length > 0 && rec.every((p) => p.par === 'code');
+  const sitesRec = [...new Set(rec.map((p) => p.plateforme))];
   const aussi = rec.length ? (
-    <button type="button" className="sb-lien vrm-mph-ligne is-reconnue" data-meme-photo-aussi={k} data-par={parCode ? 'code' : 'ressemblance'} data-n={String(rec.length)} data-sites={sitesRec.join(' ')}
-      title={parCode ? tr('memePhoto.limiteOrigine') : undefined} onClick={() => ouvrirMemePhoto(sitesRec.length === 1 ? sitesRec[0] : null)}>
-      <span className="vrm-mph-diode" aria-hidden="true"/>
-      <span className="vrm-mph-ligne-texte">{tr(parCode ? 'memePhoto.aussiSurOrigine' : 'memePhoto.aussiSur', { sites: sitesRec.join(' · ') })}</span>
-      <span aria-hidden="true" className="vrm-mph-chevron">›</span>
-    </button>) : null;
+    <p className="vrm-mph-ligne is-reconnue" data-meme-photo-aussi={k} data-par="code" data-n={String(rec.length)} data-sites={sitesRec.join(' ')} title={tr('memePhoto.limiteOrigine')}>
+      <span className="vrm-mph-ligne-texte">{tr('memePhoto.aussiSurOrigine', { sites: sitesRec.join(' · ') })}</span>
+    </p>) : null;
   if (!l.length) return aussi;
   const sites = [...new Set(l.map((p) => p.annonce.plateforme))];
   return (<>{aussi}
@@ -119,36 +115,10 @@ function Proposition({ p, Photo, onRelier, onRefuser }) {
   );
 }
 
-// (16 nov., lot photo-identite-sites) RECONNUE PAR LA PHOTO : les deux mesures disent la même photo, une seule
-// paire ⇒ l'annonce porte déjà le N° (une identité, src/photoIdentite.js). Rien à faire ; « Ce n'est pas la
-// même » la défait (le couple ne revient plus).
-function Reconnue({ p, Photo, onRefuser }) {
-  const v = (p.vinted || [])[0] || {};
-  return (
-    <section className="vrm-mph-prop is-sur is-reconnue" data-meme-photo-reconnue={p.id} data-numero={p.numero} data-distance={String(p.distance)} data-etat="reconnue">
-      <p className="vrm-mph-sur" data-mph-verdict="reconnue" data-mph-par={p.par || 'ressemblance'} data-mph-fine={p.fine == null ? '' : String(p.fine)}><span className="vrm-mph-diode" aria-hidden="true"/>{tr(p.par === 'code' ? 'memePhoto.reconnueOrigine' : 'memePhoto.reconnue', { numero: p.numero })}</p>
-      <div className="vrm-mph-cotes">
-        <Cote src={p.annonce.photo} Photo={Photo} legende={legendeAutre(p.annonce)} sous={p.annonce.titre} lien={p.annonce.lien} attrs={{ 'data-mph-autre': p.annonce.id }}/>
-        <span className="vrm-mph-egal" aria-hidden="true">=</span>
-        <Cote src={photoVintedDe(p)} Photo={Photo} legende={`N°${p.numero} · Vinted`} sous={v.titre} lien={v.lien} attrs={{ 'data-mph-vinted': v.id || '' }}/>
-      </div>
-      <div className="vrm-mph-gestes">
-        <button type="button" className="sb-lien" data-meme-photo-non={p.id} onClick={() => onRefuser({ annonce: p.annonce, numero: p.numero })}>{tr('memePhoto.pasLaMeme')}</button>
-      </div>
-    </section>
-  );
-}
-// « Même photo sur N°12 et N°40 : laquelle ? » — les N° nommés quand toutes les paires en ont un.
-const phraseAmbigu = (x) => {
-  if (x.raison === 'numero-double') return tr('memePhoto.numeroDouble', { numero: (x.paires[0] || {}).numero || '' });
-  const ns = x.paires.map((p) => p.numero).filter(Boolean);
-  if (x.raison === 'deux-paires' && ns.length === x.paires.length && ns.length >= 2) return tr('memePhoto.memeSurNumeros', { numeros: ns.slice(0, -1).map((n) => 'N°' + n).join(', '), dernier: 'N°' + ns[ns.length - 1] });
-  return tr('memePhoto.deuxPaires', { n: x.paires.length, numero: (x.paires[0] || {}).numero || '' });
-};
 function Ambigu({ x, Photo, onRelier, onRefuser }) {
   return (
     <section className="vrm-mph-prop is-ambigu" data-meme-photo-ambigu={x.id} data-raison={x.raison} data-n={String(x.paires.length)}>
-      <p className="vrm-mph-phrase"><span className="sb-point-ambre" aria-hidden="true"/> <span data-mph-phrase-ambigu="">{phraseAmbigu(x)}</span></p>
+      <p className="vrm-mph-phrase"><span className="sb-point-ambre" aria-hidden="true"/> {tr(x.raison === 'numero-double' ? 'memePhoto.numeroDouble' : 'memePhoto.deuxPaires', { n: x.paires.length, numero: (x.paires[0] || {}).numero || '' })}</p>
       <div className="vrm-mph-cotes is-choix">
         <Cote src={x.annonce.photo} Photo={Photo} legende={legendeAutre(x.annonce)} sous={x.annonce.titre} lien={x.annonce.lien} attrs={{ 'data-mph-autre': x.annonce.id }}/>
         {x.paires.map((p) => {
@@ -173,28 +143,24 @@ function Ambigu({ x, Photo, onRelier, onRefuser }) {
 export function MemePhotoDetail({ res, site = null, Photo, onRelier, onRefuser, extension = 'ok', versionExt = '', extensionSure = 'ok', versionSure = '' }) {
   useLangue();
   if (!res) return <p className="vrm-mph-etat" data-mph-pas-pret="">{tr('memePhoto.lecture')}</p>;
-  if (!res.lu && !(res.reconnues || []).length && !(res.ambigusCode || []).length) return <p className="vrm-mph-etat" data-mph-lu="0">{tr('memePhoto.lectureRatee')}</p>;
+  if (!res.lu) return <p className="vrm-mph-etat" data-mph-lu="0">{tr('memePhoto.lectureRatee')}</p>;
   const sites = site ? [site] : SITES_MEME_PHOTO;
-  const props = (res.lu ? res.propositions : []).filter((p) => sites.includes(p.annonce.plateforme));
-  const ambs = (res.lu ? res.ambigus : res.ambigusCode || []).filter((p) => sites.includes(p.annonce.plateforme) && p.raison !== 'sans-numero');
+  const props = res.propositions.filter((p) => sites.includes(p.annonce.plateforme));
+  const ambs = res.ambigus.filter((p) => sites.includes(p.annonce.plateforme) && p.raison !== 'sans-numero');
   const illisibles = (res.illisibles || []).filter((s) => sites.includes(s));
-  const recs = (res.reconnues || []).filter((p) => sites.includes(p.annonce.plateforme));
   return (
-    <div className="vrm-mph" data-meme-photo="" data-mph-lu={res.lu ? "1" : "0"} data-mph-props={props.length} data-mph-ambigus={ambs.length} data-mph-verifiees={res.nVerifiees} data-mph-pas-verifiees={res.nSansEmpreinte} data-mph-generiques={res.nGeneriques}
-      data-mph-surs={props.filter((p) => p.etat === 'sur').length} data-mph-ecartees={res.nEcartees || 0} data-mph-fine-lue={res.fineLue ? '1' : '0'} data-mph-reconnues={recs.length}>
+    <div className="vrm-mph" data-meme-photo="" data-mph-lu="1" data-mph-props={props.length} data-mph-ambigus={ambs.length} data-mph-verifiees={res.nVerifiees} data-mph-pas-verifiees={res.nSansEmpreinte} data-mph-generiques={res.nGeneriques}
+      data-mph-surs={props.filter((p) => p.etat === 'sur').length} data-mph-ecartees={res.nEcartees || 0} data-mph-fine-lue={res.fineLue ? '1' : '0'}>
       <p className="vrm-mph-etat" data-mph-etat="">
-        {props.length + ambs.length + recs.length ? null : <span>{tr('memePhoto.rien', { n: res.nVerifiees })}</span>}
+        {props.length + ambs.length ? null : <span>{tr('memePhoto.rien', { n: res.nVerifiees })}</span>}
         {res.nSansEmpreinte > 0 ? <span data-mph-manque={res.nSansEmpreinte}>{tr('memePhoto.pasVerifiees', { n: res.nSansEmpreinte })}</span> : null}
         {illisibles.length ? <span data-mph-illisibles={illisibles.join(' ')}>{tr('memePhoto.pasLu', { sites: illisibles.join(' · ') })}</span> : null}
       </p>
       {extension !== 'ok' ? <p className="vrm-mph-etat is-ext" data-mph-ext={extension}>{tr('memePhoto.extension', { v: versionExt })}</p> : null}
       {props.map((p) => <Proposition key={p.id} p={p} Photo={Photo} onRelier={onRelier} onRefuser={onRefuser}/>)}
       {ambs.map((x) => <Ambigu key={x.id} x={x} Photo={Photo} onRelier={onRelier} onRefuser={onRefuser}/>)}
-      {recs.length ? <h3 className="vrm-mph-titre-reconnues" data-mph-titre-reconnues="">{tr('memePhoto.reconnues', { n: recs.length })}</h3> : null}
-      {recs.map((p) => <Reconnue key={p.id} p={p} Photo={Photo} onRefuser={onRefuser}/>)}
       {extensionSure !== 'ok' ? <p className="vrm-mph-etat is-ext" data-mph-ext-sure={extensionSure}>{tr('memePhoto.extensionSure', { v: versionSure })}</p> : null}
       <p className="vrm-mph-aide">{tr('memePhoto.aideSure')}</p>
-      <p className="vrm-mph-aide" data-mph-limite-origine="">{tr('memePhoto.limiteOrigine')}</p>
     </div>
   );
 }

@@ -37,12 +37,7 @@ export default {
   "memePhoto.nSurs": {"one": "{n} sûre", "other": "{n} sûres"},
   "memePhoto.nAVerifier": {"one": "{n} à vérifier", "other": "{n} à vérifier"},
   "memePhoto.extensionSure": "L’extension {v} confirme « sûr » : mets-la à jour. En attendant, tout est « à vérifier ».",
-  "memePhoto.reconnue": "Même photo · reconnue : N°{numero}",
-  "memePhoto.reconnues": {"one": "{n} annonce reconnue par la photo", "other": "{n} annonces reconnues par la photo"},
-  "memePhoto.aussiSur": "Aussi sur {sites} · même photo",
-  "memePhoto.memeSurNumeros": "Même photo sur {numeros} et {dernier} : laquelle ?",
   "memePhoto.aideSure": "« Sûr » : deux mesures différentes disent la même photo. « À vérifier » : regarde les deux photos. Rien n’est relié sans ton toucher.",
   "memePhoto.aussiSurOrigine": "Aussi sur {sites} · reconnue par la photo d’origine",
-  "memePhoto.reconnueOrigine": "Photo d’origine identique · N°{numero}",
   "memePhoto.limiteOrigine": "Photo d’origine : le même fichier envoyé depuis ton Chrome avec l’extension. Publiée depuis une appli mobile, VRM ne la voit pas.",
 };

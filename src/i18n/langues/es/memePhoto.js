@@ -37,12 +37,7 @@ export default {
   "memePhoto.nSurs": {"one": "{n} segura", "other": "{n} seguras"},
   "memePhoto.nAVerifier": {"one": "{n} por comprobar", "other": "{n} por comprobar"},
   "memePhoto.extensionSure": "La extensión {v} confirma «seguro»: actualízala. Mientras tanto, todo está «por comprobar».",
-  "memePhoto.reconnue": "Misma foto · reconocida: N.º{numero}",
-  "memePhoto.reconnues": {"one": "{n} anuncio reconocido por la foto", "other": "{n} anuncios reconocidos por la foto"},
-  "memePhoto.aussiSur": "También en {sites} · misma foto",
-  "memePhoto.memeSurNumeros": "Misma foto en {numeros} y {dernier}: ¿cuál?",
   "memePhoto.aideSure": "«Seguro»: dos medidas distintas dicen que es la misma foto. «Por comprobar»: mira las dos fotos. Nada se vincula sin tu toque.",
   "memePhoto.aussiSurOrigine": "También en {sites} · reconocido por la foto original",
-  "memePhoto.reconnueOrigine": "Foto original idéntica · N.º{numero}",
   "memePhoto.limiteOrigine": "Foto original: el mismo archivo subido desde tu Chrome con la extensión. Publicado desde una app móvil, VRM no lo ve.",
 };

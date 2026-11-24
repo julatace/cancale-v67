@@ -5,12 +5,13 @@
 // reconnaît parce que la photo utilisée est exactement la même » — puis : « non pas à quoi
 // elle ressemble, mais son CODE » ; « vas-y, fais ça au moins ».
 //
+// (24 nov., lot ext-anciens-lots : repris de la PR #1219 sur l'extension 5.446 ; règle inchangée.)
 // MESURÉ (16 nov., lecture seule) : le code des photos SERVIES ne peut pas se retrouver d'un site
 // à l'autre. Vinted ne sert que des tailles refaites (`/t/…/f800/…`, `310x430`, `150x210`…),
 // Leboncoin une « règle » par taille (`?rule=ad-large`, `ad-thumb`, `ad-private`) : chaque site
 // réencode le fichier téléversé, aucune variante « originale » n'est servie. Le code exact (SHA-256)
 // est donc pris sur le FICHIER D'ORIGINE, au moment où il le téléverse depuis son Chrome avec
-// l'extension (5.401) — c'est une LECTURE de ce qu'il fait lui-même, aucune requête en plus :
+// l'extension (5.446) — c'est une LECTURE de ce qu'il fait lui-même, aucune requête en plus :
 //   · Vinted : `POST /api/v2/photos` (le fichier choisi) ⇒ l'identifiant de photo rendu par Vinted,
 //     puis `POST /api/v2/item_upload/items` (ou `PUT …/{id}`) ⇒ l'annonce qui porte ces photos ;
 //     rangé dans `photo_origine_vinted` = { annonces: { [itemId]: { codes: [sha256…], compte, at } } } ;
