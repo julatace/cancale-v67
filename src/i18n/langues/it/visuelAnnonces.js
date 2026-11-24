@@ -20,5 +20,6 @@ export default {
   "inv.puce.aconfirmer": "Da confermare",
   "inv.affichage": "Vista",
   "inv.vue.liste": "Elenco",
-  "inv.vue.grille": "Dettagliata"
+  "inv.vue.grille": "Dettagliata",
+  "inv.age.jour": "Oggi"
 };

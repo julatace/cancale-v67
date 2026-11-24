@@ -147,7 +147,8 @@ export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selec
   else {
     if (a.favoris != null) bouts.push(<span className="n-ad-stat" data-ad-stat="favoris" aria-label={tr('egalite.favoris', { n: a.favoris })}>{ic('heart')}<span aria-hidden="true">{a.favoris}</span></span>);
     if (a.vues != null) bouts.push(<span className="n-ad-stat" data-ad-stat="vues" aria-label={tr('egalite.vues', { n: a.vues })}>{ic('eye')}<span aria-hidden="true">{a.vues}</span></span>);
-    if (a.depuis != null) bouts.push(<span className="n-ad-stat" data-ad-stat="jours">{ic('clock')}<span>{depuisTexte(a.depuis)}</span></span>);
+    // (24 nov.) Moins d'un jour en ligne ⇒ « Aujourd'hui », jamais « 0 j » ; âge inconnu ⇒ aucune horloge.
+    if (a.depuis != null) bouts.push(<span className="n-ad-stat" data-ad-stat="jours">{ic('clock')}<span>{Date.now() - a.depuis < 864e5 ? tr('inv.age.jour') : depuisTexte(a.depuis)}</span></span>);
   }
   // Le glissement : transform seulement, suivi au doigt, puis ouvert (largeur des boutons) ou fermé — jamais à moitié.
   const rap = !selection && Array.isArray(rapides) && rapides.length ? rapides : null;

@@ -112,7 +112,7 @@ const MESURE = () => {
   }
   for (const el of document.querySelectorAll('[data-eg-liste] button, [data-tt] [data-ad-carte] button, [data-ad-carte]')) { const b = el.getBoundingClientRect(); if (!vis(b)) continue; if (b.width < 44 || b.height < 44) r.cibles.push({ q: (el.getAttribute('aria-label') || el.tagName).slice(0, 30), w: Math.round(b.width), h: Math.round(b.height) }); }
   { const sans = new Set(window.__sansAge || []); r.ageInconnuAffiche = cartes.filter((c) => sans.has(c.getAttribute('data-eg-article')) && c.querySelector('[data-ad-stat="jours"]')).length; r.ageInconnuVus = cartes.filter((c) => sans.has(c.getAttribute('data-eg-article'))).length;
-    r.zeroJ = cartes.filter((c) => !sans.has(c.getAttribute('data-eg-article'))).map((c) => (c.querySelector('[data-ad-stat="jours"]') || {}).textContent || '').filter((t) => /^0\s?j/.test(t.trim())).length;
+    r.zeroJ = cartes.map((c) => (c.querySelector('[data-ad-stat="jours"]') || {}).textContent || '').filter((t) => /^0\s?j/.test(t.trim())).length;
     const r0 = document.querySelector('[data-ad-rangee][data-eg-article]'); if (r0) { const p = getComputedStyle(r0.querySelector('.n-ar-prix')), t = getComputedStyle(r0.querySelector('.n-ar-titre')); r.prixTitre = { prix: p.fontSize, poids: p.fontWeight, titre: t.fontSize }; } }
   r.animees = cartes.filter((c) => getComputedStyle(c).animationName !== 'none').length;
   r.imgsCachees = [...document.querySelectorAll('[data-ad-carte] .n-ad-photo img, [data-ad-rangee] .n-ar-photo img')].filter((i) => Number(getComputedStyle(i).opacity) < 1).length;
@@ -163,7 +163,7 @@ async function cas(nav, nom, opts, theme) {
   // Le compte est dit UNE fois : dans l'intertitre au téléphone (liste rangée par compte), sur la tuile à l'ordinateur (non rangée).
   dit(m.tuiles === m.nCartes && m.etiqs >= m.nCartes - 2 && m.avatars === (nom === 'tel' ? 0 : m.nCartes) && m.pastilles > m.nCartes / 2 && m.logosRepetes === 0 && (nom !== 'tel' || m.liste),
     `G ${nom === 'tel' ? 'LISTE par défaut' : 'grille « Détaillé »'} : photo (${m.tuiles}) · étiquette N° (${m.etiqs}) · ronds de compte par rangée (${m.avatars}, ${nom === 'tel' ? 'aucun : dit dans l\'intertitre' : 'une par tuile'}) · ♡/👁 (${m.pastilles}) · logo répété ${m.logosRepetes}`, m.avatars);
-  dit(m.ageInconnuAffiche === 0, `G âge inconnu ⇒ aucune horloge (${m.ageInconnuVus} rangées sans date vues ; « 0 j » sur ${m.zeroJ} rangée(s) d'aujourd'hui)`, m.ageInconnuAffiche);
+  dit(m.ageInconnuAffiche === 0 && m.zeroJ === 0, `G âge : jamais « 0 j » (${m.zeroJ}), « Aujourd'hui » à la place ; âge inconnu ⇒ aucune horloge (${m.ageInconnuVus} vues ici)`, { inconnu: m.ageInconnuAffiche, zeroJ: m.zeroJ });
   if (m.prixTitre) dit(m.prixTitre.prix === m.prixTitre.titre && Number(m.prixTitre.poids) <= 600, `G le prix à la taille du titre (${m.prixTitre.prix} / ${m.prixTitre.titre}), demi-gras (${m.prixTitre.poids})`, m.prixTitre);
   dit(m.carres.every((x) => x === 1), `G photos carrées${nom === 'tel' ? ' (60 px)' : ''}`, m.carres);
   dit(m.identite.length === 0, `I chaque carte montre la photo de SON identifiant (${m.nCartes} vérifiées)`, m.identite.slice(0, 4));
