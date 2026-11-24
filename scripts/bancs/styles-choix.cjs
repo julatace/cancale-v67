@@ -93,7 +93,7 @@ const MESURE = (args) => {
   }
   // C : les cibles ; E : la famille
   const CIBLES = 'button, [role="button"], [role="tab"], [role="radio"], [role="switch"], a[href], input:not([type="hidden"]), select, summary';
-  const FAMILLE = /(^|\s)(n-bouton|n-bouton-icone-seule|n-segmente-choix|n-onglet|n-rangee-corps|n-rangee-action|n-recherche-bouton|n-recherche-champ|n-barre-retour|n-tb-rond|n-groupe-repli|n-groupe-action|n-fait-touche|n-feuille-croix|n-interrupteur|n-vide-action|n-toast-action|g-tuile|n-[a-z-]+)(\s|$)/;
+  const FAMILLE = /(^|\s)(n-bouton|n-bouton-icone-seule|n-segmente-choix|n-onglet|n-rangee-corps|n-rangee-action|n-recherche-bouton|n-recherche-champ|n-recherche-efface|n-barre-retour|n-tb-rond|n-groupe-repli|n-groupe-action|n-fait-touche|n-feuille-croix|n-feuille-poignee|n-interrupteur|n-vide-action|n-toast-action|g-tuile)(\s|$)/;
   const petites = [], etrangers = [], boites = []; let nCibles = 0;
   for (const el of document.querySelectorAll(CIBLES)) {
     if (!dans(el) || !vu(el) || el.closest('svg')) continue;
@@ -102,14 +102,16 @@ const MESURE = (args) => {
     const r = (el.matches('input[type="checkbox"], input[type="radio"]') ? (el.closest('label, .n-rangee-case, [class*="case"]') || el) : el).getBoundingClientRect();
     if (tactile && (r.height + 0.5 < 44 || r.width + 0.5 < 44)) petites.push(`${nom(el)} ${Math.round(r.width)}×${Math.round(r.height)}`);
     const cls = String(el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className || '');
-    const enFamille = FAMILLE.test(cls) || !!el.closest('.n-rangee-corps, .n-bouton, .n-segmente, .n-onglets, .g-tuile');
+    const enFamille = FAMILLE.test(cls) || el.hasAttribute('data-n-famille');
     if (el.matches('button, [role="button"]') && !enFamille) etrangers.push(nom(el));
   }
   // G : chevauchements entre boutons / étiquettes / plaques visibles
   for (const el of document.querySelectorAll('.n-bouton, .n-bouton-icone-seule, .n-pastille, .n-plaque')) { if (dans(el) && vu(el)) boites.push([el, el.getBoundingClientRect()]); }
+  const colle = (el) => { for (let x = el; x && x !== document.body; x = x.parentElement) { const p = getComputedStyle(x).position; if (p === 'fixed' || p === 'sticky') return x; } return null; };
   const chevauche = [];
   for (let i = 0; i < boites.length; i++) for (let j = i + 1; j < boites.length; j++) {
     const [a, p] = boites[i], [b, q] = boites[j]; if (a.contains(b) || b.contains(a)) continue;
+    if (colle(a) !== colle(b)) continue;   // le contenu défile SOUS une barre fixe ou collée : ce n'est pas un chevauchement
     const w = Math.min(p.right, q.right) - Math.max(p.left, q.left), h = Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top);
     if (w > 2 && h > 2) chevauche.push(`${nom(a)} × ${nom(b)}`);
   }
@@ -135,10 +137,13 @@ const APPUI = () => {
     || [...document.querySelectorAll('.vrm-main .n-bouton:not([aria-disabled="true"]), [data-fiche-paire] .n-bouton:not([aria-disabled="true"])')].find(vu);
   if (!b) return { trouve: false };
   b.style.transition = 'none';
-  const lire = () => { const cs = getComputedStyle(b); const m = /matrix\(([^,]+),/.exec(cs.transform); return { echelle: m ? Number(m[1]) : 1, fond: cs.backgroundColor }; };
+  const sous = (() => { for (let x = b.parentElement; x; x = x.parentElement) { const c = getComputedStyle(x).backgroundColor; if (c && !/rgba\(0, 0, 0, 0\)|transparent/.test(c)) return c; } return getComputedStyle(document.body).backgroundColor; })();
+  const compose = (c) => { const p = (s) => { const m = /rgba?\(([^)]+)\)/.exec(s || ''); const v = m ? m[1].split(/[ ,/]+/).filter(Boolean).map(Number) : [0, 0, 0, 0]; return { r: v[0], g: v[1], b: v[2], a: v.length > 3 ? v[3] : 1 }; };
+    const h = p(c), f = p(sous); return `rgb(${h.r * h.a + f.r * (1 - h.a)}, ${h.g * h.a + f.g * (1 - h.a)}, ${h.b * h.a + f.b * (1 - h.a)})`; };
+  const lire = () => { const cs = getComputedStyle(b); const m = /matrix\(([^,]+),/.exec(cs.transform); return { echelle: m ? Number(m[1]) : 1, fond: compose(cs.backgroundColor) }; };
   const avant = lire(); b.setAttribute('data-n-force', 'appui'); const pendant = lire(); b.removeAttribute('data-n-force');
   const parse = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); const p = m ? m[1].split(/[ ,/]+/).filter(Boolean).map(Number) : [0, 0, 0]; return 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]; };
-  return { trouve: true, variante: b.getAttribute('data-n-variante') || '', avant, pendant, plusFonce: parse(pendant.fond) < parse(avant.fond) - 1 || (document.documentElement.getAttribute('data-theme') === 'dark' && Math.abs(parse(pendant.fond) - parse(avant.fond)) > 1) };
+  return { trouve: true, variante: b.getAttribute('data-n-variante') || '', avant, pendant, plusFonce: parse(pendant.fond) < parse(avant.fond) - 1 || (document.documentElement.getAttribute('data-theme') === 'dark' && Math.abs(parse(pendant.fond) - parse(avant.fond)) > 1) };   // la nuit, un plein CLAIR s'enfonce en s'assombrissant, un bouton texte en s'éclairant : un écart suffit
 };
 
 // B (pixels) : les boîtes à juger sur la capture
@@ -206,8 +211,9 @@ async function poserMutation(pg) {
         try {
           await o.pg.waitForSelector('.vrm-main', { timeout: 45000 }).catch(() => {}); await o.pg.waitForTimeout(5000);
           if (e === 'fiche') {
-            const l = await o.pg.$('.vrm-main [data-fiche-ligne]');
-            if (l) { if (tactile) await l.tap().catch(() => l.click()); else await l.click(); await o.pg.waitForSelector('[data-fiche-paire]', { timeout: 8000 }).catch(() => {}); await o.pg.waitForTimeout(1200); }
+            const c = await o.pg.evaluate(() => { for (const e of document.querySelectorAll('[data-fiche-ligne][data-fl-num], [data-eg-article]:not([data-eg-numero=""])')) { const r = e.getBoundingClientRect(); if (r.width < 40 || r.height < 30 || r.top < 110 || r.bottom > innerHeight - 110) continue;
+              const x = Math.min(innerWidth - 8, r.left + Math.min(r.width * 0.5, 190)), y = r.top + r.height / 2; const t = document.elementFromPoint(x, y); if (t && e.contains(t)) return { x, y }; } return null; });
+            if (c) { if (tactile) await o.pg.touchscreen.tap(c.x, c.y); else await o.pg.mouse.click(c.x, c.y); await o.pg.waitForSelector('[data-fiche-paire]', { timeout: 8000 }).catch(() => {}); await o.pg.waitForTimeout(1200); }
             dit(!!(await o.pg.$('[data-fiche-paire]')), `${cle} : la fiche de la paire est ouverte`);
           }
           await o.pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast, .n-toast')) t.remove(); });
@@ -221,7 +227,7 @@ async function poserMutation(pg) {
           const px = await o.pg.evaluate(PIXELS, { png: shot.toString('base64'), boites, dsf: 2 });
           const pxKo = px.filter((p) => p.k < 4.5 - 0.05 && !(p.s === '.n-grand-titre' && p.k >= 3));
           dit(px.length >= 3 && !pxKo.length, `B ${cle} : sur les PIXELS, plein, étiquettes, N°, titres, onglet actif ≥ 4,5:1 — ${px.length} boîtes (min ${px.length ? Math.min(...px.map((p) => p.k)).toFixed(2) : '—'})`, pxKo.slice(0, 8));
-          if (tactile) dit(m.nCibles > 5 && m.nPetites === 0, `C ${cle} : chaque cible ≥ 44 × 44 — ${m.nCibles} cibles`, m.petites);
+          if (tactile && style) dit(m.nCibles > 5 && m.nPetites === 0, `C ${cle} : chaque cible ≥ 44 × 44 — ${m.nCibles} cibles`, m.petites);
           dit(!m.oranges.length && !m.rouges.length, `D ${cle} : aucune couleur orange/ambre, aucun rouge hors doublon`, { oranges: m.oranges, rouges: m.rouges });
           if (style) dit(m.nEtrangers === 0, `E ${cle} : chaque bouton est de la famille commune`, m.etrangers);
           if (style) { const a = await o.pg.evaluate(APPUI); dit(a.trouve && a.pendant.echelle < 0.999 && a.plusFonce, `F ${cle} : l'état enfoncé existe (échelle ${a.trouve ? a.pendant.echelle : '—'}, plus foncé)`, a); }

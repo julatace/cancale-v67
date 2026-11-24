@@ -54,6 +54,24 @@
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="texte"][aria-disabled="true"] { background-color: transparent; }
 [data-style]:not([data-style=""]) .n-bouton:focus-visible { outline: none; box-shadow: var(--g-anneau); }
 
+/* ── les boutons propres à un composant partagé, rattachés à la famille par `data-n-famille` (attribut seul : le style
+   actuel ne change pas) : « second » = le secondaire teinté ; « champ » = un champ creusé qu'on touche (« + prix »).
+   36 dessinés dans une zone de 44 (bordure transparente), comme `.n-bouton`. ── */
+[data-style]:not([data-style=""]) [data-n-famille] {
+  position: relative; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: var(--n-cible); min-width: var(--n-cible); margin: 0; padding: 0 12px;
+  border: 0; border-block: calc((var(--n-cible) - var(--n-h-controle)) / 2) solid transparent; background-clip: padding-box;
+  border-radius: var(--g-r-bouton) / calc(var(--g-r-bouton) + (var(--n-cible) - var(--n-h-controle)) / 2);
+  font: var(--n-t-second-fort); cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform var(--n-duree-appui) ease-out, background-color var(--n-duree-appui) ease-out;
+}
+[data-style]:not([data-style=""]) [data-n-famille="second"] { background-color: var(--g-second-fond); color: var(--n-encre); box-shadow: none; }
+[data-style]:not([data-style=""]) [data-n-famille="champ"] { background-color: var(--g-champ-fond); color: var(--n-encre-2); box-shadow: var(--g-champ-ombre); font-weight: 500; }
+[data-style]:not([data-style=""]) [data-n-famille]:active,
+[data-style]:not([data-style=""]) [data-n-famille][data-n-force="appui"] { transform: scale(var(--g-appui)); background-color: var(--g-second-appui); }
+[data-style]:not([data-style=""]) [data-n-famille]:focus-visible { outline: none; box-shadow: var(--g-anneau); }
+[data-style]:not([data-style=""]) [data-n-famille] .n-vt-relier-rond { width: auto; height: auto; background: none; box-shadow: none; color: inherit; }
+
 /* ── les boutons ronds (icône seule, 44) ── */
 [data-style]:not([data-style=""]) .n-bouton-icone-seule,
 [data-style]:not([data-style=""]) .n-tb-rond.n-bouton-icone-seule { border-radius: 50%; background: var(--g-second-fond); color: var(--n-encre); box-shadow: none;
