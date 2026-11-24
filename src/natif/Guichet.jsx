@@ -85,7 +85,9 @@ function Diapo({ x, aides, Photo, etat, onRetire, onAnnuler, loc, actif }) {
   const code2 = String(x.code2 || '');
   const qr = aides.qrSrc ? aides.qrSrc(x) : '';
   const titre = (rg.titre || (aides.titre ? aides.titre(x) : '') || '').trim();
-  const photo = x.photo && Photo ? Photo(x.photo) : null;   // la photo de l'achat relié PAR IDENTITÉ (pickupUnion), sinon rien
+  // La photo de l'achat relié PAR IDENTITÉ (pickupUnion), ou de la vente retournée — la même source que la rangée ; sinon rien.
+  const srcPhoto = x.photo || (x.contenu && x.contenu.etat === 'retour' ? x.contenu.photo : null);
+  const photo = srcPhoto && Photo ? Photo(srcPhoto) : null;
   const lim = rg.limite && rg.limite.source === 'lue' && rg.limite.jour ? rg.limite.jour : '';
   let limTxt = '';
   if (lim) { try { limTxt = tr('retraits.p.echAvant', { date: new Date(lim + 'T12:00:00').toLocaleDateString(loc, { weekday: 'short', day: 'numeric', month: 'short' }) }); } catch (_) { limTxt = ''; } }
