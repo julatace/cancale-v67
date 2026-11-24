@@ -18,7 +18,7 @@ SONDE="Paramètres → Mon compte" node scripts/bancs/chemins-aide.cjs   # suit 
 - **Ce qu'il lit** : l'aide publique (`scripts/aide-contenu.cjs` : articles et gestes du « ? »),
   les fiches de l'aide intégrée (`src/aideFiches.js`) et **chaque texte français du
   dictionnaire** (`src/i18n/langues/fr*.js`) qui écrit « Écran → … ». Un « Ouvre Colis. » (un
-  écran seul) est lu aussi. 74 chemins aujourd'hui.
+  écran seul) est lu aussi. 67 chemins aujourd'hui.
 - **Ce qu'il fait** : au téléphone (390 px, tactile), base vide + un compte Vinted, pour chaque
   chemin : le 1er nom est un onglet de la barre du bas ou une tuile du menu (☰) ; chaque nom
   suivant est un bouton, un onglet ou une rangée **visible** après le geste d'avant (texte ou
@@ -43,8 +43,8 @@ SONDE="Paramètres → Mon compte" node scripts/bancs/chemins-aide.cjs   # suit 
   `Messages → Outils → Offres automatiques`, `Taille`, `Imprimante`, `Vérifier mon installation`
   rangé dans Aide (il est dans Mes plateformes), `Mon compte → Journal` (il est dans Sécurité des
   données), `eBay → À traiter`…
-- **Vert après** : voir le bilan dans la PR.
-- **Mutation** : remettre `Ouvre **Colis → À retirer**.` dans `scripts/aide-contenu.cjs`, ou
+- **Vert après** : **70 verts, 0 rouge** (67 chemins + ouverture + aucune erreur de page), 6 chemins jugés jusqu'au site (« ℹ️ ») ; lancé par `lourd.sh` sur le build de la branche (machine saturée : ~40 s par chemin).
+- **Mutation (faite, rouge les deux fois)** : remettre `Ouvre **Colis → À retirer**.` dans `scripts/aide-contenu.cjs`, ou
   `Paramètres → Aide → Signaler un problème.` dans `src/aideFiches.js` ⇒ rouge (le banc relit les
   sources à chaque lancement : pas besoin de reconstruire).
 
@@ -70,9 +70,11 @@ SONDE="Paramètres → Mon compte" node scripts/bancs/chemins-aide.cjs   # suit 
   rend la CLÉ ; les trois phrases sont écrites en entier dans chaque langue.
 - **La porte de confidentialité** (`src/PorteConfidentialite.jsx`) : titres, phrases, boutons,
   l'heure du bandeau hors ligne.
+- **Mes plateformes** : « Associer une adresse », « N adresses à confirmer », « Vérifier » (`src/reglagesActions.js`, repli français hors de l'app comme son titre) — vu en français sur la capture allemande.
 - **La rangée « Comptes liés »** de Paramètres : c'était le mot français de `src/libelles.js` dans
   toutes les langues ; maintenant `reglages.liens.lib`.
-- Clés : `src/i18n/langues/{fr,en,es,it,de}/textesRestes.js` (51 clés).
+- Clés : `src/i18n/langues/{fr,en,es,it,de}/textesRestes.js` (54 clés).
+- Captures en anglais et en allemand à 390 px (Appareils connectés, Mes plateformes, Achats) : aucun débordement (`scrollWidth` = largeur), aucun mot coupé.
 - `audit-traduction` F protège ces zones (rouge sur l'ancien code : 30 textes en dur relevés).
   `audit-appareils-groupes` G4 et `audit-comptes-securite` 3.6 jugent désormais la clé et sa
   valeur française ; le test `deconnexion-proprietaire` reçoit `tr`.
