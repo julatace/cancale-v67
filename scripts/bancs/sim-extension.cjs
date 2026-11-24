@@ -310,8 +310,10 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       await page(`https://www.vinted.fr/inbox`);
       await lancer(FAVORIS.map((f) => f.nid));
       await attendreQue(async () => (ecrituresVinted().some((e) => /inquiries$/.test(e.p)) ? true : null), 300000, 500);
-      await dansSW(async () => { chrome.runtime.reload(); }).catch(() => {});
-      await attendre(4000);
+      const nouveau = ctx.waitForEvent('serviceworker', { timeout: 30000 }).catch(() => null);
+      await dansSW(async () => { setTimeout(() => chrome.runtime.reload(), 50); return true; }).catch(() => {});
+      const nv = await nouveau; note('nouveau service worker : ' + (nv ? nv.url().split('/').pop() : 'aucun événement'));
+      await attendre(3000);
       const w2 = await sw(30000);
       dit(!!w2, 'le service worker redémarre');
       const res = await finFile(600000);
