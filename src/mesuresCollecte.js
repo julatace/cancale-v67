@@ -59,15 +59,38 @@ function noter(ecran, metrique, valeur) {
 // l'écran de démarrage (`SELECTEUR_ATTENTE`, src/demarrage.js — la même règle :
 // squelette d'un écran qui attend ses données essentielles, morceau en
 // téléchargement, session ou boutique en vérification), aucun squelette.
+// (24 nov., vitesse) « Du contenu » = un premier TEXTE VISIBLE, trouvé en descendant l'arbre (les sous-arbres cachés sont
+// sautés d'un coup) — plus `innerText` de tout l'écran : mesuré (banc vitesse-iphone, profil, 390 ×4), il sérialisait
+// l'écran entier toutes les 50 ms et forçait le recalcul du style et de la mise en page au milieu du rendu (Argent : ~180 ms
+// par changement d'onglet). Même règle : un texte non vide d'un élément rendu et visible (`visibility` comprise), comme
+// `innerText`. Sans arbre parcourable (faux navigateur des audits), `innerText` comme avant.
+const aUneBoite = (e) => (typeof e.checkVisibility === 'function' ? e.checkVisibility() : e.getClientRects().length > 0) || getComputedStyle(e).display === 'contents';
+export function texteVisible(m, doc = document) {
+  if (!m) return false;
+  if (typeof doc.createTreeWalker !== 'function' || typeof NodeFilter === 'undefined') return (m.innerText || '').trim().length > 0;
+  const F = NodeFilter;
+  // Un élément sans boîte (display:none, hidden) : tout son sous-arbre sauté. `visibility` s'hérite et se rouvre plus bas :
+  // elle se juge sur le parent du texte.
+  const w = doc.createTreeWalker(m, F.SHOW_ELEMENT | F.SHOW_TEXT, {
+    acceptNode: (n) => (n.nodeType === 1 ? (aUneBoite(n) ? F.FILTER_SKIP : F.FILTER_REJECT)
+      : (/\S/.test(n.data) && n.parentElement && getComputedStyle(n.parentElement).visibility === 'visible' ? F.FILTER_ACCEPT : F.FILTER_SKIP)),
+  });
+  return !!w.nextNode();
+}
 export function ecranUtile(doc = document) {
   try {
     if (doc.querySelector(SELECTEUR_ATTENTE)) return false;
     const m = doc.querySelector('main.vrm-main') || doc.querySelector('main');
     if (!m) return false;
     if (m.querySelector('.vrm-skeleton')) return false;
-    return (m.innerText || '').trim().length > 0;
+    return texteVisible(m, doc);
   } catch (_) { return false; }
 }
+
+// (24 nov., vitesse) Chaque regard sur l'écran attend l'image qui suit (rAF puis tâche) : le style et la mise en page sont
+// alors déjà faits, rien n'est forcé. Avant, le premier regard partait PENDANT le rendu de l'app (`mesuresEcran` est appelé
+// au rendu) : il forçait tout le document… et regardait l'écran QUITTÉ (le nouveau n'était pas encore posé).
+const apresImage = (f) => { if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => setTimeout(f, 0)); else setTimeout(f, 0); };
 
 function suivrePremierEcran(ecran, debut) {
   const visite = E.visite;
@@ -77,9 +100,9 @@ function suivrePremierEcran(ecran, debut) {
     const ecoule = performance.now() - debut;
     if (ecranUtile()) { noter(ecran, 'peu', Math.max(0, ecoule)); visite.peuFait = true; return; }
     if (ecoule > PEU_MAX_MS || Date.now() - t0 > PEU_MAX_MS + 5000) { noter(ecran, 'peu', PEU_MAX_MS + 1); visite.peuFait = true; return; }
-    visite.minuteur = setTimeout(tour, PAS_MS);
+    visite.minuteur = setTimeout(() => apresImage(tour), PAS_MS);
   };
-  tour();
+  apresImage(tour);
 }
 
 function finirVisite() {
