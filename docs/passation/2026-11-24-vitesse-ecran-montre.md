@@ -183,9 +183,10 @@ par calcul, `window.__vrmCalculsMs`), puis corrigé.
 
 ### Annonces
 - La liste des transactions projetée : lue UNE fois (rejointe en cours, gardée 10 min, oubliée au signal de l'extension et au
-  retour du réseau), lancée au toucher (agent précédent). `lireTout` : la 1re page demande le nombre estimé de lignes
-  (`Prefer: count=estimated`), les pages suivantes partent ENSEMBLE (une page ratée ⇒ reprise une par une ; seule une page
-  courte dit « fini »).
+  retour du réseau), lancée au toucher (agent précédent).
+- ESSAYÉ PUIS RETIRÉ : les pages de `lireTout` lancées ensemble (la 1re demande le nombre estimé, `Prefer: count=estimated`).
+  AB à trois builds (A, avec, sans) : aucun gain mesuré, et une estimation de plus côté base à chaque lecture. Le code est
+  revenu à la lecture page après page (celui de `main`) ; la garde rapporte les pages sans les juger.
 - `lirePreuvesVenteVinted` : les bordereaux (`harvest_%_label_%`) partent avec les transactions au lieu d'après (ils n'en
   dépendent pas) — les ventes à juger partent ~1 s plus tôt.
 - Les relevés « plus vue » (`vinted_suivi_{compte}`) : plusieurs comptes par lecture (`lireSeriesComptes`, 60 annonces au
@@ -200,7 +201,29 @@ par calcul, `window.__vrmCalculsMs`), puis corrigé.
   données) + relevés groupés + pages ensemble : **rouge sur A** (9 défauts : `pickupUnion` 4, `cartesColis` 12/15,
   `listeEnvoyes` 15, pages l'une après l'autre, 15 relevés pour 180 annonces), **vert sur G** (2 · 4 · 6 · 5, 3 relevés),
   **rouge par mutation** (build M : `useMemeContenu` et `useCalculParVersion` réaffaiblis, 7 annonces par relevé : 4 défauts).
-- `audit-calcul-par-version` (nouveau), `audit-tdz`, `audit-magasin-groupe` 7/7, `audit-memo-court` 21/21,
+- `audit-calcul-par-version` (nouveau) : rouge par mutation (`tracking` retiré de `cle()` ⇒ « absent : tracking ») — et il a
+  vu pour de vrai la fusion de `main` (`venteMailItem`, lu par les deux calculs, ajouté à leurs clés). `audit-tdz`, `audit-magasin-groupe` 7/7, `audit-memo-court` 21/21,
   `audit-apres-finale-app` 40/40 : verts. Audits qui lisaient le texte changé, suivis (mêmes règles) : `audit-identite`,
   `audit-qr-capture-mr`, `audit-memo-court`, `audit-apres-finale-app`. Les autres audits rouges le sont aussi sur A.
-- AB : §8 bis.
+- `memeContenu` : un nombre de clés différent répond « différent » sans sérialiser (à l'ouverture, `{}` puis la fiche du
+  nuage, une fois par écran qui écoute la clé).
+
+### 8 bis. AB alterné (iPhone 390, processeur ×4, 4G, volume de Julien, `PASSES=5 TOURS=0`)
+A = PR A (`076f9f462`), B = cette branche AVANT la fusion de `main` (pour ne mesurer que ce lot : `4cdf908f7` + le retour de
+`lireTout` + `memeContenu` rapide). Du doigt posé à l'écran PRÊT, en ms. Charge au départ 9,2 ; ⚠️ elle est montée à 21 et 19
+pendant les passes 2 et 3 (la machine est partagée).
+
+| 1re visite | A (5 passes) | B (5 passes) | médiane A → B | écart par paire (B − A) |
+|---|---|---|---|---|
+| **Achats** | 5 813 · 8 751 · 7 142 · 5 746 · 4 686 | 5 868 · 3 963 · 7 601 · 4 087 · 4 236 | **5 813 → 4 236** | +55 −4 788 +459 −1 659 −450 |
+| Annonces | 6 221 · 4 016 · 5 299 · 4 845 · 3 657 | 5 152 · 4 492 · 5 305 · 2 844 · 4 523 | 4 845 → 4 523 | −1 069 +476 +6 −2 001 +866 |
+| Ventes | 3 611 · 2 887 · 3 135 · 2 765 · 2 719 | 3 904 · 2 311 · 3 880 · 1 873 · 2 857 | 2 887 → 2 857 | +293 −576 +745 −892 +138 |
+| Argent | 1 307 · 2 393 · 1 574 · 1 511 · 1 710 | 1 945 · 1 537 · 2 062 · 1 664 · 1 808 | 1 574 → 1 808 | +638 −856 +488 +153 +98 |
+| Ma journée (1re visite) | 2 818 · 3 391 · 2 555 · 1 272 · 2 279 | 1 704 · 2 433 · 3 839 · 1 557 · 1 917 | 2 555 → 1 917 | −1 114 −958 +1 284 +285 −362 |
+| à froid (Ma journée prête) | 9 554 · 8 888 · 8 466 · 8 236 · 8 521 | 10 409 · 8 466 · 10 170 · 8 690 · 8 854 | 8 521 → 8 854 | +855 −422 +1 704 +454 +333 |
+
+Deux AB précédents (même A ; B avec les pages ensemble, puis sans) disent la même chose pour Achats : 4 904 → 4 369 (5/5
+paires plus rapides, charge 3,8–13) et 6 479 → 4 594 (5/5). Annonces : mélangé dans les trois (4 417 → 3 856 ; 4 892 → 4 778 ;
+ci-dessus) — pas de gain prouvé. ⚠️ À FROID : plus lent dans 12 paires sur 15 sur les trois AB (médianes +269, +957, +333 ms ;
+un quatrième AB, sous forte charge, disait l'inverse 5/5). Cause pas trouvée (piste : les lectures des bordereaux lancées
+avec les transactions, ou les comparaisons de contenu pendant l'arrivée du nuage). À mesurer avant de fusionner.
