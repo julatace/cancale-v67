@@ -320,13 +320,15 @@ async function anneaux(pg, n = 40) {
         const vue = () => pg.waitForFunction((sel) => [...document.querySelectorAll(sel)].some((x) => x.getClientRects().length), F.sel, { timeout: 6000 }).then(() => true, () => false);
         if (!await vue()) { await F.ouvrir(pg).catch(() => {}); await vue(); }
         await pg.waitForTimeout(400); await finir(pg);
-        if (MUT === 'feuille') await pg.evaluate((sel) => { for (const d of document.querySelectorAll(sel)) d.removeAttribute('aria-modal'); }, F.sel);
-        const d = await pg.evaluate((sel) => {
+        // Lue jusqu'à ce qu'elle soit là (la liste peut remonter la feuille un instant) ; la mutation « feuille » est
+        // rejouée à chaque lecture (un remontage remettrait l'attribut).
+        const d = await pg.waitForFunction(([sel, mut]) => {
           const e = [...document.querySelectorAll(sel)].filter((x) => x.getClientRects().length).pop(); if (!e) return null;
+          if (mut === 'feuille') e.removeAttribute('aria-modal');
           const lb = e.getAttribute('aria-labelledby'); const nom = (e.getAttribute('aria-label') || (lb && document.getElementById(lb) && document.getElementById(lb).textContent) || '').trim();
           const r = e.getBoundingClientRect();
           return { role: e.getAttribute('role'), modal: e.getAttribute('aria-modal'), nom, couvre: Math.round((r.width * r.height) / (innerWidth * innerHeight) * 100), lang: document.documentElement.lang };
-        }, F.sel);
+        }, [F.sel, MUT], { timeout: 8000 }).then((h) => h.jsonValue(), () => null);
         const modaleVoulue = W < 600;
         dit(!!d && d.role === 'dialog' && !!d.nom && (modaleVoulue ? d.modal === 'true' : d.modal !== 'true'), `${T} G ${F.nom} : role=dialog, nommée, ${modaleVoulue ? 'aria-modal="true" (elle recouvre l’écran)' : 'pas modale (volet à côté de la liste)'}`, JSON.stringify(d));
         dit(!!d && F.nomAttendu[langue].test(d.nom), `${T} G ${F.nom} : son nom est dans la langue choisie`, JSON.stringify(d));
