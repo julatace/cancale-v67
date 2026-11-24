@@ -180,7 +180,9 @@
 }
 }
 
-/* ── les grands titres : HORS couche (une règle `h1` d'avant, sans couche, passait devant la couche) ── */
+/* ── les grands titres : HORS couche. La police d'un titre est imposée ailleurs par des `!important` qui LISENT une
+   variable (`--ap-police` en couche n-anciens, `--vrm-police`) : on pose ces variables SUR le titre (mesuré, Papier). ── */
+:root[data-style]:not([data-style=""]) :is(.n-grand-titre, .n-barre-centre) { --ap-police: var(--g-titre-police); --vrm-police: var(--g-titre-police); }
 :root[data-style]:not([data-style=""]) .n-grand-titre { font-family: var(--g-titre-police); font-weight: var(--g-titre-poids); font-size: 32px; line-height: 36px; letter-spacing: -.02em; padding-bottom: 12px; }
 :root[data-style]:not([data-style=""]) .n-barre-centre { font-family: var(--g-titre-police); }
 
