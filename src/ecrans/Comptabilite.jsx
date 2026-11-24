@@ -13952,7 +13952,18 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const offRetour = vivant ? vivant.surRetour(() => { if (aRedessiner) { aRedessiner = false; setEmailBords((v) => (Array.isArray(v) ? v.slice() : v)); } }) : null;
     window.addEventListener('vrm:etiquettes-lues', relire);
     window.addEventListener('vrm:etiquette-lue-ici', redessiner);
-    return () => { if (offRetour) offRetour(); window.removeEventListener('vrm:etiquettes-lues', relire); window.removeEventListener('vrm:etiquette-lue-ici', redessiner); };
+    // (23 nov., temps réel) Un bordereau vient d'arriver par e-mail (la veille, src/tempsReel.js : `bordereaux`) :
+    // la liste est relue (scalaires, `fetchEmailBordereaux`) — tout de suite si l'écran est visible, sinon UNE fois
+    // à son retour. Une lecture ratée ne change rien (`if (v)`).
+    let aRelire = false;
+    const neufBord = (e) => {
+      const d = e && e.detail; if (!d || !Array.isArray(d.quoi) || !d.quoi.some((q) => q && q.quoi === 'bordereaux')) return;
+      if (cache()) { aRelire = true; return; }
+      relire();
+    };
+    const offRetourBord = vivant ? vivant.surRetour(() => { if (aRelire) { aRelire = false; relire(); } }) : null;
+    window.addEventListener('vrm:neuf', neufBord);
+    return () => { if (offRetour) offRetour(); if (offRetourBord) offRetourBord(); window.removeEventListener('vrm:etiquettes-lues', relire); window.removeEventListener('vrm:etiquette-lue-ici', redessiner); window.removeEventListener('vrm:neuf', neufBord); };
     /* eslint-disable-next-line */
   }, []);
   // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
