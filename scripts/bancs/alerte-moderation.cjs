@@ -114,8 +114,10 @@ async function scenarioA(nav, largeur, sombre) {
     dit(await masq.locator('a[data-moderation-modifier]').getAttribute('href') === 'https://www.vinted.fr/items/1000042/edit' && /vinted\.fr\/help/.test(await masq.locator('a[data-moderation-contacter]').getAttribute('href')), `${nom} : 5.438 « Modifier » (l’édition de CETTE annonce) et « Contacter Vinted »`);
     const rev = c.locator('[data-moderation-sorte="visible"]');
     dit((await rev.count()) === 1 && /Asics Gel-Kayano 14 taille 41 est à nouveau visible/.test(await rev.innerText()) && (await rev.getAttribute('data-moderation-item')) === '1000055', `${nom} : 5.438 « Asics Gel-Kayano 14 taille 41 est à nouveau visible »`, (await rev.count()) ? await rev.innerText() : '');
-    const disp = c.locator('[data-moderation-sorte="disparue"]');
-    dit(/a disparu/.test(await disp.innerText()) && /Peut-être retirée par Vinted/.test(await disp.innerText()) && /1000077/.test(await disp.innerText()) && !/N°/.test(await disp.innerText()), `${nom} : disparue, formulé prudemment, sans fiche ⇒ l’identifiant (jamais un N° deviné)`, await disp.innerText());
+    // (23 nov., moderation-carte) la disparue vit dans le GROUPE de son compte : en-tête « 1 annonce disparue · compte »,
+    // l'explication prudente sous « Pourquoi ? » (textContent : repliée), la ligne dit l'identifiant (jamais un N° deviné).
+    const disp = c.locator('[data-moderation-groupe="disparue"]');
+    dit(/1 annonce disparue[ \u00a0]·[ \u00a0]shop_cancale/.test(await disp.innerText()) && /Peut-être retirée par Vinted/.test(await disp.textContent()) && /1000077/.test(await disp.locator('[data-moderation-sorte="disparue"]').innerText()) && !/N°/.test(await disp.innerText()), `${nom} : disparue, formulé prudemment, sans fiche ⇒ l’identifiant (jamais un N° deviné)`, await disp.innerText());
     const lim = c.locator('[data-moderation-sorte="restreint"]');
     dit(/Vinted limite le compte/.test(await lim.innerText()) && /Listing restricted/.test(await lim.innerText()) && /Pause conseillée/.test(await lim.innerText()) && /Vérifie tes messages Vinted/.test(await lim.innerText()), `${nom} : compte limité : la raison de Vinted, la pause, le geste`, await lim.innerText());
     dit(/Vue le /.test(await masq.innerText()), `${nom} : quand`);
