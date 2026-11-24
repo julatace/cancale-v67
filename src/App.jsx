@@ -781,7 +781,9 @@ const Bienvenue = aLaDemandeFeuille(() => import('./Bienvenue.jsx'));
 import VisiteBulles from "./VisiteBulles.jsx";
 // (14 nov., accueil des nouveaux, le reste : idées 133 134 136 139 140 145 147) — src/accueilReste/.
 import { poserOutilsAccueil } from "./accueilReste/deps.js";
-import { AccueilResteJournee, VisiteEcranHote } from "./accueilReste/AccueilReste.jsx";
+// (24 nov., francais-demarrage) La visite des écrans (bulles, 2,2 s après l'arrivée sur un écran) : à la demande, hors
+// du démarrage avec son français (≈ 6 Ko compressés). Elle ne rend rien avant de partir : aucune place à réserver.
+const VisiteEcranHote = aLaDemandeDiscret(() => import("./accueilReste/AccueilReste.jsx").then((m) => ({ default: m.VisiteEcranHote })));
 // ⟦→ ecrans/Comptabilite.jsx #51⟧
 import { ajouterAuRegistre, decisionRepublie, disparuesDuCompte, empreintesDe, majEmpreintesFiches, majAttente as majAttenteRepub, CLE_PHOTOS_VRM, CLE_EMPREINTES_FICHES, CLE_REPUB_REPONSES, CLE_REPUB_ATTENTE } from "./republieTelephone.js";
 import { numeroNeufPermis, lectureCompleteAnnonce, annoncesANumeroter, reserveEnDesaccord, marquerNouveau, marquerEcrit, aEcrireNouveaux, listeNumeros, demandesNumero, propositionNumero, modeNumerotation } from "./numerosNouvelles.js";
