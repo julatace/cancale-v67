@@ -1330,6 +1330,16 @@
     fa_envoye_n: { fr: '{n} envoyés', en: '{n} sent', es: '{n} enviados', it: '{n} inviati', de: '{n} gesendet' },
     fa_saute_1: { fr: '1 sauté', en: '1 skipped', es: '1 omitido', it: '1 saltato', de: '1 übersprungen' },
     fa_saute_n: { fr: '{n} sautés', en: '{n} skipped', es: '{n} omitidos', it: '{n} saltati', de: '{n} übersprungen' },
+    // 5.440.1 : UN mot par état partout (fenêtre, panneau, bilan) : envoyé · pas envoyé · sauté · en attente · à vérifier.
+    fa_pas_1: { fr: '1 pas envoyé', en: '1 not sent', es: '1 no enviado', it: '1 non inviato', de: '1 nicht gesendet' },
+    fa_pas_n: { fr: '{n} pas envoyés', en: '{n} not sent', es: '{n} no enviados', it: '{n} non inviati', de: '{n} nicht gesendet' },
+    fa_annule_1: { fr: '1 annulé', en: '1 cancelled', es: '1 cancelado', it: '1 annullato', de: '1 abgebrochen' },
+    fa_annule_n: { fr: '{n} annulés', en: '{n} cancelled', es: '{n} cancelados', it: '{n} annullati', de: '{n} abgebrochen' },
+    fa_attente_1: { fr: '1 en attente', en: '1 waiting', es: '1 en espera', it: '1 in attesa', de: '1 wartet' },
+    fa_attente_n: { fr: '{n} en attente', en: '{n} waiting', es: '{n} en espera', it: '{n} in attesa', de: '{n} warten' },
+    f6_rc_local_saute: { fr: 'Un favori n’est pas parti ({mot}) : rien n’est parti pour lui, VRM continue avec les suivants.', en: 'One favourite was not sent ({mot}): nothing was sent to them, VRM goes on with the next ones.', es: 'Un favorito no se envió ({mot}): no se le envió nada, VRM sigue con los siguientes.', it: 'Un preferito non è partito ({mot}): non gli è stato inviato nulla, VRM continua con i successivi.', de: 'Ein Favorit wurde nicht gesendet ({mot}): nichts ging an ihn, VRM macht mit den nächsten weiter.' },
+    f6_rc_locaux_suite_1: { fr: 'Un favori n’est pas parti ({mot}) : la file est en pause, rien n’est parti pour lui. Ouvre Vinted dans l’onglet de travail, vérifie que la cloche et la messagerie s’affichent, puis touche « {bouton} ».', en: 'One favourite was not sent ({mot}): the queue is paused, nothing was sent to them. Open Vinted in the work tab, check that the bell and the inbox show, then tap “{bouton}”.', es: 'Un favorito no se envió ({mot}): la cola está en pausa, no se le envió nada. Abre Vinted en la pestaña de trabajo, comprueba que la campana y la mensajería se muestran y toca «{bouton}».', it: 'Un preferito non è partito ({mot}): la coda è in pausa, non gli è stato inviato nulla. Apri Vinted nella scheda di lavoro, controlla che la campanella e i messaggi si vedano, poi tocca «{bouton}».', de: 'Ein Favorit wurde nicht gesendet ({mot}): Die Warteschlange ist pausiert, nichts ging an ihn. Öffne Vinted im Arbeits-Tab, prüfe, dass Glocke und Postfach angezeigt werden, und tippe dann auf „{bouton}“.' },
+    f6_rc_locaux_suite_n: { fr: '{n} favoris de suite ne sont pas partis (le dernier : {mot}) : la file est en pause, rien n’est parti pour eux. Ouvre Vinted dans l’onglet de travail, vérifie que la cloche et la messagerie s’affichent, puis touche « {bouton} ».', en: '{n} favourites in a row were not sent (the last one: {mot}): the queue is paused, nothing was sent to them. Open Vinted in the work tab, check that the bell and the inbox show, then tap “{bouton}”.', es: '{n} favoritos seguidos no se enviaron (el último: {mot}): la cola está en pausa, no se les envió nada. Abre Vinted en la pestaña de trabajo, comprueba que la campana y la mensajería se muestran y toca «{bouton}».', it: '{n} preferiti di fila non sono partiti (l’ultimo: {mot}): la coda è in pausa, non è stato inviato nulla. Apri Vinted nella scheda di lavoro, controlla che la campanella e i messaggi si vedano, poi tocca «{bouton}».', de: '{n} Favoriten nacheinander wurden nicht gesendet (der letzte: {mot}): Die Warteschlange ist pausiert, nichts ging an sie. Öffne Vinted im Arbeits-Tab, prüfe, dass Glocke und Postfach angezeigt werden, und tippe dann auf „{bouton}“.' },
     fa_reste_1: { fr: '1 restant', en: '1 left', es: '1 restante', it: '1 rimanente', de: '1 übrig' },
     fa_reste_n: { fr: '{n} restants', en: '{n} left', es: '{n} restantes', it: '{n} rimanenti', de: '{n} übrig' },
     fa_l_envoye: { fr: 'Envoyé', en: 'Sent', es: 'Enviado', it: 'Inviato', de: 'Gesendet' },
@@ -1348,7 +1358,7 @@
     fa_r_conversation_refusee: { fr: 'Vinted n’ouvre pas cette conversation', en: 'Vinted won’t open this conversation', es: 'Vinted no abre esta conversación', it: 'Vinted non apre questa conversazione', de: 'Vinted öffnet diese Unterhaltung nicht' },
     fa_r_filtre: { fr: 'Écarté par tes réglages', en: 'Excluded by your settings', es: 'Excluido por tus ajustes', it: 'Escluso dalle tue impostazioni', de: 'Durch deine Einstellungen ausgeschlossen' },
     fa_r_element_introuvable: { fr: 'Page Vinted pas reconnue — rien n’est parti', en: 'Vinted page not recognised — nothing was sent', es: 'Página de Vinted no reconocida — no se envió nada', it: 'Pagina Vinted non riconosciuta — non è partito nulla', de: 'Vinted-Seite nicht erkannt — nichts gesendet' },
-    fa_r_identite_non_confirmee: { fr: 'Conversation pas vérifiée — rien n’est parti', en: 'Conversation not verified — nothing was sent', es: 'Conversación no verificada — no se envió nada', it: 'Conversazione non verificata — non è partito nulla', de: 'Unterhaltung nicht bestätigt — nichts gesendet' },
+    fa_r_identite_non_confirmee: { fr: 'Article ou destinataire pas confirmé — rien n’est parti', en: 'Item or recipient not confirmed — nothing was sent', es: 'Artículo o destinatario no confirmado — no se envió nada', it: 'Articolo o destinatario non confermato — non è partito nulla', de: 'Artikel oder Empfänger nicht bestätigt — nichts gesendet' },
     fa_r_onglet_vinted: { fr: 'Onglet Vinted fermé', en: 'Vinted tab closed', es: 'Pestaña de Vinted cerrada', it: 'Scheda Vinted chiusa', de: 'Vinted-Tab geschlossen' },
     fa_r_compte_vinted_different: { fr: 'Un autre compte est connecté', en: 'Another account is signed in', es: 'Hay otra cuenta conectada', it: 'È connesso un altro account', de: 'Ein anderes Konto ist angemeldet' },
     fa_r_compte_vinted_absent: { fr: 'Compte Vinted pas connecté', en: 'Vinted account not signed in', es: 'Cuenta de Vinted no conectada', it: 'Account Vinted non connesso', de: 'Vinted-Konto nicht angemeldet' },
@@ -1856,6 +1866,15 @@
     let s = m ? (m[LANGUE] || m.fr) : String(cle);
     return vars ? String(s).replace(/\{(\w+)\}/g, (x, k) => (k in vars ? String(vars[k]) : x)) : s;
   };
+  // 5.440.1 : la raison d'une file de favoris qui saute ou s'arrête, dite par SON code (serveur : `raisonCode`, `raisonRefus`,
+  //    `raisonN`) dans la langue de l'écran, avec le VRAI nom du bouton ; sinon le texte du serveur ENTIER ; jamais coupé.
+  const raisonFileFav = (o) => {
+    const code = String((o && (o.code || o.raisonCode)) || ''), refus = String((o && (o.refus || o.raisonRefus)) || 'autre').replace(/[^a-z_]/g, '');
+    const mot = MOTS['f6_r_' + refus] ? T('f6_r_' + refus) : T('f6_r_autre');
+    if (code === 'local_saute') return T('f6_rc_local_saute', { mot });
+    if (code === 'locaux_suite') { const n = Number(o.n || o.raisonN) || 0; return T(n > 1 ? 'f6_rc_locaux_suite_n' : 'f6_rc_locaux_suite_1', { n, mot, bouton: T('a_reprendre') }); }
+    return String((o && (o.texte != null ? o.texte : o.raison)) || '');
+  };
   // La durée « 3 min », « 45 s », « 1 h 05 » (unités communes aux cinq langues).
   const duree = (ms) => { const s = Math.max(0, Math.round(Number(ms) / 1000)); if (s < 60) return s + ' s'; const m = Math.round(s / 60); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0'); };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2332,5 +2351,5 @@
   }
   const PM_CSS = '.pm7-g{margin:10px 0;padding:0}.pm7-g h4{margin:0 0 4px;font-size:13px}.pm7{display:flex;align-items:center;gap:8px;min-height:44px;border-top:1px solid var(--vu-filet,rgba(0,0,0,.08));padding:4px 0}.pm7-t{flex:1;min-width:0;display:flex;flex-direction:column}.pm7-t b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}.pm7-t small{color:var(--vu-gris,#6b6b70)}.pm7 .prix6{width:72px;min-height:36px}.pm7 .vu-btn{min-height:44px}';
   const PRIX_MINI = Object.freeze({ html: prixMiniHtml, lier: prixMiniLier, reponses: prixMiniReponses, cle: pmCle });
-  globalThis.VRM_UI = Object.freeze({ T, MOTS, LANGUES, langue: () => LANGUE, duree, esc, CSS, CSS_PAGE, monter, habiller, etiquette, barre, logoTransp, nomTransp, MODIF, noteAcheteur, nomLangue, traduction, PRIX_MINI });
+  globalThis.VRM_UI = Object.freeze({ T, raisonFileFav, MOTS, LANGUES, langue: () => LANGUE, duree, esc, CSS, CSS_PAGE, monter, habiller, etiquette, barre, logoTransp, nomTransp, MODIF, noteAcheteur, nomLangue, traduction, PRIX_MINI });
 })();

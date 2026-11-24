@@ -2197,3 +2197,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 <!-- déplacé tel quel de CLAUDE.md §9 le 24 nov. (lot agir-si-connecte) -->
 - **23 nov. · Bugs (`claude/bugs-totale`)** : vente par e-mail partout — le bordereau reçu d'une vente pas relue (particulier : vente sans n°) fait le colis (Colis, Ma journée, jamais Ventes ni CA), la photo exacte tranche la fenêtre ambiguë ; colis à retirer sans photo (`Icon`) ; boucle de rendus : `onVmrExt` ne prévient que sur changement d'empreinte (11 → 6 validations/10 s au téléphone, banc `rendus-repos`). `2026-11-22-bugs-totale.md`. Geste : aucun.
+
+<!-- déplacé tel quel de CLAUDE.md §9 le 24 nov. (lot agir-si-connecte, après la fusion de main) -->
+- **23 nov. · Isolement + colis en direct** : RLS prouvée par vendeur (0 ligne d'un autre, 8 vendeurs) ; un bordereau reçu par e-mail paraît sur Colis sans changer d'écran (veille `bordereaux`). `docs/passation/2026-11-23-isolement-temps-reel.md`. Geste : aucun.
+- **23 nov. · Gris clair étagé (`claude/style-clair`)** : variante A validée (gris froid, accent ardoise), sombre = gris choisi ; iPhone compact ; dessin fin ; pop-up d'événement + galerie du propriétaire. `docs/passation/2026-11-23-style-clair.md`. Geste : essayer le pop-up sur un vrai iPhone.

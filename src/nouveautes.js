@@ -32,6 +32,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'agir-si-connecte', date: '2026-11-24', titre: 'Répondre et republier depuis VRM', phrase: 'Si l’extension a ce compte ouvert ; sinon, lecture seule.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (24 nov., connexions-extension) Paramètres → Connexions de l'extension.
   { id: 'connexions-extension', date: '2026-11-24', titre: 'Chaque navigateur et chaque compte, en clair', phrase: 'Version, vu quand, ce qu’il lit, et quoi faire.', tab: 'connexions', pour: 'tous', mode: 'tous' },
+  // (23 nov. soir, ext. 5.440.1 — Julien : « 0 envoyé · 1 sauté », phrase coupée) docs/passation/2026-11-23-favoris-identite.md
+  { id: 'favoris-identite', date: '2026-11-23', titre: 'Messages aux favoris : le nouveau lien de Vinted', phrase: 'Un favori pas confirmé est dit et sauté, la file continue.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md
   { id: 'vente-email-partout', date: '2026-11-23', titre: 'Une vente reçue par e-mail se voit partout', phrase: 'Ventes, Ma journée et Colis, avant même le passage de l’extension.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov., photos-nettes — Julien : « toutes les photos sont floues ») docs/passation/2026-11-23-photos-nettes.md
