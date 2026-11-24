@@ -26,6 +26,8 @@ const dit = (b, q, d) => { if (b) { ok++; console.log('  ✅ ' + q); } else { ko
     console.log(`extension ${version}`);
     const w = await vivant(20000);
     dit(!!w, 'le worker démarre');
+    const espion = async (sw) => sw && sw.evaluate(() => { if (self.__espion) return; self.__espion = 1; const noter = (k, m) => chrome.storage.local.get('__erreursBanc').then((x) => chrome.storage.local.set({ __erreursBanc: [...((x && x.__erreursBanc) || []), k + ' ' + String(m).slice(0, 400)].slice(-30) })).catch(() => {}); self.addEventListener('error', (e) => noter('error', (e.message || '') + ' @' + (e.filename || '').split('/').pop() + ':' + e.lineno)); self.addEventListener('unhandledrejection', (e) => noter('rejet', e.reason && (e.reason.stack || e.reason.message) || e.reason)); }).catch(() => {});
+    await espion(w);
     const cdp = await ctx.browser() ? null : null; void cdp;
     const pg = await ctx.newPage();
     const s = await ctx.newCDPSession(pg);
@@ -37,10 +39,12 @@ const dit = (b, q, d) => { if (b) { ok++; console.log('  ✅ ' + q); } else { ko
       // Un évènement pour le fond : une page vinted.fr (ses scripts de contenu écrivent au fond dès le chargement).
       await pg.goto('https://www.vinted.fr/inbox', { waitUntil: 'domcontentloaded', timeout: 8000 }).catch(() => {});
       const w2 = await vivant(25000);
+      await espion(w2);
       dit(!!w2, `tour ${tour} : arrêté par Chrome, le worker REVIENT au premier évènement`, err.filter(Boolean).join(' | ') || '(aucune erreur rapportée)');
       if (err.length) { erreurs.push(...err); }
       if (!w2) break;
     }
+    { const sw3 = await vivant(5000); const e3 = sw3 ? await sw3.evaluate(async () => (await chrome.storage.local.get('__erreursBanc')).__erreursBanc || []).catch((e) => ['lecture: ' + e.message]) : ['(aucun worker pour lire)']; console.log('  ·  erreurs notées dans le worker : ' + JSON.stringify(e3).slice(0, 1500)); }
     if (erreurs.length) console.log('  ·  erreurs du worker : ' + [...new Set(erreurs)].slice(0, 5).join(' | '));
   } catch (e) { dit(false, 'a levé', e && e.stack); }
   finally { await ctx.close().catch(() => {}); fs.rmSync(TMP, { recursive: true, force: true }); console.log(`\n${ko ? '❌' : '✅'} sim-reveil-worker ${version} : ${ok} vert(s), ${ko} rouge(s)`); process.exit(ko ? 1 : 0); }
