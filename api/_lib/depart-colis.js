@@ -92,8 +92,18 @@ const isoDe = (ms) => (Number.isFinite(ms) ? new Date(ms).toISOString() : null);
 // Le transporteur LISIBLE comme départ d'un n° : celui qu'écrit la plateforme,
 // sinon la forme PROPRE du n° (Chronopost XW/ZW…TS/SP, Vinted Go VGS…). Mondial
 // Relay, Colissimo… ⇒ null (voir l'en-tête).
+// (24 nov., lot suivi-xu) + Chrono Relais Europe « XU/ZU + 9 chiffres + JF ». MESURÉ (lecture seule) sur
+// les bordereaux de vente des 60 derniers jours : 14 n° de cette forme (13 XU, 1 ZU), aucun lu chez le
+// transporteur — `nomDuBordereau` ne garde pas le nom « chronopost » et la forme XU n'était pas reconnue.
+// Toutes les étiquettes de cette forme dont le PDF a été lu (5 sur 5, et le bordereau de retour du 15 nov.)
+// nomment Chronopost (« Chrono Relais Europe », pied « Chronopost … 75014 Paris ») ; leur PDF est le MÊME
+// gabarit que les XW…TS (iText). « JF » n'est pas un pays : ce n'est pas un n° postal S10 (CP…IE).
+// La lecture reste celle des XW : `trackSkybillV2`, écho du `skybillNumber` exigé, un n° inconnu ⇒
+// « introuvable » (3 fois au plus, puis plus jamais relu) — rien n'est jamais déduit de la forme seule.
+export const FORME_CHRONO_RELAIS_EUROPE = /^[XZ]U\d{9}JF$/;
 function formeDepart(n) {
   if (/^[XZ]W\d{9}(?:TS|SP)$/.test(n)) return 'chronopost';
+  if (FORME_CHRONO_RELAIS_EUROPE.test(n)) return 'chronopost';
   if (/^VGS\d{13}$/.test(n)) return 'vinted';
   return '';
 }
