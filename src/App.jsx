@@ -895,7 +895,7 @@ import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, te
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import { ecrireEmailsLus } from "./emailsLusEcriture.js";
 // ⟦→ ecrans/Comptabilite.jsx #63⟧
-import {ResponsiveChatPortal} from "./ChatPortal.jsx";
+import {ResponsiveChatPortal, telFil} from "./ChatPortal.jsx";
 import "./ebay-interface.css";
 const _ecranEbay = (nom) => aLaDemande(() => import("./ebayGestion.jsx").then((m) => ({ default: m[nom] })));
 const EbayCommande = _ecranEbay("EbayCommande"), EbayMessages = _ecranEbay("EbayMessages"), EbayOffres = _ecranEbay("EbayOffres"), EbayAgent = _ecranEbay("EbayAgent");
@@ -16663,7 +16663,7 @@ function CadreFil({ etiquette, onFermer, refPanneau, attrs, children }) {
   return (
     <ResponsiveChatPortal><div className="vrm-chat-overlay vrm-chat-inline">
       <FermeAuRetour fermer={onFermer}/>
-      <div ref={refPanneau} className="vrm-chat-panel" role="dialog" aria-label={etiquette} {...(attrs || {})} style={{display:'flex',flexDirection:'column',background:C.bg,overflow:'hidden'}}>{children}</div>
+      <div ref={refPanneau} className="vrm-chat-panel" role="dialog" aria-label={etiquette} aria-modal={telFil() ? 'true' : undefined} {...(attrs || {})} style={{display:'flex',flexDirection:'column',background:C.bg,overflow:'hidden'}}>{children}</div>
     </div></ResponsiveChatPortal>
   );
 }

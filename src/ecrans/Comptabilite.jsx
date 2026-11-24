@@ -103,7 +103,7 @@ import { indexRecusParTransaction, recuDeLAchat, bilanRecusAchat } from '../../a
 import { etatRetrait, estAVerifier, urgenceTri, GARDE_MAX_J, limiteEstimee } from '../../api/_lib/retrait-colis.js';
 import { DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction, TEXTE_ESTIMEE_DEPASSEE, heureCourte as heureCourteJ } from '../../api/_lib/limite-envoi.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from '../photosArticles.js';
-import { ResponsiveChatPortal } from '../ChatPortal.jsx';
+import { ResponsiveChatPortal, telFil } from '../ChatPortal.jsx';
 import { installerExtensionIci, estAndroid, pageExtensionsIci } from '../navigateurExtension.js';
 import { enregistrerSourceColis, ouvrirRetrouver, EV_RELIER_COLIS } from '../retrouverColis.js';
 import { etatCopies } from '../copieLignes.js';
@@ -21362,7 +21362,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const rendreConversation=()=>openConv && (
 <ResponsiveChatPortal><div className={curSub==='messages'?'vrm-chat-overlay vrm-chat-inline':'vrm-chat-overlay'} onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
   <FermeAuRetour fermer={()=>setOpenConv(null)}/>
-          <div className="vrm-chat-panel" role="dialog" aria-label="Conversation Vinted" onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div className="vrm-chat-panel" role="dialog" aria-label={tr('a11y.conversationSur',{site:'Vinted'})} aria-modal={curSub!=='messages'||telFil()?'true':undefined} onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             {/* (16 oct.) En-tête de messagerie : retour à gauche (au doigt, c'est
                 là qu'on le cherche), la personne et la paire, l'actualisation à
                 droite. La source (« lu sur Vinted ») passe dans l'infobulle. */}
