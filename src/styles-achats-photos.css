@@ -396,6 +396,9 @@
    · la bande : une carte blanche ; « Novembre » et « Modifier » sur la même ligne (Modifier discret, 13 px) ; Dépensé en grand
      sur toute la largeur ; En route · À retirer · Arrivés en trois colonnes égales, sous un filet ;
    · les onglets prennent toute la ligne (chacun sa part, jamais coupés) ; ✓ et « ⋯ » passent sur la ligne d'après, à droite. */
+/* Dans la couche `vrm-premium` : une déclaration !important d'une couche passe AVANT toute déclaration !important hors couche
+   (la bande y est réglée) — ici la même couche, un sélecteur plus fort. */
+@layer vrm-premium {
 @media (max-width: 599px) {
   :root:root:root:root:root:root body .vrm-main .vrm-achats-scan { display: flex !important; flex-wrap: wrap !important; gap: 8px !important; margin: 0 16px 12px !important; padding: 0 !important; justify-content: stretch !important; box-sizing: border-box !important; max-width: calc(100% - 32px) !important; }
   :root:root:root:root:root:root body .vrm-main .vrm-achats-scan > * { flex: 1 1 140px !important; min-width: 0 !important; max-width: 100% !important; margin: 0 !important; }
@@ -412,4 +415,5 @@
   :root:root:root:root:root:root body .vrm-main .vrm-achats-barre { flex-wrap: wrap !important; justify-content: flex-end !important; row-gap: 4px !important; }
   :root:root:root:root:root:root body .vrm-main .vrm-achats-barre > .vrm-seg { flex: 1 1 100% !important; min-width: 0 !important; max-width: 100% !important; overflow: visible !important; display: flex !important; }
   :root:root:root:root:root:root body .vrm-main .vrm-achats-barre > .vrm-seg > .vrm-seg-btn { flex: 1 1 0 !important; min-width: 0 !important; padding-left: 4px !important; padding-right: 4px !important; justify-content: center !important; }
+}
 }

@@ -224,7 +224,7 @@ const toucher = (pg, sel) => pg.evaluate((s) => { const e = document.querySelect
         h.scrollIntoView({ block: 'center' }); await new Promise((r) => setTimeout(r, 500));
         let barre = innerHeight; for (let q = document.elementFromPoint(innerWidth / 2, innerHeight - 20); q && q !== document.body; q = q.parentElement) { const r = q.getBoundingClientRect(); if (r.height < 220 && r.width > innerWidth * 0.6) barre = Math.min(barre, r.top); }
         const main = document.querySelector('.vrm-main') || document.body;
-        const coupes = [...main.querySelectorAll('button, a, [role="tab"], h1, h2, h3, [data-achats-hero] *, .vrm-seg *, [class*="segment"] *')].filter(vis).filter((e) => { const r = e.getBoundingClientRect(); if (r.bottom < 0 || r.top > barre || r.height < 4) return false;
+        const coupes = [...main.querySelectorAll('button, a, [role="tab"], h1, h2, h3, [data-achats-hero] *, .vrm-seg *, [class*="segment"] *')].filter(vis).filter((e) => { const r = e.getBoundingClientRect(); if (r.bottom < 0 || r.top > barre || r.height < 4 || r.width < 4) return false;
           if (e.closest('[data-rp-point], .n-gc, .vrm-toasts, [data-defile-x], .n-rangee-defile, .n-barre-onglets, nav')) return false;
           const cs = getComputedStyle(e); const deborde = r.right > innerWidth + 1 || r.left < -1; const tronque = (cs.textOverflow === 'ellipsis' || cs.overflow === 'hidden' || cs.overflowX === 'hidden') && e.scrollWidth > e.clientWidth + 2 && (e.innerText || '').trim().length > 2;
           return deborde || tronque; }).map((e) => (e.innerText || e.getAttribute('aria-label') || '').toString().trim().slice(0, 40) || e.className);
@@ -295,14 +295,14 @@ const toucher = (pg, sel) => pg.evaluate((s) => { const e = document.querySelect
       await o2.ctx.setOffline(true);
       await pg2.waitForTimeout(400);
       await toucher(pg2, '[data-rp-code="551234"] [data-v2-en-grand], [data-rp-code="551234"] [data-rp-billet]');
-      await attendre(pg, () => !!document.querySelector('[data-gc]'), 5000);
+      await attendre(pg2, () => !!document.querySelector('[data-gc]'), 5000);
       await pg2.waitForTimeout(800);
       g = await pg2.evaluate(guichet);
       dit(!!g && g.horsLigne === '1' && g.bandeHL && g.ici && g.ici.texteCode === '551234' && g.ici.qr && g.ici.qr.charge, `H1 hors ligne : la feuille le dit, le code et le QR lu sont là (${g && g.ici && g.ici.texteCode})`, g);
       await pg2.screenshot({ path: path.join(SHOTS, `hors-ligne-${W}-${th}.png`) });
       await toucher(pg2, '[data-gc-fermer]'); await pg2.waitForTimeout(500);
       await toucher(pg2, '[data-rp-code="345678"] [data-v2-en-grand], [data-rp-code="345678"] [data-rp-billet]');
-      await attendre(pg, () => !!document.querySelector('[data-gc]'), 5000);
+      await attendre(pg2, () => !!document.querySelector('[data-gc]'), 5000);
       await pg2.waitForTimeout(1500);
       g = await pg2.evaluate(guichet);
       dit(!!g && g.ici && g.ici.texteCode === '345678' && (g.ici.qrKo || (g.ici.qr && (g.ici.qr.etat === 'reserve' || g.ici.qr.charge))), `H1 hors ligne, QR hébergé : la réserve, sinon « donne le code » — jamais une image cassée (${g && g.ici && (g.ici.qrKo ? 'dit' : g.ici.qr && g.ici.qr.etat)})`, g && g.ici);
