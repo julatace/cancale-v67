@@ -4234,6 +4234,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       noteAcheteurCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
     }
+    // 5.450 (audit-confiance-publique G5) : un fichier pour LUI (bordereaux PDF, sauvegarde des réglages) se télécharge par
+    //    `chrome.downloads` depuis le service worker — plus jamais par un clic simulé (`a.click()`) dans la page de Vinted.
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'telecharger') {
+      const url = String(msg.url || ''), nom = String(msg.nom || '').replace(/[^\w.-]/g, '_').slice(0, 80);
+      if (!/^data:application\/(?:pdf|json);base64,[A-Za-z0-9+/=]+$/.test(url) || url.length > 40e6 || !/^[\w-][\w.-]{0,79}\.(?:pdf|json)$/.test(nom)) { sendResponse({ ok: false }); return true; }
+      try { chrome.downloads.download({ url, filename: nom, saveAs: false, conflictAction: 'uniquify' }, (id) => { void chrome.runtime.lastError; sendResponse({ ok: Number.isInteger(id) }); }); } catch (_) { sendResponse({ ok: false }); }
+      return true;
+    }
     // 5.435 (`sauvegardereglages`) : sauvegarder ses réglages dans un fichier ; restaurer = aperçu, puis SON « Oui ».
     if (msg && msg.from === 'vrm-badge' && msg.action === 'sauvegardeReglages') {
       sauvegardeReglagesCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', raison: 'Rien n’a changé.' }));
@@ -38678,9 +38686,12 @@ async function lireVentesProuvees() {
     if (!Array.isArray(lignes)) return { echec: true, vendus: new Set() };
     parCompte = ventesParCompteDe(lignes, uids);
   }
-  const vendus = new Set(preuvesParTransaction(rows, parCompte).items);
-  for (const it of preuvesParBordereau(bords, parCompte).items) vendus.add(it);
-  return { echec: false, vendus };
+  const pt = preuvesParTransaction(rows, parCompte), pb = preuvesParBordereau(bords, parCompte);
+  const vendus = new Set(pt.items);
+  for (const it of pb.items) vendus.add(it);
+  // 5.450 : les TRANSACTIONS prouvées aussi (la même règle), pour « l'après-vente » (`ventesApresVente`) — plus de 2ᵉ copie.
+  const tx = new Set([...pt.tx, ...pb.tx]);
+  return { echec: false, vendus, tx };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -43912,9 +43923,10 @@ function apresVenteAFaire({ ventes, reglage, memo, litiges, maintenant }) {
   for (const v of Array.isArray(ventes) ? ventes : []) {
     if (!v || !/^\d{1,20}$/.test(String(v.tx || ''))) continue;
     const tx = String(v.tx), st = String(v.statut || ''), exp = String(v.expedition || '');
-    if (!st && !v.code) continue;                                   // une conversation n'est pas une vente (§5)
+    // 5.450 : « est-ce une vente ? » se juge par LA règle partagée (<preuve-vente-regle>, `lireVentesProuvees`) : `v.prouvee`.
+    if (v.prouvee !== true) continue;                               // une conversation, une vente annulée… n'est pas une vente (§5)
     const e = Object.assign({}, m.tx[tx] || {});
-    const litige = (litiges && litiges.has && litiges.has(tx)) || BLEAM_LITIGE.test(st) || BLEAM_LITIGE.test(exp) || PAS_UNE_VENTE.test(st);
+    const litige = (litiges && litiges.has && litiges.has(tx)) || BLEAM_LITIGE.test(st) || BLEAM_LITIGE.test(exp);
     const finalisee = String(v.code) === '450' || /finalis/i.test(st);
     const auPoint = !finalisee && (BLEAM_AU_POINT.test(exp) || BLEAM_AU_POINT.test(st));
     if (auPoint && !e.relaisVu) e.relaisVu = t;
@@ -43950,14 +43962,17 @@ async function ventesApresVente(uid) {
   if (v === null) return null;
   const r0 = (v && v[0]) || null;
   const cmds = r0 ? Array.from({ length: n }, (_, i) => r0['o' + i]).filter((x) => x && typeof x === 'object' && x.transaction_id != null) : [];
-  const det = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id,it:meta->>item_id,st:meta->>status,ti:meta->>status_title,sst:meta->>ship_status_title`);
+  // 5.450 : l'ÉTAT DE COMMANDE n'est plus lu ici (2ᵉ copie de la règle « vendue ») : la preuve vient de `lireVentesProuvees`.
+  const det = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id,it:meta->>item_id,st:meta->>status,sst:meta->>ship_status_title`);
   if (det === null) return null;
+  const preuves = await lireVentesProuvees();
+  if (!preuves || preuves.echec || !preuves.tx) return null;                 // pas su ⇒ rien (jamais une vente devinée)
   const parTx = new Map((det || []).map((r) => [(/_txn_(\d+)$/.exec(String(r.id || '')) || [])[1], r]).filter((x) => x[0]));
   const lit = await sbGet(`app_data?id=like.harvest_${uid}_litige_*&select=id,tx:data->payload->>transaction_id,tx2:data->payload->complaint->>transaction_id`);
   if (lit === null) return null;
   const litiges = new Set((lit || []).flatMap((r) => [r.tx, r.tx2, (/_litige_(\d+)$/.exec(String(r.id || '')) || [])[1]]).filter((x) => /^\d{1,20}$/.test(String(x || ''))).map(String));
   const ventes = cmds.map((o) => { const tx = String(o.transaction_id); const d = parTx.get(tx) || {};
-    return { tx, conv: o.conversation_id != null ? String(o.conversation_id) : '', item: d.it ? String(d.it) : '', statut: String(d.ti || o.status || ''), code: d.st ? String(d.st) : '', expedition: String(d.sst || ''), date: o.date || '' }; });
+    return { tx, prouvee: preuves.tx.has(tx), conv: o.conversation_id != null ? String(o.conversation_id) : '', item: d.it ? String(d.it) : '', statut: String(o.status || ''), code: d.st ? String(d.st) : '', expedition: String(d.sst || ''), date: o.date || '' }; });
   return { ventes, litiges };
 }
 // Une version tirée au hasard (jamais celle d'avant), {pseudo} retiré s'il n'est pas su, jamais deux fois le même texte.

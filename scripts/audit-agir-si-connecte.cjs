@@ -230,6 +230,13 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     const p = await bg.ctx.distPeutPartir(bg.ctx.adistCommande(cmds[4].data), [{ site: 'leboncoin', id: 'autre' }]);
     const p2 = await bg.ctx.distPeutPartir(bg.ctx.adistCommande(cmds[4].data), []);
     dit(p.attend === 'autre-compte' && p2.attend === 'absent', 'la file : supprimer sur un autre compte Leboncoin ou sans onglet ⇒ attend, rien ne part', JSON.stringify([p, p2]));
+    // 5.450 (preuve-vente §1 bis) : l'après-vente juge « vente » par LA règle partagée (`prouvee`, `lireVentesProuvees`), plus par l'état lu.
+    if (typeof bg.ctx.apresVenteAFaire === 'function') {
+      const reg = { msgFinalise: { actif: true, textes: ['Merci !'] }, msgVente: { actif: true, textes: ['Merci pour ta commande'] } };
+      const avec = (prouvee) => bg.ctx.apresVenteAFaire({ ventes: [{ tx: '15000000001', prouvee, conv: '7001', item: '91010001', statut: 'Commande finalisée', code: '450', expedition: '' }], reglage: reg, memo: { init: 1, tx: {} }, litiges: new Set(), maintenant: Date.now() });
+      const a0 = avec(false), a1 = avec(true);
+      dit(a0.actions.length === 0 && a1.actions.some((x) => x.sorte === 'finalise'), 'après-vente : une vente NON prouvée par la règle partagée ne déclenche rien, même « Commande finalisée » ; prouvée ⇒ les messages', JSON.stringify([a0.actions, a1.actions]));
+    } else dit(false, 'background.js : apresVenteAFaire se charge');
   } else dit(false, 'background.js : distanceExecuter (5.450) se charge dans le vm');
 
   // ── 5. Le panneau (ouvrirPanneau) est gardé ─────────────────────────────────────────────────────────────

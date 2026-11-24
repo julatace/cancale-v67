@@ -190,7 +190,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     // ══ F1 : 3 favoris, identité par la commande ═════════════════════════════════════════════════════════════════
     for (const F1 of ['F1', 'F1W', 'F1M', 'F1E', 'F1P', 'F1N']) if (veut(F1)) {
       for (const [i, f] of FAVORIS.entries()) f.forme = F1 === 'F1W' ? 'web' : F1 === 'F1M' ? (i === 1 ? 'web' : 'app') : 'app';
-      if (F1 === 'F1W' || F1 === 'F1M') console.log(`\n── ${F1}. trois favoris, liens ${F1 === 'F1W' ? 'web (/items/N/want_it/new?offering_id=N)' : 'mêlés (app, web, app)'}`); else console.log(F1 === 'F1P' ? '\n── F1P. ancienne relecture refusée (commande), message avec {pseudo}' : F1 === 'F1' ? '\n── F1. trois favoris lancés depuis la carte (l’ancienne relecture répond, comme mesuré le 21 nov.)' : '\n── F1E. les mêmes, l’ancienne relecture REFUSÉE : nouvelle messagerie, identité par la commande');
+      if (F1 === 'F1W' || F1 === 'F1M') console.log(`\n── ${F1}. trois favoris, liens ${F1 === 'F1W' ? 'web (/items/N/want_it/new?offering_id=N)' : 'mêlés (app, web, app)'}`); else console.log(F1 === 'F1N' ? '\n── F1N. ancienne relecture refusée, {pseudo}, la nouvelle messagerie ne dit pas le pseudo' : F1 === 'F1P' ? '\n── F1P. ancienne relecture refusée (commande), message avec {pseudo}' : F1 === 'F1' ? '\n── F1. trois favoris lancés depuis la carte (l’ancienne relecture répond, comme mesuré le 21 nov.)' : '\n── F1E. les mêmes, l’ancienne relecture REFUSÉE : nouvelle messagerie, identité par la commande');
       await reset();
       if (F1 === 'F1E' || F1 === 'F1P' || F1 === 'F1N') V.st.ancienneConv = 404;
       if (F1 === 'F1N') { V.st.sansLogin = true; console.log('   (F1N : {pseudo}, et la nouvelle messagerie NE dit PAS le pseudo ⇒ version neutre, jamais un nom)'); }
@@ -216,8 +216,8 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       if (F1 === 'F1P' || F1 === 'F1N') {
         const textes = msgs.map((e) => { let t = ''; try { t = String(JSON.parse(e.corps).content || ''); } catch (_) {} const cv = [...V.st.convs.values()].find((c) => e.p.includes(c.uuid) || e.p.includes(String(c.core))); return { t, login: cv ? cv.login : '' }; });
         const noms = FAVORIS.map((f) => f.login);
-        dit(textes.length === 3 && textes.every((x) => F1 === 'F1P' ? x.t.startsWith('Bonjour ' + x.login + ',') : (x.t.startsWith('Bonjour,') && !noms.some((n) => x.t.includes(n)))),
-          F1 === 'F1P' ? '{pseudo} = le pseudo de CETTE conversation (nouvelle messagerie)' : 'pseudo pas dit ⇒ « Bonjour, … » sans aucun nom', JSON.stringify(textes));
+        dit(textes.length === 3 && textes.every((x) => F1 === 'F1P' ? x.t.startsWith('Bonjour ' + x.login + ',') : (/^[A-Za-zÀ-ÿ]+, ton favori/.test(x.t) && !noms.some((n) => x.t.includes(n)))),
+          F1 === 'F1P' ? '{pseudo} = le pseudo de CETTE conversation (nouvelle messagerie)' : 'pseudo pas dit ⇒ la version neutre (« Bonjour, … »), sans aucun nom', JSON.stringify(textes));
       }
       dit(offres.length === 3, '3 offres (réduction de 10 %) envoyées par la page', offres.map((e) => e.p + ' ' + e.corps).join(' | '));
       if (F1 === 'F1E' || F1 === 'F1P') dit(V.st.req.some((e) => /escrow-orders/.test(e.p)), 'la commande escrow est relue (identité par la commande)', V.st.req.filter((e) => e.h === 'api.vinted.fr').map((e) => e.m + ' ' + e.p).slice(0, 12).join(' '));

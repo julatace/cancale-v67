@@ -3910,6 +3910,15 @@ function vrmVerifVisible(sel) {
     if (!r || r.assembler !== true || typeof A !== 'function') return null;
     try { const x = await A((r.pdfs || []).map((p) => ({ tx: String(p.tx), b64: p.b64 }))); return x && (x.ok || x.code === 'illisibles') ? x : null; } catch (_) { return null; }
   }
+  // 5.450 (§3, audit-confiance-publique G5) : un fichier pour LUI se télécharge par le service worker (`chrome.downloads`,
+  //    permission « downloads » déjà là) ; le contenu voyage en data: (le worker ne lit pas une adresse blob: de la page).
+  function telechargerParExtension(blob, nom) {
+    try {
+      const fr = new FileReader();
+      fr.onload = () => { try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'telecharger', url: String(fr.result || ''), nom: String(nom || 'vrm.pdf') }, () => { void chrome.runtime.lastError; }); } catch (_) {} };
+      fr.readAsDataURL(blob);
+    } catch (_) {}
+  }
   function imprimerBordereaux(txs) {
     const ids = [...new Set(txs.map(String).filter((t) => /^\d{1,20}$/.test(t)))].slice(0, 10);
     if (!ids.length || impEnVol) return;
@@ -3922,7 +3931,8 @@ function vrmVerifVisible(sel) {
       let url = ''; try { url = URL.createObjectURL(blob); } catch (_) { return ''; }
       setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 120000);
       if (!premierPris && fen) { premierPris = true; try { fen.location.href = url; return 'ouvert'; } catch (_) {} }
-      try { const a = document.createElement('a'); a.href = url; a.download = nom; a.rel = 'noopener'; a.click(); return 'telecharge'; } catch (_) { return ''; }
+      // 5.450 : téléchargé par le service worker (`chrome.downloads`), jamais un clic simulé dans la page (§3).
+      telechargerParExtension(blob, nom); return 'telecharge';
     };
     const fini = (r, un) => {
       impEnVol = false;
@@ -5261,7 +5271,8 @@ function vrmVerifVisible(sel) {
       srEnVol = true; srEtat = null; rendre();
       try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'sauvegardeReglages', quoi: 'exporter' }, (r) => { void chrome.runtime.lastError; srEnVol = false;
         if (r && r.ok && typeof r.texte === 'string') {
-          try { const url = URL.createObjectURL(new Blob([r.texte], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = r.nom || 'vrm-reglages.json'; a.style.display = 'none'; a.setAttribute('data-sr-telecharge', r.nom || ''); (document.body || document.documentElement).appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 60000);
+          // 5.450 : le fichier part par le service worker (`chrome.downloads`) — aucun lien ajouté à la page de Vinted, aucun clic simulé.
+          try { telechargerParExtension(new Blob([r.texte], { type: 'application/json' }), r.nom || 'vrm-reglages.json');
             srEtat = { ok: true, texte: TU('sr_sauve', { nom: r.nom || '' }) }; } catch (_) { srEtat = { ok: false, texte: TU('ra_ko') }; }
         } else srEtat = { ok: false, texte: (r && r.raison) || TU('ra_ko') };
         rendre(); }); } catch (_) { srEnVol = false; rendre(); }
