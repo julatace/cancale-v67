@@ -83,6 +83,9 @@
   font: var(--n-t-second-fort); cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
   transition: transform var(--n-duree-appui) ease-out, background-color var(--n-duree-appui) ease-out;
 }
+/* dans une rangée de liste (Ventes : « Relier · + prix » sur la ligne du prix), le dessin est plus bas (30) : la zone
+   de 44 déborde en transparent, sans recouvrir le texte de la ligne du dessus */
+[data-style]:not([data-style=""]) .n-vt-achat :is([data-n-famille="second"], [data-n-famille="champ"]) { border-block-width: 7px; padding-inline: 10px; }
 [data-style]:not([data-style=""]) [data-n-famille="second"] { background-color: var(--g-second-fond); color: var(--n-encre); box-shadow: none; }
 [data-style]:not([data-style=""]) [data-n-famille="champ"] { background-color: var(--g-champ-fond); color: var(--n-encre-2); box-shadow: var(--g-champ-ombre); font-weight: 500; }
 [data-style]:not([data-style=""]) :is([data-n-famille="second"], [data-n-famille="champ"]):active,
@@ -100,7 +103,8 @@
 [data-style]:not([data-style=""]) [data-n-famille] .n-vt-relier-rond { width: auto; height: auto; background: none; box-shadow: none; color: inherit; }
 
 /* ── les boutons ronds (icône seule, 44) ── */
-[data-style]:not([data-style=""]) .n-bouton-icone-seule,
+[data-style]:not([data-style=""]) .n-bouton-icone-seule { border-radius: 50%; background: transparent; color: var(--n-encre); box-shadow: none;
+  transition: transform var(--n-duree-appui) ease-out, background-color var(--n-duree-appui) ease-out; }
 [data-style]:not([data-style=""]) .n-tb-rond.n-bouton-icone-seule { border-radius: 50%; background: var(--g-second-fond); color: var(--n-encre); box-shadow: none;
   transition: transform var(--n-duree-appui) ease-out, background-color var(--n-duree-appui) ease-out; }
 [data-style]:not([data-style=""]) .n-bouton-icone-seule:active,

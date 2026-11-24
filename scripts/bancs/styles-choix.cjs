@@ -115,6 +115,17 @@ const MESURE = (args) => {
     const w = Math.min(p.right, q.right) - Math.max(p.left, q.left), h = Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top);
     if (w > 2 && h > 2) chevauche.push(`${nom(a)} × ${nom(b)}`);
   }
+  // G (bis) : un bouton DESSINÉ (sa boîte moins ses bordures transparentes) ne recouvre aucun texte d'à côté
+  const recouvre = [];
+  const textes = [...document.querySelectorAll('.vrm-main *, [data-fiche-paire] *')].filter((el) => [...el.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim()) && vu(el));
+  for (const [el] of boites.concat([...document.querySelectorAll('[data-n-famille="second"], [data-n-famille="champ"]')].filter((x) => dans(x) && vu(x)).map((x) => [x]))) {
+    if (!el.matches('.n-bouton, [data-n-famille]')) continue;
+    const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+    const d = { l: r.left + parseFloat(cs.borderLeftWidth), r: r.right - parseFloat(cs.borderRightWidth), t: r.top + parseFloat(cs.borderTopWidth), b: r.bottom - parseFloat(cs.borderBottomWidth) };
+    for (const t of textes) { if (el.contains(t) || t.contains(el) || colle(t) !== colle(el)) continue; const q = t.getBoundingClientRect();
+      const w = Math.min(d.r, q.right) - Math.max(d.l, q.left), h = Math.min(d.b, q.bottom) - Math.max(d.t, q.top);
+      if (w > 3 && h > 3) { recouvre.push(`${nom(el)} sur ${nom(t)}`); break; } }
+  }
   // D : orange / ambre ; rouge hors doublon
   const oranges = [], rouges = [];
   const LOGO = '.n-logo-site, [class*="logo"], [data-site-logo], img, picture, video, canvas, [data-n-doublon], [data-n-ton="doublon"], .vrm-logo';
@@ -127,7 +138,7 @@ const MESURE = (args) => {
   const rootCs = getComputedStyle(document.documentElement);
   return { style: document.documentElement.getAttribute('data-style') || '', theme: document.documentElement.getAttribute('data-theme'), fond: rootCs.getPropertyValue('--n-fond').trim(),
     nTextes, contraste: contraste.slice(0, 20), nContraste: contraste.length, nCibles, petites: petites.slice(0, 12), nPetites: petites.length, etrangers: [...new Set(etrangers)].slice(0, 12), nEtrangers: etrangers.length,
-    chevauche: chevauche.slice(0, 8), oranges: [...new Set(oranges)].slice(0, 8), rouges: [...new Set(rouges)].slice(0, 8), deborde: document.documentElement.scrollWidth - innerWidth };
+    chevauche: chevauche.slice(0, 8).concat(recouvre.slice(0, 8)), oranges: [...new Set(oranges)].slice(0, 8), rouges: [...new Set(rouges)].slice(0, 8), deborde: document.documentElement.scrollWidth - innerWidth };
 };
 
 // F : l'état enfoncé (forcé par le crochet du contrat natif `data-n-force="appui"`)
