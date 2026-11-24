@@ -295,6 +295,8 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
   const auto = !arrivee && ENTREES_UNIVERSELLES.has(String(depuis || ''));
   // Le résultat posé : à la feuille, ou — en rafale — à la liste (la caméra reprend aussitôt).
   const poser = React.useCallback((r) => {
+    // Le code lu reste montré 1 s À PARTIR du résultat (une lecture qui a attendu ses sources le remontre).
+    if (r && r.etat !== 'attente' && r.brut) setBandeau({ code: String(r.brut), at: Date.now() });
     if (r && r.etat !== 'attente' && rafaleRef.current) {
       setListe((L) => {
         const cle = r.etat === 'un' && r.trouve ? `${r.trouve.sorte}:${r.trouve.cle}` : 'code:' + normaliserN(r.brut);
