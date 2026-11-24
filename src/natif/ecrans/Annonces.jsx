@@ -53,7 +53,8 @@ const PAR_PAGE = 60;
 const ETATS = ['enligne', 'apublier', 'dorment'];
 // (21 nov.) « Bloqués » : le segment n'apparaît que s'il y a la dernière trace d'un compte bloqué (jamais un segment vide).
 const ETATS_AVEC_BLOQUE = [...ETATS, 'bloque'];
-const etatMot = (e) => tr('egalite.etatAnnonce.' + e);
+// (24 nov.) Une annonce vendue d'après l'e-mail de vente (Vinted pas encore relu) le dit : « Vendue · par e-mail, en attente de Vinted ».
+const etatMot = (e, x) => (e === 'vendue' && x && x.venteMail ? tr('vm.statut') : tr('egalite.etatAnnonce.' + e));
 
 // Ce que dit la 2e ligne d'une rangée (20 nov., Julien : « améliore le visuel » — NATIF §1 bis) : COURTE, après la plaque N° :
 // « T. 40 · sur 2 sites · acheté 30 € ». Le compte et le site sont dans l'en-tête du groupe (la liste est divisée par compte) ;
@@ -63,7 +64,7 @@ function sousDe(a, nomSite, filtreSite, euros = (n) => String(n)) {
   const bouts = [];
   if (a.taille) bouts.push(tr('egalite.taille', { t: a.taille }));
   // (20 nov. soir) Les sites de l'article sont dits par leurs logos, devant le N° : plus de « sur N sites ».
-  if (a.etat !== 'enligne') bouts.push(etatMot(a.etat));
+  if (a.etat !== 'enligne') bouts.push(etatMot(a.etat, a));
   if (a.achat != null) bouts.push(tr('egalite.achete', { p: euros(a.achat) }));
   // (20 nov.) « à relier » n'est plus sur la ligne : il est dit UNE fois, en tête du groupe (« N à relier › »).
   return bouts.join(' · ');
@@ -107,7 +108,7 @@ function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSai
       {a ? <>
         <Groupe>
           <Rangee vignette={<Vignette src={a.photo || ''} alt=""/>} titre={a.titre} lignes={2} plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null}
-            sousTitre={[a.taille ? tr('egalite.taille', { t: a.taille }) : '', a.condition, etatMot(a.etat)].filter(Boolean).join(' · ')}/>
+            sousTitre={[a.taille ? tr('egalite.taille', { t: a.taille }) : '', a.condition, etatMot(a.etat, a)].filter(Boolean).join(' · ')}/>
         </Groupe>
         <Groupe>
           <Faits colonnes={2}>
@@ -122,7 +123,7 @@ function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSai
           </Faits>
         </Groupe>
         <Groupe titre={tr('egalite.col.sites')}>
-          {a.annonces.map((x) => <Rangee key={x.site + x.id} titre={nomSite(x.site) + (x.pseudo ? ' · ' + x.pseudo : '')} sousTitre={[etatMot(x.etat), x.depuis != null ? depuisTexte(x.depuis) : '', x.favoris != null ? tr('egalite.favoris', { n: x.favoris }) : ''].filter(Boolean).join(' · ')}
+          {a.annonces.map((x) => <Rangee key={x.site + x.id} titre={nomSite(x.site) + (x.pseudo ? ' · ' + x.pseudo : '')} sousTitre={[etatMot(x.etat, x), x.depuis != null ? depuisTexte(x.depuis) : '', x.favoris != null ? tr('egalite.favoris', { n: x.favoris }) : ''].filter(Boolean).join(' · ')}
             valeur={x.prix != null ? euros(x.prix) : null} fin={x.url ? 'chevron' : null} href={x.url || ''} attrs={{ 'data-eg-annonce': x.site + ':' + x.id }}/>)}
           {l && l.etat === 'aRelier' ? <PropositionLiaison l={l} forme="fiche" onRelier={liaison.relier} onAutre={liaison.autre} onPropre={liaison.propre} Photo={liaison.Photo || null}/>
             : a.aRelier && onRelier ? <Rangee ton="ambre" titre={tr('egalite.relier.titre')} sousTitre={tr('egalite.relier.sous')} fin="chevron" onClick={() => onRelier(a)} attrs={{ 'data-eg-relier': a.cle }}/> : null}
@@ -243,7 +244,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
                 data-eg-coche={A ? (sel.has(a.cle) ? '1' : '0') : undefined} onClick={() => ouvrir(a)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ouvrir(a); } }}>
                 {A ? <td className="n-eg-td n-eg-td-case"><input type="checkbox" className="n-eg-coche" checked={sel.has(a.cle)} disabled={!!grise} aria-label={a.titre} onChange={() => basculer(a)} onClick={(e) => e.stopPropagation()}/></td> : null}
                 <td className="n-eg-td n-eg-td-article" data-eg-col="article"><Vignette src={a.photo || ''} alt="" taille={44}/><span className="n-eg-article"><span className="n-eg-article-titre">{a.titre || tr('egalite.sansTitre')}</span>
-                  <span className="n-eg-article-sous">{[a.taille ? tr('egalite.taille', { t: a.taille }) : '', a.condition, a.etat !== 'enligne' ? etatMot(a.etat) : ''].filter(Boolean).join(' · ') || ' '}</span></span></td>
+                  <span className="n-eg-article-sous">{[a.taille ? tr('egalite.taille', { t: a.taille }) : '', a.condition, a.etat !== 'enligne' ? etatMot(a.etat, a) : ''].filter(Boolean).join(' · ') || ' '}</span></span></td>
                 <td className="n-eg-td" data-eg-col="numero">{a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : (onNumero && !A ? <button type="button" className="n-eg-cellule" data-eg-modifier="numero" aria-label={tr('egalite.modifier', { quoi: tr('egalite.col.numero'), article: a.titre })} onClick={(e) => { e.stopPropagation(); onNumero(a); }}>—</button> : <span className="n-eg-valeur">—</span>)}</td>
                 <td className="n-eg-td" data-eg-col="sites"><span className="n-eg-sites">{a.sites.map((s) => nomSite(s)).join(' · ')}</span>
                   {a.aRelier ? <span className="n-eg-arelier" data-eg-arelier="">{tr('egalite.aRelier')}</span> : (a.annonces.length === 1 && a.annonces[0].pseudo ? <span className="n-eg-article-sous">{a.annonces[0].pseudo}</span> : null)}</td>
