@@ -328,7 +328,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     const actif = tri && tri.cle === c.cle;
     return (
       <th key={c.cle} scope="col" className="n-tt-th" data-tt-th={c.cle} data-tt-num={c.num ? '1' : undefined} aria-sort={actif ? (tri.sens === 'asc' ? 'ascending' : 'descending') : undefined}>
-        {c.tri !== false ? <button type="button" className="n-tt-tri" data-tt-trier={c.cle} onClick={() => trier(c)}>
+        {c.tri !== false ? <button type="button" data-n-famille="lien" className="n-tt-tri" data-tt-trier={c.cle} onClick={() => trier(c)}>
           <span>{c.titreCourt || c.libelle}</span><span className="n-tt-tri-signe" data-tt-sens={actif ? tri.sens : ''} aria-hidden="true">{actif ? (tri.sens === 'asc' ? '↑' : '↓') : '↕'}</span>
         </button> : <span className="n-tt-th-texte">{c.titreCourt || c.libelle}</span>}
       </th>

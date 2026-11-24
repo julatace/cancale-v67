@@ -202,6 +202,8 @@ const PIXELS = async (args) => {
 };
 
 async function ouvrir(nav, { W, sombre, style, url, b }) {
+  // l'apparence rangée dans la base aussi (sinon la synchronisation la ramène au clair sur un écran lent à charger)
+  try { const d = b.main[0].data; d.vrm_apparence = sombre ? 'sombre' : 'clair'; d.vinted_dark = !!sombre; } catch (_) {}
   const o = await P.ouvrir(nav, { W, sombre, b, url, dsf: 2 });
   await o.pg.addInitScript(([st, sombre]) => { try { if (st) localStorage.setItem('vrm_style', JSON.stringify(st)); else localStorage.removeItem('vrm_style'); localStorage.setItem('vrm_apparence', JSON.stringify(sombre ? 'sombre' : 'clair')); } catch (_) {} }, [style, sombre]);
   await o.pg.reload({ waitUntil: 'domcontentloaded' });
