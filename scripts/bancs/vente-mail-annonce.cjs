@@ -153,7 +153,7 @@ async function main() {
       console.log(JSON.stringify(s));
       dit(vue, 'sans identité : rien n’est relié tout seul (aucun N°)', s.v && !s.v.num, JSON.stringify(s.v));
       dit(vue, 'sans identité : UN geste « Relier à l’annonce »', s.v && s.v.relier, JSON.stringify(s.v));
-      dit(vue, 'la feuille propose les annonces du compte (au plus 8), dont la bonne', s.feuille && s.feuille.n > 0 && s.feuille.n <= 8 && s.feuille.ids.includes(String(idAnnonce(ICI_I))), JSON.stringify(s.feuille));
+      dit(vue, 'la feuille propose les annonces du compte (les 50), dont la bonne', s.feuille && s.feuille.n === 50 && s.feuille.ids.includes(String(idAnnonce(ICI_I))), JSON.stringify(s.feuille));
       dit(vue, 'son toucher relie : N° 262', s.apresRelier && s.apresRelier.num === '262' && s.apresRelier.delier, JSON.stringify(s.apresRelier));
       dit(vue, '« Délier » défait : plus de N°, « Relier » revient', s.apresDelier && !s.apresDelier.num && s.apresDelier.relier, JSON.stringify(s.apresDelier));
       dit(vue, 'reliée par son clic : Annonces · En ligne ne la montre plus', s.annonces && s.annonces.enLigne262 === 0, JSON.stringify(s.annonces));

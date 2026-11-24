@@ -113,10 +113,10 @@ export function venduesParMail({ ventes, annonces, liens = {}, fiches = {} } = {
 export const annonceDeVente = (vendues) => { const m = new Map(); for (const [id, x] of (vendues || new Map())) m.set(x.cle, id); return m; };
 
 // LES PROPOSITIONS pour « Relier à l'annonce » : les annonces en ligne du MÊME compte (l'adresse de réception décide), lues
-// avant l'e-mail, pas déjà vendues par e-mail. La ressemblance (mots du titre, taille, prix) ne sert qu'à les ORDONNER —
+// avant l'e-mail, pas déjà vendues par e-mail — TOUTES (60 au plus) : avec 50 paires identiques, c'est la photo qu'il compare. La ressemblance (mots du titre, taille, prix) ne sert qu'à les ORDONNER —
 // elle ne relie jamais (§5) : c'est son toucher. `annonces` : [{ id, uid, titre, taille, prix (nombre), photo, lu }].
 const mots = (t) => new Set(str(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9]+/).filter((m) => m.length > 1));
-export function candidatsRelier(vente, annonces, { titre = '', prix = null, dejaPrises = new Set(), max = 8 } = {}) {
+export function candidatsRelier(vente, annonces, { titre = '', prix = null, dejaPrises = new Set(), max = 60 } = {}) {
   const n = venteMailNormale(vente); if (!n || !Array.isArray(annonces)) return [];
   const mv = mots(titre);
   const tailleV = (/(?:taille|t\.?)\s*(\d{2}(?:[.,]5)?)/i.exec(str(titre)) || [])[1] || '';

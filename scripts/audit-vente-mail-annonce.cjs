@@ -118,7 +118,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log(`${c ? '✅' : '❌'} ${m}$
   const ventesLigne = V.ventesEmailFraiches({ mails: [mail()], comptes: [{ vinted_user_id: UID }], ventes: [], ko: [], lectures: { [UID]: LU_AVANT } });
   dit(ventesLigne.length === 1, 'M5 la ligne de Ventes de l’e-mail existe (la forme de Ventes)');
   const c = M.candidatsRelier(ventesLigne[0], [...annonces50, { ...annonces50[0], id: '1', uid: AUTRE }], { titre: 'Autry reelwind low noir taille 36', prix: 77 });
-  dit(c.length > 0 && c.length <= 8 && c.every((x) => x.uid === UID), 'M5 propositions : du MÊME compte seulement, au plus 8', c.map((x) => x.uid).join(','));
+  dit(c.length === 50 && c.every((x) => x.uid === UID) && c.some((x) => x.id === ID37), 'M5 propositions : TOUTES les annonces du MÊME compte (la bonne comprise), jamais un autre compte', c.length + ' · ' + [...new Set(c.map((x) => x.uid))].join(','));
   dit(relie({ ventes: [mail({ photo: '' })], annonces: annonces50 }).size === 0, 'M5 les propositions ne relient rien sans son clic');
   r = relie({ ventes: ventesLigne, annonces: annonces50 });
   dit(r.size === 1 && r.has(ID37), 'M5 la ligne de Ventes (forme `_venteEmail`) se relie par la même règle');
