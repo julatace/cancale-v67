@@ -157,7 +157,8 @@ const APPUI = () => {
   const lire = () => { const cs = getComputedStyle(b); const m = /matrix\(([^,]+),/.exec(cs.transform); return { echelle: m ? Number(m[1]) : 1, fond: compose(cs.backgroundColor) }; };
   const avant = lire(); b.setAttribute('data-n-force', 'appui'); const pendant = lire(); b.removeAttribute('data-n-force');
   const parse = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); const p = m ? m[1].split(/[ ,/]+/).filter(Boolean).map(Number) : [0, 0, 0]; return 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]; };
-  return { trouve: true, variante: b.getAttribute('data-n-variante') || '', avant, pendant, plusFonce: parse(pendant.fond) < parse(avant.fond) - 1 || ((document.documentElement.getAttribute('data-theme') === 'dark' || parse(avant.fond) < 8) && Math.abs(parse(pendant.fond) - parse(avant.fond)) > 1) };   // un plein déjà noir s'éclaircit   // la nuit, un plein CLAIR s'enfonce en s'assombrissant, un bouton texte en s'éclairant : un écart suffit
+  const relLum = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); const p = m ? m[1].split(/[ ,/]+/).filter(Boolean).map(Number) : [0, 0, 0]; const t = p.slice(0, 3).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * t[0] + 0.7152 * t[1] + 0.0722 * t[2]; };
+  return { trouve: true, variante: b.getAttribute('data-n-variante') || '', avant, pendant, plusFonce: parse(pendant.fond) < parse(avant.fond) - 1 || ((document.documentElement.getAttribute('data-theme') === 'dark' || relLum(avant.fond) < 0.02) && Math.abs(parse(pendant.fond) - parse(avant.fond)) > 1) };   // un plein déjà noir s'éclaircit   // la nuit, un plein CLAIR s'enfonce en s'assombrissant, un bouton texte en s'éclairant : un écart suffit
 };
 
 // B (pixels) : les boîtes à juger sur la capture
