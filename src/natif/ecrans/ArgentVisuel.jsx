@@ -10,21 +10,22 @@
 //    · `JaugesSeuils` : le CA de l'année (daté au VERSEMENT, la ligne publiée) face au plafond micro et au seuil de TVA
 //      (repère du seuil majoré) ; pas su ⇒ piste en pointillé, « — » ; minimum ⇒ « au moins », fin hachurée ;
 //    · `AVenirCartes` : l'argent à venir, une carte par étape, son médaillon (src/natif/Jeu.jsx `TuilePaire`).
-//  Apparition (src/natif/arrivee.js) : déjà connu au premier rendu ⇒ rien ne bouge ; arrivé pendant qu'on regarde, et
-//  jamais vu dans la session ⇒ une pousse de 180 ms, 15 ms de décalage par élément (≤ 120 ms). Mouvement réduit ⇒ rien.
+//  Apparition (`useArrive`/`revele`, src/natif/Jeu.jsx) : déjà connu au premier rendu ⇒ rien ne bouge ; arrivé pendant qu'on
+//  regarde, et jamais montré dans la session ⇒ une pousse de 160 ms, 15 ms de décalage par élément (≤ 120 ms). Mouvement réduit ⇒ rien.
 //  Aucune couleur orange : l'ardoise (`--n-accent`), le vert « fait », la sarcelle, l'encre.
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr } from '../../i18n/index.js';
 import { Carte, TIRET, Anneau, TuilePaire } from '../index.js';
-import { useArriveeNeuve, retard } from '../arrivee.js';
+import { useArrive, revele, REVELE_PAS, REVELE_MAX } from '../Jeu.jsx';   // l'apparition partagée « sans latence »
+const retard = (i) => Math.min(Math.max(0, i | 0), REVELE_MAX) * REVELE_PAS;
 import './argent-visuel.css';
 
 const pctTexte = (p) => (p == null ? TIRET : String(p).replace('.', ',') + ' %');
 
 // L'anneau de l'objectif. `o` : { etat: 'aucun' | 'passu' | 'lu', type, cible, valeur, pct, partiel, atteint }.
 export function AnneauObjectif({ o, montant, nombre = (x) => String(x) }) {
-  const neuf = useArriveeNeuve('argent-objectif', !!o && o.etat !== 'encours');
+  const neuf = useArrive(!!o && o.etat !== 'encours', 'argent-objectif');
   if (!o || o.etat === 'aucun') return null;
   const f = (x) => (o.type === 'ventes' ? nombre(x) : montant(x));
   const su = o.etat === 'lu' && o.pct != null;
@@ -95,7 +96,7 @@ function Jauge({ nom, cle, pct, seuil, etat, partiel, marque = null, montant, ne
 
 // `J` : le retour de `jaugeSeuils` (src/microEntreprise.js) ou null (pas su) ; `etat` : 'encours' | 'lu'.
 export function JaugesSeuils({ J, annee, montant, etat = 'lu' }) {
-  const neuf = useArriveeNeuve('argent-seuils', etat !== 'encours');
+  const neuf = useArrive(etat !== 'encours', 'argent-seuils');
   const nomP = tr('agv.plafond'), nomT = tr('agv.tva');
   return (
     <Carte titre={tr('agv.seuils', { annee: String(annee) })} className="n-agv-seuils" attrs={{ 'data-agv-seuils': etat === 'encours' ? 'encours' : J ? 'lu' : 'passu', 'data-agv-ca': J ? String(Math.round(J.ca * 100)) : '' }}>
@@ -119,7 +120,7 @@ const ICONE_ETAPE = { envoyer: 'box', route: 'truck', livree: 'home', versement:
 const GENRE_ETAPE = { envoyer: 'rappel', route: 'arrivee', livree: 'arrivee', versement: 'argent', autre: 'offre' };
 export function AVenirCartes({ A, montant, onOuvrir, Icon }) {
   const pret = !!A && !A.enCours;
-  const neuf = useArriveeNeuve('argent-avenir', pret);
+  const neuf = useArrive(pret, 'argent-avenir');
   if (!pret) return null;
   const parEtape = (A.parEtape || []).filter((g) => g.n > 0);
   if (!parEtape.length) return null;
@@ -129,7 +130,7 @@ export function AVenirCartes({ A, montant, onOuvrir, Icon }) {
       <h2 className="n-agv-avenir-titre">{tr('agv.aVenir')}</h2>
       <div className="n-agv-avenir-grille">
         {parEtape.map((g, i) => (
-          <button key={g.etape} type="button" className={'n-agv-av-carte' + (neuf ? ' n-agv-apparait' : '')} style={neuf ? { animationDelay: retard(i) + 'ms' } : undefined}
+          <button key={g.etape} type="button" {...revele(i, 'n-agv-av-carte', neuf)}
             onClick={onOuvrir} data-agv-etape={g.etape} data-eur={String(Math.round(g.eur * 100))} data-agv-n={String(g.n)}>
             <TuilePaire icone={ICONE_ETAPE[g.etape] || 'clock'} genre={GENRE_ETAPE[g.etape] || 'offre'} Icon={Icon} taille="m"/>
             <span className="n-agv-av-txt">

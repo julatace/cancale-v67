@@ -24,7 +24,8 @@ import { tr } from '../../i18n/index.js';
 import { Carte, Plaque, Attente, useOrdinateur, TIRET } from '../index.js';
 import { AideArgent } from './AideArgent.jsx';
 import { AnneauObjectif, BarreChiffre, CouvertureBarre } from './ArgentVisuel.jsx';   // (24 nov., visuel-argent) l'anneau, les barres
-import { useArriveeNeuve, retard } from '../arrivee.js';   // (24 nov.) « sans latence » : rien ne bouge si c'est déjà connu
+import { useArrive, REVELE_PAS, REVELE_MAX } from '../Jeu.jsx';   // (24 nov.) « sans latence » : l'aide partagée (rien ne bouge si c'est déjà connu)
+const retard = (i) => Math.min(Math.max(0, i | 0), REVELE_MAX) * REVELE_PAS;
 import './argent.css';
 
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
@@ -54,8 +55,8 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
   const ordi = useOrdinateur();
   // (24 nov., visuel-argent) Les barres ne poussent que si les mois ARRIVENT sous les yeux (jamais vus dans la session).
   const moisPrets = barres.some((x) => x.v != null) || versements.etat !== 'encours';
-  const neuf6 = useArriveeNeuve('argent-mois6', moisPrets);
-  const neufL = useArriveeNeuve('argent-chiffres', (vendu && vendu.valeur != null) || versements.etat !== 'encours');
+  const neuf6 = useArrive(moisPrets, 'argent-mois6');
+  const neufL = useArrive((vendu && vendu.valeur != null) || versements.etat !== 'encours', 'argent-chiffres');
   const [tout, setTout] = React.useState(false);
   const MONTRES = ordi ? 30 : 8;   // le téléphone reste court ; « Voir les 29 » déplie le reste (rien n'est caché sans le dire)
   const { valeur, partiel } = poster;
