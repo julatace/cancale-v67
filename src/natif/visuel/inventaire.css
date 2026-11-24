@@ -106,7 +106,9 @@
   .n-inv-liste .n-ar-meta { gap: 6px; margin-top: 3px; }
   .n-inv-liste .n-inv-case + .n-inv-case .n-ar::before { content: ""; position: absolute; top: 0; right: 0; z-index: 2; left: calc(var(--n-marge) + 60px + 12px); border-top: .5px solid var(--n-trait); pointer-events: none; }
   .n-ar-etiq.n-etiq { font-size: 11px; line-height: 14px; padding: 1px 6px 1px 11px; box-shadow: inset 0 0 0 1px var(--n-jeu-papier-bord), 0 .5px 1px rgb(0 0 0 / .14); }
-  .n-ar-stats { display: inline-flex; align-items: center; gap: 9px; min-width: 0; }
+  /* Ce qui ne tient pas sur la ligne passe à la ligne… cachée : un bout s'efface en entier, jamais coupé à moitié. */
+  .n-ar-stats { display: inline-flex; align-items: center; flex: 1 1 auto; flex-wrap: wrap; column-gap: 9px; row-gap: 8px; min-width: 0; height: 18px; overflow: hidden; }
+  .n-ar-stats > * { flex: none; }
   .n-ar-stats .n-ad-stat { gap: 3px; }
   /* Les gestes rapides, sous la rangée (révélés en la glissant vers la gauche) : 84 × 72, au pouce. */
   .n-ar-rapides { position: absolute; top: 0; right: 0; bottom: 0; z-index: 0; display: flex; }

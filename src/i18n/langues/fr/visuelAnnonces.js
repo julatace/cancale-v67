@@ -21,5 +21,5 @@ export default {
   "inv.affichage": "Affichage",
   "inv.vue.liste": "Liste",
   "inv.vue.grille": "Détaillé",
-  "inv.age.jour": "Aujourd’hui"
+  "inv.age.jour": "Auj."
 };

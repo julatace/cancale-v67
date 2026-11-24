@@ -34,7 +34,7 @@ const item = (i, extra = {}) => ({ id: String(10000 + i), title: MOD[i % MOD.len
   condition: 'Très bon état', brand: MARQ[i % MARQ.length], createdTs: i % 13 === 5 ? undefined : NOW - (((i * 7) % 61 + 1) * J + (i % 5) * 3600e3), /* âges variés ; 1 sur 13 inconnu (pas d'horloge) */ favourites: i % 4 === 3 ? undefined : (i * 3) % 41, views: (i * 13) % 1400, url: 'https://www.vinted.fr/items/' + (10000 + i), ...extra });
 const lues = Array.from({ length: N }, (_, i) => item(i));
 // Le LEURRE : deux annonces du 1er compte affiché portent le MÊME titre, chacune SA photo.
-const L0 = Math.floor(N / 3) * 2; lues[L0].title = lues[L0 + 1].title = 'Nike Air Max 90 blanc taille 42'; lues[L0].createdTs = lues[L0 + 1].createdTs = NOW - 60e3;   // en tête de liste
+const L0 = Math.floor(N / 3) * 2; lues[L0].title = lues[L0 + 1].title = 'Nike Air Max 90 blanc taille 42'; lues[L0].size = lues[L0 + 1].size = '42'; lues[L0].createdTs = lues[L0 + 1].createdTs = NOW - 60e3;   // en tête de liste
 const tiers = Math.floor(N / 3);
 const comptes = [
   { uid: '111', pseudo: 'atelier.nord', ok: true, lu: NOW - 18 * 60e3, enLigne: lues.slice(0, tiers - 3), aConfirmer: lues.slice(tiers - 3, tiers - 1), masquees: lues.slice(tiers - 1, tiers), brouillons: [] },
