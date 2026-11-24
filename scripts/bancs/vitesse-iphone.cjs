@@ -3,10 +3,7 @@
 //  Récit : docs/passation/2026-11-24-vitesse.md.
 //
 //    node scripts/bancs/vitesse-iphone.cjs <dist> [port]
-//      CPU=4 · PASSES=3 · JSON=<fichier> · ETAPES=froid,onglets,vente,defilement,recherche,rechachats · RENDUS=1 (validations React)
-//      PROFIL=froid,onglet:achats,vente (profil par fonction ; build non minifié conseillé) · CAPTURES=<dossier>
-//    node scripts/bancs/vitesse-iphone.cjs <distA>,<distB>[,…]   ⇒ mode AB : les builds mesurés en alternance, geste par geste
-//      (froid et onglets ; TOURS=4), médianes par build — la seule comparaison honnête sur une machine partagée.
+//      CPU=4 · PASSES=3 · JSON=<fichier> · ETAPES=froid,onglets,vente,defilement,recherche · RENDUS=1 (validations React)
 //      VOLUME=julien (défaut : 15 comptes, 2 600 ventes, 2 700 achats, 1 100 annonces — compté sur SA base le 24 nov.,
 //      lecture seule, nombres seulement) · VOLUME=banc (la base des autres bancs : 7 comptes, 1 500 / 800 / 1 200).
 //
@@ -96,13 +93,24 @@ function ecranPret(id) {
   const sel = id === 'compta' ? '[data-attente="pret"],[data-attente="plafond"]' : `[data-attente-ecran="${id}"][data-attente="pret"],[data-attente-ecran="${id}"][data-attente="plafond"]`;
   return [...m.querySelectorAll(sel)].some((x) => x.getClientRects().length && x.getBoundingClientRect().height > 40 && !x.closest('[data-copie-ecran],.vrm-attente-cache,[hidden]'));
 }
+// Le PREMIER CONTENU de l'onglet : sa copie (la dernière liste affichée sur l'appareil, src/copieEcran.js) ou l'écran vrai
+// prêt — ce que Julien voit en premier (jamais un squelette ni un écran blanc).
+function premierContenu(id) {
+  const m = document.querySelector('#root .vrm-main'); if (!m) return false;
+  for (const e of m.querySelectorAll('[data-copie-ecran] [data-copie-contenu], [data-copie-ecran][data-copie-contenu]')) { const r = e.getBoundingClientRect(); if (r.height > 8 && r.top < innerHeight - 60 && r.bottom > 60) return true; }
+  return ecranPret(id);
+}
+// Du doigt posé à la première image du premier contenu ET à celle de l'écran complet (prêt), en un seul guet.
+const jusquaDeux = (pg, id, max = 20000) => pg.evaluate(([p1, p2, id, max]) => new Promise((ok) => { const f1 = new Function('arg', 'return (' + p1 + ')(arg)'), f2 = new Function('arg', 'return (' + p2 + ')(arg)'); const t0 = window.__tDown || performance.now(); let premier = null;
+  const v = () => { const t = Math.round(performance.now() - t0); let b1 = false, b2 = false; try { b2 = f2(id); b1 = b2 || f1(id); } catch (_) {} if (b1 && premier == null) premier = t; if (b2) return ok({ premier, complet: t }); if (t > max) return ok({ premier, complet: null }); requestAnimationFrame(v); }; requestAnimationFrame(v); }), [premierContenu.toString().replace('return ecranPret(id);', 'return false;'), ecranPret.toString(), id, max]).catch(() => ({ premier: null, complet: null }));
 // Du doigt posé (pointerdown) à la première image où `cond` est vraie.
 const jusqua = (pg, cond, arg, max = 20000) => pg.evaluate(([src, arg, max]) => new Promise((ok) => { const f = new Function('arg', 'return (' + src + ')(arg)'); const t0 = window.__tDown || performance.now();
   const v = () => { let b = false; try { b = f(arg); } catch (_) {} if (b) return ok(Math.round(performance.now() - t0)); if (performance.now() - t0 > max) return ok(null); requestAnimationFrame(v); }; requestAnimationFrame(v); }), [cond.toString(), arg, max]).catch(() => null);
 const rendus = (pg) => pg.evaluate(() => { const R = window.__vrmRendus; if (!R) return null; const r = { v: R.validations }; R.validations = 0; return r; }).catch(() => null);
 // Le coût du geste par nature (métriques du moteur, cumulées, ralentissement compris) : script, style, mise en page.
 let CDP = null;
-const metr = async () => { try { const { metrics } = await CDP.send('Performance.getMetrics'); const m = Object.fromEntries(metrics.map((x) => [x.name, x.value])); return { script: m.ScriptDuration || 0, style: m.RecalcStyleDuration || 0, page: m.LayoutDuration || 0 }; } catch (_) { return null; } };
+const borne = (p, ms = 15000) => Promise.race([p, new Promise((_, ko) => setTimeout(() => ko(new Error('borne')), ms))]);
+const metr = async () => { try { const { metrics } = await borne(CDP.send('Performance.getMetrics')); const m = Object.fromEntries(metrics.map((x) => [x.name, x.value])); return { script: m.ScriptDuration || 0, style: m.RecalcStyleDuration || 0, page: m.LayoutDuration || 0 }; } catch (_) { return null; } };
 // PROFIL=onglet:annonces,vente,froid… : le profil par fonction du geste (build non minifié conseillé).
 const PROFILS = String(process.env.PROFIL || '').split(',').filter(Boolean);
 async function profilDebut(cle) { if (!PROFILS.includes(cle)) return false; await CDP.send('Profiler.enable'); await CDP.send('Profiler.setSamplingInterval', { interval: 500 }); await CDP.send('Profiler.start'); return true; }
@@ -207,7 +215,7 @@ async function rechercheAchats(pg, R) {
 
 // ── AB : plusieurs builds, mêmes gestes, en alternance ──
 async function modeAB(nav) {
-  const R = DISTS.map(() => ({ froid: [], onglets: {}, cout: {} })); const erreurs = [];
+  const R = DISTS.map(() => ({ froid: [], onglets: {}, premier: {}, v1p: {}, v1c: {}, cout: {} })); const erreurs = [];
   const ORDRE = ['annonces', 'ventes', 'achats', 'compta', 'journee']; const TOURS = +(process.env.TOURS || 4);
   for (let p = 0; p < PASSES; p++) {
     const P = [];
@@ -215,20 +223,27 @@ async function modeAB(nav) {
     const ordre = (k) => (k % 2 ? P.slice().reverse() : P);
     for (const x of ordre(p)) { await x.pg.goto(`${BASE_URL.get(x.pg)}/?tab=journee`, { waitUntil: 'commit', timeout: 120000 });
       const fin = Date.now() + 90000; let t = null; while (Date.now() < fin) { t = await x.pg.evaluate(() => window.__pret).catch(() => null); if (t != null) break; await attendre(100); }
-      R[x.i].froid.push(t == null ? null : Math.round(t)); await calme(x.pg, 2000, 40000); }
-    for (const x of P) for (const o of ORDRE) { await x.pg.locator(`[data-n-onglet="${CLE(o)}"]`).first().tap({ timeout: 30000 }).catch(() => {}); await x.pg.waitForFunction(ecranPret, o, { timeout: 60000, polling: 200 }).catch(() => {}); await calme(x.pg, 1500, 20000); }
+      R[x.i].froid.push(t == null ? null : Math.round(t)); await calme(x.pg, 2000, 40000); if (process.env.DETAIL) console.log(`    ${path.basename(DISTS[x.i])} froid ${t == null ? '—' : Math.round(t)}`); }
+    // 1re visite de chaque onglet après l'ouverture (l'écran n'est pas encore gardé : la copie, puis l'écran vrai).
+    for (const o of ORDRE) for (const x of ordre(p)) { await calme(x.pg, 1000, 15000); await x.pg.locator(`[data-n-onglet="${CLE(o)}"]`).first().tap({ timeout: 30000 }).catch(() => {});
+      const d = await jusquaDeux(x.pg, o, 60000); (R[x.i].v1p[o] = R[x.i].v1p[o] || []).push(d.premier); (R[x.i].v1c[o] = R[x.i].v1c[o] || []).push(d.complet); await calme(x.pg, 1500, 20000); }
     let k = 0;
     for (let tour = 0; tour < TOURS; tour++) for (const o of ORDRE) for (const x of ordre(k++)) {
       CDP = x.cdp; await calme(x.pg, 1000, 15000); const m0 = await metr();
       await x.pg.locator(`[data-n-onglet="${CLE(o)}"]`).first().tap({ timeout: 30000 }).catch(() => {});
-      const ms = await jusqua(x.pg, ecranPret, o); const cout = ecart(m0, await metr());
+      const d = await jusquaDeux(x.pg, o); const ms = d.complet; const cout = ecart(m0, await metr());
+      (R[x.i].premier[o] = R[x.i].premier[o] || []).push(d.premier);
       (R[x.i].onglets[o] = R[x.i].onglets[o] || []).push(ms); (R[x.i].cout[o] = R[x.i].cout[o] || []).push(cout);
       await calme(x.pg, 800, 15000);
+      if (process.env.DETAIL) console.log(`    ${path.basename(DISTS[x.i])} ${o} : premier ${d.premier} · complet ${ms}${cout ? ` · script ${cout.script} · style ${cout.style}` : ''}`);
     }
-    for (const x of P) await x.ctx.close();
+    for (const x of P) await borne(x.ctx.close(), 20000).catch(() => {});
     console.log(`  passe ${p + 1} faite (charge ${os.loadavg()[0].toFixed(1)})`);
   }
   const out = DISTS.map((d, i) => ({ build: path.basename(d), froid: med(R[i].froid),
+    visite1Premier: Object.fromEntries(Object.entries(R[i].v1p).map(([o, L]) => [o, med(L)])),
+    visite1Complet: Object.fromEntries(Object.entries(R[i].v1c).map(([o, L]) => [o, med(L)])),
+    premier: Object.fromEntries(Object.entries(R[i].premier).map(([o, L]) => [o, med(L)])),
     onglets: Object.fromEntries(Object.entries(R[i].onglets).map(([o, L]) => [o, med(L)])),
     script: Object.fromEntries(Object.entries(R[i].cout).map(([o, L]) => [o, med(L.map((c) => c && c.script))])),
     style: Object.fromEntries(Object.entries(R[i].cout).map(([o, L]) => [o, med(L.map((c) => c && c.style))])) }));
