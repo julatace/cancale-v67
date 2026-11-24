@@ -72,6 +72,10 @@ export function normaliserRapportExt(c, maintenant = Date.now()) {
     flux, compteurs, erreurs,
     files: { commandes, reseau: entier(c.files && c.files.reseau, 100) },
     pauses: { vinted: heure(p.vinted, maintenant + 86400000), toutArrete: p.toutArrete === true, republication: heure(p.republication, maintenant) },
+    // (24 nov., ext. 5.440.3) « Envoyer l'observation » : qu'une observation de Vinted est rangée (sa ligne
+    // `observation_vinted_*`), combien d'entrées, de quand à quand — jamais la frise elle-même.
+    ...(c.observation && typeof c.observation === 'object' && !Array.isArray(c.observation)
+      ? { observation: { n: entier(c.observation.n, 2000), debut: heure(c.observation.debut, maintenant + 660000), fin: heure(c.observation.fin, maintenant + 660000) } } : {}),
   };
 }
 

@@ -21,6 +21,10 @@ const path = require('path');
 const R = path.join(__dirname, '..');
 const parser = require(path.join(R, 'node_modules', '@babel', 'parser'));
 const traverse = require(path.join(R, 'node_modules', '@babel', 'traverse')).default;
+// (24 nov., main-vert) `Comptabilite` (et `commandesAVerifierCalc`) a déménagé dans src/ecrans/Comptabilite.jsx (découpe
+// d'App.jsx) : on analyse l'app RECOLLÉE (_source-app.cjs, chemins vus de src/, comme avant la découpe) ; `--ecrire`
+// réécrit la clé dans le fichier qui PORTE ses marqueurs.
+const { sourceAppCode, fichierQuiPorte } = require('./_source-app.cjs');
 const FICHIER = path.join(R, 'src', 'App.jsx');
 const CIBLE = 'commandesAVerifierCalc';
 const DEBUT = '/* ⟦cle-verifier⟧ */', FIN = '/* ⟦/cle-verifier⟧ */';
@@ -28,6 +32,7 @@ const DEBUT = '/* ⟦cle-verifier⟧ */', FIN = '/* ⟦/cle-verifier⟧ */';
 // Lus mais sans effet sur le résultat d'un rendu à l'autre — chacun avec sa raison.
 const EXEMPTS = {
   _expeditionsMemo: 'mémoire interne de `expeditions()`, elle-même rangée par sa propre clé',
+  _listeEnvoyesMemo: 'mémoire d\'UN calcul synchrone de `listeEnvoyes()`, vidée à la microtâche suivante (comme liensColis.js:memo)',
   memosVersion: 'référence stable (useRef) : la mémoire de `memoVersion`, rangée par version',
   INV_STATUS: 'table constante (jamais modifiée)',
   ETATS_HORS_PARCOURS: 'table constante (jamais modifiée)',
@@ -149,10 +154,11 @@ function verifier(src) {
   return { rouges, a, cle };
 }
 
-const src = fs.readFileSync(FICHIER, 'utf8');
+const src = sourceAppCode(R);
 if (process.argv.includes('--ecrire')) {
   const a = analyser(src);
-  fs.writeFileSync(FICHIER, ecrireCle(src, cleAttendue(a)));
+  const porte = fichierQuiPorte(DEBUT, R);
+  fs.writeFileSync(porte, ecrireCle(fs.readFileSync(porte, 'utf8'), cleAttendue(a)));
   console.log(`clé réécrite : ${cleAttendue(a).length} entrées (${a.racines.length} de l'écran, ${a.modules.length} de module)`);
   process.exit(0);
 }

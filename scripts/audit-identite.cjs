@@ -144,7 +144,11 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   // (src/venduesParEmail.js, exécuté par audit-robustesse-metier B).
   {
     const regle = (() => { try { return fs.readFileSync(path.join(__dirname, '..', 'src', 'venduesParEmail.js'), 'utf8').replace(/\/\/[^\n]*/g, ''); } catch (_) { return ''; } })();
-    /emailSoldIds = useMemo\(\(\) => venduesParEmail\(/.test(SRC) && !/ambiguousKey|normTitle\(t\) \+ '\|'/.test(SRC) && regle && !/title|designation|article/.test(regle)
+    // (24 nov., vente-mail-annonce) + les annonces que `venduesParMail` relie (src/venteMailAnnonce.js) : son clic ou l'image
+    // EXACTE — la partie qui relie ne lit aucun titre (exécutée par audit-vente-mail-annonce).
+    const mailRegle = (() => { try { const t = fs.readFileSync(path.join(__dirname, '..', 'src', 'venteMailAnnonce.js'), 'utf8').replace(/\/\/[^\n]*/g, ''); return (t.split('export function venduesParMail')[1] || '').split('export function candidatsRelier')[0]; } catch (_) { return ''; } })();
+    /emailSoldIds = useMemo\(\(\) => new Set\(\[\.\.\.venduesParEmail\([\s\S]{0,300}\), \.\.\.venduesMail\.keys\(\)\]\)/.test(SRC) && !/ambiguousKey|normTitle\(t\) \+ '\|'/.test(SRC) && regle && !/title|designation|article/.test(regle)
+      && mailRegle && !/title|titre|designation|article/.test(mailRegle)
       ? ok('auto-retrait d\'une annonce (email) : par identité seulement (transaction → annonce, bordereau)')
       : nok('auto-retrait d\'une annonce (email) : par identité seulement (transaction → annonce, bordereau)');
   }

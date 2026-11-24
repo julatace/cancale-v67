@@ -291,7 +291,8 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
   dit(!hors.length, `S1 aucun texte ne dit « paire(s) » hors Sneakers (${nPermis} permis, ${nGardes} gardés par « sneakers »)`, hors);
 
   // ── B : le branchement ──
-  const app = lire(racine, 'src/App.jsx');
+  // (24 nov., main-vert) App.jsx découpé (src/ecrans/*.jsx) : l'app se lit RECOLLÉE (_source-app.cjs).
+  const app = require('./_source-app.cjs').sourceApp(racine);
   dit(/poserSourceVend\(\(\) => vendActuel\(\)\);/.test(app), 'B1 l’app pose la source du vocabulaire (`poserSourceVend(() => vendActuel())`)');
   const aide = lire(racine, 'src/composants/AideEcran.jsx');
   dit(/phraseVendeur\(e, vend\)/.test(aide) && /phraseVendeur\(qq, vend\)/.test(aide) && /phraseVendeur\(r, vend\)/.test(aide), 'B2 l’aide du « ? » (étapes, questions, réponses) passe par `phraseVendeur`');
