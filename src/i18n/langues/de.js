@@ -28,6 +28,7 @@ import ecran_ext5428 from './de/ext5428.js';   // (21 nov.) ext. 5.428   // (21 
 import ecran_relier_retires from './de/relierRetires.js';   // (21 nov.) relier ce qui est chez moi, colis non retirés, remboursés hors dépenses
 import ecran_verre2 from './de/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './de/fiched.js';
+import ecran_vente_mail from './de/venteMail.js';   // (24 nov.) la vente vue par e-mail et son annonce
 import ecran_egalite from './de/egalite.js';
 import ecran_tableau from './de/tableau.js';   // (19 nov. soir) le tableau de travail
 import ecran_publierAgent from './de/publierAgent.js';
@@ -2411,6 +2412,7 @@ export default {
   ...ecran_styleClarte,
   ...ecran_relier_retires,
   ...ecran_fiched,
+  ...ecran_vente_mail,
   ...ecran_egalite,
   ...ecran_tableau,
   ...ecran_publierAgent,
