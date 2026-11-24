@@ -666,6 +666,8 @@ function SuiviTravailCoque() {
 const AlerteModeration = lazySur(() => import('./AlerteModeration.jsx'));
 const CompteBloque = lazySur(() => import('./CompteBloque.jsx'));   // (19 nov., lot compte-bloque) « Vinted a bloqué {compte} » + la question   // (11 nov., ext. 5.350) « Vinted a masqué / fait disparaître / limite »
 const EcranExtension = lazySur(() => import('./extension/EcranExtension.jsx'));
+const EcranConnexions = lazySur(() => import('./connexions/EcranConnexions.jsx'));   // (24 nov.) « Connexions de l'extension » : chaque navigateur, chaque compte
+const LigneConnexionsJournee = lazySur(() => import('./connexions/EcranConnexions.jsx').then((m) => ({ default: m.LigneConnexionsJournee })));
 const EcranADistance = lazySur(() => import('./aDistance/EcranADistance.jsx'));   // (22 nov., ext. 5.436 `adistance`) « Mes comptes » : tes comptes à distance, ton ordinateur exécute   // (19 nov., demande H) LE seul endroit « Extension »   // (11 nov., ext. 5.350) « Vinted a masqué / fait disparaître / limite »
 const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
 // (11 nov.) « Publier partout » : la feuille à la demande (règle : src/publierPartout.js).
@@ -16960,7 +16962,7 @@ function titreEcran(tab) {
 // onglets : un ancien chemin vers elles (lien `?tab=`, `vrm:aller`, `setTab`) ouvre l'écran
 // qui les porte, sur la bonne vue — [onglet, vue demandée] (`setTab`).
 const VUES_DEPLACEES = { republier: ['cat_annonces', 'republier'], favoris: ['cat_msg', 'favoris'] };
-const ONGLETS_LIENS=['menu','extension','adistance',...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','colis','cat_msg','cat_expedition','garage','organisation','communaute','parrainage','emails','invoices','masques','automatisations','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+const ONGLETS_LIENS=['menu','extension','connexions','adistance',...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','colis','cat_msg','cat_expedition','garage','organisation','communaute','parrainage','emails','invoices','masques','automatisations','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
@@ -18633,7 +18635,7 @@ function TeteNative({ tab, setTab, ordi, titre, nonLus = 0, rechercheOuverte = f
   // (22 nov., bugs-totale) « Comptes liés » est une page de Paramètres : la barre disait « ‹ Menu » ET la page « ‹ Paramètres »
   // (deux retours l'un sous l'autre, qui ne menaient pas au même endroit). La barre dit « ‹ Paramètres » ; la page garde le sien
   // à l'ordinateur seulement (pas de barre là-bas).
-  const sousReglages = tab === 'vintedaccounts';
+  const sousReglages = tab === 'vintedaccounts' || tab === 'connexions';   // (24 nov.) « Connexions de l'extension » est une page de Paramètres
   // Une catégorie ou un panneau de Paramètres ouvert (src/ecrans/Reglages.jsx le dit) : la barre porte SON retour (le geste
   // retour : la page est une entrée d'historique, `FermeAuRetour`).
   const [pageReglages, setPageReglages] = React.useState(() => (typeof window !== 'undefined' && window.__vrmPageReglages) || '');
@@ -39146,6 +39148,8 @@ function AppCoeur() {
         {/* (11 nov., ext. 5.350) EN TÊTE de Ma journée : ce que Vinted a masqué, fait disparaître ou limité (src/moderationVinted.js). Rien tant que rien n'est prouvé. */}
         {tab==='journee'&&!baseKO&&<GardeEcran nom="journee:moderation"><Suspense fallback={null}><AlerteModeration comptes={vintedAccounts}/></Suspense></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee:forme"><Suspense fallback={null}><AlerteFormeVinted/></Suspense></GardeEcran>}
+        {/* (24 nov.) UNE ligne quand une connexion de l'extension demande un geste (extension ancienne, compte pas relu, vérification) ; rien sinon. */}
+        {tab==='journee'&&!baseKO&&accountsLoaded&&<GardeEcran nom="journee:connexions"><Suspense fallback={null}><LigneConnexionsJournee comptesVinted={vintedAccounts} ecarte={(u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {})} onOuvrir={()=>setTab('connexions')}/></Suspense></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee:verification"><Suspense fallback={null}><AlertesVerificationJournee/></Suspense></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} alertesLues={notifsLus||baseKO||(accountsLoaded&&!vintedAccounts.length)} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} aTrancher={aTrancherEtat} onAllerTrancher={allerTrancher} onTrancherAT={trancherAT} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {/* (15 nov., eBay complet 3) Un versement eBay en route (ou arrivé depuis 3 jours) : UNE ligne, lue en base. */}
@@ -39216,6 +39220,7 @@ function AppCoeur() {
         {/* (21 nov., onglets-menu) L'écran « Menu » : la 5ᵉ place de la barre du bas (téléphone). */}
         {tab==='menu'&&<GardeEcran nom="menu"><EcranMenu tab={tab} setTab={setTab} badges={badgesStables} sites={sitesPresents} entreprise={entreprise} streamVisible={!!reglesStream.bouton} sombre={dark} basculerSombre={toggleDark} etats={<span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>}/></GardeEcran>}
         {tab==='extension'&&<GardeEcran nom="extension"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranExtension comptesVinted={!accountsLoaded ? undefined : baseKO ? [] : vintedAccounts} ecarte={(u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {})}/></Suspense></GardeEcran>}
+        {tab==='connexions'&&<GardeEcran nom="connexions"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranConnexions comptesVinted={!accountsLoaded ? undefined : baseKO ? [] : vintedAccounts} ecarte={(u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {})}/></Suspense></GardeEcran>}
         {tab==='adistance'&&<GardeEcran nom="adistance"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranADistance comptesVinted={!accountsLoaded ? undefined : baseKO ? [] : vintedAccounts} ecarte={(u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {})} onNav={setTab}/></Suspense></GardeEcran>}
         {tab==='emails'&&<div data-espace="autres" style={{display:'contents'}}><GardeEcran nom="emails"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranEmails comptes={vintedAccounts} headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour} photoDe={photoEmailParTx}
           ecrireLus={(g)=>ecrireEmailsLus(g,{url:SUPABASE_URL,entetes:sbAuth,avecOwner:withOwner,owner:AUTH.user&&AUTH.user.id,cloisonne:CLOISONNE})}

@@ -2199,6 +2199,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (11 nov., lot sante-comptes) Chaque compte Vinted : en forme / à surveiller, LA raison et LE geste, chaque point lisible (src/SanteComptes.jsx).
       { id:'santecomptes', type:'panneau', ic:'star', lib:tr('reglages.santecomptes.lib'), desc:tr('reglages.santecomptes.desc'), data:{ 'data-reglage-santecomptes':'' }, el:<SanteComptes variante="reglages" comptes={comptes||[]}/> },
       // (22 nov., ext. 5.436) « Mes comptes » : chaque compte et ton ordinateur, les gestes à distance (src/aDistance/).
+      // (24 nov.) « Connexions de l'extension » : chaque navigateur (version, vu quand, ce qu'il lit, son problème) et chaque compte (src/connexions/).
+      { id:'connexionsext', type:'nav', ic:'device', lib:tr('cnx.reglages.lib'), desc:tr('cnx.reglages.desc'), data:{ 'data-reglage-connexions-ext':'' }, onClick:()=>setTab('connexions') },
       { id:'adistance', type:'nav', ic:'users', lib:tr('nav.adistance'), desc:tr('adist.reglages.desc'), data:{ 'data-reglage-adistance':'' }, onClick:()=>setTab('adistance') },
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:tr('reglages.liens.desc'), onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:tr('reglages.connexions.lib'), desc:tr('reglages.connexions.desc'), titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },

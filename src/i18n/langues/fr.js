@@ -24,7 +24,8 @@ import ecran_journee_stats from './fr/journeeStats.js';   // (21 nov.) Ma journ�
 import ecran_rentabilite from './fr/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
 import ecran_transp_depenses from './fr/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './fr/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
-import ecran_a_distance from './fr/aDistance.js';   // (22 nov., ext. 5.436) « Mes comptes » à distance
+import ecran_a_distance from './fr/aDistance.js';
+import ecran_connexions_ext from './fr/connexions.js';   // (24 nov.) « Connexions de l'extension »   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './fr/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
 import ecran_styleClarte from './fr/styleClarte.js';   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './fr/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
@@ -2412,6 +2413,7 @@ export default {
   ...ecran_lotachat,
   ...ecran_ext5438,
   ...ecran_a_distance,
+  ...ecran_connexions_ext,
   ...ecran_apresFinale,
   ...ecran_styleClarte,
   ...ecran_relier_retires,
