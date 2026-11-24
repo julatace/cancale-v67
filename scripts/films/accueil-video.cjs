@@ -72,8 +72,11 @@ const PLANS = [
   { tab: 'ventes', async jouer(f, dire) {
     dire('ventes');
     await f.jouer(0.4);
-    await f.viser('[data-lot-ouvrir]', { zoom: 1.38, dur: 1.0, dy: 140 });
-    await f.jouer(1.2);
+    // (24 nov., gris clair) « Choisir les bordereaux » est rangé derrière « ⋯ » de Ventes (audit d'utilité du 19 nov.) :
+    // on ouvre le menu, puis le choix — la même feuille qu'avant.
+    await f.viser('[data-vn-plus]', { zoom: 1.38, dur: 1.0, dy: 140 });
+    await f.jouer(0.8);
+    await f.toucher('[data-vn-plus]', { apres: 0.6 });
     await f.toucher('[data-lot-ouvrir]', { apres: 0.6 });
     await f.jouer(3.4); f.cle('ventes');
     f.repos_(0.8); await f.jouer(2.4);
