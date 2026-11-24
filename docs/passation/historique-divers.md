@@ -2192,6 +2192,8 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **23 nov. · Isolement + colis en direct** : RLS prouvée par vendeur (0 ligne d'un autre, 8 vendeurs) ; un bordereau reçu par e-mail paraît sur Colis sans changer d'écran (veille `bordereaux`). `docs/passation/2026-11-23-isolement-temps-reel.md`. Geste : aucun.
 - **23 nov. (nuit) · Favoris 5.440.1** : la cloche de son compte porte un lien d'application (`vintedfr://messaging?item_id&user_id`) que la 5.440 refusait avant tout clic (« Conversation pas vérifiée ») ; reconnu par ses DEUX identités, identité par la commande si la conversation n'a pas d'article, un refus local saute CE favori (compteur remis à zéro à chaque envoi/Reprendre), phrase entière, un mot par état. `2026-11-23-favoris-identite.md`. Geste : installer la 5.440.1, relancer, dire ce que dit chaque ligne.
 - **23 nov. · Gris clair étagé (`claude/style-clair`)** : variante A validée (gris froid, accent ardoise), sombre = gris choisi ; iPhone compact ; dessin fin ; pop-up d'événement + galerie du propriétaire. `docs/passation/2026-11-23-style-clair.md`. Geste : essayer le pop-up sur un vrai iPhone.
+- **24 nov. · Morceaux périmés (`claude/morceaux-perimes`)** : la page ouverte pendant une mise en ligne ne repart plus — elle fait ranger les fichiers de SA version au repos (`src/reserveMorceaux.js`), le ménage du service worker garde ceux d'une page ouverte ; un écran introuvable recharge SUR cet écran, jamais pendant une saisie ou une feuille (sinon page cachée) ; un 404 /assets/ de la prod porte `immutable`. Banc `morceaux-perimes`, audit. `2026-11-24-morceaux-perimes.md`. Geste : aucun.
+- **24 nov. · CI ≈ 222 → ≈ 121 min-machine par PR, job le plus long 68 → 17 min (`claude/ci-rapide`)** : mêmes contrôles (`python3 -I scripts/ci-controles.py --diff origin/main`), bancs 3 à la fois (`BANCS_PARALLELE`), ventes-e2, accessibilite et budget-vitesse en morceaux, parts rééquilibrées, `dist/` partagé pour les écrans ; la part 2/3 (annulée à 45 min à chaque PR) finit. `2026-11-24-ci-rapide.md`. Geste : aucun.
 
 
 ## « Extension servie » : historique des versions, déplacé tel quel de CLAUDE.md §9 (23 nov. soir, train)
@@ -2203,3 +2205,18 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., morceaux-perimes)
 - **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., vente-mail-annonce)
+- **23 nov. · Gris clair étagé (`claude/style-clair`)** : variante A validée (gris froid, accent ardoise), sombre = gris choisi ; iPhone compact ; dessin fin ; pop-up d'événement + galerie du propriétaire. `docs/passation/2026-11-23-style-clair.md`. Geste : essayer le pop-up sur un vrai iPhone.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1377)
+- **24 nov. · Bugs terrain (`claude/bugs-terrain-24nov`)** : mesuré (Vercel 0 erreur/72 h ; 3 plantages app/72 h dont `Icon` déjà corrigé) ; une photo Leboncoin n'est plus demandée par `fetch` (refusée par `connect-src` : `src/lisibleParLaPage.js`, `audit-lecture-csp`) ; restent : morceaux périmés au téléphone (~15/jour), suivi `escrow` de l'extension jamais reconnu. `2026-11-24-bugs-terrain.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1377)
+- **24 nov. · Français du démarrage 79,96 → 73,6 Ko** (budget 80 inchangé) : l'accueil des nouveaux à la demande. `2026-11-24-francais-demarrage.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1386)
+- **24 nov. · Favoris 5.440.2 (`claude/favoris-ancien`)** : « trop ancien » faux (rangs 1, 2, 4 de la liste) ⇒ liste de Vinted indexée et lue jusqu'au bout, ligne pas montrée ⇒ son adresse native ouverte (onglet en arrière-plan), sinon « en recherche ». `2026-11-24-favoris-ancien.md`. Geste : installer 5.440.2.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1386)
+- **24 nov. · Vente vue par e-mail ↔ son annonce (`claude/vente-mail-annonce`)** : l'annonce EN LIGNE qu'un e-mail de vente du même compte désigne (SON clic « Relier à l'annonce », sinon l'image exacte dossier+fichier ; dressing lu avant l'e-mail) passe « Vendue · par e-mail, en attente de Vinted » (hors d'« en ligne » et des totaux, rien supprimé) et la vente reçoit son N° ; « Délier » défait ; fiche « pas su » dite une fois + « Pourquoi ? ». `src/venteMailAnnonce.js`, `2026-11-24-vente-mail-annonce.md`. Geste : aucun.

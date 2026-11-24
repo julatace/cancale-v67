@@ -49,6 +49,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
   const [menu, setMenu] = React.useState(false);         // « Choisir une action »
   const [toutHist, setToutHist] = React.useState(false);
   const [ouvert, setOuvert] = React.useState(null);      // le geste dont le contenu est montré en feuille (note, photos…)
+  const [pourquoi, setPourquoi] = React.useState(false); // (24 nov.) « Pourquoi ? » sous la ligne d'état « pas su »
   const [vue, setVue] = React.useState(0);               // la photo à l'écran dans le carrousel
   const defile = React.useRef(null);
   const zone = React.useRef(null);
@@ -159,7 +160,10 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
               {quandF && suDe(quandF, quandV) ? <span className="nf-etiquette" {...attrsFait(quandF, true, null)}>{T.libelle(quandF.lib) + ' ' + quandV}{quandF.auMoins ? ' ' + T.auMoins : ''}</span> : null}
               {tailleF && suDe(tailleF, valeurDe(tailleF)) ? <span className="nf-etiquette" data-nf-taille="" {...attrsFait(tailleF, true, null)}>{T.libelle(tailleF.lib) + ' ' + valeurDe(tailleF)}</span> : null}
               {suiteEtat}
+              {etat && etat.pourquoi && T.pourquoi ? <button type="button" className="nf-pourquoi" aria-expanded={pourquoi ? 'true' : 'false'} onClick={() => setPourquoi((v) => !v)} data-fd-pourquoi={etat.pourquoi}>{T.pourquoi}</button> : null}
             </div>
+            {/* (24 nov., vente-mail-annonce) La raison du « pas su », UNE fois, sur demande — gris clair, jamais orange. */}
+            {etat && etat.pourquoi && pourquoi ? <p className="nf-pourquoi-texte" data-fd-pourquoi-texte="">{T.raison(etat.pourquoi)}</p> : null}
           </header> : null}
           {prix || pastilles.length ? <div className="nf-prixbloc">
             {prix}
