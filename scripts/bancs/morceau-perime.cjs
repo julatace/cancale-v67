@@ -32,12 +32,11 @@ const base = () => ({ lignes: JSON.parse(JSON.stringify(NV.JEU_LIGNES)), comptes
 
 // E-mails : dans la barre latérale à l'ordinateur ; au téléphone, dans le menu de l'avatar (choix n° 61 du 14 nov. :
 // plus de « Plus » dans la barre — le menu du haut porte Messages, Stock, E-mails…).
-async function versEmails(pg, tel) {
-  if (!tel) { await pg.locator('.vrm-sidebar [data-nav-entree="emails"]').first().click(); return; }
-  const tete = pg.locator('[data-profil-tete]').filter({ visible: true }).first();
-  if (await tete.count()) { await tete.click(); await pg.waitForTimeout(500); }
-  const tuile = pg.locator('[data-menu-profil] [data-nav-entree="emails"], [data-nav-entree="emails"]:visible').first();
-  if (await tuile.count()) await tuile.click();
+// (24 nov., morceaux-perimes) Le chemin par le menu de l'avatar ou la barre latérale n'aboutissait plus (l'écran restait
+// « journee », sur main aussi) : E-mails est ouvert comme le fait l'app elle-même pour un lien (`vrm:aller`). La règle jugée
+// est inchangée — un écran DEMANDÉ dont le morceau n'existe plus ⇒ UN rechargement vers la nouvelle version.
+async function versEmails(pg) {
+  await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=emails' }))).catch(() => {});
 }
 async function scenario(nav, { W, panne, jsSeul = false }) {
   const T = `[${W}px ${panne ? 'panne' : jsSeul ? 'déploiement, CSS déjà là' : 'déploiement'}]`;
@@ -94,11 +93,12 @@ async function scenario(nav, { W, panne, jsSeul = false }) {
   const o = await NV.ouvrir(nav, { W, sombre: false, base: bv, tab: 'journee' });
   nav.newContext = nc;
   let chargements = 0;
+  if (process.env.MV_DBG) o.pg.on('console', async (m) => { if (m.type() !== 'error' || !/application en erreur/.test(m.text())) return; try { const a = m.args(); const st = await a[1].evaluate((e) => String(e && e.stack)); const cs = a[2] ? await a[2].evaluate((x) => String(x)) : ''; console.log('MVSTACK', st.slice(0, 1500), '\nCOMPOSANTS', cs.slice(0, 1500)); } catch (e) { console.log('MVSTACK?', String(e)); } });
   o.pg.on('load', () => { chargements++; });
   await o.pg.waitForTimeout(3000);
   // La mise en ligne.
   etat.deploye = true; etat.nouvelle = !panne;
-  await versEmails(o.pg, tel);
+  await versEmails(o.pg);
   await o.pg.waitForTimeout(5000);
   await o.pg.waitForLoadState('domcontentloaded').catch(() => {});
   await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
@@ -106,7 +106,7 @@ async function scenario(nav, { W, panne, jsSeul = false }) {
   // Après le rechargement, l'app peut être revenue ailleurs : on rouvre E-mails.
   const surEmails = await o.pg.evaluate(() => (document.querySelector('.vrm-main') || { getAttribute: () => '' }).getAttribute('data-ecran') === 'emails');
   if (!surEmails) {
-    await versEmails(o.pg, tel);
+    await versEmails(o.pg);
     await o.pg.waitForTimeout(2500);
   }
   await o.pg.waitForTimeout(4000);   // la file des plantages part vers la base 3 s après
@@ -115,10 +115,11 @@ async function scenario(nav, { W, panne, jsSeul = false }) {
     let file = [], compte = null;
     try { file = JSON.parse(localStorage.getItem('vrm_plantages_attente') || '[]'); } catch (_) {}
     try { compte = JSON.parse(localStorage.getItem('vrm_morceaux_perimes') || 'null'); } catch (_) {}
-    const nav = document.querySelector('.vrm-mobile-nav, .vrm-sidebar');
+    const nav = document.querySelector('nav[data-n-onglets], [data-n-laterale], .vrm-mobile-nav, .vrm-sidebar');   // (24 nov., main-vert) la barre NATIVE (téléphone) et la colonne native (ordinateur)
     return { file: file.map((x) => x.message), compte, ecran: (document.querySelector('.vrm-main') || { getAttribute: () => '' }).getAttribute('data-ecran'),
       souci: /n'a pas pu s'afficher/.test(t), dernierFilet: /L'application n'a pas pu démarrer/.test(t), nav: !!(nav && nav.getBoundingClientRect().height) };
   });
+  if (process.env.MV_DBG) console.log('MVDBG', T, await o.pg.evaluate(() => { const t = document.body.innerText || ''; const i = t.indexOf("n'a pas pu démarrer"); return i < 0 ? 'pas de filet' : t.slice(Math.max(0, i - 200), i + 600); }));
   const enBase = bv.lignes.filter((l) => /^plantage_/.test(l.id)).map((l) => l.data && l.data.message);
   const morceaux = vu.file.concat(enBase).filter((m) => /preload CSS|dynamically imported module|module script failed/i.test(m || ''));
   dit(etat.refus.length > 0, `${T} (contrôle du banc) des fichiers d'avant ont bien été refusés`, JSON.stringify(etat.refus));

@@ -163,5 +163,6 @@ export default {
   "ext.sante.r.refus": "Vinted refused a request in the last 24 h: avoid batches.",
   "ext.sante.r.verification_recente": "A Vinted check in the last 24 h: avoid batches.",
   "ext.sante.r.pas_vu": "An action wasn’t seen on screen: look at the work tab.",
-  "ext.sante.r.presque_plafond": "Close to the limit (80%)."
+  "ext.sante.r.presque_plafond": "Close to the limit (80%).",
+  "v2.dv.enLecture": "Sale — details still loading",
 };

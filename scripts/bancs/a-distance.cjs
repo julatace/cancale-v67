@@ -443,7 +443,7 @@ async function eteint(nav, { mobile, sombre, nom }) {
   if (!pw) { console.log('❌ Playwright introuvable'); process.exit(1); }
   if (!fs.existsSync(path.join(DIST0, 'index.html'))) { console.log(`❌ pas de build dans ${DIST0} — lance npm run build`); process.exit(1); }
   if (MUT && !MUTATIONS[MUT]) { console.log(`❌ mutation inconnue : ${MUT}`); process.exit(2); }
-  const dirR = fs.mkdtempSync(path.join(TMP, 'regle-')); fs.writeFileSync(path.join(dirR, 'package.json'), '{"type":"module"}'); fs.copyFileSync(path.join(RACINE, 'src', 'aDistance.js'), path.join(dirR, 'aDistance.js'));
+  const dirR = fs.mkdtempSync(path.join(TMP, 'regle-')); fs.writeFileSync(path.join(dirR, 'package.json'), '{"type":"module"}'); fs.copyFileSync(path.join(RACINE, 'src', 'aDistance.js'), path.join(dirR, 'aDistance.js')); fs.copyFileSync(path.join(RACINE, 'src', 'compatSafari.js'), path.join(dirR, 'compatSafari.js'));
   R = await import(pathToFileURL(path.join(dirR, 'aDistance.js')).href);
   const DIST = preparerDist();
   M = monde({ tls: certificat(TMP), port: PORT, dist: DIST, comptes: {}, journal: [] });

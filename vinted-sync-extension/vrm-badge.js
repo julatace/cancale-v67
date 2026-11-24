@@ -77,7 +77,7 @@ function vrmVerifVisible(sel) {
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   // 5.406 : la feuille et les pièces COMMUNES de l'extension (vrm-ui.js, chargé avant ce fichier) ;
   // `U.T(clé, vars)` : les textes neufs, en cinq langues. Absent (ancien manifeste) ⇒ le français.
-  const U = globalThis.VRM_UI || { T: (k, v) => k, duree: (ms) => Math.round(ms / 60000) + ' min', etiquette: () => '', barre: () => '', monter: () => {}, esc };
+  const U = globalThis.VRM_UI || { T: (k, v) => k, raisonFileFav: (o) => String((o && (o.texte || o.raison)) || ''), duree: (ms) => Math.round(ms / 60000) + ' min', etiquette: () => '', barre: () => '', monter: () => {}, esc };
   const TU = (k, v) => U.T(k, v);
   // 5.188 : le HTML de nos propres gabarits (valeurs passées par `esc`) est posé
   // par DOMParser plutôt que `innerHTML =` — même résultat, et c'est la forme que
@@ -2087,12 +2087,23 @@ function vrmVerifVisible(sel) {
   // prochain dans 3 min », un trait fin, la VRAIE raison de l'attente (`quoi`, posé par le fond :
   // ouverture de Vinted, 15/h, 50/h…) et UN plein : « Tout arrêter ». Mêmes marques `data-fav*`.
   const QUOI_FAV = { ouverture: 'q_ouverture', sorte: 'q_sorte', heure: 'q_heure', jour: 'q_jour', rythme: 'q_rythme', 'autre-compte': 'q_autre', serie: 'q_serie', rodage: 'q_rodage', espace: 'q_espace', calme: 'q_calme' };
+  // 5.440.1 (Julien, 23 nov. : « 1 sauté » dans la fenêtre, « 1 refusé » au bilan, « 1 pas envoyé(s) » ici pour le MÊME favori) :
+  //    les nombres du serveur (`pasEnvoyes`, `sautes` : la règle du bilan) et UN mot par état — pas envoyé · sauté · en attente.
+  function comptesFav(fi) {
+    const n = (v) => Number(v) || 0;
+    const pas = fi.pasEnvoyes != null ? n(fi.pasEnvoyes) : n(fi.refuses), sautes = fi.sautes != null ? n(fi.sautes) : n(fi.ignores);
+    return { pas, sautes, verifier: n(fi.incertains), attente: n(fi.attente), annules: n(fi.annules) };
+  }
+  function motsComptesFav(cf, fin) {
+    const p = (n, a, b) => TU(n === 1 ? a : b, { n });
+    return [cf.pas ? p(cf.pas, 'fa_pas_1', 'fa_pas_n') : '', cf.sautes ? p(cf.sautes, 'fa_saute_1', 'fa_saute_n') : '', !fin && cf.verifier ? p(cf.verifier, 'fa_verif_1', 'fa_verif_n') : '', fin && cf.annules ? p(cf.annules, 'fa_annule_1', 'fa_annule_n') : '', fin && cf.attente ? p(cf.attente, 'fa_attente_1', 'fa_attente_n') : ''].filter(Boolean).join(' · ');
+  }
   function favorisFileHtml(e) {
     if (!e || e.plateforme !== 'vinted' || !e.site || !e.site.id || !e.site.favoris) return '';
     const st = e.site.favoris.file;
     if (st && st.actif) {
       const fi = st.file || {}, total = Number(fi.total) || Number(st.total) || 0, faits = Number(fi.envoyes) || 0;
-      const pas = (Number(fi.refuses) || 0) + (Number(fi.ignores) || 0) + (Number(fi.incertains) || 0);
+      const cf = comptesFav(fi), pas = cf.pas + cf.sautes + cf.verifier;
       const dans = !st.enCours && Number(st.prochain) > Date.now() ? dansFav(st.prochain) : '';
       const att = st.attente && ATTENTES_FAV[st.attente];
       const pour = QUOI_FAV[st.quoi] ? TU(QUOI_FAV[st.quoi]) : '';
@@ -2100,7 +2111,7 @@ function vrmVerifVisible(sel) {
       return `<section class="fav principal" data-fav="encours" data-fav-envoyes="${faits}" data-fav-total="${total}"${st.attente ? ` data-fav-attente="${esc(st.attente)}"` : ''}${st.quoi ? ` data-fav-quoi="${esc(st.quoi)}"` : ''}>
         <div class="p-t fav-l" role="status"><span class="p-nom">${esc(TU('f_titre'))}</span><b class="p-n">${esc(TU('f_sur', { n: faits, total }))}</b></div>
         ${U.barre(total ? 100 * faits / total : 0, ' aria-label="' + esc(TU('f_titre')) + '"')}
-        <div class="p-l2">${etat.replace('· ', '')}${pas ? `<span class="p-dans"> · ${esc(TU('f_pas', { n: pas }))}</span>` : ''}</div>
+        <div class="p-l2">${etat.replace('· ', '')}${pas ? `<span class="p-dans" data-fav-comptes="${cf.pas}:${cf.sautes}:${cf.verifier}"> · ${esc(motsComptesFav(cf, false))}</span>` : ''}</div>
         ${st.robot ? `<div class="p-pour ambre" data-fav-robot>${esc(TU(verifAffichee() ? 'a_verif_page' : 'a_refus_robot'))}</div><div class="p-pour">${esc(TU('a_doucement'))}</div>${favErreur ? `<div class="p-pour ambre" role="alert">${esc(favErreur)}</div>` : ''}<button class="vu-btn vu-plein" data-fav-reprendre>${esc(TU('a_reprendre'))}</button><button class="vu-btn vu-sec" data-fav-arreter>${esc(TU('c_tout_arreter'))}</button>`
           : `${att ? `<div class="p-pour ambre" data-fav-attente-texte>${esc(att)}</div>` : `<div class="p-pour" data-fav-pour>${esc(pour || TU('f_garde'))}</div>`}
         <button class="vu-btn vu-plein" data-fav-arreter>${esc(TU('c_tout_arreter'))}</button>`}
@@ -2108,15 +2119,15 @@ function vrmVerifVisible(sel) {
     }
     if (st && !st.actif && st.fin && Date.now() - Number(st.fin.at || 0) < 6 * 3600000) {
       const fi = st.file || {}, env = Number(fi.envoyes) || 0, inc = Number(fi.incertains) || 0;
-      const pas = (Number(fi.refuses) || 0) + (Number(fi.ignores) || 0) + (Number(fi.annules) || 0);
+      const cf = comptesFav(fi), pas = cf.pas + cf.sautes + cf.attente + cf.annules;
       const quoi = st.fin.raison === 'robot' ? TU('f_fin_robot')
         : st.fin.raison === 'arret' ? TU('f_fin_arret')
         : st.fin.raison === 'travail_ferme' ? TU('f6_fin_travail')
-        : st.fin.raison === 'interrompu' ? (st.fin.texte ? TU('f_fin_interrompu_t', { t: st.fin.texte }) : TU('f_fin_interrompu'))
+        : st.fin.raison === 'interrompu' ? (st.fin.texte || st.fin.code ? TU('f_fin_interrompu_t', { t: U.raisonFileFav(st.fin) }) : TU('f_fin_interrompu'))
         : TU('a_fini');
       return `<section class="fav principal" data-fav="fini" data-fav-fin="${esc(st.fin.raison || '')}" data-fav-envoyes="${env}">
-        <div class="p-t fav-l" role="status"><span>${esc(TU('f_titre'))}</span><span>· <b>${esc(env > 0 ? '✓ ' + TU('f_envoye_a', { n: env }) : TU('f_envoyes', { n: env }))}</b></span>${pas ? `<span class="p-dans">· ${esc(TU('f_pas', { n: pas }))}</span>` : ''}</div>
-        <div class="p-pour${st.fin.raison === 'robot' ? ' ambre' : ''}">${esc(quoi)}</div>
+        <div class="p-t fav-l" role="status"><span>${esc(TU('f_titre'))}</span><span>· <b>${esc(env > 0 ? '✓ ' + TU('f_envoye_a', { n: env }) : TU(env === 1 ? 'fa_envoye_1' : 'fa_envoye_n', { n: env }))}</b></span>${pas ? `<span class="p-dans" data-fav-comptes="${cf.pas}:${cf.sautes}:${cf.attente}:${cf.annules}">· ${esc(motsComptesFav(cf, true))}</span>` : ''}</div>
+        <div class="p-pour${st.fin.raison === 'robot' ? ' ambre' : ''}" data-fav-raison-fin>${esc(quoi)}</div>
         ${st.fin.bilan ? `<div class="p-pour" data-fav-bilan>${esc(st.fin.bilan)}</div>` : ''}
         ${env > 0 && st.fin.raison !== 'robot' ? `<div class="p-pour" data-fav-ensuite>${esc(TU('f_ensuite'))}</div>` : ''}
         ${inc ? `<div class="p-pour ambre" data-fav-verifier="${inc}">${esc(TU('f_verifier', { n: inc }))}</div>` : ''}
@@ -2748,7 +2759,7 @@ function vrmVerifVisible(sel) {
       + `<button type="button" class="vu-btn vu-sec" data-fav-tout="aucun">${esc(TU('fl_rien'))}</button><button type="button" class="vu-btn vu-plein" data-fav-envoyer${fi && fi.active ? ' data-fav6-remplacer' : ''}${p.attente ? ` data-fav-a="${p.attente}"` : ''}${!p.k || p.attente || favOccupe ? ' disabled' : ''}>${esc(fi && fi.active && !p.attente ? TU('f6_remplacer', { n: p.k }) : p.bouton)}</button></div>` : '';
     // 5.410.8 : une file restée chez VRM (active ou en pause, son reste d'hier) que ce navigateur ne mène pas : DITE, avec
     //    « Reprendre » et « Annuler » — plus un nouvel envoi qui se fait refuser « déjà préparés ».
-    const ancienne = !actif && fi && (fi.active || restes > 0) ? `<div class="fav6-file" data-fav6-file="${fi.active ? 'active' : 'pause'}" data-fav6-attente="${restes}" role="status"><span><b>${esc(TU(fi.active ? 'f6_file_active' : 'f6_file_pause', { n: restes }))}</b>${!fi.active && fi.raison ? `<small data-fav6-file-raison>${esc(String(fi.raison).slice(0, 240))}</small>` : ''}<small>${esc(TU('f6_file_note'))}</small></span>${restes ? `<button type="button" class="vu-btn vu-sec" data-fav6-continuer${favOccupe ? ' disabled' : ''}>${esc(TU('a_reprendre'))}</button>` : ''}<button type="button" class="vu-btn vu-sec" data-fav6-annuler${favOccupe ? ' disabled' : ''}>${esc(TU('f6_annuler_file'))}</button></div>` : '';
+    const ancienne = !actif && fi && (fi.active || restes > 0) ? `<div class="fav6-file" data-fav6-file="${fi.active ? 'active' : 'pause'}" data-fav6-attente="${restes}" role="status"><span><b>${esc(TU(fi.active ? 'f6_file_active' : 'f6_file_pause', { n: restes }))}</b>${!fi.active && (fi.raison || fi.raisonCode) ? `<small data-fav6-file-raison>${esc(U.raisonFileFav(fi))}</small>` : ''}<small>${esc(TU('f6_file_note'))}</small></span>${restes ? `<button type="button" class="vu-btn vu-sec" data-fav6-continuer${favOccupe ? ' disabled' : ''}>${esc(TU('a_reprendre'))}</button>` : ''}<button type="button" class="vu-btn vu-sec" data-fav6-annuler${favOccupe ? ' disabled' : ''}>${esc(TU('f6_annuler_file'))}</button></div>` : '';
     return `<div class="fav6" data-fav6="liste" data-fav-vue="tableau"${actif ? ' data-fav6-envoi' : ''}>${envoi ? `<div class="fav6-envoi">${envoi}</div>` : ''}${ancienne}${actif ? '' : lotsHtml()}${outils}${ligneN}${notes}${table}${bas}</div>${feuilleFav6(a)}`;
   }
   // ══ 5.417 (`favorisperso2`, Julien 21 nov. : « on n'a pas la possibilité de personnaliser, améliore ça ») ══════════
@@ -3102,6 +3113,10 @@ function vrmVerifVisible(sel) {
       });
     } catch (_) { favEnVol = false; }
   }
+  // 5.440.2 (Julien : « c'est à l'extension d'aller capter les favoris et d'actualiser l'écran, pas à moi ») : dès que le
+  //    fond a lu la liste des notifications de Vinted (`vrmFavorisListeLue`), la liste des favoris de la carte ouverte est
+  //    redemandée à VRM et redessinée — sans attendre la minute de l'aperçu, sans aucun geste.
+  try { chrome.storage.onChanged.addListener((ch, zone) => { if (zone !== 'local' || !ch.vrmFavorisListeLue) return; apercuFavAt = 0; if (!LISTES && vivant() && carte.classList.contains('on')) rendre(); }); } catch (_) {}
   function brancherFavoris(e) {
     const uid = e && e.site && e.site.id ? String(e.site.id) : '';
     const demander = (quoi, extra, fin) => {
@@ -5277,6 +5292,51 @@ function vrmVerifVisible(sel) {
         rendre(); }); } catch (_) { srEnVol = false; rendre(); }
     });
   }
+  // 5.440.3 : « Observer Vinted (10 min) » — l'interrupteur, l'état (minutes restantes, étapes notées) et « Envoyer
+  //    l'observation ». L'état est lu au fond (`vrmObservation`) ; la frise n'est jamais montrée ici (seulement dans VRM).
+  let obsVue = null, obsTexte = '', obsEnVol = false, obsLu = 0, obsRelire = null;
+  function lireObservation(forcer) {
+    if (!forcer && Date.now() - obsLu < 4000) return;
+    obsLu = Date.now();
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'observation', quoi: 'etat' }, (r) => {
+        void chrome.runtime.lastError;
+        if (!(r && r.ok)) return;
+        const avant = JSON.stringify(obsVue); obsVue = r;
+        if (JSON.stringify(obsVue) !== avant) rendre();
+      });
+    } catch (_) {}
+    clearTimeout(obsRelire);
+    if (obsVue && obsVue.actif) obsRelire = setTimeout(() => lireObservation(true), 5000);
+  }
+  function observationHtml(e) {
+    if (!e || e.plateforme !== 'vinted') return '';
+    lireObservation(false);
+    const o = obsVue, actif = !!(o && o.actif);
+    const reste = actif ? Math.max(1, Math.ceil((Number(o.fin) - Date.now()) / 60000)) : 0;
+    const sous = actif ? TU('ob_en_cours', { min: reste, n: o.n || 0 }) : o && o.n ? TU('ob_fini', { n: o.n }) : TU('ob_eteint');
+    return `<section class="grp5" data-observation="${actif ? 'on' : 'off'}" data-observation-n="${Number(o && o.n) || 0}"><h3>${esc(TU('ob_titre'))}</h3><p class="note5">${esc(TU('ob_note'))}</p>
+      <label class="rg6"><span><b>${esc(TU('ob_switch'))}</b><small data-obs-sous>${esc(sous)}</small></span><span class="v6"><input type="checkbox" data-obs-switch${actif ? ' checked' : ''}${obsEnVol ? ' disabled' : ''} aria-label="${esc(TU('ob_switch'))}"></span></label>
+      ${o && o.n ? `<div class="outils"><button type="button" class="vu-btn" data-obs-envoyer${obsEnVol ? ' disabled' : ''}>${esc(TU('ob_envoyer'))}</button></div>` : ''}
+      ${obsTexte ? `<p class="note5" role="status" data-obs-etat>${esc(obsTexte)}</p>` : ''}
+    </section>`;
+  }
+  function brancherObservation(R) {
+    const envoyerObs = (quoi, apres) => {
+      obsEnVol = true; obsTexte = ''; rendre();
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'observation', quoi }, (r) => {
+          void chrome.runtime.lastError; obsEnVol = false;
+          if (r && r.ok) { if (quoi !== 'envoyer') obsVue = r; apres(r); } else obsTexte = (r && r.raison) || TU('ob_ko');
+          lireObservation(true); rendre();
+        });
+      } catch (_) { obsEnVol = false; obsTexte = TU('ob_ko'); rendre(); }
+    };
+    const sw = R.querySelector('[data-obs-switch]');
+    if (sw) sw.addEventListener('change', () => envoyerObs(sw.checked ? 'demarrer' : 'arreter', () => {}));
+    const env = R.querySelector('[data-obs-envoyer]');
+    if (env) env.addEventListener('click', () => envoyerObs('envoyer', (r) => { obsTexte = TU('ob_envoye', { n: r.n || 0 }); }));
+  }
   function cadenceHtml() {
     const c0 = listes && listes.automatisations && listes.automatisations.cadence;
     if (!listes || !listes.compte || !/^\d{1,20}$/.test(String(listes.compte.id || ''))) return '';
@@ -6233,6 +6293,7 @@ function vrmVerifVisible(sel) {
       ${e.capte && !(e.plateforme === 'leboncoin' && e.lbc) ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}
       ${e.mesure ? `<div class="ligne"><div class="lib">Mesure</div><div class="val gris">VRM apprend à lire ${esc(nomSite)} : il relève la forme des pages, jamais leur contenu. Aucune vente ni annonce n'est encore captée.</div>${(() => { const f = e.flux || {}; return f.koAt && (!f.okAt || f.koAt > f.okAt) ? `<div class="val alerte">Dernier relevé refusé ${esc(depuis(f.koAt))}</div>` : f.okAt ? `<div class="val gris">Relevé envoyé ${esc(depuis(f.okAt))}</div>` : ''; })()}</div>` : ''}
       ${outils ? `<div class="outils">${outils}</div>` : ''}${rapTexte ? `<div class="rep" data-rapport-etat role="status">${esc(rapTexte)}</div>` : ''}
+      ${v && v.connecte ? observationHtml(e) : ''}
       </details>`;
     const lienVrm = (q, k) => `<a class="rg5" href="https://vrm.center/${q}" target="_blank" rel="noopener" data-reglage-vrm="${esc(k)}"><span>${esc(TU(k))}</span><i aria-hidden="true">›</i></a>`;
     const parametres5 = grand5 ? `<div class="par5" data-parametres>
@@ -6280,6 +6341,7 @@ function vrmVerifVisible(sel) {
     if (grand5) garderPanneau();
     brancherReparer();
     brancherRapport();
+    brancherObservation(carte);
     const det = carte.querySelector('[data-detail]');
     if (det) det.addEventListener('toggle', () => { if (resume.etat !== 'geste') detailOuvert = det.open; });
     brancherFavoris(e);
