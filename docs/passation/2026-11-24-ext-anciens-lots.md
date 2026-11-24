@@ -114,7 +114,14 @@ Main n'en avait rien (la ressemblance « même photo · sûr » y reste une prop
 - `node scripts/audit-photo-identite.cjs` : 30 verts ; rouge sur origin/main (`--src`) ; `--mutation=toutes`
   **16/16 rouges** (dont `fondLecture`, `fondAutreCompte`, `pageRefus` sur le vrai fond / la vraie page).
 - Voisins verts : `coherence`, `extension-zip`, `extension-navigateurs`, `meme-photo`, `identite`,
-  `quoi-de-neuf`, `traduction`, `extension-feuille`, `familles-extension`, `extension-moyennes` ; passe des
-  audits qui exécutent l'extension : voir la PR (comparée à main).
+  `quoi-de-neuf`, `traduction`, `extension-feuille`, `familles-extension`, `extension-moyennes`.
+- **Passe des 191 audits qui touchent l'extension** (pages, relais, `_fond-vm`) : après remise à la règle du canal
+  privé (rien d'affaibli : les bancs servent le port comme le navigateur — `_canal-faux.cjs` repris de #1186 ;
+  `diagnostic`, `evt-extension` (PATCH conditionnel), `favoris-sites`, `vc-messages`, `vc-conversations`,
+  `capture-vc-lbc`, `lbc-details`, `fiche-modif`, `notifications-vinted`, `suivi-vinted`, `supprimees`,
+  `vc-ecrire` (le vrai vc.js posé avant la page ; + « envoi vu jamais sur window »), `vc-moderation`,
+  `relais-lbc-kinds` (exemple du kind neuf), `republier-question` (lit aussi le message après une acceptation —
+  rouge déjà sur main)) : **3 rouges, les MÊMES sur origin/main** — `ext-5420` R6, `preuve-vente`
+  (`ventesApresVente`), `vocabulaire-article` ; `ext-arrets-formulaire` rouge une fois sous charge, vert relancé.
 - `npm run build` vert.
 - Pas de capture d'écran : aucun écran neuf (une ligne neutre sur la fiche, une preuve dans « Relier mes annonces »).
