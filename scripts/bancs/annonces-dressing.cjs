@@ -170,7 +170,9 @@ async function juger(nav, mutant = '') {
   // ── La grille, choisissable et mémorisée : sobre (photo carrée, une ligne, « ⋯ » discret) ──
   { const ctx = await nav.newContext(TEL);
     let { pg } = await ouvrir(nav, TEL, '?v=tous', { garder: ctx });
-    const b = await pg.$('[data-ad-bascule]');
+    // (24 nov., lot visuel-annonces) l'affichage vit dans « ⋯ » → Affichage (Liste · Détaillé) ; l'ancienne bascule de la barre sinon.
+    if (!(await pg.$('[data-ad-bascule]'))) { await pg.click('[data-eg-actions]').catch(() => {}); await pg.waitForTimeout(400); }
+    const b = (await pg.$('[data-ad-vue-choix="grille"]')) || (await pg.$('[data-ad-bascule]'));
     if (dit(!!b, 'G 390 : une bascule liste ⇄ grille')) {
       await b.click(); await pg.waitForTimeout(300);
       await pg.close(); ({ pg } = await ouvrir(nav, TEL, '?v=tous', { garder: ctx }));

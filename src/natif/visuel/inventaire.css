@@ -90,7 +90,7 @@
   .n-tt-nombre-os { display: inline-block; width: 84px; height: 12px; border-radius: 4px; background: var(--n-squelette, var(--n-carte-2)); }
 }
 
-/* ── (24 nov., 2e direction — Julien : « améliore le design et la praticité ») LA LISTE : rangées nettes de 76 px, virtualisées,
+/* ── (24 nov., 2e direction — Julien : « améliore le design et la praticité ») LA LISTE : rangées nettes de 72 px, virtualisées,
    glisser pour les gestes rapides, puces de tri et de filtre au pouce. ── */
 @layer vrm-natif {
   .n-ad-section .n-inv-grille.n-inv-liste, [data-ad-attente] .n-inv-grille.n-inv-liste { margin: 0; }
@@ -108,7 +108,7 @@
   .n-ar-etiq.n-etiq { font-size: 11px; line-height: 14px; padding: 1px 6px 1px 11px; box-shadow: inset 0 0 0 1px var(--n-jeu-papier-bord), 0 .5px 1px rgb(0 0 0 / .14); }
   .n-ar-stats { display: inline-flex; align-items: center; gap: 9px; min-width: 0; }
   .n-ar-stats .n-ad-stat { gap: 3px; }
-  /* Les gestes rapides, sous la rangée (révélés en la glissant vers la gauche) : 84 × 76, au pouce. */
+  /* Les gestes rapides, sous la rangée (révélés en la glissant vers la gauche) : 84 × 72, au pouce. */
   .n-ar-rapides { position: absolute; top: 0; right: 0; bottom: 0; z-index: 0; display: flex; }
   .n-ar-rapide { appearance: none; border: 0; margin: 0; padding: 0 6px; flex: 1 1 0; min-width: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
     font: 600 12px/15px var(--n-police); color: #FFFFFF; background: #3D4B5B; cursor: pointer; text-align: center; }

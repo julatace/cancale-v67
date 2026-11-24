@@ -134,7 +134,7 @@ export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, e
 export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selection = null, euros, depuisTexte, nomSite, Icon = null, Photo = null, plusVue = null, attrs = null, groupe = false, rapides = null, revele = null }) {
   // (24 nov., lot visuel-annonces — Julien : « améliore le design et la praticité ») Une rangée plus nette : photo 60 (par identité),
   // l'étiquette papier du N°, le titre sur 2 lignes, le prix à droite ; ♡ et 👁 en petites icônes ; l'état seulement s'il diffère
-  // de l'onglet ; le logo du site seulement si la liste n'est PAS rangée par compte (ou paire sur 2 sites). Hauteur FIXE (76).
+  // de l'onglet ; le logo du site seulement si la liste n'est PAS rangée par compte (ou paire sur 2 sites). Hauteur FIXE (72).
   // `rapides` : [{ cle, libelle, icone, onClick }] — glisser la rangée vers la gauche les montre (≥ 44 px), sans quitter la liste.
   const b = bandeauDe(a);
   const trace = a.etat === 'bloque' ? traceDe(a) : null;

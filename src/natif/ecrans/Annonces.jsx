@@ -430,7 +430,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
         </Groupe> : null}
         {enPhoto ? photoDouble.contenu : enPrio ? priorite.contenu
           : articles === undefined ? (vueG ? attenteGrille : <div data-ad-attente="" aria-busy="true" aria-label={tr('inv.chargement')}><section className="n-ad-section"><div className="n-ad-tete-compte n-inv-tete-os" aria-hidden="true"><span className="n-os"/></div>
-              <GrilleInventaire items={undefined} attente={9} ligne={76} gap={0} squelette={() => <span className="n-ar-os" aria-hidden="true"><span className="n-os n-ar-os-photo"/><span className="n-ar-os-texte"><span className="n-os"/><span className="n-os" data-court=""/></span></span>}/></section></div>)
+              <GrilleInventaire items={undefined} attente={9} ligne={72} gap={0} squelette={() => <span className="n-ar-os" aria-hidden="true"><span className="n-os n-ar-os-photo"/><span className="n-ar-os-texte"><span className="n-os"/><span className="n-os" data-court=""/></span></span>}/></section></div>)
           : articles === null ? <Vide icone={Icon ? <Icon name="alert" size={40}/> : null} phrase={tr('egalite.pasSu')} detail={manque}/>
           // (20 nov., chasse-bugs) Rien d'affiché ET une lecture ratée (`manque`) : « VRM n'a pas pu lire », jamais « Aucune annonce » (§5 : rien lu ≠ rien).
           : !liste.length && manque && !recherche ? <Vide icone={Icon ? <Icon name="alert" size={40}/> : null} phrase={tr('egalite.pasSu')}/>
@@ -444,7 +444,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
                   {enTeteCompte(g, n)}
                   {ouvertG ? <>
                     {vueG ? <GrilleInventaire items={g.articles} cle={(a) => a.cle + '|' + g.cle} rendu={(a, i, rv) => carte(a, g.cle, rv)} corps={96} revele={enArrivee} debut={debutDe(g.cle)} attrs={{ 'data-ad-grille': g.cle }}/>
-                      : <GrilleInventaire items={g.articles} ligne={76} gap={0} cle={(a) => a.cle + '|' + g.cle} rendu={(a, i, rv) => rangeeTel(a, g.cle, rv)} revele={enArrivee} debut={debutDe(g.cle)} className="n-ar-liste" attrs={{ 'data-ad-forme': formeRangee, 'data-ad-liste-compte': g.cle }}/>}
+                      : <GrilleInventaire items={g.articles} ligne={72} gap={0} cle={(a) => a.cle + '|' + g.cle} rendu={(a, i, rv) => rangeeTel(a, g.cle, rv)} revele={enArrivee} debut={debutDe(g.cle)} className="n-ar-liste" attrs={{ 'data-ad-forme': formeRangee, 'data-ad-liste-compte': g.cle }}/>}
                   </> : null}
                 </section>);
             })}</div>}
@@ -483,7 +483,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
         {/* (24 nov.) L'affichage vit ici (plus dans la barre du haut) : Liste par défaut, Détaillé (les tuiles). */}
         {!ordinateur ? <Groupe titre={tr('inv.affichage')} attrs={{ 'data-ad-affichage': vueG ? 'grille' : 'liste' }}>
           {['liste', 'grille'].map((v) => <Rangee key={v} icone={Icon ? <Icon name={v === 'liste' ? 'menu' : 'grid'} size={22}/> : null} titre={tr('inv.vue.' + v)} fin={vueTel === v ? 'coche' : null}
-            onClick={() => { setMenuActions(false); if (vueTel !== v) basculerVue(); }} attrs={{ 'data-ad-vue-choix': v, 'data-ad-bascule': v === 'grille' ? 'liste' : 'grille' }}/>)}
+            onClick={() => { setMenuActions(false); if (vueTel !== v) basculerVue(); }} attrs={{ 'data-ad-vue-choix': v }}/>)}
         </Groupe> : null}
         <Groupe>{actions.map((x) => <Rangee key={x.cle} icone={Icon && x.icone ? <Icon name={x.icone} size={22}/> : null} titre={x.libelle} sousTitre={x.court || ''} fin="chevron"
           onClick={() => { setMenuActions(false); setSel(new Set()); setAction(x.cle); }} attrs={{ 'data-eg-action': x.cle }}/>)}</Groupe>

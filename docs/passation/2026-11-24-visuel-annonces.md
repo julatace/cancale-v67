@@ -15,15 +15,15 @@ Se fusionne APRÈS #1326 et #1355.
 
 - **Plus de grande grille par défaut.** La LISTE reste l'affichage du téléphone ; « Détaillé » (les tuiles ci-dessous) se
   choisit dans « ⋯ » → Affichage (la bascule de la barre du haut est retirée).
-- **La rangée** (`RangeeArticle`) : 76 px FIXES, photo 60 par identité, étiquette papier du N° (petite), titre sur 2 lignes,
+- **La rangée** (`RangeeArticle`) : 72 px FIXES, photo 60 par identité, étiquette papier du N° (petite), titre sur 2 lignes,
   prix à droite, ♡ 👁 et l'âge en petites icônes ; l'état seulement s'il diffère de l'onglet ; logo du site seulement si la
   liste n'est pas rangée par compte (ou paire sur 2 sites) ; aucun rond de compte par rangée (il est dans l'intertitre).
 - **La praticité** : un toucher ouvre la fiche (inchangé) ; **glisser la rangée vers la gauche** montre « Baisser » et
-  « Republier » (84 × 76, les actions EXISTANTES de l'écran jugées sur cet article) ; « ⋯ » garde tous les gestes et gagne
+  « Republier » (84 × 72, les actions EXISTANTES de l'écran jugées sur cet article) ; « ⋯ » garde tous les gestes et gagne
   « Copier le lien » (l'adresse LUE de l'annonce, jamais fabriquée) ; **puces au pouce** sous les segments : Trier (récentes,
   prix ↓/↑, vues, favoris, anciennes), « Sans N° · n », « À confirmer · n », un compte (avec son rond) ; « Dorment » reste un
   segment ; la recherche est inchangée (instantanée) ; la sélection en série reste « ⋯ » → une action → cocher → lancer.
-- **La liste est virtualisée** (GrilleInventaire en mode `ligne`, 76 px) : plus de « Voir 60 de plus » au téléphone.
+- **La liste est virtualisée** (GrilleInventaire en mode `ligne`, 72 px) : plus de « Voir 60 de plus » au téléphone.
 
 ## Ce qui est fait (1re direction, gardée pour « Détaillé » et l'ordinateur)
 
