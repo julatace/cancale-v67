@@ -40,11 +40,18 @@ la cause précise ne se prouve que sur son compte. La 5.440.2 rend le résultat 
 4. **Sur la page** (`vrm-formulaire.js`, `__vrmFormulaireV` 7.3) : la ligne se reconnaît par ses deux identités quelle que
    soit la forme de son adresse (`identiteLigneFavori` : `/items/N/want_it…` ou `item_id=N`, ET `offering_id`/`receiver_id`/
    `user_id` = la personne, une seule clé ; un autre paramètre `…_id` ⇒ refusée). La page complète est lue jusqu'au bout :
-   fenêtre ET bloc qui défile, « Afficher plus » s'il est seul, 4 s pour chaque suite, arrêt après 3 essais sans rien de
-   neuf ou 90 s.
+   fenêtre ET bloc qui défile (positions posées : `scrollTo`, `scrollTop`), « Afficher plus » s'il est seul, 4 s pour chaque
+   suite, arrêt après 3 essais sans rien de neuf ou 90 s. ⚠️ **Aucun événement fabriqué** : un `dispatchEvent(new
+   Event('scroll'))` a été essayé (90e6337e4) puis RETIRÉ — `isTrusted:false` est la même preuve d'automatisation que la
+   souris et le clavier (§3). C'est le navigateur qui envoie son propre « scroll ».
+   ⚠️ **Limite mesurée en simulation** : l'onglet de travail est en ARRIÈRE-PLAN ; le navigateur n'y rend rien, donc
+   n'envoie pas son « scroll » — une liste qui charge sa suite au défilement ne la charge pas. Les favoris dont la ligne
+   n'est que dans cette suite ne sont PAS trouvés : dit (« pas trouvé sur la page : ouvre la page des notifications sur
+   vinted.fr »), rien n'est envoyé pour eux. Piste suivante (pas faite) : lire la suite comme la page la lit (GET de la
+   liste paginée) ne suffit pas, il faut une LIGNE à l'écran pour cliquer.
 5. **Pas trouvée sur la page alors que la liste de Vinted la contient** ⇒ `notification_pas_trouvee` : rien n'est écrit, le
-   favori **attend** (il repart après les autres ; seul, dans 3 min), une fois, puis « pas envoyé » avec cette raison,
-   la file continue. Jamais sauté pour ça.
+   favori **attend** (il repart après les autres ; seul, dans 3 min), une fois, puis « pas envoyé » avec cette raison et
+   le geste (« ouvre la page des notifications sur vinted.fr »), la file continue. Jamais sauté pour ça.
 6. **Ordre** : la file part des favoris les plus RÉCENTS (date de leur notification ; `ordreRecents`, `api/_lib/favoris.js`) —
    ceux que la cloche montre — puis les plus anciens.
 7. **Directement la page complète** : quand la cloche n'a pas montré une ligne, VRM retient combien elle en montre
