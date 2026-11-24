@@ -20,6 +20,7 @@
 import React from 'react';
 import { lireTout, load, save, onCloudReady, lirePreuvesVenteVinted, Icon, PhotoVinted } from './App.jsx';
 import { Actions, Pourquoi } from './natif/Actions.jsx';
+import { TuilePaire } from './natif/Jeu.jsx';   // (24 nov., visuel-jeu) les disparues en GRILLE de photos, comme un inventaire
 import { SELECT_MODERATION, LIGNE_MODERATION_VU, alertesActives, texteEvenement, evenementsDesLignes } from './moderationVinted.js';
 import { tr, date as dateLoc } from './i18n/index.js';
 import './styles-alerte-moderation.css';
@@ -69,23 +70,19 @@ function GroupeDisparues({ compte, evts, nom, fiches, seul, enTete, marquerVu })
     <div className="vrm-mod-groupe" data-moderation-groupe="disparue" data-moderation-compte={compte} data-moderation-n={n}>
       {enTete ? null : <h3 className="vrm-mod-groupe-titre" data-moderation-groupe-titre="">{titre}</h3>}
       <div className="vrm-mod-groupe-quand" data-moderation-fenetre="">{fenetreGroupe(evts)}</div>
-      <ul className="vrm-mod-lignes">
+      {/* (24 nov., visuel-jeu — Julien : « c'est pas visuel ») LA GRILLE : chaque disparue est une tuile — la photo de SA fiche
+          (identifiant d'annonce, jamais un titre), son étiquette N° ; sans fiche, le médaillon et l'identifiant ; « Vu » dessous. */}
+      <ul className="vrm-mod-lignes vrm-mod-grille" data-n-jeu="moderation">
         {vues.map((e) => {
           const f = e.a ? fiches[e.a] : null;
           const num = f && f.numero != null && f.numero !== '' ? String(f.numero) : null;
           const ph = photoDeFiche(f);
-          const titreCourt = f && f.title ? String(f.title) : '';
           const etiquette = num ? 'N°' + num : tr('mod5428.articleId', { id: e.a || '' });
           return (
-            <li key={e.cle} className="vrm-mod-ligne" data-moderation-sorte="disparue" data-moderation-compte={e.compte} data-moderation-item={e.a || undefined} data-moderation-photo={ph ? '1' : '0'}>
-              <span className="vrm-mod-vignette" aria-hidden="true">
-                {ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: 40, height: 40 }} repli={null}/> : <Icon name="image" size={18}/>}
-              </span>
-              <span className="vrm-mod-ligne-texte">
-                <span className="vrm-mod-num" data-moderation-num={num || undefined}>{etiquette}</span>
-                {titreCourt ? <span className="vrm-mod-titre-court">{titreCourt}</span> : null}
-              </span>
-              <button type="button" className="vrm-mod-vu" data-moderation-vu={e.cle} aria-label={tr('modc.vuDe', { article: etiquette })} onClick={() => marquerVu([e.cle])}>{tr('modc.vu')}</button>
+            <li key={e.cle} className="vrm-mod-ligne vrm-mod-case" data-moderation-sorte="disparue" data-moderation-compte={e.compte} data-moderation-item={e.a || undefined} data-moderation-photo={ph ? '1' : '0'}>
+              <TuilePaire photo={ph} numero={num || ''} icone="image" Icon={Icon} taille="xl" Photo={PhotoVinted} className="vrm-mod-tuile" attrsN={{ 'data-moderation-num': num || undefined }}/>
+              {num ? null : <span className="vrm-mod-id">{etiquette}</span>}
+              <button type="button" className="vrm-mod-vu" data-moderation-vu={e.cle} aria-label={tr('modc.vuDe', { article: etiquette })} onClick={() => marquerVu([e.cle])}><Icon name="check" size={14}/><span>{tr('modc.vu')}</span></button>
             </li>
           );
         })}

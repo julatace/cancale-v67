@@ -23905,7 +23905,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 lecture={(Array.isArray(listings.items) && listings.items.length > 0) || (Array.isArray(sales.items) && sales.items.length > 0) ? true : null}
                 numeros={(usedNumeros || []).length > 0 || Object.values(numeros || {}).some((e) => e && String(e.numero || '').trim())}/></> : null}
               pret={baseKO || [xE, xR, xM, xP].every((x) => !!x && !x.pasSu)}
-              affiche={{ n: nE, pasSu: nE == null, sous: ecart, ambre: colisJournee.some((c) => c.e && c.e.ambre) }}
+              affiche={{ n: nE, pasSu: nE == null, sous: ecart, ambre: colisJournee.some((c) => c.e && c.e.ambre), prets: nE == null || !em ? null : { n: nPrets, exact: em.exact !== false } }}
               // (19 nov., fiche directe) Un colis de la bande désigne un article : le toucher ouvre SA fiche, par identité (son N°,
               // le n° de transaction de SA vente, l'identifiant de son annonce — src/ficheLigne.js), jamais par son titre.
               colis={nE ? colisJournee.map((c) => ({ ...c, fl: attrsFicheLigne({ contexte: 'journee', site: c.site, cle: 'j' + c.cle, nums: c.num ? [String(c.num)] : [], tx: c.site === 'vinted' ? String(c.cle).slice(2) : '', item: c.idAnnonce || '', photo: typeof c.photo === 'string' ? c.photo : '', titre: c.titre || '', prix: c.prix || '' }) })) : []}

@@ -40,10 +40,14 @@
   @keyframes n-pop-sort-gauche { to { opacity: 0; transform: translateX(-115%) rotate(-6deg); } }
   @keyframes n-pop-sort-droite { to { opacity: 0; transform: translateX(115%) rotate(6deg); } }
   .n-pop-tuile { grid-area: img; animation: n-pop-tuile 560ms var(--n-jeu-tampon) 60ms both; }
+  /* (24 nov.) L'étiquette du N° reste PETITE, dans le coin (≈ 1/3 de la tuile) : la chaussure se voit. */
+  .n-pop-tuile > .n-etiq { left: -3px; bottom: 4px; padding: 1px 4px 1px 9px; font-size: 10.5px; line-height: 13px; border-radius: 3px 4px 4px 3px; clip-path: polygon(4px 0, 100% 0, 100% 100%, 4px 100%, 0 50%); transform: rotate(-3deg); }
+  .n-pop-tuile > .n-etiq .n-etiq-trou { left: 3.5px; width: 3px; height: 3px; margin-top: -1.5px; }
+  .n-pop-tuile > .n-etiq .n-etiq-pre { font-size: 8px; }
   .n-pop-tuile > .n-etiq { animation: n-pop-etiq 520ms var(--n-jeu-tampon) 220ms both; }
   .n-pop-tuile > .n-tuile-badge { animation: n-pop-badge 520ms var(--n-jeu-tampon) 300ms both; }
   @keyframes n-pop-tuile { from { transform: scale(.55) rotate(-6deg); } to { transform: none; } }
-  @keyframes n-pop-etiq { from { opacity: 0; transform: translateX(-10px) rotate(-18deg) scale(1.25); } to { opacity: 1; transform: rotate(-4deg); } }
+  @keyframes n-pop-etiq { from { opacity: 0; transform: translateX(-10px) rotate(-18deg) scale(1.25); } to { opacity: 1; transform: rotate(-3deg); } }
   @keyframes n-pop-badge { from { transform: scale(0); } to { transform: none; } }
   /* La vente : un reflet traverse la carte, le médaillon vert rebondit deux fois. */
   .n-pop-reflet { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; z-index: 0; }
@@ -83,7 +87,8 @@
     .n-pop-corps { gap: 1px; }
     .n-pop-titre { font-size: 15px; line-height: 20px; }
     .n-pop-detail { font-size: 13px; line-height: 17px; }
-    .n-pop-detail > span:last-child { -webkit-line-clamp: 1; white-space: nowrap; text-overflow: ellipsis; display: block; }
+    .n-pop-detail { align-items: flex-start; }
+    .n-pop-detail > span:last-child { -webkit-line-clamp: 2; }   /* (24 nov.) deux lignes : la phrase n'est plus coupée après trois mots */
     .n-pop .n-logo-site { display: none; }
     .n-pop-geste { margin-top: 5px; min-height: 30px; font-size: 12.5px; }
     .n-pop-fermer { width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

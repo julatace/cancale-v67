@@ -59,6 +59,7 @@ export function CasesChiffres({ cases = [], className = '', attrs = null }) {
       {cases.map((c) => (
         <button key={c.cle} type="button" className="n-cc" onClick={c.onClick} disabled={!c.onClick} {...(c.attrs || {})}>
           <span className="n-cc-tete">{c.icone ? <span className="n-cc-icone" aria-hidden="true">{c.icone}</span> : null}{c.libelle}</span>
+          {c.visuel ? <span className="n-cc-visuel">{c.visuel}</span> : null}
           <span className="n-cc-valeur">{c.valeur == null || c.valeur === '' ? TIRET : c.valeur}</span>
           {c.sous ? <span className="n-cc-sous" data-n-ton={c.tonSous || undefined}>{c.sous}</span> : null}
         </button>

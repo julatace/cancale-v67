@@ -34,7 +34,15 @@
   .n-tuile-img { object-fit: cover; background: var(--n-carte-2); box-shadow: inset 0 0 0 1px var(--n-trait); -webkit-user-drag: none; user-select: none; }
   .n-tuile-vide { display: grid; place-items: center; color: var(--n-accent);
     background: linear-gradient(150deg, color-mix(in srgb, var(--n-carte) 70%, var(--n-teinte)) 0%, var(--n-carte-2) 100%); box-shadow: inset 0 0 0 1px var(--n-trait); }
-  .n-tuile-paire[data-n-tuile-genre="vente"] .n-tuile-vide { color: var(--n-vert); background: linear-gradient(150deg, var(--n-vert-fond), var(--n-carte-2)); }
+  /* (24 nov.) Sans photo : un MÉDAILLON teinté par famille (ardoise, encre, sarcelle, vert, acier — jamais orange), l'icône en
+     blanc, un reflet en haut : une pièce de jeu, plus une case grise vide. */
+  .n-tuile-paire[data-n-tuile-photo="0"] .n-tuile-vide { color: #FFFFFF; background: radial-gradient(120% 90% at 30% 10%, rgb(255 255 255 / .28), transparent 55%), linear-gradient(150deg, var(--n-med-1, #5A6B7E), var(--n-med-2, #3D4B5B));
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / .14), inset 0 -6px 12px rgb(0 0 0 / .14), 0 2px 6px rgb(29 29 31 / .14); }
+  .n-tuile-paire[data-n-tuile-genre="vente"], .n-tuile-paire[data-n-tuile-genre="argent"] { --n-med-1: #2E9466; --n-med-2: #17744A; }
+  .n-tuile-paire[data-n-tuile-genre="arrivee"], .n-tuile-paire[data-n-tuile-genre="bordereau"] { --n-med-1: #2C8A8B; --n-med-2: #0D6A6B; }
+  .n-tuile-paire[data-n-tuile-genre="moderation"], .n-tuile-paire[data-n-tuile-genre="erreur"] { --n-med-1: #3A3D44; --n-med-2: #1D1D1F; }
+  .n-tuile-paire[data-n-tuile-genre="rappel"], .n-tuile-paire[data-n-tuile-genre="avis"] { --n-med-1: #6A7890; --n-med-2: #4C5A73; }
+  .n-tuile-paire[data-n-tuile-genre="favori"], .n-tuile-paire[data-n-tuile-genre="message"], .n-tuile-paire[data-n-tuile-genre="offre"] { --n-med-1: #5A6B7E; --n-med-2: #3D4B5B; }
   .n-tuile-badge { position: absolute; top: -6px; right: -6px; z-index: 2; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%;
     background: var(--n-jeu-medaille); color: var(--n-jeu-medaille-encre); box-shadow: 0 0 0 2px var(--n-carte), 0 2px 6px rgb(0 0 0 / .18); }
   .n-tuile-paire[data-n-tuile-genre="vente"] .n-tuile-badge { background: var(--n-vert); color: #FFFFFF; }
@@ -69,4 +77,26 @@
     .n-confettis { display: none; }
     .n-anneau-plein { transition: none; }
   }
+}
+
+/* ── (24 nov.) L'inventaire : les dernières ventes en tuiles (Aujourd'hui) — une rangée qui défile de côté au téléphone. ── */
+@layer vrm-natif {
+  .n-inventaire { display: grid; grid-auto-flow: column; grid-auto-columns: 104px; gap: 12px; overflow-x: auto; padding: 10px 2px 12px; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .n-inventaire::-webkit-scrollbar { display: none; }
+  @media (min-width: 1024px) { .n-inventaire { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); overflow: visible; } }
+  .n-inventaire-case { appearance: none; border: 0; background: transparent; padding: 0; margin: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; scroll-snap-align: start;
+    display: flex; flex-direction: column; gap: 2px; min-width: 0; min-height: 44px; touch-action: manipulation; }
+  .n-inventaire-case .n-tuile-paire { --n-tuile-t: 104px; width: 100%; height: auto; aspect-ratio: 1 / 1; margin-bottom: 4px; }
+  .n-inventaire-case .n-tuile-img { width: 100% !important; height: 100% !important; }
+  .n-inventaire-prix { font: 700 15px/20px var(--n-police); font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  .n-inventaire-quand { font: 400 12px/16px var(--n-police); color: var(--n-encre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-inventaire-case:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 3px; border-radius: 16px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .n-inventaire-case { transition: transform 160ms var(--n-jeu-ressort); }
+    .n-inventaire-case:active { transform: scale(.96); }
+  }
+  /* L'anneau dans une case de chiffre (Colis) : en haut à droite. */
+  .n-cc { position: relative; }
+  .n-cc-visuel { position: absolute; top: 10px; right: 10px; pointer-events: none; }
+  .n-cc-anneau .n-anneau-centre { color: var(--n-encre-2); display: grid; place-items: center; }
 }

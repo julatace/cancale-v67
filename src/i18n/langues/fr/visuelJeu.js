@@ -1,4 +1,5 @@
 // fr · le langage « jeu vidéo » (24 nov., lot visuel-jeu) — src/natif/Jeu.jsx, src/natif/PopEvenements.jsx
 export default {
-  "jeu.pasSu": "Pas encore su"
+  "jeu.pasSu": "Pas encore su",
+  "jeu.anneauPrets": "{n} prêts sur {total}"
 };

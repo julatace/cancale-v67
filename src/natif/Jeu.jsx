@@ -16,11 +16,11 @@ import './jeu.css';
 // Le N° tel qu'il est écrit sur le carton (« 124 », « B230 ») — sinon '' (rien n'est inventé ni reformaté).
 export const numeroPropre = (n) => { const s = n == null ? '' : String(n).trim(); return /^[A-Z]{0,2}\d{1,6}$/i.test(s) ? s.toUpperCase() : ''; };
 
-export function EtiquetteN({ numero, className = '' }) {
+export function EtiquetteN({ numero, className = '', attrs = null }) {
   const n = numeroPropre(numero);
   if (!n) return null;
   return (
-    <span className={cx('n-etiq', className)} data-n-etiq={n} role="img" aria-label={tr('natif.plaque.numero', { numero: n })}>
+    <span className={cx('n-etiq', className)} data-n-etiq={n} role="img" aria-label={tr('natif.plaque.numero', { numero: n })} {...(attrs || {})}>
       <span className="n-etiq-trou" aria-hidden="true"/>
       <span className="n-etiq-pre" aria-hidden="true">{tr('natif.plaque.prefixe')}</span>
       <span className="n-etiq-n" aria-hidden="true">{n}</span>
@@ -29,18 +29,22 @@ export function EtiquetteN({ numero, className = '' }) {
 }
 
 // `taille` : 'm' (56, une rangée) · 'l' (72, la carte d'un événement) · 'xl' (96, une grille). `Icon` : le composant d'icônes
-// de l'app (ICON_PATHS) ; sans photo, l'icône occupe la tuile.
-export function TuilePaire({ photo = '', numero = '', icone = '', genre = '', Icon = null, taille = 'l', className = '', onErreurPhoto = null, children = null }) {
+// de l'app (ICON_PATHS) ; sans photo, l'icône occupe la tuile. `Photo` (facultatif) : le composant photo de l'app
+// (`PhotoVinted`, qui prend la bonne taille — src/photoTaille.js) ; sinon une simple <img>. `attrsN` : attributs de l'étiquette.
+const PX = { m: 56, l: 72, xl: 96 };
+export function TuilePaire({ photo = '', numero = '', icone = '', genre = '', Icon = null, taille = 'l', className = '', onErreurPhoto = null, children = null, Photo = null, attrsN = null }) {
   const [rate, setRate] = React.useState(false);
   React.useEffect(() => { setRate(false); }, [photo]);
   const avecPhoto = !!photo && !rate;
   return (
     <span className={cx('n-tuile-paire', className)} data-n-tuile={taille} data-n-tuile-genre={genre || undefined} data-n-tuile-photo={avecPhoto ? '1' : '0'}>
-      {avecPhoto
+      {avecPhoto && Photo
+        ? <Photo className="n-tuile-img" src={photo} alt="" loading="lazy" draggable="false" style={{ width: PX[taille] || 72, height: PX[taille] || 72 }} repli={null}/>
+        : avecPhoto
         ? <img className="n-tuile-img" src={photo} alt="" referrerPolicy="no-referrer" decoding="async" draggable="false" onError={() => { setRate(true); if (onErreurPhoto) onErreurPhoto(); }}/>
         : <span className="n-tuile-vide" aria-hidden="true">{Icon && icone ? <Icon name={icone} size={taille === 'm' ? 22 : 30}/> : null}</span>}
       {avecPhoto && Icon && icone ? <span className="n-tuile-badge" aria-hidden="true"><Icon name={icone} size={14}/></span> : null}
-      <EtiquetteN numero={numero}/>
+      <EtiquetteN numero={numero} attrs={attrsN}/>
       {children}
     </span>
   );

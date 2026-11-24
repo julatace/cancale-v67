@@ -170,12 +170,54 @@ async function film(nav, d) {
   if (v) { const p = await v.path(); const cible = path.join(VIDEO, 'pop-vente-390-clair.webm'); try { fs.renameSync(p, cible); } catch (_) {} console.log('film : ' + cible); }
 }
 
+// J7 — l'anneau « pas su » rendu tel quel (React côté serveur, le vrai composant) : jamais 0, jamais plein.
+async function anneauPasSu() {
+  const esb = require(path.join(__dirname, '..', '..', 'node_modules', 'esbuild'));
+  const sortie = path.join(require('os').tmpdir(), `banc-jeu-${process.pid}.cjs`);
+  esb.buildSync({ stdin: { contents: "export { Anneau } from './src/natif/Jeu.jsx'; export { renderToStaticMarkup } from 'react-dom/server'; export { createElement } from 'react';", resolveDir: path.join(__dirname, '..', '..'), loader: 'js' },
+    bundle: true, outfile: sortie, format: 'cjs', platform: 'node', loader: { '.css': 'empty', '.js': 'jsx' }, jsx: 'automatic', logLevel: 'error' });
+  const m = require(sortie); try { fs.unlinkSync(sortie); } catch (_) {}
+  const rendre = (p) => m.renderToStaticMarkup(m.createElement(m.Anneau, p));
+  for (const [quoi, p] of [['valeur inconnue', { valeur: null, total: 30 }], ['total inconnu', { valeur: 6, total: null }], ['les deux inconnus', {}], ['total 0', { valeur: 0, total: 0 }]]) {
+    const h = rendre(p);
+    dit(/data-n-anneau-su="0"/.test(h) && !/n-anneau-plein/.test(h) && />—</.test(h) && !/>0</.test(h), `[anneau] J7 ${quoi} ⇒ pointillé « — », ni 0 ni plein`, h.slice(0, 200));
+  }
+  const su = rendre({ valeur: 6, total: 30 });
+  dit(/data-n-anneau-su="1"/.test(su) && /data-n-anneau-part="0.200"/.test(su) && /n-anneau-plein/.test(su), '[anneau] J7 6 sur 30 ⇒ 0,2 rempli', su.slice(0, 200));
+}
+// J8 — Aujourd'hui : l'anneau des colis prêts dit les MÊMES nombres que la case ; les dernières ventes en tuiles.
+async function journee(nav, W, theme, d) {
+  const T = `[aujourd'hui ${W}px ${theme}]`;
+  const o = await ouvrir(nav, W, theme === 'sombre', d.b);
+  const pg = o.pg;
+  await pg.waitForSelector('[data-v2-cj-ligne="envoyer"]', { timeout: 20000 }).catch(() => {});
+  await pg.waitForTimeout(2500);
+  const r = await pg.evaluate(() => {
+    const c = document.querySelector('[data-v2-cj-ligne="envoyer"]'); const a = c && c.querySelector('.n-anneau');
+    const sous = c && c.querySelector('.n-cc-sous');
+    return { n: c && c.getAttribute('data-v2-cj-n'), su: a && a.getAttribute('data-n-anneau-su'), part: a && a.getAttribute('data-n-anneau-part'), sous: sous ? sous.textContent : '',
+      tuiles: document.querySelectorAll('[data-n-jeu="ventes"] .n-tuile-paire').length, photos: [...document.querySelectorAll('[data-n-jeu="ventes"] .n-tuile-img')].map((i) => i.getAttribute('src') || '') };
+  });
+  const n = Number(r.n), m = /(\d+) pas encore prêt/.exec(r.sous);
+  const attendu = n > 0 && m ? (n - Number(m[1])) / n : null;
+  dit(!!r.su && (attendu == null ? true : Math.abs(Number(r.part) - attendu) < 0.002), `${T} J8 l'anneau des colis dit les nombres de la case (${r.part} ; ${r.n} colis, « ${r.sous} »)`, JSON.stringify(r));
+  dit(!r.photos.some((u) => u.includes('990000002')), `${T} J8 aucune tuile ne montre la photo du leurre`);
+  const orange = await pg.evaluate(ORANGE);
+  dit(!orange.length, `${T} J3 aucune couleur orange calculée`, orange.join(' ¦ '));
+  await capture(pg, `aujourdhui-${W}-${theme}`);
+  const bloc = await pg.$('[data-v2-bloc="ventes"]'); if (bloc && SHOTS) { await bloc.scrollIntoViewIfNeeded(); await pg.waitForTimeout(500); await capture(pg, `aujourdhui-ventes-${W}-${theme}`); }
+  dit(!(await pg.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)), `${T} J6 rien ne déborde`);
+  dit(!o.erreurs.length, `${T} J6 aucune erreur JS`, o.erreurs.join(' ¦ '));
+  await o.ctx.close();
+}
+
 (async () => {
   await new Promise((ok) => srv.listen(PORT, ok));
+  try { await anneauPasSu(); } catch (e) { dit(false, '[anneau] J7 rendu', String(e && e.stack || e).slice(0, 400)); }
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] });
   try {
     const d = baseAvecLeurre();
-    for (const W of LARGEURS) for (const th of THEMES) await pops(nav, W, th, d);
+    for (const W of LARGEURS) for (const th of THEMES) { await pops(nav, W, th, d); await journee(nav, W, th, d); }
     await reduit(nav, d);
     await film(nav, d);
   } catch (e) { dit(false, 'le banc a pu aller au bout', String(e && e.stack || e).slice(0, 600)); }
