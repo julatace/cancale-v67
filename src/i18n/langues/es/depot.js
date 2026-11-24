@@ -39,7 +39,7 @@ export default {
   "depot.porteeModele": "para el modelo {m}",
   "depot.modeleRempli": "Todas las variables están rellenadas.",
   "depot.utiliser": "Usar esta plantilla",
-  "depot.aucunModele": "Ninguna plantilla se aplica a esta ficha (Ajustes → Anuncios → Mis plantillas).",
+  "depot.aucunModele": "Ninguna plantilla se aplica a esta ficha (Ajustes → Ventas y paquetes → Mis plantillas).",
   "depot.liste.preparer": "Preparar",
   "depot.liste.aPreparer": "por preparar",
   "depot.liste.prete": "Lista para publicar",

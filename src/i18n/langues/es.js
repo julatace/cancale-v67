@@ -1239,7 +1239,7 @@ export default {
   "suivi.arreter.non": "Continuar",
   "suivi.arreter.oui": "Detener",
   "suivi.fermer": "Cerrar",
-  "suivi.garde": "El detalle queda en Ajustes → Lo que hizo VRM.",
+  "suivi.garde": "El detalle queda en Ajustes → Seguridad de los datos → «Registro: lo que ha hecho VRM».",
   "suivi.passes.titre": "Trabajos seguidos en este dispositivo",
   "suivi.reprise.sansEcran": "Vuelve a abrir la pantalla del trabajo para reanudar.",
   // (11 nov., lot sante-comptes) la santé de chaque compte Vinted (src/SanteComptes.jsx)
@@ -1613,7 +1613,7 @@ export default {
   "ebay.err.incertain": "No sé si el anuncio salió.",
   "ebay.err.incertain.geste": "Relee tus anuncios de eBay antes de reintentar.",
   "ebay.err.jeton": "El acceso de esta cuenta de eBay caducó.",
-  "ebay.err.jeton.geste": "Ajustes → Cuentas de eBay → «Reconectar».",
+  "ebay.err.jeton.geste": "Ajustes → Mis plataformas → Cuentas de eBay, y luego «Reconectar».",
   "ebay.err.droit": "Esta cuenta no dio este permiso a VRM.",
   "ebay.err.droit.geste": "Reconéctala: eBay volverá a pedir acceso.",
   "ebay.err.deja": "Este par ya está en venta o programado en eBay.",

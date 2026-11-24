@@ -55,7 +55,7 @@ export default {
   "fiab.sante.g.moderation": "Vinted moderated this account: check what happened, then tap Resume.",
   "fiab.sante.g.deconnecte": "This account is no longer signed in: sign in on the site, VRM will resume.",
   "fiab.sante.g.panne": "Open {site} in the browser where the VRM extension is.",
-  "fiab.sante.g.delie": "Link it again in Settings → Linked accounts.",
+  "fiab.sante.g.delie": "Link it again in Settings → My platforms → Linked accounts.",
   "fiab.sante.g.relire": "Open {site} on this account, in the browser where the VRM extension is.",
   "fiab.sante.g.ventes": "Open Vinted › My orders › Sold on this account.",
   "fiab.sante.g.extension": "Install {v} on {appareil}.",

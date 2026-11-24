@@ -39,7 +39,7 @@ export default {
   "depot.porteeModele": "per il modello {m}",
   "depot.modeleRempli": "Tutte le variabili sono compilate.",
   "depot.utiliser": "Usa questo modello",
-  "depot.aucunModele": "Nessun modello per questa scheda (Impostazioni → Annunci → I miei modelli).",
+  "depot.aucunModele": "Nessun modello per questa scheda (Impostazioni → Vendite e pacchi → I miei modelli).",
   "depot.liste.preparer": "Prepara",
   "depot.liste.aPreparer": "da preparare",
   "depot.liste.prete": "Pronta da depositare",

@@ -70,7 +70,7 @@ export default {
   "nouveaux.parcours.ebay.titre": "Verbinde dein eBay-Konto",
   "nouveaux.parcours.ebay.geste": "eBay verbinden",
   "nouveaux.parcours.ebay.pourquoi": "eBay gibt VRM deine Bestellungen über die offizielle Verbindung. Ohne Erweiterung.",
-  "nouveaux.parcours.ebay.ligne": "Einstellungen → eBay-Konten → Konto verbinden.",
+  "nouveaux.parcours.ebay.ligne": "Einstellungen → Meine Plattformen → eBay-Konten, dann „Konto verbinden“.",
   "nouveaux.parcours.ebay.ok": "eBay-Konto verbunden",
   "nouveaux.parcours.attente": "Konto erkannt. Anzeigen werden gelesen…",
   "nouveaux.aide.video": "Im Video ansehen",

@@ -146,7 +146,7 @@ export default {
   "emails.articleCompteTransaction": "Item, account or transaction",
   "emails.aucunRecuRecherche": "No receipt for this search.",
   "emails.aucunRecuAchat": "No purchase receipt arrived by email yet.",
-  "emails.achatSansLigne": "A purchase without “{nom}” on its row: VRM linked no receipt to it. If VRM doesn’t receive the Vinted emails of one of your accounts, forward them to your VRM address (Settings → Email reception).",
+  "emails.achatSansLigne": "A purchase without “{nom}” on its row: VRM linked no receipt to it. If VRM doesn’t receive the Vinted emails of one of your accounts, forward them to your VRM address (Settings → My platforms → My VRM address).",
   "emails.1AutreE": "1 other order email (update, confirmation, return) isn’t a receipt: it’s not listed here.",
   "emails.autresEMails": "{autres} other order emails (updates, confirmations, returns) aren’t receipts: they’re not listed here.",
   "emails.recuAchatVinted": "Vinted purchase receipt",

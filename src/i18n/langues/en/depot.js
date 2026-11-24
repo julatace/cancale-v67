@@ -39,7 +39,7 @@ export default {
   "depot.porteeModele": "for model {m}",
   "depot.modeleRempli": "All variables are filled in.",
   "depot.utiliser": "Use this template",
-  "depot.aucunModele": "No template applies to this listing (Settings → Listings → My templates).",
+  "depot.aucunModele": "No template applies to this listing (Settings → Sales and parcels → My templates).",
   "depot.liste.preparer": "Prepare",
   "depot.liste.aPreparer": "to prepare",
   "depot.liste.prete": "Ready to post",

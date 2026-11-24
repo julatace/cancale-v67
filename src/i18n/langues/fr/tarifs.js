@@ -42,7 +42,7 @@ export default {
   "tarifs.essai.uneFois": "Une seule fois par adresse e-mail et par compte Vinted.",
   "tarifs.apres.titre": "Et ensuite ?",
   "tarifs.apres.resilier.titre": "Résilier en deux gestes",
-  "tarifs.apres.resilier.texte": "Paramètres → Abonnement → Résilier. Tu gardes l’accès jusqu’à la fin de la période, aucun autre prélèvement.",
+  "tarifs.apres.resilier.texte": "Paramètres → Mon compte → Mon abonnement, puis « Résilier ». Tu gardes l’accès jusqu’à la fin de la période, aucun autre prélèvement.",
   "tarifs.apres.rien.titre": "Rien n’est supprimé",
   "tarifs.apres.rien.texte": "Sans abonnement, tu vois un aperçu de tes données ; le reste est gardé. Reprendre rend tout, tel quel.",
   "tarifs.apres.retract.titre": "14 jours pour te rétracter",

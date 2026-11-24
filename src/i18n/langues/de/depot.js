@@ -39,7 +39,7 @@ export default {
   "depot.porteeModele": "für Modell {m}",
   "depot.modeleRempli": "Alle Variablen sind ausgefüllt.",
   "depot.utiliser": "Diese Vorlage nutzen",
-  "depot.aucunModele": "Keine Vorlage für diese Karte (Einstellungen → Anzeigen → Meine Vorlagen).",
+  "depot.aucunModele": "Keine Vorlage für diese Karte (Einstellungen → Verkäufe und Pakete → Meine Vorlagen).",
   "depot.liste.preparer": "Vorbereiten",
   "depot.liste.aPreparer": "vorzubereiten",
   "depot.liste.prete": "Bereit zum Einstellen",

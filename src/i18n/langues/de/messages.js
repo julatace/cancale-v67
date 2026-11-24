@@ -61,7 +61,7 @@ export default {
   "messages.statistiques": "Statistiken",
   "messages.annonceLeboncoinChiffre": "der Anzeige bei Leboncoin: Die Zahl folgt.",
   "messages.releverChiffreFaut": "Um diese Zahl zu lesen, brauchst du die Erweiterung",
-  "messages.metsJourDepuis": ": aktualisiere sie über Einstellungen → Verbindungsstatus, dann öffne die",
+  "messages.metsJourDepuis": ": aktualisiere sie über Einstellungen → Meine Plattformen → Verbindungsstatus, dann öffne die",
   "messages.annonceLeboncoin": "der Anzeige bei Leboncoin.",
   "messages.extensionInstalleeReleve2": "Die Erweiterung liest diese Zahl dort, wo sie installiert ist, wenn du öffnest: die",
   "messages.annonceLeboncoin2": "einer Anzeige bei Leboncoin.",

@@ -55,7 +55,7 @@ export default {
   "fiab.sante.g.moderation": "Vinted ha moderato questo account: guarda cosa è successo, poi tocca Riprendi.",
   "fiab.sante.g.deconnecte": "Questo account non è più connesso: accedi al sito, VRM riprenderà.",
   "fiab.sante.g.panne": "Apri {site} nel browser dove c’è l’estensione VRM.",
-  "fiab.sante.g.delie": "Ricollegalo in Impostazioni → Account collegati.",
+  "fiab.sante.g.delie": "Ricollegalo in Impostazioni → Le mie piattaforme → Account collegati.",
   "fiab.sante.g.relire": "Apri {site} su questo account, nel browser dove c’è l’estensione VRM.",
   "fiab.sante.g.ventes": "Apri Vinted › I miei ordini › Venduti su questo account.",
   "fiab.sante.g.extension": "Installa la {v} su {appareil}.",

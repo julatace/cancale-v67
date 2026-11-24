@@ -107,7 +107,7 @@ export default {
   "pn.abonnement.offert": "VRM ist vorerst kostenlos: alles ist offen.",
   "pn.abonnement.essai": { one: "Gratis-Test: noch {n} Tag.", other: "Gratis-Test: noch {n} Tage." },
   "pn.abonnement.actif": "Dein Abo ist aktiv.",
-  "pn.abonnement.passu": "Abo-Status: nicht gelesen. Einstellungen → Mein Konto → Abo.",
+  "pn.abonnement.passu": "Abo-Status: nicht gelesen. Einstellungen → Mein Konto → Mein Abo.",
   "pn.abonnement.solo": "Solo",
   "pn.abonnement.solo.desc": "1 Verkäuferkonto pro Plattform",
   "pn.abonnement.pro": "Pro",

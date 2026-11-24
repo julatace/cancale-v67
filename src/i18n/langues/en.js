@@ -1239,7 +1239,7 @@ export default {
   "suivi.arreter.non": "Keep going",
   "suivi.arreter.oui": "Stop",
   "suivi.fermer": "Close",
-  "suivi.garde": "The details stay in Settings → What VRM did.",
+  "suivi.garde": "The details stay in Settings → Data security → “Log: what VRM did”.",
   "suivi.passes.titre": "Tasks tracked on this device",
   "suivi.reprise.sansEcran": "Reopen the task’s screen to resume.",
   // (11 nov., lot sante-comptes) la santé de chaque compte Vinted (src/SanteComptes.jsx)
@@ -1613,7 +1613,7 @@ export default {
   "ebay.err.incertain": "I don't know if the listing went through.",
   "ebay.err.incertain.geste": "Re-read your eBay listings before trying again.",
   "ebay.err.jeton": "This eBay account's access has expired.",
-  "ebay.err.jeton.geste": "Settings → eBay accounts → “Reconnect”.",
+  "ebay.err.jeton.geste": "Settings → My platforms → eBay accounts, then “Reconnect”.",
   "ebay.err.droit": "This account did not grant VRM this right.",
   "ebay.err.droit.geste": "Reconnect it: eBay will ask for access again.",
   "ebay.err.deja": "This pair is already listed or scheduled on eBay.",

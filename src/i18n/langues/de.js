@@ -1239,7 +1239,7 @@ export default {
   "suivi.arreter.non": "Weiter",
   "suivi.arreter.oui": "Stoppen",
   "suivi.fermer": "Schließen",
-  "suivi.garde": "Die Details bleiben in Einstellungen → Was VRM getan hat.",
+  "suivi.garde": "Die Details bleiben in Einstellungen → Datensicherheit → „Protokoll: was VRM getan hat“.",
   "suivi.passes.titre": "Auf diesem Gerät verfolgte Aufgaben",
   "suivi.reprise.sansEcran": "Öffne den Bildschirm der Aufgabe erneut, um fortzusetzen.",
   // (11 nov., lot sante-comptes) la santé de chaque compte Vinted (src/SanteComptes.jsx)
@@ -1613,7 +1613,7 @@ export default {
   "ebay.err.incertain": "Ich weiß nicht, ob das Angebot raus ist.",
   "ebay.err.incertain.geste": "Lies deine eBay-Angebote neu, bevor du es erneut versuchst.",
   "ebay.err.jeton": "Der Zugriff dieses eBay-Kontos ist abgelaufen.",
-  "ebay.err.jeton.geste": "Einstellungen → eBay-Konten → „Neu verbinden“.",
+  "ebay.err.jeton.geste": "Einstellungen → Meine Plattformen → eBay-Konten, dann „Neu verbinden“.",
   "ebay.err.droit": "Dieses Konto gab VRM diese Berechtigung nicht.",
   "ebay.err.droit.geste": "Neu verbinden: eBay fragt erneut nach Zugriff.",
   "ebay.err.deja": "Dieses Paar ist schon bei eBay oder geplant.",

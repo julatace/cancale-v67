@@ -107,7 +107,7 @@ export default {
   "pn.abonnement.offert": "Por ahora VRM es gratis: todo está abierto.",
   "pn.abonnement.essai": { one: "Prueba gratis: queda {n} día.", other: "Prueba gratis: quedan {n} días." },
   "pn.abonnement.actif": "Tu suscripción está activa.",
-  "pn.abonnement.passu": "Estado de tu suscripción: no leído. Ajustes → Mi cuenta → Suscripción.",
+  "pn.abonnement.passu": "Estado de tu suscripción: no leído. Ajustes → Mi cuenta → Mi suscripción.",
   "pn.abonnement.solo": "Solo",
   "pn.abonnement.solo.desc": "1 cuenta de vendedor por plataforma",
   "pn.abonnement.pro": "Pro",

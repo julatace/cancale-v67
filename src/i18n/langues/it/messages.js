@@ -61,7 +61,7 @@ export default {
   "messages.statistiques": "statistiche",
   "messages.annonceLeboncoinChiffre": "dell’annuncio su Leboncoin: il numero segue.",
   "messages.releverChiffreFaut": "Per rilevare questo numero serve l’estensione",
-  "messages.metsJourDepuis": ": aggiornala da Impostazioni → Stato delle connessioni, poi apri le",
+  "messages.metsJourDepuis": ": aggiornala da Impostazioni → Le mie piattaforme → Stato delle connessioni, poi apri le",
   "messages.annonceLeboncoin": "dell’annuncio su Leboncoin.",
   "messages.extensionInstalleeReleve2": "È l’estensione, dove è installata, che rileva questo numero quando apri le",
   "messages.annonceLeboncoin2": "di un annuncio su Leboncoin.",

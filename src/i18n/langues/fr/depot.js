@@ -39,7 +39,7 @@ export default {
   "depot.porteeModele": "pour le modèle {m}",
   "depot.modeleRempli": "Toutes les variables sont remplies.",
   "depot.utiliser": "Utiliser ce modèle",
-  "depot.aucunModele": "Aucun modèle ne concerne cette fiche (Réglages → Annonces → Mes modèles).",
+  "depot.aucunModele": "Aucun modèle ne concerne cette fiche (Paramètres → Ventes et colis → Mes modèles).",
   "depot.liste.preparer": "Préparer",
   "depot.liste.aPreparer": "à préparer",
   "depot.liste.prete": "Prête à déposer",

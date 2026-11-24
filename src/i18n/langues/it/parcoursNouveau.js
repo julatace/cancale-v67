@@ -107,7 +107,7 @@ export default {
   "pn.abonnement.offert": "Per ora VRM è gratis: è tutto aperto.",
   "pn.abonnement.essai": { one: "Prova gratuita: ancora {n} giorno.", other: "Prova gratuita: ancora {n} giorni." },
   "pn.abonnement.actif": "Il tuo abbonamento è attivo.",
-  "pn.abonnement.passu": "Stato dell’abbonamento: non letto. Impostazioni → Il mio account → Abbonamento.",
+  "pn.abonnement.passu": "Stato dell’abbonamento: non letto. Impostazioni → Il mio account → Il mio abbonamento.",
   "pn.abonnement.solo": "Solo",
   "pn.abonnement.solo.desc": "1 account venditore per piattaforma",
   "pn.abonnement.pro": "Pro",

@@ -70,7 +70,7 @@ export default {
   "nouveaux.parcours.ebay.titre": "Connect your eBay account",
   "nouveaux.parcours.ebay.geste": "Connect eBay",
   "nouveaux.parcours.ebay.pourquoi": "eBay gives your orders to VRM through its official connection. No extension needed.",
-  "nouveaux.parcours.ebay.ligne": "Settings → eBay accounts → Connect an account.",
+  "nouveaux.parcours.ebay.ligne": "Settings → My platforms → eBay accounts, then “Connect an account”.",
   "nouveaux.parcours.ebay.ok": "eBay account connected",
   "nouveaux.parcours.attente": "Account seen. Reading your listings…",
   "nouveaux.aide.video": "Watch it in a video",

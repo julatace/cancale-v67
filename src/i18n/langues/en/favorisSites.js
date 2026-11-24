@@ -29,7 +29,7 @@ export default {
   "aimesVc.arrete": "Stopped at {faites} of {n} ({heure})",
   "aimesVc.incertaines": {"one": "{n} to check on Vestiaire", "other": "{n} to check on Vestiaire"},
   "favorisSites.lbcQui": "Leboncoin doesn’t say who saved your listing: VRM can’t write to anyone.",
-  "favorisSites.lbcLevier": "To reach them, lower the price (Leboncoin screen → “Lower prices on Leboncoin”). Leboncoin doesn’t say whether it notifies them.",
+  "favorisSites.lbcLevier": "To reach them, lower the price (Listings → Leboncoin → “Lower prices on Leboncoin”). Leboncoin doesn’t say whether it notifies them.",
   "fav.bilan.envoyes": {"one": "{n} sent", "other": "{n} sent"},
   "fav.bilan.sautes": {"one": "{n} skipped ({quoi})", "other": "{n} skipped ({quoi})"},
   "fav.bilan.refuses": {"one": "{n} refused: {quoi}", "other": "{n} refused: {quoi}"},

@@ -70,7 +70,7 @@ export default {
   "nouveaux.parcours.ebay.titre": "Vincula tu cuenta de eBay",
   "nouveaux.parcours.ebay.geste": "Vincular eBay",
   "nouveaux.parcours.ebay.pourquoi": "eBay da tus pedidos a VRM por su conexión oficial. Sin extensión.",
-  "nouveaux.parcours.ebay.ligne": "Ajustes → Cuentas de eBay → Vincular una cuenta.",
+  "nouveaux.parcours.ebay.ligne": "Ajustes → Mis plataformas → Cuentas de eBay, y luego «Vincular una cuenta».",
   "nouveaux.parcours.ebay.ok": "Cuenta de eBay vinculada",
   "nouveaux.parcours.attente": "Cuenta vista. Leyendo tus anuncios…",
   "nouveaux.aide.video": "Ver el gesto en vídeo",

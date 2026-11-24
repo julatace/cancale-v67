@@ -70,7 +70,7 @@ export default {
   "nouveaux.parcours.ebay.titre": "Collega il tuo account eBay",
   "nouveaux.parcours.ebay.geste": "Collega eBay",
   "nouveaux.parcours.ebay.pourquoi": "eBay passa i tuoi ordini a VRM con la sua connessione ufficiale. Niente estensione.",
-  "nouveaux.parcours.ebay.ligne": "Impostazioni → Account eBay → Collega un account.",
+  "nouveaux.parcours.ebay.ligne": "Impostazioni → Le mie piattaforme → Account eBay, poi «Collega un account».",
   "nouveaux.parcours.ebay.ok": "Account eBay collegato",
   "nouveaux.parcours.attente": "Account visto. Lettura dei tuoi annunci…",
   "nouveaux.aide.video": "Guarda il gesto in video",
