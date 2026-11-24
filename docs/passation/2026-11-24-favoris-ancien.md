@@ -45,13 +45,20 @@ la cause précise ne se prouve que sur son compte. La 5.440.2 rend le résultat 
    Event('scroll'))` a été essayé (90e6337e4) puis RETIRÉ — `isTrusted:false` est la même preuve d'automatisation que la
    souris et le clavier (§3). C'est le navigateur qui envoie son propre « scroll ».
    ⚠️ **Limite mesurée en simulation** : l'onglet de travail est en ARRIÈRE-PLAN ; le navigateur n'y rend rien, donc
-   n'envoie pas son « scroll » — une liste qui charge sa suite au défilement ne la charge pas. Les favoris dont la ligne
-   n'est que dans cette suite ne sont PAS trouvés : dit (« pas trouvé sur la page : ouvre la page des notifications sur
-   vinted.fr »), rien n'est envoyé pour eux. Piste suivante (pas faite) : lire la suite comme la page la lit (GET de la
-   liste paginée) ne suffit pas, il faut une LIGNE à l'écran pour cliquer.
+   n'envoie pas son « scroll » — une liste qui charge sa suite au défilement ne la charge pas. D'où la règle 4 bis.
+4 bis. **L'adresse NATIVE du favori** (Julien : « c'est à l'extension d'aller capter les favoris et d'actualiser l'écran, pas
+   à moi » ; refusés : « ouvre la page des notifications », « garde l'onglet devant ») : la liste de Vinted est lue comme
+   DONNÉE (règle 2, GET paginé depuis l'onglet, lecture) ; quand la ligne n'est pas dans la cloche montrée (ou qu'elle est
+   plus bas que ce que la cloche montre), le lien web de SA notification (`/items/N/want_it/new?offering_id=U`, la forme
+   mesurée sur tomj606, article ET personne vérifiés) est OUVERT dans l'onglet de travail (`favoriLien`, une navigation
+   comme au clic de la ligne, aucun événement fabriqué) : la page de Vinted ouvre la conversation elle-même (relevé passif
+   du 23 nov. : `/inbox/want_it` puis `POST …/inquiries` 201). Rien ne dépend du rendu ni du défilement. Lien
+   d'application seulement (`vintedfr://…`, pas d'adresse web relevée) ⇒ la page complète, comme avant.
+   ⚠️ À confirmer sur un vrai compte : que l'adresse `want_it` ouverte directement ouvre bien la conversation (le
+   relevé le montre ; la simulation le reproduit). Sinon : rien n'est envoyé, « en recherche ».
 5. **Pas trouvée sur la page alors que la liste de Vinted la contient** ⇒ `notification_pas_trouvee` : rien n'est écrit, le
-   favori **attend** (il repart après les autres ; seul, dans 3 min), une fois, puis « pas envoyé » avec cette raison et
-   le geste (« ouvre la page des notifications sur vinted.fr »), la file continue. Jamais sauté pour ça.
+   favori **attend** (il repart après les autres ; seul, dans 3 min), une fois, puis « pas envoyé · notification en
+   recherche (VRM réessaie seul) » — aucune consigne à Julien ; il redevient sélectionnable. Jamais sauté pour ça.
 6. **Ordre** : la file part des favoris les plus RÉCENTS (date de leur notification ; `ordreRecents`, `api/_lib/favoris.js`) —
    ceux que la cloche montre — puis les plus anciens.
 7. **Directement la page complète** : quand la cloche n'a pas montré une ligne, VRM retient combien elle en montre

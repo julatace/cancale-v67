@@ -485,7 +485,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **24 nov. · Favoris 5.440.2 (`claude/favoris-ancien`)** : « trop ancien » faux (rangs 1, 2, 4 de la liste) ⇒ liste de Vinted indexée et lue jusqu'au bout, ligne par ses 2 identités, page pas trouvée ⇒ attend. `2026-11-24-favoris-ancien.md`. Geste : installer 5.440.2.
+- **24 nov. · Favoris 5.440.2 (`claude/favoris-ancien`)** : « trop ancien » faux (rangs 1, 2, 4 de la liste) ⇒ liste de Vinted indexée et lue jusqu'au bout, ligne pas montrée ⇒ son adresse native ouverte (onglet en arrière-plan), sinon « en recherche ». `2026-11-24-favoris-ancien.md`. Geste : installer 5.440.2.
 - **24 nov. · CI ≈ 222 → ≈ 121 min-machine par PR, job le plus long 68 → 17 min (`claude/ci-rapide`)** : mêmes contrôles (`python3 -I scripts/ci-controles.py --diff origin/main`), bancs 3 à la fois (`BANCS_PARALLELE`), ventes-e2, accessibilite et budget-vitesse en morceaux, parts rééquilibrées, `dist/` partagé pour les écrans ; la part 2/3 (annulée à 45 min à chaque PR) finit. `2026-11-24-ci-rapide.md`. Geste : aucun.
 - **24 nov. · Morceaux périmés (`claude/morceaux-perimes`)** : la page ouverte pendant une mise en ligne ne repart plus — elle fait ranger les fichiers de SA version au repos (`src/reserveMorceaux.js`), le ménage du service worker garde ceux d'une page ouverte ; un écran introuvable recharge SUR cet écran, jamais pendant une saisie ou une feuille (sinon page cachée) ; un 404 /assets/ de la prod porte `immutable`. Banc `morceaux-perimes`, audit. `2026-11-24-morceaux-perimes.md`. Geste : aucun.
 
