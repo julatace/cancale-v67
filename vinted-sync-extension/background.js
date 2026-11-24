@@ -18153,6 +18153,21 @@ async function noterArret(site, geste, code) {
     await chrome.storage.local.set({ [ARRETS_DERNIERS]: x });
   } catch (_) {}
 }
+// ══ 5.448 (`reglesservies`) — UNE VERSION DÉPASSÉE NE FAIT PAS UN GESTE DONT LA RÈGLE A CHANGÉ ══════════════════════
+//  Julien : « va encore plus loin ». Mesuré le 24 nov. : ses Chrome tournaient sur 5.409 à 5.440 en même temps. Une
+//  version dépassée continue de LIRE (rien n'est refusé), mais un GESTE dont la règle a changé depuis sa version (la
+//  liste `regles` de vrm.center/extension-version.json, lue avec la version servie) n'est pas fait avec l'ancienne
+//  règle : rien ne part, et la phrase dit la version installée, la version à installer et LE geste.
+async function regleDepassee(cle) {
+  try {
+    const g = (await chrome.storage.local.get('vrmVersionServie')).vrmVersionServie;
+    const min = g && g.regles && g.regles[cle];
+    if (!min || !VERSION_RE.test(String(min)) || !versionPlusRecente(min, CODE_VERSION)) return null;
+    noterDiag('regle_depassee_' + String(cle).replace(/[^a-z-]/g, '_').slice(0, 30));
+    const servie = VERSION_RE.test(String(g.v || '')) ? g.v : min;
+    return `Ton extension (${CODE_VERSION}) suit une ancienne règle pour ce geste : VRM ne le fait pas avec elle, rien n'est parti (les lectures continuent). Geste : installe la ${servie} — télécharge vrm.center/VRM-extension.zip, remplace le dossier, puis ⟳ dans chrome://extensions (sur l'iPhone : VRM-Orion.xpi).`;
+  } catch (_) { return null; }
+}
 // ══ 5.440 — uuid de la nouvelle messagerie ↔ ancien n° de la conversation (appris de la page, jamais deviné) ══════════
 const CONV_ROUTES = 'vrmConvRoutes', CONV_ROUTES_MAX = 300;
 const RE_UUID_CONV = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -18167,6 +18182,7 @@ async function etapeFormulaire(acc, tabId, etape, d) {
   // n'attend jamais : file occupée par un autre compte, ou en pause ⇒ refusée, rien n'est parti).
   const uidEtape = String((acc && acc.vinted_user_id) || '');
   const dansLaSienne = () => !!(_fileCourante && (!_fileCourante.uid || _fileCourante.uid === uidEtape));
+  if (!ETAPES_LECTURE_FORM.has(etape)) { const dep = await regleDepassee('vinted:' + etape); if (dep) { noterArret('vinted', etape, 'version-depassee'); return { ok: false, code: 'version-depassee', raison: dep }; } }
   if (!ETAPES_LECTURE_FORM.has(etape) && !dansLaSienne()) {
     noterDiag('formulaire_hors_file');
     const r = await auPassageFile({ sorte: SORTE_ETAPE_FILE[etape] || 'autre', site: 'vinted', uid: acc && acc.vinted_user_id, itemId: (d && (d.id || d.draftId)) || '' }, () => (dansLaSienne() ? etapeFormulaire(acc, tabId, etape, d) : { ok: false, code: 'hors-file', raison: PHRASE_HORS_FILE }));
@@ -18636,6 +18652,7 @@ function resultatInterface(o, geste) {
 // 5.433 (`filevisible`) : chaque geste d'interface entre dans la file (une étape de l'action en cours, ou une action à lui).
 const SORTE_GESTE_FILE = { 'message': 'message', 'offre': 'offre', 'favoriOuvrir': 'favori', 'favoriListe': 'favori', 'favoriAccueil': 'favori', 'ouvrir': 'message', 'repondreOffre': 'reponse', 'masquer': 'masquer', 'supprimer': 'supprimer', 'prix': 'prix', 'bordereau': 'bordereau', 'evaluation': 'evaluation', 'vacances': 'vacances' };
 async function interfaceVinted(acc, geste, d, opts = {}) {
+  { const dep = await regleDepassee('vinted:' + geste); if (dep) { noterArret('vinted', geste, 'version-depassee'); return { status: 0, ok: false, json: null, rienParti: true, sansPage: 'element', manque: 'version', raison: dep }; } }
   const g = GESTES_INTERFACE[geste];
   const uid = String((acc && acc.vinted_user_id) || '');
   const x = d && typeof d === 'object' ? Object.assign({}, d) : {};
@@ -25714,7 +25731,11 @@ async function versionServieConnue({ attendre = false } = {}) {
         let j = null; try { j = await r.json(); } catch (_) { j = null; }
         const v = j && typeof j.version === 'string' ? j.version : '';
         if (!VERSION_RE.test(v)) { noterDiag('version_servie_forme'); return null; }
-        try { await chrome.storage.local.set({ vrmVersionServie: { v, at: Date.now() } }); } catch (_) {}
+        // 5.448 (`reglesservies`) : les gestes dont la RÈGLE a changé, avec la version où elle a changé (« vinted:supprimer »
+        //    → « 5.448.0 »). Forme inconnue ⇒ rien retenu (aucun geste n'est bloqué sur une liste illisible).
+        const regles = {};
+        if (j && j.regles && typeof j.regles === 'object' && !Array.isArray(j.regles)) for (const k of Object.keys(j.regles).slice(0, 60)) if (/^(vinted|lbc|vc):[a-zA-Z-]{2,30}$/.test(k) && VERSION_RE.test(String(j.regles[k]))) regles[k] = String(j.regles[k]);
+        try { await chrome.storage.local.set({ vrmVersionServie: { v, at: Date.now(), regles } }); } catch (_) {}
         return v;
       } catch (_) { return null; }
     })().finally(() => { _versionServieEnVol = null; });
@@ -39859,6 +39880,7 @@ async function repondreVestiaire(msg) {
   try {
     const pause = await pauseVc();
     if (pause) return { accepte: false, code: 'vc-pause', raison: `Vestiaire a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };
+    { const dep = await regleDepassee('vc:message'); if (dep) { noterArret('vc', 'message', 'version-depassee'); return { accepte: false, code: 'version-depassee', raison: dep }; } }
     let ui;
     try { ui = (await chrome.storage.local.get(VC_UI))[VC_UI] || null; } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
     if (!ui || !ui.champ || !ui.envoi) return { accepte: false, code: 'pas-appris', raison: RAISONS_UI_VC['pas-appris'] };
@@ -41711,6 +41733,7 @@ async function rechargerOnglet(tabId) {
   return false;
 }
 async function gesteLbcInterface(quoi, compte, url, ordre, budgetMs) {
+  { const dep = await regleDepassee('lbc:' + quoi); if (dep) { noterArret('lbc', quoi, 'version-depassee'); return { rien: true, code: 'version-depassee', raison: dep }; } }
   // 5.433 (`filevisible`) : le geste entre dans la file (une étape de l'action en cours de CE compte, ou une action à lui).
   const uidF = 'lbc:' + String(compte || '').replace(/[^\w-]/g, '').slice(0, 30);
   if (!(_fileCourante && (!_fileCourante.uid || _fileCourante.uid === uidF))) return auPassageFile({ sorte: SORTE_LBC_FILE[quoi] || 'autre', site: 'leboncoin', uid: uidF, itemId: ordre && (ordre.ad || ordre.id) ? String(ordre.ad || ordre.id) : '' }, () => gesteLbcInterface(quoi, compte, url, ordre, budgetMs));

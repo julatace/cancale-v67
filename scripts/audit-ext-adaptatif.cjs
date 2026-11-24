@@ -21,6 +21,7 @@
 //       forme de réponse changée passe avant (« … attend la correction ») ; chaque nouveau problème dit UNE fois (notification) ;
 //   R1–R4  la page pas prête se rattrape seule : rechargée UNE fois, le même ordre repart ; jamais après un clic final ;
 //   T   « Envoyer un rapport » porte le journal de repérage et les 20 derniers arrêts (étiquettes, jamais un texte) ;
+//   V   une version dépassée lit toujours mais ne fait pas un geste dont la règle a changé (`regles` servies) ;
 //   G1  garde-fous §3 inchangés : `vintedPage` refuse toute méthode ≠ GET ; aucun `chrome.debugger`, aucune
 //       permission `debugger` ; plafond 50/h et réserve 5 ; 15/h favoris.
 //  `--prouve` : chaque règle réaffaiblie doit faire rougir l'audit.
@@ -46,6 +47,7 @@ if (process.argv.includes('--prouve')) {
     ['formeTaisee', 'src', "    if (site === 'vc') { const c = st.vrmVcCapte || {};", "    if (false) { const c = st.vrmVcCapte || {};"],
     ['jamaisGueri', 'src', "const ok = el[e.nom]; if (ok && Number(ok.at || 0) > Number(e.at || 0)) continue;", 'const ok = null;'],
     ['rapportSansReperage', 'src', "    reperage: (Array.isArray(local[TROUVE_JOURNAL])", "    sansReperage: (Array.isArray(local[TROUVE_JOURNAL])"],
+    ['regleIgnoree', 'src', "  { const dep = await regleDepassee('vinted:' + geste); if (dep) {", "  { const dep = null; if (dep) {"],
     ['trouverApres', 'manifeste', '"vrm-trouver.js",\n        "lbc-ecrire.js"', '"lbc-ecrire.js",\n        "vrm-trouver.js"'],
   ];
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-ext-adaptatif-'));
@@ -176,6 +178,24 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
     const S = await import(path.join(__dirname, '..', 'api', '_lib', 'rapport-extension.js'));
     const n = S.normaliserRapportExt(r, Date.now());
     dit(n && Array.isArray(n.reperage) && n.reperage.length === r.reperage.length && Array.isArray(n.arrets) && n.arrets.length === r.arrets.length && !/Bonjour|sophie/.test(JSON.stringify(n)), 'T le serveur les garde (liste blanche, étiquettes)', JSON.stringify(n && { a: n.arrets, r: n.reperage }).slice(0, 300));
+  }
+  // ── V : une version dépassée lit toujours, mais ne fait pas un geste dont la règle a changé ──
+  {
+    const g = faireFond({ src: F.src, connecte: '3175765377' });
+    const f0 = g.ctx.fetch;
+    const servi = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'public', 'extension-version.json'), 'utf8'));
+    dit(servi && servi.regles && /^\d+\.\d+\.\d+$/.test(servi.regles['vinted:supprimer'] || ''), 'V0 vrm.center/extension-version.json porte la liste `regles` (vinted:supprimer)', JSON.stringify(servi));
+    g.ctx.fetch = async (u, o) => (/extension-version\.json/.test(String(u)) ? { ok: true, status: 200, json: async () => ({ version: '9.1.0', regles: { 'vinted:supprimer': '9.1.0', 'lbc:message': '9.0.0', 'pas une cle': '9.1.0', 'vc:message': 'abc' } }) } : f0(u, o));
+    await g.ctx.versionServieConnue({ attendre: true });
+    const vs = g.store.vrmVersionServie || {};
+    dit(vs.v === '9.1.0' && vs.regles && vs.regles['vinted:supprimer'] === '9.1.0' && !('pas une cle' in vs.regles) && !('vc:message' in vs.regles), 'V1 les règles servies sont lues et filtrées (clé site:geste, version valide)', JSON.stringify(vs));
+    const acc = { vinted_user_id: '3175765377', login: 'x', domain: 'www.vinted.fr' };
+    const r = await g.ctx.interfaceVinted(acc, 'supprimer', { id: '123456' });
+    dit(r && r.rienParti === true && /\(5\.448\.0\) suit une ancienne règle/.test(r.raison || '') && /installe la 9\.1\.0/.test(r.raison || '') && /les lectures continuent/.test(r.raison || ''), 'V2 version dépassée pour « supprimer » ⇒ rien ne part, la phrase dit la version et LE geste', JSON.stringify(r).slice(0, 400));
+    const lbc = await require('vm').runInContext("_fileCourante = { uid: 'lbc:moi1' }; gesteLbcInterface('message', 'moi1', 'https://www.leboncoin.fr/x', {}, 1000)", g.ctx);
+    dit(lbc && lbc.rien === true && lbc.code === 'version-depassee', 'V3 Leboncoin : même règle (aucun onglet ouvert)', JSON.stringify(lbc).slice(0, 200));
+    const autre = await g.ctx.regleDepassee('vinted:message');
+    dit(autre === null, 'V4 un geste dont la règle n’a pas changé n’est pas bloqué', String(autre));
   }
   // ── R : la page pas prête se rattrape seule (Leboncoin, Vestiaire), une fois, jamais après un geste ──
   {

@@ -1,3 +1,6 @@
 {
-  "version": "5.448.0"
+  "version": "5.448.0",
+  "regles": {
+    "vinted:supprimer": "5.448.0"
+  }
 }
