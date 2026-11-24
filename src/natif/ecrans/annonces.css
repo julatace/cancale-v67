@@ -212,3 +212,6 @@
   .n-ad-plus { appearance: none; border: 0; margin: -6px 0 -6px -6px; padding: 0; background: none; flex: none; width: var(--n-cible); height: var(--n-cible); display: inline-flex; align-items: center; justify-content: center; color: var(--n-encre-2); cursor: pointer; }
   .n-ad-plus:focus-visible { outline: 2px solid var(--n-accent); outline-offset: -4px; border-radius: var(--n-r-rond); }
 }
+/* (23 nov., Julien : plus d'orange — nouvelle apparence) « N à régler » : à l'encre, un point gris ; le chevron dit que ça s'ouvre. */
+.n-ad-afaire.n-ad-aregler { color: var(--n-encre); }
+.n-ad-afaire.n-ad-aregler .n-ad-point { background: var(--n-encre-2); }

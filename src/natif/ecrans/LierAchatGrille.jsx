@@ -22,6 +22,7 @@
 // Un LOT dit combien de ses articles sont déjà reliés ; il reste proposé jusqu'à son nombre, son prix ne se divise jamais.
 // Rien n'est relié sans son toucher sur « Oui » (`relier`, seul appel d'`onRelier`).
 import React from 'react';
+import { metaDistincte, dateHeureAchat } from '../../achatDistinct.js';   // (23 nov., revue UX #10)
 import { tr, localeCourante } from '../../i18n/index.js';
 import { tousAchatsLibresDetail } from '../../suggestionsAchat.js';
 import { rangerPropositions, etatLot } from '../../relierPropositions.js';
@@ -191,7 +192,7 @@ export default function LierAchatGrille({ achats, liens, curTx = '', recuDe = nu
                 return (
                   <div key={tx} className="n-la-point-rangee" data-la-point-achat={tx}>
                     <span className="n-rf-autre-photo">{ph ? (Photo ? <Photo src={ph} alt="" loading="lazy" decoding="async"/> : <img src={ph} alt="" loading="lazy" decoding="async"/>) : null}</span>
-                    <span className="n-rf-autre-txt"><span className="n-rf-autre-titre">{a.title || '—'}</span><span className="n-rf-raison">{prixCourt(prixDe(a))}{jourCourt(a.date) ? ' · ' + tr('la.commande', { date: jourCourt(a.date) }) : ''}</span></span>
+                    <span className="n-rf-autre-txt"><span className="n-rf-autre-titre">{a.title || '—'}</span><span className="n-rf-raison">{prixCourt(prixDe(a))}{metaDistincte(a, { avecTx: !ph, locale: localeCourante() }) ? ' · ' + metaDistincte(a, { avecTx: !ph, locale: localeCourante() }) : ''}</span></span>
                     {onRetire ? <button type="button" className="n-la-plus" data-la-retire={tx} disabled={retireEnvoi === tx}
                       onClick={async () => { setRetireEnvoi(tx); try { await onRetire(a); } finally { setRetireEnvoi(''); } }}>{tr('la.point.retire')}</button> : null}
                   </div>
@@ -213,7 +214,8 @@ export default function LierAchatGrille({ achats, liens, curTx = '', recuDe = nu
                     {on ? <span className="n-la-coche" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7.2 5.8 10 11 4.2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></span> : null}</span>
                   <span className="n-la-prix" data-la-prix="">{prixCourt(px)}</span>
                   <span className="n-la-titre">{a.title || '—'}</span>
-                  <span className="n-la-date">{jourCourt(a.date)}</span>
+                  {/* (23 nov., revue UX #10) Sans photo, le n° de transaction court et la date ET l'heure : deux cases jamais identiques. */}
+                  <span className="n-la-date" data-la-distinct={metaDistincte(a, { avecTx: !ph, locale: localeCourante() })}>{ph ? (dateHeureAchat(a.date, localeCourante()) || jourCourt(a.date)) : metaDistincte(a, { avecTx: true, locale: localeCourante() })}</span>
                   <LotDit achat={a} liens={liens}/>
                 </button>
               );

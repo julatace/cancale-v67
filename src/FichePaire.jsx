@@ -282,6 +282,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const T = {
     plus: tr('fd.plus.titre'), sites: tr('fd.sites.titre'), gestes: tr('fd.gestes.titre'), histoire: tr('fd.seg.histoire'), toutVoir: tr('verre2.fiche.toutVoir'), replier: tr('fd.h.replier'),
     recu: tr('fd.argent.recu'), delier: tr('fd.argent.delier'), achatPropose: tr('fd.relier.propose'), autreAchat: tr('fd.relier.autre'), aucunSite: tr('fd.sites.aucun'), auPlus: tr('fd.argent.auPlus'), auMoins: tr('fd.f.auMoins'),
+    pourquoi: tr('fd.pourquoi'),   // (24 nov.) « Pourquoi ? » sous une ligne d'état « pas su »
     agrandir: tr('fd.photo.agrandir'), voirPhotos: (n) => tr('fd.photo.voirN', { n }), sansTitre: tr('fiche.sansTitre'), titre: motsInsecables(titre),
     etat: (e) => tr(e.court, e.vars), libelle: (k) => tr(k), raison: (k) => tr(k), site: (s) => NOM_SITE_FD[s] || s, pasLus: (s) => tr('fd.sites.pasLus', { sites: s }),
     // (21 nov., fiche-sites) L'état de CHAQUE site (src/ficheSites.js) : la date de vente est dans sa colonne, l'état ne la redit pas.
