@@ -67,7 +67,7 @@ l'ordinateur. **Le défaut ne change pas** : sans choix, aucun attribut, aucune 
 - Résultats : voir « État à la reprise ».
 
 ## État à la reprise
-- PR #1380 (base `main`), **à fusionner APRÈS #1326 et #1355** (la branche part des deux). Pas fusionnée.
+- PR #1380 (base `main`) ; #1326 est fusionnée, **#1355 (visuel-jeu) est contenue dans cette branche** (la fusionner avant, ou celle-ci l'emporte). Pas fusionnée.
 - Banc `styles-choix`, build de la branche : **537 verts, 0 rouge** — 10 styles + « Actuel » × clair/sombre × 390 × Ventes,
   Annonces, fiche, + les tuiles (11, à l'écran, « Nuit » appliqué sans recharger et rangé, « Actuel » revient, cibles ≥ 44).
 - Rouge prouvé : chaque mutation rougit sa règle (`sansstyle` A, `orange` D, `pale` B, `petit` C, `appui` F, `vieux` E,
@@ -85,6 +85,23 @@ l'ordinateur. **Le défaut ne change pas** : sans choix, aucun attribut, aucune 
   sur le titre ; (3) `complements.css` met « Relier · + prix » en liens par des `!important` en couche ⇒ scopés au style
   actuel par `:where(:root:not([data-style]))` (spécificité inchangée) ; (4) un plein noir (Encre, Studio, Papier) ne peut
   pas foncer : il s'éclaircit enfoncé (règle du générateur, luminance < 0,02).
+
+## Reprise du 24 nov. (soir) : Monochrome, Ma journée dans le banc
+- `origin/main` fusionné (vrai merge) ; CLAUDE.md §9 : la ligne « CI ≈ 222 → 121 » déplacée telle quelle dans
+  `historique-divers.md` (< 60 000 octets).
+- **Monochrome** ajouté par la table (voir tableau) ; première tuile après « Actuel » (`STYLES` de `styleChoix.js` ;
+  `demarrage-theme.js` porte la même liste). Clés `v2.style.monochrome(.desc)` en 5 langues ; Quoi de neuf : « Onze styles à
+  essayer, dont Monochrome ».
+- **Ma journée** entre dans le banc (`ECRANS` par défaut `journee,ventes,annonces,fiche`). Elle a trouvé, dans TOUS les styles :
+  « 7 j · 30 j · Mois » à 43 de large (⇒ 44), le choix posé sur le curseur de la carte du haut illisible la nuit (1,1–1,4:1 ⇒
+  l'encre de la carte), le point « geste » de la ligne de fraîcheur ambre la nuit (⇒ l'ardoise du style).
+- **H** (styles à `second: 'contour'`) : secondaire à contour ≥ 3:1, texte/liens soulignés, ronds à plaque et contour.
+- Banc complet (Actuel + 11 styles × clair/sombre × 390 × 4 écrans + tuiles) : **748 verts** ; les 3 seuls rouges étaient
+  « Actuel » sombre (le point de fraîcheur orange, `--d-point-ambre: #FF9F0A` des feuilles d'avant) — le défaut, que ce lot ne
+  change pas : D y est désormais RAPPORTÉ (ℹ️), règle pour chaque style. À régler dans un lot du défaut.
+- Rouge sur `main` (build d'`origin/main`, `BANC_DIST`) : A, C, E, F, T. Mutations sur Monochrome, chacune rougit sa règle :
+  `sansstyle` A, `orange` D (+B), `pale` B, `petit` C, `appui` F, `vieux` E, `deborde` G, `fondu` H.
+- Pas de police web (Plus Jakarta Sans / Figtree de la maquette) : police du système dans ce lot.
 
 ## Reste
 - Écrans plus anciens (Achats, Argent, Messages, Paramètres) : jetons et composants natifs suivent ; les boutons d'avant
