@@ -29,10 +29,10 @@
 //   P2  la même, mais DEUX mises en ligne (B puis C) et une AUTRE page qui s'ouvre
 //       sur C entre-temps (un 2e onglet) : le service worker range C et fait son
 //       ménage — la page restée sur A doit continuer comme en P1.
-//   P3  la mise en ligne tombe AVANT que la réserve ait fini (page ouverte depuis
-//       quelques secondes) : un écran dont le fichier n'existe plus nulle part.
-//       Au plus UN rechargement, sans « Mettre à jour VRM » ni écran tombé, qui
-//       arrive sur l'écran demandé, en B ; jamais une boucle.
+//   P3  la mise en ligne tombe AVANT que la réserve ait fini : les écrans un à un
+//       jusqu'au premier dont le fichier n'existe plus nulle part. UN rechargement,
+//       sans « Mettre à jour VRM » ni écran tombé, qui arrive SUR cet écran, en B ;
+//       jamais une boucle.
 //   P4  un texte EN COURS DE SAISIE quand un préchargement de fond rate (après la
 //       mise en ligne) : AUCUN rechargement, le texte reste ; la page se relit
 //       quand elle passe en arrière-plan (invisible), sur le même écran.
@@ -303,17 +303,22 @@ const ECRANS = ['settings', 'dashboard', 'emails', 'communaute', 'garage', 'sema
     site.dist = DIST_B;   // la réserve n'a pas commencé
     await relireVersion(pg); await attendre(1500);
     const navs = vu.navs;
-    await aller(pg, 'settings');
-    await attendre(600);
-    const voulu = await pg.evaluate(() => history.state && history.state.vrmTab).catch(() => null);   // l'écran que la coque a ouvert (Réglages)
-    await attendre(8400);
-    await pg.waitForLoadState('load').catch(() => {});
-    await attendre(4000);
-    const e = await etatPage(pg);
-    const v = await versionDe(pg);
-    if (DEBUG) console.log(`   ${n} : ${vu.navs} chargement(s), version ${v}, url ${e.url}, maj ${e.majEcran}, attente ${e.attente}`);
-    await shot(pg, `${n}-settings`);
-    dit(vu.navs - navs <= 1, `${n} au plus UN rechargement (jamais une boucle)`, `${vu.navs} chargement(s)`);
+    // Les écrans un à un, jusqu'au premier dont le fichier n'existe plus nulle part (lequel dépend de ce que la page a
+    // déjà chargé ou que le cache HTTP garde) : c'est lui qui doit recharger, SUR lui.
+    let voulu = null, e = null, v = null;
+    for (const tab of ECRANS) {
+      await aller(pg, tab);
+      await attendre(600);
+      const t = await pg.evaluate(() => history.state && history.state.vrmTab).catch(() => null);
+      await attendre(4400);
+      await pg.waitForLoadState('load', { timeout: 15000 }).catch(() => {});
+      if (DEBUG) console.log(`   P3 ${tab} : écran ${t}, ${vu.navs - navs} rechargement(s)`);
+      if (vu.navs > navs) { voulu = t; await attendre(5000); break; }
+    }
+    e = await etatPage(pg); v = await versionDe(pg);
+    if (DEBUG) console.log(`   ${n} : ${vu.navs} chargement(s), version ${v}, écran ${e.tab}, maj ${e.majEcran}, attente ${e.attente}`);
+    await shot(pg, `${n}-apres-rechargement`);
+    dit(vu.navs - navs === 1, `${n} un écran introuvable ⇒ UN rechargement (jamais une boucle)`, `${vu.navs - navs} rechargement(s)`);
     dit(v === vB && !!voulu && e.tab === voulu && voulu !== 'journee', `${n} la page repart en B, SUR l’écran demandé (« ${voulu} »)`, `${v} · écran « ${e.tab} » · ${e.texte.slice(0, 60)} · ${JSON.stringify(e.recharges)}`);
     dit(!e.majEcran && !e.attente, `${n} l’écran s’affiche (ni « Mettre à jour VRM », ni attente restée)`, e.texte.slice(0, 120));
     const res = await parcourir(n, pg, vu);
