@@ -30,10 +30,16 @@ export const anneeSureDeVente = (tsVente, tsLecture) => {
 
 // La date de VENTE d'une ligne « à dater » de `ventesDeclarables` (Vinted :
 // `dateVente`, la date de la commande). Illisible ⇒ `null`.
+// (16 nov., vitesse-volume) Gardée par ligne (identité de l'objet, jamais modifié après sa construction) :
+// Ma journée la relit pour chaque ligne à dater à chaque rendu (20 000 ventes : des milliers de lignes).
+const _tsVenteM = new WeakMap();
 export const tsVenteADater = (l) => {
   if (!l) return null;
+  if (typeof l === 'object' && _tsVenteM.has(l)) return _tsVenteM.get(l);
   const t = typeof l.tsVente === 'number' ? l.tsVente : Date.parse(l.dateVente || '');
-  return Number.isFinite(t) && t > 0 ? t : null;
+  const r = Number.isFinite(t) && t > 0 ? t : null;
+  if (typeof l === 'object') _tsVenteM.set(l, r);
+  return r;
 };
 
 const r2 = (x) => Math.round(x * 100) / 100;

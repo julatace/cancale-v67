@@ -62,9 +62,11 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
   const b = await chromium.launch({ executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] }).catch(() => chromium.launch());
   const res = { ventes: Number(process.env.VENTES) || 0, ecrans: {}, publie: {}, erreurs: [] };
   try {
-    const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: 1512, height: 982 } });
-    if (SESSION) await ctx.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); localStorage.setItem('schema_cloisonne', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1'); } catch (_) {} }, SESSION);
-    else await ctx.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1'); } catch (_) {} });
+    // (16 nov., vitesse-moteur) CAPTURES=<préfixe> : une capture par écran relevé ; LARGEUR=390 (tactile) ; SOMBRE=1.
+    const larg = Number(process.env.LARGEUR) || 1512, tel = larg < 600;
+    const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: larg, height: tel ? 844 : 982 }, ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
+    if (SESSION) await ctx.addInitScript(([s, sombre]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); localStorage.setItem('schema_cloisonne', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, [SESSION, !!process.env.SOMBRE]);
+    else await ctx.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, !!process.env.SOMBRE);
     let derniere = Date.now();
     await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
     await ctx.route('**/rest/v1/**', async (route) => {
@@ -92,7 +94,7 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
     const pg = await ctx.newPage();
     pg.on('pageerror', (e) => res.erreurs.push(e.message.slice(0, 200)));
     for (const tab of ONGLETS) {
-      await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'commit' });
+      await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'commit', timeout: 240000 });   // (16 nov.) machine chargée : l'écran d'avant peut tenir la page longtemps
       await pg.waitForSelector('.vrm-main', { timeout: 90000 }).catch(() => {});
       derniere = Date.now(); const fin = Date.now() + 120000;
       while (Date.now() - derniere < 4000 && Date.now() < fin) await attendre(250);
@@ -121,7 +123,7 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
       }
       await pg.evaluate(() => { for (const [k, e, v] of (window.__vrmOuverts || []).reverse()) { if (k === 'details') e.open = false; else if (k === 'hidden') e.hidden = true; else e.style.display = v; } window.__vrmOuverts = []; window.scrollTo(0, 0); const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; }).catch(() => {});
       { derniere = Date.now(); const fin2 = Date.now() + 60000; while (Date.now() - derniere < 2500 && Date.now() < fin2) await attendre(250); await attendre(800); }
-      res.ecrans[tab] = await pg.evaluate(() => {
+      const releve = () => pg.evaluate(() => {
         const main = document.querySelector('.vrm-main') || document.body;
         const texte = (main.innerText || '').replace(/[\u00a0\u202f]/g, ' ');
         const montants = texte.match(/-?\d[\d ]*(?:,\d{1,2})? ?€/g) || [];
@@ -132,6 +134,20 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
         for (const e of main.querySelectorAll('*')) attrs.push(...[...e.attributes].filter((a) => a.name.startsWith('data-') && /^-?\d+(?:[.,]\d+)?$/.test(a.value)).map((a) => a.name + '=' + a.value).sort());
         return { montants, comptes, attrs };
       });
+      // (24 nov., vitesse-moteur) LE RELEVÉ D'UN ÉCRAN STABLE. « Aucune lecture depuis 4 s » ne dit pas que l'écran a fini :
+      // à 20 000 ventes, sur une machine chargée, le calcul et le rendu des réponses arrivées continuent sans aucune lecture
+      // (mesuré : Ventes relevé sans ses « 14 bordereaux / 35 bordereaux » une passe sur deux, même build). Le relevé est
+      // donc refait toutes les 3 s jusqu'à DEUX relevés identiques de suite (sans lecture entre eux) ; jamais
+      // stable en 3 min ⇒ `instable` noté, et compare-chiffres-volume le dit rouge (jamais un vert sur un écran pas fini).
+      { let r0 = await releve(), essais = 1, stable = false; const finS = Date.now() + 180000;
+        while (Date.now() < finS) {
+          const d0 = derniere; await attendre(3000);
+          while (Date.now() - derniere < 2500 && Date.now() < finS) await attendre(250);
+          const r1 = await releve(); essais++;
+          if (derniere === d0 && JSON.stringify(r1) === JSON.stringify(r0)) { stable = true; break; }
+          r0 = r1;
+        }
+        res.ecrans[tab] = r0; res.ecrans[tab].releves = essais; if (!stable) res.ecrans[tab].instable = true; }
       // (22 nov., P1 — Annonces virtualisée) L'IDENTITÉ de chaque rangée : article ↔ N° ↔ sites, relevée en faisant défiler
       // TOUTE la liste (une liste virtualisée ne pose que les rangées visibles : on les relève toutes, au fil du défilement).
       if (/^annonces/.test(tab)) {
@@ -149,6 +165,7 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
         }
         res.ecrans[tab].identites = [...vus.entries()].sort((x, y) => (x[0] < y[0] ? -1 : 1)).map(([k, v]) => k + '=' + v);
       }
+      if (process.env.CAPTURES) await pg.screenshot({ path: `${process.env.CAPTURES}-${tab}.png` }).catch(() => {});
     }
     const ls = await pg.evaluate(() => Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)])));
     for (const [k, v] of Object.entries(ls)) { const kk = k.replace(/_[0-9a-f-]{36}$/, ''); if (!PUBLIE.test(kk)) continue; let x = v; try { x = JSON.parse(v); } catch (_) {} res.publie[kk] = nettoie(x); }

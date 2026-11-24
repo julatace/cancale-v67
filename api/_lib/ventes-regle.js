@@ -51,7 +51,11 @@ export const classifyOrderStatus = (status) => {
   return r;
 };
 
-export const tsCommande = (o) => Date.parse((o && o.date) || '') || 0;
+export const tsCommande = (o) => {
+  if (!o || typeof o !== 'object') return Date.parse((o && o.date) || '') || 0;
+  const m = tsCommande.memo || (tsCommande.memo = new WeakMap());
+  let v = m.get(o); if (v === undefined) { v = Date.parse(o.date || '') || 0; m.set(o, v); } return v;
+};
 
 export const montantCommande = (o) => {
   const p = o && o.price;
