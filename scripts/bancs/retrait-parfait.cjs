@@ -188,7 +188,18 @@ const toucher = (pg, sel) => pg.evaluate((s) => { const e = document.querySelect
       const orG = await pg.evaluate((s) => (0, eval)(s)('[data-gc]'), ORANGE);
       dit(orG.length === 0 && g.deb <= 1 && g.debPage <= 1, `G5 aucun orange, rien ne déborde (${g.deb}, ${g.debPage})`, orG);
       await pg.screenshot({ path: path.join(SHOTS, `comptoir-${W}-${th}.png`) });
-      // G4 — « Retiré » sur le 1er colis : la rangée sort de sa carte aussitôt
+      // G5 — le geste RETOUR (la même page : une marque posée avant doit survivre ; aucun rechargement)
+      await pg.evaluate(() => { window.__marqueBanc = 1; });
+      await pg.evaluate(() => history.back());
+      const ferme = await attendre(pg, () => !document.querySelector('[data-gc]'), 4000);
+      const reste = await pg.evaluate(() => !!document.querySelector('[data-rp]') && window.__marqueBanc === 1);
+      const rel = await pg.evaluate(() => window.__wlRel || 0);
+      dit(ferme && reste, `G5 le geste retour ferme la feuille, Achats reste, même page (${ferme}, ${reste})`);
+      dit(rel >= 1, `G3 le Wake Lock est relâché à la fermeture (${rel})`);
+      // G4 — rouvrir sur le 1er colis, « Retiré » : la rangée sort de la carte aussitôt
+      await toucher(pg, '[data-rp-code="551234"] [data-v2-en-grand], [data-rp-code="551234"] [data-rp-billet]');
+      await attendre(pg, () => !!document.querySelector('[data-gc]'), 5000);
+      await pg.waitForTimeout(600);
       await toucher(pg, '[data-gc-diapo] [data-gc-retirer]');
       const sorti = await attendre(pg, () => !document.querySelector('[data-rp-colis][data-rp-code="551234"]'), 6000);
       g = await pg.evaluate(guichet);
@@ -196,13 +207,9 @@ const toucher = (pg, sel) => pg.evaluate((s) => { const e = document.querySelect
       await toucher(pg, '[data-gc-diapo] [data-gc-annuler]');
       const revenu = await attendre(pg, () => !!document.querySelector('[data-rp-colis][data-rp-code="551234"]'), 6000);
       dit(revenu, '« Annuler » remet le colis dans sa carte');
-      // G5 — le geste retour
-      await pg.goBack().catch(() => {});
-      const ferme = await attendre(pg, () => !document.querySelector('[data-gc]'), 4000);
-      const reste = await pg.evaluate(() => !!document.querySelector('[data-rp]'));
-      const rel = await pg.evaluate(() => window.__wlRel || 0);
-      dit(ferme && reste, `G5 le geste retour ferme la feuille, Achats reste (${ferme}, ${reste})`);
-      dit(rel >= 1, `G3 le Wake Lock est relâché à la fermeture (${rel})`);
+      await toucher(pg, '[data-gc-fermer]');
+      const ferme2 = await attendre(pg, () => !document.querySelector('[data-gc]'), 4000);
+      dit(ferme2 && await pg.evaluate(() => window.__marqueBanc === 1), `G5 « Fermer » ferme la feuille, même page (${ferme2})`);
       // P4 bis : 10:00 ⇒ ouvert
       await pg.clock.setFixedTime(new Date(T1000));
       await pg.reload({ waitUntil: 'domcontentloaded' });

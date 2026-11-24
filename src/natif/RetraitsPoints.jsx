@@ -284,10 +284,12 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc, variant
           </span>
           {!c && echeance ? <span className="n-rp-etiquette n-rp-etat" data-n-ton={echeance.presse ? 'ambre' : 'neutre'} data-rp-rebours={echeance.cle}>{echeance.texte}</span> : null}
         </div>
-        {adresseTxt || horaires ? <div className="n-rp-adresse-ligne">
-          <span className="n-rp-adresse" data-rp-adresse="">{adresseTxt ? <span className="n-rp-adresse-txt">{adresseTxt}</span> : null}{horaires ? <span className="n-rp-horaires" data-rp-horaires="" data-rp-ouverture={ouv ? ouv.etat : undefined} data-rp-horaires-jour={ouv ? ouv.jour || '' : undefined}>{adresseTxt ? ' · ' : ''}{horaires}</span> : null}</span>
+        {adresseTxt || (horaires && !ouv) ? <div className="n-rp-adresse-ligne">
+          <span className="n-rp-adresse" data-rp-adresse="">{adresseTxt ? <span className="n-rp-adresse-txt">{adresseTxt}</span> : null}{horaires && !ouv ? <span className="n-rp-horaires" data-rp-horaires="">{adresseTxt ? ' · ' : ''}{horaires}</span> : null}</span>
           {lien && !c ? <a className="n-rp-itineraire" href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">{Icon ? <Icon name="pin" size={15}/> : null}<span>{tr('retraits.v.itineraire')}</span></a> : null}
         </div> : null}
+        {/* (24 nov., retrait-parfait) L'OUVERTURE sur sa propre ligne (elle passe à la ligne si besoin, l'adresse reste sur une). */}
+        {horaires && ouv ? <p className="n-rp-ouverture n-rp-horaires" data-rp-horaires="" data-rp-ouverture={ouv.etat} data-rp-horaires-jour={ouv.jour || ''}>{horaires}</p> : null}
       </header>
       {colis.length ? <ul className="n-rp-liste">
         {comptes.map((x) => <LigneColis key={x.cle || x.id} x={x} aides={aides} Photo={Photo} Icon={Icon} nouveaux={nouveaux} guichet={guichet} avecLimite={avecLimite} loc={loc}/>)}
@@ -310,7 +312,7 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc, variant
         {lien ? <span className="n-bouton-bloc"><a className="n-bouton n-action" data-n-variante="teinte" href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">
           <span className="n-bouton-icone" aria-hidden="true">{Icon ? <Icon name="pin" size={18}/> : null}</span><span className="n-bouton-libelle">{tr('retraits.v.itineraire')}</span></a></span> : null}
         <span className="n-bouton-bloc"><button type="button" className="n-bouton n-action" data-n-variante={premier ? 'plein' : 'teinte'} data-rp-code-plein="" data-rp-montrer={String(nMontrer)} onClick={() => guichet(colis.find((x) => x.code || x.code2 || aides.qrSrc(x)) || colis[0])}>
-          <span className="n-bouton-icone" aria-hidden="true">{Icon ? <Icon name="qr" size={18}/> : null}</span><span className="n-bouton-libelle">{tr('retraits.g.montrer', { n: nMontrer })}</span></button></span>
+          <span className="n-bouton-icone" aria-hidden="true">{Icon ? <Icon name="qr" size={18}/> : null}</span><span className="n-bouton-libelle">{nMontrer > 1 ? tr('retraits.g.montrerN', { n: nMontrer }) : tr('retraits.g.montrer1')}</span></button></span>
       </div> : variante === 'c' && (lien || codeSeul) ? <div className="n-actions n-rp-actions" data-n-actions={(lien ? 1 : 0) + (codeSeul ? 1 : 0)}>
         {lien ? <span className="n-bouton-bloc"><a className="n-bouton n-action" data-n-variante={premier ? 'plein' : 'teinte'} href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">
           <span className="n-bouton-icone" aria-hidden="true">{Icon ? <Icon name="pin" size={18}/> : null}</span><span className="n-bouton-libelle">{tr('retraits.v.itineraire')}</span></a></span> : null}

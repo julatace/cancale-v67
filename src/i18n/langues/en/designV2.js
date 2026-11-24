@@ -429,7 +429,8 @@ export default {
   "retraits.p.echAvant": "by {date}",
   // (24 nov., retrait-parfait) Au comptoir (src/natif/Guichet.jsx), l'ouverture du point.
   "retraits.g.titre": "At the counter",
-  "retraits.g.montrer": {"one": "Show the code", "other": "Show the codes"},
+  "retraits.g.montrer1": "Show the code",
+  "retraits.g.montrerN": "The {n} codes",
   "retraits.g.fermer": "Close",
   "retraits.g.position": "{i} of {n}",
   "retraits.g.precedent": "Previous parcel",

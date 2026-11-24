@@ -332,10 +332,12 @@
 @layer vrm-natif {
   /* (24 nov., retrait-parfait) La date limite LUE de chaque colis (plusieurs colis, dates différentes) ; le geste unique d'un
      « à vérifier » (« Retiré », bouton au trait, 44 px au doigt) ; l'ouverture du point d'après ses horaires lus. */
-  .n-rp-limite-colis { margin: 0; padding: 0 14px; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  .n-rp-ouverture { margin: 2px 0 0; padding: 0; font: var(--n-t-legende); color: var(--n-encre-2); white-space: normal; }
+  .n-rp-limite-colis { margin: 0; padding: 0 14px 0 56px; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
   .n-rp-verif { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .n-rp-verif-geste { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; margin-inline-start: auto; border-radius: 10px;
     border: 1px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: var(--n-t-second-fort); cursor: pointer; }
   @media (pointer: coarse) { .n-rp-verif-geste { min-height: var(--n-cible); } }
-  .n-rp-horaires[data-rp-ouverture="ouvert"] { color: var(--n-encre); font-weight: 600; }
+  .n-rp[data-rp-variante="c"] .n-rp-tete .n-rp-ouverture { box-sizing: border-box; width: 100%; padding-left: 48px; white-space: normal; flex: none; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-rp[data-rp-variante="c"] .n-rp-tete .n-rp-horaires[data-rp-ouverture="ouvert"] { color: var(--n-encre); font-weight: 600; }
 }
