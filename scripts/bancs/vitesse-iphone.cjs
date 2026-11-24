@@ -163,7 +163,10 @@ async function vente(pg, R) {
 }
 async function defiler(pg, cdp, R) {
   await pg.locator(`[data-n-onglet="paires"]`).first().tap({ timeout: 30000 }).catch(() => {});
-  await pg.waitForFunction(ecranPret, 'annonces', { timeout: 60000, polling: 200 }).catch(() => {}); await calme(pg, 3000, 40000);
+  await pg.waitForFunction(ecranPret, 'annonces', { timeout: 60000, polling: 200 }).catch(() => {});
+  // Les annonces de TOUS les comptes lues (le titre du groupe porte son nombre) : au moins 300 rangées promises.
+  await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-groupe-n]')].reduce((t, e) => t + (+e.getAttribute('data-eg-groupe-n') || 0), 0) >= 300 || document.querySelectorAll('[data-eg-article]').length >= 300, null, { timeout: 90000, polling: 500 }).catch(() => {});
+  await calme(pg, 3000, 40000);
   await pg.evaluate(() => { window.scrollTo(0, 0); for (const e of document.querySelectorAll('*')) if (e.scrollTop) e.scrollTop = 0; });
   await attendre(500);
   await pg.evaluate(() => { window.__im = []; const b = (t) => { window.__im.push(t); window.__raf = requestAnimationFrame(b); }; window.__raf = requestAnimationFrame(b); });
@@ -186,7 +189,7 @@ async function recherche(pg, R) {
       const v = () => { if (String(champ.value || '').endsWith(c)) return window.__frappe.push(Math.round(performance.now() - t0)); if (performance.now() - t0 < 5000) requestAnimationFrame(v); }; requestAnimationFrame(v); }, true); });
   for (const c of 'samba') { await pg.keyboard.type(c); await attendre(180); }
   await calme(pg, 1500, 20000);
-  const { L, liste } = await pg.evaluate(() => ({ L: window.__frappe.slice(), liste: Math.round(Math.max(0, ...window.__lt2.filter((t) => t > window.__derniereTouche)) - window.__derniereTouche) }));
+  const { L, liste } = await pg.evaluate(() => ({ L: window.__frappe.slice(), liste: (() => { const L = window.__lt2.filter((t) => t > window.__derniereTouche); return L.length ? Math.round(Math.max(...L) - window.__derniereTouche) : 0; })() }));
   R.frappeListe.push(liste);
   R.frappe.push(...L);
   console.log(`    recherche : lettre affichée ${L.join(' · ')} ms (médiane ${med(L)}, pire ${Math.max(...L)}) · liste à jour ${liste} ms après la dernière lettre`);
