@@ -198,3 +198,22 @@ export function SqueletteInventaire({ n = 4 }) {
     </div>
   );
 }
+
+// ── Le TRAJET d'un colis, comme une carte de niveau : des étapes PROUVÉES (`etapes` = [{ cle, fait, ici }], la règle de
+// l'appelant — src/ventesVerre.js `etapesRoute`), reliées par une piste ; le camion (ou `icone`) sur l'étape où il est. Aucune
+// étape prouvée ⇒ la piste en pointillé, sans camion (« pas su » ne dit pas « au départ »). `libelles[cle]` : le nom de chaque
+// étape pour le lecteur d'écran.
+export function Trajet({ etapes = [], Icon = null, icone = 'truck', libelles = {}, className = '' }) {
+  const L = Array.isArray(etapes) ? etapes : [];
+  if (!L.length) return null;
+  const ici = L.findIndex((e) => e && e.ici);
+  const part = ici < 0 ? 0 : ici / Math.max(1, L.length - 1);
+  const dit = ici < 0 ? tr('jeu.pasSu') : L.map((e) => (libelles[e.cle] || e.cle) + (e.fait ? ' ✓' : '')).join(' · ');
+  return (
+    <span className={cx('n-trajet', className)} role="img" aria-label={dit} data-n-trajet={ici} data-n-trajet-su={ici < 0 ? '0' : '1'} style={{ '--n-trajet-part': part }}>
+      <span className="n-trajet-piste" aria-hidden="true"><span className="n-trajet-fait"/></span>
+      {L.map((e, k) => <span key={e.cle || k} className="n-trajet-pt" data-fait={e.fait ? '1' : '0'} data-ici={e.ici ? '1' : undefined} style={{ '--k': k / Math.max(1, L.length - 1) }} aria-hidden="true"/>)}
+      {ici >= 0 && Icon ? <span className="n-trajet-pion" aria-hidden="true"><Icon name={icone} size={12}/></span> : null}
+    </span>
+  );
+}
