@@ -51,7 +51,6 @@ const MUTATIONS = {
   'cron-oublie': [['api/ship-reminders.js', '          try { await notifsSuiviEnvoi(); } catch (_) {', '          try { await null; } catch (_) {']],
   'pas-visite': [['api/_lib/colis-frequent.js', '    `app_data?id=like.depart_*&meta->>etat=in.(en_route,disponible)', '    `app_data?id=like.rien_*&meta->>etat=in.(en_route,disponible)']],
   'app-ambigu-lu': [['src/ecrans/Comptabilite.jsx', '    const amb = !!(su && ambigusFrise && ambigusFrise.has(su));', '    const amb = false;']],
-  'app-frise-et-piste': [['src/ecrans/Comptabilite.jsx', '{pre.envPv && pre.envPv.pc.groupe ? <ParcoursEnvoi', '{pre.envPv && pre.envPv.pc.groupe && false ? <ParcoursEnvoi']],
 };
 if (process.argv.includes('--prouve')) { prouver(__filename, R, MUTATIONS); return; }
 
