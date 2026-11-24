@@ -58,6 +58,8 @@ const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 10933;
 const SORTIE = process.env.CAPTURES || '';
 const MUT = process.env.BANC_MUTATION || '';
+// BANC_DSF=2 : captures nettes (SONDE seulement — les mesures E supposent 1 pixel par point CSS).
+const DSF = Number(process.env.BANC_DSF) || 1;
 const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim()).filter(Boolean);
 const LARGEURS = liste('LARGEURS', '390,1512').map(Number);
 const THEMES = liste('THEMES', 'clair,sombre');
@@ -119,7 +121,7 @@ async function rest(route, b) {
 }
 async function ouvrir(nav, { W, sombre, url, langue = null }) {
   const tel = W < 600, b = base();
-  const ctx = await nav.newContext({ ...(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 } : { viewport: { width: 1512, height: 950 } }), colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris', serviceWorkers: 'block' });
+  const ctx = await nav.newContext({ ...(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: DSF } : { viewport: { width: 1512, height: 950 }, deviceScaleFactor: DSF }), colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris', serviceWorkers: 'block' });
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(String(e.message || e).slice(0, 200)));
   await pg.addInitScript(([s, sombre, langue]) => {
