@@ -45,6 +45,8 @@ déterministe. Captures regardées (`SHOTS=`) : sur ce lot, P6 Réglages en A av
 pilule « Nouvelle version de VRM · Mettre à jour » (existante), P4 le texte « Jordan 4
 bleu 42 » toujours dans la recherche d'Achats.
 
+Après la fusion de `origin/main` (build refait) : P2, P4, P6 et P3 (réécrit : les écrans un à un jusqu'au premier introuvable) rejoués, verts ; ce P3 rouge sur main (rechargé tout seul sur Aujourd'hui, avant même le premier toucher).
+
 **Mutations** (chacune rouge) : ménage du SW sans `nomsDesPagesOuvertes` ⇒ P2 rouge
 (0/338, rechargement, 15 en 404) ; build sans la réserve de la page, sans `momentSur`
 ni `adresseDeRetour` ⇒ P6, P3, P4 rouges (9 KO). `scripts/audit-morceaux-perimes.cjs`
