@@ -22,6 +22,8 @@
 //   R1–R4  la page pas prête se rattrape seule : rechargée UNE fois, le même ordre repart ; jamais après un clic final ;
 //   T   « Envoyer un rapport » porte le journal de repérage et les 20 derniers arrêts (étiquettes, jamais un texte) ;
 //   V   une version dépassée lit toujours mais ne fait pas un geste dont la règle a changé (`regles` servies) ;
+//   A   au démarrage, chaque onglet ouvert d'un site est sondé : sans VRM ⇒ rechargé UNE fois (jamais un formulaire ni
+//       l'onglet regardé) ou dit (« recharge cet onglet ») ;
 //   G1  garde-fous §3 inchangés : `vintedPage` refuse toute méthode ≠ GET ; aucun `chrome.debugger`, aucune
 //       permission `debugger` ; plafond 50/h et réserve 5 ; 15/h favoris.
 //  `--prouve` : chaque règle réaffaiblie doit faire rougir l'audit.
@@ -48,6 +50,9 @@ if (process.argv.includes('--prouve')) {
     ['jamaisGueri', 'src', "const ok = el[e.nom]; if (ok && Number(ok.at || 0) > Number(e.at || 0)) continue;", 'const ok = null;'],
     ['rapportSansReperage', 'src', "    reperage: (Array.isArray(local[TROUVE_JOURNAL])", "    sansReperage: (Array.isArray(local[TROUVE_JOURNAL])"],
     ['regleIgnoree', 'src', "  { const dep = await regleDepassee('vinted:' + geste); if (dep) {", "  { const dep = null; if (dep) {"],
+    ['rechargeSansPrudence', 'src', "    const prudent = actifs.has(t.id) || RE_FORMULAIRE_ONGLET.test(String(t.url || ''));", '    const prudent = false;'],
+    ['rechargeRepetee', 'src', "    if (!prudent && !deja[t.id]) {", '    if (!prudent) {'],
+    ['ongletTaisu', 'src', "    if (!v && st.vrmOngletsSansVrm && Number(st.vrmOngletsSansVrm[site]) > 0) v =", '    if (false) v ='],
     ['trouverApres', 'manifeste', '"vrm-trouver.js",\n        "lbc-ecrire.js"', '"lbc-ecrire.js",\n        "vrm-trouver.js"'],
   ];
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-ext-adaptatif-'));
@@ -196,6 +201,32 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
     dit(lbc && lbc.rien === true && lbc.code === 'version-depassee', 'V3 Leboncoin : même règle (aucun onglet ouvert)', JSON.stringify(lbc).slice(0, 200));
     const autre = await g.ctx.regleDepassee('vinted:message');
     dit(autre === null, 'V4 un geste dont la règle n’a pas changé n’est pas bloqué', String(autre));
+  }
+  // ── A : au démarrage, l'extension se contrôle dans chaque onglet ouvert ──
+  {
+    const g = faireFond({ src: F.src, connecte: '3175765377' });
+    const c3 = g.ctx; const recharges = [], sess = {};
+    const tabs = [
+      { id: 1, url: 'https://www.leboncoin.fr/recherche?q=nike', status: 'complete', active: false },     // sans VRM, en fond ⇒ rechargé
+      { id: 2, url: 'https://www.vinted.fr/items/new', status: 'complete', active: false },               // sans VRM, formulaire ⇒ jamais rechargé, dit
+      { id: 3, url: 'https://www.vestiairecollective.com/', status: 'complete', active: true },           // sans VRM, onglet regardé ⇒ jamais rechargé, dit
+      { id: 4, url: 'https://www.ebay.fr/', status: 'complete', active: false },                          // VRM présent ⇒ rien
+      { id: 5, url: 'https://exemple.org/', status: 'complete', active: false },                         // autre site ⇒ jamais sondé
+    ];
+    const sondes = [];
+    c3.chrome.tabs.query = async (q) => (q && q.active ? tabs.filter((t) => t.active) : tabs);
+    c3.chrome.tabs.reload = async (id) => { recharges.push(id); };
+    c3.chrome.storage.session = { get: async (k) => ({ [k]: sess[k] }), set: async (o) => { Object.assign(sess, o); } };
+    c3.chrome.scripting.executeScript = async (o) => { sondes.push(o.target.tabId); return [{ result: o.target.tabId === 4 }]; };
+    const notifs = []; c3.chrome.notifications = { create: (id, o, cb) => { notifs.push(id); if (cb) cb(id); } };
+    const r1 = await c3.autoControleOnglets();
+    dit(recharges.join() === '1' && !sondes.includes(5), 'A1 un onglet Leboncoin sans VRM, en fond ⇒ rechargé UNE fois ; un autre site jamais sondé', JSON.stringify({ recharges, sondes, r1 }));
+    dit(!recharges.includes(2) && !recharges.includes(3), 'A2 un formulaire ou l’onglet regardé n’est JAMAIS rechargé (un texte en cours ne se perd pas)', JSON.stringify(recharges));
+    await new Promise((x) => setTimeout(x, 50));
+    const v = (g.store.vrmSanteSites || {}).sites || {};
+    dit(/recharge cet onglet Vinted/.test((v.vinted || {}).t || '') && /recharge cet onglet Vestiaire/.test((v.vc || {}).t || ''), 'A3 ce qui n’est pas rechargé est DIT : « … recharge cet onglet … » (ligne de santé)', JSON.stringify({ vi: v.vinted, vc: v.vc }));
+    await c3.autoControleOnglets();
+    dit(recharges.join() === '1', 'A4 au contrôle suivant, l’onglet déjà rechargé ne l’est pas une 2e fois (borné)', JSON.stringify(recharges));
   }
   // ── R : la page pas prête se rattrape seule (Leboncoin, Vestiaire), une fois, jamais après un geste ──
   {

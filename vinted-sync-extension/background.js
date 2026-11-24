@@ -12615,8 +12615,59 @@ function afficherRappelLbc(version){
 async function rappelerMiseAJourLbc(){
   try{const tabs=await chrome.tabs.query({url:['https://*.leboncoin.fr/*']});for(const t of tabs||[])try{await chrome.scripting.executeScript({target:{tabId:t.id},func:afficherRappelLbc,args:[CODE_VERSION]});}catch(_){}}catch(_){}
 }
-chrome.runtime.onInstalled.addListener((details) => { fullSync(); if (raisonReinjecte(details)){reinjecterPont();rappelerMiseAJourLbc();} });
-chrome.runtime.onStartup.addListener(() => { fullSync(); try { distanceReveil('demarrage').catch(() => {}); } catch (_) {} });   // 5.436 : Chrome relancé ⇒ présence et file à distance tout de suite
+// ══ 5.448 (`autocontrole`) — AU DÉMARRAGE, L'EXTENSION VÉRIFIE QU'ELLE EST BIEN DANS CHAQUE ONGLET OUVERT ══════════
+//  Julien : « va encore plus loin ». Après une mise à jour ou un redémarrage, un onglet Vinted / Leboncoin / Vestiaire /
+//  eBay ouvert AVANT garde l'ancienne page, sans les scripts de VRM : rien n'y est lu, aucun geste n'y répond — en
+//  silence. Ici, 20 s après le démarrage : chaque onglet de ces sites est sondé (dans le monde isolé de l'extension, une
+//  lecture du DOM, aucune requête au site) — les scripts de VRM sont-ils là ? Sinon :
+//   · l'onglet n'est PAS celui que tu regardes et n'est pas un formulaire (dépôt, mise en vente, message en cours) ⇒
+//     rechargé UNE fois par VRM (une fois par onglet et par démarrage) ;
+//   · sinon (tu y es, ou tu y tapes peut-être) ⇒ jamais rechargé : la ligne de santé du site et une notification disent
+//     « recharge l'onglet … ».
+const SITES_CONTROLE = [
+  { site: 'vinted', re: /^https:\/\/[^/]*\.vinted\.(fr|com|it)\//, signe: 'vinted', nom: 'Vinted' },
+  { site: 'lbc', re: /^https:\/\/[^/]*\.leboncoin\.fr\//, signe: 'lbc', nom: 'Leboncoin' },
+  { site: 'vc', re: /^https:\/\/[^/]*\.vestiairecollective\.com\//, signe: 'vc', nom: 'Vestiaire' },
+  { site: 'ebay', re: /^https:\/\/[^/]*\.ebay\.fr\//, signe: 'ebay', nom: 'eBay' },
+];
+const RE_FORMULAIRE_ONGLET = /\/items\/new|\/items\/\d+\/edit|\/deposer|\/ai\/form|\/sell|\/sl\/|\/lstng|\/inbox|\/messages|\/messagerie|\/conversation/i;
+async function scriptsDansOnglet(tabId, signe) {
+  try {
+    const r = await chrome.scripting.executeScript({ target: { tabId, frameIds: [0] }, args: [signe], func: (s) => (s === 'vinted' ? !!globalThis.VRM_UI : s === 'lbc' ? !!window.__vrmLbcEcrire : s === 'vc' ? !!window.__vrmVcEcrire : !!window.__vrmEbayLoaded) });
+    return r && r[0] ? r[0].result === true : null;
+  } catch (_) { return null; }   // pas su (onglet fermé, accès au site retiré) : rien n'est conclu
+}
+async function autoControleOnglets() {
+  const out = [];
+  let tabs = []; try { tabs = await chrome.tabs.query({}); } catch (_) { return null; }
+  let actifs = new Set(); try { for (const t of await chrome.tabs.query({ active: true })) actifs.add(t.id); } catch (_) {}
+  let deja = {}; try { deja = (await chrome.storage.session.get('vrmAutoControle')).vrmAutoControle || {}; } catch (_) { deja = {}; }
+  const manquants = {};
+  for (const t of tabs || []) {
+    const sc = SITES_CONTROLE.find((x) => x.re.test(String(t && t.url || '')));
+    if (!sc || t.status !== 'complete' || t.discarded) continue;
+    const la = await scriptsDansOnglet(t.id, sc.signe);
+    if (la !== false) continue;
+    const prudent = actifs.has(t.id) || RE_FORMULAIRE_ONGLET.test(String(t.url || ''));
+    if (!prudent && !deja[t.id]) {
+      deja[t.id] = Date.now();
+      try { await chrome.storage.session.set({ vrmAutoControle: deja }); } catch (_) {}
+      noterDiag('autocontrole_recharge_' + sc.site);
+      try { await chrome.tabs.reload(t.id); out.push({ site: sc.site, tabId: t.id, geste: 'recharge' }); continue; } catch (_) {}
+    }
+    noterDiag('autocontrole_a_recharger_' + sc.site);
+    manquants[sc.site] = Date.now();
+    out.push({ site: sc.site, tabId: t.id, geste: 'dire' });
+  }
+  try { await chrome.storage.local.set({ vrmOngletsSansVrm: manquants }); } catch (_) {}
+  majSanteSites().catch(() => {});
+  return out;
+}
+function autoControlePlusTard() { setTimeout(() => { autoControleOnglets().catch(() => {}); }, 20000); }
+// Un onglet signalé « sans VRM » qui vient de (re)charger : revérifié 3 s après (la ligne de santé s'efface d'elle-même).
+try { chrome.tabs.onUpdated.addListener((tabId, info, tab) => { if (!info || info.status !== 'complete') return; const sc = SITES_CONTROLE.find((x) => x.re.test(String((tab && tab.url) || ''))); if (!sc) return; chrome.storage.local.get('vrmOngletsSansVrm').then((g) => { if (g && g.vrmOngletsSansVrm && g.vrmOngletsSansVrm[sc.site]) setTimeout(() => { autoControleOnglets().catch(() => {}); }, 3000); }, () => {}); }); } catch (_) {}
+chrome.runtime.onInstalled.addListener((details) => { fullSync(); if (raisonReinjecte(details)){reinjecterPont();rappelerMiseAJourLbc();} autoControlePlusTard(); });
+chrome.runtime.onStartup.addListener(() => { fullSync(); try { distanceReveil('demarrage').catch(() => {}); } catch (_) {} autoControlePlusTard(); });   // 5.436 : Chrome relancé ⇒ présence et file à distance tout de suite
 
 // ⚠️ 11 octobre (mesuré au banc, dans un vrai Chromium) : `chrome.alarms.create`
 //    REMET À ZÉRO une alarme qui existe déjà. Refait à CHAQUE réveil du service
@@ -18099,7 +18150,7 @@ function verdictElement(site, nom, ambigu) {
 }
 async function santeSites() {
   let st = {};
-  try { st = await chrome.storage.local.get([TROUVE_JOURNAL, TROUVE_CLE, TROUVE_CLE + '_lbc', TROUVE_CLE + '_vc', TROUVE_CLE + '_ebay', FORMES_VUES, 'vrmVcCapte', 'vrmLbcForme', 'vrmFlux']); } catch (_) { return null; }
+  try { st = await chrome.storage.local.get([TROUVE_JOURNAL, TROUVE_CLE, TROUVE_CLE + '_lbc', TROUVE_CLE + '_vc', TROUVE_CLE + '_ebay', FORMES_VUES, 'vrmVcCapte', 'vrmLbcForme', 'vrmFlux', 'vrmOngletsSansVrm']); } catch (_) { return null; }
   const t = Date.now(), out = {};
   const journal = Array.isArray(st[TROUVE_JOURNAL]) ? st[TROUVE_JOURNAL] : [];
   for (const site of ['vinted', 'lbc', 'vc', 'ebay']) {
@@ -18110,6 +18161,8 @@ async function santeSites() {
     if (site === 'vinted') { const fv = st[FORMES_VUES] || {}; for (const uid of Object.keys(fv)) for (const ty of Object.keys(fv[uid] || {})) if (!v) v = { k: 'forme', nom: ty, t: `Vinted a changé ${FORMES_PAGES_SANTE[ty] || 'une page'} : VRM ne la lit plus et n'en range rien de faux ; il attend la correction (la prochaine version). Geste : touche « Envoyer un rapport » dans la fenêtre de l’extension.` }; }
     if (site === 'vc') { const c = st.vrmVcCapte || {}; const q = Object.keys(c).find((k) => c[k] && c[k].inconnu === true); if (q) v = { k: 'forme', nom: q, t: `Vestiaire a changé sa page (${q}) : VRM ne la lit plus et n'en range rien de faux ; il attend la correction. Geste : touche « Envoyer un rapport » dans la fenêtre de l’extension.` }; }
     if (site === 'lbc' && st.vrmLbcForme && t - Number(st.vrmLbcForme.at || 0) < SANTE_JOURNAL_MS) v = { k: 'forme', nom: 'mes-annonces', t: "Leboncoin a changé ta page « Mes annonces » : VRM ne la lit plus et n'en range rien de faux ; il attend la correction. Geste : touche « Envoyer un rapport » dans la fenêtre de l’extension." };
+    // 1 bis. (5.448 `autocontrole`) un onglet ouvert de ce site où les scripts de VRM ne sont pas (pas rechargé par prudence).
+    if (!v && st.vrmOngletsSansVrm && Number(st.vrmOngletsSansVrm[site]) > 0) v = { k: 'onglet', nom: 'onglet', t: `${n} : un onglet ouvert n'a pas VRM chargé (il date d'avant la mise à jour) ; rien n'y est lu. Geste : recharge cet onglet ${n} (⟳ du navigateur).` };
     // 2. un élément introuvable ou en double, pas retrouvé depuis.
     if (!v) {
       const siens = journal.filter((e) => e && (e.site || 'vinted') === site && t - Number(e.at || 0) < SANTE_JOURNAL_MS).sort((a, b) => Number(b.at) - Number(a.at));
