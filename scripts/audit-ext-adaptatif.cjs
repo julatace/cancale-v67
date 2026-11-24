@@ -228,6 +228,15 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
     await c3.autoControleOnglets();
     dit(recharges.join() === '1', 'A4 au contrôle suivant, l’onglet déjà rechargé ne l’est pas une 2e fois (borné)', JSON.stringify(recharges));
   }
+  // ── X : les champs publiés dans `ext_appareil_*` pour l'app (codes seulement) ──
+  {
+    const g = faireFond({ src: F.src, connecte: '3175765377' });
+    g.store.vrmTrouverJournal = [{ site: 'lbc', nom: 'envoyer', etape: 'message', at: Date.now(), essais: [] }];
+    g.store.vrmVersionServie = { v: '9.0.0', at: Date.now(), regles: {} };
+    await g.ctx.noterArret('lbc', 'message', 'champ-introuvable');
+    const x = await g.ctx.champsSanteAppareil();
+    dit(x && x.sante && x.sante.lbc && x.sante.lbc.k === 'element' && x.sante.lbc.nom === 'envoyer' && x.arret && x.arret.code === 'champ-introuvable' && x.servie === '9.0.0' && x.depassee === true && !/ /.test(JSON.stringify(x.sante)), 'X ext_appareil porte sante{site:{k,nom}}, arret{site,geste,code,at}, servie, depassee — des codes, aucune phrase', JSON.stringify(x));
+  }
   // ── R : la page pas prête se rattrape seule (Leboncoin, Vestiaire), une fois, jamais après un geste ──
   {
     const vmm = require('vm');

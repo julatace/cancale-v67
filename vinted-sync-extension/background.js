@@ -18173,6 +18173,19 @@ async function santeSites() {
   }
   return out;
 }
+async function champsSanteAppareil() {
+  const out = {};
+  const v = await santeSites().catch(() => null);
+  if (v) { out.sante = {}; for (const k of Object.keys(v)) out.sante[k] = { k: String(v[k].k || ''), nom: String(v[k].nom || '').replace(/[^a-zA-Z_-]/g, '').slice(0, 40) }; }
+  try {
+    const g = await chrome.storage.local.get([ARRETS_DERNIERS, 'vrmVersionServie']);
+    const l = g[ARRETS_DERNIERS]; const d = Array.isArray(l) && l.length ? l[l.length - 1] : null;
+    if (d) out.arret = { site: String(d.site || ''), geste: String(d.geste || ''), code: String(d.code || ''), at: Number(d.at) || 0 };
+    const sv = g.vrmVersionServie && VERSION_RE.test(String(g.vrmVersionServie.v || '')) ? String(g.vrmVersionServie.v) : '';
+    if (sv) { out.servie = sv; out.depassee = versionPlusRecente(sv, CODE_VERSION); }
+  } catch (_) {}
+  return out;
+}
 // Recalcule, range, et dit UNE fois chaque nouveau problème (même site, même cause ⇒ jamais deux fois).
 let _santeSitesEnVol = null;
 function majSanteSites() {
@@ -25524,7 +25537,12 @@ async function publierAppareilUn(force) {
       refus: (Array.isArray(x.refus) ? x.refus.slice(-5) : []) }, x.secours ? { secours: x.secours } : {});
   }
   const data = { v: 1, appareil: decrireAppareil(), ver, code: CODE_VERSION, at: new Date(t).toISOString(), atMs: t, flux: fl, vus: local[COMPTES_VUS_STORE] || {},
-    ...(local[DIAG_NAV] ? { diag: local[DIAG_NAV] } : {}) };   // 5.409 : le diagnostic des lectures de CE navigateur
+    ...(local[DIAG_NAV] ? { diag: local[DIAG_NAV] } : {}),   // 5.409 : le diagnostic des lectures de CE navigateur
+    // 5.448 (`santesites`) : pour l'app (« Tout va bien ? », page Extension) — des CODES seulement, jamais une phrase de page :
+    //   sante   { vinted|lbc|vc|ebay: { k: 'ok'|'element'|'forme'|'onglet'|'pas-vu', nom: code de l'élément ou de la page } }
+    //   arret   le dernier arrêt { site, geste, code, at } (`noterArret`) ;  servie / depassee : la version servie lue et
+    //           « ce navigateur est en retard » (true/false ; absent = pas su).
+    ...(await avecDelai(champsSanteAppareil(), 400, {}).catch(() => ({}))) };
   // Son propre échec ne doit pas devenir « le dernier refus » d'une capture.
   const garde = [_statutDernierRefus, _familleDernierRefus, _octetsDernierRefus];
   let ok = false;
