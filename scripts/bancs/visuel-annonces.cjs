@@ -72,35 +72,35 @@ const MESURE = () => {
   const orange = (s) => { const c = lire(s); if (!c || c.a < 0.2) return false; const x = hsl(c); return x.h >= 15 && x.h <= 50 && x.s >= 0.3 && x.l >= 0.2 && x.l <= 0.85; };
   const r = { contrastes: [], cibles: [], oranges: [], debord: document.scrollingElement.scrollWidth - innerWidth, sorties: [], chevauchements: [], coupes: [], identite: [], etiq: [] };
   for (const el of document.querySelectorAll('body *')) { if (el.closest('.n-logo-site, [data-logo], .n-plaque[data-n-doublon]')) continue; const cs = getComputedStyle(el); for (const p of ['color', 'backgroundColor', 'borderTopColor', 'borderLeftColor', 'outlineColor', 'fill', 'stroke']) if (orange(cs[p]) && (p !== 'color' || el.textContent.trim())) { r.oranges.push((el.className && String(el.className).slice(0, 40)) + ':' + p + ':' + cs[p]); break; } }
-  const cartes = [...document.querySelectorAll('[data-ad-carte][data-eg-article]')];
+  const cartes = [...document.querySelectorAll('[data-ad-carte][data-eg-article], [data-ad-rangee][data-eg-article]')]; r.liste = !!document.querySelector('[data-ad-rangee][data-eg-article]');
   r.nCartes = cartes.length; r.nVisibles = cartes.filter((c) => vis(c.getBoundingClientRect())).length;
   const g = document.querySelector('[data-inv-grille]'); r.grille = !!g; r.nGrille = g ? Number(g.getAttribute('data-inv-n')) : 0; r.hGrille = g ? Math.round(g.getBoundingClientRect().height) : 0;
-  r.logosRepetes = document.querySelector('[data-eg-groupe]') ? cartes.filter((c) => c.querySelectorAll('.n-ad-ligne .n-logo-site, .n-ad-ligne [data-logo]').length === 1).length : 0;
-  r.tuiles = cartes.filter((c) => c.querySelector('.n-tuile-paire')).length; r.avatars = cartes.filter((c) => c.querySelector('[data-inv-avatar]')).length; r.pastilles = cartes.filter((c) => c.querySelector('.n-inv-stat')).length;
-  r.carres = cartes.slice(0, 12).map((c) => { const b = (c.querySelector('.n-ad-photo') || c).getBoundingClientRect(); return Math.abs(b.width - b.height) <= 1.5 ? 1 : Math.round(b.width) + 'x' + Math.round(b.height); });
+  r.logosRepetes = document.querySelector('[data-eg-groupe]') ? cartes.filter((c) => c.querySelectorAll(':is(.n-ad-ligne, .n-ar-meta) :is(.n-logo-site, [data-logo])').length === 1).length : 0;
+  r.tuiles = cartes.filter((c) => c.querySelector('.n-tuile-paire') || c.querySelector('.n-ar-photo')).length; r.etiqs = cartes.filter((c) => c.querySelector('[data-n-etiq], [data-n-doublon]')).length; r.avatars = cartes.filter((c) => c.querySelector('[data-inv-avatar]')).length; r.pastilles = cartes.filter((c) => c.querySelector('.n-inv-stat, .n-ar-stats [data-ad-stat]')).length;
+  r.carres = cartes.slice(0, 12).map((c) => { const b = (c.querySelector('.n-ad-photo, .n-ar-photo') || c).getBoundingClientRect(); return Math.abs(b.width - b.height) <= 1.5 ? 1 : Math.round(b.width) + 'x' + Math.round(b.height); });
   const att = window.__attendu || {};
   for (const c of cartes) {
-    const cle = c.getAttribute('data-eg-article'); const im = c.querySelector('.n-ad-photo img'); const src = im ? new URL(im.getAttribute('src'), location.href).pathname : null;
+    const cle = c.getAttribute('data-eg-article'); const im = c.querySelector('.n-ad-photo img, .n-ar-photo img'); const src = im ? new URL(im.getAttribute('src'), location.href).pathname : null;
     const voulu = cle in att ? att[cle] : undefined;
     if (voulu === undefined) continue;
     if ((voulu || null) !== (src || null)) r.identite.push({ cle, voulu, src });
     const e = c.querySelector('[data-n-etiq]'); const num = c.getAttribute('data-eg-numero') || '';
     if (num && !c.querySelector('[data-n-doublon]') && (!e || e.getAttribute('data-n-etiq') !== num.toUpperCase())) r.etiq.push({ cle, num, etiq: e && e.getAttribute('data-n-etiq') });
   }
-  r.leurreVu = (window.__leurre || []).map((k) => { const c = document.querySelector(`[data-eg-article="${CSS.escape(k)}"]`); const im = c && c.querySelector('.n-ad-photo img'); return im ? new URL(im.getAttribute('src'), location.href).pathname : null; });
+  r.leurreVu = (window.__leurre || []).map((k) => { const c = document.querySelector(`[data-eg-article="${CSS.escape(k)}"]`); const im = c && c.querySelector('.n-ad-photo img, .n-ar-photo img'); return im ? new URL(im.getAttribute('src'), location.href).pathname : null; });
   const dans = (b, p, m = 0.6) => b.left >= p.left - m && b.right <= p.right + m && b.top >= p.top - m && b.bottom <= p.bottom + m;
   const croise = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.6 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.6;
   const vues = cartes.filter((c) => vis(c.getBoundingClientRect()));
   for (const c of vues) {
-    const B = c.getBoundingClientRect(); const P = c.querySelector('.n-ad-photo').getBoundingClientRect();
+    const B = c.getBoundingClientRect(); const P = (c.querySelector('.n-ad-photo') || c).getBoundingClientRect();
     const sur = ['.n-etiq', '.n-inv-plaque', '.n-inv-avatars', '.n-inv-stats', '.n-ad-bandeau', '.n-ad-conseil', '.n-ad-coche'].map((q) => c.querySelector('.n-ad-photo ' + q)).filter(Boolean);
     for (const e of sur) { const b = e.getBoundingClientRect(); if (!dans(b, P, 1)) r.sorties.push({ q: e.className, b: [Math.round(b.left - P.left), Math.round(b.right - P.right), Math.round(b.top - P.top), Math.round(b.bottom - P.bottom)] }); }
     for (let i = 0; i < sur.length; i++) for (let j = i + 1; j < sur.length; j++) if (croise(sur[i].getBoundingClientRect(), sur[j].getBoundingClientRect())) r.chevauchements.push(sur[i].className + ' × ' + sur[j].className);
-    const ligne = [...c.querySelectorAll('.n-ad-ligne > *')].filter((e) => e.getBoundingClientRect().width > 0);
-    for (const e of [c.querySelector('.n-ad-titre'), ...ligne]) if (e && !dans(e.getBoundingClientRect(), B, 0.6)) r.sorties.push({ q: e.className || e.tagName, carte: c.getAttribute('data-eg-article') });
+    const ligne = [...c.querySelectorAll('.n-ad-ligne > *, .n-ar-meta > *, .n-ar-haut > *')].filter((e) => e.getBoundingClientRect().width > 0 && !e.closest('.n-ar-rapides'));
+    for (const e of [c.querySelector('.n-ad-titre, .n-ar-titre'), ...ligne]) if (e && !dans(e.getBoundingClientRect(), B, 0.6)) r.sorties.push({ q: e.className || e.tagName, carte: c.getAttribute('data-eg-article') });
     for (let i = 0; i < ligne.length; i++) for (let j = i + 1; j < ligne.length; j++) if (!ligne[i].classList.contains('n-ad-espace') && !ligne[j].classList.contains('n-ad-espace') && croise(ligne[i].getBoundingClientRect(), ligne[j].getBoundingClientRect())) r.chevauchements.push('ligne:' + ligne[i].className + ' × ' + ligne[j].className);
-    for (const e of c.querySelectorAll('.n-ad-prix, .n-etiq, .n-inv-stat, .n-ad-bandeau')) if (e.scrollWidth > e.clientWidth + 1) r.coupes.push(e.textContent);
-    const t = c.querySelector('.n-ad-titre'); if (t) { const lh = parseFloat(getComputedStyle(t).lineHeight); const h = t.getBoundingClientRect().height; if (Math.abs(h / lh - Math.round(h / lh)) > 0.05) r.coupes.push('titre à demi-ligne ' + h + '/' + lh); }
+    for (const e of c.querySelectorAll('.n-ad-prix, .n-ar-prix, .n-etiq, .n-inv-stat, .n-ad-bandeau, .n-ad-etiquette')) if (e.scrollWidth > e.clientWidth + 1) r.coupes.push(e.textContent);
+    const t = c.querySelector('.n-ad-titre, .n-ar-titre'); if (t) { const lh = parseFloat(getComputedStyle(t).lineHeight); const h = t.getBoundingClientRect().height; if (Math.abs(h / lh - Math.round(h / lh)) > 0.05) r.coupes.push('titre à demi-ligne ' + h + '/' + lh); }
   }
   for (let i = 0; i < vues.length; i++) for (let j = i + 1; j < Math.min(vues.length, i + 6); j++) if (croise(vues[i].getBoundingClientRect(), vues[j].getBoundingClientRect())) r.chevauchements.push('cartes ' + i + '×' + j);
   const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -112,7 +112,7 @@ const MESURE = () => {
   }
   for (const el of document.querySelectorAll('[data-eg-liste] button, [data-tt] [data-ad-carte] button, [data-ad-carte]')) { const b = el.getBoundingClientRect(); if (!vis(b)) continue; if (b.width < 44 || b.height < 44) r.cibles.push({ q: (el.getAttribute('aria-label') || el.tagName).slice(0, 30), w: Math.round(b.width), h: Math.round(b.height) }); }
   r.animees = cartes.filter((c) => getComputedStyle(c).animationName !== 'none').length;
-  r.imgsCachees = [...document.querySelectorAll('[data-ad-carte] .n-ad-photo img')].filter((i) => Number(getComputedStyle(i).opacity) < 1).length;
+  r.imgsCachees = [...document.querySelectorAll('[data-ad-carte] .n-ad-photo img, [data-ad-rangee] .n-ar-photo img')].filter((i) => Number(getComputedStyle(i).opacity) < 1).length;
   return r;
 };
 
@@ -124,10 +124,10 @@ const INIT = () => {
   // Chaque image : un squelette a-t-il été montré ? quand la 1re carte est-elle là, et comment (opacité, délai) ?
   const tick = () => { try {
     if (document.querySelector('[data-inv-attente], [data-ad-attente], .n-attente, [aria-busy="true"]')) window.__os++;
-    { const o = document.querySelector('[data-inv-attente] .n-inv-os'); if (o) { const b = o.getBoundingClientRect(); window.__osBoite = [b.left, b.top + scrollY, b.width, b.height].map(Math.round); } }
-    if (!window.__premiere) { const c = document.querySelector('[data-ad-carte][data-eg-article]'); if (c) { const cs = getComputedStyle(c); { const b = c.getBoundingClientRect(); window.__carteBoite = [b.left, b.top + scrollY, b.width, b.height].map(Math.round); }
+    { const o = document.querySelector('[data-inv-attente] .n-inv-os, [data-inv-attente] .n-ar-os'); if (o) { const b = o.getBoundingClientRect(); window.__osBoite = [b.left, b.top + scrollY, b.width, b.height].map(Math.round); } }
+    if (!window.__premiere) { const c = document.querySelector('[data-ad-carte][data-eg-article], [data-ad-rangee][data-eg-article]'); if (c) { const cs = getComputedStyle(c); { const b = c.getBoundingClientRect(); window.__carteBoite = [b.left, b.top + scrollY, b.width, b.height].map(Math.round); }
       window.__premiere = { t: performance.now(), op: Number(cs.opacity), delai: parseFloat(cs.animationDelay) || 0, anim: cs.animationName };
-      const l = [...document.querySelectorAll('[data-ad-carte][data-n-revele]')]; const d = l.map((x) => parseFloat(getComputedStyle(x).animationDelay) * 1000 || 0); const du = l.map((x) => parseFloat(getComputedStyle(x).animationDuration) * 1000 || 0);
+      const l = [...document.querySelectorAll('[data-ad-carte][data-n-revele], [data-ad-rangee][data-n-revele]')]; const d = l.map((x) => parseFloat(getComputedStyle(x).animationDelay) * 1000 || 0); const du = l.map((x) => parseFloat(getComputedStyle(x).animationDuration) * 1000 || 0);
       const u = [...new Set(d.map((x) => Math.round(x)))].sort((x, y) => x - y); window.__cascade = { n: l.length, pas: u.length > 1 ? Math.max(...u.slice(1).map((x, i) => x - u[i])) : 0, total: d.length ? Math.max(...d) : 0, duree: du.length ? Math.max(...du) : 0 }; } }
     } catch (_) {} requestAnimationFrame(tick);
   };
@@ -156,15 +156,16 @@ async function cas(nav, nom, opts, theme) {
   const m = await pg.evaluate(MESURE);
   const cls = await pg.evaluate(() => window.__cls);
   dit(erreurs.length === 0, `aucune erreur de page`, erreurs);
-  dit(m.grille && m.nCartes > 0 && m.nCartes < Math.min(N, 200) && m.hGrille > 1000, `G grille virtualisée : ${m.nCartes} cartes montées sur ${m.nGrille} (hauteur réservée ${m.hGrille} px)`, m);
+  dit(m.grille && m.nCartes > 0 && m.nCartes < Math.min(N, 200) / 2 && m.hGrille > 1000, `G grille virtualisée : ${m.nCartes} cartes montées sur ${m.nGrille} (hauteur réservée ${m.hGrille} px)`, m);
   // Le compte est dit UNE fois : dans l'intertitre au téléphone (liste rangée par compte), sur la tuile à l'ordinateur (non rangée).
-  dit(m.tuiles === m.nCartes && m.avatars === (nom === 'tel' ? 0 : m.nCartes) && m.pastilles > m.nCartes / 2 && m.logosRepetes === 0, `G tuiles d'inventaire (${m.tuiles}) · ronds de compte sur les tuiles (${m.avatars}, ${nom === 'tel' ? 'aucun : dit dans l\'intertitre' : 'une par tuile'}) · vues/favoris dans la bande (${m.pastilles}) · logo de site répété ${m.logosRepetes}`, m.avatars);
-  dit(m.carres.every((x) => x === 1), `G photos carrées`, m.carres);
+  dit(m.tuiles === m.nCartes && m.etiqs >= m.nCartes - 2 && m.avatars === (nom === 'tel' ? 0 : m.nCartes) && m.pastilles > m.nCartes / 2 && m.logosRepetes === 0 && (nom !== 'tel' || m.liste),
+    `G ${nom === 'tel' ? 'LISTE par défaut' : 'grille « Détaillé »'} : photo (${m.tuiles}) · étiquette N° (${m.etiqs}) · ronds de compte par rangée (${m.avatars}, ${nom === 'tel' ? 'aucun : dit dans l\'intertitre' : 'une par tuile'}) · ♡/👁 (${m.pastilles}) · logo répété ${m.logosRepetes}`, m.avatars);
+  dit(m.carres.every((x) => x === 1), `G photos carrées${nom === 'tel' ? ' (60 px)' : ''}`, m.carres);
   dit(m.identite.length === 0, `I chaque carte montre la photo de SON identifiant (${m.nCartes} vérifiées)`, m.identite.slice(0, 4));
   // Le leurre : on défile jusqu'à voir ses deux cartes (la grille est virtualisée : elles ne sont montées que près de l'écran).
   m.leurre = await pg.evaluate(async () => { const el = document.scrollingElement; const vus = {}; const k = window.__leurre || [];
     for (let y = 0; y <= el.scrollHeight && Object.keys(vus).length < k.length; y += innerHeight * 0.8) { el.scrollTop = y; await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
-      for (const c of k) { const x = document.querySelector(`[data-eg-article="${CSS.escape(c)}"] .n-ad-photo img`); if (x && !vus[c]) vus[c] = new URL(x.getAttribute('src'), location.href).pathname; } }
+      for (const c of k) { const x = document.querySelector(`[data-eg-article="${CSS.escape(c)}"] :is(.n-ad-photo, .n-ar-photo) img`); if (x && !vus[c]) vus[c] = new URL(x.getAttribute('src'), location.href).pathname; } }
     el.scrollTop = 0; await new Promise((ok) => setTimeout(ok, 400)); return k.map((c) => vus[c] || null); });
   dit(m.leurre.length === 2 && m.leurre[0] && m.leurre[1] && m.leurre[0] !== m.leurre[1], `I le leurre au même titre : deux photos différentes, chacune la sienne`, m.leurre);
   dit(m.etiq.length === 0, `I l'étiquette du N° dit le N° de SA fiche`, m.etiq.slice(0, 4));
@@ -198,6 +199,24 @@ async function cas(nav, nom, opts, theme) {
       const image = await new Promise((ok) => { const v = () => { if (pret()) ok(performance.now() - t0); else if (performance.now() - t0 > 3000) ok(9999); else requestAnimationFrame(v); }; requestAnimationFrame(v); });
       mo.disconnect(); return { dom: dom == null ? 9999 : Math.round(dom), image: Math.round(image) }; });
     dit(tap.dom < 100, `S toucher un segment ⇒ 1er contenu dans la page en ${tap.dom} ms (< 100) ; à l'écran à l'image suivante : ${tap.image} ms (rapporté)`, tap);
+    // P · la praticité (téléphone) : puces au pouce, tri, glisser pour les gestes rapides, « Copier le lien ».
+    await pg.evaluate(() => { document.querySelector('[data-eg-segment="enligne"]').click(); window.scrollTo(0, 0); }); await pg.waitForTimeout(250);
+    const p1 = await pg.evaluate(async () => { const c = document.querySelector('[data-ad-puce="sansnum"]'); if (!c) return { absente: true }; const n = Number(c.getAttribute('data-ad-puce-n')); const b = c.getBoundingClientRect(); c.click();
+      await new Promise((ok) => setTimeout(ok, 150)); const l = [...document.querySelectorAll('[data-ad-rangee][data-eg-article]')]; const r = { n, vus: l.length, avecN: l.filter((x) => x.getAttribute('data-eg-numero')).length, h: Math.round(b.height) };
+      document.querySelector('[data-ad-puce="sansnum"]').click(); await new Promise((ok) => setTimeout(ok, 150)); return r; });
+    dit(!p1.absente && p1.vus === p1.n && p1.avecN === 0 && p1.h >= 44, `P puce « Sans N° » : ${p1.vus} rangée(s) = son nombre (${p1.n}), aucune avec N°, cible ${p1.h} px`, p1);
+    const p2 = await pg.evaluate(async () => { document.querySelector('[data-ad-tri]').click(); await new Promise((ok) => setTimeout(ok, 250)); const t = document.querySelector('[data-ad-tri-choix="prixHaut"]'); if (!t) return { menu: false }; t.click();
+      await new Promise((ok) => setTimeout(ok, 250)); const v = [...document.querySelectorAll('[data-eg-groupe]')][0]; const prix = [...v.querySelectorAll('[data-ad-rangee] .n-ar-prix')].map((e) => parseFloat(e.textContent.replace(/\s/g, '').replace(',', '.'))).filter((x) => !isNaN(x));
+      const r = { n: prix.length, ordonne: prix.every((x, i) => !i || x <= prix[i - 1]), tri: document.querySelector('[data-ad-tri]').getAttribute('data-ad-tri') };
+      document.querySelector('[data-ad-tri]').click(); await new Promise((ok) => setTimeout(ok, 250)); document.querySelector('[data-ad-tri-choix="recent"]').click(); await new Promise((ok) => setTimeout(ok, 250)); return r; });
+    dit(p2.n > 3 && p2.ordonne && p2.tri === 'prixHaut', `P tri « Prix décroissant » : ${p2.n} prix dans l'ordre`, p2);
+    const row = await pg.$('[data-ad-rangee][data-eg-article] .n-ar-glisse'); const bb = await row.boundingBox();
+    await pg.mouse.move(bb.x + bb.width - 70, bb.y + bb.height / 2); await pg.mouse.down(); for (let k = 1; k <= 8; k++) await pg.mouse.move(bb.x + bb.width - 70 - k * 28, bb.y + bb.height / 2 + 1); await pg.mouse.up(); await pg.waitForTimeout(350);
+    const p3 = await pg.evaluate(() => { const r = document.querySelector('[data-ad-rangee][data-ad-ouvert="1"]'); if (!r) return { ouvert: false }; const bs = [...r.querySelectorAll('[data-ad-rapide]')].map((b) => { const x = b.getBoundingClientRect(); return { cle: b.getAttribute('data-ad-rapide'), w: Math.round(x.width), h: Math.round(x.height), vu: x.left >= 0 && x.right <= innerWidth + 0.5 }; }); return { ouvert: true, cle: r.getAttribute('data-eg-article'), bs }; });
+    let lance = null; if (p3.ouvert) { await pg.click('[data-ad-rangee][data-ad-ouvert="1"] [data-ad-rapide="baisser"]'); await pg.waitForTimeout(150); lance = await pg.evaluate(() => (window.__lance || []).slice(-1)[0] || null); }
+    dit(p3.ouvert && p3.bs.length === 2 && p3.bs.every((b) => b.w >= 44 && b.h >= 44 && b.vu) && lance && lance[0] === 'baisser' && lance[1][0] === p3.cle, `P glisser la rangée : « Baisser » et « Republier » (≥ 44 px) ; « Baisser » lancé sur CETTE annonce`, { p3, lance });
+    const p4 = await pg.evaluate(async () => { const b = document.querySelector('[data-ad-rangee][data-eg-article] [data-ad-gestes]'); b.click(); await new Promise((ok) => setTimeout(ok, 300)); const ok = !!document.querySelector('[data-ad-feuille-gestes] [data-ad-geste="lien"]'); const bai = !!document.querySelector('[data-ad-feuille-gestes] [data-ad-geste="action:baisser"]'); return { lien: ok, baisser: bai }; });
+    dit(p4.lien && p4.baisser, `P « ⋯ » d'une rangée : « Copier le lien » et « Baisser le prix » sans quitter la liste`, p4);
   }
   await ctx.close();
   // 2. Contenu DÉJÀ connu : aucun squelette, aucune cascade, cartes dès la 1re image.

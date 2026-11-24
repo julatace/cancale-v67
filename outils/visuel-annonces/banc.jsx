@@ -23,14 +23,15 @@ const Icon = ({ name, size = 24 }) => { const d = ICON_PATHS[name]; if (!d) retu
 poserIcone(Icon);
 const P = new URLSearchParams(location.search);
 document.documentElement.setAttribute('data-theme', P.get('theme') === 'dark' ? 'dark' : 'light');
-try { localStorage.setItem('vrm_annonces_vue_tel', 'grille'); localStorage.setItem('vrm_tableau_annonces', JSON.stringify({ vue: 'grille' })); } catch (_) {}
+// Téléphone : la LISTE (par défaut, ?vue=grille pour « Détaillé ») ; ordinateur : la grille « Détaillé » du tableau.
+try { localStorage.setItem('vrm_annonces_vue_tel', P.get('vue') === 'grille' ? 'grille' : 'liste'); localStorage.setItem('vrm_tableau_annonces', JSON.stringify({ vue: 'grille' })); } catch (_) {}
 const N = Number(P.get('n') || 600), ARRIVEE = Number(P.get('arrivee') || 0);
 const J = 24 * 3600e3, NOW = Date.now();
 const MOD = ['Nike Air Max 1 bleu', 'adidas Handball Spezial noir', 'Nike SB Dunk Low vert', 'Nike P-6000 gris', 'Salomon XT-6 noir', 'New Balance 550 blanc vert édition très longue pour voir la coupe du titre'];
 const MARQ = ['Nike', 'adidas', 'Nike SB', 'Nike', 'Salomon', 'New Balance'];
 const photo = (i) => (i % 11 === 7 ? null : `/photo/${i}.svg`);
 const item = (i, extra = {}) => ({ id: String(10000 + i), title: MOD[i % MOD.length] + ' taille ' + (38 + (i % 8)), photo: photo(i), price: 27 + (i * 7) % 160 + (i % 3 ? 0 : 0.5), size: String(38 + (i % 8)),
-  condition: 'Très bon état', brand: MARQ[i % MARQ.length], createdTs: NOW - ((i * 5) % 50) * J, favourites: i % 4 === 3 ? undefined : (i * 3) % 41, views: (i * 13) % 1400, url: '', ...extra });
+  condition: 'Très bon état', brand: MARQ[i % MARQ.length], createdTs: NOW - ((i * 5) % 50) * J, favourites: i % 4 === 3 ? undefined : (i * 3) % 41, views: (i * 13) % 1400, url: 'https://www.vinted.fr/items/' + (10000 + i), ...extra });
 const lues = Array.from({ length: N }, (_, i) => item(i));
 // Le LEURRE : deux annonces du 1er compte affiché portent le MÊME titre, chacune SA photo.
 const L0 = Math.floor(N / 3) * 2; lues[L0].title = lues[L0 + 1].title = 'Nike Air Max 90 blanc taille 42'; lues[L0].createdTs = lues[L0 + 1].createdTs = NOW - 60e3;   // en tête de liste
@@ -62,7 +63,9 @@ function Banc() {
   const liste = React.useMemo(() => (lu ? trierArticles(filtrerArticles(M.articles, { ...opts, ...filtre, recherche: q })) : undefined), [lu, filtre, q]);
   const lignesT = React.useMemo(() => (lu ? trierArticles(M.articles).map((a) => ({ a, statut: statutTableau(a, {}) })).filter((x) => x.statut) : undefined), [lu]);
   return <VueAnnonces articles={liste} comptes={COMPTES} filtre={filtre} onFiltre={(f) => { window.__tapA = performance.now(); setFiltre(f); }} sites={sites} recherche={q} onRecherche={setQ} filtreSite={false}
-    actions={[]} onAction={() => {}} onFait={async () => ({ ok: true })} onPrix={() => {}} onRelier={() => {}} onFiche={(a) => { window.__fiche = a.cle; }}
+    actions={[{ cle: 'baisser', libelle: 'Baisser le prix', icone: 'tag', phrase: '', pour: (a) => a.annonces.some((x) => x.site === 'vinted' && x.etat === 'enligne'), juger: (l) => ({ ok: l.length > 0 }) },
+      { cle: 'recreer', libelle: 'Republier', icone: 'sync', phrase: '', pour: (a) => a.annonces.some((x) => x.site === 'vinted' && x.etat === 'enligne'), juger: (l) => ({ ok: l.length > 0 }) }]}
+    onAction={(k, l) => { (window.__lance = window.__lance || []).push([k, l.map((a) => a.cle)]); }} onFait={async () => ({ ok: true })} onPrix={() => {}} onRelier={() => {}} onFiche={(a) => { window.__fiche = a.cle; }}
     travail={{ site: 'tous', articles: lignesT, filtres: [], compte: '', majLe: lu ? NOW - 18 * 60e3 : undefined, onRafraichir: () => {} }}
     Photo={(src, o) => <img src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>}
     Logo={(s) => <span data-logo={s}/>} euros={euros} depuisTexte={(ms) => tr('egalite.jours', { n: Math.floor((NOW - ms) / J) })} nomSite={(s) => NOM_SITE[s]} Icon={Icon}/>;

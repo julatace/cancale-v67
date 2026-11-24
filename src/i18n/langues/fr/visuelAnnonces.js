@@ -2,5 +2,23 @@
 export default {
   "inv.compte": "Compte {pseudo}",
   "inv.comptesPlus": "{n} autres comptes",
-  "inv.chargement": "Chargement des annonces"
+  "inv.chargement": "Chargement des annonces",
+  "inv.copier": "Copier le lien",
+  "inv.lienCopie": "Lien copié",
+  "inv.lienPasCopie": "Lien pas copié",
+  "inv.rapide.baisser": "Baisser",
+  "inv.rapide.republier": "Republier",
+  "inv.puces": "Trier et filtrer",
+  "inv.tri.titre": "Trier",
+  "inv.tri.recent": "Plus récentes",
+  "inv.tri.prixHaut": "Prix décroissant",
+  "inv.tri.prixBas": "Prix croissant",
+  "inv.tri.vues": "Plus vues",
+  "inv.tri.favoris": "Plus de favoris",
+  "inv.tri.anciennes": "Les plus anciennes",
+  "inv.puce.sansnum": "Sans N°",
+  "inv.puce.aconfirmer": "À confirmer",
+  "inv.affichage": "Affichage",
+  "inv.vue.liste": "Liste",
+  "inv.vue.grille": "Détaillé"
 };

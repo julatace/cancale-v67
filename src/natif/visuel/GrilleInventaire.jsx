@@ -24,8 +24,9 @@ const DEBORD = 3;            // rangées montées au-dessus et au-dessous de l'�
 const ESTIME_LARGEUR = () => { try { return Math.max(280, Math.min(window.innerWidth || 390, 1600) - 32); } catch (_) { return 358; } };
 
 // Le parent qui défile (la page, ou un panneau `overflow: auto`) : la grille écoute le défilement de TOUS en capture.
-export function geometrie(largeur, { min = 200, colonnesTel = 2, gap = 12, corps = 96 } = {}) {
+export function geometrie(largeur, { min = 200, colonnesTel = 2, gap = 12, corps = 96, ligne = 0 } = {}) {
   const l = Math.max(1, largeur);
+  if (ligne > 0) return { cols: 1, colL: l, rangH: ligne, pas: ligne + gap };   // une LISTE : une rangée par ligne, hauteur fixe
   const cols = l < 700 - 32 ? colonnesTel : Math.max(1, Math.floor((l + gap) / (min + gap)));
   const colL = (l - (cols - 1) * gap) / cols;
   const rangH = Math.round(colL + corps);
@@ -33,7 +34,7 @@ export function geometrie(largeur, { min = 200, colonnesTel = 2, gap = 12, corps
 }
 
 export default function GrilleInventaire({ items, cle = (x) => x && x.cle, rendu, corps = 96, min = 200, colonnesTel = 2, gap = 12, revele = false, debut = 0,
-  attente = 6, attrs = null, className = '', squelette = null }) {
+  attente = 6, attrs = null, className = '', squelette = null, ligne = 0 }) {
   const ref = React.useRef(null);
   const [largeur, setLargeur] = React.useState(ESTIME_LARGEUR);
   const [fenetre, setFenetre] = React.useState({ a: 0, b: 4 });
@@ -44,7 +45,7 @@ export default function GrilleInventaire({ items, cle = (x) => x && x.cle, rendu
   if (items === undefined) vu.current.vide = true; else if (vu.current.vide && Array.isArray(items)) { vu.current.vide = false; vu.current.liste = items; }
   const enRevele = Array.isArray(items) && (revele || items === vu.current.liste);
   const n = Array.isArray(items) ? items.length : (items === undefined ? attente : 0);
-  const g = geometrie(largeur, { min, colonnesTel, gap, corps });
+  const g = geometrie(largeur, { min, colonnesTel, gap, corps, ligne });
   const rangees = Math.ceil(n / g.cols);
   const hauteur = rangees ? rangees * g.rangH + (rangees - 1) * gap : 0;
 
@@ -87,7 +88,7 @@ export default function GrilleInventaire({ items, cle = (x) => x && x.cle, rendu
     for (let i = de; i < a; i++) { const x = items[i]; const k = cle(x); cases.push(<React.Fragment key={k || i}>{rendu(x, i, rangs && rangs.has(k) ? reveleJeu(rangs.get(k), '', true) : null)}</React.Fragment>); }
   }
   return (
-    <div ref={ref} className={cx('n-inv-grille', className)} style={{ ...style, height: hauteur }} data-inv-grille="" data-inv-n={String(n)} data-inv-cols={String(g.cols)}
+    <div ref={ref} className={cx('n-inv-grille', ligne > 0 && 'n-inv-liste', className)} style={{ ...style, height: hauteur }} data-inv-grille="" data-inv-n={String(n)} data-inv-cols={String(g.cols)}
       data-inv-rang-h={String(g.rangH)} data-inv-montees={String(a - de)} data-inv-attente={items === undefined ? '1' : undefined} aria-busy={items === undefined ? 'true' : undefined} {...(attrs || {})}>
       <div className="n-inv-fenetre" style={{ transform: `translateY(${fenetre.a * g.pas}px)` }}>{cases}</div>
     </div>

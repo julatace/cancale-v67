@@ -131,45 +131,72 @@ export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, e
 // de l'article ; toucher la rangée ouvre sa fiche). Deux formes à comparer : 'a' = le prix à droite, en haut (et « mini »
 // dessous) ; 'b' = le prix en gras DANS la méta, le titre a toute la largeur. L'état n'est dit (étiquette douce) que s'il n'est pas
 // « en ligne » et pas déjà dit par l'en-tête du compte (« Compte bloqué »).
-export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selection = null, euros, depuisTexte, nomSite, Icon = null, Photo = null, plusVue = null, attrs = null }) {
+export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selection = null, euros, depuisTexte, nomSite, Icon = null, Photo = null, plusVue = null, attrs = null, groupe = false, rapides = null, revele = null }) {
+  // (24 nov., lot visuel-annonces — Julien : « améliore le design et la praticité ») Une rangée plus nette : photo 60 (par identité),
+  // l'étiquette papier du N°, le titre sur 2 lignes, le prix à droite ; ♡ et 👁 en petites icônes ; l'état seulement s'il diffère
+  // de l'onglet ; le logo du site seulement si la liste n'est PAS rangée par compte (ou paire sur 2 sites). Hauteur FIXE (76).
+  // `rapides` : [{ cle, libelle, icone, onClick }] — glisser la rangée vers la gauche les montre (≥ 44 px), sans quitter la liste.
   const b = bandeauDe(a);
   const trace = a.etat === 'bloque' ? traceDe(a) : null;
   const grise = selection && !selection.cochable;
-  const clic = () => { if (selection) { if (selection.cochable) selection.onBascule(); return; } onOuvrir(a); };
   const ic = (n) => (Icon ? <Icon name={n} size={13}/> : null);
   const prix = <span className="n-ar-prix" data-ad-prix={a.prix != null ? '1' : '0'}>{a.prix != null ? euros(a.prix) : '—'}</span>;
   const bouts = [];
-  if (forme === 'b') bouts.push(prix);
   if (a.taille && !tailleDansTitre(a.titre, a.taille)) bouts.push(<span>{tr('egalite.taille', { t: a.taille })}</span>);
   if (trace) bouts.push(<span className="n-ad-trace" data-ad-trace={trace.par}>{texteTrace(trace)}</span>);
   else {
-    if (a.depuis != null) bouts.push(<span className="n-ad-stat" data-ad-stat="jours">{depuisTexte(a.depuis)}</span>);
     if (a.favoris != null) bouts.push(<span className="n-ad-stat" data-ad-stat="favoris" aria-label={tr('egalite.favoris', { n: a.favoris })}>{ic('heart')}<span aria-hidden="true">{a.favoris}</span></span>);
     if (a.vues != null) bouts.push(<span className="n-ad-stat" data-ad-stat="vues" aria-label={tr('egalite.vues', { n: a.vues })}>{ic('eye')}<span aria-hidden="true">{a.vues}</span></span>);
+    if (a.depuis != null) bouts.push(<span className="n-ad-stat" data-ad-stat="jours">{ic('clock')}<span>{depuisTexte(a.depuis)}</span></span>);
   }
-  if (forme === 'b' && a.prixMini != null) bouts.push(<span>{tr('egalite.mini', { p: euros(a.prixMini) })}</span>);
+  // Le glissement : transform seulement, suivi au doigt, puis ouvert (largeur des boutons) ou fermé — jamais à moitié.
+  const rap = !selection && Array.isArray(rapides) && rapides.length ? rapides : null;
+  const W = rap ? rap.length * 84 : 0;
+  const [ouvert, setOuvert] = React.useState(false);
+  const corpsRef = React.useRef(null), geste = React.useRef(null), avale = React.useRef(false);
+  React.useEffect(() => {
+    if (!ouvert) return undefined;
+    const fermer = (e) => { if (corpsRef.current && corpsRef.current.parentElement && !corpsRef.current.parentElement.contains(e.target)) setOuvert(false); };
+    document.addEventListener('pointerdown', fermer, true); return () => document.removeEventListener('pointerdown', fermer, true);
+  }, [ouvert]);
+  const pose = (x, anime) => { const el = corpsRef.current; if (!el) return; el.style.transition = anime ? '' : 'none'; el.style.transform = x ? `translateX(${x}px)` : ''; };
+  React.useLayoutEffect(() => { pose(ouvert ? -W : 0, true); }, [ouvert, W]);
+  const bas = (e) => { if (!rap || e.button > 0) return; geste.current = { x: e.clientX, y: e.clientY, dx: 0, pris: false, id: e.pointerId }; };
+  const bouge = (e) => {
+    const g = geste.current; if (!g) return;
+    const dx = e.clientX - g.x, dy = e.clientY - g.y;
+    if (!g.pris) { if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy) * 1.2) { if (Math.abs(dy) > 10) geste.current = null; return; } g.pris = true; try { e.currentTarget.setPointerCapture(g.id); } catch (_) {} }
+    g.dx = dx; pose(Math.max(-W - 24, Math.min(0, (ouvert ? -W : 0) + dx)), false);
+  };
+  const haut = () => { const g = geste.current; geste.current = null; if (!g || !g.pris) return; avale.current = true; const x = (ouvert ? -W : 0) + g.dx; const o = x < -W / 2; setOuvert(o); pose(o ? -W : 0, true); };
+  const clic = () => { if (avale.current) { avale.current = false; return; } if (ouvert) { setOuvert(false); return; } if (selection) { if (selection.cochable) selection.onBascule(); return; } onOuvrir(a); };
   return (
-    <div className="n-ar" data-ad-forme={forme} data-ad-rangee="" data-ad-etat={a.etat} data-ad-grise={grise ? '1' : undefined} {...(attrs || {})}>
-      <button type="button" className="n-ar-corps" onClick={clic} aria-pressed={selection ? (selection.cochee ? 'true' : 'false') : undefined} aria-disabled={grise ? 'true' : undefined}>
-        {selection ? <span className="n-ar-coche" data-ad-coche={selection.cochee ? '1' : '0'} aria-hidden="true">{selection.cochee ? <Glyphe nom="check" taille={16}/> : null}</span> : null}
-        <span className="n-ar-photo"><PhotoCadre a={a} Photo={Photo} taille={20}/></span>
-        <span className="n-ar-texte">
-          <span className="n-ar-haut">
-            <span className="n-ar-titre">{a.titre || tr('egalite.sansTitre')}</span>
-            {forme === 'a' ? <span className="n-ar-droite">{prix}{a.prixMini != null ? <span className="n-ar-mini">{tr('egalite.mini', { p: euros(a.prixMini) })}</span> : null}</span>
-              // B : la méta est pleine (prix, jours, favoris, vues) ; l'état va en haut à droite, jamais coupé.
-              : (b && b !== 'bloque' ? <span className="n-ar-droite"><span className="n-ad-etiquette" data-ad-bandeau={b}>{tr('tableau.etat.' + b)}</span></span> : null)}
+    <div {...(revele || {})} className={cx('n-ar', revele && revele.className)} style={revele ? revele.style : undefined} data-ad-forme={forme} data-ad-rangee="" data-ad-etat={a.etat} data-ad-grise={grise ? '1' : undefined}
+      data-inv-photo={a.photo || ''} data-ad-ouvert={ouvert ? '1' : undefined} {...(attrs || {})}>
+      {rap ? <span className="n-ar-rapides" aria-hidden={ouvert ? undefined : 'true'} style={{ width: W }}>
+        {rap.map((x) => <button key={x.cle} type="button" className="n-ar-rapide" data-ad-rapide={x.cle} tabIndex={ouvert ? 0 : -1}
+          onClick={(e) => { e.stopPropagation(); setOuvert(false); x.onClick(); }}>{Icon && x.icone ? <Icon name={x.icone} size={20}/> : null}<span>{x.libelle}</span></button>)}
+      </span> : null}
+      <span className="n-ar-glisse" ref={corpsRef} onPointerDown={bas} onPointerMove={bouge} onPointerUp={haut} onPointerCancel={haut}>
+        <button type="button" className="n-ar-corps" onClick={clic} aria-pressed={selection ? (selection.cochee ? 'true' : 'false') : undefined} aria-disabled={grise ? 'true' : undefined}>
+          {selection ? <span className="n-ar-coche" data-ad-coche={selection.cochee ? '1' : '0'} aria-hidden="true">{selection.cochee ? <Glyphe nom="check" taille={16}/> : null}</span> : null}
+          <span className="n-ar-photo"><PhotoCadre a={a} Photo={Photo} taille={20}/></span>
+          <span className="n-ar-texte">
+            <span className="n-ar-haut">
+              <span className="n-ar-titre">{a.titre || tr('egalite.sansTitre')}</span>
+              <span className="n-ar-droite">{prix}</span>
+            </span>
+            <span className="n-ar-meta">
+              {(!groupe || a.sites.length > 1) ? a.sites.map((x) => <LogoSite key={x} site={x} taille={16} nom={nomSite(x)}/>) : null}
+              {a.numero ? (a.doublon ? <Plaque numero={a.numero} doublon/> : <EtiquetteN numero={a.numero} className="n-ar-etiq" attrs={{ 'data-inv-n': a.numero }}/>) : null}
+              {b && b !== 'bloque' ? <span className="n-ad-etiquette" data-ad-bandeau={b}>{tr('tableau.etat.' + b)}</span> : null}
+              {plusVue != null ? <span className="n-ad-etiquette" data-ad-conseil="plusvue" data-ad-plusvue={String(plusVue)}>{tr('af.pv.etiquette', { n: plusVue })}</span> : null}
+              <span className="n-ar-stats">{bouts.map((x, i) => <React.Fragment key={i}>{x}</React.Fragment>)}</span>
+            </span>
           </span>
-          <span className="n-ar-meta">
-            {a.sites.map((x) => <LogoSite key={x} site={x} taille={16} nom={nomSite(x)}/>)}
-            {a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null}
-            {plusVue != null ? <span className="n-ad-etiquette" data-ad-conseil="plusvue" data-ad-plusvue={String(plusVue)}>{tr('af.pv.etiquette', { n: plusVue })}</span> : null}
-            {bouts.map((x, i) => <React.Fragment key={i}>{i || a.numero ? <span className="n-ar-sep" aria-hidden="true">·</span> : null}{x}</React.Fragment>)}
-            {forme === 'a' && b && b !== 'bloque' ? <span className="n-ad-etiquette" data-ad-bandeau={b}>{tr('tableau.etat.' + b)}</span> : null}
-          </span>
-        </span>
-      </button>
-      {onGestes && !selection ? <BoutonPlus a={a} onGestes={onGestes} className="n-ar-plus"/> : null}
+        </button>
+        {onGestes && !selection ? <BoutonPlus a={a} onGestes={onGestes} className="n-ar-plus"/> : null}
+      </span>
     </div>
   );
 }
