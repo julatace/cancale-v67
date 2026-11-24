@@ -181,18 +181,31 @@ const nombreDe = (s) => { const m = /(\d+)/.exec(String(s || '')); return m ? Nu
       await pg.waitForSelector('[data-lot-retour]', { timeout: 20000 }).catch(() => {});
       await pg.waitForTimeout(1200);
       await shot(pg, `${nom}-avant`);
-      const sel = vp.width > 600 ? '[data-vv-pied] [data-colis-barre-btn="imprimer"]' : '[data-colis-barre-btn="imprimer"]';
+      // (24 nov., main-vert) Ventes natif (src/natif/ecrans/Ventes.jsx) : le bouton « Imprimer » porte ses nombres en data-*
+      // (`data-impr-lot` ventes, `data-impr-retours-coches` retours) ; cases `data-vn-coche` (`data-vn-coche-on`) et `data-retour-coche`.
+      const sel = vp.width > 600 ? '[data-vv-pied] [data-colis-barre-btn="imprimer"], [data-colis-barre-btn="imprimer"][data-impr-retours-coches]' : '[data-colis-barre-btn="imprimer"]';
       const m = await pg.evaluate((s) => {
         const vis = (e) => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
         const bt = [...document.querySelectorAll(s)].find(vis);
         const choisir = [...document.querySelectorAll('[data-lot-ouvrir]')].find(vis);
-        return { texte: bt ? bt.innerText.replace(/\s+/g, ' ').trim() : null, ventesCochees: [...document.querySelectorAll('[data-vv-coche-on="1"]')].filter(vis).length,
-          retoursCoches: [...document.querySelectorAll('[data-lot-retour][data-coche="1"]')].filter(vis).length, cases: document.querySelectorAll('[data-vv-coche]').length,
+        return { texte: bt ? bt.innerText.replace(/\s+/g, ' ').trim() : null, ventesCochees: [...document.querySelectorAll('[data-vv-coche-on="1"], [data-vn-coche-on="1"]')].filter(vis).length,
+          retoursCoches: [...document.querySelectorAll('[data-lot-retour][data-coche="1"]')].filter(vis).length + [...document.querySelectorAll('[data-retour-coche]')].filter((c) => vis(c) && (c.checked || (c.querySelector && c.querySelector('input:checked')))).length,
+          cases: document.querySelectorAll('[data-vv-coche], [data-vn-coche]').length,
+          nRetoursBouton: bt ? bt.getAttribute('data-impr-retours-coches') : null,
           choisir: choisir ? choisir.innerText.replace(/\s+/g, ' ').trim() : null };
       }, sel);
       const n = nombreDe(m.texte);
-      dit(n === 4 && /dont 1 retour/.test(m.texte || ''), `${nom} : C1 le bouton compte les 3 ventes ET le retour cochés (« 4 … dont 1 retour »)`, JSON.stringify(m));
+      dit(n === 4 && (/dont 1 retour/.test(m.texte || '') || m.nRetoursBouton === '1'), `${nom} : C1 le bouton compte les 3 ventes ET le retour cochés (« 4 … dont 1 retour »)`, JSON.stringify(m));
       if (m.cases) dit(n === m.ventesCochees + m.retoursCoches, `${nom} : C2 le nombre du bouton = les cases cochées à l’écran (${m.ventesCochees} + ${m.retoursCoches})`, JSON.stringify(m));
+      // (24 nov., main-vert) Ventes natif : « Choisir » est une rangée du menu « ⋯ » (`data-vn-plus`, gestes rangés) ; on l'ouvre,
+      // on lit la rangée, on la referme (attendue partie, jamais un délai seul).
+      if (vp.width > 600 && !m.choisir && await pg.locator('[data-vn-plus]').filter({ visible: true }).count()) {
+        await pg.locator('[data-vn-plus]').filter({ visible: true }).first().click().catch(() => {});
+        await pg.waitForFunction(() => [...document.querySelectorAll('[data-lot-ouvrir]')].some((e) => e.getClientRects().length), null, { timeout: 8000 }).catch(() => {});
+        m.choisir = await pg.evaluate(() => { const e = [...document.querySelectorAll('[data-lot-ouvrir]')].find((x) => x.getClientRects().length); return e ? e.innerText.replace(/\s+/g, ' ').trim() : null; });
+        await pg.keyboard.press('Escape').catch(() => {});
+        await pg.waitForFunction(() => ![...document.querySelectorAll('[data-lot-ouvrir]')].some((e) => e.getClientRects().length), null, { timeout: 8000 }).catch(() => {});
+      }
       if (vp.width > 600) dit(/N°43 attend son bordereau/.test(m.choisir || ''), `${nom} : C3 « Choisir » nomme ce qui n’y est pas (N°43 attend son bordereau)`, JSON.stringify(m.choisir));
       await essaie(`${nom} : C4 ce qui part`, async () => {
         const bt = pg.locator(sel).filter({ visible: true }).first();

@@ -40,7 +40,7 @@ const base = () => {
 const ATTENDU = { journee: 'journee', annonces: 'paires', garage: 'paires', achats: 'achats', ventes: 'ventes', cat_bord: 'ventes', compta: 'compta', dashboard: 'compta' };
 
 const etat = (pg) => pg.evaluate(() => {
-  const m = document.querySelector('.vrm-main'); const a = document.querySelector('.vrm-tabbar [aria-current="page"]');
+  const m = document.querySelector('.vrm-main'); const a = document.querySelector('nav[data-n-onglets] [aria-current="page"]');
   const seg = document.querySelector('[data-plat-sub-actif], .vrm-plat-subnav [aria-pressed="true"], .vrm-plat-subnav [aria-selected="true"]');
   return { ecran: m ? m.getAttribute('data-ecran') : null, top: m ? Math.round(m.scrollTop) : null, haut: m ? m.scrollHeight - m.clientHeight : 0, actif: a ? a.getAttribute('data-nav-entree') : null, seg: seg ? seg.innerText.trim() : '', url: location.search };
 });
@@ -48,7 +48,7 @@ const defiler = (pg, y) => pg.evaluate((y) => { const m = document.querySelector
 const attendre = (pg, ms = 1200) => pg.waitForTimeout(ms);
 // Le geste « pause » : la mémoire du défilement range la position à la sortie ; on laisse le temps au tenir (2,5 s) de finir.
 const poser = async (pg) => { await pg.mouse.move(5, 300).catch(() => {}); await attendre(pg, 2800); };
-const barre = async (pg, id) => { await pg.locator(`.vrm-tabbar [data-nav-entree="${id}"]`).first().tap(); await attendre(pg, 1800); };
+const barre = async (pg, id) => { await pg.locator(`nav[data-n-onglets] [data-nav-entree="${id}"]`).first().tap(); await attendre(pg, 1800); };
 const segment = async (pg, libelle) => {
   const l = pg.locator('.vrm-main').getByRole('button', { name: new RegExp('^' + libelle + '$') }).first();
   if (await l.count()) await l.tap(); else await pg.locator(`.vrm-main :text-is("${libelle}")`).first().tap();
@@ -67,11 +67,16 @@ const segment = async (pg, libelle) => {
 
     // N5 d'abord : Ventes défilée, on part par la barre et on revient par la barre ⇒ sa position.
     await essaie('N5', async () => {
-      await barre(pg, 'ventes');
-      const y = await defiler(pg, 700); await poser(pg);
-      await barre(pg, 'compta'); await barre(pg, 'ventes');
+      // (24 nov., main-vert) La règle porte sur UN onglet de la barre qui défile : depuis la refonte, Ventes de ce jeu tient dans
+      // l'écran (rien à défiler, y = 0) — on prend le premier onglet de la barre assez long pour défiler (Ventes d'abord).
+      let ici = '';
+      for (const id of ['ventes', 'achats', 'paires', 'compta', 'journee']) { await barre(pg, id); const e0 = await etat(pg); if (e0.haut > 400) { ici = id; break; } }
+      const ailleurs = ici === 'compta' ? 'journee' : 'compta';
+      if (ici) await barre(pg, ici);
+      const y = ici ? await defiler(pg, 700) : 0; await poser(pg);
+      await barre(pg, ailleurs); if (ici) await barre(pg, ici);
       const e = await etat(pg);
-      dit(y > 200 && e.top >= Math.min(y, e.haut) - 40, `N5 revenir sur Ventes par la barre garde sa position (${y})`, JSON.stringify(e));
+      dit(!!ici && y > 200 && e.top >= Math.min(y, e.haut) - 40, `N5 revenir sur ${ici || '(aucun onglet assez long)'} par la barre garde sa position (${y})`, JSON.stringify(e));
     });
     // N2 « J'ai déclaré » : Ventes gardait 700 ; le geste doit ouvrir sa destination en haut.
     await essaie('N2', async () => {
@@ -106,7 +111,7 @@ const segment = async (pg, libelle) => {
       await segment(pg, 'Statistiques');
       const y = await defiler(pg, 600); await poser(pg);
       const e0 = await etat(pg);
-      await pg.locator('.vrm-tabbar [data-nav-entree="compta"]').first().tap(); await attendre(pg, 1500);
+      await pg.locator('nav[data-n-onglets] [data-nav-entree="compta"]').first().tap(); await attendre(pg, 1500);
       const e = await etat(pg);
       dit(y > 100 && e.top === 0 && e.ecran === e0.ecran, `N4 retoucher « Argent » sur Statistiques remonte en haut sans changer d’écran (${e0.ecran} → ${e.ecran})`, JSON.stringify({ e0, e }));
     });
@@ -147,13 +152,13 @@ const segment = async (pg, libelle) => {
       // Tout en bas, une fois le contenu arrivé (la hauteur ne bouge plus).
       for (let k = 0, h0 = -1; k < 10; k++) { await defiler(pg, 1e7); await attendre(pg, 800); const h = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); return { h: m.scrollHeight, auBout: Math.abs(m.scrollTop - (m.scrollHeight - m.clientHeight)) < 2 }; }); if (h.h === h0 && h.auBout) break; h0 = h.h; }
       const b = await pg.evaluate(() => {
-        const bar = document.querySelector('.vrm-tabbar'); const m = document.querySelector('.vrm-main'); if (!bar || !m) return null;
+        const bar = document.querySelector('nav[data-n-onglets]'); const m = document.querySelector('.vrm-main'); if (!bar || !m) return null;
         const haut = bar.getBoundingClientRect().top;
         let bas = 0, quoi = '';
         const mr = m.getBoundingClientRect();
         for (const x of m.querySelectorAll('button, a, p, h1, h2, h3, li, [data-fu-principal]')) {
           const r = x.getBoundingClientRect(); const s = getComputedStyle(x);
-          if (!r.width || !r.height || s.visibility === 'hidden' || s.position === 'fixed' || x.closest('[role="dialog"], .vrm-sheet, .vrm-tabbar, [aria-hidden="true"], [hidden]')) continue;
+          if (!r.width || !r.height || s.visibility === 'hidden' || s.position === 'fixed' || x.closest('[role="dialog"], .vrm-sheet, nav[data-n-onglets], [aria-hidden="true"], [hidden]')) continue;
           if (!((x.innerText || '').trim() || x.getAttribute('aria-label'))) continue;
           if (r.top >= mr.bottom || (x.checkVisibility && !x.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }))) continue;
           // Coupé par un parent qui ne déborde pas (liste repliée, carrousel) : pas une ligne de la page.

@@ -295,7 +295,7 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
       const retSous = lecture ? tr('v2.jour.lecture') : nRet == null ? tr('v2.jour.pasSu') : nRet === 0 ? tr('v2.af.rienRetirer')
         : [point ? point.lieu || tr('v2.retirer.pointInconnu') : '', point && point.code ? point.code : '', pts.length > 1 || (retraits && retraits.nPoints > 1) ? tr('v2.retirer.points', { n: retraits.nPoints || pts.length }) : ''].filter(Boolean).join(' · ');
       return (
-        <Carte titre={tr('v2.af.titre')} action={plein && !aPilotage ? <Bouton variante="plein" onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n) }}>{tr('v2.imprimer', { n: plein.n })}</Bouton> : null}
+        <Carte titre={tr('v2.af.titre')} action={plein && !aPilotage ? <Bouton variante="plein" onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n), 'data-v2-principal-exact': plein.exact === false ? '0' : '1' }}>{tr('v2.imprimer', { n: plein.n })}</Bouton> : null}
           attrs={{ 'data-v2-bloc': 'colis', 'data-v2-cj': lecture ? '' : [n == null ? '' : n, nRet == null ? '' : nRet].join(','), 'aria-busy': lecture ? 'true' : undefined }}>
           {/* (22 nov. soir, maquettes de Julien) DEUX CASES côte à côte : « 6 à envoyer » (l'échéance qui presse en ambre) |
               « 3 à retirer » (le point relais). Les mêmes nombres, les mêmes repères (`data-v2-cj-ligne`), le même toucher. */}
@@ -334,7 +334,7 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
     // Rien à envoyer ni à retirer : à la place d'« À envoyer », UNE carte qui le dit (jamais deux cartes vides).
     envoyer: () => (rien && !(n > 0) ? <Carte attrs={{ 'data-v2-bloc': 'rien', 'data-v2-rien': '' }}><Vide icone={<Icon name="check" size={40}/>} phrase={tr('v2.rien.titre')} detail={tr('v2.rien.sous')}/></Carte> : (
       <Carte titre={tr('v2.envoyer.titre')} n={nombre(n)} sousTitre={alerteEnv ? alerte.txt : (affiche.sous || '')} tonSous={alerteEnv ? 'ambre' : 'neutre'}
-        action={plein ? <Bouton variante="plein" onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n) }}>{tr('v2.imprimer', { n: plein.n })}</Bouton> : null}
+        action={plein ? <Bouton variante="plein" onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n), 'data-v2-principal-exact': plein.exact === false ? '0' : '1' }}>{tr('v2.imprimer', { n: plein.n })}</Bouton> : null}
         attrs={{ 'data-v2-bloc': 'envoyer', 'data-v2-groupe': 'envoyer', 'data-v2-envoyer': String(n), 'data-v2-ecart': affiche.sous || '', 'data-v2-alerte': alerteEnv ? 'poster' : undefined, 'data-v2-bande': String(montres.length) }}>
         {montres.map((c) => (
           // (19 nov.) Le titre a SA ligne (2 au plus) et le prix à droite ; dessous « N° · échéance · transporteur ».
@@ -621,7 +621,7 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
           {/* (22 nov., « en noir ») LES GESTES DU JOUR en disques : Imprimer (LE plein, avec son nombre), Scanner, Annonces,
               Messages, Statistiques — le geste « Imprimer » n'est plus répété dans l'en-tête de Colis. */}
           <ActionsRondes libelle={tr('pil.a.libelle')} elements={[
-            { cle: 'imprimer', libelle: tr('pil.a.imprimer'), icone: <Icon name="printer" size={22}/>, n: plein ? plein.n : 0, plein: true, onClick: plein ? plein.faire : null, attrs: plein ? { 'data-v2-principal': String(plein.n) } : { 'data-v2-imprimer-rien': '' } },
+            { cle: 'imprimer', libelle: tr('pil.a.imprimer'), icone: <Icon name="printer" size={22}/>, n: plein ? plein.n : 0, plein: true, onClick: plein ? plein.faire : null, attrs: plein ? { 'data-v2-principal': String(plein.n), 'data-v2-principal-exact': plein.exact === false ? '0' : '1' } : { 'data-v2-imprimer-rien': '' } },
             onScanner ? { cle: 'scanner', libelle: tr('pil.a.scanner'), icone: <Icon name="scan" size={22}/>, onClick: onScanner, attrs: { 'data-v2-scanner': '' } } : null,
             // (23 nov., maquettes de Julien) Publier (le parcours existant : choisir l'article) et Relier (la feuille d'Achats) ;
             // sans eux, Annonces et Statistiques comme avant.

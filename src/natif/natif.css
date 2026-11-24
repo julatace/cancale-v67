@@ -782,3 +782,12 @@
 [data-vrm-signale] { outline: 2px solid var(--n-encre, currentColor); outline-offset: 4px; border-radius: 12px; animation: vrm-signale 1.4s ease-out forwards; }
 @keyframes vrm-signale { 0%, 60% { outline-color: var(--n-encre, currentColor); } 100% { outline-color: transparent; } }
 @media (prefers-reduced-motion: reduce) { [data-vrm-signale] { animation: none; } }
+/* (23 nov.) Achats au téléphone : le menu « ⋯ » d'une rangée en feuille d'actions (rangées 48, icônes alignées). */
+.vrm-buy-menu-feuille { display: flex; flex-direction: column; padding: 0 0 8px; }
+.vrm-buy-menu-feuille > :is(button, a) { min-height: 48px !important; padding: 0 16px !important; font-weight: 500 !important; border-radius: 10px; }
+.vrm-buy-menu-feuille svg { width: 18px; height: 18px; flex: none; }
+/* (23 nov., revue UX #7) Achats au téléphone : des achats attendus à un point, rien à retirer ⇒ une ligne repliée. */
+.n-rp-compact { margin: 0 var(--n-marge, 16px) 8px; border: 1px solid var(--n-trait); border-radius: 12px; background: var(--n-carte); }
+.n-rp-compact-tete { list-style: none; display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 14px; font: var(--n-t-corps-fort); color: var(--n-encre); cursor: pointer; }
+.n-rp-compact-tete::-webkit-details-marker { display: none; }
+.n-rp-compact[open] .n-rp-compact-tete { border-bottom: 1px solid var(--n-trait); }
