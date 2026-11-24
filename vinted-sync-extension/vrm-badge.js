@@ -5652,7 +5652,7 @@ function vrmVerifVisible(sel) {
           <h1 data-vx-titre>${esc(TU(PAGES6[cle]))}</h1>${nom ? `<span class="compte6" data-vx-compte><i aria-hidden="true">${esc(nom.charAt(0).toUpperCase())}</i>${esc(nom)}</span>` : ''}
           <span class="esp6"></span><button type="button" class="maj6" data-vx-maj data-lu="${lu || ''}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>${esc(lu ? TU('v6_mis_a_jour', { quand: depuis(lu) || '' }) : TU('v6_mettre_a_jour'))}</span></button>
           <button class="fermer rond6" data-fermer-carte title="${esc(TU('c_fermer'))}" aria-label="${esc(TU('c_fermer'))}">×</button></header>
-        <div class="corps6" data-defil="corps6">${extras || ''}${corps}</div>
+        <div class="corps6" data-defil="corps6">${ligneSante(e)}${extras || ''}${corps}</div>
       </div>
     </div>`;
   }
@@ -5898,7 +5898,7 @@ function vrmVerifVisible(sel) {
   // les mêmes marques `data-q4*` (bancs), « pas su » ⇒ « — ». Le nom de la fonction reste
   // `quatreLignes` (capacité `carte4`).
   // 5.448 (`santesites`) : la ligne de santé seule (carte Leboncoin, qui n'a pas les quatre lignes).
-  function ligneSante(e) { const sa = e && e.santeSite; return sa && typeof sa.t === 'string' && sa.k !== 'pas-vu' ? `<div class="ligne" data-sante-site="${esc(sa.k)}"${sa.ok === false ? ' style="color:var(--vu-ambre)"' : ''}>${esc(sa.t)}</div>` : ''; }
+  function ligneSante(e) { const sa = e && e.santeSite; return sa && typeof sa.t === 'string' && sa.k !== 'pas-vu' ? `<div class="ligne" data-sante-site="${esc(sa.k)}" style="padding:10px 16px;font-size:13px;line-height:1.4${sa.ok === false ? ';color:var(--ambre)' : ''}">${esc(sa.t)}</div>` : ''; }
   function quatreLignes(e, r) {
     const site = e.site || {}, f = e.flux || {};
     let compte = site.nom || (site.id && e.plateforme !== 'leboncoin' ? 'n° ' + site.id : '');
@@ -5926,7 +5926,7 @@ function vrmVerifVisible(sel) {
     if (lu || morceaux.length) morceaux.push(`<span data-q4="lu" data-q4-at="${lu || ''}">${lu ? esc(TU('c_lu', { quand: depuis(lu) })) : '—'}</span>`);
     // 5.448 (`santesites`) : la santé de CE site en une ligne — « tout marche » ou « X ne marche plus : fais Y » (ambre).
     const sa = e && e.santeSite;
-    if (sa && typeof sa.t === 'string' && sa.k !== 'pas-vu') morceaux.push(`<span data-sante-site="${esc(sa.k)}"${sa.ok === false ? ' style="color:var(--vu-ambre)"' : ''}>${esc(sa.t)}</span>`);
+    if (sa && typeof sa.t === 'string' && sa.k !== 'pas-vu') morceaux.push(`<span data-sante-site="${esc(sa.k)}"${sa.ok === false ? ' style="color:var(--ambre)"' : ''}>${esc(sa.t)}</span>`);
     const c = e && e.capture;
     if (c && c.phrase) {
       const lien = c.lien && /^https:\/\/www\.vinted\.fr\//.test(String(c.lien)) ? String(c.lien) : '';
