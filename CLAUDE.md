@@ -484,9 +484,9 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **24 nov. · Bugs terrain (`claude/bugs-terrain-24nov`)** : mesuré (Vercel 0 erreur/72 h ; 3 plantages app/72 h dont `Icon` déjà corrigé) ; une photo Leboncoin n'est plus demandée par `fetch` (refusée par `connect-src` : `src/lisibleParLaPage.js`, `audit-lecture-csp`) ; restent : morceaux périmés au téléphone (~15/jour), suivi `escrow` de l'extension jamais reconnu. `2026-11-24-bugs-terrain.md`. Geste : aucun.
 - **24 nov. · CI ≈ 222 → ≈ 121 min-machine par PR, job le plus long 68 → 17 min (`claude/ci-rapide`)** : mêmes contrôles (`python3 -I scripts/ci-controles.py --diff origin/main`), bancs 3 à la fois (`BANCS_PARALLELE`), ventes-e2, accessibilite et budget-vitesse en morceaux, parts rééquilibrées, `dist/` partagé pour les écrans ; la part 2/3 (annulée à 45 min à chaque PR) finit. `2026-11-24-ci-rapide.md`. Geste : aucun.
-- **24 nov. · Morceaux périmés (`claude/morceaux-perimes`)** : la page ouverte pendant une mise en ligne ne repart plus — elle fait ranger les fichiers de SA version au repos (`src/reserveMorceaux.js`), le ménage du service worker garde ceux d'une page ouverte ; un écran introuvable recharge SUR cet écran, jamais pendant une saisie ou une feuille (sinon page cachée) ; un 404 /assets/ de la prod porte `immutable`. Banc `morceaux-perimes`, audit. `2026-11-24-morceaux-perimes.md`. Geste : aucun.
-- **23 nov. · Gris clair étagé (`claude/style-clair`)** : variante A validée (gris froid, accent ardoise), sombre = gris choisi ; iPhone compact ; dessin fin ; pop-up d'événement + galerie du propriétaire. `docs/passation/2026-11-23-style-clair.md`. Geste : essayer le pop-up sur un vrai iPhone.
+- **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
