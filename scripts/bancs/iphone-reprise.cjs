@@ -248,7 +248,7 @@ const mesureBarre = (pg) => pg.evaluate(() => {
     // (jetons.css : env(safe-area-inset-bottom)) : la variable est résolue jusqu'à env(), jamais admise sur son nom.
     const vars = new Set(); for (const x of tous) { if (!x.style) continue; for (let i = 0; i < x.style.length; i++) { const p = x.style[i]; if (p.startsWith('--') && /safe-area-inset-bottom/.test(x.style.getPropertyValue(p))) vars.add(p); } }
     const porte = (v) => /safe-area-inset-bottom/.test(v) || [...vars].some((n) => v.includes(`var(${n}`));
-    for (const x of tous) { if (x.selectorText && /(^|[\s,>])\.n-onglets(?![\w-])/.test(x.selectorText) && x.style && porte(x.style.getPropertyValue('padding-bottom'))) zoneSure = true; } }
+    for (const x of tous) { if (x.selectorText && /(^|[\s,>])\.n-onglets(?![\w-])/.test(x.selectorText) && x.style && (porte(x.style.getPropertyValue('padding-bottom')) || porte(x.style.getPropertyValue('padding')))) zoneSure = true; } }
   return { bas: Math.round(r.bottom), haut: Math.round(r.top), vh: innerHeight, vw: innerWidth, docW: document.documentElement.scrollWidth, entrees, nombres, zoneSure };
 });
 const mesurePanneau = (pg) => pg.evaluate(() => {
