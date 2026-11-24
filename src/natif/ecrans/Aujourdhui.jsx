@@ -17,7 +17,7 @@
 //  AUCUNE règle ici : tout arrive calculé (src/aujourdhui/modele.js, les cartes de Ma journée dans src/App.jsx).
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { Anneau, TuilePaire, revele } from '../Jeu.jsx';   // (24 nov., visuel-jeu) l'anneau des colis prêts, les ventes en tuiles
+import { Anneau, TuilePaire, revele, useArrive } from '../Jeu.jsx';   // (24 nov., visuel-jeu) l'anneau des colis prêts, les ventes en tuiles
 import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site de chaque colis
 import { tr, nombre, localeCourante } from '../../i18n/index.js';
 import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segmente, Colonnes, Colonne, Carte, Tuiles, Tuile, Pastille, Faits, Fait, Feuille, Courbe, Progression, Champ, ListeOrdonnee, Editable, Toast, useOrdinateur, GrapheJours, Etincelle, Repartition, Heros, ActionsRondes, CasesChiffres } from '../index.js';
@@ -269,6 +269,7 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
   const rien = pret && n === 0 && nRet === 0;
   const point = retraits && Array.isArray(retraits.points) ? retraits.points[0] : null;
   const lignesV = ventes && ventes.etat === 'lu' && Array.isArray(ventes.lignes) ? ventes.lignes.slice(0, 5) : [];
+  const ventesArrivent = useArrive(lignesV.length > 0);   // (24 nov., « sans latence ») déjà connues au montage ⇒ là d'un coup
   // « Argent à venir » : seulement s'il est lu ET qu'il y en a (« 0 € à venir » n'apprend rien).
   const aVenirLu = !!aVenir && aVenir.valeur != null && aVenir.valeur > 0;
   const image = (src, taille) => (src && Photo ? <Photo className="n-vignette" data-n-taille={taille} src={src} alt="" width={taille} height={taille} loading="lazy" decoding="async"/> : <Vignette taille={taille} icone={<Icon name="cintre" size={22}/>}/>);
@@ -367,7 +368,7 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
             par identité), l'étiquette du N°, le prix et « il y a » dessous ; défilement de côté au téléphone. */}
         {lignesV.length ? <div className="n-inventaire" data-n-jeu="ventes" role="list">
           {lignesV.map((l, k) => (
-            <button key={l.cle} type="button" role="listitem" {...revele(k, 'n-inventaire-case')} onClick={l.ouvrir || onVentes} data-v2-vente={l.cle} data-n-vente-tx={l.tx || undefined}
+            <button key={l.cle} type="button" role="listitem" {...revele(k, 'n-inventaire-case', ventesArrivent)} onClick={l.ouvrir || onVentes} data-v2-vente={l.cle} data-n-vente-tx={l.tx || undefined}
               aria-label={[l.titre || tr('v2.dv.vente', { site: l.site }), l.num ? 'N°' + l.num : '', l.prix, ilYaCourt(l.ts)].filter(Boolean).join(' · ')}>
               <TuilePaire photo={l.photo || ''} numero={l.num || ''} icone={l.photo ? '' : 'cash'} genre="vente" Icon={Icon} taille="xl" Photo={Photo}/>
               <span className="n-inventaire-prix">{l.site ? <LogoSite site={String(l.site).toLowerCase()} taille={14}/> : null}<span>{l.prix || '—'}</span></span>

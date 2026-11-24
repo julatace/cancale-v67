@@ -35,20 +35,22 @@ const PX = { m: 56, l: 72, xl: 96 };
 export function TuilePaire({ photo = '', numero = '', icone = '', genre = '', Icon = null, taille = 'l', className = '', onErreurPhoto = null, children = null, Photo = null, attrsN = null }) {
   const [rate, setRate] = React.useState(false);
   // (24 nov., « pas d'un coup en bloc ») chargée ⇒ fondu ; une image déjà en cache (complete au montage) ne refait pas le fondu.
-  const [charge, setCharge] = React.useState(false);
+  const [charge, setCharge] = React.useState(false);   // false · true (chargée sous nos yeux : fondu) · 'deja' (en cache : aucun fondu)
   const refTuile = React.useRef(null);
-  React.useEffect(() => {
+  // (« sans latence ») vérifié AVANT la première peinture : une image en cache n'est jamais cachée, même une image.
+  const avantPeinture = typeof window === 'undefined' ? React.useEffect : React.useLayoutEffect;
+  avantPeinture(() => {
     setRate(false);
     const el = refTuile.current; if (!el) return undefined;
-    const vu = () => setCharge(true);
+    const vu = () => setCharge((c) => (c === 'deja' ? c : true));
     el.addEventListener('load', vu, true);   // `load` ne remonte pas : écouté en capture sur la tuile (l'<img> peut changer de source)
     let deja = false; try { const im = el.querySelector('img'); deja = !!(im && im.complete && im.naturalWidth); } catch (_) {}
-    setCharge(deja);
+    setCharge(deja ? 'deja' : false);
     return () => el.removeEventListener('load', vu, true);
   }, [photo]);
   const avecPhoto = !!photo && !rate;
   return (
-    <span ref={refTuile} className={cx('n-tuile-paire', className)} data-n-tuile={taille} data-n-tuile-genre={genre || undefined} data-n-tuile-photo={avecPhoto ? '1' : '0'} data-n-tuile-charge={avecPhoto ? (charge ? '1' : '0') : undefined}
+    <span ref={refTuile} className={cx('n-tuile-paire', className)} data-n-tuile={taille} data-n-tuile-genre={genre || undefined} data-n-tuile-photo={avecPhoto ? '1' : '0'} data-n-tuile-charge={avecPhoto ? (charge === 'deja' ? 'deja' : charge ? '1' : '0') : undefined}
 >
       {avecPhoto && Photo
         ? <Photo className="n-tuile-img" src={photo} alt="" loading="lazy" draggable="false" style={{ width: PX[taille] || 72, height: PX[taille] || 72 }} repli={null}/>
@@ -154,19 +156,31 @@ export function EtagereTrophees({ total = null, Icon = null, paliers = PALIERS_V
   return <span className="n-etagere" data-n-etagere={total}>{paliers.map((p) => <Trophee key={p} palier={p} atteint={total >= p} Icon={Icon}/>)}</span>;
 }
 
-// ── (24 nov., Julien : « pas d'un coup en bloc ») L'APPARITION PROGRESSIVE, partagée par tous les écrans visuels :
-//   • `revele(i)` ⇒ les props à poser sur le i-ème élément d'une liste ({ className, style, 'data-n-revele' }) : il arrive en
-//     fondu + 4 px (transform et opacité SEULEMENT — aucun décalage de mise en page), 30 ms après le précédent, plafonné au
-//     8ᵉ (240 ms au plus) ; mouvement réduit ⇒ immédiat. Il est lisible dès la première image (opacité de départ 0,35).
-//   • <Revele i>…</Revele> : la même chose en composant (un <div style="display:contents"> ne s'anime pas : il enveloppe).
-//   • <SqueletteTuile taille/> et <SqueletteInventaire n/> : la FORME EXACTE des tuiles qui arrivent (même taille, mêmes
-//     coins), pour que rien ne bouge quand elles arrivent (CLS ≤ 0,02).
-//   • Les images des tuiles ne flashent jamais en blanc : fond gris du squelette, puis fondu de l'image quand elle est chargée.
-export const REVELE_PAS = 30, REVELE_MAX = 8;
-export const revele = (i = 0, className = '') => ({ className: cx('n-revele', className), style: { '--n-rang': Math.min(Math.max(0, i | 0), REVELE_MAX) }, 'data-n-revele': '' });
-export function Revele({ i = 0, as: Balise = 'div', className = '', children, ...reste }) {
-  const p = revele(i, className);
-  return <Balise {...reste} className={p.className} style={{ ...(reste.style || {}), ...p.style }} data-n-revele="">{children}</Balise>;
+// ── (24 nov., Julien : « pas d'un coup en bloc », puis « fais quelque chose sans latence ») L'APPARITION, partagée par tous
+// les écrans visuels. Elle n'ajoute JAMAIS d'attente :
+//   • ce qui est DÉJÀ connu au premier rendu (cache, visite d'avant) s'affiche d'un coup, sans fondu : `useArrive(pret)` dit
+//     si le contenu est ARRIVÉ après le montage (faux s'il était là dès la première image) ;
+//   • `revele(i, className, arrive)` ⇒ les props du i-ème élément ({ className, style, 'data-n-revele' }). Seul un contenu qui
+//     ARRIVE s'anime : fondu + 3 px, 160 ms, 15 ms après le précédent, plafonné à 120 ms ; le PREMIER élément (i = 0) n'attend
+//     jamais et n'a pas de fondu ; transform et opacité seulement (aucun décalage de mise en page) ; mouvement réduit ⇒ rien.
+//   • <Revele i arrive>…</Revele> : la même chose en composant.
+//   • <SqueletteTuile taille/> et <SqueletteInventaire n/> : SEULEMENT quand rien n'est encore connu ; la forme exacte de ce
+//     qui arrive (mêmes tailles : CLS ≤ 0,02).
+//   • Les images des tuiles : sur le gris du squelette ; une image déjà en cache s'affiche tout de suite, une image qui se
+//     charge arrive en fondu de 160 ms (jamais de flash blanc).
+export const REVELE_PAS = 15, REVELE_MAX = 8;   // 8 × 15 ms = 120 ms au plus
+export function useArrive(pret) {
+  const auMontage = React.useRef(!!pret);
+  return !!pret && !auMontage.current;
+}
+export const revele = (i = 0, className = '', arrive = true) => {
+  const rang = Math.min(Math.max(0, i | 0), REVELE_MAX);
+  if (!arrive || rang === 0) return { className: cx(className) || undefined, style: undefined, 'data-n-revele': arrive ? '0' : undefined };
+  return { className: cx('n-revele', className), style: { '--n-rang': rang }, 'data-n-revele': String(rang) };
+};
+export function Revele({ i = 0, arrive = true, as: Balise = 'div', className = '', children, ...reste }) {
+  const p = revele(i, className, arrive);
+  return <Balise {...reste} className={p.className} style={p.style ? { ...(reste.style || {}), ...p.style } : reste.style} data-n-revele={p['data-n-revele']}>{children}</Balise>;
 }
 export function SqueletteTuile({ taille = 'l', className = '' }) {
   return <span className={cx('n-tuile-paire n-tuile-os', className)} data-n-tuile={taille} aria-hidden="true"><span className="n-os n-tuile-os-fond"/></span>;
