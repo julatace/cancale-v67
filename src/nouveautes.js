@@ -30,6 +30,8 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (24 nov., ext. 5.440.3 — Julien : « capte absolument tout ce que fait Bleam ») docs/passation/2026-11-24-observation-vinted.md
   { id: 'observer-vinted', date: '2026-11-24', titre: 'Observer Vinted pendant un envoi', phrase: 'Le chemin de la page Vinted noté 10 min, sans tes données.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (24 nov., vente-mail-annonce — Julien : « la vente a été détectée par les mails […] l'annonce n'a pas encore été supprimée ») docs/passation/2026-11-24-vente-mail-annonce.md
+  { id: 'vente-mail-annonce', date: '2026-11-24', titre: 'Vendue par e-mail : l’annonce quitte « en ligne »', phrase: 'La vente prend son N°, sinon « Relier à l’annonce ».', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (24 nov., ext. 5.440.2 — Julien : « Sauté · Favori trop ancien » pour des favoris de la veille) docs/passation/2026-11-24-favoris-ancien.md
   { id: 'favoris-ancien', date: '2026-11-24', titre: 'Favoris : plus de « trop ancien » à tort', phrase: 'Les notifications sont lues jusqu’au bout avant de sauter un favori.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov. soir, ext. 5.440.1 — Julien : « 0 envoyé · 1 sauté », phrase coupée) docs/passation/2026-11-23-favoris-identite.md
