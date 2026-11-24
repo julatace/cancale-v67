@@ -483,6 +483,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **24 nov. · Audit « chaque bouton », 2ᵉ passe (morceaux C–F)** : Relier eBay → retour piégé corrigé, rond « Retrouver » sur les segments eBay corrigé, deux exceptions du robot réparées (l'autotest les éprouve). `2026-11-23-audit-boutons-2.md`. Geste : aucun.
 - **23 nov. · Isolement + colis en direct** : RLS prouvée par vendeur (0 ligne d'un autre, 8 vendeurs) ; un bordereau reçu par e-mail paraît sur Colis sans changer d'écran (veille `bordereaux`). `docs/passation/2026-11-23-isolement-temps-reel.md`. Geste : aucun.
 - **23 nov. · Bugs (`claude/bugs-totale`)** : vente par e-mail partout — le bordereau reçu d'une vente pas relue (particulier : vente sans n°) fait le colis (Colis, Ma journée, jamais Ventes ni CA), la photo exacte tranche la fenêtre ambiguë ; colis à retirer sans photo (`Icon`) ; boucle de rendus : `onVmrExt` ne prévient que sur changement d'empreinte (11 → 6 validations/10 s au téléphone, banc `rendus-repos`). `2026-11-22-bugs-totale.md`. Geste : aucun.
 - **23 nov. · Photos nettes (`claude/photos-nettes`)** : chaque photo Vinted prend la plus petite taille DÉJÀ LUE du même fichier qui donne 2 px réels par point (`src/photoTaille.js`) ; visionneuse progressive (petite puis grande) ; aucune adresse fabriquée (chaque taille a sa signature). Achats : souvent 150x210 seule. `docs/passation/2026-11-23-photos-nettes.md`. Geste : aucun.
