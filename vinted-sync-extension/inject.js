@@ -688,6 +688,7 @@ function clocheFavorisNative(activer=false,origine){
         const id = it && it.id != null ? String(it.id) : '';
         if (/^\d{4,15}$/.test(id)) {
           post({ kind: 'publication', itemId: id, status: st });
+          noteAnnoncePhotos(id, corps);   // 16 nov. (5.401) : le code d'origine de ses photos
           const tc = (typeof corps === 'string' && corps.length <= 100000) ? corps : '';   // 22 oct. : sa fiche, sous l'identifiant que Vinted vient de donner
           if (tc) post({ kind: 'fiche', itemId: id, status: st, via: 'publication', corps: tc });
         }
@@ -695,6 +696,55 @@ function clocheFavorisNative(activer=false,origine){
       }).catch(() => {});
     } catch (_) {}
   };
+
+  // ── LE CODE D'ORIGINE DE SES PHOTOS (16 nov., 5.401, lot photo-identite-sites) ──
+  // Julien : « non pas à quoi elle ressemble, mais son CODE ». Les sites réencodent ce
+  // qu'il téléverse : seul le FICHIER D'ORIGINE porte un code qui se retrouve d'un site à
+  // l'autre. Quand LUI envoie une photo (`POST /api/v2/photos`, le fichier qu'il a choisi),
+  // on calcule le SHA-256 de ce fichier DANS la page (aucune requête de plus, le geste n'est
+  // pas modifié, l'image ne part nulle part) ; après le 2xx de Vinted, l'identifiant de photo
+  // rendu voyage avec son code. Puis l'annonce qu'il publie ou modifie (`item_upload/items`)
+  // dit quelles photos elle porte (`assigned_photos`). Jamais l'image, jamais un titre.
+  const RE_PHOTO_ENVOI = /^\/api\/v\d+\/photos\/?$/;
+  const imageDuCorps = (b) => {
+    try {
+      if (typeof Blob !== 'undefined' && b instanceof Blob) return /^image\//i.test(b.type || '') ? b : null;
+      if (typeof FormData !== 'undefined' && b instanceof FormData) { let x = null; b.forEach((v) => { if (!x && typeof Blob !== 'undefined' && v instanceof Blob && /^image\//i.test(v.type || '')) x = v; }); return x; }
+    } catch (_) {}
+    return null;
+  };
+  const hexDe = (buf) => Array.from(new Uint8Array(buf), (o) => o.toString(16).padStart(2, '0')).join('');
+  const codeOrigine = (b) => {
+    const img = imageDuCorps(b);
+    if (!img || img.size > 25 * 1024 * 1024 || !(window.crypto && crypto.subtle)) return null;
+    return img.arrayBuffer().then((a) => crypto.subtle.digest('SHA-256', a)).then(hexDe).catch(() => null);
+  };
+  const notePhotoOrigine = (method, url, status, lireTexte, codeP) => {
+    try {
+      if (!codeP || String(method || '').toUpperCase() !== 'POST') return;
+      const st = Number(status);
+      if (!(st >= 200 && st < 300)) return;
+      let U = null; try { U = new URL(url, location.origin); } catch (_) { return; }
+      if (!/(^|\.)vinted\.[a-z.]+$/i.test(U.hostname) || !RE_PHOTO_ENVOI.test(U.pathname)) return;
+      Promise.all([codeP, Promise.resolve().then(lireTexte)]).then(([code, t]) => {
+        let j = null; try { j = JSON.parse(t); } catch (_) {}
+        const ph = j && (j.photo && typeof j.photo === 'object' ? j.photo : j);
+        const id = ph && ph.id != null ? String(ph.id) : '';
+        if (/^\d{1,15}$/.test(id) && /^[0-9a-f]{64}$/.test(String(code || ''))) post({ kind: 'photoOrigine', photoId: id, code });
+        else post({ kind: 'photoOrigine', photoId: null, cles: j && typeof j === 'object' ? Object.keys(j).slice(0, 12) : [] });
+      }).catch(() => {});
+    } catch (_) {}
+  };
+  // Les photos d'une annonce qu'il vient d'enregistrer (2xx) : les identifiants de `assigned_photos`.
+  const photosDuCorps = (corps) => {
+    try {
+      const j = JSON.parse(String(corps || ''));
+      const it = j && (j.item && typeof j.item === 'object' ? j.item : j);
+      const l = it && Array.isArray(it.assigned_photos) ? it.assigned_photos : [];
+      return l.map((p) => String(p && typeof p === 'object' ? p.id : p)).filter((x) => /^\d{1,15}$/.test(x)).slice(0, 30);
+    } catch (_) { return []; }
+  };
+  const noteAnnoncePhotos = (itemId, corps) => { try { const ids = photosDuCorps(corps); if (ids.length && /^\d{4,15}$/.test(String(itemId || ''))) post({ kind: 'annoncePhotos', itemId: String(itemId), photoIds: ids }); } catch (_) {} };
 
   // ── SA FICHE, TELLE QU'IL L'ENREGISTRE (22 octobre) ────────────────────────
   // Quand il publie (`POST …/item_upload/items`) ou MODIFIE une annonce
@@ -718,6 +768,7 @@ function clocheFavorisNative(activer=false,origine){
       const t = corpsTexte(corps);
       if (!m || !t) return;
       post({ kind: 'fiche', itemId: m[1], status: st, via: 'modif', corps: t });
+      noteAnnoncePhotos(m[1], t);   // 16 nov. (5.401)
     } catch (_) {}
   };
 
@@ -1347,13 +1398,14 @@ function nettoyerRelaisSuivi(r) {
   const origFetch = window.fetch;
   if (origFetch) {
     window.fetch = commeNatif(function (input, init) {
-      let url = '', method = 'GET', corpsEnvoye;
+      let url = '', method = 'GET', corpsEnvoye, codeEnvoi = null;
       try {
         url = (typeof input === 'string') ? input : input instanceof URL ? input.href : (input && input.url) || '';
         if (init && init.headers) sendCsrf(init.headers);
         else if (input && input.headers) sendCsrf(input.headers);
         method = (init && init.method) || (input && input.method) || 'GET';
         corpsEnvoye = init && init.body;
+        if (String(method).toUpperCase() === 'POST' && /\/api\/v\d+\/photos\/?(?:\?|$)/.test(url)) codeEnvoi = codeOrigine(corpsEnvoye);   // 16 nov. (5.401)
         const contexte=contexteCreation(method,url);
         const estCreation=String(method).toUpperCase()==='POST'&&/\/api\/v2\/conversations(?:\?|$)/.test(url);
         if(estCreation&&corpsEnvoye===undefined&&typeof Request!=='undefined'&&input instanceof Request){
@@ -1367,6 +1419,7 @@ function nettoyerRelaisSuivi(r) {
           try {
             noteSuppression(method, url, res.status);   // 5.165 : AVANT tout le reste (la page va naviguer)
             notePublication(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 5.201
+            notePhotoOrigine(method, url, res.status, () => res.clone().text(), codeEnvoi);   // 16 nov. (5.401)
             noteModification(method, url, res.status, corpsEnvoye);   // 22 oct.
             noteVacances(method, url, res.status, corpsEnvoye);   // 10 nov. (5.338)
             noteBrouillon(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 28 oct.
@@ -1410,11 +1463,13 @@ function nettoyerRelaisSuivi(r) {
         // Capte aussi le csrf/anon posé via setRequestHeader (déjà relayé plus
         // haut) pour la moisson active.
         sendWriteReq(this.__cancaleMethod, url, bodyArg,contexteCreation(this.__cancaleMethod,url));
+        const codeEnvoiX = (String(this.__cancaleMethod || '').toUpperCase() === 'POST' && /\/api\/v\d+\/photos\/?(?:\?|$)/.test(url)) ? codeOrigine(bodyArg) : null;   // 16 nov. (5.401)
         noteSeen(url); // diagnostic : TOUT appel API (XHR aussi)
         this.addEventListener('load', function () {
           try {
             noteSuppression(this.__cancaleMethod, url, this.status);   // 5.165
             notePublication(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 5.201
+            notePhotoOrigine(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } }, codeEnvoiX);   // 16 nov. (5.401)
             noteModification(this.__cancaleMethod, url, this.status, bodyArg);   // 22 oct.
             noteVacances(this.__cancaleMethod, url, this.status, bodyArg);   // 10 nov. (5.338)
             noteBrouillon(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 28 oct.

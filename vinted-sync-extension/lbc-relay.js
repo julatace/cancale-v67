@@ -188,6 +188,7 @@
     else if (d.kind === 'lbcenvoi' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcEnvoi', url: d.url, methode: d.methode || '', cles: d.cles }); } catch (_) {} }
     else if (d.kind === 'lbcvente' && d.body) { try { transmettre({ from: 'cancale-lbc', action: 'lbcVente', sequence:d.__vrmSequence,url: d.url, body: d.body, coupe: !!d.coupe,session:typeof d.session==='string'?d.session.slice(0,80):'' }); } catch (_) {} }
     else if(d.kind==='lbcblocage'){signaler(d.raison==='taille'?'taille':null);}
+    else if (d.kind === 'lbcphotoorigine') { try { if (d.fichier && /^[0-9a-f]{40}$/.test(String(d.fichier)) && /^[0-9a-f]{64}$/.test(String(d.code || ''))) transmettre({ from: 'cancale-lbc', action: 'lbcPhotoOrigine', fichier: String(d.fichier), code: String(d.code) }); else chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcPhotoOrigine', fichier: null }); } catch (_) {} }   // 16 nov. (5.401)
     else if (d.kind === 'lbcpaths' && d.paths) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcPaths', paths: d.paths, url: location.href }); } catch (_) {} }
     else if (d.kind === 'lbcschema' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcSchema', endpoint: d.endpoint, cles: d.cles }); } catch (_) {} }
     // La messagerie : le NOMBRE de non-lus d'un compte, et la liste de ses comptes
