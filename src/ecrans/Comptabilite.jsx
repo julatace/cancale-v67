@@ -20058,10 +20058,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const composerLot = async (lignes, format, tampons, { apercu = false, pas = null, places = null } = {}) => {
     const items = [], raisons = {};
     // (22 nov., défaut « Argent bloqué ») Les étiquettes lues pendant la composition : UN signal à la fin (`avecRafaleEtiquettes`).
-    const lues = await avecRafaleEtiquettes(async () => { const L = []; for (const l of lignes) L.push(await lireOctetsLigne(l)); return L; });
+    // (24 nov., main-vert) La progression avance APRÈS la lecture de CHAQUE bordereau (dans la boucle de lecture) — depuis
+    // le 22 nov. elle ne bougeait qu'une fois TOUT lu (0 sur 50, puis 50 d'un coup ; banc lot-preparation-reprise).
+    const lues = await avecRafaleEtiquettes(async () => { const L = []; for (const l of lignes) { L.push(await lireOctetsLigne(l)); if (pas) pas(L.length); } return L; });
     for (const [i, l] of lignes.entries()) {
       const o = lues[i];
-      if (pas) pas(i + 1);
       if (!o.buf) { raisons[l.cle] = o.raison; continue; }
       items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: o.buf, invBytes: o.invBytes, cle: l.cle, site: l.site, ligne: l, retour: estRetour(l), tampon: !estRetour(l) && TAMPONS_IMPR.includes((tampons || {})[l.cle]) ? tampons[l.cle] : null, places: places && places[l.cle] ? places[l.cle] : null });
     }

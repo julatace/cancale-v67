@@ -9,7 +9,8 @@
 //   4. un changement de compte pendant la préparation : rien ouvert, rien marqué.
 const fs=require('fs'),vm=require('vm'),path=require('path'),url=require('url'),assert=require('assert/strict');
 const racine=path.resolve(__dirname,'..','..');
-const src=fs.readFileSync(path.join(racine,'src/App.jsx'),'utf8'),a=src.indexOf('  const batchBordereaux ='),b=src.indexOf('  // « Déplacer le tampon » (depuis « Bordereau prêt »)',a);
+// (24 nov., main-vert) App.jsx découpé : le bloc a déménagé dans src/ecrans/Comptabilite.jsx — lu dans l'app RECOLLÉE (code).
+const src=require(path.join(racine,'scripts','_source-app.cjs')).sourceAppCode(racine),a=src.indexOf('  const batchBordereaux ='),b=src.indexOf('  // « Déplacer le tampon » (depuis « Bordereau prêt »)',a);
 assert(a>0&&b>a,'le bloc du lot (batchBordereaux … imprimerLotRef.current = imprimerLot) est introuvable');
 const bloc=src.slice(a,b);
 assert(/imprimerLotRef\.current = imprimerLot;/.test(bloc)&&/const attendrePuisOuvrir =/.test(bloc),'le bloc ne porte plus imprimerLot / attendrePuisOuvrir');
@@ -47,7 +48,8 @@ function banc(){
   composerBordereaux:async(items)=>({bytes:new Uint8Array([1]),count:items.length,reussis:items.map((_,i)=>i),rates:[]}),
   ouvrirPdfLot:()=>'visionneuse',
   setBordsPrinted:()=>{},noterImprimeSansNum:()=>{},signalerBordereauImprime:()=>{},
-  marquerVc:(_,id)=>marques.push(id)});
+  marquerVc:(_,id)=>marques.push(id),
+  /* (22 nov., « Argent bloqué ») la composition d'un lot passe dans `avecRafaleEtiquettes` (un signal à la fin) : ici, elle s'exécute telle quelle */avecRafaleEtiquettes:async(faire)=>faire()});
  vm.createContext(c);vm.runInContext(code,c);
  const dernier=(nom)=>{const l=poses[nom]||[];return l[l.length-1];};
  // Son toucher sur « Imprimer » de l'aperçu (s'il est ouvert) ; rend la fin du geste.
