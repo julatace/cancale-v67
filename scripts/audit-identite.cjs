@@ -384,7 +384,7 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   mauvais.length
     ? nok('les lectures de plus de 1 000 lignes paginent', 'sans pagination : ' + mauvais.join(', '))
     : ok('les lectures de plus de 1 000 lignes paginent');
-  /const lireTout = async \(query, opts = \{\}\)/.test(SRC) && (/Range: `\$\{from\}-\$\{from \+ PAGE_SB - 1\}`/.test(SRC) || /Range: `\$\{p \* PAGE_SB\}-\$\{p \* PAGE_SB \+ PAGE_SB - 1\}`/.test(SRC))
+  /const lireTout = async \(query, opts = \{\}\)/.test(SRC) && /Range: `\$\{from\}-\$\{from \+ PAGE_SB - 1\}`/.test(SRC)
     ? ok('le helper de pagination existe et utilise l\'en-tête Range')
     : nok('le helper de pagination existe', '`lireTout` absent ou ne pagine pas');
 }

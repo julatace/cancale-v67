@@ -25,8 +25,8 @@ const path = require('path'), fs = require('fs'), http = require('http');
 const RACINE = path.join(__dirname, '..', '..');
 const { chromium } = require(path.join(RACINE, 'node_modules', 'playwright'));
 const { fabriquer, repondre } = require(path.join(__dirname, '_base-volume.cjs'));
-// (24 nov., vitesse-lectures-toucher) 15 comptes (les siens, banc vitesse-iphone) : la liste des transactions a TROIS pages
-// (2 550 lignes) — à 7 comptes, deux (1 190) : rien à juger sur les pages qui partent ensemble (`lireTout`).
+// (24 nov., vitesse-lectures-toucher) 15 comptes (les siens, banc vitesse-iphone) : 15 relevés « plus vue » à grouper, et la
+// liste des transactions en TROIS pages (2 550 lignes).
 const base = fabriquer({ volumeReel: true, qr: true, comptes: 15, ventes: 1500, achats: 800, annonces: 1200 });
 const DIST = path.resolve(process.argv[2] || path.join(RACINE, 'dist'));
 const PORT = +(process.argv[3] || process.env.BANC_PORT || 21000 + Math.floor(Math.random() * 8000));
@@ -138,11 +138,10 @@ const ATTENDU = {
     // (24 nov., vitesse-lectures-toucher) La liste des transactions projetée (`lireExtrasRepartition`, src/App.jsx) part UNE
     // fois pour tout le parcours (une lecture en cours est rejointe, gardée 10 min) : elle partait 2 à 3 fois.
     console.log(`  lectures de la liste des transactions (pays, acheteur) : ${lecturesExtras.length}`);
-    // (24 nov.) LES PAGES PARTENT ENSEMBLE (`lireTout`) : la 3e page de cette liste est DEMANDÉE avant que la 2e soit rendue.
+    // (24 nov.) Les pages de cette liste, rapportées (pas jugées) : les lancer ensemble (`lireTout`, nombre estimé) a été
+    // essayé puis retiré — aucun gain mesuré à la 1re visite (AB, récit §8), une lecture de plus côté base.
     { const dem2 = pagesTxn.find((x) => x[0] === 'dem' && x[1] === 2000), ren1 = pagesTxn.find((x) => x[0] === 'rendue' && x[1] === 1000);
-      console.log(`  pages de la liste des transactions : ${pagesTxn.filter((x) => x[0] === 'dem').map((x) => x[1]).join(' · ')}${dem2 && ren1 ? ` · 3e demandée ${dem2[2] - ren1[2]} ms après la 2e rendue` : ''}`);
-      if (!dem2 || !ren1) fautes.push('la liste des transactions n\'a pas trois pages au banc : rien à juger sur les pages');
-      else if (dem2[2] >= ren1[2]) fautes.push(`les pages de \`lireTout\` partent l'une après l'autre (3e demandée ${dem2[2] - ren1[2]} ms après la 2e rendue)`); }
+      console.log(`  pages de la liste des transactions : ${pagesTxn.filter((x) => x[0] === 'dem').map((x) => x[1]).join(' · ')}${dem2 && ren1 ? ` · 3e demandée ${dem2[2] - ren1[2]} ms après la 2e rendue` : ''}`); }
     // (24 nov.) LES RELEVÉS « PLUS VUE » (`vinted_suivi_{compte}`, src/plusVueLecture.js) : plusieurs comptes par lecture,
     // 60 annonces au plus — avant, une lecture par compte (7 au banc), l'une après l'autre.
     { const nAnn = lecturesSuivi.reduce((a, x) => a + x, 0), mini = Math.ceil(nAnn / 60);

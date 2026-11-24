@@ -7894,17 +7894,6 @@ const lireTout = async (query, opts = {}) => {
   // peut sauter ou revenir d'une page à l'autre. Une requête qui a déjà son
   // `order=` le garde (scripts/audit-pagination-ordre.cjs).
   const requete = /(^|&)order=/.test(String(query)) ? query : `${query}&order=id.asc`;
-  // (24 nov., vitesse-lectures-toucher) LES PAGES PARTENT ENSEMBLE. Mesuré à la 1re visite d'Annonces (banc vitesse-iphone,
-  // LECTURES=1, volume de Julien) : la liste des transactions partait en trois vagues (+2,0 · +3,6 · +4,5 s) — ses trois
-  // pages, l'une après l'autre. La 1re page demande le NOMBRE estimé de lignes (`Prefer: count=estimated`, rendu dans
-  // `Content-Range`) ; les pages suivantes qu'il annonce partent alors ensemble, rangées dans l'ordre. Les règles ne changent
-  // pas : une page ratée = « pas su » ; si une page lancée ensemble répond autre chose qu'une page lue (416, erreur), on la
-  // reprend UNE PAR UNE à partir d'elle, comme avant ; une dernière page pleine ⇒ on continue une par une (le nombre estimé
-  // n'est jamais cru pour dire « fini » : seule une page courte le dit).
-  const lirePage = (p, avecNombre) => (opts.memo ? fetchMemo : fetch)(`${SUPABASE_URL}/rest/v1/app_data?${requete}`, Object.assign({
-    headers: sbAuth(Object.assign({ Range: `${p * PAGE_SB}-${p * PAGE_SB + PAGE_SB - 1}`, 'Range-Unit': 'items' }, avecNombre ? { Prefer: 'count=estimated' } : {})),
-  }, opts.voirSupprimes ? { vrmVoirSupprimes: true } : {}));
-  const enAvance = new Map();   // p → promesse de la page lancée en même temps que les autres
   for (let p = 0; p < max; p++) {
     const from = p * PAGE_SB;
     // (7 nov.) `opts.memo` : une lecture de MONTAGE peut partager la réponse 60 s (`fetchMemo`).
@@ -7912,20 +7901,11 @@ const lireTout = async (query, opts = {}) => {
     //    rejeté) ou un corps illisible (HTML d'une page d'erreur) LEVAIT : un
     //    appelant sans `catch` restait « en cours » pour toujours. Pas su ⇒ `null`.
     let r;
-    const avance = enAvance.get(p); enAvance.delete(p);
-    if (avance) {
-      r = await avance.catch(() => null);
-      // Lancée ensemble mais pas une page lue : reprise une par une, à partir d'elle (les suivantes lancées sont oubliées).
-      if (!r || !r.ok) { enAvance.clear(); r = undefined; }
-    }
-    if (r === undefined) try {
-      r = await lirePage(p, p === 0);
+    try {
+      r = await (opts.memo ? fetchMemo : fetch)(`${SUPABASE_URL}/rest/v1/app_data?${requete}`, Object.assign({
+        headers: sbAuth({ Range: `${from}-${from + PAGE_SB - 1}`, 'Range-Unit': 'items' }),
+      }, opts.voirSupprimes ? { vrmVoirSupprimes: true } : {}));
     } catch (_) { return null; }
-    if (p === 0 && r && r.ok && r.status !== 416) {
-      const tot = /\/(\d+)$/.exec((r.headers && r.headers.get && r.headers.get('content-range')) || '');
-      const n = tot ? Math.min(max, Math.ceil(Number(tot[1]) / PAGE_SB)) : 0;
-      for (let q = 1; q < n; q++) { const pr = lirePage(q, false); pr.catch(() => {}); enAvance.set(q, pr); }
-    }
     // ⚠️⚠️ (1er nov., audit « conditions difficiles ») UNE PAGE RATÉE = « PAS SU »,
     //    TOUJOURS. Avant, seuls les lecteurs `strict` recevaient `null` : les
     //    autres recevaient la PREMIÈRE page seule, présentée comme la liste
