@@ -322,4 +322,8 @@
 :root:root body .vrm-ms-stock-resume .vrm-pop-chips { margin: 0 !important; padding: 0 !important; }
 :root:root body .vrm-ms-stock-resume .vrm-s2d-filtres { flex-wrap: nowrap !important; }
 
+/* (22 nov., bugs-totale) La bulle portait `max-width: 78 %` DANS une colonne (`.vrm-bulle-l`) déjà bornée à 78 % et taillée sur
+   son contenu : 78 % de 78 % d'une largeur ajustée, « Bonjour » passait sur deux lignes (« Bonj / our »). La colonne garde la
+   borne ; la bulle prend toute la colonne. */
+:root:root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle-l > .vrm-bulle.vrm-bulle { max-width: 100% !important; }
 }
