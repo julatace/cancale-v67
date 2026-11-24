@@ -501,7 +501,8 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   // vente par du vide. Reproduit au banc (N°777 ressorti en N°319).
   const j = SRC.indexOf('setCloudReady(true)');
   const bloc = j < 0 ? '' : SRC.slice(Math.max(0, j - 700), j);
-  /setSaleOv\(load\('vinted_sale_overrides'/.test(bloc)
+  // (24 nov., vitesse-lectures-toucher) `pareil(load(…))` : relu de même, l'objet d'avant gardé s'il a le même contenu.
+  /setSaleOv\((pareil\()?load\('vinted_sale_overrides'/.test(bloc)
     ? ok('les numéros de vente sont relus quand le cloud arrive')
     : nok('les numéros de vente sont relus quand le cloud arrive',
           '`vinted_sale_overrides` absent du rechargement : ils peuvent être écrasés par du vide');
@@ -569,7 +570,7 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     : nok('le prochain numéro doit éviter annonces ET ventes');
   // ⚠️ Et le pool doit être RELU quand le nuage atterrit — c'est la cause exacte
   // des doublons d'août.
-  /setUsedNumeros\(load\('vinted_used_numeros'/.test(SRC)
+  /setUsedNumeros\((pareil\()?load\('vinted_used_numeros'/.test(SRC)
     ? ok('le pool est relu quand le nuage atterrit')
     : nok('sans relecture, un appareil neuf renumérote à partir de 1');
 }

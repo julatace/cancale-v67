@@ -13059,6 +13059,9 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
   window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (k && k in _vcMem) { delete _vcMem[k]; signalerVc(); } });
 }
 // L'état « Vestiaire » d'un écran : se redessine quand une de ces clés change.
+const lireVcLocal = () => {
+  return { auto: numerosVcEffectifs(), donnes: carteNumerosVc(vcCarte('vrm_vc_numeros')), liens: vcCarte('vrm_vc_liens'), fait: vcCarte('vrm_vc_colis_done'), imprimes: vcCarte('vrm_vc_imprimes'), departs: departsCarte(), departsCle: departsCle() };
+};
 function useVcLocal() {
   const [, maj] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => { _ecoutesVc.add(maj); return () => { _ecoutesVc.delete(maj); }; }, []);
@@ -13066,7 +13069,7 @@ function useVcLocal() {
   // (24 nov., vitesse-lectures-toucher) LE MÊME OBJET tant que rien n'a changé (chaque champ comparé par son CONTENU,
   // `memeContenu`) : il était neuf à chaque rendu, et ce qui le lit (`cartesColis`, `listeEnvoyes`, gardés par version des
   // données) repartait à chaque rendu. Un champ changé ⇒ un objet neuf, comme avant.
-  const neuf = { auto: numerosVcEffectifs(), donnes: carteNumerosVc(vcCarte('vrm_vc_numeros')), liens: vcCarte('vrm_vc_liens'), fait: vcCarte('vrm_vc_colis_done'), imprimes: vcCarte('vrm_vc_imprimes'), departs: departsCarte(), departsCle: departsCle() };
+  const neuf = lireVcLocal();
   const avant = React.useRef(null);
   const a = avant.current;
   if (!a || Object.keys(neuf).some((k) => !memeContenu(a[k], neuf[k]))) avant.current = neuf;
