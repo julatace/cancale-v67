@@ -26,7 +26,7 @@ export const QUOTA_ATTENTES_MAX=12;
 // un nouvel essai (NOTIF_ATTENTE_MS), au plus NOTIF_ATTENTES_MAX fois ; ensuite « pas envoyé » avec sa raison, la file
 // continue. Seule la liste de Vinted lue jusqu'à sa dernière page dit « trop ancien » (côté extension).
 export const NOTIF_ATTENTE_MS=3*60000;
-export const NOTIF_ATTENTES_MAX=2;
+export const NOTIF_ATTENTES_MAX=1;
 export function delaiFavori(min,max,jeton){
   const a=Number(min),b=Number.isInteger(max)&&max>a?max:a;
   let h=0x811c9dc5;for(const c of String(jeton||''))h=Math.imul(h^c.charCodeAt(0),0x01000193)>>>0;
@@ -215,7 +215,7 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
   if(attendNotif){j.etat='attente';delete j.raison;delete j.traiteLe;j.attentesNotif=(Number(j.attentesNotif)||0)+1;
     // Les AUTRES favoris passent d'abord (ce favori repart en fin de file) ; seul, il attend NOTIF_ATTENTE_MS.
     if(g.jobs.some(x=>x!==j&&x.etat==='attente')){g.jobs.splice(g.jobs.indexOf(j),1);g.jobs.push(j);}else{g.prochain=Math.max(g.prochain||0,fin+NOTIF_ATTENTE_MS);d.prochainGlobal=g.prochain;}
-    g.raison='Notification d’un favori pas encore trouvée sur la page Vinted : rien n’est parti pour lui, VRM le réessaie après les autres.';}
+    g.raison='Un favori n’a pas été trouvé sur la page des notifications de Vinted : rien n’est parti pour lui, VRM le réessaie après les autres (sinon, ouvre la page des notifications sur vinted.fr).';}
   else if(autreVersion){g.refusTexte=(Number(g.refusTexte)||0)+1;g.raison='Vinted a refusé une version de ton message : VRM ne la réutilise plus et continue avec tes autres versions.';if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
   // (22 nov.) Un refus qui ne tient qu'à CE favori, rien d'écrit : il est sauté, la file CONTINUE (au plus REFUS_LOCAUX_MAX de suite).
   else if(refusLocalIci){g.refusLocaux=(Number(g.refusLocaux)||0)+1;

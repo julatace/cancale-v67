@@ -43,7 +43,7 @@ la cause précise ne se prouve que sur son compte. La 5.440.2 rend le résultat 
    fenêtre ET bloc qui défile, « Afficher plus » s'il est seul, 4 s pour chaque suite, arrêt après 3 essais sans rien de
    neuf ou 90 s.
 5. **Pas trouvée sur la page alors que la liste de Vinted la contient** ⇒ `notification_pas_trouvee` : rien n'est écrit, le
-   favori **attend** (il repart après les autres ; seul, dans 3 min), au plus 2 fois, puis « pas envoyé » avec cette raison,
+   favori **attend** (il repart après les autres ; seul, dans 3 min), une fois, puis « pas envoyé » avec cette raison,
    la file continue. Jamais sauté pour ça.
 6. **Ordre** : la file part des favoris les plus RÉCENTS (date de leur notification ; `ordreRecents`, `api/_lib/favoris.js`) —
    ceux que la cloche montre — puis les plus anciens.

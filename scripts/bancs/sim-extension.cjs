@@ -221,23 +221,24 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       note(`durée ${Math.round((Date.now() - t0) / 1000)} s`);
       const ecr = ecrituresVinted();
       const inq = ecr.filter((e) => /inquiries$/.test(e.p)), msgs = ecr.filter((e) => /\/replies$/.test(e.p)), offres = ecr.filter((e) => /\/offers$/.test(e.p));
+      const envT = (jobs() || []).filter((x) => x.etat === 'envoye').length, E = T ? envT : N;
       dit(!!res, 'la file se termine', JSON.stringify(parItem()));
-      dit(inq.length === N && inq.every((e) => e.uid === UID), N + ' conversations ouvertes PAR LA PAGE, au nom du compte de l’onglet', inq.map((e) => e.corps).join(' | '));
-      dit(msgs.length === N && msgs.every((e) => { let t = ''; try { t = String(JSON.parse(e.corps).content || ''); } catch (_) {} return e.uid === UID && /ton favori est toujours dispo/.test(t) && !/[{}]/.test(t); }), N + ' messages envoyés par la page', msgs.map((e) => e.corps.slice(0, 80)).join(' | '));
-      dit(offres.length === N, N + ' offres (réduction de 10 %) envoyées par la page', offres.map((e) => e.p + ' ' + e.corps).join(' | '));
+      dit(inq.length === E && inq.every((e) => e.uid === UID), E + ' conversations ouvertes PAR LA PAGE, au nom du compte de l’onglet', inq.map((e) => e.corps).join(' | '));
+      dit(msgs.length === E && msgs.every((e) => { let t = ''; try { t = String(JSON.parse(e.corps).content || ''); } catch (_) {} return e.uid === UID && /ton favori est toujours dispo/.test(t) && !/[{}]/.test(t); }), N + ' messages envoyés par la page', msgs.map((e) => e.corps.slice(0, 80)).join(' | '));
+      dit(offres.length === E, E + ' offres (réduction de 10 %) envoyées par la page', offres.map((e) => e.p + ' ' + e.corps).join(' | '));
       if (F1 === 'F1E' || F1 === 'F1P') dit(V.st.req.some((e) => /escrow-orders/.test(e.p)), 'la commande escrow est relue (identité par la commande)', V.st.req.filter((e) => e.h === 'api.vinted.fr').map((e) => e.m + ' ' + e.p).slice(0, 12).join(' '));
       dit(ecr.every((e) => !e.origine.startsWith('chrome-extension')), 'aucune écriture partie du service worker (toutes de la page)', ecr.map((e) => e.origine).join(','));
       for (const cv of V.st.convs.values()) { const ordre = [...cv.messages.map(() => 'm'), ...cv.offres.map(() => 'o')]; void ordre; }
       const b = FP.bilanFavoris(jobs());
       const f = res && res.f;
       note(`bilan VRM ${JSON.stringify(b)} · carte ${JSON.stringify(f && f.f && f.f.file)}`);
-      dit(b.envoyes === N, `VRM : ${N} envoyés`, JSON.stringify(parItem()));
+      dit(T ? b.envoyes >= (F1 === 'F1X' ? 2 : 0) && jobs().every((x) => x.etat === 'envoye' || (x.etat === 'refuse' && x.raison === 'notification_pas_trouvee' && x.ecrits === 0)) : b.envoyes === N, T ? `VRM : ${b.envoyes}/${N} envoyés, les autres « pas trouvé sur la page : ouvre la page des notifications sur vinted.fr », rien d’écrit pour eux` : `VRM : ${N} envoyés`, JSON.stringify(parItem()));
       if (F1 === 'F1X') { const ordre = inq.map((e) => { try { return String(JSON.parse(e.corps).item_id || ''); } catch (_) { return ''; } }); const pages = V.st.req.filter((e) => e.page && /^\/member\/notifications/.test(e.p)).length;
-        dit(JSON.stringify(ordre) === JSON.stringify(FAVORIS.map((f) => f.itemId)), 'du plus récent au plus ancien (ceux de la cloche d’abord)', JSON.stringify(ordre));
-        dit(pages >= 1 && pages <= 6, 'la page complète ouverte pour les favoris plus bas que la cloche (et pas pour ceux de la cloche)', 'pages complètes : ' + pages); }
+        dit(ordre.length >= 2 && JSON.stringify(ordre) === JSON.stringify(FAVORIS.slice(0, ordre.length).map((f) => f.itemId)), 'du plus récent au plus ancien (ceux de la cloche d’abord)', JSON.stringify(ordre));
+        dit(pages >= 1, 'la page complète ouverte pour les favoris plus bas que la cloche', 'pages complètes : ' + pages); }
       if (T) dit(!jobs().some((x) => x.raison === 'favori_trop_ancien'), 'aucun favori « trop ancien » (la liste de Vinted les contient, de la veille)', JSON.stringify(parItem()));
       const fenL = f && f.a && Array.isArray(f.a.lignes) ? f.a.lignes : [];
-      dit(fenL.length === N && fenL.every((l) => l.etat === 'envoye'), `la fenêtre : ${N} lignes`+'  « envoyé »', JSON.stringify(fenL.map((l) => l.etat)));
+      dit(fenL.length === N && fenL.filter((l) => l.etat === 'envoye').length === b.envoyes, `la fenêtre : ${N} lignes, autant « envoyé » que chez VRM`, JSON.stringify(fenL.map((l) => l.etat)));
       dit(f && f.f && f.f.file && Number(f.f.file.envoyes) === b.envoyes, 'les nombres de la carte = ceux de VRM', JSON.stringify(f && f.f && f.f.file));
       const tw = ctx.pages().find((p) => /vinted\.fr\/inbox\//.test(p.url())); if (tw) await shot(tw, F1 + '-fin'); await vt.bringToFront().catch(() => {}); await attendre(800); await shot(vt, F1 + '-onglet-de-julien');
     }

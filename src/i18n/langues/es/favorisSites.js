@@ -45,7 +45,7 @@ export default {
   "fav.bilan.r.pause_vinted": "Vinted pide ir más despacio",
   "fav.bilan.r.offre_refusee": "oferta rechazada por Vinted",
   "fav.bilan.r.element_introuvable": "botón o campo no encontrado en la página de Vinted",
-  "fav.bilan.r.notification_pas_trouvee": "notificación del favorito aún no encontrada en la página de Vinted",
+  "fav.bilan.r.notification_pas_trouvee": "no encontrado en la página: abre la página de notificaciones en vinted.fr",
   "fav.bilan.r.identite_non_confirmee": "artículo o destinatario no confirmado",
   "fav.bilan.r.historique_non_verifie": "conversación no verificada",
   "fav.bilan.r.autre": "otro rechazo",

@@ -700,11 +700,12 @@
             if (Date.now() > tFin) { fin = 'temps'; return { absent: true }; }
             // Charger la suite : bas de la fenêtre et du bloc qui défile (un cran plus haut d'abord, pour que la page le voie), puis « Afficher plus ».
             const b = blocDefilant();
-            // L'onglet de travail est souvent en ARRIÈRE-PLAN : le navigateur n'y rend aucune image, et l'événement « scroll »
-            // qu'il enverrait au rendu suivant n'arrive pas — la liste ne charge jamais sa suite. La position est posée, puis
-            // l'événement « scroll » (jamais un geste de souris ni de clavier) est envoyé à la page pour qu'elle la relise.
-            try { const h = document.documentElement.scrollHeight; window.scrollTo(0, Math.max(0, h - window.innerHeight - 240)); window.scrollTo(0, h); window.dispatchEvent(new Event('scroll')); document.dispatchEvent(new Event('scroll')); } catch (_) {}
-            if (b) { try { b.scrollTop = Math.max(0, b.scrollHeight - b.clientHeight - 240); b.scrollTop = b.scrollHeight; b.dispatchEvent(new Event('scroll')); } catch (_) {} }
+            // ⚠️ Aucun événement fabriqué (`dispatchEvent` ⇒ isTrusted:false, une preuve d'automatisation, CLAUDE.md §3) : seules
+            //    les positions sont posées (fenêtre, bloc qui défile) ; c'est le NAVIGATEUR qui envoie son propre « scroll ».
+            //    Onglet de travail en arrière-plan : le navigateur peut ne rien envoyer (aucun rendu) ⇒ la suite ne vient pas,
+            //    le favori n'est PAS trouvé et c'est dit (« ouvre la page des notifications sur vinted.fr »), rien n'est envoyé.
+            try { const h = document.documentElement.scrollHeight; window.scrollTo(0, Math.max(0, h - window.innerHeight - 240)); window.scrollTo(0, h); } catch (_) {}
+            if (b) { try { b.scrollTop = Math.max(0, b.scrollHeight - b.clientHeight - 240); b.scrollTop = b.scrollHeight; } catch (_) {} }
             await nap(250);
             const p = boutonPlus(); if (p) { try { p.click(); } catch (_) {} }
             // La suite attendue 4 s au plus (relue toutes les 200 ms) : nouvelles lignes ou page plus haute.

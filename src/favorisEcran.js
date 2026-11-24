@@ -125,7 +125,7 @@ export const RAISONS_ECRAN={
   arrete:{texte:'envoi arrêté avant de partir'},
   annule:{texte:'retiré de l’envoi avant de partir'},
   trop_ancien:{texte:'pas trouvé dans tes notifications Vinted (toute la liste lue)'},
-  notif_pas_trouvee:{texte:'notification du favori pas encore trouvée sur la page Vinted (rien n’est parti)',geste:'Renvoie-le : VRM relit toute la liste des notifications.'},
+  notif_pas_trouvee:{texte:'pas trouvé sur la page des notifications de Vinted (rien n’est parti)',geste:'Ouvre la page des notifications sur vinted.fr, puis relance-le.'},
   verifie:{texte:'vérifié par toi sur Vinted, envoi non confirmé'},
   interrompu:{texte:'interrompu avant l’envoi'},
 };
