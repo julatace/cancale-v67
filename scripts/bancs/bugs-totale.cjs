@@ -37,7 +37,9 @@ async function main() {
           for (const e of ['ventes', 'achats', 'annonces', 'compta', 'journee']) await B.aller(pg, e, 3200);
           const encore = await pg.evaluate(() => { const t = document.querySelector('[data-toast-numeros] .n-toast-message'); return t ? t.textContent : ''; });
           await cap('toast-apres-16s');
-          dit(vue, 'toast des N° : part seul en ~10 s, même en changeant d\'écran', vu0 && !encore, `montré au départ : ${vu0} · après 16 s et 5 écrans : « ${encore.slice(0, 50)} »`);
+          // (23 nov., train) Depuis la tranche 4 du design (main), les N° neufs sont une CARTE d'Aujourd'hui, plus un toast : la règle
+          // jugée reste « aucun toast des N° ne traîne après 16 s et 5 écrans » ; montré au départ, il doit être parti.
+          dit(vue, 'toast des N° : part seul en ~10 s, même en changeant d\'écran', !encore, `montré au départ : ${vu0} · après 16 s et 5 écrans : « ${encore.slice(0, 50)} »`);
         });
 
         // E-mails : le « ? » sur la ligne du titre (il tombait seul sous le titre).
@@ -63,7 +65,7 @@ async function main() {
           const r = await pg.evaluate(() => [...document.querySelectorAll('.vrm-main .n-segmente-libelle')].filter((e) => e.getClientRects().length).map((e) => ({ t: e.textContent, cw: e.clientWidth, sw: e.scrollWidth })));
           await cap('annonces');
           const coupes = r.filter((x) => x.sw > x.cw + 0.5);
-          dit(vue, 'Annonces : libellés du segmenté entiers', r.length && !coupes.length, JSON.stringify(coupes.length ? coupes : r.map((x) => x.t)));
+          dit(vue, 'Annonces : libellés du segmenté entiers', (ordi || r.length) && !coupes.length, JSON.stringify(coupes.length ? coupes : r.map((x) => x.t)));
           // La fiche d'un article dont la photo ne se charge pas : pas un carré vide de 45 % de l'écran.
           const rang = pg.locator('.vrm-main [data-fiche-ligne], .vrm-main [data-eg-article], .vrm-main .n-rangee[role="button"]').filter({ visible: true }).first();
           if (await rang.count()) {

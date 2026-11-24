@@ -958,6 +958,7 @@ import { lectureSeuleActive, EXPORT_FERME } from "./abonnement/etatAbonnement.js
 // ⟦→ ecrans/Comptabilite.jsx #68⟧   // (10 nov., lot H)
 import { verifierAppareilUneFois, DEMANDE_APPAREIL, sessionValide } from './appareilNouveau.js';   // (10 nov., lot H)
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR, quandEtat, ageEtatH, etatVieux, ETAT_VIEUX_H, pointsDeRetrait, colisRetireApres, colisRetireAnnule, marqueApres, marqueAnnulee } from "./journeeHorsLigne.js";
+import { demarrerPresentation, CLE_PRESENTATION, poserLibelleCompte } from "./modeStream.js";
 import { masquerPourEnvoi, jetonsStream, demarrerStream, demarrerMontants, photoACacherSelon, poserReglesStream, normaliserRegles, compilerRegle, masquerTexteStream, textePourStream, regleCourante, regleApercu, ligneACacher, CATEGORIES as STREAM_CATEGORIES, LISTES as STREAM_LISTES, nettoyerMots, CLE_STREAM, CLE_STREAM_REGLES, REGLES_DEFAUT as STREAM_DEFAUT } from "./modeStream.js";
 // ⟦→ ecrans/Reglages.jsx #14⟧
 import { ecouterPartage } from "./communaute/accompagnement.js";
@@ -1700,6 +1701,7 @@ import * as Natif from "./natif/index.js";
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
+import { noterPhotos, photoPour, largeurPhoto, besoinAffiche, FACTEUR_RETINA } from "./photoTaille.js";   // (23 nov., photos-nettes)
 import { noterSuspens } from "./journalSuspens.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre, generationDonnees, AGE_MAX_CACHE_MS } from "./ecransGardes.jsx";
 import { numDataGardable, numDataFrais } from "./histoireGardee.js";   // (17 nov., lot vitesse-cache) l'histoire des N° gardée entre deux fiches
@@ -8737,8 +8739,8 @@ function useVentesCoque() {
 // gardée 60 s, une seule requête en vol. `null` = pas su ⇒ aucune ligne ajoutée
 // (la liste Vinted reste ce qu'elle est : rien n'est retiré).
 const _ventesEmailLu = { at: 0, rows: undefined, vol: null };
-const lireVentesEmail = () => {
-  if (_ventesEmailLu.rows !== undefined && Date.now() - _ventesEmailLu.at < 60000) return Promise.resolve(_ventesEmailLu.rows);
+const lireVentesEmail = (garde = 60000) => {
+  if (_ventesEmailLu.rows !== undefined && Date.now() - _ventesEmailLu.at < garde) return Promise.resolve(_ventesEmailLu.rows);
   if (_ventesEmailLu.vol) return _ventesEmailLu.vol;
   _ventesEmailLu.vol = (async () => {
     let rows = null;
@@ -8768,6 +8770,21 @@ function useVentesEmailFraiches(ventes, ko, comptes, ecarte, cleEcarte) {
     lireVentesEmail().then((r) => { if (!mort) setMails(r); });
     return () => { mort = true; };
   }, [ventes]);
+  // (22 nov., bugs-totale — Julien : « une vente reçue par mail […] ce n'est pas actualisé dans l'application ») Les e-mails
+  // n'étaient relus QUE quand la liste des ventes changeait : l'app ouverte le matin ne voyait jamais la vente de l'après-midi
+  // connue seulement par son e-mail (la liste Vinted, elle, n'est relue qu'au passage de l'extension). Relus aussi toutes les
+  // 2 minutes tant que l'app est à l'écran, et au retour sur l'app (focus, onglet rendu visible) ; même contenu ⇒ même objet
+  // (aucun rendu de plus).
+  useEffect(() => {
+    if (!Array.isArray(ventes)) return undefined;
+    let mort = false;
+    const relire = (garde) => { if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return; lireVentesEmail(garde).then((r) => { if (mort || !Array.isArray(r)) return; setMails((av) => (Array.isArray(av) && JSON.stringify(av) === JSON.stringify(r) ? av : r)); }); };
+    const t = setInterval(() => relire(60000), 120000);
+    const auRetour = () => relire(15000);
+    window.addEventListener('focus', auRetour); document.addEventListener('visibilitychange', auRetour);
+    return () => { mort = true; clearInterval(t); window.removeEventListener('focus', auRetour); document.removeEventListener('visibilitychange', auRetour); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Array.isArray(ventes)]);
   const cleKo = (Array.isArray(ko) ? ko : []).map(String).sort().join(',');
   const cleComptesV = (comptes || []).map((a) => String((a && a.vinted_user_id) || '')).join(',');
   return useMemo(() => ventesEmailFraiches({ mails, comptes, ecarte, ventes, ko, lectures: lecturesVentesVinted(comptes) }),
@@ -10900,7 +10917,30 @@ let __vmrAppelsFinis = false;
 // Qui veut savoir quand l'extension se manifeste (l'écran Réglages, l'accueil) :
 // la détection est asynchrone, un composant déjà affiché doit se redessiner.
 const __vmrExtSubs = new Set();
-const onVmrExt = (fn) => { __vmrExtSubs.add(fn); return () => __vmrExtSubs.delete(fn); };
+// (23 nov., bugs-totale §3.3) CE QUE L'EXTENSION A DIT, EN UNE EMPREINTE. Chaque message du pont (« ready » à chaque sonde, chaque
+// battement, chaque évènement de commande, chaque relecture du relais) prévenait TOUS les abonnés, même quand rien n'avait changé :
+// la pastille, la ligne de fraîcheur, les boutons d'extension, la file réseau, les photos bloquées… se redessinaient à chaque message
+// (des dizaines de composants, sur chaque écran gardé) : mesuré au banc rendus-repos, une validation React toutes les 1,3 s.
+// `onVmrExt` ne prévient donc un abonné que si l'empreinte a changé depuis SON dernier appel. L'empreinte réunit tout l'état que ces composants lisent ; inchangée ⇒ aucun rendu. La minute en cours en
+// fait partie : ce qui dépend de l'heure (« vivant il y a… ») avance au plus une minute en retard, comme avant au battement.
+var _sigExt = null;   // `var` et une fonction déclarée : appelables avant leur ligne (abonnés posés au chargement du module)
+function signatureExt() {
+  if (_sigExt !== null) return _sigExt;
+  let s;
+  try {
+    s = JSON.stringify([__vmrExtReady, __vmrExtVersion, __vmrPlusieurs, __vmrAppelsFinis, __vmrEtat === undefined ? 'u' : __vmrEtat, __vmrRates, __vmrJobs,
+      __vmrPerimePont, __relais === undefined ? 'u' : __relais, __extAilleurs === undefined ? 'u' : __extAilleurs, __lier, __sessExtEnVol, __sessExtPasAvant, __vmrPontUnique,
+      [...__vmrPontSeul].sort(), Math.floor(Date.now() / 60000)]);
+  } catch (_) { s = 'x' + Math.random(); }
+  _sigExt = s;
+  queueMicrotask(() => { _sigExt = null; });   // une empreinte par tour de messages, partagée par tous les abonnés
+  return s;
+}
+const onVmrExt = (fn) => {
+  let vu = null;
+  const g = () => { let s = null; try { s = signatureExt(); } catch (_) { s = null; } if (s !== null && s === vu) return; vu = s; fn(); };
+  __vmrExtSubs.add(g); return () => __vmrExtSubs.delete(g);
+};
 // ══ COMBIEN D'EXTENSIONS VRM RÉPONDENT DANS CETTE PAGE ? (5.165) ═══════════
 // Mesuré le 9 octobre (Chromium réel, vraies extensions) : avec une 5.143 ou une
 // 5.77 restée installée À CÔTÉ de la 5.164, CHAQUE commande et CHAQUE envoi de
@@ -12166,7 +12206,49 @@ const taillePicto = (style) => {
 //     ordinaire), `onError` part sur l'erreur du navigateur, comme avant.
 // (9 nov., vitesse) `decoding="async"` : la photo se décode hors du fil qui dessine l'écran
 // (aucun effet sur son chargement ni sur `onLoad`).
-function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) {
+// (23 nov., lot photos-nettes) LA BONNE TAILLE (src/photoTaille.js) : Julien, « toutes les photos sont floues ».
+// Une photo Vinted se montre dans la plus petite taille DÉJÀ CONNUE (même fichier, adresse lue chez Vinted,
+// jamais fabriquée) qui donne 2 px réels par point affiché. Largeur connue d'avance (style.width en nombre) ⇒
+// choisie tout de suite ; sinon, une fois la petite chargée, on mesure, et la plus grande est PRÉCHARGÉE à côté :
+// elle ne remplace la petite qu'une fois chargée (jamais un trou ; un échec ⇒ la petite reste). `mieux` : une
+// adresse à précharger d'office (la visionneuse : la pleine taille).
+function PhotoVinted({ mieux, ...props }) {
+  const src0 = props.src;
+  const wStyle = props.style && typeof props.style.width === 'number' ? props.style.width : 0;
+  const hStyle = props.style && typeof props.style.height === 'number' ? props.style.height : 0;
+  if (photosVinted.estPhotoVinted(src0)) noterPhotos(src0);
+  const depart = wStyle > 0 ? photoPour(src0, FACTEUR_RETINA * Math.max(wStyle, hStyle * 0.72)) : src0;
+  const [monte, setMonte] = React.useState({ de: src0, url: null });
+  const essai = React.useRef({ de: null, vus: new Set() });
+  if (essai.current.de !== src0) essai.current = { de: src0, vus: new Set() };
+  const plus = monte.de === src0 && monte.url ? monte.url : null;
+  const courant = plus || depart;
+  const precharger = React.useCallback((url) => {
+    if (!url || url === courant || essai.current.vus.has(url) || typeof Image === 'undefined') return;
+    const de = src0; essai.current.vus.add(url);
+    const im = new Image();
+    try { im.referrerPolicy = 'no-referrer'; } catch (_) {}
+    im.decoding = 'async';
+    im.onload = () => { if (essai.current.de === de && im.naturalWidth > 0) setMonte({ de, url }); };
+    im.src = url;
+  }, [src0, courant]);
+  React.useEffect(() => { if (mieux && mieux !== courant && largeurPhoto(mieux) > (largeurPhoto(courant) || 0)) precharger(mieux); }, [mieux, courant, precharger]);
+  const onLoad0 = props.onLoad;
+  const surCharge = React.useCallback((e) => {
+    try {
+      const im = e && e.currentTarget;
+      if (im && im.getBoundingClientRect && photosVinted.estPhotoVinted(courant)) {
+        const r = im.getBoundingClientRect();
+        let fit = 'cover'; try { fit = (window.getComputedStyle(im).objectFit || 'fill'); } catch (_) {}
+        const besoin = besoinAffiche(r.width, r.height, im.naturalWidth, im.naturalHeight, fit === 'contain' || fit === 'scale-down' ? 'contain' : 'cover');
+        if (besoin > im.naturalWidth) { const cand = photoPour(courant, besoin); if (cand && cand !== courant) precharger(cand); }
+      }
+    } catch (_) {}
+    if (onLoad0) onLoad0(e);
+  }, [courant, precharger, onLoad0]);
+  return <PhotoVintedBase {...props} src={courant} onLoad={surCharge} data-photo-taille={largeurPhoto(courant) || undefined}/>;
+}
+function PhotoVintedBase({ src, repli, onError, onLoad, style, loading, ...reste }) {
   const vinted = photosVinted.estPhotoVinted(src);
   const [, maj] = React.useReducer((x) => x + 1, 0);
   const qui = React.useRef(null); if (!qui.current) qui.current = {};
@@ -15587,7 +15669,7 @@ const toastNumerosVu = (m) => { try { return localStorage.getItem(CLE_TOAST_NUME
 // et ne partait jamais seul tant que des N° arrivaient.
 function poserToastNumeros(t) { if (!t || toastNumerosVu(t.message)) return; _toastNumeros = _toastNumeros && _toastNumeros.id != null ? { ...t, id: _toastNumeros.id, vuA: _toastNumeros.vuA } : t; _abToastNumeros.forEach((f) => { try { f(t); } catch (_) {} }); }
 // Une page poussée (pas le volet de l'ordinateur) ou une feuille ouverte ⇒ le toast attend ; il reprend quand elle se ferme.
-const recouvrementOuvert = () => { try { return !!document.querySelector('[data-n-poussee]:not([data-n-volet]), [role="dialog"][aria-modal="true"], .vrm-fp'); } catch (_) { return false; } };
+const recouvrementOuvert = () => { try { return !!document.querySelector('[data-n-poussee]:not([data-n-volet]), [role="dialog"][aria-modal="true"], .vrm-fp, .vrm-chat-overlay:not(.vrm-chat-volet)'); } catch (_) { return false; } };   // (22 nov., bugs-totale) + un fil ouvert au téléphone : le toast couvrait « Répondre dans l'extension »
 function ToastNumeros() {
   const [t, setT] = React.useState(_toastNumeros);
   const [cache, setCache] = React.useState(false);
@@ -15614,7 +15696,11 @@ function ToastNumeros() {
   });
   if (!t || cache) return null;
   const fin = () => { try { localStorage.setItem(CLE_TOAST_NUMEROS_VU, String(t.message)); } catch (_) {} _toastNumeros = null; setT(null); };
-  return <div ref={refToast} data-toast-numeros="" style={dessus ? { '--n-toast-dessus': dessus + 'px' } : undefined}><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin}/></div>;
+  // (22 nov., bugs-totale) Le toast vit DANS l'écran : changer d'écran le remontait avec 10 s neuves — il suivait Julien sur
+  // chaque écran jusqu'à « Fermer ». Ses 10 s se comptent depuis sa PREMIÈRE apparition, quel que soit l'écran.
+  if (!_toastNumeros || _toastNumeros.id !== t.id) { /* rien : un toast d'un autre tour */ } else if (_toastNumeros.vuA == null) _toastNumeros.vuA = Date.now();
+  const reste = _toastNumeros && _toastNumeros.vuA != null ? Math.max(1200, 10000 - (Date.now() - _toastNumeros.vuA)) : 10000;
+  return <div ref={refToast} data-toast-numeros="" style={dessus ? { '--n-toast-dessus': dessus + 'px' } : undefined}><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin} duree={reste}/></div>;
 }
 // (23 nov., style-clarte-4 — « un message qui doit rester n'est pas un toast flottant ») AUJOURD'HUI : les N° neufs à écrire sur
 // les cartons en CARTE en ligne (sous les actions, avant Colis) : la même liste que Stock (`vrm_numeros_a_ecrire`, synchronisée),
@@ -15893,9 +15979,27 @@ const poserMontants = (on) => {
   try { demarrerMontants(on); } catch (_) {}
   try { window.dispatchEvent(new CustomEvent('vrm:montants', { detail: !!on })); } catch (_) {}
 };
+// (23 nov., Julien présente VRM) LE MODE PRÉSENTATION (src/modeStream.js) : la règle du stream à programme FIXE
+// (tout caché sauf photos, titres, N°, compteurs ; « Compte 1, 2… »). Propre à l'appareil, purement visuel.
+const presentationActif = () => {
+  try { return localStorage.getItem(CLE_PRESENTATION) === '1'; } catch (_) { return false; }
+};
+const poserPresentation = (on) => {
+  try { if (on) localStorage.setItem(CLE_PRESENTATION, '1'); else localStorage.removeItem(CLE_PRESENTATION); } catch (_) {}
+  try { demarrerPresentation(on); } catch (_) {}
+  try { window.dispatchEvent(new CustomEvent('vrm:presentation', { detail: !!on })); } catch (_) {}
+};
+const usePresentation = () => {
+  const [on, setOn] = React.useState(presentationActif);
+  React.useEffect(() => { const f = (e) => setOn(!!(e && e.detail)); window.addEventListener('vrm:presentation', f); return () => window.removeEventListener('vrm:presentation', f); }, []);
+  return on;
+};
 // ⚠️ Posé AU CHARGEMENT du module, avant le premier rendu : allumé, aucune image
 //    ne montre ce qu'il a caché (pas d'attente d'un effet React).
-try { poserReglesStream(lireReglesStreamIci()); demarrerMontants(montantsActif()); demarrerStream(streamActif()); } catch (_) {}
+try { poserLibelleCompte((n) => tr('presentation.compte', { n })); } catch (_) {}
+// (23 nov.) Les codes de retrait gardés sur l'appareil (`vrm_codes_hors_ligne`) : connus de la règle dès l'ouverture.
+try { const ch = load('vrm_codes_hors_ligne', null); if (ch && Array.isArray(ch.codes)) jetonsStream('codes_hors_ligne', ch.codes.flatMap((c) => [c && c.code, c && c.suivi])); } catch (_) {}
+try { poserReglesStream(lireReglesStreamIci()); demarrerMontants(montantsActif()); demarrerPresentation(presentationActif()); demarrerStream(streamActif()); } catch (_) {}
 const useStream = () => {
   const [on, setOn] = React.useState(streamActif);
   React.useEffect(() => { const f = (e) => setOn(!!(e && e.detail)); window.addEventListener('vrm:stream', f); return () => window.removeEventListener('vrm:stream', f); }, []);
@@ -16030,7 +16134,7 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,t
 function Montant({ v, dec = 0, prefixe = '' }) {
   if (v == null || !Number.isFinite(Number(v))) return <span className="vrm-jc-montant vrm-jc-vide">—</span>;
   const n = Number(v).toLocaleString('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-  return <span className="vrm-jc-montant">{prefixe}{n}<span className="vrm-jc-eur">{' '}€</span></span>;
+  return <span className="vrm-jc-montant vrm-sensible" data-stream-type="montant">{prefixe}{n}<span className="vrm-jc-eur">{' '}€</span></span>;
 }
 // ⟦→ ecrans/Comptabilite.jsx #190⟧
 
@@ -16278,6 +16382,7 @@ const ICON_PATHS = {
   check:   <><path d="M4.5 12.6 9.5 17.5 19.5 7"/></>,
   euro:    <><path d="M17 6.6A6.6 6.6 0 0 0 8.2 12 6.6 6.6 0 0 0 17 17.4"/><path d="M4.5 10.4h7.8"/><path d="M4.5 13.6h7.8"/></>,
   stream:  <><circle cx="12" cy="12" r="2"/><path d="M8.6 8.6a4.8 4.8 0 0 0 0 6.8"/><path d="M15.4 8.6a4.8 4.8 0 0 1 0 6.8"/><path d="M5.8 5.8a8.8 8.8 0 0 0 0 12.4"/><path d="M18.2 5.8a8.8 8.8 0 0 1 0 12.4"/></>,
+  presentation: <><rect x="3.5" y="4.5" width="17" height="11" rx="1.6"/><path d="M12 15.5v4"/><path d="M8.5 19.5h7"/><path d="M10.4 8.2v4.6l3.8-2.3-3.8-2.3Z"/></>,
   eye:     <><path d="M2.5 12S6 6.2 12 6.2 21.5 12 21.5 12 18 17.8 12 17.8 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.7"/></>,
   heart:   <><path d="M12 19.6S3.8 14.8 3.8 9.6a4.2 4.2 0 0 1 8.2-1.4 4.2 4.2 0 0 1 8.2 1.4c0 5.2-8.2 10-8.2 10Z"/></>,
   // (11 nov., lot avis-negatif) Un avis reçu : l'étoile au trait.
@@ -18244,6 +18349,7 @@ function MenuProfilCoque({ setTab, entreprise, badges = null, sites = null }) {
   const ordiMenu = useOrdinateur();
   const etatVu = useEtatActionsVu();
   const montantsCachesMenu = useMontantsCaches();
+  const presentationMenu = usePresentation();
   if (!ouvert || !AUTH.user || !AUTH.user.id) return null;
   const planLu = (reglePlanCourante() || {}).plan;
   // (14 nov., refonte de la coque) Au téléphone, la barre du haut ne porte que loupe · cloche · compte :
@@ -18272,6 +18378,11 @@ function MenuProfilCoque({ setTab, entreprise, badges = null, sites = null }) {
       <span className="vrm-profil-ligne-ic" aria-hidden="true"><Icon name={montantsCachesMenu ? 'eyeOff' : 'eye'} size={18}/></span>
       <span className="vrm-profil-ligne-lib">{tr('coque.cacherMontants')}</span>
       <input type="checkbox" role="switch" data-bouton-montants-menu="" checked={!!montantsCachesMenu} onChange={() => poserMontants(!montantsCachesMenu)} aria-label={tr('coque.cacherMontants')}/>
+    </label>
+    <label className="vrm-profil-ligne vrm-profil-bascule" data-profil-menu="presentation">
+      <span className="vrm-profil-ligne-ic" aria-hidden="true"><Icon name="presentation" size={18}/></span>
+      <span className="vrm-profil-ligne-lib">{tr('presentation.lib')}</span>
+      <input type="checkbox" role="switch" data-bouton-presentation-menu="" checked={!!presentationMenu} onChange={() => poserPresentation(!presentationMenu)} aria-label={tr('presentation.lib')}/>
     </label>
   </>;
   const aller = (sous) => { setOuvert(false); if (sous) { DEMANDE_REGLAGE_SOUS.id = sous; try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } setTab('settings'); };
@@ -18519,10 +18630,16 @@ function TeteNative({ tab, setTab, ordi, titre, nonLus = 0, rechercheOuverte = f
   // (deux retours l'un sous l'autre, qui ne menaient pas au même endroit). La barre dit « ‹ Paramètres » ; la page garde le sien
   // à l'ordinateur seulement (pas de barre là-bas).
   const sousReglages = tab === 'vintedaccounts';
+  // Une catégorie ou un panneau de Paramètres ouvert (src/ecrans/Reglages.jsx le dit) : la barre porte SON retour (le geste
+  // retour : la page est une entrée d'historique, `FermeAuRetour`).
+  const [pageReglages, setPageReglages] = React.useState(() => (typeof window !== 'undefined' && window.__vrmPageReglages) || '');
+  React.useEffect(() => { const f = () => setPageReglages(window.__vrmPageReglages || ''); window.addEventListener('vrm:page-reglages', f); f(); return () => window.removeEventListener('vrm:page-reglages', f); }, []);
+  const pageR = tab === 'settings' && pageReglages ? pageReglages : '';
+  const libRetour = pageR || (sousReglages ? tr('menu.parametres') : tr('menu.titre'));
   const gauche = depuisMenu ? (
-    <button type="button" className="n-barre-retour" data-n-retour-menu={sousReglages ? undefined : ''} data-n-retour-reglages={sousReglages ? '' : undefined} onClick={sousReglages ? () => { if (setTab) setTab('settings'); } : retourMenu} aria-label={tr('natif.retourVers', { ecran: sousReglages ? tr('menu.parametres') : tr('menu.titre') })}>
+    <button type="button" className="n-barre-retour" data-n-retour-menu={sousReglages || pageR ? undefined : ''} data-n-retour-reglages={sousReglages || pageR ? '' : undefined} onClick={pageR ? () => { try { window.history.back(); } catch (_) {} } : sousReglages ? () => { if (setTab) setTab('settings'); } : retourMenu} aria-label={tr('natif.retourVers', { ecran: libRetour })}>
       <Natif.Glyphe nom="chevron" taille={22} className="n-barre-retour-fleche"/>
-      <span className="n-barre-retour-libelle">{sousReglages ? tr('menu.parametres') : tr('menu.titre')}</span>
+      <span className="n-barre-retour-libelle">{libRetour}</span>
     </button>
   ) : null;
   // (20 nov., lot argent-natif) Argent (`compta`, `dashboard`) a son GRAND TITRE au téléphone, comme Aujourd'hui et le Menu.
@@ -18537,8 +18654,10 @@ function TeteNative({ tab, setTab, ordi, titre, nonLus = 0, rechercheOuverte = f
       messages={tab === 'messages' ? null : { n: nMsg || undefined, libelle: tr('nav.messages'), libellePastille: nMsg ? `${tr('nav.messages')} · ${nMsg}` : '', icone: <Icon name="chat" size={24}/>, onOuvrir: () => { revenirSurOnglet(); ouvrirEntree(ONGLET_MESSAGES, setTab); } }}
       avatar={uid ? <PastilleProfil owner={uid} headers={enTeteSession} nom="" email={String(AUTH.user.email || '')} taille={30} className="vrm-sensible"/> : <Natif.Avatar compte={{ initiales: 'V' }}/>}/>
   </>);
+  // (23 nov., audit démo) À l'ordinateur, Aujourd'hui pose SON titre (date et ronds, src/natif/ecrans/Aujourdhui.jsx ;
+  // `sj-titre` pour un compte neuf) : la coque n'en ajoute pas un second (banc titre-unique).
   return (
-    <Natif.TetePage titre={!natif && !ordi && !ECRANS_TITRE_COQUE.has(tab) ? '' : tab === 'journee' ? tr('nav.journee.court') : argentTab ? tr('nav.compta') : titre} grandTitre={natif || (ECRANS_TITRE_COQUE.has(tab) && (!ordi || tab === 'journee'))} gauche={gauche} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}/>
+    <Natif.TetePage titre={!natif && !ordi && !ECRANS_TITRE_COQUE.has(tab) ? '' : tab === 'journee' ? tr('nav.journee.court') : argentTab ? tr('nav.compta') : titre} grandTitre={natif || (ECRANS_TITRE_COQUE.has(tab) && !ordi)} gauche={gauche} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}/>
   );
 }
 // ⚠️⚠️ (21 nov., onglets-menu) LES GROUPES DU MENU — une source pour l'écran « Menu » du téléphone ET la barre latérale de
@@ -18584,6 +18703,7 @@ function groupesMenu({ tab, setTab, badges, sites, taille = 22, ordi = false }) 
 function EcranMenu({ tab, setTab, badges, sites, entreprise, streamVisible = false, etats = null, sombre = false, basculerSombre = null }) {
   useProfilVendeur(); useEcransVusTick(); useEtatActionsVu();
   const montants = useMontantsCaches();
+  const presentation = usePresentation();
   const stream = useStream();
   const uid = (AUTH.user && AUTH.user.id) || '';
   const mail = String((AUTH.user && AUTH.user.email) || '').trim();
@@ -18598,6 +18718,7 @@ function EcranMenu({ tab, setTab, badges, sites, entreprise, streamVisible = fal
       {groupes.map((g) => <GrilleMenu key={g.cle} titre={g.titre} pied={g.pied} tuiles={g.tuiles.map((t) => ({ ...t, pastille: t.pastille }))} attrs={{ 'data-n-menu-groupe': g.cle }}/>)}
       <Natif.Groupe attrs={{ 'data-n-menu-reglages': '' }}>
         <Natif.Rangee titre={tr('coque.cacherMontants')} icone={<Icon name="eyeOff" size={22}/>} interrupteur={{ actif: montants, onChange: (v) => poserMontants(v), attrs: { 'data-bouton-montants': '', 'data-montants-caches': montants ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'montants' }}/>
+        <Natif.Rangee titre={tr('presentation.lib')} icone={<Icon name="presentation" size={22}/>} interrupteur={{ actif: presentation, onChange: (v) => poserPresentation(v), attrs: { 'data-bouton-presentation': '', 'data-presentation-on': presentation ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'presentation' }}/>
         {streamVisible || stream ? <Natif.Rangee titre={tr('natif.plus.stream')} icone={<Icon name="stream" size={22}/>} interrupteur={{ actif: stream, onChange: (v) => poserStream(v), attrs: { 'data-bouton-stream': '', 'data-stream-on': stream ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'stream' }}/> : null}
         {/* (21 nov., comme le Menu de Bleam) le bas du Menu : thème, langue, déconnexion — les mêmes gestes que Paramètres
             (Apparence et langue, Se déconnecter), à un toucher ; la langue ouvre SA rubrique, la déconnexion demande d'abord. */}
@@ -29728,7 +29849,7 @@ const recuAvecADater = (r, ligne) => {
 // Aucune notification.
 const lireTableGestes = (cle) => () => { try { const v = load(cle, null); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return null; } };
 const lireShipDone = lireTableGestes('vinted_ship_done'), lireLbcDone = lireTableGestes('vrm_lbc_colis_done'), lireVcDone = lireTableGestes('vrm_vc_colis_done');
-const REGLES_JOURNAL = { semainePassee, bilanLignes, beneficeDesJours, chiffreBrut };
+const REGLES_JOURNAL = { semainePassee, bilanLignes, beneficeDesJours, chiffreBrut, chiffreApresFrais };
 function JournalSemaineCarte({ liveStats }) {
   const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
   const [ship, pret] = useLigneSynchro('vinted_ship_done', lireShipDone);
@@ -30379,7 +30500,7 @@ const urssafAPayerCarte = (ligne, maintenant = Date.now()) => {
   const { ca, apayer, partiel } = montantPeriodeUrssaf(due, ligne, tauxUrssaf());
   return { ca, apayer, partiel, label: due.label };
 };
-const REGLES_CARTE = { bilanLignes, rythmeVendu, chiffreBenefice, chiffreBrut, beneficeDesJours, debutPeriode, decalerPeriode, fmt, progressionObjectif, urssafAPayer: urssafAPayerCarte };
+const REGLES_CARTE = { bilanLignes, rythmeVendu, chiffreBenefice, chiffreBrut, chiffreApresFrais, beneficeDesJours, debutPeriode, decalerPeriode, fmt, progressionObjectif, urssafAPayer: urssafAPayerCarte };
 // `page` : une clé de PAGES_CARTE ; `sel` : { site, compte: {uid, login, nom} | null, periode } ;
 // `locaux` : les cases propres de la page ({ id → { nom, court, type, valeur, partiel, onClick, attrs, affiche } }) ;
 // `ici` : l'onglet où l'on est (une case n'y renvoie pas).
@@ -33104,6 +33225,30 @@ function BoutonStream() {
 // (6 nov.) L'ŒIL « cacher les montants » (4 nov.) REVIENT quand le bouton
 // « Stream » n'est pas affiché (réglage éteint par défaut) : sans lui, plus aucun
 // moyen de cacher ses chiffres d'un geste. La même règle, réduite aux montants.
+// (23 nov.) LA PASTILLE « Présentation » : l'état visible, sur tous les écrans (portail, au-dessus des feuilles) ;
+// un toucher quitte le mode. Jamais réécrite par la règle (`data-stream-libre`).
+function PastillePresentation() {
+  const on = usePresentation();
+  if (!on || typeof document === 'undefined') return null;
+  return createPortal(
+    <button type="button" className="vrm-pastille-presentation" data-pastille-presentation="" data-stream-libre=""
+      aria-label={tr('presentation.quitter')} title={tr('presentation.quitter')} onClick={() => poserPresentation(false)}>
+      <span className="vrm-pastille-presentation-pt" aria-hidden="true"/>
+      <span>{tr('presentation.pastille')}</span>
+      <Icon name="close" size={13}/>
+    </button>, document.body);
+}
+// (23 nov.) À côté de l'œil (bas de la barre latérale) : le même geste, étendu à la présentation.
+function BoutonPresentation() {
+  const on = usePresentation();
+  const lib = on ? tr('presentation.quitter') : tr('presentation.lib');
+  return (
+    <button className="vrm-hbtn" type="button" data-bouton-presentation="" data-presentation-on={on ? '1' : '0'} data-stream-libre=""
+      aria-pressed={on} aria-label={lib} title={lib} onClick={() => poserPresentation(!on)}>
+      <Icon name="presentation" size={21}/>
+    </button>
+  );
+}
 function BoutonMontants() {
   const cache = useMontantsCaches();
   const lib = cache ? 'Montrer les montants' : 'Cacher les montants';
@@ -35482,8 +35627,9 @@ function AppCoeur() {
   React.useEffect(() => {
     jetonsStream('acheteurs_ebay', (Array.isArray(ebayCommandes) ? ebayCommandes : []).map((o) => o && o.buyer && o.buyer.username));
   }, [ebayCommandes]);
+  const presentationOn = usePresentation();
   React.useEffect(() => {
-    if (!streamOn) return undefined;
+    if (!streamOn && !presentationOn) return undefined;
     let mort = false;
     (async () => {
       const B = `${SUPABASE_URL}/rest/v1/app_data?`;
@@ -35494,21 +35640,24 @@ function AppCoeur() {
       if (mort) return;
       const noms = [];
       const accs = Array.isArray(lbc) && lbc[0] && lbc[0].a && typeof lbc[0].a === 'object' ? lbc[0].a : {};
-      for (const [id, x] of Object.entries(accs)) { noms.push(id); if (x && typeof x === 'object') noms.push(x.name, x.pseudo, x.email); }
+      // (23 nov.) Un compte = UN tableau d'alias (le mode présentation lui donne un seul « Compte N »).
+      const ok = (l) => l.filter((x) => typeof x === 'string' || typeof x === 'number').map(String);
+      for (const [id, x] of Object.entries(accs)) noms.push(ok([id, ...(x && typeof x === 'object' ? [x.name, x.pseudo, x.email] : [])]));
       const ses = Array.isArray(vc) && vc[0] ? vc[0] : null;
-      if (ses) { noms.push(ses.id); const c = ses.comptes; if (c && typeof c === 'object') for (const [id, x] of Object.entries(c)) { noms.push(id); if (x && typeof x === 'object') noms.push(x.name, x.pseudo, x.email); } }
-      jetonsStream('comptes_sites', noms.filter((x) => typeof x === 'string' || typeof x === 'number').map(String));
+      if (ses) { noms.push(ok([ses.id])); const c = ses.comptes; if (c && typeof c === 'object') for (const [id, x] of Object.entries(c)) noms.push(ok([id, ...(x && typeof x === 'object' ? [x.name, x.pseudo, x.email] : [])])); }
+      jetonsStream('comptes_sites', noms);
     })();
     return () => { mort = true; };
-  }, [streamOn]);
+  }, [streamOn, presentationOn]);
   React.useEffect(() => {
     const labels = load('vinted_account_labels', {}) || {};
     const mails = load('vinted_account_emails', {}) || {};
     const ch = vintedDeChrome(); const rl = etatRelais();
     jetonsStream('comptes', [
-      ...(vintedAccounts || []).flatMap((a) => [a && a.login, a && a.email, a && labels[a.vinted_user_id]]),
+      // (23 nov.) Un compte = UN tableau d'alias (le mode présentation lui donne un seul « Compte N »).
+      ...(vintedAccounts || []).map((a) => [a && a.login, a && a.email, a && labels[a.vinted_user_id], a && a.vinted_user_id != null ? String(a.vinted_user_id) : null, a && mails[a.vinted_user_id]]),
       ...Object.values(mails), ...Object.values(labels),
-      ...((Array.isArray(comptesEbay) ? comptesEbay : []).map((c) => c && c.pseudo)),
+      ...((Array.isArray(comptesEbay) ? comptesEbay : []).map((c) => [c && c.pseudo])),
       ch && ch.login, rl && rl.vinted && rl.vinted.login, typeof __relais === 'object' && __relais && __relais.vLogin,
       AUTH.user && AUTH.user.email,
       entreprise && entreprise.nom, entreprise && entreprise.siret,
@@ -38534,7 +38683,9 @@ function AppCoeur() {
           <span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>
           {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
           {((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}
+          <BoutonPresentation/>
         </>}/> : null}
+      <PastillePresentation/>
       {/* (20 nov., Julien : « même les écrans de chargement sont atroces ») Plus de barre bleue de progression en haut : elle
           restait à 80 % tant qu'UNE lecture traînait (4G) et faisait « site web ». Le compteur `onBusy` reste (diagnostic). */}
       <Toaster/>
@@ -39138,7 +39289,7 @@ function AppCoeur() {
   );
 }
 // ⟦démarrage léger⟧ emprunts des écrans à la demande
-export { CarteNumerosAEcrire, ACHATS_MASQUES, ACTIONS_REPUB, ARegler, AUTH, AchatsTableau, AideEcran, ApercuAvantImpression, Avancement, BENEF_CHAMPS, BarreHautSlot, BlocARetirerAilleurs, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BoutonToutGenerer, BulleConv, C, CARRIERS, CLES_PREPAREES, CLE_ACCT_OUBLIS, CLE_A_ECRIRE, CLE_INDEX_ARRIVEE, CLOISONNE, COLIS_DEJA_BOUGE, CYCLE_DECISIONS, CacheSiV2, CarteColisVc, CarteStatsApp, CompteVente, CoutAchatVente, DEFAULT_QUICK_REPLIES, DEMANDE_ACTION_ANNONCES, DEMANDE_DECLARATION, DEMANDE_EBAY_CIBLE, DEMANDE_EBAY_MSG, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_FICHE, DEMANDE_PERIODE_VENTES, DEMANDE_REPUB_MAIN, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, DEMANDE_VC_PAIRE, DEMANDE_VUE, DEPS_FACTURE, ENLIGNE_FRAIS_MS, ENTREPRISE_VIDE, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, FURN_TYPES, FermeAuRetour, FeuilleCreerVinted, FeuilleFusionLazy, FeuilleRecuAchat, FicheConvVolet, FilsTous, FraicheurAnnonces, GESTES_RAPPEL, GardeEcranAllume, GuideDemarrageApp, INV_STATUS, Icon, JOURNAL_REPUB, JourneePersoSetting, LBC_ORANGE, LBC_VC_COLIS_FAIT_RETIRE, LigneConv, LignePanne, LigneRelais, LigneSansDate, LigneVenteCompacte, LiveStatsCarte, MAG_FUSIONS, MP_PLACES, MULTI_USER, MicDictee, Montant, NAV, NOM_RECU_ACHAT, NUMEROS_PERIMES_IMPRESSION, NUM_A_VERIFIER_ANNULE, NUM_OK, NotePaireCoque, ONGLETS_DEPLACES, OUTILS_AUJOURDHUI, OngletManque, PROFIL_VENDEUR, PeriodePicker, PhotoArticleAgrandissable, PhotoVente, PhotoVinted, PhraseEcran, Pourquoi, PuceProposition, QrColis, RA, REGLES_CARTE, REGLES_JOURNAL, RELIER_VENTES, REPERE_MIN, RETOURS_ACHAT_CACHE, RepartitionsVentes, RetoursVentes, RetraitsPoints, RienARetirer, SB_CONFLICT, SEL_EBAY_COMMANDES, SERIE_DECLARATION, STUDIO_BASE, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, StudioPhoto, TXN_ETATS, TXN_ETATS_LU, TamponPose, TeteFil, VENTES_MASQUEES_AUCUNE, VENTES_NATIF, VUS_EN_LIGNE, VentesNatif, VuesVentes, Z_CONFIRMATION, _CACHE_TTL, __repubVivant, __vmrEtat, __vmrJobs, __vmrPlusieurs, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _ecrivainVrm, _genLectures, _gestes, _harvestSeen, _lecturesEcrit, _nnListener, _pdfEtiquettes, _pdfVus, _pendingBordPrint, _persistAcctCache, _persistAcctCacheBientot, _poserVisionneuse, _rowCache, _rtListener, _verNum, _visionneuse, aExpedier, aLaDemande, aLaDemandeDiscret, aLaDemandeFeuille, aPayerUrssaf, achatDuNumeroLu, achatsMasques, ajouterNumerosHorsEcran, alerteLocale, annonceDeclareePartie, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, archiveNumeros, articlesTeteRA, askChoix, askConfirm, askText, assurerVersionNumerotation, autresPresents, avecDatesLbc, avecNumerosVc, b64ToBytes, beneficeVide, bilanLignes, bilanThermique, bordereauFormatKey, buildFacturXBytes, caDeclarableParMois, cachedRow, cadrePhoto, carrierKey, carrierName, chargerPhotoBoite, chargerPublie, choisirTampon, classifyOrderStatus, clavierNum, cleComptesVinted, cleDeclarationPartie, cleJourLocal, cleNum, cleanLieu, codePerime, codeRetrait, colisKey, commandeEbayEngagee, composerBordereaux, compressImage, comptaChargesAnnee, compteCarte, compteEcarteChoix, compteEffectif, comptesLbcProuves, comptesLbcSession, confirmerNumerosAVerifier, conflitsDeNumeros, connexionExtensionVrm, corpsCompteEbay, coupureNumerotation, couvertureBenefice, dateCourteFr, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, defaireVc, deleteVintedAccount, demanderDeclaration, demanderVue, depuisFr, dessinerPdf, detailsAchatScan, doublesVenteLbc, doublonsAReattribuer, ecrireJournalRepub, ecrireLocalJson, ecrireReglageTampons, emettreClesRelues, enTeteSession, entForInvoice, entreePool, estIOS, estOctetsPdf, estTamponAnnule, etapeAchat, etapeVente, etatCibleRappel, etatColisEmail, etatRegleOffre, etatRelais, etatTxn, exemplesActuels, extEstEnRetard, extSait, extSaitLireCodes, extractBrand, extractColors, extractModel, extractSize, extrasImpression, familleArticle, fetchBillingRows, fetchEmailAchats, fetchEmailBordereaux, fetchEmailTracking, fetchHarvest, fetchMemo, fetchRetoursAchat, fetchTranspLignes, fetchTxnItemIds, fetchVersementsVinted, fetchVintedConversations, fetchVintedListings, fetchVintedOrders, fetchWalletEscrow, ficheAVerifier, ficheUniqueDuNumero, filtreInventaire, finsColis, fmt, generateAchatJustificatif, gesteMorceaux, gesteRA, gesteVrm, harvestTs, horsLigneMaintenant, iconeApp, idCompteLbcApp, imprMode, isAtRelayStatus, isCloudReady, isColisActive, isColisEnAttente, isColisRetirable, jourClef, joursAvant, joursAvantVc, lbcAnnoncesSession, lbcAnnulee, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcPostesEncoreEnVente, libelleRegime, libelleRelais, libelleSourceAchat, libererNumeroDuPlan, libererOngletPdf, lienItemEbay, ligneDeSaSession, limiteVcTexte, lireArriveesANumeroter, lireBaseRelue, lireBeneficeJours, lireDatesLbc, lireDeclarations, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEmpreintesPhotos, lireExtrasRepartition, lireFichesPage, lireFreinsVus, lireLbcDone, lireLbcEnVente, lireLocalJson, lireMisDeCote, lireMontantSaisi, lireNumeroEcrit, lireObjet, lirePdfLigne, lireReglageCarte, lireReglesEbay, lireReleveVentes, lireShipDone, lireSupprimeesTous, lireTout, lireVcDone, load, loadCollected, loadRoomPlan, majRA, marcheEbayDeRef, marquerVc, marqueurNumerotation, masqueesPresentes, messagePdfManquant, messagesRetires, modifierCle, moisDeclare, montantCommande, montantCommandeLu, montantRecuEbay, moyennesParModele, mpChoisi, needsBordereau, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, noterArrivees, numDeSkuEbay, numEbayLu, numLigneEbay, numeroEcritActif, numeroExterne, numeroLbcIdentite, numeroReprenable, numeroVcIdentite, numerosLbcSortis, numerosReserves, numerosServisLus, numerosVcEffectifs, numerotationPermise, onCleRelue, onCloudReady, onVersionNumerotation, onVmrExt, optsNumeroVerif, orderPhoto, ouDansMeubles, ouEstNumero, ouNumeroEcrit, ouStockNumero, oublierCommandesCompte, oublierDressing, ouvrirAtelier, ouvrirAtelierArrivee, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirPorteDressings, pairesAFinirIci, payeDe, pctFr, phaseAchat, photoKey, phraseNonComptees, phrasePersonne, placesAnnonces, posePrefsImpression, poserAchatsMasques, poserBordereau, poserCible, poserDureeProchainGeste, poserGroupesDeuxFois, poserPendingBordPrint, poserToastNumeros, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLigneExt, prochainLibre, profilFiscalLu, proposerFusion, publierATrancher, qrImage, rafraichirGestesHL, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, reattribueAEcrire, recusAchatDe, refusHorsLigne, regimeFiscal, reglageImpressionChoisi, reglageTamponsChoisi, regrouperSignaux, relaisVivant, relierBoiteDe, reserverOngletPdf, resultatReviseEbay, resumeBenefice, sansFonctions, save, saveRoomPlan, saveTout, sbAuth, sensColis, signalerBordereauImprime, sitesRA, sonderPonts, stockGestes, tailleEnFin, taillePicto, tamponPourPage, tamponnerBordereau, tauxUrssaf, telechargerFichier, texteSansBalises, toast, triNum, triPool, tsCommande, txRecuAchat, txnAnnuleeAvantEnvoi, urlPhotoVc, urssafConcerne, useBeneficeJournee, useComptesARelier, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useHorsLigne, useJourneePerso, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useOrdinateur, useProfilFiscal, useProfilVendeur, useRA, useSansSouris, useSourcesCarte, useStateCle, useVcLocal, useVentesEmailFraiches, useVentesVestiaireBrut, useVoixExt, useVueSession, vcCarte, vendActuel, venduEtat, venteFinalisee, ventesAilleursDe, ventesDeclarables, ventesFaites, ventesVcDeMemo, ventilationRecuAchat, verifierVersionNumerotation, versExtension, viaOrdinateur, viderCacheLignes, viderLecturesMemo, viderMemoLignes, vintedAgissant, vintedApiCall, vintedDeChrome, vmrCmd, vmrExec, vmrExtPresent, vmrExtVersion, vmrPdfLbc, voirAbonnement, withOwner, ymDeTs };
+export { lecturesVentesVinted, CarteNumerosAEcrire, ACHATS_MASQUES, ACTIONS_REPUB, ARegler, AUTH, AchatsTableau, AideEcran, ApercuAvantImpression, Avancement, BENEF_CHAMPS, BarreHautSlot, BlocARetirerAilleurs, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BoutonToutGenerer, BulleConv, C, CARRIERS, CLES_PREPAREES, CLE_ACCT_OUBLIS, CLE_A_ECRIRE, CLE_INDEX_ARRIVEE, CLOISONNE, COLIS_DEJA_BOUGE, CYCLE_DECISIONS, CacheSiV2, CarteColisVc, CarteStatsApp, CompteVente, CoutAchatVente, DEFAULT_QUICK_REPLIES, DEMANDE_ACTION_ANNONCES, DEMANDE_DECLARATION, DEMANDE_EBAY_CIBLE, DEMANDE_EBAY_MSG, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_FICHE, DEMANDE_PERIODE_VENTES, DEMANDE_REPUB_MAIN, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, DEMANDE_VC_PAIRE, DEMANDE_VUE, DEPS_FACTURE, ENLIGNE_FRAIS_MS, ENTREPRISE_VIDE, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, FURN_TYPES, FermeAuRetour, FeuilleCreerVinted, FeuilleFusionLazy, FeuilleRecuAchat, FicheConvVolet, FilsTous, FraicheurAnnonces, GESTES_RAPPEL, GardeEcranAllume, GuideDemarrageApp, INV_STATUS, Icon, JOURNAL_REPUB, JourneePersoSetting, LBC_ORANGE, LBC_VC_COLIS_FAIT_RETIRE, LigneConv, LignePanne, LigneRelais, LigneSansDate, LigneVenteCompacte, LiveStatsCarte, MAG_FUSIONS, MP_PLACES, MULTI_USER, MicDictee, Montant, NAV, NOM_RECU_ACHAT, NUMEROS_PERIMES_IMPRESSION, NUM_A_VERIFIER_ANNULE, NUM_OK, NotePaireCoque, ONGLETS_DEPLACES, OUTILS_AUJOURDHUI, OngletManque, PROFIL_VENDEUR, PeriodePicker, PhotoArticleAgrandissable, PhotoVente, PhotoVinted, PhraseEcran, Pourquoi, PuceProposition, QrColis, RA, REGLES_CARTE, REGLES_JOURNAL, RELIER_VENTES, REPERE_MIN, RETOURS_ACHAT_CACHE, RepartitionsVentes, RetoursVentes, RetraitsPoints, RienARetirer, SB_CONFLICT, SEL_EBAY_COMMANDES, SERIE_DECLARATION, STUDIO_BASE, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, StudioPhoto, TXN_ETATS, TXN_ETATS_LU, TamponPose, TeteFil, VENTES_MASQUEES_AUCUNE, VENTES_NATIF, VUS_EN_LIGNE, VentesNatif, VuesVentes, Z_CONFIRMATION, _CACHE_TTL, __repubVivant, __vmrEtat, __vmrJobs, __vmrPlusieurs, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _ecrivainVrm, _genLectures, _gestes, _harvestSeen, _lecturesEcrit, _nnListener, _pdfEtiquettes, _pdfVus, _pendingBordPrint, _persistAcctCache, _persistAcctCacheBientot, _poserVisionneuse, _rowCache, _rtListener, _verNum, _visionneuse, aExpedier, aLaDemande, aLaDemandeDiscret, aLaDemandeFeuille, aPayerUrssaf, achatDuNumeroLu, achatsMasques, ajouterNumerosHorsEcran, alerteLocale, annonceDeclareePartie, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, archiveNumeros, articlesTeteRA, askChoix, askConfirm, askText, assurerVersionNumerotation, autresPresents, avecDatesLbc, avecNumerosVc, b64ToBytes, beneficeVide, bilanLignes, bilanThermique, bordereauFormatKey, buildFacturXBytes, caDeclarableParMois, cachedRow, cadrePhoto, carrierKey, carrierName, chargerPhotoBoite, chargerPublie, choisirTampon, classifyOrderStatus, clavierNum, cleComptesVinted, cleDeclarationPartie, cleJourLocal, cleNum, cleanLieu, codePerime, codeRetrait, colisKey, commandeEbayEngagee, composerBordereaux, compressImage, comptaChargesAnnee, compteCarte, compteEcarteChoix, compteEffectif, comptesLbcProuves, comptesLbcSession, confirmerNumerosAVerifier, conflitsDeNumeros, connexionExtensionVrm, corpsCompteEbay, coupureNumerotation, couvertureBenefice, dateCourteFr, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, defaireVc, deleteVintedAccount, demanderDeclaration, demanderVue, depuisFr, dessinerPdf, detailsAchatScan, doublesVenteLbc, doublonsAReattribuer, ecrireJournalRepub, ecrireLocalJson, ecrireReglageTampons, emettreClesRelues, enTeteSession, entForInvoice, entreePool, estIOS, estOctetsPdf, estTamponAnnule, etapeAchat, etapeVente, etatCibleRappel, etatColisEmail, etatRegleOffre, etatRelais, etatTxn, exemplesActuels, extEstEnRetard, extSait, extSaitLireCodes, extractBrand, extractColors, extractModel, extractSize, extrasImpression, familleArticle, fetchBillingRows, fetchEmailAchats, fetchEmailBordereaux, fetchEmailTracking, fetchHarvest, fetchMemo, fetchRetoursAchat, fetchTranspLignes, fetchTxnItemIds, fetchVersementsVinted, fetchVintedConversations, fetchVintedListings, fetchVintedOrders, fetchWalletEscrow, ficheAVerifier, ficheUniqueDuNumero, filtreInventaire, finsColis, fmt, generateAchatJustificatif, gesteMorceaux, gesteRA, gesteVrm, harvestTs, horsLigneMaintenant, iconeApp, idCompteLbcApp, imprMode, isAtRelayStatus, isCloudReady, isColisActive, isColisEnAttente, isColisRetirable, jourClef, joursAvant, joursAvantVc, lbcAnnoncesSession, lbcAnnulee, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcPostesEncoreEnVente, libelleRegime, libelleRelais, libelleSourceAchat, libererNumeroDuPlan, libererOngletPdf, lienItemEbay, ligneDeSaSession, limiteVcTexte, lireArriveesANumeroter, lireBaseRelue, lireBeneficeJours, lireDatesLbc, lireDeclarations, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEmpreintesPhotos, lireExtrasRepartition, lireFichesPage, lireFreinsVus, lireLbcDone, lireLbcEnVente, lireLocalJson, lireMisDeCote, lireMontantSaisi, lireNumeroEcrit, lireObjet, lirePdfLigne, lireReglageCarte, lireReglesEbay, lireReleveVentes, lireShipDone, lireSupprimeesTous, lireTout, lireVcDone, load, loadCollected, loadRoomPlan, majRA, marcheEbayDeRef, marquerVc, marqueurNumerotation, masqueesPresentes, messagePdfManquant, messagesRetires, modifierCle, moisDeclare, montantCommande, montantCommandeLu, montantRecuEbay, moyennesParModele, mpChoisi, needsBordereau, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, noterArrivees, numDeSkuEbay, numEbayLu, numLigneEbay, numeroEcritActif, numeroExterne, numeroLbcIdentite, numeroReprenable, numeroVcIdentite, numerosLbcSortis, numerosReserves, numerosServisLus, numerosVcEffectifs, numerotationPermise, onCleRelue, onCloudReady, onVersionNumerotation, onVmrExt, optsNumeroVerif, orderPhoto, ouDansMeubles, ouEstNumero, ouNumeroEcrit, ouStockNumero, oublierCommandesCompte, oublierDressing, ouvrirAtelier, ouvrirAtelierArrivee, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirPorteDressings, pairesAFinirIci, payeDe, pctFr, phaseAchat, photoKey, phraseNonComptees, phrasePersonne, placesAnnonces, posePrefsImpression, poserAchatsMasques, poserBordereau, poserCible, poserDureeProchainGeste, poserGroupesDeuxFois, poserPendingBordPrint, poserToastNumeros, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLigneExt, prochainLibre, profilFiscalLu, proposerFusion, publierATrancher, qrImage, rafraichirGestesHL, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, reattribueAEcrire, recusAchatDe, refusHorsLigne, regimeFiscal, reglageImpressionChoisi, reglageTamponsChoisi, regrouperSignaux, relaisVivant, relierBoiteDe, reserverOngletPdf, resultatReviseEbay, resumeBenefice, sansFonctions, save, saveRoomPlan, saveTout, sbAuth, sensColis, signalerBordereauImprime, sitesRA, sonderPonts, stockGestes, tailleEnFin, taillePicto, tamponPourPage, tamponnerBordereau, tauxUrssaf, telechargerFichier, texteSansBalises, toast, triNum, triPool, tsCommande, txRecuAchat, txnAnnuleeAvantEnvoi, urlPhotoVc, urssafConcerne, useBeneficeJournee, useComptesARelier, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useHorsLigne, useJourneePerso, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useOrdinateur, useProfilFiscal, useProfilVendeur, useRA, useSansSouris, useSourcesCarte, useStateCle, useVcLocal, useVentesEmailFraiches, useVentesVestiaireBrut, useVoixExt, useVueSession, vcCarte, vendActuel, venduEtat, venteFinalisee, ventesAilleursDe, ventesDeclarables, ventesFaites, ventesVcDeMemo, ventilationRecuAchat, verifierVersionNumerotation, versExtension, viaOrdinateur, viderCacheLignes, viderLecturesMemo, viderMemoLignes, vintedAgissant, vintedApiCall, vintedDeChrome, vmrCmd, vmrExec, vmrExtPresent, vmrExtVersion, vmrPdfLbc, voirAbonnement, withOwner, ymDeTs };
 // (21 nov., ext. 5.428 `endirect`) « En direct » : relire l'état de l'extension TOUT DE SUITE quand elle dit que son action a bougé
 // (au plus une fois par 1,5 s ; le battement de 20 s reste le filet).
 let __relireDirectAt = 0, __relireDirectMin = null;
@@ -39157,6 +39308,7 @@ export { relireTransporteursSiVieux };
 export { oublierReglageMontage };   // (11 nov., intégration) la lecture gardée au montage, oubliée par une écriture directe
 // // (11 nov., robustesse) la synchro de l'inventaire relie par identité
 // // (16 nov., lot tampons-parametres)
+export { poserPresentation, usePresentation };
 export { annoncerFicheAPublier, sortieCaseStock, texteAvecDescentes, pushNotif, ANNONCES_RETIREES, AUTH_REDIRECT, RECHERCHE_OUVERTURE, BUILD_ID, Badge, BrandMark, Btn, CE_QUE_VOIT_UN_MEMBRE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_LBC_CIBLE, DEMANDE_REGLAGE_SOUS, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, INVENTAIRE_FEUILLE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, EQUIPE_NON_INSTALLE_TXT, EbayCommande, FiltresVentes, GuideReglage, IMPR_MODES, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, NOM_PLAT_STOCK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVc, PiedSansEnvoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, RapidesConv, RecapFrise, SEL_EBAY_ANNONCES, SUPABASE_KEY, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, URL_ITEM_EBAY, ZOOM_KEY, __vmrNotifier, _failedLocalSaves, _fichesEbayMemo, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aRetirerDeLbcEbay, aRetirerDeLbcVinted, actionEquipe, ageCourtVc, allerComptesEbay, annonceLbcALui, applyZoom, authSetPassword, authSignOut, avecRetour, beneficeDesJours, beneficeDuMoisPub, brouillonsParametres, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, comptaChargesMois, compteEcarte, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesStockEcartes, contexteSignalement, EcrireSupportFeuille, dansVueEbay, dateCourteVc, debutPeriode, decalerPeriode, delaiDemandeEmail, demanderQuestionRepub, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, doublesVenteEbay, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireLigneAccompagnement, estRelaisApple, etatEnClair, eurEbay, extEnRetard, fetchHarvestOrders, fetchProInvoices, fetchVintedAccounts, fichesPourEbay, fmtDate, ilYaBr, ilYaCourt, imprimanteChoisie, jumellesParPhoto, lbcDescription, lbcEuro, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, lienEbay, lignesRecu, lireAbonnement, lireAchatsLies, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDressings, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireModelesRanges, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireVentesVestiaire, logoFacture, makeChallenge, makeVerifier, mapMailError, marquerEbay, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, nomAppareil, numerosDejaVendus, numerosVendusEbay, numerosVendusVc, onSyncChange, ouVenduesTexte, ouvrirRecherchePhoto, ouvrirStripe, placeDansMeubles, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prixLisible, providerEnabled, questionRepubOk, readZoom, rechercheParNumero, recuAvecADater, refLbcPresente, regleEngage, reglesEngagees, repondreSansDepenses, reponsesRapidesPartagees, retraitsEbayAutoPermis, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, texteCentimesRecu, textePerime, texteReglesQuiRestent, tod, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useRegimeFiscal, useReglesStream, useSecondesRestantes, useStream, useVentesCoque, useVentesVestiaire, useMotsArticle, useExemplesVendeur, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcSetter, verifierAvantPublication, vmrAuthEtat, writeSession, xmlEsc, ymCompta, ymCourant, zoneEtiquette, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, DEMANDE_RETOUR_EBAY, seDeconnecter, ecrireCopieLocale, verifierMessageAvantEnvoi, demanderActionAnnonces, confirmerOffresAuto };
 export { BienDemarrerApp };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { RepriseAppareil };   // (22 nov., choix n° 23) lu par ecrans/Comptabilite.jsx (Aujourd'hui)
