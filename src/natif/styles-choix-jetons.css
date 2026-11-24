@@ -487,7 +487,7 @@
   --g-h-plein: 50px;
   --g-r-chip: 999px;
   --g-appui: 0.97;
-  --g-plein-appui: #000000;
+  --g-plein-appui: #383838;
   --g-second-fond: #E3E3E3;
   --g-second-texte: #000000;
   --g-second-appui: #CCCCCC;
@@ -632,7 +632,7 @@
   --g-h-plein: 48px;
   --g-r-chip: 6px;
   --g-appui: 0.97;
-  --g-plein-appui: #1A1713;
+  --g-plein-appui: #54514C;
   --g-second-fond: #E4E4E2;
   --g-second-texte: #1F1B16;
   --g-second-appui: #D2D3D3;
@@ -720,7 +720,7 @@
   --g-descente: 0px;
   --g-carte-ombre: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -14px rgb(0 0 0 / 0.55);
   --g-plaque-fond: #4A4236;
-  --g-plaque-texte: #F2EADC;
+  --g-plaque-texte: #EEEAE3;
   --n-ombre-carte: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -14px rgb(0 0 0 / 0.55);
   --n-fond-degrade: linear-gradient(180deg, #1E1C19 0%, #1E1C19 45%, #171614 100%);
   --g-fond-image: none;
@@ -1212,7 +1212,7 @@
   --g-h-plein: 48px;
   --g-r-chip: 3px;
   --g-appui: 0.98;
-  --g-plein-appui: #000000;
+  --g-plein-appui: #383838;
   --g-second-fond: #E3E3E3;
   --g-second-texte: #000000;
   --g-second-appui: #CCCCCC;

@@ -33,8 +33,6 @@
 [data-style]:not([data-style=""]) .n-carte-corps,
 [data-style]:not([data-style=""]) .n-tuile { border-color: transparent; box-shadow: var(--g-carte-ombre); border-radius: var(--n-r-carte); }
 [data-style]:not([data-style=""]) .n-groupe-carte { -webkit-backdrop-filter: var(--g-verre); backdrop-filter: var(--g-verre); }
-[data-style]:not([data-style=""]) .n-grand-titre { font-family: var(--g-titre-police); font-weight: var(--g-titre-poids); font-size: 32px; line-height: 36px; letter-spacing: -.02em; padding-bottom: 12px; }
-[data-style]:not([data-style=""]) .n-barre-centre { font-family: var(--g-titre-police); }
 
 /* ── LE BOUTON PLEIN : encre/ardoise, 48–52, relief doux (reflet intérieur + petite ombre), enfoncé 0,97 plus foncé, 80 ms ── */
 [data-style]:not([data-style=""]) .n-bouton {
@@ -92,6 +90,11 @@
 [data-style]:not([data-style=""]) .n-vt-rang .n-rangee-corps { padding-block: 8px; }
 [data-style]:not([data-style=""]) .n-vt-rang .n-rangee-note { min-height: 32px; align-items: center; }
 [data-style]:not([data-style=""]) .n-rangee.n-vt-rang > .n-rangee-pied { bottom: 2px; }
+/* Annonces au téléphone : la liste devient une carte posée (marges, rayon, ombre douce) comme une liste groupée d'iOS */
+@media (max-width: 1023px) {
+  [data-style]:not([data-style=""]) .n-ar-liste { margin: 0 var(--n-marge) 8px; border: 0; border-radius: var(--n-r-carte); overflow: hidden; box-shadow: var(--g-carte-ombre); }
+  [data-style]:not([data-style=""]) .n-ar-titre { font-weight: 500; letter-spacing: -.1px; }
+}
 /* la fiche : « Actions ▾ » à la hauteur du plein, les faits (« achat · Ajouter ») en puces teintées */
 [data-style]:not([data-style=""]) .nf-choisir[data-n-famille="second"] { min-height: var(--g-h-plein); box-shadow: none; font-weight: 600; }
 [data-style]:not([data-style=""]) .nf-pastille .nf-pi { min-height: 32px; background: var(--g-second-fond); box-shadow: none; border-radius: var(--g-r-chip); }
@@ -176,6 +179,10 @@
   [data-style]:not([data-style=""]) .n-rangee[data-n-touche] .n-rangee-corps:active { transform: none; }
 }
 }
+
+/* ── les grands titres : HORS couche (une règle `h1` d'avant, sans couche, passait devant la couche) ── */
+:root[data-style]:not([data-style=""]) .n-grand-titre { font-family: var(--g-titre-police); font-weight: var(--g-titre-poids); font-size: 32px; line-height: 36px; letter-spacing: -.02em; padding-bottom: 12px; }
+:root[data-style]:not([data-style=""]) .n-barre-centre { font-family: var(--g-titre-police); }
 
 /* ── LES TUILES D'APERÇU (Paramètres → Apparence → Style) : une rangée et un bouton, dessinés par les jetons du style ── */
 .g-styles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 4px 0; }

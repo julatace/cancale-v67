@@ -121,6 +121,7 @@ const MESURE = (args) => {
   for (const [el] of boites.concat([...document.querySelectorAll('[data-n-famille="second"], [data-n-famille="champ"]')].filter((x) => dans(x) && vu(x)).map((x) => [x]))) {
     if (!el.matches('.n-bouton, [data-n-famille]')) continue;
     const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+    { const t0 = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!t0 || !(el.contains(t0) || t0.contains(el))) continue; }   // caché sous autre chose (une barre) : rien à recouvrir
     const d = { l: r.left + parseFloat(cs.borderLeftWidth), r: r.right - parseFloat(cs.borderRightWidth), t: r.top + parseFloat(cs.borderTopWidth), b: r.bottom - parseFloat(cs.borderBottomWidth) };
     for (const t of textes) { if (el.contains(t) || t.contains(el) || colle(t) !== colle(el)) continue; const q = t.getBoundingClientRect();
       const w = Math.min(d.r, q.right) - Math.max(d.l, q.left), h = Math.min(d.b, q.bottom) - Math.max(d.t, q.top);
@@ -155,7 +156,7 @@ const APPUI = () => {
   const lire = () => { const cs = getComputedStyle(b); const m = /matrix\(([^,]+),/.exec(cs.transform); return { echelle: m ? Number(m[1]) : 1, fond: compose(cs.backgroundColor) }; };
   const avant = lire(); b.setAttribute('data-n-force', 'appui'); const pendant = lire(); b.removeAttribute('data-n-force');
   const parse = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); const p = m ? m[1].split(/[ ,/]+/).filter(Boolean).map(Number) : [0, 0, 0]; return 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]; };
-  return { trouve: true, variante: b.getAttribute('data-n-variante') || '', avant, pendant, plusFonce: parse(pendant.fond) < parse(avant.fond) - 1 || (document.documentElement.getAttribute('data-theme') === 'dark' && Math.abs(parse(pendant.fond) - parse(avant.fond)) > 1) };   // la nuit, un plein CLAIR s'enfonce en s'assombrissant, un bouton texte en s'éclairant : un écart suffit
+  return { trouve: true, variante: b.getAttribute('data-n-variante') || '', avant, pendant, plusFonce: parse(pendant.fond) < parse(avant.fond) - 1 || ((document.documentElement.getAttribute('data-theme') === 'dark' || parse(avant.fond) < 8) && Math.abs(parse(pendant.fond) - parse(avant.fond)) > 1) };   // un plein déjà noir s'éclaircit   // la nuit, un plein CLAIR s'enfonce en s'assombrissant, un bouton texte en s'éclairant : un écart suffit
 };
 
 // B (pixels) : les boîtes à juger sur la capture

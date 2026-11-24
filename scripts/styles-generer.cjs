@@ -91,7 +91,8 @@ function jetons(p, f, sombre) {
     // la famille de boutons (src/natif/styles-choix.css)
     '--g-r-bouton': f.rBouton + 'px', '--g-h-plein': f.hPlein + 'px', '--g-r-chip': f.rChip === 999 ? '999px' : f.rChip + 'px',
     '--g-appui': String(f.appui),
-    '--g-plein-appui': melange(p.plein, sombre ? '#000000' : '#000000', sombre ? 0.18 : 0.28),
+    // enfoncé : plus foncé ; un plein déjà (presque) noir s'éclaircit (il ne peut pas foncer)
+    '--g-plein-appui': lum(p.plein) < 0.02 ? melange(p.plein, '#FFFFFF', 0.22) : melange(p.plein, '#000000', sombre ? 0.18 : 0.28),
     '--g-second-fond': ardoiseFond, '--g-second-texte': sombre ? p.encre : p.encre,
     '--g-second-appui': sombre ? rgba(p.accent, 0.26) : melange(p.carte, p.accent, 0.20),
     '--g-champ-fond': sombre ? melange(p.fond, '#000000', 0.18) : melange(p.carte2, p.fond, 0.35),
@@ -109,7 +110,7 @@ function jetons(p, f, sombre) {
   j['--g-carte-ombre'] = prof === 'aucune' ? 'none' : prof === 'arcade' ? `0 2px 0 ${rgba(p.bord, sombre ? 0.6 : 0.9)}, 0 8px 24px -12px ${rgba('#000000', sombre ? 0.6 : 0.20)}`
     : `0 1px 2px ${rgba('#000000', sombre ? 0.30 : 0.05)}, 0 8px 24px -14px ${rgba('#000000', sombre ? 0.55 : 0.18)}`;
   j['--g-plaque-fond'] = f.plaque === 'kraft' ? (sombre ? '#4A4236' : '#D8CDB9') : p.carte2;
-  j['--g-plaque-texte'] = f.plaque === 'kraft' ? (sombre ? '#F2EADC' : '#2E261A') : p.encre;
+  j['--g-plaque-texte'] = f.plaque === 'kraft' ? (sombre ? '#EEEAE3' : '#2E261A') : p.encre;
   j['--n-ombre-carte'] = j['--g-carte-ombre'];
   if (sombre) j['--n-fond-degrade'] = f.verre ? `linear-gradient(180deg, ${p.fond} 0%, ${p.fond2} 100%)` : `linear-gradient(180deg, ${p.fond} 0%, ${p.fond} 45%, ${melange(p.fond, '#000000', 0.22)} 100%)`;
   if (f.verre) { j['--g-fond-image'] = `linear-gradient(180deg, ${p.fond} 0%, ${p.fond2} 100%)`; j['--g-verre'] = 'saturate(160%) blur(18px)'; }
@@ -132,11 +133,12 @@ function controler(table) {
     for (const [n, f] of Object.entries(fonds)) { paires.push(['encre/' + n, p.encre, f], ['texte/' + n, p.texte, f], ['encre2/' + n, p.encre2, f]); }
     paires.push(['accent/fond', p.accent, p.fond], ['accent/carte', p.accent, carte], ['surPlein/plein', p.surPlein, p.plein],
       ['vert/carte', p.vert, carte], ['vert/vertFond', p.vert, vFond], ['accent/chip', p.accent, aFond], ['encre/chip', p.encre, aFond],
-      ['encre2/chipEncre', p.encre2, eFond], ['surPlein/pleinAppui', p.surPlein, melange(p.plein, '#000000', sombre ? 0.18 : 0.28)],
+      ['encre2/chipEncre', p.encre2, eFond], ['surPlein/pleinAppui', p.surPlein, lum(p.plein) < 0.02 ? melange(p.plein, '#FFFFFF', 0.22) : melange(p.plein, '#000000', sombre ? 0.18 : 0.28)],
       ['encre2/champ', p.encre2, sombre ? melange(p.fond, '#000000', 0.18) : melange(p.carte2, p.fond, 0.35)]);
-    if (s.forme.plaque === 'kraft') paires.push(['plaque', sombre ? '#F2EADC' : '#2E261A', sombre ? '#4A4236' : '#D8CDB9']);
+    if (s.forme.plaque === 'kraft') paires.push(['plaque', sombre ? '#EEEAE3' : '#2E261A', sombre ? '#4A4236' : '#D8CDB9']);
     for (const [n, a, b] of paires) { const k = rapport(a, b); if (k < 4.5) ko.push(`${id} ${t} ${n} ${k.toFixed(2)}:1`); }
-    for (const [n, c] of Object.entries(p)) if (typeof c === 'string' && /^#/.test(c) && estAmbre(c)) ko.push(`${id} ${t} ${n} ${c} est orange/ambre`);
+    const kraft = s.forme.plaque === 'kraft' ? { kraftFond: sombre ? '#4A4236' : '#D8CDB9', kraftTexte: sombre ? '#EEEAE3' : '#2E261A' } : {};
+    for (const [n, c] of Object.entries({ ...p, ...kraft })) if (typeof c === 'string' && /^#/.test(c) && estAmbre(c)) ko.push(`${id} ${t} ${n} ${c} est orange/ambre`);
   }
   return ko;
 }
