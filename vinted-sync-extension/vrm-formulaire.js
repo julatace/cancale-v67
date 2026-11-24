@@ -25,7 +25,7 @@
 //  formulaire et la réponse attendue.
 // ════════════════════════════════════════════════════════════════════════════
 (() => {
-  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 7.1) return;
+  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 7.2) return;
   const SEL = Object.freeze({
     vendre: 'a[data-testid="header-upload-item-button"]',
     photos: 'input[data-testid="add-photos-input"]',
@@ -693,12 +693,24 @@
       //    n° que la page a lu de Vinted (`__vrmConvCore`), jamais deviné.
       let rep = null, repVue = false;
       reponseDe('POST', /(?:\/api\/v2\/conversations|\/messaging\/main\/inquiries)\/?$/, 25000, d && d.cle).then((x) => { rep = x; repVue = true; });
+      const _cheminAvantClic = location.pathname;
       clic(l.el);
+      // ⚠️ 24 nov. (simulation de bout en bout, vraie extension) : `conv` et `route` sont relus de l'adresse ACTUELLE à chaque
+      //    tour, jamais gardés d'un tour d'avant. Avant : à partir du 2ᵉ favori, l'onglet de travail montrait la conversation
+      //    PRÉCÉDENTE ; une fois l'adresse passée au nouvel uuid mais sa relecture pas encore reçue (`coeurDe` inconnu), `conv`
+      //    restait l'ancien n° de la conversation précédente, apparié au NOUVEL uuid — la vérification relisait une autre
+      //    conversation (autre acheteur) et le favori finissait « pas envoyé ». La conversation montrée AVANT le clic ne compte
+      //    que si la réponse de création dit qu'elle est la même (conversation déjà ouverte).
+      const avantClic = String(_cheminAvantClic || '');
       const fin = Date.now() + 25000; let conv = '', route = '';
       for (;;) {
         if (captcha()) return Object.assign(vuCaptcha(), { parti: true });
-        const m = /^\/inbox\/([1-9]\d{0,19})\/?$/.exec(location.pathname); if (m) conv = m[1];
-        const u = uuidIci(); if (u) { route = u; const c = coeurDe(u); if (c) conv = c; }
+        let ici = '', rIci = '';
+        const m = /^\/inbox\/([1-9]\d{0,19})\/?$/.exec(location.pathname); if (m) ici = m[1];
+        const u = uuidIci(); if (u) { rIci = u; ici = coeurDe(u) || ''; }
+        const rj = rep && rep.json;
+        const memeQuAvant = location.pathname === avantClic && !(rj && ((typeof rj.conversation_id === 'string' && rIci && rj.conversation_id === rIci) || (rj.conversation && ici && String(rj.conversation.id) === ici)));
+        conv = memeQuAvant ? '' : ici; route = memeQuAvant ? '' : rIci;
         if (!conv && rep && rep.json && rep.json.conversation && /^[1-9]\d{0,19}$/.test(String(rep.json.conversation.id))) conv = String(rep.json.conversation.id);
         // La conversation montrée ; la réponse de création attendue encore 3 s (une conversation déjà là n'en a pas).
         if (conv && (repVue || Date.now() > fin - 22000)) break;
@@ -961,7 +973,7 @@
       return x ? { ok: true, rep: x } : { ok: false, code: 'sans-reponse' };
     },
   };
-  globalThis.__vrmFormulaireV = 7.1;   // 5.440.1 : 7.1 (ligne du favori par `user_id`)   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
+  globalThis.__vrmFormulaireV = 7.2;   // 5.440.1 : 7.2 (conversation ouverte relue de l'adresse à chaque tour) ; 7.1 (ligne du favori par `user_id`)   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
   globalThis.__vrmFormulaireSel = SEL;
   globalThis.__vrmFormulaire = async (etape, d) => {
     if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(location.hostname)) return { ok: false, code: 'hors-vinted' };

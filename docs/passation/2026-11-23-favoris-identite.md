@@ -142,3 +142,17 @@ chaque ligne.
 - CI à 23:39 UTC : 35 exécutions en file sur le dépôt, celle de la PR attend un exécuteur depuis ~2 h ; seul
   `comptes-et-reception` a tourné — rouge, avec EXACTEMENT les mêmes tests rouges que la PR #1332 fusionnée (B1–B7,
   sauvegardes différées). Fusion seulement quand la CI complète est comparée job par job (référence : #1332).
+
+## 24 nov. — simulation de bout en bout : la conversation de l'envoi PRÉCÉDENT (corrigé, toujours 5.440.1)
+Simulation (`scripts/bancs/sim-extension.cjs`, branche `claude/ext-simulations` : la vraie extension 5.440.1 chargée dans
+Chromium, faux vinted.fr / api.vinted.fr aux formes mesurées, la vraie file du serveur) : 3 favoris ⇒ **1 ou 2 envoyés
+seulement**, les autres « pas envoyé · article ou destinataire pas confirmé ». Cause (`vrm-formulaire.js`, `favoriOuvrir`) :
+`conv` était gardé d'un tour de boucle à l'autre. À partir du 2ᵉ favori, l'onglet de travail montre la conversation
+précédente ; dès que la page passe au NOUVEL uuid mais avant qu'elle l'ait relu (`coeurDe` encore inconnu), `conv` restait
+l'ancien n° de la conversation PRÉCÉDENTE, apparié au nouvel uuid (la vérification `conversation_id === uuid` passait) ⇒ la
+relecture visait l'autre conversation (autre acheteur) ⇒ refus d'identité. Rien n'est jamais parti chez la mauvaise
+personne (l'acheteur et l'article sont revérifiés), mais le favori était perdu selon le moment.
+Correction : `conv`/`route` relus de l'adresse ACTUELLE à chaque tour ; la conversation montrée avant le clic ne compte que si
+la réponse de création dit la même. `__vrmFormulaireV` 7.1 ⇒ 7.2 (réinjection). Preuve : F1, F1W (liens web
+`/items/N/want_it/new?offering_id=N`), F1M (liens mêlés) ⇒ 3/3 envoyés, la fenêtre et la carte = VRM ; avant : 1/3 et 2/3 ;
+`--mutation conv-garde` ⇒ 1/3, rouge. `favoris-auto` 87 verts, `audit-favoris-identite` 31 verts.
