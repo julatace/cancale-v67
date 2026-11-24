@@ -47,7 +47,8 @@ import { Glyphe } from '../icones.jsx';
 import { groupesParCompte, lireReplis, ecrireReplis } from './annoncesComptes.js';   // (20 nov.) la liste divisée par compte
 import { CarteAnnonce, RangeeArticle, lireVueTel, ecrireVueTel, traceDe, texteTrace, seulementBloque, bandeauDe, tailleDansTitre } from './AnnoncesCartes.jsx';   // (21 nov.) la grille « Dressing »
 import { depuisMaj } from '../TableauTravail.jsx';
-import GrilleInventaire from '../visuel/GrilleInventaire.jsx';   // (24 nov., lot visuel-annonces) la grille d'inventaire virtualisée
+import GrilleInventaire from '../visuel/GrilleInventaire.jsx';
+import { AvatarCompte } from '../visuel/Inventaire.jsx';   // (24 nov.) le rond du compte, le même que sur ses tuiles   // (24 nov., lot visuel-annonces) la grille d'inventaire virtualisée
 
 const PAR_PAGE = 60;
 // Les segments (audit d'utilité du 19 nov.) : En ligne · À publier · Dorment.
@@ -335,6 +336,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
       <div className="n-ad-tete-compte" data-ad-bloque={bloque ? '1' : undefined}>
         <button type="button" className="n-ad-compte" aria-expanded={ouvertG ? 'true' : 'false'} onClick={() => basculerRepli(g.cle)} data-ad-repli={g.cle}>
           {Logo && g.site ? <span className="n-eg-compte-logo" aria-hidden="true">{Logo(g.site)}</span> : null}
+          {g.cle !== 'sans' ? <AvatarCompte pseudo={titre} cle={g.cle} petit/> : null}
           <span className="n-ad-compte-nom">{titre}<span className="n-ad-compte-n"> · {n}</span></span>
           {g.site ? <span className="n-eg-sr"> · {nomSite(g.site)} · {tr('egalite.groupe.n', { n })}</span> : null}
           {bloque ? <span className="n-ad-etiquette" data-ad-bandeau="bloque">{tr('tableau.etat.bloque')}</span> : null}

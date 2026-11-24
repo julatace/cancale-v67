@@ -79,7 +79,7 @@ export default function GrilleInventaire({ items, cle = (x) => x && x.cle, rendu
     for (let i = de; i < a; i++) cases.push(<React.Fragment key={'os' + i}>{squelette ? squelette(i) : <span className="n-inv-os" aria-hidden="true"><span className="n-os n-inv-os-photo"/><span className="n-os n-inv-os-l"/><span className="n-os n-inv-os-l" data-court=""/></span>}</React.Fragment>);
   } else if (Array.isArray(items)) {
     // La cascade part de la 1re case À L'ÉCRAN (jamais retardée par celles d'au-dessus), plafonnée par `revele` (Jeu.jsx).
-    for (let i = de; i < a; i++) { const x = items[i]; cases.push(<React.Fragment key={cle(x) || i}>{rendu(x, i, enRevele ? reveleJeu(debut + i - de) : null)}</React.Fragment>); }
+    for (let i = de; i < a; i++) { const x = items[i]; cases.push(<React.Fragment key={cle(x) || i}>{rendu(x, i, enRevele ? reveleJeu(debut + i - de, '', true) : null)}</React.Fragment>); }
   }
   return (
     <div ref={ref} className={cx('n-inv-grille', className)} style={{ ...style, height: hauteur }} data-inv-grille="" data-inv-n={String(n)} data-inv-cols={String(g.cols)}
