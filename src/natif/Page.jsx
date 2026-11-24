@@ -45,15 +45,45 @@ import { Glyphe } from './icones.jsx';
 // Ce que la coque dit aux pages qu'elle contient : { titreRendu, voletDetail }.
 export const ContexteCoque = React.createContext(null);
 
+// (24 nov., vitesse) LA LETTRE D'ABORD, LA LISTE APRÈS. Mesuré (banc vitesse-iphone, 390 ×4, volume de Julien) : chaque
+// lettre tapée dans la recherche d'Annonces re-rendait tout l'écran AVANT d'afficher la lettre (124 à 750 ms par lettre).
+// Le champ garde sa propre valeur (la lettre s'affiche à l'image suivante) ; l'écran reçoit la valeur APRÈS cette image
+// (rAF puis tâche, 100 ms au plus sans image) — des lettres tapées plus vite que l'écran ne se rend sont envoyées ensemble
+// (la dernière valeur seulement). Entrée, l'effacement et la sortie du champ envoient tout de suite. Ce que l'écran reçoit
+// est inchangé (la même valeur, dans le même ordre) ; une valeur posée par l'écran (effacée, coupée) remplace celle du champ.
+// Pas une transition React : une transition retenue ailleurs retiendrait la recherche (latence, 22 nov.).
+function useValeurDiffere(valeur, onChange) {
+  const [locale, setLocale] = React.useState(valeur);
+  const recue = React.useRef(valeur);   // la dernière valeur que l'écran connaît (reçue de lui, ou envoyée à lui)
+  if (valeur !== recue.current) { recue.current = valeur; if (locale !== valeur) setLocale(valeur); }
+  const surChange = useDernier(onChange);
+  const plan = React.useRef({ image: 0, tache: 0, filet: 0, v: null });
+  const annuler = React.useCallback(() => { const p = plan.current; if (p.image) cancelAnimationFrame(p.image); if (p.tache) clearTimeout(p.tache); if (p.filet) clearTimeout(p.filet); p.image = p.tache = p.filet = 0; }, []);
+  const envoyer = React.useCallback((v) => { annuler(); plan.current.v = null; recue.current = v; if (surChange.current) surChange.current(v); }, [annuler, surChange]);
+  const vider = React.useCallback(() => { const v = plan.current.v; if (v != null) envoyer(v); }, [envoyer]);
+  const planifier = React.useCallback((v) => {
+    const p = plan.current; p.v = v;
+    if (p.image || p.tache || p.filet) return;
+    const ensuite = () => { if (p.image) cancelAnimationFrame(p.image); if (p.filet) clearTimeout(p.filet); p.image = p.filet = 0; if (!p.tache) p.tache = setTimeout(() => { p.tache = 0; vider(); }, 0); };
+    p.image = requestAnimationFrame(ensuite);
+    p.filet = setTimeout(ensuite, 100);
+  }, [vider]);
+  React.useEffect(() => () => { vider(); annuler(); }, [vider, annuler]);
+  const changer = (v) => { setLocale(v); planifier(v); };
+  return { locale, changer, envoyer, vider };
+}
+
 export function ChampRecherche({ valeur = '', onChange, placeholder = '', onEnvoyer = null, onScanner = null, libelle = '', onOuvrir = null, className = '', attrs = null }) {
   const ref = React.useRef(null);
   const nom = libelle || placeholder || tr('natif.recherche.nom');
+  const d = useValeurDiffere(valeur, onChange);
+  const vue = onOuvrir ? valeur : d.locale;
   return (
     <form
       className={cx('n-recherche', className)}
       role="search"
       data-n-recherche=""
-      onSubmit={(e) => { e.preventDefault(); if (onEnvoyer) onEnvoyer(valeur); if (ref.current) ref.current.blur(); }}
+      onSubmit={(e) => { e.preventDefault(); d.vider(); if (onEnvoyer) onEnvoyer(vue); if (ref.current) ref.current.blur(); }}
     >
       <Glyphe nom="search" taille={18} className="n-recherche-loupe"/>
       <input
@@ -66,17 +96,18 @@ export function ChampRecherche({ valeur = '', onChange, placeholder = '', onEnvo
         autoCorrect="off"
         autoCapitalize="none"
         spellCheck={false}
-        value={valeur}
+        value={vue}
         placeholder={placeholder || tr('natif.recherche.nom')}
         aria-label={nom}
         readOnly={onOuvrir ? true : undefined}
         onClick={onOuvrir || undefined}
         onKeyDown={onOuvrir ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOuvrir(e); } } : undefined}
-        onChange={(e) => { if (onChange) onChange(e.target.value); }}
+        onChange={(e) => { if (onOuvrir) { if (onChange) onChange(e.target.value); } else d.changer(e.target.value); }}
+        onBlur={onOuvrir ? undefined : d.vider}
         {...(attrs || {})}
       />
-      {valeur && !onOuvrir ? (
-        <button type="button" className="n-recherche-bouton" aria-label={tr('natif.recherche.effacer')} onClick={() => { if (onChange) onChange(''); if (ref.current) ref.current.focus(); }}>
+      {vue && !onOuvrir ? (
+        <button type="button" className="n-recherche-bouton" aria-label={tr('natif.recherche.effacer')} onClick={() => { d.changer(''); d.envoyer(''); if (ref.current) ref.current.focus(); }}>
           <span className="n-recherche-efface" aria-hidden="true"><Glyphe nom="close" taille={12}/></span>
         </button>
       ) : null}
