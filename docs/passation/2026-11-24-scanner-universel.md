@@ -62,7 +62,21 @@ l'affichage seulement ; elle passe aussi `regles: { cleNum, archive: archiveNume
   audit-arrivee-scan 44/44, audit-traduction, audit-icones, audit-quoi-de-neuf verts. `npm run build` vert.
 
 ## Résultats du banc
-(complété après exécution)
+`scanner-universel` : **37/37** (390 clair et sombre, 1512 clair et sombre), captures regardées :
+- A (390 clair, barre du haut) : Code 128 « 55… » d'une vente parmi 50 au même titre ⇒ bandeau « Mondial Relay · 5546… »,
+  sa fiche (N°123) avec « Ouverture… / Rester ici », puis Ventes ouvert seul sur sa fiche ; vibration demandée ; caméra coupée.
+- B (390 sombre) : QR « VRM-124 » ⇒ la fiche de la paire N°124 ouverte seule.
+- C (1512 clair, outils de la barre latérale) : EAN-13 ⇒ « Code d'une boîte : aucune paire », « Chercher » seul ; 3 s
+  après, rien d'ouvert.
+- D (1512 sombre) : Code 128 « 230 » ⇒ « 2 fiches portent ce n° » : N°230 et N°B230, rien d'ouvert.
+- E (390 clair, rafale) : suivi + transaction + code de retrait en QR ⇒ 3 lignes (vente, vente, achat), caméra ouverte,
+  pas de doublon ; cibles ≥ 44 px, rien ne déborde, aucun orange (teintes rendues mesurées).
+
+Bancs voisins (même `dist`) : `scan-achat-suite` vert, `arrivee-scan` 236 verts. `scan-colis`, `scan-bordereau-vente`
+et `scan-instantane` attendent `[data-scan-retrouver-bouton="ventes"]` sur l'écran Ventes et expirent AVANT d'ouvrir le
+scanner (aucune ligne de ce lot ne touche ce bouton ni l'écran Ventes : l'écran Ventes natif du 19 nov. ne le rend
+plus) — leurs contrôles qui ouvrent le scanner autrement (loupe, Achats) passent. À reprendre par le lot qui a refait
+Ventes (entrée à viser : `[data-vv-scanner]` dans le champ de Ventes).
 
 ## Geste de Julien
 Aucun.
