@@ -58,6 +58,9 @@ const toucher = async (pg, sel, tel) => { const l = pg.locator(sel).filter({ vis
         await toucher(pg, '[data-tt-ouvre="statut"]', tel);
         const nAnnul = await pg.evaluate(() => { const c = document.querySelector('[data-tt-statut="annule"] [data-tt-n]'); return c ? c.getAttribute('data-tt-n') : null; });
         dit(nAnnul === '1', `[${W}] A2 « Annulés » porte son nombre (1)`, JSON.stringify({ statut: nAnnul }));
+        // Le filtre est une liste à cocher (plusieurs statuts) : « Annulés » SEUL = repartir de « Tous » (`data-tt-statuts-tous`,
+        // le jeu vidé), puis cocher « Annulés ».
+        if (await pg.locator('[data-tt-statuts-tous]').filter({ visible: true }).count()) { await toucher(pg, '[data-tt-statuts-tous]', tel); await pg.waitForFunction(() => !document.querySelector('[data-tt-statuts-tous]'), null, { timeout: 5000 }).catch(() => {}); }
         la = await toucher(pg, '[data-tt-statut="annule"] input', tel);
         await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(600);
       } else {

@@ -49,7 +49,18 @@ const mesure = (pg) => pg.evaluate(() => {
       const ix = Math.min(a.right, b.right) - Math.max(a.left, b.left), iy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
       if (ix > 2 && iy > 3) chevauche.push(`« ${boites[i].t} » × « ${boites[j].t} »`);
     }
-    for (const e of row.querySelectorAll('.vrm-fu-vente-compte, .vrm-fu-vente-compte *, .vrm-fu-legende, .vrm-ledger-sale-state, .n-rangee-sous-texte, .n-pastille')) {
+    // (24 nov., main-vert) Rangée native : le PSEUDO est un morceau du sous-titre (`data-toutes-compte` dit lequel) — jugé là où il
+    // est écrit (sa boîte de texte entière dans la boîte visible du sous-titre), jamais toute la ligne de détail, que la rangée
+    // compacte d'« À envoyer » coupe exprès (23 nov.). L'état est sa pastille (`.n-pastille`), jamais rognée.
+    const pseudo = row.getAttribute('data-toutes-compte') || '';
+    if (pseudo) for (const st of row.querySelectorAll('.n-rangee-sous-texte')) {
+      if (!vis(st)) continue; const boite = st.getBoundingClientRect();
+      const tw2 = document.createTreeWalker(st, NodeFilter.SHOW_TEXT);
+      for (let n = tw2.nextNode(); n; n = tw2.nextNode()) { const i = n.nodeValue.indexOf(pseudo); if (i < 0) continue;
+        const rg = document.createRange(); rg.setStart(n, i); rg.setEnd(n, i + pseudo.length); const r = rg.getBoundingClientRect();
+        if (r.right > boite.right + 1 || r.left < boite.left - 1 || st.scrollWidth > st.clientWidth + 1 && r.right > boite.right - 12) rognes.push(pseudo + ' (pseudo coupé)'); }
+    }
+    for (const e of row.querySelectorAll('.vrm-fu-vente-compte, .vrm-fu-vente-compte *, .vrm-fu-legende, .vrm-ledger-sale-state, .n-pastille')) {
       if (!vis(e)) continue; const cs = getComputedStyle(e);
       const tx = (e.innerText || '').trim(); if (tx && cs.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 1) rognes.push(tx.slice(0, 30) + ' (' + e.className + ')');
     }

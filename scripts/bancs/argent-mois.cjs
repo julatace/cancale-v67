@@ -141,23 +141,25 @@ const capture = async (pg, nom, sel) => { if (!SHOTS) return; fs.mkdirSync(SHOTS
     const etat = { main: JSON.parse(JSON.stringify(MAIN0)) };
     const { ctx, pg, errs } = await contexte(b, T, T.sombre, etat);
     await essaie(`A ${T.nom}`, async () => {
-      // (24 nov., main-vert) Ventes n'a plus de sélecteur de plateforme (D2, navigation native) : la carte s'ouvre sur
-      // TOUS les sites. La règle « À venir Vinted = les ventes pas encore versées » est jugée sur la rangée Vinted de
-      // l'écran « Argent à venir » (`data-av-site`, `data-eur`, `data-n`), plus bas.
-      await aller(pg, 'cat_ventes', '[data-a-venir]', 3000);
-      await pg.waitForFunction(() => { const e = document.querySelector('[data-a-venir]'); return e && e.getAttribute('data-a-venir-site') === 'toutes'; }, null, { timeout: 15000 }).catch(() => {});
-      const A = await attrs(pg, '[data-a-venir]');
+      // (24 nov., main-vert) VRM natif : la carte « À venir » de Ventes n'est plus RENDUE (montée cachée, `CacheSiV2`) — la lire
+      // jugeait des data-* invisibles. L'argent à venir vit dans Argent : la ligne « En attente » (`data-v2-argent-fait="attente"`,
+      // même règle `argentAVenir`) porte le total VISIBLE et ouvre l'écran « Argent à venir ». Ventes n'a plus de sélecteur de
+      // plateforme : la part Vinted est jugée sur la rangée Vinted de cet écran (`data-av-site`, `data-eur`, `data-n`).
+      const vis = '[data-v2-argent-fait="attente"]';
+      await aller(pg, 'compta', vis, 3000);
+      await pg.waitForFunction((s) => [...document.querySelectorAll(s)].some((e) => e.getClientRects().length && e.getAttribute('data-v2-argent-valeur')), vis, { timeout: 15000 }).catch(() => {});
+      const A = await pg.evaluate((s) => { const e = [...document.querySelectorAll(s)].find((x) => x.getClientRects().length); return e ? { valeur: e.getAttribute('data-v2-argent-valeur'), pasSu: e.hasAttribute('data-v2-pas-su') } : null; }, vis);
       const att = Math.round((A_VENIR_VINTED + VC_MONTANT) * 100);
-      dit(A && A['a-venir-site'] === 'toutes' && Number(A['a-venir']) === att && A['a-venir-n'] === '3', `A : Ventes · Tous — « À venir » = ${att / 100} € sur 3 ventes (Vinted + Vestiaire)`, JSON.stringify(A));
-      // (16 nov., parcours-vert) Depuis le 15 nov. (« Argent à venir : étapes, écran, résumé compact », d4940f9b8) la
-      // carte n'est plus repliable : elle est le RÉSUMÉ (le total, les sites, les étapes) et le détail par site et
-      // par compte vit dans l'écran « Argent à venir » qu'elle ouvre au toucher. Les règles jugées restent : le
-      // total seul sur la carte (aucune ligne de compte), une ligne par site et par compte (montants exacts),
-      // Vestiaire avec SA date « paiement estimé », aucune date inventée pour Vinted, des cibles de 44 px.
-      const carte = await pg.evaluate(() => ({ comptes: document.querySelectorAll('section.vrm-a-venir [data-a-venir-compte]').length, groupes: (document.querySelector('section.vrm-a-venir[data-a-venir-site="toutes"]') || { getAttribute: () => null }).getAttribute('data-a-venir-groupes') }));
-      dit(carte.comptes === 0 && carte.groupes === '3', 'A : la carte est le résumé (le total seul, aucune ligne de compte ; 3 groupes site × compte)', JSON.stringify(carte));
-      await pg.click('section.vrm-a-venir[data-a-venir-site="toutes"] [data-a-venir-ouvrir]').catch(() => {});
+      dit(A && Number(A.valeur) === att && !A.pasSu, `A : Argent · « En attente » = ${att / 100} € (Vinted + Vestiaire, la vente versée n'y est pas)`, JSON.stringify(A));
+      // (16 nov., parcours-vert) La carte est le RÉSUMÉ (le total) ; le détail par site et par compte vit dans l'écran
+      // « Argent à venir » qu'elle ouvre au toucher. Règles jugées : le total seul (aucune ligne de compte VISIBLE sur Argent),
+      // une ligne par site et par compte (montants exacts), Vestiaire avec SA date, aucune date inventée pour Vinted, 44 px.
+      const carte = await pg.evaluate(() => ({ comptes: [...document.querySelectorAll('[data-a-venir-compte], [data-av-compte]')].filter((e) => e.getClientRects().length).length }));
+      dit(carte.comptes === 0, 'A : Argent montre le résumé (le total seul, aucune ligne de compte)', JSON.stringify(carte));
+      await pg.locator(vis).filter({ visible: true }).first().click().catch(() => {});
       await pg.waitForSelector('[data-argent-a-venir-ecran] [data-av-site]', { timeout: 6000 }).catch(() => {});
+      const sites = await pg.evaluate(() => document.querySelectorAll('[data-argent-a-venir-ecran] [data-av-site]').length);
+      dit(sites === 2, 'A : l’écran « Argent à venir » s’ouvre au toucher, un rang par site (Vinted, Vestiaire)', String(sites));
       const V = await attrs(pg, '[data-argent-a-venir-ecran] [data-av-site="Vinted"]');
       dit(V && Number(V.eur) === Math.round(A_VENIR_VINTED * 100) && V.n === '2', `A : Ventes · Vinted — « À venir » = ${A_VENIR_VINTED} € sur 2 ventes (la vente versée — 450, liste « colis déposé » — n'y est pas)`, JSON.stringify(V));
       await capture(pg, `A-ventes-vinted-${T.nom}`, '[data-argent-a-venir-ecran] [data-av-site="Vinted"]');
