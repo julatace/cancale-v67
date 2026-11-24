@@ -37,7 +37,8 @@ export default function GrilleInventaire({ items, cle = (x) => x && x.cle, rendu
   attente = 6, attrs = null, className = '', squelette = null, ligne = 0 }) {
   const ref = React.useRef(null);
   const [largeur, setLargeur] = React.useState(ESTIME_LARGEUR);
-  const [fenetre, setFenetre] = React.useState({ a: 0, b: 4 });
+  // La 1re fenêtre couvre déjà l'écran (estimée sur sa hauteur) : toutes les rangées vues à l'arrivée ont leur rang de cascade.
+  const [fenetre, setFenetre] = React.useState(() => { let h = 844; try { h = window.innerHeight || 844; } catch (_) {} return { a: 0, b: Math.ceil(h / Math.max(60, ligne > 0 ? ligne : 220)) + 1 }; });
   // Elle a VU la lecture (squelette) puis l'arrivée : la cascade d'arrivée — sur CETTE liste seulement, et seulement pour les
   // cases à l'écran à l'arrivée (leur rang est figé : un nouveau rendu ne la rejoue ni ne la coupe ; les cases montées plus tard
   // en défilant, ou après un filtre, sont là tout de suite). Contenu déjà connu ⇒ jamais.
