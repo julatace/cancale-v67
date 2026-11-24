@@ -38,7 +38,15 @@ Se fusionne APRÈS #1326 et #1355.
   aucun JSX du Stock ne change (deux autres lots travaillent sur Stock.jsx : `stock-mieux`, `stock-rangement`). Le Stock 3D
   n'est pas touché.
 
-### Pièces ajoutées au langage visuel (à signaler au propriétaire de src/natif/visuel/README.md)
+#### Retouches du coordinateur (même jour)
+- Le compte est dit UNE fois (§7) : au téléphone (liste rangée par compte), le rond est dans l'intertitre, plus sur les
+  tuiles ; à l'ordinateur (grille non rangée), il est sur la tuile. Le logo du site n'est sur la tuile que si la liste n'est
+  pas rangée par compte ou si la paire est sur 2 sites ou plus.
+- Plus de point d'état : l'état n'est dit que s'il diffère de l'onglet (pastille en haut à gauche : à confirmer, masquée…).
+- Le N°, les vues et les favoris sont dans une BANDE claire de 32 px au bas de la photo (rien posé sur la chaussure).
+- Le « 410 » des captures était le texte des fausses photos du banc (retiré du banc) : l'app ne dessine rien à cet endroit.
+
+## Pièces ajoutées au langage visuel (à signaler au propriétaire de src/natif/visuel/README.md)
 - `src/natif/visuel/GrilleInventaire.jsx` (grille virtualisée, squelette, cascade par `revele`) ;
 - `src/natif/visuel/Inventaire.jsx` : `AvatarCompte`, `AvatarsComptes`, `PontPhoto`/`PhotoPont`/`TaillePhoto` (passer la
   fonction photo d'un écran à `TuilePaire`, qui attend un composant stable) ;
