@@ -55,10 +55,10 @@
 /* secondaire : un fond teinté, aucun filet */
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="teinte"],
 [data-style]:not([data-style=""]) .n-bouton:not([data-n-variante]),
-[data-style]:not([data-style=""]) .n-bouton[data-n-variante="contour"] { box-shadow: none; }
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="contour"] { box-shadow: var(--g-second-contour, none); }
 /* tertiaire : un bouton texte (avec son icône), à l'accent */
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="texte"],
-[data-style]:not([data-style=""]) .n-bouton[data-n-variante="destructif"] { background-color: transparent; color: var(--n-accent); }
+[data-style]:not([data-style=""]) .n-bouton[data-n-variante="destructif"] { background-color: transparent; color: var(--n-accent); box-shadow: none; text-decoration-line: var(--g-lien-deco, none); text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="texte"]:active,
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="texte"][data-n-force="appui"],
 [data-style]:not([data-style=""]) .n-bouton[data-n-variante="destructif"]:active,
@@ -99,18 +99,19 @@
 [data-style]:not([data-style=""]) .n-tt-bouton { border-color: transparent; }
 [data-style]:not([data-style=""]) .n-tt-bouton[data-n-famille="rond"] { background-color: transparent; }
 /* la fiche : « Actions ▾ » à la hauteur du plein, les faits (« achat · Ajouter ») en puces teintées */
-[data-style]:not([data-style=""]) .nf-choisir[data-n-famille="second"] { min-height: var(--g-h-plein); box-shadow: none; font-weight: 600; }
-[data-style]:not([data-style=""]) .nf-pastille .nf-pi { min-height: 32px; background: var(--g-second-fond); box-shadow: none; border-radius: var(--g-r-chip); }
+[data-style]:not([data-style=""]) .nf-choisir[data-n-famille="second"] { min-height: var(--g-h-plein); box-shadow: var(--g-second-contour, none); font-weight: 600; }
+[data-style]:not([data-style=""]) .nf-pastille .nf-pi { min-height: 32px; background: var(--g-puce-fond, var(--g-second-fond)); box-shadow: none; border-radius: var(--g-r-chip); }
 [data-style]:not([data-style=""]) button.nf-pastille:active .nf-pi { background: var(--g-second-appui); }
 [data-style]:not([data-style=""]) [data-n-famille="puce"] { transition: transform var(--g-relache) var(--g-courbe); }
 [data-style]:not([data-style=""]) [data-n-famille="puce"]:active, [data-style]:not([data-style=""]) [data-n-famille="puce"][data-n-force="appui"] { transform: scale(var(--g-appui)); }
-[data-style]:not([data-style=""]) [data-n-famille="second"] { background-color: var(--g-second-fond); color: var(--n-encre); box-shadow: none; }
+[data-style]:not([data-style=""]) [data-n-famille="second"] { background-color: var(--g-second-fond); color: var(--n-encre); box-shadow: var(--g-second-contour, none); }
 [data-style]:not([data-style=""]) [data-n-famille="champ"] { background-color: var(--g-champ-fond); color: var(--n-encre-2); box-shadow: var(--g-champ-ombre); font-weight: 500; }
 [data-style]:not([data-style=""]) :is([data-n-famille="second"], [data-n-famille="champ"]):active,
 [data-style]:not([data-style=""]) :is([data-n-famille="second"], [data-n-famille="champ"])[data-n-force="appui"] { transform: scale(var(--g-appui)); background-color: var(--g-second-appui); }
 [data-style]:not([data-style=""]) [data-n-famille="rond"] { border-radius: 50%; transition: transform var(--g-relache) var(--g-courbe), background-color var(--g-relache) var(--g-courbe); }
 [data-style]:not([data-style=""]) [data-n-famille="rond"]:active,
 [data-style]:not([data-style=""]) [data-n-famille="rond"][data-n-force="appui"] { transform: scale(.92); background-color: var(--g-voile); }
+[data-style]:not([data-style=""]) [data-n-famille="lien"]:not(.n-eg-cellule):not(.n-tt-tri) { text-decoration-line: var(--g-lien-deco, none); text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
 [data-style]:not([data-style=""]) [data-n-famille="lien"] { color: var(--n-encre); font-weight: 600; transition: transform var(--g-relache) var(--g-courbe), opacity var(--g-relache) var(--g-courbe); }
 [data-style]:not([data-style=""]) [data-n-famille="lien"]:active,
 [data-style]:not([data-style=""]) [data-n-famille="lien"][data-n-force="appui"] { transform: scale(var(--g-appui)); opacity: .6; }
@@ -121,9 +122,9 @@
 [data-style]:not([data-style=""]) [data-n-famille] .n-vt-relier-rond { width: auto; height: auto; background: none; box-shadow: none; color: inherit; }
 
 /* ── les boutons ronds (icône seule, 44) ── */
-[data-style]:not([data-style=""]) .n-bouton-icone-seule { border-radius: 50%; background: transparent; color: var(--n-encre); box-shadow: none;
+[data-style]:not([data-style=""]) .n-bouton-icone-seule { border-radius: 50%; background: var(--g-rond-fond, transparent); color: var(--n-encre); box-shadow: var(--g-rond-contour, none);
   transition: transform var(--n-duree-appui) ease-out, background-color var(--n-duree-appui) ease-out; }
-[data-style]:not([data-style=""]) .n-tb-rond.n-bouton-icone-seule { border-radius: 50%; background: var(--g-second-fond); color: var(--n-encre); box-shadow: none;
+[data-style]:not([data-style=""]) .n-tb-rond.n-bouton-icone-seule { border-radius: 50%; background: var(--g-rond-fond, var(--g-second-fond)); color: var(--n-encre); box-shadow: var(--g-rond-contour, none);
   transition: transform var(--n-duree-appui) ease-out, background-color var(--n-duree-appui) ease-out; }
 [data-style]:not([data-style=""]) .n-bouton-icone-seule:active,
 [data-style]:not([data-style=""]) .n-bouton-icone-seule[data-n-force="appui"] { transform: scale(.92); background: var(--g-voile); }
@@ -133,8 +134,11 @@
 [data-style]:not([data-style=""]) .n-pastille { border-radius: var(--g-r-chip); box-shadow: none; height: 22px; padding: 0 9px; gap: 5px; font-weight: 600; }
 [data-style]:not([data-style=""]) .n-pastille[data-n-ton="ambre"]::before,
 [data-style]:not([data-style=""]) .n-pastille[data-n-ton="accent"]::before {
-  content: ""; flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+  content: ""; flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: var(--g-point, currentColor);
 }
+/* le vert « fait » en POINT ou en aplat (Monochrome : `--g-point`), jamais en texte sur clair ; sinon le vert du style */
+[data-style]:not([data-style=""]) .n-tb-lu-point { background: var(--g-point, var(--n-vert)); }
+[data-style]:not([data-style=""]) .n-anneau[data-n-anneau-fait] .n-anneau-plein { stroke: var(--g-point, var(--n-vert)); }
 [data-style]:not([data-style=""]) .n-onglet-pastille::before,
 [data-style]:not([data-style=""]) .n-coin-pastille::before { content: none; }
 [data-style]:not([data-style=""]) .n-onglet-pastille,
@@ -170,7 +174,7 @@
 /* ── la barre d'onglets : translucide, floutée, l'onglet actif en capsule ── */
 [data-style]:not([data-style=""]) .n-onglets { background: var(--n-barre); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-top: 0; box-shadow: 0 -1px 0 rgb(0 0 0 / .06); }
 [data-style]:not([data-style=""]) .n-onglet[aria-current="page"] { color: var(--n-encre); }
-[data-style]:not([data-style=""]) .n-onglet[aria-current="page"] .n-onglet-icone { background: var(--g-second-fond); color: var(--n-encre); border-radius: 999px; }
+[data-style]:not([data-style=""]) .n-onglet[aria-current="page"] .n-onglet-icone { background: var(--g-onglet-fond, var(--g-second-fond)); color: var(--n-encre); border-radius: 999px; }
 [data-style]:not([data-style=""]) .n-onglet:active .n-onglet-icone { transform: scale(.88); }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -190,7 +194,7 @@
 :root[data-style]:not([data-style=""]) .n-barre-centre { font-family: var(--g-titre-police); }
 
 /* ── l'icône d'une carte d'alerte d'avant (« N nouveaux N° à écrire ») était ambre (`--vrm-warn`) : l'ardoise du style ── */
-:root[data-style]:not([data-style=""]) .vrm-alerte-icone { color: var(--n-accent); background: var(--g-second-fond); }
+:root[data-style]:not([data-style=""]) .vrm-alerte-icone { color: var(--n-accent); background: var(--g-puce-fond, var(--g-second-fond)); }
 
 /* ── LES TUILES D'APERÇU (Paramètres → Apparence → Style) : une rangée et un bouton, dessinés par les jetons du style ── */
 .g-styles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 4px 0; }
@@ -209,7 +213,7 @@
 .g-tuile-lignes { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 auto; }
 .g-tuile-ligne { display: block; height: 6px; border-radius: 3px; background: var(--n-encre); opacity: .85; width: 80%; }
 .g-tuile-ligne + .g-tuile-ligne { background: var(--n-encre-2); opacity: .6; width: 55%; }
-.g-tuile-chip { flex: 0 0 auto; width: 18px; height: 10px; border-radius: var(--g-r-chip, 999px); background: var(--n-vert-fond); box-shadow: inset 0 0 0 1px var(--n-vert); }
+.g-tuile-chip { flex: 0 0 auto; width: 18px; height: 10px; border-radius: var(--g-r-chip, 999px); background: var(--g-point, var(--n-vert-fond)); box-shadow: inset 0 0 0 1px var(--g-point, var(--n-vert)); }
 .g-tuile-plein { display: block; height: 22px; border-radius: var(--g-r-bouton, 8px); background: var(--n-plein); box-shadow: var(--g-plein-relief, none); }
 .g-tuile-nom { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; font: 600 14px/18px var(--n-police); color: var(--n-encre); }
 .g-tuile-coche { font: 600 12px/16px var(--n-police); color: var(--n-encre-2); }

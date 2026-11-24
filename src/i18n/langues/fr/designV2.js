@@ -474,5 +474,7 @@ export default {
   "v2.style.studio": "Studio",
   "v2.style.studio.desc": "Blanc pur, noir franc, angles nets.",
   "v2.style.arcade": "Arcade",
-  "v2.style.arcade.desc": "Gros boutons en relief, comme un jeu."
+  "v2.style.arcade.desc": "Gros boutons en relief, comme un jeu.",
+  "v2.style.monochrome": "Monochrome",
+  "v2.style.monochrome.desc": "Noir, blanc et gris clair ; un point vert."
 };

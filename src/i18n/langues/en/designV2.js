@@ -474,5 +474,7 @@ export default {
   "v2.style.studio": "Studio",
   "v2.style.studio.desc": "Pure white, bold black, sharp corners.",
   "v2.style.arcade": "Arcade",
-  "v2.style.arcade.desc": "Chunky raised buttons, like a game."
+  "v2.style.arcade.desc": "Chunky raised buttons, like a game.",
+  "v2.style.monochrome": "Monochrome",
+  "v2.style.monochrome.desc": "Black, white and light grey; one green dot."
 };

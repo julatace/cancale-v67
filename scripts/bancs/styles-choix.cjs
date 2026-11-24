@@ -17,7 +17,8 @@ require('./_porte-banc.cjs');
 //       recherche) : aucune ancienne classe de bouton ;
 //    F  l'état enfoncé EXISTE : `data-n-force="appui"` sur un bouton ⇒ réduit (échelle < 1) et plus foncé ;
 //    G  rien ne déborde, aucun bouton/étiquette n'en chevauche un autre, aucune erreur d'app.
-//  `STYLES=graphite,nuit` `THEMES=clair` `LARGEURS=390,1512` `ECRANS=ventes,annonces,fiche` `SHOTS=<dossier>`.
+//  `STYLES=graphite,nuit` `THEMES=clair` `LARGEURS=390,1512` `ECRANS=ventes,annonces,fiche[,journee]` `SHOTS=<dossier>`
+//  (`journee` = Ma journée : les règles A–D, F, G ; E y est un rapport, comme hors des trois écrans des captures).
 //  Rouge : `BANC_DIST=<dist d'avant>` (aucun style) ; `MUTATION=sansstyle|orange|pale|petit|appui|vieux|deborde`.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -236,7 +237,8 @@ async function poserMutation(pg) {
         try {
           await o.pg.waitForSelector('.vrm-main', { timeout: 45000 }).catch(() => {});
           // la liste CHARGÉE (des N° à l'écran), pas son squelette : la machine des bancs est lente
-          await o.pg.waitForFunction(() => document.querySelectorAll('.vrm-main .n-plaque').length >= 3, null, { timeout: 60000 }).catch(() => {});
+          if (e === 'journee') await o.pg.waitForFunction(() => (document.querySelector('.vrm-main') || {}).innerText?.length > 200, null, { timeout: 60000 }).catch(() => {});
+          else await o.pg.waitForFunction(() => document.querySelectorAll('.vrm-main .n-plaque').length >= 3, null, { timeout: 60000 }).catch(() => {});
           await o.pg.waitForTimeout(2500);
           if (e === 'fiche') {
             const c = await o.pg.evaluate(() => { for (const e of document.querySelectorAll('[data-fiche-ligne][data-fl-num], [data-eg-article]:not([data-eg-numero=""])')) { const r = e.getBoundingClientRect(); if (r.width < 40 || r.height < 30 || r.top < 110 || r.bottom > innerHeight - 110) continue;
@@ -283,7 +285,7 @@ async function poserMutation(pg) {
         }
         dit(await tuileVue(), `T les tuiles sont À L'ÉCRAN dans Paramètres → Apparence`);
         const n = await o.pg.$$eval('[data-style-tuile]', (x) => x.length);
-        dit(n === 11, `T Paramètres → Apparence : 11 tuiles d'aperçu (Actuel + 10 styles)`, n);
+        dit(n === G.ORDRE.length + 1, `T Paramètres → Apparence : ${G.ORDRE.length + 1} tuiles d'aperçu (Actuel + ${G.ORDRE.length} styles)`, n);
         const t = await o.pg.$('[data-style-tuile="nuit"]');
         if (t) { const c = await t.evaluate((e) => { e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await o.pg.touchscreen.tap(c.x, c.y); await o.pg.waitForTimeout(300); }
         const apres = await o.pg.evaluate(() => ({ st: document.documentElement.getAttribute('data-style'), lu: localStorage.getItem('vrm_style'), fond: getComputedStyle(document.documentElement).getPropertyValue('--n-fond').trim() }));

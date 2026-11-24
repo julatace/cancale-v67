@@ -474,5 +474,7 @@ export default {
   "v2.style.studio": "Studio",
   "v2.style.studio.desc": "Reines Weiß, kräftiges Schwarz, scharfe Ecken.",
   "v2.style.arcade": "Arcade",
-  "v2.style.arcade.desc": "Dicke erhabene Tasten, wie ein Spiel."
+  "v2.style.arcade.desc": "Dicke erhabene Tasten, wie ein Spiel.",
+  "v2.style.monochrome": "Monochrom",
+  "v2.style.monochrome.desc": "Schwarz, Weiß und Hellgrau; ein grüner Punkt."
 };
