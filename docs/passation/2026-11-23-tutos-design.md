@@ -81,3 +81,33 @@ d'essai faites sur style-gris (sombre) n'ont PAS été versées.
      (à côté de « Voir VRM en 45 s ») — lecteur au toucher, affiche d'abord, piste de la langue de la page.
   5. `npm run build`, passe complète `lancer-audits`, PR, CI, fusion selon la règle du brief.
 - Gestes de Julien : recoller les 6 modèles `supabase/templates/*.html` dans Supabase (après la fusion).
+
+## REPRISE DU 24 NOV. — tout refait au gris clair (#1326), PR #1320
+- Fusions : `origin/claude/style-clair` (#1326) puis `origin/main` (vrais `merge`) ; CLAUDE.md §9 et `nouveautes.js` gardent les deux côtés.
+- **E-mails** : `api/_lib/mail-verre.js` recopié sur les jetons de #1326 (fond `#DFE1E5`, dégradé `#E9EBEE → #DFE1E5 → #D4D7DC`,
+  carte `#FAFAFB`, encre `#1D1D1F`, gris `#50535B`, filet `#E1E3E7`, puits `#E9EBEE`, lien à l'ardoise `#3D4B5B` souligné, plein à
+  l'encre — `audit-mails-envoyes` exige un plein d'encre foncé) ; `node scripts/modeles-email.cjs --ecrire` ⇒ les 6 modèles Supabase.
+  Nuit inchangée. Audits e-mails verts (contrastes AA).
+- **Jetons de nuit hérités du clair par #1326** (vus sur les captures sombres) : `--n-sur-heros` (le chiffre du héros d'Aujourd'hui
+  était encre sur ardoise, illisible) ⇒ `#FFFFFF` ; `--n-laterale` (latérale gris clair, texte blanc) ⇒ `#2A2A2F` ; `--n-ambre*` de
+  nuit (pastilles orange) ⇒ l'accent clair. Argent : « À envoyer » (`verre-ecrans.css`) et URSSAF de l'anneau (`fusion.css`)
+  n'ont plus d'orange en dur.
+- **Refaits** : `accueil-captures.cjs` (accueil clair+sombre + `public/aide/captures/`), `accueil-og.cjs`, `boutiques-visuels.cjs`
+  (fr + `--langue en`, les `en-*` versés pour la première fois), `PUBLIER=1 accueil-video.cjs`, `PUBLIER=1 tutos-gestes.cjs`.
+  Vidéos du « ? » (`aide-videos.cjs`) PAS refaites : #1238 n'est pas fusionnée.
+- **Cibles des films réglées** : 45 s, Ventes : « ⋯ » (`data-vn-plus`) puis « Choisir ce qui part » ; Annonces : la rangée est
+  `[data-eg-article="vinted#7103"]` (les anciennes `data-carte-annonce` sont des copies cachées). Tutos : imprimer (vrai clic sur le
+  bouton fixe ⇒ choix du papier puis aperçu tamponné) ; numéroter (Stock n'est plus dans la barre du bas ⇒ coupe en fondu vers
+  `garage`) ; relier un achat (monde `achatARelier` : N°23 sans prix d'achat, achat reçu 92005 ⇒ « Relier », proposition, Oui) ;
+  bénéfice (Ventes ouvert hors champ d'abord, sinon Argent dit « Pas encore calculé »). Reste : le plan « retrait » du 45 s ne
+  trouve plus `[aria-label^="Copier code de retrait"]` (plan gardé, caméra immobile).
+- Regardé : chaque capture (390 et 1512, clair et sombre), l'image de partage, les visuels des boutiques, des planches de chaque film ;
+  balayage « orange » de toutes les images et d'une image par seconde des films : seuls restent les logos Leboncoin (marque).
+- Vu au passage (pas corrigé, à #1326 / design) : Argent au téléphone, carte URSSAF : « avant le 30 nov. » est mangé par
+  « J'ai déclaré » quand Argent n'a pas encore calculé ; beaucoup d'oranges en dur restent dans des CSS d'anciens écrans
+  (`#A35200`, `#B25E00`, `#FF9F0A`…), hors captures.
+- Verts : `audit-captures-a-jour` (+ `--mutation`), `audit-tutos-gestes` (+ `--mutation`), e-mails (6 audits), `audit-style-vintex`,
+  `audit-centre-aide`, `audit-aide-client`, `audit-quoi-de-neuf`, `audit-traduction`, `audit-coherence`, `npm run build`.
+  Banc `accueil` : 3 rouges, les MÊMES sur l'arbre d'avant (fusion sans ce lot) : fichier d'entrée 28,9 Ko, « film fonction pure du
+  temps », poids au chargement 410–416 Ko qui varie d'un passage à l'autre — aucun rouge nouveau.
+- Pas fait (hors de cette reprise) : brancher les 5 tutos dans le centre d'aide et la page publique (étape 4 ci-dessus).
