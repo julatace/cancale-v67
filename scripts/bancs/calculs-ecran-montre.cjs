@@ -25,7 +25,9 @@ const path = require('path'), fs = require('fs'), http = require('http');
 const RACINE = path.join(__dirname, '..', '..');
 const { chromium } = require(path.join(RACINE, 'node_modules', 'playwright'));
 const { fabriquer, repondre } = require(path.join(__dirname, '_base-volume.cjs'));
-const base = fabriquer({ volumeReel: true, qr: true, comptes: 7, ventes: 1500, achats: 800, annonces: 1200 });
+// (24 nov., vitesse-lectures-toucher) 2 600 ventes (son volume, banc vitesse-iphone) : la liste des transactions a TROIS pages
+// — à 1 500, deux : rien à juger sur les pages qui partent ensemble (`lireTout`).
+const base = fabriquer({ volumeReel: true, qr: true, comptes: 7, ventes: 2600, achats: 800, annonces: 1200 });
 const DIST = path.resolve(process.argv[2] || path.join(RACINE, 'dist'));
 const PORT = +(process.argv[3] || process.env.BANC_PORT || 21000 + Math.floor(Math.random() * 8000));
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.webp': 'image/webp' };
