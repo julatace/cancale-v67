@@ -4,19 +4,18 @@ require('./_porte-banc.cjs');
 //  capture iPhone : « c'est moche »). src/AlerteModeration.jsx ; règle inchangée
 //  (src/moderationVinted.js). Base INVENTÉE (dépôt public), servie par la règle de
 //  table du mode exemple (src/exempleBase.js).
-//   Les « disparues » d'un compte = UN groupe :
-//    1. l'en-tête dit le compte et la fenêtre UNE fois (« 5 annonces disparues ·
-//       shop_cancale », « entre le … et le … ») ; le nom du compte n'est écrit qu'une
-//       fois par groupe ; aucune ligne ne répète la fenêtre ;
-//    2. l'explication (« Aucune vente prouvée… ») UNE fois par groupe, sous « Pourquoi ? » ;
-//    3. UN bouton « Vérifier sur Vinted » par groupe (il ouvre vinted.fr/inbox) ;
-//    4. chaque ligne : la photo de SA fiche (identifiant), jamais celle d'une fiche au
-//       même titre ; le N° ; « Vu » (44 px) qui la range dans `vrm_moderation_vu` ;
-//    5. 30 disparues : 5 lignes, puis « Voir les 25 autres » ;
-//    6. deux comptes : deux groupes, chacun son en-tête et son bouton ; « Tout est vu »
-//       d'un groupe ne range que le sien ;
-//    7. aucun orange ni ambre (couleurs CALCULÉES de chaque élément de la carte), aucun
-//       trait de couleur sur le bord ; 390 tactile et 1512, clair et sombre.
+//   (24 nov.) RÉCONCILIÉ avec la revue UX (#1321, sur main) : la carte est la LIGNE COMPACTE d'un compte (photos
+//   empilées) et la FEUILLE qu'elle ouvre (les grandes photos). Les règles du lot restent, jugées là où elles vivent :
+//    1. la ligne dit le compte et la fenêtre UNE fois (« 5 annonces ont disparu de shop_cancale », « entre le … et
+//       le … ») ; le nom du compte n'est écrit qu'une fois par groupe ; aucune case ne répète la fenêtre ;
+//    2. l'explication (« Aucune vente prouvée… ») UNE fois, dans la feuille, sous « Pourquoi ? » ;
+//    3. UN bouton (le geste) par feuille, qui ouvre vinted.fr/inbox ;
+//    4. chaque case : la photo de SA fiche (identifiant), jamais celle d'une fiche au même titre ; le N° ; « C'est vu »
+//       (menu « ⋯ ») la range dans `vrm_moderation_vu` ;
+//    5. 30 disparues : la feuille montre 6 photos, puis « Voir les 24 autres » (était 5 lignes dans la carte) ;
+//    6. deux comptes : deux lignes, chacune sa feuille ; « Tout est vu » d'une feuille ne range que son compte ;
+//    7. aucun orange ni ambre (couleurs CALCULÉES, carte ET feuille), aucun trait de couleur sur le bord ; aucun texte
+//       visible de plus de 8 mots ; cibles 44 px ; 390 tactile et 1512, clair et sombre.
 //  Captures dans BANC_CAPTURES (à regarder : §6.2).
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), http = require('http'), fs = require('fs'), os = require('os');
@@ -102,11 +101,11 @@ async function ouvrir(nav, { b, largeur = 390, sombre = false }) {
 const CARTE = '[data-moderation]';
 const attendre = (pg, ms = 25000) => pg.locator(CARTE).first().waitFor({ timeout: ms }).then(() => true).catch(() => false);
 // L'écran tel qu'il s'ouvre, puis la carte entière (élément).
-const capture = async (pg, nom) => { await pg.evaluate(() => window.scrollTo(0, 0)).catch(() => {}); await pg.screenshot({ path: path.join(CAPTURES, `moderation-carte-${nom}.png`) }).catch(() => {}); await pg.locator(CARTE).first().screenshot({ path: path.join(CAPTURES, `moderation-carte-${nom}-carte.png`) }).catch(() => {}); };
+const capture = async (pg, nom, cible = CARTE) => { if (cible === CARTE) await pg.evaluate(() => window.scrollTo(0, 0)).catch(() => {}); await pg.screenshot({ path: path.join(CAPTURES, `moderation-carte-${nom}.png`) }).catch(() => {}); await pg.locator(cible).first().screenshot({ path: path.join(CAPTURES, `moderation-carte-${nom}-${cible === CARTE ? 'carte' : 'feuille'}.png`) }).catch(() => {}); };
 
 // Toutes les couleurs CALCULÉES de la carte (texte, fond, bords, ombre) : aucune n'est orange / ambre / brune.
 // Orange = teinte 10°–60°, saturation ≥ 0,30, pas presque blanc ni presque noir.
-const couleursOrange = (pg) => pg.evaluate((sel) => {
+const couleursOrange = (pg, cible = CARTE) => pg.evaluate((sel) => {
   const carte = document.querySelector(sel); if (!carte) return ['(pas de carte)'];
   const rgb = (s) => [...String(s).matchAll(/rgba?\(([^)]+)\)/g)].map((m) => m[1].split(/[ ,/]+/).filter(Boolean).map(Number));
   const orange = ([r, g, b, a = 1]) => {
@@ -126,43 +125,54 @@ const couleursOrange = (pg) => pg.evaluate((sel) => {
     for (const p of props) for (const c of rgb(cs[p])) if (orange(c)) out.push(`${el.className || el.tagName}.${p}=${cs[p]}`);
   }
   return out;
-}, CARTE);
+}, cible);
 const bordCouleur = (pg) => pg.evaluate((sel) => { const c = document.querySelector(sel); const cs = getComputedStyle(c); return Math.max(...['Top', 'Right', 'Bottom', 'Left'].map((k) => parseFloat(cs[`border${k}Width`]) || 0)); }, CARTE);
-const cibles44 = (pg) => pg.evaluate((sel) => { const p = [...document.querySelectorAll(`${sel} button, ${sel} a, ${sel} summary`)].filter((e) => e.getClientRects().length && e.getBoundingClientRect().height < 43.5); return p.length ? p.length + ' : ' + p.slice(0, 3).map((e) => (e.getAttribute('class') || e.tagName) + '=' + Math.round(e.getBoundingClientRect().height) + 'px').join(', ') : 0; }, CARTE);
+const cibles44 = (pg, cible = CARTE) => pg.evaluate((sel) => { const p = [...document.querySelectorAll(`${sel} button, ${sel} a, ${sel} summary`)].filter((e) => e.getClientRects().length && e.getBoundingClientRect().height < 43.5); return p.length ? p.length + ' : ' + p.slice(0, 3).map((e) => (e.getAttribute('class') || e.tagName) + '=' + Math.round(e.getBoundingClientRect().height) + 'px').join(', ') : 0; }, cible);
 const occurrences = (txt, mot) => (String(txt).match(new RegExp(mot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
 
-// Les règles communes à chaque groupe.
+const FEUILLE = '[data-moderation-feuille]';
+const ouvrirFeuille = async (pg, uid) => { await pg.locator(`[data-moderation-groupe="disparue"][data-moderation-compte="${uid}"]`).click(); await pg.locator(`${FEUILLE}[data-moderation-feuille="${uid}"]`).waitFor({ timeout: 5000 }); await pg.waitForTimeout(450); return pg.locator(FEUILLE).first(); };
+const fermerFeuille = async (pg) => { await pg.keyboard.press('Escape'); await pg.locator(FEUILLE).waitFor({ state: 'detached', timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(200); };
+const longsTextes = (loc) => loc.evaluate((g) => [...g.querySelectorAll('*')].filter((e) => e.getClientRects().length && ![...e.children].some((c) => c.getClientRects().length && c.innerText)).map((e) => String(e.innerText || '').trim()).filter((t) => t && t.split(/\s+/).length > 8));
+
+// Les règles communes à chaque groupe : sa ligne (dans la carte), puis sa feuille.
 async function verifierGroupes(pg, nom, attendus) {
   const c = pg.locator(CARTE).first();
   const g = c.locator('[data-moderation-groupe="disparue"]');
-  dit((await g.count()) === attendus.length, `${nom} : ${attendus.length} groupe(s) de disparues (un par compte)`, String(await g.count()));
+  dit((await g.count()) === attendus.length, `${nom} : ${attendus.length} ligne(s) de disparues (une par compte)`, String(await g.count()));
   const texteCarte = await c.innerText();
-  const contenuCarte = await c.textContent();
   for (const [i, a] of attendus.entries()) {
     const gi = c.locator(`[data-moderation-groupe="disparue"][data-moderation-compte="${a.uid}"]`);
     if (!(await gi.count())) { dit(false, `${nom} : groupe ${a.login} présent`); continue; }
-    dit(Number(await gi.getAttribute('data-moderation-n')) === a.n, `${nom} : groupe ${a.login} : ${a.n} disparue(s)`, await gi.getAttribute('data-moderation-n'));
-    // 1. le compte UNE fois (par groupe) ; l'en-tête au pluriel.
-    // (hors des lignes d'une AUTRE sorte — une masquée dit son compte sur sa ligne)
+    dit(Number(await gi.getAttribute('data-moderation-n')) === a.n && Number(await gi.getAttribute('data-moderation-disparues')) === a.n, `${nom} : groupe ${a.login} : ${a.n} disparue(s)`, await gi.getAttribute('data-moderation-n'));
+    // 1. le compte UNE fois (par groupe), hors des lignes d'une AUTRE sorte (une masquée dit son compte sur sa ligne).
     const texteDisparues = await pg.evaluate((sel) => { const c = document.querySelector(sel).cloneNode(true); c.querySelectorAll('.vrm-moderation-ligne').forEach((x) => x.remove()); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; }, CARTE);
     dit(occurrences(texteDisparues, a.login) === 1, `${nom} : « ${a.login} » écrit une seule fois pour ses disparues`, String(occurrences(texteDisparues, a.login)));
-    const enTete = new RegExp(`${a.n} annonces? disparues?[ \u00a0]·[ \u00a0]${a.login}`);
-    dit(enTete.test(texteCarte), `${nom} : en-tête « ${a.n} annonce(s) disparue(s) · ${a.login} »`, texteCarte.slice(0, 200));
-    // La fenêtre : une fois par groupe, jamais sur une ligne.
-    dit((await gi.locator('[data-moderation-fenetre]').count()) === 1 && /entre le .+ et le /.test(await gi.locator('[data-moderation-fenetre]').innerText()), `${nom} : ${a.login} : la fenêtre dite une fois (« entre le … et le … »)`, (await gi.locator('[data-moderation-fenetre]').count()) ? await gi.locator('[data-moderation-fenetre]').innerText() : '');
-    const lignesTxt = await gi.locator('[data-moderation-sorte="disparue"]').allInnerTexts();
-    dit(lignesTxt.every((t) => !/entre le|vue |·|Vinted|vente/i.test(t)), `${nom} : ${a.login} : aucune ligne ne répète compte, fenêtre ou explication`, lignesTxt.find((t) => /entre le|vue |·|Vinted|vente/i.test(t)));
-    // « Trop de texte » (23 nov.) : aucun texte VISIBLE de plus de 8 mots dans le groupe (« Pourquoi ? » replié).
-    const longs = await gi.evaluate((g) => [...g.querySelectorAll('*')].filter((e) => e.getClientRects().length && ![...e.children].some((c) => c.getClientRects().length && c.innerText)).map((e) => String(e.innerText || '').trim()).filter((t) => t && t.split(/\s+/).length > 8));
-    dit(!longs.length, `${nom} : ${a.login} : aucun texte visible de plus de 8 mots`, longs.join(' | '));
+    const enTete = new RegExp(`${a.n} annonces? (ont|a) disparu de[  ]${a.login}`);
+    dit(enTete.test(texteCarte), `${nom} : la ligne « ${a.n} annonce(s) ont disparu de ${a.login} »`, texteCarte.slice(0, 200));
+    dit((await gi.locator('[data-moderation-fenetre]').count()) === 1 && /entre le .+ et le /.test(await gi.locator('[data-moderation-fenetre]').innerText()), `${nom} : ${a.login} : la fenêtre dite une fois sur la ligne (« entre le … et le … »)`, (await gi.locator('[data-moderation-fenetre]').count()) ? await gi.locator('[data-moderation-fenetre]').innerText() : '');
+    const longsLigne = await longsTextes(gi);
+    dit(!longsLigne.length, `${nom} : ${a.login} : la ligne n'a aucun texte de plus de 8 mots`, longsLigne.join(' | '));
+    dit((await gi.evaluate((x) => x.getBoundingClientRect().height)) <= 90, `${nom} : ${a.login} : la ligne reste compacte (≤ 90 px)`, String(await gi.evaluate((x) => Math.round(x.getBoundingClientRect().height))));
+    // La feuille du groupe.
+    const f = await ouvrirFeuille(pg, a.uid);
+    const casesTxt = await f.locator('[data-moderation-case]').allInnerTexts();
+    dit(casesTxt.length > 0 && casesTxt.every((t) => !/entre le|vue |·|Vinted|vente/i.test(t)) && casesTxt.every((t) => !t.includes(a.login)), `${nom} : ${a.login} : aucune case ne répète compte, fenêtre ou explication`, casesTxt.find((t) => /entre le|vue |·|Vinted|vente/i.test(t)));
+    const longs = await longsTextes(f);
+    dit(!longs.length, `${nom} : ${a.login} : la feuille n'a aucun texte visible de plus de 8 mots (« Pourquoi ? » replié)`, longs.join(' | '));
     // 2. l'explication UNE fois, sous « Pourquoi ? » (repliée).
-    dit((await gi.locator('[data-moderation-pourquoi="disparue"]').count()) === 1, `${nom} : ${a.login} : un seul « Pourquoi ? »`, String(await gi.locator('[data-moderation-pourquoi="disparue"]').count()));
-    dit(occurrences(await gi.textContent(), 'Aucune vente prouvée') === 1, `${nom} : ${a.login} : l’explication « Aucune vente prouvée » une seule fois`, String(occurrences(await gi.textContent(), 'Aucune vente prouvée')));
-    // 3. UN bouton « Vérifier sur Vinted ».
-    const geste = gi.locator('[data-moderation-geste="disparue"]');
-    dit((await geste.count()) === 1 && /Vérifier sur Vinted/.test(await geste.innerText()), `${nom} : ${a.login} : UN bouton « Vérifier sur Vinted »`, String(await geste.count()));
-    if (i === 0) dit(occurrences(contenuCarte, 'Vérifie tes messages Vinted') === 0, `${nom} : l’ancienne pilule « Vérifie tes messages Vinted » n’est plus sur les lignes`);
+    dit((await f.locator('[data-moderation-pourquoi="disparue"]').count()) === 1, `${nom} : ${a.login} : un seul « Pourquoi ? »`, String(await f.locator('[data-moderation-pourquoi="disparue"]').count()));
+    dit(occurrences(await f.textContent(), 'Aucune vente prouvée') === 1, `${nom} : ${a.login} : l’explication « Aucune vente prouvée » une seule fois`, String(occurrences(await f.textContent(), 'Aucune vente prouvée')));
+    // 3. UN geste, qui ouvre la messagerie Vinted.
+    const geste = f.locator('[data-moderation-geste="disparue"]');
+    dit((await geste.count()) === 1 && /Vinted/.test(await geste.innerText()) && (await geste.getAttribute('data-href')) === 'https://www.vinted.fr/inbox', `${nom} : ${a.login} : UN bouton (« ${(await geste.count()) ? (await geste.innerText()).trim() : ''} ») vers vinted.fr/inbox`, String(await geste.count()));
+    const oranges = await couleursOrange(pg, FEUILLE);
+    dit(!oranges.length, `${nom} : ${a.login} : la feuille n'a aucune couleur orange / ambre`, oranges.slice(0, 4).join(' ; '));
+    dit((await cibles44(pg, FEUILLE)) === 0, `${nom} : ${a.login} : la feuille a des cibles de 44 px`, String(await cibles44(pg, FEUILLE)));
+    if (i === 0) await capture(pg, nom + '-feuille', FEUILLE);
+    await fermerFeuille(pg);
   }
+  dit(occurrences(await c.textContent(), 'Vérifie tes messages Vinted') === 0, `${nom} : l’ancienne pilule « Vérifie tes messages Vinted » n’est plus sur les lignes des disparues`);
 }
 
 async function scenario(nav, { cas, largeur, sombre }) {
@@ -199,56 +209,58 @@ async function scenario(nav, { cas, largeur, sombre }) {
     dit((await bordCouleur(pg)) <= 1, `${nom} : aucun trait de couleur sur le bord de la carte`, String(await bordCouleur(pg)));
     await capture(pg, nom);
     await verifierGroupes(pg, nom, attendus);
-    // 4. lignes : photo par IDENTITÉ, N°.
+    // 4. cases de la feuille : photo par IDENTITÉ, N°.
     const g0 = c.locator('[data-moderation-groupe="disparue"]').first();
-    const l0 = g0.locator('[data-moderation-sorte="disparue"]').first();
+    const u0 = await g0.getAttribute('data-moderation-compte');
+    let f = await ouvrirFeuille(pg, u0);
+    const l0 = f.locator('[data-moderation-case]').first();
     const id0 = await l0.getAttribute('data-moderation-item');
     const src0 = await l0.locator('img').getAttribute('src').catch(() => null);
-    dit(!!src0 && fiches[id0] && src0 === fiches[id0].photo, `${nom} : la vignette est celle de SA fiche (identifiant ${id0})`, String(src0).slice(0, 60));
-    dit(/^N°\d+$/.test((await l0.locator('[data-moderation-num]').innerText()).trim()) && (await l0.locator('[data-moderation-num]').innerText()).trim() === 'N°' + fiches[id0].numero, `${nom} : le N° de SA fiche`, await l0.innerText());
+    dit(!!src0 && fiches[id0] && src0 === fiches[id0].photo, `${nom} : la photo est celle de SA fiche (identifiant ${id0})`, String(src0).slice(0, 60));
+    dit(/^N°\d+$/.test((await l0.locator('[data-moderation-num]').innerText()).trim()) && (await l0.locator('[data-moderation-num]').innerText()).trim() === 'N°' + fiches[id0].numero, `${nom} : le N° de SA fiche, sur sa photo`, await l0.innerText());
+    // 5. trente : 6 photos puis « Voir les 24 autres ».
+    if (cas === 'n30') {
+      dit((await f.locator('[data-moderation-case]').count()) === 6 && /Voir les 24 autres/.test(await f.locator('[data-moderation-plus]').innerText()), `${nom} : repliée : 6 photos et « Voir les 24 autres »`, String(await f.locator('[data-moderation-case]').count()));
+      await f.locator('[data-moderation-plus]').click(); await pg.waitForTimeout(250);
+      dit((await f.locator('[data-moderation-case]').count()) === 30, `${nom} : « Voir les 24 autres » ⇒ les 30 photos`, String(await f.locator('[data-moderation-case]').count()));
+    }
     if (sansFiche) {
-      if (attendus[0].n > 5) await g0.locator('[data-moderation-plus]').click();
-      const ls = c.locator(`[data-moderation-sorte="disparue"][data-moderation-item="${sansFiche}"]`);
-      await pg.waitForTimeout(200);
+      if (attendus[0].n > 6 && (await f.locator('[data-moderation-plus]').count())) { await f.locator('[data-moderation-plus]').click(); await pg.waitForTimeout(200); }
+      const ls = pg.locator(`${FEUILLE} [data-moderation-case][data-moderation-item="${sansFiche}"]`);
       dit((await ls.count()) === 1 && (await ls.getAttribute('data-moderation-photo')) === '0' && (await ls.locator('img').count()) === 0 && !/N°/.test(await ls.innerText()) && new RegExp(sansFiche).test(await ls.innerText()),
         `${nom} : sans fiche ⇒ ni photo ni N° (la fiche LEURRE au même titre ne sert jamais), l’identifiant`, (await ls.count()) ? await ls.innerText() : 'absente');
-      const leurre = await pg.evaluate((p) => [...document.querySelectorAll('[data-moderation] img')].some((i) => i.getAttribute('src') === p), LEURRE_PHOTO);
+      const leurre = await pg.evaluate((p) => [...document.querySelectorAll('[data-moderation] img, [data-moderation-feuille] img')].some((i) => i.getAttribute('src') === p), LEURRE_PHOTO);
       dit(!leurre, `${nom} : la photo de la fiche leurre n’apparaît nulle part`);
     }
-    // 5. trente : 5 lignes puis « Voir les 25 autres ».
-    if (cas === 'n30') {
-      // (la ligne sans fiche a déjà ouvert la liste ci-dessus) — on recharge l'état replié pour la capture.
-      dit((await g0.locator('[data-moderation-sorte="disparue"]').count()) === 30, `${nom} : « Voir les 25 autres » ⇒ les 30 lignes`, String(await g0.locator('[data-moderation-sorte="disparue"]').count()));
-    }
-    dit((await cibles44(pg)) === 0, `${nom} : cibles de 44 px`, String(await cibles44(pg)));
-    dit(await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${nom} : pas de débordement horizontal`);
-    if (cas === 'n30') { await pg.reload({ waitUntil: 'domcontentloaded' }); await attendre(pg); await pg.waitForTimeout(1500);
-      dit((await pg.locator('[data-moderation-groupe="disparue"] [data-moderation-sorte="disparue"]').count()) === 5 && /Voir les 25 autres/.test(await pg.locator('[data-moderation-plus]').innerText()), `${nom} : repliée : 5 lignes et « Voir les 25 autres »`); }
-    // « Pourquoi ? » ouvert : l'explication lisible.
+    dit(await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${nom} : pas de débordement horizontal (feuille ouverte)`);
+    // « Pourquoi ? » ouvert : l'explication lisible ; le geste ; « C'est vu » d'une case.
     if (cas === 'n5' && !sombre) {
-      await pg.locator('[data-moderation-pourquoi] summary').first().click();
+      await f.locator('[data-moderation-pourquoi] summary').first().click();
       await pg.waitForTimeout(250);
-      dit(/Aucune vente prouvée/.test(await pg.locator('[data-moderation-pourquoi]').first().innerText()), `${nom} : « Pourquoi ? » ouvert ⇒ l’explication`);
-      await capture(pg, nom + '-pourquoi');
-      // Le bouton ouvre la messagerie Vinted.
+      dit(/Aucune vente prouvée/.test(await f.locator('[data-moderation-pourquoi]').first().innerText()), `${nom} : « Pourquoi ? » ouvert ⇒ l’explication`);
+      await capture(pg, nom + '-pourquoi', FEUILLE);
       const avant = etat.ouverts.length;
-      await pg.locator('[data-moderation-geste="disparue"]').first().click();
+      await f.locator('[data-moderation-geste="disparue"]').first().click();
       await pg.waitForTimeout(1200);
-      dit(etat.ouverts.slice(avant).some((u) => /^https:\/\/www\.vinted\.fr\/inbox/.test(u)), `${nom} : « Vérifier sur Vinted » ouvre vinted.fr/inbox`, etat.ouverts.slice(avant).join(' '));
-      // « Vu » d'une ligne : elle sort, rangée dans vrm_moderation_vu (la règle d'avant).
-      const cle = await pg.locator('[data-moderation-groupe] [data-moderation-vu]').first().getAttribute('data-moderation-vu');
-      await pg.locator('[data-moderation-groupe] [data-moderation-vu]').first().click();
+      dit(etat.ouverts.slice(avant).some((u) => /^https:\/\/www\.vinted\.fr\/inbox/.test(u)), `${nom} : le geste ouvre vinted.fr/inbox`, etat.ouverts.slice(avant).join(' '));
+      await f.locator('[data-moderation-menu]').first().click(); await pg.waitForTimeout(200);
+      const cle = await f.locator('[data-moderation-vu]').first().getAttribute('data-moderation-vu');
+      await f.locator('[data-moderation-vu]').first().click();
       await pg.waitForTimeout(700);
-      dit(Number(await pg.locator(CARTE).getAttribute('data-moderation')) === 4 && /4 annonces disparues[ \u00a0]·[ \u00a0]shop_cancale/.test(await pg.locator(CARTE).innerText()), `${nom} : « Vu » ⇒ la ligne sort (4 restantes, en-tête à jour)`);
+      dit(Number(await pg.locator(CARTE).getAttribute('data-moderation')) === 4 && /4 annonces ont disparu de[  ]shop_cancale/.test(await pg.locator(CARTE).innerText()) && (await f.locator('[data-moderation-case]').count()) === 4, `${nom} : « C’est vu » ⇒ la case sort (4 restantes, ligne à jour)`);
       const vu = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_moderation_vu') || '{}'); } catch (_) { return {}; } });
       dit(Object.prototype.hasOwnProperty.call(vu, cle), `${nom} : rangée dans vrm_moderation_vu`, JSON.stringify(vu).slice(0, 120));
     }
-    // 6. deux comptes : « Tout est vu » d'un groupe ne range que le sien.
+    await fermerFeuille(pg);
+    dit((await cibles44(pg)) === 0, `${nom} : cibles de 44 px`, String(await cibles44(pg)));
+    dit(await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${nom} : pas de débordement horizontal`);
+    // 6. deux comptes : « Tout est vu » d'une feuille ne range que son compte.
     if (cas === 'deux' && largeur === 390 && !sombre) {
-      await pg.locator('[data-moderation-groupe-vu="222"]').click();
+      f = await ouvrirFeuille(pg, '222');
+      await f.locator('[data-moderation-groupe-vu="222"]').click();
       await pg.waitForTimeout(700);
       dit((await pg.locator('[data-moderation-groupe="disparue"][data-moderation-compte="222"]').count()) === 0 && (await pg.locator('[data-moderation-groupe="disparue"][data-moderation-compte="111"]').count()) === 1 && Number(await pg.locator(CARTE).getAttribute('data-moderation')) === 4,
-        `${nom} : « Tout est vu » de paris_sneak ne range que ce groupe`);
+        `${nom} : « Tout est vu » de paris_sneak ne range que ce compte`);
     }
     dit(!etat.erreurs.length, `${nom} : aucune erreur d’app`, etat.erreurs.join(' | ').slice(0, 300));
   } finally { await ctx.close(); }

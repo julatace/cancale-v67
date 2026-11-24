@@ -224,9 +224,17 @@ const INSPECTE = (pg, tel) => pg.evaluate((tel) => {
     // Hors jeu : un repli fermé (rien n'est dessiné), les contrôles de la carte, et
     // les barres d'un graphique (12 mois sur 390 px ne tiennent pas à 44 px chacun).
     if (!vis(e) || e.closest('.maplibregl-ctrl, [aria-hidden="true"], .vrm-sr, svg') || (e.closest('details:not([open])') && e.tagName !== 'SUMMARY')) continue;
-    const r = e.getBoundingClientRect();
-    if (r.bottom < 0 || r.top > innerHeight * 3) continue;
+    const r0 = e.getBoundingClientRect();
+    if (r0.bottom < 0 || r0.top > innerHeight * 3) continue;
     if (e.tagName === 'A' && getComputedStyle(e).display === 'inline') continue; // lien dans une phrase
+    // (24 nov., main-vert) La CIBLE au doigt est la boîte touchable : celle du bouton ET d'un ::before/::after posé en absolu
+    // qui l'agrandit (`inset: -8px -4px`, src/natif/complements.css « Relier · + prix ») — le toucher sur lui va au bouton.
+    let r = { left: r0.left, top: r0.top, right: r0.right, bottom: r0.bottom };
+    if (getComputedStyle(e).position !== 'static') for (const ps of ['::before', '::after']) { const c = getComputedStyle(e, ps); if (!c || c.content === 'none' || c.position !== 'absolute' || c.pointerEvents === 'none' || c.display === 'none') continue;
+      const px = (v) => (/^-?[\d.]+px$/.test(v) ? parseFloat(v) : null); const t = px(c.top), b = px(c.bottom), l = px(c.left), rr = px(c.right);
+      if (t == null || b == null || l == null || rr == null) continue;
+      r = { left: Math.min(r.left, r0.left + l), top: Math.min(r.top, r0.top + t), right: Math.max(r.right, r0.right - rr), bottom: Math.max(r.bottom, r0.bottom - b) }; }
+    r.width = r.right - r.left; r.height = r.bottom - r.top;
     if (r.height < 43.5 || r.width < 43.5) petits.push(`${(e.innerText || e.getAttribute('aria-label') || e.tagName).trim().replace(/\s+/g, ' ').slice(0, 30)} ${Math.round(r.width)}×${Math.round(r.height)}` + (window.__bancSonde ? ' <' + e.outerHTML.slice(0, 220) + ' | parent ' + (e.parentElement && e.parentElement.className) + '>' : ''));
   }
   // Une carte « écran vide » collée à ce qui suit (aucun espace entre les deux).
