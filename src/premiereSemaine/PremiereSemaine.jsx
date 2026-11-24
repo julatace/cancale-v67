@@ -22,10 +22,12 @@ export default function PremiereSemaine({ etapes, onGeste, onMasquer = null, onE
       <Progression pct={Math.round((n / Math.max(1, total)) * 100)} attrs={{ 'data-semaine-progression': String(n) }}/>
       {etapes.map((e, i) => {
         const fait = e.etat === 'fait';
-        const titre = e.cle === 'numero' && Mot ? <>{tr('ps.numero.t1')} <Mot k="numero"/></> : tr(`ps.${e.cle}.t`);
+        const titre = tr(`ps.${e.cle}.t`);
+        // Le « N° » se touche : sa définition en une phrase (le glossaire, src/accueilReste/glossaire.js).
+        const phrase = e.cle === 'numero' && Mot ? <>{tr('ps.numero.p1')} <Mot k="numero"/> {tr('ps.numero.p2')}</> : tr(`ps.${e.cle}.p`);
         const pied = e.courante ? (
           <div className="vrm-ps-geste" data-semaine-geste={e.cle}>
-            <p className="vrm-ps-phrase">{tr(`ps.${e.cle}.p`)}</p>
+            <p className="vrm-ps-phrase" data-mot-explique={e.cle === 'numero' ? 'numero' : undefined}>{phrase}</p>
             <Actions elements={[{ cle: e.cle, plein: true, icone: ic(GESTE_ICONE[e.cle], 18), libelle: tr(`ps.${e.cle}.geste`), onClick: () => onGeste && onGeste(e.cle) }]}/>
             <Pourquoi attrs={{ 'data-semaine-pourquoi': e.cle }}>{tr(`ps.${e.cle}.pourquoi`)}</Pourquoi>
           </div>

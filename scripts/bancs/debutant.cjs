@@ -57,7 +57,8 @@ const VENTE = { transaction_id: 96000, title: ANN[0].title, price: { amount: '45
 const BASES = {
   vide: () => ({ lignes: [{ id: 'main', data: { ...MAIN_VU } }], comptes: [] }),
   relie: () => ({ lignes: [{ id: 'main', data: { ...MAIN_VU } }, { id: 'harvest_9111_listings', data: { capturedAt: iso(0.01), complete: true, payload: { items: ANN } } }, { id: 'harvest_9111_orders_sold', data: { capturedAt: iso(0.01), payload: { my_orders: [] } } }, { id: 'harvest_9111_orders_purchased', data: { capturedAt: iso(0.01), payload: { my_orders: [] } } }], comptes: COMPTE }),
-  vente: () => ({ lignes: [{ id: 'main', data: { ...MAIN_VU, vinted_annonce_numeros: { [ANN[0].id]: { numero: '1' } } } }, { id: 'harvest_9111_listings', data: { capturedAt: iso(0.01), complete: true, payload: { items: ANN.slice(1) } } }, { id: 'harvest_9111_orders_sold', data: { capturedAt: iso(0.01), payload: { my_orders: [VENTE] } } }, { id: 'harvest_9111_orders_purchased', data: { capturedAt: iso(0.01), payload: { my_orders: [] } } },
+  // La feuille « debutante_v est reliée » a déjà été vue (le jour où elle a relié son compte, D5).
+  vente: () => ({ lignes: [{ id: 'main', data: { ...MAIN_VU, vinted_annonce_numeros: { [ANN[0].id]: { numero: '1', buyPrice: '20' } } } }, { id: 'vrm_comptes_relies', data: { v: 1, rev: 1, bases: { vinted: now - 86400000 }, connus: { 'vinted:9111': { at: now - 86400000, accueilli: now - 86000000, notifie: now - 86000000 } } } }, { id: 'harvest_9111_listings', data: { capturedAt: iso(0.01), complete: true, payload: { items: ANN.slice(1) } } }, { id: 'harvest_9111_orders_sold', data: { capturedAt: iso(0.01), payload: { my_orders: [VENTE] } } }, { id: 'harvest_9111_orders_purchased', data: { capturedAt: iso(0.01), payload: { my_orders: [] } } },
     { id: 'email_bord_96000', data: { transaction: '96000', filename: 'bordereau-96000.pdf', pdfB64: 'JVBERi0x', modele: VENTE.title, account: 'debutante_v', receivedAt: iso(0.15), dateLimite: new Date(now + 4 * 86400000).toLocaleDateString('fr-FR') + ' 10 h 00', type: 'vinted' } }], comptes: COMPTE }),
 };
 
@@ -164,7 +165,7 @@ const INSPECTE = (pg, { tel, jargon }) => pg.evaluate(({ tel, jargon }) => {
   // Les actions PLEINES visibles (le bouton primaire, `data-n-variante="primaire"`), feuilles comprises.
   const pleins = [...document.querySelectorAll('[data-n-variante="plein"]')].filter(vis).map((e) => (e.innerText || e.getAttribute('aria-label') || '').trim().slice(0, 40));
   // Un écran vide : sa carte d'écran vide (`.vrm-empty-state`, `[data-ecran-vide]`) et ses actions.
-  const vides = [...main.querySelectorAll('.vrm-empty-state, [data-ecran-vide]')].filter(vis).map((c) => ({
+  const vides = [...main.querySelectorAll('.vrm-empty-state, [data-ecran-vide], .n-vide')].filter(vis).map((c) => ({
     t: (c.innerText || '').trim().split('\n')[0].slice(0, 60),
     n: [...c.querySelectorAll('button, a[href], [role="button"]')].filter((b) => vis(b) && !b.closest('[data-pourquoi], details')).length,
   }));
@@ -310,15 +311,21 @@ async function parcours(nav, W, theme) {
     dit(!o.journal.erreurs.length, `${T('D3')} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
     await o.ctx.close();
   }
-  // D4 — l'extension.
+  // D4 — l'extension. L'écran des connexions est le chantier `claude/connexions-extension` : ici les règles communes
+  // (débordement, cibles, jargon) sont jugées ; ce qui manque à l'installation est NOTÉ (« NOTE »), pas jugé.
   if (ETAPES.includes('D4')) {
     const o = await ouvrir(nav, { W, sombre, base: BASES.vide(), tab: 'extension' });
     await ecranPret(o.pg, '', { max: 20000 });
+    await o.pg.waitForFunction(() => !/regarde si l.extension|on regarde/i.test((document.querySelector('.vrm-main') || document.body).innerText), null, { timeout: 10000 }).catch(() => {});
     const r = await INSP(o);
     await capture(o.pg, nomCap('D4', 'extension'));
     juger(T('D4'), 'Extension', r, {});
-    const etapes = await o.pg.evaluate(() => document.querySelectorAll('[data-install-etape], [data-etape-installation], ol li').length);
-    dit(etapes >= 3 || tel, `${T('D4')} l'installation est dite pas à pas (${etapes} étapes)`);
+    const ext = await o.pg.evaluate(() => {
+      const t = (document.querySelector('.vrm-main') || document.body).innerText;
+      return { attente: /regarde si l.extension|on regarde/i.test(t), installer: !!document.querySelector('.vrm-main a[href*="VRM-extension"], .vrm-main a[href*="Orion"], .vrm-main a[href*="chromewebstore"], .vrm-main a[href*="microsoftedge"], .vrm-main a[download]') };
+    });
+    if (ext.attente) console.log(`NOTE ${T('D4')} l'écran Extension dit encore « on regarde… » après 10 s, extension absente`);
+    if (!ext.installer) console.log(`NOTE ${T('D4')} l'écran Extension ne montre aucun lien de téléchargement à une débutante sans extension`);
     await o.ctx.close();
   }
   // D5 — Vinted relié, les premières annonces : le prix d'achat et le N°.
@@ -355,17 +362,31 @@ async function parcours(nav, W, theme) {
     dit(!/encaiss/i.test(r.texte), `${T('D7')} Argent : jamais « encaissé »`);
     await o.ctx.close();
   }
-  // D8 — Paramètres, l'aide, l'abonnement.
+  // D8 — Paramètres, l'aide (le « ? » d'Aujourd'hui), l'abonnement.
   if (ETAPES.includes('D8')) {
     const o = await ouvrir(nav, { W, sombre, base: BASES.vide(), tab: 'settings' });
     await ecranPret(o.pg, '', { max: 20000 });
-    const r = await INSP(o);
+    let r = await INSP(o);
     await capture(o.pg, nomCap('D8', 'parametres'));
-    juger(T('D8'), 'Paramètres', r, {});
-    await aller(o, 'aide');
-    const ra = await INSP(o);
-    await capture(o.pg, nomCap('D8', 'aide'));
-    juger(T('D8'), 'Aide', ra, {});
+    juger(T('D8'), 'Paramètres', r, { pleinsMax: 1 });
+    await aller(o, 'journee');
+    const aide = o.pg.locator('[data-aide-ouvrir="journee"]').first();
+    if (await aide.count()) {
+      await aide.click().catch(() => {});
+      await o.pg.waitForSelector('[data-aide-feuille]', { timeout: 6000 }).catch(() => {});
+      await o.pg.waitForTimeout(500);
+      r = await INSP(o);
+      await capture(o.pg, nomCap('D8', 'aide'));
+      dit(await o.pg.locator('[data-aide-feuille]').count() > 0, `${T('D8')} le « ? » d'Aujourd’hui ouvre l'aide`);
+      juger(T('D8'), 'Aide', r, { pleinsMax: 1 });
+    } else dit(false, `${T('D8')} Aujourd’hui porte un « ? »`);
+    await o.pg.goto(`http://localhost:${PORT}/?tab=settings&section=abonnement`, { waitUntil: 'domcontentloaded' });
+    await ecranPret(o.pg, '', { max: 20000 });
+    r = await INSP(o);
+    await capture(o.pg, nomCap('D8', 'abonnement'));
+    juger(T('D8'), 'Abonnement', r, { pleinsMax: 1 });
+    dit(/16,99/.test(r.texte) || /19,99/.test(r.texte) || !/€/.test(r.texte), `${T('D8')} Abonnement : le prix dit est celui des offres (16,99 € / 19,99 €)`, (r.texte.match(/\d+,\d\d\s*€/g) || []).slice(0, 4).join(' '));
+    dit(!o.journal.erreurs.length, `${T('D8')} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
     await o.ctx.close();
   }
 }
