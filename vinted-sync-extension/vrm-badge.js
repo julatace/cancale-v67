@@ -3380,9 +3380,27 @@ function vrmVerifVisible(sel) {
   const NOM_AUSSI6 = { leboncoin: 'Leboncoin', vestiaire: 'Vestiaire' };
   const ETAPES_AUSSI6 = ['verifie', 'onglet', 'compte', 'photos', 'champs', 'relu', 'publie', 'retenue'];
   const cleRepAussi = (q) => (q.site ? q.site + '|' : '') + q.champ;
-  function ouvrirAussi6(ids) {
-    geste6 = { k: 'aussi', ids: ids.slice(0, 10), sites: SITES_AUSSI6.slice(), pct: { leboncoin: 0, vestiaire: 0 }, reponses: {}, ap: null, charge: true, confirme: false, jobId: '', job: null };
+  // 5.451 (`aussilien`) : `opts` = { sites, pct } venus du lien de l'app (« Mettre aussi sur… ») — les sites PRÉ-COCHÉS et le
+  //    « +N % » de chacun, filtrés sur les choix de la voie ; rien ne part : SA confirmation « Publier sur N sites » reste due.
+  function ouvrirAussi6(ids, opts) {
+    const o = opts && typeof opts === 'object' ? opts : {};
+    const ss = Array.isArray(o.sites) ? SITES_AUSSI6.filter((x) => o.sites.includes(x)) : [];
+    const pc = { leboncoin: 0, vestiaire: 0 };
+    for (const x of SITES_AUSSI6) { const n = Number(o.pct && o.pct[x]); if ([0, 5, 10, 15, 20].includes(n)) pc[x] = n; }
+    geste6 = { k: 'aussi', ids: ids.slice(0, 10), sites: ss.length ? ss : SITES_AUSSI6.slice(), pct: pc, reponses: {}, ap: null, charge: true, confirme: false, jobId: '', job: null };
     geste6Etat = null; rendre(); aussiCharger6();
+  }
+  // 5.451 (`aussilien`) : le lien `action=aussi` de l'app ouvre « Publier aussi sur… » sur ces annonces (1 à 10, des
+  //    identifiants d'annonces Vinted), sites et pourcentages pré-choisis. Seulement sur vinted.fr (la source est l'annonce
+  //    du compte de l'onglet ; le fond le revérifie, `publierAussiApercu`). Rien n'est lancé : la feuille attend SON toucher.
+  function aussiDepuisLien(l) {
+    if (!l || l.action !== 'aussi' || !l.aussi) return false;
+    if (!/(^|\.)vinted\.[a-z.]+$/i.test(String(location.hostname || ''))) return false;
+    const ids = (l.ids || []).filter((x) => /^\d{4,15}$/.test(x)).slice(0, 10);
+    if (!ids.length) return false;
+    for (const id of ids) annSel.add(id);
+    ouvrirAussi6(ids, l.aussi);
+    return true;
   }
   function aussiCharger6() {
     const g = geste6; if (!g || g.k !== 'aussi') return;
@@ -6869,7 +6887,15 @@ function vrmVerifVisible(sel) {
   // Le vocabulaire de l'app (src/actionsExtension.js du chantier actions-extension) ET celui du panneau : une page
   // inconnue ⇒ Accueil ; une action inconnue ⇒ aucune. Une action n'est jamais FAITE : elle est pré-choisie.
   const PAGES_LIEN = { articles: 'annonces', annonces: 'annonces', commandes: 'ventes', ventes: 'ventes', messagerie: 'messages', messages: 'messages', offres: 'messages', notifications: 'notifications', automatisations: 'automatisations', favoris: 'favoris', republier: 'annonces', prix: 'annonces', publier: 'annonces', vacances: 'parametres', accueil: 'accueil', parametres: 'parametres' };
-  const ACTIONS_LIEN = ['baisser', 'changer', 'remettre', 'masquer', 'afficher', 'republier-direct', 'republier', 'mettre-en-ligne', 'brouillon', 'creer', 'deposer', 'publier', 'pause', 'supprimer', 'favoris', 'envoyer', 'ouvrir', 'offre', 'repondre', 'regler', 'vacances', 'relancer'];
+  const ACTIONS_LIEN = ['baisser', 'changer', 'remettre', 'masquer', 'afficher', 'republier-direct', 'republier', 'mettre-en-ligne', 'brouillon', 'creer', 'deposer', 'publier', 'pause', 'supprimer', 'favoris', 'envoyer', 'ouvrir', 'offre', 'repondre', 'regler', 'vacances', 'relancer', 'aussi'];
+  // 5.451 (`aussilien`, « Mettre aussi sur… » de l'app) : `sites` (leboncoin, vestiaire) et `pct` (« leboncoin:5,vestiaire:10 »)
+  //    d'un lien `action=aussi` ; tout le reste est ignoré. Lu, puis retiré de l'adresse comme les autres paramètres.
+  function lienAussiParams(p) {
+    const sites = String(p.get('sites') || '').split(',').map((x) => x.trim()).filter((x) => x === 'leboncoin' || x === 'vestiaire');
+    const pct = {};
+    for (const morceau of String(p.get('pct') || '').split(',')) { const m = /^(leboncoin|vestiaire):(\d{1,2})$/.exec(morceau.trim()); if (m && [0, 5, 10, 15, 20].includes(Number(m[2]))) pct[m[1]] = Number(m[2]); }
+    return { sites: [...new Set(sites)], pct };
+  }
   // L'action pré-choisie dans « Choisir une action » du tableau (seulement si ce geste y existe pour ce site).
   const ACTION_MENU = { baisser: 'baisser', changer: 'baisser', remettre: 'baisser', republier: 'republier', 'mettre-en-ligne': 'republier', brouillon: 'republier', masquer: 'masquer', afficher: 'afficher', favoris: 'favoris', envoyer: 'favoris' };
   function lireLienPanneau() {
@@ -6881,8 +6907,9 @@ function vrmVerifVisible(sel) {
       const ids = String(p.get('ids') || '').split(',').map((x) => x.trim()).filter((x) => /^[\w-]{1,40}$/.test(x)).slice(0, 200);
       let action = String(p.get('action') || '').toLowerCase();
       if (!ACTIONS_LIEN.includes(action)) action = p.get('page') === 'republier' ? 'republier' : p.get('page') === 'prix' ? 'baisser' : '';
-      try { for (const k of ['vrm', 'page', 'ids', 'action']) p.delete(k); const q = p.toString(); history.replaceState(history.state, '', location.pathname + (q ? '?' + q : '') + location.hash); } catch (_) {}
-      return { page, ids, action };
+      const aussi = action === 'aussi' ? lienAussiParams(p) : null;
+      try { for (const k of ['vrm', 'page', 'ids', 'action', 'sites', 'pct']) p.delete(k); const q = p.toString(); history.replaceState(history.state, '', location.pathname + (q ? '?' + q : '') + location.hash); } catch (_) {}
+      return { page, ids, action, aussi };
     } catch (_) { return null; }
   }
   const lienPanneau = lireLienPanneau();
@@ -6910,7 +6937,7 @@ function vrmVerifVisible(sel) {
     // CETTE conversation : son offre et la conversation dans le volet (avant : la page Messages sans rien de choisi).
     if (lienPanneau.page === 'messages' && lienPanneau.ids.length === 1 && /^\d{1,20}$/.test(lienPanneau.ids[0])) convChoisie = lienPanneau.ids[0];
     hote.setAttribute('data-lien-panneau', lienPanneau.page);
-    setTimeout(() => { try { doigt = true; carte.classList.add('on'); rafraichir(); } catch (_) {} }, 400);
+    setTimeout(() => { try { doigt = true; carte.classList.add('on'); rafraichir(); aussiDepuisLien(lienPanneau); } catch (_) {} }, 400);
   }
 
   // 5.409 : Échap ferme le grand panneau (le ✕ aussi) ; jamais quand on tape dans un champ du site.
