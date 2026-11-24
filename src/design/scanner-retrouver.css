@@ -17,9 +17,11 @@
   --rtv-encre: #1C1C20;
   --rtv-gris: #3F5468;
   --rtv-lien: #16181D;
-  --rtv-ambre-fond: #FFF1D6;
-  --rtv-ambre-bord: #F2C879;
-  --rtv-ambre: #764300;
+  /* (24 nov., lot scanner-universel — décision de Julien du 23 nov. : « aucun orange/ambre ») « à faire » = gris clair,
+     filet et texte à l'ARDOISE (l'accent rare, `--n-accent`), le gras du libellé fait le reste. */
+  --rtv-ambre-fond: #EEF0F3;
+  --rtv-ambre-bord: #C9D1DB;
+  --rtv-ambre: #3D4B5B;
   --rtv-vert-fond: #DDF4E6; --rtv-vert-bord: #C3EAD2; --rtv-vert: #17744A;
   --rtv-filet: rgb(28 28 32 / .10);
   position: fixed; inset: 0; z-index: 18000;
@@ -31,7 +33,7 @@
 }
 :root[data-theme="dark"] .vrm-rtv {
   --rtv-porcelaine: #212126; --rtv-porcelaine-2: #2D2D33; --rtv-encre: #F1F2F4; --rtv-gris: #9CB0C6; --rtv-lien: #F4F4F5;
-  --rtv-ambre-fond: rgb(242 182 94 / .14); --rtv-ambre-bord: rgb(242 182 94 / .45); --rtv-ambre: #F2B65E; --rtv-filet: rgb(241 242 244 / .12);
+  --rtv-ambre-fond: rgb(241 242 244 / .08); --rtv-ambre-bord: rgb(241 242 244 / .28); --rtv-ambre: #F4F4F5; --rtv-filet: rgb(241 242 244 / .12);
   --rtv-vert-fond: rgb(63 212 154 / .14); --rtv-vert-bord: rgb(63 212 154 / .26); --rtv-vert: #6FE3B5;
 }
 .vrm-rtv *, .vrm-rtv *::before, .vrm-rtv *::after { box-sizing: border-box; }
@@ -214,3 +216,33 @@ html[data-scan-retrouver] body .vrm-app-shell { visibility: hidden !important; }
 .vrm-rtv-num-ligne { display: flex; align-items: baseline; gap: 2px; flex-wrap: wrap; }
 .vrm-rtv-num-ligne + .vrm-rtv-num-ligne { margin-top: 4px; }
 .vrm-rtv-touche.vrm-rtv-large { margin-top: 10px; width: 100%; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   (24 nov., lot scanner-universel) LE CODE LU (1 s), L'OUVERTURE DIRECTE, LA RAFALE.
+   Gris clair, aucun orange ; l'ardoise seulement pour le fil d'ouverture. Cibles ≥ 44 px.
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-rtv-lu-bandeau { position: relative; z-index: 2; align-self: center; margin: 4px 16px 0; max-width: calc(100% - 32px);
+  display: inline-flex; align-items: baseline; gap: 8px; padding: 8px 14px; border-radius: 999px;
+  background: var(--rtv-porcelaine); color: var(--rtv-encre); box-shadow: 0 6px 18px rgb(0 0 0 / .28);
+  font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; animation: vrm-rtv-lu-entre .14s ease-out; }
+.vrm-rtv-lu-bandeau small { font-size: 13px; font-weight: 600; color: var(--rtv-gris); white-space: nowrap; }
+@keyframes vrm-rtv-lu-entre { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .vrm-rtv-lu-bandeau { animation: none; } .vrm-rtv-auto-fil > span { transition: none !important; } }
+.vrm-rtv-auto { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.vrm-rtv-auto-fil { flex: 1 1 auto; height: 3px; border-radius: 3px; background: var(--rtv-porcelaine-2); overflow: hidden; }
+.vrm-rtv-auto-fil > span { display: block; height: 100%; width: 0; background: var(--rtv-ambre); transition: width 1s linear; }
+.vrm-rtv-auto.is-parti .vrm-rtv-auto-fil > span { width: 100%; }
+.vrm-rtv-auto .vrm-rtv-lien { flex: none; }
+.vrm-rtv-indice-chercher { display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; min-height: 44px; padding: 0 16px;
+  border-radius: 999px; border: 1px solid var(--rtv-verre-bord); background: var(--rtv-verre); color: var(--rtv-clair); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+  -webkit-backdrop-filter: saturate(160%) blur(18px); backdrop-filter: saturate(160%) blur(18px); }
+.vrm-rtv-rafale { width: 100%; border-radius: 22px; padding: 10px 12px 6px; background: var(--rtv-porcelaine); color: var(--rtv-encre);
+  box-shadow: 0 18px 50px rgb(0 0 0 / .38); margin-bottom: 10px; }
+.vrm-rtv-rafale-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; }
+.vrm-rtv-rafale-tete b { font-size: 15px; font-weight: 650; }
+.vrm-rtv-rafale .vrm-rtv-liste { margin-top: 4px; max-height: 32vh; overflow-y: auto; }
+.vrm-rtv-rafale .vrm-rtv-rangee { min-height: 56px; }
+.vrm-rtv-rangee.is-muet { cursor: default; }
+.vrm-rtv-rangee .vrm-rtv-mono { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vrm-rtv-colonne { width: min(100%, 520px); display: flex; flex-direction: column; align-items: stretch; }
+.vrm-rtv-colonne > .vrm-rtv-outils { width: 100%; }
