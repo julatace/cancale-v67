@@ -254,10 +254,14 @@ async function widget() {
       const toutes = [];
       // Ma journée
       { const { ctx, pg, errs } = await ouvrir(b, vp, 'journee');
-        await attendre(pg, () => { const e = document.querySelector('[data-tuile="envoyer"]'); return e && e.getAttribute('data-n') && document.querySelector('[data-journee-a-imprimer]') && document.querySelector('[data-journee-a-imprimer]').getAttribute('data-exact') === '1'; }, null, 40000);
+        // (24 nov., main-vert) Ma journée NATIVE (src/natif/ecrans/Aujourdhui.jsx) : « Imprimer N » est LE plein de la carte Colis
+        // (`data-v2-principal` = les bordereaux reçus pas encore imprimés, `data-v2-principal-exact`) ; l'ancienne case
+        // `data-journee-a-imprimer` n'est plus rendue. Même règle : N exact, jamais les prêts déjà imprimés.
+        const AI = '[data-journee-a-imprimer], [data-v2-principal]';
+        await attendre(pg, (AI) => { const e = document.querySelector('[data-tuile="envoyer"]'); const a = [...document.querySelectorAll(AI)].find((x) => x.getClientRects().length); return e && e.getAttribute('data-n') && a && (a.getAttribute('data-exact') === '1' || a.getAttribute('data-v2-principal-exact') === '1'); }, AI, 40000);
         const n = await attr(pg, '[data-tuile="envoyer"]', 'data-n');
         dit(n === String(ATT.envoyer), `${T} E Ma journée : ${ATT.envoyer} colis à envoyer`, n);
-        const ai = await attr(pg, '[data-journee-a-imprimer]', 'data-journee-a-imprimer'), ex = await attr(pg, '[data-journee-a-imprimer]', 'data-exact');
+        const { ai, ex } = await pg.evaluate((AI) => { const a = [...document.querySelectorAll(AI)].find((x) => x.getClientRects().length); return a ? { ai: a.getAttribute('data-journee-a-imprimer') || a.getAttribute('data-v2-principal'), ex: a.getAttribute('data-exact') || a.getAttribute('data-v2-principal-exact') } : { ai: null, ex: null }; }, AI);
         dit(ai === String(ATT.imprimer) && ex === '1', `${T} I Ma journée : ${ATT.imprimer} à imprimer (pas encore imprimés), exact — jamais les prêts déjà imprimés`, `${ai} exact=${ex}`);
         toutes.push(...(await cartes(pg)).map((c) => ({ ...c, ecran: 'journee' })));
         await shot(pg, `chiffres-journee-${T}`);
@@ -269,12 +273,15 @@ async function widget() {
         // (Ventes porte SA carte, « à envoyer » = `aposter`), ses autres cases sont la ligne `data-colis-resume`.
         await attendre(pg, () => { const e = document.querySelector('[data-fu-colis-envoyer]') || document.querySelector('[data-carte-chiffre="aposter"]'); return !!e && !!document.querySelector('[data-colis-onglet-choix="envoyer"]'); }, null, 40000);
         await pg.click('[data-colis-onglet-choix="envoyer"]').catch(() => {});
-        await attendre(pg, () => !!document.querySelector('[data-colis-recap]') && !!document.querySelector('[data-tournee-ouvrir]'), null, 20000);
+        await attendre(pg, () => !!document.querySelector('[data-colis-recap]'), null, 20000);
         await pg.waitForTimeout(800);
         const carte = (await attr(pg, '[data-fu-colis-envoyer]', 'data-fu-colis-envoyer')) ?? (await attr(pg, '[data-carte-chiffre="aposter"]', 'data-carte-valeur'));
         const ong = await attr(pg, '[data-colis-onglet-choix="envoyer"]', 'data-colis-onglet-n');
         const rec = await attr(pg, '[data-colis-recap]', 'data-colis-recap');
-        const badge = await pg.evaluate(() => { const e = [...document.querySelectorAll('[data-badge-n]')].map((x) => x.getAttribute('data-badge-n')); return e; });
+        // (24 nov., main-vert) La barre NATIVE (BarreOnglets, colonne latérale) porte le nombre en pastille (`.n-pastille`) sur
+        // l'entrée de Ventes (`data-nav-entree="ventes"`) ; l'ancienne barre le portait en `data-badge-n`.
+        const badge = await pg.evaluate(() => [...[...document.querySelectorAll('[data-badge-n]')].map((x) => x.getAttribute('data-badge-n')),
+          ...[...document.querySelectorAll('[data-nav-entree="ventes"] .n-pastille')].filter((x) => x.getClientRects().length).map((x) => (x.textContent || '').replace(/\D/g, ''))]);
         dit(carte === String(ATT.envoyer) && ong === String(ATT.envoyer) && rec === String(ATT.envoyer), `${T} E Colis : carte, onglet et récapitulatif disent ${ATT.envoyer}`, `carte ${carte} · onglet ${ong} · récap ${rec}`);
         dit(badge.includes(String(ATT.envoyer)), `${T} E la barre (badge de Colis) dit ${ATT.envoyer}`, JSON.stringify(badge));
         const imp = await pg.evaluate(() => { const e = document.querySelector('[data-carte-chiffre="imprimer"]'); if (e) return e.getAttribute('data-carte-valeur'); const r = document.querySelector('[data-colis-resume="ventes"] [data-colis-resume-case="imprimer"]'); if (r) return r.getAttribute('data-n'); const b = document.querySelector('[data-colis-barre-btn="imprimer"][data-imprimer-prets]'); return b ? b.getAttribute('data-imprimer-prets') : null; });
@@ -283,12 +290,11 @@ async function widget() {
         const mImp = /(\d+)\s+bordereaux?\s+à imprimer/.exec(recTxt);
         dit(!!mImp && Number(mImp[1]) === ATT.imprimer, `${T} I le récapitulatif lu dit ${ATT.imprimer} à imprimer`, recTxt.replace(/\s+/g, ' ').slice(0, 140));
         toutes.push(...(await cartes(pg)).map((c) => ({ ...c, ecran: 'cat_bord' })));
-        await pg.click('[data-tournee-ouvrir]').catch(() => {});
-        await attendre(pg, () => !!document.querySelector('[data-tournee-sheet]'), null, 8000);
-        await pg.waitForTimeout(500);
-        const st = await pg.evaluate(() => { const e = document.querySelector('[data-tournee-sheet]'); return e ? e.innerText : ''; });
-        const md = /(\d+)\s+colis à déposer(?:\s*·\s*(\d+)\s+(?:attend|attendent))?/.exec(st);
-        dit(!!md && Number(md[1]) === ATT.deposer && Number(md[2] || 0) === ATT.attente, `${T} D Tournée : ${ATT.deposer} colis à déposer · ${ATT.attente} attendent leur bordereau`, md ? md[0] : st.slice(0, 120));
+        // (24 nov., main-vert) Décision « 4 oui » de Julien (20 nov., docs/passation/2026-11-20-chasse-bugs-2.md) : la tournée de
+        // dépôt et « Je dépose » sont RETIRÉS (garde : audit-depose-retire). Le nombre « à déposer » n'a donc plus d'écran : la règle
+        // portée est qu'aucun écran ne montre un « N colis à déposer » qu'il ne peut plus tenir (un chiffre sans source est faux).
+        const dep = await pg.evaluate(() => ({ bouton: !!document.querySelector('[data-tournee-ouvrir]'), texte: (/\d+\s+colis à déposer/.exec(document.body.innerText) || [''])[0] }));
+        dit(!dep.bouton && !dep.texte, `${T} D aucune « tournée » ni « N colis à déposer » (retirés le 20 nov.)`, JSON.stringify(dep));
         await shot(pg, `chiffres-tournee-${T}`);
         dit(!errs.length, `${T} Z Colis sans erreur`, errs.slice(0, 2).join(' | '));
         await ctx.close(); }

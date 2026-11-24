@@ -26,7 +26,9 @@ const base = () => {
 };
 const mesure = (pg) => pg.evaluate(() => {
   const vis = (e) => { const r = e.getBoundingClientRect(); const s = getComputedStyle(e); return r.width > 1 && r.height > 1 && s.visibility !== 'hidden' && s.opacity !== '0'; };
-  const rows = [...document.querySelectorAll('.vrm-main .vrm-sale-row')].filter(vis).slice(0, 12);
+  // (24 nov., main-vert) Ventes natif : une vente est une RANGÉE native — « À envoyer » (`data-vn-num`, src/natif/ecrans/Ventes.jsx)
+  // et « Terminées » (`data-toutes-vente`, VentesListeTel). Le pseudo est dans le sous-titre, l'état est sa pastille.
+  const rows = [...document.querySelectorAll('.vrm-main .vrm-sale-row, .vrm-main .n-rangee[data-vn-num], .vrm-main .n-rangee[data-toutes-vente]')].filter(vis).slice(0, 12);
   const chevauche = [], rognes = [];
   for (const row of rows) {
     // Les morceaux de texte visibles de la ligne (un rectangle par ligne de texte).
@@ -47,7 +49,7 @@ const mesure = (pg) => pg.evaluate(() => {
       const ix = Math.min(a.right, b.right) - Math.max(a.left, b.left), iy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
       if (ix > 2 && iy > 3) chevauche.push(`« ${boites[i].t} » × « ${boites[j].t} »`);
     }
-    for (const e of row.querySelectorAll('.vrm-fu-vente-compte, .vrm-fu-vente-compte *, .vrm-fu-legende, .vrm-ledger-sale-state')) {
+    for (const e of row.querySelectorAll('.vrm-fu-vente-compte, .vrm-fu-vente-compte *, .vrm-fu-legende, .vrm-ledger-sale-state, .n-rangee-sous-texte, .n-pastille')) {
       if (!vis(e)) continue; const cs = getComputedStyle(e);
       const tx = (e.innerText || '').trim(); if (tx && cs.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 1) rognes.push(tx.slice(0, 30) + ' (' + e.className + ')');
     }
@@ -66,13 +68,15 @@ const mesure = (pg) => pg.evaluate(() => {
       await pg.setViewportSize({ width: W, height: W === 375 ? 667 : 844 });
       await pg.evaluate((t) => { try { if (t === 'normal') localStorage.removeItem('vrm_taille_texte'); else localStorage.setItem('vrm_taille_texte', t); } catch (_) {} }, taille);
       await pg.reload({ waitUntil: 'domcontentloaded' });
-      await pg.waitForSelector('.vrm-main .vrm-sale-row', { timeout: 30000 }).catch(() => {});
+      const LIGNE = '.vrm-main .vrm-sale-row, .vrm-main .n-rangee[data-vn-num], .vrm-main .n-rangee[data-toutes-vente]';
+      await pg.waitForSelector(LIGNE, { timeout: 30000 }).catch(() => {});
       await pg.waitForTimeout(3000);
       // « À envoyer » (l'ouverture) PUIS « Toutes » (la capture de Julien) : les lignes des deux listes.
       const m1 = await mesure(pg);
-      const toutes = pg.locator('.vrm-main').getByRole('button', { name: /^Toutes/ }).first();
-      if (await toutes.count()) { await toutes.tap().catch(() => {}); }
-      await pg.waitForSelector('.vrm-main .vrm-sale-row', { timeout: 30000 }).catch(() => {});
+      // (24 nov., main-vert) « Toutes » est devenu le choix « Terminées » du segmenté natif (role=radio) : on attend SES rangées.
+      const toutes = pg.locator('.vrm-main').getByRole('radio', { name: /^Terminées/ }).first();
+      if (await toutes.count()) { await toutes.tap().catch(() => {}); await pg.waitForSelector('.vrm-main .n-rangee[data-toutes-vente]', { timeout: 30000 }).catch(() => {}); }
+      await pg.waitForSelector(LIGNE, { timeout: 30000 }).catch(() => {});
       await pg.waitForTimeout(2500);
       const m2 = await mesure(pg);
       const m = { n: m2.n, chevauche: [...m1.chevauche, ...m2.chevauche], rognes: [...m1.rognes, ...m2.rognes] };

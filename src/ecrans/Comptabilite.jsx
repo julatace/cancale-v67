@@ -23914,7 +23914,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               colis={nE ? colisJournee.map((c) => ({ ...c, fl: attrsFicheLigne({ contexte: 'journee', site: c.site, cle: 'j' + c.cle, nums: c.num ? [String(c.num)] : [], tx: c.site === 'vinted' ? String(c.cle).slice(2) : '', item: c.idAnnonce || '', photo: typeof c.photo === 'string' ? c.photo : '', titre: c.titre || '', prix: c.prix || '' }) })) : []}
               retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ, prevision: lu(xR) && xR.t.prevision ? xR.t.prevision : null }}
               groupes={baseKO ? null : groupesJ} alerte={alerteJ} ventes={dernieresJ}
-              plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimerCourt'), faire: () => { poserPendingBordPrint('imprimer'); if (onNav) onNav(xE.tab); } } : null}
+              plein={nPrets > 0 ? { n: nPrets, exact: !(em && em.exact === false), txt: tr('v2.imprimerCourt'), faire: () => { poserPendingBordPrint('imprimer'); if (onNav) onNav(xE.tab); } } : null}
               onScanner={() => ouvrirRetrouver('journee')}
               // (23 nov., style-clarte-3) « Publier » : le parcours existant (choisir l'article dans la feuille, `vrm:publier-ailleurs`) ;
               // « Relier » : Achats et sa feuille « Relier achats et ventes » (la même que son bouton).
@@ -28996,6 +28996,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         rangs: rangsNV, ecart: ecartNomme(rangsNV, nCochesV), plein: pleinImprimer({ nC: nCochesV, nR: nNR, occupe: !!batchBusy || !!imprBusy, total: resLot.total + Lret.length }),
                         retours: Lret.map((l) => ({ cle: l.cle, tx: l.tx, num: l.num || '', titre: l.titre || '', vendeur: l.vendeur || '', on: choixNR.has(l.cle) })),
                         format: formatLot, autres: resLot.autres, aPreparer: (nEnv || 0) > 0, aEmballer: nPrets > 0,
+                        // (24 nov., main-vert — règle du 17 nov., chasse-bugs) « Choisir » NOMME ce qui ne part pas (« N°43 attend son
+                        // bordereau ») : les colis Vinted de la liste sans ligne de lot (aucun bordereau reçu), puis les exclus du lot —
+                        // comme le pied d'avant (`vvHorsLotRef`), que l'écran natif ne calculait plus.
+                        exclus: (() => { const vus = new Set(); const hors = rangsNV.filter((r) => r && r.site === 'vinted' && !(r.coche && r.coche.cle)).map((r) => ({ cle: r.cle, num: r.num, titre: r.titre, raison: 'sansBordereau' }));
+                          const X = [...hors, ...resumeLot(Ltous, choixNV).exclus].filter((x) => x && !vus.has(x.cle) && vus.add(x.cle)); return X.length ? texteExclus(tr, X) : ''; })(),
                         bordsPasSu: !!(voitSite('vinted') && emailBordsKO && emailBords === null) },
                       route: onglet === 'envoyes' && !toutesSeules ? routeNatif() : null },
                     g: { onglet: (v) => onOngletColis && onOngletColis(v),

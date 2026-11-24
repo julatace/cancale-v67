@@ -197,6 +197,15 @@ const nombreDe = (s) => { const m = /(\d+)/.exec(String(s || '')); return m ? Nu
       const n = nombreDe(m.texte);
       dit(n === 4 && (/dont 1 retour/.test(m.texte || '') || m.nRetoursBouton === '1'), `${nom} : C1 le bouton compte les 3 ventes ET le retour cochés (« 4 … dont 1 retour »)`, JSON.stringify(m));
       if (m.cases) dit(n === m.ventesCochees + m.retoursCoches, `${nom} : C2 le nombre du bouton = les cases cochées à l’écran (${m.ventesCochees} + ${m.retoursCoches})`, JSON.stringify(m));
+      // (24 nov., main-vert) Ventes natif : « Choisir » est une rangée du menu « ⋯ » (`data-vn-plus`, gestes rangés) ; on l'ouvre,
+      // on lit la rangée, on la referme (attendue partie, jamais un délai seul).
+      if (vp.width > 600 && !m.choisir && await pg.locator('[data-vn-plus]').filter({ visible: true }).count()) {
+        await pg.locator('[data-vn-plus]').filter({ visible: true }).first().click().catch(() => {});
+        await pg.waitForFunction(() => [...document.querySelectorAll('[data-lot-ouvrir]')].some((e) => e.getClientRects().length), null, { timeout: 8000 }).catch(() => {});
+        m.choisir = await pg.evaluate(() => { const e = [...document.querySelectorAll('[data-lot-ouvrir]')].find((x) => x.getClientRects().length); return e ? e.innerText.replace(/\s+/g, ' ').trim() : null; });
+        await pg.keyboard.press('Escape').catch(() => {});
+        await pg.waitForFunction(() => ![...document.querySelectorAll('[data-lot-ouvrir]')].some((e) => e.getClientRects().length), null, { timeout: 8000 }).catch(() => {});
+      }
       if (vp.width > 600) dit(/N°43 attend son bordereau/.test(m.choisir || ''), `${nom} : C3 « Choisir » nomme ce qui n’y est pas (N°43 attend son bordereau)`, JSON.stringify(m.choisir));
       await essaie(`${nom} : C4 ce qui part`, async () => {
         const bt = pg.locator(sel).filter({ visible: true }).first();
