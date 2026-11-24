@@ -22,7 +22,7 @@
 //      les colonnes (avant : les colonnes 7-8 sortaient du meuble dessiné) ; le Garage (qui tient) ne dit rien ;
 //   G  44 px au doigt (cases, boutons de la tête), aucune page plus large que l'écran, aucune erreur ;
 //   M  rapporté : hauteur de la section « Mes meubles », « + » dessinés, contraste mini, taille du N°.
-// MUTATION=num (N° réduit et coupé), plus (« + » dans chaque case vide), debord (rangées plus collées), fermer (marge
+// MUTATION=compte (« 12 / 32 rangées » gris moyen via color-mix), num (N° réduit et coupé), plus (« + » dans chaque case vide), debord (rangées plus collées), fermer (marge
 // −12 px rendue au bouton) : CSS injectée ⇒ le banc DOIT rougir.
 // BANC_DIST=<dist> (l'arbre d'avant doit être ROUGE), BANC_PORT, CAPTURES=dossier, VARIANTES=390c,390s,1512c,1512s.
 const path = require('path');
@@ -92,6 +92,9 @@ srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.c
 const CSS_MUTATION = {
   // (reprise) préfixée : les plaques portent leur taille en `!important` sur 4 classes — sans préfixe, la mutation ne prenait plus.
   num: ':root:root:root:root body .vrm-s2d-case.vrm-s2d-case * { font-size: 9px !important; } :root:root:root:root body .vrm-s2d-case.vrm-s2d-case > span { max-width: 14px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }',
+  // (24 nov.) « 12 / 32 rangées » en gris moyen écrit par `color-mix()` (rendu `color(srgb …)`) : < 4,5:1 en clair
+  // comme en sombre ⇒ H rouge — preuve que la couleur `color(…)` est bien lue (l'ancienne regex la prenait pour du noir).
+  compte: ':root:root body .vrm-etag-carte .vrm-s2d-tete .vrm-s2d-compte { color: color-mix(in srgb, #737373 50%, #7a7a7a) !important; }',
   debord: '.vrm-s2d-regle[data-regle-rang] { position: static !important; }',
   fermer: '.vrm-etag-cibles .vrm-b-discret { margin: -12px 0 !important; }',
   plus: '.vrm-s2d-case.is-vide::after { content: "+" !important; display: block !important; position: absolute; inset: 0; display: grid !important; place-items: center; font-size: 22px; opacity: .6; color: #445; }',
@@ -150,8 +153,17 @@ async function contrastePixels(pg, el) {
     const d = x.getImageData(0, 0, c.width, c.height).data;
     const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
     const L = (r, g, b) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-    const m = /rgba?\(([^)]+)\)/.exec(couleur); const p = m ? m[1].split(/[\s,\/]+/).filter(Boolean).map(Number) : [0, 0, 0, 1];
-    const a = p.length > 3 ? p[3] : 1;
+    // (24 nov.) La couleur du texte est RÉSOLUE par le navigateur (un pixel peint avec elle), jamais lue à la regex :
+    // `color-mix()` rend `color(srgb 0.68 0.68 0.71)`, que l'ancienne regex `rgba?(…)` ne reconnaissait pas — elle
+    // retombait sur du NOIR, et « 12 / 32 rangées » (gris clair sur fond sombre, lisible) se mesurait 1,19:1.
+    // Une couleur que le navigateur ne sait pas peindre ⇒ « pas su » (null ⇒ rouge), jamais un noir supposé.
+    const cc = document.createElement('canvas'); cc.width = cc.height = 1; const cx = cc.getContext('2d', { willReadFrequently: true });
+    cx.fillStyle = '#010203'; cx.fillStyle = couleur;
+    if (cx.fillStyle === '#010203' && !/^\s*(#010203|rgba?\(\s*1\s*,\s*2\s*,\s*3\s*\))\s*$/i.test(couleur)) return null;
+    cx.clearRect(0, 0, 1, 1); cx.fillRect(0, 0, 1, 1);
+    const px = cx.getImageData(0, 0, 1, 1).data;
+    if (px[3] === 0) return null;
+    const p = [px[0], px[1], px[2]]; const a = px[3] / 255;
     const ct = [];
     for (let i = 0; i < d.length; i += 4) {
       const fond = [d[i], d[i + 1], d[i + 2]];
