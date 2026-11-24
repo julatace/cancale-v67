@@ -68,7 +68,9 @@ const PHOTO = (cle, vue = 1, id = 'x') => `https://images1.vinted.net/t/${id}/${
 const achatDe = (prix) => Math.round(prix * 0.52 / 5) * 5;
 
 // `partis` : des ventes à expédier dont le colis est parti (le temps a passé).
-function monde({ partis = [] } = {}) {
+// `achatARelier` (tuto « relier un achat », 24 nov.) : la vente N°23 n'a pas encore de prix d'achat et son achat,
+// reçu (commande finalisée), attend d'être relié par SON toucher — jamais deviné.
+function monde({ partis = [], achatARelier = false } = {}) {
   const lignes = [];
   const num = {};               // vinted_annonce_numeros
   const details = {};           // vinted_item_details
@@ -135,6 +137,11 @@ function monde({ partis = [] } = {}) {
     { transaction_id: 92003, conversation_id: 93003, title: 'New Balance 1906R argent T43', price: { amount: '55.00', currency_code: 'EUR' }, status: 'Le vendeur a expédié la commande', transaction_user_status: 'waiting', date: ilYaJ(2), photo: { url: PHOTO('course_argent', 2, 'a3') } },
     { transaction_id: 92004, conversation_id: 93004, title: 'Asics GT-2160 grise T42', price: { amount: '47.00', currency_code: 'EUR' }, status: 'Le vendeur a expédié la commande', transaction_user_status: 'waiting', date: ilYaJ(1), photo: { url: PHOTO('course_gris', 2, 'a4') } },
   ];
+  if (achatARelier) {
+    const [titre, , taille, , ph] = CATALOGUE[22];
+    if (num['7122']) delete num['7122'].buyPrice;
+    achats.push({ transaction_id: 92005, conversation_id: 93005, title: `${titre} T${taille}`, price: { amount: '25.00', currency_code: 'EUR' }, status: STATUT_FINAL, transaction_user_status: 'completed', date: ilYaJ(12), photo: { url: PHOTO(ph, 2, 'a5') } });
+  }
   const dateLimite = (j) => new Date(T0 + j * J).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' }) + ' 23 h 59';
   // Les meubles du Stock (2D) et les cases : N°1 à 12 rangés.
   const meubles = [

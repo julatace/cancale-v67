@@ -112,7 +112,7 @@ const GESTES = {
     await f.jouer(3.2); f.cle('numero');
     dire('impr.3');
     const b = await voir(f, ['[data-imprimer-prets]', 'texte:Imprimer'], { zoom: 1.38 });
-    if (b) await f.toucher(b, { avant: 0.4, apres: 0.5 });
+    if (b) await f.toucher(b, { avant: 0.4, apres: 0.5, clic: true });   // (24 nov.) le bouton fixe du bas reçoit un vrai clic
     await f.attendreQue('[data-impr-papier-choix="normale"]', 4);
     f.repos_(0.8); await f.jouer(2.0); f.cle('imprimer');
     dire('impr.4');
@@ -124,37 +124,43 @@ const GESTES = {
   } },
   numeroter: { tab: 'annonces', async jouer(f, dire) {
     dire('num.1'); await entree(f);
-    await voir(f, ['[data-carte-annonce="7115"]', '[data-carte-annonce]'], { zoom: 1.38, marge: 120 });
+    // (24 nov.) Les listes arrivent par paquets : la rangée visée (N°4, `data-eg-article`) est DÉJÀ à l'écran, pas une 16e encore à venir.
+    await voir(f, ['[data-eg-article="vinted#7103"]', '0@[data-ad-rangee]', '0@[data-carte-annonce]'], { zoom: 1.38, marge: 120 });
     await f.jouer(3.0); f.cle('numero');
     dire('num.2');
-    await voir(f, ['[data-carte-annonce="7115"] [data-num]', 'texte:N°16', '[data-carte-annonce="7115"]'], { zoom: 1.6, defiler: false });
+    await voir(f, ['[data-eg-article="vinted#7103"] .n-plaque', '0@[data-ad-rangee] .n-plaque', '0@[data-carte-annonce] [data-num]'], { zoom: 1.6, defiler: false });
     await f.jouer(3.4);
     dire('num.3'); f.repos_(0.8); await f.jouer(0.6);
-    const st = await une(f, ['[data-onglet="garage"]', 'a[href*="tab=garage"]', 'texte:Stock']);
-    if (st) await f.toucher(st, { apres: 0.6 });
+    // (24 nov.) Au téléphone, le Stock n'est plus dans la barre du bas : on le montre s'il y est, sinon on y va (coupe : fondu enchaîné, aucune image noire).
+    const st = await une(f, ['[data-n-onglet="garage"]', '[data-onglet="garage"]', 'a[href*="tab=garage"]']);
+    if (st) await f.toucher(st, { apres: 0.6 }); else await f.coupe(null, { tab: 'garage', fondu: 0.6 });
     await f.attendreQue('[data-garage], [data-stock], h1', 4);
     await voir(f, ['[data-case-num]', '[data-stock-case]', 'texte:16'], { zoom: 1.3 });
     await f.jouer(3.2); f.cle('stock');
     dire('num.4'); f.repos_(0.8); await f.jouer(3.0);
     dire('fin'); await f.fin('vrm.center', 3.0);
   } },
-  'relier-achat': { tab: 'ventes', async jouer(f, dire) {
+  // (24 nov.) Le monde du tuto : la vente N°23 sans prix d'achat, son achat reçu à relier (`achatARelier`, _monde.cjs).
+  'relier-achat': { tab: 'ventes', monde: { achatARelier: true }, async jouer(f, dire) {
     dire('achat.1'); await entree(f);
-    await voir(f, ['texte:Prix d’achat', 'texte:sans achat', '[data-carte-vente]'], { zoom: 1.38 });
+    await voir(f, ['[data-vt-relier="libre"]', 'texte:Prix d’achat', '[data-carte-vente]'], { zoom: 1.45, dy: -40 });
     await f.jouer(3.2);
     dire('achat.2');
-    const r = await voir(f, ['texte:Relier', '[data-relier-ouvrir]'], { zoom: 1.45 });
+    const r = await une(f, ['[data-vt-relier="libre"]', 'texte:Relier', '[data-relier-ouvrir]']);
     if (r) await f.toucher(r, { avant: 0.4, apres: 0.6 });
     await f.attendreQue('[data-relier-feuille]', 4);
     f.repos_(0.8); await f.jouer(1.6); f.cle('feuille');
     dire('achat.3');
-    const a = await voir(f, ['[data-relier-feuille] [data-relier-achat]', '[data-relier-feuille] button'], { zoom: 1.3, defiler: false });
+    const a = await voir(f, ['[data-relier-feuille] [data-la-relier]', '[data-relier-feuille] [data-relier-achat]', '[data-relier-feuille] button'], { zoom: 1.3 });
     await f.jouer(2.4);
     if (a) await f.toucher(a, { avant: 0.4, apres: 0.6 });
+    const oui = await une(f, ['[data-relier-feuille] [data-la-oui]']);
+    if (oui) { await f.viser(oui, { zoom: 1.3, dur: 0.8 }); await f.jouer(1.0); await f.toucher(oui, { avant: 0.3, apres: 0.6 }); }
     dire('achat.4'); f.repos_(0.8); await f.jouer(3.4); f.cle('relie');
     dire('fin'); await f.fin('vrm.center', 3.0);
   } },
-  benefice: { tab: 'compta', async jouer(f, dire) {
+  // (24 nov.) Ventes d'abord (hors champ) : Argent montre alors les chiffres calculés, pas « Pas encore calculé ».
+  benefice: { tab: ['ventes', 'compta'], async jouer(f, dire) {
     dire('ben.1'); await entree(f);
     await voir(f, ['texte:Vendu', '[data-fu-case="vendu-mois"]'], { zoom: 1.38 });
     await f.jouer(3.0); f.cle('vendu');
@@ -182,7 +188,7 @@ function vtt(cues, duree, l) {
 
 async function tournerUn(nav, cle) {
   const g = GESTES[cle];
-  const f = new Film({ nom: 'tuto-' + cle, format: 'portrait', monde: monde(), tab: g.tab });
+  const f = new Film({ nom: 'tuto-' + cle, format: 'portrait', monde: monde(g.monde || {}), tab: g.tab });
   await f.demarrer(nav);
   if (g.preparer) await g.preparer(f);
   const dossier = sortie('tutos');

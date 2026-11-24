@@ -767,10 +767,10 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta
 @media (min-width: 768px) { html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero { font-size: 44px !important; } }
 /* L'anneau et les barres aux couleurs de la maquette */
 .vrm-fu-compta .vrm-fu-arc.is-benef { stroke: var(--fu-bleu); }
-.vrm-fu-compta .vrm-fu-arc.is-cotis { stroke: #ff9f0a; }
+.vrm-fu-compta .vrm-fu-arc.is-cotis { stroke: var(--n-encre-3, #8C8F98); /* (24 nov., #1320) plus d’orange */ }
 .vrm-fu-compta .vrm-fu-arc.is-achat { stroke: transparent; }
 .vrm-fu-compta .vrm-fu-legende li > i.is-benef { background: var(--fu-bleu); }
-.vrm-fu-compta .vrm-fu-legende li > i.is-cotis { background: #ff9f0a; }
+.vrm-fu-compta .vrm-fu-legende li > i.is-cotis { background: var(--n-encre-3, #8C8F98); }
 .vrm-fu-compta .vrm-fu-legende li > i.is-achat { background: #e5e5ea; }
 .vrm-fu-compta .vrm-fu-barre[data-courant] .vrm-fu-barre-piste > i { background: var(--fu-bleu) !important; }
 .vrm-fu-compta .vrm-fu-barre-piste > i { background: #d1d1d6; }

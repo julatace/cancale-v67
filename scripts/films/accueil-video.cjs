@@ -95,8 +95,9 @@ const PLANS = [
   { tab: 'annonces', async jouer(f, dire) {
     dire('numero');
     await f.jouer(0.4);
-    await f.defilerVers('[data-carte-annonce="7115"]', { marge: 120, dur: 1.2 });
-    await f.viser('[data-carte-annonce="7115"]', { zoom: 1.38, dur: 1.0 });
+    // (24 nov.) Les listes arrivent par paquets et la rangée d'annonce est `data-eg-article` : le N°4, déjà à l'écran.
+    await f.defilerVers('[data-eg-article="vinted#7103"]', { marge: 120, dur: 1.2 });
+    await f.viser('[data-eg-article="vinted#7103"]', { zoom: 1.38, dur: 1.0 });
     await f.jouer(4.0); f.cle('numero');
     f.repos_(0.8); await f.jouer(1.6);
     dire('fin');

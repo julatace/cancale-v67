@@ -35,7 +35,7 @@
 :root:root:root body :is(.vg-a-vendu, .vg-a-case, .vg-a-case-corps, .vg-a-venir-btn, .vg-av-groupe-tete):active { transform: scale(.985); }
 @media (prefers-reduced-motion: reduce) { :root:root:root body :is(.vg-a-vendu, .vg-a-case, .vg-a-case-corps, .vg-a-venir-btn, .vg-av-groupe-tete):active { transform: none; } }
 /* Les teintes des étapes (maquette) : ambre = à envoyer (un geste), encre = en route, ardoise = livrée, hachuré = versement. */
-:root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-envoyer { background: #B26A00 !important; }
+:root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-envoyer { background: var(--n-ambre, #3D4B5B) !important; /* (24 nov., #1320) plus d’orange : « à envoyer » = l’ambre du gris clair (l’ardoise) */ }
 :root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-route { background: #1C1C20 !important; }
 :root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-livree { background: #5E7A96 !important; }
 :root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille):is(.is-versement, .is-pm) { background: repeating-linear-gradient(45deg, rgb(28 28 32 / .26) 0 4px, rgb(28 28 32 / .08) 4px 8px) !important; }
