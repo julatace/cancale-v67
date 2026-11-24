@@ -48,14 +48,16 @@ finalisée = argent versé. Chaque étape **seulement de SA preuve lue** :
 `groupesEnvois` : en route · au point, pas retiré (date limite la plus proche d'abord) · retiré, argent en attente · argent
 versé (+ retour) ; couverture `lus / n` (lus chez un transporteur).
 
-## 3. L'écran
-- **Tiroir de la vente (Ventes)** : un colis PARTI montre la piste (`src/SuiviEnvoi.jsx` `ParcoursEnvoi`) **à la place** de la
-  frise (une piste, jamais deux : les dates ne s'écrivent pas deux fois). Logo du transporteur (40 px), n° de suivi qui ouvre
-  la page du transporteur (`lienSuivi`), le point, « depuis », « à retirer avant », le danger, le retour. Avant le départ, la
-  frise reste (geste « à déposer »).
-- **« Mes envois »** (Ventes / Colis → Envoyés, en haut) : quatre tuiles avec nombre et mini-piste, la couverture
-  (« 3 sur 5 lus chez le transporteur ») ; une tuile ouvre SA liste à la place de la liste (date limite la plus proche
-  d'abord) ; toucher une ligne ouvre la fiche de la vente (`ouvrirLigne`, contexte vente, par n° de transaction).
+## 3. L'écran (Ventes est l'écran natif depuis le 19 nov. : src/natif/ecrans/Ventes.jsx)
+- **La fiche d'une vente « En route »** (poussée au téléphone, volet à l'ordinateur) : la piste (`src/SuiviEnvoi.jsx`
+  `ParcoursEnvoi`, dessinée par l'app via `g.parcours`, `r.envoi` posé par `rangsRouteNatif`) **remplace** les quatre étapes
+  (une piste, jamais deux) ; le n° de suivi n'est plus redit dans « Transport ». Logo du transporteur (40 px), n° qui ouvre sa
+  page (`lienSuivi`), le point, « depuis », « à retirer avant », le danger, le retour.
+- **« Mes envois »** en tête d'« En route » (slot `avantRoute`, `mesEnvoisCalc`) : quatre tuiles (nombre + mini-piste) et la
+  couverture « N sur M lus chez le transporteur ». Une tuile choisie **est** la liste d'« En route » (`routeNatif` rend ce
+  groupe, argent versé compris) — jamais une seconde liste ; toucher une ligne ouvre SA fiche.
+- Écran Colis (ancien, `curSub === 'bordereaux'`) → Envoyés : le même bloc, avec sa propre liste (`ListeEnvois`).
+- L'ancien tiroir de Ventes (`recapVente`, plus rendu depuis l'écran natif) suit la même règle (piste une fois parti).
 - Gris clair, aucun orange : ardoise pour « fait », vert « fait » pour l'argent, pointillé pour « pas su » ; le danger à
   l'encre en gras avec une horloge. `claude/visuel-jeu` n'est pas fusionné : ses couleurs (ardoise, vert) sont reprises,
   pas ses composants. Textes `tr()` : `src/i18n/langues/*/envois.js` (5 langues).
@@ -75,12 +77,21 @@ versé (+ retour) ; couverture `lus / n` (lus chez un transporteur).
 - `scripts/audit-suivi-envoi.cjs` : 41 verts — P (par transporteur, formes mesurées, la VRAIE `preuvesFriseVinted`), G, I
   (50 titres identiques ; l'app ne lit aucune ligne d'un n° ambigu), N, T, C (la VRAIE route `ship-reminders?moment=colis`
   sur une fausse base PostgREST : colis en route visité entre les crons, relu chez Vinted Go, « au point » puis « retiré »,
-  une fois chacun). `--prouve` : voir l'état à la reprise. Sur `origin/main` : planté (module absent) ⇒ rouge.
-- `scripts/bancs/suivi-envoi.cjs` : 390 / 1512, clair / sombre (voir l'état à la reprise).
+  une fois chacun). `--prouve` : **19/19 mutations attrapées**. Sur `origin/main` : planté (module absent) ⇒ rouge.
+- `scripts/bancs/suivi-envoi.cjs` : **68 verts** — 390 tactile / 1512, clair / sombre ; captures regardées (piste 8002 au
+  point avec danger, 8003 retiré, « Mes envois » et le groupe « au point »).
 - Bancs/audits mis à jour : `audit-colis-danger` (ancres de mutation, « au point » peut sonner aussi), `audit-notifications`
-  (F5 : quatorze familles), `bancs/recap-vente` (7011 et 7005 sont partis ⇒ la piste remplace la frise).
+  (F5 : quatorze familles), `audit-frise-source` (E1), `bancs/recap-vente` (7011 et 7005 partis ⇒ la piste),
+  `bancs/frise-transporteur` (la fiche lit la piste quand elle est là ; pas relancé ici, file de la machine).
+- Voisins verts : colis-* (sauf `colis-trois`, déjà rouge AVANT ce lot, vérifié sur l'arbre d'avant), suivi-*, frise-*,
+  statuts, fonctions-api (12), notif*, traduction, quoi-de-neuf, coherence, identite, ventes-modele. `npm run build` vert.
 
 ## 6. Ce que l'extension devrait lire en plus (pas fait dans ce lot)
 - Le suivi Vinted du VENDEUR (détail de la transaction de vente : `shipment` / suivi) donnerait « au point » et la date
   limite pour `XU` et Mondial Relay, que le serveur ne lit pas. Ce serait une capacité nouvelle (`suivivente`) à mesurer
   d'abord sur une vraie réponse.
+
+## ÉTAT À LA REPRISE
+- Branche `claude/suivi-ventes`, PR #1369 (base main, à fusionner APRÈS #1326 et #1338). Pas fusionnée.
+- Aucune extension changée. Geste de Julien : aucun (la famille « Suivi de tes envois » est allumée par défaut).
+- À surveiller au premier vrai colis : qu'un « disponible » soit bien lu pour un colis vendu Chronopost (jamais vu au 24 nov.).
