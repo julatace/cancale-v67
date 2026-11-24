@@ -204,7 +204,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       const inq = ecr.filter((e) => /inquiries$/.test(e.p)), msgs = ecr.filter((e) => /\/replies$/.test(e.p)), offres = ecr.filter((e) => /\/offers$/.test(e.p));
       dit(!!res, 'la file se termine', JSON.stringify(parItem()));
       dit(inq.length === 3 && inq.every((e) => e.uid === UID), '3 conversations ouvertes PAR LA PAGE, au nom du compte de l’onglet', inq.map((e) => e.corps).join(' | '));
-      dit(msgs.length === 3 && msgs.every((e) => e.uid === UID && /ton favori est toujours dispo/.test(e.corps) && !/[{}]/.test(e.corps)), '3 messages envoyés par la page', msgs.map((e) => e.corps.slice(0, 80)).join(' | '));
+      dit(msgs.length === 3 && msgs.every((e) => { let t = ''; try { t = String(JSON.parse(e.corps).content || ''); } catch (_) {} return e.uid === UID && /ton favori est toujours dispo/.test(t) && !/[{}]/.test(t); }), '3 messages envoyés par la page', msgs.map((e) => e.corps.slice(0, 80)).join(' | '));
       dit(offres.length === 3, '3 offres (réduction de 10 %) envoyées par la page', offres.map((e) => e.p + ' ' + e.corps).join(' | '));
       if (F1 === 'F1E' || F1 === 'F1P') dit(V.st.req.some((e) => /escrow-orders/.test(e.p)), 'la commande escrow est relue (identité par la commande)', V.st.req.filter((e) => e.h === 'api.vinted.fr').map((e) => e.m + ' ' + e.p).slice(0, 12).join(' '));
       dit(ecr.every((e) => !e.origine.startsWith('chrome-extension')), 'aucune écriture partie du service worker (toutes de la page)', ecr.map((e) => e.origine).join(','));
