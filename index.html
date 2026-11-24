@@ -20,7 +20,7 @@
        en sombre donnait une barre d'état BLANC CASSÉ au-dessus d'une app noire
        — mesuré : `theme-color = #F5F8F6` alors que les cartes étaient à
        `rgb(26,31,39)`. Une seule balise, sans `media`, pilotée par le choix. -->
-  <meta name="theme-color" content="#F4F4F2" />
+  <meta name="theme-color" content="#DFE1E5" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/vrm-apple-touch-icon-v5.png" />
   <link rel="apple-touch-icon" sizes="152x152" href="/vrm-apple-touch-icon-v5-152.png" />
@@ -141,14 +141,14 @@
        rendu), et sa spécificité passe devant la règle `body` du média.
        ⚠️ Et la teinte est celle de `THEMES.dark.bg` (#1C1C1F) : le média
        utilisait #0E1116, une TROISIÈME valeur de fond sombre dans le projet. */
-    html[data-theme="dark"]  body{ background:#0F0F11; background-image:none; }
+    html[data-theme="dark"]  body{ background:#1C1C20; background-image:none; }
     html[data-theme="light"] body{ background:#FFFFFF; background-image:none; }
     /* `color-scheme` habille les champs NATIFS (date, sélecteurs, ascenseurs).
        Il n'était posé nulle part : la date d'« Import des emails » dans
        Réglages s'affichait en boîte blanche au milieu de l'app sombre. */
     html[data-theme="dark"]  { color-scheme: dark; }
     html[data-theme="light"] { color-scheme: light; }
-    @media (prefers-color-scheme: dark){ body{background:#0F0F11;background-image:none;} }
+    @media (prefers-color-scheme: dark){ body{background:#1C1C20;background-image:none;} }
     *{-webkit-tap-highlight-color:transparent;}
     /* ── COURBES & DURÉES, nommées UNE fois (cohésion : une app « composée »
        réutilise les mêmes ressorts partout au lieu d'en réinventer à chaque
@@ -490,6 +490,17 @@
     [data-stream="1"] [data-stream-article] [data-stream-photo],
     [data-stream="1"] [data-stream-article][data-stream-photo] { filter: blur(48px) saturate(.6) !important; }
     [data-stream="m"] [data-stream-flou] { filter: blur(6px) !important; user-select: none; }
+    /* (23 nov.) LE MODE PRÉSENTATION (src/modeStream.js, data-presentation="1") : la pastille d'état, en haut au
+       centre, au-dessus de tout (feuilles comprises), sous l'encoche ; un toucher quitte le mode. */
+    .vrm-pastille-presentation { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 6px); left: 50%; transform: translateX(-50%);
+      z-index: 2147483000; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px 0 9px; margin: 0;
+      border-radius: 999px; border: 1px solid #E4E4E7; background: #FFFFFF; color: #18181B; font: 600 12px/1 -apple-system, system-ui, sans-serif;
+      box-shadow: 0 1px 2px rgb(0 0 0 / .06), 0 4px 12px rgb(0 0 0 / .08); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .vrm-pastille-presentation::after { content: ""; position: absolute; inset: -8px -4px; }
+    .vrm-pastille-presentation-pt { width: 7px; height: 7px; border-radius: 50%; background: #0F6B4C; }
+    .vrm-pastille-presentation svg { opacity: .55; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vrm-pastille-presentation { background: #18181B; color: #F4F4F5; border-color: #3F3F46; } :root:not([data-theme="light"]) .vrm-pastille-presentation-pt { background: #3FD49A; } }
+    [data-theme="dark"] .vrm-pastille-presentation, .vrm-dark .vrm-pastille-presentation { background: #18181B; color: #F4F4F5; border-color: #3F3F46; }
 </style>
   <!-- (6 nov.) L'ÉCRAN DE DÉMARRAGE — avant tout JavaScript. Julien : « je veux qu'il y
        ait de vrais écrans de chargement ». Il couvre le téléchargement de l'app, la
@@ -516,9 +527,9 @@
        l'instantané les lisent) ; ils valent un aplat. Mêmes valeurs que src/natif/jetons.css (contrat §1). */
     :root{
       --vrm-verre-fond:none;
-      --vrm-verre-uni:#F4F4F2;
+      --vrm-verre-uni:#DFE1E5;
       --vrm-verre-fond-nuit:none;
-      --vrm-verre-uni-nuit:#0F0F11;
+      --vrm-verre-uni-nuit:#1C1C20;
       --vrm-boot-encre:#111114;--vrm-boot-encre-2:#6C6C70;--vrm-boot-trait:rgb(60 60 67 / .18);--vrm-boot-accent:#16181D;--vrm-boot-teinte:rgb(11 81 57 / .12);
     }
     html[data-theme="dark"]{--vrm-boot-encre:#FFFFFF;--vrm-boot-encre-2:#98989F;--vrm-boot-trait:rgb(84 84 88 / .60);--vrm-boot-accent:#F4F4F5;--vrm-boot-teinte:rgb(244 244 245 / .20)}

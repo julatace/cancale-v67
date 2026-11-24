@@ -6,13 +6,13 @@
 // src/navigationTache.js ; commentaires retirés). Ce qu'il exige :
 //   · une clé légère SYNCHRONISÉE (SYNC_KEYS), par compte VRM : un autre vendeur ne
 //     la lit pas ; écrite avec un délai (pas à chaque frappe), jamais au montage ;
-//   · le dernier écran rouvre seulement s'il a moins de 30 min, le plus FRAIS de
+//   · le dernier écran rouvre seulement s'il a moins de 12 h (16 nov. ; 30 min avant), le plus FRAIS de
 //     l'appareil et du compte ; un lien `?tab=` gagne toujours ;
 //   · une recherche ne revient que quittée il y a moins de 10 min ; un filtre 60 j ;
 //   · deux appareils qui changent deux réglages différents : les deux restent ;
 //   · le nuage arrivé après l'ouverture ne remplace que ce qui n'a pas été touché ;
 //   · un filtre retenu est TOUJOURS dit à l'écran, avec « Effacer » ;
-//   · le défilement reste sur l'appareil (jamais dans la clé synchronisée).
+//   · le défilement reste sur l'appareil (jamais dans la clé synchronisée), 12 h au plus.
 //   node scripts/audit-reprise-synchro.cjs [--mutation=NOM | --prouve]
 require('./_source-app.cjs').brancher();
 const fs = require('fs'), path = require('path'), os = require('os');
@@ -40,6 +40,9 @@ const MUTATIONS = {
   'adopte-apres-geste': ['app', '      if(aNavigue.current) return;\n', ''],
   'bandeau-absent': ['app', '<RepriseRetenue tab={tab}', '<RepriseRetenueAilleurs tab={tab}'],
   'gardes-perimes': ['gardes', ", 'vrm_reprise_ecrans'];", '];'],
+  'ecran-30min': ['synchro', 'export const DUREE_ECRAN = 12 * 3600000;', 'export const DUREE_ECRAN = 30 * 60000;'],
+  'defilement-7j': ['synchro', "'position:' + ecran, 0, now, DUREE_ECRAN)", "'position:' + ecran, 0, now)"],
+  'defilement-sans-regle': ['app', 'gardee=positionReprise(st,owner,ecran);', "gardee=Number(lireParcours(st,owner,'position:'+ecran,0))||0;"],
   'choix-seul': ['nav', '  if (TACHES_SITE[tab].choixSeul && !choix) return false;\n', ''],
 };
 
@@ -111,10 +114,27 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     const locale = { tab: 'annonces', at: T0 };
     const r = S.ecranAOuvrir({ carte, locale, ongletsOk: OK, now: T0 + 20 * MIN });
     dit(r && r.tab === 'ventes' && r.sub === 'leboncoin', 'le plus FRAIS gagne : posé sur l’autre appareil il y a 10 min, il passe devant celui de cet appareil', r);
-    dit((S.ecranAOuvrir({ carte, locale, ongletsOk: OK, now: T0 + 39 * MIN }) || {}).tab === 'ventes', '29 min après : il rouvre');
-    dit(S.ecranAOuvrir({ carte, locale, ongletsOk: OK, now: T0 + 41 * MIN }) === null, '31 min après : Ma journée');
+    const H = 60 * MIN;
+    dit((S.ecranAOuvrir({ carte, locale, ongletsOk: OK, now: T0 + 10 * MIN + 31 * MIN }) || {}).tab === 'ventes', '31 min après : il rouvre encore (16 nov. : 12 h)');
+    dit((S.ecranAOuvrir({ carte, locale, ongletsOk: OK, now: T0 + 10 * MIN + 11 * H + 59 * MIN }) || {}).tab === 'ventes', '11 h 59 après : il rouvre');
+    dit(S.ecranAOuvrir({ carte, locale, ongletsOk: OK, now: T0 + 10 * MIN + 12 * H + MIN }) === null, '12 h 01 après : Ma journée');
+    dit(S.ecranAOuvrir({ carte: S.lireCarte({ owner: A, ecran: { tab: 'colis', at: T0 } }, A), locale: { tab: 'colis', at: T0 }, ongletsOk: OK, now: T0 + MIN }) === null, 'un écran retiré (Colis) ou inconnu ⇒ Ma journée');
     dit(S.ecranAOuvrir({ carte, locale, ongletsOk: OK, search: '?tab=achats&sub=retirer', now: T0 + 20 * MIN }) === null, 'un lien ?tab= reçu (notification) gagne toujours');
     dit(S.ecranAOuvrir({ carte: S.lireCarte({ owner: A, ecran: { tab: 'organisation', at: T0 } }, A), locale: null, ongletsOk: OK, now: T0 + MIN }) === null, 'un écran hors liste blanche ⇒ Ma journée');
+  });
+  essaie('défilement', () => {
+    const mem = new Map();
+    const st = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k), key: (i) => [...mem.keys()][i], get length() { return mem.size; } };
+    const P = S.positionReprise;
+    dit(typeof P === 'function', 'la règle du défilement existe (positionReprise)');
+    if (typeof P !== 'function') return;
+    const H = 60 * MIN;
+    st.setItem('vrm_parcours:' + A + ':position:ventes', JSON.stringify({ owner: A, at: T0, valeur: 1840 }));
+    dit(P(st, A, 'ventes', T0 + 11 * H) === 1840, 'une position laissée il y a 11 h revient', P(st, A, 'ventes', T0 + 11 * H));
+    dit(P(st, A, 'ventes', T0 + 13 * H) === 0, 'une position laissée il y a 13 h ne revient pas (haut de l’écran)', P(st, A, 'ventes', T0 + 13 * H));
+    dit(P(st, B, 'ventes', T0 + MIN) === 0, 'la position d’un autre vendeur ne se lit pas');
+    st.setItem('vrm_parcours:' + A + ':position:annonces', JSON.stringify({ owner: A, at: T0, valeur: 9e9 }));
+    dit(P(st, A, 'annonces', T0 + MIN) === 1000000 && P(null, A, 'ventes', T0) === 0, 'une valeur folle est bornée ; aucun stockage ⇒ 0');
   });
   essaie('deux appareils', () => {
     const base = S.poserCarte(null, { vues: { 'ventes-filtre': { valeur: 'transit', at: T0 } } }, A, OK);
@@ -154,6 +174,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     dit(/<RepriseRetenue tab=\{tab\}/.test(app) && /retenusAffiches\(\[\.\.\._vuesMontees\.values\(\)\], tab\)/.test(app) && /data-effacer-vue=/.test(app) && /data-reinitialiser-ecran=/.test(app), 'un filtre retenu est dit à l’écran, avec « Effacer » et « Réinitialiser l’écran »');
     const def = (app.match(/function MemoireDefilement[\s\S]*?\n\}/) || [''])[0];
     dit(/stockageParcours\(\)/.test(def) && !/noterReprise|CLE_REPRISE_ECRANS/.test(def), 'le défilement reste sur l’appareil');
+    dit(/positionReprise\(st,owner,ecran\)/.test(def) && !/lireParcours\(/.test(def), 'le défilement relu passe par la règle des 12 h (positionReprise), jamais par la lecture de 7 j');
     dit(/CLES_NEUTRES = \[[^\]]*'vrm_reprise_ecrans'/.test(src.gardes), 'écrire la reprise ne fait pas remonter les écrans gardés');
     dit(/if \(TACHES_SITE\[tab\]\.choixSeul && !choix\) return false;/.test(src.nav), 'un écran « choix seul » (C9) ne retient toujours que le site TOUCHÉ');
   });
