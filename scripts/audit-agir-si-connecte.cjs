@@ -273,7 +273,10 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(/<BadgeLectureSeule site="vinted" compte=\{g\.uid\}/.test(CPT), 'Messages : le badge « Lecture seule » par compte');
   // Aucun bouton d'action « nu » : chaque ouvrirPanneau / envoi passe par la porte (ouvrirPanneau est gardé lui-même).
   const AG = sansCommentaires(lire('agir/Agir.jsx'));
-  dit(/usePeutAgir\(site, compte, 'repondre', 'file'\)/.test(AG) && /disabled=\{!v\.ok\}/.test(AG), 'le champ « Répondre » éteint (visible) quand la porte dit non');
+  // (24 nov., lot messages-pro) Lecture seule : plus de champ éteint mais une barre fine qui dit pourquoi (ou renvoie au
+  // bandeau) — aucun champ ni « Envoyer » à toucher ; l'envoi, lui, reste un BoutonAgir (la porte).
+  dit(/usePeutAgir\(site, compte, 'repondre', 'file'\)/.test(AG) && /if \(!v\.ok\) return \(\s*<div className="vrm-agir-composer vrm-mp-compose vrm-mp-compose-ro"/.test(AG)
+    && /<BoutonAgir site=\{site\} compte=\{compte\} geste="repondre" par="file"/.test(AG), 'le champ « Répondre » : lecture seule ⇒ une barre (aucun champ), envoi par la porte');
   dit(/onClick=\{v\.ok \? onClick : undefined\}/.test(AG), 'BoutonAgir : un toucher éteint n\'appelle jamais le geste');
   // ── 5.450 (lot agir-tout) : les écrans qui envoient DEPUIS VRM ─────────────────────────────────────────────────
   const src = (r) => sansCommentaires(lire(r));

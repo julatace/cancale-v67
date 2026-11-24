@@ -34,7 +34,8 @@ const MUTATIONS = {
   // la porte ne compare plus le compte de l'onglet : tout compte d'un ordinateur allumé passe
   'tout-compte': [[/\.some\(\((\w)\)=>\1&&\1\.site===(\w)&&\((\w)\|\|(\w)\(\2,\1\.id\)===(\w)\)\)/g, '.some(($1)=>$1&&$1.site===$2)']],
   // le champ « Répondre » n'est jamais éteint
-  'champ-allume': [[/disabled:!(\w)\.ok,"aria-label"/g, 'disabled:!1,"aria-label"']],
+  // (24 nov., lot messages-pro) la lecture seule n'est plus un champ éteint mais une barre : on la retire ⇒ le champ s'allume
+  'champ-allume': [[/return (\w+)\.ok\?(\w+)\.jsxs\("div",\{className:"vrm-agir-composer vrm-mp-compose",/g, 'return !0?$2.jsxs("div",{className:"vrm-agir-composer vrm-mp-compose",']],
 };
 if (process.argv.includes('--prouve')) {
   const lancer = (extra) => spawnSync(process.execPath, [__filename, ...extra], { stdio: ['ignore', 'pipe', 'pipe'], env: process.env, timeout: 1500000, encoding: 'utf8' });
@@ -156,13 +157,17 @@ async function ouvrirConv(pg, uid) {
       // ── Le fil de B : visible, champ éteint, raison + geste ; l'offre visible, ses gestes éteints ; un toucher n'envoie rien
       const fb = await ouvrirConv(pg, B);
       await attendre(800); await photo(pg, `messages-B-${nom}`);
-      const vb = await pg.evaluate(() => { const c = document.querySelector('[data-agir-composer="vinted"]'); const ta = c && c.querySelector('textarea');
-        const btn = c && c.querySelector('[data-agir-envoyer]'); const raison = c && c.querySelector('[data-n-raison]');
+      // (24 nov., lot messages-pro) La lecture seule se dit UNE fois, dans le bandeau en tête du fil (`[data-mp-raison]`) ; le
+      // champ devient une barre fine (aucun champ, aucun « Envoyer ») — rien à toucher qui puisse envoyer.
+      const vb = await pg.evaluate(() => { const c = document.querySelector('[data-agir-composer="vinted"]'); const ta0 = c && c.querySelector('textarea');
+        const ta = ta0 ? ta0.disabled : (c && c.querySelector('[data-mp-compose-ro]') ? true : null);
+        const btn0 = c && c.querySelector('[data-agir-envoyer]'); const btn = btn0 ? btn0.getAttribute('aria-disabled') : (ta === true ? 'true' : null);
+        const raison = document.querySelector('[data-mp-raison]') || (c && c.querySelector('[data-n-raison]'));
         const off = [...document.querySelectorAll('[data-agir-offre] [data-agir]')].map((x) => x.getAttribute('data-agir'));
         const fil = /taille grand/.test(document.body.innerText || '');
-        return { ta: ta ? ta.disabled : null, btn: btn ? btn.getAttribute('aria-disabled') : null, raison: raison ? raison.innerText : '', off, fil, orange: false }; }).catch(() => null);
+        return { ta, btn, raison: raison ? raison.innerText : '', off, fil, orange: false }; }).catch(() => null);
       dit(fb && fb.compte === B && fb.agir === 'lecture', 'fil de atelier_b : la porte dit « lecture seule »', JSON.stringify(fb));
-      dit(vb && vb.fil && vb.ta === true && vb.btn === 'true' && /atelier_b/.test(vb.raison) && /Vinted/.test(vb.raison), 'fil de atelier_b : messages lisibles, champ et « Envoyer » éteints mais visibles, « … atelier_b : ouvre Vinted … »', JSON.stringify(vb));
+      dit(vb && vb.fil && vb.ta === true && vb.btn === 'true' && /atelier_b/.test(vb.raison) && /Vinted/.test(vb.raison), 'fil de atelier_b : messages lisibles, réponse éteinte (barre fine), « … atelier_b : ouvre Vinted … » dans le bandeau', JSON.stringify(vb));
       dit(vb && vb.off.length >= 2 && vb.off.every((x) => x === 'lecture'), 'offre de atelier_b : visible, Accepter / Refuser éteints', JSON.stringify(vb && vb.off));
       await pg.evaluate(() => { const b = document.querySelector('[data-agir-composer="vinted"] [data-agir-envoyer]'); if (b) b.click(); const r = document.querySelector('[data-agir-refuser]'); if (r) r.click(); }).catch(() => {});
       await attendre(1500);

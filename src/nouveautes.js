@@ -28,18 +28,20 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (24 nov., messages-pro — Julien : « ça fait encore beaucoup trop vieux ») docs/passation/2026-11-24-messages-pro.md
+  { id: 'messages-pro', date: '2026-11-24', titre: 'Conversations : une offre claire, un champ moderne', phrase: 'L’offre dans le fil, ta marge, et « Lecture seule » dit une fois.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (24 nov., agir-tout, ext. 5.450) docs/passation/2026-11-24-agir-tout.md
   { id: 'agir-tout', date: '2026-11-24', titre: 'Favoris, vacances, prix : tout depuis VRM', phrase: 'Leboncoin et Vestiaire aussi, si l’extension a le compte ouvert.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (24 nov., agir-si-connecte) Julien : « faire absolument tout si l'extension est connectée ». docs/passation/2026-11-24-agir-si-connecte.md
   { id: 'agir-si-connecte', date: '2026-11-24', titre: 'Répondre et republier depuis VRM', phrase: 'Si l’extension a ce compte ouvert ; sinon, lecture seule.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (24 nov., connexions-extension) Paramètres → Connexions de l'extension.
   { id: 'connexions-extension', date: '2026-11-24', titre: 'Chaque navigateur et chaque compte, en clair', phrase: 'Version, vu quand, ce qu’il lit, et quoi faire.', tab: 'connexions', pour: 'tous', mode: 'tous' },
-  // (23 nov. soir, ext. 5.440.1 — Julien : « 0 envoyé · 1 sauté », phrase coupée) docs/passation/2026-11-23-favoris-identite.md
-  { id: 'favoris-identite', date: '2026-11-23', titre: 'Messages aux favoris : le nouveau lien de Vinted', phrase: 'Un favori pas confirmé est dit et sauté, la file continue.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (24 nov., style-graphite — Julien : « un peu plus foncé en gris […] améliore tous les boutons […] change de style pour l'iPhone ») docs/passation/2026-11-24-style-graphite.md
   { id: 'styles-a-essayer', date: '2026-11-24', titre: 'Dix styles à essayer', phrase: 'Paramètres → Apparence → Style : touche, c’est appliqué.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (24 nov., visuel-jeu — Julien : « c'est pas visuel, hésite pas à faire des designs comme jeu vidéo ») docs/passation/2026-11-24-visuel-jeu.md
   { id: 'visuel-jeu', date: '2026-11-24', titre: 'Pop-ups et ventes en grandes photos', phrase: 'La paire en grand, son N°, une petite fête par vente.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (23 nov. soir, ext. 5.440.1 — Julien : « 0 envoyé · 1 sauté », phrase coupée) docs/passation/2026-11-23-favoris-identite.md
+  { id: 'favoris-identite', date: '2026-11-23', titre: 'Messages aux favoris : le nouveau lien de Vinted', phrase: 'Un favori pas confirmé est dit et sauté, la file continue.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., moderation-carte — Julien sur une capture : « c'est moche ») src/AlerteModeration.jsx
   { id: 'annonces-disparues-groupees', date: '2026-11-23', titre: 'Annonces disparues : une carte claire par compte', phrase: 'Le compte et les dates dits une fois, un seul bouton.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md
