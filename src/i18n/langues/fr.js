@@ -4,6 +4,7 @@
 // absente d'une langue, une variable `{x}` qui n'est pas la même partout, ou un pluriel
 // sans `other`. Clés : `<écran>.<élément>[.<précision>]`, jamais le texte lui-même.
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
+import ecran_textes_restes from './fr/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
 import ecran_accessibilite from './fr/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './fr/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './fr/suiviVente.js';   // (16 nov.) le suivi des colis vendus
@@ -118,6 +119,7 @@ import ecran_offres_photos from './fr/offresPhotos.js';   // (22 nov.) offres sa
 import ecran_actions_ext from './fr/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './fr/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
+  ...ecran_textes_restes,
   ...ecran_accessibilite,
   ...ecran_groupes,
   ...ecran_perso,

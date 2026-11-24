@@ -1,4 +1,5 @@
 // ITALIANO — traduzione di fr.js (la fonte). Stesse chiavi, stesse {variabili}.
+import ecran_textes_restes from './it/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
 import ecran_accessibilite from './it/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './it/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './it/suiviVente.js';   // (16 nov.) le suivi des colis vendus
@@ -113,6 +114,7 @@ import ecran_offres_photos from './it/offresPhotos.js';   // (22 nov.) offres sa
 import ecran_actions_ext from './it/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './it/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
+  ...ecran_textes_restes,
   ...ecran_accessibilite,
   ...ecran_groupes,
   ...ecran_perso,

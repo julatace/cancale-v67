@@ -38,11 +38,10 @@ export async function deconnecterAutres({ fetch: f, url, apikey, jeton }) {
 // par `/api/compte?mode=session-extension`) : « partout » la ferme aussi. Une
 // extension qui sait la liaison (5.171+) se reconnecte toute seule quand VRM est
 // rouvert et connecté dans ce Chrome ; une plus ancienne demande son mot de passe.
-export function texteConfirmationPartout({ extension }) {
-  const base = 'VRM se fermera sur ce téléphone, cet ordinateur et tous les autres. Tu devras te reconnecter partout.';
-  if (extension === 'liaison') return base + ' L’extension VRM sera déconnectée aussi : elle se reconnecte toute seule quand tu rouvres VRM dans son navigateur.';
-  if (extension === 'ancienne') return base + ' L’extension VRM sera déconnectée aussi : reconnecte-la avec ton mot de passe VRM.';
-  return base + ' L’extension VRM, si tu l’utilises, sera déconnectée aussi.';
+// (24 nov., lot textes-restes) La CLÉ du texte (src/i18n/langues/*/textesRestes.js) : le français et ses
+// quatre traductions y sont écrits en entier, une phrase par cas (l'écran fait `tr(cle)`).
+export function cleConfirmationPartout({ extension }) {
+  return 'appareils.partout.desc.' + (extension === 'liaison' ? 'liaison' : extension === 'ancienne' ? 'ancienne' : 'inconnue');
 }
 
 // ── Le journal ──────────────────────────────────────────────────────────────

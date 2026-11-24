@@ -109,7 +109,7 @@ import { avecChoix as avecChoixTampons, modeDuContenu, contenuDuMode } from '../
 import { actionsReglages } from '../reglagesActions.js';
 // ⟦← App.jsx #3⟧
 import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
-import { grouperAppareils, nConnexions } from '../appareilsGroupes.js';
+import { grouperAppareils } from '../appareilsGroupes.js';
 // ⟦← App.jsx #4⟧
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : la famille « Rappels » dit si l'URSSAF en fait partie.
 import { useProfilFiscal } from '../App.jsx';
@@ -155,7 +155,7 @@ import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
 import { VAPID_PUBLIC_KEY } from "../vapid.js";
 // ⟦← App.jsx #13⟧
 import TesDonnees from '../composants/TesDonnees.jsx';
-import { deconnecterPartout, deconnecterAutres, texteConfirmationPartout, ligneJournal, filtrerJournal, comptesDuJournal, FILTRES_TYPE } from '../securiteCompte.js';
+import { deconnecterPartout, deconnecterAutres, cleConfirmationPartout, ligneJournal, filtrerJournal, comptesDuJournal, FILTRES_TYPE } from '../securiteCompte.js';
 // ⟦← App.jsx #14⟧
 import { DISCORD_ERREURS } from "../communaute/discordErreurs.js";
 // ⟦← App.jsx #15⟧
@@ -165,7 +165,7 @@ import { ligneEmailsCompte } from "../emailsCompteLie.js";
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
 // (11 nov., lot traduction) Les textes de Paramètres passent par `tr()` (src/i18n/index.js).
-import { tr, monnaie, LANGUES, NOMS_LANGUES, langueCourante, choisirLangue } from '../i18n/index.js';
+import { tr, monnaie, LANGUES, NOMS_LANGUES, langueCourante, choisirLangue, date as dateI18n } from '../i18n/index.js';
 import { useLangue } from '../i18n/react.js';
 import { ReglagesAidesAccueil } from '../accueilReste/AccueilReste.jsx';   // (14 nov., idées 136 139 140 147)
 import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?raw";
@@ -2200,7 +2200,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'santecomptes', type:'panneau', ic:'star', lib:tr('reglages.santecomptes.lib'), desc:tr('reglages.santecomptes.desc'), data:{ 'data-reglage-santecomptes':'' }, el:<SanteComptes variante="reglages" comptes={comptes||[]}/> },
       // (22 nov., ext. 5.436) « Mes comptes » : chaque compte et ton ordinateur, les gestes à distance (src/aDistance/).
       { id:'adistance', type:'nav', ic:'users', lib:tr('nav.adistance'), desc:tr('adist.reglages.desc'), data:{ 'data-reglage-adistance':'' }, onClick:()=>setTab('adistance') },
-      { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:tr('reglages.liens.desc'), onClick:()=>setTab('vintedaccounts') },
+      { id:'liens', type:'nav', ic:'link', lib:tr('reglages.liens.lib'), desc:tr('reglages.liens.desc'), onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:tr('reglages.connexions.lib'), desc:tr('reglages.connexions.desc'), titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (11 nov., lot import-depart) Tout l'historique Vinted (ventes, achats), lu par l'extension ; « Tout récupérer » pour le compte de l'onglet.
       { id:'historique', type:'panneau', ic:'box', lib:tr('reglages.historique.lib'), desc:tr('reglages.historique.desc'), data:{ 'data-reglage-historique':'' }, el:<><HistoriqueVinted comptes={comptes||[]} variante="reglages"/><HistoriqueSites/></> },
@@ -3069,22 +3069,22 @@ const quandCourt = (v) => {
   const t = typeof v === 'number' ? v : Date.parse(String(v || ''));
   if (!Number.isFinite(t)) return '—';
   const m = Math.round((Date.now() - t) / 60000);
-  if (m < 2) return 'à l’instant';
-  if (m < 60) return `il y a ${m} min`;
-  if (m < 24 * 60) return `il y a ${Math.round(m / 60)} h`;
-  return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  if (m < 2) return tr('appareils.quand.instant');
+  if (m < 60) return tr('appareils.quand.min', { n: m });
+  if (m < 24 * 60) return tr('appareils.quand.h', { n: Math.round(m / 60) });
+  return dateI18n(t, { day: 'numeric', month: 'short' });
 };
 const seDeconnecterPartout = async () => {
   const owner = AUTH.user?.id;
   if (!owner) return;
   const ext = !vmrExtPresent() ? 'inconnue' : extSait('liaison') === 'ok' ? 'liaison' : 'ancienne';
-  const ok = await askConfirm({ title: 'Se déconnecter partout ?', desc: texteConfirmationPartout({ extension: ext }), ok: 'Se déconnecter partout', cancel: 'Annuler', danger: true });
+  const ok = await askConfirm({ title: tr('appareils.partout.titre'), desc: tr(cleConfirmationPartout({ extension: ext })), ok: tr('appareils.partout.bouton'), cancel: tr('appareils.annuler'), danger: true });
   if (!ok || AUTH.user?.id !== owner) return;
   const r = await deconnecterPartout({ fetch: (...a) => fetch(...a), url: SUPABASE_URL, apikey: SUPABASE_KEY, jeton: AUTH.session && AUTH.session.access_token });
   if (AUTH.user?.id !== owner) return;
-  if (r === 'injoignable') { toast("⚠️ Le service de connexion n'a pas répondu — rien n'a été fermé. Réessaie dans un instant.", 'err'); return; }
-  if (r === 'refuse') toast('Ta session ici avait expiré : reconnecte-toi, puis recommence pour fermer les autres appareils.', 'info');
-  else toast('✓ VRM est fermé sur tous tes appareils.', 'ok');
+  if (r === 'injoignable') { toast(tr('appareils.injoignable'), 'err'); return; }
+  if (r === 'refuse') toast(tr('appareils.partout.refuse'), 'info');
+  else toast(tr('appareils.partout.fait'), 'ok');
   setTimeout(() => { if (AUTH.user?.id !== owner) return; try { authSignOut(); } catch (_) {} location.reload(); }, 1600);
 };
 // (11 nov., lot connexions-oauth) Regroupé par appareil + navigateur (src/appareilsGroupes.js) :
@@ -3094,13 +3094,13 @@ const seDeconnecterPartout = async () => {
 const deconnecterLesAutres = async (relire) => {
   const owner = AUTH.user?.id;
   if (!owner) return;
-  const ok = await askConfirm({ title: 'Déconnecter les autres appareils ?', desc: 'VRM reste ouvert ici. Partout ailleurs, il faudra te reconnecter. L’extension VRM se reconnecte seule quand tu rouvres VRM dans son navigateur.', ok: 'Déconnecter', cancel: 'Annuler', danger: true });
+  const ok = await askConfirm({ title: tr('appareils.autres.titre'), desc: tr('appareils.autres.desc'), ok: tr('appareils.deconnecter'), cancel: tr('appareils.annuler'), danger: true });
   if (!ok || AUTH.user?.id !== owner) return;
   const r = await deconnecterAutres({ fetch: (...a) => fetch(...a), url: SUPABASE_URL, apikey: SUPABASE_KEY, jeton: AUTH.session && AUTH.session.access_token });
   if (AUTH.user?.id !== owner) return;
-  if (r === 'ok') toast('✓ Les autres appareils sont déconnectés.', 'ok');
-  else if (r === 'refuse') toast('Ta session ici a expiré : reconnecte-toi, puis recommence.', 'info');
-  else toast("⚠️ Le service de connexion n'a pas répondu — rien n'a été fermé. Réessaie dans un instant.", 'err');
+  if (r === 'ok') toast(tr('appareils.autres.fait'), 'ok');
+  else if (r === 'refuse') toast(tr('appareils.autres.refuse'), 'info');
+  else toast(tr('appareils.injoignable'), 'err');
   relire();
 };
 function AppareilsConnectes() {
@@ -3112,7 +3112,7 @@ function AppareilsConnectes() {
   const [ouverts, setOuverts] = React.useState({});
   const lire = React.useCallback(async () => {
     const { status, j } = await appelSecurite('appareils');
-    setEtat(status === 200 && j && Array.isArray(j.appareils) ? { appareils: j.appareils } : { erreur: (j && j.erreur) || 'reseau', message: (j && j.message) || "Je n'ai pas pu lire tes appareils — réessaie dans un instant." });
+    setEtat(status === 200 && j && Array.isArray(j.appareils) ? { appareils: j.appareils } : { erreur: (j && j.erreur) || 'reseau', message: (j && j.message) || tr('appareils.lireErreur') });
   }, []);
   React.useEffect(() => { lire(); }, [lire]);
   const fermerUne = async (a) => {
@@ -3122,25 +3122,25 @@ function AppareilsConnectes() {
   const fermer = async (a) => {
     const owner = AUTH.user?.id;
     if (!owner) return;
-    const ok = await askConfirm({ title: `Déconnecter ${a.appareil} ?`, desc: 'VRM s’y fermera dans l’heure au plus.', ok: 'Déconnecter', cancel: 'Annuler', danger: true });
+    const ok = await askConfirm({ title: tr('appareils.fermer.titre', { appareil: a.appareil }), desc: tr('appareils.fermer.desc'), ok: tr('appareils.deconnecter'), cancel: tr('appareils.annuler'), danger: true });
     if (!ok || AUTH.user?.id !== owner) return;
     setEnVol(a.id);
     const r = await fermerUne(a);
     if (AUTH.user?.id !== owner) return;
     setEnVol(null);
-    if (r === true) { toast(`✓ ${a.appareil} déconnecté.`, 'ok'); lire(); }
-    else toast('⚠️ ' + (r || "Je n'ai pas pu déconnecter cet appareil."), 'err');
+    if (r === true) { toast(tr('appareils.fermer.fait', { appareil: a.appareil }), 'ok'); lire(); }
+    else toast('⚠️ ' + (r || tr('appareils.fermer.erreur')), 'err');
   };
   const fermerAnciennes = async (liste) => {
     const owner = AUTH.user?.id;
     if (!owner || !liste.length) return;
-    const ok = await askConfirm({ title: `Fermer ${nConnexions(liste.length)} ancienne${liste.length > 1 ? 's' : ''} ?`, desc: 'Inactives depuis plus de 30 jours. Rien d’autre ne change.', ok: 'Fermer', cancel: 'Annuler' });
+    const ok = await askConfirm({ title: tr('appareils.anciennes.confirmer', { n: liste.length }), desc: tr('appareils.anciennes.desc'), ok: tr('appareils.anciennes.fermer'), cancel: tr('appareils.annuler') });
     if (!ok || AUTH.user?.id !== owner) return;
     setEnVol('anciennes');
     let n = 0;
     for (const a of liste) { if (AUTH.user?.id !== owner) return; if ((await fermerUne(a)) === true) n++; }
     setEnVol(null);
-    toast(n === liste.length ? `✓ ${nConnexions(n)} fermée${n > 1 ? 's' : ''}.` : `⚠️ ${n} sur ${liste.length} fermée${n > 1 ? 's' : ''}. Réessaie pour les autres.`, n === liste.length ? 'ok' : 'err');
+    toast(n === liste.length ? tr('appareils.anciennes.fait', { n }) : tr('appareils.anciennes.partiel', { n, total: liste.length }), n === liste.length ? 'ok' : 'err');
     lire();
   };
   const g = etat && etat.appareils ? grouperAppareils(etat.appareils) : null;
@@ -3148,14 +3148,14 @@ function AppareilsConnectes() {
   const groupeCible = g && cible ? g.autres.find((x) => x.sessions.some((s) => s.id === cible)) : null;
   const ouvert = (cle) => ouverts[cle] !== undefined ? ouverts[cle] : !!(groupeCible && groupeCible.appareil === cle);
   const basculer = (cle) => setOuverts((o) => ({ ...o, [cle]: !ouvert(cle) }));
-  const resume = (grp) => `${nConnexions(grp.n)} · dernière ${quandCourt(grp.actifLe)}`;
+  const resume = (grp) => tr('appareils.resume', { connexions: tr('appareils.connexions', { n: grp.n }), quand: quandCourt(grp.actifLe) });
   const detail = (grp) => grp.sessions.map((a) => (
     <div key={a.id} className="vrm-sec-ligne" data-appareil={a.ici ? 'ici' : 'autre'} {...(cible && a.id === cible && !a.ici ? { 'data-appareil-nouveau': 'oui' } : {})} style={{ paddingLeft: 28 }}>
       <div className="vrm-sec-corps">
-        <span className="vrm-sec-sous">{a.ici ? 'Cette connexion' : 'Connexion'} · active {quandCourt(a.actifLe)}</span>
+        <span className="vrm-sec-sous">{tr(a.ici ? 'appareils.ligne.ici' : 'appareils.ligne.autre', { quand: quandCourt(a.actifLe) })}</span>
       </div>
-      {a.ici ? <span className="vrm-sec-etat is-ici">Ici</span>
-        : <button type="button" className="vrm-sec-bouton" data-appareil-fermer={a.id} disabled={enVol === a.id} onClick={() => fermer(a)}>{enVol === a.id ? '…' : 'Déconnecter'}</button>}
+      {a.ici ? <span className="vrm-sec-etat is-ici">{tr('appareils.ici')}</span>
+        : <button type="button" className="vrm-sec-bouton" data-appareil-fermer={a.id} disabled={enVol === a.id} onClick={() => fermer(a)}>{enVol === a.id ? '…' : tr('appareils.deconnecter')}</button>}
     </div>
   ));
   const groupe = (grp) => (
@@ -3163,9 +3163,9 @@ function AppareilsConnectes() {
       <button type="button" className="vrm-sec-ligne" data-appareil-groupe={grp.appareil} data-groupe-n={grp.n} aria-expanded={ouvert(grp.appareil)} onClick={() => basculer(grp.appareil)} style={{ width: '100%', border: 0, background: 'transparent', textAlign: 'left', font: 'inherit', color: 'inherit', cursor: 'pointer' }}>
         <div className="vrm-sec-corps">
           <span className="vrm-sec-titre">{grp.appareil}</span>
-          <span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{grp.ici ? 'Cet appareil · ' : ''}{resume(grp)}</span>
+          <span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{grp.ici ? tr('appareils.cetAppareil', { resume: resume(grp) }) : resume(grp)}</span>
         </div>
-        <span aria-hidden="true" style={{ color: 'var(--fu-gris2, #6e6e73)', fontSize: 13 }}>{ouvert(grp.appareil) ? 'Masquer' : 'Détail'}</span>
+        <span aria-hidden="true" style={{ color: 'var(--fu-gris2, #6e6e73)', fontSize: 13 }}>{ouvert(grp.appareil) ? tr('appareils.masquer') : tr('appareils.detail')}</span>
       </button>
       {ouvert(grp.appareil) && detail(grp)}
     </React.Fragment>
@@ -3174,24 +3174,24 @@ function AppareilsConnectes() {
   return (
     <div data-appareils={etat === undefined ? 'lecture' : etat.erreur ? 'pas-su' : String(etat.appareils.length)}>
       {etat === undefined ? <div className="vrm-sec-liste"><div className="vrm-sec-vide">…</div></div>
-        : etat.erreur ? <div className="vrm-sec-liste"><div className="vrm-sec-ligne" data-appareils-erreur={etat.erreur}><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{etat.message}</span></div><button type="button" className="vrm-sec-bouton" onClick={() => { setEtat(undefined); lire(); }}>Réessayer</button></div></div>
+        : etat.erreur ? <div className="vrm-sec-liste"><div className="vrm-sec-ligne" data-appareils-erreur={etat.erreur}><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{etat.message}</span></div><button type="button" className="vrm-sec-bouton" onClick={() => { setEtat(undefined); lire(); }}>{tr('commun.reessayer')}</button></div></div>
         : (
         <>
           <div className="vrm-sec-liste" data-appareils-ici="">
-            {g.ici ? groupe(g.ici) : <div className="vrm-sec-ligne"><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>Cet appareil n’apparaît pas dans la liste. Recharge la page.</span></div></div>}
+            {g.ici ? groupe(g.ici) : <div className="vrm-sec-ligne"><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{tr('appareils.absent')}</span></div></div>}
           </div>
           {(nAutres > 0 || g.anciennes.length > 0) && (
             <details className="vrm-repli" data-appareils-autres={nAutres} open={!!groupeCible || undefined} style={{ marginTop: 12 }}>
-              <summary>{nAutres > 0 ? `Voir les appareils (${nAutres})` : 'Anciennes connexions'}</summary>
+              <summary>{nAutres > 0 ? tr('appareils.voir', { n: nAutres }) : tr('appareils.anciennes.titre')}</summary>
               {nAutres > 0 && <div className="vrm-sec-liste" style={{ marginTop: 8 }}>{g.autres.map(groupe)}</div>}
               {g.anciennes.length > 0 && (
                 <div className="vrm-sec-liste" style={{ marginTop: 8 }}>
                   <div className="vrm-sec-ligne" data-appareils-anciennes={g.anciennes.length}>
                     <div className="vrm-sec-corps">
-                      <span className="vrm-sec-titre">{nConnexions(g.anciennes.length)} ancienne{g.anciennes.length > 1 ? 's' : ''}</span>
-                      <span className="vrm-sec-sous">Inactives depuis plus de 30 jours</span>
+                      <span className="vrm-sec-titre">{tr('appareils.anciennes.n', { n: g.anciennes.length })}</span>
+                      <span className="vrm-sec-sous">{tr('appareils.anciennes.sous')}</span>
                     </div>
-                    <button type="button" className="vrm-sec-bouton" data-appareils-fermer-anciennes="" disabled={enVol === 'anciennes'} onClick={() => fermerAnciennes(g.anciennes)}>{enVol === 'anciennes' ? '…' : 'Fermer'}</button>
+                    <button type="button" className="vrm-sec-bouton" data-appareils-fermer-anciennes="" disabled={enVol === 'anciennes'} onClick={() => fermerAnciennes(g.anciennes)}>{enVol === 'anciennes' ? '…' : tr('appareils.anciennes.fermer')}</button>
                   </div>
                 </div>
               )}
@@ -3199,13 +3199,13 @@ function AppareilsConnectes() {
           )}
           {nAutres > 0 && (
             <div style={{ marginTop: 16 }}>
-              <Bouton variante="secondaire" data-deconnexion-autres="" onClick={() => deconnecterLesAutres(lire)} style={{ width: '100%' }}>Déconnecter les autres appareils</Bouton>
+              <Bouton variante="secondaire" data-deconnexion-autres="" onClick={() => deconnecterLesAutres(lire)} style={{ width: '100%' }}>{tr('appareils.autres.bouton')}</Bouton>
             </div>
           )}
         </>
       )}
       <div style={{ marginTop: 12, textAlign: 'center' }}>
-        <button type="button" className="vrm-lien-action" data-deconnexion-partout="" onClick={seDeconnecterPartout} style={{ minHeight: 44, border: 0, background: 'transparent', font: 'inherit', fontSize: 15, padding: '0 12px', cursor: 'pointer' }}>Se déconnecter partout</button>
+        <button type="button" className="vrm-lien-action" data-deconnexion-partout="" onClick={seDeconnecterPartout} style={{ minHeight: 44, border: 0, background: 'transparent', font: 'inherit', fontSize: 15, padding: '0 12px', cursor: 'pointer' }}>{tr('appareils.partout.bouton')}</button>
       </div>
     </div>
   );
