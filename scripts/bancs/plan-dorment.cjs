@@ -85,7 +85,7 @@ async function passe(nav, port, W, sombre) {
     dit(r.L.some((x) => x.action === 'baisser' && x.sugg) && r.L.every((x, i) => x.action !== 'baisser' || Number(x.sugg) === P.lignes[i].action.sugg), `PL1 ${ou} : « Baisser à X € » porte la baisse de la règle`, r.L.filter((x) => x.action === 'baisser'));
     const okPhoto = r.L.every((x, i) => decodeURIComponent(x.img) === decodeURIComponent(P.lignes[i].photo) && x.texte.includes(P.lignes[i].numero) && x.texte.includes(String(P.lignes[i].age)) && x.texte.includes(String(P.lignes[i].vues)) && x.texte.includes(String(P.lignes[i].favoris)));
     dit(okPhoto, `PL2 ${ou} : la photo de CETTE annonce, son N°, son âge, ses vues et favoris (ceux de la règle)`);
-    dit(!r.L.some((x) => x.cle.endsWith(':7300009999')) && window && true, `PL3 ${ou} : la paire aux vues PAS LUES n'est pas dans le plan`, r.L.map((x) => x.cle));
+    dit(!r.L.some((x) => x.cle.endsWith(':7300009999')), `PL3 ${ou} : la paire aux vues PAS LUES n'est pas dans le plan`, r.L.map((x) => x.cle));
     dit(!r.dorment, `PL8 ${ou} : le compte « N paires dorment » ne double pas le plan`);
     const n = await A.pg.evaluate(() => ({ brut: /NaN|undefined|\bcplan\.|\bcons\.[a-z]/.test(document.body.innerText), deborde: document.documentElement.scrollWidth > innerWidth + 1 }));
     dit(!n.brut && !n.deborde, `N ${ou} : ni NaN ni clé brute, aucun débordement horizontal`, n);

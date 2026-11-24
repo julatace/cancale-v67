@@ -13,7 +13,7 @@ import frNatif from '../../src/i18n/langues/fr.js';
 import { poserIcone, Coque, Page } from '../../src/natif/index.js';
 import { EcranConseiller } from '../../src/conseiller/Conseiller.jsx';
 import { PlanDuMatin } from '../../src/conseiller/PlanDorment.jsx';
-import { planDuMatin } from '../../src/conseiller/planDorment.js';
+import { planDuMatin, seuilsDormir } from '../../src/conseiller/planDorment.js';
 import { agirPlan, verdictPlan } from '../../src/conseiller/planGestes.js';
 import { sourcesConseiller } from '../../src/conseiller/sources.js';
 import { conseils as conseilsDe } from '../../src/conseiller/regles.js';
@@ -45,7 +45,9 @@ for (let i = 0; i < n; i++) {
 if (BASE === 'lu') {
   // Une paire très vieille mais aux vues PAS LUES : jamais « dort » (§5) ; une vieille vue sans favori, achat connu : la baisse.
   lignes.push({ ...lignes[9], id: '7300009999', numero: '999', vues: null, age: 80 });
-  lignes.push({ ...lignes[10], id: '7300008888', numero: '888', vues: 900, favoris: 0, age: 45, prix: '92.0', achat: 30 });
+  // Ses vues par jour JUSTE au-dessus du quart le plus bas (pas « peu vue »), aucun favori : la baisse, dans le plan.
+  const S0 = seuilsDormir(lignes);
+  lignes.push({ ...lignes[10], id: '7300008888', numero: '888', vues: Math.ceil(S0.vuesJour * 45 * 1.02) + 1, favoris: 0, age: 45, prix: '92.0', achat: 30 });
 }
 const PLAN = BASE === 'vide' ? null : planDuMatin(lignes, { bloque: {}, sites: ['leboncoin', 'ebay'], maintenant: NOW });
 try {
