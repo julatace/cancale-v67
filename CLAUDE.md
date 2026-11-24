@@ -452,6 +452,7 @@ sans la fonction.
 
 | capacité | fonction de l'extension | arrivée en | ce que l'app promet |
 |---|---|---|---|
+| `adaptatif` `adaptatiflbc` `adaptatifvc` `adaptatifebay` `arretsimple` | `vrm-trouver.js:souple` · `lbc-ecrire.js:trouverAdapte` · `vc-ecrire.js:trouverAdapte` · `ebay.js:champAdapte` · `phraseElement` | **5.448.0** (24 nov.) | tous les sites s'adaptent (un seul gagnant), arrêt dit avec son geste |
 | `reperage` `clocheauto` `messagerieuuid` `fenetrefavoris` | `vrm-trouver.js:trouver` · `pageNotifsConnue` · `retenirRouteConv` · `lignesFavoris` | **5.440.0** (23 nov.) | favoris sans geste, messagerie uuid, fenêtre ligne par ligne |
 | `vcmoderation` | `transitionModVc` | **5.439.0** (23 nov.) | Vestiaire : compteurs de modération (`users/me/products/count`, lus au passage) et « validée / refusée / à corriger » noté sur l'annonce ; mot d'une annonce en attente jamais vu — `2026-11-22-annulees-vc.md` |
 | `santenote` `precieux` `relancesansachat` `lotauto` `brouillonsauto` `demasquee` | `noteCompteDe` · `precieuxBloque` · `lrOffreSansAchat` · `lotFavorisAuto` · `brouillonsAutoTick` · `moderationCarte` | **5.438.0** (22 nov. ; contient la 5.437) | note de santé et cadence par palier, compte précieux, relance offre acceptée sans achat, lot seul, brouillons seuls, « à nouveau visible » — `2026-11-22-ext-5438.md` |
@@ -483,8 +484,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **24 nov. · Extension adaptative, tous les sites (`claude/ext-adaptatif`, ext. 5.448.0 — à fusionner APRÈS les autres PR de l'extension)** : `vrm-trouver.js` sert Vinted, Leboncoin, Vestiaire et eBay (table par site, 5 langues, un seul gagnant, geste appris « souple », mémoire et journal par site) ; la confirmation de suppression Vinted et les champs eBay ne prennent plus « le premier venu » ; chaque arrêt dit quoi et LE geste. `2026-11-24-ext-adaptatif.md`. Geste : installer la 5.448, essayer les gestes listés.
 - **23 nov. · Bugs (`claude/bugs-totale`)** : vente par e-mail partout — le bordereau reçu d'une vente pas relue (particulier : vente sans n°) fait le colis (Colis, Ma journée, jamais Ventes ni CA), la photo exacte tranche la fenêtre ambiguë ; colis à retirer sans photo (`Icon`) ; boucle de rendus : `onVmrExt` ne prévient que sur changement d'empreinte (11 → 6 validations/10 s au téléphone, banc `rendus-repos`). `2026-11-22-bugs-totale.md`. Geste : aucun.
-- **23 nov. · Photos nettes (`claude/photos-nettes`)** : chaque photo Vinted prend la plus petite taille DÉJÀ LUE du même fichier qui donne 2 px réels par point (`src/photoTaille.js`) ; visionneuse progressive (petite puis grande) ; aucune adresse fabriquée (chaque taille a sa signature). Achats : souvent 150x210 seule. `docs/passation/2026-11-23-photos-nettes.md`. Geste : aucun.
 - **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
