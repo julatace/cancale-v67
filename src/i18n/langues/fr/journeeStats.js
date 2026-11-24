@@ -163,5 +163,6 @@ export default {
   "ext.sante.r.refus": "Vinted a refusé une demande ces dernières 24 h : évite les séries.",
   "ext.sante.r.verification_recente": "Une vérification de Vinted ces dernières 24 h : évite les séries.",
   "ext.sante.r.pas_vu": "Un geste n’a pas été vu à l’écran : regarde l’onglet de travail.",
-  "ext.sante.r.presque_plafond": "Près du plafond (80 %)."
+  "ext.sante.r.presque_plafond": "Près du plafond (80 %).",
+  "v2.dv.enLecture": "Vente — détail en cours de lecture",
 };

@@ -2199,7 +2199,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (11 nov., lot sante-comptes) Chaque compte Vinted : en forme / à surveiller, LA raison et LE geste, chaque point lisible (src/SanteComptes.jsx).
       { id:'santecomptes', type:'panneau', ic:'star', lib:tr('reglages.santecomptes.lib'), desc:tr('reglages.santecomptes.desc'), data:{ 'data-reglage-santecomptes':'' }, el:<SanteComptes variante="reglages" comptes={comptes||[]}/> },
       // (22 nov., ext. 5.436) « Mes comptes » : chaque compte et ton ordinateur, les gestes à distance (src/aDistance/).
-      { id:'adistance', type:'nav', ic:'users', lib:tr('nav.adistance'), desc:tr('adist.reglages.desc'), data:{ 'data-reglage-adistance':'' }, onClick:()=>setTab('adistance') },
+      { id:'adistance', type:'nav', ic:'ordi', lib:tr('nav.adistance'), desc:tr('adist.reglages.desc'), data:{ 'data-reglage-adistance':'' }, onClick:()=>setTab('adistance') },
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:tr('reglages.liens.desc'), onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:tr('reglages.connexions.lib'), desc:tr('reglages.connexions.desc'), titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (11 nov., lot import-depart) Tout l'historique Vinted (ventes, achats), lu par l'extension ; « Tout récupérer » pour le compte de l'onglet.
@@ -2215,7 +2215,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:tr('reglages.ebay.lib'), desc:tr('reglages.ebay.desc'), el:ebayCompte },
       // (20 nov. soir) Les rangées par plateforme ont quitté la barre de gauche : les recherches et alertes eBay s'ouvrent d'ici.
-      ebayCompte && { id:'ebay-recherches', type:'nav', ic:'search', lib:tr('ebay.recherches.titre'), desc:'', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:ebay-recherches')); } catch (_) {} }, data:{ 'data-reglage-ebay-recherches':'' } },
+      ebayCompte && { id:'ebay-recherches', type:'nav', ic:'jumelles', lib:tr('ebay.recherches.titre'), desc:'', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:ebay-recherches')); } catch (_) {} }, data:{ 'data-reglage-ebay-recherches':'' } },
     ]},
     { id:'emails-reglages', titre:tr('reglages.groupe.emails-reglages'), items:[
       // (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : l'ancien sous-écran est devenu
@@ -2622,6 +2622,12 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const resultats = q ? filtrerReglages((designV2 ? catsV2 : categories).flatMap((c) => c.groupes.map((g) => ({ id: g.id, titre: [titreCat(c.id), g.titreCle ? tr(g.titreCle) : (g.titre || '')].filter(Boolean).join(' · '), items: g.items }))), q) : null;
   const nTrouves = resultats ? resultats.reduce((n, g) => n + g.items.length, 0) : 0;
   const catOuverte = etroit && cat ? (designV2 ? catsV2.find((c) => c.id === idV2(cat)) : categories.find((c) => c.id === cat)) || null : null;
+  // (22 nov., bugs-totale) La barre du haut du téléphone disait « ‹ Menu » au-dessus du « ‹ Paramètres » de la page (deux
+  // retours, deux destinations). Une page de Paramètres ouverte le dit à la barre, qui porte alors SON retour (le même
+  // libellé, le geste retour) ; celui de la page se tait au téléphone (styles-reglages.css).
+  const pageReglages = etroit && !q && (ouvert || catOuverte) ? (ouvert ? titreRetour : tr('ecran.settings')) : '';
+  React.useEffect(() => { try { window.__vrmPageReglages = pageReglages || ''; window.dispatchEvent(new Event('vrm:page-reglages')); } catch (_) {} }, [pageReglages]);
+  React.useEffect(() => () => { try { window.__vrmPageReglages = ''; window.dispatchEvent(new Event('vrm:page-reglages')); } catch (_) {} }, []);
 
   return (
     <div ref={racine} className="vrm-set vrm-pm" data-espace="autres" data-reglages-disposition={etroit ? 'telephone' : 'ordinateur'} data-sous-ecran-ouvert={ouvert ? ouvert.id : ''}
@@ -2640,6 +2646,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {signaler && <SignalerProblemeFeuille onClose={()=>setSignaler(false)}/>}
       {support && <EcrireSupportFeuille depuis="reglages" onClose={()=>setSupport(false)}/>}
       {feuilleAdresseVrm && <FeuilleAdresseVrm headers={sbAuth} FermeAuRetour={FermeAuRetour} proprio={proprioInst===true} onBoite={()=>setTab('emails')} onFermer={()=>setFeuilleAdresseVrm(false)}/>}
+      {/* (22 nov., bugs-totale) Au téléphone, une catégorie ou un panneau ouvert est une page POUSSÉE : le geste retour de
+          l'iPhone la referme (avant : il quittait Paramètres pour le Menu, la catégorie perdue). UNE entrée tant qu'une page
+          est ouverte (passer de la catégorie à un de ses panneaux n'en ajoute pas ; le retour revient d'un cran). */}
+      {etroit && !q && (ouvert || catOuverte) ? <FermeAuRetour fermer={() => { if (ouvert) fermerSous(); else fermerCategorie(); }}/> : null}
       {ouvert ? (
         // ── LE PANNEAU D'UN RÉGLAGE : « ‹ sa catégorie » (téléphone) ou « ‹ Paramètres » ──
         // (21 nov., ux-reglages, audit design n° 34) UN retour : « ‹ Paramètres » (ou « ‹ sa catégorie ») en texte accent,

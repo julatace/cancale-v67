@@ -163,5 +163,6 @@ export default {
   "ext.sante.r.refus": "Vinted hat in den letzten 24 h abgelehnt: Serien vermeiden.",
   "ext.sante.r.verification_recente": "Eine Vinted-Prüfung in den letzten 24 h: Serien vermeiden.",
   "ext.sante.r.pas_vu": "Eine Aktion war nicht zu sehen: Arbeits-Tab ansehen.",
-  "ext.sante.r.presque_plafond": "Nahe am Limit (80 %)."
+  "ext.sante.r.presque_plafond": "Nahe am Limit (80 %).",
+  "v2.dv.enLecture": "Verkauf — Details werden gelesen",
 };
