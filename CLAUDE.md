@@ -482,7 +482,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **24 nov. · Visuel Annonces + Stock (`claude/visuel-annonces`)** : Annonces en inventaire (tuile photo carrée, étiquette N°, rond du compte + présence, vues/favoris), grille virtualisée, sans latence (connu ⇒ tout de suite) ; Stock : étiquette papier, creux, tuiles. `2026-11-24-visuel-annonces.md`. Geste : regarder Annonces en grille sur l'iPhone.
+- **24 nov. · Annonces + Stock (`claude/visuel-annonces`)** : la LISTE reste par défaut, rangée nette 72 px (photo 60, étiquette N°, ♡ 👁, jamais « 0 j »), glisser ⇒ Baisser/Republier, puces au pouce, liste virtualisée, sans latence ; « Détaillé » (tuiles) dans ⋯ ; Stock : étiquette papier, creux. `2026-11-24-visuel-annonces.md`. Geste : aucun.
 - **24 nov. · Visuel « jeu vidéo » (`claude/visuel-jeu`)** : pop-ups en notifications de jeu (photo par identité, étiquette N°, médaillon, ressort, balayage, « +2 », vente fêtée) ; disparues en grille ; anneau des colis prêts ; ventes en tuiles ; pièces `src/natif/Jeu.jsx` (README `src/natif/visuel/`). `2026-11-24-visuel-jeu.md`. Geste : regarder la galerie des pop-ups sur l'iPhone.
 - **23 nov. · « Vinted a agi » regroupée (`claude/moderation-carte`)** : disparues d'un compte = un groupe (compte et dates une fois, « Pourquoi ? », un bouton « Vérifier sur Vinted », lignes photo + N° + « Vu ») ; ni orange ni trait de bord ; règle inchangée. `docs/passation/2026-11-23-moderation-carte.md`. Geste : aucun.
 - **23 nov. · Gris clair étagé (`claude/style-clair`)** : variante A validée (gris froid, accent ardoise), sombre = gris choisi ; iPhone compact ; dessin fin ; pop-up d'événement + galerie du propriétaire. `docs/passation/2026-11-23-style-clair.md`. Geste : essayer le pop-up sur un vrai iPhone.

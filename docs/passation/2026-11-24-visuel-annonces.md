@@ -75,14 +75,15 @@ Voir « Résultats » ci-dessous.
 
 ## Résultats (2e direction, la LISTE)
 
-Banc `visuel-annonces` (4 variantes, 600 annonces) : **96 verts, 0 rouge** au dernier passage complet avant les âges
-réalistes (le passage suivant, avec la vérification de l'âge inconnu en défilant, est dans le rapport final). Mesures :
+Banc `visuel-annonces` (4 variantes, 600 annonces) : **100 verts, 0 rouge** (passage final). Mesures :
 - liste virtualisée : 14–23 rangées montées sur 200 ; squelette à la place exacte ; CLS 0 à la lecture ET au défilement ;
 - cascade sur ce qu'on VOIT : 15 ms par rangée, 90 ms au total, fondu 160 ms, 1re rangée sans délai ; contenu connu : rien ;
 - toucher un segment : 31 ms dans la page ; défilement 95e centile 62–72 ms (charge 6–8 sur 4 cœurs) ;
 - praticité : « Sans N° » (n = son nombre, 44 px), « Prix décroissant » (ordonné), glisser ⇒ « Baisser »/« Republier »
   (≥ 44, lancé sur CETTE annonce), « ⋯ » ⇒ « Copier le lien » + « Baisser le prix » ;
-- prix à la taille du titre (15 px), demi-gras (600) ; âge inconnu ⇒ aucune horloge.
+- prix à la taille du titre (15 px), demi-gras (600) ; moins d'un jour ⇒ « Auj. » (jamais « 0 j ») ; âge inconnu ⇒ aucune
+  horloge (vérifié en défilant) ; la ligne d'infos ne coupe jamais un mot (ce qui ne tient pas s'efface en entier, la taille
+  en dernier ; le banc mesure chaque bout).
 
 **Bancs voisins** : build ✅ ; textes-visibles ✅ (16/0) ; annonces-dressing ✅ (après deux mises à jour assumées :
 la bascule d'affichage vit dans « ⋯ », la vignette 56–64 au lieu de 52 — décision de Julien) ; stock-etageres : le
