@@ -23,6 +23,8 @@ import React from 'react';
 import { tr } from '../../i18n/index.js';
 import { Carte, Plaque, Attente, useOrdinateur, TIRET } from '../index.js';
 import { AideArgent } from './AideArgent.jsx';
+import { AnneauObjectif, BarreChiffre, CouvertureBarre } from './ArgentVisuel.jsx';   // (24 nov., visuel-argent) l'anneau, les barres
+import { useArriveeNeuve, retard } from '../arrivee.js';   // (24 nov.) « sans latence » : rien ne bouge si c'est déjà connu
 import './argent.css';
 
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
@@ -31,12 +33,13 @@ const coupe = (t) => { const m = /^(.*?)[\s  ]*€$/.exec(String(t)); return 
 const signe = (m, montant) => (m > 0 ? '+' : m < 0 ? '−' : '') + montant(Math.abs(m));
 
 // Une rangée de chiffre : libellé (et sa ligne grise) à gauche, montant à droite. Toute la rangée se touche.
-function Ligne({ libelle, valeur, sous = null, tonSous = 'neutre', onClick = null, chevron = true, attrs = null, attrsValeur = null }) {
+function Ligne({ libelle, valeur, sous = null, tonSous = 'neutre', onClick = null, chevron = true, attrs = null, attrsValeur = null, visuel = null }) {
   const corps = (
     <>
       <span className="n-arg-l-textes">
         <span className="n-arg-l-lib">{libelle}</span>
         {sous ? <span className="n-arg-l-sous" data-n-ton={tonSous}>{sous}</span> : null}
+        {visuel ? <span className="n-arg-l-visuel">{visuel}</span> : null}
       </span>
       <span className="n-arg-l-val" data-arg-montant="" data-n-vide={valeur == null ? '1' : undefined} {...(attrsValeur || {})}>{valeur == null ? TIRET : valeur}</span>
       {onClick && chevron ? <span className="n-arg-l-chev" aria-hidden="true"/> : null}
@@ -47,8 +50,12 @@ function Ligne({ libelle, valeur, sous = null, tonSous = 'neutre', onClick = nul
     : <div className="n-arg-l" data-arg-rangee="" {...(attrs || {})}>{corps}</div>;
 }
 
-export default function ArgentMois({ poster, phrase, note = '', moisLong, barres, faits, geste, versements, montant, vendu = null, comptes = null, sansBarres = false }) {
+export default function ArgentMois({ poster, phrase, note = '', moisLong, barres, faits, geste, versements, montant, vendu = null, comptes = null, sansBarres = false, objectif = null, avenir = null, seuils = null, nombre = undefined }) {
   const ordi = useOrdinateur();
+  // (24 nov., visuel-argent) Les barres ne poussent que si les mois ARRIVENT sous les yeux (jamais vus dans la session).
+  const moisPrets = barres.some((x) => x.v != null) || versements.etat !== 'encours';
+  const neuf6 = useArriveeNeuve('argent-mois6', moisPrets);
+  const neufL = useArriveeNeuve('argent-chiffres', (vendu && vendu.valeur != null) || versements.etat !== 'encours');
   const [tout, setTout] = React.useState(false);
   const MONTRES = ordi ? 30 : 8;   // le téléphone reste court ; « Voir les 29 » déplie le reste (rien n'est caché sans le dire)
   const { valeur, partiel } = poster;
@@ -67,6 +74,13 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
       attrs={{ 'data-v2-argent-fait': f.id, 'data-v2-argent-valeur': f.cents, 'data-v2-pas-su': f.pasSu ? '' : undefined, ...(extra.attrs || {}) }}/>;
   };
   const B = F.benefice;
+  // (24 nov., visuel-argent) Les petites barres de Vendu et du Bénéfice : la part du plus grand des deux, les MÊMES valeurs
+  // que les rangées (vendu.valeur ; le bénéfice en centimes `B.cents`) ; pas su ⇒ barre en pointillé ; un minimum ⇒ hachuré.
+  const vV = vendu && vendu.valeur != null && Number.isFinite(Number(vendu.valeur)) ? Number(vendu.valeur) : null;
+  const bV = B && !B.pasSu && B.cents !== '' && B.cents != null && Number.isFinite(Number(B.cents)) ? Number(B.cents) / 100 : null;
+  const maxC = Math.max(0, vV || 0, bV || 0);
+  const partDe = (x) => (x == null ? null : maxC > 0 && x > 0 ? x / maxC : 0);
+  const kn = C && typeof C.cents === 'string' && /^\d+\/\d+$/.test(C.cents) ? C.cents.split('/').map(Number) : null;
   const sousBenef = B && !B.pasSu && B.auMoins ? tr('journee.moins') : B && B.pasSu ? (B.sous || tr('v2.ar.pasSu')) : '';
   const lignesV = versements.etat === 'lu' ? (tout ? versements.lignes : versements.lignes.slice(0, MONTRES)) : [];
   const meta = (l) => [l.date, l.plateforme, l.achat != null ? tr('v2.ar.achete', { p: montant(l.achat) }) : ''].filter(Boolean).join(' · ');
@@ -83,9 +97,13 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
                 <p>{tr('arn.aideRecu')}</p>
               </AideArgent>
             </div>
-            <div className="n-arg-recu-chiffre" data-arg-montant="" data-n-vide={n == null ? '1' : undefined}>
-              {partiel && valeur != null ? <span className="n-arg-recu-moins">{tr('journee.moins')}</span> : null}
-              <span className="n-arg-recu-n">{n == null ? TIRET : n}</span>{u ? <span className="n-arg-recu-u">{u}</span> : null}
+            <div className="n-arg-recu-ligne">
+              <div className="n-arg-recu-chiffre" data-arg-montant="" data-n-vide={n == null ? '1' : undefined}>
+                {partiel && valeur != null ? <span className="n-arg-recu-moins">{tr('journee.moins')}</span> : null}
+                <span className="n-arg-recu-n">{n == null ? TIRET : n}</span>{u ? <span className="n-arg-recu-u">{u}</span> : null}
+              </div>
+              {/* L'anneau vers SON objectif du mois (src/objectifMois.js) : pas d'objectif ⇒ rien ; pas su ⇒ pointillé, « — ». */}
+              <AnneauObjectif o={objectif} montant={montant} nombre={nombre}/>
             </div>
             {/* Le manque (la note de la MÊME règle), en une ligne ; sans manque, rien (la datation est dans le « ? »). */}
             {note || valeur == null ? <p className="n-arg-recu-note" data-arg-recu-note="">{phrase}</p> : null}
@@ -99,7 +117,7 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
                   <li key={x.cle} className="n-arg-m6" data-arg-m6={x.cle} data-arg-m6-v={cents(x.v)} data-courant={x.courant ? '1' : undefined}
                     data-arg-m6-partiel={x.partiel ? '1' : undefined} data-arg-m6-adater={x.aDater > 0 ? String(x.aDater) : undefined} title={x.aDater > 0 ? tr('arn.aDaterPourquoi') : undefined}>
                     <span className="n-arg-m6-nom">{x.long.replace(/\s+\d{4}$/, '')}</span>
-                    <span className="n-arg-m6-piste" aria-hidden="true"><span className="n-arg-m6-plein" style={{ width: h + '%' }}/></span>
+                    <span className="n-arg-m6-piste" aria-hidden="true"><span className={'n-arg-m6-plein' + (neuf6 ? ' n-agv-pousse' : '')} style={{ width: h + '%', ...(neuf6 ? { animationDelay: retard(i) + 'ms' } : {}) }}/></span>
                     <span className="n-arg-m6-v" data-arg-montant="">{x.v == null ? TIRET : (x.partiel ? tr('journee.moins') + ' ' : '') + montant(x.v)}{x.aDater > 0 ? <span className="n-arg-m6-adater">{tr('arn.aDaterN', { n: x.aDater })}</span> : null}</span>
                   </li>
                 );
@@ -110,20 +128,27 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
         {/* 2. Le mois en chiffres : des rangées fines, le montant à droite. */}
         <Carte titre={tr('arn.chiffres', { mois: moisLong })} className="n-arg-lignes" attrs={{ 'data-v2-argent-faits': String(faits.filter((f) => !f.pasSu).length + (vendu && vendu.valeur != null ? 1 : 0)) }}>
           {vendu ? <Ligne libelle={tr('arn.vendu')} valeur={vendu.valeur == null ? null : montant(vendu.valeur)} onClick={vendu.onClick}
+            visuel={<BarreChiffre part={partDe(vV)} partiel={!!vendu.partiel} ton="accent" neuf={neufL} rang={0} attrs={{ 'data-agv-barre': 'vendu' }}/>}
             sous={vendu.valeur == null ? (vendu.note || tr('v2.ar.pasSu')) : vendu.partiel ? tr('journee.moins') : ''} attrs={{ 'data-arg-vendu': cents(vendu.valeur) }}/> : null}
           {B ? <Ligne libelle={B.l} valeur={B.pasSu ? null : B.v} onClick={geste ? geste.onClick : B.onClick}
             sous={prix || sousBenef} tonSous={geste ? 'ambre' : 'neutre'}
+            visuel={<><BarreChiffre part={partDe(bV)} partiel={!!(B.auMoins || B.connu || B.brut)} ton="vert" neuf={neufL} rang={1} attrs={{ 'data-agv-barre': 'benefice' }}/>
+              {geste && kn ? <CouvertureBarre k={kn[0]} n={kn[1]}/> : null}</>}
             attrs={{ 'data-v2-argent-fait': 'benefice', 'data-v2-argent-valeur': B.cents, 'data-v2-pas-su': B.pasSu ? '' : undefined, 'data-benef-notion': B.connu ? 'connu' : B.brut ? 'brut' : 'benefice', 'data-arg-net-connu': B.connu ? `${B.nCout}/${B.n}` : undefined,
               'data-v2-argent-geste': geste ? String(geste.n) : undefined, 'data-v2-principal': geste ? geste.id : undefined }}/> : null}
           {fait(F.attente, tr('arn.aVenir'))}
           {fait(F.dispo)}
           {comptes ? <Ligne libelle={tr('arn.comptes')} valeur={comptes.texte} onClick={comptes.onClick} attrs={{ 'data-v2-argent-comptes': comptes.dedans == null ? '' : String(comptes.dedans), 'data-arg-comptes-ligne': '' }}/> : null}
         </Carte>
+        {/* (24 nov., visuel-argent) L'argent à venir en cartes, par étape (src/natif/ecrans/ArgentVisuel.jsx). */}
+        {avenir}
         {/* La couverture des coûts reste lisible des bancs (k/n), sans redire un chiffre à l'écran. */}
         {C ? <span hidden data-v2-argent-fait="couts" data-v2-argent-valeur={C.cents}/> : null}
         <span hidden data-v2-argent-passu={faits.filter((f) => f.pasSu).map((f) => f.id).join(' ')}/>
       </div>
       <div className="n-arg-col">
+        {/* (24 nov., visuel-argent) Les seuils de l'année en jauges (plafond micro, TVA). */}
+        {seuils}
         {/* 3. Les versements du mois : téléphone = rangées (N°, titre sur deux lignes, jour · site · acheté, montant et marge) ;
             ordinateur = un tableau à colonnes. */}
         <Carte titre={tr('v2.ar.versements', { mois: moisLong })} n={versements.etat === 'lu' && versements.n ? String(versements.n) : null} className="n-arg-vers"

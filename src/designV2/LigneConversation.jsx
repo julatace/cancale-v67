@@ -12,6 +12,7 @@
 import React from 'react';
 import { RangeeTouchable } from './BoutonV2.jsx';
 import { Etiquette } from './Signature.jsx';
+import { TuilePaire } from '../natif/index.js';   // (24 nov., visuel-argent) la paire comme une pièce d'inventaire
 import './design-v2.css';
 import './messages-v2.css';
 
@@ -33,15 +34,19 @@ export function nomSecable(nom) {
   return (t.match(/[^_.\-]*[_.\-]|[^_.\-]+$/g) || [t]).map((x, k) => (k ? <React.Fragment key={k}><wbr/>{x}</React.Fragment> : x));
 }
 
-export function LigneConversation({ photo, Photo, nom, heure, quandIso, extrait, toi = '', num = '', offre = '', etat = '', nonLu = false, lectureSeule = false, actif = false, label, onClick, attrs = {}, apres = null }) {
+// (24 nov., visuel-argent — « toute l'application visuelle ») La rangée : à gauche la PAIRE en tuile (sa photo, trouvée PAR
+// IDENTITÉ par l'écran : la photo de l'annonce de la conversation ou de la fiche reliée ; jamais l'avatar de l'acheteur ;
+// sans photo, un médaillon), et l'AVATAR DU COMPTE (son initiale) posé sur son coin ; le non-lu = un point calme à
+// l'ardoise, fixe ; l'offre = une pastille visuelle (icône + prix). Les mêmes valeurs, les mêmes data-* qu'avant.
+const initiale = (t) => String(t || '').trim().replace(/^[^\p{L}\p{N}]+/u, '').charAt(0).toUpperCase() || '·';
+export function LigneConversation({ photo, Photo, Icon = null, nom, compte = '', heure, quandIso, extrait, toi = '', num = '', offre = '', etat = '', nonLu = false, lectureSeule = false, actif = false, label, onClick, attrs = {}, apres = null, revele = null }) {
   return (
-    <RangeeTouchable className={'v2m-ligne' + (nonLu ? ' is-nonlu' : '') + (lectureSeule ? ' is-ro' : '') + (actif ? ' is-actif' : '')} label={label} onClick={onClick}
-      attrs={{ 'data-v2-conv': '', 'aria-current': actif ? 'true' : undefined, ...attrs }}>
+    <RangeeTouchable className={'v2m-ligne' + (nonLu ? ' is-nonlu' : '') + (lectureSeule ? ' is-ro' : '') + (actif ? ' is-actif' : '') + (revele ? ' ' + revele.className : '')} label={label} onClick={onClick}
+      attrs={{ 'data-v2-conv': '', 'aria-current': actif ? 'true' : undefined, ...(revele ? { style: revele.style } : {}), ...attrs }}>
       <span className="v2m-point" aria-hidden="true" data-v2-conv-point={nonLu ? '1' : '0'}/>
-      {/* (19 nov. soir, NATIF.md §2 bis — la liste « tableau de travail ») À gauche l'AVATAR de la personne (son initiale), à
-          droite la VIGNETTE de l'article ; les mêmes valeurs qu'avant. */}
-      <span className="v2m-av v2m-av-rond" aria-hidden="true">
-        <span className="v2m-ini vrm-sensible" data-stream-type="acheteur">{String(nom || '').trim().charAt(0).toUpperCase() || '·'}</span>
+      <span className="v2m-tuile" aria-hidden="true" data-v2-conv-vignette={photo ? '' : undefined}>
+        <TuilePaire photo={photo || ''} Photo={Photo} Icon={Icon} icone="chat" genre="message" taille="m"/>
+        {compte ? <span className="v2m-compte-av vrm-sensible" data-stream-type="compte" data-v2-conv-compte-av="" title={compte}>{initiale(compte)}</span> : null}
       </span>
       <span className="v2m-txt">
         <span className="v2m-l1">
@@ -51,12 +56,11 @@ export function LigneConversation({ photo, Photo, nom, heure, quandIso, extrait,
         <span className="v2m-extrait" data-v2-conv-extrait="">{toi ? <span className="v2m-toi">{toi} </span> : null}{extrait}</span>
         {(num || offre || etat || apres) ? <span className="v2m-l3">
           {num ? <Etiquette num={num}/> : null}
-          {offre ? <span className="v2m-offre" data-v2-conv-offre="">{offre}</span> : null}
+          {offre ? <span className="v2m-offre v2m-puce-offre" data-v2-conv-offre="">{Icon ? <Icon name="tag" size={13}/> : null}<span>{offre}</span></span> : null}
           {etat ? <span className="v2m-etat">{etat}</span> : null}
           {apres}
         </span> : null}
       </span>
-      {photo && Photo ? <span className="v2m-vignette" aria-hidden="true" data-v2-conv-vignette=""><Photo src={photo} alt="" loading="lazy" decoding="async"/></span> : null}
     </RangeeTouchable>
   );
 }

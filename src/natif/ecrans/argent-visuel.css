@@ -1,0 +1,87 @@
+/* ── src/natif/ecrans/argent-visuel.css — Argent visuel (24 nov., lot visuel-argent ; src/natif/ecrans/ArgentVisuel.jsx) ──
+   Jetons `--n-*` seulement. Aucune couleur orange : ardoise (`--n-accent`), vert « fait », sarcelle, encre.
+   « Sans latence » : rien n'est animé quand la donnée est déjà connue ; une donnée qui ARRIVE pousse en 180 ms
+   (décalage 15 ms par élément, posé en ligne). Mouvement réduit ⇒ aucune animation. */
+@layer vrm-natif {
+  /* ── La pousse (barres, jauges) et l'apparition (cartes) : courtes, une fois. ── */
+  .n-agv-pousse { transform-origin: left center; animation: n-agv-pousse 180ms cubic-bezier(.2, .7, .3, 1) both; }
+  @keyframes n-agv-pousse { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  .n-agv-apparait { animation: n-agv-apparait 160ms cubic-bezier(.2, .7, .3, 1) both; }
+  @keyframes n-agv-apparait { from { opacity: .4; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+  .n-agv-obj[data-agv-anime] .n-anneau-plein { animation: n-agv-anneau 200ms cubic-bezier(.2, .7, .3, 1) both; }
+  @keyframes n-agv-anneau { from { stroke-dashoffset: var(--n-agv-c, 400); } }
+  @media (prefers-reduced-motion: reduce) {
+    .n-agv-pousse, .n-agv-apparait, .n-agv-obj[data-agv-anime] .n-anneau-plein, .n-arg-m6-plein.n-agv-pousse { animation: none; }
+  }
+
+  /* ── L'affiche du reçu : le chiffre à gauche, l'anneau de l'objectif à droite. ── */
+  .n-arg-recu-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+  .n-arg-recu-ligne > .n-arg-recu-chiffre { flex: 1 1 auto; }
+  .n-agv-obj { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .n-agv-obj .n-anneau-centre { font: 700 15px/1 var(--n-police); font-variant-numeric: tabular-nums; }
+  .n-agv-obj-pct small { font-size: 10px; font-weight: 600; margin-left: 1px; color: var(--n-encre-2); }
+  .n-agv-obj-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .n-agv-obj-lib { font: var(--n-t-legende-fort); color: var(--n-encre); white-space: nowrap; }
+  .n-agv-obj-cible { font: var(--n-t-legende); color: var(--n-encre-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .n-agv-obj[data-agv-objectif="passu"] .n-agv-obj-lib { color: var(--n-encre-2); }
+  @media (max-width: 380px) { .n-agv-obj-txt { display: none; } }
+
+  /* ── Les six mois : une vraie barre par mois, plus épaisse, le mois en cours à l'accent, un minimum hachuré, un mois
+     pas su en pointillé. ── */
+  .n-arg-vx .n-arg-m6-piste { height: 10px; background: var(--n-carte-2); }
+  .n-arg-vx .n-arg-m6-plein { background: color-mix(in srgb, var(--n-accent) 38%, var(--n-carte-2)); }
+  .n-arg-vx .n-arg-m6[data-courant] .n-arg-m6-plein { background: var(--n-accent); }
+  .n-arg-vx .n-arg-m6[data-arg-m6-partiel] .n-arg-m6-plein { background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgb(255 255 255 / .38) 4px 7px); }
+  .n-arg-vx .n-arg-m6[data-arg-m6-v=""] .n-arg-m6-piste { background: transparent; box-shadow: inset 0 0 0 1px var(--n-bord); border: 0; background-image: repeating-linear-gradient(90deg, var(--n-bord) 0 3px, transparent 3px 7px); background-size: 100% 1px; background-position: 0 50%; background-repeat: no-repeat; box-shadow: none; }
+  .n-arg-vx .n-arg-m6 { min-height: 34px; }
+
+  /* ── Les chiffres du mois : une petite barre sous Vendu et Bénéfice, la couverture des prix sous le bénéfice. ── */
+  .n-arg-l-visuel { display: flex; align-items: center; gap: 8px; margin-top: 4px; min-width: 0; }
+  .n-agv-barre { display: block; flex: 1 1 auto; height: 6px; min-width: 40px; max-width: 220px; border-radius: var(--n-r-rond); background: var(--n-carte-2); overflow: hidden; }
+  .n-agv-barre[data-agv-barre-su="0"] { background: transparent; background-image: repeating-linear-gradient(90deg, var(--n-bord) 0 3px, transparent 3px 7px); background-size: 100% 1px; background-position: 0 50%; background-repeat: no-repeat; }
+  .n-agv-barre-plein { display: block; height: 100%; border-radius: inherit; background: var(--n-accent); }
+  .n-agv-barre[data-agv-ton="vert"] .n-agv-barre-plein { background: var(--n-vert); }
+  .n-agv-barre[data-agv-ton="encre"] .n-agv-barre-plein { background: color-mix(in srgb, var(--n-accent) 45%, var(--n-carte-2)); }
+  .n-agv-barre[data-agv-partiel] .n-agv-barre-plein { background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgb(255 255 255 / .4) 4px 7px); }
+  .n-agv-couv { display: inline-flex; align-items: center; gap: 2px; flex: 0 1 auto; min-width: 0; max-width: 100%; flex-wrap: nowrap; }
+  .n-agv-couv > i { display: block; width: 6px; height: 10px; border-radius: 2px; background: var(--n-carte-2); box-shadow: inset 0 0 0 1px var(--n-bord); }
+  .n-agv-couv > i[data-plein] { background: var(--n-vert); box-shadow: none; }
+  .n-agv-couv-continu { display: block; width: 120px; height: 6px; border-radius: var(--n-r-rond); background: var(--n-carte-2); overflow: hidden; }
+  .n-agv-couv-continu > span { display: block; height: 100%; background: var(--n-vert); }
+
+  /* ── Les seuils de l'année ── */
+  .n-agv-seuils-ca { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 16px 8px; min-width: 0; }
+  .n-agv-seuils-ca-lib { font: var(--n-t-second); color: var(--n-encre-2); min-width: 0; }
+  .n-agv-seuils-ca-v { font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--n-encre); }
+  .n-agv-seuils-ca-v[data-n-vide] { color: var(--n-encre-2); font-weight: 400; }
+  .n-agv-jauge { display: flex; flex-direction: column; gap: 6px; padding: 10px 16px 12px; border-top: 1px solid var(--n-trait); min-width: 0; }
+  .n-agv-jauge-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
+  .n-agv-jauge-nom { font: var(--n-t-corps); color: var(--n-encre); min-width: 0; }
+  .n-agv-jauge-etat { font-weight: 700; color: var(--n-accent); }
+  .n-agv-jauge-pct { font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--n-encre); }
+  .n-agv-jauge[data-agv-jauge-su="0"] .n-agv-jauge-pct { color: var(--n-encre-2); font-weight: 400; }
+  .n-agv-jauge-piste { position: relative; height: 12px; border-radius: var(--n-r-rond); background: var(--n-carte-2); overflow: hidden; }
+  .n-agv-jauge[data-agv-jauge-su="0"] .n-agv-jauge-piste { background: transparent; box-shadow: inset 0 0 0 1px var(--n-bord); background-image: repeating-linear-gradient(90deg, var(--n-bord) 0 3px, transparent 3px 7px); background-size: 100% 1px; background-position: 0 50%; background-repeat: no-repeat; }
+  .n-agv-jauge-plein { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--n-accent); }
+  .n-agv-jauge[data-agv-partiel] .n-agv-jauge-plein { background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgb(255 255 255 / .4) 4px 7px); }
+  .n-agv-jauge-seuil { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--n-encre); opacity: .55; }
+  .n-agv-jauge-pied { display: flex; justify-content: space-between; gap: 8px; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; min-width: 0; }
+  .n-agv-jauge-borne { text-align: end; white-space: nowrap; }
+  .n-agv-jauge-pied > span:last-child:not(:first-child) { white-space: nowrap; }
+  .n-agv-squelette-jauges { display: flex; flex-direction: column; gap: 22px; padding: 16px 16px 20px; }
+  .n-agv-squelette-jauges > i { display: block; height: 12px; border-radius: var(--n-r-rond); background: var(--n-squelette); }
+
+  /* ── L'argent à venir en cartes ── */
+  .n-agv-avenir { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .n-agv-avenir-titre { margin: 0 4px; font: var(--n-t-section, 700 17px/22px var(--n-police)); color: var(--n-encre); }
+  .n-agv-avenir-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .n-agv-av-carte { appearance: none; display: flex; align-items: center; gap: 12px; min-height: 76px; min-width: 0; margin: 0; padding: 10px 12px; box-sizing: border-box;
+    border: 0; border-radius: var(--n-r-carte, 14px); background: var(--n-carte); box-shadow: var(--n-ombre-carte, 0 0 0 1px var(--n-trait)); color: inherit; font: inherit; text-align: left; cursor: pointer; touch-action: manipulation; }
+  .n-agv-av-carte:active { background: var(--n-appui); }
+  .n-agv-av-carte:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-agv-av-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .n-agv-av-lib { font: var(--n-t-legende-fort); color: var(--n-encre-2); overflow-wrap: anywhere; }
+  .n-agv-av-v { font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--n-encre); }
+  .n-agv-av-n { font: var(--n-t-legende); color: var(--n-encre-2); white-space: nowrap; }
+  @media (max-width: 420px) { .n-agv-avenir-grille { grid-template-columns: repeat(2, minmax(0, 1fr)); } .n-agv-av-carte { gap: 10px; padding: 10px; } }
+}
