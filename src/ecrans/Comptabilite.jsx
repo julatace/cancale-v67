@@ -29291,8 +29291,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   const enRouteSR = vinVu ? ((groupesRelais && groupesRelais.enRouteSansRelais) || 0) : 0;
                   const videSite = chRet.filtre && chRet.vide && enRouteSR === 0 && toutLuRet
                     ? <p className="vrm-colis-vide" data-retraits-vide="site" data-retraits-vide-site={chRet.site}>{tr('achats.retirer.aucunSite', { site: nomSite[chRet.site] || chRet.site })}</p> : null;
+                  // La place est TENUE pendant la lecture (une hauteur d'écran) quand la dernière publication disait des colis à retirer
+                  // (ou n'a jamais été faite) : sans elle, la liste des achats se dessinait dessous puis était poussée hors de l'écran
+                  // par la colonne arrivée d'un coup (banc parcours-iphone, CLS 0,58). Publication à 0 ⇒ aucune réserve.
+                  const pubRet = (() => { try { const v = load('vrm_colis_retirer', null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } })();
+                  const reserveRet = !pubRet || !(Number(pubRet.total) === 0 && !(Number(pubRet.aVerifier) > 0));
                   const lectureAncienne = !retraitsPrets && !(designV2 && colisDans === 'achats')
-                    ? <p className="vrm-colis-vide" data-retraits-lecture="" data-retraits-attente-sources="">{tr('sv.lib.lecture')}</p> : null;
+                    ? <p className="vrm-colis-vide" data-retraits-lecture="" data-retraits-attente-sources="" style={reserveRet ? { minHeight: '100svh', margin: 0 } : undefined}>{tr('sv.lib.lecture')}</p> : null;
                   const ancienne = lectureAncienne || (colRet && (colRet.cartes.length > 0 || enRouteSR > 0)
                   ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={false} ordi={ordiColis} delai={delaiColisRetrait} enRouteSansRelais={enRouteSR}
                       fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} suiviDe={suiviRetrait} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} qrDe={qrRetrait} memeColisDe={memeColisDe} enRoute={vinVu ? ((groupesRelais && groupesRelais.sansRelais) || []) : []}

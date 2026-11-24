@@ -130,7 +130,7 @@ const dit = (ok, quoi, detail = '') => { if (!ok) ROUGES++; const l = `${ok ? '�
         await l.click().catch(() => {}); await pg.waitForTimeout(2500); return true;
       };
       if (!SEUL) for (const [ecran, cle] of [['aujourdhui', 'journee'], ['annonces', 'paires'], ['ventes', 'ventes'], ['achats', 'achats'], ['argent', 'compta'], ['stock', 'garage']]) {
-        if (await aller(cle)) await juger(ecran); else dit(false, `${W} ${th} · ${ecran} : écran introuvable`);
+        if (await aller(cle) || (cle === 'paires' && await aller('annonces'))) await juger(ecran); else dit(false, `${W} ${th} · ${ecran} : écran introuvable`);
       }
       // Messages
       // Messages, puis « Offres », puis une conversation qui porte une offre Vinted (sa carte d'offre : le cadre doré du 24 nov.).
@@ -154,7 +154,8 @@ const dit = (ok, quoi, detail = '') => { if (!ok) ROUGES++; const l = `${ok ? '�
         await juger('parametres');
         const sections = await pg.evaluate(() => [...document.querySelectorAll('[data-categorie-ouvrir]')].map((x) => x.getAttribute('data-categorie-ouvrir')));
         for (const s of sections) {
-          const l = await visible(`[data-categorie-ouvrir="${s}"]`);
+          let l = await visible(`[data-categorie-ouvrir="${s}"]`);
+          if (!l) { await aller('settings'); l = await visible(`[data-categorie-ouvrir="${s}"]`); }   // 1512 : le retour ne ramène pas toujours la liste
           if (!l) { dit(false, `${W} ${th} · parametres-${s} : section introuvable`); continue; }
           await l.click().catch(() => {}); await pg.waitForTimeout(1200);
           await juger(`parametres-${s}`);
@@ -163,11 +164,11 @@ const dit = (ok, quoi, detail = '') => { if (!ok) ROUGES++; const l = `${ok ? '�
       } else dit(false, `${W} ${th} · parametres : écran introuvable`);
       // La loupe (sans rien taper, puis un N°)
       if (!SEUL) await aller('journee');
-      const loupe = pg.locator('[data-recherche-loupe], [data-n-tete-loupe]').first();
+      const loupe = pg.locator('[data-recherche-loupe]:visible, [data-n-tete-loupe]:visible, [data-n-recherche]:visible, .vrm-global-search input:visible').first();
       if (!SEUL && await loupe.count()) {
         await loupe.click().catch(() => {}); await pg.waitForTimeout(2500); await juger('loupe');
         await pg.keyboard.type('12', { delay: 40 }).catch(() => {}); await pg.waitForTimeout(1500); await juger('loupe-resultats');
-      }
+      } else if (!SEUL) dit(false, `${W} ${th} · loupe : introuvable`);
       if (o.erreurs.length) dit(false, `${W} ${th} : erreur JS`, o.erreurs.slice(0, 3).join(' | '));
       await o.ctx.close();
     }
