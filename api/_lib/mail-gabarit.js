@@ -156,9 +156,9 @@ export function gabaritMail({ titre, preentete = '', paras = [], liste = [], chi
   const btn = bouton && urlBouton ? boutonVerre({ urlHtml: echapperHtml(urlBouton), motHtml: echapperHtml(bouton.mot) }) : '';
   // Le pied, en clair sur le bleu (hors de la carte) ; ses liens en blanc souligné.
   const petit = (t) => `<p class="vv-pied" style="margin:0 0 10px;font-family:${P};font-size:13px;line-height:1.55;color:${V.surBleu2}">${t}</p>`;
-  const lienDoux = (url, mot) => `<a href="${echapperHtml(url)}" style="color:${V.surBleu};text-decoration:underline">${echapperHtml(mot)}</a>`;
+  const lienDoux = (url, mot) => `<a class="vv-lien" href="${echapperHtml(url)}" style="color:${V.surBleu};text-decoration:underline">${echapperHtml(mot)}</a>`;
   const blocsPied = [];
-  if (bouton && urlBouton) blocsPied.push(petit(`${echapperHtml(tm(lang, 'g.secours'))}<br><span style="word-break:break-all;color:${V.surBleu}">${echapperHtml(urlBouton)}</span>`));
+  if (bouton && urlBouton) blocsPied.push(petit(`${echapperHtml(tm(lang, 'g.secours'))}<br><span class="vv-encre" style="word-break:break-all;color:${V.surBleu}">${echapperHtml(urlBouton)}</span>`));
   if (pied) blocsPied.push(petit(`${echapperHtml(pied.texte)}${lienPied ? ` ${lienDoux(lienPied, majuscule(pied.motLien || 'lien'))}.` : ''}`));
   if (facultatif) blocsPied.push(petit(lienDoux(LIEN_GERER, tm(lang, 'g.gerer'))));
   if (signature) blocsPied.push(petit(`${echapperHtml(signature.replace(/ · vrm\.center$/, ''))} · ${lienDoux(SITE, 'vrm.center')}`));

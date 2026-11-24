@@ -7,7 +7,7 @@
 //   · scripts/modeles-email.cjs — les six modèles de compte Supabase
 //     (supabase/templates/*.html, à coller dans Supabase).
 // Un e-mail n'a pas de `backdrop-filter` : le « verre » se rend par
-//   1. un FOND bleu profond (couleur unie #174C88 — ce que montre un client qui
+//   1. un FOND gris clair (couleur unie #DFE1E5 — ce que montre un client qui
 //      retire les images de fond — et le dégradé de la page en image de fond) ;
 //   2. en tête, sur le bleu : le logo (image hébergée sur vrm.center, jamais en
 //      base64) + le mot « VRM », puis le TITRE en blanc ;
@@ -17,26 +17,29 @@
 // Tableaux, styles EN LIGNE (le bloc <style> ne sert qu'au sombre et au téléphone),
 // largeur 600, Inter puis la police du système, aucune feuille externe.
 // Sombre : `prefers-color-scheme` (Apple Mail, iOS, Outlook macOS) ET `[data-ogsc]`
-// / `[data-ogsb]` (Outlook.com) : bleu-nuit, carte bleu-nuit, texte clair.
-// Contrastes (calculés sur ces jetons par scripts/audit-emails-verre.cjs, F8) : encre sur
-// blanc 17,0:1 ; gris #3F5468 7,8:1 ; lien #0055B8 7,0:1 ; titre blanc sur #174C88 8,7:1
-// (sur le haut du dégradé #1E5DA4 6,7:1) ; pied #D6E4F3 sur #174C88 6,7:1 (haut 5,1:1) ;
-// mot blanc sur le plein 17,0:1 ; la nuit : 14,4 · 8,3 · 7,4 · 11,5:1.
+// / `[data-ogsb]` (Outlook.com) : gris-ardoise, carte grise, texte clair.
+// (23 nov., Julien : « tous les tutos doivent ressembler à l'application », puis « toute l'app en
+// gris clair ») : le BLEU de la première forme est remplacé par le GRIS CLAIR de l'app
+// (src/natif/jetons.css, gris clair étagé du 23 nov. : fond #DFE1E5, carte #FAFAFB, encre #1D1D1F,
+// filet #E1E3E7, accent ardoise #3D4B5B) ; titre et pied à l'encre sur le gris ; le lien à l'ARDOISE et
+// SOULIGNÉ (aucun bleu vif, aucun orange : audit-style-vintex) ; le plein à l'encre. La nuit (choix du client mail) : les valeurs graphite de l'app.
+// Les clés `bleu` / `surBleu` gardent leur nom (= « le fond » / « le texte posé sur le fond »).
+// Contrastes : calculés sur ces jetons par scripts/audit-emails-verre.cjs (F8), ≥ 4,5:1 partout.
 // ════════════════════════════════════════════════════════════════════════════
 
 export const VERRE = Object.freeze({
   largeur: 600,
   police: "Inter,-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",
   policeCode: "'SF Mono',ui-monospace,Menlo,Consolas,'Liberation Mono',monospace",
-  bleu: '#174C88',                      // le fond uni (repli sans image)
-  degrade: 'linear-gradient(170deg,#1E5DA4 0%,#174C88 45%,#0F2F57 100%)',
-  carte: '#FFFFFF', encre: '#0C1D30', gris: '#3F5468', filet: '#E2E8F0', puits: '#EEF3F9', lien: '#0055B8',
-  plein: '#0C1D30', pleinMot: '#FFFFFF',
-  surBleu: '#FFFFFF', surBleu2: '#D6E4F3',
-  ombre: '0 18px 40px -18px rgba(8,26,50,.55)',
+  bleu: '#DFE1E5',                      // le fond uni (repli sans image) : le gris clair de l'app (--n-fond)
+  degrade: 'linear-gradient(180deg,#E9EBEE 0%,#DFE1E5 45%,#D4D7DC 100%)',
+  carte: '#FAFAFB', encre: '#1D1D1F', gris: '#50535B', filet: '#E1E3E7', puits: '#E9EBEE', lien: '#3D4B5B',
+  plein: '#1D1D1F', pleinMot: '#FFFFFF',
+  surBleu: '#1D1D1F', surBleu2: '#50535B',
+  ombre: '0 1px 2px rgba(22,24,29,.06),0 8px 24px -12px rgba(22,24,29,.12)',
   logo: 'https://vrm.center/vrm-logo-v5-192.png',
-  // La nuit (Apple Mail, iOS, Outlook) : bleu-nuit, carte de verre sombre, texte clair.
-  nuit: { bleu: '#0C2848', carte: '#0E2139', encre: '#EAF2FB', gris: '#A9BBCF', filet: '#24364E', puits: '#08182C', lien: '#6CB4FF', plein: '#FFFFFF', pleinMot: '#0C1D30' },
+  // La nuit (Apple Mail, iOS, Outlook) : les valeurs de l'app la nuit (fond, carte #2A2A2F, texte blanc).
+  nuit: { bleu: '#0F0F10', carte: '#2A2A2F', encre: '#FFFFFF', gris: '#B8B8C0', filet: '#42424A', puits: '#1C1C20', lien: '#F4F4F5', plein: '#FFFFFF', pleinMot: '#16181D' },
 });
 
 // La feuille : le sombre (deux syntaxes) et le téléphone. Les classes `vv-*` sont la
@@ -47,7 +50,7 @@ export function styleVerre() {
     const s = (sel) => sel.split(',').map((x) => `${pre}${x.trim()}`).join(',');
     return `${s('.vv-fond')}{background-color:${N.bleu}!important;background-image:none!important}`
       + `${s('.vv-carte')}{background-color:${N.carte}!important}`
-      + `${s('.vv-encre')}{color:${N.encre}!important}${s('.vv-gris')}{color:${N.gris}!important}`
+      + `${s('.vv-encre')}{color:${N.encre}!important}${s('.vv-gris')}{color:${N.gris}!important}${s('.vv-pied')}{color:${N.gris}!important}`
       + `${s('.vv-lien')}{color:${N.lien}!important}${s('.vv-filet')}{border-color:${N.filet}!important}`
       + `${s('.vv-puits')}{background-color:${N.puits}!important;color:${N.encre}!important}`
       + `${s('.vv-plein')}{background-color:${N.plein}!important;color:${N.pleinMot}!important}`;
@@ -66,11 +69,11 @@ export function styleVerre() {
 export function teteVerre({ titreHtml, marqueHtml = '' }) {
   const P = VERRE.police;
   const marque = marqueHtml
-    ? `<td style="font-family:${P};font-size:18px;line-height:24px;font-weight:700;color:${VERRE.surBleu};letter-spacing:-0.2px;word-break:break-word">${marqueHtml}</td>`
+    ? `<td class="vv-encre" style="font-family:${P};font-size:18px;line-height:24px;font-weight:700;color:${VERRE.surBleu};letter-spacing:-0.2px;word-break:break-word">${marqueHtml}</td>`
     : `<td width="40" style="width:40px;vertical-align:middle"><img src="${VERRE.logo}" width="32" height="32" alt="" style="display:block;border:0;border-radius:9px;outline:none;text-decoration:none"></td>`
-      + `<td style="vertical-align:middle;font-family:${P};font-size:19px;line-height:24px;font-weight:700;color:${VERRE.surBleu};letter-spacing:-0.3px">VRM</td>`;
+      + `<td class="vv-encre" style="vertical-align:middle;font-family:${P};font-size:19px;line-height:24px;font-weight:700;color:${VERRE.surBleu};letter-spacing:-0.3px">VRM</td>`;
   return `<tr><td data-vv="tete" style="padding:0 6px 18px"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${marque}</tr></table></td></tr>`
-    + `<tr><td data-vv="titre" style="padding:0 6px 20px"><h1 class="vv-titre" style="margin:0;font-family:${P};font-size:28px;line-height:34px;font-weight:700;letter-spacing:-0.6px;color:${VERRE.surBleu};word-break:break-word">${titreHtml}</h1></td></tr>`;
+    + `<tr><td data-vv="titre" style="padding:0 6px 20px"><h1 class="vv-titre vv-encre" style="margin:0;font-family:${P};font-size:28px;line-height:34px;font-weight:700;letter-spacing:-0.6px;color:${VERRE.surBleu};word-break:break-word">${titreHtml}</h1></td></tr>`;
 }
 
 // Le bouton plein : une cellule colorée + le lien en bloc. 48 px.
@@ -113,7 +116,7 @@ export function enveloppeVerre({ lang = 'fr', titreDoc = 'VRM', apercuHtml = '',
     + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${L}px">`
     + teteHtml
     + `<tr><td class="vv-carte vv-carte-td" data-vv="carte" bgcolor="${VERRE.carte}" style="background-color:${VERRE.carte};border-radius:22px;padding:30px 28px;box-shadow:${VERRE.ombre};font-family:${P}">${corpsHtml}</td></tr>`
-    + (piedHtml ? `<tr><td data-vv="pied" style="padding:22px 8px 0;font-family:${P};font-size:13px;line-height:20px;color:${VERRE.surBleu2}">${piedHtml}</td></tr>` : '')
+    + (piedHtml ? `<tr><td data-vv="pied" class="vv-gris" style="padding:22px 8px 0;font-family:${P};font-size:13px;line-height:20px;color:${VERRE.surBleu2}">${piedHtml}</td></tr>` : '')
     + `</table>`
     + `<!--[if mso]></td></tr></table><![endif]-->`
     + `</td></tr></table></body></html>`;

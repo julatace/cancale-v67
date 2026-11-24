@@ -1,0 +1,37 @@
+{
+ "relier-compte": {
+  "mp4": "cc6d64db1eedaa211b18b65b69e1fed60c6ee6491d65d89b76ce48ffb28a79e7",
+  "jpg": "45abfb25554516c579feb41d9d2fa4a8a50336b0449debff58099fe9f5f8ce59",
+  "duree": 21.5,
+  "design": "70a4b80e8c021e89",
+  "modeExemple": true
+ },
+ "imprimer": {
+  "mp4": "763ad7f3a7f71780162f007621fe71493ef127201600403dff5f87a22bd1b8c1",
+  "jpg": "c516fb03306c519408606085f99b7bf45cf96f01a0926daaafeb65bf376e1429",
+  "duree": 18.8,
+  "design": "70a4b80e8c021e89",
+  "modeExemple": true
+ },
+ "numeroter": {
+  "mp4": "f146be3250551401573cb81c93bfb1bbaa5264245a9221a83eb7c941badf2476",
+  "jpg": "8969de7bb43a9dc1fb145b83e9a792c2fe8db1b9333c3ed91da78fc28de8a058",
+  "duree": 20.3,
+  "design": "70a4b80e8c021e89",
+  "modeExemple": true
+ },
+ "relier-achat": {
+  "mp4": "076e496b2e4e111e6d28ae1c8e05644f5f4102bc5789e0d49b9276a284faad0f",
+  "jpg": "b6caa47cd07ac99111e4dd92ac75005072e9c25115156c7abea2a42ab813e57b",
+  "duree": 21,
+  "design": "70a4b80e8c021e89",
+  "modeExemple": true
+ },
+ "benefice": {
+  "mp4": "11c16a5f9761ea0de33a36cbf08f868c8a3e74607d2d15e0c0a55fd9c58376e2",
+  "jpg": "b132d6390aaf5c501e99115bbcbebd7753fe3d9bcd4da39327e168ef988af958",
+  "duree": 21.5,
+  "design": "70a4b80e8c021e89",
+  "modeExemple": true
+ }
+}

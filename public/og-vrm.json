@@ -1,8 +1,9 @@
 {
- "sha256": "4cea2bee3c67d4568dbff47844120eee9b29c7bb25766a2807a93c7f05f676c9",
+ "sha256": "a8fec1ee9ebfb655dafe5e4390ebb832b9949fd31729e559a68c63bf7fdf9a71",
  "largeur": 1200,
  "hauteur": 630,
  "source": "accueil/journee-clair.webp",
- "sourceSha256": "02f236e5739085e59dd3f7f5c1f25e6362ab53f88371efb43a304768a2313966",
- "modeExemple": true
+ "sourceSha256": "57d9c83d758112d1ea02ba5dc0ea5431f00132d36ad2d146dcc124a70b51d525",
+ "modeExemple": true,
+ "design": "70a4b80e8c021e89"
 }

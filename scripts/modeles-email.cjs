@@ -198,7 +198,7 @@ const TETE = '{{- $l := printf "%v" .Data.langue -}}';
 
 // (15 nov., « Verre dépoli », Julien : « J'aime la 9 » ; « intègre les e-mails ») LA FORME vient
 // d'api/_lib/mail-verre.js — la MÊME que les e-mails que VRM envoie (api/_lib/mail-gabarit.js) :
-// fond bleu profond (couleur unie #174C88 + dégradé en image de fond), logo hébergé + « VRM » et
+// fond gris clair (couleur unie #DFE1E5 + dégradé en image de fond), logo hébergé + « VRM » et
 // le TITRE en blanc sur le bleu, carte blanche arrondie, code EN GRAND, UN plein d'encre, pied en
 // clair. Un document entier par langue (`{{ if $en }}…{{ else }}…{{ end }}`) : le `lang` suit.
 const { VERRE, teteVerre, boutonVerre, codeVerre, enveloppeVerre } = require('../api/_lib/mail-verre.js');
@@ -218,8 +218,8 @@ const bloc = (m, l) => {
     m.lien ? ligne(`<p class="vv-gris vv-filet" style="margin:0;padding:16px 0 0;border-top:1px solid ${VERRE.filet};font-family:${P};font-size:13px;line-height:19px;color:${VERRE.gris}">${SECOURS[l]}<br><a class="vv-lien" href="${m.lien}" style="color:${VERRE.lien};text-decoration:underline;word-break:break-all">${m.lien}</a></p>`, '0') : '',
     `</table>`,
   ].join('');
-  const pied = `<p style="margin:0 0 10px;font-family:${P};font-size:13px;line-height:20px;color:${VERRE.surBleu2}">${t.pied}</p>`
-    + `<p style="margin:0;font-family:${P};font-size:13px;line-height:20px;color:${VERRE.surBleu2}">VRM · <a href="https://vrm.center" style="color:${VERRE.surBleu};text-decoration:underline">vrm.center</a></p>`;
+  const pied = `<p class="vv-gris" style="margin:0 0 10px;font-family:${P};font-size:13px;line-height:20px;color:${VERRE.surBleu2}">${t.pied}</p>`
+    + `<p class="vv-gris" style="margin:0;font-family:${P};font-size:13px;line-height:20px;color:${VERRE.surBleu2}">VRM · <a class="vv-lien" href="https://vrm.center" style="color:${VERRE.surBleu};text-decoration:underline">vrm.center</a></p>`;
   return enveloppeVerre({ lang: l, titreDoc: 'VRM', apercuHtml: t.apercu, teteHtml: teteVerre({ titreHtml: t.titre }), corpsHtml: corps, piedHtml: pied });
 };
 
