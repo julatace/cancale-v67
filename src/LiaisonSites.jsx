@@ -396,6 +396,8 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
           <span className="n-lia-annonce-site">{siteCompte(a)}</span>
           <h2 className="n-lia-annonce-titre">{a.titre || '—'}</h2>
           <span className="n-lia-annonce-faits">{faits(tailleTxt(a), prixTxt(a.prix), entree.numeroSite ? 'N°' + entree.numeroSite : '')}</span>
+          {/* (24 nov., lot lbc-numero-ecrit) Un N° écrit à la fin de sa description qui ne désigne pas UNE paire : pas relié, la raison dite (neutre). */}
+          {a.numeroEcrit && a.numeroEcrit.raison ? <span className="n-lia-annonce-ecrit" data-liaison-ecrit={a.numeroEcrit.raison} data-numero={a.numeroEcrit.numero || undefined}>{tr('lia.ecrit.' + a.numeroEcrit.raison, { numero: a.numeroEcrit.numero || '' })}</span> : null}
           {a.lien ? <a className="n-lia-annonce-lien" href={a.lien} target="_blank" rel="noopener noreferrer">{tr('lia.ouvrir')} ↗</a> : null}
         </div>
       </section>

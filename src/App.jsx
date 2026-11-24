@@ -1548,6 +1548,7 @@ import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : { MesModeles, InsererModele } (était importé en statique)
 const InsererModele = aLaDemandeDiscret(() => import('./ModelesDescription.jsx').then((m) => ({ default: m.InsererModele })));
 // ⟦→ ecrans/Comptabilite.jsx #98⟧
+import { identitesNumeroEcrit, liensLbcAvecNumeroEcrit, autresAvecNumeroEcrit, poserNumerosEcritsLbc, lireNumerosEcritsLbc } from './lbcNumeroEcrit.js';   // (24 nov., lot lbc-numero-ecrit) le N° écrit en fin de description relie l'annonce Leboncoin
 import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEcrit as lireNumeroEcritRegle, lectureRecue, apercuNumeroEcrit, decisionEcrite, PHRASE_ETAT as PHRASE_NUMERO_ECRIT, NOM_SOURCE as NOM_SOURCE_NUMERO } from "./numeroEcrit.js";
 // ⟦→ ecrans/Comptabilite.jsx #99⟧
 // (6 nov., vitesse 2) PrixPartout : à la demande (sa feuille de style est déjà plus haut).
@@ -13152,7 +13153,10 @@ async function numeroterSites(aVinted = null) {
       if (!numerotationPermise() || !isCloudReady()) return 0;
       if (CLES_ECRITURE_NUMEROS.some((k) => _saveTimers[k])) { if (!_numSitesRelance) _numSitesRelance = setTimeout(() => { _numSitesRelance = null; numeroterSites(aVinted); }, 1500); return 0; }
       const vendues = annoncesLbcVendues((vr[0] && vr[0].ventes) || {});
-      const liensL = { ...(load('vrm_lbc_liens', {}) || {}) };
+      // (24 nov., lot lbc-numero-ecrit) Le N° écrit à la fin de la description d'abord : une annonce reconnue ainsi porte
+      // déjà le N° de sa paire (jamais un N° neuf).
+      await chargerNumerosEcritsLbc().catch(() => null);
+      const liensL = { ...liensLbcLus() };
       const journal = load('vrm_liaison_sites', {}) || {};
       const propre = (site, id) => { const e = journal['propre:' + site + ':' + id]; return !!(e && typeof e === 'object' && e.actif !== false); };
       // (20 nov.) Jamais un N° pour l'annonce d'un autre vendeur : compte prouvé par une vente (ou référence VRM).
@@ -13165,7 +13169,10 @@ async function numeroterSites(aVinted = null) {
       const luDe = new Map((eb.lignes || []).map(({ compte, ligne }) => [compte && compte.ref, ligne && ligne.capturedAt ? Date.parse(ligne.capturedAt) : NaN]));
       const ebay = annoncesEbay((eb.items || []).map((x) => { const t = luDe.get(x && x._compte); return { ...x, frais: Number.isFinite(t) && Date.now() - t >= 0 && Date.now() - t < 24 * 3600 * 1000 }; }),
         { numeroDe: (x) => numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis) || '', vintedDe: (x) => (lienEbay(x && x.itemId) ? String(lienEbay(x.itemId).pairId) : ''), propreDe: (x) => propre('eBay', x && x.itemId) });
-      const { ids } = annoncesSitesANumeroter({ annonces: [...lbc, ...ebay], mode: 'vrm', aVinted, cle: cleNum });
+      // (24 nov., lot lbc-numero-ecrit) Une annonce dont la description porte un N° écrit qui n'a PAS relié (deux paires, N°
+      // inconnu, deux numéros…) est « à relier » : elle ne reçoit jamais un N° neuf (son carton en porte déjà un).
+      const ecritEnAttente = (a) => { if (a.site !== 'leboncoin' || cleNum(a.numero || '')) return false; const ad = ls.items[String(a.id)]; const l = ad ? lectureFinLbc(ad) : null; return !!(l && (l.etat === 'lu' || l.etat === 'ambigu')); };
+      const { ids } = annoncesSitesANumeroter({ annonces: [...lbc.filter((a) => !ecritEnAttente(a)), ...ebay], mode: 'vrm', aVinted, cle: cleNum });
       if (!ids.length) return 0;
       const pris = new Set(), prisK = new Set();
       const add = (v) => { const c = cleNum(v); if (!c) return; prisK.add(c); if (/^\d+$/.test(c)) pris.add(Number(c)); };
@@ -17132,7 +17139,7 @@ function rechercheParNumero(q, numData, comptes) {
   const cloud = isCloudReady();
   const fichesLues = cloud || Object.keys(numeros).length ? numeros : null;
   const shipDone = load('vinted_ship_done', {}) || {};
-  const liensLbc = load('vrm_lbc_liens', {}) || {};
+  const liensLbc = liensLbcLus();
   const series = [prefixeNumeros(), archiveNumeros()];
   const lu = (v) => (v === undefined ? null : v);
   const rn = toutSurLeNumero(q, {
@@ -17289,14 +17296,14 @@ export const soldeOkVrm = () => extSait('remiseprix') === 'ok';
 // (22 nov., ext. 5.435) Les annonces Leboncoin en pause et Vestiaire hors ligne de ce N°, par les mêmes identités que `sitesPrixDe`.
 const annoncesHorsLigneAutresSitesFiche = (k, extra) => annoncesHorsLigneAutresSites(k, { lbcItems: extra ? extra.lbcItems : null, vcItems: extra ? extra.vcItems : null }, {
   cleNum,
-  numLbc: (ad, id) => numeroLbcIdentite({ itemId: id }, { [id]: ad }, load('vrm_lbc_liens', {}) || {}),
+  numLbc: (ad, id) => numeroLbcIdentite({ itemId: id }, { [id]: ad }, liensLbcLus()),
   numVc: (id, it) => numeroVcIdentite(id, it, extra ? extra.vcLiens : null),
   etatLbc: (ad) => etatAnnonceLeboncoin(ad, [], lbcSortieDe).etat,
   etatVc: (it) => etatAnnonceVcBrut(it, false, null),
 });
 const sitesPrixDe = (k, rn, extra) => sitesDuNumero(k, { rn, fiches: load('vinted_annonce_numeros', {}) || {}, lbcItems: extra ? extra.lbcItems : null, vcItems: extra ? extra.vcItems : null }, {
   cleNum, recettes: extra ? extra.recettes : null, formats: extra ? extra.formats : null,
-  numLbc: (ad, id) => numeroLbcIdentite({ itemId: id }, { [id]: ad }, load('vrm_lbc_liens', {}) || {}),
+  numLbc: (ad, id) => numeroLbcIdentite({ itemId: id }, { [id]: ad }, liensLbcLus()),
   numVc: (id, it) => numeroVcIdentite(id, it, extra ? extra.vcLiens : null),
 });
 // Les envois, appelés UNIQUEMENT par « Appliquer » (src/PrixPartout.jsx).
@@ -23473,7 +23480,7 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
   // SAISI de cette paire (`vinted_buyprice_by_num`, via `prixAchatDe` — la MÊME
   // source que Vinted/eBay, §11). Prix d'achat inconnu ⇒ pas de bénéfice (jamais
   // 0 : un total partiel présenté comme complet est pire qu'un absent).
-  const liens = React.useMemo(() => load('vrm_lbc_liens', {}) || {}, [lbcVentes]);
+  const liens = React.useMemo(() => liensLbcLus(), [lbcVentes]);
   const buyByNum = React.useMemo(() => load('vinted_buyprice_by_num', {}) || {}, [lbcVentes]);
   const numerosFiches = React.useMemo(() => load('vinted_annonce_numeros', {}) || {}, [lbcVentes]);
   // La carte des annonces LBC donne la réf VRM ; en l'attendant, `null` ⇒ le
@@ -24660,6 +24667,9 @@ async function annoncesAutresMemePhoto() {
       }
     }
   } catch (_) { illisibles.push('Vestiaire'); }
+  // (24 nov., lot lbc-numero-ecrit) Une annonce Leboncoin dont la description finit par SON N° est reliée (preuve
+  // « N° écrit dans l'annonce ») ; un N° écrit qui ne désigne pas UNE paire ⇒ « à relier », la raison portée par l'annonce.
+  if (!illisibles.includes('Leboncoin')) { try { await chargerNumerosEcritsLbc(); return { autres: autresAvecNumeroEcrit(autres, identEcritDuCompte()), illisibles }; } catch (_) { /* rien de plus */ } }
   return { autres, illisibles };
 }
 // Ses annonces Vinted qui ont une empreinte : N°, titre, photo de leur FICHE (identifiant d'annonce).
@@ -31485,6 +31495,82 @@ async function lbcListingsLire() {
   } catch (_) { return null; }
 }
 
+// ── LEBONCOIN : LE N° ÉCRIT À LA FIN DE LA DESCRIPTION RELIE L'ANNONCE (24 nov., lot lbc-numero-ecrit) ──
+// Julien : « Oui, relie par le N° ». La RÈGLE : src/lbcNumeroEcrit.js (pure, exécutée par
+// scripts/audit-lbc-numero-ecrit.cjs). Ici : ce qu'elle lit (ses annonces, ses comptes prouvés, ses paires,
+// la remise à zéro) et l'état publié. RIEN n'est écrit : `liensLbcLus()` superpose le N° écrit à SES liens,
+// et c'est `liensLbcLus()` que lit chaque endroit qui DÉCIDE une identité Leboncoin (retirer ailleurs, ventes
+// croisées, numérotation, bénéfice, recherche, « Relier mes annonces ») — une règle, un propriétaire (§11).
+// Ses liens POSÉS seuls (une clé présente, même vide, est SA décision) : ce que les gestes relisent et réécrivent.
+function liensLbcPoses() { return load('vrm_lbc_liens', {}) || {}; }
+// La fin de la description, lue EN ENTIER (la lecture de l'extension `numEcrit`, ou un texte gardé en entier) —
+// la description SEULE, quel que soit son réglage « où est ton numéro » (le titre sert à voir deux numéros).
+function lectureFinLbc(ad) {
+  const body = typeof ad.body === 'string' && ad.body ? ad.body : undefined;
+  return lireNumeroEcritRegle({ description: body, descriptionCoupee: !!body && body.length >= 400, descriptionLue: ad.numEcrit, ou: ['description'] });
+}
+// Les N° de SES paires (fiches Vinted, fiches neuves, articles des autres sites) ; avant le nuage ⇒ null (pas su).
+function numerosPairesConnus() {
+  if (!isCloudReady()) return null;
+  const s = new Set(); const add = (v) => { const c = cleNum(v); if (c) s.add(c); };
+  Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((f) => add(f && f.numero));
+  Object.values(load('vrm_fiches_neuves', {}) || {}).forEach((f) => add(f && f.numero));
+  Object.values(load('vrm_articles_sites', {}) || {}).forEach((f) => add(f && f.numero && typeof f.numero === 'object' ? f.numero.valeur : null));
+  Object.values(load(LIENS_EBAY, {}) || {}).forEach((e) => add(e && typeof e === 'object' ? e.numero : null));
+  try { Object.values(carteNumerosVc(vcCarte('vrm_vc_numeros'))).forEach(add); } catch (_) {}
+  return s;
+}
+const dateAnnonceLbc = (ad) => { const t = Date.parse((ad && (ad.publieeLe || ad.first_publication_date || ad.indexeeLe)) || ''); return isNaN(t) ? null : t; };
+// LE calcul, sur des annonces données. `siens` : Set de SES comptes Leboncoin (prouvés : session vue, vente).
+function identNumeroEcritLbc(items, siens) {
+  return identitesNumeroEcrit({ annonces: items, lecture: lectureFinLbc, titre: (ad) => lireNumeroTexte(ad.subject || ad.title || '', 'titre'),
+    sienne: (ad) => !!(siens && siens.has(idCompteLbcApp(ad.account || ad.lbcUser || ''))),
+    traduire: (k, ad) => numeroExterne(k, ad.id, 'lbcAnnonces', dateAnnonceLbc(ad)),
+    connus: numerosPairesConnus(), douteux: lireNumerosAmbigus(), poses: liensLbcPoses(), journal: load(CLE_LIAISON, {}) || {}, cle: cleNum });
+}
+// Lit ses annonces et ses comptes, calcule, publie (src/lbcNumeroEcrit.js). Une lecture ratée ⇒ rien publié
+// (aucun lien par le N° écrit, jamais « rien d'écrit »). Un changement prévient les lecteurs des liens.
+let _numEcritEnVol = null, _numEcritAt = 0, _numEcritEssai = 0, _numEcritEcoute = false, _numEcritEmet = false;
+function chargerNumerosEcritsLbc(force = false) {
+  if (!isCloudReady() || !AUTH.user?.id) return Promise.resolve(null);
+  if (!_numEcritEcoute) {
+    _numEcritEcoute = true;
+    try {
+      const relance = () => { _numEcritAt = 0; setTimeout(() => chargerNumerosEcritsLbc(true), 80); };
+      window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (_numEcritEmet) return; if (['vrm_lbc_liens', 'vinted_annonce_numeros', 'vrm_fiches_neuves', 'vrm_articles_sites', CLE_LIAISON, CLE_FUSIONS].includes(k)) relance(); });
+      window.addEventListener('vrm:ext', (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'lbc') relance(); });
+    } catch (_) {}
+  }
+  if (_numEcritEnVol) return _numEcritEnVol;
+  if (!force && _numEcritAt && Date.now() - _numEcritAt < 120000) return Promise.resolve(lireNumerosEcritsLbc());
+  const qui = AUTH.user.id;
+  _numEcritEssai = Date.now();
+  const p = (async () => {
+    const [ls, ra, rv] = await Promise.all([lbcListingsSession(),
+      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=accounts:data->accounts`).catch(() => null),
+      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`).catch(() => null)]);
+    if (!ls || !ls.items || !Array.isArray(ra) || !Array.isArray(rv) || AUTH.user?.id !== qui) return null;
+    const siens = new Set([...comptesLbcSession((ra[0] && ra[0].accounts) || {}), ...comptesLbcProuves((rv[0] && rv[0].ventes) || {}, ls.items)].map(idCompteLbcApp));
+    const ident = identNumeroEcritLbc(ls.items, siens);
+    if (!ident.lu) return null;
+    _numEcritAt = Date.now();
+    if (poserNumerosEcritsLbc({ ...ident, owner: qui })) { _numEcritEmet = true; try { emettreClesRelues(['vrm_lbc_liens']); } finally { _numEcritEmet = false; } }
+    return lireNumerosEcritsLbc();
+  })().catch(() => null).finally(() => { if (_numEcritEnVol === p) _numEcritEnVol = null; });
+  _numEcritEnVol = p;
+  return p;
+}
+// Les identités par le N° écrit, celles du compte VRM connecté seulement ; pas encore calculées ⇒ aucune (et le
+// calcul part, une fois).
+function identEcritDuCompte() {
+  const i = lireNumerosEcritsLbc();
+  if (!i && !_numEcritEnVol && Date.now() - _numEcritEssai > 30000) chargerNumerosEcritsLbc();
+  return i && i.owner && i.owner === AUTH.user?.id ? i : null;
+}
+// LES LIENS LUS : ses liens d'abord, puis le N° écrit (après #1348 : puis la photo d'origine). Pour LIRE une
+// identité seulement — une écriture part toujours de `liensLbcPoses()` (jamais le N° écrit recopié en base).
+function liensLbcLus() { return liensLbcAvecNumeroEcrit(liensLbcPoses(), identEcritDuCompte(), load(CLE_LIAISON, {}) || {}); }
+
 // (5 nov.) Les annonces Leboncoin EN VENTE (la règle `annonceLbcEnVente`, §11)
 // avec leur N° par IDENTITÉ (`numeroLbcIdentite` : lien posé à la main, référence
 // VRM — jamais le « nXXX » d'un titre). Seulement ses annonces reliées à VRM
@@ -31504,7 +31590,7 @@ async function lireLbcEnVente() {
     if (!vr.ok) return null;
     const vrows = await vr.json(); if (!Array.isArray(vrows)) return null;
     const vendues = annoncesLbcVendues((vrows[0] && vrows[0].ventes) || {});
-    const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
+    const liens = { ...liensLbcLus() };
     const liste = [];
     for (const ad of Object.values(items || {})) {
       if (!annonceLbcEnVente(ad, vendues)) continue;
@@ -33739,7 +33825,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
       }
     }
     if (voit('leboncoin') && lbcLu === true) {
-      const liens = load('vrm_lbc_liens', {}) || {};
+      const liens = liensLbcLus();
       const dates = lireDatesLbc();
       for (const v of ((lbcVentes && lbcVentes.ventes) || [])) {
         // (22 nov.) Une vente Leboncoin ANNULÉE (vendeur prouvé) n'est plus cachée : elle est rangée sous « Annulées ».
@@ -34904,7 +34990,7 @@ function AppCoeur() {
       sb('app_data?id=eq.vc_listings&select=liens:data->liens').catch(()=>null),
     ]);
     const messagesA=messagesAutresSitesPourRecherche({ lbcFils:lbcF, lbcItems:lbcL?lbcL.items||{}:null, vcFils:vcF, vcConvs:Array.isArray(vcM)&&vcM[0]?vcM[0].conversations:null, vcLiens:Array.isArray(vcLiensR)&&vcLiensR[0]?vcLiensR[0].liens:null },
-      { numLbc:(ad,id)=>numeroLbcIdentite({ itemId:id },{ [id]:ad },load('vrm_lbc_liens',{})||{}), numVc:(pid,ref,liens)=>cleNum((pid&&liens[pid])||(/VRM/i.test(String(ref||''))?refVRMDe(ref):'')||'') });
+      { numLbc:(ad,id)=>numeroLbcIdentite({ itemId:id },{ [id]:ad },liensLbcLus()), numVc:(pid,ref,liens)=>cleNum((pid&&liens[pid])||(/VRM/i.test(String(ref||''))?refVRMDe(ref):'')||'') });
     // Vinted pas lu ⇒ la source « Messages » reste « pas lue » ; les autres sites s'ajoutent à ce qui est lu.
     const messages=messagesV===null?null:messagesV.concat(messagesA||[]);
     let vcVentes=null; try{ vcVentes=vcBrut?ventesVcDe(avecNumerosVc(vcBrut)):null; }catch(_){ vcVentes=null; }
@@ -35068,7 +35154,7 @@ function AppCoeur() {
     const bordereaux=(bE&&bL)?[...bE,...bL].filter(b=>b&&b.tx).map(b=>({tx:String(b.tx),pdf:!!b.pdf&&String(b.pdf)!=='false',dateLimite:b.dateLimite||''})):null;
     let lbcVentes=null, lbcItems=null;
     if(lbcRows){ const v=(lbcRows[0]&&lbcRows[0].ventes)||{}; lbcVentes=Object.entries(v).map(([id,x])=>({...(x||{}),_id:id})).filter(x=>x.isSeller===true);
-      const liens=load('vrm_lbc_liens',{})||{}; if(lbcVentes.some(x=>x.itemId!=null&&!liens[String(x.itemId)])) lbcItems=await lbcAnnoncesSession(); }
+      const liens=liensLbcLus(); if(lbcVentes.some(x=>x.itemId!=null&&!liens[String(x.itemId)])) lbcItems=await lbcAnnoncesSession(); }
     let ebayCommandes=null, ebayAnnonces=null;
     if(Array.isArray(cE)){ const tous=async(base,sel,champ)=>{ const r=await lireEbayTous(base,sel,champ,cE); return (!r||r.illisibles.length)?null:r.items; };
       [ebayCommandes, ebayAnnonces]=await Promise.all([tous('ebay_orders',SEL_EBAY_COMMANDES,'orders'), tous('ebay_listings',SEL_EBAY_ANNONCES,'items')]); }
@@ -36889,7 +36975,7 @@ function AppCoeur() {
           const rows=await r.json();
           const ventesL=(rows&&rows[0]&&rows[0].ventes)||{};
           if(Array.isArray(rows)) ventesLbcLu=ventesL;
-          const liensL=load('vrm_lbc_liens',{})||{};
+          const liensL=liensLbcLus();
           const calc=(items)=>doublesVenteLbc({ventes:ventesL, items, liens:liensL, numeros:nums, enLigne:lbcOnlineIds, vendusVinted:soldIdsN});
           let dv=calc(null);
           if(dv.aRelier.length){ const items=await lbcAnnoncesSession(); lbcItemsLu=items||null; if(items) dv=calc(items); }
@@ -36926,7 +37012,7 @@ function AppCoeur() {
         const items=ls?ls.items:null;
         if(lbcItemsLu===undefined) lbcItemsLu=items||null;
         lbcLecturesLu=ls?ls.lectures:null;
-        const liensR=load('vrm_lbc_liens',{})||{};
+        const liensR=liensLbcLus();
         let sortis=null;
         if(items){
           // La preuve, comme l'écran Leboncoin : ses comptes (session vue ou
@@ -36997,7 +37083,7 @@ function AppCoeur() {
         // (6 octobre) Le verdict « déjà vendue, toutes plateformes » — la MÊME
         // règle que l'écran eBay (`numerosDejaVendus`, §11) : une programmée
         // vendue sur Leboncoin ou sur eBay est « à annuler » aussi.
-        const liensV=load('vrm_lbc_liens',{})||{};
+        const liensV=liensLbcLus();
         // (1er nov., audit A1) + Vestiaire (par identité ; pas su ⇒ aucune alerte inventée).
         const ventesVcN=ventesVcDe(avecNumerosVc(await lireVentesVestiaire()));
         const verdict=(items)=>numerosDejaVendus({numeros:nums, enLigne:enLigneE, vendusVinted:vendusE, commandes:ords, ventesLbc:ventesLbcLu, itemsLbc:items, liensLbc:liensV, ventesVc:ventesVcN});
@@ -37036,7 +37122,7 @@ function AppCoeur() {
           const soldEbayN=numerosVendusEbay(ords);
           if(soldEbayN && soldEbayN.size){
             const vintedRemN=new Set((lbcARetirer||[]).map(r=>cleNum(r.numero)).filter(Boolean));
-            const liensE=load('vrm_lbc_liens',{})||{};
+            const liensE=liensLbcLus();
             const reE=aRetirerDeLbcEbay({soldEbay:soldEbayN, posted:postedIds, numeros:nums, itemsLbc:lbcItemsLu||null, liens:liensE, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis:sortisN, deja:vintedRemN, lectures:lbcLecturesLu});
             lbcRemoveEbayCount=reE?reE.length:0; lbcSupprEbay=(reE||[]).filter(r=>r&&r.ident&&r.lbcId);
           }
@@ -37044,7 +37130,7 @@ function AppCoeur() {
           const soldVcN=numerosVendusVc(ventesVcN);
           if(soldVcN && soldVcN.size){
             const dejaN=new Set([...(lbcARetirer||[]).map(r=>cleNum(r.numero)).filter(Boolean)]);
-            const reV=aRetirerDeLbcEbay({soldEbay:soldVcN, posted:postedIds, numeros:nums, itemsLbc:lbcItemsLu||null, liens:load('vrm_lbc_liens',{})||{}, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis:sortisN, deja:dejaN, lectures:lbcLecturesLu});
+            const reV=aRetirerDeLbcEbay({soldEbay:soldVcN, posted:postedIds, numeros:nums, itemsLbc:lbcItemsLu||null, liens:liensLbcLus(), vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis:sortisN, deja:dejaN, lectures:lbcLecturesLu});
             lbcRemoveVcCount=reV?reV.length:0; lbcSupprVc=(reV||[]).filter(r=>r&&r.ident&&r.lbcId);
           }
         }
@@ -37115,7 +37201,7 @@ function AppCoeur() {
           ]);
           let itemsC=lbcItemsLu;
           const vd=(it)=>numerosDejaVendus({ numeros:nums, enLigne:new Set([...lectures.values()].flatMap(l=>[...l.enLigne])), vendusVinted:pv&&pv.vendus?pv.vendus:null,
-            commandes:ordsC, ventesLbc:ventesLbcLu, itemsLbc:it, liensLbc:load('vrm_lbc_liens',{})||{}, ventesVc:vcC });
+            commandes:ordsC, ventesLbc:ventesLbcLu, itemsLbc:it, liensLbc:liensLbcLus(), ventesVc:vcC });
           let verdictC=vd(itemsC===undefined?undefined:itemsC);
           if(verdictC.lbcSansPaire>0 && itemsC===undefined){ itemsC=await lbcAnnoncesSession().catch(()=>null); verdictC=vd(itemsC||null); }
           const ventes=(!pv||!pv.vendus||verdictC.pasSu.length||verdictC.enCours)?null:{ ids:pv.vendus, nums:new Set(verdictC.vendus.keys()), revenues:pv.revenuesItems||new Set() };
@@ -37999,7 +38085,7 @@ function AppCoeur() {
         // Vestiaire : le N° de la vente lue) — jamais par le titre.
         const autres = memoSur('gs-autres', [numData && numData.ebayCommandes, numData && numData.lbcVentes, numData && numData.lbcItems, gsData && gsData.vcVentes], () => ventesAutresPourRecherche(
           { ebay: numData && numData.ebayCommandes, lbc: numData && numData.lbcVentes, vc: gsData && gsData.vcVentes },
-          { numEbay: (c, li) => numLigneEbay(c, li) || '', numLbc: (v) => numeroLbcIdentite(v, (numData && numData.lbcItems) || null, load('vrm_lbc_liens', {}) || {}) }));
+          { numEbay: (c, li) => numLigneEbay(c, li) || '', numLbc: (v) => numeroLbcIdentite(v, (numData && numData.lbcItems) || null, liensLbcLus()) }));
         // (15 nov., vendre plus) LE STOCK : chaque N° rangé (le plan, par `cleNum`) et son lieu ; le garage aussi.
         let brutPlan = null; try { brutPlan = localStorage.getItem('vrm_room_plan'); } catch (_) {}
         // (16 nov., lot ecrans-restes) + les paires IMPORTÉES d'un autre outil (`vrm_stock_importe`), par leur N°.
@@ -39316,3 +39402,7 @@ export { NET_VENTES };   // (22 nov., intégration finale) lu par ecrans/Comptab
 export { CLE_FORFAIT_EMBALLAGE };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { prendreVue };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx et ecrans/AnnoncesEgalite.jsx
 export { ventesCoqueLues };   // (22 nov.) Annonces · « Vendue » : toutes les ventes Vinted PROUVÉES
+export { liensLbcLus, liensLbcPoses, chargerNumerosEcritsLbc };   // (24 nov., lot lbc-numero-ecrit) les liens Leboncoin LUS : les siens, puis le N° écrit en fin de description (identité, jamais écrite)
+// Une carte de liens donnée (l'écran Leboncoin fusionne nuage + appareil) + le N° écrit là où il n'a rien décidé.
+function avecNumeroEcritLbc(m) { return liensLbcAvecNumeroEcrit(m, identEcritDuCompte(), load(CLE_LIAISON, {}) || {}); }
+export { avecNumeroEcritLbc };

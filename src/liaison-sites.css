@@ -33,6 +33,8 @@
 .n-lia-annonce-site { font: var(--n-t-legende-fort); color: var(--n-encre-2); }
 .n-lia-annonce-titre { margin: 0; font: var(--n-t-corps-fort); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .n-lia-annonce-faits { font: var(--n-t-second); color: var(--n-encre-2); }
+/* (24 nov., lot lbc-numero-ecrit) Le N° écrit pas relié : une phrase neutre (gris, jamais d'ambre), la raison. */
+.n-lia-annonce-ecrit { font: var(--n-t-second); color: var(--n-encre-2); }
 .n-lia-annonce-lien { align-self: flex-start; display: inline-flex; align-items: center; min-height: var(--n-cible); font: var(--n-t-second); color: var(--n-accent); text-decoration: none; }
 .n-lia-candidates { min-width: 0; padding: 0 var(--n-marge) 8px; }
 
