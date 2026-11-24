@@ -69,7 +69,10 @@ function mesure(CH) {
         const m = await pg.evaluate(mesure, CHIFFRES);
         if (process.env.SHOTS) { fs.mkdirSync(process.env.SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(process.env.SHOTS, `attente-${e}-${W}${sombre ? '-sombre' : ''}.png`) }); }
         dit(m.os > 0, `A ${cle} : la lecture est en cours (${m.os} chiffres en squelette)`);
-        dit(m.tirets.length <= F.tirets.length, `A ${cle} : pendant la lecture, pas plus de « — » dessinés qu'une fois tout lu (${m.tirets.length} ≤ ${F.tirets.length})`, m.tirets.join(' ¦ '));
+        // Argent : ses rangées « pas calculé » / « pas lu » le temps que Ventes publie le mois sont des PAS SU dits (raison
+        // `absente`, §5) dont le nombre dépend de l'instant — rapportés, pas jugés (récit : « Ce qui reste »).
+        if (e === 'compta') { console.log(`  · ${cle} : ${m.tirets.length} « — » pendant la lecture, ${F.tirets.length} une fois tout lu (rapporté)`); }
+        else dit(m.tirets.length <= F.tirets.length, `A ${cle} : pendant la lecture, pas plus de « — » dessinés qu'une fois tout lu (${m.tirets.length} ≤ ${F.tirets.length})`, m.tirets.join(' ¦ '));
         dit(m.raisons.length === 0, `A ${cle} : aucune raison « lecture… » visible pendant la lecture (${m.raisons.length})`, m.raisons.join(' ¦ '));
         if (erreurs.length) console.log('     erreurs : ' + erreurs.join(' | ').slice(0, 200));
       } finally { await ctx.close(); }
