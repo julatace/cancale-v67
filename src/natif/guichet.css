@@ -1,0 +1,57 @@
+/* ── src/natif/guichet.css — AU COMPTOIR : les codes d'un point en grand (24 nov., lot retrait-parfait) ──
+   Plein écran au téléphone, une grande carte centrée à l'ordinateur. Le CODE et le QR sur BLANC, même en sombre (le
+   lecteur du comptoir lit mal un écran sombre) ; aucun orange ni ambre ; l'accent (ardoise) ne sert qu'au geste plein. */
+@layer vrm-natif {
+  .n-gc-voile { position: fixed; inset: 0; z-index: 19990; background: rgba(0, 0, 0, .45); display: flex; align-items: stretch; justify-content: center; overscroll-behavior: contain; }
+  .n-gc { position: relative; display: flex; flex-direction: column; width: 100%; max-width: 100%; height: 100%; height: 100dvh; background: var(--n-fond, var(--n-carte)); color: var(--n-encre);
+    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); font-family: var(--n-police); }
+  @media (min-width: 720px) {
+    .n-gc-voile { align-items: center; padding: 24px; }
+    .n-gc { max-width: 520px; height: auto; max-height: min(92vh, 900px); border-radius: 20px; overflow: hidden; box-shadow: 0 24px 60px rgba(0, 0, 0, .25); }
+  }
+  .n-gc-tete { display: flex; align-items: center; gap: 12px; padding: 12px 8px 10px 16px; min-height: 60px; }
+  .n-gc-logo { flex: none; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; }
+  .n-gc-tete-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .n-gc-nom { font-size: 17px; font-weight: 650; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-gc-sous { font-size: 13px; color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  .n-gc-fermer { flex: none; width: 44px; height: 44px; border: 0; border-radius: 22px; background: var(--n-carte-2, rgba(0,0,0,.06)); color: var(--n-encre); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+  .n-gc-bande { display: flex; align-items: center; gap: 8px; margin: 0 16px 6px; padding: 8px 12px; border-radius: 12px; background: var(--n-carte-2, rgba(0,0,0,.06)); font-size: 13px; font-weight: 600; color: var(--n-encre); }
+  .n-gc-rail { flex: 1 1 auto; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .n-gc-rail::-webkit-scrollbar { display: none; }
+  .n-gc-diapo { flex: 0 0 100%; width: 100%; scroll-snap-align: center; scroll-snap-stop: always; overflow-y: auto; padding: 4px 16px 12px; display: flex; flex-direction: column; gap: 12px; box-sizing: border-box; }
+  .n-gc-paire { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .n-gc-photo { flex: none; width: 56px; height: 56px; border-radius: 12px; overflow: hidden; background: var(--n-carte-2, rgba(0,0,0,.06)); }
+  .n-gc-photo[data-gc-photo="0"] { display: none; }
+  .n-gc-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .n-gc-paire-txt { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .n-gc-paire-titre { font-size: 15px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .n-gc-paire-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--n-encre-2); }
+  /* La zone du code : BLANC, encre noire, dans les deux modes. */
+  .n-gc-blanc { background: #FFFFFF; color: #000000; border-radius: 18px; padding: 18px 14px 16px; display: flex; flex-direction: column; align-items: center; gap: 14px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+  .n-gc-code-bloc { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; }
+  .n-gc-code-mot { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #6E6E73; }
+  .n-gc-code { display: flex; justify-content: center; flex-wrap: wrap; gap: .32em; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums;
+    font-size: clamp(44px, 15vw, 76px); font-weight: 700; line-height: 1.05; letter-spacing: .02em; color: #000000; background: none; padding: 0; }
+  .n-gc-code.is-long { font-size: clamp(30px, 9vw, 52px); }
+  .n-gc-code.is-moyen { font-size: clamp(30px, 9vw, 44px); }
+  .n-gc-code-bloc.is-second .n-gc-code { font-size: clamp(28px, 8vw, 44px); }
+  .n-gc-qr { width: min(100%, 340px); aspect-ratio: 1 / 1; background: #FFFFFF; display: flex; align-items: center; justify-content: center; }
+  .n-gc-qr img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block; }
+  .n-gc-qr-ko, .n-gc-sans { margin: 0; font-size: 14px; color: #3A3A3C; text-align: center; }
+  .n-gc-geste { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; }
+  .n-gc-b { min-height: 48px; padding: 0 20px; border-radius: 14px; border: 1px solid var(--n-trait, rgba(0,0,0,.12)); background: var(--n-carte, #fff); color: var(--n-encre); font-size: 16px; font-weight: 600; cursor: pointer; }
+  .n-gc-b.is-plein { flex: 1 1 100%; background: var(--n-plein, var(--n-accent)); color: var(--n-sur-plein, #FFFFFF); border-color: transparent; }
+  .n-gc-b.is-lien { border: 0; background: none; color: var(--n-encre-2); min-height: 44px; font-size: 14px; }
+  .n-gc-fait { flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; font-size: 16px; font-weight: 650; color: var(--n-encre); }
+  .n-gc-diapo.is-retire .n-gc-blanc { opacity: .45; }
+  .n-gc-pied { flex: none; padding: 6px 16px 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .n-gc-pages { display: flex; align-items: center; gap: 12px; }
+  .n-gc-fleche { width: 44px; height: 44px; border-radius: 22px; border: 0; background: var(--n-carte-2, rgba(0,0,0,.06)); color: var(--n-encre); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+  .n-gc-fleche:disabled { opacity: .35; cursor: default; }
+  .n-gc-points { display: inline-flex; gap: 6px; }
+  .n-gc-points i { width: 7px; height: 7px; border-radius: 4px; background: var(--n-encre-3, rgba(0,0,0,.25)); opacity: .5; }
+  .n-gc-points i.is-ici { width: 18px; opacity: 1; background: var(--n-encre); }
+  .n-gc-points i.is-fait { opacity: 1; }
+  .n-gc-lumiere { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; color: var(--n-encre-2); }
+  @media (prefers-reduced-motion: reduce) { .n-gc-rail { scroll-behavior: auto; } }
+}

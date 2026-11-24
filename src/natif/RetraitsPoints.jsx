@@ -36,6 +36,7 @@ import { CartePoints } from './CartePoints.jsx';
 import { arriveePrevue } from '../relaisPrevision.js';
 import { Plaque } from './Plaque.jsx';
 import { Pourquoi } from './Actions.jsx';
+import { Guichet, rechaufferQrs } from './Guichet.jsx';
 import { texteContenu, rangeeRetrait } from '../contenuColis.js';
 import './retraits.css';
 import './actions.css';
@@ -87,6 +88,9 @@ const texteEcheance = (c, loc) => {
   try { d = new Date(Date.now() + c.n * 86400e3).toLocaleDateString(loc, { day: 'numeric', month: 'short' }); } catch (_) { d = ''; }
   return tr('retraits.p.echAvant', { date: d });
 };
+
+// « avant le mar. 25 nov. » depuis un jour LU (AAAA-MM-JJ).
+const texteJourLimite = (jour, loc) => { try { return tr('retraits.p.echAvant', { date: new Date(jour + 'T12:00:00').toLocaleDateString(loc, { weekday: 'short', day: 'numeric', month: 'short' }) }); } catch (_) { return ''; } };
 
 // La barre du trajet : cinq étapes, chacune allumée par SA date lue (jamais déduite d'une autre). La plus avancée des
 // étapes lues est la courante ; une étape non lue reste grise, sans date.
@@ -156,12 +160,15 @@ function Contenu({ x, c, rg, photo, aides, prix, neuf, Icon = null }) {
 // visuel du colis à retirer », « enlève Copier ») UN BILLET par colis, compact : la paire (vignette 48, titre complet, N°) ; la zone
 // du CODE sur blanc (code groupé en chasse fixe à gauche, QR à droite, une petite icône « plein écran » dans son coin) — toucher la
 // zone = plein écran pour le guichet (`enGrand`, le geste d'avant) ; la frise compacte au pied. Aucun « Copier ».
-function LigneColis({ x, aides, Photo, Icon, nouveaux }) {
+function LigneColis({ x, aides, Photo, Icon, nouveaux, guichet = null, avecLimite = false, loc = 'fr-FR' }) {
   const neuf = !!(nouveaux && estNouveau(nouveaux.etat, x.cle || x.id));
   const conflit = x.codesDesaccord && x.codesDesaccord.length > 1;
   const code = conflit ? '' : (x.code || '');
   const qr = aides.qrSrc(x);
-  const ouvrir = aides.enGrand(x);
+  // (24 nov., retrait-parfait) Toucher le code ou le QR ouvre LE COMPTOIR du point sur CE colis (src/natif/Guichet.jsx) ;
+  // sans lui (un banc qui monte la liste seule), le plein écran d'avant (`enGrand`).
+  const aCode = !!(x.code || x.code2 || aides.qrSrc(x) || (x.codesDesaccord && x.codesDesaccord.length > 1));
+  const ouvrir = guichet && aCode ? () => guichet(x) : aides.enGrand(x);
   const mention = mentionVerif(x);
   const contenu = x.contenu || null;
   const contenuTxt = texteContenu(contenu, tr);
@@ -178,7 +185,11 @@ function LigneColis({ x, aides, Photo, Icon, nouveaux }) {
     <li className={'n-rp-colis n-rp-billet' + (neuf ? ' is-nouveau' : '')  + (mention ? ' is-verif' : '')} data-rp-colis={x.cle || x.id} data-rp-code={code} data-rp-sorte={x.sorte || ''} data-rp-verif={mention || undefined}
       data-v2-face={x.cle || x.id} data-v2-code={x.code || ''} data-v2-sorte={x.sorte || ''} data-v2-code-etat={rg.codeEtat} data-v2-qr-dispo={rg.qr ? '1' : '0'} data-v2-limite-jour={(rg.limite && rg.limite.jour) || ''} data-v2-limite-source={(rg.limite && rg.limite.source) || ''} data-v2-titre-de={rg.titreDe || ''} data-v2-transporteur={(rg.transporteur && rg.transporteur.cle) || ''}>
       <Contenu x={x} c={contenu} rg={rg} photo={photo} aides={aides} prix={prix} neuf={neuf} Icon={Icon}/>
-      {mention ? <p className="n-rp-verif" data-rp-verif-mention={mention}><span className="n-rp-etiquette" data-n-ton="ambre">{tr(MENTION[mention] || MENTION.autre)}</span>{mention === 'autre' && x.raisonVerif ? <span className="n-rp-verif-raison">{x.raisonVerif}</span> : null}</p> : null}
+      {/* (24 nov., retrait-parfait) Plusieurs colis au même point : CHAQUE rangée dit SA date limite LUE (jamais une estimation). */}
+      {avecLimite && rg.limite && rg.limite.source === 'lue' && rg.limite.jour && !mention ? <p className="n-rp-limite-colis" data-rp-limite-colis={rg.limite.jour}>{texteJourLimite(rg.limite.jour, loc)}</p> : null}
+      {mention ? <p className="n-rp-verif" data-rp-verif-mention={mention}><span className="n-rp-etiquette" data-n-ton="ambre">{tr(MENTION[mention] || MENTION.autre)}</span>{mention === 'autre' && x.raisonVerif ? <span className="n-rp-verif-raison">{x.raisonVerif}</span> : null}
+        {/* Le geste UNIQUE d'un colis « à vérifier » : « Retiré », sur SON toucher (le geste d'avant, annulable). */}
+        {aides.retirer ? <button type="button" className="n-rp-verif-geste" data-rp-verif-geste="retire" onClick={(e) => { e.stopPropagation(); try { aides.retirer(x); } catch (_) {} }}>{Icon ? <Icon name="check" size={16}/> : null}<span>{tr('retraits.g.retire')}</span></button> : null}</p> : null}
       <div className={'n-rp-code-zone n-rp-billet-code' + (qr ? ' avec-qr' : '') + (voir ? ' is-touchable' : '')} data-rp-billet="" onClick={voir || undefined}>
         <div className="n-rp-code-col">
           <span className="n-rp-code-mot">{tr('retraits.b.code')}</span>
@@ -220,14 +231,17 @@ function LigneEnRoute({ a, Photo, Icon, loc }) {
   );
 }
 
-function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc, variante = 'c', premier = false }) {
+function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc, variante = 'c', premier = false, ouvrirGuichet = null }) {
   const { comptes, verif } = colisDuPoint(p);
   const colis = [...comptes, ...verif];
   const attendus = p.attendus || [];
   const transp = (p.transporteurs || [])[0] || '';
   const nomT = transp ? aides.nomTransporteur(transp) : '';
   const rebours = compteARebours(limiteDuPoint(p));
-  const horaires = aides.horairesDe ? aides.horairesDe(p) : '';
+  // (24 nov., retrait-parfait) L'OUVERTURE d'après les horaires LUS : « ouvert maintenant · ferme à 19 h » / « fermé — ouvre à
+  // 8 h », puis les plages d'aujourd'hui. `ouvertureDe` absent (un banc ancien) ⇒ la phrase d'avant (`horairesDe`).
+  const ouv = aides.ouvertureDe ? aides.ouvertureDe(p) : null;
+  const horaires = ouv ? [ouv.phrase, ouv.jour ? tr('retraits.p.aujourdhui', { h: ouv.jour }) : ''].filter(Boolean).join(' · ') : (aides.horairesDe ? aides.horairesDe(p) : '');
   const lien = lienItineraire(p, { apple });
   // (23 nov. au soir, capture iPhone de Julien : « le transporteur inconnu, le logo mal mis ça va pas ») Un point dont le NOM n'est
   // pas lu porte le nom de son TRANSPORTEUR (« Vinted Go ») — jamais « Point pas encore connu » à côté de ses horaires lus (c'était
@@ -248,6 +262,11 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc, variant
     : !comptes.length ? { cle: 'verif', presse: true, texte: tr('retraits.v.nVerif', { n: verif.length }) }
     : rebours ? { cle: rebours.cle, presse: !!rebours.ambre, texte: c ? texteEcheance(rebours, loc) : texteEtatPoint(rebours, loc) }
     : { cle: 'pas-lu', presse: false, texte: tr('retraits.v.limitePasLue') };
+  // Plusieurs colis : chaque rangée dit sa date limite seulement si elles DIFFÈRENT (sinon l'en-tête la dit, une fois).
+  const joursLus = new Set(colis.map((x) => { const r = rangeeRetrait(x); return r && r.limite && r.limite.source === 'lue' ? r.limite.jour : ''; }).filter(Boolean));
+  const avecLimite = colis.length > 1 && joursLus.size > 1;
+  const guichet = ouvrirGuichet ? (x) => ouvrirGuichet(p, x) : null;
+  const nMontrer = colis.filter((x) => x.code || x.code2 || aides.qrSrc(x) || (x.codesDesaccord && x.codesDesaccord.length > 1)).length;
   const seulColis = colis.length === 1 && colis[0] && colis[0].code && !(colis[0].codesDesaccord && colis[0].codesDesaccord.length > 1) ? colis[0] : null;
   const codeSeul = seulColis ? aides.enGrand(seulColis) : null;
   return (
@@ -266,19 +285,19 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc, variant
           {!c && echeance ? <span className="n-rp-etiquette n-rp-etat" data-n-ton={echeance.presse ? 'ambre' : 'neutre'} data-rp-rebours={echeance.cle}>{echeance.texte}</span> : null}
         </div>
         {adresseTxt || horaires ? <div className="n-rp-adresse-ligne">
-          <span className="n-rp-adresse" data-rp-adresse="">{adresseTxt ? <span className="n-rp-adresse-txt">{adresseTxt}</span> : null}{horaires ? <span className="n-rp-horaires" data-rp-horaires="">{adresseTxt ? ' · ' : ''}{horaires}</span> : null}</span>
+          <span className="n-rp-adresse" data-rp-adresse="">{adresseTxt ? <span className="n-rp-adresse-txt">{adresseTxt}</span> : null}{horaires ? <span className="n-rp-horaires" data-rp-horaires="" data-rp-ouverture={ouv ? ouv.etat : undefined} data-rp-horaires-jour={ouv ? ouv.jour || '' : undefined}>{adresseTxt ? ' · ' : ''}{horaires}</span> : null}</span>
           {lien && !c ? <a className="n-rp-itineraire" href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">{Icon ? <Icon name="pin" size={15}/> : null}<span>{tr('retraits.v.itineraire')}</span></a> : null}
         </div> : null}
       </header>
       {colis.length ? <ul className="n-rp-liste">
-        {comptes.map((x) => <LigneColis key={x.cle || x.id} x={x} aides={aides} Photo={Photo} Icon={Icon} nouveaux={nouveaux}/>)}
+        {comptes.map((x) => <LigneColis key={x.cle || x.id} x={x} aides={aides} Photo={Photo} Icon={Icon} nouveaux={nouveaux} guichet={guichet} avecLimite={avecLimite} loc={loc}/>)}
       </ul> : <p className="n-rp-rien-ici" data-rp-rien-ici="">{tr('retraits.p.rienIci')}</p>}
       {verif.length ? <>
         {/* (23 nov. au soir, « une phrase courte par bloc ») La phrase courte ; le pourquoi (code et QR gardés…) replié. */}
         {c ? <div className="n-rp-verif-tete" data-rp-verif-tete={verif.length}><span>{tr('retraits.m.horsCompteCourt')}</span> <Pourquoi>{tr('retraits.m.horsCompte')}</Pourquoi></div>
           : <p className="n-rp-verif-tete" data-rp-verif-tete={verif.length}>{tr('retraits.m.horsCompte')}</p>}
         <ul className="n-rp-liste" data-rp-verif-liste="">
-          {verif.map((x) => <LigneColis key={x.cle || x.id} x={x} aides={aides} Photo={Photo} Icon={Icon} nouveaux={nouveaux}/>)}
+          {verif.map((x) => <LigneColis key={x.cle || x.id} x={x} aides={aides} Photo={Photo} Icon={Icon} nouveaux={nouveaux} guichet={guichet} avecLimite={avecLimite} loc={loc}/>)}
         </ul>
       </> : null}
       {/* (21 nov., ext. 5.411) EN ROUTE VERS CE POINT : les achats dont le suivi de CETTE transaction nomme ce point (identité,
@@ -287,7 +306,12 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc, variant
           Les gestes du point, en VRAIS boutons au pied de la carte : « Itinéraire » (le plein de l'écran sur le premier point,
           celui qui presse le plus — `trierPoints`) et, quand UN seul colis attend ici avec son code, « Code » (le plein écran
           pour le guichet, le geste d'avant `enGrand`). Plusieurs colis : chaque code se touche dans sa rangée. */}
-      {variante === 'c' && (lien || codeSeul) ? <div className="n-actions n-rp-actions" data-n-actions={(lien ? 1 : 0) + (codeSeul ? 1 : 0)}>
+      {variante === 'c' && guichet && nMontrer ? <div className="n-actions n-rp-actions" data-n-actions={(lien ? 1 : 0) + 1}>
+        {lien ? <span className="n-bouton-bloc"><a className="n-bouton n-action" data-n-variante="teinte" href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">
+          <span className="n-bouton-icone" aria-hidden="true">{Icon ? <Icon name="pin" size={18}/> : null}</span><span className="n-bouton-libelle">{tr('retraits.v.itineraire')}</span></a></span> : null}
+        <span className="n-bouton-bloc"><button type="button" className="n-bouton n-action" data-n-variante={premier ? 'plein' : 'teinte'} data-rp-code-plein="" data-rp-montrer={String(nMontrer)} onClick={() => guichet(colis.find((x) => x.code || x.code2 || aides.qrSrc(x)) || colis[0])}>
+          <span className="n-bouton-icone" aria-hidden="true">{Icon ? <Icon name="qr" size={18}/> : null}</span><span className="n-bouton-libelle">{tr('retraits.g.montrer', { n: nMontrer })}</span></button></span>
+      </div> : variante === 'c' && (lien || codeSeul) ? <div className="n-actions n-rp-actions" data-n-actions={(lien ? 1 : 0) + (codeSeul ? 1 : 0)}>
         {lien ? <span className="n-bouton-bloc"><a className="n-bouton n-action" data-n-variante={premier ? 'plein' : 'teinte'} href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">
           <span className="n-bouton-icone" aria-hidden="true">{Icon ? <Icon name="pin" size={18}/> : null}</span><span className="n-bouton-libelle">{tr('retraits.v.itineraire')}</span></a></span> : null}
         {codeSeul ? <span className="n-bouton-bloc"><button type="button" className="n-bouton n-action" data-n-variante="teinte" data-rp-code-plein="" onClick={codeSeul}>
@@ -342,7 +366,20 @@ export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo, enRouteS
   const apple = React.useMemo(() => appareilApple(), []);
   const [carte, setCarte] = React.useState(false);
   const loc = localeCourante();
-  if (!avec.length && !bientot.length && !enRouteSansPoint.length) return null;
+  // (24 nov., retrait-parfait) LE COMPTOIR : { p, depart } — ouvert sur le toucher d'un code, d'un QR ou de « Montrer ».
+  const [guichet, setGuichet] = React.useState(null);
+  const avecGuichet = variante === 'c' && !!(aides && aides.retirer);
+  const ouvrirGuichet = avecGuichet ? (p, x) => { if (nouveaux && x) nouveaux.vu(x.cle || x.id); setGuichet({ p, depart: (x && (x.cle || x.id)) || '' }); } : null;
+  // Les QR hébergés de tous les points, mis en réserve tant que le réseau est là (hors ligne au comptoir, ils restent).
+  const qrsHeberges = points.flatMap((p) => (p.arrives || []).map((x) => (aides && aides.qrSrc ? aides.qrSrc(x) : ''))).filter((u) => /^https:\/\//i.test(String(u || '')));
+  const cleQrs = qrsHeberges.join('|');
+  React.useEffect(() => { if (qrsHeberges.length) rechaufferQrs(qrsHeberges); }, [cleQrs]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const feuilleGuichet = guichet ? (() => { const gp = avec.find((q) => (q.cle || q.numero) === (guichet.p.cle || guichet.p.numero)) || guichet.p; const d = colisDuPoint(gp);
+    const nomT = ((gp.transporteurs || [])[0] && aides.nomTransporteur) ? aides.nomTransporteur(gp.transporteurs[0]) : '';
+    return <Guichet point={gp} colis={[...d.comptes, ...d.verif]} depart={guichet.depart} aides={aides} Photo={Photo} Icon={Icon} Logo={Logo}
+      nomPoint={gp.nom || nomT || tr('retraits.p.pointRelais')} onFermer={() => setGuichet(null)}/>; })() : null;
+  // Le dernier colis retiré au comptoir vide la liste : la feuille reste (« Retiré ✓ · Annuler ») jusqu'à ce qu'il la ferme.
+  if (!avec.length && !bientot.length && !enRouteSansPoint.length) return feuilleGuichet;
   const r = resumeRetraits(avec);
   const nRoute = [...avec, ...bientot].reduce((t, p) => t + (p.attendus || []).length, 0);
   // La carte : un repère par point à la position LUE (liste Vinted), son nombre à retirer, sinon en route.
@@ -364,12 +401,13 @@ export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo, enRouteS
           <Icon name="pin" size={18}/><span>{tr('retraits.p.carte')}</span>
         </button> : null}
       </div>
+      {feuilleGuichet}
       {carte && reperes.length ? <CartePoints reperes={reperes} onPoint={aller} label={tr('retraits.p.carteAria')}/> : null}
       {/* Rien à retirer ni à prévoir sous un point, mais des achats en route sans point lu : « Rien à retirer » d'abord (jamais une
           liste vide sous un titre), la rangée repliée des achats sans point dessous. */}
       {!avec.length && !bientot.length ? <RienARetirer/> : null}
       {avec.length ? <div className="n-rp-cartes" data-v2-bloc="passes">
-        {avec.map((p, i) => <CartePoint key={p.cle || p.numero} p={p} aides={aides} Photo={Photo} Icon={Icon} Logo={Logo} nouveaux={nouveaux} apple={apple} loc={loc} variante={variante} premier={i === 0}/>)}
+        {avec.map((p, i) => <CartePoint key={p.cle || p.numero} p={p} aides={aides} Photo={Photo} Icon={Icon} Logo={Logo} nouveaux={nouveaux} apple={apple} loc={loc} variante={variante} premier={i === 0} ouvrirGuichet={ouvrirGuichet}/>)}
       </div> : null}
       {bientot.length ? <section className="n-rp-bientot" data-rp-bientot-liste={String(bientot.length)} aria-label={tr('retraits.p.bientot')}>
         <h2 className="n-rp-section">{tr('retraits.p.bientot')}</h2>

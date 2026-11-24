@@ -494,7 +494,7 @@ import { etapesTrajet } from "../retraitTrajet.js";   // (20 nov.) la barre du t
 import { ligneVente, ligneAchat, JOURS_PUB_TRANSP, clePubTransp, lignePubliee, ligneVenteLbc, ligneVenteVc, ligneVenteEbay, ligneAchatVc, ligneAchatLbc, listeSite, suivisPartages, memoTrajet, trajetDeMemo, memoArrivee, ligneNonRetire, CLE_PUB_NON_RETIRES } from "../statsTransporteurs.js";   // (21 nov., lot journee-stats) les colis par transporteur, publiés pour Statistiques
 import { colisDuPoint } from "../retraitsVue.js";   // (20 nov.) rétention : comptés + « à vérifier » qui ont encore un code ou un QR
 import { prevoirRetraits } from "../relaisPrevision.js";   // (21 nov., ext. 5.411) « Demain : 3 colis chez Relais X »
-import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture } from "../../api/_lib/horaires-relais.js";
+import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture, horairesDuJour } from "../../api/_lib/horaires-relais.js";
 // ⟦← App.jsx #111⟧
 import { GroupeConversations as GroupeConversationsV2, LigneConversation as LigneConversationV2 } from "../designV2/LigneConversation.jsx";
 // ⟦← App.jsx #112⟧
@@ -29340,6 +29340,17 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                           return Number.isFinite(pn) && pn > 0 && !(o.price && o.price.currency_code && o.price.currency_code !== 'EUR') ? montant(pn) : ''; },
                         horairesDe: (p) => { const h = horairesDuPoint((p.arrives || []).map((c) => (c && c.src && c.src.t ? { horaires: c.src.t.horaires, ms: Date.parse((c.src.t.horairesDuTransporteur && c.src.t.horairesAt) || c.src.t.emailAt || c.src.t.receivedAt || '') } : null)).filter(Boolean), (c) => c.ms);
                           if (!h) return ''; return phraseOuverture(etatOuverture(h, Date.now())) || texteHoraires(h); },
+                        // (24 nov., retrait-parfait) L'ouverture CALCULÉE sur les horaires LUS (heure de Paris) : { etat: 'ouvert' | 'ferme' | '',
+                        // phrase, jour } — « ouvert maintenant · ferme à 19 h » / « fermé — ouvre à 8 h » et les plages d'aujourd'hui. Pas lu ⇒ null.
+                        ouvertureDe: (p) => { const h = horairesDuPoint((p.arrives || []).map((c) => (c && c.src && c.src.t ? { horaires: c.src.t.horaires, ms: Date.parse((c.src.t.horairesDuTransporteur && c.src.t.horairesAt) || c.src.t.emailAt || c.src.t.receivedAt || '') } : null)).filter(Boolean), (c) => c.ms);
+                          if (!h) return null; const now = Date.now(); const e = etatOuverture(h, now);
+                          return { etat: e ? (e.ouvert ? 'ouvert' : 'ferme') : '', phrase: phraseOuverture(e) || (e ? '' : texteHoraires(h)), jour: horairesDuJour(h, now) }; },
+                        // (24 nov., retrait-parfait) Au comptoir : « Retiré » sur SON toucher = le geste d'avant (`retirerRelais` : markCollected /
+                        // markPickupDone, annulable — il rend l'identifiant du geste), « Annuler », et « Détails » = la feuille d'avant (openQrView).
+                        retirer: (x) => retirerRelais(x),
+                        annuler: (id) => { try { _gestes.annuler(id); } catch (_) {} },
+                        details: (x) => { const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null; if (!t && !o) return null;
+                          return () => openQrView(t ? (x.code && codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : ligneRetraitVinted(o)); },
                         qrSrc: (x) => { const t = (x.src && x.src.t) || null; return t ? qrVivant(t) : ''; },
                         enGrand: (x) => { const f = qrRetrait(x); if (f) return f; const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
                           if (!x.code) return null; return () => openQrView(t ? (codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : ligneRetraitVinted(o)); } }}/>
