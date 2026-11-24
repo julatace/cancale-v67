@@ -82,3 +82,6 @@
   .n-inv-tete-os { display: flex; align-items: center; height: var(--n-cible); }
   .n-inv-tete-os > .n-os { display: block; width: 132px; height: 14px; border-radius: 4px; background: var(--n-squelette, var(--n-carte-2)); }
 }
+@layer vrm-natif {
+  .n-tt-nombre-os { display: inline-block; width: 84px; height: 12px; border-radius: 4px; background: var(--n-squelette, var(--n-carte-2)); }
+}

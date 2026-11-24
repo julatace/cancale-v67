@@ -313,8 +313,9 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     </div>
   );
   const nombre = (
-    <div className="n-tt-nombre" data-tt-nombre={String(affichees.length)}>
-      <span className="n-tt-nombre-texte">{unite(affichees.length)}</span>
+    <div className="n-tt-nombre" data-tt-nombre={Array.isArray(lignes) ? String(affichees.length) : undefined}>
+      {/* (24 nov., lot visuel-annonces) pendant la lecture de la grille : la ligne est là (rien ne saute), le nombre pas encore su */}
+      {Array.isArray(lignes) ? <span className="n-tt-nombre-texte">{unite(affichees.length)}</span> : <span className="n-os n-tt-nombre-os" aria-hidden="true"/>}
       <span className="n-tt-espace"/>
       {ordinateur && grille ? <span className="n-tt-vues" role="group" aria-label={tr('tableau.vue')}>
         <button type="button" className="n-tt-bouton n-tt-bouton-icone" aria-pressed={vue === 'liste'} aria-label={tr('tableau.vueListe')} title={tr('tableau.vueListe')} data-tt-vue="liste" onClick={() => setVue('liste')}>{ic('menu', 18)}</button>
@@ -439,7 +440,10 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     </div>
   ) : null;
 
-  const corps = lignes === undefined ? <Attente forme="rangees" n={6} vignette={ordinateur ? 0 : 56} titre/>
+  // (24 nov., lot visuel-annonces) En grille d'inventaire, le squelette a la FORME des cartes (rien ne saute à l'arrivée).
+  const corps = lignes === undefined ? (ordinateur && vue === 'grille' && carteGrille && carteCorps
+      ? <GrilleInventaire items={undefined} attente={12} corps={carteCorps} min={200} gap={16} className="n-tt-grille-ecran" attrs={{ 'data-tt-grille': '' }}/>
+      : <Attente forme="rangees" n={6} vignette={ordinateur ? 0 : 56} titre/>)
     : lignes === null ? <Vide icone={ic('cloudOff', 40)} phrase={pasSu || tr('tableau.pasSu')} action={actionPasSu}/>
     : !affichees.length ? <Vide icone={ic(q || nStatuts ? 'search' : iconeVide, 40)} phrase={q || nStatuts ? (videRecherche || tr('tableau.videRecherche')) : (vide || tr('tableau.vide'))}
         action={q || nStatuts ? <Bouton variante="texte" onClick={() => { setQ(''); setStatutsSel(new Set()); }} attrs={{ 'data-tt-effacer': '' }}>{tr('tableau.effacerFiltres')}</Bouton> : null}/>
@@ -456,7 +460,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
           {avantOutils}
           {outils}
           {/* (21 nov.) À l'ordinateur, « N articles » · liste ⇄ grille · « Colonnes » font partie de la tête collante : rien ne passe dessous. */}
-          {ordinateur && Array.isArray(lignes) ? nombre : null}
+          {ordinateur && (Array.isArray(lignes) || (lignes === undefined && vue === 'grille' && carteGrille && carteCorps)) ? nombre : null}
         </div>
         {haut}
         {!ordinateur && Array.isArray(lignes) ? nombre : null}

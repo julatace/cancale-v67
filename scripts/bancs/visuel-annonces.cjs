@@ -123,7 +123,9 @@ const INIT = () => {
   // Chaque image : un squelette a-t-il été montré ? quand la 1re carte est-elle là, et comment (opacité, délai) ?
   const tick = () => { try {
     if (document.querySelector('[data-inv-attente], [data-ad-attente], .n-attente, [aria-busy="true"]')) window.__os++;
-    if (!window.__premiere) { const c = document.querySelector('[data-ad-carte][data-eg-article]'); if (c) { const cs = getComputedStyle(c); window.__premiere = { t: performance.now(), op: Number(cs.opacity), delai: parseFloat(cs.animationDelay) || 0, anim: cs.animationName };
+    { const o = document.querySelector('[data-inv-attente] .n-inv-os'); if (o) { const b = o.getBoundingClientRect(); window.__osBoite = [b.left, b.top + scrollY, b.width, b.height].map(Math.round); } }
+    if (!window.__premiere) { const c = document.querySelector('[data-ad-carte][data-eg-article]'); if (c) { const cs = getComputedStyle(c); { const b = c.getBoundingClientRect(); window.__carteBoite = [b.left, b.top + scrollY, b.width, b.height].map(Math.round); }
+      window.__premiere = { t: performance.now(), op: Number(cs.opacity), delai: parseFloat(cs.animationDelay) || 0, anim: cs.animationName };
       const l = [...document.querySelectorAll('[data-ad-carte][data-n-revele]')]; const d = l.map((x) => parseFloat(getComputedStyle(x).animationDelay) * 1000 || 0); const du = l.map((x) => parseFloat(getComputedStyle(x).animationDuration) * 1000 || 0);
       const u = [...new Set(d.map((x) => Math.round(x)))].sort((x, y) => x - y); window.__cascade = { n: l.length, pas: u.length > 1 ? Math.max(...u.slice(1).map((x, i) => x - u[i])) : 0, total: d.length ? Math.max(...d) : 0, duree: du.length ? Math.max(...du) : 0 }; } }
     } catch (_) {} requestAnimationFrame(tick);
@@ -166,6 +168,8 @@ async function cas(nav, nom, opts, theme) {
   dit(m.etiq.length === 0, `I l'étiquette du N° dit le N° de SA fiche`, m.etiq.slice(0, 4));
   dit(prem && prem.op >= 0.35 && prem.delai === 0, `S la 1re carte est lisible dès sa 1re image, sans délai (opacité ${prem && prem.op}, délai ${prem && prem.delai})`, prem);
   dit((nom !== 'tel' || casc.n > 0) && casc.pas <= 15.5 && casc.total <= 120.5 && casc.duree <= 200.5, `S cascade d'arrivée : ${casc.n} cartes, ${casc.pas} ms par carte (≤ 15), ${casc.total} ms au total (≤ 120), durée ${casc.duree} ms (≤ 200)`, casc);
+  const boites = await pg.evaluate(() => ({ os: window.__osBoite || null, carte: window.__carteBoite || null }));
+  dit(!!boites.os && !!boites.carte && boites.os.every((v, i) => Math.abs(v - boites.carte[i]) <= 1), `L le squelette est à la place EXACTE de la 1re carte (gauche, haut, largeur, hauteur ±1 px)`, boites);
   dit(cls <= 0.02, `L CLS pendant la lecture et l'arrivée des photos : ${cls.toFixed(4)} (≤ 0,02)`);
   dit(m.oranges.length === 0, `O aucune couleur orange calculée`, m.oranges.slice(0, 6));
   dit(m.debord <= 0 && m.sorties.length === 0 && m.chevauchements.length === 0 && m.coupes.length === 0, `D aucun débordement (${m.debord}), aucune sortie, aucun chevauchement, aucun texte coupé`, { s: m.sorties.slice(0, 4), c: m.chevauchements.slice(0, 4), x: m.coupes.slice(0, 4) });
@@ -211,7 +215,7 @@ async function cas(nav, nom, opts, theme) {
 (async () => {
   construire();
   const srv = await servir();
-  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined), args: ['--no-sandbox', '--use-angle=swiftshader'] });
+  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined), args: ['--no-sandbox', '--use-angle=swiftshader', '--disable-dev-shm-usage'] });
   try {
     // CAS=tel-clair (une seule variante, pour une mutation rapide) ; par défaut les quatre.
     const CAS = (process.env.CAS || 'tel-clair,ordi-clair,tel-sombre,ordi-sombre').split(',');
