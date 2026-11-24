@@ -50,7 +50,7 @@ export default {
   "cnx.relu.age": "read {age}",
   "cnx.relu.jamais": "never read",
   "cnx.relu.passu": "read: —",
-  "cnx.compte.vieux": "Not read for 24 h: open {site} on {compte}",
+  "cnx.compte.vieux": "Not read for 24 h",
   "cnx.compte.verification": "Vinted asks for a check",
   "cnx.compte.session": "Vinted session expired: sign in again",
   "cnx.compte.moderation": "Vinted is limiting this account",
@@ -63,6 +63,6 @@ export default {
   "cnx.alerte.session": "{compte}: Vinted session expired",
   "cnx.pourquoi.lignes": "Each VRM extension publishes its state a few minutes after each visit. A browser “not seen” is closed, off, or linked to another VRM account.",
   "cnx.pourquoi.jauge": "The 50 actions per hour limit belongs to the account, all browsers added up: it shows on the account, not on a browser.",
-  "cnx.pourquoi.anciens": "Each new install gets its own number. Those not seen for 7 days are kept apart: nothing is deleted.",
+  "cnx.pourquoi.anciens": "Each new install gets its own number. Those not seen for 3 days are kept apart: nothing is deleted.",
   "cnx.pourquoi.sante": "The last stop and each site's health are only reported from extension {v}. Before that, VRM doesn't know: it shows nothing rather than “ok”."
 };

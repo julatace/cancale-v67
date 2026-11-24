@@ -50,7 +50,7 @@ export default {
   "cnx.relu.age": "leído {age}",
   "cnx.relu.jamais": "nunca leído",
   "cnx.relu.passu": "leído: —",
-  "cnx.compte.vieux": "Sin leer desde hace 24 h: abre {site} en {compte}",
+  "cnx.compte.vieux": "Sin leer desde hace 24 h",
   "cnx.compte.verification": "Vinted pide una verificación",
   "cnx.compte.session": "Sesión de Vinted caducada: vuelve a entrar",
   "cnx.compte.moderation": "Vinted limita esta cuenta",
@@ -63,6 +63,6 @@ export default {
   "cnx.alerte.session": "{compte}: sesión de Vinted caducada",
   "cnx.pourquoi.lignes": "Cada extensión VRM publica su estado unos minutos después de cada visita. Un navegador «sin ver» está cerrado, apagado o vinculado a otra cuenta VRM.",
   "cnx.pourquoi.jauge": "El límite de 50 acciones por hora es de la cuenta, sumando todos los navegadores: se muestra en la cuenta, no en un navegador.",
-  "cnx.pourquoi.anciens": "Cada instalación nueva tiene su propio número. Las que no aparecen desde hace 7 días se guardan aparte: no se borra nada.",
+  "cnx.pourquoi.anciens": "Cada instalación nueva tiene su propio número. Las que no aparecen desde hace 3 días se guardan aparte: no se borra nada.",
   "cnx.pourquoi.sante": "La última parada y el estado de cada sitio solo se indican desde la extensión {v}. Antes, VRM no lo sabe: no muestra nada en lugar de «ok»."
 };

@@ -8,7 +8,7 @@
 // Mesuré sur la vraie base le 24 nov. (lecture seule, projections) :
 //   · `ext_appareil_{16 hex}` : 22 lignes, 1 vendeur. Une ligne par INSTALLATION (un dossier dézippé de plus = un id
 //     de plus) : 17 « Chrome · Mac » de 5.329 à 5.440. Le nom publié se limite à `appareil.nav` + `appareil.systeme`
-//     (+ `paquet`) : aucun nom d'ordinateur. Les installations plus vues depuis 7 j sont donc rangées à part, repliées.
+//     (+ `paquet`) : aucun nom d'ordinateur. Les installations plus vues depuis 3 j sont donc rangées à part, repliées.
 //   · `vus.vinted` = { uid Vinted: ms } (les comptes que CE navigateur a lus) ; `flux.{vinted|leboncoin|vestiaire}` =
 //     { okAt, koAt, koStatut, refus[{at, statut:'reseau', famille, octets}] } : les ENVOIS vers VRM, pas Vinted.
 //   · `diag` = compteurs internes du jour (suivi_vu_escrow…) : rien pour lui, pas montré.
@@ -24,7 +24,7 @@ export const MIN = 60000;
 export const HEURE = 60 * MIN;
 export const VU_DIRECT_MS = 15 * MIN;      // « en direct » : la ligne se republie à chaque visite et toutes les quelques minutes
 export const ABSENT_MS = 24 * HEURE;      // « pas vu depuis … »
-export const ANCIEN_MS = 7 * 24 * HEURE;  // une installation plus vue depuis 7 j : rangée à part (une réinstallation laisse sa vieille ligne)
+export const ANCIEN_MS = 3 * 24 * HEURE;  // une installation plus vue depuis 3 j (mesuré : 20 lignes vues en 7 j, 15 en 3 j, pour quelques navigateurs réels) : rangée à part (une réinstallation laisse sa vieille ligne)
 export const RELU_VIEUX_MS = 24 * HEURE;  // un compte pas relu depuis 24 h : nommé, avec son geste
 // La version qui publie `sante` / `arret` / `servie` / `depassee` (ext. 5.448, capacité « santesites » à ajouter à
 // EXT_CAPACITES quand la 5.448 arrive sur main — l'écran passe `EXT_CAPACITES.santesites` s'il existe).
@@ -165,7 +165,7 @@ export function vueConnexions({ rows, attendue = '', maintenant = Date.now(), ic
     for (const r of rows) {
       const n = navigateurDe(r || {}, { attendue, maintenant, ici, depuis, nomsVinted });
       if (!n || vus.has(n.id)) continue; vus.add(n.id);
-      // Une installation plus vue depuis 7 j (ou jamais datée) : à part. Celle de CE navigateur reste toujours en haut.
+      // Une installation plus vue depuis 3 j (ou jamais datée) : à part. Celle de CE navigateur reste toujours en haut.
       if (!n.ici && (n.atMs == null || maintenant - n.atMs >= ANCIEN_MS)) anciens.push(n); else navigateurs.push(n);
     }
     const ordre = (a, b) => (b.ici - a.ici) || ((b.atMs || 0) - (a.atMs || 0)) || a.id.localeCompare(b.id);

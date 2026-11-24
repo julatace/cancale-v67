@@ -50,7 +50,7 @@ export default {
   "cnx.relu.age": "letto {age}",
   "cnx.relu.jamais": "mai letto",
   "cnx.relu.passu": "letto: —",
-  "cnx.compte.vieux": "Non letto da 24 h: apri {site} su {compte}",
+  "cnx.compte.vieux": "Non letto da 24 h",
   "cnx.compte.verification": "Vinted chiede una verifica",
   "cnx.compte.session": "Sessione Vinted scaduta: accedi di nuovo",
   "cnx.compte.moderation": "Vinted limita questo account",
@@ -63,6 +63,6 @@ export default {
   "cnx.alerte.session": "{compte}: sessione Vinted scaduta",
   "cnx.pourquoi.lignes": "Ogni estensione VRM pubblica il suo stato pochi minuti dopo ogni visita. Un browser «non visto» è chiuso, spento o collegato a un altro account VRM.",
   "cnx.pourquoi.jauge": "Il limite di 50 azioni all'ora è dell'account, sommando tutti i browser: si vede sull'account, non su un browser.",
-  "cnx.pourquoi.anciens": "Ogni nuova installazione ha il suo numero. Quelle non viste da 7 giorni sono messe da parte: nulla viene cancellato.",
+  "cnx.pourquoi.anciens": "Ogni nuova installazione ha il suo numero. Quelle non viste da 3 giorni sono messe da parte: nulla viene cancellato.",
   "cnx.pourquoi.sante": "L'ultimo arresto e lo stato di ogni sito sono indicati solo dall'estensione {v}. Prima, VRM non lo sa: non mostra nulla invece di «ok»."
 };

@@ -50,7 +50,7 @@ export default {
   "cnx.relu.age": "gelesen {age}",
   "cnx.relu.jamais": "nie gelesen",
   "cnx.relu.passu": "gelesen: —",
-  "cnx.compte.vieux": "Seit 24 Std. nicht gelesen: öffne {site} mit {compte}",
+  "cnx.compte.vieux": "Seit 24 Std. nicht gelesen",
   "cnx.compte.verification": "Vinted verlangt eine Prüfung",
   "cnx.compte.session": "Vinted-Sitzung abgelaufen: neu anmelden",
   "cnx.compte.moderation": "Vinted schränkt dieses Konto ein",
@@ -63,6 +63,6 @@ export default {
   "cnx.alerte.session": "{compte}: Vinted-Sitzung abgelaufen",
   "cnx.pourquoi.lignes": "Jede VRM-Erweiterung meldet ihren Zustand wenige Minuten nach jedem Besuch. Ein „nicht gesehener“ Browser ist geschlossen, aus oder mit einem anderen VRM-Konto verbunden.",
   "cnx.pourquoi.jauge": "Das Limit von 50 Aktionen pro Stunde gilt für das Konto, alle Browser zusammen: es steht beim Konto, nicht beim Browser.",
-  "cnx.pourquoi.anciens": "Jede neue Installation hat eine eigene Nummer. Seit 7 Tagen nicht gesehene werden separat gelistet: nichts wird gelöscht.",
+  "cnx.pourquoi.anciens": "Jede neue Installation hat eine eigene Nummer. Seit 3 Tagen nicht gesehene werden separat gelistet: nichts wird gelöscht.",
   "cnx.pourquoi.sante": "Der letzte Stopp und der Zustand jeder Seite werden erst ab Erweiterung {v} gemeldet. Davor weiß VRM es nicht: es zeigt nichts statt „ok“."
 };

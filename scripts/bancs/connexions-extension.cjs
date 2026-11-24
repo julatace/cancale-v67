@@ -147,12 +147,14 @@ const TECHNIQUES = /\b(select=|ext_appareil|actions_compte|harvest_|undefined|nu
       dit(g('d').version === 'passu' && g('d').sante !== 'ok' && !/À jour/.test(g('d').texte) && !/\b0\b/.test(g('d').texte.replace(/\d+ min/, '')), 'champs manquants : « — », jamais « À jour » ni ok ni 0', JSON.stringify(g('d')));
       const cp = (u) => e.comptes.find((c) => c.id === 'vinted:' + u) || {};
       dit(cp(A).relu === 'frais' && cp(A).jauge === '12/50' && cp(A).par === 'a'.repeat(16), 'boutique_a : relu, par ce Chrome, 12/50', JSON.stringify(cp(A)));
-      dit(cp(D).relu === 'vieux' && /ouvre Vinted sur vieux_d/.test(cp(D).texte), 'vieux_d : « Pas relu depuis 24 h : ouvre Vinted sur vieux_d »', JSON.stringify(cp(D)));
+      dit(cp(D).relu === 'vieux' && /Pas relu depuis 24 h/.test(cp(D).texte) && /Ouvrir Vinted/.test(cp(D).texte), 'vieux_d : « Pas relu depuis 24 h » + « Ouvrir Vinted »', JSON.stringify(cp(D)));
       dit(cp(B).jauge === 'pas-su' && !/\b0\/50\b/.test(cp(B).texte), 'jauge pas sue : « — », jamais 0/50', JSON.stringify(cp(B)));
       dit(e.alerte === 'version', 'la page sait la ligne d’Aujourd’hui (extension ancienne vue aujourd’hui)', e.alerte);
       dit(e.deborde <= 0, 'aucun débordement horizontal', e.deborde);
       dit(!mobile || !e.petites.length, 'cibles au doigt ≥ 44 px', JSON.stringify(e.petites.slice(0, 4)));
       dit(!TECHNIQUES.test(e.texte), 'aucun mot technique dans le texte rendu', (e.texte.match(TECHNIQUES) || [])[0]);
+      const longs = await pg.evaluate(() => { const out = []; for (const el of document.querySelectorAll('[data-ecran-connexions] *')) { if (el.closest('details:not([open])')) continue; const t = [...el.childNodes].filter((c) => c.nodeType === 3).map((c) => c.textContent).join(' ').replace(/\s+/g, ' ').trim(); if (!t) continue; const n = t.split(' ').filter((w) => /[\p{L}\p{N}]/u.test(w)).length; const r = el.getBoundingClientRect(); if (n > 8 && r.width > 1) out.push(t.slice(0, 60)); } return out; }).catch(() => null);
+      dit(Array.isArray(longs) && !longs.length, 'aucun texte visible de plus de 8 mots (le détail sous « Pourquoi ? »)', JSON.stringify(longs));
       // Couleurs : aucun ambre/orange dans la page.
       const ambre = await pg.evaluate(() => [...document.querySelectorAll('[data-ecran-connexions] *')].some((x) => { const c = getComputedStyle(x).color; const m = /rgb\((\d+), (\d+), (\d+)/.exec(c); return m && +m[1] > 180 && +m[2] > 90 && +m[2] < 170 && +m[3] < 60; })).catch(() => null);
       dit(ambre === false, 'aucun texte orange/ambre', ambre);

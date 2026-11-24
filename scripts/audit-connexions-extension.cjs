@@ -84,7 +84,7 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '�
 
   // 2. Chaque navigateur une fois ; les vieilles installations à part.
   dit(new Set(ids).size === ids.length && ids.filter((x) => x === 'aaaaaaaaaaaaaaaa').length === 1, 'chaque navigateur listé une fois (le doublon d’id est retiré)', ids.join(','));
-  dit(N.length === 4 && v.anciens.length === 1 && v.anciens[0].id === 'eeeeeeeeeeeeeeee', 'une installation plus vue depuis 7 j est rangée à part (pas mêlée)', JSON.stringify({ n: ids, a: v.anciens.map((x) => x.id) }));
+  dit(N.length === 4 && v.anciens.length === 1 && v.anciens[0].id === 'eeeeeeeeeeeeeeee', 'une installation plus vue depuis 3 j est rangée à part (pas mêlée)', JSON.stringify({ n: ids, a: v.anciens.map((x) => x.id) }));
   dit(N[0].id === 'aaaaaaaaaaaaaaaa' && N[0].ici, 'ce navigateur en tête');
 
   // 3. Les versions.

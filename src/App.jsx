@@ -16942,6 +16942,7 @@ function titreEcran(tab) {
   if (tab === 'journee') return tr('nav.journee');
   if (tab === 'semaine') return tr('ecran.semaine');
   if (tab === 'menu') return tr('menu.titre');
+  if (tab === 'connexions') return tr('cnx.titre');   // (24 nov.) Paramètres → Connexions de l'extension
   const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
   const cle = { settings: 'ecran.settings', dashboard: 'nav.compta', litiges: 'ecran.litiges', cat_expedition: 'nav.cat_bord', masques: 'ecran.masques', automatisations: 'auto.titre', organisation: 'ecran.organisation', catalog: 'ecran.catalog', stockvinted: 'ecran.stockvinted', vintedaccounts: 'ecran.vintedaccounts', sales: 'nav.ventes', inventory: 'ecran.inventory' }[tab];
@@ -18564,7 +18565,7 @@ const ECRANS_AVEC_RECHERCHE = new Set(['annonces', 'messages', 'achats', 'emails
 // (21 nov., onglets-menu — audit §1.2 « le grand titre au même endroit partout ») La coque dessine le GRAND TITRE de ces
 // écrans (au téléphone) ; les autres écrivent le leur juste sous la barre — la barre ne double alors jamais leur titre
 // (plus de petit titre centré au-dessus de leur grand titre, plus de recherche entre les deux).
-const ECRANS_TITRE_COQUE = new Set(['journee', 'compta', 'dashboard', 'menu', 'extension', 'adistance']);
+const ECRANS_TITRE_COQUE = new Set(['journee', 'compta', 'dashboard', 'menu', 'extension', 'adistance', 'connexions']);
 // (19 nov. soir) Les sites présents (ceux des filtres de la coque), lus par les tableaux de travail pour leur filtre « Site » ;
 // un choix y passe par `vrm:site-tache` (le MÊME `setPlatSub` + `retenirFiltre` que le menu de plateforme).
 const SITES_COQUE = { v: ['vinted'] };

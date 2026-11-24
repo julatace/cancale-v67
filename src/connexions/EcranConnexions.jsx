@@ -108,8 +108,8 @@ function RangeeNavigateur({ n, maintenant, iciVrm, homonyme = false }) {
   const sante = n.sante === undefined ? 'trop-ancienne' : n.sante === null ? 'pas-dit' : n.sante.every((s) => s.k === 'ok') ? 'ok' : 'probleme';
   return (
     <Rangee titre={nom} sousTitre={[vu, lienVrm ? tr('cnx.vrm.' + lienVrm) : ''].filter(Boolean).join(' · ')} valeur={valeur} valeurForte={v.etat === 'ancienne'}
-      icone={<Icon name="device" size={22}/>}
-      note={lit.length ? lit.join(' · ') : tr('cnx.lit.rien')}
+      icone={<Icon name={n.sys === 'iphone' || n.sys === 'android' || n.sys === 'ipad' ? 'device' : 'ecrans'} size={22}/>}
+      note={lit.length ? lit.map((t, i) => <React.Fragment key={i}>{i ? ' · ' : ''}<span>{t}</span></React.Fragment>) : tr('cnx.lit.rien')}
       pied={p ? (
         <div className="cnx-probleme" data-cnx-probleme={p.code}>
           <p className="cnx-phrase">{phrase}{p.at ? <span className="cnx-quand"> · {ilYa(p.at, maintenant)}</span> : null}</p>
@@ -132,11 +132,11 @@ function RangeeCompte({ c, maintenant }) {
   const relu = c.relu === 'passu' ? tr('cnx.relu.passu') : c.relu === 'jamais' ? tr('cnx.relu.jamais') : tr('cnx.relu.age', { age: ilYa(c.at, maintenant) });
   const arret = c.arret ? (c.arret === 'deconnecte' ? 'session' : c.arret === 'moderation' ? 'moderation' : 'verification') : '';
   const geste = arret || c.relu === 'vieux' ? gesteBouton('ouvrir-site', c.site) : null;
-  const phrase = arret ? tr('cnx.compte.' + arret) : c.relu === 'vieux' ? tr('cnx.compte.vieux', { site: NOMS_SITES[c.site], compte: c.nom || '—' }) : '';
+  const phrase = arret ? tr('cnx.compte.' + arret) : c.relu === 'vieux' ? tr('cnx.compte.vieux') : '';
   const prudence = c.jauge && c.jauge.prudence ? tr('cnx.prudence') : '';
   return (
-    <Rangee titre={c.nom || '—'} sousTitre={[NOMS_SITES[c.site], relu, par].filter(Boolean).join(' · ')}
-      valeur={c.site === 'vinted' ? texteJauge(c.jauge) : null} detailValeur={c.site === 'vinted' ? (prudence || tr('cnx.jauge.heure')) : ''}
+    <Rangee titre={c.nom || '—'} sousTitre={[NOMS_SITES[c.site], relu].filter(Boolean).join(' · ')} note={par}
+      valeur={c.site === 'vinted' ? texteJauge(c.jauge) : null} detailValeur={c.site === 'vinted' && c.jauge ? (prudence || tr('cnx.jauge.heure')) : ''}
       pied={phrase ? (
         <div className="cnx-probleme" data-cnx-compte-probleme={arret || 'vieux'}>
           <p className="cnx-phrase">{phrase}</p>

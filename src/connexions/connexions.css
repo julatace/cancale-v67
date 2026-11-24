@@ -1,6 +1,8 @@
 /* « Connexions de l'extension » (24 nov.) — gris clair, accent ardoise rare, aucun ambre (passation du 23 nov. §3). */
-.cnx-probleme { display: flex; flex-direction: column; gap: 8px; padding: 2px 0 6px; }
-.cnx-phrase { margin: 0; font-size: 15px; line-height: 20px; font-weight: 600; color: var(--n-encre); }
+.n-rangee-pied:has(> .cnx-probleme) { justify-content: flex-start; }
+.cnx-probleme { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 2px 0 10px; width: 100%; }
+.cnx-phrase { margin: 0; font-size: inherit; line-height: 1.35; font-weight: 600; color: var(--n-encre); }
+.cnx-probleme .n-actions { padding: 0; }
 .cnx-quand { font-weight: 400; color: var(--n-gris); }
 .cnx-pourquoi { padding: 0 var(--n-marge, 16px) 24px; }
 .cnx-pourquoi p { margin: 0 0 8px; }
@@ -8,4 +10,4 @@
   background: var(--n-carte); border: 1px solid var(--n-gris-bord); border-radius: var(--n-r-carte, 14px); }
 .cnx-journee-point { width: 8px; height: 8px; border-radius: 50%; background: var(--n-accent); flex: none; }
 .cnx-journee-texte { flex: 1 1 200px; min-width: 0; font-size: 15px; line-height: 20px; font-weight: 600; color: var(--n-encre); overflow-wrap: anywhere; }
-.cnx-journee .n-actions { margin: 0; }
+.cnx-journee .n-actions { margin: 0; padding: 0; flex: none; }
