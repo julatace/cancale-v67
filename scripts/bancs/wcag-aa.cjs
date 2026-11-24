@@ -136,6 +136,8 @@ async function ouvrir(nav, { W, sombre, url, langue = null }) {
       }
     } catch (_) {}
   }, [SESSION, sombre, langue]);
+  // Mutation « filnom » posée DÈS LE PREMIER RENDU (posée après, l'arbre d'accessibilité garde les noms déjà calculés).
+  if (MUT === 'filnom') await pg.addInitScript(() => document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = ':root:root:root:root:root:root body .vg-fil{content-visibility:auto!important}'; document.head.appendChild(st); }));
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
     const u = r.request().url();
     if (/vinted\.net|vinted\.fr\/.*\.(jpe?g|png|webp)/i.test(u) || r.request().resourceType() === 'image') return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: vignette(u) });
@@ -172,7 +174,6 @@ async function saboter(pg) {
   if (MUT === 'gris') await pg.addStyleTag({ content: '.vrm-an,.vrm-an-voile{--an-gris:#6E6E73!important}' });
   if (MUT === 'noms') await pg.addStyleTag({ content: ':root:root:root:root:root:root:root:root body .vrm-plus-groupe .vrm-ui-ligne{content-visibility:auto!important}' });
   if (MUT === 'libelle') await pg.evaluate(() => { for (const b of document.querySelectorAll('button.vg-fil')) b.setAttribute('aria-label', 'Ouvrir le fil ' + (b.querySelector('b') || b).textContent); });
-  if (MUT === 'filnom') await pg.addStyleTag({ content: ':root:root:root:root:root:root body .vg-fil{content-visibility:auto!important}' });
   // Anneau pâle (≈ 1,5:1 sur clair comme sur sombre), quelle que soit sa forme (contour ou ombre). Posé EN LIGNE au focus :
   // l'anneau de l'app est un !important dans une @layer, qu'aucune feuille ajoutée après ne bat (une style en ligne, si).
   if (MUT === 'anneau') await pg.evaluate(() => document.addEventListener('focusin', (e) => { const t = e.target; if (!t || !t.style) return; t.style.setProperty('outline-color', 'rgba(127,127,127,.35)', 'important'); t.style.setProperty('box-shadow', '0 0 0 2px rgba(127,127,127,.35)', 'important'); }, true));
@@ -292,6 +293,8 @@ async function anneaux(pg, n = 40) {
         const okPops = pops.length >= 1 && pops.every((p) => p.live && (!p.nom || ['status', 'region', 'log', 'alert'].includes(p.role)));
         dit(okPops, `${T} ${nom} · F 4.1.3 la zone des messages passagers est montée, vivante, nommée légalement`, JSON.stringify(pops));
         // B
+        // l'état POSÉ (une entrée en fondu relancée par un re-rendu n'est pas un défaut de contraste)
+        await finir(pg); await pg.waitForTimeout(100); await finir(pg);
         const c = await M.contrastePixels(pg);
         dit(!c.length, `${T} ${nom} · B 1.4.3 aucun texte sous 4,5:1 (3:1 en grand)`, `${c.length} : ` + c.slice(0, 5).map((x) => `${x.ratio}:1 « ${x.texte} » ${x.sel} ${x.fg} sur ${x.bg}`).join(' ║ '));
         // C
