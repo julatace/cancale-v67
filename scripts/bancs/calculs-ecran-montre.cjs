@@ -55,7 +55,7 @@ const ATTENDU = {
 
 (async () => {
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--explicitly-allowed-ports=' + PORT] });
-  const fautes = [], erreurs = [], vus = {}, ecrits = new Set(), lecturesExtras = [];
+  const fautes = [], erreurs = [], vus = {}, ecrits = new Set(), lecturesExtras = [], pagesTxn = [];
   try {
     const ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'fr-FR', serviceWorkers: 'block',
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1' });
@@ -71,13 +71,21 @@ const ATTENDU = {
     await ctx.route('**/rest/v1/**', async (route) => { const rq = route.request();
       if (rq.method() !== 'GET') { try { const b = JSON.parse(rq.postData() || 'null'); for (const x of [].concat(b || [])) if (x && x.id) ecrits.add(String(x.id)); } catch (_) {}
         return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' }).catch(() => {}); }
-      if (/harvest_%25_txn_%25&select=tx:meta-%3E%3Eid,cc:|harvest_%_txn_%&select=tx:meta->>id,cc:/.test(rq.url())) lecturesExtras.push(Date.now());
+      const estTxn = /harvest_%25_txn_%25&select=tx:meta-%3E%3Eid,cc:|harvest_%_txn_%&select=tx:meta->>id,cc:/.test(rq.url());
+      const deTxn = estTxn ? +((rq.headers().range || '0-').split('-')[0] || 0) : -1;
+      if (estTxn) pagesTxn.push(['dem', deTxn, Date.now()]);
+      if (/harvest_%25_txn_%25&select=tx:meta-%3E%3Eid,cc:|harvest_%_txn_%&select=tx:meta->>id,cc:/.test(rq.url())) { const rg = (rq.headers().range || '0-').split('-')[0]; if (rg === '0' || rg === '') lecturesExtras.push(Date.now()); }   // une LECTURE = sa 1re page (`lireTout` pagine par `Range`)
       const h = await rq.allHeaders(); const rep = repondre(rq.url(), h.range, base);
+      if (estTxn) { await attendre(300); pagesTxn.push(['rendue', deTxn, Date.now()]); }
       return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { ...(rep.headers || {}) }, body: JSON.stringify(rep.body) }).catch(() => {}); });
     await ctx.route('**/api/**', (r) => { const u = r.request().url();
       const corps = /mode=equipe/.test(u) ? { ok: true, equipe: [], invitations: [], membreDe: [], aBoutique: true } : /mode=abonnement/.test(u) ? { ok: true, acces: true, statut: 'active', configure: true } : { pret: true, devices: 1 };
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(corps) }).catch(() => {}); });
     const pg = await ctx.newPage(); pg.on('pageerror', (e) => erreurs.push(e.message.slice(0, 200)));
+    // (24 nov., vitesse-lectures-toucher) Le téléphone : processeur ×4, 4G (150 ms). C'est le temps de montage qui laissait
+    // repartir la même lecture (le lecteur suivant arrivait avant la fin de la précédente) : sans lui, rien à juger.
+    { const cdp = await ctx.newCDPSession(pg); await cdp.send('Emulation.setCPUThrottlingRate', { rate: +(process.env.CPU || 4) }).catch(() => {});
+      await cdp.send('Network.enable').catch(() => {}); await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 150, downloadThroughput: 9e6 / 8, uploadThroughput: 3e6 / 8 }).catch(() => {}); }
     const calme = (sans = 1500, max = 30000) => pg.evaluate(([sans, max]) => new Promise((ok) => { let der = performance.now(); try { new PerformanceObserver((l) => { if (l.getEntries().length) der = performance.now(); }).observe({ type: 'longtask' }); } catch (_) {} const t0 = performance.now(); const iv = setInterval(() => { if (performance.now() - der > sans || performance.now() - t0 > max) { clearInterval(iv); ok(); } }, 100); }), [sans, max]).catch(() => {});
     await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'commit', timeout: 120000 });
     await pg.waitForFunction(() => window.__pret != null, null, { timeout: 120000, polling: 200 }).catch(() => fautes.push('Ma journée jamais prête'));
@@ -111,6 +119,11 @@ const ATTENDU = {
     // (24 nov., vitesse-lectures-toucher) La liste des transactions projetée (`lireExtrasRepartition`, src/App.jsx) part UNE
     // fois pour tout le parcours (une lecture en cours est rejointe, gardée 10 min) : elle partait 2 à 3 fois.
     console.log(`  lectures de la liste des transactions (pays, acheteur) : ${lecturesExtras.length}`);
+    // (24 nov.) LES PAGES PARTENT ENSEMBLE (`lireTout`) : la 3e page de cette liste est DEMANDÉE avant que la 2e soit rendue.
+    { const dem2 = pagesTxn.find((x) => x[0] === 'dem' && x[1] === 2000), ren1 = pagesTxn.find((x) => x[0] === 'rendue' && x[1] === 1000);
+      console.log(`  pages de la liste des transactions : ${pagesTxn.filter((x) => x[0] === 'dem').map((x) => x[1]).join(' · ')}${dem2 && ren1 ? ` · 3e demandée ${dem2[2] - ren1[2]} ms après la 2e rendue` : ''}`);
+      if (!dem2 || !ren1) fautes.push('la liste des transactions n\'a pas trois pages au banc : rien à juger sur les pages');
+      else if (dem2[2] >= ren1[2]) fautes.push(`les pages de \`lireTout\` partent l'une après l'autre (3e demandée ${dem2[2] - ren1[2]} ms après la 2e rendue)`); }
     if (lecturesExtras.length > 1) fautes.push(`la liste des transactions projetée est lue ${lecturesExtras.length} fois (une seule attendue)`);
     // `widget_stats` est écrit dans la base par la coque (src/App.jsx), pas rangé sur l'appareil.
     console.log(`  publication widget_stats : ${ecrits.has('widget_stats') ? 'écrite' : 'ABSENTE'}`);
