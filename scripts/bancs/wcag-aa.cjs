@@ -9,11 +9,10 @@ require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heure
 //
 //  Par écran, mesuré sur la page RENDUE :
 //   A  axe-core (wcag2a/aa, wcag21a/aa + aria-allowed-role, aria-dialog-name) : aucune violation
-//      « serious »/« critical » — sauf celles que la PR #1376 (main-vert) corrige déjà
-//      (`PAR_1376`, nommées une par une : ce banc ne les refait pas, il ne les compte pas).
+//      « serious »/« critical ».
 //   B  1.4.3 contraste du texte mesuré sur les PIXELS (`_a11y-mesure.cjs`) : ≥ 4,5:1 (3:1 en grand).
 //   C  44 × 44 px au doigt (390 tactile, clair).
-//   D  4.1.2 aucun contrôle sans nom dans l'arbre d'accessibilité de Chrome (hors `PAR_1376`).
+//   D  4.1.2 aucun contrôle sans nom dans l'arbre d'accessibilité de Chrome.
 //   E  2.4.7 + 1.4.11 (1512) 40 Tab : chaque arrêt porte un anneau visible, et sa couleur
 //      fait ≥ 3:1 contre le fond SUR lequel il est dessiné (mesuré : pixels autour de l'élément,
 //      anneau effacé ⇒ fond ; couleur de l'anneau lue dans le style calculé).
@@ -72,19 +71,6 @@ const UID = '7a1e0c55-2b1d-4c3e-9f00-0000000000e7';
 const SESSION = { access_token: 'jeton-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: UID, email: 'vendeur.exemple@exemple.test', user_metadata: { full_name: 'Camille Exemple' } } };
 const AXE = fs.readFileSync(require.resolve('axe-core/axe.min.js', { paths: [path.join(__dirname, '..', '..')] }), 'utf8');
 
-// Ce que la PR #1376 (claude/main-vert, 24 nov.) corrige déjà : ce banc ne le compte pas
-// (même défaut, même correction — le refaire ici doublerait le travail et les conflits).
-const PAR_1376 = [
-  { regle: 'label-content-name-mismatch', cible: /\.n-laterale-compte/, quoi: 'carte du compte (le nom commence par le texte visible)' },
-  { regle: 'label-content-name-mismatch', cible: /\.n-ad-afaire/, quoi: '« Choisir une action »' },
-  { regle: 'label-content-name-mismatch', cible: /data-eg-modifier="(prix|achat)"/, quoi: 'cellules prix / achat' },
-  { regle: 'label-content-name-mismatch', cible: /data-tt-col="(prix|achat|regler)"|a-regler|aregler/i, quoi: 'cellules « À régler »' },
-  { regle: 'button-name', cible: /data-tt-trier="site"/, quoi: 'en-tête de tri « Site »' },
-  { regle: 'aria-allowed-attr', cible: /n-segmente|data-msg-vue|role="radio"/, quoi: 'Segmente : aria-pressed sur role=radio' },
-  { regle: 'aria-allowed-attr', cible: /class="n-rangee"[^>]*aria-(pressed|expanded)/, quoi: 'Rangee : les aria-* d’attrs sur l’élément touchable, pas sur le cadre <div>' },
-  { regle: 'nom-vide', cible: /data-tt-trier="site"/, quoi: 'en-tête de tri « Site »' },
-];
-const par1376 = (regle, cible) => PAR_1376.some((e) => e.regle === regle && e.cible.test(cible));
 
 const srv = http.createServer((q, r) => {
   let f = q.url.split('?')[0];
@@ -288,8 +274,8 @@ async function anneaux(pg, n = 40) {
         await saboter(pg);
         await capture(pg, `${tab}-${W}-${theme}`);
         // A
-        const v = (await axe(pg)).filter((x) => (['serious', 'critical'].includes(x.impact) || ['aria-allowed-role', 'aria-dialog-name'].includes(x.id)) && !par1376(x.id, x.cible + ' ' + x.html));
-        dit(!v.length, `${T} ${nom} · A axe : aucune violation grave (hors #1376)`, `${v.length} : ` + v.slice(0, 6).map((x) => `${x.id} [${x.impact}] ${x.cible} — ${x.html}`).join(' ║ '));
+        const v = (await axe(pg)).filter((x) => (['serious', 'critical'].includes(x.impact) || ['aria-allowed-role', 'aria-dialog-name'].includes(x.id)));
+        dit(!v.length, `${T} ${nom} · A axe : aucune violation grave`, `${v.length} : ` + v.slice(0, 6).map((x) => `${x.id} [${x.impact}] ${x.cible} — ${x.html}`).join(' ║ '));
         // F
         const pops = await pg.evaluate(() => [...document.querySelectorAll('[data-n-pops], .vrm-toasts')].map((e) => ({ cls: e.className, role: e.getAttribute('role'), live: e.getAttribute('aria-live'), nom: e.getAttribute('aria-label') })));
         const okPops = pops.length >= 1 && pops.every((p) => p.live && (!p.nom || ['status', 'region', 'log', 'alert'].includes(p.role)));
@@ -302,7 +288,7 @@ async function anneaux(pg, n = 40) {
         // C
         if (W < 600 && !sombre) { const p = await M.cibles(pg); dit(!p.length, `${T} ${nom} · C 44 × 44 px au doigt`, `${p.length} : ` + p.slice(0, 5).join(' ║ ')); }
         // D
-        const n = (await M.nomsVides(pg)).filter((x) => !par1376('nom-vide', x));
+        const n = (await M.nomsVides(pg));
         dit(!n.length, `${T} ${nom} · D 4.1.2 aucun contrôle sans nom`, `${n.length} : ` + n.slice(0, 4).join(' ║ '));
         // E
         if (W >= 600) {
@@ -345,7 +331,7 @@ async function anneaux(pg, n = 40) {
         const modaleVoulue = W < 600;
         dit(!!d && d.role === 'dialog' && !!d.nom && (modaleVoulue ? d.modal === 'true' : d.modal !== 'true'), `${T} G ${F.nom} : role=dialog, nommée, ${modaleVoulue ? 'aria-modal="true" (elle recouvre l’écran)' : 'pas modale (volet à côté de la liste)'}`, JSON.stringify(d));
         dit(!!d && F.nomAttendu[langue].test(d.nom), `${T} G ${F.nom} : son nom est dans la langue choisie`, JSON.stringify(d));
-        const v = (await axe(pg, F.sel)).filter((x) => ['serious', 'critical'].includes(x.impact) && !par1376(x.id, x.cible + ' ' + x.html));
+        const v = (await axe(pg, F.sel)).filter((x) => ['serious', 'critical'].includes(x.impact));
         dit(!v.length, `${T} G ${F.nom} : axe dans la feuille`, `${v.length} : ` + v.slice(0, 4).map((x) => `${x.id} ${x.cible} — ${x.html}`).join(' ║ '));
         await capture(pg, `feuille-${F.id}-${W}-${theme}-${langue}`);
         dit(!erreurs.length, `${T} G ${F.nom} : aucune erreur de page`, erreurs.slice(0, 2).join(' | '));
