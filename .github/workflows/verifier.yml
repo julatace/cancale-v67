@@ -207,6 +207,10 @@ jobs:
           sudo mkdir -p /opt/pw-browsers
           sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
           echo "VRM_CHROMIUM_PATH=/opt/pw-browsers/chromium" >> "$GITHUB_ENV"
+      - name: Vérifier le démarrage et le redémarrage des profils VRM Cloud
+        run: node --test outils/vrm-cloud/profils.test.mjs
+      - name: Vérifier la lecture des achats entre deux espaces VRM
+        run: node scripts/bancs/commandes-lecture.cjs
       - name: Lancer le banc e2e-extension
         env:
           BANC_PORT: '10060'
