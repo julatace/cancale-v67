@@ -336,13 +336,16 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   );
 
   // ── le tableau (ordinateur) ───────────────────────────────────────────────────────────────────────────────────────
+  // (24 nov., main-vert) `titreCourt: true` = une colonne SANS titre visible (les logos parlent d'eux-mêmes) : avant, `true`
+  // se rendait vide et le bouton de tri n'avait AUCUN nom (axe button-name, colonne Site). Son nom est alors `libelle`.
+  const titreVu = (c) => (c.titreCourt === true ? '' : (c.titreCourt || c.libelle));
   const enTete = (c) => {
     const actif = tri && tri.cle === c.cle;
     return (
       <th key={c.cle} scope="col" className="n-tt-th" data-tt-th={c.cle} data-tt-num={c.num ? '1' : undefined} aria-sort={actif ? (tri.sens === 'asc' ? 'ascending' : 'descending') : undefined}>
-        {c.tri !== false ? <button type="button" className="n-tt-tri" data-tt-trier={c.cle} onClick={() => trier(c)}>
-          <span>{c.titreCourt || c.libelle}</span><span className="n-tt-tri-signe" data-tt-sens={actif ? tri.sens : ''} aria-hidden="true">{actif ? (tri.sens === 'asc' ? '↑' : '↓') : '↕'}</span>
-        </button> : <span className="n-tt-th-texte">{c.titreCourt || c.libelle}</span>}
+        {c.tri !== false ? <button type="button" className="n-tt-tri" data-tt-trier={c.cle} onClick={() => trier(c)} aria-label={titreVu(c) ? undefined : c.libelle} title={titreVu(c) ? undefined : c.libelle}>
+          <span>{titreVu(c)}</span><span className="n-tt-tri-signe" data-tt-sens={actif ? tri.sens : ''} aria-hidden="true">{actif ? (tri.sens === 'asc' ? '↑' : '↓') : '↕'}</span>
+        </button> : <span className="n-tt-th-texte" aria-label={titreVu(c) ? undefined : c.libelle}>{titreVu(c)}</span>}
       </th>
     );
   };

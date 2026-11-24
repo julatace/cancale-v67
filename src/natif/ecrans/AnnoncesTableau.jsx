@@ -54,9 +54,12 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
   const unParArticle = (ls) => { const vu = new Set(); return ls.filter((l) => (vu.has(l.a.cle) ? false : (vu.add(l.a.cle), true))).map((l) => l.a); };
 
   // Une cellule qui se modifie : la valeur, ou « — » qui ouvre SA saisie (la même feuille que la liste).
+  // (24 nov., main-vert) Le nom d'une cellule COMMENCE par ce qu'elle montre (« 45,00 € · Prix de … ») : avant, le lecteur d'écran
+  // disait « Prix de … » sans la valeur visible (axe label-content-name-mismatch).
+  const nomCellule = (v) => (v == null ? '— · ' : typeof v === 'string' || typeof v === 'number' ? String(v) + ' · ' : '');
   const modifiable = (l, cle, valeur, onModifier) => (onModifier && !seulementBloque(l.a)
     ? <button type="button" className="n-eg-cellule" data-eg-modifier={cle} data-eg-vide={valeur == null ? '1' : undefined}
-        aria-label={tr('egalite.modifier', { quoi: tr('egalite.col.' + cle), article: l.titre })} onClick={(e) => { e.stopPropagation(); onModifier(); }}>{valeur == null ? '—' : valeur}</button>
+        aria-label={nomCellule(valeur) + tr('egalite.modifier', { quoi: tr('egalite.col.' + cle), article: l.titre })} onClick={(e) => { e.stopPropagation(); onModifier(); }}>{valeur == null ? '—' : valeur}</button>
     : valeur);
   const pasFourni = () => <span className="n-tt-vide-cellule" title={tr('cqm.pasFourni')} aria-label={'— · ' + tr('cqm.pasFourni')} data-eg-pasfourni="">—</span>;
   const colonnes = [

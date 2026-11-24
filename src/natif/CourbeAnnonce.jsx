@@ -50,7 +50,7 @@ function Trace({ jours, cle, libelle, attrs }) {
       <figcaption className="n-ca-lib"><span>{libelle}</span><b>{ecart == null ? '—' : tr('courbe.delta', { d: (ecart > 0 ? '+' : ecart < 0 ? '−' : '') + nombre(Math.abs(ecart)), date: dateLoc(dateDuJour(jours[iP].j), { day: 'numeric', month: 'short' }) })}</b></figcaption>
       <svg className="n-ca-svg" viewBox={`-4 0 ${L + 8} ${H}`} preserveAspectRatio="none" role="img" aria-label={libelle}>
         <line className="n-ca-base" x1="0" x2={L} y1={H - BAS + 2} y2={H - BAS + 2}/>
-        {segs.map((s, i) => (s.length > 1 ? <polyline key={i} className="n-ca-ligne" points={s.map((p) => p.join(',')).join(' ')}/> : null))}
+        {segs.map((s) => (s.length > 1 ? <polyline key={s.map((p) => p.join(',')).join(' ')} className="n-ca-ligne" points={s.map((p) => p.join(',')).join(' ')}/> : null))}
         {/* un jour lu ISOLÉ (sans voisin lu) : un point rond (trait de longueur nulle, extrémités rondes — jamais déformé par l'étirement) */}
         {segs.filter((s) => s.length === 1).map((s, i) => <line key={'p' + i} className="n-ca-ligne n-ca-point" x1={s[0][0]} x2={s[0][0]} y1={s[0][1]} y2={s[0][1]}/>)}
         {jours.map((d, i) => (
@@ -81,12 +81,12 @@ export function VueCourbe({ sources, maintenant = Date.now(), jours = 30, attrs 
       <Trace jours={s.jours} cle="vues" libelle={tr('courbe.vues')}/>
       <Trace jours={s.jours} cle="fav" libelle={tr('courbe.favoris')}/>
       {s.reperes.length ? <svg className="n-ca-reperes" viewBox={`-4 0 ${L + 8} 12`} preserveAspectRatio="none" aria-hidden="true">
-        {s.reperes.map((r, i) => <g key={i} data-ca-repere={r.code}><title>{tr('courbe.r.' + r.code)}</title>
+        {s.reperes.map((r) => <g key={r.j + ':' + r.code} data-ca-repere={r.code}><title>{tr('courbe.r.' + r.code)}</title>
           <line className="n-ca-repere" x1={(xPct(r.j) * L) / 100} x2={(xPct(r.j) * L) / 100} y1="1" y2="11"/></g>)}
       </svg> : null}
       <div className="n-ca-axe"><span>{dateLoc(dateDuJour(s.debut), { day: 'numeric', month: 'short' })}</span><span>{dateLoc(dateDuJour(s.fin), { day: 'numeric', month: 'short' })}</span></div>
       {s.reperes.length ? <ul className="n-ca-liste" aria-label={tr('courbe.reperes')}>
-        {s.reperes.slice(-6).reverse().map((r, i) => <li key={i} data-ca-repere-l={r.code}><span>{dateLoc(dateDuJour(r.j), { day: 'numeric', month: 'short' })}</span>{tr('courbe.r.' + r.code)}</li>)}
+        {s.reperes.slice(-6).reverse().map((r) => <li key={r.j + ':' + r.code} data-ca-repere-l={r.code}><span>{dateLoc(dateDuJour(r.j), { day: 'numeric', month: 'short' })}</span>{tr('courbe.r.' + r.code)}</li>)}
       </ul> : null}
       <p className="n-ca-note">{tr('courbe.pied', { lus: s.lus, n })}</p>
       </div>

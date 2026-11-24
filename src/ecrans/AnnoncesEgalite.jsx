@@ -359,7 +359,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   React.useEffect(() => {
     if (!sigEnLigne || sigEnLigne === '{}') return undefined;
     let mort = false;
-    const t = setTimeout(() => { lireRelevesEnLigne(STUDIO_BASE, JSON.parse(sigEnLigne)).then((r) => { if (!mort) setReleves(r); }).catch(() => {}); }, 600);
+    const t = setTimeout(() => { let sig = null; try { sig = JSON.parse(sigEnLigne); } catch (_) { return; } lireRelevesEnLigne(STUDIO_BASE, sig).then((r) => { if (!mort) setReleves(r); }).catch(() => {}); }, 600);
     return () => { mort = true; clearTimeout(t); };
   }, [sigEnLigne]);
   const plusVueAnnonce = (x) => {

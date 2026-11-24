@@ -33,8 +33,13 @@ const GLOBAUX = new Set(Object.getOwnPropertyNames(globalThis).concat(`chrome br
   createImageBitmap ImageData ImageDecoder VideoFrame Path2D DOMMatrix DOMMatrixReadOnly CanvasRenderingContext2D MediaRecorder
   MediaStream AudioContext webkitAudioContext SpeechRecognition webkitSpeechRecognition BarcodeDetector PublicKeyCredential
   IDBKeyRange EventTarget ScrollTimeline ViewTransition Translator LanguageDetector ontouchstart onerror arguments undefined
-  module require process exports __dirname __filename Buffer __BUILD__`.split(/\s+/).filter(Boolean)));
+  module require process exports __dirname __filename Buffer __BUILD__ __VRM_COPIE_MUTATION__`.split(/\s+/).filter(Boolean)));
 
+// (24 nov., main-vert) Les BIBLIOTHÈQUES TIERCES embarquées telles quelles (minifiées, pas notre code ; leur UMD teste
+// `define`/`UZIP` à sa façon) : nommées une par une, avec leur raison — jamais un motif large.
+const TIERS = new Set([
+  'vinted-sync-extension/pdf-lib.min.js',   // pdf-lib (MIT), embarqué par 5.420 pour « un seul PDF » (vrm-pdf.js)
+]);
 function fichiers() {
   const out = [];
   const voir = (d) => {
@@ -43,7 +48,7 @@ function fichiers() {
       const rel = path.join(d, n);
       const st = fs.statSync(path.join(R, rel));
       if (st.isDirectory()) { if (!/node_modules|i18n[\\/]langues|vendor/.test(rel)) voir(rel); }
-      else if (/\.(jsx?|mjs)$/.test(n)) out.push(rel);
+      else if (/\.(jsx?|mjs)$/.test(n) && !TIERS.has(rel.split(path.sep).join('/'))) out.push(rel);
     }
   };
   voir('src'); voir('api'); voir('vinted-sync-extension');
@@ -63,6 +68,19 @@ function horsPortee(rel, texte) {
       if (p.parentPath.isMemberExpression({ property: p.node }) && !p.parent.computed) return;
       // `typeof x` : un test d'existence, permis.
       if (p.parentPath.isUnaryExpression({ operator: 'typeof' })) return;
+      // (24 nov., main-vert) `typeof x === 'function' && x(…)` : l'appel est GARDÉ par ce test d'existence (aucune ReferenceError
+      // possible) — la fonction d'une autre script du même monde (ex. `vrmVerifVisible`, déclarée par vrm-badge.js).
+      { let q = p;
+        while (q.parentPath && !q.parentPath.isStatement() && !q.parentPath.isFunction()) {
+          const par = q.parentPath;
+          if (par.isLogicalExpression({ operator: '&&' }) && par.node.right === q.node) {
+            const g = par.node.left;
+            const garde = (e) => e && e.type === 'BinaryExpression' && (e.operator === '===' || e.operator === '==') && e.left.type === 'UnaryExpression' && e.left.operator === 'typeof'
+              && e.left.argument.type === 'Identifier' && e.left.argument.name === n && e.right.type === 'StringLiteral' && e.right.value === 'function';
+            if (garde(g) || (g.type === 'LogicalExpression' && g.operator === '&&' && (garde(g.left) || garde(g.right)))) return;
+          }
+          q = par;
+        } }
       manque.push(`${n} (l.${p.node.loc ? p.node.loc.start.line : '?'})`);
     },
   });
