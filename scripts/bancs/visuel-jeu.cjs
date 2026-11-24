@@ -147,8 +147,9 @@ async function reduit(nav, d) {
   const conf = await o.pg.evaluate(() => document.querySelectorAll('.n-confettis').length);
   dit(!!e && e.anim === 'n-pop-fondu' && e.tuileAnim === 'none' && conf === 0, `${T} J4 mouvement réduit : un fondu, aucune pluie, la tuile ne rebondit pas`, JSON.stringify({ anim: e && e.anim, tuile: e && e.tuileAnim, conf }));
   await o.pg.waitForSelector('[data-n-revele]', { timeout: 20000 }).catch(() => {});
+  await o.pg.waitForTimeout(2500);
   const rv = await o.pg.evaluate(() => [...document.querySelectorAll('[data-n-revele]')].map((x) => getComputedStyle(x).animationName));
-  dit(rv.length > 0 && rv.every((a) => a === 'none'), `${T} J9 mouvement réduit : les tuiles sont là d'un coup (aucune apparition)`, JSON.stringify(rv));
+  dit(rv.length > 0 && rv.every((a) => a === 'none'), `${T} J9 mouvement réduit : les tuiles sont là d'un coup (aucune apparition, ${rv.length})`, JSON.stringify(rv));
   await o.ctx.close();
 }
 
@@ -211,9 +212,26 @@ async function journee(nav, W, theme, d) {
   dit(!croise.length && r.photos.length > 0, `${T} J8 chaque tuile montre la photo de SA vente (${r.photos.length} tuiles ; le leurre au même titre ne prête pas la sienne)`, JSON.stringify(croise.length ? croise : r.photos).slice(0, 300));
   const orange = await pg.evaluate(ORANGE);
   dit(!orange.length, `${T} J3 aucune couleur orange calculée`, orange.join(' ¦ '));
-  // J9 — « pas d'un coup en bloc » : chaque tuile a son apparition, 30 ms d'écart, plafonnée (≤ 240 ms).
-  const rv = await pg.evaluate(() => [...document.querySelectorAll('[data-n-jeu="ventes"] [data-n-revele]')].map((x) => [getComputedStyle(x).animationName, parseFloat(getComputedStyle(x).animationDelay) * 1000]));
-  dit(rv.length > 0 && rv.every(([a, dl]) => a === 'n-revele' && dl <= 240) && (rv.length < 2 || Math.abs(rv[1][1] - rv[0][1] - 30) < 1), `${T} J9 les tuiles apparaissent l'une après l'autre (30 ms, ≤ 240 ms)`, JSON.stringify(rv));
+  // J9 — « pas d'un coup en bloc » mais « sans latence » : seul ce qui ARRIVE s'anime ; le 1er élément jamais ; 15 ms d'écart,
+  // 120 ms au plus, 160 ms de fondu ; aucune animation d'écran au-delà de 200 ms.
+  const rv = await pg.evaluate(() => [...document.querySelectorAll('[data-n-jeu="ventes"] [data-n-revele]')].map((x) => [getComputedStyle(x).animationName, Math.round(parseFloat(getComputedStyle(x).animationDelay) * 1000), Math.round(parseFloat(getComputedStyle(x).animationDuration) * 1000)]));
+  const premierLibre = rv.length > 0 && rv[0][0] === 'none';
+  const autres = rv.slice(1);
+  dit(premierLibre && autres.every(([a, dl, du]) => a === 'none' || (dl <= 120 && du <= 200)) && (autres.length < 2 || autres[0][0] === 'none' || Math.abs(autres[1][1] - autres[0][1] - 15) < 1),
+    `${T} J9 la 1re tuile n'attend pas ; les suivantes ≤ 15 ms d'écart, ≤ 120 ms, fondu ≤ 200 ms`, JSON.stringify(rv));
+  // J10 — le TOUCHER : quitter Aujourd'hui puis y revenir par la barre ; ce qui est connu revient d'un coup (aucun fondu).
+  if (W < 600) {
+    await pg.evaluate(() => { const l = [...document.querySelectorAll('.n-onglets [data-n-onglet]')]; if (l[2]) l[2].click(); });
+    await pg.waitForTimeout(1500);
+    const t = await pg.evaluate(async () => {
+      const b = document.querySelectorAll('.n-onglets [data-n-onglet]')[0]; if (!b) return null;
+      const t0 = performance.now(); b.click();
+      return await new Promise((ok) => { const f = () => { const c = document.querySelector('[data-v2-cj-ligne="envoyer"]'); const r = c && c.getBoundingClientRect();
+        if (r && r.height > 0) { const tu = [...document.querySelectorAll('[data-n-jeu="ventes"] [data-n-revele]')]; ok({ ms: Math.round(performance.now() - t0), anims: tu.map((x) => getComputedStyle(x).animationName) }); } else if (performance.now() - t0 > 5000) ok({ ms: null }); else requestAnimationFrame(f); }; f(); });
+    });
+    dit(!!t && t.ms != null && t.ms < 1000, `${T} J10 du toucher au premier contenu : ${t && t.ms} ms (banc logiciel, swiftshader)`, JSON.stringify(t));
+    dit(!!t && (t.anims || []).every((a) => a === 'none'), `${T} J10 au retour, les ventes déjà connues sont là d'un coup (aucun fondu)`, JSON.stringify(t));
+  }
   await capture(pg, `aujourdhui-${W}-${theme}`);
   const bloc = await pg.$('[data-v2-bloc="ventes"]'); if (bloc && SHOTS) { await bloc.scrollIntoViewIfNeeded(); await pg.waitForTimeout(500); await capture(pg, `aujourdhui-ventes-${W}-${theme}`); }
   dit(!(await pg.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)), `${T} J6 rien ne déborde`);

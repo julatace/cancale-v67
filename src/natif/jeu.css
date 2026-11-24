@@ -92,7 +92,7 @@
   .n-inventaire-quand { font: 400 12px/16px var(--n-police); color: var(--n-encre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .n-inventaire-case:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 3px; border-radius: 16px; }
   @media (prefers-reduced-motion: no-preference) {
-    .n-inventaire-case { transition: transform 160ms var(--n-jeu-ressort); }
+    .n-inventaire-case { transition: transform 80ms ease-out; }
     .n-inventaire-case:active { transform: scale(.96); }
   }
   /* L'anneau dans une case de chiffre (Colis) : en haut à droite. */
@@ -128,9 +128,9 @@
 /* ── (24 nov.) L'apparition progressive (src/natif/Jeu.jsx, `revele`) et les squelettes de tuiles ── */
 @layer vrm-natif {
   @media (prefers-reduced-motion: no-preference) {
-    .n-revele { animation: n-revele 260ms cubic-bezier(.2, .7, .3, 1) both; animation-delay: calc(var(--n-rang, 0) * 30ms); }
+    .n-revele { animation: n-revele 160ms cubic-bezier(.2, .7, .3, 1) both; animation-delay: calc(min(var(--n-rang, 0), 8) * 15ms); }
   }
-  @keyframes n-revele { from { opacity: .35; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @keyframes n-revele { from { opacity: .35; transform: translateY(3px); } to { opacity: 1; transform: none; } }
   .n-tuile-os { background: transparent; }
   .n-tuile-os-fond { grid-area: 1 / 1; width: 100%; height: 100%; border-radius: inherit; }
   .n-inventaire-case .n-tuile-os { --n-tuile-t: 104px; width: 100%; height: auto; aspect-ratio: 1 / 1; margin-bottom: 4px; }
@@ -138,6 +138,7 @@
   .n-tuile-img { background-color: var(--n-squelette, var(--n-carte-2)); }
   @media (prefers-reduced-motion: no-preference) {
     .n-tuile-paire[data-n-tuile-charge="0"] .n-tuile-img { opacity: 0; }
-    .n-tuile-paire[data-n-tuile-charge="1"] .n-tuile-img { opacity: 1; transition: opacity 220ms ease-out; }
+    .n-tuile-paire[data-n-tuile-charge="1"] .n-tuile-img { opacity: 1; transition: opacity 160ms ease-out; }
+    .n-tuile-paire[data-n-tuile-charge="deja"] .n-tuile-img { opacity: 1; transition: none; }
   }
 }
