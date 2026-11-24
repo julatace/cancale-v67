@@ -113,6 +113,11 @@ function lancer(nom, port) {
   const file = taches.filter((t) => !seuls.includes(t))
     .sort((a, b) => PARALLELE > 1 ? ((DUREES_CI[b.nom] || 120) - (DUREES_CI[a.nom] || 120)) || (a.k - b.k) : a.k - b.k);
   if (PARALLELE > 1) console.log(`${taches.length} banc(s), ${PARALLELE} à la fois${seuls.length ? ` (seul(s) d'abord : ${seuls.map((t) => t.nom).join(', ')})` : ''}.`);
+  // (24 nov.) Combien le processeur a travaillé pendant le lot (Linux, /proc/stat) : la mesure
+  // qui dit si l'on peut lancer plus de bancs à la fois sans les ralentir. Rien n'en dépend.
+  const lireCpu = () => { try { const v = fs.readFileSync('/proc/stat', 'utf8').split('\n')[0].trim().split(/\s+/).slice(1).map(Number); const idle = v[3] + (v[4] || 0); return { tout: v.reduce((a, b) => a + b, 0), idle }; } catch (_) { return null; } };
+  const cpu0 = lireCpu(); let chargeMax = 0;
+  const sonde = setInterval(() => { try { chargeMax = Math.max(chargeMax, Number(fs.readFileSync('/proc/loadavg', 'utf8').split(' ')[0]) || 0); } catch (_) {} }, 15000);
   for (const t of seuls) res[t.k] = await lancer(t.nom, t.port);
   let j = 0;
   const ouvrier = async () => { while (j < file.length) { const t = file[j++]; res[t.k] = await lancer(t.nom, t.port); } };
@@ -128,7 +133,10 @@ function lancer(nom, port) {
     else if (!vert && exc) console.log(`     ⚠️ des lignes rouges NOUVELLES, hors de l'exception : ${rouges.filter((l) => !exc.re.test(l)).slice(0, 3).join(' ¦ ')}`);
     if (vert && exc) console.log(`     ⚠️ exception à retirer de scripts/audits-exceptions.json : ${r.nom} est VERT`);
   }
-  console.log(`   (lot : ${((Date.now() - debutLot) / 1000).toFixed(0)} s du premier départ au dernier banc, ${PARALLELE} à la fois)`);
+  clearInterval(sonde);
+  const cpu1 = lireCpu();
+  const occupe = cpu0 && cpu1 && cpu1.tout > cpu0.tout ? Math.round(100 * (1 - (cpu1.idle - cpu0.idle) / (cpu1.tout - cpu0.tout))) : null;
+  console.log(`   (lot : ${((Date.now() - debutLot) / 1000).toFixed(0)} s du premier départ au dernier banc, ${PARALLELE} à la fois ; processeur occupé ${occupe == null ? '—' : occupe + ' %'} en moyenne sur ${require('os').cpus().length} cœurs, charge max ${chargeMax.toFixed(1)})`);
   const ko = res.filter((r) => (r.code !== 0 || r.tropLong) && !r.connu);
   console.log(ko.length ? `\n❌ ${ko.length} banc(s) rouge(s) : ${ko.map((r) => r.nom).join(', ')}` : '\n✅ tous les bancs du lot passent.');
   process.exit(ko.length ? 1 : 0);

@@ -95,15 +95,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # nouveau-vendeur seul : le plus long (chaque écran, 2 largeurs, 2 thèmes).
+          # (24 nov., ci-rapide) Les MÊMES 21 bancs qu'avant, répartis par durée mesurée en CI
+          # (scripts/lancer-bancs.cjs, DUREES_CI) et lancés 3 à la fois dans chaque part
+          # (BANCS_PARALLELE) : la part 2 dépassait 45 min et était annulée à chaque PR —
+          # accessibilite et barre-achats n'avaient plus tourné depuis des jours. Liste
+          # complète, avant/après : node scripts/ci-controles.cjs (docs/passation/2026-11-24-ci-rapide.md).
+          # Part 1 : ventes-e2 (~19 min seul) occupe un ouvrier, les deux autres prennent le reste.
           - part: 1
-            lot: nouveau-vendeur garde-ecrans imprimer-compte-exact defilement-navigation achats-annules ventes-ligne-propre
+            lot: ventes-e2 accessibilite defilement-navigation imprimer-compte-exact nouveau-vendeur ventes-ligne-propre iphone-reprise garde-ecrans
           # budget-vitesse (11 nov.) : lectures, octets, doublons, lignes entières et JS par
-          # écran principal, contre scripts/budget-vitesse.json (~5 min).
+          # écran principal, contre scripts/budget-vitesse.json (~5 min). Lancé SEUL avant les
+          # autres (BANCS_SEULS, défaut de lancer-bancs) : il compte des lectures « jusqu'au calme ».
           - part: 2
-            lot: navigation-tache ventes-e2 journee-coherence morceau-perime statut-colis budget-vitesse accessibilite barre-achats
+            lot: budget-vitesse navigation-tache chiffres-coherents statut-colis morceau-perime journee-coherence
           - part: 3
-            lot: colis-retirer-propre annonces-actions iphone-reprise argent-mois chiffres-coherents retraits-suivi accessibilite-clavier
+            lot: argent-mois accessibilite-clavier annonces-actions barre-achats achats-annules colis-retirer-propre retraits-suivi
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -127,6 +133,7 @@ jobs:
       - name: Lancer les bancs
         env:
           BANCS_PORT_BASE: '10000'
+          BANCS_PARALLELE: '3'
         run: node scripts/lancer-bancs.cjs ${{ matrix.lot }}
 
   bancs-webkit:
@@ -170,6 +177,8 @@ jobs:
           BANCS_PORT_BASE: '10030'
           BANCS_TIMEOUT_S: '1800'
           LARGEURS: '390'
+          # (24 nov., ci-rapide) Les mêmes 11 bancs, 3 à la fois (37 à 67 min l'un après l'autre).
+          BANCS_PARALLELE: '3'
         run: node scripts/lancer-bancs.cjs connexion-claire journee-coherence ventes-e2 colis-retirer-propre retraits-suivi tout-imprimer iphone-reprise nouveau-vendeur defilement-navigation ventes-ligne-propre barre-depuis-journee
 
   e2e-extension:
