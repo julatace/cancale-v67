@@ -53,7 +53,7 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
 
   // Une cellule qui se modifie : la valeur, ou « — » qui ouvre SA saisie (la même feuille que la liste).
   const modifiable = (l, cle, valeur, onModifier) => (onModifier && !seulementBloque(l.a)
-    ? <button type="button" className="n-eg-cellule" data-eg-modifier={cle} data-eg-vide={valeur == null ? '1' : undefined}
+    ? <button type="button" data-n-famille="lien" className="n-eg-cellule" data-eg-modifier={cle} data-eg-vide={valeur == null ? '1' : undefined}
         aria-label={tr('egalite.modifier', { quoi: tr('egalite.col.' + cle), article: l.titre })} onClick={(e) => { e.stopPropagation(); onModifier(); }}>{valeur == null ? '—' : valeur}</button>
     : valeur);
   const pasFourni = () => <span className="n-tt-vide-cellule" title={tr('cqm.pasFourni')} aria-label={'— · ' + tr('cqm.pasFourni')} data-eg-pasfourni="">—</span>;
