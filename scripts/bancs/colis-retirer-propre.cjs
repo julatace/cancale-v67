@@ -21,7 +21,7 @@ catch (_) { PW = require('playwright'); }
 const { lancer, estWebkit } = require('./_navigateur.cjs');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
-const DIST = path.join(__dirname, '..', '..', 'dist');
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');   // (24 nov.) BANC_DIST : un autre dist/ (preuve avant/après)
 const PORT = Number(process.env.BANC_PORT || 4421);
 const SHOTS = process.env.SHOTS || '';
 const JEU = process.env.JR_JEU || 'base';
@@ -184,7 +184,7 @@ const ouvrir = async (b, vp, sombre) => {
             // (11 nov., lot DJ3) « À retirer » est la section de tête d'Achats : plus d'onglet ni de grande carte ;
             // le nombre est celui de SA liste (`data-cc-n`) et de la pastille d'Achats.
             pub, onglet: (document.querySelector('[data-cc-colonne="retirer"]') || { getAttribute: () => null }).getAttribute('data-cc-n'),
-            carte: ((document.querySelector('[data-nav-entree="achats"] .vrm-nav-badge-n') || {}).textContent || '').replace(/\D/g, '') || null,
+            carte: ((document.querySelector('[data-nav-entree="achats"] .vrm-nav-badge-n, [data-nav-entree="achats"] .n-pastille') || {}).textContent || '').replace(/\D/g, '') || null,
             idents: lignes.map((l) => l.getAttribute('data-cc-carte')),
             comptes: lignes.filter((l) => !l.hasAttribute('data-hors-compte')).length,
             points: [...document.querySelectorAll('.vrm-rpf-section:not(.is-repli) .vrm-rpf-point')].map((p) => ({ cle: p.getAttribute('data-relais-point'), nom: (p.querySelector('.vrm-rpf-nom') || {}).textContent, adr: (p.querySelector('[data-relais-adresse]') || {}).textContent || '', h: (() => { const a = p.querySelector('.vrm-rpf-nom'), d = p.querySelector('[data-relais-adresse]'); if (!d) return 0; const ra = a.getBoundingClientRect(), rd = d.getBoundingClientRect(); return rd.top >= ra.bottom - 2 && a.scrollWidth <= a.clientWidth + 1 && rd.height <= 24 ? 0 : 99; })(), n: p.querySelectorAll('[data-cc-carte]').length, inconnu: p.classList.contains('is-inconnu') })),
@@ -306,8 +306,13 @@ const ouvrir = async (b, vp, sombre) => {
           // (17 nov.) La fiche fermée, la ligne retrouve ses gestes (DansFiche les prête à la fiche le temps qu'elle est ouverte).
           const fermerFiche = async () => { await pg.keyboard.press('Escape').catch(() => {}); const f = pg.locator('[role="dialog"] [aria-label^="Fermer"]').filter({ visible: true }).last(); if (await f.count()) await f.click({ timeout: 3000 }).catch(() => {}); await pg.waitForFunction(() => ![...document.querySelectorAll('[data-rp-detail]')].some((x) => x.getClientRects().length), null, { timeout: 8000 }).catch(() => {}); };
           await fermerFiche();
-          const gestes=await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-rang button').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return r.top+r.height/2;}));
-          dit(gestes.every(y=>Math.abs(y-gestes[0])<2),'ouvrir et retrait restent côte à côte');
+          // (24 nov., main-vert) La règle nomme DEUX gestes : ouvrir (la ligne) et « J'ai retiré ». Le rond « code en grand »
+          // (`va-rond-code`, 15 nov.) s'aligne sur le CODE qu'il agrandit : il n'entre pas dans cette règle. « Ouvrir » est
+          // devenu la ligne entière (titre, code, n°, délai : 3 à 4 lignes) : côte à côte = « J'ai retiré » À DROITE de la ligne,
+          // dans sa hauteur (jamais dessous) — le centre d'une ligne de 170 px ne dit plus rien.
+          const gestes=await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-rang :is(.vrm-rpf-ouvrir, .vrm-rpf-retire)').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return {c:e.classList.contains('vrm-rpf-retire')?'retire':'ouvrir',t:Math.round(r.top),b:Math.round(r.bottom),l:Math.round(r.left),r:Math.round(r.right)};}));
+          const go=gestes.find((g)=>g.c==='ouvrir'), gr=gestes.find((g)=>g.c==='retire');
+          dit(gestes.length===2&&go&&gr&&gr.l>=go.r-2&&gr.t>=go.t-2&&gr.b<=go.b+2,'ouvrir et retrait restent côte à côte',JSON.stringify(gestes));
           await pg.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw Error('refus');}}}));
           await pg.locator('[data-cc-carte*="9301"] [data-rp-titre]').first().click();
           await pg.waitForFunction(() => [...document.querySelectorAll('[data-rp-detail]')].some((d) => d.getClientRects().length), null, { timeout: 15000 }).catch(() => {});

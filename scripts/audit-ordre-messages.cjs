@@ -35,7 +35,8 @@ async function juger(src, code, dire) {
   dit(/convsSansDoublons\(r\.items/.test(app), 'Vinted : chaque boîte lue passe par `sansDoublons`');
   dit(/data-conv-sans-date=\{nSansDate\}/.test(app), 'Vinted : « N sans date lue » est dit sous la liste');
   dit(/trierRecents\((sansDoublons\()?d\.fils/.test(sansCom(code.lbc)), 'Leboncoin : `trierRecents` sur les fils (doublons fondus avant, 12 nov.)');
-  dit(/trierRecents\(liste, \(v\) => v\.date\)/.test(sansCom(code.vc)), 'Vestiaire : `trierRecents` (plus les non-lus devant)');
+  // (12 nov., comptes SÉPARÉS) le 3e argument range par compte, la même règle dans chaque groupe.
+  dit(/trierRecents\(liste, \(v\) => v\.date(?:, \(v\) => rangCompteVc\(v\.compte\))?\)/.test(sansCom(code.vc)), 'Vestiaire : `trierRecents` (plus les non-lus devant)');
   dit(/const affiches=trierRecents\(/.test(sansCom(code.eb)), 'eBay · Tout : `trierRecents`');
   dit(/\(b\.tsDerniere \|\| 0\) - \(a\.tsDerniere \|\| 0\)/.test(code.qe) && !/if \(!!a\.nSans !== !!b\.nSans\)/.test(code.qe), 'eBay · Questions : la plus récente en haut (une attente ne passe plus devant)');
   return ko;
@@ -43,7 +44,8 @@ async function juger(src, code, dire) {
 
 (async () => {
   const src = lire('src/ordreConversations.js');
-  const code = { app: lire('src/App.jsx'), lbc: lire('src/ecrans/MessagesLeboncoin.jsx'), vc: lire('src/ecrans/Vestiaire.jsx'), eb: lire('src/ebayGestion.jsx'), qe: lire('src/questionsEbay.js') };
+  // (24 nov., main-vert) La liste Vinted a déménagé dans src/ecrans/Comptabilite.jsx (découpe) : l'app se lit RECOLLÉE.
+  const code = { app: require('./_source-app.cjs').sourceApp(path.join(__dirname, '..')), lbc: lire('src/ecrans/MessagesLeboncoin.jsx'), vc: lire('src/ecrans/Vestiaire.jsx'), eb: lire('src/ebayGestion.jsx'), qe: lire('src/questionsEbay.js') };
   if (!process.argv.includes('--prouve')) {
     const ko = await juger(src, code, true);
     console.log(ko ? `\n❌ ordre-messages : ${ko} rouge(s)` : '\n✅ ordre-messages : tout est vert');
@@ -58,7 +60,7 @@ async function juger(src, code, dire) {
   ];
   const mutCode = [
     ['Vinted : offre devant', { ...code, app: code.app.replace('const tri=trierRecents(', 'const tri=(x=>x)(') }],
-    ['Vestiaire : non-lus devant', { ...code, vc: code.vc.replace('trierRecents(liste, (v) => v.date)', 'liste') }],
+    ['Vestiaire : non-lus devant', { ...code, vc: code.vc.replace('trierRecents(liste, (v) => v.date, (v) => rangCompteVc(v.compte))', 'liste').replace('trierRecents(liste, (v) => v.date)', 'liste') }],
     ['eBay : attente devant', { ...code, qe: code.qe.replace('(b.tsDerniere || 0) - (a.tsDerniere || 0)', '0') }],
   ];
   let rates = 0;

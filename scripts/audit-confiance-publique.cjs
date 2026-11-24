@@ -52,7 +52,8 @@ const PREUVES = {
   'auto-ebay-offres': [['api/ebay.js', 'BestOfferAutoAcceptPrice']],
   'auto-favoris': [['src/favorisAuto.js', 'export const AUTO_DEFAUT']],
   'auto-ebay': [['src/ecrans/Ebay.jsx', "load('vrm_ebay_retrait_auto', false) === true"], ['api/ebay.js', "if (v !== 'true') return { status: 403"]],
-  'auto-bordereaux': [[BG, 'async function bordereauxAutoActifs'], ['src/App.jsx', 'rows[0]?.data?.active === true']],
+  // (24 nov., main-vert) le lecteur de l'app a déménagé avec Comptabilite (découpe d'App.jsx).
+  'auto-bordereaux': [[BG, 'async function bordereauxAutoActifs'], ['src/ecrans/Comptabilite.jsx', 'rows[0]?.data?.active === true']],
   'limite-heure': [[BG, 'const ACTIONS_MAX_HEURE ='], [BG, 'const MONTEE_PALIERS =']],
   'limite-jour': [[BG, 'const DISCRETION_JOUR_DEFAUT ='], ['src/discretion.js', 'export const PAR_JOUR_DEFAUT']],
   'limite-une': [[BG, '_fileRequetes = suite.then']],
@@ -141,7 +142,11 @@ const PREUVES = {
   // ── G. Les règles elles-mêmes ──────────────────────────────────────────────
   if (!silencieux) console.log('\n── G. les règles que la page promet');
   dit(auto && auto.actif === false, 'G1 le mode auto des favoris est éteint par défaut', auto);
-  dit(/const actif = m\.vinted_offres_auto === true;/.test(bg) && (/if \(!reg \|\| !reg\.actif\) return 0;/.test(bg) || (/if \(!reg \|\| !\(reg\.actif \|\| \(reg\.paliers && reg\.paliers\.actif\)\)\) return 0;/.test(bg) && (bg.match(/quoi = 'accept'/g) || []).length === 1 && /if \(reg\.actif && isFinite\(min\) && min > 0 && o\.prix >= min\) quoi = 'accept';/.test(bg))), 'G2 l’acceptation auto des offres Vinted n’est allumée que par un vrai « oui » (absent ⇒ éteint)');
+  dit(/const actif = m\.vinted_offres_auto === true;/.test(bg) && (/if \(!reg \|\| !reg\.actif\) return 0;/.test(bg) || (/if \(!reg \|\| !\(reg\.actif \|\| \(reg\.paliers && reg\.paliers\.actif\)\)\) return 0;/.test(bg) && ((bg.match(/quoi = 'accept'/g) || []).length === 1
+      // (5.410.4) une 2e acceptation : l'offre à ≤ N € du palier, SEULEMENT dans la négociation par paliers allumée par un vrai « oui »
+      || ((bg.match(/quoi = 'accept'/g) || []).length === 2 && /else if \(reg\.paliers && reg\.paliers\.actif && o\.tx\) \{[\s\S]{0,2500}?if \(palier && palier\.accepter\) quoi = 'accept';/.test(bg)
+        && /function reglagesPaliersExt\(v\) \{[\s\S]{0,1500}?return \{ actif: o\.actif === true,/.test(bg)))
+      && /if \(reg\.actif && isFinite\(min\) && min > 0 && o\.prix >= min\) quoi = 'accept';/.test(bg))), 'G2 l’acceptation auto des offres Vinted n’est allumée que par un vrai « oui » (absent ⇒ éteint)');
   dit(/load\('vrm_ebay_retrait_auto', false\) === true/.test(lire('src/ecrans/Ebay.jsx')) && /if \(v !== 'true'\) return \{ status: 403/.test(lire('api/ebay.js')), 'G3 le retrait eBay automatique : éteint par défaut, et le serveur le re-vérifie');
   dit(/return rows\.length === 1 && rows\[0\]\?\.data\?\.active === true;/.test((/async function bordereauxAutoActifs[\s\S]*?\n\}/.exec(bg) || [''])[0]), 'G4 bordereaux automatiques : éteints tant que la ligne ne dit pas « active: true »');
   // Rien n'est simulé sur Vinted : ni les scripts injectés sur Vinted, ni le service worker

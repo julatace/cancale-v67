@@ -397,6 +397,7 @@ Vinted est un **objet** `{amount}` ; les données vivent sous `data.payload`).
    (`_porte-banc.cjs`) sur le playwright du chemin absolu ; un banc rouge en masse ⇒
    regarder d'abord la capture (écran de connexion ?) et `df -h /` (disque plein).
 
+⚠️ **CI (24 nov.)** : les bancs d'une part tournent 3 à la fois (`BANCS_PARALLELE`, chacun son port et son navigateur) ; un banc long se coupe en morceaux de SA variable (`ventes-e2@SCENARIOS=jeu,exclu`, `accessibilite@BANC_LARGEUR=390`, `budget-vitesse@ECRANS=…`) ; avant de toucher un workflow, `python3 -I scripts/ci-controles.py --diff origin/main` doit dire « identiques » (rien de retiré, rien de rendu non bloquant). Récit : `docs/passation/2026-11-24-ci-rapide.md`.
 ⚠️⚠️ **Plusieurs sessions mergent sur `main` en même temps** : amener `main` par un
 **vrai `git merge origin/main`**, jamais `-s ours` ; après, `git diff origin/main --stat`
 ne montre que ses fichiers. **Commiter AVANT toute manipulation de branche.** Une
@@ -453,6 +454,8 @@ sans la fonction.
 
 | capacité | fonction de l'extension | arrivée en | ce que l'app promet |
 |---|---|---|---|
+| `favorislisteentiere` | `listeClocheJusqua` | **5.440.2** (24 nov.) | « pas trouvé dans tes notifications » seulement liste de Vinted lue jusqu'au bout ; sinon le favori attend |
+| `favorislienapp` `favoriscommande` | `lienFavoriProfond` · `identiteParCommande` | **5.440.1** (23 nov. nuit) | favoris : la notification au lien d'application (`vintedfr://messaging?item_id=&user_id=`) reconnue par ses DEUX identités ; conversation sans article ⇒ identité par SA commande (uuid, n°, acheteur, côté vendeur, article), forme inconnue notée (clés/types), sinon rien ne part |
 | `reperage` `clocheauto` `messagerieuuid` `fenetrefavoris` | `vrm-trouver.js:trouver` · `pageNotifsConnue` · `retenirRouteConv` · `lignesFavoris` | **5.440.0** (23 nov.) | favoris sans geste, messagerie uuid, fenêtre ligne par ligne |
 | `vcmoderation` | `transitionModVc` | **5.439.0** (23 nov.) | Vestiaire : compteurs de modération (`users/me/products/count`, lus au passage) et « validée / refusée / à corriger » noté sur l'annonce ; mot d'une annonce en attente jamais vu — `2026-11-22-annulees-vc.md` |
 | `santenote` `precieux` `relancesansachat` `lotauto` `brouillonsauto` `demasquee` | `noteCompteDe` · `precieuxBloque` · `lrOffreSansAchat` · `lotFavorisAuto` · `brouillonsAutoTick` · `moderationCarte` | **5.438.0** (22 nov. ; contient la 5.437) | note de santé et cadence par palier, compte précieux, relance offre acceptée sans achat, lot seul, brouillons seuls, « à nouveau visible » — `2026-11-22-ext-5438.md` |
@@ -482,20 +485,19 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **24 nov. · Parcours iPhone (`claude/parcours-iphone`, APRÈS #1326)** : un robot joue sa journée au doigt (banc `parcours-iphone`, WebKit dans `iphone-webkit.yml`) ; corrigés : le code au comptoir que le « retour » ne fermait pas (VRM quitté), « Colis mondial_relay » dans la loupe ; rapportés : sauts d'Achats/Argent/loupe (données lues après). `2026-11-24-parcours-iphone.md`. Geste : aucun.
-- **23 nov. · Gris clair étagé (`claude/style-clair`)** : variante A validée (gris froid, accent ardoise), sombre = gris choisi ; iPhone compact ; dessin fin ; pop-up d'événement + galerie du propriétaire. `docs/passation/2026-11-23-style-clair.md`. Geste : essayer le pop-up sur un vrai iPhone.
-- **23 nov. · Bugs (`claude/bugs-totale`)** : vente par e-mail partout — le bordereau reçu d'une vente pas relue (particulier : vente sans n°) fait le colis (Colis, Ma journée, jamais Ventes ni CA), la photo exacte tranche la fenêtre ambiguë ; colis à retirer sans photo (`Icon`) ; boucle de rendus : `onVmrExt` ne prévient que sur changement d'empreinte (11 → 6 validations/10 s au téléphone, banc `rendus-repos`). `2026-11-22-bugs-totale.md`. Geste : aucun.
+- **24 nov. · « Vinted a agi » : UNE carte** (#1321+#1346) : ligne par compte, feuille aux photos (N°), un geste. `2026-11-23-moderation-carte.md`. Geste : aucun.
+- **24 nov. · Observer Vinted (ext. 5.440.3, `claude/observation-vinted`)** : interrupteur 10 min (carte du logo, page Extension) ; la page note pages, requêtes (clés et types), clics (`isTrusted`), cloche — formes seulement, rebâties par le fond, ligne `observation_vinted_{compte}_{nav}`, « Envoyer l'observation » ; rien envoyé à Vinted. `2026-11-24-observation-vinted.md`. Geste : installer, Observer, un envoi (Bleam ou main), Envoyer l'observation.
 - **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.440.0** (23 nov., favoris sans geste ; versions servies avant : `historique-divers.md`, « Extension servie », fin). **À lire en premier : `docs/passation/2026-11-23-passation-generale.md`** (23 nov. soir), puis `docs/passation/2026-11-22-passation-generale.md` (22 nov.), puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passation-generale.md` (la plus complète : en ligne, prêt, en pause, en file, refusé, gestes), puis `2026-11-16-passation.md`, `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.440.2** (24 nov., favoris : liste lue jusqu'au bout ; avant 5.440.1, lien d'application ; 5.440.0, favoris sans geste ; versions servies avant : `historique-divers.md`, « Extension servie », fin). **À lire en premier : `docs/passation/2026-11-23-passation-generale.md`** (23 nov. soir), puis `docs/passation/2026-11-22-passation-generale.md` (22 nov.), puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passation-generale.md` (la plus complète : en ligne, prêt, en pause, en file, refusé, gestes), puis `2026-11-16-passation.md`, `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter « Ma facture » (Argent → Factures : SIRET, forme, régime de TVA, son e-mail) ; poser `RELANCES_SMTP_*` + `RELANCES_EXPEDITEUR` (SPF/DKIM, Brevo 300/j) — VRM envoie par défaut.
-- Installer l’extension **5.440.0** (23 nov. ; avant 5.436.0, 22 nov., intégration 2 ; avant 5.434.0, puis 5.419.0, 21 nov. nuit ; avant 5.418.0, 21 nov. soir ; avant 5.410.8, 21 nov. ; avant 5.410.2, 20 nov. : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip` ; mesuré le 19 nov. : Chrome 5.406, 5.400, 5.329, Orion 5.377, 5.368, 5.336). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
+- Installer l’extension **5.440.1** (23 nov. nuit ; avant 5.440.0, 23 nov. ; avant 5.436.0, 22 nov., intégration 2 ; avant 5.434.0, puis 5.419.0, 21 nov. nuit ; avant 5.418.0, 21 nov. soir ; avant 5.410.8, 21 nov. ; avant 5.410.2, 20 nov. : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip` ; mesuré le 19 nov. : Chrome 5.406, 5.400, 5.329, Orion 5.377, 5.368, 5.336). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
