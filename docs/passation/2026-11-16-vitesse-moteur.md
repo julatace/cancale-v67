@@ -89,3 +89,44 @@ quoi-de-neuf, bilan-semaine, dac7-comptes. Build vert.
 `scripts/audit-meme-valeur.cjs`, `scripts/audit-calcul-par-version.cjs`, `scripts/audit-index-ventes.cjs` (neufs),
 `scripts/bancs/chiffres-volume.cjs` (captures), `scripts/bancs/_mesure-demarrage.cjs` (rendus venus du parent).
 Geste de Julien : aucun.
+
+## 24 nov. — reprise seule : `main` refusionnée, banc des 20 000 ventes rendu fiable, un vrai défaut corrigé
+
+**Fusion** (vrai `git merge origin/main`, 6 fichiers en conflit). Le moteur `Comptabilite` vit depuis le découpage dans
+`src/ecrans/Comptabilite.jsx` : les 30 morceaux du lot dans `App.jsx` ont été relus un par un (script : ancien texte ⇒
+nouveau, appliqué seulement s'il se trouve UNE fois). 19 sont passés tels quels dans `Comptabilite.jsx` ; `cartesColis` et
+`listeEnvoyes` gardent la mémoire « une fois par rendu » que `main` leur a donnée le 20 nov. (celle du lot n'y est pas
+remise, et la fin de `cartesColisCalc` qu'un morceau avait refermée en `});` est remise en `};`) ; la preuve de départ par
+n° (`parTransaction`) et le géocodage hors des états sont reportés à la main. CLAUDE.md laissé à `main` (règle de
+l'intégration du 23 nov.) ; historique-divers : les deux côtés.
+
+**Le défaut trouvé (réel, fait par la fusion)** : `main` (18 nov., `src/versionDonnees.js`) a réécrit `noterEtatsTxn` —
+la version de la table passe par `toucherMemoire()`, et `TXN_ETATS.ver` n'était plus jamais montée. Or `aExpedier`,
+`venteSortieDuStock` et l'index « à expédier » du lot gardent leur réponse tant que `TXN_ETATS.ver` ne bouge pas :
+une vente jugée « à expédier » le restait après qu'une lecture des transactions l'a dite finalisée ou annulée (colis
+fantôme dans « À envoyer », paire jamais sortie du Stock). Corrigé : `noterEtatsTxn` monte `TXN_ETATS.ver` ET appelle
+`toucherMemoire()` quand une ligne change (la table seule, pas toute la mémoire : moins de calculs refaits).
+- Contrôle EXÉCUTÉ (`audit-index-ventes`) : la vraie `aExpedier` / `noterEtatsTxn` / `venteSortieDuStock` lues dans le
+  texte de l'app recollé ; une vente jugée, puis sa transaction lue finalisée, puis rejugée ⇒ la réponse change.
+- Rouge avant : l'arbre fusionné sans la correction ⇒ `aExpedier` reste `true` après « finalisée », sortie du stock
+  `false` (2 rouges). Mutations rouges : `aExpedier` ou `venteSortieDuStock` qui ignorent la version, `noterEtatsTxn` qui
+  ne la monte plus.
+- `chiffres-volume` ne le voit PAS (build avec le défaut = mêmes chiffres que `main`) : dans sa base, les états des
+  transactions arrivent avant le premier jugement. Seul l'audit le garde.
+- Audits du lot (`audit-index-ventes`, `audit-meme-valeur`, `audit-calcul-par-version`) portés sur le texte RECOLLÉ
+  (`_source-app.cjs`) : sur `App.jsx` seul, deux rougissaient et un (« plus de `setGeo` ») passait à vide.
+
+**Le banc des 20 000 ventes (`chiffres-volume`)** — lancé seul (aucun autre banc de cette session en même temps ; la machine
+restait à une charge de 18 à 32 pour 4 cœurs, d'autres agents).
+- Ce qui le rendait non fiable, mesuré : 4 passes à l'ancienne, même build ⇒ « branche-1 » ≠ « branche-2 » sur Ventes
+  (« 14 bordereaux », « 35 bordereaux », `data-file-envoi=1132` absents de l'une). « Aucune lecture depuis 4 s » ne dit
+  pas que l'écran a fini : le calcul et le rendu continuent sans lecture.
+- Correction du banc : le relevé de chaque écran est refait toutes les 3 s jusqu'à DEUX relevés identiques de suite sans
+  lecture entre eux (3 min au plus) ; jamais stable ⇒ `instable`, et `compare-chiffres-volume` le dit ROUGE (vérifié sur
+  un relevé marqué instable). Aucun écart n'est effacé : un écran stable mais différent reste rouge.
+- **Verdict** : 1512 px, 4 passes alternées (main, branche, main, branche) : les 4 identiques deux à deux (41 relevés,
+  6 comparaisons) ; 390 px tactile, une passe chacun : identiques (41 relevés). Captures 390 regardées (Aujourd'hui,
+  Ventes : mêmes chiffres, écran complet).
+- Vitesse : PAS remesurée — sur une machine à charge 20+, une mesure de temps ne prouve rien. Les chiffres du 16 nov.
+  plus haut restent ceux d'avant la fusion. `volume-budget` (dans le lot de la CI depuis vitesse-volume) juge 2 s après
+  les données : à surveiller en CI, il peut y être rouge (objectif jamais tenu le 16 nov.).
