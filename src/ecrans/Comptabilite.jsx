@@ -62,7 +62,7 @@ import { versementsParReleve, relevesNonVerifies } from '../versementReleve.js';
 import { masqueesParCompte } from '../annoncesMasquees.js';
 import { rythmeVendu, ecartPct, stockQuiDort } from '../statsVentes.js';
 import React, { useState, useMemo, useEffect, useRef, Suspense } from 'react';
-import { useMemoParesseux, useLecteurParesseux, paresseux, compterCalcul, useMemeContenu, useCalculParVersion } from '../calculParesseux.js';
+import { useMemoParesseux, useLecteurParesseux, paresseux, compterCalcul, useMemeContenu, useCalculParVersion, memeContenu } from '../calculParesseux.js';
 import { useAttenteDepassee } from '../attenteBornee.js';   // (22 nov., chasse P2-5)
 import { lazySur } from '../chargementSur.js';
 import { createPortal } from 'react-dom';
@@ -6814,11 +6814,15 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // VIDE — donc les numéros existants disparaissaient. Le commentaire de cet
   // effet-là annonçait justement cette protection ; elle n'existait pas.
   // Reproduit au banc : une vente portant le N°777 ressortait à N°319.
+  // (24 nov., vitesse-lectures-toucher) Relu au MÊME contenu ⇒ même objet (`memeContenu`) : cet effet part au montage de
+  // chaque écran (le nuage est déjà là) et rendait des objets neufs identiques — tous les calculs qui lisent les fiches
+  // repartaient une 2e fois (mesuré, 1re visite d'Achats).
   useEffect(() => onCloudReady(() => {
-    setNumeros(load('vinted_annonce_numeros', {}));
-    setUsedNumeros(load('vinted_used_numeros', []));
-    setSaleOv(load('vinted_sale_overrides', {}));
-    setHiddenSales(new Set(VENTES_MASQUEES_AUCUNE().map(String)));
+    const pareil = (lu) => (avant) => (memeContenu(avant, lu) ? avant : lu);
+    setNumeros(pareil(load('vinted_annonce_numeros', {})));
+    setUsedNumeros(pareil(load('vinted_used_numeros', [])));
+    setSaleOv(pareil(load('vinted_sale_overrides', {})));
+    setHiddenSales(pareil(new Set(VENTES_MASQUEES_AUCUNE().map(String))));
     setCloudReady(true);
   }), []);
   // (6 nov.) Revenir sur l'écran : la dernière liste LUE (src/memoireEcrans.js), relue aussitôt en place.
@@ -14238,14 +14242,17 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // CET appareil gagne toujours.
   useEffect(() => onCloudReady(() => {
     const vide = (o) => !o || (Array.isArray(o) ? o.length === 0 : Object.keys(o).length === 0);
-    setSavedPoints(p => vide(p) ? load('vrm_points_relais', []) : p);
-    setBuyByNum(n => vide(n) ? load('vinted_buyprice_by_num', {}) : n);
-    setPickupDone(n => vide(n) ? load('vinted_pickup_done', {}) : n);
-    setShipDone(n => vide(n) ? load('vinted_ship_done', {}) : n);
-    setTxnLink(n => vide(n) ? load('vinted_txn_link', {}) : n);
-    setCollectedAt(n => vide(n) ? load('vrm_colis_collected_at', {}) : n);
-    setQrPoses(n => vide(n) ? load(CLE_QR_POSES, {}) : n);
-    setCollected(c => (c && c.size) ? c : loadCollected());
+    // (24 nov., vitesse-lectures-toucher) Resté vide et relu VIDE : on garde l'objet d'avant (même identité). Avant, chaque
+    // `{}` relu était un objet neuf et relançait tout ce qui le lit (mesuré : `pickupUnion` et `retoursEnCours` sur Achats).
+    const pareil = (avant, lu) => (memeContenu(avant, lu) ? avant : lu);
+    setSavedPoints(p => vide(p) ? pareil(p, load('vrm_points_relais', [])) : p);
+    setBuyByNum(n => vide(n) ? pareil(n, load('vinted_buyprice_by_num', {})) : n);
+    setPickupDone(n => vide(n) ? pareil(n, load('vinted_pickup_done', {})) : n);
+    setShipDone(n => vide(n) ? pareil(n, load('vinted_ship_done', {})) : n);
+    setTxnLink(n => vide(n) ? pareil(n, load('vinted_txn_link', {})) : n);
+    setCollectedAt(n => vide(n) ? pareil(n, load('vrm_colis_collected_at', {})) : n);
+    setQrPoses(n => vide(n) ? pareil(n, load(CLE_QR_POSES, {})) : n);
+    setCollected(c => (c && c.size) ? c : pareil(c, loadCollected()));
     // §5.49 — mêmes cartes PARTAGÉES lues au montage (appareil neuf : vides tant
     // que le nuage n'est pas arrivé) qu'`apply()` ne gère PAS. Sans ça, sur un
     // appareil neuf, un clic avant l'arrivée du nuage réécrit la carte réduite à
@@ -14253,20 +14260,20 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // remplit QUE ce qui est resté par défaut — jamais une saisie faite pendant
     // le chargement. Ce sont des corrections de compta (sale_overrides), notes,
     // états de bordereau/retour, achats hors-Vinted : les plus coûteux à perdre.
-    setBordsPrinted(n => vide(n) ? load('vinted_bords_printed', {}) : n);
-    setBordsSansNum(n => vide(n) ? load(CLE_IMPRIMES_SANS_NUM, {}) : n);
-    setBordLinks(n => vide(n) ? load('vinted_bord_links', {}) : n);
-    setBordsHidden(n => vide(n) ? load('vinted_bords_hidden', {}) : n);
-    setBordsShipped(n => vide(n) ? load('vinted_bords_shipped', {}) : n);
-    setBordFormats(n => vide(n) ? load('vinted_bordereau_formats', {}) : n);
-    setSaleOv(n => vide(n) ? load('vinted_sale_overrides', {}) : n);
-    setPairsLost(n => vide(n) ? load('vinted_pairs_lost', {}) : n);
-    setRetoursRecus(n => vide(n) ? load('vinted_retours_recus', {}) : n);
-    setRetoursDismissed(n => vide(n) ? load('vinted_retours_dismissed', {}) : n);
-    setRetoursRemis(n => vide(n) ? load('vinted_retours_remis', {}) : n);
-    setRetoursDeposes(n => vide(n) ? load('vrm_retours_deposes', {}) : n);
-    setAchatNotes(n => vide(n) ? load('vinted_achat_notes', {}) : n);
-    setOffBuys(n => vide(n) ? load('vinted_offvinted_buys', []) : n);
+    setBordsPrinted(n => vide(n) ? pareil(n, load('vinted_bords_printed', {})) : n);
+    setBordsSansNum(n => vide(n) ? pareil(n, load(CLE_IMPRIMES_SANS_NUM, {})) : n);
+    setBordLinks(n => vide(n) ? pareil(n, load('vinted_bord_links', {})) : n);
+    setBordsHidden(n => vide(n) ? pareil(n, load('vinted_bords_hidden', {})) : n);
+    setBordsShipped(n => vide(n) ? pareil(n, load('vinted_bords_shipped', {})) : n);
+    setBordFormats(n => vide(n) ? pareil(n, load('vinted_bordereau_formats', {})) : n);
+    setSaleOv(n => vide(n) ? pareil(n, load('vinted_sale_overrides', {})) : n);
+    setPairsLost(n => vide(n) ? pareil(n, load('vinted_pairs_lost', {})) : n);
+    setRetoursRecus(n => vide(n) ? pareil(n, load('vinted_retours_recus', {})) : n);
+    setRetoursDismissed(n => vide(n) ? pareil(n, load('vinted_retours_dismissed', {})) : n);
+    setRetoursRemis(n => vide(n) ? pareil(n, load('vinted_retours_remis', {})) : n);
+    setRetoursDeposes(n => vide(n) ? pareil(n, load('vrm_retours_deposes', {})) : n);
+    setAchatNotes(n => vide(n) ? pareil(n, load('vinted_achat_notes', {})) : n);
+    setOffBuys(n => vide(n) ? pareil(n, load('vinted_offvinted_buys', [])) : n);
   }), []);
   // Un colis est à retirer → on charge les achats (harvest, gratuit) pour
   // retrouver la photo de l'article correspondant.
