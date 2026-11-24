@@ -47,6 +47,7 @@ import { Glyphe } from '../icones.jsx';
 import { groupesParCompte, lireReplis, ecrireReplis } from './annoncesComptes.js';   // (20 nov.) la liste divisée par compte
 import { CarteAnnonce, RangeeArticle, lireVueTel, ecrireVueTel, traceDe, texteTrace, seulementBloque, bandeauDe, tailleDansTitre } from './AnnoncesCartes.jsx';   // (21 nov.) la grille « Dressing »
 import { depuisMaj } from '../TableauTravail.jsx';
+import GrilleInventaire from '../visuel/GrilleInventaire.jsx';   // (24 nov., lot visuel-annonces) la grille d'inventaire virtualisée
 
 const PAR_PAGE = 60;
 // Les segments (audit d'utilité du 19 nov.) : En ligne · À publier · Dorment.
@@ -164,6 +165,13 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   // Chaque compte montre ses `max` premières annonces (« Voir N de plus » les allonge toutes) : un compte n'est jamais caché
   // derrière la pagination d'un autre.
   const groupes = React.useMemo(() => groupesParCompte(liste, filtre.site), [liste, filtre.site]);
+  // (24 nov., lot visuel-annonces) « Sans latence » : le contenu DÉJÀ connu s'affiche tel quel ; seul celui qui ARRIVE (la lecture
+  // finie pendant que l'écran est ouvert) se dévoile en cascade, pendant 600 ms au plus. Calculé AU RENDU (jamais un rendu de plus).
+  const arrivee = React.useRef({ vide: articles === undefined, le: 0 });
+  if (articles === undefined) arrivee.current.vide = true;
+  else if (arrivee.current.vide) { arrivee.current.vide = false; arrivee.current.le = Date.now(); }
+  const enArrivee = !!arrivee.current.le && Date.now() - arrivee.current.le < 600;
+  const debutDe = (cle) => { let n = 0; for (const g of groupes) { if (g.cle === cle) return n; if (!replis.has(g.cle)) n += Math.min(g.articles.length, 4); } return n; };
   const resteGroupes = groupes.reduce((n, g) => n + Math.max(0, g.articles.length - max), 0);
   const A = action ? actions.find((x) => x.cle === action) : null;
   const cochable = (a) => !A || !A.pour || A.pour(a);
@@ -306,8 +314,8 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   };
   const articleGestes = gestesDe ? liste.find((x) => x.cle === gestesDe) || null : null;
   const gestesOuverts = articleGestes ? lesGestes(articleGestes) : [];
-  const carte = (a, cleCompte) => (
-    <CarteAnnonce key={a.cle + '|' + cleCompte} a={a} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon}
+  const carte = (a, cleCompte, rv = null) => (
+    <CarteAnnonce key={a.cle + '|' + cleCompte} a={a} revele={rv} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon}
       Photo={Photo} dort={dortDe && !A ? dortDe(a) : null} plusVue={plusVueDe && !A ? plusVueDe(a) : null}
       selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), onBascule: () => basculer(a) } : null}
       attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined, 'data-eg-compte': cleCompte }}/>
@@ -359,7 +367,9 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
       {(actions.length || onPublier || (onEcranSite && filtre.site !== 'tous')) && !A && articles !== undefined ? <BoutonIcone libelle={tr('egalite.actions')} icone={<Glyphe nom="more" taille={22}/>} onClick={() => setMenuActions(true)} attrs={{ 'data-eg-actions': '' }}/> : null}
     </div>
   );
-  const attenteGrille = <div className="n-ad-grille" data-ad-attente="" aria-busy="true">{Array.from({ length: 4 }, (_, i) => <span key={i} className="n-ad-carte n-ad-carte-attente" aria-hidden="true"><span className="n-ad-photo"/><span className="n-ad-corps"><span className="n-ad-ligne-attente"/><span className="n-ad-ligne-attente" data-court=""/></span></span>)}</div>;
+  // (24 nov., lot visuel-annonces) Le squelette a la FORME finale : l'intertitre d'un compte, puis la grille aux mêmes cases.
+  const attenteGrille = <div data-ad-attente="" aria-busy="true" aria-label={tr('inv.chargement')}><section className="n-ad-section"><div className="n-ad-tete-compte n-inv-tete-os" aria-hidden="true"><span className="n-os"/></div>
+    <GrilleInventaire items={undefined} attente={6} corps={96}/></section></div>;
   return (
     <>
       <Page titre={tr('egalite.titre')} plein={plein} attrs={{ 'data-eg-ecran': '', 'data-eg-site': filtre.site, 'data-eg-etat': filtre.etat, 'data-eg-selection': A ? A.cle : undefined, 'data-eg-vue': ordinateur ? 'tableau' : 'liste', 'data-ad-vue': vueG ? 'grille' : 'liste' }}
@@ -381,19 +391,19 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
           : !liste.length && manque && !recherche ? <Vide icone={Icon ? <Icon name="alert" size={40}/> : null} phrase={tr('egalite.pasSu')}/>
           : !liste.length ? <Vide icone={Icon ? <Icon name="tag" size={40}/> : null} phrase={recherche ? tr('egalite.videRecherche') : tr('egalite.vide.' + filtre.etat)} action={!recherche ? videAction : null}/>
           : ordinateur ? tableau
-          : <div data-eg-liste="" data-eg-groupes={String(groupes.length)} data-ad-liste={vueG ? 'grille' : 'liste'}>{groupes.map((g) => {
+          : <div data-eg-liste="" data-eg-groupes={String(groupes.length)} data-inv-arrivee={enArrivee ? '1' : undefined} data-ad-liste={vueG ? 'grille' : 'liste'}>{groupes.map((g) => {
               const n = g.articles.length;
               const ouvertG = !replis.has(g.cle);
               return (
                 <section key={g.cle} className="n-ad-section" data-eg-groupe={g.cle} data-eg-groupe-n={String(n)}>
                   {enTeteCompte(g, n)}
                   {ouvertG ? <>
-                    {vueG ? <div className="n-ad-grille">{g.articles.slice(0, max).map((a) => carte(a, g.cle))}</div>
+                    {vueG ? <GrilleInventaire items={g.articles} cle={(a) => a.cle + '|' + g.cle} rendu={(a, i, rv) => carte(a, g.cle, rv)} corps={96} revele={enArrivee} debut={debutDe(g.cle)} attrs={{ 'data-ad-grille': g.cle }}/>
                       : <div className="n-ar-liste" data-ad-forme={formeRangee}>{g.articles.slice(0, max).map((a) => rangeeTel(a, g.cle))}</div>}
                   </> : null}
                 </section>);
             })}</div>}
-        {!enPrio && (ordinateur ? liste.length > max : resteGroupes > 0) ? <Groupe nu><Bouton variante="texte" large onClick={() => setMax((m) => m + PAR_PAGE)} attrs={{ 'data-eg-plus': '' }}>{tr('egalite.plus', { n: ordinateur ? liste.length - max : resteGroupes })}</Bouton></Groupe> : null}
+        {!enPrio && (ordinateur ? liste.length > max : (vueTel !== 'grille' && resteGroupes > 0)) ? <Groupe nu><Bouton variante="texte" large onClick={() => setMax((m) => m + PAR_PAGE)} attrs={{ 'data-eg-plus': '' }}>{tr('egalite.plus', { n: ordinateur ? liste.length - max : resteGroupes })}</Bouton></Groupe> : null}
         {/* (20 nov., « téléphone bâclé ») Sous la liste, seulement ce qui MANQUE (un site pas lu : « rien lu » n'est pas « rien »). */}
         {!enPrio && Array.isArray(articles) && manque ? <Groupe nu pied={manque} attrs={{ 'data-eg-pied': '' }}/> : null}
       </Page>

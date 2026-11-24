@@ -1,0 +1,80 @@
+/* ── src/natif/visuel/inventaire.css — l'inventaire Annonces (24 nov., lot visuel-annonces) ───────────────────────────────
+   La grille virtualisée (GrilleInventaire.jsx), la carte-tuile d'une annonce (AnnoncesCartes.jsx), les ronds de compte.
+   Le langage de src/natif/jeu.css : la photo en grand, l'étiquette papier du N° (jamais orange), des pastilles « verre » pour
+   les vues et favoris, un point d'état calme. Hauteurs FIXES (photo carrée + corps --n-inv-corps) : rien ne saute. */
+@layer vrm-natif {
+  /* ── La grille : la hauteur totale est réservée, seules les rangées proches de l'écran sont montées. ── */
+  .n-inv-grille { position: relative; contain: layout; min-width: 0; }
+  .n-inv-fenetre { display: grid; grid-template-columns: repeat(var(--n-inv-cols, 2), minmax(0, 1fr)); grid-auto-rows: var(--n-inv-rang-h, 270px); gap: var(--n-inv-gap, 12px); }
+  .n-ad-section .n-inv-grille, [data-ad-attente] .n-inv-grille { margin: 0 var(--n-marge); }
+  .n-tt-grille-ecran.n-inv-grille { padding: 0; margin: 0 var(--n-marge); display: block; }
+
+  /* ── Le squelette : la FORME exacte de la carte (photo carrée + deux lignes). ── */
+  .n-inv-os { display: grid; grid-template-rows: minmax(0, 1fr) var(--n-inv-corps); border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; }
+  .n-inv-os .n-os { display: block; background: var(--n-squelette, var(--n-carte-2)); border-radius: 0; }
+  .n-inv-os .n-inv-os-photo { width: 100%; height: 100%; }
+  .n-inv-os-l { height: 14px; margin: 12px 12px 0; border-radius: 4px !important; }
+  .n-inv-os-l[data-court] { width: 40%; margin-top: 10px; }
+
+  /* ── La carte-tuile : photo carrée + corps fixe. ── */
+  .n-ad-carte.n-inv { display: grid; grid-template-rows: minmax(0, 1fr) var(--n-inv-corps, 96px); height: 100%; box-shadow: 0 0 0 .5px var(--n-trait), 0 1px 2px rgb(29 29 31 / .06); }
+  .n-ad-carte.n-inv .n-inv-photo { aspect-ratio: auto; height: 100%; min-height: 0; }
+  .n-inv-photo > .n-tuile-paire { --n-tuile-t: 100%; position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; display: grid; }
+  .n-inv-photo .n-tuile-img { width: 100% !important; height: 100% !important; border-radius: 0; box-shadow: none; object-fit: cover; }
+  .n-inv-photo .n-tuile-vide { border-radius: 0; }
+  /* L'étiquette du N° : un peu plus grande sur une tuile d'inventaire, posée en bas à gauche, sans sortir de la carte. */
+  .n-inv-photo .n-tuile-paire > .n-etiq { left: 8px; bottom: 10px; font-size: 14px; line-height: 18px; padding: 2px 8px 2px 14px; }
+  .n-inv-photo > .n-inv-plaque { position: absolute; left: 8px; bottom: 10px; z-index: 3; }
+
+  /* Les ronds des comptes (en haut à droite) — teintés par identité, jamais orange. */
+  .n-inv-avatars { position: absolute; top: 8px; right: 8px; z-index: 3; display: inline-flex; flex-direction: row-reverse; }
+  .n-inv-avatars > .n-inv-avatar + .n-inv-avatar { margin-right: -6px; }
+  .n-inv-avatar { --n-av: #3D4B5B; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; flex: none; background: var(--n-av); color: #FFFFFF;
+    font: 700 12px/1 var(--n-police); box-shadow: 0 0 0 2px var(--n-carte), 0 1px 3px rgb(0 0 0 / .2); }
+  .n-inv-avatar[data-inv-teinte="1"] { --n-av: #26272B; }
+  .n-inv-avatar[data-inv-teinte="2"] { --n-av: #0D6A6B; }
+  .n-inv-avatar[data-inv-teinte="3"] { --n-av: #4C5A73; }
+  .n-inv-avatar[data-inv-teinte="4"] { --n-av: #17744A; }
+  .n-inv-avatar-plus { --n-av: var(--n-carte); color: var(--n-encre); font-size: 11px; }
+  .n-inv-avatar-petit { width: 20px; height: 20px; font-size: 10px; }
+
+  /* Vues et favoris : deux pastilles « verre » en bas à droite, le nombre à côté de l'icône. */
+  .n-inv-stats { position: absolute; right: 8px; bottom: 10px; z-index: 3; display: inline-flex; gap: 4px; }
+  .n-inv-stat { display: inline-flex; align-items: center; gap: 3px; height: 22px; padding: 0 7px 0 6px; border-radius: 11px; font: 600 12px/1 var(--n-police); font-variant-numeric: tabular-nums;
+    color: #1D1D1F; background: rgb(255 255 255 / .9); box-shadow: 0 1px 3px rgb(0 0 0 / .16); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+  .n-inv-stat svg { flex: none; color: #3D4B5B; }
+  :root[data-theme="dark"] .n-inv-stat { color: #F4F4F5; background: rgb(28 28 30 / .82); }
+  :root[data-theme="dark"] .n-inv-stat svg { color: #C9D2DE; }
+
+  /* L'état, calme : en haut à gauche, une pastille seulement quand ce n'est pas « en ligne ». */
+  .n-ad-carte.n-inv .n-ad-bandeau { left: 8px; right: auto; top: 8px; bottom: auto; max-width: calc(100% - 56px); padding: 3px 9px; border-radius: 11px; font: 600 12px/16px var(--n-police);
+    color: #1D1D1F; background: rgb(255 255 255 / .9); box-shadow: 0 1px 3px rgb(0 0 0 / .16); }
+  :root[data-theme="dark"] .n-ad-carte.n-inv .n-ad-bandeau { color: #F4F4F5; background: rgb(28 28 30 / .82); }
+  .n-ad-carte.n-inv .n-ad-conseil { left: 8px; right: auto; top: 8px; bottom: auto; max-width: calc(100% - 56px); padding: 3px 9px; font: 600 12px/16px var(--n-police); }
+  .n-ad-carte.n-inv .n-ad-coche { left: auto; right: 8px; }
+
+  /* Le corps : le titre (2 lignes), puis UNE ligne — logos · prix · point d'état · « ⋯ ». */
+  .n-ad-carte.n-inv .n-ad-corps { padding: 8px 10px 0 12px; gap: 0; overflow: hidden; }
+  .n-ad-carte.n-inv .n-ad-titre { font: 400 14px/19px var(--n-police); min-height: 38px; height: 38px; }
+  .n-ad-carte.n-inv[data-inv-trace] .n-ad-titre { -webkit-line-clamp: 1; min-height: 19px; height: 19px; }
+  .n-ad-carte.n-inv .n-ad-trace { font: 400 12px/16px var(--n-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-ad-carte.n-inv .n-ad-ligne { margin-top: 2px; gap: 6px; height: var(--n-cible); justify-content: flex-start; }
+  .n-ad-carte.n-inv .n-ad-ligne > .n-logo-site, .n-ad-carte.n-inv .n-ad-ligne > [data-logo] { flex: none; }
+  .n-ad-carte.n-inv .n-ad-prix { font: 700 16px/20px var(--n-police); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .n-ad-carte.n-inv .n-ad-plus { margin: 0 -10px 0 0; }
+  .n-inv-statut { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--n-encre-3); }
+  .n-inv-statut[data-inv-statut="enligne"] { background: var(--n-vert); }
+  .n-inv-statut[data-inv-statut="aconfirmer"] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--n-encre-2); }
+
+  /* Appui : la carte s'enfonce à peine (feedback < 100 ms, 120 ms ease-out). */
+  @media (prefers-reduced-motion: no-preference) {
+    .n-ad-carte.n-inv { transition: transform 120ms cubic-bezier(.23, 1, .32, 1); }
+    .n-ad-carte.n-inv:active { transform: scale(.98); }
+  }
+  @media (prefers-reduced-motion: reduce) { .n-ad-carte.n-inv { transition: none; } .n-ad-carte.n-inv:active { transform: none; } }
+}
+@layer vrm-natif {
+  /* L'intertitre d'un compte pendant la lecture : sa hauteur exacte (44), une barre courte. */
+  .n-inv-tete-os { display: flex; align-items: center; height: var(--n-cible); }
+  .n-inv-tete-os > .n-os { display: block; width: 132px; height: 14px; border-radius: 4px; background: var(--n-squelette, var(--n-carte-2)); }
+}

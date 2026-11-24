@@ -31,6 +31,7 @@
 //   vide / videRecherche / pasSu   les phrases d'un tableau vide · grille (vrai ⇒ liste ⇄ grille) · Icon
 //   outilsPlus    nœud posé au bout de la barre d'outils (un lien vers un écran voisin : « Automatisations »)
 // Clavier : ↑ ↓ d'une ligne à l'autre, Entrée ouvre, Espace coche, Échap ferme le menu ou vide la sélection, ⌘K « / » cherche.
+import GrilleInventaire from './visuel/GrilleInventaire.jsx';   // (24 nov., lot visuel-annonces)
 import React from 'react';
 import { tr } from '../i18n/index.js';
 import { Page, ChampRecherche } from './Page.jsx';
@@ -112,7 +113,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   lignes, statuts = [], statutsDefaut = null, filtres = [], colonnes = [], triDefaut = null,
   actions = [], onAction = null, menuLigne = null, onOuvrir = null, ligneTel = null,
   unite = (n) => tr('tableau.articles', { n }), placeholder = '', plein = null, haut = null, pied = '',
-  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null, groupe = null, avantOutils = null, ligneChoisie = '', cases = true, coches = null, onCocher = null, iconeVide = 'search', actionPasSu = null, carteGrille = null }) {
+  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null, groupe = null, avantOutils = null, ligneChoisie = '', cases = true, coches = null, onCocher = null, iconeVide = 'search', actionPasSu = null, carteGrille = null, carteCorps = 0 }) {
   // `iconeVide` : l'icône d'un tableau vide sans filtre (Ventes : le carton) ; `actionPasSu` : le geste d'une lecture ratée (« Réessayer »).
   // `cases={false}` : pas de colonne de cases (une liste sans geste en série : Ventes · En route).
   // `coches` (Set) + `onCocher(cles[], on)` : les cases sont CELLES DE L'ÉCRAN (Ventes · À envoyer : le lot d'impression, cochées
@@ -388,11 +389,16 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   );
   // (21 nov., Annonces « Dressing ») `carteGrille(l, { coche, cochable, basculer, ouvrir, selection })` : l'écran dessine SA carte
   // dans la grille (mêmes lignes, même sélection, même ouverture) ; sans elle, la carte générique d'ici.
-  const grilleVue = carteGrille ? (
+  // (24 nov., lot visuel-annonces) Une grille d'inventaire VIRTUALISÉE (src/natif/visuel/GrilleInventaire.jsx) quand l'écran donne la
+  // hauteur de sa carte (`carteCorps`) : des centaines de cartes, seules celles près de l'écran sont montées, rien ne saute.
+  const grilleVue = carteGrille ? (carteCorps ? (
+    <GrilleInventaire items={affichees} cle={(l) => l.cle} corps={carteCorps} min={200} gap={16} className="n-tt-grille-ecran" attrs={{ 'data-tt-grille': '' }}
+      rendu={(l, i, rv) => carteGrille(l, { coche: sel.has(l.cle), cochable: cochable(l), basculer, ouvrir, selection: !!A || sel.size > 0, revele: rv })}/>
+  ) : (
     <div className="n-tt-grille n-tt-grille-ecran" data-tt-grille="">
       {visibles.map((l) => <React.Fragment key={l.cle}>{carteGrille(l, { coche: sel.has(l.cle), cochable: cochable(l), basculer, ouvrir, selection: !!A || sel.size > 0 })}</React.Fragment>)}
     </div>
-  ) : (
+  )) : (
     <div className="n-tt-grille" data-tt-grille="">
       {visibles.map((l) => { const coche = sel.has(l.cle); const st = statutDe(l); const prix = l.prixGrille;
         return (
@@ -455,7 +461,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
         {haut}
         {!ordinateur && Array.isArray(lignes) ? nombre : null}
         {corps}
-        {affichees.length > max ? <div className="n-tt-plus-bas"><Bouton variante="texte" onClick={() => setMax((m) => m + PAR_PAGE)} attrs={{ 'data-tt-voir-plus': '' }}>{tr('tableau.voirPlus', { n: Math.min(PAR_PAGE, affichees.length - max) })}</Bouton></div> : null}
+        {affichees.length > max && !(ordinateur && vue === 'grille' && carteGrille && carteCorps) ? <div className="n-tt-plus-bas"><Bouton variante="texte" onClick={() => setMax((m) => m + PAR_PAGE)} attrs={{ 'data-tt-voir-plus': '' }}>{tr('tableau.voirPlus', { n: Math.min(PAR_PAGE, affichees.length - max) })}</Bouton></div> : null}
         {pied ? <p className="n-tt-pied" data-tt-pied="">{pied}</p> : null}
         {enfants}
       </Page>

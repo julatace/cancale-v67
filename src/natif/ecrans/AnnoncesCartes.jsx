@@ -12,6 +12,8 @@ import { Plaque } from '../Plaque.jsx';
 import { LogoSite } from '../LogoSite.jsx';
 import { Glyphe } from '../icones.jsx';
 import { cx } from '../outils.js';
+import { TuilePaire } from '../Jeu.jsx';   // (24 nov., lot visuel-annonces) la tuile d'inventaire
+import { AvatarsComptes, PontPhoto, PhotoPont, TaillePhoto } from '../visuel/Inventaire.jsx';
 
 // La vue choisie au téléphone (`vrm_annonces_vue`, cet appareil seulement : une commodité d'affichage, jamais une donnée).
 const CLE_VUE = 'vrm_annonces_vue_tel';
@@ -61,35 +63,61 @@ const BoutonPlus = ({ a, onGestes, className }) => (
     onClick={(e) => { e.stopPropagation(); onGestes(a); }}><Glyphe nom="more" taille={18}/></button>
 );
 
-// UNE carte de la grille (21 nov., 2e passe — Julien : « je n'aime pas du tout l'affichage sur iPhone ») : sobre. Photo CARRÉE,
-// au plus un bandeau d'état et l'étiquette « Dort », puis le titre (2 lignes) et UNE ligne : logo · prix · N° · « ⋯ » discret.
+// UNE carte de la grille — (24 nov., lot visuel-annonces : « toute l'application visuelle », Julien) une TUILE D'INVENTAIRE :
+// la photo carrée en grand (TuilePaire, src/natif/Jeu.jsx : l'étiquette papier du N° en bas à gauche, la photo en fondu sur le
+// gris, jamais un flash blanc), les ronds des comptes en haut à droite, vues et favoris en pastilles en bas à droite, l'état en
+// pastille calme seulement s'il n'est pas « en ligne » ; dessous le titre (2 lignes) et UNE ligne : logos · prix · point d'état ·
+// « ⋯ ». Hauteur FIXE (src/natif/visuel/inventaire.css) : la grille virtualisée connaît chaque case d'avance.
+// La photo est CELLE DE L'ARTICLE (`a.photo`, trouvée par identité dans src/articles/modele.js) : rien n'est cherché ici.
+// Un doublon de N° garde la Plaque rouge (le seul rouge, §7) à la place de l'étiquette.
 // `selection` : { cochee, cochable, onBascule } (mode « Actions ») ; `onGestes` : le « ⋯ » (absent ⇒ pas de « ⋯ »).
-export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, euros, nomSite, dort = null, plusVue = null, Photo = null, attrs = null }) {   // (22 nov., choix 27) plusVue : jours mesurés (src/plusVue.js) ou null
+const IconeGlyphe = ({ name, size }) => <Glyphe nom={name} taille={size}/>;
+export const comptesDe = (a) => {
+  const vus = new Map();
+  for (const x of (a && Array.isArray(a.annonces) ? a.annonces : [])) {
+    if (!x || x.etat === 'vendue' || x.etat === 'retiree') continue;
+    const cle = (x.site || '') + ':' + (x.compte || '');
+    if (!vus.has(cle) && (x.pseudo || x.compte)) vus.set(cle, { cle, pseudo: x.pseudo || x.compte });
+  }
+  return [...vus.values()];
+};
+export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, euros, nomSite, dort = null, plusVue = null, Photo = null, attrs = null, Icon = null, revele = null, taillePhoto = 360 }) {   // (22 nov., choix 27) plusVue : jours mesurés (src/plusVue.js) ou null
   const bandeau = bandeauDe(a);
   const trace = a.etat === 'bloque' ? traceDe(a) : null;
   const grise = selection && !selection.cochable;
   const clic = () => { if (selection) { if (selection.cochable) selection.onBascule(); return; } onOuvrir(a); };
+  const ic = (n) => (Icon ? <Icon name={n} size={13}/> : null);
+  const comptes = comptesDe(a);
+  const statutMot = tr('tableau.etat.' + (a.etat || 'aconfirmer'));
   return (
-    <div className="n-ad-carte" role="button" tabIndex={0} aria-pressed={selection ? (selection.cochee ? 'true' : 'false') : undefined}
-      aria-disabled={grise ? 'true' : undefined} data-ad-carte="" data-ad-etat={a.etat} data-ad-grise={grise ? '1' : undefined}
+    <div {...(revele || {})} className={cx('n-ad-carte n-inv', revele && revele.className)} style={revele ? revele.style : undefined} role="button" tabIndex={0} aria-pressed={selection ? (selection.cochee ? 'true' : 'false') : undefined}
+      aria-disabled={grise ? 'true' : undefined} data-ad-carte="" data-ad-etat={a.etat} data-ad-grise={grise ? '1' : undefined} data-inv-photo={a.photo || ''} data-inv-trace={trace ? '1' : undefined}
       onClick={clic} onKeyDown={(e) => { if (e.target !== e.currentTarget) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clic(); } }} {...(attrs || {})}>
-      <span className="n-ad-photo">
-        <PhotoCadre a={a} Photo={Photo}/>
+      <span className="n-ad-photo n-inv-photo">
+        <PontPhoto.Provider value={Photo}><TaillePhoto.Provider value={taillePhoto}>
+          <TuilePaire photo={a.photo || ''} numero={a.doublon ? '' : a.numero} Photo={PhotoPont} Icon={IconeGlyphe} icone={a.photo ? '' : 'image'} taille="xl"
+            attrsN={{ 'data-inv-n': a.numero || '' }}/>
+        </TaillePhoto.Provider></PontPhoto.Provider>
+        {a.doublon && a.numero ? <span className="n-inv-plaque"><Plaque numero={a.numero} doublon/></span> : null}
         {bandeau ? <span className="n-ad-bandeau" data-ad-bandeau={bandeau}>{tr('tableau.etat.' + bandeau)}</span> : null}
         {plusVue != null && !bandeau ? <span className="n-ad-conseil" data-ad-conseil="plusvue" data-ad-plusvue={String(plusVue)}><span className="n-ad-point" aria-hidden="true"/>{tr('af.pv.etiquette', { n: plusVue })}</span> : null}
         {dort != null && plusVue == null && !bandeau ? <span className="n-ad-conseil" data-ad-conseil="dort"><span className="n-ad-point" aria-hidden="true"/>{tr('egalite.d.conseil.dort', { n: dort })}</span> : null}
-        {selection ? <span className="n-ad-coche" data-ad-coche={selection.cochee ? '1' : '0'} aria-hidden="true">{selection.cochee ? <Glyphe nom="check" taille={18}/> : null}</span> : null}
+        {selection ? <span className="n-ad-coche" data-ad-coche={selection.cochee ? '1' : '0'} aria-hidden="true">{selection.cochee ? <Glyphe nom="check" taille={18}/> : null}</span> : <AvatarsComptes comptes={comptes}/>}
+        {!trace && (a.favoris != null || a.vues != null) ? <span className="n-inv-stats">
+          {a.favoris != null ? <span className="n-inv-stat" data-ad-stat="favoris" aria-label={tr('egalite.favoris', { n: a.favoris })}>{ic('heart')}<span aria-hidden="true">{a.favoris}</span></span> : null}
+          {a.vues != null ? <span className="n-inv-stat" data-ad-stat="vues" aria-label={tr('egalite.vues', { n: a.vues })}>{ic('eye')}<span aria-hidden="true">{a.vues}</span></span> : null}
+        </span> : null}
       </span>
       <span className="n-ad-corps">
         <span className="n-ad-titre">{a.titre || tr('egalite.sansTitre')}</span>
+        {trace ? <span className="n-ad-trace" data-ad-trace={trace.par}>{texteTrace(trace)}</span> : null}
         <span className="n-ad-ligne">
           {a.sites.map((x) => <LogoSite key={x} site={x} taille={16} nom={nomSite(x)}/>)}
           <span className="n-ad-prix" data-ad-prix={a.prix != null ? '1' : '0'}>{a.prix != null ? euros(a.prix) : '—'}</span>
-          {a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null}
+          <span className="n-inv-statut" data-inv-statut={a.etat} role="img" aria-label={statutMot} title={statutMot}/>
           <span className="n-ad-espace"/>
           {onGestes && !selection ? <BoutonPlus a={a} onGestes={onGestes} className="n-ad-plus"/> : null}
         </span>
-        {trace ? <span className="n-ad-trace" data-ad-trace={trace.par}>{texteTrace(trace)}</span> : null}
       </span>
     </div>
   );
