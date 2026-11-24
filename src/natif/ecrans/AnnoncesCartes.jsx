@@ -143,4 +143,21 @@ export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selec
   );
 }
 
+// (24 nov., vitesse) LA RANGÉE NE SE RE-REND QUE SI CE QU'ELLE MONTRE CHANGE. Mesuré (banc vitesse-iphone, 390 ×4, volume de
+// Julien) : chaque paquet de rangées posé en défilant (src/composants/ParPaquets.jsx) et chaque lettre de la recherche
+// re-rendaient TOUTES les rangées déjà posées. Comparé : l'article (même objet = même contenu, src/articles/modele.js ne
+// le recopie pas), la forme, la sélection (cochée, cochable), le conseil « plus vue », les attributs, l'icône et la photo.
+// Les fonctions ne sont PAS comparées : l'écran passe des fonctions STABLES qui appellent la dernière version
+// (`onOuvrir`, `onGestes`, `selection.onBascule` : src/natif/ecrans/Annonces.jsx) ; `euros`, `depuisTexte`, `nomSite` sont
+// des mises en forme pures (même entrée, même texte).
+const memesAttrs = (x, y) => { if (x === y) return true; if (!x || !y) return false; const k = Object.keys(x); if (k.length !== Object.keys(y).length) return false; for (const c of k) if (x[c] !== y[c]) return false; return true; };
+export function rangeeArticleEgale(p, q) {
+  if (p.a !== q.a || p.forme !== q.forme || p.plusVue !== q.plusVue || p.Icon !== q.Icon || p.Photo !== q.Photo) return false;
+  if (!!p.onGestes !== !!q.onGestes) return false;
+  const s = p.selection, t = q.selection;
+  if (!!s !== !!t || (s && (s.cochee !== t.cochee || s.cochable !== t.cochable))) return false;
+  return memesAttrs(p.attrs, q.attrs);
+}
+export const RangeeArticleMemo = React.memo(RangeeArticle, rangeeArticleEgale);
+
 export default CarteAnnonce;

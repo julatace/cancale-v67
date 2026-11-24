@@ -74,6 +74,8 @@ jobs:
         run: node scripts/tests/outils-articles-vinted-interface.cjs
       - name: Vérifier le bilan de synchronisation
         run: node scripts/tests/bilan-synchronisation-interface.cjs
+      - name: Vérifier les rangées d'Annonces gardées (un paquet ne re-rend pas les autres)
+        run: node scripts/tests/rangees-gardees-interface.cjs
       - name: Vérifier les relectures de conversation
         run: node scripts/tests/conversation-relecture-interface.cjs
       - name: Vérifier les brouillons des annonces

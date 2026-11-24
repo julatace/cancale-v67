@@ -45,7 +45,7 @@ import './annonces.css';
 import AnnoncesTableau from './AnnoncesTableau.jsx';   // (19 nov. soir) l'ordinateur : le tableau de travail
 import { Glyphe } from '../icones.jsx';
 import { groupesParCompte, lireReplis, ecrireReplis } from './annoncesComptes.js';   // (20 nov.) la liste divisée par compte
-import { CarteAnnonce, RangeeArticle, lireVueTel, ecrireVueTel, traceDe, texteTrace, seulementBloque, bandeauDe, tailleDansTitre } from './AnnoncesCartes.jsx';   // (21 nov.) la grille « Dressing »
+import { CarteAnnonce, RangeeArticle, RangeeArticleMemo, lireVueTel, ecrireVueTel, traceDe, texteTrace, seulementBloque, bandeauDe, tailleDansTitre } from './AnnoncesCartes.jsx';   // (21 nov.) la grille « Dressing »
 import { depuisMaj } from '../TableauTravail.jsx';
 import { useParPaquets } from '../../composants/ParPaquets.jsx';   // (23 nov., latence-2) les rangées du téléphone par paquets
 
@@ -177,6 +177,12 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   // (19 nov., fiche directe — Julien : « je dois cliquer sur la paire puis […] pour avoir des informations ») UN toucher : un
   // article qui a son N° ouvre LA fiche complète (`onFiche`) ; sans N°, la fiche courte d'ici (il n'a pas encore de fiche).
   const ouvrir = (a) => { if (A) basculer(a); else if (onFiche && a.numero) onFiche(a); else setOuvert(a.cle); };
+  // (24 nov., vitesse) Des fonctions STABLES pour les rangées gardées (`RangeeArticleMemo`) : elles appellent toujours la
+  // dernière version (`ouvrir`, `basculer` changent avec la sélection et l'atelier).
+  const refOuvrir = React.useRef(ouvrir); refOuvrir.current = ouvrir;
+  const refBasculer = React.useRef(basculer); refBasculer.current = basculer;
+  const ouvrirStable = React.useCallback((a) => refOuvrir.current(a), []);
+  const gestesStable = React.useCallback((x) => setGestesDe(x.cle), []);
   const saisir = (a, champ) => setSaisie({ article: a, champ });
   const articleOuvert = ouvert ? liste.find((a) => a.cle === ouvert) || null : null;
   const nSite = (s) => (comptes && comptes[s] ? comptes[s][filtre.etat] : null);
@@ -320,8 +326,8 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   );
   // La liste « Articles » au téléphone (21 nov., 2e passe) : `RangeeArticle`, forme A ou B (`formeRangee`), pleine largeur, filets fins.
   const rangeeTel = (a, cleCompte) => (
-    <RangeeArticle key={a.cle + '|' + cleCompte} a={a} forme={formeRangee} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte}
-      nomSite={nomSite} Icon={Icon} Photo={Photo} plusVue={plusVueDe && !A ? plusVueDe(a) : null} selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), onBascule: () => basculer(a) } : null}
+    <RangeeArticleMemo key={a.cle + '|' + cleCompte} a={a} forme={formeRangee} onOuvrir={ouvrirStable} onGestes={gestesStable} euros={euros} depuisTexte={depuisTexte}
+      nomSite={nomSite} Icon={Icon} Photo={Photo} plusVue={plusVueDe && !A ? plusVueDe(a) : null} selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), onBascule: () => refBasculer.current(a) } : null}
       attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined, 'data-eg-compte': cleCompte }}/>
   );
   const enTeteCompte = (g, n) => {
