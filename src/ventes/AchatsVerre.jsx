@@ -24,7 +24,7 @@ export function CodeComptoir({ code, lieu = '', adresse = '', plan = null, trans
         <span className="va-grab" aria-hidden="true"/>
         <button type="button" className="va-fx" aria-label={tr('va.comptoir.fermer')} onClick={onFermer}><IconeV nom="x" taille={18} trait={2.2}/></button>
         <p className="va-fc-t">{tr('va.comptoir.titre')}</p>
-        <div className="va-fc-code" data-va-code-cases={String(code).length} aria-label={String(code).split('').join(' ')}>
+        <div className="va-fc-code vrm-sensible" data-stream-type="code" data-va-code-cases={String(code).length} aria-label={String(code).split('').join(' ')}>
           {String(code).split('').map((c, i) => <i key={i} aria-hidden="true">{c}</i>)}
         </div>
         <p className="va-fc-l"><IconeV nom="sun" taille={15}/>{tr('va.comptoir.lumiere')}</p>

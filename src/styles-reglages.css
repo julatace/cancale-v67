@@ -31,6 +31,9 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 .vrm-set-val { font-size:15px; flex-shrink:0; max-width:45%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .vrm-set-chev { flex-shrink:0; opacity:.4; }
 .vrm-set-champ { flex:0 1 55%; min-width:0; border:0 !important; background:transparent !important; text-align:right; font-size:15px; font-family:inherit; padding:8px 0; outline:none; box-shadow:none !important; }
+/* (22 nov., bugs-totale) Le champ est posé sur un fond gris arrondi (design) : sans marge intérieure, « Facultatif » et le texte
+   tapé collaient à son bord droit, coupés par l'arrondi. */
+html body .vrm-set .vrm-set-champ { padding-left: 12px !important; padding-right: 12px !important; box-sizing: border-box; }
 .vrm-set-profil { display:flex; align-items:center; gap:14px; padding:16px; border-radius:12px; margin:0 0 32px; }
 .vrm-set-profil > span:last-child { flex:1; min-width:0; }
 .vrm-set-avatar { width:52px; height:52px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:600; }
@@ -93,6 +96,8 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 .vrm-settings-intro { margin:0 0 18px; font-size:13px; line-height:1.6; }
 /* (22 nov., bugs-totale) Au téléphone, la barre du haut porte déjà « ‹ Paramètres » : pas un second retour dans la page. */
 @media (max-width: 1023px) { html body .vrm-settings-back { display:none !important; } }
+/* (22 nov., bugs-totale) …et une catégorie / un panneau de Paramètres : la barre porte « ‹ Paramètres » (ou la catégorie). */
+@media (max-width: 1023px) { html body .vrm-set[data-reglages-disposition="telephone"] .ux-pm-barre .ux-pm-retour { display:none !important; } }
 .vrm-settings-back { display:inline-flex; align-items:center; min-height:44px; padding:8px 13px; margin-bottom:12px; border:1px solid; border-radius:12px; background:transparent; font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
 .vrm-settings-guide { border:1px solid; border-radius:12px; margin:10px 0 14px; overflow:hidden; }
 .vrm-settings-guide summary { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; cursor:pointer; font-size:13px; font-weight:600; line-height:1.5; }
