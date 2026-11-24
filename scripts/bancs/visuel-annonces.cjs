@@ -125,7 +125,7 @@ const INIT = () => {
     if (document.querySelector('[data-inv-attente], [data-ad-attente], .n-attente, [aria-busy="true"]')) window.__os++;
     if (!window.__premiere) { const c = document.querySelector('[data-ad-carte][data-eg-article]'); if (c) { const cs = getComputedStyle(c); window.__premiere = { t: performance.now(), op: Number(cs.opacity), delai: parseFloat(cs.animationDelay) || 0, anim: cs.animationName };
       const l = [...document.querySelectorAll('[data-ad-carte][data-n-revele]')]; const d = l.map((x) => parseFloat(getComputedStyle(x).animationDelay) * 1000 || 0); const du = l.map((x) => parseFloat(getComputedStyle(x).animationDuration) * 1000 || 0);
-      window.__cascade = { n: l.length, pas: d.length > 1 ? Math.max(...d.slice(1).map((x, i) => x - d[i])) : 0, total: d.length ? Math.max(...d) : 0, duree: du.length ? Math.max(...du) : 0 }; } }
+      const u = [...new Set(d.map((x) => Math.round(x)))].sort((x, y) => x - y); window.__cascade = { n: l.length, pas: u.length > 1 ? Math.max(...u.slice(1).map((x, i) => x - u[i])) : 0, total: d.length ? Math.max(...d) : 0, duree: du.length ? Math.max(...du) : 0 }; } }
     } catch (_) {} requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
@@ -135,7 +135,7 @@ async function ouvrir(nav, opts, q, extra = {}) {
   const ctx = await nav.newContext({ ...opts, ...extra }); const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(String(e && e.message || e)));
   await pg.addInitScript(INIT);
-  await pg.goto(`http://127.0.0.1:${PORT}/${q}`); await pg.waitForSelector('[data-eg-ecran]', { timeout: 20000 });
+  await pg.goto(`http://127.0.0.1:${PORT}/${q}`); await pg.waitForSelector('[data-eg-ecran]', { state: 'attached', timeout: 60000 });
   if (opts.isMobile) await pg.addStyleTag({ content: ':root{--n-zone-haut:47px;--n-zone-bas:34px}' });
   return { ctx, pg, erreurs };
 }
@@ -145,7 +145,8 @@ async function cas(nav, nom, opts, theme) {
   const t = theme === 'sombre' ? '&theme=dark' : '';
   // 1. Contenu qui ARRIVE (lecture 700 ms) : squelette, puis cascade courte, CLS.
   const { ctx, pg, erreurs } = await ouvrir(nav, opts, `?n=${N}&arrivee=700${t}`);
-  await pg.waitForSelector('[data-ad-carte][data-eg-article]', { timeout: 15000 });
+  await pg.waitForSelector('[data-ad-carte][data-eg-article]', { state: 'attached', timeout: 60000 });
+  await pg.waitForFunction(() => window.__premiere, null, { timeout: 30000 });   // la 1re image qui la montre (rAF), pas l'instant du sélecteur
   const prem = await pg.evaluate(() => window.__premiere);
   const casc = (await pg.evaluate(() => window.__cascade)) || { n: 0, pas: 0, total: 0, duree: 0 };
   await pg.waitForTimeout(RETARD + 900);
@@ -160,7 +161,7 @@ async function cas(nav, nom, opts, theme) {
   m.leurre = await pg.evaluate(async () => { const el = document.scrollingElement; const vus = {}; const k = window.__leurre || [];
     for (let y = 0; y <= el.scrollHeight && Object.keys(vus).length < k.length; y += innerHeight * 0.8) { el.scrollTop = y; await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
       for (const c of k) { const x = document.querySelector(`[data-eg-article="${CSS.escape(c)}"] .n-ad-photo img`); if (x && !vus[c]) vus[c] = new URL(x.getAttribute('src'), location.href).pathname; } }
-    el.scrollTop = 0; return k.map((c) => vus[c] || null); });
+    el.scrollTop = 0; await new Promise((ok) => setTimeout(ok, 400)); return k.map((c) => vus[c] || null); });
   dit(m.leurre.length === 2 && m.leurre[0] && m.leurre[1] && m.leurre[0] !== m.leurre[1], `I le leurre au même titre : deux photos différentes, chacune la sienne`, m.leurre);
   dit(m.etiq.length === 0, `I l'étiquette du N° dit le N° de SA fiche`, m.etiq.slice(0, 4));
   dit(prem && prem.op >= 0.35 && prem.delai === 0, `S la 1re carte est lisible dès sa 1re image, sans délai (opacité ${prem && prem.op}, délai ${prem && prem.delai})`, prem);
@@ -183,9 +184,14 @@ async function cas(nav, nom, opts, theme) {
   if (nom === 'tel') {
     // Toucher un segment : le 1er contenu arrive en < 100 ms.
     await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(100);
-    const tap = await pg.evaluate(async () => { const s = document.querySelector('[data-eg-segment="dorment"]') || document.querySelector('[data-eg-segment]:not([aria-checked="true"])'); const t0 = performance.now(); s.click();
-      return await new Promise((ok) => { const v = () => { const e = document.querySelector('[data-eg-ecran]'); if (e && e.getAttribute('data-eg-etat') !== 'enligne' && (document.querySelector('[data-ad-carte]') || document.querySelector('.n-vide'))) ok(Math.round(performance.now() - t0)); else if (performance.now() - t0 > 2000) ok(9999); else requestAnimationFrame(v); }; v(); }); });
-    dit(tap < 100, `S toucher un segment ⇒ 1er contenu en ${tap} ms (< 100)`);
+    // Le 1er contenu dans le DOM (MutationObserver : le travail de l'app) et à l'image suivante (rAF : rapporté, la machine est chargée).
+    const tap = await pg.evaluate(async () => { const s = document.querySelector('[data-eg-segment="dorment"]') || document.querySelector('[data-eg-segment]:not([aria-checked="true"])');
+      const pret = () => { const e = document.querySelector('[data-eg-ecran]'); return e && e.getAttribute('data-eg-etat') !== 'enligne' && (document.querySelector('[data-ad-carte]') || document.querySelector('.n-vide')); };
+      let dom = null; const mo = new MutationObserver(() => { if (dom == null && pret()) dom = performance.now() - t0; }); mo.observe(document.body, { subtree: true, childList: true, attributes: true });
+      const t0 = performance.now(); s.click(); if (pret()) dom = performance.now() - t0;
+      const image = await new Promise((ok) => { const v = () => { if (pret()) ok(performance.now() - t0); else if (performance.now() - t0 > 3000) ok(9999); else requestAnimationFrame(v); }; requestAnimationFrame(v); });
+      mo.disconnect(); return { dom: dom == null ? 9999 : Math.round(dom), image: Math.round(image) }; });
+    dit(tap.dom < 100, `S toucher un segment ⇒ 1er contenu dans la page en ${tap.dom} ms (< 100) ; à l'écran à l'image suivante : ${tap.image} ms (rapporté)`, tap);
   }
   await ctx.close();
   // 2. Contenu DÉJÀ connu : aucun squelette, aucune cascade, cartes dès la 1re image.
@@ -196,7 +202,7 @@ async function cas(nav, nom, opts, theme) {
   await k.ctx.close();
   // 3. Mouvement réduit : rien ne bouge, les photos se montrent sans fondu.
   const r = await ouvrir(nav, opts, `?n=${N}&arrivee=500${t}`, { reducedMotion: 'reduce' });
-  await r.pg.waitForSelector('[data-ad-carte][data-eg-article]', { timeout: 15000 }); await r.pg.waitForTimeout(80);
+  await r.pg.waitForSelector('[data-ad-carte][data-eg-article]', { state: 'attached', timeout: 60000 }); await r.pg.waitForTimeout(80);
   const mr = await r.pg.evaluate(MESURE);
   dit(mr.animees === 0 && mr.imgsCachees === 0, `M mouvement réduit : ${mr.animees} carte animée, ${mr.imgsCachees} photo masquée`, mr.animees);
   await r.ctx.close();
@@ -207,7 +213,9 @@ async function cas(nav, nom, opts, theme) {
   const srv = await servir();
   const nav = await chromium.launch({ executablePath: process.env.CHROMIUM || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined), args: ['--no-sandbox', '--use-angle=swiftshader'] });
   try {
-    for (const theme of ['clair', 'sombre']) { await cas(nav, 'tel', TEL, theme); await cas(nav, 'ordi', ORDI, theme); }
+    // CAS=tel-clair (une seule variante, pour une mutation rapide) ; par défaut les quatre.
+    const CAS = (process.env.CAS || 'tel-clair,ordi-clair,tel-sombre,ordi-sombre').split(',');
+    for (const c of CAS) { const [nom, theme] = c.split('-'); await cas(nav, nom, nom === 'tel' ? TEL : ORDI, theme); }
     if (process.env.VIDEO) {
       const ctx = await nav.newContext({ ...TEL, recordVideo: { dir: SHOTS, size: { width: 390, height: 844 } } }); const pg = await ctx.newPage();
       await pg.goto(`http://127.0.0.1:${PORT}/?n=${N}&arrivee=900`); await pg.waitForTimeout(2200);

@@ -37,10 +37,12 @@ export default function GrilleInventaire({ items, cle = (x) => x && x.cle, rendu
   const ref = React.useRef(null);
   const [largeur, setLargeur] = React.useState(ESTIME_LARGEUR);
   const [fenetre, setFenetre] = React.useState({ a: 0, b: 4 });
-  // Elle a VU la lecture (squelette) puis l'arrivée : la cascade d'arrivée, 600 ms au plus. Contenu déjà connu ⇒ jamais.
-  const vu = React.useRef({ vide: items === undefined, le: 0 });
-  if (items === undefined) vu.current.vide = true; else if (vu.current.vide) { vu.current.vide = false; vu.current.le = Date.now(); }
-  const enRevele = revele || (!!vu.current.le && Date.now() - vu.current.le < 600);
+  // Elle a VU la lecture (squelette) puis l'arrivée : la cascade d'arrivée — sur CETTE liste seulement, et seulement pour les
+  // cases à l'écran à l'arrivée (leur rang est figé : un nouveau rendu ne la rejoue ni ne la coupe ; les cases montées plus tard
+  // en défilant, ou après un filtre, sont là tout de suite). Contenu déjà connu ⇒ jamais.
+  const vu = React.useRef({ vide: items === undefined, liste: null, rangs: null });
+  if (items === undefined) vu.current.vide = true; else if (vu.current.vide && Array.isArray(items)) { vu.current.vide = false; vu.current.liste = items; }
+  const enRevele = Array.isArray(items) && (revele || items === vu.current.liste);
   const n = Array.isArray(items) ? items.length : (items === undefined ? attente : 0);
   const g = geometrie(largeur, { min, colonnesTel, gap, corps });
   const rangees = Math.ceil(n / g.cols);
@@ -79,7 +81,10 @@ export default function GrilleInventaire({ items, cle = (x) => x && x.cle, rendu
     for (let i = de; i < a; i++) cases.push(<React.Fragment key={'os' + i}>{squelette ? squelette(i) : <span className="n-inv-os" aria-hidden="true"><span className="n-os n-inv-os-photo"/><span className="n-os n-inv-os-l"/><span className="n-os n-inv-os-l" data-court=""/></span>}</React.Fragment>);
   } else if (Array.isArray(items)) {
     // La cascade part de la 1re case À L'ÉCRAN (jamais retardée par celles d'au-dessus), plafonnée par `revele` (Jeu.jsx).
-    for (let i = de; i < a; i++) { const x = items[i]; cases.push(<React.Fragment key={cle(x) || i}>{rendu(x, i, enRevele ? reveleJeu(debut + i - de, '', true) : null)}</React.Fragment>); }
+    if (!enRevele) vu.current.rangs = null;
+    else if (!vu.current.rangs || vu.current.rangsDe !== items) { vu.current.rangsDe = items; vu.current.rangs = new Map(); for (let i = de; i < a; i++) vu.current.rangs.set(cle(items[i]), debut + i - de); }
+    const rangs = vu.current.rangs;
+    for (let i = de; i < a; i++) { const x = items[i]; const k = cle(x); cases.push(<React.Fragment key={k || i}>{rendu(x, i, rangs && rangs.has(k) ? reveleJeu(rangs.get(k), '', true) : null)}</React.Fragment>); }
   }
   return (
     <div ref={ref} className={cx('n-inv-grille', className)} style={{ ...style, height: hauteur }} data-inv-grille="" data-inv-n={String(n)} data-inv-cols={String(g.cols)}

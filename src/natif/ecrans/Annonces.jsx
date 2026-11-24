@@ -166,12 +166,12 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   // Chaque compte montre ses `max` premières annonces (« Voir N de plus » les allonge toutes) : un compte n'est jamais caché
   // derrière la pagination d'un autre.
   const groupes = React.useMemo(() => groupesParCompte(liste, filtre.site), [liste, filtre.site]);
-  // (24 nov., lot visuel-annonces) « Sans latence » : le contenu DÉJÀ connu s'affiche tel quel ; seul celui qui ARRIVE (la lecture
-  // finie pendant que l'écran est ouvert) se dévoile en cascade, pendant 600 ms au plus. Calculé AU RENDU (jamais un rendu de plus).
-  const arrivee = React.useRef({ vide: articles === undefined, le: 0 });
+  // (24 nov., lot visuel-annonces) « Sans latence » : le contenu DÉJÀ connu s'affiche tel quel ; seule la liste qui ARRIVE (la
+  // lecture finie pendant que l'écran est ouvert) se dévoile, une fois (GrilleInventaire fige les rangs). Calculé AU RENDU.
+  const arrivee = React.useRef({ vide: articles === undefined, liste: null });
   if (articles === undefined) arrivee.current.vide = true;
-  else if (arrivee.current.vide) { arrivee.current.vide = false; arrivee.current.le = Date.now(); }
-  const enArrivee = !!arrivee.current.le && Date.now() - arrivee.current.le < 600;
+  else if (arrivee.current.vide && Array.isArray(articles)) { arrivee.current.vide = false; arrivee.current.liste = articles; }
+  const enArrivee = Array.isArray(articles) && articles === arrivee.current.liste;
   const debutDe = (cle) => { let n = 0; for (const g of groupes) { if (g.cle === cle) return n; if (!replis.has(g.cle)) n += Math.min(g.articles.length, 4); } return n; };
   const resteGroupes = groupes.reduce((n, g) => n + Math.max(0, g.articles.length - max), 0);
   const A = action ? actions.find((x) => x.cle === action) : null;

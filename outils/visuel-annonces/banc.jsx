@@ -32,8 +32,8 @@ const photo = (i) => (i % 11 === 7 ? null : `/photo/${i}.svg`);
 const item = (i, extra = {}) => ({ id: String(10000 + i), title: MOD[i % MOD.length] + ' taille ' + (38 + (i % 8)), photo: photo(i), price: 27 + (i * 7) % 160 + (i % 3 ? 0 : 0.5), size: String(38 + (i % 8)),
   condition: 'Très bon état', brand: MARQ[i % MARQ.length], createdTs: NOW - ((i * 5) % 50) * J, favourites: i % 4 === 3 ? undefined : (i * 3) % 41, views: (i * 13) % 1400, url: '', ...extra });
 const lues = Array.from({ length: N }, (_, i) => item(i));
-// Le LEURRE : 10000 et 10001 portent le MÊME titre, chacune SA photo.
-lues[0].title = lues[1].title = 'Nike Air Max 90 blanc taille 42'; lues[0].createdTs = lues[1].createdTs = NOW - 60e3;   // en tête de liste
+// Le LEURRE : deux annonces du 1er compte affiché portent le MÊME titre, chacune SA photo.
+const L0 = Math.floor(N / 3) * 2; lues[L0].title = lues[L0 + 1].title = 'Nike Air Max 90 blanc taille 42'; lues[L0].createdTs = lues[L0 + 1].createdTs = NOW - 60e3;   // en tête de liste
 const tiers = Math.floor(N / 3);
 const comptes = [
   { uid: '111', pseudo: 'atelier.nord', ok: true, lu: NOW - 18 * 60e3, enLigne: lues.slice(0, tiers - 3), aConfirmer: lues.slice(tiers - 3, tiers - 1), masquees: lues.slice(tiers - 1, tiers), brouillons: [] },
@@ -52,15 +52,16 @@ window.__attendu = {}; for (const a of M.articles) { const id = a.annonces[0] &&
 window.__leurre = M.articles.filter((a) => a.titre === 'Nike Air Max 90 blanc taille 42').map((a) => a.cle);
 const euros = (x) => (Math.round(x * 100) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' €';
 const opts = { maintenant: NOW, seuil: 30 };
+const COMPTES = compterArticles(M.articles, opts);   // calculés une fois (l'app les mémorise aussi)
 function Banc() {
   const [filtre, setFiltre] = React.useState({ site: 'tous', etat: 'enligne' });
   const [q, setQ] = React.useState('');
   const [lu, setLu] = React.useState(ARRIVEE <= 0);
   React.useEffect(() => { if (lu) return undefined; const t = setTimeout(() => { window.__arriveeA = performance.now(); setLu(true); }, ARRIVEE); return () => clearTimeout(t); }, []);
   const sites = [...new Set(M.articles.flatMap((a) => a.sites))];
-  const liste = lu ? trierArticles(filtrerArticles(M.articles, { ...opts, ...filtre, recherche: q })) : undefined;
-  const lignesT = lu ? trierArticles(M.articles).map((a) => ({ a, statut: statutTableau(a, {}) })).filter((x) => x.statut) : undefined;
-  return <VueAnnonces articles={liste} comptes={compterArticles(M.articles, opts)} filtre={filtre} onFiltre={(f) => { window.__tapA = performance.now(); setFiltre(f); }} sites={sites} recherche={q} onRecherche={setQ} filtreSite={false}
+  const liste = React.useMemo(() => (lu ? trierArticles(filtrerArticles(M.articles, { ...opts, ...filtre, recherche: q })) : undefined), [lu, filtre, q]);
+  const lignesT = React.useMemo(() => (lu ? trierArticles(M.articles).map((a) => ({ a, statut: statutTableau(a, {}) })).filter((x) => x.statut) : undefined), [lu]);
+  return <VueAnnonces articles={liste} comptes={COMPTES} filtre={filtre} onFiltre={(f) => { window.__tapA = performance.now(); setFiltre(f); }} sites={sites} recherche={q} onRecherche={setQ} filtreSite={false}
     actions={[]} onAction={() => {}} onFait={async () => ({ ok: true })} onPrix={() => {}} onRelier={() => {}} onFiche={(a) => { window.__fiche = a.cle; }}
     travail={{ site: 'tous', articles: lignesT, filtres: [], compte: '', majLe: lu ? NOW - 18 * 60e3 : undefined, onRafraichir: () => {} }}
     Photo={(src, o) => <img src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>}
