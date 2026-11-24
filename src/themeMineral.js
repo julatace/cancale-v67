@@ -69,7 +69,7 @@ export const MINERAL_DARK = Object.freeze({
  bg:'#1C1C20',haut:'#27272B',surface:'#2A2A2F',card:'#2A2A2F',card2:'#323238',
  border:'#42424A',text:'#FFFFFF',muted:'#B8B8C0',faint:'#B8B8C0',
  accent:'#F4F4F5',accentTexte:'#F4F4F5',accentSoft:'#D4D4D8',onAccent:'#18181B',
- danger:'#FFC266',doublon:'#FF7A6E',warn:'#FFC266',onWarn:'#1C1300',warnSoft:'#3A3020',gold:'#FFC266',blue:'#B8B8C0',purple:'#B8B8C0',
+ danger:'#F4F4F5',doublon:'#FF7A6E',warn:'#F4F4F5',onWarn:'#18181B',warnSoft:'#38383E',gold:'#F4F4F5',blue:'#B8B8C0',purple:'#B8B8C0',
  shadow:'none',shadowMd:'0 0 0 1px rgba(255,255,255,.02)',shadowLg:'0 8px 30px rgba(0,0,0,.45)',
  ring:'rgba(244,244,245,.30)',glass:'#2A2A2F',bar:'#1C1C20',hair:'rgba(255,255,255,.10)',
  sidebar:'#232327',chrome:'#1C1C20',onChrome:'#FFFFFF',chromeMuted:'#B8B8C0',chromeLine:'#42424A',

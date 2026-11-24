@@ -8,10 +8,10 @@
   --s-gris: var(--d-gris, var(--vrm-muted, #6E6E73));
   --s-filet: var(--d-filet, rgba(60,60,67,.18));
   --s-remplir: var(--d-remplir, rgba(118,118,128,.12));
-  --s-ambre: var(--d-ambre, #B25E00);
+  --s-ambre: var(--d-ambre, var(--n-ambre));
   display: flex; flex-direction: column; gap: 12px; padding: 4px 0 8px; color: var(--s-encre);
 }
-:root[data-theme="dark"] .vrm-sim { --s-ambre: var(--d-ambre, #FFB340); }
+:root[data-theme="dark"] .vrm-sim { --s-ambre: var(--d-ambre, var(--n-ambre)); }
 .vrm-sim-intro { margin: 0; font-size: 14px; color: var(--s-gris); }
 .vrm-sim-lancer { align-self: flex-start; min-height: 44px; }
 .vrm-sim-bilan { margin: 0; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }

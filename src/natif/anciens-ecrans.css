@@ -39,8 +39,8 @@ html {
   --ap-plein: var(--n-plein, #16181D);
   --ap-sur-plein: var(--n-sur-plein, #FFFFFF);
   --ap-teinte: var(--n-teinte, rgb(11 81 57 / .12));
-  --ap-ambre: var(--n-ambre, #8A4B00);
-  --ap-ambre-fond: var(--n-ambre-fond, #FFF4DD);
+  --ap-ambre: var(--n-ambre, var(--n-ambre));
+  --ap-ambre-fond: var(--n-ambre-fond, var(--n-ambre-fond));
   --ap-ambre-point: var(--n-accent, #3D4B5B);   /* (23 nov.) plus d orange */
   --ap-matiere: rgb(249 249 249 / .94);
   --ap-flou: saturate(180%) blur(20px);
@@ -64,9 +64,9 @@ html[data-theme="dark"] {
   --ap-plein: var(--n-plein, #16181D);
   --ap-sur-plein: var(--n-sur-plein, #FFFFFF);
   --ap-teinte: var(--n-teinte, rgb(244 244 245 / .20));
-  --ap-ambre: var(--n-ambre, #FFB340);
-  --ap-ambre-fond: var(--n-ambre-fond, rgb(255 179 64 / .16));
-  --ap-ambre-point: #FF9F0A;
+  --ap-ambre: var(--n-ambre, var(--n-ambre));
+  --ap-ambre-fond: var(--n-ambre-fond, color-mix(in srgb, var(--n-ambre) 16%, transparent));
+  --ap-ambre-point: var(--n-ambre);
   --ap-matiere: rgb(22 22 24 / .90);
   --ap-ombre-wallet: 0 8px 30px rgb(0 0 0 / .5);
   color-scheme: dark;
@@ -136,15 +136,15 @@ html:root {
   --v2-filet: var(--ap-filet) !important; --v2-socle: var(--ap-fond) !important;
   --v2-ambre: var(--ap-ambre) !important; --v2-ambre-point: var(--ap-ambre-point) !important;
   /* L'étiquette N° kraft : gardée, plus calme (moins saturée). */
-  --v2-kraft: #F1EADC !important; --v2-kraft-encre: #2E2619 !important; --v2-kraft-doux: #6B5C44 !important;
+  --v2-kraft: var(--n-ambre-fond) !important; --v2-kraft-encre: #2E2619 !important; --v2-kraft-doux: #6B5C44 !important;
   --v2-kraft-bord: rgb(46 38 25 / .16) !important; --v2-kraft-trou: var(--ap-carte) !important;
 }
 html[data-theme="dark"]:root {
   --sb-puits: var(--ap-remplir) !important;
   --sb-ombre-avant: 0 0 0 .5px rgb(255 255 255 / .08), 0 12px 40px -12px rgb(0 0 0 / .9) !important;
   --v2-socle: var(--ap-carte-2) !important; --sb-socle: var(--ap-carte-2) !important;
-  --v2-kraft: #34302A !important; --v2-kraft-encre: #EFE6D6 !important; --v2-kraft-doux: #C4B69E !important;
-  --v2-kraft-bord: rgb(239 230 214 / .18) !important;
+  --v2-kraft: #34302A !important; --v2-kraft-encre: var(--n-ambre-fond) !important; --v2-kraft-doux: #C4B69E !important;
+  --v2-kraft-bord: color-mix(in srgb, var(--n-ambre-fond) 18%, transparent) !important;
 }
 /* Les familles posées sur un CONTENEUR (pas la racine) : les Paires (studio-paires.css) et Ma journée (studio-journee.css). */
 html :is([data-espace="paires"], .vrm-paires-selecteur, .vrm-fp, .vrm-main[data-ecran="annonces"], .vrm-main[data-ecran="garage"], .vrm-main[data-ecran="inventory"], .sj-journee) {
@@ -242,7 +242,7 @@ html body .vrm-app-shell .vrm-tabbar > .vrm-tab { color: var(--ap-gris) !importa
 html body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] { color: var(--ap-bleu-teinte) !important; }
 html body .vrm-app-shell .vrm-tabbar > .vrm-tab::before, html body .vrm-app-shell .vrm-tabbar > .vrm-tab::after { background: transparent !important; }
 /* La pastille rouge d'iOS est réservée par §7 à deux paires sous un N° : celle de la barre reste ambre (le geste à faire). */
-html body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { background: #F2A516 !important; color: #2B1700 !important; box-shadow: none !important; }
+html body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { background: var(--n-ambre) !important; color: #2B1700 !important; box-shadow: none !important; }
 /* La barre collée d'une liste (recherche) : le fond, sans verre. */
 html body :is(.vrm-annbar, .vrm-achats-barre) { background-image: none !important; }
 

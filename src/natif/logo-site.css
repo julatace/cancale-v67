@@ -1,3 +1,4 @@
+/* orange-permis-fichier : les LOGOS des sites (Leboncoin, eBay) — leurs marques (audit-sans-orange.cjs) */
 /* Le logo du site d'une rangée (src/natif/LogoSite.jsx) : la forme du fichier, la couleur du site. */
 @layer vrm-natif {
   .n-logo-site { display: inline-block; flex: 0 0 auto; vertical-align: -3px; width: 16px; height: 16px; background: var(--n-encre);

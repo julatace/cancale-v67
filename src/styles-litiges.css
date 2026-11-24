@@ -11,13 +11,13 @@
   --lit-tuile: var(--w-remplir, rgba(118,118,128,.12));
   --lit-encre: var(--w-encre, #1D1D1F);
   --lit-gris: var(--w-gris, #6E6E73); 
-  --lit-ambre-fond: rgba(255,149,0,.14);
-  --lit-ambre: #A35200;
+  --lit-ambre-fond: color-mix(in srgb, var(--n-ambre) 14%, transparent);
+  --lit-ambre: var(--n-ambre);
   --lit-ok: #1D1D1F;
 }
 :root[data-theme="dark"] {
-  --lit-ambre-fond: rgba(255,159,10,.20);
-  --lit-ambre: #FFB340;
+  --lit-ambre-fond: color-mix(in srgb, var(--n-ambre) 20%, transparent);
+  --lit-ambre: var(--n-ambre);
   --lit-ok: #F5F5F7;
 }
 

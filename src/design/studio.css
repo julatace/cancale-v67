@@ -52,8 +52,8 @@
   --sb-encre-2: #3F5468;
   --sb-diode: #16181D;
   --sb-lien: #16181D;
-  --sb-ambre: #764300;
-  --sb-ambre-point: #E08A12;
+  --sb-ambre: var(--n-ambre);
+  --sb-ambre-point: var(--n-ambre);
   /* L'ombre : UNE lumière, au-dessus ; sa teinte est celle du bleu (triplet RVB). */
   --sb-o: 18 52 96;
   --sb-ombre-pose: none;
@@ -98,7 +98,7 @@
   --sb-haut: #27272B; --sb-aplat: #19191C; --sb-bas: #0F0F10; --sb-halo: rgb(244 244 245 / .10);
   --sb-porcelaine: #27272B; --sb-porcelaine-2: #212126; --sb-creux: #131316; --sb-socle: #2E2E34;
   --sb-verre: rgb(41 41 46 / .62); --sb-verre-plan: rgb(35 35 39 / .82); --sb-puits: rgb(0 0 0 / .22);
-  --sb-encre: #F1F2F4; --sb-encre-2: #9CB0C6; --sb-diode: #F4F4F5; --sb-lien: #F4F4F5; --sb-ambre: #F2B65E; --sb-ambre-point: #F2A33A;
+  --sb-encre: #F1F2F4; --sb-encre-2: #9CB0C6; --sb-diode: #F4F4F5; --sb-lien: #F4F4F5; --sb-ambre: var(--n-ambre); --sb-ambre-point: var(--n-ambre);
   --sb-o: 0 0 0;
   --sb-ombre-pose: none;
   --sb-ombre-plan: none;
@@ -119,7 +119,7 @@
     --sb-haut: #27272B; --sb-aplat: #19191C; --sb-bas: #0F0F10; --sb-halo: rgb(244 244 245 / .10);
     --sb-porcelaine: #27272B; --sb-porcelaine-2: #212126; --sb-creux: #131316; --sb-socle: #2E2E34;
     --sb-verre: rgb(41 41 46 / .62); --sb-verre-plan: rgb(35 35 39 / .82); --sb-puits: rgb(0 0 0 / .22);
-    --sb-encre: #F1F2F4; --sb-encre-2: #9CB0C6; --sb-diode: #F4F4F5; --sb-lien: #F4F4F5; --sb-ambre: #F2B65E; --sb-ambre-point: #F2A33A;
+    --sb-encre: #F1F2F4; --sb-encre-2: #9CB0C6; --sb-diode: #F4F4F5; --sb-lien: #F4F4F5; --sb-ambre: var(--n-ambre); --sb-ambre-point: var(--n-ambre);
     --sb-o: 0 0 0;
     --sb-ombre-pose: none;
     --sb-ombre-plan: none;
@@ -157,7 +157,7 @@
   --d-segment: var(--sb-porcelaine);
   --d-encre: var(--sb-encre); --d-gris: var(--sb-encre-2); --d-glyphe: #8399AE;
   --d-accent: var(--sb-diode); --d-accent-texte: var(--sb-lien);
-  --d-ambre: var(--sb-ambre); --d-point-ambre: var(--sb-ambre-point); --d-ambre-fond: #F8EBD8;
+  --d-ambre: var(--sb-ambre); --d-point-ambre: var(--sb-ambre-point); --d-ambre-fond: var(--n-ambre-fond);
   --d-r-carte: var(--sb-r-tuile); --d-r-case: 12px; --d-r-num: var(--sb-r-plaque);
   --d-ombre-carte: var(--sb-ombre-plan); --d-ombre-douce: none; --d-ombre-douce-haute: none;
   --d-ombre-flottant: var(--sb-ombre-avant); 

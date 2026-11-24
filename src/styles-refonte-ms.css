@@ -68,7 +68,7 @@
   flex: none !important; min-height: 32px !important; height: 32px !important; padding: 0 12px !important; border-radius: 999px !important; border: 0 !important;
   font: 600 13px/1 var(--vrm-police) !important; background: var(--d-pastille-neutre-fond, rgba(118,118,128,.12)) !important; color: var(--d-encre, #1D1D1F) !important; box-shadow: none !important;
 }
-:root:root body .vrm-ms-stock-resume .vrm-pop-chip.is-ambre { background: var(--d-pastille-ambre-fond, rgba(255,159,10,.14)) !important; color: var(--d-pastille-ambre, #B25000) !important; }
+:root:root body .vrm-ms-stock-resume .vrm-pop-chip.is-ambre { background: var(--d-pastille-ambre-fond, color-mix(in srgb, var(--n-ambre) 14%, transparent)) !important; color: var(--d-pastille-ambre, var(--n-ambre)) !important; }
 :root:root body .vrm-ms-stock-resume .vrm-s2d-filtres { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 8px !important; margin: 0 !important; padding: 0 !important; background: none !important; }
 :root:root body .vrm-ms-stock-resume .vrm-s2d-filtres > .vrm-ui-filtres { flex: 1 1 auto !important; margin-right: 0 !important; }
 /* la recherche : un vrai champ, collé en haut — (20 nov., chasse-bugs-2) 44 px : à 40 px elle passait sous la cible du doigt (banc parcours-chasse) */

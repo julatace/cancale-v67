@@ -1,3 +1,4 @@
+// orange-permis-fichier : le stock en 3D : parquet, carton kraft, lumière — des objets réels dessinés (audit-sans-orange.cjs)
 // ── STOCK 3D — chargé À LA DEMANDE (Vitesse 5) ───────────────────────────────
 // Sorti de src/App.jsx (fichier unique de ~37 000 lignes) pour alléger le bundle
 // initial : ce gros bloc 3D (~1250 lignes + `three`, déjà en import dynamique) ne

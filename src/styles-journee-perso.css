@@ -67,9 +67,9 @@
 /* ── 3. « Affichée car urgent » (ambre : un geste à faire, jamais le rouge) ── */
 .vrm-jp-urgent {
   display: block; font-size: 12px; font-weight: 600; line-height: 1.3;
-  color: var(--p-ambre-texte, #B25000);
+  color: var(--p-ambre-texte, var(--n-ambre));
 }
-.vrm-jv2-prochain .vrm-jp-urgent { color: #FFB340; }
+.vrm-jv2-prochain .vrm-jp-urgent { color: var(--n-ambre); }
 
 @media (prefers-reduced-motion: reduce) {
   .vrm-jp-ligne { transition: none; }

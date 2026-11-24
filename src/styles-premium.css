@@ -50,8 +50,8 @@
   --p-filet: rgba(60,60,67,.14);
   --p-accent: #16181D;
   --p-accent-texte: #16181D;
-  --p-ambre-point: #FF9F0A;
-  --p-ambre-texte: #B25000;
+  --p-ambre-point: var(--n-ambre);
+  --p-ambre-texte: var(--n-ambre);
   /* Ombre : un seul niveau posé, presque rien — la surface blanche sur le gris suffit */ 
   --p-ombre-sombre: 0 1px 2px rgba(0,0,0,.10), 0 12px 32px -14px rgba(26,26,30,.45);
   /* La carte sombre : un bleu nuit, plus calme (moins de halo) */
@@ -72,7 +72,7 @@
   --p-filet: rgba(84,84,88,.55);
   --p-accent: #16181D;
   --p-accent-texte: #F4F4F5;
-  --p-ambre-texte: #FFB340; 
+  --p-ambre-texte: var(--n-ambre); 
   --p-ombre-sombre: 0 0 0 .5px rgba(255,255,255,.08);
   /* (9 nov.) En sombre, le bas de la carte ne finit plus au gris des cartes (#1C1C1E) : il reste bleu nuit (banc journee-coherence E4). */
   --p-nuit: radial-gradient(120% 140% at 100% 0%, #43434B 0%, #2C2C32 50%, #26262A 100%);
@@ -993,7 +993,7 @@
 .vrm-fs.vrm-confirmation[data-confirmation="irreversible"] .vrm-b.vrm-b-primaire {
   background: var(--p-ambre-texte) !important; color: #FFFFFF !important; box-shadow: none !important;
 }
-:root[data-theme="dark"] .vrm-fs.vrm-confirmation[data-confirmation="irreversible"] .vrm-b.vrm-b-primaire { background: #FFB340 !important; color: #1C1C1E !important; }
+:root[data-theme="dark"] .vrm-fs.vrm-confirmation[data-confirmation="irreversible"] .vrm-b.vrm-b-primaire { background: var(--n-ambre) !important; color: #1C1C1E !important; }
 
 /* 13.2 UNE FEUILLE QUI NE PEUT PAS SE FERMER (`bloque`, un envoi en cours) : sa croix
    reste à sa place, éteinte ; la toucher dit pourquoi (le `title`, lu par Toaster). */

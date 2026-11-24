@@ -20,13 +20,13 @@
 .vrm-cb-pastille {
   flex: 0 0 32px; width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 17px; line-height: 1;
-  background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00);
+  background: var(--n-ambre-fond, var(--n-ambre-fond)); color: var(--n-ambre, var(--n-ambre));
 }
 .vrm-cb-pastille-ok { background: var(--n-teinte, rgb(11 81 57 / .12)); color: var(--n-accent, #16181D); }
 .vrm-cb-corps { flex: 1 1 auto; min-width: 0; }
 .vrm-cb-sur { margin: 0 0 2px; font-size: 13px; line-height: 18px; color: var(--n-encre-2, #6C6C70); }
 .vrm-cb-titre { margin: 0; font-size: 17px; line-height: 22px; font-weight: 600; overflow-wrap: anywhere; }
-.vrm-cb-question { margin: 4px 0 0; font-size: 17px; line-height: 22px; font-weight: 400; color: var(--n-ambre, #8A4B00); }
+.vrm-cb-question { margin: 4px 0 0; font-size: 17px; line-height: 22px; font-weight: 400; color: var(--n-ambre, var(--n-ambre)); }
 .vrm-cb-texte { margin: 6px 0 0; font-size: 15px; line-height: 20px; color: var(--n-encre-2, #6C6C70); }
 .vrm-cb-preuve { margin: 4px 0 0; font-size: 13px; line-height: 18px; color: var(--n-encre-2, #6C6C70); font-variant-numeric: tabular-nums; }
 .vrm-cb-gestes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -44,8 +44,8 @@
 /* Sombre (choisi : `vinted_dark`). */
 [data-theme="dark"] .vrm-cb-carte { background: var(--n-carte, #1C1C1E); color: var(--n-encre, #FFFFFF); border-color: var(--n-trait, rgb(84 84 88 / .60)); }
 [data-theme="dark"] .vrm-cb-sur, [data-theme="dark"] .vrm-cb-texte, [data-theme="dark"] .vrm-cb-preuve { color: var(--n-encre-2, #98989F); }
-[data-theme="dark"] .vrm-cb-pastille, [data-theme="dark"] .vrm-cb-question { color: var(--n-ambre, #FFB340); }
-[data-theme="dark"] .vrm-cb-pastille { background: var(--n-ambre-fond, rgb(255 179 64 / .16)); }
+[data-theme="dark"] .vrm-cb-pastille, [data-theme="dark"] .vrm-cb-question { color: var(--n-ambre, var(--n-ambre)); }
+[data-theme="dark"] .vrm-cb-pastille { background: var(--n-ambre-fond, color-mix(in srgb, var(--n-ambre) 16%, transparent)); }
 [data-theme="dark"] .vrm-cb-btn { background: var(--n-teinte, rgb(244 244 245 / .20)); color: var(--n-accent, #F4F4F5); }
 [data-theme="dark"] .vrm-cb-plein { background: var(--n-plein, #16181D); color: var(--n-sur-plein, #FFFFFF); }
 [data-theme="dark"] .vrm-cb-lien { background: transparent; }

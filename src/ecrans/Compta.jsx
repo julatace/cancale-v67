@@ -3052,7 +3052,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
     <summary>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 auto', minWidth: 0 }}>
         <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{tr('compta.microEntreprise')}</span>
-        <span style={{ fontSize: 13, color: besoin ? (C.warn || '#B25000') : C.muted, fontWeight: 400, lineHeight: 1.4 }}>{aConfirmer ? tr('compta.1QuestionConfirmer') : ''}{seuilAlerte ? tr('compta.seuilApproche') : ''}{tr('compta.taux2')} {String(taux).replace('.', ',')}&nbsp;%{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} {tr('compta.seuilsImpots')}</span>
+        <span style={{ fontSize: 13, color: besoin ? (C.warn || 'var(--n-ambre)') : C.muted, fontWeight: 400, lineHeight: 1.4 }}>{aConfirmer ? tr('compta.1QuestionConfirmer') : ''}{seuilAlerte ? tr('compta.seuilApproche') : ''}{tr('compta.taux2')} {String(taux).replace('.', ',')}&nbsp;%{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} {tr('compta.seuilsImpots')}</span>
       </span>
     </summary>
     <div data-micro-entreprise="" className="vrm-micro-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 12, alignItems: 'stretch', marginTop: 8 }}>{calendrier}{seuils}{profil}{impots}</div>
@@ -3080,7 +3080,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
   const jour = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
   const nomMois = (ym) => MOIS_NOMS_FR[Number(String(ym).slice(5)) - 1];
   const ETAT = { declaree: 'Notée déclarée', a_declarer: 'À déclarer', en_retard: 'Pas notée', en_cours: 'En cours' };
-  const ambre = C.warn || C.amber || '#B25000';
+  const ambre = C.warn || C.amber || 'var(--n-ambre)';
   // (2 nov.) Dans « Le détail », le repli porte déjà le titre : pas de redite.
   const titre = sansTitre ? null : <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{tr('compta.suiviDeclarationsUrssaf')}</div>;
   if (suivi === undefined) return <Card style={{ padding: '14px 16px', marginTop: sansTitre ? 0 : 12 }}><div data-suivi-urssaf="charge">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{tr('compta.lectureDeclarations')}</div></div></Card>;
@@ -4820,6 +4820,11 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // se dit UNE fois ici, avec le geste ; les cartes ne gardent que « — ».
   const ligneComptaPub = useLigneUrssaf();
   const designV2 = useDesignV2();
+  // (24 nov., sauts-orange — banc parcours-iphone : CLS 0,21 à l'arrivée sur Argent) « Tes seuils de l'année » se décide sur
+  // la ligne publiée par Ventes, le régime et le registre « Compris » (synchronisés). Prêts dès l'ouverture de l'écran : en tête,
+  // comme avant. Pas encore prêts : la carte arrivait en tête APRÈS le reste et le poussait — elle prend alors sa place en
+  // bas du résumé (sous ce qui est déjà dessiné), jamais cachée ; à la prochaine ouverture d'Argent, elle revient en tête.
+  const [seuilsEnTete] = React.useState(() => !!ligneComptaPub && isCloudReady());
   return (
     <div className="vrm-finance-page vrm-fu-ecran vrm-argent" data-espace="argent" data-argent-ecran={vue} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* (10 nov., Argent) Statistiques et Comptabilité en UN endroit (src/argent.js) : le titre
@@ -4840,7 +4845,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       </div>}
       <div className="vrm-argent-partie" data-argent-vue="resume" hidden={vue !== 'resume'}>
         {/* (15 nov., lot argent-plus) Un seuil de l'année à 80 % ou 100 % : en tête, jusqu'à « Compris » (rien sinon). */}
-        <AlertesSeuilsArgent />
+        {seuilsEnTete ? <AlertesSeuilsArgent /> : null}
         {/* (17 nov., nouveau design · phase 2) Allumé : « Mois » (src/designV2/ArgentMois.jsx) à la place des réponses, de
             « À venir » et des six mois — qui restent MONTÉS, cachés (mêmes lectures, mêmes data-*). Éteint : rien ne change. */}
         {designV2 ? <ARegler onglet="argent" Icon={Icon}/> : null}
@@ -4855,6 +4860,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       {/* (2 nov., style « Fusion ») L'anneau et les six mois — des parts et des hauteurs, aucun montant redit. */}
       <ComptaFusion compta={data} onNav={onNav}/>
         </>); return designV2 ? <div className="v2-cache-ancienne" hidden style={{ display: 'none' }}>{anciens}</div> : anciens; })()}
+        {seuilsEnTete ? null : <div data-seuils-place="bas" style={{ display: "contents" }}><AlertesSeuilsArgent /></div>}
         <section id="compta-detail" className="vrm-compta-q" data-compta-q="detail" style={{ scrollMarginTop: 72 }}>
           <div className="vrm-compta-q-tete">
             <h2 className="vrm-compta-question" data-compta-question="detail">{tr('compta.detail')}</h2>

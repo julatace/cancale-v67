@@ -9,7 +9,7 @@
 // ⚠️ JS pur, sans React : le banc et l'audit l'importent depuis Node.
 export const PLATEFORMES = {
   vinted: { nom: 'Vinted', point: '#12B7BE' },
-  leboncoin: { nom: 'Leboncoin', point: '#F56B2A' },
+  leboncoin: { nom: 'Leboncoin', point: '#F56B2A' },   // orange-permis : la marque Leboncoin
   ebay: { nom: 'eBay', point: '#86B817' }, // ⚠️ jamais bleu : il se confondait avec l'accent
 };
 

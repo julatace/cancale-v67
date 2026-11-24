@@ -10,13 +10,13 @@
   --ret-encre: var(--w-encre, #1D1D1F);
   --ret-gris: var(--w-gris, #6E6E73);
   --ret-ombre: var(--w-ombre, 0 1px 2px rgba(0,0,0,.04), 0 6px 20px -8px rgba(0,0,0,.10));
-  --ret-ambre: #A35200;
+  --ret-ambre: var(--n-ambre);
 }
-:root[data-theme="dark"] { --ret-carte: var(--w-carte, #1C1C1E); --ret-encre: var(--w-encre, #F5F5F7); --ret-gris: var(--w-gris, #98989D); --ret-ambre: #FFB340; }
+:root[data-theme="dark"] { --ret-carte: var(--w-carte, #1C1C1E); --ret-encre: var(--w-encre, #F5F5F7); --ret-gris: var(--w-gris, #98989D); --ret-ambre: var(--n-ambre); }
 /* (15 nov., lot retours) « Studio bleu clair » : la carte « À renvoyer » prend les jetons du studio
    (porcelaine posée, une lumière, ambre = le geste à faire) quand ils existent ; sinon ceux d'avant. */
 :root:root { --ret-carte: var(--sb-porcelaine, var(--w-carte, #FFFFFF)); --ret-encre: var(--sb-encre, var(--w-encre, #1D1D1F)); --ret-gris: var(--sb-encre-2, var(--w-gris, #6E6E73));
-  --ret-ombre: var(--sb-ombre-pose, var(--w-ombre, 0 1px 2px rgba(0,0,0,.04), 0 6px 20px -8px rgba(0,0,0,.10))); --ret-tuile: var(--sb-creux, var(--w-remplir, rgba(118,118,128,.12))); --ret-ambre: var(--sb-ambre, #A35200); }
+  --ret-ombre: var(--sb-ombre-pose, var(--w-ombre, 0 1px 2px rgba(0,0,0,.04), 0 6px 20px -8px rgba(0,0,0,.10))); --ret-tuile: var(--sb-creux, var(--w-remplir, rgba(118,118,128,.12))); --ret-ambre: var(--sb-ambre, var(--n-ambre)); }
 /* (23 nov., lot retours-suivi — « gris clair, AUCUN orange ») ce qui était ambre (date de dépôt proche) est dit à l'ENCRE, en gras. */
 :root:root:root { --ret-ambre: var(--ret-encre); }
 :root:root body .vrm-ret-pastille.is-presse, :root:root body .vrm-ret-limite.is-presse { font-weight: 800; }
@@ -71,20 +71,20 @@
    les étapes jusqu'au remboursement (rond plein + coche = prouvé ; rond ambre = où il en est ; rond creux = à
    venir ; gris = passé sans preuve), « Imprimer le bordereau » sur toute la largeur, « Déposé » avec sa coche.
    Ambre = le geste à faire (§7) ; aucun rouge. */
-:root:root body .vrm-renv-bande { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: var(--ret-bande-fond, #FFE7C4); color: var(--ret-bande-encre, #5E3900); border: 1px solid var(--ret-bande-bord, rgb(178 106 0 / .22)); min-width: 0; }
+:root:root body .vrm-renv-bande { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: var(--ret-bande-fond, var(--n-ambre-fond)); color: var(--ret-bande-encre, var(--n-ambre)); border: 1px solid var(--ret-bande-bord, color-mix(in srgb, var(--n-ambre) 22%, transparent)); min-width: 0; }
 :root:root body .vrm-renv-bande-ic { flex: 0 0 auto; display: inline-flex; color: currentColor; }
 :root:root body .vrm-renv-bande-ic svg { width: 20px; height: 20px; }
 :root:root body .vrm-renv-bande-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 :root:root body .vrm-renv-bande-txt > b { font: 700 15px/1.3 var(--sb-police-texte, var(--vrm-police, system-ui, sans-serif)); color: inherit; overflow-wrap: anywhere; }
 :root:root body .vrm-renv-bande .vrm-ret-limite, :root:root body .vrm-renv-bande .vrm-ret-limite.is-presse { font: inherit; color: inherit; }
 :root:root body .vrm-renv-bande-txt > span { font: 550 13px/1.35 var(--sb-police-texte, var(--vrm-police, system-ui, sans-serif)); color: inherit; overflow-wrap: anywhere; }
-:root[data-theme="dark"] { --ret-bande-fond: rgb(242 182 94 / .14); --ret-bande-encre: #F2B65E; --ret-bande-bord: rgb(242 182 94 / .30); }
+:root[data-theme="dark"] { --ret-bande-fond: color-mix(in srgb, var(--n-ambre) 14%, transparent); --ret-bande-encre: var(--n-ambre); --ret-bande-bord: color-mix(in srgb, var(--n-ambre) 30%, transparent); }
 :root:root body .vrm-renv-etapes { list-style: none; margin: 0; padding: 4px 2px 2px; display: flex; flex-direction: column; }
 :root:root body .vrm-renv-et { display: grid; grid-template-columns: 22px minmax(0, auto) minmax(0, 1fr); align-items: center; gap: 10px; min-height: 30px; position: relative; }
 :root:root body .vrm-renv-et + .vrm-renv-et::before { content: ""; position: absolute; left: 10px; top: -9px; height: 12px; width: 2px; border-radius: 1px; background: var(--ret-trait, rgb(28 28 32 / .14)); }
 :root:root body .vrm-renv-et > i { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--ret-rond, #FFFFFF); box-shadow: inset 0 0 0 2px var(--ret-rond-bord, rgb(28 28 32 / .22)); color: var(--ret-rond-coche, #FFFFFF); font-style: normal; }
 :root:root body .vrm-renv-et.is-fait > i { background: var(--ret-encre); box-shadow: none; color: var(--ret-carte-plein, #FFFFFF); }
-:root:root body .vrm-renv-et.is-ici > i { background: var(--ret-bande-fond, #FFE2B8); box-shadow: inset 0 0 0 2px var(--ret-ambre); }
+:root:root body .vrm-renv-et.is-ici > i { background: var(--ret-bande-fond, var(--n-ambre-fond)); box-shadow: inset 0 0 0 2px var(--ret-ambre); }
 :root:root body .vrm-renv-et.is-saute > i { background: transparent; box-shadow: inset 0 0 0 2px var(--ret-trait, rgb(28 28 32 / .14)); }
 :root:root body .vrm-renv-et > b { font: 650 14px/1.25 var(--sb-police-texte, var(--vrm-police, system-ui, sans-serif)); color: var(--ret-gris); overflow-wrap: anywhere; }
 :root:root body .vrm-renv-et.is-fait > b, :root:root body .vrm-renv-et.is-ici > b { color: var(--ret-encre); }
@@ -118,7 +118,7 @@
 /* (16 nov., lot impression-retours) LES RETOURS DANS LE LOT D'IMPRESSION : le mot RETOUR, distinct, en
    pastille NEUTRE (encre sur fond creux, bordée) ; ambre seulement quand la date limite de dépôt approche ;
    jamais rouge (§7). La section est séparée des ventes par un filet. */
-:root:root body .vrm-ret-lot { --ret-encre: var(--sv-encre, var(--sb-encre, #1D1D1F)); --ret-gris: var(--sv-encre-2, var(--sb-encre-2, #6E6E73)); --ret-ambre: var(--sv-ambre, var(--sb-ambre, #A35200)); --ret-tuile: var(--vv-tui, var(--sb-creux, rgba(118,118,128,.12))); color: var(--ret-encre); margin: 0; padding: 12px 14px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--ret-encre) 14%, transparent); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+:root:root body .vrm-ret-lot { --ret-encre: var(--sv-encre, var(--sb-encre, #1D1D1F)); --ret-gris: var(--sv-encre-2, var(--sb-encre-2, #6E6E73)); --ret-ambre: var(--sv-ambre, var(--sb-ambre, var(--n-ambre))); --ret-tuile: var(--vv-tui, var(--sb-creux, rgba(118,118,128,.12))); color: var(--ret-encre); margin: 0; padding: 12px 14px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--ret-encre) 14%, transparent); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 :root:root body .vrm-ret-lot > h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin: 0 2px; font: 650 15px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--ret-encre); }
 :root:root body .vrm-ret-lot .vrm-ret-lot-n { font-style: normal; color: var(--ret-gris); font-weight: 600; font-variant-numeric: tabular-nums; }
 :root:root body .vrm-ret-mot { font-weight: 800; letter-spacing: .06em; }

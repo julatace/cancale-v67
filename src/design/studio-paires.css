@@ -24,7 +24,7 @@
   --sbp-creux: var(--sb-creux, #EBEDF0);
   --sbp-encre: var(--sb-encre, #1C1C20); --sbp-encre2: var(--sb-encre-2, #3F5468);
   --sbp-diode: var(--sb-diode, #16181D); --sbp-lien: var(--sb-lien, #16181D);
-  --sbp-ambre: var(--sb-ambre, #764300); --sbp-point: var(--sb-ambre-point, #E08A12);
+  --sbp-ambre: var(--sb-ambre, var(--n-ambre)); --sbp-point: var(--sb-ambre-point, var(--n-ambre));
   --sbp-o: var(--sb-o, 18 52 96);
   --sbp-socle: #F3F5F7;
   --sbp-plan: rgb(255 255 255 / .80);
@@ -50,7 +50,7 @@
   --sbp-creux: var(--sb-creux, #131316);
   --sbp-encre: var(--sb-encre, #F1F2F4); --sbp-encre2: var(--sb-encre-2, #9CB0C6);
   --sbp-diode: var(--sb-diode, #F4F4F5); --sbp-lien: var(--sb-lien, #F4F4F5);
-  --sbp-ambre: var(--sb-ambre, #F2B65E); --sbp-point: var(--sb-ambre-point, #F2A33A);
+  --sbp-ambre: var(--sb-ambre, var(--n-ambre)); --sbp-point: var(--sb-ambre-point, var(--n-ambre));
   --sbp-o: var(--sb-o, 0 0 0);
   --sbp-socle: #2E2E34;
   --sbp-plan: rgb(35 35 39 / .82);
@@ -73,7 +73,7 @@
     --sbp-creux: var(--sb-creux, #131316);
     --sbp-encre: var(--sb-encre, #F1F2F4); --sbp-encre2: var(--sb-encre-2, #9CB0C6);
     --sbp-diode: var(--sb-diode, #F4F4F5); --sbp-lien: var(--sb-lien, #F4F4F5);
-    --sbp-ambre: var(--sb-ambre, #F2B65E); --sbp-point: var(--sb-ambre-point, #F2A33A);
+    --sbp-ambre: var(--sb-ambre, var(--n-ambre)); --sbp-point: var(--sb-ambre-point, var(--n-ambre));
     --sbp-o: var(--sb-o, 0 0 0);
     --sbp-socle: #2E2E34;
     --sbp-plan: rgb(35 35 39 / .82);

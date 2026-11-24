@@ -61,11 +61,11 @@
   @media (prefers-reduced-motion: reduce) { .vrm-ahp-ticket-roue { animation-duration: 2.4s; } }
   /* Un champ qui porte encore la valeur LUE : ambre (un geste à faire : vérifier). */
   [data-achat-hors-form] input[data-champ-lu="1"] {
-    border-color: var(--vrm-warn, #B25000) !important;
+    border-color: var(--vrm-warn, var(--n-ambre)) !important;
     background: var(--vrm-warn-soft, transparent) !important;
   }
   [data-achat-hors-form] input[data-prix-lu="1"] {
-    border-color: var(--vrm-warn, #B25000) !important;
+    border-color: var(--vrm-warn, var(--n-ambre)) !important;
     background: var(--vrm-warn-soft, transparent) !important;
   }
   .vrm-ahp-lieux { scrollbar-width: none; }

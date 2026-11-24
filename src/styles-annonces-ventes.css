@@ -6,8 +6,8 @@
    Ce fichier est chargé EN DERNIER : il décide de ces deux listes. Les règles
    plus anciennes (minéral, studio, gestion) restent pour le reste de l'app. */
 
-.vrm-app-shell { --av-warn: #B25000; }
-:root[data-theme=dark] .vrm-app-shell { --av-warn: #FFB23E; }
+.vrm-app-shell { --av-warn: var(--n-ambre); }
+:root[data-theme=dark] .vrm-app-shell { --av-warn: var(--n-ambre); }
 
 /* ── Ventes : une ligne = titre, puis date · compte en dessous ─────────────── */
 .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-title {

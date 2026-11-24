@@ -26993,7 +26993,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     <button key={t.k} type="button" className="vrm-annbar-outil" data-outil-annonces={t.k} data-outil-n={t.n ? String(t.n) : undefined} onClick={t.on} title={t.desc}>
                       <span aria-hidden="true" className="vrm-annbar-outil-icone"><Icon name={t.icon} size={18}/></span>
                       <span className="vrm-annbar-outil-mot">{t.lab}</span>
-                      {t.n ? <span className="vrm-annbar-outil-n" style={{marginLeft:'auto',color:'var(--vrm-warn, #B25000)',fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{t.n}</span> : null}
+                      {t.n ? <span className="vrm-annbar-outil-n" style={{marginLeft:'auto',color:'var(--vrm-warn, var(--n-ambre))',fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{t.n}</span> : null}
                     </button>
                   ))}
                 </div>
@@ -27263,7 +27263,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           {/* (15 nov., refonte-journee — « la liste d'abord ») Les N° à vérifier rejoignent « À faire » (la feuille, au téléphone) :
               ils poussaient la 1re annonce sous le premier écran. Le même bloc, les mêmes gestes. */}
           {aVerifierCarton.length > 0 && <VersAFaire>{(
-          <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '4px 12px 10px', marginBottom: 12 }}>
+          <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || 'var(--n-ambre)'}`, borderRadius: 12, padding: '4px 12px 10px', marginBottom: 12 }}>
             <summary style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{trj('annonces.numerosVerifier', { n: aVerifierCarton.length })}</summary>
             {/* (6 nov., v36-visuel) Une ligne ; le récit de la panne derrière le « ⓘ ». */}
             <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, margin: '2px 0 6px' }}>
@@ -28849,6 +28849,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             if (t) return suiviDeLigne(t) || String(t.suivi || '');
             return o ? (suivisAchat(o, indexSuivisAchats)[0] || '') : ''; };
           const toutLuRet = !notes.retirer && !baseKO && tracking !== null && Array.isArray(buys.items) && !buys.error;
+          // (24 nov., sauts-orange — banc parcours-iphone : CLS 0,53 à l'arrivée sur Achats) La colonne « À retirer » et « Mode relais »
+          // n'arrivent qu'une fois les DEUX sources lues (e-mails de suivi ET achats) : avant, les achats lus seuls dessinaient
+          // « À vérifier », puis les codes arrivaient AU-DESSUS et poussaient tout (~46 px, défilement décalé de ~320 px).
+          // Pendant la lecture, la place dit qu'on lit (jamais un vide muet) ; une lecture ratée le dit (Réessayer) ; une
+          // attente trop longue montre ce qui est lu (un colis n'est jamais caché faute d'une seconde source, §5).
+          const retraitsPrets = baseKO || (trackingKO && tracking === null) || (tracking !== null && Array.isArray(buys.items) && !buys.error) || colisAttenteLongue;
           // (3 nov., Julien : « beaucoup trop brouillon ») La ligne d'un colis à retirer : l'échéance en UNE puce
           // (la date limite de CE colis, la même source que son détail — e-mail ou transporteur ; inconnue ⇒ rien),
           // le statut d'un « à vérifier » en une puce (sa raison, `raisonAVerifier`), « J'ai retiré » (les mêmes
@@ -29232,7 +29238,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 {notes.retirer && !(designV2 && colisDans === 'achats') ? <p className="vrm-colis-note" data-cc-note="retirer">{notes.retirer}</p> : null}
                 {/* (9 nov., lot AD) Le MODE RELAIS : au comptoir, chaque code en très grand, un par écran. */}
                 {/* (21 nov.) Achats natif : plus de pilule « Mode relais » — toucher le code d'un colis l'ouvre en plein écran (le même geste). */}
-                {!(designV2 && colisDans === 'achats') && (chRet.filtre ? (chRet.n || 0) : pickupUnion.total) > 0 ? <div className="vrm-pas-a-pas-rangee" data-cc-relais=""><Bouton variante="secondaire" icone="qr" data-relais-ouvrir={pickupUnion.total} onClick={() => setRelaisOuvert(true)} style={{ minHeight: 44 }}>Mode relais</Bouton></div> : null}
+                {!(designV2 && colisDans === 'achats') && retraitsPrets && (chRet.filtre ? (chRet.n || 0) : pickupUnion.total) > 0 ? <div className="vrm-pas-a-pas-rangee" data-cc-relais=""><Bouton variante="secondaire" icone="qr" data-relais-ouvrir={pickupUnion.total} onClick={() => setRelaisOuvert(true)} style={{ minHeight: 44 }}>Mode relais</Bouton></div> : null}
                 {(() => { // (9 nov., Julien : « le statut doit être regardé très souvent ») QUAND le suivi a été lu chez
                   // le transporteur pour la dernière fois (la plus récente lecture réussie, `lu` des lignes `transp_`) —
                   // discret, une ligne ; rien lu ⇒ rien dit (jamais « à l'instant » inventé).
@@ -29274,7 +29280,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   const enRouteSR = vinVu ? ((groupesRelais && groupesRelais.enRouteSansRelais) || 0) : 0;
                   const videSite = chRet.filtre && chRet.vide && enRouteSR === 0 && toutLuRet
                     ? <p className="vrm-colis-vide" data-retraits-vide="site" data-retraits-vide-site={chRet.site}>{tr('achats.retirer.aucunSite', { site: nomSite[chRet.site] || chRet.site })}</p> : null;
-                  const ancienne = (colRet && (colRet.cartes.length > 0 || enRouteSR > 0)
+                  const lectureAncienne = !retraitsPrets && !(designV2 && colisDans === 'achats')
+                    ? <p className="vrm-colis-vide" data-retraits-lecture="" data-retraits-attente-sources="">{tr('sv.lib.lecture')}</p> : null;
+                  const ancienne = lectureAncienne || (colRet && (colRet.cartes.length > 0 || enRouteSR > 0)
                   ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={false} ordi={ordiColis} delai={delaiColisRetrait} enRouteSansRelais={enRouteSR}
                       fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} suiviDe={suiviRetrait} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} qrDe={qrRetrait} memeColisDe={memeColisDe} enRoute={vinVu ? ((groupesRelais && groupesRelais.sansRelais) || []) : []}
                       redirige={(vinVu ? (colisRelaisChange(tracking, { transp: transpMap }) || []) : []).map((r) => { const t = (tracking || []).find((l) => l && l.relaisChange && suiviDeLigne(l) === r.suivi) || { suivi: r.suivi, carrier: r.carrier, emailRecu: r.emailRecu };

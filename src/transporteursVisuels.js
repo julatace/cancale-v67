@@ -1,3 +1,4 @@
+// orange-permis-fichier : les LOGOS et couleurs de marque des transporteurs (leurs marques, pas la palette de l'app) (audit-sans-orange.cjs)
 // ════════════════════════════════════════════════════════════════════════════
 //  LES TRANSPORTEURS, À L'ÉCRAN — UN module (2 nov., §11)
 //  Julien : « quand je fais une vente, je veux qu'à côté du bouton bordereau,

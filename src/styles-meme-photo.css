@@ -3,7 +3,7 @@
    jamais de rouge. Cibles au doigt 44 px. Rien ne déborde : les choix d'un cas ambigu défilent. */
 .vrm-mph { font-size: 14px; color: var(--sb-encre, inherit); min-width: 0; }
 .vrm-mph-etat { margin: 0 0 12px; font-size: 13px; color: var(--sb-encre-2, inherit); display: flex; flex-wrap: wrap; gap: 2px 12px; font-variant-numeric: tabular-nums; }
-.vrm-mph-etat.is-ext { color: var(--sb-ambre, #9A5A00); }
+.vrm-mph-etat.is-ext { color: var(--sb-ambre, var(--n-ambre)); }
 .vrm-mph-prop { padding: 14px 0; border-top: .5px solid var(--sb-verre-bord, rgba(60, 80, 110, .16)); min-width: 0; }
 .vrm-mph-prop:first-of-type { border-top: 0; }
 .vrm-mph-phrase { margin: 0 0 10px; font: 600 15px/1.35 var(--sb-police-texte, inherit); color: var(--sb-encre, inherit); display: flex; align-items: center; gap: 6px; }
@@ -30,7 +30,7 @@
    « à vérifier » = le point ambre et la raison. Jamais de rouge. */
 .vrm-mph-sur, .vrm-mph-averifier { margin: 0 0 6px; display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 1.35; }
 .vrm-mph-sur { font-weight: 600; color: var(--sb-encre, inherit); }
-.vrm-mph-averifier { color: var(--sb-ambre, #764300); flex-wrap: wrap; }
+.vrm-mph-averifier { color: var(--sb-ambre, var(--n-ambre)); flex-wrap: wrap; }
 .vrm-mph-averifier b { font-weight: 600; }
 .vrm-mph-raison { flex-basis: 100%; padding-left: 12px; font-size: 12px; line-height: 1.35; }
 .vrm-mph-choix .vrm-mph-raison { padding-left: 0; }

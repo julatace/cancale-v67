@@ -8,7 +8,7 @@
 }
 .vrm-colis-prochain-txt { flex: 1 1 240px; min-width: 0; font-weight: 600; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .vrm-colis-prochain-sous { font-weight: 400; color: var(--vrm-muted, #6E6E73); }
-.vrm-colis-prochain.is-ambre .vrm-colis-prochain-txt { color: var(--vrm-warn, #B25000); }
+.vrm-colis-prochain.is-ambre .vrm-colis-prochain-txt { color: var(--vrm-warn, var(--n-ambre)); }
 .vrm-colis-prochain.is-second { margin-top: -6px; padding-top: 8px; padding-bottom: 8px; font-size: 14px; }
 .vrm-colis-prochain.is-second .vrm-colis-prochain-txt { font-weight: 400; }
 .vrm-colis-prochain > button { flex: 0 0 auto; }
@@ -24,4 +24,4 @@
 .vrm-s2d-pastille.is-libre { color: var(--vrm-muted, #8E8E93); outline: 1.5px dashed color-mix(in srgb, var(--vrm-muted, #8E8E93) 55%, transparent); outline-offset: -1.5px; font-weight: 400; font-size: 13px; }
 .vrm-s2d-pastille.is-rangee { background: rgba(0, 0, 0, .62); color: #FFFFFF; }
 .vrm-s2d-pastille.is-vendue { background: var(--vrm-accent, #16181D); color: var(--vrm-on-accent, #FFFFFF); }
-.vrm-s2d-pastille.is-plusenligne { background: var(--vrm-warn, #B25000); color: var(--vrm-on-warn, #FFFFFF); }
+.vrm-s2d-pastille.is-plusenligne { background: var(--vrm-warn, var(--n-ambre)); color: var(--vrm-on-warn, #FFFFFF); }

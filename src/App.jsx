@@ -2288,7 +2288,7 @@ const THEMES = {
     // contraste du texte blanc sur bouton), le bleu reste une seconde teinte.
     bg:"#F2F2F7", surface:"#FFFFFF", card:"#FFFFFF", card2:"#F2F2F7", border:"#E5E5EA",
     accent:"#16181D", accentSoft:"#B5BDCA", onAccent:"#FFFFFF",
-    danger:"#C0392B", warn:"#B25000", gold:"#7A6636",
+    danger:"#C0392B", warn:"#3D4B5B", gold:"#3D4B5B",   // (24 nov.) aucun orange : « à faire » = l'ardoise
     blue:"#16181D", purple:"#5B4B9E", text:"#000000", muted:"#636366",
     // Cartes BLANCHES sur fond gris : c'est l'écart entre les deux qui donne le
     // relief, et une ombre très douce qui les décolle. Les filets « imprimés »
@@ -2335,7 +2335,7 @@ const THEMES = {
     // rail (chrome) < page (bg) < cartes (card), marches bien écartées.
     bg:"#000000", surface:"#1C1C1E", card:"#1C1C1E", card2:"#1C1C1E", border:"#2C2C2E",
     accent:"#B5BDCA", accentSoft:"#B5BDCA", onAccent:"#FFFFFF",
-    danger:"#FF6B6B", warn:"#FFB23E", gold:"#C9AE78",
+    danger:"#FF6B6B", warn:"#F4F4F5", gold:"#F4F4F5",   // (24 nov.) aucun ambre la nuit : l'encre claire
     blue:"#B5BDCA", purple:"#A99AF0", text:"#F2F2F7", muted:"#8E8E93",
     shadow:"0 1px 1px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.45)",
     shadowMd:"0 1px 2px rgba(0,0,0,.5), 0 8px 20px rgba(0,0,0,.5)",
@@ -4797,7 +4797,7 @@ function RepublieeHost() {
           <div style={{ fontSize: 19, fontWeight: 600, color: C.text, letterSpacing: '-0.02em', lineHeight: 1.3 }}>{tr('rt.feuille.titre')}</div>
           {l.length > 1 ? <span data-rt-rang="" style={{ fontSize: 13, color: C.muted, flexShrink: 0 }}>{tr('rt.rang', { i: k + 1, n: l.length })}</span> : null}
         </div>
-        <div data-rt-bandeau="" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 12, padding: '12px 14px', borderRadius: 'var(--sb-r-plateau, 16px)', background: 'color-mix(in srgb, var(--sb-ambre-point, #E08A12) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--sb-ambre-point, #E08A12) 45%, transparent)', color: 'var(--sb-ambre, #764300)' }}>
+        <div data-rt-bandeau="" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 12, padding: '12px 14px', borderRadius: 'var(--sb-r-plateau, 16px)', background: 'color-mix(in srgb, var(--sb-ambre-point, var(--n-ambre)) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--sb-ambre-point, var(--n-ambre)) 45%, transparent)', color: 'var(--sb-ambre, var(--n-ambre))' }}>
           <span aria-hidden="true" style={{ display: 'flex', flexShrink: 0, marginTop: 1 }}><Icon name="box" size={20}/></span>
           <span style={{ fontSize: 15, lineHeight: 1.4, fontWeight: 600 }}>{tr('rt.job.detail')}</span>
         </div>
@@ -9218,16 +9218,16 @@ const ecouterFenetreCsp = (w, nom) => {
 const CARRIERS = {
   mondialrelay: { name: 'Mondial Relay', short: 'MR', bg: '#C8105F', fg: '#fff', retrait: 'code' },
   chronopost:   { name: 'Chronopost',    short: 'CH', bg: '#16181D', fg: '#fff', retrait: 'qr'   },
-  ups:          { name: 'UPS',           short: 'UPS', bg: '#2C2C2E', fg: '#FFB500', retrait: 'auto' },
+  ups:          { name: 'UPS',           short: 'UPS', bg: '#2C2C2E', fg: '#FFB500', retrait: 'auto' },   // orange-permis : couleur de MARQUE du transporteur
   vinted:       { name: 'Vinted Go',     short: 'V',  bg: '#007782', fg: '#fff', retrait: 'auto' },
   relaiscolis:  { name: 'Relais Colis',  short: 'RC', bg: '#1D1D1F', fg: '#fff', retrait: 'code' },
-  colissimo:    { name: 'La Poste',      short: 'LP', bg: '#FFCD00', fg: '#111', retrait: 'home' },
-  amazon:       { name: 'Amazon',        short: 'AZ', bg: '#2C2C2E', fg: '#FF9900', retrait: 'code' },
+  colissimo:    { name: 'La Poste',      short: 'LP', bg: '#FFCD00', fg: '#111', retrait: 'home' },   // orange-permis : couleur de MARQUE du transporteur
+  amazon:       { name: 'Amazon',        short: 'AZ', bg: '#2C2C2E', fg: '#FF9900', retrait: 'code' },   // orange-permis : couleur de MARQUE du transporteur
   shop2shop:    { name: 'Shop2Shop',     short: 'S2S', bg: '#16181D', fg: '#fff', retrait: 'code' },
   inpost:       { name: 'InPost',        short: 'IP', bg: '#C8105F', fg: '#fff', retrait: 'code' },
   dpd:          { name: 'DPD',           short: 'DPD', bg: '#414042', fg: '#fff', retrait: 'auto' },
-  gls:          { name: 'GLS',           short: 'GLS', bg: '#16181D', fg: '#FFD200', retrait: 'code' },
-  dhl:          { name: 'DHL',           short: 'DHL', bg: '#FFCC00', fg: '#1D1D1B', retrait: 'auto' },
+  gls:          { name: 'GLS',           short: 'GLS', bg: '#16181D', fg: '#FFD200', retrait: 'code' },   // orange-permis : couleur de MARQUE du transporteur
+  dhl:          { name: 'DHL',           short: 'DHL', bg: '#FFCC00', fg: '#1D1D1B', retrait: 'auto' },   // orange-permis : couleur de MARQUE du transporteur
   fedex:        { name: 'FedEx',         short: 'FX', bg: '#1D1D1F', fg: '#FFFFFF', retrait: 'auto' },
   // ⚠️ `autre` = le filet du serveur : un email de colis d'un transporteur non
   // listé est quand même traité (api/email-inbound.js). Sans cette entrée, sa
@@ -15938,7 +15938,7 @@ const DEMANDE_DEPENSE = { on: false, at: 0 };
 // logo de marque, la seule raison d'un ton hors palette, et Julien l'a demandé
 // (21 sept.). Le teal #007782 ailleurs est « Vinted GO » le transporteur, une
 // autre notion — on n'y touche pas.
-const LBC_ORANGE = '#EC5A13';
+const LBC_ORANGE = '#EC5A13';   // orange-permis : la MARQUE Leboncoin (son logo), pas la palette de l'app
 // LE MODE STREAM — cacher ce qu'il ne veut pas montrer quand il filme son écran.
 // (16 oct.) un flou sur `.vrm-sensible` ; (17 oct.) un flou sur tout texte qui
 // porte un pseudo de ses comptes ; (5 nov.) UNE RÈGLE PROGRAMMÉE, src/modeStream.js :
@@ -18916,9 +18916,10 @@ const BrandMark = ({ id }) => id === 'apple' ? (
     <path d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.19-1.73-1.36-.14-2.65.8-3.34.8-.69 0-1.75-.78-2.88-.76-1.48.02-2.85.86-3.61 2.19-1.54 2.67-.39 6.62 1.1 8.79.73 1.06 1.6 2.25 2.74 2.2 1.1-.04 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.08 2.65-2.14.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.32-3.5zM14.18 6.13c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.54 1.31-.56.65-1.05 1.69-.92 2.68.97.08 1.96-.49 2.56-1.23z"/>
   </svg>
 ) : id === 'google' ? (
-  <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true" style={{flexShrink:0}}>
+  <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true" style={{flexShrink:0}} data-logo="google">
     <path fill="#B5BDCA" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"/>
     <path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/>
+    {/* orange-permis : le logo Google (sa marque, pas la palette de l'app) */}
     <path fill="#FBBC05" d="M11.8 28.2c-.4-1.3-.7-2.7-.7-4.2s.2-2.9.7-4.2v-5.7H4.5C3 17 2.1 20.4 2.1 24s.9 7 2.4 9.9l7.3-5.7z"/>
     <path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 29.9 2 24 2 15.5 2 8.1 6.9 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/>
   </svg>
@@ -20415,7 +20416,7 @@ function GestesHorsLigneCoque({ tab, ongletDedie }) {
         {texte ? <span data-gestes-hl-texte="" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: etat === 'envoyes' ? C.text : C.muted, border: `1px solid ${C.border}`, background: C.card, borderRadius: 999, padding: '6px 12px' }}>
           <Icon name={horsLigne ? 'cloudOff' : 'sync'} size={14}/>{texte}</span> : null}
         {atrancher ? <button type="button" data-gestes-hl-trancher={atrancher} onClick={() => setOuvert(true)}
-          style={{ minHeight: 44, fontSize: 13, fontWeight: 600, color: C.text, border: `1px solid ${C.warn || '#B26B00'}`, background: C.card, borderRadius: 999, padding: '0 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
+          style={{ minHeight: 44, fontSize: 13, fontWeight: 600, color: C.text, border: `1px solid ${C.warn || 'var(--n-ambre)'}`, background: C.card, borderRadius: 999, padding: '0 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
           {tr('horsligne.coque.atrancher', { n: atrancher })} · {tr('horsligne.coque.voir')}</button>
           : attente ? <button type="button" data-gestes-hl-voir="" onClick={() => setOuvert(true)} style={{ minHeight: 44, fontSize: 13, color: C.muted, border: 'none', background: 'transparent', padding: '0 6px', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>{tr('horsligne.coque.voir')}</button> : null}
       </div>
@@ -25582,51 +25583,7 @@ function VestiaireMesure() {
 // ⟦→ ecrans/Stats.jsx #13⟧
 // ⟦→ ecrans/Compta.jsx #19⟧
 
-/* ── Box & Door ──────────────────────────────────────── */
-const Box = React.memo(function Box({val,isSold,highlight}) {
-  const W=46,H=26,SW=6,TH=5;
-  const hasVal=val&&val.trim()!=='';
-  // Cases vides : rendu ultra simple, pas de SVG complexe
-  if(!hasVal&&!highlight){
-    return (
-      <svg width={W+SW} height={H+TH} style={{display:'block'}}>
-        <rect x={0} y={TH} width={W} height={H} rx={2} fill="#2C2C2E"/>
-      </svg>
-    );
-  }
-  let front,side,top,textCol;
-  if(isSold)      {front='#8a1a2a';side='#5a0e1a';top='#aa2535';textCol='#ffaaaa';}
-  else if(hasVal) {front='#B25000';side='#B25000';top='#d09040';textCol='#B25000';}
-  else            {front='#2C2C2E';side='#1D1D1F';top='#3A3A3C';textCol='transparent';}
-  return (
-    <svg width={W+SW} height={H+TH} style={{display:'block',overflow:'visible',
-      filter:highlight?'drop-shadow(0 0 8px #ffb830) drop-shadow(0 0 16px #ffb830) brightness(1.5)':'none'}}>
-      {highlight&&<rect x={-2} y={TH-2} width={W+4} height={H+4} rx={3} fill="none" stroke="#ffb830" strokeWidth="2.5"/>}      <polygon points={`0,${TH} ${SW},0 ${W+SW},0 ${W},${TH}`} fill={top} stroke="#111" strokeWidth="0.6"/>
-      <rect x={0} y={TH} width={W} height={H} rx={2} fill={front} stroke="#111" strokeWidth="0.6"/>
-      <polygon points={`${W},${TH} ${W+SW},0 ${W+SW},${H} ${W},${H+TH}`} fill={side} stroke="#111" strokeWidth="0.6"/>
-      {hasVal&&<rect x={8} y={TH+H/2-2} width={W-16} height={4} rx={1} fill={side} opacity="0.6"/>}
-      {hasVal&&<text x={W/2} y={TH+H/2+4} textAnchor="middle" fill={textCol} fontSize={8} fontWeight="800" fontFamily="monospace">{val.trim()}</text>}
-    </svg>
-  );
-});
-function Door({h}) {
-  const W=80,H=h;
-  return (
-    <svg width={W} height={H} style={{display:'block',flexShrink:0}}>
-      <rect width={W} height={H} fill="#2C2C2E"/>
-      <rect x={4} y={4} width={W-8} height={H-4} rx={3} fill="#6a4828"/>
-      <rect x={8} y={8} width={W-16} height={H-12} rx={2} fill="#c8a060"/>
-      <rect x={13} y={14} width={W-26} height={H*0.28} rx={2} fill="#b08848" stroke="#B25000" strokeWidth="0.8"/>
-      <rect x={18} y={18} width={W-36} height={H*0.28-8} rx={1} fill="#B5BDCA" opacity="0.4"/>
-      <rect x={13} y={14+H*0.28+8} width={W-26} height={H*0.42} rx={2} fill="#b08848" stroke="#B25000" strokeWidth="0.8"/>
-      <circle cx={W-16} cy={H*0.56} r={5} fill="#d4a820" stroke="#B25000" strokeWidth="1"/>
-      <circle cx={W-16} cy={H*0.56} r={2} fill="#ffe060"/>
-      <rect x={10} y={H*0.18} width={7} height={12} rx={1} fill="#B25000"/>
-      <rect x={10} y={H*0.72} width={7} height={12} rx={1} fill="#B25000"/>
-      <rect x={0} y={H-6} width={W} height={6} fill="#1D1D1F"/>
-    </svg>
-  );
-}
+// (24 nov., sauts-orange) `Box` et `Door` (le garage 2D d'avant, jamais rendus — aucun `<Box`/`<Door`) retirés : ils gardaient de l'orange écrit à la main.
 // ⟦→ ecrans/Compta.jsx #20⟧
 
 // Helper format date FR
@@ -25898,19 +25855,19 @@ const FURN_TYPES = {
   bacs:    { label: 'Étagère à bacs', emoji: '🧺', w: 1.2, h: 0.45, rows: 4, cols: 3, color: '#AEAEB2', h3d: 1.25, build: 'metal', bacs: true, cases: 'pile' },
   cintres: { label: 'Portant à cintres', emoji: '👕', w: 1.5, h: 0.5, rows: 1, cols: 8, color: '#8E8E93', h3d: 1.1, build: 'portant', cases: 'cintre' },
   table:   { label: 'Table',   emoji: '🪵', w: 2, h: 1, rows: 1, cols: 3, color: '#8E8E93', h3d: 0.5, build: 'table', cases: 'pile' },
-  pile:    { label: 'Boîtes au sol', emoji: '📦', w: 0.5, h: 0.5, rows: 5, cols: 1, cell: 0.5, start: 1, color: '#c9a24b', h3d: 0.34, build: 'pile', pile: true },
+  pile:    { label: 'Boîtes au sol', emoji: '📦', w: 0.5, h: 0.5, rows: 5, cols: 1, cell: 0.5, start: 1, color: '#c9a24b', h3d: 0.34, build: 'pile', pile: true },   // orange-permis : bois, carton, lumière du garage 3D (des objets réels dessinés)
   porte:   { label: 'Porte',   emoji: '🚪', w: 1, h: 0.35, rows: 1, cols: 1, color: '#8E8E93', h3d: 1.4, build: 'porte', deco: true, structure: true },
   fenetre: { label: 'Fenêtre', emoji: '🪟', w: 1.6, h: 0.35, rows: 1, cols: 1, color: '#E5E5EA', h3d: 1.0, build: 'fenetre', deco: true, structure: true },
   // ── ANCIENS TYPES (cachés de la palette, gardés pour les pièces existantes) ──
-  commode: { label: 'Commode', emoji: '🗄️', w: 2, h: 1, rows: 3, cols: 1, color: '#c8935f', h3d: 1.0, build: 'commode', hidden: true },
+  commode: { label: 'Commode', emoji: '🗄️', w: 2, h: 1, rows: 3, cols: 1, color: '#c8935f', h3d: 1.0, build: 'commode', hidden: true },   // orange-permis : bois, carton, lumière du garage 3D (des objets réels dessinés)
   etagere: { label: 'Étagère', emoji: '📚', w: 3, h: 1, rows: 4, cols: 3, color: '#8E8E93', h3d: 1.8, build: 'etagere', hidden: true },
   casier:  { label: 'Casiers', emoji: '🔲', w: 2, h: 1, rows: 3, cols: 3, color: '#8E8E93', h3d: 1.6, build: 'etagere', hidden: true },
-  grille:  { label: 'Grille de boîtes', emoji: '🔳', w: 2, h: 0.5, rows: 3, cols: 4, cell: 0.5, color: '#c9a24b', h3d: 1.5, build: 'grille', hidden: true },
+  grille:  { label: 'Grille de boîtes', emoji: '🔳', w: 2, h: 0.5, rows: 3, cols: 4, cell: 0.5, color: '#c9a24b', h3d: 1.5, build: 'grille', hidden: true },   // orange-permis : bois, carton, lumière du garage 3D (des objets réels dessinés)
   armoire: { label: 'Armoire', emoji: '🚪', w: 2, h: 1, rows: 2, cols: 2, color: '#b08a5f', h3d: 1.9, build: 'armoire', hidden: true },
   penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#8E8E93', h3d: 1.6, build: 'penderie', hidden: true },
   portant: { label: 'Portant', emoji: '👗', w: 2, h: 1, rows: 1, cols: 5, color: '#8E8E93', h3d: 1.6, build: 'penderie', hidden: true },
-  carton:  { label: 'Boîte à empiler', emoji: '📦', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#c9a24b', h3d: 0.34, build: 'carton', box: true, hidden: true },
-  boites:  { label: 'Boîtes',  emoji: '📦', w: 1, h: 1, rows: 2, cols: 2, color: '#c9a24b', h3d: 0.5, build: 'boites', hidden: true },
+  carton:  { label: 'Boîte à empiler', emoji: '📦', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#c9a24b', h3d: 0.34, build: 'carton', box: true, hidden: true },   // orange-permis : bois, carton, lumière du garage 3D (des objets réels dessinés)
+  boites:  { label: 'Boîtes',  emoji: '📦', w: 1, h: 1, rows: 2, cols: 2, color: '#c9a24b', h3d: 0.5, build: 'boites', hidden: true },   // orange-permis : bois, carton, lumière du garage 3D (des objets réels dessinés)
   bac:     { label: 'Bac',     emoji: '🧺', w: 1, h: 1, rows: 1, cols: 2, color: '#5fb0a3', h3d: 0.5, build: 'crate', hidden: true },
   malle:   { label: 'Malle',   emoji: '🧳', w: 2, h: 1, rows: 1, cols: 2, color: '#6E6E73', h3d: 0.6, build: 'malle', hidden: true },
   autre:   { label: 'Autre',   emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#8E8E93', h3d: 1.0, build: 'generic', hidden: true },
@@ -25925,7 +25882,7 @@ const FURN_TYPES = {
   lit:     { label: 'Lit',     emoji: '🛏️', w: 2,   h: 1.6, rows: 1, cols: 1, color: '#8E8E93', h3d: 0.6,  build: 'lit',    deco: true },
   tapis:   { label: 'Tapis',   emoji: '🟫', w: 2.4, h: 1.6, rows: 1, cols: 1, color: '#a8564f', h3d: 0.03, build: 'tapis',  deco: true },
   plante:  { label: 'Plante',  emoji: '🪴', w: 0.6, h: 0.6, rows: 1, cols: 1, color: '#3f7d4f', h3d: 1.3,  build: 'plante', deco: true },
-  lampe:   { label: 'Lampadaire', emoji: '💡', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#d8c48a', h3d: 1.7, build: 'lampe', deco: true },
+  lampe:   { label: 'Lampadaire', emoji: '💡', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#d8c48a', h3d: 1.7, build: 'lampe', deco: true },   // orange-permis : bois, carton, lumière du garage 3D (des objets réels dessinés)
   miroir:  { label: 'Miroir',  emoji: '🪞', w: 0.9, h: 0.3, rows: 1, cols: 1, color: '#D1D1D6', h3d: 1.6,  build: 'miroir', deco: true },
   cadre:   { label: 'Cadre',   emoji: '🖼️', w: 0.8, h: 0.2, rows: 1, cols: 1, color: '#6E6E73', h3d: 0.6,  build: 'cadre',  deco: true },
   poubelle:{ label: 'Poubelle',emoji: '🗑️', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#6E6E73', h3d: 0.7,  build: 'poubelle', deco: true },
@@ -25934,16 +25891,16 @@ const FURN_TYPES = {
   velo:    { label: 'Vélo',    emoji: '🚲', w: 1.7, h: 0.6, rows: 1, cols: 1, color: '#48484A', h3d: 1.0,  build: 'velo',   deco: true },
   etabli:  { label: 'Établi',  emoji: '🛠️', w: 1.8, h: 0.8, rows: 1, cols: 1, color: '#6E6E73', h3d: 0.9,  build: 'etabli', deco: true },
 };
-const FURN_COLORS = ['#c8935f','#8E8E93','#8E8E93','#8E8E93','#c9a24b','#8E8E93','#cf7b7b','#5fb0a3','#8E8E93','#3A3A3C','#E5E5EA','#d98a3d'];
+const FURN_COLORS = ['#c8935f','#8E8E93','#8E8E93','#8E8E93','#c9a24b','#8E8E93','#cf7b7b','#5fb0a3','#8E8E93','#3A3A3C','#E5E5EA','#d98a3d'];   // orange-permis : bois, carton, lumière du garage 3D (des objets réels dessinés)
 // ── AMBIANCES du garage 3D : « crée ton propre univers ». Chaque preset ne fait
 // que changer des COULEURS et des INTENSITÉS de lumière (0 risque de casser le
 // rendu), appliquées en direct sur la scène. « Clair » = exactement le rendu
 // d'origine (aucune régression). wall/floor à null = on garde la matière de base.
 const GARAGE_AMBIANCES = [
   { id:'clair',  name:'Clair',        emoji:'☀️', bg:'#F2F2F7', sky:'#F2F2F7', ground:'#AEAEB2', hemi:0.92, ambient:0.20, sun:'#F2F2F7', sunI:1.05, fill:'#E5E5EA', fillI:0.32, wall:null,      floor:null,      exposure:1.12 },
-  { id:'chaud',  name:'Chaleureux',   emoji:'🔥', bg:'#E5E5EA', sky:'#FFF4E5', ground:'#6E6E73', hemi:0.95, ambient:0.22, sun:'#ffd6a0', sunI:1.15, fill:'#E5E5EA', fillI:0.24, wall:'#E5E5EA', floor:'#FFF4E5', exposure:1.15 },
+  { id:'chaud',  name:'Chaleureux',   emoji:'🔥', bg:'#E5E5EA', sky:'#FFF4E5', ground:'#6E6E73', hemi:0.95, ambient:0.22, sun:'#ffd6a0', sunI:1.15, fill:'#E5E5EA', fillI:0.24, wall:'#E5E5EA', floor:'#FFF4E5', exposure:1.15 },   // orange-permis : bois, carton, lumière du garage 3D (des objets réels dessinés)
   { id:'nuit',   name:'Néon nuit',    emoji:'🌙', bg:'#1C1C1E', sky:'#3a4a80', ground:'#000000', hemi:0.55, ambient:0.16, sun:'#B5BDCA', sunI:0.85, fill:'#ff5fae', fillI:0.55, wall:'#1C1C1E', floor:'#2C2C2E', exposure:1.28 },
-  { id:'luxe',   name:'Boutique luxe',emoji:'✨', bg:'#1C1C1E', sky:'#FFF4E5', ground:'#1C1C1E', hemi:0.50, ambient:0.20, sun:'#ffcf85', sunI:1.15, fill:'#FFF4E5', fillI:0.30, wall:'#1D1D1F', floor:'#48484A', exposure:1.20 },
+  { id:'luxe',   name:'Boutique luxe',emoji:'✨', bg:'#1C1C1E', sky:'#FFF4E5', ground:'#1C1C1E', hemi:0.50, ambient:0.20, sun:'#ffcf85', sunI:1.15, fill:'#FFF4E5', fillI:0.30, wall:'#1D1D1F', floor:'#48484A', exposure:1.20 },   // orange-permis : bois, carton, lumière du garage 3D (des objets réels dessinés)
   { id:'beton',  name:'Atelier béton',emoji:'🏗️', bg:'#D1D1D6', sky:'#E5E5EA', ground:'#8E8E93', hemi:0.90, ambient:0.26, sun:'#F2F2F7', sunI:1.00, fill:'#E5E5EA', fillI:0.32, wall:'#C7C7CC', floor:'#C7C7CC', exposure:1.08 },
 ];
 // ⟦→ ecrans/Comptabilite.jsx #232⟧
@@ -28672,7 +28629,7 @@ const INV_STATUS = {
   online:       { label: 'En ligne',      get color() { return C.text; }, icon: '🟢' },
   pending_sale: { label: 'Vente en cours', color: '#16181D', icon: '⏳' },
   sold:         { label: 'Vendu',         color: '#636366', icon: '💸' },
-  stock:        { label: 'Stock',         color: '#B25000', icon: '📦' },
+  stock:        { label: 'Stock',         color: '#3D4B5B', icon: '📦' },   // (24 nov.) plus d'orange : l'ardoise
 };
 // Normalise un titre pour comparer une annonce et une commande vendue (Vinted
 // renvoie le titre exact de l'article dans les deux). Insensible casse/espaces.
@@ -38286,11 +38243,16 @@ function AppCoeur() {
                 <div style={{display:'flex',flexWrap:'wrap',gap:6}}>{gsRecents.map(t=><button key={t} type="button" data-recherche-recent={t} onClick={()=>{ setGsQ(t); try{ gsChampRef.current&&gsChampRef.current.focus({preventScroll:true}); }catch(_){} }}
                   style={{minHeight:44,display:'inline-flex',alignItems:'center',gap:6,padding:'0 12px',border:`1px solid ${C.border}`,borderRadius:999,background:C.card,color:C.text,fontFamily:'inherit',fontSize:13,cursor:'pointer',maxWidth:'100%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}><Icon name="clock" size={14} style={{color:C.muted}}/>{t}</button>)}</div>
               </div>}
+              {/* (24 nov., sauts-orange — banc parcours-iphone : CLS 0,12) Les suggestions n'arrivent qu'une fois la lecture de la loupe
+                  faite (`gsData`) : avant, « Dernières ventes » (déjà en mémoire) se dessinait seule, puis « Colis à retirer » (les e-mails,
+                  lus ensuite) arrivait AU-DESSUS et la poussait. Pendant la lecture, une ligne le dit ; tout arrive ensuite d'un coup. */}
+              {!gsData ? <div data-recherche-sugg-attente="" style={{margin:'16px 4px 2px',color:C.muted,fontSize:13,lineHeight:1.5}}>{tr('nc.chargement')}</div> : <>
               {sugg && sugg.colis.length > 0 && <div data-recherche-suggestions="colis">{entete('Colis à retirer', null, 'sugg-colis')}{sugg.colis.map((r,i)=>ligne(r,'colis',i))}</div>}
               {sugg && sugg.ventes.length > 0 && <div data-recherche-suggestions="ventes">{entete('Dernières ventes', null, 'sugg-ventes')}{sugg.ventes.map((r,i)=>ligne(r,'vente',i))}</div>}
               {blocActions}
               {/* (9 nov.) L'état vide UTILE : ce qu'on peut taper, et le clavier (ordinateur). */}
               <div data-recherche-aide="" style={{padding:'12px 2px 4px',color:C.muted,fontSize:12,lineHeight:1.5}}>N°, pseudo, suivi, commande, code de retrait, montant ou titre.{ordi ? ' ↑ ↓ pour choisir, Entrée pour ouvrir, Échap pour fermer.' : ''}</div>
+              </>}
             </div>}
             {/* (11 nov., parler à la loupe) J'écoute / ce qui est entendu en direct / l'erreur dite (micro refusé), et le « Pourquoi ? ». */}
             <LigneVoix canal="loupe" Pourquoi={Pourquoi} couleur={C.muted} mobile={!ordi} vide={!q}/>

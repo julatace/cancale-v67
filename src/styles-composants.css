@@ -99,7 +99,7 @@ html body button.vrm-fs-croix:focus-visible { outline: 2px solid var(--vrm-accen
 :root[data-theme="dark"] .vrm-fs.vrm-fs-lumineuse {
   --vrm-bg: #FFFFFF; --vrm-surface: #FFFFFF; --vrm-card2: #F2F2F7; --vrm-ink: #1D1D1F; --vrm-muted: #6E6E73;
   --vrm-faint: #6E6E73; --vrm-line: #E5E5EA; --vrm-hair: rgba(0,0,0,.06); --vrm-photo: #F2F2F7;
-  --vrm-accent: #16181D; --vrm-on-accent: #FFFFFF; --vrm-warn: #B25000; --vrm-warn-soft: #FFF4E5;
+  --vrm-accent: #16181D; --vrm-on-accent: #FFFFFF; --vrm-warn: var(--n-ambre); --vrm-warn-soft: var(--n-ambre-fond);
   --fu-remplir: rgba(118,118,128,.12); --fu-remplir-fort: rgba(118,118,128,.2);
   --vrm-b-teinte: rgba(11,81,57,.08); --vrm-b-teinte-f: rgba(11,81,57,.14); --vrm-b-encre: #1D1D1F; --vrm-b-lien: #16181D;
   color-scheme: light;
@@ -110,17 +110,17 @@ html body button.vrm-fs-croix:focus-visible { outline: 2px solid var(--vrm-accen
 /* ── 2. LE BOUTON « DANGER » = AMBRE (Bouton variante="danger") ─────────────── */
 .vrm-b-danger,
 .vrm-app-shell .vrm-main .vrm-b.vrm-b-danger {
-  background: rgba(178,80,0,.1) !important; color: var(--vrm-warn, #B25000) !important;
+  background: color-mix(in srgb, var(--n-ambre) 10%, transparent) !important; color: var(--vrm-warn, var(--n-ambre)) !important;
 }
 :root[data-theme="dark"] .vrm-b-danger,
-:root[data-theme="dark"] .vrm-app-shell .vrm-main .vrm-b.vrm-b-danger { background: rgba(255,179,64,.14) !important; }
+:root[data-theme="dark"] .vrm-app-shell .vrm-main .vrm-b.vrm-b-danger { background: color-mix(in srgb, var(--n-ambre) 14%, transparent) !important; }
 @supports (color: color-mix(in srgb, red 10%, transparent)) {
-  .vrm-b-danger, .vrm-app-shell .vrm-main .vrm-b.vrm-b-danger { background: color-mix(in srgb, var(--vrm-warn, #B25000) 11%, transparent) !important; }
+  .vrm-b-danger, .vrm-app-shell .vrm-main .vrm-b.vrm-b-danger { background: color-mix(in srgb, var(--vrm-warn, var(--n-ambre)) 11%, transparent) !important; }
 }
 @media (hover: hover) and (pointer: fine) {
   .vrm-b-danger:not(:disabled):hover,
-  .vrm-app-shell .vrm-main .vrm-b.vrm-b-danger:not(:disabled):hover { filter: none; background: rgba(178,80,0,.16) !important; }
-  :root[data-theme="dark"] .vrm-b-danger:not(:disabled):hover { background: rgba(255,179,64,.2) !important; }
+  .vrm-app-shell .vrm-main .vrm-b.vrm-b-danger:not(:disabled):hover { filter: none; background: color-mix(in srgb, var(--n-ambre) 16%, transparent) !important; }
+  :root[data-theme="dark"] .vrm-b-danger:not(:disabled):hover { background: color-mix(in srgb, var(--n-ambre) 20%, transparent) !important; }
 }
 
 /* ── 3. LE CHAMP DE RECHERCHE (ChampRecherche) ──────────────────────────────── */
@@ -192,8 +192,8 @@ html body .vrm-num-grand { padding: 3px 9px; font-size: 17px; }
 html body .vrm-num[data-num-etat="doublon"] { background: var(--vrm-doublon); color: #FFFFFF; }
 :root[data-theme="dark"] body .vrm-num[data-num-etat="doublon"] { background: var(--vrm-doublon); color: #000000; }
 /* À vérifier sur son carton : un geste à faire, en ambre. */
-html body .vrm-num[data-num-etat="aVerifier"] { background: #B25000; color: #FFFFFF; }
-:root[data-theme="dark"] body .vrm-num[data-num-etat="aVerifier"] { background: #FFB340; color: #000000; }
+html body .vrm-num[data-num-etat="aVerifier"] { background: var(--n-ambre); color: var(--n-sur-ambre); }
+:root[data-theme="dark"] body .vrm-num[data-num-etat="aVerifier"] { background: var(--n-ambre); color: #000000; }
 /* Dans la feuille lumineuse, la pastille reprend la forme claire. */
 :root[data-theme="dark"] body .vrm-fs-lumineuse .vrm-num:not([data-num-etat]) { background: #1D1D1F; color: #FFFFFF; }
 

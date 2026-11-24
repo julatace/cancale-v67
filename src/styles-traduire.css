@@ -13,7 +13,7 @@
 .vrm-trad-absente { margin: 6px 12px; text-align: center; }
 .vrm-note-acheteur { display: inline-flex; align-items: center; flex: none; height: 22px; padding: 0 8px; border-radius: 999px; background: var(--n-neutre, rgba(118,118,128,.12));
   color: var(--n-encre-2, #6E6E73); font: 600 12px/1 var(--vrm-police, -apple-system, system-ui, sans-serif); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.vrm-note-acheteur[data-k="ambre"] { color: var(--n-ambre, #8A4B00); background: var(--n-ambre-fond, #FFF4DD); }
-.vrm-note-avis { margin: 4px 0 0; font: 600 13px/1.35 var(--vrm-police, -apple-system, system-ui, sans-serif); color: var(--n-ambre, #8A4B00); }
+.vrm-note-acheteur[data-k="ambre"] { color: var(--n-ambre, var(--n-ambre)); background: var(--n-ambre-fond, var(--n-ambre-fond)); }
+.vrm-note-avis { margin: 4px 0 0; font: 600 13px/1.35 var(--vrm-police, -apple-system, system-ui, sans-serif); color: var(--n-ambre, var(--n-ambre)); }
 .vrm-fil-note { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 16px 0; }
 .vrm-fil-note .vrm-note-avis { margin: 0; flex: 1 1 220px; }

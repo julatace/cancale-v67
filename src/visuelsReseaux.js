@@ -33,7 +33,7 @@ export const ACCENTS = Object.freeze([
   { k: 'bleu', c: '#0071E3' },
   { k: 'encre', c: '#1D1D1F' },
   { k: 'vert', c: '#1E8E3E' },
-  { k: 'orange', c: '#E8590C' },
+  { k: 'orange', c: '#E8590C' },   // orange-permis : une couleur de visuel choisie par lui
   { k: 'rose', c: '#D6336C' },
 ]);
 export const PAR_PAGE = Object.freeze({ carre: 4, story: 6 });

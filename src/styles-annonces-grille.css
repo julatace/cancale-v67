@@ -126,7 +126,7 @@
   font: 600 11px/1 var(--vrm-police, system-ui); padding: 5px 9px; border-radius: 999px;
   background: var(--w-carte, #fff); color: var(--w-encre, #1D1D1F);
 }
-:root:root body .vrm-main .vrm-vignette .vrm-vignette-marque.is-ambre { background: var(--a-ambre-fond, rgba(255,149,0,.16)); color: var(--a-ambre-encre, #A65A00); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+:root:root body .vrm-main .vrm-vignette .vrm-vignette-marque.is-ambre { background: var(--a-ambre-fond, color-mix(in srgb, var(--n-ambre) 16%, transparent)); color: var(--a-ambre-encre, var(--n-ambre)); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette [data-ann-a-confirmer] { right: 8px !important; top: 8px !important; }
 
 /* ── La vignette OUVERTE : la fiche entière, sur toute la largeur ─────────── */
@@ -224,7 +224,7 @@
 :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette {
   width: auto !important; flex: none !important; margin: 2px 0 0 !important; padding: 8px !important;
   border-radius: 12px !important; box-shadow: none !important;
-  background: var(--a-ambre-fond, rgba(255,149,0,.16)) !important;
+  background: var(--a-ambre-fond, color-mix(in srgb, var(--n-ambre) 16%, transparent)) !important;
 }
 :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-photos { display: flex !important; align-items: center; gap: 8px; }
 :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-photos > .vrm-remise-photo:first-child { width: 56px; flex: 0 0 56px; border-radius: 12px; }
@@ -232,7 +232,7 @@
 :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-photos > :not(:first-child) { display: none !important; }
 :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-photo .vrm-remise-num { left: 3px; top: 3px; padding: 1px 6px; font-size: 11px; }
 :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-q { margin-top: 6px !important; }
-:root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-q b { font-size: 14px !important; line-height: 1.25; color: var(--a-ambre-encre, #A65A00) !important; }
+:root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-q b { font-size: 14px !important; line-height: 1.25; color: var(--a-ambre-encre, var(--n-ambre)) !important; }
 :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-boutons { gap: 6px !important; margin-top: 6px !important; }
 :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-boutons > * { min-height: 44px !important; padding: 0 8px !important; font-size: 14px !important; }
 @media (pointer: coarse) {
@@ -242,7 +242,7 @@
   :root:root body .vrm-main .vrm-vignette .vrm-remise-carte.is-vignette .vrm-remise-boutons > * { min-height: 55px !important; font-size: 15px !important; }
 }
 /* La pastille de tête « N · Même paire ? » (elle mène à la première vignette concernée). */
-:root:root body .vrm-pop-puce.is-ambre { color: var(--a-ambre-encre, #A65A00) !important; background: var(--a-ambre-fond, rgba(255,149,0,.16)) !important; }
+:root:root body .vrm-pop-puce.is-ambre { color: var(--a-ambre-encre, var(--n-ambre)) !important; background: var(--a-ambre-fond, color-mix(in srgb, var(--n-ambre) 16%, transparent)) !important; }
 
 /* UN SEUL GABARIT (retour du 10 nov. : « les deux cartes n'ont pas la même hauteur ni la même structure ») :
    le titre réserve ses deux lignes, l'état prend sa ligne, les chiffres (vues, favoris, jours) la suivante. */

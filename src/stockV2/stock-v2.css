@@ -18,8 +18,8 @@
   --sr-plein-appui: var(--v2-plein-fond-appui, #E3E6EA);
   --sr-plein-texte: var(--v2-plein-texte, #1C1C20);
   --sr-accent: #16181D;
-  --sr-ambre: var(--v2-ambre, #8A4B00);
-  --sr-page-ambre: var(--v2-page-ambre, #FFF1C0);
+  --sr-ambre: var(--v2-ambre, var(--n-ambre));
+  --sr-page-ambre: var(--v2-page-ambre, var(--n-ambre-fond));
   --sr-anneau: var(--v2-anneau, 0 0 0 3px rgb(11 81 57 / .45));
   --sr-appui: 100ms cubic-bezier(.2, .9, .25, 1);
   --sr-retour: 200ms cubic-bezier(.32, 1.25, .5, 1);
@@ -35,7 +35,7 @@
   --sr-filet: var(--v2-filet, rgb(255 255 255 / .10)); --sr-socle: var(--v2-socle, #303037); 
   --sr-teinte: var(--v2-teinte-fond, rgb(244 244 245 / .16)); --sr-teinte-appui: var(--v2-teinte-fond-appui, rgb(244 244 245 / .26));
   --sr-teinte-texte: var(--v2-teinte-texte, #BCC4CF); --sr-plein: var(--v2-plein-fond, #F1F2F4); --sr-plein-appui: var(--v2-plein-fond-appui, #D3D8E0);
-  --sr-plein-texte: var(--v2-plein-texte, #111114); --sr-accent: #16181D; --sr-ambre: var(--v2-ambre, #F2B65E); --sr-page-ambre: var(--v2-page-ambre, #F2B65E);
+  --sr-plein-texte: var(--v2-plein-texte, #111114); --sr-accent: #16181D; --sr-ambre: var(--v2-ambre, var(--n-ambre)); --sr-page-ambre: var(--v2-page-ambre, var(--n-ambre));
   --sr-anneau: var(--v2-anneau, 0 0 0 3px rgb(188 196 207 / .55));
 }
 .vrm-ms-stock.sr-hote { padding: 4px 16px 24px !important; gap: 0 !important; }
@@ -216,8 +216,8 @@
 }
 
 /* ══ LA SIGNATURE (17 nov., brief « SIGNATURE ») : l'ÉTIQUETTE KRAFT — une place est une étiquette de carton, en plus grand
-   que celle du N° (kraft clair #E9DCC4 / nuit #3A3226, encre, coin coupé, œillet percé) ; et le MOUVEMENT « fait ». ══ */
-.sr-kraft { --sr-kraft: var(--v2-kraft, #E9DCC4); --sr-kraft-encre: var(--v2-kraft-encre, #2A2116); --sr-kraft-muet: var(--v2-kraft-doux, #6B5A40); background: var(--sr-kraft) !important; color: var(--sr-kraft-encre) !important;
+   que celle du N° (kraft clair var(--n-ambre) / nuit #3A3226, encre, coin coupé, œillet percé) ; et le MOUVEMENT « fait ». ══ */
+.sr-kraft { --sr-kraft: var(--v2-kraft, var(--n-ambre)); --sr-kraft-encre: var(--v2-kraft-encre, #2A2116); --sr-kraft-muet: var(--v2-kraft-doux, #6B5A40); background: var(--sr-kraft) !important; color: var(--sr-kraft-encre) !important;
   clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%); border-radius: 6px; box-shadow: inset 0 0 0 .5px var(--v2-kraft-bord, rgb(42 33 22 / .22)); position: relative; }
 /* L'œillet percé, à gauche (la géométrie de l'étiquette N° partagée, src/designV2/signature.css, en plus grand). */
 .sr-kraft::before { content: ""; position: absolute; left: 10px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: var(--sr-trou, var(--v2-kraft-trou, #FFFFFF)); box-shadow: inset 0 0 0 .5px var(--v2-kraft-bord, rgb(42 33 22 / .22)); }

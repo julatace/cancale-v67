@@ -1,3 +1,4 @@
+// orange-permis-fichier : les couleurs des PAIRES (chercher une chaussure orange), pas la palette de l'app (audit-sans-orange.cjs)
 // ══════════════════════════════════════════════════════════════════════════════
 //  CHERCHER PAR COULEUR (14 nov., proposition 104 — validée par Julien)
 // ══════════════════════════════════════════════════════════════════════════════

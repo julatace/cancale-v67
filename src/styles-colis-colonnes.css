@@ -25,7 +25,7 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #16181D)
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .vrm-cc-bas { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
 .vrm-cc-etat { font-size: 12px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); min-width: 0; overflow-wrap: anywhere; }
-.vrm-cc-etat.is-ambre { color: var(--vrm-warn, #B25000); font-weight: 700; }
+.vrm-cc-etat.is-ambre { color: var(--vrm-warn, var(--n-ambre)); font-weight: 700; }
 .vrm-cc-num { flex: none; font-family: var(--vrm-police-mono, ui-monospace, monospace); font-weight: 400; font-size: 12px; word-spacing: -.3em;
   background: var(--vrm-surface, #FFFFFF); color: var(--vrm-ink, #1D1D1F); border-radius: 999px; padding: 3px 7px; white-space: nowrap; }
 .vrm-cc-note { font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); margin: 0 0 8px; }
@@ -71,7 +71,7 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #16181D)
 .vrm-rp-nom { font-size: 15px; font-weight: 700; line-height: 1.25; color: var(--vrm-ink, #1D1D1F); overflow-wrap: anywhere; }
 .vrm-rp-adresse { font-size: 13px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); overflow-wrap: anywhere; }
 .vrm-rp-resume { font-size: 13px; line-height: 1.4; color: var(--vrm-ink, #1D1D1F); }
-.vrm-rp-resume .is-ambre { color: var(--vrm-warn, #B25000); font-weight: 700; }
+.vrm-rp-resume .is-ambre { color: var(--vrm-warn, var(--n-ambre)); font-weight: 700; }
 .vrm-rp-pas-carte { font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); }
 .vrm-rp-liste { display: flex; flex-direction: column; gap: 6px; }
 .vrm-rp-code-ligne { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
@@ -90,15 +90,15 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #16181D)
    nombre d'un onglet qui a un geste dû passe en ambre (§7, jamais de rouge). */
 .vrm-colis-onglets { margin: 4px 0 14px; max-width: 520px; }
 .vrm-colis-onglets .vrm-seg-btn { min-height: 44px; }
-.vrm-colis-onglets [data-urgent="1"] .vrm-seg-n { color: var(--vrm-warn, #B25000); opacity: 1; font-weight: 700; }
+.vrm-colis-onglets [data-urgent="1"] .vrm-seg-n { color: var(--vrm-warn, var(--n-ambre)); opacity: 1; font-weight: 700; }
 .vrm-colis-note { font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); margin: 0 2px 10px; }
 .vrm-colis-vide { font-size: 13px; line-height: 1.5; color: var(--vrm-muted, #6E6E73); padding: 18px 2px; margin: 0; }
 .vrm-colis-outils { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
 .vrm-colis-retirer { margin: 0 0 18px; max-width: 760px; }
 .vrm-colis-alerte { display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; min-height: 44px; margin: 0 0 12px; padding: 8px 12px;
-  border: 0; border-radius: 12px; background: color-mix(in srgb, var(--vrm-warn, #B25000) 10%, transparent); color: var(--vrm-ink, #1D1D1F);
+  border: 0; border-radius: 12px; background: color-mix(in srgb, var(--vrm-warn, var(--n-ambre)) 10%, transparent); color: var(--vrm-ink, #1D1D1F);
   font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
-.vrm-colis-alerte svg { color: var(--vrm-warn, #B25000); flex: none; }
+.vrm-colis-alerte svg { color: var(--vrm-warn, var(--n-ambre)); flex: none; }
 .vrm-colis-alerte span { min-width: 0; overflow-wrap: anywhere; }
 
 /* À retirer : une carte = ce que c'est, puis SES gestes (code nommé et copiable,
@@ -108,7 +108,7 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #16181D)
 .vrm-rp-quoi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-rp-quoi .vrm-cc-nom { flex: none; }
 .vrm-rp-sous { font-size: 12px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); overflow-wrap: anywhere; }
-.vrm-rp-sous.is-ambre { color: var(--vrm-warn, #B25000); font-weight: 700; }
+.vrm-rp-sous.is-ambre { color: var(--vrm-warn, var(--n-ambre)); font-weight: 700; }
 .vrm-rp-gestes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; min-width: 0; }
 .vrm-rp-gestes > * { flex: 0 0 auto; max-width: 100%; }
 .vrm-rp-gestes .vrm-pickup-code { min-width: 0; }
@@ -117,7 +117,7 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #16181D)
 .vrm-rp-qr img { width: 100%; height: 100%; object-fit: contain; }
 .vrm-rp-gestes .vrm-pickup-collect { min-height: 44px; margin-left: auto; padding: 0 14px; border: 0; border-radius: 12px; white-space: nowrap;
   background: var(--vrm-b-teinte, rgba(0,0,0,.06)); color: var(--vrm-b-encre, var(--vrm-ink, #1D1D1F)); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-.vrm-rp-verifier { box-shadow: inset 3px 0 0 var(--vrm-warn, #B25000); }
+.vrm-rp-verifier { box-shadow: inset 3px 0 0 var(--vrm-warn, var(--n-ambre)); }
 .vrm-rp-verifier .vrm-rp-carte[data-a-verifier] { opacity: 1; }
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   .vrm-colis-retirer { max-width: 900px; }
@@ -163,7 +163,7 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #16181D)
 .vrm-mr-comptes li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 13px; line-height: 1.4; padding: 8px 12px; border-radius: 12px; background: var(--vrm-surface, #FFFFFF); }
 .vrm-mr-nom { font-weight: 600; color: var(--vrm-ink, #1D1D1F); overflow-wrap: anywhere; }
 .vrm-mr-frais { font-size: 12px; color: var(--vrm-muted, #6E6E73); }
-.vrm-mr-frais.is-ambre { color: var(--vrm-warn, #B25000); font-weight: 600; }
+.vrm-mr-frais.is-ambre { color: var(--vrm-warn, var(--n-ambre)); font-weight: 600; }
 
 /* ══ (5 nov., chantier D) COLIS, CÔTÉ ENVOI ═══════════════════════════════════════════════
    La barre du haut : les mêmes trois boutons sur les trois onglets, une forme (revue 2.21). */
@@ -191,13 +191,13 @@ html body .vrm-colis-barre > .vrm-b:disabled { opacity: .45; }
   color: var(--vrm-muted, #6E6E73); background: var(--vrm-card2, #F2F2F7); border-radius: 12px; padding: 10px 14px; }
 .vrm-eg-absent strong { color: var(--vrm-ink, #1D1D1F); font-weight: 600; font-size: 14px; }
 .vrm-eg-note { margin: 0; font-size: 12px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); text-align: center; max-width: 38ch; }
-.vrm-eg-note.is-ambre { color: var(--vrm-warn, #B25000); font-weight: 600; }
+.vrm-eg-note.is-ambre { color: var(--vrm-warn, var(--n-ambre)); font-weight: 600; }
 .vrm-eg-capture { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
 .vrm-eg-faits { list-style: none; margin: 0; padding: 0; align-self: stretch; display: flex; flex-direction: column; gap: 0;
   border-top: 1px solid var(--vrm-line, #E5E5EA); }
 .vrm-eg-faits:empty { display: none; }
 .vrm-eg-faits li { font-size: 14px; line-height: 1.4; color: var(--vrm-ink, #1D1D1F); padding: 10px 2px; border-bottom: 1px solid var(--vrm-line, #E5E5EA); overflow-wrap: anywhere; }
-.vrm-eg-faits li.is-ambre { color: var(--vrm-warn, #B25000); font-weight: 600; }
+.vrm-eg-faits li.is-ambre { color: var(--vrm-warn, var(--n-ambre)); font-weight: 600; }
 html body .vrm-eg-corps > .vrm-b { align-self: stretch; }
 
 /* La tournée de dépôt (5 nov.) : un bouton au-dessus des colis, puis une feuille par transporteur. */
@@ -262,9 +262,9 @@ html body .vrm-main .vrm-colis-titre .vrm-num, html body .vrm-tournee .vrm-num, 
 :root:root body .vrm-rpf-delai.is-tete { margin: 0; }
 :root:root body .vrm-rpf-delai-piste { position: relative; flex: 1 1 auto; min-width: 48px; height: 4px; border-radius: 2px; overflow: hidden; background: var(--d-remplir, rgba(118,118,128,.12)); }
 :root:root body .vrm-rpf-delai-plein { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--d-gris, #6E6E73); }
-:root:root body .vrm-rpf-delai.is-ambre .vrm-rpf-delai-plein { background: var(--d-ambre, var(--vrm-warn, #B25000)); }
+:root:root body .vrm-rpf-delai.is-ambre .vrm-rpf-delai-plein { background: var(--d-ambre, var(--vrm-warn, var(--n-ambre))); }
 :root:root body .vrm-rpf-delai-txt { flex: none; font-size: 12px; line-height: 16px; font-weight: 400; color: var(--d-gris, #6E6E73); white-space: nowrap; font-variant-numeric: tabular-nums; }
-:root:root body .vrm-rpf-delai-txt.is-ambre { color: var(--d-ambre, var(--vrm-warn, #B25000)); font-weight: 600; }
+:root:root body .vrm-rpf-delai-txt.is-ambre { color: var(--d-ambre, var(--vrm-warn, var(--n-ambre))); font-weight: 600; }
 :root:root body .vrm-rpf-delai-est { font-weight: 400; }
 html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete-delai { padding: 10px 16px 2px !important; margin: 0 !important; }
 /* La carte en haut de la liste (téléphone compris) ; « Agrandir » posé dans son coin, 44 px au doigt. */
@@ -292,8 +292,8 @@ html body .vrm-rpf-ligne .vrm-rpf-source:has(+ .vrm-rpf-verifie)::after { conten
 html body .vrm-rpf-ligne .vrm-rpf-source, html body .vrm-rpf-ligne .vrm-rpf-verifie { display: inline !important; white-space: nowrap; }
 html body .vrm-rpf-ligne .vrm-rpf-verifie { font-variant-numeric: tabular-nums; }
 html body .vrm-rpf-ligne .vrm-rpf-code .vrm-rpf-code-sur { margin-left: 4px; vertical-align: -1px; }
-html body .vrm-rpf-ligne .vrm-rpf-code.is-ambre { color: var(--vrm-warn, #B25000) !important; border-color: currentColor !important; font-weight: 600 !important; }
-html body .vrm-rpf-ligne .vrm-rpf-desaccord { display: flex; flex-direction: column; gap: 2px; margin: 6px 0 4px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--vrm-warn, #B25000); color: var(--vrm-warn, #B25000); font-size: 13px; }
+html body .vrm-rpf-ligne .vrm-rpf-code.is-ambre { color: var(--vrm-warn, var(--n-ambre)) !important; border-color: currentColor !important; font-weight: 600 !important; }
+html body .vrm-rpf-ligne .vrm-rpf-desaccord { display: flex; flex-direction: column; gap: 2px; margin: 6px 0 4px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--vrm-warn, var(--n-ambre)); color: var(--vrm-warn, var(--n-ambre)); font-size: 13px; }
 html body .vrm-rpf-ligne .vrm-rpf-desaccord-t { font-weight: 600; }
 html body .vrm-rpf-ligne .vrm-rpf-desaccord-v b { font-variant-numeric: tabular-nums; letter-spacing: .04em; }
 html body .vrm-rpf-ligne .vrm-rpf-code-origine { margin: 4px 0; font-size: 12px; color: var(--p-gris, #86868b); }
@@ -311,7 +311,7 @@ html body .vrm-rpf-ligne .vrm-rpf-code-origine { margin: 4px 0; font-size: 12px;
 /* (11 nov., retraits fiables) Le code de retrait LISIBLE sur la ligne, en grand, chiffres alignés : on le lit
    d'un coup d'œil au comptoir ; un toucher le copie. « Pas confirmé depuis » en ambre (§7 : un geste à faire). */
 :root:root body .vrm-rpf-ligne .vrm-rpf-code.is-valeur, :root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-code.is-valeur { font-size: 20px !important; font-weight: 700 !important; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
-html body .vrm-rpf-ligne .vrm-rpf-verifie.is-ambre { color: var(--vrm-warn, #B25000) !important; }
+html body .vrm-rpf-ligne .vrm-rpf-verifie.is-ambre { color: var(--vrm-warn, var(--n-ambre)) !important; }
 html body .vrm-rpf-tete .vrm-rpf-masquer { font: inherit; padding: 12px 2px; margin: -12px 0; background: none; border: 0; color: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 html body .vrm-rpf .vrm-rpf-ordre { margin: 4px 0 8px; }
 html body .vrm-rpf .vrm-rpf-masques { display: block; min-height: 44px; margin: 6px 0; font-size: 13px; background: none; border: 0; color: var(--p-gris, #86868b); cursor: pointer; text-align: left; }

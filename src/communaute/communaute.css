@@ -212,8 +212,8 @@ form.vrm-cm-discord-moi { display: block !important; }
 .vrm-cm-invitation { display: grid; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--cm-fond); }
 .vrm-cm-invitation b { font-variant-numeric: tabular-nums; letter-spacing: .06em; font-size: 17px; }
 .vrm-cm-etiquette { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--cm-fond); color: var(--cm-doux); white-space: nowrap; }
-.vrm-cm-etiquette.attente { color: #B25000; background: rgba(255,149,0,.14); }
-.vrm-communaute[data-dark="true"] .vrm-cm-etiquette.attente { color: #FFB340; }
+.vrm-cm-etiquette.attente { color: var(--n-ambre); background: color-mix(in srgb, var(--n-ambre) 14%, transparent); }
+.vrm-communaute[data-dark="true"] .vrm-cm-etiquette.attente { color: var(--n-ambre); }
 .vrm-cm-partage { border: 0; padding: 0; margin: 4px 0; display: grid; gap: 6px; min-width: 0; }
 .vrm-cm-partage legend { font-size: 13px; font-weight: 700; margin-bottom: 4px; padding: 0; }
 .vrm-cm-partage-option { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; min-height: 44px; border-radius: 12px; border: 1px solid var(--cm-bord); background: var(--cm-carte); cursor: pointer; }

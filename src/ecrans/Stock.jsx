@@ -1817,7 +1817,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   const [blockMode,setBlockMode]=useState(false);
   const [colorMode,setColorMode]=useState(false);
   const [addMode,setAddMode]=useState(false); // masquer les cases vides par défaut
-  const [activeColor,setActiveColor]=useState('#ffb830');
+  const [activeColor,setActiveColor]=useState('#3D4B5B');
   const [focusedCell,setFocusedCell]=useState(null); // {zid, ci, si}
   const highlightRef=React.useRef(null);
   // Rangement lancé DEPUIS le garage (bouton « Ranger » sur une paire à ranger),
@@ -2177,7 +2177,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
           <h3 style={{fontSize:15,fontWeight:600,margin:'0 0 8px',color:C.warn,display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={15}/>{tr('stock.incoherencesAvecStock')}</h3>
 
           {enLignePasGarage.length>0&&(
-            <div style={{marginBottom:10,padding:10,background:'rgba(156,106,31,0.10)',borderRadius:12}}>
+            <div style={{marginBottom:10,padding:10,background:'color-mix(in srgb, var(--n-ambre) 10%, transparent)',borderRadius:12}}>
               <div style={{fontSize:13,fontWeight:400,marginBottom:4}}>{trj('stock.ligneMaisAbsent', { enLignePasGarageN: enLignePasGarage.length })}</div>
               <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginBottom:6}}>{tr('stock.cesAnnoncesSont')}</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
@@ -2231,7 +2231,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
             return (
               <span key={n} style={{
                 display:'inline-flex',alignItems:'center',gap:6,
-                background:absentGarage?'rgba(156,106,31,0.12)':(C.card2||'rgba(0,0,0,0.05)'),
+                background:absentGarage?'color-mix(in srgb, var(--n-ambre) 12%, transparent)':(C.card2||'rgba(0,0,0,0.05)'),
                 border:absentGarage?`1px solid ${C.warn}`:'1px solid transparent',
                 borderRadius:12,padding:'5px 8px 5px 10px',fontSize:13,fontWeight:400
               }}>
