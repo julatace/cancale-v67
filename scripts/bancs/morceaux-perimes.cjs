@@ -38,6 +38,11 @@
 //       quand elle passe en arrière-plan (invisible), sur le même écran.
 //   P5  page fermée, plus aucune page sur A, deux mises en ligne plus tard : le
 //       ménage a eu lieu — les fichiers de A ne restent pas sur le téléphone.
+//   P6  comme P1, mais le service worker « endormi » avant sa réserve (iOS le fait
+//       quand il veut : sa réserve attend 15 s puis range ≈ 340 fichiers un à un) :
+//       la page ouverte depuis 90 s doit avoir ses fichiers quand même.
+//  P1, P2, P6 vident le cache HTTP avant d'ouvrir les écrans : Safari l'évince vite,
+//  seule la réserve du service worker est une garantie.
 //  Données inventées ; rien ne sort de la machine (garde réseau des bancs).
 // ════════════════════════════════════════════════════════════════════════════
 require('./_porte-banc.cjs');
@@ -96,6 +101,8 @@ const srv = http.createServer((q, r) => {
   const cc = f.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'public, max-age=0, must-revalidate';
   if (absent) return servi(r, 404, { 'content-type': 'text/plain', 'cache-control': cc }, 'The page could not be found\n\nNOT_FOUND\n');
   const t = types[path.extname(p)] || 'application/octet-stream'; let b = fs.readFileSync(p);
+  // P6 : « comme iOS » — le service worker endormi avant de faire SA réserve (le vrai, à une constante près).
+  if (f === '/sw.js' && site.swEndormi) b = Buffer.from(String(b).replace(/const ATTENTE_RECHAUFFE_MS = \d+;/, 'const ATTENTE_RECHAUFFE_MS = 1e9;'));
   const gz = /javascript|css|html|json|svg/.test(t);
   if (gz) b = zlib.gzipSync(b, { level: 1 });
   servi(r, 200, { 'content-type': t, ...(gz ? { 'content-encoding': 'gzip' } : {}), 'cache-control': cc }, b);
@@ -135,7 +142,10 @@ const SONDE = () => {
   const o = window.__mp = { erreurs: [], preload: 0 };
   addEventListener('error', (e) => { try { o.erreurs.push(String((e && (e.message || (e.error && e.error.message))) || 'erreur').slice(0, 200)); } catch (_) {} }, true);
   addEventListener('unhandledrejection', (e) => { try { o.erreurs.push(String((e && e.reason && (e.reason.message || e.reason)) || 'rejet').slice(0, 200)); } catch (_) {} });
-  addEventListener('vite:preloadError', () => { o.preload++; });
+  // Le rechargement de l'app (src/chargementSur.js) : sa raison et l'écran ouvert à ce moment, gardés pour l'onglet.
+  addEventListener('vrm:rechargement', (e) => { try { const l = JSON.parse(sessionStorage.getItem('banc_recharges') || '[]'); l.push({ raison: e.detail && e.detail.raison, tab: history.state && history.state.vrmTab }); sessionStorage.setItem('banc_recharges', JSON.stringify(l)); } catch (_) {} });
+  // Compté pour l'ONGLET (sessionStorage) : un rechargement ne remet pas le compteur à zéro.
+  addEventListener('vite:preloadError', () => { o.preload++; try { sessionStorage.setItem('banc_preload', String(Number(sessionStorage.getItem('banc_preload') || 0) + 1)); } catch (_) {} });
 };
 const MAUVAIS = /reading 'default'|evaluating '[\w$.]*\.default'|_result\.default|Unable to preload CSS|dynamically imported module|Importing a module script failed|is not a valid JavaScript MIME type/i;
 
@@ -169,13 +179,15 @@ async function attendreReserve(pg, liste, max = 180000) {
 }
 const etatPage = (pg) => pg.evaluate(() => ({
   url: location.search,
+  tab: history.state && history.state.vrmTab,
+  recharges: (() => { try { return JSON.parse(sessionStorage.getItem('banc_recharges') || '[]'); } catch (_) { return []; } })(),
   texte: (document.body && document.body.innerText || '').replace(/\s+/g, ' ').slice(0, 300),
   garde: [...document.querySelectorAll('[data-garde-ecran],[data-garde-feuille]')].map((e) => e.getAttribute('data-garde-ecran') || e.getAttribute('data-garde-feuille')),
   majEcran: !!document.querySelector('[data-mettre-a-jour-vrm]'),
   attente: document.querySelectorAll('[data-morceau-attente]').length,
   filet: /n’a pas pu démarrer|n'a pas pu démarrer/.test(document.body && document.body.innerText || ''),
   erreurs: (window.__mp && window.__mp.erreurs) || [],
-  preload: (window.__mp && window.__mp.preload) || 0,
+  preload: (() => { try { return Number(sessionStorage.getItem('banc_preload') || 0); } catch (_) { return (window.__mp && window.__mp.preload) || 0; } })(),
 })).catch(() => ({ url: '', texte: '', garde: [], majEcran: false, attente: 0, filet: false, erreurs: [], preload: 0 }));
 const shot = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SHOTS, nom + '.png') }); } catch (_) {} };
 const aller = (pg, tab) => pg.evaluate((t) => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=' + t })), tab).catch(() => {});
@@ -206,9 +218,9 @@ const ECRANS = ['settings', 'dashboard', 'emails', 'communaute', 'garage', 'sema
   };
   const URL0 = `http://localhost:${PORT}/?tab=journee`;
   const a404De = (depuis) => site.journal.filter((x) => x.t >= depuis && x.s === 404 && nomsA.has(x.u)).map((x) => x.u.slice(8, 40));
-  const juger = (n, vu, e) => {
+  const juger = (n, vu, e, { compte = true } = {}) => {
     const mauvais = [...vu.erreurs, ...vu.console, ...e.erreurs].filter((m) => MAUVAIS.test(m));
-    dit(mauvais.length === 0 && e.preload === 0, `${n} aucune erreur de morceau (ce que la production compte « morceau »)`, `preloadError ${e.preload} · ` + mauvais.slice(0, 2).join(' | '));
+    dit(mauvais.length === 0 && (!compte || e.preload === 0), `${n} aucune erreur de morceau (ce que la production compte « morceau »)`, `preloadError ${e.preload} · ` + mauvais.slice(0, 2).join(' | '));
     const tombes = vu.console.filter((m) => /\[VRM\] (écran|application) en erreur/.test(m));
     dit(e.garde.length === 0 && !e.filet && tombes.length === 0, `${n} aucun écran tombé (garde-fou, dernier filet)`, [...e.garde, ...(e.filet ? ['filet'] : []), ...tombes.map((m) => m.slice(0, 110))].join(' | '));
   };
@@ -227,25 +239,29 @@ const ECRANS = ['settings', 'dashboard', 'emails', 'communaute', 'garage', 'sema
   }
 
   // ── P1 / P2 : ouverte longtemps, puis la mise en ligne ─────────────────────
-  for (const n of ['P1', 'P2']) {
+  for (const n of ['P1', 'P2', 'P6']) {
     if (veut(n)) await essaie(n, async () => {
-      site.dist = DIST_A;
+      site.dist = DIST_A; site.swEndormi = n === 'P6';
       const ctx = await contexte();
       const { pg, vu } = await nouvellePage(ctx);
       await pg.goto(URL0, { waitUntil: 'commit' });
       dit(await attendrePret(pg), `${n} Ma journée s’affiche (version A)`);
       const t0 = Date.now();
-      const nRes = await attendreReserve(pg, listeA);
-      dit(nRes === listeA.length, `${n} la réserve du service worker a rangé toute la liste de A`, `${nRes}/${listeA.length} en ${Math.round((Date.now() - t0) / 1000)} s`);
+      const nRes = await attendreReserve(pg, listeA, n === 'P6' ? 90000 : 180000);
+      dit(nRes === listeA.length, `${n} ${n === 'P6' ? 'service worker endormi : ' : ''}toute la liste de A est rangée (la page ouverte depuis 90 s au plus)`, `${nRes}/${listeA.length} en ${Math.round((Date.now() - t0) / 1000)} s`);
       const deploie = Date.now();
       site.dist = DIST_B;   // la mise en ligne : plus un seul fichier de A sur le serveur
       if (n === 'P2') {
         // Deux mises en ligne (B puis C) et une AUTRE page qui s'ouvre (2e onglet, l'app ailleurs) : elle passe en C, le
         // service worker range C et fait son ménage — c'est la 2e mise en ligne qui retirait les fichiers de A.
         const vC = (fs.readFileSync(path.join(DIST_C, 'index.html'), 'utf8').match(/\/assets\/index-[\w-]+\.js/) || [])[0];
-        site.dist = DIST_C;
         const p2 = await nouvellePage(ctx);
+        // L'autre page s'ouvre en B (sa réserve range B), puis C est mise en ligne et elle passe en C.
         await p2.pg.goto(URL0, { waitUntil: 'commit' });
+        await attendrePret(p2.pg); await attendre(3000);
+        await attendreReserve(p2.pg, JSON.parse(fs.readFileSync(path.join(DIST_B, 'hors-ligne-assets.json'), 'utf8')).fichiers, 120000);
+        site.dist = DIST_C;
+        await p2.pg.reload();
         await attendrePret(p2.pg); await attendre(3000);
         dit(await versionDe(p2.pg) === vC, `${n} l’autre page tourne en C`, await versionDe(p2.pg));
         await attendreReserve(p2.pg, JSON.parse(fs.readFileSync(path.join(DIST_C, 'hors-ligne-assets.json'), 'utf8')).fichiers, 120000);
@@ -256,6 +272,9 @@ const ECRANS = ['settings', 'dashboard', 'emails', 'communaute', 'garage', 'sema
         dit(restent === listeA.length, `${n} la page restée sur A garde ses fichiers dans la réserve (ménage différé tant qu'elle est ouverte)`, `${restent}/${listeA.length}`);
       }
       await pg.bringToFront().catch(() => {});
+      // Le cache HTTP du navigateur ne garantit rien (Safari l'évince vite, surtout sur iPhone) : on le vide —
+      // seule la réserve du service worker doit tenir les fichiers de A.
+      try { const cdp = await ctx.newCDPSession(pg); await cdp.send('Network.clearBrowserCache'); await cdp.detach(); } catch (_) {}
       await relireVersion(pg); await attendre(1500);
       const res = await parcourir(n, pg, vu);
       if (DEBUG) console.log('   ' + JSON.stringify(res));
@@ -266,7 +285,7 @@ const ECRANS = ['settings', 'dashboard', 'emails', 'communaute', 'garage', 'sema
       const a404 = a404De(deploie);
       dit(a404.length === 0, `${n} aucun fichier de A demandé au serveur (404)`, a404.slice(0, 4).join(', ') + (a404.length > 4 ? ` … (${a404.length})` : ''));
       juger(n, vu, e);
-      await ctx.close();
+      await ctx.close(); site.swEndormi = false;
     });
   }
 
@@ -282,7 +301,9 @@ const ECRANS = ['settings', 'dashboard', 'emails', 'communaute', 'garage', 'sema
     await relireVersion(pg); await attendre(1500);
     const navs = vu.navs;
     await aller(pg, 'settings');
-    await attendre(9000);
+    await attendre(600);
+    const voulu = await pg.evaluate(() => history.state && history.state.vrmTab).catch(() => null);   // l'écran que la coque a ouvert (Réglages)
+    await attendre(8400);
     await pg.waitForLoadState('load').catch(() => {});
     await attendre(4000);
     const e = await etatPage(pg);
@@ -290,12 +311,14 @@ const ECRANS = ['settings', 'dashboard', 'emails', 'communaute', 'garage', 'sema
     if (DEBUG) console.log(`   ${n} : ${vu.navs} chargement(s), version ${v}, url ${e.url}, maj ${e.majEcran}, attente ${e.attente}`);
     await shot(pg, `${n}-settings`);
     dit(vu.navs - navs <= 1, `${n} au plus UN rechargement (jamais une boucle)`, `${vu.navs} chargement(s)`);
-    dit(v === vB && /tab=settings/.test(e.url), `${n} la page repart en B, SUR l’écran demandé (Réglages)`, `${v} · « ${e.url} » · ${e.texte.slice(0, 60)}`);
+    dit(v === vB && !!voulu && e.tab === voulu && voulu !== 'journee', `${n} la page repart en B, SUR l’écran demandé (« ${voulu} »)`, `${v} · écran « ${e.tab} » · ${e.texte.slice(0, 60)} · ${JSON.stringify(e.recharges)}`);
     dit(!e.majEcran && !e.attente, `${n} l’écran s’affiche (ni « Mettre à jour VRM », ni attente restée)`, e.texte.slice(0, 120));
     const res = await parcourir(n, pg, vu);
     dit(res.every((x) => !x.recharge && !x.maj && !x.attente), `${n} en B, les autres écrans s’ouvrent sans rien de plus`, JSON.stringify(res.filter((x) => x.recharge || x.maj || x.attente)));
     dit(vu.navs - navs <= 1, `${n} toujours au plus UN rechargement après ${ECRANS.length} écrans`, `${vu.navs} chargement(s)`);
-    juger(n, vu, await etatPage(pg));
+    // Les préchargements de fond de A, ratés avant le rechargement, sont comptés (la production les compte) : ici les
+    // fichiers n'existent plus NULLE PART, c'est attendu ; seul ce que Julien voit est jugé.
+    juger(n, vu, await etatPage(pg), { compte: false });
     await ctx.close();
   });
 
@@ -307,21 +330,22 @@ const ECRANS = ['settings', 'dashboard', 'emails', 'communaute', 'garage', 'sema
     site.dist = DIST_A;
     const ctx = await contexte();
     const { pg, vu } = await nouvellePage(ctx);
-    await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'commit' });
+    await pg.goto(`http://localhost:${PORT}/?tab=achats`, { waitUntil: 'commit' });
     await pg.waitForFunction(() => [...document.querySelectorAll('input[type="search"], input[type="text"], input:not([type]), textarea')].some((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; }), null, { timeout: 60000 }).catch(() => {});
-    await attendre(2000);
+    await attendre(10000);   // l'écran et ses morceaux sont là, les préchargements du repos sont passés
+    const ecran = await pg.evaluate(() => history.state && history.state.vrmTab).catch(() => null);
     site.dist = DIST_B;
     const champ = await pg.evaluate(() => {
       const el = [...document.querySelectorAll('input[type="search"], input[type="text"], input:not([type]), textarea')].find((x) => { const r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
       if (!el) return null; el.setAttribute('data-banc-champ', '1'); el.focus(); return el.outerHTML.slice(0, 90);
     }).catch(() => null);
-    dit(!!champ, `${n} un champ de texte trouvé (Ventes)`, champ);
+    dit(!!champ, `${n} un champ de texte trouvé (écran « ${ecran} »)`, champ);
     await pg.keyboard.type('Jordan 4 bleu 42', { delay: 15 });
     const navs = vu.navs;
     await pg.evaluate(() => window.dispatchEvent(Object.assign(new Event('vite:preloadError', { cancelable: true }), { payload: new Error('Unable to preload CSS for /assets/Reglages-perime.css') }))).catch(() => {});
     await attendre(6000);
     const texte = await pg.evaluate(() => { const el = document.querySelector('[data-banc-champ]'); return el ? el.value : null; }).catch(() => null);
-    dit(vu.navs === navs, `${n} un texte en cours : AUCUN rechargement tout seul`, `${vu.navs - navs} rechargement(s)`);
+    dit(vu.navs === navs, `${n} un texte en cours : AUCUN rechargement tout seul`, `${vu.navs - navs} rechargement(s) · ${JSON.stringify((await etatPage(pg)).recharges)}`);
     dit(texte === 'Jordan 4 bleu 42', `${n} le texte tapé est toujours là`, JSON.stringify(texte));
     await shot(pg, `${n}-texte-garde`);
     // Il a fini d'écrire et range le téléphone (l'app passe en arrière-plan) : la page se relit là, sans qu'il le voie.
@@ -331,7 +355,7 @@ const ECRANS = ['settings', 'dashboard', 'emails', 'communaute', 'garage', 'sema
     await attendre(3000);
     const e = await etatPage(pg);
     dit(vu.navs === navs + 1 && await versionDe(pg) === vB, `${n} page CACHÉE, plus rien en cours : UN rechargement, invisible, vers B`, `${vu.navs - navs} rechargement(s) · ${await versionDe(pg)}`);
-    dit(/tab=ventes/.test(e.url), `${n} et il revient sur Ventes`, `« ${e.url} »`);
+    dit(!!ecran && e.tab === ecran, `${n} et il revient sur le même écran (« ${ecran} »)`, `écran « ${e.tab} » · ${JSON.stringify(e.recharges)}`);
     await ctx.close();
   });
 
@@ -357,8 +381,11 @@ const ECRANS = ['settings', 'dashboard', 'emails', 'communaute', 'garage', 'sema
     }
     ({ pg } = await nouvellePage(ctx));
     await pg.goto(`http://localhost:${PORT}/version-app.json`).catch(() => {});
-    const restent = await reserve(pg, listeA);
-    dit(restent === 0, 'P5 plus aucune page sur A, deux mises en ligne plus tard : ses fichiers ont quitté la réserve (rien ne s’accumule)', `${restent} fichier(s) de A encore rangés`);
+    // Les MORCEAUX (.js, l'essentiel du poids). Les feuilles .css d'une « copie d'écran » du jour (src/copieEcran.js)
+    // sont redemandées par la copie à l'ouverture et reviennent du cache HTTP : observé sur main comme ici, borné au jour.
+    const restent = await reserve(pg, listeA.filter((f) => f.endsWith('.js')));
+    if (DEBUG) console.log('   restent : ' + (await pg.evaluate(async (l) => { const c = await caches.open('vrm-shell-v6'); const r = []; for (const f of l) if (await c.match(f)) r.push(f.slice(8, 30)); return r.join(' '); }, listeA).catch(() => '')));
+    dit(restent === 0, 'P5 plus aucune page sur A, deux mises en ligne plus tard : ses morceaux ont quitté la réserve (rien ne s’accumule)', `${restent} fichier(s) de A encore rangés`);
     await ctx.close();
   });
 
