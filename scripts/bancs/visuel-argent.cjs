@@ -343,8 +343,10 @@ async function parametres(nav, taille, sombre) {
     await pg.waitForSelector('[data-pm-cat]', { timeout: 40000 }).catch(() => {});
     await calme(pg);
     const m = await pg.evaluate(() => {
-      const med = [...document.querySelectorAll('[data-pm-cat]')].filter((e) => e.getClientRects().length);
-      return { n: med.length, degrades: med.filter((e) => /gradient/.test(getComputedStyle(e).backgroundImage)).length, teintes: [...new Set(med.map((e) => getComputedStyle(e).backgroundImage.match(/rgb\([^)]*\)/g).slice(-1)[0]))].length };
+      // Les médaillons des RANGÉES de sections (la tête d'une section à l'ordinateur garde son icône d'avant).
+      const med = [...document.querySelectorAll('[data-pm-cat]')].filter((e) => e.getClientRects().length && !e.closest('.vrm-pm-cat-h'));
+      const fond = (e) => (getComputedStyle(e).backgroundImage.match(/rgb\([^)]*\)/g) || ['aucun']).slice(-1)[0];
+      return { n: med.length, degrades: med.filter((e) => /gradient/.test(getComputedStyle(e).backgroundImage)).length, teintes: [...new Set(med.map(fond))].length };
     });
     dit(m.n >= 6 && m.degrades === m.n && m.teintes >= 4, `P ${ou} chaque section a son médaillon teinté (${m.degrades}/${m.n}, ${m.teintes} teintes)`, m);
     const orange = await pg.evaluate(ORANGE, ['.vrm-pm']);
@@ -380,10 +382,11 @@ async function film(nav) {
   await new Promise((r) => P.srv.listen(P.PORT, r));
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   try {
-    for (const taille of TAILLES) for (const t of THEMES) await argent(nav, taille, t === 'sombre');
-    for (const taille of TAILLES) await reduit(nav, taille);
-    for (const taille of TAILLES) for (const t of THEMES) await messages(nav, taille, t === 'sombre');
-    for (const taille of TAILLES) for (const t of THEMES) await parametres(nav, taille, t === 'sombre');
+    const PARTIES = liste('PARTIES', 'argent,reduit,messages,parametres');
+    if (PARTIES.includes('argent')) for (const taille of TAILLES) for (const t of THEMES) await argent(nav, taille, t === 'sombre');
+    if (PARTIES.includes('reduit')) for (const taille of TAILLES) await reduit(nav, taille);
+    if (PARTIES.includes('messages')) for (const taille of TAILLES) for (const t of THEMES) await messages(nav, taille, t === 'sombre');
+    if (PARTIES.includes('parametres')) for (const taille of TAILLES) for (const t of THEMES) await parametres(nav, taille, t === 'sombre');
     if (VIDEO) await film(nav).catch((e) => console.log('  (film) ' + String(e).slice(0, 200)));
   } catch (e) { ko++; console.log('  ❌ le banc s’est arrêté : ' + String(e && e.stack || e).slice(0, 1200)); }
   await nav.close(); P.srv.close();
