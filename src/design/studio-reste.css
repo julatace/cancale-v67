@@ -176,7 +176,7 @@
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is([style*="color: rgb(110, 110, 115)"], [style*="color: rgb(152, 152, 157)"], [style*="color:#6E6E73"]):not(svg *) { color: var(--sb-encre-2) !important; }
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is([style*="color: rgb(29, 29, 31)"], [style*="color: rgb(245, 245, 247)"]):not(svg *) { color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is([style*="color: rgb(11, 81, 57)"], [style*="color: rgb(63, 212, 154)"]):not(svg *) { color: var(--sb-lien) !important; }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is([style*="color: var(--n-ambre)"], [style*="color: var(--n-ambre)"]):not(svg *) { color: var(--sb-ambre) !important; }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is([style*="color: var(--n-ambre)"], [style*="color: var(--n-ambre-fond)"]):not(svg *) { color: var(--sb-ambre) !important; }
 
 /* Le grand titre d'écran : Urbanist 34 (38 à l'ordinateur), 400, serré. */
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is(.vrm-screen-head h1, .vrm-screen-head h2.vrm-display, .vrm-tache-tete h1, .vrm-market-heading h1, h2.vrm-set-h1, .vrm-cm-titre) {

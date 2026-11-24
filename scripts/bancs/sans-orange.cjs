@@ -132,7 +132,16 @@ const dit = (ok, quoi, detail = '') => { if (!ok) ROUGES++; const l = `${ok ? '�
         if (await aller(cle)) await juger(ecran); else dit(false, `${W} ${th} · ${ecran} : écran introuvable`);
       }
       // Messages
-      { const m = await visible('[data-n-coque-messages]') || await visible('[data-n-entree="messages"]'); if (m) { await m.click().catch(() => {}); await pg.waitForTimeout(2500); await juger('messages'); await pg.goBack().catch(() => {}); await pg.waitForTimeout(800); } }
+      // Messages, puis « Offres », puis une conversation qui porte une offre Vinted (sa carte d'offre : le cadre doré du 24 nov.).
+      { const m = await visible('[data-n-coque-messages]') || await visible('[data-n-entree="messages"]');
+        if (m) {
+          await m.click().catch(() => {}); await pg.waitForTimeout(2500); await juger('messages');
+          const off = await visible('[data-msg-vue="offres"]'); if (off) { await off.click().catch(() => {}); await pg.waitForTimeout(1200); await juger('messages-offres'); }
+          const fil = await visible('[data-fil-offre]:not([data-fil-offre=""]):not([data-fil-offre="0"])') || await visible('[data-fil]');
+          if (fil) { await fil.click().catch(() => {}); await pg.waitForTimeout(3000); await juger('messages-conversation'); await pg.goBack().catch(() => {}); await pg.waitForTimeout(800); }
+          else dit(false, `${W} ${th} · messages : aucune conversation à ouvrir`);
+          await pg.goBack().catch(() => {}); await pg.waitForTimeout(800);
+        } }
       // Argent → Statistiques (le segment)
       if (await aller('compta')) {
         const stats = await visible('[data-argent-seg="stats"], [data-section="stats"], .vrm-seg-btn:has-text("Statistiques")');

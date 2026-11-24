@@ -20,7 +20,7 @@
   --at-double: var(--vrm-doublon);
 }
 :root[data-theme="dark"] {
-  --at-ambre-fond: color-mix(in srgb, var(--n-ambre) 20%, transparent);
+  --at-ambre-fond: color-mix(in srgb, var(--n-ambre-fond) 20%, transparent);
   --at-ambre: var(--n-ambre);
   --at-double-fond: color-mix(in srgb, var(--vrm-doublon) 20%, transparent);
 }

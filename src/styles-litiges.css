@@ -16,7 +16,7 @@
   --lit-ok: #1D1D1F;
 }
 :root[data-theme="dark"] {
-  --lit-ambre-fond: color-mix(in srgb, var(--n-ambre) 20%, transparent);
+  --lit-ambre-fond: color-mix(in srgb, var(--n-ambre-fond) 20%, transparent);
   --lit-ambre: var(--n-ambre);
   --lit-ok: #F5F5F7;
 }

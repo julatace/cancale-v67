@@ -6,7 +6,7 @@
 
    Les VALEURS sont celles de la maquette (scratchpad maquettes-verre : kit.cjs, style.cjs, e-argent-msg.cjs,
    e-reste.cjs) : rayons 22 (verre) / 20 (tuile) / 16 (plein) / 14 (touche), chiffres 52·26·22/750, libellés
-   12.5–13.5/600–700, gris #3F5468, ambre var(--n-ambre) → jeton --sv-ambre (var(--n-ambre), mesuré 5,28:1 sur le verre).
+   12.5–13.5/600–700, gris #3F5468, ambre #744400 → jeton --sv-ambre (#764300, mesuré 5,28:1 sur le verre).
    Les COULEURS viennent des jetons de la couche (`--sv-*`, src/design/studio-verre.css), jamais codées ici,
    sauf les quatre teintes des étapes de l'argent (maquette : ambre, encre, ardoise, hachuré).
 
@@ -40,7 +40,7 @@
 :root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-livree { background: #5E7A96 !important; }
 :root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille):is(.is-versement, .is-pm) { background: repeating-linear-gradient(45deg, rgb(28 28 32 / .26) 0 4px, rgb(28 28 32 / .08) 4px 8px) !important; }
 :root:root:root body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-autre { background: #A9B9CB !important; }
-:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-envoyer { background: var(--n-ambre) !important; }
+:root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-envoyer { background: var(--n-ambre-fond) !important; }
 :root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-route { background: #F1F2F4 !important; }
 :root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-livree { background: #7F9BB8 !important; }
 :root:root:root[data-theme="dark"] body :is(.vg-argent, .vg-a-venir, .vg-av) :is(.vrm-av-barre-seg, .vrm-av-pastille):is(.is-versement, .is-pm) { background: repeating-linear-gradient(45deg, rgb(241 242 244 / .34) 0 4px, rgb(241 242 244 / .10) 4px 8px) !important; }
@@ -184,7 +184,7 @@
 /* « Tout va bien ? · N choses à régler » : l'ambre plein de la maquette (fond #FFE7C4, encre #5E3900), une pastille de cœur. */
 :root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte-liste { margin: 0 !important; padding: 0 !important; border-radius: 20px !important; overflow: hidden;
   background: var(--n-ambre-fond) !important; background-image: none !important; border: 1px solid color-mix(in srgb, var(--n-ambre) 25%, transparent) !important; box-shadow: 0 14px 30px -18px rgb(27 27 31 / .6) !important; }
-:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-pm-alerte-liste { background: var(--n-ambre) !important; border-color: color-mix(in srgb, var(--n-ambre) 45%, transparent) !important; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-pm-alerte-liste { background: var(--n-ambre-fond) !important; border-color: color-mix(in srgb, var(--n-ambre) 45%, transparent) !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte { min-height: 64px !important; padding: 10px 14px 10px 10px !important; gap: 12px !important; background: transparent !important; color: var(--n-ambre) !important; }
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm .vrm-pm-alerte { color: var(--n-ambre) !important; }
 :root:root:root:root:root:root:root body .vrm-pm .vrm-pm-alerte :is(b, .vrm-set-desc, .vrm-pm-alerte-geste) { color: inherit !important; }

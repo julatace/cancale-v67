@@ -60,7 +60,7 @@
 .vrm-frv-bif-icone { display: inline-flex; color: var(--frv-muted); }
 .vrm-frv-bif[data-frv-ton="geste"] { background: var(--vrm-warn-soft, color-mix(in srgb, var(--n-ambre) 10%, transparent)); }
 .vrm-frv-bif[data-frv-ton="geste"] .vrm-frv-nom, .vrm-frv-bif[data-frv-ton="geste"] .vrm-frv-bif-icone { color: var(--frv-warn); }
-:root[data-theme="dark"] .vrm-frv-bif[data-frv-ton="geste"] { background: color-mix(in srgb, var(--n-ambre) 14%, transparent); }
+:root[data-theme="dark"] .vrm-frv-bif[data-frv-ton="geste"] { background: color-mix(in srgb, var(--n-ambre-fond) 14%, transparent); }
 
 /* ── Horizontale : le panneau de l'ordinateur ────────────────────────────── */
 @container (min-width: 440px) {

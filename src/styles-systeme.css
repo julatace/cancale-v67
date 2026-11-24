@@ -216,7 +216,7 @@
 :root:root body .vrm-main .vrm-argent-w-n { font-weight: 700 !important; }
 /* L'AMBRE n'est jamais un encadré (règle 2 de la revue du 11 nov.) : les fonds et cadres
    ambre écrits en ligne (`${C.warn}14`, `${C.warn}44`) s'effacent ; le TEXTE reste ambre. */
-:root:root body :is(.vrm-main, .vrm-fs) :is([style*="background: rgba(178, 80, 0, 0.08)"], [style*="background: rgba(178, 80, 0, 0.07)"], [style*="background: color-mix(in srgb, var(--n-ambre) 10%, transparent)"], [style*="background: rgba(255, 179, 64, 0.08)"], [style*="background: rgba(255, 179, 64, 0.07)"], [style*="background: color-mix(in srgb, var(--n-ambre) 10%, transparent)"]):not(button):not([data-colis-urgence]) {
+:root:root body :is(.vrm-main, .vrm-fs) :is([style*="background: rgba(178, 80, 0, 0.08)"], [style*="background: rgba(178, 80, 0, 0.07)"], [style*="background: color-mix(in srgb, var(--n-ambre) 10%, transparent)"], [style*="background: rgba(255, 179, 64, 0.08)"], [style*="background: rgba(255, 179, 64, 0.07)"], [style*="background: color-mix(in srgb, var(--n-ambre-fond) 10%, transparent)"]):not(button):not([data-colis-urgence]) {
   background: transparent !important; border-color: transparent !important; padding-left: 0 !important; padding-right: 0 !important;
 }
 :root:root body .vrm-main .vrm-surface:not(:is(.vrm-surface, .vrm-ios-groupe, .vrm-fu-panneau) .vrm-surface) {
@@ -898,7 +898,7 @@
   --d-pastille-neutre-fond: rgb(118 118 128 / .24);  --d-pastille-neutre: #E5E5EA;
   --d-pastille-nuit-fond: rgb(244 244 245 / .18);    --d-pastille-nuit: #C7CDD7;
   --d-pastille-accent-fond: rgb(22 24 29 / .18);   --d-pastille-accent: #F4F4F5;
-  --d-pastille-ambre-fond: color-mix(in srgb, var(--n-ambre) 18%, transparent);    --d-pastille-ambre: var(--n-ambre);
+  --d-pastille-ambre-fond: color-mix(in srgb, var(--n-ambre-fond) 18%, transparent);    --d-pastille-ambre: var(--n-ambre);
 }
 @media (prefers-reduced-transparency: reduce) {
   :root:root { --d-materiau: var(--d-materiau-plein); --d-materiau-flou: none; }

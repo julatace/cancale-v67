@@ -57,7 +57,7 @@
   --fu-case: #2c2c2e;
   --fu-ambre: var(--n-ambre);
   --fu-ambre-txt: var(--n-ambre);
-  --fu-ambre-fond: color-mix(in srgb, var(--n-ambre) 12%, transparent);
+  --fu-ambre-fond: color-mix(in srgb, var(--n-ambre-fond) 12%, transparent);
   --fu-ombre: none;
   --fu-ombre-sombre: 0 0 0 1px rgba(255,255,255,.07), 0 12px 30px rgba(0,0,0,.5);
   /* (5 nov., chantier E1, revue 2.3) La nuit, la carte sombre finissait en #1c1c1e — la couleur
@@ -532,7 +532,7 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero { color: #fff !important; font-size: 44px !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(.vrm-compta-phrase, small, .vrm-set-lib small) { color: var(--fu-sur-sombre-2) !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(b, .vrm-display, summary, .vrm-set-lib b) { color: #fff !important; }
-html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte [data-benef-manque] { color: var(--n-ambre) !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte [data-benef-manque] { color: var(--n-ambre-fond) !important; }
 html body .vrm-app-shell .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(.vrm-compta-geste button, .vrm-compta-geste a, .vrm-lien-action, [data-depenses-choix] button),
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(.vrm-compta-geste button, .vrm-compta-geste a, .vrm-lien-action, [data-depenses-choix] button) {
   color: #fff !important; text-decoration-color: rgba(255,255,255,.4) !important;
@@ -777,7 +777,7 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta
 :root[data-theme="dark"] .vrm-fu-compta .vrm-fu-barre-piste > i { background: #3a3a3c; }
 .vrm-fu-compta .vrm-fu-panneau { padding: 16px; }
 .vrm-fu-compta .vrm-fu-declaration { background: var(--n-ambre-fond); color: var(--n-ambre); }
-:root[data-theme="dark"] .vrm-fu-compta .vrm-fu-declaration { background: color-mix(in srgb, var(--n-ambre) 14%, transparent); color: var(--n-ambre); }
+:root[data-theme="dark"] .vrm-fu-compta .vrm-fu-declaration { background: color-mix(in srgb, var(--n-ambre-fond) 14%, transparent); color: var(--n-ambre); }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta { display: flex !important; flex-direction: column !important; gap: 12px !important; }
 @media (min-width: 900px) { html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta { display: grid !important; grid-template-columns: 1fr 1fr; } html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta > .vrm-fu-declaration { grid-column: 1 / -1; } }
 html body .vrm-app-shell .vrm-main[data-vrm-d9]:not(._) .vrm-rubriques { display: none !important; }
@@ -911,7 +911,7 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-cas
    pastilles #3A3A3C (plus de carré blanc pur, l'élément le plus lumineux de l'écran). */
 html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task span.vrm-fu-pastille.is-secondaire { background: #c7c7cc !important; color: #fff !important; }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task span.vrm-fu-pastille { background: #3a3a3c !important; color: #fff !important; }
-:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task span.vrm-fu-pastille.is-urgent { background: var(--n-ambre) !important; color: #1d1d1f !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task span.vrm-fu-pastille.is-urgent { background: var(--n-ambre-fond) !important; color: #1d1d1f !important; }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task span.vrm-fu-pastille.is-secondaire { background: #2c2c2e !important; color: #98989d !important; }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task span.vrm-fu-pastille.is-icone { background: #2c2c2e !important; color: #98989d !important; }
 /* La ligne URSSAF : même carte, « Noter » en pilule à droite (plus de bouton dessous, plus de fond gris). */

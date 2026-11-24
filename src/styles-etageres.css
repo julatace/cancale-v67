@@ -11,7 +11,7 @@
 [data-couleur="ciel"]    { --etag-fond: #E8EAEE; --etag-bord: #F4F4F5; }
 [data-couleur="lagon"]   { --etag-fond: #D4EFEB; --etag-bord: #4FAEA4; }
 [data-couleur="sauge"]   { --etag-fond: #E2EDDA; --etag-bord: #84AC70; }
-[data-couleur="sable"]   { --etag-fond: var(--n-ambre-fond); --etag-bord: var(--n-ambre); }
+[data-couleur="sable"]   { --etag-fond: var(--n-ambre-fond); --etag-bord: var(--n-ambre-fond); }
 [data-couleur="terre"]   { --etag-fond: #EDE0D6; --etag-bord: #A6826D; }
 [data-couleur="ardoise"] { --etag-fond: #E2E7ED; --etag-bord: #8493A3; }
 :root[data-theme="dark"] [data-couleur="ciel"]    { --etag-fond: #323239; --etag-bord: #838995; }

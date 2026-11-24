@@ -10,7 +10,7 @@
   --sd-ambre-fond: color-mix(in srgb, var(--n-ambre) 14%, transparent);
   display: flex; flex-direction: column; gap: var(--d-e-6, 24px); color: var(--d-encre);
 }
-:root[data-theme="dark"] .vrm-sd, :root[data-theme="dark"] .vrm-sd-compacte { --sd-double-fond: color-mix(in srgb, var(--vrm-doublon) 20%, transparent); --sd-ambre-fond: color-mix(in srgb, var(--n-ambre) 20%, transparent); }
+:root[data-theme="dark"] .vrm-sd, :root[data-theme="dark"] .vrm-sd-compacte { --sd-double-fond: color-mix(in srgb, var(--vrm-doublon) 20%, transparent); --sd-ambre-fond: color-mix(in srgb, var(--n-ambre-fond) 20%, transparent); }
 .vrm-sd-compacte { --sd-double: var(--vrm-doublon); }
 .vrm-sd .vrm-ios-groupe { margin: 0; }
 

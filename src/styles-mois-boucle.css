@@ -22,7 +22,7 @@
 :root[data-theme="dark"] {
   --mb-sep: rgba(235,235,245,.14);
   --mb-ambre: var(--n-ambre);
-  --mb-ambre-fond: color-mix(in srgb, var(--n-ambre) 18%, transparent);
+  --mb-ambre-fond: color-mix(in srgb, var(--n-ambre-fond) 18%, transparent);
 }
 
 @layer vrm-premium {

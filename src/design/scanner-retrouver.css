@@ -18,7 +18,7 @@
   --rtv-gris: #3F5468;
   --rtv-lien: #16181D;
   --rtv-ambre-fond: var(--n-ambre-fond);
-  --rtv-ambre-bord: var(--n-ambre);
+  --rtv-ambre-bord: var(--n-ambre-fond);
   --rtv-ambre: var(--n-ambre);
   --rtv-filet: rgb(28 28 32 / .10);
   position: fixed; inset: 0; z-index: 18000;

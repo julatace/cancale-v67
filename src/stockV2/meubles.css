@@ -12,7 +12,7 @@
     --sm-bati-ciel: #AEB7C5; --sm-bati-ardoise: #7F8FA3; --sm-bati-sable: #CDB68C; --sm-bati-sauge: #9DB394;
     --sm-fond-ciel: #E3E6EB; --sm-fond-ardoise: #D3D9E1; --sm-fond-sable: var(--n-ambre-fond); --sm-fond-sauge: #DDE6D8;
     --sm-trou: rgb(17 17 20 / .07);
-    --sm-kraft: var(--n-ambre); --sm-blanc: #FFFFFF; --sm-ardoise: #A4B4C6; --sm-sable: var(--n-ambre); --sm-sauge: #B7CCAE; --sm-ciel: #CBD1D9; --sm-lagon: #A2D1CC;
+    --sm-kraft: var(--n-ambre-fond); --sm-blanc: #FFFFFF; --sm-ardoise: #A4B4C6; --sm-sable: var(--n-ambre-fond); --sm-sauge: #B7CCAE; --sm-ciel: #CBD1D9; --sm-lagon: #A2D1CC;
     --sm-bord: rgb(17 17 20 / .22);
   }
   :root[data-theme="dark"] {

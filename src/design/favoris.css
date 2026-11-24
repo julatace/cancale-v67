@@ -63,8 +63,8 @@
 }
 .vrm-fa-auto-nom { font: 600 15px/1.25 var(--vrm-police); color: #fff; }
 .vrm-fa-auto-ligne { font: 400 12.5px/1.35 var(--vrm-police); color: rgba(255,255,255,.66); }
-.vrm-fa-auto-ligne.is-geste { color: var(--n-ambre); }
-.vrm-fa-auto-erreur { flex-basis: 100%; margin: 0; font: 400 12.5px/1.35 var(--vrm-police); color: var(--n-ambre); }
+.vrm-fa-auto-ligne.is-geste { color: var(--n-ambre-fond); }
+.vrm-fa-auto-erreur { flex-basis: 100%; margin: 0; font: 400 12.5px/1.35 var(--vrm-police); color: var(--n-ambre-fond); }
 /* L'interrupteur iOS (51 × 31) dans une cible de 44 px. */
 .vrm-fa .vrm-fa-switch, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-switch {
   flex: none; width: 51px; height: 44px; padding: 0; background: none !important; display: flex; align-items: center; position: relative;

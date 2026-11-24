@@ -69,7 +69,7 @@
   display: block; font-size: 12px; font-weight: 600; line-height: 1.3;
   color: var(--p-ambre-texte, var(--n-ambre));
 }
-.vrm-jv2-prochain .vrm-jp-urgent { color: var(--n-ambre); }
+.vrm-jv2-prochain .vrm-jp-urgent { color: var(--n-ambre-fond); }
 
 @media (prefers-reduced-motion: reduce) {
   .vrm-jp-ligne { transition: none; }

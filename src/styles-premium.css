@@ -993,7 +993,7 @@
 .vrm-fs.vrm-confirmation[data-confirmation="irreversible"] .vrm-b.vrm-b-primaire {
   background: var(--p-ambre-texte) !important; color: #FFFFFF !important; box-shadow: none !important;
 }
-:root[data-theme="dark"] .vrm-fs.vrm-confirmation[data-confirmation="irreversible"] .vrm-b.vrm-b-primaire { background: var(--n-ambre) !important; color: #1C1C1E !important; }
+:root[data-theme="dark"] .vrm-fs.vrm-confirmation[data-confirmation="irreversible"] .vrm-b.vrm-b-primaire { background: var(--n-ambre-fond) !important; color: #1C1C1E !important; }
 
 /* 13.2 UNE FEUILLE QUI NE PEUT PAS SE FERMER (`bloque`, un envoi en cours) : sa croix
    reste à sa place, éteinte ; la toucher dit pourquoi (le `title`, lu par Toaster). */

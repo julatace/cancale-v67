@@ -45,7 +45,7 @@
 [data-theme="dark"] .vrm-cb-carte { background: var(--n-carte, #1C1C1E); color: var(--n-encre, #FFFFFF); border-color: var(--n-trait, rgb(84 84 88 / .60)); }
 [data-theme="dark"] .vrm-cb-sur, [data-theme="dark"] .vrm-cb-texte, [data-theme="dark"] .vrm-cb-preuve { color: var(--n-encre-2, #98989F); }
 [data-theme="dark"] .vrm-cb-pastille, [data-theme="dark"] .vrm-cb-question { color: var(--n-ambre, var(--n-ambre)); }
-[data-theme="dark"] .vrm-cb-pastille { background: var(--n-ambre-fond, color-mix(in srgb, var(--n-ambre) 16%, transparent)); }
+[data-theme="dark"] .vrm-cb-pastille { background: var(--n-ambre-fond, color-mix(in srgb, var(--n-ambre-fond) 16%, transparent)); }
 [data-theme="dark"] .vrm-cb-btn { background: var(--n-teinte, rgb(244 244 245 / .20)); color: var(--n-accent, #F4F4F5); }
 [data-theme="dark"] .vrm-cb-plein { background: var(--n-plein, #16181D); color: var(--n-sur-plein, #FFFFFF); }
 [data-theme="dark"] .vrm-cb-lien { background: transparent; }

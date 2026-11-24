@@ -28,7 +28,7 @@
   --vv-touche: rgb(255 255 255 / .08);
   --vv-touche-b: rgb(255 255 255 / .14);
   --vv-tui: rgb(255 255 255 / .08);
-  --vv-am-bg: color-mix(in srgb, var(--n-ambre) 20%, transparent);
+  --vv-am-bg: color-mix(in srgb, var(--n-ambre-fond) 20%, transparent);
   --vv-am-t: var(--n-ambre);
   --vv-seg-on: rgb(243 244 246 / .95);
   --vv-stp-vide: rgb(255 255 255 / .10);

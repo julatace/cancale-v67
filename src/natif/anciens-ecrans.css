@@ -143,8 +143,8 @@ html[data-theme="dark"]:root {
   --sb-puits: var(--ap-remplir) !important;
   --sb-ombre-avant: 0 0 0 .5px rgb(255 255 255 / .08), 0 12px 40px -12px rgb(0 0 0 / .9) !important;
   --v2-socle: var(--ap-carte-2) !important; --sb-socle: var(--ap-carte-2) !important;
-  --v2-kraft: #34302A !important; --v2-kraft-encre: var(--n-ambre-fond) !important; --v2-kraft-doux: #C4B69E !important;
-  --v2-kraft-bord: color-mix(in srgb, var(--n-ambre-fond) 18%, transparent) !important;
+  --v2-kraft: #34302A !important; --v2-kraft-encre: var(--n-ambre) !important; --v2-kraft-doux: #C4B69E !important;
+  --v2-kraft-bord: color-mix(in srgb, var(--n-ambre) 18%, transparent) !important;
 }
 /* Les familles posées sur un CONTENEUR (pas la racine) : les Paires (studio-paires.css) et Ma journée (studio-journee.css). */
 html :is([data-espace="paires"], .vrm-paires-selecteur, .vrm-fp, .vrm-main[data-ecran="annonces"], .vrm-main[data-ecran="garage"], .vrm-main[data-ecran="inventory"], .sj-journee) {
@@ -242,7 +242,7 @@ html body .vrm-app-shell .vrm-tabbar > .vrm-tab { color: var(--ap-gris) !importa
 html body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] { color: var(--ap-bleu-teinte) !important; }
 html body .vrm-app-shell .vrm-tabbar > .vrm-tab::before, html body .vrm-app-shell .vrm-tabbar > .vrm-tab::after { background: transparent !important; }
 /* La pastille rouge d'iOS est réservée par §7 à deux paires sous un N° : celle de la barre reste ambre (le geste à faire). */
-html body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { background: var(--n-ambre) !important; color: #2B1700 !important; box-shadow: none !important; }
+html body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { background: var(--n-ambre) !important; color: var(--n-sur-ambre) !important; box-shadow: none !important; }
 /* La barre collée d'une liste (recherche) : le fond, sans verre. */
 html body :is(.vrm-annbar, .vrm-achats-barre) { background-image: none !important; }
 

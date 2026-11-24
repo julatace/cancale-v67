@@ -18,7 +18,7 @@
 }
 
 .vrm-pil {
-  --pil-fond: #1D1D1F; --pil-texte: #FFFFFF; --pil-sous: rgba(255,255,255,.72); --pil-action: #E4E4E7; --pil-alerte: var(--n-ambre);
+  --pil-fond: #1D1D1F; --pil-texte: #FFFFFF; --pil-sous: rgba(255,255,255,.72); --pil-action: #E4E4E7; --pil-alerte: var(--n-ambre-fond);
   pointer-events: auto;
   display: flex; align-items: center; gap: 10px;
   min-height: 52px; max-width: 440px; width: 100%; box-sizing: border-box;
