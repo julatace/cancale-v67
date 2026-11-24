@@ -36,7 +36,7 @@ import { SqLignes } from '../Squelette.jsx';
 import { usePreparation, useEnPreparation } from '../preparations.js';
 import { souvenir, retenir } from '../memoireEcrans.js';
 import { TeteStudio, BoutonPlein, Rond, TuilesFiltres } from '../design/StudioVentes.jsx';
-import { indexSuivis } from '../indexSuivis.js';
+import { indexSuivis, premierParCle } from '../indexSuivis.js';
 import { sortiParSuivis, sortiParSuivi, suiviDeLigne, lienSuivi, codePostalLu, nouvelleVinted, transporteurDeForme, colisInternational, suiviValide, TRANSPORTEURS_SAISIE, normaliserCodePostal, idSuiviManuel, finDeCommandeAchat, txAchatsEnRetour, achatEnRetour, fusionTransporteur, ligneDuTransporteur, ligneDeSuiviTransporteur, leverGarde, incidentDeSuivis, incidentDeLigne, repartiAffichable, nomTransporteurSuivi } from '../../api/_lib/suivi-colis.js';
 import { repriseNumerosRecreation, tableRecrees, archivesAEcrire } from '../repriseNumero.js';
 import { etatAnnonceVinted, raisonPasSelectionnable, actionsPossibles, raisonCommune, ACTIONS_TUILES, ETATS_ANNONCE, liensRepubMain, fusionLiensRecrees, candidatsNouvelle, etatSuiviMain, minisSelection, ecritureMini } from '../annoncesActions.js';
@@ -8011,7 +8011,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // `generateAchatJustificatif` la lisent sans cas particulier.
   const achatRelie = (e) => {
     if (!e || !e.buyFromId) return null;
-    const live = (buys.items||[]).find(b => String(b.transaction_id)===String(e.buyFromId));
+    // (24 nov., vitesse) Par l'index des achats (n° de transaction → PREMIER achat qui le porte, src/indexSuivis.js) : appelé
+    // pour chaque vente reliée (clé de rangée de Ventes), la relecture de tous les achats coûtait ventes × achats.
+    const live = premierParCle(buys.items, (b) => String(b.transaction_id)).get(String(e.buyFromId));
     if (live) return live;
     const s = e.buyFrom;
     if (!s) return null;

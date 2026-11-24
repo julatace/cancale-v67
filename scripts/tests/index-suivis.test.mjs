@@ -46,3 +46,17 @@ test('le coût ne grandit plus comme lignes × appels', () => {
   assert.ok(trouves > 1000);
   assert.ok(ms < 1000, `6 000 × ${cles.length} appels en ${Math.round(ms)} ms (≥ 1 s : la liste est relue à chaque appel)`);
 });
+
+// (24 nov.) `achatRelie` : l'achat relié par son n° de transaction — même réponse que `find` (le PREMIER achat qui le porte).
+import { premierParCle } from '../../src/indexSuivis.js';
+test('achats : même réponse que find, coût linéaire', () => {
+  const buys = []; for (let i = 0; i < 6000; i++) buys.push({ transaction_id: i % 4 === 0 ? String(20000 + (i % 3000)) : 20000 + (i % 3000), i });
+  const cle = (b) => String(b.transaction_id);
+  const avantA = (id) => buys.find((b) => String(b.transaction_id) === String(id));
+  const nouveauA = (id) => premierParCle(buys, cle).get(String(id));
+  for (const id of [20000, '20001', 22999, 99, 'x']) assert.equal(nouveauA(id), avantA(id), 'n° ' + id);
+  const f = process.env.AVANT ? avantA : nouveauA;
+  const t0 = performance.now(); for (let i = 0; i < 6000; i++) f(i % 2 ? 'absent' + i : 20000 + ((i * 7) % 3500));   // la moitié introuvables : la liste entière relue
+  const ms = performance.now() - t0;
+  assert.ok(ms < 150, `6 000 achats × 6 000 appels en ${Math.round(ms)} ms (la liste relue à chaque appel : ~400 ms et plus)`);
+});

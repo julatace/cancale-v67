@@ -14,3 +14,18 @@ export function indexSuivis(tracking) {
   INDEX.set(tracking, m);
   return m;
 }
+
+// Une liste → Map(clé → PREMIER élément de la liste qui la porte), gardée par liste ET par fonction de clé (la même fonction
+// doit être passée : une fonction neuve à chaque appel rebâtit l'index). Les éléments vides sont sautés ; une clé vide aussi.
+const PAR_CLE = new WeakMap();
+export function premierParCle(liste, cle) {
+  if (!Array.isArray(liste)) return new Map();
+  let parFn = PAR_CLE.get(liste); if (!parFn) { parFn = new Map(); PAR_CLE.set(liste, parFn); }
+  const nom = cle.toString();
+  let m = parFn.get(nom);
+  if (m) return m;
+  m = new Map();
+  for (const x of liste) { if (!x) continue; const k = cle(x); if (k !== '' && k != null && !m.has(k)) m.set(k, x); }
+  parFn.set(nom, m);
+  return m;
+}
