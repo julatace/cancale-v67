@@ -130,3 +130,9 @@ restait à une charge de 18 à 32 pour 4 cœurs, d'autres agents).
 - Vitesse : PAS remesurée — sur une machine à charge 20+, une mesure de temps ne prouve rien. Les chiffres du 16 nov.
   plus haut restent ceux d'avant la fusion. `volume-budget` (dans le lot de la CI depuis vitesse-volume) juge 2 s après
   les données : à surveiller en CI, il peut y être rouge (objectif jamais tenu le 16 nov.).
+- **CI de la PR (24 nov., commit 0dc5dc27f)**, comparée job par job aux rouges de #1310 (dernière fusionnée) : deux rouges
+  neufs. `audit-ext-arrets-formulaire` : extension seule, vert 2/2 en local, déjà noté instable le 23 nov. ⇒ pas un rouge.
+  `volume-budget` : rouge VOULU — Ma journée 5 824 ms et Ventes 9 743 ms après les données (médianes de 3, budget 2 000 +
+  750). Le banc est dans la CI à la demande de Julien (`verifier.yml`, part 3) : il dit que l'objectif des 2 s n'est pas
+  tenu ; ni le budget ni le banc n'ont été touchés. À trancher par le train : fusionner avec ce rouge connu, ou sortir le
+  banc de la part 3 jusqu'à ce qu'il passe (décision de Julien, pas de ce lot).
