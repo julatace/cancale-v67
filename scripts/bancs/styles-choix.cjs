@@ -133,7 +133,9 @@ const MESURE = (args) => {
   const oranges = [], rouges = [];
   const LOGO = '.n-logo-site, [class*="logo"], [data-site-logo], img, picture, video, canvas, [data-n-doublon], [data-n-ton="doublon"], .vrm-logo';
   for (const el of document.querySelectorAll('body *')) {
-    if (!dans(el) || !vu(el) || el.closest(LOGO)) continue;
+    // une icône décorative (`aria-hidden`) a une couleur aussi : on la juge (seule la géométrie et la visibilité comptent ici)
+    if (!dans(el) || el.closest(LOGO)) continue;
+    { const q = el.getBoundingClientRect(); if (q.width < 3 || q.height < 3 || q.bottom < 0 || q.top > innerHeight || q.right < 0 || q.left > innerWidth) continue; if (el.checkVisibility && !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) continue; if (el.closest('[hidden], [inert]')) continue; }
     const cs = getComputedStyle(el);
     const cs2 = [cs.color, cs.backgroundColor, cs.borderTopColor, cs.borderBottomColor, cs.outlineColor, cs.fill, cs.stroke, ...(cs.boxShadow.match(/rgba?\([^)]+\)/g) || []), ...arrets(cs.backgroundImage).map((c) => `rgba(${c.r},${c.g},${c.b},${c.a})`)];
     for (const s of cs2) { const c = parse(s); if (ambre(c)) { oranges.push(`${nom(el)} ${s}`); break; } if (rouge(c) && !el.closest('svg')) { rouges.push(`${nom(el)} ${s}`); break; } }
