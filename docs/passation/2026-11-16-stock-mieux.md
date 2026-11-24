@@ -117,3 +117,28 @@ Captures (hors dépôt, données inventées) : `A-*.png` (piste A) et `sm-*.png`
 `design-restes`, `stock-case-a-sortir`, `stock-retrouver` : 0 KO. CI de la PR #1221 comparée à `main` (rouges déjà
 présents sur `main` : vocabulaire-article, vendeur-generaliste, banc nouveau-vendeur). Possible plus tard : dire
 « glisse → » en mots au-dessus d'un meuble qui défile.
+
+## 24 nov. — le « 1,19:1 » de la tête expliqué : c'était le banc
+
+Constat (intégration du 23 nov.) : le banc mesurait « 12 / 32 rangées » à 1,19:1 alors que la capture le montre lisible.
+Reproduit en local après `git merge origin/main` : rouge en **sombre seulement** (390s, 1512s), vert en clair.
+
+- **Cause** : `contrastePixels` lisait la couleur du texte avec la regex `rgba?\(…\)`. Le gris du compte vient de
+  `color-mix()` ; Chrome le rend `color(srgb 0.680196 0.680196 0.710784)`. La regex ne le reconnaissait pas et
+  retombait sur `[0, 0, 0, 1]` — du NOIR. Noir supposé sur le fond sombre (~#1C1C1E) = 1,19:1. Le texte, lui, est un
+  gris clair (≈ #ADADB5) lisible : la capture avait raison, le banc mesurait une couleur qui n'existe pas.
+- **Correction (du banc, pas de l'écran)** : la couleur est RÉSOLUE par le navigateur (un pixel de canvas peint avec
+  elle, relu) — `rgb()`, `color(srgb …)`, `oklch()`… tout ce que Chrome sait peindre. Une couleur qu'il ne sait pas
+  peindre rend « pas su » (null ⇒ rouge), plus jamais un noir supposé. Le seuil (4,5:1, 10e centile des pixels du fond)
+  ne bouge pas.
+- **Mesures** (main fusionnée, 4 variantes, 64 OK) : tête mini 7,16:1 (clair) et 7,95:1 (sombre) au lieu de 1,19:1.
+- **Rouge avant** : même build, banc d'avant ⇒ 390s et 1512s rouges (1,19:1). **Mutation** `compte` (nouvelle :
+  « 12 / 32 rangées » en gris moyen écrit par `color-mix()`, donc `color(srgb …)`) ⇒ H rouge, 4,48:1 en clair,
+  3,96:1 en sombre : le chemin `color(…)` est bien lu et le seuil tient.
+- **Sur `claude/style-clair` (#1326)** — fusion jetable dans un worktree à part, build, banc : 64 OK aux 4 variantes ;
+  tête 8,38:1 (clair) / 8,14:1 (sombre), N° 8,91:1 / 11,52:1. Captures regardées : en clair, gris étagé, cases
+  « à sortir » et case trouvée à l'ARDOISE, aucun orange (le Stock suit `--n-ambre`, que #1326 pose sur l'accent). En
+  sombre, l'ambre #FFC266 de #1326 reste pour la case trouvée et « 2 à sortir » — c'est le jeton de #1326 pour la nuit,
+  pas un choix de ce lot.
+- Même regex dans 8 autres bancs (`grep -l 'rgba?\\(([^)]+)\\)' scripts/bancs`) : pas touchés ici ; un texte en
+  `color-mix()` y serait aussi mesuré comme noir (faux rouge en sombre, faux vert possible en clair sur fond sombre).
