@@ -78,19 +78,22 @@ export default function GrilleInventaire({ items, cle = (x) => x && x.cle, rendu
   const de = fenetre.a * g.cols, a = Math.min(n, (fenetre.b + 1) * g.cols);
   const style = { '--n-inv-cols': g.cols, '--n-inv-rang-h': g.rangH + 'px', '--n-inv-gap': gap + 'px', '--n-inv-corps': corps + 'px', '--n-inv-col-l': Math.round(g.colL) + 'px' };
   const cases = [];
+  // Chaque case est posée à SA place (rangée × colonne), jamais déplacée quand les rangées d'au-dessus sont démontées :
+  // aucun décalage de mise en page pendant le défilement (une fenêtre translatée déplaçait les cases restantes — CLS 0,7).
+  const place = (i) => ({ top: Math.floor(i / g.cols) * g.pas, left: `calc(${i % g.cols} * (100% - ${(g.cols - 1) * gap}px) / ${g.cols} + ${(i % g.cols) * gap}px)`, width: `calc((100% - ${(g.cols - 1) * gap}px) / ${g.cols})`, height: g.rangH });
   if (items === undefined) {
-    for (let i = de; i < a; i++) cases.push(<React.Fragment key={'os' + i}>{squelette ? squelette(i) : <span className="n-inv-os" aria-hidden="true"><span className="n-os n-inv-os-photo"/><span className="n-os n-inv-os-l"/><span className="n-os n-inv-os-l" data-court=""/></span>}</React.Fragment>);
+    for (let i = de; i < a; i++) cases.push(<div className="n-inv-case" style={place(i)} key={'os' + i}>{squelette ? squelette(i) : <span className="n-inv-os" aria-hidden="true"><span className="n-os n-inv-os-photo"/><span className="n-os n-inv-os-l"/><span className="n-os n-inv-os-l" data-court=""/></span>}</div>);
   } else if (Array.isArray(items)) {
     // La cascade part de la 1re case À L'ÉCRAN (jamais retardée par celles d'au-dessus), plafonnée par `revele` (Jeu.jsx).
     if (!enRevele) vu.current.rangs = null;
     else if (!vu.current.rangs || vu.current.rangsDe !== items) { vu.current.rangsDe = items; vu.current.rangs = new Map(); for (let i = de; i < a; i++) vu.current.rangs.set(cle(items[i]), debut + i - de); }
     const rangs = vu.current.rangs;
-    for (let i = de; i < a; i++) { const x = items[i]; const k = cle(x); cases.push(<React.Fragment key={k || i}>{rendu(x, i, rangs && rangs.has(k) ? reveleJeu(rangs.get(k), '', true) : null)}</React.Fragment>); }
+    for (let i = de; i < a; i++) { const x = items[i]; const k = cle(x); cases.push(<div className="n-inv-case" style={place(i)} key={k || i} data-inv-i={i}>{rendu(x, i, rangs && rangs.has(k) ? reveleJeu(rangs.get(k), '', true) : null)}</div>); }
   }
   return (
     <div ref={ref} className={cx('n-inv-grille', ligne > 0 && 'n-inv-liste', className)} style={{ ...style, height: hauteur }} data-inv-grille="" data-inv-n={String(n)} data-inv-cols={String(g.cols)}
       data-inv-rang-h={String(g.rangH)} data-inv-montees={String(a - de)} data-inv-attente={items === undefined ? '1' : undefined} aria-busy={items === undefined ? 'true' : undefined} {...(attrs || {})}>
-      <div className="n-inv-fenetre" style={{ transform: `translateY(${fenetre.a * g.pas}px)` }}>{cases}</div>
+      {cases}
     </div>
   );
 }

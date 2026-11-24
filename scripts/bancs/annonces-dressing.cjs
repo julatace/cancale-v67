@@ -7,7 +7,7 @@
 //  (src/articles/sources.js, src/articles/modele.js) sur une base INVENTÉE — dont un compte Vinted BLOQUÉ (en pause).
 //  Mesures (data-* et nombres, jamais un libellé) — 390 × 844 tactile (DPR 3), 1512 × 900, clair et sombre :
 //   G. téléphone (2e passe du 21 nov., « je n'aime pas du tout l'affichage sur iPhone ») : la LISTE « Articles » par défaut, formes
-//      A et B : rangées 64–72, vignette 52 réservée, ≥ 8 rangées par écran, prix, « ⋯ » 44 au doigt, aucun plein, liste pleine
+//      A et B : rangées 64–72, vignette 56–64 réservée (24 nov. ; 52 avant), ≥ 8 rangées par écran, prix, « ⋯ » 44 au doigt, aucun plein, liste pleine
 //      largeur, « À régler » sur la ligne de « Mis à jour », pas de capitales, taille non répétée ; CLS ≈ 0 à l'arrivée des
 //      photos ; la grille (photo carrée, « ⋯ » à côté du prix) choisissable et mémorisée ;
 //   K. compte bloqué : un segment « Bloqués » avec SES 3 annonces ; « En ligne » ne les compte pas ; chaque carte dit sa
@@ -137,7 +137,8 @@ async function juger(nav, mutant = '') {
       const r = await pg.evaluate(MESURE); const cls = await pg.evaluate(() => window.__cls);
       const ou = `390 ${forme.toUpperCase()}${sombre ? ' · sombre' : ''}`;
       dit(r.vue === 'liste' && r.nRangees > 0 && r.nCartes === 0, `G ${ou} : la LISTE par défaut, ${r.nRangees} rangées`, { vue: r.vue, n: r.nRangees });
-      dit(r0.photos.length > 0 && r0.photos.every((p) => p.w === 52 && p.h === 52), `G ${ou} : vignette 52 × 52 réservée avant son arrivée`, r0.photos.slice(0, 4));
+      // (24 nov., lot visuel-annonces — Julien : « photo 56–64 ») la vignette réservée, carrée, entre 56 et 64.
+      dit(r0.photos.length > 0 && r0.photos.every((p) => p.w >= 56 && p.w <= 64 && p.h === p.w), `G ${ou} : vignette carrée 56–64 réservée avant son arrivée`, r0.photos.slice(0, 4));
       dit(r.hauteurs.length > 0 && r.hauteurs.every((h) => h >= 64 && h <= 72), `G ${ou} : rangées de ${Math.min(...r.hauteurs)}–${Math.max(...r.hauteurs)} px (64–72)`, r.hauteurs);
       dit(cls < 0.01, `G ${ou} : aucun saut quand les photos arrivent (CLS ${cls.toFixed(4)})`, cls);
       dit(r.prix && r.ronds.length > 0 && r.ronds.every((x) => x === 1) && r.pleinsCarte === 0 && r.pleins === 0, `G ${ou} : chaque rangée dit son prix, un « ⋯ » 44 au doigt, aucun plein à l'écran`, { prix: r.prix, ronds: r.ronds, pleins: r.pleins });
