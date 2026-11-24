@@ -483,9 +483,9 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **24 nov. · Morceaux périmés (`claude/morceaux-perimes`)** : la page ouverte pendant une mise en ligne ne repart plus — elle fait ranger les fichiers de SA version au repos (`src/reserveMorceaux.js`), le ménage du service worker garde ceux d'une page ouverte ; un écran introuvable recharge SUR cet écran, jamais pendant une saisie ou une feuille (sinon page cachée) ; un 404 /assets/ de la prod porte `immutable`. Banc `morceaux-perimes`, audit. `2026-11-24-morceaux-perimes.md`. Geste : aucun.
 - **23 nov. · Bugs (`claude/bugs-totale`)** : vente par e-mail partout — le bordereau reçu d'une vente pas relue (particulier : vente sans n°) fait le colis (Colis, Ma journée, jamais Ventes ni CA), la photo exacte tranche la fenêtre ambiguë ; colis à retirer sans photo (`Icon`) ; boucle de rendus : `onVmrExt` ne prévient que sur changement d'empreinte (11 → 6 validations/10 s au téléphone, banc `rendus-repos`). `2026-11-22-bugs-totale.md`. Geste : aucun.
 - **23 nov. · Photos nettes (`claude/photos-nettes`)** : chaque photo Vinted prend la plus petite taille DÉJÀ LUE du même fichier qui donne 2 px réels par point (`src/photoTaille.js`) ; visionneuse progressive (petite puis grande) ; aucune adresse fabriquée (chaque taille a sa signature). Achats : souvent 150x210 seule. `docs/passation/2026-11-23-photos-nettes.md`. Geste : aucun.
-- **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
