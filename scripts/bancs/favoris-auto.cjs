@@ -207,7 +207,7 @@ const lireFenetre = (pg) => pg.evaluate(() => {
   const chevauche = [...r.querySelectorAll('.fav-l')].filter((l) => { const t = l.querySelector('.lt'), e = l.querySelector('.fav-e'); if (!t || !e) return false; const a = t.getBoundingClientRect(), b = e.getBoundingClientRect(); return a.right > b.left + 0.5 && a.bottom > b.top && a.top < b.bottom; }).length;
   const deborde = [...r.querySelectorAll('.boite *')].filter((e) => { const x = e.getBoundingClientRect(); return x.width && (x.right > boite.right + 1 || x.left < boite.left - 1); }).length;
   return { fav: true, fin: !!r.querySelector('[data-action-fav-fin]'), txt, lignes, etape: (r.querySelector('[data-fav-etape]') || {}).getAttribute ? r.querySelector('[data-fav-etape]').getAttribute('data-fav-etape') : '', etapeTxt: (r.querySelector('.fav-etape') || {}).textContent || '',
-    envoyes: ch ? ch.getAttribute('data-fav-envoyes') : null, sautes: ch ? ch.getAttribute('data-fav-sautes') : null, restants: ch ? ch.getAttribute('data-fav-restants') : null, chiffres: ch ? ch.textContent : '', boutons, deborde, chevauche, larg: Math.round(boite.width) };
+    envoyes: ch ? ch.getAttribute('data-fav-envoyes') : null, sautes: ch ? ch.getAttribute('data-fav-sautes') : null, pas: ch ? ch.getAttribute('data-fav-pas') : null, annules: ch ? ch.getAttribute('data-fav-annules') : null, finRaison: (r.querySelector('[data-fav-fin-raison]') || {}).textContent || '', restants: ch ? ch.getAttribute('data-fav-restants') : null, chiffres: ch ? ch.textContent : '', boutons, deborde, chevauche, larg: Math.round(boite.width) };
 });
 
 (async () => {
@@ -249,6 +249,15 @@ const lireFenetre = (pg) => pg.evaluate(() => {
       dit(r.ok === false && r.manque === 'cloche' && !l.some((x) => /want_it/.test(x)), 'P8 pas de cloche, des lignes de notification visibles en haut ⇒ aucune ligne prise pour la cloche, rien cliqué', JSON.stringify({ r: { ok: r.ok, m: r.manque }, l }));
     });
 
+    // 5.440.1 : la notification porte `item_id` + `user_id` (lien d'application mesuré le 23 nov.) ; la ligne de la page aussi.
+    const ROW_U = (item, user, txt, ch = '/inbox/want_it') => `<a class="rang" href="${ch}?item_id=${item}&user_id=${user}&portal=fr"><span>${txt}</span></a>`;
+    await cas('P9', '/inbox', { cloche: 'nom', lignes: BAISSE(0) + ROW_U(F.item, '990022', 'autre_personne a ajouté ton article à ses favoris') + ROW_U(F.item, F.receiver, 'acheteuse a ajouté ton article à ses favoris') }, 'favoriOuvrir', D, async (r, l) => {
+      const fav = l.filter((x) => /want_it/.test(x));
+      dit(r.ok === true && fav.length === 1 && fav[0].includes(`user_id=${F.receiver}`) && fav[0].includes(`item_id=${F.item}`), 'P9 ligne `item_id` + `user_id` (nouveau lien) : CELLE du favori est cliquée, jamais l’autre personne', JSON.stringify({ ok: r.ok, m: r.manque, l }));
+    });
+    await cas('P10', '/inbox', { cloche: 'nom', lignes: BAISSE(0) + ROW_U(F.item, '990022', 'autre_personne') + `<a class="rang" href="/inbox/want_it?item_id=${F.item}&user_id=${F.receiver}&receiver_id=${F.receiver}"><span>deux personnes</span></a>` }, 'favoriOuvrir', D, async (r, l) => {
+      dit(r.ok !== true && !l.some((x) => /want_it/.test(x)), 'P10 une ligne aux clés en trop (user_id ET receiver_id) ou d’une autre personne ⇒ rien cliqué', JSON.stringify({ ok: r.ok, m: r.manque, l }));
+    });
     console.log('M. Le message dans une conversation de la nouvelle messagerie');
     const TXT = 'Bonjour ! Je viens de te faire une offre sur cet article.';
     for (const [k, v] of [['M1', 'testid'], ['M2', 'editable'], ['M3', 'nu']]) {
@@ -271,7 +280,7 @@ const lireFenetre = (pg) => pg.evaluate(() => {
         dit(m && m.fav && !m.fin, `F1 ${tag} : la fenêtre des favoris est montée`, JSON.stringify(m).slice(0, 200));
         if (!m || !m.fav) return;
         dit(m.etape === 'conversation' && /Ouverture de la conversation/.test(m.etapeTxt), `F1 ${tag} : l’étape en mots simples (« Ouverture de la conversation… »)`, m.etapeTxt);
-        dit(m.envoyes === '1' && m.sautes === '1' && m.restants === '3' && /1\s*envoyé/.test(m.chiffres) && /1\s*sauté/.test(m.chiffres) && /3\s*restants/.test(m.chiffres), `F1 ${tag} : « 1 envoyé · 1 sauté · 3 restants »`, m.chiffres);
+        dit(m.envoyes === '1' && m.sautes === '1' && m.restants === '3' && /1\s*envoyé/.test(m.chiffres) && /1\s*sauté/.test(m.chiffres) && /3\s*en attente/.test(m.chiffres), `F1 ${tag} : « 1 envoyé · 1 sauté · 3 en attente » (5.440.1 : un mot par état)`, m.chiffres);
         dit(m.lignes.length === 5 && m.lignes.map((x) => x.e).join() === 'envoye,saute,cours,attente,attente' && m.lignes[1].r === 'Plus en vente', `F1 ${tag} : chaque ligne avec son état, la raison courte du sauté`, JSON.stringify(m.lignes));
         const pleins = m.boutons.filter((x) => x.plein);
         dit(pleins.length === 1 && /^Pause$/.test(pleins[0].t) && m.boutons.some((x) => /Tout arrêter/.test(x.t) && !x.plein) && m.boutons.some((x) => /Réduire/.test(x.t) && /data-reduire/.test(x.attr)), `F1 ${tag} : « Pause » seul bouton plein, « Tout arrêter » secondaire, « Réduire » discret`, JSON.stringify(m.boutons));
@@ -308,8 +317,25 @@ const lireFenetre = (pg) => pg.evaluate(() => {
       await pg.evaluate((a) => window.__poser(a), ETAT({ actif: false, enCours: false, fin: { at: Date.now(), raison: 'arret' }, lignes: [LIGNES[0], LIGNES[1], Object.assign({}, LIGNES[2], { etat: 'annule' }), Object.assign({}, LIGNES[3], { etat: 'annule' }), Object.assign({}, LIGNES[4], { etat: 'annule' })] }));
       await pg.waitForTimeout(2500);
       const m = await lireFenetre(pg);
-      dit(m && m.fin && /Envoi arrêté/.test(m.txt) && m.lignes.filter((x) => x.e === 'annule').length === 3 && m.restants === '3' && /3\s*non envoyés/.test(m.chiffres), 'F6 arrêté — « Envoi arrêté », « 3 non envoyés », les 3 restants « Annulé »', JSON.stringify(m && [m.fin, m.txt.slice(0, 80)]));
+      dit(m && m.fin && /Envoi arrêté/.test(m.txt) && m.lignes.filter((x) => x.e === 'annule').length === 3 && m.annules === '3' && m.restants === '0' && /3\s*annulés/.test(m.chiffres) && !/en attente|non envoyés/.test(m.chiffres), 'F6 arrêté — « Envoi arrêté », « 3 annulés » (5.440.1 : un annulé n’est pas « en attente »), les 3 restants « Annulé »', JSON.stringify(m && [m.fin, m.chiffres, m.txt.slice(0, 80)]));
     });
+    // 5.440.1 (Julien, 23 nov. 19:44 : « 0 envoyés · 1 sauté · 2 non envoyés », la ligne « Pas envoyé · Conversation pas vérifiée »).
+    const L7 = [Object.assign({}, LIGNES[3], { etat: 'pas', r: 'identite_non_confirmee' }), Object.assign({}, LIGNES[4], { etat: 'attente' }), Object.assign({}, LIGNES[2], { etat: 'attente' })];
+    for (const [larg, sombre] of [[1512, false], [390, false], [390, true]]) {
+      await fenetre(b, 'F7-un-pas-envoye', larg, sombre, ETAT({ enCours: false, etapeFav: '', prochain: Date.now() + 60000, total: 3, fait: 0, lignes: L7 }), async (pg) => {
+        const m = await lireFenetre(pg);
+        dit(m && m.envoyes === '0' && m.pas === '1' && m.sautes === '0' && m.restants === '2' && /0\s*envoyé/.test(m.chiffres) && /1\s*pas envoyé/.test(m.chiffres) && /2\s*en attente/.test(m.chiffres) && !/sauté|non envoyé|restant/.test(m.chiffres), `F7 ${larg}${sombre ? ' sombre' : ''} : UN refus d’identité ⇒ « 0 envoyé · 1 pas envoyé · 2 en attente » — jamais « sauté », la file continue`, m && m.chiffres);
+        dit(m && m.lignes[0].chip === 'Pas envoyé' && m.lignes[0].r === 'Article ou destinataire pas confirmé — rien n’est parti' && m.lignes.slice(1).every((x) => x.chip === 'En attente'), `F7 ${larg} : la ligne dit « Pas envoyé · Article ou destinataire pas confirmé — rien n’est parti » (le mot du bilan)`, JSON.stringify(m && m.lignes));
+      });
+      await fenetre(b, 'F8-pause-trois', larg, sombre, ETAT(), async (pg) => {
+        await pg.evaluate((a) => window.__poser(a), ETAT({ actif: false, enCours: false, total: 5, fait: 0, fin: { at: Date.now(), raison: 'interrompu', code: 'locaux_suite', refus: 'identite_non_confirmee', n: 3 }, lignes: [Object.assign({}, LIGNES[0], { etat: 'pas', r: 'identite_non_confirmee' }), Object.assign({}, LIGNES[1], { etat: 'pas', r: 'identite_non_confirmee' }), Object.assign({}, LIGNES[2], { etat: 'pas', r: 'identite_non_confirmee' }), Object.assign({}, LIGNES[3], { etat: 'attente' }), Object.assign({}, LIGNES[4], { etat: 'attente' })] }));
+        await pg.waitForTimeout(2500);
+        const m = await lireFenetre(pg);
+        dit(m && m.fin && m.pas === '3' && m.restants === '2' && /3\s*pas envoyés/.test(m.chiffres) && /2\s*en attente/.test(m.chiffres) && !/sauté|non envoyé/.test(m.chiffres), `F8 ${larg} : trois de suite ⇒ « 3 pas envoyés · 2 en attente »`, m && m.chiffres);
+        dit(m && /^3 favoris de suite ne sont pas partis \(le dernier : article ou destinataire pas confirmé\)/.test(m.finRaison) && /« Reprendre »\.$/.test(m.finRaison.trim()), `F8 ${larg} : la fenêtre dit pourquoi, phrase ENTIÈRE finie par « Reprendre »`, m && m.finRaison);
+        dit(m && !m.deborde, `F8 ${larg} : rien ne déborde`, m && m.deborde);
+      });
+    }
   } finally { await b.close(); }
   if (SHOTS) console.log(`\n  captures : ${SHOTS}`);
   console.log(`\n${ko ? '❌' : '✅'} favoris sans geste : ${ok} bon(s), ${ko} défaut(s)`);
