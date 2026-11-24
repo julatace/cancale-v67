@@ -157,17 +157,22 @@ async function recherche(pg, R) {
   const champ = pg.locator('#root .vrm-main input[type="search"]:visible').first();
   if (!(await champ.count())) { console.log('    recherche : aucun champ'); return; }
   await champ.tap(); await calme(pg, 800, 8000);
-  await pg.evaluate(() => { window.__frappe = []; addEventListener('keydown', () => { const t0 = performance.now(); setTimeout(() => requestAnimationFrame(() => window.__frappe.push(Math.round(performance.now() - t0))), 0); }, true); });
-  for (const c of 'samba ') { await pg.keyboard.type(c); await attendre(250); }
-  await calme(pg, 1000, 15000);
-  const L = await pg.evaluate(() => window.__frappe.slice());
+  // De la touche à la première image où la lettre est DANS le champ (l'écho), et de la dernière touche à la fin du travail
+  // qu'elle déclenche (la liste à jour : plus aucune tâche longue).
+  await pg.evaluate(() => { window.__frappe = []; window.__lt2 = []; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__lt2.push(e.startTime + e.duration); }).observe({ type: 'longtask' }); } catch (_) {}
+    addEventListener('keydown', (e) => { const t0 = performance.now(); window.__derniereTouche = t0; const c = e.key; const champ = e.target;
+      const v = () => { if (String(champ.value || '').endsWith(c)) return window.__frappe.push(Math.round(performance.now() - t0)); if (performance.now() - t0 < 5000) requestAnimationFrame(v); }; requestAnimationFrame(v); }, true); });
+  for (const c of 'samba') { await pg.keyboard.type(c); await attendre(180); }
+  await calme(pg, 1500, 20000);
+  const { L, liste } = await pg.evaluate(() => ({ L: window.__frappe.slice(), liste: Math.round(Math.max(0, ...window.__lt2.filter((t) => t > window.__derniereTouche)) - window.__derniereTouche) }));
+  R.frappeListe.push(liste);
   R.frappe.push(...L);
-  console.log(`    recherche : ${L.join(' · ')} ms par lettre (médiane ${med(L)}, pire ${Math.max(...L)})`);
+  console.log(`    recherche : lettre affichée ${L.join(' · ')} ms (médiane ${med(L)}, pire ${Math.max(...L)}) · liste à jour ${liste} ms après la dernière lettre`);
 }
 
 (async () => {
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--explicitly-allowed-ports=' + PORT] });
-  const R = { froid: [], rouvert: [], longuesFroid: [], onglets: {}, venteOuvrir: [], venteRetour: [], defile: [], frappe: [], rendus: {}, cout: {} };
+  const R = { froid: [], rouvert: [], longuesFroid: [], onglets: {}, venteOuvrir: [], venteRetour: [], defile: [], frappe: [], frappeListe: [], rendus: {}, cout: {} };
   const erreurs = [];
   console.log(`Banc vitesse-iphone · ${path.relative(process.cwd(), DIST) || DIST} · CPU ×${CPU} · volume ${process.env.VOLUME || 'julien'} · ${PASSES} passe(s) · charge ${os.loadavg()[0].toFixed(1)}`);
   try {
@@ -199,7 +204,7 @@ async function recherche(pg, R) {
     onglets: Object.fromEntries(Object.entries(R.onglets).map(([k, L]) => [k, med(L)])),
     venteOuvrir: med(R.venteOuvrir), venteRetour: med(R.venteRetour),
     defileP95: med(R.defile.map((x) => x.p95)), defilePire: med(R.defile.map((x) => x.pire)), defileMed: med(R.defile.map((x) => x.med)),
-    frappeMed: med(R.frappe), frappeP95: centile(R.frappe, 0.95),
+    frappeMed: med(R.frappe), frappeP95: centile(R.frappe, 0.95), frappeListe: med(R.frappeListe),
     cout: Object.fromEntries(Object.entries(R.cout).map(([k, L]) => [k, { script: med(L.map((x) => x && x.script)), style: med(L.map((x) => x && x.style)), page: med(L.map((x) => x && x.page)) }])),
     rendus: Object.fromEntries(Object.entries(R.rendus).map(([k, L]) => [k, med(L)])), charge: os.loadavg()[0].toFixed(1),
   };
