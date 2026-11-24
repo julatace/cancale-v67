@@ -48,6 +48,7 @@ import { groupesParCompte, lireReplis, ecrireReplis } from './annoncesComptes.js
 import { CarteAnnonce, RangeeArticle, lireVueTel, ecrireVueTel, traceDe, texteTrace, seulementBloque, bandeauDe, tailleDansTitre } from './AnnoncesCartes.jsx';   // (21 nov.) la grille « Dressing »
 import { depuisMaj } from '../TableauTravail.jsx';
 import GrilleInventaire from '../visuel/GrilleInventaire.jsx';
+import { useArrive } from '../Jeu.jsx';
 import { AvatarCompte } from '../visuel/Inventaire.jsx';   // (24 nov.) le rond du compte, le même que sur ses tuiles   // (24 nov., lot visuel-annonces) la grille d'inventaire virtualisée
 
 const PAR_PAGE = 60;
@@ -171,7 +172,9 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   const arrivee = React.useRef({ vide: articles === undefined, liste: null });
   if (articles === undefined) arrivee.current.vide = true;
   else if (arrivee.current.vide && Array.isArray(articles)) { arrivee.current.vide = false; arrivee.current.liste = articles; }
-  const enArrivee = Array.isArray(articles) && articles === arrivee.current.liste;
+  // `useArrive` (Jeu.jsx) : déjà montrée une fois dans la session (retour sur l'onglet) ⇒ plus jamais de cascade.
+  const arriveeSession = useArrive(Array.isArray(articles), 'annonces');
+  const enArrivee = arriveeSession && Array.isArray(articles) && articles === arrivee.current.liste;
   const debutDe = (cle) => { let n = 0; for (const g of groupes) { if (g.cle === cle) return n; if (!replis.has(g.cle)) n += Math.min(g.articles.length, 4); } return n; };
   const resteGroupes = groupes.reduce((n, g) => n + Math.max(0, g.articles.length - max), 0);
   const A = action ? actions.find((x) => x.cle === action) : null;

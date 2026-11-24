@@ -53,7 +53,31 @@ Voir « Résultats » ci-dessous.
 
 ## Résultats
 
-(remplis en fin de session)
+Branche (après fusion de `claude/visuel-jeu` à jour, `useArrive`/`revele` « sans latence ») : **78 verts, 0 rouge**
+(390 et 1512, clair et sombre, 600 annonces) :
+- grille virtualisée : 17 cartes montées sur 200 par compte au téléphone, 36 sur 600 à l'ordinateur ; hauteur réservée ;
+- identité : chaque carte montée (avant et après défilement) porte la photo de SON identifiant ; le leurre au même titre :
+  deux photos différentes ; l'étiquette dit le N° de SA fiche ;
+- sans latence : contenu connu ⇒ 0 image de squelette, 0 cascade, carte pleine à la 1re image ; contenu qui arrive ⇒
+  1re carte sans délai, cascade 15 ms par carte, 120 ms au total, fondu 160 ms ; toucher un segment ⇒ 1er contenu dans la
+  page en 32–53 ms (à l'écran à l'image suivante : 76–78 ms, machine chargée) ;
+- le squelette est à la place EXACTE de la 1re carte (±1 px) ; CLS 0,0000 ;
+- aucune couleur orange calculée (hors logos de site), aucune sortie, aucun chevauchement, aucun texte coupé, contrastes
+  ≥ 4,5:1, cibles ≥ 44 ; mouvement réduit : 0 carte animée, 0 photo masquée ;
+- défilement, 95e centile du temps d'image (rapporté, charge 13–15 sur 4 cœurs, rendu logiciel swiftshader) : téléphone
+  161–171 ms, ordinateur 711–886 ms (voir la comparaison avec l'arbre d'avant ci-dessous).
+
+**Arbre d'avant** (`git archive origin/claude/style-clair`, banc copié dedans, 390 clair) : **6 rouges** (pas de grille
+virtualisée — 181 cartes montées —, pas de tuile ni de rond ni de pastilles, pas d'étiquette N° sur la photo, pas de
+cascade, « ⋯ » qui sort de la carte et titres à demi-ligne, toucher 126 ms).
+
+**Mutations** (chacune rougit) : photo prise au TITRE ⇒ I rouge (identité + leurre) ; pastilles remises en ligne ⇒ D
+(étiquette × pastilles) ; rond de compte orange ⇒ O ; cascade sur le contenu connu ⇒ S (« contenu déjà connu ») ;
+animation sous `prefers-reduced-motion` ⇒ M. Une intertitre de squelette plus courte ne rougissait PAS le CLS (les cartes
+remplacent le squelette, elles ne le déplacent pas) : d'où la mesure « place EXACTE du squelette », qui l'attrape.
+
+Captures et film : `scratchpad/visuel-annonces/` de la session (tel-clair, tel-sombre, ordi-clair, ordi-sombre,
+chargement-et-defilement.webm).
 
 ## Ce qui n'est pas fait / à savoir
 
