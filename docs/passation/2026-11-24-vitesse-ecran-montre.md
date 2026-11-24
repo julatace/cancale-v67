@@ -100,7 +100,29 @@ Le banc `vitesse-iphone` reçoit le crochet `visite1` du récit (§5 quater) : `
   « vitesse » §4 bis) sont sortis identiques sur cette passe.
 - AB alterné, 1re visite, iPhone 390 ×4, volume de Julien, 5 passes (`PASSES=5 TOURS=0`) : voir le tableau ci-dessous.
 
-AB_TABLEAU
+Charge de la machine 12 → 27 pendant la mesure (partagée). Builds : `avant` = base de la branche (main + #1366), `après` =
+ce lot (sans le dernier retrait de l'attribut, sans effet sur le temps). Du doigt posé à l'écran PRÊT, en ms.
+
+| 1re visite | avant (5 passes) | après (5 passes) | médiane avant → après | écart par paire (après − avant) |
+|---|---|---|---|---|
+| à froid (Ma journée prête) | 15 237 · 14 621 · 12 235 · 11 172 · 9 783 | 13 024 · 13 885 · 10 013 · 10 340 · 10 097 | 12 235 → 10 340 | −2 213 −736 −2 222 −832 +314 |
+| Annonces | 9 149 · 7 341 · 6 437 · 6 015 · 5 644 | 6 516 · 7 157 · 6 949 · 4 667 · 4 810 | 6 437 → 6 516 | −2 633 −184 +512 −1 348 −834 |
+| **Ventes** | 7 092 · 6 033 · 6 155 · 5 246 · 5 713 | 6 667 · 5 011 · 3 877 · 4 274 · 4 457 | **6 033 → 4 457** | −425 −1 022 −2 278 −972 −1 256 |
+| Achats | 8 482 · 9 261 · 6 281 · 7 379 · 9 301 | 10 690 · 9 137 · 5 616 · 8 456 · 8 716 | 8 482 → 8 716 | +2 208 −124 −665 +1 077 −585 |
+| Argent | 4 476 · 2 836 · 2 040 · 2 564 · 3 423 | 3 003 · 3 136 · 1 380 · 1 850 · 2 438 | 2 836 → 2 438 | −1 473 +300 −660 −714 −985 |
+| Ma journée | 3 913 · 2 867 · 2 563 · 4 546 · 3 346 | 4 760 · 2 736 · 3 299 · 2 299 · 2 920 | 3 346 → 2 920 | +847 −131 +736 −2 247 −426 |
+
+Lecture honnête :
+- **Ventes : −1,6 s en médiane, plus rapide dans les 5 paires** (−0,4 à −2,3 s). C'est le gain attendu : la section Colis
+  ne calcule plus les colis à retirer ni leurs cartes à chaque rendu.
+- **Annonces : plus rapide dans 4 paires sur 5** (médiane des écarts −834 ms), mais la médiane brute ne bouge pas
+  (6,4 → 6,5 s) : dans le bruit de la machine. Annonces reste ~6 s : son coût est ailleurs (AnnoncesEgalite, construction
+  des articles, les 3 vagues de lectures — PR B).
+- **Achats : aucun gain mesurable** (écarts de −0,7 à +2,2 s). Achats lit vraiment les colis à retirer ; ses 3 instances
+  ne refont plus les retours ni l'Atelier, mais `pickupUnion` reste fait 4 fois par instance (ses dépendances changent à
+  chaque lecture qui arrive) et `cartesColis` à chaque rendu.
+- À froid −1,9 s en médiane (4 paires sur 5) : Ma journée ne publie plus depuis les sections et Annonces ; à confirmer,
+  la charge a baissé pendant la mesure (alternance A/B/B/A, donc pesée pareil).
 
 ## 5. Ce qui reste
 
