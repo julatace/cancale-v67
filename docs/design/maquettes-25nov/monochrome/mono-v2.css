@@ -1,0 +1,239 @@
+/* Monochrome v2 — mise en page. Ne lit que des jetons --m-* / --p-* (jetons-mono-v2.css). Rythme de 8. */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--m-page); color: var(--m-encre); font: 400 15px/20px var(--p-police-texte); -webkit-font-smoothing: antialiased;
+  font-feature-settings: "kern" 1; font-variant-numeric: tabular-nums; }
+button, input { font: inherit; color: inherit; font-variant-numeric: inherit; }
+button { border: 0; background: none; padding: 0; margin: 0; cursor: pointer; text-align: left; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+svg { display: block; flex: 0 0 auto; }
+h1, h2 { margin: 0; }
+ul { margin: 0; padding: 0; list-style: none; }
+
+.scene { display: flex; gap: 40px; padding: 40px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+.phone { width: 390px; height: 844px; background: var(--m-page); position: relative; overflow: hidden; display: flex; flex-direction: column; }
+.statut { height: 48px; flex: 0 0 auto; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 28px 8px 34px; font: 600 16px/20px var(--p-police-titre); }
+.statut .pictos { display: flex; gap: 6px; align-items: center; }
+.defile { flex: 1 1 auto; overflow: hidden; padding: 0 var(--p-4) 120px; }
+
+/* ── titres ── */
+.tete { display: flex; align-items: center; justify-content: space-between; gap: var(--p-3); padding: var(--p-2) 0 var(--p-4); }
+.tete h1 { font: 700 32px/40px var(--p-police-titre); letter-spacing: -0.03em; word-spacing: 0.06em; }
+.etiquette { display: flex; align-items: center; justify-content: space-between; gap: var(--p-2); min-height: 28px; }
+.nom { display: flex; align-items: center; gap: var(--p-2); font: 600 16px/24px var(--p-police-titre); letter-spacing: -0.02em; word-spacing: 0.08em; }
+.point { width: 8px; height: 8px; border-radius: 50%; background: var(--m-accent); flex: 0 0 auto; box-shadow: 0 0 0 3px color-mix(in srgb, var(--m-accent) 22%, transparent); }
+.compte { font: 700 30px/32px var(--p-police-titre); letter-spacing: -0.03em; margin-right: 2px; position: relative; top: -1px; }
+.quand { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px 0 8px; border-radius: 14px; background: var(--m-creux-fond); font: 600 13px/16px var(--p-police-texte); color: var(--m-encre); }
+.quand svg { color: var(--m-encre-2); }
+
+/* ── cartes : 24, liseré + ombre deux couches ── */
+.carte { background: var(--m-carte); border-radius: var(--p-r-carte); box-shadow: 0 0 0 1px var(--m-filet), var(--m-ombre); padding: var(--p-4); margin-bottom: var(--p-3); }
+.carte.heros { padding: var(--p-5) var(--p-4) var(--p-4); box-shadow: 0 0 0 1px var(--m-filet), var(--m-ombre-heros); }
+.heros-ligne { display: flex; align-items: center; justify-content: space-between; margin: var(--p-2) 0 var(--p-2); }
+.grand { font: 700 72px/72px var(--p-police-titre); letter-spacing: -0.05em; margin-left: -3px; }
+.pile { display: flex; }
+.pile .paire { box-shadow: 0 0 0 3px var(--m-carte), 0 2px 6px -2px rgb(0 0 0 / 0.18); }
+.pile .paire + .paire { margin-left: -14px; }
+
+/* ── la paire : assiette grise + silhouette détourée d'un liseré ── */
+.paire { --t: 48px; width: var(--t); height: var(--t); flex: 0 0 auto; border-radius: calc(var(--t) * 0.27); background: var(--m-assiette); display: flex; align-items: center; justify-content: center; position: relative; box-shadow: inset 0 0 0 1px var(--m-filet); }
+.paire::after { content: ""; position: absolute; left: 18%; right: 18%; bottom: 19%; height: 7%; border-radius: 50%; background: radial-gradient(closest-side, rgb(0 0 0 / 0.28), transparent); }
+.paire svg { width: 78%; height: auto; position: relative; z-index: 1; filter: drop-shadow(0 0 0.6px rgb(0 0 0 / 0.55)) drop-shadow(0 1px 1px rgb(0 0 0 / 0.12)); }
+.ton-noir { --u: var(--m-paire-noir-u); --s: var(--m-paire-noir-s); --d: var(--m-paire-noir-d); }
+.ton-gris { --u: var(--m-paire-gris-u); --s: var(--m-paire-gris-s); --d: var(--m-paire-gris-d); }
+.ton-blanc { --u: var(--m-paire-blanc-u); --s: var(--m-paire-blanc-s); --d: var(--m-paire-blanc-d); }
+.assiette-ic { width: 40px; height: 40px; border-radius: 11px; background: var(--m-assiette); box-shadow: inset 0 0 0 1px var(--m-filet); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+
+/* ── rangées : se touchent, portent un chevron ── */
+.liste { margin: var(--p-1) calc(-1 * var(--p-2)) 0; }
+.ligne { display: flex; align-items: center; gap: var(--p-3); min-height: 48px; padding: var(--p-1) var(--p-2); width: 100%; border-radius: 12px; position: relative; }
+.ligne.grande { min-height: 56px; padding: var(--p-2); }
+.carte > .ligne.grande { margin: var(--p-2) calc(-1 * var(--p-2)) 0; width: calc(100% + 16px); }
+.liste li + li .ligne::before { content: ""; position: absolute; top: 0; left: var(--p-2); right: var(--p-2); height: 1px; background: var(--m-trait); }
+.liste li + li .ligne.grande::before, .liste li + li .ligne.annonce::before { left: 60px; }
+.chevron { color: var(--m-encre-2); margin-left: 2px; }
+.corps { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.l1 { display: flex; align-items: center; gap: var(--p-2); min-width: 0; }
+.titre { flex: 1 1 auto; font: 500 15px/20px var(--p-police-texte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.l1 .titre, .corps > .titre { flex: 0 1 auto; }
+.l2 { display: flex; align-items: center; gap: 6px; font: 500 13px/18px var(--p-police-texte); color: var(--m-encre-2); white-space: nowrap; }
+.sep { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: .55; flex: 0 0 auto; }
+.glyphes { display: inline-flex; align-items: center; gap: 4px; }
+.prix { width: 64px; text-align: right; font: 600 16px/20px var(--p-police-titre); letter-spacing: -0.02em; white-space: nowrap; flex: 0 0 auto; }
+.eur { font-size: 0.78em; font-weight: 600; letter-spacing: 0; }
+.prix .eur, .mois-col .eur, .montant .eur { color: var(--m-encre-2); }
+
+/* ── le N° : plaque d'encre gravée ── */
+.plaque { flex: 0 0 auto; display: inline-flex; align-items: baseline; height: 22px; padding: 0 7px; border-radius: var(--p-r-plaque);
+  background: #19191C linear-gradient(180deg, #2A2A2E 0%, #0E0E10 100%); color: #FFFFFF; font: 600 12.5px/22px var(--p-police-plaque); letter-spacing: 0.01em; font-feature-settings: "tnum" 1, "zero" 1;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.16), inset 0 0 0 1px rgb(0 0 0 / 0.6), 0 1px 1px rgb(0 0 0 / 0.12); }
+.plaque .no { font: 600 10px/22px var(--p-police-texte); font-style: normal; letter-spacing: 0; opacity: .7; margin-right: 2px; }
+.plaque.petite { height: 20px; font-size: 11.5px; line-height: 20px; padding: 0 6px; }
+.plaque.petite .no { line-height: 20px; }
+.plaque.doublon { background: var(--m-doublon); color: var(--m-sur-doublon); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 1px 1px rgb(0 0 0 / 0.12); }
+:root[data-theme="dark"] .plaque:not(.doublon) { background: #3A3A40 linear-gradient(180deg, #45454C 0%, #303035 100%); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), inset 0 0 0 1px rgb(0 0 0 / 0.5); }
+
+/* ── ne se touche pas : étiquette d'état, point + mot, glyphe de plateforme ── */
+.etat { display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 8px; border-radius: var(--p-r-etiquette); background: var(--m-etiquette); color: var(--m-sur-etiquette); font: 600 12px/16px var(--p-police-texte); white-space: nowrap; flex: 0 0 auto; }
+.etat.accent { background: var(--m-accent); color: var(--m-sur-accent); }
+.etat.accent .eur { color: inherit; }
+.etat-pt { display: inline-flex; align-items: center; gap: 6px; font: 500 13px/18px var(--p-police-texte); color: var(--m-encre); }
+.etat-pt i { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+.pt-vert { background: var(--m-accent); }
+.pt-rouge { background: var(--m-doublon); }
+.pt-gris { background: var(--m-point-gris); }
+.pt-creux { box-shadow: inset 0 0 0 1.5px var(--m-point-gris); }
+.marque { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 4px; background: var(--m-marque-fond); color: var(--m-marque-texte); font: 800 9.5px/16px var(--p-police-titre); letter-spacing: 0.01em; flex: 0 0 auto; }
+
+/* ════ LES BOUTONS — quatre familles ════ */
+.bouton, .rond, .puce, .lien, .ligne, .segmente button, .onglet, .comptes, .carte.mois, .objet {
+  transition: background-color 200ms var(--p-courbe), color 200ms var(--p-courbe), transform 160ms cubic-bezier(.23,1,.32,1), box-shadow 200ms var(--p-courbe); }
+:is(.bouton, .rond, .puce, .lien, .ligne, .segmente button, .onglet, .comptes, .carte.mois, .objet):focus-visible, .est-focus { outline: none; box-shadow: var(--m-anneau); }
+/* 1. principal */
+.bouton { display: flex; align-items: center; justify-content: center; gap: var(--p-2); width: 100%; min-height: 52px; padding: 0 var(--p-4); border-radius: 14px; font: 600 16px/20px var(--p-police-texte); letter-spacing: -0.01em; text-align: center; }
+.bouton.plein { background: var(--m-plein); color: var(--m-sur-plein); margin-top: var(--p-3); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 2px rgb(0 0 0 / 0.2), 0 4px 10px -4px rgb(0 0 0 / 0.35); }
+:root[data-theme="dark"] .bouton.plein { box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.12); }
+.bouton.plein:active, .bouton.plein.est-appui { background: var(--m-plein-appui); transform: scale(0.97); box-shadow: none; }
+.bouton.plein.est-focus { box-shadow: var(--m-anneau); }
+/* 2. secondaire */
+.bouton.second { background: var(--m-second-fond); color: var(--m-encre); box-shadow: inset 0 0 0 1.5px var(--m-second-bord); }
+.bouton.second:active, .bouton.second.est-appui { background: var(--m-second-appui); transform: scale(0.97); }
+.bouton.second.est-focus { box-shadow: inset 0 0 0 1.5px var(--m-second-bord), var(--m-anneau); }
+/* 3. tertiaire */
+.lien { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 4px; margin-top: var(--p-1); border-radius: 10px; font: 600 15px/20px var(--p-police-texte); color: var(--m-encre);
+  text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 4px; }
+.lien:active { background: var(--m-second-appui); transform: scale(0.97); }
+.lien.centre { justify-content: center; padding: 0 var(--p-4); margin: 0; }
+/* 4. icône */
+.rond { width: 44px; height: 44px; min-width: 44px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--m-carte); color: var(--m-encre); box-shadow: inset 0 0 0 1px var(--m-limite), 0 1px 2px rgb(0 0 0 / 0.06); flex: 0 0 auto; }
+.rond:active, .rond.est-appui { background: var(--m-second-appui); transform: scale(0.94); box-shadow: inset 0 0 0 1.5px var(--m-encre); }
+.rond.est-focus { box-shadow: inset 0 0 0 1px var(--m-limite), var(--m-anneau); }
+.rond.envoyer { background: var(--m-plein); color: var(--m-sur-plein); box-shadow: none; }
+/* comptes : pile d'avatars + flèche (se lit « mes comptes ▾ ») */
+.comptes { display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 12px 0 14px; border-radius: 22px; background: var(--m-carte); box-shadow: inset 0 0 0 1px var(--m-limite), 0 1px 2px rgb(0 0 0 / 0.06); color: var(--m-encre); }
+.comptes:active { transform: scale(0.94); background: var(--m-second-appui); }
+.avatars { display: flex; }
+.avatars i { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: 700 12px/1 var(--p-police-titre); font-style: normal; text-transform: uppercase; box-shadow: 0 0 0 2px var(--m-carte); }
+.avatars i + i { margin-left: -8px; }
+.comptes-mot { font: 600 15px/20px var(--p-police-texte); white-space: nowrap; margin-left: 2px; }
+.comptes-mot b { font-weight: 700; }
+.tete-lien { width: calc(100% + 16px); margin: -8px -8px 0; padding: 4px 8px; min-height: 44px; border-radius: 12px; transition: background-color 200ms var(--p-courbe), transform 160ms cubic-bezier(.23,1,.32,1); }
+.tete-lien:active { background: var(--m-creux-fond); transform: scale(0.99); }
+.tete-lien:focus-visible { outline: none; box-shadow: var(--m-anneau); }
+.avatars i:nth-child(1) { background: #111111; color: #FFFFFF; }
+.avatars i:nth-child(2) { background: #575D67; color: #FFFFFF; }
+.avatars i:nth-child(3) { background: #D7D9DE; color: #111111; }
+.avatars i:nth-child(4) { background: #FFFFFF; color: #111111; box-shadow: 0 0 0 2px var(--m-carte), inset 0 0 0 1px #9BA0A8; }
+:root[data-theme="dark"] .avatars i:nth-child(1) { background: #F5F5F6; color: #000; }
+:root[data-theme="dark"] .avatars i:nth-child(4) { background: #2A2A2E; color: #F5F5F6; box-shadow: 0 0 0 2px var(--m-carte), inset 0 0 0 1px #5A5A62; }
+/* rangées et cartes qui se touchent */
+.ligne:active, .ligne.est-appui { background: var(--m-creux-fond); transform: scale(0.99); }
+.carte.mois:active, .objet:active { transform: scale(0.99); }
+/* filtres */
+.puce { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 999px; background: var(--m-carte); box-shadow: inset 0 0 0 1px var(--m-limite); font: 500 14px/18px var(--p-police-texte); position: relative; }
+.puce::after { content: ""; position: absolute; inset: -4px 0; }
+.puce { min-width: 44px; justify-content: center; }
+.puce .marque { background: none; color: inherit; font: 700 14px/18px var(--p-police-titre); min-width: 0; height: auto; padding: 0; }
+.puce[aria-pressed="true"] { background: var(--m-plein); color: var(--m-sur-plein); box-shadow: none; }
+.puce:active { transform: scale(0.97); }
+.puce.est-focus { box-shadow: inset 0 0 0 1px var(--m-limite), var(--m-anneau); }
+
+/* ── champs ── */
+.champ { display: flex; align-items: center; gap: var(--p-2); min-height: 44px; padding: 0 var(--p-4) 0 var(--p-3); border-radius: var(--p-r-champ); background: var(--m-carte); box-shadow: inset 0 0 0 1px var(--m-limite); color: var(--m-encre-2); margin-bottom: var(--p-3); transition: box-shadow 200ms var(--p-courbe), color 200ms var(--p-courbe); }
+.champ input { flex: 1 1 auto; min-width: 0; border: 0; outline: none; background: none; padding: 12px 0; font: 400 16px/20px var(--p-police-texte); color: var(--m-encre); }
+.champ input::placeholder { color: var(--m-encre-2); opacity: 1; }
+.champ:focus-within, .champ.est-champ-focus { box-shadow: inset 0 0 0 2px var(--m-encre); color: var(--m-encre); }
+
+/* ── code de retrait : un puits enfoncé ── */
+.puits { display: flex; align-items: center; justify-content: space-between; margin-top: var(--p-2); padding: var(--p-2) var(--p-2) var(--p-2) var(--p-4); border-radius: 16px; background: var(--m-creux-fond); box-shadow: var(--m-creux); }
+.code { font: 600 24px/32px var(--p-police-plaque); letter-spacing: 0.14em; font-feature-settings: "zero" 1; }
+.code i { font-style: normal; color: var(--m-encre-2); letter-spacing: 0.04em; }
+
+/* ── le mois : chiffres d'argent, € en retrait ── */
+.carte.mois { display: flex; align-items: center; gap: var(--p-4); width: 100%; padding: var(--p-4) var(--p-3) var(--p-4) var(--p-5); text-align: left; }
+.mois-col { flex: 1 1 0; display: flex; flex-direction: column; gap: 2px; }
+.mois-col b { font: 700 22px/28px var(--p-police-titre); letter-spacing: -0.03em; }
+.lib { font: 500 13px/16px var(--p-police-texte); color: var(--m-encre-2); }
+
+/* ── barre d'onglets iOS : verre sur le contenu, indicateur d'accueil, actif = pastille d'encre ── */
+.onglets { position: absolute; left: 0; right: 0; bottom: 0; height: 84px; padding: 6px 8px 0; display: flex; background: var(--m-barre);
+  -webkit-backdrop-filter: saturate(160%) blur(24px); backdrop-filter: saturate(160%) blur(24px); box-shadow: 0 -0.5px 0 var(--m-filet), 0 -8px 24px -16px rgb(0 0 0 / 0.18); z-index: 2; }
+.onglet { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 52px; border-radius: 14px; color: var(--m-encre-2); text-align: center; }
+.onglet-ic { position: relative; display: flex; align-items: center; justify-content: center; width: 56px; height: 30px; border-radius: 15px; transition: background-color 200ms var(--p-courbe), color 200ms var(--p-courbe); }
+.onglet-mot { font: 500 11px/13px var(--p-police-texte); letter-spacing: 0.01em; }
+.onglet[aria-current="page"] { color: var(--m-encre); }
+.onglet[aria-current="page"] .onglet-ic { background: var(--m-plein); color: var(--m-sur-plein); }
+.onglet[aria-current="page"] .onglet-mot { font-weight: 700; }
+.onglet:active { transform: scale(0.94); }
+.onglet .pt { position: absolute; top: 2px; right: 13px; width: 9px; height: 9px; border-radius: 50%; background: var(--m-accent); box-shadow: 0 0 0 2px var(--m-page); }
+.indicateur { position: absolute; left: 50%; bottom: 8px; width: 134px; height: 5px; margin-left: -67px; border-radius: 3px; background: var(--m-indicateur); }
+@media (prefers-reduced-transparency: reduce) { .onglets, .composer { background: var(--m-carte); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+
+/* ── Annonces ── */
+.segmente { display: flex; gap: 4px; padding: 4px; border-radius: 16px; background: var(--m-carte); box-shadow: inset 0 0 0 1px var(--m-limite); margin-bottom: var(--p-3); }
+.segmente button { flex: 1 1 0; min-height: 40px; border-radius: 12px; font: 500 14px/18px var(--p-police-texte); color: var(--m-encre); text-align: center; position: relative; }
+.segmente button::after { content: ""; position: absolute; inset: -4px 0; }
+.segmente button .n { color: var(--m-encre-2); margin-left: 2px; }
+.segmente button[aria-pressed="true"] { background: var(--m-plein); color: var(--m-sur-plein); font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / 0.2); }
+.segmente button[aria-pressed="true"] .n { color: inherit; opacity: .72; }
+.segmente button:active { transform: scale(0.97); }
+.puces { display: flex; gap: var(--p-2); margin: 0 calc(-1 * var(--p-4)) var(--p-5); padding: 4px var(--p-4); overflow: hidden; }
+.groupe-tete { display: flex; align-items: center; justify-content: space-between; padding: 0 var(--p-1) var(--p-2); }
+.groupe-tete b { display: flex; align-items: center; gap: var(--p-2); font: 600 15px/20px var(--p-police-titre); letter-spacing: -0.02em; }
+.groupe-tete > span { display: inline-flex; align-items: center; gap: 4px; font: 500 13px/18px var(--p-police-texte); color: var(--m-encre-2); }
+.carte.liste-carte { padding: var(--p-1) var(--p-2); margin-bottom: var(--p-5); }
+.carte.liste-carte .liste { margin: 0; }
+.ligne.annonce { min-height: 68px; padding: var(--p-2); }
+.ligne.annonce .corps { gap: 4px; }
+
+/* ── Messages ── */
+.nav { display: flex; align-items: center; justify-content: space-between; padding: var(--p-1) var(--p-3) var(--p-2); }
+.nav .qui { display: flex; align-items: center; gap: var(--p-2); }
+.nav .qui b { font: 600 17px/22px var(--p-police-titre); letter-spacing: -0.02em; }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--m-encre); color: var(--m-carte); display: flex; align-items: center; justify-content: center; font: 700 13px/1 var(--p-police-titre); text-transform: uppercase; }
+.objet { display: flex; align-items: center; gap: var(--p-3); margin: 0 var(--p-4); width: calc(100% - 32px); padding: var(--p-2) var(--p-3) var(--p-2) var(--p-2); min-height: 56px; background: var(--m-carte); border-radius: 18px; box-shadow: 0 0 0 1px var(--m-filet), var(--m-ombre); }
+.objet .titre { flex: 1 1 auto; }
+.fil { padding: var(--p-4) var(--p-4) 0; display: flex; flex-direction: column; gap: 4px; }
+.jour { align-self: center; font: 600 12px/16px var(--p-police-texte); color: var(--m-encre-2); margin: 0 0 var(--p-2); }
+.bulle { max-width: 76%; padding: 9px 14px; border-radius: 20px; font: 400 16px/22px var(--p-police-texte); position: relative; }
+.bulle.eux { align-self: flex-start; background: var(--m-carte); box-shadow: 0 0 0 1px var(--m-filet); border-bottom-left-radius: 8px; }
+.bulle.moi { align-self: flex-end; background: var(--m-bulle-moi); color: var(--m-sur-bulle-moi); border-bottom-right-radius: 8px; }
+.bulle + .bulle.eux, .heure + .bulle { margin-top: var(--p-2); }
+.heure { font: 500 12px/16px var(--p-police-texte); color: var(--m-encre-2); }
+.heure.d { align-self: flex-end; margin-right: 4px; }
+.offre { margin: var(--p-3) 0 0; padding: var(--p-4); box-shadow: 0 0 0 1px var(--m-filet), var(--m-ombre-heros); }
+.offre .montant { display: flex; align-items: baseline; gap: var(--p-3); margin: var(--p-2) 0 0; }
+.offre .montant b { font: 700 44px/48px var(--p-police-titre); letter-spacing: -0.04em; }
+.offre .montant b .eur { font-size: 0.6em; }
+.offre .montant s { color: var(--m-encre-2); font: 500 17px/22px var(--p-police-texte); text-decoration-thickness: 1.5px; }
+.offre .montant s .eur { color: inherit; }
+/* la jauge : où tombe l'offre par rapport à ton prix mini (un trait, pas une phrase) */
+.jauge { position: relative; margin: var(--p-3) 0 var(--p-1); padding-bottom: 20px; }
+.jauge-piste { display: block; position: relative; height: 6px; border-radius: 3px; background: var(--m-creux-fond); box-shadow: var(--m-creux); }
+.jauge-plein { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--m-encre); }
+.jauge-mini { position: absolute; top: -4px; width: 2px; height: 14px; margin-left: -1px; border-radius: 1px; background: var(--m-encre); box-shadow: 0 0 0 2px var(--m-carte); }
+.jauge-lib { position: absolute; top: 14px; left: var(--x); transform: translateX(-50%); font: 600 12px/16px var(--p-police-texte); color: var(--m-encre-2); white-space: nowrap; }
+.jauge-lib .eur { font-size: 1em; }
+.rangee-boutons { display: flex; gap: var(--p-2); margin-top: var(--p-2); }
+.rangee-boutons > * { flex: 1 1 0; margin-top: 0; }
+.reponses { display: flex; gap: var(--p-2); padding: var(--p-4) var(--p-4) 4px; overflow: hidden; }
+.composer { position: absolute; left: 0; right: 0; bottom: 0; padding: var(--p-2) var(--p-3) 34px; display: flex; gap: var(--p-2); align-items: center; background: var(--m-barre);
+  -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); box-shadow: 0 -0.5px 0 var(--m-filet); }
+.composer .champ.capsule { flex: 1 1 auto; margin: 0; border-radius: 22px; }
+
+/* ── planche ── */
+.boutons { padding: 24px 40px 40px; display: flex; justify-content: center; }
+.planche { display: flex; gap: 40px; padding: 28px; background: var(--m-carte); border-radius: var(--p-r-carte); box-shadow: 0 0 0 1px var(--m-filet), var(--m-ombre); }
+.pl-col { display: flex; flex-direction: column; gap: 12px; width: 480px; }
+.pl-titre { font: 700 18px/24px var(--p-police-titre); letter-spacing: -0.02em; word-spacing: 0.08em; margin-bottom: 4px; }
+.pl-rang { display: flex; align-items: center; gap: 10px; min-height: 52px; }
+.pl-rang .bouton { width: auto; flex: 1 1 0; margin: 0; }
+.pl-lib { width: 88px; flex: 0 0 auto; font: 500 13px/18px var(--p-police-texte); color: var(--m-encre-2); }
+.pl-ligne { flex: 1 1 0; min-height: 52px; background: var(--m-carte); }
+.pl-ligne .titre { flex: 1 1 auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+  :is(.bouton, .rond, .puce, .lien, .ligne, .onglet, .comptes, .carte.mois, .objet, .segmente button):active, .est-appui { transform: none !important; }
+}
+@media (max-width: 500px) { .scene { padding: 0; gap: 24px; } }
+:root[data-theme="dark"] .bouton.plein:focus-visible, :root[data-theme="dark"] .bouton.plein.est-focus { box-shadow: var(--m-anneau); }
