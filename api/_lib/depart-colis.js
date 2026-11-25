@@ -92,15 +92,28 @@ const isoDe = (ms) => (Number.isFinite(ms) ? new Date(ms).toISOString() : null);
 // Le transporteur LISIBLE comme départ d'un n° : celui qu'écrit la plateforme,
 // sinon la forme PROPRE du n° (Chronopost XW/ZW…TS/SP, Vinted Go VGS…). Mondial
 // Relay, Colissimo… ⇒ null (voir l'en-tête).
-function formeDepart(n) {
+// (24 nov., lot suivi-xu) + Chrono Relais Europe « XU/ZU + 9 chiffres + JF ». MESURÉ (lecture seule) sur
+// les bordereaux de vente des 60 derniers jours : 14 n° de cette forme (13 XU, 1 ZU), aucun lu chez le
+// transporteur — `nomDuBordereau` ne garde pas le nom « chronopost » et la forme XU n'était pas reconnue.
+// Toutes les étiquettes de cette forme dont le PDF a été lu (5 sur 5, et le bordereau de retour du 15 nov.)
+// nomment Chronopost (« Chrono Relais Europe », pied « Chronopost … 75014 Paris ») ; leur PDF est le MÊME
+// gabarit que les XW…TS (iText). « JF » n'est pas un pays : ce n'est pas un n° postal S10 (CP…IE).
+// La lecture reste celle des XW : `trackSkybillV2`, écho du `skybillNumber` exigé, un n° inconnu ⇒
+// « introuvable » (3 fois au plus, puis plus jamais relu) — rien n'est jamais déduit de la forme seule.
+export const FORME_CHRONO_RELAIS_EUROPE = /^[XZ]U\d{9}JF$/;
+// (25 nov.) Cette forme vaut pour un colis VENDU seulement : un bordereau de RETOUR (`rt:`, le colis qu'il
+// renvoie) n'est lu chez Chronopost qu'avec le transporteur LU sur son étiquette (`transporteurPdf`, lot
+// retour-parfait, audit-retour-parfait T3) — la forme seule ne lui suffit pas.
+function formeDepart(n, { vente = false } = {}) {
   if (/^[XZ]W\d{9}(?:TS|SP)$/.test(n)) return 'chronopost';
+  if (vente && FORME_CHRONO_RELAIS_EUROPE.test(n)) return 'chronopost';
   if (/^VGS\d{13}$/.test(n)) return 'vinted';
   return '';
 }
-export function carrierDepart(transporteur, suivi) {
+export function carrierDepart(transporteur, suivi, { vente = false } = {}) {
   const n = normaliserSuivi(suivi);
   if (!n) return null;
-  const c = carrierLisible(transporteur || '', n) || carrierLisible(formeDepart(n), n);
+  const c = carrierLisible(transporteur || '', n) || carrierLisible(formeDepart(n, { vente }), n);
   return c && DEPART_CARRIERS.includes(c) ? c : null;
 }
 
@@ -320,7 +333,7 @@ export function departsAInterroger({ sortants = [], departs = new Map(), entrant
     const k = normaliserSuivi(s && s.suivi);
     if (!k || vus.has(k) || ambigus.has(k)) continue;
     vus.add(k);
-    const carrier = carrierDepart(s.transporteur, k);
+    const carrier = carrierDepart(s.transporteur, k, { vente: !s.retour });
     if (!carrier) continue;
     const v = msDe(s.venteMs);
     if (v != null && maintenant - v > FENETRE_DEPART_J * 86400000) continue;
@@ -386,7 +399,7 @@ export function sortantsDuVendeur({ vcVentes = null, bords = [], retours = [] } 
   }
   for (const r of Array.isArray(retours) ? retours : []) {
     if (!r || !r.suivi) continue;
-    out.push({ cle: 'rt:' + String(r.transaction || r.suivi), suivi: r.suivi, transporteur: r.transporteurPdf || '', venteMs: msDe(r.receivedAt) });
+    out.push({ cle: 'rt:' + String(r.transaction || r.suivi), suivi: r.suivi, transporteur: r.transporteurPdf || '', venteMs: msDe(r.receivedAt), retour: true });
   }
   return out;
 }
