@@ -26,7 +26,7 @@ import { estCommandePlateforme, estEcriturePlateforme, refusPanneau, ACTIONS_EXT
 import { poserExtensionIci, poserPanneauRetard, ouvrirPanneau } from './ouvrirPanneau.js';
 import { poserFaitsAgir, poserEnvoiAgir } from './agir/porte.js';
 import { texteRaison as texteRaisonAgir, CreerVintedAgir, publierLbcDepuisVrm, EbayLectureSeule } from './agir/Agir.jsx';   // (24 nov., lot agir-si-connecte) LA porte de tous les gestes
-import { requeteConnexions } from './connexions/connexions.js';
+// (25 nov.) `requeteConnexions` chargé À LA DEMANDE (src/connexions/connexions.js n'est plus dans le premier JS de chaque écran).
 import { lirePresences as lirePresencesAgir, nouvelleCommandeDistance as commandeDistanceAgir, deposerCommandeDistance as deposerDistanceAgir, lireUneCommande as lireUneCommandeAgir } from './aDistance.js';
 import { CLE_DISCRETION as CLE_DISCRETION_AGIR } from './discretion.js';
 
@@ -23864,7 +23864,8 @@ function SourceAgir({ comptesVinted }) {
       } finally { enVol = false; }
     };
     const lireApp = async () => {
-      const q = requeteConnexions((AUTH.user && AUTH.user.id) || '');
+      let q = null; try { q = (await import('./connexions/connexions.js')).requeteConnexions((AUTH.user && AUTH.user.id) || ''); } catch (_) { q = null; }
+      if (mort) return;
       if (!q) { if (!mort) setAppareils(null); return; }
       let rows = null; try { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${q}&limit=40`, { headers: sbAuth(), cache: 'no-store' }); rows = r.ok ? await r.json() : null; } catch (_) { rows = null; }
       if (!mort) setAppareils((x) => (Array.isArray(rows) ? rows : Array.isArray(x) ? x : null));
