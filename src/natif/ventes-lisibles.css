@@ -273,7 +273,8 @@
     .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-td[data-tt-col="prix"] { font: 600 14.5px/20px var(--n-police); font-variant-numeric: tabular-nums; text-align: right; }
     .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-td[data-tt-col="date"] { color: var(--n-tg-encre-2); font-variant-numeric: tabular-nums; }
     .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-td[data-tt-col="transporteur"] { color: var(--n-tg-encre); }
-    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-transporteur { gap: 8px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-transporteur { gap: 8px; max-width: 100%; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-transporteur > [data-transporteur-logo] { width: 20px; height: 20px; }
     .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-vide-cellule { color: var(--n-tg-encre-2); }
     /* Le statut : étiquette pâle, rayon 6. Par défaut le gris (annulée, en cours) ; la teinte vient de la CATÉGORIE de la ligne
        (`data-tt-statut-ligne`, posée par l'écran : la règle d'état ne change pas, seule la couleur). */
@@ -284,14 +285,20 @@
       background: var(--n-ambre-fond); color: var(--n-tg-encre); font-weight: 700; }
     .vrm-main[data-ecran="ventes"] .n-tt-ordi :is(.n-tt-tr[data-tt-statut-ligne="route"], .n-tt-tr[data-tt-statut-ligne="livree"]) .n-tt-etiquette { background: var(--n-bleu-fond); color: var(--n-bleu); }
     .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-tr[data-tt-statut-ligne="terminee"] .n-tt-etiquette { background: var(--n-vert-fond); color: var(--n-vert); }
-    /* Les largeurs de la maquette (N° 70 · Prix 96 · Date 112 · Transporteur 170 · Statut 140) : l'article prend le reste. */
-    .vrm-main[data-ecran="ventes"] .n-tt-ordi :is(.n-tt-th, .n-tt-td):not(.n-tt-th-case, .n-tt-td-case, .n-tt-th-menu, .n-tt-td-menu) { padding-inline: 12px; }
-    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="numero"] { width: 70px; }
-    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="prix"], .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="net"] { width: 96px; }
-    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="date"] { width: 112px; }
-    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="transporteur"] { width: 170px; }
-    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="statut"] { width: 140px; }
-    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="limite"] { width: 130px; }
+    /* Les largeurs de la maquette (N° 70 · Prix 96 · Date 112 · Transporteur 170 · Statut 140), resserrées : la colonne Achat s'y ajoute : l'article prend le reste. */
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi :is(.n-tt-th, .n-tt-td):not(.n-tt-th-case, .n-tt-td-case, .n-tt-th-menu, .n-tt-td-menu) { padding-inline: 10px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="numero"] { width: 64px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="prix"], .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="net"] { width: 84px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="date"] { width: 100px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="transporteur"] { width: 150px; }
+    /* Le NOM du transporteur à côté de son logo (maquette) dès que le tableau a la place ; plus étroit, le logo seul (le nom au survol
+       et au lecteur d'écran, la règle d'avant : src/natif/ventes-lisibles.css @container tt 1400). */
+    @container tt (min-width: 1060px) {
+      .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-transporteur > span:last-child { position: static; width: auto; height: auto; overflow: hidden; clip-path: none;
+        text-overflow: ellipsis; white-space: nowrap; min-width: 0; font: 400 14px/20px var(--n-police); color: var(--n-tg-encre); }
+    }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="statut"] { width: 120px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="limite"] { width: 112px; }
     /* « ··· » : discret, gris, au bout de la ligne. */
     .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-td-menu .n-tt-plus { color: var(--n-tg-encre-2); }
     /* Les cartes de l'écran (« Mes envois », « Litiges et retours », « À régler ») sur la même surface, bordées du même filet. */
