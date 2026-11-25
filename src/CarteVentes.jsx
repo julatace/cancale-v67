@@ -138,7 +138,7 @@ export default function CarteVentes({ lignes, paysVinted, ebay, releve, maintena
       {tete}
       <p className="vrm-cv-resume" data-cv-resume="">{resume}{L.paysEnCours ? ` · ${tr('fc.paysEnCours')}` : ''}</p>
       {filtres}
-      {!L.n ? <p className="vrm-fc-ligne-vide" data-cv-vide="">{tr('fc.aucuneVente')}</p> : !bulles.length ? <p className="vrm-fc-ligne-vide" data-cv-vide="">{tr('fc.aucunLieu')}</p> : (
+      {!L.n ? <p className="vrm-fc-ligne-vide" data-cv-vide="">{tr('fc.aucuneVente')}</p> : !bulles.length ? (L.sansLieu.n >= L.n ? null : <p className="vrm-fc-ligne-vide" data-cv-vide="">{tr('fc.aucunLieu')}</p>) : (
         <>
           <FondVentes bulles={surCarte} max={max} vue={vue} choisi={choisi} onChoisir={(k) => setChoisi(k === choisi ? null : k)}/>
           {sel ? <DetailLieu b={sel} onFermer={() => setChoisi(null)}/> : (

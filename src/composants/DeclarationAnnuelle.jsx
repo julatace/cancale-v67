@@ -19,7 +19,7 @@ export default function DeclarationAnnuelle({ D, fmt, id = 'compta-revenus' }) {
     return (
       <section id={id} className="vrm-ac-section vrm-sv-repliee" data-dr-etat={D.etat}>
         {titre}
-        <p className="vrm-ac-couv">{tr('ac.dr.' + D.etat)}</p>
+        <p className="vrm-ac-couv">{D.etat === 'statut' ? tr('mtb.statutAChoisir') : tr('ac.dr.' + D.etat)}</p>
       </section>
     );
   }

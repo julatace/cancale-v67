@@ -2575,7 +2575,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
         <div style={{ padding: '14px 16px' }}>
           <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>{trj('compta.facturesElectroniquesVentes', { libelleYm: libelleYm(ym) })}</div>
           {raisonGrise && <div data-fe-raison style={{ marginTop: 8, fontSize: 13, color: C.text, lineHeight: 1.55, border: `1px solid ${C.border}`, background: C.bg, borderRadius: 12, padding: '10px 12px' }}>
-            {raisonGrise}{!etat.ok && etat.geste ? <span style={{ color: C.muted }}> {etat.geste}</span> : null}
+            {raisonGrise}{!etat.ok && etat.geste ? <span style={{ color: C.muted }} title={etat.geste}> <span aria-hidden="true">{etat.etat === 'regime' ? tr('mtb.versDeclarer') : etat.geste}</span>{etat.etat === 'regime' ? <span className="vrm-sr-seul">{etat.geste}</span> : null}</span> : null}
           </div>}
           {etat.ok && <div style={{ fontSize: 11, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>{trj('compta.vendeurSirenAcheteur', { nom: etat.vendeur.nom, siren: etat.vendeur.siren, mention: etat.vendeur.mention })}</div>}
           {recap && recap.lignes.length === 0 && <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>{tr('compta.aucuneVenteDatee')}{recap.partiel ? tr('compta.avecPuEtre') : ''}.</div>}

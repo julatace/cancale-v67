@@ -30,5 +30,12 @@ export default {
   "mtb.adistAucunSous": "Extension 5.436+ on your computer, browser open.",
   "mtb.adistPasOuvert": "closed on the computer",
   "mtb.proPasLu": "Pro or private: —",
+  "mtb.periodeVs": "{p} · vs {prec}",
+  "mtb.laPrecedente": "the previous one",
+  "mtb.dateesSur": "{n}/{total} dated",
+  "mtb.joursTiret": "“—”: listing date not read",
+  "mtb.versDeclarer": "Money → Declare",
+  "mtb.aucuneFacture": "No invoices.",
+  "mtb.statutAChoisir": "Status to choose.",
   "mtb.sansSource": "{n} with no source",
 };

@@ -1276,9 +1276,10 @@ const CLE_VITE = { modele: (l) => l.modele, marque: (l) => l.marqueLue, taille: 
 // Le titre de la période : « Octobre · comparé à septembre ».
 const titrePeriodeStats = (b) => {
   const maj = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-  if (b.type === 'semaine') return `Semaine du ${new Date(b.de).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} · comparée à la précédente`;
-  if (b.type === 'annee') return `${new Date(b.de).getFullYear()} · comparée à ${new Date(b.prevDe).getFullYear()}`;
-  return `${maj(new Date(b.de).toLocaleDateString('fr-FR', { month: 'long' }))} · comparé à ${new Date(b.prevDe).toLocaleDateString('fr-FR', { month: 'long' })}`;
+  // (25 nov., moins de texte) « comparé à » ⇒ « vs » : la période et ce à quoi elle se compare, en trois mots.
+  if (b.type === 'semaine') return tr('mtb.periodeVs', { p: `Semaine du ${new Date(b.de).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`, prec: tr('mtb.laPrecedente') });
+  if (b.type === 'annee') return tr('mtb.periodeVs', { p: String(new Date(b.de).getFullYear()), prec: String(new Date(b.prevDe).getFullYear()) });
+  return tr('mtb.periodeVs', { p: maj(new Date(b.de).toLocaleDateString('fr-FR', { month: 'long' })), prec: new Date(b.prevDe).toLocaleDateString('fr-FR', { month: 'long' }) });
 };
 // ── ANNULATIONS PAR COMPTE ET NOTES REÇUES (3 nov.) ─────────────────────────
 // Deux cartes de Statistiques, sur les règles pures `bilanAnnulees`
@@ -1729,9 +1730,9 @@ function ComparerComptes({ comptes, brutComptes, enLigneDe }) {
   const L = [
     ['ventes', 'Ventes', (x) => String(x.n)],
     ['vendu', 'Vendu', (x) => fmt(x.eur)],
-    ['benef', 'Bénéfice connu', (x) => (x.brut == null ? (x.nFin ? `— · prix d’achat 0 sur ${x.nFin}` : '—') : `${fmt(x.brut)}${x.nCout < x.nFin ? ` · ${x.nCout} sur ${x.nFin}` : ''}`)],
+    ['benef', 'Bénéfice connu', (x) => (x.brut == null ? (x.nFin ? `— · 0/${x.nFin}` : '—') : `${fmt(x.brut)}${x.nCout < x.nFin ? ` · ${x.nCout} sur ${x.nFin}` : ''}`)],
     ['panier', 'Panier moyen', (x) => (x.panier == null ? '— · pas assez' : fmt(x.panier))],
-    ['delai', 'Temps pour vendre', (x) => (x.delai === undefined ? '— · pas sur ce site' : x.delai == null ? '— · aucune date' : jr(x.delai))],
+    ['delai', 'Temps pour vendre', (x) => (x.delai === undefined ? '— · pas sur ce site' : x.delai == null ? '—' : jr(x.delai))],
     ['taux', 'Taux de vente', (x) => (x.taux === undefined ? '— · pas sur ce site' : x.taux == null ? '— · en ligne pas lu' : pct(x.taux))],
   ];
   return (
@@ -1839,10 +1840,10 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
       <RepliStats id="plus" titre={tr('stats.plusChiffres')} ouvertDefaut>
         <div className="vrm-sp-corps">
           <div className="vrm-sv-rangee vrm-sv-rangee-2">
-            {carte('sp-vr', tr('stats.venduRecu2'), `${titreBarres.replace('Vendu par ', 'par ')} · ${noteBarres}`, corpsVR, { 'data-sv-carte': 'vendu-recu' }, 'vrm-sv-large')}
-            {carte('sp-age', tr('stats.ageStock'), A && A.total ? `aujourd’hui · ${plSP(A.datesConnues, 'annonce datée', 'annonces datées')}` : 'aujourd’hui', corpsAge, { 'data-sv-carte': 'age-stock' })}
+            {carte('sp-vr', tr('stats.venduRecu2'), noteBarres, corpsVR, { 'data-sv-carte': 'vendu-recu' }, 'vrm-sv-large')}
+            {carte('sp-age', tr('stats.ageStock'), A && A.total && A.datesConnues < A.total ? tr('mtb.dateesSur', { n: A.datesConnues, total: A.total }) : null, corpsAge, { 'data-sv-carte': 'age-stock' })}
           </div>
-          {carte('sp-records', tr('stats.mesRecords'), 'depuis le début', <MesRecords vendu={venduTout} releve={releveTout} partiel={partielTout} onGo={onGo}/>, { 'data-sv-carte': 'records' })}
+          {carte('sp-records', tr('stats.mesRecords'), null, <MesRecords vendu={venduTout} releve={releveTout} partiel={partielTout} onGo={onGo}/>, { 'data-sv-carte': 'records' })}
           {Array.isArray(comptes) && comptes.length >= 2
             ? carte('sp-comptes', tr('stats.comparerDeuxComptes'), null, <ComparerComptes comptes={comptes} brutComptes={brutComptes} enLigneDe={enLigneDe}/>, { 'data-sv-carte': 'comparer-comptes' })
             : carte('sp-comptes', tr('stats.comparerDeuxComptes'), null, vide(comptes === null ? 'Tes ventes n’ont pas pu être lues.' : comptes === undefined ? 'Je lis tes ventes…' : 'Il faut deux comptes avec au moins une vente sur la période.', { 'data-sv-etat': comptes == null ? 'passu' : 'pas-assez' }), { 'data-sv-carte': 'comparer-comptes' })}

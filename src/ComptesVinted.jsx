@@ -50,7 +50,7 @@ export default function ComptesVinted({ vendu, manque = [], nonComptees = [], re
     if (pasLus.length) notes.push(['paslu', tr('stats.cv.pasLu', { x: pasLus.join(', ') })]);
     const lus = lignes.filter((l) => !l.pasLu);
     if (lus.some((l) => l.prixRaison === 'peu')) notes.push(['prix', tr('stats.cv.prixDes', { n: MIN_DONNEES })]);
-    if (lus.some((l) => l.delaiRaison === 'sansdate')) notes.push(['delai', tr('stats.cv.delaiSansDate')]);
+    if (lus.some((l) => l.delaiRaison === 'sansdate')) notes.push(['delai', tr('mtb.joursTiret')]);
     else if (lus.some((l) => l.delaiRaison === 'passu')) notes.push(['delai', tr('stats.cv.delaiPasLu')]);
     else if (lus.some((l) => l.delaiRaison === 'releve')) notes.push(['delai', tr('stats.cv.delaiReleve')]);
     const part = lus.filter((l) => l.offresRaison === 'partiel' && Number.isFinite(l.luJusqua)).map((l) => l.luJusqua);

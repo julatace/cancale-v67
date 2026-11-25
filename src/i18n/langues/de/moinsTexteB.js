@@ -30,5 +30,12 @@ export default {
   "mtb.adistAucunSous": "Erweiterung 5.436+ am Computer, Browser offen.",
   "mtb.adistPasOuvert": "am Computer geschlossen",
   "mtb.proPasLu": "Pro oder privat: —",
+  "mtb.periodeVs": "{p} · vs. {prec}",
+  "mtb.laPrecedente": "die vorige",
+  "mtb.dateesSur": "{n}/{total} datiert",
+  "mtb.joursTiret": "„—“: Einstelldatum nicht gelesen",
+  "mtb.versDeclarer": "Geld → Melden",
+  "mtb.aucuneFacture": "Keine Rechnungen.",
+  "mtb.statutAChoisir": "Status wählen.",
   "mtb.sansSource": "{n} ohne Quelle",
 };

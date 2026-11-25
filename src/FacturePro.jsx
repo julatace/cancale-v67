@@ -1250,7 +1250,7 @@ export function ListeFacturesPro({ deps }) {
         </select> : null}
       </div>
       {manquants.length ? <p className="vrm-fp-muet is-ambre" data-fp-trous={manquants.length}>Numéro{manquants.length > 1 ? 's' : ''} pris sans pièce : {manquants.slice(0, 8).map((x) => `${x.s === 'avoir' ? 'avoir ' : ''}n° ${x.n}`).join(', ')}{manquants.length > 8 ? '…' : ''}.</p> : null}
-      {!tout.length ? <p className="vrm-fp-muet">Aucune facture émise pour l'instant.</p> : <>
+      {!tout.length ? <p className="vrm-fp-muet">{tr('mtb.aucuneFacture')}</p> : <>
         <ul className="vrm-fp-liste">
           {lignes.map((x) => {
             const e = x.envoi;

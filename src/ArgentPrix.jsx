@@ -88,7 +88,7 @@ export function PrixVouluCarte({ taux }) {
   const net = netTape(texte);
   const T = taux ? prixAAfficher(net, taux) : null;
   return (
-    <Section titre={tr('ap.pv.titre')} couv={tr('ap.pv.couv')} data-prix-voulu={taux ? (net == null ? 'vide' : 'ok') : 'encours'}>
+    <Section titre={tr('ap.pv.titre')} couv={null} aria-description={tr('ap.pv.couv')} data-prix-voulu={taux ? (net == null ? 'vide' : 'ok') : 'encours'}>
       <div className="vrm-ac-carte">
         <label className="vrm-ap-champ">
           <span className="vrm-ac-libelle">{tr('ap.pv.jeVeux')}</span>
@@ -120,7 +120,7 @@ export function PrixVouluCarte({ taux }) {
 export function EcartsPrixPorte({ onOuvrir }) {
   useLangue();
   return (
-    <Section titre={tr('ap.ec.titre')} couv={tr('ap.ec.porte')} data-ecarts-porte="">
+    <Section titre={tr('ap.ec.titre')} couv={null} aria-description={tr('ap.ec.porte')} data-ecarts-porte="">
       <Bouton variante="secondaire" icone="search" className="vrm-ac-lien" data-ecarts-ouvrir="" onClick={onOuvrir}>{tr('ap.ec.verifier')}</Bouton>
     </Section>
   );

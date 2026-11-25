@@ -744,7 +744,10 @@ function LigneEmailsCompte({ ligne, uid, login }) {
   return (
     <div className="vrm-cl-emails" data-compte-emails={ligne.etat} data-compte-emails-jours={ligne.jours != null ? String(ligne.jours) : undefined}>
       <span className="vrm-cl-emails-lib">{L.emails}</span>
-      <span className={'vrm-cl-emails-txt' + (ligne.geste ? ' is-geste' : '')}>{ligne.texte}</span>
+      {/* (25 nov., moins de texte) L'état normal (« reçoit ses e-mails ») : une coche ; les mots au lecteur d'écran. Un manque reste écrit. */}
+      {ligne.etat === 'recoit' && !ligne.geste
+        ? <span className="vrm-cl-emails-txt" title={ligne.texte}><Icon name="check" size={15}/><span className="vrm-sr-seul">{ligne.texte}</span></span>
+        : <span className={'vrm-cl-emails-txt' + (ligne.geste ? ' is-geste' : '')}>{ligne.texte}</span>}
       {ligne.geste && <button type="button" className="vrm-lien-action vrm-cl-emails-geste" data-compte-emails-relier={uid || ''} onClick={relier}>{login ? `Relier la boîte de ${login}` : L.relierBoite.replace(/\bma\b/, 'sa')}</button>}
     </div>
   );
@@ -2140,7 +2143,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       <section key={g.id} id={`reglages-${g.id}`} className="vrm-set-groupe" data-groupe-reglages={g.id}>
         {g.titre && <h3 className="vrm-set-titre" style={{color:C.muted}}>{g.titre}</h3>}
         {corps}
-        {g.pied && <div className="vrm-set-pied" style={{color:C.muted}}>{g.pied}</div>}
+        {/* (25 nov., moins de texte) Le pied d'un groupe (une phrase d'explication) passe au lecteur d'écran, sauf dans « Sécurité des données ». */}
+        {g.pied && <div className={'vrm-set-pied' + (typeof g.pied === 'string' && !(idsDonneesRef.current && idsDonneesRef.current.has('groupe:' + g.id)) ? ' vrm-sr-seul' : '')} style={{color:C.muted}}>{g.pied}</div>}
       </section>
     );
     // (14 nov., refonte visible) LES OPTIONS AVANCÉES REPLIÉES : un groupe `avance` (Sécurité et sauvegarde)
@@ -2480,7 +2484,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
   const categories = rangerParCategorie(groupes);
   rangementRef.current = categories;
-  idsDonneesRef.current = new Set(((categories.find((c) => c.id === 'donnees') || {}).ids) || []);
+  { const dn = categories.find((c) => c.id === 'donnees') || {}; idsDonneesRef.current = new Set([...(dn.ids || []), ...((dn.groupes || []).map((g) => 'groupe:' + g.id))]); }
   // (17 nov., nouveau design — Julien : « c'est beau mais les cases sont dispersées partout ») NEUF SECTIONS, dans l'ordre des
   // Réglages d'iOS : Compte · Plateformes et comptes · Ventes et colis · Stock et numéros · Argent et compta · Apparence et
   // langue · Notifications · Sécurité et données · Aide. « Sécurité des comptes » et « Sécurité des données » (le panneau
@@ -2523,7 +2527,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       </span>
       <span>
         <span style={{display:'block',fontSize:17,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:'-.01em'}}>{AUTH.user.email}</span>
-        <span style={{display:'block',fontSize:13,color:C.muted,marginTop:3}}>
+        {/* (25 nov., moins de texte) « Tes données ne sont visibles que par toi » : l'état normal, dit au lecteur d'écran ; l'autre (un avertissement) reste écrit. */}
+        <span className={CLOISONNE ? 'vrm-sr-seul' : undefined} style={CLOISONNE ? undefined : {display:'block',fontSize:13,color:C.muted,marginTop:3}}>
           {CLOISONNE ? tr('reglages.profil.cloisonne') : tr('reglages.profil.pasCloisonne')}
         </span>
       </span>

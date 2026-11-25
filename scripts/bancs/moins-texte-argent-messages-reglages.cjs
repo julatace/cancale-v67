@@ -58,20 +58,20 @@ const MESURER = ([replis, lignes, racine]) => {
   // Une LISTE (conversations, factures) : ses lignes sont du contenu, pas du texte à couper — une seule compte (la
   // première), les autres sont cachées le temps de la lecture ; leur nombre est rendu à part.
   const rangs = lignes ? [...main.querySelectorAll(lignes)].slice(1) : [];
-  const avR = rangs.map((e) => e.style.display); rangs.forEach((e) => { e.style.setProperty('display', 'none', 'important'); });
+  const avR = rangs.map((e) => e.style.getPropertyValue('display')); rangs.forEach((e) => { e.style.setProperty('display', 'none', 'important'); });
   // Les mots VUS : le texte réservé au lecteur d'écran (1 px, découpé) ne compte pas — il est retiré le temps de la lecture.
   const caches = [...main.querySelectorAll('*')].filter((e) => { const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); if (cs.position !== 'absolute' && cs.position !== 'fixed') return false; const decoupe = /inset\(50%\)/.test(cs.clipPath) || /rect\(0(px)?,? 0(px)?,? 0(px)?,? 0(px)?\)/.test(cs.clip); return decoupe || (r.width <= 1 && r.height <= 1 && (cs.clipPath !== 'none' || cs.clip !== 'auto')); });
-  const avant = caches.map((e) => e.style.display); caches.forEach((e) => { e.style.display = 'none'; });
+  const avant = caches.map((e) => e.style.getPropertyValue('display')); caches.forEach((e) => { e.style.setProperty('display', 'none', 'important'); });
   // La coque (en-tête : titre, loupe, cloche, ligne de fraîcheur) n'est pas l'écran : hors du compte.
-  const coque = [...main.querySelectorAll('[data-fraicheur-deplier], .vrm-fraicheur, [data-n-tete], .n-tete-app')];
-  const avC = coque.map((e) => e.style.display); coque.forEach((e) => { e.style.display = 'none'; });
+  const coque = [...main.querySelectorAll('[data-fraicheur-deplier], .vrm-fraicheur')];
+  const avC = coque.map((e) => e.style.getPropertyValue('display')); coque.forEach((e) => { e.style.setProperty('display', 'none', 'important'); });
   // Un menu déroulant (<select>) ne montre QUE son choix : ses autres options ne sont pas « vues ».
-  const menus = [...main.querySelectorAll('select')].map((sel) => { const sp = document.createElement('span'); sp.textContent = sel.selectedOptions && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : ''; const d = sel.style.display; sel.style.display = 'none'; sel.after(sp); return [sel, sp, d]; });
+  const menus = [...main.querySelectorAll('select')].map((sel) => { const sp = document.createElement('span'); sp.textContent = sel.selectedOptions && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : ''; const d = sel.style.getPropertyValue('display'); sel.style.setProperty('display', 'none', 'important'); sel.after(sp); return [sel, sp, d]; });
   const texte = main.innerText || '';
-  menus.forEach(([sel, sp, d]) => { sp.remove(); sel.style.display = d; });
-  caches.forEach((e, i) => { e.style.display = avant[i]; });
-  coque.forEach((e, i) => { e.style.display = avC[i]; });
-  rangs.forEach((e, i) => { e.style.display = avR[i]; });
+  menus.forEach(([sel, sp, d]) => { sp.remove(); sel.style.setProperty('display', d); });
+  caches.forEach((e, i) => { e.style.setProperty('display', avant[i]); });
+  coque.forEach((e, i) => { e.style.setProperty('display', avC[i]); });
+  rangs.forEach((e, i) => { e.style.setProperty('display', avR[i]); });
   const mots = texte.replace(/(\d)[\s  ](?=\d)/g, '$1').split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w));
   return { mots: mots.length, texte };
 };

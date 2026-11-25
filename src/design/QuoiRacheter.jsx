@@ -30,7 +30,7 @@ export default function QuoiRacheter({ lignes, Segmente, fmt, etat, onSaisirPrix
   // nom, « N vendues · X € par paire · N j » en gris, le chiffre du tri à droite). La même règle (`quoiRacheter`).
   if (!Q || !Q.nReliees) {
     return (
-      <Carte titre={tr('ac.qr.titre')} className="vrm-sv-repliee" sousTitre={!Q ? (etat === 'encours' ? tr('ac.qr.encours') : tr('ac.qr.pasLu')) : Q.n ? tr('ac.qr.aucuneReliee', { n: Q.n }) : tr('ac.qr.aucune')}
+      <Carte titre={tr('ac.qr.titre')} className="vrm-sv-repliee" sousTitre={!Q ? (etat === 'encours' ? tr('ac.qr.encours') : tr('ac.qr.pasLu')) : Q.n ? tr('mtb.prixAchatSur', { n: 0, total: Q.n }) : tr('ac.qr.aucune')}
         attrs={{ 'data-stats-carte': 'sv-racheter', 'data-qr-etat': Q ? 'lu' : (etat || 'passu'), 'data-qr-n': Q ? Q.n : '', 'data-qr-reliees': Q ? Q.nReliees : '' }}>
         {Q && Q.n && onSaisirPrix ? <Rangee titre={tr('ac.qr.saisir')} ton="ambre" fin="chevron" onClick={onSaisirPrix} attrs={{ 'data-qr-saisir': '' }}/> : null}
       </Carte>
