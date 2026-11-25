@@ -296,3 +296,15 @@ au niveau de A. Ma journée et tous les autres écrans : B plus rapide en média
 AB précédent, même protocole (25 nov. vers 1 h, charge ≤ 6,5 ; interrompu ensuite par le redémarrage pour son 3e build) : à froid 8 108 → 8 018 mais 6 paires sur 7 plus lentes (+8 à +323 ms) ;
 Ma journée 1 542 → 1 570. Sur ces 14 paires à froid, l'écart médian par paire est d'environ +80 ms (1 %).
 Ma journée lue au banc (`LECTURES`, `CALCULS`) : B fait 40 lectures au lieu de 80 et `pickupUnion` 2 fois au lieu de 5.
+
+### 8 sexies. Train du 25 nov. : #1388 avec `main`, puis #1393 avec #1388
+- **#1388** (`claude/vitesse-ecran-montre`, après la fusion de `main` par le train) :
+  - `audit-cle-verifier` : la clé est refaite par `--ecrire`. Les quatre noms ajoutés (`colisDans`, `only`, `retraitsOutils` : des propriétés ; `sub` : un état) ne sont pas des calculs paresseux. Les deux paresseux déjà dans la clé (`pickupUnion`, `colisParTx`) n'y sont comparés que par identité, sans être lus.
+  - `e2e-extension` « ses annonces sont visibles dans Annonces » : l'écran d'hier, monté caché (`src/annoncesCachees.js`), ne rend plus ses vignettes. Or c'est sur elles que le banc trouvait `data-carte-annonce`. La grille et la rangée natives (`AnnoncesCartes.jsx`) et la ligne du tableau à l'ordinateur (`AnnoncesTableau.jsx`) portent maintenant cet attribut, par identité : la 1re annonce Vinted de l'article. Le contrôle est vert. Les 13 autres rouges sont les mêmes que sur `main` (`5c81357b7`, même banc : 28 verts, 13 rouges).
+- **#1393** : fusion de #1388.
+  - `CLAUDE.md` reste sous 60 000 : les lignes « Parcours iPhone » et « Styles au choix » ont été déplacées telles quelles.
+  - `audit-cle-verifier` développe maintenant `useCalculParVersion` comme une fonction du composant (`listeEnvoyes`, qui rend une identité neuve à chaque rendu, n'est pas une racine). Mutations : 48/48 rouges.
+- Preuves :
+  - `chiffres-volume`, #1388 contre #1393 : 35/35 et 12/12. `main` contre #1388 : 33/35, avec les deux écarts connus de `data-colis-total` (§4), et 12/12.
+  - La garde est verte sur les deux branches.
+  - `e2e-extension` est identique à `main` sur les deux branches.
