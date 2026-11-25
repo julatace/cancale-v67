@@ -31,7 +31,7 @@ const { fabriquer, repondre } = require('./_base-volume.cjs');
 const DIST = process.env.VITESSE_DIST ? path.resolve(process.env.VITESSE_DIST) : path.join(__dirname, '..', '..', 'dist');   // (17 nov.) VITESSE_DIST : un autre build (mutation de francais-differe)
 const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 4871;
 const DETAIL = !!process.env.VITESSE_DETAIL;
-const RTT = 150;            // ms — un aller-retour vers Supabase depuis la France (mesuré : 165–536 ms)
+const RTT = Number(process.env.VITESSE_RTT) || 150;            // ms — un aller-retour vers Supabase depuis la France (mesuré : 165–536 ms)
 const DEBIT = 2_000_000;    // octets/s — une 4G correcte
 const CPU = Number(process.env.VITESSE_CPU || 4);   // téléphone : processeur 4× plus lent qu'un ordinateur (émulation Chrome)
 
@@ -185,7 +185,7 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
     const du = decodeURIComponent(url);
     const hors = Array.isArray(rep.body) ? rep.body.filter((x) => x && horsEcran(x.id)).reduce((a, x) => a + JSON.stringify(x).length, 0) : 0;
     const achatsHors = Array.isArray(rep.body) ? rep.body.filter((x) => x && achatsHors_(x.id)).reduce((a, x) => a + JSON.stringify(x).length, 0) : 0;
-    const e = { m: 'GET', url, range: h.range || '', debut, fin: debut + delai, octets: body.length, pdf, poids: visePoids(du), entier: !!visePoids(du) && selectEntier(du), hors, achatsHors };
+    const e = { m: 'GET', url, range: h.range || '', debut, debutAbs: Date.now(), fin: debut + delai, octets: body.length, pdf, poids: visePoids(du), entier: !!visePoids(du) && selectEntier(du), hors, achatsHors };
     noter(e);
     await new Promise((r) => setTimeout(r, delai));
     return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body });
@@ -271,6 +271,8 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   // sessionStorage, est là). Mesurée à part, jusqu'au calme, avec ses fichiers.
   let deuxieme = null, reqPremier = req;
   const observe1 = pendant ? await Promise.resolve(pendant).catch(() => null) : null;
+  // (25 nov., chargement-structure) Ce que le banc relève sur la 1re ouverture, avant le rechargement.
+  const avantDeuxieme = opts.deuxieme && opts.avantDeuxieme ? await opts.avantDeuxieme(pg).catch(() => null) : null;
   if (opts.deuxieme) {
     reqPremier = req.slice();
     fige = false; req.length = 0; servis = []; t0 = Date.now();
@@ -291,7 +293,7 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   if (opts.capture) await pg.screenshot({ path: opts.capture }).catch(() => {});   // (17 nov.) la capture à regarder (francais-differe CAPTURES=dossier)
   const apres = opts.apres ? await opts.apres(pg).catch(() => null) : null;
   await ctx.close();
-  return { req: reqPremier, utile, errs, lu, frappes, heros, rendusSignal, fichiers, coque, deuxieme, observe: observe1, apres };
+  return { req: reqPremier, utile, errs, lu, frappes, heros, rendusSignal, fichiers, coque, deuxieme, observe: observe1, apres, avantDeuxieme };
 }
 
 function bilan(nom, r) {
