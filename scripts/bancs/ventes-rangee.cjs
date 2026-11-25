@@ -17,6 +17,7 @@ require('./_porte-banc.cjs');
 //       carré plein) ;
 //    O  1512 : « À envoyer » et « En route » restent le tableau de travail (lignes rendues, pas de défilement de côté).
 //  `BANC_DIST=…` juge un autre build (le code d'avant : rouge attendu). `SHOTS=dossier` garde les captures (dsf 2).
+//  `STYLE=monochrome` (ou c3doux…) juge un style de Paramètres → Apparence.
 //  `MUTATION=logo` réaffaiblit la règle (la 2ᵉ ligne rognée) : L doit passer au rouge.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -31,6 +32,7 @@ const LARG = liste('VUES', '390,1512').map(Number);
 const THEMES = liste('THEMES', 'clair,sombre');
 const ONGLETS = liste('ONGLETS', 'envoyes,envoyer,toutes');
 const MUTATION = process.env.MUTATION || '';
+const STYLE = process.env.STYLE || '';
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 600) : '')); } return c; };
 const attendre = async (pg, f, ms = 30000, arg) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await pg.evaluate(f, arg).catch(() => false)) return true; await pg.waitForTimeout(300); } return false; };
@@ -102,6 +104,9 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
   await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
   await attendre(pg, () => !!document.querySelector('[data-vn="ventes"]'), 40000);
   await pg.waitForTimeout(1500);
+  // `STYLE=monochrome|c3doux|…` : un style de Paramètres → Apparence (src/natif/styleChoix.js, rangé sur l'appareil) ; vide = le style par défaut.
+  if (STYLE) { await pg.evaluate((st) => { localStorage.setItem('vrm_style', JSON.stringify(st)); }, STYLE); await pg.reload({ waitUntil: 'domcontentloaded' });
+    await attendre(pg, () => !!document.querySelector('[data-vn="ventes"]'), 40000); await pg.waitForTimeout(1500); }
   if (MUTATION === 'logo') await pg.addStyleTag({ content: '.n-vr-meta, .n-vt-ligne { flex-wrap: nowrap !important; overflow: hidden !important; max-width: 150px !important; } .n-rangee-sous { overflow: hidden !important; }' });
   return { ctx, pg, erreurs };
 }
@@ -124,9 +129,9 @@ async function onglet(pg, cle) {
       const tel = W < 600;
       const { ctx, pg, erreurs } = await ouvrirVentes(nav, { W, sombre: th === 'sombre', b });
       for (const og of (tel ? ONGLETS : ['envoyer', 'envoyes'])) {
-        console.log(`\n── Ventes · ${og} · ${W} · ${th}${MUTATION ? ' · MUTATION ' + MUTATION : ''}`);
+        console.log(`\n── Ventes · ${og} · ${W} · ${th}${STYLE ? ' · style ' + STYLE : ''}${MUTATION ? ' · MUTATION ' + MUTATION : ''}`);
         await onglet(pg, og);
-        await pg.screenshot({ path: path.join(SHOTS, `rangee-${og}-${W}-${th}.png`) });
+        await pg.screenshot({ path: path.join(SHOTS, `rangee-${og}-${W}-${th}${STYLE ? '-' + STYLE : ''}.png`) });
         // Les rangées à partir de la 20ᵉ portent `content-visibility: auto` (natif.css) : hors de la fenêtre, rien n'est mis en page.
         // Pour juger CHAQUE rangée, on les fait mettre en page le temps de la mesure (la règle mesurée est la même).
         const cv = await pg.addStyleTag({ content: '.n-rangee { content-visibility: visible !important; }' });

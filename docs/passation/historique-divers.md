@@ -2273,3 +2273,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (25 nov., style-c3)
 - **24 nov. · Vitesse PR B (`claude/vitesse-lectures-toucher`)** : 1re visite d'Achats 4,7 → 3,5 s (calculs refaits une fois par version des données), relevés « plus vue » groupés ; à froid = PR A (pas de comparaison pendant le 1er nuage) ; chiffres 35/35. `2026-11-24-vitesse-ecran-montre.md` §8. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (25 nov., ventes-rangee)
+- **25 nov. · Banc `e2e-extension` vert (`claude/e2e-extension-vert`)** : étapes 3/4 lisaient l'ancien écran (Ventes, « Qui dorment ») ⇒ portées sur le natif et le panneau ; vrais défauts corrigés : extension **5.440.4** (copie du dressing oubliée quand il est rangé : le panneau perdait la paire du lien), app (« Baisser » refusé et « mets à jour » pour une extension d'avant le lien du panneau). `2026-11-25-e2e-extension-vert.md`. Geste : installer la 5.440.4.
