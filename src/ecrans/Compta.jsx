@@ -99,6 +99,7 @@ import { DEMANDE_BILAN_MOIS, attrCible } from "../cibleNotif.js";   // (13 nov.,
 import { delaisPaiement, texteDelai } from "../delaiPaiement.js";
 // ⟦← App.jsx #8⟧
 import DepensesMois from '../natif/ecrans/DepensesMois.jsx';   // (21 nov., transp-depenses) « + Dépense » en deux touchers
+import { attrsAttente } from '../natif/outils.js';   // (25 nov., chargement propre) un chiffre en cours de lecture = un squelette
 import { nouvelleDepense, ecrireDepense, depensesDuMois, idCat } from '../depensesRapides.js';
 import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, texteDuTicket } from "../depensesTicket.js";
 
@@ -3781,8 +3782,11 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
     'data-argent-raison': q.raison || undefined, 'data-argent-echeance': q.echeance ? String(q.echeance) : undefined, title: nom(q), onClick: () => aller(q) });
   // (16 nov.) Le nom d'une case = son texte visible (WCAG 2.5.3 : un aria-label différent cachait le chiffre lu) ;
   // la phrase complète (« au moins », la question) reste en `title`.
+  // (25 nov., chargement propre) Un chiffre EN COURS de lecture : squelette à sa place, sa note invisible (place gardée).
+  const enLectureQ = (q) => !!q && q.valeur == null && !q.texte && q.raison === 'encours';
+  const noteAttente = (q) => attrsAttente(enLectureQ(q), 'note') || {};
   const chiffre = (q, affiche = false) => (
-    <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined}>
+    <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined} {...(attrsAttente(enLectureQ(q), 'valeur') || {})}>
       {q.valeur != null ? <>{q.partiel ? <small>{tr('journee.moins')} </small> : null}{affiche ? sommeAffiche(somme(q.valeur)) : somme(q.valeur)}</> : (q.texte || '—')}
     </b>
   );
@@ -3815,20 +3819,20 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
       <button type="button" className="vg-a-vendu" {...attrs(qV)}>
         <span className="vrm-argent-w-l vg-sr">{qV.libelle}</span>
         {chiffre(qV, true)}
-        <span className="vg-a-vendu-sous">{tr('verre2.argent.venduEn', { mois: moisLong })}{nV && nV.valeur != null ? ` · ${tr('avenir.ventes', { n: nV.valeur })}` : ''}{qV.note ? <span className="vrm-argent-w-note"> · {qV.note}</span> : null}</span>
+        <span className="vg-a-vendu-sous">{tr('verre2.argent.venduEn', { mois: moisLong })}{nV && nV.valeur != null ? ` · ${tr('avenir.ventes', { n: nV.valeur })}` : ''}{qV.note ? <span className="vrm-argent-w-note" {...noteAttente(qV)}> · {qV.note}</span> : null}</span>
       </button>
       <div className="vg-a-duo">
         <button type="button" className="vg-carte vg-a-case" {...attrs(qR)}>
           <span className="vrm-argent-w-l vg-ds">{tr('verre2.argent.recu')}</span>
           {chiffre(qR)}
-          <small className="vg-a-petit">{qR.note ? <span className="vrm-argent-w-note">{qR.note}</span> : tr('verre2.argent.auVersement')}</small>
+          <small className="vg-a-petit">{qR.note ? <span className="vrm-argent-w-note" {...noteAttente(qR)}>{qR.note}</span> : tr('verre2.argent.auVersement')}</small>
         </button>
         <div className="vg-carte vg-a-case vg-a-benef">
           <button type="button" className="vg-a-case-corps" {...attrs(qB)}>
             <span className="vrm-argent-w-l vg-ds">{netConnu != null ? tr('cr.beneficeConnu.court') : brut ? NOM_BENEFICE_BRUT : tr('verre2.argent.benefice')}</span>
             {netConnu != null ? <b className="vrm-argent-w-n vg-a-brut" data-benef-notion="connu" data-benef-valeur={String(Math.round(netConnu * 100))} data-arg-net-connu={`${Bn.nCout}/${Bn.n}`}>{somme(netConnu)}</b>
               : brut ? <b className="vrm-argent-w-n vg-a-brut" {...brut.attrs}>{somme(brut.valeur)}</b> : chiffre(qB)}
-            <small className="vg-a-petit">{brut || netConnu != null ? <span data-benef-couverture="">{tr('verre2.argent.ventesSur', { k: Bn.nCout, n: Bn.n })}</span> : qB.note ? <span className="vrm-argent-w-note">{qB.note}</span> : (Bn && Bn.n > 0 ? tr('avenir.ventes', { n: Bn.n }) : null)}</small>
+            <small className="vg-a-petit">{brut || netConnu != null ? <span data-benef-couverture="">{tr('verre2.argent.ventesSur', { k: Bn.nCout, n: Bn.n })}</span> : qB.note ? <span className="vrm-argent-w-note" {...noteAttente(qB)}>{qB.note}</span> : (Bn && Bn.n > 0 ? tr('avenir.ventes', { n: Bn.n }) : null)}</small>
           </button>
           {manquent > 0 ? <button type="button" className="vg-a-ambre" data-benef-porte="" data-benef-manque={manquent} onClick={versSaisiePrix}>{tr('verre2.argent.prixASaisir', { n: manquent })}<Icon name="chevron" size={13}/></button> : null}
         </div>
@@ -3837,7 +3841,7 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
         <button type="button" className="vg-a-case-corps" {...attrs(qD)}>
           <span className="vg-a-urssaf-tete">
             <span className="vrm-argent-w-l vg-ds">{P && P.label && (P.etat === 'lu' || P.etat === 'passu') ? tr('verre2.argent.urssafPour', { periode: P.label }) : tr('verre2.argent.urssaf')}</span>
-            {qD.note ? <span className="vrm-argent-w-note vg-a-echeance">{qD.note}</span> : null}
+            {qD.note ? <span className="vrm-argent-w-note vg-a-echeance" {...noteAttente(qD)}>{qD.note}</span> : null}
           </span>
           {cotis != null
             ? <b className="vrm-argent-w-n">{P.partiel ? <small>{tr('journee.moins')} </small> : null}{somme(cotis)}</b>
@@ -4523,7 +4527,7 @@ function DelaiPaiementCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, ac
     const dateVenteDe = (l) => (l.plateforme === 'Vinted' ? (Date.parse((l.o && l.o.date) || l.dateVente || '') || null) : l.plateforme === 'Vestiaire' ? venteVc.get(String(l.id)) || null : null);
     return delaisPaiement({ lignes: calc.decl.lignes, dateVenteDe });
   }, [calc, ventesVcER]);
-  if (R === undefined) return <p className="vrm-compta-phrase" data-delai-etat="encours" style={{ margin: 0 }}>{PAS_SU.enCours}</p>;
+  if (R === undefined) return <p className="vrm-compta-phrase" data-delai-etat="encours" style={{ margin: 0 }}><span {...attrsAttente(true, 'valeur')}>{PAS_SU.enCours}</span></p>;
   if (R === null) return <EtatPanne quoi="Le délai de paiement" raison="Tes ventes n’ont pas pu être lues." compact />;
   if (!R.sites.length) return <p className="vrm-compta-phrase" data-delai-etat="vide" style={{ margin: 0 }}>{tr('compta.aucuneVenteRecue')}</p>;
   return (

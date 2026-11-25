@@ -29,7 +29,7 @@ if (!process.env.VITESSE_CPU) process.env.VITESSE_CPU = '1';
 const path = require('path'), fs = require('fs');
 
 const ECRANS_TOUS = [
-  ['journee', 'Aujourd\'hui', () => !!document.querySelector('[data-vendu-mois],[data-vendu-pas-su]') || /pas pu s'afficher/.test(document.body.innerText)],
+  ['journee', 'Aujourd\'hui', () => !!document.querySelector('[data-attente-ecran="journee"][data-attente="pret"] [data-jv2-argent]') || /pas pu s'afficher/.test(document.body.innerText)],
   ['annonces', 'Annonces', () => /en ligne|annonce/i.test(document.body.innerText)],
   ['ventes', 'Ventes', () => document.querySelectorAll('[data-vente],[data-tx],[data-fiche-ligne]').length > 0 || /vente/i.test(document.body.innerText)],
   // L'onglet « Colis » de la barre du bas EST l'écran des achats (`ONGLET_ACHATS`) : `?tab=colis` ouvre Ma journée.
@@ -99,9 +99,11 @@ async function mesurer(V, b, ecran, dossier) {
   // t0 = la fin de l'écran de démarrage (`window.__vrmDemarrage`, src/demarrage.js) : la première image de l'APP.
   const pendant = async (pg, _t, quand) => {
     const pre = quand === 'deuxieme' ? '2-' : '';
+    // 2e ouverture : la page d'avant est encore là au premier regard — on attend la NOUVELLE (son origine de temps).
+    const origine0 = quand === 'deuxieme' ? await pg.evaluate(() => performance.timeOrigin).catch(() => null) : null;
     let fin = null;
     for (let i = 0; i < 1600 && fin == null; i++) {
-      fin = await pg.evaluate(() => (window.__vrmDemarrage ? window.__vrmDemarrage.fin : null)).catch(() => null);
+      fin = await pg.evaluate((o) => (performance.timeOrigin !== o && window.__vrmDemarrage ? window.__vrmDemarrage.fin : null), origine0).catch(() => null);
       if (fin == null) await new Promise((r) => setTimeout(r, 25));
     }
     if (!dossier) return fin;
@@ -115,6 +117,7 @@ async function mesurer(V, b, ecran, dossier) {
   const r = await V.ouvrir(b, { width: 390, height: 844 }, tab, attendre, null, {
     initScript: `(${sonde.toString()})(${JSON.stringify(MOTS_CHARGEMENT.source)})`,
     pendant,
+    images: true,
     deuxieme: true,
     capture: dossier ? path.join(dossier, `2-${tab}-final.png`) : null,
     apres: (pg) => pg.evaluate(() => window.__chgBilan ? window.__chgBilan() : null),

@@ -30445,6 +30445,11 @@ function RepliRetirerAchats({ children, sansLigne = false, siteFiltre = false })
 }
 function RepliRetirerAchatsTous({ children, sansLigne = false }) {
   const [pub] = useLigneSynchro('vrm_colis_retirer', lireColisARetirer);
+  // (25 nov., chargement propre) La ligne « À retirer · + N à vérifier » se montre ou non selon ce compte : l'écran
+  // Achats l'attend (ESSENTIELS_ECRAN.achats) — sinon elle arrivait APRÈS l'écran et poussait tout (CLS 0,09). La
+  // publication (`vrm_colis_retirer`, faite par la section « À retirer » montée dessous) n'existe pas encore sur un appareil
+  // neuf : l'écran l'attend, au plus son plafond (src/AttenteEcran.jsx), jamais plus.
+  useEssentiel('retirer', pub || undefined);
   // (17 nov., nouveau design) Allumé : les passes sont compactes — « À retirer » est TOUJOURS ouvert, sans ligne de repli.
   const designV2 = useDesignV2();
   const lireChoix = () => { try { return localStorage.getItem(CLE_RETIRER_OUVERT); } catch (_) { return null; } };
@@ -34094,7 +34099,7 @@ const ESSENTIELS_ECRAN = {
   journee: ['comptes', 'nuage'],
   ventes: ['comptes', 'nuage', 'sites', 'stats', 'carte', 'ventes'],
   annonces: ['comptes', 'nuage', 'sites', 'stats', 'carte', 'annonces'],
-  achats: ['comptes', 'nuage', 'sites', 'carte', 'achats'],
+  achats: ['comptes', 'nuage', 'sites', 'carte', 'achats', 'retirer'],
   messages: ['comptes', 'nuage', 'sites', 'messages', 'annonces'],
   cat_bord: ['comptes', 'nuage', 'sites', 'carte', 'ventes', 'achats', 'bordereaux'],
   garage: ['comptes', 'nuage', 'stock'],

@@ -96,6 +96,7 @@ srv.on('error', (e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.c
 const demarrer = () => new Promise((ok) => { if (srv.listening) return ok(); srv.once('listening', ok); srv.listen(PORT); });
 if (require.main === module) srv.listen(PORT);
 
+const PNG_1PX = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN89+7dfwAJYwPRx0LxXQAAAABJRU5ErkJggg==', 'base64');
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 
@@ -138,7 +139,8 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   if (opts.initScript) await pg.addInitScript(opts.initScript);
   // (12 nov.) une photo Vinted qui échoue fait SONDER le CDN par l'app (`essaiSonde`, fetch no-cors,
   // src/photosVinted.js) : coupée comme l'image elle-même — rien ne sort du banc (garde réseau).
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (opts.images && /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PNG_1PX })   // (25 nov., chargement-structure) les photos servies : un iPhone les charge
+    : ['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   // (11 nov.) `opts.cpu` : le ralentissement de CETTE ouverture (budget-vitesse relève à ×1 et ×4).
   const cpu = opts.cpu != null ? opts.cpu : CPU;
   if (vp.width < 600 && (cpu > 1 || RESEAU)) { const cdp = await ctx.newCDPSession(pg); if (cpu > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu }); if (RESEAU) { await cdp.send('Network.enable'); await cdp.send('Network.emulateNetworkConditions', RESEAU); } }
@@ -193,6 +195,9 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
   // (19 nov., capacite-3000) `opts.pendant(pg, t0)` : ce qu'un banc observe PENDANT l'ouverture
   // (captures en série du banc chargement-propre). Lancé avant le chargement, jamais attendu ici.
+  // (25 nov., mise-a-jour-auto) Des routes du banc posées AVANT la page (elles passent devant celles-ci : Playwright
+  // prend la dernière route enregistrée en premier) — la prise Realtime simulée, une réponse à une fonction.
+  if (opts.avantGoto) await opts.avantGoto(pg);
   const pendant = opts.pendant ? opts.pendant(pg, t0) : null;
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
   let utile = null;

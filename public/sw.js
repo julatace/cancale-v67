@@ -262,6 +262,10 @@ const avecNotif = (url, n) => {
 const cheminApp = (u) => (typeof u === 'string' && u.startsWith('/') && !u.startsWith('//') ? u : '/');
 const ICONE_VRM = '/vrm-icon-v5-192.png', BADGE_VRM = '/vrm-badge-96.png';
 const SAFARI = (() => { try { const u = String(self.navigator && self.navigator.userAgent || ''); return /AppleWebKit/.test(u) && !/Chrome|Chromium|CriOS|Edg|OPR|Android/.test(u); } catch (_) { return false; } })();
+async function signalerApp() {
+  const fen = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const c of fen) { try { if (estCoquille(new URL(c.url))) c.postMessage({ type: 'vrm-signal' }); } catch (_) {} }
+}
 async function montrerDansApp(ev) {
   try {
     const fen = await clients.matchAll({ type: 'window', includeUncontrolled: true });
@@ -304,6 +308,10 @@ self.addEventListener('push', event => {
   if (typeof data.lang === 'string' && /^(fr|en|es|it|de)$/.test(data.lang)) opts.lang = data.lang;
   if (typeof data.image === 'string' && /^https:\/\/images\d*\.vinted\.net\//.test(data.image)) opts.image = data.image;
   event.waitUntil((async () => {
+    // (25 nov., Julien : « elle doit se mettre à jour si elle reçoit un mail ou que quelque chose se met à jour sur Vinted »)
+    // Toute fenêtre de l'app (visible ou en arrière-plan) reçoit « du neuf » : elle sonde les VERSIONS de ses lignes au
+    // plus tôt (src/VeilleTempsReel.jsx) — une page gelée par iOS le reçoit à son retour. Aucune donnée dans le message.
+    signalerApp().catch(() => {});
     if (data.tagGroupe && genre && self.registration.getNotifications) {
       try { for (const n of await self.registration.getNotifications()) if (n.data && n.data.genre === genre) n.close(); } catch (_) {}
     }
