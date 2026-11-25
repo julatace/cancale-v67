@@ -73,3 +73,15 @@ colorer `MarquePlateforme` (l'audit l'interdit, et le sélecteur de sites doit r
 ## Geste de Julien
 
 Aucun. Si un compte garde l'initiale : ouvrir Vinted connecté sur ce compte (l'extension range `harvest_{uid}_profile`).
+
+## Bancs voisins, comparés à origin/main par nom (même machine, charge 12 à 38)
+
+| banc | origin/main | cette branche |
+|---|---|---|
+| `styles-choix` (Monochrome, Graphite · Annonces) | 4 rouges E (`n-ad-puce` hors famille) | les mêmes 4 |
+| `visuel-annonces` | 1 rouge (toucher 104 ms, charge) | 100 verts, 0 rouge |
+| `inventaire` | 16 KO | 16 KO (un 17e, « Hors connexion » 1512 sombre, au 1er passage sous charge ; 16 au 2e) |
+| `annonces-grille` | 4 rouges | les mêmes 4 |
+| `boutons-inventaire` | délai dépassé (charge) | 0 rouge |
+| `annonces-tete` | 4 rouges (rangée des sites d'avant) | les mêmes 4 |
+| `annonces-egalite` | plante (clés en double à la construction) | plante pareil |
