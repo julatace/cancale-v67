@@ -730,7 +730,12 @@ const TableauEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) =>
 const ArgentEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.ArgentEbay })));
 const TraficEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.TraficEbay })));
 const SanteEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.SanteEbay })));
-const VersementsEbayJournee = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.VersementsEbayJournee })));
+// (25 nov., régressions — captures iPhone de Julien : trois cartes grises sous « Personnaliser », pour toujours) Ce bloc
+// n'existe que s'il y a un versement à dire (le plus souvent : rien). En `aLaDemande`, son attente était le squelette de
+// trois rangées (`MorceauAttente`) : il paraissait puis s'en allait (un saut), et restait pour de bon quand le morceau
+// eBay n'arrivait pas (réseau de l'iPhone, morceau tenu — banc regressions-25nov S). Une attente MUETTE, comme tout bloc
+// d'appoint (`aLaDemandeDiscret`) : rien tant qu'il n'est pas là.
+const VersementsEbayJournee = aLaDemandeDiscret(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.VersementsEbayJournee })));
 // (15 nov., 2e tour) Les photos de la FICHE d'un N° (par identité : une seule fiche porte ce N°), lues
 // en projection dans `vinted_item_details` (§4.4, la forme de Republier) : « Ajouter les photos de ta
 // fiche » sur une annonce eBay qui en a peu. Deux fiches ou aucune ⇒ null (rien proposé).

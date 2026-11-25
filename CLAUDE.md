@@ -486,7 +486,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 - **25 nov. · Ventes, la rangée compacte (`claude/ventes-rangee`)** : photo par SES sources (identité), titre + prix, UN état, logo entier, ~84 px ; achat au balayage et dans la fiche. `2026-11-25-ventes-rangee.md`. Geste : aucun.
-- **25 nov. · Style « C3 doux » (mélange C3 × Vintex) (`claude/style-c3`, au choix, PAS par défaut)** : 12e style (gris `#DADDE2`, cartes blanches, plaque gravée, capsule du bas ; forme chargée seulement si choisi) ; Monochrome fond `#E2E4E8` ; À retirer, loupe, Argent nettoyés pour tout style choisi. `docs/passation/2026-11-25-style-c3.md`. Geste : regarder les planches.
+- **25 nov. · Régressions iPhone (`claude/regressions-25nov`)** : 3 cartes grises d'Aujourd'hui (versements eBay en attente muette), barre du haut opaque, ligne d'une vente en rangée (ordre des feuilles), « Pas revue récemment » une fois par compte, copie sans squelette ni heure. `2026-11-25-regressions.md`, banc `regressions-25nov`. Geste : aucun.
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier

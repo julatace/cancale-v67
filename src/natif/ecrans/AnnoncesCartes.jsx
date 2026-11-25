@@ -86,8 +86,9 @@ export const comptesDe = (a) => {
 // VUE (banc e2e-extension « ses annonces sont visibles dans Annonces », cible d'une notification : src/cibleNotif.js).
 // Par identité seulement : la 1re annonce Vinted de l'article ; aucune ⇒ pas d'attribut.
 export const idCarteAnnonce = (a) => { const v = a && Array.isArray(a.annonces) ? a.annonces.find((x) => x && x.site === 'vinted' && x.id != null) : null; return v ? String(v.id) : undefined; };
-export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, euros, nomSite, dort = null, plusVue = null, Photo = null, attrs = null, Icon = null, revele = null, taillePhoto = 360, groupe = false }) {   // (22 nov., choix 27) plusVue : jours mesurés (src/plusVue.js) ou null
-  const bandeau = bandeauDe(a);
+export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, euros, nomSite, dort = null, plusVue = null, Photo = null, attrs = null, Icon = null, revele = null, taillePhoto = 360, groupe = false, etatDit = null }) {   // (22 nov., choix 27) plusVue : jours mesurés (src/plusVue.js) ou null
+  // (25 nov.) `etatDit` : l'état déjà dit par l'en-tête du groupe — la carte ne le répète pas (src/natif/ecrans/Annonces.jsx `etatGroupe`).
+  const bandeau = etatDit && bandeauDe(a) === etatDit.cle ? '' : bandeauDe(a);
   const trace = a.etat === 'bloque' ? traceDe(a) : null;
   const grise = selection && !selection.cochable;
   const clic = () => { if (selection) { if (selection.cochable) selection.onBascule(); return; } onOuvrir(a); };
@@ -136,12 +137,17 @@ export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, e
 // de l'article ; toucher la rangée ouvre sa fiche). Deux formes à comparer : 'a' = le prix à droite, en haut (et « mini »
 // dessous) ; 'b' = le prix en gras DANS la méta, le titre a toute la largeur. L'état n'est dit (étiquette douce) que s'il n'est pas
 // « en ligne » et pas déjà dit par l'en-tête du compte (« Compte bloqué »).
-export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selection = null, euros, depuisTexte, nomSite, Icon = null, Photo = null, plusVue = null, attrs = null, groupe = false, rapides = null, revele = null }) {
+export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selection = null, euros, depuisTexte, nomSite, Icon = null, Photo = null, plusVue = null, attrs = null, groupe = false, rapides = null, revele = null, etatDit = null }) {
   // (24 nov., lot visuel-annonces — Julien : « améliore le design et la praticité ») Une rangée plus nette : photo 60 (par identité),
   // l'étiquette papier du N°, le titre sur 2 lignes, le prix à droite ; ♡ et 👁 en petites icônes ; l'état seulement s'il diffère
   // de l'onglet ; le logo du site seulement si la liste n'est PAS rangée par compte (ou paire sur 2 sites). Hauteur FIXE (72).
   // `rapides` : [{ cle, libelle, icone, onClick }] — glisser la rangée vers la gauche les montre (≥ 44 px), sans quitter la liste.
-  const b = bandeauDe(a);
+  // (25 nov.) `etatDit` : l'état déjà dit UNE fois par l'en-tête du groupe (src/natif/ecrans/Annonces.jsx `etatGroupe`) — la rangée
+  // n'en garde qu'un point discret, jamais la phrase répétée.
+  const b0 = bandeauDe(a);
+  const dejaDit = !!b0 && !!etatDit && b0 === etatDit.cle;
+  const signe = dejaDit && !etatDit.tous;   // toutes les rangées du compte le portent : l'en-tête suffit, aucun point
+  const b = dejaDit ? '' : b0;
   const trace = a.etat === 'bloque' ? traceDe(a) : null;
   const grise = selection && !selection.cochable;
   const ic = (n) => (Icon ? <Icon name={n} size={13}/> : null);
@@ -197,6 +203,7 @@ export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selec
               {(!groupe || a.sites.length > 1) ? a.sites.map((x) => <LogoSite key={x} site={x} taille={16} nom={nomSite(x)}/>) : null}
               {a.numero ? (a.doublon ? <Plaque numero={a.numero} doublon/> : <EtiquetteN numero={a.numero} className="n-ar-etiq" attrs={{ 'data-inv-n': a.numero }}/>) : null}
               {b && b !== 'bloque' ? <span className="n-ad-etiquette" data-ad-bandeau={b}>{tr('tableau.etat.' + b)}</span> : null}
+              {signe ? <span className="n-ad-point" data-ad-signe={b0} role="img" aria-label={tr('tableau.etat.' + b0)}/> : null}
               {plusVue != null ? <span className="n-ad-etiquette" data-ad-conseil="plusvue" data-ad-plusvue={String(plusVue)}>{tr('af.pv.etiquette', { n: plusVue })}</span> : null}
               <span className="n-ar-stats">{bouts}</span>
             </span>
