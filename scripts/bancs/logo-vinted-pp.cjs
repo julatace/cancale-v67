@@ -5,7 +5,8 @@ require('./_porte-banc.cjs');
 //  LE LOGO VINTED ET LA PHOTO DU COMPTE EN TÊTE DE CHAQUE COMPTE (25 nov. 2026 — docs/passation/2026-11-25-logo-vinted-pp.md)
 //  Julien (iPhone, Monochrome, Annonces) : « corrige le logo compte Vinted » — « le logo de Vinted, mais pour le compte la pp
 //  du compte Vinted » ; puis (Ventes) : « Mets ce logo Vinted » (le V turquoise des ventes).
-//  Sur l'app RENDUE (base inventée de design-passe, 3 comptes Vinted), Annonces, 390 tactile ET 1512, clair ET sombre,
+//  Sur l'app RENDUE (base inventée de design-passe, 3 comptes Vinted), Annonces (liste au téléphone, intertitres du tableau à
+//  l'ordinateur), 390 tactile ET 1512, clair ET sombre,
 //  style par défaut ET Monochrome :
 //    L  chaque en-tête de compte Vinted porte LE logo Vinted des ventes (`.n-logo-site[data-site="vinted"]`), ≥ 18 px,
 //       à la couleur de la marque : sa couleur calculée n'est pas l'encre (écart ≥ 80), saturée (≥ 0,4), et tient 3:1 sur
@@ -58,7 +59,7 @@ const MESURE = () => {
   const peinte = (el) => { const cs = getComputedStyle(el); const bg = parse(cs.backgroundColor); if (bg && bg.a > 0.5) return bg;
     const p = el.querySelector('path'); if (p) { const f = parse(getComputedStyle(p).fill); if (f) return f; } return parse(cs.color); };
   const encre = parse(getComputedStyle(document.querySelector('.n-ad-compte-nom') || document.body).color);
-  const tetes = [...document.querySelectorAll('[data-ad-repli^="vinted:"]')];
+  const tetes = [...document.querySelectorAll('[data-ad-repli^="vinted:"], [data-eg-compte-cle^="vinted:"]')];
   return {
     style: document.documentElement.getAttribute('data-style'), theme: document.documentElement.getAttribute('data-theme'),
     tetes: tetes.map((t) => {
@@ -68,7 +69,7 @@ const MESURE = () => {
       const c = logo ? peinte(logo) : null, f = fondDe(t);
       const av = t.querySelector('[data-inv-avatar]'); const img = av && av.querySelector('img');
       const ir = img ? img.getBoundingClientRect() : null, ics = img ? getComputedStyle(img) : null;
-      return { cle: t.getAttribute('data-ad-repli'), classe: logo ? String(logo.className) : '', site: logo ? (logo.getAttribute('data-site') || logo.getAttribute('data-logo-site')) : '',
+      return { cle: t.getAttribute('data-ad-repli') || t.getAttribute('data-eg-compte-cle'), classe: logo ? String(logo.className) : '', site: logo ? (logo.getAttribute('data-site') || logo.getAttribute('data-logo-site')) : '',
         w: r ? Math.round(r.width) : 0, h: r ? Math.round(r.height) : 0, couleur: c, encre, ecart: c && encre ? Math.abs(c.r - encre.r) + Math.abs(c.g - encre.g) + Math.abs(c.b - encre.b) : 0,
         sat: c ? Math.round(sat(c) * 100) / 100 : 0, k: c ? Math.round(rapport(c, f) * 100) / 100 : 0,
         img: img ? { src: img.currentSrc || img.src, lazy: img.getAttribute('loading'), rond: ics.borderRadius, fit: ics.objectFit, w: Math.round(ir.width), h: Math.round(ir.height), charge: img.complete && img.naturalWidth > 0 } : null,
@@ -114,7 +115,7 @@ async function ouvrir(nav, { W, sombre, style, url, b }) {
       const o = await ouvrir(nav, { W, sombre, style, url: '/?tab=annonces', b });
       try {
         await o.pg.waitForSelector('.vrm-main', { timeout: 45000 }).catch(() => {});
-        await o.pg.waitForFunction(() => document.querySelectorAll('[data-ad-repli^="vinted:"]').length >= 3, null, { timeout: 60000 }).catch(() => {});
+        await o.pg.waitForFunction(() => document.querySelectorAll('[data-ad-repli^="vinted:"], [data-eg-compte-cle^="vinted:"]').length >= 3, null, { timeout: 60000 }).catch(() => {});
         await o.pg.waitForTimeout(2500);
         if (MUT === 'encre') await o.pg.addStyleTag({ content: '.n-logo-site, .vrm-logo-site { background: var(--n-encre) !important; color: var(--n-encre) !important; }' });
         const m = await o.pg.evaluate(MESURE);
@@ -135,11 +136,11 @@ async function ouvrir(nav, { W, sombre, style, url, b }) {
         dit(!m.pageHtml, `P ${cle} : la photo d'une ligne orpheline (aucun compte relié) n'apparaît nulle part`);
         dit(o.profils.length === 1 && !/select=data(&|$)/.test(o.profils[0]) && /photo/.test(o.profils[0]), `R ${cle} : une seule lecture des photos de profil, projetée`, o.profils);
         dit(!o.erreurs.length, `${cle} : aucune erreur d'app`, o.erreurs);
-        await o.pg.evaluate(() => { const e = document.querySelector('[data-ad-repli^="vinted:"]'); if (e) e.scrollIntoView({ block: 'center' }); });
+        await o.pg.evaluate(() => { const e = document.querySelector('[data-ad-repli^="vinted:"], [data-eg-compte-cle^="vinted:"]'); if (e) e.scrollIntoView({ block: 'center' }); });
         await o.pg.waitForTimeout(300);
         await o.pg.screenshot({ path: path.join(SHOTS, `annonces-${cle}.png`) });
         // gros plan sur l'en-tête (pour la planche)
-        const bx = await o.pg.evaluate(() => { const e = document.querySelector('[data-ad-repli^="vinted:"]'); if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.max(0, r.left - 8), y: Math.max(0, r.top - 8), width: Math.min(innerWidth - Math.max(0, r.left - 8), Math.max(r.width, 260) + 16), height: r.height + 16 }; });
+        const bx = await o.pg.evaluate(() => { const e = document.querySelector('[data-ad-repli^="vinted:"], [data-eg-compte-cle^="vinted:"]'); if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.max(0, r.left - 8), y: Math.max(0, r.top - 8), width: Math.min(innerWidth - Math.max(0, r.left - 8), Math.max(r.width, 260) + 16), height: r.height + 16 }; });
         if (bx) await o.pg.screenshot({ path: path.join(SHOTS, `tete-${cle}.png`), clip: bx });
         // une photo qui ne se charge pas ⇒ l'initiale (jamais un trou)
         if (W === 390 && !style && th === 'clair') {
@@ -148,7 +149,7 @@ async function ouvrir(nav, { W, sombre, style, url, b }) {
             await o2.pg.route(/pp-\d+/, (r) => r.fulfill({ status: 404, body: '' }));
             await o2.ctx.route(/pp-\d+/, (r) => r.fulfill({ status: 404, body: '' }));
             await o2.pg.reload({ waitUntil: 'domcontentloaded' });
-            await o2.pg.waitForFunction(() => document.querySelectorAll('[data-ad-repli^="vinted:"]').length >= 3, null, { timeout: 60000 }).catch(() => {});
+            await o2.pg.waitForFunction(() => document.querySelectorAll('[data-ad-repli^="vinted:"], [data-eg-compte-cle^="vinted:"]').length >= 3, null, { timeout: 60000 }).catch(() => {});
             await o2.pg.waitForTimeout(2500);
             const m2 = await o2.pg.evaluate(MESURE); const a2 = m2.tetes.find((x) => x.cle === 'vinted:' + uids[0]);
             dit(!!a2 && !a2.img && !!a2.initiale, `P ${cle} : une photo en erreur ⇒ l'initiale`, a2 && { img: a2.img, initiale: a2.initiale });
