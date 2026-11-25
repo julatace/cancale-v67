@@ -23,7 +23,7 @@ import './selection-serie.css'; // (8 nov.) style de ./composants/SelectionSerie
 import './designV2/design-v2.css'; // (8 nov.) style de ./composants/SelectionSerie.jsx, gardé à sa place (son écran est chargé à la demande)
 import './designV2/argent-v2.css'; // (8 nov.) style de ./composants/SelectionSerie.jsx, gardé à sa place (son écran est chargé à la demande)
 import { estCommandePlateforme, estEcriturePlateforme, refusPanneau, ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from './actionsExtension.js';   // (20 nov., décision de Julien) aucun geste de plateforme dans l'app
-import { poserExtensionIci, ouvrirPanneau } from './ouvrirPanneau.js';
+import { poserExtensionIci, poserPanneauRetard, ouvrirPanneau } from './ouvrirPanneau.js';
 import { GrilleMenu, CarteCompte } from './natif/GrilleMenu.jsx';   // (21 nov., onglets-menu) l'écran « Menu » en tuiles
 import { BoutonExtension, RangeeExtension, FeuilleExtension } from './BoutonExtension.jsx';
 // ⟦→ ecrans/Comptabilite.jsx #3⟧
@@ -1784,7 +1784,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.440.3';
+const EXT_ATTENDUE = '5.440.4';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -11066,6 +11066,8 @@ if (typeof window !== 'undefined') {
 }
 const vmrExtPresent = () => __vmrExtReady;
 poserExtensionIci(vmrExtPresent);   // (20 nov.) « s'ouvre sur Vinted avec l'extension » quand elle ne répond pas ici
+// (25 nov., e2e-extension-vert) Une extension d'ICI trop ancienne pour le lien du panneau : aucun geste « dans l'extension » ne l'ouvre.
+poserPanneauRetard(() => (extSait('panneaucomplet') === 'retard' ? tr('actionsExt.aJour') : ''));
 const vmrExtVersion = () => __vmrExtVersion;
 // ══ « À INSTALLER » SEULEMENT SI RIEN NE PROUVE LE CONTRAIRE (19 nov.) ═══════
 // Julien, sur son Mac (photo du 19 nov.) : la coque dit « Extension à installer » et « Publier sur Leboncoin » dit

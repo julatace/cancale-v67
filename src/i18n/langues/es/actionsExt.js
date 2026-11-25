@@ -22,6 +22,7 @@ export default {
   "actionsExt.phrase": "se abre en {site} con la extensión",
   "actionsExt.explique": "Esto se hace en la extensión, en {site}: VRM abre el panel en la página correcta, tu selección lista.",
   "actionsExt.refus": "Esto se hace en la extensión: abre el panel en el sitio.",
+  "actionsExt.aJour": "Actualiza la extensión VRM de este navegador.",
   "actionsExt.sansTitre": "Sin título",
   "actionsExt.etPlus": "y {n} más",
   "actionsExt.dejaPubliee": "Ya publicada desde VRM",
