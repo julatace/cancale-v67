@@ -25,6 +25,7 @@ import ecran_styleClarte from './de/styleClarte.js';
 import ecran_revueUx from './de/revueUx.js';   // (23 nov.) revue UX   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './de/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './de/ext5438.js';   // (22 nov.) ext. 5.438
+import ecran_visuelJeu from './de/visuelJeu.js';   // (24 nov.) le langage « jeu vidéo »   // (23 nov.) « Vinted a agi » regroupée
 import ecran_moderationCarte from './de/moderationCarte.js';   // (23 nov.) « Vinted a agi » regroupée
 import ecran_observation from './de/observation.js';   // (24 nov.) ext. 5.440.3 « Observer Vinted »
 import ecran_ext5428 from './de/ext5428.js';   // (21 nov.) ext. 5.428   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
@@ -2411,6 +2412,7 @@ export default {
   ...ecran_lotachat,
   ...ecran_ext5438,
   ...ecran_moderationCarte,
+  ...ecran_visuelJeu,
   ...ecran_observation,
   ...ecran_a_distance,
   ...ecran_apresFinale,
