@@ -28,7 +28,7 @@ const path = require('path');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');
 const { prouver } = require('./_mutations-audit.cjs');
 const MUTATIONS = {
-  'xu-pas-reconnu': [['api/_lib/depart-colis.js', "  if (FORME_CHRONO_RELAIS_EUROPE.test(n)) return 'chronopost';\n", '']],
+  'xu-pas-reconnu': [['api/_lib/depart-colis.js', "  if (vente && FORME_CHRONO_RELAIS_EUROPE.test(n)) return 'chronopost';\n", '']],
   'xu-toute-fin': [['api/_lib/depart-colis.js', 'export const FORME_CHRONO_RELAIS_EUROPE = /^[XZ]U\\d{9}JF$/;', 'export const FORME_CHRONO_RELAIS_EUROPE = /^[XZ]U\\d{9}[A-Z]{2}$/;']],
   'echo-ignore': [['api/_lib/transporteurs.js', "  if (!sky || sky !== n) return rendu('forme',", "  if (false) return rendu('forme',"]],
   'introuvable-sans-fin': [['api/_lib/depart-colis.js', "  if (r === 'introuvable') return (Number(t.essais) || 0) >= INTROUVABLE_MAX ? Infinity : e + INTROUVABLE_MS;", "  if (r === 'introuvable') return e + INTROUVABLE_MS;"]],
