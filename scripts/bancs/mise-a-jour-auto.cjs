@@ -30,6 +30,8 @@
 //  `MAJ_REPOS_MS` (120 s) · `MAJ_JSON=fichier` · `MAJ_DETAIL=1` (les lectures au repos).
 // ════════════════════════════════════════════════════════════════════════════
 if (!process.env.VITESSE_CPU) process.env.VITESSE_CPU = '1';
+// Le design que Julien voit (VRM natif) : sans ça, la garde des bancs sert le DOM d'avant le 17 nov. (_garde-reseau.cjs).
+if (!process.env.BANC_DESIGN_V2) process.env.BANC_DESIGN_V2 = 'defaut';
 const fs = require('fs');
 const V = require('./vitesse.cjs');
 const DELAI = Number(process.env.MAJ_DELAI_MS) || 30000;

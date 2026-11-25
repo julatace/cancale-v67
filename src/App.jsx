@@ -323,6 +323,7 @@ import MenuProfil,{PastilleProfil,useNomCoque} from './profil/MenuProfil.jsx';
 import {poserLecteurFiche} from './profil/AvatarPersonnel.jsx';
 import { SqueletteChargement } from "./Chargement.jsx";
 import { AttenteEcran, useEssentiel, useAttenteComplete, useEcranMontre } from './AttenteEcran.jsx';
+import { PlaceGardee } from './natif/PlaceGardee.jsx';   // (25 nov., chargement propre) la place d'un bloc qui arrive tard
 // (9 nov.) Ma journée tout de suite : les derniers chiffres rendus sur CET appareil (src/journeeInstantanee.js).
 import { JourneeInstantanee } from './JourneeInstantanee.jsx';
 import { capturerJournee, ecrireInstantane, effacerInstantanes, lireInstantane } from './journeeInstantanee.js';
@@ -15761,17 +15762,21 @@ function CarteNumerosAEcrire() {
   const [ouvert, setOuvert] = React.useState(false);
   React.useEffect(() => { const f = () => setD(load(CLE_A_ECRIRE, null)); window.addEventListener('vrm:save', f); window.addEventListener('storage', f); const off = onCloudReady(f); return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('storage', f); if (typeof off === 'function') off(); }; }, []);
   const items = d && Array.isArray(d.items) ? d.items : [];
-  if (!items.length) return null;
+  // (25 nov., chargement propre — banc chargement-structure : la carte arrivait avec le nuage, ~7 s après l'écran, et poussait
+  // « Porte-monnaie » de 162 px) Tant que le nuage n'est pas lu, la place de la dernière fois est tenue (src/natif/PlaceGardee.jsx).
+  const placeCle = 'journee-numeros:' + ((AUTH.user && AUTH.user.id) || '');
+  const nuagePret = isCloudReady();
+  if (!items.length) return <PlaceGardee cle={placeCle} pret={nuagePret}/>;
   const nums = items.map((x) => x.numero);
   const court = nums.length > 6 ? `N° ${nums.slice(0, 6).join(', ')} +${nums.length - 6}` : listeNumeros(nums);
-  return (
+  return (<PlaceGardee cle={placeCle} pret={nuagePret}>
     <Natif.Carte titre={tr('nn.carte.titre', { n: items.length })} attrs={{ 'data-numeros-a-ecrire-journee': String(items.length) }}>
       <Natif.Rangee icone={<Icon name="tag" size={22}/>} titre={ouvert ? listeNumeros(nums) : court} lignes={ouvert ? 6 : 2}
         valeur={nums.length > 6 ? tr(ouvert ? 'nn.carte.masquer' : 'nn.carte.voir') : null} onClick={nums.length > 6 ? () => setOuvert(!ouvert) : null} attrs={{ 'data-numeros-voir': ouvert ? '1' : '0', 'aria-expanded': nums.length > 6 ? (ouvert ? 'true' : 'false') : undefined }}/>
       {/* (23 nov., « pas assez de beaux boutons ») « C'est écrit » : un vrai bouton (icône + verbe), plus de phrase d'instruction. */}
       <Natif.Actions elements={[{ cle: 'ecrit', icone: <Icon name="check" size={18}/>, libelle: tr('nn.stock.ecrit'), onClick: () => { save(CLE_A_ECRIRE, { v: 1, items: [] }); setD({ v: 1, items: [] }); }, attrs: { 'data-numeros-ecrits': 'journee' } }]}/>
     </Natif.Carte>
-  );
+  </PlaceGardee>);
 }
 // Stock : « À écrire sur tes cartons · N » — la liste reste jusqu'à « C'est écrit » (son toucher).
 function NumerosAEcrire() {

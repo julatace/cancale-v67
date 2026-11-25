@@ -26,6 +26,8 @@
 // ════════════════════════════════════════════════════════════════════════════
 if (!process.env.VITESSE_RTT) process.env.VITESSE_RTT = '700';
 if (!process.env.VITESSE_CPU) process.env.VITESSE_CPU = '1';
+// Le design que Julien voit (VRM natif) : sans ça, la garde des bancs sert le DOM d'avant le 17 nov. (_garde-reseau.cjs).
+if (!process.env.BANC_DESIGN_V2) process.env.BANC_DESIGN_V2 = 'defaut';
 const path = require('path'), fs = require('fs');
 
 const ECRANS_TOUS = [
@@ -46,7 +48,7 @@ function sonde(motsSource) {
   const mots = new RegExp(motsSource, 'i');
   const S = window.__chg = { shifts: [], chargement: [], zerosVus: [], t0: performance.now() };
   try {
-    new PerformanceObserver((l) => { for (const e of l.getEntries()) { if (!e.hadRecentInput) S.shifts.push({ t: Math.round(e.startTime), v: e.value, src: (e.sources || []).slice(0, 3).map((s) => { const n = s.node; if (!n || !n.closest) return ''; const el = n.nodeType === 1 ? n : n.parentElement; return el ? (el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : '')) : ''; }) }); } }).observe({ type: 'layout-shift', buffered: true });
+    new PerformanceObserver((l) => { for (const e of l.getEntries()) { if (!e.hadRecentInput) S.shifts.push({ t: Math.round(e.startTime), v: e.value, src: (e.sources || []).slice(0, 3).map((s) => { const n = s.node; if (!n || !n.closest) return ''; const el = n.nodeType === 1 ? n : n.parentElement; return el ? (el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : '') + ' «' + String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24) + '» ' + Math.round(s.previousRect.y) + '→' + Math.round(s.currentRect.y) + '/h' + Math.round(s.previousRect.height) + '→' + Math.round(s.currentRect.height)) : ''; }) }); } }).observe({ type: 'layout-shift', buffered: true });
   } catch (_) {}
   const zeros = [];
   const RE_ZERO = /^\s*[-−]?0(?:[,.]00)?\s?€\s*$/;
