@@ -209,12 +209,17 @@ async function poserSessionApp(ctx, s) {
 // recouvrir l'écran : elle n'empêche pas son doigt de fermer d'abord, le banc juge la règle, pas la pile des feuilles).
 let ID_COURANT = '';   // l'extension du profil principal (son service worker)
 const clicDom = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector(s); if (!e) return false; e.click(); return true; }, sel).catch(() => false);
-async function ouvrirAnnoncesDorment(pg) {
+async function ouvrirAnnoncesDorment(pg, { recharger = true } = {}) {
   await pg.bringToFront();
-  await pg.goto('https://vrm.center/?tab=cat_annonces', { waitUntil: 'domcontentloaded' });
+  if (recharger) await pg.goto('https://vrm.center/?tab=cat_annonces', { waitUntil: 'domcontentloaded' });
   await attendreQue(() => pg.evaluate(() => document.querySelectorAll('[data-eg-ecran] [data-eg-article]').length > 0), 40000, 300);
-  await clicDom(pg, '[data-tt-ouvre="filtre:dort"]'); await attendre(300);
-  await clicDom(pg, '[data-tt-filtre-choix="dort:dorment"]'); await attendre(800);
+  // Le filtre est posé quand l'outil le DIT (`data-tt-filtre-valeur`) — l'écran peut se redessiner sous le premier toucher.
+  const pose = () => pg.evaluate(() => !!document.querySelector('[data-tt-filtre="dort"][data-tt-filtre-valeur="dorment"]')).catch(() => false);
+  for (let i = 0; i < 6 && !(await pose()); i++) {
+    await clicDom(pg, '[data-tt-ouvre="filtre:dort"]'); await attendre(300);
+    await clicDom(pg, '[data-tt-filtre-choix="dort:dorment"]'); await attendre(700);
+  }
+  await attendre(500);
   return pg.evaluate(() => [...document.querySelectorAll('[data-eg-ecran] [data-eg-article]')].map((x) => x.getAttribute('data-eg-article'))).catch(() => []);
 }
 // Le bouton « Baisser » de la barre de sélection : { ouvert, raison } (raison = la phrase sous un bouton fermé).
@@ -226,12 +231,17 @@ const lireBoutonBaisser = (pg) => pg.evaluate(() => {
 }).catch(() => null);
 // Coche la paire (qui dort) et touche « Baisser » : rend le lien du panneau ouvert (la requête de navigation), ou ce qui manque.
 async function baisserDepuisApp(ctx, pg, id) {
-  const lignes = await ouvrirAnnoncesDorment(pg);
   const cle = 'vinted#' + id;
-  if (!lignes.includes(cle)) return { absente: true, lignes };
-  await pg.evaluate((c) => { const r = document.querySelector(`[data-eg-ecran] [data-eg-article="${c}"]`); const x = r && r.querySelector('input.n-tt-coche'); if (x && !x.checked) x.click(); }, cle);
-  await attendreQue(() => pg.evaluate(() => !!document.querySelector('[data-tt-action-directe="baisser"]')), 8000, 200);
-  const bouton = await lireBoutonBaisser(pg);
+  // L'écran se redessine quand une lecture arrive (filtre et cases repartent de zéro) : comme lui, on refait le geste
+  // tant que la barre de SA sélection n'est pas là (3 fois au plus) — jamais un autre chemin.
+  let lignes = [], bouton = null;
+  for (let i = 0; i < 3 && !bouton; i++) {
+    lignes = await ouvrirAnnoncesDorment(pg, { recharger: i === 0 });
+    if (!lignes.includes(cle)) { if (i === 2) return { absente: true, lignes }; await attendre(1500); continue; }
+    await pg.evaluate((c) => { const r = document.querySelector(`[data-eg-ecran] [data-eg-article="${c}"]`); const x = r && r.querySelector('input.n-tt-coche'); if (x && !x.checked) x.click(); }, cle);
+    await attendreQue(() => pg.evaluate(() => !!document.querySelector('[data-tt-action-directe="baisser"]')), 6000, 200);
+    bouton = await lireBoutonBaisser(pg);
+  }
   const liens = [];
   const surRequete = (r) => { try { if (r.isNavigationRequest() && /^https:\/\/www\.vinted\.fr\/\?vrm=panneau/.test(r.url())) liens.push(r.url()); } catch (_) {} };
   ctx.on('request', surRequete);
@@ -239,7 +249,7 @@ async function baisserDepuisApp(ctx, pg, id) {
   if (bouton && bouton.ouvert) await clicDom(pg, '[data-tt-action-directe="baisser"]');
   await attendreQue(async () => liens.length > 0, bouton && bouton.ouvert ? 15000 : 4000, 200);
   ctx.off('request', surRequete);
-  const panneauPg = ctx.pages().slice(nPages).find((p) => /^https:\/\/www\.vinted\.fr\//.test(p.url())) || null;
+  const panneauPg = liens.length ? await attendreQue(async () => ctx.pages().slice(nPages).find((p) => /^https:\/\/www\.vinted\.fr\//.test(p.url())) || null, 10000, 200) : null;
   return { lignes, bouton, lien: liens[0] || '', panneauPg, onglets: ctx.pages().length - nPages };
 }
 // Le panneau vit dans une racine d'ombre FERMÉE (vrm-badge.js) que Playwright ne traverse pas : le protocole du navigateur
@@ -456,9 +466,10 @@ const fermerPanneauPg = async (pp) => { if (pp) await pp.close().catch(() => {})
       const d1 = vinted().length, t1 = Date.now();
       const r2 = await baisserDepuisApp(ctx, pg, 91010001);
       const lp2 = r2.panneauPg ? await lancerDansPanneau(ctx, r2.panneauPg, 91010001, Math.round((M.st.prix[91010001] - 5) * 100) / 100) : {};
+      await capture(r2.panneauPg || pg, '4-panneau-plafond');
       const cmd2 = await attendreQue(async () => { const c = commandePrix(M, 91010001, t1); return c && (c.data.attend || !['attente', 'pris'].includes(c.data.etat)) ? c : null; }, 30000, 500) || commandePrix(M, 91010001, t1);
       const rien = vinted().slice(d1).filter((e) => /item_upload/.test(e.p));
-      dit(n45 === 45 && !!lp2.lance && rien.filter((e) => e.m === 'PUT').length === 0, '4 : plafond plein ⇒ RIEN ne part chez Vinted', `${rien.length} requête(s) · ${rien.map((e) => e.m + ' ' + e.p).join(' | ')}`);
+      dit(n45 === 45 && !!lp2.lance && rien.filter((e) => e.m === 'PUT').length === 0, '4 : plafond plein ⇒ RIEN ne part chez Vinted', `${rien.length} requête(s) · ${rien.map((e) => e.m + ' ' + e.p).join(' | ')} · panneau ${JSON.stringify({ lien: r2.lien, pg: !!r2.panneauPg, lignes: r2.lignes, bouton: r2.bouton, absente: r2.absente, avant: lp2.avant, apres: lp2.apres })}`);
       dit(!!cmd2 && /plafond/.test(String(cmd2.data.attend || '') + String(cmd2.data.code || '')), '4 : VRM dit le plafond (la commande attend, motif « plafond »)', JSON.stringify(cmd2 && cmd2.data));
       await fermerPanneauPg(r2.panneauPg);
       await dansSW(ctx, ID, async () => { await chrome.storage.local.set({ vrmActions: {} }); });

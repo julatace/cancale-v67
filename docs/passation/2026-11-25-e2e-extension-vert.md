@@ -13,3 +13,10 @@ et faux Supabase), captures regardées.
 | 6 · extension en retard | **vrai défaut de l'app** : « Baisser » ouvrait vinted.fr même pour une extension d'avant le lien du panneau (< 5.410.0, `panneaucomplet`), qui l'ignore : rien ne se passait, rien n'était dit | `ouvrirPanneau` refuse et dit « Mets à jour l'extension VRM de ce navigateur. » quand l'extension D'ICI est en retard (pas d'extension ici ⇒ le lien s'ouvre comme avant, Orion) ; les gestes du panneau d'Annonces sont fermés avec cette phrase. Rouge avant, vert après. Mutation `capacite` portée sur `panneaucomplet` |
 
 Le banc répond aussi « Oui, capter ce compte » à la question de l'extension (première visite d'un compte), comme lui.
+
+**Suite (même PR, 5.440.4 jamais servie)** : le lien `action=baisser` (et `remettre`) de l'app ouvre DIRECTEMENT la feuille
+du prix de la paire dans le panneau (avant : « Baisser » seulement pré-choisi dans le menu — re-choisir l'option déjà
+choisie ne déclenche rien). La feuille ouverte par le lien ne garde que les annonces du compte de l'onglet (aucune ⇒ fermée).
+Le banc ne touche plus au menu : rouge avec l'ancien vrm-badge.js (paire cochée, « baisser » pré-choisi, aucune feuille),
+vert avec le nouveau. Le banc refait aussi le filtre « Dorment » et la case si l'écran se redessine (une lecture qui
+arrive remet filtre et cases à zéro) : deux passages complets en parallèle, 44 verts chacun.
