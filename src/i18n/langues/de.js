@@ -119,6 +119,7 @@ import ecran_ux_reglages from './de/uxReglages.js';   // (21 nov.) Paramètres, 
 import ecran_natif from './de/natif.js';
 import ecran_menu_onglets from './de/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './de/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
+import ecran_parrainage20 from './de/parrainage.js';   // (25 nov.) le parrainage à 20 %
 import ecran_actions_ext from './de/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './de/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
@@ -470,7 +471,7 @@ export default {
   "auth.lier.extension": "Melde dich hier an: Die Erweiterung in {navigateur} meldet sich mit an, nichts zu tippen.",
   "auth.parrain.offertPar": "Ein Geschenk von {nom}",
   "auth.parrain.offertVendeur": "Ein Geschenk eines VRM-Verkäufers",
-  "auth.parrain.texte": "1 Monat VRM gratis bei deiner ersten Zahlung, für dich und für die Person, die dich einlädt.",
+  "auth.parrain.texte": "−10 % auf deinen ersten VRM-Monat und 1 Gratiswoche bei deiner ersten Zahlung.",
   "auth.parrain.texteConnexion": "Schon ein Konto? Melde dich an: Empfehlungen gelten nur für neue Konten.",
   "auth.lier.pasOuverte": "Die Anmeldung mit {nom} ist auf VRM noch nicht offen. Melde dich hier mit deiner VRM-E-Mail und deinem Passwort an: Die Erweiterung wird gleich mit verbunden.",
   "auth.lier.pasVerifie": "Ich konnte die Anmeldung mit {nom} nicht prüfen. Versuch die Anmeldewege unten nochmal oder melde dich per E-Mail an: Die Erweiterung wird gleich mit verbunden.",
@@ -2449,4 +2450,5 @@ export default {
   ...ecran_extension,
   ...ecran_actions_ext,
   ...ecran_offres_photos,
+  ...ecran_parrainage20,
 };
