@@ -895,7 +895,7 @@ import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, te
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import { ecrireEmailsLus } from "./emailsLusEcriture.js";
 // ⟦→ ecrans/Comptabilite.jsx #63⟧
-import {ResponsiveChatPortal} from "./ChatPortal.jsx";
+import {ResponsiveChatPortal, telFil} from "./ChatPortal.jsx";
 import "./ebay-interface.css";
 const _ecranEbay = (nom) => aLaDemande(() => import("./ebayGestion.jsx").then((m) => ({ default: m[nom] })));
 const EbayCommande = _ecranEbay("EbayCommande"), EbayMessages = _ecranEbay("EbayMessages"), EbayOffres = _ecranEbay("EbayOffres"), EbayAgent = _ecranEbay("EbayAgent");
@@ -10944,6 +10944,7 @@ const fetchVintedConversations = async (account, page = 1, opts = {}) => {
 let __vmrExtReady = false, __vmrExtVersion = '';
 // (19 nov.) Les appels du démarrage (0 · 0,6 · 1,5 · 3 · 6 s) sont-ils tous partis sans réponse ? Avant : « je lui demande ».
 let __vmrAppelsFinis = false;
+const FENETRE_POIGNEE_MS = 3200;   // (24 nov., livrable) la fenêtre de la poignée de main avec l'extension
 // Qui veut savoir quand l'extension se manifeste (l'écran Réglages, l'accueil) :
 // la détection est asynchrone, un composant déjà affiché doit se redessiner.
 const __vmrExtSubs = new Set();
@@ -11054,7 +11055,10 @@ if (typeof window !== 'undefined') {
       try { if (!__vmrExtReady) window.postMessage({ __vmr: 'ping' }, '*'); } catch (_) {}
     }, ms));
     // (19 nov.) La fenêtre de la poignée de main est passée : qui disait « Vérification… » dit maintenant ce qui est su.
-    setTimeout(() => { __vmrAppelsFinis = true; if (!__vmrExtReady) __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} }); }, 6800);
+    // (24 nov., livrable) 3,2 s, plus 6,8 : sans extension, l'écran Extension disait « VRM regarde si l'extension est là… »
+    // près de 7 s sans rien à toucher. Après trois pings (0,6 · 1,5 · 3 s), « pas installée » et le bouton ; le ping de
+    // 6 s reste — une extension lente à répondre remet l'écran à jour d'elle-même (`__vmrExtSubs`).
+    setTimeout(() => { __vmrAppelsFinis = true; if (!__vmrExtReady) __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} }); }, FENETRE_POIGNEE_MS);
   } catch (_) {}
 }
 const vmrExtPresent = () => __vmrExtReady;
@@ -16663,7 +16667,7 @@ function CadreFil({ etiquette, onFermer, refPanneau, attrs, children }) {
   return (
     <ResponsiveChatPortal><div className="vrm-chat-overlay vrm-chat-inline">
       <FermeAuRetour fermer={onFermer}/>
-      <div ref={refPanneau} className="vrm-chat-panel" role="dialog" aria-label={etiquette} {...(attrs || {})} style={{display:'flex',flexDirection:'column',background:C.bg,overflow:'hidden'}}>{children}</div>
+      <div ref={refPanneau} className="vrm-chat-panel" role="dialog" aria-label={etiquette} aria-modal={telFil() ? 'true' : undefined} {...(attrs || {})} style={{display:'flex',flexDirection:'column',background:C.bg,overflow:'hidden'}}>{children}</div>
     </div></ResponsiveChatPortal>
   );
 }

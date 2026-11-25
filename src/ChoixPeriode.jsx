@@ -219,7 +219,7 @@ export default function ChoixPeriode({ owner = '', datation = '', value: brut, o
         <>
           {Retour ? <Retour fermer={fermer}/> : null}
           <div className="vrm-cal-voile" onClick={fermer}/>
-          <div className="vrm-cal-feuille" role="dialog" aria-label={titre} data-periode-panneau data-periode-mode="defile">
+          <div className="vrm-cal-feuille" role="dialog" aria-modal="true" aria-label={titre} data-periode-panneau data-periode-mode="defile">
             <div className="vrm-cal-tete">
               <b>{titre}</b>
               <button type="button" className="vrm-cal-fermer" aria-label="Fermer" onClick={fermer}>×</button>
