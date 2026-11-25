@@ -241,6 +241,8 @@
     .vrm-main[data-ecran="ventes"] .n-segmente-choix { color: var(--n-tg-encre-2); font: var(--n-t-second); }
     .vrm-main[data-ecran="ventes"] .n-segmente-choix[aria-checked="true"] { color: var(--n-tg-encre); font: var(--n-t-second-fort); }
     .vrm-main[data-ecran="ventes"] .n-segmente-n { color: inherit; }
+    .vrm-main[data-ecran="ventes"] .n-vt-segment-seul .n-segmente { flex: 0 0 auto; width: max-content; }
+    .vrm-main[data-ecran="ventes"] .n-vt-segment-seul .n-segmente-choix { padding-inline: 12px; }
     .vrm-main[data-ecran="ventes"] .n-tt-nombre-texte { font: var(--n-t-second); color: var(--n-tg-encre-2); }
 
     /* Le tableau : surface #F4F5F6, filet 1 px #DADCE0, rayon 10, filets fins entre les lignes. */

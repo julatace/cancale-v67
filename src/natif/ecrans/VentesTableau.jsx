@@ -23,6 +23,7 @@ import { texteNet } from '../../coutReel.js';
 import { ParPaquets } from '../../composants/ParPaquets.jsx';   // (22 nov., latence) la liste des ventes au téléphone posée par paquets
 
 const TON = { envoyer: 'ambre', route: 'teal', terminee: 'vert', annulee: 'neutre', litige: 'ambre', encours: 'neutre' };
+const SITES_LOGO = new Set(['vinted', 'leboncoin', 'ebay', 'vestiaire']);   // ceux que `LogoSite` dessine
 const joint = (...x) => x.filter(Boolean).join(' · ');
 // (21 nov.) « Marque · T42 » : la marque de la ligne (lue, ou écrite dans le titre — pour l'affichage seulement) et sa taille.
 // Ce que le titre dit déjà ne se répète pas (src/ventes/marqueTaille.js).
@@ -36,7 +37,8 @@ export default function VentesTableau({ lignes, haut = null, pied = '', majLe, o
     const mot = l.etat ? motEtat(l.etat) : '';
     // (25 nov., ventes-tableau-gris) le logo de SON site devant le titre (ordinateur) ; la colonne « Site » reste dans « Colonnes ».
     return { ...l, v: l, titre: l.titre, photo: typeof l.photo === 'string' ? l.photo : '', statut: categorieVente(mot), statutLibelle: mot, avantTitre: l.site ? <LogoSite site={l.site} taille={14} nom={nomSite(l.site)}/> : null,
-      sous: joint(marqueTaille(l), nomSite(l.site), l.compte),
+      // le nom du site ne se répète pas quand son logo est devant le titre (le nom reste lu : `aria-label` et `title` du logo).
+      sous: joint(marqueTaille(l), SITES_LOGO.has(l.site) ? '' : nomSite(l.site), l.compte),
       texte: [l.titre, l.num ? 'n' + l.num + ' n°' + l.num + ' ' + l.num : '', l.compte, nomSite(l.site), l.tr && l.tr.nom, l.id].filter(Boolean).join(' '),
       prixGrille: prix(l), attrs: { 'data-vt-site': l.site, 'data-toutes-vente': l.site, 'data-toutes-id': l.id, 'data-ordre-t': l.t != null ? String(l.t) : '' } };
   }) : lignes), [lignes, motEtat, nomSite, prix]);
