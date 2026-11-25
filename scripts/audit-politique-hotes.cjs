@@ -90,6 +90,9 @@ const COUPLES = {
   'src/notifsBonMoment.js|vrm.center': ['vrm', 'VRM lui-même (base pour lire le lien d’une notification, jamais appelé)'],
   // (22 nov., intégration) ext. 5.428 / 5.424 : des liens ouverts d'un clic.
   'src/AlerteModeration.jsx|www.vinted.fr': ['lien', LIEN + ' — l’annonce masquée par Vinted, ou la messagerie'],
+  'src/connexions/EcranConnexions.jsx|www.vinted.fr': ['lien', LIEN + ' — « Connexions de l’extension » : ouvrir le site du compte pour le reconnecter (24 nov., agir-tout)'],
+  'src/connexions/EcranConnexions.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Connexions de l’extension » : ouvrir le site du compte pour le reconnecter (24 nov., agir-tout)'],
+  'src/connexions/EcranConnexions.jsx|www.vestiairecollective.com': ['lien', LIEN + ' — « Connexions de l’extension » : ouvrir le site du compte pour le reconnecter (24 nov., agir-tout)'],
   'src/publier/aussi.js|www.leboncoin.fr': ['lien', LIEN + ' — l’annonce créée par « Publier aussi sur… »'],
   'src/publier/aussi.js|fr.vestiairecollective.com': ['lien', LIEN + ' — l’annonce créée par « Publier aussi sur… »'],
   'src/ficheSites.js|www.leboncoin.fr': ['lien', LIEN + ' — la fiche « Sur les sites » : l’annonce Leboncoin en pause (22 nov., 5.435)'],

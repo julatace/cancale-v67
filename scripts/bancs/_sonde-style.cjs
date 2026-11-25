@@ -15,6 +15,7 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
   const tel = (process.env.FORMAT || 'tel') === 'tel';
   const ctx = await nav.newContext(tel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'fr-FR' } : { viewport: { width: 1512, height: 945 }, locale: 'fr-FR' });
   await ctx.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  if (process.env.GARDE) await ctx.addInitScript(() => { window.__vrmGardeDebug = true; });
   await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
   await ctx.route('**/rest/v1/**', async (route) => { const rq = route.request(); if (rq.method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' }); const h = await rq.allHeaders(); const rep = repondre(rq.url(), h.range, base); return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { ...(rep.headers || {}) }, body: JSON.stringify(rep.body) }); });
   await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
@@ -32,6 +33,34 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
           if (f.sibling) pile.push(f.sibling); if (f.child) pile.push(f.child); }
         V.push({ t: Math.round(performance.now()), qui }); } catch (_) {} } };
   });
+  if (process.env.QUI2) await ctx.addInitScript((cible) => {
+    // POURQUOI un composant (nom `cible`) est re-rendu : à chaque validation, ses rendus NEUFS (une liste de crochets jamais vue),
+    // et, par rapport à son rendu d'avant, quels crochets à file (état, réducteur, magasin externe) et quels contextes ont changé.
+    const vus = new WeakSet(); const ids = new WeakMap(); let nId = 0; const snap = new Map(); const R = window.__vrmQui2 = [];
+    const nom = (f) => { const t = f.elementType || f.type; return (t && (t.displayName || t.name)) || ''; };
+    const court = (v) => { try { if (v === undefined) return 'undef'; if (typeof v === 'function') return 'fn'; const j = JSON.stringify(v); return j && j.length > 60 ? j.slice(0, 60) + '…(' + j.length + ')' : String(j); } catch (_) { return typeof v; } };
+    const MAJ = window.__vrmMajs = [];
+    const noterMaj = (f) => { try { if (!window.__vrmQui2Actif) return; let x = f, chemin = []; for (let k = 0; x && k < 60; x = x.return, k++) { const nm = nom(x); if (nm) chemin.push(nm); if (nm === cible) break; }
+      if (!chemin.includes(cible)) return; MAJ.push({ t: Math.round(performance.now()), qui: chemin[0], pile: String(new Error().stack || '').split('\n').slice(3, 9).map((l) => l.trim().replace(/https?:\/\/[^/]+\/assets\//, '')).join(' < ') }); } catch (_) {} };
+    const noop = () => {};
+    const crochets = new Proxy({ markStateUpdateScheduled: (f) => noterMaj(f), markForceUpdateScheduled: (f) => noterMaj(f) }, { get: (o, k) => o[k] || noop });
+    window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = { isDisabled: false, supportsFiber: true, renderers: new Map(), inject(internals) { try { if (internals && internals.injectProfilingHooks) internals.injectProfilingHooks(crochets); } catch (_) {} return 1; }, onScheduleFiberRoot() {}, onCommitFiberUnmount() {}, onPostCommitFiberRoot() {},
+      onCommitFiberRoot(id, root) { try { const pile = [root.current]; let n = 0;
+        while (pile.length && n < 300000) { const f = pile.pop(); n++;
+          if (f.tag === 0 && nom(f) === cible && f.memoizedState) {
+            const tete = f.memoizedState; if (!vus.has(tete)) { vus.add(tete);
+              let i = ids.get(f) || (f.alternate && ids.get(f.alternate)); if (!i) { i = ++nId; } ids.set(f, i); if (f.alternate) ids.set(f.alternate, i);
+              const etats = []; for (let h = tete, k = 0; h; h = h.next, k++) if (h.queue) etats.push([k, h.memoizedState]);
+              const ctx = []; for (let d = f.dependencies && f.dependencies.firstContext, k = 0; d; d = d.next, k++) ctx.push([k, d.memoizedValue, (d.context && (d.context.displayName || '')) || '']);
+              const av = snap.get(i); snap.set(i, { etats, ctx });
+              if (av && window.__vrmQui2Actif) { const dE = [], dC = [];
+                const mE = new Map(av.etats); for (const [k, v] of etats) if (mE.has(k) && !Object.is(mE.get(k), v)) dE.push('crochet ' + k + ' : ' + court(mE.get(k)) + ' → ' + court(v));
+                const mC = new Map(av.ctx.map((x) => [x[0], x])); for (const [k, v, nm] of ctx) if (mC.has(k) && !Object.is(mC.get(k)[1], v)) dC.push('contexte ' + k + (nm ? '(' + nm + ')' : '') + ' : ' + court(mC.get(k)[1]) + ' → ' + court(v));
+                const props = f.alternate && f.memoizedProps !== f.alternate.memoizedProps ? 'props neuves' : '';
+                R.push({ t: Math.round(performance.now()), inst: i, props, dE, dC }); } } }
+          if (f.sibling) pile.push(f.sibling); if (f.child) pile.push(f.child); }
+      } catch (e) { R.push({ err: String(e) }); } } };
+  }, process.env.QUI2);
   const pg = await ctx.newPage(); const cdp = await ctx.newCDPSession(pg);
   const sel = (o) => `[data-n-onglet="${o}"]:visible, [data-nav-entree="${o}"]:visible`;
   const aller = async (o) => { await pg.locator(sel(o)).first()[tel ? 'tap' : 'click']({ timeout: 20000 }); await pg.waitForSelector(`[data-attente-ecran="${o}"][data-attente="pret"]`, { timeout: 60000, state: 'visible' }).catch(() => {}); await attendre(6000); };
@@ -39,7 +68,11 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
   await pg.waitForSelector(`[data-attente-ecran="journee"][data-attente="pret"]`, { timeout: 90000, state: 'attached' }).catch(() => {});
   await attendre(10000);
   const DEPUIS = process.env.DEPUIS || 'journee';
-  await aller(TAB); await aller(DEPUIS); await aller(TAB); await aller(DEPUIS);
+  await aller(TAB); await aller(DEPUIS); await aller(TAB);
+  if (process.env.POURQUOI) await pg.evaluate(() => { window.__vrmPourquoi = []; });
+  if (process.env.QUI2) await pg.evaluate(() => { window.__vrmQui2Actif = true; window.__vrmQui2.length = 0; });
+  await aller(DEPUIS);
+  if (process.env.POURQUOI) await pg.evaluate(() => { window.__vrmPourquoiCache = window.__vrmPourquoi.length; });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: +(process.env.CPU || 4) });
   const fichier = path.join(os.tmpdir(), 'sonde-style-' + process.pid + '.json');
   await nav.startTracing(pg, { path: fichier, categories: process.env.STATS === '0' ? ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'v8.execute', 'viz', 'cc', 'benchmark', 'devtools.timeline.frame', 'disabled-by-default-devtools.timeline.frame'] : ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'blink', 'disabled-by-default-blink.debug'] });
@@ -48,6 +81,11 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
   await aller(TAB);
   await nav.stopTracing();
   if (process.env.QUI) { const V = await pg.evaluate(() => window.__vrmQui); console.log('VALIDATIONS ' + V.length); for (const v of V.slice(0, 12)) { const m = new Map(); for (const q of v.qui) m.set(q, (m.get(q) || 0) + 1); console.log('  ' + v.t + ' · ' + v.qui.length + ' rendus · ' + [...m].filter(([k]) => /\[état/.test(k)).slice(0, 30).map(([k, n]) => (n > 1 ? n + '× ' : '') + k).join(' ; ').slice(0, 1500)); } }
+  if (process.env.QUI2) { const M = await pg.evaluate(() => window.__vrmMajs); const m = new Map(); for (const x of M) { const k = x.qui + ' ← ' + x.pile.slice(0, 400); m.set(k, (m.get(k) || 0) + 1); } console.log('MISES À JOUR sous ' + process.env.QUI2 + ' : ' + M.length); for (const [k, n] of [...m].sort((a, b) => b[1] - a[1]).slice(0, 20)) console.log('  ' + n + '× ' + k); }
+  if (process.env.QUI2) { const R = await pg.evaluate(() => window.__vrmQui2); console.log('QUI2 ' + R.length + ' rendus'); for (const r of R.slice(0, 30)) console.log('  ' + JSON.stringify(r).slice(0, 900)); }
+  if (process.env.GARDE) console.log('ÉCARTS ' + JSON.stringify(await pg.evaluate(() => window.__vrmGardeEcarts || [])).slice(0, 3000));
+  if (process.env.POURQUOI) { const P = await pg.evaluate(() => ({ cache: window.__vrmPourquoiCache, L: window.__vrmPourquoi })); const m = new Map(); P.L.forEach((x, i) => { const k = (i < P.cache ? 'caché  ' : 'retour ') + x.pile.replace(/https?:\/\/[^/]+\/assets\//g, '').slice(0, 260); m.set(k, (m.get(k) || 0) + 1); });
+    console.log('POURQUOI ' + P.L.length + ' poses (' + P.cache + ' pendant que l\'écran était caché)'); for (const [k, n] of [...m].sort((a, b) => b[1] - a[1]).slice(0, 25)) console.log('  ' + n + '× ' + k); }
   if (process.env.PROFIL) {
     const { profile: P } = await cdp.send('Profiler.stop'); const parId = new Map(P.nodes.map((n) => [n.id, n])); const parent = new Map(); for (const n of P.nodes) for (const c of n.children || []) parent.set(c, n.id);
     const nom = (n) => (n.callFrame.functionName || '(anon)') + '@' + String(n.callFrame.url || '').split('/').pop().replace(/-[A-Za-z0-9_-]{8}\.js$/, '') + ':' + (n.callFrame.lineNumber + 1);

@@ -9,6 +9,7 @@
 // dans son onglet, avec tous ses garde-fous) ou par le panneau de l'extension de CE navigateur.
 import React from 'react';
 import { peutAgir, etatCompteAgir } from './peutAgir.js';
+import { suiviTermine, delaiSuivi } from './suivi.js';
 
 let faits = null;
 const abonnes = new Set();
@@ -44,15 +45,48 @@ export function useCompteAgir(site, compte) {
 let depsEnvoi = null;
 export function poserEnvoiAgir(d) { depsEnvoi = d || null; }
 // Rend { ok: true, id } · { ok: false, raison } — RIEN n'est déposé si la porte dit non (relue au moment du geste).
+// (25 nov., 5.452 `envoisurs`) JAMAIS DEUX FOIS : un second toucher pendant que le premier dépose encore (double tap,
+// lecture lente de la base) ne dépose pas une seconde commande — la base ne la voyait pas encore (`deja` arrivait trop
+// tard) et le même message partait deux fois. Clé = le geste ET son contenu (un autre message, une autre offre passent).
+const enVol = new Set();
 export async function envoyerGeste({ site, compte, geste, distGeste, args, confirme = false, num = '', avant = null }) {
   const v = agirMaintenant(site, compte, geste, 'file');
   if (!v.ok) return { ok: false, raison: v.raison, verdict: v };
   if (!depsEnvoi || typeof depsEnvoi.deposer !== 'function') return { ok: false, raison: 'envoi-absent' };
+  let cle = ''; try { cle = [site, String(compte), distGeste, JSON.stringify(args == null ? null : args)].join('|'); } catch (_) { cle = [site, String(compte), distGeste].join('|'); }
+  if (enVol.has(cle)) return { ok: false, raison: 'deja' };
+  enVol.add(cle);
   try {
     const r = await depsEnvoi.deposer({ geste: distGeste, site, compte: String(compte), args, confirme, num, avant });
     if (r && r.deja) return { ok: false, raison: 'deja', id: r.deja };
     return r && r.id ? { ok: true, id: r.id, voie: v.voie } : { ok: false, raison: 'base' };
   } catch (_) { return { ok: false, raison: 'base' }; }
+  finally { enVol.delete(cle); }
+}
+
+// (25 nov., 5.452 `envoisurs`) LE SUIVI : relit la commande déposée jusqu'à son issue RÉELLE (écrite par l'extension après
+// la réponse lue de Vinted) — src/agir/suivi.js dit la phrase. `surVue(vue)` : undefined → null (pas su) → la vue.
+// Rend une fonction d'arrêt. Sans lecteur posé par l'app : rien n'est relu (la vue reste « pas su »).
+export function suivreCommande(id, surVue) {
+  let fini = false, minuteur = null;
+  const t0 = Date.now();
+  const tour = async () => {
+    if (fini) return;
+    let v = null;
+    try { v = depsEnvoi && typeof depsEnvoi.lire === 'function' ? await depsEnvoi.lire(id) : null; } catch (_) { v = null; }
+    if (fini) return;
+    try { surVue(v); } catch (_) {}
+    if (suiviTermine(v)) return;
+    const d = delaiSuivi(Date.now() - t0);
+    if (d != null) minuteur = setTimeout(tour, d);
+  };
+  minuteur = setTimeout(tour, 800);
+  return () => { fini = true; if (minuteur) clearTimeout(minuteur); };
+}
+export function useSuiviCommande(id) {
+  const [vue, setVue] = React.useState(undefined);
+  React.useEffect(() => { setVue(undefined); if (!id) return undefined; return suivreCommande(id, setVue); }, [id]);
+  return vue;
 }
 
 // « REPUBLIER » DEPUIS L'APP (Julien, 24 nov. : « republier dans l'application »). Une commande `republier` par annonce

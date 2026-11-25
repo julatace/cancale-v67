@@ -233,7 +233,10 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
     dit(iConf >= 0 && iExe > iConf && tConf >= 0 && tExe > tConf && /askConfirm\(/.test(corpsDe('async function confirmerRA(')), 'I2 · confirmation AVANT tout envoi (refusée ⇒ rien ne part), un geste comme une série');
     // (20 nov., décision de Julien) Leboncoin : la suppression se fait dans le PANNEAU de l'extension (UN onglet, toutes les annonces
     // Leboncoin à retirer, par identité) ; la ligne reste « à faire sur Leboncoin » jusqu'à la relecture.
-    dit(/ouvrirPanneau\(\{ site: 'leboncoin', page: 'annonces', ids: ids\.length \? ids : \[String\(site\.id\)\], action: 'supprimer' \}\)/.test(un) && /return \{ statut: 'onglet'/.test(un) && !/cmd: 'lbcSupprime'/.test(un), 'I3 · (20 nov.) Leboncoin : le panneau de l’extension (un onglet), la ligne reste « à faire »');
+    // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) le panneau est lui-même GARDÉ par la porte : au nom du compte de CETTE
+    // annonce, sur ces annonces ; pas connecté ⇒ rien ne s'ouvre, la raison est dite.
+    { const g = require('./_porte-agir.cjs').panneauGarde({ code: un, appel: /ouvrirPanneau\(\{ site: 'leboncoin', compte: String\(site\.compte \|\| ''\)\.replace\(\/\^lbc-account:\/i, ''\) \|\| '\*', page: 'annonces', ids: ids\.length \? ids : \[String\(site\.id\)\], action: 'supprimer' \}\)/ });
+      dit(g.ok && /return \{ statut: 'onglet'/.test(un) && !/cmd: 'lbcSupprime'/.test(un), 'I3 · (24 nov.) Leboncoin : le panneau GARDÉ par la porte (un onglet, SON compte), la ligne reste « à faire »', g.detail); }
     dit(/action: 'retirer', itemId: String\(site\.id\), confirme: true/.test(un) && !/auto:\s*true/.test(un), 'I4 · eBay : la route `retirer`, jamais en `auto` (c’est SON clic)');
     const jsx = sansCommentaires(fs.readFileSync(path.join(RACINE, 'src', 'ARetirerAilleurs.jsx'), 'utf8'));
     dit(/data-retirer-ailleurs-liste=""/.test(jsx) && /blocRetirerAilleurs\(false\)/.test(app) && /blocRetirerAilleurs\(true\)/.test(app), 'I5 · le bloc est rendu en tête de Ma journée, dans la feuille et en tête de Ventes');

@@ -305,7 +305,7 @@ async function m8() {
   dit(r0 && r0.accepte === false && r0.code === 'pas-appris', '« Envoyer » reste REFUSÉ sans interface apprise (rien ne part)', JSON.stringify(r0));
 }
 
-function m9() {
+async function m9() {
   const APP = fs.readFileSync(F.app, 'utf8');
   const debut = APP.indexOf('function MessagesVestiaire()'), fin = APP.indexOf('function AchatsVestiaire()');
   const bloc = debut > 0 && fin > debut ? APP.slice(debut, fin) : '';
@@ -313,7 +313,10 @@ function m9() {
   dit(/photoArticle:\s*urlPhotoVc\(/.test(bloc) && /photo=\{\(fv && fv\.photo\) \|\| v\.photoArticle\}/.test(bloc), 'M9 · … et sa photo (adresse vestiairecollective.com vérifiée)');
   const fil = APP.slice(APP.indexOf('function FilVestiaire('), debut);
   // (20 nov., décision de Julien) Répondre se fait dans le PANNEAU de l'extension : le pied du fil l'ouvre (plus de raison technique ici).
-  dit(/<BoutonExtension action="repondre" site="vestiaire" ids=\{\[String\(conv\)\]\} large\/>/.test(fil), 'M9 · le pied du fil ouvre « Répondre dans l’extension » sur CETTE conversation');
+  // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) le pied du fil : répondre DEPUIS VRM par la porte, CETTE conversation ;
+  // pas connecté ⇒ lecture seule (src/agir/Agir.jsx `ComposerReponse`).
+  const rep = await require('./_porte-agir.cjs').repondre(fil.replace(/\/\/[^\n]*/g, ''), fs.readFileSync(path.join(__dirname, '..', 'src', 'agir', 'Agir.jsx'), 'utf8'), 'vestiaire');
+  dit(rep.ok, 'M9 · le pied du fil : répondre DEPUIS VRM par la porte sur CETTE conversation, sinon lecture seule', rep.detail);
   const cap = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
   const man = JSON.parse(fs.readFileSync(path.join(path.dirname(F.inject), 'manifest.json'), 'utf8'));
   // (4 nov., 5.319) La version d'ARRIVÉE (5.317.0), jamais la dernière publiée (§8) : comparer au manifeste rougissait à chaque montée de version.

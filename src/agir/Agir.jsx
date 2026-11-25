@@ -10,16 +10,20 @@
 import React from 'react';
 import { tr } from '../i18n/index.js';
 import { Bouton, Feuille, Glyphe } from '../natif/index.js';
-import { usePeutAgir, useCompteAgir, envoyerGeste, agirOuPanneau, useFaitsAgir as useFaitsAgirA, envoyerSerie as envoyerSerieA, agirMaintenant as agirMaintenantA, faitsAgir as faitsAgirA } from './porte.js';
+import { phraseSuivi, suiviTermine } from './suivi.js';
+import { usePeutAgir, useCompteAgir, envoyerGeste, useSuiviCommande, agirOuPanneau, useFaitsAgir as useFaitsAgirA, envoyerSerie as envoyerSerieA, agirMaintenant as agirMaintenantA, faitsAgir as faitsAgirA } from './porte.js';
 import { NOMS_SITES_AGIR } from './peutAgir.js';
+import { motsNavigateur } from '../navigateurExtension.js';
 import './agir.css';
 
-// La phrase d'un « non » : la raison ET le geste, en une phrase (« Connecte l'extension sur shop_x : ouvre Vinted dans Chrome »).
+// La phrase d'un « non » : la raison ET le geste, en une phrase (« Connecte l'extension sur shop_x : ouvre Vinted dans {nav} »).
 export const remplirReponse = (site, conv, texte) => { try { window.dispatchEvent(new CustomEvent('vrm:agir-remplir', { detail: { site, conv: String(conv), texte } })); } catch (_) {} };
 
 export function texteRaison(v) {
   if (!v || v.ok) return '';
-  const vars = { compte: '—', site: 'Vinted', autre: '', version: '?', attendue: '', ou: '', ...(v.vars || {}) };
+  // Le navigateur NOMMÉ tel qu'il est (Chrome, Orion…), jamais « Chrome » en dur (`motsNavigateur`, audit-chrome-en-dur).
+  const N = motsNavigateur();
+  const vars = { compte: '—', site: 'Vinted', autre: '', version: '?', attendue: '', ou: '', nav: N.connu ? N.nom : tr('agir.nav.inconnu'), ...(v.vars || {}) };
   return tr(v.cle || 'agir.raison.passu', vars);
 }
 
@@ -78,6 +82,20 @@ export function issueTexte(r) {
   return tr('agir.envoi.base');
 }
 
+// (25 nov., 5.452 `envoisurs`) L'ISSUE RÉELLE d'un geste déposé : relue jusqu'à ce que l'extension l'écrive (réponse LUE de
+// Vinted) — « Envoyé : Vinted l'a confirmé », « Pas encore parti : plafond… reprise vers 14 h 10 », « Pas envoyé : … »,
+// « Pas sûr : regarde avant de refaire ». Jamais « envoyé » sur un simple dépôt.
+export function LigneSuivi({ id, onVue = null }) {
+  const vue = useSuiviCommande(id);
+  React.useEffect(() => { if (onVue) { try { onVue(vue); } catch (_) {} } }, [vue, onVue]);
+  if (!id) return null;
+  const p = phraseSuivi(vue);
+  return <p className="vrm-agir-issue" role="status" aria-live="polite" data-agir-issue={p.etat === 'fait' ? 'ok' : p.etat} data-agir-suivi={p.etat}>{tr(p.cle, p.vars)}</p>;
+}
+// Le premier retour (avant le suivi) : déposé ⇒ le suivi prend la suite ; sinon la raison.
+const IssueOuSuivi = ({ issue, onVue }) => (!issue ? null : issue.ok && issue.id ? <LigneSuivi id={issue.id} onVue={onVue}/>
+  : <p className="vrm-agir-issue" role="status" data-agir-issue={issue.raison || 'non'}>{issueTexte(issue)}</p>);
+
 // (24 nov., lot messages-pro) Le champ « Répondre » d'une messagerie de 2026 : une pilule qui grandit avec le texte (jusqu'à
 // 5 lignes), le bouton d'envoi rond (une icône, nommé pour le lecteur d'écran), la zone sûre de l'iPhone respectée.
 // `puces` : SES réponses rapides en puces défilantes au-dessus (un toucher REMPLIT le champ, rien ne part) — seulement quand
@@ -86,6 +104,8 @@ export function issueTexte(r) {
 export function ComposerReponse({ site, compte, conv, max = 2000, onEnvoye = null, puces = null, decrit = '' }) {
   const [texte, setTexte] = React.useState('');
   const [issue, setIssue] = React.useState(null);
+  const [enCours, setEnCours] = React.useState(false);   // déposé, issue pas encore écrite : pas de second envoi
+  const surVue = React.useCallback((v) => { if (v === undefined || v === null) return; if (v.etat === 'fait') setTexte(''); setEnCours(!suiviTermine(v)); }, []);
   const champ = React.useRef(null);
   const v = usePeutAgir(site, compte, 'repondre', 'file');
   // Une réponse rapide touchée (src/ReponsesRapidesApp.jsx) remplit CE champ — rien ne part avant « Envoyer ».
@@ -97,10 +117,12 @@ export function ComposerReponse({ site, compte, conv, max = 2000, onEnvoye = nul
   // La pilule suit le texte (1 à 5 lignes), sans saut : la hauteur se mesure après le rendu.
   React.useLayoutEffect(() => { const t = champ.current; if (!t) return; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 132) + 'px'; }, [texte, v.ok]);
   const envoyer = async () => {
-    const t = texte.trim(); if (!t) return;
+    const t = texte.trim(); if (!t || enCours) return;
+    setEnCours(true);
     const r = await envoyerGeste({ site, compte, geste: 'repondre', distGeste: 'repondre', args: { conv: String(conv), texte: t } });
     setIssue(r);
-    if (r.ok) { setTexte(''); if (onEnvoye) { try { onEnvoye(r); } catch (_) {} } }
+    if (!r.ok) setEnCours(false);
+    else if (onEnvoye) { try { onEnvoye(r); } catch (_) {} }   // le champ se vide quand Vinted a CONFIRMÉ (`surVue`), pas au dépôt
   };
   const nom = NOMS_SITES_AGIR[site] || '';
   const attrs = { 'data-agir-composer': site, 'data-agir-compte': String(compte == null ? '' : compte), 'data-agir': v.ok ? 'ok' : 'lecture' };
@@ -117,9 +139,9 @@ export function ComposerReponse({ site, compte, conv, max = 2000, onEnvoye = nul
         <textarea ref={champ} value={texte} onChange={(e) => setTexte(e.target.value.slice(0, max))} rows={1} maxLength={max} className="vrm-mp-champ"
           aria-label={tr('agir.repondre.place', { site: nom })} placeholder={tr('agir.repondre.place', { site: nom })}/>
         <BoutonAgir site={site} compte={compte} geste="repondre" par="file" variante="plein" className="vrm-mp-envoyer" icone={<Glyphe nom="send" taille={18}/>}
-          onClick={texte.trim() ? envoyer : undefined} attrs={{ 'data-agir-envoyer': site, 'aria-label': tr('agir.repondre.envoyer'), 'data-mp-vide': texte.trim() ? undefined : '1' }}><span className="vrm-sr">{tr('agir.repondre.envoyer')}</span></BoutonAgir>
+          onClick={texte.trim() ? envoyer : undefined} attrs={{ 'data-agir-envoyer': site, 'aria-label': tr('agir.repondre.envoyer'), 'data-mp-vide': texte.trim() ? undefined : '1', ...(enCours ? { 'aria-busy': 'true', 'data-agir-en-cours': '' } : {}) }}><span className="vrm-sr">{tr('agir.repondre.envoyer')}</span></BoutonAgir>
       </div>
-      {issue ? <p className="vrm-agir-issue" role="status" data-agir-issue={issue.ok ? 'ok' : issue.raison || 'non'}>{issueTexte(issue)}</p> : null}
+      <IssueOuSuivi issue={issue} onVue={surVue}/>
     </div>
   );
 }
@@ -135,7 +157,9 @@ export function GestesOffreVinted({ compte, tx, oid, conv, prix, contre = null, 
   const [issue, setIssue] = React.useState(null);
   const [confirmer, setConfirmer] = React.useState(false);
   const base = { site: 'vinted', compte, geste: 'offre', decrit };
-  const partir = async (distGeste, args, confirme = false) => setIssue(await envoyerGeste({ site: 'vinted', compte, geste: 'offre', distGeste, args, confirme }));
+  const [enCours, setEnCours] = React.useState(false);   // un geste déposé, pas encore d'issue : aucun second geste sur CETTE offre
+  const surVue = React.useCallback((v) => { if (v === undefined || v === null) return; setEnCours(!suiviTermine(v)); }, []);
+  const partir = async (distGeste, args, confirme = false) => { if (enCours) return; setEnCours(true); const r = await envoyerGeste({ site: 'vinted', compte, geste: 'offre', distGeste, args, confirme }); setIssue(r); if (!r.ok) setEnCours(false); };
   const ids = { tx: String(tx), oid: String(oid), ...(conv != null ? { conv: String(conv) } : {}) };
   return (
     <div className="vrm-agir-offre vrm-mp-gestes" data-agir-offre={String(oid)}>
@@ -144,7 +168,7 @@ export function GestesOffreVinted({ compte, tx, oid, conv, prix, contre = null, 
         <BoutonAgir {...base} par="file" variante="plein" className="vrm-mp-accepter" icone={<Glyphe nom="check" taille={17}/>} onClick={() => setConfirmer(true)} attrs={{ 'data-agir-accepter': String(prix) }}>{tr('agir.offre.accepter', { prix: eur(prix) })}</BoutonAgir>
       </div>
       {contre != null ? <BoutonAgir {...base} par="file" variante="texte" className="vrm-mp-contre" onClick={() => partir('contreOffre', { tx: String(tx), prix: contre, ...(conv != null ? { conv: String(conv) } : {}) })} attrs={{ 'data-agir-contre': String(contre) }}>{tr('agir.offre.contre', { prix: eur(contre) })}</BoutonAgir> : null}
-      {issue ? <p className="vrm-agir-issue" role="status" data-agir-issue={issue.ok ? 'ok' : issue.raison || 'non'}>{issueTexte(issue)}</p> : null}
+      <IssueOuSuivi issue={issue} onVue={surVue}/>
       {confirmer ? <Feuille ouverte titre={tr('agir.offre.accepter', { prix: eur(prix) })} onFermer={() => setConfirmer(false)}
         pied={<Bouton variante="plein" onClick={() => { setConfirmer(false); partir('accepter', { ...ids, prix }, true); }} attrs={{ 'data-agir-accepter-confirmer': '' }}>{tr('agir.offre.confirmerOui')}</Bouton>}>
         <p className="vrm-agir-feuille-p">{tr('agir.offre.confirmer')}</p>

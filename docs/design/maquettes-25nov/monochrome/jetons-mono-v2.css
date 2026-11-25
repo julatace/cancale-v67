@@ -1,0 +1,165 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   STYLE « MONOCHROME v2 » — maquette (24 nov. 2026, v1 gardée telle quelle dans jetons-mono.css), d'après le guide collé par Julien :
+   noir, blanc, gris clair ; titres « General Sans », texte « Satoshi » ; cartes 24, champs 12, boutons 12.
+
+   Polices : General Sans et Satoshi (Fontshare) n'existent sur npm sous aucun paquet sous licence
+   (cherché : @fontsource/general-sans, @fontsource/satoshi, general-sans, satoshi-font, @fontshare/*,
+   typeface-satoshi — tous 404). Doublures libres (OFL, @fontsource, auto-hébergées) :
+     titres  → Plus Jakarta Sans 600/700 (grotesque géométrique, chasse et graisses proches de General Sans)
+     texte   → Figtree 400/500/600 (géométrique douce, proche de Satoshi ; la même que Cinéma C)
+     chiffres du N° et codes → JetBrains Mono 600 (« N° » lui-même dans la police du texte)
+
+   Couche 1 : primitifs --p-*. Couche 2 : sémantiques --m-* (lus par la maquette, jamais une valeur en dur).
+   Règles : UN accent (#22C55E) rare, en point ou en aplat avec texte sombre (jamais en texte sur clair) ;
+   aucun orange/ambre/violet ; rouge = deux paires sous un N° ; AA mesuré (mesures.json) ; cibles 44.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@font-face { font-family: "Plus Jakarta Sans"; font-weight: 600; font-display: swap; src: url(polices/plus-jakarta-sans-latin-600-normal.woff2) format("woff2"); }
+@font-face { font-family: "Plus Jakarta Sans"; font-weight: 700; font-display: swap; src: url(polices/plus-jakarta-sans-latin-700-normal.woff2) format("woff2"); }
+@font-face { font-family: "Figtree"; font-weight: 400; font-display: swap; src: url(polices/figtree-latin-400-normal.woff2) format("woff2"); }
+@font-face { font-family: "Figtree"; font-weight: 500; font-display: swap; src: url(polices/figtree-latin-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "Figtree"; font-weight: 600; font-display: swap; src: url(polices/figtree-latin-600-normal.woff2) format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 600; font-display: swap; src: url(polices/jetbrains-mono-latin-600-normal.woff2) format("woff2"); }
+
+/* ── 1. PRIMITIFS ─────────────────────────────────────────────────────────── */
+:root {
+  --p-noir: #000000;
+  --p-blanc: #FFFFFF;
+  --p-gris-50: #F9FAFB;
+  --p-gris-100: #F3F4F6;
+  --p-gris-200: #E5E7EB;
+  --p-gris-500: #6B7280;    /* la limite d'un contrôle : 4,0:1 sur le gris de page, 4,8:1 sur blanc */
+  --p-gris-550: #575D67;    /* le texte secondaire : ≥ 5,9:1 sur le gris de page */
+  --p-gris-700: #374151;
+  --p-gris-900: #111111;
+  /* trois gris de page candidats (choix : B) */
+  --p-page-a: #E9EAED;
+  --p-page-b: #ECEDF0;
+  --p-page-c: #EEF0F2;
+  /* nuit */
+  --p-nuit-0: #0B0B0C;
+  --p-nuit-1: #161618;
+  --p-nuit-2: #202023;
+  --p-nuit-3: #2A2A2E;
+  --p-nuit-bord: #2E2E33;
+  --p-nuit-limite: #7A7A82; /* limite d'un contrôle la nuit : ≥ 3,7:1 */
+  --p-nuit-texte-2: #A1A1AA;
+  --p-nuit-encre: #F5F5F6;
+  /* l'accent, et lui seul */
+  --p-vert: #22C55E;
+  --p-vert-encre: #052E16;  /* texte posé sur l'aplat vert : 6,5:1 */
+  --p-vert-nuit-texte: #4ADE80;
+  /* sens */
+  --p-rouge: #C42B1C;       /* deux paires sous un N°, rien d'autre */
+  --p-rouge-nuit: #FF6961;
+  /* matière */
+  --p-r-carte: 24px; --p-r-champ: 12px; --p-r-bouton: 12px; --p-r-vignette: 12px; --p-r-plaque: 7px; --p-r-etiquette: 6px;
+  --p-ombre-sm: 0 1px 2px rgb(0 0 0 / 0.05);
+  /* v2 : ombre en deux couches (contact + diffusion, à la Stripe/Airbnb) et creux */
+  --p-ombre-2: 0 1px 2px rgb(16 17 20 / 0.06), 0 6px 16px -6px rgb(16 17 20 / 0.10);
+  --p-ombre-heros: 0 1px 2px rgb(16 17 20 / 0.06), 0 12px 32px -12px rgb(16 17 20 / 0.18);
+  --p-creux: inset 0 1px 2px rgb(16 17 20 / 0.10), inset 0 0 0 1px rgb(16 17 20 / 0.06);
+  /* rythme de 8 */
+  --p-1: 4px; --p-2: 8px; --p-3: 12px; --p-4: 16px; --p-5: 20px; --p-6: 24px; --p-8: 32px;
+  --p-police-titre: "Plus Jakarta Sans", "General Sans", ui-sans-serif, system-ui, sans-serif;
+  --p-police-texte: "Figtree", "Satoshi", ui-sans-serif, system-ui, sans-serif;
+  --p-police-plaque: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --p-courbe: cubic-bezier(0.4, 0, 0.2, 1);  /* ease-in-out du guide */
+}
+
+/* ── 2. SÉMANTIQUES — clair ───────────────────────────────────────────────── */
+:root {
+  --m-page: var(--p-page-b);
+  --m-carte: var(--p-blanc);
+  --m-carte-2: var(--p-gris-50);        /* creux dans une carte (code de retrait, vignette) */
+  --m-bord-carte: var(--p-gris-200);    /* le bord d'une carte (pas un contrôle) */
+  --m-trait: var(--p-gris-200);
+  --m-encre: var(--p-gris-900);
+  --m-encre-2: var(--p-gris-550);
+  --m-limite: var(--p-gris-500);        /* le bord de TOUT ce qui se touche (≥ 3:1) */
+  --m-plein: var(--p-noir);             /* bouton principal */
+  --m-sur-plein: var(--p-blanc);
+  --m-plein-appui: #2B2B2B;
+  --m-second-bord: var(--p-gris-900);   /* bouton secondaire : contour d'encre 1,5 px */
+  --m-second-fond: var(--p-blanc);
+  --m-second-appui: var(--p-gris-100);
+  --m-plaque-rond: var(--p-gris-100);   /* le disque d'un bouton-icône */
+  --m-etiquette: var(--p-gris-100);     /* étiquette d'état (ne se touche pas) */
+  --m-sur-etiquette: var(--p-gris-700);
+  --m-accent: var(--p-vert);
+  --m-sur-accent: var(--p-vert-encre);
+  --m-doublon: var(--p-rouge);
+  --m-sur-doublon: var(--p-blanc);
+  --m-plaque-fond: var(--p-gris-900);
+  --m-plaque-texte: var(--p-blanc);
+  --m-barre: rgb(250 250 251 / 0.92);
+  --m-marque-fond: #E3E5E9;   /* glyphe de plateforme : plein, sans contour (un bouton a un contour) */
+  --m-marque-texte: #374151;
+  --m-anneau: 0 0 0 2px var(--m-carte), 0 0 0 4px var(--p-noir);
+  --m-ombre: var(--p-ombre-2);
+  --m-ombre-heros: var(--p-ombre-heros);
+  --m-creux-fond: #F1F2F4;
+  --m-creux: var(--p-creux);
+  --m-filet: rgb(16 17 20 / 0.07);   /* le liseré d'une carte (hairline) */
+  --m-glyphe: var(--p-gris-550);
+  --m-assiette: linear-gradient(180deg, #EFF0F3 0%, #DCDEE3 100%);  /* l'assiette grise sous chaque paire */
+  --m-point-gris: #8A9099;
+  --m-indicateur: #111111;
+  --m-bulle-moi: var(--p-gris-900);
+  --m-sur-bulle-moi: var(--p-blanc);
+  /* les paires (silhouettes de Cinéma C, teintes pour le gris clair) */
+  --m-vignette: radial-gradient(120% 90% at 50% 0%, #FFFFFF 0%, #F1F2F4 75%);
+  --m-sol: rgb(0 0 0 / 0.22);
+  --m-paire-noir-u: #1E1F23; --m-paire-noir-s: #FFFFFF; --m-paire-noir-d: #6B6E76;
+  --m-paire-gris-u: #8D919A; --m-paire-gris-s: #FFFFFF; --m-paire-gris-d: #3D4047;
+  --m-paire-blanc-u: #FFFFFF; --m-paire-blanc-s: #A9ADB5; --m-paire-blanc-d: #5F646D;
+  color-scheme: light;
+}
+:root[data-gris="a"] { --m-page: var(--p-page-a); }
+:root[data-gris="c"] { --m-page: var(--p-page-c); }
+
+/* ── 2 bis. SÉMANTIQUES — nuit : surfaces presque noires, boutons principaux blancs ── */
+:root[data-theme="dark"] {
+  --m-page: var(--p-nuit-0);
+  --m-carte: var(--p-nuit-1);
+  --m-carte-2: var(--p-nuit-2);
+  --m-bord-carte: var(--p-nuit-bord);
+  --m-trait: var(--p-nuit-bord);
+  --m-encre: var(--p-nuit-encre);
+  --m-encre-2: var(--p-nuit-texte-2);
+  --m-limite: var(--p-nuit-limite);
+  --m-plein: var(--p-blanc);
+  --m-sur-plein: var(--p-noir);
+  --m-plein-appui: #D4D4D8;
+  --m-second-bord: var(--p-nuit-encre);
+  --m-second-fond: var(--p-nuit-1);
+  --m-second-appui: var(--p-nuit-3);
+  --m-plaque-rond: var(--p-nuit-3);
+  --m-etiquette: var(--p-nuit-3);
+  --m-sur-etiquette: #D4D4D8;
+  --m-doublon: var(--p-rouge-nuit);
+  --m-sur-doublon: var(--p-noir);
+  --m-plaque-fond: #3A3A40;
+  --m-plaque-texte: var(--p-nuit-encre);
+  --m-barre: rgb(22 22 24 / 0.92);
+  --m-marque-fond: #2E2E33;
+  --m-marque-texte: #C8C8CE;
+  --m-anneau: 0 0 0 2px var(--m-carte), 0 0 0 4px var(--p-blanc);
+  --m-ombre: none;
+  --m-ombre-heros: none;
+  --m-creux-fond: #0E0E10;
+  --m-creux: inset 0 1px 2px rgb(0 0 0 / 0.6), inset 0 0 0 1px rgb(255 255 255 / 0.06);
+  --m-filet: rgb(255 255 255 / 0.08);
+  --m-glyphe: var(--p-nuit-texte-2);
+  --m-assiette: linear-gradient(180deg, #3A3A41 0%, #2B2B31 100%);
+  --m-point-gris: #8E8E96;
+  --m-indicateur: #F5F5F6;
+  --m-bulle-moi: var(--p-nuit-encre);
+  --m-sur-bulle-moi: var(--p-noir);
+  --m-vignette: radial-gradient(120% 90% at 50% 0%, #2A2A2F 0%, #1C1C20 75%);
+  --m-sol: rgb(0 0 0 / 0.6);
+  --m-paire-noir-u: #08080A; --m-paire-noir-s: #F4F4F5; --m-paire-noir-d: #71717A;
+  --m-paire-gris-u: #8E9098; --m-paire-gris-s: #EDEDEF; --m-paire-gris-d: #3F4046;
+  --m-paire-blanc-u: #ECECEE; --m-paire-blanc-s: #A1A1AA; --m-paire-blanc-d: #6B6B73;
+  color-scheme: dark;
+}

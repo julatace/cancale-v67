@@ -16,6 +16,9 @@ import { gardePrixRegle } from '../gardePrix.js';
 const eur = (n) => (n == null || !Number.isFinite(Number(n)) ? '—' : Number(n).toLocaleString(undefined, { style: 'currency', currency: 'EUR', minimumFractionDigits: Number.isInteger(Number(n)) ? 0 : 2 }));
 export const prixBaisse = (prix, pct) => { const p = Number(prix), x = Number(pct); if (!(p > 0) || !(x >= 1 && x <= 90)) return null; const c = Math.round(p * (100 - x)); return c >= 100 && c < Math.round(p * 100) ? c / 100 : null; };
 
+// (25 nov.) Le prix CONSEILLÉ d'une annonce (« Baisses conseillées » : `cible`), sous son prix, 1 € au moins — tant qu'aucun
+// pourcentage n'est saisi, c'est LUI qui part (la cible montrée « prix → cible »), jamais deviné.
+export const cibleDe = (a) => { const c = Number(a && a.cible), p = Number(a && a.prix); return Number.isFinite(c) && c >= 1 && p > 0 && c < p ? Math.round(c * 100) / 100 : null; };
 export default function BaisseSerie({ annonces = [], onFermer, autres = null }) {
   useFaitsAgir();
   const [pct, setPct] = React.useState('');
@@ -25,7 +28,7 @@ export default function BaisseSerie({ annonces = [], onFermer, autres = null }) 
   const x = Number(String(pct).replace(',', '.'));
   const l = (annonces || []).filter((a) => a && a.id != null).map((a) => {
     const v = agirMaintenant('vinted', a.uid, 'baisser', 'file');
-    const vers = prixBaisse(a.prix, x);
+    const vers = x >= 1 && x <= 90 ? prixBaisse(a.prix, x) : cibleDe(a);
     const g = vers == null ? null : gardePrixRegle({ prixC: Math.round(vers * 100), actuelC: Math.round(Number(a.prix) * 100), plancher: null, mode: 'main', confirmeC: confirme ? Math.round(vers * 100) : null });
     return { a, v, vers, suspect: !!(g && !g.ok) };
   });
@@ -38,7 +41,7 @@ export default function BaisseSerie({ annonces = [], onFermer, autres = null }) 
     const r = await envoyerSerie('baisser', 'prix', partent.map((p) => ({ site: 'vinted', compte: p.a.uid, id: p.a.id, num: p.a.numero || '', avant: p.a.prix, args: { id: String(p.a.id), prix: p.vers, prixAvant: p.a.prix } })));
     setEnCours(false); setIssue(r);
   };
-  const raison = !(x >= 1 && x <= 90) ? tr('agir.baisse.taux') : !partent.length ? tr('agir.baisse.aucune') : '';
+  const raison = !(x >= 1 && x <= 90) && !l.some((r) => r.vers != null) ? tr('agir.baisse.taux') : !partent.length ? tr('agir.baisse.aucune') : '';
   return (
     <Feuille ouverte onFermer={onFermer} titre={tr('agir.baisse.titre')} attrs={{ 'data-agir-baisse': l.length }}
       pied={issue ? <Bouton variante="plein" onClick={onFermer} attrs={{ 'data-agir-baisse-fini': '' }}>{tr('agir.baisse.fini')}</Bouton>

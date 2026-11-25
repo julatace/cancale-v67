@@ -45,7 +45,7 @@ export function BoutonExtension({ action, site = 'vinted', compte = '*', ids = [
   const url = lienPanneau(c);
   const v = usePeutAgir(c.site, compte, gesteDe(action), 'panneau');
   const porte = { 'data-agir': v.ok ? 'ok' : 'lecture', 'data-agir-site': c.site, 'data-agir-geste': gesteDe(action), 'data-agir-raison': v.ok ? undefined : v.raison };
-  const ouvrir = (e) => { if (e && e.stopPropagation) e.stopPropagation(); if (!v.ok) return; ouvrirPanneau({ ...c, compte }); if (onOuvert) { try { onOuvert(url); } catch (_) {} } };
+  const ouvrir = (e) => { if (e && e.stopPropagation) e.stopPropagation(); if (!v.ok) return; if (!ouvrirPanneau({ ...c, compte })) return; if (onOuvert) { try { onOuvert(url); } catch (_) {} } };
   if (!v.ok) {
     const raison = texteRaison(v);
     if (className) return <button type="button" className={className} aria-disabled="true" onClick={ouvrir} title={raison} {...attrsDe(action, c, url, attrs)} {...porte}>{libelle || tr(c.cle, { site: NOMS_SITES[c.site] })}<small style={{ display: 'block', opacity: 0.75, fontWeight: 400 }} data-agir-phrase="">{raison}</small></button>;
@@ -71,7 +71,7 @@ export function RangeeExtension({ action, site = 'vinted', compte = '*', ids = [
   const phrase = v.ok ? '' : texteRaison(v);
   return (
     <Rangee titre={libelle || tr(c.cle, { site: NOMS_SITES[c.site] })} sousTitre={[sousTitre, phrase].filter(Boolean).join(' · ')} sousLignes={2} fin={v.ok ? 'chevron' : undefined}
-      onClick={v.ok ? () => { ouvrirPanneau({ ...c, compte }); if (onOuvert) { try { onOuvert(url); } catch (_) {} } } : undefined} attrs={{ ...attrsDe(action, c, url, attrs), ...porte, ...(v.ok ? {} : { 'aria-disabled': 'true' }) }}/>
+      onClick={v.ok ? () => { if (!ouvrirPanneau({ ...c, compte })) return; if (onOuvert) { try { onOuvert(url); } catch (_) {} } } : undefined} attrs={{ ...attrsDe(action, c, url, attrs), ...porte, ...(v.ok ? {} : { 'aria-disabled': 'true' }) }}/>
   );
 }
 

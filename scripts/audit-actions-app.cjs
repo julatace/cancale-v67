@@ -22,6 +22,12 @@
 //  L. Le lien : `lienPanneau` rend EXACTEMENT
 //     https://www.vinted.fr/?vrm=panneau&page=…&ids=…&action=… (format partagé avec
 //     le chantier du panneau), le bon domaine par site.
+//  G. (25 nov., décision de Julien du 24 nov. : « faire absolument tout si l'extension est connectée ; pas connectée sur un
+//     compte, on voit les données mais on ne peut pas agir », CLAUDE.md §3) Un geste DEPUIS VRM passe par LA PORTE
+//     (src/agir/porte.js sur src/agir/peutAgir.js) : une COMMANDE pour l'extension (jamais une requête de l'app), déposée
+//     seulement si la porte dit oui pour CE compte ; refusée ⇒ rien ne part, le panneau (lui-même gardé :
+//     src/ouvrirPanneau.js) ou la lecture seule. Lu (les gardes sont dans le code) ET exécuté (scripts/_porte-agir.cjs :
+//     connecté ⇒ SA confirmation puis UNE commande pour CET article ; pas connecté ⇒ rien, le panneau de CET article).
 //  Y. eBay reste dans l'app : la feuille « Changer le prix » coche et applique eBay
 //     seul (route `revise`), « Publier partout » garde la case eBay.
 //
@@ -89,6 +95,11 @@ function executerModule(texte) {
 function juger(t) {
   const ko = [], ok = [];
   const verif = (cond, texte) => (cond ? ok : ko).push(texte);
+  // G. la porte : ses gardes sont dans le code (envoi, panneau, republier) — retirées ⇒ rouge.
+  { const porte = t.src['src/agir/porte.js'] || '', op = t.src['src/ouvrirPanneau.js'] || '';
+    const G = require('./_porte-agir.cjs').GARDES_PORTE;
+    verif(G.every(([g]) => porte.includes(g)) && op.includes("if (!v.ok) { try { window.dispatchEvent(new CustomEvent('vrm:agir-refus', { detail: v })); } catch (_) {} return null; }"),
+      'G la porte garde chaque geste depuis VRM (envoi, panneau, republier) : refusée ⇒ rien ne part'); }
   const reg = executerModule(t.src['src/actionsExtension.js']);
   const CMDS = reg && Array.isArray(reg.CMDS_PLATEFORME) ? reg.CMDS_PLATEFORME : [];
   verif(CMDS.length > 0 && reg && typeof reg.refusPanneau === 'function', 'P0 le registre src/actionsExtension.js se charge (CMDS_PLATEFORME, refusPanneau)');
@@ -205,6 +216,8 @@ const MUTATIONS = {
   'commande nouvelle pas classée': (t) => { t.fond += "\nif (cmd === 'vintedMasquerTout') {}\n"; },
   'écran Automatisations remonté': (t) => { t.src['src/App.jsx'] += "\nconst AutomatisationsLazy = aLaDemande(() => import('./automatisations/Branchement.jsx'));\n"; },
   // (24 nov., lot agir-tout) les vacances se font depuis VRM (`VacancesAgir`) : la mutation retire ce chemin.
+  'garde de la porte retirée (envoyerGeste)': (t) => { t.src['src/agir/porte.js'] = t.src['src/agir/porte.js'].replace(require('./_porte-agir.cjs').GARDES_PORTE[0][0], ''); },
+  'garde du panneau retirée (ouvrirPanneau)': (t) => { t.src['src/ouvrirPanneau.js'] = t.src['src/ouvrirPanneau.js'].replace("if (!v.ok) { try { window.dispatchEvent(new CustomEvent('vrm:agir-refus', { detail: v })); } catch (_) {} return null; }", ''); },
   'bouton manquant (vacances)': (t) => { t.src['src/ecrans/Reglages.jsx'] = t.src['src/ecrans/Reglages.jsx'].replace('<VacancesAgir comptes=', '<VacancesRetire comptes='); },
 };
 
@@ -222,8 +235,12 @@ if (args.includes('--mutation')) {
   process.exit(0);
 }
 
+(async () => {
 const r = juger(charger(null));
+// G (exécuté) : la porte servie de faits inventés (connecté / pas connecté / pas su) — `MUTATION_PORTE=1` la retire ⇒ rouge.
+{ const p = await require('./_porte-agir.cjs').porteTient(); (p.ok ? r.ok : r.ko).push('G la porte EXÉCUTÉE : connecté ⇒ SA confirmation puis UNE commande pour CET article ; pas connecté ou pas su ⇒ rien, le panneau de CET article' + (p.ok ? '' : ' — ' + p.fautes.join(' · '))); }
 r.ok.forEach((x) => console.log('  ✅ ' + x));
 r.ko.forEach((x) => console.log('  ❌ ' + x));
 if (r.ko.length) { console.log(`\n❌ audit-actions-app : ${r.ko.length} contrôle(s) rouge(s) — un geste de plateforme part encore de l'app`); process.exit(1); }
 console.log(`\n✅ audit-actions-app : aucun geste de plateforme dans l'app (sauf eBay) — ${r.ok.length} contrôles`);
+})();

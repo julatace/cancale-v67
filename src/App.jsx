@@ -23,11 +23,11 @@ import './selection-serie.css'; // (8 nov.) style de ./composants/SelectionSerie
 import './designV2/design-v2.css'; // (8 nov.) style de ./composants/SelectionSerie.jsx, gardé à sa place (son écran est chargé à la demande)
 import './designV2/argent-v2.css'; // (8 nov.) style de ./composants/SelectionSerie.jsx, gardé à sa place (son écran est chargé à la demande)
 import { estCommandePlateforme, estEcriturePlateforme, refusPanneau, ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from './actionsExtension.js';   // (20 nov., décision de Julien) aucun geste de plateforme dans l'app
-import { poserExtensionIci, ouvrirPanneau } from './ouvrirPanneau.js';
+import { poserExtensionIci, poserPanneauRetard, ouvrirPanneau } from './ouvrirPanneau.js';
 import { poserFaitsAgir, poserEnvoiAgir } from './agir/porte.js';
 import { texteRaison as texteRaisonAgir, CreerVintedAgir, publierLbcDepuisVrm, EbayLectureSeule } from './agir/Agir.jsx';   // (24 nov., lot agir-si-connecte) LA porte de tous les gestes
 import { requeteConnexions } from './connexions/connexions.js';
-import { lirePresences as lirePresencesAgir, nouvelleCommandeDistance as commandeDistanceAgir, deposerCommandeDistance as deposerDistanceAgir } from './aDistance.js';
+import { lirePresences as lirePresencesAgir, nouvelleCommandeDistance as commandeDistanceAgir, deposerCommandeDistance as deposerDistanceAgir, lireUneCommande as lireUneCommandeAgir } from './aDistance.js';
 import { CLE_DISCRETION as CLE_DISCRETION_AGIR } from './discretion.js';
 
 import { GrilleMenu, CarteCompte } from './natif/GrilleMenu.jsx';   // (21 nov., onglets-menu) l'écran « Menu » en tuiles
@@ -334,8 +334,7 @@ import { JourneeInstantanee } from './JourneeInstantanee.jsx';
 import { capturerJournee, ecrireInstantane, effacerInstantanes, lireInstantane } from './journeeInstantanee.js';
 // (9 nov., soir) Colis et Ventes tout de suite : la même règle d'instantané (src/instantaneEcran.js).
 import { VentesInstantanee } from './ColisVentesInstantanes.jsx';
-import { AnnoncesInstantanee } from './AnnoncesInstantanee.jsx';   // (11 nov., ouverture-legere-2)
-import { capturerAnnonces, ecrireInstantaneAnnonces, lireInstantaneAnnonces } from './annoncesInstantanee.js';
+import { AnnoncesCacheesCtx } from './annoncesCachees.js';   // (23 nov., latence-2) l'écran Annonces d'hier, caché : sans ses vignettes
 import { capturerVentes, ecrireInstantaneVentes, lireInstantaneVentes } from './colisVentesInstantanes.js';
 // (20 nov., affichage instantané) LA COPIE DE CHAQUE ÉCRAN (src/copieEcran.js) : la dernière projection rendue de
 // l'écran, gardée par compte VRM dans IndexedDB, montrée INERTE et datée à la place du squelette (src/CopieEcran.jsx).
@@ -942,6 +941,7 @@ import { lireCodeColis } from "./scanColis.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 // ⟦→ ecrans/Comptabilite.jsx #67⟧
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
+import { memeContenu, nuageCharge } from './calculParesseux.js';
 import { creerMemoCourt } from "./memoCourt.js";   // (20 nov., lectures-legeres) lectures lourdes servies 20 s aux voisines
 import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
@@ -1792,7 +1792,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.450.1';
+const EXT_ATTENDUE = '5.452.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -2204,7 +2204,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { agirtout: '5.450.1', suiviescrow: '5.450.1', observation: '5.440.3', favorislisteentiere: '5.440.2', favorislienapp: '5.440.1', favoriscommande: '5.440.1', reperage: '5.440.0', clocheauto: '5.440.0', messagerieuuid: '5.440.0', fenetrefavoris: '5.440.0', vcmoderation: '5.439.0', prixminipublier: '5.437.0', negointelligente: '5.437.0', formulairerythme: '5.437.0', descriptioncoller: '5.437.0', favorisautobilan: '5.437.0', repubverification: '5.437.0', nuitaussi: '5.437.0', santenote: '5.438.0', precieux: '5.438.0', relancesansachat: '5.438.0', lotauto: '5.438.0', brouillonsauto: '5.438.0', demasquee: '5.438.0', adistance: '5.436.0', sauvegardereglages: '5.436.0', lbcoffres: '5.436.0', retoursautres: '5.436.0', noteacheteur: '5.430.0', traductionlocale: '5.430.0', alertemasquee: '5.428.0', courbeannonce: '5.428.0', endirect: '5.428.0', retirerpartout: '5.426.0', relances: '5.425.0', triconversations: '5.425.0', publieraussi: '5.424.0', depotprepare: '5.429.0', ordrephotos: '5.429.0', suiviboost: '5.429.0', depotpanneau: '5.429.0', gardeprix: '5.432.0', prixpartout: '5.432.0', pushcapte: '5.422.0', repubprogramme: '5.422.0', reponsesrapides: '5.421.0', lotfavoris: '5.421.0', relanceoffres: '5.421.0', agentvrm: '5.421.0', modifavantapres: '5.423.0', filevisible: '5.433.0', pauseapres: '5.433.0', reessai: '5.433.0', apprisclic: '5.433.0', retoursuivi: '5.431.0', bordereauxunpdf: '5.420.0', vacancesinterface: '5.420.0', favorisreponses: '5.420.0', santecomptes: '5.420.0', favorisetapes: '5.420.0', ventesfavoris: '5.420.0', relaisprevu: '5.411.0', vcecrireui: '5.412.0', vcfilpanneau: '5.412.0', vcaimespanneau: '5.412.0', panneautelephone: '5.413.0', toutinterface: '5.414.0', connexionsimple: '5.415.0', lbcinterface: '5.416.0', favorisperso2: '5.417.0', favorisenvoi9: '5.419.0', commandeslot: '5.419.0', ongletravail: '5.410.5', marquelu: '5.410.5', repubformulaire: '5.410.3', favorisbleam: '5.410.3', apresvente: '5.410.4', stockauto: '5.410.4', cyclevie: '5.410.4', sauvegardeauto: '5.410.4', dressingplus: '5.410.4', negotranches: '5.410.4', favfiltres: '5.410.4', panneaureste: '5.410.2', imprimerpanneau: '5.410.2', vcdatemise: '5.410.0', baissevc: '5.410.0', lbcinteresses: '5.410.0', lbcecrireinteresses: '5.410.0', repubfidele: '5.410.0', repubverif: '5.410.0', messagesmalins: '5.410.0', panneaucomplet: '5.410.0', lienpanneau: '5.410.0', lbcpubliee: '5.409.0', vcpubliee: '5.409.0', masquercarte: '5.409.0', baisselbc: '5.409.0', contreoffres: '5.409.0', repondrecarte: '5.409.0', publierfiche: '5.409.0', listesvinted: '5.409.0', lbcformulaire: '5.409.0', vcrelu: '5.409.0', captejournal: '5.409.0', etatici: '5.409.0', suivicolis: '5.409.0', comptebloque: '5.409.0', prixattente: '5.409.0', baisseregle: '5.409.0', masquerailleurs: '5.409.0', repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { envoisurs: '5.452.0', agirtout: '5.450.1', suiviescrow: '5.450.1', observation: '5.440.3', favorislisteentiere: '5.440.2', favorislienapp: '5.440.1', favoriscommande: '5.440.1', reperage: '5.440.0', clocheauto: '5.440.0', messagerieuuid: '5.440.0', fenetrefavoris: '5.440.0', vcmoderation: '5.439.0', prixminipublier: '5.437.0', negointelligente: '5.437.0', formulairerythme: '5.437.0', descriptioncoller: '5.437.0', favorisautobilan: '5.437.0', repubverification: '5.437.0', nuitaussi: '5.437.0', santenote: '5.438.0', precieux: '5.438.0', relancesansachat: '5.438.0', lotauto: '5.438.0', brouillonsauto: '5.438.0', demasquee: '5.438.0', adistance: '5.436.0', sauvegardereglages: '5.436.0', lbcoffres: '5.436.0', retoursautres: '5.436.0', noteacheteur: '5.430.0', traductionlocale: '5.430.0', alertemasquee: '5.428.0', courbeannonce: '5.428.0', endirect: '5.428.0', retirerpartout: '5.426.0', relances: '5.425.0', triconversations: '5.425.0', publieraussi: '5.424.0', depotprepare: '5.429.0', ordrephotos: '5.429.0', suiviboost: '5.429.0', depotpanneau: '5.429.0', gardeprix: '5.432.0', prixpartout: '5.432.0', pushcapte: '5.422.0', repubprogramme: '5.422.0', reponsesrapides: '5.421.0', lotfavoris: '5.421.0', relanceoffres: '5.421.0', agentvrm: '5.421.0', modifavantapres: '5.423.0', filevisible: '5.433.0', pauseapres: '5.433.0', reessai: '5.433.0', apprisclic: '5.433.0', retoursuivi: '5.431.0', bordereauxunpdf: '5.420.0', vacancesinterface: '5.420.0', favorisreponses: '5.420.0', santecomptes: '5.420.0', favorisetapes: '5.420.0', ventesfavoris: '5.420.0', relaisprevu: '5.411.0', vcecrireui: '5.412.0', vcfilpanneau: '5.412.0', vcaimespanneau: '5.412.0', panneautelephone: '5.413.0', toutinterface: '5.414.0', connexionsimple: '5.415.0', lbcinterface: '5.416.0', favorisperso2: '5.417.0', favorisenvoi9: '5.419.0', commandeslot: '5.419.0', ongletravail: '5.410.5', marquelu: '5.410.5', repubformulaire: '5.410.3', favorisbleam: '5.410.3', apresvente: '5.410.4', stockauto: '5.410.4', cyclevie: '5.410.4', sauvegardeauto: '5.410.4', dressingplus: '5.410.4', negotranches: '5.410.4', favfiltres: '5.410.4', panneaureste: '5.410.2', imprimerpanneau: '5.410.2', vcdatemise: '5.410.0', baissevc: '5.410.0', lbcinteresses: '5.410.0', lbcecrireinteresses: '5.410.0', repubfidele: '5.410.0', repubverif: '5.410.0', messagesmalins: '5.410.0', panneaucomplet: '5.410.0', lienpanneau: '5.410.0', lbcpubliee: '5.409.0', vcpubliee: '5.409.0', masquercarte: '5.409.0', baisselbc: '5.409.0', contreoffres: '5.409.0', repondrecarte: '5.409.0', publierfiche: '5.409.0', listesvinted: '5.409.0', lbcformulaire: '5.409.0', vcrelu: '5.409.0', captejournal: '5.409.0', etatici: '5.409.0', suivicolis: '5.409.0', comptebloque: '5.409.0', prixattente: '5.409.0', baisseregle: '5.409.0', masquerailleurs: '5.409.0', repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -4955,7 +4955,7 @@ const reprendreSyncMaintenant = () => { if (_repriseT) { clearTimeout(_repriseT)
 // c'est ce qui faisait « changer » les numéros entre deux connexions).
 let _cloudReady = false;
 let _cloudReadyListeners = [];
-const markCloudReady = () => { if (_cloudReady) return; _cloudReady = true; try { globalThis.__vrmNuagePret = true; } catch (_) {} _cloudReadyListeners.forEach(fn => { try { fn(); } catch (_) {} }); _cloudReadyListeners = []; };
+const markCloudReady = () => { if (_cloudReady) return; _cloudReady = true; try { globalThis.__vrmNuagePret = true; } catch (_) {} setTimeout(nuageCharge, 0); _cloudReadyListeners.forEach(fn => { try { fn(); } catch (_) {} }); _cloudReadyListeners = []; };
 const onCloudReady = (fn) => { if (_cloudReady) { try { fn(); } catch (_) {} return () => {}; } _cloudReadyListeners.push(fn); return () => { _cloudReadyListeners = _cloudReadyListeners.filter(f => f !== fn); }; };
 const isCloudReady = () => _cloudReady;
 // (21 nov., lot rentabilite) LE FORFAIT D'EMBALLAGE (src/beneficePaire.js `poserForfaitEmballage`) : relu au démarrage,
@@ -5415,7 +5415,10 @@ function useSystemeSombre(ecouter) {
 function useStateCle(k, init) {
   const [v, setV] = React.useState(init);
   const initRef = React.useRef(init); initRef.current = init;
-  React.useEffect(() => onCleRelue(k, () => { try { setV(initRef.current()); } catch (_) {} }), [k]);
+  // (24 nov., vitesse-lectures-toucher) Une clé relue au MÊME contenu garde sa valeur (même identité) : avant, chaque relecture
+  // du nuage rendait un objet neuf et relançait tous les calculs qui la lisent (`pickupUnion` sur Achats, mesuré). Un contenu
+  // différent passe comme avant (src/calculParesseux.js, `memeContenu`).
+  React.useEffect(() => onCleRelue(k, () => { try { const n = initRef.current(); setV((p) => (memeContenu(p, n) ? p : n)); } catch (_) {} }), [k]);
   return [v, setV];
 }
 const emettreClesRelues = (cles) => {
@@ -11073,6 +11076,8 @@ if (typeof window !== 'undefined') {
 }
 const vmrExtPresent = () => __vmrExtReady;
 poserExtensionIci(vmrExtPresent);   // (20 nov.) « s'ouvre sur Vinted avec l'extension » quand elle ne répond pas ici
+// (25 nov., e2e-extension-vert) Une extension d'ICI trop ancienne pour le lien du panneau : aucun geste « dans l'extension » ne l'ouvre.
+poserPanneauRetard(() => (extSait('panneaucomplet') === 'retard' ? tr('actionsExt.aJour') : ''));
 const vmrExtVersion = () => __vmrExtVersion;
 // ══ « À INSTALLER » SEULEMENT SI RIEN NE PROUVE LE CONTRAIRE (19 nov.) ═══════
 // Julien, sur son Mac (photo du 19 nov.) : la coque dit « Extension à installer » et « Publier sur Leboncoin » dit
@@ -13073,11 +13078,21 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
   window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (k && k in _vcMem) { delete _vcMem[k]; signalerVc(); } });
 }
 // L'état « Vestiaire » d'un écran : se redessine quand une de ces clés change.
+const lireVcLocal = () => {
+  return { auto: numerosVcEffectifs(), donnes: carteNumerosVc(vcCarte('vrm_vc_numeros')), liens: vcCarte('vrm_vc_liens'), fait: vcCarte('vrm_vc_colis_done'), imprimes: vcCarte('vrm_vc_imprimes'), departs: departsCarte(), departsCle: departsCle() };
+};
 function useVcLocal() {
   const [, maj] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => { _ecoutesVc.add(maj); return () => { _ecoutesVc.delete(maj); }; }, []);
   React.useEffect(() => { chargerDeparts(false); }, []);
-  return { auto: numerosVcEffectifs(), donnes: carteNumerosVc(vcCarte('vrm_vc_numeros')), liens: vcCarte('vrm_vc_liens'), fait: vcCarte('vrm_vc_colis_done'), imprimes: vcCarte('vrm_vc_imprimes'), departs: departsCarte(), departsCle: departsCle() };
+  // (24 nov., vitesse-lectures-toucher) LE MÊME OBJET tant que rien n'a changé (chaque champ comparé par son CONTENU,
+  // `memeContenu`) : il était neuf à chaque rendu, et ce qui le lit (`cartesColis`, `listeEnvoyes`, gardés par version des
+  // données) repartait à chaque rendu. Un champ changé ⇒ un objet neuf, comme avant.
+  const neuf = lireVcLocal();
+  const avant = React.useRef(null);
+  const a = avant.current;
+  if (!a || Object.keys(neuf).some((k) => !memeContenu(a[k], neuf[k]))) avant.current = neuf;
+  return avant.current;
 }
 // Une lecture Vestiaire (`vc_ventes`/`vc_listings` projetés) + les numéros donnés
 // et les « Colis fait » de cet appareil : ce que lisent `ventesVcDe`,
@@ -23812,7 +23827,7 @@ poserEnvoiAgir({ deposer: async ({ geste, site, compte, args, confirme, num, ava
   if (r && r.deja) return { deja: r.deja };
   if (r) { try { window.dispatchEvent(new CustomEvent('vrm:agir-envoye', { detail: { id: c.id, geste, site, compte } })); } catch (_) {} }
   return r ? { id: c.id } : null;
-} });
+}, lire: (id) => lireUneCommandeAgir(depAgir(), id) });   // (25 nov., 5.452) le suivi de l'issue réelle (src/agir/suivi.js)
 const nomsEbayAgir = {};
 function SourceAgir({ comptesVinted }) {
   useExtVivante();
@@ -29126,11 +29141,14 @@ function ventesParCompteDe(lignes, uids) {
 const lirePreuvesVenteVinted = async (opts = {}) => {
   try {
     // (20 nov., lectures-legeres) `lireTxnPreuves` : la famille gardée des transactions, sous les noms d'ici.
-    const rows = await lireTxnPreuves(opts);
-    if (rows === null) return null;
     // Les bordereaux (une ligne par vente, tous comptes, `_latest` écarté par
     // la règle) : deux scalaires de `meta`, jamais le PDF (§4.4).
-    const bords = await lireTout('id=like.harvest_%25_label_%25&select=id,tx:meta->>tx,it:meta->>item', { strict: true });
+    // (24 nov., vitesse-lectures-toucher) LES DEUX LECTURES PARTENT ENSEMBLE : les bordereaux ne dépendent pas des
+    // transactions. Mesuré à la 1re visite d'Annonces (banc vitesse-iphone, LECTURES=1) : ils partaient après les trois pages
+    // des transactions (+1,6 → +2,9 s), et les ventes à juger encore après (+3,8 s). Mêmes lectures, même règle : l'une
+    // « pas su » ⇒ « pas su ».
+    const [rows, bords] = await Promise.all([lireTxnPreuves(opts), lireTout('id=like.harvest_%25_label_%25&select=id,tx:meta->>tx,it:meta->>item', { strict: true }).catch(() => null)]);
+    if (rows === null) return null;
     if (bords === null) return null;
     const comptes = Array.isArray(opts.comptes) ? [...new Set(opts.comptes.map(String).filter((u) => /^\d+$/.test(u)))] : null;
     const ordres = (uids) => lireTout(`id=in.(${uids.map((u) => `harvest_${u}_orders_sold`).join(',')})&select=id,v:data->payload->my_orders`, { strict: true });
@@ -29884,11 +29902,36 @@ const beneficeDuMoisPub = ({ pub, compta, ligneUrssaf, regime }, ym, jusqua = nu
 //     sur celles-là, et la couverture est écrite À CÔTÉ (§5).
 // Une vente annulée, remboursée ou revenue ne compte pas ; un compte exclu non
 // plus (`compteEcarte`, comme le CA). Lecture ratée ⇒ « pas pu lire », jamais 0.
-let _repartCache = null;      // { at, txn: {tx: {cc}} | null, items: {id: {...}} | null, dates: {} | null }
+// (24 nov., vitesse-lectures-toucher) UNE LECTURE À LA FOIS, GARDÉE 10 MIN (src/memoCourt.js). Mesuré à la 1re visite
+// d'Annonces (banc vitesse-iphone, LECTURES=1) : la liste des transactions projetée partait TROIS fois (+2,0 · +3,6 · +4,5 s) —
+// chaque lecteur arrivait avant que la précédente ait rempli le cache (une lecture ~1 200 lignes décompressées, plusieurs
+// secondes au téléphone). Maintenant : une lecture EN COURS est rejointe ; finie et COMPLÈTE, elle sert 10 min au même vendeur ;
+// oubliée à tout signal de l'extension (ses lignes ont changé de version) et au retour du réseau ; un autre vendeur relit. Une lecture dont une partie est « pas su » n'est jamais gardée (le suivant relit).
+const _memoExtras = creerMemoCourt({ dureeMs: 10 * 60 * 1000 });
+// Ces lignes (`harvest_*_txn_*`, `harvest_*_listings`, `vinted_listing_dates`) ne sont écrites que par l'extension, dont le
+// signal (`vrm:ext`) dit qu'elles ont changé : PAS d'abonnement aux écritures de l'app (le partage des lectures prévient tous
+// ses abonnés à chaque écriture qu'il ne sait pas lire — mesuré : la lecture repartait après chaque publication).
+try {
+  if (typeof window !== 'undefined') { window.addEventListener('vrm:ext', () => _memoExtras.oublier()); window.addEventListener('online', () => _memoExtras.oublier()); }
+} catch (_) {}
 const lireExtrasRepartition = async () => {
   const owner = AUTH.user?.id;
   if (!owner) return {txn:null,items:null,dates:null};
-  if (_repartCache?.owner === owner && Date.now() - _repartCache.at < 10 * 60 * 1000) return _repartCache;
+  const r = await _memoExtras.lire(owner, async () => { const x = await lireExtrasRepartitionNeuve(owner); return x && x.txn && x.items && x.dates ? x : { ...(x || {}), _passu: true }; }).catch(() => null);
+  if (!r) return {txn:null,items:null,dates:null};
+  if (r._passu) { _memoExtras.oublier(); const { _passu, ...reste } = r; return { txn: null, items: null, dates: null, ...reste }; }
+  return r;
+};
+// (24 nov., vitesse-lectures-toucher) LA LECTURE PART AU TOUCHER : le doigt posé sur l'onglet Annonces lance la lecture (la
+// même, rejointe par l'écran quand il se monte) au lieu d'attendre ~2 s de montage. Une lecture, pas une écriture : rien
+// d'autre ne change. Sans session, rien ne part.
+try {
+  if (typeof document !== 'undefined') document.addEventListener('pointerdown', (e) => {
+    try { const t = e.target && e.target.closest ? e.target.closest('[data-n-onglet]') : null;
+      if (t && t.getAttribute('data-n-onglet') === 'paires' && t.getAttribute('aria-current') !== 'page' && AUTH.user?.id) lireExtrasRepartition().catch(() => {}); } catch (_) {}
+  }, { capture: true, passive: true });
+} catch (_) {}
+const lireExtrasRepartitionNeuve = async (owner) => {
   const [pays, items, dates, txnItems] = await Promise.all([
     // Le pays n'est pas dans `meta` : cette lecture décompresse le détail de
     // transaction — partagée avec les analyses de l’accueil, une fois
@@ -29916,8 +29959,7 @@ const lireExtrasRepartition = async () => {
     }
   }
   if (AUTH.user?.id !== owner) return {txn:null,items:null,dates:null};
-  _repartCache = { owner, at: Date.now(), txn, items: idx, dates };
-  return _repartCache;
+  return { owner, at: Date.now(), txn, items: idx, dates };
 };
 // ⟦→ ecrans/Stats.jsx #14⟧
 const nomPays = (cc) => {
@@ -34307,10 +34349,6 @@ function CaptureJournee({ uid }) {
 function CaptureVentes({ uid }) {
   return <CaptureInstantane uid={uid} ecran="ventes" racine={() => racineEcranPret('ventes', 'section.vrm-tache[data-tache="ventes"]')} capturer={capturerVentes} ecrire={ecrireInstantaneVentes}/>;
 }
-// (11 nov., ouverture-legere-2) Annonces · Vinted, compte « Tous », recherche vide (src/annoncesInstantanee.js).
-function CaptureAnnonces({ uid }) {
-  return <CaptureInstantane uid={uid} ecran="annonces" racine={() => racineEcranPret('annonces', 'section.vrm-tache[data-tache="annonces"]')} capturer={capturerAnnonces} ecrire={ecrireInstantaneAnnonces}/>;
-}
 // (20 nov., affichage instantané) LA COPIE D'UN ÉCRAN est prise ICI, dans l'écran vrai, seulement quand TOUTES ses
 // données essentielles sont là (`useAttenteComplete`) — jamais au plafond, jamais hors ligne ni base injoignable (le
 // montage est gardé par la coque) —, au repos du navigateur, 1,5 s après le dernier changement, et quand la page est
@@ -37492,10 +37530,6 @@ function AppCoeur() {
   // rien ne le rangeait plus, `ColisInstantane` n'était plus montré — code mort retiré, §4.11).
   const vueVentesTous = tab === 'ventes' && siteDeTache('ventes', platSub) === 'toutes';
   const snapVentes = React.useMemo(() => (vueVentesTous && uidInstantane ? lireInstantaneVentes(uidInstantane) : null), [vueVentesTous, uidInstantane]);
-  // (11 nov.) Annonces : sur sa vue d'ouverture (Vinted · Annonces) et le compte « Tous » (rien de choisi d'autre).
-  const vueAnnoncesOuverture = tab === 'annonces' && siteDeTache('annonces', platSub) === 'vinted' && sectionDeTache('annonces', platSub) === 'annonces'
-    && compteEffectif(compteSel, compteConnecte, (u) => (comptesChoisissables || []).some((a) => String(a.vinted_user_id) === u)) === '';
-  const snapAnnonces = React.useMemo(() => (vueAnnoncesOuverture && uidInstantane ? lireInstantaneAnnonces(uidInstantane) : null), [vueAnnoncesOuverture, uidInstantane]);
   // (14 nov., ouverture instantanée) Hors ligne ou base injoignable, l'instantané de Ma journée RESTE, daté, et dit
   // pourquoi rien n'est relu (`etat` de src/JourneeInstantanee.jsx) — jamais présenté comme frais, aucune écriture.
   const instantaneAuMoinsPermis = !!uidInstantane && !(() => { try { const a = abonnementPublie(); return etatAbonnement(a === null ? undefined : a).lectureSeule; } catch (_) { return false; } })();
@@ -37513,7 +37547,8 @@ function AppCoeur() {
     : !instantanePermis ? null
     : tab === 'journee' && snapJournee ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt}/>
     : vueVentesTous && snapVentes ? <VentesInstantanee snap={snapVentes} fmt={REGLES_CARTE.fmt} ordi={ordi} dateTete={dateJourFr(new Date())}/>
-    : vueAnnoncesOuverture && snapAnnonces ? <AnnoncesInstantanee snap={snapAnnonces} fmt={REGLES_CARTE.fmt}/>
+    // (23 nov., latence-2) Annonces : plus d'instantané à part (il relisait les vignettes de l'écran d'hier, caché et sans
+    // vignettes désormais) — la COPIE de l'écran (`copieIci`, src/copieEcran.js) montre la liste à égalité elle-même.
     : null;
   // (11 nov., lot sante-donnees) Le bouton d'une ligne de « Santé de tes données » (Paramètres,
   // src/SanteDonnees.jsx) : le MÊME chemin qu'À trancher (`allerTrancher`), plus trois portes —
@@ -39132,7 +39167,6 @@ function AppCoeur() {
         {tab==='journee'&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-journee"><CaptureJournee uid={uidInstantane}/></GardeEcran>}
         {/* (11 nov., lot DJ3) Plus d'onglet Colis : son instantané (`CaptureColis`) n'a plus d'écran à photographier. */}
         {tab==='ventes'&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-ventes"><CaptureVentes uid={uidInstantane}/></GardeEcran>}
-        {tab==='annonces'&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-annonces"><CaptureAnnonces uid={uidInstantane}/></GardeEcran>}
         {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>{ histoRef.current.silence=true; setPlatSub('reglages'); }} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}
@@ -39358,7 +39392,7 @@ function AppCoeur() {
           ? <>
               <AnnoncesEgaliteLazy accounts={comptesChoisissables && comptesChoisissables.length ? comptesChoisissables : vintedAccounts}
                 onEcranSite={(s)=>{ setAnnoncesAncien(s); setPlatSub(s); }}/>
-              {Array.isArray(vintedAccounts) && vintedAccounts.length ? <CacheSiV2 si>{rendreVinted('annonces')}</CacheSiV2> : null}
+              {Array.isArray(vintedAccounts) && vintedAccounts.length ? <CacheSiV2 si><AnnoncesCacheesCtx.Provider value={true}>{rendreVinted('annonces')}</AnnoncesCacheesCtx.Provider></CacheSiV2> : null}
             </>
           : <>
               {annoncesAncien ? <div className="vrm-eg-retour" style={{padding:'8px 16px 0'}}><Natif.Bouton variante="texte" onClick={()=>setAnnoncesAncien(null)} attrs={{ 'data-eg-retour': '' }}>{'‹ ' + tr('egalite.titre')}</Natif.Bouton></div> : null}
