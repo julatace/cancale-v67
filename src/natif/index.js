@@ -42,3 +42,4 @@ export { Courbe, Progression, Champ } from './Courbe.jsx';   // (19 nov.) la cou
 export { ListeOrdonnee, Editable } from './ListeOrdonnee.jsx';   // (19 nov.) « Personnaliser » : la liste qu'on réordonne, la grille qu'on modifie
 export { LogoSite } from './LogoSite.jsx';
 export { TuilePaire, EtiquetteN, Confettis, Anneau, CarteQuete, QuetesFaites, Trophee, EtagereTrophees, PALIERS_VENTES, numeroPropre, mouvementReduit, revele, Revele, useArrive, REVELE_PAS, REVELE_MAX, SqueletteTuile, SqueletteInventaire, CaseInventaire } from './Jeu.jsx';   // (24 nov., visuel-jeu) le langage « jeu vidéo » : src/natif/visuel/README.md   // (20 nov. soir) le logo du site d'une rangée (tout est mélangé)
+export { Puce } from './Puce.jsx';   // (24 nov., visuel-annonces) la puce d'une rangée de filtres

@@ -49,6 +49,7 @@ import { CarteAnnonce, RangeeArticle, lireVueTel, ecrireVueTel, traceDe, texteTr
 import { depuisMaj } from '../TableauTravail.jsx';
 import GrilleInventaire from '../visuel/GrilleInventaire.jsx';
 import { useArrive } from '../Jeu.jsx';
+import { Puce } from '../Puce.jsx';   // (24 nov., visuel-annonces) les puces de filtre, natives
 import { AvatarCompte } from '../visuel/Inventaire.jsx';   // (24 nov.) le rond du compte, le même que sur ses tuiles   // (24 nov., lot visuel-annonces) la grille d'inventaire virtualisée
 
 const PAR_PAGE = 60;
@@ -426,11 +427,11 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
         {/* Pendant la lecture, la rangée des puces est déjà là (même hauteur) : rien ne saute à l'arrivée. */}
         {!A && !enPrio && articles === undefined && !ordinateur ? <div className="n-ad-puces" aria-hidden="true" data-ad-puces-os="">{[96, 84, 110].map((w) => <span key={'os-' + w} className="n-ad-puce"><span className="n-ad-puce-pilule n-os" style={{ width: w }}/></span>)}</div> : null}
         {!A && !enPrio && Array.isArray(articles) && liste.length ? <div className="n-ad-puces" role="toolbar" aria-label={tr('inv.puces')} data-ad-puces="">
-          <button type="button" className="n-ad-puce" data-ad-tri={tri} aria-haspopup="dialog" onClick={() => setMenuTri(true)}><span className="n-ad-puce-pilule">{Icon ? <Icon name="filter" size={15}/> : null}{tr('inv.tri.' + tri)}</span></button>
+          <Puce className="n-ad-puce" onClick={() => setMenuTri(true)} attrs={{ 'data-ad-tri': tri, 'aria-haspopup': 'dialog' }}><span className="n-ad-puce-pilule">{Icon ? <Icon name="filter" size={15}/> : null}{tr('inv.tri.' + tri)}</span></Puce>
           {[['sansnum', liste.filter((a) => !a.numero).length], ['aconfirmer', liste.filter((a) => a.annonces.some((x) => x.etat === 'aconfirmer')).length]].filter(([, k]) => k > 0 || puce)
-            .map(([c, k]) => <button key={c} type="button" className="n-ad-puce" aria-pressed={puce === c ? 'true' : 'false'} data-ad-puce={c} data-ad-puce-n={String(k)} onClick={() => setPuce((p) => (p === c ? '' : c))}><span className="n-ad-puce-pilule">{tr('inv.puce.' + c)}<span className="n-ad-puce-n">{k}</span></span></button>)}
-          {groupesTous.length > 1 ? groupesTous.filter((g) => g.cle !== 'sans').map((g) => <button key={g.cle} type="button" className="n-ad-puce" aria-pressed={puce === 'compte:' + g.cle ? 'true' : 'false'} data-ad-puce={'compte:' + g.cle}
-            onClick={() => setPuce((p) => (p === 'compte:' + g.cle ? '' : 'compte:' + g.cle))}><span className="n-ad-puce-pilule"><AvatarCompte pseudo={g.pseudo || g.compte} cle={g.cle} petit/>{g.pseudo || ('#' + g.compte)}</span></button>) : null}
+            .map(([c, k]) => <Puce key={c} className="n-ad-puce" presse={puce === c} onClick={() => setPuce((p) => (p === c ? '' : c))} attrs={{ 'data-ad-puce': c, 'data-ad-puce-n': String(k) }}><span className="n-ad-puce-pilule">{tr('inv.puce.' + c)}<span className="n-ad-puce-n">{k}</span></span></Puce>)}
+          {groupesTous.length > 1 ? groupesTous.filter((g) => g.cle !== 'sans').map((g) => <Puce key={g.cle} className="n-ad-puce" presse={puce === 'compte:' + g.cle} attrs={{ 'data-ad-puce': 'compte:' + g.cle }}
+            onClick={() => setPuce((p) => (p === 'compte:' + g.cle ? '' : 'compte:' + g.cle))}><span className="n-ad-puce-pilule"><AvatarCompte pseudo={g.pseudo || g.compte} cle={g.cle} petit/>{g.pseudo || ('#' + g.compte)}</span></Puce>) : null}
         </div> : null}
         {(travail || aReglerTel) && !A && !ordinateur ? <div className="n-ad-maj" data-ad-maj={!travail ? 'aucun' : majLe === undefined ? 'lecture' : majLe == null ? 'passu' : 'lu'}>
           <span className="n-ad-maj-texte">{travail ? depuisMaj(majLe, maintenantMaj) : ''}</span>
