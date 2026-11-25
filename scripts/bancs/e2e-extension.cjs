@@ -520,7 +520,11 @@ const fermerPanneauPg = async (pp) => { if (pp) await pp.close().catch(() => {})
       await fermerPanneauPg(r.panneauPg);
       const cmd5 = commandePrix(M, 91010001, t4);
       const tente5 = vinted().slice(d4).filter((e) => e.m !== 'GET' || /item_upload/.test(e.p));
-      dit(!!r.lien && !lp.lance && !cmd5 && tente5.length === 0, '5 : le panneau ne lance pas la baisse pour vendeur_a (l’onglet est sur autre_b)', JSON.stringify({ lien: r.lien, avant: lp.avant, lance: lp.lance, commande: cmd5 && cmd5.data, envoye: tente5.map((e) => e.m + ' ' + e.p + ' uid=' + e.uid) }));
+      // (25 nov., décision du 24 nov. — CLAUDE.md §3 « Agir depuis l'app ») : l'onglet n'est pas sur vendeur_a ⇒ la porte
+      //    `peutAgir` peut éteindre « Baisser » dans VRM (lecture seule, la raison dite) au lieu d'ouvrir le panneau. Les deux
+      //    issues sont justes ; ce qui compte : rien n'est lancé, aucune commande, rien chez Vinted.
+      const eteint = !!(r.bouton && r.bouton.ouvert === false && String(r.bouton.raison || '').trim());
+      dit((!!r.lien || (eteint && !r.panneauPg)) && !lp.lance && !cmd5 && tente5.length === 0, '5 : le panneau ne lance pas la baisse pour vendeur_a (l’onglet est sur autre_b)', JSON.stringify({ lien: r.lien, eteint, bouton: r.bouton, avant: lp.avant, lance: lp.lance, commande: cmd5 && cmd5.data, envoye: tente5.map((e) => e.m + ' ' + e.p + ' uid=' + e.uid) }));
       // Et même une commande postée DIRECTEMENT au pont (un écran périmé, un autre onglet) :
       const rep = await pg.evaluate(() => new Promise((ok) => {
         const reqId = 'banc-' + Date.now();
