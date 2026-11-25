@@ -24,3 +24,28 @@ Mesure de référence : `scripts/bancs/chargement-structure.cjs` (CLS) avant / a
 ## Pas vérifié
 - Sur un vrai iPhone (le morceau eBay tenu est une hypothèse de réseau ; la correction tient quel que soit le cas).
 - Le toast (§6) et la copie (§5b) : par lecture du code, pas rejoués au banc.
+
+## Suite (branche `claude/onglets-fluides`) — passages d'onglet (« améliore encore l'affichage quand les données apparaissent »)
+
+Mesure `scripts/bancs/_passages-onglets.cjs` (base à 700 ms, Aujourd'hui → Annonces → Ventes → Achats → Argent → Aujourd'hui puis
+2e tour, une mesure par image ; banc `regressions-25nov` cas O). Images avec squelette / sauts > 4 px (avant = main du 25 nov. avant #1405) :
+
+| passage | 390 avant | 390 après | 1512 avant | 1512 après |
+|---|---|---|---|---|
+| 1re visite Ventes | 1 image grise | 0 | 1 | 0 |
+| 1re visite Achats | 1 | 0 | 1 | 0 |
+| 1re visite Argent | 1–2 | 0 | 1 | 0 |
+| retour Aujourd'hui | 0–17 sq, 0–2 sauts | 0 / 0 | 9 sq, 6 sauts (−19 / +105 px) | 0 / 0 |
+| 1re visite Annonces | squelette de l'écran (lit sa liste) | idem | idem | idem |
+| 2e visite (tous) | 0 / 0, défilement retrouvé | idem | idem | idem |
+
+Causes et corrections :
+- **Image grise à la 1re visite** (`src/AttenteEcran.jsx`) : l'écran déjà rempli n'était conclu « peint » qu'après une image
+  (effet + observateur). Conclu dans un effet de mise en page quand le premier écran n'a aucune brique d'attente.
+- **« Par site » au retour sur Aujourd'hui** (`src/natif/ecrans/Aujourdhui.jsx`) : depuis #1400 la carte n'existe qu'à 2 sites, mais
+  sa place était tenue 3 s par un squelette puis rendue (−19 px). Désormais `PlaceGardee` (la hauteur de la dernière fois, 0 s'il n'y était pas).
+- **« Dernières ventes » insérée tard** (même fichier) : au remontage, ses lignes se recalculaient une image plus tard et la colonne
+  entrait dans la grille (« Tes chiffres » +105 px). Les lignes déjà montrées dans la page, pour ce compte (`vrm_local_owner`), restent
+  pendant le temps de grâce.
+- **Fondu** (`src/passageOnglet.js`) : 150 ms au téléphone et à l'ordinateur (180 avant), opacité seule, coupé sous prefers-reduced-motion.
+- Préchargement des morceaux des onglets : existait déjà (`prechargerOnglets`), inchangé.
