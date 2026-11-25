@@ -24,7 +24,7 @@ export { Vide } from './Vide.jsx';
 export { Attente } from './Attente.jsx';
 export { Faits, Fait } from './Faits.jsx';
 export { EnteteArticle, Photos, Herite } from './Article.jsx';
-export { Segmente } from './Segmente.jsx';
+export { Segmente, TuileRadio } from './Segmente.jsx';
 export { Groupe } from './Groupe.jsx';
 export { Rangee, Vignette, Interrupteur, poserPhoto, photoParApp } from './Rangee.jsx';
 export { Feuille } from './Feuille.jsx';

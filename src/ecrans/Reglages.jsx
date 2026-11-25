@@ -174,6 +174,7 @@ import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) les composa
 import { RangeeTouchable } from '../designV2/BoutonV2.jsx';   // (17 nov., phase 2) les rangées de Paramètres
 import { Bouton as BoutonNatif, BoutonIcone as BoutonIconeNatif } from '../natif/Bouton.jsx';
 import { Glyphe as GlypheNatif } from '../natif/icones.jsx';
+import { TuileRadio as TuileRadioNatif } from '../natif/Segmente.jsx';   // (24 nov., style-graphite) les tuiles de style
 import { Groupe as GroupeNatif } from '../natif/Groupe.jsx';   // (21 nov., ux-reglages) Paramètres en liste groupée native
 import { Rangee as RangeeNatif } from '../natif/Rangee.jsx';
 import { STYLES as STYLES_CHOIX, styleLu, choisirStyle } from '../natif/styleChoix.js';   // (24 nov., style-graphite) les dix styles à essayer
@@ -4941,13 +4942,12 @@ function StyleSetting() {
         {ids.map((id) => {
           const nom = tr('v2.style.' + (id || 'actuel')), choisi = style === id;
           return (
-            <button key={id || 'actuel'} type="button" role="radio" aria-checked={choisi} className="g-tuile" data-style={id} data-style-tuile={id || 'actuel'}
-              aria-label={nom + ' — ' + tr('v2.style.' + (id || 'actuel') + '.desc')} title={tr('v2.style.' + (id || 'actuel') + '.desc')}
-              onClick={() => setStyle(choisirStyle(id))}>
+            <TuileRadioNatif key={id || 'actuel'} choisi={choisi} className="g-tuile" onChoisir={() => setStyle(choisirStyle(id))}
+              attrs={{ 'data-style': id, 'data-style-tuile': id || 'actuel', 'aria-label': nom + ' — ' + tr('v2.style.' + (id || 'actuel') + '.desc'), title: tr('v2.style.' + (id || 'actuel') + '.desc') }}>
               <span className="g-tuile-rangee" aria-hidden="true"><span className="g-tuile-photo"/><span className="g-tuile-lignes"><span className="g-tuile-ligne"/><span className="g-tuile-ligne"/></span><span className="g-tuile-chip"/></span>
               <span className="g-tuile-plein" aria-hidden="true"/>
               <span className="g-tuile-nom"><span>{nom}</span>{choisi ? <span className="g-tuile-coche">✓</span> : null}</span>
-            </button>
+            </TuileRadioNatif>
           );
         })}
       </div>
