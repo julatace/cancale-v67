@@ -110,6 +110,8 @@ export function rangeeRoute(f = {}) {
     etat: { texte: str(f.etat), ambre: !!f.etatAmbre },
     transporteur: str(f.transporteur), transporteurCle: str(f.transporteurCle), t: tempsVente(f.t), achat: f.achat || null, suivi: str(f.suivi), lienSuivi: str(f.lienSuivi),
     fiche: f.fiche || null, detail: f.detail || null, gestes: f.gestes || {},
+    // (24 nov., lot suivi-ventes) la piste de l'envoi (api/_lib/suivi-envoi.js), dessinée par le détail ; null sinon.
+    envoi: f.envoi && f.envoi.parcours ? f.envoi : null,
   };
 }
 

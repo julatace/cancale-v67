@@ -39,7 +39,7 @@ import React from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { tr } from '../i18n/index.js';
 import { FermeAuRetourUi, retourDisponible } from '../ui/retour.jsx';
-import { cx, mouvementReduit, portailNatif, useDernier } from './outils.js';
+import { cx, focusables, mouvementReduit, portailNatif, useDernier } from './outils.js';
 import { Glyphe } from './icones.jsx';
 
 // Ce que la coque dit aux pages qu'elle contient : { titreRendu, voletDetail }.
@@ -334,7 +334,16 @@ export function PagePoussee({ ouverte = true, titre = '', onRetour, libelleRetou
       aria-modal={volet ? undefined : 'true'}
       aria-label={titre || undefined}
       tabIndex={-1}
-      onKeyDown={(e) => { if (e.key === 'Escape' && (volet || !retourDisponible())) { e.stopPropagation(); retour(); } }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && (volet || !retourDisponible())) { e.stopPropagation(); retour(); return; }
+        // (24 nov., main-vert) Une page qui COUVRE l'écran est un dialogue modal (aria-modal) : Tab y reste, comme dans une
+        // Feuille (avant, Tab sortait vers l'écran caché dessous — banc accessibilite E5, 14 sorties sur 30).
+        if (volet || e.key !== 'Tab') return;
+        const f = focusables(ref.current); if (!f.length) { e.preventDefault(); return; }
+        const premier = f[0], dernier = f[f.length - 1], ici = document.activeElement;
+        if (e.shiftKey && (ici === premier || ici === ref.current)) { e.preventDefault(); dernier.focus(); }
+        else if (!e.shiftKey && ici === dernier) { e.preventDefault(); premier.focus(); }
+      }}
       onPointerDown={bas} onPointerMove={bouge} onPointerUp={haut} onPointerCancel={haut}
       {...(attrs || {})}
     >

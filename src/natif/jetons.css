@@ -116,6 +116,7 @@
   :root[data-theme="dark"] {
     --n-fond: #1C1C20;   /* (23 nov., Julien : « le gris de l'écran d'accueil ») l'aplat gris-ardoise de vrm.center (src/accueil/accueil.css, nuit) */
     --n-fond-degrade: radial-gradient(90% 40% at 18% 0%, rgb(244 244 245 / .10), transparent 70%), linear-gradient(180deg, #27272B 0%, #1C1C20 38%, #0F0F10 100%);
+    --n-laterale: #2A2A2F;   /* (24 nov., #1320) la latérale la nuit : la carte, comme avant le gris clair (sinon elle héritait du gris clair, texte blanc illisible) */
     --n-carte: #2A2A2F;   /* un cran plus clair que le fond */
     --n-carte-2: #323238;
     --n-bord: #42424A;
@@ -128,16 +129,16 @@
     --n-plein: #FFFFFF;   /* le plein = l'encre (texte blanc pur la nuit) */
     --n-sur-plein: #18181B;
     --n-teinte: rgb(244 244 245 / .10);
-    --n-ambre: #FFC266;
-    --n-ambre-fond: rgb(255 179 64 / .14);
-    --n-ambre-bord: rgb(255 179 64 / .28);
+    --n-ambre: #F4F4F5;   /* (24 nov., #1320, Julien : « pas d'orange ») la nuit aussi : « à faire » = l'accent clair + le gras */
+    --n-ambre-fond: rgb(244 244 245 / .10);
+    --n-ambre-bord: rgb(244 244 245 / .24);
     --n-doublon: #FF7A6E;
     --n-vert: #7BE8BE; --n-vert-fond: rgb(63 212 154 / .14); --n-vert-bord: rgb(63 212 154 / .26);
     --n-teal: #6ED6D6; --n-teal-fond: rgb(45 190 190 / .14); --n-teal-bord: rgb(45 190 190 / .26);
     --n-gris: #D0D0D7; --n-gris-fond: #34343A; --n-gris-bord: #46464E;
 
     --n-sur-teinte: #F4F4F5;
-    --n-sur-ambre: #1C1300;
+    --n-sur-ambre: #18181B;
     --n-sur-doublon: #1A0000;
     --n-inactif: #34343A;
     --n-sur-inactif: #B8B8C0;
@@ -154,7 +155,7 @@
     --n-curseur: #46464E;
     --n-pouce: #FFFFFF;
     --n-graphe-barre: #4A4A52;
-    --n-heros: #15161A; --n-heros-2: #3D4B5B; --n-heros-trait: rgb(255 255 255 / .14); --n-sur-heros-2: rgb(244 244 242 / .82);   /* sur l'ardoise la plus claire : ≥ 4,5:1 */   /* le héros : l'ardoise bleutée du bouton de vrm.center, il se détache du fond gris */
+    --n-heros: #15161A; --n-heros-2: #3D4B5B; --n-sur-heros: #FFFFFF; /* (24 nov., #1320) le chiffre du héros en blanc la nuit (il héritait de l'encre du clair) */ --n-heros-trait: rgb(255 255 255 / .14); --n-sur-heros-2: rgb(244 244 242 / .82);   /* sur l'ardoise la plus claire : ≥ 4,5:1 */   /* le héros : l'ardoise bleutée du bouton de vrm.center, il se détache du fond gris */
     --n-graphe-barre-fort: #8A8A94;
   }
 
