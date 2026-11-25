@@ -142,15 +142,15 @@ export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selec
   const ic = (n) => (Icon ? <Icon name={n} size={13}/> : null);
   const prix = <span className="n-ar-prix" data-ad-prix={a.prix != null ? '1' : '0'}>{a.prix != null ? euros(a.prix) : '—'}</span>;
   const bouts = [];
-  if (trace) bouts.push(<span className="n-ad-trace" data-ad-trace={trace.par}>{texteTrace(trace)}</span>);
+  if (trace) bouts.push(<span key="trace" className="n-ad-trace" data-ad-trace={trace.par}>{texteTrace(trace)}</span>);
   else {
-    if (a.favoris != null) bouts.push(<span className="n-ad-stat" data-ad-stat="favoris" aria-label={tr('egalite.favoris', { n: a.favoris })}>{ic('heart')}<span aria-hidden="true">{a.favoris}</span></span>);
-    if (a.vues != null) bouts.push(<span className="n-ad-stat" data-ad-stat="vues" aria-label={tr('egalite.vues', { n: a.vues })}>{ic('eye')}<span aria-hidden="true">{a.vues}</span></span>);
+    if (a.favoris != null) bouts.push(<span key="favoris" className="n-ad-stat" data-ad-stat="favoris" aria-label={tr('egalite.favoris', { n: a.favoris })}>{ic('heart')}<span aria-hidden="true">{a.favoris}</span></span>);
+    if (a.vues != null) bouts.push(<span key="vues" className="n-ad-stat" data-ad-stat="vues" aria-label={tr('egalite.vues', { n: a.vues })}>{ic('eye')}<span aria-hidden="true">{a.vues}</span></span>);
     // (24 nov.) Moins d'un jour en ligne ⇒ « Aujourd'hui », jamais « 0 j » ; âge inconnu ⇒ aucune horloge.
-    if (a.depuis != null) bouts.push(<span className="n-ad-stat" data-ad-stat="jours">{ic('clock')}<span>{Date.now() - a.depuis < 864e5 ? tr('inv.age.jour') : depuisTexte(a.depuis)}</span></span>);
+    if (a.depuis != null) bouts.push(<span key="jours" className="n-ad-stat" data-ad-stat="jours">{ic('clock')}<span>{Date.now() - a.depuis < 864e5 ? tr('inv.age.jour') : depuisTexte(a.depuis)}</span></span>);
   }
   // La taille en dernier : si la ligne manque de place, c'est elle qui s'efface (jamais un mot coupé en deux).
-  if (!trace && a.taille && !tailleDansTitre(a.titre, a.taille)) bouts.push(<span>{tr('egalite.taille', { t: a.taille })}</span>);
+  if (!trace && a.taille && !tailleDansTitre(a.titre, a.taille)) bouts.push(<span key="taille">{tr('egalite.taille', { t: a.taille })}</span>);
   // Le glissement : transform seulement, suivi au doigt, puis ouvert (largeur des boutons) ou fermé — jamais à moitié.
   const rap = !selection && Array.isArray(rapides) && rapides.length ? rapides : null;
   const W = rap ? rap.length * 84 : 0;
@@ -193,7 +193,7 @@ export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selec
               {a.numero ? (a.doublon ? <Plaque numero={a.numero} doublon/> : <EtiquetteN numero={a.numero} className="n-ar-etiq" attrs={{ 'data-inv-n': a.numero }}/>) : null}
               {b && b !== 'bloque' ? <span className="n-ad-etiquette" data-ad-bandeau={b}>{tr('tableau.etat.' + b)}</span> : null}
               {plusVue != null ? <span className="n-ad-etiquette" data-ad-conseil="plusvue" data-ad-plusvue={String(plusVue)}>{tr('af.pv.etiquette', { n: plusVue })}</span> : null}
-              <span className="n-ar-stats">{bouts.map((x, i) => <React.Fragment key={i}>{x}</React.Fragment>)}</span>
+              <span className="n-ar-stats">{bouts}</span>
             </span>
           </span>
         </button>
