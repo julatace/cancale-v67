@@ -37,7 +37,7 @@ export default {
   "fd.bord.pret": "Bordereau prêt",
   "fd.bord.plein": "Imprimer le bordereau",
   "fd.baisser.titre": "En vente",
-  "fd.baisser.aucuneOffre": {"one": "Aucune offre en {n} jour", "other": "Aucune offre en {n} jours"},
+  "fd.baisser.aucuneOffre": { one: "0 offre en {n} j", other: "0 offre en {n} j" },
   "fd.baisser.offres": {"one": "{n} offre en {j} jours", "other": "{n} offres en {j} jours"},
   "fd.baisser.depuis": {"one": "En ligne depuis {n} jour", "other": "En ligne depuis {n} jours"},
   "fd.baisser.favoris": {"one": "{n} favori.", "other": "{n} favoris."},

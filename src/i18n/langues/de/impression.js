@@ -23,7 +23,7 @@ export default {
   "impr.choisirTitre": "Auswählen, was rausgeht",
   "impr.papier.titre": "Dein Drucker",
   "impr.papier.phrase": "Für die nächsten Male gemerkt.",
-  "impr.papier.phraseUneFois": "Nur einmal: VRM merkt es sich und druckt sofort.",
+  "impr.papier.phraseUneFois": "Einmal gewählt, dann gedruckt.",
   "impr.feuille.titre": { one: "{n} Etikett im PDF", other: "{n} Etiketten im PDF" },
   "impr.voie.partage": "Wähle „Drucken“ beim Teilen.",
   "impr.voie.onglet": "Das PDF ist offen: Teilen, dann Drucken.",

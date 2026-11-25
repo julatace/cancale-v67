@@ -9,7 +9,7 @@ export default {
   "fiche.lotTitre": "Questa riga contiene {n} paia: scegli quale vedere.",
   "fiche.lecture": "Sto leggendo questa riga…",
   "fiche.passu": "non so: la base non ha risposto, riprova tra un momento.",
-  "fiche.pasDePaire": "Nessun paio collegato a questa riga.",
+  "fiche.pasDePaire": "Nessun paio collegato.",
   "fiche.gesteRelier.vente": "Per collegarla: metti il suo N. o collega il suo acquisto, nelle azioni qui sotto.",
   "fiche.gesteRelier.achat": "Per collegarla: metti il N. del paio sul suo annuncio, o collega questo acquisto dalla vendita.",
   "fiche.gesteRelier.annonce": "Per collegarla: dai un N. a questo annuncio.",

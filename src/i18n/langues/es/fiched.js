@@ -37,7 +37,7 @@ export default {
   "fd.bord.pret": "Etiqueta lista",
   "fd.bord.plein": "Imprimir la etiqueta",
   "fd.baisser.titre": "En venta",
-  "fd.baisser.aucuneOffre": {"one": "Ninguna oferta en {n} día", "other": "Ninguna oferta en {n} días"},
+  "fd.baisser.aucuneOffre": { one: "0 ofertas en {n} d", other: "0 ofertas en {n} d" },
   "fd.baisser.offres": {"one": "{n} oferta en {j} días", "other": "{n} ofertas en {j} días"},
   "fd.baisser.depuis": {"one": "En línea desde hace {n} día", "other": "En línea desde hace {n} días"},
   "fd.baisser.favoris": {"one": "{n} favorito.", "other": "{n} favoritos."},

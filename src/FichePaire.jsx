@@ -23,6 +23,7 @@ import CourbeAnnonce from './natif/CourbeAnnonce.jsx';   // (21 nov., ext. 5.428
 import { lireTout } from './App.jsx';
 const lireCourbe = (q) => lireTout(q, { strict: true });   // (19 nov.) la vue « VRM natif » de la fiche
 import { Herite, Bouton, Vignette, Rangee, Glyphe, poserIcone, iconePosee } from './natif/index.js';
+import { Pourquoi } from './natif/Actions.jsx';   // (25 nov., moins-texte-a)
 // (19 nov.) « Vendu ailleurs » sur la fiche : son bouton d'ouverture est une RANGÉE de la grille des gestes (icône + libellé,
 // 44 px) ; ses boutons « Annuler » / « Valider » sont des boutons natifs teintés (le seul plein reste celui de la fiche).
 const BoutonRangeeGeste = ({ children, onClick, variante, className, type, ...attrs }) => (attrs['data-vendu-ailleurs-ouvrir'] != null
@@ -271,7 +272,8 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
         : ligneRes && ligneRes.etat === 'passu' ? <p className="vrm-fp-sans-paire-t">— {tr('fiche.passu')}</p>
         : <>
           <p className="vrm-fp-sans-paire-t">{tr('fiche.pasDePaire')}</p>
-          <p className="vrm-fp-sans-paire-g" data-fiche-geste-relier="">{tr('fiche.gesteRelier.' + (ctx === 'achat' ? 'achat' : ctx === 'annonce' ? 'annonce' : 'vente'))}</p>
+          {/* (25 nov., moins-texte-a) Le « comment la relier » sous « Pourquoi ? » : les gestes sont juste dessous. */}
+          <Pourquoi attrs={{ 'data-fiche-geste-relier': '' }}>{tr('fiche.gesteRelier.' + (ctx === 'achat' ? 'achat' : ctx === 'annonce' ? 'annonce' : 'vente'))}</Pourquoi>
         </>}
       {/* (21 nov., lot rentabilite — choix n° 41) Une VENTE sans N° relié garde son coût réel : la fiche de CETTE vente (son prix
           d'achat noté, ses frais), par la règle du bénéfice (`beneficeArticle`, posé par Ventes) — ligne par ligne, puis le forfait. */}

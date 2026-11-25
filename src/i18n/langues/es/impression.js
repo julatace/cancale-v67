@@ -23,7 +23,7 @@ export default {
   "impr.choisirTitre": "Elegir lo que sale",
   "impr.papier.titre": "Tu impresora",
   "impr.papier.phrase": "Guardado para las próximas veces.",
-  "impr.papier.phraseUneFois": "Solo una vez: VRM lo guarda e imprime enseguida.",
+  "impr.papier.phraseUneFois": "Se elige una vez y se imprime.",
   "impr.feuille.titre": { one: "{n} etiqueta en el PDF", other: "{n} etiquetas en el PDF" },
   "impr.voie.partage": "Elige «Imprimir» al compartir.",
   "impr.voie.onglet": "El PDF está abierto: Compartir y luego Imprimir.",

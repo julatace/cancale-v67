@@ -116,6 +116,7 @@ import ecran_stock_etiquetage from './de/stockEtiquetage.js';   // (19 nov., lot
 import ecran_demarrage from './de/demarrage.js';   // (20 nov.) « Bien démarrer » et « Tout va bien ? » en rangées
 import ecran_ux_reglages from './de/uxReglages.js';   // (21 nov.) Paramètres, e-mails, écrans vides, « Nouveau », « Bien démarrer » sur Aujourd'hui
 import ecran_natif from './de/natif.js';
+import ecran_moinsTexteA from './de/moinsTexteA.js';
 import ecran_menu_onglets from './de/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './de/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
 import ecran_actions_ext from './de/actionsExt.js';   // (20 nov.) « … dans l’extension »
@@ -2447,4 +2448,5 @@ export default {
   ...ecran_extension,
   ...ecran_actions_ext,
   ...ecran_offres_photos,
+  ...ecran_moinsTexteA,
 };

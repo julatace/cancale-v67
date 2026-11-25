@@ -14,7 +14,7 @@ export default {
   "lotachat.prouveNombre": "Vinted dit {n} articles dans cette commande (le détail n’est pas encore lu).",
   "lotachat.peutEtreDit": "Le titre parle d’un lot, la commande ne le dit pas : à toi de choisir.",
   "lotachat.simpleDit": "Un achat simple : tu peux le diviser si tu as reçu plusieurs paires.",
-  "lotachat.diviser": "Diviser cet achat",
+  "lotachat.diviser": "Diviser",
   "lotachat.voirDivision": "Voir la division",
   "lotachat.combien": "En combien de parts",
   "lotachat.parts": "Parts",

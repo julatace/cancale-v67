@@ -38408,7 +38408,8 @@ function AppCoeur() {
             </div>}
             {/* (11 nov., parler à la loupe) J'écoute / ce qui est entendu en direct / l'erreur dite (micro refusé), et le « Pourquoi ? ». */}
             <LigneVoix canal="loupe" Pourquoi={Pourquoi} couleur={C.muted} mobile={!ordi} vide={!q}/>
-            {q && compris && compris.genres.length > 0 && <div data-recherche-compris={compris.genres.join(' ')} style={{padding:'8px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>Je cherche {compris.genres.map(g=>GENRES_REQUETE[g]).filter(Boolean).join(', ')}.</div>}
+            {/* (25 nov., moins-texte-a) « Je cherche un N°. » se DIT (lecteur d'écran) : les résultats montrent déjà ce qui a été compris. */}
+            {q && compris && compris.genres.length > 0 && <div data-recherche-compris={compris.genres.join(' ')} role="status" className="vrm-sr-seul">Je cherche {compris.genres.map(g=>GENRES_REQUETE[g]).filter(Boolean).join(', ')}.</div>}
             {nonLues.length > 0 && <div data-recherche-non-lu={idx.nonLues.join(' ')} data-recherche-non-lu-encours={gsData ? '0' : '1'} style={{padding:'6px 2px 0',color:C.muted,fontSize:12,lineHeight:1.4}}>{nonLues}</div>}
             {q && blocPhrase}
             {q && blocExactes}

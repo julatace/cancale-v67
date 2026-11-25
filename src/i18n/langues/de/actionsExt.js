@@ -12,7 +12,7 @@ export default {
   "actionsExt.creerVinted": "In der Erweiterung auf Vinted anlegen",
   "actionsExt.publier": "In der Erweiterung veröffentlichen",
   "actionsExt.publierSur": "Auf {site} in der Erweiterung veröffentlichen",
-  "actionsExt.pause": "In der Erweiterung pausieren",
+  "actionsExt.pause": "Pause · Erweiterung",
   "actionsExt.supprimer": "In der Erweiterung löschen",
   "actionsExt.repondre": "In der Erweiterung antworten",
   "actionsExt.offres": "Angebot in der Erweiterung beantworten",

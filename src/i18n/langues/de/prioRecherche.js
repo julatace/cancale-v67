@@ -14,7 +14,7 @@ export default {
   "prio.raison.vuesPasLues": "Aufrufe nicht gelesen",
   "prio.raison.favorisPasLus": "Favoriten nicht gelesen",
   "prio.raison.baisse": "Aufrufe sinken",
-  "prio.resume": "Am längsten liegende zuerst · seit {jours} T oder länger online · {n} pro Tag",
+  "prio.resume": "≥ {jours} T · {n}/Tag",
   "prio.republierN": {
     "one": "{n} Anzeige neu einstellen",
     "other": "{n} Anzeigen neu einstellen"
@@ -46,8 +46,8 @@ export default {
     "one": "{n} eines privaten Kontos",
     "other": "{n} eines privaten Kontos"
   },
-  "prio.rienNePart": "Von hier geht nichts raus: Die Werkstatt „Neu einstellen“ der Erweiterung öffnet sich mit diesen Anzeigen, du startest selbst.",
-  "prio.vide": "Keine Anzeige, die seit {jours} T oder länger online ist.",
+  "prio.rienNePart": "Du startest es in der Erweiterung.",
+  "prio.vide": "Nichts neu einzustellen.",
   "prio.videRecherche": "Keine Anzeige der Liste passt.",
   "prio.pasSu": "VRM konnte deine Anzeigen nicht lesen: Die Liste kommt beim nächsten Lesen zurück.",
   "prio.reglages.titre": "Zuerst neu einstellen",

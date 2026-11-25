@@ -145,7 +145,7 @@ export default {
   "emails.rechercherRecuE": "Beleg per E-Mail suchen",
   "emails.articleCompteTransaction": "Artikel, Konto oder Transaktion",
   "emails.aucunRecuRecherche": "Kein Beleg für diese Suche.",
-  "emails.aucunRecuAchat": "Noch kein Kaufbeleg per E-Mail angekommen.",
+  "emails.aucunRecuAchat": "Noch kein Beleg.",
   "emails.achatSansLigne": "Ein Einkauf ohne „{nom}“ in seiner Zeile: VRM hat keinen Beleg verknüpft. Erhält VRM die Vinted-E-Mails eines Kontos nicht, leite sie an deine VRM-Adresse weiter (Einstellungen → E-Mail-Empfang).",
   "emails.1AutreE": "1 weitere Bestell-E-Mail (Update, Bestätigung, Rücksendung) ist kein Beleg: nicht aufgeführt.",
   "emails.autresEMails": "{autres} weitere Bestell-E-Mails (Updates, Bestätigungen, Rücksendungen) sind keine Belege: nicht aufgeführt.",

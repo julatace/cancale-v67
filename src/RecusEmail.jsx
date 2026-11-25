@@ -2,6 +2,7 @@ import React, {useState} from 'react';
 import './recus-email.css';
 import { tr } from './i18n/index.js';
 import { trj } from './i18n/react.js';
+import { Pourquoi } from './natif/Actions.jsx';
 // (revue du 29 oct.) Ce que l'archive dit de ses reçus vient de `bilanRecusAchat`
 // (api/_lib/recu-achat.js) : des ACHATS reliés (n° distincts), et pour les autres
 // ce qui est mesuré — sans n° · n° qu'aucun achat affiché ne porte · pas comparés
@@ -31,7 +32,8 @@ export default function RecusEmail({recus,autres=0,relies=null,nom='Reçu d’ac
  {!liste.length&&<p>{recus.length?tr('emails.aucunRecuRecherche'):tr('emails.aucunRecuAchat')}</p>}
  {/* (29 oct.) Ce qui se relie à un achat, par le n° de transaction seulement (§5) ; le reste reste ici, jamais rattaché au hasard. */}
  {relies&&recus.length>0&&<p data-recus-relies={relies.achats} data-recus-lignes={relies.lignes} data-recus-sans-tx={relies.sansTx} data-recus-absents={relies.absents} data-recus-passu={relies.passu} data-recus-comptes-ko={(relies.ko||[]).join(',')}>{phraseRelies(relies,nom)}</p>}
- {relies&&<p data-recus-geste="">{trj('emails.achatSansLigne', { nom: nom })}</p>}
+ {/* (25 nov., moins-texte-a) La phrase longue (le geste : faire suivre ses e-mails) sous « Pourquoi ? », au toucher. */}
+ {relies&&<Pourquoi attrs={{ 'data-recus-geste': '' }}>{trj('emails.achatSansLigne', { nom: nom })}</Pourquoi>}
  {autres>0&&<p data-recus-autres={autres}>{autres===1?tr('emails.1AutreE'):tr('emails.autresEMails', { autres: String(autres) })}</p>}
  <ul>{liste.slice(0,max).map((r,i)=><li key={r._emailId||i}><button type="button" onClick={()=>onOuvrir(r)}><span><strong>{r.article||r.subject||tr('emails.recuAchatVinted')}</strong><small>{[r.account,r.receivedAt&&Number.isFinite(Date.parse(r.receivedAt))?new Date(r.receivedAt).toLocaleDateString('fr-FR'):'',r.transaction?`Transaction ${r.transaction}`:''].filter(Boolean).join(' · ')||tr('emails.compteNonIdentifie')}</small></span><span aria-hidden="true">{tr('stock.voir')}</span></button></li>)}</ul>
  {liste.length>max&&<button type="button" onClick={()=>setMax(n=>n+10)}>{trj('emails.afficherRecusSuivants', { x: liste.length-max })}</button>}

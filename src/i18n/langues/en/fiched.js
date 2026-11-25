@@ -37,7 +37,7 @@ export default {
   "fd.bord.pret": "Label ready",
   "fd.bord.plein": "Print the label",
   "fd.baisser.titre": "For sale",
-  "fd.baisser.aucuneOffre": {"one": "No offer in {n} day", "other": "No offer in {n} days"},
+  "fd.baisser.aucuneOffre": { one: "0 offers in {n} d", other: "0 offers in {n} d" },
   "fd.baisser.offres": {"one": "{n} offer in {j} days", "other": "{n} offers in {j} days"},
   "fd.baisser.depuis": {"one": "Online for {n} day", "other": "Online for {n} days"},
   "fd.baisser.favoris": {"one": "{n} favourite.", "other": "{n} favourites."},

@@ -553,7 +553,8 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
           <span aria-hidden="true" style={{ flexShrink: 0, color: C.muted, display: 'flex' }}><Icon name="tag" size={18} /></span>
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ display: 'block', fontSize: 15, fontWeight: 600 }}>{tr('achats.achatsHorsPlateforme')}</span>
-            <span data-achats-hors-resume style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sousTitre}</span>
+            {/* (25 nov., moins-texte-a) Vide : « Brocante, fournisseur, main propre… » n'est plus écrit (le titre le dit) ; le nombre et la somme restent. */}
+            <span data-achats-hors-resume className={liste.length ? undefined : 'vrm-sr-seul'} style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sousTitre}</span>
           </span>
           {liste.length > 0 && <span aria-hidden="true" style={{ fontSize: 17, color: C.muted, transform: ouvert ? 'rotate(90deg)' : 'none', transition: 'transform .2s ease', flexShrink: 0, padding: '0 4px' }}>›</span>}
         </button>

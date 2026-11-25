@@ -19,6 +19,20 @@ import { FORMATS_IMPRESSION } from './impression/lotSimple.js';
 import { TAMPONS } from './impression/thermique.js';
 import './styles-impression.css';
 
+// (25 nov., moins-texte-a) Le papier se DESSINE (une feuille A4 et SON bordereau, l'étiquette 10×15, la feuille en quatre) :
+// la phrase qui le décrivait passe au lecteur d'écran. Dessin seul (aria-hidden), à la couleur du texte.
+function PictoPapier({ format }) {
+  const trait = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinejoin: 'round' };
+  const plein = { fill: 'currentColor', opacity: 0.22 };
+  return (
+    <svg className="vrm-impr-picto" data-impr-picto={format} width="44" height="52" viewBox="0 0 44 52" aria-hidden="true">
+      {format === 'thermique' ? <><rect x="9" y="8" width="26" height="38" rx="3" {...trait}/><rect x="13" y="13" width="18" height="6" rx="1" {...plein}/><path d="M13 25h18M13 30h12M13 35h15" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></>
+        : format === 'planche4' ? <><rect x="5" y="3" width="34" height="46" rx="2.5" {...trait}/><path d="M22 3v46M5 26h34" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2.5 2.5"/><rect x="9" y="7" width="9" height="15" rx="1" {...plein}/><rect x="26" y="7" width="9" height="15" rx="1" {...plein}/><rect x="9" y="30" width="9" height="15" rx="1" {...plein}/><rect x="26" y="30" width="9" height="15" rx="1" {...plein}/></>
+        : <><rect x="5" y="3" width="34" height="46" rx="2.5" {...trait}/><rect x="11" y="9" width="22" height="30" rx="1.5" {...plein}/><circle cx="29" cy="43" r="2.4" fill="currentColor"/></>}
+    </svg>
+  );
+}
+
 // LA QUESTION DU PAPIER — une fois. Toucher un papier = le choisir (et, la première
 // fois, imprimer aussitôt : `puisImprimer`, le même toucher).
 export function ChoixPapier({ Feuille, valeur = null, puisImprimer = false, onChoisir, onFermer }) {
@@ -29,8 +43,9 @@ export function ChoixPapier({ Feuille, valeur = null, puisImprimer = false, onCh
         {FORMATS_IMPRESSION.map((f) => (
           <button key={f} type="button" role="radio" aria-checked={valeur === f ? 'true' : 'false'} className="vrm-impr-papier" data-impr-papier-choix={f} data-actif={valeur === f ? '1' : undefined}
             onClick={() => onChoisir(f)}>
+            <PictoPapier format={f}/>
             <span className="vrm-impr-papier-nom">{tr(`impr.format.${f}`)}</span>
-            <span className="vrm-impr-papier-dit">{tr(`cp.guide.imprimante.${f}`)}</span>
+            <span className="vrm-sr-seul">{tr(`cp.guide.imprimante.${f}`)}</span>
             <span className="vrm-impr-diode" aria-hidden="true"/>
           </button>
         ))}

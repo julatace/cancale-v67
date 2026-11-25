@@ -109,7 +109,7 @@ export default {
   "glisser.facette.marque.tous": "Todas las marcas",
   "glisser.facette.taille": "Talla",
   "glisser.facette.taille.tous": "Todas las tallas",
-  "achats.relierA": "Vincular a una venta / anuncio",
+  "achats.relierA": "Vincular a una venta",
   // (17 nov., lot relier-taille) La ligne « ce qu’on sait » d’un achat à relier (src/FaitsAchat.jsx).
   "faits.taille": "Talla {taille}",
   "faits.tailleTitre": "Talla {taille} (título)",

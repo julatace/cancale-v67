@@ -14,7 +14,7 @@ export default {
   "prio.raison.vuesPasLues": "vues pas lues",
   "prio.raison.favorisPasLus": "favoris pas lus",
   "prio.raison.baisse": "vues qui baissent",
-  "prio.resume": "Les plus endormies d’abord · en ligne depuis {jours} j ou plus · {n} par jour",
+  "prio.resume": "≥ {jours} j · {n}/jour",
   "prio.republierN": {
     "one": "Republier {n} annonce",
     "other": "Republier {n} annonces"
@@ -46,8 +46,8 @@ export default {
     "one": "{n} d’un compte personnel",
     "other": "{n} d’un compte personnel"
   },
-  "prio.rienNePart": "Rien ne part d’ici : l’atelier Republier de l’extension s’ouvre avec ces annonces cochées, c’est toi qui lances.",
-  "prio.vide": "Aucune annonce en ligne depuis {jours} j ou plus à republier.",
+  "prio.rienNePart": "C’est toi qui lances, dans l’extension.",
+  "prio.vide": "Rien à republier.",
   "prio.videRecherche": "Aucune annonce de la liste ne correspond.",
   "prio.pasSu": "VRM n’a pas pu lire tes annonces : la liste reviendra à la prochaine lecture.",
   "prio.reglages.titre": "À republier en priorité",

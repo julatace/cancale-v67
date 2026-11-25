@@ -14,7 +14,7 @@ export default {
   "prio.raison.vuesPasLues": "views not read",
   "prio.raison.favorisPasLus": "favourites not read",
   "prio.raison.baisse": "views dropping",
-  "prio.resume": "Sleepiest first · online {jours} d or more · {n} a day",
+  "prio.resume": "≥ {jours} d · {n}/day",
   "prio.republierN": {
     "one": "Relist {n} listing",
     "other": "Relist {n} listings"
@@ -46,8 +46,8 @@ export default {
     "one": "{n} from a personal account",
     "other": "{n} from a personal account"
   },
-  "prio.rienNePart": "Nothing is sent from here: the extension’s Relist workshop opens with these listings ticked, and you start it.",
-  "prio.vide": "No listing online for {jours} d or more to relist.",
+  "prio.rienNePart": "You start it, in the extension.",
+  "prio.vide": "Nothing to relist.",
   "prio.videRecherche": "No listing in the list matches.",
   "prio.pasSu": "VRM couldn’t read your listings: the list will come back with the next read.",
   "prio.reglages.titre": "Relist first",

@@ -128,6 +128,7 @@ export default function AchatsPlus({ achats = [], carte = null, achatParTx = new
   const [feuille, setFeuille] = useState('');
   const groupes = useMemo(() => groupesMemeAnnonce(carte), [carte]);
   const nListe = listePropre(liste).length;
+  // (25 nov., moins-texte-a) Les sous-titres qui expliquaient l'évidence passent au lecteur d'écran ; un nombre reste écrit.
   return (
     <section className="vrm-pour-acheter" data-pour-acheter="" aria-label={tr('plus.achats.titre')}>
       <h2 className="vrm-plus-entete" style={{ marginTop: 24 }}>{tr('plus.achats.titre')}</h2>
@@ -136,12 +137,12 @@ export default function AchatsPlus({ achats = [], carte = null, achatParTx = new
           photo={undefined}/> : null}
         <button type="button" className="vrm-ui-ligne" data-achats-carnet="" onClick={() => setFeuille('carnet')}>
           <Icone d={<><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.8-4.6 5.5-4.6s4.9 1.6 5.5 4.6"/><path d="M15.5 5.2a3 3 0 0 1 0 5.6M17.5 14.6c1.6.6 2.7 2 3 4.4"/></>}/>
-          <span className="vrm-ui-ligne-textes"><span className="vrm-ui-ligne-titre"><span>{tr('plus.carnet.ligne')}</span></span><span className="vrm-ui-ligne-sous">{tr('plus.carnet.sous')}</span></span>
+          <span className="vrm-ui-ligne-textes"><span className="vrm-ui-ligne-titre"><span>{tr('plus.carnet.ligne')}</span></span><span className="vrm-sr-seul">{tr('plus.carnet.sous')}</span></span>
           <svg className="vrm-ui-chevron" width="8" height="14" viewBox="0 0 8 14" aria-hidden="true"><path d="m1.5 1.5 5 5.5-5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
         <button type="button" className="vrm-ui-ligne" data-achats-recherche={String(nListe)} onClick={() => setFeuille('recherche')}>
           <Icone d={<><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></>}/>
-          <span className="vrm-ui-ligne-textes"><span className="vrm-ui-ligne-titre"><span>{tr('plus.recherche.ligne')}</span></span><span className="vrm-ui-ligne-sous">{nListe ? pl('plus.recherche.sous', nListe) : tr('plus.recherche.sousVide')}</span></span>
+          <span className="vrm-ui-ligne-textes"><span className="vrm-ui-ligne-titre"><span>{tr('plus.recherche.ligne')}</span></span>{nListe ? <span className="vrm-ui-ligne-sous">{pl('plus.recherche.sous', nListe)}</span> : <span className="vrm-sr-seul">{tr('plus.recherche.sousVide')}</span>}</span>
           <svg className="vrm-ui-chevron" width="8" height="14" viewBox="0 0 8 14" aria-hidden="true"><path d="m1.5 1.5 5 5.5-5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
       </div>

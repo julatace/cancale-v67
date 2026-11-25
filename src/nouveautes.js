@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (25 nov., moins-texte-a — Julien : « dès qu'il y a du texte, tu l'enlèves ») docs/passation/2026-11-25-moins-texte-a.md
+  { id: 'moins-texte-annonces-achats', date: '2026-11-25', titre: 'Annonces, Achats, loupe : moitié moins de texte', phrase: 'Des icônes et des chiffres ; le détail sous « Pourquoi ? ».', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (25 nov., chargement-propre — Julien : « je dois fermer l'app et la rouvrir pour avoir les nouvelles infos ») docs/passation/2026-11-25-chargement-propre.md
   { id: 'maj-sans-relancer', date: '2026-11-25', titre: 'Les nouvelles infos arrivent seules', phrase: 'Vente, e-mail, retour sur l’app : à jour sans la rouvrir.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., chargement-propre — Julien : « quand les données s'affichent c'est moche, long et déstructuré ») même récit

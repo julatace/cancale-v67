@@ -12,7 +12,7 @@ export default {
   "actionsExt.creerVinted": "Crea su Vinted nell’estensione",
   "actionsExt.publier": "Pubblica nell’estensione",
   "actionsExt.publierSur": "Pubblica su {site} nell’estensione",
-  "actionsExt.pause": "Metti in pausa nell’estensione",
+  "actionsExt.pause": "Pausa · estensione",
   "actionsExt.supprimer": "Elimina nell’estensione",
   "actionsExt.repondre": "Rispondi nell’estensione",
   "actionsExt.offres": "Rispondi all’offerta nell’estensione",

@@ -9,7 +9,7 @@ export default {
   "fiche.lotTitre": "This line holds {n} pairs: choose which one to view.",
   "fiche.lecture": "Reading this line…",
   "fiche.passu": "unknown: the database did not answer, try again in a moment.",
-  "fiche.pasDePaire": "No pair linked to this line.",
+  "fiche.pasDePaire": "No pair linked.",
   "fiche.gesteRelier.vente": "To link it: set its No. or link its purchase, in the actions below.",
   "fiche.gesteRelier.achat": "To link it: set the pair's No. on its listing, or link this purchase from the sale.",
   "fiche.gesteRelier.annonce": "To link it: give this listing a No.",

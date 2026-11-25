@@ -9,7 +9,7 @@ export default {
   "fiche.lotTitre": "Esta línea lleva {n} pares: elige cuál ver.",
   "fiche.lecture": "Leyendo esta línea…",
   "fiche.passu": "desconocido: la base no respondió, inténtalo de nuevo en un momento.",
-  "fiche.pasDePaire": "Ningún par vinculado a esta línea.",
+  "fiche.pasDePaire": "Ningún par vinculado.",
   "fiche.gesteRelier.vente": "Para vincularla: pon su N.º o vincula su compra, en las acciones de abajo.",
   "fiche.gesteRelier.achat": "Para vincularla: pon el N.º del par en su anuncio, o vincula esta compra desde la venta.",
   "fiche.gesteRelier.annonce": "Para vincularla: da un N.º a este anuncio.",

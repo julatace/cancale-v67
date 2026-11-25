@@ -12,7 +12,7 @@ export default {
   "actionsExt.creerVinted": "Create on Vinted in the extension",
   "actionsExt.publier": "Publish in the extension",
   "actionsExt.publierSur": "Publish on {site} in the extension",
-  "actionsExt.pause": "Pause in the extension",
+  "actionsExt.pause": "Pause · extension",
   "actionsExt.supprimer": "Delete in the extension",
   "actionsExt.repondre": "Reply in the extension",
   "actionsExt.offres": "Answer the offer in the extension",

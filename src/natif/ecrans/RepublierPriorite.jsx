@@ -72,8 +72,10 @@ export default function RepublierPriorite({ res, lignes, coches, onBasculer, onT
   return (
     <div data-prio-ecran="" data-prio-etat="lu" data-prio-n={String(res.n)} data-prio-montres={String(L.length)} data-prio-jours={String(r.jours)} data-prio-par-jour={String(r.parJour)}>
       {/* UNE ligne fine : ce que la liste est, et ses deux réglages (au toucher, une feuille). */}
-      <button type="button" className="n-rp-reglages" data-prio-reglages="" onClick={() => setReglages(true)}>
-        <span className="n-rp-reglages-texte">{tr('prio.resume', { jours: r.jours, n: r.parJour })}</span>
+      {/* (25 nov., moins-texte-a) « ≥ 30 j · 10/jour » à l'œil (la lune dit « les plus endormies d'abord ») ; la phrase entière au lecteur d'écran. */}
+      <button type="button" className="n-rp-reglages" data-prio-reglages="" onClick={() => setReglages(true)} aria-label={tr('prio.resumeLong', { jours: r.jours, n: r.parJour })}>
+        {Icon ? <Icon name="sleep" size={15} aria-hidden="true"/> : null}
+        <span className="n-rp-reglages-texte" aria-hidden="true">{tr('prio.resume', { jours: r.jours, n: r.parJour })}</span>
         <Glyphe nom="chevron" taille={14}/>
       </button>
       {!L.length ? <Vide icone={Icon ? <Icon name="check" size={40}/> : null} phrase={res.n ? tr('prio.videRecherche') : tr('prio.vide', { jours: r.jours })}/> : (

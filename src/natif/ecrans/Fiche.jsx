@@ -214,6 +214,10 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
             // même quand elle n'y est pas (« Pas publiée » + « Publier sur… ») ou que la lecture manque (« — » et pourquoi).
             const rangees = Array.isArray(A.rangeesSites) ? A.rangeesSites : [];
             const nb = (x) => (Number.isFinite(x) ? String(x) : '—');
+            // (25 nov., moins-texte-a) Au téléphone, un seul site à prix qui redit LE prix de la fiche : il n'est écrit qu'une fois
+            // (CLAUDE.md §7) — la cellule le garde au lecteur d'écran. « Pas publiée » à côté de « Publier » : le bouton le dit.
+            const prixRedit = (x) => !ordi && x.prix != null && rangees.filter((y) => y.prix != null).length === 1 && prixV != null && T.euros(x.prix) === prixV;
+            const etatDitParBouton = (x) => x.etat === 'pas-publiee' && !!(x.publier && publierSur);
             return <section className="nf-section" aria-label={T.sites} data-fd-sites={rangees.length} data-fiche-sites={rangees.length} data-fd-sites-annonces={A.sites.length}
               data-fd-sites-pas-lus={rangees.filter((r) => r.etat === 'pas-su').map((r) => r.site).join(',') || undefined}>
             <h3 className="nf-section-titre">{T.sites}</h3>
@@ -235,12 +239,12 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
                   data-fiche-site={s.site} data-fiche-site-etat={s.etat} data-fiche-site-premiere={s.premiere ? '1' : undefined} data-fiche-site-raison={s.raison || undefined}
                   data-fiche-site-jours={s.jours != null ? String(s.jours) : undefined} data-nf-vide-site={vide ? '1' : undefined} data-nf-geste={s.publier && publierSur ? '1' : undefined}>
                   <span role="cell" className="nf-c-site">{lien ? <a className="nf-site-lien" href={lien} target="_blank" rel="noreferrer" data-fiche-site-lien="" aria-label={T.site(s.site)}><span className="nf-logo">{rendre.logo(s.site)}</span><span className="nf-site-nom">{T.site(s.site)}</span></a> : <><span className="nf-logo">{rendre.logo(s.site)}</span><span className="nf-site-nom">{T.site(s.site)}</span></>}</span>
-                  <span role="cell" className="nf-c-compte"><span className="nf-compte-site">{T.site(s.site) + (s.compte ? ' · ' : '')}</span>{s.compte || <span className="nf-compte-vide">—</span>}{vide ? <span className="nf-compte-etat">{T.etatSite(s)}</span> : null}</span>
-                  <span role="cell" className="nf-c-num nf-c-prix" data-nf-vide={s.prix != null ? undefined : '1'}>{s.prix != null ? T.euros(s.prix) : '—'}</span>
+                  <span role="cell" className="nf-c-compte"><span className="nf-compte-site">{T.site(s.site) + (s.compte ? ' · ' : '')}</span>{s.compte || <span className="nf-compte-vide">—</span>}{vide ? <span className={etatDitParBouton(s) ? 'vrm-sr-seul' : 'nf-compte-etat'}>{T.etatSite(s)}</span> : null}</span>
+                  <span role="cell" className="nf-c-num nf-c-prix" data-nf-vide={s.prix != null ? undefined : '1'} data-nf-prix-redit={prixRedit(s) ? '1' : undefined}>{s.prix != null ? (prixRedit(s) ? <span className="vrm-sr-seul">{T.euros(s.prix)}</span> : T.euros(s.prix)) : '—'}</span>
                   <span role="cell" className="nf-c-num nf-c-vues" data-nf-vide={Number.isFinite(s.vues) ? undefined : '1'}>{nb(s.vues)}</span>
                   <span role="cell" className="nf-c-num nf-c-fav" data-nf-vide={Number.isFinite(s.favoris) ? undefined : '1'}><span className="nf-coeur" aria-hidden="true">♡</span>{nb(s.favoris)}</span>
                   <span role="cell" className="nf-c-date" data-nf-vide={s.date != null ? undefined : '1'} data-fiche-site-date={s.date != null ? s.dateSorte : undefined}>{s.date != null ? <><span className="nf-date-long">{T.dateSite(s)}</span><span className="nf-date-court">{T.date(s.date)}</span></> : '—'}</span>
-                  <span role="cell" className="nf-c-etat"><span className="nf-etat-ligne"><span className="nf-etat-site" data-nf-ton={s.etat}>{T.etatSite(s)}</span>{s.etat === 'pas-su' ? <span className="nf-raison nf-etat-raison">{T.raisonSite(s)}</span> : null}</span>
+                  <span role="cell" className="nf-c-etat"><span className="nf-etat-ligne"><span className={etatDitParBouton(s) ? 'nf-etat-site vrm-sr-seul' : 'nf-etat-site'} data-nf-ton={s.etat}>{T.etatSite(s)}</span>{s.etat === 'pas-su' ? <span className="nf-raison nf-etat-raison">{T.raisonSite(s)}</span> : null}</span>
                     {s.publier && publierSur ? <span className="nf-geste"><Bouton variante="teinte" onClick={() => publierSur(s.site)} attrs={{ 'data-fiche-publier-sur': s.site, 'aria-label': T.publierSur(s.site) }}>{T.publier}</Bouton></span> : null}</span>
                 </Tag>;
               })}

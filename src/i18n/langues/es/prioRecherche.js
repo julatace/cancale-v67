@@ -14,7 +14,7 @@ export default {
   "prio.raison.vuesPasLues": "visitas no leídas",
   "prio.raison.favorisPasLus": "favoritos no leídos",
   "prio.raison.baisse": "visitas en descenso",
-  "prio.resume": "Los más dormidos primero · en línea desde {jours} d o más · {n} al día",
+  "prio.resume": "≥ {jours} d · {n}/día",
   "prio.republierN": {
     "one": "Republicar {n} anuncio",
     "other": "Republicar {n} anuncios"
@@ -46,8 +46,8 @@ export default {
     "one": "{n} de una cuenta personal",
     "other": "{n} de una cuenta personal"
   },
-  "prio.rienNePart": "Nada sale de aquí: el taller Republicar de la extensión se abre con estos anuncios marcados y tú lo lanzas.",
-  "prio.vide": "Ningún anuncio en línea desde hace {jours} d o más que republicar.",
+  "prio.rienNePart": "Lo lanzas tú, en la extensión.",
+  "prio.vide": "Nada que republicar.",
   "prio.videRecherche": "Ningún anuncio de la lista coincide.",
   "prio.pasSu": "VRM no pudo leer tus anuncios: la lista volverá en la próxima lectura.",
   "prio.reglages.titre": "Republicar primero",

@@ -145,7 +145,7 @@ export default {
   "emails.rechercherRecuE": "Rechercher un reçu par e-mail",
   "emails.articleCompteTransaction": "Article, compte ou transaction",
   "emails.aucunRecuRecherche": "Aucun reçu pour cette recherche.",
-  "emails.aucunRecuAchat": "Aucun reçu d’achat arrivé par e-mail pour l’instant.",
+  "emails.aucunRecuAchat": "Aucun reçu pour l’instant.",
   "emails.achatSansLigne": "Un achat sans « {nom} » sur sa ligne : VRM n’a relié aucun reçu à cet achat. Si VRM ne reçoit pas les e-mails Vinted d’un de tes comptes, fais-les suivre vers ton adresse VRM (Paramètres → Réception des e-mails).",
   "emails.1AutreE": "1 autre e-mail de commande (mise à jour, confirmation, retour) n’est pas un reçu : il n’est pas listé ici.",
   "emails.autresEMails": "{autres} autres e-mails de commande (mises à jour, confirmations, retours) ne sont pas des reçus : ils ne sont pas listés ici.",

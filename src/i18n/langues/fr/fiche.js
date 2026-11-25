@@ -9,7 +9,7 @@ export default {
   "fiche.lotTitre": "Cette ligne porte {n} paires : choisis laquelle voir.",
   "fiche.lecture": "Je lis cette ligne…",
   "fiche.passu": "pas su : la base n’a pas répondu, réessaie dans un instant.",
-  "fiche.pasDePaire": "Pas de paire reliée à cette ligne.",
+  "fiche.pasDePaire": "Aucune paire reliée.",
   "fiche.gesteRelier.vente": "Pour la relier : pose son N° ou relie son achat, dans les actions ci-dessous.",
   "fiche.gesteRelier.achat": "Pour la relier : pose le N° de la paire sur son annonce, ou relie cet achat depuis la vente.",
   "fiche.gesteRelier.annonce": "Pour la relier : donne un N° à cette annonce.",

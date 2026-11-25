@@ -31,6 +31,11 @@
 .vrm-impr-papier:active, .vrm-impr-papier[aria-checked="true"] { transform: translateY(1px); box-shadow: inset 0 1px 2px rgba(54,54,60,.22); background: var(--d-creux, var(--d-remplir, rgba(120,120,128,.10))); }
 .vrm-impr-papier-nom { font-size: var(--d-t-15, 15px); font-weight: 600; }
 .vrm-impr-papier-dit { font-size: var(--d-t-13, 13px); line-height: 1.35; color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+/* (25 nov., moins-texte-a) Trois tuiles côte à côte : le dessin du papier, son nom ; la phrase au lecteur d'écran. */
+.vrm-impr-papiers { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.vrm-impr-papier { justify-items: center; text-align: center; align-content: start; gap: 8px; min-height: 120px; padding: 16px 8px 12px; }
+.vrm-impr-papier-nom { line-height: 1.25; text-wrap: balance; }
+.vrm-impr-picto { display: block; color: var(--d-encre, var(--vrm-ink, #1D1D1F)); }
 .vrm-impr-diode { position: absolute; top: 14px; right: 14px; width: 8px; height: 8px; border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 1px var(--d-trait, rgba(0,0,0,.18)); }
 .vrm-impr-papier[aria-checked="true"] .vrm-impr-diode, .vrm-impr-vignette[aria-pressed="true"] .vrm-impr-diode { background: var(--d-accent, #16181D); box-shadow: 0 0 6px var(--d-accent, #16181D); }
 

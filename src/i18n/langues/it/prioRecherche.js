@@ -14,7 +14,7 @@ export default {
   "prio.raison.vuesPasLues": "visualizzazioni non lette",
   "prio.raison.favorisPasLus": "preferiti non letti",
   "prio.raison.baisse": "visualizzazioni in calo",
-  "prio.resume": "Prima i più fermi · online da {jours} g o più · {n} al giorno",
+  "prio.resume": "≥ {jours} g · {n}/giorno",
   "prio.republierN": {
     "one": "Ripubblica {n} annuncio",
     "other": "Ripubblica {n} annunci"
@@ -46,8 +46,8 @@ export default {
     "one": "{n} di un account personale",
     "other": "{n} di un account personale"
   },
-  "prio.rienNePart": "Da qui non parte nulla: il laboratorio Ripubblica dell’estensione si apre con questi annunci selezionati, sei tu ad avviarlo.",
-  "prio.vide": "Nessun annuncio online da {jours} g o più da ripubblicare.",
+  "prio.rienNePart": "Lo avvii tu, nell’estensione.",
+  "prio.vide": "Niente da ripubblicare.",
   "prio.videRecherche": "Nessun annuncio della lista corrisponde.",
   "prio.pasSu": "VRM non ha potuto leggere i tuoi annunci: la lista tornerà alla prossima lettura.",
   "prio.reglages.titre": "Da ripubblicare per primi",

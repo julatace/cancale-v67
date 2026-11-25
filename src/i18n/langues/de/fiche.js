@@ -9,7 +9,7 @@ export default {
   "fiche.lotTitre": "Diese Zeile enthält {n} Paare: wähle, welches du sehen willst.",
   "fiche.lecture": "Ich lese diese Zeile…",
   "fiche.passu": "unbekannt: die Datenbank hat nicht geantwortet, versuche es gleich noch einmal.",
-  "fiche.pasDePaire": "Kein Paar mit dieser Zeile verknüpft.",
+  "fiche.pasDePaire": "Kein Paar verknüpft.",
   "fiche.gesteRelier.vente": "Zum Verknüpfen: Nr. setzen oder Einkauf verknüpfen, in den Aktionen unten.",
   "fiche.gesteRelier.achat": "Zum Verknüpfen: Nr. des Paares am Inserat setzen oder diesen Einkauf beim Verkauf verknüpfen.",
   "fiche.gesteRelier.annonce": "Zum Verknüpfen: gib diesem Inserat eine Nr.",

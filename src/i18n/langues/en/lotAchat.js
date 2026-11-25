@@ -14,7 +14,7 @@ export default {
   "lotachat.prouveNombre": "Vinted says {n} items in this order (details not read yet).",
   "lotachat.peutEtreDit": "The title mentions a bundle, the order doesn’t say so: your call.",
   "lotachat.simpleDit": "A single purchase: you can split it if you received several pairs.",
-  "lotachat.diviser": "Split this purchase",
+  "lotachat.diviser": "Split",
   "lotachat.voirDivision": "See the split",
   "lotachat.combien": "How many parts",
   "lotachat.parts": "Parts",

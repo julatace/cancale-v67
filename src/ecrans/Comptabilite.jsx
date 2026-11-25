@@ -26694,11 +26694,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             quand toute la liste est sur le même (§7) ; sur chaque ligne sinon. */}
         {/* (21 nov., lot fiche-sites) « N achats arrivés sans vente » : la série achat après achat (plusieurs seulement). */}
         {!modeRetraits && only === 'achats' && Array.isArray(buys.items) && (()=>{ const n = (buysBase || []).filter(achatLibreSerie).length; if (n < 2) return null;
-          return <button type="button" className="vrm-achats-serie" data-achats-serie={n} onClick={lancerSerieAchats}
+          return <button type="button" className="vrm-achats-serie" data-achats-serie={n} onClick={lancerSerieAchats} aria-label={trj('achats.serie.titre', { n }) + ' · ' + tr('achats.serie.sous')}
             style={{display:'flex',alignItems:'center',gap:12,width:'100%',minHeight:56,margin:'0 0 10px',padding:'8px 14px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,textAlign:'left',cursor:'pointer',fontFamily:'inherit',boxSizing:'border-box'}}>
             <Icon name="link" size={18} style={{color:C.muted,flexShrink:0}}/>
-            <span style={{flex:1,minWidth:0}}><span style={{display:'block',fontSize:15,fontWeight:600}}>{trj('achats.serie.titre', { n })}</span>
-              <span style={{display:'block',fontSize:13,color:C.muted,marginTop:1}}>{tr('achats.serie.sous')}</span></span>
+            <span style={{flex:1,minWidth:0}}><span style={{display:'block',fontSize:15,fontWeight:600}}>{trj('achats.serie.titre', { n })}</span></span>
             <Icon name="chevron" size={16} style={{color:C.muted,flexShrink:0}}/>
           </button>; })()}
         {(()=>{
@@ -26780,7 +26779,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       pour un colis arrivé le 28 oct. L'arrivée est celle LUE dans l'e-mail du colis
                       (`arriveLe`, relié par identité) ; pas lue ⇒ rien d'écrit. */}
                   {!cancelled && !st.retour && st.step===3 && (()=>{ const a=Date.parse((tk&&tk.arriveLe)||''); if(!Number.isFinite(a)) return null; const j=Math.max(0,Math.floor((Date.now()-a)/86400000)); return <span data-achat-au-relais={j} style={{fontWeight:400,color:C.muted,whiteSpace:'normal'}}> {tr('achats.relais')} {j===0?tr('achats.depuisAujourdHui'):tr('achats.depuis', { j: String(j) })}</span>; })()}
-                  {!cancelled && !st.retour && st.step>=1 && st.step<3 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:500,color:tard?C.warn:C.muted,whiteSpace:'normal'}}> {tr('achats.depuis2')} {j} j{tard?tr('achats.relanceVendeur'):''}</span>; })()}</span>
+                  {!cancelled && !st.retour && st.step>=1 && st.step<3 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span data-achat-depuis={j} style={{fontWeight:tard?700:500,color:tard?C.warn:C.muted,whiteSpace:'normal'}}> <span aria-hidden="true">· </span><span className="vrm-sr-seul">{tr('achats.depuis2')} </span>{j} j{tard?tr('achats.relanceVendeur'):''}</span>; })()}</span>
                   {tk && tk.lieu && st.step===3 && <span style={{color:C.text}} title={tk.lieu}>{(cleanLieu(tk.lieu).nom || tk.lieu)}</span>}
                   {numA!=null && <span title={tr('achats.numeroArticleLien')} style={{fontWeight:600,color:C.text}}>N°{numA}</span>}
                   {o._fromEmail && <span title={tr('achats.reconstitueeDepuisEmail')} style={{fontSize:11,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:12,padding:'0 6px'}}>{tr('achats.email')}</span>}
@@ -26791,7 +26790,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     la ligne — il n'était que dans le menu ⋯. Son contenu (et un
                     PDF joint) ne se lit qu'au clic. */}
                 <div className="vrm-buy-pastilles">
-                  <span className="vrm-buy-statut" data-achat-etat={cancelled?'annule':(st.retour||st.step===3)?'geste':'neutre'}><i style={{background:st.color}}/>{st.label}</span>
+                  {/* (25 nov., moins-texte-a) « Arrivé » et « En route » se DESSINENT (une coche, un camion : pastille d'état) — le mot reste au
+                      lecteur d'écran et au survol ; un geste (« À retirer », « À renvoyer ») et « Annulé » gardent leurs mots. */}
+                  {(()=>{ const etat = cancelled?'annule':(st.retour||st.step===3)?'geste':'neutre'; const ico = etat==='neutre' ? (st.step===4 ? 'check' : st.step===2 ? 'truck' : null) : null;
+                    return <span className="vrm-buy-statut" data-achat-etat={etat} data-achat-statut-icone={ico || undefined} title={ico ? st.label : undefined}><i style={{background:st.color}}/>{ico ? <><Icon name={ico} size={14} aria-hidden="true"/><span className="vrm-sr-seul">{st.label}</span></> : st.label}</span>; })()}
                   {/* (22 nov., lot achats-lot) Un lot PROUVÉ par SA transaction, peut-être un lot (le titre), ou un achat DIVISÉ (ses N°) :
                       l'étiquette se touche et ouvre « Diviser cet achat » (un toucher). Jamais affirmé par le titre seul. */}
                   {!cancelled && (()=>{ const tl = texteLotRangee(o); if (!tl) return null; const l = lotDeRangee(o);
@@ -26935,11 +26937,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             faisait 72 880 px sur iPhone — quatre-vingt-six écrans. */}
         {achatsGroupees ? (achatsGroupees.nets > achatsGroupees.netsDessinees && (
           <Bouton variante="secondaire" plein data-groupe-suite-nettes={achatsGroupees.nets - achatsGroupees.netsDessinees} onClick={()=>setAchatsMax(n=>n+120)} style={{marginTop:10}}>
-            {achatsGroupees.nets - achatsGroupees.netsDessinees <= 120 ? tr('achats.voirDerniers', { x: String(achatsGroupees.nets - achatsGroupees.netsDessinees) }) : tr('achats.voirPlus')} — {achatsGroupees.netsDessinees} {tr('achats.affiches')} {achatsGroupees.nets.toLocaleString('fr-FR')}
+            {achatsGroupees.nets - achatsGroupees.netsDessinees <= 120 ? tr('achats.voirDerniers', { x: String(achatsGroupees.nets - achatsGroupees.netsDessinees) }) : tr('achats.voirPlus')} · {achatsGroupees.netsDessinees}<span className="vrm-sr-seul"> {tr('achats.affiches')}</span><span aria-hidden="true"> / </span>{achatsGroupees.nets.toLocaleString('fr-FR')}
           </Bouton>)) : <>
         {achatsAffiches.length > achatsMax && (
           <Bouton variante="secondaire" plein onClick={()=>setAchatsMax(n=>n+120)} style={{marginTop:10}}>
-            {achatsAffiches.length - achatsMax <= 120 ? tr('achats.voirDerniers', { x: String(achatsAffiches.length - achatsMax) }) : tr('achats.voirPlus')} — {achatsMax} {tr('achats.affiches')} {achatsAffiches.length.toLocaleString('fr-FR')}
+            {achatsAffiches.length - achatsMax <= 120 ? tr('achats.voirDerniers', { x: String(achatsAffiches.length - achatsMax) }) : tr('achats.voirPlus')} · {achatsMax}<span className="vrm-sr-seul"> {tr('achats.affiches')}</span><span aria-hidden="true"> / </span>{achatsAffiches.length.toLocaleString('fr-FR')}
           </Bouton>
         )}
         </>}

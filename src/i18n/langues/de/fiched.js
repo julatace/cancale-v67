@@ -37,7 +37,7 @@ export default {
   "fd.bord.pret": "Etikett bereit",
   "fd.bord.plein": "Etikett drucken",
   "fd.baisser.titre": "Im Verkauf",
-  "fd.baisser.aucuneOffre": {"one": "Kein Angebot in {n} Tag", "other": "Kein Angebot in {n} Tagen"},
+  "fd.baisser.aucuneOffre": { one: "0 Angebote in {n} T.", other: "0 Angebote in {n} T." },
   "fd.baisser.offres": {"one": "{n} Angebot in {j} Tagen", "other": "{n} Angebote in {j} Tagen"},
   "fd.baisser.depuis": {"one": "Online seit {n} Tag", "other": "Online seit {n} Tagen"},
   "fd.baisser.favoris": {"one": "{n} Favorit.", "other": "{n} Favoriten."},
