@@ -44,3 +44,12 @@
 @keyframes vrm-attente-reflet { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @keyframes vrm-attente-fin { to { --vrm-att-encre: currentcolor; --vrm-att-fond: transparent; --vrm-att-reflet: none; } }
 @keyframes vrm-attente-note { to { --vrm-att-op: 1; } }
+
+/* (24 nov., livrable-2 — « zéro saut ») Au téléphone, la porte « Saisis 4 prix › » du pied du héros (src/natif/Heros.jsx) prenait
+   la hauteur plancher d'un bouton (44 px) : le héros grandissait de 24 px à l'arrivée des chiffres et poussait tout l'écran. Le
+   bouton GARDE ses 44 px (la cible au doigt) mais n'en prend que sa ligne dans la mise en page (marges négatives). */
+@layer vrm-vintex {
+  @media (max-width: 1023px) {
+    html body .n-heros-trio .n-heros-trio-porte.n-heros-trio-porte { display: flex !important; align-items: center !important; margin-block: -12px !important; }
+  }
+}
