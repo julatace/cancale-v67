@@ -485,8 +485,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **25 nov. · Moins de texte A (`claude/moins-texte-a`)** : Annonces, Achats, Colis (imprimante), loupe : états dessinés, phrases au lecteur d'écran ou sous « Pourquoi ? » ; 390 px 567 → 310 mots d'interface. `2026-11-25-moins-texte-a.md`. Geste : aucun.
 - **25 nov. · Banc `e2e-extension` vert (`claude/e2e-extension-vert`)** : étapes 3/4 lisaient l'ancien écran (Ventes, « Qui dorment ») ⇒ portées sur le natif et le panneau ; vrais défauts corrigés : extension **5.440.4** (copie du dressing oubliée quand il est rangé : le panneau perdait la paire du lien), app (« Baisser » refusé et « mets à jour » pour une extension d'avant le lien du panneau). `2026-11-25-e2e-extension-vert.md`. Geste : installer la 5.440.4.
-- **24 nov. · Vitesse PR B (`claude/vitesse-lectures-toucher`)** : 1re visite d'Achats 4,7 → 3,5 s (calculs refaits une fois par version des données), relevés « plus vue » groupés ; à froid = PR A (pas de comparaison pendant le 1er nuage) ; chiffres 35/35. `2026-11-24-vitesse-ecran-montre.md` §8. Geste : aucun.
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
