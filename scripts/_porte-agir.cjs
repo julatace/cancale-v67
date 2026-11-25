@@ -165,10 +165,13 @@ function panneauGarde({ code, appel }) {
 // porte, sur CETTE conversation (`args.conv`), SON compte ; pas connecté ⇒ champ éteint, « lecture seule », la raison dite.
 function repondre(ecran, agir, site) {
   const a = String(agir), i = a.indexOf('export function ComposerReponse('), j = i < 0 ? -1 : a.indexOf('\nexport ', i + 1);
-  const balise = (String(ecran).match(new RegExp('<ComposerReponse site="' + site + '" compte=\\{[^}]+\\} conv=\\{[^}]+\\}[^>]*\\/>')) || [''])[0];
+  // (25 nov.) la balise jusqu'à `conv={…}` : ses autres props peuvent porter du JSX (`puces={…}`, messages-pro), où `>` apparaît.
+  const balise = (String(ecran).match(new RegExp('<ComposerReponse site="' + site + '" compte=\\{[^}]+\\} conv=\\{[^}]+\\}')) || [''])[0];
   return regle({ code: balise + '\n' + (i < 0 ? '' : a.slice(i, j < 0 ? i + 3000 : j)),
     porte: /^<ComposerReponse site="\w+" compte=\{[^}]+\} conv=\{[^}]+\}[\s\S]*const v = usePeutAgir\(site, compte, 'repondre', 'file'\);[\s\S]*envoyerGeste\(\{ site, compte, geste: 'repondre', distGeste: 'repondre', args: \{ conv: String\(conv\), texte: t \} \}\)/,
-    repli: /disabled=\{!v\.ok\}[\s\S]*placeholder=\{v\.ok \? [^\n]*?: tr\('agir\.badge'\)\}[\s\S]*<BoutonAgir site=\{site\} compte=\{compte\} geste="repondre"/ });
+    // (25 nov.) deux formes du « pas connecté » : le champ éteint (agir-tout) ou la barre « Lecture seule » qui dit la raison
+    //    (messages-pro : `if (!v.ok) return (… texteRaison(v) …)`), le bouton d'envoi par la porte ensuite.
+    repli: /(?:disabled=\{!v\.ok\}[\s\S]*placeholder=\{v\.ok \? [^\n]*?: tr\('agir\.badge'\)\}|if \(!v\.ok\) return \([\s\S]*?texteRaison\(v\)[\s\S]*?\n  \);)[\s\S]*<BoutonAgir site=\{site\} compte=\{compte\} geste="repondre"/ });
 }
 
 // « Publier sur Leboncoin » une fiche : DEPUIS VRM par la porte (le compte Leboncoin ouvert, une commande pour CETTE fiche) ;
