@@ -110,7 +110,7 @@ function RangeeNavigateur({ n, maintenant, iciVrm, homonyme = false }) {
   return (
     <Rangee titre={nom} sousTitre={[vu, lienVrm ? tr('cnx.vrm.' + lienVrm) : ''].filter(Boolean).join(' · ')} valeur={valeur} valeurForte={v.etat === 'ancienne'}
       icone={<Icon name={n.sys === 'iphone' || n.sys === 'android' || n.sys === 'ipad' ? 'device' : 'ecrans'} size={22}/>}
-      note={lit.length ? lit.map((t, i) => <React.Fragment key={i}>{i ? ' · ' : ''}<span>{t}</span></React.Fragment>) : tr('cnx.lit.rien')}
+      note={lit.length ? lit.map((t, i) => <React.Fragment key={'lit-' + t}>{i ? ' · ' : ''}<span>{t}</span></React.Fragment>) : tr('cnx.lit.rien')}
       pied={p ? (
         <div className="cnx-probleme" data-cnx-probleme={p.code}>
           <p className="cnx-phrase">{phrase}{p.at ? <span className="cnx-quand"> · {ilYa(p.at, maintenant)}</span> : null}</p>

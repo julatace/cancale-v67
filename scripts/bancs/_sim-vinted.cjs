@@ -29,6 +29,11 @@ function fauxVinted({ jetonVinted, lireJwt }) {
     lienWeb: 'receiver_id',
     sansLogin: false,     // (5.450) la nouvelle messagerie ne donne pas le pseudo de l'acheteur
     n: 0,
+    // (24 nov., 5.440.2 — « Sauté · Favori trop ancien » à tort) La liste comme chez Vinted : `avant` notifications d'autres
+    // sortes (baisses de prix…) PLUS RÉCENTES que les favoris ; l'API paginée (`paginer` : 20 par page, `page`, `per_page`) ;
+    // la cloche ne montre que les `clocheN` dernières ; la page complète en montre `pageTaille`, puis charge la suite au
+    // défilement en `suiteMs` ms (lignes chargées à la demande).
+    avant: 0, intercale: null, paginer: false, clocheN: 0, pageTaille: 20, suiteMs: 0,
   };
   const cookieUid = (req) => {
     const m = /(?:^|;\s*)access_token_web=([^;]+)/.exec(String(req.headers.cookie || ''));
@@ -46,12 +51,19 @@ function fauxVinted({ jetonVinted, lireJwt }) {
   };
   const notifs = (uid) => {
     const c = st.comptes[uid]; if (!c) return [];
-    return (c.favoris || []).map((f, i) => ({
+    const autre = (i) => ({ id: `n-prix-${i + 1}`, body: 'Le prix d’un article que tu aimes a baissé', link: `/items/${92000000 + i}`, photo: null, is_read: true, user_id: null,
+      entry_type: 720, photo_type: 'item', subject_id: 92000000 + i, small_photo_url: null });
+    const favs = (c.favoris || []).map((f) => ({
       id: f.nid, body: `${f.login} a ajouté ton article à ses favoris`, link: lienNotif(f),
       photo: { id: Number(f.itemId) * 10, url: `https://images1.vinted.net/t/${f.itemId}/f800/photo.jpeg` }, is_read: false, user_id: Number(f.userId),
-      entry_type: 20, photo_type: 'item', subject_id: Number(f.itemId), updated_at: new Date(Date.now() - (i + 1) * 600000).toISOString(),
+      entry_type: 20, photo_type: 'item', subject_id: Number(f.itemId),
       small_photo_url: `https://images1.vinted.net/t/${f.itemId}/f100/photo.jpeg`,
     }));
+    // `avant` notifications d'autres sortes avant tous les favoris ; `intercale` {apres, n} : n autres après les `apres` premiers.
+    let k = 0; const l = Array.from({ length: st.avant }, () => autre(k++));
+    favs.forEach((f, i) => { if (st.intercale && i === st.intercale.apres) for (let j = 0; j < st.intercale.n; j++) l.push(autre(k++)); l.push(f); });
+    // Les dates suivent l'ordre de la liste (la plus récente d'abord), comme chez Vinted.
+    return l.map((x, i) => Object.assign(x, { updated_at: new Date(Date.now() - (i + 1) * 300000).toISOString() }));
   };
   // Les deux formes MESURÉES du lien d'une notification de favori : le lien d'application (angeled92 depuis le 23 nov.)
   // et l'adresse web d'avant (les autres comptes).
@@ -87,7 +99,12 @@ function fauxVinted({ jetonVinted, lireJwt }) {
     const c = uid && st.comptes[uid];
     if (!c) return fin(401, { code: 100, message: 'Token is invalid' });
     if (host === 'api.vinted.fr') {
-      if (p === '/inbox-notifications/v1/notifications' && m === 'GET') { const l = notifs(uid); return fin(200, { notifications: l, pagination: { current_page: 1, total_pages: 1, total_entries: l.length, per_page: 20 } }); }
+      if (p === '/inbox-notifications/v1/notifications' && m === 'GET') {
+        const l = notifs(uid);
+        if (!st.paginer) return fin(200, { notifications: l, pagination: { current_page: 1, total_pages: 1, total_entries: l.length, per_page: 20 } });
+        const pp = Math.min(100, Math.max(1, Number(url.searchParams.get('per_page')) || 20)), pg = Math.max(1, Number(url.searchParams.get('page')) || 1);
+        return fin(200, { code: 0, notifications: l.slice((pg - 1) * pp, pg * pp), pagination: { current_page: pg, total_pages: Math.ceil(l.length / pp), total_entries: l.length, per_page: pp } });
+      }
       if (p === '/inbox-notifications/v1/notifications/unread_count') return fin(200, { unread_count: (c.favoris || []).length });
       if (p === '/messaging/main/inquiries' && m === 'POST') {
         let b = {}; try { b = JSON.parse(corps || '{}'); } catch (_) {}
@@ -140,12 +157,12 @@ function fauxVinted({ jetonVinted, lireJwt }) {
 
 // ── LA PAGE (une SPA minimale qui fait ce que fait Vinted quand on clique) ────────────────────────────────────
 function PAGE(st, uid) {
-  const O = { lienWeb: st.lienWeb, captcha: st.captchaSur ? st.captchaSur.source : '' };
+  const O = { lienWeb: st.lienWeb, captcha: st.captchaSur ? st.captchaSur.source : '', clocheN: st.clocheN, pageTaille: st.pageTaille, suiteMs: st.suiteMs };
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Vinted (simulation)</title><style>
 body{margin:0;font-family:system-ui,sans-serif;background:#f6f6f6;color:#111}header{display:flex;gap:14px;align-items:center;height:60px;padding:0 20px;background:#fff;border-bottom:1px solid #ddd}
 header .logo{color:#09b1ba;font-weight:700;font-size:24px;margin-right:auto}header button,header a{min-width:44px;height:44px;display:inline-grid;place-items:center;background:none;border:0;color:#111;text-decoration:none;font-size:15px}
 #pan{position:absolute;top:60px;right:20px;width:380px;background:#fff;border:1px solid #ccc;box-shadow:0 6px 20px #0002;display:none;z-index:5}#pan.on{display:block}
-.rang{display:block;padding:12px;border-bottom:1px solid #eee;color:#111;text-decoration:none}main{padding:20px;max-width:760px}#fil p{background:#fff;border-radius:8px;padding:8px 12px;margin:6px 0}
+.rang{display:block;padding:12px;border-bottom:1px solid #eee;color:#111;text-decoration:none}#tout .rang{min-height:96px}main{padding:20px;max-width:760px}#fil p{background:#fff;border-radius:8px;padding:8px 12px;margin:6px 0}
 textarea{width:420px;min-height:44px;display:block;margin:8px 0}.btn{height:44px;padding:0 16px;border-radius:6px;border:1px solid #09b1ba;background:#09b1ba;color:#fff}
 [role=dialog]{position:fixed;top:120px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid #999;padding:20px;width:320px;z-index:9}
 </style></head><body>
@@ -176,27 +193,46 @@ textarea{width:420px;min-height:44px;display:block;margin:8px 0}.btn{height:44px
       if (r3.ok) { const p = document.createElement('p'); p.textContent = t; fil.appendChild(p); m.querySelector('textarea').value = ''; }
     };
   };
+  // L'adresse d'un favori ouverte directement (comme au clic de sa ligne) : la page ouvre la conversation elle-même
+  // (relevé passif du 23 nov. : /inbox/want_it puis POST …/inquiries 201).
+  const ouvrirFavori = async (u) => {
+    const iw = (u.pathname.match(/^\\/items\\/(\\d+)\\//) || [])[1];
+    const r = await api('/messaging/main/inquiries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: iw || u.searchParams.get('item_id'), receiver_id: u.searchParams.get('receiver_id') || u.searchParams.get('user_id') || u.searchParams.get('offering_id') }) });
+    if (!r.ok) return; const j = await r.json(); history.pushState({}, '', '/inbox/' + j.conversation_id); return route();
+  };
   const route = () => {
     captcha();
+    if (/want_it/.test(location.pathname)) return ouvrirFavori(new URL(location.href));
     const u = (location.pathname.match(/^\\/inbox\\/([0-9a-f-]{36})/) || [])[1];
     if (u) return rendreFil(u);
-    if (/^\\/member\\/notifications/.test(location.pathname)) { m.innerHTML = '<h1>Notifications</h1><div id="tout"></div>'; return lireNotifs(document.getElementById('tout')); }
+    if (/^\\/member\\/notifications/.test(location.pathname)) { m.innerHTML = '<h1>Notifications</h1><div id="tout"></div><div id="bas" style="height:40px"></div>'; return pageComplete(document.getElementById('tout')); }
     if (/^\\/inbox/.test(location.pathname)) m.innerHTML = '<h1>Messages</h1><p>Choisis une conversation.</p>';
   };
+  const ligne = (n) => { const q = /item_id=(\\d+)&user_id=(\\d+)/.exec(n.link); const href = q ? '/inbox/want_it/new?' + O.lienWeb + '=' + q[2] + '&item_id=' + q[1] : n.link; return '<a class="rang" data-testid="notification-item" href="' + href + '">' + n.body.replace(/</g, '') + '</a>'; };
+  // La cloche : les clocheN dernières seulement (0 = la page de 20).
   const lireNotifs = async (dans) => {
-    const r = await api('/inbox-notifications/v1/notifications?page=1&per_page=20'); if (!r.ok) return; const j = await r.json();
-    dans.innerHTML = (j.notifications || []).map((n) => { const q = /item_id=(\\d+)&user_id=(\\d+)/.exec(n.link); const href = q ? '/inbox/want_it/new?' + O.lienWeb + '=' + q[2] + '&item_id=' + q[1] : n.link; return '<a class="rang" data-testid="notification-item" href="' + href + '">' + n.body.replace(/</g, '') + '</a>'; }).join('');
+    const r = await api('/inbox-notifications/v1/notifications?page=1&per_page=' + (O.clocheN || 20)); if (!r.ok) return; const j = await r.json();
+    dans.innerHTML = (j.notifications || []).map(ligne).join('');
+  };
+  // La page complète : pageTaille lignes, puis la SUITE quand on arrive en bas (chargée en suiteMs ms), jusqu’à la dernière page.
+  const pageComplete = async (dans) => {
+    let page = 0, fini = false, enCours = false;
+    const suite = async () => {
+      if (fini || enCours) return; enCours = true;
+      if (page > 0 && O.suiteMs) await new Promise((r) => setTimeout(r, O.suiteMs));
+      const r = await api('/inbox-notifications/v1/notifications?page=' + (page + 1) + '&per_page=' + O.pageTaille); enCours = false; if (!r.ok) return;
+      const j = await r.json(); page++; dans.insertAdjacentHTML('beforeend', (j.notifications || []).map(ligne).join(''));
+      const pg = j.pagination || {}; if (!(j.notifications || []).length || Number(pg.current_page) >= Number(pg.total_pages)) fini = true;
+    };
+    await suite();
+    addEventListener('scroll', () => { if (/^\\/member\\/notifications/.test(location.pathname) && innerHeight + scrollY >= document.documentElement.scrollHeight - 60) suite(); });
   };
   cl.addEventListener('click', async () => { const on = !pan.classList.contains('on'); if (on) await lireNotifs(document.getElementById('lignes')); pan.classList.toggle('on', on); cl.setAttribute('aria-expanded', on ? 'true' : 'false'); });
   document.addEventListener('click', async (e) => {
     const a = e.target.closest && e.target.closest('a'); if (!a || a.target) return;
     const u = new URL(a.href); if (u.origin !== location.origin) return;
     e.preventDefault(); pan.classList.remove('on'); cl.setAttribute('aria-expanded', 'false');
-    if (/want_it/.test(u.pathname)) {
-      const iw = (u.pathname.match(/^\\/items\\/(\\d+)\\//) || [])[1];
-      const r = await api('/messaging/main/inquiries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: iw || u.searchParams.get('item_id'), receiver_id: u.searchParams.get('receiver_id') || u.searchParams.get('user_id') || u.searchParams.get('offering_id') }) });
-      if (!r.ok) return; const j = await r.json(); history.pushState({}, '', '/inbox/' + j.conversation_id); return route();
-    }
+    if (/want_it/.test(u.pathname)) return ouvrirFavori(u);
     history.pushState({}, '', u.pathname + u.search); route();
   }, true);
   addEventListener('popstate', route); route();

@@ -22,7 +22,17 @@ import { AideAnimation } from './AideAnimation.jsx';
 import { AideVideo } from './AideVideo.jsx';
 import './aide-ecran.css';
 // (14 nov., idées 136 et 139) « Revoir la visite de cet écran » et « Les mots de VRM ».
-import { RevoirVisite, GlossaireListe } from '../accueilReste/AccueilReste.jsx';
+import { lazySur } from '../chargementSur.js';
+// (24 nov., francais-demarrage) « Revoir la visite » et le glossaire viennent de src/accueilReste/ À LA DEMANDE : ce
+// module (le « ? » de chaque écran) est au démarrage, eux et leur français n'y sont plus. Ils suspendent la feuille
+// ENTIÈRE (le Suspense entoure la feuille) : elle paraît d'un bloc, jamais un bouton qui pousse le reste après coup ;
+// préchargés à l'intention (survol, appui, focus du « ? », ou `vrm:aide`), la feuille s'ouvre aussitôt.
+const chargerAccueilReste = () => import('../accueilReste/AccueilReste.jsx');
+const RevoirVisite = lazySur(() => chargerAccueilReste().then((m) => ({ default: m.RevoirVisite })));
+const GlossaireListe = lazySur(() => chargerAccueilReste().then((m) => ({ default: m.GlossaireListe })));
+const prechargerFeuille = () => { try { RevoirVisite.precharger && RevoirVisite.precharger(); GlossaireListe.precharger && GlossaireListe.precharger(); } catch (_) {} };
+// Pendant le tout premier chargement : la pastille discrète des feuilles à la demande (App.jsx, `MorceauAttente`).
+const OUVERTURE = <div role="status" aria-live="polite" aria-busy="true" data-morceau-attente="" style={{ position: 'fixed', left: '50%', bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))', transform: 'translateX(-50%)', zIndex: 2147483000, padding: '8px 14px', borderRadius: 999, background: 'rgba(0,0,0,.72)', color: '#fff', fontSize: 13, pointerEvents: 'none' }}>Ouverture…</div>;
 import { BoutonIcone } from '../natif/Bouton.jsx';
 
 export const NOMS_ECRANS_AIDE = {
@@ -141,8 +151,8 @@ export function AideEcran({ cle, Feuille = SheetShellBase, Bouton = BoutonBase, 
   };
   return (
     <>
-      <BoutonIcone libelle={`Aide : ${NOMS_ECRANS_AIDE[cle] || 'cet écran'}`} icone={<IconeAide/>} className="vrm-aide-bouton" onClick={ouvrir} attrs={{ 'aria-haspopup': 'dialog', 'data-aide-ouvrir': cle }}/>
-      {vue === 'aide' && <AideEcranFeuille cle={cle} vend={vend} mode={mode} Feuille={Feuille} Bouton={Bouton} onClose={() => setVue(null)} onSignaler={() => setVue('signaler')}/>}
+      <BoutonIcone libelle={`Aide : ${NOMS_ECRANS_AIDE[cle] || 'cet écran'}`} icone={<IconeAide/>} className="vrm-aide-bouton" onClick={ouvrir} attrs={{ 'aria-haspopup': 'dialog', 'data-aide-ouvrir': cle, onPointerEnter: prechargerFeuille, onPointerDown: prechargerFeuille, onFocus: prechargerFeuille }}/>
+      {vue === 'aide' && <React.Suspense fallback={OUVERTURE}><AideEcranFeuille cle={cle} vend={vend} mode={mode} Feuille={Feuille} Bouton={Bouton} onClose={() => setVue(null)} onSignaler={() => setVue('signaler')}/></React.Suspense>}
       {vue === 'signaler' && Signaler && <Signaler Feuille={Feuille} Bouton={Bouton} entetes={entetes} masque={masque} contexte={() => ({ ...(instantane.current || {}), ecran: (instantane.current && instantane.current.ecran) || (cle === 'colis' ? 'cat_bord' : cle) })} onClose={() => setVue(null)}/>}
     </>
   );
@@ -154,12 +164,12 @@ export function AideEcran({ cle, Feuille = SheetShellBase, Bouton = BoutonBase, 
 export function CentreAide({ Feuille = SheetShellBase, Bouton = BoutonBase, Signaler = null, contexte, entetes, masque, vend = 'sneakers', mode = 'complet' }) {
   const [ouvert, setOuvert] = React.useState(null);   // { cle, fiche, q } · 'signaler'
   React.useEffect(() => {
-    const f = (e) => { const d = (e && e.detail) || {}; const fi = d.fiche ? FICHES_AIDE.find((x) => x.id === d.fiche) : null; const cle = fi ? fi.ecran : (AIDE_ECRANS[d.ecran] ? d.ecran : null); if (!cle) return; setOuvert({ cle, fiche: fi ? fi.id : null, q: typeof d.q === 'string' ? d.q.slice(0, 80) : '' }); };
+    const f = (e) => { const d = (e && e.detail) || {}; const fi = d.fiche ? FICHES_AIDE.find((x) => x.id === d.fiche) : null; const cle = fi ? fi.ecran : (AIDE_ECRANS[d.ecran] ? d.ecran : null); if (!cle) return; prechargerFeuille(); setOuvert({ cle, fiche: fi ? fi.id : null, q: typeof d.q === 'string' ? d.q.slice(0, 80) : '' }); };
     window.addEventListener('vrm:aide', f); return () => window.removeEventListener('vrm:aide', f);
   }, []);
   if (!ouvert) return null;
   if (ouvert === 'signaler') return Signaler ? <Signaler Feuille={Feuille} Bouton={Bouton} entetes={entetes} masque={masque} contexte={() => (contexte ? contexte() : {})} onClose={() => setOuvert(null)}/> : null;
-  return <AideEcranFeuille key={ouvert.cle + (ouvert.fiche || '')} cle={ouvert.cle} vend={vend} mode={mode} ficheOuverte={ouvert.fiche} Feuille={Feuille} Bouton={Bouton} onClose={() => setOuvert(null)} onSignaler={() => setOuvert('signaler')}/>;
+  return <React.Suspense fallback={OUVERTURE}><AideEcranFeuille key={ouvert.cle + (ouvert.fiche || '')} cle={ouvert.cle} vend={vend} mode={mode} ficheOuverte={ouvert.fiche} Feuille={Feuille} Bouton={Bouton} onClose={() => setOuvert(null)} onSignaler={() => setOuvert('signaler')}/></React.Suspense>;
 }
 
 export default AideEcran;

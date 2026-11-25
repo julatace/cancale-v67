@@ -3113,6 +3113,10 @@ function vrmVerifVisible(sel) {
       });
     } catch (_) { favEnVol = false; }
   }
+  // 5.440.2 (Julien : « c'est à l'extension d'aller capter les favoris et d'actualiser l'écran, pas à moi ») : dès que le
+  //    fond a lu la liste des notifications de Vinted (`vrmFavorisListeLue`), la liste des favoris de la carte ouverte est
+  //    redemandée à VRM et redessinée — sans attendre la minute de l'aperçu, sans aucun geste.
+  try { chrome.storage.onChanged.addListener((ch, zone) => { if (zone !== 'local' || !ch.vrmFavorisListeLue) return; apercuFavAt = 0; if (!LISTES && vivant() && carte.classList.contains('on')) rendre(); }); } catch (_) {}
   function brancherFavoris(e) {
     const uid = e && e.site && e.site.id ? String(e.site.id) : '';
     const demander = (quoi, extra, fin) => {
@@ -5299,6 +5303,51 @@ function vrmVerifVisible(sel) {
         rendre(); }); } catch (_) { srEnVol = false; rendre(); }
     });
   }
+  // 5.440.3 : « Observer Vinted (10 min) » — l'interrupteur, l'état (minutes restantes, étapes notées) et « Envoyer
+  //    l'observation ». L'état est lu au fond (`vrmObservation`) ; la frise n'est jamais montrée ici (seulement dans VRM).
+  let obsVue = null, obsTexte = '', obsEnVol = false, obsLu = 0, obsRelire = null;
+  function lireObservation(forcer) {
+    if (!forcer && Date.now() - obsLu < 4000) return;
+    obsLu = Date.now();
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'observation', quoi: 'etat' }, (r) => {
+        void chrome.runtime.lastError;
+        if (!(r && r.ok)) return;
+        const avant = JSON.stringify(obsVue); obsVue = r;
+        if (JSON.stringify(obsVue) !== avant) rendre();
+      });
+    } catch (_) {}
+    clearTimeout(obsRelire);
+    if (obsVue && obsVue.actif) obsRelire = setTimeout(() => lireObservation(true), 5000);
+  }
+  function observationHtml(e) {
+    if (!e || e.plateforme !== 'vinted') return '';
+    lireObservation(false);
+    const o = obsVue, actif = !!(o && o.actif);
+    const reste = actif ? Math.max(1, Math.ceil((Number(o.fin) - Date.now()) / 60000)) : 0;
+    const sous = actif ? TU('ob_en_cours', { min: reste, n: o.n || 0 }) : o && o.n ? TU('ob_fini', { n: o.n }) : TU('ob_eteint');
+    return `<section class="grp5" data-observation="${actif ? 'on' : 'off'}" data-observation-n="${Number(o && o.n) || 0}"><h3>${esc(TU('ob_titre'))}</h3><p class="note5">${esc(TU('ob_note'))}</p>
+      <label class="rg6"><span><b>${esc(TU('ob_switch'))}</b><small data-obs-sous>${esc(sous)}</small></span><span class="v6"><input type="checkbox" data-obs-switch${actif ? ' checked' : ''}${obsEnVol ? ' disabled' : ''} aria-label="${esc(TU('ob_switch'))}"></span></label>
+      ${o && o.n ? `<div class="outils"><button type="button" class="vu-btn" data-obs-envoyer${obsEnVol ? ' disabled' : ''}>${esc(TU('ob_envoyer'))}</button></div>` : ''}
+      ${obsTexte ? `<p class="note5" role="status" data-obs-etat>${esc(obsTexte)}</p>` : ''}
+    </section>`;
+  }
+  function brancherObservation(R) {
+    const envoyerObs = (quoi, apres) => {
+      obsEnVol = true; obsTexte = ''; rendre();
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'observation', quoi }, (r) => {
+          void chrome.runtime.lastError; obsEnVol = false;
+          if (r && r.ok) { if (quoi !== 'envoyer') obsVue = r; apres(r); } else obsTexte = (r && r.raison) || TU('ob_ko');
+          lireObservation(true); rendre();
+        });
+      } catch (_) { obsEnVol = false; obsTexte = TU('ob_ko'); rendre(); }
+    };
+    const sw = R.querySelector('[data-obs-switch]');
+    if (sw) sw.addEventListener('change', () => envoyerObs(sw.checked ? 'demarrer' : 'arreter', () => {}));
+    const env = R.querySelector('[data-obs-envoyer]');
+    if (env) env.addEventListener('click', () => envoyerObs('envoyer', (r) => { obsTexte = TU('ob_envoye', { n: r.n || 0 }); }));
+  }
   function cadenceHtml() {
     const c0 = listes && listes.automatisations && listes.automatisations.cadence;
     if (!listes || !listes.compte || !/^\d{1,20}$/.test(String(listes.compte.id || ''))) return '';
@@ -6255,6 +6304,7 @@ function vrmVerifVisible(sel) {
       ${e.capte && !(e.plateforme === 'leboncoin' && e.lbc) ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}
       ${e.mesure ? `<div class="ligne"><div class="lib">Mesure</div><div class="val gris">VRM apprend à lire ${esc(nomSite)} : il relève la forme des pages, jamais leur contenu. Aucune vente ni annonce n'est encore captée.</div>${(() => { const f = e.flux || {}; return f.koAt && (!f.okAt || f.koAt > f.okAt) ? `<div class="val alerte">Dernier relevé refusé ${esc(depuis(f.koAt))}</div>` : f.okAt ? `<div class="val gris">Relevé envoyé ${esc(depuis(f.okAt))}</div>` : ''; })()}</div>` : ''}
       ${outils ? `<div class="outils">${outils}</div>` : ''}${rapTexte ? `<div class="rep" data-rapport-etat role="status">${esc(rapTexte)}</div>` : ''}
+      ${v && v.connecte ? observationHtml(e) : ''}
       </details>`;
     const lienVrm = (q, k) => `<a class="rg5" href="https://vrm.center/${q}" target="_blank" rel="noopener" data-reglage-vrm="${esc(k)}"><span>${esc(TU(k))}</span><i aria-hidden="true">›</i></a>`;
     const parametres5 = grand5 ? `<div class="par5" data-parametres>
@@ -6302,6 +6352,7 @@ function vrmVerifVisible(sel) {
     if (grand5) garderPanneau();
     brancherReparer();
     brancherRapport();
+    brancherObservation(carte);
     const det = carte.querySelector('[data-detail]');
     if (det) det.addEventListener('toggle', () => { if (resume.etat !== 'geste') detailOuvert = det.open; });
     brancherFavoris(e);

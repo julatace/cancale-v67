@@ -15,7 +15,7 @@
 //  AUTOTEST=1 : le robot se prouve lui-même — sept éléments FAUTIFS sont posés dans la page (bouton mort, trop petit, grisé
 //  sans raison, recouvert, qui lève une erreur, lien cassé, montant qui avale la virgule) ; il doit les attraper TOUS, sinon rouge.
 //  BANC_DIST=<dist d'avant> pour prouver qu'un contrôle était rouge.   Sortie ≠ 0 s'il reste un défaut non admis
-//  (scripts/bancs/chaque-bouton-admis.json : chaque exception avec sa raison).   Un banc ne meurt pas : il rapporte.
+//  (scripts/bancs/_chaque-bouton-admis.cjs : chaque exception avec sa raison).   Un banc ne meurt pas : il rapporte.
 // ═════════════════════════════════════════════════════════════════════════════
 const path = require('path'), fs = require('fs'), os = require('os');
 const B = require('./_bt-commun.cjs');
@@ -47,7 +47,7 @@ const POSER_FAUTIFS = () => {
   const sain = b('cb-test sain'); sain.setAttribute('aria-pressed', 'false'); sain.onclick = () => sain.setAttribute('aria-pressed', sain.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
   document.body.appendChild(d);
 };
-const ADMIS = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'chaque-bouton-admis.json'), 'utf8')); } catch (_) { return []; } })();
+const ADMIS = (() => { try { return require('./_chaque-bouton-admis.cjs'); } catch (_) { return []; } })();
 const admis = (d) => ADMIS.find((a) => (!a.vue || a.vue === d.vue) && a.defaut === d.type && new RegExp(a.cle, 'i').test(d.cle));
 
 // ── Ce qui tourne DANS la page (posé avant l'app) ────────────────────────────────────────────────────────────────

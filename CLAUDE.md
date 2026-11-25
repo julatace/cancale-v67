@@ -398,6 +398,7 @@ Vinted est un **objet** `{amount}` ; les données vivent sous `data.payload`).
    (`_porte-banc.cjs`) sur le playwright du chemin absolu ; un banc rouge en masse ⇒
    regarder d'abord la capture (écran de connexion ?) et `df -h /` (disque plein).
 
+⚠️ **CI (24 nov.)** : les bancs d'une part tournent 3 à la fois (`BANCS_PARALLELE`, chacun son port et son navigateur) ; un banc long se coupe en morceaux de SA variable (`ventes-e2@SCENARIOS=jeu,exclu`, `accessibilite@BANC_LARGEUR=390`, `budget-vitesse@ECRANS=…`) ; avant de toucher un workflow, `python3 -I scripts/ci-controles.py --diff origin/main` doit dire « identiques » (rien de retiré, rien de rendu non bloquant). Récit : `docs/passation/2026-11-24-ci-rapide.md`.
 ⚠️⚠️ **Plusieurs sessions mergent sur `main` en même temps** : amener `main` par un
 **vrai `git merge origin/main`**, jamais `-s ours` ; après, `git diff origin/main --stat`
 ne montre que ses fichiers. **Commiter AVANT toute manipulation de branche.** Une
@@ -454,6 +455,7 @@ sans la fonction.
 
 | capacité | fonction de l'extension | arrivée en | ce que l'app promet |
 |---|---|---|---|
+| `favorislisteentiere` | `listeClocheJusqua` | **5.440.2** (24 nov.) | « pas trouvé dans tes notifications » seulement liste de Vinted lue jusqu'au bout ; sinon le favori attend |
 | `favorislienapp` `favoriscommande` | `lienFavoriProfond` · `identiteParCommande` | **5.440.1** (23 nov. nuit) | favoris : la notification au lien d'application (`vintedfr://messaging?item_id=&user_id=`) reconnue par ses DEUX identités ; conversation sans article ⇒ identité par SA commande (uuid, n°, acheteur, côté vendeur, article), forme inconnue notée (clés/types), sinon rien ne part |
 | `reperage` `clocheauto` `messagerieuuid` `fenetrefavoris` | `vrm-trouver.js:trouver` · `pageNotifsConnue` · `retenirRouteConv` · `lignesFavoris` | **5.440.0** (23 nov.) | favoris sans geste, messagerie uuid, fenêtre ligne par ligne |
 | `vcmoderation` | `transitionModVc` | **5.439.0** (23 nov.) | Vestiaire : compteurs de modération (`users/me/products/count`, lus au passage) et « validée / refusée / à corriger » noté sur l'annonce ; mot d'une annonce en attente jamais vu — `2026-11-22-annulees-vc.md` |
@@ -486,13 +488,12 @@ sans la fonction.
 ## 9. État actuel et décisions récentes
 - **24 nov. · Agir tout (ext. 5.450)** : favoris, vacances, brouillon, Leboncoin pause/supprimer/publier, Vestiaire offres/aimés, baisses, masquer par la file ; eBay expiré ⇒ lecture seule. `2026-11-24-agir-tout.md`. Geste : installer 5.450.
 - **24 nov. · Agir si connecté (`claude/agir-si-connecte`)** : répondre (3 sites), offres Vinted, republier depuis VRM ; chaque bouton d'action passe par `peutAgir` ; badge « Lecture seule ». `2026-11-24-agir-si-connecte.md`. Geste : aucun.
-- **24 nov. · Connexions de l'extension (`claude/connexions-extension`)** : Paramètres → « Connexions de l'extension » : chaque navigateur (nom, version « à jour » ou « 5.418 → 5.440 », vu quand, comptes lus, dernier problème + son geste), chaque compte (lu par qui, quand, jauge 50/h), vieilles installations repliées ; une ligne sur Aujourd'hui seulement si un geste attend ; champs 5.448 (`sante`, `arret`, `servie`) lus présents, sinon « — ». `2026-11-24-connexions-extension.md`. Geste : aucun.
-- **24 nov. · Simulations de bout en bout (`claude/ext-simulations`, ext. 5.449.0)** : la vraie extension chargée contre des sites simulés aux formes mesurées (`scripts/bancs/sim-extension.cjs`) ; suivi des achats : l'expédition d'une commande à sa forme réelle (sans point) n'est plus « inattendue », le transporteur est rangé (`audit-suivi-escrow-forme`). `2026-11-24-simulations-extension.md`. Geste : aucun.
+- **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.440.1** (23 nov. nuit, favoris : lien d'application de la cloche ; avant 5.440.0, favoris sans geste ; versions servies avant : `historique-divers.md`, « Extension servie », fin). **À lire en premier : `docs/passation/2026-11-23-passation-generale.md`** (23 nov. soir), puis `docs/passation/2026-11-22-passation-generale.md` (22 nov.), puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passation-generale.md` (la plus complète : en ligne, prêt, en pause, en file, refusé, gestes), puis `2026-11-16-passation.md`, `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.440.2** (24 nov., favoris : liste lue jusqu'au bout ; avant 5.440.1, lien d'application ; 5.440.0, favoris sans geste ; versions servies avant : `historique-divers.md`, « Extension servie », fin). **À lire en premier : `docs/passation/2026-11-23-passation-generale.md`** (23 nov. soir), puis `docs/passation/2026-11-22-passation-generale.md` (22 nov.), puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passation-generale.md` (la plus complète : en ligne, prêt, en pause, en file, refusé, gestes), puis `2026-11-16-passation.md`, `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien

@@ -977,7 +977,7 @@ function FilVestiaire({ conv, num, titre, envoi, annonce = false, offre = null, 
   );
   else if (fil !== undefined) pied = <PiedSansEnvoi lien={lien} texteLien="Ouvrir sur Vestiaire ↗" raison="Sans le texte de la conversation, VRM ne répond pas d'ici."/>;
   return (
-    <CadreFil etiquette="Conversation Vestiaire" onFermer={onFerme} attrs={{ 'data-vc-fil-ouvert': conv }}>
+    <CadreFil etiquette={tr('a11y.conversationSur', { site: 'Vestiaire' })} onFermer={onFerme} attrs={{ 'data-vc-fil-ouvert': conv }}>
       <TeteFil onFermer={onFerme} nom={num ? `N°${num}` : 'Conversation pas reliée à un article VRM'} titre={titre || ''} compte="Vestiaire"/>
       {/* (12 nov.) L'offre de CET article (même productId, §5), en carte, en tête du fil : ses gestes seulement
           quand c'est à lui de répondre (`OffresVestiaire`, recettes apprises, inchangé). */}
