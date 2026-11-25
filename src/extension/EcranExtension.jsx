@@ -260,7 +260,7 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
             // « Lié » : une coche (le titre du groupe dit déjà « liés »).
             return <Rangee key={`lie:${c.site}:${c.id}`} icone={<LogoSite site={c.site} taille={20} nom={NOMS_SITES[c.site]}/>}
               titre={c.nom || '—'} sousTitre={[ici ? tr('ext.lies.ici') : '', faits.ext && faits.ext.version ? tr('ext.lies.version', { v: faits.ext.version }) : ''].filter(Boolean).join(' · ')}
-              valeur={<><GlypheNatif nom="coche" taille={18}/><span className="n-lu-seul">{tr('ext.lies.lie')}</span></>} attrs={{ 'data-ext-lie': `${c.site}:${c.id}`, 'data-ext-lie-ici': ici ? '1' : '0' }}/>;
+              valeur={<><GlypheNatif nom="check" taille={18}/><span className="n-lu-seul">{tr('ext.lies.lie')}</span></>} attrs={{ 'data-ext-lie': `${c.site}:${c.id}`, 'data-ext-lie-ici': ici ? '1' : '0' }}/>;
           })}
         </Groupe>
       ) : null}
