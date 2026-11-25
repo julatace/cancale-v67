@@ -32,6 +32,9 @@ const MUTATIONS = {
   'bg-sans-retour-oublie': ['BG', "cmd: 'lbcSupprime', id: a.id, confirme: true, sansRetour: true,", "cmd: 'lbcSupprime', id: a.id, confirme: true,"],
   'bg-apres-vente-2e-copie': ['BG', "    if (v.prouvee !== true) continue;", "    if (!String(v.statut || '') && !v.code) continue;"],
   'bg-favoris-tous': ['BG', "const choix = cochables.filter((x) => !voulus || voulus.has(String(x.id)))", "const choix = (Array.isArray(ap.liste) ? ap.liste : []).filter((x) => x && x.id)"],
+  // 5.453.1 : le choix de la 5.450–5.453.0 (dans `apercu.liste`, qui ne porte pas `cochable`) — rien ne partait jamais.
+  'bg-favoris-liste-5453': ['BG', "const cochables = (Array.isArray(ap.tous) ? ap.tous : []).filter((x) => x && x.id && okIds.has(String(x.id))).sort((p, q) => parDate(q) - parDate(p));", "const cochables = (Array.isArray(ap.liste) ? ap.liste : []).filter((x) => x && x.cochable === true && x.id);"],
+  'favoris-distcap-ancien': ['agir/peutAgir.js', "favoris: { cap: 'favoris', dist: 'favoris', distCap: 'favorisdistance' },", "favoris: { cap: 'favoris', dist: 'favoris', distCap: 'agirtout' },"],
   'favoris-sans-confirmation': ['aDistance.js', "const ADIST_CONFIRMER = ['accepter', 'republier', 'favoris', 'supprimer'];", "const ADIST_CONFIRMER = ['accepter', 'republier'];"],
   'ebay-expire-ok': ['agir/peutAgir.js', "if (j === 'expire') return non('ebay-expire', base, 'reconnecter-ebay');", "if (j === 'expire') return { ok: true, voie: 'api', par: null };"],
   'distcap-ignore': ['agir/peutAgir.js', "g.distCap ? (caps[g.distCap] || '9999.0.0') : '0.0.0'", "'0.0.0'"],
@@ -77,7 +80,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const T = Date.now();
   const CAPS = { messagerie: '5.135.0', favoris: '5.217.0', republierpage: '5.277.0', baisseprix: '5.336.0', masquercarte: '5.409.0', vacances: '5.338.0', creervinted: '5.367.0',
     commande: '5.129.0', panneaucomplet: '5.410.0', lbcrepondre: '5.318.0', lbcprix: '5.368.0', lbcinterface: '5.416.0', lbcsupprime: '5.291.0', publication: '5.160.0',
-    lbcecrireinteresses: '5.410.0', vcrepondre: '5.295.0', vcoffrerepondre: '5.319.0', vcprix: '5.368.0', vcpublier: '5.235.0', vcaimes: '5.393.0', adistance: '5.436.0', agirtout: '5.450.0' };
+    lbcecrireinteresses: '5.410.0', vcrepondre: '5.295.0', vcoffrerepondre: '5.319.0', vcprix: '5.368.0', vcpublier: '5.235.0', vcaimes: '5.393.0', adistance: '5.436.0', agirtout: '5.450.0', favorisdistance: '5.453.1' };
   const MOI = '0f0e0d0c-0000-4000-8000-000000000001';
   // 50 comptes Vinted, TOUS nommés « boutique » (les mêmes titres partout) : seule l'identité (uid) les distingue.
   const UIDS = Array.from({ length: 50 }, (_, i) => String(41000001 + i));
@@ -86,9 +89,9 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const ICI = 'aaaaaaaaaaaaaaaa', ORDI = 'bbbbbbbbbbbbbbbb';
   const presence = (id, comptes, ver = '5.450.0', age = 30000) => ({ id, atMs: T - age, allume: age < 180000, ver, nav: 'chrome', sys: 'mac', comptes, retenues: [], enCours: '', rt: '' });
   // CE navigateur : extension branchée à CE compte VRM, onglet Vinted sur A.
-  const extIci = (uidOnglet = A, version = '5.450.0') => ({ present: true, appelsFinis: true, installeeIci: true, version, plusieurs: [], perime: false,
+  const extIci = (uidOnglet = A, version = '5.453.1') => ({ present: true, appelsFinis: true, installeeIci: true, version, plusieurs: [], perime: false,
     etat: { ok: true, vrm: { connecte: true, user_id: MOI, email: 'x@y.z' }, vinted: uidOnglet ? { uid: uidOnglet, login: 'boutique' } : null, ici: { appareil: ICI } } });
-  const faits = (plus = {}) => ({ maintenant: T, attendue: '5.450.0', capacites: CAPS, telephone: false, brancheEnCours: false, moi: { id: MOI, email: 'x@y.z' },
+  const faits = (plus = {}) => ({ maintenant: T, attendue: '5.453.1', capacites: CAPS, telephone: false, brancheEnCours: false, moi: { id: MOI, email: 'x@y.z' },
     ext: extIci(), presences: [presence(ICI, [{ site: 'vinted', id: A, nom: 'boutique' }, { site: 'leboncoin', id: 'lbcA', nom: 'boutique' }, { site: 'vestiaire', id: 'vcA', nom: 'boutique' }])],
     appareils: [], toutArrete: null, ebay: { principal: true }, noms, ...plus });
   const GESTES = P.GESTES_AGIR;
@@ -153,7 +156,12 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(nouveaux.every(([si, co, g]) => P.peutAgir(F448, { site: si, compte: co, geste: g, par: 'file' }).raison === 'retard') && P.peutAgir(F448, { site: 'vinted', compte: B, geste: 'repondre', par: 'file' }).ok,
     'ordinateur en 5.448 : les gestes de la 5.450 (favoris, vacances, brouillon, pause/supprimer/publier Leboncoin, offres/aimés Vestiaire) en lecture seule (« mets à jour »), répondre permis');
   const F450 = faits({ ext: Fd.ext, presences: [presence(ORDI, [{ site: 'vinted', id: B }, { site: 'leboncoin', id: 'lbcB' }, { site: 'vestiaire', id: 'vcB' }], '5.450.0')] });
-  dit(nouveaux.every(([si, co, g]) => P.peutAgir(F450, { site: si, compte: co, geste: g, par: 'file' }).voie === 'distance'), 'ordinateur en 5.450 : ces gestes partent à distance');
+  // 5.453.1 : « favoris » à distance exige la 5.453.1 (avant, `distFavoris` ne choisissait jamais rien : « aucun favori à contacter »).
+  const sansFavV = nouveaux.filter(([si, , g]) => !(si === 'vinted' && g === 'favoris'));
+  dit(sansFavV.every(([si, co, g]) => P.peutAgir(F450, { site: si, compte: co, geste: g, par: 'file' }).voie === 'distance'), 'ordinateur en 5.450 : ces gestes partent à distance');
+  const F4531 = faits({ ext: Fd.ext, presences: [presence(ORDI, [{ site: 'vinted', id: B }], '5.453.1')] });
+  dit(P.peutAgir(F450, { site: 'vinted', compte: B, geste: 'favoris', par: 'file' }).raison === 'retard' && P.peutAgir(F4531, { site: 'vinted', compte: B, geste: 'favoris', par: 'file' }).voie === 'distance',
+    '« Envoyer aux favoris » à distance : « mets à jour » pour une 5.450–5.453.0 (elle n’envoyait rien), part à distance dès la 5.453.1');
   const eteint = faits({ ext: Fd.ext, presences: [presence(ORDI, [{ site: 'vinted', id: B, nom: 'boutique' }], '5.448.0', 10 * 60000)] });
   dit(P.peutAgir(eteint, { site: 'vinted', compte: B, geste: 'repondre', par: 'file' }).ok === false, 'ordinateur éteint (présence de 10 min) ⇒ lecture seule');
 
@@ -211,7 +219,11 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   else if (bg && typeof bg.ctx.distanceExecuter === 'function') {
     const vus = [];
     bg.ctx.executerCommande = async (msg) => { vus.push(msg); return { accepte: true, etape: 'fait' }; };
-    bg.ctx.apercuCarteFrais = async () => ({ ok: true, apercu: { reglages: { r: 1 }, liste: [{ id: 'notif-1', cochable: true, itemId: '91010001' }, { id: 'notif-2', cochable: false }, { id: 'notif-3', cochable: true, itemId: '91010002' }] } });
+    // 5.453.1 : la VRAIE forme de l'aperçu (api/_lib/favoris-carte.js) — `liste` (15 prêts) ne porte PAS `cochable` ; seule `tous`
+    //    porte `cochable` et `envoi`. L'ancienne fixture (cochable dans `liste`) était une fiction : elle cachait que `distFavoris`
+    //    ne choisissait jamais rien chez Julien.
+    bg.ctx.apercuCarteFrais = async () => ({ ok: true, apercu: { etat: 'pret', reglages: { r: 1 }, liste: [{ id: 'notif-1', itemId: '91010001' }, { id: 'notif-3', itemId: '91010002' }],
+      tous: [{ id: 'notif-1', itemId: '91010001', cochable: true, envoi: 'a_envoyer', date: '2026-11-25T10:00:00Z' }, { id: 'notif-2', itemId: '91010003', cochable: false, envoi: 'envoye' }, { id: 'notif-3', itemId: '91010002', cochable: true, envoi: 'a_envoyer', date: '2026-11-25T09:00:00Z' }] } });
     const lances = [];
     bg.ctx.favorisCarte = async (msg, sender) => { lances.push({ msg, sender }); return { ok: true }; };
     const issues = [];
