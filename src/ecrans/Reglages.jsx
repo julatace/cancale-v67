@@ -2043,6 +2043,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // La catégorie qui range une rangée : lue dans le rangement du DERNIER rendu (un réglage ajouté
   // ailleurs, rangé par le filet de son groupe d'avant, se trouve aussi).
   const rangementRef = React.useRef([]);
+  const idsDonneesRef = React.useRef(null);   // (25 nov., moins de texte) les rangées de « Sécurité des données » gardent leur phrase écrite
   const categorieDeRangee = (id) => { const c = (rangementRef.current || []).find((x) => x.ids.includes(id)); return c ? c.id : null; };
   // Aller à un réglage (lien profond, conseil, cloche) : sa catégorie, puis son panneau (ou sa rangée).
   const allerAuReglage = (brut) => { const id = rangeeDuLien(brut); const c = categorieDeRangee(id); setPousse({ cat: false, sous: false }); setCat(c); ouvrirSous(id, true); return id; };
@@ -2088,6 +2089,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   //    composant défini ici serait recréé à chaque rendu, et ce qu'il contient
   //    — un panneau en cours de saisie — remonterait à neuf).
   const chevron = <svg className="vrm-set-chev" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke={C.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m1.5 1.5 6 6-6 6"/></svg>;
+  const phraseEcrite = (it) => !!(idsDonneesRef.current && idsDonneesRef.current.has(it.id));
   const ligne = (it) => {
     if (it.type === 'el') return <React.Fragment key={it.id}>{it.el}</React.Fragment>;
     const ouvre = it.type === 'panneau';
@@ -2098,7 +2100,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         {/* (6 nov., onglets D) « Chaque réglage dit en une phrase ce qu'il fait » (demande du 6 nov.,
             qui remplace la critique #1.4 du 3 nov.) : la phrase revient, UNE ligne grise, courte ;
             une alerte (un élément) garde sa couleur. */}
-        {it.desc && <small className="vrm-set-desc" data-reglage-phrase={typeof it.desc === 'string' ? '' : 'alerte'} style={{color:C.muted}}>{it.desc}</small>}
+        {/* (25 nov., moins de texte — Julien : « dès qu'il y a du texte, tu l'enlèves ») La phrase d'un réglage est lue au
+            lecteur d'écran (et dite au survol), plus écrite sous chaque nom : le nom suffit à l'œil. Restent ÉCRITES : une alerte
+            (un élément, sa couleur) et les phrases du panneau « Sécurité des données » (vocabulaire assumé, CLAUDE.md §5). */}
+        {it.desc && <small className={'vrm-set-desc' + (typeof it.desc === 'string' && !phraseEcrite(it) ? ' vrm-sr-seul' : '')} data-reglage-phrase={typeof it.desc === 'string' ? '' : 'alerte'} style={{color:C.muted}}>{it.desc}</small>}
       </span>
       {it.val != null && it.val !== '' && <span className="vrm-set-val" style={{color:C.muted}}>{it.val}</span>}
       {it.type === 'switch' && <Interrupteur on={it.on} label={it.lib} onClick={it.onClick} {...(it.data || {})}/>}
@@ -2106,7 +2111,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     </>);
     if (it.type === 'switch') return <div key={it.id} className="vrm-set-ligne" data-reglage-id={it.id}>{corps}</div>;
     return (
-      <button key={it.id} type="button" className="vrm-set-ligne" data-reglage-id={it.id}
+      <button key={it.id} type="button" className="vrm-set-ligne" data-reglage-id={it.id} title={typeof it.desc === 'string' && !phraseEcrite(it) ? it.desc : undefined}
         onClick={ouvre ? () => ouvrirSous(it.id) : it.onClick}
         {...(ouvre ? { 'data-sous-ouvrir': it.id, 'aria-haspopup': 'true' } : {})} {...(it.data || {})}>
         {corps}
@@ -2475,6 +2480,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
   const categories = rangerParCategorie(groupes);
   rangementRef.current = categories;
+  idsDonneesRef.current = new Set(((categories.find((c) => c.id === 'donnees') || {}).ids) || []);
   // (17 nov., nouveau design — Julien : « c'est beau mais les cases sont dispersées partout ») NEUF SECTIONS, dans l'ordre des
   // Réglages d'iOS : Compte · Plateformes et comptes · Ventes et colis · Stock et numéros · Argent et compta · Apparence et
   // langue · Notifications · Sécurité et données · Aide. « Sécurité des comptes » et « Sécurité des données » (le panneau
@@ -2557,7 +2563,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       <button key={c.id} type="button" className="vrm-set-ligne vrm-pm-cat-ligne" data-categorie-ouvrir={c.id} data-categorie-contient={` ${c.ids.join(' ')} `}
         {...(c.id === 'compte' ? { 'data-vue': 'compte' } : {})} aria-current={actif ? 'true' : undefined} onClick={surClic}>
         <span className="vrm-pm-cat-ic" aria-hidden="true" data-pm-cat={c.id}><Icon name={c.ic} size={17}/></span>
-        <span className="vrm-set-lib"><b style={{color:C.text}}>{titreCat(c.id)}</b><small className="vrm-set-desc" style={{color:C.muted}}>{tr(`parametres.cat.${c.id}.desc`)}</small></span>
+        <span className="vrm-set-lib"><b style={{color:C.text}}>{titreCat(c.id)}</b><small className="vrm-set-desc vrm-sr-seul">{' — ' + tr(`parametres.cat.${c.id}.desc`)}</small></span>
         {v && <span className="vrm-set-val" data-categorie-valeur={c.id} style={{color: ambre ? C.warn : C.muted}}>{v}</span>}
         {chevron}
       </button>

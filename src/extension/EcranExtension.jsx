@@ -14,7 +14,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr, heure as heureLoc, dateRelative } from '../i18n/index.js';
-import { Page, Groupe, Rangee, Bouton, Attente, poserIcone, iconePosee } from '../natif/index.js';
+import { Page, Groupe, Rangee, Bouton, Attente, poserIcone, iconePosee, Pourquoi as PourquoiNatif } from '../natif/index.js';
 import { pageExtension } from './peutFaire.js';
 import { useLignesActions } from '../JaugeActions.jsx';
 import { jaugeDuCompte, toutArreteDe } from '../jaugeActions.js';
@@ -237,7 +237,7 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
   return (
     <Page titre={tr('ext.titre')} plein={plein} attrs={{ 'data-ecran-extension': '', 'data-ext-nav': nav.code, 'data-ext-pastille': vm.pastille.code }}>
       <Groupe titre={tr('ext.groupe.navigateur')} attrs={{ 'data-ext-groupe': 'navigateur' }}>
-        <Rangee titre={dire(nav.cle, nav.vars)} lignes={2} ton={nav.ton === 'geste' ? 'ambre' : 'neutre'} sousTitre={consigne} attrs={{ 'data-ext-nav-phrase': nav.code }}/>
+        <Rangee titre={nav.cle === 'ext.nav.telephone' ? <><span aria-hidden="true">{tr('mtb.extTelephone')}</span><span className="n-lu-seul">{dire(nav.cle, nav.vars)}</span></> : dire(nav.cle, nav.vars)} lignes={2} ton={nav.ton === 'geste' ? 'ambre' : 'neutre'} sousTitre={consigne} attrs={{ 'data-ext-nav-phrase': nav.code }}/>
         {vm.avertissements.map((a) => <Rangee key={a.code} titre={dire(a.cle, a.vars)} lignes={2} ton="ambre" fin={a.geste ? 'chevron' : null} onClick={a.geste === 'reprendre-tout' ? reprendreTout : null} attrs={{ 'data-ext-avert': a.code }}/>)}
         <Pourquoi cle={nav.pourquoi || (vm.avertissements[0] && vm.avertissements[0].pourquoi)} id={'nav-' + nav.code}/>
       </Groupe>
@@ -253,7 +253,7 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
           pseudo, « vu ici » quand l'extension de CE navigateur le voit, navigateur · version de l'extension, « Lié »). Les mêmes
           comptes et la même ouverture que les groupes dessous (`pageExtension`) ; délier reste dans Paramètres → Comptes. */}
       {!chargement && vm.sites.some((s) => s.comptes.length) ? (
-        <Groupe titre={tr('ext.groupe.lies')} pied={tr('ext.lies.pied')} attrs={{ 'data-ext-groupe': 'lies' }}>
+        <Groupe titre={tr('ext.groupe.lies')} pied={<PourquoiNatif>{tr('ext.lies.pied')}</PourquoiNatif>} attrs={{ 'data-ext-groupe': 'lies' }}>
           {vm.sites.flatMap((s) => s.comptes).map((c) => {
             const ici = c.ouverture === 'ici' || c.ouverture === 'relais';
             return <Rangee key={`lie:${c.site}:${c.id}`} icone={<span className="n-ext-initiale" aria-hidden="true">{String(c.nom || '?').trim().charAt(0).toUpperCase() || '?'}</span>}
@@ -266,7 +266,7 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
       {/* (21 nov., ext. 5.420 `santecomptes`) LA SANTÉ DE CHAQUE COMPTE : l'état calculé par l'extension de CE navigateur
           (Bon · Attention · Pause, la raison et quoi faire) — rien n'est recalculé ici ; pas dit ⇒ « — » et la raison. */}
       {!chargement && faits.ext && faits.ext.present ? (
-        <Groupe titre={tr('ext.sante.groupe')} pied={tr('ext.sante.pied')} attrs={{ 'data-ext-groupe': 'sante' }}>
+        <Groupe titre={tr('ext.sante.groupe')} pied={<PourquoiNatif>{tr('ext.sante.pied')}</PourquoiNatif>} attrs={{ 'data-ext-groupe': 'sante' }}>
           {faits.ext.etat && faits.ext.etat.sante && Array.isArray(faits.ext.etat.sante.comptes) ? faits.ext.etat.sante.comptes.filter((c) => c && !ecarte(String(c.uid))).map((c) => {
             const v = c.sante || { etat: 'passu', raison: 'passu' };
             const h = Number(v.jusqua) > 0 ? heureLoc(Number(v.jusqua)) : '';

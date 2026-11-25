@@ -18743,7 +18743,7 @@ function groupesMenu({ tab, setTab, badges, sites, taille = 22, ordi = false }) 
   const notifs = { cle: 'notifications', libelle: tr('menu.notifications'), icone: <Icon name="bell2" size={taille}/>, onChoisir: ouvrirCentreNotifs, attrs: { 'data-n-plus-entree': 'notifications', 'data-n-notifs': '' } };
   return [...tete,
     { titre: tr('menu.groupe.gestion'), cle: 'gestion', tuiles: [vus.has('garage') || tab === 'garage' ? tuile('garage') : null, ordi ? tuile('messages') : null, ordi ? notifs : null, tuile('emails')].filter(Boolean) },
-    { titre: tr('menu.groupe.extension'), cle: 'extension', pied: ordi ? '' : tr('menu.extensionPied'), tuiles: [
+    { titre: tr('menu.groupe.extension'), cle: 'extension', pied: ordi ? '' : tr('menu.extensionPied'), piedLu: true, tuiles: [
       { cle: 'favoris-ext', libelle: tr('menu.favoris'), icone: <Icon name="heart" size={taille}/>, onChoisir: () => ouvrirPanneau({ site: 'vinted', page: 'favoris' }), attrs: { 'data-n-plus-entree': 'favoris-ext', 'data-n-panneau': 'favoris' } },
       { cle: 'automatisations-ext', libelle: tr('menu.automatisations'), icone: <Icon name="spark" size={taille}/>, valeur: n > 0 ? tr('menu.actives', { n }) : '', onChoisir: () => ouvrirPanneau({ site: 'vinted', page: 'automatisations' }), attrs: { 'data-n-plus-entree': 'automatisations-ext', 'data-n-panneau': 'automatisations', 'data-auto-actives': String(n) } }] },
     { titre: tr('menu.groupe.aide'), cle: 'aide', tuiles: [
@@ -18776,7 +18776,7 @@ function EcranMenu({ tab, setTab, badges, sites, entreprise, streamVisible = fal
       <CarteCompte avatar={uid ? <PastilleProfil owner={uid} headers={enTeteSession} nom={nomCompte} email={mail} taille={40} className="vrm-sensible"/> : <Natif.Avatar compte={{ initiales: 'V' }} taille={40}/>}
         nom={<span className="vrm-sensible">{uid ? nomCoque.texte : tr('menu.compte')}</span>} sousTitre={tr('menu.parametres')}
         onChoisir={() => { revenirSurOnglet(); ouvrirEntree(ONGLET_PARAMETRES, setTab); }} attrs={{ 'data-n-plus-entree': 'settings', 'data-nav-entree': 'settings', 'data-profil-tete': '' }}/>
-      {groupes.map((g) => <GrilleMenu key={g.cle} titre={g.titre} pied={g.pied} tuiles={g.tuiles.map((t) => ({ ...t, pastille: t.pastille }))} attrs={{ 'data-n-menu-groupe': g.cle }}/>)}
+      {groupes.map((g) => <GrilleMenu key={g.cle} titre={g.titre} pied={g.pied} piedLu={!!g.piedLu} tuiles={g.tuiles.map((t) => ({ ...t, pastille: t.pastille }))} attrs={{ 'data-n-menu-groupe': g.cle }}/>)}
       <Natif.Groupe attrs={{ 'data-n-menu-reglages': '' }}>
         <Natif.Rangee titre={tr('coque.cacherMontants')} icone={<Icon name="eyeOff" size={22}/>} interrupteur={{ actif: montants, onChange: (v) => poserMontants(v), attrs: { 'data-bouton-montants': '', 'data-montants-caches': montants ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'montants' }}/>
         <Natif.Rangee titre={tr('presentation.lib')} icone={<Icon name="presentation" size={22}/>} interrupteur={{ actif: presentation, onChange: (v) => poserPresentation(v), attrs: { 'data-bouton-presentation': '', 'data-presentation-on': presentation ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'presentation' }}/>

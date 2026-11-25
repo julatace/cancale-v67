@@ -65,7 +65,7 @@ import { lireTableFamilles, lireCategoriesFiches, fabriqueFamDe } from '../categ
 import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
 import { totauxVentesManuelles, beneficeVenteManuelle } from '../venteManuelle.js';
 import { ecrireLocal } from '../stockageSur.js';   // (11 nov.) Safari privé / quota : le bouton ferme quand même
-import { tr } from '../i18n/index.js';
+import { tr, localeCourante } from '../i18n/index.js';
 import { useLectureBornee } from '../attenteBornee.js';
 import { trj } from '../i18n/react.js';
 import ComptesVinted from '../ComptesVinted.jsx';   // (13 nov., lot 36-27) « Tes comptes Vinted » sur 30 j / 90 j / année
@@ -1574,7 +1574,7 @@ function PoserCategories({ cles, titres, vendu, main, onClose }) {
 // les règles sont celles de src/statsPlus.js (qui assemble les propriétaires).
 // ═══════════════════════════════════════════════════════════════════════════
 const plSP = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
-const ecartTxt = (e, nomPrec) => (e == null ? '' : `${e > 0 ? '+' : e < 0 ? '−' : '±'}${Math.abs(e)} % par rapport à ${nomPrec}`);
+const ecartTxt = (e) => (e == null ? '' : `${e > 0 ? '+' : e < 0 ? '−' : '±'}${Math.abs(e)} %`);   // (25 nov., moins de texte) « par rapport à … » : dit une fois, dans le sous-titre
 const RAISON_RECU = { absente: 'le reçu se calcule dans Ventes (ouvre-le une fois)', ancienne: 'calcul du reçu trop ancien : rouvre Ventes', 'ancienne-app': 'calcul du reçu trop ancien : rouvre Ventes', illisible: 'le reçu n’a pas pu être lu', encours: 'je lis le reçu…', partiel: 'reçu pas tout lu' };
 // Le graphique « Vendu et reçu » : deux barres par période, sans bibliothèque (SVG).
 // Chaque groupe est un BOUTON : toucher ou tabuler écrit ses deux valeurs au-dessus.
@@ -1688,10 +1688,10 @@ function MesRecords({ vendu, releve, partiel, onGo }) {
   return (
     <>
       <div className="vrm-sp-records" data-sp-records="">
-        {ligne('mois', tr('stats.meilleurMois2'), M, M && !M.pasAssez ? fmt(M.eur) : '', M && !M.pasAssez ? `${nomMoisSP(M.k)} · ${plSP(M.n, 'vente')}${lu}` : M ? `pas assez de données (${plSP(M.nGroupes, 'mois', 'mois')} de ventes)` : '', M && !M.pasAssez ? { 'data-sp-record-k': M.k, 'data-sp-record-v': String(Math.round(M.eur * 100)) } : {})}
-        {ligne('semaine', tr('stats.meilleureSemaine'), S, S && !S.pasAssez ? fmt(S.eur) : '', S && !S.pasAssez ? `du ${new Date(S.de).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })} · ${plSP(S.n, 'vente')}${lu}` : S ? 'pas assez de données' : '', S && !S.pasAssez ? { 'data-sp-record-v': String(Math.round(S.eur * 100)) } : {})}
-        {ligne('vente', tr('stats.meilleureVente'), V, V && !V.pasAssez ? `+${fmt(V.brut)}` : '', V && !V.pasAssez ? `parmi les ventes au prix d’achat connu (${V.nCout} sur ${V.n}) · ${V.titre || 'Sans titre'}` : V ? `pas assez de données\u00a0· prix d’achat connu ${V.nCout} sur ${V.n}` : '', V && !V.pasAssez ? { 'data-sp-record-v': String(Math.round(V.brut * 100)), 'data-sp-record-couv': `${V.nCout}/${V.n}` } : {})}
-        {ligne('rapide', tr('stats.ventePlusRapide'), Q, Q && !Q.pasAssez ? delaiSP(Q) : '', Q && !Q.pasAssez ? `parmi ${plSP(Q.nDelai, 'vente Vinted datée', 'ventes Vinted datées')} · ${Q.titre || 'Sans titre'}` : Q ? 'pas assez de ventes Vinted à la date de mise en ligne connue' : '', Q && !Q.pasAssez ? { 'data-sp-record-h': String(Q.heures) } : {})}
+        {ligne('mois', tr('stats.meilleurMois2'), M, M && !M.pasAssez ? fmt(M.eur) : '', M && !M.pasAssez ? `${nomMoisSP(M.k)} · ${plSP(M.n, 'vente')}${lu}` : M ? tr('mtb.peuDeMois', { n: M.nGroupes }) : '', M && !M.pasAssez ? { 'data-sp-record-k': M.k, 'data-sp-record-v': String(Math.round(M.eur * 100)) } : {})}
+        {ligne('semaine', tr('stats.meilleureSemaine'), S, S && !S.pasAssez ? fmt(S.eur) : '', S && !S.pasAssez ? `du ${new Date(S.de).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })} · ${plSP(S.n, 'vente')}${lu}` : S ? tr('mtb.pasAssez') : '', S && !S.pasAssez ? { 'data-sp-record-v': String(Math.round(S.eur * 100)) } : {})}
+        {ligne('vente', tr('stats.meilleureVente'), V, V && !V.pasAssez ? `+${fmt(V.brut)}` : '', V && !V.pasAssez ? `parmi les ventes au prix d’achat connu (${V.nCout} sur ${V.n}) · ${V.titre || 'Sans titre'}` : V ? tr('mtb.prixAchatSur', { n: V.nCout, total: V.n }) : '', V && !V.pasAssez ? { 'data-sp-record-v': String(Math.round(V.brut * 100)), 'data-sp-record-couv': `${V.nCout}/${V.n}` } : {})}
+        {ligne('rapide', tr('stats.ventePlusRapide'), Q, Q && !Q.pasAssez ? delaiSP(Q) : '', Q && !Q.pasAssez ? `parmi ${plSP(Q.nDelai, 'vente Vinted datée', 'ventes Vinted datées')} · ${Q.titre || 'Sans titre'}` : Q ? tr('mtb.miseEnLigneInconnue') : '', Q && !Q.pasAssez ? { 'data-sp-record-h': String(Q.heures) } : {})}
       </div>
       {feuille()}
     </>
@@ -1749,7 +1749,7 @@ function ComparerComptes({ comptes, brutComptes, enLigneDe }) {
           ))}
         </tbody>
       </table>
-      <p className="vrm-sv-note">{trj('stats.periodeComptesSelectionnes2', { MIN_DONNEES: MIN_DONNEES })}</p>
+      <p className="vrm-sv-note" data-mtb-pourquoi="comparer"><Pourquoi>{trj('stats.periodeComptesSelectionnes2', { MIN_DONNEES: MIN_DONNEES })}</Pourquoi></p>
     </div>
   );
 }
@@ -1779,12 +1779,12 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
   const tPanier = R === undefined ? tuile('sp-panier', tr('stats.panierMoyen'), '—', 'je lis tes ventes…', { 'data-sv-etat': 'encours' })
     : R === null ? tuile('sp-panier', tr('stats.panierMoyen'), '—', 'ventes pas pu être lues', { 'data-sv-etat': 'passu' })
       : R.partiel ? tuile('sp-panier', tr('stats.panierMoyen'), '—', 'des ventes au montant pas lu : pas de moyenne', { 'data-sv-etat': 'partiel', 'data-sp-panier': '' })
-        : R.panier == null ? tuile('sp-panier', tr('stats.panierMoyen'), '—', R.n === 0 ? 'aucune vente sur la période' : `pas assez de données (${plSP(R.n, 'vente')}, il en faut ${MIN_DONNEES})`, { 'data-sv-etat': 'pas-assez', 'data-sp-panier': '' })
+        : R.panier == null ? tuile('sp-panier', tr('stats.panierMoyen'), '—', R.n === 0 ? tr('mtb.aucuneVente') : tr('mtb.minVentes', { min: MIN_DONNEES }), { 'data-sv-etat': 'pas-assez', 'data-sp-panier': '' })
           : tuile('sp-panier', tr('stats.panierMoyen'), fmt(R.panier), R.ecartPanier != null ? ecartTxt(R.ecartPanier, nomPrec) : `sur ${plSP(R.n, 'vente')}`,
             { 'data-sv-etat': 'lu', 'data-sp-panier': String(Math.round(R.panier * 100)), 'data-sp-ecart-panier': R.ecartPanier == null ? '' : R.ecartPanier }, tr('stats.venduPeriodeDivise'));
   const tMarge = M === undefined || lp === undefined ? tuile('sp-marge', tr('stats.margeConnue'), '—', 'je lis tes ventes…', { 'data-sv-etat': 'encours' })
     : !M ? tuile('sp-marge', tr('stats.margeConnue'), '—', 'pas encore calculé', { 'data-sv-etat': 'passu' })
-      : M.marge == null ? tuile('sp-marge', tr('stats.margeConnue'), '—', M.n === 0 ? 'aucune vente finalisée' : `pas assez de données\u00a0· prix d’achat connu ${M.nCout} sur ${M.n}`, { 'data-sv-etat': 'pas-assez', 'data-sp-marge': '', 'data-sp-couv': `${M.nCout}/${M.n}` })
+      : M.marge == null ? tuile('sp-marge', tr('stats.margeConnue'), '—', M.n === 0 ? tr('mtb.aucuneFinalisee') : tr('mtb.prixAchatSur', { n: M.nCout, total: M.n }), { 'data-sv-etat': 'pas-assez', 'data-sp-marge': '', 'data-sp-couv': `${M.nCout}/${M.n}` })
         : tuile('sp-marge', tr('stats.margeConnue'), pct(M.marge), <>{fmt(M.moyen)} {tr('stats.vente2')}{M.nCout < M.n ? tr('stats.ventes4', { nCout: String(M.nCout), x: String(M.n) }) : ''}</>,
           { 'data-sv-etat': 'lu', 'data-sp-marge': String(M.marge), 'data-sp-moyen': String(Math.round(M.moyen * 100)), 'data-sp-couv': `${M.nCout}/${M.n}`, 'data-benef-notion': 'brut' },
           `${NOM_BENEFICE_BRUT} ÷ ventes, seulement les ventes finalisées au prix d’achat connu (sans frais, dépenses ni URSSAF).`);
@@ -1803,7 +1803,7 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
   const corpsTop = T === undefined ? vide(tr('stats.jeLisVentes'), { 'data-sv-etat': 'encours' })
     : T === null ? vide(tr('stats.encoreCalculeOuvre'), { 'data-sv-etat': 'passu' })
       : T.n === 0 ? vide(tr('stats.aucuneVenteFinalisee'), { 'data-sv-etat': 'lu' })
-        : T.nCout === 0 ? vide(`Il manque le prix d’achat de tes ${plSP(T.n, 'vente finalisée', 'ventes finalisées')} : rien à classer.`, { 'data-sv-etat': 'lu', 'data-sp-top-couv': `0/${T.n}` })
+        : T.nCout === 0 ? vide(tr('mtb.prixAchatSur', { n: 0, total: T.n }), { 'data-sv-etat': 'lu', 'data-sp-top-couv': `0/${T.n}` })
           : (
             <ol className="vrm-sp-top" data-sv-etat="lu" data-sp-top={T.lignes.map((l) => Math.round(l.brut * 100)).join(',')} data-sp-top-couv={`${T.nCout}/${T.n}`}>
               {T.lignes.map((l, i) => (
@@ -2023,7 +2023,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
   const tVendu = V == null
     ? tuile('vendu', 'Vendu', '—', vendu === null ? 'ventes pas pu être lues' : 'je lis tes ventes…', { 'data-sv-etat': vendu === null ? 'passu' : 'encours' })
     : tuile('vendu', 'Vendu', `${partielVendu ? 'au moins ' : ''}${fmt(V.eur)}`,
-      <>{pl(V.n, 'vente')}{V.ecart != null && !partielVendu ? <span title={`Comparé à ${nomPrec}${auMemePoint ? ', au même jour' : ''} : ${fmt(V.prec.eur)}`}>{tr('stats.rapport', { x: String(V.ecart > 0 ? '+' : ''), ecart: String(V.ecart), nomPrec: String(nomPrec) })}</span> : null}{manque.length ? tr('stats.sans', { x: String(manque.join(', ')) }) : ''}{ncPeriode.length ? tr('stats.nonComptees', { n: String(ncPeriode.length) }) : ''}</>,
+      <>{pl(V.n, 'vente')}{V.ecart != null && !partielVendu ? <span title={`Comparé à ${nomPrec}${auMemePoint ? ', au même jour' : ''} : ${fmt(V.prec.eur)}`}>{' · ' + ecartTxt(V.ecart)}</span> : null}{manque.length ? tr('stats.sans', { x: String(manque.join(', ')) }) : ''}{ncPeriode.length ? tr('stats.nonComptees', { n: String(ncPeriode.length) }) : ''}</>,
       { 'data-sv-etat': 'lu', 'data-sv-n': V.n, 'data-sv-eur': cents(V.eur), 'data-sv-prec': cents(V.prec.eur), 'data-sv-ecart': V.ecart == null ? '' : V.ecart, 'data-sv-partiel': partielVendu ? '1' : '0', 'data-sv-non-comptees': ncPeriode.length || undefined }, ncPeriode.length ? `Pas dans ce montant : ${phraseNonComptees(ncPeriode)}` : undefined);
   // (7 nov., demande de Julien) LE CA DEPUIS LE DÉBUT : la MÊME source que « Vendu »
   // (`ventesFaites`, date de vente, toutes plateformes, comptes sélectionnés), sans borne
@@ -2035,7 +2035,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
     for (const l of vendu) { if (!l || !isFinite(l.ts) || !(l.ts > 0) || !isFinite(Number(l.eur))) continue; n += 1; c += Math.round(Number(l.eur) * 100); if (premier == null || l.ts < premier) premier = l.ts; }
     const ncTout = nonCompteesDe(liveStats && liveStats.venduNonComptees, 0, Infinity);
     const partiel = manque.length > 0 || ncTout.length > 0;
-    const depuis = premier != null ? ` · depuis le ${new Date(premier).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : '';
+    const depuis = premier != null ? ' · ' + tr('mtb.depuis', { date: new Date(premier).toLocaleDateString(localeCourante(), { month: 'short', year: 'numeric' }) }) : '';
     return tuile('total', tr('stats.caDepuisDebut'), n === 0 && !partiel ? '0,00 €' : `${partiel ? 'au moins ' : ''}${fmt(c / 100)}`, n === 0 ? 'aucune vente lue pour l’instant' : <>{pl(n, 'vente')}{depuis}</>,
       { 'data-sv-etat': 'lu', 'data-sv-n': n, 'data-sv-eur': String(c), 'data-sv-partiel': partiel ? '1' : '0' },
       tr('stats.toutesVentesToutes'));
@@ -2045,7 +2045,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
       const R = chiffreBrut(B);
       const sous = !B ? 'pas encore calculé'
         : B.n === 0 ? 'aucune vente finalisée'
-        : B.nCout === 0 ? `il manque le prix d’achat de tes ${pl(B.n, 'vente')}`
+        : B.nCout === 0 ? tr('mtb.prixAchatSur', { n: 0, total: B.n })
         : R.partiel ? `${B.nCout} vente${B.nCout > 1 ? 's' : ''} sur ${B.n} ${B.nCout > 1 ? 'ont' : 'a'} leur prix d’achat : il manque celui des autres`
         : `vente − prix d’achat, sur ${pl(B.n, 'vente finalisée', 'ventes finalisées')}`;
       return tuile('benefice', NOM_BENEFICE_BRUT, R.valeur == null ? '—' : fmt(R.valeur), sous,
@@ -2056,7 +2056,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
     const manquent = BP ? BP.n - BP.nCout : 0;
     const sous = !BP ? (etatBP === 'encours' ? 'je le lis…' : 'pas encore calculé')
       // (7 nov., revue UX) « finalisées » écrit : à côté de « Vendu · 35 ventes », « 21 sur 21 » semblait le contredire.
-      : CB.raison === 'achats' ? `il manque le prix d’achat de ${manquent} vente${manquent > 1 ? 's' : ''} finalisée${manquent > 1 ? 's' : ''} sur ${BP.n}`
+      : CB.raison === 'achats' ? tr('mtb.prixAchatSur', { n: BP.n - manquent, total: BP.n })
       : CB.raison === 'frais' ? 'des frais eBay ne sont pas encore connus'
       : CB.raison === 'cotisations' ? 'en attente de ton chiffre déclaré (écran Ventes)'
       : CB.raison === 'rien' ? 'aucune vente finalisée ni dépense sur la période'
@@ -2069,14 +2069,14 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
     ? tuile('delai', tr('stats.tempsVendre'), '—', 'pas encore calculé', { 'data-sv-etat': 'passu' })
     : extras === undefined ? tuile('delai', tr('stats.tempsVendre'), '—', 'je lis tes annonces…', { 'data-sv-etat': 'encours' })
       : datesPasSu ? tuile('delai', tr('stats.tempsVendre'), '—', 'annonces pas pu être lues', { 'data-sv-etat': 'passu' })
-        : !Dl || Dl.nDelai === 0 ? tuile('delai', tr('stats.tempsVendre'), '—', Dl && Dl.n ? (Dl.n === 1 ? 'ta vente Vinted n’a pas de date de mise en ligne' : `aucune de tes ${Dl.n} ventes Vinted n’a de date de mise en ligne`) : 'aucune vente Vinted finalisée', { 'data-sv-etat': 'lu', 'data-sv-mediane': '', 'data-sv-couv': Dl ? `0/${Dl.n}` : '0/0' })
-          : tuile('delai', tr('stats.tempsVendre'), joursLong(Dl.mediane), `la moitié de tes articles partent plus vite${Dl.nDelai < Dl.n ? ` · ${Dl.nDelai} ventes datées sur ${Dl.n}` : ''}`,
+        : !Dl || Dl.nDelai === 0 ? tuile('delai', tr('stats.tempsVendre'), '—', Dl && Dl.n ? tr('mtb.miseEnLigneSur', { n: 0, total: Dl.n }) : tr('mtb.aucuneFinalisee'), { 'data-sv-etat': 'lu', 'data-sv-mediane': '', 'data-sv-couv': Dl ? `0/${Dl.n}` : '0/0' })
+          : tuile('delai', tr('stats.tempsVendre'), joursLong(Dl.mediane), `${tr('mtb.mediane')}${Dl.nDelai < Dl.n ? ` · ${Dl.nDelai}/${Dl.n}` : ''}`,
             { 'data-sv-etat': 'lu', 'data-sv-mediane': Dl.mediane, 'data-sv-couv': `${Dl.nDelai}/${Dl.n}` }, tr('stats.vintedSeulementLeboncoin'));
   const enLigneTxt = texteEnLigne(liveStats);
   const dort = stock && stock.dort && stock.dort.seuils ? (stock.dort.seuils[30] || { n: 0 }).n : null;
   const tEnLigne = tuile('enligne', tr('stock.ligne'),
     <span data-dash-stat="online">{enLigneTxt === '—' ? '—' : <><b style={{ fontWeight: 'inherit' }}>{enLigneTxt}</b> {tr('annonces.annonce')}{enLigneTxt === '1' ? '' : 's'}</>}</span>,
-    dort == null ? 'aujourd’hui' : dort === 0 ? 'aucune depuis 30 jours ou plus' : `dont ${dort} depuis 30 jours ou plus`,
+    dort == null ? 'aujourd’hui' : dort === 0 ? tr('mtb.aucuneDort') : tr('mtb.dontDort', { n: dort }),
     { 'data-sv-etat': enLigneTxt === '—' ? 'passu' : 'lu', 'data-sv-dort': dort == null ? '' : dort }, tr('stats.aujourdHuiQuelle'));
 
   // ── Les barres ──
@@ -2126,7 +2126,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
           ? vide(tr('stats.encoreCalcule'), { 'data-sv-etat': 'passu' })
           : extras === undefined ? vide(tr('stats.jeLisDates'), { 'data-sv-etat': 'encours' })
             : datesPasSu ? vide(tr('stats.annoncesOntPu'), { 'data-sv-etat': 'passu' })
-              : !rapides.length && !rapidesC.peu.length ? vide(tr('stats.aucuneVenteVinted2'), { 'data-sv-etat': 'lu' })
+              : !rapides.length && !rapidesC.peu.length ? vide(tr('mtb.miseEnLigneInconnue'), { 'data-sv-etat': 'lu' })
                 : (
                   <div className="vrm-sv-lignes" data-sv-etat="lu" data-sv-axe-vite={axeVite} data-sv-peu={rapidesC.peu.length} data-sv-n-peu={rapidesC.nPeu}>
                     <Segmente label={tr('stats.texte2')} className="vrm-sv-axes-vite" value={axeVite} onChange={setAxeVite} options={Object.entries(AXES_VITE).map(([v, l]) => ({ v, l, data: { 'data-sv-axe-choix': v } }))}/>
@@ -2151,7 +2151,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
               <div className="vrm-sv-lignes vrm-sv-comptes" data-sv-etat="lu">
                 {(() => { const m = meilleurCompte ? comptes.find((c) => c.k === meilleurCompte) : null;
                   if (m) return <p className="vrm-sv-phrase" data-sv-meilleur={m.k}>{m.nom}{m.site && m.site !== m.nom ? ` (${m.site})` : ''} {tr('stats.vendPlus')}</p>;
-                  return comptes.length > 1 ? <p className="vrm-sv-note" data-sv-pas-conclu-compte="">{trj('stats.moinsVentesEgalite', { SEUIL_CONCLUSION: SEUIL_CONCLUSION })}</p> : null; })()}
+                  return comptes.length > 1 ? <p className="vrm-sv-note" data-sv-pas-conclu-compte="">{tr('mtb.pasDeMeilleur')} <Pourquoi>{trj('stats.moinsVentesEgalite', { SEUIL_CONCLUSION: SEUIL_CONCLUSION })}</Pourquoi></p> : null; })()}
                 {comptes.slice(0, 6).map((c) => (
                   <div key={c.k} className="vrm-sv-ligne-compte" data-sv-compte={c.k} data-n={c.n} data-mediane={c.mediane == null ? '' : c.mediane}>
                     <span className="vrm-sv-nom" title={c.nom || undefined}>{c.nom}{c.site && c.site !== c.nom ? <span className="vrm-sv-site"> ({c.site})</span> : null}</span>
@@ -2227,7 +2227,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
           );
           const corps = etat === 'encours' ? vide('…')
             : etat === 'passu' ? vide(tr('stats.annoncesVentesSont'), { 'data-sv-boost-passu': '' })
-              : etat === 'pas-assez' ? vide(`Pas assez de données · ${boost.comparables.b}/${SEUIL_BOOST} boostés`, { 'data-sv-boost-pas-assez': String(boost.comparables.b) })
+              : etat === 'pas-assez' ? vide(tr('mtb.boostes', { n: boost.comparables.b, min: SEUIL_BOOST }), { 'data-sv-boost-pas-assez': String(boost.comparables.b) })
                 : (<>
                   <div className="vrm-sv-boost-table">
                     <span/>

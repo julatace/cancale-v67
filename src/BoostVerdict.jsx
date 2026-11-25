@@ -5,7 +5,7 @@
 import React from 'react';
 import { lireSerie, periodesBoost, verdictBoost, boostsDuMois, SEUILS_BOOST } from './boostPeriode.js';
 import { lireBoostes, lireSeries } from './boostLecture.js';
-import { Groupe, Rangee, Faits, Fait } from './natif/index.js';
+import { Groupe, Rangee, Faits, Fait, Pourquoi } from './natif/index.js';
 import { tr } from './i18n/index.js';
 import { useLectureBornee } from './attenteBornee.js';   // (22 nov., chasse P2-5) une attente finit en « pas lu »
 
@@ -41,7 +41,7 @@ export function BoostAnnonce({ base, uid, id, cout = null, venteAt = null }) {
   if (serie === null) return <Groupe titre={tr('boost.titre')} attrs={{ 'data-boost-annonce': 'pas-su' }}><Rangee titre={tr('boost.pasLu')}/></Groupe>;
   if (!per.length) return null;   // aucun boost relevé : rien à montrer (pas de carte récurrente)
   return (
-    <Groupe titre={tr('boost.titre')} pied={tr('boost.regle', { n: SEUILS_BOOST.vuesMin })} attrs={{ 'data-boost-annonce': String(per.length) }}>
+    <Groupe titre={tr('boost.titre')} pied={<Pourquoi>{tr('boost.regle', { n: SEUILS_BOOST.vuesMin })}</Pourquoi>} attrs={{ 'data-boost-annonce': String(per.length) }}>
       {per.slice(-3).reverse().map((p) => { const v = verdictBoost({ serie: s, periode: p, venteAt, cout: Number(cout) > 0 ? Number(cout) : null });
         return <Rangee key={p.debut} titre={tr(MOT_VERDICT[v.verdict])} sousTitre={tr(p.enCours ? 'boost.depuis' : 'boost.du', { a: jourCourt(p.debut), b: jourCourt(p.fin) })} note={[...lignesVerdict(v), v.verdict === 'pas-assez' && v.code ? tr('boost.r.' + v.code, { n: SEUILS_BOOST.vuesMin }) : ''].filter(Boolean).join(' · ')}
           attrs={{ 'data-boost-verdict': v.verdict, 'data-boost-debut': String(p.debut) }}/>; })}
@@ -77,8 +77,8 @@ export function BoostsDuMois({ base, comptes = [], items = [], ventes = {}, cout
   if (res === null) return <Groupe titre={tr('boost.mois')} attrs={{ 'data-boosts-mois': 'pas-su' }}><Rangee titre={tr('boost.pasLu')}/></Groupe>;
   const n = res.n;
   return (
-    <Groupe titre={tr('boost.mois')} pied={tr('boost.regle', { n: SEUILS_BOOST.vuesMin })} attrs={{ 'data-boosts-mois': String(n.total), 'data-boosts-au-moins': res.auMoins ? '1' : '0' }}>
-      {!n.total ? <Rangee titre={tr('boost.moisVide')} sousTitre={tr('boost.moisVideSous')}/> : <>
+    <Groupe titre={tr('boost.mois')} pied={<Pourquoi>{tr('boost.regle', { n: SEUILS_BOOST.vuesMin })} {tr('boost.moisVideSous')}</Pourquoi>} attrs={{ 'data-boosts-mois': String(n.total), 'data-boosts-au-moins': res.auMoins ? '1' : '0' }}>
+      {!n.total ? <Rangee titre={tr('boost.moisVide')}/> : <>
         <Faits colonnes={3}>
           <Fait libelle={tr('boost.nServi')} valeur={String(n.servi)}/>
           <Fait libelle={tr('boost.nPasServi')} valeur={String(n.pasServi)}/>

@@ -14,7 +14,7 @@ const eur = (c) => monnaie(c / 100);
 export function PhraseComptePro({ statut }) {
   if (!statut) return null;
   if (statut.etat === 'pro') return <p className="vrm-cl-pro" data-vpro-phrase="pro" data-vpro-source={statut.source}>{tr(statut.source === 'email' ? 'vpro.pro.email' : 'vpro.pro.profil')}</p>;
-  if (statut.etat === 'passu') return <p className="vrm-cl-pro is-passu" data-vpro-phrase="passu">{tr('vpro.passu')}</p>;
+  if (statut.etat === 'passu') return <p className="vrm-cl-pro is-passu" data-vpro-phrase="passu" title={tr('vpro.passu')}><span aria-hidden="true">{tr('mtb.proPasLu')}</span><span className="vrm-sr-seul">{tr('vpro.passu')}</span></p>;
   return null;
 }
 

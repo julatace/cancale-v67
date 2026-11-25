@@ -17,7 +17,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr, heure as heureLoc, date as dateLoc, dateRelative, monnaie } from '../i18n/index.js';
-import { Page, Groupe, Rangee, Vignette, Bouton, Attente, Segmente, Feuille, Toast, PagePoussee, Champ, poserIcone, iconePosee } from '../natif/index.js';
+import { Page, Groupe, Rangee, Vignette, Bouton, Attente, Segmente, Feuille, Toast, PagePoussee, Champ, poserIcone, iconePosee, Pourquoi } from '../natif/index.js';
 import { Icon, SUPABASE_URL, sbAuth, withOwner, SB_CONFLICT, AUTH, load, lireCapturesDetail, useComptesAutresSites, aExpedier, lirePdfLigne, lireTout } from '../App.jsx';
 import { NOTE_SELECT, notesDesLignes, phraseNote } from '../noteCompteLue.js';
 import { MIROIR_N, selectAnnoncesVinted, annoncesVintedDe, selectVentesVinted, ventesVintedDe, annoncesLbcDe, annoncesVcDe, filsLbcDe, filsVcDe, filAutreDe, prixVoulu } from './miroir.js';
@@ -503,14 +503,14 @@ export default function EcranADistance({ comptesVinted, ecarte = () => false, on
       <Groupe titre={tr('adist.groupe.ordis')} attrs={{ 'data-adist-groupe': 'ordis' }}>
         {ordis.niveau === 'lecture' ? <Rangee titre={tr('adist.ordi.lecture')}/>
           : ordis.niveau === 'passu' ? <Rangee titre="—" sousTitre={tr('adist.ordi.passu')}/>
-          : ordis.niveau === 'aucun' ? <Rangee titre={tr('adist.ordi.aucun')} sousTitre={tr('adist.ordi.aucunSous')} sousLignes={2} ton="ambre" attrs={{ 'data-adist-ordi': 'aucun' }}/>
+          : ordis.niveau === 'aucun' ? <Rangee titre={tr('mtb.adistAucun')} sousTitre={<><span aria-hidden="true">{tr('mtb.adistAucunSous')}</span><span className="n-lu-seul">{tr('adist.ordi.aucun')} — {tr('adist.ordi.aucunSous')}</span></>} sousLignes={2} ton="ambre" attrs={{ 'data-adist-ordi': 'aucun' }}/>
           : [...ordis.allumes, ...ordis.eteints].slice(0, 6).map(ligneOrdi)}
         {ordis.niveau === 'allume' ? <Rangee titre={rt === 'joint' ? tr('adist.rt.joint') : tr('adist.rt.sondage')} lignes={2} attrs={{ 'data-adist-temps-reel': rt === 'joint' ? 'joint' : 'sondage' }}/> : null}
         <Rangee titre={tr('adist.guide.titre')} fin={guide ? null : 'chevron'} onClick={() => setGuide((x) => !x)} attrs={{ 'data-adist-guide': guide ? '1' : '0', 'aria-expanded': guide ? 'true' : 'false' }}/>
         {guide ? ['chrome', 'windows', 'mac', 'veille', 'comptes'].map((k) => <Rangee key={k} titre={tr('adist.guide.' + k)} lignes={2} attrs={{ 'data-adist-guide-ligne': k }}/>) : null}
       </Groupe>
 
-      <Groupe titre={tr('adist.groupe.file')} pied={tr('adist.file.pied')} attrs={{ 'data-adist-groupe': 'file' }}>
+      <Groupe titre={tr('adist.groupe.file')} pied={<Pourquoi>{tr('adist.file.pied')}</Pourquoi>} attrs={{ 'data-adist-groupe': 'file' }}>
         <div className="n-adist-segment">
           <Segmente libelle={tr('adist.groupe.file')} valeur={seg} onChange={setSeg} options={['attente', 'cours', 'fait', 'refuse'].map((k) => ({ cle: k, libelle: tr('adist.file.' + k), n: g[k].length || undefined, attrs: { 'data-adist-seg': k } }))}/>
         </div>
@@ -529,7 +529,7 @@ export default function EcranADistance({ comptesVinted, ecarte = () => false, on
         {comptesVinted === undefined ? <Attente forme="rangees" n={3}/> : comptes.map((c) => {
           const p = ordinateurPour(ordis.allumes, c.site, c.id);
           const vieux = c.luSu && (!c.lu || maintenant - c.lu > VIEUX_MS);   // pas su ⇒ ni « vieux » ni « jamais relu »
-          const sous = [p && p.ouvert ? tr('adist.compte.ouvertSur', { nom: nomOrdi(p.p) }) : tr('adist.compte.pasOuvert'),
+          const sous = [p && p.ouvert ? tr('adist.compte.ouvertSur', { nom: nomOrdi(p.p) }) : tr('mtb.adistPasOuvert'),
             !c.luSu ? (lus === null ? tr('adist.compte.luPasSu') : '') : c.lu ? (vieux ? tr('adist.compte.vieux', { age: ilYa(c.lu, maintenant) }) : tr('adist.compte.lu', { age: ilYa(c.lu, maintenant) })) : tr('adist.compte.jamaisLu'),
             c.aEnvoyer ? tr('adist.compte.aEnvoyer', { n: c.aEnvoyer }) : ''].filter(Boolean).join(' · ');
           // 5.438 : la note du compte et, si elle a baissé sa cadence, la cadence appliquée — sur la rangée.

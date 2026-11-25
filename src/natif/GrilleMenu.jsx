@@ -25,7 +25,7 @@ export function TuileMenu({ libelle, icone = null, pastille, libellePastille = '
   );
 }
 
-export function GrilleMenu({ titre = '', pied = '', tuiles = [], className = '', attrs = null }) {
+export function GrilleMenu({ titre = '', pied = '', piedLu = false, tuiles = [], className = '', attrs = null }) {
   const id = React.useId();
   const visibles = tuiles.filter(Boolean);
   if (!visibles.length) return null;
@@ -35,7 +35,7 @@ export function GrilleMenu({ titre = '', pied = '', tuiles = [], className = '',
       <div className="n-grille-menu-tuiles">
         {visibles.map((t) => <TuileMenu key={t.cle} {...t}/>)}
       </div>
-      {pied ? <p className="n-grille-menu-pied">{pied}</p> : null}
+      {pied ? <p className={'n-grille-menu-pied' + (piedLu ? ' n-lu-seul' : '')}>{pied}</p> : null}   {/* (25 nov.) `piedLu` : la phrase au lecteur d'écran seulement */}
     </section>
   );
 }

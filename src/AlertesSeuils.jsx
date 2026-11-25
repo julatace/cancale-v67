@@ -35,7 +35,7 @@ export function AlertesSeuils({ ligne, regime, activite = 'vente', vues, onCompr
         const t = texteSeuil(a, l);
         return (
           <Rangee key={a.cle} titre={t.titre} sousTitre={t.ou} sousLignes={2}
-            note={<a className="n-arg-lien" href={t.url} target="_blank" rel="noopener noreferrer" title={t.phrase} data-seuil-source={a.source ? a.source.url : ''}>{t.source}<span className="n-lu-seul"> — {t.phrase}</span></a>}
+            note={<a className="n-arg-lien" href={t.url} target="_blank" rel="noopener noreferrer" title={`${t.source} — ${t.phrase}`} data-seuil-source={a.source ? a.source.url : ''}>{tr('mtb.source')}<span className="n-lu-seul"> — {t.source} — {t.phrase}</span></a>}
             fin={<Bouton variante="texte" onClick={() => onCompris && onCompris(a.marquer)} attrs={{ 'data-seuil-compris': a.cle }}>{tr('argentPlus.seuils.compris')}</Bouton>}
             attrs={{ 'data-seuil': a.seuil, 'data-seuil-palier': a.palier, 'data-seuil-cle': a.cle, 'data-seuil-plateforme': a.plateforme || undefined, 'data-au-moins': a.auMoins ? '1' : undefined }}/>
         );

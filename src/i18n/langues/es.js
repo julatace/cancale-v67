@@ -120,6 +120,7 @@ import ecran_menu_onglets from './es/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './es/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
 import ecran_actions_ext from './es/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './es/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
+import ecran_moinsTexteB from './es/moinsTexteB.js';   // (25 nov.) moins de texte B
 export default {
   ...ecran_accessibilite,
   ...ecran_groupes,
@@ -2447,4 +2448,5 @@ export default {
   ...ecran_extension,
   ...ecran_actions_ext,
   ...ecran_offres_photos,
+  ...ecran_moinsTexteB,
 };

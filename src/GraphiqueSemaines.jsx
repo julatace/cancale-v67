@@ -10,6 +10,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { graduations, detailSemaine, semaineSous } from './graphiqueSemaines.js';
+import { tr } from './i18n/index.js';
 
 const dateCourte = (ms) => new Date(ms).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }).replace('.', '');
 const dateLongue = (ms) => new Date(ms).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
@@ -28,7 +29,7 @@ export function GraphiqueSemaines({ semaines, partiel = false, manque = [], fmt,
   const euros = (v) => (fmt ? fmt(v) : `${Math.round(v)} €`);
   const libSemaine = D.enCours ? 'Cette semaine' : `Semaine du ${dateLongue(D.debut)}`;
   const comparaison = D.avant == null ? '' : D.pct != null
-    ? `${D.pct > 0 ? '+' : D.pct < 0 ? '−' : ''}${Math.abs(D.pct)} % par rapport à la semaine d’avant`
+    ? tr('mtb.vsSemaineAvant', { ecart: `${D.pct > 0 ? '+' : D.pct < 0 ? '−' : ''}${Math.abs(D.pct)} %` })
     : `la semaine d’avant : ${euros(D.avant)}`;
   const choisirSous = (e) => {
     const el = refPlot.current; if (!el) return;

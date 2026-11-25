@@ -14,6 +14,7 @@ import React from 'react';
 import { previsionMois, textePrevision, eurosRonds } from './previsionMois.js';
 import { coutParPlateforme, sitesMontresCout, moisAvant, nomMois, CATEGORIES_COUT } from './coutPlateformes.js';
 import './argent-plus.css';
+import { tr } from './i18n/index.js';
 
 const lireReleveLocal = () => { try { const v = JSON.parse(localStorage.getItem('vrm_stats_ventes') || 'null'); return v && Array.isArray(v.l) ? v.l : null; } catch (_) { return null; } };
 // Le relevé de Ventes, relu quand l'écran Ventes le republie (même évènement que `useLigneSynchro`).
@@ -75,13 +76,13 @@ export function PrevisionMoisCarte({ liveStats, releve, onSaisirPrix = null }) {
           {B.etat === 'ok' ? (
             <span className="vrm-ap-benef-v">vers <b>{eurosRonds(B.centre)}</b><small> si ta marge reste la même</small></span>
           ) : B.etat === 'couverture' ? (
-            <span className="vrm-ap-benef-v"><b className="is-vide">—</b><small> prix d’achat connus sur {B.nConnu}/{B.n} ventes</small>{onSaisirPrix && B.nConnu < B.n ? <button type="button" className="vrm-lien-action vrm-ap-saisir" data-prev-saisir="" onClick={onSaisirPrix}>Saisir ›</button> : null}</span>
+            <span className="vrm-ap-benef-v"><b className="is-vide">—</b><small> {tr('mtb.prixAchatSur', { n: B.nConnu, total: B.n })}</small>{onSaisirPrix && B.nConnu < B.n ? <button type="button" className="vrm-lien-action vrm-ap-saisir" data-prev-saisir="" onClick={onSaisirPrix}>Saisir ›</button> : null}</span>
           ) : (
             <span className="vrm-ap-benef-v"><b className="is-vide">—</b><small>{B.etat === 'aucune' ? ' aucune vente finalisée ce mois-ci' : ' ouvre Ventes une fois'}</small></span>
           )}
         </div>
       ) : null}
-      <p className="vrm-ap-pied">Une estimation au rythme réel, pas une promesse.</p>
+      {/* (25 nov., moins de texte) « Une estimation au rythme réel, pas une promesse » : l'étiquette « estimation » du haut le dit. */}
     </section>
   );
 }

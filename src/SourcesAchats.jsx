@@ -9,6 +9,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { beneficeParSource, texteSource, lireSources, CLE_SOURCES, EVT_SOURCES } from './sourceAchats.js';
 import './styles-sources-achats.css';
 import { Carte, Rangee } from './natif/index.js';
+import { tr } from './i18n/index.js';
 import './natif/ecrans/argent.css';
 
 export function useSources(owner) {
@@ -42,8 +43,8 @@ export default function SourcesAchats({ owner = '', de, a }) {
         return <Rangee key={g.cle} titre={g.libelle} sousTitre={t.sur} valeur={t.montant} valeurForte
           attrs={{ 'data-sa-source': g.cle, 'data-sa-moyenne': g.moyenne == null ? '' : String(g.moyenne), 'data-sa-n': g.n, 'data-sa-connu': g.nConnu, 'data-sa-partiel': g.partiel ? '1' : undefined }}/>;
       })}
-      {r.sansSource ? <p className="n-arg-pied" data-sa-sans-source={r.sansSource}>{pl(r.sansSource, 'vente')} : source pas saisie sur l’achat (Achats → l’achat → « Où »).</p> : null}
-      {r.sansAchat ? <p className="n-arg-pied" data-sa-sans-achat={r.sansAchat}>{pl(r.sansAchat, 'vente')} sans achat relié : source pas sue.</p> : null}
+      {r.sansSource ? <p className="n-arg-pied" data-sa-sans-source={r.sansSource}>{tr('mtb.sansSource', { n: r.sansSource })}</p> : null}
+      {r.sansAchat ? <p className="n-arg-pied" data-sa-sans-achat={r.sansAchat}>{tr('mtb.sansAchatRelie', { n: r.sansAchat })}</p> : null}
     </div>
   );
   return <Carte titre="D’où viennent mes achats" sousTitre="bénéfice moyen" className="vrm-sa-carte" attrs={{ 'data-stats-carte': 'sources-achats' }}>{corps}</Carte>;
