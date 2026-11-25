@@ -83,9 +83,9 @@ async function attendre(pg, fn, arg, ms) {
   try { await pg.waitForFunction(fn, arg, { timeout: ms, polling: 200 }); return Date.now() - t0; } catch (_) { return null; }
 }
 const venteVue = (titre) => new RegExp(titre).test(document.body.innerText);
-// La vente est « à imprimer » : sa rangée porte un geste d'impression (`data-imprime`) ou le dit.
-const venteAImprimer = (titre) => [...document.querySelectorAll('*')].some((e) => e.children.length === 0 && new RegExp(titre).test(e.textContent)
-  && (() => { let p = e; for (let i = 0; i < 8 && p; i++, p = p.parentElement) { if (p.querySelector && (p.querySelector('[data-imprime]') || /imprimer|prêt à imprimer|bordereau prêt/i.test(p.textContent || ''))) return !/en attente du bordereau/i.test(p.textContent || ''); } return false; })());
+// La vente est « à imprimer » : sa rangée (`data-vn-rang="v:{tx}"`, écran Ventes natif) ne dit plus « bordereau en
+// attente » (`data-vn-bordereau="attente"`).
+const venteAImprimer = (tx) => { const r = document.querySelector(`[data-vn-rang="v:${tx}"]`); return !!r && !!r.getAttribute('data-vn-bordereau') && r.getAttribute('data-vn-bordereau') !== 'attente'; };
 async function cacher(pg, cache) {
   await pg.evaluate((c) => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (c ? 'hidden' : 'visible') });
@@ -115,9 +115,11 @@ async function cacher(pg, cache) {
       res.vinted = await attendre(pg, venteVue, 'Zebulon Neuve Banc', DELAI);
       if (process.env.MAJ_DOM) fs.writeFileSync(process.env.MAJ_DOM, await pg.evaluate(() => { const l = [...document.querySelectorAll('*')].filter((e) => e.children.length === 0 && /Zebulon Neuve Banc/.test(e.textContent)).pop(); let p = l; for (let i = 0; i < 6 && p && p.parentElement; i++) p = p.parentElement; return p ? p.outerHTML : 'rien'; }).catch(() => 'rien'));
       // 2. E-mail : le bordereau de cette vente.
-      res.emailAvant = await pg.evaluate(venteAImprimer, 'Zebulon Neuve Banc');
+      res.emailAvant = await pg.evaluate(venteAImprimer, '23999000001');
+      res.rangee = await pg.evaluate(() => !!document.querySelector('[data-vn-rang="v:23999000001"]'));
       diffuser(bordereauEmail(23999000001));
-      res.email = await attendre(pg, venteAImprimer, 'Zebulon Neuve Banc', DELAI);
+      res.email = await attendre(pg, venteAImprimer, '23999000001', DELAI);
+      res.bordereauApres = await pg.evaluate(() => { const r = document.querySelector('[data-vn-rang="v:23999000001"]'); return r ? r.getAttribute('data-vn-bordereau') : null; });
       // 3. iPhone : caché, prise coupée et refusée pendant l'absence, une vente arrive, retour.
       await cacher(pg, true);
       RT.accepte = false; couperPrise();
@@ -155,7 +157,7 @@ async function cacher(pg, cache) {
   const s = (ms) => (ms / 1000).toFixed(1) + ' s';
   const dit = (ok, m) => { if (!ok) ko++; console.log((ok ? '  ✅ ' : '  ❌ ') + m); };
   dit(q.vinted != null, `1. Vinted (vente captée, Realtime) : ${q.vinted != null ? 'à l\'écran en ' + s(q.vinted) : 'pas à l\'écran en ' + s(DELAI)}`);
-  dit(q.email != null && !q.emailAvant, `2. E-mail (bordereau rangé, Realtime) : ${q.emailAvant ? 'déjà « à imprimer » AVANT le bordereau (le banc ne mesure rien)' : q.email != null ? 'vente « à imprimer » en ' + s(q.email) : 'pas à l\'écran en ' + s(DELAI)}`);
+  dit(q.rangee && q.email != null && !q.emailAvant, `2. E-mail (bordereau rangé, Realtime) : ${!q.rangee ? 'la rangée de la vente est introuvable (le banc ne mesure rien)' : q.emailAvant ? 'déjà « à imprimer » AVANT le bordereau (le banc ne mesure rien)' : q.email != null ? 'bordereau à l\'écran (« ' + q.bordereauApres + ' ») en ' + s(q.email) : 'pas à l\'écran en ' + s(DELAI)}`);
   dit(q.retour != null && q.retour <= DELAI_RETOUR, `3. iPhone, retour au premier plan après 40 s (prise coupée) : ${q.retour != null ? 'vente vue ' + s(q.retour) + ' après le retour' : 'pas vue'}${q.cacheVu ? ' (déjà là pendant que la page était cachée)' : ''}`);
   dit(q.sonde != null, `4. Sans Realtime (sonde seule) : ${q.sonde != null ? 'à l\'écran en ' + s(q.sonde) : 'pas à l\'écran en ' + s(DELAI)}`);
   if (process.env.MAJ_DETAIL) console.log('  signaux vrm:neuf :', JSON.stringify(q.signaux || []));
