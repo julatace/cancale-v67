@@ -22,7 +22,7 @@
 import React from 'react';
 import { tr } from '../../i18n/index.js';
 import { Carte, Plaque, Attente, useOrdinateur, TIRET } from '../index.js';
-import { attenteDe, attrsAttente } from '../outils.js';
+import { attenteDe, attrsAttente, estLecture } from '../outils.js';
 import { AideArgent } from './AideArgent.jsx';
 import { AnneauObjectif, BarreChiffre, CouvertureBarre } from './ArgentVisuel.jsx';   // (24 nov., visuel-argent) l'anneau, les barres
 import { useArrive, REVELE_PAS, REVELE_MAX } from '../Jeu.jsx';   // (24 nov.) « sans latence » : l'aide partagée (rien ne bouge si c'est déjà connu)
@@ -106,7 +106,7 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
             <div className="n-arg-recu-haut" data-arg-recu-pas-calcule={valeur == null && onPasSu ? '1' : undefined}>
               {valeur == null && onPasSu
                 ? <button type="button" className="n-arg-recu-geste" data-arg-recu-geste="" data-arg-recu-note="" data-n-ton="ambre" data-arg-montant="" data-n-vide="1" onClick={onPasSu}>
-                    <span className="n-arg-recu-geste-point" aria-hidden="true"/><span className="n-arg-recu-geste-texte">{tr('arn.recuEn', { mois: moisLong }) + ' : ' + phrase}</span><span className="n-arg-l-chev" aria-hidden="true"/></button>
+                    <span className="n-arg-recu-geste-point" aria-hidden="true"/><span className="n-arg-recu-geste-texte">{tr('arn.recuEn', { mois: moisLong }) + ' : '}{estLecture(phrase) ? <span {...attrsAttente(true, 'valeur')}>{phrase}</span> : phrase}</span><span className="n-arg-l-chev" aria-hidden="true"/></button>
                 : <span className="n-arg-recu-lib" data-arg-recu-lib="">{tr('arn.recuEn', { mois: moisLong })}</span>}
               <AideArgent titre={tr('arn.comment')} attrs={{ 'data-arg-aide-recu': '' }}>
                 <p>{tr('v2.ar.auVersement')}.</p>

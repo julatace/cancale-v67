@@ -18,6 +18,7 @@ import React from 'react';
 import { tr } from '../../i18n/index.js';
 import { Carte, TIRET, Anneau, TuilePaire } from '../index.js';
 import { useArrive, revele, REVELE_PAS, REVELE_MAX } from '../Jeu.jsx';   // l'apparition partagée « sans latence »
+import { PlaceGardee } from '../PlaceGardee.jsx';   // (25 nov., chargement propre) la place de « À venir » gardée pendant la lecture
 const retard = (i) => Math.min(Math.max(0, i | 0), REVELE_MAX) * REVELE_PAS;
 import './argent-visuel.css';
 
@@ -118,14 +119,18 @@ export function JaugesSeuils({ J, annee, montant, etat = 'lu' }) {
 // montant serait le total, redit).
 const ICONE_ETAPE = { envoyer: 'box', route: 'truck', livree: 'home', versement: 'wallet', autre: 'clock' };
 const GENRE_ETAPE = { envoyer: 'rappel', route: 'arrivee', livree: 'arrivee', versement: 'argent', autre: 'offre' };
+// La hauteur de « À venir » (titre + une rangée de cartes, 390 px) tenue sur un appareil qui ne l'a jamais mesurée.
+const HAUTEUR_AVENIR = 115;
 export function AVenirCartes({ A, montant, onOuvrir, Icon }) {
   const pret = !!A && !A.enCours;
   const neuf = useArrive(pret, 'argent-avenir');
-  if (!pret) return null;
+  // (25 nov., chargement propre — banc chargement-structure : « À venir » arrivait après l'écran et poussait « Versements
+  // de novembre » de 91 px, CLS 0,05) Pendant la lecture, la hauteur de la dernière fois est tenue (src/natif/PlaceGardee.jsx).
+  if (!pret) return <PlaceGardee cle="argent-avenir" pret={false} defaut={HAUTEUR_AVENIR}/>;
   const parEtape = (A.parEtape || []).filter((g) => g.n > 0);
-  if (!parEtape.length) return null;
+  if (!parEtape.length) return <PlaceGardee cle="argent-avenir" pret defaut={HAUTEUR_AVENIR}/>;
   const seul = parEtape.length === 1;
-  return (
+  return (<PlaceGardee cle="argent-avenir" pret defaut={HAUTEUR_AVENIR}>
     <section className="n-agv-avenir" aria-label={tr('agv.aVenir')} data-agv-avenir={String(parEtape.length)}>
       <h2 className="n-agv-avenir-titre">{tr('agv.aVenir')}</h2>
       <div className="n-agv-avenir-grille">
@@ -142,5 +147,5 @@ export function AVenirCartes({ A, montant, onOuvrir, Icon }) {
         ))}
       </div>
     </section>
-  );
+  </PlaceGardee>);
 }
