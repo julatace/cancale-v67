@@ -36,6 +36,7 @@ const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 // (20 nov.) BaissePrixVestiaire, FavorisEtapes, FavorisSansVente retirés : leurs gestes se font dans l'extension (audit-actions-app).
 const MIGRES = [
   ['src/Accueil.jsx', ['*']],
+  ['src/abonnement/CarteApercu.jsx', ['*']],   // (25 nov.) la carte de l'aperçu sans abonnement
   ['src/RelierMaBoite.jsx', ['*']],   // (19 nov., emails-mail) « Relier ma boîte » accompagné
   ['src/BoiteEmails.jsx', ['Compris', 'Lecture', 'Ligne', 'Pile', 'ARelier', 'Quarantaine', 'MessageOrigine', 'PuceCode']],   // (19 nov., emails-mail) E-mails comme Mail
   ['src/communaute/Accompagnement.jsx', ['*']],
