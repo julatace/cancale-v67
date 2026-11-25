@@ -1,5 +1,6 @@
 // ── src/natif/outils.js — les petits outils partagés par les composants natifs ───────────
 import React from 'react';
+import { tr } from '../i18n/index.js';
 
 // Assemble des classes : cx('n-bouton', large && 'n-bouton-large', className).
 export const cx = (...c) => c.filter(Boolean).join(' ');
@@ -37,3 +38,11 @@ export function portailNatif() {
   }
   return _portail;
 }
+
+// (24 nov., livrable) UN CHIFFRE EN COURS DE LECTURE : sa raison est « lecture… » (`v2.jour.lecture`, ou la raison courte
+// des cartes de chiffres, src/design/carteChiffres.js). La case dessine alors un SQUELETTE à la place du « — » et cache sa
+// raison (src/styles-chiffre-attente.css : 15 s au plus, puis « — » et la raison reviennent) — jamais « pas su » (null,
+// raison dite) ni une valeur. `enCours` explicite gagne ; sinon on reconnaît la raison.
+export const estLecture = (t) => typeof t === 'string' && (t === tr('v2.jour.lecture') || t === 'lecture…');
+export const attenteDe = (enCours, su, raison) => (!su && (enCours === true || (enCours == null && estLecture(raison))));
+export const attrsAttente = (oui, role) => (oui ? { 'data-chiffre-attente': role } : null);
