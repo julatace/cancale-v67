@@ -142,7 +142,8 @@ async function executer(boutonSrc) {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-boutons-'));
   fs.mkdirSync(path.join(d, 'natif'), { recursive: true });
   fs.writeFileSync(path.join(d, 'natif', 'Bouton.jsx'), boutonSrc);
-  fs.copyFileSync(path.join(RACINE, 'src', 'natif', 'outils.js'), path.join(d, 'natif', 'outils.js'));
+  // (25 nov.) outils.js importe `tr` (src/i18n) depuis le 24 nov. (`estLecture`) : la même traduction de banc que Bouton.jsx.
+  fs.writeFileSync(path.join(d, 'natif', 'outils.js'), fs.readFileSync(path.join(RACINE, 'src', 'natif', 'outils.js'), 'utf8').replace(/from '\.\.\/i18n\/index\.js'/, "from '../i18n.js'"));
   fs.writeFileSync(path.join(d, 'i18n.js'), "export const tr = (k) => ({ 'natif.bouton.echec': 'ECHEC_PAR_DEFAUT', 'natif.bouton.confirmer': 'CONFIRMER' }[k] || k);");
   const boutonPatch = fs.readFileSync(path.join(d, 'natif', 'Bouton.jsx'), 'utf8').replace(/from '\.\.\/i18n\/index\.js'/, "from '../i18n.js'");
   fs.writeFileSync(path.join(d, 'natif', 'Bouton.jsx'), boutonPatch);

@@ -189,6 +189,7 @@ import VendusAilleurs, { useVerifVendusAilleurs, VendusAilleursDetail } from '..
 import { articlesVendusAilleurs } from '../bilanSynchronisation.js';
 import { gardeOffres, avisAcceptationManuelle } from '../offresGarde.js';
 import {comparerComptes,diagnosticConnexion} from '../outilsArticlesVinted.js';
+import { attrsAttente } from '../natif/outils.js';   // (25 nov., chargement propre) un fait EN COURS de lecture se dessine en squelette
 import {correspondRechercheMessage} from '../rechercheMessagesVinted.js';
 // ⟦← App.jsx #7⟧
 import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted,instantVinted} from '../suiviMessagerieVinted.js';
@@ -5532,11 +5533,11 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, onSemain
             <p className="vrm-jv2-faits">
               {/* (15 nov., refonte-journee) « vendu aujourd'hui · 1 vente » : le chiffre dit de QUAND il parle (la maquette). */}
               {!semaine && vSel != null && vSel > 0 ? <span className="vrm-jv2-quoi" data-jv2-quoi="">{(sel === 0 ? tr('journee.venduAuj') : sel === 1 ? tr('journee.venduHier') : tr('journee.venduLe', { quand: dateJourFr(jSel.d) })) + ' · '}</span> : null}
-              <span data-journal-case="ventes" data-valeur={J.ventes.valeur == null ? '' : String(J.ventes.valeur)} data-partiel={J.ventes.partiel ? '1' : undefined}>{faitVentes}</span>
+              <span data-journal-case="ventes" data-valeur={J.ventes.valeur == null ? '' : String(J.ventes.valeur)} data-partiel={J.ventes.partiel ? '1' : undefined} {...(attrsAttente(J.ventes.valeur == null && J.ventes.raison === 'encours', 'valeur') || {})}>{faitVentes}</span>
               {' '}
-              <span data-jv2-verse={verse.valeur == null ? '' : String(Math.round(verse.valeur * 100))} data-partiel={verse.partiel ? '1' : undefined} title={verse.partiel && verse.manque && verse.manque.length ? tr('journee.moinsSans', { x: String(verse.manque.join(', ')) }) : tr('journee.argentVerseSites')}>{faitVerse}</span>
+              <span data-jv2-verse={verse.valeur == null ? '' : String(Math.round(verse.valeur * 100))} data-partiel={verse.partiel ? '1' : undefined} {...(attrsAttente(verse.valeur == null && verse.raison === 'encours', 'valeur') || {})} title={verse.partiel && verse.manque && verse.manque.length ? tr('journee.moinsSans', { x: String(verse.manque.join(', ')) }) : tr('journee.argentVerseSites')}>{faitVerse}</span>
               {' '}
-              <span data-journal-case="colis" data-valeur={J.colis.valeur == null ? '' : String(J.colis.valeur)} data-partiel={J.colis.partiel ? '1' : undefined} title={J.colis.partiel && J.colis.manque && J.colis.manque.length ? tr('journee.moinsSans', { x: String(J.colis.manque.join(', ')) }) : tr('journee.colisAsNotes')}>{faitColis}</span>
+              <span data-journal-case="colis" data-valeur={J.colis.valeur == null ? '' : String(J.colis.valeur)} data-partiel={J.colis.partiel ? '1' : undefined} {...(attrsAttente(J.colis.valeur == null && J.colis.raison === 'encours', 'valeur') || {})} title={J.colis.partiel && J.colis.manque && J.colis.manque.length ? tr('journee.moinsSans', { x: String(J.colis.manque.join(', ')) }) : tr('journee.colisAsNotes')}>{faitColis}</span>
             </p>
           </div>
           {photos.length && Photo
@@ -29531,8 +29532,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         // (24 nov., retrait-parfait) L'ouverture CALCULÉE sur les horaires LUS (heure de Paris) : { etat: 'ouvert' | 'ferme' | '',
                         // phrase, jour } — « ouvert maintenant · ferme à 19 h » / « fermé — ouvre à 8 h » et les plages d'aujourd'hui. Pas lu ⇒ null.
                         ouvertureDe: (p) => { const h = horairesDuPoint((p.arrives || []).map((c) => (c && c.src && c.src.t ? { horaires: c.src.t.horaires, ms: Date.parse((c.src.t.horairesDuTransporteur && c.src.t.horairesAt) || c.src.t.emailAt || c.src.t.receivedAt || '') } : null)).filter(Boolean), (c) => c.ms);
-                          if (!h) return null; const now = Date.now(); const e = etatOuverture(h, now);
-                          return { etat: e ? (e.ouvert ? 'ouvert' : 'ferme') : '', phrase: phraseOuverture(e) || (e ? '' : texteHoraires(h)), jour: horairesDuJour(h, now) }; },
+                          if (!h) return null; const now = Date.now(); const e = etatOuverture(h, now); const jour = horairesDuJour(h, now);
+                          // (25 nov., Julien : « ouvert maintenant · ferme à 23 h 59 · aujourd'hui 0 h 01–23 h 59 ») une consigne ouverte toute la
+                          // journée (0 h 01–23 h 59, minuit–23 h 59…) se dit court : « aujourd'hui 24 h/24 », sans « ferme à 23 h 59 »
+                          if (e && e.ouvert && /^(?:minuit|0 h(?: 0\d)?)–(?:23 h 5\d|minuit)$/.test(jour)) return { etat: 'ouvert', phrase: '', jour: '24 h/24' };
+                          return { etat: e ? (e.ouvert ? 'ouvert' : 'ferme') : '', phrase: phraseOuverture(e) || (e ? '' : texteHoraires(h)), jour }; },
                         // (24 nov., retrait-parfait) Au comptoir : « Retiré » sur SON toucher = le geste d'avant (`retirerRelais` : markCollected /
                         // markPickupDone, annulable — il rend l'identifiant du geste), « Annuler », et « Détails » = la feuille d'avant (openQrView).
                         retirer: (x) => retirerRelais(x),

@@ -33,7 +33,7 @@
     document.documentElement.setAttribute('data-vrm-boot', '');
     // (24 nov., style-graphite) le STYLE choisi sur cet appareil (`vrm_style`, src/natif/styleChoix.js : même clé, même liste)
     var st = lire('vrm_style');
-    if (['graphite', 'ardoise', 'pierre', 'encre', 'papier', 'verre', 'nuit', 'menthe', 'studio', 'arcade', 'monochrome'].indexOf(st) >= 0) document.documentElement.setAttribute('data-style', st);
+    if (['graphite', 'ardoise', 'pierre', 'encre', 'papier', 'verre', 'nuit', 'menthe', 'studio', 'arcade', 'monochrome', 'c3doux'].indexOf(st) >= 0) document.documentElement.setAttribute('data-style', st);
   } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
   // « Recharger » de l'écran de démarrage (au-delà de 8 s) : avant tout JavaScript de l'app (c'est quand
   // elle ne vient pas qu'on le touche). Il OUBLIE la coquille gardée par le service worker (la page `/`,
