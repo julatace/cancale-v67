@@ -25,7 +25,7 @@
 //  formulaire et la réponse attendue.
 // ════════════════════════════════════════════════════════════════════════════
 (() => {
-  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 7.2) return;
+  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 7.4) return;
   const SEL = Object.freeze({
     vendre: 'a[data-testid="header-upload-item-button"]',
     photos: 'input[data-testid="add-photos-input"]',
@@ -260,6 +260,62 @@
     if (nomA && IRREVERSIBLE_APPRIS.test(nomA) && !(APPRIS[nomA] && APPRIS[nomA].confirme === true)) { const e = new Error('appris-a-confirmer'); e.vrmAConfirmer = nomA; throw e; }
     try { el.scrollIntoView({ block: 'center' }); } catch (_) {} el.click();
   };
+  // ══ 5.453 (`favorishumains`, Julien, 25 nov. : « tu dois faire tous les gestes que je fais pour faire les favoris »,
+  //    « ça doit être humain ») — LES GESTES D'UN FAVORI COMME UNE PERSONNE ATTENTIVE ═══════════════════════════════════
+  //  Dans les règles déjà VALIDÉES (CLAUDE.md §3 « Discrétion », 12 nov. ; 5.437 `formulairerythme`), pour les étapes d'un
+  //  favori seulement (`d.favori` / `d.humain`) :
+  //   · `regarder(k)` : un temps de lecture quand l'écran vient de changer (0,4 à 1,4 s) ;
+  //   · `toucher(el)` : l'élément amené au milieu de l'écran (`scrollIntoView` : la position est posée, c'est le navigateur
+  //     qui défile), une courte hésitation (0,25 à 0,9 s), puis le clic de `clic` (ses gardes : appris non confirmé ⇒ rien) ;
+  //   · `taperHumain(el, texte, cible)` : lettre à lettre, plus long après une espace ou une ponctuation, parfois une pause de
+  //     réflexion entre deux mots ; le tout ramené au TEMPS D'ÉCRITURE que le fond a tiré (`cible`, la règle du 12 nov.),
+  //     chaque lettre bornée (55 ms à 0,9 s) ; la valeur EXACTE, les mêmes événements qu'avant (`saisir`).
+  //  Tout au hasard, jamais deux fois de suite le même temps (`tirerUnique`). Les attentes passent par `attenteFrappe`
+  //  (aucune minuterie : l'onglet de travail peut être en arrière-plan). Rien de maquillé : ni isTrusted, ni souris inventée,
+  //  ni débogueur — refusés (§3).
+  const _derniers = {};
+  function tirerUnique(k, a, b) { let ms = Math.round(entre(a, b)); for (let i = 0; i < 6 && _derniers[k] != null && Math.round(ms / 10) === Math.round(_derniers[k] / 10); i++) ms = Math.round(entre(a, b)); _derniers[k] = ms; return ms; }
+  async function regarder(k) { const ms = tirerUnique('regarder', 400, 1400); noterDelai('regarder:' + String(k || ''), ms); await attenteFrappe(ms); }
+  async function toucher(el, k) {
+    try { el.scrollIntoView({ block: 'center' }); } catch (_) {}
+    const ms = tirerUnique('hesite', 250, 900); noterDelai('hesite:' + String(k || ''), ms); await attenteFrappe(ms);
+    if (captcha()) { const e = new Error('captcha'); e.vrmCaptcha = true; throw e; }
+    clic(el);
+  }
+  const H = (d) => !!(d && (d.humain === true || d.favori === true));
+  const valeurDe = (el) => { try { return el && el.isContentEditable ? String(el.textContent || '') : String((el && el.value) || ''); } catch (_) { return ''; } };
+  function delaisHumains(texte, cible) {
+    const l = Array.from(String(texte));
+    const brut = l.map((ch, i) => {
+      let x = entre(60, 190);
+      if (ch === ' ') x *= 1.5; else if (/[,.;:!?'’-]/.test(ch)) x *= 1.8;
+      if (ch === ' ' && i > 0 && Math.random() < 0.12) x += entre(400, 1200);   // on cherche le mot suivant
+      else if (Math.random() < 0.03) x += entre(250, 700);
+      return x;
+    });
+    const somme = brut.reduce((a, b) => a + b, 0) || 1;
+    const k = Number(cible) > 0 ? Math.min(2.5, Math.max(0.5, Number(cible) / somme)) : 1;
+    return brut.map((x) => Math.round(Math.min(900, Math.max(55, x * k))));
+  }
+  async function taperHumain(el, texte, cible) {
+    const t = String(texte), l = Array.from(t), dl = delaisHumains(t, cible);
+    try { el.scrollIntoView({ block: 'center' }); } catch (_) {}
+    try { el.focus(); } catch (_) {}
+    if (el.isContentEditable) { el.textContent = ''; el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' })); }
+    else { const p0 = setterDe(el); p0(''); el.dispatchEvent(new Event('input', { bubbles: true })); }
+    const poser = el.isContentEditable ? (v) => { el.textContent = v; } : setterDe(el);
+    let v = '';
+    for (let i = 0; i < l.length; i++) {
+      const ch = l[i];
+      v += ch; poser(v);
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, data: ch, inputType: ch === '\n' ? 'insertLineBreak' : 'insertText' }));
+      noterDelai(ch === ' ' ? 'mot' : 'lettre-favori', dl[i]);
+      await attenteFrappe(dl[i]);
+      if (ch === ' ' && captcha()) return { captcha: true };
+    }
+    if (!el.isContentEditable) el.dispatchEvent(new Event('change', { bubbles: true }));
+    return { ok: valeurDe(el) === t };
+  }
 
   // ── 5.414 : les aides des gestes par l'interface (messagerie, offre, annonce) ─────────────────────────────
   // Un nom accessible (la règle de la cloche des favoris, 5.356) : aria-labelledby, aria-label, texte, title.
@@ -746,7 +802,7 @@
           if (c.ambigu) return manque('cloche-ambigue'); if (!c.el) return manque('cloche');
           // Un LIEN vers la page des notifications : la même liste, complète — le fond l'ouvre (`favoriListe`).
           if (c.el.tagName === 'A') { const ch = cheminNotif(c.el); if (ch) return absent({ cloche: true, voirTout: ch, lienCloche: true }); }
-          if (c.el.getAttribute('aria-expanded') !== 'true') clic(c.el);
+          if (c.el.getAttribute('aria-expanded') !== 'true') { if (H(d)) await toucher(c.el, 'cloche'); else clic(c.el); }
         }
         // La ligne attendue 8 s au plus ; dès que la liste est ouverte (« Voir tout » montré) depuis 2,5 s sans elle, c'est su.
         let ouverteDepuis = p ? Date.now() : 0;
@@ -764,7 +820,7 @@
       let rep = null, repVue = false;
       reponseDe('POST', /(?:\/api\/v2\/conversations|\/messaging\/main\/inquiries)\/?$/, 25000, d && d.cle).then((x) => { rep = x; repVue = true; });
       const _cheminAvantClic = direct ? '' : location.pathname;
-      if (!direct) clic(l.el);
+      if (!direct) { if (H(d)) await toucher(l.el, 'ligne'); else clic(l.el); }
       // ⚠️ 24 nov. (simulation de bout en bout, vraie extension) : `conv` et `route` sont relus de l'adresse ACTUELLE à chaque
       //    tour, jamais gardés d'un tour d'avant. Avant : à partir du 2ᵉ favori, l'onglet de travail montrait la conversation
       //    PRÉCÉDENTE ; une fois l'adresse passée au nouvel uuid mais sa relecture pas encore reçue (`coeurDe` inconnu), `conv`
@@ -805,17 +861,43 @@
     async message(d) {
       const conv = String((d && d.conv) || ''), texte = String((d && d.texte) || '');
       if (!/^[1-9]\d{0,19}$/.test(conv) || !texte.trim()) return { ok: false, code: 'etape' };
-      if (!(await attendreConv(conv, d, 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
+      const h = H(d);
+      if (!(await attendreConv(conv, d, h ? 15000 : 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
       const z = await attendreN('message-champ', () => { const x = composeur(); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (z.captcha) return vuCaptcha(); if (z.absent) return manque('message-champ'); if (z.el === 'AMBIGU') return manque('message-champ-ambigu');
       const champ = z.el;
-      { const env = ouAppris('message-envoyer', boutonEnvoyer(champ)); if (env.ambigu) return manque('message-envoyer-ambigu'); if (!env.el) return manque('message-envoyer'); }
+      // 5.453 (`favorishumains`) : comme une personne — le champ d'abord, le texte tapé, PUIS « Envoyer » (souvent éteint tant
+      //    que le champ est vide : il n'est plus exigé AVANT la frappe). `taper` : l'étape tape et s'ARRÊTE (rien n'est envoyé) ;
+      //    le fond revoit ses gardes (Tout arrêter, pause, compte de l'onglet) puis rappelle l'étape, qui trouve le texte
+      //    déjà là et ne fait plus que toucher « Envoyer ».
+      if (!h) { const env = ouAppris('message-envoyer', boutonEnvoyer(champ)); if (env.ambigu) return manque('message-envoyer-ambigu'); if (!env.el) return manque('message-envoyer'); }
+      const deja = h && valeurDe(champ) === texte;
       const avant = occurrences(texte);
-      const okT = await saisir(champ, texte, { garderFocus: true });
-      if (!okT) return { ok: false, code: 'valeur', manque: 'message-champ' };
+      if (!deja) {
+        if (h) {
+          await regarder('message');
+          const t = await taperHumain(champ, texte, Number(d && d.frappeMs) || 0);
+          if (t.captcha) return vuCaptcha();
+          if (!t.ok) return { ok: false, code: 'valeur', manque: 'message-champ' };
+        } else {
+          const okT = await saisir(champ, texte, { garderFocus: true });
+          if (!okT) return { ok: false, code: 'valeur', manque: 'message-champ' };
+        }
+      }
       if (captcha()) return vuCaptcha();
       if (!surConv(conv, d)) return { ok: false, code: 'identite', chemin: location.pathname };
-      const b2 = ouAppris('message-envoyer', boutonEnvoyer(champ)); if (!b2.el || b2.ambigu) return manque('message-envoyer');
+      if (h && d.taper === true) return valeurDe(champ) === texte ? { ok: true, tape: true, vu: true, chemin: location.pathname } : { ok: false, code: 'valeur', manque: 'message-champ' };
+      let b2;
+      if (h) {
+        const w = await attendreN('message-envoyer', () => { const x = ouAppris('message-envoyer', boutonEnvoyer(champ)); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 6000);
+        if (w.captcha) return vuCaptcha(); if (w.el === 'AMBIGU') return manque('message-envoyer-ambigu'); if (!w.el) return manque('message-envoyer');
+        b2 = { el: w.el };
+        if (valeurDe(champ) !== texte) return { ok: false, code: 'valeur', manque: 'message-champ' };
+        try { b2.el.scrollIntoView({ block: 'center' }); } catch (_) {}
+        const ms = tirerUnique('hesite', 250, 900); noterDelai('hesite:envoyer', ms); await attenteFrappe(ms);
+        if (captcha()) return vuCaptcha();
+        if (!surConv(conv, d)) return { ok: false, code: 'identite', chemin: location.pathname };
+      } else { b2 = ouAppris('message-envoyer', boutonEnvoyer(champ)); if (!b2.el || b2.ambigu) return manque('message-envoyer'); }
       ecouter();
       // 5.440 : l'ancienne messagerie (`/api/v2/conversations/{n°}/replies`) ou la nouvelle (`…/messaging/main/
       //    conversations/{uuid}/replies`, l'uuid de CETTE page, vérifié par `surConv`).
@@ -833,21 +915,25 @@
     async offre(d) {
       const conv = String((d && d.conv) || ''), tx = String((d && d.tx) || ''), prix = Number(d && d.prix);
       if (!/^[1-9]\d{0,19}$/.test(conv) || !/^[1-9]\d{0,19}$/.test(tx) || !(prix > 0)) return { ok: false, code: 'etape' };
-      if (!(await attendreConv(conv, d, 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
+      if (!(await attendreConv(conv, d, H(d) ? 15000 : 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
       const b = await attendreN('offre-bouton', () => { let x = parNom(RE_FAIRE_OFFRE, document, /make[-_]?offer|offer[-_]?(button|cta)/i, /accept|decline|reject|cancel/i); if (!x.el && !x.ambigu && T()) { const r = T().trouver('boutonOffre', {}); noterTrouve('boutonOffre', r); x = { el: r.el || null, ambigu: !!r.ambigu }; } return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (b.captcha) return vuCaptcha(); if (b.absent) return manque('offre-bouton'); if (b.el === 'AMBIGU') return manque('offre-bouton-ambigu');
       const avant = occurrencesPrix(prix);
-      clic(b.el);
+      const h = H(d);   // 5.453 : « Faire une offre » touché après une hésitation, la fenêtre regardée, le prix tapé, « Proposer » touché
+      if (h) await toucher(b.el, 'offre'); else clic(b.el);
       const dl = await attendreN('offre-fenetre', () => dialogue(), 15000); if (dl.captcha) return vuCaptcha(); if (dl.absent) return manque('offre-fenetre');
+      if (h) await regarder('offre');
       const inp = await attendreN('offre-prix', () => { const x = champPrix(dl.el); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 10000);
       if (inp.captcha) return vuCaptcha(); if (inp.absent) return manque('offre-prix'); if (inp.el === 'AMBIGU') return manque('offre-prix-ambigu');
-      const okT = await saisir(inp.el, texteMontant(prix), { garderFocus: true });
+      const okT = h ? await taperHumain(inp.el, texteMontant(prix), 0).then((t) => (t.captcha ? 'captcha' : t.ok)) : await saisir(inp.el, texteMontant(prix), { garderFocus: true });
+      if (okT === 'captcha') return vuCaptcha();
       if (!okT) return { ok: false, code: 'valeur', manque: 'offre-prix' };
       let s = ouAppris('offre-valider', parNom(RE_VALIDER_OFFRE, dl.el, /submit|confirm|send|offer/i, /cancel|close|annul/i, true));
       if (!s.el && !s.ambigu && T()) { const r = T().trouver('offreValider', {}); noterTrouve('offreValider', r); s = { el: r.el || null, ambigu: !!r.ambigu }; }
       if (s.ambigu) return manque('offre-valider-ambigu'); if (!s.el) return manque('offre-valider');
       if (captcha()) return vuCaptcha();
       ecouter();
+      if (h) { try { s.el.scrollIntoView({ block: 'center' }); } catch (_) {} const ms = tirerUnique('hesite', 250, 900); noterDelai('hesite:proposer', ms); await attenteFrappe(ms); if (captcha()) return vuCaptcha(); }
       const att = reponseDe('POST', new RegExp(`/api/v2/transactions/${tx}/offers$`), 30000, d && d.cle);
       clic(s.el);
       const r = await att;
@@ -1045,7 +1131,7 @@
       return x ? { ok: true, rep: x } : { ok: false, code: 'sans-reponse' };
     },
   };
-  globalThis.__vrmFormulaireV = 7.3;   // 5.440.2 : 7.3 (ligne du favori par ses deux identités, page complète lue jusqu'au bout)   // 5.440.1 : 7.2 (conversation ouverte relue de l'adresse à chaque tour) ; 7.1 (ligne du favori par `user_id`)   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
+  globalThis.__vrmFormulaireV = 7.4;   // 5.453 : 7.4 (gestes d'un favori comme une personne : regarder, hésiter, taper, puis « Envoyer »)   // 5.440.2 : 7.3 (ligne du favori par ses deux identités, page complète lue jusqu'au bout)   // 5.440.1 : 7.2 (conversation ouverte relue de l'adresse à chaque tour) ; 7.1 (ligne du favori par `user_id`)   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
   globalThis.__vrmFormulaireSel = SEL;
   globalThis.__vrmFormulaire = async (etape, d) => {
     if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(location.hostname)) return { ok: false, code: 'hors-vinted' };
@@ -1057,6 +1143,6 @@
     MEMOIRE = {}; try { const m = d && d.memoire && typeof d.memoire === 'object' ? d.memoire : {}; for (const k of Object.keys(m).slice(0, 20)) if (/^[a-zA-Z]{2,30}$/.test(k) && /^[a-z]{2,20}$/.test(String(m[k] || ''))) MEMOIRE[k] = String(m[k]); } catch (_) {}
     TROUVES.length = 0;
     const avecTrouves = (o) => { try { if (o && typeof o === 'object' && TROUVES.length) { o.trouves = TROUVES.slice(); o.verPage = T() ? T().versionPage() : ''; } } catch (_) {} return o; };
-    try { return avecTrouves(await f(d || {})); } catch (e) { if (e && e.vrmAConfirmer) return { ok: false, code: 'appris-a-confirmer', manque: String(e.vrmAConfirmer), chemin: location.pathname }; return { ok: false, code: 'erreur', raison: String((e && e.message) || e).slice(0, 120) }; }
+    try { return avecTrouves(await f(d || {})); } catch (e) { if (e && e.vrmCaptcha) return vuCaptcha(); if (e && e.vrmAConfirmer) return { ok: false, code: 'appris-a-confirmer', manque: String(e.vrmAConfirmer), chemin: location.pathname }; return { ok: false, code: 'erreur', raison: String((e && e.message) || e).slice(0, 120) }; }
   };
 })();

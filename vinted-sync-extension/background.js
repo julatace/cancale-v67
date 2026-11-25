@@ -22088,13 +22088,15 @@ async function sequenceFavoriBleam(x) {
   // 2. Le message : le temps d'écriture, puis l'envoi.
   await pauseFavori('reponse', uid);
   etape('ecriture');
-  const ec = await attendreEcriture(uid, acc, texte, premier ? 'premier' : 'serie');   // 5.419 : le 1er message de SON envoi = le temps de son clic
+  const ec = await attendreEcriture(uid, acc, texte, premier ? 'premier' : 'serie', { frappe: true });   // 5.419 : le 1er message de SON envoi = le temps de son clic ; 5.453 : le temps se passe à LIRE puis à TAPER
   if (!ec.ok) return { resultat: 'refuse', raison: ec.code === 'vinted-pause' ? 'pause_vinted' : ec.code === 'vinted-autre' ? 'compte_vinted_different' : ec.code === 'secu-robot' ? 'vinted_robot' : ec.code === 'tout-arrete' ? 'autorisation_expiree' : 'compte_vinted_absent' };
+  etape('envoi');   // 5.453 : taper dans le champ fait partie de l'envoi (la ligne du favori dit « envoi » si le champ manque)
+  { const tp = await taperMessageFavori(uid, acc, { conv: convId, route: x.convRoute || '', texte, frappeMs: ec.frappeMs }); if (tp) return { resultat: 'refuse', raison: tp.raison, ...(tp.cause ? { cause: tp.cause } : {}) }; }
   if (await gardeStricte(uid, acc, { lecture: true })) return { resultat: 'refuse' };
   etape('envoi');
   // 5.414 (`toutinterface`) : le message TAPÉ dans le champ de CETTE conversation (vérifiée dans l'adresse), « Envoyer »,
   //    puis la preuve à l'écran (le message apparu dans le fil) ; pas vu ⇒ « incertain », JAMAIS renvoyé.
-  const r = await interfaceVinted(acc, 'message', { conv: String(convId), route: x.convRoute || '', texte, favori: true });
+  const r = await interfaceVinted(acc, 'message', { conv: String(convId), route: x.convRoute || '', texte, favori: true, humain: true });
   if (partie(r)) compterEcrit();
   if (r.rienParti && !r.pause) return { resultat: 'refuse', raison: raisonFavoriInterface(r), cause: causeFavoriInterface(r) };
   if (r.pause) return { resultat: 'refuse', raison: r.robot ? 'vinted_robot' : 'pause_vinted' };
@@ -22628,12 +22630,14 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   // (5.369) Le temps qu'un humain mettrait à taper CE texte, puis l'envoi d'un coup.
   // Pause de Vinted ou autre compte pendant l'attente ⇒ rien ne part (places rendues).
   etape('ecriture');
-  const ec=await attendreEcriture(uid,acc,texteFinal,premier?'premier':'serie');
+  const ec=await attendreEcriture(uid,acc,texteFinal,premier?'premier':'serie',{frappe:true});   // 5.453 : lire puis TAPER dans la page
   if(!ec.ok)return rep('refuse',0,ec.code==='vinted-pause'?'pause_vinted':ec.code==='vinted-autre'?'compte_vinted_different':ec.code==='secu-robot'?'vinted_robot':ec.code==='tout-arrete'?(prixOffreFait!=null?'tout_arrete':'autorisation_expiree'):'compte_vinted_absent');
+  etape('envoi');
+  {const tp=await taperMessageFavori(uid,acc,{conv:convId,route:convRoute,texte:texteFinal,frappeMs:ec.frappeMs});if(tp)return rep('refuse',0,tp.raison==='autorisation_expiree'&&prixOffreFait!=null?'tout_arrete':tp.raison,tp.cause||'');}
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   etape('envoi');
   // 5.414 : le message TAPÉ dans le champ de CETTE conversation, « Envoyer », puis VU dans le fil (sinon incertain, jamais renvoyé).
-  const r=await interfaceVinted(acc,'message',{conv:String(convId),route:convRoute,texte:texteFinal,favori:true});
+  const r=await interfaceVinted(acc,'message',{conv:String(convId),route:convRoute,texte:texteFinal,favori:true,humain:true});
   if(partie(r))ecrits++;
   // (29 oct., revue) Pas d'onglet, onglet hors de Vinted, ou pause : le message n'est PAS
   // parti (vérifié dans la page avant l'envoi) — un refus certain, pas « à vérifier »
@@ -25396,7 +25400,21 @@ function texteJamaisRepete(texte, pseudo, recents, hasard) {
 }
 // </variantes-regle>
 const ECRITURE_TRANCHE_MS = 4000;
-async function attendreEcriture(uid, acc, texte, mode) {
+// ══ 5.453 (`favorishumains`, Julien, 25 nov. : « tu dois faire tous les gestes que je fais », « ça doit être humain ») ══
+//  Avant : le temps d'écriture (la règle du 12 nov., 5 à 45 s) s'attendait ICI, l'écran immobile, puis le texte apparaissait
+//  d'un coup dans le champ. Désormais, pour un message à un favori (`opts.frappe`), ce MÊME temps se passe à écrire : une
+//  part de lecture (1,2 à 3,2 s, ici, gardes revues à chaque tranche) puis la frappe lettre à lettre DANS la page
+//  (`vrm-formulaire.js` `taperHumain`, ramenée au reste du temps). La durée tirée ne change pas ; elle est notée pareil.
+const LECTURE_AVANT_FRAPPE_MS = [1200, 3200];
+let _derniereLecture = 0;
+function partageEcriture(ms, hasard) {
+  const tirer = typeof hasard === 'function' ? hasard : Math.random;
+  let l = 0; for (let i = 0; i < 6; i++) { l = Math.round(LECTURE_AVANT_FRAPPE_MS[0] + Number(tirer()) * (LECTURE_AVANT_FRAPPE_MS[1] - LECTURE_AVANT_FRAPPE_MS[0])); if (Math.round(l / 50) !== Math.round(_derniereLecture / 50)) break; }
+  _derniereLecture = l;
+  const lecture = Math.min(Math.max(0, ms), l);
+  return { lecture, frappe: Math.max(0, ms - lecture) };
+}
+async function attendreEcriture(uid, acc, texte, mode, opts) {
   // 5.419 : `premier` = le 1er message d'un envoi qu'IL vient de lancer : le temps d'écriture de son clic (2 à 6 s),
   //    mais « Tout arrêter » reste écouté comme dans une série.
   const ms = tempsEcritureMs(texte, mode === 'clic' || mode === 'premier' ? 'clic' : 'serie');
@@ -25404,9 +25422,12 @@ async function attendreEcriture(uid, acc, texte, mode) {
   try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['ecriture:' + nomE, ms, String(texte == null ? '' : texte).length]); } catch (_) {}
   noterDiag('ecriture_' + nomE);
   if (mode === 'premier') mode = 'serie';
+  const part = opts && opts.frappe === true ? partageEcriture(ms) : null;
+  const attente = part ? part.lecture : ms;
+  if (part) { try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['lecture:' + nomE, part.lecture, part.frappe]); } catch (_) {} }
   // Le temps se découpe en tranches (le worker MV3 s'endort après 30 s sans appel
   // d'API : chaque tranche relit l'état, ce qui le tient éveillé — §4.9).
-  const tranches = Math.max(1, Math.ceil(ms / ECRITURE_TRANCHE_MS));
+  const tranches = Math.max(1, Math.ceil(attente / ECRITURE_TRANCHE_MS));
   for (let i = 0; i <= tranches; i++) {
     const p = await pauseVinted();
     if (p) { noterDiag('ecriture_annulee_pause'); return { ok: false, code: 'vinted-pause', error: raisonPauseVinted(p) }; }
@@ -25415,10 +25436,25 @@ async function attendreEcriture(uid, acc, texte, mode) {
     const ar = await arretPendantEcriture(uid, mode);
     if (ar) { noterDiag('ecriture_annulee_' + (ar.code === 'secu-robot' ? 'robot' : 'arret')); return { ok: false, code: ar.code, error: ar.error }; }
     if (i === tranches) break;
-    const t = i === tranches - 1 ? ms - ECRITURE_TRANCHE_MS * (tranches - 1) : ECRITURE_TRANCHE_MS;
+    const t = i === tranches - 1 ? attente - ECRITURE_TRANCHE_MS * (tranches - 1) : ECRITURE_TRANCHE_MS;
     await new Promise((ok) => setTimeout(ok, Math.max(0, t)));
   }
-  return { ok: true, ms };
+  return part ? { ok: true, ms, frappeMs: part.frappe } : { ok: true, ms };
+}
+// 5.453 : le message d'un favori TAPÉ dans le champ de CETTE conversation (rien n'est envoyé), puis les gardes revues
+//    (« Tout arrêter », vérification anti-robot, pause de Vinted, compte de l'onglet) AVANT « Envoyer ». Rend null (tapé,
+//    on peut envoyer) ou { raison, cause } (rien n'est parti : la phrase de la ligne du favori).
+async function taperMessageFavori(uid, acc, x) {
+  const t = await interfaceVinted(acc, 'message', { conv: String(x.conv), route: x.route || '', texte: x.texte, favori: true, humain: true, taper: true, frappeMs: Math.max(0, Math.round(Number(x.frappeMs) || 0)) });
+  if (t && t.pause) return { raison: t.robot ? 'vinted_robot' : 'pause_vinted' };
+  if (!t || !t.ok || t.tape !== true) { noterDiag('favori_frappe_' + String((t && (t.manque || t.sansPage || t.code)) || 'non').replace(/[^a-z-]/g, '').slice(0, 30)); return { raison: t && t.rienParti ? raisonFavoriInterface(t) : 'element_introuvable', cause: causeFavoriInterface(t || { sansPage: 'element', manque: 'message-champ' }) }; }
+  noterDiag('favori_frappe_ok');
+  const ar = await arretPendantEcriture(uid, 'serie');
+  if (ar) return { raison: ar.code === 'secu-robot' ? 'vinted_robot' : 'autorisation_expiree' };
+  const p = await pauseVinted(); if (p) return { raison: 'pause_vinted' };
+  const actif = await compteConnecte(acc && acc.domain);
+  if (!actif || String(actif) !== String(uid)) return { raison: actif ? 'compte_vinted_different' : 'compte_vinted_absent' };
+  return null;
 }
 // La version du message PRÉCÉDENT, par compte et par sorte (`favori`, `refus`) :
 // `chrome.storage.local` (§4.9). Notée seulement quand le message est PARTI.

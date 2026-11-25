@@ -20,7 +20,7 @@ function fabriquerFaussePage({ ctx, j, tab, fetchPage }) {
   const emule = async (etape, d0) => {
     const d = d0 || {}, opt = ctx.__vrmPage || {};
     const chemin = (() => { try { return new URL(tab.url).pathname; } catch (_) { return '/'; } })();
-    (j.etapesPage = j.etapesPage || []).push({ etape, quoi: d.quoi, chemin });
+    (j.etapesPage = j.etapesPage || []).push({ etape, quoi: d.quoi, chemin, ...(d.taper === true ? { taper: true } : {}) });
     if (opt.captcha) return { ok: false, code: 'captcha', chemin };
     if (opt.manque && (opt.manqueEtape ? opt.manqueEtape === etape : true)) return { ok: false, code: 'selecteur', manque: opt.manque, chemin };
     const envoi = async (m, p, corps) => {
@@ -55,7 +55,8 @@ function fabriquerFaussePage({ ctx, j, tab, fetchPage }) {
         if (conv) tab.url = `https://www.vinted.fr/inbox/${conv}`;
         return { ok: true, rep, conv, envoye: true };
       }
-      case 'message': if (!new RegExp(`^/inbox/${d.conv}/?$`).test(chemin)) return { ok: false, code: 'identite', chemin }; { const rep = await envoi('POST', `/api/v2/conversations/${d.conv}/replies`, { reply: { body: String(d.texte), photo_temp_uuids: null, is_personal_data_sharing_check_skipped: false } }); return { ok: true, rep, vu: rep.ok && opt.vu !== false }; }
+      // 5.453 (`favorishumains`) : `taper` = le texte tapé dans le champ, RIEN n'est envoyé (le fond revoit ses gardes, puis rappelle l'étape).
+      case 'message': if (!new RegExp(`^/inbox/${d.conv}/?$`).test(chemin)) return { ok: false, code: 'identite', chemin }; if (d.taper === true) { st.tape = String(d.texte); return { ok: true, tape: true, vu: true, chemin }; } { const rep = await envoi('POST', `/api/v2/conversations/${d.conv}/replies`, { reply: { body: String(d.texte), photo_temp_uuids: null, is_personal_data_sharing_check_skipped: false } }); return { ok: true, rep, vu: rep.ok && opt.vu !== false }; }
       case 'offre': if (!new RegExp(`^/inbox/${d.conv}/?$`).test(chemin)) return { ok: false, code: 'identite', chemin }; { const p = Number(d.prix); const rep = await envoi('POST', `/api/v2/transactions/${d.tx}/offers`, { offer: { currency: 'EUR', price: Math.round(p * 100) % 100 ? p.toFixed(2) : String(Math.round(p)) } }); return { ok: true, rep, vu: rep.ok && opt.vu !== false && opt.offreVue !== false }; }
       case 'repondreOffre': if (!new RegExp(`^/inbox/${d.conv}/?$`).test(chemin)) return { ok: false, code: 'identite', chemin }; { const rep = await envoi('PUT', `/api/v2/transactions/${d.tx}/offer_requests/${d.oid}/${d.accepter ? 'accept' : 'reject'}`, null); return { ok: true, rep, vu: true, autre: false }; }
       case 'masquer': if (!new RegExp(`^/items/${d.id}(?:-[^/]*)?/?$`).test(chemin)) return { ok: false, code: 'identite', chemin }; return { ok: true, rep: await envoi('PUT', `/api/v2/items/${d.id}/is_hidden`, { is_hidden: !!d.voulu }), vu: true };
