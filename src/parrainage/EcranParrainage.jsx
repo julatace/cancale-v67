@@ -18,7 +18,7 @@ import { useLangue } from '../i18n/react.js';
 import { Page, Groupe, Rangee, Bouton, Segmente, Feuille, Heros, ActionsRondes, Tuiles, Tuile, Barres, Vide, Pourquoi } from '../natif/index.js';
 import { Icon, enTeteSession, useEstProprietaire, load, toast } from '../App.jsx';
 import { lienParrainage } from '../abonnement/etatAbonnement.js';
-import { SqCarte, SqBarre, SqChiffre, SqLignes } from '../Squelette.jsx';
+import { SqCarte, SqBarre, SqChiffre } from '../Squelette.jsx';
 import './parrainage.css';
 
 const eur = (c) => (Number.isFinite(c) ? monnaie(c / 100, 'EUR') : '—');
@@ -66,7 +66,7 @@ function SqueletteParrainage() {
     <div className="vrm-pr" aria-busy="true" data-parrainage="lecture">
       <SqCarte h={232}><SqBarre l={110} h={12}/><SqChiffre l="52%" h={44}/><SqBarre l={130} h={12}/><div style={{ height: 70 }}/></SqCarte>
       <SqCarte h={190}><SqBarre l={80} h={12}/><SqBarre l="86%" h={20}/><SqBarre l="100%" h={48} r={14}/></SqCarte>
-      <SqCarte h={150}><SqLignes n={3} vignette="rond" montant={false}/></SqCarte>
+      <SqCarte h={150}>{[0, 1, 2].map((i) => <div key={i} className="vrm-pr-sq-ligne"><SqBarre l={40} h={40} r={20}/><SqBarre l="60%" h={14}/></div>)}</SqCarte>
     </div>
   );
 }
@@ -138,7 +138,7 @@ export function ParrainsAVerser({ fetcher = fetch }) {
       if (j && j.ok) { toast(tr('parrain.admin.fait')); setConfirme(''); lire(); } else toast(tr('parrain.erreur.ecriture'));
     } catch (_) { toast(tr('parrain.erreur.ecriture')); }
   };
-  if (l === undefined) return <SqCarte h={120}><SqLignes n={2} montant/></SqCarte>;
+  if (l === undefined) return <SqCarte h={120}>{[0, 1].map((i) => <div key={i} className="vrm-pr-sq-ligne"><SqBarre l={40} h={40} r={20}/><SqBarre l="55%" h={14}/></div>)}</SqCarte>;
   if (l === null) return <Groupe titre={tr('parrain.admin.titre')} attrs={{ 'data-parrains-verser': 'pas-su' }}><Rangee titre={tr('parrain.erreur.phrase')} sousTitre={tr('parrain.erreur.detail')} valeur="—"/></Groupe>;
   if (!l.installe) return <Groupe titre={tr('parrain.admin.titre')} attrs={{ 'data-parrains-verser': 'non-installe' }}><Rangee titre={tr('parrain.admin.nonInstalle')} valeur="—"/></Groupe>;
   return (
@@ -147,10 +147,10 @@ export function ParrainsAVerser({ fetcher = fetch }) {
       <Groupe>
         {!l.parrains.length ? <Rangee titre={tr('parrain.admin.vide')}/> : l.parrains.map((p) => (
           <div key={p.parrain} className="vrm-pr-admin-ligne" data-parrain-verser={p.pret ? 'pret' : 'sous-seuil'}>
-            <Rangee icone={<Icon name="euro" size={22}/>} titre={p.nom || p.email || '—'}
+            <Rangee icone={<Icon name="euro" size={22}/>} titre={p.nom || p.email || '—'} sousLignes={2}
               sousTitre={[p.email && p.nom ? p.email : '', p.depuis ? tr('parrain.admin.depuis', { date: jour(p.depuis) }) : '', p.pret ? '' : tr('parrain.admin.sousSeuil', { seuil: eur(l.seuilCentimes) })].filter(Boolean).join(' · ')}
               valeur={eur(p.centimes)} valeurForte/>
-            <div className="vrm-pr-admin-iban">{p.iban ? <><code data-parrain-iban="">{p.iban}</code>{p.titulaire ? <span> · {p.titulaire}</span> : null}</> : <span>{tr('parrain.admin.ibanManque')}</span>}</div>
+            <div className="vrm-pr-admin-iban">{p.iban ? <><code data-parrain-iban={p.iban}>{String(p.iban).replace(/(.{4})(?=.)/g, '$1 ')}</code>{p.titulaire ? <span> · {p.titulaire}</span> : null}</> : <span>{tr('parrain.admin.ibanManque')}</span>}</div>
             {p.pret ? (confirme === p.parrain
               ? <Bouton variante="teinte" large onClick={() => verse(p)} attrs={{ 'data-parrain-verse-confirmer': '' }}>{tr('parrain.admin.confirmer', { m: eur(p.centimes) })}</Bouton>
               : <Bouton variante="teinte" large icone={<Icon name="check" size={18}/>} onClick={() => setConfirme(p.parrain)} attrs={{ 'data-parrain-verse': '' }}>{tr('parrain.admin.verse')}</Bouton>) : null}

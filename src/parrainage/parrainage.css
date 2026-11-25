@@ -9,7 +9,9 @@
 
 /* Le héros : le pictogramme en haut à droite, les 12 barres dessous. */
 .vrm-pr-heros-ic { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: rgb(255 255 255 / .12); color: var(--n-sur-heros); }
-.vrm-pr-barres .n-barres { margin: 8px 0 0; }
+.vrm-pr-barres .n-barres { grid-template-columns: repeat(12, minmax(0, 1fr)); margin: 10px 0 0; }
+.vrm-pr-barres .n-barres-btn { min-width: 0; padding-left: 0; padding-right: 0; }
+.vrm-pr-barres .n-barres-piste { width: min(18px, 100%); height: 56px; }
 .vrm-pr-barres-detail { margin: 4px 0 0; min-height: 18px; font: var(--n-t-legende); color: var(--n-sur-heros-2); font-variant-numeric: tabular-nums; }
 
 /* Une carte de l'écran. */
@@ -17,6 +19,8 @@
 .vrm-pr-carte > .n-actions-rondes, .vrm-pr-carte > .n-groupe, .vrm-pr-carte > .n-bouton-bloc { margin-left: 0; margin-right: 0; margin-bottom: 0; }
 .vrm-pr-carte > .n-groupe { border: 1px solid var(--n-bord); border-radius: 12px; overflow: hidden; }
 .vrm-pr-carte .n-segmente { margin: 0; }
+.vrm-pr-carte > .n-actions-rondes { border: 0; box-shadow: none; background: none; padding: 0; }
+.vrm-pr-sq-ligne { display: flex; align-items: center; gap: 12px; width: 100%; }
 .vrm-pr-carte .n-pourquoi { padding: 0; }
 .vrm-pr-titre { margin: 0; font: var(--n-t-corps-fort); color: var(--n-encre); }
 .vrm-pr-phrase { margin: -4px 0 0; font: var(--n-t-second); color: var(--n-encre-2); }
@@ -75,7 +79,8 @@
 .vrm-pr-admin-ligne:first-child { border-top: 0; }
 .vrm-pr-admin-iban { padding: 0 16px 10px 54px; font: var(--n-t-legende); color: var(--n-encre-2); overflow-wrap: anywhere; }
 .vrm-pr-admin-iban code { font: 600 13px/18px var(--n-police); color: var(--n-encre); letter-spacing: .02em; }
-.vrm-pr-admin-ligne > .n-bouton-bloc { margin: 0 16px; }
+.vrm-pr-admin-ligne > .n-bouton-bloc { box-sizing: border-box; width: auto; margin: 0 16px; }
+.vrm-pr-admin-ligne > .n-bouton-bloc > .n-bouton { box-sizing: border-box; width: 100%; }
 
 /* À l'ordinateur : deux colonnes, le héros et le partage côte à côte. */
 @media (min-width: 1024px) {
