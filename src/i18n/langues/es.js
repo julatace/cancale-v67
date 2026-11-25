@@ -23,6 +23,7 @@ import ecran_file_actions from './es/fileActions.js';   // (21 nov., ext. 5.433)
 import ecran_a_distance from './es/aDistance.js';   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './es/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
 import ecran_styleClarte from './es/styleClarte.js';
+import ecran_moinsTexte from './es/moinsTexte.js';
 import ecran_revueUx from './es/revueUx.js';   // (23 nov.) revue UX   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './es/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './es/ext5438.js';   // (22 nov.) ext. 5.438
@@ -118,6 +119,7 @@ import ecran_ux_reglages from './es/uxReglages.js';   // (21 nov.) Paramètres, 
 import ecran_natif from './es/natif.js';
 import ecran_menu_onglets from './es/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './es/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
+import ecran_parrainage20 from './es/parrainage.js';   // (25 nov.) le parrainage à 20 %
 import ecran_actions_ext from './es/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './es/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
@@ -469,7 +471,7 @@ export default {
   "auth.lier.extension": "Inicia sesión aquí: la extensión de {navigateur} también se conecta, nada que escribir.",
   "auth.parrain.offertPar": "Un regalo de {nom}",
   "auth.parrain.offertVendeur": "Un regalo de un vendedor VRM",
-  "auth.parrain.texte": "1 mes de VRM gratis con tu primer pago, para ti y para quien te invita.",
+  "auth.parrain.texte": "−10 % en tu primer mes de VRM y 1 semana gratis con tu primer pago.",
   "auth.parrain.texteConnexion": "¿Ya tienes cuenta? Inicia sesión: la invitación es solo para cuentas nuevas.",
   "auth.lier.pasOuverte": "El inicio de sesión con {nom} aún no está abierto en VRM. Inicia sesión aquí con tu e-mail y tu contraseña de VRM: la extensión se conectará a la vez.",
   "auth.lier.pasVerifie": "No pude verificar el inicio de sesión con {nom}. Vuelve a probar los métodos de abajo o inicia sesión con tu e-mail: la extensión se conectará a la vez.",
@@ -2423,6 +2425,7 @@ export default {
   ...ecran_a_distance,
   ...ecran_apresFinale,
   ...ecran_styleClarte,
+  ...ecran_moinsTexte,
   ...ecran_revueUx,
   ...ecran_relier_retires,
   ...ecran_fiched,
@@ -2447,4 +2450,5 @@ export default {
   ...ecran_extension,
   ...ecran_actions_ext,
   ...ecran_offres_photos,
+  ...ecran_parrainage20,
 };

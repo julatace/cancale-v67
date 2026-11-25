@@ -29,6 +29,9 @@ import './journee.css';   // (21 nov.) « Colis » à hauteur fixe
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
 // « 1 107 € » ⇒ [« 1 107 », « € »] : l'unité est posée à côté du chiffre par <Affiche>.
 const coupe = (t) => { const m = /^(.*?)[\s  ]*€$/.exec(String(t)); return m ? [m[1], '€'] : [String(t), '']; };
+// (25 nov., moins de texte) Un montant « au moins » en forme courte : « ≥ 1 234 € » à l'œil, « au moins 1 234 € » au lecteur
+// d'écran (CLAUDE.md §5 : un total incomplet DIT qu'il est incomplet — le signe le dit, sans couper le chiffre à 390 px).
+export const auMoinsCourt = (texte) => <><span aria-hidden="true">{'≥ '}</span><span className="n-lu-seul">{tr('journee.moins') + ' '}</span>{texte}</>;
 // « il y a 3 h » dans la langue (Intl) ; pas de date ⇒ rien.
 export function ilYaCourt(ts, maintenant = Date.now()) {
   if (!Number.isFinite(Number(ts))) return '';
@@ -107,11 +110,12 @@ function Chiffres({ chiffres, p, setP, objectif = null, onSaisirPrix = null, onV
     <Tuiles titre={tr('v2.stats.titre')} pied={objectif && p === 'mois' ? <ObjectifLigne objectif={objectif} montant={montant}/> : null} action={<Segmente libelle={tr('v2.stats.periode')} valeur={p} onChange={setP} options={PERIODES_JOURNEE.map((k) => ({ cle: k, libelle: tr('v2.stats.' + k) }))}/>}
       attrs={{ 'data-v2-bloc': 'chiffres', 'data-v2-chiffres': etat, 'data-v2-periode': p, 'data-v2-stats': resume, 'aria-busy': etat === 'encours' ? 'true' : undefined, 'aria-label': libelle,
         'data-v2-jour-vendu': etat === 'lu' && stats ? cents(stats.jour.vendu.valeur) : '', 'data-v2-jour-ventes': etat === 'lu' && stats && stats.jour.ventes.valeur != null ? String(stats.jour.ventes.valeur) : '' }}>
-      <Tuile libelle={tr('v2.stats.ca')} valeur={n} unite={u} detail={etat === 'encours' ? tr('v2.jour.lecture') : detailV} onClick={ouvrir} graphe={etincelle('v')} attrs={{ 'data-v2-stat': 'vendu' }}/>
+      {/* (25 nov., « trop de texte ») Les libellés en un mot (« Vendu · Ventes · Brut · Net ») : le titre et le segmenté disent le reste. */}
+      <Tuile libelle={tr('jour.t.vendu')} valeur={n} unite={u} detail={etat === 'encours' ? tr('v2.jour.lecture') : detailV} onClick={ouvrir} graphe={etincelle('v')} attrs={{ 'data-v2-stat': 'vendu' }}/>
       <Tuile libelle={tr('v2.stats.ventes')} valeur={S && S.ventes.valeur != null ? nombre(S.ventes.valeur) : null}
         detail={S && S.ventes.valeur == null ? note(S.ventes) : (S && S.ventes.partiel ? tr('journee.moins') : '')} onClick={ouvrir} graphe={etincelle('n')} enCours={etat === 'encours'} attrs={{ 'data-v2-stat': 'ventes' }}/>
-      {benef('brut', Br, tr('v2.stats.beneficeBrut'), detailBr)}
-      {benef('net', Nt, tr('v2.stats.beneficeNet'), detailNt)}
+      {benef('brut', Br, tr('jour.t.brut'), detailBr)}
+      {benef('net', Nt, tr('jour.t.net'), detailNt)}
     </Tuiles>
   );
 }
@@ -158,6 +162,7 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
   const Bm = Sm ? Sm.brut : null;
   const manquePrix = !!Bm && (Bm.raison === 'achats' || /achat/.test(String(Bm.note || '')));
   const nomMois = chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : '';
+  const moisCourt = (() => { try { return new Date().toLocaleDateString(localeCourante(), { month: 'short' }); } catch (_) { return nomMois; } })();
   // (23 nov., style-clarte-3 — « le grand chiffre suit la fenêtre ») LE HÉROS DIT LA FENÊTRE CHOISIE : le VENDU des 7 j / 30 j / du mois
   // (`courbe.fenetres[f]`, la même source que la courbe et que « Par site »), l'écart nommé et le nombre de ventes dessous. Le
   // bénéfice brut du mois reste celui de la tuile du mois (`stats.mois.brut`) : il n'est plus le grand chiffre d'une autre période.
@@ -166,20 +171,25 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
   const ecartTxt = W && W.ecart != null ? (f === 'mois' ? tr('pil.ecartMois', { s: signe(W.ecart), mois: (chiffres && chiffres.moisAvant) || '' }) : tr('pil.ecart', { s: signe(W.ecart), n: f })) : '';
   const ventesFen = W && W.ventes != null ? tr('pil.ventesFen', { n: W.ventes }) : '';
   const [hn, hu] = W && W.vendu != null ? coupe((W.partiel ? tr('journee.moins') + ' ' : '') + montant(W.vendu)) : [null, ''];
-  const titreH = f === 'mois' ? tr('pil.h.titreVendu', { mois: nomMois }) : tr('pil.h.titreJours', { n: f });
+  // (25 nov., moins de texte) « Vendu » seul : la fenêtre est dite par le segmenté juste à côté (7 j · 30 j · Mois).
+  const titreH = tr('pil.h.titreJours', { n: f });
   const sousFen = !W ? (!chiffres || chiffres.etat === 'encours' ? tr('v2.jour.lecture') : tr('v2.jour.pasSu'))
     : W.vendu == null ? (W.raison || tr('v2.jour.pasSu'))
-    : ecartTxt ? <><span className={W.ecart >= 0 ? 'n-heros-hausse' : 'n-heros-baisse'} data-pil-ecart={String(W.ecart)}>{(W.ecart >= 0 ? '▲ ' : '▼ ') + ecartTxt}</span>{ventesFen ? ' · ' + ventesFen : ''}</> : ventesFen;
+    // (25 nov., moins de texte) L'écart en court (« +12 % ») ; la phrase entière (« … vs les 7 jours d'avant ») au lecteur d'écran
+    // et au survol. ±0 % n'est NI une hausse NI une baisse : neutre, sans flèche (Julien : « ±0 % » vert avec ▲ était faux).
+    : ecartTxt ? <><span className={W.ecart > 0 ? 'n-heros-hausse' : W.ecart < 0 ? 'n-heros-baisse' : 'n-heros-egal'} data-pil-ecart={String(W.ecart)} title={ecartTxt}>
+        {W.ecart !== 0 ? <span aria-hidden="true">{W.ecart > 0 ? '▲ ' : '▼ '}</span> : null}<span aria-hidden="true">{signe(W.ecart)}</span><span className="n-lu-seul">{ecartTxt}</span></span>{ventesFen ? ' · ' + ventesFen : ''}</> : ventesFen;
   const benefFen = W && W.brut != null ? montant(W.brut) : null;
   const trio = [
-    { cle: 'benef', libelle: (f === 'mois' ? tr('pil.t.benefMois', { mois: nomMois }) : tr('pil.t.benef', { n: f })) + (W && W.brutCouv ? ' · ' + tr('pil.t.sur', { c: W.brutCouv }) : ''),
+    { cle: 'benef', libelle: tr('pil.t.benef', { n: f }) + (W && W.brutCouv ? ' · ' + tr('pil.t.sur', { c: W.brutCouv }) : ''),
       valeur: benefFen, attrs: { 'data-pil-benef-fen': W ? cents(W.brut) : '', 'data-pil-couv': W && W.brutCouv ? W.brutCouv : undefined },
       // (23 nov.) « — » dit POURQUOI, et le chiffre faux est la porte pour le corriger (CLAUDE.md §5) : il ouvre la saisie des prix.
       // (23 nov., iPhone) au téléphone, la porte est une puce courte « Saisis 5 prix › » (le nombre de ventes sans prix d'achat
       // de la fenêtre, quand il est su) — plus de bouton pleine largeur dans le héros.
       ...(benefFen == null && manquePrix && onSaisirPrix ? { pourquoi: telephone ? (W && W.manque > 0 ? tr('pil.t.saisisN', { n: W.manque }) : tr('pil.t.saisis')) : tr('pil.t.prixManquants'), onClick: onSaisirPrix } : {}) },
-    { cle: 'recu', libelle: tr('pil.t.recu', { mois: nomMois }), valeur: Rc && Rc.valeur != null ? (Rc.partiel ? tr('journee.moins') + ' ' : '') + montant(Rc.valeur) : null, attrs: { 'data-pil-recu': Rc ? cents(Rc.valeur) : '' } },
-    { cle: 'avenir', libelle: tr('pil.t.avenir'), valeur: aVenir && aVenir.valeur != null ? (aVenir.partiel ? tr('journee.moins') + ' ' : '') + montant(aVenir.valeur) : null, attrs: { 'data-pil-avenir': aVenir ? cents(aVenir.valeur) : '', ...(aVenir && aVenir.valeur > 0 ? { 'data-v2-avenir': cents(aVenir.valeur) } : {}) } },
+    // (25 nov., captures de Julien : « Reçu · novembre au moins 1… » coupé) « au moins » en forme courte « ≥ » (auMoinsCourt).
+    { cle: 'recu', libelle: tr('pil.t.recu', { mois: moisCourt }), valeur: Rc && Rc.valeur != null ? (Rc.partiel ? auMoinsCourt(montant(Rc.valeur)) : montant(Rc.valeur)) : null, attrs: { 'data-pil-recu': Rc ? cents(Rc.valeur) : '', 'data-pil-recu-partiel': Rc && Rc.partiel ? '1' : undefined } },
+    { cle: 'avenir', libelle: tr('pil.t.avenir'), valeur: aVenir && aVenir.valeur != null ? (aVenir.partiel ? auMoinsCourt(montant(aVenir.valeur)) : montant(aVenir.valeur)) : null, attrs: { 'data-pil-avenir': aVenir ? cents(aVenir.valeur) : '', ...(aVenir && aVenir.valeur > 0 ? { 'data-v2-avenir': cents(aVenir.valeur) } : {}) } },
   ];
   return (
     <Heros titre={titreH} valeur={hn} unite={hu} sous={sousFen}
@@ -193,7 +203,8 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
         'data-pil-somme': (() => { const lus = L.filter((x) => x.v != null); return lus.length === L.length ? cents(lus.reduce((t, x) => t + x.v, 0)) : ''; })() }}
       graphe={<>
         <GrapheJours forme="aire" jours={jours} choisie={k} onChoisir={setJour} libelle={f === 'mois' ? tr('pil.grapheMois') : tr('pil.graphe', { n: f })} moyenneLibelle={tr('pil.moyenne')} attrs={{ 'data-pil-jour': j ? j.cle : '' }}/>
-        <p className="n-heros-jour" data-pil-detail="" data-pil-touche={jour != null ? '1' : undefined}>{detailJour}</p>
+        {/* (25 nov., « trop de texte ») Le détail d'un jour n'est dit qu'au toucher de ce jour (sa place est tenue : rien ne saute). */}
+        <p className="n-heros-jour" data-pil-detail="" data-pil-touche={jour != null ? '1' : undefined}>{jour != null ? detailJour : '\u00a0'}</p>
         <ul className="n-pilotage-legende" aria-hidden="true">
           <li><span className="n-pilotage-cle" data-n-cle="aire"/>{tr('pil.cle.vendu')}</li>
           {aBenef ? <li><span className="n-pilotage-cle" data-n-cle="ligne"/>{tr('pil.cle.benefice')}</li> : null}
@@ -232,7 +243,9 @@ function ParSiteAttente({ f, nomMois = '' }) {
 const NOM_SITE = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
 function ParSite({ courbe, f, montant, nomMois = '' }) {
   const L = courbe && courbe.parSite ? courbe.parSite[f] : null;
-  if (!Array.isArray(L) || !L.length) return null;
+  // (25 nov., moins de texte) Un seul site a vendu : la barre pleine « Vinted 100 % » redit le grand chiffre du haut (CLAUDE.md §7 :
+  // le même nombre ne s'écrit pas deux fois) — la carte n'est montrée qu'à partir de DEUX sites.
+  if (!Array.isArray(L) || L.length < 2) return null;
   const parts = L.map((x, i) => ({ cle: x.site, nom: NOM_SITE[x.site] || x.site, icone: <LogoSite site={x.site} taille={18}/>, valeur: x.v, ton: i + 1,
     texte: (x.vp ? tr('journee.moins') + ' ' : '') + montant(x.v) }));
   return (
@@ -309,9 +322,12 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
       const lecture = !pret;
       const envSous = lecture ? tr('v2.jour.lecture') : n == null ? tr('v2.jour.pasSu') : alerteEnv ? alerte.txt : n === 0 ? tr('v2.af.rienEnvoyer') : (affiche && affiche.sous) || '';
       const retSous = lecture ? tr('v2.jour.lecture') : nRet == null ? tr('v2.jour.pasSu') : nRet === 0 ? tr('v2.af.rienRetirer')
-        : [point ? point.lieu || tr('v2.retirer.pointInconnu') : '', point && point.code ? point.code : '', pts.length > 1 || (retraits && retraits.nPoints > 1) ? tr('v2.retirer.points', { n: retraits.nPoints || pts.length }) : ''].filter(Boolean).join(' · ');
+        // (25 nov., captures de Julien : « Super U · 409796 · 4 points », confus) LE CODE du premier point, groupé par trois
+        // (« code 409 796 ») ; sans code, le nom du point. Le lieu et le nombre de points restent dans l'écran À retirer (›).
+        : point && point.code ? tr('v2.retirer.code', { code: String(point.code).replace(/^(\d{3})(\d{3})$/, '$1 $2') }) : point ? point.lieu || tr('v2.retirer.pointInconnu') : '';
+      // (25 nov., « trop de texte ») Avec le tableau de bord, la carte n'a plus de titre « Colis » : ses deux cases le disent.
       return (
-        <Carte titre={tr('v2.af.titre')} action={plein && !aPilotage ? <Bouton variante="plein" onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n), 'data-v2-principal-exact': plein.exact === false ? '0' : '1' }}>{tr('v2.imprimer', { n: plein.n })}</Bouton> : null}
+        <Carte titre={aPilotage ? undefined : tr('v2.af.titre')} action={plein && !aPilotage ? <Bouton variante="plein" onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n), 'data-v2-principal-exact': plein.exact === false ? '0' : '1' }}>{tr('v2.imprimer', { n: plein.n })}</Bouton> : null}
           attrs={{ 'data-v2-bloc': 'colis', 'data-v2-cj': lecture ? '' : [n == null ? '' : n, nRet == null ? '' : nRet].join(','), 'aria-busy': lecture ? 'true' : undefined }}>
           {/* (22 nov. soir, maquettes de Julien) DEUX CASES côte à côte : « 6 à envoyer » (l'échéance qui presse en ambre) |
               « 3 à retirer » (le point relais). Les mêmes nombres, les mêmes repères (`data-v2-cj-ligne`), le même toucher. */}
@@ -332,17 +348,17 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
             attrs={{ 'data-journee-prevision': retraits.prevision.quand }}/> : null}
           {/* (21 nov., prio-recherche) « N paires à republier en priorité › » : la publication de l'écran Annonces (src/republierPriorite.js),
               seulement quand elle propose au moins une paire ; le toucher ouvre Annonces sur « À republier ». Rien ne part d'ici. */}
-          {!lecture && aRepublier && aRepublier.n > 0 ? <Rangee icone={<Icon name="sync" size={22}/>} titre={tr('prio.journee', { n: aRepublier.n })} lignes={2} sousTitre={tr('prio.journeeSous', { jours: aRepublier.jours })}
+          {!lecture && aRepublier && aRepublier.n > 0 ? <Rangee icone={<Icon name="sync" size={22}/>} titre={tr('prio.journee', { n: aRepublier.n })}
             fin="chevron" onClick={aRepublier.ouvrir} attrs={{ 'data-prio-journee': String(aRepublier.n) }}/> : null}
           {/* (22 nov., choix n° 33) « N offres sans réponse › » : la règle de Messages (src/offresSansReponse.js), seulement LUE et
               non vide ; le toucher ouvre Messages · Offres (la liste, puis le panneau de l'extension). */}
-          {!lecture && offresSR && offresSR.n > 0 ? <Rangee icone={<Icon name="tag" size={22}/>} titre={tr('osr.journee', { n: offresSR.n })} lignes={2} ton="ambre"
-            sousTitre={offresSR.age ? tr('osr.journeeSous', { age: tr('osr.age.' + offresSR.age.cle, { n: offresSR.age.n }) }) : ''}
+          {!lecture && offresSR && offresSR.n > 0 ? <Rangee icone={<Icon name="tag" size={22}/>} titre={tr('osr.journee', { n: offresSR.n })} ton="ambre"
+            valeur={offresSR.age ? tr('osr.age.' + offresSR.age.cle, { n: offresSR.age.n }) : ''}
             fin="chevron" onClick={offresSR.ouvrir} attrs={{ 'data-osr-journee': String(offresSR.n) }}/> : null}
           {/* (22 nov., choix n° 35) « Même photo sur deux annonces › » : la règle d'Annonces (src/photoEnDouble.js, le fichier exact) ;
               le toucher ouvre Annonces sur « Photo en double ». Rien n'est modifié ni relié. */}
           {!lecture && photoDouble && photoDouble.n > 0 ? <Rangee icone={<Icon name="image" size={22}/>} titre={photoDouble.n === 1 ? tr('photoDouble.journee1') : tr('photoDouble.journeeN', { n: photoDouble.n })} lignes={2}
-            sousTitre={photoDouble.n === 1 ? tr('photoDouble.journeeSous', { nums: numsPhotoDouble(photoDouble.groupes[0]) }) : tr('photoDouble.journeeSousN')}
+            valeur={photoDouble.n === 1 ? numsPhotoDouble(photoDouble.groupes[0]) : ''}
             fin="chevron" onClick={photoDouble.ouvrir} attrs={{ 'data-photo-double-journee': String(photoDouble.n) }}/> : null}
         </Carte>
       );
@@ -395,7 +411,8 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
               'aria-label': [l.titre || tr('v2.dv.vente', { site: l.site }), l.num ? 'N°' + l.num : '', l.prix, ilYaCourt(l.ts)].filter(Boolean).join(' · ') }}>
               <TuilePaire photo={l.photo || ''} numero={l.num || ''} icone={l.photo ? '' : 'cash'} genre="vente" Icon={Icon} taille="xl" Photo={Photo}/>
               <span className="n-inventaire-prix">{l.site ? <LogoSite site={String(l.site).toLowerCase()} taille={14}/> : null}<span>{l.prix || '—'}</span></span>
-              <span className="n-inventaire-quand">{ilYaCourt(l.ts)}</span>
+              {/* (25 nov., « trop de texte ») L'âge de chaque vente quitte la tuile : elles sont rangées de la plus récente à la plus
+                  ancienne, et l'âge reste dans le nom de la tuile (aria-label) et dans Ventes. */}
             </CaseInventaire>
           ))}
         </div> : null}
@@ -665,8 +682,8 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
               poussaient « Tes chiffres » de 270 px. Tant que l'écran lit (`!pret`), leur place est TENUE : les mêmes cartes, chiffres
               en squelette (src/natif/outils.js) ; lu sans rien à montrer, la place se rend (un retrait, jamais une poussée). */}
           {porteMonnaie !== undefined ? <PorteMonnaie pm={porteMonnaie} montant={montant} Icon={Icon}/> : tenirPlace ? <PorteMonnaie pm={undefined} enLecture montant={montant} Icon={Icon}/> : null}
-          {pret && courbe.parSite && courbe.parSite[fen] && courbe.parSite[fen].length ? <ParSite courbe={courbe} f={fen} montant={montant} nomMois={chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : ''}/>
-            : tenirPlace ? <ParSiteAttente f={fen} nomMois={chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : ''}/> : null}
+          {pret && courbe.parSite && courbe.parSite[fen] && courbe.parSite[fen].length > 1 ? <ParSite courbe={courbe} f={fen} montant={montant} nomMois={chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : ''}/>
+            : tenirPlace && !(pret && courbe.parSite && courbe.parSite[fen]) ? <ParSiteAttente f={fen} nomMois={chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : ''}/> : null}
         </Colonne> : null}
         {montrees.filter((k) => k !== 'courbe' && !(aPilotage && k === 'colis')).map((k) => (
           // (23 nov.) Sans graphique, Colis (deux cases) prend la rangée entière : sinon « Dernières ventes », arrivée après la lecture,
@@ -682,7 +699,7 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
         {/* (22 nov., « zéro saut ») « Toutes les statistiques » et « Personnaliser » closent l'écran : posés AVEC les cartes (`pret`),
             jamais avant — sinon les cartes arrivées ensuite les poussaient hors de la fenêtre (banc couches-chargement : CLS 0,05). */}
         {pret && (onNav || (cartes && cartes.poser)) ? <Colonne attrs={{ 'data-tb': 'fin' }}>
-        {onNav ? <Groupe><Rangee icone={<Icon name="chart" size={22}/>} titre={tr('v2.af.toutesStats')} sousTitre={tr('v2.af.toutesStatsSous')} fin="chevron" onClick={() => onNav('dashboard')} attrs={{ 'data-v2-vers-stats': '' }}/></Groupe> : null}
+        {onNav ? <Groupe><Rangee icone={<Icon name="chart" size={22}/>} titre={tr('v2.af.toutesStats')} fin="chevron" onClick={() => onNav('dashboard')} attrs={{ 'data-v2-vers-stats': '' }}/></Groupe> : null}
         {cartes && cartes.poser ? <div className="n-ecran-outils">
           {ordinateur ? <Bouton variante="texte" onClick={() => setModifier(!modifier)} attrs={{ 'data-v2-modifier': modifier ? '1' : '0' }}>{modifier ? tr('v2.perso.fini') : tr('v2.perso.modifier')}</Bouton> : null}
           <Bouton variante="texte" onClick={() => setPerso(true)} attrs={{ 'data-v2-perso': '' }}>{tr('v2.perso.ouvrir')}</Bouton>

@@ -11,6 +11,7 @@ import { tr } from '../../i18n/index.js';
 import { TableauTravail } from '../TableauTravail.jsx';
 import { Plaque } from '../Plaque.jsx';
 import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site
+import { AvatarCompte } from '../visuel/Inventaire.jsx';   // (25 nov., logo-vinted-pp) le rond du compte : sa photo de profil, sinon l'initiale
 import { PropositionLiaison } from './PropositionLiaison.jsx';   // (20 nov.) relier depuis la liste
 import { STATUTS_TABLEAU, STATUTS_EN_LIGNE, statutTableau } from '../../articles/modele.js';
 import { groupesParCompte } from './annoncesComptes.js';   // (20 nov.) un intertitre par compte
@@ -37,7 +38,7 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     for (const g of groupesParCompte(garde, site)) {
       // (23 nov., revue UX P2) Le nombre du groupe = ses lignes AFFICHÉES (filtres compris), « 36 sur 82 » quand un filtre en cache : la
       // même règle et le même mot (« annonces ») que le nombre en tête du tableau.
-      const titre = (n, total) => <span className="n-eg-compte">{Logo && g.site ? <span className="n-eg-compte-logo" aria-hidden="true">{Logo(g.site)}</span> : null}{g.cle === 'sans' ? tr('egalite.groupe.sansCompte') : (g.pseudo || ('#' + g.compte))}<span className="n-tt-intertitre-n" data-eg-groupe-n={String(n)} data-eg-groupe-total={String(total)}>{n < total ? tr('egalite.groupe.nSur', { k: n, n: total }) : tr('egalite.groupe.n', { n })}</span></span>;
+      const titre = (n, total) => <span className="n-eg-compte" data-eg-compte-cle={g.cle}>{Logo && g.site ? <span className="n-eg-compte-logo" aria-hidden="true">{Logo(g.site)}</span> : null}{g.cle !== 'sans' ? <AvatarCompte pseudo={g.pseudo || ('#' + g.compte)} cle={g.cle} petit/> : null}{g.cle === 'sans' ? tr('egalite.groupe.sansCompte') : (g.pseudo || ('#' + g.compte))}<span className="n-tt-intertitre-n" data-eg-groupe-n={String(n)} data-eg-groupe-total={String(total)}>{n < total ? tr('egalite.groupe.nSur', { k: n, n: total }) : tr('egalite.groupe.n', { n })}</span></span>;
       // (22 nov., Julien : « les filtres ne sont pas précis ») La rangée d'un COMPTE porte l'état de SON annonce (vendue sur Vinted,
       // en ligne sur Leboncoin : deux rangées, « Vendue » et « En ligne ») — le compteur de chaque statut = ses rangées.
       for (const a of g.articles) out.push({ a, statut: (g.cle !== 'sans' && statutTableau(a, { site: g.site, compte: g.compte })) || statutDe.get(a.cle), groupe: { cle: g.cle, titre } });
