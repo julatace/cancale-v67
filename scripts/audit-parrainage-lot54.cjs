@@ -270,7 +270,7 @@ const evt = (type, objet, created) => JSON.stringify({ id: 'evt_' + created, typ
 
   console.log('\n── D. Le mois offert : un compte Vinted jamais vu');
   await essaie('D', async () => {
-    // D1-D2 : sans compte Vinted au paiement, rien ; relié ensuite, un mois à chacun.
+    // D1-D2 : sans compte Vinted au paiement, rien ; relié ensuite, une semaine à chacun (25 nov.).
     reset(); delete vinted[N]; let code = (await get('aa.bb.A')).corps.code; await nommer('aa.bb.A', 'Julie');
     await rattacher('aa.bb.N', code);
     abos[N] = { statut: 'active', client_stripe: 'cus_N' }; abos[A] = { statut: 'active', client_stripe: 'cus_A' };
@@ -282,7 +282,7 @@ const evt = (type, objet, created) => JSON.stringify({ id: 'evt_' + created, typ
     dit(Array.isArray(gA.filleuls) && gA.filleuls.length === 1 && gA.filleuls[0].etat === 'paye' && gA.filleuls[0].rang === 1 && /^\d{4}-\d{2}-\d{2}$/.test(gA.filleuls[0].inscritLe), '  le parrain lit « Filleul 1 · a payé son 1er mois » (en vérification)', JSON.stringify(gA.filleuls));
     vinted[N] = [{ vinted_user_id: '5500', login: 'nouvelle_v' }];
     r = await webhook(facture('cus_N', 1699, 2));
-    dit(r.code === 200 && (balance.cus_N || []).length === 1 && (balance.cus_A || []).length === 1 && balance.cus_N[0].amount === -1699, 'D2 compte Vinted neuf relié : un mois (16,99 €) à chacun à la facture suivante', JSON.stringify({ N: balance.cus_N, A: balance.cus_A }));
+    dit(r.code === 200 && (balance.cus_N || []).length === 1 && (balance.cus_A || []).length === 1 && balance.cus_N[0].amount === -396, 'D2 compte Vinted neuf relié : une semaine (3,96 €, règle du 25 nov.) à chacun à la facture suivante', JSON.stringify({ N: balance.cus_N, A: balance.cus_A }));
     gA = (await get('aa.bb.A')).corps; gN = (await get('aa.bb.N')).corps;
     dit(gA.filleuls[0].etat === 'offert' && gA.suivi.moisOfferts === 1 && gN.filleul.moisOffert === true, '  « mois offert crédité » chez le parrain, et chez le filleul', JSON.stringify({ f: gA.filleuls, s: gA.suivi, n: gN.filleul }));
     dit(propre(gA) && propre(gN), '  aucune réponse ne porte un uuid, une adresse ou un pseudo/identifiant Vinted');
