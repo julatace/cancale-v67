@@ -2245,8 +2245,11 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1380)
 - **24 nov. · Livrable 2 (`claude/livrable-2`)** : Argent ne dit plus « pas calculé / ouvre Ventes » pendant la lecture (publication pas encore relue = en lecture) ; Ventes sans ligne coupée ; Aujourd'hui sans saut (places tenues, 0 px mesuré à 390 et 1512). `2026-11-24-livrable.md` (Suite). Geste : aucun.
 
-## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1378)
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1351)
 - **24 nov. · Argent, Messages, Paramètres visuels (`claude/visuel-argent`)** : anneau, jauges micro/TVA, « À venir » en cartes, tuiles de paire ; affichage seul. `2026-11-24-visuel-argent.md`. Geste : aucun.
 
-## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1378)
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1351)
 - **24 nov. · Annonces + Stock (`claude/visuel-annonces`)** : la LISTE reste par défaut, rangée nette 72 px (photo 60, étiquette N°, ♡ 👁, jamais « 0 j »), glisser ⇒ Baisser/Republier, puces au pouce, liste virtualisée, sans latence ; « Détaillé » (tuiles) dans ⋯ ; Stock : étiquette papier, creux. `2026-11-24-visuel-annonces.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1378)
+- **24 nov. · Styles au choix (`claude/style-graphite`, PR #1380)** : Paramètres → Apparence → Style, tuiles (Actuel + 11 styles dont Monochrome), clair/sombre, un toucher applique ; jetons par `scripts/styles-generer.cjs` (table, AA, zéro orange), famille de boutons `src/natif/styles-choix.css`. Banc `styles-choix`. `2026-11-24-style-graphite.md`. Geste : essayer, dire lequel garder.
