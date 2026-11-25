@@ -2243,9 +2243,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **24 nov. · Chargement sans tirets (`claude/livrable`)** : un chiffre EN COURS de lecture se dessine en squelette (composants natifs : héros, tuiles, cases, rangées d'Argent), « — » et sa raison rendus au bout de 15 s ; pas su = « — » dit, inchangé ; ⚠️ un banc sans `BANC_DESIGN_V2=defaut` voit l'ancien DOM. `2026-11-24-livrable.md`. Geste : aucun.
 
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., agir-tout 5.450.1, fusion de main)
-- **24 nov. · « Vinted a agi » : UNE carte** (#1321+#1346) : ligne par compte, feuille aux photos (N°), un geste. `2026-11-23-moderation-carte.md`. Geste : aucun.
-
-## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., agir-tout 5.450.1, fusion de main)
 - **24 nov. · Visuel « jeu vidéo » (`claude/visuel-jeu`)** : pop-ups en notifications de jeu (photo par identité, étiquette N°, médaillon, ressort, balayage, « +2 », vente fêtée) ; disparues en grille ; anneau des colis prêts ; ventes en tuiles ; pièces `src/natif/Jeu.jsx` (README `src/natif/visuel/`). `2026-11-24-visuel-jeu.md`. Geste : regarder la galerie des pop-ups sur l'iPhone.
 
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., agir-tout 5.450.1, fusion de main)
@@ -2253,3 +2250,15 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., agir-tout 5.450.1, fusion de main)
 - **24 nov. · Connexions de l'extension (`claude/connexions-extension`)** : Paramètres → « Connexions de l'extension » : chaque navigateur (nom, version « à jour » ou « 5.418 → 5.440 », vu quand, comptes lus, dernier problème + son geste), chaque compte (lu par qui, quand, jauge 50/h), vieilles installations repliées ; une ligne sur Aujourd'hui seulement si un geste attend ; champs 5.448 (`sante`, `arret`, `servie`) lus présents, sinon « — ». `2026-11-24-connexions-extension.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1365)
+- **24 nov. · « Vinted a agi » : UNE carte** (#1321+#1346) : ligne par compte, feuille aux photos (N°), un geste. `2026-11-23-moderation-carte.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., agir-tout 5.450.1, 2e fusion de main)
+- **24 nov. · Visuel « jeu vidéo » (`claude/visuel-jeu`)** : pop-ups en notifications de jeu (photo par identité, étiquette N°, médaillon, ressort, balayage, « +2 », vente fêtée) ; disparues en grille ; anneau des colis prêts ; ventes en tuiles ; pièces `src/natif/Jeu.jsx` (README `src/natif/visuel/`). `2026-11-24-visuel-jeu.md`. Geste : regarder la galerie des pop-ups sur l'iPhone.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., agir-tout 5.450.1, 2e fusion de main)
+- **24 nov. · Livrable 2 (`claude/livrable-2`)** : Argent ne dit plus « pas calculé / ouvre Ventes » pendant la lecture (publication pas encore relue = en lecture) ; Ventes sans ligne coupée ; Aujourd'hui sans saut (places tenues, 0 px mesuré à 390 et 1512). `2026-11-24-livrable.md` (Suite). Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., agir-tout 5.450.1, 2e fusion de main)
+- **24 nov. · Argent, Messages, Paramètres visuels (`claude/visuel-argent`)** : anneau, jauges micro/TVA, « À venir » en cartes, tuiles de paire ; affichage seul. `2026-11-24-visuel-argent.md`. Geste : aucun.

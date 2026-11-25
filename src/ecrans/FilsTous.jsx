@@ -22,6 +22,8 @@ import { attrCible } from '../cibleNotif.js';   // (22 nov., ext. 5.435) la loup
 import { Bouton as BoutonNatif, BoutonIcone } from '../natif/Bouton.jsx';
 import { Segmente } from '../natif/Segmente.jsx';
 import { Glyphe } from '../natif/icones.jsx';
+import { TuilePaire } from '../natif/Jeu.jsx';
+import '../natif/ecrans/messages-visuel.css';   // (24 nov., visuel-argent) la paire en tuile, l'avatar du compte sur son coin
 import { LogoSite } from '../SelecteurSites.jsx';
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
 import { motifDeLApercu } from '../antiArnaque.js';
@@ -210,6 +212,8 @@ function FilEbay({ x, onFerme, onEnvoye }) {
   );
 }
 
+// L'initiale d'un compte (sans le « @ » ni la ponctuation de tête).
+const initialeCompte = (t) => String(t || '').trim().replace(/^[^\p{L}\p{N}]+/u, '').charAt(0).toUpperCase() || '·';
 export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, rendreVinted, lireVinted, compteOnglet = '', pairesLues = true }) {
   const autres = useAutresSites();
   const [ebayTous, relireEbay] = useEbayTous();
@@ -421,7 +425,13 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                             data-fil-at={f.at != null ? String(f.at) : ''} data-fil-offre={offre ? String(offre.prix) : undefined}
                             data-cible={attrCible(...f.convs.flatMap((c) => [['conv', c.conv], c.compte != null && c.compte !== '' ? ['conv', String(c.compte).replace(/^lbc-account:/, ''), c.conv] : null]).filter(Boolean))}
                             onClick={() => ouvrir(f)}>
-                            {ordinateur ? <span className="vg-fil-ph n-fil-avatar" aria-hidden="true"><span className={sensible ? 'vrm-sensible' : undefined}>{String(nomF || '?').trim().charAt(0).toUpperCase() || '?'}</span></span> : <span className="vg-fil-ph" aria-hidden="true">{photo ? <PhotoVinted src={photo} alt="" loading="lazy" decoding="async" width={44} height={44}/> : <span className={sensible ? 'vrm-sensible' : undefined}>{String(nomF || '').trim().charAt(0).toUpperCase() || '·'}</span>}</span>}
+                            {/* (24 nov., visuel-argent) La PAIRE en tuile (sa photo vient de la fiche reliée PAR IDENTITÉ, `convVinted` ⇒
+                                `paire.photo` ; jamais l'avatar de l'acheteur ; sans photo, un médaillon) et l'AVATAR DU COMPTE (l'initiale du
+                                groupe) sur son coin — au téléphone comme à l'ordinateur (la vignette de droite est devenue cette tuile). */}
+                            <span className="vg-fil-tuile" aria-hidden="true" data-fil-tuile={photo ? 'photo' : 'medaillon'}>
+                              <TuilePaire photo={photo || ''} Photo={PhotoVinted} Icon={Icon} icone={offre ? 'tag' : photo ? '' : 'chat'} genre={offre ? 'offre' : 'message'} taille="m"/>
+                              {(g.nom || NOM_SITE[g.plateforme]) ? <span className={'vg-fil-compte-av' + (g.plateforme === 'vinted' ? ' vrm-sensible' : '')} data-fil-compte-av="" data-stream-type="compte">{initialeCompte(g.nom || NOM_SITE[g.plateforme])}</span> : null}
+                            </span>
                             <span className="vg-fil-mid">
                               <span className="vg-fil-1">
                                 <b className={sensible ? 'vrm-sensible' : undefined} data-stream-type={sensible ? 'acheteur' : undefined}>{nomF}</b>
@@ -429,13 +439,12 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                               </span>
                               <span className="vg-fil-2">
                                 {f.num ? <span className="sb-plaque vg-fil-plaque"><small>N°</small>{f.num}</span> : null}
-                                <span className={'vg-fil-extrait' + (offre ? ' is-offre' : '')}>{offre ? tr('verre2.msg.offreDe', { m: montantCourt(offre.prix) }) : <>{d && d.apercu && d.deMoi === true ? <span className="vg-fil-toi">{tr('messages.toi')} </span> : null}{d ? d.apercu : ''}</>}</span>
+                                <span className={'vg-fil-extrait' + (offre ? ' is-offre' : '')}>{offre ? <span className="vg-fil-puce-offre" data-fil-offre-puce=""><Icon name="tag" size={13}/><span>{tr('verre2.msg.offreDe', { m: montantCourt(offre.prix) })}</span></span> : <>{d && d.apercu && d.deMoi === true ? <span className="vg-fil-toi">{tr('messages.toi')} </span> : null}{d ? d.apercu : ''}</>}</span>
                                 {f.convs.length > 1 ? <span className="vrm-msg-etat vg-fil-etat" data-fil-relie="">{trj('messages.conv', { x: f.convs.length })}</span> : null}
                                 <PastilleArnaque motif={motif}/>
                                 {f.plateformes.length > 1 ? <Marques plateformes={f.plateformes}/> : null}
                               </span>
                             </span>
-                            {ordinateur && photo ? <span className="n-fil-vignette" aria-hidden="true"><PhotoVinted src={photo} alt="" loading="lazy" decoding="async" width={44} height={44}/></span> : null}
                           </button>
                         );
                       })}

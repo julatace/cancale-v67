@@ -28564,7 +28564,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         const auteur = auteurDernier(c, paire);
                         const offre = offreDeConv(c);
                         const tsConv = Date.parse(c.updated_at||'') || null;
-                        const photo = (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || (paire&&paire.photo) || (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || null;
+                        // (24 nov., visuel-argent) La tuile montre la PAIRE : la photo de l'annonce de la conversation, sinon celle de la
+                        // fiche reliée PAR IDENTITÉ (`paireDeConv`) — plus l'avatar de l'acheteur (ce n'est pas la paire).
+                        const photo = (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || (paire&&paire.photo) || null;
                         const ro = !!prioMsg && uidC(c)!==prioMsg;
                         const nom = (c.opposite_user&&c.opposite_user.login)||tr('v2.msg.conversation');
                         const ex = extraitConversation(c, paire&&paire.r, paire&&paire.titre, normTitle);
@@ -28573,7 +28575,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                           : ex.kind==='event' ? tr('v2.msg.vinted',{ t: ex.texte }) : ex.kind==='message' ? (ex.vinted?tr('v2.msg.equipe',{ t: ex.texte }):ex.texte) : '';
                         const toi = ex.kind==='message'&&ex.source==='fil'&&(ex.de==='toi'||auteur==='toi');
                         const titrePaire = (paire&&paire.titre)||c.item_title||c.item?.title||'';
-                        return <LigneConversationV2 key={uidC(c)+'_'+c.id} Photo={PhotoVinted} photo={photo} nom={nom} heure={tsConv?heureListe(tsConv):''} quandIso={tsConv?new Date(tsConv).toISOString():''}
+                        return <LigneConversationV2 key={uidC(c)+'_'+c.id} Photo={PhotoVinted} Icon={Icon} photo={photo} nom={nom} compte={g.nom || ''} heure={tsConv?heureListe(tsConv):''} quandIso={tsConv?new Date(tsConv).toISOString():''}
                           extrait={texteEx || titrePaire} toi={toi?tr('messages.toi'):''} num={paire&&paire.num?String(paire.num):''}
                           offre={offre?tr('v2.msg.offreAttente',{ p: prix(offre.prix) }):''} etat={paire&&paire.etat?paire.etat.t:''}
                           nonLu={!!c.unread} lectureSeule={ro} actif={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)}
