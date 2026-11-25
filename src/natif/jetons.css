@@ -24,7 +24,7 @@
   :root {
     /* ── couleurs du contrat ── */
     --n-fond: #878B92;   /* (25 nov., Julien : « gris moyen c'est d'accord » — entre le clair #DFE1E5 et la nuit #1C1C20 ; avant, 23 nov. : « gris clair ») */
-    --n-laterale: #7F838A;            /* la barre latérale : un gris un cran plus soutenu que le fond */
+    --n-laterale: #999DA3;            /* la barre latérale (25 nov.) : un cran plus CLAIR que la page grise (secondaire 5,9:1, entrée active 4,9:1) */
     --n-carte: #F1F2F4;
     --n-carte-2: #E3E5E9;             /* bande de groupe, champ dans une feuille */
     --n-bord: #B9BDC3;                /* contour d'un contrôle, d'une carte, filet de structure */
