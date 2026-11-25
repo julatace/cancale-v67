@@ -2253,3 +2253,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1378)
 - **24 nov. · Styles au choix (`claude/style-graphite`, PR #1380)** : Paramètres → Apparence → Style, tuiles (Actuel + 11 styles dont Monochrome), clair/sombre, un toucher applique ; jetons par `scripts/styles-generer.cjs` (table, AA, zéro orange), famille de boutons `src/natif/styles-choix.css`. Banc `styles-choix`. `2026-11-24-style-graphite.md`. Geste : essayer, dire lequel garder.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1381)
+- **24 nov. · Parcours iPhone (`claude/parcours-iphone`, APRÈS #1326)** : un robot joue sa journée au doigt (banc `parcours-iphone`, WebKit dans `iphone-webkit.yml`) ; corrigés : le code au comptoir que le « retour » ne fermait pas (VRM quitté), « Colis mondial_relay » dans la loupe ; rapportés : sauts d'Achats/Argent/loupe (données lues après). `2026-11-24-parcours-iphone.md`. Geste : aucun.
