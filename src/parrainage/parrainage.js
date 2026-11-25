@@ -1,6 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // LE PARRAINAGE, CLAIR ET VISIBLE (13 nov., lot 54)
-// « Parraine un vendeur : 1 mois offert pour toi et pour lui. »
+// « Parraine un vendeur : 1 mois offert pour toi et pour lui. » — (25 nov.) remplacé : −10 % + 1 semaine
+// pour le filleul, 20 % de chaque mois payé pour le parrain ; l'écran : src/parrainage/EcranParrainage.jsx.
 // ════════════════════════════════════════════════════════════════════════════
 // Ce fichier ne DÉCIDE rien : la règle (qui est filleul, quand le mois part,
 // l'anti-abus) est au serveur (api/_lib/parrainage.js) et dans les CGV
@@ -14,16 +15,16 @@
 // Trois états partout : `undefined` en cours · `null` pas su · la valeur lue.
 // ════════════════════════════════════════════════════════════════════════════
 
-export const PHRASE_PARRAINAGE = 'Parraine un vendeur : 1 mois offert pour toi et pour lui';
-export const TEXTE_PARTAGE = 'Je t’offre 1 mois de VRM, l’outil qui gère mes ventes. Inscris-toi avec mon lien : on gagne chacun un mois à ton premier paiement.';
+export const PHRASE_PARRAINAGE = 'Parraine un vendeur : −10 % pour lui, 20 % chaque mois pour toi';
+export const TEXTE_PARTAGE = 'Je t’offre −10 % sur ton 1er mois de VRM et une semaine offerte. Inscris-toi avec mon lien.';
 
 // Les états rendus par la route (`etatsFilleuls`) : un mot court (à droite) et sa phrase (dessous).
 export const ETATS_FILLEUL = {
   inscrit: { court: 'Inscrit', detail: 'pas encore payé son 1er mois' },
   paye: { court: 'A payé', detail: 'a payé son 1er mois · ton mois arrive' },
   'attente-toi': { court: 'A payé', detail: 'a payé · ton mois t’attend (ton 1er paiement)' },
-  offert: { court: 'Mois offert', detail: 'a payé son 1er mois' },
-  plafond: { court: 'A payé', detail: 'a payé · plafond de 12 mois atteint' },
+  offert: { court: 'Offert', detail: 'a payé son 1er mois' },
+  plafond: { court: 'A payé', detail: 'a payé · plafond de 12 semaines atteint' },
   refuse: { court: 'Pas retenu', detail: 'règle anti-abus' },
 };
 export function texteEtatFilleul(etat) {
