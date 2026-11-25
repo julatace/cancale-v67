@@ -165,10 +165,7 @@ export default {
   "v2.l.acheteMarge": "Comprado {p} · margen {m}",
   "v2.chargement": "Leyendo tus anuncios…",
   "v2.imprimerCourt": "Imprimir las etiquetas",
-  "v2.ecartCourt": {
-    "one": "{r} aún no listo",
-    "other": "{r} aún no listos"
-  },
+  "v2.ecartCourt": {"one": "{r} sin preparar", "other": "{r} sin preparar"},
   "v2.tousPrets": "todos listos para imprimir",
   "v2.achats.ajouterCourt": "Añadir",
   "v2.reessayer": "Reintentar",
@@ -247,7 +244,7 @@ export default {
   "v2.reg.completer": "Completar mis anuncios",
   "v2.reg.completerN": "Completar mis anuncios · {n}",
   "v2.jour.lecture": "leyendo…",
-  "v2.stats.titre": "Tus cifras",
+  "v2.stats.titre": "Cifras",
   "v2.stats.ca": "Vendido",
   "v2.obj.fixer": "Fijar un objetivo del mes",
   "v2.obj.titre": "Objetivo del mes",
@@ -306,7 +303,7 @@ export default {
     "one": "{n} oferta enviada",
     "other": "{n} ofertas enviadas"
   },
-  "v2.perso.ouvrir": "Personalizar esta pantalla",
+  "v2.perso.ouvrir": "Personalizar",
   "v2.perso.titre": "Tarjetas de Hoy",
   "v2.perso.pied": "Toca − para quitar una tarjeta, + para añadirla; arrastra ≡ para moverla.",
   "v2.perso.monter": "Subir",

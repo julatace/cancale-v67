@@ -165,10 +165,7 @@ export default {
   "v2.l.acheteMarge": "Gekauft {p} · Marge {m}",
   "v2.chargement": "Deine Anzeigen werden gelesen…",
   "v2.imprimerCourt": "Etiketten drucken",
-  "v2.ecartCourt": {
-    "one": "{r} noch nicht bereit",
-    "other": "{r} noch nicht bereit"
-  },
+  "v2.ecartCourt": {"one": "{r} nicht bereit", "other": "{r} nicht bereit"},
   "v2.tousPrets": "alle druckbereit",
   "v2.achats.ajouterCourt": "Hinzufügen",
   "v2.reessayer": "Erneut versuchen",
@@ -247,7 +244,7 @@ export default {
   "v2.reg.completer": "Meine Anzeigen vervollständigen",
   "v2.reg.completerN": "Meine Anzeigen vervollständigen · {n}",
   "v2.jour.lecture": "wird gelesen…",
-  "v2.stats.titre": "Deine Zahlen",
+  "v2.stats.titre": "Zahlen",
   "v2.stats.ca": "Umsatz",
   "v2.obj.fixer": "Monatsziel festlegen",
   "v2.obj.titre": "Monatsziel",
@@ -306,7 +303,7 @@ export default {
     "one": "{n} Angebot gesendet",
     "other": "{n} Angebote gesendet"
   },
-  "v2.perso.ouvrir": "Diesen Bildschirm anpassen",
+  "v2.perso.ouvrir": "Anpassen",
   "v2.perso.titre": "Karten von Heute",
   "v2.perso.pied": "Tippe −, um eine Karte zu entfernen, +, um sie hinzuzufügen; ziehe ≡, um sie zu verschieben.",
   "v2.perso.monter": "Hoch",
