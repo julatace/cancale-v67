@@ -37,6 +37,12 @@
   .n-inv-avatar[data-inv-teinte="4"] { --n-av: #17744A; }
   .n-inv-avatar-plus { --n-av: var(--n-carte); color: var(--n-encre); font-size: 11px; }
   .n-inv-avatar-petit { width: 20px; height: 20px; font-size: 10px; }
+  /* (25 nov., logo-vinted-pp) La photo de profil du compte : ronde, recadrée, un filet fin pour la détacher du fond. */
+  .n-inv-avatar[data-inv-photo] { position: relative; overflow: hidden; background: var(--n-carte-2); }
+  .n-inv-avatar[data-inv-photo]::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .14); pointer-events: none; }
+  :root[data-theme="dark"] .n-inv-avatar[data-inv-photo]::after { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .2); }
+  .n-inv-avatar-img { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+  span.n-inv-avatar-img { display: grid; place-items: center; background: var(--n-av); color: #FFFFFF; }
 
   /* (24 nov., retouches) La BANDE claire du bas de la photo : l'étiquette du N° à gauche, vues et favoris à droite en texte
      + icône. Elle ne pose rien SUR la chaussure (au milieu de la photo) ; verre clair le jour, gris profond la nuit. */
