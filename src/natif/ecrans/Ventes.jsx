@@ -145,12 +145,14 @@ function DetailVente({ r, g, Icon, Logo, Photo, Generer }) {
           <Fait libelle={tr('vv.fiche.pourToi')} valeur={(route ? (r.pourToi ? r.prix : '') : d.pourToi) || null} detail={!route && d.sansFrais ? tr('vv.fiche.sansFrais') : ''}/>
           {!route ? <Fait libelle={tr('vv.col.limite')} valeur={texteEcheance(r.echeance) || null} ton={r.echeance && r.echeance.ambre ? 'ambre' : 'neutre'} detail={r.echeance && r.echeance.sorte === 'estimee' ? tr('vv.ech.estimee') : ''}/> : null}
           {!route ? <Fait libelle={tr('vv.col.ou')} valeur={textePlace(r.place) || null}/> : null}
-          <Fait libelle={tr('vv.col.transport')} valeur={r.transporteur || null} detail={route ? r.suivi : texteBordereau(r.bordereau)}/>
+          <Fait libelle={tr('vv.col.transport')} valeur={r.transporteur || null} detail={route ? (r.envoi ? '' : r.suivi) : texteBordereau(r.bordereau)}/>   {/* (24 nov.) la piste dit le n° (un nombre une fois, §7) */}
           <Fait libelle={tr('vn.f.acheteur')} valeur={r.acheteur || null}/>
         </Faits>
       </Groupe>
       {(r.notes || []).length ? <Groupe>{r.notes.map((n) => <Rangee key={n.cle} titre={n.texte} lignes={2} ton="ambre" attrs={{ 'data-vn-note': n.cle }}/>)}</Groupe> : null}
-      {etapes.length ? <Groupe titre={tr('vv.route.etapes')} attrs={{ 'data-vn-etapes': r.cle }}>
+      {/* (24 nov., lot suivi-ventes) Un colis vendu PARTI : la piste de l'envoi (dessinée par l'app, `g.parcours`) remplace les étapes. */}
+      {r.envoi && g && g.parcours ? <Groupe nu attrs={{ 'data-vn-parcours': r.cle }}>{g.parcours(r)}</Groupe>
+      : etapes.length ? <Groupe titre={tr('vv.route.etapes')} attrs={{ 'data-vn-etapes': r.cle }}>
         {etapes.map((e) => <Rangee key={e.cle} titre={e.libelle} valeur={e.valeur || null} fin={e.fait ? 'coche' : null} sousTitre={!e.fait && e.geste ? tr('vn.aFaire') : ''} ton={e.geste ? 'ambre' : 'neutre'}
           attrs={{ 'data-etape': e.cle, 'data-fait': e.fait ? '1' : '0' }}/>)}
       </Groupe> : null}

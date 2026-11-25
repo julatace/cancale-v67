@@ -166,6 +166,8 @@ const lire = (pg, id) => pg.evaluate((id) => {
   const hors = [...d.querySelectorAll('*')].filter((e) => vis(e) && !e.closest('svg') && e.getBoundingClientRect().right > vw + 1).map((e) => String(e.className || e.tagName).slice(0, 30));
   const benef = d.querySelector('[data-recap-benef-etat]');
   return {
+    // (24 nov., lot suivi-ventes) Un colis PARTI : la piste de l'envoi (src/SuiviEnvoi.jsx) remplace la frise.
+    piste: [...d.querySelectorAll('[data-envoi-parcours] [data-envoi-etape]')].map((li) => ({ cle: li.getAttribute('data-envoi-etape'), etat: li.getAttribute('data-envoi-etat'), t: li.getAttribute('data-envoi-t'), source: li.getAttribute('data-envoi-source'), txt: li.innerText.replace(/\s+/g, ' ').trim() })),
     etapes, frise: !!d.querySelector('[data-recap-frise]'), bif: fr ? fr.getAttribute('data-frv-bif') : null,
     pastille: d.querySelectorAll('[data-statut-vente], .vrm-statut').length,
     phrase: (d.querySelector('[data-recap-phrase]') || {}).textContent || '',
@@ -207,12 +209,14 @@ const sous = (r, c) => (r.etapes.find((e) => e.cle === c) || {}).sous || '';
       await essaie('7011 livrée', async () => {
         const id = await ouvrirVente(pg, '7011');
         const r = await lire(pg, id);
-        dit(faits(r) === 'vendue,bordereau,deposee,livree', 'livrée + colis fait : Vendue, Bordereau, Déposée, Livrée — rien d’autre', faits(r));
-        dit(etat(r, 'enroute') === 'paslu' && /pas lu/.test(sous(r, 'enroute')), '… « En route » : aucun transporteur lu ⇒ « pas lu », jamais déduit de « Livrée »', `${etat(r, 'enroute')} · ${sous(r, 'enroute')}`);
-        dit(!r.etapes.find((e) => e.cle === 'versee').fait && !r.etapes.some((e) => e.etat === 'geste'), '… « Versée » pas cochée, aucune étape ambre (rien à faire)');
-        dit(r.frise && r.pastille === 0, 'la frise REMPLACE la pastille de statut (jamais les deux)', `pastilles ${r.pastille}`);
+        // (24 nov., lot suivi-ventes) Le colis est PARTI : la piste de l'envoi remplace la frise (une seule piste).
+        const pv = (c) => (r.piste.find((e) => e.cle === c) || {});
+        dit(!r.frise && r.piste.filter((e) => e.etat === 'fait').map((e) => e.cle).join(',') === 'depose,retire', 'livrée + colis fait : la piste coche Déposé et Retiré — rien d’autre', r.piste.map((e) => e.cle + ':' + e.etat).join(' '));
+        dit(pv('enroute').etat === 'passu' && pv('aupoint').etat === 'passu' && /pas encore su/.test(pv('enroute').txt), '… « En route » et « Au point » : aucun transporteur lu ⇒ « pas encore su », jamais déduits de « Retiré »', `${pv('enroute').etat} · ${pv('enroute').txt}`);
+        dit(pv('argent').etat === 'passu' && !r.etapes.some((e) => e.etat === 'geste'), '… l’argent pas coché, aucune étape ambre (rien à faire)');
+        dit(r.piste.length === 5 && r.pastille === 0, 'la piste REMPLACE la pastille de statut (jamais les deux)', `pastilles ${r.pastille}`);
         dit(r.benefEtat === 'partiel' && /au plus/.test(r.benefTexte) && r.benefData === '42.05', 'frais pas confirmés : « au plus 42,05 € » (79 − 35 − 1,95)', `${r.benefEtat} · ${r.benefTexte} · ${r.benefData}`);
-        dit(r.verse === 'non', 'pas finalisée : « Versé — pas encore »', String(r.verse));
+        dit(pv('argent').etat === 'passu' && pv('argent').t === '', 'pas finalisée : l’argent « pas encore su », sans date', JSON.stringify(pv('argent')));
         dit(r.num === '73', 'le N° vient de l’identité (saisi à la main) : N°73', String(r.num));
         const fois = (re) => (r.txt.match(re) || []).length;
         dit(fois(/79,00/g) === 1 && fois(/N°\s?73/g) === 1, 'un nombre une seule fois (prix 79,00 et N°73)', `79,00 ×${fois(/79,00/g)} · N°73 ×${fois(/N°\s?73/g)}`);
@@ -228,9 +232,11 @@ const sous = (r, c) => (r.etapes.find((e) => e.cle === c) || {}).sous || '';
       });
       await essaie('7005 finalisée', async () => {
         const r = await lire(pg, await ouvrirVente(pg, '7005'));
-        dit(faits(r) === 'vendue,finalisee,versee', 'finalisée (450), versée : Vendue, Finalisée, Versée — rien de déduit', faits(r));
-        dit(['bordereau', 'deposee', 'enroute', 'livree'].every((c) => etat(r, c) === 'paslu' && /pas lu/.test(sous(r, c))), '… bordereau, dépôt, route, livraison sans preuve : gris, « pas lu »', r.etapes.map((e) => e.cle + ':' + e.etat).join(' '));
-        dit(r.verse === 'date' && /25 oct/.test(r.txt), 'versée : la date du versement lue (25 oct.)', `${r.verse}`);
+        // (24 nov., lot suivi-ventes) Finalisée = un envoi arrivé au bout : la piste, l'argent à la date du versement LUE.
+        const pv = (c) => (r.piste.find((e) => e.cle === c) || {});
+        dit(!r.frise && r.piste.filter((e) => e.etat === 'fait').map((e) => e.cle).join(',') === 'argent', 'finalisée (450), versée : la piste coche l’argent — rien de déduit', r.piste.map((e) => e.cle + ':' + e.etat).join(' '));
+        dit(['depose', 'enroute', 'aupoint', 'retire'].every((c) => pv(c).etat === 'passu' && /pas encore su/.test(pv(c).txt)), '… dépôt, route, point, retrait sans preuve : gris, « pas encore su »', r.piste.map((e) => e.cle + ':' + e.etat).join(' '));
+        dit(pv('argent').source === 'versement' && /25 oct/.test(pv('argent').txt), 'versée : la date du versement lue (25 oct.)', JSON.stringify(pv('argent')));
         const dates = (r.txt.match(/25 oct/g) || []).length;
         dit(dates === 1, 'la date du versement n’est écrite qu’une fois', `×${dates}`);
       });

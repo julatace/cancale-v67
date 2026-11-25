@@ -1,0 +1,111 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LE SUIVI D'UN ENVOI — 24 nov. (lot suivi-ventes, src/SuiviEnvoi.jsx).
+   Gris clair étagé, aucun orange (Julien, 23 nov.) : l'ardoise pour une étape FAITE, le vert « fait » pour
+   l'argent versé (la récompense de la piste), un pointillé gris pour ce qui n'est pas su. Le danger est dit
+   à l'encre, en gras, avec une horloge — jamais en ambre. Cibles au doigt ≥ 44 px. Clair et sombre.
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-env, .vrm-envs {
+  --env-encre: var(--vrm-ink, #1D1D1F);
+  --env-doux: var(--vrm-muted, #6E6E73);
+  --env-trait: #D5D9DF;
+  --env-fond: #F2F3F5;
+  --env-carte: #FFFFFF;
+  --env-fait: #3D4B5B;
+  --env-argent: #17744A;
+  --env-pas-su: #AEB4BE;
+  --env-sur-fait: #FFFFFF;
+}
+:root[data-theme="dark"] .vrm-env, :root[data-theme="dark"] .vrm-envs {
+  --env-encre: #F4F4F5; --env-doux: #A1A1AA; --env-trait: #3A3A41; --env-fond: #1C1C1F; --env-carte: #26262A;
+  --env-fait: #C9D2DE; --env-argent: #7BE8BE; --env-pas-su: #6B6B74; --env-sur-fait: #111114;
+}
+
+/* ── La piste d'un colis ── */
+.vrm-env { margin-top: 14px; padding: 14px; border-radius: 16px; background: var(--env-fond); color: var(--env-encre); }
+.vrm-env-tete { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.vrm-env-logo { display: inline-flex; flex-shrink: 0; }
+.vrm-env-ident { display: flex; flex-direction: column; min-width: 0; }
+.vrm-env-nom { font-size: 15px; font-weight: 600; }
+.vrm-env-numero { display: inline-flex; align-items: center; min-height: 44px; margin: -10px 0; font-size: 13px; color: var(--env-doux);
+  font-variant-numeric: tabular-nums; letter-spacing: .02em; text-decoration: none; overflow-wrap: anywhere; }
+a.vrm-env-numero { color: var(--env-encre); text-decoration: underline; text-decoration-color: var(--env-trait); text-underline-offset: 3px; }
+.vrm-env-numero-vide { min-height: 0; margin: 0; }
+
+.vrm-env-piste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.vrm-env-etape { position: relative; display: grid; grid-template-columns: 22px 1fr; gap: 12px; padding: 0 0 14px; min-height: 30px; }
+.vrm-env-etape:last-child { padding-bottom: 0; }
+/* Le trait vers l'étape suivante : plein entre deux étapes faites, pointillé sinon. */
+.vrm-env-etape::before { content: ''; position: absolute; left: 10px; top: 22px; bottom: -2px; width: 2px;
+  background: repeating-linear-gradient(to bottom, var(--env-pas-su) 0 3px, transparent 3px 7px); }
+.vrm-env-etape:last-child::before { display: none; }
+.vrm-env-etape[data-envoi-etat="fait"]:has(+ .vrm-env-etape[data-envoi-etat="fait"])::before { background: var(--env-fait); }
+.vrm-env-point { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; box-sizing: border-box;
+  border: 2px dashed var(--env-pas-su); background: var(--env-carte); color: var(--env-sur-fait); }
+.vrm-env-etape[data-envoi-etat="fait"] .vrm-env-point { border: 0; background: var(--env-fait); }
+.vrm-env-etape[data-envoi-etape="argent"][data-envoi-etat="fait"] .vrm-env-point { background: var(--env-argent); }
+.vrm-env-etape[data-envoi-ici] .vrm-env-point { box-shadow: 0 0 0 4px color-mix(in srgb, var(--env-fait) 18%, transparent); }
+.vrm-env-etape[data-envoi-etape="argent"][data-envoi-ici] .vrm-env-point { box-shadow: 0 0 0 4px color-mix(in srgb, var(--env-argent) 20%, transparent); }
+.vrm-env-etape[data-envoi-cours] .vrm-env-point { border-style: solid; border-color: var(--env-fait); animation: vrm-env-pouls 1.8s ease-in-out infinite; }
+@keyframes vrm-env-pouls { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--env-fait) 14%, transparent); } }
+.vrm-env-texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-top: 1px; }
+.vrm-env-ligne { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.vrm-env-libelle { font-size: 15px; font-weight: 600; }
+.vrm-env-etape[data-envoi-etat="passu"] .vrm-env-libelle { font-weight: 400; color: var(--env-doux); }
+.vrm-env-date { font-size: 13px; color: var(--env-doux); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vrm-env-lieu { font-size: 13px; color: var(--env-encre); }
+.vrm-env-limite { font-size: 13px; color: var(--env-encre); font-variant-numeric: tabular-nums; }
+.vrm-env-limite-passu { color: var(--env-doux); }
+.vrm-env-danger { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 6px 10px; border-radius: 10px; width: fit-content;
+  font-size: 13px; font-weight: 700; color: var(--env-encre); background: var(--env-carte); box-shadow: inset 0 0 0 1.5px var(--env-encre); }
+.vrm-env-etape[data-envoi-apres-retour] { opacity: .45; }
+.vrm-env-retour { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--env-carte);
+  font-size: 14px; font-weight: 600; }
+.vrm-env-retour .vrm-env-date { margin-left: auto; }
+
+/* ── La ligne « au point » d'une carte de la liste ── */
+.vrm-env-carte-point { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 13px; color: var(--vrm-ink, #1D1D1F); line-height: 1.35; }
+.vrm-env-carte-point strong { font-weight: 700; }
+
+/* ── « Mes envois » : quatre tuiles ── */
+.vrm-envs { margin: 0 0 12px; padding: 14px; border-radius: 16px; background: var(--env-fond); color: var(--env-encre); }
+.vrm-envs-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.vrm-envs-titre { margin: 0; font-size: 17px; font-weight: 700; }
+.vrm-envs-couv { font-size: 12px; color: var(--env-doux); }
+.vrm-envs-tuiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 720px) { .vrm-envs-tuiles { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); } }
+.vrm-envs-tuile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 76px; padding: 10px 12px; border: 0; border-radius: 14px;
+  background: var(--env-carte); color: var(--env-encre); font: inherit; text-align: left; cursor: pointer; box-shadow: inset 0 0 0 1px var(--env-trait);
+  transition: transform 80ms ease, box-shadow 120ms ease; }
+.vrm-envs-tuile:active { transform: scale(.98); }
+.vrm-envs-tuile[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--env-fait); }
+.vrm-envs-n { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.vrm-envs-lib { font-size: 12px; color: var(--env-doux); line-height: 1.25; }
+/* La mini-piste : la case du groupe remplie jusqu'à son étape. */
+.vrm-envs-piste { display: flex; gap: 3px; margin-top: auto; padding-top: 6px; }
+.vrm-envs-piste i { width: 12px; height: 4px; border-radius: 2px; background: var(--env-trait); }
+.vrm-envs-piste-enroute i:nth-child(-n+2), .vrm-envs-piste-aupoint i:nth-child(-n+3), .vrm-envs-piste-retire i:nth-child(-n+4) { background: var(--env-fait); }
+.vrm-envs-piste-argent i { background: var(--env-argent); }
+.vrm-envs-piste-retour i:nth-child(-n+2) { background: var(--env-doux); }
+
+/* ── La liste d'un groupe ── */
+.vrm-envs-liste { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.vrm-envs-ligne { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 8px 12px 8px 8px; border: 0; border-radius: 14px;
+  background: var(--env-carte); color: var(--env-encre); font: inherit; text-align: left; cursor: pointer; box-shadow: inset 0 0 0 1px var(--env-trait); }
+.vrm-envs-ligne:active { transform: scale(.99); }
+.vrm-envs-photo { width: 48px; height: 48px; flex-shrink: 0; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: var(--env-fond); }
+.vrm-envs-photo img { width: 100%; height: 100%; object-fit: cover; }
+.vrm-envs-mid { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 auto; }
+.vrm-envs-l1 { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.vrm-envs-titre-ligne { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.vrm-envs-phrase { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--env-doux); line-height: 1.3; }
+.vrm-envs-ligne[data-envoi-danger] .vrm-envs-phrase { color: var(--env-encre); }
+.vrm-envs-mini { display: flex; gap: 3px; flex-shrink: 0; }
+.vrm-envs-mini i { width: 7px; height: 7px; border-radius: 50%; box-sizing: border-box; border: 1.5px dashed var(--env-pas-su); }
+.vrm-envs-mini i[data-fait="1"] { border: 0; background: var(--env-fait); }
+.vrm-envs-mini i[data-fait="argent"] { border: 0; background: var(--env-argent); }
+.vrm-envs-vide { margin: 10px 0 0; font-size: 13px; color: var(--env-doux); }
+
+@media (prefers-reduced-motion: reduce) {
+  .vrm-env-etape[data-envoi-cours] .vrm-env-point { animation: none; }
+  .vrm-envs-tuile { transition: none; }
+}
