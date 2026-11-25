@@ -486,6 +486,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 - **25 nov. · Aujourd'hui, moitié moins de texte (`claude/aujourdhui-moins-texte`)** : titres courts (« 5 annonces disparues », « En pause », « Ordinateur éteint · 07:37 », « 24 N° à écrire »), ±0 % neutre sans flèche, « ≥ » pour « au moins » (plus coupé), « Par site » seulement à 2 sites ; 213 → 100 mots (390 px), 249 → 123 (1512). `2026-11-25-aujourdhui-moins-texte.md`. Geste : regarder les planches.
+- **25 nov. · Achats : retours compacts (`claude/achats-retours-design`)** : carte en cours ~1/3 d'écran (état écrit une fois, frise en points, UN bouton + liens), remboursé = rangée repliée, « À vérifier » = une rangée, ✓ ⋯ dans la tête ; aucune règle touchée. `2026-11-25-achats-retours-design.md`. Geste : regarder les planches.
 - **25 nov. · Style « C3 doux » (mélange C3 × Vintex) (`claude/style-c3`, au choix, PAS par défaut)** : 12e style (gris `#DADDE2`, cartes blanches, plaque gravée, capsule du bas ; forme chargée seulement si choisi) ; Monochrome fond `#E2E4E8` ; À retirer, loupe, Argent nettoyés pour tout style choisi. `docs/passation/2026-11-25-style-c3.md`. Geste : regarder les planches.
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
 
