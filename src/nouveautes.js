@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (25 nov., sombre-par-defaut — Julien : « La deuxième couleur est pas mal, mets en mode sombre ») docs/passation/historique-interface-stock.md (fin)
+  { id: 'sombre-par-defaut', date: '2026-11-25', titre: 'VRM s’ouvre en sombre', phrase: 'Le clair reste au choix : Paramètres → Apparence.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (25 nov., aujourdhui-moins-texte — Julien : « C'est pas mal mais trop de texte, améliore. ») docs/passation/2026-11-25-aujourdhui-moins-texte.md
   { id: 'aujourdhui-moins-texte', date: '2026-11-25', titre: 'Aujourd’hui : deux fois moins de texte', phrase: 'Un titre court, un chiffre ; le détail derrière ›.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., achats-retours-design — Julien : « tu peux améliorer ce design ») docs/passation/2026-11-25-achats-retours-design.md
