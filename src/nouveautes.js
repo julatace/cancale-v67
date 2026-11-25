@@ -30,6 +30,8 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (25 nov., ventes-rangee — Julien : « c'est atroce, la mise en page est catastrophique ») docs/passation/2026-11-25-ventes-rangee.md
   { id: 'ventes-rangee-compacte', date: '2026-11-25', titre: 'Ventes : des lignes compactes avec photo', phrase: 'Photo, prix, un seul état, le transporteur entier : sept ventes par écran.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (25 nov., style-c3 — Julien : « fait un mélange c3 vintex », « le gris de fond un peu foncé ») docs/passation/2026-11-25-style-c3.md
+  { id: 'style-c3-doux', date: '2026-11-25', titre: 'Un douzième style : C3', phrase: 'Gris un peu foncé, cartes blanches, boutons nets : à essayer.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (25 nov., chargement-propre — Julien : « je dois fermer l'app et la rouvrir pour avoir les nouvelles infos ») docs/passation/2026-11-25-chargement-propre.md
   { id: 'maj-sans-relancer', date: '2026-11-25', titre: 'Les nouvelles infos arrivent seules', phrase: 'Vente, e-mail, retour sur l’app : à jour sans la rouvrir.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., chargement-propre — Julien : « quand les données s'affichent c'est moche, long et déstructuré ») même récit

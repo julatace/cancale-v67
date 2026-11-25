@@ -29560,8 +29560,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         // (24 nov., retrait-parfait) L'ouverture CALCULÉE sur les horaires LUS (heure de Paris) : { etat: 'ouvert' | 'ferme' | '',
                         // phrase, jour } — « ouvert maintenant · ferme à 19 h » / « fermé — ouvre à 8 h » et les plages d'aujourd'hui. Pas lu ⇒ null.
                         ouvertureDe: (p) => { const h = horairesDuPoint((p.arrives || []).map((c) => (c && c.src && c.src.t ? { horaires: c.src.t.horaires, ms: Date.parse((c.src.t.horairesDuTransporteur && c.src.t.horairesAt) || c.src.t.emailAt || c.src.t.receivedAt || '') } : null)).filter(Boolean), (c) => c.ms);
-                          if (!h) return null; const now = Date.now(); const e = etatOuverture(h, now);
-                          return { etat: e ? (e.ouvert ? 'ouvert' : 'ferme') : '', phrase: phraseOuverture(e) || (e ? '' : texteHoraires(h)), jour: horairesDuJour(h, now) }; },
+                          if (!h) return null; const now = Date.now(); const e = etatOuverture(h, now); const jour = horairesDuJour(h, now);
+                          // (25 nov., Julien : « ouvert maintenant · ferme à 23 h 59 · aujourd'hui 0 h 01–23 h 59 ») une consigne ouverte toute la
+                          // journée (0 h 01–23 h 59, minuit–23 h 59…) se dit court : « aujourd'hui 24 h/24 », sans « ferme à 23 h 59 »
+                          if (e && e.ouvert && /^(?:minuit|0 h(?: 0\d)?)–(?:23 h 5\d|minuit)$/.test(jour)) return { etat: 'ouvert', phrase: '', jour: '24 h/24' };
+                          return { etat: e ? (e.ouvert ? 'ouvert' : 'ferme') : '', phrase: phraseOuverture(e) || (e ? '' : texteHoraires(h)), jour }; },
                         // (24 nov., retrait-parfait) Au comptoir : « Retiré » sur SON toucher = le geste d'avant (`retirerRelais` : markCollected /
                         // markPickupDone, annulable — il rend l'identifiant du geste), « Annuler », et « Détails » = la feuille d'avant (openQrView).
                         retirer: (x) => retirerRelais(x),
