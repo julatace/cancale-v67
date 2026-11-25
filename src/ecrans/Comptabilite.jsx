@@ -104,6 +104,7 @@ import { indexRecusParTransaction, recuDeLAchat, bilanRecusAchat } from '../../a
 import { etatRetrait, estAVerifier, urgenceTri, GARDE_MAX_J, limiteEstimee } from '../../api/_lib/retrait-colis.js';
 import { DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction, TEXTE_ESTIMEE_DEPASSEE, heureCourte as heureCourteJ } from '../../api/_lib/limite-envoi.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from '../photosArticles.js';
+import { publierPhotosVentes } from '../ventes/photosVentesPub.js';
 import { ResponsiveChatPortal, telFil } from '../ChatPortal.jsx';
 import { installerExtensionIci, estAndroid, pageExtensionsIci } from '../navigateurExtension.js';
 import { enregistrerSourceColis, ouvrirRetrouver, EV_RELIER_COLIS } from '../retrouverColis.js';
@@ -14193,6 +14194,33 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     })();
     return()=>{stop=true;};
   },[sales.items,listings.items,txnItem,curSub,photosVentesForcees]);
+  // (25 nov., lot ventes-rangee — Julien : « la vignette photo VIDE sur chaque ligne ») LA PHOTO D'UNE VENTE pour les rangées natives :
+  // la liste des ventes de Vinted n'a la photo que d'une vente sur quatre ; les autres ont la leur dans les sources déjà lues
+  // ci-dessus (l'annonce de CETTE transaction, la transaction rangée, le coffre, la fiche N° de CETTE annonce) — par IDENTITÉ,
+  // jamais par titre (§5), la règle de la liste d'avant (`preparerLigneVente`). Calculée une fois par version des sources (annonces
+  // indexées par identifiant : jamais un parcours de toutes les annonces par vente), publiée pour « Terminées » (src/ventes/photosVentesPub.js).
+  const photoVenteParTx = React.useMemo(() => {
+    const m = new Map();
+    const items = Array.isArray(sales.items) ? sales.items : [];
+    if (!items.length) return m;
+    const lst = listings.items || _acctCache.listings?.items || [];
+    const parId = new Map();
+    for (const a of lst) { const id = a && (a.id ?? a.itemId); if (id == null) continue; const k = String(id); const t = parId.get(k); if (t) t.push(a); else parId.set(k, [a]); }
+    for (const o of items) {
+      if (!o || o.transaction_id == null || photoArticle(o)) continue;
+      const tx = String(o.transaction_id);
+      const id = txnItem[tx] ?? o.item_id ?? (o.item && o.item.id);
+      const fiche = txnItem[tx] != null ? (numeros || {})[String(txnItem[tx])] || null : null;
+      let ph = null;
+      try { ph = photosVenteVintedCandidates(o, id != null ? (parId.get(String(id)) || []) : [], txnItem[tx], photosVentesArchivees, photosVentesTransactions, fiche)[0] || null; } catch (_) { ph = null; }
+      if (ph) m.set(tx, ph);
+    }
+    return m;
+  }, [sales.items, listings.items, txnItem, photosVentesArchivees, photosVentesTransactions, numeros]);
+  useEffect(() => { publierPhotosVentes(photoVenteParTx); }, [photoVenteParTx]);
+  useEffect(() => () => publierPhotosVentes(new Map()), []);
+  // La photo d'une vente Vinted : celle de la commande, sinon celle de SES sources (ci-dessus) ; rien ⇒ null (le repli dessiné).
+  const photoVenteNatif = (o) => (o ? (orderPhoto(o) || photoVenteParTx.get(String(o.transaction_id)) || null) : null);
   // ⚠️ Ma journée aussi (revue visuelle du 17 oct.) : sans les emails de suivi,
   // sa tuile « À retirer » comptait les seuls colis vus par Vinted (1) quand
   // l'écran Achats en montrait 2 — la même notion, deux nombres (§11).
@@ -20984,7 +21012,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           } });
       }
       const o = e.o, b = e.b;
-      const photo = o ? orderPhoto(o) : bordPhoto(b);
+      const photo = o ? photoVenteNatif(o) : bordPhoto(b);
       const titre = o ? (o.title || '') : ((b && (b.modele || b.article)) || 'Bordereau');
       const num = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
       const capte = e.txn ? labelsCaptes[e.txn] : null;
@@ -21165,7 +21193,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const prix = x.site === 'vinted' && o && o.price ? montant(o.price, { etrangere: 'ecarter' }) : '';
     return rangeeRoute({ cle, site: x.site, tx, compte: o && o._acc ? accNameOf(o._acc) : '', achat: x.site === 'vinted' ? (o ? achatNatifDe(o) : null) : achatAutreSiteDe({ site: x.site, num: x.num || '', annonce: x.lo ? (x.lo.itemId || null) : null, titre: x.titre || '' }),
       marque: (o && (o.brand_title || o.brand)) || extractBrand(String(x.titre || '')) || '', acheteur: pseudoAcheteur(o), num: x.num || '', titre: x.titre || '',
-      taille: o && typeof o.size_title === 'string' ? o.size_title : '', photo: x.photo && !imgMortes.has(x.photo) ? x.photo : null,
+      taille: o && typeof o.size_title === 'string' ? o.size_title : '', photo: (() => { const ph = x.photo || (x.site === 'vinted' && o ? photoVenteNatif(o) : null); return ph && !imgMortes.has(ph) ? ph : null; })(),
       prix, pourToi: x.site === 'vinted', lues: x.lues || {}, etat: so.t, etatAmbre: so.ambre, transporteur: x.tr && x.tr.nom, transporteurCle: x.tr && x.tr.cle,
       t: [o && o.date, x.v && x.v.date, x.lo && x.lo.date, x.t], suivi: su,
       lienSuivi: su ? trackUrl((x.tr && x.tr.cle) || '', su) : '',
