@@ -85,7 +85,7 @@ export const comptesDe = (a) => {
 // l'écran Annonces d'hier, monté caché (src/annoncesCachees.js), ne rend plus ses vignettes — c'est ici qu'une annonce est
 // VUE (banc e2e-extension « ses annonces sont visibles dans Annonces », cible d'une notification : src/cibleNotif.js).
 // Par identité seulement : la 1re annonce Vinted de l'article ; aucune ⇒ pas d'attribut.
-const idCarteAnnonce = (a) => { const v = a && Array.isArray(a.annonces) ? a.annonces.find((x) => x && x.site === 'vinted' && x.id != null) : null; return v ? String(v.id) : undefined; };
+export const idCarteAnnonce = (a) => { const v = a && Array.isArray(a.annonces) ? a.annonces.find((x) => x && x.site === 'vinted' && x.id != null) : null; return v ? String(v.id) : undefined; };
 export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, euros, nomSite, dort = null, plusVue = null, Photo = null, attrs = null, Icon = null, revele = null, taillePhoto = 360, groupe = false }) {   // (22 nov., choix 27) plusVue : jours mesurés (src/plusVue.js) ou null
   const bandeau = bandeauDe(a);
   const trace = a.etat === 'bloque' ? traceDe(a) : null;
