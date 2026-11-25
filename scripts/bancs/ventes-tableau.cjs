@@ -84,9 +84,10 @@ function mesure(src) {
       coche: c ? (c.checked ? 1 : 0) : null, dispo: c ? !c.disabled : null, haut: Math.round(R(l).top), larg: Math.round(R(l).width), droite: Math.round(R(l).right) };
   });
   const rangsTel = [...document.querySelectorAll('[data-vn-liste] [data-vn-rang], [data-vn-liste] [data-vn-route]')].filter(vis).map((r) => ({
-    cle: r.getAttribute('data-vn-rang') || r.getAttribute('data-vn-route'), pied: r.hasAttribute('data-n-a-pied'), logo: !!r.querySelector('.n-vt-logo [data-transporteur-logo]'), trCle: (r.querySelector('[data-vt-transporteur]') || { getAttribute: () => '' }).getAttribute('data-vt-transporteur'),
-    etiquette: (r.querySelector('.n-vt-valeur .n-pastille') || { textContent: '' }).textContent.trim(), haut: Math.round(R(r).top), bas: Math.round(R(r).bottom),
-    prix: !!(r.querySelector('.n-vt-valeur > span:not(.n-pastille)') || { textContent: '' }).textContent.trim(),
+    cle: r.getAttribute('data-vn-rang') || r.getAttribute('data-vn-route'), pied: r.hasAttribute('data-n-a-pied'), logo: !!r.querySelector('.n-vt-logo [data-transporteur-logo], .n-vr-logo [data-transporteur-logo]'),   // (25 nov., ventes-rangee) la rangée compacte : `.n-vr-logo`
+    trCle: (r.querySelector('[data-vt-transporteur]') || { getAttribute: () => '' }).getAttribute('data-vt-transporteur'),
+    etiquette: (r.querySelector('.n-vt-valeur .n-pastille, .n-vr-etat .n-vr-mot') || { textContent: '' }).textContent.trim(), haut: Math.round(R(r).top), bas: Math.round(R(r).bottom),
+    prix: !!(r.querySelector('.n-vt-valeur > span:not(.n-pastille), [data-vt-prix]') || { textContent: '' }).textContent.trim(),
     meta: (r.querySelector('.n-rangee-sous') || { textContent: '' }).textContent.trim(), bord: r.getAttribute('data-vn-bordereau'), rond: (() => { const d = r.querySelector('.n-case-dessin'); return !!d && getComputedStyle(d).visibility !== 'hidden' && d.getBoundingClientRect().width > 0; })(),
     pointille: (() => { const d = r.querySelector('.n-case-dessin'); return !!d && getComputedStyle(d).visibility !== 'hidden' && getComputedStyle(d).borderStyle === 'dashed'; })(),
     // Un titre ne se coupe qu'APRÈS ses deux lignes entières (jamais « spezial taill… » sur une 2e ligne qui avait la place).
@@ -212,7 +213,9 @@ const segment = async (pg, i) => {
         dit(r.length > 0, `la liste du téléphone est rendue (${r.length})`);
         dit(r.filter((x) => x.trCle).length >= 4 && r.every((x) => !x.trCle || x.logo), `logo du transporteur sur chaque rangée qui en a un (${r.filter((x) => x.logo).length}/${r.length})`);
         const sansB = r.filter((x) => x.bord === 'attente'), avecB = r.filter((x) => x.bord !== 'attente');
-        dit(avecB.length && avecB.every((x) => /exp[ée]dier/i.test(x.etiquette) && x.rond) && sansB.every((x) => /exp[ée]dier/i.test(x.etiquette)), 'bordereau là : un rond ; « À expédier » sous le prix partout', avecB.slice(0, 3).map((x) => x.etiquette + ':' + x.rond));
+        // (25 nov., ventes-rangee — Julien : « c'est atroce ») « À expédier » est l'onglet lui-même : la rangée compacte ne le répète plus (il était
+        // déjà caché au téléphone, `complements.css`) ; aucune AUTRE étiquette d'état ne s'y pose.
+        dit(avecB.length && avecB.every((x) => (!x.etiquette || /exp[ée]dier/i.test(x.etiquette)) && x.rond) && sansB.every((x) => !x.etiquette || /exp[ée]dier/i.test(x.etiquette)), 'bordereau là : un rond ; aucune étiquette d’état autre que « À expédier »', avecB.slice(0, 3).map((x) => x.etiquette + ':' + x.rond));
         dit(sansB.length && sansB.every((x) => !x.rond && /sans bordereau/i.test(x.meta)), 'sans bordereau : AUCUN rond, la raison « sans bordereau » dans la méta', sansB.slice(0, 3).map((x) => x.meta + ':' + x.rond));
         dit(!r.some((x) => x.pointille), 'aucun rond pointillé');
         dit(r.every((x) => !x.titreCoupe) && r.every((x) => x.titreLarg >= 130), `chaque titre a ses deux lignes entières avant l’ellipse, ≥ 130 px (mini ${Math.min(...r.map((x) => x.titreLarg))})`, r.filter((x) => x.titreCoupe).map((x) => x.cle).slice(0, 4));

@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (25 nov., ventes-rangee — Julien : « c'est atroce, la mise en page est catastrophique ») docs/passation/2026-11-25-ventes-rangee.md
+  { id: 'ventes-rangee-compacte', date: '2026-11-25', titre: 'Ventes : des lignes compactes avec photo', phrase: 'Photo, prix, un seul état, le transporteur entier : sept ventes par écran.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (25 nov., aujourdhui-moins-texte — Julien : « C'est pas mal mais trop de texte, améliore. ») docs/passation/2026-11-25-aujourdhui-moins-texte.md
   { id: 'aujourdhui-moins-texte', date: '2026-11-25', titre: 'Aujourd’hui : deux fois moins de texte', phrase: 'Un titre court, un chiffre ; le détail derrière ›.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., achats-retours-design — Julien : « tu peux améliorer ce design ») docs/passation/2026-11-25-achats-retours-design.md

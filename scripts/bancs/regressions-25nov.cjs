@@ -106,14 +106,14 @@ async function ouvrir(nav, { b, url, sombre, tenir = null }) {
       }
       if (CAS.includes('R')) {
         const { ctx, pg, erreurs } = await ouvrir(nav, { b: base(), url: '/?tab=cat_ventes', sombre });
-        await pret(pg, '[data-vt-ligne]');
+        await pret(pg, '[data-vt-ligne], [data-vr-meta]');
         await pg.waitForTimeout(3000);
         await pg.evaluate(() => { for (const b of document.querySelectorAll('button, [role="tab"]')) if (/^En route/.test((b.textContent || '').trim())) { b.click(); break; } });
         await pg.waitForTimeout(2500);
         // La feuille du morceau AVANT celle de l'app (ordre de la copie d'un écran) : on la déplace en tête du <head>.
         const deplacee = await pg.evaluate(() => { const l = [...document.querySelectorAll('link[rel="stylesheet"]')].find((x) => /ventes-lisibles/.test(x.href)); if (!l) return false; document.head.prepend(l); return true; });
         await pg.waitForTimeout(600);
-        const m = await pg.evaluate(() => [...document.querySelectorAll('[data-vt-ligne]')].filter((e) => e.getClientRects().length).slice(0, 8).map((e) => { const r = e.closest('.n-rangee'); return { dir: getComputedStyle(e).flexDirection, disp: getComputedStyle(e).display, h: r ? Math.round(r.getBoundingClientRect().height) : 0, hl: Math.round(e.getBoundingClientRect().height) }; }));
+        const m = await pg.evaluate(() => [...document.querySelectorAll('[data-vt-ligne], [data-vr-meta]')].filter((e) => e.getClientRects().length).slice(0, 8).map((e) => { const r = e.closest('.n-rangee'); return { dir: getComputedStyle(e).flexDirection, disp: getComputedStyle(e).display, h: r ? Math.round(r.getBoundingClientRect().height) : 0, hl: Math.round(e.getBoundingClientRect().height) }; }));
         await defiler(pg, 200); await pg.waitForTimeout(300);
         await capture(pg, `R-${theme}-route`);
         dit(deplacee, 'R la feuille ventes-lisibles est chargée (déplacée en tête)');
