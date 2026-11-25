@@ -69,7 +69,9 @@ function ecran(ok) {
   const app = fs.readFileSync(APP, 'utf8');
   const sans = app.replace(/\/\/[^\n]*/g, '');
   ok(!/contreOffreProposee/.test(sans), 'B1 plus aucun « milieu » calculé (contreOffreProposee retirée)');
-  ok(/const contreMini = off && pc && \(pc\.devise\|\|'EUR'\)==='EUR' \? contreOffreMini\(off\.prix, pc\.prix, isFinite\(minF\)&&minF>0\?minF:null\) : null;/.test(sans), 'B2 X = contreOffreMini(offre, prix affiché lu par identité, SON mini posé à côté du N°)');
+  // (25 nov.) messages-pro : la carte d'offre du fil pose `mini` une fois (même règle : un nombre > 0, sinon null) puis le passe.
+  ok((/const contreMini = off && pc && \(pc\.devise\|\|'EUR'\)==='EUR' \? contreOffreMini\(off\.prix, pc\.prix, isFinite\(minF\)&&minF>0\?minF:null\) : null;/.test(sans)
+    || /const mini = Number\.isFinite\(minF\)&&minF>0 \? minF : null;[\s\S]{0,400}const contreMini = pc && \(pc\.devise\|\|'EUR'\)==='EUR' \? contreOffreMini\(off\.prix, pc\.prix, mini\) : null;/.test(sans)), 'B2 X = contreOffreMini(offre, prix affiché lu par identité, SON mini posé à côté du N°)');
   ok(/const minF = itemF!=null \? Number\(String\(\(numeros\[String\(itemF\)\]\|\|\{\}\)\.min/.test(sans), 'B3 le mini est celui de la fiche de CETTE annonce (item_id de la transaction, §5)');
   // (20 nov., décision de Julien) Proposer, accepter, refuser se font dans le PANNEAU de l'extension : l'app montre l'offre et
   // SON mini (règle contreOffreMini ci-dessus, recopiée par l'extension) et ouvre « Répondre à l'offre dans l'extension ».

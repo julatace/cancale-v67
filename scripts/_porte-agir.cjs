@@ -129,10 +129,11 @@ async function regle({ code, porte, repli }) {
 
 // La carte d'offre Vinted du fil (Comptabilite.jsx) : Accepter (confirmé) · Refuser · Proposer SON mini, DEPUIS VRM par la porte,
 // sur CETTE offre (tx + offer_request_id, jamais un titre) ; pas connecté ⇒ boutons éteints avec la raison (BoutonAgir).
+// (25 nov.) messages-pro : la carte porte aussi `decrit` (le bandeau « Lecture seule ») et nomme le geste en entier.
 function offreVinted(app, agir) {
   const corps = (t, debut) => { const i = t.indexOf(debut); if (i < 0) return ''; const j = t.indexOf('\nexport ', i + 1); return t.slice(i, j < 0 ? i + 3000 : j); };
   return regle({ code: (String(app).match(/<GestesOffreVinted compte=\{[^\n]*/) || [''])[0] + '\n' + corps(String(agir), 'export function GestesOffreVinted('),
-    porte: /<GestesOffreVinted compte=\{String\(openConv\.acc\?\.vinted_user_id\|\|''\)\} tx=\{off\.tx\} oid=\{off\.oid\} conv=\{openConv\.convId\} prix=\{off\.prix\} contre=\{contreMini!=null&&contreMini>=1\?contreMini:null\}\/>[\s\S]*envoyerGeste\(\{ \.\.\.base, distGeste, args, confirme \}\)[\s\S]*const ids = \{ tx: String\(tx\), oid: String\(oid\)[\s\S]*onClick=\{\(\) => setConfirmer\(true\)\}[\s\S]*partir\('accepter', \{ \.\.\.ids, prix \}, true\)/,
+    porte: /<GestesOffreVinted compte=\{String\(openConv\.acc\?\.vinted_user_id\|\|''\)\} tx=\{off\.tx\} oid=\{off\.oid\} conv=\{openConv\.convId\} prix=\{off\.prix\} contre=\{contreMini!=null&&contreMini>=1\?contreMini:null\}(?: decrit=\{\w+\})?\/>[\s\S]*envoyerGeste\(\{ (?:\.\.\.base|site: 'vinted', compte, geste: 'offre'), distGeste, args, confirme \}\)[\s\S]*const ids = \{ tx: String\(tx\), oid: String\(oid\)[\s\S]*onClick=\{\(\) => setConfirmer\(true\)\}[\s\S]*partir\('accepter', \{ \.\.\.ids, prix \}, true\)/,
     repli: /<BoutonAgir \{\.\.\.base\} par="file"/ });
 }
 
