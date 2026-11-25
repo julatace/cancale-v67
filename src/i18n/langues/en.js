@@ -26,6 +26,7 @@ import ecran_revueUx from './en/revueUx.js';   // (23 nov.) revue UX   // (22 no
 import ecran_lotachat from './en/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './en/ext5438.js';   // (22 nov.) ext. 5.438
 import ecran_visuelAnnonces from './en/visuelAnnonces.js';   // (24 nov.) l'inventaire Annonces / Stock
+import ecran_argentVisuel from './en/argentVisuel.js';   // (24 nov.) Argent, Messages, Paramètres visuels   // (24 nov.) le langage « jeu vidéo »   // (23 nov.) « Vinted a agi » regroupée
 import ecran_visuelJeu from './en/visuelJeu.js';   // (24 nov.) le langage « jeu vidéo »   // (23 nov.) « Vinted a agi » regroupée
 import ecran_moderationCarte from './en/moderationCarte.js';   // (23 nov.) « Vinted a agi » regroupée
 import ecran_observation from './en/observation.js';   // (24 nov.) ext. 5.440.3 « Observer Vinted »
@@ -2415,6 +2416,7 @@ export default {
   ...ecran_moderationCarte,
   ...ecran_visuelJeu,
   ...ecran_visuelAnnonces,
+  ...ecran_argentVisuel,
   ...ecran_observation,
   ...ecran_a_distance,
   ...ecran_apresFinale,
