@@ -330,6 +330,7 @@ const fermerPanneauPg = async (pp) => { if (pp) await pp.close().catch(() => {})
     dit(!!w, 'le service worker MV3 de la vraie extension démarre dans Chromium headless');
     if (!w) throw new Error('pas de service worker');
 
+    { let der = ''; setInterval(async () => { const x = await dansSW(ctx, ID, async () => (typeof _infosPage !== 'undefined' && _infosPage ? { at: _infosPage.at, n: Object.keys(_infosPage.parId || {}).length, uid: _infosPage.uid } : null)).catch(() => null); const h = M.ligne('harvest_111_listings'); const k = JSON.stringify(x) + ' h=' + (h ? (h.data.payload.items || []).length : '-'); if (k !== der) { der = k; console.log('     DIAG', new Date().toISOString().slice(11, 19), k, ctx.pages().map((p) => p.url().slice(0, 60)).join(' ; ')); } }, 300); }
     // ══ 1. CONNEXION DE L'EXTENSION À CE COMPTE VRM ═══════════════════════════
     console.log('\n── 1. connexion de l’extension (liaison par le site VRM)');
     let vrm = null;
@@ -469,11 +470,12 @@ const fermerPanneauPg = async (pp) => { if (pp) await pp.close().catch(() => {})
       { const pr = prixRange(91010001); if (pr) M.st.prix[91010001] = pr; }
       const t2 = Date.now();
       const r3 = await baisserDepuisApp(ctx, pg, 91010001);
-      if (r3.panneauPg) await lancerDansPanneau(ctx, r3.panneauPg, 91010001, Math.round((M.st.prix[91010001] - 6) * 100) / 100);
+      const lp3 = r3.panneauPg ? await lancerDansPanneau(ctx, r3.panneauPg, 91010001, Math.round((M.st.prix[91010001] - 6) * 100) / 100) : null;
+      await capture(r3.panneauPg, '4-panneau-429');
       await attendreQue(async () => { const c = commandePrix(M, 91010001, t2); return c && (c.data.attend || !['attente', 'pris'].includes(c.data.etat)) ? c : null; }, 60000, 500);
       await fermerPanneauPg(r3.panneauPg);
       const pause = await dansSW(ctx, ID, async () => (await chrome.storage.local.get('vrmPauseVinted')).vrmPauseVinted || null);
-      dit(!!pause && Number(pause.jusqua) > Date.now(), '4 : un 429 de Vinted pose la pause', JSON.stringify({ pause, commande: (commandePrix(M, 91010001, t2) || {}).data }));
+      dit(!!pause && Number(pause.jusqua) > Date.now(), '4 : un 429 de Vinted pose la pause', JSON.stringify({ pause, commande: (commandePrix(M, 91010001, t2) || {}).data, panneau: lp3 && lp3.apres, lien: r3.lien, prixVinted: M.st.prix[91010001], toutes: M.lignes().filter((x) => /^cmd_prix_/.test(x.id)).map((x) => x.data.etat + ':' + (x.data.attend || x.data.code || '') + ':' + x.data.prix) }));
       const d3 = vinted().length;
       const r4 = await baisserDepuisApp(ctx, pg, 91010001);
       if (r4.panneauPg) await lancerDansPanneau(ctx, r4.panneauPg, 91010001, Math.round((M.st.prix[91010001] - 7) * 100) / 100);
