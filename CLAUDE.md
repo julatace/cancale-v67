@@ -485,9 +485,9 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **25 nov. · Banc `e2e-extension` vert (`claude/e2e-extension-vert`)** : étapes 3/4 lisaient l'ancien écran (Ventes, « Qui dorment ») ⇒ portées sur le natif et le panneau ; vrais défauts corrigés : extension **5.440.4** (copie du dressing oubliée quand il est rangé : le panneau perdait la paire du lien), app (« Baisser » refusé et « mets à jour » pour une extension d'avant le lien du panneau). `2026-11-25-e2e-extension-vert.md`. Geste : installer la 5.440.4.
 - **24 nov. · Suivi des envois (`claude/suivi-ventes`)** : la piste d'un colis vendu (Déposé → En route → Au point « nom », à retirer avant → Retiré → finalisée = argent versé), chaque étape LUE ou « pas encore su » (`api/_lib/suivi-envoi.js`) ; « Mes envois » en 4 groupes ; notifications « au point » / « retiré » (famille `envois`). Mesuré : Vinted Go 0 vente, XU jamais lus, aucune date limite hors Vinted Go. `2026-11-24-suivi-ventes.md`. Geste : aucun.
 - **23 nov. · Colis en danger (`claude/colis-danger`)** : colis VENDU Vinted Go relu jusqu'à sa remise ; date de départ LUE (`expiration_time`) gardée sur `depart_vinted_*`, relu toutes les 2 h ; famille « Colis en danger » la veille et le jour (`api/_lib/colis-danger.js`) ; 0 vente Vinted Go en base au 23 nov. `2026-11-23-colis-danger.md`. Geste : aucun.
-- **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).

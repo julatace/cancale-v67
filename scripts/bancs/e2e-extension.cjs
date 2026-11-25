@@ -330,7 +330,6 @@ const fermerPanneauPg = async (pp) => { if (pp) await pp.close().catch(() => {})
     dit(!!w, 'le service worker MV3 de la vraie extension démarre dans Chromium headless');
     if (!w) throw new Error('pas de service worker');
 
-    { let der = ''; setInterval(async () => { const x = await dansSW(ctx, ID, async () => (typeof _infosPage !== 'undefined' && _infosPage ? { at: _infosPage.at, n: Object.keys(_infosPage.parId || {}).length, uid: _infosPage.uid } : null)).catch(() => null); const h = M.ligne('harvest_111_listings'); const k = JSON.stringify(x) + ' h=' + (h ? (h.data.payload.items || []).length : '-'); if (k !== der) { der = k; console.log('     DIAG', new Date().toISOString().slice(11, 19), k, ctx.pages().map((p) => p.url().slice(0, 60)).join(' ; ')); } }, 300); }
     // ══ 1. CONNEXION DE L'EXTENSION À CE COMPTE VRM ═══════════════════════════
     console.log('\n── 1. connexion de l’extension (liaison par le site VRM)');
     let vrm = null;

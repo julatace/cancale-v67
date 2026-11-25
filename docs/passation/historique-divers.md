@@ -2262,3 +2262,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1369)
 - **24 nov. · Audit boutons, 2ᵉ passe** : retour piégé après « Relier eBay », rond « Retrouver » sur les segments eBay, 2 exceptions du robot. `2026-11-23-audit-boutons-2.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (25 nov., e2e-extension-vert)
+- **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
