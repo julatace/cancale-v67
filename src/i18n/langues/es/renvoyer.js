@@ -76,6 +76,7 @@ export default {
   "rt.f.route": "En camino",
   "rt.f.relais": "En el punto",
   "rt.f.livre": "Entregado al vendedor",
+  "rt.f.recu": "Recibido",
   "rt.f.rembourse": "Reembolsado",
   "rt.etat.depassee": "Plazo de entrega superado",
   "rt.court.depassee": "Puede que te quedes el artículo.",

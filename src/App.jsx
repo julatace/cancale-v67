@@ -37815,6 +37815,9 @@ function AppCoeur() {
                 (Intégration 20nov) DANS le même hôte que « Retrouver » : deux hôtes posés au même endroit (absolu, à droite) se
                 recouvraient — « Retrouver un colis » n'était plus touchable (banc design-v2 T). */}
             {t === 'achats' ? <span data-arv-hote="achats" style={{ display: 'contents' }}><Rond icone="box" label={tr('arv.bouton')} titre={tr('arv.boutonTitre')} onClick={() => ouvrirRetrouver('achats', '', 'arrivee')} attrs={{ 'data-arv-bouton': 'achats' }}/></span> : null}
+            {/* (25 nov., achats-retours-design) LA PLACE de « ✓ Sélectionner » et « ⋯ Plus » d'Achats (rendus par l'écran, par portail) :
+                ils flottaient seuls sur une ligne vide sous les étapes. */}
+            {t === 'achats' ? <span className="vrm-achats-tete-place" data-achats-tete-place="achats" style={{ display: 'contents' }}/> : null}
           </span> : null}
           {t === 'ventes' && !designV2App && !baseKO ? <span className="vv-tete-place" data-vv-tete-place="ventes"/> : null}
         </header>}
