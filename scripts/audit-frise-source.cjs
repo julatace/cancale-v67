@@ -169,7 +169,7 @@ const url = (f) => require('url').pathToFileURL(path.join(SRC, f)).href;
 
   console.log('\n── E. Les écrans');
   const app = sansCommentaires(lire('App.jsx'));
-  dit(/\{pre\.frisePv \? <FriseVente frise=\{pre\.frisePv\.frise\}/.test(app) && !/<RecapFrise etapes=\{etapes\} cle=\{txL\}/.test(app), 'E1 le récapitulatif de la vente rend la frise prouvée (plus la frise déduite)');
+  dit(/(\{|: )pre\.frisePv \? <FriseVente frise=\{pre\.frisePv\.frise\}/.test(app)   /* (24 nov., lot suivi-ventes) avant le départ ; parti ⇒ la piste de l'envoi */ && !/<RecapFrise etapes=\{etapes\} cle=\{txL\}/.test(app), 'E1 le récapitulatif de la vente rend la frise prouvée (plus la frise déduite)');
   dit(/friseProuveeDe\(o, litige\)/.test(app) && /preuvesFriseVinted\(\{ vente: o, bord, label/.test(app), 'E2 la frise est calculée par vente, par SA transaction');
   dit(/publierSources\(lignes/.test(app) && /beneficeLigneVente\(o\.price && o\.price\.amount, e\);\s*const src = e \? sourceDeVente\(e, ctx\)/.test(app), 'E3 Ventes publie la source avec le bénéfice de la règle unique');
   const sa = sansCommentaires(lire('SourcesAchats.jsx'));

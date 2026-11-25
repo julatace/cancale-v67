@@ -33,7 +33,12 @@ export function useParPaquets(total, { initial = PAQUET_INITIAL, pas = PAQUET_PA
   const sansFenetre = typeof window === 'undefined' || typeof requestAnimationFrame !== 'function';
   const [n, setN] = useState(initial);
   const ref = useRef(null);
-  const reste = sansFenetre ? 0 : Math.max(0, (total || 0) - n);
+  // (25 nov., train #1388 — « un achat pas montré est un colis caché ») LE DERNIER PAQUET, INCOMPLET, EST TOUJOURS POSÉ : ce qui
+  // reste après les rangées montrées tient dans un paquet (`pas`) ⇒ tout est posé maintenant, sans attendre un défilement.
+  // Mesuré : « En route » ouvert montrait 12 achats sur 13 (banc colis-retirer-propre) — la 13e attendait que la sentinelle,
+  // sous l'écran, soit approchée. Une liste plus longue garde sa fenêtre ; son dernier paquet vient avec l'avant-dernier.
+  const enAttente = sansFenetre ? 0 : Math.max(0, (total || 0) - n);
+  const reste = enAttente <= pas ? 0 : enAttente;
   useEffect(() => {
     if (!reste) return undefined;
     let image = 0, fini = false, avance = 0;
@@ -55,7 +60,7 @@ export function useParPaquets(total, { initial = PAQUET_INITIAL, pas = PAQUET_PA
     bientot();
     return () => { fini = true; if (image) cancelAnimationFrame(image); window.removeEventListener('scroll', defile, { capture: true }); window.removeEventListener('resize', bientot); document.removeEventListener('toggle', bientot, true); };
   }, [reste, n, pas, marge, initial]);
-  const montres = sansFenetre ? (total || 0) : Math.min(n, total || 0);
+  const montres = sansFenetre || !reste ? (total || 0) : Math.min(n, total || 0);
   const sentinelle = reste ? <div ref={ref} className="vrm-par-paquets" data-par-paquets="" aria-hidden="true" style={{ height: 1 }}/> : null;
   return [montres, sentinelle];
 }

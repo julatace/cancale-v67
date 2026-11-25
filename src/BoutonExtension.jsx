@@ -33,7 +33,7 @@ export function PhraseExtension({ site = 'vinted' }) {
 export function BoutonExtension({ action, site = 'vinted', ids = [], variante = 'teinte', libelle = '', large = false, className = '', onOuvert = null, attrs = null }) {
   const c = cibleDe(action, site, ids);
   const url = lienPanneau(c);
-  const ouvrir = (e) => { if (e && e.stopPropagation) e.stopPropagation(); ouvrirPanneau(c); if (onOuvert) { try { onOuvert(url); } catch (_) {} } };
+  const ouvrir = (e) => { if (e && e.stopPropagation) e.stopPropagation(); if (!ouvrirPanneau(c)) return; if (onOuvert) { try { onOuvert(url); } catch (_) {} } };   // (25 nov.) refusé (extension trop ancienne) : la feuille reste, la phrase est dite
   if (className) {
     const ph = extensionIci() ? '' : tr('actionsExt.phrase', { site: NOMS_SITES[c.site] });
     return <button type="button" className={className} onClick={ouvrir} title={ph || undefined} {...attrsDe(action, c, url, attrs)}>{libelle || tr(c.cle, { site: NOMS_SITES[c.site] })}{ph ? <small style={{ display: 'block', opacity: 0.7, fontWeight: 400 }} data-vrm-panneau-phrase="">{ph}</small> : null}</button>;
@@ -52,7 +52,7 @@ export function RangeeExtension({ action, site = 'vinted', ids = [], libelle = '
   const phrase = extensionIci() ? '' : tr('actionsExt.phrase', { site: NOMS_SITES[c.site] });
   return (
     <Rangee titre={libelle || tr(c.cle, { site: NOMS_SITES[c.site] })} sousTitre={[sousTitre, phrase].filter(Boolean).join(' · ')} sousLignes={2} fin="chevron"
-      onClick={() => { ouvrirPanneau(c); if (onOuvert) { try { onOuvert(url); } catch (_) {} } }} attrs={attrsDe(action, c, url, attrs)}/>
+      onClick={() => { if (!ouvrirPanneau(c)) return; if (onOuvert) { try { onOuvert(url); } catch (_) {} } }} attrs={attrsDe(action, c, url, attrs)}/>
   );
 }
 

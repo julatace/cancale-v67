@@ -179,7 +179,8 @@ export function histoireArticle(rn, d = {}, o = {}) {
       const r = o.montantRecuEbay ? o.montantRecuEbay(c) : { eur: null };
       ev.push({ at: iso(c.creationDate), texte: ['eBay', r && r.eur != null ? eur(r.eur) + ' reçus' : null].filter(Boolean).join(' · '), preuve: `commande ${str(c.orderId)}`, cle: 'ebay' });
     }
-    pose('vente', ev.length ? 'fait' : (e ? (e.etat === 'passu' ? 'passu' : 'absent') : 'passu'), ev.length ? (e && e.etat === 'fait' ? e.titre : 'Vendu') : 'Vente', ev, ev.length ? null : (e ? e.detail : null));
+    // (24 nov.) `mail` : vendue d'après l'e-mail de vente (son annonce par identité), Vinted pas encore relu — gardée telle quelle.
+    pose('vente', ev.length ? 'fait' : (e ? (e.etat === 'passu' ? 'passu' : e.etat === 'mail' ? 'mail' : 'absent') : 'passu'), ev.length ? (e && e.etat === 'fait' ? e.titre : 'Vendu') : 'Vente', ev, ev.length ? null : (e ? e.detail : null));
   }
 
   // 9. COLIS — la frise de la vente Vinted (prouvée), sinon l'étape d'avant.

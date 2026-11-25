@@ -583,6 +583,272 @@ function clocheFavorisNative(activer=false,origine){
   // bloqué, et sans ça on ne sait même pas qu'il y est passé.
   try { noteSeen(location.href, 'PAGE', null); } catch (_) {}
 
+  // ═══ « OBSERVER VINTED (10 MIN) » (24 nov., 5.440.3) ═══════════════════════════════════════════════════════════════
+  //  Julien : « refais-moi une extension qui capte absolument tout ce que fait Bleam ». On n'ouvre ni ne lit AUCUN autre
+  //  outil : on regarde ce que fait la PAGE de Vinted dans SON onglet pendant qu'il envoie (à la main, ou avec un autre
+  //  outil) un message ou une offre à un favori — le vrai chemin de Vinted, pour le comparer à celui de VRM.
+  //  Allumé seulement sur son geste (carte du logo, ou VRM → Paramètres), 10 min au plus (`fin`, posée par le fond et
+  //  relayée par content.js sur le canal privé). Une FRISE, chaque entrée datée :
+  //   · `page`   l'adresse de la page (forme : {id}/{uuid}, clés de la requête seules) ;
+  //   · `req`    une requête envoyée par la page vers Vinted : méthode, hôte, chemin (forme), statut, les CLÉS du corps
+  //              envoyé et leur type (jamais une valeur), les clés de tête de la réponse et leur type (`formeTete`) ;
+  //   · `clic`   un clic (de lui, ou de n'importe quoi : `isTrusted`) : balise, rôle, data-testid, nom accessible s'il
+  //              est fait de mots d'interface (sinon {texte}), place dans l'en-tête, forme du lien ; JAMAIS ce qu'il tape ;
+  //   · `notifs` la liste de la cloche lue par la page (nombre de lignes, formes des liens, sortes, page) ;
+  //   · `cloche` / `defile` les lignes de notification visibles (nombre, formes) quand la liste s'ouvre ou s'allonge.
+  //  Aucune requête de plus, aucun clic, aucune touche : on ne fait que REGARDER (CLAUDE.md §3 inchangé). Aucun texte de
+  //  message, pseudo, jeton, cookie, en-tête : la règle `<observation-regle>` (la même dans le fond, qui la rejoue
+  //  entrée par entrée) et `audit-observation-vinted.cjs` (une page aux vraies valeurs : aucune ne doit survivre).
+  // <observation-regle> (24 nov., 5.440.3) — la MÊME dans la page (inject.js) et dans le fond (background.js).
+  // « Observer Vinted » ne garde d'une adresse, d'un lien, d'une étiquette que leur FORME : un identifiant devient
+  // {id} / {uuid}, une valeur de paramètre {v} (sauf un petit nombre ou une valeur d'énumération connue), un morceau
+  // d'adresse qui suit un identifiant ({id}-nike-air…) {id}-{slug}, ce qui suit /member/ {x}, un nom accessible qui
+  // n'est pas fait de mots d'interface connus {texte}. Idempotente : la page l'applique, le fond la rejoue.
+  const OBS_MOTS = new Set(('notifications notification notifs messages message messagerie boite inbox envoyer send voir tout all see view '
+    + 'fermer close menu rechercher recherche search favoris favori favorites favourites likes profil profile retour back accueil home '
+    + 'faire une un offre offer make proposer propose vendre sell plus more suivant next precedent previous ouvrir open cloche bell '
+    + 'compte account parametres settings deconnexion logout aide help conversation conversations repondre reply valider confirmer '
+    + 'confirm annuler cancel ok oui non yes no le la les de des du a the of to et and mon ma mes ton ta tes my your nouveau nouvelle '
+    + 'new lire read marquer comme lu mark as photo photos article articles item items prix price catalogue catalog membre member '
+    + 'notificaciones mensajes enviar ver todo cerrar buscar favoritos perfil notifiche messaggi invia vedi tutto chiudi cerca '
+    + 'preferiti profilo benachrichtigungen nachrichten senden alle anzeigen schliessen suchen favoriten angebot machen mehr '
+    + 'acheter buy commande order commandes orders dressing wardrobe abonnements').split(' '));
+  function obsSegment(s, avant) {
+    let x = String(s == null ? '' : s);
+    if (!x) return x;
+    x = x.replace(/\d{4,}/g, '{id}');
+    if (/^\{(?:id|uuid|hex|x|slug)\}$/.test(x)) return x;
+    if (/^\{id\}[-_.]/.test(x)) return '{id}-{slug}';
+    if (/^(?:member|members|user|users|profile|u)$/i.test(String(avant || '')) && !/^(?:notifications|settings|general|edit|items|favourite_list|favorites|wallet|personalization|signup|login|messages)$/.test(x)) return '{x}';
+    if (x.length > 40 || !/^[A-Za-z0-9_.{}-]+$/.test(x)) return '{x}';
+    return x;
+  }
+  function obsChemin(p) {
+    const parts = String(cheminNormalise(String(p == null ? '' : p).split(/[?#]/)[0])).split('/');
+    return parts.map((s, i) => (i === 0 ? s : obsSegment(s, parts[i - 1]))).join('/').slice(0, 200);
+  }
+  function obsCle(k) { const t = String(k == null ? '' : k); return /^[A-Za-z_$][\w$.[\]-]{0,39}$/.test(t) && !/\d{2,}/.test(t) ? t : '{x}'; }   // deux chiffres de suite : un identifiant, un pseudo (« lea_92 »), jamais un nom de champ
+  function obsValeur(k, v) {
+    const x = String(v == null ? '' : v);
+    if (x === '' || /^\{(?:id|uuid|v)\}$/.test(x) || /^\d{1,3}$/.test(x)) return x;
+    if (/^\d+$/.test(x)) return '{id}';
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x)) return '{uuid}';
+    if (/^(?:portal|type|source|tab|scope|order|sort|sort_by|status|filter|view|mode|lang|locale|currency)$/i.test(String(k)) && /^[a-z_]{1,20}$/.test(x)) return x;
+    return '{v}';
+  }
+  // Une forme déjà faite (« api.vinted.fr/inbox/{uuid}?page=2 », « vintedfr://messaging?item_id={id} », « /inbox/{uuid} »)
+  // repassée à la règle : ce qui n'a pas cette forme n'est pas gardé.
+  function obsFormeSure(s) {
+    const t = String(s == null ? '' : s).slice(0, 400);
+    if (t === '{tiers}') return t;
+    const m = /^((?:[a-z][a-z0-9+.-]{0,20}:\/\/[a-z0-9.-]{0,40})|(?:[a-z0-9-]{1,30}\.){0,3}vinted\.[a-z]{2,3}(?:\.[a-z]{2})?)?(\/[^?#]*)?(?:\?([^#]*))?$/i.exec(t);
+    if (!m) return undefined;
+    const tete = m[1] ? (/^javascript:/i.test(m[1]) ? null : m[1].toLowerCase()) : '';
+    if (tete === null) return undefined;
+    const q = String(m[3] || '').split('&').filter(Boolean).slice(0, 10).map((p) => { const i = p.indexOf('='); const k = obsCle(i < 0 ? p : p.slice(0, i)); return k + '=' + obsValeur(k, i < 0 ? '' : p.slice(i + 1)); });
+    return (tete + obsChemin(m[2] || '') + (q.length ? '?' + q.join('&') : '')).slice(0, 300);
+  }
+  function obsLien(v, origine) {
+    let u, o0 = '';
+    try { o0 = new URL(String(origine || 'https://www.vinted.fr')).hostname; } catch (_) { o0 = ''; }
+    try { u = new URL(String(v == null ? '' : v), origine || 'https://www.vinted.fr'); } catch (_) { return undefined; }
+    let tete = '';
+    if (/^https?:$/.test(u.protocol)) tete = u.hostname === o0 ? '' : (/(?:^|\.)vinted\.[a-z.]{2,6}$/i.test(u.hostname) ? u.hostname : '{tiers}');
+    else if (/^[a-z][a-z0-9+.-]{0,20}:$/.test(u.protocol) && u.protocol !== 'javascript:' && u.protocol !== 'data:' && u.protocol !== 'blob:') tete = u.protocol + '//' + (/^[a-z0-9.-]{0,40}$/i.test(u.hostname) ? u.hostname : 'x');
+    else return undefined;
+    if (tete === '{tiers}') return tete;
+    const q = []; for (const [k, val] of u.searchParams) { if (q.length >= 10) break; const ck = obsCle(k); q.push(ck + '=' + obsValeur(ck, val)); }
+    let p = u.pathname; try { p = decodeURIComponent(p); } catch (_) {}
+    return obsFormeSure(tete + obsChemin(p) + (q.length ? '?' + q.join('&') : ''));
+  }
+  function obsAria(s) {
+    const t = String(s == null ? '' : s).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ß/g, 'ss');
+    if (!t) return undefined;
+    const mots = t.split(/[\s'’,.:;!?()«»"/|·-]+/).filter(Boolean);
+    if (!mots.length || mots.length > 5 || !mots.every((w) => OBS_MOTS.has(w))) return '{texte}';
+    return mots.join(' ');
+  }
+  function obsTestid(s) {
+    const t = String(s == null ? '' : s).slice(0, 80).replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '{uuid}').replace(/\d{3,}/g, '{id}');
+    return /^[A-Za-z0-9_{}.:-]{1,60}$/.test(t) ? t : (t ? '{x}' : undefined);
+  }
+  // </observation-regle>
+  let obsFin = 0;
+  const obsFile = [];
+  let obsMinut = null, obsUrl = '', obsSonde = null, obsLignesVues = 0, obsDefil = null;
+  const obsActif = () => obsFin > 0 && Date.now() < obsFin;
+  const obsTypes = ['string', 'number', 'boolean', 'null', 'array', 'object'];
+  // Les CLÉS d'un corps envoyé et leur type — jamais une valeur (`formeCorps` du fond, côté page).
+  const obsCorps = (b) => {
+    const out = [];
+    try {
+      if (b == null) return out;
+      if (typeof FormData !== 'undefined' && b instanceof FormData) { for (const k of b.keys()) { if (out.length >= 40) break; out.push(obsCle(k) + ':form'); } return out; }
+      if (typeof URLSearchParams !== 'undefined' && b instanceof URLSearchParams) { for (const k of b.keys()) { if (out.length >= 40) break; out.push(obsCle(k) + ':form'); } return out; }
+      if (typeof Blob !== 'undefined' && b instanceof Blob) return ['(racine):blob'];
+      if (b instanceof ArrayBuffer || ArrayBuffer.isView(b)) return ['(racine):binaire'];
+      if (typeof ReadableStream !== 'undefined' && b instanceof ReadableStream) return ['(racine):flux'];
+      const t = String(b).trim();
+      if (!t) return out;
+      let j; try { j = JSON.parse(t); } catch (_) { j = undefined; }
+      if (j === undefined) {
+        if (/^[\w.%[\]-]+=/.test(t)) { for (const p of t.split('&').slice(0, 40)) { let k = p.split('=')[0]; try { k = decodeURIComponent(k); } catch (_) {} out.push(obsCle(k) + ':form'); } return out; }
+        return ['(racine):texte'];
+      }
+      const marche = (v, pre, prof) => {
+        if (out.length >= 40) return;
+        if (v && typeof v === 'object' && !Array.isArray(v) && prof < 4) { const ks = Object.keys(v); if (!ks.length) out.push((pre || '(racine)') + ':object'); for (const k of ks.slice(0, 40)) marche(v[k], pre ? pre + '.' + obsCle(k) : obsCle(k), prof + 1); }
+        else if (Array.isArray(v) && v.length && prof < 4) marche(v[0], (pre || '') + '[]', prof + 1);
+        else out.push((pre || '(racine)').slice(0, 80) + ':' + typeDe(v));
+      };
+      marche(j, '', 0);
+    } catch (_) {}
+    return out.slice(0, 40);
+  };
+  const obsPousser = (e) => {
+    if (!obsActif()) return;
+    e.t = Date.now();
+    obsFile.push(e);
+    if (obsFile.length > 300) obsFile.splice(0, obsFile.length - 300);
+    if (!obsMinut) obsMinut = setTimeout(obsVider, 1500);
+  };
+  const obsVider = () => {
+    obsMinut = null;
+    if (!obsFile.length) return;
+    const ev = obsFile.splice(0, 100);
+    post({ kind: 'observation', ev });
+    if (obsFile.length) obsMinut = setTimeout(obsVider, 200);
+  };
+  const obsHote = (h) => (h === location.hostname ? '' : hoteVinted(h) ? h : /(?:^|\.)(captcha-delivery\.com|datadome\.co)$/i.test(h) ? h.toLowerCase() : null);
+  // Les lignes de notification visibles : un lien dans un bloc « notification » (data-testid), ou un lien de favori.
+  const obsVrm = (el) => { try { return !!(el && el.closest && el.closest('[id^="vrm-"],[id^="vrm_"],[data-vrm]')); } catch (_) { return false; } };
+  const obsLignes = () => {
+    const formes = new Set(); let n = 0;
+    try {
+      for (const a of Array.from(document.querySelectorAll('a[href]')).slice(0, 4000)) {
+        if (obsVrm(a)) continue;
+        const h = a.getAttribute('href') || '';
+        const dansNotif = !!a.closest('[data-testid*="notification" i],[class*="notification" i]');
+        if (!dansNotif && !/want_it|receiver_id|offering_id|messaging\?/i.test(h)) continue;
+        if (/\/notifications?\/?$/i.test(h.split('?')[0]) && !/want_it|receiver_id/i.test(h)) continue;   // « Voir tout »
+        if (!a.getClientRects().length) continue;
+        n++;
+        const f = obsLien(h, location.href); if (f && formes.size < 8) formes.add(f);
+      }
+    } catch (_) {}
+    return { n, formes: Array.from(formes) };
+  };
+  const obsClocheSonder = (pourquoi) => {
+    clearTimeout(obsSonde);
+    const une = (ms, fin) => setTimeout(() => { if (!obsActif()) return; const l = obsLignes(); if (l.n !== obsLignesVues || fin) { obsPousser({ k: 'cloche', pourquoi, lignes: l.n, formes: l.formes }); obsLignesVues = l.n; } }, ms);
+    une(900, false); obsSonde = une(2500, true);
+  };
+  const obsPage = () => {
+    if (!obsActif()) return;
+    if (location.href === obsUrl) return;
+    obsUrl = location.href;
+    const q = []; try { for (const k of new URL(location.href).searchParams.keys()) { if (q.length >= 10) break; q.push(obsCle(k)); } } catch (_) {}
+    obsPousser({ k: 'page', p: obsChemin(location.pathname), q });
+    obsLignesVues = 0;
+    if (/notification/i.test(location.pathname)) obsClocheSonder('page');
+  };
+  const obsEnTete = (el) => {
+    try {
+      const h = el.closest('header,[role="banner"]'); if (!h) return null;
+      const cibles = Array.from(h.querySelectorAll('a[href],button,[role="button"],[role="link"]')).filter((x) => !obsVrm(x));
+      const c = el.closest('a[href],button,[role="button"],[role="link"]');
+      const i = c ? cibles.indexOf(c) : -1;
+      return { i: i >= 0 ? i + 1 : 0, n: cibles.length };
+    } catch (_) { return null; }
+  };
+  const obsClic = (ev) => {
+    try {
+      if (!obsActif()) return;
+      const t0 = ev.target && ev.target.nodeType === 1 ? ev.target : (ev.target && ev.target.parentElement) || null;
+      if (!t0 || obsVrm(t0)) return;
+      const el = t0.closest('a[href],button,[role="button"],[role="link"],[role="menuitem"],[role="tab"],input,textarea,select,label,[data-testid]') || t0;
+      const a = el.closest('a[href]');
+      const e = { k: 'clic', conf: ev.isTrusted === true, tag: String(el.localName || '').slice(0, 20) };
+      const role = el.getAttribute('role'); if (role && /^[a-z]{1,20}$/.test(role)) e.role = role;
+      const tid = el.getAttribute('data-testid') || (el.closest('[data-testid]') && el.closest('[data-testid]').getAttribute('data-testid')); if (tid) e.tid = obsTestid(tid);
+      const nom = el.getAttribute('aria-label') || el.getAttribute('title'); if (nom) e.aria = obsAria(nom);
+      const exp = el.getAttribute('aria-expanded'); if (exp === 'true' || exp === 'false') e.ouvert = exp === 'true';
+      if (el.hasAttribute('aria-haspopup')) e.popup = true;
+      const anc = []; let p = el.parentElement;
+      while (p && anc.length < 4 && p !== document.body) { const x = p.getAttribute && p.getAttribute('data-testid'); if (x) anc.push(obsTestid(x)); p = p.parentElement; }
+      if (anc.length) e.anc = anc;
+      const ent = obsEnTete(el); if (ent) e.entete = ent;
+      if (a) { const f = obsLien(a.getAttribute('href'), location.href); if (f) e.href = f; }
+      if (/^(input|textarea|select)$/.test(e.tag)) { const ty = String(el.getAttribute('type') || '').toLowerCase(); if (/^[a-z]{1,12}$/.test(ty)) e.type = ty; }
+      obsPousser(e);
+      // La cloche : un bouton de l'en-tête qui ouvre une liste, ou nommé « notifications » ; la liste comptée après.
+      const cloche = (e.aria && /notif|benachrichtigung/.test(e.aria)) || /notif|bell/i.test(String(tid || '')) || (e.entete && e.popup);
+      if (cloche) obsClocheSonder('clic');
+    } catch (_) {}
+  };
+  // La liste de la cloche telle que la page la reçoit (`…/inbox-notifications/v1/notifications`, `/api/v2/notifications`).
+  const obsNotifs = (j, u) => {
+    try {
+      const l = j && Array.isArray(j.notifications) ? j.notifications : null;
+      if (!l) return;
+      const formes = new Set(), sortes = {};
+      for (const x of l.slice(0, 200)) {
+        if (!x || typeof x !== 'object') continue;
+        if (typeof x.link === 'string' && formes.size < 8) { const f = obsLien(x.link, location.href); if (f) formes.add(f); }
+        const s = String(x.entry_type == null ? '' : x.entry_type); if (/^\d{1,4}$/.test(s)) sortes[s] = (sortes[s] || 0) + 1;
+      }
+      const pg = j.pagination && typeof j.pagination === 'object' ? j.pagination : {};
+      const ent = (v) => (Number.isSafeInteger(Number(v)) && Number(v) >= 0 && Number(v) <= 100000 ? Number(v) : undefined);
+      obsPousser({ k: 'notifs', n: l.length, formes: Array.from(formes), sortes, page: ent(u.searchParams.get('page')) || ent(pg.current_page), pp: ent(u.searchParams.get('per_page')) || ent(pg.per_page), tp: ent(pg.total_pages) });
+    } catch (_) {}
+  };
+  const noteObservation = (via, method, url, status, ct, corps, lireTexte, t0) => {
+    try {
+      if (!obsActif()) return;
+      let u; try { u = new URL(String(url || ''), location.href); } catch (_) { return; }
+      if (!/^https?:$/.test(u.protocol)) return;
+      const h = obsHote(u.hostname); if (h === null) return;
+      const q = []; for (const k of u.searchParams.keys()) { if (q.length >= 10) break; q.push(obsCle(k)); }
+      const e = { k: 'req', via, m: String(method || 'GET').toUpperCase().slice(0, 10), h, p: obsChemin(u.pathname), st: Number(status) || 0, q, corps: obsCorps(corps), ms: t0 ? Math.max(0, Date.now() - t0) : undefined };
+      const typeCt = String(ct || '').split(';')[0].trim().toLowerCase();
+      if (/^[a-z]+\/[a-z0-9.+-]{1,40}$/.test(typeCt)) e.ct = typeCt;
+      const estNotifs = /\/notifications\/?$/.test(u.pathname) && e.m === 'GET';
+      if (!(e.st >= 200 && e.st < 300) || typeof lireTexte !== 'function' || !/json/.test(typeCt)) { obsPousser(e); return; }
+      let lecture; try { lecture = lireTexte(); } catch (_) { obsPousser(e); return; }
+      Promise.resolve(lecture).then((t) => {
+        let j; try { if (typeof t === 'string' && t.length < 3000000) j = JSON.parse(t); } catch (_) { j = undefined; }
+        if (j !== undefined) { const f = formeTete(j), r = {}; for (const k of Object.keys(f)) r[String(k).split('.').map(obsCle).join('.')] = f[k]; e.rep = r; }
+        obsPousser(e);
+        if (estNotifs && j) obsNotifs(j, u);
+      }, () => obsPousser(e));
+    } catch (_) {}
+  };
+  const obsDefiler = () => {
+    if (!obsActif() || !/notification/i.test(location.pathname)) return;
+    clearTimeout(obsDefil);
+    obsDefil = setTimeout(() => { const l = obsLignes(); if (l.n > obsLignesVues) { obsPousser({ k: 'defile', lignes: l.n, avant: obsLignesVues, formes: l.formes }); obsLignesVues = l.n; } }, 900);
+  };
+  let obsVeille = null, obsEcoute = false;
+  const obsRegler = (fin) => {
+    const f = Number(fin) || 0;
+    obsFin = f > Date.now() && f <= Date.now() + 11 * 60000 ? f : 0;
+    if (obsActif() && !obsEcoute) {
+      obsEcoute = true; obsUrl = '';
+      window.addEventListener('click', obsClic, true);
+      window.addEventListener('scroll', obsDefiler, true);
+      obsVeille = setInterval(() => { if (!obsActif()) { obsRegler(0); return; } obsPage(); }, 300);
+      obsPage();
+    } else if (!obsActif() && obsEcoute) {
+      obsEcoute = false;
+      window.removeEventListener('click', obsClic, true);
+      window.removeEventListener('scroll', obsDefiler, true);
+      clearInterval(obsVeille); obsVeille = null;
+      obsVider();   // ce qui restait dans la file part encore
+    }
+  };
+  surCanal((d) => { try { if (d && d.__tag === 'CANCALE_VINTED_OBS') obsRegler(d.fin); } catch (_) {} });
+  try { window.addEventListener('pagehide', () => { if (obsFile.length) obsVider(); }); } catch (_) {}
+
   const sendHarvest = (url, text, method = 'GET', status = null) => {
     noteSeen(url);
     const h = matchHarvest(url);
@@ -1360,11 +1626,13 @@ function nettoyerRelaisSuivi(r) {
           try{const copie=input.clone();corpsRequestBorne(copie).then(body=>{if(body!==null)sendWriteReq(method,url,body,contexte);}).catch(()=>{});}catch{}
         }else sendWriteReq(method, url, corpsEnvoye,contexte);
       } catch (_) {}
+      const t0Obs = Date.now();
       const p = origFetch.apply(this, arguments);
       try {
         noteSeen(url); // diagnostic : TOUT appel API, pas seulement ceux qui matchent
         p.then((res) => {
           try {
+            if (obsFin) noteObservation('fetch', method, url, res.status, (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '', corpsEnvoye, () => res.clone().text(), t0Obs);   // 5.440.3 : « Observer Vinted »
             noteSuppression(method, url, res.status);   // 5.165 : AVANT tout le reste (la page va naviguer)
             notePublication(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 5.201
             noteModification(method, url, res.status, corpsEnvoye);   // 22 oct.
@@ -1384,7 +1652,7 @@ function nettoyerRelaisSuivi(r) {
               res.clone().text().then((t) => sendHarvest(url, t, method, res.status)).catch(() => {});
             }
           } catch (_) {}
-        }).catch(() => {});
+        }).catch(() => { try { if (obsFin) noteObservation('fetch', method, url, 0, '', corpsEnvoye, null, t0Obs); } catch (_) {} });
       } catch (_) {}
       return p;
     }, origFetch);
@@ -1411,8 +1679,11 @@ function nettoyerRelaisSuivi(r) {
         // haut) pour la moisson active.
         sendWriteReq(this.__cancaleMethod, url, bodyArg,contexteCreation(this.__cancaleMethod,url));
         noteSeen(url); // diagnostic : TOUT appel API (XHR aussi)
+        const t0Obs = Date.now();
+        if (obsFin) this.addEventListener('loadend', function () { try { if (this.status === 0) noteObservation('xhr', this.__cancaleMethod, url, 0, '', bodyArg, null, t0Obs); } catch (_) {} });   // 5.440.3
         this.addEventListener('load', function () {
           try {
+            if (obsFin) noteObservation('xhr', this.__cancaleMethod, url, this.status, this.getResponseHeader ? (this.getResponseHeader('content-type') || '') : '', bodyArg, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } }, t0Obs);   // 5.440.3 : « Observer Vinted »
             noteSuppression(this.__cancaleMethod, url, this.status);   // 5.165
             notePublication(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 5.201
             noteModification(this.__cancaleMethod, url, this.status, bodyArg);   // 22 oct.

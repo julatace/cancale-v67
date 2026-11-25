@@ -50,7 +50,7 @@ export default function AchatsTableau({ lignes, filtres = [], compte = '', majLe
     // (20 nov.) Le N° de suivi : toucher = le copier (« Copié ✓ »), ↗ = le suivre chez SON transporteur (lien lu, jamais deviné).
     { cle: 'suivi', libelle: tr('tableau.col.suivi'), tri: (l) => (l.suivi && l.suivi.n) || null, rendu: (l) => (l.suivi ? <NumeroSuivi suivi={l.suivi}/> : null) },
     { cle: 'code', libelle: tr('tableau.col.code'), titreCourt: tr('tableau.col.codeCourt'), tri: (l) => l.code || null,
-      rendu: (l) => (l.code ? (onCode ? <button type="button" className="n-eg-cellule n-tt-code" data-achat-code={l.cle} aria-label={tr('tableau.voirCode', { code: l.code })} onClick={(e) => { e.stopPropagation(); onCode(l); }}>{l.code}</button> : <span className="n-tt-code">{l.code}</span>) : null) },
+      rendu: (l) => (l.code ? (onCode ? <button type="button" data-n-famille="lien" className="n-eg-cellule n-tt-code" data-achat-code={l.cle} aria-label={tr('tableau.voirCode', { code: l.code })} onClick={(e) => { e.stopPropagation(); onCode(l); }}>{l.code}</button> : <span className="n-tt-code">{l.code}</span>) : null) },
     { cle: 'statut', libelle: tr('tableau.col.statut'), tri: (l) => CATEGORIES_ACHAT.indexOf(l.statut) },
   ];
   const statuts = CATEGORIES_ACHAT.map((c) => ({ cle: c, libelle: tr('tableau.achat.' + c), ton: TON[c] }));

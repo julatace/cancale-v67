@@ -74,6 +74,7 @@ async function contexte(nav) {
   await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
   await ctx.route(/^https:\/\/images\d*\.vinted\.net\//i, async (r) => { await attendre(RTT); return r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PHOTO }).catch(() => {}); });
   await ctx.route('**/rest/v1/**', async (route) => { const rq = route.request();
+    if (process.env.LECTURES && LECTURES_EN_COURS) LECTURES_EN_COURS.push([Date.now(), rq.method(), decodeURIComponent(rq.url().replace(/^.*\/rest\/v1\//, '')).slice(0, +process.env.LECTURES > 1 ? +process.env.LECTURES : 140) + (rq.headers().range ? ' [' + rq.headers().range + ']' : '')]);
     if (rq.method() !== 'GET') { await attendre(RTT); return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' }).catch(() => {}); }
     const h = await rq.allHeaders(); const rep = repondre(rq.url(), h.range, base); const body = JSON.stringify(rep.body);
     await attendre(RTT + Math.round(body.length / DEBIT * 1000)); return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { ...(rep.headers || {}) }, body }).catch(() => {}); });
@@ -112,6 +113,8 @@ let CDP = null;
 const borne = (p, ms = 15000) => Promise.race([p, new Promise((_, ko) => setTimeout(() => ko(new Error('borne')), ms))]);
 const metr = async () => { try { const { metrics } = await borne(CDP.send('Performance.getMetrics')); const m = Object.fromEntries(metrics.map((x) => [x.name, x.value])); return { script: m.ScriptDuration || 0, style: m.RecalcStyleDuration || 0, page: m.LayoutDuration || 0 }; } catch (_) { return null; } };
 // PROFIL=onglet:annonces,vente,froid… : le profil par fonction du geste (build non minifié conseillé).
+// LECTURES=1 : chaque lecture de la base pendant une 1re visite, datée depuis le toucher (récit « vitesse » §5 ter).
+let LECTURES_EN_COURS = null;
 const PROFILS = String(process.env.PROFIL || '').split(',').filter(Boolean);
 async function profilDebut(cle) { if (!PROFILS.includes(cle)) return false; await CDP.send('Profiler.enable'); await CDP.send('Profiler.setSamplingInterval', { interval: 500 }); await CDP.send('Profiler.start'); return true; }
 async function profilFin(cle, actif) { if (!actif) return; const { profile: P } = await CDP.send('Profiler.stop');
@@ -126,7 +129,18 @@ const ecart = (a, b) => (a && b ? { script: Math.round((b.script - a.script) * 1
 
 async function onglets(pg, R) {
   const ORDRE = ['annonces', 'ventes', 'achats', 'compta', 'journee'];
-  for (const o of ORDRE) { await pg.locator(`[data-n-onglet="${CLE(o)}"]`).first().tap({ timeout: 30000 }).catch(() => {}); await pg.waitForFunction(ecranPret, o, { timeout: 60000, polling: 200 }).catch(() => {}); await calme(pg, 1500, 20000); }
+  // 1re visite de chaque onglet. PROFIL=visite1:<onglet> : le profil du montage (récit §5 quater, recopié le 24 nov.) ;
+  // CALCULS=1 : les gros calculs faits pendant la visite, par écran (`window.__vrmCalculs`, src/calculParesseux.js).
+  for (const o of ORDRE) { const pf = await profilDebut('visite1:' + o); await pg.evaluate((pile) => { window.__vrmCalculs = {}; window.__vrmCalculsMs = {}; window.__vrmPiles = []; window.__vrmCalculsPile = pile === 'pile'; window.__vrmDeps = []; window.__vrmCalculsDeps = pile === 'deps'; }, process.env.CALCULS || '').catch(() => {});
+    LECTURES_EN_COURS = process.env.LECTURES ? [] : null; const tTap = Date.now();
+    await pg.locator(`[data-n-onglet="${CLE(o)}"]`).first().tap({ timeout: 30000 }).catch(() => {}); await pg.waitForFunction(ecranPret, o, { timeout: 60000, polling: 200 }).catch(() => {});
+    await profilFin('visite1:' + o, pf);
+    if (LECTURES_EN_COURS) { const d = Date.now() - tTap; await calme(pg, 1500, 20000); const L = LECTURES_EN_COURS; LECTURES_EN_COURS = null;
+      console.log(`      lectures 1re visite ${o} (prêt à +${d} ms) : ${L.length}`); for (const [t, m, u] of L) console.log(`        +${t - tTap} ${m} ${u}`); } await calme(pg, 1500, 20000);
+    if (process.env.CALCULS) console.log(`      calculs 1re visite ${o} : ${JSON.stringify(await pg.evaluate(() => window.__vrmCalculs || null).catch(() => null))}`);
+    if (process.env.CALCULS) console.log(`      durée des calculs 1re visite ${o} (ms, processeur ralenti) : ${JSON.stringify(await pg.evaluate(() => window.__vrmCalculsMs || null).catch(() => null))}`);
+    if (process.env.CALCULS === 'deps') console.log(`      dépendances changées (rang) : ${JSON.stringify(await pg.evaluate(() => window.__vrmDeps || []).catch(() => []))}`);
+    if (process.env.CALCULS === 'pile') for (const x of await pg.evaluate(() => window.__vrmPiles || []).catch(() => [])) console.log('        ' + x.join(' · ').slice(0, 900)); }
   for (let tour = 0; tour < 2; tour++) for (const o of ORDRE) {
     await calme(pg, 1000, 15000); await rendus(pg); const m0 = await metr(); const pf = tour === 1 && await profilDebut('onglet:' + o);
     await pg.locator(`[data-n-onglet="${CLE(o)}"]`).first().tap({ timeout: 30000 }).catch(() => {});
@@ -163,7 +177,10 @@ async function vente(pg, R) {
 }
 async function defiler(pg, cdp, R) {
   await pg.locator(`[data-n-onglet="paires"]`).first().tap({ timeout: 30000 }).catch(() => {});
-  await pg.waitForFunction(ecranPret, 'annonces', { timeout: 60000, polling: 200 }).catch(() => {}); await calme(pg, 3000, 40000);
+  await pg.waitForFunction(ecranPret, 'annonces', { timeout: 60000, polling: 200 }).catch(() => {});
+  // Les annonces de TOUS les comptes lues (le titre du groupe porte son nombre) : au moins 300 rangées promises.
+  await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-groupe-n]')].reduce((t, e) => t + (+e.getAttribute('data-eg-groupe-n') || 0), 0) >= 300 || document.querySelectorAll('[data-eg-article]').length >= 300, null, { timeout: 90000, polling: 500 }).catch(() => {});
+  await calme(pg, 3000, 40000);
   await pg.evaluate(() => { window.scrollTo(0, 0); for (const e of document.querySelectorAll('*')) if (e.scrollTop) e.scrollTop = 0; });
   await attendre(500);
   await pg.evaluate(() => { window.__im = []; const b = (t) => { window.__im.push(t); window.__raf = requestAnimationFrame(b); }; window.__raf = requestAnimationFrame(b); });
@@ -186,7 +203,7 @@ async function recherche(pg, R) {
       const v = () => { if (String(champ.value || '').endsWith(c)) return window.__frappe.push(Math.round(performance.now() - t0)); if (performance.now() - t0 < 5000) requestAnimationFrame(v); }; requestAnimationFrame(v); }, true); });
   for (const c of 'samba') { await pg.keyboard.type(c); await attendre(180); }
   await calme(pg, 1500, 20000);
-  const { L, liste } = await pg.evaluate(() => ({ L: window.__frappe.slice(), liste: Math.round(Math.max(0, ...window.__lt2.filter((t) => t > window.__derniereTouche)) - window.__derniereTouche) }));
+  const { L, liste } = await pg.evaluate(() => ({ L: window.__frappe.slice(), liste: (() => { const L = window.__lt2.filter((t) => t > window.__derniereTouche); return L.length ? Math.round(Math.max(...L) - window.__derniereTouche) : 0; })() }));
   R.frappeListe.push(liste);
   R.frappe.push(...L);
   console.log(`    recherche : lettre affichée ${L.join(' · ')} ms (médiane ${med(L)}, pire ${Math.max(...L)}) · liste à jour ${liste} ms après la dernière lettre`);
