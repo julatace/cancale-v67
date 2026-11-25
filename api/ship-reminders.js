@@ -45,6 +45,7 @@ import { modifierCas } from './_lib/suivi-vinted.js';
 import { nomTransporteur } from './_lib/transporteurs.js';
 import { semainePassee, semaineCourante, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
 import { notificationUrssaf, rappelVeilleUrssaf, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
+import { rappelVeilleFiscal, MAIN_FISCAL } from './_lib/rappel-fiscal.js';   // (16 nov., confiance-clients) CFE, impôt : la veille
 // « À expédier » : la règle du widget (elle-même jugée identique à celle de
 // l'app et de l'extension par audit-statuts.cjs). Importée, jamais recopiée.
 import { aExpedier } from './widget.js';
@@ -1075,6 +1076,21 @@ async function traiterVendeurApresRelecture() {
       }
     } catch (_) { urssaf = 'échec'; }
 
+    // (16 nov., confiance-clients, point 8) LA VEILLE DE LA CFE ET DES LIMITES DE LA DÉCLARATION DE REVENUS
+    // (api/_lib/rappel-fiscal.js, le calendrier fiscal de l'app). Une fois par échéance (`veilleFiscale` dans le
+    // mémo URSSAF, réservé AVANT l'envoi), famille « Rappels », heures calmes tenues par `sendPushToAll`.
+    let fiscal = null;
+    try {
+      const n = rappelVeilleFiscal({ today, main: await getRowProjete('main', MAIN_FISCAL) });
+      if (!n.envoyer) fiscal = n.raison;
+      else if (!(await pushCategorieActive('urssaf'))) fiscal = 'rappels coupés par le vendeur';
+      else {
+        const res = await reserverDedup('urssaf_reminder_dedup', (d) => !!d && d.veilleFiscale === n.cle, (d) => ({ ...(d || {}), veilleFiscale: n.cle }));
+        if (res.reserve) await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'fiscal-veille-' + n.cle, cle: 'fiscal-veille:' + n.cle, url: n.url });
+        fiscal = res.reserve ? 'envoyé · ' + n.raison : res.raison === 'deja' ? 'déjà rappelé' : 'mémo illisible — rien';
+      }
+    } catch (_) { fiscal = 'échec'; }
+
     // BILAN DE LA SEMAINE — le lundi (rattrapage mardi et mercredi). Posé ici,
     // AVANT le calcul des colis du jour : celui-ci se tait quand le résumé
     // manque, le bilan ne doit pas se taire avec lui. Un échec du bilan
@@ -1157,7 +1173,7 @@ async function traiterVendeurApresRelecture() {
     // (1er nov., audit A4) Les ventes Vestiaire : leur date limite, la règle de Colis.
     const vcR = t ? t.vestiaire : resumeColisSites({ vc: d.vc }).vestiaire;
     const vcDus = vcR ? vcR.overdue + vcR.today + vcR.tomorrow : 0;
-    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: vintedSkip + ' — aucune notification envoyée' };
+    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, fiscal, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: vintedSkip + ' — aucune notification envoyée' };
 
     const c = vintedSkip ? null : compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
     // ⚠️ (revue du 22 oct.) `overdue` = une limite LUE (email du bordereau, ou
@@ -1176,19 +1192,19 @@ async function traiterVendeurApresRelecture() {
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedupLu = await getRow('ship_reminder_dedup');
     // (11 nov., M81) un mémo illisible n'est pas « jamais notifié » : rien ne part.
-    if (dedupLu === undefined) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: 'mémo illisible — rien', total };
+    if (dedupLu === undefined) return { urssaf, fiscal, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: 'mémo illisible — rien', total };
     const memeJour = (d) => !!d && d.date === today && d.total === total && (d.nePasPoster || 0) === nePasPoster;
-    if (memeJour(dedupLu)) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: 'déjà notifié', total };
+    if (memeJour(dedupLu)) return { urssaf, fiscal, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       // (11 nov., B130) réservé AVANT l'envoi : deux passages ⇒ une seule notification.
       const res = await reserverDedup('ship_reminder_dedup', memeJour, () => ({ date: today, total, nePasPoster }));
-      if (!res.reserve) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: res.raison === 'deja' ? 'déjà notifié' : 'mémo illisible — rien', total };
+      if (!res.reserve) return { urssaf, fiscal, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: res.raison === 'deja' ? 'déjà notifié' : 'mémo illisible — rien', total };
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, vestiaireDus: vcDus, nePasPoster, vinted: c });
       // (11 nov.) Des colis dus aujourd'hui (ou en retard) : urgent — il passe un jour calme.
       await sendPushToAll({ cat: 'expedier', ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}), ...(overdue + dueToday > 0 ? { urgent: true } : {}) });
     } else await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
-    return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, overdue, aVerifier, dueToday, dueTomorrow, total,
+    return { urssaf, fiscal, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, overdue, aVerifier, dueToday, dueTomorrow, total,
       ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
       ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, vestiaire: vcR ? { aPoster: vcR.total, dus: vcDus } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }

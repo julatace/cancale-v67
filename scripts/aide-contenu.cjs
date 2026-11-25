@@ -221,7 +221,7 @@ const ARTICLES = [
         '**« Pas enregistré — Réessayer »** : le serveur n’a pas confirmé. Rien n’est perdu, l’écran est revenu comme avant.',
       ] },
       { titre: 'Vérifier que VRM fonctionne', id: 'etat' },
-      'La page [vrm.center/etat](/etat) dit si la base, la réception des e-mails et les notifications fonctionnent, vérifiées chaque minute.',
+      'La page [vrm.center/statut](/statut) dit « Tout fonctionne » ou la panne en mots simples (base, connexion, réception et envoi des e-mails, notifications, extension), vérifiée toutes les 10 minutes, avec l’historique des derniers jours. Aucune donnée d’un vendeur n’y apparaît. Aussi : Paramètres → Aide et « Tout va bien ? » → État de VRM.',
       { titre: 'Mes ventes sont-elles à jour ?', id: 'a-jour' },
       'Les ventes Vinted se mettent à jour quand tu passes sur Vinted avec l’extension. Si un compte n’a pas été lu depuis plus d’un jour, VRM le nomme et te dit d’y repasser.',
     ],

@@ -58,7 +58,7 @@ const tete = ({ titre, description, slug }) => `<!doctype html>
 `;
 const pied = `  <footer class="pied">
     <p>Ça ne marche toujours pas&nbsp;? Dans VRM, touche <b>?</b> en haut de l’écran, puis <b>Signaler un problème</b> : tu vois exactement ce qui part avant d’envoyer.</p>
-    <nav class="liens"><a href="/aide">Centre d’aide</a><a href="/etat">État de VRM</a><a href="/legal/mentions-legales.html">Mentions légales</a><a href="/legal/confidentialite.html">Confidentialité</a></nav>
+    <nav class="liens"><a href="/aide">Centre d’aide</a><a href="/statut">État de VRM</a><a href="/legal/mentions-legales.html">Mentions légales</a><a href="/legal/confidentialite.html">Confidentialité</a></nav>
   </footer>
 </main>
 </body>
