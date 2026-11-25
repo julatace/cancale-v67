@@ -19,9 +19,9 @@ import { GestesAchat } from './celluleAchat.jsx';
 // La mini-frise : un trait par étape, plein quand l'étape est PROUVÉE (les mêmes `etapes` que la fiche). Décorative : le mot
 // d'état à côté le dit, et son nom accessible porte « étape n sur m ».
 export function MiniFrise({ etapes }) {
-  const L = Array.isArray(etapes) ? etapes : [];
+  const L = (Array.isArray(etapes) ? etapes : []).filter((e) => e && e.cle);   // une étape a SA clé (`etapesRoute`)
   if (!L.length) return null;
-  return <span className="n-vr-frise" aria-hidden="true" data-vr-frise={String(L.filter((e) => e && e.fait).length)}>{L.map((e, k) => <i key={(e && e.cle) || k} data-fait={e && e.fait ? '1' : '0'}/>)}</span>;
+  return <span className="n-vr-frise" aria-hidden="true" data-vr-frise={String(L.filter((e) => e.fait).length)}>{L.map((e) => <i key={e.cle} data-fait={e.fait ? '1' : '0'}/>)}</span>;
 }
 
 // LA DEUXIÈME LIGNE : le site, le N°, la taille, l'état (frise + mot), ce qui reste à dire (date limite…), le transporteur.
@@ -36,7 +36,7 @@ export function MetaVente({ site = '', nomSite = '', num = '', numDouble = false
       {etat && etat.mot ? <span className="n-vr-etat" data-vr-etat={etat.cle || ''} aria-label={etat.aria || undefined} role={etat.aria ? 'img' : undefined}>
         <MiniFrise etapes={etat.etapes}/><span className="n-vr-mot" aria-hidden={etat.aria ? 'true' : undefined}>{etat.mot}</span>
       </span> : null}
-      {autres.map((m, i) => <span key={i} className="n-vr-morceau">{m}</span>)}
+      {autres.map((m) => <span key={typeof m === 'string' ? m : m.key} className="n-vr-morceau">{m}</span>)}   {/* un morceau-nœud porte SA clé (« limite ») */}
       {transporteur && transporteur.logo ? <span className="n-vr-logo" data-vt-transporteur={transporteur.cle || ''} title={transporteur.nom || ''}>{transporteur.logo}</span> : null}
     </span>
   );

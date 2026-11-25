@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (25 nov., ventes-rangee — Julien : « c'est atroce, la mise en page est catastrophique ») docs/passation/2026-11-25-ventes-rangee.md
+  { id: 'ventes-rangee-compacte', date: '2026-11-25', titre: 'Ventes : des lignes compactes avec photo', phrase: 'Photo, prix, un seul état, le transporteur entier : sept ventes par écran.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (25 nov., chargement-propre — Julien : « je dois fermer l'app et la rouvrir pour avoir les nouvelles infos ») docs/passation/2026-11-25-chargement-propre.md
   { id: 'maj-sans-relancer', date: '2026-11-25', titre: 'Les nouvelles infos arrivent seules', phrase: 'Vente, e-mail, retour sur l’app : à jour sans la rouvrir.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., chargement-propre — Julien : « quand les données s'affichent c'est moche, long et déstructuré ») même récit

@@ -79,7 +79,7 @@ function RangeeColis({ r, g, Icon, Photo, choisie, onOuvrir }) {
   // « À expédier » est l'onglet lui-même : la rangée ne le répète pas ; elle dit ce qui RESTE à savoir (N° à poser, sans bordereau,
   // la date limite) — chaque morceau entier.
   const morceauxEnv = [!r.num && r.numAttendu ? tr('vn.numAttente') : '', sansBordereau(r) ? tr('vt.sansBordMeta') : '',
-    ech ? <span className="n-vt-limite" data-vt-limite-rangee="" data-vt-ambre={r.echeance && r.echeance.ambre ? '1' : undefined}>{ech}</span> : ''];
+    ech ? <span key="limite" className="n-vt-limite" data-vt-limite-rangee="" data-vt-ambre={r.echeance && r.echeance.ambre ? '1' : undefined}>{ech}</span> : ''];
   return (
     <Rangee
       vignette={vignette(r, Photo, 56)}

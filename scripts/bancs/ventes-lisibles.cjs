@@ -59,7 +59,8 @@ function mesure() {
     const v = r.querySelector('.n-vignette'), t = r.querySelector('.n-rangee-titre');
     return { cle: r.getAttribute('data-vn-rang') || r.getAttribute('data-vn-route'), vig: v ? Math.round(R(v).width) : 0, titreRogne: rogne(t), titre: t ? t.textContent.trim() : '',
       taille: /\b(taille|T)\s?\d{2}/.test(r.textContent), relier: !!r.querySelector('[data-vt-relier]') && vis(r.querySelector('[data-vt-relier]')),
-      achat: (r.querySelector('[data-vt-achat]') || { getAttribute: () => '' }).getAttribute('data-vt-achat'), champ: (!!r.querySelector('[data-vt-prix-champ]') && vis(r.querySelector('[data-vt-prix-champ]'))) || (!!r.querySelector('[data-vt-plus-prix]') && vis(r.querySelector('[data-vt-plus-prix]'))),
+      achat: r.getAttribute('data-vr-achat') || (r.querySelector('[data-vt-achat]') || { getAttribute: () => '' }).getAttribute('data-vt-achat'),
+      balayage: [...r.querySelectorAll('.n-rangee-action')].map((b) => b.textContent.trim()), champ: (!!r.querySelector('[data-vt-prix-champ]') && vis(r.querySelector('[data-vt-prix-champ]'))) || (!!r.querySelector('[data-vt-plus-prix]') && vis(r.querySelector('[data-vt-plus-prix]'))),
       haut: Math.round(R(r).height) };
   });
   const tab = [...document.querySelectorAll('[data-vn="ventes"] [data-tt-ligne], [data-ventes-tableau] [data-tt-ligne]')].filter(vis).map((l) => {
@@ -104,12 +105,18 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
       const vMin = tel ? 52 : 56;
       dit(rangs.length && rangs.every((x) => x.vig >= vMin), `V vignette ≥ ${vMin} px sur chaque vente (mini ${Math.min(...rangs.map((x) => x.vig))})`, rangs.filter((x) => x.vig < vMin).slice(0, 3));
       // H (23 nov., Julien : « moins zoomé ») au téléphone, une rangée de vente tient en 64–80 px (pied « Relier · + prix » compris).
+      // (25 nov., ventes-rangee) 60–104 px : le titre ENTIER sur deux lignes, le prix à droite, une ligne d'état qui peut passer à la ligne
+      // (« sans bordereau · à vérifier ») ; plus de pied « Relier · + prix » (scripts/bancs/ventes-rangee.cjs juge le reste).
       if (tel) { const hs = await pg.evaluate(() => [...document.querySelectorAll('[data-vn-rang]')].filter((e) => e.getClientRects().length).map((e) => Math.round(e.getBoundingClientRect().height)));
-        dit(hs.length > 3 && hs.every((h) => h >= 60 && h <= 80), `H chaque rangée de vente de 60 à 80 px au téléphone (${hs.length} : ${[...new Set(hs)].join(', ')})`, hs.filter((h) => h < 60 || h > 80).slice(0, 8)); }
+        dit(hs.length > 3 && hs.every((h) => h >= 60 && h <= 104), `H chaque rangée de vente de 60 à 104 px au téléphone (${hs.length} : ${[...new Set(hs)].join(', ')})`, hs.filter((h) => h < 60 || h > 104).slice(0, 8)); }
       dit(rangs.length && rangs.every((x) => !x.titreRogne), 'T le titre de chaque vente est entier (rien de rogné)', rangs.filter((x) => x.titreRogne).map((x) => x.titre).slice(0, 4));
       dit(rangs.length && rangs.every((x) => x.taille), 'T la taille est écrite sur chaque rangée', rangs.filter((x) => !x.taille).map((x) => x.titre).slice(0, 4));
       const sansAchat = rangs.filter((x) => tel ? x.achat === 'libre' : x.champ);
-      dit(sansAchat.length > 3 && sansAchat.every((x) => x.relier && x.champ), `G « Relier » et « Prix d'achat » (le champ, ou « + prix » qui l'ouvre) sur la rangée, sans « ⋯ » (${sansAchat.length} rangées)`, rangs.slice(0, 3));
+      // (25 nov., ventes-rangee — Julien : « c'est atroce ») Au téléphone, « Relier » et « Prix d'achat » ne sont plus posés en gros sur
+      // chaque rangée : ils sont au BALAYAGE de la rangée d'une vente sans achat (et seulement d'elle), toujours sans « ⋯ ».
+      if (tel) dit(sansAchat.length > 3 && sansAchat.every((x) => !x.relier && !x.champ && x.balayage.some((a) => /relier/i.test(a)) && x.balayage.some((a) => /prix d/i.test(a))),
+        `G « Relier » et « Prix d'achat » au balayage de chaque vente sans achat, rien de posé sur la rangée (${sansAchat.length} rangées)`, sansAchat.slice(0, 2));
+      else dit(sansAchat.length > 3 && sansAchat.every((x) => x.relier && x.champ), `G « Relier » et « Prix d'achat » (le champ, ou « + prix » qui l'ouvre) sur la rangée, sans « ⋯ » (${sansAchat.length} rangées)`, rangs.slice(0, 3));
       dit(m.stock === 0, `O aucune pilule « stock » posée sur la liste (${m.stock})`);
       dit(m.bords === 0, `O aucune rangée « bordereaux déjà traités » sur la liste (${m.bords})`);
       dit(m.ebay === 0, `O aucun groupe « eBay » au milieu de Ventes (${m.ebay})`);
@@ -129,22 +136,28 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
 
       // P — saisir un prix d'achat sur une rangée sans achat.
       // (23 nov., style-clarte-5) Dans le tableau, le champ s'ouvre au toucher de « + prix » (la même saisie ensuite).
-      await pg.evaluate(() => { const b = [...document.querySelectorAll('[data-vt-plus-prix]')].filter((e) => e.getClientRects().length)[1]; if (b) b.click(); });
+      if (tel) await pg.evaluate(() => { const r = [...document.querySelectorAll('[data-vn-rang][data-vr-achat="libre"]')][1]; const b = r && [...r.querySelectorAll('.n-rangee-action')].find((x) => /prix d/i.test(x.textContent)); if (b) b.click(); });
+      else await pg.evaluate(() => { const b = [...document.querySelectorAll('[data-vt-plus-prix]')].filter((e) => e.getClientRects().length)[1]; if (b) b.click(); });
       await pg.waitForTimeout(300);
-      const cibleP = await pg.evaluate(() => { const vus = [...document.querySelectorAll('[data-vt-prix-champ]')].filter((e) => e.getClientRects().length); const r = vus.length > 1 ? vus[1] : vus[0]; if (!r) return ''; const l = r.closest('[data-vn-rang], [data-tt-ligne]'); return l ? (l.getAttribute('data-vn-rang') || l.getAttribute('data-tt-ligne')) : ''; });
+      const cibleP = await pg.evaluate((tel) => { const vus = [...document.querySelectorAll('[data-vt-prix-champ]')].filter((e) => e.getClientRects().length); const r = tel ? vus[0] : vus.length > 1 ? vus[1] : vus[0]; if (!r) return ''; const l = r.closest('[data-vn-rang], [data-tt-ligne]'); return l ? (l.getAttribute('data-vn-rang') || l.getAttribute('data-tt-ligne')) : ''; }, tel);
       if (cibleP) {
         const sel = tel ? `[data-vn-rang="${cibleP}"]` : `[data-tt-ligne="${cibleP}"]`;
         await pg.locator(`${sel} [data-vt-prix-champ]`).first().fill('24,50');
         await pg.locator(`${sel} [data-vt-prix-champ]`).first().press('Enter');
         await pg.waitForTimeout(1200);
-        const p = await pg.evaluate((s) => { const l = document.querySelector(s); if (!l) return null; const a = l.querySelector('[data-vt-achat]'); return { etat: a ? a.getAttribute('data-vt-achat') : '', texte: a ? a.textContent.trim() : '', champ: !!l.querySelector('[data-vt-prix-champ]') }; }, sel);
-        dit(!!p && p.etat === 'prix' && /24,50/.test(p.texte) && !p.champ, `P « 24,50 » tapé ⇒ « ${p && p.texte} », le champ disparaît`, p);
+        const p = await pg.evaluate((s) => { const l = document.querySelector(s); if (!l) return null; const a = l.querySelector('[data-vt-achat]'); return { etat: a ? a.getAttribute('data-vt-achat') : '', texte: a ? a.textContent.trim() : '', champ: !!l.querySelector('[data-vt-prix-champ]'), vr: l.getAttribute('data-vr-achat') }; }, sel);
+        // (25 nov., ventes-rangee) Au téléphone, le prix posé fait de la vente une vente « au prix connu » (`data-vr-achat="connu"`) : le
+        // champ se referme et « Relier » / « Prix d'achat » quittent son balayage ; « Acheté 24,50 € » se lit dans sa fiche.
+        if (tel) dit(!!p && p.vr === 'connu' && !p.champ, `P « 24,50 » tapé ⇒ la vente a son prix d'achat (${p && p.vr}), le champ disparaît`, p);
+        else dit(!!p && p.etat === 'prix' && /24,50/.test(p.texte) && !p.champ, `P « 24,50 » tapé ⇒ « ${p && p.texte} », le champ disparaît`, p);
       } else dit(false, 'P une rangée avec le champ « Prix d’achat »');
 
       // L — « Relier » ouvre la grille façon Bleam.
-      const cibleL = await pg.evaluate(() => { const r = [...document.querySelectorAll('[data-vt-relier="libre"]')].find((e) => e.getClientRects().length); if (!r) return ''; const l = r.closest('[data-vn-rang], [data-tt-ligne]'); return l ? (l.getAttribute('data-vn-rang') || l.getAttribute('data-tt-ligne')) : ''; });
+      const cibleL = tel ? await pg.evaluate(() => { const r = [...document.querySelectorAll('[data-vn-rang][data-vr-achat="libre"]')][0]; return r ? r.getAttribute('data-vn-rang') : ''; })
+        : await pg.evaluate(() => { const r = [...document.querySelectorAll('[data-vt-relier="libre"]')].find((e) => e.getClientRects().length); if (!r) return ''; const l = r.closest('[data-vn-rang], [data-tt-ligne]'); return l ? (l.getAttribute('data-vn-rang') || l.getAttribute('data-tt-ligne')) : ''; });
       const selL = tel ? `[data-vn-rang="${cibleL}"]` : `[data-tt-ligne="${cibleL}"]`;
-      await pg.locator(`${selL} [data-vt-relier="libre"]`).first().click({ timeout: 8000 }).catch(() => {});
+      if (tel) await pg.evaluate((s) => { const r = document.querySelector(s); const b = r && [...r.querySelectorAll('.n-rangee-action')].find((x) => /relier/i.test(x.textContent)); if (b) b.click(); }, selL);
+      else await pg.locator(`${selL} [data-vt-relier="libre"]`).first().click({ timeout: 8000 }).catch(() => {});
       const vu = await attendre(pg, () => !!document.querySelector('[data-la-grille] [data-la-achat]'), 15000);
       await pg.waitForTimeout(600);
       await pg.screenshot({ path: path.join(SHOTS, `lier-${W}-${th}.png`) });
@@ -165,16 +178,16 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
         await pg.locator('[data-la-oui]').click({ timeout: 5000 }).catch(() => {});
         await attendre(pg, () => !document.querySelector('[data-relier-feuille]'), 8000);
         await pg.waitForTimeout(1200);
-        const apres = await pg.evaluate((s) => { const l = document.querySelector(s); const a = l && l.querySelector('[data-vt-achat]');
+        const apres = await pg.evaluate((s) => { const l = document.querySelector(s); const a = l && l.querySelector('[data-vt-achat]'); const vr = l && l.getAttribute('data-vr-achat');
           const ann = [...document.querySelectorAll('button')].filter((b) => b.getClientRects().length && /^annuler$/i.test(b.textContent.trim()));
-          return { etat: a ? a.getAttribute('data-vt-achat') : '', texte: a ? a.textContent.trim() : '', annuler: ann.length, ferme: !document.querySelector('[data-relier-feuille]') }; }, selL);
+          return { etat: vr ? (vr === 'connu' ? 'relie' : vr) : a ? a.getAttribute('data-vt-achat') : '', texte: vr ? 'achet' : a ? a.textContent.trim() : '', annuler: ann.length, ferme: !document.querySelector('[data-relier-feuille]') }; }, selL);
         await pg.screenshot({ path: path.join(SHOTS, `lier-${W}-${th}-relie.png`) });
         dit(apres.ferme && apres.etat === 'relie' && /achet/i.test(apres.texte), `L « Oui » ⇒ reliée (« ${apres.texte} »)`, apres);
         dit(apres.annuler >= 1, `L le geste s'annule (« Annuler » visible : ${apres.annuler})`);
         if (apres.annuler) {
           await pg.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => x.getClientRects().length && /^annuler$/i.test(x.textContent.trim())); if (b) b.click(); });
           await pg.waitForTimeout(1500);
-          const ann = await pg.evaluate((s) => { const l = document.querySelector(s); const a = l && l.querySelector('[data-vt-achat]'); return a ? a.getAttribute('data-vt-achat') : ''; }, selL);
+          const ann = await pg.evaluate((s) => { const l = document.querySelector(s); const vr = l && l.getAttribute('data-vr-achat'); if (vr) return vr; const a = l && l.querySelector('[data-vt-achat]'); return a ? a.getAttribute('data-vt-achat') : ''; }, selL);
           dit(ann === 'libre', `L « Annuler » ⇒ la vente redevient « à relier » (${ann})`);
         }
       }
