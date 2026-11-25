@@ -195,3 +195,22 @@ html body .v2e-compte select:disabled { opacity: 1; cursor: default; color: inhe
 /* Messages en très grand texte : le segmenté défile avec un fondu (jamais « Favor » rogné net). */
 @layer vrm-v2 {
 }
+
+/* ── (24 nov., visuel-argent — « toute l'application visuelle ») La rangée en pièce d'inventaire ───────────────────────
+   À gauche la tuile de la PAIRE (src/natif/Jeu.jsx `TuilePaire`, 56 px), l'avatar du COMPTE posé sur son coin bas-droit ;
+   le non-lu : un point calme à l'ardoise, fixe (jamais clignotant, jamais orange) ; l'offre : une pastille icône + prix. */
+.v2m-tuile { position: relative; flex: none; width: 56px; height: 56px; align-self: flex-start; margin-top: 2px; }
+.v2m-tuile .n-tuile-paire { width: 56px; height: 56px; }
+.v2m-compte-av { position: absolute; right: -5px; bottom: -5px; z-index: 3; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--n-accent, #3D4B5B); color: var(--n-sur-accent, #FFFFFF); font: 700 11px/1 var(--n-police, system-ui); letter-spacing: 0;
+  box-shadow: 0 0 0 2px var(--v2-carte, #FFFFFF); }
+:root[data-theme="dark"] .v2m-compte-av { color: #16181D; }
+.v2m-carte > .v2m-ligne + .v2m-ligne::before { left: 100px; }
+.v2m-point { left: 9px; top: 50%; width: 9px; height: 9px; margin-top: -4.5px; }
+.v2m-ligne.is-nonlu .v2m-point { background: var(--n-accent, #3D4B5B); box-shadow: 0 0 0 3px color-mix(in srgb, var(--n-accent, #3D4B5B) 16%, transparent); }
+.v2m-ligne.is-nonlu.is-ro .v2m-point { background: var(--v2-muet); box-shadow: none; }
+.v2m-puce-offre { display: inline-flex; align-items: center; gap: 4px; min-height: 24px; padding: 0 9px 0 7px; border-radius: 999px;
+  background: color-mix(in srgb, var(--n-accent, #3D4B5B) 10%, transparent); color: var(--n-encre, #1D1D1F); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2m-puce-offre svg { flex: none; color: var(--n-accent, #3D4B5B); }
+:root[data-theme="dark"] .v2m-puce-offre { background: rgb(244 244 245 / .12); color: #F4F4F5; }
+:root[data-theme="dark"] .v2m-puce-offre svg { color: #F4F4F5; }

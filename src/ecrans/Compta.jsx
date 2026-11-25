@@ -62,6 +62,10 @@ import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiff
 import { questionsArgent } from '../argent.js';
 import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) le nouveau design, en essai
 import ArgentMoisV2Vue from '../natif/ecrans/ArgentMois.jsx';
+import { JaugesSeuils, AVenirCartes } from '../natif/ecrans/ArgentVisuel.jsx';   // (24 nov., visuel-argent) seuils en jauges, à venir en cartes
+import { useObjectifMois } from '../App.jsx';
+import { progressionObjectif } from '../objectifMois.js';
+import { valeurObjectif } from '../design/carteChiffres.js';
 import { useOrdinateur, Carte as NCarte, Rangee as NRangee, Bouton as NBouton } from '../natif/index.js';
 import '../natif/ecrans/argent.css';   // (20 nov., lot argent-natif) Mois au style natif §2 bis
 import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : déclarer, ventes sans prix d'achat   // (17 nov., phase 2) Argent · Mois
@@ -3881,7 +3885,12 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
       const nAD = AD && AD.parMois && typeof AD.parMois === 'object' ? (Number(AD.parMois[ym]) || 0) : 0;
       const finM = new Date(de.getFullYear(), de.getMonth() + 1, 1).getTime();
       const dansPeriode = !!(AD && !AD.parMois && Number(AD.n) > 0 && Number(AD.de) < finM && Number(AD.a) >= de.getTime());
-      out.push({ cle: ym, l: de.toLocaleDateString(localeCourante(), { month: 'narrow' }), long: de.toLocaleDateString(localeCourante(), { month: 'long', year: 'numeric' }), v: R.valeur == null || (R.valeur === 0 && !R.partiel && (nAD > 0 || dansPeriode)) ? null : R.valeur, partiel: !!R.partiel || (R.valeur != null && (nAD > 0 || dansPeriode)), aDater: nAD, courant: k === 0 });
+      // (24 nov., visuel-argent — « rien lu ne vaut pas rien », §5) Un mois passé à 0 € n'est un VRAI zéro que si l'historique
+      // lu le couvre : une vente lue AVANT ce mois (la règle `couvert` de `valeurObjectifMois`, src/design/carteChiffres.js).
+      // Sinon l'historique commence peut-être après : « — » et une piste vide, jamais « 0 € ».
+      const couvert = k === 0 || !!(S.vendu && Array.isArray(S.vendu.lignes) && S.vendu.lignes.some((l) => Number(l.ts) < de.getTime()));
+      const zeroNonCouvert = k > 0 && R.valeur === 0 && !couvert;
+      out.push({ cle: ym, l: de.toLocaleDateString(localeCourante(), { month: 'narrow' }), long: de.toLocaleDateString(localeCourante(), { month: 'long', year: 'numeric' }), v: R.valeur == null || zeroNonCouvert || (R.valeur === 0 && !R.partiel && (nAD > 0 || dansPeriode)) ? null : R.valeur, partiel: !!R.partiel || (R.valeur != null && (nAD > 0 || dansPeriode)), aDater: nAD, courant: k === 0, couvert });
       // ⚠️ « au moins 0 € » ne se dit jamais (§5) : un mois à 0 € reçu dont des ventes sont à dater se dit « — · N à dater ».
     }
     return out;
@@ -3949,7 +3958,25 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     lignes: lignesV.slice(0, MAX).map((l) => ({ id: l.id, num: l.num, titre: l.titre, plateforme: l.plateforme, montant: l.montant, date: jour(l.ts), ...coutDe(l.id),
       onClick: () => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: String(l.num) })); } catch (_) {} } })),
   };
+  // (24 nov., visuel-argent) L'OBJECTIF DU MOIS : la règle de la carte des chiffres (`valeurObjectif` puis
+  // `progressionObjectif`, src/objectifMois.js) — la même que Statistiques. Pas d'objectif ⇒ rien.
+  const [objM] = useObjectifMois();
+  const progO = objM ? progressionObjectif(objM, valeurObjectif(objM, S, REGLES_CARTE)) : null;
+  const objectif = !objM ? { etat: 'aucun' } : !progO || progO.pct == null ? { etat: 'passu', type: objM.type, cible: objM.valeur }
+    : { etat: 'lu', type: objM.type, cible: objM.valeur, valeur: progO.valeur, pct: progO.pct, partiel: !!progO.partiel, atteint: !!progO.atteint };
+  // LES SEUILS DE L'ANNÉE : `jaugeSeuils` sur la ligne publiée (datée au VERSEMENT), le régime CHOISI seulement (micro) ;
+  // un régime pas choisi ⇒ aucune jauge (jamais deviné, §5).
+  const regime = useRegimeFiscal();
+  const [activite] = useLigneSynchro('vrm_micro_options', lireActiviteMicro);
+  const now = new Date();
+  const jauge = React.useMemo(() => (S.ligneUrssaf ? jaugeSeuils({ ligne: S.ligneUrssaf, now, activite: activite || 'vente' }) : null), [S.ligneUrssaf, activite]); // eslint-disable-line react-hooks/exhaustive-deps
+  const seuils = regime === 'micro' && seuilsDe(now.getFullYear(), activite || 'vente')
+    ? <JaugesSeuils J={jauge} annee={now.getFullYear()} montant={somme} etat={S.ligneUrssaf === undefined ? 'encours' : 'lu'}/> : null;
+  // L'ARGENT À VENIR : la règle de la coque (`liveStats.aVenir`), une carte par étape ; toucher ouvre son écran.
+  const aV = (liveStats || liveCoque) ? (liveStats || liveCoque).aVenir : null;
+  const avenir = <AVenirCartes A={aV} montant={somme} onOuvrir={ouvrirArgentAVenir} Icon={Icon}/>;
   return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme} note={qR.note || ''} comptes={comptesV} onPasSu={() => { if (onNav) onNav('ventes'); }}
+    objectif={objectif} seuils={seuils} avenir={avenir}
     vendu={qV ? { valeur: qV.valeur, partiel: qV.partiel, note: qV.note, onClick: () => { if (onNav) onNav('stats'); } } : null}/>;
 }
 // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater, cela n'a aucun sens.
