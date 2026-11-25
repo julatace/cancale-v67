@@ -3249,6 +3249,12 @@ function vrmVerifVisible(sel) {
         void chrome.runtime.lastError;
         listesEnVol = false;
         if (r && r.ok) { listes = r; listesAt = Date.now(); } else listesErreur = 'L’extension n’a pas répondu. Réessaie dans un instant.';
+        // 5.440.4 : la feuille du prix ouverte par le lien de l'app ne garde que les annonces du compte de l'onglet (lues) ;
+        //    aucune ⇒ elle se ferme (le lien d'une paire d'un autre compte n'ouvre rien). Une liste vide ne décide rien.
+        if (r && r.ok && geste6 && geste6.k === 'prix' && geste6.lien && !geste6.aa) {
+          const ts = (r.annonces && Array.isArray(r.annonces.toutes)) ? r.annonces.toutes : [];
+          if (ts.length) { geste6.ids = geste6.ids.filter((id) => ts.some((x) => x.id === id)); if (!geste6.ids.length) { geste6 = null; geste6Etat = null; } }
+        }
         // 5.410.2 : le dressing de CE compte est en relecture (budget de lecture, compte de l'onglet, une requête à la
         // fois — `retourSurVinted` du fond) ⇒ la liste est redemandée seule quand elle a eu le temps d'arriver (3 fois au
         // plus) : ses annonces redeviennent « En vente » sans geste.
@@ -6962,7 +6968,10 @@ function vrmVerifVisible(sel) {
     if ((lienPanneau.action === 'masquer' || lienPanneau.action === 'afficher') && lienPanneau.ids.length && lienPanneau.ids.length <= 10) annConfirme = { k: lienPanneau.action, ids: lienPanneau.ids.slice() };
     // 5.432 (`prixpartout`) : « Changer le prix » d'une paire depuis l'app ⇒ la feuille du prix s'ouvre sur elle (ses autres
     //    sites lus par identité, « sur tous les sites » coché d'office) ; rien ne part avant SON « Lancer ».
-    else if (lienPanneau.action === 'changer' && lienPanneau.page === 'annonces' && lienPanneau.ids.length && lienPanneau.ids.length <= 20) { geste6 = { k: 'prix', ids: lienPanneau.ids.slice(0, 20), prix: {} }; annActionPre = 'baisser'; }
+    // 5.440.4 (25 nov.) : « Baisser » / « Remettre les prix » aussi — avant, l'action n'était que PRÉ-CHOISIE dans le menu, et
+    //    re-choisir l'option déjà choisie ne déclenche rien : il fallait passer par une autre option. La feuille du prix
+    //    s'ouvre donc sur la paire, comme « Changer » ; rien ne part avant SON « Revoir » puis « Lancer ».
+    else if ((lienPanneau.action === 'changer' || lienPanneau.action === 'baisser' || lienPanneau.action === 'remettre') && lienPanneau.page === 'annonces' && lienPanneau.ids.length && lienPanneau.ids.length <= 20) { geste6 = { k: 'prix', ids: lienPanneau.ids.slice(0, 20), prix: {}, lien: true }; annActionPre = 'baisser'; }
     else if (ACTION_MENU[lienPanneau.action]) annActionPre = ACTION_MENU[lienPanneau.action];
     if (lienPanneau.page === 'favoris' && lienPanneau.ids.length === 1) filtreAnnonce = lienPanneau.ids[0];
     if (lienPanneau.action === 'vacances') hote.setAttribute('data-lien-vacances', '');   // 5.420 : la section « Mode vacances » de Paramètres

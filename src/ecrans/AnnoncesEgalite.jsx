@@ -37,7 +37,7 @@ import { annuaireLbc } from '../plateformes.js';
 import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
   annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, lireVentesEmail, photoKey, STUDIO_BASE } from '../App.jsx';
-import { ouvrirPanneau } from '../ouvrirPanneau.js';
+import { ouvrirPanneau, panneauEnRetard } from '../ouvrirPanneau.js';
 // (22 nov., choix n° 35) « Photo en double » : la règle d'identité par le FICHIER photo exact (src/photoEnDouble.js).
 import { photosEnDouble, numerosEnExemplaires, refuserGroupe, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
 import PhotoEnDouble from '../natif/ecrans/PhotoEnDouble.jsx';
@@ -46,7 +46,7 @@ import { republierEnPriorite, lireReglagePrio, publierPriorite, CLE_SEUIL_DORMEN
 import RepublierPriorite, { usePrioSelection, PleinRepublier } from '../natif/ecrans/RepublierPriorite.jsx';
 import { comptesPersonnels, CLE_ROLES_COMPTES } from '../rolesComptes.js';
 import { enLitigeConnus, abonnerLitiges } from '../litigesEnCours.js';
-import { ACTIONS_EXTENSION } from '../actionsExtension.js';
+import { ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from '../actionsExtension.js';
 import { plusVue, joursPlusVue, CLE_PLUS_VUE_JOURS } from '../plusVue.js';   // (22 nov., choix 27) « Plus vue depuis N j »
 import { lireRelevesEnLigne } from '../plusVueLecture.js';
 import { lireSupprimes } from '../comptesSupprimes.js';   // (21 nov.) un compte supprimé pour de bon n'est jamais relu   // (20 nov.) la pause Leboncoin : dans l'extension
@@ -428,6 +428,8 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     pour: (a) => (A.tousSites ? !!a.numero && a.annonces.some((x) => x.etat === 'enligne') : (() => { const v = vintedDe(a); return !!v && A.etats.includes(v.etat); })()),
     juger: (sel) => {
       if (!sel.length) return { ok: false, raison: tr('egalite.selection.aucune') };
+      // (25 nov., e2e-extension-vert) Un geste du panneau, et l'extension d'ici ne sait pas ouvrir le panneau : fermé, dit.
+      if (PANNEAU_DE_SELECTION[A.cle] && panneauEnRetard()) return { ok: false, raison: panneauEnRetard() };
       if (A.robot) { const c = new Set(sel.map((a) => (vintedDe(a) || {}).compte)); if (c.size > 1) return { ok: false, raison: tr('egalite.action.vintedSeul') }; }
       return { ok: true };
     },
@@ -444,7 +446,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     // (20 nov., décision de Julien) La pause Leboncoin se fait dans le panneau de l'extension, sur leboncoin.fr.
     { cle: 'pauseLbc', libelle: tr('actionsExt.pause'), icone: 'archive', phrase: tr('actionsExt.phrase', { site: 'Leboncoin' }),
       pour: (a) => lbcEnLigne(a).length > 0,
-      juger: (sel) => (!sel.length ? { ok: false, raison: tr('egalite.selection.aucune') } : { ok: true }) });
+      juger: (sel) => (!sel.length ? { ok: false, raison: tr('egalite.selection.aucune') } : panneauEnRetard() ? { ok: false, raison: panneauEnRetard() } : { ok: true }) });
   const pauserLbc = (choisis) => {
     const ids = choisis.flatMap((a) => lbcEnLigne(a).map((x) => String(x.id)));
     if (!ids.length) return;

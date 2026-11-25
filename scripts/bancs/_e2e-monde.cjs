@@ -209,6 +209,24 @@ function monde({ tls, port, dist, comptes, journal }) {
     // Le dressing d'un membre : la page (une SPA, comme Vinted) charge ses annonces.
     const mb = /^\/member\/(\d+)/.exec(p);
     if (mb) return rep(res, 200, PAGE('Dressing').replace('</main>', `</main><script>fetch('/api/v2/wardrobe/${mb[1]}/items?page=1&per_page=20&order=relevance',{credentials:'include',headers:{'x-banc-site':'1'}});</script>`));
+    // (25 nov., e2e-extension-vert) La page « Modifier » d'une annonce, à la forme que le VRAI vrm-formulaire.js lit (depuis la
+    // 5.414 l'extension n'envoie plus aucune écriture : elle TAPE le prix et touche « Enregistrer », c'est la PAGE qui envoie
+    // SA requête — `#price`, `upload-form-save-button`, comme scripts/bancs/interface-vinted.cjs). Le prix montré est celui
+    // de Vinted ; le corps envoyé est celui de la page (aucun `x-banc-site` : c'est le geste de l'extension).
+    const ed = /^\/items\/(\d+)\/edit$/.exec(p);
+    if (ed && m === 'GET') {
+      const uidC = cookieUid(req), c0 = uidC && comptes[uidC];
+      const a = c0 && (c0.annonces || []).find((x) => String(x.id) === ed[1]);
+      if (!a) return rep(res, 200, PAGE('Annonce introuvable'));
+      const prixTxt = String(st.prix[a.id]).replace('.', ',');
+      return rep(res, 200, PAGE('Modifier').replace('</main>', `<form id="f" onsubmit="return false"><input id="title" value="${a.titre}"><input id="price" inputmode="decimal" value="${prixTxt}"><button type="button" data-testid="upload-form-save-button">Enregistrer</button></form></main><script>
+document.querySelector('[data-testid=upload-form-save-button]').addEventListener('click', () => {
+  const amount = document.getElementById('price').value.replace(/[\\s€]/g, '').replace(',', '.');
+  fetch('/api/v2/item_upload/items/${a.id}', { method: 'PUT', credentials: 'include', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ item: { id: ${a.id}, title: document.getElementById('title').value, description: 'Très bon état', price: { amount, currency_code: 'EUR' }, catalog_id: 1234, assigned_photos: [{ id: ${a.id * 10}, orientation: 0 }] } }) });
+});
+</script>`));
+    }
     if (!p.startsWith('/api/')) return rep(res, 200, PAGE(p === '/' ? 'Accueil' : p.split('/')[1] || 'Vinted'));
     const uidCookie = cookieUid(req);
     const e = { m, p, q: url.search, uid: uidCookie, auth: !!req.headers.authorization, origine: String(req.headers.origin || req.headers.referer || ''), mode: String(req.headers['sec-fetch-mode'] || '') + '/' + String(req.headers['sec-fetch-site'] || ''), corps: corps || '', t: Date.now() };
