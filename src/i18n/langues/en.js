@@ -23,6 +23,7 @@ import ecran_file_actions from './en/fileActions.js';   // (21 nov., ext. 5.433)
 import ecran_a_distance from './en/aDistance.js';   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './en/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
 import ecran_styleClarte from './en/styleClarte.js';
+import ecran_moinsTexte from './en/moinsTexte.js';
 import ecran_revueUx from './en/revueUx.js';   // (23 nov.) revue UX   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './en/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './en/ext5438.js';   // (22 nov.) ext. 5.438
@@ -2425,6 +2426,7 @@ export default {
   ...ecran_a_distance,
   ...ecran_apresFinale,
   ...ecran_styleClarte,
+  ...ecran_moinsTexte,
   ...ecran_revueUx,
   ...ecran_relier_retires,
   ...ecran_fiched,

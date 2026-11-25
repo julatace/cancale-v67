@@ -47,7 +47,7 @@ export default {
   "v2.af.titre": "Colis",
   "v2.af.rienEnvoyer": "rien à envoyer",
   "v2.af.rienRetirer": "rien à retirer",
-  "v2.af.toutesStats": "Toutes les statistiques",
+  "v2.af.toutesStats": "Statistiques",
   "v2.af.toutesStatsSous": "Pilotage et finances, sur 7, 30 ou 90 jours",
   "v2.perso.carte.colis": "Colis",
   "v2.perso.phrase.colis": "À envoyer et à retirer, d’un coup d’œil",
