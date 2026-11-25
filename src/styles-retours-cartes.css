@@ -91,10 +91,9 @@
 /* Le n° de suivi : une ligne discrète (logo · n°), un toucher = copié */
 :root body .vrm-rt-suivi { display: flex; align-items: center; gap: 6px; margin-top: 2px; min-width: 0; }
 :root body .vrm-rt-logo { display: inline-flex; flex: none; }
-:root body .vrm-rt button.vrm-rt-copier { appearance: none; -webkit-appearance: none; border: 0; background: none; margin: 0; padding: 0 2px; min-height: 36px; height: auto; box-shadow: none;
+:root body .vrm-rt button.vrm-rt-copier { appearance: none; -webkit-appearance: none; border: 0; background: none; margin: 0; padding: 0 2px; min-height: 44px; height: auto; box-shadow: none;
   display: inline-flex; align-items: center; gap: 6px; font: 500 12px/16px var(--n-police, system-ui, sans-serif); color: var(--n-encre-2, #50535B); font-variant-numeric: tabular-nums;
   letter-spacing: .02em; cursor: pointer; min-width: 0; overflow-wrap: anywhere; text-align: left; }
-@media (pointer: coarse) { :root body .vrm-rt button.vrm-rt-copier { min-height: 44px; } }
 :root body .vrm-rt button.vrm-rt-copier:focus-visible { outline: 2px solid var(--n-encre, #1D1D1F); outline-offset: 2px; border-radius: 6px; }
 :root body .vrm-rt button.vrm-rt-copier svg { flex: none; opacity: .7; }
 
@@ -168,3 +167,4 @@
   text-decoration-color: color-mix(in srgb, currentColor 55%, transparent) !important; }
 :root body .vrm-rt .vrm-rt-verif-sous .vrm-rt-geste.is-lien .n-bouton { margin-block: -12px !important; font-size: 12px !important; text-underline-offset: 3px !important; }
 :root body .vrm-rt .vrm-rt-geste.is-lien .n-bouton[aria-pressed="true"] { text-decoration-color: currentColor !important; }
+:root body .vrm-rt-et > span + span { margin-top: -4px; }

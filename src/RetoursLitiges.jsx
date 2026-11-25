@@ -195,7 +195,8 @@ function EtapesRetour({ c, courte = false }) {
           <li key={e.cle} className={'vrm-rt-et is-' + e.etat + (e.implicite ? ' is-implicite' : '')} data-retour-et={e.cle} data-retour-et-etat={e.etat} data-retour-et-implicite={e.implicite ? '1' : '0'} aria-current={e.etat === 'ici' ? 'step' : undefined}>
             <i aria-hidden="true">{e.etat === 'fait' ? COCHE : null}</i>
             <b className={courte ? 'vrm-sr-seul' : undefined}>{lib}</b>
-            {det ? <span className={detVu ? undefined : 'vrm-sr-seul'} data-retour-et-detail="">{partiel ? tr('renv.et.partiel', { montant: det }) : det}{det2 ? <><br/>{det2}</> : null}</span> : null}
+            {det ? <span className={detVu ? undefined : 'vrm-sr-seul'} data-retour-et-detail="">{partiel ? tr('renv.et.partiel', { montant: det }) : det}</span> : null}
+            {det && det2 ? <span className={detVu ? undefined : 'vrm-sr-seul'}>{det2}</span> : null}
           </li>);
       })}
     </ol>
@@ -295,7 +296,7 @@ export function CarteRenvoyer({ c, onImprimer, onPreparer = null, onDepose = nul
   // de la phrase courte, dans une carte en cours (elle ne passe plus seule à la ligne sous le titre).
   const droite = e.droite ? <span className="vrm-rt-droite" {...(e.bande ? { 'data-retour-bande-sous': '' } : {})} {...(e.cle === 'depassee' ? { 'data-retour-phrase-limite': '' } : {})}>{e.droite}</span> : null;
   const ligneEtat = (avecDroite) => (
-    <span className={'vrm-rt-etat is-' + ton} {...(e.bande ? { 'data-retour-bande': e.bande } : {})}>
+    <span className={'vrm-rt-etat is-' + ton} {...(e.bande && avecDroite ? { 'data-retour-bande': e.bande } : {})}>
       <i className="vrm-rt-point" aria-hidden="true" data-retour-tag={e.tag}/>
       <b>{e.titre}</b>
       {avecDroite ? droite : null}
@@ -343,8 +344,11 @@ export function CarteRenvoyer({ c, onImprimer, onPreparer = null, onDepose = nul
           <span className="vrm-ret-meta vrm-rt-meta">{c.num ? <span className="vrm-rt-num" data-retour-plaque=""><small>N°</small>{c.num}</span> : null}{meta ? <span>{meta}</span> : null}</span>
         </div>
       </div>
-      {ligneEtat(false)}
-      {phrase(true)}
+      {/* L'état et sa phrase : un bloc (la « bande » d'avant : `data-retour-bande` porte l'état ET sa date). */}
+      <div className="vrm-rt-bloc-etat" {...(e.bande ? { 'data-retour-bande': e.bande } : {})}>
+        {ligneEtat(false)}
+        {phrase(true)}
+      </div>
       {!compact ? <EtapesRetour c={c} courte/> : null}
       {!compact ? <LigneSuiviRetour c={c}/> : null}
       {actions}

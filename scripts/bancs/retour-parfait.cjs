@@ -297,6 +297,8 @@ const dernierPdf = async (pg, viaPartage) => {
         await pg.goto(`http://localhost:${PORT}/?tab=achats`, { waitUntil: 'domcontentloaded' });
         await pg.waitForSelector(`[data-retours-achat] [data-retour-achat="${TXA}"][data-retour-etape="rembourse"]`, { timeout: 40000 }).catch(() => {});
         await pg.waitForTimeout(1000);
+        // (25 nov., achats-retours-design) Un retour remboursé est une rangée REPLIÉE : son toucher la déplie (frise, n°, gestes).
+        await pg.evaluate(() => document.querySelectorAll('[data-retours-achat] details.vrm-rt-fini').forEach((d) => { d.open = true; }));
         a = await carte(pg, '[data-retours-achat]', TXA);
         dit(a && a.etape === 'rembourse' && a.etapes.every((e) => e.etat === 'fait') && /^34,32\s€$/.test(a.etapes[4].det), `${nom} : livré puis remboursé ⇒ toutes les étapes cochées, « Remboursé · ${a && a.etapes[4] && a.etapes[4].det} »`, JSON.stringify(a && a.etapes));
         await pg.locator(`[data-retours-achat] [data-retour-achat="${TXA}"]`).first().screenshot({ path: path.join(SHOTS, `retour-parfait-rembourse-${suff}.png`) }).catch(() => {});
