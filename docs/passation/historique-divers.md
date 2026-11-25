@@ -2256,3 +2256,9 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1381)
 - **24 nov. · Parcours iPhone (`claude/parcours-iphone`, APRÈS #1326)** : un robot joue sa journée au doigt (banc `parcours-iphone`, WebKit dans `iphone-webkit.yml`) ; corrigés : le code au comptoir que le « retour » ne fermait pas (VRM quitté), « Colis mondial_relay » dans la loupe ; rapportés : sauts d'Achats/Argent/loupe (données lues après). `2026-11-24-parcours-iphone.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1369)
+- **24 nov. · À retirer parfait (`claude/retrait-parfait`, après #1341, #1351, #1326)** : le COMPTOIR d'un point (toucher un code : tous ses colis à glisser, code énorme et QR max sur blanc, « Retiré » / Annuler, écran allumé, retour, hors ligne), ouverture calculée sur les horaires lus, date lue par colis, « à vérifier » + un geste ; rappel exact (heure limite lue seule). `2026-11-24-retrait-parfait.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1369)
+- **24 nov. · Audit boutons, 2ᵉ passe** : retour piégé après « Relier eBay », rond « Retrouver » sur les segments eBay, 2 exceptions du robot. `2026-11-23-audit-boutons-2.md`. Geste : aucun.
