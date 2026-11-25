@@ -5,12 +5,13 @@ require('./_porte-banc.cjs');
 //    · essai J-5 : la page dit « Encore 5 jours », la coque se tait ;
 //    · essai J-3 et J-1 : une ligne discrète dans la coque (« dans 3 jours »,
 //      « demain »), qui ouvre l'abonnement et se ferme pour la journée ;
-//    · sans abonnement (Julien, 8 nov. : « un extrait de ses données, le reste
-//      flouté ») : sur Ventes, Colis, Annonces… (données du mode exemple), les
-//      3 premières lignes de chaque liste NETTES, la 4e et la suite FLOUTÉES,
-//      `inert` et `aria-hidden`, ni sélectionnables ; une carte nette « Ton
-//      abonnement a pris fin » ; tout clic dans l'écran est arrêté ; AUCUNE
-//      écriture n’atteint la base ; la sauvegarde complète est fermée (l’export de ses données reste ouvert) ;
+//    · sans abonnement (Julien, 8 nov., puis 25 nov. : « Il voit 5 ventes et 5
+//      annonces ») : sur Ventes et Annonces (données du mode exemple), les 5
+//      premières lignes NETTES, la suite FLOUTÉE ; ailleurs 3 par liste ; `inert`
+//      et `aria-hidden`, ni sélectionnables ; UNE carte là où le flou commence
+//      (compteur lu, séquence, prix, « Débloquer tout ») ; tout clic dans l'écran
+//      ramène à elle ; AUCUNE écriture n’atteint la base ; l'essai gratuit est net ;
+//      le retour de Stripe défloute sur place ;
 //    · expiré sans la 027 : l'ancienne porte (jamais une app vide) ;
 //    · actif · résilié · impayé · Stripe absent : chacun son état, aucun
 //      bouton qui mènerait nulle part quand Stripe n'est pas branché ;
@@ -70,11 +71,11 @@ async function exemple() {
 // voit d'abord Ma configuration puis le parcours d'arrivée en plein écran : les essais d'un vendeur EN COURS
 // d'abonnement (J-5, J-3, J-1, résilier…) sont joués par un vendeur qui a déjà fait sa configuration (la forme
 // réelle d'un abonné depuis plusieurs jours) ; le compte neuf a son propre essai (« le compte neuf voit l'offre »).
-async function ouvrir(nav, { abo, tab = 'settings', largeur = 1512, sombre = false, vue = 'abonnement', parrain = PARRAIN, donnees = false, nouveau = false }) {
+async function ouvrir(nav, { abo, tab = 'settings', largeur = 1512, sombre = false, vue = 'abonnement', parrain = PARRAIN, donnees = false, nouveau = false, suite = '', reduit = false }) {
   const ex = donnees ? await exemple() : null;
   const SESSION = ex ? { ...SESSION_BANC, user: { ...SESSION_BANC.user, id: ex.uid } } : SESSION_BANC;
   const mobile = largeur < 600;
-  const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, colorScheme: sombre ? 'dark' : 'light' });
+  const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, colorScheme: sombre ? 'dark' : 'light', reducedMotion: reduit ? 'reduce' : 'no-preference' });
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   await pg.addInitScript(({ s, vue, sombre, nouveau }) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_mfa_plus_tard_' + s.user.id, String(Date.now())); if (vue) localStorage.setItem('vrm_reglages_vue', vue); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); if (!nouveau) { localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at: '2026-11-01T10:00:00.000Z', statut: null, version: 1 })); localStorage.setItem('vrm_parcours_plus_tard', (() => { const t = new Date().toISOString(); return JSON.stringify({ extension: t, emails: t, vinted: t, premiere: t, configuration: t }); })()); } } catch (_) {} }, { s: SESSION, vue, sombre, nouveau });
@@ -104,13 +105,13 @@ async function ouvrir(nav, { abo, tab = 'settings', largeur = 1512, sombre = fal
   const appels = [];
   await pg.route('**/api/**', (r) => {
     const u = r.request().url();
-    if (/mode=abonnement/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(abo) });
+    if (/mode=abonnement/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(typeof abo === 'function' ? abo() : abo) });
     if (/mode=factures/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FACTURES) });
     if (/mode=parrainage/.test(u)) { appels.push({ mode: 'parrainage', m: r.request().method(), corps: r.request().postData() || '' }); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(parrain) }); }
-    if (/mode=(checkout|portail)/.test(u)) { appels.push({ mode: /checkout/.test(u) ? 'checkout' : 'portail' }); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: 'https://billing.stripe.com/p/session/banc' }) }); }
+    if (/mode=(checkout|portail)/.test(u)) { appels.push({ mode: /checkout/.test(u) ? 'checkout' : 'portail', corps: r.request().postData() || '' }); return r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Paiement de banc : rien ne part.' }) }); }
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
   });
-  await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/?tab=${tab}${suite}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(3800);
   // (12 nov.) Machine lente : la page Abonnement peut encore dire « Je regarde… » à 3,8 s — on attend
   // qu'elle ait LU son état (10 s au plus), jamais un délai de plus à l'aveugle.
@@ -169,57 +170,92 @@ const capture = (pg, nom) => pg.screenshot({ path: path.join(CAPTURES, nom + '.p
     });
 
     }
-    console.log('\n── L’expiration : un aperçu net, le reste flouté, aucune action');
+    console.log('\n── Sans abonnement (25 nov.) : 5 ventes et 5 annonces nettes, le reste flouté, UNE carte, aucune action');
     const lireApercu = (pg, tab) => pg.evaluate((tab) => {
       const r = document.querySelector('[data-attente-ecran="' + tab + '"]');
       if (!r) return null;
       const fl = [...r.querySelectorAll('[data-apercu-floute]')];
-      // Une liste « extrait » : ses 3 premières lignes nettes, la 4e floutée.
+      const vis = (e) => e.getClientRects().length > 0;
+      // Les lignes jugées par la RÈGLE (data-*), jamais par un libellé : nettes, et lignes floutées VISIBLES.
+      const nettes = [...r.querySelectorAll('[data-apercu-nette]')].filter(vis);
+      const debut = r.querySelector('[data-apercu-debut]');
+      // Une liste « extrait » d'un autre écran : ses 3 premières lignes nettes, la 4e floutée.
       const listes = [...r.querySelectorAll('*')].filter((e) => e.children.length >= 4 && e.children[3].hasAttribute('data-apercu-floute'));
       const extrait = listes.filter((e) => [0, 1, 2].every((i) => !e.children[i].hasAttribute('data-apercu-floute') && !e.children[i].closest('[data-apercu-floute]')));
-      extrait.sort((x, y) => (y.innerText || '').length - (x.innerText || '').length);
       const echantillon = fl.map((e) => (e.innerText || '').trim()).find((t) => t.length > 6) || '';
-      const nettes = extrait[0] ? [0, 1, 2].map((i) => (extrait[0].children[i].innerText || '').trim().slice(0, 40)) : [];
       const s = fl[0] ? getComputedStyle(fl[0]) : null;
       document.getSelection().removeAllRanges();
       const plage = document.createRange(); plage.selectNodeContents(r); document.getSelection().addRange(plage);
       const choisi = document.getSelection().toString(); document.getSelection().removeAllRanges();
+      const carte = document.querySelector('[data-carte-apercu]');
+      const porteur = carte && carte.closest('[data-apercu-garde]');
+      // La carte est là où le flou commence : juste avant la 1re ligne floutée (dans le fil), ou posée sur elle
+      // (liste virtuelle), sinon juste après la dernière ligne nette.
+      let place = 'ailleurs';
+      if (porteur && debut) {
+        const pr = porteur.getBoundingClientRect(), dr = debut.getBoundingClientRect();
+        if (porteur.nextElementSibling === debut || Math.abs(pr.top - dr.top) < 2) place = 'debut-du-flou';
+      } else if (porteur && nettes.length) {
+        const der = nettes[nettes.length - 1]; if (der.nextElementSibling === porteur || (porteur.compareDocumentPosition(der) & Node.DOCUMENT_POSITION_PRECEDING)) place = 'apres-les-nettes';
+      }
+      const dessus = (() => { if (!carte) return false; const b = carte.querySelector('[data-apercu-debloquer]'); if (!b) return false; b.scrollIntoView({ block: 'center' }); const x = b.getBoundingClientRect(); const d = document.elementFromPoint(x.left + x.width / 2, x.top + x.height / 2); return !!d && (d === b || b.contains(d)); })();
       return {
-        apercu: r.hasAttribute('data-apercu'), floutes: fl.length, listes: listes.length, extraits: extrait.length, nettes,
+        apercu: r.hasAttribute('data-apercu'), floutes: fl.length, nettes: nettes.length, nettesPhoto: nettes.filter((e) => e.querySelector('img, [class*="photo"], [class*="vignette"]')).length,
+        debut: !!debut, place, listes: listes.length, extraits: extrait.length,
+        nettesTexte: nettes.slice(0, 5).map((e) => (e.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 30)),
         inertes: fl.every((e) => e.hasAttribute('inert') && e.getAttribute('aria-hidden') === 'true'),
         flou: s ? s.filter : '', selection: s ? (s.userSelect || s.webkitUserSelect) : '',
         echantillon: echantillon.slice(0, 30), copiable: !!echantillon && choisi.includes(echantillon.slice(0, 12)),
-        carte: (document.querySelector('[data-carte-apercu]') || {}).innerText || '',
+        cartes: document.querySelectorAll('[data-carte-apercu]').length, carte: carte ? carte.innerText : '', boutonLibre: dessus,
+        boutons: carte ? [...carte.querySelectorAll('button')].map((b) => b.innerText.trim()).filter(Boolean) : [],
+        compteur: carte ? carte.hasAttribute('data-apercu-compteur') : false, anim: !!(carte && carte.querySelector('[data-apercu-anim]')), scenes: carte ? carte.querySelectorAll('[data-apercu-scene]').length : 0,
+        prixSolo: ((carte && carte.querySelector('[data-apercu-prix-solo]')) || {}).innerText || '', prixPro: ((carte && carte.querySelector('[data-apercu-prix-pro]')) || {}).innerText || '',
         porte: !!document.querySelector('[data-abonnement-requis]'), coque: !!document.querySelector('.vrm-app-shell'),
         deborde: document.documentElement.scrollWidth - window.innerWidth,
       };
     }, tab);
-    for (const [tab, largeur, sombre] of [['ventes', 1512, false], ['achats', 1512, false], ['annonces', 390, true], ['ventes', 390, false], ['dashboard', 1512, true]]) {
+    const ECRANS = [['ventes', 1512, false], ['ventes', 1512, true], ['ventes', 390, false], ['ventes', 390, true], ['annonces', 1512, false], ['annonces', 1512, true], ['annonces', 390, false], ['annonces', 390, true], ['achats', 1512, false], ['dashboard', 1512, true]];
+    for (const [tab, largeur, sombre] of ECRANS) {
       if (SEUL && !SEUL.split(',').includes(tab)) continue;
-      await essaie(`aperçu ${tab} ${largeur}`, async () => {
-        const { ctx, pg, rest, erreurs } = await ouvrir(nav, { abo: ETATS.expire, tab, vue: 'reglages', largeur, sombre, donnees: true });
-        await pg.waitForTimeout(1500);
+      await essaie(`aperçu ${tab} ${largeur}${sombre ? ' sombre' : ''}`, async () => {
+        const { ctx, pg, rest, erreurs, appels } = await ouvrir(nav, { abo: ETATS.expire, tab, vue: 'reglages', largeur, sombre, donnees: true });
+        await pg.waitForSelector('[data-carte-apercu] [data-apercu-scene]', { timeout: 12000 }).catch(() => {}); await pg.waitForTimeout(600);
         const a = await lireApercu(pg, tab);
         const nom = `${tab} ${largeur}${sombre ? ' sombre' : ''}`;
         dit(a && !a.porte && a.coque && a.apercu && erreurs.length === 0, `${nom} : l’app s’ouvre en APERÇU (pas la porte), sur des données lues`, JSON.stringify(a && { porte: a.porte, coque: a.coque, apercu: a.apercu, lectures: rest.lectures }) + ' ' + erreurs.join('|'));
-        // Une liste de 4 lignes ou plus (Ventes, Annonces, Ma journée dans l'exemple) : l'extrait.
-        if (tab !== 'achats') dit(a && a.extraits >= 1 && a.nettes.every((t) => t.length > 0), '  un EXTRAIT net : les 3 premières lignes d’une liste, la 4e floutée', JSON.stringify(a && { listes: a.listes, extraits: a.extraits, nettes: a.nettes }));
+        if (tab === 'annonces') dit(a && a.nettes === 5 && a.debut, '  Annonces : les 5 PREMIÈRES lignes nettes (toutes listes confondues), la 6e floutée', JSON.stringify(a && { nettes: a.nettes, debut: a.debut, t: a.nettesTexte }));
+        // Ventes du mode exemple : l'onglet « À envoyer » en montre 1 — elle est nette (avant : floutée, liste < 4).
+        if (tab === 'ventes') dit(a && a.nettes >= 1 && a.nettes <= 5 && (a.debut ? a.nettes === 5 : true), '  Ventes : ses lignes nettes, jusqu’à 5 (une liste d’une seule vente n’est plus floutée)', JSON.stringify(a && { nettes: a.nettes, debut: a.debut, t: a.nettesTexte }));
+        if (tab === 'dashboard') dit(a && a.extraits >= 1, '  autres écrans : la règle d’avant, 3 premières lignes par liste', JSON.stringify(a && { listes: a.listes, extraits: a.extraits }));
         dit(a && a.floutes > 0 && a.inertes && /blur/.test(a.flou) && a.selection === 'none', '  le reste flouté fort, `inert` + `aria-hidden`, non sélectionnable', JSON.stringify(a && { n: a.floutes, inertes: a.inertes, flou: a.flou, sel: a.selection }));
         const copie = await pg.evaluate((tab) => { const f = document.querySelector('[data-attente-ecran="' + tab + '"] [data-apercu-floute]'); if (!f) return null; const ev = new Event('copy', { bubbles: true, cancelable: true }); f.dispatchEvent(ev); return ev.defaultPrevented; }, tab);
         dit(copie === true, '  copier dans l’écran est refusé', String(copie));
-        dit(a && /Ton abonnement a pris fin/.test(a.carte) && /rien n'est supprimé/.test(a.carte) && /Reprendre l'abonnement/.test(a.carte), '  la carte nette : « a pris fin · rien n’est supprimé · Reprendre l’abonnement »', a && a.carte.replace(/\n/g, ' · '));
+        dit(a && a.cartes === 1 && (a.place === 'debut-du-flou' || a.place === 'apres-les-nettes'), '  UNE carte, posée là où le flou commence', JSON.stringify(a && { cartes: a.cartes, place: a.place }));
+        dit(a && a.compteur && /Ventes lues : \d+/.test(a.carte) && a.anim && a.scenes === 5 && /16,99/.test(a.prixSolo) && /19,99/.test(a.prixPro) && a.boutons.length === 1 && a.boutons[0] === 'Débloquer tout' && a.boutonLibre,
+          '  la carte : le compteur lu, la séquence (5 scènes), Solo et Pro au prix du serveur, UN bouton « Débloquer tout », touchable', a && JSON.stringify({ c: a.carte.replace(/\n/g, ' · ').slice(0, 220), b: a.boutons, libre: a.boutonLibre }));
         dit(a && a.deborde <= 0, '  rien ne déborde', String(a && a.deborde));
+        await pg.evaluate(() => { const c = document.querySelector('[data-carte-apercu]'); if (c) c.scrollIntoView({ block: 'center' }); }); await pg.waitForTimeout(300);
         await capture(pg, `apercu-${tab}-${largeur}${sombre ? '-sombre' : ''}`);
-        // Aucune action : un clic sur un bouton NET de l'écran est arrêté.
+        if (tab === 'ventes' && largeur === 390 && !sombre) {
+          // L'animation : trois images à 2,5 s d'écart — trois scènes différentes.
+          const vues = [];
+          for (let i = 0; i < 3; i++) {
+            await pg.waitForFunction(() => [...document.querySelectorAll('[data-apercu-scene]')].some((e) => Number(getComputedStyle(e).opacity) > 0.9), null, { timeout: 3000 }).catch(() => {});
+            vues.push(await pg.evaluate(() => { const v = [...document.querySelectorAll('[data-apercu-scene]')].map((e) => [e.getAttribute('data-apercu-scene'), Number(getComputedStyle(e).opacity)]).sort((x, y) => y[1] - x[1])[0]; return v && v[1] > 0.2 ? v[0] : null; }));
+            await capture(pg, `animation-${i + 1}-390`);
+            await pg.waitForTimeout(2500);
+          }
+          dit(vues.every(Boolean) && new Set(vues).size === 3, '  l’animation passe d’une scène à l’autre (3 images, 3 scènes)', JSON.stringify(vues));
+        }
+        // Aucune action : un clic sur un bouton NET de l'écran est arrêté et ramène à CETTE carte.
         const avant = { ecr: rest.ecritures, url: pg.url() };
-        const b = pg.locator(`[data-attente-ecran="${tab}"] button:not([data-apercu-floute] button)`).first();
+        const b = pg.locator(`[data-attente-ecran="${tab}"] button:not([data-apercu-floute] button):not([data-apercu-garde] button)`).first();
         const nb = await b.count();
         if (nb) await b.click({ timeout: 3000 }).catch(() => {});
-        await pg.waitForTimeout(700);
-        const apres = await pg.evaluate(() => ({ signe: (document.querySelector('[data-carte-apercu]') || {}).getAttribute ? document.querySelector('[data-carte-apercu]').getAttribute('data-signe') : null, feuille: !!document.querySelector('[role="dialog"]:not([data-carte-apercu])') }));
-        dit(nb > 0 && apres.signe && !apres.feuille && pg.url() === avant.url, '  aucune action : un bouton net de l’écran ne fait rien d’autre que montrer la carte', JSON.stringify({ boutons: nb, ...apres }));
-        // Les actions de la ligne de titre (« Tout imprimer », « Publier »…), où qu'elles soient rendues.
-        const actions = pg.locator('.vrm-main button:visible', { hasText: /imprimer|publier|répondre|exporter|scanner|générer/i });
+        await pg.waitForTimeout(900);
+        const apres = await pg.evaluate(() => { const c = document.querySelector('[data-carte-apercu]'); const x = c && c.getBoundingClientRect(); return { signe: c ? c.getAttribute('data-signe') : null, visible: !!x && x.top < innerHeight && x.bottom > 0, cartes: document.querySelectorAll('[data-carte-apercu]').length, feuille: !!document.querySelector('[role="dialog"]:not([data-carte-apercu])') }; });
+        dit(nb > 0 && apres.signe && apres.visible && apres.cartes === 1 && !apres.feuille && pg.url() === avant.url, '  aucune action : un bouton net de l’écran ne fait que ramener CETTE carte sous les yeux', JSON.stringify({ boutons: nb, ...apres }));
+        const actions = pg.locator('.vrm-main button:visible:not([data-apercu-garde] button)', { hasText: /imprimer|publier|répondre|exporter|scanner|générer/i });
         const na = await actions.count();
         let fuite = '';
         for (let i = 0; i < Math.min(na, 4); i++) {
@@ -228,10 +264,69 @@ const capture = (pg, nom) => pg.screenshot({ path: path.join(CAPTURES, nom + '.p
           if (await pg.evaluate(() => !!document.querySelector('[role="dialog"]:not([data-carte-apercu]), .vrm-sheet, [data-feuille]'))) { fuite = t; break; }
         }
         dit(!fuite, `  aucune action de la ligne de titre ne s’ouvre (${na} essayée(s))`, fuite);
-        // Aucune écriture : celles que l'app tente sont refusées AVANT le réseau.
         const r = await pg.evaluate(async (o) => { const x = await fetch(o + '/rest/v1/app_data?on_conflict=owner,id', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '[]' }); return { s: x.status, j: await x.json().catch(() => null) }; }, rest.origine || 'https://lgonxzrzjcqthjtbdpzo.supabase.co');
-        dit(r.s === 403 && r.j && r.j.code === 'vrm-lecture-seule' && rest.ecritures === 0, '  AUCUNE écriture n’atteint la base (garde : refus sur place)', JSON.stringify(r) + ` · parties=${rest.ecritures}`);
+        dit(r.s === 403 && r.j && r.j.code === 'vrm-lecture-seule' && rest.ecritures === 0, '  AUCUNE écriture de l’app n’atteint la base (garde : refus sur place)', JSON.stringify(r) + ` · parties=${rest.ecritures}`);
+        if (tab === 'ventes' && largeur === 1512 && !sombre) {
+          // « Débloquer tout » : 1er toucher ⇒ les deux cases légales DANS la carte ; cochées ⇒ le paiement part, avec le retour sur CET écran.
+          await pg.locator('[data-apercu-debloquer]').first().click(); await pg.waitForTimeout(400);
+          const cgv = await pg.evaluate(() => !!document.querySelector('[data-carte-apercu] [data-apercu-cgv] input[type="checkbox"]'));
+          dit(cgv && appels.every((x) => x.mode !== 'checkout'), '  « Débloquer tout » : d’abord les deux cases (CGV, accès immédiat) dans la carte, rien ne part', JSON.stringify({ cgv, appels: appels.map((x) => x.mode) }));
+          const cases = pg.locator('[data-carte-apercu] [data-apercu-cgv] input[type="checkbox"]');
+          for (let i = 0; i < await cases.count(); i++) await cases.nth(i).check({ force: true }).catch(() => {});
+          await pg.locator('[data-apercu-debloquer]').first().click(); await pg.waitForTimeout(800);
+          const co = appels.find((x) => x.mode === 'checkout');
+          let corps = null; try { corps = JSON.parse(co && co.corps); } catch (_) {}
+          dit(!!corps && corps.cgv === true && corps.accesImmediat === true && corps.retour === 'ventes', '  cochées : le paiement part, CGV + accès immédiat, retour = « ventes »', JSON.stringify(corps));
+        }
         await ctx.close();
+      });
+    }
+    if (!SEUL || SEUL.split(',').includes('ventes')) {
+      await essaie('mouvement réduit', async () => {
+        const { ctx, pg } = await ouvrir(nav, { abo: ETATS.expire, tab: 'ventes', vue: 'reglages', largeur: 390, donnees: true, reduit: true });
+        await pg.waitForSelector('[data-carte-apercu] [data-apercu-scene]', { timeout: 12000 }).catch(() => {}); await pg.waitForTimeout(600);
+        const r = await pg.evaluate(() => { const s = [...document.querySelectorAll('[data-apercu-scene]')]; return { n: s.length, visibles: s.filter((e) => Number(getComputedStyle(e).opacity) > 0.9).length, anim: s.map((e) => getComputedStyle(e).animationName).filter((x) => x && x !== 'none').length }; });
+        dit(r.n === 5 && r.visibles === 5 && r.anim === 0, 'mouvement réduit : une image fixe — les 5 scènes visibles ensemble, aucune animation', JSON.stringify(r));
+        await pg.evaluate(() => { const c = document.querySelector('[data-carte-apercu]'); if (c) c.scrollIntoView({ block: 'center' }); }); await pg.waitForTimeout(300);
+        await capture(pg, 'animation-reduite-390');
+        await ctx.close();
+      });
+      await essaie('essai gratuit : tout net', async () => {
+        for (const [largeur, sombre] of [[390, false], [1512, true]]) {
+          for (const tab of ['ventes', 'annonces']) {
+            const { ctx, pg } = await ouvrir(nav, { abo: ETATS.essai5, tab, vue: 'reglages', largeur, sombre, donnees: true });
+            await pg.waitForSelector('[data-attente-ecran="' + tab + '"]', { timeout: 12000 }).catch(() => {}); await pg.waitForTimeout(1500);
+            const r = await pg.evaluate(() => ({ apercu: !!document.querySelector('[data-apercu]'), floutes: document.querySelectorAll('[data-apercu-floute]').length, carte: !!document.querySelector('[data-carte-apercu]'), coque: !!document.querySelector('.vrm-app-shell') }));
+            dit(r.coque && !r.apercu && r.floutes === 0 && !r.carte, `essai gratuit ${tab} ${largeur}${sombre ? ' sombre' : ''} : tout est NET, aucune carte`, JSON.stringify(r));
+            await capture(pg, `essai-${tab}-${largeur}${sombre ? '-sombre' : ''}`);
+            await ctx.close();
+          }
+        }
+      });
+      await essaie('essai disponible', async () => {
+        const { ctx, pg } = await ouvrir(nav, { abo: { ...ETATS.expire, essaiDispo: true, statut: null, peutGerer: false }, tab: 'annonces', vue: 'reglages', largeur: 390, donnees: true });
+        await pg.waitForSelector('[data-carte-apercu] [data-apercu-scene]', { timeout: 12000 }).catch(() => {}); await pg.waitForTimeout(600);
+        const b = await pg.evaluate(() => [...document.querySelectorAll('[data-carte-apercu] button')].map((x) => x.innerText.trim()).filter(Boolean));
+        dit(b.length === 1 && b[0] === "Commencer l'essai gratuit", 'jamais eu d’essai : le même bouton dit « Commencer l’essai gratuit »', JSON.stringify(b));
+        await ctx.close();
+      });
+      await essaie('retour de Stripe', async () => {
+        // Le webhook arrive au 3e passage : l'aperçu se lève SUR PLACE, sans recharger, sans relire les données.
+        let n = 0; const abo = () => (++n >= 3 ? ETATS.actif : ETATS.expire);
+        const { ctx, pg, rest } = await ouvrir(nav, { abo, tab: 'ventes', vue: 'reglages', largeur: 390, donnees: true, suite: '&abonnement=merci' });
+        await pg.evaluate(() => { window.__vrmMemePage = 1; });
+        const lectures0 = rest.lectures;
+        await pg.waitForFunction(() => !document.querySelector('[data-apercu]') && !document.querySelector('[data-carte-apercu]'), null, { timeout: 20000 }).catch(() => {});
+        const r = await pg.evaluate(() => ({ meme: window.__vrmMemePage === 1, apercu: !!document.querySelector('[data-apercu]'), floutes: document.querySelectorAll('[data-apercu-floute]').length, carte: !!document.querySelector('[data-carte-apercu]'), ecran: !!document.querySelector('[data-attente-ecran="ventes"]') }));
+        dit(r.meme && !r.apercu && r.floutes === 0 && !r.carte && r.ecran, 'retour de Stripe : sur Ventes, tout se défloute SUR PLACE (même page, aucun rechargement)', JSON.stringify({ ...r, appelsAbo: n }));
+        const t0 = Date.now(), apresRetour = rest.lectures - lectures0;
+        await capture(pg, 'retour-stripe-390');
+        await ctx.close();
+        // Le témoin : la même page, le même temps, l'abonnement qui ne vient pas — ce que l'app lit de toute façon.
+        const temoin = await ouvrir(nav, { abo: ETATS.expire, tab: 'ventes', vue: 'reglages', largeur: 390, donnees: true, suite: '&abonnement=merci' });
+        const l0 = temoin.rest.lectures; await temoin.pg.waitForTimeout(Math.max(1000, Date.now() - t0 + 6000)); const lt = temoin.rest.lectures - l0;
+        await temoin.ctx.close();
+        dit(apresRetour <= lt + 6, '  sans relire ses données : pas plus de lectures que la page qui attend toujours (témoin)', `retour=${apresRetour} · témoin=${lt}`);
       });
     }
     if (!SEUL) {
