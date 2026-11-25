@@ -203,7 +203,8 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
         'data-pil-somme': (() => { const lus = L.filter((x) => x.v != null); return lus.length === L.length ? cents(lus.reduce((t, x) => t + x.v, 0)) : ''; })() }}
       graphe={<>
         <GrapheJours forme="aire" jours={jours} choisie={k} onChoisir={setJour} libelle={f === 'mois' ? tr('pil.grapheMois') : tr('pil.graphe', { n: f })} moyenneLibelle={tr('pil.moyenne')} attrs={{ 'data-pil-jour': j ? j.cle : '' }}/>
-        <p className="n-heros-jour" data-pil-detail="" data-pil-touche={jour != null ? '1' : undefined}>{detailJour}</p>
+        {/* (25 nov., « trop de texte ») Le détail d'un jour n'est dit qu'au toucher de ce jour (sa place est tenue : rien ne saute). */}
+        <p className="n-heros-jour" data-pil-detail="" data-pil-touche={jour != null ? '1' : undefined}>{jour != null ? detailJour : '\u00a0'}</p>
         <ul className="n-pilotage-legende" aria-hidden="true">
           <li><span className="n-pilotage-cle" data-n-cle="aire"/>{tr('pil.cle.vendu')}</li>
           {aBenef ? <li><span className="n-pilotage-cle" data-n-cle="ligne"/>{tr('pil.cle.benefice')}</li> : null}

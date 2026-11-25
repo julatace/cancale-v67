@@ -16,7 +16,7 @@ require('./_porte-banc.cjs');
 //    G  GESTES   — chaque geste reste là : Reprendre, C'est écrit, Imprimer, les 2 cases Colis, la rangée de l'ordinateur,
 //                  la ligne des annonces disparues (qui ouvre sa feuille), le porte-monnaie (ses deux montants).
 //  Réglages : `BANC_DIST` (un autre build : l'AVANT), `LARGEURS=390,1512`, `THEMES=clair,sombre`, `STYLES=,monochrome`,
-//  `SHOTS=<dossier>` (captures à REGARDER), `DSF=2`, `MOTS_MAX` (défaut 105 : la moitié des 211 mots VUS d'origin/main sur la même base), `MUTATION=fleche|site|tronque` (rouge attendu).
+//  `SHOTS=<dossier>` (captures à REGARDER), `DSF=2`, `MOTS_MAX` (défaut : la moitié des mots VUS d'origin/main sur la même base, 106 à 390 px et 124 à 1512 px), `MUTATION=fleche|site|tronque` (rouge attendu).
 //  Un banc ne meurt pas, il rapporte.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -30,7 +30,8 @@ const liste = (v, d) => String(process.env[v] == null ? d : process.env[v]).spli
 const LARGEURS = liste('LARGEURS', '390,1512').filter(Boolean).map(Number), THEMES = liste('THEMES', 'clair,sombre').filter(Boolean);
 const STYLES = liste('STYLES', ',monochrome');
 const DSF = Number(process.env.DSF || 1);
-const MOTS_MAX = Number(process.env.MOTS_MAX || 105);
+// La moitié des mots VUS d'origin/main sur la même base (25 nov. : 213 à 390 px, 249 à 1512 px).
+const MOTS_MAX = (W) => Number(process.env.MOTS_MAX || (W < 600 ? 106 : 124));
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 600) : '')); } return c; };
 
@@ -84,6 +85,10 @@ function baseCapture() {
   const d = Math.round((somme(A) - somme(B)) * 100) / 100;
   const cible = d > 0 ? B[0] : A[0];
   if (cible && d) cible.price.amount = String(Math.round((Number(cible.price.amount) + Math.abs(d)) * 100) / 100);
+  // « Reçu » incomplet (CLAUDE.md §5 : « au moins ») : une vente finalisée de ce mois, hors des deux fenêtres, au prix illisible.
+  const debutMois = new Date(minuit()); debutMois.setDate(1);
+  const illisible = vent.find((o) => o.status === 'Commande finalisée' && Date.parse(o.date) >= debutMois.getTime() && Date.parse(o.date) < M14);
+  if (illisible) illisible.price = { amount: '', currency_code: 'EUR' };
   b.attendu = { uid, sept: somme(fen(M7, Date.now() + J)), avant: somme(fen(M14, M7)) };
   return b;
 }
@@ -127,7 +132,7 @@ const MESURER = () => {
   const coupes = [];
   const cand = main.querySelectorAll('.n-heros-trio *, .n-cc-valeur, .n-cc-sous, .n-cc-libelle, .n-carte-titre, .n-rangee-titre, .n-rangee-sous, .n-heros-valeur, .n-heros-sous, [data-pil-recu], [data-pil-benef-fen], [data-pil-avenir], .vrm-mod-disp-titre, .vrm-mod-disp-quand, .vrm-verif-texte, h2, h3');
   for (const e of cand) {
-    if (!e.getClientRects().length || e.children.length > 3) continue;
+    if (!e.getClientRects().length || e.children.length > 3 || e.getBoundingClientRect().width <= 1) continue;   // le texte réservé au lecteur d'écran n'est pas « coupé »
     const cs = getComputedStyle(e);
     if (e.scrollWidth > e.clientWidth + 1 && (cs.overflow !== 'visible' || cs.textOverflow === 'ellipsis' || cs.overflowX !== 'visible')) coupes.push((e.className || e.tagName) + ' « ' + (e.innerText || '').slice(0, 40) + ' » ' + e.scrollWidth + '>' + e.clientWidth);
   }
@@ -144,6 +149,7 @@ const MESURER = () => {
   const g = (s) => !!main.querySelector(s) || !!document.querySelector(s);
   const gestes = { reprendre: g('[data-tout-reprendre]'), ecrit: g('[data-numeros-ecrits="journee"]'), imprimer: g('[data-v2-principal], [data-v2-imprimer-rien]'),
     envoyer: g('[data-v2-cj-ligne="envoyer"]'), retirer: g('[data-v2-cj-ligne="retirer"]'), ordi: g('[data-adist-jour-rangee]'), disparues: g('[data-moderation-disparues]'),
+    recuPartiel: !!document.querySelector('[data-pil-recu-partiel="1"]') || !document.querySelector('[data-pil-recu]'),
     pm: !!document.querySelector('[data-v2-bloc="portemonnaie"][data-pm-attente="216500"][data-pm-dispo="11109"]'), prio: g('[data-prio-journee]') };
   return { mots: mots.length, texte, coupes, ecart, sites, nSites, doubles, gestes, ecran: !!ecran, debord: document.documentElement.scrollWidth > window.innerWidth + 1 };
 };
@@ -172,7 +178,7 @@ const MESURER = () => {
         dit(r.ecran, 'l\'écran Aujourd\'hui est rendu');
         dit(!erreurs.length, 'aucune erreur JS', erreurs);
         dit(!r.debord, 'aucun défilement de côté');
-        dit(r.mots <= MOTS_MAX, `M mots rendus ${r.mots} ≤ ${MOTS_MAX}`);
+        dit(r.mots <= MOTS_MAX(W), `M mots rendus ${r.mots} ≤ ${MOTS_MAX(W)}`);
         dit(!r.coupes.length, 'T aucun chiffre ni titre coupé', r.coupes);
         dit(!!r.ecart && r.ecart.v === '0', 'Z la base sert un écart nul (data-pil-ecart="0")', r.ecart);
         if (r.ecart && r.ecart.v === '0') dit(!/hausse/.test(r.ecart.cls) && !/[▲▼↑↗]/.test(r.ecart.txt) && !r.ecart.vert, 'Z ±0 % sans flèche ni couleur de hausse', r.ecart);

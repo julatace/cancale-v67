@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (25 nov., aujourdhui-moins-texte — Julien : « C'est pas mal mais trop de texte, améliore. ») docs/passation/2026-11-25-aujourdhui-moins-texte.md
+  { id: 'aujourdhui-moins-texte', date: '2026-11-25', titre: 'Aujourd’hui : deux fois moins de texte', phrase: 'Un titre court, un chiffre ; le détail derrière ›.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (24 nov., suivi-ventes — Julien : « retrait des articles vendus, fais un vrai suivi ») docs/passation/2026-11-24-suivi-ventes.md
   { id: 'suivi-envois', date: '2026-11-24', titre: 'Tes colis vendus, du dépôt au versement', phrase: 'Au point, retiré, argent versé : chaque étape lue, datée.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (24 nov., lot retrait-parfait — Julien : « pour le retrait tu dois vraiment faire quelque chose de parfait ») docs/passation/2026-11-24-retrait-parfait.md
