@@ -30,6 +30,16 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (24 nov., parcours-iphone — Julien : « elle bug trop encore ») docs/passation/2026-11-24-parcours-iphone.md
   { id: 'comptoir-retour', date: '2026-11-24', titre: 'Code au comptoir : le retour le ferme', phrase: 'Sur iPhone, le geste retour ne quitte plus VRM.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (24 nov., visuel-annonces — Julien : « toute l'application visuelle », « sans latence ») docs/passation/2026-11-24-visuel-annonces.md
+  { id: 'visuel-annonces', date: '2026-11-24', titre: 'Annonces en grandes photos, comme un inventaire', phrase: 'Le N°, le compte, les vues et favoris sur chaque photo.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (24 nov., visuel-argent — Julien : « toute l'application visuelle », « sans latence ») docs/passation/2026-11-24-visuel-argent.md
+  { id: 'visuel-argent', date: '2026-11-24', titre: 'Argent en un coup d’œil', phrase: 'Anneau de l’objectif, seuils en jauges, à venir en cartes.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (24 nov., livrable-2) docs/passation/2026-11-24-livrable.md (Suite)
+  { id: 'aujourdhui-sans-saut', date: '2026-11-24', titre: 'Aujourd’hui ne bouge plus au chargement', phrase: 'Chaque carte tient sa place avant ses chiffres.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (24 nov., visuel-jeu — Julien : « c'est pas visuel, hésite pas à faire des designs comme jeu vidéo ») docs/passation/2026-11-24-visuel-jeu.md
+  { id: 'visuel-jeu', date: '2026-11-24', titre: 'Pop-ups et ventes en grandes photos', phrase: 'La paire en grand, son N°, une petite fête par vente.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (24 nov., livrable — Julien : « écran de chargement etc., tout doit être parfait ») docs/passation/2026-11-24-livrable.md
+  { id: 'chargement-squelette', date: '2026-11-24', titre: 'Ouverture plus calme, sans tirets', phrase: 'Les chiffres en lecture se dessinent à leur place.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (24 nov., wcag-aa — Julien : plugin fairmind-design, accessibilité) docs/passation/2026-11-24-wcag-aa.md
   { id: 'wcag-aa-24nov', date: '2026-11-24', titre: 'Plus lisible, aussi avec un lecteur d’écran', phrase: 'Le bilan se lit la nuit ; feuilles et messages sont bien annoncés.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (24 nov., moderation-carte réconciliée avec la revue UX — Julien : « c'est moche ») src/AlerteModeration.jsx

@@ -11,18 +11,29 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { LogoSite } from './LogoSite.jsx';
+import { TuilePaire, Confettis, numeroPropre, mouvementReduit } from './Jeu.jsx';
 import { tr } from '../i18n/index.js';
 import { ICONE_FAMILLE } from '../../api/_lib/notif-belle.js';
 import './pop-evenements.css';
 
 const DUREE = 7000, MAX = 3;
 const RE_PHOTO = /^https:\/\/images\d*\.vinted\.net\/[^\s"'<>]{8,480}$/i;
-const ICONE_GENRE = { vente: 'cash', offre: 'tag', arrivee: 'pin', message: 'chat', bordereau: 'box', argent: 'cash', rappel: 'clock' };
-const genreDeTag = (t) => { t = String(t || ''); if (/^(sale|vc-vente)-/.test(t)) return 'vente'; if (/^offer-/.test(t)) return 'offre'; if (/^(relais|retrait-code)-/.test(t)) return 'arrivee'; if (/^msg-/.test(t)) return 'message'; if (/^bord-/.test(t)) return 'bordereau'; if (/^final-/.test(t)) return 'argent'; if (/^rappel-/.test(t)) return 'rappel'; return ''; };
+// (24 nov., « comme un jeu vidéo ») une icône par sorte d'événement : favori (cœur), Vinted a agi (œil), erreur (alerte).
+const ICONE_GENRE = { vente: 'cash', offre: 'tag', arrivee: 'pin', message: 'chat', bordereau: 'box', argent: 'wallet', rappel: 'clock', favori: 'heart', avis: 'star', moderation: 'eye', erreur: 'alert' };
+const genreDeTag = (t) => { t = String(t || ''); if (/^(sale|vc-vente|vendu-leboncoin|vendu-ebay)-/.test(t)) return 'vente'; if (/^(fav|favoris-[a-z]+)-/.test(t)) return 'favori'; if (/^vrm-(moderation|compte-bloque)-/.test(t)) return 'moderation'; if (/^offer-/.test(t)) return 'offre'; if (/^(relais|retrait-code)-/.test(t)) return 'arrivee'; if (/^msg-/.test(t)) return 'message'; if (/^bord-/.test(t)) return 'bordereau'; if (/^final-/.test(t)) return 'argent'; if (/^rappel-/.test(t)) return 'rappel'; return ''; };
 const siteDeTag = (t) => { t = String(t || ''); if (/^vc-/.test(t)) return 'vestiaire'; if (/^(sale|offer)-/.test(t)) return 'vinted'; if (/^lbc-/.test(t)) return 'leboncoin'; if (/^ebay-/.test(t)) return 'ebay'; return ''; };
 const NOM_SITE = { vinted: 'Vinted', vestiaire: 'Vestiaire Collective', leboncoin: 'Leboncoin', ebay: 'eBay' };
 const chemin = (u) => (typeof u === 'string' && u.startsWith('/') && !u.startsWith('//') ? u : '');
 const texte = (s, n) => (typeof s === 'string' ? s.replace(/\s+/g, ' ').trim().slice(0, n) : '');
+// La galerie du propriétaire (données d'exemple) montre les photos d'EXEMPLE de l'app (public/exemple/, crédits
+// public/exemple/CREDITS.md) ; une vraie notification, seulement une photo Vinted prouvée.
+const RE_PHOTO_EXEMPLE = /^\/exemple\/[a-z0-9-]{3,80}-(120|400)\.webp$/;
+// (24 nov.) Le N° de l'étiquette : celui que l'émetteur a POSÉ (`numero`), sinon celui qu'il a ÉCRIT dans son texte (« N°124 »,
+// tiré par le serveur de ses propres règles d'identité) — jamais deviné ici. Il est retiré du texte (un nombre ne s'écrit pas
+// deux fois, CLAUDE.md §7).
+const RE_N = /N°\s?([A-Z]{0,2}\d{1,6})\b/;
+export const numeroDeEvenement = (ev) => { const p = numeroPropre(ev && ev.numero); if (p) return p; for (const s of [ev && ev.title, ev && ev.body]) { const m = RE_N.exec(String(s || '')); if (m) return numeroPropre(m[1]); } return ''; };
+const sansNumero = (s, n) => { if (!n || !s) return s; const t = s.replace(new RegExp('\\s*(·\\s*)?N°\\s?' + n + '\\b(\\s*·)?\\s*'), (m, a, b) => (a && b ? ' · ' : ' ')).trim().replace(/^·\s*/, ''); return t && t !== s ? t.charAt(0).toUpperCase() + t.slice(1) : s; };
 
 // Une forme sûre, ou `null` (rien d'affiché pour un message sans titre).
 export function evenementPropre(ev) {
@@ -32,7 +43,9 @@ export function evenementPropre(ev) {
   const genre = (typeof ev.genre === 'string' && ICONE_GENRE[ev.genre] ? ev.genre : '') || genreDeTag(tag);
   const actions = (Array.isArray(ev.actions) ? ev.actions : []).filter((a) => a && texte(a.title, 30)).slice(0, 1).map((a) => ({ titre: texte(a.title, 30), url: chemin(a.url) || chemin(ev.url) }));
   const icone = ICONE_GENRE[genre] || (typeof ev.famille === 'string' && ICONE_FAMILLE[ev.famille]) || 'bell2';
-  return { cle: tag || titre + '|' + texte(ev.body, 40), titre, detail: texte(ev.body, 160), url: chemin(ev.url), image: RE_PHOTO.test(String(ev.image || '')) ? String(ev.image) : '', genre, icone, site: siteDeTag(tag), action: actions[0] || null };
+  const numero = numeroDeEvenement(ev);
+  const image = RE_PHOTO.test(String(ev.image || '')) ? String(ev.image) : (ev.galerie === true && RE_PHOTO_EXEMPLE.test(String(ev.image || '')) ? String(ev.image) : '');
+  return { cle: tag || titre + '|' + texte(ev.body, 40), titre: sansNumero(titre, numero), detail: sansNumero(texte(ev.body, 160), numero), numero, url: chemin(ev.url), image, genre, icone, site: siteDeTag(tag), action: actions[0] || null };
 }
 
 const recouvrement = () => { try { return !!document.querySelector('[role="dialog"][aria-modal="true"], [data-n-poussee]:not([data-n-volet]), .vrm-fp'); } catch (_) { return false; } };
@@ -45,12 +58,13 @@ function Carte({ e, Icon, onFermer, tenue, photoDe, i }) {
   React.useEffect(() => { if (e.image || typeof photoDe !== 'function') return undefined; let vivant = true;
     Promise.resolve().then(() => photoDe(e)).then((u) => { if (vivant && RE_PHOTO.test(String(u || ''))) setPhoto(String(u)); }).catch(() => {});
     return () => { vivant = false; }; }, [e, photoDe]);
-  const [sort, setSort] = React.useState(false);
+  // `sort` : '' (là) · 'haut' (le temps, la croix, Échap) · 'gauche' / 'droite' (balayée) — la sortie part dans le sens du geste.
+  const [sort, setSort] = React.useState('');
   const reste = React.useRef(DUREE);
-  const fermer = React.useCallback(() => { setSort(true); setTimeout(() => onFermer(e.id), 190); }, [e.id, onFermer]);
+  const fermer = React.useCallback((sens = 'haut') => { setSort(sens || 'haut'); setTimeout(() => onFermer(e.id), mouvementReduit() ? 140 : 230); }, [e.id, onFermer]);
   React.useEffect(() => {
     let debut = Date.now(), t = null, court = false;
-    const lancer = () => { if (court) return; court = true; debut = Date.now(); t = setTimeout(fermer, Math.max(1500, reste.current)); };
+    const lancer = () => { if (court) return; court = true; debut = Date.now(); t = setTimeout(() => fermer('haut'), Math.max(1500, reste.current)); };
     const pause = () => { if (!court) return; court = false; clearTimeout(t); reste.current -= Date.now() - debut; };
     e.ctl = { pause, lancer };
     lancer();
@@ -61,27 +75,49 @@ function Carte({ e, Icon, onFermer, tenue, photoDe, i }) {
   // La pile entière est tenue (souris, doigt ou clavier sur N'IMPORTE QUELLE carte) : toutes attendent, toutes repartent ensemble.
   const premier = React.useRef(true);
   React.useEffect(() => { if (premier.current) { premier.current = false; if (!tenue) return; } if (!e.ctl) return; if (tenue) e.ctl.pause(); else e.ctl.lancer(); }, [tenue, e]);
-  // (23 nov., iPhone) Balayer la carte vers le haut la ferme (comme une bannière d'iOS) ; relâchée avant 32 px, elle revient.
-  const [glisse, setGlisse] = React.useState(0);
-  const depart = React.useRef(null);
-  const toucheDebut = (x) => { const t = x.touches && x.touches[0]; depart.current = t ? t.clientY : null; };
-  const toucheMouv = (x) => { const t = x.touches && x.touches[0]; if (depart.current == null || !t) return; setGlisse(Math.min(0, t.clientY - depart.current)); };
-  const toucheFin = () => { if (depart.current == null) return; depart.current = null; if (glisse < -32) fermer(); else setGlisse(0); };
+  // (24 nov., « balayer pour fermer ») Le doigt ou la souris tire la carte : de côté (gauche ou droite) ou vers le haut. Le sens
+  // se décide après 8 px ; vers le bas, elle résiste (élastique). Lâchée au-delà de 80 px (40 vers le haut) ou lancée vite
+  // (> 0,5 px/ms), elle part dans ce sens ; sinon elle revient sur un ressort. Un tirage n'est jamais un clic.
+  const [tire, setTire] = React.useState(null);   // { x, y } pendant le geste
+  const geste0 = React.useRef(null), aTire = React.useRef(false);
+  const bas = (x) => { if (sort || (x.button != null && x.button !== 0)) return; geste0.current = { x: x.clientX, y: x.clientY, t: performance.now(), axe: '', vx: 0, vy: 0, px: x.clientX, py: x.clientY, pt: performance.now(), id: x.pointerId }; aTire.current = false; };
+  const bouge = (x) => {
+    const g = geste0.current; if (!g || x.pointerId !== g.id) return;
+    const dx = x.clientX - g.x, dy = x.clientY - g.y;
+    if (!g.axe) { if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return; g.axe = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'; aTire.current = true; try { x.currentTarget.setPointerCapture(x.pointerId); } catch (_) {} }
+    const now = performance.now(), dt = Math.max(1, now - g.pt); g.vx = (x.clientX - g.px) / dt; g.vy = (x.clientY - g.py) / dt; g.px = x.clientX; g.py = x.clientY; g.pt = now;
+    setTire(g.axe === 'x' ? { x: dx, y: 0 } : { x: 0, y: dy < 0 ? dy : Math.sqrt(dy) * 3 });
+  };
+  const haut = () => {
+    const g = geste0.current; geste0.current = null; if (!g || !g.axe) { setTire(null); return; }
+    const t = tire || { x: 0, y: 0 };
+    if (g.axe === 'x' && (Math.abs(t.x) > 80 || Math.abs(g.vx) > 0.5)) { setTire(null); fermer((t.x || g.vx) < 0 ? 'gauche' : 'droite'); return; }
+    if (g.axe === 'y' && (t.y < -40 || g.vy < -0.5)) { setTire(null); fermer('haut'); return; }
+    setTire(null);
+  };
   const geste = e.action || (e.url ? { titre: tr('pop.voir'), url: e.url } : null);
+  const fete = e.genre === 'vente' && i === 0;
+  const style = { '--i': i };
+  if (tire) { style.transform = `translate(${tire.x}px, ${tire.y}px) rotate(${(tire.x / 28).toFixed(2)}deg)`; style.opacity = Math.max(0.35, 1 - Math.abs(tire.x) / 320 + Math.min(0, tire.y) / 140); style.transition = 'none'; }
   return (
-    <div className="n-pop" data-n-pop={e.genre || 'autre'} data-n-pop-sort={sort ? '1' : undefined} data-n-pop-rang={i} style={{ '--i': i, ...(glisse ? { transform: `translateY(${glisse}px)`, opacity: Math.max(0.3, 1 + glisse / 120), transition: 'none' } : {}) }} role="status"
-      onTouchStart={toucheDebut} onTouchMove={toucheMouv} onTouchEnd={toucheFin} onTouchCancel={toucheFin} data-n-pop-glisse={glisse ? '1' : undefined} {...(i > 0 && !tenue ? { inert: '' } : {})}>
-      {photo
-        ? <img className="n-pop-photo" src={photo} alt="" referrerPolicy="no-referrer" loading="eager" decoding="async"/>
-        : <span className="n-pop-ic" aria-hidden="true">{Icon ? <Icon name={e.icone} size={20}/> : null}</span>}
+    <div className="n-pop" data-n-pop={e.genre || 'autre'} data-n-pop-sort={sort || undefined} data-n-pop-rang={i} data-n-pop-numero={e.numero || undefined}
+      data-n-pop-photo={photo ? '1' : '0'} data-n-pop-fete={fete ? '1' : undefined} style={style} role="status"
+      onPointerDown={bas} onPointerMove={bouge} onPointerUp={haut} onPointerCancel={haut}
+      onClickCapture={(x) => { if (aTire.current) { x.stopPropagation(); x.preventDefault(); aTire.current = false; } }}
+      data-n-pop-glisse={tire ? '1' : undefined} {...(i > 0 && !tenue ? { inert: '' } : {})}>
+      <TuilePaire photo={photo} numero={e.numero} icone={e.icone} genre={e.genre} Icon={Icon} taille="l" className="n-pop-tuile">
+        {fete ? <Confettis graine={Math.round(e.id % 97) + 1}/> : null}
+      </TuilePaire>
       <div className="n-pop-corps">
         <div className="n-pop-titre">{e.titre}</div>
         <div className="n-pop-detail">{e.site ? <LogoSite site={e.site} taille={14} nom={NOM_SITE[e.site]}/> : null}<span>{e.detail}</span></div>
+        {geste ? <button type="button" className="n-pop-geste" data-n-pop-geste="" onClick={() => { aller(geste.url); fermer('haut'); }}>
+          {Icon ? <Icon name={e.icone === 'cash' || e.icone === 'wallet' ? 'eye' : e.icone} size={14}/> : null}<span>{geste.titre}</span></button> : null}
       </div>
-      {geste ? <button type="button" className="n-pop-geste" data-n-pop-geste="" onClick={() => { aller(geste.url); fermer(); }}>{geste.titre}</button> : null}
-      <button type="button" className="n-pop-fermer" aria-label={tr('pop.fermer')} title={tr('pop.fermer')} onClick={fermer}>
-        {Icon ? <Icon name="close" size={16}/> : '×'}
+      <button type="button" className="n-pop-fermer" aria-label={tr('pop.fermer')} title={tr('pop.fermer')} onClick={() => fermer('haut')}>
+        {Icon ? <Icon name="close" size={14}/> : '×'}
       </button>
+      {fete ? <span className="n-pop-reflet" aria-hidden="true"/> : null}
     </div>
   );
 }
@@ -128,7 +164,7 @@ export function PopEvenements({ Icon, photoDe = null }) {
       {vues.map((e, i) => <Carte key={e.id} e={e} i={i} Icon={Icon} onFermer={fermer} tenue={tenue} photoDe={photoDe}/>)}
       {/* Empilement compact : la plus récente en entier, les autres repliées derrière ; « +2 » les déplie (doigt, clavier). */}
       {vues.length > 1 ? <button type="button" className="n-pops-plus" data-n-pops-plus={vues.length - 1} aria-expanded={tenue} onClick={() => setDeplie((v) => !v)}>
-        {tenue ? tr('pop.replier') : '+' + (vues.length - 1)}</button> : null}
+        {tenue ? tr('pop.replier') : <span key={vues.length} className="n-pops-compte">{'+' + (vues.length - 1)}</span>}</button> : null}
     </div>, document.body);
 }
 export default PopEvenements;

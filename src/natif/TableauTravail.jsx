@@ -31,6 +31,7 @@
 //   vide / videRecherche / pasSu   les phrases d'un tableau vide · grille (vrai ⇒ liste ⇄ grille) · Icon
 //   outilsPlus    nœud posé au bout de la barre d'outils (un lien vers un écran voisin : « Automatisations »)
 // Clavier : ↑ ↓ d'une ligne à l'autre, Entrée ouvre, Espace coche, Échap ferme le menu ou vide la sélection, ⌘K « / » cherche.
+import GrilleInventaire from './visuel/GrilleInventaire.jsx';   // (24 nov., lot visuel-annonces)
 import React from 'react';
 import { tr } from '../i18n/index.js';
 import { Page, ChampRecherche } from './Page.jsx';
@@ -112,7 +113,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   lignes, statuts = [], statutsDefaut = null, filtres = [], colonnes = [], triDefaut = null,
   actions = [], onAction = null, menuLigne = null, onOuvrir = null, ligneTel = null,
   unite = (n) => tr('tableau.articles', { n }), placeholder = '', plein = null, haut = null, pied = '',
-  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null, groupe = null, avantOutils = null, ligneChoisie = '', cases = true, coches = null, onCocher = null, iconeVide = 'search', actionPasSu = null, carteGrille = null }) {
+  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null, groupe = null, avantOutils = null, ligneChoisie = '', cases = true, coches = null, onCocher = null, iconeVide = 'search', actionPasSu = null, carteGrille = null, carteCorps = 0 }) {
   // `iconeVide` : l'icône d'un tableau vide sans filtre (Ventes : le carton) ; `actionPasSu` : le geste d'une lecture ratée (« Réessayer »).
   // `cases={false}` : pas de colonne de cases (une liste sans geste en série : Ventes · En route).
   // `coches` (Set) + `onCocher(cles[], on)` : les cases sont CELLES DE L'ÉCRAN (Ventes · À envoyer : le lot d'impression, cochées
@@ -324,8 +325,9 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     </div>
   );
   const nombre = (
-    <div className="n-tt-nombre" data-tt-nombre={String(affichees.length)}>
-      <span className="n-tt-nombre-texte">{unite(affichees.length)}</span>
+    <div className="n-tt-nombre" data-tt-nombre={Array.isArray(lignes) ? String(affichees.length) : undefined}>
+      {/* (24 nov., lot visuel-annonces) pendant la lecture de la grille : la ligne est là (rien ne saute), le nombre pas encore su */}
+      {Array.isArray(lignes) ? <span className="n-tt-nombre-texte">{unite(affichees.length)}</span> : <span className="n-os n-tt-nombre-os" aria-hidden="true"/>}
       <span className="n-tt-espace"/>
       {ordinateur && grille ? <span className="n-tt-vues" role="group" aria-label={tr('tableau.vue')}>
         <button type="button" className="n-tt-bouton n-tt-bouton-icone" aria-pressed={vue === 'liste'} aria-label={tr('tableau.vueListe')} title={tr('tableau.vueListe')} data-tt-vue="liste" onClick={() => setVue('liste')}>{ic('menu', 18)}</button>
@@ -403,11 +405,16 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   );
   // (21 nov., Annonces « Dressing ») `carteGrille(l, { coche, cochable, basculer, ouvrir, selection })` : l'écran dessine SA carte
   // dans la grille (mêmes lignes, même sélection, même ouverture) ; sans elle, la carte générique d'ici.
-  const grilleVue = carteGrille ? (
+  // (24 nov., lot visuel-annonces) Une grille d'inventaire VIRTUALISÉE (src/natif/visuel/GrilleInventaire.jsx) quand l'écran donne la
+  // hauteur de sa carte (`carteCorps`) : des centaines de cartes, seules celles près de l'écran sont montées, rien ne saute.
+  const grilleVue = carteGrille ? (carteCorps ? (
+    <GrilleInventaire items={affichees} cle={(l) => l.cle} corps={carteCorps} min={200} gap={16} className="n-tt-grille-ecran" attrs={{ 'data-tt-grille': '' }}
+      rendu={(l, i, rv) => carteGrille(l, { coche: sel.has(l.cle), cochable: cochable(l), basculer, ouvrir, selection: !!A || sel.size > 0, revele: rv })}/>
+  ) : (
     <div className="n-tt-grille n-tt-grille-ecran" data-tt-grille="">
       {visibles.map((l) => <React.Fragment key={l.cle}>{carteGrille(l, { coche: sel.has(l.cle), cochable: cochable(l), basculer, ouvrir, selection: !!A || sel.size > 0 })}</React.Fragment>)}
     </div>
-  ) : (
+  )) : (
     <div className="n-tt-grille" data-tt-grille="">
       {visibles.map((l) => { const coche = sel.has(l.cle); const st = statutDe(l); const prix = l.prixGrille;
         return (
@@ -464,7 +471,10 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     </div>
   ) : null;
 
-  const corps = lignes === undefined ? <Attente forme="rangees" n={6} vignette={ordinateur ? 0 : 56} titre/>
+  // (24 nov., lot visuel-annonces) En grille d'inventaire, le squelette a la FORME des cartes (rien ne saute à l'arrivée).
+  const corps = lignes === undefined ? (ordinateur && vue === 'grille' && carteGrille && carteCorps
+      ? <GrilleInventaire items={undefined} attente={12} corps={carteCorps} min={200} gap={16} className="n-tt-grille-ecran" attrs={{ 'data-tt-grille': '' }}/>
+      : <Attente forme="rangees" n={6} vignette={ordinateur ? 0 : 56} titre/>)
     : lignes === null ? <Vide icone={ic('cloudOff', 40)} phrase={pasSu || tr('tableau.pasSu')} action={actionPasSu}/>
     : !affichees.length ? <Vide icone={ic(q || nStatuts ? 'search' : iconeVide, 40)} phrase={q || nStatuts ? (videRecherche || tr('tableau.videRecherche')) : (vide || tr('tableau.vide'))}
         action={q || nStatuts ? <Bouton variante="texte" onClick={() => { setQ(''); setStatutsSel(new Set()); }} attrs={{ 'data-tt-effacer': '' }}>{tr('tableau.effacerFiltres')}</Bouton> : null}/>
@@ -481,12 +491,12 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
           {avantOutils}
           {outils}
           {/* (21 nov.) À l'ordinateur, « N articles » · liste ⇄ grille · « Colonnes » font partie de la tête collante : rien ne passe dessous. */}
-          {ordinateur && Array.isArray(lignes) ? nombre : null}
+          {ordinateur && (Array.isArray(lignes) || (lignes === undefined && vue === 'grille' && carteGrille && carteCorps)) ? nombre : null}
         </div>
         {haut}
         {!ordinateur && Array.isArray(lignes) ? nombre : null}
         {corps}
-        {affichees.length > max ? <div className="n-tt-plus-bas"><Bouton variante="texte" onClick={() => setMax((m) => m + PAR_PAGE)} attrs={{ 'data-tt-voir-plus': '' }}>{tr('tableau.voirPlus', { n: Math.min(PAR_PAGE, affichees.length - max) })}</Bouton></div> : null}
+        {affichees.length > max && !(ordinateur && vue === 'grille' && carteGrille && carteCorps) ? <div className="n-tt-plus-bas"><Bouton variante="texte" onClick={() => setMax((m) => m + PAR_PAGE)} attrs={{ 'data-tt-voir-plus': '' }}>{tr('tableau.voirPlus', { n: Math.min(PAR_PAGE, affichees.length - max) })}</Bouton></div> : null}
         {pied ? <p className="n-tt-pied" data-tt-pied="">{pied}</p> : null}
         {enfants}
       </Page>

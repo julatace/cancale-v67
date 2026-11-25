@@ -17,6 +17,7 @@
 //  AUCUNE règle ici : tout arrive calculé (src/aujourdhui/modele.js, les cartes de Ma journée dans src/App.jsx).
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
+import { Anneau, TuilePaire, CaseInventaire, useArrive } from '../Jeu.jsx';   // (24 nov., visuel-jeu) l'anneau des colis prêts, les ventes en tuiles
 import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site de chaque colis
 import { tr, nombre, localeCourante } from '../../i18n/index.js';
 import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segmente, Colonnes, Colonne, Carte, Tuiles, Tuile, Pastille, Faits, Fait, Feuille, Courbe, Progression, Champ, ListeOrdonnee, Editable, Toast, useOrdinateur, GrapheJours, Etincelle, Repartition, Heros, ActionsRondes, CasesChiffres } from '../index.js';
@@ -108,7 +109,7 @@ function Chiffres({ chiffres, p, setP, objectif = null, onSaisirPrix = null, onV
         'data-v2-jour-vendu': etat === 'lu' && stats ? cents(stats.jour.vendu.valeur) : '', 'data-v2-jour-ventes': etat === 'lu' && stats && stats.jour.ventes.valeur != null ? String(stats.jour.ventes.valeur) : '' }}>
       <Tuile libelle={tr('v2.stats.ca')} valeur={n} unite={u} detail={etat === 'encours' ? tr('v2.jour.lecture') : detailV} onClick={ouvrir} graphe={etincelle('v')} attrs={{ 'data-v2-stat': 'vendu' }}/>
       <Tuile libelle={tr('v2.stats.ventes')} valeur={S && S.ventes.valeur != null ? nombre(S.ventes.valeur) : null}
-        detail={S && S.ventes.valeur == null ? note(S.ventes) : (S && S.ventes.partiel ? tr('journee.moins') : '')} onClick={ouvrir} graphe={etincelle('n')} attrs={{ 'data-v2-stat': 'ventes' }}/>
+        detail={S && S.ventes.valeur == null ? note(S.ventes) : (S && S.ventes.partiel ? tr('journee.moins') : '')} onClick={ouvrir} graphe={etincelle('n')} enCours={etat === 'encours'} attrs={{ 'data-v2-stat': 'ventes' }}/>
       {benef('brut', Br, tr('v2.stats.beneficeBrut'), detailBr)}
       {benef('net', Nt, tr('v2.stats.beneficeNet'), detailNt)}
     </Tuiles>
@@ -180,13 +181,14 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
     { cle: 'recu', libelle: tr('pil.t.recu', { mois: nomMois }), valeur: Rc && Rc.valeur != null ? (Rc.partiel ? tr('journee.moins') + ' ' : '') + montant(Rc.valeur) : null, attrs: { 'data-pil-recu': Rc ? cents(Rc.valeur) : '' } },
     { cle: 'avenir', libelle: tr('pil.t.avenir'), valeur: aVenir && aVenir.valeur != null ? (aVenir.partiel ? tr('journee.moins') + ' ' : '') + montant(aVenir.valeur) : null, attrs: { 'data-pil-avenir': aVenir ? cents(aVenir.valeur) : '', ...(aVenir && aVenir.valeur > 0 ? { 'data-v2-avenir': cents(aVenir.valeur) } : {}) } },
   ];
-  // La porte du bénéfice : des prix d'achat manquent (la raison du mois) et le bénéfice de la fenêtre n'est pas su.
-  const porte = benefFen == null && onSaisirPrix && manquePrix;
   return (
     <Heros titre={titreH} valeur={hn} unite={hu} sous={sousFen}
       action={<Segmente libelle={tr('pil.fenetre')} valeur={String(f)} onChange={(v) => { setF(v === 'mois' ? 'mois' : Number(v)); setJour(null); }} options={FENETRES.map((x) => ({ cle: String(x), libelle: x === 'mois' ? tr('pil.mois') : tr('pil.jours', { n: x }) }))}/>}
       trio={trio}
-      pied={porte && !telephone ? <div className="n-heros-porte"><Bouton variante="teinte" taille="compact" onClick={onSaisirPrix} attrs={{ 'data-pil-porte': 'prix' }}>{tr('v2.ben.prixManquentGeste')}</Bouton></div> : null}
+      // (24 nov., livrable-2) Plus de bouton « Saisir les prix d'achat » sous le héros à l'ordinateur : le « — prix d'achat
+      // manquants » du trio ouvre DÉJÀ la saisie (un geste, une fois), et le bouton arrivait après les chiffres (le héros
+      // grandissait de 42 px et poussait la colonne).
+      pied={null}
       attrs={{ 'data-v2-bloc': 'pilotage', 'data-pil-heros': 'fenetre', 'data-pil-fenetre': String(f), 'data-pil-vendu': W ? cents(W.vendu) : '', 'data-pil-brut-mois': Bm ? cents(Bm.valeur) : '', 'data-pil-jours': L.map((x) => cents(x.v)).join(','), 'data-pil-benef': L.map((x) => cents(x.b)).join(','),
         'data-pil-somme': (() => { const lus = L.filter((x) => x.v != null); return lus.length === L.length ? cents(lus.reduce((t, x) => t + x.v, 0)) : ''; })() }}
       graphe={<>
@@ -203,16 +205,25 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
 
 // LE PORTE-MONNAIE VINTED (23 nov.) : les soldes lus par l'extension (src/ecrans/Comptabilite.jsx `porteMonnaie`). `pm` null = rien
 // lu ⇒ « — » et le geste (ouvrir son porte-monnaie Vinted) ; partiel ⇒ « au moins » et « N comptes sur M lus ».
-function PorteMonnaie({ pm, montant, Icon }) {
+function PorteMonnaie({ pm, montant, Icon, enLecture = false }) {
   const partiel = !!pm && pm.m != null && pm.n < pm.m;
   const val = (v) => (v == null ? null : (partiel ? tr('journee.moins') + ' ' : '') + montant(v));
   const lu = !pm ? '' : [pm.jours == null ? '' : pm.jours === 0 ? tr('pm.luAuj') : tr('pm.luIlYa', { n: pm.jours }), partiel ? tr('pm.comptes', { n: pm.n, m: pm.m }) : ''].filter(Boolean).join(' · ');
   return (
-    <Carte titre={tr('pm.titre')} attrs={{ 'data-v2-bloc': 'portemonnaie', 'data-pm-attente': pm && pm.attente != null ? cents(pm.attente) : '', 'data-pm-dispo': pm && pm.dispo != null ? cents(pm.dispo) : '', 'data-pm-lus': pm ? String(pm.n) : '0' }}>
-      <CasesChiffres cases={[
-        { cle: 'attente', icone: <Icon name="clock" size={18}/>, libelle: tr('pm.attente'), valeur: pm ? val(pm.attente) : null, sous: pm ? lu : tr('pm.ouvrir') },
-        { cle: 'dispo', icone: <Icon name="euro" size={18}/>, libelle: tr('pm.dispo'), valeur: pm ? val(pm.dispo) : null, sous: pm ? '' : '' },
+    <Carte titre={tr('pm.titre')} attrs={enLecture ? { 'data-v2-bloc-attente': 'portemonnaie', 'aria-busy': 'true' } : { 'data-v2-bloc': 'portemonnaie', 'data-pm-attente': pm && pm.attente != null ? cents(pm.attente) : '', 'data-pm-dispo': pm && pm.dispo != null ? cents(pm.dispo) : '', 'data-pm-lus': pm ? String(pm.n) : '0' } }>
+      <CasesChiffres className="n-ccs-pm" cases={[
+        { cle: 'attente', icone: <Icon name="clock" size={18}/>, libelle: tr('pm.attente'), valeur: pm ? val(pm.attente) : null, sous: enLecture ? tr('v2.jour.lecture') : pm ? lu : tr('pm.ouvrir'), enCours: enLecture || null },
+        { cle: 'dispo', icone: <Icon name="euro" size={18}/>, libelle: tr('pm.dispo'), valeur: pm ? val(pm.dispo) : null, sous: pm ? '' : '', enCours: enLecture || null },
       ]}/>
+    </Carte>
+  );
+}
+
+// (24 nov., livrable-2) La place de « Par site » tenue pendant la lecture : son titre, une barre et une ligne en squelette.
+function ParSiteAttente({ f, nomMois = '' }) {
+  return (
+    <Carte titre={f === 'mois' ? tr('pil.sitesMois', { mois: nomMois }) : tr('pil.sites', { n: f })} attrs={{ 'data-v2-bloc-attente': 'sites', 'aria-busy': 'true' }}>
+      <div className="n-sites-attente" aria-hidden="true"><span className="n-os n-sites-attente-barre"/><span className="n-os n-os-ligne n-sites-attente-ligne"/></div>
     </Carte>
   );
 }
@@ -260,6 +271,11 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
   React.useEffect(() => { if (pretLu) return undefined; const t = setTimeout(() => setDelai(true), 10000); return () => clearTimeout(t); }, [pretLu]);
   if (pretLu || delai) dejaPret.current = true;
   const pret = dejaPret.current;
+  // (24 nov., livrable-2) Les places tenues (porte-monnaie, « Par site ») restent 3 s de plus après `pret` : leurs données
+  // arrivent au rendu suivant — sans ce délai, la place disparaissait une seconde puis revenait (deux sauts au lieu d'aucun).
+  const [graceFinie, setGraceFinie] = React.useState(false);
+  React.useEffect(() => { if (!pret) return undefined; const t = setTimeout(() => setGraceFinie(true), 3000); return () => clearTimeout(t); }, [pret]);
+  const tenirPlace = !pret || !graceFinie;
   // ⚠️ « À FAIRE » QUITTE CET ÉCRAN : ses groupes sont PUBLIÉS pour leurs onglets, chacun avec son geste. Seulement une
   // fois les lectures arrivées ; des groupes absents (null) = la base ne répond pas : la publication d'avant reste.
   React.useEffect(() => { if (pret && pretLu && Array.isArray(groupes)) publierARegler(groupes); });
@@ -268,6 +284,8 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
   const rien = pret && n === 0 && nRet === 0;
   const point = retraits && Array.isArray(retraits.points) ? retraits.points[0] : null;
   const lignesV = ventes && ventes.etat === 'lu' && Array.isArray(ventes.lignes) ? ventes.lignes.slice(0, 5) : [];
+  const ventesAttente = tenirPlace && !lignesV.length && (!ventes || ventes.etat === 'encours' || ventes.etat === undefined);
+  const ventesArrivent = useArrive(lignesV.length > 0, 'journee-ventes');   // (24 nov., « sans latence ») déjà connues au montage ⇒ là d'un coup
   // « Argent à venir » : seulement s'il est lu ET qu'il y en a (« 0 € à venir » n'apprend rien).
   const aVenirLu = !!aVenir && aVenir.valeur != null && aVenir.valeur > 0;
   const image = (src, taille) => (src && Photo ? <Photo className="n-vignette" data-n-taille={taille} src={src} alt="" width={taille} height={taille} loading="lazy" decoding="async"/> : <Vignette taille={taille} icone={<Icon name="cintre" size={22}/>}/>);
@@ -298,7 +316,11 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
           {/* (22 nov. soir, maquettes de Julien) DEUX CASES côte à côte : « 6 à envoyer » (l'échéance qui presse en ambre) |
               « 3 à retirer » (le point relais). Les mêmes nombres, les mêmes repères (`data-v2-cj-ligne`), le même toucher. */}
           <CasesChiffres attrs={{ 'data-n-colis-duo': '' }} cases={[
+            // (24 nov., visuel-jeu) L'ANNEAU des bordereaux prêts sur les colis à envoyer — les MÊMES nombres que la phrase
+            // (`affiche.prets`, Comptabilite.jsx) ; pas lu ⇒ anneau en pointillé « — », jamais 0 ni plein ; rien à envoyer ⇒ pas d'anneau.
             { cle: 'envoyer', icone: <Icon name="truck" size={18}/>, libelle: tr('v2.envoyer.titre'), valeur: lecture || n == null ? '—' : nombre(n), sous: envSous, tonSous: alerteEnv ? 'ambre' : undefined,
+              visuel: lecture || n === 0 ? null : <Anneau valeur={n != null && affiche && affiche.prets ? affiche.prets.n : null} total={n} taille={40} epaisseur={5} centre={<Icon name="printer" size={15}/>}
+                fait={!!(affiche && affiche.prets && affiche.prets.exact)} libelle={n != null && affiche && affiche.prets ? tr('jeu.anneauPrets', { n: affiche.prets.n, total: n }) : tr('jeu.pasSu')} className="n-cc-anneau"/>,
               onClick: () => onColis && onColis(null), attrs: { 'data-v2-cj-ligne': 'envoyer', 'data-v2-cj-n': n == null ? '' : String(n), 'data-v2-ecart': (affiche && affiche.sous) || '', 'data-v2-alerte': alerteEnv ? 'poster' : undefined } },
             { cle: 'retirer', icone: <Icon name="pin" size={18}/>, libelle: tr('v2.retirer.titre'), valeur: lecture || nRet == null ? '—' : nombre(nRet), sous: retSous,
               tonSous: retraits && retraits.premier && retraits.premier.ambre ? 'ambre' : point && point.lieu && nRet > 0 ? 'lieu' : undefined,
@@ -356,15 +378,30 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
           attrs={{ 'data-journee-prevision': retraits.prevision.quand }}/> : null}
       </Carte>
     ),
-    ventes: () => (
+    // (24 nov., livrable-2) Pendant la lecture, « Dernières ventes » tient sa place (cinq rangées en squelette) : à l'ordinateur,
+    // arrivée après coup, elle poussait « Tes chiffres » de 330 px.
+    ventes: () => (!lignesV.length && ventesAttente ? (
+      <Carte titre={tr('v2.dv.titre')} attrs={{ 'data-v2-bloc-attente': 'ventes', 'aria-busy': 'true' }}>
+        <div className="n-dv-attente" aria-hidden="true">{[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} className="n-dv-os"><span className="n-os n-dv-os-photo"/><span className="n-dv-os-txt"><span className="n-os n-os-ligne" style={{ width: (62 - i * 6) + '%' }}/><span className="n-os n-os-second" style={{ width: '38%' }}/></span><span className="n-os n-os-ligne n-dv-os-prix"/></div>))}</div>
+      </Carte>
+    ) : (
       <Carte titre={tr('v2.dv.titre')} attrs={{ 'data-v2-bloc': 'ventes', 'data-v2-dernieres': String(lignesV.length) }}>
-        {lignesV.map((l) => (
-          <Rangee key={l.cle} vignette={image(l.photo, 44)} titre={l.titre || tr('v2.dv.vente', { site: l.site })} lignes={2} plaque={<>{l.site ? <LogoSite site={String(l.site).toLowerCase()} taille={16}/> : null}{l.num ? <Plaque numero={l.num}/> : null}</>}
-            sousTitre={[l.site, ilYaCourt(l.ts)].filter(Boolean).join(' · ')} valeur={l.prix} valeurForte onClick={l.ouvrir || onVentes} attrs={{ 'data-v2-vente': l.cle }}/>
-        ))}
+        {/* (24 nov., visuel-jeu — « comme un inventaire ») Les dernières ventes en TUILES : la photo (celle que la source a trouvée
+            par identité), l'étiquette du N°, le prix et « il y a » dessous ; défilement de côté au téléphone. */}
+        {lignesV.length ? <div className="n-inventaire" data-n-jeu="ventes" role="list">
+          {lignesV.map((l, k) => (
+            <CaseInventaire key={l.cle} i={k} arrive={ventesArrivent} onClick={l.ouvrir || onVentes} attrs={{ 'data-v2-vente': l.cle, 'data-n-vente-tx': l.tx || undefined,
+              'aria-label': [l.titre || tr('v2.dv.vente', { site: l.site }), l.num ? 'N°' + l.num : '', l.prix, ilYaCourt(l.ts)].filter(Boolean).join(' · ') }}>
+              <TuilePaire photo={l.photo || ''} numero={l.num || ''} icone={l.photo ? '' : 'cash'} genre="vente" Icon={Icon} taille="xl" Photo={Photo}/>
+              <span className="n-inventaire-prix">{l.site ? <LogoSite site={String(l.site).toLowerCase()} taille={14}/> : null}<span>{l.prix || '—'}</span></span>
+              <span className="n-inventaire-quand">{ilYaCourt(l.ts)}</span>
+            </CaseInventaire>
+          ))}
+        </div> : null}
         {aVenirLu && !aPilotage ? <Rangee titre={tr('v2.dv.aVenir')} valeur={(aVenir.partiel ? tr('journee.moins') + ' ' : '') + aVenir.texte} fin="chevron" onClick={aVenir.ouvrir} attrs={{ 'data-v2-avenir': cents(aVenir.valeur) }}/> : null}
       </Carte>
-    ),
+    )),
     // LA COURBE DES 30 JOURS (vendu par jour) : toucher ou glisser choisit un jour ; ses chiffres dans l'en-tête.
     courbe: () => {
       const L = courbe && Array.isArray(courbe.jours) ? courbe.jours : [];
@@ -539,10 +576,10 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
       </Carte>
     ),
   };
-  const presents = { colis: true, chiffres: !!chiffres, envoyer: n > 0 || rien, retirer: !!nRet || !!(retraits && retraits.prevision), ventes: lignesV.length > 0 || aVenirLu, courbe: !!courbe, comptes: true, annonces: true, vrm: true, stock: true, vitesse: true, prevision: true, marge: true, marques: true, dorment: true, avenir: true, vues: true, retour: !!alerte && alerte.id === 'retour' };
+  const presents = { colis: true, chiffres: !!chiffres, envoyer: n > 0 || rien, retirer: !!nRet || !!(retraits && retraits.prevision), ventes: lignesV.length > 0 || aVenirLu || ventesAttente, courbe: !!courbe, comptes: true, annonces: true, vrm: true, stock: true, vitesse: true, prevision: true, marge: true, marques: true, dorment: true, avenir: true, vues: true, retour: !!alerte && alerte.id === 'retour' };
   // L'ordre et les cartes montrées sont LES SIENS (« Personnaliser », `vrm_aujourdhui_cartes`, synchronisé) ; avant que
   // les lectures soient là, seules les chiffres sont montrés à leur taille (rien qui saute ensuite).
-  const montrees = choix.ordre.filter((k) => choix.montrees.has(k) && presents[k] && (k === 'chiffres' || k === 'colis' || pret));
+  const montrees = choix.ordre.filter((k) => choix.montrees.has(k) && presents[k] && (k === 'chiffres' || k === 'colis' || pret || (k === 'ventes' && ventesAttente)));
   // « PERSONNALISER » (19 nov., « ça doit être bien fait ») : retirer / ajouter / déplacer ; l'écran derrière suit en direct.
   const poser = (ordre, m) => { if (cartes && cartes.poser) cartes.poser({ ordre, montrees: CARTES_AUJOURDHUI.filter((x) => m.has(x)) }); };
   const basculer = (k) => { const m = new Set(choix.montrees); if (m.has(k)) m.delete(k); else m.add(k); poser(choix.ordre, m); };
@@ -624,8 +661,12 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
               ensuite, la date de lecture ; jamais 0 € pour « pas lu ». */}
           {/* (23 nov., iPhone) le premier écran = l'essentiel : héros, gestes, Colis ; les N° à écrire viennent après. */}
           {!ordinateur ? aEcrire : null}
-          {porteMonnaie !== undefined ? <PorteMonnaie pm={porteMonnaie} montant={montant} Icon={Icon}/> : null}
-          {pret && courbe.parSite && courbe.parSite[fen] && courbe.parSite[fen].length ? <ParSite courbe={courbe} f={fen} montant={montant} nomMois={chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : ''}/> : null}
+          {/* (24 nov., livrable-2 — « zéro saut ») Le porte-monnaie et « Par site » arrivaient ~9 s après l'ouverture (base lente) et
+              poussaient « Tes chiffres » de 270 px. Tant que l'écran lit (`!pret`), leur place est TENUE : les mêmes cartes, chiffres
+              en squelette (src/natif/outils.js) ; lu sans rien à montrer, la place se rend (un retrait, jamais une poussée). */}
+          {porteMonnaie !== undefined ? <PorteMonnaie pm={porteMonnaie} montant={montant} Icon={Icon}/> : tenirPlace ? <PorteMonnaie pm={undefined} enLecture montant={montant} Icon={Icon}/> : null}
+          {pret && courbe.parSite && courbe.parSite[fen] && courbe.parSite[fen].length ? <ParSite courbe={courbe} f={fen} montant={montant} nomMois={chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : ''}/>
+            : tenirPlace ? <ParSiteAttente f={fen} nomMois={chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : ''}/> : null}
         </Colonne> : null}
         {montrees.filter((k) => k !== 'courbe' && !(aPilotage && k === 'colis')).map((k) => (
           // (23 nov.) Sans graphique, Colis (deux cases) prend la rangée entière : sinon « Dernières ventes », arrivée après la lecture,

@@ -292,6 +292,12 @@
     .n-vt-rang .n-rangee-sous { flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
     .n-rangee.n-vt-rang > .n-rangee-pied, .n-rangee.n-vt-rang[data-n-a-pied] > .n-rangee-pied { position: absolute; z-index: 2; right: 10px; bottom: 6px; margin: 0; padding: 0; border: 0; background: none; }
     .n-rangee.n-vt-rang > .n-rangee-pied .n-vt-achat { gap: 2px; }
+    /* (24 nov., livrable-2 — « sans bordereau · à véri… » coupé sur chaque ligne) La ligne de détail n'est JAMAIS coupée : chaque
+       morceau (« sans bordereau », « à vérifier », « vers le 26 nov. ») reste entier et, s'il ne tient pas, passe à la ligne
+       (deux lignes au plus) — la rangée grandit de 16 px au lieu de rogner le texte. */
+    .n-vt-rang .n-rangee-sous { overflow: visible; }
+    .n-vt-rang .n-rangee-sous-texte[data-n-lignes] { white-space: normal; overflow: visible; text-overflow: clip; display: block; }
+    .n-vt-rang .n-vt-morceau { white-space: nowrap; }
     .n-actions-rondes .n-action-ronde-disque { box-shadow: 0 0 0 .5px var(--n-bord), 0 1px 2px rgb(29 29 31 / .05); }
   }
 }

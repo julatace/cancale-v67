@@ -485,8 +485,9 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **24 nov. · « Vinted a agi » : UNE carte** (#1321+#1346) : ligne par compte, feuille aux photos (N°), un geste. `2026-11-23-moderation-carte.md`. Geste : aucun.
-- **24 nov. · Observer Vinted (ext. 5.440.3, `claude/observation-vinted`)** : interrupteur 10 min (carte du logo, page Extension) ; la page note pages, requêtes (clés et types), clics (`isTrusted`), cloche — formes seulement, rebâties par le fond, ligne `observation_vinted_{compte}_{nav}`, « Envoyer l'observation » ; rien envoyé à Vinted. `2026-11-24-observation-vinted.md`. Geste : installer, Observer, un envoi (Bleam ou main), Envoyer l'observation.
+- **24 nov. · Parcours iPhone (`claude/parcours-iphone`, APRÈS #1326)** : un robot joue sa journée au doigt (banc `parcours-iphone`, WebKit dans `iphone-webkit.yml`) ; corrigés : le code au comptoir que le « retour » ne fermait pas (VRM quitté), « Colis mondial_relay » dans la loupe ; rapportés : sauts d'Achats/Argent/loupe (données lues après). `2026-11-24-parcours-iphone.md`. Geste : aucun.
+- **24 nov. · Annonces + Stock (`claude/visuel-annonces`)** : la LISTE reste par défaut, rangée nette 72 px (photo 60, étiquette N°, ♡ 👁, jamais « 0 j »), glisser ⇒ Baisser/Republier, puces au pouce, liste virtualisée, sans latence ; « Détaillé » (tuiles) dans ⋯ ; Stock : étiquette papier, creux. `2026-11-24-visuel-annonces.md`. Geste : aucun.
+- **24 nov. · Argent, Messages, Paramètres visuels (`claude/visuel-argent`)** : anneau, jauges micro/TVA, « À venir » en cartes, tuiles de paire ; affichage seul. `2026-11-24-visuel-argent.md`. Geste : aucun.
 - **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
