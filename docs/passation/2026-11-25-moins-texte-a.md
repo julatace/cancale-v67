@@ -52,7 +52,30 @@ langues (clés neuves : `src/i18n/langues/*/moinsTexteA.js` ; valeurs raccourcie
   pour un écran dont les mots sont surtout des NOMS DE GESTES (Annonces, menus « ⋯ », fiche d'une annonce ou d'un N° : on ne
   retire jamais un geste) ; « rien de plus » pour Colis (ses rangées sont le chantier d'un autre) et le « ⋯ » d'Achats (12 mots).
   ⚠️ C'est un écart à la consigne « ≤ 55 % par écran » : sur ces écrans-là, 55 % voudrait retirer des gestes. Dit, pas caché.
-- **Mots** (voir le tableau du rapport, rempli à la dernière mesure).
+- **Mots d'interface vus** (origin/main → ce lot ; clair = sombre) :
+
+  | écran | 390 px | 1512 px |
+  |---|---|---|
+  | Annonces (En ligne) | 12 → 9 | 100 → 25 |
+  | Republier | 45 → 14 | — (segment du téléphone) |
+  | fiche d'une annonce | 52 → 42 | 62 → 52 |
+  | « ⋯ » d'une annonce | 31 → 25 | — |
+  | « ⋯ » Actions d'Annonces | 42 → 30 | — |
+  | Achats | 169 → 67 | 196 → 81 |
+  | fiche d'un achat | 54 → 26 | 28 → 8 |
+  | « ⋯ » d'Achats | 12 → 11 | — |
+  | Colis (hors rangées) | 10 → 10 | 1 → 1 |
+  | Ton imprimante | 42 → 11 | 42 → 11 |
+  | loupe « Tout sur le N° » | 46 → 23 | 46 → 23 |
+  | fiche d'un N° | 52 → 42 | 62 → 52 |
+  | **tout le périmètre** | **567 → 310 (55 %)** | **537 → 253 (47 %)** |
+
+- **Après** : 127 verts / 0 rouge à 390 (clair, sombre), 87 / 0 à 1512 (clair, sombre).
+- **origin/main** (le banc copié dans l'arbre de fb8916c4a, son build) : 23 rouges à 390, 8 à 1512 (M partout, T « Les plus
+  endormies d'abord… » 392 > 338 px, la somme du périmètre).
+- **Mutations** (`MUTATION=phrase|coupe|geste`, sur la loupe) : chacune rougit SA mesure (M 44 > 25 ; T « 1 234,56 € » 109 > 30 ;
+  G `partout-num` absent).
+- Planches avant/après (mots comptés en en-tête) : `…/scratchpad/planches/<écran>-{390-clair,390-sombre,1512-clair}.png` (hors dépôt).
 - Audits verts : traduction, quoi-de-neuf, tdz, coherence, icones, boutons, style-vintex, boutons-natifs ; `npm run build`.
   `audit-stockage-sur` : les mêmes 5 rouges qu'origin/main (fichiers non touchés), aucun ajouté.
 
