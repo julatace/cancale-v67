@@ -53,7 +53,9 @@ export default function AchatsTableau({ lignes, filtres = [], compte = '', majLe
       rendu: (l) => (l.code ? (onCode ? <button type="button" data-n-famille="lien" className="n-eg-cellule n-tt-code" data-achat-code={l.cle} aria-label={tr('tableau.voirCode', { code: l.code })} onClick={(e) => { e.stopPropagation(); onCode(l); }}>{l.code}</button> : <span className="n-tt-code">{l.code}</span>) : null) },
     { cle: 'statut', libelle: tr('tableau.col.statut'), tri: (l) => CATEGORIES_ACHAT.indexOf(l.statut) },
   ];
-  const statuts = CATEGORIES_ACHAT.map((c) => ({ cle: c, libelle: tr('tableau.achat.' + c), ton: TON[c] }));
+  // (25 nov., moins-texte-a) « Arrivé » et « En route » dessinés (une coche, un camion) ; les gestes gardent leurs mots.
+  const ICONE = { arrive: 'check', route: 'truck' };
+  const statuts = CATEGORIES_ACHAT.map((c) => ({ cle: c, libelle: tr('tableau.achat.' + c), ton: TON[c], icone: ICONE[c] || null }));
   return (
     <TableauTravail id="achats" titre={tr('tableau.achats.titre')} compte={compte} majLe={majLe} onRafraichir={onRafraichir} lignes={rangees} statuts={statuts}
       statutsDefaut={['retirer', 'renvoyer', 'route', 'paye', 'arrive']} filtres={filtres} colonnes={colonnes}

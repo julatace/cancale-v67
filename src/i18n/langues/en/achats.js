@@ -386,7 +386,7 @@ export default {
   "achats.memeColis.delierEnCours": "Unlinking…",
   "achats.memeColis.delierRate": "The database didn’t remove the link — nothing changed. Try again.",
   "achats.relier.chercher": "Search my purchases",
-  "achats.serie.titre": { one: "{n} purchase arrived, no sale linked", other: "{n} purchases arrived, no sale linked" },
+  "achats.serie.titre": { one: "{n} arrived, no sale", other: "{n} arrived, no sale" },
   "achats.serie.sous": "Link them one after another",
   "achats.calculette": "Calculator",
 };

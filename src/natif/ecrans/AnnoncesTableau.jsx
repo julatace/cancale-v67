@@ -45,7 +45,8 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     return out.map(({ a, statut, groupe }) => ({
     cle: a.cle + '|' + groupe.cle, groupe, a, statut, titre: a.titre || tr('egalite.sansTitre'), photo: a.photo || '',
     // (21 nov.) Une annonce d'un compte bloqué dit sa dernière trace (« Lu le 21 nov. ») à la place de son état.
-    sous: [a.taille ? tr('egalite.taille', { t: a.taille }) : '', a.condition, statut === 'bloque' ? texteTrace(traceDe(a)) : ''].filter(Boolean).join(' · '),
+    // (25 nov., moins-texte-a) la taille déjà dans le titre (« … taille 36 ») n'est pas redite dessous (§7).
+    sous: [a.taille && !new RegExp('(^|[\\s,·(])' + String(a.taille).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[\\s,·)])', 'i').test(String(a.titre || '')) ? tr('egalite.taille', { t: a.taille }) : '', a.condition, statut === 'bloque' ? texteTrace(traceDe(a)) : ''].filter(Boolean).join(' · '),
     nonCochable: seulementBloque(a),
     texte: [a.titre, a.numero ? 'n' + a.numero + ' n°' + a.numero + ' ' + a.numero : '', a.taille, ...a.annonces.map((x) => x.pseudo + ' ' + nomSite(x.site))].join(' '),
     prixGrille: a.prix != null ? euros(a.prix) : '',
@@ -99,7 +100,8 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
   ];
   const filtresL = liaison ? [...filtres, { cle: 'liaison', libelle: tr('liaL.col'), valeur: filtreLien, onChange: setFiltreLien,
     options: [{ cle: 'tous', libelle: tr('liaL.filtre.tous') }, { cle: 'arelier', libelle: tr('liaL.filtre.arelier') }, { cle: 'reliee', libelle: tr('liaL.filtre.reliee') }, { cle: 'propre', libelle: tr('liaL.filtre.propre') }] }] : filtres;
-  const statuts = STATUTS_TABLEAU.map((s) => ({ cle: s, libelle: tr('tableau.etat.' + s), ton: TON[s] }));
+  // (25 nov., moins-texte-a) « En ligne », l'état de presque chaque rangée, se dessine (un œil) ; les autres gardent leurs mots.
+  const statuts = STATUTS_TABLEAU.map((s) => ({ cle: s, libelle: tr('tableau.etat.' + s), ton: TON[s], icone: s === 'enligne' ? 'eye' : null }));
   const acts = actions.map((x) => ({ cle: x.cle, libelle: x.libelle, courante: !!x.courante, aucune: tr('tableau.actionAucuneIci'),
     pour: x.pour ? (l) => x.pour(l.a) : null, juger: x.juger ? (ls) => x.juger(unParArticle(ls)) : null }));
   const menuLigne = (l) => (seulementBloque(l.a) ? [{ cle: 'fiche', libelle: tr('tableau.ouvrir'), onClick: () => onOuvrir(l.a) }] : [

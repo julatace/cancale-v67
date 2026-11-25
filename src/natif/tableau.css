@@ -140,6 +140,8 @@
   .n-tt-etiquette[data-tt-ton="ambre"] { background: var(--n-ambre-fond); color: var(--n-ambre); box-shadow: inset 0 0 0 1px var(--n-ambre-bord); }
   .n-tt-etiquette[data-tt-ton="vert"] { background: var(--n-vert-fond); color: var(--n-vert); box-shadow: inset 0 0 0 1px var(--n-vert-bord); }
   .n-tt-etiquette[data-tt-ton="teal"] { background: var(--n-teal-fond); color: var(--n-teal); box-shadow: inset 0 0 0 1px var(--n-teal-bord); }
+  /* (25 nov., moins-texte-a) un statut dessiné : la pastille ronde à l'icône (le mot au lecteur d'écran). */
+  .n-tt-etiquette[data-tt-icone] { width: 26px; padding: 0; justify-content: center; }
 
   /* La grille : des cartes photo. */
   .n-tt-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; padding: 0 var(--n-marge); }

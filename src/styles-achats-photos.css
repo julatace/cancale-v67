@@ -60,7 +60,8 @@
 :root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-statut[data-achat-etat="geste"] { background: var(--a-ambre-fond) !important; color: var(--a-ambre-encre) !important; }
 :root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-statut[data-achat-etat="annule"] { color: var(--w-gris) !important; }
 /* (25 nov., moins-texte-a) « Arrivé » / « En route » dessinés : une pastille ronde à l'icône (le mot au lecteur d'écran). */
-:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-statut[data-achat-statut-icone] { width: 22px !important; padding: 0 !important; justify-content: center !important; color: var(--w-gris) !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-statut[data-achat-statut-icone] { width: 20px !important; height: 20px !important; padding: 0 !important; justify-content: center !important; color: var(--w-gris) !important; flex: none !important; }
+:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-pastilles:empty { display: none !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-statut[data-achat-statut-icone="truck"] { color: var(--w-encre) !important; }
 :root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-facture { display: inline-flex !important; margin: 0 !important; }
 /* Une pastille qui se touche : 44 px de haut au doigt (la cible), la pilule dessinée dedans (26 px). */

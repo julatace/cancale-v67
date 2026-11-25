@@ -44,7 +44,8 @@ export function ChoixPapier({ Feuille, valeur = null, puisImprimer = false, onCh
           <button key={f} type="button" role="radio" aria-checked={valeur === f ? 'true' : 'false'} className="vrm-impr-papier" data-impr-papier-choix={f} data-actif={valeur === f ? '1' : undefined}
             onClick={() => onChoisir(f)}>
             <PictoPapier format={f}/>
-            <span className="vrm-impr-papier-nom">{tr(`impr.format.${f}`)}</span>
+            {/* « Classique · A4 » : le nom, puis la mesure en gris dessous (rien ne se coupe au milieu). */}
+            <span className="vrm-impr-papier-nom">{tr(`impr.format.${f}`).split(' · ').map((x, i) => (i ? <span key={i} className="vrm-impr-papier-mesure">{x}</span> : <span key={i}>{x}</span>))}</span>
             <span className="vrm-sr-seul">{tr(`cp.guide.imprimante.${f}`)}</span>
             <span className="vrm-impr-diode" aria-hidden="true"/>
           </button>

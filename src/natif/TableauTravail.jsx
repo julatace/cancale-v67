@@ -104,8 +104,11 @@ function ChoixMenu({ choisi, onClick, libelle, n = null, attrs = null, indisponi
   );
 }
 
-function Etiquette({ ton = 'neutre', children }) {
+function Etiquette({ ton = 'neutre', icone = null, children }) {
   if (!children) return <span className="n-tt-vide-cellule">—</span>;
+  // (25 nov., moins-texte-a) Un statut qui porte `icone` (choisi par l'écran : « Arrivé », « En route », « En ligne ») se DESSINE :
+  // l'icône dans sa pastille, le mot au lecteur d'écran et au survol. Sans `icone`, rien ne change (Ventes, les gestes à faire).
+  if (icone) return <span className="n-tt-etiquette" data-tt-ton={ton} data-tt-icone="" title={typeof children === 'string' ? children : undefined}>{icone}<span className="vrm-sr-seul">{children}</span></span>;
   return <span className="n-tt-etiquette" data-tt-ton={ton}>{children}</span>;
 }
 
@@ -385,7 +388,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
                   </span>
                 </td>
                 {colsVues.filter((c) => c.cle !== 'statut' && !c.apresStatut).map((c) => <td key={c.cle} className="n-tt-td" data-tt-col={c.cle} data-tt-num={c.num ? '1' : undefined}>{celluleVal(c, l)}</td>)}
-                {colonnes.some((c) => c.cle === 'statut') && !cachees.has('statut') ? <td className="n-tt-td" data-tt-col="statut"><Etiquette ton={st ? st.ton : 'neutre'}>{l.statutLibelle || (st ? st.libelle : '')}</Etiquette></td> : null}
+                {colonnes.some((c) => c.cle === 'statut') && !cachees.has('statut') ? <td className="n-tt-td" data-tt-col="statut"><Etiquette ton={st ? st.ton : 'neutre'} icone={st && st.icone && !l.statutLibelle ? ic(st.icone, 14) : null}>{l.statutLibelle || (st ? st.libelle : '')}</Etiquette></td> : null}
                 {colsVues.filter((c) => c.apresStatut).map((c) => <td key={c.cle} className="n-tt-td" data-tt-col={c.cle} data-tt-num={c.num ? '1' : undefined}>{celluleVal(c, l)}</td>)}
                 {menuLigne ? <td className="n-tt-td n-tt-td-menu" onClick={(e) => e.stopPropagation()}>
                   {m.length ? <span className="n-tt-ancre" data-tt-ancre="">

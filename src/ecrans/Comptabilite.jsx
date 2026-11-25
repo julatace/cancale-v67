@@ -26768,6 +26768,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 {/* (23 nov., capture de Julien : « 12 nov. · · Relais », « 13 nov.   ·  N°247 ») La sous-ligne se construit des
                     seuls morceaux présents, un séparateur unique entre eux (`data-sep="js"` éteint les séparateurs dessinés en CSS). */}
                 <div className="vrm-buy-meta" data-sep="js" style={{color:C.muted}}>
+                  {/* (25 nov., moins-texte-a) « Arrivé » et « En route » se DESSINENT (une coche, un camion) en tête de la sous-ligne ; le mot reste
+                      au lecteur d'écran et au survol. Un geste (« À retirer », « À renvoyer »), « Annulé » et « Payé » gardent leurs mots (pastille). */}
+                  {!cancelled && !st.retour && (st.step===4 || st.step===2) ? <span className="vrm-buy-statut" data-achat-etat="neutre" data-achat-statut-icone={st.step===4?'check':'truck'} title={st.label}><Icon name={st.step===4?'check':'truck'} size={14} aria-hidden="true"/><span className="vrm-sr-seul">{st.label}</span></span> : null}
                   {/* (5 nov., revue 2.16) Achats : le compte en mots, sans pastille de couleur (hors palette). */}
                   {!unCompte && !achatsGroupees && <AcctTag acc={o._acc} name={accNameOf(o._acc)} pastille={false}/>}
                   <span style={{whiteSpace:'nowrap'}}>{o.date?dateFr(o.date, new Date(o.date).getFullYear()===new Date().getFullYear() ? {day:'numeric',month:'short'} : {day:'numeric',month:'short',year:'numeric'}):''}
@@ -26790,10 +26793,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     la ligne — il n'était que dans le menu ⋯. Son contenu (et un
                     PDF joint) ne se lit qu'au clic. */}
                 <div className="vrm-buy-pastilles">
-                  {/* (25 nov., moins-texte-a) « Arrivé » et « En route » se DESSINENT (une coche, un camion : pastille d'état) — le mot reste au
-                      lecteur d'écran et au survol ; un geste (« À retirer », « À renvoyer ») et « Annulé » gardent leurs mots. */}
-                  {(()=>{ const etat = cancelled?'annule':(st.retour||st.step===3)?'geste':'neutre'; const ico = etat==='neutre' ? (st.step===4 ? 'check' : st.step===2 ? 'truck' : null) : null;
-                    return <span className="vrm-buy-statut" data-achat-etat={etat} data-achat-statut-icone={ico || undefined} title={ico ? st.label : undefined}><i style={{background:st.color}}/>{ico ? <><Icon name={ico} size={14} aria-hidden="true"/><span className="vrm-sr-seul">{st.label}</span></> : st.label}</span>; })()}
+                  {/* (25 nov., moins-texte-a) « Arrivé » / « En route » : dessinés au DÉBUT de la sous-ligne (voir plus haut) ; ici les états à mots. */}
+                  {(()=>{ const etat = cancelled?'annule':(st.retour||st.step===3)?'geste':'neutre'; if (etat==='neutre' && (st.step===4 || st.step===2)) return null;
+                    return <span className="vrm-buy-statut" data-achat-etat={etat}><i style={{background:st.color}}/>{st.label}</span>; })()}
                   {/* (22 nov., lot achats-lot) Un lot PROUVÉ par SA transaction, peut-être un lot (le titre), ou un achat DIVISÉ (ses N°) :
                       l'étiquette se touche et ouvre « Diviser cet achat » (un toucher). Jamais affirmé par le titre seul. */}
                   {!cancelled && (()=>{ const tl = texteLotRangee(o); if (!tl) return null; const l = lotDeRangee(o);
