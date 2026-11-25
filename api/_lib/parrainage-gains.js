@@ -20,11 +20,11 @@
 import { sbCle } from './cle.js';
 import { stripeApi, stripePret } from './stripe.js';
 import { fetchAvecDelai } from './fetch-delai.js';
-import { parrainageOuvert, crediter, clientDe, emailDe, nomDe } from './parrainage.js';
+import { parrainageOuvert, crediter, clientDe, emailDe, nomDe, nomAffichable, pseudosVintedDe } from './parrainage.js';
 import { paiementsDeFacture, annulationDeLEvenement, remboursementDe } from './partenaires-regle.js';
 import {
-  decisionGain, chiffresParrain, gainsACrediter, gainsAAnnulerAntiAbus, modeActuel, aVerserAdmin,
-  ibanPropre, ibanMasque, titulairePropre, MODES_REGLEMENT, COUPON_FILLEUL, POURCENT_PARRAIN,
+  decisionGain, chiffresParrain, vueFilleuls, rangsInscription, gainsACrediter, gainsAAnnulerAntiAbus, modeActuel, aVerserAdmin,
+  gainNet as gainNetDe, ibanPropre, ibanMasque, titulairePropre, MODES_REGLEMENT, COUPON_FILLEUL, POURCENT_PARRAIN,
   REMISE_FILLEUL_POURCENT, JOURS_OFFERTS, SEUIL_VIREMENT_CENTIMES, DELAI_DUE_JOURS,
 } from './parrainage-regle.js';
 
@@ -200,24 +200,112 @@ async function abonnementsVivants(owners) {
 }
 export const regleAffichee = () => ({ pourcent: POURCENT_PARRAIN, remise: REMISE_FILLEUL_POURCENT, joursOfferts: JOURS_OFFERTS, seuilCentimes: SEUIL_VIREMENT_CENTIMES, delaiJours: DELAI_DUE_JOURS });
 // { installe:false } · { installe:true, mode, iban, titulaire?, chiffres } · undefined pas su.
-export async function vueGains(owner, maintenant = Date.now()) {
+// Les abonnements de ces comptes : Map owner → { statut, plan, fin_periode } · null pas su.
+async function abonnementsDe(owners) {
+  const m = new Map();
+  for (let i = 0; i < owners.length; i += 100) {
+    const lot = owners.slice(i, i + 100);
+    const r = await lireT(`abonnements?owner=in.(${lot.map(enc).join(',')})&select=owner,statut,plan,fin_periode`);
+    if (!r.ok) return null;
+    for (const x of r.lignes) if (x && x.owner) m.set(String(x.owner), { statut: x.statut, plan: x.plan, fin_periode: x.fin_periode });
+  }
+  return m;
+}
+// Les parrainages d'un parrain (avec `refus` si la 037 est passée) · null pas su.
+async function lignesParrain(parrain) {
+  let r = await lireT(`parrainages?parrain=eq.${enc(parrain)}&select=filleul,inscrit,refus,credit_filleul_le&limit=1000`);
+  if (!r.ok) r = await lireT(`parrainages?parrain=eq.${enc(parrain)}&select=filleul,inscrit,credit_filleul_le&limit=1000`);
+  return r.ok ? r.lignes : null;
+}
+
+// ── LE PRÉNOM QU'UN FILLEUL MONTRE À SON PARRAIN (25 nov.) ──────────────────
+// PAR DÉFAUT RIEN (« Filleul 1 »). Seul le FILLEUL l'active (à l'inscription par lien, ou sur
+// son écran), et le retire quand il veut. Rangé par la route (`app_data.vrm_parrainage_montrer`)
+// et REVALIDÉ à chaque lecture (`nomAffichable` : jamais un e-mail, un pseudo Vinted, un lien, un
+// numéro). Une lecture ratée ⇒ aucun nom (jamais une identité « au cas où »).
+export const MONTRER_ID = 'vrm_parrainage_montrer';
+export async function nomsMontres(filleuls) {
+  const noms = new Map();
+  const ids = [...new Set(filleuls.map(String).filter((x) => UUID.test(x)))];
+  for (let i = 0; i < ids.length; i += 100) {
+    const lot = ids.slice(i, i + 100).map(enc).join(',');
+    const [a, v] = await Promise.all([
+      lireT(`app_data?owner=in.(${lot})&id=eq.${MONTRER_ID}&select=owner,montrer:data->>montrer,nom:data->>nom`),
+      lireT(`vinted_accounts?owner=in.(${lot})&select=owner,login`),
+    ]);
+    if (!a.ok || !v.ok) return new Map();
+    for (const x of a.lignes) {
+      if (!x || String(x.montrer) !== 'true' || !x.nom) continue;
+      const pseudos = v.lignes.filter((y) => String(y.owner) === String(x.owner)).map((y) => y.login).filter(Boolean);
+      const ok = nomAffichable(x.nom, pseudos);
+      if (ok.ok) noms.set(String(x.owner), ok.nom);
+    }
+  }
+  return noms;
+}
+// Le choix du filleul lui-même : { montrer, nom } · undefined pas su.
+export async function lireMontrer(owner) {
   if (!service() || !UUID.test(String(owner || ''))) return undefined;
-  const [g, c, ve, ib, v] = await Promise.all([
+  const r = await lireT(`app_data?owner=eq.${enc(owner)}&id=eq.${MONTRER_ID}&select=montrer:data->>montrer,nom:data->>nom&limit=1`);
+  if (!r.ok) return undefined;
+  const x = r.lignes[0];
+  return { montrer: !!(x && String(x.montrer) === 'true' && x.nom), nom: (x && x.nom) || null };
+}
+// Poser le choix (montrer / retirer). Rend { ok, http, montrer, nom?, raison?, message? }.
+export async function poserMontrer(owner, montrer, brut, maintenant = Date.now()) {
+  if (!service() || !UUID.test(String(owner || ''))) return { ok: false, http: 503, raison: 'pas-su' };
+  let nom = null;
+  if (montrer === true) {
+    const pseudos = await pseudosVintedDe(owner);
+    if (!pseudos) return { ok: false, http: 503, raison: 'pas-su', message: 'Pas enregistré. Réessaie dans un instant.' };
+    const v = nomAffichable(brut, pseudos);
+    if (!v.ok) return { ok: false, http: 400, raison: v.raison, message: v.message };
+    nom = v.nom;
+  }
+  const at = new Date(maintenant).toISOString();
+  const w = await ecrire('POST', 'app_data?on_conflict=owner,id', [{ owner, id: MONTRER_ID, data: { montrer: montrer === true, nom, le: at }, updated_at: at }], 'resolution=merge-duplicates,return=minimal');
+  return w.ok ? { ok: true, http: 200, montrer: montrer === true, nom } : { ok: false, http: 503, raison: 'ecriture', message: 'Pas enregistré. Réessaie dans un instant.' };
+}
+
+// { installe:false } · { installe:true, mode, iban, chiffres, filleuls, potentiel } · undefined pas su.
+// `prix` = { solo, pro } en centimes : les prix des CGV (passés par la route, jamais en dur ici).
+// `identites` (Julien seul) : Map filleul → libellé (son e-mail) à la place du prénom consenti.
+export async function vueGains(owner, maintenant = Date.now(), prix = {}, identites = null) {
+  if (!service() || !UUID.test(String(owner || ''))) return undefined;
+  const [g, c, ve, ib, v, lignes] = await Promise.all([
     lireT(`parrainage_gains?parrain=eq.${enc(owner)}&select=${CHAMPS_GAIN}&limit=2000`),
     lireT(`parrainage_choix?parrain=eq.${enc(owner)}&select=mode,le&order=le.asc&limit=1000`),
     lireT(`parrainage_versements?parrain=eq.${enc(owner)}&select=montant_centimes,verse_le&limit=1000`),
     lireT(`parrainage_iban?parrain=eq.${enc(owner)}&select=iban,titulaire&limit=1`),
     verificationsDe(owner),
+    lignesParrain(owner),
   ]);
   if ([g, c, ve, ib].some((x) => !x.ok && x.absent)) return { installe: false };
-  if (!g.ok || !c.ok || !ve.ok || !ib.ok || !v) return undefined;
-  const owners = [...new Set(g.lignes.map((x) => x.filleul).filter((x) => UUID.test(String(x || ''))))];
-  const actifs = owners.length ? await abonnementsVivants(owners) : new Set();
+  if (!g.ok || !c.ok || !ve.ok || !ib.ok || !v || !lignes) return undefined;
+  const owners = [...new Set([...g.lignes.map((x) => x.filleul), ...lignes.map((x) => x.filleul)].filter((x) => UUID.test(String(x || ''))).map(String))];
+  const abos = owners.length ? await abonnementsDe(owners) : new Map();
+  const actifs = abos ? new Set([...abos].filter(([, a]) => ['active', 'past_due'].includes(String(a.statut))).map(([o]) => o)) : null;
+  const noms = identites instanceof Map ? identites : await nomsMontres(lignes.map((x) => x.filleul));
   const i = ib.lignes[0];
+  const vf = vueFilleuls({ lignes, abonnements: abos, gains: g.lignes, choix: c.lignes, verifies: v.verifies, versements: ve.lignes, prix, noms, maintenant });
   return {
     installe: true, mode: modeActuel(c.lignes, maintenant), iban: i && i.iban ? ibanMasque(i.iban) : null,
-    chiffres: chiffresParrain({ gains: g.lignes, choix: c.lignes, verifies: v.verifies, versements: ve.lignes, actifs, maintenant }),
+    chiffres: chiffresParrain({ gains: g.lignes, choix: c.lignes, verifies: v.verifies, versements: ve.lignes, actifs, maintenant, rangs: rangsInscription(lignes) }),
+    filleuls: vf.filleuls,
+    // ⚠️ DES ESTIMATIONS, jamais additionnées au gagné (§5) : l'écran les dit « estimé ».
+    potentiel: { estimation: true, moisCentimes: vf.potentielMoisCentimes, siTousCentimes: vf.siTousCentimes, nPayants: vf.nPayants, nPossibles: vf.nPossibles },
   };
+}
+// Julien : la même vue pour un parrain, avec l'identité de chaque filleul (son e-mail).
+export async function vueParrainAdmin(parrain, prix = {}, maintenant = Date.now()) {
+  if (!UUID.test(String(parrain || ''))) return { http: 400, corps: { ok: false, raison: 'parrain' } };
+  const lignes = await lignesParrain(parrain);
+  if (!lignes) return { http: 503, corps: { ok: false, raison: 'pas-su' } };
+  const identites = new Map();
+  for (const l of lignes) { const e = await emailDe(l.filleul); identites.set(String(l.filleul), e || null); }
+  const [vue, email, nom] = await Promise.all([vueGains(parrain, maintenant, prix, identites), emailDe(parrain), nomDe(parrain)]);
+  if (vue === undefined) return { http: 503, corps: { ok: false, raison: 'pas-su' } };
+  return { http: 200, corps: { ok: true, parrain, email: email || null, nom: nom || null, vue } };
 }
 
 // ── LE CHOIX DU PARRAIN (crédit / virement) ET SON IBAN ─────────────────────
@@ -268,7 +356,18 @@ export async function listeAVerser(maintenant = Date.now()) {
     const i = ibans.get(String(x.parrain));
     lignes.push({ ...x, email: email || null, nom: nom || null, iban: i ? i.iban : null, titulaire: i ? i.titulaire : null });
   }
-  return { http: 200, corps: { ok: true, installe: true, totalCentimes: a.totalCentimes, seuilCentimes: a.seuilCentimes, parrains: lignes } };
+  // (25 nov.) TOUS les parrains (Julien voit tout) : filleuls, payants, gagné — le détail par `vueParrainAdmin`.
+  const tous = [];
+  const parP = new Map();
+  for (const x of pr.lignes) { const k = String(x.parrain); if (!parP.has(k)) parP.set(k, []); parP.get(k).push(x); }
+  for (const [k, fs] of parP) {
+    const gs = (par.get(k) || { gains: [] }).gains.filter((y) => !y.annulee_le);
+    const deja = lignes.find((y) => y.parrain === k);
+    const [email, nom] = deja ? [deja.email, deja.nom] : await Promise.all([emailDe(k), nomDe(k)]);
+    tous.push({ parrain: k, email: email || null, nom: nom || null, filleuls: fs.length, payants: new Set(gs.map((y) => String(y.filleul))).size, gagneCentimes: gs.reduce((s, y) => s + gainNetDe(y), 0) });
+  }
+  tous.sort((a, b) => b.gagneCentimes - a.gagneCentimes || b.filleuls - a.filleuls);
+  return { http: 200, corps: { ok: true, installe: true, totalCentimes: a.totalCentimes, seuilCentimes: a.seuilCentimes, parrains: lignes, tous } };
 }
 const jourValide = (d) => (/^\d{4}-\d{2}-\d{2}$/.test(String(d || '')) && Number.isFinite(Date.parse(d + 'T12:00:00Z')) ? String(d) : '');
 export async function noterVerseParrain(corps, maintenant = Date.now()) {

@@ -152,7 +152,7 @@ export function nomAffichable(brut, pseudosVinted = []) {
   return { ok: true, nom };
 }
 // Les pseudos Vinted d'un vendeur · `undefined` pas su.
-async function pseudosVintedDe(owner) {
+export async function pseudosVintedDe(owner) {
   const j = await lireJson(`${SUPABASE_URL}/rest/v1/vinted_accounts?owner=eq.${encodeURIComponent(owner)}&select=login`);
   return j ? j.map((x) => x && x.login).filter(Boolean).map(String) : undefined;
 }

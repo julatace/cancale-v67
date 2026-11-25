@@ -56,6 +56,13 @@ const MUTATIONS = {
   'compte:remise-cumulee': ['api/compte.js', "    // (25 nov.) LE FILLEUL : −10 % sur son 1er mois payé (jamais cumulé avec un code partenaire).\n    else {", "    // (25 nov.) LE FILLEUL : −10 % sur son 1er mois payé (jamais cumulé avec un code partenaire).\n    {"],
   'compte:mois-au-lieu-semaine': ['api/compte.js', 'const p = await factureFilleulPayee(owner, client, obj, creditSemaine(PRIX_CGV.centimes));', 'const p = await factureFilleulPayee(owner, client, obj, PRIX_CGV.centimes);'],
   'compte:gain-oublie': ['api/compte.js', '    const g = await gainFacturePayee(owner, obj);', '    const g = { ok: true };'],
+  // (25 nov.) Tous les filleuls, le potentiel, la vie privée.
+  'regle:potentiel-prix-solo': ['api/_lib/parrainage-regle.js', "    const p = prixDe(plan || 'solo');", "    const p = prixDe('solo');"],
+  'regle:si-tous-sans-payants': ['api/_lib/parrainage-regle.js', '  return { filleuls, nPayants, nPossibles, potentielMoisCentimes: potentiel, siTousCentimes: potentiel + possibles };', '  return { filleuls, nPayants, nPossibles, potentielMoisCentimes: potentiel, siTousCentimes: possibles };'],
+  'regle:essai-vu-inscrit': ['api/_lib/parrainage-regle.js', "    else if (statut === 'trialing') { etat = 'essai';", "    else if (false) { etat = 'essai';"],
+  'gains:fuite-email': ['api/_lib/parrainage-gains.js', '  const noms = identites instanceof Map ? identites : await nomsMontres(lignes.map((x) => x.filleul));', '  const noms = new Map(await Promise.all(lignes.map(async (x) => [String(x.filleul), await emailDe(x.filleul)])));'],
+  'gains:consentement-ignore': ['api/_lib/parrainage-gains.js', "      if (!x || String(x.montrer) !== 'true' || !x.nom) continue;", "      if (!x || !x.nom) continue;"],
+  'gains:nom-non-revalide': ['api/_lib/parrainage-gains.js', '      if (ok.ok) noms.set(String(x.owner), ok.nom);', '      noms.set(String(x.owner), x.nom);'],
   'compte:admin-ouvert': ['api/compte.js', "  if (String(proprio) !== String(u.id)) return repondre(res, 403, { ok: false, raison: 'proprietaire' });", ''],
 };
 if (args.includes('--prouve')) {
@@ -102,7 +109,7 @@ const jetonDe = (id) => 'jt.x.' + id;
 const nouveauCompte = (i, o = {}) => { const id = uid(i); COMPTES[id] = { email: o.email || `vendeur${i}@exemple.test`, created_at: o.cree || iso(NOW - 2 * J) }; return id; };
 const tokens = () => Object.fromEntries(Object.entries(COMPTES).map(([id, c]) => [jetonDe(id), { id, ...c }]));
 const SCH = {
-  abonnements: { uniques: [['owner']] }, vrm_reglages: { uniques: [['cle']] },
+  abonnements: { uniques: [['owner']], defauts: { plan: null, fin_periode: null } }, vrm_reglages: { uniques: [['cle']] },
   parrainages: { uniques: [['filleul']] }, parrainage_codes: { uniques: [['owner'], ['code']] },
   vinted_accounts: {}, essais_gratuits: { uniques: [['cle']] }, app_data: { uniques: [['owner', 'id']] },
   partenaires: { uniques: [['id'], ['code'], ['jeton_empreinte']], defauts: { id: () => crypto.randomUUID(), pause_le: null, coupon: null, compte: null, contact: null } },
@@ -336,6 +343,65 @@ const facture = (client, o = {}) => {
     await vue(E.p);
     const ce = (soldes[E.cp] || []).filter((t) => /^gain:/.test(t.metadata.vrm_parrainage || ''));
     dit(ce.length === 1 && ce[0].metadata.vrm_parrainage === 'gain:in_e7', 'retour au crédit : seul le gain dû après le changement part sur le solde (aucun versé ne repart)', JSON.stringify(ce.map((t) => t.metadata.vrm_parrainage)));
+  });
+
+  await essaie('Q10 tous les filleuls, le potentiel, la vie privée', async () => {
+    // Un parrain, cinq filleuls : paie (Solo), paie (Pro), en essai (Pro), inscrit, a arrêté.
+    const P = nouveauCompte(800); db.t.vinted_accounts.push({ owner: P, vinted_user_id: '8000' }); abonne(P, 'cus_p800');
+    const code = (await vue(P)).code;
+    const F = [];
+    for (let i = 1; i <= 5; i++) {
+      const f = nouveauCompte(800 + i, { email: `filleul${i}.secret@exemple.test` }); db.t.vinted_accounts.push({ owner: f, vinted_user_id: String(8000 + i), login: 'pseudo_vinted_' + i });
+      await appel({ method: 'POST', mode: 'parrainage', headers: session(f), corps: { action: 'rattacher', code } });
+      db.t.parrainages.find((x) => x.filleul === f).inscrit = iso(NOW - (50 - i) * J);
+      F.push(f);
+    }
+    const sousc = (f, cus, statut, plan, fin) => { abonne(f, cus, statut); Object.assign(db.t.abonnements.find((x) => x.owner === f), { plan, fin_periode: fin || null }); cartes[cus] = ['fp_' + cus]; };
+    sousc(F[0], 'cus_q1', 'active', 'solo'); sousc(F[1], 'cus_q2', 'active', 'pro'); sousc(F[2], 'cus_q3', 'trialing', 'pro', iso(NOW + 4 * J));
+    sousc(F[4], 'cus_q5', 'canceled', 'solo', iso(NOW - 5 * J));
+    await webhook('invoice.paid', facture('cus_q1', { id: 'in_q1a', le: NOW - 30 * J })); await webhook('invoice.paid', facture('cus_q1', { id: 'in_q1b', le: NOW - 3 * J }));
+    await webhook('invoice.paid', facture('cus_q2', { id: 'in_q2a', montant: 1999, le: NOW - 20 * J }));
+    await webhook('invoice.paid', facture('cus_q5', { id: 'in_q5a', le: NOW - 35 * J }));
+    const brut = (await appel({ mode: 'parrainage', headers: session(P) })).corps;
+    const g = brut.gains, fl = g && g.filleuls;
+    dit(fl && fl.map((x) => x.etat).join(',') === 'paie,paie,essai,inscrit,arrete', 'cinq filleuls, dans l’ordre d’inscription : paie · paie · en essai · inscrit · a arrêté', fl && fl.map((x) => x.etat).join(','));
+    dit(fl && fl.map((x) => x.rang).join(',') === '1,2,3,4,5', '  numérotés 1 à 5 (stables, ordre d’inscription)');
+    dit(fl && fl[0].moisPayes === 2 && fl[0].gagneCentimes === 678 && fl[0].prochainCentimes === 339 && fl[0].paiements.length === 2, '  Filleul 1 (Solo) : 2 mois payés, 6,78 € gagnés, 3,39 € le mois prochain, ses 2 paiements', JSON.stringify(fl && fl[0]).slice(0, 200));
+    dit(fl && fl[1].plan === 'pro' && fl[1].prochainCentimes === 399, '  Filleul 2 (Pro) : 3,99 € le mois prochain (20 % du prix Pro, pas du Solo)');
+    dit(fl && fl[2].jusquau === iso(NOW + 4 * J).slice(0, 10) && fl[2].pourraitCentimes === 399 && fl[2].prochainCentimes === null, '  Filleul 3 en essai (Pro) jusqu’au …, pourrait rapporter 3,99 €/mois');
+    dit(fl && fl[3].pourraitCentimes === 339 && fl[4].pourraitCentimes === null && fl[4].le === iso(NOW - 5 * J).slice(0, 10), '  Filleul 4 inscrit : ~3,39 € possibles ; Filleul 5 a arrêté le … : rien d’estimé');
+    dit(g.potentiel.estimation === true && g.potentiel.moisCentimes === 738 && g.potentiel.siTousCentimes === 738 + 399 + 339, '« Potentiel / mois » 7,38 € ; « si tous payaient » 14,76 € — marqués ESTIMATION', JSON.stringify(g.potentiel));
+    dit(g.chiffres.totalCentimes === 339 * 2 + 399 + 339 && g.chiffres.totalCentimes !== g.chiffres.totalCentimes + g.potentiel.moisCentimes, '  le gagné (14,16 €) reste le gagné : l’estimation n’y est jamais ajoutée', g.chiffres.totalCentimes);
+    const texte = JSON.stringify(brut);
+    const fuites = F.filter((f) => texte.includes(f)).length + (texte.match(/secret@|pseudo_vinted_|cus_q/g) || []).length;
+    dit(fuites === 0 && fl.every((x) => x.nom === null), 'la RÉPONSE de la route ne porte aucune identité de filleul (ni uuid, ni e-mail, ni pseudo Vinted, ni client Stripe) sans son choix', 'fuites=' + fuites);
+    // Une ligne écrite par le navigateur (montrer: false) : rien ne sort.
+    db.t.app_data.push({ owner: F[3], id: 'vrm_parrainage_montrer', data: { montrer: false, nom: 'Zoé' } });
+    dit(!JSON.stringify((await appel({ mode: 'parrainage', headers: session(P) })).corps).includes('Zoé'), '  « montrer : non » écrit à la main : rien ne sort');
+    // Une ligne écrite à la main avec « montrer : oui » et son pseudo Vinted / son e-mail : REVALIDÉE, rien ne sort.
+    db.t.app_data.push({ owner: F[4], id: 'vrm_parrainage_montrer', data: { montrer: true, nom: 'pseudo_vinted_5' } });
+    const rv = JSON.stringify((await appel({ mode: 'parrainage', headers: session(P) })).corps);
+    dit(!rv.includes('pseudo_vinted_5'), '  « montrer : oui » écrit à la main avec son pseudo Vinted : revalidé, rien ne sort');
+    // Le filleul 1 choisit de montrer son prénom ; un pseudo Vinted est refusé.
+    const refus = await appel({ method: 'POST', mode: 'parrainage', headers: session(F[0]), corps: { action: 'montrer', montrer: true, nom: 'pseudo_vinted_1' } });
+    dit(refus.code === 400 && refus.corps.raison === 'pseudo-vinted', 'le filleul ne peut pas montrer son pseudo Vinted (400)', JSON.stringify(refus.corps));
+    const okm = await appel({ method: 'POST', mode: 'parrainage', headers: session(F[0]), corps: { action: 'montrer', montrer: true, nom: 'Léa' } });
+    const apres = (await appel({ mode: 'parrainage', headers: session(P) })).corps;
+    dit(okm.code === 200 && apres.gains.filleuls[0].nom === 'Léa' && apres.gains.filleuls[1].nom === null && !/secret@/.test(JSON.stringify(apres)), 'il active « Montrer mon prénom » : le parrain lit « Léa » (et rien des autres)');
+    const vueF = (await appel({ mode: 'parrainage', headers: session(F[0]) })).corps;
+    dit(vueF.montrer && vueF.montrer.montrer === true && vueF.montrer.nom === 'Léa', '  le filleul relit son choix');
+    await appel({ method: 'POST', mode: 'parrainage', headers: session(F[0]), corps: { action: 'montrer', montrer: false } });
+    dit((await appel({ mode: 'parrainage', headers: session(P) })).corps.gains.filleuls[0].nom === null, '  il le retire : « Filleul 1 » de nouveau');
+    // Coché à l'inscription par lien : posé avec le rattachement.
+    const f6 = nouveauCompte(806); db.t.vinted_accounts.push({ owner: f6, vinted_user_id: '8006' });
+    await appel({ method: 'POST', mode: 'parrainage', headers: session(f6), corps: { action: 'rattacher', code, montrer: true, nom: 'Noé' } });
+    dit((await appel({ mode: 'parrainage', headers: session(P) })).corps.gains.filleuls.some((x) => x.nom === 'Noé'), 'coché à l’inscription par lien : le parrain lit « Noé »');
+    // Julien voit tout, un autre non.
+    dit((await appel({ mode: 'partenaires', headers: session(P), query: { vue: 'parrain', id: P } })).code === 403, 'la vue détaillée d’un parrain : 403 pour un autre que Julien');
+    const adm = (await appel({ mode: 'partenaires', headers: session(JULIEN), query: { vue: 'parrain', id: P } })).corps;
+    dit(adm.ok && adm.vue.filleuls.length === 6 && adm.vue.filleuls[1].nom === 'filleul2.secret@exemple.test' && adm.vue.filleuls[0].paiements.length === 2, 'Julien : la même vue, chaque filleul nommé (son e-mail), ses paiements', JSON.stringify(adm.vue && adm.vue.filleuls.map((x) => x.nom)));
+    const tous = (await appel({ mode: 'partenaires', headers: session(JULIEN), query: { vue: 'parrains' } })).corps.tous;
+    dit(Array.isArray(tous) && tous.some((x) => x.parrain === P && x.filleuls === 6 && x.payants === 3), 'Julien : la liste de TOUS les parrains (filleuls, payants, gagné)', JSON.stringify(tous && tous.find((x) => x.parrain === P)));
   });
 
   await essaie('Q8 le coupon −10 % du filleul', async () => {

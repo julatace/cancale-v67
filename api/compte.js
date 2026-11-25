@@ -129,7 +129,7 @@ import { codeDe, suiviDe, parrainageOuvert, rattacher, factureFilleulPayee, aper
 // (15 nov.) LE PROGRAMME PARTENAIRE : 3 € par mois et par client payant (api/_lib/partenaires.js, migration 043).
 // (25 nov.) LE PARRAINAGE À 20 % : −10 % le 1er mois du filleul, 20 % de chaque facture payée au parrain
 // (api/_lib/parrainage-gains.js, règle api/_lib/parrainage-regle.js, migration 049).
-import { gainFacturePayee, annulerGains, reglerGains, parrainDe, vueGains, regleAffichee, poserChoix, poserIban, listeAVerser, noterVerseParrain, remiseFilleul } from './_lib/parrainage-gains.js';
+import { gainFacturePayee, annulerGains, reglerGains, parrainDe, vueGains, regleAffichee, poserChoix, poserIban, listeAVerser, noterVerseParrain, remiseFilleul, lireMontrer, poserMontrer, vueParrainAdmin } from './_lib/parrainage-gains.js';
 import { creditSemaine } from './_lib/parrainage-regle.js';
 import { rattacherPartenaire, commissionFacturePayee, annulerCommissions, vuePartenaire, listeAdmin, csvAdmin, actionAdmin, couponDuFilleul, rattacheAUnPartenaire } from './_lib/partenaires.js';
 // (9 nov.) Solo et Pro : la règle (api/_lib/plan-regle.js, la même que l'app).
@@ -1245,6 +1245,12 @@ async function parrainage(req, res) {
       const r = await poserChoix(u.id, String(corps.mode || ''));
       return repondre(res, r.http, { ok: r.ok, mode: r.mode, raison: r.raison });
     }
+    // (25 nov.) Le FILLEUL choisit de montrer (ou non) son prénom à son parrain. Défaut : rien.
+    if (corps && corps.action === 'montrer') {
+      if (typeof corps.montrer !== 'boolean' || (corps.nom != null && (typeof corps.nom !== 'string' || corps.nom.length > 200))) return repondre(res, 400, { ok: false, raison: 'montrer' });
+      const r = await poserMontrer(u.id, corps.montrer, corps.nom);
+      return repondre(res, r.http, { ok: r.ok, montrer: r.montrer, nom: r.ok ? r.nom : undefined, raison: r.raison, message: r.message });
+    }
     if (corps && corps.action === 'iban') {
       if (typeof corps.iban !== 'string' || corps.iban.length > 60 || (corps.titulaire != null && (typeof corps.titulaire !== 'string' || corps.titulaire.length > 120))) return repondre(res, 400, { ok: false, raison: 'iban' });
       const r = await poserIban(u.id, corps.iban, corps.titulaire);
@@ -1259,6 +1265,8 @@ async function parrainage(req, res) {
     if (chezPartenaire) return repondre(res, 409, { ok: false, raison: 'deja-partenaire', message: 'Ton compte est déjà venu par un code partenaire.' });
     const essaiDeja = await essaiDejaUtilise(u.email, idsVinted);
     const r = await rattacher(corps.code, { u, ligne, idsVinted, essaiDeja });
+    // (25 nov.) Coché à l'inscription par lien : « Montrer mon prénom à mon parrain » (son choix, revalidé).
+    if (r.ok && corps.montrer === true && typeof corps.nom === 'string' && corps.nom.length <= 200) { try { await poserMontrer(u.id, true, corps.nom); } catch (_) {} }
     return repondre(res, r.http || (r.ok ? 200 : 400), { ok: r.ok, raison: r.raison, message: r.message });
   }
   const [ouvert, code, suivi, filleul, ligne, nom] = await Promise.all([parrainageOuvert(), codeDe(u.id), suiviDe(u.id), filleulDetail(u.id), ligneDe(req), nomDe(u.id)]);
@@ -1268,9 +1276,10 @@ async function parrainage(req, res) {
   const filleuls = await filleulsDe(u.id, ligne === undefined ? null : !!(ligne && ligne.client_stripe));
   // (25 nov.) Les 20 % : ce qui est dû part d'abord sur le solde (mode crédit), puis les NOMBRES.
   if (ouvert) { try { await reglerGains(u.id); } catch (_) {} }
-  const gains = await vueGains(u.id);
+  const gains = await vueGains(u.id, Date.now(), { solo: PRIX_CGV.centimes, pro: PRIX_PRO_CGV && PRIX_PRO_CGV.centimes });
+  const montrer = filleul && filleul.parraine ? await lireMontrer(u.id) : undefined;
   // (11 nov.) `modeTest` : Stripe en clé de test (ou pas encore branché) — l'écran le DIT.
-  return repondre(res, 200, { ok: true, installe: true, ouvert, code, suivi, filleuls: filleuls || null, nom: nom === undefined ? undefined : nom, filleul: filleul || null, semaineCentimes: creditSemaine(PRIX_CGV.centimes), moisCentimes: PRIX_CGV.centimes, regle: regleAffichee(), gains: gains === undefined ? null : gains, modeTest: !stripePret() || stripeModeTest() });
+  return repondre(res, 200, { ok: true, installe: true, ouvert, code, suivi, filleuls: filleuls || null, nom: nom === undefined ? undefined : nom, filleul: filleul || null, semaineCentimes: creditSemaine(PRIX_CGV.centimes), moisCentimes: PRIX_CGV.centimes, regle: regleAffichee(), gains: gains === undefined ? null : gains, montrer: montrer === undefined ? null : montrer, modeTest: !stripePret() || stripeModeTest() });
 }
 
 // ── LE PROGRAMME PARTENAIRE (15 nov., api/_lib/partenaires.js) ──────────────
@@ -1318,6 +1327,7 @@ async function partenairesAdmin(req, res) {
     }
     // (25 nov.) « Parrains à verser » (mode virement) : la vue de Julien.
     if (req.query && req.query.vue === 'parrains') { const v = await listeAVerser(); return repondre(res, v.http, v.corps); }
+    if (req.query && req.query.vue === 'parrain') { const v = await vueParrainAdmin(String(req.query.id || ''), { solo: PRIX_CGV.centimes, pro: PRIX_PRO_CGV && PRIX_PRO_CGV.centimes }); return repondre(res, v.http, v.corps); }
     const l = await listeAdmin();
     return repondre(res, l.http, l.corps);
   }

@@ -139,9 +139,10 @@ export function etatsGains({ gains = [], choix = [], verifies = null, versements
 
 // ── LES CHIFFRES DU PARRAIN (des nombres, jamais qui) ───────────────────────
 // actifs : Set des filleuls dont l'abonnement vit (null = pas su ⇒ « — »).
-export function chiffresParrain({ gains = [], choix = [], verifies = null, versements = [], actifs = null, maintenant = Date.now(), limite = 120 }) {
+export function chiffresParrain({ gains = [], choix = [], verifies = null, versements = [], actifs = null, maintenant = Date.now(), limite = 120, rangs = null }) {
   const etats = etatsGains({ gains, choix, verifies, versements, maintenant });
-  const rang = new Map();
+  // (25 nov.) Le rang d'un filleul : l'ordre d'INSCRIPTION (`rangs`, stable), sinon celui du premier paiement.
+  const rang = rangs instanceof Map ? new Map(rangs) : new Map();
   [...gains].filter(Boolean).sort((a, b) => String(a.paye_le).localeCompare(String(b.paye_le))).forEach((g) => { if (g.filleul && !rang.has(String(g.filleul))) rang.set(String(g.filleul), rang.size + 1); });
   const moisCourant = moisParis(maintenant);
   const somme = (f) => etats.filter(f).reduce((s, g) => s + g.net, 0);
@@ -208,3 +209,61 @@ export function aVerserAdmin(parrains = [], maintenant = Date.now()) {
   return { parrains: out, totalCentimes: out.filter((x) => x.pret).reduce((s, x) => s + x.centimes, 0), seuilCentimes: SEUIL_VIREMENT_CENTIMES };
 }
 export { RE_MOIS };
+
+// ════════════════════════════════════════════════════════════════════════════
+// (25 nov., Julien) « que le parrain puisse voir TOUS ses filleuls et tous les paiements qu'il serait
+// possible qu'il ait si jamais la personne paye ». Une ligne PAR filleul, numérotée dans l'ordre
+// d'inscription (stable), SANS identité — sauf le prénom que le FILLEUL a choisi de montrer (`noms`,
+// revalidé par l'appelant). Les montants « possibles » sont des ESTIMATIONS, rendues À PART du gagné
+// (jamais additionnées : §5 « un total partiel ou estimé ne se présente jamais comme un fait »).
+// Entrées :
+//   lignes       les parrainages du parrain [{ filleul, inscrit, refus }]
+//   abonnements  Map filleul → { statut, plan, fin_periode }   (null ⇒ pas su : états « — »)
+//   gains, choix, verifies, versements : comme `chiffresParrain`
+//   prix         { solo, pro } en centimes — LES prix des CGV (lus par l'appelant, jamais en dur ici)
+//   noms         Map filleul → prénom montré (le choix du filleul)
+// Rend { filleuls: [...], potentielMoisCentimes, siTousCentimes, nPayants, nPossibles }.
+export const ETATS_FILLEUL_DETAIL = ['inscrit', 'essai', 'paie', 'arrete', 'rembourse', 'refuse'];
+const VIVANTS = ['active', 'past_due'];
+export function vueFilleuls({ lignes = [], abonnements = null, gains = [], choix = [], verifies = null, versements = [], prix = {}, noms = null, maintenant = Date.now() }) {
+  const etats = etatsGains({ gains, choix, verifies, versements, maintenant });
+  const tries = [...lignes].filter((x) => x && x.filleul).sort((a, b) => String(a.inscrit || '').localeCompare(String(b.inscrit || '')) || String(a.filleul).localeCompare(String(b.filleul)));
+  const prixDe = (plan) => { const c = Number(plan === 'pro' ? prix.pro : prix.solo); return Number.isInteger(c) && c > 0 ? c : null; };
+  let potentiel = 0, possibles = 0, nPayants = 0, nPossibles = 0;
+  const filleuls = tries.map((l, i) => {
+    const f = String(l.filleul);
+    const ses = etats.filter((g) => String(g.filleul) === f).sort((a, b) => String(a.paye_le).localeCompare(String(b.paye_le)));
+    const vivants = ses.filter((g) => g.etat !== 'annule');
+    const annules = ses.filter((g) => g.etat === 'annule');
+    const sub = abonnements instanceof Map ? (abonnements.get(f) || null) : undefined;
+    const statut = sub ? String(sub.statut || '') : '';
+    const plan = sub && sub.plan === 'pro' ? 'pro' : sub ? 'solo' : null;
+    let etat, depuis = null, jusquau = null, le = null;
+    if (l.refus) etat = 'refuse';
+    else if (VIVANTS.includes(statut) && (vivants.length || !annules.length)) { etat = 'paie'; depuis = vivants.length ? String(vivants[0].paye_le).slice(0, 7) : null; }
+    else if (!vivants.length && annules.length) etat = 'rembourse';
+    else if (statut === 'trialing') { etat = 'essai'; jusquau = sub.fin_periode ? String(sub.fin_periode).slice(0, 10) : null; }
+    else if (vivants.length || ['canceled', 'unpaid', 'incomplete_expired'].includes(statut)) { etat = 'arrete'; le = sub && sub.fin_periode ? String(sub.fin_periode).slice(0, 10) : vivants.length ? String(vivants[vivants.length - 1].paye_le).slice(0, 10) : null; }
+    else etat = sub === undefined ? null : 'inscrit';
+    const p = prixDe(plan || 'solo');
+    const part = p == null ? null : gainDeFacture(p);
+    // Le mois prochain s'il continue (il paie) · ce qu'il POURRAIT rapporter (inscrit, en essai).
+    const prochain = etat === 'paie' ? part : null;
+    const pourrait = etat === 'inscrit' || etat === 'essai' ? part : null;
+    if (etat === 'paie') nPayants++;
+    if (prochain != null) potentiel += prochain;
+    if (pourrait != null) { possibles += pourrait; nPossibles++; }
+    const nom = noms instanceof Map && typeof noms.get(f) === 'string' && noms.get(f) ? noms.get(f) : null;
+    return {
+      rang: i + 1, nom, etat, plan, inscritLe: l.inscrit ? String(l.inscrit).slice(0, 10) : null, depuis, jusquau, le,
+      moisPayes: vivants.length, gagneCentimes: vivants.reduce((s, g) => s + g.net, 0), prochainCentimes: prochain, pourraitCentimes: pourrait,
+      paiements: ses.map((g) => ({ payeLe: String(g.paye_le || '').slice(0, 10), dueLe: String(g.due_le || '').slice(0, 10),
+        payeCentimes: Math.max(0, (Number(g.facture_centimes) || 0) - (Number(g.rembourse_centimes) || 0)), partCentimes: g.net, etat: g.etat, raison: g.annulee_raison || null })),
+    };
+  });
+  return { filleuls, nPayants, nPossibles, potentielMoisCentimes: potentiel, siTousCentimes: potentiel + possibles };
+}
+// Le rang d'inscription de chaque filleul (pour l'historique) : Map filleul → rang.
+export const rangsInscription = (lignes = []) => new Map([...lignes].filter((x) => x && x.filleul)
+  .sort((a, b) => String(a.inscrit || '').localeCompare(String(b.inscrit || '')) || String(a.filleul).localeCompare(String(b.filleul)))
+  .map((x, i) => [String(x.filleul), i + 1]));
