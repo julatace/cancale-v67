@@ -1338,7 +1338,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
       {/* (8 nov.) L'accueil d'un compte relié (src/CompteRelie.jsx), rattrapable ici : la feuille revient
           avec les derniers comptes reliés, leur première lecture et leurs choix. */}
       <div className="vrm-cl-revoir" style={{display:'flex',justifyContent:'center'}}>
-        <Bouton variante="discret" icone="link" data-comptes-relies-revoir="" onClick={()=>{ try{ window.dispatchEvent(new Event('vrm:comptes-relies-revoir')); }catch(_){} }}>Revoir l’accueil des comptes reliés</Bouton>
+        <Bouton variante="discret" icone="link" data-comptes-relies-revoir="" onClick={()=>{ try{ window.dispatchEvent(new Event('vrm:comptes-relies-revoir')); }catch(_){} }} title="Revoir l’accueil des comptes reliés">{tr('mtb.revoirAccueil')}</Bouton>
       </div>
 
       {/* ── MODALE : SUPPRIMER LES DONNÉES D'UN COMPTE (ciblé, récupérable) ──── */}

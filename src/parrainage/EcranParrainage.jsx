@@ -366,8 +366,9 @@ export default function EcranParrainage({ fetcher = fetch }) {
         {p.filleul && p.filleul.parraine ? <BlocFilleul filleul={p.filleul} regle={regle} montrer={p.montrer === undefined ? null : p.montrer} onMontrer={(m) => setP((x) => ({ ...x, montrer: m }))}/> : null}
 
         {/* 1. Le héros : gagné au total, ce mois, 12 mois en barres. */}
+        {/* (25 nov., moins de texte) « Ce mois : … » n'est plus redit sous le total : la tuile « Ce mois » et le détail du mois choisi le disent. */}
         <Heros className="vrm-pr-heros" titre={tr('parrain.heros.titre')} valeur={c ? eur(c.totalCentimes) : null}
-          sous={c ? tr('parrain.heros.mois', { m: eur(c.moisCentimes) }) : tr('parrain.gainsNonInstalle')} attrs={{ 'data-parrainage-heros': '' }}
+          sous={c ? null : tr('parrain.gainsNonInstalle')} attrs={{ 'data-parrainage-heros': '' }}
           trio={g && g.potentiel && g.potentiel.siTousCentimes > 0 ? [
             { cle: 'potentiel', libelle: tr('parrain.potentiel.lib'), valeur: `~${eur(g.potentiel.moisCentimes)}`, pourquoi: tr('parrain.potentiel.estime'), attrs: { 'data-estimation': 'potentiel', 'data-centimes': g.potentiel.moisCentimes } },
             { cle: 'sitous', libelle: tr('parrain.potentiel.siTous'), valeur: `~${eur(g.potentiel.siTousCentimes)}`, pourquoi: tr('parrain.potentiel.estime'), attrs: { 'data-estimation': 'si-tous', 'data-centimes': g.potentiel.siTousCentimes } },
@@ -412,11 +413,11 @@ export default function EcranParrainage({ fetcher = fetch }) {
         {c && !aucun ? (
           <Tuiles titre={tr('parrain.gains.titre')} attrs={{ 'data-parrainage-gains': '' }}>
             <Tuile libelle={tr('parrain.tuile.payants')} valeur={c.filleulsPayants == null ? null : String(c.filleulsPayants)} detail={tr('parrain.tuile.payantsDetail', { n: c.filleulsAyantPaye })} attrs={{ 'data-tuile': 'payants' }}/>
-            <Tuile libelle={tr('parrain.tuile.mois')} valeur={eur(c.moisCentimes)} detail={tr('parrain.tuile.moisDetail')} attrs={{ 'data-tuile': 'mois' }}/>
+            <Tuile libelle={tr('parrain.tuile.mois')} valeur={eur(c.moisCentimes)} detail={<span className="n-lu-seul">{tr('parrain.tuile.moisDetail')}</span>} attrs={{ 'data-tuile': 'mois' }}/>
             <Tuile libelle={tr('parrain.tuile.attente')} valeur={eur(c.attenteCentimes)} detail={tr('parrain.tuile.attenteDetail', { j: regle.delaiJours })} attrs={{ 'data-tuile': 'attente' }}/>
             {mode === 'virement'
               ? <Tuile libelle={tr('parrain.tuile.verse')} valeur={eur(c.verseCentimes)} detail={tr('parrain.tuile.aVerser', { m: eur(c.aVerserCentimes) })} attrs={{ 'data-tuile': 'verse' }}/>
-              : <Tuile libelle={tr('parrain.tuile.credite')} valeur={eur(c.crediteCentimes)} detail={tr('parrain.tuile.creditePhrase')} attrs={{ 'data-tuile': 'credite' }}/>}
+              : <Tuile libelle={tr('parrain.tuile.credite')} valeur={eur(c.crediteCentimes)} detail={<span className="n-lu-seul">{tr('parrain.tuile.creditePhrase')}</span>} attrs={{ 'data-tuile': 'credite' }}/>}
           </Tuiles>
         ) : null}
 

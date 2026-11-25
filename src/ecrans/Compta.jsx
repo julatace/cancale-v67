@@ -1084,7 +1084,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
               {search.trim()
                 ? <>{tr('compta.aucuneFactureTrouvee')} {search} ».</>
                 : zone==='attente'
-                  ? <>{tr('compta.aucuneFactureAttente')}<br/>
+                  ? <><span className="vrm-sr-seul">{tr('compta.aucuneFactureAttente')}</span>
                       {/* ⚠️ Cette phrase parlait d'une « feuille Google » : le
                           pipeline Apps Script est mort (404, mesuré). Il aurait
                           attendu des factures qui ne pouvaient pas arriver. Ce
@@ -2651,9 +2651,9 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
   const choix = (
     <div data-statut-choix="" className="vrm-statut-grille">
       {REGIMES_FISCAUX.map(([k, t, sous, effet]) => (
-        <button key={k} type="button" data-statut={k} aria-pressed={regime === k} onClick={() => choisir(k)} className="vrm-statut-option" title={effet}>
+        <button key={k} type="button" data-statut={k} aria-pressed={regime === k} onClick={() => choisir(k)} className="vrm-statut-option" title={`${sous} — ${effet}`}>
           <span className="vrm-statut-t">{t}</span>
-          <span className="vrm-statut-s">{sous}</span>
+          <span className="vrm-statut-s vrm-sr-seul">{sous}</span>
           {/* (25 nov., moins de texte) Ce que le statut change : au survol et au lecteur d'écran ; le nom et sa ligne courte suffisent à choisir. */}
           <span className="vrm-statut-e vrm-sr-seul">{effet}</span>
         </button>

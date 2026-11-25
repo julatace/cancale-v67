@@ -529,7 +529,7 @@ export default function EcranADistance({ comptesVinted, ecarte = () => false, on
         {comptesVinted === undefined ? <Attente forme="rangees" n={3}/> : comptes.map((c) => {
           const p = ordinateurPour(ordis.allumes, c.site, c.id);
           const vieux = c.luSu && (!c.lu || maintenant - c.lu > VIEUX_MS);   // pas su ⇒ ni « vieux » ni « jamais relu »
-          const sous = [p && p.ouvert ? tr('adist.compte.ouvertSur', { nom: nomOrdi(p.p) }) : tr('mtb.adistPasOuvert'),
+          const sous = [p && p.ouvert ? tr('adist.compte.ouvertSur', { nom: nomOrdi(p.p) }) : ordis.niveau === 'aucun' ? '' : tr('mtb.adistPasOuvert'),
             !c.luSu ? (lus === null ? tr('adist.compte.luPasSu') : '') : c.lu ? (vieux ? tr('adist.compte.vieux', { age: ilYa(c.lu, maintenant) }) : tr('adist.compte.lu', { age: ilYa(c.lu, maintenant) })) : tr('adist.compte.jamaisLu'),
             c.aEnvoyer ? tr('adist.compte.aEnvoyer', { n: c.aEnvoyer }) : ''].filter(Boolean).join(' · ');
           // 5.438 : la note du compte et, si elle a baissé sa cadence, la cadence appliquée — sur la rangée.

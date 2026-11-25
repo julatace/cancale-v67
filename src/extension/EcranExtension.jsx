@@ -14,7 +14,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr, heure as heureLoc, dateRelative } from '../i18n/index.js';
-import { Page, Groupe, Rangee, Bouton, Attente, poserIcone, iconePosee, Pourquoi as PourquoiNatif } from '../natif/index.js';
+import { Page, Groupe, Rangee, Bouton, Attente, poserIcone, iconePosee, Pourquoi as PourquoiNatif, LogoSite, Glyphe as GlypheNatif } from '../natif/index.js';
 import { pageExtension } from './peutFaire.js';
 import { useLignesActions } from '../JaugeActions.jsx';
 import { jaugeDuCompte, toutArreteDe } from '../jaugeActions.js';
@@ -256,9 +256,11 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
         <Groupe titre={tr('ext.groupe.lies')} pied={<PourquoiNatif>{tr('ext.lies.pied')}</PourquoiNatif>} attrs={{ 'data-ext-groupe': 'lies' }}>
           {vm.sites.flatMap((s) => s.comptes).map((c) => {
             const ici = c.ouverture === 'ici' || c.ouverture === 'relais';
-            return <Rangee key={`lie:${c.site}:${c.id}`} icone={<span className="n-ext-initiale" aria-hidden="true">{String(c.nom || '?').trim().charAt(0).toUpperCase() || '?'}</span>}
-              titre={c.nom || '—'} sousTitre={[NOMS_SITES[c.site], ici ? tr('ext.lies.ici') : '', faits.ext && faits.ext.version ? tr('ext.lies.version', { v: faits.ext.version }) : ''].filter(Boolean).join(' · ')}
-              valeur={tr('ext.lies.lie')} attrs={{ 'data-ext-lie': `${c.site}:${c.id}`, 'data-ext-lie-ici': ici ? '1' : '0' }}/>;
+            // (25 nov., moins de texte) Le logo du site (son nom au lecteur d'écran) au lieu de l'initiale et du nom écrit ;
+            // « Lié » : une coche (le titre du groupe dit déjà « liés »).
+            return <Rangee key={`lie:${c.site}:${c.id}`} icone={<LogoSite site={c.site} taille={20} nom={NOMS_SITES[c.site]}/>}
+              titre={c.nom || '—'} sousTitre={[ici ? tr('ext.lies.ici') : '', faits.ext && faits.ext.version ? tr('ext.lies.version', { v: faits.ext.version }) : ''].filter(Boolean).join(' · ')}
+              valeur={<><GlypheNatif nom="coche" taille={18}/><span className="n-lu-seul">{tr('ext.lies.lie')}</span></>} attrs={{ 'data-ext-lie': `${c.site}:${c.id}`, 'data-ext-lie-ici': ici ? '1' : '0' }}/>;
           })}
         </Groupe>
       ) : null}

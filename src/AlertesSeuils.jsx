@@ -30,7 +30,7 @@ export function AlertesSeuils({ ligne, regime, activite = 'vente', vues, onCompr
   // ligne grise, la source en lien discret sous la ligne), « Compris » en bouton texte à droite. La phrase officielle n'est
   // plus un paragraphe permanent : elle est le titre (survol, lecteur d'écran) du lien vers le texte officiel.
   return (
-    <Carte titre={tr('argentPlus.seuils.titre')} className="vrm-seuils-alertes n-arg-seuils" attrs={{ 'data-alertes-seuils': liste.length, 'data-cible': attrCible(['seuils']), 'aria-label': tr('argentPlus.seuils.titre') }}>
+    <Carte titre="" className="vrm-seuils-alertes n-arg-seuils" attrs={{ 'data-alertes-seuils': liste.length, 'data-cible': attrCible(['seuils']), 'aria-label': tr('argentPlus.seuils.titre') }}>
       {liste.map((a) => {
         const t = texteSeuil(a, l);
         return (

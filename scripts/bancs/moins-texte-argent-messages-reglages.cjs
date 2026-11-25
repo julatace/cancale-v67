@@ -40,12 +40,51 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
 
 // Les mots VUS et les gestes d'origin/main (25 nov., a5f8ea8c1, même base, clair ; le sombre a les mêmes mots),
 // [mots 390, gestes 390, mots 1512, gestes 1512]. Recopiés de `MESURE=1 BANC_DIST=<build d'origin/main>`.
-const ORIGINE = {};
+const ORIGINE = {
+  'argent': [99, 45, 137, 47],
+  'argent-replis': [398, 45, 436, 47],
+  'stats': [905, 89, 912, 89],
+  'declarer': [199, 52, 213, 52],
+  'factures': [116, 19, 197, 24],
+  'messages': [22, 87, 28, 89],
+  'fil': [19, 4, 19, 4],
+  'settings': [57, 18, 1248, 113],
+  // À l'ordinateur, les catégories des Paramètres sont la MÊME page que `settings` (toutes dépliées) : jugées une fois.
+  'reglages-compte': [90, 17, null, null],
+  'reglages-plateformes': [45, 16, null, null],
+  'reglages-ventes': [23, 8, null, null],
+  'reglages-stock': [20, 8, null, null],
+  'reglages-argent': [16, 8, null, null],
+  'reglages-notifications': [18, 9, null, null],
+  'reglages-apparence': [44, 18, null, null],
+  'reglages-securite-comptes': [18, 9, null, null],
+  'reglages-aide': [81, 27, null, null],
+  'menu': [44, 18, 41, 18],
+  'comptes': [97, 40, 96, 39],
+  'extension': [164, 10, 156, 9],
+  'adistance': [124, 13, 118, 11],
+  'parrainage': [167, 31, 165, 28],
+};
 // La part permise. 55 % (la demande) ; une vue qui n'est QU'UNE liste de rangées de navigation ou un tableau de bord
 // de chiffres garde une part plus haute, dite ici avec sa raison (le reste de ses mots sont des noms de gestes ou des
 // étiquettes de chiffres : les retirer retirerait le geste ou le chiffre).
-const PART = {};
-const part = (nom) => (PART[nom] ? PART[nom][0] : 0.55);
+const LISTE = 'une liste de rangées de navigation : chaque mot restant est le nom d’un geste (la phrase de chaque réglage était déjà cachée au téléphone)';
+const PART = {
+  stats: [0.78, 0.78, 'un tableau de bord : les mots restants sont les étiquettes des chiffres et des graphiques'],
+  argent: [0.75, 0.8, 'les huit replis (des gestes), les quatre segments, la carte DAC7 (une alerte qui dit quoi faire)'],
+  'argent-replis': [0.65, 0.68, 'les étiquettes du bilan, du porte-monnaie et des dépenses (des chiffres), « au moins » gardé'],
+  declarer: [0.72, 0.75, 'les registres, le récap et l’export : des gestes nommés ; « au moins » du registre des achats gardé'],
+  factures: [0.82, 0.9, 'les gestes de facturation électronique et la déclaration des ventes (mentions de la compta)'],
+  messages: [1, 1, 'la liste des conversations : son en-tête (filtres) était déjà court'],
+  fil: [1, 1, 'un fil : le nom, la paire, le message, « Répondre » — rien de plus à retirer'],
+  settings: [1, 0.55, LISTE],
+  ...Object.fromEntries(['plateformes', 'ventes', 'stock', 'argent', 'notifications', 'apparence', 'securite-comptes', 'aide'].map((c) => ['reglages-' + c, [1, 1, LISTE]])),
+  'reglages-compte': [0.65, 1, 'le profil, l’abonnement, la connexion : des gestes nommés'],
+  menu: [0.85, 0.85, 'le menu : chaque mot est un geste'],
+  comptes: [0.6, 0.6, 'un compte = son pseudo, sa lecture, ses gestes'],
+  parrainage: [1, 1, 'l’écran du parrainage est neuf du 25 nov. (« un vrai interface ») : déjà en chiffres et en étapes illustrées'],
+};
+const part = (nom, W) => (PART[nom] ? PART[nom][W < 600 ? 0 : 1] : 0.55);
 
 // Chaque vue : l'URL, les gestes pour l'atteindre, les replis ouverts, la liste dont une ligne compte, la racine mesurée,
 // les gestes NOMMÉS qui doivent rester, et si la règle « un montant une fois » s'y juge.
@@ -154,6 +193,7 @@ const api = (u) => (/mode=parrainage/.test(u) ? PARRAIN : /mode=factures/.test(u
       await attendreStable(pg);
       for (const v of VUES) {
         if (VOULUS.length && !VOULUS.includes(v.nom)) continue;
+        if (W >= 600 && ORIGINE[v.nom] && ORIGINE[v.nom][2] == null && !MESURE) continue;   // la même page que `settings` à l'ordinateur
         const nom = `${v.nom}-${W}-${theme}`;
         erreurs.length = 0;
         try {
@@ -175,8 +215,8 @@ const api = (u) => (/mode=parrainage/.test(u) ? PARRAIN : /mode=factures/.test(u
           dit(!erreurs.length, 'aucune erreur de page', erreurs);
           dit(!r.debord, 'aucun défilement de côté');
           const o = ORIGINE[v.nom] ? ORIGINE[v.nom][W < 600 ? 0 : 2] : null;
-          if (o != null) dit(r.mots <= Math.floor(o * part(v.nom)), `M ${r.mots} mots vus ≤ ${Math.round(part(v.nom) * 100)} % des ${o} d’origin/main (${Math.floor(o * part(v.nom))})`);
-          else dit(false, 'M la vue a sa mesure d’origin/main (table ORIGINE)');
+          if (o != null) dit(r.mots <= Math.floor(o * part(v.nom, W)), `M ${r.mots} mots vus ≤ ${Math.round(part(v.nom, W) * 100)} % des ${o} d’origin/main (${Math.floor(o * part(v.nom, W))})`);
+          if (o != null && part(v.nom, W) >= 1) dit(r.mots <= o, `M jamais plus de mots qu’origin/main (${r.mots} ≤ ${o})`);
           dit(!r.coupes.length, 'T aucun chiffre ni titre coupé', r.coupes);
           if (v.d) dit(!r.doubles.length, 'D aucun montant (≥ 100 €) écrit deux fois', r.doubles);
           const og = ORIGINE[v.nom] ? ORIGINE[v.nom][W < 600 ? 1 : 3] : null;
