@@ -194,7 +194,9 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     const parItem = () => Object.fromEntries(jobs().map((x) => [String(x.itemId || String(x.id || '').split(':')[0]), `${x.etat}${x.raison ? ':' + x.raison : ''}${x.cause ? '/' + x.cause : ''}${x.etape ? '@' + x.etape : ''}`]));
     const reset = async () => {
       S.d = null; V.st.req = []; V.st.ancienneConv = 200; V.st.sansLogin = false; Object.assign(V.st, { avant: 0, intercale: null, paginer: false, clocheN: 0, pageTaille: 20, suiteMs: 0 }); REGLAGES.message = MSG_PSEUDO; V.st.forcer = []; V.st.captchaSur = null; V.st.commande = {}; V.st.convs.clear(); seed();
-      await dansSW(async () => { await chrome.storage.local.remove(['vrmFavorisCarte', 'vrmActionEnCours', 'vrmPauseVinted', 'vrmCaptcha', 'vrmFavorisApercu', 'vrmTextesRecents', 'vrmToutArrete']); });
+      await dansSW(async () => { await chrome.storage.local.remove(['vrmFavorisCarte', 'vrmActionEnCours', 'vrmPauseVinted', 'vrmCaptcha', 'vrmFavorisApercu', 'vrmTextesRecents', 'vrmToutArrete', 'vrmSortes']); });
+      // (25 nov.) `vrmSortes` : les envois de l'heure par sorte (15 favoris/h, FAVORIS_HEURE_MAX). Chaque scénario part d'une
+      // heure vide — sinon, depuis que F1P réussit (5.450), F1+F1W+F1M+F1E+F1P = 15 envois et F1T restait « en attente » du plafond.
     };
 
     // ══ F1 : 3 favoris, identité par la commande ═════════════════════════════════════════════════════════════════
