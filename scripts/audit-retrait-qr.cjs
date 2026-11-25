@@ -115,7 +115,7 @@ async function verifier(srcModule, srcApp, bavard) {
   // ── E. l'app ──
   const app = sansCommentaires(srcApp);
   dit(/lireTout\(`id=like\.mr_colis_\*&select=\$\{MR_SELECT\}`/.test(app) && !/mr_colis_[^`]*select=data[`&]/.test(app), 'E1 les lignes mr_colis_* lues projetées (jamais select=data), paginées');
-  const pu = app.slice(app.indexOf('const pickupUnion = useMemo('), app.indexOf('const groupesRelais = useMemo('));
+  const pu = app.slice(app.indexOf('const pickupUnion = useMemoParesseux('), app.indexOf('const groupesRelais = useMemoParesseux('));
   dit(/finsColis\(trackingRetrait,/.test(pu) && !/\btracking\b/.test(pu.replace(/trackingRetrait/g, '')), 'E2 pickupUnion ne lit QUE les lignes fusionnées (e-mails + comptes Mondial Relay)');
   dit(/const trackingRetrait = useMemo\(\(\) => (?:avecQrPoses\()?suivisAvecMondialRelay\(tracking, mrColis\)/.test(app), 'E3 la fusion vient de src/retraitQr.js (une règle ; + les QR posés depuis une capture, src/qrCapture.js)');
   const ov = app.slice(app.indexOf('const openQrView = async'), app.indexOf('const openQrView = async') + 3000);

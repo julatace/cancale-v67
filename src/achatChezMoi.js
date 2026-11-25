@@ -75,12 +75,15 @@ export function etatChezMoi(achat, { retireClic = false, finiSuivi = false, auPo
 // ── La publication de l'écran qui a les preuves ─────────────────────────────
 let _publie = null;
 // m : Map tx → { chez, etat } (ou null pour retirer la publication).
-export function publierChezMoi(m) { _publie = m instanceof Map ? m : null; }
-export const chezMoiPublie = () => _publie;
+// (24 nov., vitesse-ecran-montre) `m` : la Map, ou une FONCTION qui la rend (calculée au premier appel, src/calculParesseux.js).
+export function publierChezMoi(m) { _publie = typeof m === 'function' ? m : m instanceof Map ? () => m : null; }
+const _publieeLue = () => { try { const m = _publie ? _publie() : null; return m instanceof Map ? m : null; } catch (_) { return null; } };
+export const chezMoiPublie = () => _publieeLue();
 // L'état d'un achat : la publication si elle a CET achat, sinon le statut seul.
 export function etatAchatChezMoi(achat) {
   const tx = txDe(achat);
-  if (tx && _publie && _publie.has(tx)) return _publie.get(tx);
+  const P = tx ? _publieeLue() : null;
+  if (P && P.has(tx)) return P.get(tx);
   return etatChezMoi(achat);
 }
 // Le seul test que les chemins de proposition appellent.
