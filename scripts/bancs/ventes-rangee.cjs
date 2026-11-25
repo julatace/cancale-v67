@@ -138,6 +138,12 @@ async function onglet(pg, cle) {
         await pg.waitForTimeout(200);
         const m = await pg.evaluate(mesure);
         await cv.evaluate((e) => e.remove());
+        if (tel) { // la liste elle-même, depuis sa 1re vente (la capture à montrer : combien de ventes tiennent dans un écran)
+          await pg.evaluate(() => { const r = document.querySelector('.vrm-main [data-vn-rang], .vrm-main [data-vn-route], .vrm-main [data-toutes-vente]'); if (r) { r.scrollIntoView({ block: 'start' }); window.scrollBy(0, -190); } });
+          await pg.waitForTimeout(500);
+          await pg.screenshot({ path: path.join(SHOTS, `rangee-${og}-${W}-${th}${STYLE ? '-' + STYLE : ''}-liste.png`) });
+          await pg.evaluate(() => window.scrollTo(0, 0));
+        }
         dit(m.deb <= 1, `rien ne déborde de l'écran (${m.deb})`);
         if (!tel) { dit(m.tab > 3, `O le tableau de travail est rendu (${m.tab} lignes)`); dit(m.tabScroll <= 1, `O le tableau tient sans défilement de côté (${m.tabScroll})`); continue; }
         const rs = m.rangs;
