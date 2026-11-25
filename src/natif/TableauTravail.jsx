@@ -269,7 +269,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
       <span className="n-tt-compte" data-tt-compte={compte || ''}><span className="n-tt-compte-point" aria-hidden="true"/>{compte || tr('tableau.tousComptes')}</span>
       <span className="n-tt-espace"/>
       <span className="n-tt-maj" data-tt-maj={majLe === undefined ? 'lecture' : majLe == null ? 'passu' : 'lu'}>{depuisMaj(majLe, maintenant)}</span>
-      {onRafraichir ? <button type="button" className="n-tt-bouton n-tt-bouton-icone" data-tt-rafraichir="" aria-label={tr('tableau.rafraichir')} title={tr('tableau.rafraichir')}
+      {onRafraichir ? <button type="button" data-n-famille="rond" className="n-tt-bouton n-tt-bouton-icone" data-tt-rafraichir="" aria-label={tr('tableau.rafraichir')} title={tr('tableau.rafraichir')}
         disabled={rafraichit} aria-busy={rafraichit ? 'true' : undefined} onClick={() => onRafraichir()}>{ic('sync', 18)}</button> : null}
     </div>
   );
@@ -306,7 +306,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   // Un bouton de la barre d'outils + son menu (à l'ordinateur) ; au téléphone, le menu est une feuille (plus bas).
   const outil = (cle, libelle, corps, { icone = null, droite = false, large = false, haut: versHaut = false, actif = false, attrs: a = null, chevron = true } = {}) => (
     <span className="n-tt-ancre" data-tt-ancre="">
-      <button type="button" className="n-tt-bouton" data-tt-ouvre={cle} data-tt-actif={actif ? '1' : undefined} aria-haspopup="true" aria-expanded={menu === cle ? 'true' : 'false'}
+      <button type="button" data-n-famille="second" className="n-tt-bouton" data-tt-ouvre={cle} data-tt-actif={actif ? '1' : undefined} aria-haspopup="true" aria-expanded={menu === cle ? 'true' : 'false'}
         onClick={() => setMenu((m) => (m === cle ? '' : cle))} {...(a || {})}>
         {icone}<span className="n-tt-bouton-libelle">{libelle}</span>{chevron ? <span className="n-tt-chevron" aria-hidden="true"/> : null}
       </button>
@@ -330,8 +330,8 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
       {Array.isArray(lignes) ? <span className="n-tt-nombre-texte">{unite(affichees.length)}</span> : <span className="n-os n-tt-nombre-os" aria-hidden="true"/>}
       <span className="n-tt-espace"/>
       {ordinateur && grille ? <span className="n-tt-vues" role="group" aria-label={tr('tableau.vue')}>
-        <button type="button" className="n-tt-bouton n-tt-bouton-icone" aria-pressed={vue === 'liste'} aria-label={tr('tableau.vueListe')} title={tr('tableau.vueListe')} data-tt-vue="liste" onClick={() => setVue('liste')}>{ic('menu', 18)}</button>
-        <button type="button" className="n-tt-bouton n-tt-bouton-icone" aria-pressed={vue === 'grille'} aria-label={tr('tableau.vueGrille')} title={tr('tableau.vueGrille')} data-tt-vue="grille" onClick={() => setVue('grille')}>{ic('grid', 18)}</button>
+        <button type="button" data-n-famille="rond" className="n-tt-bouton n-tt-bouton-icone" aria-pressed={vue === 'liste'} aria-label={tr('tableau.vueListe')} title={tr('tableau.vueListe')} data-tt-vue="liste" onClick={() => setVue('liste')}>{ic('menu', 18)}</button>
+        <button type="button" data-n-famille="rond" className="n-tt-bouton n-tt-bouton-icone" aria-pressed={vue === 'grille'} aria-label={tr('tableau.vueGrille')} title={tr('tableau.vueGrille')} data-tt-vue="grille" onClick={() => setVue('grille')}>{ic('grid', 18)}</button>
       </span> : null}
       {ordinateur && vue === 'liste' && colonnes.length ? outil('colonnes', tr('tableau.colonnes'), corpsColonnes, { icone: ic('gabarit', 16), droite: true }) : null}
     </div>
@@ -345,7 +345,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     const actif = tri && tri.cle === c.cle;
     return (
       <th key={c.cle} scope="col" className="n-tt-th" data-tt-th={c.cle} data-tt-num={c.num ? '1' : undefined} aria-sort={actif ? (tri.sens === 'asc' ? 'ascending' : 'descending') : undefined}>
-        {c.tri !== false ? <button type="button" className="n-tt-tri" data-tt-trier={c.cle} onClick={() => trier(c)} aria-label={titreVu(c) ? undefined : c.libelle} title={titreVu(c) ? undefined : c.libelle}>
+        {c.tri !== false ? <button type="button" data-n-famille="lien" className="n-tt-tri" data-tt-trier={c.cle} onClick={() => trier(c)} aria-label={titreVu(c) ? undefined : c.libelle} title={titreVu(c) ? undefined : c.libelle}>
           <span>{titreVu(c)}</span><span className="n-tt-tri-signe" data-tt-sens={actif ? tri.sens : ''} aria-hidden="true">{actif ? (tri.sens === 'asc' ? '↑' : '↓') : '↕'}</span>
         </button> : <span className="n-tt-th-texte" aria-label={titreVu(c) ? undefined : c.libelle}>{titreVu(c)}</span>}
       </th>
@@ -389,7 +389,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
                 {colsVues.filter((c) => c.apresStatut).map((c) => <td key={c.cle} className="n-tt-td" data-tt-col={c.cle} data-tt-num={c.num ? '1' : undefined}>{celluleVal(c, l)}</td>)}
                 {menuLigne ? <td className="n-tt-td n-tt-td-menu" onClick={(e) => e.stopPropagation()}>
                   {m.length ? <span className="n-tt-ancre" data-tt-ancre="">
-                    <button type="button" className="n-tt-bouton n-tt-bouton-icone n-tt-plus" aria-label={tr('tableau.actionsDe', { titre: l.titre || '' })} aria-haspopup="true" aria-expanded={menu === 'ligne:' + l.cle ? 'true' : 'false'}
+                    <button type="button" data-n-famille="rond" className="n-tt-bouton n-tt-bouton-icone n-tt-plus" aria-label={tr('tableau.actionsDe', { titre: l.titre || '' })} aria-haspopup="true" aria-expanded={menu === 'ligne:' + l.cle ? 'true' : 'false'}
                       data-tt-plus={l.cle} onClick={() => setMenu((x) => (x === 'ligne:' + l.cle ? '' : 'ligne:' + l.cle))}>{ic('more', 18)}</button>
                     <Deroulant ouvert={menu === 'ligne:' + l.cle} onFermer={fermerMenu} libelle={tr('tableau.actionsDe', { titre: l.titre || '' })} droite>
                       <div className="n-tt-pop-liste" role="menu">{m.map((x) => <ChoixMenu key={x.cle} choisi={false} libelle={x.libelle} onClick={() => { setMenu(''); x.onClick(); }} attrs={{ 'data-tt-plus-choix': x.cle }}/>)}</div>

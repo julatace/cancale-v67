@@ -62,4 +62,9 @@ export function Segmente({ options = [], valeur, onChange, libelle = '', classNa
   );
 }
 
+// Un choix en TUILE dans un groupe radio (`role="radiogroup"` posé par le parent) : l'aperçu en enfant, coché ou non.
+// (24 nov., style-graphite) Les tuiles de style de Paramètres → Apparence passent par lui, jamais par un <button> brut.
+export function TuileRadio({ choisi = false, onChoisir, className = '', attrs = null, children }) {
+  return <button type="button" role="radio" aria-checked={choisi} className={cx(className)} onClick={onChoisir} {...(attrs || {})}>{children}</button>;
+}
 export default Segmente;

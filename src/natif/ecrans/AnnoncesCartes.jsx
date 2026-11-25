@@ -59,7 +59,7 @@ function PhotoCadre({ a, Photo, taille = 28 }) {
     : <span className="n-ad-sans-photo" aria-hidden="true"><Glyphe nom="image" taille={taille}/></span>;
 }
 const BoutonPlus = ({ a, onGestes, className }) => (
-  <button type="button" className={className} data-ad-gestes={a.cle} aria-label={tr('egalite.d.gestes', { titre: a.titre || '' })}
+  <button type="button" className={className} data-n-famille="rond" data-ad-gestes={a.cle} aria-label={tr('egalite.d.gestes', { titre: a.titre || '' })}
     onClick={(e) => { e.stopPropagation(); onGestes(a); }}><Glyphe nom="more" taille={18}/></button>
 );
 
@@ -180,7 +180,7 @@ export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selec
           onClick={(e) => { e.stopPropagation(); setOuvert(false); x.onClick(); }}>{Icon && x.icone ? <Icon name={x.icone} size={20}/> : null}<span>{x.libelle}</span></button>)}
       </span> : null}
       <span className="n-ar-glisse" ref={corpsRef} onPointerDown={bas} onPointerMove={bouge} onPointerUp={haut} onPointerCancel={haut}>
-        <button type="button" className="n-ar-corps" onClick={clic} aria-pressed={selection ? (selection.cochee ? 'true' : 'false') : undefined} aria-disabled={grise ? 'true' : undefined}>
+        <button type="button" className="n-ar-corps" data-n-famille="rangee" onClick={clic} aria-pressed={selection ? (selection.cochee ? 'true' : 'false') : undefined} aria-disabled={grise ? 'true' : undefined}>
           {selection ? <span className="n-ar-coche" data-ad-coche={selection.cochee ? '1' : '0'} aria-hidden="true">{selection.cochee ? <Glyphe nom="check" taille={16}/> : null}</span> : null}
           <span className="n-ar-photo"><PhotoCadre a={a} Photo={Photo} taille={20}/></span>
           <span className="n-ar-texte">

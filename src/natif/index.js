@@ -10,6 +10,9 @@ import './jetons.css';
 import './natif.css';
 import './mouvements.css';   // (21 nov., ux-reglages) toucher 0,97 · feuille 250 ms · fondu de segment 150 ms
 import './finitions.css';   // (23 nov., « mieux travailler les bords ») filets nets, rayons cohérents, relief doux, état appuyé
+import './styles-choix-jetons.css';   // (24 nov., style-graphite) les jetons des dix styles à essayer (fabriqués : scripts/styles-generer.cjs)
+import './styles-choix.css';   // (24 nov.) la famille de boutons de ces styles (rien sans `data-style`)
+import './styleChoix.js';   // (24 nov.) pose `data-style` sur la racine (le choix de cet appareil)
 
 export { poserIcone, iconePosee, Glyphe, GLYPHES } from './icones.jsx';
 export { Bouton, BoutonIcone, useGesteUnique } from './Bouton.jsx';
@@ -21,7 +24,7 @@ export { Vide } from './Vide.jsx';
 export { Attente } from './Attente.jsx';
 export { Faits, Fait } from './Faits.jsx';
 export { EnteteArticle, Photos, Herite } from './Article.jsx';
-export { Segmente } from './Segmente.jsx';
+export { Segmente, TuileRadio } from './Segmente.jsx';
 export { Groupe } from './Groupe.jsx';
 export { Rangee, Vignette, Interrupteur, poserPhoto, photoParApp } from './Rangee.jsx';
 export { Feuille } from './Feuille.jsx';

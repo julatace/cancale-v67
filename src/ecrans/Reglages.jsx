@@ -175,8 +175,10 @@ import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) les composa
 import { RangeeTouchable } from '../designV2/BoutonV2.jsx';   // (17 nov., phase 2) les rangées de Paramètres
 import { Bouton as BoutonNatif, BoutonIcone as BoutonIconeNatif } from '../natif/Bouton.jsx';
 import { Glyphe as GlypheNatif } from '../natif/icones.jsx';
+import { TuileRadio as TuileRadioNatif } from '../natif/Segmente.jsx';   // (24 nov., style-graphite) les tuiles de style
 import { Groupe as GroupeNatif } from '../natif/Groupe.jsx';   // (21 nov., ux-reglages) Paramètres en liste groupée native
 import { Rangee as RangeeNatif } from '../natif/Rangee.jsx';
+import { STYLES as STYLES_CHOIX, styleLu, choisirStyle } from '../natif/styleChoix.js';   // (24 nov., style-graphite) les dix styles à essayer
 // (21 nov., ux-reglages) « Comme l'iPhone » sur un iPhone, « Comme l'appareil » ailleurs (le même mode `auto`).
 const surIphone = () => { try { return /iP(hone|od)/.test(navigator.userAgent); } catch (_) { return false; } };
 const libelleApparence = (m) => (m === 'auto' ? tr(surIphone() ? 'uxr.apparence.autoIphone' : 'uxr.apparence.auto') : tr('uxr.apparence.' + m));
@@ -4921,9 +4923,37 @@ function ApparenceSetting({ valeur, onChoisir }) {
           attrs={{ 'data-apparence': m, 'data-apparence-coche': valeur === m ? '1' : '0' }} onClick={() => onChoisir && onChoisir(m)}/>
       ))}
     </GroupeNatif>
-    {/* (19 nov., « VRM natif », docs/design/NATIF.md) UN seul design : les réglages « Style » (Apple · Studio bleu) et « Ancien design » ont disparu. */}
+    {/* (24 nov., style-graphite) « Style » : dix styles à essayer (jetons seulement), « Actuel » = le défaut, inchangé. */}
+    <StyleSetting/>
     {/* (19 nov.) Le réglage « Barre d'onglets » (cinq dessins de l'ancienne barre) est RETIRÉ : la barre native n'a qu'un dessin, il n'avait plus d'effet. */}
   </>);
+}
+// (24 nov., style-graphite — Julien : « essaye un peu de changer de style pour l'iPhone », dix styles à essayer DANS l'app)
+// LE STYLE : une tuile d'aperçu par style (une rangée et un bouton, dessinés par les jetons de CE style : la tuile porte
+// son propre `data-style`), un toucher l'applique tout de suite, « Actuel » revient au défaut. Rangé sur cet appareil.
+function StyleSetting() {
+  const [style, setStyle] = React.useState(styleLu);
+  React.useEffect(() => { const f = (e) => setStyle(e.detail || ''); window.addEventListener('vrm-style', f); return () => window.removeEventListener('vrm-style', f); }, []);
+  const ids = [''].concat(STYLES_CHOIX);
+  return (
+    <div className="g-styles-bloc" data-style-choix={style || 'actuel'}>
+      <h3 className="n-groupe-titre" style={{ margin: '16px 0 4px' }}>{tr('v2.style.lib')}</h3>
+      <p style={{ margin: '0 0 8px', font: 'var(--n-t-second)', color: 'var(--n-encre-2)' }}>{tr('v2.style.phrase')}</p>
+      <div className="g-styles" role="radiogroup" aria-label={tr('v2.style.lib')}>
+        {ids.map((id) => {
+          const nom = tr('v2.style.' + (id || 'actuel')), choisi = style === id;
+          return (
+            <TuileRadioNatif key={id || 'actuel'} choisi={choisi} className="g-tuile" onChoisir={() => setStyle(choisirStyle(id))}
+              attrs={{ 'data-style': id, 'data-style-tuile': id || 'actuel', 'aria-label': nom + ' — ' + tr('v2.style.' + (id || 'actuel') + '.desc'), title: tr('v2.style.' + (id || 'actuel') + '.desc') }}>
+              <span className="g-tuile-rangee" aria-hidden="true"><span className="g-tuile-photo"/><span className="g-tuile-lignes"><span className="g-tuile-ligne"/><span className="g-tuile-ligne"/></span><span className="g-tuile-chip"/></span>
+              <span className="g-tuile-plein" aria-hidden="true"/>
+              <span className="g-tuile-nom"><span>{nom}</span>{choisi ? <span className="g-tuile-coche">✓</span> : null}</span>
+            </TuileRadioNatif>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 // (11 nov., lot traduction) LA LANGUE : la même liste d'iOS que l'Apparence. Chaque langue
 // est écrite DANS sa langue (on la retrouve sans comprendre la langue courante) ; le choix
