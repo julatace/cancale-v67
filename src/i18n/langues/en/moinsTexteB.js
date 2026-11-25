@@ -17,7 +17,6 @@ export default {
   "mtb.vsSemaineAvant": "{ecart} vs previous week",
   "mtb.sansAchatRelie": {"one": "{n} sale with no linked purchase", "other": "{n} sales with no linked purchase"},
   "mtb.source": "Source",
-  "mtb.aucunPrixAchat": "No purchase prices.",
   "mtb.medianeSur": {"one": "median · {n} sale", "other": "median · {n} sales"},
   "mtb.aucunePourLinstant": "None yet.",
   "mtb.aucunPourLinstant": "None yet.",

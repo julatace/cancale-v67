@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (25 nov., moins-texte-b — Julien : « dès qu'il y a du texte, tu l'enlèves ») docs/passation/2026-11-25-moins-texte-b.md
+  { id: 'moins-texte-argent-reglages', date: '2026-11-25', titre: 'Argent et Réglages : moins de texte', phrase: 'Les chiffres et les boutons, les explications sous « Pourquoi ? ».', tab: 'argent', pour: 'tous', mode: 'tous' },
   // (25 nov., parrainage-20 — Julien : « le parrain touche 20 % … tant que son filleul paye ») docs/passation/2026-11-25-parrainage-20.md
   //   `proprietaire` tant que le programme est éteint (vrm_reglages.parrainage) : passer à 'tous' en l'ouvrant.
   { id: 'parrainage-20', date: '2026-11-25', titre: 'Parrainage : 20 % chaque mois', phrase: 'Ton filleul a −10 %, toi 20 % de chaque mois payé.', tab: 'parrainage', pour: 'proprietaire', mode: 'tous' },

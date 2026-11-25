@@ -4131,13 +4131,10 @@ function ComptaFusion({ compta, onNav }) {
           </div>
         ) : null}
       </section> : null}
-      {/* (5 nov., chantier F) Aucun mois au bénéfice brut connu : une ligne (la raison et le geste), plus six barres plates. */}
-      {!mois6.some((m) => m.v != null && m.n > 0) ? (
-        <section className="vrm-fu-panneau vrm-fu-mois6-vide" aria-label={tr('compta.beneficeBrutVentes')} data-fu-mois6={mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',')} data-fu-mois6-vide="">
-          <div className="vrm-fu-panneau-tete"><h3>{tr('compta.6DerniersMois')}</h3><span data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></div>
-          <p className="vrm-fu-note">{mois6.some((m) => m.n > 0) ? <>{tr('mtb.aucunPrixAchat')} <Bouton variante="discret" data-fu-mois6-porte="" onClick={() => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}>{tr('compta.saisir')}</Bouton></> : tr('compta.aucuneVenteFinalisee')}</p>
-        </section>
-      ) : (
+      {/* (5 nov., chantier F) Aucun mois au bénéfice brut connu : une ligne (la raison et le geste), plus six barres plates.
+          (25 nov., moins de texte) Plus rien : la case « Bénéfice » au-dessus dit déjà le manque et porte le geste
+          (« N prix à saisir ») — la même phrase n'est plus écrite deux fois. */}
+      {!mois6.some((m) => m.v != null && m.n > 0) ? null : (
       <section className="vrm-fu-panneau" aria-label={tr('compta.beneficeBrutVentes')} data-fu-mois6={mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',')}>
         <div className="vrm-fu-panneau-tete"><h3>{tr('compta.6DerniersMois')}</h3>{/* (3 nov.) Ces barres sont le BRUT (ventes − prix d'achat) : elles portent son nom (src/beneficeNoms.js), jamais « bénéfice » seul. */}<span data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></div>
         <div className="vrm-fu-barres">

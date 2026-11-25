@@ -51,8 +51,9 @@ export default function MargePlateforme({ sansCompte = false, liveStats, releve 
               {p.etat === 'lu' && p.n === 0 && !p.nFin ? (
                 <span className="vrm-mp-sur" data-mp-aucune="">Aucune vente sur la période</span>
               ) : (<>
+                {/* (25 nov., moins de texte) Un seul site : son « vendu » est celui de la tuile Vendu (un montant une fois par écran). */}
                 {p.etat === 'lu' ? (
-                  <span className="vrm-mp-chiffres">{t.ventes} · {t.vendu} vendu{p.total != null ? <> · {t.total} en tout</> : null}</span>
+                  <span className="vrm-mp-chiffres">{t.ventes}{lignes.length > 1 ? <> · {t.vendu} vendu</> : null}{p.total != null ? <> · {t.total} en tout</> : null}</span>
                 ) : null}
                 <span className="vrm-mp-sur" data-mp-raison={p.etat !== 'lu' ? (p.raison || p.etat) : undefined}>{sansCompte && p.etat === 'encours' ? 'aucun compte relié' : t.sur}</span>
               </>)}

@@ -75,7 +75,7 @@ export default function ObservationVinted() {
     : actif ? tr('obs.app.enCours', { min: reste, n: Number(etat.n) || 0 })
     : Number(etat.n) > 0 ? tr('obs.app.fini', { n: Number(etat.n) }) : tr('obs.app.eteint');
   return (
-    <Groupe titre={tr('obs.app.titre')} pied={<Pourquoi>{tr('obs.app.pied')}</Pourquoi>} attrs={{ 'data-ext-groupe': 'observation', 'data-observation': actif ? 'on' : 'off' }}>
+    <Groupe titre="" pied={<Pourquoi>{tr('obs.app.pied')}</Pourquoi>} attrs={{ 'data-ext-groupe': 'observation', 'data-observation': actif ? 'on' : 'off' }}>
       <Rangee titre={tr('obs.app.switch')} sousTitre={sous} lignes={2} indisponible={!possible || !etat}
         interrupteur={{ actif, onChange: (v) => commande(v ? 'demarrer' : 'arreter'), attrs: { 'data-observation-switch': actif ? '1' : '0', 'aria-label': tr('obs.app.switch') } }}/>
       {possible && etat && Number(etat.n) > 0 ? (

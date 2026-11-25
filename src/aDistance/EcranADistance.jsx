@@ -17,7 +17,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr, heure as heureLoc, date as dateLoc, dateRelative, monnaie } from '../i18n/index.js';
-import { Page, Groupe, Rangee, Vignette, Bouton, Attente, Segmente, Feuille, Toast, PagePoussee, Champ, poserIcone, iconePosee, Pourquoi } from '../natif/index.js';
+import { Page, Groupe, Rangee, Vignette, Bouton, Attente, Segmente, Feuille, Toast, PagePoussee, Champ, poserIcone, iconePosee, Pourquoi, LogoSite } from '../natif/index.js';
 import { Icon, SUPABASE_URL, sbAuth, withOwner, SB_CONFLICT, AUTH, load, lireCapturesDetail, useComptesAutresSites, aExpedier, lirePdfLigne, lireTout } from '../App.jsx';
 import { NOTE_SELECT, notesDesLignes, phraseNote } from '../noteCompteLue.js';
 import { MIROIR_N, selectAnnoncesVinted, annoncesVintedDe, selectVentesVinted, ventesVintedDe, annoncesLbcDe, annoncesVcDe, filsLbcDe, filsVcDe, filAutreDe, prixVoulu } from './miroir.js';
@@ -535,7 +535,7 @@ export default function EcranADistance({ comptesVinted, ecarte = () => false, on
           // 5.438 : la note du compte et, si elle a baissé sa cadence, la cadence appliquée — sur la rangée.
           const nt = c.site === 'vinted' && notes ? notes[c.id] : null;
           const sousNote = nt ? [tr('adist.note.court', { n: nt.n }), nt.reduite && nt.cap ? tr('adist.note.cap', { cap: nt.cap }) : '', nt.prec ? tr('adist.note.precieux') : ''].filter(Boolean).join(' · ') : '';
-          return <Rangee key={`${c.site}:${c.id}`} titre={c.nom || c.id} sousTitre={[sous, sousNote].filter(Boolean).join(' · ')} sousLignes={2} ton={vieux || (nt && nt.reduite) ? 'ambre' : 'neutre'} valeur={NOMS_SITES[c.site]} fin="chevron"
+          return <Rangee key={`${c.site}:${c.id}`} titre={c.nom || c.id} sousTitre={[sous, sousNote].filter(Boolean).join(' · ')} sousLignes={2} ton={vieux || (nt && nt.reduite) ? 'ambre' : 'neutre'} valeur={<LogoSite site={c.site} taille={18} nom={NOMS_SITES[c.site]}/>} fin="chevron"
             onClick={() => setOuvert(c)}
             actions={vieux && ['vinted', 'leboncoin'].includes(c.site) ? [{ cle: 'relire', libelle: tr('adist.relire'), onClick: () => envoyer({ geste: 'relire', site: c.site, compte: c.id, args: {} }) }] : null}
             attrs={{ 'data-adist-compte': `${c.site}:${c.id}`, 'data-adist-vieux': vieux ? '1' : '0', 'data-adist-ouvert': p && p.ouvert ? '1' : '0', 'data-adist-note-rangee': nt ? String(nt.n) : '' }}/>;
