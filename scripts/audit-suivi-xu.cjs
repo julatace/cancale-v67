@@ -12,7 +12,7 @@
 //  ws.chronopost.fr qui répond le XML `trackSkybillV2` à la forme des XW déjà lus (codes DC/PC/TS/AB/D,
 //  `infoCompList`, écho `skybillNumber`). Valeurs INVENTÉES. Aucune requête réelle.
 //   X1 la forme : XU/ZU…JF ⇒ Chronopost, pour chaque combinaison de champs mesurée ; pas « XU…FR » (S10),
-//      ni 8 chiffres, ni « XU » à 10 chiffres ;
+//      ni 8 chiffres, ni « XU » à 10 chiffres ; une VENTE seulement (un retour exige `transporteurPdf`) ;
 //   X2 le vrai passage : le bordereau XU (sans transporteur) est lu chez ws.chronopost.fr, UNE requête au n°
 //      exact ; ligne `depart_chronopost_XU…` : pris en charge (date du 1er évènement de route), au point
 //      (nom LU), jamais une ligne `transp_` ;
@@ -32,6 +32,7 @@ const MUTATIONS = {
   'xu-toute-fin': [['api/_lib/depart-colis.js', 'export const FORME_CHRONO_RELAIS_EUROPE = /^[XZ]U\\d{9}JF$/;', 'export const FORME_CHRONO_RELAIS_EUROPE = /^[XZ]U\\d{9}[A-Z]{2}$/;']],
   'echo-ignore': [['api/_lib/transporteurs.js', "  if (!sky || sky !== n) return rendu('forme',", "  if (false) return rendu('forme',"]],
   'introuvable-sans-fin': [['api/_lib/depart-colis.js', "  if (r === 'introuvable') return (Number(t.essais) || 0) >= INTROUVABLE_MAX ? Infinity : e + INTROUVABLE_MS;", "  if (r === 'introuvable') return e + INTROUVABLE_MS;"]],
+  'retour-par-la-forme': [['api/_lib/depart-colis.js', '    const carrier = carrierDepart(s.transporteur, k, { vente: !s.retour });', '    const carrier = carrierDepart(s.transporteur, k, { vente: true });']],
   'achat-lu-en-vente': [['api/_lib/depart-colis.js', '    if (!k || vus.has(k) || ambigus.has(k)) continue;', '    if (!k || vus.has(k)) continue;']],
 };
 if (process.argv.includes('--prouve')) { prouver(__filename, R, MUTATIONS); return; }
@@ -140,9 +141,15 @@ const POINT = 'TABAC FICTIF DU PORT';
       return D.departsAInterroger({ sortants: s, maintenant: NOW, max: 6, parTransporteur: 6 });
     });
     dit(choisis.every((l, i) => l.length === 1 && l[0].carrier === 'chronopost' && l[0].suivi === XU(i)), 'X1 XU…JF ⇒ lu chez Chronopost, quels que soient les champs mesurés (absent, vide + étiquette, nommé)', J(choisis));
-    dit(D.carrierDepart('', ZU(1)) === 'chronopost' && D.carrierDepart(null, XU(1).toLowerCase()) === 'chronopost', 'X1b ZU…JF aussi (1 bordereau mesuré), casse indifférente', J([D.carrierDepart('', ZU(1)), D.carrierDepart(null, XU(1).toLowerCase())]));
+    const V = { vente: true };
+    dit(D.carrierDepart('', ZU(1), V) === 'chronopost' && D.carrierDepart(null, XU(1).toLowerCase(), V) === 'chronopost', 'X1b ZU…JF aussi (1 bordereau mesuré), casse indifférente', J([D.carrierDepart('', ZU(1), V), D.carrierDepart(null, XU(1).toLowerCase(), V)]));
     const autres = ['XU400000001FR', 'CP400000001IE', 'XU4000000001JF', '40000001', 'XU40000001JF'];
-    dit(autres.every((n) => D.carrierDepart('', n) === null), 'X1c ni un n° postal S10 (XU…FR, CP…IE), ni 10 chiffres, ni 8 chiffres, ni 8 chiffres + JF : jamais Chronopost par la forme', J(autres.map((n) => [n, D.carrierDepart('', n)])));
+    // (25 nov.) Un bordereau de RETOUR (le colis qu'il renvoie) : la forme seule ne suffit pas — seulement avec le
+    // transporteur lu sur SON étiquette (lot retour-parfait, audit-retour-parfait T3).
+    const retour = (tp) => D.departsAInterroger({ sortants: D.sortantsDuVendeur({ retours: [{ suivi: XU(50), transaction: '9200000050', receivedAt: iso(NOW - 20 * H), transporteurPdf: tp }] }), maintenant: NOW, max: 6, parTransporteur: 6 });
+    const rSans = retour(''), rAvec = retour('chronopost');
+    dit(autres.every((n) => D.carrierDepart('', n, V) === null) && rSans.length === 0 && rAvec.length === 1 && rAvec[0].carrier === 'chronopost',
+      'X1c ni un n° postal S10 (XU…FR, CP…IE), ni 10 chiffres, ni 8 chiffres, ni 8 chiffres + JF ; et un RETOUR XU sans `transporteurPdf` n’est pas lu (avec, oui) : la forme XU vaut pour une VENTE seulement', J({ autres: autres.map((n) => [n, D.carrierDepart('', n, V)]), rSans, rAvec }));
     dit(D.carrierDepart('', 'XW400000001TS') === 'chronopost', 'X1d les XW…TS restent lus (inchangé)');
   });
 
