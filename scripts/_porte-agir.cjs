@@ -181,4 +181,4 @@ function publierLbc(ecran, agir, appel) {
     repli: /ouvrirPanneau\(\{ site: [^\n]*page: 'publier', ids: \[[^\]]+\], action: 'publier' \}\)/ });
 }
 
-module.exports = { GARDES_PORTE: GARDES, publierLbc, repondre, panneauGarde, supprimerLbc, offreVinted, regle, porteTient, lue, sansPorte, APPELS_PORTE };
+module.exports = { faitsInventes, GARDES_PORTE: GARDES, publierLbc, repondre, panneauGarde, supprimerLbc, offreVinted, regle, porteTient, lue, sansPorte, APPELS_PORTE };
