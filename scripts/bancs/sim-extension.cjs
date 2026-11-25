@@ -434,6 +434,10 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       await vt.click('#lignes a.rang'); 
       await vt.waitForURL(/\/inbox\/[0-9a-f-]{36}/, { timeout: 10000 }).catch(() => {});
       await vt.waitForSelector('textarea', { timeout: 10000 }).catch(() => {});
+      // (25 nov.) La page est notée par la veille de l'observation (inject.js `obsVeille`, toutes les 300 ms) : un clic dans
+      // les 300 ms qui suivent l'arrivée passait AVANT « page /inbox/{uuid} » dans la frise (vu 2 fois sur 5.450.1). Une main
+      // ne clique pas si vite : on laisse passer une veille avant de toucher le champ.
+      await attendre(450);
       await vt.click('textarea'); await vt.keyboard.type(SECRET_MSG, { delay: 5 });
       await vt.click('form button[type=submit]'); await attendre(1200);
       await vt.click('#offreB'); await attendre(500); await vt.fill('[role=dialog] input', '45'); await vt.click('#prop'); await attendre(1500);
