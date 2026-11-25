@@ -69,6 +69,9 @@
    groupes restent des cartes arrondies (inset iOS), les en-têtes de groupe 13/400 gris. */
 :root:root:root body .vrm-plus-groupe { border-radius: 16px !important; overflow: hidden !important; background: var(--d-carte, #fff) !important; }
 :root:root:root body .vrm-plus-groupe .vrm-ui-ligne { background: transparent !important; }
+/* (24 nov., WCAG 4.1.2) Deux ou trois rangées : `content-visibility:auto` (ui.css, listes de 1 000) laissait ces boutons
+   SANS NOM dans l'arbre d'accessibilité tant qu'ils étaient hors écran (banc wcag-aa D). Ici rien à économiser. */
+:root:root:root:root:root:root:root body .vrm-plus-groupe .vrm-ui-ligne { content-visibility: visible !important; }
 :root:root:root body .vrm-plus-groupe .vrm-ui-ligne:active { background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
 :root:root:root body .vrm-plus-feuille .vrm-plus-groupe { background: var(--d-carte, #fff) !important; box-shadow: none !important; }
 :root:root:root body h2.vrm-plus-entete, :root:root:root body h3.vrm-plus-entete { font: 400 13px/18px var(--vrm-police, system-ui) !important; color: var(--d-gris, #6E6E73) !important; letter-spacing: 0 !important; margin: 24px 4px 6px !important; text-transform: none !important; }

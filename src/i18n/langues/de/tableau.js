@@ -17,6 +17,7 @@ export default {
   "tableau.statutN": "Status · {n}",
   "tableau.statutTous": "Alle anzeigen",
   "tableau.colArticle": "Artikel",
+  "tableau.colArticleToujours": "Der Artikel wird immer angezeigt",
   "tableau.chercher": "Suchen…",
   "tableau.chercherArticle": "Artikel, Nr., Konto suchen…",
   "tableau.vue": "Ansicht",

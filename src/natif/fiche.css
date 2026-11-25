@@ -58,6 +58,10 @@
   }
   .nf-etiquette[data-nf-ton="ambre"] { background: var(--n-ambre-fond); color: var(--n-ambre); }
   .nf-etiquette[data-nf-ton="doublon"] { background: var(--n-doublon); color: var(--n-sur-doublon); }
+  /* (24 nov., vente-mail-annonce) « Pourquoi ? » : un lien discret à côté de la ligne d'état « pas su » ; sa raison en gris clair. */
+  .nf-pourquoi { display: inline-flex; align-items: center; min-height: 26px; padding: 2px 4px; border: 0; background: none; color: var(--n-encre-2); font: var(--n-t-legende); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; position: relative; }
+  .nf-pourquoi::after { content: ""; position: absolute; inset: -9px -6px; }   /* la cible au doigt : 44 px */
+  .nf-pourquoi-texte { margin: 8px 0 0; color: var(--n-encre-2); font: var(--n-t-legende); line-height: 1.4; }
 
   /* ── 3. Le prix en très grand, ses pastilles ── */
   .nf-prixbloc { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; row-gap: 0; padding: 10px var(--n-marge) 4px; }
@@ -117,6 +121,12 @@
   .nf-val { margin: 0; min-width: 0; text-align: end; font: var(--n-t-corps); color: var(--n-encre); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
   .nf-valeur { font: var(--n-t-corps-fort); }
   .nf-val-touche { appearance: none; -webkit-appearance: none; display: inline-flex; align-items: center; justify-content: flex-end; min-height: 44px; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: end; cursor: pointer; }
+  /* (23 nov., revue UX #11) Prix d'achat / prix mini : un champ dessiné (contour fin, rayon 8, 36 de haut dans 44), « — € » vide. */
+  .nf-champ-faux { display: inline-flex; align-items: center; justify-content: flex-end; box-sizing: border-box; min-width: 92px; height: 36px; padding: 0 10px;
+    border: 1px solid var(--n-trait); border-radius: 8px; background: var(--n-carte); font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  .nf-champ-faux[data-nf-champ="vide"] { color: var(--n-encre-2); font-weight: 400; }
+  .nf-ligne[data-nf-ligne-prix] .nf-champ { outline-offset: -2px; border-radius: 8px; height: 36px; width: 110px; }
+  .nf-section[data-fd-courbe]:not(:has(:not([hidden]))) { display: none; }
   .nf-vide, .nf-pied { margin: 6px var(--n-marge) 0; padding: 0 16px; font: var(--n-t-legende); color: var(--n-encre-2); }
   .nf-vide { margin-top: 0; padding: 12px 16px; border-radius: var(--n-r-carte); background: var(--n-carte); font: var(--n-t-second); }
 
@@ -125,8 +135,13 @@
     display: grid; grid-template-columns: auto auto auto auto minmax(0, 1fr) auto; grid-template-areas: "site compte compte compte compte prix" "site vues fav date . etat";
     align-items: center; column-gap: 10px; row-gap: 0; min-height: 56px; padding: 8px 16px; box-sizing: border-box; color: var(--n-encre); text-decoration: none;
   }
-  a.nf-site { -webkit-tap-highlight-color: transparent; }
-  a.nf-site:active { background: var(--n-appui); }
+  /* (24 nov., main-vert) la rangée porte un vrai lien DANS sa cellule, étendu à toute la rangée (la rangée reste role="row") */
+  .nf-site[data-nf-lien] { position: relative; -webkit-tap-highlight-color: transparent; }
+  .nf-site[data-nf-lien]:active { background: var(--n-appui); }
+  .nf-site-lien { color: inherit; text-decoration: none; display: contents; }
+  .nf-site-lien::after { content: ""; position: absolute; inset: 0; }
+  .nf-site-lien:focus-visible::after { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .nf-site[data-nf-lien] .nf-geste { position: relative; z-index: 1; }
   .nf-site + .nf-site { box-shadow: inset 0 .5px 0 var(--n-trait); }
   .nf-site-tete { display: none; }
   .nf-c-site { grid-area: site; display: inline-flex; align-items: center; gap: 10px; min-width: 0; font: var(--n-t-corps-fort); }

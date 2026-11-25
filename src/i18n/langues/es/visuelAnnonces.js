@@ -1,0 +1,25 @@
+// es · l'inventaire Annonces / Stock (24 nov., lot visuel-annonces) — src/natif/visuel/Inventaire.jsx
+export default {
+  "inv.compte": "Cuenta {pseudo}",
+  "inv.comptesPlus": "{n} cuentas más",
+  "inv.chargement": "Cargando anuncios",
+  "inv.copier": "Copiar enlace",
+  "inv.lienCopie": "Enlace copiado",
+  "inv.lienPasCopie": "Enlace no copiado",
+  "inv.rapide.baisser": "Bajar",
+  "inv.rapide.republier": "Republicar",
+  "inv.puces": "Ordenar y filtrar",
+  "inv.tri.titre": "Ordenar",
+  "inv.tri.recent": "Más recientes",
+  "inv.tri.prixHaut": "Precio descendente",
+  "inv.tri.prixBas": "Precio ascendente",
+  "inv.tri.vues": "Más vistos",
+  "inv.tri.favoris": "Más favoritos",
+  "inv.tri.anciennes": "Más antiguos",
+  "inv.puce.sansnum": "Sin N°",
+  "inv.puce.aconfirmer": "Por confirmar",
+  "inv.affichage": "Vista",
+  "inv.vue.liste": "Lista",
+  "inv.vue.grille": "Detallada",
+  "inv.age.jour": "Hoy"
+};
