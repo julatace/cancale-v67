@@ -76,6 +76,7 @@ export default {
   "rt.f.route": "On its way",
   "rt.f.relais": "At pick-up point",
   "rt.f.livre": "Delivered to seller",
+  "rt.f.recu": "Received",
   "rt.f.rembourse": "Refunded",
   "rt.etat.depassee": "Drop-off deadline passed",
   "rt.court.depassee": "You may have to keep the item.",

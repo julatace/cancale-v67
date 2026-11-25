@@ -25,7 +25,7 @@ import { Pourquoi } from './natif/Actions.jsx';
 import { poserComptesFeuille } from './moderationFeuille.js';
 import { ArretModerationCompte } from './Discretion.jsx';
 import { SELECT_MODERATION, LIGNE_MODERATION_VU, alertesActives, texteEvenement, evenementsDesLignes } from './moderationVinted.js';
-import { tr, date as dateLoc } from './i18n/index.js';
+import { tr, date as dateLoc, localeCourante } from './i18n/index.js';
 import './styles-alerte-moderation.css';
 
 // (21 nov., ext. 5.428, choix 57) « nike air max 1 taille 42 masquée par Vinted · Raison : … · Que faire » : le titre et la taille
@@ -50,6 +50,13 @@ export function fenetreGroupe(evts) {
   const de = Math.min(...L.map((e) => Number(e.av) > 0 ? Number(e.av) : Number(e.t))), a = Math.max(...L.map((e) => Number(e.t)));
   const j1 = jourCourt(de), j2 = jourCourt(a);
   return j1 === j2 ? tr('modc.le', { jour: j2 }) : tr('modc.entre', { de: j1, a: j2 });
+}
+// (25 nov., « trop de texte ») La même fenêtre en court, sur la ligne d'Aujourd'hui : « 21–23 nov. » (Intl, dans la langue).
+export function fenetreCourte(evts) {
+  const L = (evts || []).filter((e) => e && Number(e.t) > 0);
+  if (!L.length) return '';
+  const de = Math.min(...L.map((e) => Number(e.av) > 0 ? Number(e.av) : Number(e.t))), a = Math.max(...L.map((e) => Number(e.t)));
+  try { const f = new Intl.DateTimeFormat(localeCourante(), { day: 'numeric', month: 'short' }); return f.formatRange ? f.formatRange(new Date(de), new Date(a)) : fenetreGroupe(evts); } catch (_) { return fenetreGroupe(evts); }
 }
 // La photo d'une annonce : celle de SA fiche (`vinted_annonce_numeros[id].photo`), par identifiant — jamais par titre.
 const photoDeFiche = (f) => (f && (typeof f.photo === 'string' ? f.photo : (f.photo && f.photo.url))) || '';
@@ -129,15 +136,16 @@ export default function AlerteModeration({ comptes = [] }) {
     const nom = nomDe(u) || ('#' + u);
     return (
       <button key={'d:' + u} type="button" className="vrm-mod-disp" data-moderation-disparues={String(evts.length)} data-moderation-groupe="disparue" data-moderation-compte={u} data-moderation-n={evts.length}
-        aria-haspopup="dialog" onClick={() => { setFeuille(u); setToutes(false); setMenuA(''); }}>
+        aria-haspopup="dialog" aria-label={tr('ru.mod.disparues', { n: evts.length, compte: nom }) + ' · ' + fenetreGroupe(evts)} onClick={() => { setFeuille(u); setToutes(false); setMenuA(''); }}>
         <span className="vrm-mod-pile" aria-hidden="true" data-moderation-pile={String(photos.length)}>
           {photos.length ? photos.map((ph, i) => <span key={ph + i} className="vrm-mod-pile-ph" style={{ zIndex: 3 - i }}><PhotoVinted src={ph} alt="" loading="lazy" decoding="async" repli={null}/></span>)
             : <span className="vrm-mod-pile-ph vrm-mod-pile-vide"><Icon name="image" size={18}/></span>}
           <span className="vrm-mod-pile-n" data-moderation-pastille="">{evts.length}</span>
         </span>
         <span className="vrm-mod-disp-texte">
-          <span className="vrm-mod-disp-titre" data-moderation-groupe-titre="">{insecable(tr('ru.mod.disparues', { n: evts.length, compte: nom }))}</span>
-          <span className="vrm-mod-disp-quand" data-moderation-fenetre="">{fenetreGroupe(evts)}</span>
+          <span className="vrm-mod-disp-titre" data-moderation-groupe-titre="">{insecable(tr('ru.mod.disparuesCourt', { n: evts.length }))}</span>
+          {/* (25 nov., Julien : « trop de texte ») « 5 annonces disparues » puis « shop_cancale · 21–23 nov. » ; la phrase entière au lecteur d'écran. */}
+          <span className="vrm-mod-disp-quand" data-moderation-fenetre="">{nom + ' · ' + fenetreCourte(evts)}</span>
         </span>
         <span className="vrm-mod-chev" aria-hidden="true"><Icon name="chevron" size={18}/></span>
       </button>

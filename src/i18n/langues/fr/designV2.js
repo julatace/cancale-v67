@@ -165,10 +165,7 @@ export default {
   "v2.l.acheteMarge": "Acheté {p} · marge {m}",
   "v2.chargement": "Lecture de tes annonces…",
   "v2.imprimerCourt": "Imprimer les bordereaux",
-  "v2.ecartCourt": {
-    "one": "{r} pas encore prêt",
-    "other": "{r} pas encore prêts"
-  },
+  "v2.ecartCourt": {"one": "{r} pas prêt", "other": "{r} pas prêts"},
   "v2.tousPrets": "tous prêts à imprimer",
   "v2.achats.ajouterCourt": "Ajouter",
   "v2.reessayer": "Réessayer",
@@ -247,7 +244,7 @@ export default {
   "v2.reg.completer": "Compléter mes annonces",
   "v2.reg.completerN": "Compléter mes annonces · {n}",
   "v2.jour.lecture": "lecture…",
-  "v2.stats.titre": "Tes chiffres",
+  "v2.stats.titre": "Chiffres",
   "v2.stats.ca": "CA vendu",
   "v2.obj.fixer": "Fixer un objectif du mois",
   "v2.obj.titre": "Objectif du mois",
@@ -306,7 +303,7 @@ export default {
     "one": "{n} offre envoyée",
     "other": "{n} offres envoyées"
   },
-  "v2.perso.ouvrir": "Personnaliser cet écran",
+  "v2.perso.ouvrir": "Personnaliser",
   "v2.perso.titre": "Cartes d’Aujourd’hui",
   "v2.perso.pied": "Touche − pour retirer une carte, + pour l’ajouter ; glisse ≡ pour la déplacer.",
   "v2.perso.monter": "Monter",
@@ -503,5 +500,7 @@ export default {
   "v2.style.arcade": "Arcade",
   "v2.style.arcade.desc": "Gros boutons en relief, comme un jeu.",
   "v2.style.monochrome": "Monochrome",
-  "v2.style.monochrome.desc": "Noir, blanc et gris clair ; un point vert."
+  "v2.style.monochrome.desc": "Noir, blanc et gris clair ; un point vert.",
+  "v2.style.c3doux": "C3",
+  "v2.style.c3doux.desc": "Gris un peu foncé, cartes blanches, plaques gravées."
 };

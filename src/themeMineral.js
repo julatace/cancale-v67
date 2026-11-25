@@ -46,11 +46,13 @@
 // fond #F1F3F6, cartes blanches, contours #E4E4E7, encre #16181D, gris #62676F, accent VERT SAPIN #16181D (nuit #F4F4F5,
 // texte sombre dessus), ambre pour un geste, rouge au seul doublon. Plus aucun bleu (docs/passation/2026-11-21-style-vintex.md).
 // (22 nov., décision de Julien : « j'aime bien en noir ») l'accent devient l'ENCRE (#16181D ; nuit #F4F4F5).
+// (25 nov., Julien : « gris moyen c'est d'accord ») le clair passe au GRIS MOYEN : page #878B92, cartes #F1F2F4, encre #0E0F12,
+// secondaire #1F2226 (posé aussi sur la page : 4,67:1), accent = plein #19222C (4,70:1 sur la page) — src/natif/jetons.css.
 export const MINERAL = Object.freeze({
- bg:'#DFE1E5',haut:'#DFE1E5',surface:'#FAFAFB',card:'#FAFAFB',card2:'#E9EBEE',
- border:'#CBCED4',text:'#1D1D1F',muted:'#50535B',faint:'#50535B',
- accent:'#3D4B5B',accentTexte:'#3D4B5B',accentSoft:'#57677A',onAccent:'#FFFFFF',
- danger:'#3D4B5B',doublon:'#BF2A21',warn:'#3D4B5B',onWarn:'#FFFFFF',warnSoft:'#E2E6EC',gold:'#3D4B5B',blue:'#62676F',purple:'#62676F',
+ bg:'#878B92',haut:'#878B92',surface:'#F1F2F4',card:'#F1F2F4',card2:'#E3E5E9',
+ border:'#B9BDC3',text:'#0E0F12',muted:'#1F2226',faint:'#1F2226',
+ accent:'#19222C',accentTexte:'#19222C',accentSoft:'#2C3846',onAccent:'#FFFFFF',
+ danger:'#19222C',doublon:'#BF2A21',warn:'#19222C',onWarn:'#FFFFFF',warnSoft:'#D9DBDE',gold:'#19222C',blue:'#1F2226',purple:'#1F2226',
  shadow:'none',
  shadowMd:'0 1px 2px rgba(26,26,30,.04), 0 2px 6px rgba(26,26,30,.04)',
  shadowLg:'0 8px 30px rgba(26,26,30,.14)',

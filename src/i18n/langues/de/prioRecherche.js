@@ -55,10 +55,7 @@ export default {
   "prio.reglages.jours": "{n} T",
   "prio.reglages.parJour": "Wie viele pro Tag",
   "prio.reglages.note": "Dasselbe Alter wie im Bereich „Liegen“. Verkaufte, von Vinted ausgeblendete, strittige oder Paare eines gesperrten oder privaten Kontos werden nie vorgeschlagen.",
-  "prio.journee": {
-    "one": "{n} Paar zuerst neu einstellen",
-    "other": "{n} Paare zuerst neu einstellen"
-  },
+  "prio.journee": {"one": "{n} Paar neu einstellen", "other": "{n} Paare neu einstellen"},
   "prio.journeeSous": "Seit {jours} T oder länger online, sortiert",
   "rech.approx": "bis auf einen Buchstaben"
 };

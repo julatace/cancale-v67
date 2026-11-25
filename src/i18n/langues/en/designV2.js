@@ -165,10 +165,7 @@ export default {
   "v2.l.acheteMarge": "Bought {p} · margin {m}",
   "v2.chargement": "Reading your listings…",
   "v2.imprimerCourt": "Print the labels",
-  "v2.ecartCourt": {
-    "one": "{r} not ready yet",
-    "other": "{r} not ready yet"
-  },
+  "v2.ecartCourt": {"one": "{r} not ready", "other": "{r} not ready"},
   "v2.tousPrets": "all ready to print",
   "v2.achats.ajouterCourt": "Add",
   "v2.reessayer": "Try again",
@@ -247,7 +244,7 @@ export default {
   "v2.reg.completer": "Complete my listings",
   "v2.reg.completerN": "Complete my listings · {n}",
   "v2.jour.lecture": "reading…",
-  "v2.stats.titre": "Your figures",
+  "v2.stats.titre": "Figures",
   "v2.stats.ca": "Sales",
   "v2.obj.fixer": "Set a monthly goal",
   "v2.obj.titre": "Monthly goal",
@@ -306,7 +303,7 @@ export default {
     "one": "{n} offer sent",
     "other": "{n} offers sent"
   },
-  "v2.perso.ouvrir": "Customise this screen",
+  "v2.perso.ouvrir": "Customise",
   "v2.perso.titre": "Today’s cards",
   "v2.perso.pied": "Tap − to remove a card, + to add it; drag ≡ to move it.",
   "v2.perso.monter": "Up",
@@ -503,5 +500,7 @@ export default {
   "v2.style.arcade": "Arcade",
   "v2.style.arcade.desc": "Chunky raised buttons, like a game.",
   "v2.style.monochrome": "Monochrome",
-  "v2.style.monochrome.desc": "Black, white and light grey; one green dot."
+  "v2.style.monochrome.desc": "Black, white and light grey; one green dot.",
+  "v2.style.c3doux": "C3",
+  "v2.style.c3doux.desc": "Slightly darker grey, white cards, engraved plates."
 };

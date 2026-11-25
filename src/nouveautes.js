@@ -30,6 +30,19 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (25 nov., moins-texte-a — Julien : « dès qu'il y a du texte, tu l'enlèves ») docs/passation/2026-11-25-moins-texte-a.md
   { id: 'moins-texte-annonces-achats', date: '2026-11-25', titre: 'Annonces, Achats, loupe : moitié moins de texte', phrase: 'Des icônes et des chiffres ; le détail sous « Pourquoi ? ».', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (25 nov., aujourdhui-moins-texte — Julien : « C'est pas mal mais trop de texte, améliore. ») docs/passation/2026-11-25-aujourdhui-moins-texte.md
+  { id: 'aujourdhui-moins-texte', date: '2026-11-25', titre: 'Aujourd’hui : deux fois moins de texte', phrase: 'Un titre court, un chiffre ; le détail derrière ›.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (25 nov., achats-retours-design — Julien : « tu peux améliorer ce design ») docs/passation/2026-11-25-achats-retours-design.md
+  { id: 'retours-cartes-compactes', date: '2026-11-25', titre: 'Tes retours tiennent en un coup d’œil', phrase: 'Un état, un bouton ; les retours remboursés se replient.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (25 nov., logo-vinted-pp — Julien : « le logo de Vinted, mais pour le compte la pp du compte Vinted ») docs/passation/2026-11-25-logo-vinted-pp.md
+  { id: 'logo-vinted-pp', date: '2026-11-25', titre: 'Chaque compte avec sa photo de profil', phrase: 'Le V Vinted en couleur, puis la photo du compte.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (25 nov., gris-moyen — Julien : « fais entre les deux, la couleur », puis « gris moyen c'est d'accord ») docs/passation/2026-11-25-gris-moyen.md
+  { id: 'clair-gris-moyen', date: '2026-11-25', titre: 'Le clair passe au gris moyen', phrase: 'Entre le clair et le sombre : cartes claires, texte bien noir.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (25 nov., parrainage-20 — Julien : « le parrain touche 20 % … tant que son filleul paye ») docs/passation/2026-11-25-parrainage-20.md
+  //   `proprietaire` tant que le programme est éteint (vrm_reglages.parrainage) : passer à 'tous' en l'ouvrant.
+  { id: 'parrainage-20', date: '2026-11-25', titre: 'Parrainage : 20 % chaque mois', phrase: 'Ton filleul a −10 %, toi 20 % de chaque mois payé.', tab: 'parrainage', pour: 'proprietaire', mode: 'tous' },
+  // (25 nov., style-c3 — Julien : « fait un mélange c3 vintex », « le gris de fond un peu foncé ») docs/passation/2026-11-25-style-c3.md
+  { id: 'style-c3-doux', date: '2026-11-25', titre: 'Un douzième style : C3', phrase: 'Gris un peu foncé, cartes blanches, boutons nets : à essayer.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (25 nov., chargement-propre — Julien : « je dois fermer l'app et la rouvrir pour avoir les nouvelles infos ») docs/passation/2026-11-25-chargement-propre.md
   { id: 'maj-sans-relancer', date: '2026-11-25', titre: 'Les nouvelles infos arrivent seules', phrase: 'Vente, e-mail, retour sur l’app : à jour sans la rouvrir.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., chargement-propre — Julien : « quand les données s'affichent c'est moche, long et déstructuré ») même récit

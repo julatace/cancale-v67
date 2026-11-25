@@ -55,10 +55,7 @@ export default {
   "prio.reglages.jours": "{n} d",
   "prio.reglages.parJour": "How many a day",
   "prio.reglages.note": "The same age as the “Sleeping” segment. Pairs that are sold, hidden by Vinted, in a dispute, or from a blocked or personal account are never suggested.",
-  "prio.journee": {
-    "one": "{n} pair to relist first",
-    "other": "{n} pairs to relist first"
-  },
+  "prio.journee": {"one": "{n} pair to relist", "other": "{n} pairs to relist"},
   "prio.journeeSous": "Online {jours} d or more, ranked",
   "rech.approx": "one letter off"
 };

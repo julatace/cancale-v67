@@ -7,7 +7,7 @@ const path = require('path'), fs = require('fs');
 const { chromium } = require('playwright');
 const SHOTS = process.env.SHOTS, SORTIE = process.env.SORTIE || SHOTS;
 const G = require('../styles-generer.cjs');
-const NOMS = { actuel: 'Actuel', graphite: 'Graphite', ardoise: 'Ardoise', pierre: 'Pierre', encre: 'Encre', papier: 'Papier', verre: 'Verre', nuit: 'Nuit', menthe: 'Menthe', studio: 'Studio', arcade: 'Arcade', monochrome: 'Monochrome' };
+const NOMS = { actuel: 'Actuel', graphite: 'Graphite', ardoise: 'Ardoise', pierre: 'Pierre', encre: 'Encre', papier: 'Papier', verre: 'Verre', nuit: 'Nuit', menthe: 'Menthe', studio: 'Studio', arcade: 'Arcade', monochrome: 'Monochrome', c3doux: 'C3 doux' };
 const ECRANS = [['ventes', 'Ventes · À envoyer'], ['annonces', 'Annonces'], ['fiche', 'Fiche de la paire']];
 const img = (f) => { const p = path.join(SHOTS, f); return fs.existsSync(p) ? 'data:image/png;base64,' + fs.readFileSync(p).toString('base64') : ''; };
 const cell = (f, leg) => `<figure><div class="cad">${img(f) ? `<img src="${img(f)}">` : '<div class="manque">pas de capture</div>'}</div><figcaption>${leg}</figcaption></figure>`;

@@ -8086,6 +8086,17 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   //     recherche, chiffres, la liste (prix, reçus, liaison au stock), les
   //     litiges ; jamais le bloc « à retirer ».
   const modeRetraits = vueAchats === 'retraits';
+  // (25 nov., achats-retours-design) Julien, iPhone : « ✓ » et « ⋯ » d'Achats flottaient SEULS sur une ligne vide sous les étapes
+  // (les étapes prennent toute la largeur au téléphone depuis le 24 nov.). La tête de la tâche (App.jsx) pose une PLACE à côté de
+  // ses ronds (Retrouver, Arrivée) : ils y sont rendus par portail — mêmes composants, mêmes data-*. Pas de place (design V2,
+  // retraits) ⇒ à leur place d'avant, dans la barre. Même mécanique que `data-vv-tete-place` (Ventes).
+  const [slotTeteA, setSlotTeteA] = useState(null);
+  useEffect(() => {
+    if (only !== 'achats' || modeRetraits) { if (slotTeteA) setSlotTeteA(null); return; }
+    const el = document.querySelector('[data-achats-tete-place="achats"]');
+    if (el !== slotTeteA) setSlotTeteA(el && el.isConnected ? el : null);
+  });
+  const rondsDansTete = !!slotTeteA;
   const modeListeAchats = vueAchats === 'achats';
   const aFilter = modeRetraits ? 'attente' : (modeListeAchats && aFilterBrut === 'attente') ? 'all' : aFilterBrut;
   // ⚠️ UNE IMAGE MORTE (QR OU PHOTO) DOIT LAISSER SA PLACE — et le repli doit vivre dans
@@ -25420,6 +25431,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       </>)}
 
 
+      {curSub==='achats' && rondsDansTete && !achatsVidePur ? createPortal(<>{!ordiAchats && achatsAffiches.length>1 && !serieAchats.actif && serieAchats.total ? <Natif.BoutonIcone libelle={tr('achats.selectionner')} icone={<Icon name="check" size={20}/>} className="vrm-achats-selection" onClick={()=>serieAchats.ouvrir()} attrs={{'data-serie-ouvrir':serieAchats.nom}}/> : null}{!baseKO && <Natif.BoutonIcone libelle={tr('achats.plusFournisseursDelai')} icone={<Icon name="more" size={20}/>} actif={achatsOutilsOuverts} className="vrm-achats-plus" onClick={()=>setAchatsOutilsOuverts(v=>!v)} attrs={{'data-achats-plus':achatsOutilsOuverts?'ouvert':'ferme','aria-expanded':achatsOutilsOuverts,'aria-controls':'vrm-achats-outils','aria-pressed':undefined}}/>}</>, slotTeteA) : null}
       {curSub==='achats' && (<div className="vrm-achats" data-ecran-achats={modeRetraits?(retraitsOutils?'retraits-outils':'retraits'):'achats'}>
         {/* (26 oct.) Dans l'espace Vinted, l'onglet « Achats » sélectionné dit déjà le titre : pas deux fois (§7). */}
         {/* (9 nov., lot V) « Scanner » au point relais : la caméra lit le colis ⇒ l'achat qui porte CE n°
@@ -25539,12 +25551,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             <button type="button" key={id} className="vrm-seg-btn" data-achats-onglet={id} data-n={cnt==null?undefined:String(cnt)} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} aria-label={cnt?`${label} ${cnt}`:undefined} style={{whiteSpace:'nowrap'}}>{label}{cnt&&!dejaDit(id)?<span className="vrm-seg-n" title={String(cnt)}> {cnt>=1000?`${(Math.floor(cnt/100)/10).toLocaleString('fr-FR')} k`:cnt}</span>:null}</button>
           )); })()}
         </div>
-        {achatsAffiches.length>1 && !serieAchats.actif && serieAchats.total ? <Natif.BoutonIcone libelle={tr('achats.selectionner')} icone={<Icon name="check" size={20}/>} className="vrm-achats-selection" onClick={()=>serieAchats.ouvrir()} attrs={{'data-serie-ouvrir':serieAchats.nom}}/> : null}
-        {!baseKO && <Natif.BoutonIcone libelle={tr('achats.plusFournisseursDelai')} icone={<Icon name="more" size={20}/>} actif={achatsOutilsOuverts} className="vrm-achats-plus" onClick={()=>setAchatsOutilsOuverts(v=>!v)} attrs={{'data-achats-plus':achatsOutilsOuverts?'ouvert':'ferme','aria-expanded':achatsOutilsOuverts,'aria-controls':'vrm-achats-outils','aria-pressed':undefined}}/>}
+        {!rondsDansTete && (achatsAffiches.length>1 && !serieAchats.actif && serieAchats.total ? <Natif.BoutonIcone libelle={tr('achats.selectionner')} icone={<Icon name="check" size={20}/>} className="vrm-achats-selection" onClick={()=>serieAchats.ouvrir()} attrs={{'data-serie-ouvrir':serieAchats.nom}}/> : null)}
+        {!rondsDansTete && (!baseKO && <Natif.BoutonIcone libelle={tr('achats.plusFournisseursDelai')} icone={<Icon name="more" size={20}/>} actif={achatsOutilsOuverts} className="vrm-achats-plus" onClick={()=>setAchatsOutilsOuverts(v=>!v)} attrs={{'data-achats-plus':achatsOutilsOuverts?'ouvert':'ferme','aria-expanded':achatsOutilsOuverts,'aria-controls':'vrm-achats-outils','aria-pressed':undefined}}/>)}
         </div>}
         {/* (23 nov., achats-ordi-casse) À l'ordinateur la barre des étapes laisse la place au tableau (il a ses filtres) : « … »
             (Fournisseurs · Délai · Lots) n'était plus nulle part (banc achats-sourcing à 1512). Il garde sa place, seul, à droite. */}
-        {!modeRetraits && ordiAchats && !achatsVidePur && !baseKO && <div className="vrm-achats-barre" data-achats-barre-ordi="" style={{display:'flex',justifyContent:'flex-end'}}><Natif.BoutonIcone libelle={tr('achats.plusFournisseursDelai')} icone={<Icon name="more" size={20}/>} actif={achatsOutilsOuverts} className="vrm-achats-plus" onClick={()=>setAchatsOutilsOuverts(v=>!v)} attrs={{'data-achats-plus':achatsOutilsOuverts?'ouvert':'ferme','aria-expanded':achatsOutilsOuverts,'aria-controls':'vrm-achats-outils','aria-pressed':undefined}}/></div>}
+        {!modeRetraits && ordiAchats && !achatsVidePur && !baseKO && !rondsDansTete && <div className="vrm-achats-barre" data-achats-barre-ordi="" style={{display:'flex',justifyContent:'flex-end'}}><Natif.BoutonIcone libelle={tr('achats.plusFournisseursDelai')} icone={<Icon name="more" size={20}/>} actif={achatsOutilsOuverts} className="vrm-achats-plus" onClick={()=>setAchatsOutilsOuverts(v=>!v)} attrs={{'data-achats-plus':achatsOutilsOuverts?'ouvert':'ferme','aria-expanded':achatsOutilsOuverts,'aria-controls':'vrm-achats-outils','aria-pressed':undefined}}/></div>}
         {/* (31 oct., soir) Achats ne montre plus les colis à retirer : une ligne mène
             à Colis (colonne « À retirer » et son détail). Le nombre est celui de la
             règle (`pickupUnion.total`), seulement quand les e-mails de suivi sont lus. */}
@@ -29536,8 +29548,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         // (24 nov., retrait-parfait) L'ouverture CALCULÉE sur les horaires LUS (heure de Paris) : { etat: 'ouvert' | 'ferme' | '',
                         // phrase, jour } — « ouvert maintenant · ferme à 19 h » / « fermé — ouvre à 8 h » et les plages d'aujourd'hui. Pas lu ⇒ null.
                         ouvertureDe: (p) => { const h = horairesDuPoint((p.arrives || []).map((c) => (c && c.src && c.src.t ? { horaires: c.src.t.horaires, ms: Date.parse((c.src.t.horairesDuTransporteur && c.src.t.horairesAt) || c.src.t.emailAt || c.src.t.receivedAt || '') } : null)).filter(Boolean), (c) => c.ms);
-                          if (!h) return null; const now = Date.now(); const e = etatOuverture(h, now);
-                          return { etat: e ? (e.ouvert ? 'ouvert' : 'ferme') : '', phrase: phraseOuverture(e) || (e ? '' : texteHoraires(h)), jour: horairesDuJour(h, now) }; },
+                          if (!h) return null; const now = Date.now(); const e = etatOuverture(h, now); const jour = horairesDuJour(h, now);
+                          // (25 nov., Julien : « ouvert maintenant · ferme à 23 h 59 · aujourd'hui 0 h 01–23 h 59 ») une consigne ouverte toute la
+                          // journée (0 h 01–23 h 59, minuit–23 h 59…) se dit court : « aujourd'hui 24 h/24 », sans « ferme à 23 h 59 »
+                          if (e && e.ouvert && /^(?:minuit|0 h(?: 0\d)?)–(?:23 h 5\d|minuit)$/.test(jour)) return { etat: 'ouvert', phrase: '', jour: '24 h/24' };
+                          return { etat: e ? (e.ouvert ? 'ouvert' : 'ferme') : '', phrase: phraseOuverture(e) || (e ? '' : texteHoraires(h)), jour }; },
                         // (24 nov., retrait-parfait) Au comptoir : « Retiré » sur SON toucher = le geste d'avant (`retirerRelais` : markCollected /
                         // markPickupDone, annulable — il rend l'identifiant du geste), « Annuler », et « Détails » = la feuille d'avant (openQrView).
                         retirer: (x) => retirerRelais(x),

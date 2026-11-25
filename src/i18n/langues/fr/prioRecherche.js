@@ -55,10 +55,7 @@ export default {
   "prio.reglages.jours": "{n} j",
   "prio.reglages.parJour": "Combien par jour",
   "prio.reglages.note": "Le même âge que le segment « Dorment ». Les paires vendues, masquées par Vinted, en litige, d’un compte bloqué ou personnel ne sont jamais proposées.",
-  "prio.journee": {
-    "one": "{n} paire à republier en priorité",
-    "other": "{n} paires à republier en priorité"
-  },
+  "prio.journee": {"one": "{n} paire à republier", "other": "{n} paires à republier"},
   "prio.journeeSous": "En ligne depuis {jours} j ou plus",
   "rech.approx": "à une lettre près"
 };

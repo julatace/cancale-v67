@@ -5,12 +5,13 @@
    à l'encre, en gras, avec une horloge — jamais en ambre. Cibles au doigt ≥ 44 px. Clair et sombre.
    ════════════════════════════════════════════════════════════════════════════ */
 .vrm-env, .vrm-envs {
-  --env-encre: var(--vrm-ink, #1D1D1F);
-  --env-doux: var(--vrm-muted, #6E6E73);
-  --env-trait: #D5D9DF;
-  --env-fond: #F2F3F5;
+  /* (25 nov., gris moyen) les jetons natifs : le bloc est une CARTE claire posée sur la page grise */
+  --env-encre: var(--n-encre, #0E0F12);
+  --env-doux: var(--n-encre-2, #1F2226);
+  --env-trait: var(--n-bord, #B9BDC3);
+  --env-fond: var(--n-carte, #F1F2F4);
   --env-carte: #FFFFFF;
-  --env-fait: #3D4B5B;
+  --env-fait: var(--n-accent, #19222C);
   --env-argent: #17744A;
   --env-pas-su: #AEB4BE;
   --env-sur-fait: #FFFFFF;

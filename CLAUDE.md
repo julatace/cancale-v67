@@ -485,8 +485,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **25 nov. · Moins de texte A (`claude/moins-texte-a`)** : Annonces, Achats, Colis (imprimante), loupe : états dessinés, phrases au lecteur d'écran ou sous « Pourquoi ? » ; 390 px 567 → 310 mots d'interface. `2026-11-25-moins-texte-a.md`. Geste : aucun.
-- **25 nov. · Banc `e2e-extension` vert (`claude/e2e-extension-vert`)** : étapes 3/4 lisaient l'ancien écran (Ventes, « Qui dorment ») ⇒ portées sur le natif et le panneau ; vrais défauts corrigés : extension **5.440.4** (copie du dressing oubliée quand il est rangé : le panneau perdait la paire du lien), app (« Baisser » refusé et « mets à jour » pour une extension d'avant le lien du panneau). `2026-11-25-e2e-extension-vert.md`. Geste : installer la 5.440.4.
+- **25 nov. · Moins de texte A (`claude/moins-texte-a`)** : Annonces, Achats, imprimante, loupe : 567 → 310 mots (390 px). `2026-11-25-moins-texte-a.md`. Geste : aucun.
+- **25 nov. · Le clair par défaut passe au GRIS MOYEN (`claude/gris-moyen-essai`, Julien : « gris moyen c'est d'accord »)** : page #878B92, cartes #F1F2F4, encre #0E0F12, secondaire #1F2226 (posé sur la page : 4,67:1), accent = plein #19222C ; la nuit ne change pas ; tout texte posé sur la page est à l'encre. `2026-11-25-gris-moyen.md`, NATIF.md §0 ter. Geste : aucun.
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier

@@ -23,6 +23,7 @@ import ecran_file_actions from './de/fileActions.js';   // (21 nov., ext. 5.433)
 import ecran_a_distance from './de/aDistance.js';   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './de/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
 import ecran_styleClarte from './de/styleClarte.js';
+import ecran_moinsTexte from './de/moinsTexte.js';
 import ecran_revueUx from './de/revueUx.js';   // (23 nov.) revue UX   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './de/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './de/ext5438.js';   // (22 nov.) ext. 5.438
@@ -119,6 +120,7 @@ import ecran_natif from './de/natif.js';
 import ecran_moinsTexteA from './de/moinsTexteA.js';
 import ecran_menu_onglets from './de/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './de/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
+import ecran_parrainage20 from './de/parrainage.js';   // (25 nov.) le parrainage à 20 %
 import ecran_actions_ext from './de/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './de/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
@@ -470,7 +472,7 @@ export default {
   "auth.lier.extension": "Melde dich hier an: Die Erweiterung in {navigateur} meldet sich mit an, nichts zu tippen.",
   "auth.parrain.offertPar": "Ein Geschenk von {nom}",
   "auth.parrain.offertVendeur": "Ein Geschenk eines VRM-Verkäufers",
-  "auth.parrain.texte": "1 Monat VRM gratis bei deiner ersten Zahlung, für dich und für die Person, die dich einlädt.",
+  "auth.parrain.texte": "−10 % auf deinen ersten VRM-Monat und 1 Gratiswoche bei deiner ersten Zahlung.",
   "auth.parrain.texteConnexion": "Schon ein Konto? Melde dich an: Empfehlungen gelten nur für neue Konten.",
   "auth.lier.pasOuverte": "Die Anmeldung mit {nom} ist auf VRM noch nicht offen. Melde dich hier mit deiner VRM-E-Mail und deinem Passwort an: Die Erweiterung wird gleich mit verbunden.",
   "auth.lier.pasVerifie": "Ich konnte die Anmeldung mit {nom} nicht prüfen. Versuch die Anmeldewege unten nochmal oder melde dich per E-Mail an: Die Erweiterung wird gleich mit verbunden.",
@@ -2424,6 +2426,7 @@ export default {
   ...ecran_a_distance,
   ...ecran_apresFinale,
   ...ecran_styleClarte,
+  ...ecran_moinsTexte,
   ...ecran_revueUx,
   ...ecran_relier_retires,
   ...ecran_fiched,
@@ -2449,4 +2452,5 @@ export default {
   ...ecran_actions_ext,
   ...ecran_offres_photos,
   ...ecran_moinsTexteA,
+  ...ecran_parrainage20,
 };
