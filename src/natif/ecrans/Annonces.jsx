@@ -37,6 +37,7 @@ import { Plaque } from '../Plaque.jsx';
 import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site de chaque annonce
 import { Vide } from '../Vide.jsx';
 import { Attente } from '../Attente.jsx';
+import { attrsAttente } from '../outils.js';   // (25 nov., chargement propre) « mis à jour » en cours de lecture = un squelette
 import { Toast } from '../Toast.jsx';
 import { useOrdinateur } from '../Coque.jsx';
 import '../jetons.css';
@@ -434,7 +435,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
             onClick={() => setPuce((p) => (p === 'compte:' + g.cle ? '' : 'compte:' + g.cle))}><span className="n-ad-puce-pilule"><AvatarCompte pseudo={g.pseudo || g.compte} cle={g.cle} petit/>{g.pseudo || ('#' + g.compte)}</span></Puce>) : null}
         </div> : null}
         {(travail || aReglerTel) && !A && !ordinateur ? <div className="n-ad-maj" data-ad-maj={!travail ? 'aucun' : majLe === undefined ? 'lecture' : majLe == null ? 'passu' : 'lu'}>
-          <span className="n-ad-maj-texte">{travail ? depuisMaj(majLe, maintenantMaj) : ''}</span>
+          <span className="n-ad-maj-texte" {...(attrsAttente(!!travail && majLe === undefined, 'valeur') || {})}>{travail ? depuisMaj(majLe, maintenantMaj) : ''}</span>
           {aReglerTel}
           {travail && travail.onRafraichir ? <BoutonIcone libelle={tr('tableau.rafraichir')} indisponible={!!travail.rafraichit} icone={Icon ? <Icon name="sync" size={18}/> : null}
             onClick={() => { if (!travail.rafraichit) travail.onRafraichir(); }} className="n-ad-rafraichir" attrs={{ 'data-ad-rafraichir': '', 'aria-busy': travail.rafraichit ? 'true' : undefined }}/> : null}
