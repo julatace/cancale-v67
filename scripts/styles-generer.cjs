@@ -88,7 +88,21 @@ const PRESETS = {
     sombre: { fond: '#121316', laterale: '#0C0D0F', carte: '#1C1D21', carte2: '#24252A', bord: '#303238', encre: '#F4F4F5', texte: '#E4E4E7', encre2: '#A1A1AA', encre3: '#8A8A93', accent: '#A9BCD3', plein: '#F4F4F5', surPlein: '#18181B', vert: '#6FE3B5',
       point: '#A9BCD3', surPoint: '#121316', contour: '#A1A1AA', limite: '#7C7C85', douce: '#2A2B30', bordCarte: '#2A2B30',
       etiquettes: { vert: ['#6FE3B5', '#1E3A2F'], teal: ['#6ED6D6', '#1B3638'], gris: ['#C4C4CC', '#2A2B30'] } } },
+  // ── ESSAIS TEMPORAIRES (25 nov., Julien, devant Aujourd'hui clair #DFE1E5 et sombre #1C1C20 : « fais entre les deux, la
+  // couleur ») : trois teintes de fond INTERMÉDIAIRES à montrer, pas un choix livré. UNE palette par essai (clair = sombre,
+  // `nuit` dit sa nature) ; `appui` : la rangée enfoncée posée à la main (C : plus sombre que la carte, sinon le secondaire
+  // devrait être presque blanc). Branche claude/gris-moyen-essai.
+  'essai-a': { forme: { rCarte: 12, rBouton: 10, hPlein: 44, rChip: 999, profondeur: 'doux', appui: 0.97 }, clair: null, sombre: null },
+  'essai-b': { forme: { rCarte: 12, rBouton: 10, hPlein: 44, rChip: 999, profondeur: 'doux', appui: 0.97 }, clair: null, sombre: null },
+  'essai-c': { forme: { rCarte: 12, rBouton: 10, hPlein: 44, rChip: 999, profondeur: 'doux', appui: 0.97 }, clair: null, sombre: null },
 };
+// A « gris moyen clair » · B « gris moyen » · C « gris ardoise moyen »
+const ESSAIS = {
+  'essai-a': { nuit: false, fond: '#A9ADB3', laterale: '#A0A4AA', carte: '#F7F8F9', carte2: '#E9EBEE', bord: '#C4C8CE', encre: '#16181D', texte: '#23262C', encre2: '#3A3E45', encre3: '#6A6F77', accent: '#2F3B49', plein: '#3D4B5B', surPlein: '#FFFFFF', vert: '#17653F' },
+  'essai-b': { nuit: false, fond: '#878B92', laterale: '#7F838A', carte: '#F1F2F4', carte2: '#E3E5E9', bord: '#B9BDC3', encre: '#0E0F12', texte: '#16181C', encre2: '#1F2226', encre3: '#5A5F67', accent: '#19222C', plein: '#2C3846', surPlein: '#FFFFFF', vert: '#135A37' },
+  'essai-c': { nuit: true, fond: '#4A4E55', laterale: '#43474E', carte: '#3A3E45', carte2: '#43474E', appui: '#33373D', bord: '#5E636B', encre: '#FFFFFF', texte: '#F4F4F6', encre2: '#CDD0D4', encre3: '#A9ADB4', accent: '#E6ECF2', plein: '#F4F4F5', surPlein: '#1E2126', vert: '#A3EDC6' },
+};
+for (const [id, p] of Object.entries(ESSAIS)) { PRESETS[id].clair = p; PRESETS[id].sombre = p; }
 const ORDRE = Object.keys(PRESETS);
 // la plaque du N° : kraft (Papier), encre (Monochrome : noire au jour, gris anthracite la nuit), sinon le ton de la carte
 const PLAQUES = { kraft: { clair: ['#D8CDB9', '#2E261A'], sombre: ['#4A4236', '#EEEAE3'] }, encre: { clair: ['#111111', '#FFFFFF'], sombre: ['#3A3A40', '#F5F5F6'] },
@@ -97,11 +111,12 @@ const PLAQUES = { kraft: { clair: ['#D8CDB9', '#2E261A'], sombre: ['#4A4236', '#
 
 // ── les jetons dérivés d'une palette ──
 function jetons(p, f, sombre) {
+  if (p.nuit !== undefined) sombre = p.nuit;   // (essais du 25 nov.) une palette UNIQUE : sa nature, pas le thème, choisit les dérivés
   const v = p.vert;
   const vertFond = sombre ? rgba(v, 0.16) : melange(p.carte, v, 0.12);
   const ardoiseFond = sombre ? rgba(p.accent, 0.16) : melange(p.carte, p.accent, 0.11);
   const encreFond = sombre ? rgba(p.encre, 0.10) : melange(p.carte, p.encre, 0.07);
-  const appui = melange(p.carte, p.encre, sombre ? 0.10 : 0.09);
+  const appui = p.appui || melange(p.carte, p.encre, sombre ? 0.10 : 0.09);
   const carte = p.carteA ? rgba(p.carte, p.carteA) : p.carte;
   const j = {
     '--n-fond': p.fond, '--n-laterale': p.laterale, '--n-carte': carte, '--n-carte-2': p.carte2, '--n-bord': p.bord,
@@ -166,9 +181,9 @@ function jetons(p, f, sombre) {
 function controler(table) {
   const ko = [];
   for (const [id, s] of Object.entries(table)) for (const t of ['clair', 'sombre']) {
-    const p = s[t], sombre = t === 'sombre';
+    const p = s[t], sombre = p.nuit !== undefined ? p.nuit : t === 'sombre';
     const carte = p.carteA ? melange(p.fond2 || p.fond, p.carte, p.carteA) : p.carte;   // la carte translucide, posée sur le fond le plus contrasté
-    const fonds = { fond: p.fond, carte, carte2: p.carte2, appui: melange(p.carte, p.encre, sombre ? 0.10 : 0.09) };
+    const fonds = { fond: p.fond, carte, carte2: p.carte2, appui: p.appui || melange(p.carte, p.encre, sombre ? 0.10 : 0.09) };
     if (p.fond2) fonds.fond2 = p.fond2;
     const vFond = sombre ? melange(carte, p.vert, 0.16) : melange(p.carte, p.vert, 0.12);
     const aFond = sombre ? melange(carte, p.accent, 0.16) : melange(p.carte, p.accent, 0.11);

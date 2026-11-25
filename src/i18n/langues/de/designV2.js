@@ -505,5 +505,11 @@ export default {
   "v2.style.monochrome": "Monochrom",
   "v2.style.monochrome.desc": "Schwarz, Weiß und Hellgrau; ein grüner Punkt.",
   "v2.style.c3doux": "C3",
-  "v2.style.c3doux.desc": "Etwas dunkleres Grau, weiße Karten, gravierte Schilder."
+  "v2.style.c3doux.desc": "Etwas dunkleres Grau, weiße Karten, gravierte Schilder.",
+  "v2.style.essai-a": "Test A",
+  "v2.style.essai-a.desc": "Helles Mittelgrau, weiße Karten.",
+  "v2.style.essai-b": "Test B",
+  "v2.style.essai-b.desc": "Mittelgrau, helle Karten.",
+  "v2.style.essai-c": "Test C",
+  "v2.style.essai-c.desc": "Mittleres Schiefergrau, heller Text."
 };

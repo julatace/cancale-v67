@@ -505,5 +505,11 @@ export default {
   "v2.style.monochrome": "Monochrome",
   "v2.style.monochrome.desc": "Black, white and light grey; one green dot.",
   "v2.style.c3doux": "C3",
-  "v2.style.c3doux.desc": "Slightly darker grey, white cards, engraved plates."
+  "v2.style.c3doux.desc": "Slightly darker grey, white cards, engraved plates.",
+  "v2.style.essai-a": "Trial A",
+  "v2.style.essai-a.desc": "Light mid grey, white cards.",
+  "v2.style.essai-b": "Trial B",
+  "v2.style.essai-b.desc": "Mid grey, light cards.",
+  "v2.style.essai-c": "Trial C",
+  "v2.style.essai-c.desc": "Mid slate grey, light text."
 };

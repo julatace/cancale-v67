@@ -505,5 +505,11 @@ export default {
   "v2.style.monochrome": "Monocromo",
   "v2.style.monochrome.desc": "Nero, bianco e grigio chiaro; un punto verde.",
   "v2.style.c3doux": "C3",
-  "v2.style.c3doux.desc": "Grigio un po' scuro, schede bianche, targhe incise."
+  "v2.style.c3doux.desc": "Grigio un po' scuro, schede bianche, targhe incise.",
+  "v2.style.essai-a": "Prova A",
+  "v2.style.essai-a.desc": "Grigio medio chiaro, schede bianche.",
+  "v2.style.essai-b": "Prova B",
+  "v2.style.essai-b.desc": "Grigio medio, schede chiare.",
+  "v2.style.essai-c": "Prova C",
+  "v2.style.essai-c.desc": "Grigio ardesia medio, testo chiaro."
 };
