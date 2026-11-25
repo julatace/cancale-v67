@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (25 nov., achats-retours-design — Julien : « tu peux améliorer ce design ») docs/passation/2026-11-25-achats-retours-design.md
+  { id: 'retours-cartes-compactes', date: '2026-11-25', titre: 'Tes retours tiennent en un coup d’œil', phrase: 'Un état, un bouton ; les retours remboursés se replient.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (24 nov., suivi-ventes — Julien : « retrait des articles vendus, fais un vrai suivi ») docs/passation/2026-11-24-suivi-ventes.md
   { id: 'suivi-envois', date: '2026-11-24', titre: 'Tes colis vendus, du dépôt au versement', phrase: 'Au point, retiré, argent versé : chaque étape lue, datée.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (24 nov., lot retrait-parfait — Julien : « pour le retrait tu dois vraiment faire quelque chose de parfait ») docs/passation/2026-11-24-retrait-parfait.md
