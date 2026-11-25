@@ -104,10 +104,10 @@ function Diapo({ x, aides, Photo, etat, onRetire, onAnnuler, loc, actif }) {
       </div>
       <div className="n-gc-blanc" data-gc-blanc="">
         {code2 ? <div className="n-gc-code-bloc is-second"><span className="n-gc-code-mot">{tr('retraits.g.identifiant')}</span>
-          <code className="n-gc-code vrm-sensible" data-stream-type="code" data-gc-code2={code2}>{grouper(code2).map((m, i) => <span key={i}>{m}</span>)}</code></div> : null}
+          <code className="n-gc-code vrm-sensible" data-stream-type="code" data-gc-code2={code2}>{grouper(code2).map((m, i) => <span key={'c2-' + i + '-' + m}>{m}</span>)}</code></div> : null}
         {code ? <div className="n-gc-code-bloc"><span className="n-gc-code-mot">{tr(code2 ? 'retraits.g.codeOuverture' : 'retraits.b.code')}</span>
           <code className={'n-gc-code vrm-sensible' + (code.length > 7 ? ' is-long' : '')} data-stream-type="code" data-gc-code-grand={code} aria-label={code.split('').join(' ')}>
-            {grouper(code).map((m, i) => <span key={i}>{m}</span>)}</code></div> : null}
+            {grouper(code).map((m, i) => <span key={'c-' + i + '-' + m}>{m}</span>)}</code></div> : null}
         {conflit ? <div className="n-gc-code-bloc" data-gc-desaccord=""><span className="n-gc-code-mot">{tr('v2.passe.codesEnConflit')}</span>
           {x.codesDesaccord.map((d) => <code key={d.source + d.code} className="n-gc-code is-moyen vrm-sensible" data-stream-type="code">{d.code}</code>)}</div> : null}
         <QrGrand src={qr} titre={titre}/>
@@ -174,7 +174,7 @@ export function Guichet({ point, colis = [], depart = '', aides, Photo, Icon, Lo
         <footer className="n-gc-pied">
           {n > 1 ? <div className="n-gc-pages">
             <button type="button" className="n-gc-fleche" data-gc-precedent="" aria-label={tr('retraits.g.precedent')} disabled={idx === 0} onClick={() => aller(idx - 1)}>{Icon ? <Icon name="chevron" size={20} style={{ transform: 'rotate(180deg)' }}/> : '‹'}</button>
-            <span className="n-gc-points" aria-hidden="true">{liste.map((x, k) => <i key={k} className={k === idx ? 'is-ici' : (etats[x.cle || x.id] ? 'is-fait' : '')}/>)}</span>
+            <span className="n-gc-points" aria-hidden="true">{liste.map((x, k) => <i key={x.cle || x.id || ('p-' + k)} className={k === idx ? 'is-ici' : (etats[x.cle || x.id] ? 'is-fait' : '')}/>)}</span>
             <button type="button" className="n-gc-fleche" data-gc-suivant="" aria-label={tr('retraits.g.suivant')} disabled={idx >= n - 1} onClick={() => aller(idx + 1)}>{Icon ? <Icon name="chevron" size={20}/> : '›'}</button>
           </div> : null}
           <p className="n-gc-lumiere" data-gc-lumiere="">{Icon ? <Icon name="sun" size={16}/> : null}<span>{tr('retraits.g.lumiere')}</span></p>
