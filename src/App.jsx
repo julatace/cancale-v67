@@ -34002,10 +34002,12 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   // se replie en UNE ligne, le geste dedans ; « lu il y a… » ne se redit plus (la
   // fraîcheur vit dans la coque, revue 2.30). Une lecture en cours, ratée ou partielle
   // reste écrite, en clair : elle change ce que la liste veut dire.
-  const visibles = etats.filter((e) => e[1] === 'lecture' || e[1] === 'pas-su' || e[1] === 'partiel');
+  // (25 nov.) Sous un site choisi (filtre par plateforme), seul l'état de lecture de CE site est dit.
+  const etatsF = effP === TOUTES_PLATEFORMES ? etats : etats.filter((e) => e[0] === effP);
+  const visibles = etatsF.filter((e) => e[1] === 'lecture' || e[1] === 'pas-su' || e[1] === 'partiel');
   const sansCompteVinted = etats.some((e) => e[0] === 'vinted' && e[1] === 'jamais');
   // Aucun compte Vinted et aucune vente : l'état vide dit déjà ce geste — le repli ne le redit pas.
-  const jamais = etats.filter((e) => e[1] === 'jamais' && !(e[0] === 'vinted' && lignes.length === 0));
+  const jamais = etatsF.filter((e) => e[1] === 'jamais' && !(e[0] === 'vinted' && lignes.length === 0));
   const NOMS_SITES = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
   const listeNoms = (l) => l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' et ' + l[l.length - 1];
   // L'état d'une vente : le mot retenu (« À envoyer », « En route »), et l'ambre
