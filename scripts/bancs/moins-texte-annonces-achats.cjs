@@ -36,7 +36,7 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
 
 // Les mots d'interface d'origin/main (fb8916c4a, 25 nov.) sur CETTE base, par écran et par largeur : le plafond est 55 %.
 const AVANT = {
-  annonces: { 390: 12, 1512: 208 }, republier: { 390: 45 }, 'annonce-fiche': { 390: 52, 1512: 62 }, 'annonce-gestes': { 390: 31 },
+  annonces: { 390: 12, 1512: 100 }, republier: { 390: 45 }, 'annonce-fiche': { 390: 52, 1512: 62 }, 'annonce-gestes': { 390: 31 },
   'annonces-menu': { 390: 42 }, achats: { 390: 169, 1512: 196 }, 'achat-fiche': { 390: 54, 1512: 28 }, 'achats-menu': { 390: 12 },
   colis: { 390: 10, 1512: 1 }, imprimante: { 390: 42, 1512: 42 }, loupe: { 390: 46, 1512: 46 }, 'fiche-num': { 390: 52, 1512: 62 },
 };
@@ -106,6 +106,7 @@ async function ouvrir(nav, { W, sombre, e, b }) {
 const MESURER = ({ donnees, fiche, ignorer }) => {
   const fenetres = [...document.querySelectorAll('[role="dialog"], .vrm-fs, .vrm-fp, [data-recherche-panneau], [data-fiche-paire]')].filter((x) => x.getClientRects().length && (x.innerText || '').trim());
   const racine = fenetres[fenetres.length - 1] || document.querySelector('.vrm-main') || document.body;
+  if (racine !== document.querySelector('.vrm-main')) racine.setAttribute('data-banc-racine', '');   // une feuille : sa capture à elle
   const vu = (el) => {
     for (let x = el; x && x !== document.documentElement; x = x.parentElement) {
       const cs = getComputedStyle(x);
@@ -193,7 +194,7 @@ const MESURER = ({ donnees, fiche, ignorer }) => {
         for (const g of (W < 600 ? e.gestes : (e.gestesOrdi || e.gestes))) if (!(await pg.$(g))) gManque.push(g);
         resume.push(`${nom} ${r.mots}`);
         if (theme === THEMES[0] && (AVANT[e.nom] || {})[W]) { const t = total[W] = total[W] || { av: 0, ap: 0 }; t.av += AVANT[e.nom][W]; t.ap += r.mots; } if (process.env.DEBUG) console.log('   ', r.racine, JSON.stringify(r.pourquoi));
-        if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); fs.writeFileSync(path.join(SHOTS, nom + '.txt'), r.texte + '\n\n── mots d\'interface (' + r.mots + ') ──\n' + r.liste.join(' ')); await pg.screenshot({ path: path.join(SHOTS, nom + '.png') }); }
+        if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); fs.writeFileSync(path.join(SHOTS, nom + '.txt'), r.texte + '\n\n── mots d\'interface (' + r.mots + ') ──\n' + r.liste.join(' ')); const f = await pg.$('[data-banc-racine]'); if (f) await f.screenshot({ path: path.join(SHOTS, nom + '.png') }).catch(() => pg.screenshot({ path: path.join(SHOTS, nom + '.png') })); else await pg.screenshot({ path: path.join(SHOTS, nom + '.png') }); }
         dit(!erreurs.length, 'E aucune erreur JS', erreurs);
         dit(!r.debord, 'E aucun défilement de côté');
         dit(r.mots <= MAX(e, W), `M mots d'interface ${r.mots} ≤ ${MAX(e, W) === Infinity ? '∞ (pas de mesure d’avant)' : MAX(e, W)}`, r.liste.join(' '));

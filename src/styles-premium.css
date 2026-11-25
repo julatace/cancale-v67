@@ -707,6 +707,7 @@
 .vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-title { padding-right: 72px !important; }
 .vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-act { grid-column: 4 !important; grid-row: 1 !important; }
 .vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-meta > * + *::before { content: "·" !important; margin: 0 6px !important; color: var(--p-gris) !important; }
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-meta > [data-achat-statut-icone] + *::before { content: none !important; }   /* (25 nov., moins-texte-a) */
 .vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-meta > .vrm-buy-statut { color: var(--p-encre) !important; font-weight: 400 !important; }
 .vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-meta > .vrm-buy-statut > i { display: inline-block !important; width: 7px !important; height: 7px !important; border-radius: 50% !important; margin: 0 6px 1px 0 !important; vertical-align: middle !important; }
 .vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-meta .vrm-acct-tag > span { display: inline !important; }
