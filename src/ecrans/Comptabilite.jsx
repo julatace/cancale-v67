@@ -29922,7 +29922,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             n'est pas passée (`numAttente`), « deux articles sous un N° » n'est pas su — la
             liste garde son squelette au lieu d'être poussée par l'alerte qui arrive (CLS).
             Ventes pas encore lues : c'est leur squelette à elles, plus bas, qui tient la place. */}
-        {numAttente && ongletColisVu === 'envoyer' && sales.items ? <Skeleton variant="row" count={4}/> : (<>
+        {/* (25 nov., régressions — à l'ordinateur, mode exemple : quatre grandes cartes grises SOUS le tableau des ventes, ~3 s,
+            puis rien) Sur Ventes natif, ce bloc ne porte plus la liste (le tableau, src/natif/ecrans/Ventes.jsx, a sa propre
+            attente) mais seulement des alertes qui, le plus souvent, n'existent pas : il attend EN SILENCE. Un squelette n'a le
+            droit d'exister qu'à la forme de ce qui va s'afficher (banc regressions-25nov V). */}
+        {numAttente && ongletColisVu === 'envoyer' && sales.items ? (natifVentes ? null : <Skeleton variant="row" count={4}/>) : (<>
         {blocAEcrire()}
         <BlocBarrerVc/>
         {conflitsNum.length > 0 && (
@@ -29994,7 +29998,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             (l'étiquette se prend dans eBay : l'acheteur a payé le port, §2.8). Reste ici l'âge de la lecture. */}
         {voitSite('ebay') && colisEb && colisEb.aPoster.length>0 && ebayLuA && Math.floor((Date.now() - ebayLuA) / 3600000) >= 6 ? (() => { const ageH = Math.floor((Date.now() - ebayLuA) / 3600000);
           return <p className="vrm-colis-note-ebay" data-colis-ebay-age={ageH} style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 2px 10px'}}>Commandes eBay lues il y a {ageH >= 48 ? `${Math.floor(ageH/24)} j` : `${ageH} h`}, peut-être pas à jour : eBay → Compte → Rafraîchir.</p>; })() : null}
-        {voitSite('vinted') && sales.loading && !sales.items && <Skeleton variant="row" count={4}/>}
+        {voitSite('vinted') && sales.loading && !sales.items && !natifVentes && <Skeleton variant="row" count={4}/>}
         {/* (20 nov.) Sur Ventes natif, l'écran dit lui-même « pas su » avec « Réessayer » (une seule vérité, une seule phrase). */}
         {voitSite('vinted') && sales.error && !(VENTES_NATIF && colisDans === 'ventes') && <div data-colis-ventes="passu" style={{marginBottom:10}}><EtatPanne compact quoi="Tes ventes Vinted" raison="Les colis à envoyer ne sont pas connus tant qu’elles ne sont pas lues." onReessayer={()=>loadOrders('sold',setSales,true)}/></div>}
         {(()=>{
