@@ -213,6 +213,8 @@ import { grouperParCompte, entreesGroupees } from '../regroupeComptes.js';
 import {etatColisDepuisTexte,normaliserSuivi} from '../../api/_lib/etat-colis-email.js';
 import { sorteRetrait } from "../retraitSorte.js";   // (19 nov., retraits parfaits) consigne ou comptoir
 import { comparerRetraits, texteAnnonce, CLE_RETRAITS_VUS } from "../retraitsNouveaux.js";   // (19 nov.) « nouveau code de retrait » en direct
+// (25 nov.) Les colis « nouveau code de retrait » déjà annoncés pendant CETTE ouverture de l'app (clé|raison) : une annonce, une fois.
+const RETRAITS_DEJA_DITS = new Set();
 import { preuvesTransporteur, fusionnerPreuves } from "../friseTransporteur.js";   // (17 nov.) la frise d'une vente : le transporteur tranche
 // (11 nov., lot suivi-commandes) Le suivi des commandes en cours : dernier statut, incohérences datées.
 import {dernierStatut,incoherencesVente,incoherencesAchat,estEnCours,lienPublic,nbAVerifier,statutCourt} from '../../api/_lib/suivi-commandes.js';
@@ -9580,8 +9582,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         let avantN = null; try { avantN = JSON.parse(localStorage.getItem(CLE_RETRAITS_VUS) || 'null'); } catch (_) { avantN = null; }
         const { etat, annonces } = comparerRetraits(avantN, tous, Date.now());
         try { localStorage.setItem(CLE_RETRAITS_VUS, JSON.stringify(etat)); } catch (_) {}
-        if (annonces.length) {
-          const t = texteAnnonce(annonces, { tr, nomTransp: (k) => (CARRIERS[k] && CARRIERS[k].name) || '' });
+        // (25 nov., régressions — capture iPhone de Julien : « 2 nouveaux codes de retrait » restait au-dessus de la barre d'onglets)
+        // Un colis (sa clé et sa raison) n'est annoncé qu'UNE fois par ouverture de l'app : deux écrans montés ensemble (Aujourd'hui
+        // et Achats gardés, chacun sa lecture) se renvoyaient l'état « vu » et ré-annonçaient le même code à chaque relecture —
+        // le même texte remplaçait le toast et remettait ses 4 s à zéro : il ne partait jamais.
+        const aDire = annonces.filter((a) => { const k = a.cle + '|' + a.raison; if (RETRAITS_DEJA_DITS.has(k)) return false; RETRAITS_DEJA_DITS.add(k); return true; });
+        if (aDire.length) {
+          const t = texteAnnonce(aDire, { tr, nomTransp: (k) => (CARRIERS[k] && CARRIERS[k].name) || '' });
           if (t) toast(t, 'info');
           try { window.dispatchEvent(new CustomEvent('vrm:retraits-nouveaux', { detail: { cles: annonces.map((a) => a.cle) } })); } catch (_) {}
         }

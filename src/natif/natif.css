@@ -403,6 +403,16 @@
     border-bottom: 1px solid var(--n-bord); opacity: 0; transition: opacity var(--n-duree) ease-out;
   }
   .n-barre-titre[data-n-reduit]::before, .n-barre-titre[data-n-fond]::before { opacity: 1; }
+  /* (25 nov., régressions — capture iPhone de Julien : « Dernières ventes » et le carrousel visibles SOUS la barre, loupe et bulle
+     posées sur les photos) Au téléphone la barre est TOUJOURS opaque, du fond de la page : le contenu ne passe jamais dessous,
+     même quand l'état « défilé » (`data-n-fond`, posé par Page.jsx au défilement) manque — copie d'écran rouverte (src/CopieEcran.jsx,
+     prise page en haut), image de défilement pas encore relue, fondu de 200 ms en cours. En haut de page la barre a la couleur du
+     fond : elle ne se voit pas ; seul le filet (et le petit titre) attend le défilement. */
+  @media (max-width: 759px) {
+    .n-barre-titre::before { opacity: 1; background: var(--n-fond); -webkit-backdrop-filter: none; backdrop-filter: none; border-bottom-color: transparent; transition: border-color var(--n-duree) ease-out; }
+    .n-barre-titre[data-n-reduit]::before, .n-barre-titre[data-n-fond]::before { border-bottom-color: var(--n-bord); }
+    .n-barre-titre::after { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 64px; background: var(--n-fond); pointer-events: none; }
+  }
   /* (20 nov., capture de Julien : des rangées visibles au-dessus et derrière l'en-tête) Dès que du contenu passe dessous, la barre
      est OPAQUE et son fond monte jusqu'au bord haut de l'écran (une marge du défileur laissait voir les rangées au-dessus). */
   .n-barre-titre[data-n-fond]::before { background: var(--n-fond); -webkit-backdrop-filter: none; backdrop-filter: none; }
