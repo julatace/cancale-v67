@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="referrer" content="strict-origin" />
@@ -20,7 +20,9 @@
        en sombre donnait une barre d'état BLANC CASSÉ au-dessus d'une app noire
        — mesuré : `theme-color = #F5F8F6` alors que les cartes étaient à
        `rgb(26,31,39)`. Une seule balise, sans `media`, pilotée par le choix. -->
-  <meta name="theme-color" content="#878B92" />
+  <!-- (25 nov., Julien : « mets en mode sombre ») le défaut est SOMBRE : la barre d’état part sur la nuit (#1C1C20),
+       demarrage-theme.js la remet en clair pour qui a choisi Clair. -->
+  <meta name="theme-color" content="#1C1C20" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/vrm-apple-touch-icon-v5.png" />
   <link rel="apple-touch-icon" sizes="152x152" href="/vrm-apple-touch-icon-v5-152.png" />
