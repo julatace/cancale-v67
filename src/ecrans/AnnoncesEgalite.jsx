@@ -24,7 +24,8 @@ import { lazySur } from '../chargementSur.js';
 import { tr } from '../i18n/index.js';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
 import { Bouton as BoutonNatifAE } from '../natif/Bouton.jsx';   // (21 nov., ux-reglages) le geste de l'état vide
-import { LogoSite } from '../SelecteurSites.jsx';   // (20 nov.) le logo du site dans l'en-tête de chaque compte
+import { LogoSite } from '../natif/LogoSite.jsx';   // (25 nov., logo-vinted-pp) le logo du site dans l'en-tête de chaque compte : le MÊME V que sur Ventes (couleur de marque, 20 px) — l'ancien (SelecteurSites, à l'encre) sortait noir
+import { poserSourcePhotosComptes } from '../natif/visuel/photosProfil.js';   // (25 nov.) la photo de profil de chaque compte, une lecture partagée
 import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES, statutTableau, comptesDesArticles, SITES } from '../articles/modele.js';
 import { annoncesVinted, annoncesLeboncoin, annoncesEbay, annoncesVestiaire, annoncesVintedVendues } from '../articles/sources.js';
 import { venduesParMail, LIENS_VENTE_MAIL } from '../venteMailAnnonce.js';   // (24 nov.) l'annonce vendue par e-mail
@@ -36,7 +37,7 @@ import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
 import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, lireVentesEmail, photoKey, STUDIO_BASE } from '../App.jsx';
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, lireTout, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, lireVentesEmail, photoKey, STUDIO_BASE } from '../App.jsx';
 import { ouvrirPanneau, panneauEnRetard } from '../ouvrirPanneau.js';
 // (22 nov., choix n° 35) « Photo en double » : la règle d'identité par le FICHIER photo exact (src/photoEnDouble.js).
 import { photosEnDouble, numerosEnExemplaires, refuserGroupe, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
@@ -222,6 +223,12 @@ export function tracesFiches(bloques, preuves) {
 // (rien n'est écrit) ; une lecture ratée ne l'efface pas, elle ne s'y substitue pas non plus (« pas su » reste dit).
 const _derniereLecture = { cle: '', lu: undefined };
 const cleLecture = (cleComptes) => ((AUTH.user && AUTH.user.id) || '') + '|' + cleComptes;
+// (25 nov., logo-vinted-pp) Le logo d'un site dans l'en-tête de chaque compte (liste et tableau) : celui des ventes.
+const logoDuSite = (s) => <LogoSite site={s} taille={20}/>;
+// La photo de profil de chaque compte (le rond `AvatarCompte`) : UNE lecture projetée, au premier rond monté, pour CETTE
+// session ; rendue par PhotoVinted (la règle des photos du CDN de Vinted).
+const PhotoProfil = (p) => <PhotoVinted {...p}/>;
+poserSourcePhotosComptes({ lire: (q) => lireTout(q), qui: () => (AUTH.user && AUTH.user.id) || '', Photo: PhotoProfil });
 export default function AnnoncesEgalite({ accounts: accountsTous = [], siteInitial = 'tous', onEcranSite = null }) {
   // (19 nov., intégration — lot compte-bloque) Un compte que Vinted a bloqué et que le vendeur a mis EN PAUSE (son choix) :
   // ses annonces sortent de la liste, comme dans l'écran d'avant (`annBase`) ; la ligne « N annonces en pause » les dit.
@@ -392,7 +399,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     plein: prio && lignesPrio.length ? <PleinRepublier lignes={lignesPrio} coches={selPrio.coches} onRepublier={republierPrio}/> : null,
     contenu: <RepublierPriorite res={prio} lignes={lignesPrio} coches={selPrio.coches} onBasculer={selPrio.onBasculer} onTout={selPrio.onTout} onReglage={(r) => { if (r && r.plusVue != null) { poserJoursPV(r.plusVue); return; } poserRegPrio(r); }}
       plusVue={{ jours: joursPV, de: (l) => plusVueAnnonce(l.article.annonces.find((x) => x.site === 'vinted' && String(x.id) === String(l.annonce.id)) || null), autres: plusVuesHorsPrio, republier: republierUne }}
-      Photo={(src, o) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>} Logo={(s) => <LogoSite site={s}/>} euros={(n) => fmt(n)} Icon={Icon}/>,
+      Photo={(src, o) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>} Logo={logoDuSite} euros={(n) => fmt(n)} Icon={Icon}/>,
   };
   // ── (22 nov., Julien — choix n° 35) « PHOTO EN DOUBLE » ── deux annonces Vinted EN LIGNE (l'état que <enligne-regle> a
   // donné, jamais « à confirmer » ni masquées) au MÊME fichier photo (`photoKey`, ou la clé `photoK` de leur fiche). Un
@@ -522,7 +529,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   };
   return (
     <>
-    <VueAnnonces parMail={modele && Array.isArray(modele.articles) ? modele.articles.filter((a) => a && a.venteMail) : null} priorite={priorite} photoDouble={photoDouble} plusVueDe={plusVueDe} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={(s) => <LogoSite site={s}/>} dortDe={dortDe} Photo={(src, o) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>}
+    <VueAnnonces parMail={modele && Array.isArray(modele.articles) ? modele.articles.filter((a) => a && a.venteMail) : null} priorite={priorite} photoDouble={photoDouble} plusVueDe={plusVueDe} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={logoDuSite} dortDe={dortDe} Photo={(src, o) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>}
       onCompleter={(sujet) => { try { window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet, num: '', lot: false, at: Date.now() } })); } catch (_) {} }} liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
