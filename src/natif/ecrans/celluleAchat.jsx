@@ -48,7 +48,7 @@ function ChampPrix({ a, onPose, court = false, auto = false }) {
 }
 
 // Les gestes de l'achat (cellule « Achat » du tableau, pied de la rangée au téléphone).
-export function GestesAchat({ a, Icon = null, court = false, replie = false }) {
+export function GestesAchat({ a, Icon = null, court = false, replie = false, auto = false }) {   // `auto` (25 nov.) : le champ ouvert par un geste prend la main
   const [pose, setPose] = React.useState('');   // le prix qu'il vient de taper, montré tout de suite (la relecture suit)
   // (23 nov., style-clarte-5 — « l'icône lien + le champ Payé € sur chaque ligne alourdit ») Dans un tableau (`replie`), le champ
   // ne s'ouvre qu'au toucher d'un petit « + prix » ; le prix connu s'affiche tel quel. Même saisie, même relecture (§2.5).
@@ -74,7 +74,7 @@ export function GestesAchat({ a, Icon = null, court = false, replie = false }) {
         onClick={(e) => { e.stopPropagation(); a.ouvrir(); }} onKeyDown={stop}>
         <span className="n-vt-relier-rond" aria-hidden="true">{maillons(16)}</span><span className="n-vt-relier-mot">{tr('vt.relierCourt')}</span>
       </button> : null}
-      {a.saisir && (!replie || ouvert) ? <ChampPrix a={a} onPose={(x) => { setPose(x); setOuvert(false); }} court={court} auto={replie}/> : null}
+      {a.saisir && (!replie || ouvert) ? <ChampPrix a={a} onPose={(x) => { setPose(x); setOuvert(false); }} court={court} auto={replie || auto}/> : null}
       {a.saisir && replie && !ouvert ? <button type="button" className="n-vt-plus-prix" data-n-famille="champ" data-vt-plus-prix="" aria-label={tr('vt.prixAchatAria', { titre: a.titre || '' })}
         onClick={(e) => { e.stopPropagation(); setOuvert(true); }} onKeyDown={stop}>{tr('vt.plusPrix')}</button> : null}
     </span>

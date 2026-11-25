@@ -24,12 +24,10 @@ import '../ventes-lisibles.css';
 import { useARegler } from '../../designV2/useARegler.js';
 import { groupesDe, atelierCompleter } from '../../designV2/aRegler.js';   // (21 nov.) vignettes lisibles, titre entier, gestes de l'achat
 import { ParPaquets } from '../../composants/ParPaquets.jsx';
-import { Trajet } from '../Jeu.jsx';   // (24 nov., visuel-jeu) le trajet du colis en piste, étapes PROUVÉES   // (22 nov., latence) 70 colis à envoyer posés par paquets
 import { RelierAnnonceMail } from './RelierAnnonceMail.jsx';   // (24 nov.) « Relier à l'annonce » d'une vente vue par e-mail   // (22 nov., latence) 70 colis à envoyer posés par paquets
+import { MetaVente, useAchatRange } from './rangeeVente.jsx';   // (25 nov., ventes-rangee) la rangée compacte
 
 const joint = (...x) => x.filter(Boolean).join(' · ');
-// Les morceaux d'une méta qui peut passer à la ligne : chacun reste entier (« à vérifier » ne se coupe jamais en deux).
-const morceaux = (...x) => x.filter(Boolean).map((t, i) => <React.Fragment key={i}>{i ? ' · ' : ''}<span className="n-vt-morceau">{t}</span></React.Fragment>);
 // La photo d'une rangée : la <PhotoVinted> de l'app quand elle est passée (sans référent, relais de l'extension quand l'adresse
 // Vinted a expiré — sinon le CDN refuse et la vignette restait un carré vide), sinon l'icône dessinée.
 const vignette = (r, Photo, taille = 56) => <Vignette src={r.photo || ''} alt="" taille={taille} image={r.photo && Photo ? <Photo src={r.photo} alt="" loading="lazy" decoding="async"/> : null}/>;
@@ -48,10 +46,6 @@ function texteEcheance(e) {
 }
 const textePlace = (p) => (p ? tr('vv.ou.court', { meuble: p.nom || tr('vv.ou.meuble'), r: p.rangee, c: p.colonne }) : '');
 const texteBordereau = (b) => (b === 'imprime' ? tr('vv.bord.imprime') : b === 'attente' ? tr('v2v.sansBordereau') : '');
-function texteEtape(etapes) {
-  const i = (etapes || []).findIndex((e) => e.ici);
-  return i < 0 ? tr('v2v.etapeAucune') : tr('vn.etape', { n: i + 1, m: etapes.length, mot: tr('vv.route.' + etapes[i].cle) });
-}
 
 // (20 nov., Julien sur sa capture de Ventes à l'ordinateur : « fais comme Vintex et comme l'extension avec les transporteurs »)
 // LE TRANSPORTEUR d'une rangée : son LOGO (src/transporteursVisuels.js, le même que le panneau « Commandes » de l'extension)
@@ -63,63 +57,68 @@ const motStatut = (r) => tr(MOT_STATUT[statutRangee(r)] || 'tableau.vente.route'
 // (20 nov., « corrige le défaut visuel ») Un colis SANS bordereau n'a pas de rond (rien ne se coche) : sa raison est dite à la
 // dans la méta (« N° 40 · sans bordereau · vers le 23 nov. », qui passe à la ligne plutôt que d'être coupée).
 const sansBordereau = (r) => r.bordereau === 'attente' && !(r.coche && r.coche.possible);
-const etiquetteTel = (r) => <Pastille ton={statutRangee(r) === 'envoyer' ? 'ambre' : 'neutre'}>{motStatut(r)}</Pastille>;
 // La date limite COURTE de la rangée (« avant le 25 nov. », « vers le 23 nov. ») : le « dans N j » reste dans la fiche.
 const echeanceCourte = (e) => (!e ? '' : e.code !== 'date' ? e.texte : e.sorte === 'estimee' ? tr('v2v.versLe', { date: e.texte }) : tr('vv.ech.avantLe', { date: e.texte }));
-// (21 nov., « comme la page Commandes de Vintex », version empilée) Au téléphone, la ligne SOUS le titre : le prix (gras), l'étiquette
-// d'état, le logo du transporteur, la date limite — le titre garde toute la largeur (jamais coupé à 20 caractères).
-const ligneTel = (r, fin) => <span className="n-vt-valeur n-vt-ligne" data-vt-ligne="">{r.prix ? <span className="n-vt-ligne-prix" data-vt-prix="">{r.prix}</span> : null}{etiquetteTel(r)}{logoTel(r)}{fin ? <span className="n-vt-ligne-fin">{fin}</span> : null}</span>;
-const piedAchat = (r, Icon) => (r.achat ? <GestesAchat a={{ ...r.achat, titre: r.achat.titre || r.titre }} Icon={Icon} court replie/> : null);
-// (20 nov. soir, plus de sélecteur de plateforme) Le logo du SITE de la vente, devant le N° (au téléphone comme dans le volet).
-const avecSite = (r, plaque) => (r && r.site ? <>{<LogoSite site={r.site} taille={20}/>}{plaque}</> : plaque);
-const logoTel = (r) => (r.transporteurCle ? <span className="n-vt-logo" data-vt-transporteur={r.transporteurCle} title={r.transporteur || ''}>{logoTr(r, 22)}</span> : null);
+
+// (25 nov., lot ventes-rangee — Julien : « c'est atroce […] la mise en page est catastrophique ») La rangée COMPACTE d'une vente
+// au téléphone (src/natif/ecrans/rangeeVente.jsx) : photo de 56, le titre sur deux lignes au plus et le PRIX aligné à droite, puis UNE
+// ligne « site · N° · taille · état · transporteur » ; ~84–100 px au lieu de ~260. Plus de pied « Relier · + prix » sur chaque rangée :
+// l'achat se fait au balayage (seulement quand il manque), dans la fiche et dans le tableau de l'ordinateur.
+const tailleSeule = (r) => morceauxMarqueTaille({ titre: r.titre, taille: r.taille }, (t) => tr('vv.taille', { t }))[0] || '';
+const transporteurDe = (r) => (r && r.transporteurCle ? { cle: r.transporteurCle, nom: r.transporteur || '', logo: logoTr(r, 18) } : null);
+const prixRangee = (r) => (r.prix ? <span className="n-vr-prix" data-vt-prix="">{r.prix}</span> : null);
 
 function RangeeColis({ r, g, Icon, Photo, choisie, onOuvrir }) {
   const ech = echeanceCourte(r.echeance);
+  const achat = useAchatRange(r.achat, r.titre, Icon);
   const actions = [
+    ...achat.actions,
     r.gestes.depose ? { cle: 'depose', libelle: tr('vn.b.depose'), ton: 'neutre', icone: <Icon name="check" size={20}/>, onClick: r.gestes.depose } : null,
     r.gestes.imprimer ? { cle: 'imprimer', libelle: tr('vn.b.imprimer'), icone: <Icon name="printer" size={20}/>, onClick: () => r.gestes.imprimer(), franc: true } : null,
   ].filter(Boolean);
+  // « À expédier » est l'onglet lui-même : la rangée ne le répète pas ; elle dit ce qui RESTE à savoir (N° à poser, sans bordereau,
+  // la date limite) — chaque morceau entier.
+  const morceauxEnv = [!r.num && r.numAttendu ? tr('vn.numAttente') : '', sansBordereau(r) ? tr('vt.sansBordMeta') : '',
+    ech ? <span key="limite" className="n-vt-limite" data-vt-limite-rangee="" data-vt-ambre={r.echeance && r.echeance.ambre ? '1' : undefined}>{ech}</span> : ''];
   return (
     <Rangee
-      // (21 nov., ventes-lisibles) Vignette de 64, le titre ENTIER sur toute la largeur (deux lignes), « Marque · T42 » et le N°
-      // dessous, puis le prix, l'étiquette, le transporteur et la date limite ; les gestes de l'achat au pied (hors du bouton).
-      vignette={vignette(r, Photo, 64)}
-      titre={r.titre} lignes={2}
-      plaque={avecSite(r, r.num ? <Plaque numero={r.num} doublon={r.numDouble}/> : null)}
-      // (21 nov., 2e passe) Dense : la date limite rejoint la ligne du N° (chaque morceau reste entier, la ligne passe à la ligne
-      // seulement s'il le faut) ; dessous, prix · étiquette · transporteur ; au pied, l'achat.
-      sousTitre={morceaux(!r.num && r.numAttendu ? tr('vn.numAttente') : '', ...marqueTailleM(r), sansBordereau(r) ? tr('vt.sansBordMeta') : '',
-        ech ? <span className="n-vt-limite" data-vt-limite-rangee="" data-vt-ambre={r.echeance && r.echeance.ambre ? '1' : undefined}>{ech}</span> : '')} sousLignes={2}
-      note={ligneTel(r, null)}
-      // (24 nov., vente-mail-annonce) Une vente vue par e-mail sans annonce reliée : UN geste, « Relier à l'annonce » (à la place de
-      // l'achat : sans annonce, il n'y a pas encore de paire à qui relier un achat). Reliée par son clic : « Délier ».
-      pied={r.gestes && r.gestes.relierAnnonce ? <RelierAnnonceMail ra={r.gestes.relierAnnonce} r={r} Photo={Photo} Icon={Icon}/> : piedAchat(r, Icon)}
+      vignette={vignette(r, Photo, 56)}
+      titre={r.titre} lignes={2} valeur={prixRangee(r)} valeurForte
+      plaque={<MetaVente site={r.site} logo={r.site ? <LogoSite site={r.site} taille={16}/> : null} num={r.num} numDouble={r.numDouble} taille={tailleSeule(r)} morceaux={morceauxEnv} transporteur={transporteurDe(r)}/>}
+      // (24 nov., vente-mail-annonce) Une vente vue par e-mail sans annonce reliée : « Relier à l'annonce » reste SOUS elle (le seul
+      // geste qui manque à CETTE vente) ; « Prix d'achat » ouvert au balayage s'y pose aussi.
+      pied={r.gestes && r.gestes.relierAnnonce ? <RelierAnnonceMail ra={r.gestes.relierAnnonce} r={r} Photo={Photo} Icon={Icon}/> : achat.pied}
       selection={{ cochee: r.coche.on, indisponible: !r.coche.possible, libelle: tr(r.coche.possible ? 'vv.coche.label' : 'vv.coche.sansBordereau', { titre: r.titre }),
         onChange: () => g.basculer(r.coche.cle), attrs: { 'data-vn-coche': r.cle } }}
-      // Pas de chevron : la rangée entière s'ouvre (comme une liste en mode choix) ; le titre garde ses deux lignes entières.
-      className={sansBordereau(r) ? 'n-vt-rang n-vt-sans-case' : 'n-vt-rang'}
+      className={sansBordereau(r) ? 'n-vt-rang n-vr n-vt-sans-case' : 'n-vt-rang n-vr'}
       selectionnee={choisie} fin={null} onClick={() => onOuvrir(r.cle)} actions={actions.length ? actions : null}
       attrs={{ 'data-vn-rang': r.cle, 'data-vn-bordereau': r.bordereau || '', 'data-vn-limite': r.echeance ? r.echeance.sorte : '', 'data-vn-limite-code': r.echeance ? r.echeance.code : '',
-        'data-vn-num': r.num, 'data-vn-place': r.place ? `${r.place.nom || ''}|${r.place.rangee}|${r.place.colonne}` : '', 'data-vn-coche-on': r.coche.on ? '1' : '0', 'data-vn-prix': r.prix }}
+        'data-vn-num': r.num, 'data-vn-place': r.place ? `${r.place.nom || ''}|${r.place.rangee}|${r.place.colonne}` : '', 'data-vn-coche-on': r.coche.on ? '1' : '0', 'data-vn-prix': r.prix,
+        'data-vr-achat': r.achat ? (achat.libre ? 'libre' : 'connu') : '' }}
     />
   );
 }
 
 function RangeeRoute({ r, Icon, Photo, choisie, onOuvrir }) {
+  const achat = useAchatRange(r.achat, r.titre, Icon);
+  const etapes = r.etapes || [];
+  const ici = etapes.findIndex((e) => e.ici);
+  // UN état : le mot de l'étiquette (`statutRangee` : En route · Livrée · Terminée) et sa mini-frise ; « étape n sur m » pour le lecteur.
+  const etat = { cle: statutRangee(r), mot: motStatut(r), etiquette: <Pastille ton="neutre">{motStatut(r)}</Pastille>, etapes, aria: ici < 0 ? '' : tr('vn.etape', { n: ici + 1, m: etapes.length, mot: motStatut(r) }) };
+  const actions = [
+    ...achat.actions,
+    r.lienSuivi ? { cle: 'suivre', libelle: tr('vn.b.suivre'), icone: <Icon name="truck" size={20}/>, onClick: () => { try { window.open(r.lienSuivi, '_blank', 'noopener'); } catch (_) {} }, franc: true } : null,
+  ].filter(Boolean);
   return (
     <Rangee
-      vignette={vignette(r, Photo, 64)}
-      titre={r.titre} lignes={2}
-      plaque={avecSite(r, r.num ? <Plaque numero={r.num}/> : null)}
-      sousTitre={morceaux(...marqueTailleM(r), texteEtape(r.etapes))} sousLignes={2}
+      vignette={vignette(r, Photo, 56)}
+      titre={r.titre} lignes={2} valeur={prixRangee(r)} valeurForte
+      plaque={<MetaVente site={r.site} logo={r.site ? <LogoSite site={r.site} taille={16}/> : null} num={r.num} taille={tailleSeule(r)} etat={etat} transporteur={transporteurDe(r)}/>}
       ton={r.etat.ambre ? 'ambre' : 'neutre'}
-      // (24 nov., visuel-jeu) Le trajet dessiné sous la phrase : les MÊMES étapes prouvées (`etapesRoute`), le camion sur la dernière.
-      note={<>{ligneTel(r, null)}<Trajet etapes={r.etapes} Icon={Icon} libelles={Object.fromEntries((r.etapes || []).map((e) => [e.cle, tr('vv.route.' + e.cle)]))}/></>}
-      pied={piedAchat(r, Icon)}
-      selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)}
-      actions={r.lienSuivi ? [{ cle: 'suivre', libelle: tr('vn.b.suivre'), icone: <Icon name="truck" size={20}/>, onClick: () => { try { window.open(r.lienSuivi, '_blank', 'noopener'); } catch (_) {} }, franc: true }] : null}
-      className="n-vt-rang" attrs={{ 'data-vn-route': r.cle, 'data-vn-num': r.num, 'data-vn-etape': String((r.etapes || []).filter((e) => e.fait).length) }}
+      pied={achat.pied}
+      selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)} actions={actions.length ? actions : null}
+      className="n-vt-rang n-vr" attrs={{ 'data-vn-route': r.cle, 'data-vn-num': r.num, 'data-vn-etape': String(etapes.filter((e) => e.fait).length), 'data-vt-statut': etat.cle,
+        'data-vr-achat': r.achat ? (achat.libre ? 'libre' : 'connu') : '' }}
     />
   );
 }
@@ -160,6 +159,9 @@ function DetailVente({ r, g, Icon, Logo, Photo, Generer }) {
         {G.relierAnnonce ? <RelierAnnonceMail ra={G.relierAnnonce} r={r} Photo={Photo} Icon={Icon} rangee/> : null}
         {r.achat ? <Rangee icone={<Icon name="relier" size={22}/>} titre={r.achat.relie ? tr('vt.achatRelie', { prix: r.achat.prix || '—' }) : tr('vt.relier')} fin="chevron"
           onClick={r.achat.ouvrir} attrs={{ 'data-vn-geste': 'relier-achat', 'data-vt-relier': r.achat.relie ? 'relie' : 'libre' }}/> : null}
+        {/* (25 nov., ventes-rangee) Le prix d'achat qui manque : le champ, ici (il n'est plus posé sur chaque rangée de la liste). */}
+        {r.achat && r.achat.saisir && !r.achat.relie && !r.achat.prix ? <Rangee icone={<Icon name="tag" size={22}/>} titre={tr('vt.prixAchatChamp')}
+          fin={<GestesAchat a={{ ...r.achat, ouvrir: null, titre: r.achat.titre || r.titre }} Icon={Icon} court/>} attrs={{ 'data-vn-geste': 'prix-achat' }}/> : null}
         {G.imprimer ? <Rangee icone={<Icon name="printer" size={22}/>} titre={tr(G.facture ? 'vn.g.imprimerFacture' : 'vn.g.imprimer')} onClick={(ev) => G.imprimer(ev)} attrs={{ 'data-vn-geste': 'imprimer' }}/> : null}
         {G.lien ? <Rangee icone={<Icon name="printer" size={22}/>} titre={tr('vn.g.lien.' + G.lien.sorte)} href={G.lien.url} fin="chevron" attrs={{ 'data-vn-geste': 'lien' }}/> : null}
         {G.depose ? <Rangee icone={<Icon name="check" size={22}/>} titre={tr(r.depose ? 'vv.volet.pasDepose' : 'vn.g.depose')} onClick={G.depose} attrs={{ 'data-vn-geste': 'depose' }}/> : null}
