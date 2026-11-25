@@ -28,6 +28,10 @@ const RACINE = path.join(__dirname, '..');
 const argBg = (() => { const i = process.argv.indexOf('--bg'); return i > 0 ? process.argv[i + 1] : ''; })();
 let BG = argBg ? path.resolve(argBg) : path.join(RACINE, 'vinted-sync-extension', 'background.js');
 const MUTATIONS = {
+  'sans-signal': ["...(neuve||lues>(ix0&&ix0.pages?Object.keys(ix0.pages).length:0)?{vrmFavorisListeLue:{uid,at:Date.now(),pages:lues}}:{})", ""],
+  'sans-lien-direct': ["if(page&&!profond){noterDiag('favori_lien_direct');", "if(false){"],
+  'liste-premiere-page': ["for(let page=2;;page++){", "for(let page=2;;page++){ix.bout=true;return {bout:true};"],
+  'page-trop-ancien': ["return rep('refuse',0,'notification_pas_trouvee',rangCloche>=0?", "return rep('ignore',0,'favori_trop_ancien',rangCloche>=0?"],
   // La page complète n'est plus ouverte : un favori absent de la liste courte est refusé (la file se met en pause).
   'sans-voir-tout': ['  if(creation.rienParti&&creation.absent===true&&!creation.pause){', '  if(false){'],
   // Une ligne absente est réessayée comme une page pas prête.
@@ -44,7 +48,7 @@ const MUTATIONS = {
 // Les mutations de la RÈGLE (src/favorisProgression.js) : une copie mutée à côté, lue par `PROGRESSION`.
 const MUT_REGLE = {
   // « élément introuvable » n'est plus une raison connue : il redevient « Vinted a refusé ».
-  'element-inconnu': ["export const RAISONS_FAVORIS={element_introuvable:'", "export const RAISONS_FAVORIS={element_introuvable_x:'"],
+  'element-inconnu': ["element_introuvable:'La page de Vinted", "element_introuvable_x:'La page de Vinted"],
   // L'étape et la cause ne passent plus.
   'sans-etape': ["...(etape?{etape}:{}),...(cause?{cause}:{})};\n}", "};\n}"],
 };
@@ -78,12 +82,13 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
 
 const UID = '111', JETON = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const ACC = { vinted_user_id: UID, domain: 'www.vinted.fr', access_token: 'jeton' };
-function monter(page) {
+function monter(page, listeCloche) {
   const conv = { id: 301, opposite_user: { id: 201, login: 'pseudo_banc' }, transaction: { id: 5001, item_id: 101 }, allow_reply: true, messages: [] };
   const lignes = { main: { vinted_annonce_numeros: { '101': { numero: '41', min: '40' } } } };
+  const f0 = { lectures: [] };
   const f = faireFond({ src: BG, connecte: UID, comptes: [ACC], lignes, store: { __commeBleamDefaut: true },
     vinted: (e) => {
-      if (e.methode === 'GET' && /\/inbox-notifications\/v1\/notifications$/.test(e.chemin)) return { status: 200, body: { notifications: [{ id: 'n-banc', entry_type: 20 }, { id: 'n-autre', entry_type: 20 }] } };
+      if (e.methode === 'GET' && /\/inbox-notifications\/v1\/notifications(?:\?|$)/.test(e.chemin)) { f0.lectures.push(e.chemin); if (listeCloche) return { status: 200, body: listeCloche(Number((/[?&]page=(\d+)/.exec(e.chemin) || [])[1]) || 1) }; return { status: 200, body: { notifications: [{ id: 'n-banc', entry_type: 20 }, { id: 'n-autre', entry_type: 20 }] } }; }
       if (e.methode === 'POST' && /\/api\/v2\/conversations$/.test(e.chemin)) return { status: 200, body: { conversation: conv, code: 0 } };
       if (e.methode === 'GET' && /\/api\/v2\/conversations\/\d+$/.test(e.chemin)) return { status: 200, body: { conversation: conv } };
       if (e.methode === 'GET' && /\/api\/v2\/transactions\/\d+$/.test(e.chemin)) return { status: 200, body: { transaction: { id: 5001, item_id: 101, item: { id: 101, price: { amount: '50.0', currency_code: 'EUR' }, photos: [{ id: 1, is_suspicious: false }] } } } };
@@ -91,6 +96,7 @@ function monter(page) {
       if (e.methode === 'POST' && /\/replies$/.test(e.chemin)) return { status: 200, body: { code: 0 } };
       return { status: 404, body: {} };
     } });
+  f.lectures = f0.lectures;
   const fetchFond = f.ctx.fetch;
   f.accuses = [];
   f.ctx.fetch = async (url, o = {}) => {
@@ -122,7 +128,9 @@ const jouer = (f) => f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON }).cat
     dit(navs(f).some((u) => u === 'https://www.vinted.fr/member/notifications'), 'K2 la page complète est ouverte dans l’onglet de travail, sur vinted.fr', JSON.stringify(navs(f))); }
 
   { const f = monter({ cloche: 'nulle-part' }); const r = await jouer(f);
-    dit(r && r.json && r.json.resultat === 'ignore' && r.json.raison === 'favori_trop_ancien' && seq(f) === '', 'K3 nulle part ⇒ ce favori est SAUTÉ (« ignore »), rien n’est écrit chez Vinted', `${seq(f)} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 300)}`);
+    // ⚠️ 5.440.2 (Julien, 24 nov. : « Sauté · Favori trop ancien » pour des favoris de la veille) : la liste de Vinted CONTIENT ce
+    //    favori (rang 0), seule la PAGE ne l'a pas montré ⇒ ni sauté ni « trop ancien » : rien n'est écrit, il ATTEND un nouvel essai.
+    dit(r && r.json && r.json.resultat === 'refuse' && r.json.raison === 'notification_pas_trouvee' && r.json.ecrits === 0 && seq(f) === '', 'K3 nulle part sur la PAGE alors que la liste de Vinted le contient ⇒ « notification pas encore trouvée », rien n’est écrit — jamais « trop ancien »', `${seq(f)} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 300)}`);
     dit(pas(f).join() === 'favoriOuvrir,favoriListe', 'K3 la liste puis la page complète, chacune UNE fois (une ligne absente n’est pas « une page pas prête »)', pas(f).join());
     dit(!f.store.vrmPauseVinted && !(f.store.vrmCaptcha || {})[UID] && !Object.keys((f.store.vrmAppris || {}).el || {}).length && !f.j.diags.some((d) => /appris|apprendre/.test(d)), 'K3 aucune pause de Vinted, aucune vérification, aucun bouton « à apprendre »', JSON.stringify({ p: f.store.vrmPauseVinted, d: f.j.diags.filter((d) => /appr|pause/.test(d)) }));
     // Ce résultat, rendu à la VRAIE file du serveur (api/_lib/favoris-file.js) : la file reste ACTIVE, les autres attendent.
@@ -139,8 +147,27 @@ const jouer = (f) => f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON }).cat
     };
     const vSaute = file({ ok: !!r.ok, status: r.status, data: r.json }), vRefus = file({ ok: false, status: 0, data: { resultat: 'refuse', raison: 'onglet_vinted', ecrits: 0 } });
     const attente = (v) => (v.jobs || []).filter((j) => j.etat === 'attente').length;
-    dit(vSaute.active === true && attente(vSaute) === 3, 'K3 rendu à la vraie file du serveur : ce favori est sauté, la file reste ACTIVE, les 3 autres attendent toujours', JSON.stringify({ a: vSaute.active, n: attente(vSaute), r: vSaute.raison }));
+    dit(vSaute.active === true && attente(vSaute) === 4 && (vSaute.jobs || []).map((j) => j.notificationId).join() === 'n2,n3,n4,n1', 'K3 rendu à la vraie file du serveur : ce favori ATTEND (repart après les 3 autres), la file reste ACTIVE', JSON.stringify({ a: vSaute.active, n: attente(vSaute), o: (vSaute.jobs || []).map((j) => j.notificationId + ':' + j.etat), r: vSaute.raison }));
     dit(vRefus.active === false, 'K3 (témoin) une cause GLOBALE (onglet de travail fermé) met bien la file en pause', JSON.stringify({ a: vRefus.active, r: vRefus.raison })); }
+
+  // ── K3b–K3e (5.440.2) : « trop ancien » SEULEMENT sur la liste de Vinted lue jusqu'à sa dernière page.
+  const lst = (ids, page, tot) => ({ notifications: ids.map((id) => ({ id, entry_type: 20 })), pagination: { current_page: page, total_pages: tot, per_page: 20, total_entries: tot * 20 } });
+  { const f = monter({ cloche: 'nulle-part' }, (pg) => lst(pg === 1 ? ['n-x1', 'n-x2'] : ['n-x3'], pg, 2)); const r = await jouer(f);
+    dit(r && r.json && r.json.resultat === 'ignore' && r.json.raison === 'favori_trop_ancien' && seq(f) === '' && f.lectures.length === 2 && pas(f).length === 0, 'K3b la liste de Vinted lue jusqu’à sa DERNIÈRE page (2/2) sans lui ⇒ sauté, « pas trouvé dans tes notifications », sans rien ouvrir', `${seq(f)} ${f.lectures.join(' ')} ${pas(f)} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 200)}`); }
+  { const f = monter({ cloche: 'absente' }, (pg) => lst(pg === 1 ? ['n-x1', 'n-x2'] : ['n-x3', 'n-banc'], pg, 3)); const r = await jouer(f);
+    dit(r && r.json && r.json.resultat === 'envoye' && seq(f) === 'CMO' && f.lectures.length === 2 && /[?&]page=2(&|$)/.test(f.lectures[1]), 'K3c sur la PAGE 2 de la liste de Vinted ⇒ trouvé (page 2 lue, pas la 3), le message part', `${seq(f)} ${f.lectures.join(' ')} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 200)}`);
+    dit(f.store.vrmFavorisListeLue && f.store.vrmFavorisListeLue.uid === UID && f.store.vrmFavorisListeLue.pages === 2, 'K3c la liste lue est SIGNALÉE (`vrmFavorisListeLue`, 2 pages) : la carte ouverte se redessine seule', JSON.stringify(f.store.vrmFavorisListeLue)); }
+  { const f = monter({ cloche: 'nulle-part' }, (pg) => lst(['n-x' + pg], pg, 40)); const r = await jouer(f);
+    dit(r && r.json && r.json.resultat === 'refuse' && r.json.raison === 'notification_pas_trouvee' && seq(f) === '' && f.lectures.length <= 6, 'K3d 40 pages annoncées, pas trouvé dans les 6 lues ⇒ PAS « trop ancien » : il attend, au plus 6 lectures', `${f.lectures.length} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 200)}`); }
+  { const f = monter({ cloche: 'absente' }, (pg) => ({ notifications: [{ id: 'autre-id', entry_type: 20, link: '/items/101/want_it/new?offering_id=201' }], pagination: { current_page: 1, total_pages: 1 } })); const r = await jouer(f);
+    dit(r && r.json && r.json.resultat === 'envoye' && seq(f) === 'CMO', 'K3e l’id de notification a changé mais UNE ligne porte l’article ET la personne du favori (lien web) ⇒ c’est elle', `${seq(f)} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 200)}`); }
+  { const f = monter({ cloche: 'nulle-part' }, (pg) => ({ notifications: [{ id: 'autre-id', entry_type: 20, link: '/items/101/want_it/new?offering_id=999' }], pagination: { current_page: 1, total_pages: 1 } })); const r = await jouer(f);
+    dit(r && r.json && r.json.resultat === 'ignore' && seq(f) === '', 'K3f une ligne du même article mais d’une AUTRE personne n’est jamais prise pour lui', `${seq(f)} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 200)}`); }
+
+  { const f = monter({ cloche: 'nulle-part' }, () => ({ notifications: [{ id: 'n-banc', entry_type: 20, link: '/items/101/want_it/new?offering_id=201' }], pagination: { current_page: 1, total_pages: 1 } })); const r = await jouer(f);
+    dit(r && r.json && r.json.resultat === 'envoye' && seq(f) === 'CMO' && pas(f).join() === 'favoriOuvrir,favoriLien' && navs(f).includes('https://www.vinted.fr/items/101/want_it/new?offering_id=201'), 'K3g (Julien : « c’est à l’extension d’aller capter les favoris ») la ligne n’est pas montrée ⇒ l’adresse NATIVE du favori (lien web de sa notification) ouverte dans l’onglet de travail : la page ouvre la conversation, le message part — ni défilement, ni page complète', `${seq(f)} ${pas(f)} ${JSON.stringify(navs(f))} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 200)}`); }
+  { const f = monter({ cloche: 'nulle-part' }, () => ({ notifications: [{ id: 'n-banc', entry_type: 20, link: '/items/101/want_it/new?offering_id=999' }], pagination: { current_page: 1, total_pages: 1 } })); const r = await jouer(f);
+    dit(r && r.json && seq(f) === '' && !navs(f).some((u) => /want_it/.test(u)), 'K3h le lien de la notification dit une AUTRE personne ⇒ jamais ouvert, rien n’est écrit', `${seq(f)} ${JSON.stringify(navs(f))} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 200)}`); }
 
   for (const mauvais of ['//evil.example/notifications', '/../admin/notifications', 'https://evil.example/notif', '/settings/profile', '/member/notifications?x=<script>']) {
     const f = monter({ cloche: 'absente', voirTout: mauvais }); await jouer(f);

@@ -30,6 +30,18 @@
   .n-etincelle circle { fill: var(--n-encre); }
 
   .n-repartition { display: flex; flex-direction: column; gap: 12px; padding: 4px 16px 14px; }
+  /* (24 nov., livrable-2) La place de « Par site » pendant la lecture : la barre (10 px) et une ligne de légende (36 px). */
+  /* (24 nov., livrable-2) « Dernières ventes » pendant la lecture : cinq rangées de la hauteur des vraies (60 px au téléphone, 72 à
+     l'ordinateur ; vignette 44, deux lignes, le prix) — la carte a sa taille finale avant ses données. */
+  .n-dv-os { display: flex; align-items: center; gap: 12px; height: 60px; padding: 0 14px; box-sizing: border-box; }
+  .n-dv-os + .n-dv-os { box-shadow: inset 0 .5px 0 var(--n-trait); }
+  .n-dv-os-photo { width: 44px; height: 44px; border-radius: var(--n-r-vignette); flex: none; margin: 0; }
+  .n-dv-os-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  .n-dv-os-prix { width: 40px; flex: none; }
+  @media (min-width: 1024px) { .n-dv-os { height: 72px; padding: 0 16px; } }
+  .n-sites-attente { display: flex; flex-direction: column; gap: 12px; padding: 4px 16px 14px; }
+  .n-sites-attente-barre { width: 100%; height: 10px; border-radius: 999px; margin: 0; }
+  .n-sites-attente-ligne { width: 55%; height: 20px; margin: 8px 0; }
   .n-repartition-barre { display: block; width: 100%; height: 10px; border-radius: 999px; overflow: hidden; background: var(--n-trait); }
   .n-repartition-part[data-n-ton="1"] { fill: var(--n-encre); }
   .n-repartition-part[data-n-ton="2"] { fill: var(--n-accent); }
@@ -241,7 +253,11 @@
     .n-cc { min-height: 0; padding: 10px 14px 12px; }
     .n-cc-tete { font-size: 12.5px; }
     .n-cc-valeur { font-size: 26px; line-height: 32px; }
-    .n-cc-sous { min-height: 0; font-size: 12px; line-height: 16px; -webkit-line-clamp: 1; }
+    /* (24 nov., livrable-2) Deux lignes au plus, jamais coupé : « Ouvre ton porte-monnai… » se lisait rogné au téléphone. */
+    .n-cc-sous { min-height: 0; font-size: 12px; line-height: 16px; -webkit-line-clamp: 2; }
+    /* (24 nov., livrable-2) Le porte-monnaie réserve ses deux lignes (« Ouvre ton porte-monnaie Vinted » en prend deux) : la carte
+       a la même hauteur en lecture, lue ou pas su — rien ne saute dessous. */
+    .n-ccs-pm .n-cc-sous { min-height: 32px; }
   }
   @media (prefers-reduced-motion: reduce) { .n-graphe-barre, .n-action-ronde-disque { transition: none; } }
 }

@@ -31,6 +31,7 @@
 //   vide / videRecherche / pasSu   les phrases d'un tableau vide · grille (vrai ⇒ liste ⇄ grille) · Icon
 //   outilsPlus    nœud posé au bout de la barre d'outils (un lien vers un écran voisin : « Automatisations »)
 // Clavier : ↑ ↓ d'une ligne à l'autre, Entrée ouvre, Espace coche, Échap ferme le menu ou vide la sélection, ⌘K « / » cherche.
+import GrilleInventaire from './visuel/GrilleInventaire.jsx';   // (24 nov., lot visuel-annonces)
 import React from 'react';
 import { tr } from '../i18n/index.js';
 import { Page, ChampRecherche } from './Page.jsx';
@@ -112,7 +113,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   lignes, statuts = [], statutsDefaut = null, filtres = [], colonnes = [], triDefaut = null,
   actions = [], onAction = null, menuLigne = null, onOuvrir = null, ligneTel = null,
   unite = (n) => tr('tableau.articles', { n }), placeholder = '', plein = null, haut = null, pied = '',
-  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null, groupe = null, avantOutils = null, ligneChoisie = '', cases = true, coches = null, onCocher = null, iconeVide = 'search', actionPasSu = null, carteGrille = null }) {
+  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null, groupe = null, avantOutils = null, ligneChoisie = '', cases = true, coches = null, onCocher = null, iconeVide = 'search', actionPasSu = null, carteGrille = null, carteCorps = 0 }) {
   // `iconeVide` : l'icône d'un tableau vide sans filtre (Ventes : le carton) ; `actionPasSu` : le geste d'une lecture ratée (« Réessayer »).
   // `cases={false}` : pas de colonne de cases (une liste sans geste en série : Ventes · En route).
   // `coches` (Set) + `onCocher(cles[], on)` : les cases sont CELLES DE L'ÉCRAN (Ventes · À envoyer : le lot d'impression, cochées
@@ -168,6 +169,13 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     }).map((x) => x.l);
   }, [filtrees, colTri, tri]);
   const visibles = affichees.slice(0, max);
+  // (23 nov., revue UX P2) Le nombre d'un intertitre de groupe = ses lignes AFFICHÉES (après recherche et filtres), sur le même
+  // compte que « N annonces » en tête : une seule règle de comptage. `g.titre` peut être une fonction (n, total) ⇒ nœud.
+  const nGroupe = React.useMemo(() => { if (!groupe) return null; const m = new Map(), t = new Map();
+    for (const l of affichees) { const g = groupe(l); if (g) m.set(g.cle, (m.get(g.cle) || 0) + 1); }
+    for (const l of liste) { const g = groupe(l); if (g) t.set(g.cle, (t.get(g.cle) || 0) + 1); }
+    return { n: (k) => m.get(k) || 0, total: (k) => t.get(k) || 0 }; }, [affichees, liste, groupe]);
+  const titreGroupe = (g) => (typeof g.titre === 'function' ? g.titre(nGroupe ? nGroupe.n(g.cle) : 0, nGroupe ? nGroupe.total(g.cle) : 0) : g.titre);
   // ── LE TABLEAU TIENT DANS SA LARGEUR (21 nov.) ────────────────────────────────────────────────────────────────────────
   // 1) Une colonne `replieVide` vide sur TOUTES les lignes (`vide(l)`, sinon sa valeur de tri absente) ne se montre pas : un
   //    « — » répété 82 fois ne dit rien (elle reste dans « Colonnes », où son choix la rend).
@@ -208,6 +216,11 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   const toutBasculer = () => { if (pilote) { onCocher(cochables.filter((l) => sel.has(l.cle) === toutCoche).map((l) => l.cle), !toutCoche); return; } setSel(toutCoche ? new Set() : new Set(cochables.map((l) => l.cle))); };
   const quitter = () => { setSel(new Set()); setAction(null); };
   const lancer = () => { if (!A || !jugement.ok || !onAction) return; const c = choisies; quitter(); onAction(A.cle, c); };
+  // (23 nov., revue UX #13) À l'ordinateur, la barre de sélection porte les actions COURANTES en boutons directs : un toucher lance
+  // l'action sur ce qui est coché (la même règle `pour` / `juger`, le même `onAction`) ; les autres sous « ⋯ ». Plus de « Lancer ».
+  const jugerPour = (X) => { const c = liste.filter((l) => sel.has(l.cle) && !l.grise && !l.nonCochable && (!X.pour || X.pour(l)));
+    const j = X.juger ? X.juger(c) : { ok: c.length > 0, raison: '' }; return { c, ok: !!(j && j.ok) && c.length > 0, raison: (j && j.raison) || (c.length ? '' : (X.aucune || tr('tableau.actionAucune'))) }; };
+  const lancerDirect = (X) => { const j = jugerPour(X); if (!j.ok || !onAction) return; quitter(); onAction(X.cle, j.c); };
   const choisirAction = (cle) => { setAction(cle); setMenu(''); const X = actions.find((x) => x.cle === cle); if (X && X.pour) setSel((s) => new Set([...s].filter((k) => { const l = liste.find((y) => y.cle === k); return l && !l.grise && X.pour(l); }))); };
   const ouvrir = (l) => { if (A && !ordinateur) { basculer(l); return; } if (onOuvrir) onOuvrir(l); };
 
@@ -256,7 +269,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
       <span className="n-tt-compte" data-tt-compte={compte || ''}><span className="n-tt-compte-point" aria-hidden="true"/>{compte || tr('tableau.tousComptes')}</span>
       <span className="n-tt-espace"/>
       <span className="n-tt-maj" data-tt-maj={majLe === undefined ? 'lecture' : majLe == null ? 'passu' : 'lu'}>{depuisMaj(majLe, maintenant)}</span>
-      {onRafraichir ? <button type="button" className="n-tt-bouton n-tt-bouton-icone" data-tt-rafraichir="" aria-label={tr('tableau.rafraichir')} title={tr('tableau.rafraichir')}
+      {onRafraichir ? <button type="button" data-n-famille="rond" className="n-tt-bouton n-tt-bouton-icone" data-tt-rafraichir="" aria-label={tr('tableau.rafraichir')} title={tr('tableau.rafraichir')}
         disabled={rafraichit} aria-busy={rafraichit ? 'true' : undefined} onClick={() => onRafraichir()}>{ic('sync', 18)}</button> : null}
     </div>
   );
@@ -293,7 +306,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   // Un bouton de la barre d'outils + son menu (à l'ordinateur) ; au téléphone, le menu est une feuille (plus bas).
   const outil = (cle, libelle, corps, { icone = null, droite = false, large = false, haut: versHaut = false, actif = false, attrs: a = null, chevron = true } = {}) => (
     <span className="n-tt-ancre" data-tt-ancre="">
-      <button type="button" className="n-tt-bouton" data-tt-ouvre={cle} data-tt-actif={actif ? '1' : undefined} aria-haspopup="true" aria-expanded={menu === cle ? 'true' : 'false'}
+      <button type="button" data-n-famille="second" className="n-tt-bouton" data-tt-ouvre={cle} data-tt-actif={actif ? '1' : undefined} aria-haspopup="true" aria-expanded={menu === cle ? 'true' : 'false'}
         onClick={() => setMenu((m) => (m === cle ? '' : cle))} {...(a || {})}>
         {icone}<span className="n-tt-bouton-libelle">{libelle}</span>{chevron ? <span className="n-tt-chevron" aria-hidden="true"/> : null}
       </button>
@@ -304,7 +317,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   const recherche = <ChampRecherche valeur={q} onChange={setQ} placeholder={placeholder || tr('tableau.chercher')} libelle={placeholder || tr('tableau.chercher')} attrs={{ 'data-tt-champ': '' }}/>;
   const outils = (
     <div className="n-tt-outils" data-tt-outils="">
-      {actions.length ? outil('action', A ? A.libelle : tr('tableau.choisirAction'), corpsActions, { actif: !!A, attrs: { 'data-tt-action-choisie': A ? A.cle : '' } }) : null}
+      {actions.length && !(ordinateur && cases && !pilote) ? outil('action', A ? A.libelle : tr('tableau.choisirAction'), corpsActions, { actif: !!A, attrs: { 'data-tt-action-choisie': A ? A.cle : '' } }) : null}
       <div className="n-tt-recherche" data-tt-recherche="" ref={refChamp}>{recherche}</div>
       {statuts.length ? outil('statut', nStatuts ? tr('tableau.statutN', { n: nStatuts }) : tr('tableau.statut'), corpsStatut, { icone: ic('filter', 16), actif: nStatuts > 0 }) : null}
       {filtres.map((f) => outil('filtre:' + f.cle, libFiltre(f), corpsFiltre(f), { actif: f.options[0] && f.valeur !== f.options[0].cle, attrs: { 'data-tt-filtre': f.cle, 'data-tt-filtre-valeur': f.valeur } }))}
@@ -312,25 +325,29 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     </div>
   );
   const nombre = (
-    <div className="n-tt-nombre" data-tt-nombre={String(affichees.length)}>
-      <span className="n-tt-nombre-texte">{unite(affichees.length)}</span>
+    <div className="n-tt-nombre" data-tt-nombre={Array.isArray(lignes) ? String(affichees.length) : undefined}>
+      {/* (24 nov., lot visuel-annonces) pendant la lecture de la grille : la ligne est là (rien ne saute), le nombre pas encore su */}
+      {Array.isArray(lignes) ? <span className="n-tt-nombre-texte">{unite(affichees.length)}</span> : <span className="n-os n-tt-nombre-os" aria-hidden="true"/>}
       <span className="n-tt-espace"/>
       {ordinateur && grille ? <span className="n-tt-vues" role="group" aria-label={tr('tableau.vue')}>
-        <button type="button" className="n-tt-bouton n-tt-bouton-icone" aria-pressed={vue === 'liste'} aria-label={tr('tableau.vueListe')} title={tr('tableau.vueListe')} data-tt-vue="liste" onClick={() => setVue('liste')}>{ic('menu', 18)}</button>
-        <button type="button" className="n-tt-bouton n-tt-bouton-icone" aria-pressed={vue === 'grille'} aria-label={tr('tableau.vueGrille')} title={tr('tableau.vueGrille')} data-tt-vue="grille" onClick={() => setVue('grille')}>{ic('grid', 18)}</button>
+        <button type="button" data-n-famille="rond" className="n-tt-bouton n-tt-bouton-icone" aria-pressed={vue === 'liste'} aria-label={tr('tableau.vueListe')} title={tr('tableau.vueListe')} data-tt-vue="liste" onClick={() => setVue('liste')}>{ic('menu', 18)}</button>
+        <button type="button" data-n-famille="rond" className="n-tt-bouton n-tt-bouton-icone" aria-pressed={vue === 'grille'} aria-label={tr('tableau.vueGrille')} title={tr('tableau.vueGrille')} data-tt-vue="grille" onClick={() => setVue('grille')}>{ic('grid', 18)}</button>
       </span> : null}
       {ordinateur && vue === 'liste' && colonnes.length ? outil('colonnes', tr('tableau.colonnes'), corpsColonnes, { icone: ic('gabarit', 16), droite: true }) : null}
     </div>
   );
 
   // ── le tableau (ordinateur) ───────────────────────────────────────────────────────────────────────────────────────
+  // (24 nov., main-vert) `titreCourt: true` = une colonne SANS titre visible (les logos parlent d'eux-mêmes) : avant, `true`
+  // se rendait vide et le bouton de tri n'avait AUCUN nom (axe button-name, colonne Site). Son nom est alors `libelle`.
+  const titreVu = (c) => (c.titreCourt === true ? '' : (c.titreCourt || c.libelle));
   const enTete = (c) => {
     const actif = tri && tri.cle === c.cle;
     return (
       <th key={c.cle} scope="col" className="n-tt-th" data-tt-th={c.cle} data-tt-num={c.num ? '1' : undefined} aria-sort={actif ? (tri.sens === 'asc' ? 'ascending' : 'descending') : undefined}>
-        {c.tri !== false ? <button type="button" className="n-tt-tri" data-tt-trier={c.cle} onClick={() => trier(c)}>
-          <span>{c.titreCourt || c.libelle}</span><span className="n-tt-tri-signe" data-tt-sens={actif ? tri.sens : ''} aria-hidden="true">{actif ? (tri.sens === 'asc' ? '↑' : '↓') : '↕'}</span>
-        </button> : <span className="n-tt-th-texte">{c.titreCourt || c.libelle}</span>}
+        {c.tri !== false ? <button type="button" data-n-famille="lien" className="n-tt-tri" data-tt-trier={c.cle} onClick={() => trier(c)} aria-label={titreVu(c) ? undefined : c.libelle} title={titreVu(c) ? undefined : c.libelle}>
+          <span>{titreVu(c)}</span><span className="n-tt-tri-signe" data-tt-sens={actif ? tri.sens : ''} aria-hidden="true">{actif ? (tri.sens === 'asc' ? '↑' : '↓') : '↕'}</span>
+        </button> : <span className="n-tt-th-texte" aria-label={titreVu(c) ? undefined : c.libelle}>{titreVu(c)}</span>}
       </th>
     );
   };
@@ -352,7 +369,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
             const g = groupe && !colTri ? groupe(l) : null;
             const gAvant = g && i > 0 ? groupe(visibles[i - 1]) : null;
             const inter = g && (!gAvant || gAvant.cle !== g.cle) ? <tr key={'g:' + g.cle} className="n-tt-intertitre" data-tt-groupe={g.cle}>
-              <th scope="colgroup" colSpan={(cases ? 2 : 1) + colsVues.length + (menuLigne ? 1 : 0)} className="n-tt-intertitre-th">{g.titre}</th></tr> : null;
+              <th scope="colgroup" colSpan={(cases ? 2 : 1) + colsVues.length + (menuLigne ? 1 : 0)} className="n-tt-intertitre-th">{titreGroupe(g)}</th></tr> : null;
             const coche = sel.has(l.cle); const grise = !cochable(l) && (A || l.grise); const m = menuDe(l); const st = statutDe(l);
             return (<React.Fragment key={l.cle}>{inter}
               <tr className="n-tt-tr" tabIndex={0} data-tt-ligne={l.cle} data-tt-statut-ligne={l.statut || ''} data-tt-coche={coche && !pilote ? '1' : undefined} data-tt-grise={grise ? '1' : undefined}
@@ -372,7 +389,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
                 {colsVues.filter((c) => c.apresStatut).map((c) => <td key={c.cle} className="n-tt-td" data-tt-col={c.cle} data-tt-num={c.num ? '1' : undefined}>{celluleVal(c, l)}</td>)}
                 {menuLigne ? <td className="n-tt-td n-tt-td-menu" onClick={(e) => e.stopPropagation()}>
                   {m.length ? <span className="n-tt-ancre" data-tt-ancre="">
-                    <button type="button" className="n-tt-bouton n-tt-bouton-icone n-tt-plus" aria-label={tr('tableau.actionsDe', { titre: l.titre || '' })} aria-haspopup="true" aria-expanded={menu === 'ligne:' + l.cle ? 'true' : 'false'}
+                    <button type="button" data-n-famille="rond" className="n-tt-bouton n-tt-bouton-icone n-tt-plus" aria-label={tr('tableau.actionsDe', { titre: l.titre || '' })} aria-haspopup="true" aria-expanded={menu === 'ligne:' + l.cle ? 'true' : 'false'}
                       data-tt-plus={l.cle} onClick={() => setMenu((x) => (x === 'ligne:' + l.cle ? '' : 'ligne:' + l.cle))}>{ic('more', 18)}</button>
                     <Deroulant ouvert={menu === 'ligne:' + l.cle} onFermer={fermerMenu} libelle={tr('tableau.actionsDe', { titre: l.titre || '' })} droite>
                       <div className="n-tt-pop-liste" role="menu">{m.map((x) => <ChoixMenu key={x.cle} choisi={false} libelle={x.libelle} onClick={() => { setMenu(''); x.onClick(); }} attrs={{ 'data-tt-plus-choix': x.cle }}/>)}</div>
@@ -388,11 +405,16 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   );
   // (21 nov., Annonces « Dressing ») `carteGrille(l, { coche, cochable, basculer, ouvrir, selection })` : l'écran dessine SA carte
   // dans la grille (mêmes lignes, même sélection, même ouverture) ; sans elle, la carte générique d'ici.
-  const grilleVue = carteGrille ? (
+  // (24 nov., lot visuel-annonces) Une grille d'inventaire VIRTUALISÉE (src/natif/visuel/GrilleInventaire.jsx) quand l'écran donne la
+  // hauteur de sa carte (`carteCorps`) : des centaines de cartes, seules celles près de l'écran sont montées, rien ne saute.
+  const grilleVue = carteGrille ? (carteCorps ? (
+    <GrilleInventaire items={affichees} cle={(l) => l.cle} corps={carteCorps} min={200} gap={16} className="n-tt-grille-ecran" attrs={{ 'data-tt-grille': '' }}
+      rendu={(l, i, rv) => carteGrille(l, { coche: sel.has(l.cle), cochable: cochable(l), basculer, ouvrir, selection: !!A || sel.size > 0, revele: rv })}/>
+  ) : (
     <div className="n-tt-grille n-tt-grille-ecran" data-tt-grille="">
       {visibles.map((l) => <React.Fragment key={l.cle}>{carteGrille(l, { coche: sel.has(l.cle), cochable: cochable(l), basculer, ouvrir, selection: !!A || sel.size > 0 })}</React.Fragment>)}
     </div>
-  ) : (
+  )) : (
     <div className="n-tt-grille" data-tt-grille="">
       {visibles.map((l) => { const coche = sel.has(l.cle); const st = statutDe(l); const prix = l.prixGrille;
         return (
@@ -421,19 +443,38 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
 
   // ── la barre de sélection : « N sélectionnés · {Action} » (LE plein de l'écran tant qu'elle est là) ──────────────
   const nSel = choisies.length;
+  // Les actions courantes : celles que l'écran marque `courante` (sinon les trois premières) ; les autres dans « ⋯ ».
+  const marquees = actions.filter((x) => x.courante);
+  const directes = (marquees.length ? marquees : actions.slice(0, 3)).slice(0, 3);
+  const autres = actions.filter((x) => !directes.includes(x));
+  const corpsAutres = (
+    <div className="n-tt-pop-liste" role="menu" aria-label={tr('tableau.plusActions')}>
+      {autres.map((X) => { const j = jugerPour(X);
+        return <ChoixMenu key={X.cle} choisi={false} libelle={tr('tableau.lancer', { action: X.libelle, n: j.c.length })} indisponible={!j.ok} raison={j.ok ? '' : j.raison}
+          onClick={() => { setMenu(''); lancerDirect(X); }} attrs={{ 'data-tt-action': X.cle, 'data-tt-action-directe': X.cle }}/>; })}
+    </div>
+  );
   const barreSel = !pilote && (nSel > 0 || A) ? (
     <div className="n-tt-barre-sel" data-tt-barre-sel={String(nSel)} role="region" aria-label={tr('tableau.selection', { n: nSel })}>
       <span className="n-tt-barre-texte" data-tt-n-sel={String(nSel)}>{tr('tableau.selection', { n: nSel })}</span>
       <button type="button" className="n-tt-lien" data-tt-deselect="" onClick={quitter}>{tr('tableau.deselect')}</button>
       <span className="n-tt-espace"/>
-      {ordinateur ? outil('action-bas', A ? A.libelle : tr('tableau.choisirAction'), corpsActions, { haut: true, droite: true, actif: !!A, attrs: { 'data-tt-action-bas': A ? A.cle : '' } })
+      {ordinateur && !A ? <>
+        {directes.map((X, i) => { const j = jugerPour(X);
+          return <Bouton key={X.cle} variante={i === 0 ? 'plein' : 'teinte'} indisponible={!j.ok} raison={j.ok ? '' : j.raison} onClick={() => lancerDirect(X)}
+            attrs={{ 'data-tt-action-directe': X.cle, 'data-tt-lancer-n': String(j.c.length), ...(i === 0 ? { 'data-v2-principal': 'tableau' } : {}) }}>{tr('tableau.lancer', { action: X.libelle, n: j.c.length })}</Bouton>; })}
+        {autres.length ? outil('action-bas', tr('tableau.plusActions'), corpsAutres, { haut: true, droite: true, attrs: { 'data-tt-action-bas': '' } }) : null}
+      </> : ordinateur ? outil('action-bas', A.libelle, corpsActions, { haut: true, droite: true, actif: true, attrs: { 'data-tt-action-bas': A.cle } })
         : <Bouton variante="teinte" onClick={() => setMenu('action')} attrs={{ 'data-tt-action-bas': A ? A.cle : '' }}>{A ? A.libelle : tr('tableau.choisirAction')}</Bouton>}
-      <Bouton variante="plein" indisponible={!A || !jugement.ok} raison={!A ? tr('tableau.choisisAction') : !jugement.ok ? (jugement.raison || tr('tableau.cocheDAbord')) : ''} onClick={lancer}
-        attrs={{ 'data-tt-lancer': A ? A.cle : '', 'data-tt-lancer-n': String(nSel), 'data-v2-principal': 'tableau' }}>{A ? tr('tableau.lancer', { action: A.libelle, n: nSel }) : tr('tableau.lancerSans', { n: nSel })}</Bouton>
+      {ordinateur && !A ? null : <Bouton variante="plein" indisponible={!A || !jugement.ok} raison={!A ? tr('tableau.choisisAction') : !jugement.ok ? (jugement.raison || tr('tableau.cocheDAbord')) : ''} onClick={lancer}
+        attrs={{ 'data-tt-lancer': A ? A.cle : '', 'data-tt-lancer-n': String(nSel), 'data-v2-principal': 'tableau' }}>{A ? tr('tableau.lancer', { action: A.libelle, n: nSel }) : tr('tableau.lancerSans', { n: nSel })}</Bouton>}
     </div>
   ) : null;
 
-  const corps = lignes === undefined ? <Attente forme="rangees" n={6} vignette={ordinateur ? 0 : 56} titre/>
+  // (24 nov., lot visuel-annonces) En grille d'inventaire, le squelette a la FORME des cartes (rien ne saute à l'arrivée).
+  const corps = lignes === undefined ? (ordinateur && vue === 'grille' && carteGrille && carteCorps
+      ? <GrilleInventaire items={undefined} attente={12} corps={carteCorps} min={200} gap={16} className="n-tt-grille-ecran" attrs={{ 'data-tt-grille': '' }}/>
+      : <Attente forme="rangees" n={6} vignette={ordinateur ? 0 : 56} titre/>)
     : lignes === null ? <Vide icone={ic('cloudOff', 40)} phrase={pasSu || tr('tableau.pasSu')} action={actionPasSu}/>
     : !affichees.length ? <Vide icone={ic(q || nStatuts ? 'search' : iconeVide, 40)} phrase={q || nStatuts ? (videRecherche || tr('tableau.videRecherche')) : (vide || tr('tableau.vide'))}
         action={q || nStatuts ? <Bouton variante="texte" onClick={() => { setQ(''); setStatutsSel(new Set()); }} attrs={{ 'data-tt-effacer': '' }}>{tr('tableau.effacerFiltres')}</Bouton> : null}/>
@@ -450,12 +491,12 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
           {avantOutils}
           {outils}
           {/* (21 nov.) À l'ordinateur, « N articles » · liste ⇄ grille · « Colonnes » font partie de la tête collante : rien ne passe dessous. */}
-          {ordinateur && Array.isArray(lignes) ? nombre : null}
+          {ordinateur && (Array.isArray(lignes) || (lignes === undefined && vue === 'grille' && carteGrille && carteCorps)) ? nombre : null}
         </div>
         {haut}
         {!ordinateur && Array.isArray(lignes) ? nombre : null}
         {corps}
-        {affichees.length > max ? <div className="n-tt-plus-bas"><Bouton variante="texte" onClick={() => setMax((m) => m + PAR_PAGE)} attrs={{ 'data-tt-voir-plus': '' }}>{tr('tableau.voirPlus', { n: Math.min(PAR_PAGE, affichees.length - max) })}</Bouton></div> : null}
+        {affichees.length > max && !(ordinateur && vue === 'grille' && carteGrille && carteCorps) ? <div className="n-tt-plus-bas"><Bouton variante="texte" onClick={() => setMax((m) => m + PAR_PAGE)} attrs={{ 'data-tt-voir-plus': '' }}>{tr('tableau.voirPlus', { n: Math.min(PAR_PAGE, affichees.length - max) })}</Bouton></div> : null}
         {pied ? <p className="n-tt-pied" data-tt-pied="">{pied}</p> : null}
         {enfants}
       </Page>

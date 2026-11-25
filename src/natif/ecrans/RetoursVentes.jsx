@@ -62,7 +62,7 @@ function Plus({ r, Icon }) {
   if (!r.menu || !r.menu.length) return null;
   return (
     <span className="n-tt-ancre" ref={ref}>
-      <button type="button" className="n-tt-bouton n-tt-bouton-icone n-tt-plus" aria-haspopup="true" aria-expanded={ouvert ? 'true' : 'false'}
+      <button type="button" data-n-famille="rond" className="n-tt-bouton n-tt-bouton-icone n-tt-plus" aria-haspopup="true" aria-expanded={ouvert ? 'true' : 'false'}
         aria-label={tr('tableau.actionsDe', { titre: r.titre || '' })} data-vr-plus={r.cle} onClick={() => setOuvert((v) => !v)}>{Icon ? <Icon name="more" size={18}/> : '⋯'}</button>
       {ouvert ? <div className="n-tt-pop" data-tt-droite="1" role="menu">
         <div className="n-tt-pop-liste">

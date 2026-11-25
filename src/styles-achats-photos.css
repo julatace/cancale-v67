@@ -258,6 +258,9 @@
 /* 5 bis · « À RETIRER » rangé dans UNE ligne (App.jsx, `RepliRetirerAchats`) : une rangée d'iOS, le nombre à droite,
    un point ambre si un retrait presse ; ouverte, la section d'avant dessous, telle quelle. */
 :root:root:root body .vrm-achats-retirer-repli { margin: 8px 16px 0; }
+/* (23 nov., revue UX #7) Rien à retirer ni attendu sous un point (téléphone) : la section ne garde AUCUNE place (la bande dit
+   « 0 À retirer ») — seulement quand rien d'autre n'y est montré (retours, Mondial Relay, sortis, note, lecture). */
+:root:root:root body .vrm-achats-retirer-repli:has([data-achats-retraits-tus]):not(:has([data-rp], [data-v2-detail-retraits], [data-retraits-sortis], [data-mr-bloc], [data-achats-retours-route], [data-pickup-sans-compte], .vrm-colis-vide, .vrm-colis-note, [data-retraits-suivis-ko], [data-colis-vestiaire-route], [data-vc-route])) { display: none; }
 :root:root:root body .vrm-achats-retirer-repli > .vrm-achats-retirer-ligne[hidden] { display: none !important; }
 :root:root:root body .vrm-achats-retirer-repli:has(> .vrm-achats-retirer-ligne[hidden]):not(:has(> #vrm-achats-retirer-corps:not([hidden]))) { display: none !important; }
 :root:root:root body .vrm-achats-retirer-ligne {
@@ -417,3 +420,8 @@
   :root:root:root:root:root:root body .vrm-main .vrm-achats-barre > .vrm-seg > .vrm-seg-btn { flex: 1 1 0 !important; min-width: 0 !important; padding-left: 4px !important; padding-right: 4px !important; justify-content: center !important; }
 }
 }
+/* (23 nov., revue UX #7) Seulement « Bientôt au point » (une ligne repliée) : la section ne pose rien d'autre (ni marge, ni filet). */
+:root:root:root body .vrm-achats-retirer-repli:has([data-rp-compact]):not(:has(.n-rp-cartes [data-rp-colis]:not([data-rp-colis="0"]))) { margin: 4px 0 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; background: none !important; }
+:root:root:root body .vrm-achats-retirer-repli:has([data-rp-compact]) :is(.v2-achats-retirer, section) { margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; background: none !important; }
+:root:root:root body .vrm-achats-retirer-repli:has([data-rp-compact]) .n-rp-compact { margin: 0 16px !important; }
+:root:root:root body .vrm-achats-retirer-repli:has([data-rp-compact]) .n-rp-compact-tete { min-height: 44px; }
