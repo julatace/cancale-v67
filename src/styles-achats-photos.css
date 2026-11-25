@@ -427,11 +427,12 @@
 :root:root:root body .vrm-achats-retirer-repli:has([data-rp-compact]) .n-rp-compact-tete { min-height: 44px; }
 /* (25 nov., achats-retours-design) « ✓ Sélectionner » et « ⋯ Plus » ne flottent plus seuls sous les étapes : ils sont rendus
    dans la tête de la tâche, à côté de « Retrouver » et « Arrivée » (src/ecrans/Comptabilite.jsx, `data-achats-tete-place`).
-   Même rond que leurs voisins (le fond de la carte du style, 44, rond), dans chaque style ; ouvert = enfoncé. */
-:root:root:root body .vrm-tache-retrouver[data-scan-retrouver-hote="achats"] > :is(.vrm-achats-selection, .vrm-achats-plus) {
-  flex: none; width: 44px; height: 44px; min-width: 44px; padding: 0; border: 0; border-radius: 50%;
-  background: var(--n-carte, #FFFFFF); box-shadow: none; color: var(--n-encre, #1D1D1F); }
-:root:root:root body .vrm-tache-retrouver[data-scan-retrouver-hote="achats"] > :is(.vrm-achats-selection, .vrm-achats-plus):is([aria-expanded="true"], [aria-pressed="true"]) {
-  background: var(--n-carte-2, #F2F3F5); box-shadow: inset 0 0 0 1.5px var(--n-encre, #1D1D1F); }
-:root:root:root body .vrm-tache-retrouver[data-scan-retrouver-hote="achats"] > :is(.vrm-achats-selection, .vrm-achats-plus):focus-visible {
-  outline: 3px solid var(--n-encre, #1D1D1F); outline-offset: 2px; }
+   Même rond que leurs voisins (le fond de la carte du style, 44, rond), dans chaque style ; ouvert = enfoncé. `!important` : le
+   pont des contrôles natifs (src/coque-native.css, `all: revert-layer` sous un id) effacerait sinon ces règles hors couche. */
+:root:root:root body [data-achats-tete-place] > :is(.vrm-achats-selection, .vrm-achats-plus) {
+  flex: none !important; width: 44px !important; height: 44px !important; min-width: 44px !important; padding: 0 !important; border: 0 !important; border-radius: 50% !important;
+  background: var(--n-carte, #FFFFFF) !important; box-shadow: none !important; color: var(--n-encre, #1D1D1F) !important; }
+:root:root:root body [data-achats-tete-place] > :is(.vrm-achats-selection, .vrm-achats-plus):is([aria-expanded="true"], [aria-pressed="true"]) {
+  background: var(--n-carte-2, #F2F3F5) !important; box-shadow: inset 0 0 0 1.5px var(--n-encre, #1D1D1F) !important; }
+:root:root:root body [data-achats-tete-place] > :is(.vrm-achats-selection, .vrm-achats-plus):focus-visible {
+  outline: 3px solid var(--n-encre, #1D1D1F) !important; outline-offset: 2px !important; }

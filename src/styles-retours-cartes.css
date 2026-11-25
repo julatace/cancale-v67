@@ -160,3 +160,11 @@
 
 @media (prefers-reduced-motion: no-preference) { :root body .vrm-rt .vrm-rt-actions .n-bouton { transition: filter 90ms ease-out, opacity 90ms ease-out; } }
 @media (prefers-reduced-motion: reduce) { :root body .vrm-rt-chevron { transition: none; } }
+/* Le pont des contrôles natifs (src/coque-native.css : `:is(#vrm-contenu, html) .n-bouton { all: revert-layer }`, plus fort qu'un
+   sélecteur sans id) renvoie les boutons à la couche du style choisi : plein / teinté y sont dessinés. Seul le LIEN a besoin de
+   sa forme propre dans tous les styles (souligné, sans fond, 44 au doigt) — d'où ces quelques `!important`, ciblés. */
+:root body .vrm-rt .vrm-rt-geste.is-lien .n-bouton { background: transparent !important; box-shadow: none !important; padding-inline: 2px !important; min-height: 44px !important; width: auto !important;
+  color: var(--n-encre, #1D1D1F) !important; text-decoration-line: underline !important; text-underline-offset: 4px !important; text-decoration-thickness: 1.5px !important;
+  text-decoration-color: color-mix(in srgb, currentColor 55%, transparent) !important; }
+:root body .vrm-rt .vrm-rt-verif-sous .vrm-rt-geste.is-lien .n-bouton { margin-block: -12px !important; font-size: 12px !important; text-underline-offset: 3px !important; }
+:root body .vrm-rt .vrm-rt-geste.is-lien .n-bouton[aria-pressed="true"] { text-decoration-color: currentColor !important; }
