@@ -54,6 +54,13 @@ Geste de Julien : **aucun** (rien en base, aucune extension à installer).
   Sur origin/main : 24 rouges (L, R, P, H). Après : vert. Mutation `MUTATION=logo` (la ligne d'état rognée) ⇒ L rouge.
 - `scripts/bancs/ventes-lisibles.cjs` mis à la règle du jour au téléphone (G : au balayage ; P : la vente prend son prix ; L :
   « Relier » du balayage ouvre la grille ; H : 60–104 px). L'ordinateur garde ses contrôles d'avant.
+- `scripts/bancs/ventes-tableau.cjs` lit la rangée compacte (`.n-vr-logo`, `[data-vt-prix]`, `.n-vr-mot`) ; « À expédier »
+  n'est plus exigé sur chaque rangée d'« À envoyer » (c'est l'onglet ; il était déjà caché au téléphone).
+- Bancs de la CI qui touchent Ventes (ventes-ligne-propre, natif-ventes, etats-justes, vente-mail-annonce, ventes-tableau,
+  ventes-e2 ×3), lancés comme la CI sur origin/main (53690897e) puis sur la branche, comparés PAR NOM : aucun rouge nouveau ;
+  « cibles ≥ 44 » de natif-ventes et ventes-tableau, rouges sur main, passent au vert. Restent rouges des deux côtés :
+  etats-justes (A2, J1) et ventes-e2 (V0 : `[data-selecteur-logos]` introuvable, et ce qui en découle).
+- Styles : le banc passe aussi avec `STYLE=monochrome` et `STYLE=c3doux` (clair et sombre).
 - Cliquets : `audit-stockage-sur` D — une clé d'index de MOINS (Ventes.jsx), aucune ajoutée ; `audit-boutons-natifs` identique.
 
 ## 4. Ce qui reste
