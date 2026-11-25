@@ -57,7 +57,7 @@ export default {
   "parrain.etat.annule": "storniert",
   "parrain.choix.titre": "Meine Wahl",
   "parrain.choix.libelle": "So bekommst du dein Geld",
-  "parrain.choix.credit": "Abo bezahlen",
+  "parrain.choix.credit": "Mein Abo",
   "parrain.choix.virement": "Überweisung",
   "parrain.choix.creditPhrase": "Von deiner nächsten Rechnung abgezogen.",
   "parrain.choix.virementPhrase": "Nächste Überweisung: ab {seuil}.",

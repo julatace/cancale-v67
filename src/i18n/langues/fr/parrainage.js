@@ -57,7 +57,7 @@ export default {
   "parrain.etat.annule": "annulé",
   "parrain.choix.titre": "Mon choix",
   "parrain.choix.libelle": "Comment recevoir tes gains",
-  "parrain.choix.credit": "Payer mon abonnement",
+  "parrain.choix.credit": "Mon abonnement",
   "parrain.choix.virement": "Virement",
   "parrain.choix.creditPhrase": "Déduit de ta prochaine facture.",
   "parrain.choix.virementPhrase": "Prochain virement : dès {seuil}.",

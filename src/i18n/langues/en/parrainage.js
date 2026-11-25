@@ -57,7 +57,7 @@ export default {
   "parrain.etat.annule": "cancelled",
   "parrain.choix.titre": "My choice",
   "parrain.choix.libelle": "How to receive your earnings",
-  "parrain.choix.credit": "Pay my subscription",
+  "parrain.choix.credit": "My subscription",
   "parrain.choix.virement": "Bank transfer",
   "parrain.choix.creditPhrase": "Taken off your next invoice.",
   "parrain.choix.virementPhrase": "Next transfer: from {seuil}.",

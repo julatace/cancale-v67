@@ -57,7 +57,7 @@ export default {
   "parrain.etat.annule": "annullato",
   "parrain.choix.titre": "La mia scelta",
   "parrain.choix.libelle": "Come ricevere i guadagni",
-  "parrain.choix.credit": "Pagare l’abbonamento",
+  "parrain.choix.credit": "Abbonamento",
   "parrain.choix.virement": "Bonifico",
   "parrain.choix.creditPhrase": "Scalato dalla prossima fattura.",
   "parrain.choix.virementPhrase": "Prossimo bonifico: da {seuil}.",

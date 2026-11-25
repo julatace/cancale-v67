@@ -57,7 +57,7 @@ export default {
   "parrain.etat.annule": "anulado",
   "parrain.choix.titre": "Mi elección",
   "parrain.choix.libelle": "Cómo recibir tus ganancias",
-  "parrain.choix.credit": "Pagar mi suscripción",
+  "parrain.choix.credit": "Mi suscripción",
   "parrain.choix.virement": "Transferencia",
   "parrain.choix.creditPhrase": "Descontado de tu próxima factura.",
   "parrain.choix.virementPhrase": "Próxima transferencia: desde {seuil}.",

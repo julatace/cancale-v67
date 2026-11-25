@@ -368,12 +368,12 @@ export default function EcranParrainage({ fetcher = fetch }) {
         {/* 1. Le héros : gagné au total, ce mois, 12 mois en barres. */}
         <Heros className="vrm-pr-heros" titre={tr('parrain.heros.titre')} valeur={c ? eur(c.totalCentimes) : null}
           sous={c ? tr('parrain.heros.mois', { m: eur(c.moisCentimes) }) : tr('parrain.gainsNonInstalle')} attrs={{ 'data-parrainage-heros': '' }}
-          trio={g && g.potentiel ? [
+          trio={g && g.potentiel && g.potentiel.siTousCentimes > 0 ? [
             { cle: 'potentiel', libelle: tr('parrain.potentiel.lib'), valeur: `~${eur(g.potentiel.moisCentimes)}`, pourquoi: tr('parrain.potentiel.estime'), attrs: { 'data-estimation': 'potentiel', 'data-centimes': g.potentiel.moisCentimes } },
             { cle: 'sitous', libelle: tr('parrain.potentiel.siTous'), valeur: `~${eur(g.potentiel.siTousCentimes)}`, pourquoi: tr('parrain.potentiel.estime'), attrs: { 'data-estimation': 'si-tous', 'data-centimes': g.potentiel.siTousCentimes } },
           ] : []}
           action={<span className="vrm-pr-heros-ic" aria-hidden="true"><Icon name="cadeau" size={22}/></span>}
-          graphe={c ? <div className="vrm-pr-barres">
+          graphe={c && c.totalCentimes > 0 ? <div className="vrm-pr-barres">
             <Barres libelle={tr('parrain.heros.graphe')} choisie={choisie} onChoisir={setMoisChoisi}
               barres={parMois.map((x) => ({ cle: x.mois, lettre: lettreMois(x.mois), libelle: `${libelleMois(x.mois)} · ${eur(x.centimes)}`, valeur: x.centimes }))}/>
             <p className="vrm-pr-barres-detail" aria-live="polite" data-parrainage-mois={parMois[choisie] ? parMois[choisie].mois : ''}>{detailMois}</p>
@@ -409,7 +409,7 @@ export default function EcranParrainage({ fetcher = fetch }) {
         </section>
 
         {/* 4. Tes gains. */}
-        {c ? (
+        {c && !aucun ? (
           <Tuiles titre={tr('parrain.gains.titre')} attrs={{ 'data-parrainage-gains': '' }}>
             <Tuile libelle={tr('parrain.tuile.payants')} valeur={c.filleulsPayants == null ? null : String(c.filleulsPayants)} detail={tr('parrain.tuile.payantsDetail', { n: c.filleulsAyantPaye })} attrs={{ 'data-tuile': 'payants' }}/>
             <Tuile libelle={tr('parrain.tuile.mois')} valeur={eur(c.moisCentimes)} detail={tr('parrain.tuile.moisDetail')} attrs={{ 'data-tuile': 'mois' }}/>
@@ -437,8 +437,18 @@ export default function EcranParrainage({ fetcher = fetch }) {
           </section>
         ) : null}
 
+        {/* 7. Tes filleuls : une ligne par filleul (état, gagné, prochain / possible), détail au toucher. */}
+        {g && Array.isArray(g.filleuls) && g.filleuls.length ? <ListeFilleuls filleuls={g.filleuls} onOuvrir={setDetailFilleul}/> : filleuls && filleuls.length ? (
+          <Groupe titre={tr('parrain.filleuls.titre')} attrs={{ 'data-filleuls': filleuls.length }}>
+            {filleuls.map((x) => (
+              <Rangee key={x.rang} titre={tr('parrain.filleuls.ligne', { n: x.rang })} sousTitre={x.inscritLe ? tr('parrain.filleuls.inscrit', { date: jour(x.inscritLe) }) : ''}
+                valeur={tr('parrain.filleuls.etat.' + (ETAT_FILLEUL[x.etat] || 'inscrit'))} attrs={{ 'data-filleul': x.etat }}/>
+            ))}
+          </Groupe>
+        ) : null}
+
         {/* 6. L'historique, par mois (jamais qui). */}
-        {c ? (
+        {c && !aucun ? (
           <div className="vrm-pr-historique" data-parrainage-historique={c.historique.length}>
             {!groupes.length ? <Groupe titre={tr('parrain.historique.titre')}><Rangee titre={tr('parrain.historique.vide')}/></Groupe>
               : groupes.map((gm, i) => (
@@ -451,16 +461,6 @@ export default function EcranParrainage({ fetcher = fetch }) {
                 </Groupe>
               ))}
           </div>
-        ) : null}
-
-        {/* 7. Tes filleuls : une ligne par filleul (état, gagné, prochain / possible), détail au toucher. */}
-        {g && Array.isArray(g.filleuls) && g.filleuls.length ? <ListeFilleuls filleuls={g.filleuls} onOuvrir={setDetailFilleul}/> : filleuls && filleuls.length ? (
-          <Groupe titre={tr('parrain.filleuls.titre')} attrs={{ 'data-filleuls': filleuls.length }}>
-            {filleuls.map((x) => (
-              <Rangee key={x.rang} titre={tr('parrain.filleuls.ligne', { n: x.rang })} sousTitre={x.inscritLe ? tr('parrain.filleuls.inscrit', { date: jour(x.inscritLe) }) : ''}
-                valeur={tr('parrain.filleuls.etat.' + (ETAT_FILLEUL[x.etat] || 'inscrit'))} attrs={{ 'data-filleul': x.etat }}/>
-            ))}
-          </Groupe>
         ) : null}
 
         {proprio ? <ParrainsAVerser fetcher={fetcher}/> : null}
