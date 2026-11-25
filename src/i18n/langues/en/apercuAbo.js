@@ -1,0 +1,28 @@
+// en · apercuAbo
+// (25 nov., lecture-sans-abonnement) La carte de l'aperçu sans abonnement : compteur, séquence de ce qu'il pourra faire, prix, UN bouton (src/abonnement/CarteApercu.jsx).
+export default {
+  "apercuAbo.titre": "Everything is read, ready to show",
+  "apercuAbo.titreImpaye": "Your payment didn't go through",
+  "apercuAbo.compteur": "Sales read: {v} · Listings read: {a}",
+  "apercuAbo.compteurVentes": "Sales read: {v}",
+  "apercuAbo.compteurAnnonces": "Listings read: {a}",
+  "apercuAbo.phrase": "The rest is waiting for your subscription.",
+  "apercuAbo.phraseImpaye": "Update your card to get everything back.",
+  "apercuAbo.exemple": "Example",
+  "apercuAbo.exempleNumero": "No. 12",
+  "apercuAbo.animLibelle": "What you'll be able to do: labels, favourites, numbers, profit, all your sites.",
+  "apercuAbo.scene.bordereaux": "Your shipping labels printed in 1 tap",
+  "apercuAbo.scene.favoris": "Your favourites followed up for you",
+  "apercuAbo.scene.numeros": "Every item stored under its number",
+  "apercuAbo.scene.benefice": "Your real profit, sale by sale",
+  "apercuAbo.scene.sites": "Vinted, Leboncoin, eBay, Vestiaire in one place",
+  "apercuAbo.solo": "Solo",
+  "apercuAbo.pro": "Pro",
+  "apercuAbo.essaiNote": "{j} days free, cancel anytime.",
+  "apercuAbo.essai": "Start the free trial",
+  "apercuAbo.debloquer": "Unlock everything",
+  "apercuAbo.carte": "Update my card",
+  "apercuAbo.ouverture": "Opening…",
+  "apercuAbo.paiementFerme": "Payment isn't open yet.",
+  "apercuAbo.cocher": "Tick both boxes to continue.",
+};

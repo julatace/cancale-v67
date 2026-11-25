@@ -1,0 +1,28 @@
+// de · apercuAbo
+// (25 nov., lecture-sans-abonnement) La carte de l'aperçu sans abonnement : compteur, séquence de ce qu'il pourra faire, prix, UN bouton (src/abonnement/CarteApercu.jsx).
+export default {
+  "apercuAbo.titre": "Alles gelesen, bereit zur Anzeige",
+  "apercuAbo.titreImpaye": "Deine Abbuchung ist fehlgeschlagen",
+  "apercuAbo.compteur": "Verkäufe gelesen: {v} · Anzeigen gelesen: {a}",
+  "apercuAbo.compteurVentes": "Verkäufe gelesen: {v}",
+  "apercuAbo.compteurAnnonces": "Anzeigen gelesen: {a}",
+  "apercuAbo.phrase": "Der Rest wartet auf dein Abo.",
+  "apercuAbo.phraseImpaye": "Aktualisiere deine Karte für alles.",
+  "apercuAbo.exemple": "Beispiel",
+  "apercuAbo.exempleNumero": "Nr. 12",
+  "apercuAbo.animLibelle": "Was du tun kannst: Etiketten, Favoriten, Nummern, Gewinn, alle deine Seiten.",
+  "apercuAbo.scene.bordereaux": "Versandetiketten mit 1 Tipp gedruckt",
+  "apercuAbo.scene.favoris": "Deine Favoriten für dich angeschrieben",
+  "apercuAbo.scene.numeros": "Jeder Artikel unter seiner Nr.",
+  "apercuAbo.scene.benefice": "Dein echter Gewinn, Verkauf für Verkauf",
+  "apercuAbo.scene.sites": "Vinted, Leboncoin, eBay, Vestiaire an einem Ort",
+  "apercuAbo.solo": "Solo",
+  "apercuAbo.pro": "Pro",
+  "apercuAbo.essaiNote": "{j} Tage gratis, jederzeit kündbar.",
+  "apercuAbo.essai": "Kostenlos testen",
+  "apercuAbo.debloquer": "Alles freischalten",
+  "apercuAbo.carte": "Meine Karte aktualisieren",
+  "apercuAbo.ouverture": "Wird geöffnet…",
+  "apercuAbo.paiementFerme": "Die Zahlung ist noch nicht offen.",
+  "apercuAbo.cocher": "Hake beide Kästchen an.",
+};

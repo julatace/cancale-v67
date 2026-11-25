@@ -914,11 +914,14 @@ async function checkout(req, res) {
   // `false` = éligible ; `true` = déjà utilisé ; `null` = pas su ⇒ pas d'essai.
   const idsVinted = await lireVintedIds(u.id);
   const avecEssai = (await essaiDejaUtilise(u.email, idsVinted)) === false;
+  const retourCheckout = typeof corps.retour === 'string' && /^[a-z][a-z_]{1,24}$/.test(corps.retour) && corps.retour !== 'settings' ? corps.retour : '';
   const params = {
     mode: 'subscription',
     line_items: [{ price: prix.id, quantity: 1 }],
-    success_url: `${APP_URL}/?tab=settings&vue=abonnement&abonnement=merci`,
-    cancel_url: `${APP_URL}/?tab=settings&vue=abonnement&abonnement=annule`,
+    // (25 nov., lecture sans abonnement) Payé depuis la carte de l'aperçu : retour sur le MÊME écran
+    // (`retour`, un nom d'onglet, rien d'autre), où tout se défloute dès que l'accès arrive.
+    success_url: retourCheckout ? `${APP_URL}/?tab=${retourCheckout}&abonnement=merci` : `${APP_URL}/?tab=settings&vue=abonnement&abonnement=merci`,
+    cancel_url: retourCheckout ? `${APP_URL}/?tab=${retourCheckout}&abonnement=annule` : `${APP_URL}/?tab=settings&vue=abonnement&abonnement=annule`,
     client_reference_id: u.id,
     metadata: { owner: u.id, app: 'vrm', cgv_version: CGV_VERSION, cgv_acceptees_le: accepteLe, acces_immediat_demande_le: accepteLe },
     subscription_data: {

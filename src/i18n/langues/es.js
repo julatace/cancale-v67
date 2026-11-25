@@ -25,6 +25,7 @@ import ecran_apresFinale from './es/apresFinale.js';   // (22 nov.) après la fi
 import ecran_styleClarte from './es/styleClarte.js';
 import ecran_moinsTexte from './es/moinsTexte.js';
 import ecran_revueUx from './es/revueUx.js';   // (23 nov.) revue UX   // (22 nov.) style et clarté : tableau de bord, état de l’extension
+import ecran_apercuabo from './es/apercuAbo.js';   // (25 nov.) l'aperçu sans abonnement : la carte
 import ecran_lotachat from './es/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './es/ext5438.js';   // (22 nov.) ext. 5.438
 import ecran_visuelAnnonces from './es/visuelAnnonces.js';   // (24 nov.) l'inventaire Annonces / Stock
@@ -2415,6 +2416,7 @@ export default {
   ...ecran_transp_depenses,
   ...ecran_file_actions,
   ...ecran_ext5428,
+  ...ecran_apercuabo,
   ...ecran_lotachat,
   ...ecran_ext5438,
   ...ecran_moderationCarte,

@@ -954,7 +954,8 @@ import { lireApercuParrain, lireParrainageOuvert, parrainageOuvertConnu, suivreP
 // (15 nov.) Le lien d'un PARTENAIRE (`/p/LEO`) : gardé, présenté une fois (src/partenaires/lien.js).
 import { garderCodePartenaire, codePartenaireGarde } from "./partenaires/lien.js";
 import { presenterCodePartenaire } from "./partenaires/presenter.js";
-import { marquerApercu, effacerApercu, bloquerGestes } from "./abonnement/apercu.js";
+import { marquerApercu, effacerApercu, bloquerGestes, lignesApercu } from "./abonnement/apercu.js";
+import { CarteApercu } from "./abonnement/CarteApercu.jsx";   // (25 nov.) la carte de l'aperçu sans abonnement
 // (9 nov.) Solo / Pro : la règle des ventes par offre (api/_lib/plan-regle.js) et son état (src/abonnement/planVentes.js).
 import { CLE_ROLES_COMPTES, comptesPersonnels, comptesHorsTotaux } from './rolesComptes.js';   // (20 nov., lot bleam-suite) le rôle des comptes
 import { venteHorsPlanUid, demarrerPlan, signaturePlan, suivrePlan, reglePlanCourante } from "./abonnement/planVentes.js";
@@ -20034,17 +20035,101 @@ function BandeauAbonnement({ setTab }) {
 // dans l'écran est arrêté et fait signe à la carte. La carte, nette, flotte au
 // centre en bas : « Ton abonnement a pris fin · Tes données sont là, rien n'est
 // supprimé · Reprendre l'abonnement ». Aucune écriture ne part (garde + base).
-function ApercuSansAbonnement({ tab, setTab }) {
+// (25 nov., Julien : « Tu peux directement faire la lecture et tu floutes tant que la personne n'a pas
+// d'abonnement. Sauf si il est en essai gratuit. » · « Il voit 5 ventes et 5 annonces » · « Fais quelque
+// chose de logique ») Le parcours : l'extension lit et RANGE tout (migration 050) ; ici, sur Ventes et
+// Annonces, ses 5 premières lignes nettes (`lignesApercu`), 3 par liste ailleurs ; UNE carte posée là où
+// le flou commence (`data-apercu-debut`) — le compteur de ce qui est lu, ce qu'il pourra faire, le prix,
+// UN bouton ; toucher une zone floutée ou un geste bloqué ramène à CETTE carte. Après le paiement, Stripe
+// le ramène sur le MÊME écran (`retour`), l'état est relu toutes les 2 s jusqu'à l'accès : tout se défloute
+// sans rien relire d'autre (ses données sont déjà là). Pendant l'essai : `lectureSeule` est faux, rien ici.
+const APERCU_RETOUR_MERCI = (() => { try { return new URLSearchParams(RECHERCHE_OUVERTURE).get('abonnement') === 'merci'; } catch (_) { return false; } })();
+// Le porteur de la carte : posé AVANT la 1re ligne floutée (une ligne de tableau ⇒ dans une ligne `tr`
+// pleine largeur ; une case de grille ⇒ toute la largeur), sinon après la dernière ligne nette, sinon en fin
+// d'écran. Déplacé seulement s'il n'est pas déjà à sa place (le MutationObserver ne boucle pas).
+function placerPorteurApercu(porteur, racine, bilan) {
+  const ancre = bilan.debut || bilan.derniere;
+  const avant = !!bilan.debut;
+  const parent = ancre ? ancre.parentElement : (racine.firstElementChild || racine);
+  if (!parent) return;
+  const enTr = parent.tagName === 'TBODY';
+  let env = porteur.env;
+  if (!env || (env.tagName === 'TR') !== enTr) {
+    if (env && env.parentNode) env.parentNode.removeChild(env);
+    if (enTr) { env = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = 99; td.appendChild(porteur.cible); env.appendChild(td); }
+    else { env = document.createElement('div'); env.appendChild(porteur.cible); }
+    env.setAttribute('data-apercu-garde', ''); env.className = 'vrm-apercu-porteur';
+    porteur.env = env;
+  }
+  if (env.parentNode === parent) {
+    if (ancre && avant && env.nextSibling === ancre) return;
+    if (ancre && !avant && ancre.nextSibling === env) return;
+    if (!ancre && env === parent.lastChild) return;
+  }
+  if (ancre) parent.insertBefore(env, avant ? ancre : ancre.nextSibling); else parent.appendChild(env);
+}
+// Une liste VIRTUELLE (lignes en position absolue, la grille des annonces) : le porteur se pose PAR-DESSUS
+// les lignes floutées, à la hauteur de la 1re — jamais sous les lignes nettes qu'elle masquerait.
+function caleePorteurApercu(porteur, bilan) {
+  const env = porteur.env; if (!env) return;
+  let abs = false; try { abs = !!bilan.debut && getComputedStyle(bilan.debut).position === 'absolute'; } catch (_) {}
+  const top = abs ? bilan.debut.offsetTop + 'px' : '';
+  if (env.style.position !== (abs ? 'absolute' : '')) { env.style.position = abs ? 'absolute' : ''; env.style.left = abs ? '0' : ''; env.style.right = abs ? '0' : ''; env.style.zIndex = abs ? '2' : ''; }
+  if (env.style.top !== top) env.style.top = top;
+  // La liste virtuelle a une hauteur fixe et coupe ce qui dépasse : la carte passe par-dessus la suite (floutée).
+  const parent = env.parentElement;
+  // Elle forme sa propre pile (`contain: layout`) : levée au-dessus des en-têtes collants des comptes (z 6), sinon la section suivante passe par-dessus la carte.
+  if (abs && parent && parent.style.overflow !== 'visible') { porteur.overflowAvant = { el: parent, v: parent.style.overflow, z: parent.style.zIndex }; parent.style.overflow = 'visible'; parent.style.zIndex = '7'; }
+}
+function ApercuSansAbonnement({ tab, setTab, nVentes }) {
   const [x, setX] = React.useState(() => abonnementPublie());
   const [signe, setSigne] = React.useState(0);
   const [occupe, setOccupe] = React.useState(false);
+  const [cases, setCases] = React.useState({ cgv: false, acces: false });
+  const [montrerCgv, setMontrerCgv] = React.useState(false);
+  const [nAnnonces, setNAnnonces] = React.useState(null);
+  const [porteur] = React.useState(() => ({ cible: typeof document !== 'undefined' ? document.createElement('div') : null, env: null }));
+  const [pose, setPose] = React.useState(false);
   React.useEffect(() => suivreAbonnement(setX), []);
   const e = etatAbonnement(x === null ? undefined : x);
   const actif = !!e.lectureSeule && tab !== 'settings';
+  // De retour de Stripe : l'accès arrive par le webhook, quelques secondes plus tard. Relu toutes les 2 s
+  // (8 fois au plus) ; dès qu'il est là, `publierAbonnement` lève l'aperçu — tout est net, rien n'est relu.
+  React.useEffect(() => {
+    if (!APERCU_RETOUR_MERCI || !e.lectureSeule) return undefined;
+    let mort = false;
+    (async () => {
+      for (let i = 0; i < 8 && !mort; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const y = await lireAbonnement({ frais: true });
+        if (mort || !y) continue;
+        if (y.acces !== false) { publierAbonnement(y); return; }
+      }
+    })();
+    return () => { mort = true; };
+  }, [e.lectureSeule]);
+  // Le compteur des annonces : les VRAIS nombres de ses lignes de dressing (compteur scalaire, §4.2).
+  React.useEffect(() => {
+    if (!actif) return undefined;
+    let mort = false;
+    lireTout('id=like.harvest_*_listings&select=id,n:data->>nItems').then((rows) => {
+      if (mort || !Array.isArray(rows)) return;
+      const lignes = rows.filter((r) => r && /^harvest_\d+_listings$/.test(String(r.id || '')));
+      if (!lignes.length || lignes.some((r) => !/^\d+$/.test(String(r.n == null ? '' : r.n)))) { setNAnnonces(null); return; }
+      setNAnnonces(lignes.reduce((s, r) => s + Number(r.n), 0));
+    }).catch(() => {});
+    return () => { mort = true; };
+  }, [actif]);
   React.useEffect(() => {
     if (!actif) return undefined;
     let racine = null, obs = null, rendu = 0, defaire = null, mort = false;
-    const marquer = () => { rendu = 0; if (racine && racine.isConnected) marquerApercu(racine); };
+    const opts = lignesApercu(tab);
+    const marquer = () => {
+      rendu = 0;
+      if (!racine || !racine.isConnected) return;
+      const bilan = marquerApercu(racine, undefined, opts);
+      if (porteur.cible) { placerPorteurApercu(porteur, racine, bilan); caleePorteurApercu(porteur, bilan); setPose(true); }
+    };
     const prevoir = () => { if (!rendu) rendu = requestAnimationFrame(marquer); };
     const brancher = () => {
       if (mort) return;
@@ -20056,19 +20141,32 @@ function ApercuSansAbonnement({ tab, setTab }) {
       obs.observe(r, { childList: true, subtree: true, characterData: true });
     };
     brancher();
-    return () => { mort = true; if (obs) obs.disconnect(); if (rendu) cancelAnimationFrame(rendu); if (defaire) defaire(); if (racine) effacerApercu(racine); };
+    return () => { mort = true; if (obs) obs.disconnect(); if (rendu) cancelAnimationFrame(rendu); if (defaire) defaire(); if (racine) effacerApercu(racine); if (porteur.env && porteur.env.parentNode) porteur.env.parentNode.removeChild(porteur.env); if (porteur.overflowAvant) { try { porteur.overflowAvant.el.style.overflow = porteur.overflowAvant.v; porteur.overflowAvant.el.style.zIndex = porteur.overflowAvant.z; } catch (_) {} porteur.overflowAvant = null; } setPose(false); };
   }, [actif, tab]);
-  if (!actif) return null;
-  const reprendre = async () => {
+  // Un geste bloqué (ou une zone floutée touchée) : CETTE carte vient sous les yeux.
+  React.useEffect(() => {
+    if (!signe || !porteur.env) return;
+    let doux = true; try { doux = !window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
+    try { porteur.env.scrollIntoView({ block: 'center', behavior: doux ? 'smooth' : 'auto' }); } catch (_) {}
+  }, [signe]);
+  if (!actif || !porteur.cible) return null;
+  const payable = !!(x && x.configure !== false && x.prixConforme !== false && x.mentionsCompletes === true);
+  const proOuvert = !!(x && x.offres && x.offres.pro && x.offres.pro.ouvert && x.offres.pro.texte);
+  const prixSolo = payable ? ((x.offres && x.offres.solo && x.offres.solo.texte) || prixLisible(x.prix)) : null;
+  const prixPro = payable ? (proOuvert ? x.offres.pro.texte : `${PRIX_PRO_MOIS_PN} € / mois`) : null;
+  const debloquer = async () => {
     if (e.impaye) { setOccupe(true); const m = await ouvrirStripe('portail'); if (m) { toast(m); setOccupe(false); } return; }
-    voirAbonnement(setTab);
+    if (!casesCgvCochees(cases)) { setMontrerCgv(true); return; }
+    setOccupe(true);
+    const m = await ouvrirStripe('checkout', { cgv: true, accesImmediat: true, retour: tab });
+    if (m) { toast(m); setOccupe(false); }
   };
-  return createPortal(
-    <div className="vrm-apercu-carte" role="region" aria-labelledby="vrm-apercu-titre" data-carte-apercu="" data-signe={signe || undefined} key={signe}>
-      <div className="vrm-apercu-titre" id="vrm-apercu-titre" data-apercu-nouveau={e.nouveau ? '' : undefined}>{e.nouveau ? 'Bienvenue sur VRM' : e.impaye ? "Ton prélèvement n'est pas passé" : 'Ton abonnement a pris fin'}</div>
-      <div className="vrm-apercu-phrase">{e.nouveau ? 'Abonne-toi pour tout voir et agir.' : <>Tes données sont là, rien n'est supprimé. {e.impaye ? 'Mets ta carte à jour' : "Reprends l'abonnement"} pour tout retrouver.</>}</div>
-      <Bouton variante="primaire" plein  disabled={occupe} onClick={reprendre} data-apercu-reprendre="">{occupe ? 'Ouverture…' : e.nouveau ? "Voir l'offre" : e.impaye ? 'Mettre à jour ma carte' : "Reprendre l'abonnement"}</Bouton>
-    </div>, document.body);
+  return (<>
+    {pose && createPortal(
+      <CarteApercu e={e} x={x} nVentes={Number.isInteger(nVentes) ? nVentes : null} nAnnonces={nAnnonces} prixSolo={prixSolo} prixPro={prixPro}
+        Icon={Icon} Bouton={Bouton} cgv={<CaseCgv cases={cases} onChange={setCases}/>} montrerCgv={montrerCgv} cgvOk={casesCgvCochees(cases)}
+        occupe={occupe} payable={payable} onDebloquer={debloquer} signe={signe}/>, porteur.cible)}
+  </>);
 }
 // ── (9 nov.) UN INCIDENT OUVERT PAR LES SONDES DE /statut ─────────────────────
 // Une ligne discrète, neutre (aucun geste à faire : « on s'en occupe »), UNE fois
@@ -39058,7 +39156,7 @@ function AppCoeur() {
         {MULTI_USER && authState.user && <BandeauSuppressionPrevue tab={tab}/>}
         <BandeauCompteVendeur enTete={enTeteSession} ventes={ventesCoque} autres={autresSolo}
           comptes={(vintedAccounts || []).filter((a) => a && a.vinted_user_id != null).map((a) => ({ uid: String(a.vinted_user_id), nom: (load('vinted_account_labels', {}) || {})[String(a.vinted_user_id)] || a.login || ('#' + a.vinted_user_id) }))}/>
-        <ApercuSansAbonnement tab={tab} setTab={setTab}/>
+        <ApercuSansAbonnement tab={tab} setTab={setTab} nVentes={Array.isArray(ventesCoque) ? ventesCoque.length : null}/>
         <BandeauLiaison/>
         {/* (19 nov., lot compte-bloque) « Vinted a bloqué {compte} » : l'annonce et LA question, une fois (src/CompteBloque.jsx). */}
         {!baseKO && !horsLigne && <GardeEcran nom="coque:compte-bloque"><Suspense fallback={null}><CompteBloque comptes={vintedAccounts}/></Suspense></GardeEcran>}

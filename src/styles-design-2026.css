@@ -764,15 +764,43 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 
 /* ── (8 nov.) SANS ABONNEMENT : l'aperçu ──────────────────────────────────────
    Un extrait net ; le reste flouté fort sous un voile (jamais lisible, ni
-   sélectionnable) ; une carte nette en verre, au centre en bas. */
-[data-apercu] { padding-bottom: 200px; }
+   sélectionnable). (25 nov.) UNE carte, dans le fil de l'écran, posée là où le
+   flou commence (src/abonnement/CarteApercu.jsx) — les jetons ACTUELS (--n-*). */
+[data-apercu] { padding-bottom: 40px; }
 [data-apercu] [data-apercu-floute] { filter: blur(7px) saturate(.7); opacity: .45; -webkit-user-select: none; user-select: none; pointer-events: none; }
-.vrm-apercu-carte { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 900; box-sizing: border-box; width: min(440px, calc(100vw - 32px)); padding: var(--d-e-5) var(--d-e-5) var(--d-e-4); border-radius: var(--d-r-carte); background: color-mix(in srgb, var(--d-carte) 84%, transparent); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); box-shadow: var(--d-ombre-flottant); text-align: center; color: var(--d-encre); }
-.vrm-apercu-titre { font-size: var(--d-t-17); font-weight: 700; letter-spacing: -0.012em; line-height: 1.3; }
-.vrm-apercu-phrase { margin: 6px 0 var(--d-e-4); font-size: var(--d-t-15); line-height: 1.45; color: var(--d-gris); }
+.vrm-apercu-porteur { display: block; grid-column: 1 / -1; flex: 0 0 100%; width: 100%; box-sizing: border-box; padding: 12px 16px; list-style: none; }
+tr.vrm-apercu-porteur { display: table-row; padding: 0; }
+tr.vrm-apercu-porteur > td { padding: 12px 16px; }
+.vrm-apercu-carte { box-sizing: border-box; width: min(520px, 100%); margin: 0 auto; padding: 18px 18px 16px; border-radius: var(--d-r-carte, 20px); background: var(--n-carte); border: 1px solid var(--n-bord); box-shadow: var(--n-ombre); text-align: center; color: var(--n-encre); }
+.vrm-apercu-titre { font-size: 17px; font-weight: 700; letter-spacing: -0.012em; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.vrm-apercu-phrase { margin: 4px 0 12px; font-size: 14px; line-height: 1.45; color: var(--n-encre-2); }
 .vrm-apercu-carte[data-signe] { animation: vrm-apercu-signe 380ms cubic-bezier(.2,.8,.2,1); }
-@keyframes vrm-apercu-signe { 0% { transform: translateX(-50%) scale(1); } 40% { transform: translateX(-50%) scale(1.025); } 100% { transform: translateX(-50%) scale(1); } }
-@media (max-width: 767px) { .vrm-apercu-carte { bottom: calc(88px + env(safe-area-inset-bottom, 0px)); padding: 14px 16px 12px; } .vrm-apercu-titre { font-size: var(--d-t-15); } .vrm-apercu-phrase { font-size: var(--d-t-13); margin: 4px 0 10px; } }
-@media (prefers-reduced-motion: reduce) { .vrm-apercu-carte[data-signe] { animation: none; } }
-@media (prefers-reduced-transparency: reduce) { .vrm-apercu-carte { background: var(--d-carte); -webkit-backdrop-filter: none; backdrop-filter: none; } }
-@media (min-width: 1100px) { .vrm-apercu-carte { left: calc(50% + 118px); } }
+@keyframes vrm-apercu-signe { 0% { transform: scale(1); } 40% { transform: scale(1.02); } 100% { transform: scale(1); } }
+/* La séquence : cinq scènes, une à la fois, en boucle (12,5 s). */
+.vrm-apercu-anim { position: relative; margin: 0 0 12px; height: 92px; border-radius: 12px; background: var(--n-carte-2); overflow: hidden; }
+.vrm-apercu-exemple { position: absolute; top: 8px; right: 10px; z-index: 1; font-size: 11px; font-weight: 600; color: var(--n-encre-2); }
+.vrm-apercu-scenes { position: absolute; inset: 0; }
+.vrm-apercu-scene { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; opacity: 0; animation: vrm-apercu-scene 12.5s infinite both; }
+.vrm-apercu-scene:nth-child(2) { animation-delay: 2.5s; } .vrm-apercu-scene:nth-child(3) { animation-delay: 5s; } .vrm-apercu-scene:nth-child(4) { animation-delay: 7.5s; } .vrm-apercu-scene:nth-child(5) { animation-delay: 10s; }
+@keyframes vrm-apercu-scene { 0% { opacity: 0; transform: translateY(6px); } 4% { opacity: 1; transform: none; } 18% { opacity: 1; transform: none; } 22% { opacity: 0; transform: translateY(-6px); } 100% { opacity: 0; } }
+.vrm-apercu-scene-icone { display: flex; color: var(--n-accent); }
+.vrm-apercu-scene-texte { font-size: 14px; font-weight: 600; line-height: 1.3; color: var(--n-encre); }
+.vrm-apercu-scene-dessin { display: flex; gap: 4px; align-items: flex-end; height: 14px; }
+.vrm-apercu-scene-dessin i { display: block; width: 18px; height: 6px; border-radius: 3px; background: var(--n-bord); }
+.vrm-apercu-scene-dessin[data-dessin="benefice"] i:nth-child(1) { height: 5px; } .vrm-apercu-scene-dessin[data-dessin="benefice"] i:nth-child(2) { height: 9px; } .vrm-apercu-scene-dessin[data-dessin="benefice"] i:nth-child(3) { height: 7px; } .vrm-apercu-scene-dessin[data-dessin="benefice"] i:nth-child(4) { height: 13px; background: var(--n-accent); }
+.vrm-apercu-scene-dessin[data-dessin="sites"] i { width: 10px; height: 10px; border-radius: 50%; }
+.vrm-apercu-scene-dessin b { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--n-bord); background: var(--n-carte); color: var(--n-encre); }
+.vrm-apercu-prix { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 8px; font-size: 14px; color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+.vrm-apercu-prix b { color: var(--n-encre); }
+.vrm-apercu-essai-note { margin: 0 0 10px; font-size: 13px; color: var(--n-encre-2); }
+.vrm-apercu-cgv { margin: 0 0 10px; text-align: left; }
+/* Mouvement réduit : l'image fixe — les cinq scènes en liste, aucune animation. */
+@media (prefers-reduced-motion: reduce) {
+  .vrm-apercu-carte[data-signe] { animation: none; }
+  .vrm-apercu-anim { height: auto; padding: 28px 12px 10px; }
+  .vrm-apercu-scenes { position: static; display: grid; gap: 8px; }
+  .vrm-apercu-scene { position: static; opacity: 1; animation: none; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 0; }
+  .vrm-apercu-scene-dessin { display: none; }
+  .vrm-apercu-scene-texte { text-align: left; font-size: 13px; }
+}
+@media (max-width: 767px) { .vrm-apercu-carte { padding: 14px 14px 12px; } .vrm-apercu-titre { font-size: 15px; } .vrm-apercu-phrase { font-size: 13px; margin: 4px 0 10px; } }

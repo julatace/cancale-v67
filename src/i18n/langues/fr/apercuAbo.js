@@ -1,0 +1,28 @@
+// fr · apercuAbo
+// (25 nov., lecture-sans-abonnement) La carte de l'aperçu sans abonnement : compteur, séquence de ce qu'il pourra faire, prix, UN bouton (src/abonnement/CarteApercu.jsx).
+export default {
+  "apercuAbo.titre": "Tout est lu, prêt à s'afficher",
+  "apercuAbo.titreImpaye": "Ton prélèvement n'est pas passé",
+  "apercuAbo.compteur": "Ventes lues : {v} · Annonces lues : {a}",
+  "apercuAbo.compteurVentes": "Ventes lues : {v}",
+  "apercuAbo.compteurAnnonces": "Annonces lues : {a}",
+  "apercuAbo.phrase": "Le reste attend ton abonnement.",
+  "apercuAbo.phraseImpaye": "Mets ta carte à jour pour tout retrouver.",
+  "apercuAbo.exemple": "Exemple",
+  "apercuAbo.exempleNumero": "N° 12",
+  "apercuAbo.animLibelle": "Ce que tu pourras faire : bordereaux, favoris, numéros, bénéfice, tous tes sites.",
+  "apercuAbo.scene.bordereaux": "Tes bordereaux imprimés en 1 toucher",
+  "apercuAbo.scene.favoris": "Tes favoris relancés pour toi",
+  "apercuAbo.scene.numeros": "Chaque article rangé sous son N°",
+  "apercuAbo.scene.benefice": "Ton bénéfice réel, vente par vente",
+  "apercuAbo.scene.sites": "Vinted, Leboncoin, eBay, Vestiaire au même endroit",
+  "apercuAbo.solo": "Solo",
+  "apercuAbo.pro": "Pro",
+  "apercuAbo.essaiNote": "{j} jours gratuits, résiliable à tout moment.",
+  "apercuAbo.essai": "Commencer l'essai gratuit",
+  "apercuAbo.debloquer": "Débloquer tout",
+  "apercuAbo.carte": "Mettre à jour ma carte",
+  "apercuAbo.ouverture": "Ouverture…",
+  "apercuAbo.paiementFerme": "Le paiement n'est pas encore ouvert.",
+  "apercuAbo.cocher": "Coche les deux cases pour continuer.",
+};
