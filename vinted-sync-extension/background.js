@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.440.4';
+const CODE_VERSION = '5.453.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -5935,6 +5935,38 @@ function vendDeReglage(r, proprietaire) {
   return proprietaire === true ? 'sneakers' : 'autre';
 }
 const ABONNEMENT_API = 'https://vrm.center/api/compte?mode=abonnement';
+// ══ 5.453.0 (25 nov., `lectureseule`) — SANS ABONNEMENT : LIRE OUI, AGIR NON ═══════════════════════════════
+// Julien (25 nov.) : « Tu peux directement faire la lecture et tu floutes tant que la personne n'a pas
+// d'abonnement. Sauf si il est en essai gratuit. » L'extension lit et RANGE tout dès la liaison (la base le
+// permet pour ses lignes de capture : migration 050) ; l'app floute. Ce que la lecture n'ouvre PAS : les
+// actions de plateforme. `abonnementCoupeExt()` dit si le compte VRM de la session est COUPÉ (`acces: false`
+// lu chez vrm.center, la règle de la base `vrm_acces`) ; essai gratuit et propriétaire ⇒ jamais coupé.
+// Mémo `vrm_abo_ext` (§4.9) : un « coupé » se relit toutes les 2 min (il vient peut-être de payer), un
+// « accès » toutes les 10 min. « Pas su » (réseau, 5xx) ⇒ la dernière réponse lue, sinon NON coupé : on ne
+// bloque pas un abonné parce que le serveur a hoqueté (la règle de l'app, PorteAbonnement).
+const ABO_EXT_CLE = 'vrm_abo_ext';
+const RAISON_ABONNEMENT = "Sans abonnement VRM, l'extension lit tes comptes mais n'agit pas. Abonne-toi (ou commence l'essai gratuit) dans VRM pour débloquer les actions. Rien n'est parti.";
+async function abonnementCoupeExt() {
+  try {
+    const s = await loadSession();
+    const owner = String((s && s.user_id) || '');
+    if (!owner || !s.access_token) return false;   // sans session VRM, rien ne part de toute façon (garde)
+    const t = Date.now();
+    let o = null; try { o = (await chrome.storage.local.get(ABO_EXT_CLE))[ABO_EXT_CLE] || null; } catch (_) { o = null; }
+    const connu = o && o.owner === owner && typeof o.coupe === 'boolean' ? o : null;
+    if (connu && t >= Number(connu.at || 0) && t - Number(connu.at || 0) < (connu.coupe ? 2 * 60000 : 10 * 60000)) return connu.coupe;
+    let j = null;
+    try {
+      const r = await fetch(ABONNEMENT_API, { headers: { Authorization: `Bearer ${s.access_token}` }, cache: 'no-store' });
+      if (r.ok) j = await r.json().catch(() => null);
+    } catch (_) { j = null; }
+    if (!j || typeof j.acces !== 'boolean') return connu ? connu.coupe : false;
+    const coupe = j.acces === false && j.proprietaire !== true;
+    try { await chrome.storage.local.set({ [ABO_EXT_CLE]: { owner, coupe, at: t } }); } catch (_) {}
+    if (coupe && !(connu && connu.coupe)) { try { noterDiag('actions_sans_abonnement'); } catch (_) {} }
+    return coupe;
+  } catch (_) { return false; }
+}
 async function proprietaireExt(owner) {
   try {
     const o = await chrome.storage.local.get('vrm_proprio_ext');
@@ -20460,6 +20492,10 @@ function compterAction(uid, plafond = ACTIONS_MAX_HEURE, n = 1, essai = false) {
 // (5.406) `essai` : la MÊME règle, sans rien prendre ni écrire — « une place est-elle libre, et sinon dans combien ? »
 async function compterActionUn(uid, plafond, n = 1, essai = false) {
   try {
+    // 5.453.0 (25 nov., `lectureseule`) : un compte VRM SANS abonnement (ni essai) n'agit pas — l'extension LIT et
+    //    range tout (migration 050), mais aucune action de plateforme ne part (offres, messages, republication, baisses,
+    //    bordereaux, Leboncoin, Vestiaire). Le compteur se ferme ici : TOUTE action en prend une place (§3).
+    if (await abonnementCoupeExt()) return { ok: false, code: 'abonnement', n: 0 };
     const cle = 'vrmActions';
     const cur = (await chrome.storage.local.get(cle))[cle] || {};
     const t = Date.now(), ilYaUneHeure = t - 3600000;
@@ -20897,6 +20933,7 @@ const PHRASE_CAPTCHA = 'Vinted demande une vérification : fais-la sur vinted.fr
 // Le refus du compteur dû à la discrétion (jour, vérification, compte neuf), ou `null`.
 function phraseRefusDiscretion(c) {
   if (!c || c.ok) return null;
+  if (c.code === 'abonnement') return { ok: false, code: 'abonnement', attendreMs: 0, error: RAISON_ABONNEMENT };   // 5.453.0
   if (c.code === 'tout-arrete') return { ok: false, code: 'tout-arrete', depuis: c.depuis, attendreMs: 0, error: phraseArret('tout') };
   if (c.code === 'verification') return { ok: false, code: 'verification', depuis: c.depuis, arret: c.arret || 'captcha', attendreMs: 0, error: phraseArret(c.arret) };
   if (c.code === 'plafond-jour') return { ok: false, code: 'plafond-jour', attendreMs: Number(c.resteMs) || 0, error: `${c.nJour}/${c.maxJour} actions aujourd’hui sur ce compte : VRM reprend demain.` };
@@ -24278,6 +24315,7 @@ async function publierUnAussi(jobId, uid, art, site) {
   if (secu) return arret(secu.code, { raison: secu.error });
   if (site === 'leboncoin') { const fr = await pauseLbcMsg(); if (fr) return arret('lbc-pause', { raison: 'Leboncoin a demandé de ralentir — rien n’est parti, réessaie plus tard' }); }
   const cpt = await compterAction(cleCompte, ACTIONS_MAX_HEURE);
+  if (!cpt.ok && cpt.code === 'abonnement') return arret('abonnement', { raison: RAISON_ABONNEMENT });   // 5.453.0
   if (!cpt.ok) return arret(cpt.code === 'stockage' ? 'stockage' : 'plafond', { raison: cpt.code === 'stockage' ? RAISON_STOCKAGE : `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` });
   let publie = false;
   const rendre = async () => { if (!publie && cpt.at) await rendreActions(cleCompte, cpt.at, 1); };
@@ -30296,7 +30334,7 @@ async function retraitLbcAuto(id, quoi) {
     const secu = await secuGeste('leboncoin', compte, 'autre', 'auto');
     if (secu) return { accepte: false, code: secu.code || 'secu' };
     const cpt = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);
-    if (!cpt.ok) return { accepte: false, code: cpt.code === 'stockage' ? 'stockage' : 'plafond' };
+    if (!cpt.ok) return { accepte: false, code: cpt.code === 'stockage' || cpt.code === 'abonnement' ? cpt.code : 'plafond' };
     const depuisLbc = Number(cpt.at) || (Date.now() - 5);
     const g = await gesteLbcInterface(quoi, compte, url, { id }, 60000);
     return await issueRetraitLbc(quoi, g, { id, compte, depuisLbc, autreCompte: () => ({ accepte: false, code: 'autre-compte' }) });
@@ -34181,6 +34219,7 @@ async function envoyerLotFavori(o, msg, receiver) {
   const ouv = await interfaceVinted(acc, 'favoriOuvrir', { lien, itemId: premier.itemId, receiverId: receiver });
   if (!ouv || !ouv.ok || !ouv.conv) { noterDiag('lot_ouverture_' + (ouv && (ouv.rienParti ? 'rien' : ouv.incertain ? 'incertain' : ouv.status)) ); return { ok: false, code: ouv && ouv.incertain ? 'incertain' : 'ouverture', raison: ouv && ouv.incertain ? 'La conversation ne s’est peut-être pas ouverte : regarde sur Vinted (rien ne sera renvoyé).' : 'La conversation n’a pas pu s’ouvrir : rien n’est parti.' }; }
   const c2 = await compterAction(o.uid, ACTIONS_MAX_HEURE - RESERVE_GESTES);
+  if (!c2.ok && c2.code === 'abonnement') return { ok: false, code: 'abonnement', raison: RAISON_ABONNEMENT };   // 5.453.0
   if (!c2.ok) return { ok: false, code: 'plafond', raison: 'Plafond d’actions de l’heure atteint : la conversation est ouverte, le message n’est pas parti.' };
   const r = await interfaceVinted(acc, 'message', { conv: ouv.conv, texte });
   const etat = etatGesteVinted(r);
@@ -39339,6 +39378,7 @@ async function publierFicheSiteBrut(msg) {
     if (secu) return { accepte: false, code: secu.code, raison: secu.error };
     if (site === 'leboncoin') { const fr = await pauseLbcMsg(); if (fr) return { accepte: false, code: 'lbc-pause', raison: 'Leboncoin a demandé de ralentir — rien n’est parti, réessaie plus tard' }; }
     const cpt = await compterAction((site === 'leboncoin' ? 'lbc:' : 'vc:') + o.compte, ACTIONS_MAX_HEURE);
+    if (!cpt.ok && cpt.code === 'abonnement') return { accepte: false, code: 'abonnement', raison: RAISON_ABONNEMENT };   // 5.453.0
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
     ad.account = o.compte; ad.publier = true;
@@ -40198,6 +40238,7 @@ async function repondreVestiaire(msg) {
     const secuVc = await secuGeste('vestiaire', o.compte, 'reponse', 'clic');
     if (secuVc) return { accepte: false, code: secuVc.code, raison: secuVc.error };
     const cpt = await compterAction('vc:' + o.compte, ACTIONS_MAX_HEURE);
+    if (!cpt.ok && cpt.code === 'abonnement') return { accepte: false, code: 'abonnement', raison: RAISON_ABONNEMENT };   // 5.453.0
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Vestiaire cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
     const depuis = Number(cpt.at) || (Date.now() - 5);   // SES places (X8)
@@ -40391,6 +40432,7 @@ async function repondreOffreVestiaire(msg) {
     const secuVo = await secuGeste('vestiaire', ot.compte, 'offre', 'clic');
     if (secuVo) return { accepte: false, code: secuVo.code, raison: secuVo.error };
     const cpt = await compterAction('vc:' + ot.compte, ACTIONS_MAX_HEURE);
+    if (!cpt.ok && cpt.code === 'abonnement') return { accepte: false, code: 'abonnement', raison: RAISON_ABONNEMENT };   // 5.453.0
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Vestiaire cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
     const depuis = Number(cpt.at) || (Date.now() - 5);
@@ -40635,7 +40677,7 @@ async function deroulerAimesVc() {
       const sg = await secuGeste('vestiaire', ot.compte, 'favori', 'serie');
       if (sg) { await finir('arret', sg.error || 'sécurité du compte'); break; }
       const cpt = await compterAction('vc:' + ot.compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);
-      if (!cpt.ok) { await finir('arret', cpt.code === 'stockage' ? RAISON_STOCKAGE : `déjà ${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions sur ce compte Vestiaire cette heure-ci`); break; }
+      if (!cpt.ok) { await finir('arret', cpt.code === 'abonnement' ? RAISON_ABONNEMENT : cpt.code === 'stockage' ? RAISON_STOCKAGE : `déjà ${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions sur ce compte Vestiaire cette heure-ci`); break; }
       await noterGesteAuto('vc:' + ot.compte, 'favori');
       const depuis = Number(cpt.at) || (Date.now() - 5);
       // « Une fois » : posé AVANT l'envoi (un worker tué au milieu ne renverra pas) ; la file avance aussi avant.
@@ -40770,6 +40812,7 @@ async function baisserPrixVestiaire(msg) {
     const secuBp = await secuGeste('vestiaire', ot.compte, 'baisse', 'serie');
     if (secuBp) return { accepte: false, code: secuBp.code, raison: secuBp.error };
     const cpt = await compterAction('vc:' + ot.compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);
+    if (!cpt.ok && cpt.code === 'abonnement') return { accepte: false, code: 'abonnement', raison: RAISON_ABONNEMENT };   // 5.453.0
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions sur ce compte Vestiaire cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
     const depuis = Number(cpt.at) || (Date.now() - 5);
@@ -40992,6 +41035,7 @@ async function repondreLeboncoin(msg, opts = {}) {
     if (!url || !url.includes(conv)) return { accepte: false, code: 'pas-rejouable', raison: "la page où tu as répondu ne porte pas la conversation dans son adresse — VRM ne pourrait pas vérifier le destinataire : réponds sur Leboncoin, rien n'est parti" };
     const plafondR = serie ? ACTIONS_MAX_HEURE - RESERVE_GESTES : ACTIONS_MAX_HEURE;
     const cpt = await compterAction('lbc:' + compte, plafondR);
+    if (!cpt.ok && cpt.code === 'abonnement') return { accepte: false, code: 'abonnement', raison: RAISON_ABONNEMENT };   // 5.453.0
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${plafondR} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
     const depuis = Number(cpt.at) || (Date.now() - 5);
@@ -42154,6 +42198,7 @@ async function pauseLbcDepuisApp(msg) {
     const url = adresseUiLbc(ui, { ad: id });
     if (!url) return { accepte: false, code: 'pas-appris', raison: raisonPasApprisLbc('pause') };
     const cptLbc = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);
+    if (!cptLbc.ok && cptLbc.code === 'abonnement') return { accepte: false, code: 'abonnement', raison: RAISON_ABONNEMENT };   // 5.453.0
     if (!cptLbc.ok && cptLbc.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cptLbc.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cptLbc.resteMs || 0) / 60000))} min` };
     const depuisLbc = Number(cptLbc.at) || (Date.now() - 5);
@@ -42261,6 +42306,7 @@ async function supprimeLbcDepuisApp(msg) {
     const url = adresseUiLbc(ui, { ad: id });
     if (!url) return { accepte: false, code: 'pas-appris', raison: raisonPasApprisLbc('supprime') };
     const cptLbc = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);
+    if (!cptLbc.ok && cptLbc.code === 'abonnement') return { accepte: false, code: 'abonnement', raison: RAISON_ABONNEMENT };   // 5.453.0
     if (!cptLbc.ok && cptLbc.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cptLbc.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cptLbc.resteMs || 0) / 60000))} min` };
     const depuisLbc = Number(cptLbc.at) || (Date.now() - 5);
@@ -42397,6 +42443,7 @@ async function baisserPrixLbc(msg) {
     const url = adresseUiLbc(ui, { ad: id });
     if (!url || !url.includes(id)) return { accepte: false, code: 'pas-rejouable', raison: "la page où tu as changé le prix ne porte pas l'annonce dans son adresse — VRM ne pourrait pas vérifier qu'il est sur la bonne fiche : change-le sur Leboncoin, rien n'est parti" };
     const cpt = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);
+    if (!cpt.ok && cpt.code === 'abonnement') return { accepte: false, code: 'abonnement', raison: RAISON_ABONNEMENT };   // 5.453.0
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
     const depuis = Number(cpt.at) || (Date.now() - 5);

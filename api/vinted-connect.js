@@ -20,7 +20,6 @@ import { sbCle } from './_lib/cle.js';
 import { vendeurExige } from './_lib/session.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 import { corsExtension } from './_lib/cors-extension.js';
-import { accesVendeur } from './_lib/abonnement.js';
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 // ⚠️⚠️ (9 nov., défaut #5, décision de Julien) C'EST ICI, ET SEULEMENT ICI,
 //    QU'UN COMPTE VINTED NEUF SE RELIE. La migration 029 interdit à l'API de la
@@ -210,9 +209,12 @@ export default async function handler(req, res) {
   if (!u) return;
   // (7 nov.) Sans clé de service, la clé publique ne voit rien sous RLS : 503 dit, jamais « rien à faire ».
   if (repondreSansCleService(res)) return;
-  // La base refuse toute écriture à qui n'a plus accès (027) : la clé de service
-  // ne doit pas la contourner. « Pas su » (null) ne coupe pas (abonnement.js).
-  if ((await accesVendeur(u.id)) === false) { res.status(402).json({ ok: false, raison: 'abonnement', error: "Ton abonnement VRM n'est plus actif." }); return; }
+  // (25 nov., décision de Julien : « Tu peux directement faire la lecture et tu floutes tant que la
+  // personne n'a pas d'abonnement ») RELIER un compte Vinted est le DÉBUT de la lecture : permis sans
+  // abonnement, comme la base le permet depuis la 050 (`vinted_accounts` : WITH CHECK true ; la
+  // suppression exige toujours l'accès). Ce que la liaison ouvre reste coupé sans abonnement : le
+  // relais ne fait que LIRE (vinted-proxy), notifications et widget sont fermés (`accesVendeur`),
+  // et l'extension n'agit pas pour un compte coupé (`compterActionUn`, code 'abonnement').
 
   let { refreshToken, accessToken, anonId, csrfToken, domain, source } = req.body || {};
   const str = (v) => (typeof v === 'string' ? v.trim() : '');
