@@ -160,8 +160,8 @@ export function FeuilleFilleul({ filleul: f, onFermer }) {
         </Groupe>
         <Groupe titre={tr('parrain.fl.detail.paiements')} attrs={{ 'data-filleul-paiements': (f.paiements || []).length }}>
           {!(f.paiements || []).length ? <Rangee titre={tr('parrain.fl.detail.aucun')}/>
-            : [...f.paiements].reverse().map((x, i) => (
-              <Rangee key={i} titre={jour(x.payeLe)} sousTitre={[tr('parrain.fl.detail.paye', { m: eur(x.payeCentimes) }), tr('parrain.etat.' + (ETAT_CLE[x.etat] || 'attente')), x.etat === 'attente' ? tr('parrain.historique.du', { date: jour(x.dueLe) }) : ''].filter(Boolean).join(' · ')}
+            : [...f.paiements].reverse().map((x) => (
+              <Rangee key={`${x.payeLe}|${x.payeCentimes}|${x.dueLe}`} titre={jour(x.payeLe)} sousTitre={[tr('parrain.fl.detail.paye', { m: eur(x.payeCentimes) }), tr('parrain.etat.' + (ETAT_CLE[x.etat] || 'attente')), x.etat === 'attente' ? tr('parrain.historique.du', { date: jour(x.dueLe) }) : ''].filter(Boolean).join(' · ')}
                 valeur={eur(x.partCentimes)} attrs={{ 'data-paiement': x.etat }}/>
             ))}
         </Groupe>
@@ -453,8 +453,8 @@ export default function EcranParrainage({ fetcher = fetch }) {
             {!groupes.length ? <Groupe titre={tr('parrain.historique.titre')}><Rangee titre={tr('parrain.historique.vide')}/></Groupe>
               : groupes.map((gm, i) => (
                 <Groupe key={gm.mois} titre={i === 0 ? `${tr('parrain.historique.titre')} · ${libelleMois(gm.mois)}` : libelleMois(gm.mois)}>
-                  {gm.lignes.map((h, k) => (
-                    <Rangee key={k} titre={tr('parrain.historique.ligne', { n: h.filleul || '—' })}
+                  {gm.lignes.map((h) => (
+                    <Rangee key={`${h.filleul}|${h.dueLe}|${h.centimes}|${h.etat}`} titre={tr('parrain.historique.ligne', { n: h.filleul || '—' })}
                       sousTitre={[tr('parrain.historique.du', { date: jour(h.dueLe) }), tr('parrain.etat.' + (ETAT_CLE[h.etat] || 'attente')), h.reduit ? tr('parrain.historique.reduit') : ''].filter(Boolean).join(' · ')}
                       valeur={eur(h.centimes)} attrs={{ 'data-gain': h.etat }}/>
                   ))}
@@ -483,6 +483,6 @@ function etapes(regle) {
     { ic: 'euro', t: tr('parrain.etapes.3', { pct: regle.pourcent }) },
   ];
   return e.map((x, i) => (
-    <li key={i} className="vrm-pr-etape"><span className="vrm-pr-etape-ic" aria-hidden="true"><Icon name={x.ic} size={20}/></span><span className="vrm-pr-etape-n" aria-hidden="true">{i + 1}</span><span className="vrm-pr-etape-t">{x.t}</span></li>
+    <li key={x.ic} className="vrm-pr-etape"><span className="vrm-pr-etape-ic" aria-hidden="true"><Icon name={x.ic} size={20}/></span><span className="vrm-pr-etape-n" aria-hidden="true">{i + 1}</span><span className="vrm-pr-etape-t">{x.t}</span></li>
   ));
 }
