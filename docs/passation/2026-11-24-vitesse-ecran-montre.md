@@ -251,3 +251,28 @@ AB de confirmation A contre B + (b), 5 passes, **charge 2,9 → 6,3 (propre)** :
 ⚠️ Argent (1re visite) +356 ms en médiane, 3 paires sur 5 plus lentes : pas étudié.
 `chiffres-volume` A contre B + (b), lancés ensemble : 35/35, 12/12 identiques. Garde `calculs-ecran-montre` sur le build
 final (avec `main`) : verte.
+
+### 8 quater. Argent (25 nov., demande du coordinateur : +356 ms en médiane sur l'AB de §8 ter)
+Diagnostic A contre B (1 passe chacun, `LECTURES=300`, `CALCULS=deps`, profil `visite1:compta`, compteur de rendus par
+instance de `Comptabilite` posé dans des builds de diagnostic seulement) :
+- les **mêmes 21 lectures** à la 1re visite d'Argent, dans le même ordre (aucun relevé `vinted_suivi_*` : ils sont finis
+  depuis Annonces) ; B prêt à +1 587 ms, A à +2 018 ms sur cette passe ;
+- **aucun gros calcul** fait pendant la visite, ni dans A ni dans B. Sur UNE passe sur deux, les trois instances cachées
+  d'Achats se redessinent 2 à 3 fois pendant Argent (et `cartesColis` est refait une fois, 23 ms) : c'est l'arrivée des
+  achats relus (`orders_purchased`, lue dans A comme dans B), selon l'heure d'arrivée. Pas une lecture ni un calcul en plus.
+Aucune cause propre à cette branche, donc pas de changement de code. Nouvel AB, 7 passes alternées (charge 8,6 au départ,
+⚠️ montée à 15–16 sur les passes 4 à 7) :
+
+| 1re visite | A (7 passes) | B (7 passes) | médiane A → B | écart par paire (B − A) |
+|---|---|---|---|---|
+| **Argent** | 1 564 · 1 459 · 1 996 · 1 732 · 1 568 · 1 808 · 1 399 | 1 396 · 1 266 · 1 796 · 1 583 · 2 169 · 1 496 · 1 429 | **1 568 → 1 496** | −168 −193 −200 −149 +601 −312 +30 |
+| **Achats** | 3 783 · 5 326 · 4 729 · 7 347 · 5 229 · 6 707 · 4 848 | 3 360 · 3 420 · 3 077 · 4 251 · 4 379 · 4 715 · 4 378 | **5 229 → 4 251** | −423 −1 906 −1 652 −3 096 −850 −1 992 −470 |
+| à froid | 7 785 · 8 348 · 7 764 · 8 772 · 11 117 · 9 468 · 8 312 | 7 904 · 7 980 · 9 253 · 8 747 · 8 340 · 8 714 · 10 196 | 8 348 → 8 714 | +119 −368 +1 489 −25 −2 777 −754 +1 884 |
+| Annonces | 4 639 · 3 284 · 3 240 · 4 820 · 3 885 · 4 586 · 4 912 | 3 586 · 4 098 · 4 438 · 4 900 · 4 798 · 4 095 · 4 980 | 4 586 → 4 438 | −1 053 +814 +1 198 +80 +913 −491 +68 |
+| Ventes | 2 534 · 2 560 · 1 910 · 3 340 · 3 317 · 2 616 · 3 883 | 2 844 · 1 533 · 2 005 · 3 877 · 3 189 · 3 164 · 3 296 | 2 616 → 3 164 | +310 −1 027 +95 +537 −128 +548 −587 |
+| Ma journée | 2 097 · 1 619 · 1 639 · 2 458 · 1 951 · 2 131 · 1 307 | 1 615 · 1 679 · 2 277 · 3 483 · 4 253 · 2 573 · 1 988 | 1 951 → 2 277 | −482 +60 +638 +1 025 +2 302 +442 +681 |
+
+Argent est maintenant ≤ A (5 paires sur 7). ⚠️ Ma journée (1re visite, la dernière du parcours) est plus lente sur 6 paires sur 7
+ici, surtout sous charge (passes 4–7). L'AB propre de §8 ter (charge < 7) disait 1 523 → 1 577, mélangé. Au bruit de la machine
+partagée, Ventes, Ma journée et à froid changent de signe d'un AB à l'autre. Seul Achats tient dans tous les AB (de −0,5 à −1,2 s).
+Code inchangé depuis §8 ter : `chiffres-volume` 35/35 · 12/12 et la garde verte valent toujours.
