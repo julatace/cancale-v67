@@ -133,7 +133,7 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
           {sansBarres || !barres.some((x) => x.v != null) ? null : (
             <ol className="n-arg-mois6" aria-label={tr('v2.ar.graphe')} data-arg-mois={String(barres.length)}
               data-v2-argent-barres={barres.map((x) => cents(x.v)).join(',')} data-v2-argent-barre-v={courant ? cents(courant.v) : ''}>
-              {barres.map((x) => {
+              {barres.map((x, i) => {
                 const h = x.v > 0 && max > 0 ? Math.max(2, Math.round((x.v / max) * 100)) : 0;
                 return (
                   <li key={x.cle} className="n-arg-m6" data-arg-m6={x.cle} data-arg-m6-v={cents(x.v)} data-courant={x.courant ? '1' : undefined}
