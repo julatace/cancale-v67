@@ -38202,7 +38202,7 @@ function AppCoeur() {
           } else {
             etat = type==='vente' ? etapeVente(o, { poste: posteMain }).label : type==='achat' ? etapeAchat(o, null).label : ({ available:'À retirer', retour:'Reparti', delivered:'Retiré' }[c.status] || (c.lieu ? String(c.lieu).split(',')[0] : (c.carrier || '')));
             vignette = type === 'colis' ? thumb(null, <LogoTransporteur cle={carrierKey(c.carrier || '')} taille={26} repli={<Icon name="box" size={18} style={{color:C.muted}}/>}/>) : thumb(e.photo || (o ? orderPhoto(o) : null));
-            titre = e.titre || (type==='colis' ? (c.carrier ? `Colis ${c.carrier}` : 'Colis') : '(sans titre)');
+            titre = e.titre || (type==='colis' ? (c.carrier ? `Colis ${(CARRIERS[carrierKey(c.carrier)] || {}).name || c.carrier}` : 'Colis') : '(sans titre)');   // (24 nov., parcours iPhone) le NOM du transporteur, jamais son identifiant (« Colis mondial_relay »)
             info = [etat, e.numero ? `N°${e.numero}` : '', e.date ? jourCourt(e.date) : '', type !== 'colis' && e.montants && e.montants[0] ? prixCourt(e.montants[0] / 100) : ''].filter(Boolean).join(' · ');
           }
           return (

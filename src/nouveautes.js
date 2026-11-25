@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (24 nov., parcours-iphone — Julien : « elle bug trop encore ») docs/passation/2026-11-24-parcours-iphone.md
+  { id: 'comptoir-retour', date: '2026-11-24', titre: 'Code au comptoir : le retour le ferme', phrase: 'Sur iPhone, le geste retour ne quitte plus VRM.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (24 nov., visuel-annonces — Julien : « toute l'application visuelle », « sans latence ») docs/passation/2026-11-24-visuel-annonces.md
   { id: 'visuel-annonces', date: '2026-11-24', titre: 'Annonces en grandes photos, comme un inventaire', phrase: 'Le N°, le compte, les vues et favoris sur chaque photo.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (24 nov., visuel-argent — Julien : « toute l'application visuelle », « sans latence ») docs/passation/2026-11-24-visuel-argent.md
