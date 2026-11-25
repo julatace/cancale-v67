@@ -37,15 +37,29 @@ const HISTO = [
   { filleul: 2, mois: mois(1), payeLe: mois(1) + '-08', dueLe: mois(1) + '-22', centimes: 339, brutCentimes: 339, reduit: false, etat: 'credite' },
 ];
 const CHIFFRES = { filleulsPayants: 3, filleulsAyantPaye: 4, moisCentimes: 877, totalCentimes: 5145, attenteCentimes: 478, crediteCentimes: 4667, aCrediterCentimes: 0, verseCentimes: 0, aVerserCentimes: 0, tropVerseCentimes: 0, seuilCentimes: 2000, virementPret: false, parMois: PAR_MOIS, historique: HISTO };
+const pay = (le, paye, part, etat) => ({ payeLe: le, dueLe: le, payeCentimes: paye, partCentimes: part, etat, raison: null });
+const FILLEULS = [
+  { rang: 1, nom: null, etat: 'paie', plan: 'solo', inscritLe: '2026-09-02', depuis: mois(2), jusquau: null, le: null, moisPayes: 3, gagneCentimes: 1017, prochainCentimes: 339, pourraitCentimes: null,
+    paiements: [pay(mois(2) + '-05', 1699, 339, 'credite'), pay(mois(1) + '-05', 1699, 339, 'credite'), pay(mois(0) + '-05', 1699, 339, 'attente')] },
+  { rang: 2, nom: 'Léa', etat: 'paie', plan: 'pro', inscritLe: '2026-10-09', depuis: mois(1), jusquau: null, le: null, moisPayes: 2, gagneCentimes: 798, prochainCentimes: 399, pourraitCentimes: null,
+    paiements: [pay(mois(1) + '-12', 1999, 399, 'credite'), pay(mois(0) + '-12', 1999, 399, 'attente')] },
+  { rang: 3, nom: null, etat: 'essai', plan: 'pro', inscritLe: '2026-11-19', depuis: null, jusquau: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10), le: null, moisPayes: 0, gagneCentimes: 0, prochainCentimes: null, pourraitCentimes: 399, paiements: [] },
+  { rang: 4, nom: null, etat: 'inscrit', plan: null, inscritLe: '2026-11-20', depuis: null, jusquau: null, le: null, moisPayes: 0, gagneCentimes: 0, prochainCentimes: null, pourraitCentimes: 339, paiements: [] },
+  { rang: 5, nom: null, etat: 'arrete', plan: 'solo', inscritLe: '2026-08-20', depuis: null, jusquau: null, le: '2026-10-28', moisPayes: 1, gagneCentimes: 339, prochainCentimes: null, pourraitCentimes: null, paiements: [pay('2026-09-28', 1699, 339, 'credite')] },
+  { rang: 6, nom: null, etat: 'rembourse', plan: 'solo', inscritLe: '2026-10-01', depuis: null, jusquau: null, le: null, moisPayes: 0, gagneCentimes: 0, prochainCentimes: null, pourraitCentimes: null, paiements: [pay('2026-10-05', 0, 0, 'annule')] },
+];
+const POTENTIEL = { estimation: true, moisCentimes: 738, siTousCentimes: 738 + 399 + 339, nPayants: 2, nPossibles: 2 };
 const PARRAIN = {
   ok: true, installe: true, ouvert: true, code: CODE, modeTest: false, moisCentimes: 1699, semaineCentimes: 396, regle: REGLE, nom: 'Julie',
   suivi: { inscrits: 4, payes: 3, moisOfferts: 1, enAttente: 0 },
   filleuls: [{ rang: 1, inscritLe: '2026-10-02', etat: 'offert' }, { rang: 2, inscritLe: '2026-10-09', etat: 'paye' }, { rang: 3, inscritLe: '2026-11-02', etat: 'paye' }, { rang: 4, inscritLe: '2026-11-20', etat: 'inscrit' }],
-  filleul: null, gains: { installe: true, mode: 'credit', iban: null, chiffres: CHIFFRES },
+  filleul: null, gains: { installe: true, mode: 'credit', iban: null, chiffres: CHIFFRES, filleuls: FILLEULS, potentiel: POTENTIEL },
 };
-const VIDE = { ...PARRAIN, nom: null, suivi: { inscrits: 0, payes: 0, moisOfferts: 0, enAttente: 0 }, filleuls: [], gains: { installe: true, mode: 'credit', iban: null, chiffres: { ...CHIFFRES, filleulsPayants: 0, filleulsAyantPaye: 0, moisCentimes: 0, totalCentimes: 0, attenteCentimes: 0, crediteCentimes: 0, parMois: PAR_MOIS.map((x) => ({ ...x, centimes: 0, n: 0 })), historique: [] } } };
-const FILLEUL = { ...VIDE, filleul: { parraine: true, moisOffert: false, paye: false, offertPar: 'Marc', attendVinted: false } };
-const ADMIN = { ok: true, installe: true, totalCentimes: 4268, seuilCentimes: 2000, parrains: [
+const VIDE = { ...PARRAIN, nom: null, suivi: { inscrits: 0, payes: 0, moisOfferts: 0, enAttente: 0 }, filleuls: [], gains: { installe: true, mode: 'credit', iban: null, filleuls: [], potentiel: { estimation: true, moisCentimes: 0, siTousCentimes: 0, nPayants: 0, nPossibles: 0 }, chiffres: { ...CHIFFRES, filleulsPayants: 0, filleulsAyantPaye: 0, moisCentimes: 0, totalCentimes: 0, attenteCentimes: 0, crediteCentimes: 0, parMois: PAR_MOIS.map((x) => ({ ...x, centimes: 0, n: 0 })), historique: [] } } };
+const FILLEUL = { ...VIDE, filleul: { parraine: true, moisOffert: false, paye: false, offertPar: 'Marc', attendVinted: false }, montrer: { montrer: false, nom: null } };
+const ADMIN = { ok: true, installe: true, totalCentimes: 4268, seuilCentimes: 2000,
+  tous: [{ parrain: 'aaaaaaaa-0000-4000-8000-000000000001', email: 'camille@exemple.test', nom: 'Camille', filleuls: 6, payants: 2, gagneCentimes: 2154 }, { parrain: 'aaaaaaaa-0000-4000-8000-000000000003', email: 'sam@exemple.test', nom: 'Sam', filleuls: 2, payants: 1, gagneCentimes: 678 }],
+  parrains: [
   { parrain: 'aaaaaaaa-0000-4000-8000-000000000001', centimes: 2034, pret: true, depuis: '2026-10-31', gains: 6, email: 'camille@exemple.test', nom: 'Camille', iban: 'FR7630006000011234567890189', titulaire: 'Camille Martin' },
   { parrain: 'aaaaaaaa-0000-4000-8000-000000000002', centimes: 2234, pret: true, depuis: '2026-11-04', gains: 7, email: 'leo@exemple.test', nom: null, iban: null, titulaire: null },
   { parrain: 'aaaaaaaa-0000-4000-8000-000000000003', centimes: 678, pret: false, depuis: '2026-11-12', gains: 2, email: 'sam@exemple.test', nom: 'Sam', iban: null, titulaire: null },
@@ -117,6 +131,7 @@ async function ouvrir(nav, { chemin = '/?tab=parrainage', largeur = 390, sombre 
     if (/mode=partenaires/.test(u)) {
       appels.push({ m, u, corps });
       if (/vue=parrains/.test(u)) return json(ADMIN);
+      if (/vue=parrain&/.test(u)) return json({ ok: true, parrain: 'aaaaaaaa-0000-4000-8000-000000000001', email: 'camille@exemple.test', nom: 'Camille', vue: { ...PARRAIN.gains, filleuls: FILLEULS.map((f, i) => ({ ...f, nom: `filleul${i + 1}@exemple.test` })) } });
       if (m === 'POST') return json({ ok: true });
       return json({ ok: true, installe: true, partenaires: [], commissionCentimes: 300, delaiJours: 14, stripe: true, au: new Date().toISOString() });
     }
@@ -131,6 +146,7 @@ async function ouvrir(nav, { chemin = '/?tab=parrainage', largeur = 390, sombre 
           etat.gains.iban = 'FR76 •••• 0189'; return json({ ok: true, iban: 'FR76 •••• 0189' });
         }
         if (b.action === 'nom') { etat.nom = b.nom || null; return json({ ok: true, nom: etat.nom }); }
+        if (b.action === 'montrer') { etat.montrer = { montrer: b.montrer === true, nom: b.montrer ? b.nom : null }; return json({ ok: true, montrer: b.montrer === true, nom: etat.montrer.nom }); }
         return json({ ok: false }, 400);
       }
       if (tenue) await tenue;
@@ -194,6 +210,71 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await ctx.close();
       });
     }
+
+    console.log('\n── E10 tous les filleuls, le potentiel (estimé), le détail');
+    for (const sombre of [false, true]) {
+      const s = sombre ? 'sombre' : 'clair';
+      await essaie('filleuls ' + s, async () => {
+        const { ctx, pg, erreurs } = await ouvrir(nav, { sombre });
+        await attendre(pg, '[data-filleuls]');
+        const r = await pg.evaluate(() => {
+          const lignes = [...document.querySelectorAll('[data-filleul-rang]')].map((x) => ({ e: x.getAttribute('data-filleul'), t: x.innerText.replace(/\s+/g, ' ') }));
+          const pot = document.querySelector('[data-estimation="potentiel"]'), tous = document.querySelector('[data-estimation="si-tous"]');
+          const total = document.querySelector('[data-parrainage="ouvert"]').getAttribute('data-total-centimes');
+          return { lignes, pot: pot && { c: pot.getAttribute('data-centimes'), t: pot.innerText.replace(/\s+/g, ' ') }, tous: tous && { c: tous.getAttribute('data-centimes'), t: tous.innerText.replace(/\s+/g, ' ') }, total };
+        });
+        dit(r.lignes.map((x) => x.e).join(',') === 'paie,paie,essai,inscrit,arrete,rembourse', `(${s}) une ligne PAR filleul : paie · paie · en essai · inscrit · a arrêté · remboursé`, r.lignes.map((x) => x.e).join(','));
+        dit(/Filleul 1/.test(r.lignes[0].t) && /Paie depuis/.test(r.lignes[0].t) && /\+3,39 € le mois prochain/.test(r.lignes[0].t), '  « Filleul 1 · Paie depuis … · Solo · +3,39 € le mois prochain »', r.lignes[0].t);
+        dit(/^Léa/.test(r.lignes[1].t) && /Pro/.test(r.lignes[1].t) && /\+3,99 €/.test(r.lignes[1].t), '  le prénom QU’IL a choisi de montrer (Léa, Pro, +3,99 €)', r.lignes[1].t);
+        dit(/En essai jusqu’au/.test(r.lignes[2].t) && /~3,99 €\/mois possible/.test(r.lignes[2].t) && /~3,39 €\/mois possible/.test(r.lignes[3].t) && /A arrêté le/.test(r.lignes[4].t), '  en essai jusqu’au … (~3,99 €/mois possible) · inscrit (~3,39 €) · a arrêté le …');
+        dit(r.pot && r.pot.c === '738' && /estimé/.test(r.pot.t) && /~7,38/.test(r.pot.t) && r.tous && r.tous.c === '1476' && /estimé/.test(r.tous.t), '« Potentiel / mois ~7,38 € · estimé » et « Si tous payaient ~14,76 € · estimé »', JSON.stringify([r.pot, r.tous]));
+        dit(r.total === '5145', '  le gagné (51,45 €) reste le gagné : l’estimation n’y est jamais ajoutée', r.total);
+        await capture(pg, `filleuls-liste-390-${s}`);
+        await pg.click('[data-filleul-rang="1"]');
+        const det = await attendre(pg, '[data-filleul-detail="1"] [data-paiement]', 5000);
+        const d = det ? await pg.evaluate(() => ({ n: document.querySelectorAll('[data-filleul-detail="1"] [data-paiement]').length, t: document.querySelector('[data-filleul-detail="1"]').innerText.replace(/\s+/g, ' ') })) : null;
+        dit(d && d.n === 3 && /payé 16,99/.test(d.t) && /crédité/.test(d.t) && /en attente/.test(d.t) && /Gagné grâce à ce filleul/.test(d.t), '  toucher ⇒ la feuille détail : ses 3 paiements (payé, ta part, crédité / en attente)', d && d.t.slice(0, 160));
+        await pg.waitForTimeout(400);
+        await capture(pg, `filleul-detail-390-${s}`, false);
+        dit(!erreurs.length, '  aucune erreur de page', erreurs.join('|'));
+        await ctx.close();
+      });
+      await essaie('option filleul ' + s, async () => {
+        const { ctx, pg, appels } = await ouvrir(nav, { sombre, parrain: FILLEUL });
+        const vu = await attendre(pg, '[data-parrainage-montrer="0"]');
+        const coche = await pg.evaluate(() => { const i = document.querySelector('[data-parrainage-montrer-interrupteur]'); return i ? i.checked : null; });
+        dit(vu && coche === false, `(${s}) côté filleul : « Montrer mon prénom à mon parrain », DÉCOCHÉ par défaut`);
+        await capture(pg, `filleul-option-390-${s}`);
+        await pg.click('[data-parrainage-montrer-interrupteur]');
+        await attendre(pg, '[data-parrainage-montrer-form] input', 4000);
+        await pg.fill('[data-parrainage-montrer-form] input', 'Inès');
+        await capture(pg, `filleul-option-feuille-390-${s}`, false);
+        await pg.click('[data-parrainage-montrer-enregistrer]'); await pg.waitForTimeout(500);
+        const post = appels.filter((a) => a.m === 'POST').map((a) => JSON.parse(a.corps));
+        const apres = await pg.evaluate(() => { const g = document.querySelector('[data-parrainage-montrer]'); return g && g.getAttribute('data-parrainage-montrer'); });
+        dit(post.length === 1 && post[0].action === 'montrer' && post[0].montrer === true && post[0].nom === 'Inès' && apres === '1', '  il l’active : POST { montrer: true, nom: « Inès » } — rien avant son geste', JSON.stringify(post));
+        await ctx.close();
+      });
+    }
+    await essaie('inscription : la case', async () => {
+      const { ctx, pg } = await ouvrir(nav, { session: false, chemin: `/r/${CODE}` });
+      const vu = await attendre(pg, '[data-parrain-montrer]');
+      const c = vu ? await pg.evaluate(() => document.querySelector('[data-parrain-montrer]').checked) : null;
+      dit(vu && c === false, 'à l’inscription par lien : la case « Montrer mon prénom à mon parrain », décochée par défaut');
+      await capture(pg, 'filleul-inscription-option-390-clair', false);
+      await ctx.close();
+    });
+    await essaie('admin : tous les parrains', async () => {
+      const { ctx, pg } = await ouvrir(nav, { abo: { ...ABO, proprietaire: true } });
+      await attendre(pg, '[data-parrains-tous]');
+      await pg.click('[data-parrain-tous="aaaaaaaa-0000-4000-8000-000000000001"]');
+      const vu = await attendre(pg, '[data-parrain-detail] [data-filleul-rang]', 6000);
+      const t = vu ? await pg.innerText('[data-parrain-detail]') : '';
+      dit(vu && /filleul1@exemple\.test/.test(t) && /Paie depuis/.test(t), 'Julien : « Tous les parrains » ⇒ la même vue, chaque filleul nommé (lui voit tout)', t.replace(/\s+/g, ' ').slice(0, 120));
+      await pg.waitForTimeout(400);
+      await capture(pg, 'admin-parrain-detail-390-clair', false);
+      await ctx.close();
+    });
 
     console.log('\n── E2 le choix : virement, IBAN masqué');
     for (const sombre of [false, true]) {

@@ -396,6 +396,16 @@ const facture = (client, o = {}) => {
     const f6 = nouveauCompte(806); db.t.vinted_accounts.push({ owner: f6, vinted_user_id: '8006' });
     await appel({ method: 'POST', mode: 'parrainage', headers: session(f6), corps: { action: 'rattacher', code, montrer: true, nom: 'Noé' } });
     dit((await appel({ mode: 'parrainage', headers: session(P) })).corps.gains.filleuls.some((x) => x.nom === 'Noé'), 'coché à l’inscription par lien : le parrain lit « Noé »');
+    // L'export RGPD, des deux côtés : le parrain (filleuls anonymes, gains), le filleul (son choix).
+    const X = await import('file://' + path.join(RACINE, 'api', '_lib', 'export-rgpd.js'));
+    const cur = Buffer.from(JSON.stringify({ p: 'compte', a: '', m: 0 })).toString('base64url');
+    const exp = async (id) => { const e = await X.pageExport({ utilisateur: { id, email: COMPTES[id].email }, curseur: cur, url: 'https://lgonxzrzjcqthjtbdpzo.supabase.co', service: 'sb_secret_banc', fetcher: fetch }); const m = e.corps && e.corps.morceaux && e.corps.morceaux.find((x) => /compte\.json$/.test(x.nom)); return m ? JSON.parse(m.texte) : null; };
+    const eP = await exp(P);
+    const dP = eP && eP.parrainage && eP.parrainage.tes_filleuls_detail;
+    dit(Array.isArray(dP) && dP.length >= 5 && dP[0].filleul === 'Filleul 1' && dP[0].mois_payes === 2 && !/secret@|77777777-0000-4000-8000-0000000008/.test(JSON.stringify(eP.parrainage)), 'export RGPD du parrain : ses filleuls (anonymes), mois payés, sa part', JSON.stringify(dP && dP[0]).slice(0, 160));
+    await appel({ method: 'POST', mode: 'parrainage', headers: session(F[1]), corps: { action: 'montrer', montrer: true, nom: 'Inès' } });
+    const eF = await exp(F[1]);
+    dit(eF && eF.parrainage.montrer_prenom_au_parrain.montrer === true && eF.parrainage.montrer_prenom_au_parrain.prenom === 'Inès', 'export RGPD du filleul : son choix « montrer mon prénom » (Inès)', JSON.stringify(eF && eF.parrainage.montrer_prenom_au_parrain));
     // Julien voit tout, un autre non.
     dit((await appel({ mode: 'partenaires', headers: session(P), query: { vue: 'parrain', id: P } })).code === 403, 'la vue détaillée d’un parrain : 403 pour un autre que Julien');
     const adm = (await appel({ mode: 'partenaires', headers: session(JULIEN), query: { vue: 'parrain', id: P } })).corps;

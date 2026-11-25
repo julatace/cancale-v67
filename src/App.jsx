@@ -3036,7 +3036,9 @@ const authSignUp  = async (email, password) => {
   // confirmation ouvert sur un autre appareil ne le perd plus. Le serveur décide toujours tout.
   const parrain = codeParrainGarde();
   const partenaire = codePartenaireGarde(localStorage);   // (15 nov.) le code partenaire suit aussi le compte
-  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password, data: { langue: langueNavigateur(), ...(parrain ? { parrain } : {}), ...(partenaire ? { partenaire } : {}) } });
+  // (25 nov.) « Montrer mon prénom à mon parrain », coché à l'inscription (décoché par défaut) : suit le compte.
+  let montrerParrain = false; try { montrerParrain = !!parrain && localStorage.getItem('vrm_parrain_montrer') === '1'; } catch (_) {}
+  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password, data: { langue: langueNavigateur(), ...(parrain ? { parrain } : {}), ...(montrerParrain ? { parrain_montrer: true } : {}), ...(partenaire ? { partenaire } : {}) } });
   if (!r.ok) {
     if(r.captcha)return {ok:false,error:r.error};
     // On traduit les erreurs techniques de Supabase : « email rate limit
@@ -19421,6 +19423,8 @@ function AuthScreen() {
 .vrm-cx-parrain-ic{display:flex;flex:none;color:${C.accentTexte||C.accent};margin-top:1px}
 .vrm-cx-parrain b{display:block;font-weight:600;overflow-wrap:anywhere}
 .vrm-cx-parrain-texte{display:block;color:${C.muted};font-size:13px}
+.vrm-cx-parrain-montrer{display:flex;align-items:center;gap:8px;min-height:44px;margin-top:4px;font-size:14px;color:${C.text};cursor:pointer}
+.vrm-cx-parrain-montrer input{width:20px;height:20px;margin:0;flex:none}
 .vrm-cx-champ>span:first-child{display:block;margin-bottom:6px}
 .vrm-cx-secret{position:relative;display:block}
 .vrm-cx-secret button{position:absolute;right:4px;top:3px;min-height:44px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:${C.accentTexte||C.accent};font-size:13px;font-weight:600;font-family:inherit;cursor:pointer}
@@ -19532,7 +19536,10 @@ function AuthScreen() {
             <div role="note" data-parrain-offert={apercuParrain.nom||''} className="vrm-cx-parrain">
               <span className="vrm-cx-parrain-ic" aria-hidden="true"><Icon name="cadeau" size={20}/></span>
               <span><b>{apercuParrain.nom ? tr('auth.parrain.offertPar', { nom: apercuParrain.nom }) : tr('auth.parrain.offertVendeur')}</b>
-                <span className="vrm-cx-parrain-texte">{mode==='up' ? tr('auth.parrain.texte') : tr('auth.parrain.texteConnexion')}</span></span>
+                <span className="vrm-cx-parrain-texte">{mode==='up' ? tr('auth.parrain.texte') : tr('auth.parrain.texteConnexion')}</span>
+                {/* (25 nov.) Le filleul CHOISIT de montrer son prénom à son parrain — décoché par défaut. */}
+                {mode==='up' && <label className="vrm-cx-parrain-montrer"><input type="checkbox" data-parrain-montrer="" defaultChecked={(() => { try { return localStorage.getItem('vrm_parrain_montrer') === '1'; } catch (_) { return false; } })()}
+                  onChange={(e) => { try { if (e.target.checked) localStorage.setItem('vrm_parrain_montrer', '1'); else localStorage.removeItem('vrm_parrain_montrer'); } catch (_) {} }}/><span>{tr('auth.parrain.montrer')}</span></label>}</span>
             </div>
           )}
           {/* 11 octobre : on arrive ici depuis « Se connecter » dans l'extension.
@@ -19974,12 +19981,15 @@ function BandeauAbonnement({ setTab }) {
     let deja = false; try { deja = !!uidP && localStorage.getItem('vrm_parrain_tente_' + uidP) === '1'; } catch (_) {}
     if (!code && CODE_PARRAIN_RE.test(duCompte) && !deja) code = duCompte;
     if (!code || !(AUTH.session && AUTH.session.access_token)) return;
-    fetch('/api/compte?mode=parrainage', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'rattacher', code }) })
+    // (25 nov.) Son choix de l'inscription : montrer son prénom au parrain (le serveur le revalide).
+    let montrer = false; try { montrer = (AUTH.user && AUTH.user.user_metadata && AUTH.user.user_metadata.parrain_montrer === true) || localStorage.getItem('vrm_parrain_montrer') === '1'; } catch (_) {}
+    const prenomP = String(load('vrm_prenom', '') || '').trim().slice(0, 24);
+    fetch('/api/compte?mode=parrainage', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'rattacher', code, ...(montrer && prenomP ? { montrer: true, nom: prenomP } : {}) }) })
       .then(async (r) => {
         const j = await r.json().catch(() => null);
         if (r.status >= 500 || r.status === 401) return;
         try { localStorage.removeItem(CLE_PARRAIN); if (uidP) localStorage.setItem('vrm_parrain_tente_' + uidP, '1'); } catch (_) {}
-        if (r.ok && j && j.ok) toast('✓ Parrainage enregistré : un mois offert à ton premier paiement');
+        if (r.ok && j && j.ok) toast('✓ ' + tr('parrain.rattache.ok'));
         // (13 nov., lot 54) Un refus définitif est DIT une fois (« Tu ne peux pas être ton propre parrain. »…).
         else if (j && typeof j.message === 'string' && j.message) toast(j.message);
       }).catch(() => {});

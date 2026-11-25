@@ -73,6 +73,12 @@
 .vrm-pr-filleul-offre { font: var(--n-t-corps); color: var(--n-encre); }
 .vrm-pr-filleul-etat { font: var(--n-t-legende); color: var(--n-encre-2); }
 
+/* Tous les filleuls : la phrase d'état dans la feuille détail. */
+.vrm-pr-fl-etat { margin: 0 0 12px; font: var(--n-t-second); color: var(--n-encre-2); }
+.vrm-pr-bloc-filleul > .n-groupe { margin-top: -6px; }
+.vrm-pr-heros .n-heros-trio-pourquoi { display: block; text-decoration: none; }
+.vrm-pr-heros .n-heros-trio { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
 /* Côté Julien : « Parrains à verser ». */
 .vrm-pr-admin { display: flex; flex-direction: column; }
 .vrm-pr-admin-ligne { border-top: 1px solid var(--n-trait); padding-bottom: 12px; }

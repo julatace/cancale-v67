@@ -26,7 +26,7 @@
 import { sbCle } from './cle.js';
 import { fetchAvecDelai } from './fetch-delai.js';   // (12 nov.) chaque appel sortant a un délai
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
-import { chiffresParrain, modeActuel, ibanMasque } from './parrainage-regle.js';   // (25 nov.) le parrainage à 20 %
+import { chiffresParrain, modeActuel, ibanMasque, vueFilleuls } from './parrainage-regle.js';   // (25 nov.) le parrainage à 20 %
 
 // Lignes LOURDES : seul leur résumé part (motifs `like` de PostgREST).
 export const LOURDS = ['harvest_*_txn_*', 'harvest_*_label_*', 'email_bord_*', 'email_html_*', 'email_qpj_*', 'backup_*', 'lbc_catalogue', 'lbc_recon', 'harvest_*_seen_urls', 'harvest_*_wreq_*', 'harvest_*_pickup_points'];
@@ -128,7 +128,7 @@ export async function pageExport({ utilisateur, curseur, url, service, proprio =
   }
 
   // c.p === 'compte' : tout ce qui n'est pas dans app_data, en une page.
-  const [comptes, abo, code, parrain, filleul, preuves, signalements, gains, choix, iban, verses] = await Promise.all([
+  const [comptes, abo, code, parrain, filleul, preuves, signalements, gains, choix, iban, verses, lignesP, montrer] = await Promise.all([
     lire(url, service, `vinted_accounts?owner=eq.${o}&select=vinted_user_id,login,domain`, fetcher),
     lire(url, service, `abonnements?owner=eq.${o}&select=statut,plan,fin_periode,annule_fin_periode,mode_test,client_stripe`, fetcher),
     lire(url, service, `parrainage_codes?owner=eq.${o}&select=code`, fetcher),
@@ -141,8 +141,11 @@ export async function pageExport({ utilisateur, curseur, url, service, proprio =
     lire(url, service, `parrainage_choix?parrain=eq.${o}&select=mode,le&order=le.asc`, fetcher),
     lire(url, service, `parrainage_iban?parrain=eq.${o}&select=iban,titulaire,le`, fetcher),
     lire(url, service, `parrainage_versements?parrain=eq.${o}&select=montant_centimes,verse_le`, fetcher),
+    // (25 nov.) Ses filleuls (anonymes : « Filleul N », ordre d'inscription) et, s'il est filleul, son choix de montrer son prénom.
+    lire(url, service, `parrainages?parrain=eq.${o}&select=filleul,inscrit`, fetcher),
+    lire(url, service, `app_data?owner=eq.${o}&id=eq.vrm_parrainage_montrer&select=montrer:data->>montrer,nom:data->>nom,le:data->>le`, fetcher),
   ]);
-  if ([comptes, abo, code, parrain, filleul, preuves, signalements, gains, choix, iban, verses].some((x) => x === null)) return pasSu;
+  if ([comptes, abo, code, parrain, filleul, preuves, signalements, gains, choix, iban, verses, lignesP, montrer].some((x) => x === null)) return pasSu;
   const ch = chiffresParrain({ gains, choix, versements: verses, maintenant, limite: Infinity });
   const compte = {
     exporte_le: new Date(maintenant).toISOString(),
@@ -157,6 +160,10 @@ export async function pageExport({ utilisateur, curseur, url, service, proprio =
       reglement: { mode: modeActuel(choix, maintenant), choix_successifs: choix.map((c) => ({ mode: c.mode, le: c.le })), iban: iban[0] ? { iban_masque: ibanMasque(iban[0].iban), titulaire: iban[0].titulaire || null, le: iban[0].le || null } : null },
       tes_gains: { total_centimes: ch.totalCentimes, en_attente_centimes: ch.attenteCentimes, credite_centimes: ch.crediteCentimes, verse_centimes: ch.verseCentimes, a_verser_centimes: ch.aVerserCentimes,
         detail: ch.historique.map((x) => ({ filleul: x.filleul ? 'Filleul ' + x.filleul : null, mois: x.mois, paye_le: x.payeLe, du_le: x.dueLe, centimes: x.centimes, etat: x.etat })) },
+      tes_filleuls_detail: vueFilleuls({ lignes: lignesP, gains, choix, versements: verses, maintenant }).filleuls.map((f) => ({ filleul: 'Filleul ' + f.rang, inscrit_le: f.inscritLe, mois_payes: f.moisPayes, gagne_centimes: f.gagneCentimes,
+        paiements: f.paiements.map((x) => ({ paye_le: x.payeLe, paye_centimes: x.payeCentimes, ta_part_centimes: x.partCentimes, etat: x.etat })) })),
+      // Filleul : ton choix de montrer (ou non) ton prénom à ton parrain (décoché par défaut).
+      montrer_prenom_au_parrain: montrer[0] ? { montrer: String(montrer[0].montrer) === 'true', prenom: montrer[0].nom || null, le: montrer[0].le || null } : { montrer: false, prenom: null },
     },
     adresses_prouvees: preuves.map((p) => ({ adresse: p.adresse || null, le: p.updated_at || null })),
     signalements_envoyes: signalements.map((s) => { const d = sansSecrets(s.data || {}); delete d.de; return { id: s.id, le: s.updated_at || null, ...d }; }),

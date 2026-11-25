@@ -117,11 +117,101 @@ function FeuilleIban({ ouverte, onFermer, onFait }) {
   );
 }
 
+// ── TOUS LES FILLEULS (25 nov., Julien : « voir TOUS ses filleuls et tous les paiements possibles ») ──
+// Une ligne par filleul : « Filleul 3 » (ou le prénom QU'IL a choisi de montrer), son état, le gagné,
+// le mois prochain s'il paie, ce qu'il POURRAIT rapporter s'il ne paie pas encore (une estimation, dite).
+const moisCourt = (m) => (/^\d{4}-\d{2}$/.test(String(m || '')) ? dateLoc(new Date(m + '-15T12:00:00Z'), { month: 'short', year: 'numeric' }) : '');
+export function phraseFilleul(f) {
+  const plan = f.plan === 'pro' ? tr('parrain.plan.pro') : tr('parrain.plan.solo');
+  switch (f.etat) {
+    case 'paie': return f.depuis ? tr('parrain.fl.etat.paie', { mois: moisCourt(f.depuis), plan }) : tr('parrain.fl.etat.paieSans', { plan });
+    case 'essai': return f.jusquau ? tr('parrain.fl.etat.essai', { date: jour(f.jusquau) }) : tr('parrain.fl.etat.essaiSans');
+    case 'arrete': return f.le ? tr('parrain.fl.etat.arrete', { date: jour(f.le) }) : tr('parrain.fl.etat.arreteSans');
+    case 'rembourse': return tr('parrain.fl.etat.rembourse');
+    case 'refuse': return tr('parrain.fl.etat.refuse');
+    case 'inscrit': return tr('parrain.fl.etat.inscrit');
+    default: return tr('parrain.fl.etat.pasSu');
+  }
+}
+const nomFilleul = (f) => f.nom || tr('parrain.historique.ligne', { n: f.rang });
+export function ListeFilleuls({ filleuls, onOuvrir, titre }) {
+  if (!Array.isArray(filleuls) || !filleuls.length) return null;
+  return (
+    <Groupe titre={titre || tr('parrain.filleuls.titre')} attrs={{ 'data-filleuls': filleuls.length }}>
+      {filleuls.map((f) => (
+        <Rangee key={f.rang} titre={nomFilleul(f)} sousTitre={phraseFilleul(f)} sousLignes={2}
+          valeur={eur(f.gagneCentimes)}
+          detailValeur={f.prochainCentimes != null ? tr('parrain.fl.prochain', { m: eur(f.prochainCentimes) }) : f.pourraitCentimes != null ? tr('parrain.fl.pourrait', { m: eur(f.pourraitCentimes) }) : ''}
+          fin="chevron" onClick={() => onOuvrir(f)} attrs={{ 'data-filleul': f.etat || 'pas-su', 'data-filleul-rang': f.rang, 'data-filleul-nom': f.nom || '' }}/>
+      ))}
+    </Groupe>
+  );
+}
+export function FeuilleFilleul({ filleul: f, onFermer }) {
+  return (
+    <Feuille ouverte={!!f} onFermer={onFermer} titre={f ? nomFilleul(f) : ''} detentes={['moitie', 'pleine']} attrs={{ 'data-filleul-detail': f ? f.rang : '' }}>
+      {f ? <>
+        <p className="vrm-pr-fl-etat">{phraseFilleul(f)}</p>
+        <Groupe>
+          <Rangee titre={tr('parrain.fl.detail.moisPayes')} valeur={String(f.moisPayes)}/>
+          <Rangee titre={tr('parrain.fl.detail.gagne')} valeur={eur(f.gagneCentimes)} valeurForte/>
+          {f.prochainCentimes != null ? <Rangee titre={tr('parrain.fl.detail.prochain')} valeur={eur(f.prochainCentimes)}/> : null}
+          {f.pourraitCentimes != null ? <Rangee titre={tr('parrain.fl.detail.pourrait')} valeur={`~${eur(f.pourraitCentimes)}`} attrs={{ 'data-estimation': '' }}/> : null}
+        </Groupe>
+        <Groupe titre={tr('parrain.fl.detail.paiements')} attrs={{ 'data-filleul-paiements': (f.paiements || []).length }}>
+          {!(f.paiements || []).length ? <Rangee titre={tr('parrain.fl.detail.aucun')}/>
+            : [...f.paiements].reverse().map((x, i) => (
+              <Rangee key={i} titre={jour(x.payeLe)} sousTitre={[tr('parrain.fl.detail.paye', { m: eur(x.payeCentimes) }), tr('parrain.etat.' + (ETAT_CLE[x.etat] || 'attente')), x.etat === 'attente' ? tr('parrain.historique.du', { date: jour(x.dueLe) }) : ''].filter(Boolean).join(' · ')}
+                valeur={eur(x.partCentimes)} attrs={{ 'data-paiement': x.etat }}/>
+            ))}
+        </Groupe>
+      </> : null}
+    </Feuille>
+  );
+}
+// ── CÔTÉ FILLEUL : « Montrer mon prénom à mon parrain » (décoché par défaut, son choix) ──
+function MontrerPrenom({ montrer, onChange }) {
+  const [feuille, setFeuille] = React.useState(false);
+  const [v, setV] = React.useState('');
+  const [msg, setMsg] = React.useState('');
+  const actif = !!(montrer && montrer.montrer);
+  const envoyer = async (oui, nom) => {
+    const j = await poster({ action: 'montrer', montrer: oui, ...(oui ? { nom } : {}) });
+    if (j && j.ok) { onChange({ montrer: !!j.montrer, nom: j.nom || null }); toast(tr(oui ? 'parrain.montrer.fait' : 'parrain.montrer.retire')); setFeuille(false); return true; }
+    setMsg((j && j.message) || tr('parrain.erreur.ecriture')); return false;
+  };
+  return (
+    <>
+      <Groupe attrs={{ 'data-parrainage-montrer': actif ? '1' : '0' }}>
+        <Rangee titre={tr('parrain.montrer.lib')} sousTitre={actif && montrer.nom ? montrer.nom : tr('parrain.montrer.aide')} sousLignes={2}
+          interrupteur={{ actif, onChange: (oui) => { if (oui) { setV(String(load('vrm_prenom', '') || '').trim().slice(0, 24)); setMsg(''); setFeuille(true); } else envoyer(false); }, attrs: { 'data-parrainage-montrer-interrupteur': '' } }}/>
+      </Groupe>
+      <Feuille ouverte={feuille} onFermer={() => setFeuille(false)} titre={tr('parrain.montrer.titre')} attrs={{ 'data-parrainage-montrer-form': '' }}
+        pied={<Bouton variante="plein" indisponible={!v.trim()} onClick={() => envoyer(true, v)} attrs={{ 'data-parrainage-montrer-enregistrer': '' }}>{tr('parrain.nom.enregistrer')}</Bouton>}>
+        <label className="vrm-pr-champ"><span>{tr('parrain.nom.champ')}</span>
+          <input className="vrm-pr-saisie" value={v} maxLength={24} autoComplete="given-name" onChange={(e) => { setV(e.target.value.slice(0, 24)); setMsg(''); }}/></label>
+        <p className="vrm-pr-aide">{tr('parrain.nom.aide')}</p>
+        {msg ? <p role="alert" className="vrm-pr-alerte" data-parrainage-montrer-refus="">{msg}</p> : null}
+      </Feuille>
+    </>
+  );
+}
+
 // ── CÔTÉ JULIEN : « Parrains à verser » ─────────────────────────────────────
 export function ParrainsAVerser({ fetcher = fetch }) {
   useLangue();
   const [l, setL] = React.useState(undefined);
   const [confirme, setConfirme] = React.useState('');
+  const [detail, setDetail] = React.useState(null);   // { parrain, vue } · { parrain, vue: undefined } en lecture · null
+  const [filleul, setFilleul] = React.useState(null);
+  const ouvrirParrain = async (x) => {
+    setDetail({ ...x, vue: undefined });
+    try {
+      const r = await fetcher('/api/compte?mode=partenaires&vue=parrain&id=' + encodeURIComponent(x.parrain), { headers: enTeteSession(), cache: 'no-store' });
+      const j = r.ok ? await r.json() : null;
+      setDetail({ ...x, vue: j && j.ok ? j.vue : null });
+    } catch (_) { setDetail({ ...x, vue: null }); }
+  };
   const lire = React.useCallback(async () => {
     try {
       const r = await fetcher('/api/compte?mode=partenaires&vue=parrains', { headers: enTeteSession(), cache: 'no-store' });
@@ -157,12 +247,26 @@ export function ParrainsAVerser({ fetcher = fetch }) {
           </div>
         ))}
       </Groupe>
+      {Array.isArray(l.tous) && l.tous.length ? (
+        <Groupe titre={tr('parrain.admin.tous')} attrs={{ 'data-parrains-tous': l.tous.length }}>
+          {l.tous.map((x) => (
+            <Rangee key={x.parrain} icone={<Icon name="users" size={22}/>} titre={x.nom || x.email || '—'} sousTitre={tr('parrain.admin.tousLigne', { f: x.filleuls, p: x.payants })}
+              valeur={eur(x.gagneCentimes)} fin="chevron" onClick={() => ouvrirParrain(x)} attrs={{ 'data-parrain-tous': x.parrain }}/>
+          ))}
+        </Groupe>
+      ) : null}
+      <Feuille ouverte={!!detail} onFermer={() => setDetail(null)} titre={detail ? (detail.nom || detail.email || '—') : ''} detentes={['moitie', 'pleine']} attrs={{ 'data-parrain-detail': detail ? detail.parrain : '' }}>
+        {detail && detail.vue === undefined ? <SqCarte h={120}><SqBarre l="60%" h={14}/><SqBarre l="40%" h={14}/></SqCarte>
+          : detail && detail.vue && detail.vue.installe ? <ListeFilleuls filleuls={detail.vue.filleuls} onOuvrir={setFilleul}/>
+          : detail ? <Rangee titre={tr('parrain.erreur.phrase')} valeur="—"/> : null}
+      </Feuille>
+      <FeuilleFilleul filleul={filleul} onFermer={() => setFilleul(null)}/>
     </section>
   );
 }
 
 // ── CÔTÉ FILLEUL : « Offert par … : −10 % … » ───────────────────────────────
-export function CarteFilleul({ filleul, regle = REGLE_DEFAUT, compacte = false }) {
+export function CarteFilleul({ filleul, regle = REGLE_DEFAUT, compacte = false, montrer = undefined, onMontrer = null }) {
   if (!filleul || !filleul.parraine) return null;
   const nom = filleul.offertPar || tr('parrain.nom.vide');
   const etat = filleul.moisOffert ? tr('parrain.filleul.fait') : filleul.attendVinted ? tr('parrain.filleul.attendVinted') : tr('parrain.filleul.auPaiement');
@@ -176,6 +280,9 @@ export function CarteFilleul({ filleul, regle = REGLE_DEFAUT, compacte = false }
       </span>
     </section>
   );
+}
+function BlocFilleul({ filleul, regle, montrer, onMontrer }) {
+  return <div className="vrm-pr-bloc-filleul"><CarteFilleul filleul={filleul} regle={regle}/>{montrer !== null ? <MontrerPrenom montrer={montrer} onChange={onMontrer}/> : null}</div>;
 }
 // Pour l'écran d'abonnement : la remise du filleul, visible avant de payer (lue une fois).
 export function useFilleulParraine() {
@@ -192,6 +299,7 @@ export default function EcranParrainage({ fetcher = fetch }) {
   const [moisChoisi, setMoisChoisi] = React.useState(-1);
   const [feuille, setFeuille] = React.useState('');
   const [copie, setCopie] = React.useState(false);
+  const [detailFilleul, setDetailFilleul] = React.useState(null);
   const lire = React.useCallback(() => lireParrainage(fetcher).then(setP), [fetcher]);
   React.useEffect(() => { lire(); }, [lire]);
 
@@ -255,11 +363,15 @@ export default function EcranParrainage({ fetcher = fetch }) {
       <div className="vrm-pr" data-parrainage="ouvert" data-mode={mode} data-parrainage-test={p.modeTest ? '1' : undefined}
         data-total-centimes={c ? c.totalCentimes : ''} data-filleuls-payants={c && c.filleulsPayants != null ? c.filleulsPayants : ''}>
         {p.modeTest ? <p className="vrm-pr-test">{tr('parrain.test')}</p> : null}
-        {p.filleul && p.filleul.parraine ? <CarteFilleul filleul={p.filleul} regle={regle}/> : null}
+        {p.filleul && p.filleul.parraine ? <BlocFilleul filleul={p.filleul} regle={regle} montrer={p.montrer === undefined ? null : p.montrer} onMontrer={(m) => setP((x) => ({ ...x, montrer: m }))}/> : null}
 
         {/* 1. Le héros : gagné au total, ce mois, 12 mois en barres. */}
         <Heros className="vrm-pr-heros" titre={tr('parrain.heros.titre')} valeur={c ? eur(c.totalCentimes) : null}
           sous={c ? tr('parrain.heros.mois', { m: eur(c.moisCentimes) }) : tr('parrain.gainsNonInstalle')} attrs={{ 'data-parrainage-heros': '' }}
+          trio={g && g.potentiel ? [
+            { cle: 'potentiel', libelle: tr('parrain.potentiel.lib'), valeur: `~${eur(g.potentiel.moisCentimes)}`, pourquoi: tr('parrain.potentiel.estime'), attrs: { 'data-estimation': 'potentiel', 'data-centimes': g.potentiel.moisCentimes } },
+            { cle: 'sitous', libelle: tr('parrain.potentiel.siTous'), valeur: `~${eur(g.potentiel.siTousCentimes)}`, pourquoi: tr('parrain.potentiel.estime'), attrs: { 'data-estimation': 'si-tous', 'data-centimes': g.potentiel.siTousCentimes } },
+          ] : []}
           action={<span className="vrm-pr-heros-ic" aria-hidden="true"><Icon name="cadeau" size={22}/></span>}
           graphe={c ? <div className="vrm-pr-barres">
             <Barres libelle={tr('parrain.heros.graphe')} choisie={choisie} onChoisir={setMoisChoisi}
@@ -341,8 +453,8 @@ export default function EcranParrainage({ fetcher = fetch }) {
           </div>
         ) : null}
 
-        {/* 7. Tes filleuls (sans identité). */}
-        {filleuls && filleuls.length ? (
+        {/* 7. Tes filleuls : une ligne par filleul (état, gagné, prochain / possible), détail au toucher. */}
+        {g && Array.isArray(g.filleuls) && g.filleuls.length ? <ListeFilleuls filleuls={g.filleuls} onOuvrir={setDetailFilleul}/> : filleuls && filleuls.length ? (
           <Groupe titre={tr('parrain.filleuls.titre')} attrs={{ 'data-filleuls': filleuls.length }}>
             {filleuls.map((x) => (
               <Rangee key={x.rang} titre={tr('parrain.filleuls.ligne', { n: x.rang })} sousTitre={x.inscritLe ? tr('parrain.filleuls.inscrit', { date: jour(x.inscritLe) }) : ''}
@@ -358,6 +470,7 @@ export default function EcranParrainage({ fetcher = fetch }) {
         <div className="vrm-pr-qr-boite"><QrLien texte={lien}/><p>{tr('parrain.qr.phrase')}</p><code>{lien.replace(/^https:\/\//, '')}</code></div>
       </Feuille>
       <FeuilleNom ouverte={feuille === 'nom'} nom={p.nom} onFermer={() => setFeuille('')} onFait={(nom) => setP((x) => ({ ...x, nom }))}/>
+      <FeuilleFilleul filleul={detailFilleul} onFermer={() => setDetailFilleul(null)}/>
       <FeuilleIban ouverte={feuille === 'iban'} onFermer={() => setFeuille('')} onFait={(iban) => setP((x) => ({ ...x, gains: { ...x.gains, iban } }))}/>
     </Page>
   );
