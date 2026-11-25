@@ -43,7 +43,7 @@ const MESURE = () => {
         rapport[tab][tour] = images;
         // Sauts : un bloc (même clé) dont y change entre deux images après la 1re image où il paraît.
         const sauts = []; const vu = {};
-        for (const im of images) for (const bl of im.blocs || []) { if (vu[bl.k] != null && Math.abs(vu[bl.k] - bl.y) > 2) sauts.push(`${im.t}ms ${bl.k} ${vu[bl.k]}→${bl.y}`); vu[bl.k] = bl.y; }
+        for (const im of images) { const rang = {}; for (const bl of im.blocs || []) { rang[bl.k] = (rang[bl.k] || 0) + 1; const k = bl.k + '#' + rang[bl.k]; if (vu[k] != null && Math.abs(vu[k] - bl.y) > 2) sauts.push(`${im.t}ms ${k} ${vu[k]}→${bl.y}`); vu[k] = bl.y; } }
         console.log(`\n▶ ${tab} · ${tour} · ${images.length} images`);
         console.log('  squelettes par image : ' + images.map((x) => x.sq).join(','));
         console.log('  copie montrée       : ' + images.map((x) => (x.copie ? 'C' : '.')).join(''));
