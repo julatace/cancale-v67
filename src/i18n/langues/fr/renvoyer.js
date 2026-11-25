@@ -76,6 +76,7 @@ export default {
   "rt.f.route": "En route",
   "rt.f.relais": "Au relais",
   "rt.f.livre": "Livré au vendeur",
+  "rt.f.recu": "Reçu",
   "rt.f.rembourse": "Remboursé",
   "rt.etat.depassee": "Date limite de dépôt dépassée",
   "rt.court.depassee": "L’article risque de te rester.",

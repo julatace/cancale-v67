@@ -225,5 +225,48 @@
 .g-tuile-plein { display: block; height: 22px; border-radius: var(--g-r-bouton, 8px); background: var(--n-plein); box-shadow: var(--g-plein-relief, none); }
 .g-tuile-nom { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; font: 600 14px/18px var(--n-police); color: var(--n-encre); }
 .g-tuile-coche { font: 600 12px/16px var(--n-police); color: var(--n-encre-2); }
-.g-tuile[data-style=""] { --n-fond: #DFE1E5; --n-carte: #FAFAFB; --n-carte-2: #E9EBEE; --n-encre: #1D1D1F; --n-encre-2: #50535B; --n-plein: #3D4B5B; --n-vert: #17744A; --n-vert-fond: #DDF4E6; --n-accent: #3D4B5B; --g-fond-image: none; --g-carte-ombre: 0 1px 2px rgb(26 26 30 / .04), 0 2px 6px rgb(26 26 30 / .04); --g-plein-relief: none; --g-r-bouton: 8px; --n-r-carte: 12px; --g-r-chip: 999px; }
+.g-tuile[data-style=""] { --n-fond: #878B92; --n-carte: #F1F2F4; --n-carte-2: #E3E5E9; --n-encre: #0E0F12; --n-encre-2: #1F2226; --n-plein: #19222C; --n-vert: #17744A; --n-vert-fond: #DDF4E6; --n-accent: #19222C; --g-fond-image: none; --g-carte-ombre: 0 1px 2px rgb(26 26 30 / .04), 0 2px 6px rgb(26 26 30 / .04); --g-plein-relief: none; --g-r-bouton: 8px; --n-r-carte: 12px; --g-r-chip: 999px; }
 :root[data-theme="dark"] .g-tuile[data-style=""] { --n-fond: #1C1C20; --n-carte: #2A2A2F; --n-carte-2: #323238; --n-encre: #FFFFFF; --n-encre-2: #B8B8C0; --n-plein: #FFFFFF; --n-vert: #7BE8BE; --n-vert-fond: rgb(63 212 154 / .14); --n-accent: #F4F4F5; }
+
+/* ══ (25 nov., style-c3 — Julien sur iPhone en Monochrome : « améliore le design de toute l'app ») Pour TOUT style choisi, en couche
+   `vrm-styles` : un `!important` en couche passe devant les `!important` hors couche des feuilles d'avant (la couche les inverse),
+   sans toucher au style « Actuel ». Aucun texte, nombre ni attribut ne change : la forme seulement. ══ */
+@layer vrm-styles {
+  /* Argent → À venir : le segment « À envoyer » était ORANGE (#B26A00, src/design/verre-ecrans.css) : un gris d'encre */
+  [data-style]:not([data-style=""]) :is(.vrm-av-barre-seg, .vrm-av-pastille).is-envoyer { background: var(--n-encre-3) !important; }
+
+  /* Achats → À retirer (proposition C) : le colis tient en une rangée nette. Le point « nouveau » se pose DANS la marge, à gauche
+     du titre (il était orphelin au-dessus de « Contenu pas encore lu ») ; « Contenu pas encore lu · Pourquoi ? » sur une ligne. */
+  [data-style]:not([data-style=""]) .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-colis-texte { position: relative; flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 8px; row-gap: 2px; }
+  [data-style]:not([data-style=""]) .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-colis-texte > * { flex: 1 0 100%; min-width: 0; }
+  [data-style]:not([data-style=""]) .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-colis-texte > :is(.n-rp-pas-lu, .n-rp-pas-lu-pourquoi) { flex: 0 1 auto; }
+  [data-style]:not([data-style=""]) .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-colis-texte > .n-rp-pas-lu-pourquoi:has(.n-pourquoi[open]) { flex-basis: 100%; }
+  [data-style]:not([data-style=""]) .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-colis-texte > .n-rp-point-neuf { position: absolute; flex: none; left: -10px; top: 7px; margin: 0; }
+  [data-style]:not([data-style=""]) .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-pas-lu { font: var(--n-t-second); color: var(--n-encre-2); }
+  /* l'ouverture du point : une ligne courte */
+  [data-style]:not([data-style=""]) .n-rp[data-rp-variante="c"] .n-rp-tete .n-rp-ouverture { font: var(--n-t-legende); }
+  /* le code, mis en valeur : plus grand, à l'encre */
+  [data-style]:not([data-style=""]) .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-billet-code [data-rp-code-grand] { font-size: 21px !important; line-height: 26px !important; font-weight: 700; letter-spacing: .03em !important; }
+  [data-style]:not([data-style=""]) .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-billet-code [data-rp-code-grand].is-long { font-size: 18px !important; }
+  [data-style]:not([data-style=""]) .n-rp[data-rp-variante="c"] .n-rp-actions { gap: 8px; padding: 4px 16px 14px; }
+  [data-style]:not([data-style=""]) .n-rp[data-rp-variante="c"] .n-rp-actions .n-bouton { padding-inline: 10px; }
+
+  /* La loupe « Tout sur le N° » : les phrases de méthode s'effacent à l'œil (« Je cherche un N°. », « Correspondance exacte · trouvé
+     par son N° — pas par ressemblance. ») — le titre « Tout sur le N°… » suffit ; elles restent pour le lecteur d'écran. */
+  [data-style]:not([data-style=""]) :is([data-recherche-compris], [data-recherche-exacte-numero]) { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip-path: inset(50%) !important; white-space: nowrap !important; padding: 0 !important; }
+  /* « L'ancien N°B… existe aussi — le voir » : une rangée normale (plus un lien centré sur deux lignes), la flèche à droite */
+  [data-style]:not([data-style=""]) [data-tout-ancien] { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px; width: 100% !important; min-height: 44px !important;
+    margin: 4px 0 0 !important; padding: 8px 0 !important; text-align: left !important; text-decoration: none !important; color: var(--n-encre) !important; font: var(--n-t-second-fort) !important; background: transparent !important; border: 0 !important; border-top: 1px solid var(--n-trait) !important; }
+  [data-style]:not([data-style=""]) [data-tout-ancien]::after { content: "›"; flex: none; font: 400 20px/1 var(--n-police); color: var(--n-encre-2); }
+  /* les actions de la loupe : l'icône sur une petite tuile douce (32), plus une grosse case grise de 44 */
+  [data-style]:not([data-style=""]) .vrm-recherche-ligne[data-recherche-resultat="action"] > div:first-child { width: 32px !important; height: 32px !important; margin-inline: 6px; border-radius: 9px !important; background: var(--g-puce-fond, var(--n-carte-2)) !important; }
+  /* le champ de la loupe : un contour fin et calme (il était épais et noir) ; l'encre au focus, 1,5 px */
+  [data-style]:not([data-style=""]) .vrm-recherche-champ { border: 0 !important; box-shadow: inset 0 0 0 1px var(--n-encre-3) !important; border-radius: var(--g-r-bouton) !important; background: var(--n-carte) !important; outline: 0 !important; }
+  [data-style]:not([data-style=""]) .vrm-recherche-champ:is(:focus, :focus-visible) { box-shadow: inset 0 0 0 1.5px var(--n-encre) !important; }
+}
+/* L'anneau de focus du champ de la loupe (ouvert, il prend le focus tout de suite) : l'anneau double de l'accessibilité (2 px d'encre
+   + 5 px de blanc) en faisait un cadre noir épais. Sous un style choisi : UN filet d'encre de 1,5 px, toujours visible (≥ 3:1 sur la
+   carte et le fond, WCAG 2.4.7 / 1.4.11). Dans la couche `vrm-a11y` elle-même (déjà nommée par index.html) : seule elle a le dernier mot. */
+@layer vrm-a11y {
+  :root[data-style]:not([data-style=""]) .vrm-recherche-champ:focus-visible { outline: 1.5px solid var(--n-encre) !important; outline-offset: -1.5px !important; box-shadow: none !important; }
+}

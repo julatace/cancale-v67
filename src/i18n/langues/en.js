@@ -26,6 +26,7 @@ import ecran_messagesPro from './en/messagesPro.js';   // (24 nov.) la conversat
 import ecran_connexions_ext from './en/connexions.js';   // (24 nov.) « Connexions de l'extension »   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './en/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
 import ecran_styleClarte from './en/styleClarte.js';
+import ecran_moinsTexte from './en/moinsTexte.js';
 import ecran_revueUx from './en/revueUx.js';   // (23 nov.) revue UX   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './en/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './en/ext5438.js';   // (22 nov.) ext. 5.438
@@ -121,6 +122,7 @@ import ecran_ux_reglages from './en/uxReglages.js';   // (21 nov.) Paramètres, 
 import ecran_natif from './en/natif.js';
 import ecran_menu_onglets from './en/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './en/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
+import ecran_parrainage20 from './en/parrainage.js';   // (25 nov.) le parrainage à 20 %
 import ecran_actions_ext from './en/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './en/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
@@ -472,7 +474,7 @@ export default {
   "auth.lier.extension": "Sign in here: the {navigateur} extension signs in too, nothing to type.",
   "auth.parrain.offertPar": "A gift from {nom}",
   "auth.parrain.offertVendeur": "A gift from a VRM seller",
-  "auth.parrain.texte": "1 month of VRM free on your first payment, for you and for the person who invited you.",
+  "auth.parrain.texte": "10 % off your first month of VRM and 1 free week at your first payment.",
   "auth.parrain.texteConnexion": "Already have an account? Sign in: referrals are for new accounts only.",
   "auth.lier.pasOuverte": "Sign-in with {nom} isn’t open on VRM yet. Sign in here with your VRM email and password: the extension will be connected at the same time.",
   "auth.lier.pasVerifie": "I couldn’t verify the sign-in with {nom}. Try the sign-in options below again, or sign in with your email: the extension will be connected at the same time.",
@@ -2429,6 +2431,7 @@ export default {
   ...ecran_messagesPro,
   ...ecran_apresFinale,
   ...ecran_styleClarte,
+  ...ecran_moinsTexte,
   ...ecran_revueUx,
   ...ecran_relier_retires,
   ...ecran_fiched,
@@ -2453,4 +2456,5 @@ export default {
   ...ecran_extension,
   ...ecran_actions_ext,
   ...ecran_offres_photos,
+  ...ecran_parrainage20,
 };

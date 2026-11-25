@@ -327,7 +327,7 @@ async function poserMutation(pg) {
         await o.pg.screenshot({ path: path.join(SHOTS, 'tuiles-nuit.png') });
         const a = await o.pg.$('[data-style-tuile="actuel"]'); if (a) { const c = await a.evaluate((e) => { e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await o.pg.touchscreen.tap(c.x, c.y); await o.pg.waitForTimeout(300); }
         const retour = await o.pg.evaluate(() => ({ st: document.documentElement.getAttribute('data-style'), lu: localStorage.getItem('vrm_style'), fond: getComputedStyle(document.documentElement).getPropertyValue('--n-fond').trim() }));
-        dit(retour.st === null && retour.lu === null && /^#DFE1E5$/i.test(retour.fond), `T « Actuel » revient au défaut en un toucher`, retour);
+        dit(retour.st === null && retour.lu === null && /^#878B92$/i.test(retour.fond), `T « Actuel » revient au défaut en un toucher`, retour);
         const tailles = await o.pg.$$eval('[data-style-tuile]', (x) => x.map((e) => { const r = e.getBoundingClientRect(); return Math.min(r.width, r.height); }));
         dit(tailles.length && Math.min(...tailles) >= 44, `T chaque tuile est une cible ≥ 44`, tailles);
         await o.pg.screenshot({ path: path.join(SHOTS, 'tuiles-actuel.png') });

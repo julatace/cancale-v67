@@ -144,7 +144,7 @@ const LIRE = (sel) => { const e = document.querySelector(sel); if (!e) return nu
     ventes: [...e.querySelectorAll('[data-v2-vente]')].map((v) => v.getAttribute('data-v2-vente')), avenir: a(q('[data-v2-avenir]'), 'data-v2-avenir'),
     avenirHors: [...e.querySelectorAll('[data-v2-avenir]')].filter((x) => !x.closest('[data-v2-bloc="pilotage"]')).length,
     cjEnv: a(q('[data-v2-cj-ligne="envoyer"]'), 'data-v2-cj-n'), cjEnvTxt: (q('[data-v2-cj-ligne="envoyer"]') || { textContent: '' }).textContent,
-    cjRet: a(q('[data-v2-cj-ligne="retirer"]'), 'data-v2-cj-n'), cjRetTxt: (q('[data-v2-cj-ligne="retirer"]') || { textContent: '' }).textContent,
+    cjRet: a(q('[data-v2-cj-ligne="retirer"]'), 'data-v2-cj-n'), cjRetTxt: (q('[data-v2-cj-ligne="retirer"]') || { textContent: '' }).textContent, cjRetLieu: a(q('[data-v2-cj-ligne="retirer"]'), 'data-v2-passe-lieu'), cjRetCode: a(q('[data-v2-cj-ligne="retirer"]'), 'data-v2-passe-code'),
     alerte: a(q('[data-v2-alerte]'), 'data-v2-alerte'), alertes: e.querySelectorAll('[data-v2-alerte]').length, texte: e.innerText }; };
 
 // LE DESSIN, mesuré dans la page.
@@ -294,7 +294,9 @@ async function unEcran(nav, nomBase, b, W, sombre) {
       if (nomBase === 'capture') {
         const A = b.attendu, X = attenduJours(A.ventes);
         dit(w.affiche === String(A.nEnvoyer) && w.cjEnv === String(A.nEnvoyer) && w.plein === String(A.nPrets) && /3/.test(w.ecart) && /prêts\b/.test(w.ecart), `F5 ${ou} : ${A.nEnvoyer} colis à envoyer (la case de Colis, « ${w.ecart} » accordé), le plein dit ${A.nPrets} bordereaux`, { affiche: w.affiche, cj: w.cjEnv, plein: w.plein, ecart: w.ecart });
-        dit(w.cjRet === String(A.nRetirer) && w.cjRetTxt.includes(A.point) && /\b\d{6}\b/.test(w.cjRetTxt), `F5 ${ou} : ${A.nRetirer} colis à retirer, le premier point et son code dans la case`, { cj: w.cjRet, txt: w.cjRetTxt });
+        // (25 nov., aujourdhui-moins-texte — Julien : « trop de texte ») La case dit le CODE du premier point (groupé « 448 038 ») ;
+        // le point est SA donnée (`data-v2-passe-lieu`), son nom s'écrit dans l'écran À retirer (›). Le code ÉCRIT = celui du point.
+        dit(w.cjRet === String(A.nRetirer) && w.cjRetLieu === A.point && /^\d{6}$/.test(w.cjRetCode || '') && w.cjRetTxt.replace(/[\s\u202f\u00a0]/g, '').includes(w.cjRetCode), `F5 ${ou} : ${A.nRetirer} colis à retirer, le premier point (sa donnée) et son code écrit dans la case`, { cj: w.cjRet, lieu: w.cjRetLieu, code: w.cjRetCode, txt: w.cjRetTxt });
         dit(w.ventes.length === 5 && new Set(w.ventes).size === 5, `F5 ${ou} : les 5 dernières ventes, chacune une fois`, w.ventes);
         // (19 nov., Julien : « plus de stats […] le CA, le bénéfice ») Jour · Semaine · Mois : CA vendu, ventes, panier =
         // les ventes SEMÉES (« au moins » quand un prix n'est pas lu, « — » pour un panier sur une partie des ventes).

@@ -11,12 +11,15 @@
 // Il exige (390 tactile iPhone et 1512, clair et sombre) :
 //   R1 Nike : les étapes Bordereau ✓ · Déposé ✓ (daté) · En route ✓ · Livré au vendeur ✓ · Remboursé ✓ — en route et
 //      livré « faits, date pas vue » (data-retour-et-implicite=1), AUCUNE date inventée ;
-//   R2 Autry : « Date limite de dépôt dépassée » + la date ; étiquette « Délai dépassé » ; AUCUN orange/ambre dans la
-//      carte (ni texte, ni fond, ni bord) ; au plus une phrase courte (≤ 8 mots) visible, le reste sous « Pourquoi ? » ;
+//   R2 Autry : « Date limite de dépôt dépassée » + la date ; son ton « délai dépassé » (le point au contour,
+//      data-retour-tag) — (25 nov., achats-retours-design) l'état écrit UNE fois : plus de pastille « Délai dépassé » qui le
+//      redisait ; AUCUN orange/ambre dans la carte (ni texte, ni fond, ni bord) ; au plus une phrase courte (≤ 8 mots)
+//      visible, le reste sous « Pourquoi ? » ;
 //   R3 aucun bouton hors d'une carte (tout bouton/lien-bouton de « À renvoyer » est DANS un [data-retour-achat]) et
 //      rien ne déborde de sa carte ; les boutons sont des vrais boutons (≥ 44 px au doigt, icône + verbe) ;
-//   R4 « À vérifier » : la vignette est dans la carte, le titre a la largeur (≥ 55 % de la ligne), les deux boutons
-//      sont sur la même ligne, même hauteur ;
+//   R4 « À vérifier » : la vignette est dans la carte ; (25 nov., achats-retours-design) UNE rangée : le texte garde au
+//      moins 40 % de la ligne, « Vinted » (le bouton) et « Réglé » (le lien) visibles, chacun ≥ 44 px au doigt, dans la
+//      rangée ; au téléphone la rangée ≤ 100 px (avant : deux gros boutons empilés sous le texte) ;
 //   R5 SUIVI EN CONTINU : un e-mail Chronopost « en transit » du n° EXACT de l'Autry arrive pendant que l'écran est
 //      ouvert (signal `vrm:neuf` « colis », la veille) ⇒ la carte passe « En route » SANS recharger ;
 //   R6 aucune requête vers Vinted, aucune erreur, pas de défilement horizontal ; captures regardées.
@@ -170,12 +173,12 @@ const mesurer = (pg, tx) => pg.evaluate(([TX, TXN0]) => {
     const ph = [...v.querySelectorAll('*')].find((e) => /nouvelles/.test(e.textContent || '') && ![...e.children].some((k) => /nouvelles/.test(k.textContent || '')));
     const col = ph ? ph.parentElement.getBoundingClientRect() : null;
     const act = [...v.querySelectorAll('a, button')].filter(vis).map((e) => e.getBoundingClientRect());
-    verif = { lw: Math.round(rv.width), vignette: ri ? { l: Math.round(ri.left - rv.left), w: Math.round(ri.width), h: Math.round(ri.height) } : null, colonne: col ? Math.round(col.width) : 0,
+    verif = { lw: Math.round(rv.width), h: Math.round(rv.height), dedans: act.every((r) => r.top >= rv.top - 13 && r.bottom <= rv.bottom + 13 && r.right <= rv.right + 1), vignette: ri ? { l: Math.round(ri.left - rv.left), w: Math.round(ri.width), h: Math.round(ri.height) } : null, colonne: col ? Math.round(col.width) : 0,
       gestes: act.map((r) => ({ t: Math.round(r.top), h: Math.round(r.height), w: Math.round(r.width) })), phrase: ph ? ph.innerText.trim() : '' };
   }
   const x = carte(TX), n = carte(TXN0);
   return {
-    autry: x ? { etape: x.getAttribute('data-retour-etape'), texte: x.innerText.replace(/\s+/g, ' '), tag: ((x.querySelector('[data-retour-tag]') || {}).innerText || '').trim(), oranges: orangesDans(x), longs: textesLongs(x), etapes: etapes(x) } : null,
+    autry: x ? { etape: x.getAttribute('data-retour-etape'), texte: x.innerText.replace(/\s+/g, ' '), tag: (x.querySelector('[data-retour-tag]') || { getAttribute: () => '' }).getAttribute('data-retour-tag'), ton: ((x.querySelector('.vrm-rt-etat') || {}).className || ''), oranges: orangesDans(x), longs: textesLongs(x), etapes: etapes(x) } : null,
     nike: n ? { etape: n.getAttribute('data-retour-etape'), etapes: etapes(n), oranges: orangesDans(n), longs: textesLongs(n), texte: n.innerText.replace(/\s+/g, ' ') } : null,
     gestes, verif, orangesSection: orangesDans(document.querySelector('[data-retours-achat]')), horizontal: document.documentElement.scrollWidth - document.documentElement.clientWidth,
   };
@@ -199,6 +202,8 @@ const mesurer = (pg, tx) => pg.evaluate(([TX, TXN0]) => {
         await pg.waitForSelector(`[data-retours-achat] [data-retour-achat="${TXN}"][data-retour-etape="rembourse"]`, { timeout: 45000 }).catch(() => {});
         await pg.waitForSelector('[data-retours-a-verifier]', { timeout: 15000 }).catch(() => {});
         await pg.waitForTimeout(1500);
+        // (25 nov., achats-retours-design) Le Nike remboursé est une rangée REPLIÉE : son toucher la déplie (frise, n°, gestes).
+        await pg.evaluate(() => document.querySelectorAll('[data-retours-achat] details.vrm-rt-fini').forEach((d) => { d.open = true; }));
         const m = await mesurer(pg, TXA);
         // R1
         const eN = m.nike && m.nike.etapes;
@@ -207,7 +212,7 @@ const mesurer = (pg, tx) => pg.evaluate(([TX, TXN0]) => {
           `${nom} R1 en route et livré « date pas vue » (aucune date inventée), déposé daté, remboursé 35,98 €`, JSON.stringify(eN));
         // R2
         const a = m.autry;
-        dit(a && /Date limite de dépôt dépassée/.test(a.texte) && /Délai dépassé/.test(a.tag), `${nom} R2 Autry : « Date limite de dépôt dépassée » + étiquette « Délai dépassé »`, JSON.stringify(a && [a.texte.slice(0, 160), a.tag]));
+        dit(a && /Date limite de dépôt dépassée/.test(a.texte) && a.tag === 'depassee' && /is-contour/.test(a.ton) && !/Délai dépassé/.test(a.texte), `${nom} R2 Autry : « Date limite de dépôt dépassée » écrit une fois, au ton « délai dépassé » (point au contour, sans pastille qui le redit)`, JSON.stringify(a && [a.texte.slice(0, 160), a.tag, a.ton]));
         dit(m.orangesSection && m.orangesSection.length === 0, `${nom} R2 aucun orange ni ambre dans « À renvoyer »`, JSON.stringify(m.orangesSection));
         dit(a && m.nike && a.longs.length === 0 && m.nike.longs.length === 0, `${nom} R2 au plus une phrase courte (≤ 8 mots) visible par carte, le détail sous « Pourquoi ? »`, JSON.stringify(a && [a.longs, m.nike && m.nike.longs]));
         // R3
@@ -215,9 +220,9 @@ const mesurer = (pg, tx) => pg.evaluate(([TX, TXN0]) => {
         dit(m.gestes.every((g) => g.h >= (doigt ? 44 : 36) && g.txt.split(/\s+/).length <= 2 && !/↗/.test(g.txt)), `${nom} R3 des vrais boutons (≥ ${doigt ? 44 : 36} px, un verbe court, pas de « ↗ » en texte)`, JSON.stringify(m.gestes.map((g) => [g.quoi, g.h, g.txt])));
         // R4
         const v = m.verif;
-        const memeLigne = v && v.gestes.length === 2 && Math.abs(v.gestes[0].t - v.gestes[1].t) <= 2 && v.gestes[0].h === v.gestes[1].h && v.gestes[0].h >= (doigt ? 44 : 36);
-        dit(v && v.vignette && v.vignette.l >= 0 && v.vignette.w > 0 && v.vignette.w <= 56 && v.colonne >= 0.55 * v.lw && memeLigne,
-          `${nom} R4 « À vérifier » : vignette dans la carte, texte sur la largeur (${v && v.colonne}/${v && v.lw} px), deux boutons alignés`, JSON.stringify(v));
+        const uneRangee = v && v.gestes.length === 2 && v.gestes.every((g) => g.h >= (doigt ? 44 : 36)) && v.dedans && (!doigt || v.h <= 100);
+        dit(v && v.vignette && v.vignette.l >= 0 && v.vignette.w > 0 && v.vignette.w <= 56 && v.colonne >= 0.4 * v.lw && uneRangee,
+          `${nom} R4 « À vérifier » : vignette dans la carte, texte ${v && v.colonne}/${v && v.lw} px, Vinted et Réglé dans UNE rangée (${v && v.h} px)`, JSON.stringify(v));
         dit(m.horizontal <= 0, `${nom} R6 pas de défilement horizontal`, String(m.horizontal));
         await pg.locator('[data-retours-achat]').first().screenshot({ path: path.join(SHOTS, `retours-renvoyer-suivi-${suff}.png`) }).catch(() => {});
         await pg.locator('[data-retours-a-verifier]').first().screenshot({ path: path.join(SHOTS, `retours-renvoyer-verif-${suff}.png`) }).catch(() => {});

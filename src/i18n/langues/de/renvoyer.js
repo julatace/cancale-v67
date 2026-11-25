@@ -76,6 +76,7 @@ export default {
   "rt.f.route": "Unterwegs",
   "rt.f.relais": "Im Shop",
   "rt.f.livre": "Beim Verkäufer",
+  "rt.f.recu": "Erhalten",
   "rt.f.rembourse": "Erstattet",
   "rt.etat.depassee": "Abgabefrist abgelaufen",
   "rt.court.depassee": "Der Artikel bleibt evtl. bei dir.",

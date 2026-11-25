@@ -1,6 +1,6 @@
 // ── src/natif/visuel/Inventaire.jsx — les petites pièces de l'inventaire Annonces / Stock (24 nov., lot visuel-annonces) ─────
 // Compléments de src/natif/Jeu.jsx (même langage, mêmes règles — src/natif/visuel/README.md) :
-//   <AvatarCompte pseudo site cle/>    le compte d'une annonce en rond (son initiale), teinté PAR SON IDENTITÉ (site:compte),
+//   <AvatarCompte pseudo site cle/>    le compte d'une annonce en rond : SA photo de profil (photosProfil.js), sinon son initiale, teinté PAR SON IDENTITÉ (site:compte),
 //                                       jamais par le titre ; aucune couleur orange.
 //   <AvatarsComptes comptes max/>      au plus `max` ronds superposés, puis « +N ».
 //   <PontPhoto.Provider value={fn}>    passe la fonction photo d'un écran (`Photo(src, { className, style })`, src/photoTaille.js
@@ -10,6 +10,7 @@ import React from 'react';
 import { tr } from '../../i18n/index.js';
 import { cx } from '../outils.js';
 import './inventaire.css';
+import { usePhotoCompte, photoComptesRendu } from './photosProfil.js';
 
 // Ardoise, encre, sarcelle, acier, vert « fait » : les teintes de l'app (jamais orange ni rouge).
 const TEINTES = 5;
@@ -19,10 +20,17 @@ const initiale = (p) => { const m = /[\p{L}\p{N}]/u.exec(String(p || '')); retur
 
 export function AvatarCompte({ pseudo = '', cle = '', petit = false }) {
   const nom = String(pseudo || '').trim();
+  // (25 nov., logo-vinted-pp) La VRAIE photo de profil du compte (sa ligne `harvest_{uid}_profile`, une lecture partagée :
+  // src/natif/visuel/photosProfil.js), rendue par la règle des photos Vinted ; absente, pas lue ou en erreur ⇒ l'initiale.
+  const photo = usePhotoCompte(cle);
+  const Photo = photo ? photoComptesRendu() : null;
+  const [rate, setRate] = React.useState('');
+  const lettre = <span aria-hidden="true">{initiale(nom)}</span>;
+  const montre = !!(photo && Photo && rate !== photo);
   return (
-    <span className={cx('n-inv-avatar', petit && 'n-inv-avatar-petit')} data-inv-avatar={cle} data-inv-teinte={teinteCompte(cle || nom)} role="img"
+    <span className={cx('n-inv-avatar', petit && 'n-inv-avatar-petit')} data-inv-avatar={cle} data-inv-teinte={teinteCompte(cle || nom)} data-inv-photo={montre ? '1' : undefined} role="img"
       aria-label={tr('inv.compte', { pseudo: nom || '—' })} title={nom || undefined}>
-      <span aria-hidden="true">{initiale(nom)}</span>
+      {montre ? <Photo src={photo} alt="" loading="lazy" decoding="async" className="n-inv-avatar-img" repli={lettre} onError={() => setRate(photo)}/> : lettre}
     </span>
   );
 }

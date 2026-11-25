@@ -487,7 +487,6 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 - **25 nov. · Envoi des messages et des offres (ext. 5.452)** : refus de Vinted (200) jamais « fait » ; plafond/pause/onglet/session attendent (heure dite) ; l'app suit l'issue, jamais deux dépôts. `2026-11-25-envoi-messages-offres.md`. Geste : installer 5.452.
-- **24 nov. · Agir si connecté + Agir tout (ext. 5.450)** : tous les gestes depuis VRM par `peutAgir` (sinon « Lecture seule »). `2026-11-24-agir-si-connecte.md`, `-agir-tout.md`. Geste : installer.
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier

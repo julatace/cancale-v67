@@ -89,6 +89,7 @@ const COUPLES = {
   'src/lisibleParLaPage.js|nominatim.openstreetmap.org': ['recopie', 'copie de connect-src (vercel.json) : sert à savoir si la page a le DROIT de lire une adresse, ce fichier ne contacte rien (24 nov., bugs-terrain ; audit-lecture-csp exige l’égalité avec vercel.json)'],
   'src/notifsBonMoment.js|vrm.center': ['vrm', 'VRM lui-même (base pour lire le lien d’une notification, jamais appelé)'],
   // (22 nov., intégration) ext. 5.428 / 5.424 : des liens ouverts d'un clic.
+  'src/parrainage/EcranParrainage.jsx|wa.me': ['lien', LIEN + ' — « WhatsApp » du parrainage : le lien de partage (25 nov.)'],
   'src/AlerteModeration.jsx|www.vinted.fr': ['lien', LIEN + ' — l’annonce masquée par Vinted, ou la messagerie'],
   'src/connexions/EcranConnexions.jsx|www.vinted.fr': ['lien', LIEN + ' — « Connexions de l’extension » : ouvrir le site du compte pour le reconnecter (24 nov., agir-tout)'],
   'src/connexions/EcranConnexions.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Connexions de l’extension » : ouvrir le site du compte pour le reconnecter (24 nov., agir-tout)'],

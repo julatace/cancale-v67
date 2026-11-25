@@ -147,8 +147,8 @@ export default {
   "adist.bord.aGenerer": "etiqueta por generar",
   "adist.bord.absent": "El PDF aún no está guardado: vuelve a intentarlo en un momento",
   "adist.bord.passu": "no he podido saber si la etiqueta ya está lista",
-  "adist.jour.allume": {"one": "Tu ordenador ({nom}) está encendido · {n} cuenta", "other": "Tu ordenador ({nom}) está encendido · {n} cuentas"},
-  "adist.jour.eteint": "Tu ordenador ({nom}) está apagado desde las {heure}",
+  "adist.jour.allume": {"one": "Ordenador encendido · {n} cuenta", "other": "Ordenador encendido · {n} cuentas"},
+  "adist.jour.eteint": "Ordenador apagado · {heure}",
   "adist.jour.attente": {"one": "{n} gesto espera a tu ordenador", "other": "{n} gestos esperan a tu ordenador"},
   "adist.jour.sous": "Tus cuentas a distancia: mensajes, ofertas, precios, etiquetas",
   "adist.reglages.desc": "Cada cuenta desde tu teléfono: tu ordenador ejecuta, nada pasa por la nube."

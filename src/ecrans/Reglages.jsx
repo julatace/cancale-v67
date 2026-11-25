@@ -149,9 +149,10 @@ import { TableauProprietaire } from "../composants/TableauProprietaire.jsx";
 import { SimulationCompte } from "../SimulationCompte.jsx";
 import { OuvrirPaiements } from "../composants/OuvrirPaiements.jsx";   // (12 nov.) propriétaire seul
 import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
-import Partenaires from '../partenaires/Partenaires.jsx';   // (15 nov.) le programme partenaire, Julien seul
+import Partenaires from '../partenaires/Partenaires.jsx';
+import { ParrainsAVerser, CarteFilleul, useFilleulParraine } from '../parrainage/EcranParrainage.jsx';   // (25 nov.) le parrainage à 20 % : son écran, la vue de Julien   // (15 nov.) le programme partenaire, Julien seul
 import { etatAbonnement, lienParrainage, lectureSeuleActive, EXPORT_FERME } from '../abonnement/etatAbonnement.js';
-import { PHRASE_PARRAINAGE, TEXTE_PARTAGE, texteEtatFilleul, jourCourt, moisGagnes, offertPar, prendreDemandeParrainage } from '../parrainage/parrainage.js';   // (13 nov., lot 54)
+import { parrainageOuvertConnu, lireParrainageOuvert, suivreParrainageOuvert } from '../parrainage/parrainage.js';   // (13 nov., lot 54)
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
 // ⟦← App.jsx #12⟧
 import { VAPID_PUBLIC_KEY } from "../vapid.js";
@@ -2433,7 +2434,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // (17 oct.) L'abonnement a SON onglet (« Abonnement ») ; ici, un renvoi.
     AUTH.user && { id:'abonnement', titre:tr('reglages.groupe.abonnement-lien'), items:[
       { id:'abonnement', type:'panneau', nu:true, paresseux:true, ic:'wallet', lib:tr('reglages.abonnement-ouvrir.lib'), desc:tr('reglages.abonnement-ouvrir.desc'), data:{ 'data-reglage-abonnement':'', 'data-vue':'abonnement' },
-        el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/>{proprioInst === true ? <Partenaires enTete={enTeteSession} toast={toast}/> : <Parrainage/>}</div> },
+        el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/>{proprioInst === true ? <><Partenaires enTete={enTeteSession} toast={toast}/><ParrainsAVerser/></> : null}<EntreeParrainage onOuvrir={() => setTab('parrainage')}/></div> },
     ]},
     AUTH.user && { id:'boutique', titre:tr('reglages.groupe.boutique'), items:[
       // (30 oct.) « Abonnement et factures » retiré : l'onglet « Abonnement » du haut fait la même chose.
@@ -3872,6 +3873,8 @@ function MonAbonnement() {
         </span>}>
         {RETOUR_ABONNEMENT === 'merci' && <div className="vrm-abo-phrase">Paiement reçu : ton abonnement arrive ici dans quelques secondes.</div>}
         <OffresSoloPro x={e} prixSolo={prixLisible(e.prix)} prixProAffiche={`${PRIX_PRO_MOIS} € / mois`}/>
+        {/* (25 nov.) Le filleul voit SA remise avant de payer (−10 % sur le 1er mois, posée par le serveur au paiement). */}
+        <RemiseFilleul/>
         <CaseCgv cases={cases} onChange={setCases}/>
         <div className="vrm-abo-actions">
           <Bouton variante="primaire" plein disabled={!!occupe || !cgv} data-sabonner="" data-essai={e.essaiDispo ? '' : undefined} onClick={() => agir('checkout')}  title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : e.essaiDispo ? `Commencer l'essai gratuit de ${e.essaiJours || 7} jours` : "S'abonner"}</Bouton>
@@ -3911,128 +3914,20 @@ function FacturesAbonnement({ fx }) {
   );
 }
 
-// ── PARRAINAGE (8 nov. ; clair et visible le 13 nov., lot 54) ────────────────
-// « Parraine un vendeur : 1 mois offert pour toi et pour lui. » Un lien
-// personnel (copier · partager, le partage natif sur téléphone), le total de
-// mois gagnés, l'état de CHAQUE filleul (« inscrit », « a payé son 1er mois »
-// ⇒ mois offert) SANS identité, et le nom qui s'affiche chez le filleul
-// (« Offert par … ») — choisi ici, jamais un pseudo Vinted (règle au serveur).
-// Règle et anti-abus : api/_lib/parrainage.js, CGV article 2 bis.
-// Trois états : `undefined` en cours · `null` pas su · l'objet lu. Pas installé
-// (027 pas passée) ou parrainage fermé : on le dit, sans lien à partager.
-async function lireParrainage() {
-  try {
-    const r = await fetch('/api/compte?mode=parrainage', { headers: enTeteSession(), cache: 'no-store' });
-    if (!r.ok) return null;
-    const j = await r.json();
-    return j && j.ok ? j : null;
-  } catch (_) { return null; }
-}
-function NomParrain({ nom, onChange }) {
-  // `nom` : le nom choisi · `null` rien de choisi · `undefined` pas su.
-  const [ouvert, setOuvert] = React.useState(false);
-  const [v, setV] = React.useState('');
-  const [msg, setMsg] = React.useState('');
-  const [occupe, setOccupe] = React.useState(false);
-  const ouvrir = () => { setV(nom || String(load('vrm_prenom', '') || '').trim().slice(0, 24)); setMsg(''); setOuvert(true); };
-  const envoyer = async (valeur) => {
-    if (occupe) return;
-    setOccupe(true); setMsg('');
-    try {
-      const r = await fetch('/api/compte?mode=parrainage', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'nom', nom: valeur }) });
-      const j = await r.json().catch(() => null);
-      if (r.ok && j && j.ok) { onChange(j.nom || null); setOuvert(false); toast(j.nom ? 'Enregistré' : 'Retiré'); }
-      else setMsg((j && j.message) || 'Pas enregistré. Réessaie dans un instant.');
-    } catch (_) { setMsg('Pas enregistré. Réessaie dans un instant.'); }
-    setOccupe(false);
-  };
-  if (!ouvert) {
-    return <RangeeIos titre="Ton nom chez tes filleuls" detail={nom ? `Ils lisent « Offert par ${nom} »` : 'Ils lisent « Offert par un vendeur VRM »'}
-      valeur={<span data-parrainage-nom={nom || ''}>{nom === undefined ? '—' : (nom || 'Choisir')}</span>} onClick={ouvrir} data-parrainage-nom-ouvrir=""/>;
-  }
-  return (
-    <div className="vrm-ios-rangee" style={{ padding: '10px 16px', display: 'block' }} data-parrainage-nom-form="">
-      <label htmlFor="vrm-parrain-nom" style={{ display: 'block', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Ton nom chez tes filleuls</label>
-      <input id="vrm-parrain-nom" className="vrm-set-champ" style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, textAlign: 'left' }} value={v} maxLength={24}
-        onChange={(e) => { setV(e.target.value.slice(0, 24)); setMsg(''); }} placeholder="Ton prénom ou un pseudo VRM" autoComplete="given-name" disabled={occupe}/>
-      <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>Ton prénom ou un pseudo VRM, jamais ton pseudo Vinted. Rien d’autre ne se voit.</div>
-      {msg ? <div role="alert" data-parrainage-nom-refus="" style={{ fontSize: 13, color: C.text, marginTop: 6 }}>{msg}</div> : null}
-      <div className="vrm-abo-actions" style={{ marginTop: 10 }}>
-        <Bouton variante="primaire"  disabled={occupe || !v.trim()} onClick={() => envoyer(v)} data-parrainage-nom-enregistrer="">{occupe ? 'Enregistrement…' : 'Enregistrer'}</Bouton>
-        {nom ? <Bouton variante="secondaire"  disabled={occupe} onClick={() => envoyer('')}>Ne plus montrer de nom</Bouton> : null}
-        <Bouton variante="secondaire"  disabled={occupe} onClick={() => setOuvert(false)}>Annuler</Bouton>
-      </div>
-    </div>
-  );
-}
-function Parrainage() {
-  const [p, setP] = React.useState(undefined);
+// (25 nov.) Le parrainage a son ÉCRAN (src/parrainage/EcranParrainage.jsx) : ici, une rangée qui y mène.
+// Programme fermé : la rangée n'est montrée qu'au propriétaire (rien n'est promis aux vendeurs).
+function EntreeParrainage({ onOuvrir }) {
   const proprio = useEstProprietaire();
-  const racine = React.useRef(null);
-  React.useEffect(() => { let mort = false; lireParrainage().then((x) => { if (!mort) setP(x); }); return () => { mort = true; }; }, []);
-  // Venu du menu « Plus » (« Parrainer ») ou de `?tab=parrainage` : le groupe est amené à l'écran.
-  React.useEffect(() => {
-    if (!p || !racine.current) return;
-    const amener = () => { try { racine.current && racine.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} };
-    // Ce qui est au-dessus (l'abonnement, les factures) finit parfois de se lire APRÈS : on ramène encore deux fois.
-    const minuteurs = [];
-    const plusieurs = () => { amener(); minuteurs.push(setTimeout(amener, 600), setTimeout(amener, 1500)); };
-    if (prendreDemandeParrainage()) requestAnimationFrame(plusieurs);
-    const f = () => { prendreDemandeParrainage(); plusieurs(); };
-    window.addEventListener('vrm:voir-parrainage', f);
-    return () => { window.removeEventListener('vrm:voir-parrainage', f); minuteurs.forEach(clearTimeout); };
-  }, [p]);
-  if (p === undefined) return null;
-  if (p === null) return <GroupeIos titre="Parrainage" data-parrainage="pas-su"><RangeeIos titre="Parrainage pas lu" detail="Rouvre cet écran dans un instant."/></GroupeIos>;
-  if (!p.installe || !p.ouvert) {
-    // Fermé : rien n'est promis au vendeur ; le propriétaire lit le geste.
-    if (!proprio) return null;
-    return <GroupeIos titre="Parrainage" data-parrainage="ferme" pied={!p.installe ? 'À activer : passer la migration 027, puis vrm_reglages.parrainage = 1.' : 'Éteint : vrm_reglages.parrainage = 1 l’ouvre (un mois offert au parrain et au filleul).'}><RangeeIos titre="Parrainage pas encore ouvert"/></GroupeIos>;
-  }
-  const lien = lienParrainage(p.code);
-  const s = p.suivi || { inscrits: 0, payes: 0, moisOfferts: 0, enAttente: 0 };
-  const gagnes = moisGagnes(p);
-  const filleuls = Array.isArray(p.filleuls) ? p.filleuls : null;
-  const f = p.filleul || null;
-  const peutPartager = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
-  const copier = async () => {
-    try { await navigator.clipboard.writeText(lien); toast('Lien copié'); } catch (_) { toast('Copie impossible ici — sélectionne le lien'); }
-  };
-  const partager = async () => {
-    try { if (!peutPartager) { copier(); return; } await navigator.share({ title: 'VRM — 1 mois offert', text: TEXTE_PARTAGE, url: lien }); } catch (e) { if (!(e && e.name === 'AbortError')) copier(); }
-  };
-  return (
-    <div ref={racine} data-parrainage="ouvert" data-inscrits={s.inscrits} data-payes={s.payes} data-mois-gagnes={gagnes == null ? '' : gagnes} data-parrainage-test={p.modeTest ? '1' : undefined} style={{ scrollMarginTop: 72 }}>
-      <GroupeIos titre="Parrainage"
-        pied={`${p.modeTest ? 'Mode test : aucun vrai paiement pour l’instant. ' : ''}Ton ami s’inscrit avec ton lien. À son 1er paiement, chacun de vous deux reçoit un mois offert${Number.isFinite(p.moisCentimes) ? ' (' + (p.moisCentimes / 100).toFixed(2).replace('.', ',') + ' €)' : ''}, déduit de sa prochaine facture. Un nouveau compte VRM et un compte Vinted jamais vu dans VRM ; 12 mois offerts par an au plus.`}>
-        <div className="vrm-ios-rangee" style={{ padding: '12px 16px', display: 'block' }}>
-          <div data-parrainage-titre="" style={{ fontSize: 17, fontWeight: 600, color: C.text, lineHeight: 1.35, marginBottom: 10 }}>{PHRASE_PARRAINAGE}</div>
-          <div className="vrm-abo-lien"><code data-lien-parrainage="">{lien}</code></div>
-          <div className="vrm-abo-actions" style={{ marginTop: 10 }}>
-            <Bouton variante="primaire"  onClick={copier} data-copier-parrainage="">Copier le lien</Bouton>
-            {peutPartager ? <Bouton variante="secondaire"  onClick={partager} data-partager-parrainage="">Partager</Bouton> : null}
-          </div>
-        </div>
-        <RangeeIos titre="Mois gagnés" detail={s.enAttente ? `${s.enAttente} en attente de ton premier abonnement` : undefined} valeur={<span data-chiffre-mois="">{gagnes == null ? '—' : gagnes}</span>}/>
-        <NomParrain nom={p.nom} onChange={(nom) => setP((x) => ({ ...x, nom }))}/>
-      </GroupeIos>
-      {f && f.parraine ? (
-        <GroupeIos titre="Ton parrainage" data-parraine={f.moisOffert ? 'offert' : f.attendVinted ? 'attend-vinted' : 'en-cours'}>
-          <RangeeIos titre={`Offert par ${offertPar(f.offertPar) || 'un vendeur VRM'}`}
-            detail={f.moisOffert ? 'Ton mois offert est crédité.' : f.attendVinted ? 'Relie ton compte Vinted pour recevoir ton mois offert.' : 'Ton mois offert arrive avec ton 1er paiement.'}/>
-        </GroupeIos>
-      ) : null}
-      <GroupeIos titre="Tes filleuls" data-filleuls={filleuls ? filleuls.length : ''}
-        pied={<span data-parrainage-phrase="">{s.inscrits} personne{s.inscrits > 1 ? 's' : ''} venue{s.inscrits > 1 ? 's' : ''} par toi · {s.payes} abonnée{s.payes > 1 ? 's' : ''}</span>}>
-        {filleuls === null ? <RangeeIos titre="Liste pas lue" detail="Rouvre cet écran dans un instant."/>
-          : !filleuls.length ? <RangeeIos titre="Personne pour l’instant" detail="Partage ton lien : chaque inscription apparaît ici."/>
-          : filleuls.map((x) => { const t = texteEtatFilleul(x.etat); return (
-            <RangeeIos key={x.rang} data-filleul={x.etat} titre={`Filleul ${x.rang}`} detail={`${x.inscritLe ? 'inscrit le ' + jourCourt(x.inscritLe) + ' · ' : ''}${t.detail}`}
-              valeur={t.court}/>
-          ); })}
-      </GroupeIos>
-    </div>
-  );
+  const [ouvert, setOuvert] = React.useState(parrainageOuvertConnu());
+  React.useEffect(() => { lireParrainageOuvert(); return suivreParrainageOuvert(setOuvert); }, []);
+  if (ouvert !== true && proprio !== true) return null;
+  return <GroupeNatif titre={tr('parrain.titre')} attrs={{ 'data-parrainage-entree': '' }}>
+    <RangeeNatif icone={<Icon name="cadeau" size={22}/>} titre={tr('parrain.titre')} sousTitre={tr('parrain.entree.desc')} fin="chevron" onClick={onOuvrir}/>
+  </GroupeNatif>;
+}
+function RemiseFilleul() {
+  const f = useFilleulParraine();
+  return f ? <div data-parrainage-remise=""><CarteFilleul filleul={f.filleul} regle={f.regle} compacte/></div> : null;
 }
 // ⟦← App.jsx #41⟧
 

@@ -165,10 +165,7 @@ export default {
   "v2.l.acheteMarge": "Comprato {p} · margine {m}",
   "v2.chargement": "Lettura dei tuoi annunci…",
   "v2.imprimerCourt": "Stampa le etichette",
-  "v2.ecartCourt": {
-    "one": "{r} non ancora pronto",
-    "other": "{r} non ancora pronti"
-  },
+  "v2.ecartCourt": {"one": "{r} non pronto", "other": "{r} non pronti"},
   "v2.tousPrets": "tutti pronti da stampare",
   "v2.achats.ajouterCourt": "Aggiungi",
   "v2.reessayer": "Riprova",
@@ -247,7 +244,7 @@ export default {
   "v2.reg.completer": "Completa i miei annunci",
   "v2.reg.completerN": "Completa i miei annunci · {n}",
   "v2.jour.lecture": "lettura…",
-  "v2.stats.titre": "I tuoi numeri",
+  "v2.stats.titre": "Numeri",
   "v2.stats.ca": "Venduto",
   "v2.obj.fixer": "Fissa un obiettivo del mese",
   "v2.obj.titre": "Obiettivo del mese",
@@ -306,7 +303,7 @@ export default {
     "one": "{n} offerta inviata",
     "other": "{n} offerte inviate"
   },
-  "v2.perso.ouvrir": "Personalizza questa schermata",
+  "v2.perso.ouvrir": "Personalizza",
   "v2.perso.titre": "Schede di Oggi",
   "v2.perso.pied": "Tocca − per togliere una scheda, + per aggiungerla; trascina ≡ per spostarla.",
   "v2.perso.monter": "Su",
@@ -503,5 +500,7 @@ export default {
   "v2.style.arcade": "Arcade",
   "v2.style.arcade.desc": "Grandi pulsanti in rilievo, come un gioco.",
   "v2.style.monochrome": "Monocromo",
-  "v2.style.monochrome.desc": "Nero, bianco e grigio chiaro; un punto verde."
+  "v2.style.monochrome.desc": "Nero, bianco e grigio chiaro; un punto verde.",
+  "v2.style.c3doux": "C3",
+  "v2.style.c3doux.desc": "Grigio un po' scuro, schede bianche, targhe incise."
 };

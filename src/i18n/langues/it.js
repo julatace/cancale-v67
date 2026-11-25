@@ -26,6 +26,7 @@ import ecran_messagesPro from './it/messagesPro.js';   // (24 nov.) la conversat
 import ecran_connexions_ext from './it/connexions.js';   // (24 nov.) « Connexions de l'extension »   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './it/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
 import ecran_styleClarte from './it/styleClarte.js';
+import ecran_moinsTexte from './it/moinsTexte.js';
 import ecran_revueUx from './it/revueUx.js';   // (23 nov.) revue UX   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './it/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './it/ext5438.js';   // (22 nov.) ext. 5.438
@@ -121,6 +122,7 @@ import ecran_ux_reglages from './it/uxReglages.js';   // (21 nov.) Paramètres, 
 import ecran_natif from './it/natif.js';
 import ecran_menu_onglets from './it/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './it/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
+import ecran_parrainage20 from './it/parrainage.js';   // (25 nov.) le parrainage à 20 %
 import ecran_actions_ext from './it/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './it/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
@@ -472,7 +474,7 @@ export default {
   "auth.lier.extension": "Accedi qui: anche l’estensione di {navigateur} si connette, niente da digitare.",
   "auth.parrain.offertPar": "Un regalo di {nom}",
   "auth.parrain.offertVendeur": "Un regalo di un venditore VRM",
-  "auth.parrain.texte": "1 mese di VRM in regalo al primo pagamento, per te e per chi ti invita.",
+  "auth.parrain.texte": "−10 % sul primo mese di VRM e 1 settimana gratis al primo pagamento.",
   "auth.parrain.texteConnexion": "Hai già un account? Accedi: l’invito vale solo per i nuovi account.",
   "auth.lier.pasOuverte": "L’accesso con {nom} non è ancora aperto su VRM. Accedi qui con la tua e-mail e la password VRM: l’estensione si connetterà insieme.",
   "auth.lier.pasVerifie": "Non sono riuscito a verificare l’accesso con {nom}. Riprova i metodi qui sotto, o accedi con la tua e-mail: l’estensione si connetterà insieme.",
@@ -2429,6 +2431,7 @@ export default {
   ...ecran_messagesPro,
   ...ecran_apresFinale,
   ...ecran_styleClarte,
+  ...ecran_moinsTexte,
   ...ecran_revueUx,
   ...ecran_relier_retires,
   ...ecran_fiched,
@@ -2453,4 +2456,5 @@ export default {
   ...ecran_extension,
   ...ecran_actions_ext,
   ...ecran_offres_photos,
+  ...ecran_parrainage20,
 };
