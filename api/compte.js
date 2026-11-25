@@ -127,6 +127,10 @@ import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ec
 import { corsExtension } from './_lib/cors-extension.js';
 import { codeDe, suiviDe, parrainageOuvert, rattacher, factureFilleulPayee, apercuCode, poserNom, nomDe, filleulsDe, filleulDetail } from './_lib/parrainage.js';
 // (15 nov.) LE PROGRAMME PARTENAIRE : 3 € par mois et par client payant (api/_lib/partenaires.js, migration 043).
+// (25 nov.) LE PARRAINAGE À 20 % : −10 % le 1er mois du filleul, 20 % de chaque facture payée au parrain
+// (api/_lib/parrainage-gains.js, règle api/_lib/parrainage-regle.js, migration 049).
+import { gainFacturePayee, annulerGains, reglerGains, parrainDe, vueGains, regleAffichee, poserChoix, poserIban, listeAVerser, noterVerseParrain, remiseFilleul } from './_lib/parrainage-gains.js';
+import { creditSemaine } from './_lib/parrainage-regle.js';
 import { rattacherPartenaire, commissionFacturePayee, annulerCommissions, vuePartenaire, listeAdmin, csvAdmin, actionAdmin, couponDuFilleul, rattacheAUnPartenaire } from './_lib/partenaires.js';
 // (9 nov.) Solo et Pro : la règle (api/_lib/plan-regle.js, la même que l'app).
 import { planDeLAbonnement, prochainChangement, uidValide, PLAN_PRO, PLAN_SOLO, CLE_PRIX_SOLO, PLATEFORMES_SOLO, NOMS_PLATEFORMES_SOLO, META_VENDEUR, idCompteVendeur, PRIX_COMPTE_SUP_CENTIMES, CLE_PRIX_COMPTE_SUP, COMPTES_INCLUS_SOLO, META_COMPTES_SUP, MAX_COMPTES_SUP, estPrixCompteSup } from './_lib/plan-regle.js';
@@ -661,17 +665,35 @@ async function webhook(req, res) {
     const owner = await proprietaireDe(null, client);
     if (owner === undefined) return repondre(res, 503, { erreur: 'propriétaire pas su', reessayer: true });
     if (!owner) { console.warn('[stripe] invoice.paid sans propriétaire VRM', String(obj.id || '').slice(0, 40)); return repondre(res, 200, { recu: true, ignore: 'sans-proprietaire' }); }   // (11 nov., B133) journalisé
-    const p = await factureFilleulPayee(owner, client, obj, PRIX_CGV.centimes);
+    // (25 nov.) Le mois offert devient UNE SEMAINE offerte (au parrain et au filleul, au 1er paiement réel).
+    const p = await factureFilleulPayee(owner, client, obj, creditSemaine(PRIX_CGV.centimes));
     // (15 nov.) LE PROGRAMME PARTENAIRE : une commission de 3 € par facture réelle d'un client
     // rattaché à un code (une par facture, une par mois). Pas rangée ⇒ 503, Stripe rejoue.
     const c = await commissionFacturePayee(owner, obj);
+    // (25 nov.) LE PARRAINAGE À 20 % : 20 % de cette facture au parrain (une ligne par facture).
+    const g = await gainFacturePayee(owner, obj);
     if (!p.ok) return repondre(res, 503, { erreur: 'parrainage non crédité', reessayer: true });
     if (!c.ok) return repondre(res, 503, { erreur: 'commission partenaire non rangée', reessayer: true });
+    if (!g.ok) return repondre(res, 503, { erreur: 'gain de parrainage non rangé', reessayer: true });
+    // Ce qui est dû (à ce vendeur comme parrain, et à son parrain) part sur un solde Stripe : jamais bloquant.
+    try { await reglerGains(owner); const pp = await parrainDe(owner); if (pp) await reglerGains(pp); } catch (_) {}
+    return repondre(res, 200, { recu: true });
+  } else if (type === 'invoice.created') {
+    // (25 nov.) Une heure avant la facture d'un abonné : ses gains de parrain DUS (mode crédit) partent
+    // sur son solde, déduits de CETTE facture. Pas su ⇒ 503 (Stripe rejoue) ; rien à faire ⇒ 200.
+    const client = typeof obj.customer === 'string' ? obj.customer : (obj.customer && obj.customer.id) || '';
+    const owner = await proprietaireDe(null, client);
+    if (owner === undefined) return repondre(res, 503, { erreur: 'propriétaire pas su', reessayer: true });
+    if (!owner) return repondre(res, 200, { recu: true, ignore: 'sans-proprietaire' });
+    const r = await reglerGains(owner);
+    if (!r.ok) return repondre(res, 503, { erreur: 'gains de parrainage non réglés', reessayer: true });
     return repondre(res, 200, { recu: true });
   } else if (EVENEMENTS_ANNULATION.includes(type)) {
     // (15 nov.) Remboursement, litige ou avoir : la commission partenaire de cette facture est annulée.
     const a = await annulerCommissions(type, obj);
+    const ag = await annulerGains(type, obj);   // (25 nov.) et le gain de parrainage de cette facture
     if (!a.ok) return repondre(res, 503, { erreur: 'annulation partenaire non rangée', reessayer: true });
+    if (!ag.ok) return repondre(res, 503, { erreur: 'annulation de parrainage non rangée', reessayer: true });
     return repondre(res, 200, { recu: true });
   } else {
     // invoice.* : le statut qui compte arrive par customer.subscription.updated.
@@ -924,6 +946,12 @@ async function checkout(req, res) {
     const coupon = await couponDuFilleul(u.id);
     if (coupon === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu vérifier ton abonnement. Réessaie dans un instant." });
     if (coupon) { params.discounts = [{ coupon }]; params.metadata.partenaire_coupon = coupon; }
+    // (25 nov.) LE FILLEUL : −10 % sur son 1er mois payé (jamais cumulé avec un code partenaire).
+    else {
+      const remise = await remiseFilleul(u.id);
+      if (remise === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu vérifier ton parrainage. Réessaie dans un instant." });
+      if (remise) { params.discounts = [{ coupon: remise }]; params.metadata.parrainage_remise = remise; params.subscription_data.metadata.parrainage_remise = remise; }
+    }
   }
   // Un double clic ne crée pas deux sessions (même clé dans la même minute).
   // (11 nov., M55) Les PARAMÈTRES dans la clé (Solo ou Pro, essai) : deux clics
@@ -1212,6 +1240,16 @@ async function parrainage(req, res) {
       const r = await poserNom(u.id, corps.nom);
       return repondre(res, r.http || (r.ok ? 200 : 400), { ok: r.ok, nom: r.ok ? r.nom : undefined, raison: r.raison, message: r.message });
     }
+    // (25 nov.) Le choix du parrain (crédit sur l'abonnement / virement) et l'IBAN du virement.
+    if (corps && corps.action === 'choix') {
+      const r = await poserChoix(u.id, String(corps.mode || ''));
+      return repondre(res, r.http, { ok: r.ok, mode: r.mode, raison: r.raison });
+    }
+    if (corps && corps.action === 'iban') {
+      if (typeof corps.iban !== 'string' || corps.iban.length > 60 || (corps.titulaire != null && (typeof corps.titulaire !== 'string' || corps.titulaire.length > 120))) return repondre(res, 400, { ok: false, raison: 'iban' });
+      const r = await poserIban(u.id, corps.iban, corps.titulaire);
+      return repondre(res, r.http, { ok: r.ok, iban: r.iban, raison: r.raison, message: r.message });
+    }
     if (!corps || corps.action !== 'rattacher') return repondre(res, 400, { ok: false, raison: 'action' });
     const [ligne, idsVinted] = await Promise.all([ligneDe(req), lireVintedIds(u.id)]);
     if (idsVinted === null) return repondre(res, 503, { ok: false, raison: 'pas-su', message: 'Parrainage pas vérifié. Réessaie dans un instant.' });   // (11 nov., M51)
@@ -1228,8 +1266,11 @@ async function parrainage(req, res) {
   if (code === undefined || suivi === undefined) return repondre(res, 200, { ok: true, installe: false, ouvert });
   // (13 nov., lot 54) L'état de CHAQUE filleul, sans identité (rang, jour d'inscription, état).
   const filleuls = await filleulsDe(u.id, ligne === undefined ? null : !!(ligne && ligne.client_stripe));
+  // (25 nov.) Les 20 % : ce qui est dû part d'abord sur le solde (mode crédit), puis les NOMBRES.
+  if (ouvert) { try { await reglerGains(u.id); } catch (_) {} }
+  const gains = await vueGains(u.id);
   // (11 nov.) `modeTest` : Stripe en clé de test (ou pas encore branché) — l'écran le DIT.
-  return repondre(res, 200, { ok: true, installe: true, ouvert, code, suivi, filleuls: filleuls || null, nom: nom === undefined ? undefined : nom, filleul: filleul || null, moisCentimes: PRIX_CGV.centimes, modeTest: !stripePret() || stripeModeTest() });
+  return repondre(res, 200, { ok: true, installe: true, ouvert, code, suivi, filleuls: filleuls || null, nom: nom === undefined ? undefined : nom, filleul: filleul || null, semaineCentimes: creditSemaine(PRIX_CGV.centimes), moisCentimes: PRIX_CGV.centimes, regle: regleAffichee(), gains: gains === undefined ? null : gains, modeTest: !stripePret() || stripeModeTest() });
 }
 
 // ── LE PROGRAMME PARTENAIRE (15 nov., api/_lib/partenaires.js) ──────────────
@@ -1275,11 +1316,14 @@ async function partenairesAdmin(req, res) {
       res.status(200);
       return res.end(c.texte);
     }
+    // (25 nov.) « Parrains à verser » (mode virement) : la vue de Julien.
+    if (req.query && req.query.vue === 'parrains') { const v = await listeAVerser(); return repondre(res, v.http, v.corps); }
     const l = await listeAdmin();
     return repondre(res, l.http, l.corps);
   }
   const corps = await lireCorpsJson(req);
   if (!corps || typeof corps !== 'object') return repondre(res, 400, { ok: false, raison: 'corps' });
+  if (corps.action === 'verse-parrain') { const v = await noterVerseParrain(corps); return repondre(res, v.http, v.corps); }
   const r = await actionAdmin(corps);
   return repondre(res, r.http, r.corps);
 }

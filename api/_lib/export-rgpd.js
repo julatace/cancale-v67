@@ -26,6 +26,7 @@
 import { sbCle } from './cle.js';
 import { fetchAvecDelai } from './fetch-delai.js';   // (12 nov.) chaque appel sortant a un délai
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
+import { chiffresParrain, modeActuel, ibanMasque } from './parrainage-regle.js';   // (25 nov.) le parrainage à 20 %
 
 // Lignes LOURDES : seul leur résumé part (motifs `like` de PostgREST).
 export const LOURDS = ['harvest_*_txn_*', 'harvest_*_label_*', 'email_bord_*', 'email_html_*', 'email_qpj_*', 'backup_*', 'lbc_catalogue', 'lbc_recon', 'harvest_*_seen_urls', 'harvest_*_wreq_*', 'harvest_*_pickup_points'];
@@ -127,7 +128,7 @@ export async function pageExport({ utilisateur, curseur, url, service, proprio =
   }
 
   // c.p === 'compte' : tout ce qui n'est pas dans app_data, en une page.
-  const [comptes, abo, code, parrain, filleul, preuves, signalements] = await Promise.all([
+  const [comptes, abo, code, parrain, filleul, preuves, signalements, gains, choix, iban, verses] = await Promise.all([
     lire(url, service, `vinted_accounts?owner=eq.${o}&select=vinted_user_id,login,domain`, fetcher),
     lire(url, service, `abonnements?owner=eq.${o}&select=statut,plan,fin_periode,annule_fin_periode,mode_test,client_stripe`, fetcher),
     lire(url, service, `parrainage_codes?owner=eq.${o}&select=code`, fetcher),
@@ -135,8 +136,14 @@ export async function pageExport({ utilisateur, curseur, url, service, proprio =
     lire(url, service, `parrainages?filleul=eq.${o}&select=inscrit,paye_le,credit_filleul_le`, fetcher),
     lire(url, service, `app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.vrm_email_preuve_*&data->>owner=eq.${o}&select=id,updated_at,adresse:data->>adresse`, fetcher),
     proprio ? lire(url, service, `app_data?owner=eq.${encodeURIComponent(proprio)}&id=like.signalement_*&data->>de=eq.${o}&select=id,updated_at,data`, fetcher) : Promise.resolve([]),
+    // (25 nov.) Le parrainage à 20 % (049) : ses gains (des NOMBRES, filleuls anonymes), son choix, son IBAN masqué.
+    lire(url, service, `parrainage_gains?parrain=eq.${o}&select=facture,filleul,montant_centimes,facture_centimes,paye_le,mois,due_le,annulee_le,annulee_raison,rembourse_centimes,credite_le&limit=5000`, fetcher),
+    lire(url, service, `parrainage_choix?parrain=eq.${o}&select=mode,le&order=le.asc`, fetcher),
+    lire(url, service, `parrainage_iban?parrain=eq.${o}&select=iban,titulaire,le`, fetcher),
+    lire(url, service, `parrainage_versements?parrain=eq.${o}&select=montant_centimes,verse_le`, fetcher),
   ]);
-  if ([comptes, abo, code, parrain, filleul, preuves, signalements].some((x) => x === null)) return pasSu;
+  if ([comptes, abo, code, parrain, filleul, preuves, signalements, gains, choix, iban, verses].some((x) => x === null)) return pasSu;
+  const ch = chiffresParrain({ gains, choix, versements: verses, maintenant, limite: Infinity });
   const compte = {
     exporte_le: new Date(maintenant).toISOString(),
     connexion: { email: utilisateur.email || null, compte_cree_le: utilisateur.created_at || null },
@@ -146,6 +153,10 @@ export async function pageExport({ utilisateur, curseur, url, service, proprio =
       ton_code: (code[0] && code[0].code) || null,
       tes_filleuls: { inscrits: parrain.length, ont_paye: parrain.filter((x) => x.paye_le).length, mois_offerts: parrain.filter((x) => x.credit_parrain_le).length },
       parraine: filleul[0] ? { inscrit_le: filleul[0].inscrit || null, mois_offert: !!filleul[0].credit_filleul_le } : null,
+      // (25 nov.) Tes 20 % : le mode choisi (et son historique), l'IBAN masqué, les montants.
+      reglement: { mode: modeActuel(choix, maintenant), choix_successifs: choix.map((c) => ({ mode: c.mode, le: c.le })), iban: iban[0] ? { iban_masque: ibanMasque(iban[0].iban), titulaire: iban[0].titulaire || null, le: iban[0].le || null } : null },
+      tes_gains: { total_centimes: ch.totalCentimes, en_attente_centimes: ch.attenteCentimes, credite_centimes: ch.crediteCentimes, verse_centimes: ch.verseCentimes, a_verser_centimes: ch.aVerserCentimes,
+        detail: ch.historique.map((x) => ({ filleul: x.filleul ? 'Filleul ' + x.filleul : null, mois: x.mois, paye_le: x.payeLe, du_le: x.dueLe, centimes: x.centimes, etat: x.etat })) },
     },
     adresses_prouvees: preuves.map((p) => ({ adresse: p.adresse || null, le: p.updated_at || null })),
     signalements_envoyes: signalements.map((s) => { const d = sansSecrets(s.data || {}); delete d.de; return { id: s.id, le: s.updated_at || null, ...d }; }),

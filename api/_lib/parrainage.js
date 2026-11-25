@@ -221,7 +221,7 @@ export function emailCanon(e) {
   return `${loc}@${dom}`;
 }
 // L'adresse d'un compte VRM (admin GoTrue) · '' aucune · `undefined` pas su.
-async function emailDe(owner) {
+export async function emailDe(owner) {
   try {
     const r = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(owner)}`, { headers: sbCle(service()) });
     if (r.status === 404) return '';
@@ -351,13 +351,13 @@ export async function rattacher(code, ctx, maintenant = Date.now()) {
 // ── LE MOIS OFFERT, CHEZ STRIPE ─────────────────────────────────────────────
 // Un crédit sur le solde client (montant NÉGATIF = crédit), avec sa marque.
 // Rend true (crédité, ou déjà crédité) · false (Stripe a refusé / muet).
-async function crediter(client, cle, centimes) {
+export async function crediter(client, cle, centimes, description = 'VRM — une semaine offerte (parrainage)') {
   if (!/^cus_/.test(String(client || ''))) return false;
   const lu = await stripeApi('GET', `customers/${encodeURIComponent(client)}/balance_transactions`, { limit: 100 });
   if (!lu.ok || !lu.data || !Array.isArray(lu.data.data)) return false;
   if (lu.data.data.some((t) => t && t.metadata && t.metadata.vrm_parrainage === cle)) return true;
   const r = await stripeApi('POST', `customers/${encodeURIComponent(client)}/balance_transactions`,
-    { amount: -Math.abs(centimes), currency: 'eur', description: 'VRM — un mois offert (parrainage)', metadata: { vrm_parrainage: cle } },
+    { amount: -Math.abs(centimes), currency: 'eur', description, metadata: { vrm_parrainage: cle } },
     `vrm-parrainage-${cle}`);
   return !!(r.ok && r.data && r.data.id);
 }
@@ -369,7 +369,7 @@ async function patch(filleul, champs) {
     return r.ok;
   } catch (_) { return false; }
 }
-async function clientDe(owner) {
+export async function clientDe(owner) {
   const j = await lireJson(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&select=client_stripe`);
   if (!j) return undefined;
   return (j[0] && j[0].client_stripe) || null;
