@@ -293,6 +293,6 @@ après un redémarrage du conteneur). Mêmes builds qu'en §8 quater, code incha
 La 1re passe à froid des deux builds est le 1er démarrage après le redémarrage du conteneur (36 s / 14 s : caches froids) ;
 elle ne change ni les médianes ni le compte des paires. À froid : médiane +15 ms (0,2 %), B plus lent sur 3 paires sur 7 —
 au niveau de A. Ma journée et tous les autres écrans : B plus rapide en médiane, plus lent sur au plus 3 paires sur 7.
-Rappel de l'AB précédent (§8 quater bis, charge ≤ 6,5) : à froid 8 108 → 8 018 mais 6 paires sur 7 plus lentes (+8 à +323 ms) ;
+AB précédent, même protocole (25 nov. vers 1 h, charge ≤ 6,5 ; interrompu ensuite par le redémarrage pour son 3e build) : à froid 8 108 → 8 018 mais 6 paires sur 7 plus lentes (+8 à +323 ms) ;
 Ma journée 1 542 → 1 570. Sur ces 14 paires à froid, l'écart médian par paire est d'environ +80 ms (1 %).
 Ma journée lue au banc (`LECTURES`, `CALCULS`) : B fait 40 lectures au lieu de 80 et `pickupUnion` 2 fois au lieu de 5.
