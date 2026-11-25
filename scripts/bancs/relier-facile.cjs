@@ -196,7 +196,7 @@ const fermer = async (pg) => { await pg.locator('[data-relier-fermer]').first().
           if (ouvert) break;
           await A.pg.evaluate((i) => { const l = document.querySelectorAll('[data-achats-tableau] [data-tt-ligne]')[i]; const b = l && l.querySelector('[data-tt-menu], .n-tt-menu, button[aria-haspopup]'); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); } }, i);
           await A.pg.waitForTimeout(300);
-          const it = await A.pg.evaluate(() => { const x = [...document.querySelectorAll('[role="menuitem"], [data-tt-menu-item], button')].find((y) => y.getClientRects().length && /Relier à une vente/.test(y.textContent)); if (x) { x.click(); return true; } return false; });
+          const it = await A.pg.evaluate(() => { const x = [...document.querySelectorAll('[data-tt-plus-choix="relier"], [data-achat-relier]')].find((y) => y.getClientRects().length);   // (25 nov., moins-texte-a) la DONNÉE du geste, plus son libellé (raccourci) if (x) { x.click(); return true; } return false; });
           if (it) ouvert = true; else await A.pg.keyboard.press('Escape').catch(() => {});
         }
       }
