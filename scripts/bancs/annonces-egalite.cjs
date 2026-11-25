@@ -86,6 +86,10 @@ async function ouvrir(nav, opts, q) {
   const ctx = await nav.newContext(opts); const pg = await ctx.newPage();
   await pg.goto(`http://127.0.0.1:${PORT}/${q}`); await pg.waitForSelector('[data-eg-ecran]', { timeout: 15000 });
   if (opts.isMobile) await pg.addStyleTag({ content: ':root{--n-zone-haut:47px;--n-zone-bas:34px}' });
+  // (23 nov., latence-2) Au téléphone les rangées se posent par paquets (src/composants/ParPaquets.jsx) : chaque paquet est
+  // amené (sentinelle à l'écran) avant de juger — le banc juge toutes les rangées que la liste montre, puis revient en haut.
+  for (let i = 0; i < 40 && await pg.locator('[data-par-paquets]').count(); i++) { await pg.evaluate(() => { const x = document.querySelector('[data-par-paquets]'); if (x) x.scrollIntoView({ block: 'end' }); }); await pg.waitForTimeout(120); }
+  await pg.evaluate(() => { window.scrollTo(0, 0); for (const e of document.querySelectorAll('*')) if (e.scrollTop) e.scrollTop = 0; });
   await pg.waitForTimeout(150); return { ctx, pg };
 }
 async function juger(nav, mutant = '') {
