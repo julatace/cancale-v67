@@ -34,4 +34,6 @@ export default {
   "uxr.bd.enCours": "In corso",
   "uxr.bd.lectureAttend": "Dopo aver collegato l’account",
   "uxr.bd.extensionPasSu": "Verifico…",
+  "uxr.acct.raisonEmail": "Scrivi prima il nuovo indirizzo",
+  "uxr.acct.raisonMdp": "Scrivi prima la nuova password",
 };

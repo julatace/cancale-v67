@@ -13,6 +13,8 @@ require('./_porte-banc.cjs');
 //    G  « Plein écran » : une icône ≥ 44 px dans la zone du code ; toucher la zone = le guichet ; AUCUN « Copier » (page et guichet) ;
 //    S  deux colis au même point = deux billets, chacun SON code, l'en-tête du point UNE fois ;
 //    R  ni bleu vif, ni rouge, ni violet dans un billet ; rien ne déborde.
+//  ⚠️ (23 nov., lot retours-suivi) Le défaut de l'app est devenu la proposition C (rangées compactes, `retrait-point-c.cjs` la juge) :
+//  ce banc juge le BILLET, qui reste une variante (« a » / « b », `vrm_banc_retrait_variante`), et la pose donc explicitement.
 //  `BANC_DIST=…` juge un autre build (le code d'avant : rouge attendu). `SHOTS=dossier` garde les captures.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -93,7 +95,7 @@ const releve = () => {
       console.log(`\n── Billet de retrait · ${W} · ${th}`);
       const { ctx, pg, erreurs } = await ouvrir(nav, { W, sombre: th === 'sombre', b, url: '/?tab=achats', dsf: 2 });
       try { await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: `http://localhost:${PORT}` }); } catch (_) {}
-      await pg.addInitScript((v) => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_banc_dom_ancien'); if (v === 'a') localStorage.setItem('vrm_banc_retrait_variante', 'a'); else localStorage.removeItem('vrm_banc_retrait_variante'); } catch (_) {} }, VARIANTE);
+      await pg.addInitScript((v) => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_banc_dom_ancien'); localStorage.setItem('vrm_banc_retrait_variante', v === 'a' ? 'a' : 'b'); } catch (_) {} }, VARIANTE);
       await pg.reload({ waitUntil: 'domcontentloaded' });
       await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
       const vu = await attendre(pg, () => document.querySelectorAll('[data-rp-point] [data-rp-colis]').length >= 3);

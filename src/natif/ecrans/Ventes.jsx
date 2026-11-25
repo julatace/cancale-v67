@@ -23,7 +23,9 @@ import { morceauxMarqueTaille } from '../../ventes/marqueTaille.js';
 import '../ventes-lisibles.css';
 import { useARegler } from '../../designV2/useARegler.js';
 import { groupesDe, atelierCompleter } from '../../designV2/aRegler.js';   // (21 nov.) vignettes lisibles, titre entier, gestes de l'achat
-import { ParPaquets } from '../../composants/ParPaquets.jsx';   // (22 nov., latence) 70 colis à envoyer posés par paquets
+import { ParPaquets } from '../../composants/ParPaquets.jsx';
+import { Trajet } from '../Jeu.jsx';   // (24 nov., visuel-jeu) le trajet du colis en piste, étapes PROUVÉES   // (22 nov., latence) 70 colis à envoyer posés par paquets
+import { RelierAnnonceMail } from './RelierAnnonceMail.jsx';   // (24 nov.) « Relier à l'annonce » d'une vente vue par e-mail   // (22 nov., latence) 70 colis à envoyer posés par paquets
 
 const joint = (...x) => x.filter(Boolean).join(' · ');
 // Les morceaux d'une méta qui peut passer à la ligne : chacun reste entier (« à vérifier » ne se coupe jamais en deux).
@@ -90,7 +92,9 @@ function RangeeColis({ r, g, Icon, Photo, choisie, onOuvrir }) {
       sousTitre={morceaux(!r.num && r.numAttendu ? tr('vn.numAttente') : '', ...marqueTailleM(r), sansBordereau(r) ? tr('vt.sansBordMeta') : '',
         ech ? <span className="n-vt-limite" data-vt-limite-rangee="" data-vt-ambre={r.echeance && r.echeance.ambre ? '1' : undefined}>{ech}</span> : '')} sousLignes={2}
       note={ligneTel(r, null)}
-      pied={piedAchat(r, Icon)}
+      // (24 nov., vente-mail-annonce) Une vente vue par e-mail sans annonce reliée : UN geste, « Relier à l'annonce » (à la place de
+      // l'achat : sans annonce, il n'y a pas encore de paire à qui relier un achat). Reliée par son clic : « Délier ».
+      pied={r.gestes && r.gestes.relierAnnonce ? <RelierAnnonceMail ra={r.gestes.relierAnnonce} r={r} Photo={Photo} Icon={Icon}/> : piedAchat(r, Icon)}
       selection={{ cochee: r.coche.on, indisponible: !r.coche.possible, libelle: tr(r.coche.possible ? 'vv.coche.label' : 'vv.coche.sansBordereau', { titre: r.titre }),
         onChange: () => g.basculer(r.coche.cle), attrs: { 'data-vn-coche': r.cle } }}
       // Pas de chevron : la rangée entière s'ouvre (comme une liste en mode choix) ; le titre garde ses deux lignes entières.
@@ -110,7 +114,8 @@ function RangeeRoute({ r, Icon, Photo, choisie, onOuvrir }) {
       plaque={avecSite(r, r.num ? <Plaque numero={r.num}/> : null)}
       sousTitre={morceaux(...marqueTailleM(r), texteEtape(r.etapes))} sousLignes={2}
       ton={r.etat.ambre ? 'ambre' : 'neutre'}
-      note={ligneTel(r, null)}
+      // (24 nov., visuel-jeu) Le trajet dessiné sous la phrase : les MÊMES étapes prouvées (`etapesRoute`), le camion sur la dernière.
+      note={<>{ligneTel(r, null)}<Trajet etapes={r.etapes} Icon={Icon} libelles={Object.fromEntries((r.etapes || []).map((e) => [e.cle, tr('vv.route.' + e.cle)]))}/></>}
       pied={piedAchat(r, Icon)}
       selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)}
       actions={r.lienSuivi ? [{ cle: 'suivre', libelle: tr('vn.b.suivre'), icone: <Icon name="truck" size={20}/>, onClick: () => { try { window.open(r.lienSuivi, '_blank', 'noopener'); } catch (_) {} }, franc: true }] : null}
@@ -140,16 +145,19 @@ function DetailVente({ r, g, Icon, Logo, Photo, Generer }) {
           <Fait libelle={tr('vv.fiche.pourToi')} valeur={(route ? (r.pourToi ? r.prix : '') : d.pourToi) || null} detail={!route && d.sansFrais ? tr('vv.fiche.sansFrais') : ''}/>
           {!route ? <Fait libelle={tr('vv.col.limite')} valeur={texteEcheance(r.echeance) || null} ton={r.echeance && r.echeance.ambre ? 'ambre' : 'neutre'} detail={r.echeance && r.echeance.sorte === 'estimee' ? tr('vv.ech.estimee') : ''}/> : null}
           {!route ? <Fait libelle={tr('vv.col.ou')} valeur={textePlace(r.place) || null}/> : null}
-          <Fait libelle={tr('vv.col.transport')} valeur={r.transporteur || null} detail={route ? r.suivi : texteBordereau(r.bordereau)}/>
+          <Fait libelle={tr('vv.col.transport')} valeur={r.transporteur || null} detail={route ? (r.envoi ? '' : r.suivi) : texteBordereau(r.bordereau)}/>   {/* (24 nov.) la piste dit le n° (un nombre une fois, §7) */}
           <Fait libelle={tr('vn.f.acheteur')} valeur={r.acheteur || null}/>
         </Faits>
       </Groupe>
       {(r.notes || []).length ? <Groupe>{r.notes.map((n) => <Rangee key={n.cle} titre={n.texte} lignes={2} ton="ambre" attrs={{ 'data-vn-note': n.cle }}/>)}</Groupe> : null}
-      {etapes.length ? <Groupe titre={tr('vv.route.etapes')} attrs={{ 'data-vn-etapes': r.cle }}>
+      {/* (24 nov., lot suivi-ventes) Un colis vendu PARTI : la piste de l'envoi (dessinée par l'app, `g.parcours`) remplace les étapes. */}
+      {r.envoi && g && g.parcours ? <Groupe nu attrs={{ 'data-vn-parcours': r.cle }}>{g.parcours(r)}</Groupe>
+      : etapes.length ? <Groupe titre={tr('vv.route.etapes')} attrs={{ 'data-vn-etapes': r.cle }}>
         {etapes.map((e) => <Rangee key={e.cle} titre={e.libelle} valeur={e.valeur || null} fin={e.fait ? 'coche' : null} sousTitre={!e.fait && e.geste ? tr('vn.aFaire') : ''} ton={e.geste ? 'ambre' : 'neutre'}
           attrs={{ 'data-etape': e.cle, 'data-fait': e.fait ? '1' : '0' }}/>)}
       </Groupe> : null}
       <Groupe attrs={{ 'data-vn-gestes': r.cle }}>
+        {G.relierAnnonce ? <RelierAnnonceMail ra={G.relierAnnonce} r={r} Photo={Photo} Icon={Icon} rangee/> : null}
         {r.achat ? <Rangee icone={<Icon name="relier" size={22}/>} titre={r.achat.relie ? tr('vt.achatRelie', { prix: r.achat.prix || '—' }) : tr('vt.relier')} fin="chevron"
           onClick={r.achat.ouvrir} attrs={{ 'data-vn-geste': 'relier-achat', 'data-vt-relier': r.achat.relie ? 'relie' : 'libre' }}/> : null}
         {G.imprimer ? <Rangee icone={<Icon name="printer" size={22}/>} titre={tr(G.facture ? 'vn.g.imprimerFacture' : 'vn.g.imprimer')} onClick={(ev) => G.imprimer(ev)} attrs={{ 'data-vn-geste': 'imprimer' }}/> : null}
@@ -347,7 +355,10 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
   const filtre = plateforme ? <Bouton variante="texte" onClick={() => setFeuillePlateforme(true)} attrs={{ 'data-vn-plateforme': plateforme.cle }}>{plateforme.cle === 'toutes' ? tr('vn.filtrer') : plateforme.libelle}</Bouton> : null;
   const actionPlateforme = <>{filtre}{surEnvoyer || g.sections ? <BoutonIcone libelle={tr('vn.plus')} icone={<Icon name="more" size={22}/>} onClick={() => setFeuilleGestes(true)} attrs={{ 'data-vn-plus': '' }}/> : null}</>;
   const segment = <Segmente libelle={tr('vv.seg.label')} valeur={m.onglet} onChange={g.onglet}
-    options={[{ cle: 'envoyer', libelle: tr('vv.seg.expedier'), n: m.nEnv || undefined }, { cle: 'envoyes', libelle: tr('vv.seg.route'), n: m.nRoute || undefined }, { cle: 'toutes', libelle: tr('vn.terminees') }]}/>;
+    options={[{ cle: 'envoyer', libelle: tr('vv.seg.expedier'), n: m.nEnv || undefined, attrs: { 'data-colis-onglet-choix': 'envoyer', 'data-colis-onglet-n': m.nEnv != null ? String(m.nEnv) : '' } },
+      { cle: 'envoyes', libelle: tr('vv.seg.route'), n: m.nRoute || undefined, attrs: { 'data-colis-onglet-choix': 'envoyes', 'data-colis-onglet-n': m.nRoute != null ? String(m.nRoute) : '' } }, { cle: 'toutes', libelle: tr('vn.terminees'), attrs: { 'data-colis-onglet-choix': 'toutes' } }]}/>;
+  // (24 nov., main-vert) Les repères d'avant (`data-colis-onglet-choix`, `data-colis-onglet-n`, VentesVerre) remis sur le segmenté
+  // natif : la visite guidée (src/accueilReste/visiteEcrans.js, cible « envoyer ») et les bancs les touchent ; le natif les avait perdus.
   // (20 nov.) À l'ordinateur, « À envoyer » et « En route » sont le TABLEAU DE TRAVAIL (VentesBureau) ; « Terminées » est déjà le
   // tableau de VentesToutes (src/natif/ecrans/VentesTableau.jsx) : ici, seulement le segmenté au-dessus de lui.
   // (21 nov., ventes-lisibles — captures iPhone de Julien) Le menu « ⋯ » de Ventes porte aussi ce qui était posé SUR la liste : « Où sont
@@ -356,7 +367,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
   const corpsOutils = <>
     <Groupe attrs={{ 'data-vn-outils': '' }}>
         <Rangee icone={<Icon name="printer" size={22}/>} titre={tr('vv.format')} valeur={tr('impr.format.' + E.format)} fin="chevron" onClick={fg(g.format)} attrs={{ 'data-impr-format': E.format }}/>
-        <Rangee icone={<Icon name="check" size={22}/>} titre={E.autres > 0 ? tr('impr.choisirAutres', { n: E.autres }) : tr('vv.choisir')} fin="chevron" onClick={fg(g.choisir)} attrs={{ 'data-lot-ouvrir': '1' }}/>
+        <Rangee icone={<Icon name="check" size={22}/>} titre={E.exclus ? tr('impr.exclu.choisir', { liste: E.exclus }) : E.autres > 0 ? tr('impr.choisirAutres', { n: E.autres }) : tr('vv.choisir')} fin="chevron" onClick={fg(g.choisir)} attrs={{ 'data-lot-ouvrir': '1', 'data-impr-autres': String(E.autres || 0) }}/>
         <Rangee icone={<Icon name="scan" size={22}/>} titre={tr('sv.scanner.envoi')} fin="chevron" onClick={fg(g.scanner)} attrs={{ 'data-vn-outil': 'scanner' }}/>
         {g.stock ? <Rangee icone={<Icon name="home" size={22}/>} titre={tr(g.stock.n > 1 ? 'vn.o.stockN' : 'vn.o.stock1')} fin="chevron" onClick={fg(g.stock.ouvrir)} attrs={{ 'data-colis-stock': String(g.stock.n) }}/> : null}
         {/* (21 nov., lot relier-code) « N ventes sans achat » : la feuille « Lier à un achat », vente après vente. */}

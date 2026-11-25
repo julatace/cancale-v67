@@ -251,6 +251,16 @@ export function phraseOuverture(e) {
   return `fermé — ouvre ${quand}à ${heureDite(e.ouvreA)}`;
 }
 
+// (24 nov., lot retrait-parfait) Les plages d'AUJOURD'HUI (Paris) : « 9 h–12 h, 14 h–19 h » · « fermé » (le jour est dit,
+// sans plage) · '' (aujourd'hui pas dit dans l'e-mail, ou horaires pas lus : pas su — rien n'est écrit).
+export function horairesDuJour(h0, maintenantMs = Date.now()) {
+  const h = horairesValides(h0); const m = momentParis(maintenantMs);
+  if (!h || !m) return '';
+  const e = h.find((x) => x.jours.includes(m.jour));
+  if (!e) return '';
+  return e.plages.length ? plagesDites(e.plages) : 'fermé';
+}
+
 // Les horaires d'UN point, d'après ses colis : ceux de la source la plus récente qui en a (le transporteur
 // les réécrit à chaque e-mail ; un changement d'horaires est le plus récent). Aucun ⇒ null.
 export function horairesDuPoint(colis, dateDe = () => 0) {
