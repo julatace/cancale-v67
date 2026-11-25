@@ -1613,8 +1613,8 @@
   --g-sur-point: #052E16;
 }
 [data-style="c3vintex"] {
-  --n-fond: #DFE2E6;
-  --n-laterale: #D4D8DD;
+  --n-fond: #DADDE2;
+  --n-laterale: #D0D4DA;
   --n-carte: #FFFFFF;
   --n-carte-2: #F5F6F8;
   --n-bord: #E4E4E7;
@@ -1648,7 +1648,7 @@
   --n-appui: #EAEAEB;
   --n-curseur: #EEF0F3;
   --n-pouce: #FFFFFF;
-  --n-barre: rgb(223 226 230 / 0.78);
+  --n-barre: rgb(218 221 226 / 0.78);
   --n-heros: #F5F6F8;
   --n-heros-2: #FFFFFF;
   --n-sur-heros: #16181D;

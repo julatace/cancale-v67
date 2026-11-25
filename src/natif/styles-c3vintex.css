@@ -68,6 +68,10 @@
 :root[data-style="c3vintex"]:not([data-style=""]) .n-segmente-curseur { background: var(--n-carte); box-shadow: 0 1px 2px rgb(16 24 40 / .14), 0 0 0 .5px rgb(16 24 40 / .06); }
 :root[data-theme="dark"][data-style="c3vintex"] .n-segmente-curseur { background: #3A3C43; box-shadow: 0 1px 2px rgb(0 0 0 / .5); }
 
+/* ── la carte du haut d'Aujourd'hui : BLANCHE comme les autres (plus de dégradé gris), une arête d'ardoise en haut (C3) ── */
+:root[data-style="c3vintex"]:not([data-style=""]) .n-heros { background: var(--n-carte); box-shadow: var(--g-carte-ombre), inset 0 1.5px 0 rgb(52 80 110 / .45); }
+:root[data-theme="dark"][data-style="c3vintex"] .n-heros { box-shadow: var(--g-carte-ombre), inset 0 1.5px 0 rgb(169 188 211 / .45); }
+
 /* ── l'anneau (Ma journée) : l'ardoise, un trait plus franc ── */
 :root[data-style="c3vintex"]:not([data-style=""]) .n-anneau-plein { stroke: var(--n-accent); }
 }

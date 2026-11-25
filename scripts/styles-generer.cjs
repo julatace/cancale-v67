@@ -82,7 +82,7 @@ const PRESETS = {
   // encre · contour ≥ 3:1 · lien souligné · rond à contour). Ses règles de forme sont dans src/natif/styles-c3vintex.css,
   // chargé SEULEMENT quand ce style est choisi (src/natif/styleChoix.js).
   c3vintex: { forme: { rCarte: 16, rBouton: 10, hPlein: 46, rChip: 999, profondeur: 'c3', appui: 0.97, plaque: 'grave', second: 'contour', liens: 'souligne', rond: 'plaque', champ: 'contour' },
-    clair: { fond: '#DFE2E6', laterale: '#D4D8DD', carte: '#FFFFFF', carte2: '#F5F6F8', bord: '#E4E4E7', encre: '#16181D', texte: '#30343B', encre2: '#555A63', encre3: '#6B7079', accent: '#34506E', plein: '#16181D', surPlein: '#FFFFFF', vert: '#17744A',
+    clair: { fond: '#DADDE2', laterale: '#D0D4DA', carte: '#FFFFFF', carte2: '#F5F6F8', bord: '#E4E4E7', encre: '#16181D', texte: '#30343B', encre2: '#555A63', encre3: '#6B7079', accent: '#34506E', plein: '#16181D', surPlein: '#FFFFFF', vert: '#17744A',
       point: '#34506E', surPoint: '#FFFFFF', contour: '#6B717D', limite: '#767C86', douce: '#EEF0F3', bordCarte: '#E4E4E7',
       etiquettes: { vert: ['#17744A', '#DDF4E6'], teal: ['#0D6A6B', '#DAF0F0'], gris: ['#4C525B', '#ECEEF1'] } },
     sombre: { fond: '#121316', laterale: '#0C0D0F', carte: '#1C1D21', carte2: '#24252A', bord: '#303238', encre: '#F4F4F5', texte: '#E4E4E7', encre2: '#A1A1AA', encre3: '#8A8A93', accent: '#A9BCD3', plein: '#F4F4F5', surPlein: '#18181B', vert: '#6FE3B5',
