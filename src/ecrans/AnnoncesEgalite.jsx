@@ -17,7 +17,7 @@
 //  sinon `vrm_articles_sites` sous l'identifiant de l'annonce de SON site), relus juste avant : carte pas lue ⇒ rien.
 //  Les actions passent par l'écran Annonces Vinted d'hier (monté, caché) : `demanderActionAnnonces`.
 // ══════════════════════════════════════════════════════════════════════════
-import { agirMaintenant, envoyerSerie, dire, republierDansApp } from '../agir/porte.js';   // (24 nov., lot agir-tout)
+import { agirMaintenant, envoyerSerie, dire, republierDansApp, useFaitsAgir } from '../agir/porte.js';   // (24 nov., lot agir-tout)
 import { texteRaison } from '../agir/Agir.jsx';
 import { useComptesBloques } from '../compteBloqueEtat.js';
 import { etatLienLu, propositionLu, relierDepuisListe, queSurCeSite, ouvrirLiaison, abonnerLiaison, demanderLiaison } from '../liaisonEtat.js';   // (20 nov.) relier depuis la liste
@@ -39,7 +39,7 @@ import { annuaireLbc } from '../plateformes.js';
 import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
   annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, lireVentesEmail, photoKey, STUDIO_BASE } from '../App.jsx';
-import { ouvrirPanneau, panneauEnRetard } from '../ouvrirPanneau.js';
+import { ouvrirPanneau, panneauEnRetard, gesteDuPanneau } from '../ouvrirPanneau.js';
 // (22 nov., choix n° 35) « Photo en double » : la règle d'identité par le FICHIER photo exact (src/photoEnDouble.js).
 import { photosEnDouble, numerosEnExemplaires, refuserGroupe, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
 import PhotoEnDouble from '../natif/ecrans/PhotoEnDouble.jsx';
@@ -225,6 +225,7 @@ export function tracesFiches(bloques, preuves) {
 const _derniereLecture = { cle: '', lu: undefined };
 const cleLecture = (cleComptes) => ((AUTH.user && AUTH.user.id) || '') + '|' + cleComptes;
 export default function AnnoncesEgalite({ accounts: accountsTous = [], siteInitial = 'tous', onEcranSite = null }) {
+  useFaitsAgir();   // (25 nov.) les gestes du tableau se rejugent quand la porte change (extension connectée ou non)
   // (19 nov., intégration — lot compte-bloque) Un compte que Vinted a bloqué et que le vendeur a mis EN PAUSE (son choix) :
   // ses annonces sortent de la liste, comme dans l'écran d'avant (`annBase`) ; la ligne « N annonces en pause » les dit.
   // (21 nov.) Plus retirées : elles restent lisibles sous « Comptes bloqués » (dernière lecture connue, datée), hors de « en ligne »
@@ -442,6 +443,14 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
       // (25 nov., e2e-extension-vert) Un geste du panneau, et l'extension d'ici ne sait pas ouvrir le panneau : fermé, dit.
       if (PANNEAU_DE_SELECTION[A.cle] && panneauEnRetard()) return { ok: false, raison: panneauEnRetard() };
       if (A.robot) { const c = new Set(sel.map((a) => (vintedDe(a) || {}).compte)); if (c.size > 1) return { ok: false, raison: tr('egalite.action.vintedSeul') }; }
+      // (25 nov., décision du 24 nov. — CLAUDE.md §3) Aucun compte de la sélection n'est connecté (ni par la file, ni par le
+      //    panneau) ⇒ le geste est ÉTEINT et dit pourquoi — avant : le bouton restait allumé et le toucher ne faisait rien.
+      if (PANNEAU_DE_SELECTION[A.cle]) {
+        const X = ACTIONS_EXTENSION[PANNEAU_DE_SELECTION[A.cle]] || {}, g = gesteDuPanneau(X.page, X.action);
+        const comptes = [...new Set(sel.map((a) => (vintedDe(a) || {}).compte).filter((c) => c != null && c !== ''))];
+        const verdicts = comptes.map((c) => agirMaintenant('vinted', String(c), g, 'file')).concat(comptes.map((c) => agirMaintenant('vinted', String(c), g, 'panneau')));
+        if (comptes.length && !verdicts.some((v) => v && v.ok)) return { ok: false, raison: texteRaison(verdicts[0]) };
+      }
       return { ok: true };
     },
   }));
