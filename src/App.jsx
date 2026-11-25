@@ -23,7 +23,7 @@ import './selection-serie.css'; // (8 nov.) style de ./composants/SelectionSerie
 import './designV2/design-v2.css'; // (8 nov.) style de ./composants/SelectionSerie.jsx, gardé à sa place (son écran est chargé à la demande)
 import './designV2/argent-v2.css'; // (8 nov.) style de ./composants/SelectionSerie.jsx, gardé à sa place (son écran est chargé à la demande)
 import { estCommandePlateforme, estEcriturePlateforme, refusPanneau, ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from './actionsExtension.js';   // (20 nov., décision de Julien) aucun geste de plateforme dans l'app
-import { poserExtensionIci, ouvrirPanneau } from './ouvrirPanneau.js';
+import { poserExtensionIci, poserPanneauRetard, ouvrirPanneau } from './ouvrirPanneau.js';
 import { poserFaitsAgir, poserEnvoiAgir } from './agir/porte.js';
 import { texteRaison as texteRaisonAgir, CreerVintedAgir, publierLbcDepuisVrm, EbayLectureSeule } from './agir/Agir.jsx';   // (24 nov., lot agir-si-connecte) LA porte de tous les gestes
 import { requeteConnexions } from './connexions/connexions.js';
@@ -941,6 +941,7 @@ import { lireCodeColis } from "./scanColis.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 // ⟦→ ecrans/Comptabilite.jsx #67⟧
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
+import { memeContenu, nuageCharge } from './calculParesseux.js';
 import { creerMemoCourt } from "./memoCourt.js";   // (20 nov., lectures-legeres) lectures lourdes servies 20 s aux voisines
 import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
@@ -4954,7 +4955,7 @@ const reprendreSyncMaintenant = () => { if (_repriseT) { clearTimeout(_repriseT)
 // c'est ce qui faisait « changer » les numéros entre deux connexions).
 let _cloudReady = false;
 let _cloudReadyListeners = [];
-const markCloudReady = () => { if (_cloudReady) return; _cloudReady = true; try { globalThis.__vrmNuagePret = true; } catch (_) {} _cloudReadyListeners.forEach(fn => { try { fn(); } catch (_) {} }); _cloudReadyListeners = []; };
+const markCloudReady = () => { if (_cloudReady) return; _cloudReady = true; try { globalThis.__vrmNuagePret = true; } catch (_) {} setTimeout(nuageCharge, 0); _cloudReadyListeners.forEach(fn => { try { fn(); } catch (_) {} }); _cloudReadyListeners = []; };
 const onCloudReady = (fn) => { if (_cloudReady) { try { fn(); } catch (_) {} return () => {}; } _cloudReadyListeners.push(fn); return () => { _cloudReadyListeners = _cloudReadyListeners.filter(f => f !== fn); }; };
 const isCloudReady = () => _cloudReady;
 // (21 nov., lot rentabilite) LE FORFAIT D'EMBALLAGE (src/beneficePaire.js `poserForfaitEmballage`) : relu au démarrage,
@@ -5414,7 +5415,10 @@ function useSystemeSombre(ecouter) {
 function useStateCle(k, init) {
   const [v, setV] = React.useState(init);
   const initRef = React.useRef(init); initRef.current = init;
-  React.useEffect(() => onCleRelue(k, () => { try { setV(initRef.current()); } catch (_) {} }), [k]);
+  // (24 nov., vitesse-lectures-toucher) Une clé relue au MÊME contenu garde sa valeur (même identité) : avant, chaque relecture
+  // du nuage rendait un objet neuf et relançait tous les calculs qui la lisent (`pickupUnion` sur Achats, mesuré). Un contenu
+  // différent passe comme avant (src/calculParesseux.js, `memeContenu`).
+  React.useEffect(() => onCleRelue(k, () => { try { const n = initRef.current(); setV((p) => (memeContenu(p, n) ? p : n)); } catch (_) {} }), [k]);
   return [v, setV];
 }
 const emettreClesRelues = (cles) => {
@@ -11072,6 +11076,8 @@ if (typeof window !== 'undefined') {
 }
 const vmrExtPresent = () => __vmrExtReady;
 poserExtensionIci(vmrExtPresent);   // (20 nov.) « s'ouvre sur Vinted avec l'extension » quand elle ne répond pas ici
+// (25 nov., e2e-extension-vert) Une extension d'ICI trop ancienne pour le lien du panneau : aucun geste « dans l'extension » ne l'ouvre.
+poserPanneauRetard(() => (extSait('panneaucomplet') === 'retard' ? tr('actionsExt.aJour') : ''));
 const vmrExtVersion = () => __vmrExtVersion;
 // ══ « À INSTALLER » SEULEMENT SI RIEN NE PROUVE LE CONTRAIRE (19 nov.) ═══════
 // Julien, sur son Mac (photo du 19 nov.) : la coque dit « Extension à installer » et « Publier sur Leboncoin » dit
@@ -13072,11 +13078,21 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
   window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (k && k in _vcMem) { delete _vcMem[k]; signalerVc(); } });
 }
 // L'état « Vestiaire » d'un écran : se redessine quand une de ces clés change.
+const lireVcLocal = () => {
+  return { auto: numerosVcEffectifs(), donnes: carteNumerosVc(vcCarte('vrm_vc_numeros')), liens: vcCarte('vrm_vc_liens'), fait: vcCarte('vrm_vc_colis_done'), imprimes: vcCarte('vrm_vc_imprimes'), departs: departsCarte(), departsCle: departsCle() };
+};
 function useVcLocal() {
   const [, maj] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => { _ecoutesVc.add(maj); return () => { _ecoutesVc.delete(maj); }; }, []);
   React.useEffect(() => { chargerDeparts(false); }, []);
-  return { auto: numerosVcEffectifs(), donnes: carteNumerosVc(vcCarte('vrm_vc_numeros')), liens: vcCarte('vrm_vc_liens'), fait: vcCarte('vrm_vc_colis_done'), imprimes: vcCarte('vrm_vc_imprimes'), departs: departsCarte(), departsCle: departsCle() };
+  // (24 nov., vitesse-lectures-toucher) LE MÊME OBJET tant que rien n'a changé (chaque champ comparé par son CONTENU,
+  // `memeContenu`) : il était neuf à chaque rendu, et ce qui le lit (`cartesColis`, `listeEnvoyes`, gardés par version des
+  // données) repartait à chaque rendu. Un champ changé ⇒ un objet neuf, comme avant.
+  const neuf = lireVcLocal();
+  const avant = React.useRef(null);
+  const a = avant.current;
+  if (!a || Object.keys(neuf).some((k) => !memeContenu(a[k], neuf[k]))) avant.current = neuf;
+  return avant.current;
 }
 // Une lecture Vestiaire (`vc_ventes`/`vc_listings` projetés) + les numéros donnés
 // et les « Colis fait » de cet appareil : ce que lisent `ventesVcDe`,
@@ -29125,11 +29141,14 @@ function ventesParCompteDe(lignes, uids) {
 const lirePreuvesVenteVinted = async (opts = {}) => {
   try {
     // (20 nov., lectures-legeres) `lireTxnPreuves` : la famille gardée des transactions, sous les noms d'ici.
-    const rows = await lireTxnPreuves(opts);
-    if (rows === null) return null;
     // Les bordereaux (une ligne par vente, tous comptes, `_latest` écarté par
     // la règle) : deux scalaires de `meta`, jamais le PDF (§4.4).
-    const bords = await lireTout('id=like.harvest_%25_label_%25&select=id,tx:meta->>tx,it:meta->>item', { strict: true });
+    // (24 nov., vitesse-lectures-toucher) LES DEUX LECTURES PARTENT ENSEMBLE : les bordereaux ne dépendent pas des
+    // transactions. Mesuré à la 1re visite d'Annonces (banc vitesse-iphone, LECTURES=1) : ils partaient après les trois pages
+    // des transactions (+1,6 → +2,9 s), et les ventes à juger encore après (+3,8 s). Mêmes lectures, même règle : l'une
+    // « pas su » ⇒ « pas su ».
+    const [rows, bords] = await Promise.all([lireTxnPreuves(opts), lireTout('id=like.harvest_%25_label_%25&select=id,tx:meta->>tx,it:meta->>item', { strict: true }).catch(() => null)]);
+    if (rows === null) return null;
     if (bords === null) return null;
     const comptes = Array.isArray(opts.comptes) ? [...new Set(opts.comptes.map(String).filter((u) => /^\d+$/.test(u)))] : null;
     const ordres = (uids) => lireTout(`id=in.(${uids.map((u) => `harvest_${u}_orders_sold`).join(',')})&select=id,v:data->payload->my_orders`, { strict: true });
@@ -29883,11 +29902,36 @@ const beneficeDuMoisPub = ({ pub, compta, ligneUrssaf, regime }, ym, jusqua = nu
 //     sur celles-là, et la couverture est écrite À CÔTÉ (§5).
 // Une vente annulée, remboursée ou revenue ne compte pas ; un compte exclu non
 // plus (`compteEcarte`, comme le CA). Lecture ratée ⇒ « pas pu lire », jamais 0.
-let _repartCache = null;      // { at, txn: {tx: {cc}} | null, items: {id: {...}} | null, dates: {} | null }
+// (24 nov., vitesse-lectures-toucher) UNE LECTURE À LA FOIS, GARDÉE 10 MIN (src/memoCourt.js). Mesuré à la 1re visite
+// d'Annonces (banc vitesse-iphone, LECTURES=1) : la liste des transactions projetée partait TROIS fois (+2,0 · +3,6 · +4,5 s) —
+// chaque lecteur arrivait avant que la précédente ait rempli le cache (une lecture ~1 200 lignes décompressées, plusieurs
+// secondes au téléphone). Maintenant : une lecture EN COURS est rejointe ; finie et COMPLÈTE, elle sert 10 min au même vendeur ;
+// oubliée à tout signal de l'extension (ses lignes ont changé de version) et au retour du réseau ; un autre vendeur relit. Une lecture dont une partie est « pas su » n'est jamais gardée (le suivant relit).
+const _memoExtras = creerMemoCourt({ dureeMs: 10 * 60 * 1000 });
+// Ces lignes (`harvest_*_txn_*`, `harvest_*_listings`, `vinted_listing_dates`) ne sont écrites que par l'extension, dont le
+// signal (`vrm:ext`) dit qu'elles ont changé : PAS d'abonnement aux écritures de l'app (le partage des lectures prévient tous
+// ses abonnés à chaque écriture qu'il ne sait pas lire — mesuré : la lecture repartait après chaque publication).
+try {
+  if (typeof window !== 'undefined') { window.addEventListener('vrm:ext', () => _memoExtras.oublier()); window.addEventListener('online', () => _memoExtras.oublier()); }
+} catch (_) {}
 const lireExtrasRepartition = async () => {
   const owner = AUTH.user?.id;
   if (!owner) return {txn:null,items:null,dates:null};
-  if (_repartCache?.owner === owner && Date.now() - _repartCache.at < 10 * 60 * 1000) return _repartCache;
+  const r = await _memoExtras.lire(owner, async () => { const x = await lireExtrasRepartitionNeuve(owner); return x && x.txn && x.items && x.dates ? x : { ...(x || {}), _passu: true }; }).catch(() => null);
+  if (!r) return {txn:null,items:null,dates:null};
+  if (r._passu) { _memoExtras.oublier(); const { _passu, ...reste } = r; return { txn: null, items: null, dates: null, ...reste }; }
+  return r;
+};
+// (24 nov., vitesse-lectures-toucher) LA LECTURE PART AU TOUCHER : le doigt posé sur l'onglet Annonces lance la lecture (la
+// même, rejointe par l'écran quand il se monte) au lieu d'attendre ~2 s de montage. Une lecture, pas une écriture : rien
+// d'autre ne change. Sans session, rien ne part.
+try {
+  if (typeof document !== 'undefined') document.addEventListener('pointerdown', (e) => {
+    try { const t = e.target && e.target.closest ? e.target.closest('[data-n-onglet]') : null;
+      if (t && t.getAttribute('data-n-onglet') === 'paires' && t.getAttribute('aria-current') !== 'page' && AUTH.user?.id) lireExtrasRepartition().catch(() => {}); } catch (_) {}
+  }, { capture: true, passive: true });
+} catch (_) {}
+const lireExtrasRepartitionNeuve = async (owner) => {
   const [pays, items, dates, txnItems] = await Promise.all([
     // Le pays n'est pas dans `meta` : cette lecture décompresse le détail de
     // transaction — partagée avec les analyses de l’accueil, une fois
@@ -29915,8 +29959,7 @@ const lireExtrasRepartition = async () => {
     }
   }
   if (AUTH.user?.id !== owner) return {txn:null,items:null,dates:null};
-  _repartCache = { owner, at: Date.now(), txn, items: idx, dates };
-  return _repartCache;
+  return { owner, at: Date.now(), txn, items: idx, dates };
 };
 // ⟦→ ecrans/Stats.jsx #14⟧
 const nomPays = (cc) => {

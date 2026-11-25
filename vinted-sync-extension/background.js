@@ -3782,6 +3782,7 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
   // 5.165 : un dressing RANGÉ fait foi sur les suppressions d'avant (règle
   // `supprimeeApres`) et rajeunit « annonces lues il y a… » : l'app relit.
   if (ecrit !== false && type === 'listings') notifierApp({ type: 'maj', quoi: 'annonces', uid: String(uid) });
+  if (ecrit !== false && type === 'listings') oublierInfosPage(uid);   // 5.440.4 : le panneau relit le dressing qu'on vient de ranger
   if (ecrit !== false && (type === 'inbox' || type === 'conversation')) notifierApp({ type: 'maj', quoi: 'messages', uid: String(uid), ...(type === 'conversation' ? {conv:String(id)} : {}) });
 
   // Apprentissage passif des codes de statut d'offre (voir noterStatutsOffres).
@@ -5980,6 +5981,10 @@ async function vendExtAJour() {
   } catch (_) {}
 }
 let _infosPage = null;
+// 5.440.4 (25 nov., e2e-extension-vert) : le dressing de CE compte vient d'être RANGÉ ⇒ la copie de 2 min est oubliée. Mesuré
+//    au banc e2e-extension : lue 1 s AVANT la première moisson (aucune annonce), elle faisait montrer « 0 annonce » au panneau
+//    pendant 2 min — et le lien de l'app (« Baisser » d'une paire) y perdait sa paire pré-cochée (`annSel` vidé).
+function oublierInfosPage(uid) { if (_infosPage && String(_infosPage.uid) === String(uid)) _infosPage = null; }
 async function donneesInfosPage(uid) {
   const owner = String((await loadSession())?.user_id || '');
   if (!owner || !uid) return null;
@@ -11901,6 +11906,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // heures pour une moisson de 25 jours. `capturedAt` reste la reference cote
   // app, mais autant que la colonne cesse de mentir aux autres lecteurs.
   const ecritRow = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data, updated_at: maintenant }], 'id');
+  if (ecritRow !== false && type === 'listings') oublierInfosPage(uid);   // 5.440.4 : le panneau relit le dressing qu'on vient de ranger
   // 5.294 : la date de la dernière lecture COMPLÈTE du dressing de ce compte,
   // RANGÉE (le rattrapage au retour sur Vinted la lit : `retourSurVinted`).
   if (capturePrevue && ecritRow !== false) await noterCaptureComplete(uid);

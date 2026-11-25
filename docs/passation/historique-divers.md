@@ -2232,6 +2232,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1386)
 - **24 nov. · Vente vue par e-mail ↔ son annonce (`claude/vente-mail-annonce`)** : l'annonce EN LIGNE qu'un e-mail de vente du même compte désigne (SON clic « Relier à l'annonce », sinon l'image exacte dossier+fichier ; dressing lu avant l'e-mail) passe « Vendue · par e-mail, en attente de Vinted » (hors d'« en ligne » et des totaux, rien supprimé) et la vente reçoit son N° ; « Délier » défait ; fiche « pas su » dite une fois + « Pourquoi ? ». `src/venteMailAnnonce.js`, `2026-11-24-vente-mail-annonce.md`. Geste : aucun.
+- **23 nov. · Revue UX (`claude/revue-ux`)** : Achats iPhone liste d'abord (retraits à 0 tus, gestes rares dans « ⋯ », « Filtres »), Relier distinct (n° court + heure), fiche « Prix d'achat » en ligne, sélection Annonces à un toucher, Argent une ligne ambre, verdict extension, logos (audit). `docs/passation/2026-11-23-revue-ux.md`. Geste : aucun.
 
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion de #1346 dans visuel-jeu)
 - **23 nov. · Revue UX (`claude/revue-ux`)** : Achats iPhone liste d'abord (retraits à 0 tus, gestes rares dans « ⋯ », « Filtres »), Relier distinct (n° court + heure), fiche « Prix d'achat » en ligne, sélection Annonces à un toucher, Argent une ligne ambre, verdict extension, logos (audit). `docs/passation/2026-11-23-revue-ux.md`. Geste : aucun.
@@ -2278,8 +2279,13 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., agir-tout 5.450.1, fusion de main)
 - **24 nov. · Connexions de l'extension (`claude/connexions-extension`)** : Paramètres → « Connexions de l'extension » : chaque navigateur (nom, version « à jour » ou « 5.418 → 5.440 », vu quand, comptes lus, dernier problème + son geste), chaque compte (lu par qui, quand, jauge 50/h), vieilles installations repliées ; une ligne sur Aujourd'hui seulement si un geste attend ; champs 5.448 (`sante`, `arret`, `servie`) lus présents, sinon « — ». `2026-11-24-connexions-extension.md`. Geste : aucun.
 
-## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., agir-tout 5.450.1, 3e fusion de main)
+## Lignes déplacées telles quelles de CLAUDE.md §9 (25 nov., fusion de #1388 dans #1393, < 60 000)
 - **23 nov. · Colis en danger (`claude/colis-danger`)** : colis VENDU Vinted Go relu jusqu'à sa remise ; date de départ LUE (`expiration_time`) gardée sur `depart_vinted_*`, relu toutes les 2 h ; famille « Colis en danger » la veille et le jour (`api/_lib/colis-danger.js`) ; 0 vente Vinted Go en base au 23 nov. `2026-11-23-colis-danger.md`. Geste : aucun.
+- **24 nov. · Observer Vinted (ext. 5.440.3, `claude/observation-vinted`)** : interrupteur 10 min (carte du logo, page Extension) ; la page note pages, requêtes (clés et types), clics (`isTrusted`), cloche — formes seulement, rebâties par le fond, ligne `observation_vinted_{compte}_{nav}`, « Envoyer l'observation » ; rien envoyé à Vinted. `2026-11-24-observation-vinted.md`. Geste : installer, Observer, un envoi (Bleam ou main), Envoyer l'observation.
 
-## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., agir-tout 5.450.1, 3e fusion de main)
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1394)
 - **24 nov. · Suivi des envois (`claude/suivi-ventes`)** : la piste d'un colis vendu (Déposé → En route → Au point « nom », à retirer avant → Retiré → finalisée = argent versé), chaque étape LUE ou « pas encore su » (`api/_lib/suivi-envoi.js`) ; « Mes envois » en 4 groupes ; notifications « au point » / « retiré » (famille `envois`). Mesuré : Vinted Go 0 vente, XU jamais lus, aucune date limite hors Vinted Go. `2026-11-24-suivi-ventes.md`. Geste : aucun.
+
+## Lignes déplacées telles quelles de CLAUDE.md §9 (25 nov., agir-tout : fusion de main, < 60 000)
+- **25 nov. · Banc `e2e-extension` vert (`claude/e2e-extension-vert`)** : étapes 3/4 lisaient l'ancien écran (Ventes, « Qui dorment ») ⇒ portées sur le natif et le panneau ; vrais défauts corrigés : extension **5.440.4** (copie du dressing oubliée quand il est rangé : le panneau perdait la paire du lien), app (« Baisser » refusé et « mets à jour » pour une extension d'avant le lien du panneau). `2026-11-25-e2e-extension-vert.md`. Geste : installer la 5.440.4.
+- **24 nov. · Vitesse PR B (`claude/vitesse-lectures-toucher`)** : 1re visite d'Achats 4,7 → 3,5 s (calculs refaits une fois par version des données), relevés « plus vue » groupés ; à froid = PR A (pas de comparaison pendant le 1er nuage) ; chiffres 35/35. `2026-11-24-vitesse-ecran-montre.md` §8. Geste : aucun.

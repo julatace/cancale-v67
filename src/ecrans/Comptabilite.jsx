@@ -75,7 +75,7 @@ import { versementsParReleve, relevesNonVerifies } from '../versementReleve.js';
 import { masqueesParCompte } from '../annoncesMasquees.js';
 import { rythmeVendu, ecartPct, stockQuiDort } from '../statsVentes.js';
 import React, { useState, useMemo, useEffect, useRef, Suspense } from 'react';
-import { useMemoParesseux, useLecteurParesseux, paresseux, compterCalcul } from '../calculParesseux.js';
+import { useMemoParesseux, useLecteurParesseux, paresseux, compterCalcul, useMemeContenu, useCalculParVersion, memeContenu } from '../calculParesseux.js';
 import { useAttenteDepassee } from '../attenteBornee.js';   // (22 nov., chasse P2-5)
 import { lazySur } from '../chargementSur.js';
 import { createPortal } from 'react-dom';
@@ -6392,6 +6392,7 @@ const _indexBordsListeVide = [];
 // (23 nov.) La demande « ouvre Relier » d'Aujourd'hui, prise par Achats à son arrivée (voir `ouvrirGlisser`).
 const DEMANDE_GLISSER = { at: 0 };
 function demanderRelier(onNav) { DEMANDE_GLISSER.at = Date.now(); if (onNav) onNav('achats'); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:relier-ouvrir')); } catch (_) {} }, 0); }
+const INFOS_ACHATS_AUCUNE = Object.freeze({});   // (24 nov.) « rien à lire » : un seul objet vide, jamais modifié
 function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false, colisDans = null, completer = null, onCompleterFermer = null, sectionsAutres = null }) {
   // (20 nov., bugs-terrain) LES LECTURES ASYNCHRONES DU MOTEUR, RENDUES PAR VAGUES. Mesuré (12 comptes, processeur ×4) : ~40
   // rendus par moteur en 42 s, un par lecture qui arrive. Dans ce moteur, un `setState` appelé HORS d'un geste (réponse
@@ -6849,11 +6850,15 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // VIDE — donc les numéros existants disparaissaient. Le commentaire de cet
   // effet-là annonçait justement cette protection ; elle n'existait pas.
   // Reproduit au banc : une vente portant le N°777 ressortait à N°319.
+  // (24 nov., vitesse-lectures-toucher) Relu au MÊME contenu ⇒ même objet (`memeContenu`) : cet effet part au montage de
+  // chaque écran (le nuage est déjà là) et rendait des objets neufs identiques — tous les calculs qui lisent les fiches
+  // repartaient une 2e fois (mesuré, 1re visite d'Achats).
   useEffect(() => onCloudReady(() => {
-    setNumeros(load('vinted_annonce_numeros', {}));
-    setUsedNumeros(load('vinted_used_numeros', []));
-    setSaleOv(load('vinted_sale_overrides', {}));
-    setHiddenSales(new Set(VENTES_MASQUEES_AUCUNE().map(String)));
+    const pareil = (lu) => (avant) => (memeContenu(avant, lu) ? avant : lu);
+    setNumeros(pareil(load('vinted_annonce_numeros', {})));
+    setUsedNumeros(pareil(load('vinted_used_numeros', [])));
+    setSaleOv(pareil(load('vinted_sale_overrides', {})));
+    setHiddenSales(pareil(new Set(VENTES_MASQUEES_AUCUNE().map(String))));
     setCloudReady(true);
   }), []);
   // (6 nov.) Revenir sur l'écran : la dernière liste LUE (src/memoireEcrans.js), relue aussitôt en place.
@@ -6872,11 +6877,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // `fetchEmailBordereaux` projette déjà le champ `suivi` (§23).
   // ⚠️ Déclaré ICI, juste après `emailBords`, donc AVANT tout ce qui le lit —
   // un `useMemo` s'exécute immédiatement (piège TDZ, §19).
-  const suivisEnvoyes = useMemo(() => {
+  // (24 nov., vitesse-lectures-toucher) Les bordereaux relus aux MÊMES n° gardent le même ensemble (`useMemeContenu`) : ce qui
+  // le lit (`pickupUnion`, `txSuivisColis`…) ne repart plus à chaque relecture.
+  const suivisEnvoyes = useMemeContenu(useMemo(() => {
     const set = new Set();
     for (const b of (emailBords || [])) if (b && b.suivi) set.add(String(b.suivi).trim().toUpperCase());
     return set;
-  }, [emailBords]);
+  }, [emailBords]));
   // ── LE BORDEREAU DE CHAQUE VENTE (E1, 30 sept.) ─────────────────────────
   // « Le bordereau à côté de chaque vente, à côté du prix si possible. » Relié
   // par le n° de TRANSACTION, une identité (§5) : 165 bordereaux sur 166 la
@@ -8577,7 +8584,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // Pas su (bordereaux pas lus) ⇒ rien n'est écarté.
   const txRetourAchat = useMemo(() => txAchatsEnRetour(retoursAchatLus ? retoursAchatLus.bords : null, { demandes: retoursAchatLus ? retoursAchatLus.demandes : null, achats: buysBase }), [retoursAchatLus, buysBase]);
   const auRelaisVus = useMemo(() => buysBase.filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buysBase, pickupDone]);
-  const vintedToPickup = useMemo(() => auRelaisVus.filter(o => !achatEnRetour(o, txRetourAchat)), [auRelaisVus, txRetourAchat]);
+  const vintedToPickup = useMemeContenu(useMemo(() => auRelaisVus.filter(o => !achatEnRetour(o, txRetourAchat)), [auRelaisVus, txRetourAchat]));
   // (23 oct.) LES ACHATS QUI PEUVENT RELIER UN COLIS D'E-MAIL À SA COMMANDE (le
   // n° de suivi lu dans la transaction, une identité, §5) : ceux au point relais
   // ET — seulement s'il y a un colis d'e-mail en attente — ceux achetés depuis
@@ -8595,7 +8602,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // décompressées sur Ma journée au lieu de 3 (§4.4), pour aucun lien (0 des
   // 1 290 transactions réelles ne porte de n° de suivi). Un retour écrit par le
   // transporteur n'élargit rien non plus.
-  const txSuivisColis = useMemo(() => {
+  const txSuivisColis = useMemeContenu(useMemo(() => {
     const s = new Set(vintedToPickup.map(o => String(o.transaction_id)));
     let plusAncien = Infinity;
     // (revue adverse du 5 nov.) + les colis lus dans ses comptes Mondial Relay (`trackingRetrait`) :
@@ -8611,7 +8618,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const depuis = plusAncien - 21 * 86400000;
     for (const o of buysBase) { const d = Date.parse((o && o.date) || ''); if (Number.isFinite(d) && d >= depuis) s.add(String(o.transaction_id)); }
     return s;
-  }, [buysBase, vintedToPickup, trackingRetrait, collected, suivisEnvoyes]);
+  }, [buysBase, vintedToPickup, trackingRetrait, collected, suivisEnvoyes]));
   // « Colis à retirer » = UN SEUL compteur, l'UNION des deux signaux, dédoublonnée
   // par titre : (1) email transporteur (porte le CODE de retrait) + (2) statut
   // Vinted « déposé en point relais ». ⚠️ Avant on prenait « email OU Vinted »
@@ -11546,7 +11553,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   //   laissée en ligne** (la règle du titre n'en attrapait aucune que l'identité
   //   rate). Quand l'identité ne dit rien, on ne retire pas : mieux vaut un blanc
   //   qu'un faux.
-  const annoncesVendues = useMemo(() => {
+  // (24 nov., vitesse-lectures-toucher) Les mêmes annonces ⇒ le même ensemble (`useMemeContenu`) : `retoursEnCours` ne repart
+  // plus quand les ventes relues désignent les mêmes annonces.
+  const annoncesVendues = useMemeContenu(useMemo(() => {
     const ids = new Set();
     for (const o of (sales.items || [])) {
       if (classifyOrderStatus(o.status) === 'cancelled') continue;   // retour/remboursement : la paire revient
@@ -11560,7 +11569,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     }
     return ids;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, txnItem, numeros, lotsTx, lotLiens]);
+  }, [sales.items, txnItem, numeros, lotsTx, lotLiens]));
   // (3 nov., choix n° 3) Les N° remis en stock après un retour (« Retour reçu ? » → « Remettre en
   // stock ») : posés par l'effet qui suit `retoursSuivis` (plus bas), lus par la publication ci-dessous.
   // (13 nov., point 29) `null` = pas encore su (la publication attend : une lecture en cours ne
@@ -14333,14 +14342,17 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // CET appareil gagne toujours.
   useEffect(() => onCloudReady(() => {
     const vide = (o) => !o || (Array.isArray(o) ? o.length === 0 : Object.keys(o).length === 0);
+    // (24 nov., vitesse-lectures-toucher) Resté vide et relu VIDE : on garde l'objet d'avant (même identité). Avant, chaque
+    // `{}` relu était un objet neuf et relançait tout ce qui le lit (mesuré : `pickupUnion` et `retoursEnCours` sur Achats).
+    const pareil = (avant, lu) => (memeContenu(avant, lu) ? avant : lu);
     setSavedPoints(p => vide(p) ? load('vrm_points_relais', []) : p);
-    setBuyByNum(n => vide(n) ? load('vinted_buyprice_by_num', {}) : n);
-    setPickupDone(n => vide(n) ? load('vinted_pickup_done', {}) : n);
-    setShipDone(n => vide(n) ? load('vinted_ship_done', {}) : n);
-    setTxnLink(n => vide(n) ? load('vinted_txn_link', {}) : n);
-    setCollectedAt(n => vide(n) ? load('vrm_colis_collected_at', {}) : n);
-    setQrPoses(n => vide(n) ? load(CLE_QR_POSES, {}) : n);
-    setCollected(c => (c && c.size) ? c : loadCollected());
+    setBuyByNum(n => vide(n) ? pareil(n, load('vinted_buyprice_by_num', {})) : n);
+    setPickupDone(n => vide(n) ? pareil(n, load('vinted_pickup_done', {})) : n);
+    setShipDone(n => vide(n) ? pareil(n, load('vinted_ship_done', {})) : n);
+    setTxnLink(n => vide(n) ? pareil(n, load('vinted_txn_link', {})) : n);
+    setCollectedAt(n => vide(n) ? pareil(n, load('vrm_colis_collected_at', {})) : n);
+    setQrPoses(n => vide(n) ? pareil(n, load(CLE_QR_POSES, {})) : n);
+    setCollected(c => (c && c.size) ? c : pareil(c, loadCollected()));
     // §5.49 — mêmes cartes PARTAGÉES lues au montage (appareil neuf : vides tant
     // que le nuage n'est pas arrivé) qu'`apply()` ne gère PAS. Sans ça, sur un
     // appareil neuf, un clic avant l'arrivée du nuage réécrit la carte réduite à
@@ -14348,20 +14360,20 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // remplit QUE ce qui est resté par défaut — jamais une saisie faite pendant
     // le chargement. Ce sont des corrections de compta (sale_overrides), notes,
     // états de bordereau/retour, achats hors-Vinted : les plus coûteux à perdre.
-    setBordsPrinted(n => vide(n) ? load('vinted_bords_printed', {}) : n);
-    setBordsSansNum(n => vide(n) ? load(CLE_IMPRIMES_SANS_NUM, {}) : n);
-    setBordLinks(n => vide(n) ? load('vinted_bord_links', {}) : n);
-    setBordsHidden(n => vide(n) ? load('vinted_bords_hidden', {}) : n);
-    setBordsShipped(n => vide(n) ? load('vinted_bords_shipped', {}) : n);
-    setBordFormats(n => vide(n) ? load('vinted_bordereau_formats', {}) : n);
-    setSaleOv(n => vide(n) ? load('vinted_sale_overrides', {}) : n);
-    setPairsLost(n => vide(n) ? load('vinted_pairs_lost', {}) : n);
-    setRetoursRecus(n => vide(n) ? load('vinted_retours_recus', {}) : n);
-    setRetoursDismissed(n => vide(n) ? load('vinted_retours_dismissed', {}) : n);
-    setRetoursRemis(n => vide(n) ? load('vinted_retours_remis', {}) : n);
-    setRetoursDeposes(n => vide(n) ? load('vrm_retours_deposes', {}) : n);
-    setAchatNotes(n => vide(n) ? load('vinted_achat_notes', {}) : n);
-    setOffBuys(n => vide(n) ? load('vinted_offvinted_buys', []) : n);
+    setBordsPrinted(n => vide(n) ? pareil(n, load('vinted_bords_printed', {})) : n);
+    setBordsSansNum(n => vide(n) ? pareil(n, load(CLE_IMPRIMES_SANS_NUM, {})) : n);
+    setBordLinks(n => vide(n) ? pareil(n, load('vinted_bord_links', {})) : n);
+    setBordsHidden(n => vide(n) ? pareil(n, load('vinted_bords_hidden', {})) : n);
+    setBordsShipped(n => vide(n) ? pareil(n, load('vinted_bords_shipped', {})) : n);
+    setBordFormats(n => vide(n) ? pareil(n, load('vinted_bordereau_formats', {})) : n);
+    setSaleOv(n => vide(n) ? pareil(n, load('vinted_sale_overrides', {})) : n);
+    setPairsLost(n => vide(n) ? pareil(n, load('vinted_pairs_lost', {})) : n);
+    setRetoursRecus(n => vide(n) ? pareil(n, load('vinted_retours_recus', {})) : n);
+    setRetoursDismissed(n => vide(n) ? pareil(n, load('vinted_retours_dismissed', {})) : n);
+    setRetoursRemis(n => vide(n) ? pareil(n, load('vinted_retours_remis', {})) : n);
+    setRetoursDeposes(n => vide(n) ? pareil(n, load('vrm_retours_deposes', {})) : n);
+    setAchatNotes(n => vide(n) ? pareil(n, load('vinted_achat_notes', {})) : n);
+    setOffBuys(n => vide(n) ? pareil(n, load('vinted_offvinted_buys', [])) : n);
   }), []);
   // Un colis est à retirer → on charge les achats (harvest, gratuit) pour
   // retrouver la photo de l'article correspondant.
@@ -16849,7 +16861,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // déclaré par lui) : jamais son prix entier proposé à un article (src/achatsSourcing.js).
   const [lotsDeclares, setLotsDeclares] = useStateCle('vrm_lots_declares', () => load('vrm_lots_declares', {}) || {});
   const [repartitionsLots, setRepartitionsLots] = useStateCle('vrm_repartitions_lots', () => load('vrm_repartitions_lots', {}) || {});
-  const infosAchatsLues = infosTxAchats !== undefined ? infosTxAchats : (demandesSuivis === '' && Array.isArray(buys.items) ? {} : undefined);
+  // (24 nov., vitesse-lectures-toucher) « Rien à lire » = TOUJOURS le même objet vide (`INFOS_ACHATS_AUCUNE`) : un `{}` neuf à
+  // chaque rendu relançait ce qui le lit (`nArticlesTx`, puis `cartesColis` à chaque rendu — mesuré, CALCULS=deps).
+  const infosAchatsLues = infosTxAchats !== undefined ? infosTxAchats : (demandesSuivis === '' && Array.isArray(buys.items) ? INFOS_ACHATS_AUCUNE : undefined);
   // (5 nov.) La date de RÉCEPTION lue d'un achat (livraison lue ou « Je l'ai retiré »), pour filtrer « Relier un achat ».
   // ⚠️ (5 nov., relecture) « Relier un achat » s'ouvre surtout depuis VENTES et ANNONCES, où les
   //    transactions d'achat ne sont PAS lues (`demandesSuivis` ne lit que sur Achats, et
@@ -19373,9 +19387,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // paires sous un N° » reste partout (le seul risque irréversible, §5).
   const voitSite = (s) => siteColis === 'toutes' || siteColis === s;
   // (20 nov., bugs-terrain) Calculée UNE fois par rendu (comme `expeditions`) : appelée jusqu'à 4 fois dans le même rendu
-  // (profil de Ventes au volume de sa base : ~1 à 2 s). La mémoire tombe à la fin de la tâche (microtâche) : jamais d'un rendu à l'autre.
-  let _cartesColisMemo = null;
-  const cartesColis = () => { if (_cartesColisMemo) return _cartesColisMemo; const r = cartesColisCalc(); _cartesColisMemo = r; queueMicrotask(() => { _cartesColisMemo = null; }); return r; };
+  // (profil de Ventes au volume de sa base : ~1 à 2 s).
+  // (24 nov., vitesse-lectures-toucher) PAR VERSION DES DONNÉES (`useCalculParVersion`, src/calculParesseux.js) : refaite
+  // seulement quand l'une des données qu'elle lit change (la liste ci-dessous, vérifiée par
+  // scripts/audit-calcul-par-version.cjs), et au plus toutes les 60 s (elle lit l'heure). Mesuré à la 1re visite d'Achats :
+  // 13 à 18 calculs par écran, un à chaque rendu. `reglesNumeros()` : les règles de numérotation (lues hors de l'état).
+  const cartesColis = useCalculParVersion(() => cartesColisCalc(), () => [accounts, bordLinks, bordsHidden, bordsShipped, bordsVenteEmailParTx, buyByNum, buysBase, colisDans, colisEb, colisEmailSources, colisRelais, ecranCalcul, emailBords, evsTransp, hiddenSales, imgMortes, indexSuivisAchats, labelsCaptes, labelsPrets, lbcVentes, nArticlesTx, numeros, numerosByPhoto, numerosByPhotoDir, onlineAnnonceIds, panelBordsDone, partisVinted, pickupUnion, retoursSuivis, saleOv, sales, shipDone, shippedSuivis, soldByTxn, tracking, trackingRetrait, transpMap, txnItem, txnLink, vcBrut, vcEtat, vcLoc0, venteMailItem, ventesEmailParTx, reglesNumeros()], 'cartesColis', ecranCalcul);
   const cartesColisCalc = () => { compterCalcul('cartesColis', ecranCalcul);
     const L = [];
     const nomAvecTaille = (titre, o) => { const t = String(titre || '').trim(); const e = o ? effEntry(o) : null; const tl = e && e.taille ? String(e.taille) : ''; return tl && !tailleDansTitre(t, tl) ? `${t} · ${tl}` : t; };
@@ -20747,8 +20764,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const LIMITE_ENVOYES_J = 45;
   // (20 nov., bugs-terrain) Calculée UNE fois par rendu (comme `expeditions`) : appelée jusqu'à 4 fois dans le même rendu
   // (profil de Ventes au volume de sa base : ~1 à 2 s). La mémoire tombe à la fin de la tâche (microtâche) : jamais d'un rendu à l'autre.
-  let _listeEnvoyesMemo = null;
-  const listeEnvoyes = () => { if (_listeEnvoyesMemo) return _listeEnvoyesMemo; const r = listeEnvoyesCalc(); _listeEnvoyesMemo = r; queueMicrotask(() => { _listeEnvoyesMemo = null; }); return r; };
+  // (24 nov., vitesse-lectures-toucher) Par version des données, comme `cartesColis` (liste vérifiée par
+  // scripts/audit-calcul-par-version.cjs ; au plus 60 s).
+  const listeEnvoyes = useCalculParVersion(() => listeEnvoyesCalc(), () => [LIMITE_ENVOYES_J, bordLinks, bordParTx, bordsHidden, bordsParTxn, bordsPrinted, bordsShipped, bordsVenteEmailParTx, buyByNum, cochesNonPartis, colisEmailSources, ecranCalcul, emailBords, hiddenSales, labelsCaptes, lbcLu, lbcVentes, numeros, numerosByPhoto, numerosByPhotoDir, onlineAnnonceIds, ordSearchDiff, panelBordsDone, partisVinted, periode, saleOv, sales, shipDone, shippedSuivis, siteColis, soldByTxn, tracking, transpMap, txnItem, txnLink, vcEtat, vcLoc0, venteMailItem, ventesEmailParTx, versements, reglesNumeros()], 'listeEnvoyes', ecranCalcul);
   const listeEnvoyesCalc = () => { compterCalcul('listeEnvoyes', ecranCalcul);
     const out = [];
     try {
