@@ -49,6 +49,7 @@ const LOT = ['nouveau-vendeur', 'navigation-tache', 'ventes-e2', 'colis-retirer-
   'chiffres-coherents', 'retraits-suivi', 'budget-vitesse', 'accessibilite', 'accessibilite-clavier',
   'barre-achats',   // (16 nov.) la barre du bas : Achats dedans, aucun glisser entre onglets
   'design-v2-chargement',
+  'calculs-ecran-montre',   // (24 nov.) chaque gros calcul n'est fait que par l'écran qui le lit ; publications posées
   'barre-onglets'];   // (17 nov.) les cinq styles de la barre d'onglets : onglet allumé, cibles, coupes, place gardée, contraste, réglage   // (17 nov.) nouveau design : chargement immobile (CLS ≤ 0,02) et l'AIR (marges, rangées, sections)
 const noms = process.argv.slice(2).length ? process.argv.slice(2) : LOT;
 const BASE = Number(process.env.BANCS_PORT_BASE) || 10000;

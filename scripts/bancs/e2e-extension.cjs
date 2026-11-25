@@ -18,20 +18,25 @@ require('./_porte-banc.cjs');
 //       (fabriquée par le serveur), du MÊME compte VRM que l'app ; VRM le dit.
 //    2. DRESSING : il ouvre son dressing sur vinted.fr ⇒ annonces rangées
 //       (`harvest_111_listings`, sous son vendeur) ⇒ visibles dans Annonces
-//       (`data-carte-annonce`). Il regarde ensuite le dressing d'un AUTRE membre
-//       (222) : rien de cet autre n'entre dans SES annonces (§5).
-//    3. VENTE : sa vente Vinted ⇒ dans Ventes (`data-tx`), sur SON compte.
-//    4. COMMANDE : Annonces → Qui dorment → « Baisser le prix » → Oui :
-//       l'extension baisse le prix DEPUIS L'ONGLET vinted.fr, au nom du compte
-//       de l'onglet (cookie 111, aucun `Authorization`), relit le prix, l'app
-//       l'affiche ; plafond plein (45/50) ⇒ RIEN ne part chez Vinted ; un 429 ⇒
-//       pause posée, la commande suivante n'envoie RIEN.
-//    5. AUTRE COMPTE dans l'onglet (il bascule sur autre_b) : une commande pour
-//       vendeur_a (même postée directement au pont, sans passer par l'écran)
-//       n'envoie RIEN chez Vinted ; l'app ne propose pas la baisse ; et la vente
-//       d'autre_b est rangée sous autre_b, jamais sous vendeur_a.
-//    6. EXTENSION EN RETARD (manifeste 5.335, avant `baisseprix`) dans un
-//       profil neuf : l'app ne promet rien — « Baisser » fermé, aucune commande.
+//       (l'écran natif : `data-eg-article="vinted#{id}"`, rangée visible). Il regarde
+//       ensuite le dressing d'un AUTRE membre (222) : rien de cet autre n'entre dans
+//       SES annonces (§5).
+//    3. VENTE : sa vente Vinted ⇒ dans Ventes (l'écran natif : `data-vn-rang` =
+//       `v:{n° de transaction}`), sur SON compte.
+//    4. COMMANDE (25 nov. : par le PANNEAU, décision de Julien du 20 nov.) : Annonces
+//       → Ancienneté « Dorment » → la paire cochée → « Baisser » ⇒ l'app ouvre le
+//       panneau de l'extension sur vinted.fr (la paire cochée) ; il y tape le prix,
+//       revoit l'avant / après, « Lancer » : l'extension TAPE le prix dans la page
+//       « Modifier » de l'onglet (5.414, c'est la page qui envoie), au nom du compte
+//       de l'onglet (cookie 111, aucun `Authorization`), relit le prix, la commande
+//       le garde ; plafond plein (45/50) ⇒ RIEN ne part chez Vinted, la commande
+//       attend « plafond » ; un 429 ⇒ pause posée, la commande suivante n'envoie RIEN.
+//    5. AUTRE COMPTE dans l'onglet (il bascule sur autre_b) : le panneau ne lance pas
+//       la baisse de vendeur_a ; une commande postée directement au pont n'envoie
+//       RIEN chez Vinted ; et la vente d'autre_b est rangée sous autre_b.
+//    6. EXTENSION EN RETARD (manifeste 5.335, avant le panneau ouvert par un lien,
+//       `panneaucomplet` 5.410.0) dans un profil neuf : l'app ne promet rien —
+//       « Baisser » fermé, il dit de la mettre à jour, aucun onglet, aucune commande.
 //
 //  Preuve (§6.1) : `--mutation NOM` exécute le banc sur une copie de
 //  l'extension (ou de `dist/`) où UNE règle est réaffaiblie : il doit être
@@ -75,8 +80,8 @@ const MUTATIONS = {
   plafond: { ext: [['  const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - reserve, nA);', '  const c = { ok: true, at: Date.now() };']] },
   // 4 — un 429 ne pose plus de pause
   'pause-429': { ext: [['const freinVinted = (s) => s === 429 || s === 403;', 'const freinVinted = (s) => false;']] },
-  // 6 — l'app croit la baisse arrivée une version plus tôt (promet à une 5.335)
-  capacite: { dist: [[/baisseprix:"5\.336\.0"/g, 'baisseprix:"5.335.0"']] },
+  // 6 — l'app croit le lien du panneau arrivé dès la 5.335 (elle promet à une extension qui l'ignore)
+  capacite: { dist: [[/panneaucomplet:"5\.410\.0"/g, 'panneaucomplet:"5.335.0"']] },
 };
 
 let ko = 0, ok = 0;
@@ -190,52 +195,121 @@ async function poserSessionApp(ctx, s) {
   }, { s, uid: U.id });
 }
 
-// Annonces → À relancer → Qui dorment (comme baisse-prix.cjs).
-async function ouvrirQuiDorment(pg) {
+// ── (25 nov., e2e-extension-vert) LA BAISSE PASSE PAR LE PANNEAU DE L'EXTENSION ─────────────────────────────────────────
+// Depuis le 20 nov. (décision de Julien, src/actionsExtension.js) l'app ne fait plus AUCUN geste sur Vinted : « Baisser »
+// ouvre le PANNEAU de l'extension sur vinted.fr (src/ouvrirPanneau.js, `?vrm=panneau&page=prix&ids=…&action=baisser`), la
+// paire pré-cochée ; c'est LÀ qu'il tape le prix, revoit l'avant / après et lance. L'extension range la commande
+// (`cmd_prix_*`, `changerPrixCarte`) puis la passe par `baisserPrixVinted` (compte de l'onglet, plafond, pause, relu) ; depuis
+// la 5.414 le prix est TAPÉ dans la page « Modifier » et c'est la PAGE qui envoie sa requête. Les règles jugées ne changent
+// pas : la même paire (qui dort), UNE modification, au nom du compte de l'onglet, sans Authorization, relue, dite ;
+// plafond plein ⇒ rien ; 429 ⇒ pause ; autre compte ⇒ rien ; extension trop ancienne ⇒ l'app ne promet rien.
+//
+// Annonces (écran natif) : Ancienneté → Dorment, la paire cochée par SON identité Vinted (`data-eg-article="vinted#{id}"`),
+// puis le bouton de la barre de sélection. Les gestes passent par le DOM (une feuille « Depuis ta dernière visite » peut
+// recouvrir l'écran : elle n'empêche pas son doigt de fermer d'abord, le banc juge la règle, pas la pile des feuilles).
+let ID_COURANT = '';   // l'extension du profil principal (son service worker)
+const clicDom = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector(s); if (!e) return false; e.click(); return true; }, sel).catch(() => false);
+async function ouvrirAnnoncesDorment(pg, { recharger = true } = {}) {
   await pg.bringToFront();
-  await pg.goto('https://vrm.center/?tab=vinted_annonces', { waitUntil: 'domcontentloaded' });
-  await pg.waitForSelector('[data-vue-relancer]', { timeout: 40000 }).catch(() => {});
-  await pg.locator('[data-vue-relancer]').first().click().catch(() => {});
-  await pg.waitForSelector('[data-qui-dorment]', { timeout: 20000 }).catch(() => {});
-  if (await pg.locator('[data-qd-mode-choix="dort"]').count()) await pg.locator('[data-qd-mode-choix="dort"]').first().click().catch(() => {});
-  await pg.waitForSelector('[data-qd-ligne]', { timeout: 20000 }).catch(() => {});
+  if (recharger) await pg.goto('https://vrm.center/?tab=cat_annonces', { waitUntil: 'domcontentloaded' });
+  await attendreQue(() => pg.evaluate(() => document.querySelectorAll('[data-eg-ecran] [data-eg-article]').length > 0), 40000, 300);
+  // Le filtre est posé quand l'outil le DIT (`data-tt-filtre-valeur`) — l'écran peut se redessiner sous le premier toucher.
+  const pose = () => pg.evaluate(() => !!document.querySelector('[data-tt-filtre="dort"][data-tt-filtre-valeur="dorment"]')).catch(() => false);
+  for (let i = 0; i < 6 && !(await pose()); i++) {
+    await clicDom(pg, '[data-tt-ouvre="filtre:dort"]'); await attendre(300);
+    await clicDom(pg, '[data-tt-filtre-choix="dort:dorment"]'); await attendre(700);
+  }
   await attendre(500);
+  return pg.evaluate(() => [...document.querySelectorAll('[data-eg-ecran] [data-eg-article]')].map((x) => x.getAttribute('data-eg-article'))).catch(() => []);
 }
-const lireBP = (pg) => pg.evaluate(() => {
-  const s = document.querySelector('[data-baisse-serie]'); if (!s) return null;
-  const L = {}; for (const e of s.querySelectorAll('[data-bp-ligne]')) L[e.getAttribute('data-bp-ligne')] = { coche: e.getAttribute('data-bp-coche'), nouveau: e.getAttribute('data-bp-nouveau'), bloque: e.getAttribute('data-bp-bloque'), etat: e.getAttribute('data-bp-etat'), vu: e.getAttribute('data-bp-prix-vu'), texte: e.innerText.replace(/\s+/g, ' ') };
-  const lancer = s.querySelector('[data-bp-lancer]');
-  return { L, phase: s.getAttribute('data-bp-phase'), lancer: lancer ? { n: lancer.getAttribute('data-bp-lancer'), off: lancer.disabled } : null,
-    ext: (s.querySelector('[data-bp-ext]') || {}).textContent || '', bilan: (s.querySelector('[data-bp-bilan]') || { getAttribute: () => null }).getAttribute('data-bp-bilan'), texte: s.innerText.replace(/\s+/g, ' ') };
+// Le bouton « Baisser » de la barre de sélection : { ouvert, raison } (raison = la phrase sous un bouton fermé).
+const lireBoutonBaisser = (pg) => pg.evaluate(() => {
+  const b = document.querySelector('[data-tt-action-directe="baisser"]');
+  if (!b) return null;
+  const r = b.getAttribute('aria-describedby') ? document.getElementById(b.getAttribute('aria-describedby')) : null;
+  return { ouvert: b.getAttribute('aria-disabled') !== 'true' && !b.disabled, raison: r ? r.textContent : '', texte: b.textContent };
 }).catch(() => null);
-// Coche la paire, ouvre la feuille, lance et confirme ; rend l'état de la feuille une fois la série finie.
-async function baisserDepuisApp(pg, id, { lancer: go = true } = {}) {
-  await ouvrirQuiDorment(pg);
-  const casePaire = pg.locator(`[data-qd-case="${id}"]`);
-  if (!(await casePaire.count())) return { absente: true, qd: await pg.evaluate(() => [...document.querySelectorAll('[data-qd-ligne]')].map((e) => e.getAttribute('data-qd-ligne'))).catch(() => []) };
-  await casePaire.check().catch(() => {});
-  await pg.locator('[data-qd-baisser]').click().catch(() => {});
-  await pg.waitForSelector('[data-baisse-serie]', { timeout: 15000 }).catch(() => {});
-  await attendre(600);
-  const avant = await lireBP(pg);
-  if (!go || !avant || !avant.lancer || avant.lancer.off) return { avant, apres: avant, lance: false };
-  // (13 nov.) Depuis 5.370 la feuille propose « Dans les N h » (étalé, programmé par l'extension) par
-  // défaut ; ce scénario juge l'envoi IMMÉDIAT, son clic « Maintenant ».
-  if (await pg.locator('[data-bp-quand="maintenant"]').count()) await pg.locator('[data-bp-quand="maintenant"]').click().catch(() => {});
-  await pg.locator('[data-bp-lancer]').click().catch(() => {});
-  await pg.waitForSelector('[data-bp-confirmer]', { timeout: 6000 }).catch(() => {});
-  await pg.locator('[data-bp-confirmer]').click().catch(() => {});
-  const apres = await attendreQue(async () => { const b = await lireBP(pg); return b && b.L[String(id)] && b.L[String(id)].etat && !/attente|encours|envoi/.test(b.L[String(id)].etat) ? b : null; }, 45000, 500);
-  return { avant, apres: apres || await lireBP(pg), lance: true };
+// Coche la paire (qui dort) et touche « Baisser » : rend le lien du panneau ouvert (la requête de navigation), ou ce qui manque.
+async function baisserDepuisApp(ctx, pg, id) {
+  const cle = 'vinted#' + id;
+  // L'écran se redessine quand une lecture arrive (filtre et cases repartent de zéro) : comme lui, on refait le geste
+  // tant que la barre de SA sélection n'est pas là (3 fois au plus) — jamais un autre chemin.
+  let lignes = [], bouton = null;
+  for (let i = 0; i < 3 && !bouton; i++) {
+    lignes = await ouvrirAnnoncesDorment(pg, { recharger: i === 0 });
+    if (!lignes.includes(cle)) { if (i === 2) return { absente: true, lignes }; await attendre(1500); continue; }
+    await pg.evaluate((c) => { const r = document.querySelector(`[data-eg-ecran] [data-eg-article="${c}"]`); const x = r && r.querySelector('input.n-tt-coche'); if (x && !x.checked) x.click(); }, cle);
+    await attendreQue(() => pg.evaluate(() => !!document.querySelector('[data-tt-action-directe="baisser"]')), 6000, 200);
+    bouton = await lireBoutonBaisser(pg);
+  }
+  const liens = [];
+  const surRequete = (r) => { try { if (r.isNavigationRequest() && /^https:\/\/www\.vinted\.fr\/\?vrm=panneau/.test(r.url())) liens.push(r.url()); } catch (_) {} };
+  ctx.on('request', surRequete);
+  const nPages = ctx.pages().length;
+  if (bouton && bouton.ouvert) await clicDom(pg, '[data-tt-action-directe="baisser"]');
+  await attendreQue(async () => liens.length > 0, bouton && bouton.ouvert ? 15000 : 4000, 200);
+  ctx.off('request', surRequete);
+  const panneauPg = liens.length ? await attendreQue(async () => ctx.pages().slice(nPages).find((p) => /^https:\/\/www\.vinted\.fr\//.test(p.url())) || null, 10000, 200) : null;
+  return { lignes, bouton, lien: liens[0] || '', panneauPg, onglets: ctx.pages().length - nPages };
 }
-// (16 nov.) Depuis la feuille « VRM travaille » (11 nov., src/composants/SuiviTravail.jsx, demande de Julien : VRM reste
-// FIGÉ), une série finie se ferme par SON « Fermer » : Échap n'y fait rien (exprès), et la feuille restée ouverte est
-// RELUE au rechargement — la baisse suivante n'ouvrait donc jamais sa feuille (« L2 vide »). On touche « Fermer ».
-const fermerFeuille = async (pg) => {
-  const f = pg.locator('[data-suivi-fermer]');
-  if (await f.count().catch(() => 0)) { await f.first().click().catch(() => {}); await attendre(300); }
-  await pg.keyboard.press('Escape').catch(() => {}); await attendre(300);
-};
+// Le panneau vit dans une racine d'ombre FERMÉE (vrm-badge.js) que Playwright ne traverse pas : le protocole du navigateur
+// la montre (DOM.getDocument pierce). On y lit et on y touche comme ses doigts — rien n'est changé dans l'extension.
+async function panneau(pg, fn, arg) {
+  try {
+    const cdp = pg.__cdp || (pg.__cdp = await pg.context().newCDPSession(pg));
+    const { root } = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
+    const trouver = (n) => {
+      if (!n) return null;
+      const a = n.attributes || []; const i = a.indexOf('id');
+      if (i >= 0 && i % 2 === 0 && a[i + 1] === 'vrm-badge' && n.shadowRoots && n.shadowRoots[0]) return n.shadowRoots[0];
+      for (const c of [...(n.children || []), ...(n.shadowRoots || [])]) { const r = trouver(c); if (r) return r; }
+      return null;
+    };
+    const sr = trouver(root); if (!sr) return null;
+    const { object } = await cdp.send('DOM.resolveNode', { backendNodeId: sr.backendNodeId });
+    const r = await cdp.send('Runtime.callFunctionOn', { objectId: object.objectId, functionDeclaration: `function (a) { return (${fn.toString()})(this, a); }`, arguments: [{ value: arg === undefined ? null : arg }], returnByValue: true, awaitPromise: true });
+    return r && r.result ? r.result.value : null;
+  } catch (e) { return null; }
+}
+// La question de l'extension à la première visite d'un compte (« c'est bien un de tes comptes à capter ? ») : il répond Oui,
+// une fois (vrm-badge.js `rendreQuestion`) — tant qu'elle attend, le panneau reste fermé.
+async function repondreQuestionCompte(page, ms = 8000) {
+  return attendreQue(() => panneau(page, (R) => { const b = R.querySelector('.question.on [data-choix="oui"]'); if (b) { b.click(); return true; } return false; }), ms, 400);
+}
+const lirePanneau = (pp, id) => panneau(pp, (R, id) => {
+  const sel = R.querySelector('[data-ann-action]');
+  const ligne = R.querySelector(`[data-prix-ligne="${id}"]`);
+  const etat = R.querySelector('[data-geste-etat]');
+  return { pret: !!sel, action: sel ? sel.value : '', coches: [...R.querySelectorAll('[data-ann-sel]')].filter((c) => c.checked).map((c) => c.getAttribute('data-ann-sel')),
+    lignes: [...R.querySelectorAll('[data-ann-sel]')].map((c) => c.getAttribute('data-ann-sel')), question: !!R.querySelector('.question.on [data-choix="oui"]'),
+    prix: !!R.querySelector(`[data-prix-nouveau="${id}"]`), ligne: ligne ? ligne.innerText.replace(/\s+/g, ' ') : '', aa: !!R.querySelector('[data-aa-vue]'), garde: !!R.querySelector('[data-garde-oui]'),
+    etat: etat ? { ok: etat.getAttribute('data-geste-etat'), texte: etat.textContent } : null };
+}, id);
+// Dans le panneau : le lien de l'app l'ouvre DIRECTEMENT sur la feuille du prix de la paire (5.440.4 ; aucun menu à
+// re-choisir — le banc ne touche pas au menu, il le verrait), SON prix tapé, « Revoir », puis « Lancer » sur la feuille
+// Avant | Après (et, si la garde le demande, SA confirmation du chiffre). Rend l'état lu.
+async function lancerDansPanneau(ctx, pp, id, prix) {
+  await pp.bringToFront();
+  await repondreQuestionCompte(pp, 3000);
+  const avant = await attendreQue(async () => { const l = await lirePanneau(pp, id); return l && l.prix ? l : null; }, 30000, 400) || await lirePanneau(pp, id);
+  if (!avant || !avant.prix) return { avant, lance: false };
+  await panneau(pp, (R, a) => { const c = R.querySelector(`[data-prix-nouveau="${a.id}"]`); c.value = a.prix; c.dispatchEvent(new Event('input')); c.dispatchEvent(new Event('change')); }, { id: String(id), prix: String(prix).replace('.', ',') });
+  await panneau(pp, (R) => { const b = R.querySelector('[data-prix-confirmer]'); if (b) b.click(); });
+  const aa = await attendreQue(async () => { const l = await lirePanneau(pp, id); return l && l.aa ? l : null; }, 10000, 300);
+  // (le temps passé) le vendeur a Vinted ouvert depuis longtemps : la discrétion après une OUVERTURE ne le retient pas ici
+  // (elle est jugée par l'audit de la discrétion) ; l'espace entre deux baisses en attente non plus (le temps a passé).
+  await dansSW(ctx, ID_COURANT, async () => { const m = (await chrome.storage.local.get('vrmOuverture')).vrmOuverture || {}; for (const k of Object.keys(m)) { m[k].depuis = Date.now() - 3600000; m[k].vu = Date.now(); } await chrome.storage.local.set({ vrmOuverture: m }); await chrome.storage.local.remove('vrmPrixAttSuivant'); });
+  await panneau(pp, (R) => { const b = R.querySelector('[data-aa-vue] [data-prix-confirmer]'); if (b) b.click(); });
+  let apres = await attendreQue(async () => { const l = await lirePanneau(pp, id); return l && (l.etat || l.garde) ? l : null; }, 20000, 400);
+  if (apres && apres.garde) {
+    await panneau(pp, (R) => { const b = R.querySelector('[data-garde-oui]'); if (b) b.click(); });
+    apres = await attendreQue(async () => { const l = await lirePanneau(pp, id); return l && l.etat ? l : null; }, 20000, 400) || apres;
+  }
+  return { avant, aa, apres, lance: true };
+}
+// La commande rangée par le panneau pour CETTE annonce (la plus récente), relue dans la base.
+const commandePrix = (M, id, depuis = 0) => M.lignes().filter((r) => /^cmd_prix_/.test(r.id) && r.data && r.data.cle === 'vinted:' + id && Number(r.data.demandeLe) >= depuis).sort((a, b) => Number(b.data.demandeLe) - Number(a.data.demandeLe))[0] || null;
+const fermerPanneauPg = async (pp) => { if (pp) await pp.close().catch(() => {}); };
 
 // ════════════════════════════════════════════════════════════════════════════
 (async () => {
@@ -250,6 +324,7 @@ const fermerFeuille = async (pg) => {
   try { await M.ecouter(); } catch (e) { console.log(`❌ le port ${PORT} est pris (${e.code}) — BANC_PORT=…`); process.exit(1); }
   const EXT = preparerExtension('ext');
   const ID = extId(EXT);
+  ID_COURANT = ID;
   const VERSION = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8')).version;
   console.log(`extension ${VERSION} (${ID.slice(0, 8)}…) · app ${DIST}${MUT ? ` · MUTATION « ${MUT} »` : ''}`);
   const ctxs = [];
@@ -293,6 +368,7 @@ const fermerFeuille = async (pg) => {
       await vt.bringToFront(); await vt.goto('https://www.vinted.fr/banc/connexion?uid=111');
       await vt.bringToFront(); await vt.goto('https://www.vinted.fr/member/111-vendeur_a');
       const lignes = await attendreQue(async () => { const l = M.ligne('harvest_111_listings'); const v = M.ligne('harvest_111_orders_sold'); const a = M.lignes('vinted_accounts').find((x) => String(x.vinted_user_id) === '111'); return l && v && a ? { l, v, a } : null; }, 45000, 500);
+      await repondreQuestionCompte(vt);   // « c'est bien un de tes comptes à capter ? » — Oui (une fois, comme lui)
       dit(!!lignes, '2 : la visite range le dressing, les ventes et le compte (lignes écrites par l’extension)', JSON.stringify(M.lignes().map((r) => r.id)));
       const items = lignes ? (lignes.l.data.payload.items || []).map((x) => String(x.id)).sort() : [];
       dit(items.join() === '91010001,91010002', '2 : le dressing rangé est celui du compte de l’onglet (ses 2 annonces)', items.join());
@@ -312,29 +388,36 @@ const fermerFeuille = async (pg) => {
       const items2 = l2 ? (l2.data.payload.items || []).map((x) => String(x.id)).sort().join() : '';
       dit(items2 === '91010001,91010002', '2 : le dressing d’un AUTRE membre, vu en passant, n’entre pas dans SES annonces (§5)', items2);
       void n0;
-      // L'app : Annonces.
+      // L'app : Annonces — l'écran natif (19 nov.) : une rangée par article, son identité Vinted (`vinted#{id}`), VISIBLE
+      // (l'ancienne grille `data-carte-annonce` reste montée cachée derrière l'écran natif : la lire ne prouvait rien).
       const pg = vrm || await ctx.newPage();
       await pg.bringToFront(); await pg.goto('https://vrm.center/?tab=cat_annonces', { waitUntil: 'domcontentloaded' });
-      const cartes = await attendreQue(async () => { const c = await pg.evaluate(() => [...document.querySelectorAll('[data-carte-annonce]')].map((x) => x.getAttribute('data-carte-annonce'))); return c.length ? c : null; }, 40000, 500) || [];
+      const lireRangees = () => pg.evaluate(() => [...document.querySelectorAll('[data-eg-ecran] [data-eg-article]')].filter((x) => x.getClientRects().length > 0).map((x) => x.getAttribute('data-eg-article')));
+      const cartes = await attendreQue(async () => { const c = await lireRangees(); return c.length ? c : null; }, 40000, 500) || [];
       await capture(pg, '2-annonces');
-      dit(cartes.includes('91010001') && cartes.includes('91010002'), '2 : ses annonces sont visibles dans Annonces', JSON.stringify(cartes));
-      dit(!cartes.some((c) => /^9202/.test(c)), '2 : aucune annonce de l’autre membre dans Annonces', JSON.stringify(cartes));
+      dit(cartes.includes('vinted#91010001') && cartes.includes('vinted#91010002'), '2 : ses annonces sont visibles dans Annonces', JSON.stringify(cartes));
+      dit(!cartes.some((c) => /9202\d{4}/.test(c)), '2 : aucune annonce de l’autre membre dans Annonces', JSON.stringify(cartes));
 
       // ══ 3. LA VENTE ════════════════════════════════════════════════════════
+      // Ventes natif (19 nov.) : « À envoyer » est la vue d'arrivée ; chaque rangée porte son identité `v:{n° de transaction}`
+      // (`data-vn-rang`, « En route » : `data-vn-route`) — l'ancienne liste `.vrm-sale-row[data-tx]` n'est plus rendue.
       console.log('\n── 3. une vente ⇒ Ventes');
       await pg.bringToFront(); await pg.goto('https://vrm.center/?tab=cat_ventes', { waitUntil: 'domcontentloaded' });
-      const ventes = await attendreQue(async () => { const v = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sale-row[data-tx]')].map((x) => ({ tx: x.getAttribute('data-tx'), compte: (x.querySelector('[data-vente-compte]') || x).getAttribute('data-vente-compte') || '', texte: (x.innerText || x.textContent || '').replace(/\s+/g, ' ').slice(0, 160) }))); return v.some((x) => x.tx === '7001001' && /Dunk/.test(x.texte)) ? v : null; }, 40000, 500) || await pg.evaluate(() => [...document.querySelectorAll('.vrm-sale-row[data-tx]')].map((x) => ({ tx: x.getAttribute('data-tx'), compte: '', texte: (x.innerText || x.textContent || '').replace(/\s+/g, ' ').slice(0, 160) }))).catch(() => []);
+      const lireVentes = () => pg.evaluate(() => [...document.querySelectorAll('[data-vn-rang], [data-vn-route]')].filter((x) => x.getClientRects().length > 0).map((x) => ({ cle: x.getAttribute('data-vn-rang') || x.getAttribute('data-vn-route') || '', texte: (x.innerText || x.textContent || '').replace(/\s+/g, ' ').slice(0, 160) })));
+      const ventes = await attendreQue(async () => { const v = await lireVentes(); return v.some((x) => x.cle === 'v:7001001' && /Dunk/.test(x.texte)) ? v : null; }, 40000, 500) || await lireVentes().catch(() => []);
       await capture(pg, '3-ventes');
-      const v1 = ventes.find((v) => v.tx === '7001001');
+      const v1 = ventes.find((v) => v.cle === 'v:7001001');
       dit(!!v1, '3 : la vente Vinted est dans Ventes (par son n° de transaction)', JSON.stringify(ventes));
       dit(!!v1 && /Dunk/.test(v1.texte), '3 : avec son titre', v1 && v1.texte);
-      dit(!ventes.some((v) => v.tx === '8002001'), '3 : la vente d’un autre compte n’y est pas (jamais lue sous celui-ci)', JSON.stringify(ventes));
+      dit(!ventes.some((v) => v.cle === 'v:8002001'), '3 : la vente d’un autre compte n’y est pas (jamais lue sous celui-ci)', JSON.stringify(ventes));
     }
 
-    // ══ 4. UNE COMMANDE DE L'APP, EXÉCUTÉE PAR L'EXTENSION ══════════════════
+    // ══ 4. « BAISSER » DANS L'APP ⇒ LE PANNEAU DE L'EXTENSION ⇒ L'EXTENSION ════════
     const pg = vrm || await ctx.newPage();
+    // Le prix que VRM a LU pour la paire (le dressing rangé) : c'est lui que le panneau montre et envoie comme « prix vu ».
+    const prixRange = (id) => { const l = M.ligne('harvest_111_listings'); const it = l && (l.data.payload.items || []).find((x) => String(x.id) === String(id)); return it && it.price ? Number(it.price.amount) : null; };
     if (veut(4)) {
-      console.log('\n── 4. « Baisser le prix » depuis l’app ⇒ l’extension, au nom du compte de l’onglet');
+      console.log('\n── 4. « Baisser » dans l’app ⇒ le panneau de l’extension sur vinted.fr ⇒ au nom du compte de l’onglet');
       // Il a modifié une fois l'annonce sur vinted.fr (enregistrée sans rien
       // changer) : la page envoie SA fiche, l'extension apprend le format.
       await vt.bringToFront(); await vt.goto('https://www.vinted.fr/items/91010001-annonce/edit');
@@ -348,57 +431,70 @@ const fermerFeuille = async (pg) => {
       dit(!!coffre, '4 : l’annonce est sauvegardée dans le coffre (filet avant tout geste)');
       await vt.bringToFront(); await vt.goto('https://www.vinted.fr/member/111-vendeur_a');      // l'onglet reste sur vinted.fr
       await attendre(1500);
-      // (13 nov.) Depuis 5.370, après une OUVERTURE de vinted.fr l'extension attend 2 à 5 min avant tout
-      // geste seul (porteDiscretion, `vrmOuverture`). Ce scénario juge la commande d'un vendeur dont
-      // Vinted est ouvert DEPUIS LONGTEMPS : on recule l'heure d'ouverture notée (le temps passé), on ne
-      // retire aucune porte ; l'attente elle-même est jugée par l'audit de la discrétion.
-      const recul = await dansSW(ctx, ID, async () => { const m = (await chrome.storage.local.get('vrmOuverture')).vrmOuverture || {}; for (const k of Object.keys(m)) { m[k].depuis = Date.now() - 3600000; m[k].vu = Date.now(); } await chrome.storage.local.set({ vrmOuverture: m }); return Object.keys(m); });
-      if (!Array.isArray(recul)) console.log('     (ouverture non reculée : ' + JSON.stringify(recul) + ')');
-      const d0 = vinted().length;
+      const d0 = vinted().length, t0 = Date.now();
       M.remiseEnVol();
-      const r = await baisserDepuisApp(pg, 91010001);
-      await capture(pg, '4-baisse');
+      const r = await baisserDepuisApp(ctx, pg, 91010001);
+      await capture(pg, '4-baisse-app');
+      dit(!!r.bouton && r.bouton.ouvert && /[?&]page=prix(&|$)/.test(r.lien) && /[?&]ids=91010001(&|$)/.test(r.lien) && /[?&]action=baisser(&|$)/.test(r.lien) && !(r.lignes || []).includes('vinted#91010002'),
+        '4 : l’app propose la baisse de la paire qui dort (extension à jour) et ouvre le panneau de l’extension sur elle', JSON.stringify({ lignes: r.lignes, bouton: r.bouton, lien: r.lien }));
+      const pp = r.panneauPg;
+      const nAvantLancer = () => vinted().slice(d0).filter((e) => e.m === 'PUT').length;
+      const lp = pp ? await lancerDansPanneau(ctx, pp, 91010001, 54) : { avant: null };
+      await capture(pp, '4-panneau');
+      const diag4 = await dansSW(ctx, ID, async () => ({ cache: typeof _infosPage !== 'undefined' && _infosPage ? { age: Date.now() - _infosPage.at, n: Object.keys(_infosPage.parId || {}).length } : null }));
+      const hv = M.ligne('harvest_111_listings');
+      dit(!!lp.avant && lp.avant.prix && /Nike Cortez/.test(lp.avant.ligne), '4 : le panneau s’ouvre sur vinted.fr, directement sur la feuille du prix de CETTE paire (aucun menu à re-choisir)', JSON.stringify({ avant: lp.avant, diag4, rangees: hv ? (hv.data.payload.items || []).length : null }));
+      dit(!!lp.aa && nAvantLancer() <= 1, '4 : avant / après montré avant SON « Lancer »', JSON.stringify(lp.aa));
+      const cmd = await attendreQue(async () => { const c = commandePrix(M, 91010001, t0); return c && !['attente', 'pris'].includes(c.data.etat) ? c : null; }, 90000, 500) || commandePrix(M, 91010001, t0);
+      await capture(pp, '4-panneau-apres');
       const apres = vinted().slice(d0);
       const puts = apres.filter((e) => e.m === 'PUT' && /item_upload\/items\/91010001/.test(e.p));
-      dit(!!r.avant && r.avant.lancer && !r.avant.lancer.off, '4 : l’app propose la baisse (extension à jour, compte de l’onglet)', JSON.stringify(r.avant && { lancer: r.avant.lancer, ext: r.avant.ext, L: r.avant.L }));
-      dit(puts.length === 1, '4 : UNE modification de prix part chez Vinted', `${puts.length} PUT · ${apres.map((e) => e.m + ' ' + e.p).join(' | ')}`);
+      dit(puts.length === 1, '4 : UNE modification de prix part chez Vinted', `${puts.length} PUT · ${apres.map((e) => e.m + ' ' + e.p).join(' | ')} · commande ${JSON.stringify(cmd && cmd.data)}`);
       const p0 = puts[0] || {};
       let prixEnvoye = null; try { prixEnvoye = Number(JSON.parse(p0.corps).item.price.amount); } catch (_) {}
       dit(p0.uid === '111' && !p0.auth, '4 : au nom du compte de l’onglet (cookie 111), depuis la page — aucun Authorization', JSON.stringify({ uid: p0.uid, auth: p0.auth }));
-      dit(prixEnvoye != null && prixEnvoye < 60 && M.st.prix[91010001] === prixEnvoye, '4 : le prix voulu est arrivé chez Vinted', `${prixEnvoye} · Vinted ${M.st.prix[91010001]}`);
+      dit(prixEnvoye === 54 && M.st.prix[91010001] === prixEnvoye, '4 : le prix voulu est arrivé chez Vinted', `${prixEnvoye} · Vinted ${M.st.prix[91010001]}`);
       const getsApres = apres.filter((e) => e.m === 'GET' && /item_upload\/items\/91010001/.test(e.p) && e.t > (p0.t || 0));
       dit(getsApres.length >= 1, '4 : puis le prix est RELU chez Vinted');
-      const L = r.apres && r.apres.L && r.apres.L['91010001'];
-      dit(!!L && L.etat === 'fait' && Number(L.vu) === prixEnvoye, '4 : l’app affiche le prix RELU', JSON.stringify(L));
+      dit(!!cmd && cmd.data.etat === 'fait' && Number(cmd.data.prixVu) === prixEnvoye, '4 : VRM garde le prix RELU (la commande finie, relue par l’app)', JSON.stringify(cmd && cmd.data));
       dit(M.st.maxEnVol <= 1, '4 : pendant la commande, jamais deux requêtes Vinted de l’extension en vol en même temps', `${M.st.maxEnVol} : ${(M.st.chevauchement || []).join(' | ')}`);
-      await fermerFeuille(pg);
+      await fermerPanneauPg(pp);
 
       // Plafond plein : 45 actions déjà faites dans l'heure sur ce compte (50 − réserve 5).
       const n45 = await dansSW(ctx, ID, async () => { const t = Date.now() - 60000; const cur = (await chrome.storage.local.get('vrmActions')).vrmActions || {}; cur['111'] = Array.from({ length: 45 }, (_, i) => t + i); await chrome.storage.local.set({ vrmActions: cur }); return cur['111'].length; });
-      M.st.prix[91010001] = 60;   // pour que l'aperçu reparte de 60 € (lu dans le dressing rangé)
-      const d1 = vinted().length;
-      const r2 = await baisserDepuisApp(pg, 91010001);
+      { const pr = prixRange(91010001); if (pr) M.st.prix[91010001] = pr; }   // Vinted montre le prix que VRM a lu (l'aperçu en repart)
+      const d1 = vinted().length, t1 = Date.now();
+      const r2 = await baisserDepuisApp(ctx, pg, 91010001);
+      const lp2 = r2.panneauPg ? await lancerDansPanneau(ctx, r2.panneauPg, 91010001, Math.round((M.st.prix[91010001] - 5) * 100) / 100) : {};
+      await capture(r2.panneauPg || pg, '4-panneau-plafond');
+      const cmd2 = await attendreQue(async () => { const c = commandePrix(M, 91010001, t1); return c && (c.data.attend || !['attente', 'pris'].includes(c.data.etat)) ? c : null; }, 30000, 500) || commandePrix(M, 91010001, t1);
       const rien = vinted().slice(d1).filter((e) => /item_upload/.test(e.p));
-      dit(n45 === 45 && rien.filter((e) => e.m === 'PUT').length === 0, '4 : plafond plein ⇒ RIEN ne part chez Vinted', `${rien.length} requête(s) · ${rien.map((e) => e.m + ' ' + e.p).join(' | ')}`);
-      const L2 = r2.apres && r2.apres.L && r2.apres.L['91010001'];
-      dit(!!r2.apres && (/plafond/.test(String(r2.apres.bilan || '') + (L2 ? L2.etat + L2.texte : '')) || /actions/.test(r2.apres.texte)), '4 : l’app dit le plafond', JSON.stringify({ bilan: r2.apres && r2.apres.bilan, L2 }));
-      await fermerFeuille(pg);
+      dit(n45 === 45 && !!lp2.lance && rien.filter((e) => e.m === 'PUT').length === 0, '4 : plafond plein ⇒ RIEN ne part chez Vinted', `${rien.length} requête(s) · ${rien.map((e) => e.m + ' ' + e.p).join(' | ')} · panneau ${JSON.stringify({ lien: r2.lien, pg: !!r2.panneauPg, lignes: r2.lignes, bouton: r2.bouton, absente: r2.absente, avant: lp2.avant, apres: lp2.apres })}`);
+      dit(!!cmd2 && /plafond/.test(String(cmd2.data.attend || '') + String(cmd2.data.code || '')), '4 : VRM dit le plafond (la commande attend, motif « plafond »)', JSON.stringify(cmd2 && cmd2.data));
+      await fermerPanneauPg(r2.panneauPg);
       await dansSW(ctx, ID, async () => { await chrome.storage.local.set({ vrmActions: {} }); });
 
       // 429 : Vinted demande de ralentir sur la modification ⇒ pause posée, la suivante n'envoie rien.
       M.st.forcer.push({ m: 'PUT', re: /item_upload\/items\//, status: 429, fois: 1 });
-      const d2 = vinted().length;
-      await baisserDepuisApp(pg, 91010001);
-      await fermerFeuille(pg);
+      { const pr = prixRange(91010001); if (pr) M.st.prix[91010001] = pr; }
+      const t2 = Date.now();
+      const r3 = await baisserDepuisApp(ctx, pg, 91010001);
+      const lp3 = r3.panneauPg ? await lancerDansPanneau(ctx, r3.panneauPg, 91010001, Math.round((M.st.prix[91010001] - 6) * 100) / 100) : null;
+      await capture(r3.panneauPg, '4-panneau-429');
+      await attendreQue(async () => { const c = commandePrix(M, 91010001, t2); return c && (c.data.attend || !['attente', 'pris'].includes(c.data.etat)) ? c : null; }, 60000, 500);
+      await fermerPanneauPg(r3.panneauPg);
       const pause = await dansSW(ctx, ID, async () => (await chrome.storage.local.get('vrmPauseVinted')).vrmPauseVinted || null);
-      dit(!!pause && Number(pause.jusqua) > Date.now(), '4 : un 429 de Vinted pose la pause', JSON.stringify(pause));
+      dit(!!pause && Number(pause.jusqua) > Date.now(), '4 : un 429 de Vinted pose la pause', JSON.stringify({ pause, commande: (commandePrix(M, 91010001, t2) || {}).data, panneau: lp3 && lp3.apres, lien: r3.lien, prixVinted: M.st.prix[91010001], toutes: M.lignes().filter((x) => /^cmd_prix_/.test(x.id)).map((x) => x.data.etat + ':' + (x.data.attend || x.data.code || '') + ':' + x.data.prix) }));
       const d3 = vinted().length;
-      await baisserDepuisApp(pg, 91010001);
-      await fermerFeuille(pg);
+      const r4 = await baisserDepuisApp(ctx, pg, 91010001);
+      if (r4.panneauPg) await lancerDansPanneau(ctx, r4.panneauPg, 91010001, Math.round((M.st.prix[91010001] - 7) * 100) / 100);
+      await attendre(4000);
+      await fermerPanneauPg(r4.panneauPg);
       const pendant = vinted().slice(d3);
       dit(pendant.length === 0, '4 : pendant la pause, la commande suivante n’envoie RIEN chez Vinted', `${pendant.length} · ${pendant.map((e) => e.m + ' ' + e.p).join(' | ')}`);
-      void d2;
       await dansSW(ctx, ID, async () => { await chrome.storage.local.remove('vrmPauseVinted'); });
+      // Les commandes encore en attente (pause) : annulées comme il le ferait, pour que la suite parte d'une file vide.
+      for (const c of M.lignes().filter((x) => /^cmd_prix_/.test(x.id) && x.data && ['attente', 'pris'].includes(x.data.etat))) c.data = { ...c.data, etat: 'annulee', finiLe: Date.now() };
     }
 
     // ══ 5. UN AUTRE COMPTE DANS L'ONGLET ═════════════════════════════════════
@@ -408,19 +504,23 @@ const fermerFeuille = async (pg) => {
       await vt.bringToFront(); await vt.goto('https://www.vinted.fr/member/222-autre_b');
       const actif = await attendreQue(async () => { const r = await dansSW(ctx, ID, async () => compteConnecte('www.vinted.fr')); return r === '222' ? r : null; }, 15000);
       dit(actif === '222', '5 : l’extension voit autre_b dans l’onglet');
+      await repondreQuestionCompte(vt);   // autre_b est aussi un de SES comptes : Oui
       // La vente d'autre_b, lue à la visite, est rangée sous autre_b.
       const v222 = await attendreQue(async () => M.ligne('harvest_222_orders_sold'), 40000, 500);
       const v111 = M.ligne('harvest_111_orders_sold');
       const tx111 = v111 ? (v111.data.payload.my_orders || []).map((o) => String(o.transaction_id)) : [];
       dit(!!v222 && !tx111.includes('8002001'), '5 : la vente d’autre_b est rangée sous autre_b, jamais sous vendeur_a', JSON.stringify({ v222: !!v222, tx111 }));
-      // L'app : la baisse de vendeur_a n'est pas proposée (« Ouvre vendeur_a sur Vinted »).
+      // L'app ouvre le panneau pour la paire de vendeur_a ; l'onglet est sur autre_b : le panneau ne la lance pas.
       await attendre(2000);
-      const d4 = vinted().length;
-      const r = await baisserDepuisApp(pg, 91010001);
-      await capture(pg, '5-autre-compte');
-      const L = r.avant && r.avant.L && r.avant.L['91010001'];
-      dit(!!r.absente || (L && L.bloque != null) || (r.avant && r.avant.lancer && r.avant.lancer.off) || !r.lance, '5 : l’app ne lance pas la baisse pour vendeur_a (l’onglet est sur autre_b)', JSON.stringify({ absente: r.absente, L, lancer: r.avant && r.avant.lancer }));
-      await fermerFeuille(pg);
+      const d4 = vinted().length, t4 = Date.now();
+      const r = await baisserDepuisApp(ctx, pg, 91010001);
+      const lp = r.panneauPg ? await lancerDansPanneau(ctx, r.panneauPg, 91010001, 50) : { avant: null, lance: false };
+      await capture(r.panneauPg || pg, '5-autre-compte');
+      await attendre(3000);
+      await fermerPanneauPg(r.panneauPg);
+      const cmd5 = commandePrix(M, 91010001, t4);
+      const tente5 = vinted().slice(d4).filter((e) => e.m !== 'GET' || /item_upload/.test(e.p));
+      dit(!!r.lien && !lp.lance && !cmd5 && tente5.length === 0, '5 : le panneau ne lance pas la baisse pour vendeur_a (l’onglet est sur autre_b)', JSON.stringify({ lien: r.lien, avant: lp.avant, lance: lp.lance, commande: cmd5 && cmd5.data, envoye: tente5.map((e) => e.m + ' ' + e.p + ' uid=' + e.uid) }));
       // Et même une commande postée DIRECTEMENT au pont (un écran périmé, un autre onglet) :
       const rep = await pg.evaluate(() => new Promise((ok) => {
         const reqId = 'banc-' + Date.now();
@@ -436,8 +536,10 @@ const fermerFeuille = async (pg) => {
     }
 
     // ══ 6. UNE EXTENSION EN RETARD ═══════════════════════════════════════════
+    // Une 5.335 (avant le panneau ouvert par un lien de l'app, `panneaucomplet` 5.410.0) : « Baisser » ouvrirait vinted.fr
+    // sans que rien ne s'y passe. L'app ne promet rien : le bouton est fermé et dit de mettre l'extension à jour.
     if (veut(6)) {
-      console.log('\n── 6. extension en retard (5.335, avant « baisseprix ») ⇒ l’app ne promet rien');
+      console.log('\n── 6. extension en retard (5.335, avant le panneau) ⇒ l’app ne promet rien');
       const EXTV = preparerExtension('ext-5335', { version: '5.335.0' });
       const IDV = extId(EXTV);
       const ctx6 = await lancer(path.join(TMP, 'profil-6'), EXTV); ctxs.push(ctx6);
@@ -454,12 +556,12 @@ const fermerFeuille = async (pg) => {
       const etat = await (async () => { await p6.goto('https://vrm.center/?tab=cat_annonces', { waitUntil: 'domcontentloaded' }); return attendreQue(() => p6.evaluate(() => new Promise((ok) => { const reqId = 'v' + Math.random(); const h = (e) => { const d = e.data; if (e.source === window && d && d.__vmr === 'etat:result' && d.reqId === reqId) { window.removeEventListener('message', h); ok(d.resp); } }; window.addEventListener('message', h); window.postMessage({ __vmr: 'etat', reqId }, '*'); setTimeout(() => ok(null), 4000); })), 20000); })();
       dit(!!etat && etat.version === '5.335.0', '6 : le pont de VRM parle à la 5.335', JSON.stringify(etat && { version: etat.version, code: etat.code }));
       const d5 = vinted().length;
-      const r = await baisserDepuisApp(p6, 91010001);
+      const r = await baisserDepuisApp(ctx6, p6, 91010001);
       await capture(p6, '6-retard');
       const envoye = vinted().slice(d5).filter((e) => /item_upload/.test(e.p));
-      dit(!r.absente && !!r.avant, '6 : la feuille « Baisser le prix » s’ouvre (la paire dort)', JSON.stringify(r).slice(0, 200));
-      dit(!!r.avant && (!r.avant.lancer || r.avant.lancer.off) && !r.lance, '6 : « Baisser » est fermé : l’app ne promet rien à une extension sans la baisse', JSON.stringify(r.avant && { lancer: r.avant.lancer, ext: r.avant.ext }));
-      dit(!!r.avant && /mettre à jour|à jour|version|extension/i.test(r.avant.ext || ''), '6 : et elle dit quoi faire (mettre l’extension à jour)', r.avant && r.avant.ext);
+      dit(!r.absente && !!r.bouton, '6 : la paire dort, « Baisser » est dans la barre de sa sélection', JSON.stringify(r).slice(0, 300));
+      dit(!!r.bouton && !r.bouton.ouvert && !r.lien && r.onglets === 0, '6 : « Baisser » est fermé : l’app n’ouvre pas un panneau que cette extension ne sait pas ouvrir', JSON.stringify({ bouton: r.bouton, lien: r.lien, onglets: r.onglets }));
+      dit(!!r.bouton && /mettre à jour|mets à jour|à jour/i.test(r.bouton.raison || ''), '6 : et elle dit quoi faire (mettre l’extension à jour)', r.bouton && r.bouton.raison);
       dit(envoye.length === 0, '6 : rien n’est parti chez Vinted', String(envoye.length));
     }
     dit(erreursApp.length === 0, 'aucune erreur de page dans l’app', erreursApp.slice(0, 3).join(' | '));

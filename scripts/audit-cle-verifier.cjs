@@ -99,6 +99,10 @@ function analyser(src) {
         if (b.path.isFunctionDeclaration()) { pile.push(b.path); return; }
         const n = b.path.node;
         if (n.type === 'VariableDeclarator') {
+          // (25 nov., vitesse-lectures-toucher) `useCalculParVersion(() => xCalc(), cle, …)` (src/calculParesseux.js) rend la valeur
+          // de SON calcul pour la version des données qu'il lit (identité neuve à chaque rendu : ce n'est pas une racine à poser dans
+          // la clé) : on développe le calcul, comme une fonction du composant. Sa propre clé est vérifiée par audit-calcul-par-version.
+          if (n.init && n.init.type === 'CallExpression' && n.init.callee.type === 'Identifier' && n.init.callee.name === 'useCalculParVersion' && n.init.arguments[0]) { pile.push(b.path.get('init.arguments.0')); return; }
           if (estHook(n.init)) { racines.add(nom); return; }
           if (b.kind === 'let' || b.kind === 'var') { racines.add(nom); return; }
           if (n.init) { pile.push(b.path.get('init')); return; }   // fonction ou dérivée : développée

@@ -111,12 +111,12 @@ async function controles(src, dit) {
 
 function cablage(dit) {
   const app = sansCommentaires(lire('src/App.jsx'));
-  const pu = app.slice(app.indexOf('const pickupUnion = useMemo('), app.indexOf('const groupesRelais = useMemo(') > 0 ? app.indexOf('const groupesRelais = useMemo(') : app.indexOf('const pickupUnion = useMemo(') + 40000);
+  const pu = app.slice(app.indexOf('const pickupUnion = useMemoParesseux('), app.indexOf('const groupesRelais = useMemoParesseux(') > 0 ? app.indexOf('const groupesRelais = useMemoParesseux(') : app.indexOf('const pickupUnion = useMemoParesseux(') + 40000);
   dit(/finParIdentite\(t, preuvesIdentite\(t, cmd\)\)/.test(pu) && /fi === 'retire'/.test(pu), 'D1 pickupUnion juge la fin par les autres identités (commande, code)');
   dit(/fusionnerParCode\(emailList/.test(pu), 'D2 pickupUnion : une ligne par code de retrait');
   dit(/regrouperArrivees\(emailList, \{[^}]*temoins, sansIdentite(?:, temoinActif: [^}]*)? \}\)/.test(pu), 'D3 pickupUnion donne les témoins (finis compris) et la règle « sans identité »');
   dit(/enDouble/.test(pu) && /doute_meme_relais/.test(pu), 'D4 les doubles possibles sont à part : ni « à retirer », ni « à vérifier »');
-  const tfb = app.slice(app.indexOf('const colisParTx = useMemo('), app.indexOf('const achatStage ='));
+  const tfb = app.slice(app.indexOf('const colisParTx = useLecteurParesseux('), app.indexOf('const achatStage ='));
   dit(tfb.length > 0 && !/normTitle/.test(tfb) && /achatParConversation|parConv/.test(tfb), 'D5 l\'écran Achats relie un colis à SA commande par identité, jamais par le titre');
   const eq = app.slice(app.indexOf('function ColisEquipe('), app.indexOf('function ColisEquipe(') + 6000);
   dit(!/needs_action/.test(eq.slice(eq.indexOf('const achats = d.achats'), eq.indexOf('const achats = d.achats') + 300)), 'D6 équipe : `needs_action` n\'est pas « à retirer » (« Commande livrée ! » le porte)');
