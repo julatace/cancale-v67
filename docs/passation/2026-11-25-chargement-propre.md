@@ -62,26 +62,95 @@ Le cache des lectures (`viderLecturesMemo`) est déjà vidé au retour au premie
 - Le petit signe « à jour · il y a 2 min » existait déjà (`src/aujourdhui/TeteDroite.jsx`, `tete.lu`, nourri par la
   sonde) : rien de nouveau à l'écran.
 
-### Mesures (banc `mise-a-jour-auto`, Ventes, 390 px)
+### Mesures (banc `mise-a-jour-auto`, Ventes, 390 px, design natif)
 
 | cas | avant (`origin/main`) | après |
 |---|---|---|
-| 1. Vinted, prise jointe | 1,3 s | 1,3 s |
-| 2. E-mail (bordereau), prise jointe | 0,9 s | 1,0 s |
-| 3. iPhone : 40 s en arrière-plan, prise coupée, retour | 6,9 s (Ventes a sa propre sonde au retour) | **1,4 s** |
-| 4. Prise refusée (morte), page visible | **jamais en 30 s** (sonde à 2 min) | **10,4 s** |
+| 1. Vinted (vente captée), prise jointe | 0,9 s | 1,3 s |
+| 2. E-mail (bordereau rangé), prise jointe | 0,6 s | 0,8 s |
+| 3. iPhone : 40 s en arrière-plan, prise coupée, retour | 9,8 s (Ventes a sa propre sonde au retour ; les autres écrans non) | **0,9 s** |
+| 4. Prise morte (refusée), page visible | **jamais en 30 s** (sonde ralentie à 2 min) | **8,3 s** |
 | au repos, page visible, 2 min | 14,5 lectures/min · 179 Ko/min | 16,5 lectures/min · 193 Ko/min |
 
-Au repos, la différence est la sonde des versions (toutes les 15 s au lieu de 25 s quand la prise n'a rien apporté :
-+1,6 lecture/min). Au banc chaque sonde pèse ~7 Ko parce que TOUTE la base inventée vient d'être « écrite » (elle a
-moins de 10 min) ; en production elle ne rend que les lignes écrites ces 10 dernières minutes — quelques centaines
-d'octets. Le reste des lectures au repos existait avant (les versions de la famille `harvest_*`, 111 Ko par lecture au
-banc, déjà là).
+Au repos, la différence est la sonde des versions (toutes les 15 s au lieu de 25 s tant que la prise n'a rien apporté :
++1,6 lecture/min). Au banc chaque sonde pèse ~7 Ko parce que TOUTE la base inventée vient d'être « écrite » (moins de
+10 min) ; en production elle ne rend que les lignes écrites ces 10 dernières minutes — quelques centaines d'octets. Le
+gros des lectures au repos existait avant (les versions de la famille `harvest_*`, ~110 Ko par lecture au banc).
+Avec la prise jointe ET un message reçu, la sonde reste à 2 min comme avant.
 
-Preuve : le banc est **rouge sur `origin/main`** (cas 4) et vert après.
+Preuve : le banc est **rouge sur `origin/main`** (cas 4) et vert après (même banc, même base, même machine).
 
 ---
 
-## 4. Le chargement — ce qui était moche
+## 4. Le chargement — ce qui était moche (mesuré, design natif, 700 ms par réponse)
 
-(voir §5)
+⚠️ Les bancs voient par défaut le DOM d'AVANT le 17 nov. (`_garde-reseau.cjs` pose `vrm_banc_dom_ancien`) : les deux bancs
+neufs posent `BANC_DESIGN_V2=defaut` (le design que Julien voit). Mesuré d'abord sur l'ancien DOM par erreur — ses défauts
+(tuiles d'Aujourd'hui qui se replacent, « 67 colis pressés » inséré en tête, Achats) ne sont PAS ceux de l'app d'aujourd'hui ;
+rien de cette mesure n'a été gardé dans le code.
+
+Sur le design natif (`origin/main`) :
+- **Annonces** : « Lecture en cours… » écrit en toutes lettres sous les filtres pendant toute la lecture ;
+- **Argent** : « Reçu en novembre : lecture… » en tête ; « À venir » (deux cartes) arrivait après l'écran et poussait
+  « Versements de novembre » de 91 px (CLS 0,052) ;
+- **Messages** : « Lecture… » à la place de la liste de conversations, puis la liste ;
+- **Aujourd'hui** : « N nouveaux N° à écrire sur leurs rangements » arrivait avec le nuage (~7 s après l'écran) et poussait
+  « Porte-monnaie » de 162 px (CLS 0,041) ;
+- (ancien DOM seulement) des faits « ventes : lecture… », « lecture… » sous les chiffres du mois.
+Le reste était déjà propre (squelettes natifs `Attente`, chiffres en squelette du 24 nov., copies d'écran) : Ventes et
+Colis/achats à CLS 0.
+
+## 5. Ce qui a changé (chargement)
+
+- **`src/natif/PlaceGardee.jsx`** (neuf, réutilisable) : un bloc qui n'existe que s'il y a quelque chose à dire tient, pendant
+  la lecture, la HAUTEUR qu'il avait la dernière fois sur CET appareil (`vrm_place_{cle}`, mesurée une fois tout lu,
+  effacée avec les données locales), par un squelette `.n-os` (reflet doux, coupé sous `prefers-reduced-motion`) ; rien la
+  dernière fois ⇒ rien de réservé (option `defaut` pour un bloc presque toujours là). Jamais un contenu inventé.
+  Posé sur : la carte « N° à écrire » d'Aujourd'hui (`CarteNumerosAEcrire`, App.jsx), « À venir » d'Argent
+  (`AVenirCartes`, défaut 115 px).
+- **Un chiffre ou une phrase EN COURS de lecture = un squelette** (la règle `attenteDe`/`attrsAttente` du 24 nov.,
+  src/styles-chiffre-attente.css, étendue) : « mis à jour » d'Annonces (`n-ad-maj-texte`), « Reçu en … : » d'Argent
+  (`ArgentMois`), cases des cartes du mois (`CarteMois`), faits du jour, chiffres d'Argent (ancien DOM).
+- **Messages** (`FilsTous.jsx`) : la liste en lecture = des rangées de squelette (`<Attente forme="rangees" vignette={44}>`),
+  le fil en lecture = des lignes ; plus de mot « Lecture… ».
+- **Achats** : « À retirer » devient une donnée essentielle de l'écran (`ESSENTIELS_ECRAN.achats`, `useEssentiel('retirer')`),
+  au plus le plafond de 2,5 s : la ligne ne s'insère plus après l'ouverture.
+- **Apparition** : le fondu d'un écran qui arrive passe de 180 à 140 ms (≤ 150 ms), aucun sous « réduire les animations ».
+- Aucun texte visible nouveau (rien à traduire) ; deux lignes dans « Quoi de neuf » (`chargement-propre`, `maj-sans-relancer`).
+
+### Mesures (banc `chargement-structure`, 390 px, réponses à 700 ms, design natif)
+
+| écran | ouverture | CLS avant | CLS après | texte « lecture » avant → après | fin de l'écran de démarrage avant → après |
+|---|---|---|---|---|---|
+| Aujourd'hui | appareil neuf | 0,041 | 0,038 ¹ | — | 5,3 s → 6,0 s ² |
+| Aujourd'hui | 2ᵉ ouverture | 0 | 0 | — | 4,6 s → 4,0 s |
+| Annonces | appareil neuf | 0,015 | 0,015 | « Lecture en cours… » → aucun | 6,8 s → 4,5 s |
+| Annonces | 2ᵉ ouverture | 0 | 0 | — | 3,4 s → 2,3 s |
+| Ventes | neuf / 2ᵉ | 0 / 0 | 0,001 / 0 | — | 5,5 / 3,2 s → 4,7 / 3,9 s |
+| Colis (achats) | neuf / 2ᵉ | 0 / 0 | 0 / 0 | — | 7,0 / 2,8 s → 5,1 / 1,8 s |
+| Argent | appareil neuf | **0,052** | 0,023 | « Reçu en novembre : lecture… » → aucun | 4,8 s → 4,7 s |
+| Argent | 2ᵉ ouverture | 0 | 0 | — | 1,9 s → 1,9 s |
+| Messages | neuf / 2ᵉ | 0,007 / 0,007 | 0,007 / 0,007 | « Lecture… » → aucun | 5,1 / 2,5 s → 4,6 / 2,5 s |
+
+¹ Appareil NEUF : aucune hauteur encore mesurée pour « N° à écrire », la carte arrive comme avant (sous 0,05) ; à
+l'ouverture suivante sa place est tenue. ² Les temps varient de ±1,5 s d'un passage à l'autre (machine partagée, 4 cœurs,
+mémoire à 13/15 Go) : ils ne prouvent rien seuls ; les CLS et les textes, eux, sont stables.
+Aucun « 0 € de chargement » relevé, ni avant ni après (la règle des trois états tenait déjà).
+
+Preuve : le banc est **rouge sur `origin/main`** (Annonces, Argent, Messages) et **vert** après.
+
+## 6. Planches (captures séquencées, avant en haut, après en bas)
+
+Hors dépôt (dossier de travail de la session) : `planche-{écran}.png` (appareil neuf) et `planche-2-{écran}.png`
+(2ᵉ ouverture), pour journee, annonces, ventes, achats, compta, messages — refaites par
+`CHARGEMENT_PLANCHE=<captures avant>,<captures après>,<sortie> node scripts/bancs/chargement-structure.cjs`.
+
+## 7. Ce qui reste
+
+- Aujourd'hui, 2ᵉ ouverture : quand aucune COPIE d'écran n'est rangée, l'instantané résumé (`JourneeInstantanee`) a une
+  autre forme que l'écran vrai (vu sur l'ancien DOM : texte du sous-titre qui chevauche « À jour à l'instant ») ; sur le
+  design natif le banc ne l'a pas vu (copie présente ou squelette).
+- Annonces, appareil neuf : les pastilles de comptes se recalent (CLS 0,015, sous le seuil).
+- `audit-stockage-sur` : rouge AVANT ce lot (clés d'index dans 5 fichiers natifs que ce lot ne touche pas) — inchangé.
+- `audit-boutons-natifs` : sa partie navigateur ne se lançait plus depuis le 24 nov. (`outils.js` importe `tr`) — réparée
+  (la même traduction de banc que `Bouton.jsx`).
