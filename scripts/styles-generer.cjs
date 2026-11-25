@@ -70,14 +70,30 @@ const PRESETS = {
   // `contour` (bord du secondaire, ≥ 3:1), `limite` (bord d'un champ et d'un rond, ≥ 3:1), `douce` (aplat d'un rond, d'une
   // puce, de l'onglet actif), `point` + `surPoint` (le vert et le texte posé dessus), `bordCarte` (filet des cartes).
   monochrome: { forme: { rCarte: 24, rBouton: 12, hPlein: 48, rChip: 999, profondeur: 'mono', appui: 0.97, plaque: 'encre', second: 'contour', liens: 'souligne', rond: 'plaque', champ: 'contour' },
-    clair: { fond: '#ECEDF0', laterale: '#E4E5E9', carte: '#FFFFFF', carte2: '#F9FAFB', bord: '#E5E7EB', encre: '#111111', texte: '#111111', encre2: '#575D67', encre3: '#6B7280', accent: '#111111', plein: '#000000', surPlein: '#FFFFFF', vert: '#111111',
+    // (25 nov., Julien : « je veux que le gris de fond soit un peu foncé ») #ECEDF0 → #E2E4E8 : les cartes blanches ressortent
+    clair: { fond: '#E2E4E8', laterale: '#D9DBE0', carte: '#FFFFFF', carte2: '#F9FAFB', bord: '#E5E7EB', encre: '#111111', texte: '#111111', encre2: '#575D67', encre3: '#6B7280', accent: '#111111', plein: '#000000', surPlein: '#FFFFFF', vert: '#111111',
       point: '#22C55E', surPoint: '#052E16', contour: '#111111', limite: '#6B7280', douce: '#F3F4F6', bordCarte: '#E5E7EB' },
     sombre: { fond: '#0B0B0C', laterale: '#050506', carte: '#161618', carte2: '#202023', bord: '#2E2E33', encre: '#F5F5F6', texte: '#F5F5F6', encre2: '#A1A1AA', encre3: '#7A7A82', accent: '#F5F5F6', plein: '#FFFFFF', surPlein: '#000000', vert: '#F5F5F6',
       point: '#22C55E', surPoint: '#052E16', contour: '#F5F5F6', limite: '#7A7A82', douce: '#2A2A2E', bordCarte: '#2E2E33' } },
+  // C3 Vintex (25 nov., Julien : « fait un mélange c3 vintex ») : de C3, le fond gris clair un peu foncé, la sobriété, la plaque
+  // du N° gravée, les chaussures sur plaque, la barre du bas en capsule flottante ; de Vintex (NATIF.md §0), les cartes BLANCHES à
+  // ombre très douce, l'échelle réduite, les étiquettes pastel franches (`etiquettes`), les logos en couleur, le plein à l'ENCRE.
+  // Accent : l'ARDOISE, rare (jamais un bleu vif : audit-style-vintex S1). Chaque sorte de bouton se voit par sa FORME (plein
+  // encre · contour ≥ 3:1 · lien souligné · rond à contour). Ses règles de forme sont dans src/natif/styles-c3vintex.css,
+  // chargé SEULEMENT quand ce style est choisi (src/natif/styleChoix.js).
+  c3vintex: { forme: { rCarte: 16, rBouton: 10, hPlein: 46, rChip: 999, profondeur: 'c3', appui: 0.97, plaque: 'grave', second: 'contour', liens: 'souligne', rond: 'plaque', champ: 'contour' },
+    clair: { fond: '#DFE2E6', laterale: '#D4D8DD', carte: '#FFFFFF', carte2: '#F5F6F8', bord: '#E4E4E7', encre: '#16181D', texte: '#30343B', encre2: '#555A63', encre3: '#6B7079', accent: '#34506E', plein: '#16181D', surPlein: '#FFFFFF', vert: '#17744A',
+      point: '#34506E', surPoint: '#FFFFFF', contour: '#6B717D', limite: '#767C86', douce: '#EEF0F3', bordCarte: '#E4E4E7',
+      etiquettes: { vert: ['#17744A', '#DDF4E6'], teal: ['#0D6A6B', '#DAF0F0'], gris: ['#4C525B', '#ECEEF1'] } },
+    sombre: { fond: '#121316', laterale: '#0C0D0F', carte: '#1C1D21', carte2: '#24252A', bord: '#303238', encre: '#F4F4F5', texte: '#E4E4E7', encre2: '#A1A1AA', encre3: '#8A8A93', accent: '#A9BCD3', plein: '#F4F4F5', surPlein: '#18181B', vert: '#6FE3B5',
+      point: '#A9BCD3', surPoint: '#121316', contour: '#A1A1AA', limite: '#7C7C85', douce: '#2A2B30', bordCarte: '#2A2B30',
+      etiquettes: { vert: ['#6FE3B5', '#1E3A2F'], teal: ['#6ED6D6', '#1B3638'], gris: ['#C4C4CC', '#2A2B30'] } } },
 };
 const ORDRE = Object.keys(PRESETS);
 // la plaque du N° : kraft (Papier), encre (Monochrome : noire au jour, gris anthracite la nuit), sinon le ton de la carte
-const PLAQUES = { kraft: { clair: ['#D8CDB9', '#2E261A'], sombre: ['#4A4236', '#EEEAE3'] }, encre: { clair: ['#111111', '#FFFFFF'], sombre: ['#3A3A40', '#F5F5F6'] } };
+const PLAQUES = { kraft: { clair: ['#D8CDB9', '#2E261A'], sombre: ['#4A4236', '#EEEAE3'] }, encre: { clair: ['#111111', '#FFFFFF'], sombre: ['#3A3A40', '#F5F5F6'] },
+  // gravée (C3 Vintex) : un gris clair creusé, l'encre dessus (le creux est dessiné par styles-c3vintex.css)
+  grave: { clair: ['#E6E8EC', '#16181D'], sombre: ['#2C2E34', '#F4F4F5'] } };
 
 // ── les jetons dérivés d'une palette ──
 function jetons(p, f, sombre) {
@@ -117,11 +133,13 @@ function jetons(p, f, sombre) {
   };
   const prof = f.profondeur;
   j['--g-plein-relief'] = prof === 'aucune' || prof === 'mono' ? 'none'
+    : prof === 'c3' ? `inset 0 1px 0 ${rgba('#FFFFFF', sombre ? 0.40 : 0.14)}, 0 1px 2px ${rgba('#000000', sombre ? 0.40 : 0.14)}, 0 6px 14px -8px ${rgba('#000000', sombre ? 0.50 : 0.30)}`
     : prof === 'arcade' ? `inset 0 1px 0 ${rgba('#FFFFFF', sombre ? 0.35 : 0.22)}, 0 4px 0 ${melange(p.plein, '#000000', sombre ? 0.45 : 0.40)}, 0 6px 14px ${rgba('#000000', sombre ? 0.40 : 0.18)}`
     : `inset 0 1px 0 ${rgba('#FFFFFF', sombre ? 0.30 : 0.16)}, 0 1px 2px ${rgba('#000000', sombre ? 0.40 : 0.18)}, 0 2px 8px -2px ${rgba('#000000', sombre ? 0.35 : 0.16)}`;
   j['--g-plein-relief-appui'] = prof === 'arcade' ? `inset 0 1px 0 ${rgba('#FFFFFF', 0.12)}, 0 1px 0 ${melange(p.plein, '#000000', 0.40)}` : (prof === 'aucune' || prof === 'mono' ? 'none' : `inset 0 1px 2px ${rgba('#000000', 0.25)}`);
   j['--g-descente'] = prof === 'arcade' ? '3px' : '0px';
-  j['--g-carte-ombre'] = prof === 'mono' ? `0 0 0 1px ${p.bordCarte}` + (sombre ? '' : `, 0 1px 2px ${rgba('#000000', 0.05)}, 0 4px 12px -6px ${rgba('#000000', 0.08)}`)
+  j['--g-carte-ombre'] = prof === 'c3' ? `0 0 0 1px ${sombre ? p.bordCarte : rgba('#101828', 0.05)}, 0 1px 2px ${rgba('#101828', sombre ? 0.30 : 0.05)}, 0 10px 24px -16px ${rgba('#101828', sombre ? 0.60 : 0.20)}`
+    : prof === 'mono' ? `0 0 0 1px ${p.bordCarte}` + (sombre ? '' : `, 0 1px 2px ${rgba('#000000', 0.05)}, 0 4px 12px -6px ${rgba('#000000', 0.08)}`)
     : prof === 'aucune' ? 'none' : prof === 'arcade' ? `0 2px 0 ${rgba(p.bord, sombre ? 0.6 : 0.9)}, 0 8px 24px -12px ${rgba('#000000', sombre ? 0.6 : 0.20)}`
     : `0 1px 2px ${rgba('#000000', sombre ? 0.30 : 0.05)}, 0 8px 24px -14px ${rgba('#000000', sombre ? 0.55 : 0.18)}`;
   const pq = PLAQUES[f.plaque] && PLAQUES[f.plaque][sombre ? 'sombre' : 'clair'];
@@ -139,6 +157,8 @@ function jetons(p, f, sombre) {
     '--g-anneau': `0 0 0 2px ${p.carte}, 0 0 0 4px ${p.encre}` });
   if (f.liens === 'souligne') j['--g-lien-deco'] = 'underline';
   if (p.point) Object.assign(j, { '--g-point': p.point, '--g-sur-point': p.surPoint });
+  // les étiquettes pastel franches (C3 Vintex, comme le défaut Vintex) : texte franc sur un aplat pâle
+  if (p.etiquettes) for (const [n, [t, f]] of Object.entries(p.etiquettes)) Object.assign(j, { [`--n-${n}`]: t, [`--n-${n}-fond`]: f });
   return j;
 }
 
@@ -163,13 +183,17 @@ function controler(table) {
     if (pq) paires.push(['plaque', pq[1], pq[0]]);
     if (p.douce) paires.push(['encre/douce', p.encre, p.douce], ['encre2/douce', p.encre2, p.douce]);
     if (p.point) paires.push(['surPoint/point', p.surPoint, p.point]);
+    if (p.etiquettes) for (const [n, [tx, fd]] of Object.entries(p.etiquettes)) {
+      paires.push(['etiquette-' + n, tx, fd]);
+      for (const c of [tx, fd]) if (estAmbre(c)) ko.push(`${id} ${t} etiquette-${n} ${c} est orange/ambre`);
+    }
     // un contour qui DÉSIGNE un contrôle (secondaire, champ, rond) : ≥ 3:1 sur ce qui l'entoure (WCAG 1.4.11)
     const contours = [];
     if (p.contour) contours.push(['contour/carte', p.contour, carte], ['contour/fond', p.contour, p.fond]);
     if (p.limite) contours.push(['limite/carte', p.limite, carte], ['limite/fond', p.limite, p.fond], ['limite/douce', p.limite, p.douce || carte]);
     for (const [n, a, b] of contours) { const k = rapport(a, b); if (k < 3) ko.push(`${id} ${t} ${n} ${k.toFixed(2)}:1 (< 3:1)`); }
     // le vert de Monochrome n'est jamais un TEXTE sur clair : `vert` (le texte « fait ») reste l'encre
-    if (p.point && !sombre && rapport(p.vert, p.carte) < 7) ko.push(`${id} ${t} vert ${p.vert} : un texte vert sur clair (le vert est un point, pas un texte)`);
+    if (p.point && !p.etiquettes && !sombre && rapport(p.vert, p.carte) < 7) ko.push(`${id} ${t} vert ${p.vert} : un texte vert sur clair (le vert est un point, pas un texte)`);
     for (const [n, a, b] of paires) { const k = rapport(a, b); if (k < 4.5) ko.push(`${id} ${t} ${n} ${k.toFixed(2)}:1`); }
     const kraft = pq ? { plaqueFond: pq[0], plaqueTexte: pq[1] } : {};
     for (const [n, c] of Object.entries({ ...p, ...kraft })) if (typeof c === 'string' && /^#/.test(c) && estAmbre(c)) ko.push(`${id} ${t} ${n} ${c} est orange/ambre`);

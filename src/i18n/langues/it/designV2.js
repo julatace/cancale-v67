@@ -503,5 +503,7 @@ export default {
   "v2.style.arcade": "Arcade",
   "v2.style.arcade.desc": "Grandi pulsanti in rilievo, come un gioco.",
   "v2.style.monochrome": "Monocromo",
-  "v2.style.monochrome.desc": "Nero, bianco e grigio chiaro; un punto verde."
+  "v2.style.monochrome.desc": "Nero, bianco e grigio chiaro; un punto verde.",
+  "v2.style.c3vintex": "C3 Vintex",
+  "v2.style.c3vintex.desc": "Grigio un po' scuro, schede bianche, targhe incise."
 };
