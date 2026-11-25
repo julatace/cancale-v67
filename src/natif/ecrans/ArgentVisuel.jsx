@@ -120,7 +120,7 @@ export function JaugesSeuils({ J, annee, montant, etat = 'lu' }) {
 const ICONE_ETAPE = { envoyer: 'box', route: 'truck', livree: 'home', versement: 'wallet', autre: 'clock' };
 const GENRE_ETAPE = { envoyer: 'rappel', route: 'arrivee', livree: 'arrivee', versement: 'argent', autre: 'offre' };
 // La hauteur de « À venir » (titre + une rangée de cartes, 390 px) tenue sur un appareil qui ne l'a jamais mesurée.
-const HAUTEUR_AVENIR = 91;
+const HAUTEUR_AVENIR = 115;
 export function AVenirCartes({ A, montant, onOuvrir, Icon }) {
   const pret = !!A && !A.enCours;
   const neuf = useArrive(pret, 'argent-avenir');
