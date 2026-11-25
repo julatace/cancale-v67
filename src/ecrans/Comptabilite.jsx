@@ -21566,7 +21566,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 const jPrec = (()=>{ for (let k=i-1;k>=0;k--) { const x=openConv.messages[k]; if (x.ts && visible(x)) return cleJour(x.ts); } return null; })();
                 const sep = j && j!==jPrec ? <div className="vrm-chat-jour" data-jour-sep={j} style={{color:C.muted,background:C.card2||C.card}}>{libelleJour(m.ts)}</div> : null;
                 // (24 nov., lot messages-pro) L'offre à trancher : SA carte prend la place de son évènement (même oid).
-                if (m.kind==='offer' && carteOffre && m.offre && String(m.offre.oid)===carteOffre.oid && !carteOffrePosee) { carteOffrePosee=true; return <React.Fragment key={i}>{sep}{carteOffre.el}</React.Fragment>; }
+                if (m.kind==='offer' && carteOffre && m.offre && String(m.offre.oid)===carteOffre.oid && !carteOffrePosee) { carteOffrePosee=true; return <React.Fragment key={'offre-' + carteOffre.oid}>{sep}{carteOffre.el}</React.Fragment>; }
                 return <React.Fragment key={i}>{sep}{(
                 m.kind==='offer'
                   ? (()=>{
