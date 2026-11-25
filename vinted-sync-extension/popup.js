@@ -98,6 +98,7 @@ const MOTS = {
   b_me_connecter: { fr: 'Me connecter', en: 'Sign me in', es: 'Iniciar sesión', it: 'Accedi', de: 'Anmelden' },
   b_connexion_cours: { fr: 'Connexion…', en: 'Signing in…', es: 'Conectando…', it: 'Accesso…', de: 'Anmeldung…' },
   l_oubli: { fr: 'Mot de passe oublié ?', en: 'Forgot password?', es: '¿Olvidaste la contraseña?', it: 'Password dimenticata?', de: 'Passwort vergessen?' },
+  b_panneau: { fr: 'Ouvrir le panneau', en: 'Open the panel', es: 'Abrir el panel', it: 'Apri il pannello', de: 'Panel öffnen' },
   b_relier: { fr: 'Relier par vrm.center', en: 'Link through vrm.center', es: 'Vincular con vrm.center', it: 'Collega tramite vrm.center', de: 'Über vrm.center verbinden' },
   pied_relier: { fr: 'Déjà connecté sur vrm.center ? VRM s’ouvre, l’extension se relie seule et tu reviens sur Vinted.', en: 'Already signed in on vrm.center? VRM opens, the extension links itself and you come back to Vinted.', es: '¿Ya conectado en vrm.center? VRM se abre, la extensión se vincula sola y vuelves a Vinted.', it: 'Già connesso su vrm.center? Si apre VRM, l’estensione si collega da sola e torni su Vinted.', de: 'Schon auf vrm.center angemeldet? VRM öffnet sich, die Erweiterung verbindet sich selbst und du kehrst zu Vinted zurück.' },
   e_vides: { fr: 'Tape l’e-mail et le mot de passe de ton compte VRM.', en: 'Type the e-mail and password of your VRM account.', es: 'Escribe el correo y la contraseña de tu cuenta VRM.', it: 'Scrivi l’e-mail e la password del tuo account VRM.', de: 'Gib E-Mail und Passwort deines VRM-Kontos ein.' },
@@ -172,7 +173,8 @@ function rendre(e) {
   if (etat === 'connecte') {
     html = `<div class="groupe">${phrase(T('p_connecte'), 'ok')}${compte}</div>
       <div id="transpBox" hidden></div>
-      <button class="plein" id="vrmBtn" data-ouvrir-vrm>${esc(T('b_ouvrir'))}</button>
+      <button class="plein" id="panneauBtn" data-ouvrir-panneau>${esc(T('b_panneau'))}</button>
+      <button class="contour" id="vrmBtn" type="button" data-ouvrir-vrm>${esc(T('b_ouvrir'))}</button>
       <div class="actions"><button class="lien" id="outBtn" data-se-deconnecter>${esc(T('l_deconnecter'))}</button></div>`;
   } else if (etat === 'renouvellement') {
     html = `<div class="groupe">${phrase(T('p_renouv'), 'ok')}${compte}</div>
@@ -211,6 +213,7 @@ function brancher(box) {
   const sur = (sel, fn) => box.querySelectorAll(sel).forEach((b) => b.addEventListener('click', fn));
   sur('[data-se-connecter], [data-rouvrir]', seConnecter);
   sur('[data-ouvrir-vrm]', ouvrirVRM);
+  sur('[data-ouvrir-panneau]', () => { ouvrirPanneauPuisFermer(); });
   sur('[data-se-deconnecter]', async () => { await demander('authLogout', null, 6000); charger(); });
   sur('[data-annuler]', async () => { const r = await demander('annulerLiaison', null, 6000); r && r.ok ? rendre(r) : charger(); });
   // Pendant l'attente, « Me connecter ici » arrête l'attente et montre le formulaire.
@@ -317,6 +320,14 @@ function htmlFormulaire(e) {
       <div class="actions"><a class="lien discret" id="oubliLien" href="${APP}/?connexion&mot-de-passe-oublie" target="_blank" rel="noreferrer">${esc(T('l_oubli'))}</a></div>
     </div>`;
 }
+// 5.453 (Julien : « la connexion à l'extension doit ouvrir le panneau ») : le service worker ouvre le panneau sur son accueil
+//    (le lien de l'app, `?vrm=panneau`) dans l'onglet Vinted de départ, puis la petite fenêtre se ferme. Refusé ⇒ elle reste.
+async function ouvrirPanneauPuisFermer() {
+  const t = await ongletDeDepart().catch(() => null);
+  const r = await demander('ouvrirPanneauAccueil', t && Number.isInteger(t.id) ? { tab: t.id } : null, 8000);
+  if (r && r.ok) { if (!ONGLET) { try { window.close(); } catch (_) {} } return true; }
+  charger(); return false;
+}
 function brancherFormulaire(box) {
   lireFournisseurs(rendreFournisseurs);
   box.querySelector('#oubliLien').addEventListener('click', (ev) => {
@@ -342,7 +353,7 @@ function brancherFormulaire(box) {
     const finir = (r, muet) => {
       if (fini) return; fini = true; clearTimeout(attente);
       enVol = false; btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = T('b_me_connecter'); err.classList.remove('info');
-      if (r && r.ok) { rendre({ ok: true, etat: 'connecte', email: r.email || email }); charger(); return; }
+      if (r && r.ok) { rendre({ ok: true, etat: 'connecte', email: r.email || email }); ouvrirPanneauPuisFermer(); return; }   // 5.453 : le panneau s'ouvre sur son accueil
       if (r && (r.captcha || /captcha/i.test(String(r.error || '')))) { dire(T('e_captcha')); return; }
       dire(muet ? T('e_muet') : ((r && r.error) || T('e_refus')));
     };

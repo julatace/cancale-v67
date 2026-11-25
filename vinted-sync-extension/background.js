@@ -934,6 +934,25 @@ async function revenirApresLiaison(retour) {
     return true;
   } catch (_) { return false; }
 }
+// ══ 5.453 (Julien, 25 nov. : « la connexion à l'extension doit ouvrir le panneau, comme ça on voit à quoi ça ressemble ») ══
+//  Dès que la connexion RÉUSSIT (les deux chemins : « Me connecter » dans la fenêtre, et « Relier par vrm.center » quand la
+//  session arrive d'une liaison qu'il a demandée), le panneau s'ouvre sur SON ACCUEIL par le MÊME lien que l'app
+//  (src/ouvrirPanneau.js `lienPanneau` sans page : `?vrm=panneau`, lu par vrm-badge.js `lireLienPanneau`). L'onglet Vinted
+//  d'où il est parti (ou un onglet Vinted ouvert) passe devant sur ce lien ; sans onglet Vinted, un nouvel onglet.
+//  Jamais sur un échec, jamais à la simple réouverture de la fenêtre déjà connectée (un bouton « Ouvrir le panneau » y est).
+const PANNEAU_ACCUEIL = '/?vrm=panneau';
+const HOTE_PANNEAU = /^www\.vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i;
+function originePanneau(u) { try { const x = new URL(String(u || '')); return x.protocol === 'https:' && HOTE_PANNEAU.test(x.hostname) ? x.origin : ''; } catch (_) { return ''; } }
+async function ouvrirPanneauAccueil(tabId) {
+  let t = null, o = '';
+  if (Number.isInteger(tabId) && tabId >= 0) { try { t = await chrome.tabs.get(tabId); o = t ? originePanneau(t.url) : ''; } catch (_) { t = null; } }
+  if (!o) { try { const l = (await chrome.tabs.query({})).filter((x) => x && originePanneau(x.url)); const a = l.find((x) => x.active) || l[0]; if (a) { t = a; o = originePanneau(a.url); } } catch (_) {} }
+  const url = (o || 'https://www.vinted.fr') + PANNEAU_ACCUEIL;
+  try {
+    if (t && o) { await chrome.tabs.update(t.id, { url, active: true }); try { await chrome.windows.update(t.windowId, { focused: true }); } catch (_) {} noterDiag('panneau_apres_connexion_onglet'); return { ok: true, tab: t.id, nouveau: false }; }
+    const n = await chrome.tabs.create({ url, active: true }); noterDiag('panneau_apres_connexion_nouveau'); return { ok: true, tab: n && n.id, nouveau: true };
+  } catch (_) { return { ok: false }; }
+}
 // ── 5.325 (8 nov.) : « CONTINUER AVEC GOOGLE / DISCORD » ──────────────────
 // Julien : « une personne qui a créé son compte avec Google ou Discord […] ne
 // va pas pouvoir » se connecter à l'extension — elle n'a pas de mot de passe
@@ -1231,6 +1250,7 @@ async function recevoirSessionAdressee(msg) {
   if (!uid || uid !== String(att.pour || '')) return { ok: false, code: 'compte' };
   // Le nonce ne sert qu'UNE fois — consommé avant tout le reste.
   const retour = l.retour || null;
+  const demandee = !!(l.demandeAt && Date.now() - Number(l.demandeAt) < LIAISON_DEMANDE_MS);   // 5.453 : SA liaison (« Relier par vrm.center »)
   if (!(await ecrireLiaison({}))) return { ok: false, code: 'stockage' };
   // ⚠️⚠️ L'APP TRANSMET UNE SESSION, ET L'EXTENSION L'ADOPTE. Mesuré le
   //    2 octobre : quelqu'un s'est connecté à VRM avec une AUTRE adresse dans ce
@@ -1253,7 +1273,9 @@ async function recevoirSessionAdressee(msg) {
   notifierApp({ type: 'session', etat: 'liee', email });
   if (!dejaVivante) visiteApresSession('liaison');
   // 5.415 : le retour à l'onglet de départ, juste APRÈS la réponse à l'app (elle dit « connectée »).
-  if (retour) setTimeout(() => { revenirApresLiaison(retour).catch(() => {}); }, 300);
+  // 5.453 : une liaison qu'il a DEMANDÉE ⇒ le panneau sur son accueil, dans l'onglet de départ (ou un onglet Vinted).
+  if (demandee) setTimeout(() => { ouvrirPanneauAccueil(retour && Date.now() - Number(retour.at || 0) <= LIAISON_DEMANDE_MS ? retour.tab : null).catch(() => {}); }, 300);
+  else if (retour) setTimeout(() => { revenirApresLiaison(retour).catch(() => {}); }, 300);
   return { ok: true, email };
 }
 // ── 22 oct. — LA PREMIÈRE VISITE, DÈS QUE LA SESSION ARRIVE ─────────────────
@@ -4073,6 +4095,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const site = sender && sender.tab && retourOAuthPermis(sender.tab.url) ? sender.tab : null;
       const retourTab = site ? site.id : (msg.from === 'cancale-popup' && Number.isInteger(msg.retourTab) ? msg.retourTab : null);
       lierAvecVRM((site && site.url) || (msg.from === 'cancale-popup' && typeof msg.urlActive === 'string' ? msg.urlActive : '') || '', connexion, retourTab).then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
+    // 5.453 : « Me connecter » a réussi, ou « Ouvrir le panneau » touché ⇒ le panneau sur son accueil — seulement CONNECTÉE.
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'ouvrirPanneauAccueil') {
+      (async () => { const s = await loadSession(); if (!s || s.mort || !s.refresh_token) return { ok: false, code: 'pas-connecte' }; return ouvrirPanneauAccueil(Number.isInteger(msg.tab) ? msg.tab : null); })().then(sendResponse, () => sendResponse({ ok: false }));
       return true;
     }
     // 5.415 : la fenêtre de l'extension ne lit plus que l'état de la connexion (une source).

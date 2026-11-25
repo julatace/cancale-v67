@@ -43,3 +43,6 @@ Mêmes états et chemins (5.415 `connexionsimple`) ; banc `popup` 85/0.
 ## Geste de Julien
 Installer la 5.453.0 ; lancer 2 ou 3 favoris en regardant l'onglet de travail : le texte doit s'écrire lettre à lettre,
 puis « Envoyer ». Si une ligne dit « élément … introuvable », envoyer la phrase exacte.
+
+## Ajout : la connexion ouvre le panneau (même 5.453.0)
+Julien : « la connexion à l’extension doit ouvrir le panneau, comme ça on voit à quoi ça ressemble ». « Me connecter » réussi, ou « Relier par vrm.center » qu’il a demandé (session arrivée) ⇒ le panneau sur son ACCUEIL par le lien de l’app (`?vrm=panneau`), dans l’onglet Vinted de départ (sinon un onglet Vinted ouvert, sinon un nouveau), et la petite fenêtre se ferme. Jamais sur un échec, jamais sans session, jamais pour une liaison que l’app fait seule ; fenêtre rouverte connectée : « Ouvrir le panneau » (le plein), « Ouvrir VRM » en contour. Contrôles : `audit-connexion-simple` S7 (3 rouges sur le code d’avant), banc `popup` 89/0 (3 rouges sur le code d’avant).
