@@ -52,7 +52,10 @@ const lire = (f) => { try { return sansCommentaires(fs.readFileSync(path.join(R,
     const ligne = (id) => csv.find((l) => l.includes(`/items/${id}`)) || '';
     dit(ligne(111).startsWith('12;') && ligne(222).startsWith('13;') && !csv.some((l) => l.startsWith('77;')), 'C2 le N° par identifiant d’annonce : même titre, deux N°, jamais une fiche d’un autre identifiant', csv.slice(1).join(' | '));
     dit(/"Taille 42; très bon ""état"""/.test(ligne(111)) && /;60,00;EUR;en ligne;/.test(ligne(111)) && /;65,50;/.test(ligne(222)), 'C4 prix lu dans l’objet Vinted, cellules échappées');
-    dit(/;fermée;/.test(ligne(333)) && /;à confirmer;/.test(ligne(444)), 'C4 l’état de chaque annonce est dit (fermée, à confirmer)');
+    // (24 nov., main-vert) Le mot « à confirmer » est devenu « pas revue récemment » : on juge la RÈGLE (le mot de `etatAnnonce`
+    // pour une annonce à confirmer, jamais « en ligne »), pas son orthographe.
+    const motAC = c.etatAnnonce({ id: 444 }, true);
+    dit(/;fermée;/.test(ligne(333)) && !!motAC && motAC !== 'en ligne' && ligne(444).includes(`;${motAC};`) && !ligne(444).includes(';en ligne;'), 'C4 l’état de chaque annonce est dit (fermée, à confirmer)');
     const lis = zip.find((f) => /LISEZ-MOI/.test(f.nom)).texte;
     dit(resume.descriptions === 1 && /Descriptions : 1 sur 4/.test(lis) && /pas été lues/.test(lis), 'C3 description pas lue : vide et DITE', lis.replace(/\r\n/g, ' | ').slice(0, 200));
     dit(resume.photos === 2 && resume.photosManquees === 1 && /1 pas lisibles/.test(lis), 'C4 photo illisible comptée et dite, le zip part quand même', JSON.stringify(resume));

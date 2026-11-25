@@ -85,6 +85,7 @@ export default {
   "retraits.m.doute": "Vielleicht dasselbe Paket wie ein anderes · prüfen",
   "retraits.m.autre": "Prüfen",
   "retraits.m.horsCompte": "Nicht bei „abzuholen“ gezählt: Code und QR bleiben, bis etwas beweist, dass es abgeholt oder zurückgeschickt wurde.",
+  "retraits.m.horsCompteCourt": "Nicht bei „abzuholen“ gezählt.",
   "retraits.v.nVerif": {"one": "{n} zu prüfen", "other": "{n} zu prüfen"},
   "retraits.v.qrEnGrand": "QR-Code groß anzeigen",
   "retraits.c.taille": "Größe {t}",
@@ -422,6 +423,10 @@ export default {
   // (21 nov.) Colis à retirer : prévision par point relais (ext. 5.411)
   "retraits.p.consigne": "Packstation",
   "retraits.p.comptoir": "Schalter",
+  "retraits.p.pointRelais": "Abholstelle",
+  "retraits.p.echAuj": "letzter Tag heute",
+  "retraits.p.echDemain": "letzter Tag morgen",
+  "retraits.p.echAvant": "bis {date}",
   "retraits.p.rienIci": "Hier gibt es gerade nichts abzuholen",
   "retraits.p.enRouteVers": "Unterwegs zu diesem Punkt",
   "retraits.p.prevuAuj": "heute erwartet",

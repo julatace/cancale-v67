@@ -29,6 +29,7 @@ import './argent.css';
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
 // « 1 107 € » ⇒ [« 1 107 », « € »] : l'unité est posée à côté du chiffre.
 const coupe = (t) => { const m = /^(.*?)[\s  ]*€$/.exec(String(t)); return m ? [m[1], '€'] : [String(t), '']; };
+const majuscule = (t) => { const x = String(t || ''); return x ? x.charAt(0).toLocaleUpperCase() + x.slice(1) : x; };
 const signe = (m, montant) => (m > 0 ? '+' : m < 0 ? '−' : '') + montant(Math.abs(m));
 
 // Une rangée de chiffre : libellé (et sa ligne grise) à gauche, montant à droite. Toute la rangée se touche.
@@ -49,7 +50,7 @@ function Ligne({ libelle, valeur, sous = null, tonSous = 'neutre', onClick = nul
     : <div className="n-arg-l" data-arg-rangee="" {...(attrs || {})}>{corps}</div>;
 }
 
-export default function ArgentMois({ poster, phrase, note = '', moisLong, barres, faits, geste, versements, montant, vendu = null, comptes = null, sansBarres = false }) {
+export default function ArgentMois({ poster, phrase, note = '', moisLong, barres, faits, geste, versements, montant, vendu = null, comptes = null, sansBarres = false, onPasSu = null }) {
   const ordi = useOrdinateur();
   const [tout, setTout] = React.useState(false);
   const MONTRES = ordi ? 30 : 8;   // le téléphone reste court ; « Voir les 29 » déplie le reste (rien n'est caché sans le dire)
@@ -71,6 +72,12 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
   const B = F.benefice;
   const sousBenef = B && !B.pasSu && B.auMoins ? tr('journee.moins') : B && B.pasSu ? (B.sous || tr('v2.ar.pasSu')) : '';
   const lignesV = versements.etat === 'lu' ? (tout ? versements.lignes : versements.lignes.slice(0, MONTRES)) : [];
+  // (23 nov., revue UX P2) À l'ordinateur, une colonne vide à 100 % (N°, Achat, Marge) n'est pas dessinée ; la couverture des prix
+  // d'achat est dite au-dessus du tableau (« Prix d'achat connus : 0/27 · Saisir »), le chiffre faux étant la porte (§5).
+  const toutes = versements.etat === 'lu' ? versements.lignes : [];
+  const colVide = ordi && toutes.length ? { num: toutes.every((l) => !l.num), achat: toutes.every((l) => l.achat == null), marge: toutes.every((l) => l.achat == null || l.marge == null) } : {};
+  const LARG = { num: '72px', article: 'minmax(0, 1fr)', jour: '72px', site: '96px', achat: '88px', marge: '88px', recu: '96px' };
+  const colonnesVt = ['num', 'article', 'jour', 'site', 'achat', 'marge', 'recu'].filter((k) => !colVide[k]).map((k) => LARG[k]).join(' ');
   const meta = (l) => [l.date, l.plateforme, l.achat != null ? tr('v2.ar.achete', { p: montant(l.achat) }) : ''].filter(Boolean).join(' · ');
   return (
     <section className="n-arg n-arg-mois n-arg-vx" data-v2-argent-mois="" data-arg-vintex="" aria-label={tr('v2.ar.seg.resume')}>
@@ -78,21 +85,30 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
         {/* 1. Le reçu du mois, en grand, et les six mois en rangées chiffrées. */}
         <Carte className="n-arg-affiche" attrs={{ 'data-v2-argent-recu': cents(valeur), 'data-v2-argent-partiel': partiel ? '1' : undefined, 'data-v2-argent-phrase': '' }}>
           <div className="n-arg-recu">
-            <div className="n-arg-recu-haut">
-              <span className="n-arg-recu-lib" data-arg-recu-lib="">{tr('arn.recuEn', { mois: moisLong })}</span>
+            <div className="n-arg-recu-haut" data-arg-recu-pas-calcule={valeur == null && onPasSu ? '1' : undefined}>
+              {valeur == null && onPasSu
+                ? <button type="button" className="n-arg-recu-geste" data-arg-recu-geste="" data-arg-recu-note="" data-n-ton="ambre" data-arg-montant="" data-n-vide="1" onClick={onPasSu}>
+                    <span className="n-arg-recu-geste-point" aria-hidden="true"/><span className="n-arg-recu-geste-texte">{tr('arn.recuEn', { mois: moisLong }) + ' : ' + phrase}</span><span className="n-arg-l-chev" aria-hidden="true"/></button>
+                : <span className="n-arg-recu-lib" data-arg-recu-lib="">{tr('arn.recuEn', { mois: moisLong })}</span>}
               <AideArgent titre={tr('arn.comment')} attrs={{ 'data-arg-aide-recu': '' }}>
                 <p>{tr('v2.ar.auVersement')}.</p>
                 <p>{tr('arn.aideRecu')}</p>
               </AideArgent>
             </div>
+            {/* (23 nov., revue UX #15) Pas encore calculé : plus de grand « — » ni de six mois vides — UNE ligne ambre, la phrase de la
+                MÊME règle (`phrase`), et elle se touche (le geste : ouvrir Ventes). */}
+            {valeur == null ? (onPasSu
+              ? null
+              : <p className="n-arg-recu-note" data-arg-recu-note="" data-arg-montant="" data-n-vide="1" data-n-ton="ambre" {...attrsAttente(attenteDe(null, false, phrase), 'note')}>{majuscule(phrase)}</p>) : <>
             <div className="n-arg-recu-chiffre" data-arg-montant="" data-n-vide={n == null ? '1' : undefined}>
               {partiel && valeur != null ? <span className="n-arg-recu-moins">{tr('journee.moins')}</span> : null}
               <span className="n-arg-recu-n" {...attrsAttente(attenteDe(null, n != null, phrase), 'valeur')}>{n == null ? TIRET : n}</span>{u ? <span className="n-arg-recu-u">{u}</span> : null}
             </div>
             {/* Le manque (la note de la MÊME règle), en une ligne ; sans manque, rien (la datation est dans le « ? »). */}
-            {note || valeur == null ? <p className="n-arg-recu-note" data-arg-recu-note="" {...attrsAttente(attenteDe(null, n != null, phrase), 'note')}>{phrase}</p> : null}
+            {note ? <p className="n-arg-recu-note" data-arg-recu-note="" {...attrsAttente(attenteDe(null, n != null, phrase), 'note')}>{phrase}</p> : null}
+            </>}
           </div>
-          {sansBarres ? null : (
+          {sansBarres || !barres.some((x) => x.v != null) ? null : (
             <ol className="n-arg-mois6" aria-label={tr('v2.ar.graphe')} data-arg-mois={String(barres.length)}
               data-v2-argent-barres={barres.map((x) => cents(x.v)).join(',')} data-v2-argent-barre-v={courant ? cents(courant.v) : ''}>
               {barres.map((x) => {
@@ -134,10 +150,14 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
             : versements.etat === 'passu' ? <p className="n-arg-vide">{tr('v2.ar.versementsPasSu')}</p>
             : !versements.lignes.length ? <p className="n-arg-vide">{tr('v2.ar.aucunVersement', { mois: moisLong })}</p>
             : (
-              <div className="n-arg-vt" role="table" aria-label={tr('v2.ar.versements', { mois: moisLong })}>
+              <div className="n-arg-vt" role="table" aria-label={tr('v2.ar.versements', { mois: moisLong })} data-arg-cols-vides={Object.keys(colVide).filter((k) => colVide[k]).join(',') || undefined}
+                style={ordi ? { '--n-arg-vt-cols': colonnesVt } : undefined}>
+                {ordi && colVide.achat ? (geste
+                  ? <button type="button" className="n-arg-vt-couverture" data-arg-prix-connus={`0/${versements.lignes.length}`} onClick={geste.onClick}>{tr('ru.argent.prixConnus', { k: 0, n: versements.lignes.length })}<span className="n-arg-l-chev" aria-hidden="true"/></button>
+                  : <p className="n-arg-vt-couverture" data-arg-prix-connus={`0/${versements.lignes.length}`}>{tr('ru.argent.prixConnusSans', { k: 0, n: versements.lignes.length })}</p>) : null}
                 {ordi ? (
                   <div className="n-arg-vt-tr n-arg-vt-th" role="row">
-                    {['num', 'article', 'jour', 'site', 'achat', 'marge', 'recu'].map((k) => <span key={k} role="columnheader" className={'n-arg-vt-' + k}>{tr('arn.col.' + k)}</span>)}
+                    {['num', 'article', 'jour', 'site', 'achat', 'marge', 'recu'].filter((k) => !colVide[k]).map((k) => <span key={k} role="columnheader" className={'n-arg-vt-' + k}>{tr('arn.col.' + k)}</span>)}
                   </div>
                 ) : null}
                 {lignesV.map((l) => {
@@ -146,7 +166,7 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
                     <Tag key={l.id} {...(l.num ? { type: 'button', onClick: l.onClick } : {})} role="row" className="n-arg-vt-tr"
                       data-v2-argent-versement={l.id} data-eur={cents(l.montant)}
                       data-v2-argent-achat={l.achat != null ? cents(l.achat) : undefined} data-v2-argent-marge={l.achat != null ? cents(l.marge) : undefined}>
-                      <span role="cell" className="n-arg-vt-num">{l.num ? <Plaque numero={l.num}/> : <span className="n-arg-gris">{TIRET}</span>}</span>
+                      {colVide.num ? null : <span role="cell" className="n-arg-vt-num">{l.num ? <Plaque numero={l.num}/> : <span className="n-arg-gris">{TIRET}</span>}</span>}
                       <span role="cell" className="n-arg-vt-article">
                         <span className="n-arg-vt-titre">{l.titre || tr('v2.ar.venteSans', { plateforme: l.plateforme || '' })}</span>
                         {ordi ? null : <span className="n-arg-vt-meta" data-arg-vt-meta="">{meta(l)}</span>}
@@ -154,8 +174,8 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
                       {ordi ? <>
                         <span role="cell" className="n-arg-vt-jour">{l.date}</span>
                         <span role="cell" className="n-arg-vt-site">{l.plateforme}</span>
-                        <span role="cell" className="n-arg-vt-achat" data-arg-montant="">{l.achat != null ? montant(l.achat) : TIRET}</span>
-                        <span role="cell" className="n-arg-vt-marge" data-arg-montant="">{l.achat != null && l.marge != null ? signe(l.marge, montant) : TIRET}</span>
+                        {colVide.achat ? null : <span role="cell" className="n-arg-vt-achat" data-arg-montant="">{l.achat != null ? montant(l.achat) : TIRET}</span>}
+                        {colVide.marge ? null : <span role="cell" className="n-arg-vt-marge" data-arg-montant="">{l.achat != null && l.marge != null ? signe(l.marge, montant) : TIRET}</span>}
                       </> : null}
                       <span role="cell" className="n-arg-vt-recu">
                         <span className="n-arg-vt-montant" data-arg-montant="">{l.montant == null ? TIRET : montant(l.montant)}</span>

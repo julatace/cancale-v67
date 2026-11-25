@@ -226,7 +226,7 @@ export default {
   "achats.codeRetraitSuivi": "Abholcode, Verfolgung, Notiz, Kaufbeleg, Etikett",
   "achats.plusActionsAchat": "Weitere Aktionen zu diesem Einkauf",
   "achats.prixPayeCopie": "Gezahlter Preis kopiert: {prixPaye} € — beim Nummerieren einfügen",
-  "achats.copierPrixPaye": "Gezahlten Preis kopieren (zum Nummerieren)",
+  "achats.copierPrixPaye": "Gezahlten Preis kopieren",
   "achats.modifierNoteInterne": "Interne Notiz bearbeiten",
   "achats.ajouterNoteInterne": "Interne Notiz hinzufügen",
   "achats.attestationAchat": "Kaufbestätigung",

@@ -85,6 +85,7 @@ export default {
   "retraits.m.doute": "Maybe the same parcel as another · to check",
   "retraits.m.autre": "To check",
   "retraits.m.horsCompte": "Not counted in “to pick up”: code and QR kept until something proves it was picked up or sent back.",
+  "retraits.m.horsCompteCourt": "Not counted in “to pick up”.",
   "retraits.v.nVerif": {"one": "{n} to check", "other": "{n} to check"},
   "retraits.v.qrEnGrand": "Show the QR code full size",
   "retraits.c.taille": "Size {t}",
@@ -422,6 +423,10 @@ export default {
   // (21 nov.) Colis à retirer : prévision par point relais (ext. 5.411)
   "retraits.p.consigne": "locker",
   "retraits.p.comptoir": "counter",
+  "retraits.p.pointRelais": "Pickup point",
+  "retraits.p.echAuj": "last day today",
+  "retraits.p.echDemain": "last day tomorrow",
+  "retraits.p.echAvant": "by {date}",
   "retraits.p.rienIci": "Nothing to collect here yet",
   "retraits.p.enRouteVers": "On the way to this point",
   "retraits.p.prevuAuj": "expected today",
