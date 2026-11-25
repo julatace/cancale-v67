@@ -227,6 +227,8 @@ import { grouperParCompte, entreesGroupees } from '../regroupeComptes.js';
 import {etatColisDepuisTexte,normaliserSuivi} from '../../api/_lib/etat-colis-email.js';
 import { sorteRetrait } from "../retraitSorte.js";   // (19 nov., retraits parfaits) consigne ou comptoir
 import { comparerRetraits, texteAnnonce, CLE_RETRAITS_VUS } from "../retraitsNouveaux.js";   // (19 nov.) « nouveau code de retrait » en direct
+// (25 nov.) Les colis « nouveau code de retrait » déjà annoncés pendant CETTE ouverture de l'app (clé|raison) : une annonce, une fois.
+const RETRAITS_DEJA_DITS = new Set();
 import { preuvesTransporteur, fusionnerPreuves } from "../friseTransporteur.js";   // (17 nov.) la frise d'une vente : le transporteur tranche
 // (11 nov., lot suivi-commandes) Le suivi des commandes en cours : dernier statut, incohérences datées.
 import {dernierStatut,incoherencesVente,incoherencesAchat,estEnCours,lienPublic,nbAVerifier,statutCourt} from '../../api/_lib/suivi-commandes.js';
@@ -9614,8 +9616,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         let avantN = null; try { avantN = JSON.parse(localStorage.getItem(CLE_RETRAITS_VUS) || 'null'); } catch (_) { avantN = null; }
         const { etat, annonces } = comparerRetraits(avantN, tous, Date.now());
         try { localStorage.setItem(CLE_RETRAITS_VUS, JSON.stringify(etat)); } catch (_) {}
-        if (annonces.length) {
-          const t = texteAnnonce(annonces, { tr, nomTransp: (k) => (CARRIERS[k] && CARRIERS[k].name) || '' });
+        // (25 nov., régressions — capture iPhone de Julien : « 2 nouveaux codes de retrait » restait au-dessus de la barre d'onglets)
+        // Un colis (sa clé et sa raison) n'est annoncé qu'UNE fois par ouverture de l'app : deux écrans montés ensemble (Aujourd'hui
+        // et Achats gardés, chacun sa lecture) se renvoyaient l'état « vu » et ré-annonçaient le même code à chaque relecture —
+        // le même texte remplaçait le toast et remettait ses 4 s à zéro : il ne partait jamais.
+        const aDire = annonces.filter((a) => { const k = a.cle + '|' + a.raison; if (RETRAITS_DEJA_DITS.has(k)) return false; RETRAITS_DEJA_DITS.add(k); return true; });
+        if (aDire.length) {
+          const t = texteAnnonce(aDire, { tr, nomTransp: (k) => (CARRIERS[k] && CARRIERS[k].name) || '' });
           if (t) toast(t, 'info');
           try { window.dispatchEvent(new CustomEvent('vrm:retraits-nouveaux', { detail: { cles: annonces.map((a) => a.cle) } })); } catch (_) {}
         }
@@ -29939,7 +29946,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             n'est pas passée (`numAttente`), « deux articles sous un N° » n'est pas su — la
             liste garde son squelette au lieu d'être poussée par l'alerte qui arrive (CLS).
             Ventes pas encore lues : c'est leur squelette à elles, plus bas, qui tient la place. */}
-        {numAttente && ongletColisVu === 'envoyer' && sales.items ? <Skeleton variant="row" count={4}/> : (<>
+        {/* (25 nov., régressions — à l'ordinateur, mode exemple : quatre grandes cartes grises SOUS le tableau des ventes, ~3 s,
+            puis rien) Sur Ventes natif, ce bloc ne porte plus la liste (le tableau, src/natif/ecrans/Ventes.jsx, a sa propre
+            attente) mais seulement des alertes qui, le plus souvent, n'existent pas : il attend EN SILENCE. Un squelette n'a le
+            droit d'exister qu'à la forme de ce qui va s'afficher (banc regressions-25nov V). */}
+        {numAttente && ongletColisVu === 'envoyer' && sales.items ? (natifVentes ? null : <Skeleton variant="row" count={4}/>) : (<>
         {blocAEcrire()}
         <BlocBarrerVc/>
         {conflitsNum.length > 0 && (
@@ -30011,7 +30022,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             (l'étiquette se prend dans eBay : l'acheteur a payé le port, §2.8). Reste ici l'âge de la lecture. */}
         {voitSite('ebay') && colisEb && colisEb.aPoster.length>0 && ebayLuA && Math.floor((Date.now() - ebayLuA) / 3600000) >= 6 ? (() => { const ageH = Math.floor((Date.now() - ebayLuA) / 3600000);
           return <p className="vrm-colis-note-ebay" data-colis-ebay-age={ageH} style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 2px 10px'}}>Commandes eBay lues il y a {ageH >= 48 ? `${Math.floor(ageH/24)} j` : `${ageH} h`}, peut-être pas à jour : eBay → Compte → Rafraîchir.</p>; })() : null}
-        {voitSite('vinted') && sales.loading && !sales.items && <Skeleton variant="row" count={4}/>}
+        {voitSite('vinted') && sales.loading && !sales.items && !natifVentes && <Skeleton variant="row" count={4}/>}
         {/* (20 nov.) Sur Ventes natif, l'écran dit lui-même « pas su » avec « Réessayer » (une seule vérité, une seule phrase). */}
         {voitSite('vinted') && sales.error && !(VENTES_NATIF && colisDans === 'ventes') && <div data-colis-ventes="passu" style={{marginBottom:10}}><EtatPanne compact quoi="Tes ventes Vinted" raison="Les colis à envoyer ne sont pas connus tant qu’elles ne sont pas lues." onReessayer={()=>loadOrders('sold',setSales,true)}/></div>}
         {(()=>{
