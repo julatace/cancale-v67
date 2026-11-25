@@ -68,9 +68,9 @@ const ECRANS = [
 function base() {
   const b = P.base();
   const app = b.rows.find((r) => /^ext_appareil_/.test(r.id)); if (app) { app.data.ver = EXT; app.data.code = EXT; }
-  // Les DONNÉES de la base (titres, pseudos) : retirées du compte des mots d'interface.
+  // Les DONNÉES de la base (titres, pseudos, marque, l'état d'un article « Très bon état ») : retirées du compte des mots d'interface.
   const titres = new Set(), pseudos = new Set();
-  const voir = (o, d) => { if (!o || typeof o !== 'object' || d > 7) return; for (const [k, v] of Object.entries(o)) { if (typeof v === 'string' && v.length >= 3 && v.length < 90 && /^(title|titre|login|nom|pseudo|item_title)$/.test(k)) (k === 'login' || k === 'pseudo' ? pseudos : titres).add(v); else if (v && typeof v === 'object') voir(v, d + 1); } };
+  const voir = (o, d) => { if (!o || typeof o !== 'object' || d > 7) return; for (const [k, v] of Object.entries(o)) { if (typeof v === 'string' && v.length >= 3 && v.length < 90 && (/^(title|titre|login|nom|pseudo|item_title|brand_title)$/.test(k) || (k === 'status' && /état|^Neuf/.test(v)))) (k === 'login' || k === 'pseudo' ? pseudos : titres).add(v); else if (v && typeof v === 'object') voir(v, d + 1); } };
   for (const r of b.rows) voir(r.data, 0); for (const a of b.accounts || []) { if (a.login) pseudos.add(a.login); }
   b.donnees = [...titres, ...pseudos].sort((x, y) => y.length - x.length);
   return b;

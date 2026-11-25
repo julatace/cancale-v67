@@ -435,7 +435,8 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
             onClick={() => setPuce((p) => (p === 'compte:' + g.cle ? '' : 'compte:' + g.cle))}><span className="n-ad-puce-pilule"><AvatarCompte pseudo={g.pseudo || g.compte} cle={g.cle} petit/>{g.pseudo || ('#' + g.compte)}</span></Puce>) : null}
         </div> : null}
         {(travail || aReglerTel) && !A && !ordinateur ? <div className="n-ad-maj" data-ad-maj={!travail ? 'aucun' : majLe === undefined ? 'lecture' : majLe == null ? 'passu' : 'lu'}>
-          <span className="n-ad-maj-texte" {...(attrsAttente(!!travail && majLe === undefined, 'valeur') || {})}>{travail ? depuisMaj(majLe, maintenantMaj) : ''}</span>
+          {/* (25 nov., moins-texte-a) Lu il y a moins d'une minute : « À jour » se dit au lecteur d'écran (rien à rattraper) ; plus vieux, l'âge s'écrit. */}
+          <span className={'n-ad-maj-texte' + (travail && Number.isFinite(Number(majLe)) && majLe != null && (maintenantMaj - Number(majLe)) < 60000 ? ' vrm-sr-seul' : '')} {...(attrsAttente(!!travail && majLe === undefined, 'valeur') || {})}>{travail ? depuisMaj(majLe, maintenantMaj) : ''}</span>
           {aReglerTel}
           {travail && travail.onRafraichir ? <BoutonIcone libelle={tr('tableau.rafraichir')} indisponible={!!travail.rafraichit} icone={Icon ? <Icon name="sync" size={18}/> : null}
             onClick={() => { if (!travail.rafraichit) travail.onRafraichir(); }} className="n-ad-rafraichir" attrs={{ 'data-ad-rafraichir': '', 'aria-busy': travail.rafraichit ? 'true' : undefined }}/> : null}

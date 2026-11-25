@@ -33,6 +33,11 @@ function PictoPapier({ format }) {
   );
 }
 
+function NomPapier({ texte }) {
+  const [nom, mesure] = String(texte).split(' · ');
+  return <span className="vrm-impr-papier-nom"><span>{nom}</span>{mesure ? <span className="vrm-impr-papier-mesure">{mesure}</span> : null}</span>;
+}
+
 // LA QUESTION DU PAPIER — une fois. Toucher un papier = le choisir (et, la première
 // fois, imprimer aussitôt : `puisImprimer`, le même toucher).
 export function ChoixPapier({ Feuille, valeur = null, puisImprimer = false, onChoisir, onFermer }) {
@@ -45,7 +50,7 @@ export function ChoixPapier({ Feuille, valeur = null, puisImprimer = false, onCh
             onClick={() => onChoisir(f)}>
             <PictoPapier format={f}/>
             {/* « Classique · A4 » : le nom, puis la mesure en gris dessous (rien ne se coupe au milieu). */}
-            <span className="vrm-impr-papier-nom">{tr(`impr.format.${f}`).split(' · ').map((x, i) => (i ? <span key={i} className="vrm-impr-papier-mesure">{x}</span> : <span key={i}>{x}</span>))}</span>
+            <NomPapier texte={tr(`impr.format.${f}`)}/>
             <span className="vrm-sr-seul">{tr(`cp.guide.imprimante.${f}`)}</span>
             <span className="vrm-impr-diode" aria-hidden="true"/>
           </button>
