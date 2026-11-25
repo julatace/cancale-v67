@@ -78,6 +78,8 @@ async function aller(o, ecran) {
 
 // Les entrées du filtre, telles qu'affichées. Téléphone : la rangée ; ordinateur : le menu « Site » ouvert.
 async function entrees(o, tel) {
+  // Le filtre n'a d'entrées qu'une fois les lignes lues : on l'attend (au plus 10 s ; absent ⇒ null, l'appelant juge).
+  await o.pg.locator(tel ? '[data-fp]' : '[data-tt-filtre="site"]').filter({ visible: true }).first().waitFor({ timeout: 10000 }).catch(() => {});
   if (tel) {
     return o.pg.evaluate(() => {
       const vis = (e) => e && e.getClientRects().length && !e.closest('[hidden]');
@@ -195,7 +197,12 @@ async function principal() {
               const hors = L.sites.filter((x) => !x.includes(s.cle));
               dit(L.sites.length > 0 && hors.length === 0, `F3 ${ou} · ${s.cle} : la liste ne montre que ${s.cle} (${L.sites.length} lignes)`, { par: L.par, hors: hors.slice(0, 5) });
               if (tel && ecran !== 'annonces') dit(L.n === s.n, `F3 ${ou} · ${s.cle} : autant de lignes que son nombre (${L.n} = ${s.n})`, { n: L.n, attendu: s.n });
-              if (!tel && L.nTableau != null) dit(L.nTableau === s.n, `F3 ${ou} · ${s.cle} : « N » du tableau = son nombre (${L.nTableau} = ${s.n})`, L);
+              // Annonces à l'ordinateur : le nombre du menu « Site » compte les rangées de TOUS les statuts (règle du 22 nov.,
+              // `nRangeesSite`) ; le tableau garde son filtre Statut (« En ligne » d'office) par-dessus ⇒ « N » ≤ ce nombre.
+              if (!tel && L.nTableau != null) {
+                if (ecran === 'annonces') dit(L.nTableau > 0 && L.nTableau <= s.n, `F3 ${ou} · ${s.cle} : « N » du tableau (${L.nTableau}, Statut par-dessus) ≤ son nombre (${s.n})`, L.nTableau);
+                else dit(L.nTableau === s.n, `F3 ${ou} · ${s.cle} : « N » du tableau = son nombre (${L.nTableau} = ${s.n})`, L.nTableau);
+              }
               if (ecran === 'ventes') dit(L.segEnv === String(s.n), `F3 ${ou} · ${s.cle} : « À envoyer » du segmenté = ${s.n}`, L.segEnv);
             }
           }

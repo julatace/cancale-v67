@@ -327,7 +327,8 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
   // « Toutes » puis chaque site PRÉSENT dans la liste montrée (son logo, son nombre), retenu sur cet appareil. Il filtre la liste,
   // les nombres du segmenté, le plein (seuls les colis MONTRÉS partent à l'impression) — la règle : src/filtrePlateforme.js.
   const [choixP, choisirP] = useFiltrePlateforme('ventes');
-  const baseP = surEnvoyer ? ((E.lu || E.rangs.length) ? E.rangs : null) : surRoute && R && R.lu ? R.rangs : null;
+  // Sous « Terminées » (la liste est VentesToutes, filtrée par le même choix), le segmenté compte « À envoyer » au même site.
+  const baseP = !surRoute ? ((E.lu || E.rangs.length) ? E.rangs : null) : R && R.lu ? R.rangs : null;
   const optionsP = React.useMemo(() => (Array.isArray(baseP) ? optionsPlateformes(nombresPlateformes(baseP)) : []), [baseP]);
   const effP = choixEffectif(choixP, optionsP);
   const filtreP = effP !== TOUTES;

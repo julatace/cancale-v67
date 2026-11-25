@@ -128,6 +128,8 @@
   .n-ad-puces::-webkit-scrollbar { display: none; }
   /* (25 nov.) Le filtre par plateforme (src/natif/FiltrePlateformes.jsx) : la même rangée ; `n-fp-nu` dans un hôte qui a déjà sa marge. */
   .n-ad-puces.n-fp-nu { padding-left: 0; padding-right: 0; }
+  /* Le logo à l'encre (Vestiaire) sur la puce choisie (fond plein) prend la couleur du texte de la puce : visible en clair et en sombre. */
+  .n-ad-puce[aria-pressed="true"] .n-logo-site[data-site="vestiaire"] { background: currentColor; }
   .n-ad-puce { appearance: none; border: 0; background: none; padding: 0; margin: 0; flex: none; min-height: var(--n-cible); display: inline-flex; align-items: center; cursor: pointer; color: var(--n-encre); font: inherit; touch-action: manipulation; }
   .n-ad-puce-pilule { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 16px; background: var(--n-carte); box-shadow: inset 0 0 0 .5px var(--n-trait);
     font: 500 14px/1 var(--n-police); white-space: nowrap; }
