@@ -47,7 +47,7 @@ export const GESTES_AGIR = Object.freeze({
   vinted: Object.freeze({
     repondre: { cap: 'messagerie', dist: 'repondre' },
     offre: { cap: 'messagerie', dist: 'accepter' },        // accepter · refuser · contre-offre (même capacité, même voie)
-    favoris: { cap: 'favoris', dist: 'favoris', distCap: 'agirtout' },
+    favoris: { cap: 'favoris', dist: 'favoris', distCap: 'favorisdistance' },   // 5.453.1 : avant, la commande « favoris » ne choisissait jamais rien (distFavoris)
     republier: { cap: 'republierpage', dist: 'republier' },
     baisser: { cap: 'baisseprix', dist: 'prix' },
     prix: { cap: 'baisseprix', dist: null },               // changer / remettre un prix (une hausse ne part jamais par la file)

@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.453.0';
+const CODE_VERSION = '5.453.1';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -29597,10 +29597,16 @@ async function distFavoris(uid, a) {
   const f = await apercuCarteFrais(uid).catch(() => null);
   if (!f || !f.ok || !f.apercu) return { accepte: false, code: 'lecture', raison: (f && f.raison) || '' };
   const ap = f.apercu;
-  const cochables = (Array.isArray(ap.liste) ? ap.liste : []).filter((x) => x && x.cochable === true && x.id);
+  // ⚠️ 5.453.1 (Julien, 25 nov. : « demander à l'extension … il n'y a plus personne ») : les favoris à contacter sont ceux
+  //    que `lancer` accepte (`cochablesApercu` : `apercu.tous`, `cochable` et « à envoyer »), du plus récent au plus ancien.
+  //    Avant : choisis dans `apercu.liste`, dont les lignes (api/_lib/favoris-carte.js) ne portent PAS `cochable` ⇒ toujours
+  //    vide ⇒ « aucun favori à contacter », rien ne partait jamais depuis VRM (5.450 → 5.453.0).
+  const okIds = new Set(cochablesApercu(ap));
+  const parDate = (x) => { const t = Date.parse(String((x && x.date) || '')); return Number.isFinite(t) ? t : 0; };
+  const cochables = (Array.isArray(ap.tous) ? ap.tous : []).filter((x) => x && x.id && okIds.has(String(x.id))).sort((p, q) => parDate(q) - parDate(p));
   const voulus = Array.isArray(a.ids) && a.ids.length ? new Set(a.ids.map(String)) : null;
   const choix = cochables.filter((x) => !voulus || voulus.has(String(x.id))).slice(0, FAVORIS_CARTE_MAX);
-  if (!choix.length) return { accepte: false, code: 'rien', raison: 'aucun favori à contacter pour ce compte' };
+  if (!choix.length) return { accepte: false, code: 'rien', raison: voulus ? 'les favoris choisis ne sont plus à contacter (article vendu, déjà contacté, ou liste à relire) — rien n’est parti' : 'aucun favori pas encore contacté sur ce compte (la liste de Vinted est relue au passage sur vinted.fr) — rien n’est parti' };
   const items = choix.map((x) => ({ itemId: String(x.itemId || ''), notificationId: String(x.id), photo: x.photo || '', titre: x.titre || '' }));
   const acc = ((await getStoredAccounts().catch(() => [])) || []).find((x) => String(x.vinted_user_id) === String(uid));
   const dom = (acc && acc.domain) || 'www.vinted.fr';
