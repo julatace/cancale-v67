@@ -216,7 +216,9 @@ async function controles() {
       const u = decodeURIComponent(String(url));
       if (/vrm_reglages/.test(u)) return rep([{ valeur: JULIEN }]);
       if (/rpc\//.test(u)) return rep(true);
-      if (/id=like\.plantage_\*/.test(u)) return rep([{ owner: 'v1', message: 'Erreur X', ecran: 'ventes', origine: 'page', navigateur: 'iOS Safari', version: '15 nov.', n: '1', at }, { owner: JULIEN, message: 'Erreur X', ecran: 'ventes', origine: 'page', navigateur: 'iOS Safari', n: '1', at }]);
+      // (24 nov., main-vert) La route lit les 7 derniers jours de l'HORLOGE (`listerPlantagesComptes`, maintenant = Date.now()) :
+      // ses lignes sont datées il y a une heure par rapport à maintenant, jamais au 15 nov. figé (vieux de 7 jours le 22 nov.).
+      if (/id=like\.plantage_\*/.test(u)) { const atR = new Date(Date.now() - H).toISOString(); return rep([{ owner: 'v1', message: 'Erreur X', ecran: 'ventes', origine: 'page', navigateur: 'iOS Safari', version: '15 nov.', n: '1', at: atR }, { owner: JULIEN, message: 'Erreur X', ecran: 'ventes', origine: 'page', navigateur: 'iOS Safari', n: '1', at: atR }]); }
       if (/plantages_terrain_/.test(u)) return rep([]);
       return rep([]);
     };

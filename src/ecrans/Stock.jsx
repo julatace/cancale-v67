@@ -11,6 +11,7 @@ import { phraseDescentes, listeNumeros, descentesDesOps } from '../etageresTexte
 import { annuaireLbc, nomPlateforme } from '../plateformes.js';
 import MarquePlateforme from '../plateformes/Marque.jsx';   // (15 nov.) les logos des sites où la paire est en ligne, sur sa case
 import '../styles-etageres.css';   // (15 nov.) formes, couleurs, piles — chargée avec l'écran, donc après le studio
+import '../natif/visuel/stock-inventaire.css';   // (24 nov., lot visuel-annonces) l'habit « inventaire » (étiquette papier, creux, tuiles) — après les styles du Stock
 import { requeteDeLaVoix } from '../rechercheVocale.js';
 import React, { useState, useMemo, useEffect } from 'react';
 import { tr, nombre, monnaie, localeCourante } from '../i18n/index.js';   // (11 nov., lot rangement-guide) ; (14 nov.) `nombre` : « 1 024 » dans la langue

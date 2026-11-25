@@ -76,7 +76,7 @@ export function GrapheJours({ jours = [], choisie = -1, onChoisir = null, libell
             x={x} y={H - BAS - h} width={larg} height={h} rx={Math.min(4, larg / 2)}/>;
         })}
         {moy != null && max > 0 ? <line className="n-graphe-moyenne" x1="0" x2={L} y1={y(moy)} y2={y(moy)} vectorEffect="non-scaling-stroke"/> : null}
-        {segs.map((s, k) => <polyline key={k} className="n-graphe-ligne" points={s} vectorEffect="non-scaling-stroke"/>)}
+        {segs.map((s) => <polyline key={s} className="n-graphe-ligne" points={s} vectorEffect="non-scaling-stroke"/>)}
         {pointsB.length === 1 ? <circle className="n-graphe-point" cx={pointsB[0].x} cy={pointsB[0].y} r="3" vectorEffect="non-scaling-stroke"/> : null}
         <line className="n-graphe-curseur" x1={(i + 0.5) * pas} x2={(i + 0.5) * pas} y1={HAUT - 6} y2={H - BAS} vectorEffect="non-scaling-stroke"/>
       </svg>
@@ -102,7 +102,7 @@ export function Etincelle({ valeurs = [], className = '' }) {
   const der = valeurs[n - 1];
   return (
     <svg className={cx('n-etincelle', className)} viewBox={`0 0 ${W} ${Ht}`} aria-hidden="true" focusable="false">
-      {segs.map((s, k) => <polyline key={k} points={s}/>)}
+      {segs.map((s) => <polyline key={s} points={s}/>)}
       {der != null ? <circle cx={x(n - 1)} cy={y(der)} r="2.2"/> : null}
     </svg>
   );

@@ -28,6 +28,8 @@
 const path = require('path'), fs = require('fs'), os = require('os');
 const { pathToFileURL } = require('url');
 const RACINE = path.join(__dirname, '..');
+// (24 nov., main-vert) App.jsx a été découpé (src/ecrans/*.jsx) : « l'app » se lit RECOLLÉE (_source-app.cjs).
+const { sourceApp } = require('./_source-app.cjs');
 
 // Les textes de chaussure PERMIS hors garde « sneakers » (fichier, motif, raison).
 const PERMIS = [
@@ -168,7 +170,7 @@ async function verifier(racine, { muet = false } = {}) {
   // S4 : les dessins — la basket des états vides et de « Comment marche le Stock ».
   const ill = sansCom(lire('src/composants/Illustration.jsx'));
   const appIll = (app0) => (app0.match(/<Illustration\b[^>]*>/g) || []);
-  const app0 = sansCom(lire('src/App.jsx'));
+  const app0 = sansCom(sourceApp(racine));
   const sx = sansCom(lire('src/StockExplication.jsx'));
   const stx = sansCom(lire('src/ecrans/Stock.jsx'));
   dit(/n === 'basket' && vend !== 'sneakers' \? 'etiquette' : n/.test(ill) && /const n = dessinDe\(nom, vend\)/.test(ill)
@@ -180,9 +182,9 @@ async function verifier(racine, { muet = false } = {}) {
   dit(!cartons.length, 'S2 aucun texte ne dit que le N° s’écrit « sur le carton » (étagère, bac…)', cartons);
 
   // ── B : le branchement ──
-  const app = sansCom(lire('src/App.jsx'));
+  const app = sansCom(sourceApp(racine));
   dit(/placeholder: exemplesActuels\(\)\.note/.test(app) && !/petite tache semelle/.test(app), 'B1 la note d’un article prend l’exemple de ce qu’il vend');
-  dit(/aria-label=\{`Rechercher \$\{motsArticle\(/.test(app) && !/'Rechercher une paire'|"Rechercher une paire"/.test(app), 'B2 la recherche dit « une paire » / « un article » selon ce qu’il vend');
+  dit(/aria-label=\{(?:mobile \? '[^'`]*' : )?`Rechercher \$\{motsArticle\(/.test(app) && !/'Rechercher une paire'|"Rechercher une paire"/.test(app), 'B2 la recherche dit « une paire » / « un article » selon ce qu’il vend');
   dit(/phraseEcranPour\(cle, p\.vend \|\| vendActuel\(\)\)/.test(app) && /garage: 'Où est rangé chaque article/.test(lire('src/phrasesEcran.js')), 'B3 la phrase d’Annonces et de Stock suit ce qu’il vend');
   dit(/questionVendsAOuvrir\(\{/.test(app) && /setConfigSeule\('vends'\)/.test(app), 'B4 la question « Tu vends quoi ? » s’ouvre seule, une fois');
   const st = sansCom(lire('src/ecrans/Stock.jsx'));
