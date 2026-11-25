@@ -6,7 +6,8 @@
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
 import ecran_accessibilite from './fr/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './fr/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
-import ecran_suivi_vente from './fr/suiviVente.js';   // (16 nov.) le suivi des colis vendus
+import ecran_suivi_vente from './fr/suiviVente.js';
+import ecran_envois from './fr/envois.js';   // (24 nov.) le suivi d’un envoi, « Mes envois »   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './fr/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './fr/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './fr/journee.js';
@@ -29,15 +30,20 @@ import ecran_agir from './fr/agir.js';   // (24 nov.) agir seulement si l'extens
 import ecran_messagesPro from './fr/messagesPro.js';   // (24 nov.) la conversation refaite
 import ecran_connexions_ext from './fr/connexions.js';   // (24 nov.) « Connexions de l'extension »   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './fr/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
-import ecran_styleClarte from './fr/styleClarte.js';   // (22 nov.) style et clarté : tableau de bord, état de l’extension
+import ecran_styleClarte from './fr/styleClarte.js';
+import ecran_revueUx from './fr/revueUx.js';   // (23 nov.) revue UX   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './fr/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './fr/ext5438.js';   // (22 nov.) ext. 5.438
-import ecran_moderationCarte from './fr/moderationCarte.js';
+import ecran_visuelAnnonces from './fr/visuelAnnonces.js';   // (24 nov.) l'inventaire Annonces / Stock
+import ecran_argentVisuel from './fr/argentVisuel.js';   // (24 nov.) Argent, Messages, Paramètres visuels   // (24 nov.) le langage « jeu vidéo »   // (23 nov.) « Vinted a agi » regroupée
 import ecran_visuelJeu from './fr/visuelJeu.js';   // (24 nov.) le langage « jeu vidéo »   // (23 nov.) « Vinted a agi » regroupée
+import ecran_moderationCarte from './fr/moderationCarte.js';   // (23 nov.) « Vinted a agi » regroupée
+import ecran_observation from './fr/observation.js';   // (24 nov.) ext. 5.440.3 « Observer Vinted »
 import ecran_ext5428 from './fr/ext5428.js';   // (21 nov.) ext. 5.428   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_relier_retires from './fr/relierRetires.js';   // (21 nov.) relier ce qui est chez moi, colis non retirés, remboursés hors dépenses
 import ecran_verre2 from './fr/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './fr/fiched.js';
+import ecran_vente_mail from './fr/venteMail.js';   // (24 nov.) la vente vue par e-mail et son annonce
 import ecran_egalite from './fr/egalite.js';
 import ecran_tableau from './fr/tableau.js';   // (19 nov. soir) le tableau de travail
 import ecran_publierAgent from './fr/publierAgent.js';
@@ -2400,6 +2406,7 @@ export default {
   ...ecran_liaison,
   ...ecran_completer,
   ...ecran_suivi_vente,
+  ...ecran_envois,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
@@ -2418,14 +2425,19 @@ export default {
   ...ecran_ext5438,
   ...ecran_moderationCarte,
   ...ecran_visuelJeu,
+  ...ecran_visuelAnnonces,
+  ...ecran_argentVisuel,
+  ...ecran_observation,
   ...ecran_a_distance,
   ...ecran_connexions_ext,
   ...ecran_agir,
   ...ecran_messagesPro,
   ...ecran_apresFinale,
   ...ecran_styleClarte,
+  ...ecran_revueUx,
   ...ecran_relier_retires,
   ...ecran_fiched,
+  ...ecran_vente_mail,
   ...ecran_egalite,
   ...ecran_tableau,
   ...ecran_publierAgent,

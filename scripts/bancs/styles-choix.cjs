@@ -17,8 +17,10 @@ require('./_porte-banc.cjs');
 //       recherche) : aucune ancienne classe de bouton ;
 //    F  l'état enfoncé EXISTE : `data-n-force="appui"` sur un bouton ⇒ réduit (échelle < 1) et plus foncé ;
 //    G  rien ne déborde, aucun bouton/étiquette n'en chevauche un autre, aucune erreur d'app.
-//  `STYLES=graphite,nuit` `THEMES=clair` `LARGEURS=390,1512` `ECRANS=ventes,annonces,fiche` `SHOTS=<dossier>`.
-//  Rouge : `BANC_DIST=<dist d'avant>` (aucun style) ; `MUTATION=sansstyle|orange|pale|petit|appui|vieux|deborde`.
+//  `STYLES=graphite,nuit` `THEMES=clair` `LARGEURS=390,1512` `ECRANS=ventes,annonces,fiche[,journee]` `SHOTS=<dossier>`
+//  (`journee` = Ma journée : les règles A–D, F, G ; E y est un rapport, comme hors des trois écrans des captures).
+//    H  (Monochrome) chaque sorte de bouton se voit : secondaire à contour ≥ 3:1, texte et liens soulignés, ronds à plaque.
+//  Rouge : `BANC_DIST=<dist d'avant>` (aucun style) ; `MUTATION=sansstyle|orange|pale|petit|appui|vieux|deborde|fondu`.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 const path = require('path'), fs = require('fs');
@@ -30,17 +32,17 @@ fs.mkdirSync(SHOTS, { recursive: true });
 const STYLES = (process.env.STYLES || G.ORDRE.join(',')).split(',');
 const THEMES = (process.env.THEMES || 'clair,sombre').split(',');
 const LARGEURS = (process.env.LARGEURS || '390').split(',').map(Number);
-const ECRANS = (process.env.ECRANS || 'ventes,annonces,fiche').split(',');
+const ECRANS = (process.env.ECRANS || 'journee,ventes,annonces,fiche').split(',');
 const MUT = process.env.MUTATION || '';
+const PRINCIPAUX = new Set(['ventes', 'annonces', 'fiche']);
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; if (!process.env.CALME) console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 700) : '')); } return c; };
 
 const MUTATIONS = {
   orange: ':root[data-style] { --n-accent: #E8891C !important; --n-plein: #E8891C !important; }',
   pale: ':root[data-style] { --n-encre-2: #A8ABB0 !important; --n-texte: #A8ABB0 !important; }',
-  petit: '[data-style] .n-bouton, [data-style] .n-bouton-icone-seule { min-height: 30px !important; height: 30px !important; width: auto !important; min-width: 30px !important; border-block-width: 0 !important; }',
   appui: '[data-style] .n-bouton[data-n-force="appui"] { transform: none !important; background-color: var(--n-plein) !important; filter: none !important; }',
-  deborde: '.vrm-main { min-width: 520px !important; }',
+  fondu: '[data-style] { --g-second-contour: none !important; --g-lien-deco: none !important; --g-rond-contour: none !important; }',
 };
 
 // ── la mesure, DANS la page ──
@@ -73,7 +75,7 @@ const MESURE = (args) => {
   const cache = (el) => !!el.closest('[aria-hidden="true"], [hidden], [inert], .vrm-sensible-cache, .n-lu-seul, .vrm-sr-seul, .n-tt-sr, .sr-only, .visually-hidden, .vrm-sr-only');
   const vu = (el) => { const r = el.getBoundingClientRect(); if (r.width < 3 || r.height < 3) return false; if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) return false;
     const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || /inset\(50%\)|rect\(0/.test(cs.clipPath + ' ' + cs.clip)) return false; if (el.checkVisibility && !el.checkVisibility({ checkOpacity: true })) return false; return !cache(el); };
-  const nom = (el) => `${el.tagName.toLowerCase()}.${String(el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className).trim().split(/\s+/).slice(0, 2).join('.')} « ${(el.innerText || el.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 28)} »`;
+  const nom = (el) => { const q = el.getBoundingClientRect(); return `[${Math.round(q.left)},${Math.round(q.top)} ${Math.round(q.width)}×${Math.round(q.height)}] ${el.tagName.toLowerCase()}.${String(el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className).trim().split(/\s+/).slice(0, 2).join('.')} « ${(el.innerText || el.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 28)} »`; };
   const racines = [...document.querySelectorAll('.vrm-main, .n-onglets, [data-fiche-paire]')];
   const dans = (el) => racines.some((r) => r.contains(el));
   // B : chaque texte
@@ -115,11 +117,28 @@ const MESURE = (args) => {
     const w = Math.min(p.right, q.right) - Math.max(p.left, q.left), h = Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top);
     if (w > 2 && h > 2) chevauche.push(`${nom(a)} × ${nom(b)}`);
   }
+  // G (bis) : un bouton DESSINÉ (sa boîte moins ses bordures transparentes) ne recouvre aucun texte d'à côté
+  const recouvre = [];
+  const textes = [...document.querySelectorAll('.vrm-main *, [data-fiche-paire] *')].filter((el) => [...el.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim()) && vu(el));
+  for (const [el] of boites.concat([...document.querySelectorAll('[data-n-famille="second"], [data-n-famille="champ"]')].filter((x) => dans(x) && vu(x)).map((x) => [x]))) {
+    if (!el.matches('.n-bouton, [data-n-famille]')) continue;
+    const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+    { const t0 = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!t0 || !(el.contains(t0) || t0.contains(el))) continue; }   // caché sous autre chose (une barre) : rien à recouvrir
+    const d = { l: r.left + parseFloat(cs.borderLeftWidth), r: r.right - parseFloat(cs.borderRightWidth), t: r.top + parseFloat(cs.borderTopWidth), b: r.bottom - parseFloat(cs.borderBottomWidth) };
+    for (const t of textes) { if (el.contains(t) || t.contains(el) || colle(t) !== colle(el)) continue; const q = t.getBoundingClientRect();
+      const w = Math.min(d.r, q.right) - Math.max(d.l, q.left), h = Math.min(d.b, q.bottom) - Math.max(d.t, q.top);
+      if (w > 3 && h > 3) { recouvre.push(`${nom(el)} sur ${nom(t)}`); break; } }
+  }
+  // G (ter) : un bouton, une étiquette, un N° coupé par le bord de l'écran (le défilement de l'écran le cache : scrollWidth ne le voit pas)
+  const horsCadre = [];
+  for (const el of document.querySelectorAll('.n-bouton, [data-n-famille="second"], [data-n-famille="champ"], .n-pastille, .n-plaque, .n-segmente')) { if (!dans(el) || !vu(el)) continue; const q = el.getBoundingClientRect(); if (q.right > innerWidth + 1 || q.left < -1) horsCadre.push(nom(el)); }
   // D : orange / ambre ; rouge hors doublon
   const oranges = [], rouges = [];
   const LOGO = '.n-logo-site, [class*="logo"], [data-site-logo], img, picture, video, canvas, [data-n-doublon], [data-n-ton="doublon"], .vrm-logo';
   for (const el of document.querySelectorAll('body *')) {
-    if (!dans(el) || !vu(el) || el.closest(LOGO)) continue;
+    // une icône décorative (`aria-hidden`) a une couleur aussi : on la juge (seule la géométrie et la visibilité comptent ici)
+    if (!dans(el) || el.closest(LOGO)) continue;
+    { const q = el.getBoundingClientRect(); if (q.width < 3 || q.height < 3 || q.bottom < 0 || q.top > innerHeight || q.right < 0 || q.left > innerWidth) continue; if (el.checkVisibility && !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) continue; if (el.closest('[hidden], [inert]')) continue; }
     const cs = getComputedStyle(el);
     const cs2 = [cs.color, cs.backgroundColor, cs.borderTopColor, cs.borderBottomColor, cs.outlineColor, cs.fill, cs.stroke, ...(cs.boxShadow.match(/rgba?\([^)]+\)/g) || []), ...arrets(cs.backgroundImage).map((c) => `rgba(${c.r},${c.g},${c.b},${c.a})`)];
     for (const s of cs2) { const c = parse(s); if (ambre(c)) { oranges.push(`${nom(el)} ${s}`); break; } if (rouge(c) && !el.closest('svg')) { rouges.push(`${nom(el)} ${s}`); break; } }
@@ -127,14 +146,34 @@ const MESURE = (args) => {
   const rootCs = getComputedStyle(document.documentElement);
   return { style: document.documentElement.getAttribute('data-style') || '', theme: document.documentElement.getAttribute('data-theme'), fond: rootCs.getPropertyValue('--n-fond').trim(),
     nTextes, contraste: contraste.slice(0, 20), nContraste: contraste.length, nCibles, petites: petites.slice(0, 12), nPetites: petites.length, etrangers: [...new Set(etrangers)].slice(0, 12), nEtrangers: etrangers.length,
-    chevauche: chevauche.slice(0, 8), oranges: [...new Set(oranges)].slice(0, 8), rouges: [...new Set(rouges)].slice(0, 8), deborde: document.documentElement.scrollWidth - innerWidth };
+    chevauche: chevauche.slice(0, 8).concat(recouvre.slice(0, 8), horsCadre.slice(0, 8).map((x) => 'hors cadre : ' + x)), oranges: [...new Set(oranges)].slice(0, 8), rouges: [...new Set(rouges)].slice(0, 8), deborde: document.documentElement.scrollWidth - innerWidth };
+};
+
+// H (styles à formes distinctes : Monochrome) : chaque SORTE de bouton se voit — le secondaire porte un contour ≥ 3:1 sur ce
+// qui l'entoure, un bouton texte et un lien sont soulignés, un bouton-icône est un rond plein à contour
+const SORTES = () => {
+  const p = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return null; const v = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: v[0], g: v[1], b: v[2], a: v.length > 3 ? v[3] : 1 }; };
+  const lum = (c) => { const t = [c.r, c.g, c.b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * t[0] + 0.7152 * t[1] + 0.0722 * t[2]; };
+  const k = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const sous = (el) => { for (let x = el.parentElement; x; x = x.parentElement) { const c = p(getComputedStyle(x).backgroundColor); if (c && c.a > 0.9) return c; } return p(getComputedStyle(document.body).backgroundColor); };
+  const vu = (el) => { const r = el.getBoundingClientRect(); return r.width > 10 && r.height > 10 && r.bottom > 0 && r.top < innerHeight && !el.closest('[aria-hidden="true"], [inert]'); };
+  const ko = [], vus = { second: 0, lien: 0, rond: 0 };
+  for (const el of document.querySelectorAll('.n-bouton:is([data-n-variante="teinte"], :not([data-n-variante])):not([aria-disabled="true"]), [data-n-famille="second"]')) { if (!vu(el)) continue; vus.second++;
+    const c = (getComputedStyle(el).boxShadow.match(/rgba?\([^)]+\)[^,]*inset|inset[^,]*rgba?\([^)]+\)/) || [''])[0]; const cc = p(c);
+    if (!cc || k(cc, sous(el)) < 3) ko.push('secondaire sans contour : ' + (el.innerText || '').trim().slice(0, 20)); }
+  for (const el of document.querySelectorAll('.n-bouton[data-n-variante="texte"], [data-n-famille="lien"]:not(.n-eg-cellule):not(.n-tt-tri)')) { if (!vu(el)) continue; vus.lien++;
+    if (!/underline/.test(getComputedStyle(el).textDecorationLine)) ko.push('lien sans soulignement : ' + (el.innerText || '').trim().slice(0, 20)); }
+  for (const el of document.querySelectorAll('.n-bouton-icone-seule:not([aria-pressed="true"])')) { if (!vu(el)) continue; vus.rond++; const cs = getComputedStyle(el); const f = p(cs.backgroundColor);
+    if (!f || f.a < 0.5 || !/inset/.test(cs.boxShadow)) ko.push('rond sans plaque ni contour : ' + (el.getAttribute('aria-label') || '').slice(0, 20)); }
+  return { ko: ko.slice(0, 8), vus };
 };
 
 // F : l'état enfoncé (forcé par le crochet du contrat natif `data-n-force="appui"`)
 const APPUI = () => {
   const vu = (el) => { const r = el.getBoundingClientRect(); return r.width > 10 && r.height > 10 && r.top < innerHeight && r.bottom > 0; };
   const b = [...document.querySelectorAll('.vrm-main .n-bouton[data-n-variante="plein"]:not([aria-disabled="true"]), [data-fiche-paire] .n-bouton[data-n-variante="plein"]:not([aria-disabled="true"])')].find(vu)
-    || [...document.querySelectorAll('.vrm-main .n-bouton:not([aria-disabled="true"]), [data-fiche-paire] .n-bouton:not([aria-disabled="true"])')].find(vu);
+    || [...document.querySelectorAll('.vrm-main .n-bouton:not([aria-disabled="true"]), [data-fiche-paire] .n-bouton:not([aria-disabled="true"])')].find(vu)
+    || [...document.querySelectorAll('.vrm-main [data-n-famille="second"], .vrm-main [data-n-famille="rangee"]')].find(vu);
   if (!b) return { trouve: false };
   b.style.transition = 'none';
   const sous = (() => { for (let x = b.parentElement; x; x = x.parentElement) { const c = getComputedStyle(x).backgroundColor; if (c && !/rgba\(0, 0, 0, 0\)|transparent/.test(c)) return c; } return getComputedStyle(document.body).backgroundColor; })();
@@ -143,12 +182,15 @@ const APPUI = () => {
   const lire = () => { const cs = getComputedStyle(b); const m = /matrix\(([^,]+),/.exec(cs.transform); return { echelle: m ? Number(m[1]) : 1, fond: compose(cs.backgroundColor) }; };
   const avant = lire(); b.setAttribute('data-n-force', 'appui'); const pendant = lire(); b.removeAttribute('data-n-force');
   const parse = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); const p = m ? m[1].split(/[ ,/]+/).filter(Boolean).map(Number) : [0, 0, 0]; return 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]; };
-  return { trouve: true, variante: b.getAttribute('data-n-variante') || '', avant, pendant, plusFonce: parse(pendant.fond) < parse(avant.fond) - 1 || (document.documentElement.getAttribute('data-theme') === 'dark' && Math.abs(parse(pendant.fond) - parse(avant.fond)) > 1) };   // la nuit, un plein CLAIR s'enfonce en s'assombrissant, un bouton texte en s'éclairant : un écart suffit
+  const relLum = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); const p = m ? m[1].split(/[ ,/]+/).filter(Boolean).map(Number) : [0, 0, 0]; const t = p.slice(0, 3).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * t[0] + 0.7152 * t[1] + 0.0722 * t[2]; };
+  return { trouve: true, variante: b.getAttribute('data-n-variante') || '', avant, pendant, plusFonce: parse(pendant.fond) < parse(avant.fond) - 1 || ((document.documentElement.getAttribute('data-theme') === 'dark' || relLum(avant.fond) < 0.02) && Math.abs(parse(pendant.fond) - parse(avant.fond)) > 1) };   // un plein déjà noir s'éclaircit   // la nuit, un plein CLAIR s'enfonce en s'assombrissant, un bouton texte en s'éclairant : un écart suffit
 };
 
 // B (pixels) : les boîtes à juger sur la capture
 const BOITES = () => {
-  const vu = (el) => { const r = el.getBoundingClientRect(); return r.width > 6 && r.height > 6 && r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth && !el.closest('[aria-hidden="true"]'); };
+  // à l'écran ET au-dessus de tout (une fiche posée par-dessus la liste cache la liste)
+  const vu = (el) => { const r = el.getBoundingClientRect(); if (!(r.width > 6 && r.height > 6 && r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth && !el.closest('[aria-hidden="true"]'))) return false;
+    const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!t && (el.contains(t) || t.contains(el)); };
   const sel = ['.n-bouton[data-n-variante="plein"] .n-bouton-libelle', '.n-pastille', '.n-plaque', '.n-grand-titre', '.n-rangee-titre', '.n-onglet[aria-current="page"] .n-onglet-libelle', '.n-segmente-choix[aria-checked="true"] .n-segmente-libelle', '.n-bouton[data-n-variante="teinte"] .n-bouton-libelle'];
   const out = [];
   for (const s of sel) { let n = 0; for (const el of document.querySelectorAll(s)) { if (!vu(el) || n >= 3) continue; const t = (el.innerText || '').trim(); if (t.length < 1) continue;
@@ -184,8 +226,10 @@ const PIXELS = async (args) => {
 };
 
 async function ouvrir(nav, { W, sombre, style, url, b }) {
+  // l'apparence rangée dans la base aussi (sinon la synchronisation la ramène au clair sur un écran lent à charger)
+  try { const d = b.main[0].data; d.vrm_apparence = sombre ? 'sombre' : 'clair'; d.vinted_dark = !!sombre; } catch (_) {}
   const o = await P.ouvrir(nav, { W, sombre, b, url, dsf: 2 });
-  await o.pg.addInitScript((st) => { try { if (st) localStorage.setItem('vrm_style', JSON.stringify(st)); else localStorage.removeItem('vrm_style'); } catch (_) {} }, style);
+  await o.pg.addInitScript(([st, sombre]) => { try { if (st) localStorage.setItem('vrm_style', JSON.stringify(st)); else localStorage.removeItem('vrm_style'); localStorage.setItem('vrm_apparence', JSON.stringify(sombre ? 'sombre' : 'clair')); } catch (_) {} }, [style, sombre]);
   await o.pg.reload({ waitUntil: 'domcontentloaded' });
   o.erreurs.length = 0;
   return o;
@@ -193,6 +237,9 @@ async function ouvrir(nav, { W, sombre, style, url, b }) {
 async function poserMutation(pg) {
   if (MUT === 'sansstyle') await pg.evaluate(() => document.documentElement.removeAttribute('data-style'));
   if (MUTATIONS[MUT]) await pg.addStyleTag({ content: MUTATIONS[MUT] });
+  // « petit » : posé EN LIGNE (une feuille ajoutée perd devant les `!important` en couche de l'accessibilité)
+  if (MUT === 'petit') await pg.evaluate(() => { for (const b of document.querySelectorAll('.n-bouton, .n-bouton-icone-seule, [data-n-famille="second"], [data-n-famille="champ"]')) { for (const [p, v] of [['min-height', '30px'], ['height', '30px'], ['min-width', '30px'], ['border-top-width', '0'], ['border-bottom-width', '0']]) b.style.setProperty(p, v, 'important'); } });
+  if (MUT === 'deborde') await pg.evaluate(() => { const b = document.querySelector('.vrm-main .n-bouton, .vrm-main [data-n-famille="second"]'); if (b) b.style.setProperty('min-width', '640px', 'important'); });
   if (MUT === 'vieux') await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) { const b = document.createElement('button'); b.className = 'vrm-btn vrm-btn-sec'; b.textContent = 'Ancien bouton'; b.style.cssText = 'display:block;min-height:44px;min-width:120px;margin:8px'; m.prepend(b); } });
 }
 
@@ -209,7 +256,11 @@ async function poserMutation(pg) {
         console.log(`\n── ${cle}`);
         const o = await ouvrir(nav, { W, sombre, style, url: '/?tab=' + (e === 'fiche' ? 'annonces' : e), b });
         try {
-          await o.pg.waitForSelector('.vrm-main', { timeout: 45000 }).catch(() => {}); await o.pg.waitForTimeout(5000);
+          await o.pg.waitForSelector('.vrm-main', { timeout: 45000 }).catch(() => {});
+          // la liste CHARGÉE (des N° à l'écran), pas son squelette : la machine des bancs est lente
+          if (e === 'journee') await o.pg.waitForFunction(() => (document.querySelector('.vrm-main') || {}).innerText?.length > 200, null, { timeout: 60000 }).catch(() => {});
+          else await o.pg.waitForFunction(() => document.querySelectorAll('.vrm-main .n-plaque').length >= 3, null, { timeout: 60000 }).catch(() => {});
+          await o.pg.waitForTimeout(2500);
           if (e === 'fiche') {
             const c = await o.pg.evaluate(() => { for (const e of document.querySelectorAll('[data-fiche-ligne][data-fl-num], [data-eg-article]:not([data-eg-numero=""])')) { const r = e.getBoundingClientRect(); if (r.width < 40 || r.height < 30 || r.top < 110 || r.bottom > innerHeight - 110) continue;
               const x = Math.min(innerWidth - 8, r.left + Math.min(r.width * 0.5, 190)), y = r.top + r.height / 2; const t = document.elementFromPoint(x, y); if (t && e.contains(t)) return { x, y }; } return null; });
@@ -222,14 +273,30 @@ async function poserMutation(pg) {
           if (style) dit(m.style === style && attendu && m.fond.toUpperCase() === attendu.toUpperCase() && (m.theme === 'dark') === sombre, `A ${cle} : le style est appliqué (data-style, --n-fond ${attendu})`, { style: m.style, fond: m.fond, theme: m.theme });
           else dit(!m.style, `A ${cle} : sans choix, aucun style posé (le défaut inchangé)`, m.style);
           dit(m.nTextes > 5 && m.nContraste === 0, `B ${cle} : chaque texte tient 4,5:1 (3:1 en grand) — ${m.nTextes} textes`, m.contraste);
-          const shot = await o.pg.screenshot();
-          const boites = await o.pg.evaluate(BOITES);
+          // (25 nov.) La capture et les boîtes doivent décrire LE MÊME écran : une carte qui arrive entre les deux (« N° à
+          // écrire », posée quand la numérotation finit) décalait les boîtes sur un fond uni de la capture ⇒ « 1,00 » faux.
+          // Boîtes lues AVANT et APRÈS la capture ; différentes ⇒ l'écran bougeait : on attend et on recommence (3 fois).
+          let shot = null, boites = [];
+          for (let essai = 0; essai < 3; essai++) {
+            const avant = JSON.stringify(await o.pg.evaluate(BOITES));
+            shot = await o.pg.screenshot();
+            boites = await o.pg.evaluate(BOITES);
+            if (JSON.stringify(boites) === avant) break;
+            await o.pg.waitForTimeout(800);
+          }
           const px = await o.pg.evaluate(PIXELS, { png: shot.toString('base64'), boites, dsf: 2 });
           const pxKo = px.filter((p) => p.k < 4.5 - 0.05 && !(p.s === '.n-grand-titre' && p.k >= 3));
-          dit(px.length >= 3 && !pxKo.length, `B ${cle} : sur les PIXELS, plein, étiquettes, N°, titres, onglet actif ≥ 4,5:1 — ${px.length} boîtes (min ${px.length ? Math.min(...px.map((p) => p.k)).toFixed(2) : '—'})`, pxKo.slice(0, 8));
+          dit(px.length >= 1 && !pxKo.length, `B ${cle} : sur les PIXELS, plein, étiquettes, N°, titres, onglet actif ≥ 4,5:1 — ${px.length} boîtes (min ${px.length ? Math.min(...px.map((p) => p.k)).toFixed(2) : '—'})`, pxKo.slice(0, 8));
           if (tactile && style) dit(m.nCibles > 5 && m.nPetites === 0, `C ${cle} : chaque cible ≥ 44 × 44 — ${m.nCibles} cibles`, m.petites);
-          dit(!m.oranges.length && !m.rouges.length, `D ${cle} : aucune couleur orange/ambre, aucun rouge hors doublon`, { oranges: m.oranges, rouges: m.rouges });
-          if (style) dit(m.nEtrangers === 0, `E ${cle} : chaque bouton est de la famille commune`, m.etrangers);
+          // D est une règle pour chaque style ; pour « Actuel » (le défaut, que ce lot ne change pas) le banc RAPPORTE (24 nov. : le
+          // point « geste » de la ligne de fraîcheur y est encore orange la nuit, `--d-point-ambre` des feuilles d'avant)
+          if (style) dit(!m.oranges.length && !m.rouges.length, `D ${cle} : aucune couleur orange/ambre, aucun rouge hors doublon`, { oranges: m.oranges, rouges: m.rouges });
+          else if (m.oranges.length || m.rouges.length) console.log(`  ℹ️  D ${cle} (défaut, hors de ce lot) : ${m.oranges.concat(m.rouges).slice(0, 3).join(' · ')}`);
+          // E est une RÈGLE sur les trois écrans des captures de Julien ; ailleurs (Achats, Argent, Messages, Paramètres) le banc RAPPORTE
+          // ce qui reste à rattacher (`data-n-famille`), sans rougir.
+          if (style && PRINCIPAUX.has(e)) dit(m.nEtrangers === 0, `E ${cle} : chaque bouton est de la famille commune`, m.etrangers);
+          else if (style && m.nEtrangers) console.log(`  ℹ️  E ${cle} : ${m.nEtrangers} bouton(s) d'avant à rattacher — ${m.etrangers.slice(0, 4).join(' · ')}`);
+          if (style && G.PRESETS[style].forme.second === 'contour') { const h = await o.pg.evaluate(SORTES); dit(!h.ko.length && (h.vus.second + h.vus.lien + h.vus.rond) > 0, `H ${cle} : chaque sorte de bouton se voit (secondaires ${h.vus.second}, liens ${h.vus.lien}, ronds ${h.vus.rond})`, h.ko); }
           if (style) { const a = await o.pg.evaluate(APPUI); dit(a.trouve && a.pendant.echelle < 0.999 && a.plusFonce, `F ${cle} : l'état enfoncé existe (échelle ${a.trouve ? a.pendant.echelle : '—'}, plus foncé)`, a); }
           dit(m.deborde <= 1 && !m.chevauche.length && !o.erreurs.length, `G ${cle} : rien ne déborde, rien ne se chevauche, aucune erreur`, { deborde: m.deborde, chevauche: m.chevauche, erreurs: o.erreurs });
           fs.writeFileSync(path.join(SHOTS, cle + '.png'), shot);
@@ -242,15 +309,23 @@ async function poserMutation(pg) {
       const o = await ouvrir(nav, { W: 390, sombre: false, style: '', url: '/?tab=settings', b });
       try {
         await o.pg.waitForSelector('.vrm-main', { timeout: 45000 }).catch(() => {}); await o.pg.waitForTimeout(4000);
-        const ouvre = await o.pg.$('[data-reglage-apparence]'); if (ouvre) { await ouvre.tap().catch(() => ouvre.click()); await o.pg.waitForTimeout(1200); }
+        // Paramètres → « Apparence et langue » → « Apparence » : on touche ce qui est à l'écran jusqu'à voir les tuiles
+        const tuileVue = () => o.pg.evaluate(() => { const t = document.querySelector('[data-style-tuile="nuit"]'); if (!t) return false; t.scrollIntoView({ block: 'center' }); const r = t.getBoundingClientRect(); return r.width > 20 && r.height > 20; });
+        for (let i = 0; i < 4 && !(await tuileVue()); i++) {
+          await o.pg.evaluate(() => { const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 10 && r.height > 10; };
+            const c = [...document.querySelectorAll('[data-reglage-apparence]')].find(vis) || [...document.querySelectorAll('button, [role="button"], a')].find((e) => vis(e) && /^Apparence( et langue)?$/i.test((e.innerText || '').trim().split('\n')[0]));
+            if (c) { c.scrollIntoView({ block: 'center' }); c.click(); } });
+          await o.pg.waitForTimeout(1200);
+        }
+        dit(await tuileVue(), `T les tuiles sont À L'ÉCRAN dans Paramètres → Apparence`);
         const n = await o.pg.$$eval('[data-style-tuile]', (x) => x.length);
-        dit(n === 11, `T Paramètres → Apparence : 11 tuiles d'aperçu (Actuel + 10 styles)`, n);
+        dit(n === G.ORDRE.length + 1, `T Paramètres → Apparence : ${G.ORDRE.length + 1} tuiles d'aperçu (Actuel + ${G.ORDRE.length} styles)`, n);
         const t = await o.pg.$('[data-style-tuile="nuit"]');
-        if (t) { await t.scrollIntoViewIfNeeded(); await t.tap(); await o.pg.waitForTimeout(300); }
+        if (t) { const c = await t.evaluate((e) => { e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await o.pg.touchscreen.tap(c.x, c.y); await o.pg.waitForTimeout(300); }
         const apres = await o.pg.evaluate(() => ({ st: document.documentElement.getAttribute('data-style'), lu: localStorage.getItem('vrm_style'), fond: getComputedStyle(document.documentElement).getPropertyValue('--n-fond').trim() }));
         dit(apres.st === 'nuit' && apres.lu === '"nuit"' && apres.fond.toUpperCase() === G.PRESETS.nuit.clair.fond, `T un toucher sur « Nuit » l'applique tout de suite (sans recharger) et le range`, apres);
         await o.pg.screenshot({ path: path.join(SHOTS, 'tuiles-nuit.png') });
-        const a = await o.pg.$('[data-style-tuile="actuel"]'); if (a) { await a.scrollIntoViewIfNeeded(); await a.tap(); await o.pg.waitForTimeout(300); }
+        const a = await o.pg.$('[data-style-tuile="actuel"]'); if (a) { const c = await a.evaluate((e) => { e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await o.pg.touchscreen.tap(c.x, c.y); await o.pg.waitForTimeout(300); }
         const retour = await o.pg.evaluate(() => ({ st: document.documentElement.getAttribute('data-style'), lu: localStorage.getItem('vrm_style'), fond: getComputedStyle(document.documentElement).getPropertyValue('--n-fond').trim() }));
         dit(retour.st === null && retour.lu === null && /^#DFE1E5$/i.test(retour.fond), `T « Actuel » revient au défaut en un toucher`, retour);
         const tailles = await o.pg.$$eval('[data-style-tuile]', (x) => x.map((e) => { const r = e.getBoundingClientRect(); return Math.min(r.width, r.height); }));

@@ -45,7 +45,7 @@ const NON_GESTES = {
   ebayMarque: 'une marque dans SA base (eBay)', lbcMarque: 'une marque dans SA base', vcMarque: 'une marque dans SA base',
   etatBaisses: 'lecture', exec: 'canal brut : les écritures sont refusées par vmrExec', fileReseauAnnuler: 'annule un geste en attente (rien ne part)',
   importSiteTout: 'lecture (import)', importTout: 'lecture (import)', lbcQuota: 'lecture', lbcRelire: 'lecture', listesVinted: 'lecture',
-  photos: 'lecture des photos', verifierRepub: 'lecture (contrôle avant de republier, atelier du panneau)', rapportExtension: 'rapport local', secuArret: 'arrêt de sécurité', toutArreter: 'arrêt d\'urgence', ventes: 'lecture', fileFile: 'pause / reprise de la file d\'actions (rien ne part chez une plateforme)',
+  photos: 'lecture des photos', verifierRepub: 'lecture (contrôle avant de republier, atelier du panneau)', rapportExtension: 'rapport local', observation: 'observation de la page Vinted (5.440.3 : lecture seule, rien ne part chez Vinted)', secuArret: 'arrêt de sécurité', toutArreter: 'arrêt d\'urgence', ventes: 'lecture', fileFile: 'pause / reprise de la file d\'actions (rien ne part chez une plateforme)',
 };
 const RETIRES = ['src/CreerSurVinted.jsx', 'src/LbcBaissePrix.jsx', 'src/BaissePrixSerie.jsx', 'src/BaissePrixVestiaire.jsx', 'src/ModeVacances.jsx',
   'src/NegociationPaliers.jsx', 'src/PiloteFavorisAuto.jsx', 'src/FavorisVinted.jsx', 'src/AutomatisationFavoris.jsx', 'src/ModeAutoFavoris.jsx',

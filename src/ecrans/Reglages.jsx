@@ -1,5 +1,6 @@
 import { PlateformesSetting } from '../App.jsx';
 import { VacancesAgir } from '../agir/Agir.jsx';   // (24 nov., lot agir-tout)
+import '../natif/ecrans/parametres-visuel.css';   // (24 nov., visuel-argent) médaillons des sections, interrupteurs clairs
 import { fusion3 } from '../fusionNuage.js';
 import { modifierLigneCas, ecrireDifference } from '../ligneCas.js';
 import { signalDelai } from '../compatSafari.js';
@@ -175,6 +176,7 @@ import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) les composa
 import { RangeeTouchable } from '../designV2/BoutonV2.jsx';   // (17 nov., phase 2) les rangées de Paramètres
 import { Bouton as BoutonNatif, BoutonIcone as BoutonIconeNatif } from '../natif/Bouton.jsx';
 import { Glyphe as GlypheNatif } from '../natif/icones.jsx';
+import { TuileRadio as TuileRadioNatif } from '../natif/Segmente.jsx';   // (24 nov., style-graphite) les tuiles de style
 import { Groupe as GroupeNatif } from '../natif/Groupe.jsx';   // (21 nov., ux-reglages) Paramètres en liste groupée native
 import { Rangee as RangeeNatif } from '../natif/Rangee.jsx';
 import { STYLES as STYLES_CHOIX, styleLu, choisirStyle } from '../natif/styleChoix.js';   // (24 nov., style-graphite) les dix styles à essayer
@@ -1798,7 +1800,7 @@ function PushPrefsSetting({ comptes, onMuets }) {
 // jamais cachée.
 const GROUPES_NOTIF = [
   { id: 'argent', titre: 'Ventes, argent et rappels', ids: ['ventes', 'doublevente', 'rappels'] },
-  { id: 'colis', titre: 'Colis', ids: ['poster', 'arrives'] },
+  { id: 'colis', titre: 'Colis', ids: ['poster', 'arrives', 'colisdanger', 'envois'] },
   { id: 'echanges', titre: 'Échanges avec les acheteurs', ids: ['offres', 'messages'] },
   { id: 'comptes', titre: 'Comptes et avis', ids: ['comptes', 'avis'] },
   { id: 'achats', titre: 'Achats', ids: ['alertesebay'] },
@@ -1979,7 +1981,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
           {M==='email' && resteEmail > 0 && <div role="status" data-auth-attente={resteEmail} style={{fontSize:13,color:C.text,marginTop:8,lineHeight:1.4}}>{TEXTE_DELAI_EMAIL_BOUTON}</div>}
           <div style={{display:'flex',gap:9,marginTop:16}}>
             <Bouton variante="discret" onClick={close} style={{flex:1}}>Annuler</Bouton>
-            <Bouton variante="primaire" onClick={valider} occupe={!!acct.busy} disabled={(M!=='out' && !acct.val.trim()) || (M==='email' && resteEmail > 0)}
+            <Bouton variante="primaire" onClick={valider} occupe={!!acct.busy} disabled={(M!=='out' && !acct.val.trim()) || (M==='email' && resteEmail > 0)} title={M!=='out' && !acct.val.trim() ? tr(M==='email' ? 'uxr.acct.raisonEmail' : 'uxr.acct.raisonMdp') : undefined}
               style={{flex:2,opacity:((M!=='out'&&!acct.val.trim())||(M==='email'&&resteEmail>0))?0.5:1}}>
               {acct.busy ? (M==='out' ? 'Déconnexion…' : 'Enregistrement…') : M==='out' ? 'Se déconnecter' : (M==='email' && resteEmail > 0) ? `Réessaie dans ${resteEmail} s` : 'Enregistrer'}
             </Bouton>
@@ -2203,7 +2205,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (22 nov., ext. 5.436) « Mes comptes » : chaque compte et ton ordinateur, les gestes à distance (src/aDistance/).
       // (24 nov.) « Connexions de l'extension » : chaque navigateur (version, vu quand, ce qu'il lit, son problème) et chaque compte (src/connexions/).
       { id:'connexionsext', type:'nav', ic:'device', lib:tr('cnx.reglages.lib'), desc:tr('cnx.reglages.desc'), data:{ 'data-reglage-connexions-ext':'' }, onClick:()=>setTab('connexions') },
-      { id:'adistance', type:'nav', ic:'users', lib:tr('nav.adistance'), desc:tr('adist.reglages.desc'), data:{ 'data-reglage-adistance':'' }, onClick:()=>setTab('adistance') },
+      { id:'adistance', type:'nav', ic:'ordi', lib:tr('nav.adistance'), desc:tr('adist.reglages.desc'), data:{ 'data-reglage-adistance':'' }, onClick:()=>setTab('adistance') },
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:tr('reglages.liens.desc'), onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:tr('reglages.connexions.lib'), desc:tr('reglages.connexions.desc'), titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (11 nov., lot import-depart) Tout l'historique Vinted (ventes, achats), lu par l'extension ; « Tout récupérer » pour le compte de l'onglet.
@@ -2219,7 +2221,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:tr('reglages.ebay.lib'), desc:tr('reglages.ebay.desc'), el:ebayCompte },
       // (20 nov. soir) Les rangées par plateforme ont quitté la barre de gauche : les recherches et alertes eBay s'ouvrent d'ici.
-      ebayCompte && { id:'ebay-recherches', type:'nav', ic:'search', lib:tr('ebay.recherches.titre'), desc:'', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:ebay-recherches')); } catch (_) {} }, data:{ 'data-reglage-ebay-recherches':'' } },
+      ebayCompte && { id:'ebay-recherches', type:'nav', ic:'jumelles', lib:tr('ebay.recherches.titre'), desc:'', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:ebay-recherches')); } catch (_) {} }, data:{ 'data-reglage-ebay-recherches':'' } },
     ]},
     { id:'emails-reglages', titre:tr('reglages.groupe.emails-reglages'), items:[
       // (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : l'ancien sous-écran est devenu
@@ -2557,7 +2559,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     return (
       <button key={c.id} type="button" className="vrm-set-ligne vrm-pm-cat-ligne" data-categorie-ouvrir={c.id} data-categorie-contient={` ${c.ids.join(' ')} `}
         {...(c.id === 'compte' ? { 'data-vue': 'compte' } : {})} aria-current={actif ? 'true' : undefined} onClick={surClic}>
-        <span className="vrm-pm-cat-ic" aria-hidden="true"><Icon name={c.ic} size={17}/></span>
+        <span className="vrm-pm-cat-ic" aria-hidden="true" data-pm-cat={c.id}><Icon name={c.ic} size={17}/></span>
         <span className="vrm-set-lib"><b style={{color:C.text}}>{titreCat(c.id)}</b><small className="vrm-set-desc" style={{color:C.muted}}>{tr(`parametres.cat.${c.id}.desc`)}</small></span>
         {v && <span className="vrm-set-val" data-categorie-valeur={c.id} style={{color: ambre ? C.warn : C.muted}}>{v}</span>}
         {chevron}
@@ -2588,7 +2590,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     const ambre = (c.id === 'donnees' || c.id === 'securite-donnees') && derniereSauvegarde.old;
     return (
       <RangeeTouchable key={c.id} className="v2-pm-rangee" onClick={() => ouvrirCategorie(c.id)} attrs={{ 'data-categorie-ouvrir': c.id, 'data-categorie-contient': ` ${c.ids.join(' ')} ` }}>
-        <span className="v2-pm-ic" aria-hidden="true"><Icon name={c.ic} size={18}/></span>
+        <span className="v2-pm-ic" aria-hidden="true" data-pm-cat={c.id}><Icon name={c.ic} size={18}/></span>
         <span className="v2-pm-lib">{titreCat(c.id)}<span className="vg-sr">{' — ' + tr(`parametres.cat.${c.id}.desc`)}</span></span>
         {v ? <span className={'v2-pm-val' + (ambre ? ' is-ambre' : '')} data-categorie-valeur={c.id}>{v}</span> : null}
         <span className="v2-pm-chev" aria-hidden="true">{chevron}</span>
@@ -2614,7 +2616,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   };
   const ecranCategorie = (c, { avecTitre }) => (
     <section key={c.id} id={`parametres-${c.id}`} className="vrm-pm-cat" data-categorie-ecran={c.id}>
-      {avecTitre && <h2 className="vrm-pm-cat-h" style={{color:C.text}}><span className="vrm-pm-cat-ic" aria-hidden="true"><Icon name={c.ic} size={17}/></span>{titreCat(c.id)}</h2>}
+      {avecTitre && <h2 className="vrm-pm-cat-h" style={{color:C.text}}><span className="vrm-pm-cat-ic" aria-hidden="true" data-pm-cat={c.id}><Icon name={c.ic} size={17}/></span>{titreCat(c.id)}</h2>}
       {c.expert && <p className="vrm-pm-expert" data-reglages-expert="" style={{color:C.muted}}>{tr('parametres.expert')}</p>}
       {teteCategorie(c.id)}
       {c.groupes.map((g) => groupe({ id: g.id, titre: g.titreCle ? tr(g.titreCle) : (g.titre || null), items: g.items, pied: g.pied }))}
@@ -4944,13 +4946,12 @@ function StyleSetting() {
         {ids.map((id) => {
           const nom = tr('v2.style.' + (id || 'actuel')), choisi = style === id;
           return (
-            <button key={id || 'actuel'} type="button" role="radio" aria-checked={choisi} className="g-tuile" data-style={id} data-style-tuile={id || 'actuel'}
-              aria-label={nom + ' — ' + tr('v2.style.' + (id || 'actuel') + '.desc')} title={tr('v2.style.' + (id || 'actuel') + '.desc')}
-              onClick={() => setStyle(choisirStyle(id))}>
+            <TuileRadioNatif key={id || 'actuel'} choisi={choisi} className="g-tuile" onChoisir={() => setStyle(choisirStyle(id))}
+              attrs={{ 'data-style': id, 'data-style-tuile': id || 'actuel', 'aria-label': nom + ' — ' + tr('v2.style.' + (id || 'actuel') + '.desc'), title: tr('v2.style.' + (id || 'actuel') + '.desc') }}>
               <span className="g-tuile-rangee" aria-hidden="true"><span className="g-tuile-photo"/><span className="g-tuile-lignes"><span className="g-tuile-ligne"/><span className="g-tuile-ligne"/></span><span className="g-tuile-chip"/></span>
               <span className="g-tuile-plein" aria-hidden="true"/>
               <span className="g-tuile-nom"><span>{nom}</span>{choisi ? <span className="g-tuile-coche">✓</span> : null}</span>
-            </button>
+            </TuileRadioNatif>
           );
         })}
       </div>

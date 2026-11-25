@@ -6,7 +6,7 @@
 // d'un iPhone : il essaie sur son téléphone sans changer son ordinateur. Posé AVANT le premier rendu par
 // public/demarrage-theme.js (même clé, même liste), puis ici à l'import.
 export const CLE_STYLE = 'vrm_style';
-export const STYLES = Object.freeze(['graphite', 'ardoise', 'pierre', 'encre', 'papier', 'verre', 'nuit', 'menthe', 'studio', 'arcade']);
+export const STYLES = Object.freeze(['monochrome', 'graphite', 'ardoise', 'pierre', 'encre', 'papier', 'verre', 'nuit', 'menthe', 'studio', 'arcade']);
 
 export function styleLu() {
   try { const v = JSON.parse(localStorage.getItem(CLE_STYLE) || 'null'); return STYLES.includes(v) ? v : ''; } catch (_) { return ''; }

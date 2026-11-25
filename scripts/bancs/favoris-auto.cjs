@@ -296,7 +296,7 @@ const lireFenetre = (pg) => pg.evaluate(() => {
     });
     await fenetre(b, 'F3-saute-pas', 1512, false, ETAT({ etapeFav: 'envoi', lignes: [Object.assign({}, LIGNES[0]), Object.assign({}, LIGNES[1], { etat: 'saute', r: 'favori_trop_ancien' }), Object.assign({}, LIGNES[2], { etat: 'pas', r: 'element_introuvable' }), Object.assign({}, LIGNES[3], { etat: 'cours' }), LIGNES[4]] }), async (pg) => {
       const m = await lireFenetre(pg);
-      dit(m && m.lignes[1].r === 'Favori trop ancien pour Vinted' && /Page Vinted pas reconnue/.test(m.lignes[2].r) && m.lignes[2].chip === 'Pas envoyé' && /Envoi du message/.test(m.etapeTxt), 'F3 sauté « Favori trop ancien pour Vinted », pas envoyé « Page Vinted pas reconnue — rien n’est parti », étape « Envoi du message… »', JSON.stringify(m && m.lignes));
+      dit(m && m.lignes[1].r === 'Pas trouvé dans tes notifications (liste lue jusqu’au bout)' && /Page Vinted pas reconnue/.test(m.lignes[2].r) && m.lignes[2].chip === 'Pas envoyé' && /Envoi du message/.test(m.etapeTxt), 'F3 sauté « Pas trouvé dans tes notifications (liste lue jusqu’au bout) » (5.440.2 : plus jamais « trop ancien »), pas envoyé « Page Vinted pas reconnue — rien n’est parti », étape « Envoi du message… »', JSON.stringify(m && m.lignes));
       dit(m && !INTERDITS.test(m.txt), 'F3 aucune phrase technique', m && (m.txt.match(INTERDITS) || [''])[0]);
     });
     await fenetre(b, 'F4-pause', 1512, false, ETAT({ __pause: 'oui', enCours: false, etapeFav: '' }), async (pg) => {

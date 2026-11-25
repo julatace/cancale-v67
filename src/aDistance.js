@@ -27,6 +27,7 @@
 // (`node scripts/audit-a-distance.cjs --recopie`) : l'app et l'extension jugent une commande
 // avec la MÊME règle. Module PUR au-dessus des entrées/sorties du bas.
 // ═════════════════════════════════════════════════════════════════════════════
+import { signalDelai } from './compatSafari.js';   // (24 nov.) AbortSignal.timeout manque à Safari < 16 (audit-safari)
 
 // <a-distance-regle>
 const ADIST_MS = 24 * 3600000;                 // une commande à distance périme après 24 h
@@ -279,7 +280,9 @@ const enc = encodeURIComponent;
 // Chaque lecture porte un `signal` (10 s au plus) : elle ne passe JAMAIS par la mémoire des lectures identiques de l'app
 // (src/lecturesPartagees.js — une lecture annulable passe telle quelle). L'extension écrit ces lignes sans passer par
 // l'app : une réponse gardée (2 s) pourrait montrer « en attente » juste après que l'ordinateur l'a prise. Précaution.
-const signalFrais = () => { try { return typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined; } catch (_) { return undefined; } };
+// (24 nov., main-vert) Par `signalDelai` (src/compatSafari.js) : sous Safari < 16 il n'y avait AUCUN signal (la lecture
+// passait alors par la mémoire de 2 s) ; maintenant un AbortController + minuteur, partout.
+const signalFrais = () => { try { return signalDelai(10000); } catch (_) { return undefined; } };
 async function appel(dep, chemin, init) {
   const i = Object.assign({}, init || {});
   if (!i.signal) { const s = signalFrais(); if (s) i.signal = s; }

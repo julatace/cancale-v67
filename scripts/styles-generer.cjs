@@ -62,8 +62,22 @@ const PRESETS = {
   arcade: { forme: { rCarte: 24, rBouton: 18, hPlein: 52, rChip: 999, profondeur: 'arcade', appui: 0.94 },
     clair: { fond: '#D9DEE6', laterale: '#CDD3DD', carte: '#F7F8FA', carte2: '#E6EAF0', bord: '#BEC6D2', encre: '#151B26', texte: '#232B38', encre2: '#465163', encre3: '#7E899A', accent: '#34507A', plein: '#2A3E61', surPlein: '#FFFFFF', vert: '#14613D' },
     sombre: { fond: '#161A22', laterale: '#11141B', carte: '#222833', carte2: '#2C3340', bord: '#3D4555', encre: '#F2F5FA', texte: '#E1E6EF', encre2: '#AAB4C5', encre3: '#7F8A9D', accent: '#A6BFE6', plein: '#A6BFE6', surPlein: '#111622', vert: '#86D9AE' } },
+  // Monochrome (24 nov., la direction préférée de Julien ; maquette du coordinateur « style-mono ») : page gris #ECEDF0,
+  // cartes blanches à filet #E5E7EB et ombre douce, plein NOIR, vert #22C55E en point ou en aplat seulement (jamais un texte
+  // vert sur clair : `vert` = l'encre, `point` = le vert), cartes 24, boutons 12 ; chaque sorte de bouton se voit : plein
+  // noir, secondaire à contour d'encre (`second: 'contour'`), liens soulignés, icônes sur un rond à contour (`rond`) ;
+  // la nuit l'inverse (plein blanc). Champs optionnels de la table (aucun autre style ne les porte, son bloc ne change pas) :
+  // `contour` (bord du secondaire, ≥ 3:1), `limite` (bord d'un champ et d'un rond, ≥ 3:1), `douce` (aplat d'un rond, d'une
+  // puce, de l'onglet actif), `point` + `surPoint` (le vert et le texte posé dessus), `bordCarte` (filet des cartes).
+  monochrome: { forme: { rCarte: 24, rBouton: 12, hPlein: 48, rChip: 999, profondeur: 'mono', appui: 0.97, plaque: 'encre', second: 'contour', liens: 'souligne', rond: 'plaque', champ: 'contour' },
+    clair: { fond: '#ECEDF0', laterale: '#E4E5E9', carte: '#FFFFFF', carte2: '#F9FAFB', bord: '#E5E7EB', encre: '#111111', texte: '#111111', encre2: '#575D67', encre3: '#6B7280', accent: '#111111', plein: '#000000', surPlein: '#FFFFFF', vert: '#111111',
+      point: '#22C55E', surPoint: '#052E16', contour: '#111111', limite: '#6B7280', douce: '#F3F4F6', bordCarte: '#E5E7EB' },
+    sombre: { fond: '#0B0B0C', laterale: '#050506', carte: '#161618', carte2: '#202023', bord: '#2E2E33', encre: '#F5F5F6', texte: '#F5F5F6', encre2: '#A1A1AA', encre3: '#7A7A82', accent: '#F5F5F6', plein: '#FFFFFF', surPlein: '#000000', vert: '#F5F5F6',
+      point: '#22C55E', surPoint: '#052E16', contour: '#F5F5F6', limite: '#7A7A82', douce: '#2A2A2E', bordCarte: '#2E2E33' } },
 };
 const ORDRE = Object.keys(PRESETS);
+// la plaque du N° : kraft (Papier), encre (Monochrome : noire au jour, gris anthracite la nuit), sinon le ton de la carte
+const PLAQUES = { kraft: { clair: ['#D8CDB9', '#2E261A'], sombre: ['#4A4236', '#EEEAE3'] }, encre: { clair: ['#111111', '#FFFFFF'], sombre: ['#3A3A40', '#F5F5F6'] } };
 
 // ── les jetons dérivés d'une palette ──
 function jetons(p, f, sombre) {
@@ -91,7 +105,8 @@ function jetons(p, f, sombre) {
     // la famille de boutons (src/natif/styles-choix.css)
     '--g-r-bouton': f.rBouton + 'px', '--g-h-plein': f.hPlein + 'px', '--g-r-chip': f.rChip === 999 ? '999px' : f.rChip + 'px',
     '--g-appui': String(f.appui),
-    '--g-plein-appui': melange(p.plein, sombre ? '#000000' : '#000000', sombre ? 0.18 : 0.28),
+    // enfoncé : plus foncé ; un plein déjà (presque) noir s'éclaircit (il ne peut pas foncer)
+    '--g-plein-appui': lum(p.plein) < 0.02 ? melange(p.plein, '#FFFFFF', 0.22) : melange(p.plein, '#000000', sombre ? 0.18 : 0.28),
     '--g-second-fond': ardoiseFond, '--g-second-texte': sombre ? p.encre : p.encre,
     '--g-second-appui': sombre ? rgba(p.accent, 0.26) : melange(p.carte, p.accent, 0.20),
     '--g-champ-fond': sombre ? melange(p.fond, '#000000', 0.18) : melange(p.carte2, p.fond, 0.35),
@@ -101,19 +116,29 @@ function jetons(p, f, sombre) {
     '--g-chip-ardoise': p.accent, '--g-chip-encre': p.encre2,
   };
   const prof = f.profondeur;
-  j['--g-plein-relief'] = prof === 'aucune' ? 'none'
+  j['--g-plein-relief'] = prof === 'aucune' || prof === 'mono' ? 'none'
     : prof === 'arcade' ? `inset 0 1px 0 ${rgba('#FFFFFF', sombre ? 0.35 : 0.22)}, 0 4px 0 ${melange(p.plein, '#000000', sombre ? 0.45 : 0.40)}, 0 6px 14px ${rgba('#000000', sombre ? 0.40 : 0.18)}`
     : `inset 0 1px 0 ${rgba('#FFFFFF', sombre ? 0.30 : 0.16)}, 0 1px 2px ${rgba('#000000', sombre ? 0.40 : 0.18)}, 0 2px 8px -2px ${rgba('#000000', sombre ? 0.35 : 0.16)}`;
-  j['--g-plein-relief-appui'] = prof === 'arcade' ? `inset 0 1px 0 ${rgba('#FFFFFF', 0.12)}, 0 1px 0 ${melange(p.plein, '#000000', 0.40)}` : (prof === 'aucune' ? 'none' : `inset 0 1px 2px ${rgba('#000000', 0.25)}`);
+  j['--g-plein-relief-appui'] = prof === 'arcade' ? `inset 0 1px 0 ${rgba('#FFFFFF', 0.12)}, 0 1px 0 ${melange(p.plein, '#000000', 0.40)}` : (prof === 'aucune' || prof === 'mono' ? 'none' : `inset 0 1px 2px ${rgba('#000000', 0.25)}`);
   j['--g-descente'] = prof === 'arcade' ? '3px' : '0px';
-  j['--g-carte-ombre'] = prof === 'aucune' ? 'none' : prof === 'arcade' ? `0 2px 0 ${rgba(p.bord, sombre ? 0.6 : 0.9)}, 0 8px 24px -12px ${rgba('#000000', sombre ? 0.6 : 0.20)}`
+  j['--g-carte-ombre'] = prof === 'mono' ? `0 0 0 1px ${p.bordCarte}` + (sombre ? '' : `, 0 1px 2px ${rgba('#000000', 0.05)}, 0 4px 12px -6px ${rgba('#000000', 0.08)}`)
+    : prof === 'aucune' ? 'none' : prof === 'arcade' ? `0 2px 0 ${rgba(p.bord, sombre ? 0.6 : 0.9)}, 0 8px 24px -12px ${rgba('#000000', sombre ? 0.6 : 0.20)}`
     : `0 1px 2px ${rgba('#000000', sombre ? 0.30 : 0.05)}, 0 8px 24px -14px ${rgba('#000000', sombre ? 0.55 : 0.18)}`;
-  j['--g-plaque-fond'] = f.plaque === 'kraft' ? (sombre ? '#4A4236' : '#D8CDB9') : p.carte2;
-  j['--g-plaque-texte'] = f.plaque === 'kraft' ? (sombre ? '#F2EADC' : '#2E261A') : p.encre;
+  const pq = PLAQUES[f.plaque] && PLAQUES[f.plaque][sombre ? 'sombre' : 'clair'];
+  j['--g-plaque-fond'] = pq ? pq[0] : p.carte2;
+  j['--g-plaque-texte'] = pq ? pq[1] : p.encre;
   j['--n-ombre-carte'] = j['--g-carte-ombre'];
   if (sombre) j['--n-fond-degrade'] = f.verre ? `linear-gradient(180deg, ${p.fond} 0%, ${p.fond2} 100%)` : `linear-gradient(180deg, ${p.fond} 0%, ${p.fond} 45%, ${melange(p.fond, '#000000', 0.22)} 100%)`;
   if (f.verre) { j['--g-fond-image'] = `linear-gradient(180deg, ${p.fond} 0%, ${p.fond2} 100%)`; j['--g-verre'] = 'saturate(160%) blur(18px)'; }
   else { j['--g-fond-image'] = 'none'; j['--g-verre'] = 'none'; }
+  // les champs optionnels (Monochrome) : chaque sorte de bouton se distingue ; les autres styles n'émettent rien de plus
+  if (f.second === 'contour') Object.assign(j, { '--g-second-fond': p.carte, '--g-second-texte': p.encre, '--g-second-appui': p.douce,
+    '--g-second-contour': `inset 0 0 0 1.5px ${p.contour}`, '--g-onglet-fond': p.douce, '--g-puce-fond': p.douce });
+  if (f.rond === 'plaque') Object.assign(j, { '--g-rond-fond': p.douce, '--g-rond-contour': `inset 0 0 0 1px ${p.limite}` });
+  if (f.champ === 'contour') Object.assign(j, { '--g-champ-fond': p.carte, '--g-champ-ombre': `inset 0 0 0 1px ${p.limite}`, '--n-curseur': p.douce,
+    '--g-anneau': `0 0 0 2px ${p.carte}, 0 0 0 4px ${p.encre}` });
+  if (f.liens === 'souligne') j['--g-lien-deco'] = 'underline';
+  if (p.point) Object.assign(j, { '--g-point': p.point, '--g-sur-point': p.surPoint });
   return j;
 }
 
@@ -132,18 +157,29 @@ function controler(table) {
     for (const [n, f] of Object.entries(fonds)) { paires.push(['encre/' + n, p.encre, f], ['texte/' + n, p.texte, f], ['encre2/' + n, p.encre2, f]); }
     paires.push(['accent/fond', p.accent, p.fond], ['accent/carte', p.accent, carte], ['surPlein/plein', p.surPlein, p.plein],
       ['vert/carte', p.vert, carte], ['vert/vertFond', p.vert, vFond], ['accent/chip', p.accent, aFond], ['encre/chip', p.encre, aFond],
-      ['encre2/chipEncre', p.encre2, eFond], ['surPlein/pleinAppui', p.surPlein, melange(p.plein, '#000000', sombre ? 0.18 : 0.28)],
-      ['encre2/champ', p.encre2, sombre ? melange(p.fond, '#000000', 0.18) : melange(p.carte2, p.fond, 0.35)]);
-    if (s.forme.plaque === 'kraft') paires.push(['plaque', sombre ? '#F2EADC' : '#2E261A', sombre ? '#4A4236' : '#D8CDB9']);
+      ['encre2/chipEncre', p.encre2, eFond], ['surPlein/pleinAppui', p.surPlein, lum(p.plein) < 0.02 ? melange(p.plein, '#FFFFFF', 0.22) : melange(p.plein, '#000000', sombre ? 0.18 : 0.28)],
+      ['encre2/champ', p.encre2, s.forme.champ === 'contour' ? p.carte : sombre ? melange(p.fond, '#000000', 0.18) : melange(p.carte2, p.fond, 0.35)]);
+    const pq = PLAQUES[s.forme.plaque] && PLAQUES[s.forme.plaque][t];
+    if (pq) paires.push(['plaque', pq[1], pq[0]]);
+    if (p.douce) paires.push(['encre/douce', p.encre, p.douce], ['encre2/douce', p.encre2, p.douce]);
+    if (p.point) paires.push(['surPoint/point', p.surPoint, p.point]);
+    // un contour qui DÉSIGNE un contrôle (secondaire, champ, rond) : ≥ 3:1 sur ce qui l'entoure (WCAG 1.4.11)
+    const contours = [];
+    if (p.contour) contours.push(['contour/carte', p.contour, carte], ['contour/fond', p.contour, p.fond]);
+    if (p.limite) contours.push(['limite/carte', p.limite, carte], ['limite/fond', p.limite, p.fond], ['limite/douce', p.limite, p.douce || carte]);
+    for (const [n, a, b] of contours) { const k = rapport(a, b); if (k < 3) ko.push(`${id} ${t} ${n} ${k.toFixed(2)}:1 (< 3:1)`); }
+    // le vert de Monochrome n'est jamais un TEXTE sur clair : `vert` (le texte « fait ») reste l'encre
+    if (p.point && !sombre && rapport(p.vert, p.carte) < 7) ko.push(`${id} ${t} vert ${p.vert} : un texte vert sur clair (le vert est un point, pas un texte)`);
     for (const [n, a, b] of paires) { const k = rapport(a, b); if (k < 4.5) ko.push(`${id} ${t} ${n} ${k.toFixed(2)}:1`); }
-    for (const [n, c] of Object.entries(p)) if (typeof c === 'string' && /^#/.test(c) && estAmbre(c)) ko.push(`${id} ${t} ${n} ${c} est orange/ambre`);
+    const kraft = pq ? { plaqueFond: pq[0], plaqueTexte: pq[1] } : {};
+    for (const [n, c] of Object.entries({ ...p, ...kraft })) if (typeof c === 'string' && /^#/.test(c) && estAmbre(c)) ko.push(`${id} ${t} ${n} ${c} est orange/ambre`);
   }
   return ko;
 }
 
 function css(table) {
   const lignes = ['/* ══════ FABRIQUÉ par scripts/styles-generer.cjs — ne pas modifier à la main (la table est dans le script). ══════',
-    '   Les jetons des dix styles à essayer (Paramètres → Apparence → Style). Clair : [data-style="x"] ; sombre : la racine en',
+    '   Les jetons des styles à essayer (Paramètres → Apparence → Style). Clair : [data-style="x"] ; sombre : la racine en',
     '   data-theme="dark". Le style « Actuel » (aucun attribut) garde src/natif/jetons.css tel quel. */'];
   const decl = (j) => Object.entries(j).map(([k, v]) => `  ${k}: ${v};`).join('\n');
   for (const id of Object.keys(table)) {
@@ -166,8 +202,12 @@ if (require.main === module) {
     if (controler(t2).some((x) => /orange/.test(x))) bon++; else console.log('❌ un accent orange passe');
     const t3 = JSON.parse(JSON.stringify(PRESETS)); t3.nuit.sombre.surPlein = '#8899BB';
     if (controler(t3).some((x) => /nuit sombre surPlein/.test(x))) bon++; else console.log('❌ un texte de plein illisible passe');
-    console.log(bon === 3 ? '✅ styles-generer --prouve : les 3 mutations rougissent' : '❌ styles-generer --prouve');
-    process.exit(bon === 3 ? 0 : 1);
+    const t4 = JSON.parse(JSON.stringify(PRESETS)); t4.monochrome.clair.contour = '#D1D5DB';
+    if (controler(t4).some((x) => /monochrome clair contour\/carte/.test(x))) bon++; else console.log('❌ un contour de secondaire invisible passe');
+    const t5 = JSON.parse(JSON.stringify(PRESETS)); t5.monochrome.clair.vert = '#22C55E';
+    if (controler(t5).some((x) => /monochrome clair vert/.test(x))) bon++; else console.log('❌ un texte vert sur clair passe');
+    console.log(bon === 5 ? '✅ styles-generer --prouve : les 5 mutations rougissent' : '❌ styles-generer --prouve');
+    process.exit(bon === 5 ? 0 : 1);
   }
   const ko = controler(PRESETS);
   if (ko.length) { console.log('❌ contraste ou orange :\n  ' + ko.join('\n  ')); process.exit(1); }

@@ -1,0 +1,38 @@
+/* ── src/natif/visuel/stock-inventaire.css — le Stock en inventaire « jeu vidéo » (24 nov., lot visuel-annonces) ──────────
+   Les meubles et les cases du Stock (src/ecrans/Stock.jsx, styles-stock-2d.css, styles-etageres.css) gardent leur forme et
+   leurs règles ; seul l'habit change, dans le langage de src/natif/jeu.css :
+   · le N° d'une case devient l'ÉTIQUETTE PAPIER (le même papier neutre que `EtiquetteN`, jamais orange) ;
+   · une case vide est un CREUX (ombre intérieure), une case prise une TUILE posée (photo arrondie, ombre portée) ;
+   · « plus en ligne » passe de l'orange à l'acier ; « vendue » reste l'accent ; le doublon reste le SEUL rouge (§7) ;
+   · l'arrivée d'une photo se fait sur le fond de la case (jamais de blanc) ; `prefers-reduced-motion` ⇒ rien ne bouge. */
+
+/* L'étiquette papier, à la place de la pastille noire. */
+.vrm-s2d-case .vrm-s2d-num, .vrm-s2d-vig .vrm-s2d-num {
+  background: #F3F1EC; color: #26272B; font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+  box-shadow: inset 0 0 0 1px rgb(38 39 43 / .16), 0 1px 2px rgb(0 0 0 / .2);
+  padding-left: 9px; border-radius: 3px 5px 5px 3px;
+  background-image: radial-gradient(circle at 4px 50%, rgb(38 39 43 / .3) 1.6px, transparent 2px);
+}
+.vrm-s2d-case .vrm-s2d-num:not([data-mini]) { clip-path: polygon(4px 0, 100% 0, 100% 100%, 4px 100%, 0 50%); padding-left: 10px; }
+.vrm-s2d-num[data-vendue] { background: #3D4B5B; background-image: none; color: #FFFFFF; }
+.vrm-s2d-num[data-hors-ligne] { background: #4C5A73; background-image: none; color: #FFFFFF; }
+.vrm-s2d-num.vrm-etag-notee { background: #E6E3DC; color: #3A3B40; }
+.vrm-s2d-case.is-double .vrm-s2d-num { background: var(--sb-doublon, var(--vrm-doublon, #C5162E)); background-image: none; color: #FFFFFF; }
+:root[data-theme="dark"] .vrm-s2d-num[data-vendue] { background: #C9D2DE; color: #1D1D1F; }
+
+/* Le creux d'une case vide, la tuile d'une case prise (jamais sur un doublon, une case visée ou choisie : leurs ombres disent quelque chose). */
+.vrm-s2d-case.is-vide { box-shadow: inset 0 2px 5px rgb(29 29 31 / .12), inset 0 0 0 1px rgb(29 29 31 / .05); }
+:root[data-theme="dark"] .vrm-s2d-case.is-vide { box-shadow: inset 0 2px 6px rgb(0 0 0 / .45), inset 0 0 0 1px rgb(255 255 255 / .05); }
+.vrm-s2d-case:not(.is-vide):not(.is-double):not(.is-vise):not(.is-cible):not(.is-survol):not(.is-glisse) { background-color: var(--etag-fond, var(--n-carte-2, #EDEDF0)); box-shadow: 0 1px 2px rgb(0 0 0 / .14), 0 3px 8px rgb(0 0 0 / .08), inset 0 1px 0 rgb(255 255 255 / .35); }
+.vrm-s2d-case > img { background-color: var(--etag-fond, var(--n-carte-2, #EDEDF0)); }
+
+/* La planche : un bois clair (gris chaud, saturation basse — jamais orange) avec un chant éclairé. */
+.vrm-s2d-planche, .vrm-s2d-socle { box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 2px 4px rgb(0 0 0 / .16); }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* L'appui : la tuile s'enfonce à peine (120 ms). */
+  .vrm-s2d-case:not(.is-vide):not(.is-glisse):active { transform: scale(.96); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vrm-s2d-case, .vrm-s2d-case > img { transition: none !important; animation: none !important; }
+}
