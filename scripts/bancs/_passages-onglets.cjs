@@ -53,7 +53,7 @@ async function parcours(nav, { W = 390, sombre = false, film = '', b = P.base() 
   await pg.evaluate(SONDE);
   await pg.waitForSelector('.vrm-main [data-attente="pret"]', { timeout: 40000 }).catch(() => {});
   await pg.waitForTimeout(Number(process.env.REPOS || 6000));   // l'app ouverte, au repos (les préchargements ont eu leur chance)
-  const lignes = [];
+  const lignes = []; const laisses = {};
   const toucher = (lib) => pg.evaluate((lib) => {
     const c = [...document.querySelectorAll('nav a, nav button, [role="tab"], .n-onglets button, .n-laterale a, .n-laterale button')].find((x) => (x.textContent || '').replace(/[0-9\s]+/g, '').startsWith(lib) && x.getClientRects().length);
     if (c) c.click(); return !!c;
@@ -71,9 +71,14 @@ async function parcours(nav, { W = 390, sombre = false, film = '', b = P.base() 
       const r = await mesure;
       let defile = null;
       if (visite === 2) defile = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); return m ? Math.round(m.scrollTop) : null; });
-      lignes.push({ visite, cle, ok, ...r, defile });
-      // Laisser l'écran défilé de 300 px (la 2e visite doit le retrouver), puis un temps de lecture.
-      if (visite === 1) await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 300; });
+      // Le squelette vu est-il celui de l'ÉCRAN (sa forme, `data-squelette` / attente native de l'écran) ou un bloc gris étranger ?
+      lignes.push({ visite, cle, ok, ...r, defile, laisse: laisses[cle] });
+      // Laisser l'écran défilé de 300 px (la 2e visite doit retrouver CE qui a été laissé), une fois l'écran prêt.
+      if (visite === 1) {
+        await pg.waitForSelector('.vrm-main [data-attente="pret"], .vrm-main [data-attente="plafond"]', { timeout: 15000 }).catch(() => {});
+        await pg.waitForTimeout(1200);
+        laisses[cle] = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (!m) return null; m.scrollTop = 300; return Math.round(m.scrollTop); });
+      }
       await pg.waitForTimeout(visite === 1 ? 2500 : 800);
     }
   }

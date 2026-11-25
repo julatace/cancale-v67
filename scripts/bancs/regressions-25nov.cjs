@@ -15,9 +15,8 @@ require('./_porte-banc.cjs');
 //                    compte ≥ 2 (≤ 2 rangées porteuses par compte) ; l'en-tête du compte le dit une fois (`data-ad-etat-groupe`).
 //    O  ONGLETS    — passages Aujourd'hui → Annonces → Ventes → Achats → Argent → Aujourd'hui puis 2e tour, à 390 ET 1512, base à
 //                    700 ms (scripts/bancs/_passages-onglets.cjs, une mesure par image) : aucun saut > 4 px d'un nœud déjà affiché,
-//                    aucune image presque vide ; 1re visite de Ventes, Achats, Argent et le RETOUR sur Aujourd'hui : aucune image de
-//                    squelette (Annonces lit sa liste : son squelette a la forme de l'écran) ; 2e visite : zéro squelette, défilement
-//                    laissé (300 px) retrouvé. Sur main (25 nov., avant onglets-fluides) : une image grise à chaque 1re visite, et au
+//                    aucune image presque vide ; 1re visite : un squelette seulement à la forme de l'écran (`data-squelette`) ; le
+//                    RETOUR sur Aujourd'hui et toute 2e visite : zéro squelette, défilement laissé retrouvé. Sur main (25 nov., avant onglets-fluides) : une image grise à chaque 1re visite, et au
 //                    retour sur Aujourd'hui à 1512 « Tes chiffres » poussé de 105 px.
 //  Réglages : `BANC_DIST` (un autre build : l'AVANT), `SHOTS=<dossier>` (captures à REGARDER), `THEMES=clair,sombre`,
 //  `CAS=S,E,T,R,P`. Un banc ne meurt pas, il rapporte.
@@ -152,8 +151,12 @@ async function ouvrir(nav, { b, url, sombre, tenir = null }) {
           dit(l.ok, nom + ' : onglet touché');
           dit(l.sauts === 0, nom + ' : aucun saut > 4 px (' + l.sauts + ')', l.detail);
           dit(l.vide === 0, nom + ' : aucune image presque vide (' + l.vide + ')');
-          if (l.visite === 2 || l.cle !== 'annonces') dit(l.sq === 0, nom + ' : aucune image de squelette (' + l.sq + '/' + l.images + ')', l.quoi || '');
-          if (l.visite === 2) dit(l.defile != null && Math.abs(l.defile - 300) <= 4, nom + ' : défilement retrouvé (' + l.defile + ')');
+          // 1re visite : un squelette n'est admis qu'à la forme de l'écran qui lit ses données (`data-squelette` de l'attente) ; le
+          // RETOUR sur Aujourd'hui (déjà vu) et toute 2e visite : aucun.
+          const retour = l.cle === 'journee' || l.visite === 2;
+          if (retour) dit(l.sq === 0, nom + ' : aucune image de squelette (' + l.sq + '/' + l.images + ')', l.quoi || '');
+          else dit(!l.sq || /data-squelette=|data-n-attente=/.test(l.quoi || ''), nom + ' : squelette seulement à la forme de l\'écran (' + l.sq + '/' + l.images + ')', l.quoi || '');
+          if (l.visite === 2 && l.laisse != null) dit(l.defile != null && Math.abs(l.defile - l.laisse) <= 4, nom + ' : défilement retrouvé (' + l.defile + ' pour ' + l.laisse + ')');
         }
         dit(!erreurs.length, `O ${W} aucune erreur JS`, erreurs);
       }
