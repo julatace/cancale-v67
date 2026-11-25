@@ -58,7 +58,7 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
   // disait « Prix de … » sans la valeur visible (axe label-content-name-mismatch).
   const nomCellule = (v) => (v == null ? '— · ' : typeof v === 'string' || typeof v === 'number' ? String(v) + ' · ' : '');
   const modifiable = (l, cle, valeur, onModifier) => (onModifier && !seulementBloque(l.a)
-    ? <button type="button" className="n-eg-cellule" data-eg-modifier={cle} data-eg-vide={valeur == null ? '1' : undefined}
+    ? <button type="button" data-n-famille="lien" className="n-eg-cellule" data-eg-modifier={cle} data-eg-vide={valeur == null ? '1' : undefined}
         aria-label={nomCellule(valeur) + tr('egalite.modifier', { quoi: tr('egalite.col.' + cle), article: l.titre })} onClick={(e) => { e.stopPropagation(); onModifier(); }}>{valeur == null ? '—' : valeur}</button>
     : valeur);
   const pasFourni = () => <span className="n-tt-vide-cellule" title={tr('cqm.pasFourni')} aria-label={'— · ' + tr('cqm.pasFourni')} data-eg-pasfourni="">—</span>;
@@ -118,7 +118,7 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
       lignes={lignes} statuts={statuts} statutsDefaut={[...STATUTS_EN_LIGNE, 'bloque']} carteGrille={carteGrille} carteCorps={96} filtres={filtresL} colonnes={colonnes}
       actions={acts} onAction={(cle, ls) => onAction(cle, unParArticle(ls))} menuLigne={menuLigne} onOuvrir={(l) => onOuvrir(l.a)} groupe={(l) => l.groupe}
       unite={(n) => tr('egalite.groupe.n', { n })} placeholder={tr('tableau.chercherArticle')} plein={plein} haut={haut} pied={pied}
-      outilsPlus={onPublier || onAutomatisations ? <>{onPublier ? <button type="button" className="n-tt-bouton" data-eg-publier="" onClick={onPublier}>{Icon ? <Icon name="plus" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('egalite.publier')}</span></button> : null}{onAutomatisations ? <button type="button" className="n-tt-bouton" data-tt-automatisations="" onClick={onAutomatisations}>{Icon ? <Icon name="spark" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('auto.titre')}</span></button> : null}</> : null}
+      outilsPlus={onPublier || onAutomatisations ? <>{onPublier ? <button type="button" data-n-famille="second" className="n-tt-bouton" data-eg-publier="" onClick={onPublier}>{Icon ? <Icon name="plus" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('egalite.publier')}</span></button> : null}{onAutomatisations ? <button type="button" data-n-famille="second" className="n-tt-bouton" data-tt-automatisations="" onClick={onAutomatisations}>{Icon ? <Icon name="spark" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('auto.titre')}</span></button> : null}</> : null}
       vide={tr('tableau.videAnnonces')} pasSu={tr('egalite.pasSu')} Icon={Icon} attrs={{ 'data-eg-ecran': '', 'data-eg-vue': 'tableau' }}/>
   );
 }
