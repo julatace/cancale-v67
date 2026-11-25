@@ -308,3 +308,19 @@ Ma journée lue au banc (`LECTURES`, `CALCULS`) : B fait 40 lectures au lieu de 
   - `chiffres-volume`, #1388 contre #1393 : 35/35 et 12/12. `main` contre #1388 : 33/35, avec les deux écarts connus de `data-colis-total` (§4), et 12/12.
   - La garde est verte sur les deux branches.
   - `e2e-extension` est identique à `main` sur les deux branches.
+
+### 8 septies. Train du 25 nov. (2) : un achat caché dans « En route »
+- `colis-retirer-propre` (Chromium et WebKit) : « ouvrir « En route » montre les 13 achats — 12 ». La cause est dans
+  `ParPaquets` (#1388, latence-2) : le 1er paquet est passé de 16 à 12 rangées, et la suite ne venait qu'au défilement (plus
+  de marge au montage). La 13e attendait donc sous l'écran : un colis caché.
+- La règle, dans `src/composants/ParPaquets.jsx` : **ce qui reste tient dans un paquet ⇒ tout est posé tout de suite** (le
+  dernier paquet incomplet n'attend jamais un défilement). Une liste plus longue garde sa fenêtre, et son dernier paquet
+  vient avec l'avant-dernier.
+- Preuves, sur Chromium : « 13 achats » est **rouge sur `7be9ea5a`** (12) et **vert** sur #1388 et sur #1393 (13). Le seul
+  rouge restant de ce banc (« ouvrir et retrait restent côte à côte ») est le même sur `main` (`fd9dab5fe`), avec les mêmes
+  mesures.
+- ⚠️ **WebKit pas rejoué ici.** Depuis le redémarrage du conteneur, son téléchargement est refusé par le réseau
+  (`cdn.playwright.dev` n'est pas autorisé). Le correctif est un calcul du nombre de rangées, sans rien de propre au moteur ;
+  la CI le rejoue sur WebKit.
+- `chiffres-volume` : `main` contre #1388 donne 33/35 (les deux `data-colis-total` connus, §4) et 12/12 ; #1388 contre
+  #1393 donne 35/35 et 12/12. La garde est verte sur les deux branches.
