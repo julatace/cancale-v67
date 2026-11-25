@@ -26,15 +26,18 @@ export function MiniFrise({ etapes }) {
 
 // LA DEUXIÈME LIGNE : le site, le N°, la taille, l'état (frise + mot), ce qui reste à dire (date limite…), le transporteur.
 // Chaque morceau garde sa taille (jamais rogné) ; s'il manque de place, la ligne passe à la ligne entre deux morceaux.
-export function MetaVente({ site = '', nomSite = '', num = '', numDouble = false, taille = '', etat = null, morceaux = [], transporteur = null }) {
+// `logo` : le logo du site, posé par l'écran (<LogoSite site={r.site}/>) ; sinon dessiné ici depuis `site`.
+// `etat.etiquette` : l'étiquette d'état dans son propre élément (une <Pastille>{mot}</Pastille>) ; sinon le mot seul.
+export function MetaVente({ site = '', nomSite = '', logo = null, num = '', numDouble = false, taille = '', etat = null, morceaux = [], transporteur = null }) {
   const autres = (morceaux || []).filter(Boolean);
   return (
     <span className="n-vr-meta" data-vr-meta="">
-      {site ? <LogoSite site={site} taille={16} nom={nomSite}/> : null}
+      {logo || (site ? <LogoSite site={site} taille={16} nom={nomSite}/> : null)}
       {num ? <Plaque numero={num} doublon={numDouble}/> : null}
       {taille ? <span className="n-vr-morceau" data-vr-taille="">{taille}</span> : null}
       {etat && etat.mot ? <span className="n-vr-etat" data-vr-etat={etat.cle || ''} aria-label={etat.aria || undefined} role={etat.aria ? 'img' : undefined}>
-        <MiniFrise etapes={etat.etapes}/><span className="n-vr-mot" aria-hidden={etat.aria ? 'true' : undefined}>{etat.mot}</span>
+        <MiniFrise etapes={etat.etapes}/>{etat.etiquette ? <span className="n-vr-mot" aria-hidden={etat.aria ? 'true' : undefined}>{etat.etiquette}</span>
+          : <span className="n-vr-mot" aria-hidden={etat.aria ? 'true' : undefined}>{etat.mot}</span>}
       </span> : null}
       {autres.map((m) => <span key={typeof m === 'string' ? m : m.key} className="n-vr-morceau">{m}</span>)}   {/* un morceau-nœud porte SA clé (« limite ») */}
       {transporteur && transporteur.logo ? <span className="n-vr-logo" data-vt-transporteur={transporteur.cle || ''} title={transporteur.nom || ''}>{transporteur.logo}</span> : null}

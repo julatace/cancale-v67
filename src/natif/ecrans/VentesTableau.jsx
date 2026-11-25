@@ -14,6 +14,7 @@ import { CATEGORIES_VENTE, categorieVente } from '../../ventesEcran.js';
 import { celluleAchat } from './celluleAchat.jsx';
 import { Groupe } from '../Groupe.jsx';
 import { Rangee, Vignette } from '../Rangee.jsx';
+import { Pastille } from '../Pastille.jsx';
 import '../ventes-lisibles.css';
 import { morceauxMarqueTaille } from '../../ventes/marqueTaille.js';
 import { MetaVente, useAchatRange } from './rangeeVente.jsx';   // (25 nov., ventes-rangee) la rangée compacte, la même partout
@@ -102,11 +103,11 @@ function LigneTermineeTel({ l, prix, motEtat, jour, nomSite, logoTransporteur, P
     <Rangee
       vignette={<Vignette src={photo} alt="" taille={56} image={photo && Photo ? <Photo src={photo} alt="" loading="lazy" decoding="async"/> : null}/>}
       titre={l.titre} lignes={2} valeur={p ? <span className="n-vr-prix" data-vt-prix="">{p}</span> : null} valeurForte
-      plaque={<MetaVente site={l.site} nomSite={l.site ? nomSite(l.site) : ''} num={l.num} taille={taille} etat={mot ? { cle: cat, mot } : null}
+      plaque={<MetaVente site={l.site} nomSite={l.site ? nomSite(l.site) : ''} num={l.num} taille={taille} etat={mot ? { cle: cat, mot, etiquette: <Pastille ton="neutre">{mot}</Pastille> } : null}
         morceaux={[l.compte, l.detail, jour(l.t)]} transporteur={l.tr && l.tr.cle ? { cle: l.tr.cle, nom: l.tr.nom || '', logo: logoTransporteur(l.tr) } : null}/>}
       pied={achat.pied} actions={achat.actions.length ? achat.actions : null}
       onClick={onOuvrir ? () => onOuvrir(l) : null} fin={null} className="n-vr"
-      attrs={{ 'data-toutes-vente': l.site, 'data-toutes-id': l.id, 'data-toutes-compte': l.compte || '', 'data-ordre-t': l.t != null ? String(l.t) : '', 'data-vt-statut': cat,
-        'data-vr-achat': a ? (achat.libre ? 'libre' : 'connu') : '', ...attrsDe(l) }}/>
+      // L'IDENTITÉ de SA vente (`attrsDe` = `ficheToutes` : attrsFicheLigne, n° de transaction) posée sur la rangée (§5).
+      attrs={{ 'data-toutes-vente': l.site, 'data-toutes-id': l.id, 'data-toutes-compte': l.compte || '', 'data-ordre-t': l.t != null ? String(l.t) : '', 'data-vt-statut': cat, 'data-vr-achat': a ? (achat.libre ? 'libre' : 'connu') : '', ...attrsDe(l) }}/>
   );
 }

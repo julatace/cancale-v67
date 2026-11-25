@@ -84,7 +84,7 @@ function RangeeColis({ r, g, Icon, Photo, choisie, onOuvrir }) {
     <Rangee
       vignette={vignette(r, Photo, 56)}
       titre={r.titre} lignes={2} valeur={prixRangee(r)} valeurForte
-      plaque={<MetaVente site={r.site} num={r.num} numDouble={r.numDouble} taille={tailleSeule(r)} morceaux={morceauxEnv} transporteur={transporteurDe(r)}/>}
+      plaque={<MetaVente site={r.site} logo={r.site ? <LogoSite site={r.site} taille={16}/> : null} num={r.num} numDouble={r.numDouble} taille={tailleSeule(r)} morceaux={morceauxEnv} transporteur={transporteurDe(r)}/>}
       // (24 nov., vente-mail-annonce) Une vente vue par e-mail sans annonce reliée : « Relier à l'annonce » reste SOUS elle (le seul
       // geste qui manque à CETTE vente) ; « Prix d'achat » ouvert au balayage s'y pose aussi.
       pied={r.gestes && r.gestes.relierAnnonce ? <RelierAnnonceMail ra={r.gestes.relierAnnonce} r={r} Photo={Photo} Icon={Icon}/> : achat.pied}
@@ -104,7 +104,7 @@ function RangeeRoute({ r, Icon, Photo, choisie, onOuvrir }) {
   const etapes = r.etapes || [];
   const ici = etapes.findIndex((e) => e.ici);
   // UN état : le mot de l'étiquette (`statutRangee` : En route · Livrée · Terminée) et sa mini-frise ; « étape n sur m » pour le lecteur.
-  const etat = { cle: statutRangee(r), mot: motStatut(r), etapes, aria: ici < 0 ? '' : tr('vn.etape', { n: ici + 1, m: etapes.length, mot: motStatut(r) }) };
+  const etat = { cle: statutRangee(r), mot: motStatut(r), etiquette: <Pastille ton="neutre">{motStatut(r)}</Pastille>, etapes, aria: ici < 0 ? '' : tr('vn.etape', { n: ici + 1, m: etapes.length, mot: motStatut(r) }) };
   const actions = [
     ...achat.actions,
     r.lienSuivi ? { cle: 'suivre', libelle: tr('vn.b.suivre'), icone: <Icon name="truck" size={20}/>, onClick: () => { try { window.open(r.lienSuivi, '_blank', 'noopener'); } catch (_) {} }, franc: true } : null,
@@ -113,7 +113,7 @@ function RangeeRoute({ r, Icon, Photo, choisie, onOuvrir }) {
     <Rangee
       vignette={vignette(r, Photo, 56)}
       titre={r.titre} lignes={2} valeur={prixRangee(r)} valeurForte
-      plaque={<MetaVente site={r.site} num={r.num} taille={tailleSeule(r)} etat={etat} transporteur={transporteurDe(r)}/>}
+      plaque={<MetaVente site={r.site} logo={r.site ? <LogoSite site={r.site} taille={16}/> : null} num={r.num} taille={tailleSeule(r)} etat={etat} transporteur={transporteurDe(r)}/>}
       ton={r.etat.ambre ? 'ambre' : 'neutre'}
       pied={achat.pied}
       selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)} actions={actions.length ? actions : null}

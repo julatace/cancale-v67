@@ -193,3 +193,7 @@
   .vrm-toutes-liste > .n-groupe[data-vt-liste-tel] { margin: 0; }
   .vrm-toutes-liste > .n-groupe[data-vt-liste-tel] > .n-groupe-carte { border: 0; box-shadow: none; background: transparent; border-radius: inherit; }
 }
+/* L'étiquette d'état de la rangée compacte : son élément à elle (une <Pastille>, le mot retenu), dessinée DISCRÈTE — le mot en
+   gras à l'encre, sans pilule (une pilule par vente élargissait la ligne et repoussait le logo du transporteur à la ligne).
+   Hors couche et plus précise que la pilule des styles au choix (styles-choix.css), pour la même raison dans chaque style. */
+.n-rangee.n-vr .n-vr-etat .n-pastille { min-width: 0; height: auto; padding: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--n-encre); font: var(--n-t-legende-fort); }
