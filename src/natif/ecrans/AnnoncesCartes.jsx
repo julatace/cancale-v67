@@ -86,9 +86,9 @@ export const comptesDe = (a) => {
 // VUE (banc e2e-extension « ses annonces sont visibles dans Annonces », cible d'une notification : src/cibleNotif.js).
 // Par identité seulement : la 1re annonce Vinted de l'article ; aucune ⇒ pas d'attribut.
 export const idCarteAnnonce = (a) => { const v = a && Array.isArray(a.annonces) ? a.annonces.find((x) => x && x.site === 'vinted' && x.id != null) : null; return v ? String(v.id) : undefined; };
-export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, euros, nomSite, dort = null, plusVue = null, Photo = null, attrs = null, Icon = null, revele = null, taillePhoto = 360, groupe = false, etatDit = "" }) {   // (22 nov., choix 27) plusVue : jours mesurés (src/plusVue.js) ou null
+export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, euros, nomSite, dort = null, plusVue = null, Photo = null, attrs = null, Icon = null, revele = null, taillePhoto = 360, groupe = false, etatDit = null }) {   // (22 nov., choix 27) plusVue : jours mesurés (src/plusVue.js) ou null
   // (25 nov.) `etatDit` : l'état déjà dit par l'en-tête du groupe — la carte ne le répète pas (src/natif/ecrans/Annonces.jsx `etatGroupe`).
-  const bandeau = bandeauDe(a) === etatDit ? '' : bandeauDe(a);
+  const bandeau = etatDit && bandeauDe(a) === etatDit.cle ? '' : bandeauDe(a);
   const trace = a.etat === 'bloque' ? traceDe(a) : null;
   const grise = selection && !selection.cochable;
   const clic = () => { if (selection) { if (selection.cochable) selection.onBascule(); return; } onOuvrir(a); };
@@ -137,7 +137,7 @@ export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, e
 // de l'article ; toucher la rangée ouvre sa fiche). Deux formes à comparer : 'a' = le prix à droite, en haut (et « mini »
 // dessous) ; 'b' = le prix en gras DANS la méta, le titre a toute la largeur. L'état n'est dit (étiquette douce) que s'il n'est pas
 // « en ligne » et pas déjà dit par l'en-tête du compte (« Compte bloqué »).
-export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selection = null, euros, depuisTexte, nomSite, Icon = null, Photo = null, plusVue = null, attrs = null, groupe = false, rapides = null, revele = null, etatDit = '' }) {
+export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selection = null, euros, depuisTexte, nomSite, Icon = null, Photo = null, plusVue = null, attrs = null, groupe = false, rapides = null, revele = null, etatDit = null }) {
   // (24 nov., lot visuel-annonces — Julien : « améliore le design et la praticité ») Une rangée plus nette : photo 60 (par identité),
   // l'étiquette papier du N°, le titre sur 2 lignes, le prix à droite ; ♡ et 👁 en petites icônes ; l'état seulement s'il diffère
   // de l'onglet ; le logo du site seulement si la liste n'est PAS rangée par compte (ou paire sur 2 sites). Hauteur FIXE (72).
@@ -145,8 +145,9 @@ export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selec
   // (25 nov.) `etatDit` : l'état déjà dit UNE fois par l'en-tête du groupe (src/natif/ecrans/Annonces.jsx `etatGroupe`) — la rangée
   // n'en garde qu'un point discret, jamais la phrase répétée.
   const b0 = bandeauDe(a);
-  const signe = !!b0 && b0 === etatDit;
-  const b = signe ? '' : b0;
+  const dejaDit = !!b0 && !!etatDit && b0 === etatDit.cle;
+  const signe = dejaDit && !etatDit.tous;   // toutes les rangées du compte le portent : l'en-tête suffit, aucun point
+  const b = dejaDit ? '' : b0;
   const trace = a.etat === 'bloque' ? traceDe(a) : null;
   const grise = selection && !selection.cochable;
   const ic = (n) => (Icon ? <Icon name={n} size={13}/> : null);

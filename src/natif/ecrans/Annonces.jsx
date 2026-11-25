@@ -354,7 +354,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   };
   const articleGestes = gestesDe ? liste.find((x) => x.cle === gestesDe) || null : null;
   const gestesOuverts = articleGestes ? lesGestes(articleGestes) : [];
-  const carte = (a, cleCompte, rv = null, etatDit = '') => (
+  const carte = (a, cleCompte, rv = null, etatDit = null) => (
     <CarteAnnonce key={a.cle + '|' + cleCompte} a={a} revele={rv} groupe etatDit={etatDit} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon}
       Photo={Photo} dort={dortDe && !A ? dortDe(a) : null} plusVue={plusVueDe && !A ? plusVueDe(a) : null}
       selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), onBascule: () => basculer(a) } : null}
@@ -372,7 +372,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
     }
     return out.length ? out : null;
   };
-  const rangeeTel = (a, cleCompte, rv = null, etatDit = '') => (
+  const rangeeTel = (a, cleCompte, rv = null, etatDit = null) => (
     <RangeeArticle key={a.cle + '|' + cleCompte} a={a} forme={formeRangee} groupe etatDit={etatDit} revele={rv} rapides={rapidesDe(a)} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte}
       nomSite={nomSite} Icon={Icon} Photo={Photo} plusVue={plusVueDe && !A ? plusVueDe(a) : null} selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), onBascule: () => basculer(a) } : null}
       attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined, 'data-eg-compte': cleCompte }}/>
@@ -469,8 +469,8 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
                 <section key={g.cle} className="n-ad-section" data-eg-groupe={g.cle} data-eg-groupe-n={String(n)}>
                   {enTeteCompte(g, n)}
                   {ouvertG ? <>
-                    {vueG ? <GrilleInventaire items={g.articles} cle={(a) => a.cle + '|' + g.cle} rendu={(a, i, rv) => carte(a, g.cle, rv, (etatGroupe(g) || {}).cle || '')} corps={96} revele={enArrivee} debut={debutDe(g.cle)} attrs={{ 'data-ad-grille': g.cle }}/>
-                      : <GrilleInventaire items={g.articles} ligne={72} gap={0} cle={(a) => a.cle + '|' + g.cle} rendu={(a, i, rv) => rangeeTel(a, g.cle, rv, (etatGroupe(g) || {}).cle || '')} revele={enArrivee} debut={debutDe(g.cle)} className="n-ar-liste" attrs={{ 'data-ad-forme': formeRangee, 'data-ad-liste-compte': g.cle }}/>}
+                    {vueG ? <GrilleInventaire items={g.articles} cle={(a) => a.cle + '|' + g.cle} rendu={(a, i, rv) => carte(a, g.cle, rv, etatGroupe(g))} corps={96} revele={enArrivee} debut={debutDe(g.cle)} attrs={{ 'data-ad-grille': g.cle }}/>
+                      : <GrilleInventaire items={g.articles} ligne={72} gap={0} cle={(a) => a.cle + '|' + g.cle} rendu={(a, i, rv) => rangeeTel(a, g.cle, rv, etatGroupe(g))} revele={enArrivee} debut={debutDe(g.cle)} className="n-ar-liste" attrs={{ 'data-ad-forme': formeRangee, 'data-ad-liste-compte': g.cle }}/>}
                   </> : null}
                 </section>);
             })}</div>}
