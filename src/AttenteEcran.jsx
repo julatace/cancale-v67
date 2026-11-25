@@ -153,6 +153,15 @@ export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = fals
   // est montré (la copie, le squelette) reste — l'écran vrai prend la place d'un bloc, déjà rempli, jamais une copie
   // remplacée par des blocs gris qui se remplissent ensuite (mesuré, banc couches-chargement : Ventes au toucher, copie →
   // squelettes → liste, CLS 0,32). Borné : `PLAFOND_PEINT_*` après les données.
+  // (25 nov., régressions — passages d'onglet filmés : Ventes, Achats, Argent montraient leur squelette UNE image à la 1re visite,
+  // données déjà là — un clignotement gris) L'écran vrai, déjà rempli dès son premier rendu, est conclu « peint » AVANT la
+  // peinture (effet de mise en page) : le squelette n'est jamais dessiné pour rien. Sinon, l'attente ci-dessous (inchangée).
+  React.useLayoutEffect(() => {
+    if (ouvert || peint || !enfants || !tout) return;
+    const el = hoteVrai.current;
+    if (el && el.isConnected && !attenteDansPremierEcran(el)) setPeint(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ouvert, peint, enfants, tout]);
   React.useEffect(() => {
     if (ouvert || peint || !enfants || !tout) return undefined;
     const el = hoteVrai.current;

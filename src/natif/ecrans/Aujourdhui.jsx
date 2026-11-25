@@ -24,6 +24,7 @@ import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segm
 import { CARTES_AUJOURDHUI, CARTES_DEFAUT, cartesChoisies } from '../../aujourdhui/modele.js';
 import { publierARegler } from '../../designV2/aRegler.js';
 import { numsPhotoDouble } from './photoDoubleTexte.js';   // (22 nov.) « N°142 et N°157 »
+import { PlaceGardee } from '../PlaceGardee.jsx';   // (25 nov.) « Par site » : la place de la dernière fois
 import './journee.css';   // (21 nov.) « Colis » à hauteur fixe
 
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
@@ -57,6 +58,8 @@ export function ilYaCourt(ts, maintenant = Date.now()) {
 // La boîte a la MÊME forme dans les trois états : rien ne bouge quand le chiffre arrive.
 const PERIODES = ['jour', 'semaine', 'mois'];
 // (21 nov., lot journee-stats) Ma journée montre Aujourd'hui · Ce mois ; la semaine et les fenêtres 7 · 30 · 90 j vivent dans Statistiques.
+// (25 nov.) Les dernières ventes déjà montrées dans cette page (voir `lignesV`) : { proprio, lignes }.
+let LIGNES_V_VUES = null;
 const PERIODES_JOURNEE = ['jour', 'mois'];
 // « Mardi 25 novembre » : la date du jour, la majuscule en tête (maquettes de Julien).
 const dateLongue = () => { const t = new Date().toLocaleDateString(localeCourante(), { weekday: 'long', day: 'numeric', month: 'long' }); return t.charAt(0).toUpperCase() + t.slice(1); };
@@ -231,14 +234,6 @@ function PorteMonnaie({ pm, montant, Icon, enLecture = false }) {
 }
 
 // (24 nov., livrable-2) La place de « Par site » tenue pendant la lecture : son titre, une barre et une ligne en squelette.
-function ParSiteAttente({ f, nomMois = '' }) {
-  return (
-    <Carte titre={f === 'mois' ? tr('pil.sitesMois', { mois: nomMois }) : tr('pil.sites', { n: f })} attrs={{ 'data-v2-bloc-attente': 'sites', 'aria-busy': 'true' }}>
-      <div className="n-sites-attente" aria-hidden="true"><span className="n-os n-sites-attente-barre"/><span className="n-os n-os-ligne n-sites-attente-ligne"/></div>
-    </Carte>
-  );
-}
-
 // PAR SITE : la part de chaque site dans le vendu de la fenêtre (chaque total demandé au propriétaire avec { site }).
 const NOM_SITE = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
 function ParSite({ courbe, f, montant, nomMois = '' }) {
@@ -296,7 +291,14 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
   const nRet = retraits && !retraits.pasSu ? retraits.n : null;
   const rien = pret && n === 0 && nRet === 0;
   const point = retraits && Array.isArray(retraits.points) ? retraits.points[0] : null;
-  const lignesV = ventes && ventes.etat === 'lu' && Array.isArray(ventes.lignes) ? ventes.lignes.slice(0, 5) : [];
+  const lignesVLues = ventes && ventes.etat === 'lu' && Array.isArray(ventes.lignes) ? ventes.lignes.slice(0, 5) : [];
+  // (25 nov., passages d'onglet — à l'ordinateur, au RETOUR sur Aujourd'hui : « Dernières ventes » absente les premières images, puis
+  // insérée dans la grille, « Tes chiffres » poussé de 105 px) L'écran se remonte et ses lignes se recalculent une image plus tard :
+  // pendant le temps de grâce (`tenirPlace`), les lignes DÉJÀ MONTRÉES dans cette page, pour CE compte (`vrm_local_owner`), restent
+  // à leur place — les mêmes ventes, jamais une ligne inventée ; lues, ce sont les nouvelles qui comptent.
+  const proprio = (() => { try { return localStorage.getItem('vrm_local_owner') || ''; } catch (_) { return ''; } })();
+  if (lignesVLues.length) LIGNES_V_VUES = { proprio, lignes: lignesVLues };
+  const lignesV = lignesVLues.length ? lignesVLues : tenirPlace && LIGNES_V_VUES && LIGNES_V_VUES.proprio === proprio ? LIGNES_V_VUES.lignes : [];
   const ventesAttente = tenirPlace && !lignesV.length && (!ventes || ventes.etat === 'encours' || ventes.etat === undefined);
   const ventesArrivent = useArrive(lignesV.length > 0, 'journee-ventes');   // (24 nov., « sans latence ») déjà connues au montage ⇒ là d'un coup
   // « Argent à venir » : seulement s'il est lu ET qu'il y en a (« 0 € à venir » n'apprend rien).
@@ -596,7 +598,7 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
   const presents = { colis: true, chiffres: !!chiffres, envoyer: n > 0 || rien, retirer: !!nRet || !!(retraits && retraits.prevision), ventes: lignesV.length > 0 || aVenirLu || ventesAttente, courbe: !!courbe, comptes: true, annonces: true, vrm: true, stock: true, vitesse: true, prevision: true, marge: true, marques: true, dorment: true, avenir: true, vues: true, retour: !!alerte && alerte.id === 'retour' };
   // L'ordre et les cartes montrées sont LES SIENS (« Personnaliser », `vrm_aujourdhui_cartes`, synchronisé) ; avant que
   // les lectures soient là, seules les chiffres sont montrés à leur taille (rien qui saute ensuite).
-  const montrees = choix.ordre.filter((k) => choix.montrees.has(k) && presents[k] && (k === 'chiffres' || k === 'colis' || pret || (k === 'ventes' && ventesAttente)));
+  const montrees = choix.ordre.filter((k) => choix.montrees.has(k) && presents[k] && (k === 'chiffres' || k === 'colis' || pret || (k === 'ventes' && (ventesAttente || lignesV.length > 0))));   // (25 nov.) les lignes déjà vues restent montrées
   // « PERSONNALISER » (19 nov., « ça doit être bien fait ») : retirer / ajouter / déplacer ; l'écran derrière suit en direct.
   const poser = (ordre, m) => { if (cartes && cartes.poser) cartes.poser({ ordre, montrees: CARTES_AUJOURDHUI.filter((x) => m.has(x)) }); };
   const basculer = (k) => { const m = new Set(choix.montrees); if (m.has(k)) m.delete(k); else m.add(k); poser(choix.ordre, m); };
@@ -682,8 +684,13 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
               poussaient « Tes chiffres » de 270 px. Tant que l'écran lit (`!pret`), leur place est TENUE : les mêmes cartes, chiffres
               en squelette (src/natif/outils.js) ; lu sans rien à montrer, la place se rend (un retrait, jamais une poussée). */}
           {porteMonnaie !== undefined ? <PorteMonnaie pm={porteMonnaie} montant={montant} Icon={Icon}/> : tenirPlace ? <PorteMonnaie pm={undefined} enLecture montant={montant} Icon={Icon}/> : null}
-          {pret && courbe.parSite && courbe.parSite[fen] && courbe.parSite[fen].length > 1 ? <ParSite courbe={courbe} f={fen} montant={montant} nomMois={chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : ''}/>
-            : tenirPlace && !(pret && courbe.parSite && courbe.parSite[fen]) ? <ParSiteAttente f={fen} nomMois={chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : ''}/> : null}
+          {/* (25 nov., régressions — passages d'onglet à 1512 : au retour sur Aujourd'hui, « Par site » en squelette ~2 s puis RIEN, et
+              « Tes chiffres » remontait de 19 px) Depuis le 25 nov. (« moins de texte ») « Par site » n'existe qu'à partir de DEUX sites :
+              un bloc qui finit le plus souvent vide ne tient plus une place fixe. Il tient la hauteur qu'il avait la dernière fois sur
+              cet appareil (src/natif/PlaceGardee.jsx) : rien s'il n'y était pas, sa place exacte s'il y était. */}
+          <PlaceGardee cle="journee-parsite" pret={!!(pret && courbe.parSite && courbe.parSite[fen])}>
+            {pret && courbe.parSite && courbe.parSite[fen] && courbe.parSite[fen].length > 1 ? <ParSite courbe={courbe} f={fen} montant={montant} nomMois={chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : ''}/> : null}
+          </PlaceGardee>
         </Colonne> : null}
         {montrees.filter((k) => k !== 'courbe' && !(aPilotage && k === 'colis')).map((k) => (
           // (23 nov.) Sans graphique, Colis (deux cases) prend la rangée entière : sinon « Dernières ventes », arrivée après la lecture,
