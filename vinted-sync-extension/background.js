@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.450.1';
+const CODE_VERSION = '5.452.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7291,6 +7291,9 @@ async function pauseVinted() {
   const reste = Number(p.jusqua || 0) - Date.now();
   return reste > 0 ? Object.assign({}, p, { resteMs: reste }) : null;
 }
+// 5.452 (`envoisurs`) : l'heure de reprise dite en clair (« 14 h 10 »), heure de CET ordinateur.
+function heureReprise(ms) { const d = new Date(Date.now() + Math.max(0, Number(ms) || 0)); return `${d.getHours()} h ${String(d.getMinutes()).padStart(2, '0')}`; }
+const RAISON_SESSION_EXPIREE = "ta session Vinted a expiré sur ce compte : reconnecte-toi sur vinted.fr (ce compte) — rien n'est parti, VRM reprendra ensuite";
 function raisonPauseVinted(p) {
   const min = Math.max(1, Math.ceil(Number((p && p.resteMs) || 0) / 60000));
   return `Vinted demande de ralentir — réessaie dans ${min} min`;
@@ -18670,6 +18673,15 @@ async function repondreOffreInterface(acc, { conv, tx, oid, accepter, relue = fa
   }
   const lu = await vintedPage(acc, 'GET', `/api/v2/conversations/${conv}`, null, { timeoutMs: 12000, travail: true });
   if (lu && (lu.sansPage || lu.pause)) return { ...lu, rienParti: true };
+  // 5.452 (`envoisurs`) : une conversation que Vinted n'a PAS rendue n'est pas « une offre qui n'attend plus » (avant : la même
+  //    phrase, fausse). Réseau / 5xx / frein ⇒ la file réessaiera (rien n'est parti) ; 4xx ⇒ dit, avec le geste.
+  if (!lu || !lu.ok) {
+    const st = Number(lu && lu.status) || 0;
+    const code = freinVinted(st) ? 'vinted-pause' : (!st || st >= 500) ? 'lecture' : 'conversation-illisible';
+    noterDiag('interface_offre_lecture_' + (st || 0));
+    return { status: 0, ok: false, json: null, rienParti: true, sansPage: 'identite', code,
+      raison: code === 'conversation-illisible' ? `Vinted ne rend pas la conversation de cette offre (${st}) : ouvre-la sur vinted.fr pour y répondre — rien n'est parti.` : "Vinted n'a pas rendu la conversation de cette offre : VRM réessaiera — rien n'est parti." };
+  }
   const c = lu && lu.ok && lu.json && lu.json.conversation;
   const d = c && Array.isArray(c.messages) ? derniereOffreEnAttente(c.messages, c.opposite_user && c.opposite_user.id) : null;
   if (!c || String(c.id) !== String(conv) || !d || String(d.oid) !== String(oid) || String(d.tx) !== String(tx)) { noterDiag('interface_offre_pas_la_bonne'); return { status: 0, ok: false, json: { message: 'offre plus en attente' }, rienParti: true, sansPage: 'identite', raison: "le fil relu ne montre pas CETTE offre en attente : rien n'est parti." }; }
@@ -21426,7 +21438,7 @@ async function executerPourAppCoeur(msg) {
     //    (« Faire une offre », le prix tapé, « Proposer », vue), accepter / refuser (le fil relu : CETTE offre, puis son
     //    bouton). Plus de repli « sans onglet » par le service worker : sans onglet vinted.fr, RIEN ne part, c'est dit.
     const rp = await gesteAppParInterface(acc, String(msg.uid), methode, String(msg.endpoint || ''), msg);
-    if (rp && rp.rienParti) { rienParti = true; return { status: 0, ok: false, pause: !!rp.pause, json: { message: rp.raison || raisonSansPage(rp) || (rp.sansPage === 'compte' ? RAISON_COMPTE_PAGE : "ouvre vinted.fr dans ce Chrome, connecté sur ce compte : rien n'est parti") } }; }
+    if (rp && rp.rienParti) { rienParti = true; return { status: 0, ok: false, pause: !!rp.pause, ...(rp.robot || rp.captcha ? { robot: true } : {}), ...(rp.sansPage ? { sansPage: rp.sansPage } : {}), ...(rp.travailFerme ? { travailFerme: true } : {}), ...(rp.code ? { code: String(rp.code) } : {}), ...(rp.raison ? { raison: String(rp.raison) } : {}), json: { message: rp.raison || raisonSansPage(rp) || (rp.sansPage === 'compte' ? RAISON_COMPTE_PAGE : "ouvre vinted.fr dans ce Chrome, connecté sur ce compte : rien n'est parti") } }; }
     if (rp && rp.incertain) return { status: 0, ok: false, json: { message: "Vinted n'a pas répondu clairement : regarde la conversation sur Vinted avant de réessayer (rien ne sera renvoyé)" } };
     return rp;
   });
@@ -21446,8 +21458,24 @@ async function executerPourAppCoeur(msg) {
   // (21 nov., ci-offres-panneau) `rienParti` : VRM SAIT que rien n'est parti (onglet hors Vinted, autre compte, pause) —
   //    le distinguer d'un « status 0 » de délai dépassé, où le geste est PEUT-ÊTRE arrivé (`etatGesteVinted`).
   //    (5.414) `pasVu` : la page a répondu mais le geste n'a pas été VU à l'écran.
-  return { ok: !!r.ok, status: r.status, data: r.json, ...(rienParti || pasParti(r) ? { rienParti: true } : {}), ...(r.vu === false ? { pasVu: true } : {}),
-           error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
+  // 5.452 (`envoisurs`, 25 nov. — « ça envoie pas bien les messages et les offres ») : ce que VRM SAIT de l'issue voyage
+  //    jusqu'à la file (`distSens`) au lieu d'être perdu — pourquoi rien n'est parti (`pause`, `robot`, `sansPage`, le `code`
+  //    d'une garde), et, pour un frein de Vinted (429/403) ou une session expirée (401) LU sur SA réponse, la phrase qui dit
+  //    quand ça reprend / quoi faire (« Vinted demande de ralentir — reprise vers 14 h 10 »).
+  const sup = {};
+  if (r.pause) sup.pause = true;
+  if (r.robot || r.captcha) sup.robot = true;
+  if (r.sansPage) sup.sansPage = String(r.sansPage);
+  if (r.travailFerme) sup.travailFerme = true;
+  if (r.code && (rienParti || pasParti(r) || r.rienParti)) sup.code = String(r.code);
+  let phrase = '';
+  const st = Number(r.status) || 0;
+  if (freinVinted(st)) { const p = await pauseVinted().catch(() => null); sup.frein = st; if (p) { sup.attendreMs = Math.max(60000, Number(p.resteMs) || 0); phrase = `${raisonPauseVinted(p)} (reprise vers ${heureReprise(sup.attendreMs)}) — rien n'est parti`; } else phrase = `Vinted a refusé (${st}) — rien n'est parti`; }
+  else if (st === 401) { sup.session = true; phrase = RAISON_SESSION_EXPIREE; }
+  const msgVinted = (r.json && typeof r.json === 'object' && typeof (r.json.message || r.json.error) === 'string') ? String(r.json.message || r.json.error) : '';
+  return { ok: !!r.ok, status: r.status, data: r.json, ...(rienParti || pasParti(r) ? { rienParti: true } : {}), ...(r.vu === false ? { pasVu: true } : {}), ...sup,
+           ...(r.incertain ? { incertain: true } : {}),
+           error: r.ok ? '' : (phrase || msgVinted || raisonSansPage(r) || `erreur ${r.status}`) };
 }
 // 5.414 — UNE COMMANDE D'ÉCRITURE DE L'APP (liste blanche `EXEC_PERMIS`) TRADUITE EN GESTE D'INTERFACE. Les identités
 // viennent du chemin (conversation, transaction, offre) ; la conversation d'une offre est retrouvée PAR IDENTITÉ
@@ -29386,9 +29414,46 @@ async function distPeutPartir(c, ouverts) {
 // Une réponse d'un chemin existant ⇒ { etat: fait|refuse|incertain|attendre, code, raison, ... }.
 function distSens(r, plus) {
   if (!r || typeof r !== 'object') return { etat: 'incertain', code: 'sans-reponse', raison: '' };
-  const raison = String(r.raison || r.error || '').slice(0, 300);
-  if (r.accepte === true || (r.ok === true && r.accepte === undefined)) return r.pasVu ? { etat: 'incertain', code: 'pas-vu', raison } : Object.assign({ etat: 'fait', code: '', raison: '' }, plus || {});
-  const code = String(r.code || '');
+  let raison = String(r.raison || r.error || '').slice(0, 300);
+  if (r.accepte === true) return r.pasVu ? { etat: 'incertain', code: 'pas-vu', raison } : Object.assign({ etat: 'fait', code: '', raison: '' }, plus || {});
+  // 5.452 (`envoisurs`) — UNE RÉPONSE DE VINTED (le chemin du clic de l'app, `executerPourApp`) se JUGE par la règle commune
+  //    (`etatGesteVinted`) : un HTTP 200 qui porte un refus de Vinted (`code` ≠ 0 : message bloqué, offre trop basse…) n'est
+  //    PAS « fait » (avant : « fait », jamais dit — un « envoyé » faux). Le refus est dit avec les mots de Vinted.
+  if (r.ok === true && r.accepte === undefined) {
+    if (etatGesteVinted({ ok: true, status: r.status, data: r.data, rienParti: r.rienParti }) === 'refuse') {
+      const d = r.data && typeof r.data === 'object' ? r.data : {};
+      const mots = typeof (d.message || d.error) === 'string' ? String(d.message || d.error).slice(0, 200) : '';
+      return { etat: 'refuse', code: 'vinted-refus', raison: `Vinted a refusé${mots ? ` : « ${mots} »` : ''} — rien n'est parti, rien ne sera renvoyé` };
+    }
+    return r.pasVu ? { etat: 'incertain', code: 'pas-vu', raison: raison || "Vinted a répondu oui mais VRM ne l'a pas vu dans la page : regarde la conversation avant de refaire" } : Object.assign({ etat: 'fait', code: '', raison: '' }, plus || {});
+  }
+  let code = String(r.code || '');
+  // Ce que VRM SAIT d'un « rien n'est parti » sans code (pause posée, vérification, onglet absent, autre compte, session) :
+  //    un code de la file qui ATTEND (la commande repart d'elle-même quand c'est possible, jamais deux fois : rien n'était parti).
+  const st = Number(r.status) || 0;
+  if (!code && r.accepte === undefined) {
+    if (r.frein || st === 429 || st === 403) code = 'vinted-pause';
+    else if (r.session || st === 401) code = 'session';
+    else if (r.rienParti && r.robot) code = 'verification';
+    else if (r.rienParti && r.pause) code = 'vinted-pause';
+    else if (r.rienParti && r.sansPage === 'compte') code = 'vinted-autre';
+    else if (r.rienParti && (r.sansPage === 'onglet' || r.sansPage === 'navigateur' || r.travailFerme)) code = 'onglet-vinted';
+    else if (r.rienParti && r.sansPage === 'file') code = 'en-cours';
+  }
+  // Un arrêt d'une GARDE avant tout envoi (`gardeStricte` : plafond, pause, onglet, autre compte — pas de statut) est certain :
+  //    rien n'est parti. Avant : jugé « refusé » pour toujours, le message était perdu (à retaper) et la raison mal dite.
+  const avantEnvoi = r.rienParti === true || r.accepte === false || (r.ok === false && !st && !!code && r.incertain !== true);
+  const vintedANon = st >= 400 && st < 500 && st !== 408;
+  if ((avantEnvoi || vintedANon) && adistAttend(code)) {
+    const ms = Math.max(0, Number(r.attendreMs) || 0);
+    if (ms > 0 && !/reprise vers/.test(raison)) raison = `${raison || 'pas maintenant'} (reprise vers ${heureReprise(ms)})`.slice(0, 300);
+    return { etat: 'attendre', code, raison, ...(ms > 0 ? { attendreMs: ms } : {}) };
+  }
+  if (vintedANon && !code) {
+    const d = r.data && typeof r.data === 'object' ? r.data : {};
+    const mots = typeof (d.message || d.error) === 'string' ? String(d.message || d.error).slice(0, 200) : '';
+    return { etat: 'refuse', code: 'vinted-refus', raison: `Vinted a refusé (${st})${mots ? ` : « ${mots} »` : ''} — rien n'est parti, rien ne sera renvoyé` };
+  }
   if (code === 'tout-arrete') return { etat: 'refuse', code, raison: raison || RAISON_REFUS_DIST['tout-arrete'] };
   if ((r.rienParti || r.accepte === false) && adistAttend(code)) return { etat: 'attendre', code, raison };
   if (r.rienParti || r.accepte === false || code) return { etat: 'refuse', code: code || 'refus', raison };
@@ -29544,7 +29609,7 @@ async function distanceTickUn(source) {
   const res = Object.assign({ code: i.code || '', raison: i.raison || '' }, i.apres != null ? { apres: Number(i.apres) } : {}, i.pdf != null ? { pdf: !!i.pdf } : {});
   if (i.etat === 'attendre' && reports < ADIST_REPORTS) {
     const ms = Math.min(6 * 3600000, Math.max(60000, Number(i.attendreMs) || 0)) + tirerEntre(20000, 120000);
-    await finirDist(x.id, moi, x.d, 'attente', { reports: reports + 1, pasAvant: Date.now() + ms, attend: i.code }, 'pris');
+    await finirDist(x.id, moi, x.d, 'attente', { reports: reports + 1, pasAvant: Date.now() + ms, attend: i.code, raison: String(i.raison || '').slice(0, 300) }, 'pris');   // 5.452 : la raison DITE à l'app (« plafond… reprise vers 14 h 10 »)
     issues.push('remise:' + i.code);
   } else {
     const etat = i.etat === 'attendre' ? 'refuse' : i.etat;
