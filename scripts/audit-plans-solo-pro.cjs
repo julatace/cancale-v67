@@ -531,7 +531,7 @@ const MUTATIONS = [
     const reg = lire('src/accueil-reglages.js'), cpt = lire('api/compte.js'), cgv = lire('public/legal/cgv.html');
     dit(/PRIX_PRO_MOIS = '19,99'/.test(reg) && /PRIX_PRO_CGV = \{ centimes: 1999, devise: 'eur', intervalle: 'month' \}/.test(cpt) && /Offre Pro : 19,99 € par mois/.test(cgv), 'Pro 19,99 € : app, serveur et CGV disent la même chose');
     // (13 nov., lot 56) CGV du 13 novembre : + l'option Solo « compte Vinted vendeur de plus » (audit-comptes-sup).
-    dit(/Dernière mise à jour : 13 novembre 2026/.test(cgv) && /const CGV_VERSION = '2026-11-13'/.test(cpt), 'CGV du 13 novembre (Solo, option comptes de plus, Pro illimité), version acceptée à jour');
+    dit(/Dernière mise à jour : 25 novembre 2026/.test(cgv) && /const CGV_VERSION = '2026-11-25'/.test(cpt), 'CGV du 25 novembre (Solo, option comptes de plus, Pro illimité ; parrainage à 20 %), version acceptée à jour');
     dit(/un compte vendeur/.test(cgv) && /comptes d’achat/.test(cgv) && /rien n’est supprimé/.test(cgv), 'CGV : Solo dit « un compte vendeur » et « comptes d’achat », rien supprimé');
     const R = await import('file://' + path.join(RACINE, 'api', '_lib', 'plan-regle.js'));
     dit(/un compte vendeur par plateforme<\/b> \(un compte Vinted, un compte Leboncoin, un compte eBay et un compte Vestiaire Collective\)/.test(cgv) && /plateforme par plateforme/.test(cgv) && /colis à envoyer restent affichés/.test(cgv),

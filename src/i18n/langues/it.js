@@ -118,6 +118,7 @@ import ecran_ux_reglages from './it/uxReglages.js';   // (21 nov.) Paramètres, 
 import ecran_natif from './it/natif.js';
 import ecran_menu_onglets from './it/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './it/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
+import ecran_parrainage20 from './it/parrainage.js';   // (25 nov.) le parrainage à 20 %
 import ecran_actions_ext from './it/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './it/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 import ecran_moinsTexteB from './it/moinsTexteB.js';   // (25 nov.) moins de texte B
@@ -470,7 +471,7 @@ export default {
   "auth.lier.extension": "Accedi qui: anche l’estensione di {navigateur} si connette, niente da digitare.",
   "auth.parrain.offertPar": "Un regalo di {nom}",
   "auth.parrain.offertVendeur": "Un regalo di un venditore VRM",
-  "auth.parrain.texte": "1 mese di VRM in regalo al primo pagamento, per te e per chi ti invita.",
+  "auth.parrain.texte": "−10 % sul primo mese di VRM e 1 settimana gratis al primo pagamento.",
   "auth.parrain.texteConnexion": "Hai già un account? Accedi: l’invito vale solo per i nuovi account.",
   "auth.lier.pasOuverte": "L’accesso con {nom} non è ancora aperto su VRM. Accedi qui con la tua e-mail e la password VRM: l’estensione si connetterà insieme.",
   "auth.lier.pasVerifie": "Non sono riuscito a verificare l’accesso con {nom}. Riprova i metodi qui sotto, o accedi con la tua e-mail: l’estensione si connetterà insieme.",
@@ -2448,5 +2449,6 @@ export default {
   ...ecran_extension,
   ...ecran_actions_ext,
   ...ecran_offres_photos,
+  ...ecran_parrainage20,
   ...ecran_moinsTexteB,
 };

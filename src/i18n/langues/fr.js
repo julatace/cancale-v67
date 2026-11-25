@@ -123,6 +123,7 @@ import ecran_ux_reglages from './fr/uxReglages.js';   // (21 nov.) Paramètres, 
 import ecran_natif from './fr/natif.js';
 import ecran_menu_onglets from './fr/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './fr/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
+import ecran_parrainage20 from './fr/parrainage.js';   // (25 nov.) le parrainage à 20 %
 import ecran_actions_ext from './fr/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './fr/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 import ecran_moinsTexteB from './fr/moinsTexteB.js';   // (25 nov.) moins de texte B
@@ -475,7 +476,7 @@ export default {
   "auth.lier.extension": "Connecte-toi ici : l'extension {navigateur} se connecte aussi, rien à taper.",
   "auth.parrain.offertPar": "Offert par {nom}",
   "auth.parrain.offertVendeur": "Offert par un vendeur VRM",
-  "auth.parrain.texte": "1 mois de VRM offert à ton premier paiement, pour toi et pour la personne qui t’invite.",
+  "auth.parrain.texte": "−10 % sur ton 1er mois de VRM et 1 semaine offerte à ton premier paiement.",
   "auth.parrain.texteConnexion": "Déjà un compte ? Connecte-toi : le parrainage est réservé aux nouveaux comptes.",
   "auth.lier.pasOuverte": "La connexion avec {nom} n’est pas encore ouverte sur VRM. Connecte-toi ici avec ton e-mail et ton mot de passe VRM : l’extension sera connectée en même temps.",
   "auth.lier.pasVerifie": "Je n’ai pas pu vérifier la connexion avec {nom}. Réessaie les moyens de connexion ci-dessous, ou connecte-toi avec ton e-mail : l’extension sera connectée en même temps.",
@@ -2453,5 +2454,6 @@ export default {
   ...ecran_extension,
   ...ecran_actions_ext,
   ...ecran_offres_photos,
+  ...ecran_parrainage20,
   ...ecran_moinsTexteB,
 };
