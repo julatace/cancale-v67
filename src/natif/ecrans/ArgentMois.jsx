@@ -22,6 +22,7 @@
 import React from 'react';
 import { tr } from '../../i18n/index.js';
 import { Carte, Plaque, Attente, useOrdinateur, TIRET } from '../index.js';
+import { attenteDe, attrsAttente } from '../outils.js';
 import { AideArgent } from './AideArgent.jsx';
 import './argent.css';
 
@@ -33,13 +34,14 @@ const signe = (m, montant) => (m > 0 ? '+' : m < 0 ? '−' : '') + montant(Math.
 
 // Une rangée de chiffre : libellé (et sa ligne grise) à gauche, montant à droite. Toute la rangée se touche.
 function Ligne({ libelle, valeur, sous = null, tonSous = 'neutre', onClick = null, chevron = true, attrs = null, attrsValeur = null }) {
+  const att = attenteDe(null, valeur != null, sous);   // (24 nov., livrable) en lecture : un squelette, jamais « — · lecture… »
   const corps = (
     <>
       <span className="n-arg-l-textes">
         <span className="n-arg-l-lib">{libelle}</span>
-        {sous ? <span className="n-arg-l-sous" data-n-ton={tonSous}>{sous}</span> : null}
+        {sous ? <span className="n-arg-l-sous" data-n-ton={tonSous} {...attrsAttente(att, 'note')}>{sous}</span> : null}
       </span>
-      <span className="n-arg-l-val" data-arg-montant="" data-n-vide={valeur == null ? '1' : undefined} {...(attrsValeur || {})}>{valeur == null ? TIRET : valeur}</span>
+      <span className="n-arg-l-val" data-arg-montant="" data-n-vide={valeur == null ? '1' : undefined} {...(attrsValeur || {})} {...attrsAttente(att, 'valeur')}>{valeur == null ? TIRET : valeur}</span>
       {onClick && chevron ? <span className="n-arg-l-chev" aria-hidden="true"/> : null}
     </>
   );
@@ -97,13 +99,13 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
                 MÊME règle (`phrase`), et elle se touche (le geste : ouvrir Ventes). */}
             {valeur == null ? (onPasSu
               ? null
-              : <p className="n-arg-recu-note" data-arg-recu-note="" data-arg-montant="" data-n-vide="1" data-n-ton="ambre">{majuscule(phrase)}</p>) : <>
+              : <p className="n-arg-recu-note" data-arg-recu-note="" data-arg-montant="" data-n-vide="1" data-n-ton="ambre" {...attrsAttente(attenteDe(null, false, phrase), 'note')}>{majuscule(phrase)}</p>) : <>
             <div className="n-arg-recu-chiffre" data-arg-montant="" data-n-vide={n == null ? '1' : undefined}>
               {partiel && valeur != null ? <span className="n-arg-recu-moins">{tr('journee.moins')}</span> : null}
-              <span className="n-arg-recu-n">{n == null ? TIRET : n}</span>{u ? <span className="n-arg-recu-u">{u}</span> : null}
+              <span className="n-arg-recu-n" {...attrsAttente(attenteDe(null, n != null, phrase), 'valeur')}>{n == null ? TIRET : n}</span>{u ? <span className="n-arg-recu-u">{u}</span> : null}
             </div>
             {/* Le manque (la note de la MÊME règle), en une ligne ; sans manque, rien (la datation est dans le « ? »). */}
-            {note ? <p className="n-arg-recu-note" data-arg-recu-note="">{phrase}</p> : null}
+            {note ? <p className="n-arg-recu-note" data-arg-recu-note="" {...attrsAttente(attenteDe(null, n != null, phrase), 'note')}>{phrase}</p> : null}
             </>}
           </div>
           {sansBarres || !barres.some((x) => x.v != null) ? null : (
