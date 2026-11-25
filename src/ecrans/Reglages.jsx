@@ -1,4 +1,5 @@
 import { PlateformesSetting } from '../App.jsx';
+import '../natif/ecrans/parametres-visuel.css';   // (24 nov., visuel-argent) médaillons des sections, interrupteurs clairs
 import { fusion3 } from '../fusionNuage.js';
 import { modifierLigneCas, ecrireDifference } from '../ligneCas.js';
 import { signalDelai } from '../compatSafari.js';
@@ -2555,7 +2556,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     return (
       <button key={c.id} type="button" className="vrm-set-ligne vrm-pm-cat-ligne" data-categorie-ouvrir={c.id} data-categorie-contient={` ${c.ids.join(' ')} `}
         {...(c.id === 'compte' ? { 'data-vue': 'compte' } : {})} aria-current={actif ? 'true' : undefined} onClick={surClic}>
-        <span className="vrm-pm-cat-ic" aria-hidden="true"><Icon name={c.ic} size={17}/></span>
+        <span className="vrm-pm-cat-ic" aria-hidden="true" data-pm-cat={c.id}><Icon name={c.ic} size={17}/></span>
         <span className="vrm-set-lib"><b style={{color:C.text}}>{titreCat(c.id)}</b><small className="vrm-set-desc" style={{color:C.muted}}>{tr(`parametres.cat.${c.id}.desc`)}</small></span>
         {v && <span className="vrm-set-val" data-categorie-valeur={c.id} style={{color: ambre ? C.warn : C.muted}}>{v}</span>}
         {chevron}
@@ -2586,7 +2587,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     const ambre = (c.id === 'donnees' || c.id === 'securite-donnees') && derniereSauvegarde.old;
     return (
       <RangeeTouchable key={c.id} className="v2-pm-rangee" onClick={() => ouvrirCategorie(c.id)} attrs={{ 'data-categorie-ouvrir': c.id, 'data-categorie-contient': ` ${c.ids.join(' ')} ` }}>
-        <span className="v2-pm-ic" aria-hidden="true"><Icon name={c.ic} size={18}/></span>
+        <span className="v2-pm-ic" aria-hidden="true" data-pm-cat={c.id}><Icon name={c.ic} size={18}/></span>
         <span className="v2-pm-lib">{titreCat(c.id)}<span className="vg-sr">{' — ' + tr(`parametres.cat.${c.id}.desc`)}</span></span>
         {v ? <span className={'v2-pm-val' + (ambre ? ' is-ambre' : '')} data-categorie-valeur={c.id}>{v}</span> : null}
         <span className="v2-pm-chev" aria-hidden="true">{chevron}</span>
@@ -2612,7 +2613,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   };
   const ecranCategorie = (c, { avecTitre }) => (
     <section key={c.id} id={`parametres-${c.id}`} className="vrm-pm-cat" data-categorie-ecran={c.id}>
-      {avecTitre && <h2 className="vrm-pm-cat-h" style={{color:C.text}}><span className="vrm-pm-cat-ic" aria-hidden="true"><Icon name={c.ic} size={17}/></span>{titreCat(c.id)}</h2>}
+      {avecTitre && <h2 className="vrm-pm-cat-h" style={{color:C.text}}><span className="vrm-pm-cat-ic" aria-hidden="true" data-pm-cat={c.id}><Icon name={c.ic} size={17}/></span>{titreCat(c.id)}</h2>}
       {c.expert && <p className="vrm-pm-expert" data-reglages-expert="" style={{color:C.muted}}>{tr('parametres.expert')}</p>}
       {teteCategorie(c.id)}
       {c.groupes.map((g) => groupe({ id: g.id, titre: g.titreCle ? tr(g.titreCle) : (g.titre || null), items: g.items, pied: g.pied }))}

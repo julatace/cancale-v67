@@ -18953,7 +18953,7 @@ const BrandMark = ({ id }) => id === 'apple' ? (
     <path d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.19-1.73-1.36-.14-2.65.8-3.34.8-.69 0-1.75-.78-2.88-.76-1.48.02-2.85.86-3.61 2.19-1.54 2.67-.39 6.62 1.1 8.79.73 1.06 1.6 2.25 2.74 2.2 1.1-.04 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.08 2.65-2.14.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.32-3.5zM14.18 6.13c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.54 1.31-.56.65-1.05 1.69-.92 2.68.97.08 1.96-.49 2.56-1.23z"/>
   </svg>
 ) : id === 'google' ? (
-  <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true" style={{flexShrink:0}}>
+  <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true" style={{flexShrink:0}} data-marque="google">
     <path fill="#B5BDCA" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"/>
     <path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/>
     <path fill="#FBBC05" d="M11.8 28.2c-.4-1.3-.7-2.7-.7-4.2s.2-2.9.7-4.2v-5.7H4.5C3 17 2.1 20.4 2.1 24s.9 7 2.4 9.9l7.3-5.7z"/>
@@ -30470,8 +30470,13 @@ function useSourcesCarte(liveStats) {
   const prep = useEnPreparation(CLES_PREPAREES);
   // (11 nov., états vides) Aucun compte relié, PROUVÉ par la coque : « aucun compte relié », pas « lecture… ».
   const sansCompte = React.useContext(SansCompteCarte);
+  // (24 nov., livrable-2) La coque n'a pas encore ses ventes : l'écran qui publie (Ventes, `usePreparation`) n'a pas
+  // encore pu commencer — une publication absente est alors EN LECTURE, jamais « pas calculé / pas lu / ouvre Ventes »
+  // (mesuré : Argent les disait 5 à 10 s à l'ouverture, puis les chiffres arrivaient). Pas su = la coque a répondu ET
+  // personne ne prépare.
+  const coqueEnCours = venduEtat(liveStats) === 'encours';
   // (6 nov.) Jamais publié mais un écran ouvert le prépare : « lecture… » (src/preparations.js).
-  const etat = pub ? 'lu' : (pret && !prep.has('vrm_benefice_jours') ? 'passu' : 'encours');
+  const etat = pub ? 'lu' : (pret && !prep.has('vrm_benefice_jours') && !coqueEnCours ? 'passu' : 'encours');
   return React.useMemo(() => ({
     sansCompte: !!sansCompte,
     // (6 nov., onglets A) TROIS ÉTATS (§5) : la coque pas encore revenue (`liveStats` absent, ou
@@ -30482,8 +30487,8 @@ function useSourcesCarte(liveStats) {
     beneficeDe: (p) => ({ B: beneficeDe({ pub, compta, ligneUrssaf, regime }, p), etat }),
     joursBenef: pub, etatBenef: etat, ligneUrssaf, colisAPoster, colisARetirer, dorment, live: liveStats || null,
     // (6 nov.) Une publication absente que l'écran ouvert est en train de préparer : « lecture… ».
-    enPreparation: { dorment: prep.has('vrm_paires_dorment'), retirer: prep.has('vrm_colis_retirer'), urssaf: prep.has('vinted_urssaf_mois') },
-  }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep, sansCompte]);
+    enPreparation: { dorment: prep.has('vrm_paires_dorment') || coqueEnCours, retirer: prep.has('vrm_colis_retirer') || coqueEnCours, urssaf: prep.has('vinted_urssaf_mois') || coqueEnCours || !pret },
+  }), [liveStats, pub, pret, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep, sansCompte, coqueEnCours]);
 }
 // ⟦→ ecrans/Comptabilite.jsx #248⟧
 const OUTILS_AUJOURDHUI = { load, save, onCloudReady, lireTout, entete: () => enTeteSession(), uid: () => AUTH.user?.id || '', extras: lireExtrasRepartition, enLigne: dateMiseEnLigneMs, vue: demanderVue, aVenir: ouvrirArgentAVenir, cle: CLE_CARTES_AUJOURDHUI };
