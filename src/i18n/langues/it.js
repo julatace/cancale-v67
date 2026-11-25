@@ -25,6 +25,7 @@ import ecran_styleClarte from './it/styleClarte.js';
 import ecran_revueUx from './it/revueUx.js';   // (23 nov.) revue UX   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './it/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './it/ext5438.js';   // (22 nov.) ext. 5.438
+import ecran_visuelAnnonces from './it/visuelAnnonces.js';   // (24 nov.) l'inventaire Annonces / Stock
 import ecran_argentVisuel from './it/argentVisuel.js';   // (24 nov.) Argent, Messages, Paramètres visuels   // (24 nov.) le langage « jeu vidéo »   // (23 nov.) « Vinted a agi » regroupée
 import ecran_visuelJeu from './it/visuelJeu.js';   // (24 nov.) le langage « jeu vidéo »   // (23 nov.) « Vinted a agi » regroupée
 import ecran_moderationCarte from './it/moderationCarte.js';   // (23 nov.) « Vinted a agi » regroupée
@@ -2414,6 +2415,7 @@ export default {
   ...ecran_ext5438,
   ...ecran_moderationCarte,
   ...ecran_visuelJeu,
+  ...ecran_visuelAnnonces,
   ...ecran_argentVisuel,
   ...ecran_observation,
   ...ecran_a_distance,
