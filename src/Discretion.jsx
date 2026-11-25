@@ -16,6 +16,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { load, save, vmrCmd } from './App.jsx';
+import { tr } from './i18n/index.js';
 import { useLignesActions } from './JaugeActions.jsx';
 import { jaugeDuCompte, texteJauge, heureFr, toutArreteDe } from './jaugeActions.js';
 import { useComptesFeuille } from './moderationFeuille.js';
@@ -69,8 +70,9 @@ export function ToutArreter({ rows, variante = 'panneau' }) {
     return (
       <div className="vrm-verif" role="alert" data-tout-arrete={String(etat.at)}>
         <span className="vrm-verif-point" aria-hidden="true" />
-        <p className="vrm-verif-texte"><b>Tout est arrêté.</b> Aucun geste automatique ne part, sur aucun compte.</p>
-        <button type="button" className="vrm-verif-reprendre" data-tout-reprendre="" onClick={() => poser(false)}>Reprendre</button>
+        {/* (25 nov., Julien : « trop de texte ») « Tout est en pause » + « Reprendre » sur UNE ligne ; la phrase entière au lecteur d'écran. */}
+        <p className="vrm-verif-texte"><b>{tr('disc.toutPause')}</b><span className="vrm-sr">{' · ' + tr('ext.avert.toutArrete')}</span></p>
+        <button type="button" className="vrm-verif-reprendre" data-tout-reprendre="" onClick={() => poser(false)}>{tr('direct.reprendre')}</button>
       </div>
     );
   }

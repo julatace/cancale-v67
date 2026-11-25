@@ -147,8 +147,8 @@ export default {
   "adist.bord.aGenerer": "etichetta da generare",
   "adist.bord.absent": "Il PDF non è ancora salvato: riprova tra un momento",
   "adist.bord.passu": "non sono riuscito a sapere se l’etichetta è già pronta",
-  "adist.jour.allume": {"one": "Il tuo computer ({nom}) è acceso · {n} account", "other": "Il tuo computer ({nom}) è acceso · {n} account"},
-  "adist.jour.eteint": "Il tuo computer ({nom}) è spento dalle {heure}",
+  "adist.jour.allume": {"one": "Computer acceso · {n} account", "other": "Computer acceso · {n} account"},
+  "adist.jour.eteint": "Computer spento · {heure}",
   "adist.jour.attente": {"one": "{n} azione aspetta il tuo computer", "other": "{n} azioni aspettano il tuo computer"},
   "adist.jour.sous": "I tuoi account a distanza: messaggi, offerte, prezzi, etichette",
   "adist.reglages.desc": "Ogni account dal telefono: il tuo computer esegue, niente passa dal cloud."
