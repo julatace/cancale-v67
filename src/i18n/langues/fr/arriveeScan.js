@@ -33,7 +33,7 @@ export default {
   "arv.numeros": "Leurs N°",
   "arv.paireK": "Paire {k} sur {n}",
   "arv.attribue": "Ce N° lui est déjà donné : il ne change pas.",
-  "arv.moi.pied": "Tu numérotes toi-même : tape le N° écrit sur le carton.",
+  "arv.moi.pied": "Tu numérotes toi-même : tape le N° écrit sur son rangement.",
   "arv.moi.place": "N°",
   "arv.moi.aria": "N° de la paire {k}",
   "arv.moi.raison": "Tape le N° de chaque paire.",

@@ -44,6 +44,14 @@ nommément (un autre ajout reste refusé) :
   · 5.420.0 (21 nov., ext-5420, « bordereaux en un seul PDF ») : `pdf-lib.min.js` (pdf-lib 1.17.1, MIT, le fichier
     dist tel quel), `pdf-lib.LICENSE.txt` (ses licences) et `vrm-pdf.js` (l'assembleur) membres du paquet, injectés À LA
     DEMANDE par background.js (`chrome.scripting.executeScript`, `files`, aucun bloc du manifeste) — rien d'autre.
+  · (24 nov., main-rouges-24nov : ce contrôle était rouge sur main depuis la 5.418 — chaque lot a livré son
+    fichier dans la base commune ET le paquet Orion sans l'approuver ici) ajouts de la base commune, approuvés
+    nommément, chacun exactement comme dans `vinted-sync-extension/manifest.json` :
+      5.418 `lbc-ecrire.js` (Leboncoin par l'interface) : nouveau bloc leboncoin [lbc-ecrire.js, vrm-depot-aussi.js] ;
+      5.412 `vc-ecrire.js` (Vestiaire par l'interface) + 5.424 `vrm-depot-aussi.js` : APRÈS vc-depot.js dans son bloc ;
+      5.429 `vrm-depot.js` (dépôt par l'interface) : juste AVANT vrm-badge.js dans son bloc ;
+      5.433 `vrm-appris.js` et 5.440 `vrm-trouver.js` : injectés À LA DEMANDE par background.js
+      (`chrome.scripting.executeScript`, aucun bloc du manifeste) — rien d'autre.
 """
 from pathlib import Path
 import zipfile
@@ -55,8 +63,9 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
     noms = set(nouveau.namelist())
     AJOUTS_COMMUNS = [  # blocs de la base commune approuvés après la 5.319 (sans compat-orion.js)
         ['vrm-regles-achat.js', 'vinted-infos.js'],
+        ['lbc-ecrire.js', 'vrm-depot-aussi.js'],  # 5.418 / 5.424 (24 nov., main-rouges-24nov)
     ]
-    membres_attendus = set(ancien.namelist()) | {'oauth-retour.js'} | {n for b in AJOUTS_COMMUNS for n in b} | {'vrm-mots.js'} | {'vrm-ui.js', 'vrm-action.js'} | {'vrm-dressing.js', 'vrm-formulaire.js'} | {'pdf-lib.min.js', 'pdf-lib.LICENSE.txt', 'vrm-pdf.js'}
+    membres_attendus = set(ancien.namelist()) | {'oauth-retour.js'} | {n for b in AJOUTS_COMMUNS for n in b} | {'vrm-mots.js'} | {'vrm-ui.js', 'vrm-action.js'} | {'vrm-dressing.js', 'vrm-formulaire.js'} | {'pdf-lib.min.js', 'pdf-lib.LICENSE.txt', 'vrm-pdf.js'} | {'vc-ecrire.js', 'vrm-depot.js', 'vrm-appris.js', 'vrm-trouver.js'}
     assert membres_attendus == noms, f'Membres ajoutés ou retirés : {sorted(membres_attendus ^ noms)}'
     version = json.loads(nouveau.read('manifest.json'))['version']
     attendue = json.loads((ext/'manifest.json').read_text('utf8'))['version']
@@ -109,6 +118,14 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
     assert sorted(orion_mots) == avec_mots, f'{MOTS} : blocs Orion {sorted(orion_mots)} ≠ blocs communs {avec_mots}'
     for c in commun['content_scripts']:
         c['js'] = sans_mots(c['js'])
+    # 5.412–5.429 : fichiers insérés dans un bloc EXISTANT de la base commune — le même bloc, à la même place, dans
+    # la base commune et dans le paquet Orion (une fois chacun), retirés ici avant la comparaison à la référence.
+    for avant, ajout, apres in ((['vc-depot.js'], ['vc-ecrire.js', 'vrm-depot-aussi.js'], []),
+                                ([], ['vrm-depot.js'], ['vrm-badge.js'])):
+        for blocs, pre in ((commun['content_scripts'], []), (m_nouveau['content_scripts'], ['compat-orion.js'])):
+            avec = [c for c in blocs if c['js'] == [*pre, *avant, *ajout, *apres]]
+            assert len(avec) == 1, f'{ajout} : attendu une fois, exactement {[*pre, *avant, *ajout, *apres]} ({[c["js"] for c in blocs if ajout[0] in c["js"]]})'
+            avec[0]['js'] = [*pre, *avant, *apres]
     # Hôtes que la base commune a RETIRÉS depuis la référence (jamais ajoutés).
     hotes_communs = set(commun.get('host_permissions', [])) | {h for c in commun['content_scripts'] for h in c['matches']}
     retires = {h for h in m_ancien['permissions'] if h.startswith('https://') and h not in hotes_communs}
@@ -147,4 +164,4 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
         if nouveau.read(nom) != source:
             propres.append(nom)
     assert not propres, f'Changements propres à Orion (hors base commune de l’extension) : {propres}'
-    print(f'OK : paquet Orion {version} = base commune de l’extension ; adaptateur et structure 5.319.0 conservés ; ajouts approuvés : retour OAuth commun 5.328, infos Vinted 5.339, surfaces 5.406, dressing et formulaire 5.410.3 ; hôtes seulement retirés ; vérifié octet pour octet.')
+    print(f'OK : paquet Orion {version} = base commune de l’extension ; adaptateur et structure 5.319.0 conservés ; ajouts approuvés : retour OAuth commun 5.328, infos Vinted 5.339, surfaces 5.406, dressing et formulaire 5.410.3, PDF 5.420, écriture par l’interface et dépôt 5.412–5.440 ; hôtes seulement retirés ; vérifié octet pour octet.')

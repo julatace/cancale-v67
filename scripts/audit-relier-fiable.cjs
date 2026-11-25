@@ -214,7 +214,10 @@ const enLigne = (r) => Object.values(r.parArticle).reduce((n, l) => n + (l || []
     // (src/natif/ecrans/Fiche.jsx) — « Reçu » SEULEMENT s'il y en a un, « Délier » à côté, toujours. (« Pas de reçu » n'est
     // plus écrit : rien n'est montré à la place d'un lien mort.)
     const FN = sans(fs.readFileSync(path.join(SRC, 'natif', 'ecrans', 'Fiche.jsx'), 'utf8'));
-    const d4Natif = /\{achatRelie\.recu \? <button[^\n]*data-fd-recu=\{achatRelie\.tx\}[^\n]*: null\}/.test(FN) && /<button[^\n]*onClick=\{achatRelie\.onDelier\}[^\n]*data-fd-delier=\{achatRelie\.tx\}/.test(FN) && /achatRelie=\{achatRelie\}/.test(FP);
+    // (24 nov., main-vert) Boutons natifs : `<Bouton … attrs={{ 'data-fd-recu': achatRelie.tx }}>` au lieu de `<button data-fd-recu={…}>`.
+    const fdAttr = (nom, val) => `(?:${nom}=\\{${val}\\}|'${nom}': ${val})`;
+    const d4Natif = new RegExp(`\\{achatRelie\\.recu \\? <(?:button|Bouton)\\b[^\\n]*${fdAttr('data-fd-recu', 'achatRelie\\.tx')}[^\\n]*: null\\}`).test(FN)
+      && new RegExp(`<(?:button|Bouton)\\b[^\\n]*onClick=\\{achatRelie\\.onDelier\\}[^\\n]*${fdAttr('data-fd-delier', 'achatRelie\\.tx')}`).test(FN) && /achatRelie=\{achatRelie\}/.test(FP);
     dit(d4Natif || (/lien\.recu === true \? <button[^\n]*data-fd-recu/.test(FP) && /lien\.recu === false \? <small[^\n]*data-fd-pas-recu/.test(FP) && /data-fd-delier=\{lien\.tx\}/.test(FP)), 'D4 la fiche : « Reçu » seulement s’il y a un reçu, sinon « Pas de reçu » (jamais un lien mort) ; « Délier » toujours');
     dit(/achatRelie=\{achatRelieFiche\}/.test(A) && /<FeuilleRecuAchat recu=\{recuFicheVue\} z=\{Z_CONFIRMATION \+ 10\}/.test(A), 'D5 branché sur la fiche ; le reçu s’ouvre AU-DESSUS d’elle');
   }

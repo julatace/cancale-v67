@@ -149,7 +149,9 @@ async function importer(m, rempl = []) {
   dit(/ACTIONS_EXTENSION\.republierMaintenant/.test(rep) && nRep === 0 && /onClick=\{\(\) => plusVue\.republier\(/.test(autres[3]),
     'P11 « Republier » : la feuille Avant | Après de CETTE paire (republier-direct), seulement sur SON toucher');
   const RL = sans(lire('plusVueLecture.js'));
-  dit(/lireSeries\(base, uid, ids\.slice\(i, i \+ 60\)\)/.test(RL) && !/select=data\b/.test(RL), 'P12 relevés lus PROJETÉS par 60 (jamais la ligne entière)');
+  // (24 nov., vitesse-lectures-toucher) Plusieurs comptes par lecture (`lireSeriesComptes`), toujours 60 annonces au plus.
+  const BL = sans(lire('boostLecture.js'));
+  dit(/PAR_LECTURE = 60\b/.test(RL) && /lireSeriesComptes\(base, p\.parUid\)/.test(RL) && /if \(n > 60\) return null;/.test(BL) && !/select=data\b/.test(RL + BL), 'P12 relevés lus PROJETÉS par 60 (jamais la ligne entière)');
 
   // ── F. Fluidité : une lecture identique ne part qu'une fois, même bornée ; une valeur inchangée ne périme pas ──
   {
