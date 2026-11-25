@@ -49,7 +49,7 @@ export function resumeFileCarte(vue, maintenant = Date.now()) {
     raison: vue.raison || '', raisons,
     // 5.440.1 : les nombres de la fenêtre et du panneau viennent de LA règle du bilan (`bilanFavoris`) : un « pas envoyé »
     //    n'est jamais compté « sauté », et l'inverse ; la raison d'une file en pause porte son code (traduit par l'extension).
-    sautes: b.sautes, pasEnvoyes: b.refuses,
+    sautes: b.sautes, pasEnvoyes: b.refuses, recherche: b.recherche || 0,
     ...(vue.raisonCode ? { raisonCode: vue.raisonCode, ...(vue.raisonRefus ? { raisonRefus: vue.raisonRefus } : {}), ...(vue.raisonN ? { raisonN: vue.raisonN } : {}) } : {}) };
 }
 

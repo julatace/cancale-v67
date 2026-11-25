@@ -1068,7 +1068,18 @@ function vrmVerifVisible(sel) {
   .cel6 .of6, .cel6 .rs6 { display: block; margin-top: 2px; font: 400 12px/16px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); white-space: normal; }
   .cel6[data-col="etat"] { white-space: normal; }
   .fav6-envoi { margin: 12px 16px 0; }
-  .fav6-file { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 12px 16px 0; padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
+  .fav6-file { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 12px 16px 0; padding: 8px 8px 8px 16px; border-radius: 14px; background: var(--n-carte, #fff); color: var(--n-encre, #111); box-shadow: inset 0 0 0 1px var(--n-trait, #E4E4E7); }
+  /* 5.440.5 : « Pourquoi ? » — une ligne qui se déplie, 44 px au doigt, neutre (aucune couleur d'alerte sur l'écran des favoris). */
+  .pq6 { margin: 4px 0 0; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2, #52525B); }
+  .pq6 > summary { list-style: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 2px; font-weight: 600; color: var(--n-encre, #111); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  .pq6 > summary::-webkit-details-marker { display: none; }
+  .pq6 > summary:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+  .pq6 > p { margin: 0 0 6px; max-width: 62ch; }
+  .fav6 > .pq6-notes { padding: 0 16px; margin: 0 0 4px; }
+  .fav6 > .pq6-notes > summary span { text-decoration: none; font-weight: 500; color: var(--n-encre-2, #52525B); }
+  .fav .p-pour.fort { color: var(--n-encre, #111); font-weight: 600; }
+  .fav-fin6 .fav-l { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+  .fav-fin6 .p-n { font-variant-numeric: tabular-nums; }
   .fav6-file > span { flex: 1 1 220px; display: flex; flex-direction: column; font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; }
   .fav6-file small { font-weight: 400; font-size: 13px; line-height: 18px; }
   .fav6-file .vu-btn { min-height: 44px; padding: 0 16px; border-radius: 12px; }
@@ -1631,7 +1642,7 @@ function vrmVerifVisible(sel) {
   /* Les blocs posés (Accueil, gestes, offres) : des surfaces blanches à contour, jamais des fonds gris lourds. */
   .carte[data-grand] .geste6, .carte[data-grand] .conf5, .carte[data-grand] .msg6 { background: var(--n-carte); border: 1px solid var(--n-trait); border-radius: 12px; box-shadow: var(--n-ombre); }
   .carte[data-grand] .conf5 { font: 500 14px/20px var(--n-police); }
-  .carte[data-grand] .fav6-file { background: var(--n-ambre-fond); box-shadow: inset 0 0 0 1px var(--n-ambre-bord); border-radius: 12px; }
+  .carte[data-grand] .fav6-file { background: var(--n-carte); box-shadow: inset 0 0 0 1px var(--n-trait); border-radius: 12px; }
   .carte[data-grand] .fav6-file > span { font: 600 14px/20px var(--n-police); }
   .carte[data-grand] .fav6-bas, .carte[data-grand] .ven6-conf { background: var(--n-carte); border: 1px solid var(--n-trait); border-radius: 12px; box-shadow: 0 4px 16px rgb(16 24 40/.08); }
   .carte[data-grand] .fav6-bas-t { font: 600 14px/20px var(--n-police); }
@@ -2092,18 +2103,18 @@ function vrmVerifVisible(sel) {
   function comptesFav(fi) {
     const n = (v) => Number(v) || 0;
     const pas = fi.pasEnvoyes != null ? n(fi.pasEnvoyes) : n(fi.refuses), sautes = fi.sautes != null ? n(fi.sautes) : n(fi.ignores);
-    return { pas, sautes, verifier: n(fi.incertains), attente: n(fi.attente), annules: n(fi.annules) };
+    return { pas, sautes, verifier: n(fi.incertains), cours: n(fi.recherche), attente: n(fi.attente), annules: n(fi.annules) };
   }
   function motsComptesFav(cf, fin) {
     const p = (n, a, b) => TU(n === 1 ? a : b, { n });
-    return [cf.pas ? p(cf.pas, 'fa_pas_1', 'fa_pas_n') : '', cf.sautes ? p(cf.sautes, 'fa_saute_1', 'fa_saute_n') : '', !fin && cf.verifier ? p(cf.verifier, 'fa_verif_1', 'fa_verif_n') : '', fin && cf.annules ? p(cf.annules, 'fa_annule_1', 'fa_annule_n') : '', fin && cf.attente ? p(cf.attente, 'fa_attente_1', 'fa_attente_n') : ''].filter(Boolean).join(' · ');
+    return [cf.cours ? p(cf.cours, 'fa_cours_1', 'fa_cours_n') : '', cf.pas ? p(cf.pas, 'fa_pas_1', 'fa_pas_n') : '', cf.sautes ? p(cf.sautes, 'fa_saute_1', 'fa_saute_n') : '', !fin && cf.verifier ? p(cf.verifier, 'fa_verif_1', 'fa_verif_n') : '', fin && cf.annules ? p(cf.annules, 'fa_annule_1', 'fa_annule_n') : '', fin && cf.attente ? p(cf.attente, 'fa_attente_1', 'fa_attente_n') : ''].filter(Boolean).join(' · ');
   }
   function favorisFileHtml(e) {
     if (!e || e.plateforme !== 'vinted' || !e.site || !e.site.id || !e.site.favoris) return '';
     const st = e.site.favoris.file;
     if (st && st.actif) {
       const fi = st.file || {}, total = Number(fi.total) || Number(st.total) || 0, faits = Number(fi.envoyes) || 0;
-      const cf = comptesFav(fi), pas = cf.pas + cf.sautes + cf.verifier;
+      const cf = comptesFav(fi), pas = cf.pas + cf.sautes + cf.verifier + cf.cours;
       const dans = !st.enCours && Number(st.prochain) > Date.now() ? dansFav(st.prochain) : '';
       const att = st.attente && ATTENTES_FAV[st.attente];
       const pour = QUOI_FAV[st.quoi] ? TU(QUOI_FAV[st.quoi]) : '';
@@ -2112,26 +2123,27 @@ function vrmVerifVisible(sel) {
         <div class="p-t fav-l" role="status"><span class="p-nom">${esc(TU('f_titre'))}</span><b class="p-n">${esc(TU('f_sur', { n: faits, total }))}</b></div>
         ${U.barre(total ? 100 * faits / total : 0, ' aria-label="' + esc(TU('f_titre')) + '"')}
         <div class="p-l2">${etat.replace('· ', '')}${pas ? `<span class="p-dans" data-fav-comptes="${cf.pas}:${cf.sautes}:${cf.verifier}"> · ${esc(motsComptesFav(cf, false))}</span>` : ''}</div>
-        ${st.robot ? `<div class="p-pour ambre" data-fav-robot>${esc(TU(verifAffichee() ? 'a_verif_page' : 'a_refus_robot'))}</div><div class="p-pour">${esc(TU('a_doucement'))}</div>${favErreur ? `<div class="p-pour ambre" role="alert">${esc(favErreur)}</div>` : ''}<button class="vu-btn vu-plein" data-fav-reprendre>${esc(TU('a_reprendre'))}</button><button class="vu-btn vu-sec" data-fav-arreter>${esc(TU('c_tout_arreter'))}</button>`
-          : `${att ? `<div class="p-pour ambre" data-fav-attente-texte>${esc(att)}</div>` : `<div class="p-pour" data-fav-pour>${esc(pour || TU('f_garde'))}</div>`}
+        ${st.robot ? `<div class="p-pour fort" data-fav-robot>${esc(TU(verifAffichee() ? 'a_verif_page' : 'a_refus_robot'))}</div><div class="p-pour">${esc(TU('a_doucement'))}</div>${favErreur ? `<div class="p-pour fort" role="alert">${esc(favErreur)}</div>` : ''}<button class="vu-btn vu-plein" data-fav-reprendre>${esc(TU('a_reprendre'))}</button><button class="vu-btn vu-sec" data-fav-arreter>${esc(TU('c_tout_arreter'))}</button>`
+          : `${att ? `<div class="p-pour fort" data-fav-attente-texte>${esc(att)}</div>` : `<div class="p-pour" data-fav-pour>${esc(pour || TU('f_garde'))}</div>`}
         <button class="vu-btn vu-plein" data-fav-arreter>${esc(TU('c_tout_arreter'))}</button>`}
       </section>`;
     }
     if (st && !st.actif && st.fin && Date.now() - Number(st.fin.at || 0) < 6 * 3600000) {
-      const fi = st.file || {}, env = Number(fi.envoyes) || 0, inc = Number(fi.incertains) || 0;
-      const cf = comptesFav(fi), pas = cf.pas + cf.sautes + cf.attente + cf.annules;
+      // 5.440.5 (Julien, 25 nov. : « catastrophique » — 5 phrases qui disaient la même chose, de l'ambre, un « OK » inutile) :
+      //    UNE ligne d'état (« 0 envoyé · 1 en cours »), le reste sous « Pourquoi ? ». Aucune couleur d'alerte, aucun bouton
+      //    qui ne fait rien. Mêmes nombres (la règle du bilan), mêmes marques `data-fav*`.
+      const fi = st.file || {}, env = Number(fi.envoyes) || 0;
+      const cf = comptesFav(fi);
       const quoi = st.fin.raison === 'robot' ? TU('f_fin_robot')
         : st.fin.raison === 'arret' ? TU('f_fin_arret')
         : st.fin.raison === 'travail_ferme' ? TU('f6_fin_travail')
         : st.fin.raison === 'interrompu' ? (st.fin.texte || st.fin.code ? TU('f_fin_interrompu_t', { t: U.raisonFileFav(st.fin) }) : TU('f_fin_interrompu'))
         : TU('a_fini');
-      return `<section class="fav principal" data-fav="fini" data-fav-fin="${esc(st.fin.raison || '')}" data-fav-envoyes="${env}">
-        <div class="p-t fav-l" role="status"><span>${esc(TU('f_titre'))}</span><span>· <b>${esc(env > 0 ? '✓ ' + TU('f_envoye_a', { n: env }) : TU(env === 1 ? 'fa_envoye_1' : 'fa_envoye_n', { n: env }))}</b></span>${pas ? `<span class="p-dans" data-fav-comptes="${cf.pas}:${cf.sautes}:${cf.attente}:${cf.annules}">· ${esc(motsComptesFav(cf, true))}</span>` : ''}</div>
-        <div class="p-pour${st.fin.raison === 'robot' ? ' ambre' : ''}" data-fav-raison-fin>${esc(quoi)}</div>
-        ${st.fin.bilan ? `<div class="p-pour" data-fav-bilan>${esc(st.fin.bilan)}</div>` : ''}
-        ${env > 0 && st.fin.raison !== 'robot' ? `<div class="p-pour" data-fav-ensuite>${esc(TU('f_ensuite'))}</div>` : ''}
-        ${inc ? `<div class="p-pour ambre" data-fav-verifier="${inc}">${esc(TU('f_verifier', { n: inc }))}</div>` : ''}
-        <button class="vu-btn vu-sec" data-fav-ok>OK</button>
+      const statut = [TU(env === 1 ? 'fa_envoye_1' : 'fa_envoye_n', { n: env }), motsComptesFav(cf, true)].filter(Boolean).join(' · ');
+      const raisons = [st.fin.raison && st.fin.raison !== 'fini' ? `<p data-fav-raison-fin>${esc(quoi)}</p>` : '', st.fin.bilan ? `<p data-fav-bilan>${esc(st.fin.bilan)}</p>` : '', env > 0 && st.fin.raison !== 'robot' ? `<p data-fav-ensuite>${esc(TU('f_ensuite'))}</p>` : ''].filter(Boolean);
+      return `<section class="fav principal fav-fin6" data-fav="fini" data-fav-fin="${esc(st.fin.raison || '')}" data-fav-envoyes="${env}">
+        <div class="p-t fav-l" role="status"><span class="p-nom">${esc(TU('f_titre'))}</span><b class="p-n" data-fav-statut data-fav-comptes="${cf.pas}:${cf.sautes}:${cf.attente}:${cf.annules}:${cf.cours}">${esc(statut)}</b></div>
+        ${raisons.length ? `<details class="pq6" data-fav-pourquoi><summary>${esc(TU('f_pourquoi'))}</summary>${raisons.join('')}</details>` : ''}
       </section>`;
     }
     return '';
@@ -2602,13 +2614,14 @@ function vrmVerifVisible(sel) {
         const premier = st.actif && !st.enCours && Number(st.prochain) > Date.now() && st.jobs.find((r) => r && r[1] === 'attente') === j;
         return { k: 'attente', t: premier ? TU('f6_e_attente_h', { h: heureFl(st.prochain) }) : TU('f6_e_attente') };
       }
-      if (et === 'incertain') return { k: 'verifier', t: TU('f6_e_verifier'), ton: 'ambre' };
+      if (et === 'recherche') return { k: 'encours', t: TU('f6_e_recherche'), ton: 'accent' };   // 5.440.5 : VRM relit la conversation
+      if (et === 'incertain') return { k: 'verifier', t: TU('f6_e_verifier') };
       return { k: 'ignore', t: TU('f6_e_ignore'), raison: raison6(j[2] || et) };
     }
     if (x.cochable === true) return { k: 'nouveau', t: TU('f6_e_nouveau') };
     if (x.envoi === 'envoye') return { k: x.offreFaite ? 'offre' : 'envoye', t: TU(x.offreFaite ? 'f6_e_offre' : 'f6_e_envoye') };
     if (x.envoi === 'en_cours') return { k: 'attente', t: TU('f6_e_attente') };
-    if (x.envoi === 'a_verifier') return { k: 'verifier', t: TU('f6_e_verifier'), ton: 'ambre' };
+    if (x.envoi === 'a_verifier') return { k: 'verifier', t: TU('f6_e_verifier') };
     return { k: 'ignore', t: TU('f6_e_ignore'), raison: x.raisonFiltre ? TU('f6_r_filtre') : raison6(x.raison || x.raisonEnvoi || x.envoi || '') };
   }
   const GROUPE_F6 = { nouveau: 'nouveaux', attente: 'envoyes', encours: 'envoyes', envoye: 'envoyes', offre: 'envoyes', ignore: 'ignores', verifier: 'ignores', refus: 'ignores' };
@@ -2738,10 +2751,14 @@ function vrmVerifVisible(sel) {
       + `<button type="button" class="vu-btn vu-sec reg6" data-fav6-reglages aria-haspopup="dialog">${esc(TU('f6_reglages'))}</button></div>`;
     const total = Number(a.totalTous) || tous.length;
     const ligneN = `<div class="n6"><span data-fav6-n="${vus.length}">${esc(vus.length === 1 ? TU('f6_n1') : TU('f6_n', { n: vus.length.toLocaleString('fr-FR') }))}${total > tous.length ? ' · ' + esc(TU('fl_plus', { n: tous.length, total: total.toLocaleString('fr-FR') })) : ''}</span><span class="n6-d">${filtreAnnonce ? `<button type="button" class="vu-lien" data-fav6-annonce-tout>${esc(TU('fl_toutes'))}</button>` : ''}${cochablesVus.length ? `<button type="button" class="vu-lien tout6" data-fav-tout="${tout ? 'aucun' : 'tous'}">${esc(TU(tout ? 'fl_rien' : 'fl_tout'))}</button>` : ''}</span></div>`;
+    // 5.440.5 : les explications (favoris cachés, ventes ailleurs pas revérifiées) sous UN « Pourquoi ? » — mêmes faits.
+    const dessous = [
+      Number(a.retires) > 0 ? `<p data-fav-caches="${Number(a.retires)}">${esc(TU('fl_caches', { n: Number(a.retires) }))}</p>` : '',
+      a.ventesAilleurs === 'pas_su' ? '<p data-fav-ailleurs>Tes ventes sur les autres sites n’ont pas été revérifiées récemment : assure-toi que ces articles ne sont pas vendus ailleurs.</p>' : '',
+    ].filter(Boolean);
     const notes = [
       autoFavLigneHtml(),
-      a.ventesAilleurs === 'pas_su' ? '<p class="note5 ambre6" data-fav-ailleurs>Tes ventes sur les autres sites n’ont pas été revérifiées récemment : assure-toi que ces articles ne sont pas vendus ailleurs.</p>' : '',
-      Number(a.retires) > 0 ? `<p class="note5" data-fav-caches="${Number(a.retires)}">${esc(TU('fl_caches', { n: Number(a.retires) }))}</p>` : '',
+      dessous.length ? `<details class="pq6 pq6-notes" data-fav6-pourquoi>${''}<summary>${Number(a.retires) > 0 ? `<span>${esc(TU('f6_caches_court', { n: Number(a.retires) }))}</span> · ` : ''}${esc(TU('f_pourquoi'))}</summary>${dessous.join('')}</details>` : '',
       favErreur ? `<p class="note5 err6" role="alert" data-fav-erreur6>${esc(favErreur)}</p>` : '',
     ].join('');
     const g6 = COLS_F6.map((c) => W6F[c]).join(' ');
@@ -2759,8 +2776,10 @@ function vrmVerifVisible(sel) {
       + `<button type="button" class="vu-btn vu-sec" data-fav-tout="aucun">${esc(TU('fl_rien'))}</button><button type="button" class="vu-btn vu-plein" data-fav-envoyer${fi && fi.active ? ' data-fav6-remplacer' : ''}${p.attente ? ` data-fav-a="${p.attente}"` : ''}${!p.k || p.attente || favOccupe ? ' disabled' : ''}>${esc(fi && fi.active && !p.attente ? TU('f6_remplacer', { n: p.k }) : p.bouton)}</button></div>` : '';
     // 5.410.8 : une file restée chez VRM (active ou en pause, son reste d'hier) que ce navigateur ne mène pas : DITE, avec
     //    « Reprendre » et « Annuler » — plus un nouvel envoi qui se fait refuser « déjà préparés ».
-    const ancienne = !actif && fi && (fi.active || restes > 0) ? `<div class="fav6-file" data-fav6-file="${fi.active ? 'active' : 'pause'}" data-fav6-attente="${restes}" role="status"><span><b>${esc(TU(fi.active ? 'f6_file_active' : 'f6_file_pause', { n: restes }))}</b>${!fi.active && (fi.raison || fi.raisonCode) ? `<small data-fav6-file-raison>${esc(U.raisonFileFav(fi))}</small>` : ''}<small>${esc(TU('f6_file_note'))}</small></span>${restes ? `<button type="button" class="vu-btn vu-sec" data-fav6-continuer${favOccupe ? ' disabled' : ''}>${esc(TU('a_reprendre'))}</button>` : ''}<button type="button" class="vu-btn vu-sec" data-fav6-annuler${favOccupe ? ' disabled' : ''}>${esc(TU('f6_annuler_file'))}</button></div>` : '';
-    return `<div class="fav6" data-fav6="liste" data-fav-vue="tableau"${actif ? ' data-fav6-envoi' : ''}>${envoi ? `<div class="fav6-envoi">${envoi}</div>` : ''}${ancienne}${actif ? '' : lotsHtml()}${outils}${ligneN}${notes}${table}${bas}</div>${feuilleFav6(a)}`;
+    // 5.440.5 : UNE ligne (« File d'envoi · 1 en attente »), « Reprendre » seulement si elle est VRAIMENT en pause, la raison
+    //    sous « Pourquoi ? » ; aucune couleur d'alerte. Elle remplace la ligne de fin de la même file (jamais les deux).
+    const ancienne = !actif && fi && (fi.active || restes > 0) ? `<div class="fav6-file" data-fav6-file="${fi.active ? 'active' : 'pause'}" data-fav6-attente="${restes}" role="status"><span><b>${esc(TU('f6_file_l', { n: restes }))}</b>${!fi.active && (fi.raison || fi.raisonCode) ? `<details class="pq6"><summary>${esc(TU('f_pourquoi'))}</summary><p data-fav6-file-raison>${esc(U.raisonFileFav(fi))}</p></details>` : ''}</span>${restes && !fi.active ? `<button type="button" class="vu-btn vu-sec" data-fav6-continuer${favOccupe ? ' disabled' : ''}>${esc(TU('a_reprendre'))}</button>` : ''}<button type="button" class="vu-btn vu-sec" data-fav6-annuler${favOccupe ? ' disabled' : ''}>${esc(TU('f6_annuler_file'))}</button></div>` : '';
+    return `<div class="fav6" data-fav6="liste" data-fav-vue="tableau"${actif ? ' data-fav6-envoi' : ''}>${envoi && !(ancienne && !actif) ? `<div class="fav6-envoi">${envoi}</div>` : ''}${ancienne}${actif ? '' : lotsHtml()}${outils}${ligneN}${notes}${table}${bas}</div>${feuilleFav6(a)}`;
   }
   // ══ 5.417 (`favorisperso2`, Julien 21 nov. : « on n'a pas la possibilité de personnaliser, améliore ça ») ══════════
   //    L'ÉDITEUR DES MESSAGES AUX FAVORIS, compte de l'onglet : versions « 1 article » et « lot » (une au hasard à chaque
@@ -4845,7 +4864,7 @@ function vrmVerifVisible(sel) {
     if (!lotsData || lotsData.charge) return `<section class="lot5" data-lots="charge" role="status"><small>${esc(TU('lot_lecture'))}</small></section>`;
     if (!lotsData.data) return `<section class="lot5" data-lots="pas-su"><small>${esc(lotsData.raison)}</small></section>`;
     const d = lotsData.data, l = d.lots || [];
-    if (!l.length) return `<section class="lot5" data-lots="0"><small>${esc(TU('lot_aucun'))}</small></section>`;
+    if (!l.length) return '';   // 5.440.5 : rien à dire quand personne n'a aimé deux articles (la phrase troublait)
     const tx = bmVal('lotFavoris').taux || d.taux || 10;
     return `<section class="lot5" data-lots="${l.length}"><div class="lot5-t"><b>${esc(TU('lot_titre', { n: l.length }))}</b><div class="vu-seg vue5" role="group" aria-label="${esc(TU('lot_taux'))}">${[5, 10, 15, 20].map((t) => `<button type="button" data-lot-taux="${t}" aria-pressed="${tx === t}">−${t} %</button>`).join('')}</div></div>`
       + `<p class="note5">${esc(TU(d.lotAppris ? 'lot_appris' : 'lot_pas_appris'))}</p><ul class="rangs">`
@@ -6128,6 +6147,8 @@ function vrmVerifVisible(sel) {
         const duree = m >= 60 ? `environ ${Math.ceil(m / 60)} h` : `environ ${Math.max(5, m)} min`;
         tete = `<div class="val gris" data-import-etat="${im.etat === 'encours' ? 'encours' : 'attente'}">${im.etat === 'encours' ? 'Lecture de ton historique' : 'Ton historique arrive'} · ${duree}, Vinted ouvert.</div>`;
       }
+      // 5.440.5 (Julien : la carte d'import finie prenait la place) : finie ⇒ UNE ligne discrète, plus de gros bouton.
+      if (im.etat === 'fini') return `<div class="ligne imp-fini" data-import="fini"><div class="val gris" data-import-etat="fini">${im.horizonMois ? 'Passé importé (12 mois)' : 'Historique importé'}<span class="coche" aria-label="vérifié">✓</span></div></div>`;
       const bouton = im.etat === 'encours' ? '' : '<button class="b sec" data-import-tout>Tout récupérer</button>';
       return `<div class="ligne" data-import="${esc(im.etat)}"><div class="lib">${im.horizonMois ? 'Import de ton passé' : 'Ton historique Vinted'}</div>${tete}${unType(im.ventes, 'ventes', false)}${unType(im.achats, 'achats', !(im.ventes && im.ventes.fini))}${bouton}</div>`;
     };

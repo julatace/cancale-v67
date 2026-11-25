@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.440.4';
+const CODE_VERSION = '5.440.5';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -22206,7 +22206,144 @@ function adresseClocheVinted(domaine){const d=String(domaine||'www.vinted.fr').t
 const PAGE_NOTIFS='vrmPageNotifs';
 async function retenirPageNotifs(p){const c=pageNotificationsSure(p);if(c!==pageNotificationsSure(''))try{await chrome.storage.local.set({[PAGE_NOTIFS]:{p:c,at:Date.now()}});}catch(_){}}
 async function pageNotifsConnue(){try{const m=(await chrome.storage.local.get(PAGE_NOTIFS))[PAGE_NOTIFS];return m&&m.p?pageNotificationsSure(m.p):'';}catch(_){return '';}}
-async function executerMessageFavori(uid,acc,body,opts={}){
+// ══ 5.440.5 (25 nov., Julien, angeled92 : « Réponse incertaine : vérifie la conversation sur Vinted… » — « catastrophique ») ══
+// UNE ISSUE INCERTAINE, C'EST L'EXTENSION QUI LA TRANCHE — jamais lui (CLAUDE.md §2.10). MESURÉ en base (lecture seule) : la
+//    tentative de son compte était « incertaine » à l'étape « conversation », 0 écriture, offre jointe — la page complète des
+//    notifications (`interface_favoriListe_incertain`) a navigué pendant que VRM attendait sa réponse : la réponse est perdue,
+//    AVANT toute offre et tout message. La file s'arrêtait là et lui demandait de vérifier à la main.
+// Désormais :
+//   · avant toute offre / tout message (l'étape le prouve) ⇒ le serveur réessaie ce favori UNE fois, en fin de file ;
+//   · après (offre, envoi) ⇒ la conversation de CET envoi (n° et uuid prouvés : article ET destinataire, avant le geste) est
+//     RELUE comme une donnée, 5 à 9 s après, dans le budget de lecture : un message ou une offre de SON compte dedans ⇒
+//     « envoyé » ; sinon « en recherche » chez VRM, qui la confie de nouveau à une lecture plus tard (`verifier`) : relue sans
+//     rien de lui ⇒ réessayée une fois ; illisible ⇒ encore en recherche (relue plus tard, puis « pas confirmé »).
+//   · JAMAIS deux envois : rien ne se renvoie sans une lecture qui prouve que rien n'est parti ; la file ne s'arrête plus.
+// Garde-fous inchangés : compte de l'onglet (`gardeLecture`), budget de LECTURE (classe 'clic' : SON envoi), pause 403/429 et
+//    captcha (un frein ⇒ « pas su », rien de conclu), une requête à la fois (`vintedPage`), aucune écriture (GET seulement).
+// <issue-favori-regle> : l'issue d'un envoi lue dans les messages d'une conversation. `parti` : un message ou une offre de CE
+//    compte ; `autre` : un message ou une offre de quelqu'un d'autre (ou d'un auteur illisible) — rien de plus n'y part ;
+//    `rien` : aucun message ni offre (seulement des lignes du système) ; null : illisible.
+function issueFavoriDansFil(messages, uid) {
+  if (!Array.isArray(messages)) return null;
+  let autre = false;
+  for (const m of messages) {
+    if (!m || typeof m !== 'object') continue;
+    const t = String(m.entity_type || m.type || m.message_type || '');
+    const estOffre = /offer/.test(t), estMsg = ['message', 'text', 'text_message', 'user_message', 'reply'].includes(t);
+    if (!estOffre && !estMsg) continue;
+    const e = m.entity && typeof m.entity === 'object' ? m.entity : {};
+    const a = e.user_id != null ? e.user_id : m.sender_id != null ? m.sender_id : m.user_id != null ? m.user_id : e.sender_id != null ? e.sender_id : null;
+    if (a != null && String(a) === String(uid)) return 'parti';
+    autre = true;
+  }
+  return autre ? 'autre' : 'rien';
+}
+const ETAPES_AVANT_ECRITURE_FAV = new Set(['autorisation', 'cloche', 'conversation', 'verification', 'historique']);
+// La conversation d'un favori relue comme une DONNÉE (GET, budget de lecture) : par SON n° (identité article + destinataire
+//    revérifiée), sinon par son uuid (la nouvelle messagerie : UNE personne, le destinataire), sinon — sans n° connu — la
+//    première page de la messagerie : les conversations AVEC CE destinataire (identité), relues une à une (3 au plus) jusqu'à
+//    celle de CET article ; aucune et la page remonte avant la tentative ⇒ rien de lui depuis (`rien`). Jamais un titre.
+async function lireIssueFavori(uid, acc, x) {
+  const ID = (v) => /^[1-9]\d{0,19}$/.test(String(v || ''));
+  const itemId = String(x.itemId || ''), recipientId = String(x.recipientId || '');
+  if (!ID(itemId) || !ID(recipientId)) return { issue: null, pourquoi: 'identite' };
+  const lire = async (chemin) => {
+    const g = await gardeLecture(String(uid), acc, 'clic');
+    if (g) return { arret: g.code || 'garde' };
+    const r = await vintedPage(acc, 'GET', chemin, null, { timeoutMs: 12000, travail: true });
+    if (r && (r.sansPage || r.pause || r.robot || freinFavoriAuto(r))) return { arret: 'frein' };
+    return r || {};
+  };
+  const parFil = (c) => {
+    const pages = Number(c && c.pagination && c.pagination.total_pages) > 1 || (c && (c.has_more === true || c.has_more_messages === true));
+    const i = issueFavoriDansFil(c && c.messages, uid);
+    return i === 'parti' || i === 'autre' ? i : pages ? null : i;
+  };
+  if (ID(x.conv)) {
+    const lu = await lire(`/api/v2/conversations/${x.conv}`);
+    if (lu.arret) return { issue: null, pourquoi: lu.arret };
+    const c = lu.ok && lu.json && lu.json.conversation;
+    if (c && String(c.id) === String(x.conv)) {
+      const art = String((c.transaction && (c.transaction.item_id || (c.transaction.item && c.transaction.item.id))) || (c.item && c.item.id) || c.item_id || '');
+      if (String(c.opposite_user && c.opposite_user.id) !== recipientId || (art && art !== itemId)) return { issue: null, pourquoi: 'identite' };
+      return { issue: parFil(c), pourquoi: 'fil' };
+    }
+  }
+  if (RE_UUID_CONV.test(String(x.route || ''))) {
+    const adr = adresseMessagerieVinted(acc && acc.domain, x.route);
+    const ln = adr ? await lire(adr) : {};
+    if (ln.arret) return { issue: null, pourquoi: ln.arret };
+    const c = ln.ok && ln.json && (ln.json.conversation || ln.json);
+    const opp = c && Array.isArray(c.opposite_users) ? c.opposite_users.map((o) => String(o && o.id)) : [];
+    if (c && String(c.id) === String(x.route)) {
+      if (opp.length !== 1 || opp[0] !== recipientId) return { issue: null, pourquoi: 'identite' };
+      return { issue: parFil(c), pourquoi: 'fil' };
+    }
+  }
+  if (ID(x.conv) || x.route) return { issue: null, pourquoi: 'illisible' };
+  // Sans conversation connue (l'extension s'est arrêtée avant de la prouver) : la messagerie, par identité.
+  const ib = await lire('/api/v2/inbox?page=1&per_page=20');
+  if (ib.arret) return { issue: null, pourquoi: ib.arret };
+  const l = ib.ok && ib.json && Array.isArray(ib.json.conversations) ? ib.json.conversations : null;
+  if (!l) return { issue: null, pourquoi: 'illisible' };
+  const avecLui = l.filter((c) => c && String(c.opposite_user && c.opposite_user.id) === recipientId && ID(c.id)).slice(0, 3);
+  for (const c0 of avecLui) {
+    const lu = await lire(`/api/v2/conversations/${c0.id}`);
+    if (lu.arret) return { issue: null, pourquoi: lu.arret };
+    const c = lu.ok && lu.json && lu.json.conversation;
+    const art = c ? String((c.transaction && (c.transaction.item_id || (c.transaction.item && c.transaction.item.id))) || '') : '';
+    if (c && String(c.id) === String(c0.id) && String(c.opposite_user && c.opposite_user.id) === recipientId && art === itemId) return { issue: parFil(c), pourquoi: 'messagerie' };
+  }
+  const depuis = Number(x.depuis) || 0, dernier = l.length ? Date.parse(String(l[l.length - 1].updated_at || '')) : NaN;
+  if (depuis > 0 && l.length >= 20 && Number.isFinite(dernier) && dernier < depuis - 60000 && !avecLui.some((c) => !(Date.parse(String(c.updated_at || '')) < depuis - 60000))) return { issue: 'rien', pourquoi: 'messagerie' };
+  if (depuis > 0 && l.length < 20 && !avecLui.length) return { issue: 'rien', pourquoi: 'messagerie' };
+  return { issue: null, pourquoi: 'pas_trouvee' };
+}
+// La tâche `verifier` de la file (une recherche due) : UNE lecture, aucune écriture. L'accusé : envoyé / déjà autre chose /
+//    rien de lui (le serveur réessaie une fois) / pas su (encore en recherche).
+async function verifierFavoriIncertain(uid, acc, body) {
+  const repV = (resultat, raison = '') => ({ ok: ['envoye', 'ignore'].includes(resultat), status: 0, json: { resultat, ...(raison ? { raison } : {}) } });
+  let r; try { r = await lireIssueFavori(uid, acc, body || {}); } catch (_) { r = { issue: null, pourquoi: 'erreur' }; }
+  noterDiag('favori_recherche_' + (r.issue || 'pas_su_' + String(r.pourquoi || '').replace(/[^a-z_-]/g, '').slice(0, 20)));
+  if (r.issue === 'parti') { logActivity('💬 Favori : la conversation relue montre ton message — compté envoyé (rien renvoyé).'); return repV('envoye'); }
+  if (r.issue === 'autre') return repV('ignore', 'conversation_deja_contactee');
+  if (r.issue === 'rien') return repV('refuse', 'incertain_pas_parti');
+  return repV('incertain', 'reponse_inconnue');
+}
+async function executerMessageFavori(uid, acc, body, opts = {}) {
+  // La lecture d'une recherche (tâche confiée par la file) : jamais une écriture, jamais une autorisation consommée.
+  if (body && body.verifier === true) return verifierFavoriIncertain(uid, acc, body);
+  const r = await executerMessageFavoriBrut(uid, acc, body, opts);
+  const j = r && r.json;
+  if (!j || j.resultat !== 'incertain' || ETAPES_AVANT_ECRITURE_FAV.has(String(j.etape || '')) || !(j.conv || j.route)) return r;
+  // Après une offre ou un message à l'issue pas claire : la conversation relue tout de suite (5 à 9 s, le temps que Vinted la
+  //    range). Son message ou son offre dedans ⇒ « envoyé ». Sinon rien n'est conclu ici (jamais renvoyé) : « en recherche ».
+  await wait(5000 + Math.round(Math.random() * 4000));
+  let lu; try { lu = await lireIssueFavori(uid, acc, { conv: j.conv, route: j.route, itemId: body && body.itemId, recipientId: body && body.recipientId }); } catch (_) { lu = { issue: null }; }
+  noterDiag('favori_incertain_relu_' + (lu.issue || 'pas_su'));
+  if (lu.issue === 'parti') return { ok: true, status: 200, json: { ...j, resultat: 'envoye', raison: '' } };
+  return r;
+}
+// 5.440.5 : après une ouverture de favori à la réponse perdue (la page a navigué), la conversation montrée par l'onglet de
+//    travail : `/inbox/{n°}`, ou `/inbox/{uuid}` relue (GET, budget de lecture) pour son ancien n° et SA personne (une seule,
+//    le destinataire). Aucune écriture. null ⇒ rien de prouvé.
+async function conversationApresPerte(acc,uid,recipientId){
+  let m=null;try{m=(await chrome.storage.local.get(ONGLET_TRAVAIL))[ONGLET_TRAVAIL];}catch(_){m=null;}
+  const tabId=m&&Number.isInteger(m.tabId)?m.tabId:null;if(tabId==null)return null;
+  try{await attendreOnglet(tabId,null,15000);}catch(_){}
+  let chemin='';try{chemin=new URL(String((await chrome.tabs.get(tabId)).url||'')).pathname;}catch(_){return null;}
+  const n=/^\/inbox\/([1-9]\d{0,19})\/?$/.exec(chemin);if(n)return {conv:n[1]};
+  const u=/^\/inbox\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/.exec(chemin);if(!u)return null;
+  if(await gardeLecture(String(uid),acc,'clic'))return null;
+  const adr=adresseMessagerieVinted(acc&&acc.domain,u[1]);if(!adr)return null;
+  const ln=await vintedPage(acc,'GET',adr,null,{timeoutMs:12000,travail:true});
+  const c=ln&&ln.ok&&ln.json&&(ln.json.conversation||ln.json);
+  const opp=c&&Array.isArray(c.opposite_users)?c.opposite_users.map(o=>String(o&&o.id)):[];
+  const core=c?String(Number(c.core_id_deprecated)):'';
+  if(!c||String(c.id)!==u[1]||!/^[1-9]\d{0,19}$/.test(core)||opp.length!==1||opp[0]!==String(recipientId))return null;
+  return {conv:core,route:u[1]};
+}
+async function executerMessageFavoriBrut(uid,acc,body,opts={}){
   // 5.419 : `manuel` = un envoi lancé par SON toucher « Confirmer l'envoi » dans le panneau (jamais le mode auto) :
   //    pas d'attente « Vinted vient d'être ouvert » ; `premier` = le 1er message de ce lot : le temps d'écriture de SON
   //    clic (2 à 6 s), pas celui d'une série ; `texte` = le message qu'il a modifié POUR CET ENVOI (le modèle, variables
@@ -22216,7 +22353,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   // (5.309, mode auto) `ecrits` = combien d'écritures sont PARTIES chez Vinted : 0 ⇒
   // rien n'est parti, le serveur peut laisser le mode auto reprendre ce favori.
   // (5.369) `variante` = le n° de la version envoyée (1 à 5), rendu au serveur pour le journal (jamais le texte).
-  let ecrits=0,frein='',variante=null,attente=null,apresMs=0,lienCloche='',rangCloche=-1;
+  let ecrits=0,frein='',variante=null,attente=null,apresMs=0,lienCloche='',rangCloche=-1,convAccuse='',routeAccuse='';
   // (5.406) `apresMs` : un refus d'ATTENTE (discrétion, plafond de l'heure, sécurité du compte) dit
   // au serveur QUAND réessayer — le vrai temps de la garde, plus les 10 min fixes d'avant.
   // 22 nov. (Julien : « 2 refusés : autre refus », impossible de dire quelle étape) : chaque accusé porte l'ÉTAPE où la
@@ -22224,7 +22361,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   //    des noms de code, jamais une valeur ni un texte. Un refus sans statut ni raison n'est PAS « Vinted a refusé » : `garde`.
   let etapeNom='autorisation';
   const causeDe=(resultat,status,raison,cause)=>cause||(['envoye','ignore'].includes(resultat)?'':frein?'frein':Number(status)>=400&&Number(status)<600?'http_'+Number(status):raison==='vinted_refus'?'garde':'');
-  const rep=(resultat,status=0,raison=resultat==='incertain'?'reponse_inconnue':resultat==='refuse'?'vinted_refus':'',cause='')=>({ok:['envoye','ignore'].includes(resultat),status,json:{resultat,raison:frein&&!['envoye','ignore'].includes(resultat)?frein:raison,etape:etapeNom,...(causeDe(resultat,status,raison,cause)?{cause:causeDe(resultat,status,raison,cause)}:{}),ecrits,...(apresMs>0&&ecrits===0?{apresMs}:{}),...(resultat==='envoye'&&Number.isInteger(variante)?{variante}:{})}});
+  const rep=(resultat,status=0,raison=resultat==='incertain'?'reponse_inconnue':resultat==='refuse'?'vinted_refus':'',cause='')=>({ok:['envoye','ignore'].includes(resultat),status,json:{resultat,raison:frein&&!['envoye','ignore'].includes(resultat)?frein:raison,etape:etapeNom,...(causeDe(resultat,status,raison,cause)?{cause:causeDe(resultat,status,raison,cause)}:{}),ecrits,...(apresMs>0&&ecrits===0?{apresMs}:{}),...(resultat==='envoye'&&Number.isInteger(variante)?{variante}:{}),...(convAccuse?{conv:convAccuse}:{}),...(routeAccuse?{route:routeAccuse}:{})}});
   if(typeof body?.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(body.jeton))return rep('refuse',400);
   const jeton=body.jeton;
   const session=await authToken();if(!session?.access_token)return rep('refuse',401,'session_extension');
@@ -22378,6 +22515,11 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   if(creation.envoye&&partie(creation))ecrits++;
   if(creation.rienParti&&!creation.pause)return rep('refuse',0,raisonFavoriInterface(creation),causeFavoriInterface(creation));
   if(creation.pause)return rep('refuse',0,creation.robot?'vinted_robot':'pause_vinted');
+  // 5.440.5 (le cas réel du 25 nov. : la ligne cliquée sur la page complète des notifications, la page a NAVIGUÉ, la réponse de
+  //    l'étape est perdue — rien d'autre n'était parti) : la conversation que la PAGE a ouverte se lit dans l'adresse de
+  //    l'onglet de travail ; reprise comme une ouverture normale — son identité (article ET destinataire) est prouvée plus
+  //    bas, avant toute offre et tout message (autre conversation ⇒ rien ne part). Rien de lisible ⇒ comme avant.
+  if(creation.incertain&&!creation.captcha&&!creation.robot){const rc=await conversationApresPerte(acc,uid,body.recipientId).catch(()=>null);if(rc){noterDiag('favori_ouverture_retrouvee');creation=Object.assign({viaPage:true,interface:true,status:200,ok:true,json:null,envoye:true},rc);ecrits++;}else noterDiag('favori_ouverture_perdue');}
   if(creation.incertain)return rep('incertain',0,'creation_non_confirmee');
   // (5.410) Vinted REFUSE d'ouvrir la conversation (400/404/422 : acheteur qui a bloqué, compte fermé, annonce
   // retirée) — certain, rien d'écrit chez lui : ce favori est SAUTÉ, la file continue. 401/403/429 : comme avant.
@@ -22388,6 +22530,8 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   if(!id(convId))return rep('incertain',creation.status,'creation_non_confirmee');
   // 5.440 : l'uuid de la nouvelle messagerie (s'il y en a un) — les gestes suivants ouvrent CETTE adresse.
   const convRoute=RE_UUID_CONV.test(String(creation.route||''))?String(creation.route):'';
+  // 5.440.5 : la conversation de CET envoi, rendue avec l'accusé (vérifiée avant tout message plus bas : seule une
+  //    conversation dont l'identité a été prouvée est relue en cas d'issue incertaine).
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   try{
     const r=await fetch(`https://vrm.center/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({action:'verifier',jeton}),signal:AbortSignal.timeout(12000)});
@@ -22415,6 +22559,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   // Both identities must be in the actual thread immediately before reply.
   const article=String(c?.transaction?.item_id||c?.transaction?.item?.id||c?.item?.id||c?.item_id||'');
   if(String(c?.id)!==convId||String(c?.opposite_user?.id)!==body.recipientId||article!==body.itemId||c?.allow_reply===false)return rep('refuse',lu.status,'identite_non_confirmee');
+  convAccuse=convId;routeAccuse=convRoute;   // 5.440.5 : identité prouvée (article ET destinataire) — relisible en cas de doute
   etape('historique');
   if(!Array.isArray(c.messages))return rep('refuse',lu.status,'historique_non_verifie');
   // (5.309, mode auto — garde-fou n° 1) Un message AUTOMATIQUE n'écrit RIEN dans une
@@ -22878,7 +23023,7 @@ async function etatDirectPourApp(uid) {
 //  La fenêtre de vinted.fr montre chaque favori lancé avec SON état, lu de la file du serveur (`st.jobs` : n° de la
 //  notification, état, raison — des codes, jamais un texte) et relié à l'article par la notification qu'il a choisie
 //  (`items[].n`) — jamais par un titre. L'étape en cours (`etapeFav`) est celle que l'envoi vient d'annoncer.
-const ETATS_LIGNE_FAV = { envoye: 'envoye', ignore: 'saute', refuse: 'pas', incertain: 'verifier', verifie: 'verifier', reserve: 'cours', attente: 'attente', annule: 'annule' };
+const ETATS_LIGNE_FAV = { envoye: 'envoye', ignore: 'saute', refuse: 'pas', incertain: 'verifier', verifie: 'verifier', reserve: 'cours', recherche: 'cours', attente: 'attente', annule: 'annule' };   // 5.440.5 : « en recherche » = VRM relit, une ligne « en cours »
 function lignesFavoris(st) {
   const items = Array.isArray(st && st.items) ? st.items.slice(0, FAVORIS_CARTE_MAX) : [];
   if (!items.length || !items.some((x) => x && x.n)) return null;

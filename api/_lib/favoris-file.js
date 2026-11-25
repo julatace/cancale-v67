@@ -61,11 +61,47 @@ export function delaiRythme(rythme,jeton,precedent){
   if(b[0]+k*1000===Number(precedent))k=(k+1+(h%(pas-1)))%pas;   // jamais deux fois de suite la même valeur
   return b[0]+k*1000;
 }
+// ══ 25 nov. (Julien, angeled92 : « Réponse incertaine : vérifie la conversation sur Vinted », la file en pause — « catastrophique ») ══
+// UNE ISSUE INCERTAINE NE S'ARRÊTE PLUS SUR LUI. C'est l'extension qui tranche, jamais Julien (CLAUDE.md §2.10) :
+//   · incertain AVANT toute offre ou message (l'étape le dit : autorisation, cloche, conversation, vérification, historique) ⇒
+//     rien de LUI n'a pu partir : réessayé UNE fois (en fin de file, par le même chemin, dans les plafonds), puis sauté ;
+//   · incertain APRÈS (offre, écriture, envoi) ⇒ « en recherche » (`recherche`) : JAMAIS renvoyé tant qu'une lecture n'a pas
+//     tranché ; la file CONTINUE avec les autres ; à la passe suivante (≥ RECHERCHE_MS), la file confie à l'extension une
+//     LECTURE de CETTE conversation (son n° / uuid, vérifiés avant le geste ; budget de lecture) : un message ou une offre de
+//     son compte dedans ⇒ « envoyé » ; relue sans rien de lui ⇒ réessayé une fois ; illisible ⇒ toujours en recherche,
+//     relue plus tard (au plus RECHERCHE_MAX fois, puis « pas confirmé » : jamais renvoyé, rien ne s'arrête, rien à faire).
+//   · plus aucune file ni mode auto bloqués par une incertitude ; une file reste « active » tant qu'une recherche attend.
+export const ETAPES_AVANT_ECRITURE=Object.freeze(['autorisation','cloche','conversation','verification','historique']);
+export const RECHERCHE_MS=2*60000;
+export const RECHERCHE_MAX=5;
+export const REESSAI_INCERTAIN_MAX=1;
+const PHRASES_INCERTAINES=/^Réponse (?:incertaine|interrompue)/;
+// Une file d'avant le 25 nov. gardait ses « incertain » bloquants : la règle d'aujourd'hui leur est appliquée à la lecture
+// (sans rien envoyer) — avant tout geste ⇒ le réessai unique ; après ⇒ en recherche ; la pause qu'ils posaient est levée
+// si la tentative a moins de 24 h (sinon la file reste arrêtée, rien ne repart).
+function migrerIncertains(d,maintenant=Date.now()){
+  for(const g of Object.values(d.groupes||{})){
+    if(!g||!Array.isArray(g.jobs))continue;let leve=false;
+    for(const j of g.jobs){
+      if(!j||j.etat!=='incertain'||j.recherches!=null)continue;
+      const recent=maintenant-(Number(j.traiteLe)||0)<86400000;
+      if(ETAPES_AVANT_ECRITURE.includes(String(j.etape||''))){
+        if(recent){j.etat='attente';j.reessaisIncertain=1;delete j.traiteLe;leve=true;}else{j.etat='refuse';j.raison='incertain_pas_parti';}
+      }else{j.etat='recherche';j.recherches=0;j.rechercheLe=0;if(recent)leve=true;}
+    }
+    if(leve&&g.active!==true&&PHRASES_INCERTAINES.test(String(g.raison||''))&&g.jobs.some(x=>['attente','recherche'].includes(x.etat))){g.active=true;g.raison='';}
+  }
+  return d;
+}
 export function initialiserFile(d){
   if(d==null)return {version:1,groupes:{},tentatives:[],enCours:null};
   if(d.version!==1||!d.groupes||!Array.isArray(d.tentatives))throw new RefusFavoris('Le format de la file nécessite une vérification.');
-  return clone(d);
+  return migrerIncertains(clone(d));
 }
+// La prochaine lecture d'une recherche : RECHERCHE_MS après la tentative, puis le double à chaque lecture sans réponse.
+const rechercheDue=j=>(Number(j.rechercheLe)||0)+RECHERCHE_MS*2**Math.min(4,Number(j.recherches)||0);
+const idConvSur=v=>/^[1-9]\d{0,19}$/.test(String(v||''))?String(v):'';
+const routeSure=v=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(v||''))?String(v):'';
 // Ce que l'écran du mode auto montre (2 nov.) : réglages, pause, compteurs, journal.
 // Les compteurs sont ceux du COMPTE Vinted (tous les propriétaires de la file).
 function vueAuto(d,g){
@@ -106,7 +142,7 @@ export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMin
   for(const t of targets)if(!t||!entier(t.itemId)||!entier(t.recipientId)||typeof t.notificationId!=='string'||!t.notificationId||t.notificationId.length>160||typeof t.initiator!=='string'||!t.initiator||t.initiator.length>80)throw new RefusFavoris('Le destinataire du favori n’est pas confirmé.');
   const g=d.groupes[owner]||{jobs:[],active:false,prochain:0};
   if(g.active||g.jobs.some(x=>x.etat==='reserve'))throw new RefusFavoris('Une file est déjà en cours pour ce compte.');
-  if(g.jobs.some(x=>x.etat==='incertain'))throw new RefusFavoris('Vérifie les envois incertains sur Vinted avant de préparer une nouvelle file.');
+  // 25 nov. : une tentative incertaine ne bloque plus un nouvel envoi (elle reste « connue » : jamais recontactée).
   // A new launch is exactly its new selection, never an old paused remainder.
   for(const j of g.jobs)if(j.etat==='attente')j.etat='annule';
   // (16 nov., lot favoris-offres-irreprochable) Un favori REFUSÉ après qu'une écriture est
@@ -123,7 +159,7 @@ export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMin
   if(anciens.length+nouveaux.length>500)throw new RefusFavoris('La file a atteint sa capacité. Aucun historique de dédoublonnage n’a été effacé.');
   delete g.raisonCode;delete g.raisonRefus;delete g.raisonN;
   // 5.440.1 : un NOUVEL envoi repart de zéro (avant : les refus d'un ancien lot comptaient « de suite » dans le nouveau).
-  d.groupes[owner]={...g,refusLocaux:0,refusTexte:0,jobs:[...anciens,...nouveaux],active:true,raison:'',lot,intervalleMinutes,intervalleMax:max,rythme:ry};
+  d.groupes[owner]={...g,arrete:false,refusLocaux:0,refusTexte:0,jobs:[...anciens,...nouveaux],active:true,raison:'',lot,intervalleMinutes,intervalleMax:max,rythme:ry};
   d.proprietaires=Object.keys(d.groupes);
   if(JSON.stringify(d).length>1500000)throw new RefusFavoris('La file a atteint sa capacité.');
   return {data:d,valeur:vueFile(d,owner)};
@@ -131,12 +167,16 @@ export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMin
 export function reserverFile(d,{owner,maintenant,jeton,suivi=''}){
   d=initialiserFile(d);const g=d.groupes[owner];
   if(!g?.active)return {valeur:{vue:vueFile(d,owner)}};
-  if(Object.values(d.groupes).some(x=>x.jobs.some(j=>j.etat==='incertain')))return {valeur:{vue:{...vueFile(d,owner),raison:'Une tentative sur ce compte doit être vérifiée sur Vinted avant la suite.'}}};
+  // 25 nov. : plus de blocage global sur une tentative incertaine (elle est « en recherche », relue par l'extension).
   if(d.enCours){
     if(maintenant-d.enCours.at>120000){
+      // Une tentative restée sans accusé : jamais renvoyée — EN RECHERCHE (la conversation sera relue), la file continue.
+      // L'autorisation d'écrire expire à 90 s (`verifierReservation`) : une extension en retard ne peut plus rien envoyer.
       const autre=d.groupes[d.enCours.owner],j=autre?.jobs.find(x=>x.id===d.enCours.id);
-      if(j)j.etat='incertain';if(autre){autre.active=false;autre.raison='Réponse interrompue : vérifie la conversation sur Vinted. Aucun renvoi automatique.';}
-      // Keep the token: a late, exact receipt may still settle this attempt.
+      if(j&&!d.enCours.verif){j.etat='recherche';j.recherches=0;j.rechercheLe=maintenant;j.traiteLe=maintenant;}
+      else if(j&&d.enCours.verif){j.recherches=(Number(j.recherches)||0)+1;j.rechercheLe=maintenant;if(j.recherches>=RECHERCHE_MAX)j.etat='incertain';}
+      if(d.enCours.verif&&autre){autre.prochain=d.enCours.prochainAvant||0;d.prochainGlobal=d.enCours.globalAvant||0;}
+      d.enCours=null;
       return {data:d,valeur:{vue:vueFile(d,owner)}};
     }
     return {valeur:{vue:vueFile(d,owner)}};
@@ -144,8 +184,20 @@ export function reserverFile(d,{owner,maintenant,jeton,suivi=''}){
   const t=d.tentatives.filter(x=>x>maintenant-3600000);
   const prochain=Math.max(g.prochain||0,d.prochainGlobal||0);
   if(maintenant<prochain)return {valeur:{vue:{...vueFile(d,owner),prochain}}};
+  // 25 nov. : une recherche due passe d'abord — une LECTURE de sa conversation confiée à l'extension (aucune écriture, aucun
+  //    rythme ni quota d'envoi consommé ; le budget de lecture est celui de l'extension).
+  const r0=g.jobs.find(x=>x.etat==='recherche'&&maintenant>=rechercheDue(x));
+  if(r0){
+    d.enCours={owner,id:r0.id,jeton,suivi,at:maintenant,verif:true,prochainAvant:g.prochain||0,globalAvant:d.prochainGlobal||0};
+    return {data:d,valeur:{vue:vueFile(d,owner),travail:{verifier:true,jeton,suivi,itemId:r0.itemId,recipientId:r0.recipientId,...(r0.notificationId?{notificationId:String(r0.notificationId)}:{}),...(idConvSur(r0.conv)?{conv:idConvSur(r0.conv)}:{}),...(routeSure(r0.route)?{route:routeSure(r0.route)}:{}),...(Number(r0.traiteLe)>0?{depuis:Number(r0.traiteLe)}:{})}}};
+  }
   const j=g.jobs.find(x=>x.etat==='attente');
-  if(!j){g.active=false;return {data:d,valeur:{vue:vueFile(d,owner)}};}
+  if(!j){
+    // Une recherche pas encore due : la file reste ouverte jusqu'à sa lecture (le prochain passage à son heure).
+    const rs=g.jobs.filter(x=>x.etat==='recherche');
+    if(rs.length&&!g.arrete){g.prochain=Math.max(g.prochain||0,Math.min(...rs.map(rechercheDue)));d.prochainGlobal=Math.max(d.prochainGlobal||0,g.prochain);return {data:d,valeur:{vue:vueFile(d,owner)}};}
+    g.active=false;return {data:d,valeur:{vue:vueFile(d,owner)}};
+  }
   // (2 nov., mode auto) Un message AUTOMATIQUE ne part que si le mode est encore
   // allumé, sans pause, dans ses horaires : sinon il est annulé (rien n'est parti,
   // le favori pourra être repris plus tard par le mode auto).
@@ -164,21 +216,53 @@ export function reserverFile(d,{owner,maintenant,jeton,suivi=''}){
   d.prochainGlobal=g.prochain;
   return {data:d,valeur:{vue:vueFile(d,owner),travail:{...j,jeton,suivi}}};
 }
-export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=null,variante=null,apresMs=null,etape=null,cause=null}){
+// Après une recherche tranchée : la file s'arrête seulement quand plus rien n'attend ni ne se cherche.
+function finSiRien(g){if(!g.jobs.some(x=>['attente','recherche'].includes(x.etat))){g.active=false;g.raison='Sélection traitée ou file arrêtée.';g.raisonCode='traitee';}}
+// « Rien n'est parti pour lui » (prouvé) : réessayé UNE fois, en fin de file ; ensuite sauté — la file continue.
+function reessaiIncertain(g,j,fin){
+  delete j.conv;delete j.route;delete j.recherches;delete j.rechercheLe;
+  if((Number(j.reessaisIncertain)||0)<REESSAI_INCERTAIN_MAX&&!g.arrete){
+    j.etat='attente';j.reessaisIncertain=(Number(j.reessaisIncertain)||0)+1;delete j.raison;delete j.traiteLe;
+    g.jobs.splice(g.jobs.indexOf(j),1);g.jobs.push(j);g.active=true;g.raison='';delete g.raisonCode;return true;
+  }
+  j.etat='refuse';j.raison='incertain_pas_parti';j.traiteLe=fin;return false;
+}
+// L'issue d'une LECTURE de recherche (jamais une écriture) : `envoye` (son message ou son offre est dans la conversation),
+// `ignore` (la conversation porte déjà autre chose : rien de plus n'y part), `refuse`+`incertain_pas_parti` (relue, rien de
+// lui ⇒ le réessai unique) ; tout le reste ⇒ toujours en recherche (relue plus tard), puis « pas confirmé ».
+function terminerRecherche(d,g,j,e,{owner,resultat,raison,maintenant}){
+  const fin=Math.max(e.at,Number.isSafeInteger(maintenant)?maintenant:e.at);
+  g.prochain=e.prochainAvant||0;d.prochainGlobal=e.globalAvant||0;d.enCours=null;
+  const etaitActive=g.active===true;
+  if(j.etat==='recherche'||j.etat==='incertain'){
+    if(resultat==='envoye'){j.etat='envoye';j.envoyeLe=Number(j.traiteLe)||fin;j.parLecture=true;delete j.raison;delete j.recherches;delete j.rechercheLe;}
+    else if(resultat==='ignore'){j.etat='ignore';j.raison='conversation_deja_contactee';j.traiteLe=fin;delete j.recherches;delete j.rechercheLe;}
+    else if(resultat==='refuse'&&raison==='incertain_pas_parti')reessaiIncertain(g,j,fin);
+    else{j.recherches=(Number(j.recherches)||0)+1;j.rechercheLe=fin;if(j.recherches>=RECHERCHE_MAX){j.etat='incertain';j.traiteLe=fin;}}
+  }
+  if(etaitActive)finSiRien(g);
+  const valeur=vueFile(d,owner);
+  if(etaitActive&&!g.active&&!j.auto){const lot=g.jobs.filter(x=>x.lot===g.lot);const n=k=>lot.filter(x=>x.etat===k).length;valeur.fin={lot:g.lot||null,total:lot.length,envoyes:n('envoye'),incertains:n('incertain'),interrompus:n('refuse'),interrompue:false,bilan:bilanFavoris(lot)};}
+  return {data:d,valeur};
+}
+export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=null,variante=null,apresMs=null,etape=null,cause=null,conv=null,route=null}){
   d=initialiserFile(d);const e=d.enCours,g=d.groupes[owner];
   if(!e||e.owner!==owner||e.jeton!==jeton)return {valeur:vueFile(d,owner)};
   const j=g.jobs.find(x=>x.id===e.id);
   const etaitActive=g.active===true;
   if(!j)throw new RefusFavoris('La tentative enregistrée nécessite une vérification.');
   if(!['envoye','ignore','refuse','incertain'].includes(resultat))throw new RefusFavoris('Accusé invalide.',400);
+  if(e.verif)return terminerRecherche(d,g,j,e,{owner,resultat,raison,maintenant});
   if(['envoye','ignore'].includes(resultat)&&!e.autorise)throw new RefusFavoris('Cette tentative n’a pas été autorisée par le serveur.');
   const fin=Math.max(e.at,Number.isSafeInteger(maintenant)?maintenant:e.at);
   if(resultat==='ignore'){
     d.tentatives=d.tentatives.filter(t=>t!==e.at);g.prochain=e.prochainAvant||0;d.prochainGlobal=e.globalAvant||0;
   }else{d.tentatives=d.tentatives.map(t=>t===e.at?fin:t);g.prochain=Math.max(g.prochain||0,fin+(Number.isSafeInteger(e.delai)?e.delai:j.intervalleMinutes*60000));d.prochainGlobal=g.prochain;}
-  const raisons=['article_vendu','ecran_inactif','compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue','onglet_vinted','offre_refusee','offre_prix_inconnu','offre_incertaine','conversation_existante','vinted_frein','vinted_robot','tout_arrete','trop_tard','annonce_indisponible','texte_interdit','texte_refuse','offre_sous_plancher','conversation_refusee','element_introuvable','favori_trop_ancien','notification_pas_trouvee'];
+  const raisons=['incertain_pas_parti','article_vendu','ecran_inactif','compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue','onglet_vinted','offre_refusee','offre_prix_inconnu','offre_incertaine','conversation_existante','vinted_frein','vinted_robot','tout_arrete','trop_tard','annonce_indisponible','texte_interdit','texte_refuse','offre_sous_plancher','conversation_refusee','element_introuvable','favori_trop_ancien','notification_pas_trouvee'];
   if(raisons.includes(raison))j.raison=raison;
-  j.etat=resultat;d.enCours=null;delete g.raisonCode;delete g.raisonRefus;delete g.raisonN;
+  j.etat=resultat;d.enCours=null;
+  // 25 nov. : la conversation de CET envoi (vérifiée avant le geste) — relue en cas de recherche ; jamais un texte.
+  if(resultat==='incertain'){if(idConvSur(conv))j.conv=idConvSur(conv);if(routeSure(route))j.route=routeSure(route);}delete g.raisonCode;delete g.raisonRefus;delete g.raisonN;
   // (22 nov.) L'étape et la classe de la cause, rangées sur la ligne (liste blanche : des noms de code, jamais un texte).
   if(typeof etape==='string'&&ETAPE_ACCUSE.test(etape))j.etape=etape;else delete j.etape;
   if(typeof cause==='string'&&CAUSE_ACCUSE.test(cause))j.cause=cause;else delete j.cause;
@@ -223,13 +307,21 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
     //    et un code la fait traduire par l'extension (`raisonCode`) — le texte français reste pour l'app.
     const rr=MOTS_REFUS[raison]?raison:'autre';g.raisonCode='local_saute';g.raisonRefus=rr;g.raison=phraseRaisonFile('local_saute',{refus:rr});if(!g.jobs.some(x=>x.etat==='attente')){g.active=false;g.raison='Sélection traitée ou file arrêtée.';g.raisonCode='traitee';}}
   else if(attendQuota){j.etat='attente';delete j.raison;delete j.traiteLe;j.attentesQuota=(Number(j.attentesQuota)||0)+1;const att=Number.isSafeInteger(apresMs)&&apresMs>=5000&&apresMs<=3600000?apresMs:QUOTA_ATTENTE_MS;g.prochain=Math.max(e.prochainAvant||0,fin+att);d.prochainGlobal=g.prochain;g.raison='La limite d’actions de l’heure est atteinte : les messages suivants partent dès qu’une place se libère.';}
+  else if(resultat==='incertain'||(resultat==='refuse'&&raison==='incertain_pas_parti')){
+    // 25 nov. : l'issue incertaine ne met plus la file en pause. Avant toute offre / tout message (l'étape le prouve), ou
+    //    l'extension a relu la conversation sans rien de lui ⇒ le réessai unique ; sinon EN RECHERCHE (relue plus tard).
+    const avant=ETAPES_AVANT_ECRITURE.includes(String(j.etape||''))||resultat==='refuse';
+    if(avant)reessaiIncertain(g,j,fin);else{j.etat='recherche';j.recherches=0;j.rechercheLe=fin;}
+    g.raison='';delete g.raisonCode;
+    if(!g.jobs.some(x=>['attente','recherche'].includes(x.etat)))finSiRien(g);
+  }
   else if(j.auto&&['envoye','ignore'].includes(resultat)){if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
   else if(!['envoye','ignore'].includes(resultat)){g.active=false;const suite=!j.auto&&refusLocal({resultat,raison,ecrits:j.ecrits,cause:j.cause,etape:j.etape});if(suite){g.raisonCode='locaux_suite';g.raisonRefus=MOTS_REFUS[raison]?raison:'autre';g.raisonN=(Number(g.refusLocaux)||0)+1;}g.raison=suite?phraseRaisonFile('locaux_suite',{refus:g.raisonRefus,n:g.raisonN}):raison==='article_vendu'?'Article vendu : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='annonce_indisponible'?'Annonce réservée, masquée, fermée ou supprimée : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='ecran_inactif'?'Écran des favoris quitté avant le départ. Les messages restants ne sont pas envoyés.':raison==='vinted_robot'&&!j.auto?'Vinted a refusé l’envoi (protection anti-robot) : la file est en pause, rien ne part. Si Vinted affiche une vérification sur vinted.fr, fais-la ; puis « Reprendre » sur la carte VRM de vinted.fr (on reprend plus doucement pendant 24 h).':resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':RAISONS_FAVORIS[raison]?`${RAISONS_FAVORIS[raison]} Les messages restants ne sont pas envoyés.`:'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
-  else {if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;if(!g.active){g.raison='Sélection traitée ou file arrêtée.';g.raisonCode='traitee';}}
+  else {if(!g.jobs.some(x=>['attente','recherche'].includes(x.etat)))g.active=false;if(!g.active){g.raison='Sélection traitée ou file arrêtée.';g.raisonCode='traitee';}}
   // (28 oct.) La file vient de se TERMINER (finie ou interrompue) : son bilan,
   // une seule fois (la transition active → inactive), pour la notification.
   const valeur=vueFile(d,owner);if(nouvelleDemande)valeur.nouvelleDemande=nouvelleDemande;
-  if(etaitActive&&!g.active&&!j.auto){const lot=g.jobs.filter(x=>x.lot===g.lot);const n=k=>lot.filter(x=>x.etat===k).length;valeur.fin={lot:g.lot||null,total:lot.length,envoyes:n('envoye'),incertains:n('incertain'),interrompus:n('refuse'),interrompue:!['envoye','ignore'].includes(resultat)&&!autreVersion,bilan:bilanFavoris(lot)};}
+  if(etaitActive&&!g.active&&!j.auto){const lot=g.jobs.filter(x=>x.lot===g.lot);const n=k=>lot.filter(x=>x.etat===k).length;valeur.fin={lot:g.lot||null,total:lot.length,envoyes:n('envoye'),incertains:n('incertain'),interrompus:n('refuse'),interrompue:!['envoye','ignore','incertain'].includes(resultat)&&raison!=='incertain_pas_parti'&&!autreVersion,bilan:bilanFavoris(lot)};}
   return {data:d,valeur};
 }
 // (29 oct., revue) Une offre (même un simple %) ne part que d'une extension ≥ 5.280 : avant, elle
@@ -259,7 +351,7 @@ export function verifierReservation(d,{owner,jeton,maintenant}){
 }
 export function arreterFile(d,owner){
   d=initialiserFile(d);const g=d.groupes[owner];if(!g)return {valeur:vueFile(d,owner)};
-  g.active=false;g.raison='File arrêtée. Une tentative déjà partie peut encore aboutir.';
+  g.active=false;g.arrete=true;g.raison='File arrêtée. Une tentative déjà partie peut encore aboutir.';
   for(const j of g.jobs)if(j.etat==='attente')j.etat='annule';
   return {data:d,valeur:vueFile(d,owner)};
 }
@@ -270,19 +362,19 @@ export function reprendreFile(d,{owner,maintenant}){
   d=initialiserFile(d);const g=d.groupes[owner];
   if(!g||g.active===true||!g.jobs.some(x=>x.etat==='attente'&&!x.auto&&(!g.lot||x.lot===g.lot)))throw new RefusFavoris('Il n’y a plus rien à reprendre : relance depuis la liste de tes favoris.',409);
   // 5.440.1 : « Reprendre » repart d'un compte de refus « de suite » à zéro.
-  g.active=true;g.raison='';g.refusLocaux=0;delete g.raisonCode;delete g.raisonRefus;delete g.raisonN;g.prochain=maintenant;d.prochainGlobal=maintenant;
+  g.active=true;g.arrete=false;g.raison='';g.refusLocaux=0;delete g.raisonCode;delete g.raisonRefus;delete g.raisonN;g.prochain=maintenant;d.prochainGlobal=maintenant;
   return {data:d,valeur:vueFile(d,owner)};
 }
 export function cloreIncertains(d,{owner,maintenant}){
   d=initialiserFile(d);const g=d.groupes[owner];
   if(!g||g.active)throw new RefusFavoris('Arrête la file avant de clôturer la vérification.');
-  if(!g.jobs.some(x=>['incertain','reserve'].includes(x.etat)))throw new RefusFavoris('Aucune tentative incertaine à clôturer.');
-  const intervalle=Math.max(...g.jobs.filter(x=>['incertain','reserve'].includes(x.etat)).map(x=>x.intervalleMinutes));
+  if(!g.jobs.some(x=>['incertain','reserve','recherche'].includes(x.etat)))throw new RefusFavoris('Aucune tentative incertaine à clôturer.');
+  const intervalle=Math.max(...g.jobs.filter(x=>['incertain','reserve','recherche'].includes(x.etat)).map(x=>x.intervalleMinutes));
   if(d.enCours?.owner===owner){
     if(maintenant-d.enCours.at<=120000)throw new RefusFavoris('La tentative peut être encore en cours. Attends deux minutes avant de la clôturer.');
     d.enCours=null;
   }
-  for(const j of g.jobs){if(['incertain','reserve'].includes(j.etat))j.etat='verifie';else if(j.etat==='attente')j.etat='annule';}
+  for(const j of g.jobs){if(['incertain','reserve','recherche'].includes(j.etat))j.etat='verifie';else if(j.etat==='attente')j.etat='annule';}
   if(d.tentatives.length)d.tentatives[d.tentatives.length-1]=Math.max(d.tentatives[d.tentatives.length-1],maintenant);
   g.prochain=Math.max(g.prochain||0,maintenant+intervalle*60000);d.prochainGlobal=Math.max(d.prochainGlobal||0,g.prochain);
   g.raison='Vérification clôturée. Ces destinataires ne seront pas recontactés automatiquement pour ces articles.';

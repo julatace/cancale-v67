@@ -19,7 +19,7 @@ import {AUTO_ESSAIS,DEMANDES_AUTO,ETATS_DEMANDE,validerAutoFavoris,dansPlageAuto
 import {gardeRefuse} from '../../src/offresGarde.js';
 import {favorisDepuisNotifications} from '../../src/favorisVinted.js';
 
-const ENVOI_FAIT=['envoye','incertain','reserve','verifie','ignore'];
+const ENVOI_FAIT=['envoye','incertain','recherche','reserve','verifie','ignore'];
 // Ce couple article/personne a-t-il déjà été traité (pour toujours) ? Seuls un
 // favori annulé avant départ, et un refus CERTAIN avant toute écriture chez Vinted
 // (l'extension 5.309 dit `ecrits: 0`), laissent le mode auto le reprendre.
@@ -49,7 +49,8 @@ export function etatAuto(d,owner,maintenant){
   if(!a?.reglages?.actif)return {etat:'eteint'};
   const pause=Number(d.pauseAutoJusqua)||0;
   if(pause>maintenant)return {etat:'pause',jusqua:pause};
-  if(Object.values(d.groupes).some(x=>(x.jobs||[]).some(j=>j.etat==='incertain')))return {etat:'a_verifier'};
+  // 25 nov. : une tentative incertaine n'attend plus « ta vérification » : l'extension relit la conversation seule
+  //    (`recherche`, la file reste active ⇒ « occupé » le temps de la lire) ; jamais renvoyée.
   if(d.enCours||Object.values(d.groupes).some(x=>x.active))return {etat:'occupe'};
   if(!dansPlageAuto(a.reglages,maintenant))return {etat:'hors_horaires'};
   const env=(Array.isArray(d.autoEnvois)?d.autoEnvois:[]).filter(t=>t>maintenant-AUTO_JOUR_MS);

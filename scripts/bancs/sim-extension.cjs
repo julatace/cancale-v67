@@ -187,7 +187,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     const jobs = () => (vue().jobs || []);
     const parItem = () => Object.fromEntries(jobs().map((x) => [String(x.itemId || String(x.id || '').split(':')[0]), `${x.etat}${x.raison ? ':' + x.raison : ''}${x.cause ? '/' + x.cause : ''}${x.etape ? '@' + x.etape : ''}`]));
     const reset = async () => {
-      S.d = null; V.st.req = []; V.st.ancienneConv = 200; Object.assign(V.st, { avant: 0, intercale: null, paginer: false, clocheN: 0, pageTaille: 20, suiteMs: 0 }); REGLAGES.message = MSG_PSEUDO; V.st.forcer = []; V.st.captchaSur = null; V.st.commande = {}; V.st.convs.clear(); seed();
+      S.d = null; V.st.req = []; V.st.ancienneConv = 200; Object.assign(V.st, { avant: 0, intercale: null, paginer: false, clocheN: 0, pageTaille: 20, suiteMs: 0 }); REGLAGES.message = MSG_PSEUDO; V.st.forcer = []; V.st.captchaSur = null; V.st.commande = {}; V.st.convs.clear(); Object.assign(V.st, { rechargerListe: 0, cacherMessage: 0, avalerMessage: 0, illisible: new Set() }); seed();
       await dansSW(async () => { await chrome.storage.local.remove(['vrmFavorisCarte', 'vrmActionEnCours', 'vrmPauseVinted', 'vrmCaptcha', 'vrmFavorisApercu', 'vrmTextesRecents', 'vrmToutArrete']); });
     };
 
@@ -243,6 +243,58 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       dit(fenL.length === N && fenL.filter((l) => l.etat === 'envoye').length === b.envoyes, `la fenêtre : ${N} lignes, autant « envoyé » que chez VRM`, JSON.stringify(fenL.map((l) => l.etat)));
       dit(f && f.f && f.f.file && Number(f.f.file.envoyes) === b.envoyes, 'les nombres de la carte = ceux de VRM', JSON.stringify(f && f.f && f.f.file));
       const tw = ctx.pages().find((p) => /vinted\.fr\/inbox\//.test(p.url())); if (tw) await shot(tw, F1 + '-fin'); await vt.bringToFront().catch(() => {}); await attendre(800); await shot(vt, F1 + '-onglet-de-julien');
+    }
+    // ══ I0–I3 (25 nov., 5.440.5 — Julien, angeled92 : « Réponse incertaine : vérifie la conversation sur Vinted », la file en
+    //    pause, « catastrophique » ; « c'est pas parti ») : l'issue incertaine est tranchée PAR L'EXTENSION, jamais par lui.
+    //    I0 le cas réel : la ligne cliquée sur la page complète des notifications, la page navigue en entier, la réponse de
+    //       l'étape est perdue AVANT toute offre et tout message ⇒ la conversation ouverte par la page est reprise (identité
+    //       prouvée ensuite), le message part — une fois.
+    //    I1 posté, pas vu (la page ne le montre pas) ⇒ la conversation relue le montre ⇒ « envoyé », rien renvoyé.
+    //    I2 pas posté (Vinted répond 500, rien rangé) ⇒ « en recherche », la file continue ; relue plus tard sans rien de lui ⇒
+    //       réessayé UNE fois ⇒ envoyé une fois.
+    //    I3 posté mais la conversation illisible ⇒ « en recherche », la file continue, rien renvoyé ; relue encore plus tard
+    //       (toujours illisible : rien), puis lisible ⇒ « envoyé ».
+    //    Toujours : jamais deux messages dans une conversation, l'autre favori part, la file finit sans pause « incertaine ».
+    for (const [nom, quoi] of [['I0', 'le cas réel : la page complète navigue au clic, la réponse de l’ouverture est perdue'], ['I1', 'message posté mais pas vu à l’écran'], ['I2', 'message pas posté (500 de Vinted)'], ['I3', 'message posté, conversation illisible un temps']]) if (veut(nom)) {
+      console.log(`\n── ${nom}. ${quoi}`);
+      FAVORIS.splice(2); ANNONCES.splice(3);
+      await reset();
+      if (nom === 'I0') Object.assign(V.st, { avant: 6, clocheN: 3, pageTaille: 20, rechargerListe: 1 });
+      if (nom === 'I1') V.st.cacherMessage = 1;
+      if (nom === 'I2') V.st.avalerMessage = 1;
+      if (nom === 'I3') { V.st.cacherMessage = 1; V.st.illisible.add(FAVORIS[0].itemId); }
+      seed();
+      const { r } = await lancer(FAVORIS.map((f) => f.nid));
+      dit(r && r.ok, 'la file part (son clic « Lancer »)', JSON.stringify(r).slice(0, 300));
+      const t0 = Date.now(); let pauseIncertaine = '', decales = 0, lectures0 = 0;
+      const lecturesA = () => { const cv = [...V.st.convs.values()].find((c) => c.itemId === FAVORIS[0].itemId); return cv ? V.st.req.filter((e) => e.m === 'GET' && (e.p === '/api/v2/conversations/' + cv.core || e.p === '/messaging/main/conversations/' + cv.uuid)).length : 0; };
+      const res = await attendreQue(async () => {
+        const v = vue(), f = await fenetre();
+        if (!v.active && /incertaine|interrompue/i.test(String(v.raison || ''))) pauseIncertaine = v.raison;
+        if (!v.active && f.f && !f.f.actif) return { v, f };
+        // Le temps qui passe (la recherche se relit 2 min après) : ramené dans le passé quand rien d'autre n'attend.
+        const g = S.d && S.d.groupes && S.d.groupes[U.id];
+        if (g && !S.d.enCours && g.jobs.some((x) => x.etat === 'recherche') && !g.jobs.some((x) => x.etat === 'attente')) {
+          if (nom === 'I3' && decales === 1 && V.st.illisible.size) { dit(lecturesA() > lectures0 && g.jobs.some((x) => x.etat === 'recherche'), 'I3 : relue encore illisible ⇒ toujours en recherche, rien renvoyé', `lectures ${lectures0} → ${lecturesA()}`); V.st.illisible.clear(); }
+          if (decales === 0) lectures0 = lecturesA();
+          for (const x of g.jobs) if (x.etat === 'recherche') x.rechercheLe = 0;
+          g.prochain = 0; S.d.prochainGlobal = 0; decales++;
+          await dansSW(async () => { try { await tickFavorisCarte(); } catch (_) {} });
+        }
+        return null;
+      }, 480000, 2000);
+      note(`durée ${Math.round((Date.now() - t0) / 1000)} s · ${JSON.stringify(parItem())}`);
+      const convs = [...V.st.convs.values()];
+      dit(!!res, 'la file se termine', JSON.stringify(parItem()));
+      dit(!pauseIncertaine, 'jamais de pause « réponse incertaine » (rien à vérifier à la main)', pauseIncertaine);
+      dit(convs.length === 2 && convs.every((c) => c.messages.length === 1), 'jamais deux messages : un seul message dans chaque conversation', JSON.stringify(convs.map((c) => [c.itemId, c.messages.length])));
+      const b = FP.bilanFavoris(jobs());
+      dit(b.envoyes === 2, 'les deux favoris envoyés (la file a continué)', JSON.stringify(parItem()));
+      dit(convs.some((c) => c.itemId === FAVORIS[1].itemId && c.messages.length === 1), 'l’autre favori est parti', JSON.stringify(convs.map((c) => c.itemId)));
+      const fl = res && res.f && res.f.f && res.f.f.fin;
+      dit(!fl || fl.raison !== 'interrompu', 'la fenêtre ne dit pas « Interrompu »', JSON.stringify(fl));
+      if (nom === 'I3') dit(decales >= 2, 'I3 : relue plusieurs fois avant de trancher', String(decales));
+      const tw = ctx.pages().find((p) => /vinted\.fr\/inbox\//.test(p.url())); if (tw) await shot(tw, nom + '-fin');
     }
     // ══ F2/F3/F4 : un désaccord sur la commande ⇒ ce favori n'est pas envoyé, la file continue ══════════════════════
     FAVORIS.splice(3); ANNONCES.splice(3);

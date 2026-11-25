@@ -33,6 +33,12 @@ function fauxVinted({ jetonVinted, lireJwt }) {
     // la cloche ne montre que les `clocheN` dernières ; la page complète en montre `pageTaille`, puis charge la suite au
     // défilement en `suiteMs` ms (lignes chargées à la demande).
     avant: 0, intercale: null, paginer: false, clocheN: 0, pageTaille: 20, suiteMs: 0,
+    // (25 nov., 5.440.5 — « Réponse incertaine » chez angeled92) Les issues incertaines, chacune pour les `n` prochaines fois :
+    //  `rechargerListe` : la page complète des notifications navigue EN ENTIER au clic d'une ligne (la réponse de l'étape est perdue) ;
+    //  `cacherMessage`  : Vinted range le message mais la page ne le montre pas (posté, pas vu) ;
+    //  `avalerMessage`  : Vinted répond 500 au message et ne le range pas (pas posté) ;
+    //  `illisible`      : les itemIds dont la conversation ne se relit plus (500) une fois un message dedans.
+    rechargerListe: 0, cacherMessage: 0, avalerMessage: 0, illisible: new Set(),
   };
   const cookieUid = (req) => {
     const m = /(?:^|;\s*)access_token_web=([^;]+)/.exec(String(req.headers.cookie || ''));
@@ -89,7 +95,7 @@ function fauxVinted({ jetonVinted, lireJwt }) {
     }
     const uid = cookieUid(req);
     const e = { h: host, m, p, q: url.search, uid, corps: corps || '', t: Date.now(), origine: String(req.headers.origin || '') };
-    if (host === 'www.vinted.fr' && !p.startsWith('/api/') && !/\.(js|png|svg|json|ico)$/.test(p)) { e.page = true; st.req.push(e); return rep(req, res, 200, PAGE(st, uid)); }
+    if (host === 'www.vinted.fr' && !p.startsWith('/api/') && !/\.(js|png|svg|json|ico)$/.test(p)) { e.page = true; st.req.push(e); const recharger = /^\/member\/notifications/.test(p) && st.rechargerListe > 0; if (recharger) st.rechargerListe--; return rep(req, res, 200, PAGE(st, uid, { recharger })); }
     st.req.push(e);
     const fin = (code, c) => { e.status = code; return rep(req, res, code, c); };
     await new Promise((r) => setTimeout(r, 30));
@@ -117,6 +123,9 @@ function fauxVinted({ jetonVinted, lireJwt }) {
       let mm = /^\/messaging\/main\/conversations\/([0-9a-f-]{36})(\/replies)?$/.exec(p);
       if (mm) {
         const cv = st.convs.get(mm[1]); if (!cv || cv.seller !== uid) return fin(404, { code: 404 });
+        if (!mm[2] && m === 'GET' && st.illisible.has(cv.itemId) && cv.messages.length) return fin(500, { code: 500 });
+        if (mm[2] && m === 'POST' && st.avalerMessage > 0) { st.avalerMessage--; return fin(500, { code: 500, message: 'Internal error' }); }
+        if (mm[2] && m === 'POST' && st.cacherMessage > 0) { st.cacherMessage--; let b = {}; try { b = JSON.parse(corps || '{}'); } catch (_) {} const id = 'm-' + (++st.n); const at = new Date().toISOString(); cv.messages.push({ id, texte: String(b.content || b.body || ''), de: uid, at }); return fin(201, { id, __cacher: true, data: { id, content: String(b.content || '') }, sender_id: Number(uid), created_at: at, message_type: 'text', conversation_id: cv.uuid }); }
         if (mm[2] && m === 'POST') { let b = {}; try { b = JSON.parse(corps || '{}'); } catch (_) {} const id = 'm-' + (++st.n); const at = new Date().toISOString(); cv.messages.push({ id, texte: String(b.content || b.body || ''), de: uid, at }); return fin(201, { id, data: { id, content: String(b.content || '') }, sender_id: Number(uid), created_at: at, message_type: 'text', conversation_id: cv.uuid }); }
         return fin(200, convJson(cv));
       }
@@ -129,6 +138,7 @@ function fauxVinted({ jetonVinted, lireJwt }) {
     let mm = /^\/api\/v2\/conversations\/(\d+)$/.exec(p);
     if (mm) { const cv = [...st.convs.values()].find((x) => String(x.core) === mm[1]);
       if (cv && st.ancienneConv !== 200) return fin(st.ancienneConv, { code: st.ancienneConv, message: 'not found' });
+      if (cv && st.illisible.has(cv.itemId) && cv.messages.length) return fin(500, { code: 500 });
       // La forme mesurée de l'ancienne relecture (tête : code, conversation.{id, messages, allow_reply, subtitle…}), complétée des
       // champs que l'extension lit déjà depuis toujours (opposite_user, transaction).
       if (cv) { const a = (c.annonces || []).find((x) => String(x.id) === cv.itemId); return fin(200, { code: 0, conversation: { id: cv.core, subtitle: a ? a.titre : '', translated: false, allow_reply: true, localization: 'fr', is_suspicious: false, read_by_current_user: true, read_by_opposite_user: false, is_deletion_restricted: false,
@@ -155,8 +165,8 @@ function fauxVinted({ jetonVinted, lireJwt }) {
 }
 
 // ── LA PAGE (une SPA minimale qui fait ce que fait Vinted quand on clique) ────────────────────────────────────
-function PAGE(st, uid) {
-  const O = { lienWeb: st.lienWeb, captcha: st.captchaSur ? st.captchaSur.source : '', clocheN: st.clocheN, pageTaille: st.pageTaille, suiteMs: st.suiteMs };
+function PAGE(st, uid, plus = {}) {
+  const O = { lienWeb: st.lienWeb, captcha: st.captchaSur ? st.captchaSur.source : '', clocheN: st.clocheN, pageTaille: st.pageTaille, suiteMs: st.suiteMs, recharger: !!plus.recharger };
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Vinted (simulation)</title><style>
 body{margin:0;font-family:system-ui,sans-serif;background:#f6f6f6;color:#111}header{display:flex;gap:14px;align-items:center;height:60px;padding:0 20px;background:#fff;border-bottom:1px solid #ddd}
 header .logo{color:#09b1ba;font-weight:700;font-size:24px;margin-right:auto}header button,header a{min-width:44px;height:44px;display:inline-grid;place-items:center;background:none;border:0;color:#111;text-decoration:none;font-size:15px}
@@ -189,7 +199,8 @@ textarea{width:420px;min-height:44px;display:block;margin:8px 0}.btn{height:44px
     document.getElementById('f').onsubmit = async (e) => {
       e.preventDefault(); const t = m.querySelector('textarea').value;
       const r3 = await api('/messaging/main/conversations/' + u + '/replies', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: t }) });
-      if (r3.ok) { const p = document.createElement('p'); p.textContent = t; fil.appendChild(p); m.querySelector('textarea').value = ''; }
+      const j3 = r3.ok ? await r3.clone().json().catch(() => ({})) : null;
+      if (r3.ok && !(j3 && j3.__cacher)) { const p = document.createElement('p'); p.textContent = t; fil.appendChild(p); m.querySelector('textarea').value = ''; }
     };
   };
   // L'adresse d'un favori ouverte directement (comme au clic de sa ligne) : la page ouvre la conversation elle-même
@@ -230,6 +241,7 @@ textarea{width:420px;min-height:44px;display:block;margin:8px 0}.btn{height:44px
   document.addEventListener('click', async (e) => {
     const a = e.target.closest && e.target.closest('a'); if (!a || a.target) return;
     const u = new URL(a.href); if (u.origin !== location.origin) return;
+    if (O.recharger && /^\/member\/notifications/.test(location.pathname) && /want_it/.test(u.pathname)) return;   // navigation complète
     e.preventDefault(); pan.classList.remove('on'); cl.setAttribute('aria-expanded', 'false');
     if (/want_it/.test(u.pathname)) return ouvrirFavori(u);
     history.pushState({}, '', u.pathname + u.search); route();
