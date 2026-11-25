@@ -531,6 +531,7 @@ import { bleamDe } from '../reglagesAutoLigne.js';   // (22 nov., intégration f
 import { BoutonTraduire, TraductionAbsente, NoteAcheteurApp, NoteAcheteurAvis } from '../TraduireLocal.jsx';   // (22 nov., intégration finale)
 import { etatChezMoi, publierChezMoi, etatAchatChezMoi } from '../achatChezMoi.js';   // (22 nov., intégration finale)
 import { avecRemboursements, coutAchatNet, enAttenteDe, publierRemboursements, coutFicheNet } from '../coutAchatNet.js';   // (22 nov., intégration finale)
+import { publierAchatsSite } from '../achats/nombresAchatsSites.js';   // (25 nov.) le nombre d'achats Vinted montrés, pour le filtre par plateforme d'Achats
 
 // ⟦← App.jsx #6⟧
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : {ComparaisonComptesVinted,HistoriqueArticle} (était importé en statique)
@@ -8500,6 +8501,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const buysBase = useMemo(() => { const l = avecRemboursements((buys.items || []).filter(o => !acctOffOf(o)), { remb: rembAchatsParTx, txn: etatTxn, montantDe: montantCommandeLu }); publierRemboursements(l); return l; },
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [buys.items, hiddenAccts, blockedAccts, rembAchatsParTx, vMemTxn]);
+  // (25 nov., filtre par plateforme d'Achats) La liste des achats Vinted publie SON nombre (src/achats/nombresAchatsSites.js) :
+  // lue ⇒ ses achats ; en cours ou ratée ⇒ rien (« pas su » n'est jamais « 0 »).
+  const publieAchatsV = only === 'achats' && vueAchats === 'achats';
+  useEffect(() => { if (publieAchatsV) publierAchatsSite('vinted', 'liste', Array.isArray(buys.items) && !buys.error ? buysBase.length : null); }, [publieAchatsV, buys.items, buys.error, buysBase]);
+  useEffect(() => () => { if (publieAchatsV) publierAchatsSite('vinted', 'liste', null); }, [publieAchatsV]);
   // (5 nov.) LES ACHATS, PUBLIÉS JOUR PAR JOUR (`vrm_achats_jours`, synchronisé) et
   // achat par achat (`vrm_achats_releve`, cet appareil) — la règle de « Dépensé »
   // (hors annulés, `achatAnnule`, `montantCommande`, date de l'achat), son

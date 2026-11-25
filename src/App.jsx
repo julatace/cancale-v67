@@ -1706,6 +1706,7 @@ import './designV2/signature.css'; // (8 nov.) style de ./designV2/Signature.jsx
 import * as Natif from "./natif/index.js";
 import { FiltrePlateformes, useFiltrePlateforme, filtreTableau } from "./natif/FiltrePlateformes.jsx";   // (25 nov.) le filtre par plateforme des onglets
 import { TOUTES as TOUTES_PLATEFORMES, nombresPlateformes, optionsPlateformes, choixEffectif as choixPlateformeEffectif, filtrerPlateforme } from "./filtrePlateforme.js";
+import { FiltreAchats, MorceauSite } from "./achats/FiltreAchats.jsx";   // (25 nov.) le filtre par plateforme d'Achats
 // (19 nov.) « VRM natif » : la coque (docs/design/NATIF.md)
 // (19 nov., « VRM natif ») `designV2/barre.jsx` n'est plus importé au démarrage (barre native) : seul Réglages le charge encore.
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
@@ -37731,7 +37732,7 @@ function AppCoeur() {
   // codes, QR, Mode relais, hors ligne, Scanner, et ses outils : à confirmer, à vérifier, e-mails,
   // argent à vérifier…) celle d'Achats. Les MÊMES composants (`Comptabilite only="bordereaux"`,
   // `colisDans`), aucune copie ; les anciens chemins (`cat_bord`, `retraits`…) mènent ici (`setTab`).
-  const rendreColisSection=(t,site)=>{
+  const rendreColisSection=(t,site,effA='toutes')=>{   // (25 nov.) effA : le filtre par plateforme d'Achats (src/achats/FiltreAchats.jsx)
     if(baseKO) return null;
     if(t==='ventes'&&site==='leboncoin') return (
       <section className="vrm-colis-section" data-colis-hote="ventes" data-colis-site="leboncoin" aria-label={L.aEnvoyer}>
@@ -37760,14 +37761,14 @@ function AppCoeur() {
             de « Toutes » : sur Vinted (l'écran d'arrivée, celui où mènent Ma journée et les notifications), TOUS les
             colis à retirer restent montrés — un achat Leboncoin au relais n'est jamais caché derrière le filtre
             (banc colis-qr : 9 colis, = vrm_colis_retirer). */}
-        <GardeEcran nom="achats:colis"><Comptabilite key="colis_achats" {...commun} only="bordereaux" colisDans="achats" siteColisDemande={site==='toutes'||site==='vinted'?null:site} sitesPresents={sitesPresents}
+        <GardeEcran nom="achats:colis"><Comptabilite key="colis_achats" {...commun} only="bordereaux" colisDans="achats" siteColisDemande={effA && effA!=='toutes' ? effA : (site==='toutes'||site==='vinted'?null:site)} sitesPresents={sitesPresents}
           ongletColis="retirer" onOngletColis={choisirOngletColis}/></GardeEcran>
         {/* Les OUTILS de retrait (à confirmer, à vérifier, suivis, e-mails reçus, argent à vérifier), sous la liste,
             une fois — les mêmes qu'hier sous Colis → À retirer (`retraitsOutils`). */}
         {/* (11 nov., intégration colis — arbitrage b) Les outils SUIVENT le filtre de site, même règle que la liste : ce qu'ils
             portent (à confirmer, à vérifier, e-mails de suivi, argent à vérifier) vient des achats Vinted et des e-mails —
             montrés sur Vinted (l'écran d'arrivée, qui montre tout), jamais sous eBay, Leboncoin ou Vestiaire. */}
-        {site==='toutes'||site==='vinted' ? <GardeEcran nom="achats:retirer"><div data-colis-retraits="outils"><Comptabilite key="colis_achats_outils" {...commun} only="achats" vueAchats="retraits" retraitsOutils dansPlateforme/></div></GardeEcran> : null}
+        {site==='toutes'||site==='vinted' ? <GardeEcran nom="achats:retirer"><div data-colis-retraits="outils" hidden={!(effA==='toutes'||effA==='vinted')}><Comptabilite key="colis_achats_outils" {...commun} only="achats" vueAchats="retraits" retraitsOutils dansPlateforme/></div></GardeEcran> : null}
       </section>
       </RepliRetirerAchats>);
     return null;
@@ -37885,7 +37886,7 @@ function AppCoeur() {
             était posée sous les 30 colis à expédier, à 5 500 px du haut. Mêmes chiffres, même carte, seulement montée.
             (15 nov., Ventes « Verre dépoli », maquette validée) Le segment À expédier · En route · Toutes et le grand chiffre
             ouvrent l'écran ; la bande du mois passe JUSTE SOUS les colis (en tête de « Toutes », qui replie les colis). */}
-        {(t==='achats' || (t==='ventes' && (!sous || sec==='ventes'))) ? rendreColisSection(t,site) : null}
+        {t==='achats' ? <FiltreAchats rangee>{(effA)=>rendreColisSection(t,site,effA)}</FiltreAchats> : (t==='ventes' && (!sous || sec==='ventes')) ? rendreColisSection(t,site) : null}
         {/* (20 nov., Julien : « tu dois appliquer les mêmes dispositions sur toutes les plateformes ») Ventes · eBay ouvre la MÊME
             liste que Ventes · Vinted (l'écran natif : À envoyer · En route · Terminées) ; ce qu'eBay a EN PLUS (tableau, à traiter,
             offres, argent, santé) est un groupe de rangées sous la liste, chacune ouvre sa section (rien n'est perdu, §4.11). */}
@@ -37915,7 +37916,7 @@ function AppCoeur() {
             aEnvoyer={(o) => aExpedier(o) && !(load('vinted_ship_done', {}) || {})[String(o.transaction_id)]} prix={(o) => (o.price && o.price.amount != null ? fmt(Number(o.price.amount)) : '')}
             onPro={() => voirAbonnement(setTab)}/></div>}</>)
           : (sitesPresents && !sitesPresents.has(site)) ? <OngletManque site={site} onglet={t} onNav={setTab}/>
-          : site==='vinted' ? rendreVinted(sec)
+          : site==='vinted' ? (t==='achats' && !libre ? <FiltreAchats>{(effA)=><MorceauSite site="vinted" eff={effA}>{rendreVinted(sec)}</MorceauSite>}</FiltreAchats> : rendreVinted(sec))
           : site==='leboncoin' ? rendreLeboncoin(sec)
           : site==='ebay' ? rendreEbay(sec)
           : rendreVestiaire(t)}
@@ -37924,9 +37925,10 @@ function AppCoeur() {
         {t==='achats' && site==='vinted' && !libre && !baseKO ? (SITES_RELIES_COQUE.v||[]).filter((x)=>x!=='vinted').map((x)=>(
           /* (21 nov., captures de Julien) Plus de grand intertitre à logo par site (trois logos avec rien dessous) : chaque site rend ses
              groupes seulement s'il a des achats, son nom dans le titre du groupe (src/achats/AchatsSite.jsx). */
-          <div key={x} data-achats-autre={x}>
+          /* (25 nov.) Sous le filtre par plateforme d'Achats : montré sous « Toutes » et sous SON site, caché (monté) sinon. */
+          <FiltreAchats key={x}>{(effA)=><MorceauSite site={x} eff={effA}><div data-achats-autre={x}>
             {x==='leboncoin' ? rendreLeboncoin('achats') : x==='ebay' ? rendreEbay('achats') : rendreVestiaire('achats')}
-          </div>)) : null}
+          </div></MorceauSite>}</FiltreAchats>)) : null}
         </GardeEcran>
         </CacheSiV2>
       </section>
