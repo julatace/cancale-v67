@@ -78,8 +78,20 @@ EXT_CAPACITES, `public/extension-version.json`, zips régénérés.
   (plus de phrase fausse) — il faudra alors lire l'offre dans `messaging/main/conversations/{uuid}` (forme des messages
   d'offre jamais relevée : à mesurer avec « Observer Vinted » pendant une réponse à une offre).
 - Accepter depuis VRM exige toujours la garde anti double-vente fraîche (`vinted_offres_garde`) ; sinon refus « vérifie ».
-- Le JS +234 Ko, `localStorage` (iphone-reprise), `data-a-ranger`, délais des bancs listés par la passation générale : voir
-  l'état CI dans le rapport de la session.
+- **CI comparée par nom à la base de `main`** (run 45559822496 de #1395) : aucune ligne rouge NOUVELLE après les corrections
+  ci-dessous ; les rouges restants (budget-vitesse, accessibilite, ventes-e2, navigation-tache, iphone-reprise,
+  colis-retirer-propre, garde réseau sur `images1.vinted.net`, vendeur-generaliste, vocabulaire-article, clés d'index de
+  stockage-sur…) sont les MÊMES sur `main`.
+- **JS « +234 Ko »** : mesuré, ce n'est pas la PR — `main` dépasse déjà de 215 Ko (2 181 Ko pour 1 966) ; agir-tout ajoutait
+  ~21 Ko (2 202). `src/connexions/connexions.js` est désormais chargé à la demande (seul `requeteConnexions` était lu au
+  démarrage). Le reste (porte `peutAgir`, `Agir.jsx`) sert à éteindre/allumer chaque bouton dès le premier rendu : pas
+  différable sans montrer un bouton faux.
+- **e2e-extension étape 5** (rouge NOUVEAU sur la CI, vrai défaut) : l'onglet sur un autre compte, « Baisser » restait
+  ALLUMÉ dans Annonces et le toucher ne faisait rien (le panneau refusé en silence par la porte). Corrigé : le `juger` des
+  gestes du tableau (`AnnoncesEgalite.jsx`) consulte la porte et ÉTEINT le geste avec la raison ; le banc accepte les deux
+  issues justes (bouton éteint et dit, OU panneau qui ne lance pas). e2e-extension **44/0** en local.
+- `localStorage` (iphone-reprise), `data-a-ranger` (accessibilite 1512), délais des bancs : rouges identiques sur `main`,
+  non traités ici.
 - Mesure réelle possible (lecture seule, pour Julien) :
   `select id, meta->>'geste' geste, meta->>'etat' etat, meta->>'code' code, meta->>'raison' raison, meta->>'attend' attend
    from app_data where id like 'cmd_dist_%' and meta->>'geste' in ('repondre','accepter','refuser','contreOffre')
