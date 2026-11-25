@@ -131,7 +131,8 @@ async function verifier(srcModule, srcApp, bavard) {
   dit(/<GardeEcranAllume\/>/.test(app) && /data-qr-plein-luminosite/.test(app), 'E8 l’écran reste allumé et la luminosité est expliquée');
   dit(/data-lbc-qr-depot/.test(app), 'E9 le QR de dépôt Leboncoin sur la carte du colis à envoyer');
   dit(/=== codeDuCompteMr\(trackingRetrait, suiviDeLigne\(t\)\) \? 'compte' : 'email'/.test(app) && /qrView\.code===qrView\.codeMr/.test(app), 'E10 « qui fait foi » se juge sur le code MONTRÉ (carte et vue en grand)');
-  const iTx = app.indexOf('const txSuivisColis = useMemo('), iFs = app.indexOf('const finsSuivis = useMemo(');
+  // (24 nov.) `useMemeContenu(useMemo(` : le même calcul, identité gardée si le contenu est le même.
+  const iTx = Math.max(app.indexOf('const txSuivisColis = useMemo('), app.indexOf('const txSuivisColis = useMemeContenu(useMemo(')), iFs = app.indexOf('const finsSuivis = useMemo(');
   dit(iTx > 0 && /trackingRetrait/.test(app.slice(iTx, iTx + 900)) && /finsColis\(trackingRetrait,/.test(app.slice(iFs, iFs + 200)) && app.indexOf('const trackingRetrait = useMemo(') < iTx,
     'E11 fenêtre des transactions et étapes des suivis à la main lisent les mêmes lignes que pickupUnion (déclarées avant, §4.6)');
   fs.rmSync(tmp, { recursive: true, force: true });

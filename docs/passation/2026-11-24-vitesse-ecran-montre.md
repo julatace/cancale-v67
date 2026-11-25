@@ -135,3 +135,192 @@ Lecture honnête :
 ## 6. Gestes de Julien
 
 Aucun.
+
+## 7. PR B : lectures datées de la 1re visite (24 nov. soir, branche `claude/vitesse-lectures-toucher`)
+
+Le crochet `LECTURES=1` du banc `vitesse-iphone` est maintenant dans le banc. Il écrit chaque lecture de la base pendant une
+1re visite, datée depuis le toucher. Mesure : build de la PR A, 1 passe, iPhone 390 ×4, volume de Julien, charge 18,7.
+
+| 1re visite | prêt à | lectures | 1re vague | vagues avant « prêt » |
+|---|---|---|---|---|
+| Annonces | +5,2 s | 52 | +2,0 s (21 lectures) | +3,6–3,75 s (`harvest_%_txn_%` relu, étiquettes, `ebay_versements`, coffre) · +4,5–5,05 s (`harvest_%_txn_%` une 3e fois, `orders_sold`, brouillons) |
+| Achats | +6,0 s | 76 | +3,9 s (25 lectures) | aucune autre : « prêt » arrive 2 s après la 1re vague (du calcul) |
+| Ventes | +2,9 s | 41 | — | — |
+
+Ce que ça dit :
+- **Achats** : 3,9 s de montage avant la PREMIÈRE lecture, puis 2 s de calcul sur les données arrivées. Les lectures partent
+  tard parce que le montage est long, pas l'inverse. Les lancer au toucher gagnerait au plus le temps d'une vague (~0,2 s au
+  banc) : le levier reste le calcul (`pickupUnion` 4 fois par instance, `cartesColis` à chaque rendu — §5).
+- **Annonces** : `harvest_%_txn_%` (la même requête) part 3 fois (+2,0 · +3,6 · +4,5 s). Chaque vague attend un rendu (calcul),
+  pas la précédente sur le réseau. Partager cette lecture (`src/lecturesPartagees.js`, `FENETRE_MS` 2 s : les relectures
+  arrivent après la fenêtre) et lancer la 1re vague au toucher sont les deux gestes à essayer.
+- Après « prêt », Annonces relit `vinted_suivi_{compte}` compte par compte, une requête à la fois (15 lectures de +5,7 à
+  +11 s). Cela ne retarde pas « prêt », mais ces lectures occupent le réseau pendant les premières secondes à l'écran.
+
+(Le code de PR B : §8.)
+
+## 8. PR B : le code (24 nov. nuit, branche `claude/vitesse-lectures-toucher`)
+
+Repris d'un agent arrêté (ses deux commits + son travail non commité, commité tel quel puis vérifié). Mesuré d'abord
+(`vitesse-iphone`, `CALCULS=deps` : à chaque calcul fait, les dépendances qui ont CHANGÉ — nouveau crochet, et les durées
+par calcul, `window.__vrmCalculsMs`), puis corrigé.
+
+### Ce qui relançait les calculs d'Achats
+- `pickupUnion` 5 fois par instance (3 instances) : 3 fois sur des entrées dont seule l'IDENTITÉ changeait. Le montage de
+  chaque écran rejoue `onCloudReady` (le nuage est déjà là ⇒ tout de suite) : `setPickupDone(n => vide(n) ? load(…) : n)` rendait
+  un `{}` NEUF pour un `{}` vide, `setNumeros(load(…))` un objet neuf identique ; `suivisEnvoyes`, `txSuivisColis`,
+  `vintedToPickup` recalculés sur les mêmes n°. ⇒ `memeContenu` / `useMemeContenu` (src/calculParesseux.js) : un contenu
+  identique garde l'objet d'avant (Set : mêmes éléments ; liste : mêmes objets ; objet simple : même JSON ; dans le doute,
+  la valeur neuve passe). Appliqué à `useStateCle` (relecture d'une clé), aux deux blocs `onCloudReady` de `Comptabilite`
+  (fiches, ventes masquées, colis retirés, bordereaux…), à `suivisEnvoyes`, `vintedToPickup`, `txSuivisColis`,
+  `annoncesVendues`. Après : **2 fois par instance** (le 1er rendu, l'arrivée des e-mails de suivi).
+- `cartesColis` et `listeEnvoyes` : une fois PAR RENDU (11 à 18 fois, ~1,1 s cumulée sur Achats ×4). ⇒ `useCalculParVersion` :
+  gardé tant que ses données ne changent pas (la liste de tout ce qu'il lit, 43 et 39 liaisons, au plus 60 s car il lit
+  l'heure). La liste est vérifiée par `scripts/audit-calcul-par-version.cjs`, qui refait l'analyse des lectures (Babel) :
+  une donnée lue absente de `cle()` ⇒ rouge. Deux identités neuves à chaque rendu empêchaient la garde : `useVcLocal()`
+  (objet neuf, maintenant le même tant que son contenu ne change pas) et `infosAchatsLues` (`{}` neuf ⇒ `INFOS_ACHATS_AUCUNE`).
+  Après : 4 calculs sur Achats, 6 sur Ventes.
+
+### Annonces
+- La liste des transactions projetée : lue UNE fois (rejointe en cours, gardée 10 min, oubliée au signal de l'extension et au
+  retour du réseau), lancée au toucher (agent précédent).
+- ESSAYÉ PUIS RETIRÉ : les pages de `lireTout` lancées ensemble (la 1re demande le nombre estimé, `Prefer: count=estimated`).
+  AB à trois builds (A, avec, sans) : aucun gain mesuré, et une estimation de plus côté base à chaque lecture. Le code est
+  revenu à la lecture page après page (celui de `main`) ; la garde rapporte les pages sans les juger.
+- `lirePreuvesVenteVinted` : les bordereaux (`harvest_%_label_%`) partent avec les transactions au lieu d'après (ils n'en
+  dépendent pas) — les ventes à juger partent ~1 s plus tôt.
+- Les relevés « plus vue » (`vinted_suivi_{compte}`) : plusieurs comptes par lecture (`lireSeriesComptes`, 60 annonces au
+  plus, `id=in.(…)`, projeté), deux à la fois, partis quand l'écran est calme (`requestIdleCallback`, Safari : 1,5 s).
+  15 lectures → 3 au volume de Julien. Un paquet raté ⇒ ses comptes « pas su » (aucune étiquette).
+- Pas fait : lancer au toucher toute la 1re vague d'Annonces (une vingtaine de lectures de composants différents ; il
+  faudrait recopier leurs adresses exactes). La 2e page du coffre attend encore la 1re (il faut le nombre de lignes).
+
+### Preuves
+- `chiffres-volume` (A = PR A `076f9f462`, G = cette branche) : **35/35 relevés identiques, 12/12 publications identiques**.
+- Garde `scripts/bancs/calculs-ecran-montre.cjs` (15 comptes : 3 pages de transactions) + PLAFOND (une fois par version des
+  données) + relevés groupés + pages ensemble : **rouge sur A** (9 défauts : `pickupUnion` 4, `cartesColis` 12/15,
+  `listeEnvoyes` 15, pages l'une après l'autre, 15 relevés pour 180 annonces), **vert sur G** (2 · 4 · 6 · 5, 3 relevés),
+  **rouge par mutation** (build M : `useMemeContenu` et `useCalculParVersion` réaffaiblis, 7 annonces par relevé : 4 défauts).
+- `audit-calcul-par-version` (nouveau) : rouge par mutation (`tracking` retiré de `cle()` ⇒ « absent : tracking ») — et il a
+  vu pour de vrai la fusion de `main` (`venteMailItem`, lu par les deux calculs, ajouté à leurs clés). `audit-tdz`, `audit-magasin-groupe` 7/7, `audit-memo-court` 21/21,
+  `audit-apres-finale-app` 40/40 : verts. Audits qui lisaient le texte changé, suivis (mêmes règles) : `audit-identite`,
+  `audit-qr-capture-mr`, `audit-memo-court`, `audit-apres-finale-app`. Les autres audits rouges le sont aussi sur A.
+- `memeContenu` : un nombre de clés différent répond « différent » sans sérialiser (à l'ouverture, `{}` puis la fiche du
+  nuage, une fois par écran qui écoute la clé).
+
+### 8 bis. AB alterné (iPhone 390, processeur ×4, 4G, volume de Julien, `PASSES=5 TOURS=0`)
+A = PR A (`076f9f462`), B = cette branche AVANT la fusion de `main` (pour ne mesurer que ce lot : `4cdf908f7` + le retour de
+`lireTout` + `memeContenu` rapide). Du doigt posé à l'écran PRÊT, en ms. Charge au départ 9,2 ; ⚠️ elle est montée à 21 et 19
+pendant les passes 2 et 3 (la machine est partagée).
+
+| 1re visite | A (5 passes) | B (5 passes) | médiane A → B | écart par paire (B − A) |
+|---|---|---|---|---|
+| **Achats** | 5 813 · 8 751 · 7 142 · 5 746 · 4 686 | 5 868 · 3 963 · 7 601 · 4 087 · 4 236 | **5 813 → 4 236** | +55 −4 788 +459 −1 659 −450 |
+| Annonces | 6 221 · 4 016 · 5 299 · 4 845 · 3 657 | 5 152 · 4 492 · 5 305 · 2 844 · 4 523 | 4 845 → 4 523 | −1 069 +476 +6 −2 001 +866 |
+| Ventes | 3 611 · 2 887 · 3 135 · 2 765 · 2 719 | 3 904 · 2 311 · 3 880 · 1 873 · 2 857 | 2 887 → 2 857 | +293 −576 +745 −892 +138 |
+| Argent | 1 307 · 2 393 · 1 574 · 1 511 · 1 710 | 1 945 · 1 537 · 2 062 · 1 664 · 1 808 | 1 574 → 1 808 | +638 −856 +488 +153 +98 |
+| Ma journée (1re visite) | 2 818 · 3 391 · 2 555 · 1 272 · 2 279 | 1 704 · 2 433 · 3 839 · 1 557 · 1 917 | 2 555 → 1 917 | −1 114 −958 +1 284 +285 −362 |
+| à froid (Ma journée prête) | 9 554 · 8 888 · 8 466 · 8 236 · 8 521 | 10 409 · 8 466 · 10 170 · 8 690 · 8 854 | 8 521 → 8 854 | +855 −422 +1 704 +454 +333 |
+
+Deux AB précédents (même A ; B avec les pages ensemble, puis sans) disent la même chose pour Achats : 4 904 → 4 369 (5/5
+paires plus rapides, charge 3,8–13) et 6 479 → 4 594 (5/5). Annonces : mélangé dans les trois (4 417 → 3 856 ; 4 892 → 4 778 ;
+ci-dessus) — pas de gain prouvé. ⚠️ À FROID : plus lent dans 12 paires sur 15 sur les trois AB (médianes +269, +957, +333 ms ;
+un quatrième AB, sous forte charge, disait l'inverse 5/5). Cause pas trouvée (piste : les lectures des bordereaux lancées
+avec les transactions, ou les comparaisons de contenu pendant l'arrivée du nuage). À mesurer avant de fusionner.
+
+### 8 ter. À froid ramené au niveau de la PR A (25 nov., demande du coordinateur : « sans latence »)
+Les deux pistes ont été essayées une à une, contre A, dans un AB à 4 builds (5 passes alternées, charge au départ 6,3 mais
+montée à 22) : B tel quel, (a) les bordereaux relus APRÈS les transactions comme avant, (b) aucune comparaison de contenu
+(`memeContenu`) pendant l'arrivée du premier nuage. Médianes à froid : A 10 070 · B 9 849 · (a) 10 120 · (b) 9 714 ; Achats
+A 6 791 · B 4 403 · (a) 5 348 · (b) 5 705. (a) n'aide pas : les bordereaux restent lus avec les transactions. (b) est gardée :
+`memeContenu` répond « différent » tant que le premier chargement complet n'est pas fini (`nuageCharge()`, posé par App.jsx
+juste après `onCloudReady`). À l'ouverture, l'appareil passe de rien aux données : comparer ne servait à rien et coûtait.
+
+AB de confirmation A contre B + (b), 5 passes, **charge 2,9 → 6,3 (propre)** :
+
+| 1re visite | A (5 passes) | B + (b) (5 passes) | médiane A → B | écart par paire (B − A) |
+|---|---|---|---|---|
+| **à froid** | 7 743 · 8 345 · 8 081 · 7 421 · 8 296 | 8 012 · 7 750 · 7 745 · 8 491 · 8 588 | **8 081 → 8 012** | +269 −595 −336 +1 070 +292 |
+| **Achats** | 4 689 · 5 025 · 4 504 · 4 258 · 4 984 | 3 479 · 3 459 · 3 641 · 2 971 · 3 716 | **4 689 → 3 479** | −1 210 −1 566 −863 −1 287 −1 268 |
+| Annonces | 3 773 · 3 642 · 3 892 · 3 420 · 5 259 | 3 696 · 3 774 · 2 920 · 3 390 · 4 450 | 3 773 → 3 696 | −77 +132 −972 −30 −809 |
+| Ventes | 2 333 · 2 379 · 2 427 · 2 414 · 2 544 | 1 847 · 2 428 · 2 046 · 2 037 · 2 498 | 2 414 → 2 046 | −486 +49 −381 −377 −46 |
+| Argent | 1 010 · 1 045 · 1 731 · 1 113 · 1 440 | 1 469 · 1 721 · 1 376 · 1 752 · 1 382 | 1 113 → 1 469 | +459 +676 −355 +639 −58 |
+| Ma journée | 1 510 · 1 523 · 1 494 · 1 640 · 1 687 | 1 594 · 1 639 · 1 470 · 1 382 · 1 577 | 1 523 → 1 577 | +84 +116 −24 −258 −110 |
+
+À froid : médiane au niveau de A (−69 ms ; paires mélangées, 3 plus lentes, 2 plus rapides). Achats −1,2 s, 5 paires sur 5.
+⚠️ Argent (1re visite) +356 ms en médiane, 3 paires sur 5 plus lentes : pas étudié.
+`chiffres-volume` A contre B + (b), lancés ensemble : 35/35, 12/12 identiques. Garde `calculs-ecran-montre` sur le build
+final (avec `main`) : verte.
+
+### 8 quater. Argent (25 nov., demande du coordinateur : +356 ms en médiane sur l'AB de §8 ter)
+Diagnostic A contre B (1 passe chacun, `LECTURES=300`, `CALCULS=deps`, profil `visite1:compta`, compteur de rendus par
+instance de `Comptabilite` posé dans des builds de diagnostic seulement) :
+- les **mêmes 21 lectures** à la 1re visite d'Argent, dans le même ordre (aucun relevé `vinted_suivi_*` : ils sont finis
+  depuis Annonces) ; B prêt à +1 587 ms, A à +2 018 ms sur cette passe ;
+- **aucun gros calcul** fait pendant la visite, ni dans A ni dans B. Sur UNE passe sur deux, les trois instances cachées
+  d'Achats se redessinent 2 à 3 fois pendant Argent (et `cartesColis` est refait une fois, 23 ms) : c'est l'arrivée des
+  achats relus (`orders_purchased`, lue dans A comme dans B), selon l'heure d'arrivée. Pas une lecture ni un calcul en plus.
+Aucune cause propre à cette branche, donc pas de changement de code. Nouvel AB, 7 passes alternées (charge 8,6 au départ,
+⚠️ montée à 15–16 sur les passes 4 à 7) :
+
+| 1re visite | A (7 passes) | B (7 passes) | médiane A → B | écart par paire (B − A) |
+|---|---|---|---|---|
+| **Argent** | 1 564 · 1 459 · 1 996 · 1 732 · 1 568 · 1 808 · 1 399 | 1 396 · 1 266 · 1 796 · 1 583 · 2 169 · 1 496 · 1 429 | **1 568 → 1 496** | −168 −193 −200 −149 +601 −312 +30 |
+| **Achats** | 3 783 · 5 326 · 4 729 · 7 347 · 5 229 · 6 707 · 4 848 | 3 360 · 3 420 · 3 077 · 4 251 · 4 379 · 4 715 · 4 378 | **5 229 → 4 251** | −423 −1 906 −1 652 −3 096 −850 −1 992 −470 |
+| à froid | 7 785 · 8 348 · 7 764 · 8 772 · 11 117 · 9 468 · 8 312 | 7 904 · 7 980 · 9 253 · 8 747 · 8 340 · 8 714 · 10 196 | 8 348 → 8 714 | +119 −368 +1 489 −25 −2 777 −754 +1 884 |
+| Annonces | 4 639 · 3 284 · 3 240 · 4 820 · 3 885 · 4 586 · 4 912 | 3 586 · 4 098 · 4 438 · 4 900 · 4 798 · 4 095 · 4 980 | 4 586 → 4 438 | −1 053 +814 +1 198 +80 +913 −491 +68 |
+| Ventes | 2 534 · 2 560 · 1 910 · 3 340 · 3 317 · 2 616 · 3 883 | 2 844 · 1 533 · 2 005 · 3 877 · 3 189 · 3 164 · 3 296 | 2 616 → 3 164 | +310 −1 027 +95 +537 −128 +548 −587 |
+| Ma journée | 2 097 · 1 619 · 1 639 · 2 458 · 1 951 · 2 131 · 1 307 | 1 615 · 1 679 · 2 277 · 3 483 · 4 253 · 2 573 · 1 988 | 1 951 → 2 277 | −482 +60 +638 +1 025 +2 302 +442 +681 |
+
+Argent est maintenant ≤ A (5 paires sur 7). ⚠️ Ma journée (1re visite, la dernière du parcours) est plus lente sur 6 paires sur 7
+ici, surtout sous charge (passes 4–7). L'AB propre de §8 ter (charge < 7) disait 1 523 → 1 577, mélangé. Au bruit de la machine
+partagée, Ventes, Ma journée et à froid changent de signe d'un AB à l'autre. Seul Achats tient dans tous les AB (de −0,5 à −1,2 s).
+Code inchangé depuis §8 ter : `chiffres-volume` 35/35 · 12/12 et la garde verte valent toujours.
+
+### 8 quinquies. « Aucun écran plus lent » (25 nov., avant le train)
+AB A contre B, 7 passes alternées, lancé quand la charge est passée sous 7 (6,1 au départ, de 6,0 à 8,5 pendant le banc, juste
+après un redémarrage du conteneur). Mêmes builds qu'en §8 quater, code inchangé.
+
+| 1re visite | A (7 passes) | B (7 passes) | médiane A → B | écart par paire (B − A) | B plus lent |
+|---|---|---|---|---|---|
+| **à froid** | 36 272 · 8 457 · 8 186 · 8 508 · 7 876 · 7 849 · 7 802 | 14 528 · 8 399 · 7 693 · 8 283 · 8 201 · 8 150 · 8 027 | **8 186 → 8 201** | −21 744 −58 −493 −225 +325 +301 +225 | 3/7 |
+| **Ma journée** | 1 674 · 1 379 · 1 772 · 1 424 · 1 402 · 2 358 · 1 697 | 1 521 · 1 951 · 1 562 · 1 240 · 1 686 · 1 251 · 1 598 | **1 674 → 1 562** | −153 +572 −210 −184 +284 −1 107 −99 | 2/7 |
+| Achats | 4 462 · 5 008 · 4 602 · 5 296 · 3 491 · 4 085 · 3 750 | 3 769 · 3 659 · 4 072 · 3 208 · 3 606 · 2 748 · 2 514 | 4 462 → 3 606 | −693 −1 349 −530 −2 088 +115 −1 337 −1 236 | 1/7 |
+| Annonces | 4 755 · 3 193 · 4 103 · 3 613 · 2 543 · 3 316 · 2 544 | 4 469 · 3 040 · 3 843 · 3 136 · 3 038 · 2 236 · 3 064 | 3 316 → 3 064 | −286 −153 −260 −477 +495 −1 080 +520 | 2/7 |
+| Ventes | 2 997 · 2 213 · 2 166 · 2 142 · 1 822 · 2 240 · 2 817 | 2 235 · 1 849 · 2 021 · 2 233 · 1 834 · 1 589 · 1 862 | 2 213 → 1 862 | −762 −364 −145 +91 +12 −651 −955 | 2/7 |
+| Argent | 1 254 · 1 653 · 1 806 · 1 185 · 976 · 984 · 1 053 | 1 064 · 979 · 1 435 · 1 289 · 1 274 · 991 · 950 | 1 185 → 1 064 | −190 −674 −371 +104 +298 +7 −103 | 3/7 |
+
+La 1re passe à froid des deux builds est le 1er démarrage après le redémarrage du conteneur (36 s / 14 s : caches froids) ;
+elle ne change ni les médianes ni le compte des paires. À froid : médiane +15 ms (0,2 %), B plus lent sur 3 paires sur 7 —
+au niveau de A. Ma journée et tous les autres écrans : B plus rapide en médiane, plus lent sur au plus 3 paires sur 7.
+AB précédent, même protocole (25 nov. vers 1 h, charge ≤ 6,5 ; interrompu ensuite par le redémarrage pour son 3e build) : à froid 8 108 → 8 018 mais 6 paires sur 7 plus lentes (+8 à +323 ms) ;
+Ma journée 1 542 → 1 570. Sur ces 14 paires à froid, l'écart médian par paire est d'environ +80 ms (1 %).
+Ma journée lue au banc (`LECTURES`, `CALCULS`) : B fait 40 lectures au lieu de 80 et `pickupUnion` 2 fois au lieu de 5.
+
+### 8 sexies. Train du 25 nov. : #1388 avec `main`, puis #1393 avec #1388
+- **#1388** (`claude/vitesse-ecran-montre`, après la fusion de `main` par le train) :
+  - `audit-cle-verifier` : la clé est refaite par `--ecrire`. Les quatre noms ajoutés (`colisDans`, `only`, `retraitsOutils` : des propriétés ; `sub` : un état) ne sont pas des calculs paresseux. Les deux paresseux déjà dans la clé (`pickupUnion`, `colisParTx`) n'y sont comparés que par identité, sans être lus.
+  - `e2e-extension` « ses annonces sont visibles dans Annonces » : l'écran d'hier, monté caché (`src/annoncesCachees.js`), ne rend plus ses vignettes. Or c'est sur elles que le banc trouvait `data-carte-annonce`. La grille et la rangée natives (`AnnoncesCartes.jsx`) et la ligne du tableau à l'ordinateur (`AnnoncesTableau.jsx`) portent maintenant cet attribut, par identité : la 1re annonce Vinted de l'article. Le contrôle est vert. Les 13 autres rouges sont les mêmes que sur `main` (`5c81357b7`, même banc : 28 verts, 13 rouges).
+- **#1393** : fusion de #1388.
+  - `CLAUDE.md` reste sous 60 000 : les lignes « Parcours iPhone » et « Styles au choix » ont été déplacées telles quelles.
+  - `audit-cle-verifier` développe maintenant `useCalculParVersion` comme une fonction du composant (`listeEnvoyes`, qui rend une identité neuve à chaque rendu, n'est pas une racine). Mutations : 48/48 rouges.
+- Preuves :
+  - `chiffres-volume`, #1388 contre #1393 : 35/35 et 12/12. `main` contre #1388 : 33/35, avec les deux écarts connus de `data-colis-total` (§4), et 12/12.
+  - La garde est verte sur les deux branches.
+  - `e2e-extension` est identique à `main` sur les deux branches.
+
+### 8 septies. Train du 25 nov. (2) : un achat caché dans « En route »
+- `colis-retirer-propre` (Chromium et WebKit) : « ouvrir « En route » montre les 13 achats — 12 ». La cause est dans
+  `ParPaquets` (#1388, latence-2) : le 1er paquet est passé de 16 à 12 rangées, et la suite ne venait qu'au défilement (plus
+  de marge au montage). La 13e attendait donc sous l'écran : un colis caché.
+- La règle, dans `src/composants/ParPaquets.jsx` : **ce qui reste tient dans un paquet ⇒ tout est posé tout de suite** (le
+  dernier paquet incomplet n'attend jamais un défilement). Une liste plus longue garde sa fenêtre, et son dernier paquet
+  vient avec l'avant-dernier.
+- Preuves, sur Chromium : « 13 achats » est **rouge sur `7be9ea5a`** (12) et **vert** sur #1388 et sur #1393 (13). Le seul
+  rouge restant de ce banc (« ouvrir et retrait restent côte à côte ») est le même sur `main` (`fd9dab5fe`), avec les mêmes
+  mesures.
+- ⚠️ **WebKit pas rejoué ici.** Depuis le redémarrage du conteneur, son téléchargement est refusé par le réseau
+  (`cdn.playwright.dev` n'est pas autorisé). Le correctif est un calcul du nombre de rangées, sans rien de propre au moteur ;
+  la CI le rejoue sur WebKit.
+- `chiffres-volume` : `main` contre #1388 donne 33/35 (les deux `data-colis-total` connus, §4) et 12/12 ; #1388 contre
+  #1393 donne 35/35 et 12/12. La garde est verte sur les deux branches.
