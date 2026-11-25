@@ -15,8 +15,10 @@ const SRC_APP = fs.readFileSync(path.join(RACINE, 'src/ouvrirPanneau.js'), 'utf8
 const SRC_EXT = fs.readFileSync(path.join(RACINE, 'vinted-sync-extension/vrm-badge.js'), 'utf8');
 
 function chargerApp(src) {
-  const code = src.replace(/^export (const|function|let) /gm, '$1 ') + '\n;({ lienPanneau });';
-  return vm.runInNewContext(code, { URLSearchParams, encodeURIComponent });
+  // (25 nov.) src/ouvrirPanneau.js importe la porte (`agirMaintenant`, lot agir-si-connecte) pour `ouvrirPanneau` ; ce
+  // banc n'exécute que `lienPanneau` (pure) : l'import est retiré et la porte, jamais appelée ici, est un bouchon qui lève.
+  const code = src.replace(/^import [^\n]*$/gm, '').replace(/^export (const|function|let) /gm, '$1 ') + '\n;({ lienPanneau });';
+  return vm.runInNewContext(code, { URLSearchParams, encodeURIComponent, agirMaintenant: () => { throw new Error('la porte n’est pas jouée par ce banc'); } });
 }
 // Le vocabulaire que l'APP envoie : src/actionsExtension.js (chantier actions-extension) s'il est là, sinon sa copie.
 const F_ACTIONS = path.join(RACINE, 'src/actionsExtension.js');

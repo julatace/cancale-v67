@@ -4245,7 +4245,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'vrm-badge' && msg.action === 'telecharger') {
       const url = String(msg.url || ''), nom = String(msg.nom || '').replace(/[^\w.-]/g, '_').slice(0, 80);
       if (!/^data:application\/(?:pdf|json);base64,[A-Za-z0-9+/=]+$/.test(url) || url.length > 40e6 || !/^[\w-][\w.-]{0,79}\.(?:pdf|json)$/.test(nom)) { sendResponse({ ok: false }); return true; }
-      try { chrome.downloads.download({ url, filename: nom, saveAs: false, conflictAction: 'uniquify' }, (id) => { void chrome.runtime.lastError; sendResponse({ ok: Number.isInteger(id) }); }); } catch (_) { sendResponse({ ok: false }); }
+      new Promise((fini) => { try { chrome.downloads.download({ url, filename: nom, saveAs: false, conflictAction: 'uniquify' }, (id) => { void chrome.runtime.lastError; fini({ ok: Number.isInteger(id) }); }); } catch (_) { fini({ ok: false }); } }).then(sendResponse);
       return true;
     }
     // 5.435 (`sauvegardereglages`) : sauvegarder ses réglages dans un fichier ; restaurer = aperçu, puis SON « Oui ».

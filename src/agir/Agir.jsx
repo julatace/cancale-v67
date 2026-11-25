@@ -12,14 +12,17 @@ import { tr } from '../i18n/index.js';
 import { Bouton, Feuille } from '../natif/index.js';
 import { usePeutAgir, useCompteAgir, envoyerGeste, agirOuPanneau, useFaitsAgir as useFaitsAgirA, envoyerSerie as envoyerSerieA, agirMaintenant as agirMaintenantA, faitsAgir as faitsAgirA } from './porte.js';
 import { NOMS_SITES_AGIR } from './peutAgir.js';
+import { motsNavigateur } from '../navigateurExtension.js';
 import './agir.css';
 
-// La phrase d'un « non » : la raison ET le geste, en une phrase (« Connecte l'extension sur shop_x : ouvre Vinted dans Chrome »).
+// La phrase d'un « non » : la raison ET le geste, en une phrase (« Connecte l'extension sur shop_x : ouvre Vinted dans {nav} »).
 export const remplirReponse = (site, conv, texte) => { try { window.dispatchEvent(new CustomEvent('vrm:agir-remplir', { detail: { site, conv: String(conv), texte } })); } catch (_) {} };
 
 export function texteRaison(v) {
   if (!v || v.ok) return '';
-  const vars = { compte: '—', site: 'Vinted', autre: '', version: '?', attendue: '', ou: '', ...(v.vars || {}) };
+  // Le navigateur NOMMÉ tel qu'il est (Chrome, Orion…), jamais « Chrome » en dur (`motsNavigateur`, audit-chrome-en-dur).
+  const N = motsNavigateur();
+  const vars = { compte: '—', site: 'Vinted', autre: '', version: '?', attendue: '', ou: '', nav: N.connu ? N.nom : tr('agir.nav.inconnu'), ...(v.vars || {}) };
   return tr(v.cle || 'agir.raison.passu', vars);
 }
 
