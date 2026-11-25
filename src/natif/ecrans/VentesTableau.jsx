@@ -11,13 +11,12 @@ import { tr } from '../../i18n/index.js';
 import { TableauTravail } from '../TableauTravail.jsx';
 import { Plaque } from '../Plaque.jsx';
 import { CATEGORIES_VENTE, categorieVente } from '../../ventesEcran.js';
-import { celluleAchat, GestesAchat } from './celluleAchat.jsx';
+import { celluleAchat } from './celluleAchat.jsx';
 import { Groupe } from '../Groupe.jsx';
 import { Rangee, Vignette } from '../Rangee.jsx';
-import { Pastille } from '../Pastille.jsx';
-import { LogoSite } from '../LogoSite.jsx';
 import '../ventes-lisibles.css';
 import { morceauxMarqueTaille } from '../../ventes/marqueTaille.js';
+import { MetaVente, useAchatRange } from './rangeeVente.jsx';   // (25 nov., ventes-rangee) la rangée compacte, la même partout
 import { texteNet } from '../../coutReel.js';
 import { ParPaquets } from '../../composants/ParPaquets.jsx';   // (22 nov., latence) la liste des ventes au téléphone posée par paquets
 
@@ -77,33 +76,37 @@ export function VentesListeTel({ lignes, avant = null, prix = (l) => (l.prix == 
   nomSite = (s) => s, logoTransporteur = () => null, Plaque: PlaqueN = Plaque, Photo = null, onOuvrir = null, attrsDe = () => ({}), achatDe = null, Icon = null }) {
   return (
     <Groupe attrs={{ 'data-vt-liste-tel': String((lignes || []).length) }}>
-      <ParPaquets items={lignes || []} rendre={(l, i) => {
-        const mot = l.etat ? motEtat(l.etat) : '';
-        const cat = categorieVente(mot);
-        const a = achatDe ? achatDe(l) : null;
-        const photo = typeof l.photo === 'string' ? l.photo : '';
-        return (
-          <React.Fragment key={l.cle}>
-            {avant ? avant(i) : null}
-            <Rangee
-              vignette={<Vignette src={photo} alt="" taille={64} image={photo && Photo ? <Photo src={photo} alt="" loading="lazy" decoding="async"/> : null}/>}
-              titre={l.titre} lignes={2}
-              plaque={<>{l.site ? <LogoSite site={l.site} taille={20} nom={nomSite(l.site)}/> : null}{l.num ? <PlaqueN numero={l.num}/> : null}</>}
-              // (24 nov., main-vert — banc ventes-ligne-propre, règle du 17 nov. : « le pseudo coupé en jujuf… ») « Marque · T42 · pseudo »
-              // passe à la ligne plutôt que de couper le pseudo (texte « Très grand », pseudos longs).
-              sousTitre={joint(marqueTaille(l), l.compte, l.detail)} sousLignes={2}
-              note={<span className="n-vt-valeur n-vt-ligne" data-vt-ligne="">
-                {prix(l) ? <span className="n-vt-ligne-prix" data-vt-prix="">{prix(l)}</span> : null}
-                {mot ? <Pastille ton={TON[cat] === 'ambre' ? 'ambre' : 'neutre'}>{mot}</Pastille> : null}
-                {l.tr && l.tr.cle ? <span className="n-vt-logo" data-vt-transporteur={l.tr.cle} title={l.tr.nom || ''}>{logoTransporteur(l.tr)}</span> : null}
-                <span className="n-vt-ligne-fin">{jour(l.t)}</span>
-              </span>}
-              pied={a ? <GestesAchat a={{ ...a, titre: a.titre || l.titre }} Icon={Icon}/> : null}
-              onClick={onOuvrir ? () => onOuvrir(l) : null} fin={null}
-              attrs={{ 'data-toutes-vente': l.site, 'data-toutes-id': l.id, 'data-toutes-compte': l.compte || '', 'data-ordre-t': l.t != null ? String(l.t) : '', 'data-vt-statut': cat, ...attrsDe(l) }}/>
-          </React.Fragment>
-        );
-      }}/>
+      <ParPaquets items={lignes || []} rendre={(l, i) => (
+        <React.Fragment key={l.cle}>
+          {avant ? avant(i) : null}
+          <LigneTermineeTel l={l} prix={prix} motEtat={motEtat} jour={jour} nomSite={nomSite} logoTransporteur={logoTransporteur} PlaqueN={PlaqueN} Photo={Photo}
+            onOuvrir={onOuvrir} attrsDe={attrsDe} achatDe={achatDe} Icon={Icon}/>
+        </React.Fragment>
+      )}/>
     </Groupe>
+  );
+}
+
+// (25 nov., lot ventes-rangee — Julien : « c'est atroce ») La rangée COMPACTE de « Terminées », la même que « À envoyer » et
+// « En route » (src/natif/ecrans/rangeeVente.jsx) : photo de 56, titre (deux lignes au plus) et prix à droite, puis UNE ligne
+// « site · N° · taille · état · compte · date · transporteur ». L'achat (Relier, prix d'achat) au balayage, quand il manque.
+function LigneTermineeTel({ l, prix, motEtat, jour, nomSite, logoTransporteur, PlaqueN, Photo, onOuvrir, attrsDe, achatDe, Icon }) {
+  const mot = l.etat ? motEtat(l.etat) : '';
+  const cat = categorieVente(mot);
+  const a = achatDe ? achatDe(l) : null;
+  const achat = useAchatRange(a, l.titre, Icon);
+  const photo = typeof l.photo === 'string' ? l.photo : '';
+  const taille = morceauxMarqueTaille({ titre: l.titre, taille: l.taille }, (t) => tr('vv.taille', { t }))[0] || '';
+  const p = prix(l);
+  return (
+    <Rangee
+      vignette={<Vignette src={photo} alt="" taille={56} image={photo && Photo ? <Photo src={photo} alt="" loading="lazy" decoding="async"/> : null}/>}
+      titre={l.titre} lignes={2} valeur={p ? <span className="n-vr-prix" data-vt-prix="">{p}</span> : null} valeurForte
+      plaque={<MetaVente site={l.site} nomSite={l.site ? nomSite(l.site) : ''} num={l.num} taille={taille} etat={mot ? { cle: cat, mot } : null}
+        morceaux={[l.compte, l.detail, jour(l.t)]} transporteur={l.tr && l.tr.cle ? { cle: l.tr.cle, nom: l.tr.nom || '', logo: logoTransporteur(l.tr) } : null}/>}
+      pied={achat.pied} actions={achat.actions.length ? achat.actions : null}
+      onClick={onOuvrir ? () => onOuvrir(l) : null} fin={null} className="n-vr"
+      attrs={{ 'data-toutes-vente': l.site, 'data-toutes-id': l.id, 'data-toutes-compte': l.compte || '', 'data-ordre-t': l.t != null ? String(l.t) : '', 'data-vt-statut': cat,
+        'data-vr-achat': a ? (achat.libre ? 'libre' : 'connu') : '', ...attrsDe(l) }}/>
   );
 }

@@ -155,3 +155,41 @@
     .n-tt-td .n-vt-prix-champ:focus + .n-vt-prix-eur { left: auto; right: 10px; z-index: 6; }
   }
 }
+
+/* ── (25 nov., lot ventes-rangee) LA RANGÉE COMPACTE D'UNE VENTE au téléphone (src/natif/ecrans/rangeeVente.jsx) ─────────────────
+   Julien, capture iPhone de Ventes → « En route » : « c'est atroce, c'est moche, la mise en page est catastrophique » (~260 px par
+   vente, vignette vide, titre coupé, état écrit deux fois, logo du transporteur coupé, frise géante, Relier · + prix partout).
+   Maintenant : photo 56 · titre 14/19 fort sur deux lignes au plus · prix 15 fort à droite (chiffres tabulaires) · UNE ligne
+   « site · N° · taille · état · … · transporteur » dont chaque morceau reste ENTIER (la ligne passe à la ligne entre deux morceaux,
+   jamais au milieu, jamais rognée) ; le logo du transporteur, entier, au bout. ~80–100 px. Jetons seulement, ni `:has()`. */
+@layer vrm-natif {
+  .n-rangee.n-vr .n-rangee-corps { align-items: center; gap: 12px; min-height: 76px; padding-block: 10px; }
+  .n-rangee.n-vr .n-vignette { width: 56px; height: 56px; border-radius: var(--n-r-vignette); }
+  .n-rangee.n-vr .n-rangee-bloc { align-self: center; row-gap: 6px; column-gap: 10px; }
+  .n-rangee.n-vr .n-rangee-titre { font: var(--n-t-second-fort); font-size: 14px; line-height: 19px; color: var(--n-encre); }
+  .n-rangee.n-vr .n-rangee-valeurs { align-self: start; min-height: 19px; }
+  .n-vr-prix { font: var(--n-t-second-fort); font-size: 15px; line-height: 19px; font-variant-numeric: tabular-nums; color: var(--n-encre); white-space: nowrap; }
+  .n-rangee.n-vr .n-rangee-sous { grid-column: 1 / -1; flex-wrap: wrap; overflow: visible; white-space: normal; }
+  .n-vr-meta { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; font: var(--n-t-legende); font-variant-numeric: tabular-nums; color: var(--n-encre-2); }
+  .n-vr-meta > * { flex: none; white-space: nowrap; }
+  .n-vr-meta .n-logo-site { margin: 0; }
+  .n-vr-etat { display: inline-flex; align-items: center; gap: 6px; font: var(--n-t-legende-fort); color: var(--n-encre); }
+  .n-vr-frise { display: inline-flex; align-items: center; gap: 2px; }
+  .n-vr-frise > i { display: block; width: 7px; height: 3px; border-radius: 2px; background: var(--n-bord); }
+  .n-vr-frise > i[data-fait="1"] { background: var(--n-encre-2); }
+  .n-vr-meta .n-vt-limite[data-vt-ambre="1"] { font: var(--n-t-legende-fort); color: var(--n-encre); }
+  /* Le transporteur : son logo ENTIER (18 px), au bout de la ligne — les logos s'alignent d'une vente à l'autre. */
+  .n-vr-logo { display: inline-flex; align-items: center; flex: none; margin-inline-start: auto; line-height: 0; }
+  .n-vr-logo > [data-transporteur-logo] { flex: none; }
+  /* Sans photo : un repli DISCRET (un contour fin et l'icône effacée), jamais un grand carré gris plein. */
+  .n-rangee.n-vr .n-vignette-vide { background: transparent; box-shadow: inset 0 0 0 1px var(--n-trait); }
+  .n-rangee.n-vr .n-vignette-vide > .n-glyphe { opacity: .35; transform: scale(.8); }
+  /* Le champ « Prix d'achat » ouvert au balayage : sous la rangée, aligné sur le texte. */
+  .n-rangee.n-vr > .n-rangee-pied { justify-content: flex-start; padding-top: 0; }
+}
+/* « Terminées » au téléphone : la liste native est posée DANS la carte de la liste d'avant (`.vrm-toutes-liste`) — une carte dans
+   une carte, décalée de 16 px (capture du 25 nov.). Le groupe s'y fond : une seule carte, bord à bord. */
+@layer vrm-natif {
+  .vrm-toutes-liste > .n-groupe[data-vt-liste-tel] { margin: 0; }
+  .vrm-toutes-liste > .n-groupe[data-vt-liste-tel] > .n-groupe-carte { border: 0; box-shadow: none; background: transparent; border-radius: inherit; }
+}
