@@ -103,7 +103,7 @@ function juger(depot = {}, { sousAudits = true } = {}) {
   const blocClair = jet.slice(0, iSombre), blocSombre = jet.slice(iSombre);
   const val = (bloc, nom) => { const m = new RegExp('--n-' + nom + '\\s*:\\s*([^;]+);').exec(bloc); return m ? m[1].trim().toLowerCase() : null; };
   const attendus = [
-    [blocClair, 'clair', { accent: '#3d4b5b', fond: '#dfe1e5', carte: '#fafafb', bord: '#cbced4' }],   // (23 nov., Julien) gris clair étagé, accent ardoise — plus de noir
+    [blocClair, 'clair', { accent: '#19222c', fond: '#878b92', carte: '#f1f2f4', bord: '#b9bdc3' }],   // (25 nov., Julien : « gris moyen c'est d'accord ») ; avant (23 nov.) gris clair #dfe1e5, accent ardoise #3d4b5b
     [blocSombre, 'sombre', { accent: '#f4f4f5', fond: '#1c1c20', carte: '#2a2a2f' }],   // (23 nov., Julien) la nuit = le gris de vrm.center
   ];
   for (const [bloc, nom, att] of attendus) {
@@ -118,7 +118,7 @@ function juger(depot = {}, { sousAudits = true } = {}) {
   }
   // S2 bis — themeMineral (les couleurs que lit le code d'avant) suit les jetons.
   const th = lire('src/themeMineral.js');
-  for (const [nomTheme, acc] of [['MINERAL', '#3d4b5b'], ['MINERAL_DARK', '#f4f4f5']]) {
+  for (const [nomTheme, acc] of [['MINERAL', '#19222c'], ['MINERAL_DARK', '#f4f4f5']]) {
     const m = new RegExp('export const ' + nomTheme + '\\s*=\\s*Object\\.freeze\\(\\{([\\s\\S]*?)\\}\\);').exec(th);
     if (!dit(!!m, `S2 ${nomTheme} lisible dans themeMineral.js`)) continue;
     const a = (/\baccent\s*:\s*'(#[0-9a-fA-F]{6})'/.exec(m[1]) || [])[1];
