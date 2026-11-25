@@ -14,7 +14,7 @@ import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site
 import { PropositionLiaison } from './PropositionLiaison.jsx';   // (20 nov.) relier depuis la liste
 import { STATUTS_TABLEAU, STATUTS_EN_LIGNE, statutTableau } from '../../articles/modele.js';
 import { groupesParCompte } from './annoncesComptes.js';   // (20 nov.) un intertitre par compte
-import { CarteAnnonce, seulementBloque, traceDe, texteTrace } from './AnnoncesCartes.jsx';   // (21 nov.) la grille « Dressing », le compte bloqué
+import { CarteAnnonce, seulementBloque, traceDe, texteTrace, idCarteAnnonce } from './AnnoncesCartes.jsx';   // (21 nov.) la grille « Dressing », le compte bloqué
 
 const TON = { corriger: 'ambre', attente: 'neutre', refusee: 'neutre', enligne: 'vert', masquee: 'neutre', pause: 'neutre', aconfirmer: 'ambre', bloque: 'neutre', brouillon: 'neutre', vendue: 'vert', retiree: 'neutre' };
 const dateCourte = (ms) => { try { return new Date(ms).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (_) { return ''; } };
@@ -49,7 +49,9 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     nonCochable: seulementBloque(a),
     texte: [a.titre, a.numero ? 'n' + a.numero + ' n°' + a.numero + ' ' + a.numero : '', a.taille, ...a.annonces.map((x) => x.pseudo + ' ' + nomSite(x.site))].join(' '),
     prixGrille: a.prix != null ? euros(a.prix) : '',
-    attrs: { 'data-eg-article': a.cle, 'data-eg-numero': a.numero || '', 'data-eg-sites': a.sites.join(','), 'data-eg-compte': groupe.cle },
+    // (25 nov., train #1388) L'identité de son annonce Vinted (`data-carte-annonce`, src/natif/ecrans/AnnoncesCartes.jsx) : l'écran
+    // d'hier caché ne rend plus ses vignettes, c'est ici qu'une annonce est vue à l'ordinateur.
+    attrs: { 'data-eg-article': a.cle, 'data-eg-numero': a.numero || '', 'data-eg-sites': a.sites.join(','), 'data-eg-compte': groupe.cle, 'data-carte-annonce': idCarteAnnonce(a) },
   })); }, [articles, euros, nomSite, filtreLien, liaison, site, Logo]);   // eslint-disable-line react-hooks/exhaustive-deps
   const unParArticle = (ls) => { const vu = new Set(); return ls.filter((l) => (vu.has(l.a.cle) ? false : (vu.add(l.a.cle), true))).map((l) => l.a); };
 

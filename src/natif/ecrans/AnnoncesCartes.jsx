@@ -81,6 +81,11 @@ export const comptesDe = (a) => {
   }
   return [...vus.values()];
 };
+// (25 nov., train #1388) L'IDENTITÉ de l'annonce Vinted d'un article (`data-carte-annonce`), posée sur sa carte et sa rangée :
+// l'écran Annonces d'hier, monté caché (src/annoncesCachees.js), ne rend plus ses vignettes — c'est ici qu'une annonce est
+// VUE (banc e2e-extension « ses annonces sont visibles dans Annonces », cible d'une notification : src/cibleNotif.js).
+// Par identité seulement : la 1re annonce Vinted de l'article ; aucune ⇒ pas d'attribut.
+export const idCarteAnnonce = (a) => { const v = a && Array.isArray(a.annonces) ? a.annonces.find((x) => x && x.site === 'vinted' && x.id != null) : null; return v ? String(v.id) : undefined; };
 export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, euros, nomSite, dort = null, plusVue = null, Photo = null, attrs = null, Icon = null, revele = null, taillePhoto = 360, groupe = false }) {   // (22 nov., choix 27) plusVue : jours mesurés (src/plusVue.js) ou null
   const bandeau = bandeauDe(a);
   const trace = a.etat === 'bloque' ? traceDe(a) : null;
@@ -90,7 +95,7 @@ export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, e
   const comptes = comptesDe(a);
   return (
     <div {...(revele || {})} className={cx('n-ad-carte n-inv', revele && revele.className)} style={revele ? revele.style : undefined} role="button" tabIndex={0} aria-pressed={selection ? (selection.cochee ? 'true' : 'false') : undefined}
-      aria-disabled={grise ? 'true' : undefined} data-ad-carte="" data-ad-etat={a.etat} data-ad-grise={grise ? '1' : undefined} data-inv-photo={a.photo || ''} data-inv-trace={trace ? '1' : undefined}
+      aria-disabled={grise ? 'true' : undefined} data-ad-carte="" data-carte-annonce={idCarteAnnonce(a)} data-ad-etat={a.etat} data-ad-grise={grise ? '1' : undefined} data-inv-photo={a.photo || ''} data-inv-trace={trace ? '1' : undefined}
       onClick={clic} onKeyDown={(e) => { if (e.target !== e.currentTarget) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clic(); } }} {...(attrs || {})}>
       <span className="n-ad-photo n-inv-photo">
         <PontPhoto.Provider value={Photo}><TaillePhoto.Provider value={taillePhoto}>
@@ -173,7 +178,7 @@ export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selec
   const haut = () => { const g = geste.current; geste.current = null; if (!g || !g.pris) return; avale.current = true; const x = (ouvert ? -W : 0) + g.dx; const o = x < -W / 2; setOuvert(o); pose(o ? -W : 0, true); };
   const clic = () => { if (avale.current) { avale.current = false; return; } if (ouvert) { setOuvert(false); return; } if (selection) { if (selection.cochable) selection.onBascule(); return; } onOuvrir(a); };
   return (
-    <div {...(revele || {})} className={cx('n-ar', revele && revele.className)} style={revele ? revele.style : undefined} data-ad-forme={forme} data-ad-rangee="" data-ad-etat={a.etat} data-ad-grise={grise ? '1' : undefined}
+    <div {...(revele || {})} className={cx('n-ar', revele && revele.className)} style={revele ? revele.style : undefined} data-ad-forme={forme} data-ad-rangee="" data-carte-annonce={idCarteAnnonce(a)} data-ad-etat={a.etat} data-ad-grise={grise ? '1' : undefined}
       data-inv-photo={a.photo || ''} data-ad-ouvert={ouvert ? '1' : undefined} {...(attrs || {})}>
       {rap ? <span className="n-ar-rapides" aria-hidden={ouvert ? undefined : 'true'} style={{ width: W }}>
         {rap.map((x) => <button key={x.cle} type="button" className="n-ar-rapide" data-ad-rapide={x.cle} tabIndex={ouvert ? 0 : -1}

@@ -45,10 +45,10 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   const uniq = SRC.slice(SRC.indexOf('const unique = ('), SRC.indexOf('const buyForTrack'));
   // (5 nov.) `trackForBuy` lit `colisParTx` (identité : conversation, n° de suivi) — plus le
   // titre. On l'exécute tel quel, avec ses voisins réduits à leur forme (§6.3).
-  const parTx = (() => { const d = SRC.indexOf('const colisParTx = useMemo('); const f = SRC.indexOf('const trackForBuy', d); return d < 0 ? '' : SRC.slice(d, f); })();
+  const parTx = (() => { const d = SRC.indexOf('const colisParTx = useLecteurParesseux(') >= 0 ? SRC.indexOf('const colisParTx = useLecteurParesseux(') : SRC.indexOf('const colisParTx = useMemo('); const f = SRC.indexOf('const trackForBuy', d); return d < 0 ? '' : SRC.slice(d, f); })();
   const tfb = (() => { const d = SRC.indexOf('const trackForBuy = ('); if (d < 0) return ''; const f = SRC.indexOf('\n', d); const l = SRC.slice(d, f); return /^const trackForBuy = \(o\) => \(o \?/.test(l) ? l : bout('trackForBuy'); })();
   const code = `const normTitle = (t) => (t || '').toLowerCase().replace(/\\s+/g, ' ').trim();
-    const useMemo = (f) => f(); const pickupUnion = { emailList: [], cmdParColis: new Map() };
+    const useMemo = (f) => f(); const useLecteurParesseux = (f) => { let v, fait = false; return () => (fait ? v : (fait = true, v = f())); }; const ecranCalcul = 'audit'; const pickupUnion = { emailList: [], cmdParColis: new Map() };
     const normaliserSuivi = (s) => String(s || '').toUpperCase().replace(/\\s+/g, ''); const suiviDeLigne = (t) => normaliserSuivi(t && t.suivi);
     const colisKey = (t) => 'e:' + suiviDeLigne(t); const suivisAchat = (o) => (o && o.suivis) || []; const indexSuivisAchats = {};
     ${uniq}
