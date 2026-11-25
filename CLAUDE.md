@@ -485,8 +485,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **25 nov. · Aujourd'hui, moitié moins de texte (`claude/aujourdhui-moins-texte`)** : titres courts (« 5 annonces disparues », « En pause », « Ordinateur éteint · 07:37 », « 24 N° à écrire »), ±0 % neutre sans flèche, « ≥ » pour « au moins » (plus coupé), « Par site » seulement à 2 sites ; 213 → 100 mots (390 px), 249 → 123 (1512). `2026-11-25-aujourdhui-moins-texte.md`. Geste : regarder les planches.
-- **25 nov. · Le clair par défaut passe au GRIS MOYEN (`claude/gris-moyen-essai`, Julien : « gris moyen c'est d'accord »)** : page #878B92, cartes #F1F2F4, encre #0E0F12, secondaire #1F2226 (posé sur la page : 4,67:1), accent = plein #19222C ; la nuit ne change pas ; tout texte posé sur la page est à l'encre. `2026-11-25-gris-moyen.md`, NATIF.md §0 ter. Geste : aucun.
+- **25 nov. · Ventes, la rangée compacte (`claude/ventes-rangee`)** : photo par SES sources (identité), titre + prix, UN état, logo entier, ~84 px ; achat au balayage et dans la fiche. `2026-11-25-ventes-rangee.md`. Geste : aucun.
+- **25 nov. · Régressions iPhone (`claude/regressions-25nov`)** : 3 cartes grises d'Aujourd'hui (versements eBay en attente muette), barre du haut opaque, ligne d'une vente en rangée (ordre des feuilles), « Pas revue récemment » une fois par compte, copie sans squelette ni heure. `2026-11-25-regressions.md`, banc `regressions-25nov`. Geste : aucun.
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier

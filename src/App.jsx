@@ -730,7 +730,12 @@ const TableauEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) =>
 const ArgentEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.ArgentEbay })));
 const TraficEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.TraficEbay })));
 const SanteEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.SanteEbay })));
-const VersementsEbayJournee = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.VersementsEbayJournee })));
+// (25 nov., régressions — captures iPhone de Julien : trois cartes grises sous « Personnaliser », pour toujours) Ce bloc
+// n'existe que s'il y a un versement à dire (le plus souvent : rien). En `aLaDemande`, son attente était le squelette de
+// trois rangées (`MorceauAttente`) : il paraissait puis s'en allait (un saut), et restait pour de bon quand le morceau
+// eBay n'arrivait pas (réseau de l'iPhone, morceau tenu — banc regressions-25nov S). Une attente MUETTE, comme tout bloc
+// d'appoint (`aLaDemandeDiscret`) : rien tant qu'il n'est pas là.
+const VersementsEbayJournee = aLaDemandeDiscret(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.VersementsEbayJournee })));
 // (15 nov., 2e tour) Les photos de la FICHE d'un N° (par identité : une seule fiche porte ce N°), lues
 // en projection dans `vinted_item_details` (§4.4, la forme de Republier) : « Ajouter les photos de ta
 // fiche » sur une annonce eBay qui en a peu. Deux fiches ou aucune ⇒ null (rien proposé).
@@ -894,6 +899,7 @@ import {etatRetrait, estAVerifier, urgenceTri, lieuDepuisExtrait, limiteRetraitD
 import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction, TEXTE_ESTIMEE_DEPASSEE, heureCourte as heureCourteJ} from '../api/_lib/limite-envoi.js';
 // ⟦→ ecrans/Comptabilite.jsx #62⟧
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
+import { photoVentePubliee, useVersionPhotosVentes } from "./ventes/photosVentesPub.js";
 import { ecrireEmailsLus } from "./emailsLusEcriture.js";
 // ⟦→ ecrans/Comptabilite.jsx #63⟧
 import {ResponsiveChatPortal, telFil} from "./ChatPortal.jsx";
@@ -33851,6 +33857,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sites && sites.has('vestiaire')]);
   const sigPlanT = signaturePlan();
+  const versionPhotos = useVersionPhotosVentes();   // (25 nov., ventes-rangee) une photo publiée par Ventes redessine la liste
   const toutesLignes = React.useMemo(() => {
     const out = [];
     const ts = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? t : null; };
@@ -33866,7 +33873,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         out.push({ cle: 'vinted:' + tx, site: 'vinted', id: tx, titre: o.title || '(sans titre)', t: ts(o.date),
           prix: euro(o.price && typeof o.price === 'object' ? o.price.amount : o.price), devise: (o.price && o.price.currency_code) || 'EUR',
           etat: etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).label,
-          compte: labels[uid] || (o._acc && o._acc.login) || '', num: '', photo: photosVenteVintedCandidates(o)[0] || null,
+          compte: labels[uid] || (o._acc && o._acc.login) || '', num: '', photo: photosVenteVintedCandidates(o)[0] || photoVentePubliee(tx) || null,   // (25 nov.) sinon la photo de SES sources, publiée par Ventes
           // (21 nov.) « Marque · T42 » sur la rangée (affichage seulement : jamais une identité).
           marque: (o.brand_title || o.brand || extractBrand(String(o.title || '')) || ''), taille: typeof o.size_title === 'string' ? o.size_title : '',
           tr: bordTParTx[tx] ? transporteurDeVente({ bord: bordTParTx[tx] }) : null });
@@ -33919,7 +33926,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     // (jamais datée au hasard). La règle unique (src/ordreRecent.js, lot AJ du 9 nov.).
     return ordreRecent(out, (l) => l.t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sites, ventesVinted, panelOff, lbcVentes, lbcLu, ebayTous, vc, annLbc, vcLocDep.departsCle, bordTParTx, sigPlanT]);
+  }, [sites, ventesVinted, panelOff, lbcVentes, lbcLu, ebayTous, vc, annLbc, vcLocDep.departsCle, bordTParTx, sigPlanT, versionPhotos]);
   // (22 nov., Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées ») LES ANNULÉES de cette
   // liste, par IDENTITÉ (`site:n°`), d'après la règle commune (src/ventesAnnulees.js — chaque plateforme par SA règle).
   // Chaque ligne annulée porte son motif (`annul`) ; au téléphone elles sont rangées dans UN groupe replié « Annulées ».

@@ -269,7 +269,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     <div className="n-tt-tete" data-tt-tete="">
       <span className="n-tt-compte" data-tt-compte={compte || ''}><span className="n-tt-compte-point" aria-hidden="true"/>{compte || tr('tableau.tousComptes')}</span>
       <span className="n-tt-espace"/>
-      <span className="n-tt-maj" data-tt-maj={majLe === undefined ? 'lecture' : majLe == null ? 'passu' : 'lu'}>{depuisMaj(majLe, maintenant)}</span>
+      <span className="n-tt-maj" data-copie-vide="" data-tt-maj={majLe === undefined ? 'lecture' : majLe == null ? 'passu' : 'lu'}>{depuisMaj(majLe, maintenant)}</span>
       {onRafraichir ? <button type="button" data-n-famille="rond" className="n-tt-bouton n-tt-bouton-icone" data-tt-rafraichir="" aria-label={tr('tableau.rafraichir')} title={tr('tableau.rafraichir')}
         disabled={rafraichit} aria-busy={rafraichit ? 'true' : undefined} onClick={() => onRafraichir()}>{ic('sync', 18)}</button> : null}
     </div>
