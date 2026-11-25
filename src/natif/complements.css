@@ -272,8 +272,9 @@
     .n-carte-corps, .n-tuiles-pied { border: 0; box-shadow: 0 0 0 .5px var(--n-bord), 0 1px 2px rgb(29 29 31 / .04); }
     .n-rangee-corps { min-height: var(--n-cible); padding: 7px 14px; gap: 12px; }
     /* Ventes : « Relier » et « + prix » deviennent deux liens discrets sur une ligne (le champ s'ouvre au toucher). */
-    .n-vt-achat .n-vt-relier, .n-vt-plus-prix { position: relative; min-height: 28px !important; padding: 0 8px 0 0; background: transparent !important; box-shadow: none !important; border: 0; color: var(--n-encre-2); font: var(--n-t-second-fort); }
-    .n-vt-achat .n-vt-relier::before, .n-vt-plus-prix::before { content: ''; position: absolute; inset: -8px -4px; }
+    /* (24 nov., style-graphite) seulement dans le style actuel : un style choisi en fait des boutons de la famille (styles-choix.css). */
+    :where(:root:not([data-style])) .n-vt-achat .n-vt-relier, :where(:root:not([data-style])) .n-vt-plus-prix { position: relative; min-height: 28px !important; padding: 0 8px 0 0; background: transparent !important; box-shadow: none !important; border: 0; color: var(--n-encre-2); font: var(--n-t-second-fort); }
+    :where(:root:not([data-style])) .n-vt-achat .n-vt-relier::before, :where(:root:not([data-style])) .n-vt-plus-prix::before { content: ''; position: absolute; inset: -8px -4px; }
     .n-vt-achat .n-vt-relier-rond { width: auto; height: auto; background: none; box-shadow: none; }
     /* Ventes : rangée de 64–72 px — vignette 52, titre sur UNE ligne, une ligne de détail, la ligne prix · étiquette, et
        « Relier · + prix » posés à droite de cette dernière ligne (hors du bouton de la rangée, comme avant). */
@@ -292,6 +293,12 @@
     .n-vt-rang .n-rangee-sous { flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
     .n-rangee.n-vt-rang > .n-rangee-pied, .n-rangee.n-vt-rang[data-n-a-pied] > .n-rangee-pied { position: absolute; z-index: 2; right: 10px; bottom: 6px; margin: 0; padding: 0; border: 0; background: none; }
     .n-rangee.n-vt-rang > .n-rangee-pied .n-vt-achat { gap: 2px; }
+    /* (24 nov., livrable-2 — « sans bordereau · à véri… » coupé sur chaque ligne) La ligne de détail n'est JAMAIS coupée : chaque
+       morceau (« sans bordereau », « à vérifier », « vers le 26 nov. ») reste entier et, s'il ne tient pas, passe à la ligne
+       (deux lignes au plus) — la rangée grandit de 16 px au lieu de rogner le texte. */
+    .n-vt-rang .n-rangee-sous { overflow: visible; }
+    .n-vt-rang .n-rangee-sous-texte[data-n-lignes] { white-space: normal; overflow: visible; text-overflow: clip; display: block; }
+    .n-vt-rang .n-vt-morceau { white-space: nowrap; }
     .n-actions-rondes .n-action-ronde-disque { box-shadow: 0 0 0 .5px var(--n-bord), 0 1px 2px rgb(29 29 31 / .05); }
   }
 }

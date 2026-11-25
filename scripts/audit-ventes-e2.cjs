@@ -137,7 +137,13 @@ function statiques(bavard) {
   dit(/etat=\{motEtatVente\(venteStage\(o\)\.label\)\}/.test(app), 'S3 l’état d’une ligne Vinted passe par `motEtatVente`');
   const toutes = bloc('function VentesToutes(', 'function AppCoeur(');
   dit(toutes.length > 0 && !/CompteurListe/.test(toutes) && !/résultats/.test(toutes), 'S4 « Tous » : plus de compteur « N sur N résultats »');
-  dit(/className="vrm-toutes-etat"/.test(toutes) && /motEtatVente\(l\.etat\)/.test(toutes), 'S4 « Tous » : l’état sur sa propre ligne, avec le mot retenu');
+  // (24 nov., main-vert) La refonte native : la liste du téléphone est `VentesListeTel` (src/natif/ecrans/VentesTableau.jsx),
+  // l'état y est une PASTILLE à part (plus une ligne de texte) — la règle reste : son élément à lui, avec le mot retenu.
+  const tel = sansCommentaires(fs.readFileSync(path.join(__dirname, '..', 'src', 'natif', 'ecrans', 'VentesTableau.jsx'), 'utf8'));
+  const listeTel = tel.slice(tel.indexOf('export function VentesListeTel('), tel.indexOf('export function VentesListeTel(') + 6000);
+  const appelsTel = [...toutes.matchAll(/<VentesListeTel\b/g)].map((m) => toutes.slice(m.index, m.index + 700));
+  dit(appelsTel.length > 0 && appelsTel.every((t) => /\smotEtat=\{motEtatVente\}/.test(t))
+    && /const mot = l\.etat \? motEtat\(l\.etat\) : ''/.test(listeTel) && /<Pastille\b[^>]*>\{mot\}<\/Pastille>/.test(listeTel), 'S4 « Tous » : l’état dans son propre élément (pastille), avec le mot retenu (`motEtatVente`)');
   dit(/<details className="vrm-toutes-repli"/.test(toutes), 'S4 « Tous » : « jamais lu » replié en une ligne');
   const alerte = bloc('fenetreAnnulations()', 'comptesQuiAnnulent(R)');
   dit(/annulationsParCompte\(\{/.test(alerte), 'S5 l’alerte lit `annulationsParCompte` (la règle de Statistiques)', alerte.slice(0, 160));

@@ -176,7 +176,9 @@ const rienTouche = () => etat.deletes.length === 0 && etat.base.utilisateurs.has
   dit((app.match(/tab==='settings'&&<GardeEcran nom="settings"/g) || []).length === 1, 'l’écran Paramètres reste monté (`tab===\'settings\'`)');
   const menu = fs.existsSync(path.join(RACINE, 'src/profil/MenuProfil.jsx')) ? fs.readFileSync(path.join(RACINE, 'src/profil/MenuProfil.jsx'), 'utf8') : '';
   dit(/data-profil-menu=\{id\}/.test(menu) && /ligne\('parametres','gear',(?:'Paramètres'|tr\('ecran\.settings'\)),onParametres\)/.test(menu) && /ligne\('appareils'/.test(menu) && /ligne\('deconnexion'/.test(menu), 'le menu du profil porte Paramètres, Appareils connectés, Se déconnecter');
-  dit(/<MenuProfilCoque setTab=\{setTab\}/.test(app) && /data-nav-compte-ouvre="profil"/.test(app) && /avatar=\{uid \? <PastilleProfil/.test(app) && /data-profil-tete/.test(app), 'la carte de la colonne et la photo de l’en-tête du téléphone (« Plus », 19 nov. : sa rangée « Mon profil ») ouvrent le menu');
+  // (21 nov., onglets-menu) La carte du compte de la colonne mène à Paramètres (qui porte Appareils, Se déconnecter) ; elle n'ouvre plus
+  // le menu du profil — le même chemin du compte, une marche de moins.
+  dit(/<MenuProfilCoque setTab=\{setTab\}/.test(app) && (/data-nav-compte-ouvre="profil"/.test(app) || /data-nav-compte-ouvre="parametres"[^\n]*\n[^\n]*onClick=\{\(\) => \{ revenirSurOnglet\(\); ouvrirEntree\(ONGLET_PARAMETRES, setTab\); \}\}/.test(app)) && /avatar=\{uid \? <PastilleProfil/.test(app) && /data-profil-tete/.test(app), 'la carte de la colonne et la photo de l’en-tête du téléphone (« Plus », 19 nov. : sa rangée « Mon profil ») ouvrent le menu');
   dit(/onParametres=\{\(\) => aller\(''\)\}/.test(app) && /setTab\('settings'\)/.test(app), '« Paramètres » du menu ouvre l’écran');
   const racc = fs.readFileSync(path.join(RACINE, 'src/raccourcisClavier.js'), 'utf8');
   dit(/touche: 'p', tab: 'settings'/.test(racc), '« g p » ouvre toujours Paramètres');

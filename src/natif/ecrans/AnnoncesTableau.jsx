@@ -20,7 +20,7 @@ const TON = { corriger: 'ambre', attente: 'neutre', refusee: 'neutre', enligne: 
 const dateCourte = (ms) => { try { return new Date(ms).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (_) { return ''; } };
 
 export default function AnnoncesTableau({ articles, filtres = [], compte = '', majLe, onRafraichir = null, rafraichit = false, actions = [], onAction, onOuvrir,
-  saisir, onNumero = null, onPrix = null, onRelier = null, onFiche = null, plein = null, haut = null, pied = '', euros = (n) => String(n) + ' €',
+  saisir, onNumero = null, onPrix = null, onRelier = null, onRelierAchat = null, onFiche = null, plein = null, haut = null, pied = '', euros = (n) => String(n) + ' €',
   depuisTexte = () => '', nomSite = (s) => s, Icon = null, sites = [], onAutomatisations = null, onPublier = null, liaison = null, site = 'tous', Logo = null, dortDe = null, plusVueDe = null, Photo = null }) {
   // (20 nov.) La colonne et le filtre « Liaison » : l'état du lien de chaque article (Reliée · À relier · Que sur ce site), lu
   // dans src/liaisonEtat.js par l'écran (`liaison.de`). Un article seulement sur Vinted n'a rien à relier : « — ».
@@ -35,7 +35,9 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     const garde = articles.filter(({ a }) => filtreLien === 'tous' || classeLien(a) === filtreLien).map(({ a }) => a);
     const out = [];
     for (const g of groupesParCompte(garde, site)) {
-      const titre = <span className="n-eg-compte">{Logo && g.site ? <span className="n-eg-compte-logo" aria-hidden="true">{Logo(g.site)}</span> : null}{g.cle === 'sans' ? tr('egalite.groupe.sansCompte') : (g.pseudo || ('#' + g.compte))}<span className="n-tt-intertitre-n">{tr('egalite.groupe.n', { n: g.articles.length })}</span></span>;
+      // (23 nov., revue UX P2) Le nombre du groupe = ses lignes AFFICHÉES (filtres compris), « 36 sur 82 » quand un filtre en cache : la
+      // même règle et le même mot (« annonces ») que le nombre en tête du tableau.
+      const titre = (n, total) => <span className="n-eg-compte">{Logo && g.site ? <span className="n-eg-compte-logo" aria-hidden="true">{Logo(g.site)}</span> : null}{g.cle === 'sans' ? tr('egalite.groupe.sansCompte') : (g.pseudo || ('#' + g.compte))}<span className="n-tt-intertitre-n" data-eg-groupe-n={String(n)} data-eg-groupe-total={String(total)}>{n < total ? tr('egalite.groupe.nSur', { k: n, n: total }) : tr('egalite.groupe.n', { n })}</span></span>;
       // (22 nov., Julien : « les filtres ne sont pas précis ») La rangée d'un COMPTE porte l'état de SON annonce (vendue sur Vinted,
       // en ligne sur Leboncoin : deux rangées, « Vendue » et « En ligne ») — le compteur de chaque statut = ses rangées.
       for (const a of g.articles) out.push({ a, statut: (g.cle !== 'sans' && statutTableau(a, { site: g.site, compte: g.compte })) || statutDe.get(a.cle), groupe: { cle: g.cle, titre } });
@@ -52,9 +54,12 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
   const unParArticle = (ls) => { const vu = new Set(); return ls.filter((l) => (vu.has(l.a.cle) ? false : (vu.add(l.a.cle), true))).map((l) => l.a); };
 
   // Une cellule qui se modifie : la valeur, ou « — » qui ouvre SA saisie (la même feuille que la liste).
+  // (24 nov., main-vert) Le nom d'une cellule COMMENCE par ce qu'elle montre (« 45,00 € · Prix de … ») : avant, le lecteur d'écran
+  // disait « Prix de … » sans la valeur visible (axe label-content-name-mismatch).
+  const nomCellule = (v) => (v == null ? '— · ' : typeof v === 'string' || typeof v === 'number' ? String(v) + ' · ' : '');
   const modifiable = (l, cle, valeur, onModifier) => (onModifier && !seulementBloque(l.a)
-    ? <button type="button" className="n-eg-cellule" data-eg-modifier={cle} data-eg-vide={valeur == null ? '1' : undefined}
-        aria-label={tr('egalite.modifier', { quoi: tr('egalite.col.' + cle), article: l.titre })} onClick={(e) => { e.stopPropagation(); onModifier(); }}>{valeur == null ? '—' : valeur}</button>
+    ? <button type="button" data-n-famille="lien" className="n-eg-cellule" data-eg-modifier={cle} data-eg-vide={valeur == null ? '1' : undefined}
+        aria-label={nomCellule(valeur) + tr('egalite.modifier', { quoi: tr('egalite.col.' + cle), article: l.titre })} onClick={(e) => { e.stopPropagation(); onModifier(); }}>{valeur == null ? '—' : valeur}</button>
     : valeur);
   const pasFourni = () => <span className="n-tt-vide-cellule" title={tr('cqm.pasFourni')} aria-label={'— · ' + tr('cqm.pasFourni')} data-eg-pasfourni="">—</span>;
   const colonnes = [
@@ -93,9 +98,10 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
   const filtresL = liaison ? [...filtres, { cle: 'liaison', libelle: tr('liaL.col'), valeur: filtreLien, onChange: setFiltreLien,
     options: [{ cle: 'tous', libelle: tr('liaL.filtre.tous') }, { cle: 'arelier', libelle: tr('liaL.filtre.arelier') }, { cle: 'reliee', libelle: tr('liaL.filtre.reliee') }, { cle: 'propre', libelle: tr('liaL.filtre.propre') }] }] : filtres;
   const statuts = STATUTS_TABLEAU.map((s) => ({ cle: s, libelle: tr('tableau.etat.' + s), ton: TON[s] }));
-  const acts = actions.map((x) => ({ cle: x.cle, libelle: x.libelle, aucune: tr('tableau.actionAucuneIci'),
+  const acts = actions.map((x) => ({ cle: x.cle, libelle: x.libelle, courante: !!x.courante, aucune: tr('tableau.actionAucuneIci'),
     pour: x.pour ? (l) => x.pour(l.a) : null, juger: x.juger ? (ls) => x.juger(unParArticle(ls)) : null }));
   const menuLigne = (l) => (seulementBloque(l.a) ? [{ cle: 'fiche', libelle: tr('tableau.ouvrir'), onClick: () => onOuvrir(l.a) }] : [
+    ...(onRelierAchat && l.a.achat == null ? [{ cle: 'relierAchat', libelle: tr('ventes.relierAchat2'), onClick: () => onRelierAchat(l.a) }] : []),
     { cle: 'fiche', libelle: tr('tableau.ouvrir'), onClick: () => onOuvrir(l.a) },
     { cle: 'mini', libelle: tr('egalite.saisie.min'), onClick: () => saisir(l.a, 'min') },
     { cle: 'achat', libelle: tr('egalite.saisie.buyPrice'), onClick: () => saisir(l.a, 'buyPrice') },
@@ -103,16 +109,16 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     ...(onFiche && l.a.numero ? [{ cle: 'toute', libelle: tr('egalite.touteLaFiche'), onClick: () => onFiche(l.a) }] : []),
   ]);
   // (21 nov.) La GRILLE de l'ordinateur : les mêmes cartes que le téléphone (photo, N°, logos, prix, vues · favoris · jours).
-  const carteGrille = (l, { coche, cochable, basculer, ouvrir: ouvrirL, selection }) => (
-    <CarteAnnonce a={l.a} onOuvrir={() => ouvrirL(l)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} Photo={Photo} dort={dortDe && !selection ? dortDe(l.a) : null} plusVue={plusVueDe && !selection ? plusVueDe(l.a) : null}
+  const carteGrille = (l, { coche, cochable, basculer, ouvrir: ouvrirL, selection, revele = null }) => (
+    <CarteAnnonce revele={revele} a={l.a} onOuvrir={() => ouvrirL(l)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} Photo={Photo} dort={dortDe && !selection ? dortDe(l.a) : null} plusVue={plusVueDe && !selection ? plusVueDe(l.a) : null}
       selection={selection ? { cochee: coche, cochable, onBascule: () => basculer(l) } : null} attrs={{ ...l.attrs, 'data-tt-ligne': l.cle, 'data-tt-coche': coche ? '1' : undefined }}/>
   );
   return (
     <TableauTravail id="annonces" titre={tr('egalite.titre')} compte={compte} majLe={majLe} onRafraichir={onRafraichir} rafraichit={rafraichit}
-      lignes={lignes} statuts={statuts} statutsDefaut={[...STATUTS_EN_LIGNE, 'bloque']} carteGrille={carteGrille} filtres={filtresL} colonnes={colonnes}
+      lignes={lignes} statuts={statuts} statutsDefaut={[...STATUTS_EN_LIGNE, 'bloque']} carteGrille={carteGrille} carteCorps={96} filtres={filtresL} colonnes={colonnes}
       actions={acts} onAction={(cle, ls) => onAction(cle, unParArticle(ls))} menuLigne={menuLigne} onOuvrir={(l) => onOuvrir(l.a)} groupe={(l) => l.groupe}
-      unite={(n) => tr('tableau.articles', { n })} placeholder={tr('tableau.chercherArticle')} plein={plein} haut={haut} pied={pied}
-      outilsPlus={onPublier || onAutomatisations ? <>{onPublier ? <button type="button" className="n-tt-bouton" data-eg-publier="" onClick={onPublier}>{Icon ? <Icon name="plus" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('egalite.publier')}</span></button> : null}{onAutomatisations ? <button type="button" className="n-tt-bouton" data-tt-automatisations="" onClick={onAutomatisations}>{Icon ? <Icon name="spark" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('auto.titre')}</span></button> : null}</> : null}
+      unite={(n) => tr('egalite.groupe.n', { n })} placeholder={tr('tableau.chercherArticle')} plein={plein} haut={haut} pied={pied}
+      outilsPlus={onPublier || onAutomatisations ? <>{onPublier ? <button type="button" data-n-famille="second" className="n-tt-bouton" data-eg-publier="" onClick={onPublier}>{Icon ? <Icon name="plus" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('egalite.publier')}</span></button> : null}{onAutomatisations ? <button type="button" data-n-famille="second" className="n-tt-bouton" data-tt-automatisations="" onClick={onAutomatisations}>{Icon ? <Icon name="spark" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('auto.titre')}</span></button> : null}</> : null}
       vide={tr('tableau.videAnnonces')} pasSu={tr('egalite.pasSu')} Icon={Icon} attrs={{ 'data-eg-ecran': '', 'data-eg-vue': 'tableau' }}/>
   );
 }

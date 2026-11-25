@@ -111,9 +111,12 @@ vm.runInNewContext([bout('const KNOWN_BRANDS=[', '];'), bout('function extractBr
     global.ResizeObserver = undefined;
     const el = (largeur, contenu) => { const style = { fontSize: '', whiteSpace: '', removeProperty() { ecritures++; }, setProperty(k, v) { ecritures++; if (k === 'font-size') this.fontSize = v; } };
       return { style, parentElement: null, get clientWidth() { return largeur; }, get scrollWidth() { const fs = parseFloat(style.fontSize) || 38; return Math.round(contenu * fs / 38); }, hasAttribute: () => false, removeAttribute() { ecritures++; }, setAttribute() { ecritures++; } }; };
-    ecritures = 0; calcules = 0; C.ajusterChiffre(el(300, 200));
+    // (24 nov., main-vert) L'ajustement est REGROUPÉ : toutes les lectures puis toutes les écritures, dans une micro-tâche
+    // (`planifierAjuste`, CarteMois.jsx). On juge donc APRÈS elle (avant : C1 passait sans que rien n'ait tourné, C2 rougissait).
+    const apresFile = () => new Promise((r) => (typeof queueMicrotask === 'function' ? queueMicrotask : (f) => Promise.resolve().then(f))(() => setImmediate(r)));
+    ecritures = 0; calcules = 0; C.ajusterChiffre(el(300, 200)); await apresFile();
     dit(ecritures === 0 && calcules === 0, 'C1 un chiffre qui tient, jamais ajusté : aucune écriture de style, aucun style calculé relu', `${ecritures} écriture(s), ${calcules} lecture(s) de style calculé`);
-    ecritures = 0; const long = el(200, 400); C.ajusterChiffre(long);
+    ecritures = 0; const long = el(200, 400); C.ajusterChiffre(long); await apresFile();
     dit(ecritures > 0 && parseFloat(long.style.fontSize) < 38, 'C2 un chiffre trop long est toujours ajusté (taille réduite)', `taille ${long.style.fontSize || '—'}`);
   }
 
