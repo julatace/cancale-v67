@@ -850,7 +850,7 @@ async function abonnement(req, res) {
 //   (les ventes de tous les comptes, prix à venir) — `CGV_PLANS_DEPUIS`.
 // 10 novembre (20 h, décision de Julien) : Pro = tous les comptes vendeurs, sans limite.
 // 13 novembre (lot 56) : option Solo « compte Vinted vendeur de plus » (3 € / mois, à confirmer).
-const CGV_VERSION = '2026-11-13';
+const CGV_VERSION = '2026-11-25';   // (25 nov.) parrainage à 20 % (article 2, « Parrainage »)
 async function checkout(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });

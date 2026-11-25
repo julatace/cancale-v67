@@ -296,7 +296,7 @@ const MUTATIONS_ROUTE = [
     const cgv = lire('public/legal/cgv.html'), cpt = lire('api/compte.js');
     const euros = R.prixCompteSupTexte().replace(' ', ' ');
     dit(cgv.includes(`compte Vinted vendeur de plus » : ${euros} par mois et par compte`) && cgv.includes(`chacun pour ${euros} par mois`), `CGV : l’option dit ${euros} par mois (la constante)`, euros);
-    dit(/Dernière mise à jour : 13 novembre 2026/.test(cgv) && /const CGV_VERSION = '2026-11-13'/.test(cpt), 'CGV du 13 novembre, version acceptée à jour');
+    dit(/Dernière mise à jour : 25 novembre 2026/.test(cgv) && /const CGV_VERSION = '2026-11-25'/.test(cpt), 'CGV du 25 novembre (13 nov. + parrainage à 20 %), version acceptée à jour');
     dit(/il ne peut pas être dépassé/.test(cgv) && /elle n’existe pas en Pro/.test(cgv), 'CGV : la quantité payée est la limite ; Pro inchangé (illimité)');
     const plans = sansCommentaires(lire('src/abonnement/PlansSoloPro.jsx')), reg = sansCommentaires(lire('src/ecrans/Reglages.jsx')), acc = sansCommentaires(lire('src/Accueil.jsx'));
     dit(!/[+]\s?3\s?€|3,00 €|3 € \/ mois/.test(plans + reg) && /texteSup\(/.test(plans) && /texteSup\(/.test(reg), 'écran : aucun « 3 € » écrit en dur (Paramètres, feuille, aperçu des ventes)');

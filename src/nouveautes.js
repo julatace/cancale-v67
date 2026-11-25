@@ -28,6 +28,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (25 nov., parrainage-20 — Julien : « le parrain touche 20 % … tant que son filleul paye ») docs/passation/2026-11-25-parrainage-20.md
+  //   `proprietaire` tant que le programme est éteint (vrm_reglages.parrainage) : passer à 'tous' en l'ouvrant.
+  { id: 'parrainage-20', date: '2026-11-25', titre: 'Parrainage : 20 % chaque mois', phrase: 'Ton filleul a −10 %, toi 20 % de chaque mois payé.', tab: 'parrainage', pour: 'proprietaire', mode: 'tous' },
   // (24 nov., suivi-ventes — Julien : « retrait des articles vendus, fais un vrai suivi ») docs/passation/2026-11-24-suivi-ventes.md
   { id: 'suivi-envois', date: '2026-11-24', titre: 'Tes colis vendus, du dépôt au versement', phrase: 'Au point, retiré, argent versé : chaque étape lue, datée.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (24 nov., lot retrait-parfait — Julien : « pour le retrait tu dois vraiment faire quelque chose de parfait ») docs/passation/2026-11-24-retrait-parfait.md

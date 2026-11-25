@@ -666,6 +666,7 @@ function SuiviTravailCoque() {
 const AlerteModeration = lazySur(() => import('./AlerteModeration.jsx'));
 const CompteBloque = lazySur(() => import('./CompteBloque.jsx'));   // (19 nov., lot compte-bloque) « Vinted a bloqué {compte} » + la question   // (11 nov., ext. 5.350) « Vinted a masqué / fait disparaître / limite »
 const EcranExtension = lazySur(() => import('./extension/EcranExtension.jsx'));
+const EcranParrainage = lazySur(() => import('./parrainage/EcranParrainage.jsx'));   // (25 nov.) le parrainage à 20 % : un VRAI écran (Julien : « Tu dois faire un vrai interface »)
 const EcranADistance = lazySur(() => import('./aDistance/EcranADistance.jsx'));   // (22 nov., ext. 5.436 `adistance`) « Mes comptes » : tes comptes à distance, ton ordinateur exécute   // (19 nov., demande H) LE seul endroit « Extension »   // (11 nov., ext. 5.350) « Vinted a masqué / fait disparaître / limite »
 const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
 // (11 nov.) « Publier partout » : la feuille à la demande (règle : src/publierPartout.js).
@@ -948,7 +949,7 @@ import { comptesARelire } from "./sondeVentes.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
 import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivreAbonnement, installerGardeEcriture, CLE_PARRAIN, CODE_PARRAIN_RE, codeParrainDe, codeParrainDuChemin } from "./abonnement/etatAbonnement.js";
 // (13 nov., lot 54) Le parrainage clair et visible : « Offert par … » à l'inscription, la ligne du menu « Plus ».
-import { lireApercuParrain, lireParrainageOuvert, parrainageOuvertConnu, suivreParrainageOuvert, demanderParrainage } from "./parrainage/parrainage.js";
+import { lireApercuParrain, lireParrainageOuvert, parrainageOuvertConnu, suivreParrainageOuvert } from "./parrainage/parrainage.js";
 // (15 nov.) Le lien d'un PARTENAIRE (`/p/LEO`) : gardé, présenté une fois (src/partenaires/lien.js).
 import { garderCodePartenaire, codePartenaireGarde } from "./partenaires/lien.js";
 import { presenterCodePartenaire } from "./partenaires/presenter.js";
@@ -34704,7 +34705,7 @@ function AppCoeur() {
   // (11 nov., lot DJ4) « À trancher » n'est plus un écran : un ancien lien (`?tab=trancher`, raccourci,
   // notification) ouvre Ma journée, sa carte ouverte en place.
   // (13 nov., lot 54) « Parrainer » (menu « Plus ») et `?tab=parrainage` : Réglages → Mon abonnement → Parrainage.
-  React.useEffect(()=>{ if(tab==='parrainage'){ demanderParrainage(); setTab('settings'); } },[tab]);
+  // (25 nov.) `?tab=parrainage` ouvre l'écran « Parrainage » lui-même (plus un détour par Réglages).
   React.useEffect(()=>{ if(tab==='trancher'){ try{ sessionStorage.setItem('vrm_trancher_ouvrir','1'); window.dispatchEvent(new Event('vrm:trancher-ouvrir')); }catch(_){} setTab('journee'); } },[tab]);
   React.useEffect(()=>{ if(tab==='leboncoin'){ subVoulue.current='annonces'; setTab('plat_leboncoin'); } },[tab]);
   // L'anti double vente eBay (cloche, notification) mène à eBay → Annonces, là
@@ -39321,6 +39322,7 @@ function AppCoeur() {
         {/* (21 nov., onglets-menu) L'écran « Menu » : la 5ᵉ place de la barre du bas (téléphone). */}
         {tab==='menu'&&<GardeEcran nom="menu"><EcranMenu tab={tab} setTab={setTab} badges={badgesStables} sites={sitesPresents} entreprise={entreprise} streamVisible={!!reglesStream.bouton} sombre={dark} basculerSombre={toggleDark} etats={<span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>}/></GardeEcran>}
         {tab==='extension'&&<GardeEcran nom="extension"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranExtension comptesVinted={!accountsLoaded ? undefined : baseKO ? [] : vintedAccounts} ecarte={(u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {})}/></Suspense></GardeEcran>}
+        {tab==='parrainage'&&<GardeEcran nom="parrainage"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranParrainage/></Suspense></GardeEcran>}
         {tab==='adistance'&&<GardeEcran nom="adistance"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranADistance comptesVinted={!accountsLoaded ? undefined : baseKO ? [] : vintedAccounts} ecarte={(u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {})} onNav={setTab}/></Suspense></GardeEcran>}
         {tab==='emails'&&<div data-espace="autres" style={{display:'contents'}}><GardeEcran nom="emails"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranEmails comptes={vintedAccounts} headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour} photoDe={photoEmailParTx}
           ecrireLus={(g)=>ecrireEmailsLus(g,{url:SUPABASE_URL,entetes:sbAuth,avecOwner:withOwner,owner:AUTH.user&&AUTH.user.id,cloisonne:CLOISONNE})}

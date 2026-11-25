@@ -276,7 +276,7 @@ const evt = (type, objet, created) => JSON.stringify({ id: 'evt_' + created, typ
     dit(r.code === 200 && !(balance.cus_N || []).length && !(balance.cus_A || []).length && !parr[N].paye_le, 'la facture à 0 € de l’essai : rien n’est offert', `HTTP ${r.code}`);
     r = await webhook(facture('cus_N', 1699, 2));
     const fN = balance.cus_N || [], fA = balance.cus_A || [];
-    dit(r.code === 200 && fN.length === 1 && fN[0].amount === -1699 && fA.length === 1 && fA[0].amount === -1699, 'premier paiement réel : un mois (16,99 €) crédité au filleul ET au parrain', JSON.stringify({ fN, fA }));
+    dit(r.code === 200 && fN.length === 1 && fN[0].amount === -396 && fA.length === 1 && fA[0].amount === -396, 'premier paiement réel : une semaine (3,96 €, règle du 25 nov.) créditée au filleul ET au parrain', JSON.stringify({ fN, fA }));
     dit(parr[N].paye_le && parr[N].credit_filleul_le && parr[N].credit_parrain_le, '  les dates sont rangées');
     await webhook(facture('cus_N', 1699, 2)); await webhook(facture('cus_N', 1699, 3));
     dit((balance.cus_N || []).length === 1 && (balance.cus_A || []).length === 1, 'webhook rejoué, mois suivant : jamais un second mois offert', `${(balance.cus_N || []).length} / ${(balance.cus_A || []).length}`);

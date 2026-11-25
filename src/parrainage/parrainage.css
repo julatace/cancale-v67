@@ -1,0 +1,91 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   L'ÉCRAN « PARRAINAGE » (25 nov.) — src/parrainage/EcranParrainage.jsx
+   Jetons --n-* seulement (aucune couleur en dur, sauf le QR : noir sur blanc pour se lire
+   dans les deux thèmes). Cartes blanches à ombre douce ; l'accent (l'encre) rare.
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-pr { display: flex; flex-direction: column; padding-bottom: 24px; }
+.vrm-pr > .vrm-sq-carte { margin: 0 var(--n-marge) 16px; width: auto; }
+.vrm-pr-test { margin: 0 var(--n-marge) 12px; font: var(--n-t-legende); color: var(--n-encre-2); }
+
+/* Le héros : le pictogramme en haut à droite, les 12 barres dessous. */
+.vrm-pr-heros-ic { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: rgb(255 255 255 / .12); color: var(--n-sur-heros); }
+.vrm-pr-barres .n-barres { margin: 8px 0 0; }
+.vrm-pr-barres-detail { margin: 4px 0 0; min-height: 18px; font: var(--n-t-legende); color: var(--n-sur-heros-2); font-variant-numeric: tabular-nums; }
+
+/* Une carte de l'écran. */
+.vrm-pr-carte { margin: 0 var(--n-marge) 16px; padding: 16px; border-radius: var(--n-r-carte); background: var(--n-carte); border: 1px solid var(--n-bord); box-shadow: var(--n-ombre-carte); display: flex; flex-direction: column; gap: 14px; }
+.vrm-pr-carte > .n-actions-rondes, .vrm-pr-carte > .n-groupe, .vrm-pr-carte > .n-bouton-bloc { margin-left: 0; margin-right: 0; margin-bottom: 0; }
+.vrm-pr-carte > .n-groupe { border: 1px solid var(--n-bord); border-radius: 12px; overflow: hidden; }
+.vrm-pr-carte .n-segmente { margin: 0; }
+.vrm-pr-carte .n-pourquoi { padding: 0; }
+.vrm-pr-titre { margin: 0; font: var(--n-t-corps-fort); color: var(--n-encre); }
+.vrm-pr-phrase { margin: -4px 0 0; font: var(--n-t-second); color: var(--n-encre-2); }
+
+/* Le lien, en grand : toute la carte se touche pour le copier. */
+.vrm-pr-lien { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 0 14px; border-radius: 14px;
+  background: var(--n-carte-2); border: 1px dashed var(--n-bord); cursor: pointer; color: var(--n-encre); }
+.vrm-pr-lien-texte { flex: 1; min-width: 0; font: 650 17px/22px var(--n-police); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.vrm-pr-lien-ic { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--n-carte); color: var(--n-encre-2); flex: none; }
+.vrm-pr-lien:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+.vrm-pr-lien:active { transform: scale(.99); }
+
+/* Comment ça marche : trois étapes, une ligne chacune. */
+.vrm-pr-etapes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; position: relative; }
+.vrm-pr-etape { display: grid; grid-template-columns: 40px 1fr; align-items: center; gap: 12px; position: relative; min-height: 44px; }
+.vrm-pr-etape-ic { grid-row: 1; grid-column: 1; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--n-carte-2); border: 1px solid var(--n-bord); color: var(--n-encre); }
+.vrm-pr-etape-n { position: absolute; left: 26px; top: 0; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border-radius: 9px; background: var(--n-plein); color: var(--n-sur-plein); font: 700 11px/18px var(--n-police); text-align: center; }
+.vrm-pr-etape-t { grid-column: 2; font: var(--n-t-corps); color: var(--n-encre); }
+.vrm-pr-etape + .vrm-pr-etape::before { content: ''; position: absolute; left: 19.5px; top: -10px; height: 10px; border-left: 1px dashed var(--n-bord); }
+
+/* L'historique : les groupes se suivent. */
+.vrm-pr-historique { display: flex; flex-direction: column; }
+
+/* Les feuilles : champs. */
+.vrm-pr-champ { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; font: var(--n-t-second-fort); color: var(--n-encre-2); }
+.vrm-pr-saisie { box-sizing: border-box; width: 100%; min-height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--n-bord); background: var(--n-carte-2); color: var(--n-encre); font: 400 17px/22px var(--n-police); }
+.vrm-pr-saisie:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 1px; }
+.vrm-pr-iban { font-variant-numeric: tabular-nums; letter-spacing: .04em; text-transform: uppercase; }
+.vrm-pr-aide { margin: 0 var(--n-marge) 12px; font: var(--n-t-legende); color: var(--n-encre-2); }
+.n-feuille .vrm-pr-aide { margin: 0 0 12px; }
+.vrm-pr-alerte { margin: 0 0 12px; font: var(--n-t-second-fort); color: var(--n-encre); }
+.vrm-pr-qr-boite { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 8px 0 16px; text-align: center; }
+.vrm-pr-qr-boite p { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); }
+.vrm-pr-qr-boite code { font: 600 15px/20px var(--n-police); color: var(--n-encre); overflow-wrap: anywhere; }
+.vrm-pr-qr { border-radius: 16px; box-shadow: 0 0 0 1px var(--n-bord); max-width: 100%; height: auto; }
+
+/* Fermé : « Bientôt disponible ». */
+.vrm-pr-bientot { margin: 8px var(--n-marge) 16px; padding: 28px 20px 20px; border-radius: var(--n-r-carte); background: var(--n-carte); border: 1px solid var(--n-bord); box-shadow: var(--n-ombre-carte); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.vrm-pr-bientot-ic { display: grid; place-items: center; width: 76px; height: 76px; border-radius: 50%; background: var(--n-carte-2); color: var(--n-encre); border: 1px solid var(--n-bord); }
+.vrm-pr-bientot h2 { margin: 6px 0 0; font: var(--n-t-section); color: var(--n-encre); }
+.vrm-pr-bientot p { margin: 0 0 8px; font: var(--n-t-second); color: var(--n-encre-2); }
+.vrm-pr-etapes-seules { align-self: stretch; text-align: left; margin-top: 8px; }
+
+/* Côté filleul : « Offert par … ». */
+.vrm-pr-filleul { margin: 0 var(--n-marge) 16px; display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: var(--n-r-carte); background: var(--n-carte); border: 1px solid var(--n-bord); box-shadow: var(--n-ombre-carte); }
+.vrm-pr-filleul[data-compacte] { margin: 0 0 12px; box-shadow: none; }
+.vrm-pr-filleul-ic { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 50%; background: var(--n-plein); color: var(--n-sur-plein); }
+.vrm-pr-filleul-corps { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-pr-filleul-corps b { font: var(--n-t-corps-fort); color: var(--n-encre); overflow-wrap: anywhere; }
+.vrm-pr-filleul-offre { font: var(--n-t-corps); color: var(--n-encre); }
+.vrm-pr-filleul-etat { font: var(--n-t-legende); color: var(--n-encre-2); }
+
+/* Côté Julien : « Parrains à verser ». */
+.vrm-pr-admin { display: flex; flex-direction: column; }
+.vrm-pr-admin-ligne { border-top: 1px solid var(--n-trait); padding-bottom: 12px; }
+.vrm-pr-admin-ligne:first-child { border-top: 0; }
+.vrm-pr-admin-iban { padding: 0 16px 10px 54px; font: var(--n-t-legende); color: var(--n-encre-2); overflow-wrap: anywhere; }
+.vrm-pr-admin-iban code { font: 600 13px/18px var(--n-police); color: var(--n-encre); letter-spacing: .02em; }
+.vrm-pr-admin-ligne > .n-bouton-bloc { margin: 0 16px; }
+
+/* À l'ordinateur : deux colonnes, le héros et le partage côte à côte. */
+@media (min-width: 1024px) {
+  .vrm-pr[data-parrainage="ouvert"] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; max-width: 1080px; }
+  .vrm-pr[data-parrainage="ouvert"] > * { grid-column: span 1; }
+  .vrm-pr[data-parrainage="ouvert"] > .vrm-pr-test,
+  .vrm-pr[data-parrainage="ouvert"] > .vrm-pr-filleul,
+  .vrm-pr[data-parrainage="ouvert"] > .n-tuiles,
+  .vrm-pr[data-parrainage="ouvert"] > .vrm-pr-historique,
+  .vrm-pr[data-parrainage="ouvert"] > .vrm-pr-admin,
+  .vrm-pr[data-parrainage="ouvert"] > .n-vide { grid-column: 1 / -1; }
+  .vrm-pr[data-parrainage="ferme"] { max-width: 640px; }
+}

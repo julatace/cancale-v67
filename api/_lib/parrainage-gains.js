@@ -88,13 +88,14 @@ const lireSignaux = (cles) => lireT(`parrainage_annulations?cle=in.(${cles.filte
 // ── LE WEBHOOK : UNE FACTURE PAYÉE D'UN FILLEUL ⇒ 20 % AU PARRAIN ───────────
 export async function gainFacturePayee(owner, facture, maintenant = Date.now()) {
   if (!service() || !UUID.test(String(owner || ''))) return { ok: true, rien: 'sans-config' };
-  const ouvert = await parrainageOuvert();
-  if (ouvert === null) return { ok: false };
-  if (!ouvert) return { ok: true, rien: 'ferme' };
+  // D'abord : ce client est-il filleul ? (La plupart ne le sont pas : rien d'autre n'est lu.)
   const l = await ligneFilleul(owner);
   if (!l.ok) return l.absent ? { ok: true, rien: 'non-installe' } : { ok: false };
   const parrainage = l.lignes[0] || null;
   if (!parrainage) return { ok: true, rien: 'pas-parraine' };
+  const ouvert = await parrainageOuvert();
+  if (ouvert === null) return { ok: false };
+  if (!ouvert) return { ok: true, rien: 'ferme' };
   const ex = await lireT(`parrainage_gains?filleul=eq.${enc(owner)}&select=facture`);
   if (!ex.ok) return ex.absent ? { ok: true, rien: 'non-installe' } : { ok: false };
   let fac = facture;
@@ -285,13 +286,14 @@ export async function noterVerseParrain(corps, maintenant = Date.now()) {
 // n'est rattaché qu'à l'un OU l'autre).
 export async function remiseFilleul(owner) {
   if (!service() || !UUID.test(String(owner || '')) || !stripePret()) return '';
-  const ouvert = await parrainageOuvert();
-  if (ouvert === null) return undefined;
-  if (!ouvert) return '';
+  // D'abord : ce compte est-il filleul ? (Pas filleul, ou 027 pas passée ⇒ rien, sans rien bloquer.)
   const l = await ligneFilleul(owner);
   if (!l.ok) return l.absent ? '' : undefined;
   const x = l.lignes[0];
   if (!x || x.refus) return '';
+  const ouvert = await parrainageOuvert();
+  if (ouvert === null) return undefined;
+  if (!ouvert) return '';
   const lu = await stripeApi('GET', `coupons/${enc(COUPON_FILLEUL.id)}`);
   if (lu.ok && lu.data && lu.data.id === COUPON_FILLEUL.id) {
     const d = lu.data;
