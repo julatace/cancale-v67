@@ -189,6 +189,7 @@ import VendusAilleurs, { useVerifVendusAilleurs, VendusAilleursDetail } from '..
 import { articlesVendusAilleurs } from '../bilanSynchronisation.js';
 import { gardeOffres, avisAcceptationManuelle } from '../offresGarde.js';
 import {comparerComptes,diagnosticConnexion} from '../outilsArticlesVinted.js';
+import { attrsAttente } from '../natif/outils.js';   // (25 nov., chargement propre) un fait EN COURS de lecture se dessine en squelette
 import {correspondRechercheMessage} from '../rechercheMessagesVinted.js';
 // ⟦← App.jsx #7⟧
 import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted,instantVinted} from '../suiviMessagerieVinted.js';
@@ -5532,11 +5533,11 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, onSemain
             <p className="vrm-jv2-faits">
               {/* (15 nov., refonte-journee) « vendu aujourd'hui · 1 vente » : le chiffre dit de QUAND il parle (la maquette). */}
               {!semaine && vSel != null && vSel > 0 ? <span className="vrm-jv2-quoi" data-jv2-quoi="">{(sel === 0 ? tr('journee.venduAuj') : sel === 1 ? tr('journee.venduHier') : tr('journee.venduLe', { quand: dateJourFr(jSel.d) })) + ' · '}</span> : null}
-              <span data-journal-case="ventes" data-valeur={J.ventes.valeur == null ? '' : String(J.ventes.valeur)} data-partiel={J.ventes.partiel ? '1' : undefined}>{faitVentes}</span>
+              <span data-journal-case="ventes" data-valeur={J.ventes.valeur == null ? '' : String(J.ventes.valeur)} data-partiel={J.ventes.partiel ? '1' : undefined} {...(attrsAttente(J.ventes.valeur == null && J.ventes.raison === 'encours', 'valeur') || {})}>{faitVentes}</span>
               {' '}
-              <span data-jv2-verse={verse.valeur == null ? '' : String(Math.round(verse.valeur * 100))} data-partiel={verse.partiel ? '1' : undefined} title={verse.partiel && verse.manque && verse.manque.length ? tr('journee.moinsSans', { x: String(verse.manque.join(', ')) }) : tr('journee.argentVerseSites')}>{faitVerse}</span>
+              <span data-jv2-verse={verse.valeur == null ? '' : String(Math.round(verse.valeur * 100))} data-partiel={verse.partiel ? '1' : undefined} {...(attrsAttente(verse.valeur == null && verse.raison === 'encours', 'valeur') || {})} title={verse.partiel && verse.manque && verse.manque.length ? tr('journee.moinsSans', { x: String(verse.manque.join(', ')) }) : tr('journee.argentVerseSites')}>{faitVerse}</span>
               {' '}
-              <span data-journal-case="colis" data-valeur={J.colis.valeur == null ? '' : String(J.colis.valeur)} data-partiel={J.colis.partiel ? '1' : undefined} title={J.colis.partiel && J.colis.manque && J.colis.manque.length ? tr('journee.moinsSans', { x: String(J.colis.manque.join(', ')) }) : tr('journee.colisAsNotes')}>{faitColis}</span>
+              <span data-journal-case="colis" data-valeur={J.colis.valeur == null ? '' : String(J.colis.valeur)} data-partiel={J.colis.partiel ? '1' : undefined} {...(attrsAttente(J.colis.valeur == null && J.colis.raison === 'encours', 'valeur') || {})} title={J.colis.partiel && J.colis.manque && J.colis.manque.length ? tr('journee.moinsSans', { x: String(J.colis.manque.join(', ')) }) : tr('journee.colisAsNotes')}>{faitColis}</span>
             </p>
           </div>
           {photos.length && Photo
