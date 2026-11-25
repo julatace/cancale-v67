@@ -17,7 +17,7 @@
 //  AUCUNE règle ici : tout arrive calculé (src/aujourdhui/modele.js, les cartes de Ma journée dans src/App.jsx).
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { Anneau, TuilePaire, revele, useArrive } from '../Jeu.jsx';   // (24 nov., visuel-jeu) l'anneau des colis prêts, les ventes en tuiles
+import { Anneau, TuilePaire, CaseInventaire, useArrive } from '../Jeu.jsx';   // (24 nov., visuel-jeu) l'anneau des colis prêts, les ventes en tuiles
 import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site de chaque colis
 import { tr, nombre, localeCourante } from '../../i18n/index.js';
 import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segmente, Colonnes, Colonne, Carte, Tuiles, Tuile, Pastille, Faits, Fait, Feuille, Courbe, Progression, Champ, ListeOrdonnee, Editable, Toast, useOrdinateur, GrapheJours, Etincelle, Repartition, Heros, ActionsRondes, CasesChiffres } from '../index.js';
@@ -368,12 +368,12 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
             par identité), l'étiquette du N°, le prix et « il y a » dessous ; défilement de côté au téléphone. */}
         {lignesV.length ? <div className="n-inventaire" data-n-jeu="ventes" role="list">
           {lignesV.map((l, k) => (
-            <button key={l.cle} type="button" role="listitem" {...revele(k, 'n-inventaire-case', ventesArrivent)} onClick={l.ouvrir || onVentes} data-v2-vente={l.cle} data-n-vente-tx={l.tx || undefined}
-              aria-label={[l.titre || tr('v2.dv.vente', { site: l.site }), l.num ? 'N°' + l.num : '', l.prix, ilYaCourt(l.ts)].filter(Boolean).join(' · ')}>
+            <CaseInventaire key={l.cle} i={k} arrive={ventesArrivent} onClick={l.ouvrir || onVentes} attrs={{ 'data-v2-vente': l.cle, 'data-n-vente-tx': l.tx || undefined,
+              'aria-label': [l.titre || tr('v2.dv.vente', { site: l.site }), l.num ? 'N°' + l.num : '', l.prix, ilYaCourt(l.ts)].filter(Boolean).join(' · ') }}>
               <TuilePaire photo={l.photo || ''} numero={l.num || ''} icone={l.photo ? '' : 'cash'} genre="vente" Icon={Icon} taille="xl" Photo={Photo}/>
               <span className="n-inventaire-prix">{l.site ? <LogoSite site={String(l.site).toLowerCase()} taille={14}/> : null}<span>{l.prix || '—'}</span></span>
               <span className="n-inventaire-quand">{ilYaCourt(l.ts)}</span>
-            </button>
+            </CaseInventaire>
           ))}
         </div> : null}
         {aVenirLu && !aPilotage ? <Rangee titre={tr('v2.dv.aVenir')} valeur={(aVenir.partiel ? tr('journee.moins') + ' ' : '') + aVenir.texte} fin="chevron" onClick={aVenir.ouvrir} attrs={{ 'data-v2-avenir': cents(aVenir.valeur) }}/> : null}
