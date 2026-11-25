@@ -13,7 +13,6 @@ export default {
   "ru.stock.auMoins": "{n}+",
   "ru.mod.disparues": {"one": "{n} annuncio è sparito da {compte}", "other": "{n} annunci sono spariti da {compte}"},
   "ru.mod.titreFeuille": "Annunci spariti · {compte}",
-  "ru.mod.phrase": "Tra il {debut} e il {fin}, questi annunci non sono più su Vinted. VRM non ha visto né vendita né eliminazione: forse li ha rimossi Vinted.",
   "ru.mod.annonceId": "Annuncio {id}",
   "ru.mod.menu": "Altre azioni per questo annuncio",
   "ru.mod.moi": "L’ho eliminato io",
@@ -21,7 +20,6 @@ export default {
   "ru.mod.messages": "Apri i miei messaggi Vinted",
   "ru.mod.toutVu": "Tutto visto",
   "ru.mod.aria": "Annunci spariti da Vinted",
-  "ru.mod.court": "Spariti tra il {debut} e il {fin}",
   "ru.ann.achatRelie": "Acquisto collegato",
   "ru.rp.bientot": {"one": "Presto al punto · {n} in arrivo", "other": "Presto al punto · {n} in arrivo"},
 };

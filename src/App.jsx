@@ -894,7 +894,7 @@ import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, te
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import { ecrireEmailsLus } from "./emailsLusEcriture.js";
 // ⟦→ ecrans/Comptabilite.jsx #63⟧
-import {ResponsiveChatPortal} from "./ChatPortal.jsx";
+import {ResponsiveChatPortal, telFil} from "./ChatPortal.jsx";
 import "./ebay-interface.css";
 const _ecranEbay = (nom) => aLaDemande(() => import("./ebayGestion.jsx").then((m) => ({ default: m[nom] })));
 const EbayCommande = _ecranEbay("EbayCommande"), EbayMessages = _ecranEbay("EbayMessages"), EbayOffres = _ecranEbay("EbayOffres"), EbayAgent = _ecranEbay("EbayAgent");
@@ -10947,6 +10947,7 @@ const fetchVintedConversations = async (account, page = 1, opts = {}) => {
 let __vmrExtReady = false, __vmrExtVersion = '';
 // (19 nov.) Les appels du démarrage (0 · 0,6 · 1,5 · 3 · 6 s) sont-ils tous partis sans réponse ? Avant : « je lui demande ».
 let __vmrAppelsFinis = false;
+const FENETRE_POIGNEE_MS = 3200;   // (24 nov., livrable) la fenêtre de la poignée de main avec l'extension
 // Qui veut savoir quand l'extension se manifeste (l'écran Réglages, l'accueil) :
 // la détection est asynchrone, un composant déjà affiché doit se redessiner.
 const __vmrExtSubs = new Set();
@@ -11057,7 +11058,10 @@ if (typeof window !== 'undefined') {
       try { if (!__vmrExtReady) window.postMessage({ __vmr: 'ping' }, '*'); } catch (_) {}
     }, ms));
     // (19 nov.) La fenêtre de la poignée de main est passée : qui disait « Vérification… » dit maintenant ce qui est su.
-    setTimeout(() => { __vmrAppelsFinis = true; if (!__vmrExtReady) __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} }); }, 6800);
+    // (24 nov., livrable) 3,2 s, plus 6,8 : sans extension, l'écran Extension disait « VRM regarde si l'extension est là… »
+    // près de 7 s sans rien à toucher. Après trois pings (0,6 · 1,5 · 3 s), « pas installée » et le bouton ; le ping de
+    // 6 s reste — une extension lente à répondre remet l'écran à jour d'elle-même (`__vmrExtSubs`).
+    setTimeout(() => { __vmrAppelsFinis = true; if (!__vmrExtReady) __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} }); }, FENETRE_POIGNEE_MS);
   } catch (_) {}
 }
 const vmrExtPresent = () => __vmrExtReady;
@@ -16676,7 +16680,7 @@ function CadreFil({ etiquette, onFermer, refPanneau, attrs, children }) {
   return (
     <ResponsiveChatPortal><div className="vrm-chat-overlay vrm-chat-inline">
       <FermeAuRetour fermer={onFermer}/>
-      <div ref={refPanneau} className="vrm-chat-panel" role="dialog" aria-label={etiquette} {...(attrs || {})} style={{display:'flex',flexDirection:'column',background:C.bg,overflow:'hidden'}}>{children}</div>
+      <div ref={refPanneau} className="vrm-chat-panel" role="dialog" aria-label={etiquette} aria-modal={telFil() ? 'true' : undefined} {...(attrs || {})} style={{display:'flex',flexDirection:'column',background:C.bg,overflow:'hidden'}}>{children}</div>
     </div></ResponsiveChatPortal>
   );
 }
@@ -18962,7 +18966,7 @@ const BrandMark = ({ id }) => id === 'apple' ? (
     <path d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.19-1.73-1.36-.14-2.65.8-3.34.8-.69 0-1.75-.78-2.88-.76-1.48.02-2.85.86-3.61 2.19-1.54 2.67-.39 6.62 1.1 8.79.73 1.06 1.6 2.25 2.74 2.2 1.1-.04 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.08 2.65-2.14.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.32-3.5zM14.18 6.13c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.54 1.31-.56.65-1.05 1.69-.92 2.68.97.08 1.96-.49 2.56-1.23z"/>
   </svg>
 ) : id === 'google' ? (
-  <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true" style={{flexShrink:0}}>
+  <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true" style={{flexShrink:0}} data-marque="google">
     <path fill="#B5BDCA" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"/>
     <path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/>
     <path fill="#FBBC05" d="M11.8 28.2c-.4-1.3-.7-2.7-.7-4.2s.2-2.9.7-4.2v-5.7H4.5C3 17 2.1 20.4 2.1 24s.9 7 2.4 9.9l7.3-5.7z"/>
@@ -29487,7 +29491,9 @@ const titleCasePR = (s) => s.toLowerCase().replace(/(^|[^a-zà-ÿ0-9])([a-zà-ÿ
 // HOCHE ». Le nom pris était « *Consigne Vinted Go* » : deux consignes de deux
 // enseignes dans un même bloc, et la même consigne dans deux blocs. On retire le
 // gras, le type générique en tête (gardé dans `type`) et un nom répété.
-const TYPE_LIEU = /^(?:point\s+relais|point\s+de\s+retrait|consigne(?:\s+vinted\s*go|\s+pick-?up|\s+automatique)?|locker(?:\s*24\s*\/?\s*7)?|casier)\b\s*[:\-–]?\s*/i;
+// (23 nov., Julien : « comment ça le point relais n'est pas reconnu ») Vinted Go écrit aussi « Relais Vinted Go, Joubert Peintures,
+// 10 Rue Du Bois Aurant » (mesuré, 2 e-mails) : « Relais Vinted Go » est le TYPE, le nom suit — sans quoi le nom était perdu (point « pas encore connu »).
+const TYPE_LIEU = /^(?:relais\s+vinted(?:\s*go)?|point\s+relais|point\s+de\s+retrait|consigne(?:\s+vinted\s*go|\s+pick-?up|\s+automatique)?|locker(?:\s*24\s*\/?\s*7)?|casier)\b\s*[:\-–]?\s*/i;
 const cleanLieu = (raw) => {
   let s = String(raw || '').replace(/®|™|©/g, ' ').replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
   if (!s) return { nom: '', adresse: '', display: '', type: '' };
@@ -30504,8 +30510,13 @@ function useSourcesCarte(liveStats) {
   const prep = useEnPreparation(CLES_PREPAREES);
   // (11 nov., états vides) Aucun compte relié, PROUVÉ par la coque : « aucun compte relié », pas « lecture… ».
   const sansCompte = React.useContext(SansCompteCarte);
+  // (24 nov., livrable-2) La coque n'a pas encore ses ventes : l'écran qui publie (Ventes, `usePreparation`) n'a pas
+  // encore pu commencer — une publication absente est alors EN LECTURE, jamais « pas calculé / pas lu / ouvre Ventes »
+  // (mesuré : Argent les disait 5 à 10 s à l'ouverture, puis les chiffres arrivaient). Pas su = la coque a répondu ET
+  // personne ne prépare.
+  const coqueEnCours = venduEtat(liveStats) === 'encours';
   // (6 nov.) Jamais publié mais un écran ouvert le prépare : « lecture… » (src/preparations.js).
-  const etat = pub ? 'lu' : (pret && !prep.has('vrm_benefice_jours') ? 'passu' : 'encours');
+  const etat = pub ? 'lu' : (pret && !prep.has('vrm_benefice_jours') && !coqueEnCours ? 'passu' : 'encours');
   return React.useMemo(() => ({
     sansCompte: !!sansCompte,
     // (6 nov., onglets A) TROIS ÉTATS (§5) : la coque pas encore revenue (`liveStats` absent, ou
@@ -30516,8 +30527,8 @@ function useSourcesCarte(liveStats) {
     beneficeDe: (p) => ({ B: beneficeDe({ pub, compta, ligneUrssaf, regime }, p), etat }),
     joursBenef: pub, etatBenef: etat, ligneUrssaf, colisAPoster, colisARetirer, dorment, live: liveStats || null,
     // (6 nov.) Une publication absente que l'écran ouvert est en train de préparer : « lecture… ».
-    enPreparation: { dorment: prep.has('vrm_paires_dorment'), retirer: prep.has('vrm_colis_retirer'), urssaf: prep.has('vinted_urssaf_mois') },
-  }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep, sansCompte]);
+    enPreparation: { dorment: prep.has('vrm_paires_dorment') || coqueEnCours, retirer: prep.has('vrm_colis_retirer') || coqueEnCours, urssaf: prep.has('vinted_urssaf_mois') || coqueEnCours || !pret },
+  }), [liveStats, pub, pret, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep, sansCompte, coqueEnCours]);
 }
 // ⟦→ ecrans/Comptabilite.jsx #248⟧
 const OUTILS_AUJOURDHUI = { load, save, onCloudReady, lireTout, entete: () => enTeteSession(), uid: () => AUTH.user?.id || '', extras: lireExtrasRepartition, enLigne: dateMiseEnLigneMs, vue: demanderVue, aVenir: ouvrirArgentAVenir, cle: CLE_CARTES_AUJOURDHUI };
@@ -38224,7 +38235,7 @@ function AppCoeur() {
           } else {
             etat = type==='vente' ? etapeVente(o, { poste: posteMain }).label : type==='achat' ? etapeAchat(o, null).label : ({ available:'À retirer', retour:'Reparti', delivered:'Retiré' }[c.status] || (c.lieu ? String(c.lieu).split(',')[0] : (c.carrier || '')));
             vignette = type === 'colis' ? thumb(null, <LogoTransporteur cle={carrierKey(c.carrier || '')} taille={26} repli={<Icon name="box" size={18} style={{color:C.muted}}/>}/>) : thumb(e.photo || (o ? orderPhoto(o) : null));
-            titre = e.titre || (type==='colis' ? (c.carrier ? `Colis ${c.carrier}` : 'Colis') : '(sans titre)');
+            titre = e.titre || (type==='colis' ? (c.carrier ? `Colis ${(CARRIERS[carrierKey(c.carrier)] || {}).name || c.carrier}` : 'Colis') : '(sans titre)');   // (24 nov., parcours iPhone) le NOM du transporteur, jamais son identifiant (« Colis mondial_relay »)
             info = [etat, e.numero ? `N°${e.numero}` : '', e.date ? jourCourt(e.date) : '', type !== 'colis' && e.montants && e.montants[0] ? prixCourt(e.montants[0] / 100) : ''].filter(Boolean).join(' · ');
           }
           return (
