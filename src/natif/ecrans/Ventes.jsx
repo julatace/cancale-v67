@@ -25,7 +25,9 @@ import { useARegler } from '../../designV2/useARegler.js';
 import { groupesDe, atelierCompleter } from '../../designV2/aRegler.js';   // (21 nov.) vignettes lisibles, titre entier, gestes de l'achat
 import { ParPaquets } from '../../composants/ParPaquets.jsx';
 import { Trajet } from '../Jeu.jsx';   // (24 nov., visuel-jeu) le trajet du colis en piste, étapes PROUVÉES   // (22 nov., latence) 70 colis à envoyer posés par paquets
-import { RelierAnnonceMail } from './RelierAnnonceMail.jsx';   // (24 nov.) « Relier à l'annonce » d'une vente vue par e-mail   // (22 nov., latence) 70 colis à envoyer posés par paquets
+import { RelierAnnonceMail } from './RelierAnnonceMail.jsx';
+import { FiltrePlateformes, useFiltrePlateforme, filtreTableau, phraseFiltre } from '../FiltrePlateformes.jsx';   // (25 nov.) « Toutes · Vinted · Leboncoin… » de l'onglet
+import { TOUTES, nombresPlateformes, optionsPlateformes, choixEffectif, filtrerPlateforme } from '../../filtrePlateforme.js';   // (24 nov.) « Relier à l'annonce » d'une vente vue par e-mail   // (22 nov., latence) 70 colis à envoyer posés par paquets
 
 const joint = (...x) => x.filter(Boolean).join(' · ');
 // Les morceaux d'une méta qui peut passer à la ligne : chacun reste entier (« à vérifier » ne se coupe jamais en deux).
@@ -192,11 +194,12 @@ const STATUTS_ENVOYER = ['pret', 'attente', 'imprime', 'site'];
 const statutEnvoyer = (r) => (r.bordereau === 'pret' || r.bordereau === 'attente' || r.bordereau === 'imprime' ? r.bordereau : 'site');
 const rangLimite = (e) => (!e ? null : e.ambre ? 0 : e.sorte === 'lue' ? 1 : 2);
 
-function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantRoute, apresListe, filtre, onOutils }) {
+function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantRoute, apresListe, filtre, onOutils, fp }) {
   const [choisie, setChoisie] = React.useState(null);
   const [majLe, setMajLe] = React.useState(undefined);
-  // (20 nov. soir) Un filtre « Site » DISCRET, dans le menu de filtres du tableau (pas de barre) ; « Tous » par défaut.
-  const [siteF, setSiteF] = React.useState('toutes');
+  // (25 nov., « un filtre avec toutes les plateformes ») Le filtre « Site » du menu de filtres du tableau est LE filtre de
+  // l'onglet (`fp` : le choix retenu sur cet appareil, src/filtrePlateforme.js), le même qu'au téléphone et sous « Terminées ».
+  const siteF = fp.eff, setSiteF = fp.choisir;
   const E = m.envoyer, R = m.route;
   const surEnvoyer = m.onglet === 'envoyer';
   React.useEffect(() => { setChoisie(null); }, [m.onglet]);
@@ -212,10 +215,8 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
     window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f);
   }, [ouverte]);
   // UNE vérité : une lecture ratée sans rien de lu ⇒ « pas su » (jamais « Mis à jour à l'instant » + « Rien à envoyer »).
-  const sitesVus = [...new Set(rangs.map((r) => r.site).filter(Boolean))];
-  const rangsVus = siteF === 'toutes' ? rangs : rangs.filter((r) => r.site === siteF);
-  const filtresSite = sitesVus.length > 1 ? [{ cle: 'site', libelle: tr('tableau.col.site'), valeur: siteF, onChange: setSiteF,
-    options: [{ cle: 'toutes', libelle: tr('tableau.site.tous') }, ...sitesVus.map((x) => ({ cle: x, libelle: Logo && Logo.nom ? Logo.nom(x) : x, n: rangs.filter((r) => r.site === x).length }))] }] : [];
+  const rangsVus = filtrerPlateforme(rangs, siteF);
+  const filtresSite = [filtreTableau(fp.options, siteF, setSiteF)].filter(Boolean);
   // (23 nov., style-clarte-5 — §7 « une même phrase sur chaque ligne est UNE phrase ») L'état d'envoi (« Bordereau prêt »…) n'est
   // écrit sur la rangée que s'il ne vaut PAS pour toutes les rangées montrées ; sinon il est dit une fois, à côté du nombre.
   const sousDe = (r) => { const st = surEnvoyer ? statutEnvoyer(r) : statutRangee(r); return surEnvoyer ? (st === 'site' ? '' : tr('vt.st.' + st)) : (r.etat && r.etat.texte) || ''; };
@@ -234,7 +235,7 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
         ? { 'data-vn-rang': r.cle, 'data-vn-bordereau': r.bordereau || '', 'data-vn-limite': r.echeance ? r.echeance.sorte : '', 'data-vn-limite-code': r.echeance ? r.echeance.code : '', 'data-vn-num': r.num, 'data-vn-prix': r.prix, 'data-vt-site': r.site, 'data-vt-statut': 'envoyer', 'data-vt-transporteur': r.transporteurCle || '' }
         : { 'data-vt-site': r.site, 'data-vn-route': r.cle, 'data-vn-num': r.num, 'data-vn-etape': String((r.etapes || []).filter((e) => e.fait).length), 'data-vt-statut': st, 'data-vt-transporteur': r.transporteurCle || '' } };
   });
-  const presses = surEnvoyer ? rangs.filter((r) => r.echeance && r.echeance.ambre).length : 0;
+  const presses = surEnvoyer ? rangsVus.filter((r) => r.echeance && r.echeance.ambre).length : 0;
   const nAVerifier = surEnvoyer ? rangsVus.filter((r) => r.echeance && r.echeance.code === 'estimee-depassee').length : 0;
   const aVerifierPartout = nAVerifier >= 2;
   const colonnes = [
@@ -260,21 +261,21 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
   const statuts = surEnvoyer
     ? STATUTS_ENVOYER.map((c) => ({ cle: c, libelle: tr('vt.st.' + c), ton: 'ambre' }))
     : ['route', 'livree', 'terminee'].map((c) => ({ cle: c, libelle: tr(MOT_STATUT[c]), ton: 'neutre' }));
-  const P = E.plein;
+  const P = fp.plein || E.plein;
   // LES CASES = LE LOT D'IMPRESSION (la règle d'avant : `cochesEffectives`, cochées d'office là où le bordereau est prêt, jamais
   // sans bordereau) ; « Imprimer N bordereaux » de la barre d'outils imprime CES cases (N = le plein d'avant, `pleinImprimer`).
   const coches = React.useMemo(() => new Set(rangs.filter((r) => r.coche && r.coche.on).map((r) => r.cle)), [rangs]);
   const cocher = (cles, on) => { const k = new Set(cles); for (const r of rangs) if (k.has(r.cle) && r.coche && r.coche.possible && !!r.coche.on !== !!on) g.basculer(r.coche.cle); };
   const outilsPlus = surEnvoyer ? <>
-    {P.n > 0 || P.occupe ? <Bouton variante="plein" ajuste icone={<Icon name="printer" size={18}/>} chargement={P.occupe} onClick={g.imprimer}
+    {P.n > 0 || P.occupe ? <Bouton variante="plein" ajuste icone={<Icon name="printer" size={18}/>} chargement={P.occupe} onClick={fp.imprimer || g.imprimer}
       attrs={{ 'data-vn-plein': String(P.n), 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': P.nVentes, 'data-impr-lot': P.nVentes, 'data-impr-retours-coches': P.nRetours }}>{tr('vt.imprimerN', { n: P.n })}</Bouton> : null}
     {filtre}
     <BoutonIcone libelle={tr('vt.outils')} icone={<Icon name="more" size={20}/>} onClick={onOutils} attrs={{ 'data-vn-plus': '' }}/>
   </> : filtre;
   const unite = (n) => [m.auMoins && surEnvoyer && n === rangs.length ? tr('vt.auMoins', { n }) : tr('tableau.ventes', { n }),
     sousCommun && nCommun >= 2 && rangsVus.length === n ? (nCommun === n ? tr('vt.tous', { etat: sousCommun.toLowerCase() }) : tr('vt.nEtat', { n: nCommun, etat: sousCommun.toLowerCase() })) : '',
-    aVerifierPartout ? tr('vt.limitesAVerifier', { n: nAVerifier }) : ''].filter(Boolean).join(' · ');
-  const retours = surEnvoyer && E.retours.length ? <Groupe titre={tr('vn.retours')} attrs={{ 'data-vn-retours': String(E.retours.length) }}>
+    aVerifierPartout ? tr('vt.limitesAVerifier', { n: nAVerifier }) : '', phraseFiltre(siteF)].filter(Boolean).join(' · ');
+  const retours = surEnvoyer && E.retours.length && fp.retours ? <Groupe titre={tr('vn.retours')} attrs={{ 'data-vn-retours': String(E.retours.length) }}>
     {E.retours.map((l) => <Rangee key={l.cle} titre={l.titre || tr('retours.article')} plaque={l.num ? <Plaque numero={l.num}/> : null} sousTitre={l.vendeur ? tr('impr.retour.vendeur', { qui: l.vendeur }) : ''}
       selection={{ cochee: l.on, libelle: tr('impr.retour.caseAria', { qui: l.num ? tr('retours.numero', { n: l.num }) : (l.titre || tr('retours.article')) }), onChange: () => g.basculerRetour(l.cle), attrs: { 'data-retour-coche': l.cle } }}
       attrs={{ 'data-lot-retour': l.tx }}/>)}
@@ -322,41 +323,60 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
   const fg = (f) => () => { setFeuilleGestes(false); if (f) f(); };
   const surEnvoyer = m.onglet === 'envoyer', surRoute = m.onglet === 'envoyes';
   React.useEffect(() => { setChoisie(null); }, [m.onglet]);
-  const rangs = surEnvoyer ? filtrerRangs(E.rangs, q) : surRoute && R ? filtrerRangs(R.rangs, q) : [];
+  // (25 nov., Julien : « un filtre avec toutes les plateformes et par plateforme dans les onglets ») LE FILTRE DE L'ONGLET :
+  // « Toutes » puis chaque site PRÉSENT dans la liste montrée (son logo, son nombre), retenu sur cet appareil. Il filtre la liste,
+  // les nombres du segmenté, le plein (seuls les colis MONTRÉS partent à l'impression) — la règle : src/filtrePlateforme.js.
+  const [choixP, choisirP] = useFiltrePlateforme('ventes');
+  const baseP = surEnvoyer ? ((E.lu || E.rangs.length) ? E.rangs : null) : surRoute && R && R.lu ? R.rangs : null;
+  const optionsP = React.useMemo(() => (Array.isArray(baseP) ? optionsPlateformes(nombresPlateformes(baseP)) : []), [baseP]);
+  const effP = choixEffectif(choixP, optionsP);
+  const filtreP = effP !== TOUTES;
+  const eRangsP = filtrerPlateforme(E.rangs, effP);
+  const rRangsP = R && R.lu ? filtrerPlateforme(R.rangs, effP) : null;
+  const avecRetoursP = !filtreP || effP === 'vinted';   // les étiquettes retour sont des colis Vinted
+  const parmi = filtreP && g.parmi ? g.parmi(eRangsP.filter((r) => r.coche && r.coche.on).map((r) => r.coche.cle), avecRetoursP) : null;
+  const fp = { eff: effP, choisir: choisirP, options: optionsP, retours: avecRetoursP,
+    // Filtré sans la fonction du lot restreint : le plein se tait (jamais imprimer un colis caché par le filtre).
+    plein: filtreP ? (parmi ? parmi.plein : { ...E.plein, n: 0, occupe: false, dispo: false }) : null, imprimer: parmi ? parmi.imprimer : null };
+  const nEnvP = filtreP ? eRangsP.length : m.nEnv;
+  const nRouteP = filtreP ? (rRangsP ? rRangsP.length : undefined) : m.nRoute;
+  const rangs = surEnvoyer ? filtrerRangs(eRangsP, q) : surRoute && R ? filtrerRangs(filtrerPlateforme(R.rangs, effP), q) : [];
   const ouverte = rangChoisi(surEnvoyer ? E.rangs : surRoute && R ? R.rangs : [], choisie);
   // À l'ordinateur, la coque pose le volet de détail à droite (ContexteCoque.voletDetail) : sans vente touchée, il dit
   // quoi faire (l'état vide dessiné du contrat, §2) au lieu de rester blanc.
   const coque = React.useContext(ContexteCoque);
   const volet = !!(coque && coque.voletDetail);
-  const P = E.plein;
+  const P = fp.plein || E.plein;
   // (21 nov., capture iPhone de Julien : « Imprimer · Coche un colis pour l'imprimer » toujours là, sans rien de coché) Le plein
   // n'apparaît qu'avec une sélection (N > 0) ou pendant l'impression — comme à l'ordinateur.
   const plein = surEnvoyer && (P.n > 0 || P.occupe)
     ? <Bouton variante="plein" icone={<Icon name="printer" size={20}/>} chargement={P.occupe} indisponible={!P.dispo && !P.occupe}
-        raison={P.raison ? tr('vn.plein.' + P.raison) : ''} onClick={g.imprimer}
+        raison={P.raison ? tr('vn.plein.' + P.raison) : ''} onClick={fp.imprimer || g.imprimer}
         attrs={{ 'data-vn-plein': String(P.n), 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': P.nVentes, 'data-impr-lot': P.nVentes, 'data-impr-retours-coches': P.nRetours }}>
         {P.n > 0 ? tr('vt.imprimerN', { n: P.n }) : tr('v2v.imprimer')}
       </Bouton>
     : null;
   // Les retours à imprimer (étiquettes retour) : des rangées de la MÊME liste, cochables, sans titre de groupe à elles.
-  const retoursTel = E.retours.length ? E.retours.map((l) => <Rangee key={l.cle} icone={<Icon name="undo" size={22}/>} titre={l.titre || tr('retours.article')} plaque={l.num ? <Plaque numero={l.num}/> : null}
+  const retoursTel = E.retours.length && avecRetoursP ? E.retours.map((l) => <Rangee key={l.cle} icone={<Icon name="undo" size={22}/>} titre={l.titre || tr('retours.article')} plaque={l.num ? <Plaque numero={l.num}/> : null}
     sousTitre={joint(tr('vn.retourEtiquette'), l.vendeur ? tr('impr.retour.vendeur', { qui: l.vendeur }) : '')}
     selection={{ cochee: l.on, libelle: tr('impr.retour.caseAria', { qui: l.num ? tr('retours.numero', { n: l.num }) : (l.titre || tr('retours.article')) }), onChange: () => g.basculerRetour(l.cle), attrs: { 'data-retour-coche': l.cle } }}
     attrs={{ 'data-lot-retour': l.tx, 'data-vn-retours': String(E.retours.length) }}/>) : null;
   // (23 nov., revue UX P1 #5) « N sans bordereau » n'est plus un chiffre gris dans l'en-tête : une rangée ambre « À faire » qui FILTRE la
   // liste sur ces colis (le toucher suivant remet tout) ; « N cochés » reste dans l'en-tête (il vit avec le bouton d'impression).
-  const ecart = joint(E.ecart.coches ? tr('vn.e.coches', { n: E.ecart.coches }) : '');   // (20 nov.) plus de « N à déposer » : le départ est constaté par le suivi (décision « 4 oui »)
+  const nCochesP = filtreP ? eRangsP.filter((r) => r.coche && r.coche.on).length : E.ecart.coches;
+  const nSansP = filtreP ? eRangsP.filter(sansBordereau).length : E.ecart.sans;
+  const ecart = joint(nCochesP ? tr('vn.e.coches', { n: nCochesP }) : '');   // (20 nov.) plus de « N à déposer » : le départ est constaté par le suivi (décision « 4 oui »)
   // (audit d'utilité du 19 nov.) Plus de grand chiffre : le segment porte le nombre. L'en-tête de la liste dit ce que
   // le nombre ne dit pas — ce qui part à l'impression, ce qui attend son bordereau, ce qui presse (« au moins » si le
   // compte est partiel, §5 : un total partiel ne se présente jamais comme complet).
-  const teteListe = joint(m.auMoins && m.nEnv != null ? tr('vn.auMoins', { n: m.nEnv }) : '', m.presses > 0 ? tr('sv.presses.envoyer', { n: m.presses }) : '', ecart) || tr('vv.seg.expedier');
+  const teteListe = joint(!filtreP && m.auMoins && m.nEnv != null ? tr('vn.auMoins', { n: m.nEnv }) : '', !filtreP && m.presses > 0 ? tr('sv.presses.envoyer', { n: m.presses }) : '', ecart, phraseFiltre(effP)) || tr('vv.seg.expedier');
   // (audit d'utilité du 19 nov.) UN bouton « Filtrer » au lieu de la rangée des sites ; les gestes rares (Préparer mes colis,
   // Je dépose, la tournée, Emballer — décision n° 6 en attente de Julien : ils RESTENT) sont rangés derrière « ⋯ ».
   const filtre = plateforme ? <Bouton variante="texte" onClick={() => setFeuillePlateforme(true)} attrs={{ 'data-vn-plateforme': plateforme.cle }}>{plateforme.cle === 'toutes' ? tr('vn.filtrer') : plateforme.libelle}</Bouton> : null;
   const actionPlateforme = <>{filtre}{surEnvoyer || g.sections ? <BoutonIcone libelle={tr('vn.plus')} icone={<Icon name="more" size={22}/>} onClick={() => setFeuilleGestes(true)} attrs={{ 'data-vn-plus': '' }}/> : null}</>;
   const segment = <Segmente libelle={tr('vv.seg.label')} valeur={m.onglet} onChange={g.onglet}
-    options={[{ cle: 'envoyer', libelle: tr('vv.seg.expedier'), n: m.nEnv || undefined, attrs: { 'data-colis-onglet-choix': 'envoyer', 'data-colis-onglet-n': m.nEnv != null ? String(m.nEnv) : '' } },
-      { cle: 'envoyes', libelle: tr('vv.seg.route'), n: m.nRoute || undefined, attrs: { 'data-colis-onglet-choix': 'envoyes', 'data-colis-onglet-n': m.nRoute != null ? String(m.nRoute) : '' } }, { cle: 'toutes', libelle: tr('vn.terminees'), attrs: { 'data-colis-onglet-choix': 'toutes' } }]}/>;
+    options={[{ cle: 'envoyer', libelle: tr('vv.seg.expedier'), n: nEnvP || undefined, attrs: { 'data-colis-onglet-choix': 'envoyer', 'data-colis-onglet-n': nEnvP != null ? String(nEnvP) : '', 'data-fp-filtre': filtreP ? effP : undefined } },
+      { cle: 'envoyes', libelle: tr('vv.seg.route'), n: nRouteP || undefined, attrs: { 'data-colis-onglet-choix': 'envoyes', 'data-colis-onglet-n': nRouteP != null ? String(nRouteP) : '', 'data-fp-filtre': filtreP ? effP : undefined } }, { cle: 'toutes', libelle: tr('vn.terminees'), attrs: { 'data-colis-onglet-choix': 'toutes' } }]}/>;
   // (24 nov., main-vert) Les repères d'avant (`data-colis-onglet-choix`, `data-colis-onglet-n`, VentesVerre) remis sur le segmenté
   // natif : la visite guidée (src/accueilReste/visiteEcrans.js, cible « envoyer ») et les bancs les touchent ; le natif les avait perdus.
   // (20 nov.) À l'ordinateur, « À envoyer » et « En route » sont le TABLEAU DE TRAVAIL (VentesBureau) ; « Terminées » est déjà le
@@ -391,7 +411,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
   if (ordinateur && m.onglet !== 'toutes') {
     return <>
       <VentesBureau m={m} g={g} Icon={Icon} Logo={Logo} Photo={Photo} Generer={Generer} segment={<div className="n-vt-segment">{segment}</div>} avant={avant} avantRoute={avantRoute} apresListe={apresListe}
-        filtre={filtre} onOutils={() => setFeuilleGestes(true)}/>
+        filtre={filtre} onOutils={() => setFeuilleGestes(true)} fp={fp}/>
       {children}
       {feuilles}
     </>;
@@ -406,6 +426,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
         recherche={m.onglet !== 'toutes' ? <ChampRecherche valeur={q} onChange={setQ} placeholder={tr('v2v.rechercher')} libelle={tr('v2v.rechercher')} onScanner={g.retrouver} attrs={{ 'data-vn-champ': '' }}/> : null}>
         {/* (20 nov.) Le segmenté reste collé sous la barre de titre, sur un fond opaque : jamais caché, rien ne passe dessus. */}
         <div className="n-vn-colle" data-vn-colle="">{segment}</div>
+        <FiltrePlateformes ecran="ventes" options={optionsP} valeur={effP} onChange={choisirP}/>
         {/* (21 nov., capture iPhone de Julien : « À RÉGLER · 2 », « RETOURS ET LITIGES · 10 », « RETOURS À IMPRIMER » en titres empilés)
             Au téléphone : UNE ligne d'accès discrète, qui ouvre une feuille avec « À régler » et « Retours et litiges » (les mêmes blocs,
             les mêmes gestes, ouverts). Les retours à IMPRIMER rejoignent la liste des colis (ils partent avec le même plein). */}
@@ -420,11 +441,11 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
             : E.erreur && !E.rangs.length ? <Vide icone={<Icon name="cloudOff" size={40}/>} phrase={tr('v2v.erreur')}
                 action={g.relire ? <Bouton variante="texte" onClick={g.relire} attrs={{ 'data-vt-reessayer': '' }}>{tr('commun.reessayer')}</Bouton> : null}/>
             : !E.rangs.length ? <Vide icone={<Icon name="box" size={40}/>} phrase={tr('v2v.vide.envoyer')}/>
-            : <>{E.ecart.sans > 0 ? <Groupe attrs={{ 'data-vn-sans-ligne': String(E.ecart.sans) }}>
-                <Rangee icone={<Icon name="printer" size={22}/>} ton="ambre" titre={seulSans ? tr('vt.sansTout') : tr('vt.sansAFaire', { n: E.ecart.sans })} fin="chevron"
+            : <>{nSansP > 0 ? <Groupe attrs={{ 'data-vn-sans-ligne': String(nSansP) }}>
+                <Rangee icone={<Icon name="printer" size={22}/>} ton="ambre" titre={seulSans ? tr('vt.sansTout') : tr('vt.sansAFaire', { n: nSansP })} fin="chevron"
                   onClick={() => setSeulSans(!seulSans)} attrs={{ 'data-vn-sans-filtre': seulSans ? '1' : '0', 'aria-pressed': seulSans ? 'true' : 'false' }}/>
               </Groupe> : null}
-              <Groupe titre={teteListe} action={actionPlateforme} attrs={{ 'data-vn-liste': 'envoyer', 'data-vn-n': String(E.rangs.length), 'data-vn-affiche': m.nEnv == null ? '' : String(m.nEnv) }}>
+              <Groupe titre={teteListe} action={actionPlateforme} attrs={{ 'data-vn-liste': 'envoyer', 'data-vn-n': String(eRangsP.length), 'data-vn-affiche': nEnvP == null ? '' : String(nEnvP), 'data-fp-filtre': filtreP ? effP : undefined }}>
                 <ParPaquets items={seulSans ? rangs.filter(sansBordereau) : rangs} rendre={(r) => <RangeeColis key={r.cle} r={r} g={g} Icon={Icon} Photo={Photo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>}/>
                 {!rangs.length ? <Vide phrase={tr('v2v.vide.recherche', { q: q.trim() })}/> : null}
                 {retoursTel}
@@ -437,7 +458,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
           {avantRoute}
           {!R || !R.lu ? (R && R.erreur ? <Vide icone={<Icon name="cloudOff" size={40}/>} phrase={tr('v2v.erreur')}/> : <Attente forme="rangees" n={5} vignette={56} titre/>)
             : !R.rangs.length ? <Vide icone={<Icon name="truck" size={40}/>} phrase={tr('v2v.vide.route')}/>
-            : <Groupe titre={tr('vv.seg.route')} action={actionPlateforme} attrs={{ 'data-vn-liste': 'route', 'data-vn-n': String(R.rangs.length) }}>
+            : <Groupe titre={joint(tr('vv.seg.route'), phraseFiltre(effP))} action={actionPlateforme} attrs={{ 'data-vn-liste': 'route', 'data-vn-n': String(rRangsP ? rRangsP.length : R.rangs.length), 'data-fp-filtre': filtreP ? effP : undefined }}>
                 <ParPaquets items={rangs} rendre={(r) => <RangeeRoute key={r.cle} r={r} Icon={Icon} Photo={Photo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>}/>
                 {!rangs.length ? <Vide phrase={tr('v2v.vide.recherche', { q: q.trim() })}/> : null}
               </Groupe>}

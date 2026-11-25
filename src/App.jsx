@@ -1704,6 +1704,8 @@ import './designV2/design-v2.css'; // (8 nov.) style de ./designV2/LigneAnnonce.
 import './designV2/signature.css'; // (8 nov.) style de ./designV2/LigneAnnonce.jsx, gardé à sa place (son écran est chargé à la demande)
 import './designV2/signature.css'; // (8 nov.) style de ./designV2/Signature.jsx, gardé à sa place (son écran est chargé à la demande)
 import * as Natif from "./natif/index.js";
+import { FiltrePlateformes, useFiltrePlateforme, filtreTableau } from "./natif/FiltrePlateformes.jsx";   // (25 nov.) le filtre par plateforme des onglets
+import { TOUTES as TOUTES_PLATEFORMES, nombresPlateformes, optionsPlateformes, choixEffectif as choixPlateformeEffectif, filtrerPlateforme } from "./filtrePlateforme.js";
 // (19 nov.) « VRM natif » : la coque (docs/design/NATIF.md)
 // (19 nov., « VRM natif ») `designV2/barre.jsx` n'est plus importé au démarrage (barre native) : seul Réglages le charge encore.
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
@@ -33930,7 +33932,14 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     return new Map(A.lignes.map((x) => [SITE[x.plateforme] + ':' + x.id, x]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sites, ventesVinted, lbcVentes, lbcLu, ebayTous, vc]);
-  const lignes = React.useMemo(() => toutesLignes.filter((l) => !l.hp).map((l) => { const x = annulParCle.get(l.cle); return x ? { ...l, annul: { motif: x.motif, sorte: x.sorte }, detail: ['passu', 'remboursee'].includes(x.motif) ? '' : tr('annul.motif.' + x.motif) } : l; }), [toutesLignes, annulParCle]);
+  const lignesTous = React.useMemo(() => toutesLignes.filter((l) => !l.hp).map((l) => { const x = annulParCle.get(l.cle); return x ? { ...l, annul: { motif: x.motif, sorte: x.sorte }, detail: ['passu', 'remboursee'].includes(x.motif) ? '' : tr('annul.motif.' + x.motif) } : l; }), [toutesLignes, annulParCle]);
+  // (25 nov., « un filtre avec toutes les plateformes et par plateforme dans les onglets ») « Terminées » suit LE filtre de
+  // l'onglet Ventes (le même choix qu'« À envoyer » et « En route », retenu sur cet appareil) : chaque site PRÉSENT, son logo,
+  // son nombre ; la règle : src/filtrePlateforme.js (la ligne porte SON site, posé par SA lecture).
+  const [choixP, choisirP] = useFiltrePlateforme('ventes');
+  const optionsP = React.useMemo(() => optionsPlateformes(nombresPlateformes(lignesTous)), [lignesTous]);
+  const effP = choixPlateformeEffectif(choixP, optionsP);
+  const lignes = React.useMemo(() => filtrerPlateforme(lignesTous, effP), [lignesTous, effP]);
   // Au téléphone : la liste d'abord (sans les annulées), puis le groupe « Annulées » (les annulations, pas les retours :
   // un retour a déjà son groupe « Retours et litiges »).
   const lignesTel = React.useMemo(() => lignes.filter((l) => !(l.annul && l.annul.sorte === 'annulee')), [lignes]);
@@ -34015,15 +34024,14 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   // lignes, la même étiquette d'état, le même ordre ; ce qui change : Statut à compteurs, colonnes, tri, sélection, et
   // « Imprimer les bordereaux » des ventes cochées (le chemin `imprimerLot` des colis, `vrm:imprimer-choix`).
   if (ordiT) {
-    const sitesT = [...new Set(lignes.map((l) => l.site))];
     const cptsT = [...new Set(lignes.filter((l) => filtreT.site === 'tous' || l.site === filtreT.site).map((l) => l.compte).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
     const depuisT = { tout: null, j7: 7, j30: 30 }[filtreT.periode];
     const lignesT = enCours && !lignes.length ? undefined : (visibles.some((e) => e[1] === 'pas-su') && !lignes.length ? null
       : lignes.filter((l) => (filtreT.site === 'tous' || l.site === filtreT.site) && (!filtreT.compte || l.compte === filtreT.compte)
         && (depuisT == null || (l.t != null && Date.now() - l.t <= depuisT * 86400000))));
+    const filtreSiteT = filtreTableau(optionsP, effP, (v) => { choisirP(v); setFiltreT((f) => ({ ...f, compte: '' })); });
     const filtresT = [
-      ...(sitesT.length > 1 ? [{ cle: 'site', libelle: tr('egalite.site.titre'), valeur: filtreT.site, onChange: (v) => setFiltreT((f) => ({ ...f, site: v, compte: '' })),
-        options: [{ cle: 'tous', libelle: tr('egalite.site.tous') }, ...sitesT.map((x) => ({ cle: x, libelle: NOM[x] || x }))] }] : []),
+      ...(filtreSiteT ? [filtreSiteT] : []),
       ...(cptsT.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreT.compte || 'tous', onChange: (v) => setFiltreT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
         options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cptsT.map((x) => ({ cle: x, libelle: x }))] }] : []),
       { cle: 'periode', libelle: tr('tableau.filtre.periode'), valeur: filtreT.periode, onChange: (v) => setFiltreT((f) => ({ ...f, periode: v })),
@@ -34044,6 +34052,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   }
   return (
     <div className="vrm-ventes-toutes" data-ventes-toutes={enCours ? 'lecture' : 'lu'} data-n={String(lignes.length)} style={{ padding: '4px 16px 16px' }}>
+      <FiltrePlateformes ecran="ventes" options={optionsP} valeur={effP} onChange={choisirP} className="n-fp-nu"/>
       {visibles.length > 0 && (
         <div className="vrm-toutes-etats" style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '4px 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
           {visibles.map(([s, k, txt]) => <div key={s} data-toutes-etat-site={s} data-etat={k} style={{ color: (k === 'pas-su' || k === 'partiel') ? C.warn : C.muted }}>{txt}</div>)}
