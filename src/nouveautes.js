@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (25 nov., gris-moyen — Julien : « fais entre les deux, la couleur », puis « gris moyen c'est d'accord ») docs/passation/2026-11-25-gris-moyen.md
+  { id: 'clair-gris-moyen', date: '2026-11-25', titre: 'Le clair passe au gris moyen', phrase: 'Entre le clair et le sombre : cartes claires, texte bien noir.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., style-c3 — Julien : « fait un mélange c3 vintex », « le gris de fond un peu foncé ») docs/passation/2026-11-25-style-c3.md
   { id: 'style-c3-doux', date: '2026-11-25', titre: 'Un douzième style : C3', phrase: 'Gris un peu foncé, cartes blanches, boutons nets : à essayer.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (25 nov., chargement-propre — Julien : « je dois fermer l'app et la rouvrir pour avoir les nouvelles infos ») docs/passation/2026-11-25-chargement-propre.md

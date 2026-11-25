@@ -5,7 +5,7 @@ require('./_porte-banc.cjs');
 //  LE GRIS CLAIR ÉTAGÉ (23 nov., Julien : « j'aime pas le noir, je veux que ce soit gris clair », « un mélange de degrés de
 //  gris », « gris un peu plus foncé » ; variante A retenue) — docs/passation/2026-11-23-style-clair.md. Le gris foncé de
 //  vrm.center reste le mode sombre CHOISI. Mesuré sur l'app RENDUE, apparence PAR DÉFAUT (aucun choix posé) :
-//    G1 l'app s'ouvre en CLAIR quand rien n'est choisi, et le fond est le gris clair de l'app (#DFE1E5) ;
+//    G1 l'app s'ouvre en CLAIR quand rien n'est choisi, et le fond est le gris MOYEN de l'app (#878B92, 25 nov. ; avant #DFE1E5) ;
 //    G2 chaque texte visible de chaque écran monté tient 4,5:1 sur ce qu'il y a derrière lui (3:1 au-dessus de 24 px, ou
 //       18,66 px gras) — le fond est recomposé couche par couche (couleurs et transparences, opacités des parents) ;
 //       un texte posé sur un DÉGRADÉ est jugé sur la couleur la plus claire de ce dégradé (le pire cas) ;
