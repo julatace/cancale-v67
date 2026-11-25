@@ -167,6 +167,13 @@ async function routeApi(route) {
     if (req.method() === 'GET') { const r = await S.listerSignalements({ utilisateur, unId: u.searchParams.get('id'), env: ENV, fetcher: fakeFetcher }); return json(r.code, r.corps); }
     const corps = JSON.parse(req.postData() || '{}');
     if (corps.action === 'traite') { const r = await S.marquerTraite({ utilisateur, corps, env: ENV, fetcher: fakeFetcher }); return json(r.code, r.corps); }
+    // (16 nov., satisfaction-clients) reçu · en cours · corrigé : le VRAI code serveur, la notification au passage à « corrigé ».
+    if (corps.action === 'etat') {
+      if (!S.changerEtatSignalement) return json(400, { ok: false, raison: 'action' });
+      const r = await S.changerEtatSignalement({ utilisateur, corps, env: ENV, fetcher: fakeFetcher });
+      if (r.code === 200 && r.prevenir) { SDB.pousses.push({ a: r.de, notif: S.notifCorrige({ mot: r.mot }) }); r.corps.notifie = true; }
+      return json(r.code, r.corps);
+    }
     if (corps.action === 'repondre') {
       if (!S.repondreSignalement) return json(400, { ok: false });
       const r = await S.repondreSignalement({ utilisateur, corps, env: ENV, fetcher: fakeFetcher });
@@ -466,6 +473,28 @@ async function partieSignalement(nav, W, theme) {
     await p.pg.screenshot({ path: path.join(SHOTS, `s-${W}-${theme}-02-proprio-repond.png`) });
   }
   dit(SDB.pousses.some((x) => x.a === AUTRE && /répondu/.test(x.notif.title)), `${etq} une notification part vers l'auteur`, JSON.stringify(SDB.pousses.map((x) => x.a.slice(0, 4) + ':' + x.notif.title)));
+  // (16 nov., satisfaction-clients, point 3) Une réponse le passe « en cours » ; le propriétaire le marque « Corrigé » + un mot :
+  // l'état est rangé sur la ligne, UNE notification « corrigé » part vers l'auteur (jamais deux), un autre compte ne peut rien changer.
+  if (liste) {
+    const etatApres = await p.pg.getAttribute('[data-signalement]', 'data-signalement-etat').catch(() => null);
+    dit(etatApres === 'en_cours', `${etq} après la réponse, le signalement est « en cours »`, etatApres);
+    const etatVole = await p.pg.evaluate(async ([j, id]) => (await fetch('/api/compte?mode=signalement', { method: 'POST', headers: { Authorization: 'Bearer ' + j, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'etat', id, etat: 'corrige', mot: 'faux' }) })).status, [jeton(AUTRE), rang[0] ? rang[0].id : 'x']);
+    dit(etatVole === 403, `${etq} un autre compte ne peut pas changer l'état (403)`, etatVole);
+    const avantCorr = SDB.pousses.length;
+    await p.pg.click('[data-signalement-traiter]');
+    await p.pg.fill('[data-signalement-mot-champ] input', 'Colis se remplit de nouveau.');
+    await p.pg.click('[data-signalement-corriger]');
+    // Corrigé, il quitte « À traiter » (la vue par défaut) : le compteur tombe à 0.
+    const corr = await p.pg.waitForFunction(() => { const l = document.querySelector('[data-signalements]'); return l && l.getAttribute('data-signalements-a-traiter') === '0'; }, null, { timeout: 10000 }).then(() => true).catch(() => false);
+    const ligne = SDB.app_data.find((x) => x.owner === PROPRIO && /^signalement_/.test(x.id));
+    dit(corr && ligne && ligne.data.etat === 'corrige' && ligne.data.mot === 'Colis se remplit de nouveau.', `${etq} « Corrigé » + un mot : rangé sur la ligne du signalement`, ligne && JSON.stringify({ etat: ligne.data.etat, mot: ligne.data.mot }));
+    const nCorr = SDB.pousses.slice(avantCorr).filter((x) => x.a === AUTRE && /corrigé/.test(x.notif.title));
+    dit(nCorr.length === 1 && /Colis se remplit/.test(nCorr[0].notif.body) && /mes-signalements/.test(nCorr[0].notif.url), `${etq} UNE notification « corrigé » part vers l'auteur, avec le mot`, JSON.stringify(SDB.pousses.slice(avantCorr).map((x) => x.notif.title)));
+    await p.pg.screenshot({ path: path.join(SHOTS, `s-${W}-${theme}-02b-proprio-corrige.png`) });
+    // Re-marquer « corrigé » (rouvrir puis corriger de nouveau, ou un double appel) : un double appel ne prévient pas deux fois.
+    const ref = await p.pg.evaluate(async ([j, id]) => (await fetch('/api/compte?mode=signalement', { method: 'POST', headers: { Authorization: 'Bearer ' + j, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'etat', id, etat: 'corrige' }) })).status, [jeton(PROPRIO), ligne ? ligne.id : 'x']);
+    dit(ref === 200 && SDB.pousses.slice(avantCorr).filter((x) => x.a === AUTRE && /corrigé/.test(x.notif.title)).length === 1, `${etq} déjà corrigé : aucune seconde notification`, ref);
+  }
   await p.ctx.close();
   // 3. L'auteur voit la réponse.
   const a2 = await nouvellePage(nav, { W, sombre, uid: AUTRE, email: 'autre@exemple.invalid' });
@@ -474,6 +503,9 @@ async function partieSignalement(nav, W, theme) {
   const vuRep = await a2.pg.waitForSelector('[data-signalement-reponse-lue]', { timeout: 30000 }).then(() => true).catch(() => false);
   const t = vuRep ? await a2.pg.locator('[data-mon-signalement]').first().innerText() : '';
   dit(vuRep && /Corrigé/.test(t), `${etq} l'auteur voit la réponse dans « Mes signalements »`, t.slice(0, 120));
+  const etatLu = vuRep ? await a2.pg.getAttribute('[data-mon-signalement]', 'data-signalement-etat') : null;
+  const motLu = await a2.pg.locator('[data-signalement-corrige-lu]').first().innerText().catch(() => '');
+  dit(etatLu === 'corrige' && /Colis se remplit/.test(motLu), `${etq} l'auteur voit l'état « Corrigé » et le mot`, `${etatLu} · ${motLu.slice(0, 80)}`);
   await a2.pg.screenshot({ path: path.join(SHOTS, `s-${W}-${theme}-03-auteur-lit.png`) });
   await a2.ctx.close();
 }

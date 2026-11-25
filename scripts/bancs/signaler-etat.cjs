@@ -9,7 +9,7 @@
 //      · le corps POSTÉ est EXACTEMENT le texte « exact » de l'aperçu ;
 //      · serveur en panne (503) ⇒ « Pas envoyé », le texte reste, jamais « Envoyé » ;
 //        réseau coupé ⇒ pareil ; confirmé ⇒ « Envoyé » ;
-//      · la liste du propriétaire : « À traiter », « Traité » envoie {action:'traite'} ;
+//      · la liste du propriétaire : « À traiter », « Corrigé » (+ un mot) envoie {action:'etat'} (16 nov.) ;
 //      · 390 tactile (cibles ≥ 44 px) et 1512, clair et sombre ; aucun débordement.
 //  2. LA PAGE /etat (public/etat.html), servie COMME VERCEL (`_vercel.servir` :
 //     réécriture /etat → /etat.html, en-têtes, CSP) avec un faux /api/sante :
@@ -101,6 +101,7 @@ async function feuille(nav, theme, tel, OUTS) {
     if (q.method() === 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, signalements: LISTE, nonTraites: 1 }) });
     const corps = JSON.parse(q.postData() || '{}'); postes.push(corps);
     if (corps.action === 'traite') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, id: corps.id, traite: corps.traite }) });
+    if (corps.action === 'etat') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, id: corps.id, etat: corps.etat, etatLe: new Date().toISOString(), mot: corps.mot || null }) });
     if (mode === 'reseau') return route.abort('failed');
     if (mode === 'panne') return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ ok: false, raison: 'base' }) });
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, id: 'signalement_2026110610_aaaaaaaaaaaa_1', notifie: true }) });
@@ -113,10 +114,13 @@ async function feuille(nav, theme, tel, OUTS) {
   await pg.screenshot({ path: path.join(SHOTS, `liste-${F}.png`), fullPage: true });
   // La liste : « À traiter » d'abord, puis « Traité ».
   dit(await pg.locator('[data-signalement]').count() === 1 && await pg.getAttribute('[data-signalements]', 'data-signalements-a-traiter') === '1', `${T} — la liste du propriétaire montre « À traiter » (1 sur 2)`);
+  // (16 nov., satisfaction-clients) « Corrigé » ouvre le champ du mot, puis envoie {action:'etat', id, etat:'corrige', mot}.
   await pg.click('[data-signalement-traiter]');
+  await pg.fill('[data-signalement-mot-champ] input', 'Réglé dans la version du soir.');
+  await pg.click('[data-signalement-corriger]');
   await pg.waitForFunction(() => document.querySelector('[data-signalements]').getAttribute('data-signalements-a-traiter') === '0', null, { timeout: 5000 }).catch(() => {});
-  const tr = postes.find((p) => p.action === 'traite');
-  dit(tr && tr.id === LISTE[0].id && tr.traite === true, `${T} — « Traité » envoie {action:'traite', id, traite:true}`, tr);
+  const tr = postes.find((p) => p.action === 'etat');
+  dit(tr && tr.id === LISTE[0].id && tr.etat === 'corrige' && tr.mot === 'Réglé dans la version du soir.', `${T} — « Corrigé » envoie {action:'etat', id, etat:'corrige', mot}`, tr);
   // La feuille.
   await pg.click('[data-signaler-ouvrir]');
   await pg.waitForSelector('[data-feuille-signaler]', { timeout: 5000 });

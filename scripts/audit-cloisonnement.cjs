@@ -378,7 +378,7 @@ const ACTIONS = {
   'compte.js': {
     communaute: ['communaute.js', 'accompagnement.js', 'formateur.js'], equipe: ['equipe.js'], 'facture-pro': ['facture-pro.js'],
     'facture-autre': ['facture-autres.js'], superpdp: ['superpdp.js'], photoroom: ['photoroom-cle.js'], favoris: ['favoris.js'],
-    agenda: ['agenda-ics.js'], parrainage: [['rattacher']], operations: ['operations.js'], signalement: [['traite']],
+    agenda: ['agenda-ics.js'], parrainage: [['rattacher']], operations: ['operations.js'], signalement: [['traite', 'etat']],
   },
 };
 const actionsDe = (fichier, mode) => {

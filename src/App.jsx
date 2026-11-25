@@ -1742,6 +1742,7 @@ import { versionMemoire, toucherMemoire, suivreStockage, stockageInchange } from
 import { trj, useLangue } from './i18n/react.js';
 // ⟦→ ecrans/Comptabilite.jsx #119⟧
 // (15 nov., parcours nouveau) Le parcours d'un nouveau en huit étapes, un écran plein (src/parcoursNouveau/).
+import { CLE_MESURE_DEMARRAGE, CLE_MESURE_COUPEE, noterEtape as noterEtapeDemarrage, tempsDejaPasse as tempsDejaPasseDemarrage, mesureCoupee as mesureDemarrageCoupee } from "./mesureDemarrage.js";   // (16 nov., satisfaction-clients) les 10 premières minutes, anonymes et coupables
 import { CLE_PARCOURS_NOUVEAU, parcoursNouveauAOuvrir, lireParcoursNouveau, positionApres as positionParcoursNouveau, etatsEtapes as etatsParcoursNouveau, reglagePlateformes, ETAPES_NOUVEAU, installationIci, etatExtensionDirect, comptesCaptes } from "./parcoursNouveau/regle.js";
 import { etatNavigateur as etatNavigateurPN } from "./extension/peutFaire.js";   // (20 nov.) l'état de la page Extension, dans « Bien démarrer »
 import { bacASableActif, bacASableEtape, bacASableAppareil } from "./modeExemple.js";
@@ -3958,6 +3959,9 @@ const SYNC_KEYS = [
   // (15 nov., parcours nouveau) Le parcours d'un nouveau en huit étapes (src/parcoursNouveau/regle.js) :
   // { etape, vues, fini, finiLe, plusTard, at } — repris à la même étape sur n'importe quel appareil.
   'vrm_parcours_nouveau',
+  // (16 nov., satisfaction-clients) Les 10 premières minutes (src/mesureDemarrage.js) : { v, t: { etape: secondes } }
+  // — l'étape atteinte et le temps passé dans le parcours, rien d'autre — et son interrupteur (coupée ⇒ rien écrit).
+  CLE_MESURE_DEMARRAGE, CLE_MESURE_COUPEE,
   // (14 nov., accueil des nouveaux) Par compte VRM, vu sur un appareil, vu partout : les écrans
   // déjà ouverts (« Nouveau », src/ecransVus.js), le bilan en une minute vu (src/bilanMinute.js),
   // le premier colis accompagné vu (src/premierColis.js), la réponse à la question des
@@ -16497,6 +16501,8 @@ const ICON_PATHS = {
   gear:   <><circle cx="12" cy="12" r="3.2"/><path d="M19.6 14.4a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></>,
   cloud:  <><path d="M17.5 18.5H7a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 11.4 1.6 3.7 3.7 0 0 1-.3 7.4Z"/></>,
   cloudOff:<><path d="M17.5 18.5H7a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 8.3-2.9"/><path d="m3 3 18 18"/></>,
+  // (16 nov., satisfaction-clients) « Mesure du démarrage » : un chronomètre.
+  chrono: <><circle cx="12" cy="14" r="7"/><path d="M12 14v-3.5M10 3h4M12 3v4"/></>,
   sync:   <><path d="M20.5 12a8.5 8.5 0 0 1-14.6 6"/><path d="M3.5 12a8.5 8.5 0 0 1 14.6-6"/><path d="M18.5 2.5V6H15M5.5 21.5V18H9"/></>,
   bell2:  <><path d="M6 9a6 6 0 0 1 12 0c0 4.5 1.5 6 1.5 6h-15S6 13.5 6 9Z"/><path d="M10 19a2 2 0 0 0 4 0"/></>,
   // Boutons d'action des listes. Ils portaient un emoji nu (🗑 ✕ ✎), dessiné
@@ -22192,10 +22198,23 @@ function ParcoursNouveauApp({ comptes, onFermer, etapeForcee = null }) {
   });
   const etatsVus = { ...etats, extension: ext, comptes: { etat: sites.every((s) => captes[s] && captes[s].etat === 'fait') ? 'fait' : sites.some((s) => captes[s] && captes[s].etat === 'encours') ? 'encours' : 'afaire' } };
   const ranger = (geste, etape) => save(CLE_PARCOURS_NOUVEAU, positionParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null), geste, { etape }));
+  // (16 nov., satisfaction-clients, point 4) L'étape atteinte et le temps passé DANS le parcours pour y arriver (repris
+  // de là où il en était, jamais une date) : `vrm_mesure_demarrage`, seulement si la mesure n'est pas coupée.
+  const mesureOuverte = React.useRef(null);
+  const noterMesure = (e) => {
+    try {
+      if (etapeForcee || mesureDemarrageCoupee(load(CLE_MESURE_COUPEE, false))) return;
+      const avant = load(CLE_MESURE_DEMARRAGE, null);
+      if (!mesureOuverte.current) mesureOuverte.current = { t0: Date.now(), deja: tempsDejaPasseDemarrage(avant, ici) };
+      const v = noterEtapeDemarrage(avant, e, mesureOuverte.current.deja + (Date.now() - mesureOuverte.current.t0) / 1000);
+      if (v) save(CLE_MESURE_DEMARRAGE, v);
+    } catch (_) {}
+  };
+  React.useEffect(() => { if (pret) noterMesure(ici); }, [pret]);   // eslint-disable-line react-hooks/exhaustive-deps
   const aller = (e) => {
     if (e === null) { setIci(null); return; }
     if (!ETAPES_NOUVEAU.includes(e)) return;
-    setIci(e); ranger('aller', e); try { window.dispatchEvent(new Event('vrm:parcours')); } catch (_) {}
+    setIci(e); ranger('aller', e); noterMesure(e); try { window.dispatchEvent(new Event('vrm:parcours')); } catch (_) {}
   };
   const ecrire = (cle, v) => new Promise((res) => save(cle, v, (ok) => res(ok !== false)));
   const prenom = String(load('vrm_prenom', '') || '').trim().slice(0, 30);
@@ -22208,7 +22227,7 @@ function ParcoursNouveauApp({ comptes, onFermer, etapeForcee = null }) {
       etiquetage={ici === 'etiquetage' ? <Suspense fallback={null}><EtiquetageReglageParcours lire={lireEtiquetagePN} archive={archiveNumeros()} ecrire={ecrireEtiquetagePN}/></Suspense> : null}
       onAller={aller}
       onPlusTard={fermerPlusTard}
-      onFin={() => { save(CLE_PARCOURS_NOUVEAU, positionParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null), 'fin')); if (onFermer) onFermer('fin'); }}
+      onFin={() => { save(CLE_PARCOURS_NOUVEAU, positionParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null), 'fin')); noterMesure('fini'); if (onFermer) onFermer('fin'); }}
       onChoisirPlateformes={(s) => { const v = reglagePlateformes(s); return v ? ecrire(CLE_PLATEFORMES, v) : Promise.resolve(false); }}
       onBrancher={navExt && navExt.geste === 'brancher' ? () => { brancherExtensionApp(); setTimeout(() => setTour((t) => t + 1), 1500); } : null}
       onExemple={bacASableEtape() ? null : () => entrerModeExemple()}
@@ -30596,6 +30615,8 @@ function EcranMaSemaine({ liveStats, onNav, entete }) {
     maintenant, lundi, vendu, joursBenef: pub, dorment,
     colisFaits: pret ? { vinted: ship, lbc: lbcF, vc: vcF } : {},
     recuEntre: (de, a) => ligneUrssaf === undefined ? { valeur: null, raison: 'encours' } : recuAvecADater(recuPublieEntre(ligneUrssaf, { de, a }, maintenant), ligneUrssaf),
+    // (16 nov., satisfaction-clients) L'argent à venir : la règle de la coque, telle quelle (« au moins », « — »).
+    aVenir: aVenirPour(liveStats && liveStats.aVenir),
     R: REGLES_SEMAINE,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [maintenant, lundi, liveStats, pub, dorment, pret, ship, lbcF, vcF, ligneUrssaf]);

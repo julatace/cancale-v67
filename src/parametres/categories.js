@@ -73,7 +73,7 @@ export const CATEGORIES = [
   { id: 'donnees', ic: 'lock', expert: true, groupes: [
     { id: 'securite', items: ['securite'] },
     { id: 'sauvegarde', titre: 'parametres.g.sauvegarde', items: ['export', 'restaurer', 'revenir', 'corbeille', 'importer', 'donnees'], pied: 'sauvegarde' },
-    { id: 'confidentialite', titre: 'reglages.groupe.donnees', items: ['tes-donnees', 'journal-vrm', 'conditions'] },
+    { id: 'confidentialite', titre: 'reglages.groupe.donnees', items: ['tes-donnees', 'journal-vrm', 'mesure-demarrage', 'conditions'] },
   ] },
 ];
 

@@ -107,7 +107,7 @@ import { pageExport } from './_lib/export-rgpd.js';   // (12 nov.) RGPD : toutes
 import { compteOAuthAnnulable } from '../src/auth/compteNeuf.js';   // (11 nov., lot DJ6)
 import { envoyerSmtp } from './_lib/smtp.js';
 import { contactEmail } from '../src/contact.js';
-import { envoyerSignalement, listerSignalements, marquerTraite, repondreSignalement, suiviSignalements, notifReponse, proprietaireInstallation as proprioAlertes } from './_lib/signalement.js';
+import { envoyerSignalement, listerSignalements, marquerTraite, repondreSignalement, suiviSignalements, notifReponse, changerEtatSignalement, notifCorrige, proprietaireInstallation as proprioAlertes } from './_lib/signalement.js';
 import { routeParcoursComptes } from './_lib/parcours-comptes.js';   // (15 nov.) Réglages → Nouveaux comptes : où les inscrits s'arrêtent (anonyme)
 // (13 nov., lot 55) « Écrire au support » : la question, cinq faits techniques, rangée chez LUI (api/_lib/demande-aide.js).
 import { envoyerDemandeAide, listerDemandesAide, marquerDemandeTraitee } from './_lib/demande-aide.js';
@@ -2225,6 +2225,13 @@ async function signalement(req, res) {
   const corps = await lireCorpsJson(req);
   if (!corps || typeof corps !== 'object') return repondre(res, 400, { ok: false, raison: 'corps' });
   if (corps.action === 'traite') { const r = await marquerTraite({ utilisateur, corps }); return repondre(res, r.code, r.corps); }
+  // (16 nov., satisfaction-clients) Reçu · en cours · corrigé : au passage à « corrigé », UNE notification à celui qui
+  // l'a envoyé (ses appareils, son contexte). La notification ne décide jamais du « enregistré ».
+  if (corps.action === 'etat') {
+    const r = await changerEtatSignalement({ utilisateur, corps });
+    if (r.code === 200 && r.prevenir) { try { const p = await contexteVendeur.run({ owner: r.de }, () => sendPushToAll(notifCorrige({ mot: r.mot }))); r.corps.notifie = !!(p && p.sent > 0); } catch (_) { r.corps.notifie = false; } }
+    return repondre(res, r.code, r.corps);
+  }
   // (15 nov.) La réponse du propriétaire : rangée sur le signalement, puis UNE notification à
   // celui qui l'a envoyé (ses appareils, son contexte). La notification ne décide jamais du « envoyé ».
   if (corps.action === 'repondre') {

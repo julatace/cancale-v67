@@ -12,6 +12,7 @@ import React from 'react';
 import { montant } from './format.js';
 import { motsVendeur } from './profilVendeur.js';
 import { raisonCourte } from './design/carteChiffres.js';
+import { tr } from './i18n/index.js';
 import './styles-ma-semaine.css';
 
 const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
@@ -126,6 +127,16 @@ export default function MaSemaine({ M, entete = null, onSemaine, onNav, vitesse 
           x={d.etat === 'su' ? { valeur: d.n, partiel: d.auMoins, manque: [] } : { valeur: null, hors: 'ouvre Annonces' }}
           sous="en ligne depuis plus de 30 jours"
           onClick={onNav ? () => onNav('annonces') : null}/>
+        {/* (16 nov., satisfaction-clients, point 6) L'argent à venir (aujourd'hui, semaine en cours seulement) et le
+            temps gagné (estimation du calculateur sur SES ventes de la semaine). */}
+        {M.aVenir ? <Widget cle="avenir" l={tr('satisf.semaine.aVenir')} x={M.aVenir} t="eur" onClick={onNav ? () => onNav('compta') : null}/> : null}
+        {M.temps ? <div className="vrm-ms-w" data-ms-chiffre="temps">
+          <span className="vrm-ms-l">{tr('satisf.semaine.temps')}</span>
+          <b className={'vrm-ms-v' + (M.temps.valeur == null ? ' is-vide' : '')} data-ms-valeur={M.temps.valeur == null ? '' : String(M.temps.valeur)} data-partiel={M.temps.partiel ? '1' : undefined}>
+            {M.temps.valeur == null ? '—' : (M.temps.partiel ? tr('satisf.semaine.auMoinsMin', { n: M.temps.valeur }) : tr('satisf.semaine.min', { n: M.temps.valeur }))}
+          </b>
+          <small className="vrm-ms-sous">{tr('satisf.semaine.estimation')}</small>
+        </div> : null}
         {vitesse}
       </div>
       <p className="vrm-ms-pied">Vendu : jour de la vente. Reçu : jour du versement.</p>

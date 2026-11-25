@@ -30,6 +30,9 @@
 import { proprietaireInstallation } from './signalement.js';
 import { lireComptes, lireTout } from './pilotage.js';
 import { fetchAvecDelai } from './fetch-delai.js';
+// (16 nov., satisfaction-clients, point 4) Les 10 premières minutes : LA règle de l'app (étape atteinte + temps,
+// regroupés par étape, rien sous 5 vendeurs, coupable), importée telle quelle.
+import { agregerDemarrage, CLE_MESURE_DEMARRAGE, CLE_MESURE_COUPEE } from '../../src/mesureDemarrage.js';
 
 const NEUTRE = '00000000-0000-0000-0000-000000000000';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -41,7 +44,7 @@ const ANCIENNES_PN = { bienvenue: 'plateformes', numeros: 'etiquetage', journee:
 const STATUTS_PAYES = new Set(['active', 'past_due']);
 
 export const REQUETES = Object.freeze({
-  mains: 'app_data?id=eq.main&select=owner,pn:data->vrm_parcours_nouveau',
+  mains: `app_data?id=eq.main&select=owner,pn:data->vrm_parcours_nouveau,md:data->${CLE_MESURE_DEMARRAGE},off:data->>${CLE_MESURE_COUPEE}`,
   vinted: 'vinted_accounts?select=owner',
   extension: 'app_data?or=(id.like.ext_appareil_*,id.in.(lbc_accounts,vc_session))&select=owner',
   lecture: 'app_data?or=(id.like.harvest_*_listings,id.like.harvest_*_orders_*,id.in.(lbc_listings,lbc_ventes,vc_listings,vc_ventes))&select=owner',
@@ -127,5 +130,7 @@ export async function routeParcoursComptes({ utilisateur, env = process.env, fet
     lireTout(env, fetcher, REQUETES.abonnements),
   ]);
   const corps = calculerParcours({ proprio, lu: { comptes, mains, vinted, extension, lecture, abonnements } });
+  // Regroupé PAR ÉTAPE, jamais par compte : seulement des nombres, et rien sous le seuil d'anonymat.
+  corps.demarrage = agregerDemarrage(mains, { proprio });
   return { code: 200, corps };
 }

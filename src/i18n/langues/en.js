@@ -57,6 +57,7 @@ import ecran_numeros_nouvelles from './en/numeros-nouvelles.js';   // (15 nov.) 
 import ecran_republie_telephone from './en/republie-telephone.js';   // (15 nov.) Republiée dans l'app Vinted   // (15 nov.) Les nouvelles annonces sans N°
 import ecran_securite_ventes from './en/securite-ventes.js';   // (15 nov.) Sécurité des ventes : arnaque, où vendre, anneau
 import ecran_parcours_nouveau from './en/parcoursNouveau.js';   // (15 nov.) le parcours d'un nouveau, « Nouveaux comptes », le suivi d'un signalement   // (15 nov.) Paramètres rangés en dix catégories
+import ecran_satisfaction from './en/satisfaction.js';   // (16 nov.) satisfaction des clients
 import ecran_idees from './en/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './en/ventes.js';
 import ecran_commun from './en/commun.js';
@@ -2447,4 +2448,5 @@ export default {
   ...ecran_extension,
   ...ecran_actions_ext,
   ...ecran_offres_photos,
+  ...ecran_satisfaction,
 };
