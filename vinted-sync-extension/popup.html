@@ -94,6 +94,36 @@
     .maj a, #parcours-favoris button { border-radius: 8px; }
     .lien { font-size: 14px; }
     html.carte { color-scheme: normal; background: transparent; }
+    /* 5.453 (25 nov., Julien : « améliore la page de connexion ») — le gris clair de l'app : fond #E9EAEC, surfaces #F4F5F6,
+       filets #DADCE0, encre #16181C ; UN plein à l'encre ; aucun vert, aucun orange (les liens et le focus à l'encre).
+       Largeur fixe centrée (rien ne déborde, marges égales). */
+    :root, :root[data-theme="clair"] { --n-fond: #E9EAEC; --n-carte: #F4F5F6; --n-carte-2: #EEEFF1; --n-trait: #DADCE0; --n-encre: #16181C; --n-encre-2: #555A62; --n-plein: #16181C; --n-sur-plein: #FFFFFF; --n-accent: #16181C; --n-ambre: #16181C; --n-teinte: rgb(22 24 28 / .08); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="clair"]) { --n-accent: #F2F3F5; --n-ambre: #F2F3F5; --n-teinte: rgb(242 243 245 / .10); } }
+    :root[data-theme="sombre"] { --n-accent: #F2F3F5; --n-ambre: #F2F3F5; --n-teinte: rgb(242 243 245 / .10); }
+    body:not(.carte) { width: 360px; margin: 0 auto; padding: 20px 16px 16px; }
+    body.onglet { width: auto; max-width: 420px; margin: 24px auto; }
+    body[data-connexion="deconnecte"] #tete, body[data-connexion="expiree"] #tete { display: none; }
+    .accueil { display: flex; flex-direction: column; align-items: center; text-align: center; margin: 4px 0 18px; }
+    .logo-grand { width: 52px; height: 52px; border-radius: 12px; display: block; }
+    .accueil-t { margin: 12px 0 4px; font-size: 20px; line-height: 26px; font-weight: 700; letter-spacing: -.01em; }
+    .accueil-p { margin: 0; color: var(--n-encre-2); font-size: 14px; line-height: 20px; }
+    .accueil-p.fort { color: var(--n-encre); font-weight: 600; }
+    .groupe { box-shadow: none; }
+    .champ-mdp { display: flex; align-items: center; border-top: 1px solid var(--n-trait); }
+    .champ-mdp .champ { flex: 1; min-width: 0; border-top: 0; }
+    .oeil { flex-shrink: 0; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; margin-right: 2px; border: 0; border-radius: 8px; background: transparent; color: var(--n-encre-2); }
+    .oeil[aria-pressed="true"] { color: var(--n-encre); }
+    .oeil[aria-pressed="false"] .barre { display: none; }
+    #mdpForm { margin-top: 0; }
+    #mdpForm .plein { margin-top: 14px; }
+    .plein[aria-busy="true"] { opacity: 1; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .plein[aria-busy="true"]::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: vrm-tourne .8s linear infinite; }
+    @keyframes vrm-tourne { to { transform: rotate(360deg); } }
+    #mdpForm .err { margin: 8px 0 0; text-align: center; color: var(--n-encre); font-weight: 500; }
+    .sep { display: flex; align-items: center; gap: 10px; margin: 8px 0 0; color: var(--n-encre-2); font-size: 13px; line-height: 18px; }
+    .sep::before, .sep::after { content: ""; flex: 1; height: 1px; background: var(--n-trait); }
+    #mdpForm .contour { margin-top: 8px; }
+    .lien.discret { color: var(--n-encre-2); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
   </style>
 </head>
 <body data-connexion="decide">
