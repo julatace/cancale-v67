@@ -28,6 +28,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (25 nov., favoris-gestes-humains — Julien : « tu dois faire tous les gestes que je fais », « ça doit être humain ») ext. 5.453
+  { id: 'favoris-gestes-humains', date: '2026-11-25', titre: 'Favoris : l’extension écrit comme toi', phrase: 'Elle lit, tape lettre à lettre, puis touche Envoyer.', tab: 'favoris', pour: 'tous', mode: 'tous' },
+  { id: 'extension-connexion-claire', date: '2026-11-25', titre: 'Connexion de l’extension plus claire', phrase: 'Deux champs, l’œil du mot de passe, un bouton.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (25 nov., aujourdhui-moins-texte — Julien : « C'est pas mal mais trop de texte, améliore. ») docs/passation/2026-11-25-aujourdhui-moins-texte.md
   { id: 'aujourdhui-moins-texte', date: '2026-11-25', titre: 'Aujourd’hui : deux fois moins de texte', phrase: 'Un titre court, un chiffre ; le détail derrière ›.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., achats-retours-design — Julien : « tu peux améliorer ce design ») docs/passation/2026-11-25-achats-retours-design.md
