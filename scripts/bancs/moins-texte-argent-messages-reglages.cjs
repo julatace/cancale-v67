@@ -130,7 +130,7 @@ const MESURER = ([v, MUT]) => {
   remettre.push(...cacher([...main.querySelectorAll('select')]));
   const texte = main.innerText || '';
   // D : les montants ≥ 100 € écrits deux fois, hors tableaux, graphiques (svg, aria-hidden) et lignes de liste.
-  remettre.push(...cacher([...main.querySelectorAll('table, svg, [aria-hidden="true"], [role="img"], [data-fil], [data-fe-vente], .vrm-sv-barres, .vrm-gs, [data-sp-cmp], [data-ca-table]')]));
+  remettre.push(...cacher([...main.querySelectorAll('table, svg, [aria-hidden="true"], [role="img"], [data-fil], [data-fe-vente], [data-rev-ligne], .vrm-sv-barres, .vrm-sp-vr, [data-stats-semaines], :has(> .vrm-cm-titre), [data-sp-cmp], [data-ca-table]')]));
   const texteD = main.innerText || '';
   remettre.forEach((f) => f()); menus.forEach((sp) => sp.remove());
   const mots = texte.replace(/(\d)[\s  ](?=\d)/g, '$1').split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w));
@@ -145,7 +145,8 @@ const MESURER = ([v, MUT]) => {
   }
   // G : les gestes visibles.
   const vis = (e) => { if (!e.getClientRects().length) return false; const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1 && !e.closest('[inert]'); };
-  const nGestes = [...main.querySelectorAll('button, a[href], [role="button"], [role="switch"], select, input, textarea, summary')].filter(vis).length;
+  // Les lignes d'une liste (une conversation, une facture, une vente à compléter) sont des données : leur nombre varie avec la lecture.
+  const nGestes = [...main.querySelectorAll('button, a[href], [role="button"], [role="switch"], select, input, textarea, summary')].filter((e) => vis(e) && !(v.lignes && e.closest(v.lignes)) && !e.closest('[role="status"], [aria-live], .vrm-toast, [data-toast], [data-fraicheur-deplier], .vrm-fraicheur')).length;   // un message passager (toast) n'est pas un geste de l'écran
   const nommes = (v.gestes || []).map((s) => [s, [...document.querySelectorAll(s)].some((e) => e.getClientRects().length || e.closest('details'))]);
   // C : la compta.
   const partiels = [...document.querySelectorAll('[data-au-moins="1"], [data-ca-min="1"], [data-sv-partiel="1"], [data-recap-partiel="1"]')].filter((e) => e.getClientRects().length);

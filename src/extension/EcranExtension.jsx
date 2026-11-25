@@ -127,7 +127,7 @@ function CompteGroupe({ c, ouvert, onBascule, maintenant, onReprendre, bloque = 
   const lu = c.lu ? tr('ext.lu', { age: ilYa(c.lu.at, maintenant) }) : (c.etat.cle === 'ext.compte.jamaisLu' ? '' : tr('ext.jamais'));
   const total = c.gestes.length;
   return (
-    <Groupe titre={`${NOMS_SITES[c.site]} · ${c.nom || '—'}`} repli={{ ouvert, onBascule, n: null }} attrs={{ 'data-ext-compte': `${c.site}:${c.id}`, 'data-ext-ouverture': c.ouverture, 'data-ext-etat': c.etat.code, 'data-ext-peut': c.peut }}>
+    <Groupe titre={<><LogoSite site={c.site} taille={16} nom={NOMS_SITES[c.site]}/> {c.nom || '—'}</>} repli={{ ouvert, onBascule, n: null }} attrs={{ 'data-ext-compte': `${c.site}:${c.id}`, 'data-ext-ouverture': c.ouverture, 'data-ext-etat': c.etat.code, 'data-ext-peut': c.peut }}>
       <Rangee titre={phrase} sousTitre={lu} lignes={2} ton={c.etat.ton === 'geste' ? 'ambre' : 'neutre'} valeur={tr('ext.peut.n', { n: c.peut, total })}
         href={c.etat.geste === 'ouvrir-vinted' ? 'https://www.vinted.fr' : ''} fin={c.etat.geste === 'ouvrir-vinted' ? 'chevron' : null}
         attrs={{ 'data-ext-compte-etat': c.etat.code }}/>
