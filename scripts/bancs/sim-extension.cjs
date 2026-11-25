@@ -21,6 +21,10 @@ require('./_porte-banc.cjs');
 //    F7  un autre compte dans l'onglet ⇒ rien ne part.
 //    F8  l'onglet de travail fermé en cours de route ⇒ la file s'arrête chez VRM, rien de plus.
 //    F9  l'extension rechargée en cours de route ⇒ rien ne part deux fois.
+//    P1  (25 nov., 5.453.1) depuis le PANNEAU (vrais clics : cocher, « Envoyer », les étapes, « Lancer ») ⇒ cloche, ligne,
+//        conversation, texte tapé, « Envoyer », offre — la panne de la 5.453.0 (« après, plus rien ne marche »).
+//    D1  (25 nov., 5.453.1) « Envoyer aux favoris » DEPUIS VRM (commande À distance `favoris`, ids vides) ⇒ la file part —
+//        la 5.450–5.453.0 choisissait dans `apercu.liste` (sans `cochable`) : « aucun favori à contacter », jamais rien.
 //    O1  (5.440.3) « Observer Vinted » : un envoi à la main (cloche, ligne, message, offre), la frise relue dans la base.
 //    F1T / F1T2 (24 nov., 5.440.2) : 17 (25) notifications plus récentes avant les 3 favoris, la cloche n'en montre que 5,
 //        la page complète 15 puis la suite au défilement (2 s) ; F1T2 : les favoris sur la page 2 de l'API. 5.440.1 :
@@ -61,6 +65,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
   const FF = await import(pathToFileURL(path.join(SRV, 'api', '_lib', 'favoris-file.js')).href);
   const FC = await import(pathToFileURL(path.join(SRV, 'api', '_lib', 'favoris-carte.js')).href);
   const FP = await import(pathToFileURL(path.join(SRV, 'src', 'favorisProgression.js')).href);
+  const AD = await import(pathToFileURL(path.join(SRV, 'src', 'aDistance.js')).href);   // D1 : la commande « À distance » telle que l'app l'écrit
   const tls = certificat(TMP);
   const M = monde({ tls, port: PORT, dist: TMP, comptes: {}, journal: [] });
   M.USERS.set(U.email, { id: U.id, email: U.email, mdp: U.mdp });
@@ -71,7 +76,10 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
   const REGLAGES = { version: 1, envoisActifs: false, message: MSG_PSEUDO, offreMode: 'pct', pourcentage: 10, arrondi: false, intervalleMinutes: 0 };
   const apercu = () => ({ etat: 'pret', total: FAVORIS.length, raison: '', reglages: REGLAGES,
     tous: FAVORIS.map((f) => ({ id: f.nid, notificationId: f.nid, itemId: f.itemId, recipientId: f.userId, cochable: true, envoi: 'a_envoyer', titre: (ANNONCES.find((a) => String(a.id) === f.itemId) || {}).titre, photo: `https://images1.vinted.net/t/${f.itemId}/f800/photo.jpeg` })),
-    liste: FAVORIS.map((f) => f.nid) });
+    // 25 nov. : `liste` à la VRAIE forme du serveur (api/_lib/favoris-carte.js : des objets SANS `cochable`, 15 au plus ;
+    //    seule `tous` porte `cochable`/`envoi`) — avant, des identifiants nus : la sélection « depuis VRM » n'était pas jugée.
+    liste: FAVORIS.slice(0, 15).map((f) => ({ id: f.nid, itemId: f.itemId, pseudo: f.login, titre: (ANNONCES.find((a) => String(a.id) === f.itemId) || {}).titre, prix: (ANNONCES.find((a) => String(a.id) === f.itemId) || {}).prix, date: null, photo: '' })),
+    selection: FAVORIS.slice(0, 15).map((f) => f.nid) });
   const favorisRoute = (req, res, url, corps) => {
     const u = M.lireJwt(String(req.headers.authorization || '').replace(/^Bearer\s+/i, ''));
     const j = (code, o) => { res.writeHead(code, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }); res.end(JSON.stringify(o)); };
@@ -132,6 +140,8 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
   seed();
   const regles = () => HOTES.map((h) => `MAP ${h} 127.0.0.1:${PORT}`).concat(['MAP * ~NOTFOUND']).join(', ');
   const EXT = path.join(TMP, 'ext'); fs.cpSync(EXT0, EXT, { recursive: true });
+  // P1 : la racine du panneau OUVERTE dans la copie du banc seulement (Playwright y touche par de vrais clics) — rien d'autre ne change.
+  { const fb = path.join(EXT, 'vrm-badge.js'); const tb = fs.readFileSync(fb, 'utf8'); if (tb.includes("attachShadow({ mode: 'closed' })")) fs.writeFileSync(fb, tb.replace("attachShadow({ mode: 'closed' })", "attachShadow({ mode: 'open' })")); }
   // `--mutation nom` : UNE règle réaffaiblie dans la copie de l'extension ; la simulation doit rougir.
   const MUTATIONS = {
     // la conversation ouverte gardée d'un tour à l'autre (la 5.440.1 d'avant le 24 nov.)
@@ -484,6 +494,95 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       const n1 = await nEv(); await vt.click('#cloche').catch(() => {}); await attendre(3000);
       const n2 = await nEv();
       dit(n2 === n1, 'arrêtée : plus rien n’est noté (un clic sur la cloche ensuite)', `${n1} → ${n2}`);
+    }
+    // ══ P1 (25 nov., Julien, 5.453.0 : « ça trouve le favori, ça te propose de le sélectionner, mais après plus rien ne
+    //    marche ») : PARTIR DU CLIC dans le panneau (le grand panneau ouvert par le lien de l'app `?vrm=panneau&page=favoris`),
+    //    de VRAIS clics de Playwright (cocher, « Envoyer », les étapes, « Lancer ») — jamais un appel direct à `favorisCarte`.
+    //    On juge ce que la PAGE de Vinted reçoit ensuite : la cloche ouverte, la ligne du favori touchée (la conversation
+    //    ouverte par la page), le texte TAPÉ dans le champ, « Envoyer », puis l'offre. Et, si rien ne part, la phrase du panneau.
+    if (veut('P1')) {
+      console.log('\n── P1. depuis le PANNEAU : cocher un favori, « Envoyer », les étapes, « Lancer » (vrais clics) ⇒ cloche, ligne, conversation, texte tapé, Envoyer, offre');
+      await reset(); V.st.ancienneConv = 404; REGLAGES.message = MSG_SIMPLE;
+      for (const f of FAVORIS) f.forme = 'app';
+      let pp = await page('https://www.vinted.fr/inbox');
+      const R = () => pp.locator('#vrm-badge');
+      const dans = (sel) => R().locator(sel);
+      // La question « c'est bien un de tes comptes à capter ? » d'abord (SON « Oui »), puis le lien du panneau de l'app.
+      { const oui = R().getByText('Oui, capter ce compte'); if (await attendreQue(async () => (await oui.count()) > 0, 15000, 500)) { await oui.first().click().catch(() => {}); await attendre(2500); } }
+      await pp.goto('https://www.vinted.fr/inbox?vrm=panneau&page=favoris', { waitUntil: 'domcontentloaded' }).catch(() => {});
+      const rang = await attendreQue(async () => (await dans(`li[data-fav-qui="${FAVORIS[0].nid}"] input[data-fav-coche]`).count()) > 0, 60000, 800);
+      await shot(pp, 'P1-0-panneau');
+      dit(!!rang, 'le panneau montre les favoris du compte (la liste à cocher)', await R().evaluate((h) => (h.shadowRoot ? h.shadowRoot.textContent : '').replace(/\s+/g, ' ').slice(0, 400)).catch((e) => String(e)));
+      const etapesPanneau = [];
+      if (rang) {
+        await dans(`li[data-fav-qui="${FAVORIS[0].nid}"] input[data-fav-coche]`).first().click({ force: true }).catch((e) => etapesPanneau.push('coche:' + e.message.slice(0, 80)));
+        await attendre(600);
+        await dans('[data-fav-envoyer]').first().click().catch((e) => etapesPanneau.push('envoyer:' + e.message.slice(0, 80)));
+        for (let i = 0; i < 6; i++) {
+          await attendre(1500);
+          if (await dans('.fav6-feuille [data-fav-lancer]').count()) break;
+          const sv = dans('.fav6-feuille [data-fav-etape-suivant]');
+          if (!(await sv.count())) { etapesPanneau.push('ni suivant ni lancer'); break; }
+          const off = await sv.first().isDisabled().catch(() => true);
+          etapesPanneau.push('suivant' + (off ? '(éteint)' : ''));
+          if (off) { await attendre(2500); }
+          await sv.first().click({ timeout: 8000 }).catch((e) => etapesPanneau.push('suivant:' + e.message.slice(0, 80)));
+        }
+        await shot(pp, 'P1-1-confirmer');
+        const lc = dans('.fav6-feuille [data-fav-lancer]');
+        await attendreQue(async () => (await lc.count()) && !(await lc.first().isDisabled()), 20000, 500);
+        etapesPanneau.push('lancer' + ((await lc.count()) ? ((await lc.first().isDisabled()) ? '(éteint)' : '') : '(absent)'));
+        await lc.first().click({ timeout: 8000 }).catch((e) => etapesPanneau.push('lancer:' + e.message.slice(0, 80)));
+      }
+      note('panneau : ' + etapesPanneau.join(' → '));
+      const lancee = await attendreQue(async () => { const f = await fenetre(); return f.f && f.f.uid === UID ? f.f : null; }, 30000, 800);
+      dit(!!lancee, 'le clic « Lancer » du panneau lance la file (l’extension la mène)', JSON.stringify(await fenetre()).slice(0, 400));
+      const t0 = Date.now();
+      const res = await attendreQue(async () => { const v = vue(); const f = await fenetre(); return f.f && !f.f.actif && !v.active ? { v, f } : null; }, 300000, 2000);
+      note(`durée ${Math.round((Date.now() - t0) / 1000)} s`);
+      const pg = V.st.req.filter((e) => e.page || true);
+      const cloche = V.st.req.filter((e) => e.m === 'GET' && /inbox-notifications\/v1\/notifications$/.test(e.p));
+      const ecr = ecrituresVinted();
+      const inq = ecr.filter((e) => /inquiries$/.test(e.p)), msgs = ecr.filter((e) => /\/replies$/.test(e.p)), offres = ecr.filter((e) => /\/offers$/.test(e.p));
+      void pg;
+      dit(cloche.length >= 1, 'la cloche est lue (liste des notifications)', cloche.length);
+      dit(inq.length === 1 && inq[0].uid === UID, 'la ligne du favori touchée : la PAGE ouvre la conversation', JSON.stringify(ecr.map((e) => e.m + ' ' + e.p)));
+      dit(msgs.length === 1 && /ton favori est toujours dispo/.test(String(msgs[0] && msgs[0].corps)), 'le texte tapé puis « Envoyer » : le message part de la page', msgs.map((e) => e.corps).join(' | '));
+      dit(offres.length === 1, 'l’offre est faite (« Faire une offre », prix, « Proposer »)', offres.map((e) => e.corps).join(' | '));
+      dit(!!res, 'la file se termine', JSON.stringify(parItem()));
+      const txt = await R().evaluate((h) => (h.shadowRoot ? h.shadowRoot.textContent : '').replace(/\s+/g, ' ')).catch(() => '');
+      if (!(msgs.length === 1)) note('panneau à la fin : ' + txt.slice(0, 600) + ' · fenêtre ' + JSON.stringify(await fenetre()).slice(0, 600));
+      await shot(pp, 'P1-2-fin');
+      await pp.close().catch(() => {});
+    }
+    // ══ D1 (25 nov., Julien, 5.453.0 : « demander à l'extension … il n'y a plus personne ») : « Envoyer aux favoris » DEPUIS
+    //    VRM (décision du 24 nov. : tout faire depuis VRM si l'extension est connectée) — la commande « À distance » écrite
+    //    comme l'app l'écrit (`src/aDistance.js` `nouvelleCommandeDistance`, geste `favoris`, `ids: []`), prise par la VRAIE
+    //    extension (`distanceTickUn`) ⇒ la file des favoris ⇒ cloche, ligne, conversation, texte tapé, « Envoyer », offre.
+    if (veut('D1')) {
+      console.log('\n── D1. « Envoyer aux favoris » depuis VRM (commande À distance, ids vides = tous les cochables) ⇒ la file part, cloche, ligne, message, offre');
+      await reset(); V.st.ancienneConv = 404; REGLAGES.message = MSG_SIMPLE;
+      const garde3 = FAVORIS.splice(1), gardeA = ANNONCES.splice(1);
+      for (const f of FAVORIS) f.forme = 'app';
+      seed();
+      const cmd = AD.nouvelleCommandeDistance({ geste: 'favoris', site: 'vinted', compte: UID, args: { ids: [] }, owner: U.id, confirme: true, alea: 'banc0d1x' });
+      dit(!!cmd, 'l’app sait écrire la commande « favoris » (sa confirmation donnée)', JSON.stringify(cmd).slice(0, 200));
+      if (cmd) M.st.tables.app_data.push({ id: cmd.id, owner: U.id, updated_at: new Date().toISOString(), data: cmd.data });
+      const ligneCmd = () => (M.st.tables.app_data.find((r) => r.id === (cmd && cmd.id)) || {}).data || {};
+      // Le réveil « À distance » de l'extension (le même que l'alarme) jusqu'à ce que la commande ait une issue.
+      const prise = await attendreQue(async () => { await dansSW(async () => { try { await distanceTickUn('banc'); } catch (_) {} }); const d = ligneCmd(); return d.etat && d.etat !== 'attente' && d.etat !== 'pris' ? d : null; }, 90000, 3000);
+      note('commande : ' + JSON.stringify(prise || ligneCmd()).slice(0, 500));
+      dit(!!prise && prise.etat === 'fait', 'la commande est faite (la file des favoris lancée)', JSON.stringify(prise).slice(0, 400));
+      const res = await attendreQue(async () => { const v = vue(); const f = await fenetre(); return f.f && !f.f.actif && !v.active && (v.jobs || []).length ? { v, f } : null; }, 240000, 2000);
+      const cloche = V.st.req.filter((e) => e.m === 'GET' && /inbox-notifications\/v1\/notifications$/.test(e.p));
+      const ecr = ecrituresVinted();
+      const inq = ecr.filter((e) => /inquiries$/.test(e.p)), msgs = ecr.filter((e) => /\/replies$/.test(e.p)), offres = ecr.filter((e) => /\/offers$/.test(e.p));
+      dit(cloche.length >= 1, 'la cloche est lue', cloche.length);
+      dit(inq.length === 1 && inq[0].uid === UID, 'la ligne du favori touchée : la PAGE ouvre la conversation', JSON.stringify(ecr.map((e) => e.m + ' ' + e.p)));
+      dit(msgs.length === 1 && /ton favori est toujours dispo/.test(String(msgs[0] && msgs[0].corps)), 'le texte tapé puis « Envoyer » : le message part de la page', msgs.map((e) => e.corps).join(' | '));
+      dit(offres.length === 1, 'l’offre est faite', offres.map((e) => e.corps).join(' | '));
+      dit(!!res && FP.bilanFavoris(jobs()).envoyes === 1, 'VRM : 1/1 envoyé', JSON.stringify(parItem()));
+      FAVORIS.push(...garde3); ANNONCES.push(...gardeA);
     }
     // ══ C1 : la carte du logo sur vinted.fr (compte relié, « Tout va bien ») ════════════════════════════════════════
     if (veut('C1')) {
