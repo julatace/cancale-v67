@@ -74,7 +74,11 @@ function ecran(ok) {
   // (20 nov., décision de Julien) Proposer, accepter, refuser se font dans le PANNEAU de l'extension : l'app montre l'offre et
   // SON mini (règle contreOffreMini ci-dessus, recopiée par l'extension) et ouvre « Répondre à l'offre dans l'extension ».
   ok(!/actionOffre\(/.test(sans) && !/\/offers`/.test(sans) && !/offer_requests/.test(sans), 'B4 l’app n’envoie plus aucune offre (ni actionOffre, ni /offers, ni offer_requests)');
-  ok(/<BoutonExtension className="vrm-chat-btn vrm-chat-btn-p" action="offres" ids=\{\[String\(openConv\.convId\|\|''\)\]\}\/>/.test(sans), 'B5 la carte d’offre ouvre le panneau sur CETTE conversation');
+  // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) « Proposer N € » (N = contreOffreMini), Accepter (confirmé), Refuser :
+  // DEPUIS VRM par la porte, sur CETTE offre ; pas connecté ⇒ éteint, la raison et le geste.
+  const PORTE = require('./_porte-agir.cjs');
+  const agir = fs.readFileSync(path.join(path.dirname(APP), 'agir', 'Agir.jsx'), 'utf8').replace(/\/\/[^\n]*/g, '');
+  return PORTE.offreVinted(sans, agir).then((r) => ok(r.ok, 'B5 (24 nov.) la carte d’offre agit DEPUIS VRM sur CETTE offre (contre-offre = SON mini), par la porte ; sinon éteinte avec sa raison', r.detail));
 }
 
 function extension(ok) {
@@ -102,7 +106,7 @@ async function audit(src, bavard) {
   let ko = 0;
   const ok = (c, m, d) => { if (!c) ko++; if (bavard) console.log(`${c ? '✅' : '❌'} ${m}${!c && d != null ? ` — ${d}` : ''}`); };
   await regle(src, ok);
-  if (bavard) { ecran(ok); await extension(ok); }
+  if (bavard) { await ecran(ok); await extension(ok); }
   return ko;
 }
 

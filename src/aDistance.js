@@ -299,8 +299,21 @@ export async function lireUneCommande(dep, id, maintenant = Date.now()) {
   const rows = await json(await appel(dep, `app_data?id=eq.${enc(id)}&select=${SELECT_DISTANCE}`, { headers: dep.entetes(), cache: 'no-store' }));
   return rows ? (rows[0] ? vueCommandeDistance(rows[0], maintenant) : { absente: true }) : null;
 }
+// (25 nov., budget-vitesse) UNE lecture des présences partagée : la porte d'« agir » (App.jsx `SourceAgir`) et « À distance » la
+// demandaient chacune au même moment (lecture en double). Une lecture en cours sert tous ceux qui la demandent ; une lecture
+// RÉUSSIE sert 5 s ; une lecture ratée (null, « pas su ») n'est jamais gardée.
+let presencesEnCours = null, presencesLues = null;
 export async function lirePresences(dep, maintenant = Date.now()) {
-  const rows = await json(await appel(dep, `app_data?id=like.presence_*&select=${SELECT_PRESENCE}&limit=20`, { headers: dep.entetes(), cache: 'no-store' }));
+  let rows;
+  if (presencesLues && Date.now() - presencesLues.at < 5000) rows = presencesLues.rows;
+  else {
+    if (!presencesEnCours) {
+      presencesEnCours = (async () => json(await appel(dep, `app_data?id=like.presence_*&select=${SELECT_PRESENCE}&limit=20`, { headers: dep.entetes(), cache: 'no-store' })))()
+        .then((r) => { if (Array.isArray(r)) presencesLues = { at: Date.now(), rows: r }; return r; }, () => null)
+        .finally(() => { presencesEnCours = null; });
+    }
+    rows = await presencesEnCours;
+  }
   return rows ? rows.map((r) => adistPresence(r, maintenant)).filter(Boolean) : null;
 }
 // Dépose UNE commande. Une commande qui attend déjà pour le MÊME geste sur la MÊME chose (`cle`) n'est pas doublée :

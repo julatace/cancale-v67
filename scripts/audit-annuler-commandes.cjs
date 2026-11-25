@@ -77,10 +77,24 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
 
   // D. Gardées : extérieures ou irréversibles
   const ebay = sans(lire('src/ecrans/Ebay.jsx')), rep = sans(lire('src/ecrans/Republier.jsx'));
+  const PORTE = require('./_porte-agir.cjs');
+  const AGIR = sans(lire('src/agir/Agir.jsx'));
+  const corpsDe = (t, debut) => { const i = t.indexOf(debut); if (i < 0) return ''; const j = t.indexOf('\nexport ', i + 1); return t.slice(i, j < 0 ? i + 3000 : j); };
+  const supLbc = await PORTE.regle({
+    code: (L.match(/const supprimerSurLbc = \(r\) => [^\n]*/) || [''])[0] + '\n' + corpsDe(AGIR, 'export function supprimerLbcAgir('),
+    porte: /supprimerLbcAgir\(r, \{ confirmer: askConfirm[\s\S]*agirOuPanneau\(\{ site: 'leboncoin', compte: compteLbcDe\(r\), geste: 'supprimer'[\s\S]*args: \{ id: String\(r\.id\)[\s\S]*confirmer: \(\) => \(typeof confirmer === 'function' \? confirmer\(\{ title: tr\('agir\.lbc\.supprimerTitre'/,
+    repli: /panneau: \(\) => ouvrirPanneau\(\{ site: 'leboncoin'[^\n]*ids: \[String\(r\.id\)\], action: 'supprimer' \}\)/ });
+  const accOffre = await PORTE.regle({
+    code: (A.match(/<GestesOffreVinted compte=\{[^\n]*/) || [''])[0] + '\n' + corpsDe(AGIR, 'export function GestesOffreVinted('),
+    porte: /<GestesOffreVinted compte=\{String\(openConv\.acc\?\.vinted_user_id\|\|''\)\} tx=\{off\.tx\} oid=\{off\.oid\}[\s\S]*envoyerGeste\(\{ \.\.\.base, distGeste, args, confirme \}\)[\s\S]*onClick=\{\(\) => setConfirmer\(true\)\}[\s\S]*partir\('accepter', \{ \.\.\.ids, prix \}, true\)/,
+    repli: /<BoutonAgir \{\.\.\.base\} par="file"/ });
+
   const gardees = [
     // (20 nov., décision de Julien) Supprimer de Leboncoin et accepter une offre se font dans le PANNEAU de l'extension, qui
     // demande sa confirmation : l'app n'ouvre que le lien (audit-actions-app : elle n'envoie rien).
-    ['Supprimer de Leboncoin (dans l’extension)', /ouvrirPanneau\(\{ site: 'leboncoin', page: 'annonces', ids, action: 'supprimer' \}\)/.test(A)],
+    // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) depuis VRM par la porte : SA confirmation « sans retour » d'abord,
+    // puis une commande pour CETTE annonce ; pas connecté ⇒ le panneau sur CETTE annonce (src/agir/Agir.jsx `supprimerLbcAgir`).
+    ['Supprimer de Leboncoin (depuis VRM par la porte, sinon le panneau)', supLbc.ok, supLbc.detail],
     // (11 nov., Julien : « inadmissible », 087bcf86) plus de confirmation « N sur M contrôlés » à chaque impression ;
     // reste la confirmation de tamponner un bordereau DÉJÀ téléchargé (un carton tamponné ne se défait pas).
     ['Tamponner un bordereau téléchargé', /askConfirm\(\{ title: `Tamponner le bordereau téléchargé il y a \$\{mins\} min \?`/.test(A)],
@@ -89,7 +103,7 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
     // (14 nov., impression-simple) « Imprimer » : un PDF préparé ne sert que si sa signature (N°, état, compte de chaque
     // bordereau) est LA MÊME au toucher ; après une attente, chaque ligne est recomparée — sinon rien ne s'ouvre.
     ['Lot changé refusé avant impression', /const sigImpr = \(lignes, format, tampons\) =>/.test(A) && /const maintenant = new Map\(lignesLot(?:Tous|Impression)\(\)\.map\(\(l\) => \[l\.cle, sigLigneLot\(l\)\]\)\);\s*if \(choisies\.some\(\(l\) => maintenant\.get\(l\.cle\) !== sigLigneLot\(l\)\)\) throw new Error\([^;]*\);/.test(A) && !/askConfirm\(\{title:'Vérifier les articles avant impression'/.test(A)],
-    ['Accepter une offre Vinted (dans l’extension)', /<BoutonExtension className="vrm-chat-btn vrm-chat-btn-p" action="offres"/.test(A)],
+    ['Accepter une offre Vinted (depuis VRM par la porte, confirmée ; sinon éteint avec sa raison)', accOffre.ok, accOffre.detail],
     ['Acceptation auto des offres', /askConfirm\(\{ title: 'Accepter les offres tout seul sur Vinted \?'/.test(A)],
     ['Supprimer une annonce eBay', /askConfirm\(\{title:'Supprimer cette annonce d’eBay \?'/.test(ebay)],
     ['Mettre un brouillon en ligne (Vinted)', /askConfirm\(\{ title: 'Mettre ce brouillon en ligne \?'/.test(rep)],
@@ -99,7 +113,7 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
     ['Restaurer une sauvegarde', /askConfirm\(`Restaurer cette sauvegarde \?/.test(A)],
     ['Vestiaire « Un seul N° »', /title: `Un seul N° : N°\$\{numVinted\}`/.test(A)],
   ];
-  for (const [nom, c] of gardees) dit(c, `D la confirmation reste : ${nom}`);
+  for (const [nom, c, d] of gardees) dit(c, `D la confirmation reste : ${nom}`, d);
   dit(!/Vérifier les articles avant impression/.test(A) && !/Préparer quand même les PDF/.test(A), 'D2 plus de confirmation « contrôlés » à chaque impression (Julien, 11 nov.)');
   dit(M.CONFIRMATIONS.filter((c) => c.decision === 'annuler').length === 8 && M.CONFIRMATIONS.every((c) => c.pourquoi && c.geste && ['annuler', 'gardee', 'corbeille'].includes(c.decision)), 'D l’inventaire dit chaque décision et sa raison', String(M.CONFIRMATIONS.length));
 
