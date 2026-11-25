@@ -273,8 +273,17 @@ async function poserMutation(pg) {
           if (style) dit(m.style === style && attendu && m.fond.toUpperCase() === attendu.toUpperCase() && (m.theme === 'dark') === sombre, `A ${cle} : le style est appliqué (data-style, --n-fond ${attendu})`, { style: m.style, fond: m.fond, theme: m.theme });
           else dit(!m.style, `A ${cle} : sans choix, aucun style posé (le défaut inchangé)`, m.style);
           dit(m.nTextes > 5 && m.nContraste === 0, `B ${cle} : chaque texte tient 4,5:1 (3:1 en grand) — ${m.nTextes} textes`, m.contraste);
-          const shot = await o.pg.screenshot();
-          const boites = await o.pg.evaluate(BOITES);
+          // (25 nov.) La capture et les boîtes doivent décrire LE MÊME écran : une carte qui arrive entre les deux (« N° à
+          // écrire », posée quand la numérotation finit) décalait les boîtes sur un fond uni de la capture ⇒ « 1,00 » faux.
+          // Boîtes lues AVANT et APRÈS la capture ; différentes ⇒ l'écran bougeait : on attend et on recommence (3 fois).
+          let shot = null, boites = [];
+          for (let essai = 0; essai < 3; essai++) {
+            const avant = JSON.stringify(await o.pg.evaluate(BOITES));
+            shot = await o.pg.screenshot();
+            boites = await o.pg.evaluate(BOITES);
+            if (JSON.stringify(boites) === avant) break;
+            await o.pg.waitForTimeout(800);
+          }
           const px = await o.pg.evaluate(PIXELS, { png: shot.toString('base64'), boites, dsf: 2 });
           const pxKo = px.filter((p) => p.k < 4.5 - 0.05 && !(p.s === '.n-grand-titre' && p.k >= 3));
           dit(px.length >= 1 && !pxKo.length, `B ${cle} : sur les PIXELS, plein, étiquettes, N°, titres, onglet actif ≥ 4,5:1 — ${px.length} boîtes (min ${px.length ? Math.min(...px.map((p) => p.k)).toFixed(2) : '—'})`, pxKo.slice(0, 8));
