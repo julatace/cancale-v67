@@ -30,6 +30,12 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (25 nov., logo-vinted-pp — Julien : « le logo de Vinted, mais pour le compte la pp du compte Vinted ») docs/passation/2026-11-25-logo-vinted-pp.md
   { id: 'logo-vinted-pp', date: '2026-11-25', titre: 'Chaque compte avec sa photo de profil', phrase: 'Le V Vinted en couleur, puis la photo du compte.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (25 nov., style-c3 — Julien : « fait un mélange c3 vintex », « le gris de fond un peu foncé ») docs/passation/2026-11-25-style-c3.md
+  { id: 'style-c3-doux', date: '2026-11-25', titre: 'Un douzième style : C3', phrase: 'Gris un peu foncé, cartes blanches, boutons nets : à essayer.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (25 nov., chargement-propre — Julien : « je dois fermer l'app et la rouvrir pour avoir les nouvelles infos ») docs/passation/2026-11-25-chargement-propre.md
+  { id: 'maj-sans-relancer', date: '2026-11-25', titre: 'Les nouvelles infos arrivent seules', phrase: 'Vente, e-mail, retour sur l’app : à jour sans la rouvrir.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (25 nov., chargement-propre — Julien : « quand les données s'affichent c'est moche, long et déstructuré ») même récit
+  { id: 'chargement-propre', date: '2026-11-25', titre: 'Les écrans se remplissent sans sauter', phrase: 'Un chiffre pas encore lu se dessine, rien ne bouge.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (24 nov., suivi-ventes — Julien : « retrait des articles vendus, fais un vrai suivi ») docs/passation/2026-11-24-suivi-ventes.md
   { id: 'suivi-envois', date: '2026-11-24', titre: 'Tes colis vendus, du dépôt au versement', phrase: 'Au point, retiré, argent versé : chaque étape lue, datée.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (24 nov., lot retrait-parfait — Julien : « pour le retrait tu dois vraiment faire quelque chose de parfait ») docs/passation/2026-11-24-retrait-parfait.md

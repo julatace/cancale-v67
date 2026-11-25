@@ -1,0 +1,77 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   C3 DOUX (mélange C3 × Vintex) — le 12e style à essayer (25 nov. 2026, Julien : « fait un mélange c3 vintex », « je veux que le gris de fond soit
+   un peu foncé », « on doit mieux distinguer les boutons », « très peu de texte »). docs/passation/2026-11-25-style-c3.md
+   • Chargé SEULEMENT quand ce style est choisi (src/natif/styleChoix.js, `import()` à la demande) : le démarrage des autres
+     styles ne pèse rien de plus. Les COULEURS sont des jetons (scripts/styles-generer.cjs → styles-choix-jetons.css) ; ici, la
+     FORME seulement : plaque du N° gravée, chaussures posées sur une plaque, barre du bas en capsule flottante, colonne de gauche
+     calme, rangées qui se touchent marquées d'une flèche.
+   • Même couche que la famille de boutons (`vrm-styles`, déjà nommée par styles-choix.css, donc après `vrm-natif`) : ces règles
+     passent après elle, sans `!important`. Aucune règle ne change un nombre, un texte ni un attribut : du CSS seulement.
+   • Rien d'orange, rien de violet, aucun bleu vif ; l'accent (ardoise) reste rare ; rouge = deux paires sous un N°.
+   ══════════════════════════════════════════════════════════════════════════ */
+@layer vrm-styles {
+:root[data-style="c3doux"]:not([data-style=""]) {
+  --c3-creux: inset 0 1px 2px rgb(16 24 40 / .16), inset 0 0 0 1px rgb(16 24 40 / .07);
+  --c3-plaque-photo: linear-gradient(180deg, #F4F5F7 0%, #E6E9ED 100%);
+  --c3-arete: inset 0 1px 0 rgb(255 255 255 / .9), 0 0 0 1px rgb(16 24 40 / .06);
+  --c3-capsule: rgb(255 255 255 / .92);
+  --c3-capsule-ombre: 0 0 0 1px rgb(16 24 40 / .06), 0 1px 2px rgb(16 24 40 / .06), 0 14px 32px -12px rgb(16 24 40 / .28);
+}
+:root[data-theme="dark"][data-style="c3doux"], :root[data-theme="dark"] [data-style="c3doux"] {
+  --c3-creux: inset 0 1px 2px rgb(0 0 0 / .55), inset 0 0 0 1px rgb(255 255 255 / .06);
+  --c3-plaque-photo: linear-gradient(180deg, #2A2C32 0%, #212328 100%);
+  --c3-arete: inset 0 1px 0 rgb(255 255 255 / .06), 0 0 0 1px rgb(255 255 255 / .05);
+  --c3-capsule: rgb(28 29 33 / .92);
+  --c3-capsule-ombre: 0 0 0 1px rgb(255 255 255 / .07), 0 14px 32px -12px rgb(0 0 0 / .7);
+}
+
+/* ── le N° : une plaque GRAVÉE (creusée dans la carte), chiffres tabulaires un peu plus serrés ── */
+:root[data-style="c3doux"]:not([data-style=""]) .n-plaque { box-shadow: var(--c3-creux); letter-spacing: -.1px; }
+:root[data-style="c3doux"]:not([data-style=""]) .n-plaque-prefixe { opacity: .72; }
+:root[data-style="c3doux"]:not([data-style=""]) .n-plaque[data-n-doublon] { box-shadow: none; }
+
+/* ── les chaussures sur une PLAQUE : un fond clair dégradé, une arête claire en haut, un cheveu autour ── */
+:root[data-style="c3doux"]:not([data-style=""]) .n-vignette { background: var(--c3-plaque-photo); box-shadow: var(--c3-arete); }
+:root[data-style="c3doux"]:not([data-style=""]) .n-vignette-vide { color: var(--n-encre-3); }
+
+/* ── les étiquettes d'état : pastel franches (comme Vintex), sans point devant ── */
+:root[data-style="c3doux"]:not([data-style=""]) .n-pastille { height: 20px; padding: 0 8px; font-weight: 600; }
+:root[data-style="c3doux"]:not([data-style=""]) .n-pastille[data-n-ton="accent"]::before { content: none; }
+
+/* ── les rangées : la flèche se lit (encre-2, pas un gris muet) ; la rangée enfoncée se voit ── */
+:root[data-style="c3doux"]:not([data-style=""]) .n-rangee-fin { color: var(--n-encre-2); }
+:root[data-style="c3doux"]:not([data-style=""]) .n-rangee-chevron { opacity: .9; }
+
+/* ── les grands titres : plus serrés, plus nets (C3) ── */
+:root[data-style="c3doux"]:not([data-style=""]) .n-grand-titre { letter-spacing: -.03em; }
+
+/* ── la barre du bas : une CAPSULE flottante, détachée du bord, l'onglet actif sur une pastille blanche en relief ── */
+@media (max-width: 1023px) {
+  :root[data-style="c3doux"]:not([data-style=""]) .n-onglets {
+    left: 10px; right: 10px; bottom: calc(var(--n-bas-sur) + 6px); height: calc(var(--n-h-onglets) + 8px); padding: 4px;
+    border-radius: 26px; background: var(--c3-capsule); box-shadow: var(--c3-capsule-ombre);
+  }
+  :root[data-style="c3doux"]:not([data-style=""]) .n-coque[data-n-defile="ecran"] > .n-onglets { margin: 4px 10px calc(var(--n-bas-sur) + 6px); left: auto; right: auto; bottom: auto; }
+  :root[data-style="c3doux"]:not([data-style=""]) .n-onglet { height: var(--n-h-onglets); border-radius: 22px; }
+  :root[data-style="c3doux"]:not([data-style=""]) .n-onglet[aria-current="page"] { background: var(--g-onglet-fond, var(--n-carte-2)); box-shadow: 0 1px 2px rgb(16 24 40 / .10), inset 0 0 0 1px rgb(16 24 40 / .05); }
+  :root[data-style="c3doux"]:not([data-style=""]) .n-onglet[aria-current="page"] .n-onglet-icone { background: transparent; }
+}
+:root[data-theme="dark"][data-style="c3doux"] .n-onglet[aria-current="page"] { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08); }
+
+/* ── la colonne de gauche (ordinateur) : un aplat calme, l'entrée active en carte blanche à ombre douce ── */
+:root[data-style="c3doux"]:not([data-style=""]) .n-laterale { background: var(--n-laterale); }
+:root[data-style="c3doux"]:not([data-style=""]) .n-laterale-entree[aria-current="page"] { background: var(--n-carte); color: var(--n-encre); box-shadow: var(--g-carte-ombre); }
+:root[data-style="c3doux"]:not([data-style=""]) .n-laterale-entree[aria-current="page"] .n-laterale-icone { color: var(--n-encre); }
+
+/* ── le contrôle segmenté : un rail GRIS doux sans contour, le choix sur une pastille BLANCHE en relief (comme iOS) ── */
+:root[data-style="c3doux"]:not([data-style=""]) .n-segmente { background: var(--g-puce-fond, var(--n-carte-2)); box-shadow: none; }
+:root[data-style="c3doux"]:not([data-style=""]) .n-segmente-curseur { background: var(--n-carte); box-shadow: 0 1px 2px rgb(16 24 40 / .14), 0 0 0 .5px rgb(16 24 40 / .06); }
+:root[data-theme="dark"][data-style="c3doux"] .n-segmente-curseur { background: #4A4D55; box-shadow: 0 1px 2px rgb(0 0 0 / .5); }
+
+/* ── la carte du haut d'Aujourd'hui : BLANCHE comme les autres (plus de dégradé gris), une arête d'ardoise en haut (C3) ── */
+:root[data-style="c3doux"]:not([data-style=""]) .n-heros { background: var(--n-carte); box-shadow: var(--g-carte-ombre), inset 0 1.5px 0 rgb(52 80 110 / .45); }
+:root[data-theme="dark"][data-style="c3doux"] .n-heros { box-shadow: var(--g-carte-ombre), inset 0 1.5px 0 rgb(169 188 211 / .45); }
+
+/* ── l'anneau (Ma journée) : l'ardoise, un trait plus franc ── */
+:root[data-style="c3doux"]:not([data-style=""]) .n-anneau-plein { stroke: var(--n-accent); }
+}
