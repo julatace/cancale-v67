@@ -39,14 +39,22 @@ export function TuilePaire({ photo = '', numero = '', icone = '', genre = '', Ic
   const refTuile = React.useRef(null);
   // (« sans latence ») vérifié AVANT la première peinture : une image en cache n'est jamais cachée, même une image.
   const avantPeinture = typeof window === 'undefined' ? React.useEffect : React.useLayoutEffect;
+  // (25 nov., régressions — capture iPhone de Julien : les photos de « Dernières ventes » devenues BLANCHES en défilant) Une tuile
+  // qui a DÉJÀ montré sa photo ne la cache plus jamais : quand l'adresse change (la relecture au retour sur l'app rend une adresse
+  // Vinted neuve, signée autrement), l'ancien fondu remettait l'image à opacité 0 en attendant un `load` qui, pour une image
+  // `loading="lazy"` dans un défilement de côté sur iPhone, peut ne jamais venir. Et un `load` manqué (image finie entre le rendu
+  // et l'écoute) est rattrapé à l'image suivante.
+  const dejaMontree = React.useRef(false);
+  if (charge) dejaMontree.current = true;
   avantPeinture(() => {
     setRate(false);
     const el = refTuile.current; if (!el) return undefined;
     const vu = () => setCharge((c) => (c === 'deja' ? c : true));
     el.addEventListener('load', vu, true);   // `load` ne remonte pas : écouté en capture sur la tuile (l'<img> peut changer de source)
-    let deja = false; try { const im = el.querySelector('img'); deja = !!(im && im.complete && im.naturalWidth); } catch (_) {}
-    setCharge(deja ? 'deja' : false);
-    return () => el.removeEventListener('load', vu, true);
+    const finie = () => { try { const im = el.querySelector('img'); return !!(im && im.complete && im.naturalWidth); } catch (_) { return false; } };
+    setCharge(finie() || dejaMontree.current ? 'deja' : false);
+    const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => { if (finie()) vu(); }) : 0;
+    return () => { el.removeEventListener('load', vu, true); if (raf) cancelAnimationFrame(raf); };
   }, [photo]);
   const avecPhoto = !!photo && !rate;
   return (

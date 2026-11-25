@@ -354,8 +354,8 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   };
   const articleGestes = gestesDe ? liste.find((x) => x.cle === gestesDe) || null : null;
   const gestesOuverts = articleGestes ? lesGestes(articleGestes) : [];
-  const carte = (a, cleCompte, rv = null) => (
-    <CarteAnnonce key={a.cle + '|' + cleCompte} a={a} revele={rv} groupe onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon}
+  const carte = (a, cleCompte, rv = null, etatDit = null) => (
+    <CarteAnnonce key={a.cle + '|' + cleCompte} a={a} revele={rv} groupe etatDit={etatDit} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon}
       Photo={Photo} dort={dortDe && !A ? dortDe(a) : null} plusVue={plusVueDe && !A ? plusVueDe(a) : null}
       selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), onBascule: () => basculer(a) } : null}
       attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined, 'data-eg-compte': cleCompte }}/>
@@ -372,13 +372,22 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
     }
     return out.length ? out : null;
   };
-  const rangeeTel = (a, cleCompte, rv = null) => (
-    <RangeeArticle key={a.cle + '|' + cleCompte} a={a} forme={formeRangee} groupe revele={rv} rapides={rapidesDe(a)} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte}
+  const rangeeTel = (a, cleCompte, rv = null, etatDit = null) => (
+    <RangeeArticle key={a.cle + '|' + cleCompte} a={a} forme={formeRangee} groupe etatDit={etatDit} revele={rv} rapides={rapidesDe(a)} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte}
       nomSite={nomSite} Icon={Icon} Photo={Photo} plusVue={plusVueDe && !A ? plusVueDe(a) : null} selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), onBascule: () => basculer(a) } : null}
       attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined, 'data-eg-compte': cleCompte }}/>
   );
+  // (25 nov., régressions — capture iPhone de Julien : « Pas revue récemment » écrit sur CHAQUE rangée) Une même phrase sur
+  // chaque ligne est UNE phrase, dans l'en-tête du groupe (CLAUDE.md §7) : dès que deux rangées d'un compte portent le même
+  // état « à confirmer », l'en-tête le dit une fois (avec leur nombre quand ce ne sont pas toutes) ; chaque rangée concernée ne
+  // garde qu'un point discret (son nom au lecteur d'écran). Aucune règle ne change : c'est l'état de `bandeauDe`.
+  const etatGroupe = (g) => {
+    const k = g.articles.filter((a) => bandeauDe(a) === 'aconfirmer').length;
+    return k >= 2 ? { cle: 'aconfirmer', n: k, tous: k === g.articles.length } : null;
+  };
   const enTeteCompte = (g, n) => {
     const titre = g.cle === 'sans' ? tr('egalite.groupe.sansCompte') : (g.pseudo || ('#' + g.compte));
+    const eg = etatGroupe(g);
     const ouvertG = !replis.has(g.cle);
     const bloque = g.articles.length > 0 && g.articles.every((x) => x.annonces.some((y) => y.etat === 'bloque' && (y.site + ':' + y.compte) === g.cle));
     const trace = bloque ? g.articles.map(traceDe).filter((t) => t && t.le != null).sort((x, y) => y.le - x.le)[0] || null : null;
@@ -390,6 +399,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
           <span className="n-ad-compte-nom">{titre}<span className="n-ad-compte-n"> · {n}</span></span>
           {g.site ? <span className="n-eg-sr"> · {nomSite(g.site)} · {tr('egalite.groupe.n', { n })}</span> : null}
           {bloque ? <span className="n-ad-etiquette" data-ad-bandeau="bloque">{tr('tableau.etat.bloque')}</span> : null}
+          {!bloque && eg ? <span className="n-ad-etiquette" data-ad-bandeau={eg.cle} data-ad-etat-groupe={String(eg.n)}>{tr('tableau.etat.' + eg.cle) + (eg.tous ? '' : ' · ' + eg.n)}</span> : null}
           <span className="n-ad-chevron" data-ouvert={ouvertG ? '1' : '0'} aria-hidden="true"><Glyphe nom="chevron" taille={16}/></span>
         </button>
         {bloque && ouvertG ? <p className="n-ad-phrase" data-ad-phrase-bloque="">{trace ? tr('egalite.d.bloque.phraseDate', { d: texteTrace(trace) }) : tr('egalite.d.bloque.phrase')}</p> : null}
@@ -435,7 +445,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
             onClick={() => setPuce((p) => (p === 'compte:' + g.cle ? '' : 'compte:' + g.cle))}><span className="n-ad-puce-pilule"><AvatarCompte pseudo={g.pseudo || g.compte} cle={g.cle} petit/>{g.pseudo || ('#' + g.compte)}</span></Puce>) : null}
         </div> : null}
         {(travail || aReglerTel) && !A && !ordinateur ? <div className="n-ad-maj" data-ad-maj={!travail ? 'aucun' : majLe === undefined ? 'lecture' : majLe == null ? 'passu' : 'lu'}>
-          <span className="n-ad-maj-texte" {...(attrsAttente(!!travail && majLe === undefined, 'valeur') || {})}>{travail ? depuisMaj(majLe, maintenantMaj) : ''}</span>
+          <span className="n-ad-maj-texte" data-copie-vide="" {...(attrsAttente(!!travail && majLe === undefined, 'valeur') || {})}>{travail ? depuisMaj(majLe, maintenantMaj) : ''}</span>
           {aReglerTel}
           {travail && travail.onRafraichir ? <BoutonIcone libelle={tr('tableau.rafraichir')} indisponible={!!travail.rafraichit} icone={Icon ? <Icon name="sync" size={18}/> : null}
             onClick={() => { if (!travail.rafraichit) travail.onRafraichir(); }} className="n-ad-rafraichir" attrs={{ 'data-ad-rafraichir': '', 'aria-busy': travail.rafraichit ? 'true' : undefined }}/> : null}
@@ -459,8 +469,8 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
                 <section key={g.cle} className="n-ad-section" data-eg-groupe={g.cle} data-eg-groupe-n={String(n)}>
                   {enTeteCompte(g, n)}
                   {ouvertG ? <>
-                    {vueG ? <GrilleInventaire items={g.articles} cle={(a) => a.cle + '|' + g.cle} rendu={(a, i, rv) => carte(a, g.cle, rv)} corps={96} revele={enArrivee} debut={debutDe(g.cle)} attrs={{ 'data-ad-grille': g.cle }}/>
-                      : <GrilleInventaire items={g.articles} ligne={72} gap={0} cle={(a) => a.cle + '|' + g.cle} rendu={(a, i, rv) => rangeeTel(a, g.cle, rv)} revele={enArrivee} debut={debutDe(g.cle)} className="n-ar-liste" attrs={{ 'data-ad-forme': formeRangee, 'data-ad-liste-compte': g.cle }}/>}
+                    {vueG ? <GrilleInventaire items={g.articles} cle={(a) => a.cle + '|' + g.cle} rendu={(a, i, rv) => carte(a, g.cle, rv, etatGroupe(g))} corps={96} revele={enArrivee} debut={debutDe(g.cle)} attrs={{ 'data-ad-grille': g.cle }}/>
+                      : <GrilleInventaire items={g.articles} ligne={72} gap={0} cle={(a) => a.cle + '|' + g.cle} rendu={(a, i, rv) => rangeeTel(a, g.cle, rv, etatGroupe(g))} revele={enArrivee} debut={debutDe(g.cle)} className="n-ar-liste" attrs={{ 'data-ad-forme': formeRangee, 'data-ad-liste-compte': g.cle }}/>}
                   </> : null}
                 </section>);
             })}</div>}

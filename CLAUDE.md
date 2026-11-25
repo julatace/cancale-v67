@@ -485,7 +485,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **25 nov. soir · Sombre par défaut (`claude/sombre-par-defaut`, Julien : « La deuxième couleur est pas mal, mets en mode sombre »)** : aucun choix ⇒ sombre (règle, démarrage, `<html data-theme="dark">`, theme-color et manifeste #1C1C20) ; Clair/Sombre/Auto/Le soir déjà posés inchangés. `historique-interface-stock.md` (fin). Geste : aucun.
+- **25 nov. soir · Sombre par défaut (`claude/sombre-par-defaut`, Julien : « La deuxième couleur est pas mal, mets en mode sombre »)** : aucun choix ⇒ sombre (règle, démarrage, `<html>`, theme-color, manifeste #1C1C20) ; un choix déjà posé ne change pas. `historique-interface-stock.md` (fin). Geste : aucun.
+- **25 nov. · Régressions iPhone (`claude/regressions-25nov`)** : 3 cartes grises d'Aujourd'hui (versements eBay en attente muette), barre du haut opaque, ligne d'une vente en rangée (ordre des feuilles), « Pas revue récemment » une fois par compte, copie sans squelette ni heure. `2026-11-25-regressions.md`, banc `regressions-25nov`. Geste : aucun.
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier

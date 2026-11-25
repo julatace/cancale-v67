@@ -10,11 +10,16 @@
    Jetons seulement (src/natif/jetons.css) ; ni `!important`, ni `:has()`. */
 @layer vrm-natif {
   /* ── La ligne sous le titre (téléphone) ── */
-  .n-vt-ligne { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; margin-top: 2px; color: var(--n-encre-2); }
-  .n-vt-ligne .n-pastille { height: 22px; padding: 0 8px; font: var(--n-t-legende-fort); }
+  /* (25 nov., régressions — capture iPhone de Julien : prix, « Livrée » et logo EMPILÉS, une rangée de 360 px) La ligne porte AUSSI
+     `.n-vt-valeur` (la colonne du tableau, src/natif/tableau.css, MÊME couche) : seul l'ORDRE des feuilles départageait. Quand
+     cette feuille (morceau à la demande) arrive AVANT celle de l'app — la copie de l'écran la pose avant l'app
+     (src/copieEcran.js `feuillesDocument`), un préchargement au repos aussi — la colonne gagnait. La ligne gagne par sa
+     spécificité (`.n-vt-valeur.n-vt-ligne`), quel que soit l'ordre (banc regressions-25nov R). */
+  .n-vt-ligne, .n-vt-valeur.n-vt-ligne { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; margin-top: 2px; color: var(--n-encre-2); }
+  .n-vt-ligne .n-pastille, .n-vt-valeur.n-vt-ligne .n-pastille { height: 22px; padding: 0 8px; font: var(--n-t-legende-fort); }
   .n-vt-ligne-prix { font: var(--n-t-second-fort); font-variant-numeric: tabular-nums; color: var(--n-encre); white-space: nowrap; }
   .n-vt-ligne-fin { font: var(--n-t-legende); color: var(--n-encre-2); white-space: nowrap; }
-  .n-vt-ligne .n-vt-logo { margin-left: 0; }
+  .n-vt-ligne .n-vt-logo, .n-vt-valeur.n-vt-ligne .n-vt-logo { margin-left: 0; }
   .n-vt-ligne .n-vt-limite { font: var(--n-t-legende); }
   .n-vt-ligne .n-vt-limite[data-vt-ambre="1"] { font: var(--n-t-legende-fort); }
   /* Le titre d'une vente : 15/20 fort (l'information principale de la rangée), deux lignes entières puis « … ». */

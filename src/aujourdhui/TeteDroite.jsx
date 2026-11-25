@@ -42,7 +42,7 @@ export default function TeteDroite({ Icon }) {
   const nb = Number.isFinite(n) && n > 0 ? n : 0;
   return (
     <div className="n-tb-droite" data-tete-droite="">
-      {lue ? <span className="n-tb-lu" data-tete-lu={String(lue)}><span className="n-tb-lu-point" aria-hidden="true"/>{tr('tete.lu', { quand: ilYaLu(lue) })}</span> : null}
+      {lue ? <span className="n-tb-lu" data-copie-vide="" data-tete-lu={String(lue)}><span className="n-tb-lu-point" aria-hidden="true"/>{tr('tete.lu', { quand: ilYaLu(lue) })}</span> : null}
       <BoutonIcone libelle={tr('tete.relire')} icone={<Icon name="sync" size={18}/>} onClick={relire} className="n-tb-rond" attrs={{ 'data-tete-relire': relit ? '1' : '0' }}/>
       <BoutonIcone libelle={tr('tete.chercher')} icone={<Icon name="search" size={18}/>} onClick={() => envoyer('vrm:recherche-ouvrir')} className="n-tb-rond" attrs={{ 'data-tete-chercher': '' }}/>
       <BoutonIcone libelle={nb ? tr('tete.notifsN', { n: nb }) : tr('tete.notifs')} icone={<Icon name="bell2" size={18}/>} onClick={() => envoyer('vrm:centre-notifs')} className="n-tb-rond"
