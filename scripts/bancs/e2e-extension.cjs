@@ -275,15 +275,14 @@ const lirePanneau = (pp, id) => panneau(pp, (R, id) => {
     prix: !!R.querySelector(`[data-prix-nouveau="${id}"]`), ligne: ligne ? ligne.innerText.replace(/\s+/g, ' ') : '', aa: !!R.querySelector('[data-aa-vue]'), garde: !!R.querySelector('[data-garde-oui]'),
     etat: etat ? { ok: etat.getAttribute('data-geste-etat'), texte: etat.textContent } : null };
 }, id);
-// Dans le panneau : « Baisser le prix » (le menu des actions, la paire déjà cochée par le lien), SON prix tapé, « Revoir »,
-// puis « Lancer » sur la feuille Avant | Après (et, si la garde le demande, SA confirmation du chiffre). Rend l'état lu.
+// Dans le panneau : le lien de l'app l'ouvre DIRECTEMENT sur la feuille du prix de la paire (5.440.4 ; aucun menu à
+// re-choisir — le banc ne touche pas au menu, il le verrait), SON prix tapé, « Revoir », puis « Lancer » sur la feuille
+// Avant | Après (et, si la garde le demande, SA confirmation du chiffre). Rend l'état lu.
 async function lancerDansPanneau(ctx, pp, id, prix) {
   await pp.bringToFront();
   await repondreQuestionCompte(pp, 3000);
-  const avant = await attendreQue(async () => { const l = await lirePanneau(pp, id); return l && l.pret && l.coches.length ? l : null; }, 30000, 400) || await lirePanneau(pp, id);
-  if (!avant || !avant.coches.includes(String(id))) return { avant, lance: false };
-  await panneau(pp, (R) => { const s = R.querySelector('[data-ann-action]'); s.value = 'baisser'; s.dispatchEvent(new Event('change')); });
-  await attendreQue(async () => { const l = await lirePanneau(pp, id); return l && l.prix ? l : null; }, 10000, 300);
+  const avant = await attendreQue(async () => { const l = await lirePanneau(pp, id); return l && l.prix ? l : null; }, 30000, 400) || await lirePanneau(pp, id);
+  if (!avant || !avant.prix) return { avant, lance: false };
   await panneau(pp, (R, a) => { const c = R.querySelector(`[data-prix-nouveau="${a.id}"]`); c.value = a.prix; c.dispatchEvent(new Event('input')); c.dispatchEvent(new Event('change')); }, { id: String(id), prix: String(prix).replace('.', ',') });
   await panneau(pp, (R) => { const b = R.querySelector('[data-prix-confirmer]'); if (b) b.click(); });
   const aa = await attendreQue(async () => { const l = await lirePanneau(pp, id); return l && l.aa ? l : null; }, 10000, 300);
@@ -434,7 +433,7 @@ const fermerPanneauPg = async (pp) => { if (pp) await pp.close().catch(() => {})
       await capture(pp, '4-panneau');
       const diag4 = await dansSW(ctx, ID, async () => ({ cache: typeof _infosPage !== 'undefined' && _infosPage ? { age: Date.now() - _infosPage.at, n: Object.keys(_infosPage.parId || {}).length } : null }));
       const hv = M.ligne('harvest_111_listings');
-      dit(!!lp.avant && lp.avant.coches.includes('91010001') && lp.avant.action === 'baisser', '4 : le panneau s’ouvre sur vinted.fr, la paire cochée, « Baisser » pré-choisi', JSON.stringify({ avant: lp.avant, diag4, rangees: hv ? (hv.data.payload.items || []).length : null }));
+      dit(!!lp.avant && lp.avant.prix && /Nike Cortez/.test(lp.avant.ligne), '4 : le panneau s’ouvre sur vinted.fr, directement sur la feuille du prix de CETTE paire (aucun menu à re-choisir)', JSON.stringify({ avant: lp.avant, diag4, rangees: hv ? (hv.data.payload.items || []).length : null }));
       dit(!!lp.aa && nAvantLancer() <= 1, '4 : avant / après montré avant SON « Lancer »', JSON.stringify(lp.aa));
       const cmd = await attendreQue(async () => { const c = commandePrix(M, 91010001, t0); return c && !['attente', 'pris'].includes(c.data.etat) ? c : null; }, 90000, 500) || commandePrix(M, 91010001, t0);
       await capture(pp, '4-panneau-apres');
