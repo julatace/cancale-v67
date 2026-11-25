@@ -175,6 +175,9 @@ const ouvrir = async (b, vp, sombre) => {
         if (process.env.JR_DBG) console.log('GAP', await pg.evaluate(() => { const d = document.querySelector('.vrm-rpf-verifier'); const y0 = d ? d.getBoundingClientRect().bottom : 0; return [...document.querySelectorAll('.vrm-main *')].filter((e) => { const r = e.getBoundingClientRect(); return r.height > 0 && r.top >= y0 - 1 && r.top < y0 + 90 && !e.closest('[data-colis-retraits]'); }).slice(0, 12).map((e) => `${Math.round(e.getBoundingClientRect().top)}/${Math.round(e.getBoundingClientRect().height)} mb${getComputedStyle(e).marginBottom} ${e.tagName}.${String(e.className).slice(0, 40)} ${[...e.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ')}`).join('\n'); }));
         // (9 nov., lot AG) la fraîcheur des comptes : la ligne UNIQUE du haut de l'app (plus de puce sur Colis).
         await pg.waitForFunction(() => { const e = document.querySelector('[data-fraicheur-unique]'); return e && !['encours', 'charge'].includes(e.getAttribute('data-fraicheur-unique')); }, null, { timeout: 25000 }).catch(() => {});
+        // (25 nov.) La pastille d'Achats se pose APRÈS la publication de `vrm_colis_retirer` (un rendu de la coque) : on attend
+        //    qu'elle soit là (8 s au plus, sur la condition, jamais un délai fixe) avant de juger — vu « null / 6 » une fois en CI.
+        await pg.waitForFunction(() => { const p = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); if (!p || !Number(p.total)) return true; const e = document.querySelector('[data-nav-entree="achats"] .vrm-nav-badge-n, [data-nav-entree="achats"] .n-pastille'); return !!(e && (e.textContent || '').replace(/\D/g, '')); }, null, { timeout: 8000 }).catch(() => {});
         const m = await pg.evaluate(() => {
           const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
           const main = document.querySelector('.vrm-main');
