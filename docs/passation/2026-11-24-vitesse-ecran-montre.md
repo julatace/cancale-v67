@@ -276,3 +276,23 @@ Argent est maintenant ≤ A (5 paires sur 7). ⚠️ Ma journée (1re visite, la
 ici, surtout sous charge (passes 4–7). L'AB propre de §8 ter (charge < 7) disait 1 523 → 1 577, mélangé. Au bruit de la machine
 partagée, Ventes, Ma journée et à froid changent de signe d'un AB à l'autre. Seul Achats tient dans tous les AB (de −0,5 à −1,2 s).
 Code inchangé depuis §8 ter : `chiffres-volume` 35/35 · 12/12 et la garde verte valent toujours.
+
+### 8 quinquies. « Aucun écran plus lent » (25 nov., avant le train)
+AB A contre B, 7 passes alternées, lancé quand la charge est passée sous 7 (6,1 au départ, de 6,0 à 8,5 pendant le banc, juste
+après un redémarrage du conteneur). Mêmes builds qu'en §8 quater, code inchangé.
+
+| 1re visite | A (7 passes) | B (7 passes) | médiane A → B | écart par paire (B − A) | B plus lent |
+|---|---|---|---|---|---|
+| **à froid** | 36 272 · 8 457 · 8 186 · 8 508 · 7 876 · 7 849 · 7 802 | 14 528 · 8 399 · 7 693 · 8 283 · 8 201 · 8 150 · 8 027 | **8 186 → 8 201** | −21 744 −58 −493 −225 +325 +301 +225 | 3/7 |
+| **Ma journée** | 1 674 · 1 379 · 1 772 · 1 424 · 1 402 · 2 358 · 1 697 | 1 521 · 1 951 · 1 562 · 1 240 · 1 686 · 1 251 · 1 598 | **1 674 → 1 562** | −153 +572 −210 −184 +284 −1 107 −99 | 2/7 |
+| Achats | 4 462 · 5 008 · 4 602 · 5 296 · 3 491 · 4 085 · 3 750 | 3 769 · 3 659 · 4 072 · 3 208 · 3 606 · 2 748 · 2 514 | 4 462 → 3 606 | −693 −1 349 −530 −2 088 +115 −1 337 −1 236 | 1/7 |
+| Annonces | 4 755 · 3 193 · 4 103 · 3 613 · 2 543 · 3 316 · 2 544 | 4 469 · 3 040 · 3 843 · 3 136 · 3 038 · 2 236 · 3 064 | 3 316 → 3 064 | −286 −153 −260 −477 +495 −1 080 +520 | 2/7 |
+| Ventes | 2 997 · 2 213 · 2 166 · 2 142 · 1 822 · 2 240 · 2 817 | 2 235 · 1 849 · 2 021 · 2 233 · 1 834 · 1 589 · 1 862 | 2 213 → 1 862 | −762 −364 −145 +91 +12 −651 −955 | 2/7 |
+| Argent | 1 254 · 1 653 · 1 806 · 1 185 · 976 · 984 · 1 053 | 1 064 · 979 · 1 435 · 1 289 · 1 274 · 991 · 950 | 1 185 → 1 064 | −190 −674 −371 +104 +298 +7 −103 | 3/7 |
+
+La 1re passe à froid des deux builds est le 1er démarrage après le redémarrage du conteneur (36 s / 14 s : caches froids) ;
+elle ne change ni les médianes ni le compte des paires. À froid : médiane +15 ms (0,2 %), B plus lent sur 3 paires sur 7 —
+au niveau de A. Ma journée et tous les autres écrans : B plus rapide en médiane, plus lent sur au plus 3 paires sur 7.
+Rappel de l'AB précédent (§8 quater bis, charge ≤ 6,5) : à froid 8 108 → 8 018 mais 6 paires sur 7 plus lentes (+8 à +323 ms) ;
+Ma journée 1 542 → 1 570. Sur ces 14 paires à froid, l'écart médian par paire est d'environ +80 ms (1 %).
+Ma journée lue au banc (`LECTURES`, `CALCULS`) : B fait 40 lectures au lieu de 80 et `pickupUnion` 2 fois au lieu de 5.
