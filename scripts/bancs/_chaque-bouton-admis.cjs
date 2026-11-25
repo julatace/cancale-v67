@@ -1,4 +1,8 @@
-[
+// Les exceptions du robot « chaque bouton marche » (scripts/bancs/chaque-bouton.cjs), chacune avec sa raison.
+// (24 nov., main-vert) Un module, plus un .json : le dossier des bancs ne porte AUCUN .json (audit-bancs, dépôt PUBLIC :
+// aucune donnée) ; ceci n'est pas une donnée, c'est la liste des défauts admis.
+'use strict';
+module.exports = [
  {
   "cle": "vrm-cp-t\\|(#|Effacer|Virgule)\\|",
   "defaut": "aucun-effet",
@@ -30,4 +34,4 @@
   "vue": "ordi",
   "raison": "À l'ordinateur, la section « À retirer » est déjà ouverte et en vue à gauche de la bande : la case la signale (contour 1,4 s, `data-vrm-signale`), rien d'autre à montrer."
  }
-]
+];

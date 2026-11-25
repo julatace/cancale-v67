@@ -90,7 +90,7 @@ export default {
   "egalite.action.vintedSeul": "Seulement pour une annonce Vinted",
   "egalite.ecranSite": "Tout l'écran {site}",
   "egalite.ecranSite.sous": "Les outils propres à ce site",
-  "egalite.numerosDonnes": { one: "{n} nouveau N° à écrire sur son carton", other: "{n} nouveaux N° à écrire sur leurs cartons" },
+  "egalite.numerosDonnes": { one: "{n} nouveau N° à écrire sur son rangement", other: "{n} nouveaux N° à écrire sur leurs rangements" },
   "annonces.refaireDisparus": { one: "{n} brouillon n'est plus sur Vinted : il sort de la liste (VRM garde sa copie).", other: "{n} brouillons ne sont plus sur Vinted : ils sortent de la liste (VRM garde leur copie)." },
   "annonces.refairePasSu": { one: "{n} brouillon : VRM ne sait pas s'il est encore sur Vinted (son dressing n'a pas été relu en entier). Ouvre vinted.fr sur ce compte.", other: "{n} brouillons : VRM ne sait pas s'ils sont encore sur Vinted (leur dressing n'a pas été relu en entier). Ouvre vinted.fr sur ces comptes." },
   "egalite.groupe.sansCompte": "Sans compte",

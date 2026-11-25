@@ -30,12 +30,44 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (24 nov., suivi-ventes — Julien : « retrait des articles vendus, fais un vrai suivi ») docs/passation/2026-11-24-suivi-ventes.md
   { id: 'suivi-envois', date: '2026-11-24', titre: 'Tes colis vendus, du dépôt au versement', phrase: 'Au point, retiré, argent versé : chaque étape lue, datée.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (24 nov., lot retrait-parfait — Julien : « pour le retrait tu dois vraiment faire quelque chose de parfait ») docs/passation/2026-11-24-retrait-parfait.md
+  { id: 'retrait-comptoir', date: '2026-11-24', titre: 'Au comptoir : tous les codes du point', phrase: 'Code en grand, QR, Retiré d’un geste, même hors ligne.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (24 nov., parcours-iphone — Julien : « elle bug trop encore ») docs/passation/2026-11-24-parcours-iphone.md
+  { id: 'comptoir-retour', date: '2026-11-24', titre: 'Code au comptoir : le retour le ferme', phrase: 'Sur iPhone, le geste retour ne quitte plus VRM.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (24 nov., visuel-annonces — Julien : « toute l'application visuelle », « sans latence ») docs/passation/2026-11-24-visuel-annonces.md
+  { id: 'visuel-annonces', date: '2026-11-24', titre: 'Annonces en grandes photos, comme un inventaire', phrase: 'Le N°, le compte, les vues et favoris sur chaque photo.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (24 nov., visuel-argent — Julien : « toute l'application visuelle », « sans latence ») docs/passation/2026-11-24-visuel-argent.md
+  { id: 'visuel-argent', date: '2026-11-24', titre: 'Argent en un coup d’œil', phrase: 'Anneau de l’objectif, seuils en jauges, à venir en cartes.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (24 nov., livrable-2) docs/passation/2026-11-24-livrable.md (Suite)
+  { id: 'aujourdhui-sans-saut', date: '2026-11-24', titre: 'Aujourd’hui ne bouge plus au chargement', phrase: 'Chaque carte tient sa place avant ses chiffres.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (24 nov., visuel-jeu — Julien : « c'est pas visuel, hésite pas à faire des designs comme jeu vidéo ») docs/passation/2026-11-24-visuel-jeu.md
+  { id: 'visuel-jeu', date: '2026-11-24', titre: 'Pop-ups et ventes en grandes photos', phrase: 'La paire en grand, son N°, une petite fête par vente.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (24 nov., livrable — Julien : « écran de chargement etc., tout doit être parfait ») docs/passation/2026-11-24-livrable.md
+  { id: 'chargement-squelette', date: '2026-11-24', titre: 'Ouverture plus calme, sans tirets', phrase: 'Les chiffres en lecture se dessinent à leur place.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (24 nov., wcag-aa — Julien : plugin fairmind-design, accessibilité) docs/passation/2026-11-24-wcag-aa.md
+  { id: 'wcag-aa-24nov', date: '2026-11-24', titre: 'Plus lisible, aussi avec un lecteur d’écran', phrase: 'Le bilan se lit la nuit ; feuilles et messages sont bien annoncés.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (24 nov., moderation-carte réconciliée avec la revue UX — Julien : « c'est moche ») src/AlerteModeration.jsx
+  { id: 'annonces-disparues-groupees', date: '2026-11-24', titre: 'Annonces disparues : leurs photos et un geste', phrase: 'Une ligne par compte ; touche-la : photos, N°, quoi faire.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (24 nov., ext. 5.440.3 — Julien : « capte absolument tout ce que fait Bleam ») docs/passation/2026-11-24-observation-vinted.md
+  { id: 'observer-vinted', date: '2026-11-24', titre: 'Observer Vinted pendant un envoi', phrase: 'Le chemin de la page Vinted noté 10 min, sans tes données.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (24 nov., vente-mail-annonce — Julien : « la vente a été détectée par les mails […] l'annonce n'a pas encore été supprimée ») docs/passation/2026-11-24-vente-mail-annonce.md
+  { id: 'vente-mail-annonce', date: '2026-11-24', titre: 'Vendue par e-mail : l’annonce quitte « en ligne »', phrase: 'La vente prend son N°, sinon « Relier à l’annonce ».', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (24 nov., ext. 5.440.2 — Julien : « Sauté · Favori trop ancien » pour des favoris de la veille) docs/passation/2026-11-24-favoris-ancien.md
+  { id: 'favoris-ancien', date: '2026-11-24', titre: 'Favoris : plus de « trop ancien » à tort', phrase: 'Les notifications sont lues jusqu’au bout avant de sauter un favori.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (24 nov., style-graphite — Julien : « un peu plus foncé en gris […] améliore tous les boutons […] change de style pour l'iPhone ») docs/passation/2026-11-24-style-graphite.md
+  { id: 'styles-a-essayer', date: '2026-11-24', titre: 'Onze styles à essayer, dont Monochrome', phrase: 'Paramètres → Apparence → Style : touche, c’est appliqué.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (23 nov., colis-danger — Julien : « te prévient avant qu'il reparte ») docs/passation/2026-11-23-colis-danger.md
   { id: 'colis-en-danger', date: '2026-11-23', titre: 'Colis pas retiré : VRM te prévient', phrase: 'Vinted Go : la veille et le jour où il repart.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (23 nov., revue UX) docs/passation/2026-11-23-revue-ux.md
+  { id: 'revue-ux-23nov', date: '2026-11-23', titre: 'Achats et fiches plus clairs', phrase: 'La liste d’abord, le prix d’achat dans la fiche, photos des disparues.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov. soir, ext. 5.440.1 — Julien : « 0 envoyé · 1 sauté », phrase coupée) docs/passation/2026-11-23-favoris-identite.md
   { id: 'favoris-identite', date: '2026-11-23', titre: 'Messages aux favoris : le nouveau lien de Vinted', phrase: 'Un favori pas confirmé est dit et sauté, la file continue.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md
   { id: 'vente-email-partout', date: '2026-11-23', titre: 'Une vente reçue par e-mail se voit partout', phrase: 'Ventes, Ma journée et Colis, avant même le passage de l’extension.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (23 nov. au soir, lot retours-suivi — Julien : « le transporteur inconnu, le logo mal mis ») docs/passation/2026-11-23-retours-suivi.md
+  { id: 'retraits-point-clair', date: '2026-11-23', titre: 'Points relais nommés, plus clairs, sans orange', phrase: 'Le nom du point Vinted Go, son logo, sa date limite.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot retours-suivi — Julien : « fais le suivi des colis retournés ») docs/passation/2026-11-23-retours-suivi.md
+  { id: 'retours-achat-suivi', date: '2026-11-23', titre: 'Tes retours suivis jusqu’au remboursement', phrase: 'Chaque étape cochée, mise à jour toute seule, boutons clairs.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov., photos-nettes — Julien : « toutes les photos sont floues ») docs/passation/2026-11-23-photos-nettes.md
   { id: 'photos-nettes', date: '2026-11-23', titre: 'Photos plus nettes, surtout en grand', phrase: 'La plus grande taille connue s’affiche dès qu’elle est chargée.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov., ext. 5.440 — Julien : « l'app doit s'adapter toute seule au bouton favoris ») docs/passation/2026-11-23-favoris-auto.md

@@ -250,7 +250,9 @@
 :root:root:root:root:root body .vrm-msg-list.vg-ms-liste { padding: 0 !important; overflow: hidden; border: 0 !important; border-radius: 22px !important; }
 :root:root:root:root:root body .vg-fil { display: flex !important; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 9px 14px 9px 12px !important; margin: 0; border: 0 !important; border-radius: 0 !important;
   background: transparent !important; background-image: none !important; box-shadow: none !important; color: var(--sv-encre) !important; text-align: left; font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
-  content-visibility: auto; contain-intrinsic-size: auto 64px; }
+  /* (24 nov., WCAG 4.1.2) Plus de `content-visibility:auto` : hors écran, Chrome laissait ces rangées SANS NOM pour un
+     lecteur d'écran (banc wcag-aa D). La liste s'arrête à 80 fils (FilsTous) : rien à économiser. */
+  content-visibility: visible; }
 :root:root:root:root:root body .vg-fil + .vg-fil { border-top: 1px solid rgb(28 28 32 / .10) !important; }
 :root:root:root:root:root[data-theme="dark"] body .vg-fil + .vg-fil { border-top-color: rgb(255 255 255 / .10) !important; }
 :root:root:root:root:root body .vg-fil:active, :root:root:root:root:root body .vg-fil.is-current { background: rgb(28 28 32 / .05) !important; }
@@ -436,7 +438,10 @@
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] { background: #FFFFFF !important; box-shadow: 0 8px 20px -12px rgb(27 27 31 / .5) !important; }
   :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] { background: rgb(255 255 255 / .12) !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-sommaire .vrm-pm-cat-ic { background: rgb(28 28 32 / .06) !important; color: var(--sv-encre) !important; box-shadow: none !important; border-radius: 12px !important; width: 36px !important; height: 36px !important; }
-  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+  /* (24 nov., crash-apres-deploiement) Deux colonnes SEULEMENT quand chacune garde 340 px : dans un détail étroit (le bureau
+     plafonné à 880 px, une fenêtre de 1024 px), deux verres de ~220 px coupaient « Supprimer mon compte », « Changer mon
+     mot de passe » sur deux lignes (banc nouveau-vendeur, 1512) — une seule colonne alors. */
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; align-items: start; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > :not(.vrm-set-groupe) { grid-column: 1 / -1; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat-h { margin: 0 !important; font: 750 30px/1.15 var(--sb-police-affiche, Inter, sans-serif) !important; letter-spacing: -.03em !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat-h .vrm-pm-cat-ic { display: none !important; }
@@ -496,6 +501,9 @@
   /* Paramètres à l'ordinateur : toute la largeur (maquette), les verres de groupe prennent leur colonne. */
   :root:root:root:root:root:root:root body .vrm-main .vrm-pm[data-reglages-disposition="ordinateur"] { max-width: none !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] :is(.vrm-pm-contenu, .vrm-pm-cat) { width: 100% !important; max-width: none !important; }
+  /* (24 nov.) Le bureau (sommaire + détail) aussi : la largeur de lecture de styles-reglages.css (`.vrm-set > * { max-width:
+     880px }`) le plafonnait, le détail n'avait que 456 px pour ses deux colonnes. */
+  :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] > .vrm-pm-bureau { max-width: none !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > .vrm-set-groupe { width: auto !important; max-width: none !important; min-width: 0; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-lib { min-width: 0; flex: 1 1 auto; }
 }

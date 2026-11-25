@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.440.1';
+const CODE_VERSION = '5.440.3';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -3271,6 +3271,7 @@ async function archiveNotifications(uid,{payload,domain,url,cycle,page,ownerAtte
 // redirect. Never accept a URL from the app; resolve its own captured ID.
 const stockageFavorisOnglets=()=>chrome.storage.session||chrome.storage.local;
 const cleOngletFavori=id=>`vrmFavoriOnglet_${id}`;
+function cheminLienFavori(v){const p=pageFavoriNative(v);if(!p)return '/inbox';try{const u=new URL(p.url);return u.pathname+u.search;}catch{return '/inbox';}}
 function pageFavoriNative(v,domain='www.vinted.fr'){
  try{const u=new URL(v,`https://${domain}`),m=/^\/items\/([1-9]\d{0,19})\/[a-z_-]{1,40}\/new\/?$/.exec(u.pathname);
   if(!m||u.protocol!=='https:'||u.username||u.password||!/^(?:www\.)?vinted\.(fr|com|it|de)$/.test(u.hostname)||u.href.length>2000)return null;
@@ -4129,6 +4130,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'reparer') {
       const tid = msg.from === 'vrm-badge' && sender && sender.tab && typeof sender.tab.id === 'number' ? sender.tab.id : null;
       reparerExtension(tid).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', raison: 'La réparation n’a pas pu se faire. Réessaie.' }));
+      return true;
+    }
+    // 5.440.3 : « Observer Vinted (10 min) » — allumer, arrêter, envoyer, l'état (carte du logo ou fenêtre).
+    if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'observation') {
+      commandeObservation(msg).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', raison: 'L’extension n’a pas pu le faire. Réessaie.' }));
       return true;
     }
     if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'rapport') {
@@ -5173,6 +5179,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   } else if (msg.kind === 'writereq' && msg.url) {
     storeWriteReq(domain,msg.method,msg.url,msg.body,msg.contexteFavori,sender?.frameId>0?null:sender?.tab?.id).then(()=>sendResponse({ok:true}),()=>sendResponse({ok:false}));
     return true;
+  } else if (msg.kind === 'observation' && Array.isArray(msg.ev)) {
+    // 5.440.3 : la frise de « Observer Vinted » (formes seulement), rebâtie entrée par entrée (`entreeObservation`).
+    recevoirObservation(domain, msg.ev, sender).catch(() => {});
   } else if (msg.kind === 'seen_urls' && Array.isArray(msg.paths)) {
     storeSeenUrls(domain, msg.paths, msg.reponses, msg.conversation);
   } else if (msg.kind === 'suppression' && msg.itemId) {
@@ -12654,6 +12663,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-session') lance('session', () => loadSession().then(s => { if (s) return authToken(); }));
   else if (a.name === 'vrm-reseau') lance('reseau', () => viderFilesEnAttente());   // 5.376 : et les captures en attente   // 5.371 : la file « en attente de réseau »
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
+  else if (a.name === OBS_ALARME) lance('observation', () => arreterObservation('delai'));   // 5.440.3 : « Observer Vinted », 10 min passées
   else if (String(a.name || '').startsWith(ATELIER_PROG_ALARME)) lance('atelierprog', () => atelierProgDepart(String(a.name).slice(ATELIER_PROG_ALARME.length)));   // 5.422 : la republication qu'IL a programmée
   else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierprog', () => atelierProgTick()); lance('atelierrepub', () => atelierRepubTick()); lance('depot', () => depotTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('distance', () => distanceTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('retirerpartout', () => retirerPartoutTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('relancesauto', () => relancesAutoTick()); lance('relanceslot', () => relancesLotTick()); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); lance('pushcapte', () => pushCapteTick()); lance('eveil', () => eveilTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
@@ -17908,7 +17918,7 @@ async function etapeFormulaireBrute(acc, tabId, etape, d) {
   let o = await lancer(etape, d);
   // 5.414 : la page a navigué PENDANT l'étape (le résultat est perdu) : la réponse rangée dans sa session est relue ;
   //    rien de relu ⇒ `perdu` (PAS « onglet » : le geste a peut-être eu lieu — jamais rejoué, toujours « incertain »).
-  if ((!o || o.code === 'sans-reponse') && d && d.cle) { await attendreOnglet(tabId, null, 20000); if (await injecter()) { const o2 = await lancer('reponse', { cle: d.cle }); if (o2 && o2.ok) o = Object.assign({}, o2, etape === 'favoriOuvrir' || etape === 'favoriListe' || etape === 'favoriAccueil' ? { envoye: true } : {}); } }
+  if ((!o || o.code === 'sans-reponse') && d && d.cle) { await attendreOnglet(tabId, null, 20000); if (await injecter()) { const o2 = await lancer('reponse', { cle: d.cle }); if (o2 && o2.ok) o = Object.assign({}, o2, etape === 'favoriOuvrir' || etape === 'favoriLien' || etape === 'favoriListe' || etape === 'favoriAccueil' ? { envoye: true } : {}); } }
   if (!o || typeof o !== 'object') o = { ok: false, code: 'perdu', parti: true };
   try { await poserOngletTravail({ ...(((await chrome.storage.local.get(ONGLET_TRAVAIL))[ONGLET_TRAVAIL]) || {}), tabId, etape, maj: Date.now() }); } catch (_) {}
   if (o.code === 'captcha') { noterDiag('formulaire_captcha'); await poserCaptcha(acc, 0); }
@@ -17935,7 +17945,7 @@ async function etapeFormulaireBrute(acc, tabId, etape, d) {
 //   · au plus 2 nouveaux essais (au hasard 2 à 6 s avant chacun), dits dans la file et sur la frise ; après le 2e échec,
 //     l'élément manquant peut être APPRIS de son clic (choix n° 102), sinon arrêt avec la raison (« Reprendre »).
 const ETAPES_LECTURE_FORM = new Set(['formulairePret', 'grille', 'reponse', 'etat']);
-const SORTE_ETAPE_FILE = { 'ouvrirVente': 'publier', 'photos': 'publier', 'champ': 'publier', 'brouillon': 'publier', 'supprimer': 'supprimer', 'publier': 'publier', 'message': 'message', 'offre': 'offre', 'favoriOuvrir': 'favori', 'favoriListe': 'favori', 'favoriAccueil': 'favori', 'repondreOffre': 'reponse', 'masquer': 'masquer', 'prix': 'prix', 'bordereau': 'bordereau', 'evaluation': 'evaluation', 'vacances': 'vacances', 'ouvrir': 'message' };
+const SORTE_ETAPE_FILE = { 'ouvrirVente': 'publier', 'photos': 'publier', 'champ': 'publier', 'brouillon': 'publier', 'supprimer': 'supprimer', 'publier': 'publier', 'message': 'message', 'offre': 'offre', 'favoriOuvrir': 'favori', 'favoriLien': 'favori', 'favoriListe': 'favori', 'favoriAccueil': 'favori', 'repondreOffre': 'reponse', 'masquer': 'masquer', 'prix': 'prix', 'bordereau': 'bordereau', 'evaluation': 'evaluation', 'vacances': 'vacances', 'ouvrir': 'message' };
 const REESSAIS_MAX = 2;
 const REESSAI_MS = [2000, 6000];
 // Les éléments qu'on peut apprendre de son clic : des boutons et des champs SANS identité (jamais une option de liste,
@@ -18023,7 +18033,7 @@ async function apprendreElement(acc, tabId, nom) {
 //  préférence) et repassée à l'étape suivante (`d.memoire`) : elle compte en premier à score égal. Rien trouvé ⇒ une entrée
 //  au journal (`vrmTrouverJournal`, 40 au plus : élément, chemin, stratégies essayées et leurs comptes, jamais un texte).
 //  Aucune question à Julien : c'est une mémoire, pas un apprentissage par son clic.
-const ETAPES_SANS_APPRENDRE = new Set(['favoriOuvrir', 'favoriListe', 'favoriAccueil']);
+const ETAPES_SANS_APPRENDRE = new Set(['favoriOuvrir', 'favoriLien', 'favoriListe', 'favoriAccueil']);
 const TROUVE_CLE = 'vrmTrouve', TROUVE_JOURNAL = 'vrmTrouverJournal', TROUVE_JOURNAL_MAX = 40;
 async function memoireTrouver() {
   try { const m = (await chrome.storage.local.get(TROUVE_CLE))[TROUVE_CLE]; if (!m || typeof m !== 'object' || !m.el) return {}; const out = {}; for (const k of Object.keys(m.el).slice(0, 20)) { const e = m.el[k]; if (e && /^[a-z]{2,20}$/.test(String(e.s || '')) && (!m.ver || !e.ver || e.ver === m.ver)) out[k] = e.s; } return out; } catch (_) { return {}; }
@@ -18475,6 +18485,11 @@ const GESTES_INTERFACE = Object.freeze({
   favoriAccueil: { route: () => '/', re: () => /^\/?$/ },
   // 22 nov. : la page complète des notifications (le « Voir tout » de la cloche, son chemin lu sur la page et revérifié).
   favoriListe: { route: (d) => pageNotificationsSure(d.page), re: (d) => new RegExp(`^${pageNotificationsSure(d.page)}/?$`) },
+  // 5.440.2 (Julien, 24 nov. : « c'est à l'extension d'aller capter les favoris, pas à moi ») : l'adresse NATIVE du favori — le
+  //    lien web de SA notification, lu dans la liste de Vinted (`/items/N/want_it/new?offering_id=U`), article et personne
+  //    vérifiés — ouverte dans l'onglet de travail ; la page de Vinted ouvre la conversation, comme au clic de la ligne.
+  //    Toujours une navigation (jamais « déjà là ») ; après : la page du favori ou la messagerie.
+  favoriLien: { route: (d) => cheminLienFavori(d.lien), re: () => /^\/(?!)/, reApres: (d) => new RegExp(`^/(?:inbox(?:/|$)|items/${String(d.itemId).replace(/\D/g, '')}(?:-[^/]*)?/want_it(?:/|$))`) },
   masquer: { route: (d) => `/items/${d.id}`, re: (d) => new RegExp(`^/items/${d.id}(?:-[^/]*)?/?$`) },
   supprimer: { route: (d) => `/items/${d.id}`, re: (d) => new RegExp(`^/items/${d.id}(?:-[^/]*)?/?$`) },
   prix: { route: (d) => `/items/${d.id}/edit`, re: (d) => new RegExp(`^/items/${d.id}/edit/?$`) },
@@ -18506,7 +18521,7 @@ function resultatInterface(o, geste) {
 }
 // UN geste par l'interface, dans la file Vinted (un à la fois), depuis l'onglet de travail du compte de l'onglet.
 // 5.433 (`filevisible`) : chaque geste d'interface entre dans la file (une étape de l'action en cours, ou une action à lui).
-const SORTE_GESTE_FILE = { 'message': 'message', 'offre': 'offre', 'favoriOuvrir': 'favori', 'favoriListe': 'favori', 'favoriAccueil': 'favori', 'ouvrir': 'message', 'repondreOffre': 'reponse', 'masquer': 'masquer', 'supprimer': 'supprimer', 'prix': 'prix', 'bordereau': 'bordereau', 'evaluation': 'evaluation', 'vacances': 'vacances' };
+const SORTE_GESTE_FILE = { 'message': 'message', 'offre': 'offre', 'favoriOuvrir': 'favori', 'favoriLien': 'favori', 'favoriListe': 'favori', 'favoriAccueil': 'favori', 'ouvrir': 'message', 'repondreOffre': 'reponse', 'masquer': 'masquer', 'supprimer': 'supprimer', 'prix': 'prix', 'bordereau': 'bordereau', 'evaluation': 'evaluation', 'vacances': 'vacances' };
 async function interfaceVinted(acc, geste, d, opts = {}) {
   const g = GESTES_INTERFACE[geste];
   const uid = String((acc && acc.vinted_user_id) || '');
@@ -18540,7 +18555,7 @@ async function interfaceVinted(acc, geste, d, opts = {}) {
     const r = resultatInterface(o, geste);
     // La conversation ouverte par la page (favori) : l'adresse de l'onglet la dit quand la réponse ne la porte pas.
     if (r.ok && r.conv && r.route) await retenirRouteConv(r.conv, r.route);
-    if ((geste === 'favoriOuvrir' || geste === 'favoriListe' || geste === 'favoriAccueil') && r.ok && !r.conv) { try { const m = /^\/inbox\/([1-9]\d{0,19})\/?$/.exec(new URL(String((await chrome.tabs.get(tab)).url || '')).pathname); if (m) r.conv = m[1]; } catch (_) {} }
+    if ((geste === 'favoriOuvrir' || geste === 'favoriLien' || geste === 'favoriListe' || geste === 'favoriAccueil') && r.ok && !r.conv) { try { const m = /^\/inbox\/([1-9]\d{0,19})\/?$/.exec(new URL(String((await chrome.tabs.get(tab)).url || '')).pathname); if (m) r.conv = m[1]; } catch (_) {} }
     if (r.ok && r.json && r.json.conversation && ID_INTERFACE.test(String(r.json.conversation.id)) && !r.conv) r.conv = String(r.json.conversation.id);
     noterDiag(`interface_${geste}_${r.ok ? (r.vu === false && ['message', 'offre'].includes(geste) ? 'pas_vu' : 'ok') : r.rienParti ? 'rien_' + String(r.manque || r.sansPage || 'parti').replace(/[^a-z-]/g, '').slice(0, 30) : 'incertain'}`);
     if (r.ok && r.vu === false && ['message', 'offre', 'masquer', 'vacances'].includes(geste)) noterCarnet(uid, 'pasvu');   // 5.420 : la santé du compte le compte
@@ -22104,6 +22119,81 @@ function lienFavoriProfond(v){
 }
 // La FORME d'un lien de notification inconnu (pour le diagnostic) : le schéma et le gabarit du chemin, jamais une valeur.
 function formeLienFavori(v){const s=String(v||'');const m=/^([a-z][a-z0-9+.-]{0,20}):/i.exec(s);return ((m?m[1].toLowerCase():'rel')+'_'+s.replace(/^[a-z][a-z0-9+.-]{0,20}:\/{0,}/i,'').split(/[?#]/)[0].replace(/\d+/g,'n').replace(/[^a-z_/n]/gi,'').replace(/\//g,'_')).slice(0,40);}
+// 5.440.2 : la liste de la cloche lue page après page jusqu'à la ligne d'un favori ou jusqu'à la DERNIÈRE page que Vinted
+//    annonce (`pagination.total_pages`, `current_page`) — lecture seule, même onglet, une page à la fois.
+//    Julien (24 nov. : « si les favoris sont dans la cloche, rends l'extension intelligente ») : la liste est INDEXÉE une
+//    fois (`vrmIndexCloche` : chaque page lue, chaque ligne par son id ET par ses deux identités article + personne tirées
+//    de son lien, web `/items/N/want_it/new?offering_id=U` ou d'application `vintedfr://messaging?item_id=&user_id=`) ;
+//    les favoris suivants de la file y vont DIRECTEMENT (la page où est leur ligne) au lieu de tout relire. L'index ne vaut
+//    que 10 min, pour CE compte, et tant que la tête de la liste n'a pas changé (Vinted ne l'a pas rafraîchie) ; sinon il
+//    est relu. Rend { n, rang, page } (trouvée), { bout:true } (TOUTE la liste lue sans elle : la seule preuve qu'elle n'y
+//    est plus), {} (pas au bout : plus de CLOCHE_PAGES_MAX pages, ou une page illisible), { frein }, { sansPage }.
+//    Une réponse SANS `pagination` est une liste d'une page (ce que Vinted rend tout entier).
+const CLOCHE_PAGES_MAX=6,INDEX_CLOCHE='vrmIndexCloche',INDEX_CLOCHE_MS=10*60000,TAILLE_CLOCHE='vrmTailleCloche';
+// Combien de lignes la cloche de Vinted montre (relevé quand une ligne n'y était pas) ; 24 h, puis relu.
+async function lireTailleCloche(){try{const t=(await chrome.storage.local.get(TAILLE_CLOCHE))[TAILLE_CLOCHE];return t&&Date.now()-Number(t.at)<86400000&&Number.isInteger(t.n)?t.n:0;}catch(_){return 0;}}
+async function poserTailleCloche(n){if(Number.isInteger(n)&&n>0&&n<200)try{await chrome.storage.local.set({[TAILLE_CLOCHE]:{n,at:Date.now()}});}catch(_){}}
+function identiteLienNotif(link){
+  const p=lienFavoriProfond(link);if(p)return {item:p.itemId,user:p.userId};
+  try{const u=new URL(String(link||''),'https://www.vinted.fr');const m=/^\/items\/([1-9]\d{0,19})(?:-[^/]*)?\/want_it(?:\/new)?\/?$/.exec(u.pathname);if(!m)return null;
+    const q=u.searchParams,ks=[...new Set([...q.keys()])];if(ks.some(k=>q.getAll(k).length!==1))return null;
+    const qui=['offering_id','receiver_id','user_id'].filter(k=>q.has(k));if(qui.length!==1||ks.some(k=>/_id$/i.test(k)&&k!==qui[0]&&k!=='item_id'))return null;
+    if(q.has('item_id')&&q.get('item_id')!==m[1])return null;const us=q.get(qui[0]);return /^[1-9]\d{0,19}$/.test(us)&&us!==m[1]?{item:m[1],user:us}:null;}catch{return null;}
+}
+// La ligne de CE favori dans une page : par son id de notification, sinon par ses DEUX identités (une seule ligne).
+function ligneDuFavori(l,cherche,cible){
+  const i=l.findIndex(x=>x&&String(x.id)===cherche);if(i>=0)return i;
+  if(!cible||!cible.itemId||!cible.recipientId)return -1;
+  const k=l.map((x,j)=>{const t=x&&identiteLienNotif(x.link);return t&&t.item===String(cible.itemId)&&t.user===String(cible.recipientId)?j:-1;}).filter(j=>j>=0);
+  return k.length===1?k[0]:-1;
+}
+const teteCloche=l=>(Array.isArray(l)?l:[]).slice(0,5).map(x=>String(x&&x.id||'')).join('|');
+async function listeClocheJusqua(acc,premiere,notificationId,cible){
+  const cherche=String(notificationId||''),uid=String(acc&&acc.vinted_user_id||'');
+  const l1=premiere&&premiere.ok&&premiere.json&&Array.isArray(premiere.json.notifications)?premiere.json.notifications:null;
+  if(!l1)return {};
+  // L'index de la liste (pages déjà lues), s'il est encore celui de CETTE liste.
+  let ix=null;try{ix=(await chrome.storage.local.get(INDEX_CLOCHE))[INDEX_CLOCHE]||null;}catch(_){ix=null;}
+  const ix0=ix&&typeof ix==='object'?{uid:ix.uid,tete:ix.tete,pages:ix.pages&&typeof ix.pages==='object'?Object.assign({},ix.pages):null}:null;
+  if(!ix||ix.uid!==uid||!(Date.now()-Number(ix.at)<INDEX_CLOCHE_MS)||ix.tete!==teteCloche(l1)||typeof ix.pages!=='object'){ix={uid,at:Date.now(),tete:teteCloche(l1),pages:{},bout:false,tot:null,pp:null};}
+  // 5.440.2 : la liste lue est SIGNALÉE (`vrmFavorisListeLue`) quand elle est neuve (tête changée) ou qu'une page de plus a été
+  //    lue : la carte ouverte sur vinted.fr redemande ses favoris à VRM et se redessine seule.
+  const neuve=!ix0||ix0.uid!==uid||ix0.tete!==teteCloche(l1);
+  const garder=async()=>{try{const lues=Object.keys(ix.pages).length;await chrome.storage.local.set({[INDEX_CLOCHE]:ix,...(neuve||lues>(ix0&&ix0.pages?Object.keys(ix0.pages).length:0)?{vrmFavorisListeLue:{uid,at:Date.now(),pages:lues}}:{})});}catch(_){}};
+  const pg1=premiere.json.pagination&&typeof premiere.json.pagination==='object'?premiere.json.pagination:null;
+  ix.pages['1']=l1.map(x=>({id:String(x&&x.id||''),link:typeof (x&&x.link)==='string'?x.link:''}));
+  if(pg1){const t=Number(pg1.total_pages),pp=Number(pg1.per_page);if(Number.isInteger(t))ix.tot=t;if(Number.isInteger(pp)&&pp>0&&pp<=100)ix.pp=pp;}
+  const rangDe=(page,i)=>{let r=0;for(let k=1;k<page;k++)r+=(ix.pages[String(k)]||[]).length||(ix.pp||20);return r+i;};
+  let i=ligneDuFavori(l1,cherche,cible);
+  if(i>=0){await garder();return {n:l1[i],rang:i,page:1};}
+  if(!pg1||!l1.length||(Number.isInteger(ix.tot)&&ix.tot<=1)){ix.bout=true;await garder();return {bout:true};}
+  if(!Number.isInteger(ix.tot)){await garder();return {};}
+  const lire=async(page)=>{
+    await new Promise(ok=>setTimeout(ok,600+Math.round(Math.random()*900)));
+    const r=await vintedPage(acc,'GET',adresseClocheVinted(acc.domain)+`?page=${page}`+(ix.pp?`&per_page=${ix.pp}`:''),null,{timeoutMs:12000,travail:true,chemin:'/inbox'});
+    const f=freinFavoriAuto(r);if(f)return {frein:f,status:r.status};if(r.sansPage)return {sansPage:true};
+    const l=r.ok&&r.json&&Array.isArray(r.json.notifications)?r.json.notifications:null;if(!l)return {illisible:true};
+    ix.pages[String(page)]=l.map(x=>({id:String(x&&x.id||''),link:typeof (x&&x.link)==='string'?x.link:''}));
+    const pg=r.json.pagination;if(pg&&Number.isInteger(Number(pg.total_pages)))ix.tot=Number(pg.total_pages);
+    return {l};
+  };
+  // 1. L'index connaît déjà sa page : elle seule est relue (la ligne y est-elle toujours ?).
+  for(const [k,lst] of Object.entries(ix.pages)){if(k==='1')continue;if(ligneDuFavori(lst,cherche,cible)>=0){
+    const r=await lire(Number(k));if(r.frein||r.sansPage)return r;
+    if(r.l){const j=ligneDuFavori(r.l,cherche,cible);if(j>=0){noterDiag('favori_index_cloche');await garder();return {n:r.l[j],rang:rangDe(Number(k),j),page:Number(k)};}}
+    break;}}
+  // 2. L'index a déjà été lu jusqu'au bout sans elle (même liste, il y a moins de 10 min) : elle n'y est pas.
+  if(ix.bout&&!Object.values(ix.pages).some(lst=>ligneDuFavori(lst,cherche,cible)>=0)){noterDiag('favori_index_cloche_bout');return {bout:true};}
+  // 3. Sinon, les pages suivantes une à une (celles que l'index n'a pas encore), jusqu'à elle ou jusqu'au bout.
+  for(let page=2;;page++){
+    if(Number.isInteger(ix.tot)&&page>ix.tot){ix.bout=true;await garder();return {bout:true};}
+    if(page>CLOCHE_PAGES_MAX){await garder();return {};}
+    const r=await lire(page);if(r.frein||r.sansPage){await garder();return r;}
+    if(!r.l){await garder();return {};}
+    const j=ligneDuFavori(r.l,cherche,cible);if(j>=0){await garder();return {n:r.l[j],rang:rangDe(page,j),page};}
+    if(!r.l.length){ix.bout=true;await garder();return {bout:true};}
+  }
+}
 // 5.440 : l'adresse de la liste de la cloche, sur l'hôte `api.` du domaine du compte (mesuré : www → 404, api → 200).
 function adresseClocheVinted(domaine){const d=String(domaine||'www.vinted.fr').toLowerCase().replace(/^www\./,'');return /^vinted\.(fr|com|it|de)$/.test(d)?`https://api.${d}/inbox-notifications/v1/notifications`:'/inbox-notifications/v1/notifications';}
 // Le chemin de la page complète des notifications, LU sur la page (« Voir tout » ou le lien de la cloche) et retenu.
@@ -22120,7 +22210,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   // (5.309, mode auto) `ecrits` = combien d'écritures sont PARTIES chez Vinted : 0 ⇒
   // rien n'est parti, le serveur peut laisser le mode auto reprendre ce favori.
   // (5.369) `variante` = le n° de la version envoyée (1 à 5), rendu au serveur pour le journal (jamais le texte).
-  let ecrits=0,frein='',variante=null,attente=null,apresMs=0,lienCloche='';
+  let ecrits=0,frein='',variante=null,attente=null,apresMs=0,lienCloche='',rangCloche=-1;
   // (5.406) `apresMs` : un refus d'ATTENTE (discrétion, plafond de l'heure, sécurité du compte) dit
   // au serveur QUAND réessayer — le vrai temps de la garde, plus les 10 min fixes d'avant.
   // 22 nov. (Julien : « 2 refusés : autre refus », impossible de dire quelle étape) : chaque accusé porte l'ÉTAPE où la
@@ -22209,9 +22299,18 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     if(cl.sansPage)return rep('refuse',0,'onglet_vinted');
     if(frein)return rep('refuse',cl.status);
     const liste=cl.ok&&cl.json&&Array.isArray(cl.json.notifications)?cl.json.notifications:null;
-    if(liste&&!liste.some(n=>n&&String(n.id)===String(body.notificationId))){noterDiag('favori_trop_ancien');return rep('ignore',cl.status,'favori_trop_ancien');}
     if(!liste)noterDiag('favori_cloche_illisible_'+(cl.status||0));
-    if(liste){const n=liste.find(x=>x&&String(x.id)===String(body.notificationId));if(n&&typeof n.link==='string')lienCloche=n.link;}
+    // ⚠️ 5.440.2 (Julien, 24 nov. 17:45, tomj606 : « Sauté · Favori trop ancien » pour des favoris de 0 à 2 jours) : « trop
+    //    ancien » ne se dit plus sur la PREMIÈRE page de la liste (20 lignes chez Vinted, toutes sortes mêlées). La liste est
+    //    lue page après page (GET, même onglet, `pagination` de Vinted) jusqu'à la ligne de CE favori ou jusqu'à sa DERNIÈRE
+    //    page ; au-delà de `CLOCHE_PAGES_MAX` pages sans la trouver, rien n'est conclu (« pas encore trouvée », le favori
+    //    attend). Seule une liste lue jusqu'au bout sans lui prouve qu'il est trop ancien pour Vinted.
+    const lc=liste?await listeClocheJusqua(acc,cl,body.notificationId,{itemId:body.itemId,recipientId:body.recipientId}):null;
+    if(lc&&lc.frein){if(!frein)frein=lc.frein;return rep('refuse',lc.status);}
+    if(lc&&lc.sansPage)return rep('refuse',0,'onglet_vinted');
+    if(lc&&!lc.n&&lc.bout){noterDiag('favori_trop_ancien');return rep('ignore',cl.status,'favori_trop_ancien');}
+    if(lc&&!lc.n){noterDiag('favori_cloche_pas_au_bout');return rep('refuse',0,'notification_pas_trouvee','favori_absent:liste-pas-au-bout');}
+    if(lc&&lc.n){if(typeof lc.n.link==='string')lienCloche=lc.n.link;rangCloche=lc.rang;if(lc.page>1)noterDiag('favori_cloche_page_'+Math.min(lc.page,9));}
     await pauseFavori('cloche',uid);
   }
   // ⚠️⚠️ 5.414 (`toutinterface`, Julien, 21 nov. : « on ne fait plus les requêtes ») : la conversation n'est plus créée par une
@@ -22235,7 +22334,13 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   }
   const page=lienBrut&&!profond?pageFavoriNative(lienBrut,acc.domain||'www.vinted.fr'):null;
   if(lienBrut&&!profond&&(!page||page.itemId!==body.itemId||(destinataireLienFavori(page)&&destinataireLienFavori(page)!==body.recipientId))){noterDiag(page?'favori_lien_autre':'favori_lien_forme_'+formeLienFavori(lienBrut));return rep('refuse',0,'identite_non_confirmee','lien_autre');}
-  let creation=await interfaceVinted(acc,'favoriOuvrir',{lien:page?page.url:'',itemId:body.itemId,receiverId:body.recipientId,favori:true});
+  // 5.440.2 (Julien : « rends l'extension intelligente ») : la ligne de CE favori est plus bas dans la liste que ce que la
+  //    cloche montre (taille relevée au tour précédent) ⇒ directement la page complète, sans rouvrir la cloche pour rien.
+  const tailleCloche=await lireTailleCloche();
+  let creation=rangCloche>=0&&tailleCloche>0&&rangCloche>=tailleCloche
+    ?(noterDiag('favori_direct_page'),{ok:false,rienParti:true,absent:true,voirTout:await pageNotifsConnue()})
+    :await interfaceVinted(acc,'favoriOuvrir',{lien:page?page.url:'',itemId:body.itemId,receiverId:body.recipientId,favori:true});
+  if(creation&&creation.cloche&&creation.absent&&Number.isInteger(creation.lignes)&&creation.lignes>0)await poserTailleCloche(creation.lignes);
   // 5.440 (`clocheauto`, Julien, 23 nov. : « l'app doit s'adapter toute seule ») : la cloche introuvable sur la messagerie
   //    ⇒ l'ACCUEIL de Vinted (l'en-tête complet y est toujours), sans rien demander ; toujours introuvable ⇒ la page complète
   //    des notifications (chemin lu sur la page, sinon le connu) ; plus jamais « touche le bouton ».
@@ -22252,8 +22357,17 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     noterDiag('favori_voir_tout');
     await pauseFavori('cloche',uid);
     if(creation.voirTout)await retenirPageNotifs(creation.voirTout);
-    creation=await interfaceVinted(acc,'favoriListe',{lien:page?page.url:'',itemId:body.itemId,receiverId:body.recipientId,page:pageNotificationsSure(creation.voirTout||await pageNotifsConnue()),favori:true});
-    if(creation.rienParti&&!creation.pause&&(creation.absent===true||creation.sansPage==='identite')){noterDiag('favori_absent_cloche');return rep('ignore',0,'favori_trop_ancien');}
+    // 5.440.2 (Julien : « c'est à l'extension d'aller capter les favoris, pas à moi ») : la ligne n'est pas dans la cloche
+    //    montrée ⇒ l'adresse NATIVE de ce favori (le lien web de sa notification, lu dans la liste de Vinted, article ET
+    //    personne vérifiés plus haut) est ouverte dans l'onglet de travail : la page de Vinted ouvre la conversation elle-même.
+    //    Aucun défilement, aucun rendu nécessaire (l'onglet peut rester en arrière-plan). Lien d'application seulement (pas
+    //    d'adresse web connue) ⇒ la page complète des notifications, comme avant.
+    if(page&&!profond){noterDiag('favori_lien_direct');creation=await interfaceVinted(acc,'favoriLien',{lien:page.url,itemId:body.itemId,receiverId:body.recipientId,favori:true});}
+    else creation=await interfaceVinted(acc,'favoriListe',{lien:page?page.url:'',itemId:body.itemId,receiverId:body.recipientId,page:pageNotificationsSure(creation.voirTout||await pageNotifsConnue()),rang:rangCloche,favori:true});
+    // ⚠️ 5.440.2 : une ligne que la PAGE ne montre pas n'est PAS « trop ancienne » — la liste de Vinted (lue plus haut jusqu'à
+    //    sa dernière page) est la seule preuve de l'âge. Pas trouvée sur la page ⇒ rien n'est écrit, et le favori ATTEND un
+    //    nouvel essai (« notification pas encore trouvée ») : jamais sauté pour ça.
+    if(creation.rienParti&&!creation.pause&&(creation.absent===true||creation.sansPage==='identite')){noterDiag('favori_absent_page_'+(creation.fin==='bout'?'bout':creation.fin==='temps'?'temps':'autre'));return rep('refuse',0,'notification_pas_trouvee',rangCloche>=0?'favori_absent:ligne-pas-montree':'favori_absent:liste-pas-lue');}
   }
   if(creation.envoye&&partie(creation))ecrits++;
   if(creation.rienParti&&!creation.pause)return rep('refuse',0,raisonFavoriInterface(creation),causeFavoriInterface(creation));
@@ -26140,8 +26254,10 @@ async function construireRapport() {
     pauses: { vinted: pause, toutArrete: !!(local.vrmToutArrete && local.vrmToutArrete.on === true), republication: heure(local[REPUB_TEMOIN]) },
   };
 }
-async function envoyerRapport() {
+async function envoyerRapport(extra = null) {
   const corps = await construireRapport();
+  // 5.440.3 : « Envoyer l'observation » — le rapport dit qu'une observation est rangée (nombre, début, fin), jamais la frise.
+  if (extra && extra.observation && typeof extra.observation === 'object') corps.observation = { n: Math.max(0, Math.min(OBS_MAX, Math.floor(Number(extra.observation.n) || 0))), debut: Number(extra.observation.debut) || null, fin: Number(extra.observation.fin) || null };
   const session = await authToken().catch(() => null);
   if (!session || !session.access_token) return { ok: false, code: 'sans-session', raison: 'Connecte d’abord l’extension à VRM.' };
   try {
@@ -26150,6 +26266,250 @@ async function envoyerRapport() {
     if (r && r.status === 429) return { ok: false, code: 'trop', raison: 'Déjà plusieurs rapports cette heure. Réessaie plus tard.' };
     return { ok: false, code: 'refus', raison: 'vrm.center n’a pas pris le rapport. Réessaie.' };
   } catch (_) { return { ok: false, code: 'reseau', raison: 'Pas de réseau : rapport pas envoyé.' }; }
+}
+
+// ═══ « OBSERVER VINTED (10 MIN) » (24 nov., 5.440.3) ═════════════════════════════════════════════════════════════════
+// Julien : Bleam réussit les messages aux favoris là où VRM a perdu le chemin (nouvelle messagerie, liens profonds,
+// cloche limitée aux dernières lignes) — « refais-moi une extension qui capte absolument tout ce que fait Bleam ».
+// On ne lit, ne copie ni n'ouvre AUCUN autre outil : on regarde ce que fait la PAGE de Vinted dans SON onglet pendant
+// qu'il envoie, à la main ou avec un autre outil, un message ou une offre à un favori. inject.js note une FRISE de
+// formes (voir `<observation-regle>`) ; ICI chaque entrée est REBÂTIE champ par champ (liste blanche, la même règle
+// rejouée) avant d'être gardée : un champ inconnu tombe, une chaîne qui n'a pas la forme attendue tombe.
+//  · allumé seulement sur SON geste (carte du logo, ou VRM → Paramètres → État des connexions) ; 10 min au plus,
+//    « Arrêter » à tout moment ; 2 000 entrées au plus (au-delà : arrêt, « limite ») ;
+//  · gardé dans `chrome.storage.local` (`vrmObservation`, `vrmObservationEv`), publié dans la ligne DÉDIÉE
+//    `observation_vinted_{compte}_{navigateur}` (un seul écrivain par ligne, jamais `main`), écrite pendant
+//    l'observation (au plus toutes les 15 s), à l'arrêt, et sur « Envoyer l'observation » — qui envoie AUSSI un rapport
+//    de l'extension (`envoyerRapport`, sa liste blanche) disant qu'une observation est là (nombre, début, fin) ;
+//  · AUCUNE requête vers Vinted, aucun clic, aucune touche (CLAUDE.md §3 inchangé) — on ne fait que regarder.
+const OBS_CLE = 'vrmObservation', OBS_EV = 'vrmObservationEv', OBS_LIGNE = 'observation_vinted_';
+const OBS_MS = 10 * 60000, OBS_MAX = 2000, OBS_ALARME = 'vrm-observation-fin';
+const OBS_SORTES = ['page', 'req', 'clic', 'notifs', 'cloche', 'defile'];
+const OBS_TYPES = /^(?:string|number|boolean|null|array|object|form|blob|binaire|flux|texte|undefined)$/;
+// <observation-regle> (24 nov., 5.440.3) — la MÊME dans la page (inject.js) et dans le fond (background.js).
+// « Observer Vinted » ne garde d'une adresse, d'un lien, d'une étiquette que leur FORME : un identifiant devient
+// {id} / {uuid}, une valeur de paramètre {v} (sauf un petit nombre ou une valeur d'énumération connue), un morceau
+// d'adresse qui suit un identifiant ({id}-nike-air…) {id}-{slug}, ce qui suit /member/ {x}, un nom accessible qui
+// n'est pas fait de mots d'interface connus {texte}. Idempotente : la page l'applique, le fond la rejoue.
+const OBS_MOTS = new Set(('notifications notification notifs messages message messagerie boite inbox envoyer send voir tout all see view '
+  + 'fermer close menu rechercher recherche search favoris favori favorites favourites likes profil profile retour back accueil home '
+  + 'faire une un offre offer make proposer propose vendre sell plus more suivant next precedent previous ouvrir open cloche bell '
+  + 'compte account parametres settings deconnexion logout aide help conversation conversations repondre reply valider confirmer '
+  + 'confirm annuler cancel ok oui non yes no le la les de des du a the of to et and mon ma mes ton ta tes my your nouveau nouvelle '
+  + 'new lire read marquer comme lu mark as photo photos article articles item items prix price catalogue catalog membre member '
+  + 'notificaciones mensajes enviar ver todo cerrar buscar favoritos perfil notifiche messaggi invia vedi tutto chiudi cerca '
+  + 'preferiti profilo benachrichtigungen nachrichten senden alle anzeigen schliessen suchen favoriten angebot machen mehr '
+  + 'acheter buy commande order commandes orders dressing wardrobe abonnements').split(' '));
+function obsSegment(s, avant) {
+  let x = String(s == null ? '' : s);
+  if (!x) return x;
+  x = x.replace(/\d{4,}/g, '{id}');
+  if (/^\{(?:id|uuid|hex|x|slug)\}$/.test(x)) return x;
+  if (/^\{id\}[-_.]/.test(x)) return '{id}-{slug}';
+  if (/^(?:member|members|user|users|profile|u)$/i.test(String(avant || '')) && !/^(?:notifications|settings|general|edit|items|favourite_list|favorites|wallet|personalization|signup|login|messages)$/.test(x)) return '{x}';
+  if (x.length > 40 || !/^[A-Za-z0-9_.{}-]+$/.test(x)) return '{x}';
+  return x;
+}
+function obsChemin(p) {
+  const parts = String(cheminNormalise(String(p == null ? '' : p).split(/[?#]/)[0])).split('/');
+  return parts.map((s, i) => (i === 0 ? s : obsSegment(s, parts[i - 1]))).join('/').slice(0, 200);
+}
+function obsCle(k) { const t = String(k == null ? '' : k); return /^[A-Za-z_$][\w$.[\]-]{0,39}$/.test(t) && !/\d{2,}/.test(t) ? t : '{x}'; }   // deux chiffres de suite : un identifiant, un pseudo (« lea_92 »), jamais un nom de champ
+function obsValeur(k, v) {
+  const x = String(v == null ? '' : v);
+  if (x === '' || /^\{(?:id|uuid|v)\}$/.test(x) || /^\d{1,3}$/.test(x)) return x;
+  if (/^\d+$/.test(x)) return '{id}';
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x)) return '{uuid}';
+  if (/^(?:portal|type|source|tab|scope|order|sort|sort_by|status|filter|view|mode|lang|locale|currency)$/i.test(String(k)) && /^[a-z_]{1,20}$/.test(x)) return x;
+  return '{v}';
+}
+// Une forme déjà faite (« api.vinted.fr/inbox/{uuid}?page=2 », « vintedfr://messaging?item_id={id} », « /inbox/{uuid} »)
+// repassée à la règle : ce qui n'a pas cette forme n'est pas gardé.
+function obsFormeSure(s) {
+  const t = String(s == null ? '' : s).slice(0, 400);
+  if (t === '{tiers}') return t;
+  const m = /^((?:[a-z][a-z0-9+.-]{0,20}:\/\/[a-z0-9.-]{0,40})|(?:[a-z0-9-]{1,30}\.){0,3}vinted\.[a-z]{2,3}(?:\.[a-z]{2})?)?(\/[^?#]*)?(?:\?([^#]*))?$/i.exec(t);
+  if (!m) return undefined;
+  const tete = m[1] ? (/^javascript:/i.test(m[1]) ? null : m[1].toLowerCase()) : '';
+  if (tete === null) return undefined;
+  const q = String(m[3] || '').split('&').filter(Boolean).slice(0, 10).map((p) => { const i = p.indexOf('='); const k = obsCle(i < 0 ? p : p.slice(0, i)); return k + '=' + obsValeur(k, i < 0 ? '' : p.slice(i + 1)); });
+  return (tete + obsChemin(m[2] || '') + (q.length ? '?' + q.join('&') : '')).slice(0, 300);
+}
+function obsLien(v, origine) {
+  let u, o0 = '';
+  try { o0 = new URL(String(origine || 'https://www.vinted.fr')).hostname; } catch (_) { o0 = ''; }
+  try { u = new URL(String(v == null ? '' : v), origine || 'https://www.vinted.fr'); } catch (_) { return undefined; }
+  let tete = '';
+  if (/^https?:$/.test(u.protocol)) tete = u.hostname === o0 ? '' : (/(?:^|\.)vinted\.[a-z.]{2,6}$/i.test(u.hostname) ? u.hostname : '{tiers}');
+  else if (/^[a-z][a-z0-9+.-]{0,20}:$/.test(u.protocol) && u.protocol !== 'javascript:' && u.protocol !== 'data:' && u.protocol !== 'blob:') tete = u.protocol + '//' + (/^[a-z0-9.-]{0,40}$/i.test(u.hostname) ? u.hostname : 'x');
+  else return undefined;
+  if (tete === '{tiers}') return tete;
+  const q = []; for (const [k, val] of u.searchParams) { if (q.length >= 10) break; const ck = obsCle(k); q.push(ck + '=' + obsValeur(ck, val)); }
+  let p = u.pathname; try { p = decodeURIComponent(p); } catch (_) {}
+  return obsFormeSure(tete + obsChemin(p) + (q.length ? '?' + q.join('&') : ''));
+}
+function obsAria(s) {
+  const t = String(s == null ? '' : s).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ß/g, 'ss');
+  if (!t) return undefined;
+  const mots = t.split(/[\s'’,.:;!?()«»"/|·-]+/).filter(Boolean);
+  if (!mots.length || mots.length > 5 || !mots.every((w) => OBS_MOTS.has(w))) return '{texte}';
+  return mots.join(' ');
+}
+function obsTestid(s) {
+  const t = String(s == null ? '' : s).slice(0, 80).replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '{uuid}').replace(/\d{3,}/g, '{id}');
+  return /^[A-Za-z0-9_{}.:-]{1,60}$/.test(t) ? t : (t ? '{x}' : undefined);
+}
+// </observation-regle>
+// UNE entrée, rebâtie. `o` = le n° d'onglet (1, 2, 3… : un autre outil peut travailler dans son propre onglet).
+function entreeObservation(e, o) {
+  if (!e || typeof e !== 'object' || !OBS_SORTES.includes(e.k)) return null;
+  const t = Number(e.t);
+  if (!Number.isSafeInteger(t) || t < 1.5e12) return null;
+  const x = { t, k: e.k };
+  if (Number.isInteger(o) && o >= 1 && o <= 50) x.o = o;
+  const ent = (v, max = 100000) => (Number.isSafeInteger(Number(v)) && Number(v) >= 0 && Number(v) <= max ? Number(v) : undefined);
+  const forme = (v) => (typeof v === 'string' ? obsFormeSure(v) : undefined);
+  const formes = (l) => (Array.isArray(l) ? l.slice(0, 8).map(forme).filter(Boolean) : []);
+  const cles = (l) => (Array.isArray(l) ? l.slice(0, 10).map(obsCle) : []);
+  const corps = (l) => (Array.isArray(l) ? l.slice(0, 40).map((s) => { const m = /^(.{1,120}):([a-z]{1,12})$/.exec(String(s || '')); if (!m || !OBS_TYPES.test(m[2])) return null; const ch = m[1] === '(racine)' ? m[1] : m[1].split('.').map((p) => { const a = /^(.*?)((?:\[\])*)$/.exec(p); return obsCle(a[1]) + a[2]; }).join('.'); return ch + ':' + m[2]; }).filter(Boolean) : []);
+  if (e.k === 'page') { const p = obsFormeSure(String(e.p || '')); if (p === undefined) return null; x.p = p; x.q = cles(e.q); return x; }
+  if (e.k === 'req') {
+    const m = String(e.m || '').toUpperCase(); if (!/^(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/.test(m)) return null;
+    const h = String(e.h == null ? '' : e.h).toLowerCase();
+    if (h && !/^(?:[a-z0-9-]{1,30}\.){0,3}(?:vinted\.[a-z]{2,3}(?:\.[a-z]{2})?|captcha-delivery\.com|datadome\.co)$/.test(h)) return null;
+    const p = obsFormeSure(String(e.p || '')); if (p === undefined) return null;
+    Object.assign(x, { via: e.via === 'xhr' ? 'xhr' : 'fetch', m, h, p, st: ent(e.st, 999) || 0, q: cles(e.q), corps: corps(e.corps) });
+    if (ent(e.ms, 600000) !== undefined) x.ms = ent(e.ms, 600000);
+    if (typeof e.ct === 'string' && /^[a-z]+\/[a-z0-9.+-]{1,40}$/.test(e.ct)) x.ct = e.ct;
+    if (e.rep && typeof e.rep === 'object' && !Array.isArray(e.rep)) {
+      const r = {}; for (const k of Object.keys(e.rep).slice(0, 30)) { const ck = String(k).split('.').map(obsCle).join('.'); const ty = String(e.rep[k]); if (OBS_TYPES.test(ty)) r[ck.slice(0, 82)] = ty; }
+      x.rep = r;
+    }
+    return x;
+  }
+  if (e.k === 'clic') {
+    x.conf = e.conf === true;
+    x.tag = /^[a-z][a-z0-9-]{0,19}$/.test(String(e.tag || '')) ? String(e.tag) : 'x';
+    if (/^[a-z]{1,20}$/.test(String(e.role || ''))) x.role = e.role;
+    if (e.tid != null) { const v = obsTestid(e.tid); if (v) x.tid = v; }
+    if (e.aria != null) { const v = obsAria(e.aria); if (v) x.aria = v; }
+    if (typeof e.ouvert === 'boolean') x.ouvert = e.ouvert;
+    if (e.popup === true) x.popup = true;
+    if (Array.isArray(e.anc)) { const a = e.anc.slice(0, 4).map(obsTestid).filter(Boolean); if (a.length) x.anc = a; }
+    if (e.entete && typeof e.entete === 'object') { const i = ent(e.entete.i, 500), n = ent(e.entete.n, 500); if (i !== undefined && n !== undefined) x.entete = { i, n }; }
+    if (e.href != null) { const v = forme(e.href); if (v) x.href = v; }
+    if (/^[a-z]{1,12}$/.test(String(e.type || ''))) x.type = e.type;
+    return x;
+  }
+  if (e.k === 'notifs') {
+    x.n = ent(e.n, 10000) || 0; x.formes = formes(e.formes);
+    const s = {}; if (e.sortes && typeof e.sortes === 'object') for (const k of Object.keys(e.sortes).slice(0, 20)) if (/^\d{1,4}$/.test(k) && ent(e.sortes[k], 10000) !== undefined) s[k] = ent(e.sortes[k], 10000);
+    x.sortes = s;
+    for (const k of ['page', 'pp', 'tp']) if (ent(e[k], 100000) !== undefined) x[k] = ent(e[k], 100000);
+    return x;
+  }
+  if (e.k === 'cloche' || e.k === 'defile') {
+    x.lignes = ent(e.lignes, 10000) || 0; x.formes = formes(e.formes);
+    if (e.k === 'cloche') x.pourquoi = e.pourquoi === 'page' ? 'page' : 'clic';
+    else if (ent(e.avant, 10000) !== undefined) x.avant = ent(e.avant, 10000);
+    return x;
+  }
+  return null;
+}
+let _chaineObs = Promise.resolve();
+function surObs(fn) { const p = _chaineObs.then(fn, fn); _chaineObs = p.then(() => {}, () => {}); return p; }
+async function lireObsBrut() { try { const x = await chrome.storage.local.get([OBS_CLE, OBS_EV]); return { s: x[OBS_CLE] || null, ev: Array.isArray(x[OBS_EV]) ? x[OBS_EV] : [] }; } catch (_) { return { s: null, ev: [] }; } }
+// Ce que la carte et l'app montrent : l'état, jamais la frise.
+function vueObservation(s, n) {
+  if (!s || typeof s !== 'object') return { actif: false, n: 0 };
+  return { actif: s.actif === true && Number(s.fin) > Date.now(), debut: Number(s.debut) || null, fin: Number(s.fin) || null, raison: s.raison || '', n: Number(n) || 0, ecritAt: Number(s.ecritAt) || null, envoyeAt: Number(s.envoyeAt) || null, ligne: s.ligne || null };
+}
+// Fin par le temps : constatée à chaque lecture (le service worker a pu dormir), puis la ligne écrite une dernière fois.
+async function finObsSiEchue() {
+  const { s } = await lireObsBrut();
+  if (s && s.actif === true && !(Number(s.fin) > Date.now())) { s.actif = false; s.raison = 'delai'; await chrome.storage.local.set({ [OBS_CLE]: s }); return true; }
+  return false;
+}
+async function demarrerObservation() {
+  return surObs(async () => {
+    const t = Date.now();
+    let uid = null; try { uid = await avecDelai(compteConnecte('www.vinted.fr'), 2500, null); } catch (_) { uid = null; }
+    const s = { actif: true, debut: t, fin: t + OBS_MS, raison: '', uid: /^\d{1,20}$/.test(String(uid || '')) ? String(uid) : null, onglets: {}, ecritAt: null, envoyeAt: null, ligne: null };
+    await chrome.storage.local.set({ [OBS_CLE]: s, [OBS_EV]: [] });
+    try { chrome.alarms && chrome.alarms.create(OBS_ALARME, { when: s.fin + 1000 }); } catch (_) {}
+    noterDiag('observation_debut');
+    return Object.assign({ ok: true }, vueObservation(s, 0));
+  });
+}
+async function arreterObservation(raison = 'manuel') {
+  const r = await surObs(async () => {
+    const { s, ev } = await lireObsBrut();
+    if (!s) return { ok: true, actif: false, n: 0 };
+    if (s.actif === true) { s.actif = false; s.raison = Number(s.fin) > Date.now() ? raison : 'delai'; await chrome.storage.local.set({ [OBS_CLE]: s }); }
+    try { chrome.alarms && chrome.alarms.clear(OBS_ALARME); } catch (_) {}
+    return Object.assign({ ok: true }, vueObservation(s, ev.length));
+  });
+  await ecrireLigneObservation().catch(() => null);
+  return r;
+}
+let _obsMinut = null;
+async function recevoirObservation(domain, ev, sender) {
+  return surObs(async () => {
+    await finObsSiEchue();
+    const { s, ev: l } = await lireObsBrut();
+    if (!s || s.actif !== true) return { actif: false };
+    const tab = sender && sender.tab && Number.isInteger(sender.tab.id) ? String(sender.tab.id) : '?';
+    if (!s.onglets || typeof s.onglets !== 'object') s.onglets = {};
+    if (!s.onglets[tab]) s.onglets[tab] = Object.keys(s.onglets).length + 1;
+    let pris = 0;
+    for (const e of (Array.isArray(ev) ? ev : []).slice(0, 100)) {
+      const x = entreeObservation(e, s.onglets[tab]);
+      if (!x || x.t < s.debut - 5000 || x.t > s.fin + 5000) continue;
+      if (l.length >= OBS_MAX) { s.actif = false; s.raison = 'limite'; break; }
+      l.push(x); pris++;
+    }
+    l.sort((a, b) => a.t - b.t);
+    await chrome.storage.local.set({ [OBS_CLE]: s, [OBS_EV]: l });
+    if (s.actif !== true) { try { chrome.alarms && chrome.alarms.clear(OBS_ALARME); } catch (_) {} setTimeout(() => { ecrireLigneObservation().catch(() => null); }, 0); }
+    else if (!_obsMinut) _obsMinut = setTimeout(() => { _obsMinut = null; ecrireLigneObservation().catch(() => null); }, 15000);
+    return { actif: s.actif === true, pris };
+  });
+}
+// La ligne `observation_vinted_{compte}_{navigateur}` : la frise entière, rebâtie une seconde fois (rien qui ne passe la règle).
+async function ecrireLigneObservation() {
+  await finObsSiEchue().catch(() => false);
+  const { s, ev } = await lireObsBrut();
+  if (!s || !ev.length) return { ok: false, code: 'vide' };
+  const moi = await idNavigateur();
+  if (!moi) return { ok: false, code: 'navigateur' };
+  let uid = s.uid; if (!uid) { try { uid = await activeAccountId('www.vinted.fr'); } catch (_) { uid = null; } }
+  const compte = /^\d{1,20}$/.test(String(uid || '')) ? String(uid) : 'inconnu';
+  const id = `${OBS_LIGNE}${compte}_${moi}`;
+  const e2 = ev.map((x) => entreeObservation(x, x && x.o)).filter(Boolean);
+  const data = { v: 1, uid: compte, nav: moi, ver: CODE_VERSION, at: new Date().toISOString(), debut: Number(s.debut) || null, fin: Number(s.fin) || null, actif: s.actif === true && Number(s.fin) > Date.now(), raison: s.raison || '', n: e2.length, max: OBS_MAX, onglets: Object.keys(s.onglets || {}).length, ev: e2 };
+  let ok = false;
+  try { ok = (await supabaseUpsert('app_data', [{ id, data }], 'id', null, { rejeu: true })) === true; } catch (_) { ok = false; }
+  await surObs(async () => { const x = await lireObsBrut(); if (x.s && x.s.debut === s.debut) { x.s.ecritAt = ok ? Date.now() : x.s.ecritAt; x.s.ligne = id; await chrome.storage.local.set({ [OBS_CLE]: x.s }); } });
+  if (!ok) noterDiag('observation_ecriture_ratee');
+  return { ok, id, n: e2.length };
+}
+// « Envoyer l'observation » : la ligne écrite tout de suite, puis un rapport de l'extension qui la signale.
+async function envoyerObservation() {
+  const w = await ecrireLigneObservation();
+  if (!w.ok) return { ok: false, code: w.code || 'ecriture', raison: w.code === 'vide' ? 'Rien d’observé pour l’instant : allume « Observer Vinted », puis fais ton envoi sur Vinted.' : 'L’observation n’a pas pu être enregistrée. Réessaie.' };
+  const { s } = await lireObsBrut();
+  const r = await envoyerRapport({ observation: { n: w.n, debut: Number(s && s.debut) || null, fin: Number(s && s.fin) || null } }).catch(() => ({ ok: false }));
+  await surObs(async () => { const x = await lireObsBrut(); if (x.s) { x.s.envoyeAt = Date.now(); await chrome.storage.local.set({ [OBS_CLE]: x.s }); } });
+  return { ok: true, n: w.n, ligne: w.id, rapport: r && r.ok === true };
+}
+async function commandeObservation(msg) {
+  const quoi = String((msg && msg.quoi) || 'etat');
+  if (quoi === 'demarrer') return demarrerObservation();
+  if (quoi === 'arreter') return arreterObservation('manuel');
+  if (quoi === 'envoyer') return envoyerObservation();
+  if (await finObsSiEchue().catch(() => false)) await ecrireLigneObservation().catch(() => null);
+  const { s, ev } = await lireObsBrut();
+  return Object.assign({ ok: true }, vueObservation(s, ev.length));
 }
 
 // ── 5. LA FILE « EN ATTENTE DE RÉSEAU » ──────────────────────────────────────
@@ -27919,6 +28279,8 @@ async function executerCommande(msg) {
   }
   // 5.371 : « Envoyer un rapport » depuis « Tout va bien ? » de l'app, et la file
   //    « en attente de réseau » (annuler un geste).
+  // 5.440.3 : « Observer Vinted » depuis VRM (Paramètres → État des connexions).
+  if (msg && msg.cmd === 'observation') { const r = await commandeObservation(msg); return r && r.ok ? Object.assign({ accepte: true, etape: 'fait' }, r) : { accepte: false, code: (r && r.code) || 'refus', raison: (r && r.raison) || 'pas fait' }; }
   if (msg && msg.cmd === 'rapportExtension') { const r = await envoyerRapport(); return r.ok ? { accepte: true, etape: 'fait', at: r.at } : { accepte: false, code: r.code, raison: r.raison }; }
   if (msg && msg.cmd === 'fileReseauAnnuler') { const r = await annulerFileReseau(String(msg.id || '')); return r.ok ? { accepte: true, etape: 'fait' } : { accepte: false, code: r.code || 'inconnu', raison: 'ce geste n’est plus en attente' }; }
   // 11 nov. (5.366) : « Tout arrêter » / « Relancer » depuis VRM — tout de suite dans CE navigateur
@@ -37162,10 +37524,10 @@ ${lettre[1]}`;
   }
 
   // src/favorisProgression.js
-  var RAISONS_LOCALES = Object.freeze(["element_introuvable", "identite_non_confirmee", "historique_non_verifie"]);
+  var RAISONS_LOCALES = Object.freeze(["notification_pas_trouvee", "element_introuvable", "identite_non_confirmee", "historique_non_verifie"]);
   var RAISONS_SAUT = Object.freeze(["favori_trop_ancien", "annonce_indisponible", "article_vendu", "conversation_deja_contactee", "conversation_existante", "offre_sous_plancher", "conversation_refusee"]);
-  var MOTS_SAUT = Object.freeze({ favori_trop_ancien: "trop anciens pour Vinted", annonce_indisponible: "vendus ou indisponibles", conversation_deja_contactee: "déjà en conversation", offre_sous_plancher: "offre sous le prix mini", conversation_refusee: "conversation refusée par Vinted", autre: "autres" });
-  var MOTS_REFUS = Object.freeze({ element_introuvable: "bouton ou champ introuvable sur la page de Vinted", identite_non_confirmee: "article ou destinataire pas confirmé", historique_non_verifie: "conversation pas vérifiée", texte_interdit: "texte contenant un lien, un e-mail, un téléphone ou un paiement hors Vinted", texte_refuse: "texte refusé par Vinted", vinted_robot: "vérification anti-robot de Vinted", pause_vinted: "Vinted demande de ralentir", vinted_frein: "Vinted demande de ralentir", offre_refusee: "offre refusée par Vinted", autre: "autre refus" });
+  var MOTS_SAUT = Object.freeze({ favori_trop_ancien: "pas trouvés dans tes notifications", annonce_indisponible: "vendus ou indisponibles", conversation_deja_contactee: "déjà en conversation", offre_sous_plancher: "offre sous le prix mini", conversation_refusee: "conversation refusée par Vinted", autre: "autres" });
+  var MOTS_REFUS = Object.freeze({ notification_pas_trouvee: "notification en recherche (VRM réessaie seul)", element_introuvable: "bouton ou champ introuvable sur la page de Vinted", identite_non_confirmee: "article ou destinataire pas confirmé", historique_non_verifie: "conversation pas vérifiée", texte_interdit: "texte contenant un lien, un e-mail, un téléphone ou un paiement hors Vinted", texte_refuse: "texte refusé par Vinted", vinted_robot: "vérification anti-robot de Vinted", pause_vinted: "Vinted demande de ralentir", vinted_frein: "Vinted demande de ralentir", offre_refusee: "offre refusée par Vinted", autre: "autre refus" });
   function phraseBilanFavoris(b, mot) {
     if (!b) return "";
     const m = (c, f) => typeof mot === "function" && mot(c, f) || (f === "saut" ? MOTS_SAUT : MOTS_REFUS)[c] || c;

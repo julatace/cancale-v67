@@ -61,7 +61,8 @@ const MUTATIONS = {
 
 (async () => {
   if (process.argv.includes('--prouve')) return prouver(__filename, R, MUTATIONS);
-  const APP = sansCommentaires(lire('src/App.jsx'));
+  // (24 nov., main-vert) App.jsx découpé (src/ecrans/*.jsx) : l'app se lit RECOLLÉE (_source-app.cjs).
+  const APP = sansCommentaires(require('./_source-app.cjs').sourceApp(R));
   const STOCK = sansCommentaires(lire('src/ecrans/Stock.jsx'));
   const COMPTA = sansCommentaires(lire('src/ecrans/Compta.jsx'));
   const ACHATS = sansCommentaires(lire('src/ecrans/Achats.jsx'));
@@ -204,7 +205,10 @@ const MUTATIONS = {
   // ── L. N° par cleNum ──────────────────────────────────────────────────────
   {
     const i = APP.indexOf('const bordForItem = '), g = i < 0 ? '' : APP.slice(i, APP.indexOf('\n  };', i));
-    dit(/cleNum\(bb\.numero\) === cleNum\(numero\)/.test(g), 'L1 bordereau ⇄ fiche par `cleNum` (« 07 » = « 7 »)');
+    // (20 nov., bugs-terrain) `bordForItem` passe par un INDEX (`indexBordsItem`) rangé par `cleNum(bb.numero)`, lu par `cleNum(numero)`.
+    const jIx = APP.indexOf('const indexBordsItem = '), ix = jIx < 0 ? '' : APP.slice(jIx, APP.indexOf('\n};', jIx));
+    dit(/cleNum\(bb\.numero\) === cleNum\(numero\)/.test(g)
+      || (/const k = cleNum\(numero\);/.test(g) && /ix\.parNum\.get\(k\)/.test(g) && /const k = cleNum\(bb\.numero\);[^\n]*parNum\.set\(k,/.test(ix)), 'L1 bordereau ⇄ fiche par `cleNum` (« 07 » = « 7 »)');
     const j = STOCK.indexOf('const numeroExists ='), h = j < 0 ? '' : STOCK.slice(j, j + 300);
     dit(/cleNum\(/.test(h) && !/toLowerCase\(\)/.test(h), 'L2 inventaire : un N° déjà pris se reconnaît par `cleNum`');
   }
