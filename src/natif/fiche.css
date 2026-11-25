@@ -143,9 +143,6 @@
   .nf-site-lien:focus-visible::after { outline: 2px solid var(--n-accent); outline-offset: 2px; }
   .nf-site[data-nf-lien] .nf-geste { position: relative; z-index: 1; }
   .nf-site + .nf-site { box-shadow: inset 0 .5px 0 var(--n-trait); }
-  /* (25 nov., moins-texte-a) Pas publiée + « Publier » : une seule ligne (le nom, le bouton) — « Pas publiée » n'est plus écrit. */
-  .nf:not([data-nf-ordi]) .nf-site[data-nf-geste="1"][data-nf-vide-site="1"] { grid-template-areas: "site compte compte compte compte etat"; }
-  .nf:not([data-nf-ordi]) .nf-site[data-nf-geste="1"][data-nf-vide-site="1"] :is(.nf-c-prix, .nf-c-vues, .nf-c-fav, .nf-c-date) { display: none; }
   .nf-site-tete { display: none; }
   .nf-c-site { grid-area: site; display: inline-flex; align-items: center; gap: 10px; min-width: 0; font: var(--n-t-corps-fort); }
   .nf-site:not(.nf-site-tete) .nf-c-site .nf-site-nom { display: none; }
@@ -181,6 +178,11 @@
   .nf-site[data-nf-vide-site] .nf-c-etat { display: contents; }
   .nf-site[data-nf-vide-site] .nf-etat-ligne { grid-area: etat; justify-self: start; display: inline-flex; align-items: center; }
   .nf-site[data-nf-vide-site] .nf-geste { grid-area: geste; align-self: center; justify-self: end; }
+  /* (25 nov., moins-texte-a) Pas publiée + « Publier » : « Pas publiée » n'est plus écrit (le bouton le dit) — le nom du site au
+     milieu de la rangée, à côté du bouton ; l'état reste au lecteur d'écran, hors de la grille. */
+  .nf:not([data-nf-ordi]) .nf-site[data-nf-vide-site][data-nf-geste="1"][data-fiche-site-etat="pas-publiee"] { grid-template-areas: "site compte compte compte compte geste" "site compte compte compte compte geste"; }
+  .nf:not([data-nf-ordi]) .nf-site[data-nf-vide-site][data-nf-geste="1"][data-fiche-site-etat="pas-publiee"] .nf-c-compte { align-self: center; }
+  .nf:not([data-nf-ordi]) .nf-site[data-nf-vide-site][data-nf-geste="1"][data-fiche-site-etat="pas-publiee"] .nf-etat-ligne { position: absolute; }
   .nf-compte-etat { display: none; }
   .nf-c-fav[data-nf-vide] .nf-coeur { display: none; }
   .nf-date-court { display: none; }

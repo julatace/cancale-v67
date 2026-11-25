@@ -74,7 +74,7 @@ export default function RepublierPriorite({ res, lignes, coches, onBasculer, onT
       {/* UNE ligne fine : ce que la liste est, et ses deux réglages (au toucher, une feuille). */}
       {/* (25 nov., moins-texte-a) « ≥ 30 j · 10/jour » à l'œil (la lune dit « les plus endormies d'abord ») ; la phrase entière au lecteur d'écran. */}
       <button type="button" className="n-rp-reglages" data-prio-reglages="" onClick={() => setReglages(true)} aria-label={tr('prio.resumeLong', { jours: r.jours, n: r.parJour })}>
-        {Icon ? <Icon name="sleep" size={15} aria-hidden="true"/> : null}
+        {Icon ? <Icon name="sleep" size={15} aria-hidden="true" style={{ color: "currentColor" }}/> : null}
         <span className="n-rp-reglages-texte" aria-hidden="true">{tr('prio.resume', { jours: r.jours, n: r.parJour })}</span>
         <Glyphe nom="chevron" taille={14}/>
       </button>
