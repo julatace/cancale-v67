@@ -470,7 +470,7 @@ export default {
   "journee.prevu.points": {"one":"{debut} et {n} autre point","other":"{debut} et {n} autres points"},
   "ach.plus.bouton": "Plus d’actions",
   "ach.plus.ajouter": "Ajouter un achat",
-  "ach.plus.arrivee": "Scanner un colis arrivé",
+  "ach.plus.arrivee": "Scanner un colis",
   // (21 nov., lot relier-code) la carte de retrait en billet
   "retraits.b.code": "Code de retrait",
   "retraits.b.plein": "Plein écran",

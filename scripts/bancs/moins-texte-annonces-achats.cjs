@@ -107,6 +107,8 @@ const MESURER = ({ donnees, fiche, ignorer }) => {
       const cs = getComputedStyle(x);
       if (cs.visibility === 'hidden' || cs.display === 'none' || Number(cs.opacity) < 0.05) return false;
     }
+    // Le contenu d'un <details> FERMÉ (« Pourquoi ? ») n'est pas peint : seul son <summary> se voit.
+    for (let d = el.closest('details:not([open])'); d; d = d.parentElement && d.parentElement.closest('details:not([open])')) { const sm = d.querySelector(':scope > summary'); if (!sm || !sm.contains(el)) return false; }
     const cs = getComputedStyle(el);
     if (parseFloat(cs.fontSize) < 4) return false;
     const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/.exec(cs.color); if (m && m[4] != null && Number(m[4]) < 0.05) return false;
@@ -146,7 +148,8 @@ const MESURER = ({ donnees, fiche, ignorer }) => {
   // Un nombre (et son unité), une date courte, un montant : des données.
   texte = texte.replace(/(\d)[\s\u202f\u00a0](?=\d)/g, '$1')
     .replace(/[-+−≥~]?\d[\d.,:×/]*\s*(?:€|%|j\b|h\b|min\b|mois\b|ans?\b|jours?\b|(?:janv|févr|mars|avr|mai|juin|juil|août|sept|oct|nov|déc)\.?)?/gi, ' ⟦n⟧ ');
-  const mots = texte.split(/\s+/).filter((w) => /[\p{L}]/u.test(w) && !/^⟦[dn]⟧$/.test(w) && !/^N°$/i.test(w));
+  // Une lettre seule (l'initiale d'un avatar, « V ») n'est pas un mot lu.
+  const mots = texte.split(/\s+/).filter((w) => /[\p{L}]/u.test(w) && w.replace(/[^\p{L}]/gu, '').length > 1 && !/^⟦[dn]⟧$/.test(w) && !/^N°$/i.test(w));
   // T : un chiffre ou un titre rogné.
   const coupes = [];
   for (const e of racine.querySelectorAll('*')) {

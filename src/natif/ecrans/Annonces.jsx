@@ -497,7 +497,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
         {onPublier && !ordinateur ? <Groupe><Rangee icone={Icon ? <Icon name="plus" size={22}/> : <Glyphe nom="plus" taille={22}/>} titre={tr('egalite.publier')} fin="chevron"
           onClick={() => { setMenuActions(false); onPublier(); }} attrs={{ 'data-eg-publier': '' }}/></Groupe> : null}
         {/* (24 nov.) L'affichage vit ici (plus dans la barre du haut) : Liste par défaut, Détaillé (les tuiles). */}
-        {!ordinateur ? <Groupe titre={tr('inv.affichage')} attrs={{ 'data-ad-affichage': vueG ? 'grille' : 'liste' }}>
+        {!ordinateur ? <Groupe attrs={{ 'data-ad-affichage': vueG ? 'grille' : 'liste', role: 'group', 'aria-label': tr('inv.affichage') }}>
           {['liste', 'grille'].map((v) => <Rangee key={v} icone={Icon ? <Icon name={v === 'liste' ? 'menu' : 'grid'} size={22}/> : null} titre={tr('inv.vue.' + v)} fin={vueTel === v ? 'coche' : null}
             onClick={() => { setMenuActions(false); if (vueTel !== v) basculerVue(); }} attrs={{ 'data-ad-vue-choix': v }}/>)}
         </Groupe> : null}

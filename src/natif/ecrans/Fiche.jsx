@@ -158,7 +158,8 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
               {etat ? <span className="nf-etiquette" data-nf-ton={etat.rouge ? 'doublon' : etat.ambre ? 'ambre' : 'neutre'} data-fd-etat={etat.cle} data-fd-ambre={etat.ambre ? '1' : '0'} data-fd-limite={etat.limite ? (etat.limite.jour || '') : undefined}>{T.etat(etat)}</span>
                 : sans && sans.prix ? <span className="nf-etiquette" data-fd-etat="sans">{sans.prix}</span> : null}
               {quandF && suDe(quandF, quandV) ? <span className="nf-etiquette" {...attrsFait(quandF, true, null)}>{T.libelle(quandF.lib) + ' ' + quandV}{quandF.auMoins ? ' ' + T.auMoins : ''}</span> : null}
-              {tailleF && suDe(tailleF, valeurDe(tailleF)) ? <span className="nf-etiquette" data-nf-taille="" {...attrsFait(tailleF, true, null)}>{T.libelle(tailleF.lib) + ' ' + valeurDe(tailleF)}</span> : null}
+              {/* (25 nov., moins-texte-a) La taille déjà écrite dans le titre (« … taille 36 ») n'a pas sa seconde étiquette (§7). */}
+              {tailleF && suDe(tailleF, valeurDe(tailleF)) && !(T.titreBrut && new RegExp('(^|[\\s,·(])' + String(valeurDe(tailleF)).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[\\s,·)])', 'i').test(T.titreBrut)) ? <span className="nf-etiquette" data-nf-taille="" {...attrsFait(tailleF, true, null)}>{T.libelle(tailleF.lib) + ' ' + valeurDe(tailleF)}</span> : null}
               {suiteEtat}
               {etat && etat.pourquoi && T.pourquoi ? <Bouton variante="texte" className="nf-pourquoi" onClick={() => setPourquoi((v) => !v)} attrs={{ 'aria-expanded': pourquoi ? 'true' : 'false', 'data-fd-pourquoi': etat.pourquoi }}>{T.pourquoi}</Bouton> : null}
             </div>
@@ -177,7 +178,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
           {ligneSeule ? <p className="nf-situe" data-nf-ton={ligneSeule.ambre ? 'ambre' : 'neutre'} data-fd-ligne-action="" {...(ligneSeule.attrs || {})}>{[ligneSeule.titre, ligneSeule.valeur].filter(Boolean).join(' · ')}</p> : null}
           {/* (23 nov., revue UX #11) Informations juste sous le prix et les actions : le prix d'achat et le prix mini se voient sans défiler. */}
           {lignesInfos.length ? <section className="nf-section" aria-label={T.infos}>
-            <h3 className="nf-section-titre">{T.infos}</h3>
+            <h3 className="nf-section-titre vrm-sr-seul">{T.infos}</h3>
             <dl className="nf-tableau" data-nf-infos="">
               {lignesInfos.map((f) => {
                 const v = valeurDe(f); const su = suDe(f, v); const porte = porteDe(f);
