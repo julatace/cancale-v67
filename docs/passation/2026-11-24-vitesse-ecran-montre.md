@@ -227,3 +227,27 @@ paires plus rapides, charge 3,8–13) et 6 479 → 4 594 (5/5). Annonces : méla
 ci-dessus) — pas de gain prouvé. ⚠️ À FROID : plus lent dans 12 paires sur 15 sur les trois AB (médianes +269, +957, +333 ms ;
 un quatrième AB, sous forte charge, disait l'inverse 5/5). Cause pas trouvée (piste : les lectures des bordereaux lancées
 avec les transactions, ou les comparaisons de contenu pendant l'arrivée du nuage). À mesurer avant de fusionner.
+
+### 8 ter. À froid ramené au niveau de la PR A (25 nov., demande du coordinateur : « sans latence »)
+Les deux pistes ont été essayées une à une, contre A, dans un AB à 4 builds (5 passes alternées, charge au départ 6,3 mais
+montée à 22) : B tel quel, (a) les bordereaux relus APRÈS les transactions comme avant, (b) aucune comparaison de contenu
+(`memeContenu`) pendant l'arrivée du premier nuage. Médianes à froid : A 10 070 · B 9 849 · (a) 10 120 · (b) 9 714 ; Achats
+A 6 791 · B 4 403 · (a) 5 348 · (b) 5 705. (a) n'aide pas : les bordereaux restent lus avec les transactions. (b) est gardée :
+`memeContenu` répond « différent » tant que le premier chargement complet n'est pas fini (`nuageCharge()`, posé par App.jsx
+juste après `onCloudReady`). À l'ouverture, l'appareil passe de rien aux données : comparer ne servait à rien et coûtait.
+
+AB de confirmation A contre B + (b), 5 passes, **charge 2,9 → 6,3 (propre)** :
+
+| 1re visite | A (5 passes) | B + (b) (5 passes) | médiane A → B | écart par paire (B − A) |
+|---|---|---|---|---|
+| **à froid** | 7 743 · 8 345 · 8 081 · 7 421 · 8 296 | 8 012 · 7 750 · 7 745 · 8 491 · 8 588 | **8 081 → 8 012** | +269 −595 −336 +1 070 +292 |
+| **Achats** | 4 689 · 5 025 · 4 504 · 4 258 · 4 984 | 3 479 · 3 459 · 3 641 · 2 971 · 3 716 | **4 689 → 3 479** | −1 210 −1 566 −863 −1 287 −1 268 |
+| Annonces | 3 773 · 3 642 · 3 892 · 3 420 · 5 259 | 3 696 · 3 774 · 2 920 · 3 390 · 4 450 | 3 773 → 3 696 | −77 +132 −972 −30 −809 |
+| Ventes | 2 333 · 2 379 · 2 427 · 2 414 · 2 544 | 1 847 · 2 428 · 2 046 · 2 037 · 2 498 | 2 414 → 2 046 | −486 +49 −381 −377 −46 |
+| Argent | 1 010 · 1 045 · 1 731 · 1 113 · 1 440 | 1 469 · 1 721 · 1 376 · 1 752 · 1 382 | 1 113 → 1 469 | +459 +676 −355 +639 −58 |
+| Ma journée | 1 510 · 1 523 · 1 494 · 1 640 · 1 687 | 1 594 · 1 639 · 1 470 · 1 382 · 1 577 | 1 523 → 1 577 | +84 +116 −24 −258 −110 |
+
+À froid : médiane au niveau de A (−69 ms ; paires mélangées, 3 plus lentes, 2 plus rapides). Achats −1,2 s, 5 paires sur 5.
+⚠️ Argent (1re visite) +356 ms en médiane, 3 paires sur 5 plus lentes : pas étudié.
+`chiffres-volume` A contre B + (b), lancés ensemble : 35/35, 12/12 identiques. Garde `calculs-ecran-montre` sur le build
+final (avec `main`) : verte.
