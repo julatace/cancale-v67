@@ -135,7 +135,7 @@ export default function DiviserAchat({ ouverte = false, onFermer, achat = null, 
           <Rangee titre={tr('lotachat.changerRepartition')} fin="chevron" onClick={() => { setMode(division.mode); setManuels(division.parts.map((p) => pourTexte(p.prix))); setVue('repartir'); }} attrs={{ 'data-lot-changer': '' }}/>
         </Groupe>
         <Groupe titre={tr('lotachat.historique')}>
-          {(division.historique || []).slice().reverse().map((h, i) => <Rangee key={i} titre={tr('lotachat.geste.' + h.geste, { n: h.n })}
+          {(division.historique || []).slice().reverse().map((h) => <Rangee key={`${h.at || ''}:${h.geste}:${h.n}:${h.total}`} titre={tr('lotachat.geste.' + h.geste, { n: h.n })}
             sousTitre={[h.at ? new Date(h.at).toLocaleString() : '', tr('lotachat.mode.' + (h.mode || 'egal'))].filter(Boolean).join(' · ')} valeur={eur(h.total)} attrs={{ 'data-lot-historique': h.geste }}/>)}
         </Groupe>
         <div className="n-lot-regrouper">

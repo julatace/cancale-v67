@@ -46,6 +46,15 @@ jobs:
           NAVIGATEUR: webkit
           SHOTS: banc-iphone
         run: node scripts/bancs/relier-glisser-iphone.cjs
+      # (24 nov., parcours-iphone — « elle bug trop encore ») La journée de Julien jouée au doigt : chaque onglet,
+      # une vente, imprimer, le code en grand, une annonce, Argent, Messages, Paramètres, la loupe, tourner, quitter
+      # et revenir, réseau lent. Ici (machine à soi) le seuil d'une seconde après un toucher est rouge (CI=true).
+      - name: Parcours de la journée sous WebKit
+        if: always()
+        env:
+          NAVIGATEUR: webkit
+          SHOTS: banc-iphone/parcours
+        run: node scripts/bancs/parcours-iphone.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -96,7 +96,8 @@ const recette = (id, d) => ({ [id]: { uid: UID, corps: JSON.stringify({ item: d 
   await essaie('message refus', async () => {
     const src = require('fs').readFileSync(SRC, 'utf8');
     // (5.369) le message est l'une de SES versions (`versionsRefus`) : même règle, autre nom.
-    const m = src.match(/if \(quoi === 'reject' && r && r\.ok && conv && (?:msg|versionsRefus\.length)\) \{([\s\S]{0,400})/);
+    // (5.410.4) aussi après une acceptation : `(quoi === 'reject' || quoi === 'accept')` — même règle pour le message.
+    const m = src.match(/if \((?:quoi === 'reject'|\(quoi === 'reject' \|\| quoi === 'accept'\)) && r && r\.ok && conv && (?:msg|versionsRefus\.length)\) \{([\s\S]{0,400})/);
     dit(!!m && /compterAction\(/.test(m[1]) && /messagePasParti/.test(m[1]), 'repondreOffre compte le message (une seconde requête) avant de l\'envoyer, et le dit s\'il ne part pas', m ? m[1].slice(0, 160) : 'bloc introuvable');
   });
 

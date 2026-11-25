@@ -243,10 +243,15 @@ export function Rangee({ titre, sousTitre = '', sousLignes = 1, valeur = null, v
     'aria-disabled': indisponible ? 'true' : undefined,
     'aria-current': selectionnee ? 'true' : undefined,
   };
+  // (24 nov., main-vert) Les `aria-*` passés par `attrs` (aria-expanded, aria-pressed…) décrivent le GESTE : ils vont sur
+  // l'élément touchable (bouton, lien), jamais sur le cadre <div> sans rôle où ils sont interdits (axe aria-allowed-attr).
+  const touchable = !interrupteur && ((href && !indisponible) || onClick);
+  const ariaGeste = {}, attrsCadre = {};
+  for (const [k, v] of Object.entries(attrs || {})) { if (touchable && /^aria-/.test(k)) ariaGeste[k] = v; else attrsCadre[k] = v; }
   let corps;
   if (interrupteur) corps = <label {...commun}>{contenu}</label>;
-  else if (href && !indisponible) corps = <a {...commun} href={href} onClick={clic}>{contenu}</a>;
-  else if (onClick) corps = <button {...commun} type="button" onClick={clic}>{contenu}</button>;
+  else if (href && !indisponible) corps = <a {...commun} {...ariaGeste} href={href} onClick={clic}>{contenu}</a>;
+  else if (onClick) corps = <button {...commun} {...ariaGeste} type="button" onClick={clic}>{contenu}</button>;
   else corps = <div {...commun} tabIndex={aActions ? 0 : undefined} role={aActions ? 'group' : undefined} onClick={aActions ? clic : undefined}>{contenu}</div>;
 
   return (
@@ -261,7 +266,7 @@ export function Rangee({ titre, sousTitre = '', sousLignes = 1, valeur = null, v
       data-n-balayage={aActions ? '1' : undefined}
       data-n-case={selection ? '1' : undefined}
       data-n-a-pied={pied ? '1' : undefined}
-      {...(attrs || {})}
+      {...attrsCadre}
     >
       {selection ? (
         <label className="n-rangee-case" data-n-indisponible={selection.indisponible ? '1' : undefined}>
