@@ -84,10 +84,9 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
     code: (L.match(/const supprimerSurLbc = \(r\) => [^\n]*/) || [''])[0] + '\n' + corpsDe(AGIR, 'export function supprimerLbcAgir('),
     porte: /supprimerLbcAgir\(r, \{ confirmer: askConfirm[\s\S]*agirOuPanneau\(\{ site: 'leboncoin', compte: compteLbcDe\(r\), geste: 'supprimer'[\s\S]*args: \{ id: String\(r\.id\)[\s\S]*confirmer: \(\) => \(typeof confirmer === 'function' \? confirmer\(\{ title: tr\('agir\.lbc\.supprimerTitre'/,
     repli: /panneau: \(\) => ouvrirPanneau\(\{ site: 'leboncoin'[^\n]*ids: \[String\(r\.id\)\], action: 'supprimer' \}\)/ });
-  const accOffre = await PORTE.regle({
-    code: (A.match(/<GestesOffreVinted compte=\{[^\n]*/) || [''])[0] + '\n' + corpsDe(AGIR, 'export function GestesOffreVinted('),
-    porte: /<GestesOffreVinted compte=\{String\(openConv\.acc\?\.vinted_user_id\|\|''\)\} tx=\{off\.tx\} oid=\{off\.oid\}[\s\S]*envoyerGeste\(\{ \.\.\.base, distGeste, args, confirme \}\)[\s\S]*onClick=\{\(\) => setConfirmer\(true\)\}[\s\S]*partir\('accepter', \{ \.\.\.ids, prix \}, true\)/,
-    repli: /<BoutonAgir \{\.\.\.base\} par="file"/ });
+  // (25 nov.) la carte d'offre se lit par LA règle partagée (`_porte-agir.cjs` offreVinted, la même que contre-offre-mini B5
+  // et robustesse-metier H5) : CETTE offre (tx + oid + SA conversation), envoyerGeste par la porte, Accepter confirmé.
+  const accOffre = await PORTE.offreVinted(A, AGIR);
 
   const gardees = [
     // (20 nov., décision de Julien) Supprimer de Leboncoin et accepter une offre se font dans le PANNEAU de l'extension, qui
