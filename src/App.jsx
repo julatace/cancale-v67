@@ -34516,6 +34516,11 @@ function AppCoeur() {
       return;
     }
     if(h.depuisRetour){ h.depuisRetour=false; return; }
+    // (24 nov., robot chaque-bouton, 2ᵉ passe) « Relier eBay » (Ventes · eBay) mène à Paramètres → Comptes eBay : la page
+    // poussée a SON entrée, puis la section revenait à « reglages » en EMPILANT une entrée AU-DESSUS d'elle — le retour
+    // retombait sur la page, qui ré-empilait : un piège, plus moyen de revenir à Ventes. Ce retour à la section n'est pas
+    // un geste : rien n'est empilé (le minuteur d'un écran pas encore posé, lui, reste).
+    if(h.silence){ h.silence=false; return; }
     clearTimeout(h.minuteur);
     const pousser=()=>{
       // Une feuille vient d'être fermée : son entrée part (history.back, asynchrone).
@@ -34545,7 +34550,8 @@ function AppCoeur() {
       if(window.__vrmRetourFeuille===true || (e && window.__vrmPopFeuille===e)) return;
       const st=(e && e.state) || {};
       const t=st.vrmTab || 'journee';
-      const sub=st.vrmSub || 'ventes';
+      // (24 nov.) `settings` + `ebay` est une DEMANDE d'ouvrir Comptes eBay (consommée à l'ouverture) : y revenir rend Paramètres.
+      const sub=(t==='settings' && st.vrmSub==='ebay') ? 'reglages' : (st.vrmSub || 'ventes');
       const h=histoRef.current;
       clearTimeout(h.minuteur);
       if(t===h.tab && sub===h.sub) return;
@@ -39021,7 +39027,7 @@ function AppCoeur() {
         {/* (11 nov., lot DJ3) Plus d'onglet Colis : son instantané (`CaptureColis`) n'a plus d'écran à photographier. */}
         {tab==='ventes'&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-ventes"><CaptureVentes uid={uidInstantane}/></GardeEcran>}
         {tab==='annonces'&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-annonces"><CaptureAnnonces uid={uidInstantane}/></GardeEcran>}
-        {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
+        {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>{ histoRef.current.silence=true; setPlatSub('reglages'); }} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}
           onToggleNotif={async()=>{

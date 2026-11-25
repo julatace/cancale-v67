@@ -30791,13 +30791,15 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           onFermer={() => setDepotOuvert(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
       {curSub==='bordereaux' && !scanOuvert && !tourneeDepot && !depotOuvert ? <BarreAnnulerDepose attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 1}/> : null}
       {/* Modale : relier un achat (depuis Annonces) */}
+      {/* (23 nov., robot chaque-bouton, 2ᵉ passe) Au-dessus des pages poussées du natif (18000) : au téléphone, « Relier à son
+          achat » depuis la fiche d'une vente l'ouvrait DERRIÈRE la fiche — invisible, et la croix touchait la fiche. */}
       {/* (16 nov., lot relier-glisser) « Relier en glissant » : plein écran, au-dessus de la feuille. */}
       {glisserOuvert ? <RelierGlisser C={C} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensGlisser}
           recuDe={(a)=>chezMoiDe(a).chez}
           tresProbables={liaison && liaison.parAchat ? liaison.parAchat : null} cibles={ciblesGlisser} prixDe={prixPayeAchat} compteDe={(a)=>accNameOf(a && a._acc)||''}
           photoDe={(a)=>orderPhoto(a)||''} tailleDe={(a)=>{ const t=tailleDuTitre(String((a&&a.title)||'')); return t ? t.replace('.', ',') : ''; }}
           Photo={PhotoVinted} Icon={Icon} Retour={FermeAuRetour} details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors}
-          onRelier={relierGlisse} onFermer={()=>setGlisserOuvert(false)} zIndex={1400} achatInitial={glisserOuvert.achat || ''} cibleInitiale={glisserOuvert.cible || ''}/> : null}
+          onRelier={relierGlisse} onFermer={()=>setGlisserOuvert(false)} zIndex={18500} achatInitial={glisserOuvert.achat || ''} cibleInitiale={glisserOuvert.cible || ''}/> : null}
       {/* (19 nov., lot completer-infos) L'atelier « Compléter » : plein écran, sous la feuille « Autre achat ». */}
       {enCompleter && completer && completer.sujet !== 'relier-serie' ? <Completer demande={completer} entrees={entreesCompleter} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))}
           liens={liensAchats} liaison={liaison} identiteDe={identiteCompleter} prixDe={prixPayeAchat} photoDe={(a)=>orderPhoto(a)||''} compteDe={(a)=>accounts.length>1 && a && a._acc ? (accNameOf(a._acc)||'') : ''}
@@ -30808,7 +30810,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           vend={vendMots()} Photo={PhotoVinted} Icon={Icon} onFermer={onCompleterFermer}/> : null}
       {/* Modale : relier un achat (depuis Annonces) */}
       {pickerFor && createPortal(
-        <div data-relier-feuille data-relier-autre={pickerFor._autre ? String(pickerFor._autre) : undefined} onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:only==='completer'?18500:1300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+        <div data-relier-feuille data-relier-autre={pickerFor._autre ? String(pickerFor._autre) : undefined} onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:18500,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setPickerFor(null)}/>
           <div className="vrm-relier-feuille-boite" role="dialog" aria-modal="true" aria-label={tr('relierTout.titreFeuille')} onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             {/* ⚠️ ON MONTRE LA PAIRE QU'ON RELIE. La modale couvrait l'écran et
@@ -30862,7 +30864,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
 
       {/* (21 nov., lot relier-code) LE GESTE INVERSE : depuis un achat, « Relier à une vente / une annonce » — la même feuille. */}
       {relierDepuis && createPortal(
-        <div data-relier-feuille="" data-relier-depuis={String(relierDepuis.tx)} onClick={()=>setRelierDepuis(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+        <div data-relier-feuille="" data-relier-depuis={String(relierDepuis.tx)} onClick={()=>setRelierDepuis(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:18500,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setRelierDepuis(null)}/>
           <div className="vrm-relier-feuille-boite" role="dialog" aria-modal="true" aria-label={tr('la.inv.titre')} onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,minHeight:'62dvh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{padding:'6px 8px 0 16px',display:'flex',alignItems:'center',gap:8}}>
@@ -31150,8 +31152,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           </div>
         </div>
       )}
-      {receiptView && <FeuilleRecuAchat recu={receiptView} z={1500} fermer={()=>setReceiptView(null)}/>}
-      {reventeVue && <SheetShell onClose={()=>setReventeVue(null)}><div data-revente-feuille="" style={{padding:'0 2px 8px'}}><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>Revendu combien ?</div><div style={{fontSize:13,color:C.muted,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{reventeVue.titre}</div>
+      {/* (23 nov., robot chaque-bouton, 2ᵉ passe) Reçu et « revendu combien » s'ouvrent aussi depuis la FICHE d'un achat (page poussée
+          du natif, 18000) : au-dessus d'elle, sinon ils restaient cachés derrière au téléphone. */}
+      {receiptView && <FeuilleRecuAchat recu={receiptView} z={18600} fermer={()=>setReceiptView(null)}/>}
+      {reventeVue && <SheetShell z={18600} onClose={()=>setReventeVue(null)}><div data-revente-feuille="" style={{padding:'0 2px 8px'}}><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>Revendu combien ?</div><div style={{fontSize:13,color:C.muted,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{reventeVue.titre}</div>
         {modeleSur('', reventeVue.titre) ? <ReventeModele ouvert C={C} cible={{ titre: reventeVue.titre }} lireReleve={lireReleveVentes} lireExtras={lireExtrasRepartition} dateEnLigne={dateMiseEnLigneMs}/> : <div data-revente-modele="inconnu" style={{fontSize:13,color:C.muted,marginTop:10}}>Modèle pas reconnu dans le titre : rien à comparer.</div>}</div></SheetShell>}
       {showSourcing && (
         <div onClick={()=>setShowSourcing(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
@@ -32455,7 +32459,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
 
       {/* ── Note interne d'un achat (Actions rapides) — privée, synchronisée ── */}
       {noteEdit && (
-        <div data-note-achat-voile="" onClick={()=>setNoteEdit(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1360,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+        <div data-note-achat-voile="" onClick={()=>setNoteEdit(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:18500,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <FermeAuRetour fermer={()=>setNoteEdit(null)}/>
           {/* (14 nov., passe design 3) La fenêtre du système : carte 20 sans cadre, l'ombre flottante, titre 20/700,
               note 13 grise, champ rayon 12, deux gestes du système (discret, principal) — plus des rectangles de 12. */}
