@@ -1,7 +1,8 @@
 // ENGLISH — translation of fr.js (the source). Same keys, same {variables}.
 import ecran_accessibilite from './en/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './en/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
-import ecran_suivi_vente from './en/suiviVente.js';   // (16 nov.) le suivi des colis vendus
+import ecran_suivi_vente from './en/suiviVente.js';
+import ecran_envois from './en/envois.js';   // (24 nov.) le suivi d’un envoi, « Mes envois »   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './en/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './en/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './en/journee.js';
@@ -2397,6 +2398,7 @@ export default {
   ...ecran_liaison,
   ...ecran_completer,
   ...ecran_suivi_vente,
+  ...ecran_envois,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,

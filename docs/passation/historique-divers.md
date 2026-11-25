@@ -2252,6 +2252,18 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1351)
 - **24 nov. · Annonces + Stock (`claude/visuel-annonces`)** : la LISTE reste par défaut, rangée nette 72 px (photo 60, étiquette N°, ♡ 👁, jamais « 0 j »), glisser ⇒ Baisser/Republier, puces au pouce, liste virtualisée, sans latence ; « Détaillé » (tuiles) dans ⋯ ; Stock : étiquette papier, creux. `2026-11-24-visuel-annonces.md`. Geste : aucun.
 
-## Lignes déplacées telles quelles de CLAUDE.md §9 (25 nov., fusion de #1388 dans #1393, < 60 000)
-- **24 nov. · Parcours iPhone (`claude/parcours-iphone`, APRÈS #1326)** : un robot joue sa journée au doigt (banc `parcours-iphone`, WebKit dans `iphone-webkit.yml`) ; corrigés : le code au comptoir que le « retour » ne fermait pas (VRM quitté), « Colis mondial_relay » dans la loupe ; rapportés : sauts d'Achats/Argent/loupe (données lues après). `2026-11-24-parcours-iphone.md`. Geste : aucun.
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1378)
 - **24 nov. · Styles au choix (`claude/style-graphite`, PR #1380)** : Paramètres → Apparence → Style, tuiles (Actuel + 11 styles dont Monochrome), clair/sombre, un toucher applique ; jetons par `scripts/styles-generer.cjs` (table, AA, zéro orange), famille de boutons `src/natif/styles-choix.css`. Banc `styles-choix`. `2026-11-24-style-graphite.md`. Geste : essayer, dire lequel garder.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1381)
+- **24 nov. · Parcours iPhone (`claude/parcours-iphone`, APRÈS #1326)** : un robot joue sa journée au doigt (banc `parcours-iphone`, WebKit dans `iphone-webkit.yml`) ; corrigés : le code au comptoir que le « retour » ne fermait pas (VRM quitté), « Colis mondial_relay » dans la loupe ; rapportés : sauts d'Achats/Argent/loupe (données lues après). `2026-11-24-parcours-iphone.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1369)
+- **24 nov. · À retirer parfait (`claude/retrait-parfait`, après #1341, #1351, #1326)** : le COMPTOIR d'un point (toucher un code : tous ses colis à glisser, code énorme et QR max sur blanc, « Retiré » / Annuler, écran allumé, retour, hors ligne), ouverture calculée sur les horaires lus, date lue par colis, « à vérifier » + un geste ; rappel exact (heure limite lue seule). `2026-11-24-retrait-parfait.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1369)
+- **24 nov. · Audit boutons, 2ᵉ passe** : retour piégé après « Relier eBay », rond « Retrouver » sur les segments eBay, 2 exceptions du robot. `2026-11-23-audit-boutons-2.md`. Geste : aucun.
+
+## Lignes déplacées telles quelles de CLAUDE.md §9 (25 nov., fusion de #1388 dans #1393, < 60 000)
+- **23 nov. · Colis en danger (`claude/colis-danger`)** : colis VENDU Vinted Go relu jusqu'à sa remise ; date de départ LUE (`expiration_time`) gardée sur `depart_vinted_*`, relu toutes les 2 h ; famille « Colis en danger » la veille et le jour (`api/_lib/colis-danger.js`) ; 0 vente Vinted Go en base au 23 nov. `2026-11-23-colis-danger.md`. Geste : aucun.
+- **24 nov. · Observer Vinted (ext. 5.440.3, `claude/observation-vinted`)** : interrupteur 10 min (carte du logo, page Extension) ; la page note pages, requêtes (clés et types), clics (`isTrusted`), cloche — formes seulement, rebâties par le fond, ligne `observation_vinted_{compte}_{nav}`, « Envoyer l'observation » ; rien envoyé à Vinted. `2026-11-24-observation-vinted.md`. Geste : installer, Observer, un envoi (Bleam ou main), Envoyer l'observation.
