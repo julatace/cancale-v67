@@ -400,7 +400,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     plein: prio && lignesPrio.length ? <PleinRepublier lignes={lignesPrio} coches={selPrio.coches} onRepublier={republierPrio}/> : null,
     contenu: <RepublierPriorite res={prio} lignes={lignesPrio} coches={selPrio.coches} onBasculer={selPrio.onBasculer} onTout={selPrio.onTout} onReglage={(r) => { if (r && r.plusVue != null) { poserJoursPV(r.plusVue); return; } poserRegPrio(r); }}
       plusVue={{ jours: joursPV, de: (l) => plusVueAnnonce(l.article.annonces.find((x) => x.site === 'vinted' && String(x.id) === String(l.annonce.id)) || null), autres: plusVuesHorsPrio, republier: republierUne }}
-      Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>} Logo={(s) => <LogoSite site={s}/>} euros={(n) => fmt(n)} Icon={Icon}/>,
+      Photo={(src, o) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>} Logo={(s) => <LogoSite site={s}/>} euros={(n) => fmt(n)} Icon={Icon}/>,
   };
   // ── (22 nov., Julien — choix n° 35) « PHOTO EN DOUBLE » ── deux annonces Vinted EN LIGNE (l'état que <enligne-regle> a
   // donné, jamais « à confirmer » ni masquées) au MÊME fichier photo (`photoKey`, ou la clé `photoK` de leur fiche). Un
@@ -529,11 +529,11 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     autre: (l) => { if (l) ouvrirLiaison({ site: l.site, id: l.id }); },
     propre: (l) => { if (l) queSurCeSite({ site: l.site, id: l.id }); },
     lot: (ls) => { const cles = ls.filter((l) => l && l.prop && l.prop.niveau === 'sur').map((l) => `${l.site}:${l.id}`); if (cles.length) ouvrirLiaison({ vue: 'lot', cles }); },
-    Photo: (src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>,
+    Photo: (src, o) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>,
   };
   return (
     <>
-    <VueAnnonces parMail={modele && Array.isArray(modele.articles) ? modele.articles.filter((a) => a && a.venteMail) : null} priorite={priorite} photoDouble={photoDouble} plusVueDe={plusVueDe} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={(s) => <LogoSite site={s}/>} dortDe={dortDe} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>}
+    <VueAnnonces parMail={modele && Array.isArray(modele.articles) ? modele.articles.filter((a) => a && a.venteMail) : null} priorite={priorite} photoDouble={photoDouble} plusVueDe={plusVueDe} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={(s) => <LogoSite site={s}/>} dortDe={dortDe} Photo={(src, o) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>}
       onCompleter={(sujet) => { try { window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet, num: '', lot: false, at: Date.now() } })); } catch (_) {} }} liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}

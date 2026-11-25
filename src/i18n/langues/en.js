@@ -1,7 +1,8 @@
 // ENGLISH — translation of fr.js (the source). Same keys, same {variables}.
 import ecran_accessibilite from './en/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './en/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
-import ecran_suivi_vente from './en/suiviVente.js';   // (16 nov.) le suivi des colis vendus
+import ecran_suivi_vente from './en/suiviVente.js';
+import ecran_envois from './en/envois.js';   // (24 nov.) le suivi d’un envoi, « Mes envois »   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './en/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './en/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './en/journee.js';
@@ -27,6 +28,7 @@ import ecran_styleClarte from './en/styleClarte.js';
 import ecran_revueUx from './en/revueUx.js';   // (23 nov.) revue UX   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './en/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './en/ext5438.js';   // (22 nov.) ext. 5.438
+import ecran_visuelAnnonces from './en/visuelAnnonces.js';   // (24 nov.) l'inventaire Annonces / Stock
 import ecran_argentVisuel from './en/argentVisuel.js';   // (24 nov.) Argent, Messages, Paramètres visuels   // (24 nov.) le langage « jeu vidéo »   // (23 nov.) « Vinted a agi » regroupée
 import ecran_visuelJeu from './en/visuelJeu.js';   // (24 nov.) le langage « jeu vidéo »   // (23 nov.) « Vinted a agi » regroupée
 import ecran_moderationCarte from './en/moderationCarte.js';   // (23 nov.) « Vinted a agi » regroupée
@@ -2398,6 +2400,7 @@ export default {
   ...ecran_liaison,
   ...ecran_completer,
   ...ecran_suivi_vente,
+  ...ecran_envois,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
@@ -2416,6 +2419,7 @@ export default {
   ...ecran_ext5438,
   ...ecran_moderationCarte,
   ...ecran_visuelJeu,
+  ...ecran_visuelAnnonces,
   ...ecran_argentVisuel,
   ...ecran_observation,
   ...ecran_a_distance,

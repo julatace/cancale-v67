@@ -59,7 +59,7 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
   // disait « Prix de … » sans la valeur visible (axe label-content-name-mismatch).
   const nomCellule = (v) => (v == null ? '— · ' : typeof v === 'string' || typeof v === 'number' ? String(v) + ' · ' : '');
   const modifiable = (l, cle, valeur, onModifier) => (onModifier && !seulementBloque(l.a)
-    ? <button type="button" className="n-eg-cellule" data-eg-modifier={cle} data-eg-vide={valeur == null ? '1' : undefined}
+    ? <button type="button" data-n-famille="lien" className="n-eg-cellule" data-eg-modifier={cle} data-eg-vide={valeur == null ? '1' : undefined}
         aria-label={nomCellule(valeur) + tr('egalite.modifier', { quoi: tr('egalite.col.' + cle), article: l.titre })} onClick={(e) => { e.stopPropagation(); onModifier(); }}>{valeur == null ? '—' : valeur}</button>
     : valeur);
   const pasFourni = () => <span className="n-tt-vide-cellule" title={tr('cqm.pasFourni')} aria-label={'— · ' + tr('cqm.pasFourni')} data-eg-pasfourni="">—</span>;
@@ -110,16 +110,16 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     ...(onFiche && l.a.numero ? [{ cle: 'toute', libelle: tr('egalite.touteLaFiche'), onClick: () => onFiche(l.a) }] : []),
   ]);
   // (21 nov.) La GRILLE de l'ordinateur : les mêmes cartes que le téléphone (photo, N°, logos, prix, vues · favoris · jours).
-  const carteGrille = (l, { coche, cochable, basculer, ouvrir: ouvrirL, selection }) => (
-    <CarteAnnonce a={l.a} onOuvrir={() => ouvrirL(l)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} Photo={Photo} dort={dortDe && !selection ? dortDe(l.a) : null} plusVue={plusVueDe && !selection ? plusVueDe(l.a) : null}
+  const carteGrille = (l, { coche, cochable, basculer, ouvrir: ouvrirL, selection, revele = null }) => (
+    <CarteAnnonce revele={revele} a={l.a} onOuvrir={() => ouvrirL(l)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} Photo={Photo} dort={dortDe && !selection ? dortDe(l.a) : null} plusVue={plusVueDe && !selection ? plusVueDe(l.a) : null}
       selection={selection ? { cochee: coche, cochable, onBascule: () => basculer(l) } : null} attrs={{ ...l.attrs, 'data-tt-ligne': l.cle, 'data-tt-coche': coche ? '1' : undefined }}/>
   );
   return (
     <TableauTravail id="annonces" titre={tr('egalite.titre')} compte={compte} majLe={majLe} onRafraichir={onRafraichir} rafraichit={rafraichit}
-      lignes={lignes} statuts={statuts} statutsDefaut={[...STATUTS_EN_LIGNE, 'bloque']} carteGrille={carteGrille} filtres={filtresL} colonnes={colonnes}
+      lignes={lignes} statuts={statuts} statutsDefaut={[...STATUTS_EN_LIGNE, 'bloque']} carteGrille={carteGrille} carteCorps={96} filtres={filtresL} colonnes={colonnes}
       actions={acts} onAction={(cle, ls) => onAction(cle, unParArticle(ls))} menuLigne={menuLigne} onOuvrir={(l) => onOuvrir(l.a)} groupe={(l) => l.groupe}
       unite={(n) => tr('egalite.groupe.n', { n })} placeholder={tr('tableau.chercherArticle')} plein={plein} haut={haut} pied={pied}
-      outilsPlus={onPublier || onAutomatisations ? <>{onPublier ? <button type="button" className="n-tt-bouton" data-eg-publier="" onClick={onPublier}>{Icon ? <Icon name="plus" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('egalite.publier')}</span></button> : null}{onAutomatisations ? <button type="button" className="n-tt-bouton" data-tt-automatisations="" onClick={onAutomatisations}>{Icon ? <Icon name="spark" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('auto.titre')}</span></button> : null}</> : null}
+      outilsPlus={onPublier || onAutomatisations ? <>{onPublier ? <button type="button" data-n-famille="second" className="n-tt-bouton" data-eg-publier="" onClick={onPublier}>{Icon ? <Icon name="plus" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('egalite.publier')}</span></button> : null}{onAutomatisations ? <button type="button" data-n-famille="second" className="n-tt-bouton" data-tt-automatisations="" onClick={onAutomatisations}>{Icon ? <Icon name="spark" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('auto.titre')}</span></button> : null}</> : null}
       vide={tr('tableau.videAnnonces')} pasSu={tr('egalite.pasSu')} Icon={Icon} attrs={{ 'data-eg-ecran': '', 'data-eg-vue': 'tableau' }}/>
   );
 }
