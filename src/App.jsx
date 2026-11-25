@@ -667,6 +667,7 @@ function SuiviTravailCoque() {
 const AlerteModeration = lazySur(() => import('./AlerteModeration.jsx'));
 const CompteBloque = lazySur(() => import('./CompteBloque.jsx'));   // (19 nov., lot compte-bloque) « Vinted a bloqué {compte} » + la question   // (11 nov., ext. 5.350) « Vinted a masqué / fait disparaître / limite »
 const EcranExtension = lazySur(() => import('./extension/EcranExtension.jsx'));
+const EcranParrainage = lazySur(() => import('./parrainage/EcranParrainage.jsx'));   // (25 nov.) le parrainage à 20 % : un VRAI écran (Julien : « Tu dois faire un vrai interface »)
 const EcranADistance = lazySur(() => import('./aDistance/EcranADistance.jsx'));   // (22 nov., ext. 5.436 `adistance`) « Mes comptes » : tes comptes à distance, ton ordinateur exécute   // (19 nov., demande H) LE seul endroit « Extension »   // (11 nov., ext. 5.350) « Vinted a masqué / fait disparaître / limite »
 const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
 // (11 nov.) « Publier partout » : la feuille à la demande (règle : src/publierPartout.js).
@@ -949,7 +950,7 @@ import { comptesARelire } from "./sondeVentes.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
 import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivreAbonnement, installerGardeEcriture, CLE_PARRAIN, CODE_PARRAIN_RE, codeParrainDe, codeParrainDuChemin } from "./abonnement/etatAbonnement.js";
 // (13 nov., lot 54) Le parrainage clair et visible : « Offert par … » à l'inscription, la ligne du menu « Plus ».
-import { lireApercuParrain, lireParrainageOuvert, parrainageOuvertConnu, suivreParrainageOuvert, demanderParrainage } from "./parrainage/parrainage.js";
+import { lireApercuParrain, lireParrainageOuvert, parrainageOuvertConnu, suivreParrainageOuvert } from "./parrainage/parrainage.js";
 // (15 nov.) Le lien d'un PARTENAIRE (`/p/LEO`) : gardé, présenté une fois (src/partenaires/lien.js).
 import { garderCodePartenaire, codePartenaireGarde } from "./partenaires/lien.js";
 import { presenterCodePartenaire } from "./partenaires/presenter.js";
@@ -3036,7 +3037,9 @@ const authSignUp  = async (email, password) => {
   // confirmation ouvert sur un autre appareil ne le perd plus. Le serveur décide toujours tout.
   const parrain = codeParrainGarde();
   const partenaire = codePartenaireGarde(localStorage);   // (15 nov.) le code partenaire suit aussi le compte
-  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password, data: { langue: langueNavigateur(), ...(parrain ? { parrain } : {}), ...(partenaire ? { partenaire } : {}) } });
+  // (25 nov.) « Montrer mon prénom à mon parrain », coché à l'inscription (décoché par défaut) : suit le compte.
+  let montrerParrain = false; try { montrerParrain = !!parrain && localStorage.getItem('vrm_parrain_montrer') === '1'; } catch (_) {}
+  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password, data: { langue: langueNavigateur(), ...(parrain ? { parrain } : {}), ...(montrerParrain ? { parrain_montrer: true } : {}), ...(partenaire ? { partenaire } : {}) } });
   if (!r.ok) {
     if(r.captcha)return {ok:false,error:r.error};
     // On traduit les erreurs techniques de Supabase : « email rate limit
@@ -19425,6 +19428,8 @@ function AuthScreen() {
 .vrm-cx-parrain-ic{display:flex;flex:none;color:${C.accentTexte||C.accent};margin-top:1px}
 .vrm-cx-parrain b{display:block;font-weight:600;overflow-wrap:anywhere}
 .vrm-cx-parrain-texte{display:block;color:${C.muted};font-size:13px}
+.vrm-cx-parrain-montrer{display:flex;align-items:center;gap:8px;min-height:44px;margin-top:4px;font-size:14px;color:${C.text};cursor:pointer}
+.vrm-cx-parrain-montrer input{width:20px;height:20px;margin:0;flex:none}
 .vrm-cx-champ>span:first-child{display:block;margin-bottom:6px}
 .vrm-cx-secret{position:relative;display:block}
 .vrm-cx-secret button{position:absolute;right:4px;top:3px;min-height:44px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:${C.accentTexte||C.accent};font-size:13px;font-weight:600;font-family:inherit;cursor:pointer}
@@ -19536,7 +19541,10 @@ function AuthScreen() {
             <div role="note" data-parrain-offert={apercuParrain.nom||''} className="vrm-cx-parrain">
               <span className="vrm-cx-parrain-ic" aria-hidden="true"><Icon name="cadeau" size={20}/></span>
               <span><b>{apercuParrain.nom ? tr('auth.parrain.offertPar', { nom: apercuParrain.nom }) : tr('auth.parrain.offertVendeur')}</b>
-                <span className="vrm-cx-parrain-texte">{mode==='up' ? tr('auth.parrain.texte') : tr('auth.parrain.texteConnexion')}</span></span>
+                <span className="vrm-cx-parrain-texte">{mode==='up' ? tr('auth.parrain.texte') : tr('auth.parrain.texteConnexion')}</span>
+                {/* (25 nov.) Le filleul CHOISIT de montrer son prénom à son parrain — décoché par défaut. */}
+                {mode==='up' && <label className="vrm-cx-parrain-montrer"><input type="checkbox" data-parrain-montrer="" defaultChecked={(() => { try { return localStorage.getItem('vrm_parrain_montrer') === '1'; } catch (_) { return false; } })()}
+                  onChange={(e) => { try { if (e.target.checked) localStorage.setItem('vrm_parrain_montrer', '1'); else localStorage.removeItem('vrm_parrain_montrer'); } catch (_) {} }}/><span>{tr('auth.parrain.montrer')}</span></label>}</span>
             </div>
           )}
           {/* 11 octobre : on arrive ici depuis « Se connecter » dans l'extension.
@@ -19978,12 +19986,15 @@ function BandeauAbonnement({ setTab }) {
     let deja = false; try { deja = !!uidP && localStorage.getItem('vrm_parrain_tente_' + uidP) === '1'; } catch (_) {}
     if (!code && CODE_PARRAIN_RE.test(duCompte) && !deja) code = duCompte;
     if (!code || !(AUTH.session && AUTH.session.access_token)) return;
-    fetch('/api/compte?mode=parrainage', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'rattacher', code }) })
+    // (25 nov.) Son choix de l'inscription : montrer son prénom au parrain (le serveur le revalide).
+    let montrer = false; try { montrer = (AUTH.user && AUTH.user.user_metadata && AUTH.user.user_metadata.parrain_montrer === true) || localStorage.getItem('vrm_parrain_montrer') === '1'; } catch (_) {}
+    const prenomP = String(load('vrm_prenom', '') || '').trim().slice(0, 24);
+    fetch('/api/compte?mode=parrainage', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'rattacher', code, ...(montrer && prenomP ? { montrer: true, nom: prenomP } : {}) }) })
       .then(async (r) => {
         const j = await r.json().catch(() => null);
         if (r.status >= 500 || r.status === 401) return;
         try { localStorage.removeItem(CLE_PARRAIN); if (uidP) localStorage.setItem('vrm_parrain_tente_' + uidP, '1'); } catch (_) {}
-        if (r.ok && j && j.ok) toast('✓ Parrainage enregistré : un mois offert à ton premier paiement');
+        if (r.ok && j && j.ok) toast('✓ ' + tr('parrain.rattache.ok'));
         // (13 nov., lot 54) Un refus définitif est DIT une fois (« Tu ne peux pas être ton propre parrain. »…).
         else if (j && typeof j.message === 'string' && j.message) toast(j.message);
       }).catch(() => {});
@@ -34714,7 +34725,7 @@ function AppCoeur() {
   // (11 nov., lot DJ4) « À trancher » n'est plus un écran : un ancien lien (`?tab=trancher`, raccourci,
   // notification) ouvre Ma journée, sa carte ouverte en place.
   // (13 nov., lot 54) « Parrainer » (menu « Plus ») et `?tab=parrainage` : Réglages → Mon abonnement → Parrainage.
-  React.useEffect(()=>{ if(tab==='parrainage'){ demanderParrainage(); setTab('settings'); } },[tab]);
+  // (25 nov.) `?tab=parrainage` ouvre l'écran « Parrainage » lui-même (plus un détour par Réglages).
   React.useEffect(()=>{ if(tab==='trancher'){ try{ sessionStorage.setItem('vrm_trancher_ouvrir','1'); window.dispatchEvent(new Event('vrm:trancher-ouvrir')); }catch(_){} setTab('journee'); } },[tab]);
   React.useEffect(()=>{ if(tab==='leboncoin'){ subVoulue.current='annonces'; setTab('plat_leboncoin'); } },[tab]);
   // L'anti double vente eBay (cloche, notification) mène à eBay → Annonces, là
@@ -39334,6 +39345,7 @@ function AppCoeur() {
         {/* (21 nov., onglets-menu) L'écran « Menu » : la 5ᵉ place de la barre du bas (téléphone). */}
         {tab==='menu'&&<GardeEcran nom="menu"><EcranMenu tab={tab} setTab={setTab} badges={badgesStables} sites={sitesPresents} entreprise={entreprise} streamVisible={!!reglesStream.bouton} sombre={dark} basculerSombre={toggleDark} etats={<span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>}/></GardeEcran>}
         {tab==='extension'&&<GardeEcran nom="extension"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranExtension comptesVinted={!accountsLoaded ? undefined : baseKO ? [] : vintedAccounts} ecarte={(u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {})}/></Suspense></GardeEcran>}
+        {tab==='parrainage'&&<GardeEcran nom="parrainage"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranParrainage/></Suspense></GardeEcran>}
         {tab==='adistance'&&<GardeEcran nom="adistance"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranADistance comptesVinted={!accountsLoaded ? undefined : baseKO ? [] : vintedAccounts} ecarte={(u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {})} onNav={setTab}/></Suspense></GardeEcran>}
         {tab==='emails'&&<div data-espace="autres" style={{display:'contents'}}><GardeEcran nom="emails"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranEmails comptes={vintedAccounts} headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour} photoDe={photoEmailParTx}
           ecrireLus={(g)=>ecrireEmailsLus(g,{url:SUPABASE_URL,entetes:sbAuth,avecOwner:withOwner,owner:AUTH.user&&AUTH.user.id,cloisonne:CLOISONNE})}
