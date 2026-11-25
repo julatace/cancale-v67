@@ -98,7 +98,7 @@ const MESURE = () => {
         await pg.waitForSelector('.vrm-main', { timeout: 40000 }).catch(() => {}); await pg.waitForTimeout(5500);
         const m = await pg.evaluate(MESURE);
         if (SOMBRE) dit(m.theme === 'dark' && /^#1C1C20$/i.test(m.fondApp), `G1 ${e} ${W} : sombre choisi, fond #1C1C20 (vrm.center)`, { theme: m.theme, fond: m.fondApp });
-        else dit(m.theme !== 'dark' && /^#DFE1E5$/i.test(m.fondApp), `G1 ${e} ${W} : sans choix posé, l'app est en clair, fond #DFE1E5 (gris étagé)`, { theme: m.theme, fond: m.fondApp });
+        else dit(m.theme !== 'dark' && /^#878B92$/i.test(m.fondApp), `G1 ${e} ${W} : sans choix posé, l'app est en clair, fond #878B92 (gris moyen, 25 nov.)`, { theme: m.theme, fond: m.fondApp });
         dit(m.n > 5 && m.ko.length === 0, `G2 ${e} ${W} : chaque texte visible tient 4,5:1 (3:1 en grand) — ${m.n} textes mesurés`, m.ko.slice(0, 25));
         if (e === 'journee') {
           dit(m.lumCarte != null && m.lumCarte > m.lumFond * (SOMBRE ? 1 : 1.15), `G3 ${e} ${W} : les cartes sont nettement plus claires que le fond`, { carte: m.lumCarte, fond: m.lumFond });

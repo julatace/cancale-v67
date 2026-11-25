@@ -505,11 +505,5 @@ export default {
   "v2.style.monochrome": "Monochrome",
   "v2.style.monochrome.desc": "Noir, blanc et gris clair ; un point vert.",
   "v2.style.c3doux": "C3",
-  "v2.style.c3doux.desc": "Gris un peu foncé, cartes blanches, plaques gravées.",
-  "v2.style.essai-a": "Essai A",
-  "v2.style.essai-a.desc": "Gris moyen clair, cartes blanches.",
-  "v2.style.essai-b": "Essai B",
-  "v2.style.essai-b.desc": "Gris moyen, cartes claires.",
-  "v2.style.essai-c": "Essai C",
-  "v2.style.essai-c.desc": "Gris ardoise moyen, texte clair."
+  "v2.style.c3doux.desc": "Gris un peu foncé, cartes blanches, plaques gravées."
 };

@@ -23,23 +23,23 @@
 @layer vrm-natif {
   :root {
     /* ── couleurs du contrat ── */
-    --n-fond: #DFE1E5;   /* (23 nov., Julien : « gris clair, un mélange de degrés de gris », plus de noir ni d'orange) */
-    --n-laterale: #D4D7DC;            /* la barre latérale : un gris un cran plus soutenu que le fond */
-    --n-carte: #FAFAFB;
-    --n-carte-2: #E9EBEE;             /* bande de groupe, champ dans une feuille */
-    --n-bord: #CBCED4;                /* contour d'un contrôle, d'une carte, filet de structure */
-    --n-trait: #E1E3E7;               /* filet entre deux rangées */
-    --n-encre: #1D1D1F;
-    --n-texte: #2E3036;               /* le corps d'une rangée (un cran sous l'encre) */
-    --n-encre-2: #50535B;             /* secondaire (≥ 5:1 sur le fond et la latérale, 7:1 sur la carte) */
-    --n-encre-3: #8C8F98;             /* jamais du texte : chevrons, icônes muettes */
-    --n-accent: #3D4B5B;   /* l'ardoise (le gris bleuté du bouton de vrm.center) : actif, lien, sélection, LE plein */              /* (22 nov.) l'ENCRE : onglet actif, lien, sélection — la couleur vient des données */
-    --n-plein: #3D4B5B;               /* LE bouton plein : à l'encre, un par écran */
+    --n-fond: #878B92;   /* (25 nov., Julien : « gris moyen c'est d'accord » — entre le clair #DFE1E5 et la nuit #1C1C20 ; avant, 23 nov. : « gris clair ») */
+    --n-laterale: #7F838A;            /* la barre latérale : un gris un cran plus soutenu que le fond */
+    --n-carte: #F1F2F4;
+    --n-carte-2: #E3E5E9;             /* bande de groupe, champ dans une feuille */
+    --n-bord: #B9BDC3;                /* contour d'un contrôle, d'une carte, filet de structure */
+    --n-trait: #D2D5D9;               /* filet entre deux rangées */
+    --n-encre: #0E0F12;
+    --n-texte: #16181C;               /* le corps d'une rangée (un cran sous l'encre) */
+    --n-encre-2: #1F2226;             /* secondaire (25 nov.) : posé aussi sur la page grise ⇒ presque l'encre (4,67:1 sur le fond, 14:1 sur la carte) */
+    --n-encre-3: #5A5F67;             /* jamais du texte : chevrons, icônes muettes */
+    --n-accent: #19222C;   /* l'ardoise (le gris bleuté du bouton de vrm.center) : actif, lien, sélection, LE plein */              /* (22 nov.) l'ENCRE : onglet actif, lien, sélection — la couleur vient des données */
+    --n-plein: #19222C;               /* LE bouton plein : à l'encre, un par écran */
     --n-sur-plein: #FFFFFF;
-    --n-teinte: rgb(61 75 91 / .10);
-    --n-ambre: #3D4B5B;   /* (23 nov.) plus d'orange : « à faire » = l'ardoise + le gras */
-    --n-ambre-fond: #E2E6EC;
-    --n-ambre-bord: #C9D0DA;
+    --n-teinte: rgb(25 34 44 / .12);
+    --n-ambre: #19222C;   /* (23 nov.) plus d'orange : « à faire » = l'ardoise + le gras */
+    --n-ambre-fond: #D9DBDE;
+    --n-ambre-bord: #B9BDC3;
     --n-doublon: #BF2A21;             /* SEULEMENT deux paires sous un N° */
     /* étiquettes (pilule 20, 12/600, fond pastel + texte + filet de la même teinte) */
     --n-vert: #17744A; --n-vert-fond: #DDF4E6; --n-vert-bord: #C3EAD2;      /* fait, prêt, en ligne */
@@ -47,29 +47,29 @@
     --n-gris: #4C525B; --n-gris-fond: #ECEEF1; --n-gris-bord: #DFE2E6;      /* en attente */
 
     /* ── dérivés (mesurés) ── */
-    --n-sur-teinte: #1D1D1F;          /* texte SUR --n-teinte (16:1) */
+    --n-sur-teinte: #0E0F12;          /* texte SUR --n-teinte (16:1) */
     --n-sur-ambre: #FFFFFF;           /* texte sur --n-ambre plein (pastille d'onglet) */
     --n-sur-doublon: #FFFFFF;         /* texte sur --n-doublon plein */
-    --n-inactif: #ECEEF1;             /* fond d'un bouton indisponible */
-    --n-sur-inactif: #5B6069;         /* son texte (≥ 4,5:1 : indisponible reste lisible) */
-    --n-inverse: #3D4B5B;             /* fond du toast */
+    --n-inactif: #E3E5E9;             /* fond d'un bouton indisponible */
+    --n-sur-inactif: #3F434A;         /* son texte (≥ 4,5:1 : indisponible reste lisible) */
+    --n-inverse: #19222C;             /* fond du toast */
     --n-sur-inverse: #FFFFFF;
-    --n-appui: #D6D9DE;               /* fond d'une rangée enfoncée, d'un choix actif */
-    --n-barre: rgb(223 225 229 / .94);/* barre de titre / d'onglets (blanche comme les cartes) */
+    --n-appui: #DDDEE0;               /* fond d'une rangée enfoncée, d'un choix actif */
+    --n-barre: rgb(135 139 146 / .94);/* barre de titre / d'onglets (blanche comme les cartes) */
     --n-voile: rgb(26 26 30 / .40);   /* derrière une feuille */
     --n-ombre: 0 8px 30px rgb(26 26 30 / .14);   /* la feuille et le volet */
     --n-ombre-carte: 0 1px 2px rgb(26 26 30 / .04), 0 2px 6px rgb(26 26 30 / .04);   /* une carte, un groupe */
     --n-ombre-xs: 0 1px 2px rgb(26 26 30 / .05);                                     /* un contrôle à contour */
     --n-flou: saturate(180%) blur(20px);
     /* (22 nov.) la carte héros d'Aujourd'hui : l'encre, un reflet à peine plus clair en haut à droite */
-    --n-heros: #CDD1D8; --n-heros-2: #F1F2F4; --n-sur-heros: #1D1D1F; --n-sur-heros-2: #4E5159; --n-heros-trait: rgb(29 29 31 / .10);   /* (23 nov.) le héros CLAIR : dégradé gris très clair → gris soutenu */ --n-heros-ligne: #E9E9E6; --n-heros-hausse: #7ED3A6;      /* barre de titre et barre d'onglets, rien d'autre */
+    --n-heros: #E3E5E9; --n-heros-2: #F1F2F4; --n-sur-heros: #0E0F12; --n-sur-heros-2: #1F2226; --n-heros-trait: rgb(29 29 31 / .10);   /* (23 nov.) le héros CLAIR : dégradé gris très clair → gris soutenu */ --n-heros-ligne: #E9E9E6; --n-heros-hausse: #7ED3A6;      /* barre de titre et barre d'onglets, rien d'autre */
     --n-squelette: rgb(60 60 67 / .06);   /* (20 nov.) très pâle : ≤ 6 % — un squelette ne crie pas */
     --n-squelette-reflet: rgb(60 60 67 / .025);
     --n-curseur: #FFFFFF;             /* le curseur du contrôle segmenté */
     --n-pouce: #FFFFFF;               /* le pouce de l'interrupteur */
     /* (22 nov., style-clarte) les graphiques : barres d'encre pâle, le jour choisi à l'encre, le bénéfice en ligne d'accent */
-    --n-graphe-barre: #C9CDD4;
-    --n-graphe-barre-fort: #9CA1A9;
+    --n-graphe-barre: #ADB0B5;
+    --n-graphe-barre-fort: #5A5F67;
     --n-graphe-ligne: var(--n-vert);  /* le bénéfice : la seule couleur des données */
 
     /* ── typographie (échelle réduite de Vintex : 22 · 15 · 14 · 13 · 12 · 10,5 ; chiffre 30) ── */
