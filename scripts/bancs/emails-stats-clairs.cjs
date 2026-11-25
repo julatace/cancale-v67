@@ -219,7 +219,7 @@ const lireStats = (pg) => pg.evaluate(() => {
   const q = (x) => document.querySelector(x);
   const sc = document.scrollingElement || document.documentElement;
   const top = (x) => { const e = q(x); return e ? e.getBoundingClientRect().top + sc.scrollTop : null; };
-  const tuiles = [...document.querySelectorAll('[data-sv-tuile]')].map((e) => ({ k: e.getAttribute('data-sv-tuile'), sous: (e.querySelector('.vrm-sv-tuile-sous') || {}).innerText || '', eur: e.getAttribute('data-sv-eur') }));
+  const tuiles = [...document.querySelectorAll('[data-sv-tuile]')].map((e) => ({ k: e.getAttribute('data-sv-tuile'), sous: (e.querySelector('.vrm-sv-tuile-sous') || {}).innerText || '', compare: [...e.querySelectorAll('.vrm-sv-tuile-sous [title]')].map((x) => x.getAttribute('title')).join(' ') + ' ' + ((document.querySelector('[data-sv-sous-titre]') || {}).innerText || ''), eur: e.getAttribute('data-sv-eur') }));
   const meilleur = q('[data-sv-meilleur]');
   const lignesCompte = [...document.querySelectorAll('[data-sv-compte]')].map((e) => ({ k: e.getAttribute('data-sv-compte'), n: Number(e.getAttribute('data-n')) }));
   const replis = [...document.querySelectorAll('[data-stats-repli]')].map((e) => ({ id: e.getAttribute('data-stats-repli'), ouvert: e.open }));
@@ -302,7 +302,8 @@ if (require.main === module && !EXPLORE) (async () => {
         await capture(pg, `stats-${suf}`);
         // (9 nov.) + « CA depuis le début » (`total`, demande de Julien du 7 nov.) : 5 chiffres en tête.
         dit(r.tuiles.map((t) => t.k).join(',') === 'vendu,benefice,delai,enligne,total' && r.tuiles.every((t) => t.sous.trim().length > 8), `${suf} : 5 chiffres en tête (dont « CA depuis le début »), chacun avec sa phrase`, r.tuiles.map((t) => t.k + ':' + t.sous).join(' / '));
-        dit(/par rapport à septembre/.test(r.tuiles[0].sous), `${suf} : l'écart dit à quoi il se compare`, r.tuiles[0].sous);
+        // (25 nov., moins-texte-b) « par rapport à septembre » n'est plus écrit sous la tuile : le sous-titre de la période le dit (« vs septembre »), la tuile au survol (« Comparé à septembre »).
+        dit(/septembre/.test(r.tuiles[0].compare) && /−|\+|±/.test(r.tuiles[0].sous), `${suf} : l'écart dit à quoi il se compare`, r.tuiles[0]);
         dit(!/médiane?|\bs\d\d\b|Délai médian/.test(r.vitTexte), `${suf} : ni « médiane » ni « s44 » en haut de l'écran`);
         const l = r.lignesCompte;
         // (9 nov., « vendre plus ») « vend le plus » ne se dit qu'à 5 ventes ou plus et sans égalité.
