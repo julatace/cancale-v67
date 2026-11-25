@@ -504,6 +504,6 @@ export default {
   "v2.style.arcade.desc": "Dicke erhabene Tasten, wie ein Spiel.",
   "v2.style.monochrome": "Monochrom",
   "v2.style.monochrome.desc": "Schwarz, Weiß und Hellgrau; ein grüner Punkt.",
-  "v2.style.c3vintex": "C3 Vintex",
-  "v2.style.c3vintex.desc": "Etwas dunkleres Grau, weiße Karten, gravierte Schilder."
+  "v2.style.c3doux": "C3",
+  "v2.style.c3doux.desc": "Etwas dunkleres Grau, weiße Karten, gravierte Schilder."
 };

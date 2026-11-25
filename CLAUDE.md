@@ -485,7 +485,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **25 nov. · Style « C3 Vintex » (`claude/style-c3`, au choix, PAS par défaut)** : 12e style (gris `#DADDE2`, cartes blanches, plaque gravée, capsule du bas ; forme chargée seulement si choisi) ; Monochrome fond `#E2E4E8` ; À retirer, loupe, Argent nettoyés pour tout style choisi. `docs/passation/2026-11-25-style-c3.md`. Geste : regarder les planches.
+- **25 nov. · Style « C3 doux » (mélange C3 × Vintex) (`claude/style-c3`, au choix, PAS par défaut)** : 12e style (gris `#DADDE2`, cartes blanches, plaque gravée, capsule du bas ; forme chargée seulement si choisi) ; Monochrome fond `#E2E4E8` ; À retirer, loupe, Argent nettoyés pour tout style choisi. `docs/passation/2026-11-25-style-c3.md`. Geste : regarder les planches.
 - **25 nov. · Banc `e2e-extension` vert (`claude/e2e-extension-vert`)** : étapes 3/4 lisaient l'ancien écran (Ventes, « Qui dorment ») ⇒ portées sur le natif et le panneau ; vrais défauts corrigés : extension **5.440.4** (copie du dressing oubliée quand il est rangé : le panneau perdait la paire du lien), app (« Baisser » refusé et « mets à jour » pour une extension d'avant le lien du panneau). `2026-11-25-e2e-extension-vert.md`. Geste : installer la 5.440.4.
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
 

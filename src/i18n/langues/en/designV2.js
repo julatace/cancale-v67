@@ -504,6 +504,6 @@ export default {
   "v2.style.arcade.desc": "Chunky raised buttons, like a game.",
   "v2.style.monochrome": "Monochrome",
   "v2.style.monochrome.desc": "Black, white and light grey; one green dot.",
-  "v2.style.c3vintex": "C3 Vintex",
-  "v2.style.c3vintex.desc": "Slightly darker grey, white cards, engraved plates."
+  "v2.style.c3doux": "C3",
+  "v2.style.c3doux.desc": "Slightly darker grey, white cards, engraved plates."
 };

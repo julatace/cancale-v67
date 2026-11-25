@@ -504,6 +504,6 @@ export default {
   "v2.style.arcade.desc": "Botones grandes en relieve, como un juego.",
   "v2.style.monochrome": "Monocromo",
   "v2.style.monochrome.desc": "Negro, blanco y gris claro; un punto verde.",
-  "v2.style.c3vintex": "C3 Vintex",
-  "v2.style.c3vintex.desc": "Gris algo oscuro, tarjetas blancas, placas grabadas."
+  "v2.style.c3doux": "C3",
+  "v2.style.c3doux.desc": "Gris algo oscuro, tarjetas blancas, placas grabadas."
 };

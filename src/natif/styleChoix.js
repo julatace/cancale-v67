@@ -6,15 +6,15 @@
 // d'un iPhone : il essaie sur son téléphone sans changer son ordinateur. Posé AVANT le premier rendu par
 // public/demarrage-theme.js (même clé, même liste), puis ici à l'import.
 export const CLE_STYLE = 'vrm_style';
-export const STYLES = Object.freeze(['monochrome', 'graphite', 'ardoise', 'pierre', 'encre', 'papier', 'verre', 'nuit', 'menthe', 'studio', 'arcade', 'c3vintex']);
+export const STYLES = Object.freeze(['monochrome', 'graphite', 'ardoise', 'pierre', 'encre', 'papier', 'verre', 'nuit', 'menthe', 'studio', 'arcade', 'c3doux']);
 
 export function styleLu() {
   try { const v = JSON.parse(localStorage.getItem(CLE_STYLE) || 'null'); return STYLES.includes(v) ? v : ''; } catch (_) { return ''; }
 }
-// (25 nov., C3 Vintex) Les règles de FORME propres à un style (plaque gravée, chaussures sur plaque, barre en capsule) sont dans
+// (25 nov., C3 doux) Les règles de FORME propres à un style (plaque gravée, chaussures sur plaque, barre en capsule) sont dans
 // leur propre feuille, chargée SEULEMENT quand ce style est choisi : le démarrage des autres ne pèse rien de plus. Ses jetons
 // (couleurs) restent dans styles-choix-jetons.css (les tuiles d'aperçu de Paramètres les lisent).
-const FEUILLES = { c3vintex: () => import('./styles-c3vintex.css') };
+const FEUILLES = { c3doux: () => import('./styles-c3doux.css') };
 const chargees = new Set();
 function chargerFeuille(id) {
   if (!FEUILLES[id] || chargees.has(id)) return;

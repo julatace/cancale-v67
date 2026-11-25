@@ -75,13 +75,13 @@ const PRESETS = {
       point: '#22C55E', surPoint: '#052E16', contour: '#111111', limite: '#6B7280', douce: '#F3F4F6', bordCarte: '#E5E7EB' },
     sombre: { fond: '#0B0B0C', laterale: '#050506', carte: '#161618', carte2: '#202023', bord: '#2E2E33', encre: '#F5F5F6', texte: '#F5F5F6', encre2: '#A1A1AA', encre3: '#7A7A82', accent: '#F5F5F6', plein: '#FFFFFF', surPlein: '#000000', vert: '#F5F5F6',
       point: '#22C55E', surPoint: '#052E16', contour: '#F5F5F6', limite: '#7A7A82', douce: '#2A2A2E', bordCarte: '#2E2E33' } },
-  // C3 Vintex (25 nov., Julien : « fait un mélange c3 vintex ») : de C3, le fond gris clair un peu foncé, la sobriété, la plaque
+  // C3 doux (25 nov., Julien : « fait un mélange c3 vintex ») : de C3, le fond gris clair un peu foncé, la sobriété, la plaque
   // du N° gravée, les chaussures sur plaque, la barre du bas en capsule flottante ; de Vintex (NATIF.md §0), les cartes BLANCHES à
   // ombre très douce, l'échelle réduite, les étiquettes pastel franches (`etiquettes`), les logos en couleur, le plein à l'ENCRE.
   // Accent : l'ARDOISE, rare (jamais un bleu vif : audit-style-vintex S1). Chaque sorte de bouton se voit par sa FORME (plein
-  // encre · contour ≥ 3:1 · lien souligné · rond à contour). Ses règles de forme sont dans src/natif/styles-c3vintex.css,
+  // encre · contour ≥ 3:1 · lien souligné · rond à contour). Ses règles de forme sont dans src/natif/styles-c3doux.css,
   // chargé SEULEMENT quand ce style est choisi (src/natif/styleChoix.js).
-  c3vintex: { forme: { rCarte: 16, rBouton: 10, hPlein: 46, rChip: 999, profondeur: 'c3', appui: 0.97, plaque: 'grave', second: 'contour', liens: 'souligne', rond: 'plaque', champ: 'contour' },
+  c3doux: { forme: { rCarte: 16, rBouton: 10, hPlein: 46, rChip: 999, profondeur: 'c3', appui: 0.97, plaque: 'grave', second: 'contour', liens: 'souligne', rond: 'plaque', champ: 'contour' },
     clair: { fond: '#DADDE2', laterale: '#D0D4DA', carte: '#FFFFFF', carte2: '#F5F6F8', bord: '#E4E4E7', encre: '#16181D', texte: '#30343B', encre2: '#555A63', encre3: '#6B7079', accent: '#34506E', plein: '#16181D', surPlein: '#FFFFFF', vert: '#17744A',
       point: '#34506E', surPoint: '#FFFFFF', contour: '#6B717D', limite: '#767C86', douce: '#EEF0F3', bordCarte: '#E4E4E7',
       etiquettes: { vert: ['#17744A', '#DDF4E6'], teal: ['#0D6A6B', '#DAF0F0'], gris: ['#4C525B', '#ECEEF1'] } },
@@ -92,7 +92,7 @@ const PRESETS = {
 const ORDRE = Object.keys(PRESETS);
 // la plaque du N° : kraft (Papier), encre (Monochrome : noire au jour, gris anthracite la nuit), sinon le ton de la carte
 const PLAQUES = { kraft: { clair: ['#D8CDB9', '#2E261A'], sombre: ['#4A4236', '#EEEAE3'] }, encre: { clair: ['#111111', '#FFFFFF'], sombre: ['#3A3A40', '#F5F5F6'] },
-  // gravée (C3 Vintex) : un gris clair creusé, l'encre dessus (le creux est dessiné par styles-c3vintex.css)
+  // gravée (C3 doux) : un gris clair creusé, l'encre dessus (le creux est dessiné par styles-c3doux.css)
   grave: { clair: ['#E6E8EC', '#16181D'], sombre: ['#2C2E34', '#F4F4F5'] } };
 
 // ── les jetons dérivés d'une palette ──
@@ -157,7 +157,7 @@ function jetons(p, f, sombre) {
     '--g-anneau': `0 0 0 2px ${p.carte}, 0 0 0 4px ${p.encre}` });
   if (f.liens === 'souligne') j['--g-lien-deco'] = 'underline';
   if (p.point) Object.assign(j, { '--g-point': p.point, '--g-sur-point': p.surPoint });
-  // les étiquettes pastel franches (C3 Vintex, comme le défaut Vintex) : texte franc sur un aplat pâle
+  // les étiquettes pastel franches (C3 doux, comme le défaut Vintex) : texte franc sur un aplat pâle
   if (p.etiquettes) for (const [n, [t, f]] of Object.entries(p.etiquettes)) Object.assign(j, { [`--n-${n}`]: t, [`--n-${n}-fond`]: f });
   return j;
 }

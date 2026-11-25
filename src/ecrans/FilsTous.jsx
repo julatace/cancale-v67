@@ -21,6 +21,7 @@ import { tr } from '../i18n/index.js';
 import { attrCible } from '../cibleNotif.js';   // (22 nov., ext. 5.435) la loupe mène à CE fil (Vinted, Leboncoin, Vestiaire)
 import { Bouton as BoutonNatif, BoutonIcone } from '../natif/Bouton.jsx';
 import { Segmente } from '../natif/Segmente.jsx';
+import { Attente } from '../natif/Attente.jsx';   // (25 nov., chargement propre) le squelette à la forme des rangées
 import { Glyphe } from '../natif/icones.jsx';
 import { TuilePaire } from '../natif/Jeu.jsx';
 import '../natif/ecrans/messages-visuel.css';   // (24 nov., visuel-argent) la paire en tuile, l'avatar du compte sur son coin
@@ -131,7 +132,7 @@ function FilFusionne({ fil, vintedDe, lireVinted, ebayDe, onRepondre, onDelier, 
       <TeteFil onFermer={onFermer} nom={nomDe(fil)} titre={fil.num ? `N°${fil.num}` : ''} compte={fil.plateformes.map((p) => NOM_SITE[p]).join(' · ')}/>
       <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {parConv ? <AlerteArnaque site={fil.plateformes.length === 1 ? fil.plateformes[0] : ''} messages={messages}/> : null}
-        {parConv === undefined ? <div role="status" data-fil-etat="charge" style={style}>{tr('messages.lecture')}</div>
+        {parConv === undefined ? <div data-fil-etat="charge" style={style}><Attente forme="texte" n={3}/></div>
           : !messages.length ? <div data-fil-etat="vide" style={style}>—</div>
           : messages.map((m, i) => (
             <BulleConv key={m.conv + ':' + m.rang} moi={m.deMoi === true} qui={m.deMoi === true ? 'Toi' : m.deMoi === false ? "L'autre personne" : ''} texte={m.t} quand={m.at} avecDate
@@ -387,7 +388,8 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
               Messages au 2e toucher : 0,3 s « vide » entre la copie et la liste). */}
           {chargement && !fils.length ? <><div className="vg-ms-vues" data-msg-vues={vue}><Segmente libelle={tr('verre2.msg.filtre')} valeur={vue} onChange={setVue}
               options={[['toutes', tr('verre2.msg.toutes')], ['offres', tr('verre2.msg.offres')], ['nonlues', tr('verre2.msg.nonLues')]].map(([k, l]) => ({ cle: k, libelle: l, attrs: { 'data-msg-vue': k, 'aria-pressed': vue === k ? 'true' : 'false' } }))}/></div>
-            <div role="status" data-fils-lecture="" style={{ ...muted, padding: '12px 0' }}>{tr('messages.lecture')}</div></>
+            {/* (25 nov., chargement propre) La liste en cours de lecture : des rangées de squelette à la place du mot « Lecture… ». */}
+            <div data-fils-lecture=""><Attente forme="rangees" n={6} vignette={44}/></div></>
             : !fils.length ? <div data-fils-vide="" style={{ ...muted, padding: '12px 0' }}>{tr('messages.aucuneConversationLue')}</div>
             : motCherche && !filsVus.length ? <div data-fils-rien="" className="vrm-ms-rien">{tr('ms.msg.rien', { x: cherche.trim() })}</div>
             : <><CompteurArnaque n={fils.filter((f) => { const d = f.dernier || f.convs[f.convs.length - 1]; return d && motifDeLApercu(d.apercu, d.deMoi); }).length}/>

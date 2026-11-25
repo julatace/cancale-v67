@@ -1612,7 +1612,7 @@
   --g-point: #22C55E;
   --g-sur-point: #052E16;
 }
-[data-style="c3vintex"] {
+[data-style="c3doux"] {
   --n-fond: #DADDE2;
   --n-laterale: #D0D4DA;
   --n-carte: #FFFFFF;
@@ -1692,7 +1692,7 @@
   --g-point: #34506E;
   --g-sur-point: #FFFFFF;
 }
-:root[data-theme="dark"][data-style="c3vintex"], :root[data-theme="dark"] [data-style="c3vintex"] {
+:root[data-theme="dark"][data-style="c3doux"], :root[data-theme="dark"] [data-style="c3doux"] {
   --n-fond: #121316;
   --n-laterale: #0C0D0F;
   --n-carte: #1C1D21;
