@@ -26,6 +26,7 @@
 //   menuLigne(l)  [{ cle, libelle, onClick }] — le « ⋯ » d'une ligne (rien ⇒ pas de ⋯)
 //   onOuvrir(l)   toucher une ligne (la fiche)
 //   ligneTel(l)   { sousTitre, valeur, detailValeur, plaque, ton } — la rangée de 72 au téléphone
+//   l.avantTitre  (25 nov., ventes-tableau-gris) nœud posé DEVANT le titre d'une ligne (le logo de SON site), ordinateur seulement
 //   unite         (n) → « 54 articles » ; placeholder ; plein (le plein de l'écran quand rien n'est sélectionné)
 //   haut          nœud posé sous la barre d'outils (« À régler », un état de lecture) ; pied (phrase)
 //   vide / videRecherche / pasSu   les phrases d'un tableau vide · grille (vrai ⇒ liste ⇄ grille) · Icon
@@ -379,7 +380,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
                   <span className="n-tt-article">
                     {l.icone ? <span className="n-tt-avatar" aria-hidden="true">{l.icone}</span> : <Vignette src={l.photo || ''} alt="" taille={48} image={l.image || null}/>}
                     <span className="n-tt-article-texte">
-                      <span className="n-tt-article-titre" title={l.titre || ''}>{l.titre || tr('tableau.sansTitre')}</span>
+                      <span className="n-tt-article-titre" title={l.titre || ''}>{l.avantTitre ? <span className="n-tt-avant-titre">{l.avantTitre}</span> : null}{l.titre || tr('tableau.sansTitre')}</span>
                       {l.sous ? <span className="n-tt-article-sous" title={typeof l.sous === 'string' ? l.sous : undefined}>{l.sous}</span> : null}
                     </span>
                   </span>

@@ -15,6 +15,7 @@ import { celluleAchat } from './celluleAchat.jsx';
 import { Groupe } from '../Groupe.jsx';
 import { Rangee, Vignette } from '../Rangee.jsx';
 import { Pastille } from '../Pastille.jsx';
+import { LogoSite } from '../LogoSite.jsx';
 import '../ventes-lisibles.css';
 import { morceauxMarqueTaille } from '../../ventes/marqueTaille.js';
 import { MetaVente, useAchatRange } from './rangeeVente.jsx';   // (25 nov., ventes-rangee) la rangée compacte, la même partout
@@ -33,7 +34,8 @@ export default function VentesTableau({ lignes, haut = null, pied = '', majLe, o
   onOuvrir = null, onImprimer = null, imprimable = () => false, Icon = null, achatDe = null, netDe = null, euros = null }) {
   const rangees = React.useMemo(() => (Array.isArray(lignes) ? lignes.map((l) => {
     const mot = l.etat ? motEtat(l.etat) : '';
-    return { ...l, v: l, titre: l.titre, photo: typeof l.photo === 'string' ? l.photo : '', statut: categorieVente(mot), statutLibelle: mot,
+    // (25 nov., ventes-tableau-gris) le logo de SON site devant le titre (ordinateur) ; la colonne « Site » reste dans « Colonnes ».
+    return { ...l, v: l, titre: l.titre, photo: typeof l.photo === 'string' ? l.photo : '', statut: categorieVente(mot), statutLibelle: mot, avantTitre: l.site ? <LogoSite site={l.site} taille={14} nom={nomSite(l.site)}/> : null,
       sous: joint(marqueTaille(l), nomSite(l.site), l.compte),
       texte: [l.titre, l.num ? 'n' + l.num + ' n°' + l.num + ' ' + l.num : '', l.compte, nomSite(l.site), l.tr && l.tr.nom, l.id].filter(Boolean).join(' '),
       prixGrille: prix(l), attrs: { 'data-vt-site': l.site, 'data-toutes-vente': l.site, 'data-toutes-id': l.id, 'data-ordre-t': l.t != null ? String(l.t) : '' } };

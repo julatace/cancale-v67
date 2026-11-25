@@ -45,6 +45,12 @@
     --n-vert: #17744A; --n-vert-fond: #DDF4E6; --n-vert-bord: #C3EAD2;      /* fait, prêt, en ligne */
     --n-teal: #0D6A6B; --n-teal-fond: #DAF0F0; --n-teal-bord: #BCE3E3;      /* en route */
     --n-gris: #4C525B; --n-gris-fond: #ECEEF1; --n-gris-bord: #DFE2E6;      /* en attente */
+    /* (25 nov., ventes-tableau-gris — maquette de Julien validée à l'ordinateur : « en plus gris ») Le TABLEAU GRIS de Ventes,
+       ordinateur seulement (src/natif/ventes-lisibles.css, ≥ 1024 px) : page, surface du tableau, filet, gris secondaire,
+       plaque, segmenté ; « en route » bleu pâle (aucun jeton bleu avant). */
+    --n-tg-page: #E9EAEC; --n-tg-surface: #F4F5F6; --n-tg-filet: #DADCE0; --n-tg-survol: #ECEDEF; --n-tg-encre: #16181C; --n-tg-encre-2: #5C626B;
+    --n-tg-plaque: #E1E3E6; --n-tg-segment: #E2E3E6; --n-tg-case: #C4C7CC;
+    --n-bleu: #2D4F7A; --n-bleu-fond: #DCE4EE;
 
     /* ── dérivés (mesurés) ── */
     --n-sur-teinte: #0E0F12;          /* texte SUR --n-teinte (16:1) */
@@ -136,6 +142,10 @@
     --n-vert: #7BE8BE; --n-vert-fond: rgb(63 212 154 / .14); --n-vert-bord: rgb(63 212 154 / .26);
     --n-teal: #6ED6D6; --n-teal-fond: rgb(45 190 190 / .14); --n-teal-bord: rgb(45 190 190 / .26);
     --n-gris: #D0D0D7; --n-gris-fond: #34343A; --n-gris-bord: #46464E;
+    /* (25 nov., ventes-tableau-gris) la déclinaison nuit des mêmes gris (contrastes : texte 2 ≥ 7:1 sur la surface) */
+    --n-tg-page: #1C1C20; --n-tg-surface: #26262B; --n-tg-filet: #3A3A41; --n-tg-survol: #2E2E34; --n-tg-encre: #F4F4F5; --n-tg-encre-2: #B4B4BC;
+    --n-tg-plaque: #36363D; --n-tg-segment: #2E2E34; --n-tg-case: #5A5A62;
+    --n-bleu: #A9C4E6; --n-bleu-fond: rgb(110 150 210 / .18);
 
     --n-sur-teinte: #F4F4F5;
     --n-sur-ambre: #18181B;

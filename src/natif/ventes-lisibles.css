@@ -197,3 +197,102 @@
    gras à l'encre, sans pilule (une pilule par vente élargissait la ligne et repoussait le logo du transporteur à la ligne).
    Hors couche et plus précise que la pilule des styles au choix (styles-choix.css), pour la même raison dans chaque style. */
 .n-rangee.n-vr .n-vr-etat .n-pastille { min-width: 0; height: auto; padding: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--n-encre); font: var(--n-t-legende-fort); }
+
+/* ── (25 nov., ventes-tableau-gris) VENTES À L'ORDINATEUR : LE TABLEAU GRIS ─────────────────────────────────────────────────────
+   Julien, maquette validée à l'ordinateur (« en plus gris », « sur ordi je veux les vrais logos etc., il faut pas supprimer des
+   fonctionnalités, on s'inspire ») : page gris clair, tableau sur une surface à peine plus claire bordée d'un filet, en-têtes 13 px
+   gris, rangées de 64 (photo 42, titre sur une ligne précédé du logo de SON site, l'étape dessous en gris), N° en plaque discrète,
+   prix gras aligné à droite, transporteur en LOGO + nom, statut en étiquette pâle, « ··· » au bout ; barre d'outils en boutons à
+   contour gris, segmenté gris, UN plein à l'encre. Rien n'est retiré : la disposition seulement (mêmes lignes, mêmes gestes).
+   ⚠️ ORDINATEUR SEULEMENT (≥ 1024 px, la largeur de `useOrdinateur`) : l'iPhone ne change pas dans ce lot.
+   Les gris redéfinissent les jetons natifs DANS l'écran Ventes : tout ce qui y lit `--n-carte`, `--n-bord`… prend le même gris.
+   Pas d'orange ni de rouge (src/CLAUDE.md) : « à expédier » et « retour / litige » = le geste (ardoise pâle + gras), comme ailleurs. */
+@media (min-width: 1024px) {
+  /* La page gris clair. La seule exception au « sans !important » de ce fichier : la couche `vrm-premium` rend `.vrm-main`
+     transparent avec !important ; pour un !important, la couche déclarée la PREMIÈRE gagne (ordre posé en tête d'index.html :
+     `vrm-vintex` d'abord) — d'où cette règle-là, seule, dans `vrm-vintex`. */
+  @layer vrm-vintex {
+    .vrm-main[data-ecran="ventes"] { background: var(--n-tg-page) !important; }
+  }
+  @layer vrm-natif {
+    .vrm-main[data-ecran="ventes"] {
+      --n-carte: var(--n-tg-surface); --n-carte-2: var(--n-tg-survol); --n-bord: var(--n-tg-filet); --n-trait: var(--n-tg-filet);
+      --n-encre-2: var(--n-tg-encre-2); --n-appui: var(--n-tg-plaque); --n-plein: var(--n-tg-encre);
+      --n-fond: var(--n-tg-page); --n-barre: var(--n-tg-page);
+      color: var(--n-tg-encre);
+    }
+    /* La barre d'outils : recherche et filtres en boutons à contour gris (34 dessinés). */
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-outils { border-bottom: 1px solid var(--n-tg-filet); padding-bottom: 14px; margin-bottom: 16px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-bouton { min-height: 34px; border: 1px solid var(--n-tg-filet); border-radius: 8px; background: var(--n-tg-surface);
+      color: var(--n-tg-encre); font: var(--n-t-controle); box-shadow: 0 1px 0 rgb(0 0 0 / .03); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-bouton:hover { background: var(--n-tg-survol); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-bouton[data-tt-actif="1"] { background: var(--n-tg-plaque); color: var(--n-tg-encre); border-color: var(--n-tg-filet); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-plus { border-color: transparent; background: transparent; box-shadow: none; color: var(--n-tg-encre-2); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-vues .n-tt-bouton { border-color: transparent; background: transparent; box-shadow: none; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-vues .n-tt-bouton[aria-pressed="true"] { background: var(--n-tg-surface); }
+    .vrm-main[data-ecran="ventes"] .n-tt-vues { background: var(--n-tg-segment); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-recherche { min-height: 34px; border: 1px solid var(--n-tg-filet); border-radius: 8px; background: var(--n-tg-surface); box-shadow: none; }
+    .vrm-main[data-ecran="ventes"] .n-tt-compte { border: 1px solid var(--n-tg-filet); background: var(--n-tg-surface); color: var(--n-tg-encre-2); }
+    /* LE plein (« Imprimer N bordereaux ») à l'encre : un seul par écran. */
+    .vrm-main[data-ecran="ventes"] .n-bouton[data-n-variante="plein"] { background: var(--n-tg-encre); color: var(--n-tg-surface); border-radius: 8px; }
+    /* Le segmenté (À envoyer · En route · Terminées) : gris, le choix sur la surface. */
+    .vrm-main[data-ecran="ventes"] .n-segmente { background: var(--n-tg-segment); border-radius: 8px; padding: 2px; box-shadow: none; }
+    .vrm-main[data-ecran="ventes"] .n-segmente-curseur { background: var(--n-tg-surface); border-radius: 6px; box-shadow: 0 1px 2px rgb(0 0 0 / .06); }
+    .vrm-main[data-ecran="ventes"] .n-segmente-choix { color: var(--n-tg-encre-2); font: var(--n-t-second); }
+    .vrm-main[data-ecran="ventes"] .n-segmente-choix[aria-checked="true"] { color: var(--n-tg-encre); font: var(--n-t-second-fort); }
+    .vrm-main[data-ecran="ventes"] .n-segmente-n { color: inherit; }
+    .vrm-main[data-ecran="ventes"] .n-tt-nombre-texte { font: var(--n-t-second); color: var(--n-tg-encre-2); }
+
+    /* Le tableau : surface #F4F5F6, filet 1 px #DADCE0, rayon 10, filets fins entre les lignes. */
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-cadre { border: 1px solid var(--n-tg-filet); border-radius: 10px; background: var(--n-tg-surface); box-shadow: none; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th { height: 40px; background: var(--n-tg-surface); border-bottom: 1px solid var(--n-tg-filet);
+      font: 500 13px/18px var(--n-police); color: var(--n-tg-encre-2); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[aria-sort] { color: var(--n-tg-encre); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th:first-child { border-top-left-radius: 10px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th:last-child { border-top-right-radius: 10px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-tri-signe { color: var(--n-tg-encre-2); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-tr + .n-tt-tr > .n-tt-td { border-top: 1px solid var(--n-tg-filet); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-tr:hover > .n-tt-td,
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-tr[data-tt-choisie="1"] > .n-tt-td { background: var(--n-tg-survol); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-tr[data-tt-coche="1"] > .n-tt-td { background: var(--n-tg-survol); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-td { height: 64px; font: 400 14px/20px var(--n-police); color: var(--n-tg-encre); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-coche { accent-color: var(--n-tg-encre); width: 16px; height: 16px; }
+    /* L'article : photo de 42 (rayon 7), le titre sur UNE ligne précédé du logo du site, l'étape dessous en gris 13. */
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-article { max-width: 520px; gap: 12px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-td-article .n-vignette { width: 42px; height: 42px; border-radius: 7px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-article-titre { display: block; -webkit-line-clamp: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font: 500 14.5px/20px var(--n-police); color: var(--n-tg-encre); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-article-sous { font: 400 13px/18px var(--n-police); color: var(--n-tg-encre-2); margin-top: 1px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-avant-titre { display: inline-flex; vertical-align: -2px; margin-inline-end: 7px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-avant-titre .n-logo-site { vertical-align: 0; }
+    /* N° en plaque discrète, prix gras à chiffres tabulaires, date en gris. */
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-td[data-tt-col="numero"] .n-plaque:not([data-n-doublon]) { background: var(--n-tg-plaque); color: var(--n-tg-encre); box-shadow: none;
+      border-radius: 5px; font: 650 12.5px/18px var(--n-police); font-variant-numeric: tabular-nums; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-td[data-tt-col="prix"] { font: 600 14.5px/20px var(--n-police); font-variant-numeric: tabular-nums; text-align: right; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-td[data-tt-col="date"] { color: var(--n-tg-encre-2); font-variant-numeric: tabular-nums; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-td[data-tt-col="transporteur"] { color: var(--n-tg-encre); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-transporteur { gap: 8px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-vide-cellule { color: var(--n-tg-encre-2); }
+    /* Le statut : étiquette pâle, rayon 6. Par défaut le gris (annulée, en cours) ; la teinte vient de la CATÉGORIE de la ligne
+       (`data-tt-statut-ligne`, posée par l'écran : la règle d'état ne change pas, seule la couleur). */
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-etiquette { height: 22px; padding: 0 9px; border-radius: 6px; font: 550 12.5px/1 var(--n-police); box-shadow: none;
+      background: var(--n-tg-plaque); color: var(--n-gris); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi :is(.n-tt-tr[data-tt-statut-ligne="pret"], .n-tt-tr[data-tt-statut-ligne="attente"], .n-tt-tr[data-tt-statut-ligne="imprime"],
+      .n-tt-tr[data-tt-statut-ligne="site"], .n-tt-tr[data-tt-statut-ligne="envoyer"], .n-tt-tr[data-tt-statut-ligne="litige"]) .n-tt-etiquette {
+      background: var(--n-ambre-fond); color: var(--n-tg-encre); font-weight: 700; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi :is(.n-tt-tr[data-tt-statut-ligne="route"], .n-tt-tr[data-tt-statut-ligne="livree"]) .n-tt-etiquette { background: var(--n-bleu-fond); color: var(--n-bleu); }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-tr[data-tt-statut-ligne="terminee"] .n-tt-etiquette { background: var(--n-vert-fond); color: var(--n-vert); }
+    /* Les largeurs de la maquette (N° 70 · Prix 96 · Date 112 · Transporteur 170 · Statut 140) : l'article prend le reste. */
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi :is(.n-tt-th, .n-tt-td):not(.n-tt-th-case, .n-tt-td-case, .n-tt-th-menu, .n-tt-td-menu) { padding-inline: 12px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="numero"] { width: 70px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="prix"], .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="net"] { width: 96px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="date"] { width: 112px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="transporteur"] { width: 170px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="statut"] { width: 140px; }
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-th[data-tt-th="limite"] { width: 130px; }
+    /* « ··· » : discret, gris, au bout de la ligne. */
+    .vrm-main[data-ecran="ventes"] .n-tt-ordi .n-tt-td-menu .n-tt-plus { color: var(--n-tg-encre-2); }
+    /* Les cartes de l'écran (« Mes envois », « Litiges et retours », « À régler ») sur la même surface, bordées du même filet. */
+    .vrm-main[data-ecran="ventes"] .n-groupe-carte { background: var(--n-tg-surface); box-shadow: inset 0 0 0 1px var(--n-tg-filet); }
+  }
+}

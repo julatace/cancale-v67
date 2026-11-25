@@ -229,7 +229,9 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
     const st = surEnvoyer ? statutEnvoyer(r) : statutRangee(r);
     const sousR = sousDe(r);
     const sous = sousCommun && nCommun >= 2 && sousR === sousCommun ? '' : sousR;
-    return { cle: r.cle, r, titre: r.titre, photo: r.photo || '', image: r.photo && Photo ? <Photo src={r.photo} alt="" loading="lazy" decoding="async"/> : null,
+    // (25 nov., ventes-tableau-gris) Le logo de SON site devant le titre (maquette « tableau gris » de Julien) ; la colonne « Site »
+    // reste dans « Colonnes » (et son tri), repliée par défaut : le même logo ne s'écrit pas deux fois sur la ligne.
+    return { cle: r.cle, r, titre: r.titre, photo: r.photo || '', avantTitre: r.site ? <LogoSite site={r.site} taille={14} nom={Logo && Logo.nom ? Logo.nom(r.site) : r.site}/> : null, image: r.photo && Photo ? <Photo src={r.photo} alt="" loading="lazy" decoding="async"/> : null,
       sous: joint(marqueTaille(r), sous), statut: st, statutLibelle: motStatut(r), nonCochable: !(r.coche && r.coche.possible), num: r.num, prix: r.prix, t: r.t, prixGrille: r.prix,
       texte: [r.titre, r.num ? 'n' + r.num + ' n°' + r.num + ' ' + r.num : '', r.taille, r.acheteur, r.compte, r.transporteur, r.suivi, sousR].filter(Boolean).join(' '),
       attrs: surEnvoyer
@@ -241,7 +243,7 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
   const aVerifierPartout = nAVerifier >= 2;
   const colonnes = [
     // (20 nov. soir) Tout est mélangé : une colonne « Site » ÉTROITE, le logo seul (le nom au survol).
-    { cle: 'site', libelle: tr('tableau.col.site'), titreCourt: true, tri: (l) => l.r.site || null, rendu: (l) => (l.r.site ? <LogoSite site={l.r.site} taille={18} nom={Logo && Logo.nom ? Logo.nom(l.r.site) : l.r.site}/> : null) },
+    { cle: 'site', libelle: tr('tableau.col.site'), titreCourt: true, defaut: false, tri: (l) => l.r.site || null, rendu: (l) => (l.r.site ? <LogoSite site={l.r.site} taille={18} nom={Logo && Logo.nom ? Logo.nom(l.r.site) : l.r.site}/> : null) },
     // (20 nov., Julien : « il y a la place pour mettre le bouton relier ») L'ACHAT : le bouton-icône « Relier » (les deux maillons) ouvre
     // l'atelier sur CETTE vente ; reliée : les maillons en gris et le prix d'achat. Hors Vinted : « — ». Jamais relié tout seul (§5).
     { cle: 'achat', libelle: tr('vt.col.achat'), tri: (l) => (l.r.achat ? (l.r.achat.relie ? 1 : 0) : null), rendu: (l) => celluleAchat(l.r.achat ? { ...l.r.achat, titre: l.r.achat.titre || l.r.titre } : null, Icon) },
