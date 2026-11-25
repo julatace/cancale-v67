@@ -105,7 +105,7 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
   await attendre(pg, () => !!document.querySelector('[data-vn="ventes"]'), 40000);
   await pg.waitForTimeout(1500);
   // `STYLE=monochrome|c3doux|…` : un style de Paramètres → Apparence (src/natif/styleChoix.js, rangé sur l'appareil) ; vide = le style par défaut.
-  if (STYLE) { await pg.evaluate((st) => { localStorage.setItem('vrm_style', JSON.stringify(st)); }, STYLE); await pg.reload({ waitUntil: 'domcontentloaded' });
+  if (STYLE) { await pg.evaluate((st) => { localStorage.setItem('vrm_style', JSON.stringify(st)); }, STYLE); await pg.goto(new URL('/?tab=ventes', pg.url()).href, { waitUntil: 'domcontentloaded' });
     await attendre(pg, () => !!document.querySelector('[data-vn="ventes"]'), 40000); await pg.waitForTimeout(1500); }
   if (MUTATION === 'logo') await pg.addStyleTag({ content: '.n-vr-meta, .n-vt-ligne { flex-wrap: nowrap !important; overflow: hidden !important; max-width: 150px !important; } .n-rangee-sous { overflow: hidden !important; }' });
   return { ctx, pg, erreurs };
