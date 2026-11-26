@@ -81,7 +81,7 @@
 
 /* ── (24 nov.) L'inventaire : les dernières ventes en tuiles (Aujourd'hui) — une rangée qui défile de côté au téléphone. ── */
 @layer vrm-natif {
-  .n-inventaire { display: grid; grid-auto-flow: column; grid-auto-columns: 104px; gap: 12px; overflow-x: auto; padding: 10px 2px 12px; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .n-inventaire { display: grid; grid-auto-flow: column; grid-auto-columns: 104px; gap: 12px; overflow-x: auto; padding: 10px 14px 12px; scroll-padding-inline: 14px; /* (26 nov.) 14 px à gauche : la 1re photo, son étiquette N° et le logo du site ne touchent plus le bord de la carte */ scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
   .n-inventaire::-webkit-scrollbar { display: none; }
   @media (min-width: 1024px) { .n-inventaire { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); overflow: visible; } }
   .n-inventaire-case { appearance: none; border: 0; background: transparent; padding: 0; margin: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; scroll-snap-align: start;
