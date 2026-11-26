@@ -47,7 +47,7 @@ export default {
   "v2.af.titre": "Paquetes",
   "v2.af.rienEnvoyer": "nada que enviar",
   "v2.af.rienRetirer": "nada que recoger",
-  "v2.af.toutesStats": "Todas las estadísticas",
+  "v2.af.toutesStats": "Estadísticas",
   "v2.af.toutesStatsSous": "Actividad y finanzas, en 7, 30 o 90 días",
   "v2.perso.carte.colis": "Paquetes",
   "v2.perso.phrase.colis": "Por enviar y por recoger, de un vistazo",

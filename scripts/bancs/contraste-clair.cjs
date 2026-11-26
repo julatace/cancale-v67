@@ -5,11 +5,13 @@ require('./_porte-banc.cjs');
 //  LE GRIS CLAIR ÉTAGÉ (23 nov., Julien : « j'aime pas le noir, je veux que ce soit gris clair », « un mélange de degrés de
 //  gris », « gris un peu plus foncé » ; variante A retenue) — docs/passation/2026-11-23-style-clair.md. Le gris foncé de
 //  vrm.center reste le mode sombre CHOISI. Mesuré sur l'app RENDUE, apparence PAR DÉFAUT (aucun choix posé) :
-//    G1 l'app s'ouvre en CLAIR quand rien n'est choisi, et le fond est le gris clair de l'app (#DFE1E5) ;
+//    G1 Clair CHOISI : l'app reste en clair, et le fond est le gris MOYEN de l'app (#FFFFFF, 25 nov. ; avant #DFE1E5) ;
+//       ⚠️ (25 nov. soir, Julien : « mets en mode sombre ») sans AUCUN choix posé, l'app s'ouvre en SOMBRE : `DEFAUT=1`
+//       retire tout choix et exige le sombre (#1C1C20) — rouge sur le code d'avant (il s'ouvrait en clair) ;
 //    G2 chaque texte visible de chaque écran monté tient 4,5:1 sur ce qu'il y a derrière lui (3:1 au-dessus de 24 px, ou
 //       18,66 px gras) — le fond est recomposé couche par couche (couleurs et transparences, opacités des parents) ;
 //       un texte posé sur un DÉGRADÉ est jugé sur la couleur la plus claire de ce dégradé (le pire cas) ;
-//    G3 les cartes sont NETTEMENT plus claires que le fond ; le héros d'Aujourd'hui s'en détache (son dégradé n'est pas le fond) ;
+//    G3 les cartes se détachent du fond par leur ton (≥ 5 %, 26 nov. : page blanche, cartes gris très clair) ; le héros d'Aujourd'hui s'en détache (son dégradé n'est pas le fond) ;
 //    G4 rien ne déborde, aucune erreur d'app.
 //  `BANC_DIST=<dist d'avant>` : rouge sur l'app d'avant (G1 : fond #F4F4F2, pas le gris étagé). `SOMBRE=1` : le même contrôle
 //  de contraste (G2) sur le mode sombre choisi (le gris de vrm.center). `SHOTS=…` les captures. `ECRANS=a,b`.
@@ -27,9 +29,11 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
 // Le contexte de design-passe (session, base, routes), puis on RETIRE le choix d'apparence qu'il pose (`vinted_dark`) et on
 // recharge : l'app doit s'ouvrir dans son apparence par défaut (les scripts d'ouverture passent dans l'ordre où ils sont posés).
 const SOMBRE = process.env.SOMBRE === '1';
+const DEFAUT = process.env.DEFAUT === '1';
 async function ouvrirDefaut(nav, W, b, url) {
+  // Sans variable : Clair CHOISI (design-passe pose `vinted_dark` = false). `DEFAUT=1` : aucun choix (ni `vinted_dark` ni `vrm_apparence`).
   const o = await P.ouvrir(nav, { W, sombre: SOMBRE, b, url });
-  if (!SOMBRE) { await o.pg.addInitScript(() => { try { localStorage.removeItem('vinted_dark'); localStorage.removeItem('vrm_apparence'); } catch (_) {} });
+  if (DEFAUT && !SOMBRE) { await o.pg.addInitScript(() => { try { localStorage.removeItem('vinted_dark'); localStorage.removeItem('vrm_apparence'); } catch (_) {} });
     await o.pg.reload({ waitUntil: 'domcontentloaded' }); }
   o.erreurs.length = 0;
   return o;
@@ -98,11 +102,13 @@ const MESURE = () => {
         await pg.waitForSelector('.vrm-main', { timeout: 40000 }).catch(() => {}); await pg.waitForTimeout(5500);
         const m = await pg.evaluate(MESURE);
         if (SOMBRE) dit(m.theme === 'dark' && /^#1C1C20$/i.test(m.fondApp), `G1 ${e} ${W} : sombre choisi, fond #1C1C20 (vrm.center)`, { theme: m.theme, fond: m.fondApp });
-        else dit(m.theme !== 'dark' && /^#DFE1E5$/i.test(m.fondApp), `G1 ${e} ${W} : sans choix posé, l'app est en clair, fond #DFE1E5 (gris étagé)`, { theme: m.theme, fond: m.fondApp });
+        else if (DEFAUT) dit(m.theme === 'dark' && /^#1C1C20$/i.test(m.fondApp), `G1 ${e} ${W} : sans choix posé, l'app s'ouvre en SOMBRE, fond #1C1C20 (25 nov.)`, { theme: m.theme, fond: m.fondApp });
+        else dit(m.theme !== 'dark' && /^#FFFFFF$/i.test(m.fondApp), `G1 ${e} ${W} : Clair choisi, l'app reste en clair, fond #FFFFFF (monochrome, 26 nov.)`, { theme: m.theme, fond: m.fondApp });
         dit(m.n > 5 && m.ko.length === 0, `G2 ${e} ${W} : chaque texte visible tient 4,5:1 (3:1 en grand) — ${m.n} textes mesurés`, m.ko.slice(0, 25));
         if (e === 'journee') {
-          dit(m.lumCarte != null && m.lumCarte > m.lumFond * (SOMBRE ? 1 : 1.15), `G3 ${e} ${W} : les cartes sont nettement plus claires que le fond`, { carte: m.lumCarte, fond: m.lumFond });
-          dit(!!m.heros && m.heros.length > 0 && (SOMBRE ? Math.max(...m.heros) > m.lumFond * 1.6 : Math.abs(Math.max(...m.heros) - m.lumFond) > 0.05), `G3 ${e} ${W} : le héros se détache du fond (son dégradé n'est pas le fond)`, m.heros);
+          // (26 nov., Julien : « 15 en clair ») monochrome : page BLANCHE, cartes gris très clair — elles se détachent par leur TON (≥ 5 % d'écart), pas forcément plus claires.
+          dit(m.lumCarte != null && (SOMBRE || DEFAUT ? m.lumCarte > m.lumFond : Math.abs(m.lumCarte - m.lumFond) >= 0.05), `G3 ${e} ${W} : les cartes se détachent du fond par leur ton`, { carte: m.lumCarte, fond: m.lumFond });
+          dit(!!m.heros && m.heros.length > 0 && (SOMBRE || DEFAUT ? Math.max(...m.heros) > m.lumFond * 1.6 : Math.abs(Math.max(...m.heros) - m.lumFond) > 0.05), `G3 ${e} ${W} : le héros se détache du fond (son dégradé n'est pas le fond)`, m.heros);
         }
         dit(m.deborde <= 1 && !erreurs.length, `G4 ${e} ${W} : rien ne déborde, aucune erreur d'app`, { deborde: m.deborde, erreurs });
         await pg.screenshot({ path: path.join(SHOTS, `${e}-${W}.png`) });

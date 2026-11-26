@@ -3591,3 +3591,24 @@ autres onglets sont inchangés. Banc `scripts/bancs/achats-en-route-ordre.cjs`
 ## Ligne déplacée de CLAUDE.md §9 (16 nov.)
 
 - **15 nov. · Police Inter, moins d'écritures, Annonces refait** : Julien (« je veux que ça soit pro », « enlève les écritures ») — Inter partout (chiffres 500, titres 600, Urbanist retirée), aides « première fois » retirées, phrase du jour lue seulement par les lecteurs d'écran, « 1 vente » seul sous le chiffre du jour ; Annonces : plateformes sur leur ligne (plus de chevauchement), logos `src/plateformes/Marque.jsx` (Vinted/eBay Simple Icons CC0 ; Leboncoin/Vestiaire dessinés, pas officiels), nombre par site, « Relier à Vinted » en lien, « Paires » ⇒ « Annonces » (texte seulement). `docs/passation/2026-11-15-annonces-propre.md`. Geste : aucun.
+
+## 25 nov. soir — Sombre par défaut (`claude/sombre-par-defaut`)
+
+Julien, après avoir vu Aujourd'hui en clair puis en sombre : « La deuxième couleur est pas mal, mets en mode sombre. »
+Et : « laisse le design de l'app actuel » — aucune couleur ne change, seul le DÉFAUT bascule.
+
+- **Règle** : `src/apparence.js` — `APPARENCE_PAR_DEFAUT = 'sombre'` ; `apparenceDe(mode, ancien)` : `vrm_apparence` valable ⇒ lui ;
+  sinon `vinted_dark` true ⇒ sombre, **false ⇒ clair** (un ancien choix est gardé) ; ni l'un ni l'autre ⇒ sombre.
+- **Copie avant le premier rendu** : `public/demarrage-theme.js` (`ancien === false ? 'clair' : 'sombre'`, et `dark` en cas d'erreur).
+  `audit-apparence` exécute les deux sur 864 entrées (dont « rien de posé ») et exige le même verdict.
+- **Aucun éclair clair** : `index.html` part de `<html lang="fr" data-theme="dark">` et `theme-color` #1C1C20 ; le manifeste PWA
+  (`background_color`, `theme_color`) passe à #1C1C20 (le fond de nuit de `--n-fond`). Le script remet le clair pour qui l'a choisi.
+- **Paramètres → Apparence** : la liste coche « Sombre » pour quelqu'un sans choix (mesuré : `sombre:1`, rien n'est écrit tant qu'il ne touche pas).
+- **Pas touché** : les pages publiques à part (`public/aide/aide.js`, `statut.js`, `etat.js`, `confiance.js`, `formateur.js`,
+  `VuePartenaire.jsx`) suivent toujours `vinted_dark`, sinon le système — ce ne sont pas l'app.
+- ⚠️ Un appareil où un ancien code a écrit `vinted_dark = false` sans qu'il choisisse (la « bascule Minéral » retirée le 17 oct.)
+  reste en clair : on ne peut pas le distinguer d'un vrai choix, et un choix posé ne change jamais.
+- **Contrôles** : `audit-apparence --prouve` (3 rouges sur le code d'avant ; mutations « défaut redevenu clair » dans la règle et
+  dans le démarrage, « vinted_dark=false ignoré »), `audit-ouverture` (2 rouges avant : theme-color et manifeste), banc
+  `contraste-clair` : `DEFAUT=1` retire tout choix et exige le sombre #1C1C20 (rouge sur le build d'avant : `light/#878B92`) ;
+  sans variable il juge désormais « Clair choisi » (gris moyen #878B92), toujours vert.

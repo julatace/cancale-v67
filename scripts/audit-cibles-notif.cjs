@@ -68,14 +68,17 @@ const APP = ['src/App.jsx', 'src/CarteRelais.jsx'].map((f) => sansCommentaires(l
   const crochet = {
     vente: /attrCible\(\['vente',/, vcvente: /attrCible\(\['vcvente',/, colis: /attrCible\(\['colis',/,
     retrait: /attrCible\(\['retrait', '(?:tx|suivi)'/, achat: /attrCible\(\[['"]achat['"],/, conv: /attrCible\(\['conv',/,
-    offre: /data-cible=\{off\?'offre':undefined\}/, offres: /data-cible="offres"/, urssaf: /data-cible="urssaf"/,
+    // (25 nov.) messages-pro : la carte d'offre DU FIL n'est rendue que si le fil a une offre (`if(!off) return null`).
+    offre: /data-cible=\{off\?'offre':undefined\}|const off=offreDuFil\(openConv\); if\(!off\) return null;[\s\S]{0,1600}data-cible="offre" data-offre="attente"/, offres: /data-cible="offres"/, urssaf: /data-cible="urssaf"/,
     colonne: /data-cible="colonne:prets colonne:attente"/, doublon: /attrCible\(\['doublon', 'ebay'|\['doublon', 'leboncoin'/,
   };
   for (const [type, re] of Object.entries(crochet)) dit(re.test(APP), `type « ${type} » : un élément de l’app porte son crochet`);
   // (revue du 5 nov.) Une carte d'offre ne porte le crochet QUE si le fil a une offre (jamais « Faire une offre »).
   // Seule la carte « annonce partie » (une offre CAPTURÉE) le porte sans condition.
-  const sansCond = (APP.match(/data-cible="offre"[^>]*/g) || []);
-  dit(sansCond.length === 1 && /data-offre="annonce-partie"/.test(sansCond[0]), 'aucune carte d’offre ne porte le crochet sans offre (« Faire une offre » n’est jamais « l’offre »)', sansCond.map((x) => x.slice(0, 60)).join(' | '));
+  // (25 nov.) …et la carte d'offre du fil de messages-pro, rendue SEULEMENT après `if(!off) return null` (une offre en attente).
+  const gardee = (APP.match(/const off=offreDuFil\(openConv\); if\(!off\) return null;[\s\S]{0,1600}?data-cible="offre" data-offre="attente"/g) || []).length;
+  const sansCond = (APP.match(/data-cible="offre"[^>]*/g) || []).filter((x) => !(gardee && /data-offre="attente"/.test(x)));
+  dit(sansCond.length === 1 && /data-offre="annonce-partie"/.test(sansCond[0]) && gardee <= 1, 'aucune carte d’offre ne porte le crochet sans offre (« Faire une offre » n’est jamais « l’offre »)', sansCond.map((x) => x.slice(0, 60)).join(' | '));
   // (revue du 5 nov.) Une vente Vestiaire rangée par l'extension a pour clé l'id de la vente, le productId en champ :
   // la ligne porte les DEUX (la notification n'a que le productId).
   dit(/attrCible\(\['vcvente', v\.id\], \['vcvente', v\.productId\]\)/.test(APP), 'vente Vestiaire : la ligne porte sa clé ET son productId (identité de l’e-mail)');

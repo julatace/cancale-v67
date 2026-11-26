@@ -272,26 +272,12 @@
     .n-carte-corps, .n-tuiles-pied { border: 0; box-shadow: 0 0 0 .5px var(--n-bord), 0 1px 2px rgb(29 29 31 / .04); }
     .n-rangee-corps { min-height: var(--n-cible); padding: 7px 14px; gap: 12px; }
     /* Ventes : « Relier » et « + prix » deviennent deux liens discrets sur une ligne (le champ s'ouvre au toucher). */
-    .n-vt-achat .n-vt-relier, .n-vt-plus-prix { position: relative; min-height: 28px !important; padding: 0 8px 0 0; background: transparent !important; box-shadow: none !important; border: 0; color: var(--n-encre-2); font: var(--n-t-second-fort); }
-    .n-vt-achat .n-vt-relier::before, .n-vt-plus-prix::before { content: ''; position: absolute; inset: -8px -4px; }
+    /* (24 nov., style-graphite) seulement dans le style actuel : un style choisi en fait des boutons de la famille (styles-choix.css). */
+    :where(:root:not([data-style])) .n-vt-achat .n-vt-relier, :where(:root:not([data-style])) .n-vt-plus-prix { position: relative; min-height: 28px !important; padding: 0 8px 0 0; background: transparent !important; box-shadow: none !important; border: 0; color: var(--n-encre-2); font: var(--n-t-second-fort); }
+    :where(:root:not([data-style])) .n-vt-achat .n-vt-relier::before, :where(:root:not([data-style])) .n-vt-plus-prix::before { content: ''; position: absolute; inset: -8px -4px; }
     .n-vt-achat .n-vt-relier-rond { width: auto; height: auto; background: none; box-shadow: none; }
-    /* Ventes : rangée de 64–72 px — vignette 52, titre sur UNE ligne, une ligne de détail, la ligne prix · étiquette, et
-       « Relier · + prix » posés à droite de cette dernière ligne (hors du bouton de la rangée, comme avant). */
-    .n-vt-rang { position: relative; }
-    .n-vt-rang .n-rangee-corps { min-height: 64px; padding-block: 6px; align-items: center; }
-    .n-vt-rang .n-vignette, .n-vt-rang img.n-vignette { width: 52px !important; height: 52px !important; border-radius: 10px; }
-    .n-vt-rang .n-rangee-titre[data-n-lignes] { -webkit-line-clamp: 1 !important; line-clamp: 1; font-size: 14.5px; line-height: 19px; }
-    .n-vt-rang .n-rangee-sous-texte[data-n-lignes] { -webkit-line-clamp: 1 !important; line-clamp: 1; font-size: 12.5px; line-height: 16px; }
-    /* Une seule ligne de détail : le texte ne passe plus à la ligne (« sans bordereau · à vérifier » faisait 92 px), il se coupe en « … ». */
-    .n-vt-rang .n-rangee-sous-texte[data-n-lignes] { display: block; flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .n-vt-rang .n-rangee-note { margin-top: 2px; padding-inline-end: 132px; min-height: 22px; }
-    .n-vt-rang .n-vt-ligne { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
-    /* « À expédier » répète l'onglet « À envoyer » : au téléphone, la pastille se tait (le statut reste dans la fiche et le tableau). */
-    .n-vt-rang .n-vt-ligne .n-pastille[data-n-ton="ambre"] { display: none; }
-    /* Le N° et la date limite sur la ligne du titre : la plaque passe dans la ligne de détail (une seule ligne). */
-    .n-vt-rang .n-rangee-sous { flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
-    .n-rangee.n-vt-rang > .n-rangee-pied, .n-rangee.n-vt-rang[data-n-a-pied] > .n-rangee-pied { position: absolute; z-index: 2; right: 10px; bottom: 6px; margin: 0; padding: 0; border: 0; background: none; }
-    .n-rangee.n-vt-rang > .n-rangee-pied .n-vt-achat { gap: 2px; }
+    /* (25 nov., lot ventes-rangee) La rangée d'une vente au téléphone (titre coupé sur UNE ligne, ligne prix · étiquette rognée,
+       « Relier · + prix » posés en absolu à droite) est remplacée par la rangée compacte `.n-vr` : src/natif/ventes-lisibles.css. */
     .n-actions-rondes .n-action-ronde-disque { box-shadow: 0 0 0 .5px var(--n-bord), 0 1px 2px rgb(29 29 31 / .05); }
   }
 }

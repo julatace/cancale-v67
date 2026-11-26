@@ -1,5 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { useEnPreparation } from '../preparations.js';   // (24 nov., livrable-2) « Pas encore calculé » seulement quand c'est vrai
 import { LigneDatesVersement } from '../composants/LigneDatesVersement.jsx';   // (15 nov., 5.390) « Dates de versement : l’extension les récupère », aucun geste
 import '../natif/ecrans/argent-pont.css';   // (20 nov., lot argent-natif) titres des cartes d'avant au style §2 bis
 import { CLE_FOURNISSEURS, lireRegistre } from '../fournisseurs.js';
@@ -61,6 +62,10 @@ import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiff
 import { questionsArgent } from '../argent.js';
 import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) le nouveau design, en essai
 import ArgentMoisV2Vue from '../natif/ecrans/ArgentMois.jsx';
+import { JaugesSeuils, AVenirCartes } from '../natif/ecrans/ArgentVisuel.jsx';   // (24 nov., visuel-argent) seuils en jauges, à venir en cartes
+import { useObjectifMois } from '../App.jsx';
+import { progressionObjectif } from '../objectifMois.js';
+import { valeurObjectif } from '../design/carteChiffres.js';
 import { useOrdinateur, Carte as NCarte, Rangee as NRangee, Bouton as NBouton } from '../natif/index.js';
 import '../natif/ecrans/argent.css';   // (20 nov., lot argent-natif) Mois au style natif §2 bis
 import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : déclarer, ventes sans prix d'achat   // (17 nov., phase 2) Argent · Mois
@@ -94,6 +99,7 @@ import { DEMANDE_BILAN_MOIS, attrCible } from "../cibleNotif.js";   // (13 nov.,
 import { delaisPaiement, texteDelai } from "../delaiPaiement.js";
 // ⟦← App.jsx #8⟧
 import DepensesMois from '../natif/ecrans/DepensesMois.jsx';   // (21 nov., transp-depenses) « + Dépense » en deux touchers
+import { attrsAttente } from '../natif/outils.js';   // (25 nov., chargement propre) un chiffre en cours de lecture = un squelette
 import { nouvelleDepense, ecrireDepense, depensesDuMois, idCat } from '../depensesRapides.js';
 import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, texteDuTicket } from "../depensesTicket.js";
 
@@ -3776,8 +3782,11 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
     'data-argent-raison': q.raison || undefined, 'data-argent-echeance': q.echeance ? String(q.echeance) : undefined, title: nom(q), onClick: () => aller(q) });
   // (16 nov.) Le nom d'une case = son texte visible (WCAG 2.5.3 : un aria-label différent cachait le chiffre lu) ;
   // la phrase complète (« au moins », la question) reste en `title`.
+  // (25 nov., chargement propre) Un chiffre EN COURS de lecture : squelette à sa place, sa note invisible (place gardée).
+  const enLectureQ = (q) => !!q && q.valeur == null && !q.texte && q.raison === 'encours';
+  const noteAttente = (q) => attrsAttente(enLectureQ(q), 'note') || {};
   const chiffre = (q, affiche = false) => (
-    <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined}>
+    <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined} {...(attrsAttente(enLectureQ(q), 'valeur') || {})}>
       {q.valeur != null ? <>{q.partiel ? <small>{tr('journee.moins')} </small> : null}{affiche ? sommeAffiche(somme(q.valeur)) : somme(q.valeur)}</> : (q.texte || '—')}
     </b>
   );
@@ -3810,20 +3819,20 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
       <button type="button" className="vg-a-vendu" {...attrs(qV)}>
         <span className="vrm-argent-w-l vg-sr">{qV.libelle}</span>
         {chiffre(qV, true)}
-        <span className="vg-a-vendu-sous">{tr('verre2.argent.venduEn', { mois: moisLong })}{nV && nV.valeur != null ? ` · ${tr('avenir.ventes', { n: nV.valeur })}` : ''}{qV.note ? <span className="vrm-argent-w-note"> · {qV.note}</span> : null}</span>
+        <span className="vg-a-vendu-sous">{tr('verre2.argent.venduEn', { mois: moisLong })}{nV && nV.valeur != null ? ` · ${tr('avenir.ventes', { n: nV.valeur })}` : ''}{qV.note ? <span className="vrm-argent-w-note" {...noteAttente(qV)}> · {qV.note}</span> : null}</span>
       </button>
       <div className="vg-a-duo">
         <button type="button" className="vg-carte vg-a-case" {...attrs(qR)}>
           <span className="vrm-argent-w-l vg-ds">{tr('verre2.argent.recu')}</span>
           {chiffre(qR)}
-          <small className="vg-a-petit">{qR.note ? <span className="vrm-argent-w-note">{qR.note}</span> : tr('verre2.argent.auVersement')}</small>
+          <small className="vg-a-petit">{qR.note ? <span className="vrm-argent-w-note" {...noteAttente(qR)}>{qR.note}</span> : tr('verre2.argent.auVersement')}</small>
         </button>
         <div className="vg-carte vg-a-case vg-a-benef">
           <button type="button" className="vg-a-case-corps" {...attrs(qB)}>
             <span className="vrm-argent-w-l vg-ds">{netConnu != null ? tr('cr.beneficeConnu.court') : brut ? NOM_BENEFICE_BRUT : tr('verre2.argent.benefice')}</span>
             {netConnu != null ? <b className="vrm-argent-w-n vg-a-brut" data-benef-notion="connu" data-benef-valeur={String(Math.round(netConnu * 100))} data-arg-net-connu={`${Bn.nCout}/${Bn.n}`}>{somme(netConnu)}</b>
               : brut ? <b className="vrm-argent-w-n vg-a-brut" {...brut.attrs}>{somme(brut.valeur)}</b> : chiffre(qB)}
-            <small className="vg-a-petit">{brut || netConnu != null ? <span data-benef-couverture="">{tr('verre2.argent.ventesSur', { k: Bn.nCout, n: Bn.n })}</span> : qB.note ? <span className="vrm-argent-w-note">{qB.note}</span> : (Bn && Bn.n > 0 ? tr('avenir.ventes', { n: Bn.n }) : null)}</small>
+            <small className="vg-a-petit">{brut || netConnu != null ? <span data-benef-couverture="">{tr('verre2.argent.ventesSur', { k: Bn.nCout, n: Bn.n })}</span> : qB.note ? <span className="vrm-argent-w-note" {...noteAttente(qB)}>{qB.note}</span> : (Bn && Bn.n > 0 ? tr('avenir.ventes', { n: Bn.n }) : null)}</small>
           </button>
           {manquent > 0 ? <button type="button" className="vg-a-ambre" data-benef-porte="" data-benef-manque={manquent} onClick={versSaisiePrix}>{tr('verre2.argent.prixASaisir', { n: manquent })}<Icon name="chevron" size={13}/></button> : null}
         </div>
@@ -3832,7 +3841,7 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
         <button type="button" className="vg-a-case-corps" {...attrs(qD)}>
           <span className="vg-a-urssaf-tete">
             <span className="vrm-argent-w-l vg-ds">{P && P.label && (P.etat === 'lu' || P.etat === 'passu') ? tr('verre2.argent.urssafPour', { periode: P.label }) : tr('verre2.argent.urssaf')}</span>
-            {qD.note ? <span className="vrm-argent-w-note vg-a-echeance">{qD.note}</span> : null}
+            {qD.note ? <span className="vrm-argent-w-note vg-a-echeance" {...noteAttente(qD)}>{qD.note}</span> : null}
           </span>
           {cotis != null
             ? <b className="vrm-argent-w-n">{P.partiel ? <small>{tr('journee.moins')} </small> : null}{somme(cotis)}</b>
@@ -3880,7 +3889,12 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
       const nAD = AD && AD.parMois && typeof AD.parMois === 'object' ? (Number(AD.parMois[ym]) || 0) : 0;
       const finM = new Date(de.getFullYear(), de.getMonth() + 1, 1).getTime();
       const dansPeriode = !!(AD && !AD.parMois && Number(AD.n) > 0 && Number(AD.de) < finM && Number(AD.a) >= de.getTime());
-      out.push({ cle: ym, l: de.toLocaleDateString(localeCourante(), { month: 'narrow' }), long: de.toLocaleDateString(localeCourante(), { month: 'long', year: 'numeric' }), v: R.valeur == null || (R.valeur === 0 && !R.partiel && (nAD > 0 || dansPeriode)) ? null : R.valeur, partiel: !!R.partiel || (R.valeur != null && (nAD > 0 || dansPeriode)), aDater: nAD, courant: k === 0 });
+      // (24 nov., visuel-argent — « rien lu ne vaut pas rien », §5) Un mois passé à 0 € n'est un VRAI zéro que si l'historique
+      // lu le couvre : une vente lue AVANT ce mois (la règle `couvert` de `valeurObjectifMois`, src/design/carteChiffres.js).
+      // Sinon l'historique commence peut-être après : « — » et une piste vide, jamais « 0 € ».
+      const couvert = k === 0 || !!(S.vendu && Array.isArray(S.vendu.lignes) && S.vendu.lignes.some((l) => Number(l.ts) < de.getTime()));
+      const zeroNonCouvert = k > 0 && R.valeur === 0 && !couvert;
+      out.push({ cle: ym, l: de.toLocaleDateString(localeCourante(), { month: 'narrow' }), long: de.toLocaleDateString(localeCourante(), { month: 'long', year: 'numeric' }), v: R.valeur == null || zeroNonCouvert || (R.valeur === 0 && !R.partiel && (nAD > 0 || dansPeriode)) ? null : R.valeur, partiel: !!R.partiel || (R.valeur != null && (nAD > 0 || dansPeriode)), aDater: nAD, courant: k === 0, couvert });
       // ⚠️ « au moins 0 € » ne se dit jamais (§5) : un mois à 0 € reçu dont des ventes sont à dater se dit « — · N à dater ».
     }
     return out;
@@ -3948,7 +3962,25 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     lignes: lignesV.slice(0, MAX).map((l) => ({ id: l.id, num: l.num, titre: l.titre, plateforme: l.plateforme, montant: l.montant, date: jour(l.ts), ...coutDe(l.id),
       onClick: () => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: String(l.num) })); } catch (_) {} } })),
   };
-  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme} note={qR.note || ''} comptes={comptesV}
+  // (24 nov., visuel-argent) L'OBJECTIF DU MOIS : la règle de la carte des chiffres (`valeurObjectif` puis
+  // `progressionObjectif`, src/objectifMois.js) — la même que Statistiques. Pas d'objectif ⇒ rien.
+  const [objM] = useObjectifMois();
+  const progO = objM ? progressionObjectif(objM, valeurObjectif(objM, S, REGLES_CARTE)) : null;
+  const objectif = !objM ? { etat: 'aucun' } : !progO || progO.pct == null ? { etat: 'passu', type: objM.type, cible: objM.valeur }
+    : { etat: 'lu', type: objM.type, cible: objM.valeur, valeur: progO.valeur, pct: progO.pct, partiel: !!progO.partiel, atteint: !!progO.atteint };
+  // LES SEUILS DE L'ANNÉE : `jaugeSeuils` sur la ligne publiée (datée au VERSEMENT), le régime CHOISI seulement (micro) ;
+  // un régime pas choisi ⇒ aucune jauge (jamais deviné, §5).
+  const regime = useRegimeFiscal();
+  const [activite] = useLigneSynchro('vrm_micro_options', lireActiviteMicro);
+  const now = new Date();
+  const jauge = React.useMemo(() => (S.ligneUrssaf ? jaugeSeuils({ ligne: S.ligneUrssaf, now, activite: activite || 'vente' }) : null), [S.ligneUrssaf, activite]); // eslint-disable-line react-hooks/exhaustive-deps
+  const seuils = regime === 'micro' && seuilsDe(now.getFullYear(), activite || 'vente')
+    ? <JaugesSeuils J={jauge} annee={now.getFullYear()} montant={somme} etat={S.ligneUrssaf === undefined ? 'encours' : 'lu'}/> : null;
+  // L'ARGENT À VENIR : la règle de la coque (`liveStats.aVenir`), une carte par étape ; toucher ouvre son écran.
+  const aV = (liveStats || liveCoque) ? (liveStats || liveCoque).aVenir : null;
+  const avenir = <AVenirCartes A={aV} montant={somme} onOuvrir={ouvrirArgentAVenir} Icon={Icon}/>;
+  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme} note={qR.note || ''} comptes={comptesV} onPasSu={() => { if (onNav) onNav('ventes'); }}
+    objectif={objectif} seuils={seuils} avenir={avenir}
     vendu={qV ? { valeur: qV.valeur, partiel: qV.partiel, note: qV.note, onClick: () => { if (onNav) onNav('stats'); } } : null}/>;
 }
 // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater, cela n'a aucun sens.
@@ -4495,7 +4527,7 @@ function DelaiPaiementCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, ac
     const dateVenteDe = (l) => (l.plateforme === 'Vinted' ? (Date.parse((l.o && l.o.date) || l.dateVente || '') || null) : l.plateforme === 'Vestiaire' ? venteVc.get(String(l.id)) || null : null);
     return delaisPaiement({ lignes: calc.decl.lignes, dateVenteDe });
   }, [calc, ventesVcER]);
-  if (R === undefined) return <p className="vrm-compta-phrase" data-delai-etat="encours" style={{ margin: 0 }}>{PAS_SU.enCours}</p>;
+  if (R === undefined) return <p className="vrm-compta-phrase" data-delai-etat="encours" style={{ margin: 0 }}><span {...attrsAttente(true, 'valeur')}>{PAS_SU.enCours}</span></p>;
   if (R === null) return <EtatPanne quoi="Le délai de paiement" raison="Tes ventes n’ont pas pu être lues." compact />;
   if (!R.sites.length) return <p className="vrm-compta-phrase" data-delai-etat="vide" style={{ margin: 0 }}>{tr('compta.aucuneVenteRecue')}</p>;
   return (
@@ -4529,6 +4561,7 @@ const portesCloture = ({ onNav }) => ({
   seuils: () => viserCompta('[data-micro-repli]'),
   export: (annee) => { DEMANDE_COMMANDE.export = Date.now(); DEMANDE_COMMANDE.exportPeriode = String(annee); try { window.dispatchEvent(new Event('vrm:export-comptable')); } catch (_) {} },
 });
+const CLES_PUB_ARGENT = ['vinted_urssaf_mois'];
 function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, comptesLus = false, vue = 'resume', allerVue = null, argentNav = null }) {
   const [data, setData] = React.useState(() => {
     try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; }
@@ -4819,6 +4852,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // (30 oct.) « Se calcule dans Ventes » était écrit ~9 fois sur cet écran : la cause
   // se dit UNE fois ici, avec le geste ; les cartes ne gardent que « — ».
   const ligneComptaPub = useLigneUrssaf();
+  // (24 nov., livrable-2) « Pas encore calculé · Ouvrir Ventes » seulement quand c'est VRAI : pas tant que la coque lit ses
+  // ventes ou que Ventes prépare la publication (src/preparations.js) — le même état que les chiffres (useSourcesCarte).
+  const prepPubArgent = useEnPreparation(CLES_PUB_ARGENT);
+  const pubEnLecture = !ligneComptaPub && (!liveStats || !Array.isArray(liveStats.venduLignes) && !liveStats.venduPasSu || prepPubArgent.has('vinted_urssaf_mois'));
   const designV2 = useDesignV2();
   return (
     <div className="vrm-finance-page vrm-fu-ecran vrm-argent" data-espace="argent" data-argent-ecran={vue} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -4826,7 +4863,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           « Argent » et ses quatre segments. Chaque segment montre SES cartes ; les autres restent
           montées (`hidden` : mêmes lectures, mêmes états, mêmes data-*), jamais supprimées. */}
       {vue !== 'factures' ? <ScreenHead titreCoque icon="euro" title={L.argent} phrase="compta" sous={argentNav} desc="Ce que tu as vendu, reçu, gagné, et ce que tu dois déclarer." /> : null}
-      {vue !== 'factures' && !ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
+      {/* (23 nov., revue UX #15) Sur « Mois », la carte du reçu dit elle-même « Reçu en novembre : ouvre Ventes › » (une ligne ambre) : pas deux fois. */}
+      {vue !== 'factures' && (vue !== 'resume' || (comptesLus && Array.isArray(accounts) && accounts.length === 0)) && !ligneComptaPub && !pubEnLecture && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
         {/* (2 nov.) Un compte neuf, sans compte Vinted : « ouvre Ventes » ne menait
             nulle part (Ventes n'a rien à publier). La cause vraie et son geste —
             seulement quand la liste des comptes est LUE (pas su ≠ aucun). */}

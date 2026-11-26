@@ -22,6 +22,7 @@ export default {
   "actionsExt.phrase": "s’ouvre sur {site} avec l’extension",
   "actionsExt.explique": "Ce geste se fait dans l’extension, sur {site} : VRM ouvre le panneau sur la bonne page, ta sélection prête.",
   "actionsExt.refus": "Ce geste se fait dans l’extension : ouvre le panneau sur le site.",
+  "actionsExt.aJour": "Mets à jour l’extension VRM de ce navigateur.",
   "actionsExt.sansTitre": "Sans titre",
   "actionsExt.etPlus": "et {n} de plus",
   "actionsExt.dejaPubliee": "Déjà publiée depuis VRM",

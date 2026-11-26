@@ -64,7 +64,9 @@ const T0 = Date.now(), iso = (t) => new Date(t).toISOString(), H = 3600000, J = 
 const UID = '111';
 const bleam = (sections) => ({ v: 1, comptes: { [UID]: sections } });
 // La VRAIE forme d'un détail de transaction (§6.3) : data.payload.transaction.{item_id, status, status_title, shipment.status_title}.
-const txnRow = ({ status, status_title, ship_status_title, item_id }) => ({ capturedAt: iso(T0), payload: { transaction: { id: 1, status: status != null ? Number(status) : undefined, status_title, item_id, shipment: ship_status_title ? { status_title: ship_status_title } : undefined } } });
+// (25 nov., 5.450) Un détail de transaction réel porte TOUJOURS son `item_id` (la preuve « vendue » de `lireVentesProuvees`
+// l'exige, §5) : il est servi ici par défaut.
+const txnRow = ({ status, status_title, ship_status_title, item_id = 70000001 }) => ({ capturedAt: iso(T0), payload: { transaction: { id: 1, status: status != null ? Number(status) : undefined, status_title, item_id, shipment: ship_status_title ? { status_title: ship_status_title } : undefined } } });
 const vente = (tx, o = {}) => Object.assign({ transaction_id: Number(tx), conversation_id: Number('9' + tx), status: 'Le paiement a été validé', date: iso(T0 - H), title: 'Paire ' + tx }, o);
 function monde({ ventes = [], txn = {}, main = {}, connecte = UID, store = {}, lignes: plus = {}, vinted } = {}) {
   const lignes = Object.assign({
@@ -95,7 +97,12 @@ const avancer = async (f, tx, champ, depuis) => { const m = (await f.ctx.chrome.
     const f = monde({ ventes: [vente(501)], main: { vinted_bleam: bleam(msgOn) } });
     await tick(f);
     dit(replies(f).length === 0, '1er passage : la vente d’AVANT est notée, aucun message aux acheteurs du passé', JSON.stringify(replies(f)));
+    // (25 nov., 5.450) « vendue » se PROUVE (§5, `lireVentesProuvees`) : une vente de la liste sans détail de transaction
+    // lu (ni bordereau) n'a encore rien prouvé ⇒ aucun message ; son détail lu (état de commande) ⇒ le message.
     f.lignes[`harvest_${UID}_orders_sold`].payload.my_orders.unshift(vente(502));
+    await tick(f);
+    dit(replies(f).length === 0, 'une vente PAS ENCORE PROUVÉE (aucun détail de transaction, aucun bordereau) ⇒ aucun message', JSON.stringify(replies(f)));
+    f.lignes[`harvest_${UID}_txn_502`] = txnRow({ status: '200', status_title: 'Le paiement a été validé' });
     await tick(f);
     const r1 = replies(f);
     dit(r1.length === 1 && /\/conversations\/9502\/replies$/.test(r1[0].chemin), 'une NOUVELLE vente ⇒ UN message, dans SA conversation', JSON.stringify(r1));
@@ -107,6 +114,7 @@ const avancer = async (f, tx, champ, depuis) => { const m = (await f.ctx.chrome.
     dit(jr.some((x) => x.s === 'message_acheteur'), 'le message est au journal « Ce que VRM a fait »', JSON.stringify(jr));
     // Litige.
     f.lignes[`harvest_${UID}_orders_sold`].payload.my_orders.unshift(vente(503, { status: 'Réclamation ouverte par l’acheteur' }));
+    f.lignes[`harvest_${UID}_txn_503`] = txnRow({ status: '200', status_title: 'Le paiement a été validé' });   // prouvée, mais en litige
     await tick(f);
     dit(replies(f).length === 1, 'vente en LITIGE ⇒ aucun message');
     // Rappel au point relais.
@@ -149,7 +157,7 @@ const avancer = async (f, tx, champ, depuis) => { const m = (await f.ctx.chrome.
     dit(ecrits(kl).length === 0, 'évaluation : litige ouvert sur la vente ⇒ rien', JSON.stringify(ecrits(kl)));
     // Autre compte dans l'onglet.
     const z = monde({ ventes: [vente(901)], main: { vinted_bleam: bleam(msgOn) }, connecte: '222' });
-    await tick(z); z.lignes[`harvest_${UID}_orders_sold`].payload.my_orders.unshift(vente(902)); await tick(z);
+    await tick(z); z.lignes[`harvest_${UID}_orders_sold`].payload.my_orders.unshift(vente(902)); z.lignes[`harvest_${UID}_txn_902`] = txnRow({ status: '200', status_title: 'Le paiement a été validé' }); await tick(z);
     dit(ecrits(z).length === 0, 'un AUTRE compte connecté dans l’onglet ⇒ rien au nom de celui-ci');
   } catch (e) { dit(false, 'après-vente — exception', e && e.stack); }
 

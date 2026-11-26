@@ -4,4 +4,6 @@ export default {
   "a11y.fiche.fermer": "Chiudi la scheda",
   "a11y.allerContenu": "Vai al contenuto",
   "a11y.enLigneSur": "Online su {site}",
+  "a11y.conversationSur": "Conversazione {site}",
+  "a11y.filMessages": "Filo di messaggi",
 };

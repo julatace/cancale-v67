@@ -15,6 +15,7 @@ export default {
   "scan.r.taper": "Escribir el número",
   "scan.r.saisie": "Número de seguimiento",
   "scan.r.ok": "OK",
+  "scan.r.okRaison": "Escribe primero el n.º de seguimiento",
   "scan.r.attente": "Leyendo tus ventas y compras…",
   "scan.r.autre": "Escanear otro paquete",
   "scan.r.sansTitre": "Sin título",

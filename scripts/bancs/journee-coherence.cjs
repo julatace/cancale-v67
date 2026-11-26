@@ -286,8 +286,10 @@ async function tournee(nav, { W, theme, scenario }) {
   if (!m.modifier.length) dit(false, 'E6', `${T} « Modifier » est sur la tête`);
   // E7
   if (m.recu) {
-    if (scenario === 'plein') dit(m.recu.valeur === '' && /—/.test(m.recu.texte) && /à dater/.test(m.recu.raison) && !/(^|\s)0(,00)?\s*€/.test(m.recu.texte), 'E7', `${T} « Reçu » sans date de versement : « — » et la raison écrite`, JSON.stringify(m.recu));
-    else dit(m.recu.valeur !== '' && Number(m.recu.valeur) > 0 && !/à dater/.test(m.recu.texte), 'E7', `${T} « Reçu » daté : un montant, pas de raison`, JSON.stringify(m.recu));
+    // (24 nov., main-vert) La raison d'une vente sans date de versement s'écrit « dates en lecture » (`versement.court`,
+    // l'extension les lit — ext. 5.341 « Dates de versement en cours de lecture ») au lieu de « à dater » : même état, mot changé.
+    if (scenario === 'plein') dit(m.recu.valeur === '' && /—/.test(m.recu.texte) && /à dater|dates? en lecture/.test(m.recu.raison) && !/(^|\s)0(,00)?\s*€/.test(m.recu.texte), 'E7', `${T} « Reçu » sans date de versement : « — » et la raison écrite`, JSON.stringify(m.recu));
+    else dit(m.recu.valeur !== '' && Number(m.recu.valeur) > 0 && !/à dater|dates? en lecture/.test(m.recu.texte), 'E7', `${T} « Reçu » daté : un montant, pas de raison`, JSON.stringify(m.recu));
   } else dit(false, 'E7', `${T} la case « Reçu » est sur la tête`);
   const sansRaison = m.casesTete.filter((c) => c.v === '' && !c.raison);
   dit(!sansRaison.length, 'E7', `${T} chaque « — » de la tête dit sa raison`, JSON.stringify(sansRaison));

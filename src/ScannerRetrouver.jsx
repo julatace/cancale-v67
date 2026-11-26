@@ -703,7 +703,7 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
               <form className="vrm-rtv-saisie" onSubmit={valider}>
                 <input ref={saisieRef} data-scan-r-saisie="" value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={tr('scan.r.saisie')} aria-label={tr('scan.r.saisie')}
                   inputMode="text" autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false} enterKeyHint="search"/>
-                <button type="submit" data-scan-r-ok="" disabled={!saisie.trim()}>{tr('scan.r.ok')}</button>
+                <button type="submit" data-scan-r-ok="" disabled={!saisie.trim()} title={!saisie.trim() ? tr('scan.r.okRaison') : undefined}>{tr('scan.r.ok')}</button>
               </form>
             ) : (
               <button type="button" className="vrm-rtv-touche is-verre" data-scan-r-clavier="" onClick={() => { setClavier(true); setTimeout(() => { try { saisieRef.current && saisieRef.current.focus({ preventScroll: true }); } catch (_) {} }, 30); }}>

@@ -16,8 +16,10 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { load, save, vmrCmd } from './App.jsx';
+import { tr } from './i18n/index.js';
 import { useLignesActions } from './JaugeActions.jsx';
 import { jaugeDuCompte, texteJauge, heureFr, toutArreteDe } from './jaugeActions.js';
+import { useComptesFeuille } from './moderationFeuille.js';
 import { CLE_DISCRETION, PAR_JOUR_DEFAUT, PAR_JOUR_MIN, PAR_JOUR_MAX, PAR_HEURE_SORTE_DEFAUT, PAR_HEURE_FAVORI_MAX, reglageDiscretion, parJourTape, parHeureTape, verificationEnCours, avecReprise, avecToutArrete, phraseArretCompte, carnetDuCompte } from './discretion.js';
 import './styles-discretion.css';
 
@@ -68,8 +70,9 @@ export function ToutArreter({ rows, variante = 'panneau' }) {
     return (
       <div className="vrm-verif" role="alert" data-tout-arrete={String(etat.at)}>
         <span className="vrm-verif-point" aria-hidden="true" />
-        <p className="vrm-verif-texte"><b>Tout est arrêté.</b> Aucun geste automatique ne part, sur aucun compte.</p>
-        <button type="button" className="vrm-verif-reprendre" data-tout-reprendre="" onClick={() => poser(false)}>Reprendre</button>
+        {/* (25 nov., Julien : « trop de texte ») « Tout est en pause » + « Reprendre » sur UNE ligne ; la phrase entière au lecteur d'écran. */}
+        <p className="vrm-verif-texte"><b>{tr('disc.toutPause')}</b><span className="vrm-sr">{' · ' + tr('ext.avert.toutArrete')}</span></p>
+        <button type="button" className="vrm-verif-reprendre" data-tout-reprendre="" onClick={() => poser(false)}>{tr('direct.reprendre')}</button>
       </div>
     );
   }
@@ -156,13 +159,23 @@ export { PAR_JOUR_MIN, PAR_JOUR_MAX };
 // Ma journée : « Tout est arrêté » et une ligne ambre par compte arrêté (tant qu'il n'a pas repris).
 export default function AlertesVerificationJournee() {
   const [rows, maintenant] = useLignesActions('', true);
+  const dansFeuille = useComptesFeuille();   // (23 nov.) la modération d'un compte expliquée dans la feuille des annonces disparues : pas deux fois
   if (!Array.isArray(rows)) return null;   // on lit, ou pas su : rien n'est affirmé
   const uids = [...new Set(rows.map((r) => (/^actions_compte_(\d{1,20})_[0-9a-f]{16}$/.exec(String((r && r.id) || '')) || [])[1]).filter(Boolean))];
   const avec = uids.map((u) => ({ u, j: jaugeDuCompte(rows, u, maintenant) })).filter((x) => x.j && x.j.captcha);
   return (
     <div data-verifications-journee={avec.length}>
       <ToutArreter rows={rows} variante="alerte" />
-      {avec.map((x) => <AlerteVerification key={x.u} uid={x.u} captcha={x.j.captcha} arret={x.j.arret || 'captcha'} />)}
+      {avec.filter((x) => !((x.j.arret || 'captcha') === 'moderation' && dansFeuille(x.u))).map((x) => <AlerteVerification key={x.u} uid={x.u} captcha={x.j.captcha} arret={x.j.arret || 'captcha'} />)}
     </div>
   );
+}
+// (23 nov.) Dans la feuille des annonces disparues d'Aujourd'hui (src/AlerteModeration.jsx) : la pause « Vinted a modéré ce
+// compte » de CE compte et son « Reprendre » (le même geste, `avecReprise`) — rien si ce compte n'est pas arrêté pour modération.
+export function ArretModerationCompte({ uid }) {
+  const [rows, maintenant] = useLignesActions('', true);
+  if (!Array.isArray(rows)) return null;
+  const j = jaugeDuCompte(rows, String(uid || ''), maintenant);
+  if (!j || !j.captcha || (j.arret || 'captcha') !== 'moderation') return null;
+  return <AlerteVerification uid={uid} captcha={j.captcha} arret="moderation"/>;
 }
