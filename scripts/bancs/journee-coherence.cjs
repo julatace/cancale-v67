@@ -275,7 +275,19 @@ async function tournee(nav, { W, theme, scenario }) {
     // mesure LÀ (coordonnées de la fenêtre). La carte « À trancher » (DJ4) pousse la 1re carte sous le pli.
     const ici = (sel, amener) => pg.evaluate(([q, a]) => { const e = document.querySelector(q); if (!e) return null; if (a) e.scrollIntoView({ block: 'nearest' }); const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, b: r.bottom }; }, [sel, amener]);
     const tv = await ici('.vrm-fu-tete', true);
-    const t = await moyenne(pg, nav, { x: tv.x + tv.w / 2 - 30, y: tv.y + 8, width: 60, height: 8 });   // en haut, au milieu : le fond de la tête (son bas porte, au téléphone, les tuiles du mois ; ses coins sont arrondis)
+    // (26 nov., bancs natifs) Le FOND de la tête, pas son texte : le point fixe « en haut, au milieu » tombait, sur Aujourd'hui
+    // natif, sur la date de la salutation (police DejaVu de la CI, plus large) ou sur le rond « ? » (Inter) — il mesurait un glyphe.
+    // On cherche dans la tête une zone de 24 × 6 où le doigt ne touche que des boîtes sans texte ni commande (le fond), en haut d'abord.
+    const fond = await pg.evaluate(() => { const t = document.querySelector('.vrm-fu-tete'); const q = t.getBoundingClientRect();
+      // Le fond de la TÊTE elle-même : aucune boîte peinte entre le point et elle (une carte posée dans la tête — « À retirer
+      // ailleurs » — n'est pas son fond).
+      const peinte = (e) => { const c = getComputedStyle(e); return !/rgba\(\d+, \d+, \d+, 0\)|transparent/.test(c.backgroundColor) || c.backgroundImage !== 'none'; };
+      const nu = (x, y) => { const e = document.elementFromPoint(x, y); if (!e || !t.contains(e)) return false; if (e.closest('button, a, svg, img, input, [role="button"]')) return false;
+        if ([...e.childNodes].some((n) => n.nodeType === 3 && /\S/.test(n.nodeValue))) return false;
+        for (let p = e; p && p !== t; p = p.parentElement) if (peinte(p)) return false; return true; };
+      for (let y = q.top + 4; y < q.bottom - 10; y += 4) for (let x = q.left + 8; x < q.right - 32; x += 8) { let ok = true; for (let dy = 0; dy <= 6 && ok; dy += 3) for (let dx = 0; dx <= 24 && ok; dx += 6) ok = nu(x + dx, y + dy); if (ok) return { x, y }; }
+      return null; });
+    const t = await moyenne(pg, nav, fond ? { x: fond.x, y: fond.y, width: 24, height: 6 } : { x: tv.x + tv.w / 2 - 30, y: tv.y + 8, width: 60, height: 8 });
     const cv = await ici('.vrm-fu-afaire [data-barre-jour] > :not([style*="contents"]), .vrm-fu-afaire [data-barre-jour] > [style*="contents"] > *', true);
     const c = await moyenne(pg, nav, { x: cv.x + cv.w - 40, y: cv.y + 4, width: 30, height: 8 });
     const rap = (Math.max(lum(t), lum(c)) + 0.05) / (Math.min(lum(t), lum(c)) + 0.05);
