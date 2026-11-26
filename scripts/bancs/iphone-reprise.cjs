@@ -422,6 +422,9 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         await toucher(pg, '[data-fp="ventes"] [data-fp-site="leboncoin"]');
         const r1avant = await ecran(pg);
         await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(3000);
+        // Le filtre retenu ne s'affiche qu'une fois ses sites LUS (une entrée sans ligne n'existe pas, src/filtrePlateforme.js
+        // `choixEffectif`) : on attend la rangée montrée sur le site retenu, 10 s au plus (§6.5) — un choix perdu reste « toutes ».
+        await pg.waitForFunction(() => [...document.querySelectorAll('[data-fp="ventes"][data-fp-choix="leboncoin"]')].some((x) => x.getClientRects().length), null, { timeout: 10000 }).catch(() => {});
         const r1 = await ecran(pg);
         dit(r1avant.site === 'leboncoin' && r1.ecran === 'ventes' && r1.segment === 'toutes' && r1.site === 'leboncoin', `R1 ${qui} : rechargé, même écran (Ventes · Terminées) et même filtre (Leboncoin)`, JSON.stringify({ avant: r1avant, apres: r1 }));
         // R1 · compte choisi (Achats, compte 222)
