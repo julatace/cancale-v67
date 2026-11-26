@@ -225,7 +225,7 @@
 .g-tuile-plein { display: block; height: 22px; border-radius: var(--g-r-bouton, 8px); background: var(--n-plein); box-shadow: var(--g-plein-relief, none); }
 .g-tuile-nom { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; font: 600 14px/18px var(--n-police); color: var(--n-encre); }
 .g-tuile-coche { font: 600 12px/16px var(--n-police); color: var(--n-encre-2); }
-.g-tuile[data-style=""] { --n-fond: #878B92; --n-carte: #F1F2F4; --n-carte-2: #E3E5E9; --n-encre: #0E0F12; --n-encre-2: #1F2226; --n-plein: #19222C; --n-vert: #17744A; --n-vert-fond: #DDF4E6; --n-accent: #19222C; --g-fond-image: none; --g-carte-ombre: 0 1px 2px rgb(26 26 30 / .04), 0 2px 6px rgb(26 26 30 / .04); --g-plein-relief: none; --g-r-bouton: 8px; --n-r-carte: 12px; --g-r-chip: 999px; }
+.g-tuile[data-style=""] { --n-fond: #FFFFFF; --n-carte: #F3F3F3; --n-carte-2: #E9E9E9; --n-encre: #000000; --n-encre-2: #555555; --n-plein: #000000; --n-vert: #17744A; --n-vert-fond: #DDF4E6; --n-accent: #000000; --g-fond-image: none; --g-carte-ombre: 0 1px 2px rgb(26 26 30 / .04), 0 2px 6px rgb(26 26 30 / .04); --g-plein-relief: none; --g-r-bouton: 8px; --n-r-carte: 12px; --g-r-chip: 999px; }
 :root[data-theme="dark"] .g-tuile[data-style=""] { --n-fond: #1C1C20; --n-carte: #2A2A2F; --n-carte-2: #323238; --n-encre: #FFFFFF; --n-encre-2: #B8B8C0; --n-plein: #FFFFFF; --n-vert: #7BE8BE; --n-vert-fond: rgb(63 212 154 / .14); --n-accent: #F4F4F5; }
 
 /* ══ (25 nov., style-c3 — Julien sur iPhone en Monochrome : « améliore le design de toute l'app ») Pour TOUT style choisi, en couche

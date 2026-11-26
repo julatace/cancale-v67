@@ -274,3 +274,12 @@ form.vrm-cm-discord-moi { display: block !important; }
 .vrm-cm-form-coche { display: flex; align-items: center; gap: 12px; min-height: 44px; width: 100%; cursor: pointer; font-size: 15px; }
 .vrm-cm-form-coche input { width: 22px; height: 22px; margin: 0; accent-color: var(--cm-accent); flex: 0 0 auto; }
 .vrm-cm-form-page .vrm-cm-select { color: var(--cm-doux); font-size: 13px; overflow-wrap: anywhere; }
+
+/* (26 nov., capture de Julien du classement : « c'est de la merde »)
+   · « Entrer un code » / « Créer un groupe » : deux vrais boutons teintés, même largeur (ils flottaient en texte nu) ;
+   · « Me retirer du classement » : un lien calé à gauche, sans retrait (il était décalé de 14 px) ;
+   · la carte « Tu es dans le classement » : la phrase et le lien serrés. */
+:root .vrm-communaute .vrm-cm-ligne-boutons:has(> [data-cm-groupe-entrer]) { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px; }
+:root .vrm-communaute .vrm-cm-ligne-boutons > :is([data-cm-groupe-entrer], [data-cm-groupe-creer]) { width: 100%; background: var(--n-carte-2, #E3E5E9) !important; color: var(--n-encre, #0E0F12) !important; border-radius: 12px !important; }
+:root .vrm-communaute .vrm-cm-moi { display: grid; gap: 4px; }
+:root .vrm-communaute .vrm-cm-moi > .vrm-cm-lien { justify-self: start; padding: 0 !important; color: var(--n-encre-2, #1F2226) !important; font-weight: 500 !important; }
