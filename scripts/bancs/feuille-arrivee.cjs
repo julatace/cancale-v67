@@ -65,7 +65,7 @@ createRoot(document.getElementById('r')).render(<div><main style={{ padding: 20 
       return { contents: t, loader: 'jsx' };
     });
   } }] : [];
-  await esbuild.build({ entryPoints: [path.join(dir, 'entree.jsx')], bundle: true, outdir: path.join(dir, 'out'), format: 'esm', jsx: 'automatic', plugins,
+  await esbuild.build({ entryPoints: [path.join(dir, 'entree.jsx')], bundle: true, outdir: path.join(dir, 'out'), format: 'esm', jsx: 'automatic', plugins, external: ['/brands/*'],
     loader: { '.js': 'jsx', '.svg': 'dataurl', '.png': 'dataurl', '.woff2': 'dataurl' }, nodePaths: [NM], logLevel: 'error', define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env': '{"MODE":"production","PROD":true,"DEV":false}' } });
   fs.writeFileSync(path.join(dir, 'out', 'index.html'), '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="stylesheet" href="/entree.css"></head><body style="margin:0;font-family:-apple-system,system-ui,sans-serif"><div id="r"></div><script type="module" src="/entree.js"></script></body></html>');
   return path.join(dir, 'out');

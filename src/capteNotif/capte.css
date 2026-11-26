@@ -73,6 +73,8 @@
   box-shadow: 0 0 0 2px var(--n-carte-2); }
 .vrm-arr-corps { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .vrm-arr-titre { font: 600 15px/20px var(--n-police); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Une ligne nue (« Vinted a demandé de ralentir : VRM attend ») ne se coupe pas au milieu : deux lignes au plus. */
+.vrm-arr-carte[data-nue] .vrm-arr-titre { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 .vrm-arr-extrait { font: 400 14px/19px var(--n-police); color: var(--n-texte, var(--n-encre)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-arr-meta { font: var(--n-t-legende); color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .vrm-arr-carte > .vrm-arr-nouveau { grid-column: 3; grid-row: 1; align-self: start; justify-self: end; margin-top: 2px; padding: 3px 7px; border-radius: 999px;
