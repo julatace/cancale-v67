@@ -1,0 +1,157 @@
+/* ── src/natif/jeu.css — le langage « jeu vidéo » (24 nov., src/natif/Jeu.jsx) ───────────────────────────────────────────
+   Vivant, pas criard : les couleurs de l'app (ardoise, vert « fait », argent), un papier neutre pour l'étiquette du N°
+   (saturation ≤ 15 % : jamais orange, ni de jour ni de nuit), des ressorts courts. `prefers-reduced-motion` ⇒ rien ne bouge. */
+@layer vrm-natif {
+  :root {
+    /* Un ressort (raideur 300, amortissement 22 : 7 % de dépassement, 600 ms) et un plus vif pour un tampon (17 %). */
+    --n-jeu-ressort: cubic-bezier(.34, 1.36, .5, 1);
+    --n-jeu-tampon: cubic-bezier(.3, 1.7, .5, 1);
+    --n-jeu-c1: #3D4B5B; --n-jeu-c2: #17744A; --n-jeu-c3: #AEB4BE; --n-jeu-c4: #FFFFFF;
+    --n-jeu-papier: #F3F1EC; --n-jeu-papier-encre: #26272B; --n-jeu-papier-bord: rgb(38 39 43 / .16);
+    --n-jeu-medaille: #FFFFFF; --n-jeu-medaille-encre: #3D4B5B;
+  }
+  @supports (animation-timing-function: linear(0, 1)) {
+    :root {
+      --n-jeu-ressort: linear(0, 0.059, 0.197, 0.371, 0.548, 0.707, 0.839, 0.938, 1.007, 1.049, 1.07, 1.076, 1.071, 1.06, 1.047, 1.034, 1.022, 1.012, 1.004, 0.999, 0.996, 0.995, 0.994, 0.995, 0.995, 0.996, 0.998, 0.998, 0.999, 1);
+      --n-jeu-tampon: linear(0, 0.07, 0.241, 0.456, 0.674, 0.864, 1.01, 1.107, 1.159, 1.173, 1.159, 1.129, 1.092, 1.054, 1.022, 0.997, 0.981, 0.972, 0.97, 0.973, 0.978, 0.985, 0.991, 0.997, 1.001, 1.003, 1.002, 1.001, 1);
+    }
+  }
+  :root[data-theme="dark"] { --n-jeu-c1: #C9D2DE; --n-jeu-c2: #7BE8BE; --n-jeu-c3: #8A8A94; --n-jeu-c4: #FFFFFF; --n-jeu-medaille: #3A3A41; --n-jeu-medaille-encre: #F4F4F5; }
+
+  /* ── L'étiquette du N° : un papier à œillet, le numéro à l'encre, tabulaire. ── */
+  .n-etiq { display: inline-flex; align-items: baseline; gap: 2px; padding: 2px 7px 2px 13px; border-radius: 4px 6px 6px 4px; position: relative;
+    background: var(--n-jeu-papier); color: var(--n-jeu-papier-encre); box-shadow: inset 0 0 0 1px var(--n-jeu-papier-bord), 0 1px 2px rgb(0 0 0 / .18);
+    font: 700 13px/16px var(--n-police); font-variant-numeric: tabular-nums; letter-spacing: -.01em; white-space: nowrap;
+    clip-path: polygon(6px 0, 100% 0, 100% 100%, 6px 100%, 0 50%); }
+  .n-etiq-trou { position: absolute; left: 5px; top: 50%; width: 4px; height: 4px; margin-top: -2px; border-radius: 50%; background: rgb(38 39 43 / .28); }
+  .n-etiq-pre { font-size: 10px; font-weight: 600; opacity: .72; margin-right: 1px; }
+
+  /* ── La tuile d'une paire : photo carrée, coins doux, l'étiquette posée en bas à gauche, le médaillon en haut à droite. ── */
+  .n-tuile-paire { position: relative; display: inline-grid; flex: 0 0 auto; width: var(--n-tuile-t, 72px); height: var(--n-tuile-t, 72px); border-radius: 14px; isolation: isolate; }
+  .n-tuile-paire[data-n-tuile="m"] { --n-tuile-t: 56px; border-radius: 12px; }
+  .n-tuile-paire[data-n-tuile="xl"] { --n-tuile-t: 96px; border-radius: 16px; }
+  .n-tuile-img, .n-tuile-vide { grid-area: 1 / 1; width: 100%; height: 100%; border-radius: inherit; }
+  .n-tuile-img { object-fit: cover; background: var(--n-carte-2); box-shadow: inset 0 0 0 1px var(--n-trait); -webkit-user-drag: none; user-select: none; }
+  .n-tuile-vide { display: grid; place-items: center; color: var(--n-accent);
+    background: linear-gradient(150deg, color-mix(in srgb, var(--n-carte) 70%, var(--n-teinte)) 0%, var(--n-carte-2) 100%); box-shadow: inset 0 0 0 1px var(--n-trait); }
+  /* (24 nov.) Sans photo : un MÉDAILLON teinté par famille (ardoise, encre, sarcelle, vert, acier — jamais orange), l'icône en
+     blanc, un reflet en haut : une pièce de jeu, plus une case grise vide. */
+  .n-tuile-paire[data-n-tuile-photo="0"] .n-tuile-vide { color: #FFFFFF; background: radial-gradient(120% 90% at 30% 10%, rgb(255 255 255 / .28), transparent 55%), linear-gradient(150deg, var(--n-med-1, #5A6B7E), var(--n-med-2, #3D4B5B));
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / .14), inset 0 -6px 12px rgb(0 0 0 / .14), 0 2px 6px rgb(29 29 31 / .14); }
+  .n-tuile-paire[data-n-tuile-genre="vente"], .n-tuile-paire[data-n-tuile-genre="argent"] { --n-med-1: #2E9466; --n-med-2: #17744A; }
+  .n-tuile-paire[data-n-tuile-genre="arrivee"], .n-tuile-paire[data-n-tuile-genre="bordereau"] { --n-med-1: #2C8A8B; --n-med-2: #0D6A6B; }
+  .n-tuile-paire[data-n-tuile-genre="moderation"], .n-tuile-paire[data-n-tuile-genre="erreur"] { --n-med-1: #3A3D44; --n-med-2: #1D1D1F; }
+  .n-tuile-paire[data-n-tuile-genre="rappel"], .n-tuile-paire[data-n-tuile-genre="avis"] { --n-med-1: #6A7890; --n-med-2: #4C5A73; }
+  .n-tuile-paire[data-n-tuile-genre="favori"], .n-tuile-paire[data-n-tuile-genre="message"], .n-tuile-paire[data-n-tuile-genre="offre"] { --n-med-1: #5A6B7E; --n-med-2: #3D4B5B; }
+  .n-tuile-badge { position: absolute; top: -6px; right: -6px; z-index: 2; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%;
+    background: var(--n-jeu-medaille); color: var(--n-jeu-medaille-encre); box-shadow: 0 0 0 2px var(--n-carte), 0 2px 6px rgb(0 0 0 / .18); }
+  .n-tuile-paire[data-n-tuile-genre="vente"] .n-tuile-badge { background: var(--n-vert); color: #FFFFFF; }
+  :root[data-theme="dark"] .n-tuile-paire[data-n-tuile-genre="vente"] .n-tuile-badge { color: #0B2A1D; }
+  .n-tuile-paire > .n-etiq { position: absolute; left: -4px; bottom: 6px; z-index: 2; transform: rotate(-4deg); transform-origin: left center; }
+  .n-tuile-paire[data-n-tuile="m"] > .n-etiq { font-size: 11px; line-height: 14px; bottom: 4px; }
+
+  /* ── Les confettis : partis du centre, ils s'envolent et retombent, 1 s. ── */
+  .n-confettis { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; z-index: 3; }
+  .n-confettis > i { position: absolute; left: -3px; top: -4px; width: 6px; height: 9px; border-radius: 1.5px; background: var(--c); opacity: 0;
+    box-shadow: 0 0 0 .5px rgb(0 0 0 / .12); animation: n-jeu-eclat var(--d, 1100ms) cubic-bezier(.2, .7, .3, 1) var(--t, 0ms) forwards; }
+  .n-confettis > i[data-f="1"] { width: 5px; height: 5px; border-radius: 50%; }
+  .n-confettis > i[data-f="2"] { width: 3px; height: 11px; }
+  @keyframes n-jeu-eclat {
+    0% { opacity: 0; transform: translate(0, 0) rotate(0) scale(.4); }
+    12% { opacity: 1; }
+    60% { opacity: 1; transform: translate(var(--x), var(--y)) rotate(calc(var(--r) * .7)) scale(1); }
+    100% { opacity: 0; transform: translate(calc(var(--x) * 1.08), calc(var(--y) + 34px)) rotate(var(--r)) scale(.9); }
+  }
+
+  /* ── L'anneau ── */
+  .n-anneau { position: relative; display: inline-grid; place-items: center; flex: 0 0 auto; }
+  .n-anneau > svg { grid-area: 1 / 1; overflow: visible; }
+  .n-anneau-fond { stroke: var(--n-carte-2); }
+  .n-anneau[data-n-anneau-su="0"] .n-anneau-fond { stroke: var(--n-bord); }
+  .n-anneau-plein { stroke: var(--n-accent); transition: stroke-dashoffset 700ms var(--n-jeu-ressort); }
+  .n-anneau[data-n-anneau-fait] .n-anneau-plein { stroke: var(--n-vert); }
+  .n-anneau-centre { grid-area: 1 / 1; font: 700 15px/1 var(--n-police); font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  .n-anneau[data-n-anneau-su="0"] .n-anneau-centre { color: var(--n-encre-2); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .n-confettis { display: none; }
+    .n-anneau-plein { transition: none; }
+  }
+}
+
+/* ── (24 nov.) L'inventaire : les dernières ventes en tuiles (Aujourd'hui) — une rangée qui défile de côté au téléphone. ── */
+@layer vrm-natif {
+  .n-inventaire { display: grid; grid-auto-flow: column; grid-auto-columns: 104px; gap: 12px; overflow-x: auto; padding: 10px 14px 12px; scroll-padding-inline: 14px; /* (26 nov.) 14 px à gauche : la 1re photo, son étiquette N° et le logo du site ne touchent plus le bord de la carte */ scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .n-inventaire::-webkit-scrollbar { display: none; }
+  @media (min-width: 1024px) { .n-inventaire { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); overflow: visible; } }
+  .n-inventaire-case { appearance: none; border: 0; background: transparent; padding: 0; margin: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; scroll-snap-align: start;
+    display: flex; flex-direction: column; gap: 2px; min-width: 0; min-height: 44px; touch-action: manipulation; }
+  .n-inventaire-case .n-tuile-paire { --n-tuile-t: 104px; width: 100%; height: auto; aspect-ratio: 1 / 1; margin-bottom: 4px; }
+  .n-inventaire-case .n-tuile-img { width: 100% !important; height: 100% !important; }
+  .n-inventaire-prix { display: flex; align-items: center; gap: 5px; font: 700 15px/20px var(--n-police); font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  .n-inventaire-quand { font: 400 12px/16px var(--n-police); color: var(--n-encre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-inventaire-case:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 3px; border-radius: 16px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .n-inventaire-case { transition: transform 80ms ease-out; }
+    .n-inventaire-case:active { transform: scale(.96); }
+  }
+  /* L'anneau dans une case de chiffre (Colis) : en haut à droite. */
+  .n-cc { position: relative; }
+  .n-cc-visuel { position: absolute; top: 10px; right: 10px; pointer-events: none; }
+  .n-cc-anneau .n-anneau-centre { color: var(--n-encre-2); display: grid; place-items: center; }
+}
+
+/* ── (24 nov.) Quête, compteur « fait », trophées ── */
+@layer vrm-natif {
+  .n-quete { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: var(--n-carte); box-shadow: inset 0 0 0 1px var(--n-trait), var(--n-ombre-carte); }
+  .n-quete-med { position: relative; width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; color: #FFFFFF;
+    background: radial-gradient(120% 90% at 30% 10%, rgb(255 255 255 / .28), transparent 55%), linear-gradient(150deg, #5A6B7E, #3D4B5B); }
+  .n-quete[data-n-quete-fait] .n-quete-med { background: radial-gradient(120% 90% at 30% 10%, rgb(255 255 255 / .28), transparent 55%), linear-gradient(150deg, #2E9466, #17744A); animation: n-pop-badge 520ms var(--n-jeu-tampon) both; }
+  .n-quete-coche path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: n-quete-trait 360ms ease-out 80ms forwards; }
+  @keyframes n-quete-trait { to { stroke-dashoffset: 0; } }
+  .n-quete-corps { display: flex; flex-direction: column; min-width: 0; }
+  .n-quete-titre { font: var(--n-t-corps-fort); color: var(--n-encre); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-quete-reste { font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  .n-quete-geste { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--n-plein); color: var(--n-sur-plein); font: var(--n-t-controle); font-weight: 600; cursor: pointer; position: relative; }
+  .n-quete-geste::after { content: ''; position: absolute; inset: -4px; }
+  .n-quete[data-n-quete-fait] { animation: n-quete-replie 300ms ease-in 650ms both; }
+  @keyframes n-quete-replie { to { opacity: 0; transform: scale(.94); } }
+  .n-quetes-faites { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 10px; border-radius: 999px; background: var(--n-vert-fond); color: var(--n-vert); font: var(--n-t-legende-fort); animation: n-pop-badge 460ms var(--n-jeu-tampon) both; }
+  .n-etagere { display: flex; flex-wrap: wrap; gap: 10px; }
+  .n-trophee { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; min-width: 44px; }
+  .n-trophee-med { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #FFFFFF; background: radial-gradient(120% 90% at 30% 10%, rgb(255 255 255 / .35), transparent 55%), linear-gradient(150deg, #8A95A5, #4C5A73); box-shadow: 0 2px 6px rgb(29 29 31 / .16); }
+  .n-trophee[data-n-trophee-atteint="0"] .n-trophee-med { background: var(--n-carte-2); color: var(--n-encre-3); box-shadow: inset 0 0 0 1px var(--n-trait); }
+  .n-trophee-n { font: var(--n-t-legende-fort); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  @media (prefers-reduced-motion: reduce) { .n-quete[data-n-quete-fait], .n-quete[data-n-quete-fait] .n-quete-med, .n-quetes-faites { animation: none; } .n-quete-coche path { animation: none; stroke-dashoffset: 0; } }
+}
+
+/* ── (24 nov.) L'apparition progressive (src/natif/Jeu.jsx, `revele`) et les squelettes de tuiles ── */
+@layer vrm-natif {
+  @media (prefers-reduced-motion: no-preference) {
+    .n-revele { animation: n-revele 160ms cubic-bezier(.2, .7, .3, 1) both; animation-delay: calc(min(var(--n-rang, 0), 8) * 15ms); }
+  }
+  @keyframes n-revele { from { opacity: .35; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+  .n-tuile-os { background: transparent; }
+  .n-tuile-os-fond { grid-area: 1 / 1; width: 100%; height: 100%; border-radius: inherit; }
+  .n-inventaire-case .n-tuile-os { --n-tuile-t: 104px; width: 100%; height: auto; aspect-ratio: 1 / 1; margin-bottom: 4px; }
+  /* L'image d'une tuile : posée sur le gris du squelette, elle apparaît en fondu une fois chargée (jamais de blanc). */
+  .n-tuile-img { background-color: var(--n-squelette, var(--n-carte-2)); }
+  @media (prefers-reduced-motion: no-preference) {
+    .n-tuile-paire[data-n-tuile-charge="0"] .n-tuile-img { opacity: 0; }
+    .n-tuile-paire[data-n-tuile-charge="1"] .n-tuile-img { opacity: 1; transition: opacity 160ms ease-out; }
+    .n-tuile-paire[data-n-tuile-charge="deja"] .n-tuile-img { opacity: 1; transition: none; }
+  }
+}
+
+/* ── (24 nov.) Le trajet d'un colis : une piste, les étapes prouvées pleines, le camion sur la dernière. ── */
+@layer vrm-natif {
+  .n-trajet { position: relative; display: block; width: 100%; max-width: 220px; height: 22px; margin: 4px 0 2px; }
+  .n-trajet-piste { position: absolute; left: 6px; right: 6px; top: 10px; height: 2px; border-radius: 2px; background: var(--n-trait); }
+  .n-trajet[data-n-trajet-su="0"] .n-trajet-piste { background: repeating-linear-gradient(90deg, var(--n-bord) 0 4px, transparent 4px 8px); }
+  .n-trajet-fait { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--n-trajet-part, 0) * 100%); border-radius: inherit; background: var(--n-accent); }
+  .n-trajet-pt { position: absolute; top: 7px; left: calc(6px + var(--k) * (100% - 12px)); width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--n-carte); box-shadow: inset 0 0 0 2px var(--n-bord); }
+  .n-trajet-pt[data-fait="1"] { background: var(--n-accent); box-shadow: none; }
+  .n-trajet-pion { position: absolute; top: 0; left: calc(6px + var(--n-trajet-part, 0) * (100% - 12px)); width: 22px; height: 22px; margin-left: -11px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--n-plein); color: var(--n-sur-plein); box-shadow: 0 0 0 2px var(--n-carte), 0 2px 5px rgb(29 29 31 / .2); }
+  .n-trajet[data-n-trajet="3"] .n-trajet-pion, .n-trajet-pt[data-ici="1"][data-fait="1"]:last-of-type { background: var(--n-vert); }
+}

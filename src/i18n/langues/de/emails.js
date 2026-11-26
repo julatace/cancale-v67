@@ -45,6 +45,7 @@ export default {
   "emails.compteEnvoieAucun": "Ein Konto sendet keine E-Mail an VRM",
   "emails.codesRetraitBordereaux": "Abholcodes, Etiketten und Nachrichten kommen nicht an.",
   "emails.relierBoite": "Postfach von {login} verknüpfen",
+  "emails.relierCourt": "Verknüpfen",
   "emails.enregistreAutresAppareils": "Auf deinen anderen Geräten nicht gespeichert — gleich erneut versuchen.",
   "emails.chercherEMail": "E-Mail suchen",
   "emails.articleCodeSuivi": "Artikel, Code, Sendungsnummer…",

@@ -226,7 +226,7 @@ export default {
   "achats.codeRetraitSuivi": "Code de retrait, suivi, note, reçu d’achat, étiquette",
   "achats.plusActionsAchat": "Plus d’actions pour cet achat",
   "achats.prixPayeCopie": "Prix payé copié : {prixPaye} € — colle-le au numérotage",
-  "achats.copierPrixPaye": "Copier le prix payé (pour le numérotage)",
+  "achats.copierPrixPaye": "Copier le prix payé",
   "achats.modifierNoteInterne": "Modifier la note interne",
   "achats.ajouterNoteInterne": "Ajouter une note interne",
   "achats.attestationAchat": "Attestation d'achat",

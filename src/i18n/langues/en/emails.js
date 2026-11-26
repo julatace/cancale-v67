@@ -45,6 +45,7 @@ export default {
   "emails.compteEnvoieAucun": "One account sends no email to VRM",
   "emails.codesRetraitBordereaux": "pickup codes, labels and messages don’t arrive.",
   "emails.relierBoite": "Link {login}’s inbox",
+  "emails.relierCourt": "Link",
   "emails.enregistreAutresAppareils": "Not saved on your other devices — try again in a moment.",
   "emails.chercherEMail": "Search an email",
   "emails.articleCodeSuivi": "Item, code, tracking number…",

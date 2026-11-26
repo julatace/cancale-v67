@@ -92,7 +92,7 @@ export const CHOIX_SERIE = [
   { v: 'lettre', titre: 'Avec une lettre', sous: 'C1, C2, C3…' },
 ];
 export const CHOIX_ETIQUETTE = [
-  { v: 'main', titre: 'Écrite à la main', sous: 'Au feutre, sur le carton ou l’étiquette.' },
+  { v: 'main', titre: 'Écrite à la main', sous: 'Au feutre, sur l’étiquette, le bac ou l’étagère.' },
   { v: 'imprimee', titre: 'Imprimée', sous: 'VRM imprime le N° en grand, à ton format.' },
 ];
 export const CHOIX_FORMAT_ETIQUETTE = FORMATS_ETIQUETTE.map((f) => ({ v: f.v, titre: f.planche ? 'Planche A4 · 24' : `${f.l} × ${f.h} mm`, sous: f.planche ? 'Une feuille, 3 × 8 étiquettes.' : 'Imprimante d’étiquettes.' }));

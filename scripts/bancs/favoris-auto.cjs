@@ -75,6 +75,9 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
 // ── La fausse page ───────────────────────────────────────────────────────────────────────────────────────────
 const F = { item: '7001234', receiver: '880011', uuid: '01a1fdff-71a1-74b0-a538-46ff8d0881ac', core: '4455667', tx: '5001' };
 const ROW = (item, receiver, txt) => `<a class="rang" href="/inbox/want_it/new?receiver_id=${receiver}&item_id=${item}"><span>${txt}</span></a>`;
+// 5.441 : la ligne RÉELLE d'un favori dans la cloche (capture de Julien) : vignette, « {pseudo} a ajouté ton article {titre} à
+//    ses favoris. Fais-lui une proposition. », « il y a N heures » ; son lien = celui que la notification captée porte.
+const ROW_VRAIE = (href, txt) => `<a class="rang" href="${href}"><img alt="" width="40" height="40" src="data:image/gif;base64,R0lGODlhAQABAAAAACw="><span>${txt} a ajouté ton article Nike Dunk taille 42 à ses favoris. Fais-lui une proposition.</span><small>il y a 3 heures</small></a>`;
 const ROW_TID = (item, receiver, txt) => `<a class="rang" href="/inbox/want_it/new?receiver_id=${receiver}&item_id=${item}"><span data-testid="notification-item-icon"><svg width="8" height="8"><path d="M0 0h8v8z"/></svg></span><span>${txt}</span></a>`;
 const BAISSE = (i) => `<a class="rang" href="/items/${5550000 + i}-nike"><span>Le prix de l'article Nike ${i} a été réduit</span></a>`;
 const BELL_SVG = '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M10 2a5 5 0 0 0-5 5v4l-2 2v1h14v-1l-2-2V7a5 5 0 0 0-5-5z"/></svg>';
@@ -84,6 +87,8 @@ const CLOCHES = {
   allemand: `<div role="button" tabindex="0" id="cloche" aria-label="Benachrichtigungen (3)">${BELL_SVG}</div>`,
   lien: `<a id="cloche" href="/member/notifications" class="header-icon"><svg width="20" height="20"><use href="#icon-notifications-24"></use></svg></a>`,
   aucune: '',
+  // 5.441 : la forme RÉELLE (capture de Julien, 23 nov.) — un bouton à icône SANS nom ni repère, entre l'enveloppe et le cœur.
+  vraie: `<button type="button" data-banc="c" class="c-button c-button--transparent">${BELL_SVG}</button>`,   // aucun repère : ni id, ni nom, ni data-testid
   double: `<button type="button" aria-label="Notifications">${BELL_SVG}</button><button type="button" aria-label="Notifications">${BELL_SVG}</button>`,
 };
 const COMPOSEURS = {
@@ -96,13 +101,13 @@ body{margin:0;font-family:sans-serif}header{display:flex;gap:12px;align-items:ce
 header button,header [role=button],header a{width:44px;height:44px;display:inline-grid;place-items:center}.pan{position:absolute;top:56px;right:16px;width:400px;border:1px solid #ccc;background:#fff;display:none}.pan.on{display:block}
 .rang{display:block;padding:10px;border-bottom:1px solid #eee;color:#111;text-decoration:none}main{padding:16px;min-height:600px}textarea,.ce{width:320px;min-height:40px;border:1px solid #999;display:block}
 </style></head><body>
-<header><b style="margin-right:auto">Vinted</b><a href="/inbox" aria-label="Messages">✉</a><button type="button" aria-label="Favoris">♡</button>${CLOCHES[o.cloche] || ''}<a href="/member/${o.moi || 1}">Moi</a></header>
-<div class="pan${o.ouvert ? ' on' : ''}" id="pan" style="${o.ouvert ? 'top:8px;left:200px;right:auto' : ''}"><div id="lignes">${o.lignes || ''}</div>${o.sansVoirTout ? '' : '<a class="rang" href="/member/notifications">Voir tout</a>'}</div>
+${o.cloche === 'vraie' ? `<header><b style="margin-right:auto">Vinted</b><a href="/inbox" class="ic">✉<span class="badge">8</span></a>${CLOCHES.vraie}<a href="/member/items/favourite_list" class="ic">♡</a><button type="button" class="avatar">◯</button><a href="/items/new">Vends tes articles</a></header>` : `<header><b style="margin-right:auto">Vinted</b><a href="/inbox" aria-label="Messages">✉</a><button type="button" aria-label="Favoris">♡</button>${CLOCHES[o.cloche] || ''}<a href="/member/${o.moi || 1}">Moi</a></header>`}
+<div class="pan${o.ouvert ? ' on' : ''}" id="pan" style="${o.ouvert ? 'top:8px;left:200px;right:auto' : ''}"><div id="lignes">${o.lignes || ''}</div>${o.sansVoirTout ? '' : o.voirToutBouton ? '<button type="button" id="voirtout">Voir tout</button>' : '<a class="rang" href="/member/notifications">Voir tout</a>'}</div>
 <main id="m">${o.composeur ? `<div id="fil"></div>${COMPOSEURS[o.composeur]}` : ''}</main>
 <script>(() => {
   const O = ${JSON.stringify({ core: o.coreServi || F.core, composeur: o.composeurApres || '' })};
   window.__clics = []; window.__envois = [];
-  const pan = document.getElementById('pan'), cl = document.getElementById('cloche');
+  const pan = document.getElementById('pan'), cl = document.getElementById('cloche') || document.querySelector('[data-banc="c"]');
   if (cl && cl.tagName !== 'A') cl.addEventListener('click', () => { window.__clics.push('cloche'); pan.classList.toggle('on'); if (cl.hasAttribute('aria-expanded')) cl.setAttribute('aria-expanded', pan.classList.contains('on') ? 'true' : 'false'); });
   const COMPO = ${JSON.stringify(COMPOSEURS)};
   document.addEventListener('click', (e) => {
@@ -126,6 +131,7 @@ header button,header [role=button],header a{width:44px;height:44px;display:inlin
       .then((r) => r.json()).then(() => { const p = document.createElement('p'); p.textContent = t; document.getElementById('fil').appendChild(p); });
   }, true);
   document.addEventListener('submit', (e) => e.preventDefault(), true);
+  const vt = document.getElementById('voirtout'); if (vt) vt.addEventListener('click', () => { window.__clics.push('voirtout'); history.pushState({}, '', '/member/notifications'); });
 })();</script></body></html>`;
 
 async function ouvrir(b, chemin, o) {
@@ -258,6 +264,17 @@ const lireFenetre = (pg) => pg.evaluate(() => {
     await cas('P10', '/inbox', { cloche: 'nom', lignes: BAISSE(0) + ROW_U(F.item, '990022', 'autre_personne') + `<a class="rang" href="/inbox/want_it?item_id=${F.item}&user_id=${F.receiver}&receiver_id=${F.receiver}"><span>deux personnes</span></a>` }, 'favoriOuvrir', D, async (r, l) => {
       dit(r.ok !== true && !l.some((x) => /want_it/.test(x)), 'P10 une ligne aux clés en trop (user_id ET receiver_id) ou d’une autre personne ⇒ rien cliqué', JSON.stringify({ ok: r.ok, m: r.manque, l }));
     });
+    // 5.441 — la forme RÉELLE de l'en-tête et de la liste (capture de Julien du 23 nov.).
+    const LIEN = `/items/${F.item}/want_it/new?offering_id=555001`;
+    await cas('P11', '/inbox', { cloche: 'vraie', voirToutBouton: true, lignes: ROW_VRAIE(`/items/${F.item}/want_it/new?offering_id=555999`, 'autre_personne') + ROW_VRAIE(LIEN, 'acheteuse') }, 'favoriOuvrir', Object.assign({}, D, { lien: LIEN }), async (r, l) => {
+      const fav = l.filter((x) => /want_it/.test(x));
+      dit(r.ok === true && l[0] === 'cloche' && fav.length === 1 && fav[0] === 'lien:' + LIEN, 'P11 forme réelle : cloche SANS nom trouvée par sa position (entre l’enveloppe et le cœur), la ligne de CE favori cliquée (son lien capté exact)', JSON.stringify({ ok: r.ok, m: r.manque, l, t: r.trouves }).slice(0, 400));
+      dit(Array.isArray(r.trouves) && r.trouves.some((x) => x.nom === 'cloche' && x.s === 'position'), 'P11 la stratégie gagnante est « position »', JSON.stringify(r.trouves));
+    });
+    await cas('P12', '/inbox', { cloche: 'vraie', voirToutBouton: true, lignes: ROW_VRAIE(`/items/${F.item}/want_it/new?offering_id=555999`, 'autre_personne') }, 'favoriOuvrir', Object.assign({}, D, { lien: LIEN }), async (r, l) => {
+      dit(r.ok === false && r.absent === true && r.voirTout === '/member/notifications' && l.includes('voirtout') && !l.some((x) => /want_it/.test(x)), 'P12 forme réelle, favori absent de la liste : le BOUTON « Voir tout » est touché, la page complète est rendue au fond, aucune ligne cliquée', JSON.stringify({ r: { ok: r.ok, m: r.manque, a: r.absent, v: r.voirTout }, l }));
+    });
+
     console.log('M. Le message dans une conversation de la nouvelle messagerie');
     const TXT = 'Bonjour ! Je viens de te faire une offre sur cet article.';
     for (const [k, v] of [['M1', 'testid'], ['M2', 'editable'], ['M3', 'nu']]) {
@@ -296,7 +313,7 @@ const lireFenetre = (pg) => pg.evaluate(() => {
     });
     await fenetre(b, 'F3-saute-pas', 1512, false, ETAT({ etapeFav: 'envoi', lignes: [Object.assign({}, LIGNES[0]), Object.assign({}, LIGNES[1], { etat: 'saute', r: 'favori_trop_ancien' }), Object.assign({}, LIGNES[2], { etat: 'pas', r: 'element_introuvable' }), Object.assign({}, LIGNES[3], { etat: 'cours' }), LIGNES[4]] }), async (pg) => {
       const m = await lireFenetre(pg);
-      dit(m && m.lignes[1].r === 'Favori trop ancien pour Vinted' && /Page Vinted pas reconnue/.test(m.lignes[2].r) && m.lignes[2].chip === 'Pas envoyé' && /Envoi du message/.test(m.etapeTxt), 'F3 sauté « Favori trop ancien pour Vinted », pas envoyé « Page Vinted pas reconnue — rien n’est parti », étape « Envoi du message… »', JSON.stringify(m && m.lignes));
+      dit(m && m.lignes[1].r === 'Pas trouvé dans tes notifications (liste lue jusqu’au bout)' && /Page Vinted pas reconnue/.test(m.lignes[2].r) && m.lignes[2].chip === 'Pas envoyé' && /Envoi du message/.test(m.etapeTxt), 'F3 sauté « Pas trouvé dans tes notifications (liste lue jusqu’au bout) » (5.440.2 : plus jamais « trop ancien »), pas envoyé « Page Vinted pas reconnue — rien n’est parti », étape « Envoi du message… »', JSON.stringify(m && m.lignes));
       dit(m && !INTERDITS.test(m.txt), 'F3 aucune phrase technique', m && (m.txt.match(INTERDITS) || [''])[0]);
     });
     await fenetre(b, 'F4-pause', 1512, false, ETAT({ __pause: 'oui', enCours: false, etapeFav: '' }), async (pg) => {

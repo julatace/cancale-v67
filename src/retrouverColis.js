@@ -22,20 +22,23 @@ export const sourcePrincipalePresente = () => [...SOURCES.keys()].some((k) => k.
 // Toutes les sources, un enregistrement (sorte + clé) une fois. `pret` : la source principale est là
 // ET chaque source a fini de lire ; sinon le scanner attend (« pas lu » n'est jamais « rien »).
 export function lireSourcesColis() {
-  const enregistrements = [], manques = [], chercheurs = []; let pret = sourcePrincipalePresente();
+  const enregistrements = [], manques = [], chercheurs = []; let pret = sourcePrincipalePresente(); let regles = null;
   const vus = new Set();
   for (const fn of SOURCES.values()) {
     let r = null; try { r = fn(); } catch (_) { r = null; }
     if (!r) continue;
     if (!r.pret) pret = false;
     if (typeof r.chercher === 'function') chercheurs.push(r.chercher);
+    // (24 nov., lot scanner-universel) Les règles du N° (`cleNum`, la lettre d'archive) : celles de l'app, données par la
+    // source des paires (src/App.jsx) — le scanner ne réécrit pas la clé d'un N° (§11).
+    if (!regles && r.regles && typeof r.regles.cleNum === 'function') regles = r.regles;
     for (const m of (Array.isArray(r.manques) ? r.manques : [])) if (m && !manques.includes(m)) manques.push(m);
     for (const e of (Array.isArray(r.enregistrements) ? r.enregistrements : [])) {
       if (!e || e.cle == null) continue;
       const k = `${e.sorte || ''}:${e.cle}`; if (vus.has(k)) continue; vus.add(k); enregistrements.push(e);
     }
   }
-  return { pret, enregistrements, manques, chercheurs };
+  return { pret, enregistrements, manques, chercheurs, regles };
 }
 // (17 nov., lot scan-bordereau-vente) Un code lu qui n'est pas un n° de suivi connu : chaque source qui sait
 // chercher dans ses étiquettes (`chercher(code)` ⇒ { etat, enregistrements, pasLus }) le cherche ; les trouvés

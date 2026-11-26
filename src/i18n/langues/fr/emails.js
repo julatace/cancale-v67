@@ -45,6 +45,7 @@ export default {
   "emails.compteEnvoieAucun": "Un compte n’envoie aucun e-mail à VRM",
   "emails.codesRetraitBordereaux": "codes de retrait, bordereaux et messages n’arrivent pas.",
   "emails.relierBoite": "Relier la boîte de {login}",
+  "emails.relierCourt": "Relier",
   "emails.enregistreAutresAppareils": "Pas enregistré sur tes autres appareils — réessaie dans un moment.",
   "emails.chercherEMail": "Chercher un e-mail",
   "emails.articleCodeSuivi": "Article, code, n° de suivi…",

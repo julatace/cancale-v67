@@ -2,7 +2,8 @@
 import ecran_textes_restes from './en/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
 import ecran_accessibilite from './en/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './en/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
-import ecran_suivi_vente from './en/suiviVente.js';   // (16 nov.) le suivi des colis vendus
+import ecran_suivi_vente from './en/suiviVente.js';
+import ecran_envois from './en/envois.js';   // (24 nov.) le suivi d’un envoi, « Mes envois »   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './en/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './en/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './en/journee.js';
@@ -18,20 +19,33 @@ import ecran_depot from './en/depot.js';   // (21 nov., ext. 5.429) brouillons p
 import ecran_avenir from './en/avenir.js';
 import ecran_journee_stats from './en/journeeStats.js';   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_rentabilite from './en/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
+import ecran_gains from './en/gains.js';   // (24 nov.) ce que tu gagnes vraiment
 import ecran_transp_depenses from './en/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './en/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
-import ecran_a_distance from './en/aDistance.js';   // (22 nov., ext. 5.436) « Mes comptes » à distance
+import ecran_a_distance from './en/aDistance.js';
+import ecran_agir from './en/agir.js';   // (24 nov.) agir seulement si l'extension est connectée
+import ecran_messagesPro from './en/messagesPro.js';   // (24 nov.) la conversation refaite
+import ecran_connexions_ext from './en/connexions.js';   // (24 nov.) « Connexions de l'extension »   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './en/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
-import ecran_styleClarte from './en/styleClarte.js';   // (22 nov.) style et clarté : tableau de bord, état de l’extension
+import ecran_styleClarte from './en/styleClarte.js';
+import ecran_moinsTexte from './en/moinsTexte.js';
+import ecran_revueUx from './en/revueUx.js';   // (23 nov.) revue UX   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './en/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './en/ext5438.js';   // (22 nov.) ext. 5.438
+import ecran_visuelAnnonces from './en/visuelAnnonces.js';   // (24 nov.) l'inventaire Annonces / Stock
+import ecran_argentVisuel from './en/argentVisuel.js';   // (24 nov.) Argent, Messages, Paramètres visuels   // (24 nov.) le langage « jeu vidéo »   // (23 nov.) « Vinted a agi » regroupée
+import ecran_visuelJeu from './en/visuelJeu.js';   // (24 nov.) le langage « jeu vidéo »   // (23 nov.) « Vinted a agi » regroupée
+import ecran_moderationCarte from './en/moderationCarte.js';   // (23 nov.) « Vinted a agi » regroupée
+import ecran_observation from './en/observation.js';   // (24 nov.) ext. 5.440.3 « Observer Vinted »
 import ecran_ext5428 from './en/ext5428.js';   // (21 nov.) ext. 5.428   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_relier_retires from './en/relierRetires.js';   // (21 nov.) relier ce qui est chez moi, colis non retirés, remboursés hors dépenses
 import ecran_verre2 from './en/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './en/fiched.js';
+import ecran_vente_mail from './en/venteMail.js';   // (24 nov.) la vente vue par e-mail et son annonce
 import ecran_egalite from './en/egalite.js';
 import ecran_tableau from './en/tableau.js';   // (19 nov. soir) le tableau de travail
 import ecran_publierAgent from './en/publierAgent.js';
+import ecran_quatreSites from './en/quatreSites.js';
 import ecran_ecrans_restes from './en/ecransRestes.js';   // (16 nov.) lot ecrans-restes : stock importé, date limite, loupe   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './en/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_transporteur_connu from './en/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
@@ -111,10 +125,16 @@ import ecran_ux_reglages from './en/uxReglages.js';   // (21 nov.) Paramètres, 
 import ecran_natif from './en/natif.js';
 import ecran_menu_onglets from './en/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './en/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
+import ecran_parrainage20 from './en/parrainage.js';   // (25 nov.) le parrainage à 20 %
 import ecran_actions_ext from './en/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './en/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
+import ecran_accompagnement_demarrage from './en/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
+import ecran_litiges_tous from './en/litigesTous.js';   // (23 nov.) Litiges et retours, tous les sites
+import ecran_achats_hors_vinted from './en/achatsHorsVinted.js';   // (23 nov.) Nouvel achat : ticket à plusieurs articles
+import ecran_loupe_num from './en/loupeNum.js';   // (26 nov.) « Tout sur le N° » refait
 export default {
   ...ecran_textes_restes,
+  ...ecran_loupe_num,
   ...ecran_accessibilite,
   ...ecran_groupes,
   ...ecran_perso,
@@ -463,7 +483,7 @@ export default {
   "auth.lier.extension": "Sign in here: the {navigateur} extension signs in too, nothing to type.",
   "auth.parrain.offertPar": "A gift from {nom}",
   "auth.parrain.offertVendeur": "A gift from a VRM seller",
-  "auth.parrain.texte": "1 month of VRM free on your first payment, for you and for the person who invited you.",
+  "auth.parrain.texte": "10 % off your first month of VRM and 1 free week at your first payment.",
   "auth.parrain.texteConnexion": "Already have an account? Sign in: referrals are for new accounts only.",
   "auth.lier.pasOuverte": "Sign-in with {nom} isn’t open on VRM yet. Sign in here with your VRM email and password: the extension will be connected at the same time.",
   "auth.lier.pasVerifie": "I couldn’t verify the sign-in with {nom}. Try the sign-in options below again, or sign in with your email: the extension will be connected at the same time.",
@@ -2392,6 +2412,7 @@ export default {
   ...ecran_liaison,
   ...ecran_completer,
   ...ecran_suivi_vente,
+  ...ecran_envois,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
@@ -2403,23 +2424,39 @@ export default {
   ...ecran_verre2,
   ...ecran_journee_stats,
   ...ecran_rentabilite,
+  ...ecran_gains,
   ...ecran_transp_depenses,
   ...ecran_file_actions,
   ...ecran_ext5428,
   ...ecran_lotachat,
   ...ecran_ext5438,
+  ...ecran_moderationCarte,
+  ...ecran_visuelJeu,
+  ...ecran_visuelAnnonces,
+  ...ecran_argentVisuel,
+  ...ecran_observation,
   ...ecran_a_distance,
+  ...ecran_connexions_ext,
+  ...ecran_agir,
+  ...ecran_messagesPro,
   ...ecran_apresFinale,
   ...ecran_styleClarte,
+  ...ecran_moinsTexte,
+  ...ecran_revueUx,
   ...ecran_relier_retires,
   ...ecran_fiched,
+  ...ecran_vente_mail,
   ...ecran_egalite,
   ...ecran_tableau,
   ...ecran_publierAgent,
+  ...ecran_quatreSites,
   ...ecran_ecrans_restes,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,
+  ...ecran_accompagnement_demarrage,
+  ...ecran_litiges_tous,
+  ...ecran_achats_hors_vinted,
   ...ecran_parcours_nouveau,
   ...ecran_stock_rangement,
   ...ecran_stock_etiquetage,
@@ -2433,4 +2470,5 @@ export default {
   ...ecran_extension,
   ...ecran_actions_ext,
   ...ecran_offres_photos,
+  ...ecran_parrainage20,
 };

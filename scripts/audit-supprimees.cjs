@@ -93,7 +93,8 @@ function mondePage(repondre) {
     document: { hidden: true, addEventListener() {} },
     localStorage: { getItem: () => String(Date.now()), setItem() {} },     // la moisson de la page ne démarre pas
     addEventListener(type, fn) { (ecoute[type] = ecoute[type] || []).push(fn); },
-    postMessage(data) { posts.push(data); ordre.push('post:' + (data && data.kind)); },
+    postMessage(data) { if (data && data.__tag === 'CANCALE_VINTED_CANAL') return; posts.push(data); ordre.push('post:' + (data && data.kind)); },
+    MessageChannel: require('./_canal-faux.cjs').canalVersBanc((data) => { posts.push(data); ordre.push('post:' + (data && data.kind)); }),   // 5.396 : inject.js ne parle plus que par son canal
     XMLHttpRequest: FauxXHR,
     fetch: async (url, init) => {
       const r = repondre(String((init && init.method) || 'GET'), String(url));

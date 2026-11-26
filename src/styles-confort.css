@@ -83,3 +83,15 @@
 .vrm-la h2 { margin: 0 0 8px 4px; font-size: 13px; font-weight: 600; color: var(--d-gris, #6e6e73); }
 /* Un lien posé dans une rangée (« Bordereau », « Couper ») : la même cible de 44 px que les boutons. */
 .vrm-cf-liste a.vrm-cf-lien { display: flex; align-items: center; flex: none; text-decoration: none; }
+/* (16 nov., lot stock-mieux) L'inventaire tournant : UNE carte (la tête et la liste dépliée dedans), une barre d'avancée. */
+.vrm-cf-carte.vrm-it { padding: 0; overflow: hidden; }
+.vrm-it-tete { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 14px 16px; border: 0; background: transparent; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.vrm-it-tete .vrm-cf-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.vrm-it-tete .vrm-cf-txt > b { font-size: 16px; }
+.vrm-it-tete .vrm-cf-txt > small { font-size: 13px; }
+.vrm-it-barre { display: block; height: 4px; border-radius: 4px; margin-top: 5px; background: color-mix(in srgb, currentColor 14%, transparent); overflow: hidden; }
+.vrm-it-barre > i { display: block; height: 100%; border-radius: 4px; background: var(--n-accent); }
+.vrm-it-chevron { flex: none; font-size: 22px; line-height: 1; opacity: .6; transition: transform .2s cubic-bezier(.23, 1, .32, 1); }
+.vrm-it[data-ouvert] .vrm-it-chevron { transform: rotate(90deg); }
+.vrm-it > .vrm-cf-pile { margin-top: 0 !important; padding: 0 12px 12px; }
+@media (prefers-reduced-motion: reduce) { .vrm-it-chevron { transition: none; } }

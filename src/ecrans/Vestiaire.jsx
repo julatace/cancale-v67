@@ -1,10 +1,12 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
-import { BoutonExtension, FeuilleExtension } from '../BoutonExtension.jsx';   // (20 nov., décision de Julien) « … dans l'extension »
+import { BoutonExtension, FeuilleExtension } from '../BoutonExtension.jsx';
+import { ComposerReponse } from '../agir/Agir.jsx';   // (24 nov.) répondre depuis VRM si l'extension a CE compte   // (20 nov., décision de Julien) « … dans l'extension »
 import DansFiche from '../DansFiche.jsx';
 import { attrsFicheLigne } from '../ficheLigne.js';
 import { attrsAvantSite, clicAvantSite, PaireAvantSiteHote } from '../paires/PaireAvantSite.jsx';   // (16 nov.) la rangée touchée monte à sa place
 import { poserNombreAnnonces, compterVcEnLigne } from '../plateformes/nombresAnnonces.js';
+import { etatVcLu, vendusVc } from '../enLigneVc.js';   // (26 nov.) « en ligne » et « vendue » : une règle (Stock, Annonces, sélecteur)
 import { problemesAnnonce } from '../verifAnnonce.js';
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
 import { motifDeLApercu } from '../antiArnaque.js';
@@ -259,7 +261,10 @@ function ClePhotoroom({ cadre = true }) {
 function etatAnnonceVc(it, vendueParVente, capturedAt) {
   if (vendueParVente) return { etat: 'vendue', label: 'Vendue', brut: (it && it.statut) || '' };
   const brut = String((it && it.statut) || '').trim();
-  const etatR = etatAnnonceVcBrut(it, false, capturedAt);
+  // (26 nov., fiabilité VC) LA règle de src/enLigneVc.js : une lecture de plus de 24 h ne dit plus « En ligne »
+  // (« à confirmer », comme le Stock et Leboncoin — §5 `<enligne-regle>`) ; le mot lu juge le reste.
+  const { etat: etatR, vieille } = etatVcLu('', it, { capturedAt });
+  if (vieille) return { etat: 'a-confirmer', label: tr('vcmod.aConfirmerVieille', { quand: ageCourtVc(capturedAt) }), brut, vieille: true };
   // (1er nov., 5.299) UNE ANNONCE QUI N'EST PLUS DANS LES LECTURES n'est pas
   // « en ligne ». Une liste en plusieurs pages n'était jamais lue en entier :
   // une annonce vendue ou supprimée gardait son dernier mot (« on_sale ») et
@@ -303,8 +308,8 @@ function AnnoncesVestiaire() {
     if (!Array.isArray(rl)) { setD(null); return; }
     const r = rl[0] || {};
     // Les ventes ne servent qu'à PROUVER « vendue » ; illisibles ⇒ on n'en tire rien.
-    const vendus = new Set();
-    if (Array.isArray(rv) && rv[0] && rv[0].ventes && typeof rv[0].ventes === 'object') for (const v of Object.values(rv[0].ventes)) if (v && v.productId) vendus.add(String(v.productId));
+    // (26 nov., fiabilité VC) Une vente ANNULÉE ne prouve rien : l'article reste chez lui (src/enLigneVc.js, `vendusVc`).
+    const vendus = (Array.isArray(rv) && rv[0] ? vendusVc(rv[0].ventes) : null) || new Set();
     setD({ items: r.items && typeof r.items === 'object' ? r.items : null, liens: (r.liens && typeof r.liens === 'object') ? r.liens : {}, capturedAt: r.capturedAt || '', complet: r.complet === true, total: typeof r.total === 'number' ? r.total : null, compteurs: r.compteurs && typeof r.compteurs === 'object' ? r.compteurs : null, vendus, ventesKO: !Array.isArray(rv), inconnu: Array.isArray(r.inconnu) && r.inconnu.length > 0 });
   }, []);
   useEffect(() => { relire(); }, [relire]);
@@ -927,10 +932,10 @@ function FilVestiaire({ conv, num, titre, envoi, annonce = false, offre = null, 
   const [envoiFil, setEnvoiFil] = React.useState(null);
   const relire = React.useCallback(async () => {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_fil_${encodeURIComponent(conv)}&select=messages:data->messages,page:data->>page,at:data->>capturedAt`, { headers: sbAuth() });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_fil_${encodeURIComponent(conv)}&select=messages:data->messages,page:data->>page,at:data->>capturedAt,compte:data->>compte`, { headers: sbAuth() });
       if (!r.ok) throw new Error('lecture');
       const j = await r.json();
-      setFil(j && j[0] ? { messages: Array.isArray(j[0].messages) ? j[0].messages : [], page: j[0].page || '', at: j[0].at || '' } : { messages: null });
+      setFil(j && j[0] ? { messages: Array.isArray(j[0].messages) ? j[0].messages : [], page: j[0].page || '', at: j[0].at || '', compte: String(j[0].compte || '') } : { messages: null });
     } catch (_) { setFil(null); }
   }, [conv]);
   React.useEffect(() => { relire(); }, [relire]);
@@ -965,16 +970,18 @@ function FilVestiaire({ conv, num, titre, envoi, annonce = false, offre = null, 
     dejaLu={!!(envoiFil && fil && dejaDansFil(fil.messages, envoiFil.texte, envoiFil.depuis))}/>;
   const resultat = res && <div role="status" data-vc-resultat={res.ton} style={{ fontSize: 13, color: res.ton === 'ko' ? C.warn : res.ton === 'ok' ? C.text : C.muted, lineHeight: 1.5, marginBottom: 8 }}>{res.texte}</div>;
   let pied;
-  // (20 nov., décision de Julien) Répondre se fait dans le panneau de l'extension, sur Vestiaire, dans CETTE conversation.
+  // (24 nov., Julien : « répondre à mes messages […] si l'extension est connectée ») Répondre DEPUIS VRM, par la porte
+  // (src/agir/peutAgir.js) : le compte du fil (`vc_fil.compte`, rangé par l'extension) doit être celui d'un onglet
+  // Vestiaire d'une extension connectée ; sinon le champ reste visible, éteint, avec la raison et le geste.
   void peut; void envoyer; void resultat;
   if (fil && fil.messages) pied = (
-    <div className="vrm-chat-foot" data-vc-repondre="panneau" style={{ borderTop: `1px solid ${C.border}`, background: C.card, padding: 12 }}>
-      <BoutonExtension action="repondre" site="vestiaire" ids={[String(conv)]} large/>
+    <div className="vrm-chat-foot" data-vc-repondre="app" style={{ borderTop: `1px solid ${C.border}`, background: C.card, padding: 12 }}>
+      <ComposerReponse site="vestiaire" compte={fil.compte || ''} conv={conv} max={1000}/>
     </div>
   );
   else if (fil !== undefined) pied = <PiedSansEnvoi lien={lien} texteLien="Ouvrir sur Vestiaire ↗" raison="Sans le texte de la conversation, VRM ne répond pas d'ici."/>;
   return (
-    <CadreFil etiquette="Conversation Vestiaire" onFermer={onFerme} attrs={{ 'data-vc-fil-ouvert': conv }}>
+    <CadreFil etiquette={tr('a11y.conversationSur', { site: 'Vestiaire' })} onFermer={onFerme} attrs={{ 'data-vc-fil-ouvert': conv }}>
       <TeteFil onFermer={onFerme} nom={num ? `N°${num}` : 'Conversation pas reliée à un article VRM'} titre={titre || ''} compte="Vestiaire"/>
       {/* (12 nov.) L'offre de CET article (même productId, §5), en carte, en tête du fil : ses gestes seulement
           quand c'est à lui de répondre (`OffresVestiaire`, recettes apprises, inchangé). */}

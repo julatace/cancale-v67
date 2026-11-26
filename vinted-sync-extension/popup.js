@@ -59,7 +59,12 @@ const poserHtml = (el, html) => { const d = new DOMParser().parseFromString('<bo
 
 // ── LES MOTS (fr, en, es, it, de — la langue du navigateur, comme vrm-ui.js) ──
 const MOTS = {
-  p_deconnecte: { fr: 'L’extension n’est pas encore reliée à ton compte VRM.', en: 'The extension is not linked to your VRM account yet.', es: 'La extensión aún no está vinculada a tu cuenta VRM.', it: 'L’estensione non è ancora collegata al tuo account VRM.', de: 'Die Erweiterung ist noch nicht mit deinem VRM-Konto verbunden.' },
+  // 5.453 (25 nov., Julien : « améliore la page de connexion ») : pas encore reliée = UNE ligne courte sous « Connecte VRM ».
+  p_deconnecte: { fr: 'Ton compte VRM, pas Vinted.', en: 'Your VRM account, not Vinted.', es: 'Tu cuenta VRM, no Vinted.', it: 'Il tuo account VRM, non Vinted.', de: 'Dein VRM-Konto, nicht Vinted.' },
+  t_connecte: { fr: 'Connecte VRM', en: 'Connect VRM', es: 'Conecta VRM', it: 'Collega VRM', de: 'VRM verbinden' },
+  sep_ou: { fr: 'ou', en: 'or', es: 'o', it: 'oppure', de: 'oder' },
+  b_voir: { fr: 'Afficher le mot de passe', en: 'Show password', es: 'Mostrar la contraseña', it: 'Mostra la password', de: 'Passwort anzeigen' },
+  b_cacher: { fr: 'Masquer le mot de passe', en: 'Hide password', es: 'Ocultar la contraseña', it: 'Nascondi la password', de: 'Passwort verbergen' },
   p_voulue: { fr: 'Tu as déconnecté l’extension de VRM.', en: 'You disconnected the extension from VRM.', es: 'Has desconectado la extensión de VRM.', it: 'Hai scollegato l’estensione da VRM.', de: 'Du hast die Erweiterung von VRM getrennt.' },
   p_avorte: { fr: 'La connexion n’a pas abouti.', en: 'The connection did not go through.', es: 'La conexión no se completó.', it: 'La connessione non è andata a buon fine.', de: 'Die Verbindung kam nicht zustande.' },
   b_connecter: { fr: 'Se connecter', en: 'Sign in', es: 'Conectarse', it: 'Accedi', de: 'Anmelden' },
@@ -87,12 +92,13 @@ const MOTS = {
   p_fourn: { fr: '{f} s’ouvre dans un nouvel onglet. Connecte-toi : l’onglet se ferme tout seul et l’extension est reliée.', en: '{f} opens in a new tab. Sign in: the tab closes by itself and the extension is linked.', es: '{f} se abre en una pestaña nueva. Inicia sesión: la pestaña se cierra sola y la extensión queda vinculada.', it: '{f} si apre in una nuova scheda. Accedi: la scheda si chiude da sola e l’estensione è collegata.', de: '{f} öffnet sich in einem neuen Tab. Melde dich an: Der Tab schließt sich selbst und die Erweiterung ist verbunden.' },
   e_fourn: { fr: 'La connexion n’a pas pu démarrer. Réessaie, ou touche « Relier par vrm.center ».', en: 'The sign-in could not start. Try again, or tap “Link through vrm.center”.', es: 'No se pudo iniciar la conexión. Reinténtalo, o toca «Vincular con vrm.center».', it: 'Impossibile avviare l’accesso. Riprova, oppure tocca «Collega tramite vrm.center».', de: 'Die Anmeldung konnte nicht starten. Versuche es erneut oder tippe auf „Über vrm.center verbinden“.' },
   ou: { fr: 'Ou ici, avec :', en: 'Or here, with:', es: 'O aquí, con:', it: 'Oppure qui, con:', de: 'Oder hier, mit:' },
-  g_mdp: { fr: 'Ton compte VRM (pas Vinted)', en: 'Your VRM account (not Vinted)', es: 'Tu cuenta VRM (no Vinted)', it: 'Il tuo account VRM (non Vinted)', de: 'Dein VRM-Konto (nicht Vinted)' },
+  g_mdp: { fr: 'Ton compte VRM, pas Vinted.', en: 'Your VRM account, not Vinted.', es: 'Tu cuenta VRM, no Vinted.', it: 'Il tuo account VRM, non Vinted.', de: 'Dein VRM-Konto, nicht Vinted.' },
   ph_mail: { fr: 'E-mail du compte VRM', en: 'VRM account e-mail', es: 'Correo de la cuenta VRM', it: 'E-mail dell’account VRM', de: 'E-Mail des VRM-Kontos' },
   ph_pw: { fr: 'Mot de passe VRM', en: 'VRM password', es: 'Contraseña de VRM', it: 'Password VRM', de: 'VRM-Passwort' },
   b_me_connecter: { fr: 'Me connecter', en: 'Sign me in', es: 'Iniciar sesión', it: 'Accedi', de: 'Anmelden' },
   b_connexion_cours: { fr: 'Connexion…', en: 'Signing in…', es: 'Conectando…', it: 'Accesso…', de: 'Anmeldung…' },
   l_oubli: { fr: 'Mot de passe oublié ?', en: 'Forgot password?', es: '¿Olvidaste la contraseña?', it: 'Password dimenticata?', de: 'Passwort vergessen?' },
+  b_panneau: { fr: 'Ouvrir le panneau', en: 'Open the panel', es: 'Abrir el panel', it: 'Apri il pannello', de: 'Panel öffnen' },
   b_relier: { fr: 'Relier par vrm.center', en: 'Link through vrm.center', es: 'Vincular con vrm.center', it: 'Collega tramite vrm.center', de: 'Über vrm.center verbinden' },
   pied_relier: { fr: 'Déjà connecté sur vrm.center ? VRM s’ouvre, l’extension se relie seule et tu reviens sur Vinted.', en: 'Already signed in on vrm.center? VRM opens, the extension links itself and you come back to Vinted.', es: '¿Ya conectado en vrm.center? VRM se abre, la extensión se vincula sola y vuelves a Vinted.', it: 'Già connesso su vrm.center? Si apre VRM, l’estensione si collega da sola e torni su Vinted.', de: 'Schon auf vrm.center angemeldet? VRM öffnet sich, die Erweiterung verbindet sich selbst und du kehrst zu Vinted zurück.' },
   e_vides: { fr: 'Tape l’e-mail et le mot de passe de ton compte VRM.', en: 'Type the e-mail and password of your VRM account.', es: 'Escribe el correo y la contraseña de tu cuenta VRM.', it: 'Scrivi l’e-mail e la password del tuo account VRM.', de: 'Gib E-Mail und Passwort deines VRM-Kontos ein.' },
@@ -167,7 +173,8 @@ function rendre(e) {
   if (etat === 'connecte') {
     html = `<div class="groupe">${phrase(T('p_connecte'), 'ok')}${compte}</div>
       <div id="transpBox" hidden></div>
-      <button class="plein" id="vrmBtn" data-ouvrir-vrm>${esc(T('b_ouvrir'))}</button>
+      <button class="plein" id="panneauBtn" data-ouvrir-panneau>${esc(T('b_panneau'))}</button>
+      <button class="contour" id="vrmBtn" type="button" data-ouvrir-vrm>${esc(T('b_ouvrir'))}</button>
       <div class="actions"><button class="lien" id="outBtn" data-se-deconnecter>${esc(T('l_deconnecter'))}</button></div>`;
   } else if (etat === 'renouvellement') {
     html = `<div class="groupe">${phrase(T('p_renouv'), 'ok')}${compte}</div>
@@ -185,8 +192,10 @@ function rendre(e) {
     // 21 nov. (Julien : « on peut faire les deux ») : les DEUX chemins à égalité, rien de caché.
     //   1. ICI, dans l'extension : e-mail + mot de passe VRM (le plein), Google / Discord (PKCE) ;
     //   2. « Relier par vrm.center » (contour, juste dessous) : la liaison par le site, retour sur Vinted.
-    const expiree = etat === 'expiree';
-    html = `<div class="groupe">${phrase(phraseDeconnecte(e), expiree ? 'geste' : '')}</div>${htmlFormulaire(e)}`;
+    // 5.453 : en tête, le logo centré, « Connecte VRM » et UNE ligne (l'état s'il y en a un, sinon « Ton compte VRM, pas Vinted »).
+    const ph = phraseDeconnecte(e), simple = ph === T('p_deconnecte');
+    html = `<div class="accueil"><img class="logo-grand" src="logo-vrm-96.png" alt=""><h2 class="accueil-t">${esc(T('t_connecte'))}</h2>
+      <p class="accueil-p${etat === 'expiree' ? ' fort' : ''}" data-etat-phrase>${esc(ph)}</p>${simple ? '' : `<p class="accueil-p">${esc(T('g_mdp'))}</p>`}</div>${htmlFormulaire(e)}`;
   } else if (etat === 'muet') {
     html = `<div class="groupe">${phrase(T('p_muet'), 'geste')}</div>
       <button class="plein" id="lierBtn" data-se-connecter>${esc(T('b_connecter'))}</button>`;
@@ -204,6 +213,7 @@ function brancher(box) {
   const sur = (sel, fn) => box.querySelectorAll(sel).forEach((b) => b.addEventListener('click', fn));
   sur('[data-se-connecter], [data-rouvrir]', seConnecter);
   sur('[data-ouvrir-vrm]', ouvrirVRM);
+  sur('[data-ouvrir-panneau]', () => { ouvrirPanneauPuisFermer(); });
   sur('[data-se-deconnecter]', async () => { await demander('authLogout', null, 6000); charger(); });
   sur('[data-annuler]', async () => { const r = await demander('annulerLiaison', null, 6000); r && r.ok ? rendre(r) : charger(); });
   // Pendant l'attente, « Me connecter ici » arrête l'attente et montre le formulaire.
@@ -292,20 +302,31 @@ function phraseDeconnecte(e) {
   return e.etat === 'expiree' ? T('p_expiree') : e.voulue ? T('p_voulue') : e.attenteExpiree ? T('p_avorte') : T('p_deconnecte');
 }
 // Le formulaire (chemin 1) et, juste dessous, « Relier par vrm.center » (chemin 2).
+const OEIL = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="barre" d="M4 4l16 16"/></svg>';
 function htmlFormulaire(e) {
+  // 5.453 : les champs (e-mail, mot de passe + l'œil), « Me connecter » (le plein) et SA phrase juste dessous (l'attente,
+  //    puis l'erreur), « ou », « Relier par vrm.center » (contour ; l'explication en bulle), « Mot de passe oublié ? ».
   return `<div id="mdpForm">
-      <p class="titre-groupe">${esc(T('g_mdp'))}</p>
       <div class="groupe">
-        <input class="champ" id="mail" type="email" inputmode="email" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="${esc(T('ph_mail'))}" placeholder="${esc(T('ph_mail'))}" autocomplete="username" value="${esc(e.etat === 'expiree' && e.email ? e.email : '')}">
-        <input class="champ" id="pw" type="password" aria-label="${esc(T('ph_pw'))}" placeholder="${esc(T('ph_pw'))}" autocomplete="current-password" enterkeyhint="go">
+        <input class="champ" id="mail" type="email" inputmode="email" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="${esc(T('ph_mail'))}" placeholder="${esc(T('ph_mail'))}" autocomplete="username email" value="${esc(e.etat === 'expiree' && e.email ? e.email : '')}">
+        <div class="champ-mdp"><input class="champ" id="pw" type="password" aria-label="${esc(T('ph_pw'))}" placeholder="${esc(T('ph_pw'))}" autocomplete="current-password" enterkeyhint="go">
+          <button class="oeil" id="oeilBtn" type="button" aria-pressed="false" aria-controls="pw" aria-label="${esc(T('b_voir'))}" title="${esc(T('b_voir'))}">${OEIL}</button></div>
       </div>
-      <p class="err" id="authErr" role="alert" hidden></p>
       <button class="plein" id="inBtn" data-me-connecter>${esc(T('b_me_connecter'))}</button>
-      <button class="contour" id="lierBtn" type="button" data-se-connecter>${esc(T('b_relier'))}</button>
-      <p class="pied">${esc(T('pied_relier'))}</p>
+      <p class="err" id="authErr" role="alert" hidden></p>
+      <p class="sep" aria-hidden="true"><span>${esc(T('sep_ou'))}</span></p>
+      <button class="contour" id="lierBtn" type="button" data-se-connecter title="${esc(T('pied_relier'))}">${esc(T('b_relier'))}</button>
       <div id="oauthBox" hidden></div>
-      <div class="actions"><a class="lien" id="oubliLien" href="${APP}/?connexion&mot-de-passe-oublie" target="_blank" rel="noreferrer">${esc(T('l_oubli'))}</a></div>
+      <div class="actions"><a class="lien discret" id="oubliLien" href="${APP}/?connexion&mot-de-passe-oublie" target="_blank" rel="noreferrer">${esc(T('l_oubli'))}</a></div>
     </div>`;
+}
+// 5.453 (Julien : « la connexion à l'extension doit ouvrir le panneau ») : le service worker ouvre le panneau sur son accueil
+//    (le lien de l'app, `?vrm=panneau`) dans l'onglet Vinted de départ, puis la petite fenêtre se ferme. Refusé ⇒ elle reste.
+async function ouvrirPanneauPuisFermer() {
+  const t = await ongletDeDepart().catch(() => null);
+  const r = await demander('ouvrirPanneauAccueil', t && Number.isInteger(t.id) ? { tab: t.id } : null, 8000);
+  if (r && r.ok) { if (!ONGLET) { try { window.close(); } catch (_) {} } return true; }
+  charger(); return false;
 }
 function brancherFormulaire(box) {
   lireFournisseurs(rendreFournisseurs);
@@ -315,6 +336,9 @@ function brancherFormulaire(box) {
     try { chrome.tabs.create({ url }, () => { try { void chrome.runtime.lastError; } catch (_) {} if (!ONGLET) { try { window.close(); } catch (_) {} } }); } catch (_) { ouvrirSansTabs(url); }
   });
   const mail = box.querySelector('#mail'), pw = box.querySelector('#pw'), btn = box.querySelector('#inBtn'), err = box.querySelector('#authErr');
+  // 5.453 : l'œil — voir / masquer le mot de passe (rien n'est gardé ; le champ reste le même).
+  const oeil = box.querySelector('#oeilBtn');
+  if (oeil) oeil.addEventListener('click', () => { const voir = pw.type === 'password'; pw.type = voir ? 'text' : 'password'; oeil.setAttribute('aria-pressed', voir ? 'true' : 'false'); const l = T(voir ? 'b_cacher' : 'b_voir'); oeil.setAttribute('aria-label', l); oeil.title = l; try { pw.focus(); } catch (_) {} });
   // Pas de focus d'office : sur iPhone le clavier couvrirait les deux chemins.
   const dire = (t) => { err.textContent = t; err.hidden = false; };
   // Une connexion à la fois : Entrée répétée ouvrait plusieurs sessions (mesuré : 4 × Entrée ⇒ 2 à 3).
@@ -324,12 +348,12 @@ function brancherFormulaire(box) {
     const email = String(mail.value || '').trim(), password = pw.value;
     if (!email || !password) { dire(!email && !password ? T('e_vides') : !email ? T('e_mail') : T('e_pw')); try { (!email ? mail : pw).focus(); } catch (_) {} return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { dire(T('e_forme')); return; }
-    enVol = true; btn.disabled = true; btn.textContent = T('b_connexion_cours'); err.hidden = true;
+    enVol = true; btn.disabled = true; btn.setAttribute('aria-busy', 'true'); btn.textContent = T('b_connexion_cours'); err.classList.add('info'); err.textContent = T('b_connexion_cours'); err.hidden = true;
     let fini = false;
     const finir = (r, muet) => {
       if (fini) return; fini = true; clearTimeout(attente);
-      enVol = false; btn.disabled = false; btn.textContent = T('b_me_connecter');
-      if (r && r.ok) { rendre({ ok: true, etat: 'connecte', email: r.email || email }); charger(); return; }
+      enVol = false; btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = T('b_me_connecter'); err.classList.remove('info');
+      if (r && r.ok) { rendre({ ok: true, etat: 'connecte', email: r.email || email }); ouvrirPanneauPuisFermer(); return; }   // 5.453 : le panneau s'ouvre sur son accueil
       if (r && (r.captcha || /captcha/i.test(String(r.error || '')))) { dire(T('e_captcha')); return; }
       dire(muet ? T('e_muet') : ((r && r.error) || T('e_refus')));
     };
@@ -526,6 +550,19 @@ function cadreAutorise() {
     return HOTES_CADRE.test(o);
   } catch (_) { return false; }
 }
+// 5.446 (lot ext-anciens-lots, revue basse 123) : l'origine EXACTE de la page qui nous encadre (la
+// même règle que `cadreAutorise`) — la carte ne parle plus qu'à elle (avant : `postMessage(…, '*')`).
+function origineDuParent() {
+  try {
+    if (window.parent === window || window.parent !== window.top) return '';
+    const anc = location.ancestorOrigins;
+    let o = '';
+    if (anc && typeof anc.length === 'number') o = anc.length === 1 ? String(anc[0]) : '';
+    else { try { o = new URL(document.referrer).origin; } catch (_) { o = ''; } }
+    return HOTES_CADRE.test(o) ? o : '';
+  } catch (_) { return ''; }
+}
+try { globalThis.__vrmCadreOrigine = origineDuParent(); } catch (_) {}
 
 // ── 5.371 : « NOUVELLE VERSION DISPONIBLE » DANS LA FENÊTRE ───────────────────
 // Installée À LA MAIN et plus ancienne que celle que sert vrm.center ⇒ « Télécharger »

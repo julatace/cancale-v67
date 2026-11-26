@@ -3,6 +3,9 @@
 import React,{useEffect,useState} from 'react';
 import {createPortal} from 'react-dom';
 
+// (24 nov., WCAG 2.1 AA) Au téléphone le fil est posé SUR l'écran (portail plein écran) : une feuille modale
+// (`aria-modal`) ; à l'ordinateur, un volet à côté de la liste (pas modal). Même seuil que le portail.
+export const telFil = () => { try { return window.matchMedia('(max-width:767px)').matches; } catch (_) { return false; } };
 export function ResponsiveChatPortal({children}){
  const [mobile,setMobile]=useState(()=>window.matchMedia('(max-width:767px)').matches);
  useEffect(()=>{const m=window.matchMedia('(max-width:767px)'),change=()=>setMobile(m.matches);m.addEventListener('change',change);return()=>m.removeEventListener('change',change);},[]);

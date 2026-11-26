@@ -226,7 +226,7 @@ export default {
   "achats.codeRetraitSuivi": "Pickup code, tracking, note, purchase receipt, label",
   "achats.plusActionsAchat": "More actions for this purchase",
   "achats.prixPayeCopie": "Price paid copied: {prixPaye} € — paste it when numbering",
-  "achats.copierPrixPaye": "Copy the price paid (for numbering)",
+  "achats.copierPrixPaye": "Copy price paid",
   "achats.modifierNoteInterne": "Edit the internal note",
   "achats.ajouterNoteInterne": "Add an internal note",
   "achats.attestationAchat": "Purchase certificate",

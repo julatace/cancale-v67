@@ -433,7 +433,9 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null,
       if (e.par0 === 'commande') { if (qa.length >= 5) { const n = e.nums.find((x) => x.includes(qa)); if (n) { par = 'commande'; exact = n === qa; valeur = e.commande; } } }
       else { const n = e.nums.find((x) => x.includes(qa)); if (n) { par = 'facture'; exact = n === qa; valeur = e.facture; } }
     }
-    if (!par && qn.length >= 3 && e.pseudos.length) { const i = e.pseudos.findIndex((p) => p.includes(qn)); if (i >= 0) { par = 'pseudo'; exact = e.pseudos[i] === qn; valeur = e.pseudosAff[i]; } }
+    // (26 nov., capture de Julien) « 262 » trouvait la conversation de « liza2627 » sous « Tout sur le N°262 » : des chiffres seuls
+    // désignent un N°, un code ou une transaction — jamais un MORCEAU de pseudo (un pseudo se cherche avec au moins une lettre).
+    if (!par && qn.length >= 3 && !chiffres && e.pseudos.length) { const i = e.pseudos.findIndex((p) => p.includes(qn)); if (i >= 0) { par = 'pseudo'; exact = e.pseudos[i] === qn; valeur = e.pseudosAff[i]; } }
     if (!par && qn.length >= 2 && e.lieux && e.lieux.length) { const i = e.lieux.findIndex((l) => tests.every((f) => f(l))); if (i >= 0) { par = 'rangement'; exact = e.lieux[i] === qn; valeur = e.lieuxAff[i]; } }
     let bonus = 0;
     // Un n° recopié par blocs (« XW 300 000 007 FR ») écrit DANS un titre : le titre le propose encore (jamais une identité).

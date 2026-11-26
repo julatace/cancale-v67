@@ -111,8 +111,8 @@ export default {
   "confort.apercu.etat": "État",
   "confort.apercu.couleur": "Couleur",
   // 129 — inventaire tournant
-  "confort.tournant.titre": {"one": "Aujourd'hui · {n} N° à vérifier", "other": "Aujourd'hui · {n} N° à vérifier"},
-  "confort.tournant.fait": "{n} sur {total} vérifiés",
+  "confort.tournant.titre": {"one": "{n} N° à vérifier aujourd'hui", "other": "{n} N° à vérifier aujourd'hui"},
+  "confort.tournant.fait": "{n} sur {total} vus",
   "confort.tournant.fini": "Tout est vérifié aujourd'hui",
   "confort.tournant.aChercher": {"one": "{n} à chercher", "other": "{n} à chercher"},
   "confort.tournant.explique": "Chaque jour, {n} N° tirés parmi tes paires présentes. Regarde à sa place, puis dis ce que tu vois. Rien n'est changé ni supprimé.",

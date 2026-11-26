@@ -45,10 +45,10 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   const uniq = SRC.slice(SRC.indexOf('const unique = ('), SRC.indexOf('const buyForTrack'));
   // (5 nov.) `trackForBuy` lit `colisParTx` (identité : conversation, n° de suivi) — plus le
   // titre. On l'exécute tel quel, avec ses voisins réduits à leur forme (§6.3).
-  const parTx = (() => { const d = SRC.indexOf('const colisParTx = useMemo('); const f = SRC.indexOf('const trackForBuy', d); return d < 0 ? '' : SRC.slice(d, f); })();
+  const parTx = (() => { const d = SRC.indexOf('const colisParTx = useLecteurParesseux(') >= 0 ? SRC.indexOf('const colisParTx = useLecteurParesseux(') : SRC.indexOf('const colisParTx = useMemo('); const f = SRC.indexOf('const trackForBuy', d); return d < 0 ? '' : SRC.slice(d, f); })();
   const tfb = (() => { const d = SRC.indexOf('const trackForBuy = ('); if (d < 0) return ''; const f = SRC.indexOf('\n', d); const l = SRC.slice(d, f); return /^const trackForBuy = \(o\) => \(o \?/.test(l) ? l : bout('trackForBuy'); })();
   const code = `const normTitle = (t) => (t || '').toLowerCase().replace(/\\s+/g, ' ').trim();
-    const useMemo = (f) => f(); const pickupUnion = { emailList: [], cmdParColis: new Map() };
+    const useMemo = (f) => f(); const useLecteurParesseux = (f) => { let v, fait = false; return () => (fait ? v : (fait = true, v = f())); }; const ecranCalcul = 'audit'; const pickupUnion = { emailList: [], cmdParColis: new Map() };
     const normaliserSuivi = (s) => String(s || '').toUpperCase().replace(/\\s+/g, ''); const suiviDeLigne = (t) => normaliserSuivi(t && t.suivi);
     const colisKey = (t) => 'e:' + suiviDeLigne(t); const suivisAchat = (o) => (o && o.suivis) || []; const indexSuivisAchats = {};
     ${uniq}
@@ -144,7 +144,11 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   // (src/venduesParEmail.js, exécuté par audit-robustesse-metier B).
   {
     const regle = (() => { try { return fs.readFileSync(path.join(__dirname, '..', 'src', 'venduesParEmail.js'), 'utf8').replace(/\/\/[^\n]*/g, ''); } catch (_) { return ''; } })();
-    /emailSoldIds = useMemo\(\(\) => venduesParEmail\(/.test(SRC) && !/ambiguousKey|normTitle\(t\) \+ '\|'/.test(SRC) && regle && !/title|designation|article/.test(regle)
+    // (24 nov., vente-mail-annonce) + les annonces que `venduesParMail` relie (src/venteMailAnnonce.js) : son clic ou l'image
+    // EXACTE — la partie qui relie ne lit aucun titre (exécutée par audit-vente-mail-annonce).
+    const mailRegle = (() => { try { const t = fs.readFileSync(path.join(__dirname, '..', 'src', 'venteMailAnnonce.js'), 'utf8').replace(/\/\/[^\n]*/g, ''); return (t.split('export function venduesParMail')[1] || '').split('export function candidatsRelier')[0]; } catch (_) { return ''; } })();
+    /emailSoldIds = useMemo\(\(\) => new Set\(\[\.\.\.venduesParEmail\([\s\S]{0,300}\), \.\.\.venduesMail\.keys\(\)\]\)/.test(SRC) && !/ambiguousKey|normTitle\(t\) \+ '\|'/.test(SRC) && regle && !/title|designation|article/.test(regle)
+      && mailRegle && !/title|titre|designation|article/.test(mailRegle)
       ? ok('auto-retrait d\'une annonce (email) : par identité seulement (transaction → annonce, bordereau)')
       : nok('auto-retrait d\'une annonce (email) : par identité seulement (transaction → annonce, bordereau)');
   }
@@ -501,7 +505,8 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   // vente par du vide. Reproduit au banc (N°777 ressorti en N°319).
   const j = SRC.indexOf('setCloudReady(true)');
   const bloc = j < 0 ? '' : SRC.slice(Math.max(0, j - 700), j);
-  /setSaleOv\(load\('vinted_sale_overrides'/.test(bloc)
+  // (24 nov., vitesse-lectures-toucher) `pareil(load(…))` : relu de même, l'objet d'avant gardé s'il a le même contenu.
+  /setSaleOv\((pareil\()?load\('vinted_sale_overrides'/.test(bloc)
     ? ok('les numéros de vente sont relus quand le cloud arrive')
     : nok('les numéros de vente sont relus quand le cloud arrive',
           '`vinted_sale_overrides` absent du rechargement : ils peuvent être écrasés par du vide');
@@ -569,7 +574,7 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     : nok('le prochain numéro doit éviter annonces ET ventes');
   // ⚠️ Et le pool doit être RELU quand le nuage atterrit — c'est la cause exacte
   // des doublons d'août.
-  /setUsedNumeros\(load\('vinted_used_numeros'/.test(SRC)
+  /setUsedNumeros\((pareil\()?load\('vinted_used_numeros'/.test(SRC)
     ? ok('le pool est relu quand le nuage atterrit')
     : nok('sans relecture, un appareil neuf renumérote à partir de 1');
 }

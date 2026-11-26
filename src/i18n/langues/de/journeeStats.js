@@ -47,7 +47,7 @@ export default {
   "v2.af.titre": "Pakete",
   "v2.af.rienEnvoyer": "nichts zu versenden",
   "v2.af.rienRetirer": "nichts abzuholen",
-  "v2.af.toutesStats": "Alle Statistiken",
+  "v2.af.toutesStats": "Statistiken",
   "v2.af.toutesStatsSous": "Aktivität und Finanzen, über 7, 30 oder 90 Tage",
   "v2.perso.carte.colis": "Pakete",
   "v2.perso.phrase.colis": "Zu versenden und abzuholen, auf einen Blick",
