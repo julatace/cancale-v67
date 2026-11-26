@@ -73,7 +73,9 @@ export function BoutonBase({ variante = 'secondaire', taille, icone, plein = fal
     return <a href={bloque ? undefined : href} className={'n-bouton' + (className ? ' ' + className : '')} data-n-variante={vn} data-n-ton={v === 'danger' ? 'ambre' : undefined}
       data-n-taille={compact ? 'compact' : undefined} onClick={onClick} {...attrs} {...(nomIcone ? { 'aria-label': nomIcone } : {})}
       {...(bloque ? { role: 'link', tabIndex: -1, 'aria-busy': occupe ? 'true' : undefined, 'aria-disabled': 'true', onClick: e => e.preventDefault(), onAuxClick: e => e.preventDefault() } : {})}>
-      {ic ? <span className="n-bouton-icone" aria-hidden="true">{ic}</span> : null}{children ? <span className="n-bouton-libelle">{children}</span> : null}</a>;
+      {/* (26 nov., zero-rouge-bancs) Un lien OCCUPÉ montre la roue à la place de son icône, comme le bouton (`chargement`) :
+          depuis le 20 nov. (bouton natif), il n'était plus que grisé — rien ne disait qu'une action tournait (test actions-visuelles). */}
+      {occupe ? <span className="n-bouton-icone" aria-hidden="true"><span className="n-roue"/></span> : ic ? <span className="n-bouton-icone" aria-hidden="true">{ic}</span> : null}{children ? <span className="n-bouton-libelle">{children}</span> : null}</a>;
   }
   if (nomIcone) {
     return <BoutonIcone libelle={rest['aria-label'] || nomIcone} icone={occupe ? <span className="n-roue"/> : ic} onClick={onClick} indisponible={disabled || occupe} raison={raison}
@@ -101,7 +103,9 @@ export function SegmenteBase({ label, options, value, onChange, plein = false, d
       options={options.map((o) => ({
         cle: o.v,
         libelle: o.icone ? <>{rendreIcone(o.icone, 15)}{o.l}</> : o.l,
-        n: o.n === 0 || o.n ? o.n : null,
+        // (26 nov., zero-rouge-bancs) Un zéro CONNU s'écrit « 0 » ; un compte pas su (null) ne s'écrit pas (§5 : « rien lu » ne vaut
+        // pas « rien »). Le segmenté natif n'écrit qu'un `n` vrai : le zéro lui arrive en texte (test controles-finitions-interface).
+        n: o.n === 0 ? '0' : o.n ? o.n : null,
         attrs: {
           'aria-pressed': value === o.v ? 'true' : 'false',
           ...(o.titre ? { title: o.titre, ...(o.l ? {} : { 'aria-label': o.titre }) } : (!o.l && o.icone ? { 'aria-label': NOMS_ICONES[o.icone] || String(o.v) } : {})),

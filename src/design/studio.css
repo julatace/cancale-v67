@@ -423,7 +423,7 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
 /* L'ondulation : un anneau de lumière part de la pastille touchée (560 ms) ; le contenu glisse de 12 px en fondu. */
 @keyframes sb-onde { to { transform: scale(1); opacity: 0; } }
 .vrm-main[data-sb-entree] { animation: sb-entree 320ms var(--sb-courbe) both; }
-@keyframes sb-entree { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+@keyframes sb-entree { from { transform: translateX(12px); } to { transform: none; } }   /* (26 nov.) sans opacité : l'écran est lisible dès sa première image */
 
 /* ══ 7. LA COQUE ET LES FORMES D'HIER RAMENÉES AU STUDIO ══════════════════════ */
 @layer vrm-premium {
@@ -578,7 +578,7 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
   .sb-btn-plein, .sb-touche, .sb-rond, .sb-lien, .sb-tuile, .sb-avant, .sb-segment > *, .sb-disque > svg { transition: opacity 150ms ease, background-color 150ms ease !important; transform: none !important; }
   .sb-btn-plein:active, .sb-touche:active, .sb-rond:active { transform: none !important; }
   .sb-lame { animation: sb-fondu 180ms ease-out both !important; animation-delay: 0ms !important; }
-  .vrm-main[data-sb-entree] { animation: sb-fondu 180ms ease-out both !important; }
+  .vrm-main[data-sb-entree] { animation: none !important; }   /* (26 nov.) l'écran : ni mouvement ni fondu sous AA */
   html[data-sb-eventail] body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transform: none !important; }
   body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: none !important; }
   .sb-diode, [class*="sb-"]::after { animation: none !important; }

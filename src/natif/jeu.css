@@ -130,7 +130,7 @@
   @media (prefers-reduced-motion: no-preference) {
     .n-revele { animation: n-revele 160ms cubic-bezier(.2, .7, .3, 1) both; animation-delay: calc(min(var(--n-rang, 0), 8) * 15ms); }
   }
-  @keyframes n-revele { from { opacity: .35; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+  @keyframes n-revele { from { transform: translateY(3px); } to { transform: none; } }   /* (26 nov.) sans opacité : jamais sous AA */
   .n-tuile-os { background: transparent; }
   .n-tuile-os-fond { grid-area: 1 / 1; width: 100%; height: 100%; border-radius: inherit; }
   .n-inventaire-case .n-tuile-os { --n-tuile-t: 104px; width: 100%; height: auto; aspect-ratio: 1 / 1; margin-bottom: 4px; }

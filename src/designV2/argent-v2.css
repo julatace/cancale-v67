@@ -98,7 +98,7 @@ html body button.v2-rangee.v2-ar-v:active { background: rgb(54 54 60 / .06); tra
   @keyframes v2-sq-reflet { 50% { opacity: .5; } }
   /* L'arrivée de Mois : un fondu court (ni saut, ni décalage). */
   .v2-ar-mois { animation: v2-ar-fondu 180ms ease-out both; }
-  @keyframes v2-ar-fondu { from { opacity: 0; } }
+  @keyframes v2-ar-fondu { from { transform: translateY(3px); } }   /* (26 nov.) sans opacité : jamais sous AA */
 }
 
 /* ══ 5. FACTURES : tête à soi, une recherche, un segmenté, un état vide ══════════════════════════════════════ */

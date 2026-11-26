@@ -47,6 +47,7 @@ const RACINE = path.join(__dirname, '..');
 const LOT = ['nouveau-vendeur', 'navigation-tache', 'ventes-e2', 'colis-retirer-propre', 'statut-colis',
   'annonces-actions', 'journee-coherence', 'iphone-reprise', 'argent-mois', 'garde-ecrans', 'morceau-perime',
   'chiffres-coherents', 'retraits-suivi', 'budget-vitesse', 'accessibilite', 'accessibilite-clavier',
+  'ecran-pret-une-fois',   // (26 nov.) l'écran arrive UNE fois, jamais sous 95 % d'opacité (fondu d'entrée sous AA)
   'barre-achats',   // (16 nov.) la barre du bas : Achats dedans, aucun glisser entre onglets
   'design-v2-chargement',
   'calculs-ecran-montre',   // (24 nov.) chaque gros calcul n'est fait que par l'écran qui le lit ; publications posées
@@ -68,6 +69,7 @@ const DUREES_CI = {
   'morceau-perime': 170, 'barre-achats': 141, 'statut-colis': 119, 'journee-coherence': 107, 'garde-ecrans': 59,
   'colis-retirer-propre': 54, 'achats-annules': 48, 'retraits-suivi': 44, 'tout-imprimer': 27, 'connexion-claire': 16,
   'barre-depuis-journee': 15,
+  'ecran-pret-une-fois': 80,   // (26 nov.) mesuré ici, seul : 77 s
 };
 // Les bancs ROUGES CONNUS (scripts/audits-exceptions.json, clé `bancs`) : chacun dit
 // SES lignes rouges connues (`rouges`, une expression régulière sur la ligne). Le banc

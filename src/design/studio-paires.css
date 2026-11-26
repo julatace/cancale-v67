@@ -441,7 +441,7 @@
   scroll-margin: 96px 0 calc(var(--vrm-barre-bas, 84px) + 20px) !important;
   animation: sbp-monte var(--sbp-e-avant) both;
 }
-@keyframes sbp-monte { from { transform: translateY(8px) scale(.985); opacity: .6; } to { transform: none; opacity: 1; } }
+@keyframes sbp-monte { from { transform: translateY(8px) scale(.985); } to { transform: none; } }   /* (26 nov.) sans opacité */
 :root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] > .vrm-ann-overview { display: contents !important; }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] a.vrm-fiche-photo {
   grid-column: 1 !important; grid-row: 1 / span 3 !important; width: 75px !important; height: 105px !important; aspect-ratio: auto !important; border-radius: 14px !important; margin: 0 !important;
@@ -803,11 +803,11 @@
 
 /* ── 14. Mouvement et transparence réduits ───────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  :root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] { animation: sbp-fondu 180ms both !important; }
-  :root:root:root:root:root body .vrm-fp.sb-plan > .vrm-fp-cadre { animation: sbp-fondu 180ms both !important; }
+  /* (26 nov.) Mouvement réduit : rien ne bouge (le fondu de remplacement passait sous AA). */
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] { animation: none !important; }
+  :root:root:root:root:root body .vrm-fp.sb-plan > .vrm-fp-cadre { animation: none !important; }
   :root:root:root:root:root body [data-espace="paires"] :is(.sb-touche, .sb-rond, .vrm-annbar-bouton):active { transform: none !important; }
 }
-@keyframes sbp-fondu { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-transparency: reduce) {
   :root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] { background: var(--sbp-feuille) !important; }
 }

@@ -106,7 +106,10 @@
 .vrm-b-rangee { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 @media (max-width: 767px) {
 .vrm-b-rangee{ justify-content: stretch; }
-.vrm-b-rangee > .vrm-b:not(.vrm-b-discret){ flex: 1 1 0; min-width: 0; }
+/* (26 nov., zero-rouge-bancs) Depuis le 20 nov., BoutonBase dessine le bouton NATIF (`.n-bouton`) : la rangée le partage
+   comme l'ancien `.vrm-b` (son bloc `display: contents` laisse le bouton être l'élément de la rangée ; deux gestes côte à côte, mêmes bords) — test controles-finitions-interface, 320 px. */
+.vrm-b-rangee > :is(.vrm-b:not(.vrm-b-discret), .n-bouton, .n-bouton-bloc:not([data-n-bloc="contenu"])),
+.vrm-b-rangee > .n-bouton-bloc[data-n-bloc="contenu"] > .n-bouton{ flex: 1 1 0; min-width: 0; }
 }
 /* L'action principale d'un écran : dans l'en-tête sur ordinateur (slot `right`
    de ScreenHead), dans une barre posée au-dessus de la navigation sur téléphone. */
