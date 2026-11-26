@@ -2304,3 +2304,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ### Geste « Installer l’extension » tel qu’il était dans CLAUDE.md jusqu’au 26 nov.
 - Installer l’extension **5.440.1** (23 nov. nuit ; avant 5.440.0, 23 nov. ; avant 5.436.0, 22 nov., intégration 2 ; avant 5.434.0, puis 5.419.0, 21 nov. nuit ; avant 5.418.0, 21 nov. soir ; avant 5.410.8, 21 nov. ; avant 5.410.2, 20 nov. : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip` ; mesuré le 19 nov. : Chrome 5.406, 5.400, 5.329, Orion 5.377, 5.368, 5.336). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
+- **26 nov. · COULEURS (Julien : « 14 en sombre, 15 en clair »)** : clair = monochrome (#FFFFFF, encre noire) ; sombre = graphite et vert (#22262B, accent #5BD68F). `src/natif/jetons.css`. Geste : aucun.
+- **26 nov. · Favoris réparés, ext. 5.453.2** : fenêtre d’offre, frappe `execCommand`, « C’est parti / Pas parti ». `2026-11-25-favoris-sequence-repare.md`. Geste : 5.453.2.
+- **26 nov. · Vestiaire/LBC fiables** : vente VC annulée ≠ « Vendue », lecture VC > 24 h = « à confirmer », Annonces lit `vc_ventes`, « LBC n » pas su sans ventes. `2026-11-26-fiabilite-vc-lbc.md`. Geste : aucun.
+- **23 nov. · eBay en série (`claude/plateformes-repub-favoris`)** : offre aux observateurs au prix vu relu chez eBay, une par annonce en 48 h ; offres et remises en vente en série. LBC/Vestiaire : plan, attend la 5.441. `docs/passation/2026-11-23-plateformes-repub-favoris.md`. Geste : aucun.

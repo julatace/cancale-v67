@@ -125,12 +125,30 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'favoris-ancien', date: '2026-11-24', titre: 'Favoris : plus de « trop ancien » à tort', phrase: 'Les notifications sont lues jusqu’au bout avant de sauter un favori.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (24 nov., style-graphite — Julien : « un peu plus foncé en gris […] améliore tous les boutons […] change de style pour l'iPhone ») docs/passation/2026-11-24-style-graphite.md
   { id: 'styles-a-essayer', date: '2026-11-24', titre: 'Onze styles à essayer, dont Monochrome', phrase: 'Paramètres → Apparence → Style : touche, c’est appliqué.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (24 nov., ext. 5.447) docs/passation/2026-11-24-republication-reperage.md
+  { id: 'repub-reperage', date: '2026-11-24', titre: 'Republier : VRM retrouve seul chaque bouton', phrase: 'Un bouton en double ou introuvable : rien ne part, c’est dit.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (24 nov., ext-anciens-lots — repris de #1219, Julien : « VRM la reconnaît parce que la photo utilisée est exactement la même »)
+  // docs/passation/2026-11-24-ext-anciens-lots.md
+  { id: 'photo-origine', date: '2026-11-24', titre: 'Même photo d’origine : déjà reliée', phrase: 'Envoyée depuis ton ordinateur sur Leboncoin : elle prend le N° Vinted.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (24 nov., ext. 5.448 — Julien : « elle doit pouvoir marcher sur tous les sites, s'adapter ») docs/passation/2026-11-24-ext-adaptatif.md
+  { id: 'extension-sante-sites', date: '2026-11-24', titre: 'Santé de chaque site dans l’extension', phrase: '« Tout marche », ou ce qui ne marche plus et le geste.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'extension-adaptative', date: '2026-11-24', titre: 'L’extension s’adapte quand un site change', phrase: 'Vinted, Leboncoin, Vestiaire, eBay : bouton retrouvé, sinon arrêt expliqué.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (24 nov., quatre-sites — Julien : « 1 paire → 4 sites ») docs/passation/2026-11-24-quatre-sites.md
+  { id: 'mettre-aussi-sur', date: '2026-11-24', titre: 'Une annonce Vinted sur trois autres sites', phrase: 'Fiche d’une paire → Ailleurs : Leboncoin, Vestiaire et eBay en un geste.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (24 nov., lbc-numero-ecrit — Julien : « Oui, relie par le N° ») docs/passation/2026-11-24-lbc-numero-ecrit.md
+  { id: 'lbc-numero-ecrit', date: '2026-11-24', titre: 'Leboncoin : relié par le N° écrit', phrase: 'Finis la description par « N°132 » : l’annonce rejoint la paire 132.', tab: 'leboncoin', pour: 'tous', mode: 'tous' },
+  // (23 nov., extension 5.444 — Julien : « le panneau de l'extension n'affiche rien ») docs/passation/2026-11-23-vestiaire-complet.md
+  { id: 'vestiaire-complet', date: '2026-11-24', titre: 'Vestiaire : litiges, achats et panneau réparés', phrase: 'Ventes à l’état juste, frise datée, achats et favoris dans l’extension.', tab: 'plat_vestiaire', pour: 'tous', mode: 'tous' },
+  // (23 nov., ext. 5.445 — Julien : « pareil pour Leboncoin ») docs/passation/2026-11-23-leboncoin-complet.md
+  { id: 'lbc-panneau', date: '2026-11-24', titre: 'Leboncoin : le panneau montre tout', phrase: 'Annonces, ventes, achats, colis, messages, porte-monnaie, sur leboncoin.fr.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (23 nov., plateformes-repub-favoris) docs/passation/2026-11-23-plateformes-repub-favoris.md
+  { id: 'ebay-en-serie', date: '2026-11-23', titre: 'eBay : offres et remises en vente en série', phrase: 'Coche les annonces, une confirmation, VRM les envoie une à une.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot historique-paire) docs/passation/2026-11-23-historique-paire.md
+  { id: 'historique-rangee', date: '2026-11-23', titre: 'Quand ta paire a été rangée', phrase: 'La case du Stock entre dans l’histoire de la paire.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (23 nov., lot photos-un-geste) docs/passation/2026-11-23-photos-un-geste.md
   { id: 'photos-un-geste', date: '2026-11-23', titre: 'Tes photos améliorées en un geste', phrase: 'Lumière, cadrage et fond uni sur toutes les photos, original gardé.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   // (23 nov., lot rentabilite-source) docs/passation/2026-11-23-rentabilite-source.md
   { id: 'rentabilite-source', date: '2026-11-23', titre: 'Rentabilité par source d’achat', phrase: 'Bénéfice moyen, taux de revente et délai, par lieu d’achat.', tab: 'stats', pour: 'tous', mode: 'tous' },
-  // (23 nov., lot historique-paire) docs/passation/2026-11-23-historique-paire.md
-  { id: 'historique-rangee', date: '2026-11-23', titre: 'Quand ta paire a été rangée', phrase: 'La case du Stock entre dans l’histoire de la paire.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (23 nov., lot appareils-connectes) docs/passation/2026-11-23-appareils-connectes.md
   { id: 'appareils-extension', date: '2026-11-23', titre: 'Appareils connectés : tes navigateurs avec l’extension', phrase: 'Chaque navigateur, sa version, sa dernière lecture ; déconnexion partout.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (23 nov., lot scan-achat — Julien : « fais tout parfaitement ») docs/passation/2026-11-23-scan-achat.md

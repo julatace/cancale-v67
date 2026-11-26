@@ -173,7 +173,7 @@ const uuidsVus = new Map();       // UUID déjà utilisé → ItemID (comme eBay
 const avantRevision = new Map();
 let ecrituresOffres = 0, getEnVol = 0, maxGetEnVol = 0;
 const remettre = () => { mode = { liste: 'ok', commandes: 'ok', eligibles: 'ok', envoi: 'ok', trading: 'ok', verif: 'ok', add: 'ok', end: 'ok', revise: 'ok', priv: 'ok', getitem: 'ok', mainKo: false, journalKo: false, listingsKo: false, getuser: 'ok', listeKoPour: '', comptesKo: false,
-  regle: 'ok', getitemApres: '', prix: 'efface', offresKo: false, offresEcritureKo: false, offresEcritureKoApres: false, getitemKoPour: '', getitemLent: false, invendues: 'ok' }; remettreEbay(); uuidsVus.clear(); avantRevision.clear(); ecrituresOffres = 0; getEnVol = 0; maxGetEnVol = 0; };
+  regle: 'ok', getitemApres: '', prix: 'efface', offresKo: false, offresEcritureKo: false, offresEcritureKoApres: false, getitemKoPour: '', getitemLent: false, invendues: 'ok' }; remettreEbay(); /* (23 nov.) le journal des offres envoyées (48 h) ne survit pas d'un cas à l'autre */ lignes = lignes.filter((r) => !/^ebay_offres_envoyees/.test(r.id)); uuidsVus.clear(); avantRevision.clear(); ecrituresOffres = 0; getEnVol = 0; maxGetEnVol = 0; };
 remettre();
 // ── LA RÈGLE D'OFFRE CHEZ LE FAUX eBAY (9 octobre) ──────────────────────────
 // Une annonce peut porter `regle: { actives: true|false|null, accepte, refuse,
@@ -619,7 +619,7 @@ const RA = {};
     dit(s.code === 200 && s.corps && s.corps.connected === false,
       "un autre vendeur connecté voit SON état : pas de compte eBay relié (jamais celui de Julien)", `HTTP ${s.code} ${JSON.stringify(s.corps)}`);
     for (const action of ['historique','commandessuite','sync', 'sku', 'offreinfo', 'offre', 'retirer', 'programmees', 'limites']) {
-      const o = await app(JWT_B, { action, itemId: '110000000001', listingId: ELIGIBLE, numero: '22', remise: 10, confirme: true });
+      const o = await app(JWT_B, { action, itemId: '110000000001', listingId: ELIGIBLE, numero: '22', remise: 10, confirme: true, prixVu: '100' });
       const jetonJ = chezEbay(o.journal).some((x) => /rt-de-J/.test(x.corps) || x.jeton === 'at-J');
       dit(o.code === 401 && o.corps && o.corps.reason === 'not-connected' && auCompte(o.journal).length === 0 && !jetonJ,
         `B, sans eBay relié, ne pilote pas « ${action} » sur le compte de Julien : « aucun compte eBay relié », zéro appel, jamais le jeton de Julien`,
@@ -818,27 +818,29 @@ const RA = {};
   });
   await essaie('offre éligible', async () => {
     remettre();
-    const o = await app(JWT_J, { action: 'offre', listingId: ELIGIBLE, remise: 15, confirme: true, message: 'Toujours dispo, envoi rapide.' });
+    const o = await app(JWT_J, { action: 'offre', listingId: ELIGIBLE, remise: 15, confirme: true, prixVu: '100', message: 'Toujours dispo, envoi rapide.' });
     const a = auCompte(o.journal);
     const post = a.find((x) => /send_offer_to_interested_buyers/.test(x.u));
     let corps = null; try { corps = JSON.parse(post && post.corps); } catch (_) {}
     dit(o.code === 200 && o.corps && o.corps.envoyees === 2, 'une offre confirmée sur une annonce éligible part, et la réponse dit à combien de personnes', `HTTP ${o.code}`);
-    dit(a.length === 2 && /find_eligible_items/.test(a[0].u) && post && post.m === 'POST', "l'éligibilité est REVÉRIFIÉE chez eBay juste avant l'envoi");
+    // (23 nov.) Entre l'éligibilité et l'envoi, l'annonce est RELUE (GetItem : le prix vu, §2.8) — audit-ebay-offre-prix.cjs.
+    const iPost = a.indexOf(post);
+    dit(/find_eligible_items/.test(a[0].u) && post && post.m === 'POST' && a.slice(0, iPost).some((x) => x.appel === 'GetItem') && a.length === 3, "l'éligibilité est REVÉRIFIÉE chez eBay juste avant l'envoi (puis l'annonce relue)", a.map((x) => x.appel || x.u.split('/').pop()).join(','));
     dit(!!corps && corps.offeredItems && corps.offeredItems[0].discountPercentage === '15' && corps.allowCounterOffer === false && corps.offerDuration.value === 2, 'le corps envoyé à eBay est celui attendu (remise « 15 », 48 h, pas de contre-offre)', JSON.stringify(corps));
   });
   await essaie('offre non éligible', async () => {
     remettre();
-    const o = await app(JWT_J, { action: 'offre', listingId: '110000000099', remise: 10, confirme: true });
+    const o = await app(JWT_J, { action: 'offre', listingId: '110000000099', remise: 10, confirme: true, prixVu: '100' });
     dit(o.code === 409 && !auCompte(o.journal).some((x) => /send_offer/.test(x.u)), 'une annonce non éligible ⇒ refusée, RIEN n\'est posté', `HTTP ${o.code}`);
   });
   await essaie('offre vérification en panne', async () => {
     remettre(); mode.eligibles = 'ko';
-    const o = await app(JWT_J, { action: 'offre', listingId: ELIGIBLE, remise: 10, confirme: true });
+    const o = await app(JWT_J, { action: 'offre', listingId: ELIGIBLE, remise: 10, confirme: true, prixVu: '100' });
     dit(o.code >= 500 && !auCompte(o.journal).some((x) => /send_offer/.test(x.u)), "la vérification d'éligibilité échoue ⇒ RIEN n'est posté", `HTTP ${o.code}`);
   });
   await essaie('offre refusée par eBay', async () => {
     remettre(); mode.envoi = 'refus';
-    const o = await app(JWT_J, { action: 'offre', listingId: ELIGIBLE, remise: 10, confirme: true });
+    const o = await app(JWT_J, { action: 'offre', listingId: ELIGIBLE, remise: 10, confirme: true, prixVu: '100' });
     dit(o.code === 400 && /Offre refusée par eBay/.test((o.corps && o.corps.error) || '') && sansJeton(o), "un refus d'eBay remonte avec SON message — sans aucun jeton dedans", `HTTP ${o.code}`);
   });
   await essaie('retirer', async () => {
