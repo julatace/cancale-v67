@@ -396,6 +396,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'ebay-a-traiter', date: '2026-11-16', titre: 'eBay À traiter : tâches et retours relus', phrase: 'Aucun retour s’écrit « aucun » ; un refus mène à la reconnexion.', tab: 'ebay_agent', pour: 'tous', mode: 'tous' },
   // (16 nov., Julien : « irréprochable, on ne peut pas se faire bloquer ») docs/passation/2026-11-16-favoris-offres-irreprochable.md
   { id: 'favoris-irreprochable', date: '2026-11-16', titre: 'Favoris et offres : encore plus prudents', phrase: 'Offre relue juste avant ; jamais deux fois le même texte.', tab: 'favoris', pour: 'tous', mode: 'tous' },
+  { id: 'reste-par-modele', date: '2026-11-16', titre: 'Ce qui reste vraiment, par modèle', phrase: 'Après achat et frais, avec les jours en ligne.', tab: 'dashboard', pour: 'tous', mode: 'tous' },
   // (16 nov., captures iPhone de Julien) docs/passation/2026-11-16-ventes-clair.md
   // (16 nov., Julien : « comme quand on reste appuyé sur une app sur iPhone ») docs/passation/2026-11-16-relier-glisser.md
   { id: 'relier-glisser', date: '2026-11-16', titre: 'Relier un achat en le glissant', phrase: 'Reste appuyé sur l’achat, pose-le sur la vente ou l’annonce.', tab: 'achats', pour: 'tous', mode: 'tous' },
@@ -413,6 +414,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'fiche-porte-achat', date: '2026-11-16', titre: 'Le « ? » d’« Achetée » ouvre la saisie', phrase: 'Et « Déplacer » est sous ⋯, sans « Tout voir ».', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (16 nov., lot achats-qr) docs/passation/2026-11-16-achats-qr.md
   { id: 'achats-qr', date: '2026-11-16', titre: 'À retirer : le QR en un toucher', phrase: 'Bouton QR visible, jours justes, achat relié par ton clic.', tab: 'retraits', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot aide-decision) docs/passation/2026-11-16-aide-decision.md
+  { id: 'argent-dort-meuble', date: '2026-11-16', titre: 'L’argent qui dort, meuble par meuble', phrase: 'Statistiques : ce que tes prix d’achat immobilisent, par meuble.', tab: 'dashboard', pour: 'tous', mode: 'tous' },
   // (16 nov., Julien : « j'ai demandé un retour […] ne me la propose pas ») docs/passation/2026-11-16-achats-retour.md
   { id: 'relier-sans-retour', date: '2026-11-16', titre: 'Un achat renvoyé n’est plus proposé', phrase: 'Retour, litige ou remboursement : il reste dans Retours, pas dans « Relier ».', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (16 nov., lot barre-achats — Julien : « ajoute les Achats dans la barre » ; « je ne veux pas qu'on puisse glisser

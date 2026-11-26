@@ -28,3 +28,5 @@
 .vrm-av-etoiles [data-plein] { color: var(--vrm-ink, #1D1D1F); }
 .vrm-av-date { font-size: 13px; color: var(--vrm-muted, #6E6E73); }
 .vrm-av-texte { flex-basis: 100%; min-width: 0; overflow-wrap: anywhere; color: var(--vrm-muted, #6E6E73); }
+/* (16 nov., lot aide-decision) Un compte qui ralentit nettement : ambre, un geste à faire (§7), jamais rouge. */
+.vrm-ve-ralenti { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.4; color: var(--vrm-warn, #B25E09); background: color-mix(in srgb, var(--vrm-warn, #B25E09) 10%, transparent); }

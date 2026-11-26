@@ -401,6 +401,7 @@ import { fusionEntreeVente, parcoursPaire } from "../fichePaire.js";
 // ⟦← App.jsx #81⟧
 import { PaireAvantHote, clicAvant, ouvrirFicheDe } from '../paires/PaireAvant.jsx';
 import { cascadeVente, valeurStock, publierValeurStock } from "../coutVente.js";
+import { lignesArgentDort, publierArgentDort } from "../argentDort.js";   // (16 nov., lot aide-decision) l’argent qui dort, par meuble
 // ⟦← App.jsx #83⟧
 import { conseilBaisse, derniereBaisseLue, baisseProportion, noterConseils, fusionConseils, CLE_CONSEIL_PRIX } from "../conseilPrix.js";
 // (15 nov., vendre plus) La baisse intelligente (règle pure), sa feuille, la relance des favoris au bon moment.
@@ -13107,6 +13108,20 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stockDort, listings, listingDatesLu, annBase]);
+  // (16 nov., lot aide-decision) « L'ARGENT QUI DORT, PAR MEUBLE » : les MÊMES paires que « Valeur du
+  // stock » (`annoncesPresentes`), le MÊME prix d'achat (règle du bénéfice) et le MÊME âge (`listedAgeDays`),
+  // par N° (`cleNum`). Cet écran publie `vrm_argent_dort` ; Statistiques le lit avec les meubles du Stock.
+  // Annonces pas lues (ou en erreur) ⇒ rien publié (pas su ≠ 0).
+  const argentDortLignes = useMemo(() => {
+    if (!Array.isArray(listings.items) || listings.error) return null;
+    return lignesArgentDort(annoncesPresentes.map((it) => { const f = numeros[it.id]; const k = f && f.numero ? cleNum(f.numero) : '';
+      return { cle: k, achat: k ? beneficePaire(null, fusionEntreeVente(f || {}, null, buyByNum)).achat : null, age: listingDatesLu === true ? listedAgeDays(it) : null }; }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annoncesPresentes, listings.items, listings.error, numeros, buyByNum, listingDates, listingDatesLu]);
+  useEffect(() => {
+    if (!argentDortLignes || !AUTH.user?.id) return;
+    publierArgentDort(argentDortLignes, { owner: AUTH.user.id, partiel: !!listings.incomplet || listingDatesLu !== true });
+  }, [argentDortLignes, listings.incomplet, listingDatesLu]);
   // ── RENUMÉROTER À LA SUITE ────────────────────────────────────────────────
   // Le numéro sert à retrouver un carton sur l'étagère : avec 116 paires en ligne
   // il ne devrait pas monter à 172. Au fil des ventes, la séquence se troue et

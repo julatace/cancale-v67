@@ -9,6 +9,7 @@
 // Chaque nombre rendu porte son attribut (centimes, '' = « — ») pour le banc.
 import React from 'react';
 import { AXES_RAPPORTE, classementRapporte, phraseMoitie } from '../ceQuiRapporte.js';
+import { tr } from '../i18n/index.js';
 
 const cents = (v) => (v == null ? '' : String(Math.round(Number(v) * 100)));
 const VISIBLES = 6;
@@ -35,7 +36,8 @@ export default function CeQuiRapporte({ lignes, Segmente, fmt, etat }) {
           const phrase = phraseMoitie(g.mediane);
           return (
             <li key={g.k || '_autres'} className="vrm-cr-item" data-cr-ligne={g.k || 'autres'} data-n={g.n} data-ncout={g.nCout} data-brut={cents(g.brut)}
-              data-moyen={cents(g.moyen)} data-marge={g.marge == null ? '' : g.marge} data-mediane={g.mediane == null ? '' : g.mediane} data-ndelai={g.nDelai} data-ouvert={ouv ? '1' : undefined}>
+              data-moyen={cents(g.moyen)} data-marge={g.marge == null ? '' : g.marge} data-mediane={g.mediane == null ? '' : g.mediane} data-ndelai={g.nDelai} data-ouvert={ouv ? '1' : undefined}
+              data-benef-notion="apres-frais" data-reste={cents(g.resteMoyen)} data-nnet={g.nNet} data-jours-moyen={g.joursMoyen == null ? '' : g.joursMoyen}>
               <button type="button" className="vrm-cr-ligne" aria-expanded={ouv} onClick={() => setOuvert(ouv ? null : g.k)}>
                 <span className="vrm-cr-rang">{rang + 1}</span>
                 <span className="vrm-cr-centre">
@@ -44,6 +46,13 @@ export default function CeQuiRapporte({ lignes, Segmente, fmt, etat }) {
                     <span className="vrm-cr-bloc">{pl(g.n, 'vendu')}</span>{g.moyen != null ? <> · <span className="vrm-cr-bloc">moy. {fmt(g.moyen)}</span></> : null}{g.marge != null ? <> · <span className="vrm-cr-bloc">marge {String(g.marge).replace('.', ',')}&nbsp;%</span></> : null}
                   </span>
                   {phrase ? <span className="vrm-cr-sous vrm-cr-delai">{phrase}</span> : null}
+                  {/* (16 nov., lot aide-decision) La rentabilité RÉELLE : ce qui reste par vente (après achat et frais
+                      notés, emballage compris s'il est saisi) et les jours MOYENS en ligne — avec leur couverture. */}
+                  <span className="vrm-cr-sous vrm-cr-reste" data-cr-reste="">
+                    <span className="vrm-cr-bloc">{g.resteMoyen == null ? tr('ad.reste.pasSu') : tr('ad.reste.moyen', { prix: fmt(g.resteMoyen) })}</span>
+                    {g.resteMoyen != null && g.nNet < g.n ? <> · <span className="vrm-cr-bloc" data-cr-reste-couv={`${g.nNet}/${g.n}`}>{tr('ad.reste.couv', { n: g.nNet, total: g.n })}</span></> : null}
+                    {g.joursMoyen != null ? <> · <span className="vrm-cr-bloc">{tr('ad.reste.jours', { n: String(Math.round(g.joursMoyen)) })}</span></> : null}
+                  </span>
                 </span>
                 <span className="vrm-cr-droite">
                   <span className="vrm-cr-brut" data-vide={g.brut == null ? '1' : undefined}>{montant(g.brut)}</span>
@@ -91,6 +100,7 @@ export default function CeQuiRapporte({ lignes, Segmente, fmt, etat }) {
         <h2 className="vrm-display vrm-cr-titre">Ce qui rapporte le plus</h2>
         {C && C.n > 0 ? <span className="vrm-cr-note" data-cr-couv={`${C.nCout}/${C.n}`}>prix d’achat connus {C.nCout}/{C.n}</span> : null}
       </div>
+      <p className="vrm-cr-note vrm-cr-regle" data-cr-regle-reste="">{tr('ad.reste.regle')}</p>
       <Segmente label="Classer par" className="vrm-cr-axes" value={axe} onChange={choisir} options={Object.entries(AXES_RAPPORTE).map(([v, l]) => ({ v, l, data: { 'data-cr-choix': v } }))}/>
       {corps}
     </section>
