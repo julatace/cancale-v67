@@ -39,6 +39,8 @@ const MUTATIONS = {
   'egalite-sans-ventes': ['src/ecrans/AnnoncesEgalite.jsx', "ventesLues: vcv", "ventesLues: null"],
   // D3 : la lecture redevient `select=data` (ligne lourde, §4.4).
   'egalite-select-data': ['src/ecrans/AnnoncesEgalite.jsx', "id=eq.vc_ventes&select=ventes:data->ventes", "id=eq.vc_ventes&select=data"],
+  // D4 : ventes Leboncoin pas lues, la touche « LBC n » se présente de nouveau complète.
+  'lbc-ventes-ko': ['src/ecrans/Leboncoin.jsx', "lbcRows === null || ventesLbcKO ? null : bilanLbc.enLigne.length", "lbcRows === null ? null : bilanLbc.enLigne.length"],
 };
 const arg = (k) => { const a = process.argv.find((x) => x.startsWith(k + '=')); return a ? a.slice(k.length + 1) : null; };
 
@@ -60,7 +62,7 @@ const mut = arg('--mutation');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-fiabilite-vc-'));
 for (const d of ['src/plateformes', 'src/ecrans', 'api/_lib']) fs.mkdirSync(path.join(tmp, d), { recursive: true });
 fs.writeFileSync(path.join(tmp, 'package.json'), '{"type":"module"}');
-for (const f of ['src/enLigneVc.js', 'src/plateformes/nombresAnnonces.js', 'src/ecrans/Vestiaire.jsx', 'src/ecrans/AnnoncesEgalite.jsx']) {
+for (const f of ['src/enLigneVc.js', 'src/plateformes/nombresAnnonces.js', 'src/ecrans/Vestiaire.jsx', 'src/ecrans/AnnoncesEgalite.jsx', 'src/ecrans/Leboncoin.jsx']) {
   const s = path.join(RACINE, f); if (fs.existsSync(s)) fs.copyFileSync(s, path.join(tmp, f));
 }
 fs.cpSync(path.join(RACINE, 'api', '_lib'), path.join(tmp, 'api', '_lib'), { recursive: true });
@@ -155,7 +157,13 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(/id=eq\.vc_ventes&select=ventes:data->ventes/.test(lectureVcv), 'D3 lireAnnoncesEgalite lit `vc_ventes` PROJETÉE (jamais select=data) dans `vcv`', lectureVcv.slice(0, 160));
   dit(/etatDe: etatDeVc\(\{ capturedAt: L\.capturedAt, ventesLues: vcv \}\)/.test(lae), 'D3 lireAnnoncesEgalite juge chaque annonce Vestiaire avec les ventes lues (`etatDeVc`)');
 
-  console.log(`\n${ko ? '❌' : '✅'} fiabilité Vestiaire (en ligne, vendue) : ${ok} vert(s), ${ko} rouge(s)`);
+  // ── D4 Leboncoin : la touche « LBC n » du sélecteur. Une annonce vendue reste `active` en base (mesuré le 20 oct.) :
+  // sans les ventes lues, le nombre la compterait et se présenterait complet. Le nombre publié est « pas su ».
+  const LB = sansCommentaires(lire('src/ecrans/Leboncoin.jsx'));
+  const pose = (/poserNombreAnnonces\('leboncoin', ([^\n]*)\);/.exec(LB) || [])[1] || '';
+  const kv = (/const ventesLbcKO = ([^;]*);/.exec(LB) || [])[1] || '';
+  dit(/lbcVentesRows === null/.test(kv) && /\bventesLbcKO\b[^?]*\?\s*null\s*:/.test(pose), 'D4 Leboncoin : ventes Leboncoin pas lues ⇒ la touche « LBC n » dit pas su (null), jamais un nombre qui compte une annonce vendue', pose);
+  console.log(`\n${ko ? '❌' : '✅'} fiabilité Vestiaire et Leboncoin (en ligne, vendue) : ${ok} vert(s), ${ko} rouge(s)`);
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) {}
   process.exit(ko ? 1 : 0);
 })();
