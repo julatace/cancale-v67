@@ -765,6 +765,15 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   //    invisibles (mesuré : 35 sur 35 à 0, fondu « en cours »), et 1 000 photos recréées à chaque geste.
   // (16 nov., lot retirer-case-compact) `dansCase` : sur le plan, la case d'une vendue est EN SURBRILLANCE (`is-vendue`), sans
   // aucun mot en plus (Julien : « la case doit juste être en surbrillance ») ; le mot « Vendue » reste sur la fiche et les listes.
+  // (26 nov., zero-rouge-bancs) Le nom d'une vignette « à ranger » COMMENCE par ce qu'on y lit, dans l'ordre (« N°22 Vendue
+  // Vestiaire +N°23 Retour »), puis le reste (titre, « seulement sur … ») : un nom qui intercalait le titre entre « N°22 » et
+  // « Vestiaire » ne contenait plus le texte vu (axe label-content-name-mismatch, banc accessibilite, Stock 1512 px).
+  const nomARanger = (f, sold) => {
+    const seul = (f.plateformes || []).length && !f.plateformes.includes('vinted');
+    const vu = [`N°${f.numero}`, sold ? tr('ventes.vendue2') : '', seul ? f.plateformes.map((x) => NOM_PLAT_STOCK[x] || x).join(' · ') : '',
+      (f.aussi || []).length ? `+N°${f.aussi.join(', ')}` : '', f.retour ? 'Retour' : ''].filter(Boolean).join(' ');
+    return `Ranger l’article ${vu}${(f.aussi || []).length ? ' (aussi N°' + f.aussi.join(', N°') + ')' : ''}${f.title ? ' · ' + f.title : ''}${seul ? ' · seulement sur ' + f.plateformes.map((x) => NOM_PLAT_STOCK[x] || x).join(' et ') : ''}${sold ? ' (vendue)' : ''}`;
+  };
   const Vignette = ({ f, sold, hors = false, mini = false, dansCase = false }) => (
     <>
       {/* (13 nov., point 45) Sans réseau : la photo gardée par le service worker (déjà vue), sinon l'initiale.
@@ -784,8 +793,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         ? <span className="vrm-s2d-num vrm-etag-plaque" data-case-n={String(f.numero)} data-long={String(f.numero).length > 4 ? '5' : String(f.numero).length > 3 ? '4' : undefined} data-vendue={sold ? '1' : undefined} data-hors-ligne={!sold && hors ? '1' : undefined} aria-hidden="true">{f.numero}</span>
         : <span className="vrm-s2d-num" data-vendue={sold ? '1' : undefined} data-hors-ligne={!sold && hors ? '1' : undefined}
         {...(mini ? { title: `N°${f.numero}`, 'aria-hidden': 'true', 'data-mini': '' } : {})}>N°{f.numero}</span>}
-      {sold && !mini && !dansCase && <span className="vrm-s2d-vendue">{tr('ventes.vendue2')}</span>}
-      {!sold && hors && !mini && <span className="vrm-s2d-horsligne">{tr('stock.plusLigne2')}</span>}
+      {sold && !mini && !dansCase && <>{' '}<span className="vrm-s2d-vendue">{tr('ventes.vendue2')}</span></>}
+      {!sold && hors && !mini && <>{' '}<span className="vrm-s2d-horsligne">{tr('stock.plusLigne2')}</span></>}
     </>
   );
 
@@ -1701,13 +1710,15 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
               1 700 photos d'un coup (1,1 s de gel au défilement). Les autres sont dans la liste, plus bas. */}
           {aRanger.slice(0, BANDE_MAX).map((f) => { const sold = estVendu(f); const sel = place === cleDeFiche(f);
             return (
-              <button type="button" key={f.id} data-a-ranger={cleDeFiche(f)} data-paire-a-ranger={String(f.numero)} data-paire-plateformes={(f.plateformes || []).join(',')} data-paire-aussi={(f.aussi || []).join(',')} {...dragProps(cleDeFiche(f))} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={`Ranger l’article N°${f.numero}${(f.aussi || []).length ? ' (aussi N°' + f.aussi.join(', N°') + ')' : ''}${f.title ? ' · ' + f.title : ''}${(f.plateformes || []).length && !f.plateformes.includes('vinted') ? ' · seulement sur ' + f.plateformes.map((x) => NOM_PLAT_STOCK[x] || x).join(' et ') : ''}${sold ? ' (vendue)' : ''}`} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.border}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
+              <button type="button" key={f.id} data-a-ranger={cleDeFiche(f)} data-paire-a-ranger={String(f.numero)} data-paire-plateformes={(f.plateformes || []).join(',')} data-paire-aussi={(f.aussi || []).join(',')} {...dragProps(cleDeFiche(f))} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={nomARanger(f, sold)} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.border}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
                 {Vignette({ f: f, sold: sold })}
                 {/* (5 nov.) Une paire vue seulement sur eBay ou Leboncoin le dit ; une
                     même paire sous deux N° (même photo) dit l'autre N° (`unParArticle`). */}
-                {(f.plateformes || []).length && !f.plateformes.includes('vinted') ? <span className="vrm-s2d-plat">{f.plateformes.map((x) => NOM_PLAT_STOCK[x] || x).join(' · ')}</span> : null}
-                {(f.aussi || []).length ? <span className="vrm-s2d-aussi">+N°{f.aussi.join(', ')}</span> : null}
-                {f.retour ? <span className="vrm-s2d-plat" data-a-ranger-retour="">Retour</span> : null}
+                {/* (26 nov.) Un espace entre deux étiquettes : le texte VU se lit « N°22 Vestiaire », comme le nom dit (axe
+                    label-content-name-mismatch : le nom d'un bouton contient ce qu'on y lit). */}
+                {(f.plateformes || []).length && !f.plateformes.includes('vinted') ? <>{' '}<span className="vrm-s2d-plat">{f.plateformes.map((x) => NOM_PLAT_STOCK[x] || x).join(' · ')}</span></> : null}
+                {(f.aussi || []).length ? <>{' '}<span className="vrm-s2d-aussi">+N°{f.aussi.join(', ')}</span></> : null}
+                {f.retour ? <>{' '}<span className="vrm-s2d-plat" data-a-ranger-retour="">Retour</span></> : null}
               </button>
             );
           })}

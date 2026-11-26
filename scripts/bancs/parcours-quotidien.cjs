@@ -20,7 +20,9 @@ if(debutReprise<0||!reprise.includes('const noterReprise')||!reprise.includes('_
  import{stockageParcours}from'./src/repriseEcran.js';
  // (18 nov., chasse-bugs) MemoireDefilement ouvre un écran en haut ou à sa position (règle de src/defilementNavigation.js) : le banc l'importe comme App.jsx.
  import{positionAOuvrir,prendreRetourOnglet}from'./src/defilementNavigation.js';
- import{CLE_REPRISE_ECRANS,DELAI_ECRITURE as DELAI_REPRISE,DUREE_RECHERCHE as DUREE_RECHERCHE_REPRISE,lireCarte as lireCarteReprise,poserCarte as poserCarteReprise,cumulerPatch as cumulerPatchReprise,vueReprise,vueSynchronisee,estRecherche as estRechercheVue}from'./src/repriseSynchro.js';
+ import{CLE_REPRISE_ECRANS,DELAI_ECRITURE as DELAI_REPRISE,DUREE_RECHERCHE as DUREE_RECHERCHE_REPRISE,lireCarte as lireCarteReprise,poserCarte as poserCarteReprise,cumulerPatch as cumulerPatchReprise,vueReprise,vueSynchronisee,estRecherche as estRechercheVue,positionReprise}from'./src/repriseSynchro.js';
+ // (26 nov., zero-rouge-bancs) MemoireDefilement lit la position gardée par positionReprise (12 h, 16 nov.) : sans cet import, l'appel levait
+ // dans son try (position 0) — le banc mesurait une ReferenceError, pas la règle (rouge « scrollTop ≥ 350 » en CI depuis le 23 nov.).
  const load=(k,d)=>{try{const v=localStorage.getItem('banc:'+k);return v==null?d:JSON.parse(v);}catch(_){return d;}};const save=(k,v)=>localStorage.setItem('banc:'+k,JSON.stringify(v));const ONGLETS_LIENS=['ventes'];const onCloudReady=fn=>{try{fn();}catch(_){}return()=>{};};
  const AUTH={get user(){return{id:window.owner}}};${scroll}
  const vuesSession=new Map();window.viderVues=()=>{vuesSession.clear();MemoireDefilement.dejaRendu=false;};/* (18 nov., chasse-bugs) rouvrir l'app = une REPRISE : le module repart de zéro (premier écran ⇒ position gardée) */window.owner='A';const readSession=()=>({user:{id:window.owner}});${reprise}${vue}
