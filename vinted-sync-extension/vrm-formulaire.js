@@ -256,8 +256,11 @@
   function apprisEl(nom) {
     const sp = APPRIS[nom];
     if (!sp || !sp.sig || !globalThis.__vrmAppris) return null;
-    const t = globalThis.__vrmAppris.trouver(sp.sig);
+    let t = globalThis.__vrmAppris.trouver(sp.sig);
     if (t.ambigu) return 'AMBIGU';
+    // 5.448 (`adaptatif`) : le geste appris que Vinted a un peu changé (un attribut renommé) — retrouvé par ce qui en reste,
+    //    SEUL et avec son mot ; sinon rien. Il reste « appris » (la confirmation d'un geste irréversible est toujours exigée).
+    if (!t.el && T() && T().souple) { const r = T().souple(sp.sig, {}); if (r.ambigu) return 'AMBIGU'; if (r.el) { noterTrouve('appris', r); t = { el: r.el }; } }
     if (t.el && !deVrm(t.el) && visible(t.el)) { VIA_APPRIS.set(t.el, nom); return t.el; }
     return null;
   }
@@ -267,14 +270,27 @@
     const a = APPRIS[nom] ? apprisEl(nom) : null;
     return a === 'AMBIGU' ? { el: null, ambigu: true } : { el: a || null, ambigu: false };
   }
-  // `attendre` avec, à défaut du deviné, l'élément appris (unique et visible).
-  function attendreN(nom, sel, ms, racine) {
-    if (!APPRIS[nom]) return attendre(sel, ms, racine);
-    return attendre(() => {
+  // `attendre` avec, à défaut du deviné, l'élément appris (unique et visible) ; puis (5.448, `adaptatif`) la couche de
+  // repérage : plusieurs stratégies (nom exact en 5 langues, data-testid partiel, libellé du champ…), UN seul gagnant.
+  // Deux candidats au même score ⇒ rien n'est rendu (l'étape s'arrête, « introuvable ou en double », rien n'est cliqué).
+  const TABLE_N = { vendre: 'vendre', titre: 'titre', description: 'description', prix: 'prix', photos: 'photos', brouillon: 'brouillon', ajouter: 'ajouter', enregistrer: 'enregistrer', supprimer: 'supprimer', 'supprimer-confirmation': 'supprimerConfirmation' };   // 5.454 : les noms de la couche 5.447 (REPUB)
+  async function attendreN(nom, sel, ms, racine) {
+    const tn = TABLE_N[nom];
+    if (!APPRIS[nom] && !tn) return attendre(sel, ms, racine);
+    let dernier = null;
+    const r = await attendre(() => {
       let el = null; try { el = typeof sel === 'function' ? sel() : (racine || document).querySelector(sel); } catch (_) { el = null; }
       if (el) return el;
-      return apprisEl(nom);
+      if (APPRIS[nom]) { const a = apprisEl(nom); if (a) return a; }
+      const t = tn ? T() : null;
+      if (t && t.sites && Array.isArray(t.sites.vinted) && t.sites.vinted.includes(tn)) {
+        const x = t.trouver(tn, { site: 'vinted', prefere: MEMOIRE[tn] || '' }); dernier = x;
+        if (x.el) return x.el;
+      }
+      return null;
     }, ms);
+    if (dernier) { noterTrouve(tn, dernier); if (r.absent && dernier.ambigu) r.ambigu = true; }
+    return r;
   }
   const clic = (el) => {
     // 5.433 : un élément APPRIS d'un geste irréversible, pas encore confirmé par lui ⇒ RIEN n'est cliqué.

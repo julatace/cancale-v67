@@ -145,6 +145,7 @@
         "https://*.leboncoin.fr/*"
       ],
       "js": [
+        "vrm-trouver.js",
         "lbc-ecrire.js",
         "vrm-depot-aussi.js"
       ],
@@ -169,6 +170,7 @@
       ],
       "js": [
         "vrm-ui.js",
+        "vrm-trouver.js",
         "ebay.js"
       ],
       "run_at": "document_idle",
@@ -203,6 +205,7 @@
         "vrm-ui.js",
         "vrm-mots.js",
         "vc-depot.js",
+        "vrm-trouver.js",
         "vc-ecrire.js",
         "vrm-depot-aussi.js"
       ],

@@ -3208,6 +3208,7 @@ function signalerForme(uid, d) {
       if (!ok) return;
       u[d.type] = { at: Date.now(), sig }; st[String(uid)] = u;
       await chrome.storage.local.set({ [FORMES_VUES]: st });
+      majSanteSites().catch(() => {});
     } catch (_) {}
   });
 }
@@ -3224,6 +3225,7 @@ function formeRevenue(uid, type) {
       delete u[type]; st[String(uid)] = u;
       await chrome.storage.local.set({ [FORMES_VUES]: st });
       noterDiag(`forme_revenue_${type}`);
+      majSanteSites().catch(() => {});
     } catch (_) {}
   });
 }
@@ -4596,6 +4598,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
+    // 5.448 (`adaptatif`) : ce que la couche de repérage a vu sur Leboncoin, Vestiaire ou eBay (le gagnant, ou les stratégies
+    //    essayées et leurs comptes — jamais un texte de la page) ⇒ la mémoire de CE site et le journal. Le site est celui de
+    //    l'ONGLET qui parle (pas celui que le message dit), cadre principal seulement.
+    if (msg && msg.action === 'trouveJournal' && (msg.from === 'cancale-lbc' || msg.from === 'cancale-vc' || msg.from === 'cancale-ebay')) {
+      (async () => {
+        let site = '';
+        try { const h = new URL((sender && sender.tab && sender.tab.url) || '').hostname; site = /(^|\.)leboncoin\.fr$/i.test(h) ? 'lbc' : /(^|\.)vestiairecollective\.com$/i.test(h) ? 'vc' : /(^|\.)ebay\.[a-z.]+$/i.test(h) ? 'ebay' : ''; } catch (_) {}
+        if (!site || (sender && sender.frameId > 0) || !sender || sender.id !== chrome.runtime.id) { sendResponse({ ok: false }); return; }
+        await retenirTrouves(String(msg.etape || '').slice(0, 20), { trouves: Array.isArray(msg.trouves) ? msg.trouves.slice(0, 12) : [], verPage: msg.verPage }, site).catch(() => {});
+        sendResponse({ ok: true });
       })();
       return true;
     }
@@ -12889,8 +12904,59 @@ async function rappelerMiseAJourLbc(){
     try{const tabs=await chrome.tabs.query({url:urls});for(const t of tabs||[])try{await chrome.scripting.executeScript({target:{tabId:t.id,frameIds:[0]},func:afficherRappelSite,args:[CODE_VERSION,site]});}catch(_){}}catch(_){}
   }
 }
-chrome.runtime.onInstalled.addListener((details) => { fullSync(); if (raisonReinjecte(details)){reinjecterPont();rappelerMiseAJourLbc();} });
-chrome.runtime.onStartup.addListener(() => { fullSync(); try { distanceReveil('demarrage').catch(() => {}); } catch (_) {} });   // 5.436 : Chrome relancé ⇒ présence et file à distance tout de suite
+// ══ 5.448 (`autocontrole`) — AU DÉMARRAGE, L'EXTENSION VÉRIFIE QU'ELLE EST BIEN DANS CHAQUE ONGLET OUVERT ══════════
+//  Julien : « va encore plus loin ». Après une mise à jour ou un redémarrage, un onglet Vinted / Leboncoin / Vestiaire /
+//  eBay ouvert AVANT garde l'ancienne page, sans les scripts de VRM : rien n'y est lu, aucun geste n'y répond — en
+//  silence. Ici, 20 s après le démarrage : chaque onglet de ces sites est sondé (dans le monde isolé de l'extension, une
+//  lecture du DOM, aucune requête au site) — les scripts de VRM sont-ils là ? Sinon :
+//   · l'onglet n'est PAS celui que tu regardes et n'est pas un formulaire (dépôt, mise en vente, message en cours) ⇒
+//     rechargé UNE fois par VRM (une fois par onglet et par démarrage) ;
+//   · sinon (tu y es, ou tu y tapes peut-être) ⇒ jamais rechargé : la ligne de santé du site et une notification disent
+//     « recharge l'onglet … ».
+const SITES_CONTROLE = [
+  { site: 'vinted', re: /^https:\/\/[^/]*\.vinted\.(fr|com|it)\//, signe: 'vinted', nom: 'Vinted' },
+  { site: 'lbc', re: /^https:\/\/[^/]*\.leboncoin\.fr\//, signe: 'lbc', nom: 'Leboncoin' },
+  { site: 'vc', re: /^https:\/\/[^/]*\.vestiairecollective\.com\//, signe: 'vc', nom: 'Vestiaire' },
+  { site: 'ebay', re: /^https:\/\/[^/]*\.ebay\.fr\//, signe: 'ebay', nom: 'eBay' },
+];
+const RE_FORMULAIRE_ONGLET = /\/items\/new|\/items\/\d+\/edit|\/deposer|\/ai\/form|\/sell|\/sl\/|\/lstng|\/inbox|\/messages|\/messagerie|\/conversation/i;
+async function scriptsDansOnglet(tabId, signe) {
+  try {
+    const r = await chrome.scripting.executeScript({ target: { tabId, frameIds: [0] }, args: [signe], func: (s) => (s === 'vinted' ? !!globalThis.VRM_UI : s === 'lbc' ? !!window.__vrmLbcEcrire : s === 'vc' ? !!window.__vrmVcEcrire : !!window.__vrmEbayLoaded) });
+    return r && r[0] ? r[0].result === true : null;
+  } catch (_) { return null; }   // pas su (onglet fermé, accès au site retiré) : rien n'est conclu
+}
+async function autoControleOnglets() {
+  const out = [];
+  let tabs = []; try { tabs = await chrome.tabs.query({}); } catch (_) { return null; }
+  let actifs = new Set(); try { for (const t of await chrome.tabs.query({ active: true })) actifs.add(t.id); } catch (_) {}
+  let deja = {}; try { deja = (await chrome.storage.session.get('vrmAutoControle')).vrmAutoControle || {}; } catch (_) { deja = {}; }
+  const manquants = {};
+  for (const t of tabs || []) {
+    const sc = SITES_CONTROLE.find((x) => x.re.test(String(t && t.url || '')));
+    if (!sc || t.status !== 'complete' || t.discarded) continue;
+    const la = await scriptsDansOnglet(t.id, sc.signe);
+    if (la !== false) continue;
+    const prudent = actifs.has(t.id) || RE_FORMULAIRE_ONGLET.test(String(t.url || ''));
+    if (!prudent && !deja[t.id]) {
+      deja[t.id] = Date.now();
+      try { await chrome.storage.session.set({ vrmAutoControle: deja }); } catch (_) {}
+      noterDiag('autocontrole_recharge_' + sc.site);
+      try { await chrome.tabs.reload(t.id); out.push({ site: sc.site, tabId: t.id, geste: 'recharge' }); continue; } catch (_) {}
+    }
+    noterDiag('autocontrole_a_recharger_' + sc.site);
+    manquants[sc.site] = Date.now();
+    out.push({ site: sc.site, tabId: t.id, geste: 'dire' });
+  }
+  try { await chrome.storage.local.set({ vrmOngletsSansVrm: manquants }); } catch (_) {}
+  majSanteSites().catch(() => {});
+  return out;
+}
+function autoControlePlusTard() { setTimeout(() => { autoControleOnglets().catch(() => {}); }, 20000); }
+// Un onglet signalé « sans VRM » qui vient de (re)charger : revérifié 3 s après (la ligne de santé s'efface d'elle-même).
+try { chrome.tabs.onUpdated.addListener((tabId, info, tab) => { if (!info || info.status !== 'complete') return; const sc = SITES_CONTROLE.find((x) => x.re.test(String((tab && tab.url) || ''))); if (!sc) return; chrome.storage.local.get('vrmOngletsSansVrm').then((g) => { if (g && g.vrmOngletsSansVrm && g.vrmOngletsSansVrm[sc.site]) setTimeout(() => { autoControleOnglets().catch(() => {}); }, 3000); }, () => {}); }); } catch (_) {}
+chrome.runtime.onInstalled.addListener((details) => { fullSync(); if (raisonReinjecte(details)){reinjecterPont();rappelerMiseAJourLbc();} autoControlePlusTard(); });
+chrome.runtime.onStartup.addListener(() => { fullSync(); try { distanceReveil('demarrage').catch(() => {}); } catch (_) {} autoControlePlusTard(); });   // 5.436 : Chrome relancé ⇒ présence et file à distance tout de suite
 
 // ⚠️ 11 octobre (mesuré au banc, dans un vrai Chromium) : `chrome.alarms.create`
 //    REMET À ZÉRO une alarme qui existe déjà. Refait à CHAQUE réveil du service
@@ -15245,10 +15311,10 @@ async function grilleParPage(uid, acc, cat) {
     let chemin = ''; try { chemin = new URL(String((await chrome.tabs.get(ot.tabId)).url || '')).pathname; } catch (_) { chemin = ''; }
     if (!/^\/items\/new\/?$/.test(chemin) && !(await naviguerTravail(ot.tabId, `https://${domaine}/items/new`, /\/items\/new/))) return { raison: RAISON_ONGLET_VINTED };
     const fp = await etapeFormulaire(acc, ot.tabId, 'formulairePret');
-    if (!fp.ok) return { raison: fp.code === 'captcha' ? PHRASE_CAPTCHA : PHRASE_SELECTEUR(fp.manque || fp.code) };
+    if (!fp.ok) return { raison: fp.code === 'captcha' ? PHRASE_CAPTCHA : `${PHRASE_SELECTEUR(fp.manque || fp.code)}. ${gesteElement(fp.manque || fp.code)}` };
     const nc = await nomCategorieVinted(cat);
     const o = await etapeFormulaire(acc, ot.tabId, 'grille', { id: cat, nom: nc && nc.nom, recherche: nc && nc.nom });
-    if (!o.ok || !o.rep) return { raison: o.code === 'captcha' ? PHRASE_CAPTCHA : o.code === 'selecteur' ? PHRASE_SELECTEUR(o.manque) : "Vinted n'a pas rendu la liste des tailles" };
+    if (!o.ok || !o.rep) return { raison: o.code === 'captcha' ? PHRASE_CAPTCHA : o.code === 'selecteur' ? `${PHRASE_SELECTEUR(o.manque)}. ${gesteElement(o.manque)}` : "Vinted n'a pas rendu la liste des tailles" };
     return { status: Number(o.rep.status) || 0, ok: !!o.rep.ok, json: o.rep.json };
   } finally { _grilleEnCours = null; fin(); }
 }
@@ -18328,26 +18394,148 @@ async function apprendreElement(acc, tabId, nom) {
 //  Aucune question à Julien : c'est une mémoire, pas un apprentissage par son clic.
 const ETAPES_SANS_APPRENDRE = new Set(['favoriOuvrir', 'favoriLien', 'favoriListe', 'favoriAccueil']);
 const TROUVE_CLE = 'vrmTrouve', TROUVE_JOURNAL = 'vrmTrouverJournal', TROUVE_JOURNAL_MAX = 40;
-async function memoireTrouver() {
-  try { const m = (await chrome.storage.local.get(TROUVE_CLE))[TROUVE_CLE]; if (!m || typeof m !== 'object' || !m.el) return {}; const out = {}; for (const k of Object.keys(m.el).slice(0, 20)) { const e = m.el[k]; if (e && /^[a-z]{2,20}$/.test(String(e.s || '')) && (!m.ver || !e.ver || e.ver === m.ver)) out[k] = e.s; } return out; } catch (_) { return {}; }
+// 5.448 (`adaptatif`) : une mémoire PAR SITE (Vinted garde sa clé d'avant ; `vrmTrouve_lbc`, `_vc`, `_ebay`), chacune rangée
+//    par version de la page de CE site ; un seul journal, chaque entrée porte son site.
+const SITES_TROUVER = new Set(['vinted', 'lbc', 'vc', 'ebay']);
+const cleTrouveSite = (site) => (!site || site === 'vinted' ? TROUVE_CLE : TROUVE_CLE + '_' + site);
+async function memoireTrouver(site) {
+  const TROUVE_CLE_S = cleTrouveSite(site);
+  try { const m = (await chrome.storage.local.get(TROUVE_CLE_S))[TROUVE_CLE_S]; if (!m || typeof m !== 'object' || !m.el) return {}; const out = {}; for (const k of Object.keys(m.el).slice(0, 20)) { const e = m.el[k]; if (e && /^[a-z]{2,20}$/.test(String(e.s || '')) && (!m.ver || !e.ver || e.ver === m.ver)) out[k] = e.s; } return out; } catch (_) { return {}; }
 }
-async function retenirTrouves(etape, o) {
+async function retenirTrouves(etape, o, siteDit) {
   if (!o || typeof o !== 'object' || !Array.isArray(o.trouves) || !o.trouves.length) return;
+  const site = SITES_TROUVER.has(siteDit) ? siteDit : 'vinted';
+  const TROUVE_CLE_S = cleTrouveSite(site), pre = site === 'vinted' ? '' : site + '_';
   const ver = String(o.verPage || '').slice(0, 40);
-  let m = null; try { m = (await chrome.storage.local.get(TROUVE_CLE))[TROUVE_CLE]; } catch (_) { return; }
+  let m = null; try { m = (await chrome.storage.local.get(TROUVE_CLE_S))[TROUVE_CLE_S]; } catch (_) { return; }
   if (!m || typeof m !== 'object' || !m.el) m = { v: 1, ver, el: {} };
   if (ver && m.ver && m.ver !== ver) m = { v: 1, ver, el: {} };   // une autre version de Vinted : la mémoire repart de zéro
   if (ver) m.ver = ver;
   const journal = [];
   for (const t of o.trouves.slice(0, 12)) {
     const nom = String((t && t.nom) || '').replace(/[^a-zA-Z]/g, '').slice(0, 30); if (!nom) continue;
-    if (t.s && /^[a-z]{2,20}$/.test(t.s)) { m.el[nom] = { s: t.s, ver, at: Date.now() }; noterDiag('trouve_' + nom + '_' + t.s); }
-    else { noterDiag((t.ambigu ? 'trouve_ambigu_' : 'trouve_rien_') + nom); journal.push({ nom, etape: String(etape || '').slice(0, 20), at: Date.now(), ambigu: !!t.ambigu, essais: (Array.isArray(t.essais) ? t.essais : []).slice(0, 8).map((e) => ({ s: String((e && e.s) || '').slice(0, 20), n: Math.max(0, Math.min(999, Number(e && e.n) || 0)) })) }); }
+    if (t.s && /^[a-z]{2,20}$/.test(t.s)) { m.el[nom] = { s: t.s, ver, at: Date.now() }; noterDiag('trouve_' + pre + nom + '_' + t.s); }
+    else { noterDiag((t.ambigu ? 'trouve_ambigu_' : 'trouve_rien_') + pre + nom); journal.push({ site, nom, etape: String(etape || '').slice(0, 20), at: Date.now(), ambigu: !!t.ambigu, essais: (Array.isArray(t.essais) ? t.essais : []).slice(0, 8).map((e) => ({ s: String((e && e.s) || '').slice(0, 20), n: Math.max(0, Math.min(999, Number(e && e.n) || 0)) })) }); }
   }
   try {
-    await chrome.storage.local.set({ [TROUVE_CLE]: m });
+    await chrome.storage.local.set({ [TROUVE_CLE_S]: m });
     if (journal.length) { const j = (await chrome.storage.local.get(TROUVE_JOURNAL))[TROUVE_JOURNAL]; const l = (Array.isArray(j) ? j : []).concat(journal).slice(-TROUVE_JOURNAL_MAX); await chrome.storage.local.set({ [TROUVE_JOURNAL]: l }); }
   } catch (_) {}
+  majSanteSites().catch(() => {});
+}
+// ══ 5.448 (`santesites`) — UNE LIGNE PAR SITE : « tout marche » / « X ne marche plus : fais Y » ══════════════════
+//  Julien : « l'extension doit être intelligente ». Ce que l'extension SAIT déjà, lu sans aucune requête :
+//   · le journal de la couche de repérage (`vrmTrouverJournal`) : un élément introuvable ou en double, et PAS retrouvé
+//     depuis (la mémoire du site, `vrmTrouve*`, garde l'heure du dernier succès de chaque élément) — 7 jours au plus ;
+//   · une RÉPONSE de forme changée : Vinted (`vrmFormesVues`, posées par `signalerForme`, retirées par `formeRevenue`),
+//     Vestiaire (`vrmVcCapte[…].inconnu`), Leboncoin (`vrmLbcForme`, sa liste « Mes annonces ») — rien n'a été rangé.
+//  Verdict : une forme changée d'abord (« Vinted a changé sa page des ventes : VRM attend la correction »), puis un
+//  élément (le bouton par son nom, et LE geste), sinon « tout marche » ; rien jamais vu ici ⇒ « pas encore vu ici ».
+//  Chaque NOUVEAU problème d'un site est dit UNE fois par une notification de l'ordinateur (là où Chrome le permet) ;
+//  la ligne reste dans la carte tant qu'il dure. Jamais un silence, jamais une alarme répétée.
+const SANTE_SITES = 'vrmSanteSites', SANTE_JOURNAL_MS = 7 * 864e5;
+const NOMS_SITES_SANTE = { vinted: 'Vinted', lbc: 'Leboncoin', vc: 'Vestiaire', ebay: 'eBay' };
+const LIB_ELEMENTS_SITES = {
+  lbc: { champMessage: 'le champ du message', envoyer: 'le bouton « Envoyer »', champPrix: 'le champ du prix', appris: 'un bouton appris' },
+  vc: { champMessage: 'le champ du message', envoyer: 'le bouton « Envoyer »', appris: 'un bouton appris' },
+  ebay: { titre: 'le champ du titre', description: 'le champ de la description', prix: 'le champ du prix', sku: 'le champ de la référence' },
+};
+// La table de vrm-trouver.js ↔ le nom de l'étape (celui des phrases de Vinted).
+const TABLE_VERS_MANQUE = { supprimerConfirmation: 'supprimer-confirmation', supprimerConfirmer: 'supprimer-confirmation', publier: 'ajouter', champMessage: 'message-champ', envoyer: 'message-envoyer', boutonOffre: 'offre-bouton', offreValider: 'offre-valider' };
+const FORMES_PAGES_SANTE = { listings: 'sa page des annonces', orders_sold: 'sa page des ventes', orders_purchased: 'sa page des achats', inbox: 'sa messagerie', transaction: 'le détail des ventes', conversation: 'ses conversations', profile: 'la page du profil', billing: 'le porte-monnaie' };
+function verdictElement(site, nom, ambigu) {
+  const n = NOMS_SITES_SANTE[site];
+  if (site === 'vinted') { const m = TABLE_VERS_MANQUE[nom] || nom; return { k: 'element', nom, t: `${quoiElement(m + (ambigu ? '-ambigu' : ''))}. ${gesteElement(m + (ambigu ? '-ambigu' : ''))}` }; }
+  const lib = (LIB_ELEMENTS_SITES[site] || {})[nom] || `l'élément « ${nom} »`;
+  const geste = site === 'ebay' ? 'Geste : remplis-le toi-même sur eBay cette fois, puis touche « Envoyer un rapport » dans la fenêtre de l’extension.'
+    : `Geste : fais ce geste une fois toi-même sur ${site === 'lbc' ? 'leboncoin.fr' : 'vestiairecollective.com'}, dans ce Chrome (VRM réapprend), puis touche « Envoyer un rapport ».`;
+  return { k: 'element', nom, t: `${n} : ${lib} ${ambigu ? 'est en double sur la page (VRM ne choisit jamais)' : 'ne marche plus (la page a changé)'}. ${geste}` };
+}
+async function santeSites() {
+  let st = {};
+  try { st = await chrome.storage.local.get([TROUVE_JOURNAL, TROUVE_CLE, TROUVE_CLE + '_lbc', TROUVE_CLE + '_vc', TROUVE_CLE + '_ebay', FORMES_VUES, 'vrmVcCapte', 'vrmLbcForme', 'vrmFlux', 'vrmOngletsSansVrm']); } catch (_) { return null; }
+  const t = Date.now(), out = {};
+  const journal = Array.isArray(st[TROUVE_JOURNAL]) ? st[TROUVE_JOURNAL] : [];
+  for (const site of ['vinted', 'lbc', 'vc', 'ebay']) {
+    const n = NOMS_SITES_SANTE[site];
+    const mem = st[cleTrouveSite(site)], el = (mem && mem.el) || {};
+    let v = null;
+    // 1. une réponse de forme changée (rien n'est rangé) — la plus grave : des données manquent.
+    if (site === 'vinted') { const fv = st[FORMES_VUES] || {}; for (const uid of Object.keys(fv)) for (const ty of Object.keys(fv[uid] || {})) if (!v) v = { k: 'forme', nom: ty, t: `Vinted a changé ${FORMES_PAGES_SANTE[ty] || 'une page'} : VRM ne la lit plus et n'en range rien de faux ; il attend la correction (la prochaine version). Geste : touche « Envoyer un rapport » dans la fenêtre de l’extension.` }; }
+    if (site === 'vc') { const c = st.vrmVcCapte || {}; const q = Object.keys(c).find((k) => c[k] && c[k].inconnu === true); if (q) v = { k: 'forme', nom: q, t: `Vestiaire a changé sa page (${q}) : VRM ne la lit plus et n'en range rien de faux ; il attend la correction. Geste : touche « Envoyer un rapport » dans la fenêtre de l’extension.` }; }
+    if (site === 'lbc' && st.vrmLbcForme && t - Number(st.vrmLbcForme.at || 0) < SANTE_JOURNAL_MS) v = { k: 'forme', nom: 'mes-annonces', t: "Leboncoin a changé ta page « Mes annonces » : VRM ne la lit plus et n'en range rien de faux ; il attend la correction. Geste : touche « Envoyer un rapport » dans la fenêtre de l’extension." };
+    // 1 bis. (5.448 `autocontrole`) un onglet ouvert de ce site où les scripts de VRM ne sont pas (pas rechargé par prudence).
+    if (!v && st.vrmOngletsSansVrm && Number(st.vrmOngletsSansVrm[site]) > 0) v = { k: 'onglet', nom: 'onglet', t: `${n} : un onglet ouvert n'a pas VRM chargé (il date d'avant la mise à jour) ; rien n'y est lu. Geste : recharge cet onglet ${n} (⟳ du navigateur).` };
+    // 2. un élément introuvable ou en double, pas retrouvé depuis.
+    if (!v) {
+      const siens = journal.filter((e) => e && (e.site || 'vinted') === site && t - Number(e.at || 0) < SANTE_JOURNAL_MS).sort((a, b) => Number(b.at) - Number(a.at));
+      for (const e of siens) { const ok = el[e.nom]; if (ok && Number(ok.at || 0) > Number(e.at || 0)) continue; v = verdictElement(site, String(e.nom || ''), !!e.ambigu); break; }
+    }
+    const vu = Object.keys(el).length || journal.some((e) => (e && (e.site || 'vinted')) === site) || (site === 'vinted' && st.vrmFlux && st.vrmFlux.vinted) || (site === 'vc' && st.vrmVcCapte && Object.keys(st.vrmVcCapte).length) || (site === 'lbc' && st.vrmFlux && st.vrmFlux.leboncoin);
+    out[site] = v ? Object.assign({ ok: false }, v) : vu ? { ok: true, k: 'ok', t: `${n} : tout marche.` } : { ok: null, k: 'pas-vu', t: `${n} : pas encore vu dans ce Chrome.` };
+  }
+  return out;
+}
+async function champsSanteAppareil() {
+  const out = {};
+  const v = await santeSites().catch(() => null);
+  if (v) { out.sante = {}; for (const k of Object.keys(v)) out.sante[k] = { k: String(v[k].k || ''), nom: String(v[k].nom || '').replace(/[^a-zA-Z_-]/g, '').slice(0, 40) }; }
+  try {
+    const g = await chrome.storage.local.get([ARRETS_DERNIERS, 'vrmVersionServie']);
+    const l = g[ARRETS_DERNIERS]; const d = Array.isArray(l) && l.length ? l[l.length - 1] : null;
+    if (d) out.arret = { site: String(d.site || ''), geste: String(d.geste || ''), code: String(d.code || ''), at: Number(d.at) || 0 };
+    const sv = g.vrmVersionServie && VERSION_RE.test(String(g.vrmVersionServie.v || '')) ? String(g.vrmVersionServie.v) : '';
+    if (sv) { out.servie = sv; out.depassee = versionPlusRecente(sv, CODE_VERSION); }
+  } catch (_) {}
+  return out;
+}
+// Recalcule, range, et dit UNE fois chaque nouveau problème (même site, même cause ⇒ jamais deux fois).
+let _santeSitesEnVol = null;
+function majSanteSites() {
+  if (_santeSitesEnVol) return _santeSitesEnVol;
+  _santeSitesEnVol = (async () => {
+    try {
+      const v = await santeSites(); if (!v) return null;
+      let avant = {}; try { avant = (await chrome.storage.local.get(SANTE_SITES))[SANTE_SITES] || {}; } catch (_) { avant = {}; }
+      const dits = Object.assign({}, avant.dits || {});
+      for (const site of Object.keys(v)) {
+        const x = v[site]; if (x.ok !== false) { delete dits[site]; continue; }
+        const cle = x.k + ':' + x.nom;
+        if (dits[site] === cle) continue;
+        dits[site] = cle;
+        noterDiag('sante_' + site + '_' + x.k);
+        try { if (chrome.notifications && chrome.notifications.create) chrome.notifications.create('vrm-sante-' + site, { type: 'basic', iconUrl: 'icon-128.png', title: 'VRM · ' + NOMS_SITES_SANTE[site], message: String(x.t).slice(0, 240), priority: 0 }, () => { void chrome.runtime.lastError; }); } catch (_) {}
+      }
+      await chrome.storage.local.set({ [SANTE_SITES]: { at: Date.now(), sites: v, dits } });
+      return v;
+    } catch (_) { return null; } finally { _santeSitesEnVol = null; }
+  })();
+  return _santeSitesEnVol;
+}
+// 5.448 (`rapportreperage`) : les 20 derniers ARRÊTS (site, geste, raison en code — jamais un texte de page, jamais un
+//    pseudo), pour « Envoyer un rapport » : avec le journal de repérage, la panne se lit sans rien demander à Julien.
+const ARRETS_DERNIERS = 'vrmArrets', ARRETS_MAX = 20;
+async function noterArret(site, geste, code) {
+  try {
+    const l = (await chrome.storage.local.get(ARRETS_DERNIERS))[ARRETS_DERNIERS];
+    const x = (Array.isArray(l) ? l : []).concat([{ site: String(site).slice(0, 10), geste: String(geste || '').replace(/[^a-zA-Z-]/g, '').slice(0, 24), code: String(code || '').replace(/[^a-z0-9-]/g, '').slice(0, 40), at: Date.now() }]).slice(-ARRETS_MAX);
+    await chrome.storage.local.set({ [ARRETS_DERNIERS]: x });
+  } catch (_) {}
+}
+// ══ 5.448 (`reglesservies`) — UNE VERSION DÉPASSÉE NE FAIT PAS UN GESTE DONT LA RÈGLE A CHANGÉ ══════════════════════
+//  Julien : « va encore plus loin ». Mesuré le 24 nov. : ses Chrome tournaient sur 5.409 à 5.440 en même temps. Une
+//  version dépassée continue de LIRE (rien n'est refusé), mais un GESTE dont la règle a changé depuis sa version (la
+//  liste `regles` de vrm.center/extension-version.json, lue avec la version servie) n'est pas fait avec l'ancienne
+//  règle : rien ne part, et la phrase dit la version installée, la version à installer et LE geste.
+async function regleDepassee(cle) {
+  try {
+    const g = (await chrome.storage.local.get('vrmVersionServie')).vrmVersionServie;
+    const min = g && g.regles && g.regles[cle];
+    if (!min || !VERSION_RE.test(String(min)) || !versionPlusRecente(min, CODE_VERSION)) return null;
+    noterDiag('regle_depassee_' + String(cle).replace(/[^a-z-]/g, '_').slice(0, 30));
+    const servie = VERSION_RE.test(String(g.v || '')) ? g.v : min;
+    return `Ton extension (${CODE_VERSION}) suit une ancienne règle pour ce geste : VRM ne le fait pas avec elle, rien n'est parti (les lectures continuent). Geste : installe la ${servie} — télécharge vrm.center/VRM-extension.zip, remplace le dossier, puis ⟳ dans chrome://extensions (sur l'iPhone : VRM-Orion.xpi).`;
+  } catch (_) { return null; }
 }
 // ══ 5.440 — uuid de la nouvelle messagerie ↔ ancien n° de la conversation (appris de la page, jamais deviné) ══════════
 const CONV_ROUTES = 'vrmConvRoutes', CONV_ROUTES_MAX = 300;
@@ -18357,12 +18545,13 @@ async function retenirRouteConv(conv, route) {
   try { const m = (await chrome.storage.local.get(CONV_ROUTES))[CONV_ROUTES] || {}; m[String(conv)] = { r: String(route), at: Date.now() }; const k = Object.keys(m).sort((a, b) => (m[b].at || 0) - (m[a].at || 0)); for (const x of k.slice(CONV_ROUTES_MAX)) delete m[x]; await chrome.storage.local.set({ [CONV_ROUTES]: m }); } catch (_) {}
 }
 async function routeDeConv(conv) { try { const m = (await chrome.storage.local.get(CONV_ROUTES))[CONV_ROUTES]; const e = m && m[String(conv)]; return e && RE_UUID_CONV.test(String(e.r || '')) ? String(e.r) : ''; } catch (_) { return ''; } }
-const PHRASE_PAS_PRETE = (m, n) => `${PHRASE_ELEMENT(m)} (${n} nouveaux essais faits). « Reprendre » quand la page est chargée.`;
+const PHRASE_PAS_PRETE = (m, n) => `${quoiElement(m)}, même après ${n} nouveaux essais : rien n'est parti. ${gesteElement(m)}`;
 async function etapeFormulaire(acc, tabId, etape, d) {
   // AUCUNE écriture hors file (choix n° 97) : une étape qui touche la page sans action en cours y entre elle-même (elle
   // n'attend jamais : file occupée par un autre compte, ou en pause ⇒ refusée, rien n'est parti).
   const uidEtape = String((acc && acc.vinted_user_id) || '');
   const dansLaSienne = () => !!(_fileCourante && (!_fileCourante.uid || _fileCourante.uid === uidEtape));
+  if (!ETAPES_LECTURE_FORM.has(etape)) { const dep = await regleDepassee('vinted:' + etape); if (dep) { noterArret('vinted', etape, 'version-depassee'); return { ok: false, code: 'version-depassee', raison: dep }; } }
   if (!ETAPES_LECTURE_FORM.has(etape) && !dansLaSienne()) {
     noterDiag('formulaire_hors_file');
     const r = await auPassageFile({ sorte: SORTE_ETAPE_FILE[etape] || 'autre', site: 'vinted', uid: acc && acc.vinted_user_id, itemId: (d && (d.id || d.draftId)) || '' }, () => (dansLaSienne() ? etapeFormulaire(acc, tabId, etape, d) : { ok: false, code: 'hors-file', raison: PHRASE_HORS_FILE }));
@@ -18409,7 +18598,7 @@ async function arretFormulaire(uid, acc) {
   { const fr = await lireFreinRepub(uid); if (fr) return { code: 'frein-refus', raison: phraseFreinRepub(fr) }; }
   return null;
 }
-const PHRASE_SELECTEUR = (m) => `Vinted a changé sa page (élément « ${String(m || '?')} » introuvable) : VRM s'arrête proprement`;
+const PHRASE_SELECTEUR = (m) => quoiElement(m);
 // Les valeurs de la fiche, telles que le formulaire les demande (identifiants de Vinted).
 function champsFormulaire(item) {
   const it = item && typeof item === 'object' ? item : {};
@@ -18522,7 +18711,7 @@ async function recreerParFormulaire(c) {
   const arret = async () => arretFormulaire(uid, acc);
   const stopAvant = (s) => fin({ accepte: false, code: s.code, raison: `${s.raison} — rien n'a été créé ni supprimé, ton annonce est intacte.` });
   const echecAvant = (o) => fin(o.code === 'captcha' ? { accepte: false, code: 'verification', raison: `${PHRASE_CAPTCHA} Rien n'a été créé ni supprimé, ton annonce est intacte.` }
-    : o.code === 'selecteur' ? { accepte: true, etape: 'echec', code: 'selecteur', manque: o.manque, raison: `${PHRASE_SELECTEUR(o.manque)} — rien n'a été créé ni supprimé, ton annonce est intacte.` }
+    : o.code === 'selecteur' ? { accepte: true, etape: 'echec', code: 'selecteur', manque: o.manque, raison: `${PHRASE_SELECTEUR(o.manque)} — rien n'a été créé ni supprimé, ton annonce est intacte. ${gesteElement(o.manque)}` }
       : o.code === 'refus' ? { accepte: true, etape: 'echec', raison: `Vinted a refusé une photo (${o.status || 0}) — rien n'a été créé ni supprimé, ton annonce est intacte.` }
         : { accepte: true, etape: 'echec', raison: `le formulaire de Vinted n'a pas répondu (${o.code || 'onglet'}) — rien n'a été créé ni supprimé, ton annonce est intacte.` });
   // 3. L'annonce ENREGISTRÉE dans VRM avant tout geste (même forme que la méthode directe : « Reprendre » la relit).
@@ -18638,7 +18827,7 @@ async function supprimerParFormulaire(acc, uid, id, tab, draftId, versB) {
   const o = await etapeFormulaire(acc, tab, 'supprimer', { id, cle: 's' + id });
   const pas = (cause, raison) => majVersBrouillon(uid, id, { etat: versB ? 'fait' : 'a-publier', draftId, supprime: false, cause }).then(() => ({ ok: false, parti: false, r: { accepte: true, etape: 'echec', draftId, raison } }));
   if (!o.ok && o.code === 'captcha' && !o.parti) return pas('verification', `${PHRASE_CAPTCHA} L'ancienne annonce n'a PAS été supprimée ; le brouillon attend.`);
-  if (!o.ok && o.code === 'selecteur') return pas('formulaire-selecteur', `${PHRASE_SELECTEUR(o.manque)} — l'ancienne annonce n'a PAS été supprimée ; le brouillon attend (« Reprendre »).`);
+  if (!o.ok && o.code === 'selecteur') return pas('formulaire-selecteur', `${PHRASE_SELECTEUR(o.manque)} — l'ancienne annonce n'a PAS été supprimée ; le brouillon attend (« Reprendre »). ${gesteElement(o.manque)}`);
   const rd = o.rep || null;
   if (!rd || !rd.status || rd.status >= 500) {
     await poserVerrouRecreer(id);
@@ -18664,11 +18853,11 @@ async function publierParFormulaire(acc, uid, id, tab, draftId, j) {
   if (await lireVerrouRecreer('b' + draftId)) { await majVersBrouillon(uid, id, { etat: 'mise-en-ligne-incertaine', draftId }); return { parti: false, r: { accepte: true, etape: 'incertain', draftId, raison: "une autre mise en ligne de ce brouillon est partie sans réponse claire — VRM n'en renvoie pas une seconde. Regarde ton dressing." } }; }
   etapeRepub(id, 'en-ligne');
   if (!(await naviguerTravail(tab, `https://${domaine}/items/${draftId}/edit`, new RegExp(`/items/${draftId}/edit`)))) { await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: "l'onglet de Vinted n'a pas ouvert le brouillon — il n'a pas été mis en ligne : « Reprendre » le fait, sans en créer un autre." } }; }
-  { const f = await etapeFormulaire(acc, tab, 'formulairePret'); if (!f.ok) { await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: 'formulaire-' + (f.code || 'ko') }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, ...(f.code === 'captcha' ? { code: 'verification' } : {}), raison: f.code === 'captcha' ? `${PHRASE_CAPTCHA} Le brouillon attend.` : `${PHRASE_SELECTEUR(f.manque)} — le brouillon attend (« Reprendre »).` } }; } }
+  { const f = await etapeFormulaire(acc, tab, 'formulairePret'); if (!f.ok) { await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: 'formulaire-' + (f.code || 'ko') }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, ...(f.code === 'captcha' ? { code: 'verification' } : {}), raison: f.code === 'captcha' ? `${PHRASE_CAPTCHA} Le brouillon attend.` : `${PHRASE_SELECTEUR(f.manque)} — le brouillon attend (« Reprendre »). ${gesteElement(f.manque)}` } }; } }
   await pauseFormulaire('champ', uid);
   await poserVerrouRecreer('b' + draftId);
   const o = await etapeFormulaire(acc, tab, 'publier', { draftId, cle: 'p' + draftId });
-  if (!o.ok && !o.parti && (o.code === 'captcha' || o.code === 'selecteur')) { await leverVerrouRecreer('b' + draftId); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, ...(o.code === 'captcha' ? { code: 'verification' } : {}), raison: o.code === 'captcha' ? `${PHRASE_CAPTCHA} Le brouillon attend.` : `${PHRASE_SELECTEUR(o.manque)} — le brouillon attend (« Reprendre »).` } }; }
+  if (!o.ok && !o.parti && (o.code === 'captcha' || o.code === 'selecteur')) { await leverVerrouRecreer('b' + draftId); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, ...(o.code === 'captcha' ? { code: 'verification' } : {}), raison: o.code === 'captcha' ? `${PHRASE_CAPTCHA} Le brouillon attend.` : `${PHRASE_SELECTEUR(o.manque)} — le brouillon attend (« Reprendre »). ${gesteElement(o.manque)}` } }; }
   const rc = o.rep || null;
   if (!rc || !rc.status || rc.status >= 500) {
     noterDiag('formulaire_mise_en_ligne_incertaine');
@@ -18794,7 +18983,28 @@ const GESTES_INTERFACE = Object.freeze({
 const ID_INTERFACE = /^[1-9]\d{0,19}$/;
 // Le chemin de « Voir tout » : lettres, chiffres, tirets, / — et il parle de notifications ; sinon la page connue.
 function pageNotificationsSure(p) { const c = String(p || '').replace(/\/+$/, ''); return /^\/[\w\-/]{1,80}$/.test(c) && /notif/i.test(c) && !/\.\./.test(c) ? c : '/member/notifications'; }
-const PHRASE_ELEMENT = (m) => `Vinted a changé sa page (élément « ${String(m || '?')} » introuvable ou en double) : VRM s'arrête proprement, rien n'est parti.`;
+// 5.448 (`adaptatif`) — CHAQUE ARRÊT DIT, EN MOTS SIMPLES, CE QUI MANQUE ET LE SEUL GESTE À FAIRE. Avant : « élément
+//    « message-envoyer » introuvable ou en double » (un nom de code, aucun geste). Maintenant : le bouton par SON nom à
+//    l'écran (`LIBELLES_APPRIS`), « introuvable » ou « deux boutons pareils » (VRM ne choisit jamais), « rien n'est parti »,
+//    puis UN geste : un bouton que VRM sait apprendre ⇒ relancer, il demandera de le toucher une fois ; un bouton des
+//    messages aux favoris (jamais appris) ou un autre ⇒ « Envoyer un rapport » (la fenêtre de l'extension), et le faire
+//    soi-même sur vinted.fr en attendant. Une vérification anti-robot n'est jamais un élément manquant (PHRASE_CAPTCHA).
+function phraseElement(m) {
+  const brut = String(m || '').toLowerCase();
+  const ambigu = /-ambigue?$/.test(brut);
+  const nom = brut.replace(/-(ambigue?|a-confirmer)$/, '');
+  const LIB_FAVORIS = { cloche: 'la cloche des notifications', 'favori-notification': 'la notification du favori', 'notifications-introuvables': 'la liste des notifications', 'conversation-pas-ouverte': 'la conversation' };
+  const lib = LIBELLES_APPRIS[nom] ? `le bouton « ${LIBELLES_APPRIS[nom]} »` : LIB_FAVORIS[nom] || (nom && nom !== 'geste' ? `l'élément « ${nom} »` : 'le bon élément');
+  const quoi = ambigu ? `VRM voit deux ${LIBELLES_APPRIS[nom] ? `boutons « ${LIBELLES_APPRIS[nom]} »` : 'éléments pareils'} sur la page Vinted et ne choisit jamais à ta place` : `VRM ne trouve plus ${lib} sur la page Vinted (Vinted a changé sa page)`;
+  const geste = APPRENABLES.has(nom) && !ambigu
+    ? "Geste : relance ; si VRM ne le retrouve toujours pas, il te demandera de toucher ce bouton UNE fois dans l'onglet de travail, puis il s'en souviendra."
+    : "Geste : fais-le toi-même sur vinted.fr cette fois, et touche « Envoyer un rapport » dans la fenêtre de l'extension : la correction arrive avec la prochaine version.";
+  return `${quoi} : rien n'est parti. ${geste}`;
+}
+const PHRASE_ELEMENT = (m) => phraseElement(m);
+// Le même texte en deux morceaux pour les phrases qui disent elles-mêmes ce qui n'est pas parti (republication, brouillon).
+const quoiElement = (m) => phraseElement(m).split(" : rien n'est parti. ")[0];
+const gesteElement = (m) => phraseElement(m).split(" : rien n'est parti. ")[1] || '';
 const PHRASE_IDENTITE = "la page de Vinted ne montre pas la bonne conversation / la bonne annonce : VRM s'arrête, rien n'est parti.";
 // Les codes d'une étape qui s'arrête AVANT le geste (rien n'a été cliqué) : certain, « rien n'est parti ».
 const AVANT_LE_GESTE = new Set(['selecteur', 'identite', 'captcha', 'etape', 'valeur', 'hors-vinted', 'script', 'onglet', 'photos-absentes', 'hors-file']);
@@ -18816,6 +19026,7 @@ function resultatInterface(o, geste) {
 // 5.433 (`filevisible`) : chaque geste d'interface entre dans la file (une étape de l'action en cours, ou une action à lui).
 const SORTE_GESTE_FILE = { 'message': 'message', 'offre': 'offre', 'favoriOuvrir': 'favori', 'favoriLien': 'favori', 'favoriListe': 'favori', 'favoriAccueil': 'favori', 'ouvrir': 'message', 'repondreOffre': 'reponse', 'masquer': 'masquer', 'supprimer': 'supprimer', 'prix': 'prix', 'bordereau': 'bordereau', 'evaluation': 'evaluation', 'vacances': 'vacances' };
 async function interfaceVinted(acc, geste, d, opts = {}) {
+  { const dep = await regleDepassee('vinted:' + geste); if (dep) { noterArret('vinted', geste, 'version-depassee'); return { status: 0, ok: false, json: null, rienParti: true, sansPage: 'element', manque: 'version', raison: dep }; } }
   const g = GESTES_INTERFACE[geste];
   const uid = String((acc && acc.vinted_user_id) || '');
   const x = d && typeof d === 'object' ? Object.assign({}, d) : {};
@@ -18851,6 +19062,7 @@ async function interfaceVinted(acc, geste, d, opts = {}) {
     if ((geste === 'favoriOuvrir' || geste === 'favoriLien' || geste === 'favoriListe' || geste === 'favoriAccueil') && r.ok && !r.conv) { try { const m = /^\/inbox\/([1-9]\d{0,19})\/?$/.exec(new URL(String((await chrome.tabs.get(tab)).url || '')).pathname); if (m) r.conv = m[1]; } catch (_) {} }
     if (r.ok && r.json && r.json.conversation && ID_INTERFACE.test(String(r.json.conversation.id)) && !r.conv) r.conv = String(r.json.conversation.id);
     noterDiag(`interface_${geste}_${r.ok ? (r.vu === false && ['message', 'offre'].includes(geste) ? 'pas_vu' : 'ok') : r.rienParti ? 'rien_' + String(r.manque || r.sansPage || 'parti').replace(/[^a-z-]/g, '').slice(0, 30) : 'incertain'}`);
+    if (!r.ok && r.rienParti) noterArret('vinted', geste, String(r.manque || r.sansPage || 'rien'));
     if (r.ok && r.vu === false && ['message', 'offre', 'masquer', 'vacances'].includes(geste)) noterCarnet(uid, 'pasvu');   // 5.420 : la santé du compte le compte
     // 5.438 (`santenote`) : Vinted a RÉPONDU non (4xx hors 401/403/429, déjà comptés ailleurs ; ou un refus dans une réponse 2xx) —
     //    jamais un « rien n'est parti » de VRM, jamais un doute : seulement SA réponse lue.
@@ -19204,7 +19416,7 @@ async function creerVintedFiche(msg, suivi) {
     if (ot.refus) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage({ sansPage: ot.refus === 'travail-ferme' ? 'onglet' : ot.refus, travailFerme: ot.refus === 'travail-ferme' }) };
     const tab = ot.tabId, domaine = acc.domain || 'www.vinted.fr';
     if (!(await naviguerTravail(tab, `https://${domaine}/items/new`, /\/items\/new/))) return { accepte: false, code: 'onglet-vinted', raison: RAISON_ONGLET_VINTED };
-    const echecF = (o) => (o.code === 'captcha' ? { accepte: false, code: 'verification', raison: `${PHRASE_CAPTCHA} Rien n’a été créé sur Vinted.` } : o.code === 'selecteur' ? { accepte: true, etape: 'echec', code: 'selecteur', manque: o.manque, raison: `${PHRASE_SELECTEUR(o.manque)} — rien n’a été créé sur Vinted.` } : { accepte: true, etape: 'echec', raison: `le formulaire de Vinted n'a pas répondu (${o.code || 'onglet'}) — rien n’a été créé sur Vinted.` });
+    const echecF = (o) => (o.code === 'captcha' ? { accepte: false, code: 'verification', raison: `${PHRASE_CAPTCHA} Rien n’a été créé sur Vinted.` } : o.code === 'selecteur' ? { accepte: true, etape: 'echec', code: 'selecteur', manque: o.manque, raison: `${PHRASE_SELECTEUR(o.manque)} — rien n’a été créé sur Vinted. ${gesteElement(o.manque)}` } : { accepte: true, etape: 'echec', raison: `le formulaire de Vinted n'a pas répondu (${o.code || 'onglet'}) — rien n’a été créé sur Vinted.` });
     let o = await etapeFormulaire(acc, tab, 'formulairePret'); if (!o.ok) return echecF(o);
     o = await etapeFormulaire(acc, tab, 'photos', { photos: ph.photos }); if (!o.ok) return o.code === 'refus' ? { accepte: true, etape: 'echec', raison: `Vinted n’a pas accepté une photo (${o.status || 0}) — rien n’a été créé sur Vinted` } : echecF(o);
     const envoyes = Array.isArray(o.envoyes) ? o.envoyes : null;   // 5.429 : chaque fichier ↔ l'identifiant rendu par Vinted
@@ -25866,6 +26078,7 @@ async function noterVcCapte(quoi, ok, n, extra) {
     const cur = (await chrome.storage.local.get('vrmVcCapte')).vrmVcCapte || {};
     if (ok) cur[quoi] = Object.assign({ at: Date.now(), n: Number(n) || 0 }, extra && extra.inconnu ? { inconnu: true } : {});
     await chrome.storage.local.set({ vrmVcCapte: cur });
+    if (ok) majSanteSites().catch(() => {});
     await noterFlux('vestiaire', ok);
   } catch (_) {}
 }
@@ -25976,7 +26189,12 @@ async function publierAppareilUn(force) {
       refus: (Array.isArray(x.refus) ? x.refus.slice(-5) : []) }, x.secours ? { secours: x.secours } : {});
   }
   const data = { v: 1, appareil: decrireAppareil(), ver, code: CODE_VERSION, at: new Date(t).toISOString(), atMs: t, flux: fl, vus: local[COMPTES_VUS_STORE] || {},
-    ...(local[DIAG_NAV] ? { diag: local[DIAG_NAV] } : {}) };   // 5.409 : le diagnostic des lectures de CE navigateur
+    ...(local[DIAG_NAV] ? { diag: local[DIAG_NAV] } : {}),   // 5.409 : le diagnostic des lectures de CE navigateur
+    // 5.448 (`santesites`) : pour l'app (« Tout va bien ? », page Extension) — des CODES seulement, jamais une phrase de page :
+    //   sante   { vinted|lbc|vc|ebay: { k: 'ok'|'element'|'forme'|'onglet'|'pas-vu', nom: code de l'élément ou de la page } }
+    //   arret   le dernier arrêt { site, geste, code, at } (`noterArret`) ;  servie / depassee : la version servie lue et
+    //           « ce navigateur est en retard » (true/false ; absent = pas su).
+    ...(await avecDelai(champsSanteAppareil(), 400, {}).catch(() => ({}))) };
   // Son propre échec ne doit pas devenir « le dernier refus » d'une capture.
   const garde = [_statutDernierRefus, _familleDernierRefus, _octetsDernierRefus];
   let ok = false;
@@ -26236,7 +26454,11 @@ async function versionServieConnue({ attendre = false } = {}) {
         let j = null; try { j = await r.json(); } catch (_) { j = null; }
         const v = j && typeof j.version === 'string' ? j.version : '';
         if (!VERSION_RE.test(v)) { noterDiag('version_servie_forme'); return null; }
-        try { await chrome.storage.local.set({ vrmVersionServie: { v, at: Date.now() } }); } catch (_) {}
+        // 5.448 (`reglesservies`) : les gestes dont la RÈGLE a changé, avec la version où elle a changé (« vinted:supprimer »
+        //    → « 5.448.0 »). Forme inconnue ⇒ rien retenu (aucun geste n'est bloqué sur une liste illisible).
+        const regles = {};
+        if (j && j.regles && typeof j.regles === 'object' && !Array.isArray(j.regles)) for (const k of Object.keys(j.regles).slice(0, 60)) if (/^(vinted|lbc|vc):[a-zA-Z-]{2,30}$/.test(k) && VERSION_RE.test(String(j.regles[k]))) regles[k] = String(j.regles[k]);
+        try { await chrome.storage.local.set({ vrmVersionServie: { v, at: Date.now(), regles } }); } catch (_) {}
         return v;
       } catch (_) { return null; }
     })().finally(() => { _versionServieEnVol = null; });
@@ -26669,7 +26891,7 @@ function etiquetteRapport(s) {
 async function construireRapport() {
   const t = Date.now();
   let local = {};
-  try { local = await chrome.storage.local.get([DIAG_BUF, 'vrmFlux', 'vrmDiagRecents', 'vrmFileReseau', REPUB_TEMOIN, 'vrmToutArrete']); } catch (_) { local = {}; }
+  try { local = await chrome.storage.local.get([DIAG_BUF, 'vrmFlux', 'vrmDiagRecents', 'vrmFileReseau', REPUB_TEMOIN, 'vrmToutArrete', TROUVE_JOURNAL, ARRETS_DERNIERS]); } catch (_) { local = {}; }
   const heure = (x) => { const n = Number(x); return n > 0 && n <= t + 60000 ? n : null; };
   const flux = {};
   for (const [pf, f] of Object.entries(local.vrmFlux || {})) {
@@ -26702,6 +26924,10 @@ async function construireRapport() {
     flux, compteurs, erreurs,
     files: { commandes: parEtape, reseau: fileReseau },
     pauses: { vinted: pause, toutArrete: !!(local.vrmToutArrete && local.vrmToutArrete.on === true), republication: heure(local[REPUB_TEMOIN]) },
+    // 5.448 (`rapportreperage`) : le journal de repérage (élément, stratégies essayées et leurs comptes) et les derniers
+    //    arrêts (site, geste, code) — des ÉTIQUETTES seulement (`etiquetteRapport`), jamais un texte de page ni un pseudo.
+    reperage: (Array.isArray(local[TROUVE_JOURNAL]) ? local[TROUVE_JOURNAL] : []).slice(-40).map((x) => ({ site: etiquetteRapport(x && (x.site || 'vinted')), nom: etiquetteRapport(x && x.nom), etape: etiquetteRapport(x && x.etape), at: heure(x && x.at), ambigu: !!(x && x.ambigu), essais: (Array.isArray(x && x.essais) ? x.essais : []).slice(0, 8).map((q) => ({ s: etiquetteRapport(q && q.s), n: Math.max(0, Math.min(999, Math.floor(Number(q && q.n) || 0))) })) })),
+    arrets: (Array.isArray(local[ARRETS_DERNIERS]) ? local[ARRETS_DERNIERS] : []).slice(-ARRETS_MAX).map((x) => ({ site: etiquetteRapport(x && x.site), geste: etiquetteRapport(String((x && x.geste) || '').toLowerCase()), code: etiquetteRapport(x && x.code), at: heure(x && x.at) })),
   };
 }
 async function envoyerRapport(extra = null) {
@@ -27113,7 +27339,10 @@ async function etatSite(url,tabId) {
   if (plateforme === 'vinted' && site && site.id && vrm && vrm.connecte === true && site.choix !== 'non') site.favoris = await favorisPourCarte(String(site.id), true).catch(() => null);
   // 5.377 : le réglage « Dire ce que l'extension capte » (true · false · null = pas su).
   const capteCoupeEtat = await capteCoupe();
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu, toutArrete, maj, aReparer, enAttenteReseau, secu, liens, capture, capteCoupe: capteCoupeEtat };
+  // 5.448 (`santesites`) : la ligne de santé de CE site (« tout marche » / « X ne marche plus : fais Y ») — `null` = pas su.
+  const santeToutes = await avecDelai(santeSites(), 400, null).catch(() => null);
+  const santeSite = santeToutes ? santeToutes[{ vinted: 'vinted', leboncoin: 'lbc', vestiaire: 'vc', ebay: 'ebay' }[plateforme]] || null : null;
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu, toutArrete, maj, aReparer, enAttenteReseau, secu, liens, capture, capteCoupe: capteCoupeEtat, santeSite };
 }
 // ══ 5.376 — « PLUS SIMPLE POUR TOUT LE MONDE » : CE QUI MANQUE, EN UNE PHRASE ══
 // Julien : « que ce soit beaucoup mieux et beaucoup plus simple pour tout le
@@ -28509,6 +28738,8 @@ async function etatPourApp() {
       avecDelai(etatIciPourApp(uid && !vintedPasSu ? String(uid) : ''), 900, null).catch(() => null).then((ici) => ({ ici })),
       // 5.420 (`santecomptes`) : la santé de chaque compte de CE navigateur (le dernier calcul de 30 s au plus) — `null` = pas su.
       avecDelai(santeComptes(), 250, null).catch(() => null).then((sante) => ({ sante })),
+      // 5.448 (`santesites`) : une ligne par site (« tout marche » / « X ne marche plus : fais Y ») — `null` = pas su.
+      avecDelai(santeSites(), 250, null).catch(() => null).then((sitesSante) => ({ sitesSante })),
       // 5.433 (`filevisible`) : la file des actions de CE navigateur (ce qui passe, ce qui attend, la pause) — `null` = pas su.
       avecDelai(vueFileApp(), 250, null).catch(() => null).then((file) => ({ file })),
       // 5.428 (`endirect`) : ce que fait l'extension en ce moment — `null` = pas su.
@@ -41206,6 +41437,7 @@ async function repondreVestiaire(msg) {
   try {
     const pause = await pauseVc();
     if (pause) return { accepte: false, code: 'vc-pause', raison: `Vestiaire a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };
+    { const dep = await regleDepassee('vc:message'); if (dep) { noterArret('vc', 'message', 'version-depassee'); return { accepte: false, code: 'version-depassee', raison: dep }; } }
     let ui;
     try { ui = (await chrome.storage.local.get(VC_UI))[VC_UI] || null; } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
     if (!ui || !ui.champ || !ui.envoi) return { accepte: false, code: 'pas-appris', raison: RAISONS_UI_VC['pas-appris'] };
@@ -41232,6 +41464,14 @@ async function repondreVestiaire(msg) {
     const depuis = Number(cpt.at) || (Date.now() - 5);   // SES places (X8)
     let rep = null;
     try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'vcEcrireUI', conv, texte, compte: o.compte }, { frameId: 0 }), 45000 + texte.length * 250, null); } catch (_) { rep = null; }
+    // 5.448 (`repriseseule`) : la messagerie de SON onglet n'avait pas fini de se charger (rien tapé) ⇒ 2 s, puis le même
+    //    ordre UNE fois de plus (son onglet n'est jamais rechargé : il peut y être en train d'écrire).
+    if (repriseSeule(rep)) {
+      noterDiag('vc_reprise_' + String(rep.erreur).replace(/[^a-z-]/g, '').slice(0, 30));
+      await new Promise((ok) => setTimeout(ok, 2000));
+      try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'vcEcrireUI', conv, texte, compte: o.compte }, { frameId: 0 }), 45000 + texte.length * 250, null); } catch (_) { rep = null; }
+    }
+    if (rep && rep.ok === true && !rep.statut && rep.erreur) noterArret('vc', 'message', rep.erreur);
     if (!rep || rep.ok !== true) { noterDiag('vc_ecrire_muet'); return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si le message est parti : regarde la conversation sur Vestiaire avant de renvoyer" }; }
     const e = String(rep.erreur || '');
     if (rep.defi === true || e === 'verification') {
@@ -43089,7 +43329,27 @@ async function noterUiLbc(msg) {
 // Le geste, dans un ONGLET DE TRAVAIL ouvert à l'adresse apprise. `{ rien: true, … }` = rien n'est parti (certain) ;
 // `{ rep }` = la réponse de lbc-ecrire.js (null : muet — on ne SAIT PAS).
 const SORTE_LBC_FILE = { pause: 'pause', supprime: 'retrait', prix: 'prix', repondre: 'message' };
+// ══ 5.448 (`repriseseule`) — LA PAGE PAS PRÊTE SE RATTRAPE SEULE ═══════════════════════════════════════════════════
+//  Julien : « l'extension doit être intelligente ». Une page de travail qui n'a pas encore dit son compte, dont le canal
+//  ne répond pas, ou dont la conversation n'est pas encore chargée n'est PAS une panne : l'onglet est rechargé (Leboncoin)
+//  ou réinterrogé (Vestiaire) UNE fois, puis l'ordre repart — seulement quand la page a répondu « rien n'est parti »
+//  (aucun clic, rien tapé). Sinon, l'arrêt d'avant, avec sa phrase et son geste. Aucune requête au site, aucun geste
+//  de plus : la même commande, dans la même place du plafond.
+const CODES_PAGE_PAS_PRETE = new Set(['page-muette', 'canal', 'conversation-pas-chargee', 'compte-pas-su', 'autre-conversation']);
+function repriseSeule(rep) {
+  return !!(rep && rep.ok === true && !rep.statut && rep.geste !== true && rep.envoye !== true && rep.tape !== true && CODES_PAGE_PAS_PRETE.has(String(rep.erreur || '')));
+}
+async function rechargerOnglet(tabId) {
+  try { await chrome.tabs.reload(tabId); } catch (_) { return false; }
+  for (const fin = Date.now() + 15000; Date.now() < fin;) {
+    let t = null; try { t = await chrome.tabs.get(tabId); } catch (_) { return false; }
+    if (t && t.status === 'complete') return true;
+    await new Promise((ok) => setTimeout(ok, 300));
+  }
+  return false;
+}
 async function gesteLbcInterface(quoi, compte, url, ordre, budgetMs) {
+  { const dep = await regleDepassee('lbc:' + quoi); if (dep) { noterArret('lbc', quoi, 'version-depassee'); return { rien: true, code: 'version-depassee', raison: dep }; } }
   // 5.433 (`filevisible`) : le geste entre dans la file (une étape de l'action en cours de CE compte, ou une action à lui).
   const uidF = 'lbc:' + String(compte || '').replace(/[^\w-]/g, '').slice(0, 30);
   if (!(_fileCourante && (!_fileCourante.uid || _fileCourante.uid === uidF))) return auPassageFile({ sorte: SORTE_LBC_FILE[quoi] || 'autre', site: 'leboncoin', uid: uidF, itemId: ordre && (ordre.ad || ordre.id) ? String(ordre.ad || ordre.id) : '' }, () => gesteLbcInterface(quoi, compte, url, ordre, budgetMs));
@@ -43100,19 +43360,33 @@ async function gesteLbcInterface(quoi, compte, url, ordre, budgetMs) {
   try { t = await chrome.tabs.create({ url, active: false }); } catch (_) { t = null; }
   if (!t || t.id == null) return { rien: true, code: 'onglet', raison: "VRM n'a pas pu ouvrir l'onglet Leboncoin de travail — rien n'est parti" };
   try {
-    const c = await attendreSessionOnglet(t.id, LBC_PAUSE_ATTENTE_SESSION_MS);
+    let c = await attendreSessionOnglet(t.id, LBC_PAUSE_ATTENTE_SESSION_MS);
+    // 5.448 : la page n'a pas encore dit son compte ⇒ rechargée UNE fois, la session relue.
+    if (!c || c.ambigue || !c.compte) { noterDiag('lbc_reprise_session'); if (await rechargerOnglet(t.id)) c = await attendreSessionOnglet(t.id, LBC_PAUSE_ATTENTE_SESSION_MS); }
     if (!c || c.ambigue || !c.compte) return { rien: true, code: 'session', raison: "Leboncoin ne m'a pas dit quel compte est connecté dans l'onglet de travail — ouvre leboncoin.fr connecté sur le bon compte, puis réessaie (rien n'est parti)" };
     if (c.compte !== 'lbc-account:' + compte) return { rien: true, code: 'autre-compte', autre: idCompteLbc(c.compte) };
-    let pret = false;
-    for (const fin = Date.now() + LBC_UI_PRET_MS; Date.now() < fin;) {
-      let r = null;
-      try { r = await avecDelai(chrome.tabs.sendMessage(t.id, { from: 'vrm-fond', action: 'lbcEcrirePret' }, { frameId: 0 }), 2000, null); } catch (_) { r = null; }
-      if (r && r.ok === true && r.canal === true) { pret = true; break; }
-      await new Promise((ok) => setTimeout(ok, 500));
-    }
+    const attendrePret = async () => {
+      for (const fin = Date.now() + LBC_UI_PRET_MS; Date.now() < fin;) {
+        let r = null;
+        try { r = await avecDelai(chrome.tabs.sendMessage(t.id, { from: 'vrm-fond', action: 'lbcEcrirePret' }, { frameId: 0 }), 2000, null); } catch (_) { r = null; }
+        if (r && r.ok === true && r.canal === true) return true;
+        await new Promise((ok) => setTimeout(ok, 500));
+      }
+      return false;
+    };
+    let pret = await attendrePret();
+    if (!pret) { noterDiag('lbc_reprise_canal'); if (await rechargerOnglet(t.id)) pret = await attendrePret(); }
     if (!pret) return { rien: true, code: 'canal', raison: "la page Leboncoin de travail ne répond pas à VRM — recharge leboncoin.fr, puis réessaie (rien n'est parti)" };
     let rep = null;
     try { rep = await avecDelai(chrome.tabs.sendMessage(t.id, Object.assign({}, ordre, { from: 'vrm-fond', action: 'lbcGesteUI', quoi, compte }), { frameId: 0 }), budgetMs, null); } catch (_) { rep = null; }
+    // 5.448 : la page a répondu « pas prête, rien n'est parti » ⇒ rechargée UNE fois, le même ordre repart.
+    if (repriseSeule(rep)) {
+      noterDiag('lbc_reprise_' + String(rep.erreur).replace(/[^a-z-]/g, '').slice(0, 30));
+      if (await rechargerOnglet(t.id) && await attendrePret()) {
+        try { rep = await avecDelai(chrome.tabs.sendMessage(t.id, Object.assign({}, ordre, { from: 'vrm-fond', action: 'lbcGesteUI', quoi, compte }), { frameId: 0 }), budgetMs, null); } catch (_) { rep = null; }
+      }
+    }
+    if (rep && rep.ok === true && !rep.statut && rep.erreur) noterArret('lbc', quoi, rep.erreur);
     return { rep };
   } finally { try { await chrome.tabs.remove(t.id); } catch (_) {} }
 }
@@ -44933,11 +45207,14 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
   const quota = detectLbcQuota(data);
   // Recon : un échantillon du corps (tronqué) + l'URL, pour inspecter la vraie forme.
   await storeLbcRecon({ url, quota: quota || undefined, sample: { url, at: new Date().toISOString(), found: found.length, quota, body: String(body).slice(0, 9000) } },owner);
-  if (found.length) return await storeLbcListings(url, found,owner);
+  if (found.length) { if (listeMoi) { try { await chrome.storage.local.remove('vrmLbcForme'); } catch (_) {} majSanteSites().catch(() => {}); } return await storeLbcListings(url, found,owner); }
   if(listeMoi&&sessListe&&(Array.isArray(data?.ads)||Array.isArray(data?.data?.ads))&&racine.length===0)return {ok:true,etat:'liste-vide',nombre:0,photos:0};
   // (1er nov., 5.296) Le tableau de bord pro qui rend `Ads: []` (Total 0) est une
   // liste VIDE, pas un format inconnu.
   if(/\/classifieds\/analysis\/list/i.test(String(url||''))&&data&&Array.isArray(data.Ads)&&data.Ads.length===0)return {ok:true,etat:'liste-vide',nombre:0,photos:0};
+  // 5.448 (`adaptatif`) : SA liste « Mes annonces » d'une forme que VRM ne reconnaît plus : rien n'est rangé (ci-dessus),
+  //    la forme est dans `lbc_recon` ; le compteur rend la panne visible dans le diagnostic (comme `forme_inconnue_*` sur Vinted).
+  if (listeMoi) { noterDiag('lbc_forme_inconnue_mes_annonces'); try { await chrome.storage.local.set({ vrmLbcForme: { at: Date.now() } }); } catch (_) {} majSanteSites().catch(() => {}); }
   return {ok:true,etat:'aucune-annonce-reconnue',nombre:0,photos:0};
 }
 // Télécharge les photos d'une paire en FICHIERS (fini les onglets). Rangées dans
