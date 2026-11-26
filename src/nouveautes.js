@@ -72,6 +72,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'envoi-confirme', date: '2026-11-25', titre: 'Envoyé seulement quand Vinted confirme', phrase: 'Sinon la raison, et l’heure où ça repart.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (23 nov., lot achats-hors-vinted) docs/passation/2026-11-23-achats-hors-vinted.md
   { id: 'ticket-plusieurs-articles', date: '2026-11-24', titre: 'Un ticket, plusieurs articles', phrase: 'Vide-grenier ou magasin : chaque article lu devient un achat.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (23 nov., captures iPhone de Julien : « ça doit être beaucoup mieux, plus pratique ») docs/passation/2026-11-23-republier-main-feuille.md
+  { id: 'republier-main-refait', date: '2026-11-24', titre: 'Republier à la main, plus simple', phrase: 'Une étape à la fois, toutes les photos, à ranger au doigt.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (24 nov., messages-pro — Julien : « ça fait encore beaucoup trop vieux ») docs/passation/2026-11-24-messages-pro.md
   { id: 'messages-pro', date: '2026-11-24', titre: 'Conversations : une offre claire, un champ moderne', phrase: 'L’offre dans le fil, ta marge, et « Lecture seule » dit une fois.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (24 nov., agir-tout, ext. 5.450) docs/passation/2026-11-24-agir-tout.md
@@ -108,6 +110,14 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'favoris-ancien', date: '2026-11-24', titre: 'Favoris : plus de « trop ancien » à tort', phrase: 'Les notifications sont lues jusqu’au bout avant de sauter un favori.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (24 nov., style-graphite — Julien : « un peu plus foncé en gris […] améliore tous les boutons […] change de style pour l'iPhone ») docs/passation/2026-11-24-style-graphite.md
   { id: 'styles-a-essayer', date: '2026-11-24', titre: 'Onze styles à essayer, dont Monochrome', phrase: 'Paramètres → Apparence → Style : touche, c’est appliqué.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot historique-paire) docs/passation/2026-11-23-historique-paire.md
+  { id: 'historique-rangee', date: '2026-11-23', titre: 'Quand ta paire a été rangée', phrase: 'La case du Stock entre dans l’histoire de la paire.', tab: 'garage', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot rentabilite-source) docs/passation/2026-11-23-rentabilite-source.md
+  { id: 'rentabilite-source', date: '2026-11-23', titre: 'Rentabilité par source d’achat', phrase: 'Bénéfice moyen, taux de revente et délai, par lieu d’achat.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot appareils-connectes) docs/passation/2026-11-23-appareils-connectes.md
+  { id: 'appareils-extension', date: '2026-11-23', titre: 'Appareils connectés : tes navigateurs avec l’extension', phrase: 'Chaque navigateur, sa version, sa dernière lecture ; déconnexion partout.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot scan-achat — Julien : « fais tout parfaitement ») docs/passation/2026-11-23-scan-achat.md
+  { id: 'scan-achat-numero', date: '2026-11-23', titre: 'Colis d’achat scanné : son N°, le geste', phrase: 'Rangé, à ranger dans telle case, à numéroter, ou déjà vendu.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov., colis-danger — Julien : « te prévient avant qu'il reparte ») docs/passation/2026-11-23-colis-danger.md
   { id: 'colis-en-danger', date: '2026-11-23', titre: 'Colis pas retiré : VRM te prévient', phrase: 'Vinted Go : la veille et le jour où il repart.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (23 nov., revue UX) docs/passation/2026-11-23-revue-ux.md
