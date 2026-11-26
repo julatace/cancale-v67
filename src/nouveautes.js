@@ -70,6 +70,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'chargement-propre', date: '2026-11-25', titre: 'Les écrans se remplissent sans sauter', phrase: 'Un chiffre pas encore lu se dessine, rien ne bouge.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., envoi-messages-offres, ext. 5.452 — Julien : « ça envoie pas bien les messages et les offres ») docs/passation/2026-11-25-envoi-messages-offres.md
   { id: 'envoi-confirme', date: '2026-11-25', titre: 'Envoyé seulement quand Vinted confirme', phrase: 'Sinon la raison, et l’heure où ça repart.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (24 nov., lot gains-reels — choisi par Julien) docs/passation/2026-11-24-gains-reels.md
+  { id: 'gains-reels', date: '2026-11-24', titre: 'Ce que tu gagnes vraiment', phrase: 'Par paire, modèle, source et compte, avec le délai de vente.', tab: 'stats', pour: 'tous', mode: 'tous' },
   // (23 nov., lot export-comptable) docs/passation/2026-11-23-export-comptable.md
   { id: 'export-depenses-sites', date: '2026-11-24', titre: 'Export comptable : dépenses et reçu par site', phrase: 'Tes frais notés et l’argent reçu par plateforme, dans le tableur.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (23 nov., lot achats-hors-vinted) docs/passation/2026-11-23-achats-hors-vinted.md
@@ -112,10 +114,10 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'favoris-ancien', date: '2026-11-24', titre: 'Favoris : plus de « trop ancien » à tort', phrase: 'Les notifications sont lues jusqu’au bout avant de sauter un favori.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (24 nov., style-graphite — Julien : « un peu plus foncé en gris […] améliore tous les boutons […] change de style pour l'iPhone ») docs/passation/2026-11-24-style-graphite.md
   { id: 'styles-a-essayer', date: '2026-11-24', titre: 'Onze styles à essayer, dont Monochrome', phrase: 'Paramètres → Apparence → Style : touche, c’est appliqué.', tab: 'settings', pour: 'tous', mode: 'tous' },
-  // (23 nov., lot historique-paire) docs/passation/2026-11-23-historique-paire.md
-  { id: 'historique-rangee', date: '2026-11-23', titre: 'Quand ta paire a été rangée', phrase: 'La case du Stock entre dans l’histoire de la paire.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (23 nov., lot rentabilite-source) docs/passation/2026-11-23-rentabilite-source.md
   { id: 'rentabilite-source', date: '2026-11-23', titre: 'Rentabilité par source d’achat', phrase: 'Bénéfice moyen, taux de revente et délai, par lieu d’achat.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot historique-paire) docs/passation/2026-11-23-historique-paire.md
+  { id: 'historique-rangee', date: '2026-11-23', titre: 'Quand ta paire a été rangée', phrase: 'La case du Stock entre dans l’histoire de la paire.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (23 nov., lot appareils-connectes) docs/passation/2026-11-23-appareils-connectes.md
   { id: 'appareils-extension', date: '2026-11-23', titre: 'Appareils connectés : tes navigateurs avec l’extension', phrase: 'Chaque navigateur, sa version, sa dernière lecture ; déconnexion partout.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (23 nov., lot scan-achat — Julien : « fais tout parfaitement ») docs/passation/2026-11-23-scan-achat.md
