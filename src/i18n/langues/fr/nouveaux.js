@@ -32,6 +32,7 @@ export default {
   "nouveaux.bilan.commencer": "Commencer ma journée",
   "nouveaux.reglage.bilan.lib": "Revoir mon bilan en une minute",
   "nouveaux.reglage.bilan.desc": "Ventes de l’année, colis, paires en ligne.",
+  "nouveaux.reglage.bilan.desc.art": "Ventes de l’année, colis, articles en ligne.",
   "nouveaux.reglage.colis.lib": "Revoir le premier colis",
   "nouveaux.reglage.colis.desc": "Imprimer, coller, déposer, suivre.",
   "nouveaux.colis.surtitre": "Ton premier colis · {i} sur {n}",

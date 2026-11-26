@@ -15,6 +15,8 @@
 //   pour    'tous' · 'sneakers' · 'autre' (pas que des sneakers) · 'pro' (micro, société, marge) ·
 //           'proprietaire' (16 nov. : le propriétaire de l'installation SEUL — Julien ; pas su ⇒ caché) ;
 //   mode    'tous' · 'complet' (un écran que l'affichage Simple ne montre pas).
+//   titreArt, phraseArt  (26 nov.) la version « article » d'un titre / d'une phrase qui dit « paire »,
+//           montrée hors Sneakers (`pourSonMot`) — exigée par audit-vocabulaire-article (sauf `pour: 'sneakers'`).
 //
 // L'état « vu » : `vrm_nouveautes_vues` = { vues: { [id]: iso } }, dans SYNC_KEYS
 // (le même sur tous ses appareils, par compte VRM). Règles PURES : aucune lecture.
@@ -31,10 +33,10 @@ export const NOUVEAUTES = Object.freeze([
   // (26 nov., fiabilite-vc-lbc — Julien : « les données doivent être fiables, pense à Vestiaire Co et Leboncoin ») src/enLigneVc.js
   { id: 'favoris-requetes', date: '2026-11-26', titre: 'Favoris envoyés sans clic', phrase: 'Extension 5.455.0 : plus fiable.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'observation-fichier', date: '2026-11-26', titre: 'Observer Vinted : enregistrer un fichier', phrase: 'Extension 5.454.1 : la frise en fichier.', tab: 'extension', pour: 'tous', mode: 'tous' },
-  { id: 'fiabilite-vc-lbc', date: '2026-11-26', titre: 'Vestiaire : en ligne et vendue, plus justes', phrase: 'Vente annulée : la paire reste. Lecture ancienne : à confirmer.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'fiabilite-vc-lbc', date: '2026-11-26', titre: 'Vestiaire : en ligne et vendue, plus justes', phrase: 'Vente annulée : la paire reste. Lecture ancienne : à confirmer.', phraseArt: 'Vente annulée : l’article reste. Lecture ancienne : à confirmer.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (26 nov., couleurs-14-15 — Julien : « j'aime bien le 14 et 15 » → « 14 en sombre, 15 en clair ») src/natif/jetons.css
   // (26 nov., loupe-retour — Julien : « la recherche se met automatiquement ») src/rechercheEcran.js loupeAFermerAuRetour
-  { id: 'loupe-retour', date: '2026-11-26', titre: 'Tout sur le N° : plus clair', phrase: 'La paire en tête, les actions en tuiles.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'loupe-retour', date: '2026-11-26', titre: 'Tout sur le N° : plus clair', phrase: 'La paire en tête, les actions en tuiles.', phraseArt: 'L’article en tête, les actions en tuiles.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'couleurs-14-15', date: '2026-11-26', titre: 'Nouvelles couleurs : blanc et graphite', phrase: 'Clair : noir et blanc. Sombre : graphite et vert.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (26 nov., classement-propre — capture de Julien : « c'est de la merde ») src/communaute/Communaute.jsx · communaute.css
   { id: 'classement-propre', date: '2026-11-26', titre: 'Classement plus net', phrase: 'Vrais boutons, pas de podium quand tu es seul.', tab: 'communaute', pour: 'tous', mode: 'tous' },
@@ -85,7 +87,7 @@ export const NOUVEAUTES = Object.freeze([
   // (23 nov., lot litiges-retours) docs/passation/2026-11-23-litiges-retours.md
   { id: 'litiges-retours-tous', date: '2026-11-24', titre: 'Litiges et retours : ventes et achats ensemble', phrase: 'Chaque litige ou retour, sa date limite lue et le lien.', tab: 'litiges', pour: 'tous', mode: 'tous' },
   // (24 nov., lot gains-reels — choisi par Julien) docs/passation/2026-11-24-gains-reels.md
-  { id: 'gains-reels', date: '2026-11-24', titre: 'Ce que tu gagnes vraiment', phrase: 'Par paire, modèle, source et compte, avec le délai de vente.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  { id: 'gains-reels', date: '2026-11-24', titre: 'Ce que tu gagnes vraiment', phrase: 'Par paire, modèle, source et compte, avec le délai de vente.', phraseArt: 'Par article, modèle, source et compte, avec le délai de vente.', tab: 'stats', pour: 'tous', mode: 'tous' },
   // (23 nov., lot export-comptable) docs/passation/2026-11-23-export-comptable.md
   { id: 'export-depenses-sites', date: '2026-11-24', titre: 'Export comptable : dépenses et reçu par site', phrase: 'Tes frais notés et l’argent reçu par plateforme, dans le tableur.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (23 nov., lot achats-hors-vinted) docs/passation/2026-11-23-achats-hors-vinted.md
@@ -113,7 +115,7 @@ export const NOUVEAUTES = Object.freeze([
   // (24 nov., livrable-2) docs/passation/2026-11-24-livrable.md (Suite)
   { id: 'aujourdhui-sans-saut', date: '2026-11-24', titre: 'Aujourd’hui ne bouge plus au chargement', phrase: 'Chaque carte tient sa place avant ses chiffres.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (24 nov., visuel-jeu — Julien : « c'est pas visuel, hésite pas à faire des designs comme jeu vidéo ») docs/passation/2026-11-24-visuel-jeu.md
-  { id: 'visuel-jeu', date: '2026-11-24', titre: 'Pop-ups et ventes en grandes photos', phrase: 'La paire en grand, son N°, une petite fête par vente.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'visuel-jeu', date: '2026-11-24', titre: 'Pop-ups et ventes en grandes photos', phrase: 'La paire en grand, son N°, une petite fête par vente.', phraseArt: 'L’article en grand, son N°, une petite fête par vente.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (24 nov., livrable — Julien : « écran de chargement etc., tout doit être parfait ») docs/passation/2026-11-24-livrable.md
   { id: 'chargement-squelette', date: '2026-11-24', titre: 'Ouverture plus calme, sans tirets', phrase: 'Les chiffres en lecture se dessinent à leur place.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (24 nov., wcag-aa — Julien : plugin fairmind-design, accessibilité) docs/passation/2026-11-24-wcag-aa.md
@@ -137,9 +139,9 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'extension-sante-sites', date: '2026-11-24', titre: 'Santé de chaque site dans l’extension', phrase: '« Tout marche », ou ce qui ne marche plus et le geste.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'extension-adaptative', date: '2026-11-24', titre: 'L’extension s’adapte quand un site change', phrase: 'Vinted, Leboncoin, Vestiaire, eBay : bouton retrouvé, sinon arrêt expliqué.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (24 nov., quatre-sites — Julien : « 1 paire → 4 sites ») docs/passation/2026-11-24-quatre-sites.md
-  { id: 'mettre-aussi-sur', date: '2026-11-24', titre: 'Une annonce Vinted sur trois autres sites', phrase: 'Fiche d’une paire → Ailleurs : Leboncoin, Vestiaire et eBay en un geste.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'mettre-aussi-sur', date: '2026-11-24', titre: 'Une annonce Vinted sur trois autres sites', phrase: 'Fiche d’une paire → Ailleurs : Leboncoin, Vestiaire et eBay en un geste.', phraseArt: 'Fiche d’un article → Ailleurs : Leboncoin, Vestiaire et eBay en un geste.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (24 nov., lbc-numero-ecrit — Julien : « Oui, relie par le N° ») docs/passation/2026-11-24-lbc-numero-ecrit.md
-  { id: 'lbc-numero-ecrit', date: '2026-11-24', titre: 'Leboncoin : relié par le N° écrit', phrase: 'Finis la description par « N°132 » : l’annonce rejoint la paire 132.', tab: 'leboncoin', pour: 'tous', mode: 'tous' },
+  { id: 'lbc-numero-ecrit', date: '2026-11-24', titre: 'Leboncoin : relié par le N° écrit', phrase: 'Finis la description par « N°132 » : l’annonce rejoint la paire 132.', phraseArt: 'Finis la description par « N°132 » : l’annonce rejoint l’article 132.', tab: 'leboncoin', pour: 'tous', mode: 'tous' },
   // (23 nov., extension 5.444 — Julien : « le panneau de l'extension n'affiche rien ») docs/passation/2026-11-23-vestiaire-complet.md
   { id: 'vestiaire-complet', date: '2026-11-24', titre: 'Vestiaire : litiges, achats et panneau réparés', phrase: 'Ventes à l’état juste, frise datée, achats et favoris dans l’extension.', tab: 'plat_vestiaire', pour: 'tous', mode: 'tous' },
   // (23 nov., ext. 5.445 — Julien : « pareil pour Leboncoin ») docs/passation/2026-11-23-leboncoin-complet.md
@@ -147,7 +149,7 @@ export const NOUVEAUTES = Object.freeze([
   // (23 nov., plateformes-repub-favoris) docs/passation/2026-11-23-plateformes-repub-favoris.md
   { id: 'ebay-en-serie', date: '2026-11-23', titre: 'eBay : offres et remises en vente en série', phrase: 'Coche les annonces, une confirmation, VRM les envoie une à une.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (23 nov., lot historique-paire) docs/passation/2026-11-23-historique-paire.md
-  { id: 'historique-rangee', date: '2026-11-23', titre: 'Quand ta paire a été rangée', phrase: 'La case du Stock entre dans l’histoire de la paire.', tab: 'garage', pour: 'tous', mode: 'tous' },
+  { id: 'historique-rangee', date: '2026-11-23', titre: 'Quand ta paire a été rangée', phrase: 'La case du Stock entre dans l’histoire de la paire.', titreArt: 'Quand ton article a été rangé', phraseArt: 'La case du Stock entre dans l’histoire de l’article.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (23 nov., lot photos-un-geste) docs/passation/2026-11-23-photos-un-geste.md
   { id: 'photos-un-geste', date: '2026-11-23', titre: 'Tes photos améliorées en un geste', phrase: 'Lumière, cadrage et fond uni sur toutes les photos, original gardé.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   // (23 nov., lot rentabilite-source) docs/passation/2026-11-23-rentabilite-source.md
@@ -181,7 +183,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'annulees-partout', date: '2026-11-22', titre: 'Ventes annulées : comptées sur chaque site', phrase: 'Nombre, montant et taux d’annulation par site, par compte, par mois.', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'vc-validation', date: '2026-11-22', titre: 'Vestiaire : en attente de validation', phrase: 'En attente, à corriger ou refusée : écrit sur l’annonce.', tab: 'plat_vestiaire', pour: 'tous', mode: 'tous' },
   // (22 nov., lot achats-lot — Julien : « l'app comprend que c'est un lot, divise l'achat ») docs/passation/2026-11-22-achats-lot.md
-  { id: 'achats-lot-diviser', date: '2026-11-22', titre: 'Diviser un achat en plusieurs paires', phrase: 'Lot ou achat simple : chaque paire, son N° et son prix.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'achats-lot-diviser', date: '2026-11-22', titre: 'Diviser un achat en plusieurs paires', phrase: 'Lot ou achat simple : chaque paire, son N° et son prix.', titreArt: 'Diviser un achat en plusieurs articles', phraseArt: 'Lot ou achat simple : chaque article, son N° et son prix.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., ext. 5.438) note de santé, compte précieux, relances, lots et brouillons seuls.
   { id: 'sante-note', date: '2026-11-22', titre: 'Une note de santé par compte', phrase: 'Elle baisse ? La cadence ralentit seule, puis remonte.', tab: 'adistance', pour: 'tous', mode: 'tous' },
   { id: 'compte-precieux', date: '2026-11-22', titre: 'Compte précieux : tout à la main', phrase: 'Cadence divisée par deux, rien en série ni d’automatique.', tab: 'adistance', pour: 'tous', mode: 'tous' },
@@ -195,7 +197,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'style-encre', date: '2026-11-22', titre: 'Aujourd’hui en tableau de bord, en noir', phrase: 'Le bénéfice du mois en grand, le graphique, les gestes en disques.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (22 nov., choix 1, 23 et 27 de Julien) docs/passation/2026-11-22-apres-finale-app.md
   { id: 'reprise-appareil', date: '2026-11-22', titre: 'Reprendre sur l’autre appareil', phrase: 'La fiche ouverte sur l’iPhone, en haut d’Aujourd’hui sur l’ordinateur.', tab: 'journee', pour: 'tous', mode: 'tous' },
-  { id: 'plus-vue', date: '2026-11-22', titre: 'Annonces qui ne sont plus vues', phrase: '« Plus vue depuis 6 j » et « Republier » pour cette paire.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'plus-vue', date: '2026-11-22', titre: 'Annonces qui ne sont plus vues', phrase: '« Plus vue depuis 6 j » et « Republier » pour cette paire.', phraseArt: '« Plus vue depuis 6 j » et « Republier » pour cet article.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (22 nov., chasse aux bugs P1-4) docs/passation/2026-11-22-chasse-bugs.md
   { id: 'mois-a-dater', date: '2026-11-22', titre: 'Argent : chaque mois dit ses ventes à dater', phrase: 'Un mois incomplet dit « au moins » et combien manquent.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (22 nov., ext. 5.435, choix 22 et 2 de Julien) docs/passation/2026-11-22-apres-finale-ext.md
@@ -203,7 +205,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'sites-egalite', date: '2026-11-22', titre: 'Leboncoin et Vestiaire comme Vinted', phrase: 'En pause, hors ligne, offres, retours et messages dans la recherche.', tab: 'cat_msg', pour: 'tous', mode: 'tous' },
   // (22 nov., choix n° 33, 35 et 36 de Julien) docs/passation/2026-11-22-offres-photos-resume.md
   { id: 'offres-sans-reponse', date: '2026-11-22', titre: 'Les offres restées sans réponse', phrase: 'La plus ancienne d’abord, avec le prix et ton plancher.', tab: 'messages', pour: 'tous', mode: 'tous' },
-  { id: 'photo-en-double', date: '2026-11-22', titre: 'Même photo sur deux annonces', phrase: 'Annonces → « Photo en double » : la même paire en ligne deux fois ?', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'photo-en-double', date: '2026-11-22', titre: 'Même photo sur deux annonces', phrase: 'Annonces → « Photo en double » : la même paire en ligne deux fois ?', phraseArt: 'Annonces → « Photo en double » : le même article en ligne deux fois ?', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   { id: 'resume-mois-email', date: '2026-11-22', titre: 'Le résumé du mois par e-mail', phrase: 'Le 1er : ventes, reçu, bénéfice, colis non retirés, URSSAF.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (22 nov., Julien : « j'ai fait 3 ventes mais pas que sur Leboncoin ») docs/passation/2026-11-22-integration-finale.md
   { id: 'annonces-vendues', date: '2026-11-22', titre: 'Annonces : toutes tes ventes, tous sites', phrase: 'Vendue montre aussi Vinted et eBay ; un filtre Site juste.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
@@ -212,22 +214,22 @@ export const NOUVEAUTES = Object.freeze([
   // (21 nov., Julien : style « comme Vintex — 2e jet » pour toute l'app) docs/passation/2026-11-21-style-vintex.md
   { id: 'style-sobre', date: '2026-11-21', titre: 'Une app plus claire, plus dense', phrase: 'Textes plus petits, cartes fines, étiquettes de couleur, accent vert sapin.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (21 nov., choix 5 et 7 de Julien) docs/passation/2026-11-21-fiche-sites.md
-  { id: 'fiche-sites', date: '2026-11-21', titre: 'La fiche dit où la paire est publiée', phrase: 'Une rangée par site, et « Publier » là où elle manque.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'fiche-sites', date: '2026-11-21', titre: 'La fiche dit où la paire est publiée', phrase: 'Une rangée par site, et « Publier » là où elle manque.', titreArt: 'La fiche dit où l’article est publié', phraseArt: 'Une rangée par site, et « Publier » là où il manque.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'serie-achats', date: '2026-11-21', titre: 'Relier tes achats arrivés, un par un', phrase: 'Dans Achats : la vente proposée, « Relier » ou « Passer ».', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien : « ça me propose des paires que je n'ai pas retirées », « ne compte pas quand je suis remboursé ») docs/passation/2026-11-21-relier-retires.md
-  { id: 'relier-retires', date: '2026-11-21', titre: 'Relier : seulement les paires déjà chez toi', phrase: 'Au point relais : « Je l’ai retiré » d’abord. Remboursé : hors dépenses.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'relier-retires', date: '2026-11-21', titre: 'Relier : seulement les paires déjà chez toi', phrase: 'Au point relais : « Je l’ai retiré » d’abord. Remboursé : hors dépenses.', titreArt: 'Relier : seulement les articles déjà chez toi', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'non-retires', date: '2026-11-21', titre: 'Statistiques des colis non retirés', phrase: 'Combien, quel argent, quel transporteur, quel point.', tab: 'dashboard', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien : « rends relier les achats à la vente / à l'annonce plus facile ») docs/passation/2026-11-21-relier-code.md
-  { id: 'retrait-billet', date: '2026-11-21', titre: 'Le code de retrait, en billet compact', phrase: 'Photo de la paire, code en gros, QR à côté.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'retrait-billet', date: '2026-11-21', titre: 'Le code de retrait, en billet compact', phrase: 'Photo de la paire, code en gros, QR à côté.', phraseArt: 'Photo de l’article, code en gros, QR à côté.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'relier-facile', date: '2026-11-21', titre: 'Relier : la meilleure proposition en tête', phrase: 'Un toucher puis « Oui » ; ou en série, vente après vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (21 nov., lot transp-depenses) docs/passation/2026-11-21-transp-depenses.md
   { id: 'depense-rapide', date: '2026-11-21', titre: '« + Dépense » en deux touchers', phrase: 'Montant, catégorie : c’est noté et déduit de ton bénéfice net.', tab: 'compta', pour: 'tous', mode: 'tous' },
   { id: 'transporteurs-sites', date: '2026-11-21', titre: 'Transporteurs : Leboncoin, eBay et Vestiaire aussi', phrase: 'Les mêmes délais pour chaque site, le site de chaque colis.', tab: 'stats', pour: 'tous', mode: 'tous' },
   // (21 nov., choix n° 36 et 41 de Julien) docs/passation/2026-11-21-rentabilite.md
   { id: 'vends-mieux', date: '2026-11-21', titre: 'Ce que tu vends le mieux', phrase: 'Par modèle, marque, taille : marge, vitesse, et quoi racheter.', tab: 'stats', pour: 'tous', mode: 'tous' },
-  { id: 'cout-reel-vente', date: '2026-11-21', titre: 'Le coût réel de chaque vente', phrase: 'Commission, boost, emballage, port, achat : le net de la paire.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'cout-reel-vente', date: '2026-11-21', titre: 'Le coût réel de chaque vente', phrase: 'Commission, boost, emballage, port, achat : le net de la paire.', phraseArt: 'Commission, boost, emballage, port, achat : le net de l’article.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (21 nov., choix n° 12 et 15 de Julien) docs/passation/2026-11-21-prio-recherche.md
-  { id: 'republier-priorite', date: '2026-11-21', titre: 'Les paires à republier en priorité, chaque jour', phrase: 'Classées avec leur raison ; coche, et l’atelier s’ouvre dans l’extension.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'republier-priorite', date: '2026-11-21', titre: 'Les paires à republier en priorité, chaque jour', phrase: 'Classées avec leur raison ; coche, et l’atelier s’ouvre dans l’extension.', titreArt: 'Les articles à republier en priorité, chaque jour', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'recherche-partout', date: '2026-11-21', titre: 'La recherche tolère les fautes de frappe', phrase: 'Logo du site sur chaque résultat ; un N° reste exact.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (21 nov., choix 77 de Julien : « Suivi des retours ») docs/passation/2026-11-21-retours-suivi.md
   { id: 'retours-suivi', date: '2026-11-21', titre: 'Retours : le colis qui revient, suivi', phrase: 'Son n°, ses étapes, le code au point ; arrivé, remets-le en ligne.', tab: 'ventes', pour: 'tous', mode: 'tous' },
@@ -312,7 +314,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'favoris-bleam', date: '2026-11-20', titre: 'Favoris : le message, puis l’offre', phrase: 'Message « lot » si on aime plusieurs articles ; offre jamais sous ton plancher.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien sur sa capture : « fais comme Vintex et comme l'extension avec les transporteurs ») src/natif/ecrans/Ventes.jsx (VentesBureau)
   // (20 nov., Julien : « trie du plus récent, des filtres, jamais un achat pas encore livré, il manque des paires ») docs/passation/2026-11-20-relier-achats.md
-  { id: 'relier-achats', date: '2026-11-20', titre: 'Relier : toutes tes paires, plus récentes d’abord', phrase: 'Filtres plateforme, marque, taille ; seuls les achats reçus.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'relier-achats', date: '2026-11-20', titre: 'Relier : toutes tes paires, plus récentes d’abord', phrase: 'Filtres plateforme, marque, taille ; seuls les achats reçus.', titreArt: 'Relier : tous tes articles, plus récents d’abord', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'achats-suivi', date: '2026-11-20', titre: 'Achats : n° de suivi en colonne', phrase: 'À l’ordinateur : touche pour copier, ↗ pour suivre.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'ventes-tableau', date: '2026-11-20', titre: 'Ventes en tableau, transporteur en logo', phrase: 'À l’ordinateur : tri, statut, imprimer ; la vente s’ouvre à droite.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « tout le site doit être comme la fiche Paramètres, simple et minimaliste » ; « les mêmes dispositions sur toutes les plateformes ») docs/passation/2026-11-20-minimaliste.md
@@ -333,13 +335,13 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'lbc-interesses', date: '2026-11-20', titre: 'Leboncoin : qui t’a écrit, par annonce', phrase: 'Leur écrire depuis le panneau VRM, une personne à la fois.', tab: 'messages', pour: 'tous', mode: 'tous' },
   { id: 'vc-date-baisse', date: '2026-11-20', titre: 'Vestiaire : date en ligne, baisse par règle', phrase: 'Lue chez Vestiaire, sinon « au moins » ; éteinte par défaut.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « on ne peut pas relier des annonces comme ça, on est obligé d'appuyer dessus ») src/natif/ecrans/PropositionLiaison.jsx
-  { id: 'relier-depuis-liste', date: '2026-11-20', titre: 'Relie une annonce depuis la liste', phrase: 'Sa paire proposée sur la rangée : un toucher, annulable 10 s.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'relier-depuis-liste', date: '2026-11-20', titre: 'Relie une annonce depuis la liste', phrase: 'Sa paire proposée sur la rangée : un toucher, annulable 10 s.', phraseArt: 'Son article proposé sur la rangée : un toucher, annulable 10 s.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « des boutons pas très beaux, pas fiables, améliore ça ») docs/passation/2026-11-20-boutons-natifs.md
   { id: 'boutons-natifs', date: '2026-11-20', titre: 'Des boutons nets et fiables partout', phrase: 'Un double toucher ne fait qu’un geste ; un bouton grisé dit pourquoi.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (20 nov., chantier « ce qui manque ») vues et favoris, stock au prix affiché, compte bloqué, Stock personnaliser.
   { id: 'vues-favoris', date: '2026-11-20', titre: 'Tes vues et favoris, chaque jour', phrase: 'Le total de tes annonces en ligne, et le gain du jour.', tab: 'journee', pour: 'tous', mode: 'tous' },
-  { id: 'stock-prix-affiche', date: '2026-11-20', titre: 'Ton stock au prix affiché', phrase: 'Une paire comptée une fois, même publiée sur plusieurs sites.', tab: 'journee', pour: 'tous', mode: 'tous' },
-  { id: 'meuble-personnaliser', date: '2026-11-20', titre: 'Personnalise tes meubles, range la pièce', phrase: 'Style, couleur, cases, nom ; à la souris, glisse une paire.', tab: 'garage', pour: 'tous', mode: 'complet' },
+  { id: 'stock-prix-affiche', date: '2026-11-20', titre: 'Ton stock au prix affiché', phrase: 'Une paire comptée une fois, même publiée sur plusieurs sites.', phraseArt: 'Un article compté une fois, même publié sur plusieurs sites.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'meuble-personnaliser', date: '2026-11-20', titre: 'Personnalise tes meubles, range la pièce', phrase: 'Style, couleur, cases, nom ; à la souris, glisse une paire.', phraseArt: 'Style, couleur, cases, nom ; à la souris, glisse un article.', tab: 'garage', pour: 'tous', mode: 'complet' },
   // (20 nov., Julien : « l'app lui donne son N°, te dit dans quelle case la ranger ») docs/passation/2026-11-20-arrivee-scan.md
   { id: 'arrivee-scan', date: '2026-11-20', titre: 'Un colis arrive : son N°, sa case', phrase: '« J’ai retiré » ou le scan : range-le en un toucher.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « un parcours de 5 minutes […] une démo […] Tout va bien ? qui dit exactement quoi faire ») docs/passation/2026-11-20-demarrage-store.md
@@ -347,7 +349,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'tout-va-bien-points', date: '2026-11-20', titre: 'Tout va bien ? dit quoi faire', phrase: 'Chaque point a son geste, le plus important d’abord.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (19 nov., Julien : « qu'il occupe toute la largeur de l'écran […] une animation quand je range ») docs/passation/2026-11-19-stock-etiquetage.md
   // (20 nov.) Colis à retirer : contenu d'abord, trajet, QR à droite, code gardé jusqu'à la fin prouvée — docs/passation/2026-11-20-retraits-visuel.md.
-  { id: 'retraits-visuel', date: '2026-11-20', titre: 'Colis à retirer : contenu, trajet et QR', phrase: 'La paire en grand, son trajet daté, le QR à droite.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'retraits-visuel', date: '2026-11-20', titre: 'Colis à retirer : contenu, trajet et QR', phrase: 'La paire en grand, son trajet daté, le QR à droite.', phraseArt: 'L’article en grand, son trajet daté, le QR à droite.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'stock-meubles', date: '2026-11-19', titre: 'Tes meubles dessinés, sur toute la largeur', phrase: '« Ranger » sur chaque article : il vole dans sa case.', tab: 'garage', pour: 'tous', mode: 'complet' },
   { id: 'methode-etiquetage', date: '2026-11-19', titre: 'Choisis ta méthode d’étiquetage', phrase: 'Qui numérote, lettre ou chiffres, étiquette écrite ou imprimée.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (19 nov., fiche directe) Un toucher ouvre la fiche, qui montre tout : faits, sites, gestes — docs/passation/2026-11-19-fiche-directe.md.
@@ -395,7 +397,7 @@ export const NOUVEAUTES = Object.freeze([
   //  — les entrées « VRM adopte le design de l’aperçu » et « Essaie le style Apple » (18 nov.) sont retirées : ces habillages et le réglage « Style » n'existent plus.
   { id: 'un-seul-design', date: '2026-11-19', titre: 'Un seul design, clair et lisible', phrase: 'Plus de réglage Style ni Ancien design : tout se lit.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « tout doit être parfait […] de annonce à brouillon et de brouillon à en ligne ») docs/passation/2026-11-17-republication-parfaite.md
-  { id: 'republication-parfaite', date: '2026-11-17', titre: 'Republier : chaque étape visible, tout se reprend', phrase: 'Coffre, brouillon, supprimée, en ligne ; « Reprendre » finit une paire arrêtée.', tab: 'republier', pour: 'tous', mode: 'tous' },
+  { id: 'republication-parfaite', date: '2026-11-17', titre: 'Republier : chaque étape visible, tout se reprend', phrase: 'Coffre, brouillon, supprimée, en ligne ; « Reprendre » finit une paire arrêtée.', phraseArt: 'Coffre, brouillon, supprimée, en ligne ; « Reprendre » finit un article arrêté.', tab: 'republier', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « il faut une liste avec les favoris pour pouvoir les sélectionner etc ») docs/passation/2026-11-17-extension-favoris-liste.md
   { id: 'extension-favoris-liste', date: '2026-11-17', titre: 'Tes favoris en liste, à cocher, sur Vinted', phrase: 'Installe la 5.407 : coche, relis le récapitulatif, puis confirme.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « pas échanger des messages dans mon app, mais sur Discord ») docs/passation/2026-11-17-carte-coucou.md
@@ -447,7 +449,7 @@ export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot argent-mieux) docs/passation/2026-11-16-argent-mieux.md
   { id: 'argent-lisible', date: '2026-11-16', titre: 'Argent : tout se lit, clair ou sombre', phrase: 'Les ventes pas comptées tiennent en une ligne par raison.', tab: 'argent', pour: 'tous', mode: 'tous' },
   // (16 nov.) docs/passation/2026-11-16-design-restes.md
-  { id: 'paire-monte-sites', date: '2026-11-16', titre: 'Leboncoin, eBay, Vestiaire : la paire monte', phrase: 'Touche une annonce : prix, jours, favoris et prix d’achat sur place.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'paire-monte-sites', date: '2026-11-16', titre: 'Leboncoin, eBay, Vestiaire : la paire monte', phrase: 'Touche une annonce : prix, jours, favoris et prix d’achat sur place.', titreArt: 'Leboncoin, eBay, Vestiaire : l’article monte', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (16 nov., lot extension-restes, extension 5.395) docs/passation/2026-11-16-extension-restes.md
   { id: 'fiche-numero-publier', date: '2026-11-16', titre: 'Son N° à côté de « Publier »', phrase: 'Ouvre Vinted depuis la fiche : l’annonce prend son N°.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'creer-vinted-studio', date: '2026-11-16', titre: 'Créer sur Vinted reprend tes photos du studio', phrase: 'Une fiche sans photo prend celles de son N°.', tab: 'annonces', pour: 'tous', mode: 'tous' },
@@ -560,7 +562,7 @@ export const NOUVEAUTES = Object.freeze([
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-depoli.md — le thème « Verre dépoli ».
   { id: 'verre-depoli', date: '2026-11-15', titre: 'Nouveau thème : verre dépoli sur bleu profond', phrase: 'Le chiffre du jour en blanc, tout se lit sur le verre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., lot deux-comptes) docs/passation/2026-11-15-deux-comptes-favoris.md — la même paire sur deux comptes Vinted.
-  { id: 'deux-comptes', date: '2026-11-15', titre: 'Une paire en vente sur deux comptes', phrase: 'VRM la montre côte à côte : tu retires l’une sur Vinted.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'deux-comptes', date: '2026-11-15', titre: 'Une paire en vente sur deux comptes', phrase: 'VRM la montre côte à côte : tu retires l’une sur Vinted.', titreArt: 'Un article en vente sur deux comptes', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., lot favoris-sites, extension 5.392) — une offre aux personnes qui ont aimé, sur Vestiaire.
   { id: 'vestiaire-aimes', date: '2026-11-15', titre: 'Vestiaire : une offre à ceux qui aiment', phrase: 'Messages → Vestiaire : une offre par personne, sur ton toucher.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « imagine que la personne publie sur l'app Vinted… ») docs/passation/2026-11-15-numeros-masquees.md
@@ -588,11 +590,11 @@ export const NOUVEAUTES = Object.freeze([
   // (15 nov., extension 5.383) Ventes Vestiaire : l'état le plus frais gagne, l'état en mots, le prix de vente.
   { id: 'vestiaire-ventes-justes', date: '2026-11-15', titre: 'Ventes Vestiaire : le vrai état, le vrai prix', phrase: 'Expédiée, en livraison, payée : plus de code ni de faux retard.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.384, Julien : « vraiment exactement la même photo ») docs/passation/2026-11-15-meme-photo.md
-  { id: 'meme-photo', date: '2026-11-15', titre: 'Même photo qu’une paire Vinted : relier', phrase: 'Leboncoin, eBay, Vestiaire : la même photo est reconnue, tu relies.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'meme-photo', date: '2026-11-15', titre: 'Même photo qu’une paire Vinted : relier', phrase: 'Leboncoin, eBay, Vestiaire : la même photo est reconnue, tu relies.', titreArt: 'Même photo qu’un article Vinted : relier', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., lot retours) docs/passation/2026-11-15-retours.md — « À renvoyer » : une carte par retour d'achat.
   { id: 'retours-a-renvoyer', date: '2026-11-15', titre: 'Retours : bordereau, date et heure, une carte', phrase: 'En tête de Ma journée : imprime, dépose, suis le remboursement.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « fais de plus belles notifications ») docs/passation/2026-11-15-notifications-belles.md
-  { id: 'notifications-belles', date: '2026-11-15', titre: 'Des notifications courtes, la paire nommée', phrase: 'Dates en clair, sans pseudo d’acheteur, le toucher ouvre le bon écran.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  { id: 'notifications-belles', date: '2026-11-15', titre: 'Des notifications courtes, la paire nommée', phrase: 'Dates en clair, sans pseudo d’acheteur, le toucher ouvre le bon écran.', titreArt: 'Des notifications courtes, l’article nommé', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.381) docs/passation/2026-11-15-publier-partout-categories.md — src/correspondances.js
   { id: 'publier-partout-categories', date: '2026-11-15', titre: 'Publier partout : la bonne catégorie sur chaque site', phrase: 'Catégorie Vinted traduite pour Leboncoin, Vestiaire, eBay ; sinon VRM demande.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.380, captures de Julien) La carte du logo sur vinted.fr : docs/passation/2026-11-15-carte-extension.md
@@ -602,10 +604,10 @@ export const NOUVEAUTES = Object.freeze([
   // (15 nov., extension 5.378) Dates de versement : relevé vérifié avant de dater, délai en heures de Vinted ouvert.
   { id: 'versements-releve-verifie', date: '2026-11-15', titre: 'Dates de versement : relevé vérifié, délai honnête', phrase: 'Le relevé ne date rien avant cinq accords ; délai en heures.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « horriblement moche », « ne mets pas paires, tu mets annonces ») docs/passation/2026-11-15-annonces-propre.md
-  { id: 'annonces-propre', date: '2026-11-15', titre: 'Annonces : logos nets, nombre par site', phrase: '« Paires » devient « Annonces » ; Relier à Vinted tient dans la ligne.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'annonces-propre', date: '2026-11-15', titre: 'Annonces : logos nets, nombre par site', phrase: '« Paires » devient « Annonces » ; Relier à Vinted tient dans la ligne.', phraseArt: '« Articles » devient « Annonces » ; Relier à Vinted tient dans la ligne.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (14 nov., décision de Julien) Studio bleu clair : la fondation (coque, barre, disque, quatre formes de bouton).
   { id: 'studio-bleu-clair', date: '2026-11-14', titre: 'VRM en bleu clair, un disque en bas', phrase: 'Touche le « + » : chercher, scanner, publier, imprimer.', tab: 'journee', pour: 'tous', mode: 'tous' },
-  { id: 'studio-paires', date: '2026-11-14', titre: 'Tes paires : touche-en une, elle monte', phrase: 'Liste en rangées, prix, acheté, jours, favoris ; Baisser ou Republier.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'studio-paires', date: '2026-11-14', titre: 'Tes paires : touche-en une, elle monte', phrase: 'Liste en rangées, prix, acheté, jours, favoris ; Baisser ou Republier.', titreArt: 'Tes articles : touche-en un, il monte', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'studio-ventes', date: '2026-11-14', titre: 'À expédier : un chiffre, un bouton Imprimer', phrase: 'Tuiles pour filtrer, À retirer en tête d’Achats avec ses codes.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'studio-argent-messages-reglages', date: '2026-11-14', titre: 'Argent, Messages et Paramètres en bleu clair', phrase: 'Grands chiffres posés, quatre formes de bouton, rien n’a disparu.', tab: 'compta', pour: 'tous', mode: 'tous' },
   { id: 'imprimer-un-toucher', date: '2026-11-14', titre: 'Imprimer en un toucher', phrase: 'Le PDF tamponné s’ouvre tout de suite ; le tampon se corrige après.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
@@ -616,13 +618,13 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'studio-journee', date: '2026-11-14', titre: 'Ma journée en tuiles, sous la lumière', phrase: 'Chaque tuile porte son geste ; touche-la, elle se déplie.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'accompagnement', date: '2026-11-14', titre: 'Chaque geste dit ce qu’il fait', phrase: 'Avant, pendant, après ; et si ça bloque, pourquoi et quoi faire.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
   // (14 nov., idées 154, 157, 158) docs/passation/2026-11-14-idees-paires.md
-  { id: 'ligne-de-temps-paire', date: '2026-11-14', titre: 'L’histoire d’une paire, dans l’ordre', phrase: 'Achetée, publiée, baissée, vendue, livrée : chaque date avec sa preuve.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'ligne-de-temps-paire', date: '2026-11-14', titre: 'L’histoire d’une paire, dans l’ordre', phrase: 'Achetée, publiée, baissée, vendue, livrée : chaque date avec sa preuve.', titreArt: 'L’histoire d’un article, dans l’ordre', phraseArt: 'Acheté, publié, baissé, vendu, livré : chaque date avec sa preuve.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'dupliquer-autre-taille', date: '2026-11-14', titre: 'Dupliquer une annonce dans une autre taille', phrase: 'Mêmes textes, nouvelle taille, N° neuf ; puis Créer sur Vinted.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'meilleure-heure-republier', date: '2026-11-14', titre: 'La meilleure heure pour republier', phrase: 'Tirée de tes ventes datées, proposée quand tu programmes.', tab: 'republier', pour: 'tous', mode: 'tous' },
   // (14 nov., extension 5.377) « L'extension a capté » et la carte du logo en trois onglets.
   { id: 'extension-capte', date: '2026-11-14', titre: 'L’extension dit ce qu’elle vient de capter', phrase: 'Un petit message près du logo VRM : ventes, bordereaux, messages captés.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'carte-favoris-annonces-ventes', date: '2026-11-14', titre: 'Favoris, annonces, ventes dans la carte VRM', phrase: 'Le compte connecté d’abord ; les autres floutés, sans action possible.', tab: 'favoris', pour: 'tous', mode: 'tous' },
-  { id: 'exemple-impossible-a-confondre', date: '2026-11-14', titre: 'Exemple avec photos, impossible à confondre', phrase: 'Vraies photos de paires, bandeau et cadre « Exemple » partout.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'exemple-impossible-a-confondre', date: '2026-11-14', titre: 'Exemple avec photos, impossible à confondre', phrase: 'Vraies photos de paires, bandeau et cadre « Exemple » partout.', phraseArt: 'Vraies photos d’articles, bandeau et cadre « Exemple » partout.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'refonte-listes', date: '2026-11-14', titre: 'Annonces et Ventes : la liste d’abord', phrase: 'Chiffres en une bande, compte en menu, alertes dans « À faire ».', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (14 nov., lot colis-plus : propositions 96 à 101, puis l'impression guidée)
   { id: 'impression-guidee', date: '2026-11-14', titre: 'Tout imprimer, guidé pas à pas', phrase: 'Ton imprimante, le tampon de chaque bordereau, puis « Tout est sorti ? ».', tab: 'ventes', pour: 'tous', mode: 'tous' },
@@ -637,7 +639,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'questions-frequentes', date: '2026-11-14', titre: '« Dispo ? » repéré, réponse proposée', phrase: 'Cinq langues, sans IA ; ton clic envoie.', tab: 'messages', pour: 'tous', mode: 'tous' },
   { id: 'catalogue-prive', date: '2026-11-14', titre: 'Catalogue privé en un lien', phrase: 'Photos, tailles, prix ; jamais ton prix d’achat. Expire seul.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'liste-recherche', date: '2026-11-14', titre: 'Ta liste de recherche sur Vinted', phrase: 'L’encart VRM te dit quand l’annonce ouverte correspond.', tab: 'achats', pour: 'tous', mode: 'tous' },
-  { id: 'carnet-vendeurs', date: '2026-11-14', titre: 'Carnet des vendeurs chez qui tu achètes', phrase: 'Ce que leurs paires ont rapporté, délais, soucis.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'carnet-vendeurs', date: '2026-11-14', titre: 'Carnet des vendeurs chez qui tu achètes', phrase: 'Ce que leurs paires ont rapporté, délais, soucis.', phraseArt: 'Ce que leurs articles ont rapporté, délais, soucis.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'achat-meme-annonce', date: '2026-11-14', titre: 'Annonce déjà achetée signalée', phrase: 'Par son identifiant Vinted, dans Achats et sur Vinted.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'carte-logo-favoris', date: '2026-11-14', titre: 'Messages aux favoris lancés depuis Vinted', phrase: 'Sur vinted.fr, le logo VRM montre à qui écrire et lance l’envoi.', tab: 'favoris', pour: 'tous', mode: 'tous' },
   { id: 'carte-logo-site', date: '2026-11-14', titre: 'Le logo ouvre tes pages Vinted', phrase: 'Ventes, messages, dressing du compte ouvert, sans quitter Vinted.', tab: 'journee', pour: 'tous', mode: 'tous' },
@@ -649,16 +651,16 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'accueil-visite-ecrans', date: '2026-11-14', titre: 'Une visite guidée de quatre écrans', phrase: 'Des bulles sur les bons boutons ; le « ? » la rejoue.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'accueil-mots-conseil', date: '2026-11-14', titre: 'Mots expliqués et conseil du jour', phrase: 'Touche un mot souligné ; un conseil par jour, 30 jours.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'accueil-essai-bilan', date: '2026-11-14', titre: 'Ce que VRM a fait pendant ton essai', phrase: 'Colis suivis, bordereaux imprimés, temps estimé, jours restants.', tab: 'journee', pour: 'tous', mode: 'tous' },
-  { id: 'refonte-coque', date: '2026-11-14', titre: 'Quatre onglets et un menu en haut', phrase: 'Paires réunit Annonces, Stock, Achats ; le reste sous ☰.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'refonte-coque', date: '2026-11-14', titre: 'Quatre onglets et un menu en haut', phrase: 'Paires réunit Annonces, Stock, Achats ; le reste sous ☰.', phraseArt: 'Articles réunit Annonces, Stock, Achats ; le reste sous ☰.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'ergonomie-gestes', date: '2026-11-14', titre: 'Republier ou publier partout depuis la loupe', phrase: 'Tape le N° : « Republier à la main » ou « Publier partout ».', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'refonte-achats', date: '2026-11-14', titre: 'Achats plus dense, plus net', phrase: 'Huit achats par écran, tes sources en chiffres, recherche par N°.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'refonte-messages-stock', date: '2026-11-14', titre: 'Messages, E-mails et Stock : la liste d’abord', phrase: 'Rangées denses, recherche en haut, fil comme sur iPhone.', tab: 'garage', pour: 'tous', mode: 'tous' },
   { id: 'photo-floue', date: '2026-11-14', titre: 'Photo floue ou sombre signalée', phrase: 'Mesuré sur ton téléphone, avant la mise en ligne. Jamais bloquant.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
-  { id: 'seance-photo', date: '2026-11-14', titre: 'Séance photo, dans l’ordre des N°', phrase: 'Les paires sans photo ou à reprendre, cochées une à une.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
-  { id: 'recherche-couleur', date: '2026-11-14', titre: 'Chercher tes paires par couleur', phrase: 'Tape « bleu » dans la loupe : la couleur vient de tes photos.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
-  { id: 'note-dictee', date: '2026-11-14', titre: 'Dicter une note sur une paire', phrase: 'Ton téléphone écrit ce que tu dis dans sa note.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
-  { id: 'certificat-paire', date: '2026-11-14', titre: 'Le certificat d’authenticité rangé avec la paire', phrase: 'PDF ou photo, dans sa fiche, prêt à envoyer à un acheteur.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
-  { id: 'fusion-fiches', date: '2026-11-14', titre: 'Fusionner deux fiches de la même paire', phrase: 'Sur ton clic, avec un aperçu ; aucun N° perdu, réversible 30 jours.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'seance-photo', date: '2026-11-14', titre: 'Séance photo, dans l’ordre des N°', phrase: 'Les paires sans photo ou à reprendre, cochées une à une.', phraseArt: 'Les articles sans photo ou à reprendre, cochés un à un.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'recherche-couleur', date: '2026-11-14', titre: 'Chercher tes paires par couleur', phrase: 'Tape « bleu » dans la loupe : la couleur vient de tes photos.', titreArt: 'Chercher tes articles par couleur', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'note-dictee', date: '2026-11-14', titre: 'Dicter une note sur une paire', phrase: 'Ton téléphone écrit ce que tu dis dans sa note.', titreArt: 'Dicter une note sur un article', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'certificat-paire', date: '2026-11-14', titre: 'Le certificat d’authenticité rangé avec la paire', phrase: 'PDF ou photo, dans sa fiche, prêt à envoyer à un acheteur.', titreArt: 'Le certificat d’authenticité rangé avec l’article', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'fusion-fiches', date: '2026-11-14', titre: 'Fusionner deux fiches de la même paire', phrase: 'Sur ton clic, avec un aperçu ; aucun N° perdu, réversible 30 jours.', titreArt: 'Fusionner deux fiches du même article', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   { id: 'journee-selon-heure', date: '2026-11-14', titre: 'Ma journée change selon l’heure', phrase: 'Les colis le matin, le bilan le soir. Ton ordre reste prioritaire.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'ecran-atelier', date: '2026-11-14', titre: 'Écran d’atelier toujours allumé', phrase: 'Colis du jour et chiffre du jour, mis à jour tout seuls.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'connexion-qr', date: '2026-11-14', titre: 'Connexion à l’ordinateur avec ton iPhone', phrase: 'Un QR, ton clic sur l’iPhone, sans retaper ton mot de passe.', tab: 'settings', pour: 'tous', mode: 'tous' },
@@ -668,22 +670,22 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'apercu-annonce', date: '2026-11-14', titre: 'Aperçu de l’annonce avant Créer sur Vinted', phrase: 'Telle que l’acheteur la verra, dessinée ici, rien envoyé.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'inventaire-tournant', date: '2026-11-14', titre: 'Chaque jour, 10 N° à vérifier', phrase: 'Vu ou pas trouvé : aucun numéro changé, rien supprimé.', tab: 'garage', pour: 'tous', mode: 'tous' },
   { id: 'carte-merci', date: '2026-11-14', titre: 'Carte de remerciement à glisser dans le colis', phrase: 'À ton nom, quatre par page, sans rien de l’acheteur.', tab: 'settings', pour: 'tous', mode: 'tous' },
-  { id: 'fiche-partout', date: '2026-11-14', titre: 'Une seule fiche pour chaque paire', phrase: 'Touche une vente, un colis, une annonce : sa fiche s’ouvre.', tab: 'ventes', pour: 'tous', mode: 'tous' },
-  { id: 'frais-carte-ventes', date: '2026-11-14', titre: 'Frais de l’année et carte de tes ventes', phrase: 'Ce que chaque site t’a coûté, et où partent tes paires.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  { id: 'fiche-partout', date: '2026-11-14', titre: 'Une seule fiche pour chaque paire', phrase: 'Touche une vente, un colis, une annonce : sa fiche s’ouvre.', titreArt: 'Une seule fiche pour chaque article', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'frais-carte-ventes', date: '2026-11-14', titre: 'Frais de l’année et carte de tes ventes', phrase: 'Ce que chaque site t’a coûté, et où partent tes paires.', phraseArt: 'Ce que chaque site t’a coûté, et où partent tes articles.', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'accueil-nouveaux-tarifs', date: '2026-11-14', titre: 'Une page des tarifs claire', phrase: 'Solo et Pro côte à côte, l’essai, la suite : vrm.center/tarifs.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'accueil-nouveaux-premier-colis', date: '2026-11-14', titre: 'Ton premier colis, accompagné', phrase: 'Imprimer, coller, déposer, suivre : rejouable dans Paramètres → Aide.', tab: 'ventes', pour: 'tous', mode: 'tous' },
-  { id: 'accueil-nouveaux-bilan', date: '2026-11-14', titre: 'Ton bilan en une minute', phrase: 'Ventes de l’année, colis, paires en ligne : rejouable dans Paramètres → Aide.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'accueil-nouveaux-bilan', date: '2026-11-14', titre: 'Ton bilan en une minute', phrase: 'Ventes de l’année, colis, paires en ligne : rejouable dans Paramètres → Aide.', phraseArt: 'Ventes de l’année, colis, articles en ligne : rejouable dans Paramètres → Aide.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'accueil-nouveaux-plateformes', date: '2026-11-14', titre: 'Un démarrage pour Leboncoin, Vestiaire, eBay', phrase: 'Sans Vinted, les étapes de tes plateformes, chacune prouvée.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'argent-prix-offres', date: '2026-11-14', titre: 'Offres acceptées et payées, compte par compte', phrase: 'Le taux d’acceptation et de paiement, avec sa couverture.', tab: 'stats', pour: 'tous', mode: 'tous' },
-  { id: 'argent-prix-voulu', date: '2026-11-14', titre: 'Le prix à afficher pour toucher ton montant', phrase: 'Frais de chaque site compris, et la même paire à deux prix.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  { id: 'argent-prix-voulu', date: '2026-11-14', titre: 'Le prix à afficher pour toucher ton montant', phrase: 'Frais de chaque site compris, et la même paire à deux prix.', phraseArt: 'Frais de chaque site compris, et le même article à deux prix.', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'argent-prix-soldes', date: '2026-11-14', titre: 'Soldes jusqu’à une date, prix remis ensuite', phrase: 'Baisser le prix → « Jusqu’au… » ; Ma journée propose de remettre.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'argent-prix-comptable', date: '2026-11-14', titre: 'Un lien lecture seule pour ton comptable', phrase: 'La compta seule, expirant, révocable ; et la révision du mois.', tab: 'compta', pour: 'tous', mode: 'tous' },
   { id: 'refonte-sites-reglages', date: '2026-11-14', titre: 'Sites et Paramètres : la liste d’abord', phrase: 'Leboncoin, eBay, Vestiaire : « À faire » en une ligne, rangées denses.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'argent-choix', date: '2026-11-14', titre: 'Coller tes prix, quoi racheter, déclaration prête', phrase: 'Un tableau « N° ; prix » collé, le bénéfice par modèle et taille.', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'recherche-phrase', date: '2026-11-14', titre: 'Chercher en phrase : « nike 42 pas vendue »', phrase: 'Ta phrase devient des filtres que tu changes d’un toucher.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'glisser-selection', date: '2026-11-14', titre: 'Cocher plusieurs annonces en glissant le doigt', phrase: 'Dans Sélectionner, glisse depuis une case, comme dans Photos.', tab: 'annonces', pour: 'tous', mode: 'tous' },
-  { id: 'epingles', date: '2026-11-14', titre: 'Épingle tes paires en haut', phrase: 'Jusqu’à 20, les mêmes sur tous tes appareils.', tab: 'annonces', pour: 'tous', mode: 'tous' },
-  { id: 'comparer-paires', date: '2026-11-14', titre: 'Comparer deux paires côte à côte', phrase: 'Achat, prix, marge, en ligne depuis, état : aligné.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'epingles', date: '2026-11-14', titre: 'Épingle tes paires en haut', phrase: 'Jusqu’à 20, les mêmes sur tous tes appareils.', titreArt: 'Épingle tes articles en haut', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'comparer-paires', date: '2026-11-14', titre: 'Comparer deux paires côte à côte', phrase: 'Achat, prix, marge, en ligne depuis, état : aligné.', titreArt: 'Comparer deux articles côte à côte', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-reglages', date: '2026-11-14', titre: 'Paramètres et Notifications plus simples', phrase: 'Choix en un toucher, cartes sans cadre, plus de barre vide.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-autres-ecrans', date: '2026-11-14', titre: 'E-mails, Achats et Leboncoin plus nets', phrase: 'Mêmes cartes, mêmes boutons, un seul N° par ligne de recherche.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'design-passe-ecrans', date: '2026-11-14', titre: 'Fiche du N° et écrans plus nets', phrase: 'Tailles, graisses et gris unifiés, boutons à bonne hauteur, textes plus contrastés.', tab: 'journee', pour: 'tous', mode: 'tous' },
@@ -788,7 +790,13 @@ export function pourLui(n, { vend = null, categories = null, pro = null, proprie
 export function nouveautesDuCompte(ctx = {}, liste = NOUVEAUTES) {
   const depuis = jourDe(ctx.inscritLe);
   if (!depuis) return [];
-  return liste.filter((n) => n && n.date > depuis && pourLui(n, ctx));
+  return liste.filter((n) => n && n.date > depuis && pourLui(n, ctx)).map((n) => pourSonMot(n, ctx.vend));
+}
+// (26 nov., lot vocabulaire-article) Hors Sneakers, une nouveauté qui dit « paire » se montre dans sa
+// version « article » (`titreArt`, `phraseArt`, écrites en entier) ; Sneakers (ou pas su) : mot pour mot.
+export function pourSonMot(n, vend) {
+  if (!n || typeof vend !== 'string' || vend === 'sneakers' || (!n.titreArt && !n.phraseArt)) return n;
+  return { ...n, titre: n.titreArt || n.titre, phrase: n.phraseArt || n.phrase };
 }
 
 // Celles à montrer sur la carte : pas encore vues.

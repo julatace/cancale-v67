@@ -18515,9 +18515,9 @@ async function recreerParFormulaire(c) {
   await marquer('brouillon-range', { draftId, supprime: false });
   // 7. L'ancienne : « Supprimer » + la confirmation de Vinted, sur sa page.
   await pauseFormulaire('champ', uid);
-  { const s = await arret(); if (s) { await marquer('fait', { draftId, supprime: false, cause: 'arret' }); return fin({ accepte: false, code: s.code, draftId, raison: `${s.raison} — le brouillon est rangé sur Vinted, l'ancienne annonce n'a PAS été supprimée : « Reprendre » finit la paire.` }); } }
+  { const s = await arret(); if (s) { await marquer('fait', { draftId, supprime: false, cause: 'arret' }); return fin({ accepte: false, code: s.code, draftId, raison: `${s.raison} — le brouillon est rangé sur Vinted, l'ancienne annonce n'a PAS été supprimée : « Reprendre » finit ${motsExt().le}.` }); } }
   etapeRepub(id, 'suppression');
-  if (!(await naviguerTravail(tab, `https://${domaine}/items/${id}`, new RegExp(`/items/${id}`)))) { await marquer('fait', { draftId, supprime: false, cause: 'suppression-pas-partie' }); return fin({ accepte: true, etape: 'echec', draftId, raison: "l'onglet de Vinted n'a pas ouvert l'ancienne annonce — elle n'a PAS été supprimée, le brouillon attend : « Reprendre » finit la paire." }); }
+  if (!(await naviguerTravail(tab, `https://${domaine}/items/${id}`, new RegExp(`/items/${id}`)))) { await marquer('fait', { draftId, supprime: false, cause: 'suppression-pas-partie' }); return fin({ accepte: true, etape: 'echec', draftId, raison: `l'onglet de Vinted n'a pas ouvert l'ancienne annonce — elle n'a PAS été supprimée, le brouillon attend : « Reprendre » finit ${motsExt().le}.` }); }
   const rd = await supprimerParFormulaire(acc, uid, id, tab, draftId, versB);
   if (rd.parti) envoyes++;
   if (!rd.ok) return fin(rd.r);
@@ -23562,7 +23562,7 @@ async function atelierGesteFile(quoi, pid) {
   const enCours = a.paires && a.ids[a.i] && a.paires[a.ids[a.i]] && a.paires[a.ids[a.i]].etape === 'cours';
   const debut = a.i + (enCours ? 1 : 0);
   const i = a.ids.indexOf(pid);
-  if (i < debut) return { ok: false, code: 'commencee', raison: 'Cette paire est commencée : elle ne se déplace plus.' };
+  if (i < debut) return { ok: false, code: 'commencee', raison: `${motsExt().Ce} est commencé${motsExt().e} : ${motsExt().elle} ne se déplace plus.` };
   if (quoi === 'retirer') a.ids.splice(i, 1);
   else { const j = quoi === 'monter' ? i - 1 : i + 1; if (j < debut || j >= a.ids.length) return { ok: false, code: 'bord', raison: 'Elle est déjà à ce bout de la file.' }; [a.ids[i], a.ids[j]] = [a.ids[j], a.ids[i]]; }
   if (a.i >= a.ids.length) { a.etat = 'finie'; a.finLe = Date.now(); }
@@ -24147,7 +24147,7 @@ async function atelierProgrammer(msg, sender) {
     progs[String(uid)] = prog;
     if (!(await atelierProgsEcrire(progs))) return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE };
     atelierProgAlarme(String(uid), at);
-    logActivity(`⏰ Republication programmée : ${prog.ids.length} paire(s) à ${new Date(at).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.`);
+    logActivity(`⏰ Republication programmée : ${prog.ids.length} ${motsExt().nom}(s) à ${new Date(at).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.`);
     return { ok: true, prog: copieProg(prog) };
   });
 }
@@ -24208,7 +24208,7 @@ function atelierProgDepart(uid, maintenant = Date.now()) {
     atelierProgSansAlarme(String(uid));
     await atelierProgsEcrire(progs);
     noterDiag('atelier_prog_partie');
-    logActivity(`⏰ Republication programmée partie : ${p.ids.length} paire(s), dans ton ordre.`);
+    logActivity(`⏰ Republication programmée partie : ${p.ids.length} ${motsExt().nom}(s), dans ton ordre.`);
     notifierApp({ type: 'maj', quoi: 'atelierProg', uid: String(uid) });
     return { etat: 'partie', atelier: v.atelier };
   });
@@ -24238,7 +24238,7 @@ async function atelierProgRelancer(msg, sender) {
     if (v.code) return { ok: false, code: v.code, raison: (RAISON_PROG[v.code] || '').replace('à l’heure dite', 'maintenant') };
     delete progs[String(uid)];
     await atelierProgsEcrire(progs);
-    logActivity(`▶️ Republication relancée à la main : ${p.ids.length} paire(s).`);
+    logActivity(`▶️ Republication relancée à la main : ${p.ids.length} ${motsExt().nom}(s).`);
     return { ok: true, atelier: v.atelier };
   });
 }
@@ -26425,7 +26425,7 @@ async function precieuxDe(uid) {
 }
 // Le geste automatique `sorte` est-il bloqué par « compte précieux » ? null, ou le refus (code `precieux`, la sorte, la phrase).
 const PHRASES_PRECIEUX = {
-  'repub-serie': 'Compte précieux : pas de republication en série — une paire à la fois, sur ton toucher.',
+  get 'repub-serie'() { return `Compte précieux : pas de republication en série — ${motsExt().un} à la fois, sur ton toucher.`; },
   'favoris-auto': 'Compte précieux : les messages aux favoris partent seulement à la main.',
   'offre-auto': 'Compte précieux : aucune offre acceptée ou refusée automatiquement.',
   agent: 'Compte précieux : l’agent VRM ne négocie pas seul sur ce compte.',

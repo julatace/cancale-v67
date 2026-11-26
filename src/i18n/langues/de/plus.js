@@ -30,6 +30,7 @@ export default {
   "plus.infos.enregistre": "Infos gespeichert",
   "plus.infos.efface": "Infos gelöscht",
   "plus.infos.cachees": "Infos verborgen: Nummer auf zwei Paaren",
+  "plus.infos.cachees.art": "Infos verborgen: Nummer auf zwei Artikeln",
   "plus.infos.ajouter": "Passform, Mängel, Sohle: auszufüllen",
   "plus.achats.titre": "Besser einkaufen",
   "plus.double.ligne": "Gleiche Anzeige zweimal gekauft",

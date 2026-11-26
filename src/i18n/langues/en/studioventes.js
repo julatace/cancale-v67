@@ -18,6 +18,7 @@ export default {
   "sv.scanner.envoi": "Scan a label",
   "sv.scanner.retrait": "Scan a parcel to collect",
   "sv.scanner.envoiTitre": "Scan a label barcode: VRM shows the pair that goes inside",
+  "sv.scanner.envoiTitre.art": "Scan a label barcode: VRM shows the item that goes inside",
   "sv.scanner.retraitTitre": "Scan the parcel at the pickup point: VRM shows the expected purchase",
   "sv.outils": "Parcel tools: pack, generate labels",
   "sv.filtre.label": "Filter parcels to send",

@@ -18,6 +18,7 @@ export default {
   "sv.scanner.envoi": "Etikett scannen",
   "sv.scanner.retrait": "Abzuholendes Paket scannen",
   "sv.scanner.envoiTitre": "Barcode eines Etiketts scannen: VRM zeigt das Paar, das hinein gehört",
+  "sv.scanner.envoiTitre.art": "Barcode eines Etiketts scannen: VRM zeigt den Artikel, der hinein gehört",
   "sv.scanner.retraitTitre": "Paket am Abholpunkt scannen: VRM zeigt den erwarteten Kauf",
   "sv.outils": "Paket-Werkzeuge: verpacken, Etiketten erstellen",
   "sv.filtre.label": "Zu versendende Pakete filtern",

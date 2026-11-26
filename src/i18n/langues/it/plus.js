@@ -30,6 +30,7 @@ export default {
   "plus.infos.enregistre": "Info salvate",
   "plus.infos.efface": "Info cancellate",
   "plus.infos.cachees": "Info nascoste: numero su due paia",
+  "plus.infos.cachees.art": "Info nascoste: numero su due articoli",
   "plus.infos.ajouter": "Vestibilità, difetti, soletta: da compilare",
   "plus.achats.titre": "Per comprare meglio",
   "plus.double.ligne": "Stesso annuncio comprato due volte",

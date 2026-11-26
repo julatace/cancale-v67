@@ -30,6 +30,7 @@ export default {
   "plus.infos.enregistre": "Infos enregistrées",
   "plus.infos.efface": "Infos effacées",
   "plus.infos.cachees": "Infos cachées : N° sur deux paires",
+  "plus.infos.cachees.art": "Infos cachées : N° sur deux articles",
   "plus.infos.ajouter": "Taille réelle, défauts, semelle : à remplir",
   "plus.achats.titre": "Pour mieux acheter",
   "plus.double.ligne": "Même annonce achetée deux fois",

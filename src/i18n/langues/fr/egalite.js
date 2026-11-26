@@ -64,6 +64,7 @@ export default {
   "egalite.refus.identite": "VRM ne sait pas quelle annonce c'est : rien n'a été écrit.",
   "egalite.relier.titre": "Aussi sur Vinted ?",
   "egalite.relier.sous": "Dis à VRM si c'est une paire déjà en ligne sur Vinted, ou une paire à part.",
+  "egalite.relier.sous.art": "Dis à VRM si c'est un article déjà en ligne sur Vinted, ou un article à part.",
   "egalite.selection.tout": "Tout sélectionner",
   "egalite.selection.rien": "Tout désélectionner",
   "egalite.selection.annuler": "Annuler",
