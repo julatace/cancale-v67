@@ -186,9 +186,11 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
           }
           if (PARTIES.includes('D')) {
             await pg.click('[data-deconnexion-partout]', { timeout: 8000 }).catch((e) => dit(false, `D ${tag} : « Se déconnecter partout » se touche`, String(e.message).split('\n')[0]));
-            await FEUILLE(pg).getByRole('button', { name: 'Se déconnecter partout' }).waitFor({ timeout: 5000 }).catch(() => {});
+            // (26 nov.) Sous charge (CI : trois bancs à la fois), la feuille de confirmation met plus de 5 s à venir : on attend
+            // le FAIT (la feuille, puis l'appel), 20 s au plus — jamais un délai qui décide du résultat.
+            await FEUILLE(pg).getByRole('button', { name: 'Se déconnecter partout' }).waitFor({ timeout: 20000 }).catch(() => {});
             await capture(pg, `D-${tag}-confirmer`);
-            await FEUILLE(pg).getByRole('button', { name: 'Se déconnecter partout' }).click({ timeout: 5000 }).catch(() => {});
+            await FEUILLE(pg).getByRole('button', { name: 'Se déconnecter partout' }).click({ timeout: 20000 }).catch(() => {});
             // (11 nov.) Attendre le FAIT (l'appel parti, puis la session effacée sur un oui) plutôt qu'un délai fixe :
             // sur une machine chargée, 2,6 s ne suffisaient pas (rouges changeants d'un passage à l'autre).
             for (let i = 0; i < 40 && !logouts.length; i++) await attendre(200);
