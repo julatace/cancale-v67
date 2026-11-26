@@ -41,3 +41,41 @@ fixture inventée (`cochable` dans `liste`) qui cachait la panne ; le banc de bo
 Si Julien lançait depuis le PANNEAU (pas depuis VRM), le banc ne reproduit pas la panne : il faut sa trace. Demande :
 installer la 5.453.1, ouvrir le panneau → Paramètres → « Observer Vinted (10 min) », lancer UN favori depuis le panneau,
 puis envoyer la phrase affichée sur l'écran plein (elle dit maintenant la garde qui retient) et la trace.
+
+## Suite du 26 nov. — 5.453.2 (retour réel de Julien, 5.453.1 lancée depuis le PANNEAU, compte angeled92)
+Constaté : 1er favori (jcbr12) « Pas parti · Vérifie les envois incertains sur Vinted avant de préparer une nouvelle
+file », toute la file bloquée ; l'onglet de travail sur `inbox/<uuid>` ; RIEN parti, champ vide. Son indice : « quand on
+appuie sur le favori, ça propose DIRECTEMENT l'offre ».
+
+**Causes (dans le code, 5.453.0/5.453.1)** :
+1. Le favori ouvre la conversation AVEC la fenêtre « Faire une offre » par-dessus (elle remplace le champ du message). La
+   séquence « comme Bleam » cherchait d'abord le champ du message (`vrm-formulaire.js` étape `message`) ⇒ introuvable ou
+   pas rempli ⇒ rien tapé.
+2. La frappe posait la valeur à la main (setter natif / `textContent` + `InputEvent` fabriqué) : un éditeur riche (React)
+   ne la garde pas ⇒ champ vide, « Envoyer » ne part pas ⇒ aucune requête vue ⇒ `sans-reponse, parti` ⇒ « incertain ».
+3. Un incertain bloque toute nouvelle file chez VRM (`lancerFile`, `reserverFile`) — garde-fou voulu — mais le panneau
+   n'avait AUCUN geste pour le trancher.
+
+**Corrections (5.453.2)** :
+- `favoriOuvrir` dit si la fenêtre d'offre est ouverte (`offreOuverte`) ; `sequenceFavoriBleam` fait alors l'offre D'ABORD,
+  dans cette fenêtre (garde du prix, plancher), le message dans le champ de la fenêtre s'il y en a un (vu dans le fil, sinon
+  « incertain »), sinon ensuite dans la conversation. Sans offre réglée, la fenêtre est fermée (son bouton, sinon Échap)
+  avant de taper ; elle ne se ferme pas ⇒ « pas parti » nommé (`offre-fenetre-ouverte`).
+- Étape `offre` : la fenêtre déjà ouverte est utilisée (sans toucher « Faire une offre »).
+- Frappe : chaque lettre par `document.execCommand('insertText')` (champ au focus — le chemin d'édition du navigateur),
+  sinon l'ancienne pose ; la valeur relue 0,4 s après (un éditeur qui la remet à vide ⇒ « pas parti » certain).
+- « Envoyer » touché sans aucune requête d'envoi, texte toujours dans le champ, rien de plus dans le fil ⇒ « pas parti »
+  CERTAIN (`message-non-parti`), la file continue. Le texte compté hors du champ (un champ riche est dans `innerText`).
+  Preuve de plus : la réponse de Vinted à CET envoi qui porte CE texte.
+- « C'est parti » / « Pas parti » sur la ligne d'un envoi à vérifier (panneau → favoris) ⇒ route serveur `trancher`
+  (`trancherIncertain` : parti ⇒ envoyé, jamais recontacté ; pas parti ⇒ refusé sans écriture, re-choisissable par lui).
+  Le refus de lancement « incertains » dit ce geste en bandeau. Jamais un renvoi automatique.
+- Capacité `favorisfenetreoffre` (5.453.2).
+
+**Preuves** : `sim-extension --seul P2` (fenêtre d'offre au favori + éditeur riche) : 7 verts / 3 rouges sur 5.453.1
+(`element_absent:message-champ`, ni message ni offre), 10/0 sur 5.453.2 ; mutation « sans execCommand » ⇒ rouge.
+`audit-favoris-trancher` 8/0 (nouveau).
+
+**Geste de Julien** : installer la 5.453.2 ; sur la ligne de jcbr12, regarder la conversation sur Vinted puis toucher
+« C'est parti » ou « Pas parti » ; relancer 1 favori. Si ça ne part pas, la ligne dit maintenant l'élément qui manque :
+envoyer cette phrase + la trace d'« Observer Vinted (10 min) » (la forme réelle de la fenêtre d'offre y est relevée).

@@ -486,7 +486,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **25 nov. · Favoris depuis VRM réparés, ext. 5.453.1** : `distFavoris` choisissait dans `apercu.liste` (sans `cochable`) ⇒ rien ne partait. `2026-11-25-favoris-sequence-repare.md`. Geste : 5.453.1.
+- **26 nov. · Favoris réparés, ext. 5.453.2** : depuis VRM (`distFavoris`) et depuis le panneau (fenêtre d’offre ouverte par le favori, frappe par `execCommand`, « C’est parti / Pas parti » sur un incertain). `2026-11-25-favoris-sequence-repare.md`. Geste : 5.453.2.
 - **25 nov. · Favoris tapés comme lui, popup refaite (ext. 5.453.0)** : `2026-11-25-favoris-gestes-humains.md`. Geste : installer la 5.453.0.
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
 
