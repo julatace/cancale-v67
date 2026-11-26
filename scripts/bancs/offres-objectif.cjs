@@ -194,7 +194,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         // Aujourd'hui : le segment du bloc des chiffres Jour · Mois (PERIODES_JOURNEE = ['jour', 'mois']) ⇒ « Mois », le 2ᵉ choix
         // (jugé sur `data-v2-periode`, jamais sur le libellé).
         const versMois = async () => {
-          await aller(pg, 'tab=journee', '[data-v2-bloc="chiffres"] [role="radiogroup"] [role="radio"]');
+          await aller(pg, 'tab=journee', '[data-v2-bloc="chiffres"][data-v2-chiffres="lu"] [role="radiogroup"] [role="radio"]');
           await pg.locator('[data-v2-bloc="chiffres"] [role="radiogroup"] [role="radio"]').nth(1).click();
           await pg.locator('[data-v2-bloc="chiffres"][data-v2-periode="mois"]').first().waitFor({ timeout: 10000 });
           await pg.locator('[data-v2-objectif]').first().waitFor({ timeout: 10000 });

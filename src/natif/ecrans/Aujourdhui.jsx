@@ -683,7 +683,7 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
           {/* (24 nov., livrable-2 — « zéro saut ») Le porte-monnaie et « Par site » arrivaient ~9 s après l'ouverture (base lente) et
               poussaient « Tes chiffres » de 270 px. Tant que l'écran lit (`!pret`), leur place est TENUE : les mêmes cartes, chiffres
               en squelette (src/natif/outils.js) ; lu sans rien à montrer, la place se rend (un retrait, jamais une poussée). */}
-          {porteMonnaie !== undefined ? <PorteMonnaie pm={porteMonnaie} montant={montant} Icon={Icon}/> : tenirPlace ? <PorteMonnaie pm={undefined} enLecture montant={montant} Icon={Icon}/> : null}
+          {porteMonnaie === false ? null : porteMonnaie !== undefined ? <PorteMonnaie pm={porteMonnaie} montant={montant} Icon={Icon}/> : tenirPlace ? <PorteMonnaie pm={undefined} enLecture montant={montant} Icon={Icon}/> : null}
           {/* (25 nov., régressions — passages d'onglet à 1512 : au retour sur Aujourd'hui, « Par site » en squelette ~2 s puis RIEN, et
               « Tes chiffres » remontait de 19 px) Depuis le 25 nov. (« moins de texte ») « Par site » n'existe qu'à partir de DEUX sites :
               un bloc qui finit le plus souvent vide ne tient plus une place fixe. Il tient la hauteur qu'il avait la dernière fois sur

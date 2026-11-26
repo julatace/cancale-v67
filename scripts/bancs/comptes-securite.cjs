@@ -194,7 +194,9 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
             for (let i = 0; i < 40 && !logouts.length; i++) await attendre(200);
             if (issue === 'oui') await pg.waitForFunction(() => { try { return !localStorage.getItem('vrm_session'); } catch (_) { return true; } }, null, { timeout: 8000 }).catch(() => {});
             await attendre(800);
-            const reste = await pg.evaluate(() => { try { return !!localStorage.getItem('vrm_session'); } catch (_) { return null; } });
+            // Un oui recharge la page (déconnexion) : la lecture se refait sur la page d'APRÈS, jamais pendant la navigation.
+            const lireReste = () => pg.evaluate(() => { try { return !!localStorage.getItem('vrm_session'); } catch (_) { return null; } });
+            let reste; for (let i = 0; i < 5; i++) { try { await pg.waitForLoadState('domcontentloaded'); reste = await lireReste(); break; } catch (_) { await attendre(500); } }
             dit(logouts.length === 1 && /scope=global/.test(logouts[0]), `D ${tag} (${issue}) : un seul appel, scope=global`, JSON.stringify(logouts));
             if (issue === 'panne') dit(reste === true, `D ${tag} : une panne de Supabase n'efface RIEN ici`, reste);
             else dit(reste === false, `D ${tag} : un oui efface la session de ce navigateur`, reste);
