@@ -12,7 +12,7 @@
   var BOOT_CLAIR = '#878B92', BOOT_NUIT = '#1C1C20';   // (25 nov.) clair = le gris moyen de l'app (« gris moyen c'est d'accord ») ; (23 nov.) clair = le gris clair de l'app, nuit = le gris de vrm.center   // (22 nov.) les jetons du 2e jet (src/natif/jetons.css)   // (19 nov., « VRM natif ») le fond de la page, `--n-fond` (plus le haut du dégradé bleu)
   function lire(k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   function sombreAuDemarrage(mode, ancien, heure, systeme) {
-    if (mode !== 'clair' && mode !== 'sombre' && mode !== 'auto' && mode !== 'soir') mode = ancien === true ? 'sombre' : 'clair';
+    if (mode !== 'clair' && mode !== 'sombre' && mode !== 'auto' && mode !== 'soir') mode = ancien === false ? 'clair' : 'sombre';   // (25 nov.) rien de choisi ⇒ SOMBRE (src/apparence.js, APPARENCE_PAR_DEFAUT)
     if (mode === 'sombre') return true;
     if (mode === 'auto') return systeme === true;
     if (mode === 'soir') return heure >= 19 || heure < 7;
@@ -34,7 +34,7 @@
     // (24 nov., style-graphite) le STYLE choisi sur cet appareil (`vrm_style`, src/natif/styleChoix.js : même clé, même liste)
     var st = lire('vrm_style');
     if (['graphite', 'ardoise', 'pierre', 'encre', 'papier', 'verre', 'nuit', 'menthe', 'studio', 'arcade', 'monochrome', 'c3doux'].indexOf(st) >= 0) document.documentElement.setAttribute('data-style', st);
-  } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
+  } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }   // (25 nov.) le défaut est sombre
   // « Recharger » de l'écran de démarrage (au-delà de 8 s) : avant tout JavaScript de l'app (c'est quand
   // elle ne vient pas qu'on le touche). Il OUBLIE la coquille gardée par le service worker (la page `/`,
   // jamais les fichiers ni les réserves du hors ligne) puis relit : une coquille d'une ancienne version

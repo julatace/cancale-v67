@@ -13,6 +13,11 @@ require('./_porte-banc.cjs');
 //                    d'une vente mesure ≤ 140 px (sur main : colonne, rangées empilées).
 //    P  PHRASE     — Annonces, dressing lu il y a 30 h (« à confirmer ») : l'état n'est écrit sur AUCUNE rangée d'un compte qui en
 //                    compte ≥ 2 (≤ 2 rangées porteuses par compte) ; l'en-tête du compte le dit une fois (`data-ad-etat-groupe`).
+//    O  ONGLETS    — passages Aujourd'hui → Annonces → Ventes → Achats → Argent → Aujourd'hui puis 2e tour, à 390 ET 1512, base à
+//                    700 ms (scripts/bancs/_passages-onglets.cjs, une mesure par image) : aucun saut > 4 px d'un nœud déjà affiché,
+//                    aucune image presque vide ; 1re visite : un squelette seulement à la forme de l'écran (`data-squelette`) ; le
+//                    RETOUR sur Aujourd'hui et toute 2e visite : zéro squelette, défilement laissé retrouvé. Sur main (25 nov., avant onglets-fluides) : une image grise à chaque 1re visite, et au
+//                    retour sur Aujourd'hui à 1512 « Tes chiffres » poussé de 105 px.
 //  Réglages : `BANC_DIST` (un autre build : l'AVANT), `SHOTS=<dossier>` (captures à REGARDER), `THEMES=clair,sombre`,
 //  `CAS=S,E,T,R,P`. Un banc ne meurt pas, il rapporte.
 // ════════════════════════════════════════════════════════════════════════════
@@ -21,7 +26,7 @@ process.env.BANC_DESIGN_V2 = process.env.BANC_DESIGN_V2 || 'defaut';
 const path = require('path'), fs = require('fs');
 const P = require('./design-passe.cjs');
 const SHOTS = process.env.SHOTS || '';
-const CAS = String(process.env.CAS || 'S,E,T,R,P').split(',');
+const CAS = String(process.env.CAS || 'S,E,T,R,P,O').split(',');
 const THEMES = String(process.env.THEMES || 'clair,sombre').split(',').filter(Boolean);
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + JSON.stringify(d).slice(0, 500) : '')); } return c; };
@@ -134,6 +139,26 @@ async function ouvrir(nav, { b, url, sombre, tenir = null }) {
         dit(aconf.every((x) => !!x.tete), 'P l\'en-tête du compte dit l\'état une fois', aconf);
         dit(!erreurs.length, 'P aucune erreur JS', erreurs);
         await ctx.close();
+      }
+    }
+    if (CAS.includes('O')) {
+      const { parcours } = require('./_passages-onglets.cjs');
+      for (const W of [390, 1512]) {
+        console.log(`\n▶ O passages d'onglet ${W}`);
+        const { lignes, erreurs } = await parcours(nav, { W, b: base() });
+        for (const l of lignes) {
+          const nom = `O ${W} v${l.visite} ${l.cle}`;
+          dit(l.ok, nom + ' : onglet touché');
+          dit(l.sauts === 0, nom + ' : aucun saut > 4 px (' + l.sauts + ')', l.detail);
+          dit(l.vide === 0, nom + ' : aucune image presque vide (' + l.vide + ')');
+          // 1re visite : un squelette n'est admis qu'à la forme de l'écran qui lit ses données (`data-squelette` de l'attente) ; le
+          // RETOUR sur Aujourd'hui (déjà vu) et toute 2e visite : aucun.
+          const retour = l.cle === 'journee' || l.visite === 2;
+          if (retour) dit(l.sq === 0, nom + ' : aucune image de squelette (' + l.sq + '/' + l.images + ')', l.quoi || '');
+          else dit(!l.sq || /data-squelette=|data-n-attente=/.test(l.quoi || ''), nom + ' : squelette seulement à la forme de l\'écran (' + l.sq + '/' + l.images + ')', l.quoi || '');
+          if (l.visite === 2 && l.laisse != null) dit(l.defile != null && Math.abs(l.defile - l.laisse) <= 4, nom + ' : défilement retrouvé (' + l.defile + ' pour ' + l.laisse + ')');
+        }
+        dit(!erreurs.length, `O ${W} aucune erreur JS`, erreurs);
       }
     }
   } finally { await nav.close(); P.srv.close(); }
