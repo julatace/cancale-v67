@@ -109,6 +109,7 @@ export default {
   "adist.offre.contrePrix": "Tu precio",
   "adist.offre.confirmeTitre": "¿Aceptar la oferta de {prix}?",
   "adist.offre.confirmeTexte": "Una oferta aceptada vende el par. Tu ordenador la acepta en Vinted, en nombre de esta cuenta.",
+  "adist.offre.confirmeTexte.art": "Una oferta aceptada vende el artículo. Tu ordenador la acepta en Vinted, en nombre de esta cuenta.",
   "adist.offre.confirmer": "Aceptar y vender",
   "adist.envoyeToast": "Enviado a tu ordenador",
   "adist.vue.messages": "Mensajes",

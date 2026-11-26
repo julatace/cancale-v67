@@ -73,6 +73,7 @@ export default {
   "agir.offre.refuser": "Ablehnen",
   "agir.offre.contre": "{prix} anbieten",
   "agir.offre.confirmer": "Annehmen verkauft das Paar. Bestätigen?",
+  "agir.offre.confirmer.art": "Annehmen verkauft den Artikel. Bestätigen?",
   "agir.offre.confirmerOui": "Ja, annehmen",
   "agir.republier": "Neu einstellen",
   "agir.republier.confirmer": "Neu einstellen löscht die alte Anzeige. Bestätigen?",

@@ -16,6 +16,8 @@ import { fetchAvecDelai } from './fetch-delai.js';
 import { modifierCas } from './suivi-vinted.js';
 import { DESTINATIONS } from './lien-notif.js';
 import { suiviRetourVente, numerosDeLigne } from './retour-vente-suivi.js';
+import { MAIN_MOTS, motsServeur } from './mots-vendeur.js';
+import { motsArticle } from '../../src/profilVendeur.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
@@ -33,9 +35,11 @@ async function lire(chemin) {
 const propre = (s, n) => String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
 
 // Le texte (une phrase, le titre de la vente lu par identité). Exporté pour l'audit.
-export function texteRetourArrive(titre) {
-  const nom = propre(titre, 60);
-  return { title: 'Retour arrivé · Remettre en ligne ?', body: nom ? `${nom} est revenue chez toi. Elle repart en stock sous son N°.` : 'Ta paire est revenue chez toi. Elle repart en stock sous son N°.' };
+// (26 nov., vocabulaire-article) `mots` : « paire » (Sneakers, le texte d'avant) ou « article » (`motsServeur`).
+export function texteRetourArrive(titre, mots = motsArticle('sneakers')) {
+  const nom = propre(titre, 60), m = mots || motsArticle('sneakers');
+  const ta = m.ta.charAt(0).toUpperCase() + m.ta.slice(1);
+  return { title: 'Retour arrivé · Remettre en ligne ?', body: `${nom || ta} est revenu${m.e} chez toi. ${m.Elle} repart en stock sous son N°.` };
 }
 
 // Rend { status, envoye?, raison? }.
@@ -74,7 +78,11 @@ export async function notifierRetourVente(tx, uid) {
   const reserve = await modifierCas(`push_retour_${tx}`, (d) => (d && d.envoye ? undefined : { v: 1, tx, envoye: true, at: new Date().toISOString() }));
   if (reserve === null) return { status: 503, raison: 'pas-su' };
   if (reserve === false) return { status: 200, envoye: false, raison: 'deja' };
-  const n = texteRetourArrive(vente ? vente.title : '');
+  // Le mot du vendeur (« paire » / « article ») : SA ligne main ; pas su ⇒ la règle par défaut (jamais un envoi bloqué).
+  const jv = await lire(`app_data?id=eq.main&select=jv:data->>${MAIN_MOTS}`);
+  let reglage = null;
+  try { reglage = jv && jv[0] && jv[0].jv ? JSON.parse(jv[0].jv) : null; } catch (_) { reglage = null; }
+  const n = texteRetourArrive(vente ? vente.title : '', motsServeur(reglage, proprietaireCourant()));
   const r = await sendPushToAll({ ...n, tag: `vrm-retour-${tx}`, url: DESTINATIONS.vente({ tx }), cat: 'colis' });
   if (r && r.coupe) return { status: 200, envoye: false, raison: r.coupe === 'preference' ? 'preference' : 'abonnement' };
   if (r && (r.attente || r.doublon)) return { status: 200, envoye: false, raison: r.attente ? 'dans-le-resume' : 'deja-dite' };

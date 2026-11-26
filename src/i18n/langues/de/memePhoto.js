@@ -9,7 +9,9 @@ export default {
   "memePhoto.relier": "Mit Nr. {numero} verknüpfen",
   "memePhoto.pasLaMeme": "Das ist nicht dasselbe",
   "memePhoto.deuxPaires": {"one": "Dieses Foto ist auf {n} Paar: welches?", "other": "Dieses Foto ist auf {n} Paaren: welches?"},
+  "memePhoto.deuxPaires.art": {"one": "Dieses Foto ist auf {n} Artikel: welcher?", "other": "Dieses Foto ist auf {n} Artikeln: welcher?"},
   "memePhoto.numeroDouble": "Nr. {numero} steht auf zwei Paaren: prüfe den Karton vor dem Verknüpfen.",
+  "memePhoto.numeroDouble.art": "Nr. {numero} steht auf zwei Artikeln: prüfe vor dem Verknüpfen, wo sie liegen.",
   "memePhoto.sansNumero": "Ohne Nr.",
   "memePhoto.cestLui": "Es ist Nr. {numero}",
   "memePhoto.aucune": "Keines davon",
@@ -27,6 +29,7 @@ export default {
   "memePhoto.pasPret": "Deine Daten sind noch nicht geladen: versuche es gleich noch einmal",
   "memePhoto.outil": "Gleiches Foto · zu verknüpfen",
   "memePhoto.outilDesc": "Eine Anzeige woanders mit dem Foto eines Vinted-Paars",
+  "memePhoto.outilDesc.art": "Eine Anzeige woanders mit dem Foto eines Vinted-Artikels",
   "memePhoto.surSites": "Gleiches Foto auf {sites} · zu verknüpfen",
   "memePhoto.sur": "Gleiches Foto · sicher",
   "memePhoto.aVerifier": "Zu prüfen",
@@ -56,5 +59,6 @@ export default {
   "ug.original": "Originale wiederhergestellt.",
   "ug.alt": "Verbessert",
   "ug.pourquoi": "Warum?",
-  "ug.pourquoi.texte": "Alles passiert in diesem Browser, kostenlos: nichts wird gesendet, keine KI. Dieselbe Einstellung gilt für jedes Foto des Paars; das Original bleibt daneben. Der Hintergrund wird nur aufgehellt, wenn er einheitlich ist – kein Freistellen."
+  "ug.pourquoi.texte": "Alles passiert in diesem Browser, kostenlos: nichts wird gesendet, keine KI. Dieselbe Einstellung gilt für jedes Foto des Paars; das Original bleibt daneben. Der Hintergrund wird nur aufgehellt, wenn er einheitlich ist – kein Freistellen.",
+  "ug.pourquoi.texte.art": "Alles passiert in diesem Browser, kostenlos: nichts wird gesendet, keine KI. Dieselbe Einstellung gilt für jedes Foto des Artikels; das Original bleibt daneben. Der Hintergrund wird nur aufgehellt, wenn er einheitlich ist – kein Freistellen.",
 };

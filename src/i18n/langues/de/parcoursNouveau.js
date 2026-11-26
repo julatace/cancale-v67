@@ -75,8 +75,10 @@ export default {
   "pn.comptes.plusTard": "VRM sieht es bei deinem ersten Besuch",
 
   "pn.numeros.titre": "Wer nummeriert deine Paare?",
+  "pn.numeros.titre.art": "Wer nummeriert deine Artikel?",
   "pn.numeros.titreAutre": "Wer nummeriert deine Artikel?",
   "pn.numeros.phrase": "Die Nummer auf dem Karton findet das Paar in einer Sekunde. Eine Nummer wird nie neu vergeben.",
+  "pn.numeros.phrase.art": "Die Nummer dort, wo er liegt, findet den Artikel in einer Sekunde. Eine Nummer wird nie neu vergeben.",
   "pn.numeros.vrm": "VRM nummeriert",
   "pn.numeros.vrm.desc": "Jede neue Anzeige bekommt eine Nummer für ihren Karton.",
   "pn.numeros.moi": "Ich nummeriere selbst",

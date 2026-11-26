@@ -18,6 +18,7 @@ export default {
   "sv.scanner.envoi": "Scanner un bordereau",
   "sv.scanner.retrait": "Scanner un colis à retirer",
   "sv.scanner.envoiTitre": "Scanner le code-barres d’un bordereau : VRM montre la paire qui doit être dedans",
+  "sv.scanner.envoiTitre.art": "Scanner le code-barres d’un bordereau : VRM montre l’article qui doit être dedans",
   "sv.scanner.retraitTitre": "Scanner le colis au point relais : VRM montre l’achat attendu",
   "sv.outils": "Outils des colis : emballer, générer les bordereaux",
   "sv.filtre.label": "Filtrer les colis à envoyer",
