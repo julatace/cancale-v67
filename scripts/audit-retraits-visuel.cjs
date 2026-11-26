@@ -79,7 +79,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m +
   // La règle d'amont (App.jsx, `pickupUnion`) : une limite dépassée envoie « à vérifier », jamais nulle part ;
   // et les fins qui SORTENT un colis sont toutes des preuves (transporteur, e-mail, commande) — lu dans la source.
   const app = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
-  const i0 = app.indexOf('const pickupUnion = useMemo(() => {'); const i1 = app.indexOf('// Le transporteur ÉCRIT que le colis repart', i0);
+  const i0 = app.indexOf('const pickupUnion = useMemoParesseux(() => {'); const i1 = app.indexOf('// Le transporteur ÉCRIT que le colis repart', i0);
   const union = i0 > 0 && i1 > i0 ? app.slice(i0, i1).replace(/\/\/[^\n]*/g, '') : '';
   dit(/if \(estAVerifier\(e\)\) \{ aVerifier\.push\(\{ kind: 'email', t, e, o: cmd \}\); continue; \}/.test(union), 'pickupUnion : date limite dépassée ⇒ « à vérifier » (visible), jamais jeté');
   dit(!/jours\s*<\s*0[^\n]*continue/.test(union) && !/delai_depasse'[^\n]*\)\s*continue/.test(union), 'pickupUnion : aucune sortie sur la date limite seule');

@@ -15,6 +15,7 @@ export default {
   "scan.r.taper": "Type the number",
   "scan.r.saisie": "Tracking number",
   "scan.r.ok": "OK",
+  "scan.r.okRaison": "First type the tracking number",
   "scan.r.attente": "Reading your sales and purchases…",
   "scan.r.autre": "Scan another parcel",
   "scan.r.sansTitre": "Untitled",

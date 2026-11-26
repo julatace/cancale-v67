@@ -106,6 +106,22 @@ export function preuveVenteEmail(m) {
   return { tx, cle, uid, t };
 }
 
+// (23 nov.) Le FICHIER d'une photo de Vinted : le chemin (`/t/{id}/{taille}/{fichier}`), sans l'hôte (images1, images…) ni
+// la signature (`?s=`) — jamais un titre. `photo` : une adresse, ou l'objet `{ url }` d'une commande. Rien de sûr ⇒ ''.
+export function clePhotoVente(photo) {
+  const u = String((photo && typeof photo === 'object' ? photo.url : photo) || '').trim();
+  const m = /^https:\/\/images\d*\.vinted\.net(\/tc?\/[^\s?#"'<>]{8,400})/i.exec(u);
+  return m ? m[1] : '';
+}
+// Vrai seulement si la photo de l'e-mail est connue ET qu'AUCUNE vente lue de la fenêtre ambiguë ne porte ce fichier, toutes
+// ayant le leur (une vente de la fenêtre sans photo ⇒ on ne sait pas ⇒ faux).
+export function autreQueLaFenetre(lues, t, ph) {
+  if (!ph) return false;
+  const fen = (Array.isArray(lues) ? lues : []).filter((x) => x && x.d >= t - FENETRE_AMBIGUE_MS);
+  if (!fen.length) return true;
+  return fen.every((x) => x.ph && x.ph !== ph);
+}
+
 const montantEmail = (p) => {
   const s = String(p == null ? '' : p).trim().replace(',', '.');
   if (!/^\d+(?:\.\d{1,2})?$/.test(s)) return null;
@@ -138,12 +154,15 @@ export function ventesEmailFraiches({ mails, comptes, ecarte, ventes, ko, lectur
   // (16 nov.) La vente lue la plus récente de chaque compte (date de vente) : la fenêtre
   // ambiguë d'un e-mail SANS n° (voir l'en-tête).
   const derniereLue = new Map();
+  // (23 nov.) Les ventes lues de chaque compte, datées, avec le FICHIER de leur photo (`clePhotoVente`).
+  const luesParUid = new Map();
   for (const o of ventes) {
     if (!o || o._venteEmail) continue;
     if (o.transaction_id != null) connues.add(String(o.transaction_id));
     const u = String((o._acc && o._acc.vinted_user_id) || '').trim();
     const d = Date.parse(String(o.date || ''));
     if (u && Number.isFinite(d) && !(derniereLue.get(u) >= d)) derniereLue.set(u, d);
+    if (u && Number.isFinite(d)) { const l = luesParUid.get(u) || []; l.push({ d, ph: clePhotoVente(o.photo) }); luesParUid.set(u, l); }
   }
   const parTx = new Map();
   for (const m of mails) {
@@ -156,7 +175,11 @@ export function ventesEmailFraiches({ mails, comptes, ecarte, ventes, ko, lectur
     if (!Number.isFinite(lu)) continue;                                 // aucune lecture datée : pas su
     if (!(p.t > lu)) continue;                                          // (c) la lecture fait foi
     // Sans n° : une vente lue de ce compte juste avant l'e-mail pourrait être la même ⇒ pas su.
-    if (!p.tx && derniereLue.get(p.uid) >= p.t - FENETRE_AMBIGUE_MS) continue;
+    // (23 nov.) …sauf si la PHOTO tranche (§5, identité 2 : le fichier exact). Mesuré le 23 nov. (lecture seule) : la photo
+    // de l'e-mail de vente est, octet pour octet, celle de la vente dans la liste Vinted (7 sur 7). Une vente de la fenêtre
+    // au même fichier ⇒ c'est elle (déjà dans la liste) ; toutes les ventes de la fenêtre ont un AUTRE fichier ⇒ ce n'est
+    // aucune d'elles ; un fichier manquant d'un côté ⇒ pas su, comme avant.
+    if (!p.tx && derniereLue.get(p.uid) >= p.t - FENETRE_AMBIGUE_MS && !autreQueLaFenetre(luesParUid.get(p.uid), p.t, clePhotoVente(m.photo))) continue;
     const deja = parTx.get(p.cle);
     // Deux e-mails du même n° (une copie transférée) : une ligne, la plus ancienne date.
     if (deja && deja._t <= p.t) continue;

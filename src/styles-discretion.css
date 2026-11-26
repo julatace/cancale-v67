@@ -10,7 +10,7 @@
   color: var(--w-encre, #1D1D1F); font-size: 14px; line-height: 1.4;
 }
 .vrm-verif-point { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--vrm-warn, #B25000); }
-.vrm-verif-texte { flex: 1 1 200px; margin: 0; min-width: 0; }
+.vrm-verif-texte { flex: 1 1 120px; margin: 0; min-width: 0; }   /* (25 nov.) « En pause » et « Reprendre » sur une ligne */
 .vrm-verif-texte b { color: var(--vrm-warn, #B25000); }
 .vrm-verif-reprendre {
   flex: none; min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; cursor: pointer;

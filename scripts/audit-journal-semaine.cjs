@@ -97,7 +97,7 @@ const charger = async (texte, nom) => {
   // (`FriseJournee`, « Semaine du … ») : même règle (`journalSemaine`), plus de carte à part.
   const frise = (A0.match(/function FriseJournee\([\s\S]*?\n\}\n/) || [''])[0];
   dit(/<FriseJournee liveStats=\{liveStats\}/.test(A0) && /journalSemaine\(\{ maintenant, vendu, joursBenef: pub, colisFaits, R: \{ \.\.\.REGLES_JOURNAL, semainePassee:/.test(frise), 'Ma journée monte la semaine passée en tête (la frise, par `journalSemaine`)');
-  dit(/const REGLES_JOURNAL = \{ semainePassee, bilanLignes, beneficeDesJours, chiffreBrut \};/.test(A0) && /import \{semainePassee\} from '\.\.\/api\/_lib\/bilan-semaine\.js';/.test(A0), 'avec les règles propriétaires (la semaine du bilan, vendu, bénéfice brut)');
+  dit(/const REGLES_JOURNAL = \{ semainePassee, bilanLignes, beneficeDesJours, chiffreBrut(, chiffreApresFrais)? \};/.test(A0) && /import \{semainePassee\} from '\.\.\/api\/_lib\/bilan-semaine\.js';/.test(A0), 'avec les règles propriétaires (la semaine du bilan, vendu, bénéfice brut)');
   const carte = extraire(A0, 'JournalSemaineCarte');
   dit(carte && !/push|notif|Notification|setTimeout/i.test(carte), 'aucune notification, aucun rappel');
   console.log(`\n${ko ? '❌' : '✅'} audit-journal-semaine : ${ok} vert(s), ${ko} rouge(s)${MUT ? ' [mutation ' + MUT + ']' : ''}`);

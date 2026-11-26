@@ -48,4 +48,21 @@
   html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > .vrm-acct-tag { max-width: 46% !important; overflow: hidden !important; text-overflow: ellipsis !important; }
   html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-pastilles { margin-top: 2px !important; }
   html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-act { align-self: center !important; }
+  /* (23 nov., capture iPhone de Julien — « pas possible, les bugs visuels ») La sous-ligne : séparateurs écrits par le code
+     (`data-sep="js"`), jamais un « · » dessiné en plus ; espaces simples. */
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta[data-sep] > * + *::before { content: "·" !important; margin: 0 5px !important; color: inherit !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta[data-sep] > * + * { margin-left: 0 !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta[data-sep] > :empty { display: none !important; }
+  /* L'état d'une rangée : plus d'orange (nouvelle apparence) — une étiquette grise, le mot suffit. */
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-statut[data-achat-etat="geste"] { background: var(--n-carte-2, #F4F4F5) !important; color: var(--n-encre, #18181B) !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-statut > i { display: none !important; }
+  /* Une grille fixe : photo | titre, détail, pastilles, suivi | prix et « ⋯ » en haut à droite ; le suivi (logo compris) reste
+     DANS sa ligne (jamais seul sous la rangée), le reçu une icône alignée dans la rangée des pastilles. */
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row :is(.vrm-buy-transp, .vrm-buy-retour) { grid-area: plus !important; display: block !important; min-width: 0 !important; max-height: none !important; overflow: hidden !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-transp > * { display: flex !important; align-items: center !important; gap: 6px !important; min-width: 0 !important; flex-wrap: nowrap !important; white-space: nowrap !important; overflow: hidden !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-transp img, html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-transp [data-transporteur-logo] { flex: none !important; position: static !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-price { grid-area: prix !important; align-self: start !important; justify-self: end !important; padding-right: 4px !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-act { grid-area: act !important; align-self: start !important; margin-top: -10px !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-pastilles { display: flex !important; align-items: center !important; min-height: 24px !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-facture { display: inline-flex !important; align-items: center !important; }
 }

@@ -2,7 +2,7 @@ require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « LE PARRAINAGE, CLAIR ET VISIBLE » (13 nov., lot 54) — RENDU, avec un
 //  faux serveur (aucun Stripe, aucune base réelle) :
-//    1. Réglages → Mon abonnement → Parrainage : la phrase « Parraine un
+//    1. (25 nov. : devenu un écran, banc parrainage-ecran.cjs) Réglages → Mon abonnement → Parrainage : la phrase « Parraine un
 //       vendeur : 1 mois offert pour toi et pour lui », le lien personnel,
 //       « Copier le lien » (le presse-papiers reçoit LE lien), « Partager » par
 //       le partage natif quand il existe (téléphone), absent sinon ; le total de
@@ -121,65 +121,8 @@ const attendre = (pg, sel, ms = 12000) => pg.waitForSelector(sel, { timeout: ms 
   await new Promise((res, rej) => { srv.once('error', rej); srv.listen(PORT, res); }).catch((e) => { console.log('❌ port ' + PORT + ' pris (' + e.code + ')'); process.exit(1); });
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
-    console.log('\n── 1. Réglages → Mon abonnement → Parrainage');
-    for (const [largeur, sombre, partage] of [[1512, false, false], [390, true, true]]) {
-      await essaie('écran ' + largeur, async () => {
-        const { ctx, pg, appels, erreurs } = await ouvrir(nav, { largeur, sombre, partage });
-        const vu = await attendre(pg, '[data-parrainage="ouvert"]');
-        await pg.locator('[data-parrainage="ouvert"]').scrollIntoViewIfNeeded().catch(() => {});
-        const r = await pg.evaluate(() => {
-          const g = document.querySelector('[data-parrainage="ouvert"]'); if (!g) return null;
-          const t = (s) => { const e = g.querySelector(s); return e ? e.innerText.trim() : null; };
-          return {
-            titre: t('[data-parrainage-titre]'), lien: t('[data-lien-parrainage]'), mois: t('[data-chiffre-mois]'), gagnes: g.getAttribute('data-mois-gagnes'),
-            copier: !!g.querySelector('[data-copier-parrainage]'), partager: !!g.querySelector('[data-partager-parrainage]'),
-            filleuls: [...g.querySelectorAll('[data-filleul]')].map((x) => ({ e: x.getAttribute('data-filleul'), t: x.innerText.replace(/\s+/g, ' ').trim() })),
-            nom: (g.querySelector('[data-parrainage-nom]') || {}).getAttribute ? g.querySelector('[data-parrainage-nom]').getAttribute('data-parrainage-nom') : null,
-            parraine: (g.querySelector('[data-parraine]') || { innerText: '' }).innerText.replace(/\s+/g, ' '), texte: g.innerText,
-            deborde: document.documentElement.scrollWidth - window.innerWidth,
-          };
-        });
-        dit(vu && !!r && r.titre === 'Parraine un vendeur : 1 mois offert pour toi et pour lui', `${largeur} px : la phrase « ${PHRASE} »`, JSON.stringify(r && r.titre));
-        dit(!!r && r.lien === LIEN && r.copier, '  le lien personnel et « Copier le lien »', JSON.stringify(r && { l: r.lien, c: r.copier }));
-        dit(!!r && r.partager === partage, partage ? '  téléphone : « Partager » (partage natif)' : '  sans partage natif : pas de bouton « Partager » qui ne mènerait nulle part', JSON.stringify(r && r.partager));
-        dit(!!r && r.mois === '2' && r.gagnes === '2', '  « Mois gagnés : 2 » (1 comme parrain + le sien comme filleul)', JSON.stringify(r && r.mois));
-        const etats = r ? r.filleuls.map((x) => x.e).join(',') : '';
-        dit(etats === 'offert,paye,inscrit' && /^Filleul 1 inscrit le 2 nov\. · a payé son 1er mois Mois offert$/.test(r.filleuls[0].t) && /a payé son 1er mois/.test(r.filleuls[1].t) && /A payé$/.test(r.filleuls[1].t) && /pas encore payé son 1er mois Inscrit$/.test(r.filleuls[2].t), '  une ligne par filleul : inscrit · a payé son 1er mois · mois offert', JSON.stringify(r && r.filleuls));
-        dit(!!r && !/@|[0-9a-f]{8}-[0-9a-f]{4}-/.test(r.texte), '  aucune adresse ni identifiant à l’écran');
-        dit(!!r && r.nom === 'Julie' && /Offert par Marc/.test(r.parraine), '  « Ton nom chez tes filleuls : Julie » ; son propre parrainage « Offert par Marc »', JSON.stringify(r && { n: r.nom, p: r.parraine }));
-        dit(appels.every((a) => a.m === 'GET'), '  ouvrir l’écran n’écrit rien');
-        if (largeur === 390) dit(r && r.deborde <= 0, '  390 px : rien ne déborde', String(r && r.deborde));
-        await capture(pg, `reglages-${largeur}${sombre ? '-sombre' : ''}`);
-        // Copier : le presse-papiers reçoit LE lien.
-        await pg.click('[data-copier-parrainage]');
-        await pg.waitForTimeout(300);
-        const presse = await pg.evaluate(() => navigator.clipboard.readText().catch(() => null));
-        dit(presse === LIEN, '  « Copier le lien » met le lien dans le presse-papiers', JSON.stringify(presse));
-        if (partage) {
-          await pg.click('[data-partager-parrainage]'); await pg.waitForTimeout(200);
-          const p = await pg.evaluate(() => window.__partages);
-          dit(p.length === 1 && p[0].url === LIEN && /1 mois/.test(p[0].text || ''), '  « Partager » ouvre le partage natif avec le lien', JSON.stringify(p));
-        }
-        // Le nom : un refus du serveur est DIT ; un nom accepté est rangé.
-        await pg.click('[data-parrainage-nom-ouvrir] button, button[data-parrainage-nom-ouvrir], [data-parrainage-nom-ouvrir]');
-        await attendre(pg, '[data-parrainage-nom-form] input', 4000);
-        await pg.fill('[data-parrainage-nom-form] input', 'juju_sneakers');
-        await pg.click('[data-parrainage-nom-enregistrer]');
-        const refus = await attendre(pg, '[data-parrainage-nom-refus]', 4000);
-        const tRefus = refus ? await pg.innerText('[data-parrainage-nom-refus]') : '';
-        dit(refus && /pseudo Vinted/.test(tRefus), '  un pseudo Vinted : refusé, et la raison est dite', tRefus);
-        if (largeur === 390) await capture(pg, 'nom-refus-390-sombre');
-        await pg.fill('[data-parrainage-nom-form] input', 'Julie B');
-        await pg.click('[data-parrainage-nom-enregistrer]');
-        await pg.waitForTimeout(500);
-        const nom2 = await pg.evaluate(() => { const e = document.querySelector('[data-parrainage-nom]'); return e && e.getAttribute('data-parrainage-nom'); });
-        const post = appels.filter((a) => a.m === 'POST').map((a) => JSON.parse(a.corps));
-        dit(nom2 === 'Julie B' && post.length === 2 && post.every((b) => b.action === 'nom' && !('owner' in b)), '  « Julie B » accepté et affiché ; le corps ne porte que le nom (jamais un owner)', JSON.stringify({ nom2, post }));
-        dit(!erreurs.length, '  aucune erreur de page', erreurs.join(' | ').slice(0, 160));
-        await ctx.close();
-      });
-    }
-
+    // (25 nov.) L'ancien groupe de Réglages est devenu un ÉCRAN (src/parrainage/EcranParrainage.jsx) : son rendu,
+    // le lien, Copier, Partager, le nom choisi, l'IBAN… sont jugés par scripts/bancs/parrainage-ecran.cjs.
     console.log('\n── 2. Le menu « Plus » (téléphone) : une ligne « Parrainer »');
     await essaie('menu ouvert', async () => {
       const { ctx, pg } = await ouvrir(nav, { largeur: 390, sombre: false, chemin: '/?tab=journee', partage: true });
@@ -194,7 +137,7 @@ const attendre = (pg, sel, ms = 12000) => pg.waitForSelector(sel, { timeout: ms 
       const arrive = await attendre(pg, '[data-parrainage="ouvert"]', 12000);
       await pg.waitForTimeout(900);
       const r = await pg.evaluate(() => { const g = document.querySelector('[data-parrainage="ouvert"]'); if (!g) return null; const b = g.getBoundingClientRect(); return { haut: Math.round(b.top), h: window.innerHeight, url: location.search, modal: !!document.querySelector('[role="dialog"][aria-modal="true"]') }; });
-      dit(arrive && r && r.haut >= 0 && r.haut < r.h, '  la toucher amène au groupe Parrainage (Réglages → Mon abonnement), à l’écran', JSON.stringify(r));
+      dit(arrive && r && r.haut >= 0 && r.haut < r.h, '  la toucher ouvre l’écran « Parrainage » (25 nov. : un vrai écran)', JSON.stringify(r));
       dit(r && !r.modal, '  aucune pop-up');
       await capture(pg, 'menu-vers-parrainage-390');
       await ctx.close();
@@ -219,7 +162,7 @@ const attendre = (pg, sel, ms = 12000) => pg.waitForSelector(sel, { timeout: ms 
           let code = null; try { code = localStorage.getItem('vrm_parrain_code'); } catch (_) {}
           return { b: b ? b.innerText.replace(/\s+/g, ' ') : null, attr: b && b.getAttribute('data-parrain-offert'), titre: h ? h.innerText : null, prenom: !!document.querySelector('input[autocomplete="given-name"]'), code, deborde: document.documentElement.scrollWidth - window.innerWidth };
         });
-        dit(vu && r.attr === 'Julie' && /Offert par Julie/.test(r.b) && /1 mois de VRM offert/.test(r.b), `${chemin} : « Offert par Julie » (le nom choisi)`, JSON.stringify(r));
+        dit(vu && r.attr === 'Julie' && /Offert par Julie/.test(r.b) && /−10 %/.test(r.b) && /1 semaine offerte/.test(r.b), `${chemin} : « Offert par Julie » (le nom choisi)`, JSON.stringify(r));
         dit(r.prenom && /Crée|Créer|compte/i.test(r.titre || ''), '  c’est l’INSCRIPTION qui s’ouvre (jamais la page d’accueil)', JSON.stringify(r.titre));
         dit(r.code === CODE, '  le code est gardé pour le rattachement après connexion', JSON.stringify(r.code));
         const pub = appels.filter((a) => /code=/.test(a.u));

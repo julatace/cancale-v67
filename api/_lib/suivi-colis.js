@@ -729,7 +729,9 @@ export function rappelsRetraitDuJour({ lignes = [], collectes = [], envoyes = []
     const transporteur = (l.carrier != null ? l.carrier : l.c) || '';
     const e = leverGarde(etatRetrait({ limite, arriveeMs, transporteur, limiteAt }, maintenant, aujourdhui), l, maintenant, aujourdhui);
     let etat = null;
-    if (e.etat === 'a_retirer' && limite && e.jours === cible) etat = cible ? 'demain' : 'dernier';
+    // (24 nov., retrait-parfait) Une date limite LUE : le jour (`limite`) OU l'heure (`limiteAt`, Vinted Go `expiration_time`) — une
+    // ligne qui ne porte que l'heure était muette. Jamais une estimation (garde du transporteur, « vers le ») : pas su ⇒ rien.
+    if (e.etat === 'a_retirer' && (limite || limiteAt) && e.jours === cible) etat = cible ? 'demain' : 'dernier';
     else if (cible) etat = null;
     else if (e.etat === 'delai_depasse' && e.jours >= -(1 + RATTRAPAGE_J)) etat = 'a_verifier';
     else if (e.etat === 'trop_long' && Number.isFinite(e.age) && e.age <= e.garde + 1 + RATTRAPAGE_J) etat = 'a_verifier';

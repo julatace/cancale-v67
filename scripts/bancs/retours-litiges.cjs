@@ -138,6 +138,8 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.goto(`http://localhost:${PORT}/?tab=achats`, { waitUntil: 'domcontentloaded' });
         await pg.waitForSelector('[data-retour-achat]', { timeout: 25000 }).catch(() => {});
         await pg.waitForTimeout(1500);
+        // (25 nov., achats-retours-design) Un retour remboursé est une rangée REPLIÉE : son toucher la déplie (frise, n°, gestes).
+        await pg.evaluate(() => document.querySelectorAll('details.vrm-rt-fini').forEach((d) => { d.open = true; }));
         const r = await pg.evaluate(() => [...document.querySelectorAll('[data-retour-achat]')].map((x) => ({
           tx: x.getAttribute('data-retour-achat'), num: x.getAttribute('data-retour-num'), presse: x.getAttribute('data-retour-presse'), remb: x.getAttribute('data-retour-rembourse'), montant: x.getAttribute('data-retour-montant'),
           limite: (x.querySelector('[data-retour-phrase-limite]') || {}).innerText || '', phraseRemb: (x.querySelector('[data-retour-et="rembourse"]') || {}).innerText || '', rembEtat: (x.querySelector('[data-retour-et="rembourse"]') || { getAttribute: () => '' }).getAttribute('data-retour-et-etat'),

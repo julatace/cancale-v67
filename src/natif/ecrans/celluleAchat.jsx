@@ -21,7 +21,7 @@ import { prixAchatSaisi } from '../../prixAuNumerotage.js';
 // fermait plus au clavier à l'ordinateur.
 const stop = (e) => { if (e && e.key === 'Escape') return; e.stopPropagation(); };
 
-function ChampPrix({ a, onPose, court = false }) {
+function ChampPrix({ a, onPose, court = false, auto = false }) {
   const [txt, setTxt] = React.useState('');
   const [faux, setFaux] = React.useState(false);
   const fait = React.useRef(false);
@@ -38,7 +38,7 @@ function ChampPrix({ a, onPose, court = false }) {
   return (
     <form className="n-vt-prix" data-vt-prix-achat="" data-vt-faux={faux ? '1' : undefined} onSubmit={(e) => { e.preventDefault(); valider(); }} onClick={stop} onPointerDown={stop} onKeyDown={stop}>
       <input className="n-vt-prix-champ" type="text" inputMode="decimal" enterKeyHint="done" autoComplete="off" value={txt} placeholder={tr(court ? 'vt.prixPayeCourt' : 'vt.prixAchatChamp')}
-        aria-label={tr('vt.prixAchatAria', { titre: a.titre || '' })} aria-invalid={faux ? 'true' : undefined} title={aide || undefined}
+        aria-label={tr('vt.prixAchatAria', { titre: a.titre || '' })} aria-invalid={faux ? 'true' : undefined} title={aide || undefined} autoFocus={auto || undefined}
         onChange={(e) => { setTxt(e.target.value); if (faux) setFaux(false); }} onBlur={valider}
         onKeyDown={(e) => { if (e.key === 'Escape') { setTxt(''); setFaux(false); e.currentTarget.blur(); } }} data-vt-prix-champ=""/>
       <span className="n-vt-prix-eur" aria-hidden="true">€</span>
@@ -48,8 +48,11 @@ function ChampPrix({ a, onPose, court = false }) {
 }
 
 // Les gestes de l'achat (cellule « Achat » du tableau, pied de la rangée au téléphone).
-export function GestesAchat({ a, Icon = null, court = false }) {
+export function GestesAchat({ a, Icon = null, court = false, replie = false, auto = false }) {   // `auto` (25 nov.) : le champ ouvert par un geste prend la main
   const [pose, setPose] = React.useState('');   // le prix qu'il vient de taper, montré tout de suite (la relecture suit)
+  // (23 nov., style-clarte-5 — « l'icône lien + le champ Payé € sur chaque ligne alourdit ») Dans un tableau (`replie`), le champ
+  // ne s'ouvre qu'au toucher d'un petit « + prix » ; le prix connu s'affiche tel quel. Même saisie, même relecture (§2.5).
+  const [ouvert, setOuvert] = React.useState(false);
   if (!a) return null;
   const maillons = (n = 18) => (Icon ? <Icon name="relier" size={n}/> : null);
   const prix = a.prix || (pose ? pose.replace(/\s*€$/, '') + ' €' : '');
@@ -58,7 +61,7 @@ export function GestesAchat({ a, Icon = null, court = false }) {
     const corps = <><span className="n-vt-relier-rond" aria-hidden="true">{maillons(16)}</span><span className="n-vt-relier-prix">{prix ? tr('vt.achatConnu', { prix }) : tr('vt.relierCourt')}</span></>;
     return (
       <span className="n-vt-achat" data-vt-achat={a.relie ? 'relie' : 'prix'}>
-        {a.ouvrir ? <button type="button" className="n-vt-relier" data-vt-relier={a.relie ? 'relie' : 'prix'} aria-label={nom} title={nom}
+        {a.ouvrir ? <button type="button" className="n-vt-relier" data-n-famille="second" data-vt-relier={a.relie ? 'relie' : 'prix'} aria-label={nom} title={nom}
           onClick={(e) => { e.stopPropagation(); a.ouvrir(); }} onKeyDown={stop}>{corps}</button>
           : <span className="n-vt-relier" data-vt-relier={a.relie ? 'relie' : 'prix'}>{corps}</span>}
       </span>
@@ -67,11 +70,13 @@ export function GestesAchat({ a, Icon = null, court = false }) {
   if (!a.ouvrir && !a.saisir) return null;
   return (
     <span className="n-vt-achat" data-vt-achat="libre">
-      {a.ouvrir ? <button type="button" className="n-vt-relier" data-vt-relier="libre" aria-label={tr('vt.relierAria', { titre: a.titre || '' })} title={tr('vt.relier')}
+      {a.ouvrir ? <button type="button" className="n-vt-relier" data-n-famille="second" data-vt-relier="libre" aria-label={tr('vt.relierAria', { titre: a.titre || '' })} title={tr('vt.relier')}
         onClick={(e) => { e.stopPropagation(); a.ouvrir(); }} onKeyDown={stop}>
         <span className="n-vt-relier-rond" aria-hidden="true">{maillons(16)}</span><span className="n-vt-relier-mot">{tr('vt.relierCourt')}</span>
       </button> : null}
-      {a.saisir ? <ChampPrix a={a} onPose={setPose} court={court}/> : null}
+      {a.saisir && (!replie || ouvert) ? <ChampPrix a={a} onPose={(x) => { setPose(x); setOuvert(false); }} court={court} auto={replie || auto}/> : null}
+      {a.saisir && replie && !ouvert ? <button type="button" className="n-vt-plus-prix" data-n-famille="champ" data-vt-plus-prix="" aria-label={tr('vt.prixAchatAria', { titre: a.titre || '' })}
+        onClick={(e) => { e.stopPropagation(); setOuvert(true); }} onKeyDown={stop}>{tr('vt.plusPrix')}</button> : null}
     </span>
   );
 }
@@ -79,5 +84,5 @@ export function GestesAchat({ a, Icon = null, court = false }) {
 // La cellule « Achat » d'un tableau de Ventes (VentesBureau, VentesTableau).
 export function celluleAchat(a, Icon) {
   if (!a) return null;
-  return <GestesAchat a={a} Icon={Icon} court/>;
+  return <GestesAchat a={a} Icon={Icon} court replie/>;
 }

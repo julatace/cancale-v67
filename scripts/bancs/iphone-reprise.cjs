@@ -167,7 +167,7 @@ const CHAMP_ANNONCES = '[data-ann-recherche] input, input[aria-label="Rechercher
 const ecran = (pg) => pg.evaluate((CHAMP_ANNONCES) => {
   const m = document.querySelector('.vrm-main');
   const t = document.querySelector('[data-tache]');
-  const actif = document.querySelector('.vrm-tabbar > [aria-current="page"]');
+  const actif = document.querySelector('nav[data-n-onglets] > [aria-current="page"]');
   return {
     ecran: m ? m.getAttribute('data-ecran') : '',
     site: t ? t.getAttribute('data-tache-site') : '',
@@ -206,13 +206,13 @@ const balayer = async (ctx, pg, x0, x1, y) => {
   await pg.waitForTimeout(800);
 };
 // (14 nov., choix n° 61) Annonces, Stock et Achats sont dans l'onglet « Paires » : l'onglet, puis le segment.
-const allerPaire = async (pg, id) => { await toucher(pg, '.vrm-tabbar [data-nav-entree="paires"]'); return toucher(pg, `[data-paires-segment="${id}"]`); };
+const allerPaire = async (pg, id) => { await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="paires"]'); return toucher(pg, `[data-paires-segment="${id}"]`); };
 const toucher = async (pg, sel) => { const l = pg.locator(sel).first(); if (!(await l.count())) { console.log(`     (absent : ${sel})`); return false; } await l.tap({ timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(800);
   // (8 nov.) L'écran se calcule en tâche interruptible (startTransition) : on attend la fin du calcul
   // (`data-en-cours` de la barre, 4 s au plus), jamais un délai fixe seul (CLAUDE.md §6.5).
-  await pg.waitForFunction(() => !document.querySelector('.vrm-tabbar[data-en-cours]'), null, { timeout: 4000 }).catch(() => {});
+  await pg.waitForFunction(() => !document.querySelector('nav[data-n-onglets][data-en-cours]'), null, { timeout: 4000 }).catch(() => {});
   return true; };
-const PLUS = '.vrm-tabbar button[aria-label^="Plus"]';
+const PLUS = 'nav[data-n-onglets] button[aria-label^="Plus"]';
 // Ce que « Plus » porte (App.jsx, GROUPES_PLUS sans les groupes `ordi`) : lu dans la source, pas recopié.
 const PLUS_ATTENDUES = (() => {
   try {
@@ -232,26 +232,30 @@ const PLUS_ATTENDUES = (() => {
 
 // La barre, mesurée.
 const mesureBarre = (pg) => pg.evaluate(() => {
-  const nav = document.querySelector('.vrm-tabbar'); if (!nav) return null;
+  const nav = document.querySelector('nav[data-n-onglets]'); if (!nav) return null;
   const r = nav.getBoundingClientRect();
   // (16 nov., barre-achats) Les ENTRÉES de la barre : ses onglets (`.vrm-tab`) — cinq depuis qu'Achats y est —, pas
   // le disque « + » du centre (14 nov.), qui comptait jusqu'ici pour la 5ᵉ entrée.
   const entrees = [...nav.querySelectorAll(':scope > .vrm-tab, :scope > .vrm-nav-more')].map((x) => {
-    const q = x.getBoundingClientRect(); const lab = x.querySelector('.vrm-nav-label');
+    const q = x.getBoundingClientRect(); const lab = x.querySelector('.n-onglet-libelle');
     const hit = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
     return { id: x.getAttribute('data-nav-entree') || 'plus', h: Math.round(q.height), w: Math.round(q.width), coupe: lab ? lab.scrollWidth > lab.clientWidth + 1 : true, touche: !!hit && x.contains(hit) };
   });
   const nombres = [...nav.querySelectorAll('[data-badge-n]')].map((x) => x.getAttribute('data-badge-n')).filter((n) => /^\d+$/.test(n));
   // La zone sûre : la règle qui gagne doit la porter (Chromium vaut env() = 0).
   let zoneSure = false;
-  for (const ss of document.styleSheets) { let rr; try { rr = ss.cssRules; } catch (_) { continue; } const tous = []; const plat = (l) => { for (const x of l) { if (x.selectorText) tous.push(x); if (x.cssRules && x.cssRules.length) plat(x.cssRules); } }; plat(rr); for (const x of tous) { if (x.selectorText && /\.vrm-tabbar\b/.test(x.selectorText) && x.style && /safe-area-inset-bottom/.test(x.style.getPropertyValue('padding-bottom'))) zoneSure = true; } }
+  for (const ss of document.styleSheets) { let rr; try { rr = ss.cssRules; } catch (_) { continue; } const tous = []; const plat = (l) => { for (const x of l) { if (x.selectorText) tous.push(x); if (x.cssRules && x.cssRules.length) plat(x.cssRules); } }; plat(rr); // (24 nov., main-vert) La barre NATIVE (`.n-onglets`, natif.css) porte la zone sûre par sa variable `--n-bas-sur`
+    // (jetons.css : env(safe-area-inset-bottom)) : la variable est résolue jusqu'à env(), jamais admise sur son nom.
+    const vars = new Set(); for (const x of tous) { if (!x.style) continue; for (let i = 0; i < x.style.length; i++) { const p = x.style[i]; if (p.startsWith('--') && /safe-area-inset-bottom/.test(x.style.getPropertyValue(p))) vars.add(p); } }
+    const porte = (v) => /safe-area-inset-bottom/.test(v) || [...vars].some((n) => v.includes(`var(${n}`));
+    for (const x of tous) { if (x.selectorText && /(^|[\s,>])\.n-onglets(?![\w-])/.test(x.selectorText) && x.style && (porte(x.style.getPropertyValue('padding-bottom')) || porte(x.style.getPropertyValue('padding')))) zoneSure = true; } }
   return { bas: Math.round(r.bottom), haut: Math.round(r.top), vh: innerHeight, vw: innerWidth, docW: document.documentElement.scrollWidth, entrees, nombres, zoneSure };
 });
 const mesurePanneau = (pg) => pg.evaluate(() => {
   const m = document.querySelector('.vrm-sheet'); if (!m) return null;
-  const q = m.getBoundingClientRect(); const nav = document.querySelector('.vrm-tabbar').getBoundingClientRect();
+  const q = m.getBoundingClientRect(); const nav = document.querySelector('nav[data-n-onglets]').getBoundingClientRect();
   const entrees = [...m.querySelectorAll('[data-nav-entree]')].map((e) => { const r = e.getBoundingClientRect(); const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); const lib = e.querySelector('.vrm-sheet-lib'); return { id: e.getAttribute('data-nav-entree'), h: Math.round(r.height), visible: r.top >= 0 && r.bottom <= Math.min(innerHeight, nav.top) + 1, touche: !!hit && e.contains(hit), coupe: lib ? lib.scrollWidth > lib.clientWidth + 1 : false }; });
-  return { bas: Math.round(q.bottom), navHaut: Math.round(nav.top), defile: m.scrollHeight > m.clientHeight + 1, entrees, plusOuvert: document.querySelector('.vrm-tabbar button[aria-label^="Plus"]').getAttribute('aria-expanded') };
+  return { bas: Math.round(q.bottom), navHaut: Math.round(nav.top), defile: m.scrollHeight > m.clientHeight + 1, entrees, plusOuvert: document.querySelector('nav[data-n-onglets] button[aria-label^="Plus"]').getAttribute('aria-expanded') };
 });
 
 (async () => {
@@ -308,14 +312,14 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         for (const id of ['messages', 'garage', 'emails']) {
           await toucher(pg, TETE); const ok = await toucher(pg, `[data-nav-groupe] [data-nav-entree="${id}"]`);
           if (!ok) { await pg.keyboard.press('Escape').catch(() => {}); continue; }
-          vus.push(await pg.evaluate(() => { const a = document.querySelector('.vrm-tabbar [aria-current="page"]'); return { ecran: document.querySelector('.vrm-main').getAttribute('data-ecran'), actif: a ? a.getAttribute('data-nav-entree') : '' }; }));
+          vus.push(await pg.evaluate(() => { const a = document.querySelector('nav[data-n-onglets] [aria-current="page"]'); return { ecran: document.querySelector('.vrm-main').getAttribute('data-ecran'), actif: a ? a.getAttribute('data-nav-entree') : '' }; }));
         }
         const groupe = { garage: 'paires', annonces: 'paires', achats: 'achats' };
         dit(vus.length >= 2 && vus.every((v) => !v.actif || v.actif === (groupe[v.ecran] || v.ecran)), `B6 ${qui} : sur chaque écran du menu, la barre n’allume que l’onglet de cet écran (ou aucun)`, JSON.stringify(vus));
         // Les visites du menu ont empilé leurs écrans : B7–B9 repartent d'une page neuve (comme avant, où « Plus » n'empilait rien).
         await pg.close().catch(() => {}); ({ pg } = await ouvrirPage(ctx, '?tab=journee'));
         // B7 · balayages
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
+        await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="ventes"]');
         // Le milieu de l'écran, HORS d'une commande : un geste qui part d'un bouton, d'un lien,
         // d'un champ ou d'une rangée qui défile de côté appartient à ce qu'il touche (règle
         // `gesteHorsNavigation` d'App.jsx, 16 oct.). Le point fixe (200, 420) tombait depuis
@@ -329,7 +333,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
             const cs = getComputedStyle(n); if (cs.position === 'fixed') return true;
             if (n.scrollWidth > n.clientWidth + 2 && (cs.overflowX === 'auto' || cs.overflowX === 'scroll')) return true;
           } return false; };
-          const barre = (document.querySelector('.vrm-tabbar') || { getBoundingClientRect: () => ({ top: innerHeight }) }).getBoundingClientRect().top;
+          const barre = (document.querySelector('nav[data-n-onglets]') || { getBoundingClientRect: () => ({ top: innerHeight }) }).getBoundingClientRect().top;
           for (let y = 160; y < barre - 20; y += 12) { const e = document.elementFromPoint(200, y), g = document.elementFromPoint(4, y); if (e && g && e.closest('.vrm-main') && g.closest('.vrm-main') && !commande(e) && !commande(g)) return y; }
           return null;
         });
@@ -348,7 +352,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         await allerPaire(pg, 'annonces');
         await pg.evaluate(() => { document.querySelector('.vrm-main').scrollTop = 400; }); await pg.waitForTimeout(300);
         const avant8 = await ecran(pg);
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="paires"]'); await pg.waitForTimeout(600);
+        await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="paires"]'); await pg.waitForTimeout(600);
         const e8 = await ecran(pg);
         dit(avant8.defile > 100 && e8.ecran === 'annonces' && e8.defile < 5, `B8 ${qui} : toucher l'onglet courant ramène en haut, même écran`, JSON.stringify({ avant: avant8.defile, apres: e8.defile, ecran: e8.ecran }));
         // B9 · le retour entre écrans
@@ -357,10 +361,10 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         // d'un onglet de la barre à l'autre n'empile plus rien (src/navHistorique.js). Règle portée : le retour
         // depuis Argent ne montre AUCUN autre onglet de la barre ; il reste entier pour un écran du menu
         // (scripts/bancs/barre-achats.cjs A9) et pour les feuilles (B4).
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="journee"]');
+        await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="journee"]');
         const h9 = await pg.evaluate(() => history.length);
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="compta"]');
+        await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="ventes"]');
+        await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="compta"]');
         const h9b = await pg.evaluate(() => history.length);
         await pg.goBack().catch(() => {}); await pg.waitForTimeout(700);
         const r1 = await ecran(pg).catch(() => ({ ecran: '', url: 'perdu' }));
@@ -380,7 +384,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         let { pg } = await ouvrirPage(ctx);
         dit((await ecran(pg)).ecran === 'journee', `R5 ${qui} : rien de rangé ⇒ Ma journée`);
         // R1 · Ventes · Leboncoin, rechargement
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
+        await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="ventes"]');
         await toucher(pg, '[data-filtre-site] button[data-site="leboncoin"]');
         await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(3000);
         const r1 = await ecran(pg);
@@ -393,7 +397,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         dit(r1b.ecran === 'ventes' && r1b.site === 'vinted' && r1b.puce === '222', `R1 ${qui} : rechargé, même compte choisi`, JSON.stringify(r1b));
         // R2 · Colis · À retirer, app rouverte
         // (16 nov., barre-achats) Achats a son onglet dans la barre.
-        await toucher(pg, '.vrm-tabbar [data-nav-entree="achats"]');
+        await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="achats"]');
         await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         const r2avant = await ecran(pg);
         await pg.close();
@@ -441,7 +445,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
           const { pg } = await ouvrirPage(ctx, '?tab=journee');
           await pg.setViewportSize({ width: c.w, height: c.h }); await pg.waitForTimeout(900);
           const r = await pg.evaluate(() => {
-            const side = document.querySelector('.vrm-sidebar'); if (!side) return null;
+            const side = document.querySelector('[data-n-laterale]'); if (!side) return null;
             const sr = side.getBoundingClientRect();
             const libs = [...side.querySelectorAll('.vrm-rail-lib, .vrm-rail-section-label, .vrm-sidebar-mot')].filter((e) => e.getClientRects().length);
             const coupes = libs.filter((e) => { const q = e.getBoundingClientRect(); if (q.width <= 1 && q.height <= 1) return false; /* rangé pour les lecteurs d'écran (colonne réduite), pas coupé */ return e.scrollWidth > e.clientWidth + 1 || q.right > sr.right + 1 || q.left < sr.left - 1; }).map((e) => e.innerText);
@@ -484,7 +488,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
             const bl = document.querySelector('[data-numeros-perimes]'); if (!bl) return null;
             const q = bl.getBoundingClientRect();
             const dedans = (x, y) => { const h = document.elementFromPoint(x, y); return !!h && bl.contains(h); };
-            const side = document.querySelector('.vrm-sidebar');
+            const side = document.querySelector('[data-n-laterale]');
             const libs = side ? [...side.querySelectorAll('.vrm-rail-lib, .vrm-rail-section-label, .vrm-sidebar-mot')].filter((e) => e.getClientRects().length) : [];
             const railVisible = libs.filter((e) => { const r = e.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && !dedans(r.left + 4, r.top + r.height / 2); }).map((e) => e.innerText);
             const coins = [[2, 2], [innerWidth - 3, 2], [2, innerHeight - 3], [innerWidth - 3, innerHeight - 3], [innerWidth - 20, innerHeight / 2], [20, innerHeight / 2]];
