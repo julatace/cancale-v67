@@ -36,11 +36,13 @@ export default function LigneOrdinateur({ onNav, Icon = null, base = `${SUPABASE
   const p = e.allumes[0] || e.dernier;
   const comptes = new Set(e.allumes.flatMap((o) => o.comptes.map((c) => c.site + ':' + c.id))).size;
   const titre = e.niveau === 'allume' ? tr('adist.jour.allume', { nom: nomOrdi(p), n: comptes }) : tr('adist.jour.eteint', { nom: nomOrdi(p), heure: heureLoc(p.atMs) });
-  const sous = attente ? tr('adist.jour.attente', { n: attente }) : tr('adist.jour.sous');
+  // (25 nov., « trop de texte ») Le titre court (« Ordinateur éteint · 07:37 ») ; la ligne dessous seulement quand des gestes
+  // attendent l'ordinateur — le navigateur et ce qu'on peut faire à distance sont dans « Mes comptes » (›) et au lecteur d'écran.
+  const sous = attente ? tr('adist.jour.attente', { n: attente }) : '';
   return (
     <Groupe attrs={{ 'data-adist-jour': e.niveau }}>
-      <Rangee icone={Icon ? <Icon name="link" size={22}/> : null} titre={titre} lignes={2} sousTitre={sous} sousLignes={2} ton={e.niveau === 'eteint' && attente ? 'ambre' : 'neutre'} fin="chevron"
-        onClick={() => { try { onNav && onNav('adistance'); } catch (_) {} }} attrs={{ 'data-adist-jour-rangee': '', 'data-adist-jour-attente': attente == null ? '' : String(attente) }}/>
+      <Rangee icone={Icon ? <Icon name="link" size={22}/> : null} titre={titre} sousTitre={sous} sousLignes={2} ton={e.niveau === 'eteint' && attente ? 'ambre' : 'neutre'} fin="chevron"
+        onClick={() => { try { onNav && onNav('adistance'); } catch (_) {} }} attrs={{ 'data-adist-jour-rangee': '', 'data-adist-jour-attente': attente == null ? '' : String(attente), 'aria-label': [titre, nomOrdi(p), sous || tr('adist.jour.sous')].filter(Boolean).join(' · ') }}/>
     </Groupe>
   );
 }

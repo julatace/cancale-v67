@@ -156,6 +156,9 @@ async function banc() {
       const res = [];
       for (const [quoi, d] of CHAMPS) res.push([quoi, await etape(pg, 'champ', Object.assign({ quoi }, d))]);
       // Encore un vrai clic, sur « Sauvegarder le brouillon » cette fois.
+      // (24 nov.) Le bouton est sous la ligne de flottaison (y ≈ 950 pour 860 px) : un clic de souris HORS de l'écran ne touche
+      //    rien (cible `HTML`) — ni l'écran plein ni Vinted. Une vraie personne clique DANS l'écran : on l'y amène d'abord.
+      await pg.locator('[data-testid=upload-form-save-draft-button]').evaluate((e) => e.scrollIntoView({ block: 'center' }));
       const bb = await pg.locator('[data-testid=upload-form-save-draft-button]').boundingBox();
       await pg.mouse.click(bb.x + 5, bb.y + 5);
       await pg.waitForTimeout(200);

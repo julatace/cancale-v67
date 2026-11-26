@@ -15,6 +15,7 @@ export default {
   "scan.r.taper": "Taper le n°",
   "scan.r.saisie": "N° de suivi",
   "scan.r.ok": "OK",
+  "scan.r.okRaison": "Tape d’abord le n° de suivi",
   "scan.r.attente": "Lecture de tes ventes et achats…",
   "scan.r.autre": "Scanner un autre colis",
   "scan.r.sansTitre": "Sans titre",

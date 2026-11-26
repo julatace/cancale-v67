@@ -7,6 +7,7 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import { cheminMonotone } from '../courbeMonotone.js';
 import { PileVignettes } from './PileVignettes.jsx';
+import { attenteDe, attrsAttente } from '../natif/outils.js';
 import './carte-pages.css';
 import '../ui/ui.css';   // (14 nov.) la bande de chiffres des écrans de liste (`bande`)   // (11 nov., lot stats-plus) plus de trois cases : pages de 2×2 au téléphone
 
@@ -146,11 +147,11 @@ export function GrandChiffre({ className = 'vrm-fu-grand', plancher = 22, childr
 
 // Le chiffre d'une case (« Vendu · mois ») : le même ajustement, plancher 14 px —
 // « 1 621 771 € » dans une demi-largeur de téléphone ne sort plus de sa case.
-function ChiffreCase({ n, nc }) {
+function ChiffreCase({ n, nc, attente = false }) {
   const ref = useRef(null);
   const texte = texteDe(n);
   useLayoutEffect(() => (ref.current && n != null ? ajusterChiffre(ref.current, 14) : undefined), [texte]);
-  return <b ref={ref} aria-hidden="true" className={n == null ? 'is-vide' : undefined} data-fu-case-chiffre="" style={{ '--nc': nc }}>{n == null ? '—' : <ChiffreRoule valeur={n} />}</b>;
+  return <b ref={ref} aria-hidden="true" className={n == null ? 'is-vide' : undefined} data-fu-case-chiffre="" style={{ '--nc': nc }} {...(attrsAttente(attente, 'valeur') || {})}>{n == null ? '—' : <ChiffreRoule valeur={n} />}</b>;
 }
 
 // cases : [{ cle, n, l, titre, raison, onClick, attrs }] — `n` peut être un nœud ; `raison` :
@@ -241,7 +242,10 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
             // (10 nov., lot P) Au lecteur d'écran : « Vendu · mois : 80 € » — le libellé AVANT le
             // chiffre, et « pas su » à la place d'un « — » muet (§5). Le dessin reste tel quel.
             const lu = `${texteDe(c.l)} : ${c.n == null ? 'pas su' : texteDe(c.n)}${c.raison ? ', ' + texteDe(c.raison) : ''}`;
-            const corps = <><span className="vrm-sr-seul" data-fu-case-lu="">{lu}</span><ChiffreCase n={c.n} nc={Math.max(1, texteDe(c.n).length)} /><span aria-hidden="true">{c.l}</span>{c.raison ? <small className="vrm-fu-case-raison" data-carte-raison="" aria-hidden="true">{c.raison}</small> : raisonsVues.current.has(c.cle) ? <small className="vrm-fu-case-raison" aria-hidden="true">{'\u00a0'}</small> : null}</>;
+            // (25 nov., chargement propre) Un chiffre EN COURS de lecture (« lecture… ») : un squelette à sa place, sa raison
+            // invisible (place gardée) — src/styles-chiffre-attente.css ; jamais « pas su » ni une valeur.
+            const enLecture = attenteDe(c.enCours, c.n != null, c.raison);
+            const corps = <><span className="vrm-sr-seul" data-fu-case-lu="">{lu}</span><ChiffreCase n={c.n} nc={Math.max(1, texteDe(c.n).length)} attente={enLecture} /><span aria-hidden="true">{typeof c.l === 'string' ? c.l.replace(/ · /g, '\u00a0· ') : c.l}</span>{c.raison ? <small className="vrm-fu-case-raison" data-carte-raison="" aria-hidden="true" {...(attrsAttente(enLecture, 'note') || {})}>{c.raison}</small> : raisonsVues.current.has(c.cle) ? <small className="vrm-fu-case-raison" aria-hidden="true">{'\u00a0'}</small> : null}</>;
             return c.onClick
               ? <button key={c.cle} type="button" className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} onClick={c.onClick} style={placeEnPage(i, liste.length)} {...(c.attrs || {})}>{corps}</button>
               : <div key={c.cle} className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} style={placeEnPage(i, liste.length)} {...(c.attrs || {})}>{corps}</div>;

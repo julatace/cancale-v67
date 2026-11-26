@@ -128,7 +128,16 @@ const J = (v) => JSON.stringify(v);
   dit(/gesteCorbeille\(\{ type: 'note'/.test(A), 'G7 note effacée : à la corbeille');
   dit(/gesteCorbeille\(\{ type: 'fournisseur'/.test(A) && /gesteCorbeille\(\{ type: 'achat-gros'/.test(A) && /title: `Retirer \$\{p\.nom\} \?`/.test(A), 'G8 fournisseur / achat en gros : confirmation gardée (plusieurs prix), puis corbeille');
   // (20 nov.) Leboncoin : la suppression se fait dans le PANNEAU de l'extension (il confirme) — l'app n'ouvre que le lien.
-  dit(/ouvrirPanneau\(\{ site: 'leboncoin', page: 'annonces', ids, action: 'supprimer' \}\)/.test(A) && /askConfirm\(\{title:'Supprimer cette annonce d’eBay \?'/.test(sansCommentaires(lire('src/ecrans/Ebay.jsx'))), 'G9 supprimer SUR Leboncoin / eBay garde sa confirmation (pas de corbeille)');
+  // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) Leboncoin : la suppression part DEPUIS VRM par la porte, après UNE
+  // confirmation « sans retour » qui nomme les N° (pas de corbeille : c'est chez Leboncoin), une commande par annonce au nom de
+  // SON compte ; ce qui ne passe pas la porte : le panneau sur CES annonces. eBay : sa confirmation, inchangée.
+  { const PORTE = require('./_porte-agir.cjs');
+    const i0 = A.indexOf('const supprimerLbcJournee = (liste) => {'), j0 = i0 < 0 ? -1 : A.indexOf('\n  };', i0);
+    const r = await PORTE.regle({ code: i0 < 0 || j0 < 0 ? '' : A.slice(i0, j0),
+      porte: /const ok = l\.filter\(\(x\) => agirMaintenant\w*\('leboncoin', x\.compte, 'supprimer', 'file'\)\.ok\)[\s\S]*if \(ok\.length && await askConfirm\(\{ title: [^\n]*sans retour[\s\S]*for \(const x of ok\) \{ const r = await envoyerGeste\w*\(\{ site: 'leboncoin', compte: x\.compte, geste: 'supprimer', distGeste: 'supprimer', args: \{ id: x\.id/,
+      repli: /if \(reste\.length\) \{[^\n]*ouvrirPanneau\(\{ site: 'leboncoin'[^\n]*ids: reste\.map\(\(x\) => x\.id\), action: 'supprimer' \}\)/ });
+    const lbcOk = (await PORTE.supprimerLbc(sansCommentaires(lire('src/ecrans/Leboncoin.jsx')), sansCommentaires(lire('src/agir/Agir.jsx')))).ok;
+    dit(r.ok && lbcOk && /askConfirm\(\{title:'Supprimer cette annonce d’eBay \?'/.test(sansCommentaires(lire('src/ecrans/Ebay.jsx'))), 'G9 (24 nov.) supprimer SUR Leboncoin (par la porte, sinon le panneau) / eBay garde sa confirmation (pas de corbeille)' + (r.ok ? '' : ' — ' + r.detail)); }
   dit(/id:'corbeille', type:'panneau'[\s\S]{0,300}el:<CorbeilleSetting\/>/.test(regl) && /data-corbeille-restaurer=\{e\.id\}/.test(A), 'G10 Paramètres → Corbeille : la liste et « Restaurer »');
   const corps = A.slice(A.indexOf('const gesteMorceaux'), A.indexOf('function CorbeilleSetting'));
   dit(/ecrireMorceaux\(/.test(corps) && !/vmrCmd|appelEbay|\/api\//.test(corps.replace(/rest\/v1\/app_data/, '')), 'G11 la corbeille n’écrit que ses clés (aucune commande à l’extension, aucun site)');

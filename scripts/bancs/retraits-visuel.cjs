@@ -163,7 +163,8 @@ async function releve(pg) {
 }
 // L'écran d'aujourd'hui (le garde-réseau des bancs pose sinon l'échafaudage du DOM d'avant, `vrm_banc_dom_ancien`).
 async function allumer(pg) {
-  await pg.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_banc_dom_ancien'); } catch (_) {} });
+  // (23 nov., lot retours-suivi) le BILLET (QR ≥ 110 à droite, photo 48) est désormais la variante « b » ; le défaut C (rangées) est jugé par retrait-point-c.cjs.
+  await pg.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_banc_dom_ancien'); localStorage.setItem('vrm_banc_retrait_variante', 'b'); } catch (_) {} });
   await pg.reload({ waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
 }

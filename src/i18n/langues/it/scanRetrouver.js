@@ -15,6 +15,7 @@ export default {
   "scan.r.taper": "Scrivi il numero",
   "scan.r.saisie": "Numero di tracciamento",
   "scan.r.ok": "OK",
+  "scan.r.okRaison": "Scrivi prima il numero di tracciamento",
   "scan.r.attente": "Lettura delle tue vendite e dei tuoi acquisti…",
   "scan.r.autre": "Scansiona un altro pacco",
   "scan.r.sansTitre": "Senza titolo",

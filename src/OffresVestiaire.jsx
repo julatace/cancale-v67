@@ -10,7 +10,9 @@
 // échéance LUE) : son temps restant en AMBRE, une seule fois dans Messages — la
 // pastille « offre 180 € » de la liste reste neutre. Les offres VINTED n'expirent pas :
 // rien de tel pour elles. Vignette vide = `PhotoVide`, N° = `Numero`, liens au style du pied.
-import { BoutonExtension } from './BoutonExtension.jsx';   // (20 nov.) « Répondre à l'offre dans l'extension »
+import { BoutonExtension } from './BoutonExtension.jsx';
+import { BoutonAgir, issueTexte } from './agir/Agir.jsx';   // (24 nov., lot agir-tout)
+import { usePeutAgir, envoyerGeste } from './agir/porte.js';   // (20 nov.) « Répondre à l'offre dans l'extension »
 import React from 'react';
 import { GESTES_OFFRE, etatGeste, prixContre, euros, resteAvant, etiquetteOffre, expireBientot } from './offresVestiaire.js';
 import { PhotoVide } from './composants/PhotoVide.jsx';
@@ -33,6 +35,9 @@ function CarteOffre({ o, recettes, cap, numDe, envoyer, Photo, maintenant }) {
   const pc = contre != null ? prixContre(contre, o) : null;
   const lien = o.lien || 'https://fr.vestiairecollective.com/';
   const bientot = expireBientot(o, maintenant);
+  const [issue, setIssue] = React.useState(null);
+  const agirOk = usePeutAgir('vestiaire', o.compte || '', 'offre', 'file').ok;
+  const partir = async (geste, cents = null) => { setConfirme(''); setContre(null); setIssue(await envoyerGeste({ site: 'vestiaire', compte: o.compte || '', geste: 'offre', distGeste: 'offre', args: Object.assign({ nego: String(o.id), geste }, cents ? { prix: cents / 100 } : {}), num: num || '' })); };
   return (
     <li className="vrm-of-carte" data-vc-offre={o.id} data-vc-offre-produit={o.produit} data-vc-offre-prets={prets.join(',')} data-vc-offre-bientot={bientot ? '1' : undefined}>
       <div className="vrm-of-tete">
@@ -49,7 +54,23 @@ function CarteOffre({ o, recettes, cap, numDe, envoyer, Photo, maintenant }) {
         <span className="vrm-of-prix" data-vc-offre-cents={o.offre == null ? '' : String(o.offre)}>{euros(o.offre)}</span>
       </div>
       {/* (20 nov., décision de Julien) Accepter, refuser, contre-offre : dans le panneau de l'extension, sur CETTE négociation. */}
-      <div className="vrm-of-gestes" data-vc-offre-panneau={o.id}><BoutonExtension className="vrm-of-btn" action="offres" site="vestiaire" ids={[String(o.id)]}/></div>
+      {/* (24 nov., lot agir-tout) DEPUIS VRM quand l'extension a CE compte Vestiaire dans un onglet (la file ; recette APPRISE
+          de SON propre geste, sinon l'extension refuse et le dit) ; sinon le panneau, gardé. */}
+      {agirOk ? (
+        <div className="vrm-of-gestes" data-vc-offre-app={o.id}>
+          {confirme ? <p className="vrm-of-confirme" data-vc-offre-confirme={confirme}>{CONFIRME[confirme] ? CONFIRME[confirme]() : ''}</p> : null}
+          {confirme ? <BoutonAgir site="vestiaire" compte={o.compte || ''} geste="offre" par="file" variante="plein" onClick={() => partir(confirme)} attrs={{ 'data-vc-offre-oui': confirme }}>{NOM[confirme]()}</BoutonAgir>
+            : <>
+              <BoutonAgir site="vestiaire" compte={o.compte || ''} geste="offre" par="file" variante="plein" onClick={() => setConfirme('accepter')} attrs={{ 'data-vc-offre-geste': 'accepter' }}>{NOM.accepter()}</BoutonAgir>
+              <BoutonAgir site="vestiaire" compte={o.compte || ''} geste="offre" par="file" variante="texte" onClick={() => setConfirme('refuser')} attrs={{ 'data-vc-offre-geste': 'refuser' }}>{NOM.refuser()}</BoutonAgir>
+              {contre == null ? <BoutonAgir site="vestiaire" compte={o.compte || ''} geste="offre" par="file" variante="texte" onClick={() => setContre('')} attrs={{ 'data-vc-offre-geste': 'contre' }}>{NOM.contre()}</BoutonAgir>
+                : <span className="vrm-of-contre"><input inputMode="decimal" value={contre} onChange={(e) => setContre(e.target.value)} aria-label={NOM.contre()} data-vc-offre-contre="" style={{ fontSize: 16 }}/>
+                  <BoutonAgir site="vestiaire" compte={o.compte || ''} geste="offre" par="file" onClick={() => { if (pc && pc.cents) partir('contre', pc.cents); }} attrs={{ 'data-vc-offre-contre-envoyer': '' }}>{tr('agir.repondre.envoyer')}</BoutonAgir>
+                  {pc && pc.erreur ? <small>{pc.erreur}</small> : null}</span>}
+            </>}
+          {issue ? <p className="vrm-agir-issue" role="status" data-agir-issue={issue.ok ? 'ok' : issue.raison || 'non'}>{issueTexte(issue)}</p> : null}
+        </div>
+      ) : <div className="vrm-of-gestes" data-vc-offre-panneau={o.id}><BoutonExtension className="vrm-of-btn" action="offres" site="vestiaire" compte={o.compte || '*'} ids={[String(o.id)]}/></div>}
       {res ? <div className="vrm-of-resultat" data-vc-offre-resultat={res.ton}>{res.ton === 'ok' ? <AccApres geste="offre.vestiaire" texte={res.texte} ensuite={null}/> : <AccEchec geste="offre.vestiaire" erreur={res.ton === 'muet' ? { sansReponse: true, raison: res.texte } : res.texte}/>}</div> : null}
     </li>
   );

@@ -159,10 +159,17 @@ async function audit(sources, bavard) {
   dit(appels.length === 1 && /onClick=\{\(\) => \{ if \(j\.ok\) onRepublier\(\{ ids: j\.ids, compte: j\.compte \}\); \}\}/.test(vueSans) && !/useEffect\([^)]*onRepublier/.test(vueSans) && !/onRepublierAuto/.test(vueSans),
     'R8 la vue n\'appelle `onRepublier` QUE dans le onClick de « Republier N »', appels.length);
   const egSans = sources.eg.replace(/\/\/.*$/gm, '');
-  const bloc = /const republierPrio = \(\{ ids \}\) => \{ const a = (ACTIONS_EXTENSION\.republier); ouvrirPanneau\(/.exec(egSans);
-  const ouvertures = (egSans.match(/ouvrirPanneau\(\{ site: 'vinted', page: a\.page, ids, action: a\.action \}\)/g) || []).length;
-  dit(!!bloc && /ACTIONS_EXTENSION\.republier/.test(bloc[1]) && ouvertures === 1 && !/useEffect\([^;]*ouvrirPanneau/.test(egSans) && !/setTimeout\([^;]*republierPrio/.test(egSans) && /onRepublier=\{republierPrio\}/.test(egSans),
-    'R8 l\'écran n\'ouvre le panneau (atelier Republier) que dans le geste « Republier N » — aucun effet, aucun minuteur');
+  // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) « Republier N » part DEPUIS VRM par la porte (les annonces cochées, SON
+  // compte, UNE confirmation) ; refusé ⇒ le panneau (atelier Republier) sur ces annonces. Seulement dans ce geste : aucun effet,
+  // aucun minuteur.
+  const i8 = egSans.indexOf('const republierPrio = ({ ids, compte }) => {'), j8 = i8 < 0 ? -1 : egSans.indexOf('})(); };', i8);
+  const corps8 = i8 < 0 || j8 < 0 ? '' : egSans.slice(i8, j8 + 8);
+  const r8 = await require('./_porte-agir.cjs').regle({ code: corps8,
+    porte: /const a = ACTIONS_EXTENSION\.republier;[\s\S]*const r = await republierDansApp\(\(ids \|\| \[\]\)\.map\(\(id\) => \(\{ compte: String\(compte \|\| ''\), id: String\(id\) \}\)\), confirmerRepub\);/,
+    repli: /if \(!r\.annule\) ouvrirPanneau\(\{ site: 'vinted', compte: compte \? String\(compte\) : '\*', page: a\.page, ids, action: a\.action \}\);/ });
+  const ouvertures = (egSans.match(/ouvrirPanneau\(\{ site: 'vinted', compte: compte \? String\(compte\) : '\*', page: a\.page, ids, action: a\.action \}\)/g) || []).length;
+  dit(r8.ok && ouvertures === 1 && !/useEffect\([^;]*(?:ouvrirPanneau|republierDansApp)/.test(egSans) && !/setTimeout\([^;]*republierPrio/.test(egSans) && /onRepublier=\{republierPrio\}/.test(egSans),
+    'R8 (24 nov.) « Republier N » : DEPUIS VRM par la porte, sinon le panneau sur ces annonces — seulement dans ce geste, aucun effet, aucun minuteur', r8.detail || ouvertures);
   const OP = await import(pathToFileURL(F('ouvrirPanneau.js')).href); const AE = await import(pathToFileURL(F('actionsExtension.js')).href);
   const url = OP.lienPanneau({ site: 'vinted', page: AE.ACTIONS_EXTENSION.republier.page, ids: s2.ids, action: AE.ACTIONS_EXTENSION.republier.action });
   dit(url === 'https://www.vinted.fr/?vrm=panneau&page=republier&ids=2,3&action=republier', 'R8 l\'URL : l\'atelier Republier du panneau, les annonces cochées', url);

@@ -92,8 +92,14 @@ async function audit(src, bavard) {
   const menu = (/\{dortAgir && \(\(\)=>\{[\s\S]*?<\/SheetShell>/.exec(code) || [''])[0]
     + ((/const allerDormante = \(a\) => \{[\s\S]*?return \{ aller, urlFiche \};/.exec(code) || [''])[0]);
   // (20 nov., décision de Julien) Le geste se fait dans le PANNEAU de l'extension, CET article pré-choisi.
-  dit(/versRepub\('modifier'\)/.test(menu) && /versRepub\('recreer'\)/.test(menu) && /ouvrirPanneau\(\{ site: 'vinted', page: a\.page, ids: \[String\(it\.id\)\], action: a\.action \}\)/.test(menu),
-    'Baisser le prix / Republier ouvrent le panneau de l’extension (« modifier » / « recréer ») avec CET article pré-choisi');
+  // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) « Republier » part DEPUIS VRM par la porte (CET article, SON compte,
+  // confirmé) ; refusé ⇒ le panneau sur CET article. « Baisser le prix » (modifier) : le panneau, lui-même gardé par la porte.
+  { const PORTE = require('./_porte-agir.cjs');
+    const panneau = /const panneau = \(\) => ouvrirPanneau\(\{ site: 'vinted', compte: uidIt, page: a\.page, ids: \[String\(it\.id\)\], action: a\.action \}\)/;
+    const r = await PORTE.regle({ code: menu, porte: /if \(act === 'recreer'\) \{ republierAgir\(\[\{ compte: uidIt, id: String\(it\.id\) \}\], panneau\); return; \} panneau\(\);/, repli: panneau });
+    const g = PORTE.panneauGarde({ code: menu, appel: panneau });
+    dit(/versRepub\('modifier'\)/.test(menu) && /versRepub\('recreer'\)/.test(menu) && r.ok && g.ok,
+      'Republier part DEPUIS VRM par la porte (sinon le panneau), Baisser le prix ouvre le panneau GARDÉ — CET article, SON compte', [r.detail, g.detail].filter(Boolean).join(' · ')); }
   dit(/DEMANDE_LBC_FICHE\.id = String\(it\.id\)/.test(menu) && /onNav\('leboncoin'\)/.test(menu) && /DEMANDE_EBAY_PAIRE\.id = String\(it\.id\)/.test(menu) && /onNav\('ebay_annonces'\)/.test(menu),
     'Leboncoin / eBay : l’écran de préparation existant, désigné par l’identifiant de l’article');
   dit(!/vmrCmd|appelEbay|fetch\(/.test(menu), 'aucune action envoyée depuis la liste : chaque geste ouvre un écran où c’est SON clic qui lance');

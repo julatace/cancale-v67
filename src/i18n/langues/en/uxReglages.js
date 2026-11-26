@@ -34,4 +34,6 @@ export default {
   "uxr.bd.enCours": "In progress",
   "uxr.bd.lectureAttend": "Once the account is linked",
   "uxr.bd.extensionPasSu": "Checking…",
+  "uxr.acct.raisonEmail": "First type the new address",
+  "uxr.acct.raisonMdp": "First type the new password",
 };

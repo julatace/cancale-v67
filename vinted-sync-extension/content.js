@@ -48,10 +48,25 @@
       if (!d || d.__tag !== 'CANCALE_VINTED_CANAL' || !event.ports || !event.ports[0]) return;
       canal = event.ports[0];
       canal.onmessage = (e) => { const m = e && e.data; if (!m || typeof m !== 'object') return; for (const f of recus) { try { f(m); } catch (_) {} } };
+      obsVersPage();   // 5.440.3 : « Observer Vinted » déjà allumé quand la page arrive
     } catch (_) {}
   }, false);
   const canalSur = () => { try { return !globalThis.__vrmOrionCompat || globalThis.__vrmCanalInline === true; } catch (_) { return false; } };
   const versPage = (m) => { if (!canal) return false; try { canal.postMessage(m); return true; } catch (_) { return false; } };
+
+  // ── « OBSERVER VINTED (10 MIN) » (24 nov., 5.440.3) ───────────────────────────────────────────────────────────────
+  // L'état est posé par le FOND seul (`vrmObservation`, sur son geste : carte du logo ou VRM) ; on ne fait que dire à
+  // la page jusqu'à quand regarder (`fin`), par le canal privé. Une page ne peut pas l'allumer (elle n'a pas le canal).
+  let obsEtat = null;
+  function obsVersPage() {
+    const o = obsEtat;
+    const fin = o && o.actif === true && Number(o.fin) > Date.now() ? Number(o.fin) : 0;
+    versPage({ __tag: 'CANCALE_VINTED_OBS', fin });
+  }
+  try {
+    chrome.storage.local.get('vrmObservation', (x) => { void (chrome.runtime && chrome.runtime.lastError); obsEtat = (x && x.vrmObservation) || null; obsVersPage(); });
+    chrome.storage.onChanged.addListener((ch, zone) => { if (zone === 'local' && ch && ch.vrmObservation) { obsEtat = ch.vrmObservation.newValue || null; obsVersPage(); } });
+  } catch (_) {}
 
   // Injecte inject.js dans le MAIN world (via un <script> pointant sur la
   // ressource web-accessible de l'extension), en secours du script MAIN posé
@@ -76,7 +91,7 @@
   //   `domain` restent posés par NOUS : la page ne doit pas pouvoir les dicter.
   surCanal((d) => {
     if (!d || d.__tag !== TAG) return;
-    if (d.kind === 'injectReady') return;
+    if (d.kind === 'injectReady') { obsVersPage(); return; }
     try {
       const m = {};
       for (const k of Object.keys(d)) {

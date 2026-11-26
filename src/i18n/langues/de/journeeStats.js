@@ -47,7 +47,7 @@ export default {
   "v2.af.titre": "Pakete",
   "v2.af.rienEnvoyer": "nichts zu versenden",
   "v2.af.rienRetirer": "nichts abzuholen",
-  "v2.af.toutesStats": "Alle Statistiken",
+  "v2.af.toutesStats": "Statistiken",
   "v2.af.toutesStatsSous": "Aktivität und Finanzen, über 7, 30 oder 90 Tage",
   "v2.perso.carte.colis": "Pakete",
   "v2.perso.phrase.colis": "Zu versenden und abzuholen, auf einen Blick",
@@ -163,5 +163,6 @@ export default {
   "ext.sante.r.refus": "Vinted hat in den letzten 24 h abgelehnt: Serien vermeiden.",
   "ext.sante.r.verification_recente": "Eine Vinted-Prüfung in den letzten 24 h: Serien vermeiden.",
   "ext.sante.r.pas_vu": "Eine Aktion war nicht zu sehen: Arbeits-Tab ansehen.",
-  "ext.sante.r.presque_plafond": "Nahe am Limit (80 %)."
+  "ext.sante.r.presque_plafond": "Nahe am Limit (80 %).",
+  "v2.dv.enLecture": "Verkauf — Details werden gelesen",
 };

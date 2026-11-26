@@ -169,6 +169,26 @@ ni bouton visible) ; `natif-coque` K9 porté sur la nouvelle règle (ce banc s'a
 les feuilles n'ont reçu que la nouvelle barre du haut ; leurs captures 390/1512 (scratchpad `sc4/ecrans-avant/`, `sc4/ecrans-apres/`)
 ne montrent pas de défaut bloquant ; la suite écran par écran reste à faire.
 
+## 9. Tranche 5 (branche `claude/style-clarte-5`, 23 nov.) — finitions demandées sur les captures du gris, revue UX
+
+Fait :
+- **Aujourd'hui** : carte « Porte-monnaie Vinted » (colonne de droite) : « Montant en attente » d'abord, « Montant disponible »
+  ensuite (les mots de Vinted), « lu aujourd'hui / il y a N jours », partiel ⇒ « au moins … · N comptes sur M lus », rien lu ⇒
+  « — · Ouvre ton porte-monnaie Vinted » (jamais 0 €). Source : `fetchWalletEscrow` (lignes `harvest_{uid}_billing`) via
+  `liveStats.walletParCompte`, comptes non écartés seulement (`comptesCa`). Le « — » du bénéfice de la fenêtre dit « prix d'achat
+  manquants » et ouvre la saisie ; « Saisir les prix d'achat » en vrai bouton ; « En direct » (la puce de l'extension) dans
+  l'en-tête à l'ordinateur ; la colonne de droite sur deux rangées (Dernières ventes remonte sous le héros) ; un seul titre.
+- **Ventes** : l'état le plus fréquent (« Bordereau prêt ») dit une fois à côté du nombre, seules les rangées différentes gardent
+  le leur ; « à vérifier » (date limite estimée dépassée) une fois dans l'en-tête, la case vide ; colonne Transporteur repliée
+  quand elle est vide partout ; « + prix » discret qui ouvre la saisie (le champ ne s'affiche plus sur chaque ligne) ; segmenté à
+  la largeur de ses mots ; « Imprimer N bordereaux » partout ; au téléphone « À faire · N sans bordereau › » en rangée ambre qui
+  filtre la liste.
+Pas fait (à reprendre) : fusionner « Tes chiffres » dans le héros (fenêtre « Jour ») et des tuiles différentes (panier moyen, en
+ligne / à republier) — touche les bancs des chiffres (journee-stats, aujourdhui-propre F4) ; compteur de « Terminées » (pas de
+source sur cet écran) ; rangées de Ventes iPhone à 64–72 px ; titre d'écran et barre du haut iPhone uniformes (revue UX P1 #1–#3) ;
+**unification de TOUS les boutons et onglets** sur la règle de l'extension (demande de Julien du 23 nov., avec un audit qui
+interdit les boutons hors règle) ; captures du site vitrine au nouveau design.
+
 ## ÉTAT À LA REPRISE
 
 Tranche 1 : voir §5 et la PR. Tranche 2 (Ventes, Annonces, fiche annonce en tableau dense) : branche `claude/style-clarte-2`.

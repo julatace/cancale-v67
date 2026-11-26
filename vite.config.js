@@ -79,13 +79,16 @@ const listeHorsLigne = () => ({
     // chaque déploiement. Ils sont rangés à part (`langues`) : le service worker ne prend que
     // ceux de la langue que la page lui dit (public/sw.js, `langueHorsLigne`) ; en français, aucun.
     const langueDe = (c) => { const m = c && c.facadeModuleId && /[\\/]src[\\/]i18n[\\/]langues[\\/](en|es|it|de)(?:-accueil)?\.js$/.exec(c.facadeModuleId); return m ? m[1] : null; };
-    const fichiers = [], langues = {};
+    // (24 nov., morceaux-perimes) Les polices du build (`polices`) : une page restée ouverte pendant une mise en
+    // ligne les demande parfois plus tard (une graisse pas encore vue) ; src/reserveMorceaux.js les fait ranger.
+    const fichiers = [], langues = {}, polices = [];
     for (const f of Object.keys(bundle).sort()) {
+      if (/^assets\/[A-Za-z0-9._-]+\.woff2$/.test(f) && existsSync(join(dir, f))) { polices.push('/' + f); continue; }
       if (!/^assets\/[A-Za-z0-9._-]+\.(?:js|css)$/.test(f) || EXCLU_HORS_LIGNE.test(f) || !existsSync(join(dir, f))) continue;
       const l = langueDe(bundle[f]);
       if (l) (langues[l] = langues[l] || []).push('/' + f); else fichiers.push('/' + f);
     }
-    writeFileSync(join(dir, 'hors-ligne-assets.json'), JSON.stringify({ v: 1, fichiers, langues }));
+    writeFileSync(join(dir, 'hors-ligne-assets.json'), JSON.stringify({ v: 1, fichiers, langues, polices }));
   },
 });
 
