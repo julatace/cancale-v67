@@ -6,8 +6,8 @@
 //   · « Automatique » : suit le réglage de l'appareil (`prefers-color-scheme`) ;
 //   · « Le soir »     : sombre de 19 h à 7 h (heure de l'appareil), clair le jour.
 // Rangé dans `vrm_apparence` ('clair' | 'sombre' | 'auto' | 'soir'). Absent (tous
-// les appareils d'avant ce chantier) ⇒ le choix d'avant, lu dans `vinted_dark` :
-// rien ne change pour qui n'a pas touché au réglage.
+// les appareils d'avant ce chantier) ⇒ le choix d'avant, lu dans `vinted_dark` ;
+// ni l'un ni l'autre ⇒ SOMBRE (25 nov., `APPARENCE_PAR_DEFAUT`).
 //
 // ⚠️ LA MÊME RÈGLE AVANT LE PREMIER RENDU : `public/demarrage-theme.js` (un fichier
 // sans import, la CSP refuse tout script en ligne) en porte une COPIE ; le banc
@@ -34,10 +34,19 @@ export const PHRASES_APPARENCE = {
   soir: 'Sombre de 19 h à 7 h, clair le jour.',
 };
 
-// Le mode choisi : `vrm_apparence` s'il est valable, sinon le choix d'avant.
+// ⚠️ (25 nov., Julien : « La deuxième couleur est pas mal, mets en mode sombre ») L'apparence
+// PAR DÉFAUT — aucun choix posé, ni `vrm_apparence` ni `vinted_dark` — est le SOMBRE. Un choix
+// déjà posé (Clair, Sombre, Automatique, Le soir, ou l'ancien `vinted_dark` à false) ne change
+// JAMAIS. « Clair » reste au choix dans Apparence.
+export const APPARENCE_PAR_DEFAUT = 'sombre';
+
+// Le mode choisi : `vrm_apparence` s'il est valable, sinon le choix d'avant
+// (`vinted_dark` true / false), sinon le défaut (sombre).
 export function apparenceDe(mode, ancienSombre) {
   if (APPARENCES.includes(mode)) return mode;
-  return ancienSombre === true ? 'sombre' : 'clair';
+  if (ancienSombre === true) return 'sombre';
+  if (ancienSombre === false) return 'clair';
+  return APPARENCE_PAR_DEFAUT;
 }
 
 export function estLeSoir(date) {
@@ -46,7 +55,7 @@ export function estLeSoir(date) {
 }
 
 // Sombre ou non, MAINTENANT. `systemeSombre` : la préférence de l'appareil
-// (true / false) ; inconnue ⇒ clair (le défaut de VRM).
+// (true / false) ; inconnue ⇒ clair (seul « Automatique » la lit).
 export function sombreEffectif(mode, { date = new Date(), systemeSombre = false } = {}) {
   if (mode === 'sombre') return true;
   if (mode === 'auto') return systemeSombre === true;
