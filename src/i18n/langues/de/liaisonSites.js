@@ -98,6 +98,7 @@ export default {
   "lia.c.garderLien": "Verknüpfung behalten",
   "lia.c.delier": "Trennen",
   "lia.preuve.photo-sure": "gleiches Foto, sicher",
+  "lia.preuve.photo-origine": "gleiches Originalfoto",
   "lia.preuve.photo": "gleiches Foto",
   "lia.preuve.recherche": "von dir gewählt",
   "lia.preuve.relecture": "von dir geprüft",

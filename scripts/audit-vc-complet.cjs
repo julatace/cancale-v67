@@ -65,7 +65,8 @@ const pilote = (() => {
   const t = fs.readFileSync(path.join(__dirname, 'audit-capture-vc-lbc.cjs'), 'utf8');
   const i = t.indexOf('function pageVc() {'), j = t.indexOf('const senderVc =');
   if (i < 0 || j < 0) throw new Error('pilote de page introuvable dans audit-capture-vc-lbc.cjs');
-  return new Function('fs', 'vm', 'F', 'copie', 'attendre', 'API', 'ORIGINE', 'URL', 'Buffer', 'console', t.slice(i, j) + '\nreturn { pageVc, relais };')(fs, vm, F, copie, attendre, API, ORIGINE, URL, Buffer, console);
+  // (5.454) le pilote sert le canal privé Vestiaire de la 5.446 (`FauxCanal`, scripts/_canal-faux.cjs).
+  return new Function('fs', 'vm', 'F', 'copie', 'attendre', 'API', 'ORIGINE', 'URL', 'Buffer', 'console', 'FauxCanal', t.slice(i, j) + '\nreturn { pageVc, relais };')(fs, vm, F, copie, attendre, API, ORIGINE, URL, Buffer, console, require('./_canal-faux.cjs').FauxCanal);
 })();
 const MOI = '11112222', AUTRE = '99998888', ACH = '33334444', ACH2 = '44445555';
 const prod = (id) => ({ id, headline: 'MARQUE', subHeadline: 'Article ' + id, picturePath: `${id}-1_3.jpg`, price: { formatted: '120 €', cents: 12000, currency: 'EUR' }, sellerEarnings: { formatted: '96 €', cents: 9600, currency: 'EUR' }, path: `/x/${id}.shtml`, segment: 's' });

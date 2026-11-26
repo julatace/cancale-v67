@@ -68,7 +68,8 @@ const pilote = (() => {
   const t = fs.readFileSync(path.join(__dirname, 'audit-capture-vc-lbc.cjs'), 'utf8');
   const i = t.indexOf('function pageVc() {'), j = t.indexOf('const senderVc =');
   if (i < 0 || j < 0) throw new Error('pilote de page introuvable dans audit-capture-vc-lbc.cjs');
-  return new Function('fs', 'vm', 'F', 'copie', 'attendre', 'API', 'ORIGINE', 'URL', 'Buffer', 'console', t.slice(i, j) + '\nreturn { pageVc, relais };')(fs, vm, F, copie, attendre, API, ORIGINE, URL, Buffer, console);
+  // (5.446) le pilote sert le canal privé Vestiaire (`FauxCanal`, scripts/_canal-faux.cjs).
+  return new Function('fs', 'vm', 'F', 'copie', 'attendre', 'API', 'ORIGINE', 'URL', 'Buffer', 'console', 'FauxCanal', t.slice(i, j) + '\nreturn { pageVc, relais };')(fs, vm, F, copie, attendre, API, ORIGINE, URL, Buffer, console, require('./_canal-faux.cjs').FauxCanal);
 })();
 const senderVc = (tab) => ({ tab: { id: tab, url: ORIGINE + '/listings/' }, frameId: 0, url: ORIGINE + '/listings/' });
 // La forme MESURÉE de « Mes articles » : une enveloppe `{ type, [type]: { product: {…}, listingDate } }`.

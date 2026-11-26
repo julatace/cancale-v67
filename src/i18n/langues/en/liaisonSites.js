@@ -98,6 +98,7 @@ export default {
   "lia.c.garderLien": "Keep the link",
   "lia.c.delier": "Unlink",
   "lia.preuve.photo-sure": "same photo, sure",
+  "lia.preuve.photo-origine": "same original photo",
   "lia.preuve.photo": "same photo",
   "lia.preuve.recherche": "chosen by you",
   "lia.preuve.relecture": "reviewed by you",

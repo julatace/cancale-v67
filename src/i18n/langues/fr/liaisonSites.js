@@ -103,6 +103,7 @@ export default {
   "lia.c.garderLien": "Garder le lien",
   "lia.c.delier": "Délier",
   "lia.preuve.photo-sure": "même photo, sûre",
+  "lia.preuve.photo-origine": "même photo d’origine",
   "lia.preuve.photo": "même photo",
   "lia.preuve.recherche": "choisie par toi",
   "lia.preuve.relecture": "relue par toi",

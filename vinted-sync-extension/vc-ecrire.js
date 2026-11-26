@@ -35,10 +35,13 @@
   const attentesVu = [];          // { conv, texte, depuis, ok }
   const attentesConv = new Map(); // jeton → résoudre
   let ordreEnCours = false;
+  // 5.446 (lot ext-anciens-lots, revue moyennes 60-62) : « envoi vu » et « conversation ouverte » ne
+  // viennent plus que du CANAL PRIVÉ de vc-inject.js, par le pont de vc.js (`__vrmVcPont`, monde isolé de
+  // l'extension) — avant, `window`, qu'un script de la page pouvait forger (« envoyé » sans que rien ne parte).
+  const pont = (() => { try { const p = window.__vrmVcPont; return p && typeof p.ecouter === 'function' ? p : null; } catch (_) { return null; } })();
   try {
-    window.addEventListener('message', (event) => {
-      const d = event && event.data;
-      if (event.source !== window || !d || d.__tag !== 'CANCALE_VC') return;
+    if (pont) pont.ecouter((d) => {
+      if (!d || d.__tag !== 'CANCALE_VC') return;
       if (d.kind === 'vcenvoivu') {
         const conv = String(d.conv || ''), t = propre(d.t);
         for (const a of attentesVu.slice()) if (a.conv === conv && propre(a.texte) === t) { attentesVu.splice(attentesVu.indexOf(a), 1); a.ok(); }
@@ -55,7 +58,7 @@
     const jeton = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2, 10);
     const t = setTimeout(() => { if (attentesConv.delete(jeton)) res(null); }, 3000);
     attentesConv.set(jeton, (r) => { clearTimeout(t); res(r); });
-    window.postMessage({ __tag: 'CANCALE_VC_ORDRE', kind: 'convouverte', jeton }, location.origin);
+    if (!pont || !pont.envoyer({ __tag: 'CANCALE_VC_ORDRE', kind: 'convouverte', jeton })) { if (attentesConv.delete(jeton)) { clearTimeout(t); res(null); } }
   });
 
   // ── La signature d'un élément (jamais son texte, jamais une valeur saisie) ──

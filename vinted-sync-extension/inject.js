@@ -12,8 +12,12 @@
 // MAIN world et l'extension).
 (function () {
   'use strict';
-  if (window.__cancaleVintedInjected) return;
-  window.__cancaleVintedInjected = true;
+  // 5.446 (lot ext-anciens-lots, revue basse 103 du 16 nov.) : la marque « capteur déjà posé » n'est
+  //    plus une variable globale nommée et énumérable de la page (`window.__cancaleVintedInjected`) :
+  //    une clé symbole, non énumérable (ni `Object.keys(window)`, ni `for…in`).
+  const MARQUE_CAPTEUR = (typeof Symbol === 'function' && typeof Symbol.for === 'function') ? Symbol.for('vrm.capteur.vinted') : '__vrmCapteurVinted';
+  if (window[MARQUE_CAPTEUR]) return;
+  try { Object.defineProperty(window, MARQUE_CAPTEUR, { value: true, enumerable: false, configurable: false, writable: false }); } catch (_) { try { window[MARQUE_CAPTEUR] = true; } catch (_) {} }
 
   const TAG = 'CANCALE_VINTED';
   // ⚠️⚠️ 5.356 (revue de robustesse, critique 4) — UN CANAL PRIVÉ AVEC content.js.
@@ -33,8 +37,11 @@
     canal = mc.port1;
     window.postMessage({ __tag: 'CANCALE_VINTED_CANAL' }, location.origin, [mc.port2]);
   } catch (_) { canal = null; }
-  const versContent = (m, origineCible) => {
-    try { if (canal) canal.postMessage(m); else window.postMessage(m, origineCible || '*'); } catch (_) {}
+  // 5.446 (lot ext-anciens-lots, revue basse 105) : sans canal, RIEN ne part — avant, on retombait
+  //    sur `window.postMessage(…, '*')`, que content.js n'écoute plus mais que tout script de la
+  //    page entendait (jeton CSRF, corps capturés).
+  const versContent = (m) => {
+    try { if (canal) canal.postMessage(m); } catch (_) {}
   };
   const ecoutesCanal = [];
   const surCanal = (fn) => { ecoutesCanal.push(fn); };
@@ -864,7 +871,15 @@ function clocheFavorisNative(activer=false,origine){
   // ensuite exactement la meme action en 1 clic, sans jamais deviner. On exclut
   // le bruit (tracking/metrics) et on ne garde que les vraies actions API.
   const WRITE_METHODS = /^(POST|PUT|PATCH|DELETE)$/i;
-  const WRITE_NOISE = /(track|metric|event|impression|visit|telemetr|analytic|log|pageview|consent)/i;
+  // 5.446 (lot ext-anciens-lots, revue basse 107) : le bruit se reconnaît à un SEGMENT entier de
+  //    l'adresse (hôte et chemin découpés sur « . / - _ »), jamais à un bout de mot — avant, `log` et
+  //    `event` écartaient « catalog », « dialog », « events_feed »… et leurs recettes n'étaient jamais apprises.
+  const WRITE_NOISE = /^(track|tracks|tracking|tracker|metric|metrics|event|events|impression|impressions|visit|visits|telemetry|analytic|analytics|log|logs|logging|pageview|pageviews|consent|consents)$/i;
+  const bruitEcriture = (url) => {
+    let h = '', p = '';
+    try { const u = new URL(url, location.origin); h = u.hostname; p = u.pathname; } catch (_) { p = String(url || '').split('?')[0]; }
+    return (h + '/' + p).split(/[./_-]+/).some((seg) => seg && WRITE_NOISE.test(seg));
+  };
   const contexteCreation = (method,url) => {
     try {const u=new URL(url,location.origin);if(String(method).toUpperCase()!=='POST'||u.pathname!=='/api/v2/conversations'||!/^(?:(?:www|api)\.)?vinted\.(fr|com|it|de)$/.test(u.hostname))return null;
       const lien=dernierFavoriClique&&Date.now()-dernierFavoriClique.at<=5000?dernierFavoriClique.url:lienContexteFavori(location.href);dernierFavoriClique=null;return lien;
@@ -881,7 +896,7 @@ function clocheFavorisNative(activer=false,origine){
     try {
       if (!WRITE_METHODS.test(method || '')) return;
       if (!/\/api\//.test(url || '')) return;
-      if (WRITE_NOISE.test(url)) return;
+      if (bruitEcriture(url)) return;
       let b = body;
       if (b && typeof b !== 'string') {
         if (typeof URLSearchParams !== 'undefined' && b instanceof URLSearchParams) b = b.toString();
@@ -954,6 +969,7 @@ function clocheFavorisNative(activer=false,origine){
         const id = it && it.id != null ? String(it.id) : '';
         if (/^\d{4,15}$/.test(id)) {
           post({ kind: 'publication', itemId: id, status: st });
+          noteAnnoncePhotos(id, corps);   // 16 nov. (5.401) : le code d'origine de ses photos
           const tc = (typeof corps === 'string' && corps.length <= 100000) ? corps : '';   // 22 oct. : sa fiche, sous l'identifiant que Vinted vient de donner
           if (tc) post({ kind: 'fiche', itemId: id, status: st, via: 'publication', corps: tc });
         }
@@ -961,6 +977,55 @@ function clocheFavorisNative(activer=false,origine){
       }).catch(() => {});
     } catch (_) {}
   };
+
+  // ── LE CODE D'ORIGINE DE SES PHOTOS (16 nov., 5.401, lot photo-identite-sites) ──
+  // Julien : « non pas à quoi elle ressemble, mais son CODE ». Les sites réencodent ce
+  // qu'il téléverse : seul le FICHIER D'ORIGINE porte un code qui se retrouve d'un site à
+  // l'autre. Quand LUI envoie une photo (`POST /api/v2/photos`, le fichier qu'il a choisi),
+  // on calcule le SHA-256 de ce fichier DANS la page (aucune requête de plus, le geste n'est
+  // pas modifié, l'image ne part nulle part) ; après le 2xx de Vinted, l'identifiant de photo
+  // rendu voyage avec son code. Puis l'annonce qu'il publie ou modifie (`item_upload/items`)
+  // dit quelles photos elle porte (`assigned_photos`). Jamais l'image, jamais un titre.
+  const RE_PHOTO_ENVOI = /^\/api\/v\d+\/photos\/?$/;
+  const imageDuCorps = (b) => {
+    try {
+      if (typeof Blob !== 'undefined' && b instanceof Blob) return /^image\//i.test(b.type || '') ? b : null;
+      if (typeof FormData !== 'undefined' && b instanceof FormData) { let x = null; b.forEach((v) => { if (!x && typeof Blob !== 'undefined' && v instanceof Blob && /^image\//i.test(v.type || '')) x = v; }); return x; }
+    } catch (_) {}
+    return null;
+  };
+  const hexDe = (buf) => Array.from(new Uint8Array(buf), (o) => o.toString(16).padStart(2, '0')).join('');
+  const codeOrigine = (b) => {
+    const img = imageDuCorps(b);
+    if (!img || img.size > 25 * 1024 * 1024 || !(window.crypto && crypto.subtle)) return null;
+    return img.arrayBuffer().then((a) => crypto.subtle.digest('SHA-256', a)).then(hexDe).catch(() => null);
+  };
+  const notePhotoOrigine = (method, url, status, lireTexte, codeP) => {
+    try {
+      if (!codeP || String(method || '').toUpperCase() !== 'POST') return;
+      const st = Number(status);
+      if (!(st >= 200 && st < 300)) return;
+      let U = null; try { U = new URL(url, location.origin); } catch (_) { return; }
+      if (!/(^|\.)vinted\.[a-z.]+$/i.test(U.hostname) || !RE_PHOTO_ENVOI.test(U.pathname)) return;
+      Promise.all([codeP, Promise.resolve().then(lireTexte)]).then(([code, t]) => {
+        let j = null; try { j = JSON.parse(t); } catch (_) {}
+        const ph = j && (j.photo && typeof j.photo === 'object' ? j.photo : j);
+        const id = ph && ph.id != null ? String(ph.id) : '';
+        if (/^\d{1,15}$/.test(id) && /^[0-9a-f]{64}$/.test(String(code || ''))) post({ kind: 'photoOrigine', photoId: id, code });
+        else post({ kind: 'photoOrigine', photoId: null, cles: j && typeof j === 'object' ? Object.keys(j).slice(0, 12) : [] });
+      }).catch(() => {});
+    } catch (_) {}
+  };
+  // Les photos d'une annonce qu'il vient d'enregistrer (2xx) : les identifiants de `assigned_photos`.
+  const photosDuCorps = (corps) => {
+    try {
+      const j = JSON.parse(String(corps || ''));
+      const it = j && (j.item && typeof j.item === 'object' ? j.item : j);
+      const l = it && Array.isArray(it.assigned_photos) ? it.assigned_photos : [];
+      return l.map((p) => String(p && typeof p === 'object' ? p.id : p)).filter((x) => /^\d{1,15}$/.test(x)).slice(0, 30);
+    } catch (_) { return []; }
+  };
+  const noteAnnoncePhotos = (itemId, corps) => { try { const ids = photosDuCorps(corps); if (ids.length && /^\d{4,15}$/.test(String(itemId || ''))) post({ kind: 'annoncePhotos', itemId: String(itemId), photoIds: ids }); } catch (_) {} };
 
   // ── SA FICHE, TELLE QU'IL L'ENREGISTRE (22 octobre) ────────────────────────
   // Quand il publie (`POST …/item_upload/items`) ou MODIFIE une annonce
@@ -984,6 +1049,7 @@ function clocheFavorisNative(activer=false,origine){
       const t = corpsTexte(corps);
       if (!m || !t) return;
       post({ kind: 'fiche', itemId: m[1], status: st, via: 'modif', corps: t });
+      noteAnnoncePhotos(m[1], t);   // 16 nov. (5.401)
     } catch (_) {}
   };
 
@@ -1613,13 +1679,14 @@ function nettoyerRelaisSuivi(r) {
   const origFetch = window.fetch;
   if (origFetch) {
     window.fetch = commeNatif(function (input, init) {
-      let url = '', method = 'GET', corpsEnvoye;
+      let url = '', method = 'GET', corpsEnvoye, codeEnvoi = null;
       try {
         url = (typeof input === 'string') ? input : input instanceof URL ? input.href : (input && input.url) || '';
         if (init && init.headers) sendCsrf(init.headers);
         else if (input && input.headers) sendCsrf(input.headers);
         method = (init && init.method) || (input && input.method) || 'GET';
         corpsEnvoye = init && init.body;
+        if (String(method).toUpperCase() === 'POST' && /\/api\/v\d+\/photos\/?(?:\?|$)/.test(url)) codeEnvoi = codeOrigine(corpsEnvoye);   // 16 nov. (5.401)
         const contexte=contexteCreation(method,url);
         const estCreation=String(method).toUpperCase()==='POST'&&/\/api\/v2\/conversations(?:\?|$)/.test(url);
         if(estCreation&&corpsEnvoye===undefined&&typeof Request!=='undefined'&&input instanceof Request){
@@ -1635,6 +1702,7 @@ function nettoyerRelaisSuivi(r) {
             if (obsFin) noteObservation('fetch', method, url, res.status, (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '', corpsEnvoye, () => res.clone().text(), t0Obs);   // 5.440.3 : « Observer Vinted »
             noteSuppression(method, url, res.status);   // 5.165 : AVANT tout le reste (la page va naviguer)
             notePublication(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 5.201
+            notePhotoOrigine(method, url, res.status, () => res.clone().text(), codeEnvoi);   // 16 nov. (5.401)
             noteModification(method, url, res.status, corpsEnvoye);   // 22 oct.
             noteVacances(method, url, res.status, corpsEnvoye);   // 10 nov. (5.338)
             noteBrouillon(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 28 oct.
@@ -1678,6 +1746,7 @@ function nettoyerRelaisSuivi(r) {
         // Capte aussi le csrf/anon posé via setRequestHeader (déjà relayé plus
         // haut) pour la moisson active.
         sendWriteReq(this.__cancaleMethod, url, bodyArg,contexteCreation(this.__cancaleMethod,url));
+        const codeEnvoiX = (String(this.__cancaleMethod || '').toUpperCase() === 'POST' && /\/api\/v\d+\/photos\/?(?:\?|$)/.test(url)) ? codeOrigine(bodyArg) : null;   // 16 nov. (5.401)
         noteSeen(url); // diagnostic : TOUT appel API (XHR aussi)
         const t0Obs = Date.now();
         if (obsFin) this.addEventListener('loadend', function () { try { if (this.status === 0) noteObservation('xhr', this.__cancaleMethod, url, 0, '', bodyArg, null, t0Obs); } catch (_) {} });   // 5.440.3
@@ -1686,6 +1755,7 @@ function nettoyerRelaisSuivi(r) {
             if (obsFin) noteObservation('xhr', this.__cancaleMethod, url, this.status, this.getResponseHeader ? (this.getResponseHeader('content-type') || '') : '', bodyArg, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } }, t0Obs);   // 5.440.3 : « Observer Vinted »
             noteSuppression(this.__cancaleMethod, url, this.status);   // 5.165
             notePublication(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 5.201
+            notePhotoOrigine(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } }, codeEnvoiX);   // 16 nov. (5.401)
             noteModification(this.__cancaleMethod, url, this.status, bodyArg);   // 22 oct.
             noteVacances(this.__cancaleMethod, url, this.status, bodyArg);   // 10 nov. (5.338)
             noteBrouillon(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 28 oct.

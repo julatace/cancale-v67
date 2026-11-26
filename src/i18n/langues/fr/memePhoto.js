@@ -38,4 +38,6 @@ export default {
   "memePhoto.nAVerifier": {"one": "{n} à vérifier", "other": "{n} à vérifier"},
   "memePhoto.extensionSure": "L’extension {v} confirme « sûr » : mets-la à jour. En attendant, tout est « à vérifier ».",
   "memePhoto.aideSure": "« Sûr » : deux mesures différentes disent la même photo. « À vérifier » : regarde les deux photos. Rien n’est relié sans ton toucher.",
+  "memePhoto.aussiSurOrigine": "Aussi sur {sites} · reconnue par la photo d’origine",
+  "memePhoto.limiteOrigine": "Photo d’origine : le même fichier envoyé depuis ton Chrome avec l’extension. Publiée depuis une appli mobile, VRM ne la voit pas.",
 };

@@ -550,6 +550,19 @@ function cadreAutorise() {
     return HOTES_CADRE.test(o);
   } catch (_) { return false; }
 }
+// 5.446 (lot ext-anciens-lots, revue basse 123) : l'origine EXACTE de la page qui nous encadre (la
+// même règle que `cadreAutorise`) — la carte ne parle plus qu'à elle (avant : `postMessage(…, '*')`).
+function origineDuParent() {
+  try {
+    if (window.parent === window || window.parent !== window.top) return '';
+    const anc = location.ancestorOrigins;
+    let o = '';
+    if (anc && typeof anc.length === 'number') o = anc.length === 1 ? String(anc[0]) : '';
+    else { try { o = new URL(document.referrer).origin; } catch (_) { o = ''; } }
+    return HOTES_CADRE.test(o) ? o : '';
+  } catch (_) { return ''; }
+}
+try { globalThis.__vrmCadreOrigine = origineDuParent(); } catch (_) {}
 
 // ── 5.371 : « NOUVELLE VERSION DISPONIBLE » DANS LA FENÊTRE ───────────────────
 // Installée À LA MAIN et plus ancienne que celle que sert vrm.center ⇒ « Télécharger »

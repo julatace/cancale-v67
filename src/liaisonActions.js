@@ -85,6 +85,14 @@ export function creerLiaison(deps) {
     return { ok: true, faits: r.faits, restes: r.restes };
   }
   function delier({ annonce } = {}) {
+    // (24 nov., lot ext-anciens-lots, repris de #1219) Reliée par la PHOTO D'ORIGINE (aucun lien posé, rien d'écrit) :
+    // « délier » = « ce n'est pas la même » pour ce N° (sinon la photo la referait) ; son « Annuler » la remet.
+    const parPhoto = annonce && Array.isArray(annonce.identites) ? annonce.identites.find((i) => i && i.sorte === 'photo-origine' && i.numero) : null;
+    if (parPhoto && !(cartes().lbc || {})[String(annonce.id)]) {
+      sur(() => refuserPhoto({ annonce, numero: parPhoto.numero }), null);
+      relire();
+      return { ok: true, numero: cleNum(parPhoto.numero) };
+    }
     const r = opsDelier({ annonce, cartes: cartes(), cle: cleNum });
     if (!r.ops) return r;
     jouer(tr('lia.fait.delie', { numero: r.numero }), r.ops);
