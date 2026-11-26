@@ -81,6 +81,10 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   // par défaut ; les audits d'avant jugent la méthode DIRECTE (toujours choisissable) — sauf ceux qui demandent le défaut.
   if (store.vrmCommeBleam === undefined && !store.__commeBleamDefaut) store.vrmCommeBleam = { methode: 'formulaire', favoris: false };   // 5.414 : le formulaire est la seule méthode
   delete store.__commeBleamDefaut;
+  // 26 nov. (ext. 5.455, `favorisvintex`) : les favoris partent par défaut par le chemin de Vintex (requêtes de la page) ; les
+  // audits d'avant jugent le chemin par l'INTERFACE (gardé en réserve, `vrmFavorisChemin: 'interface'`) — sauf ceux qui demandent le défaut.
+  if (store.vrmFavorisChemin === undefined && !store.__favorisVintex) store.vrmFavorisChemin = 'interface';
+  delete store.__favorisVintex;
   if (store.vrmSession === undefined && !store.__sansSession) store.vrmSession = { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'owner-banc', email: 'banc@vrm.test', expires_at: Date.now() + 365*864e5 };
 
   // (5.366) « N'agir que si tu es là » : par défaut, le banc est quelqu'un qui vient d'utiliser
