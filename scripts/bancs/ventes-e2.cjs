@@ -193,7 +193,9 @@ const MESURE_BRUTE = (pg, { tel, sombre }) => pg.evaluate(({ tel, sombre }) => {
   // A — les annulations.
   const alertes = [...document.querySelectorAll('[data-annulations-alerte]')].filter(vis).map((a) => ({ uid: a.getAttribute('data-annulations-alerte'), n: a.getAttribute('data-annulations-n'), sur: a.getAttribute('data-annulations-sur'), ventes: [...a.querySelectorAll('[data-annulation-vente]')].map((x) => x.getAttribute('data-annulation-vente')), texte: a.innerText.slice(0, 160) }));
   // G — la liste longue.
-  const lignesToutes = [...document.querySelectorAll('[data-toutes-vente]')].filter(vis).length;
+  // Les lignes de la page : la liste du téléphone les rend PAR PAQUETS (`ParPaquets`) — son nombre est `data-vt-liste-tel`.
+  const listeTel = document.querySelector('[data-vt-liste-tel]');
+  const lignesToutes = listeTel ? Number(listeTel.getAttribute('data-vt-liste-tel')) : document.querySelectorAll('[data-toutes-vente]').length;
   const plus = (document.querySelector('[data-toutes-plus]') || {}).innerText || '';
   const plusN = (/(\d+)/.exec(plus) || [])[1] || '';
   const ttNombre = (document.querySelector('[data-ventes-tableau] [data-tt-nombre], [data-tt-nombre]') || { getAttribute: () => null }).getAttribute('data-tt-nombre');
@@ -217,7 +219,11 @@ const capture = async (pg, nom) => {
 
 // La liste « Terminées » (toutes les ventes, tous sites mêlés) : le segment natif de Ventes.
 const allerSegment = async (pg, seg) => {
-  await pg.locator(`[data-colis-onglet-choix="${seg}"]`).first().click({ timeout: 20000 });
+  // Un vendeur SANS vente (« vide ») n'a pas de segment : l'écran est son état vide, mesuré tel quel.
+  const b = pg.locator(`[data-colis-onglet-choix="${seg}"]`).first();
+  await b.waitFor({ timeout: 15000 }).catch(() => {});
+  if (!(await b.count())) return false;
+  await b.click({ timeout: 20000 });
   await pg.waitForTimeout(600);
   if (seg === 'toutes') await pg.waitForSelector('[data-ventes-toutes="lu"] [data-toutes-vente], [data-ventes-toutes="lu"] [data-toutes-vide], [data-ventes-toutes="lu"] [data-tt-vide], [data-ventes-toutes="lu"] [data-tt-etat="vide"]', { timeout: 25000 }).catch(() => {});
   else await pg.waitForSelector(`[data-vn-onglet="${seg}"]`, { timeout: 20000 }).catch(() => {});
@@ -235,7 +241,8 @@ const ANNUL = async (pg) => {
   return pg.evaluate(() => {
     const c = document.querySelector('[data-stats-carte="sv-annulations"]'); if (!c) return null;
     const e = c.querySelector('[data-sv-annul]');
-    return { etat: e ? e.getAttribute('data-sv-annul') : null, pasLues: e ? e.getAttribute('data-sv-annul-pas-lues') : null, total: (c.querySelector('[data-sv-annul-total]') || { getAttribute: () => null }).getAttribute('data-sv-annul-total'),
+    const note = c.querySelector('[data-sv-annul-manque]');
+    return { etat: e ? e.getAttribute('data-sv-annul') : null, pasLues: e ? e.getAttribute('data-sv-annul-pas-lues') : null, manque: note ? note.getAttribute('data-sv-annul-manque') : null, total: (c.querySelector('[data-sv-annul-total]') || { getAttribute: () => null }).getAttribute('data-sv-annul-total'),
       comptes: [...c.querySelectorAll('[data-sv-annul-compte]')].map((d) => ({ uid: d.getAttribute('data-sv-annul-compte'), site: d.getAttribute('data-sv-annul-site'), n: d.getAttribute('data-n'), annulees: d.getAttribute('data-annulees'),
         ventes: [...d.querySelectorAll('[data-sv-annul-vente]')].map((x) => x.getAttribute('data-sv-annul-vente')).sort() })),
       texte: c.textContent.replace(/\s+/g, ' ').slice(0, 300) };
@@ -278,7 +285,7 @@ async function tournee(nav, { W, theme, scenario }) {
     if (tel) dit(t.lignesToutes === 60 && t.plusN === '60', 'G', `${T} Terminées : 60 lignes puis « Afficher les 60 suivantes »`, JSON.stringify({ n: t.lignesToutes, plus: t.plusN }));
     else { const attendu = base.lignes.filter((l) => /^harvest_\d+_orders_sold$/.test(l.id)).flatMap((l) => l.data.payload.my_orders).filter((x) => !/annul/i.test(x.status)).length;
       dit(t.ttNombre === String(attendu), 'G', `${T} Terminées (tableau) : toutes les ventes comptées (${attendu})`, JSON.stringify({ n: t.ttNombre })); }
-    const long = await o.pg.evaluate((L) => { const r = [...document.querySelectorAll('[data-toutes-vente]')].find((x) => (x.textContent || '').includes(L.slice(0, 30))); if (!r) return null; const p = r.querySelector('[data-vt-prix]'); return { prix: p ? p.textContent.trim() : '', droite: Math.round(r.getBoundingClientRect().right), entier: p ? p.scrollWidth <= p.clientWidth + 1 : false }; }, LONG);
+    const long = await o.pg.evaluate((L) => { const r = [...document.querySelectorAll('[data-toutes-vente]')].find((x) => (x.textContent || '').includes(L.slice(0, 30))); if (!r) return null; const p = r.querySelector('[data-vt-prix], [data-tt-col="prix"]'); return { prix: p ? p.textContent.trim() : '', droite: Math.round(r.getBoundingClientRect().right), entier: p ? p.scrollWidth <= p.clientWidth + 1 : false }; }, LONG);
     dit(long && long.prix === '249,50 €' && long.droite <= W && long.entier, 'G', `${T} Terminées : titre très long, prix « 249,50 € » entier`, JSON.stringify(long));
   }
   if (scenario === 'vide') {
@@ -324,7 +331,8 @@ async function tournee(nav, { W, theme, scenario }) {
     if (scenario === 'exclu') dit(!!A && A.etat === 'lu' && !de('222') && !!de('111'), 'A', `${T} le compte EXCLU n’entre pas (aucune ligne, aucun total)`, JSON.stringify(A));
     if (scenario === 'ko') {
       dit(!!A && !de('333'), 'A', `${T} un compte pas lu : aucune ligne inventée pour lui`, JSON.stringify(A));
-      dit(!!A && (A.etat !== 'lu' || /vendeuse_c|pas pu|pas lu|partiel|au moins/i.test(A.texte)), 'A', `${T} un compte pas lu : la carte ne se présente pas comme complète`, JSON.stringify(A));
+      // Le compte pas lu est NOMMÉ par son identité dans la note de la carte (`data-sv-annul-manque`) : jamais un total qui se dit complet.
+      dit(!!A && (A.etat !== 'lu' || String(A.manque || '').split(',').includes('333')), 'A', `${T} un compte pas lu : nommé, la carte ne se présente pas comme complète`, JSON.stringify(A));
     }
   }
   dit(!o.journal.erreurs.length, 'V0', `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));

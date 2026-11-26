@@ -34191,7 +34191,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     const etatsT = visibles.length ? visibles.map(([, , txt]) => txt).join(' ') : '';
     return (
       <div className="vrm-ventes-toutes" data-ventes-toutes={enCours ? 'lecture' : 'lu'} data-n={String(lignes.length)}>
-        {repliJamais}
+        {repliJamais ? <div style={{ padding: '0 16px' }}>{repliJamais}</div> : null}
         <VentesTableau achatDe={achatToutes} netDe={(l) => (NET_VENTES.de ? NET_VENTES.de(l) : null)} euros={(c) => montant(c / 100)} lignes={lignesT} pied={etatsT} majLe={majLeT} onRafraichir={() => { setMajLeT(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }}
           compte={filtreT.compte} filtres={filtresT} prix={prix} motEtat={motEtatVente} nomSite={(x) => NOM[x] || x} logoSite={(x) => <LogoSite site={x}/>}
           logoTransporteur={(t) => (t && t.cle ? <LogoTransporteur cle={t.cle} taille={24}/> : null)} Icon={Icon}
