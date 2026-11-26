@@ -18,6 +18,7 @@ export default {
   "sv.scanner.envoi": "Scansiona un’etichetta",
   "sv.scanner.retrait": "Scansiona un pacco da ritirare",
   "sv.scanner.envoiTitre": "Scansiona il codice di un’etichetta: VRM mostra il paio che va dentro",
+  "sv.scanner.envoiTitre.art": "Scansiona il codice di un’etichetta: VRM mostra l’articolo che va dentro",
   "sv.scanner.retraitTitre": "Scansiona il pacco al punto di ritiro: VRM mostra l’acquisto atteso",
   "sv.outils": "Strumenti: imballare, generare etichette",
   "sv.filtre.label": "Filtra i pacchi da spedire",

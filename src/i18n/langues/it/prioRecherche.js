@@ -55,7 +55,9 @@ export default {
   "prio.reglages.jours": "{n} g",
   "prio.reglages.parJour": "Quanti al giorno",
   "prio.reglages.note": "La stessa età del segmento «Fermi». Le paia vendute, nascoste da Vinted, in contestazione o di un account bloccato o personale non sono mai proposte.",
+  "prio.reglages.note.art": "La stessa età del segmento «Fermi». Gli articoli venduti, nascosti da Vinted, in contestazione o di un account bloccato o personale non sono mai proposti.",
   "prio.journee": {"one": "{n} paio da ripubblicare", "other": "{n} paia da ripubblicare"},
+  "prio.journee.art": {"one": "{n} articolo da ripubblicare", "other": "{n} articoli da ripubblicare"},
   "prio.journeeSous": "Online da {jours} g o più, in ordine",
   "rech.approx": "a meno di una lettera"
 };

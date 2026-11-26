@@ -75,8 +75,10 @@ export default {
   "pn.comptes.plusTard": "VRM lo verá en tu primera visita",
 
   "pn.numeros.titre": "¿Quién numera tus pares?",
+  "pn.numeros.titre.art": "¿Quién numera tus artículos?",
   "pn.numeros.titreAutre": "¿Quién numera tus artículos?",
   "pn.numeros.phrase": "El número escrito en la caja encuentra el par en un segundo. Un número nunca se reutiliza.",
+  "pn.numeros.phrase.art": "El número escrito donde está guardado encuentra el artículo en un segundo. Un número nunca se reutiliza.",
   "pn.numeros.vrm": "VRM numera",
   "pn.numeros.vrm.desc": "Cada anuncio nuevo recibe un número para escribir en su caja.",
   "pn.numeros.moi": "Numero yo mismo",
