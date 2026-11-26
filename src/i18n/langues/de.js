@@ -45,7 +45,6 @@ import ecran_vente_mail from './de/venteMail.js';   // (24 nov.) la vente vue pa
 import ecran_egalite from './de/egalite.js';
 import ecran_tableau from './de/tableau.js';   // (19 nov. soir) le tableau de travail
 import ecran_publierAgent from './de/publierAgent.js';
-import ecran_quatreSites from './de/quatreSites.js';
 import ecran_ecrans_restes from './de/ecransRestes.js';   // (16 nov.) lot ecrans-restes : stock importé, date limite, loupe   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './de/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_transporteur_connu from './de/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
@@ -125,8 +124,9 @@ import ecran_ux_reglages from './de/uxReglages.js';   // (21 nov.) Paramètres, 
 import ecran_natif from './de/natif.js';
 import ecran_menu_onglets from './de/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './de/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
+import ecran_actions_ext from './de/actionsExt.js';
+import ecran_ebay_series from './de/ebaySeries.js';   // (23 nov.) eBay en série   // (20 nov.) « … dans l’extension »
 import ecran_parrainage20 from './de/parrainage.js';   // (25 nov.) le parrainage à 20 %
-import ecran_actions_ext from './de/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './de/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 import ecran_accompagnement_demarrage from './de/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
 import ecran_litiges_tous from './de/litigesTous.js';   // (23 nov.) Litiges et retours, tous les sites
@@ -2449,7 +2449,6 @@ export default {
   ...ecran_egalite,
   ...ecran_tableau,
   ...ecran_publierAgent,
-  ...ecran_quatreSites,
   ...ecran_ecrans_restes,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
@@ -2469,6 +2468,7 @@ export default {
   ...ecran_menu_onglets,
   ...ecran_extension,
   ...ecran_actions_ext,
+  ...ecran_ebay_series,
   ...ecran_offres_photos,
   ...ecran_parrainage20,
 };

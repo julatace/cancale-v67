@@ -1,0 +1,344 @@
+// Banc : eBay EN SÉRIE (23 nov.) — « fais pareil pour eBay » (Julien) : l'offre aux observateurs et la remise en
+// vente des inactives, plusieurs annonces sur SON clic. L'écran RENDU (390 px tactile, 1512 px), données INVENTÉES.
+// Ce qui doit rester vrai (jugé sur les data-*, §6.5) :
+//   · « Offre aux observateurs · N » n'apparaît qu'avec des annonces qu'eBay dit éligibles ; la feuille coche celles
+//     qui sont prêtes, une offre EN COURS (48 h) n'est pas cochable ; chaque ligne porte le prix de SON offre ;
+//   · rien ne part avant la confirmation ; « Annuler » ⇒ rien ; « Oui » ⇒ une requête `offre` PAR annonce, chacune
+//     avec `confirme:true` et le PRIX VU (§2.8), un résultat par ligne ;
+//   · « Remettre en vente · N » : la vérification à blanc de chacune (frais lus) AVANT la confirmation, puis une
+//     requête `relancer` par annonce ; aucun débordement, cibles ≥ 44 px au doigt, aucune erreur de page.
+// Lancer : npm run build, puis BANC_PORT=9177 node scripts/bancs/ebay-series.cjs
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
+const SORTIE_INA = require('path').join(require('os').tmpdir(), 'banc-ebay-series'); try { require('fs').mkdirSync(SORTIE_INA, { recursive: true }); } catch (_) {}
+const { metaVersData } = require('./_meta.cjs');
+const fs = require('fs'), http = require('http'), path = require('path');
+const DIST = path.join(__dirname, '..', '..', 'dist');
+const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 9177;
+const SEUL = String(process.env.BANC_SEUL || '').split(',').map((x) => x.trim()).filter(Boolean);
+const lance = (c) => !SEUL.length || SEUL.includes(c);
+
+// Les dates sont RELATIVES à aujourd'hui : l'écran écarte une annonce terminée
+// hors de la fenêtre de 60 jours — des dates écrites en dur feraient vieillir le banc.
+const JOUR = 86400000;
+const jour = (n, hh = 10, mm = 0) => { const d = new Date(Date.now() - n * JOUR); d.setUTCHours(hh, mm, 0, 0); return d.toISOString(); };
+const parisJour = (t) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t));
+const auj = new Date();
+const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
+const annonce = (id, titre, prix, ferme) => ({ id, title: titre, price: { amount: String(prix), currency_code: 'EUR' }, brand_title: titre.split(' ')[0], size_title: (/taille (\d+)/.exec(titre) || [])[1] || '', is_closed: !!ferme, is_hidden: false, is_draft: false, photo: { url: 'https://img.test/v' + id + '.jpg' } });
+const LISTINGS = { capturedAt: auj.toISOString(), payload: { items: [
+  annonce(7001, 'Nike Dunk Low panda taille 42', 95),
+  annonce(7002, 'Adidas Gazelle bleu taille 40', 80, true),     // vendue sur Vinted (son bordereau)
+  annonce(7003, 'Salomon XT-6 noir taille 41', 120),
+  annonce(7004, 'New Balance 550 blanc taille 43', 90),
+  annonce(7005, 'Asics Gel 1130 argent taille 39', 70),
+  annonce(7006, 'Puma Suede rouge taille 42', 60),
+  annonce(7007, 'Converse Chuck 70 noir taille 41', 55, true),  // FERMÉE sur Vinted, SANS vente prouvée
+  annonce(7008, 'Nike Dunk Low panda taille 42 (ancienne)', 90, true),   // l'ancienne N°B21 (013)
+] } };
+const fiche = (numero, title, id, extra) => ({ numero, title, photo: 'https://img.test/v' + id + '.jpg', ...(extra || {}) });
+const MAIN = { vinted_annonce_numeros: {
+  '7001': fiche('21', 'Nike Dunk Low panda taille 42', 7001),
+  '7002': fiche('22', 'Adidas Gazelle bleu taille 40', 7002),
+  '7003': fiche('23', 'Salomon XT-6 noir taille 41', 7003),
+  '7004': fiche('24', 'New Balance 550 blanc taille 43', 7004),
+  '7005': fiche('25', 'Asics Gel 1130 argent taille 39', 7005),
+  '7006': fiche('26', 'Puma Suede rouge taille 42', 7006),
+  '7007': fiche('27', 'Converse Chuck 70 noir taille 41', 7007),
+} };
+const recent = (h) => new Date(Date.now() - h * 3600000).toISOString();
+// La N°22 est PROUVÉE vendue sur Vinted par son bordereau (la forme réelle, comme
+// ebay-annonces.cjs : pas de ligne de transaction).
+const VENTES = { capturedAt: auj.toISOString(), payload: { my_orders: [
+  { transaction_id: 9001, title: 'Adidas Gazelle bleu taille 40', status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action', date: recent(20) },
+] } };
+const BORDEREAU = { id: 'harvest_111_label_9001', data: { uid: '111', url: 'https://s3.test/l.pdf', tx: '9001', item: '7002', items: ['7002'], capturedAt: auj.toISOString(), pdfB64: 'JVBERi0x' } };
+// Les inactives (la forme RANGÉE par la route : `resumeInactive`). `depuis` est
+// une date FIXE d'avant la coupure du 9 octobre (013) : elle ne compte que pour
+// les scénarios qui posent le marqueur ou une date de numérotation.
+const DEPUIS = '2026-09-01T10:00:00.000Z';
+const ina = (itemId, title, sku, price, fin, extra) => ({ itemId, sku, title, price, currency: 'EUR', fin, depuis: DEPUIS, observateurs: null, photo: 'https://i.ebayimg.com/images/g/' + itemId + '/s-l225.jpg', relanceeEn: '', ...(extra || {}) });
+const I = {
+  en_vinted: ina('120000000021', 'Nike Dunk Low panda T42', 'VRM-21', '95.0', jour(18), { observateurs: 2 }),   // encore en ligne sur Vinted
+  vendue: ina('120000000022', 'Adidas Gazelle bleu T40', 'VRM-22', '80.0', jour(19)),                         // vendue sur Vinted
+  sans_sku: ina('120000000023', 'Salomon XT-6 noir taille 41', '', '120.0', jour(20)),                         // titre identique à la N°23, sans SKU
+  relancee: ina('120000000024', 'New Balance 550 blanc T43', 'VRM-24', '90.0', jour(21), { relanceeEn: '120000000099' }),
+  en_vente: ina('120000000025', 'Asics Gel 1130 argent T39', 'VRM-25', '70.0', jour(22)),                     // déjà de nouveau en vente sur eBay (AUTRE annonce)
+};
+const K1 = 'aaaaaaaaaaaaaaa1', K2 = 'bbbbbbbbbbbbbbb2';
+const I_K2 = ina('120000000026', 'Puma Suede rouge T42', 'VRM-26', '60.0', jour(17));
+const MARQUEUR_013 = { version: 2, archive: 'B', coupure: '2026-10-09T00:00:00Z', appliqueLe: '2026-10-11T14:58:07Z' };
+let rows = [];
+// `inactives` : undefined = ligne ABSENTE · un objet = la ligne rangée.
+// `listingsCap` : la date de la dernière relecture des annonces EN LIGNE (par
+// défaut maintenant) · `sansListings` : aucune relecture des annonces rangée.
+// `main(m)` : retouche la copie de `main` (marqueur 013, dates de numérotation).
+const remettre = ({ inactives, multi, inactivesK2, listingsCap, sansListings, main, listingsItems, retraits } = {}) => {
+  const m = JSON.parse(JSON.stringify(MAIN));
+  if (main) main(m);
+  rows = [
+    { id: 'main', data: m },
+    { id: 'harvest_111_listings', data: LISTINGS },
+    { id: 'harvest_111_orders_sold', data: VENTES },
+    BORDEREAU,
+    ...(sansListings ? [] : [{ id: 'ebay_listings', data: { items: listingsItems || [{ itemId: '120000000777', title: 'Asics Gel 1130 argent taille 39', price: '75.0', sku: 'VRM-25', depuis: recent(10), observateurs: 0, photo: '' }], capturedAt: listingsCap != null ? listingsCap : Date.now() } }]),
+    { id: 'ebay_orders', data: { orders: [], capturedAt: Date.now() } },
+    { id: 'ebay_programmees', data: { items: [], enLigne: [], complet: true, capturedAt: Date.now() } },
+    { id: 'lbc_ventes', data: { ventes: {} } },
+    ...(inactives ? [{ id: 'ebay_inactives', data: inactives }] : []),
+    ...(retraits ? [{ id: 'ebay_retraits_auto', data: { items: retraits } }] : []),
+    ...(multi ? [
+      { id: 'ebay_comptes', data: { comptes: [{ cle: K1, pseudo: 'paire_perso', principal: true, ajouteLe: 1 }, { cle: K2, pseudo: 'paire_pro', principal: false, ajouteLe: 2 }] } },
+      { id: 'ebay_listings_' + K2, data: { items: [], capturedAt: Date.now() } },
+      { id: 'ebay_orders_' + K2, data: { orders: [], capturedAt: Date.now() } },
+      { id: 'ebay_programmees_' + K2, data: { items: [], enLigne: [], complet: true, capturedAt: Date.now() } },
+      ...(inactivesK2 ? [{ id: 'ebay_inactives_' + K2, data: inactivesK2 }] : []),
+    ] : []),
+  ];
+};
+const lue = (items, complet, cap) => ({ items, complet: complet === false ? false : true, jours: 60, capturedAt: cap != null ? cap : Date.now() });
+
+let ko = 0, ok = 0;
+const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
+// Un banc ne meurt pas, il rapporte : ce qui lève devient un contrôle ROUGE.
+const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { dit(false, quoi, 'a levé : ' + String((e && e.message) || e).split('\n')[0].slice(0, 160)); return null; } };
+const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
+const srv = http.createServer((q, r) => {
+  let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
+  const p = path.join(DIST, f);
+  if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
+  r.writeHead(200, { 'content-type': types[path.extname(p)] || 'application/octet-stream' }); fs.createReadStream(p).pipe(r);
+});
+srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul (BANC_PORT=…)'); process.exit(1); });
+srv.listen(PORT);
+// Projection PostgREST (§6.3) : `alias:data->champ` rend le JSON, `->>` rend du
+// TEXTE (un booléen arrive en « false » — la forme que lit l'app en production).
+const projette = (row, sel) => {
+  if (!sel || sel === '*') return row;
+  const out = {};
+  for (const part of sel.split(',')) {
+    const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue;
+    const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
+    if (src === 'id') { out[alias] = row.id; continue; }
+    if (src === 'data') { out[alias] = row.data; continue; }
+    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
+    if (v != null && /->>[^>]*$/.test(src) && typeof v !== 'string') v = typeof v === 'object' ? JSON.stringify(v) : String(v);
+    out[alias] = v == null ? null : v;
+  }
+  return out;
+};
+
+const PREUVES = (u) => /_label_|orders_sold|_txn_/.test(u);
+// `opts.casse(u)` : cette lecture ne répond pas (522 + HTML, la vraie forme d'une panne).
+// `opts.ventesKo` : les ventes (Vinted ET eBay) illisibles · `opts.vintedKo` : les
+// ventes Vinted seules · `opts.retenir` : les lectures de la preuve de vente sont
+// TENUES jusqu'à ce que cette promesse se résolve (un geste joué sur une requête
+// tenue, jamais sur un délai).
+async function ouvrir(b, vp, opts = {}) {
+  const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+  const pg = await ctx.newPage();
+  const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+  const envois = [];
+  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_ebay_guide_vu', 'true'); } catch (_) {} });
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
+  await pg.route('**/rest/v1/**', async (route) => {
+    const u = decodeURIComponent(metaVersData(route.request().url()));
+    const j = (d, st) => route.fulfill({ status: st || 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) }).catch(() => {});
+    if (opts.casse && route.request().method() === 'GET' && opts.casse(u)) return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
+    if (route.request().method() !== 'GET') {
+      try { for (const l of [].concat(JSON.parse(route.request().postData() || 'null') || [])) { if (!l || !l.id || !l.data) continue; const i = rows.findIndex((r) => r.id === l.id); if (i >= 0) rows[i] = { id: l.id, data: l.data }; else rows.push({ id: l.id, data: l.data }); } } catch (_) {}
+      return j([]);
+    }
+    if (/select=owner/.test(u)) return j({ m: 1 }, 400);
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+    if (opts.ventesKo && (PREUVES(u) || /ebay_orders/.test(u))) return j({ message: 'timeout' }, 500);
+    if (opts.vintedKo && PREUVES(u)) return j({ message: 'timeout' }, 500);
+    if (opts.retenir && PREUVES(u)) await opts.retenir;
+    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+    const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data && r.data.capturedAt });
+    const eq = /id=eq\.([^&]*)/.exec(u);
+    if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
+    const inn = /id=in\.\(([^)]*)\)/.exec(u);
+    if (inn) { const ids = inn[1].split(','); return j(rows.filter((r) => ids.includes(r.id)).map(forme)); }
+    const lk = /id=like\.([^&]*)/.exec(u);
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
+    return j([]);
+  });
+  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+  // ⚠️ enregistré APRÈS le fourre-tout → Playwright le prend en PREMIER (§6.6).
+  await pg.route('**/api/ebay**', (route) => {
+    const req = route.request();
+    const j = (d, st) => route.fulfill({ status: st || 200, contentType: 'application/json', body: JSON.stringify(d) });
+    if (req.method() !== 'POST') return j({ ok: true, ready: true, canConsent: true });
+    let body = {}; try { body = JSON.parse(req.postData() || '{}'); } catch (_) {}
+    envois.push(body);
+    if (body.action === 'status') return j({ ok: true, connected: opts.connected !== false });
+    if (body.action === 'offreinfo') return j({ ok: true, eligibles: opts.eligibles || [], complet: true, enCours: opts.enCours || {} });
+    if (body.action === 'offre') return body.confirme === true && /^\d+(\.\d{1,2})?$/.test(String(body.prixVu || '')) ? j({ ok: true, remise: body.remise, envoyees: 2, prix: Number(body.prixVu), prixOffre: Math.round(Number(body.prixVu) * (100 - body.remise)) / 100 }) : j({ ok: false, reason: 'prix' }, 400);
+    if (body.action === 'finances') return j({ ok: false, reason: 'scope', error: 'x' });
+    if (body.action === 'relanceverif') return j({ ok: true, num: String(body.numero), sku: 'VRM-' + body.numero, prix: Number(body.prixVu), frais: { total: 0, devise: 'EUR' }, verifie: true });
+    if (body.action === 'relancer') return body.confirme === true ? j({ ok: true, itemId: '120000000900', ancien: body.itemId, verifie: true }) : j({ ok: false, reason: 'confirmation' }, 400);
+    return j({ ok: true });
+  });
+  return { ctx, pg, errs, envois };
+}
+// (31 oct.) Attendre que l'espace eBay soit MONTÉ (sa rangée de sections) plutôt
+//  qu'un délai fixe : sur une machine chargée, 1,5 s + 8 s ne suffisaient pas et
+//  chaque scénario tombait en « a levé » sans rien juger (§6.5).
+async function espaceEbayMonte(pg) {
+  // (31 oct., navigation par tâche) eBay → Annonces est Annonces filtré sur eBay.
+  await pg.waitForSelector('[data-tache-site="ebay"]', { timeout: 30000 }).catch(() => {});
+  await pg.waitForTimeout(500);
+}
+async function versAnnonces(pg) {
+  await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=ebay`, { waitUntil: 'domcontentloaded' });
+  await espaceEbayMonte(pg);
+  await pg.waitForSelector('[data-ebay-inactives]:not([data-ebay-inactives="charge"])', { timeout: 15000 }).catch(() => {});
+  await pg.waitForTimeout(800);
+}
+const choisirVue = async (pg, val) => { await pg.selectOption('#vrm-sel-compte-ebay', val); await pg.waitForTimeout(900); };
+const lire = (pg) => pg.evaluate(() => {
+  const sec = document.querySelector('[data-ebay-inactives]');
+  const a = (n) => (sec ? sec.getAttribute(n) : null);
+  const lignes = [...document.querySelectorAll('[data-ebay-inactive]')].map((e) => ({
+    id: e.getAttribute('data-ebay-inactive'), num: e.getAttribute('data-inactive-num'), fin: e.getAttribute('data-inactive-fin'),
+    compte: e.getAttribute('data-inactive-compte'), vendue: e.getAttribute('data-inactive-vendue'), deja: e.getAttribute('data-inactive-deja'),
+    vinted: e.getAttribute('data-inactive-vinted'),
+    retraitAuto: e.getAttribute('data-inactive-retrait-auto'),
+    prix: (e.querySelector('[data-inactive-prix]') || {}).innerText || '',
+    relancer: (e.querySelector('[data-inactive-relancer]') || { getAttribute: () => '' }).getAttribute('data-inactive-relancer') || '',
+    relancerBouton: !!e.querySelector('button[data-inactive-relancer]'),
+    // (6 nov., v36-visuel) « Voir sur eBay » vit dans la FICHE de la ligne (la ligne entière l'ouvre) :
+    // la ligne porte le lien de sa fiche (`data-inactive-lien`) ; le scénario C ouvre une fiche et y lit le lien.
+    voir: (e.querySelector('a[data-inactive-voir]') || {}).href || e.getAttribute('data-inactive-lien') || '',
+    texte: e.innerText,
+  }));
+  return {
+    etat: a('data-ebay-inactives'),
+    n: a('data-ebay-inactives-n'),
+    aumoins: a('data-ebay-inactives-aumoins'),
+    jamais: a('data-inactives-jamais'),
+    jamaisComptes: a('data-inactives-jamais-comptes'),
+    lueLe: a('data-inactives-lue-le'),
+    anciennes: a('data-inactives-anciennes'),
+    dit: a('data-inactives-dit'),
+    verif: a('data-inactives-verif'),
+    // Ce que la section ÉCRIT d'une panne (une phrase, un enfant) — distinct
+    // des `data-*` posés sur la section elle-même.
+    phrasesVerif: sec ? sec.querySelectorAll('[data-inactives-verif], [data-inactives-verif-texte]').length : 0,
+    phrasePasSu: sec ? sec.querySelectorAll('[data-inactives-note="pas-su"]').length : 0,
+    fenetre: sec ? sec.querySelectorAll('[data-inactives-fenetre]').length : 0,
+    titre: sec ? (sec.firstElementChild || {}).innerText || '' : '',
+    note: sec ? [...sec.querySelectorAll('[data-inactives-note]')].map((x) => x.getAttribute('data-inactives-note')) : [],
+    illisibles: sec ? (sec.querySelector('[data-inactives-illisibles]') || { getAttribute: () => null }).getAttribute('data-inactives-illisibles') : null,
+    lignes,
+    ecranPasSu: !!document.querySelector('[data-ebay-pas-su]'),
+    ecranBloque: !!document.querySelector('[data-regles-bloquees-commun="pas-su"]'),
+    mort: /n'a pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText),
+  };
+});
+const cibles = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-ebay-inactives] a, [data-ebay-inactives] button, [data-ebay-inactives] summary')]
+  .filter((e) => e.offsetParent !== null).map((e) => { const r = e.getBoundingClientRect(); return { t: (e.innerText || e.getAttribute('aria-label') || '').slice(0, 30), h: Math.round(r.height), w: Math.round(r.width) }; }));
+const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+const relistes = (envois) => envois.filter((x) => /relist|remettre|republi/i.test(JSON.stringify(x)) || ['publish', 'programmer'].includes(x.action));
+const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
+
+
+const L = (itemId, title, sku, price, extra) => ({ itemId, title, price, sku, depuis: recent(48), observateurs: 2, photo: '', ...(extra || {}) });
+const ANN = [L('120000000801', 'Nike Dunk Low panda T42', 'VRM-21', '95.0'), L('120000000802', 'New Balance 550 blanc T43', 'VRM-24', '90.0'), L('120000000803', 'Puma Suede rouge T42', 'VRM-26', '60.0'), L('120000000804', 'Salomon XT-6 noir T41', 'VRM-23', '120.0', { observateurs: 0 })];
+const ELIG = ['120000000801', '120000000802', '120000000803'];
+const EN_COURS = { '120000000803': { at: recent(3), jusqua: new Date(Date.now() + 45 * 3600000).toISOString(), remise: 10, offreCents: 5400 } };
+const lireSerie = (pg) => pg.evaluate(() => {
+  const f = document.querySelector('[data-ebay-serie]');
+  return { sorte: f ? f.getAttribute('data-ebay-serie') : null,
+    lancer: f ? (f.querySelector('[data-ebay-serie-lancer]') || { getAttribute: () => null }).getAttribute('data-ebay-serie-lancer') : null,
+    frais: f ? (f.querySelector('[data-ebay-serie-frais]') || { getAttribute: () => null }).getAttribute('data-ebay-serie-frais') : null,
+    lignes: f ? [...f.querySelectorAll('[data-ebay-serie-ligne]')].map((e) => ({ id: e.getAttribute('data-ebay-serie-ligne'), etat: e.getAttribute('data-etat'), verif: e.getAttribute('data-verif'), offre: e.getAttribute('data-offre-cents'), issue: e.getAttribute('data-issue'),
+      cochee: !!(e.querySelector('input[type=checkbox]') || {}).checked, grisee: !!(e.querySelector('input[type=checkbox]') || {}).disabled })) : [],
+    mort: /n'a pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText) };
+});
+const cases = (pg, sel) => pg.evaluate((s) => [...document.querySelectorAll(s + ' button, ' + s + ' input[type=checkbox], ' + s + ' label.n-rangee-case')].filter((e) => e.offsetParent !== null || e.tagName === 'INPUT')
+  .map((e) => { const r = (e.tagName === 'INPUT' ? e.closest('label') || e : e).getBoundingClientRect(); return { t: (e.innerText || e.getAttribute('aria-label') || e.tagName).slice(0, 30), h: Math.round(r.height) }; }), sel);
+
+(async () => {
+  let b;
+  try {
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+      const T = `[${vp.width}]`;
+      console.log(`── ${vp.width} px`);
+      // ── O. L'OFFRE AUX OBSERVATEURS EN SÉRIE ───────────────────────────────
+      if (lance('O')) await essaie(T + ' O offres', async () => {
+        remettre({ listingsItems: ANN });
+        const { ctx, pg, errs, envois } = await ouvrir(b, vp, { eligibles: ELIG, enCours: EN_COURS });
+        await versAnnonces(pg);
+        await pg.waitForSelector('[data-ebay-serie-ouvrir="offres"] button', { timeout: 15000 }).catch(() => {});
+        const porte = await pg.$('[data-ebay-serie-ouvrir="offres"] button');
+        const txt = porte ? await porte.innerText() : '';
+        dit(!!porte && /3/.test(txt), `${T} « Offre aux observateurs · 3 annonces » : seulement les annonces qu'eBay dit éligibles (la 4e n'a pas d'observateur)`, txt);
+        await porte.click();
+        await pg.waitForSelector('[data-ebay-serie="offres"] [data-ebay-serie-ligne]', { timeout: 8000 });
+        await pg.waitForTimeout(400);
+        let s = await lireSerie(pg);
+        const par = Object.fromEntries(s.lignes.map((l) => [l.id, l]));
+        dit(s.lignes.length === 3 && par['120000000801'].cochee && par['120000000802'].cochee && par['120000000803'].etat === 'en-cours' && par['120000000803'].grisee && !par['120000000803'].cochee,
+          `${T} la feuille : deux prêtes cochées, celle qui a une offre en cours (48 h) grisée, pas cochée`, JSON.stringify(s.lignes));
+        dit(par['120000000801'].offre === '8550' && par['120000000802'].offre === '8100' && s.lancer === '2', `${T} −10 % : 85,50 € et 81,00 € (le prix de CHAQUE offre, calculé sur le prix vu) ; « Envoyer 2 offres »`, JSON.stringify({ o: s.lignes.map((l) => l.offre), lancer: s.lancer }));
+        await pg.screenshot({ path: path.join(SORTIE_INA, `offres-feuille-${vp.width}.png`) }).catch(() => {});
+        if (vp.width < 600) { const c = await cases(pg, '[data-ebay-serie="offres"]'); const petites = c.filter((x) => x.h < 44); dit(c.length >= 3 && !petites.length, `${T} au doigt : cases et boutons de la feuille ≥ 44 px`, JSON.stringify(petites)); }
+        const n0 = envois.length;
+        await pg.click('[data-ebay-serie-lancer]');
+        await pg.waitForFunction(() => /Envoyer 2 offres à −10/.test(document.body.innerText), null, { timeout: 8000 });
+        await pg.screenshot({ path: path.join(SORTIE_INA, `offres-confirmer-${vp.width}.png`) }).catch(() => {});
+        dit(!envois.slice(n0).some((x) => x.action === 'offre'), `${T} la confirmation s'ouvre : RIEN n'est parti`);
+        await pg.getByRole('button', { name: 'Annuler', exact: true }).last().click();
+        await pg.waitForTimeout(400);
+        dit(!envois.slice(n0).some((x) => x.action === 'offre'), `${T} « Annuler » : rien ne part`);
+        await pg.click('[data-ebay-serie-lancer]');
+        await pg.waitForFunction(() => /Envoyer 2 offres à −10/.test(document.body.innerText), null, { timeout: 8000 });
+        await pg.getByRole('button', { name: 'Oui, envoyer', exact: true }).last().click();
+        await pg.waitForFunction(() => document.querySelectorAll('[data-ebay-serie="offres"] [data-issue="fait"]').length >= 2, null, { timeout: 10000 }).catch(() => {});
+        const parties = envois.slice(n0).filter((x) => x.action === 'offre');
+        dit(parties.length === 2 && parties.every((x) => x.confirme === true && x.remise === 10) && parties.map((x) => x.listingId + '@' + x.prixVu).join(',') === '120000000801@95.00,120000000802@90.00',
+          `${T} sur SON oui : une requête par annonce, \`confirme:true\`, le PRIX VU de chacune ; jamais l'offre en cours`, JSON.stringify(parties));
+        s = await lireSerie(pg);
+        dit(s.lignes.filter((l) => l.issue === 'fait').length === 2, `${T} chaque ligne dit son résultat`, JSON.stringify(s.lignes.map((l) => l.issue)));
+        await pg.screenshot({ path: path.join(SORTIE_INA, `offres-fait-${vp.width}.png`) }).catch(() => {});
+        dit(!errs.length && !s.mort, `${T} aucune erreur de page`, errs.join(' | ').slice(0, 160));
+        const d = await deborde(pg); dit(d.sw <= d.cw + 1, `${T} aucun débordement horizontal`, `${d.sw} / ${d.cw}`);
+        await ctx.close();
+      });
+      // ── R. REMETTRE EN VENTE EN SÉRIE ──────────────────────────────────────
+      if (lance('R')) await essaie(T + ' R remise en vente', async () => {
+        remettre({ inactives: lue([I.en_vinted, ina('120000000031', 'New Balance 550 blanc T43', 'VRM-24', '90.0', jour(15)), I.vendue, I.sans_sku]) });
+        const { ctx, pg, errs, envois } = await ouvrir(b, vp);
+        await versAnnonces(pg);
+        await pg.waitForSelector('[data-ebay-serie-ouvrir="relance"] button', { timeout: 15000 }).catch(() => {});
+        const porte = await pg.$('[data-ebay-serie-ouvrir="relance"] button');
+        const txt = porte ? await porte.innerText() : '';
+        dit(!!porte && /2/.test(txt), `${T} « Remettre en vente · 2 annonces » : la vendue et celle sans N° n'en sont pas`, txt);
+        const n0 = envois.length;
+        await porte.click();
+        await pg.waitForFunction(() => document.querySelectorAll('[data-ebay-serie="relance"] [data-verif="ok"]').length === 2, null, { timeout: 10000 }).catch(() => {});
+        let s = await lireSerie(pg);
+        const avant = envois.slice(n0).map((x) => x.action);
+        dit(s.lignes.length === 2 && s.lignes.every((l) => l.verif === 'ok' && l.cochee) && avant.filter((a) => a === 'relanceverif').length === 2 && !avant.includes('relancer') && s.frais === '0',
+          `${T} à l'ouverture : la vérification à blanc de chacune (frais lus : 0,00 €), rien n'est remis en vente`, JSON.stringify({ avant, s }));
+        await pg.screenshot({ path: path.join(SORTIE_INA, `relance-feuille-${vp.width}.png`) }).catch(() => {});
+        await pg.click('[data-ebay-serie-lancer]');
+        await pg.waitForFunction(() => /Remettre 2 annonces en vente \?/.test(document.body.innerText), null, { timeout: 8000 });
+        dit(!envois.slice(n0).some((x) => x.action === 'relancer'), `${T} la confirmation s'ouvre : rien n'est parti`);
+        await pg.getByRole('button', { name: 'Remettre en vente', exact: true }).last().click();
+        await pg.waitForFunction(() => document.querySelectorAll('[data-ebay-serie="relance"] [data-issue="fait"]').length >= 2, null, { timeout: 10000 }).catch(() => {});
+        const rel = envois.slice(n0).filter((x) => x.action === 'relancer');
+        dit(rel.length === 2 && rel.every((x) => x.confirme === true) && rel.map((x) => x.numero + '@' + x.prixVu).join(',') === '21@95.0,24@90.0', `${T} sur SON oui : une remise en vente par annonce, \`confirme:true\`, N° et prix vu`, JSON.stringify(rel));
+        await pg.screenshot({ path: path.join(SORTIE_INA, `relance-fait-${vp.width}.png`) }).catch(() => {});
+        s = await lireSerie(pg);
+        dit(!errs.length && !s.mort, `${T} aucune erreur de page`, errs.join(' | ').slice(0, 160));
+        await ctx.close();
+      });
+    }
+  } catch (e) { dit(false, 'banc', String(e && e.message || e).slice(0, 200)); }
+  finally { if (b) await b.close(); srv.close(); }
+  console.log(ko ? `\n${ko} contrôle(s) en échec, ${ok} vert(s)` : `\nTous les contrôles passent (${ok}) — eBay en série : rien sans sa confirmation, une requête par annonce, le prix vu, les offres en cours pas recochées.`);
+  process.exit(ko ? 1 : 0);
+})();

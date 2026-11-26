@@ -50,9 +50,7 @@ const detail = (id) => JSON.stringify({ is_seller: true, item: { id: 9000 + id, 
 
   const visite = async (avecListe) => {
     await pg.goto('https://www.leboncoin.fr/compte/part/mes-transactions');
-    // 5.396 (revue, basse 119) : le banc joue le relais — il prend le port du canal privé que
-    // lbc-inject.js remet, et l'accusé « détail intégré » repart PAR CE PORT (plus par `window`).
-    await pg.evaluate(`window.__vus = []; window.__port = null; window.addEventListener('message', (e) => { const d = e.data; if (d && d.__tag === 'CANCALE_LBC_CANAL' && e.ports && e.ports[0] && !window.__port) { window.__port = e.ports[0]; window.__port.start(); return; } if (d && d.__tag === 'CANCALE_LBC' && d.kind === 'lbcvente') {window.__vus.push(d.url); if (window.__port) window.__port.postMessage({__tag:'CANCALE_LBC_ACCUSE',sequence:d.__vrmSequence,ok:true});} });`);
+    await pg.evaluate(`window.__vus = []; window.addEventListener('message', (e) => { const d = e.data; if (d && d.__tag === 'CANCALE_LBC' && d.kind === 'lbcvente') {window.__vus.push(d.url);window.postMessage({__tag:'CANCALE_LBC_ACCUSE',sequence:d.__vrmSequence,ok:true},'*');} });`);
     await pg.evaluate(INJ);
     if (avecListe) await pg.evaluate(`fetch('https://api.leboncoin.fr/api/consumergoods/proxy/v3/pages/transactions', { credentials: 'include', headers: { 'api_key': 'CLE-DU-SITE', 'Accept': 'application/json' } }).then(r => r.text())`).catch(() => {});
     await pg.waitForTimeout(3000);

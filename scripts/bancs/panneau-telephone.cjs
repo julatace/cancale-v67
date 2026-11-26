@@ -211,7 +211,7 @@ const PAGES = ['accueil', 'annonces', 'ventes', 'messages', 'favoris', 'notifica
               await clic(t.pg, 'details.cols5[open] > summary');
             }
           } else {
-            dit(m.side && m.side.w >= 220 && m.side.w <= 240 && m.barre.length === 11 && !m.plusVisible, `${T} · ${p} : barre latérale inchangée (232 px, onze entrées, Santé (5.420), File d’actions (5.433) et Achats (5.444) comprises, pas de « Plus »)`, JSON.stringify([m.side, m.barre.length, m.plusVisible]));
+            dit(m.side && m.side.w >= 220 && m.side.w <= 240 && m.barre.length === 10 && !m.plusVisible, `${T} · ${p} : barre latérale inchangée (232 px, dix entrées, Santé (5.420) et File d’actions (5.433) comprises, pas de « Plus »)`, JSON.stringify([m.side, m.barre.length, m.plusVisible]));
             if (p === 'annonces' || p === 'ventes') dit(m.enTete && m.libelles === 0, `${T} · ${p} : le tableau garde ses en-têtes de colonnes`, JSON.stringify([m.enTete, m.libelles]));
           }
         }

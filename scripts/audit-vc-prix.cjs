@@ -27,7 +27,6 @@
 //  `--prouve` : chaque règle réaffaiblie doit faire rougir l'audit.
 // ════════════════════════════════════════════════════════════════════════════
 require('./_source-app.cjs').brancher();
-const { FauxCanal } = require('./_canal-faux.cjs');
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
@@ -104,10 +103,7 @@ function chrome2(bus) {
   const rep = (m, u) => routes[m + ' ' + u] || routes['* ' + u] || { status: 404, body: { message: 'introuvable' } };
   const ecoutesPage = [], ecoutesRel = [];
   const winP = {}, winR = {};
-  // 5.396 : `postMessage(m, origine, ports)` — le port du canal privé passe avec la lettre ;
-  // ce que le capteur poste sur SON port est aussi noté dans `posts` (le banc le regarde).
-  const diffuser = (m, o, ports) => { const d = copie(m); posts.push(d); if (ports) { setTimeout(() => { for (const f of ecoutesRel.slice()) f({ source: winR, origin: ORIGINE, data: copie(d), ports }); }, 0); return; } for (const f of ecoutesPage.slice()) f({ source: winP, origin: ORIGINE, data: copie(d), ports }); for (const f of ecoutesRel.slice()) f({ source: winR, origin: ORIGINE, data: copie(d), ports }); };
-  const CanalEspion = function () { const c = new FauxCanal(); const pm = c.port1.postMessage; c.port1.postMessage = (x) => { posts.push(copie(x)); pm(x); }; return c; };
+  const diffuser = (m) => { const d = copie(m); posts.push(d); for (const f of ecoutesPage.slice()) f({ source: winP, data: copie(d) }); for (const f of ecoutesRel.slice()) f({ source: winR, data: copie(d) }); };
   Object.assign(winP, { postMessage: diffuser, addEventListener: (t, f) => { if (t === 'message') ecoutesPage.push(f); },
     fetch: async (u, init) => {
       const m = String((init && init.method) || 'GET').toUpperCase();
@@ -118,7 +114,7 @@ function chrome2(bus) {
       return { status: r.status, ok: r.status >= 200 && r.status < 300, headers: { get: () => ct }, clone() { return this; }, text: async () => texte, arrayBuffer: async () => new ArrayBuffer(0) };
     } });
   winP.top = winP; winP.self = winP;
-  const ctxP = { MessageChannel: CanalEspion, window: winP, document: { currentScript: {}, createElement: () => ({}), head: { appendChild() {} }, addEventListener() {}, getElementById: () => null, readyState: 'complete' },
+  const ctxP = { window: winP, document: { currentScript: {}, createElement: () => ({}), head: { appendChild() {} }, addEventListener() {}, getElementById: () => null, readyState: 'complete' },
     location: { origin: ORIGINE, hostname: 'fr.vestiairecollective.com', pathname: '/my-account/items/', href: ORIGINE + '/my-account/items/' }, history: { pushState() {}, replaceState() {} },
     URL, console: { log() {}, warn() {}, error() {} }, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {}, JSON, Date, Math, Map, Set, Promise, encodeURIComponent, btoa: (x) => Buffer.from(x, 'latin1').toString('base64'), Uint8Array, ArrayBuffer, String, Number };
   vm.createContext(ctxP); vm.runInContext(INJ, ctxP, { filename: 'vc-inject.js' });
@@ -127,7 +123,7 @@ function chrome2(bus) {
   winR.top = winR;
   const ctxR = { window: winR, self: { crypto: { randomUUID: () => 'aaaaaaaa-bbbb-cccc-dddd-' + String(Math.floor(Math.random() * 1e12)).padStart(12, '0') } }, crypto: { randomUUID: () => 'aaaaaaaa-bbbb-cccc-dddd-' + String(Math.floor(Math.random() * 1e12)).padStart(12, '0') },
     chrome: { runtime: { id: 'banc', sendMessage: (m, cb) => { if (bus) bus(copie(m)); if (cb) cb(); }, lastError: null, onMessage: { addListener(f) { ecouteOrdre.push(f); } } } },
-    location: { origin: ORIGINE, href: ORIGINE + '/my-account/items/' }, URL, console, setTimeout, clearTimeout, JSON, Date, Math, Map, Set, Number, String };
+    location: { href: ORIGINE + '/my-account/items/' }, URL, console, setTimeout, clearTimeout, JSON, Date, Math, Map, Set, Number, String };
   vm.createContext(ctxR); vm.runInContext(REL, ctxR, { filename: 'vc.js' });
   const ordre = (m) => new Promise((res) => {
     let rendu = false;

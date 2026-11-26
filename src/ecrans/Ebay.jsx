@@ -1,7 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { ordreRecent, quandEbay } from '../ordreRecent.js';
-import { liensLbcLus } from '../App.jsx';   // (24 nov., lot ext-anciens-lots) les liens Leboncoin LUS (+ photo d'origine, src/photoIdentite.js)
 import DansFiche, { useLigneIci } from '../DansFiche.jsx';
 import { attrsFicheLigne, ouvrirLigne } from '../ficheLigne.js';
 import { attrsAvantSite, basculerAvant, PaireAvantSiteHote } from '../paires/PaireAvantSite.jsx';   // (16 nov.) la rangée touchée monte à sa place
@@ -35,6 +34,7 @@ import {bilanCommandeEbay} from '../ebayParcours.js';
 import {formaterMontantEbay} from '../montantsEbay.js';
 // ⟦← App.jsx #5⟧
 import { relanceProposable, numeroSorti } from '../ebayRelance.js';
+import { FeuilleOffresEbay, FeuilleRelanceEbay, lignesOffres } from '../ebay/SeriesEbay.jsx';   // (23 nov.) eBay en série, sur SON clic
 // ⟦← App.jsx #6⟧
 import { GroupeIos, RangeeIos } from "../composants/Ios.jsx";
 // (11 nov., lot ebay-complet) Tous les réglages de publication, les questions, les fenêtres guidées.
@@ -2206,7 +2206,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
 //                 connus de VRM ; titreDeNum : N° → titre ; pris : N° → annonce
 //                 eBay qui le porte déjà (une paire, une annonce).
 function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [], numsConnus = null, titreDeNum = null, pris = null, onSku, onOffre, compteNom = '',
-  regle = null, bloquee = null, achat, onRegle, enLot = false, prixAffiche, nomCompteConfirm = '',onRelire }) {
+  regle = null, bloquee = null, achat, onRegle, enLot = false, prixAffiche, nomCompteConfirm = '',onRelire, offreEnCours = null }) {
   const E = EBAY_SKIN;
   // (14 nov., proposition 62) Toucher l'annonce (ou « … ») ouvre LA fiche de la paire (son N° lu dans SON SKU,
   // par identité) ; la fiche de l'annonce eBay (modifier, règle d'offre, supprimer…) y est rendue en haut.
@@ -2283,13 +2283,15 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     if (!ok) return;
     setGeste('offre');
     try {
-      const corps = { action: 'offre', listingId: String(it.itemId), remise: remiseN, confirme: true, ...corpsCompteEbay(it._compte) };
+      // (23 nov.) Le prix VU part avec l'offre : la route relit celui d'eBay et refuse s'il a changé (§2.8).
+      const corps = { action: 'offre', listingId: String(it.itemId), remise: remiseN, confirme: true, prixVu: prixBase > 0 ? prixBase.toFixed(2) : '', ...corpsCompteEbay(it._compte) };
       if (mot.trim()) corps.message = mot.trim();
       const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify(corps) });
       const j = await r.json().catch(() => ({}));
       if (j && j.ok) {
         const n = Number(j.envoyees) || 0;
-        dire(n ? `✓ Offre à −${remiseN}\u00a0% envoyée à ${n} personne${n > 1 ? 's' : ''}, valable 48 h.` : `✓ Offre à −${remiseN}\u00a0% envoyée par eBay, valable 48 h.`);
+        const aPrix = Number.isFinite(Number(j.prixOffre)) && Number(j.prixOffre) > 0 ? ` à ${eurE(Number(j.prixOffre))}` : '';
+        dire(n ? `✓ Offre${aPrix} (−${remiseN}\u00a0%) envoyée à ${n} personne${n > 1 ? 's' : ''}, valable 48 h.` : `✓ Offre${aPrix} (−${remiseN}\u00a0%) envoyée par eBay, valable 48 h.`);
         setOffreOuverte(false); if (onOffre) onOffre(it.itemId);
       } else dire((j && j.error) || 'eBay a refusé l\'offre.');
     } catch (_) { dire('Envoi impossible (réseau) — regarde sur eBay avant de recommencer.'); }
@@ -2646,7 +2648,8 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           {!edit ? (
             <div className="vrm-eb-fiche-gestes">
               <Bouton variante="secondaire" taille="petit" icone="pencil" data-ebay-revise-ouvrir={it.itemId} disabled={supprimee} onClick={() => { setEdit(true);setMsg('');setPrice(null);setQty(String(it.qty ?? ''));setTitreEdite(it.title || '');setDescEditee(descSimple); }}>Modifier l’annonce</Bouton>
-              {eligible === true && <Bouton variante="secondaire" taille="petit" data-offre-ouvrir={it.itemId} onClick={() => { setOffreOuverte((o) => !o); setRelierOuvert(false); setRegleOuverte(false); dire(''); }} aria-label={obs ? `Faire une offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Faire une offre aux observateurs'}>{obs ? `Offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Offre aux observateurs'}</Bouton>}
+              {eligible === true && offreEnCours && <span data-offre-en-cours={it.itemId} style={{ fontSize: 13, color: E.muted, alignSelf: 'center' }}>{tr('ebaySeries.offres.enCours', { date: dateTr(offreEnCours.jusqua, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) })}</span>}
+              {eligible === true && !offreEnCours && <Bouton variante="secondaire" taille="petit" data-offre-ouvrir={it.itemId} onClick={() => { setOffreOuverte((o) => !o); setRelierOuvert(false); setRegleOuverte(false); dire(''); }} aria-label={obs ? `Faire une offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Faire une offre aux observateurs'}>{obs ? `Offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Offre aux observateurs'}</Bouton>}
               {/* Le lien se change ici (la confirmation dit « tu pourras la
                   changer ») ; il ne s'affiche en façade que quand il MANQUE. */}
               {numero && <Bouton variante="discret" taille="petit" icone="link" data-relier-changer={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }}>Changer l’article relié</Bouton>}
@@ -2666,7 +2669,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
               <button className="vrm-b vrm-b-discret" type="button" onClick={() => { setEdit(false); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.muted, borderRadius: 12, padding: '10px 12px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
             </div>
           )}
-          {offreOuverte && eligible === true && (
+          {offreOuverte && eligible === true && !offreEnCours && (
         <div data-offre-panneau={it.itemId} style={{ margin: '10px 0 0', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
           <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>Envoyée à ceux qui suivent l'annonce, 48 h. Acceptée = vendu.</div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -3479,6 +3482,7 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
   const [lu, setLu] = React.useState(undefined);
   const [voirTout, setVoirTout] = React.useState(false);
   const [ficheIna, setFicheIna] = React.useState(null);   // (6 nov.) la fiche d'une inactive (feuille)
+  const [serieRelance, setSerieRelance] = React.useState(false);   // (23 nov.) « Remettre en vente » en série
   React.useEffect(() => {
     if (comptesEbay === undefined) return undefined;
     if (comptesEbay === null) { setLu(null); return undefined; }
@@ -3537,7 +3541,10 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
   const vues = voirTout ? lignes : lignes.slice(0, INACTIVES_PAGE);
   let attenteVerif = 0;
   const lienS = { flexShrink: 0, marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 2px', fontSize: 13, fontWeight: 700, color: E.accentSoft, textDecoration: 'none', whiteSpace: 'nowrap' };
-  const rendues = vues.map((l) => {
+  // (23 nov.) Les inactives proposables (la MÊME règle que le bouton de chaque ligne, `relanceProposable`), sur TOUTE
+  // la liste (pas seulement la page affichée) : la feuille « Remettre en vente » en série.
+  const proposables = new Map();
+  const rendre = (l) => {
     const t = Date.parse(l.fin || '');
     const finJour = Number.isFinite(t) ? partsParis(t).date : '';
     const pub = Date.parse(l.depuis || '');
@@ -3566,6 +3573,7 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
     const relancer = relanceProposable({ n, ancienne: l._ancienne, vendue, retraitAuto, verifManque, sortie, memeEnLigne, relancee, deja, prix: l.price }).propose;
     const url = URL_ITEM_EBAY(l.itemId);
     const prix = Number(String(l.price || '').replace(',', '.'));
+    if (relancer && url) proposables.set((l._compte || '') + ':' + l.itemId, { cle: (l._compte || '') + ':' + l.itemId, itemId: String(l.itemId), compte: l._compte || '', titre: String(l.title || l.itemId), numero: n, prixVu: String(l.price), devise: l.currency || 'EUR' });
     const etatLigne = vendue ? `vendue sur ${vendue} — ne la remets pas en vente`
       : retraitAuto ? `retirée par VRM${Number.isFinite(Number(retraitAuto.at)) ? ' le ' + new Date(Number(retraitAuto.at)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''} : vendue sur ${retraitAuto.ou || 'Vinted'} — ne la remets pas en vente`
       : memeEnLigne ? 'aussi dans tes annonces en ligne — état à relire chez eBay'
@@ -3617,7 +3625,11 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
         {infos[l.itemId] && infos[l.itemId].texte ? <div role="status" data-inactive-resultat={infos[l.itemId].ton} style={{ flexBasis: '100%', fontSize: 12, color: infos[l.itemId].ton === 'ko' ? E.warn : infos[l.itemId].ton === 'ok' ? E.text : E.muted, paddingLeft: 54, lineHeight: 1.45 }}>{infos[l.itemId].texte}</div> : null}
       </div>
     );
-  });
+  };
+  for (const l of lignes) rendre(l);
+  attenteVerif = 0;   // compté sur la page affichée seulement (comme avant)
+  const rendues = vues.map(rendre);
+  const aRelancer = [...proposables.values()].filter((x) => !(infos[x.itemId] && infos[x.itemId].ton === 'ok'));
   // Pas d'eBay relié (ou pas encore su) et rien de rangé : on ne promet pas une
   // relecture qui n'aura pas lieu. (Après les crochets : un retour anticipé
   // avant eux changerait leur nombre d'un rendu à l'autre.)
@@ -3659,7 +3671,14 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
       {etat === 'lu' && !anciennes.length && <div data-inactives-fenetre="1" style={petit}>Terminées sans vente ces {INACTIVES_JOURS} derniers jours.</div>}
       {jamais.length > 0 && lues.length > 0 && <div data-inactives-note="partielle" style={petit}>{sousEtatJamais === 'non-rendue' ? 'Pas encore rendue par eBay' : 'Pas encore lue'} pour {nomsDe(jamais)}{sousEtatJamais === 'non-rendue' ? '' : ' — elle se lit avec la relecture eBay'}.</div>}
       {attenteVerif > 0 && !verifDiteAilleurs && <div data-inactives-verif-texte="1" style={{ fontSize: 12, color: E.warn, lineHeight: 1.5, marginBottom: 4 }}>Pas encore vérifié si {attenteVerif > 1 ? `${attenteVerif} de ces articles sont vendus` : 'un de ces articles est vendu'} ailleurs{nonDits.length ? ` (${nonDits.join(', ')})` : ''} : « Remettre en vente » revient ensuite.</div>}
+      {aRelancer.length >= 2 && (
+        <div data-ebay-serie-ouvrir="relance" style={{ margin: '4px 0 8px' }}>
+          <Bouton variante="secondaire" disabled={!!geste} onClick={() => setSerieRelance(true)} style={{ minHeight: 44 }}>{tr('ebaySeries.relance.ouvrir', { n: aRelancer.length })}</Bouton>
+        </div>
+      )}
       <div className="vrm-eb-ina-liste">{rendues}</div>
+      {serieRelance && <FeuilleRelanceEbay lignes={aRelancer} onFermer={() => setSerieRelance(false)} appel={appelEbay} corpsCompte={corpsCompteEbay} confirmer={askConfirm}
+        surFini={() => { if (onRelance) onRelance(); }}/>}
       {ficheIna && (
         <SheetShell onClose={() => setFicheIna(null)} titre={ficheIna.l.title || ficheIna.l.itemId} sousTitre={ficheIna.n ? `N°${ficheIna.n}` : 'pas reliée à un article'} data-inactive-fiche={ficheIna.l.itemId}>
           <div className="vrm-feuille-info">
@@ -4228,8 +4247,12 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     }));
     const lus = reps.filter((j) => j && j.ok && Array.isArray(j.eligibles));
     if (!lus.length) { setEligibles(null); return; }
-    setEligibles({ ids: new Set(lus.flatMap((j) => j.eligibles.map(String))), complet: lus.length === reps.length && lus.every((j) => j.complet !== false) });
+    // (23 nov.) Les offres en cours (journal de VRM, 48 h) : ce qui est lu ; `null` quand aucun compte ne l'a dit.
+    const jours = lus.filter((j) => j.enCours && typeof j.enCours === 'object');
+    setEligibles({ ids: new Set(lus.flatMap((j) => j.eligibles.map(String))), complet: lus.length === reps.length && lus.every((j) => j.complet !== false),
+      enCours: jours.length ? Object.assign({}, ...jours.map((j) => j.enCours)) : null });
   }, [comptesRelies]);
+  const [serieOffres, setSerieOffres] = React.useState(false);   // (23 nov.) la feuille « Offre aux observateurs » en série
   React.useEffect(() => { if (connected === true) chargerEligibles(); }, [connected, chargerEligibles]);
   // Jamais lue : on demande à eBay, une fois, compte relié.
   const programmeesDemandees = React.useRef(false);
@@ -4352,7 +4375,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     autres: Object.values(brouillons && typeof brouillons === 'object' ? brouillons : {}).map((d) => d && { numero: d.numero, id: d.pairId }),
     enLigne,
     vendusVinted, commandes, ventesLbc, itemsLbc: lbcItems,
-    liensLbc: liensLbcLus(), ventesVc: ventesVcDv,
+    liensLbc: load('vrm_lbc_liens', {}) || {}, ventesVc: ventesVcDv,
   }), [fiches, brouillons, enLigne, vendusVinted, commandes, ventesLbc, lbcItems, ventesVcDv]);
   // Une vente Leboncoin qui ne se relie pas sans son annonce : on lit les
   // annonces (une fois par session, comme le tableau de bord) — `null` = pas su.
@@ -5227,7 +5250,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
               eligible={elig ? (elig.has(String(it.itemId)) ? true : (eligibles.complet ? false : undefined)) : undefined}
               paires={paires} numsConnus={numsConnus} titreDeNum={titreDeNum} pris={pris}
               onSku={(id, sku) => { surSku(id, sku); resync(); }}
-              onOffre={() => chargerEligibles()}
+              onOffre={() => chargerEligibles()} offreEnCours={eligibles && eligibles.enCours ? (eligibles.enCours[String(it.itemId)] || null) : null}
               regle={etatVue(it)} bloquee={regleBloquee(it)} achat={n && achats.has(n) ? achats.get(n) : undefined}
               onRegle={surRegle} enLot={enLot.has(String(it.itemId))} prixAffiche={prixLocaux.has(cle) ? prixLocaux.get(cle) : undefined}
               nomCompteConfirm={plusieursComptes ? nomRef(it._compte || 'principal') : ''} onRelire={()=>relireRegles([it],true)}/>
@@ -5247,6 +5270,18 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     {(compteUnique || melangeAnnonces) && <div className="vrm-plat-intro" style={{ color: E.muted, fontSize: 12, margin: '12px 2px 0' }}>{compteUnique ? `Sur ton compte eBay ${compteUnique}.` : `Sur tes ${new Set(itemsVue.map((a) => a._compte)).size} comptes eBay.`}</div>}
     {/* (6 nov., v36-visuel — Julien : « des murs de texte ») UNE ligne chacune ;
         la phrase entière derrière le « ⓘ » (le sens ne change pas, il se lit au toucher). */}
+    {/* (23 nov.) « Fais pareil pour eBay » : l'offre aux observateurs en série — eBay choisit à qui (§3),
+        chaque annonce part par la même route qu'à l'unité (prix vu relu, une offre par annonce en 48 h). */}
+    {nElig > 0 && (
+      <div className="vrm-ebay-serie" data-ebay-serie-ouvrir="offres" style={{ margin: '16px 2px 0' }}>
+        <Bouton variante="secondaire" onClick={() => setSerieOffres(true)} style={{ minHeight: 44 }}>{tr('ebaySeries.offres.ouvrir', { n: nElig })}</Bouton>
+      </div>
+    )}
+    {serieOffres && (
+      <FeuilleOffresEbay onFermer={() => setSerieOffres(false)} appel={appelEbay} corpsCompte={corpsCompteEbay} confirmer={askConfirm} surFini={() => chargerEligibles()}
+        lignes={lignesOffres({ items: itemsVue, eligibles, prixDe: (it) => { const c = cleAnnonce(it); return prixLocaux.has(c) ? prixLocaux.get(c) : it.price; },
+          numeroDe: (it) => numEbayLu(it.sku, it.itemId, null, it.depuis), achatDe: (n) => (achats.has(n) ? achats.get(n) : null) }) || []}/>
+    )}
     {nSans > 0 && (
       <div className="vrm-plat-note vrm-note-ligne" data-ebay-sans-observateur={nSans} style={{ fontSize: 13, color: E.muted, lineHeight: 1.4, margin: '16px 2px 0' }}>
         {nElig ? `Offre aux observateurs : ${nElig} annonce${nElig > 1 ? 's' : ''} sur ${nElig + nSans}` : 'Offre aux observateurs : personne pour l’instant'}{' '}

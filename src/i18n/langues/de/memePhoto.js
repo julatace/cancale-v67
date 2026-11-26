@@ -38,8 +38,6 @@ export default {
   "memePhoto.nAVerifier": {"one": "{n} zu prüfen", "other": "{n} zu prüfen"},
   "memePhoto.extensionSure": "Erweiterung {v} bestätigt „sicher“: aktualisiere sie. Bis dahin ist alles „zu prüfen“.",
   "memePhoto.aideSure": "„Sicher“: zwei verschiedene Messungen sagen, dass es dasselbe Foto ist. „Zu prüfen“: sieh dir beide Fotos an. Nichts wird ohne deinen Tipp verknüpft.",
-  "memePhoto.aussiSurOrigine": "Auch auf {sites} · am Originalfoto erkannt",
-  "memePhoto.limiteOrigine": "Originalfoto: dieselbe Datei, aus deinem Computer mit der Erweiterung hochgeladen. Aus einer Handy-App veröffentlicht, sieht VRM sie nicht.",
   "ug.titre": "Mit einem Tipp verbessern",
   "ug.sous": "Gleiche Einstellungen, Original bleibt.",
   "ug.r.lumiere": "Licht",

@@ -103,7 +103,7 @@
       om.innerHTML = '<style>:host{all:initial}.b{position:relative;z-index:2;pointer-events:auto;margin:12px auto 0;max-width:560px;width:calc(100% - 24px);box-sizing:border-box;background:#16181d;color:#f4f4f5;border-radius:16px;padding:14px 16px;border:1px solid rgb(255 255 255/.14);box-shadow:0 14px 40px rgb(0 0 0/.35);font:14px/1.4 -apple-system,system-ui,sans-serif}'
         + '.b b{display:block;font-weight:650;font-size:15px;margin-bottom:4px}.b small{display:block;color:#b8bcc4;font-size:12.5px}.g{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}'
         + 'button{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;padding:0 16px;border-radius:12px;background:#2a2d34;color:#fff;font:600 14px/1 -apple-system,system-ui,sans-serif;cursor:pointer}button.p{background:#fff;color:#111}button:focus-visible{outline:2px solid #fff;outline-offset:2px}'
-        + '.cadre{position:fixed;pointer-events:none;border:3px solid #3D4B5B;border-radius:10px;box-shadow:0 0 0 9999px rgb(12 16 22/.35)}</style>'
+        + '.cadre{position:fixed;pointer-events:none;border:3px solid #d97706;border-radius:10px;box-shadow:0 0 0 9999px rgb(12 16 22/.35)}</style>'
         + '<div class="b" role="dialog" aria-live="polite" data-appris-bandeau><b data-t></b><small data-n></small><div class="g" data-g></div></div><div class="cadre" data-cadre hidden></div>';
       (document.documentElement || document.body).appendChild(hote);
       const $ = (s) => om.querySelector(s);

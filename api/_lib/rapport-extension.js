@@ -76,9 +76,6 @@ export function normaliserRapportExt(c, maintenant = Date.now()) {
     // `observation_vinted_*`), combien d'entrées, de quand à quand — jamais la frise elle-même.
     ...(c.observation && typeof c.observation === 'object' && !Array.isArray(c.observation)
       ? { observation: { n: entier(c.observation.n, 2000), debut: heure(c.observation.debut, maintenant + 660000), fin: heure(c.observation.fin, maintenant + 660000) } } : {}),
-    // (24 nov., ext. 5.448 `rapportreperage`) le journal de repérage et les derniers arrêts : étiquettes et nombres seulement.
-    reperage: (Array.isArray(c.reperage) ? c.reperage : []).slice(-40).map((x) => ({ site: etiquette(x && x.site), nom: etiquette(x && x.nom), etape: etiquette(x && x.etape), at: heure(x && x.at, maintenant), ambigu: !!(x && x.ambigu === true), essais: (Array.isArray(x && x.essais) ? x.essais : []).slice(0, 8).map((q) => ({ s: etiquette(q && q.s), n: entier(q && q.n, 999) })) })),
-    arrets: (Array.isArray(c.arrets) ? c.arrets : []).slice(-20).map((x) => ({ site: etiquette(x && x.site), geste: etiquette(x && x.geste), code: etiquette(x && x.code), at: heure(x && x.at, maintenant) })),
   };
 }
 

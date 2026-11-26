@@ -218,7 +218,7 @@ const lireS = (pg) => pg.evaluate(() => {
         a = await lireS(t.pg);
         await t.pg.screenshot({ path: path.join(SORTIE, `${site}-annonces-${largeur}-${scheme}.png`) });
         dit(a.on && a.grand && (mobile ? a.w >= largeur - 1 : a.w >= largeur * 0.7) && !a.debord, `${T} : le grand panneau s’ouvre aussi ici`, JSON.stringify(a));
-        dit(a.onglets.join(',') === 'accueil,annonces,ventes,messages,achats,favoris,notifications,automatisations,file,sante,parametres' && a.vx === 'annonces' && a.grpSite.includes(site === 'leboncoin' ? 'Leboncoin' : 'Vestiaire'), `${T} : la même barre latérale « comme Vintex », le site nommé`, JSON.stringify({ o: a.onglets, g: a.grpSite }));
+        dit(a.onglets.join(',') === 'accueil,annonces,ventes,messages,favoris,notifications,automatisations,parametres' && a.vx === 'annonces' && a.grpSite.includes(site === 'leboncoin' ? 'Leboncoin' : 'Vestiaire'), `${T} : la même barre latérale « comme Vintex », le site nommé`, JSON.stringify({ o: a.onglets, g: a.grpSite }));
         dit(a.lignes === (site === 'leboncoin' ? 2 : 1) && JSON.stringify(a.options) === JSON.stringify(site === 'leboncoin' ? ['baisser', 'supprimer', 'ouvrir'] : ['baisser', 'ouvrir']), `${T} : toutes les annonces du compte de l’onglet (tous statuts, comme Vintex) ; « Choisir une action » sans Republier ni Offre aux favoris`, JSON.stringify(a));
         if (site === 'leboncoin') {
           // 5.410 : « Supprimer » d'UNE annonce : la confirmation « sans retour » du fond, puis SON « Oui ».

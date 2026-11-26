@@ -18,8 +18,6 @@ require('./_porte-banc.cjs');
 //    B7  pendant TOUT le travail, l'écran plein : un VRAI clic et de VRAIES touches de
 //        l'utilisateur sont retenus (rien n'atteint Vinted), les gestes de VRM passent
 //    B8  les clics de VRM sont des clics fabriqués, rien n'est maquillé (`isTrusted: false`)
-//    B11–B13 (5.447) la couche commune de repérage : le titre trouvé (stratégie rendue au fond), deux brouillons ⇒ rien,
-//        data-testid disparu ⇒ le brouillon par son nom exact ; à 390 et 1512 (captures `reperage-formulaire-*.png`)
 //  `--mutation nom` : une copie de vrm-formulaire.js réaffaiblie ⇒ rouge ; `--prouve` : toutes.
 //  SHOTS=dossier : captures.
 // ════════════════════════════════════════════════════════════════════════════
@@ -33,7 +31,7 @@ let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; if (!process.env.SILENCE) console.log('✅ ' + m); } else { ko++; if (!process.env.SILENCE) console.log('❌ ' + m + (d ? '  → ' + String(d).slice(0, 500) : '')); } };
 
 // ── La fausse page : un seul document qui sait être « nouvelle annonce », « annonce », « brouillon ».
-const PAGE = ({ sansTaille = false } = {}) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vinted (banc)</title>
+const PAGE = ({ sansTaille = false } = {}) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Vinted (banc)</title>
 <style>body{margin:0;font:15px/1.4 system-ui,sans-serif}header{height:56px;display:flex;align-items:center;gap:16px;padding:0 16px;border-bottom:1px solid #ddd}
 main{padding:16px;display:grid;gap:10px;max-width:640px}label{display:grid;gap:4px}.dd{border:1px solid #ccc;padding:8px;display:none}.dd.on{display:block}
 [role=dialog]{position:fixed;inset:30% 20%;background:#fff;border:1px solid #888;padding:16px}</style></head><body>
@@ -103,7 +101,7 @@ main{padding:16px;display:grid;gap:10px;max-width:640px}label{display:grid;gap:4
 </script></body></html>`;
 
 async function ouvrir(b, o = {}) {
-  const ctx = await b.newContext({ viewport: o.vue || { width: 1280, height: 860 }, ...(o.vue && o.vue.width < 600 ? { hasTouch: true, isMobile: true } : {}) });
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 860 } });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(String(e)));
   // Le banc lit l'écran plein : sa racine fermée est ouverte ICI seulement (la vraie reste fermée).
@@ -121,10 +119,7 @@ async function ouvrir(b, o = {}) {
   return { ctx, pg, errs };
 }
 // Le service worker, joué ici : il injecte le VRAI fichier puis appelle UNE étape.
-// 5.447 : comme le service worker, la couche de repérage (vrm-trouver.js) d'abord, puis le formulaire.
-const TROUVER_SRC = arg('--trouver') || path.join(EXT, 'vrm-trouver.js');
 async function etape(pg, e, d) {
-  if (fs.existsSync(TROUVER_SRC)) await pg.addScriptTag({ content: fs.readFileSync(TROUVER_SRC, 'utf8') });
   await pg.addScriptTag({ content: fs.readFileSync(FORM_SRC, 'utf8') });
   const t0 = Date.now();
   const r = await pg.evaluate(([e2, d2]) => globalThis.__vrmFormulaire(e2, d2), [e, d || {}]);
@@ -193,27 +188,6 @@ async function banc() {
       dit(res.every(([, x]) => x.ms < 8000), 'B9 — chaque champ répond vite (< 8 s, saisie sans minuterie : l’onglet peut être en arrière-plan)', JSON.stringify(res.map(([q, x]) => q + ':' + x.ms)));
       dit(!errs.length, 'B10 — aucune erreur de page', errs.slice(0, 2).join(' | '));
       await ctx.close(); }
-    // ── B11–B13 (5.447, `repubreperage`) : la couche commune de repérage dans la paire, à 390 et 1512.
-    for (const vue of [{ width: 390, height: 844 }, { width: 1512, height: 900 }]) {
-      const { ctx, pg, errs } = await ouvrir(b, { vue });
-      await overlay(pg, true);
-      const r0 = await etape(pg, 'ouvrirVente');
-      // Vinted change ses data-testid : « Sauvegarder le brouillon » n'a plus que son nom exact.
-      await pg.evaluate(() => { const x = document.querySelector('[data-testid=upload-form-save-draft-button]'); x.removeAttribute('data-testid'); x.setAttribute('data-banc', 'brouillon'); x.addEventListener('click', () => document.querySelector('[data-banc=brouillon-reel]') && 0); });
-      const rp = await etape(pg, 'champ', { quoi: 'titre', valeur: 'Basket test 42' });
-      if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `reperage-formulaire-${vue.width}.png`) });
-      // Un second « Sauvegarder le brouillon » apparaît : rien ne part.
-      await pg.evaluate(() => { const x = document.querySelector('[data-banc=brouillon]'); const y = x.cloneNode(true); y.removeAttribute('data-banc'); x.after(y); });
-      const rb = await etape(pg, 'brouillon', { cle: 'b2' });
-      const R = await pg.evaluate(() => window.__requetes.map((x) => x.u));
-      dit(r0.ok && rp.ok && Array.isArray(rp.trouves) && rp.trouves.some((t) => t.nom === 'titre' && t.s), `B11 (${vue.width}) — le titre trouvé par la couche commune, la stratégie gagnante rendue au fond (mémoire / journal)`, JSON.stringify(rp.trouves || rp));
-      dit(rb.ok === false && rb.manque === 'brouillon-ambigu' && !R.some((u) => /drafts$/.test(u)), `B12 (${vue.width}) — deux « Sauvegarder le brouillon » ⇒ aucun brouillon ne part, « brouillon-ambigu » (l’étape le dit)`, JSON.stringify({ rb, R }));
-      await pg.evaluate(() => { const l = document.querySelectorAll('button'); [...l].filter((x) => x.textContent === 'Sauvegarder le brouillon').slice(1).forEach((x) => x.remove()); });
-      const rb2 = await etape(pg, 'brouillon', { cle: 'b3' });
-      dit(rb2.ok === true && (rb2.trouves || []).some((t) => t.nom === 'brouillon' && t.s === 'nom'), `B13 (${vue.width}) — data-testid disparu : le brouillon part par son NOM exact, seul`, JSON.stringify(rb2.trouves || rb2));
-      dit(!errs.length, `B13b (${vue.width}) — aucune erreur de page`, errs.slice(0, 2).join(' | '));
-      await ctx.close();
-    }
     // ── B4 : captcha
     { const { ctx, pg } = await ouvrir(b);
       await etape(pg, 'ouvrirVente');
