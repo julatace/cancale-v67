@@ -1788,6 +1788,8 @@
     ob_en_cours: { fr: 'En cours · encore {min} min · {n} étapes notées', en: 'Running · {min} min left · {n} steps noted', es: 'En curso · quedan {min} min · {n} pasos anotados', it: 'In corso · ancora {min} min · {n} passi annotati', de: 'Läuft · noch {min} Min. · {n} Schritte notiert' },
     ob_fini: { fr: 'Arrêté · {n} étapes notées', en: 'Stopped · {n} steps noted', es: 'Detenido · {n} pasos anotados', it: 'Fermato · {n} passi annotati', de: 'Gestoppt · {n} Schritte notiert' },
     ob_envoyer: { fr: 'Envoyer l’observation', en: 'Send the observation', es: 'Enviar la observación', it: 'Invia l’osservazione', de: 'Beobachtung senden' },
+    ob_fichier: { fr: 'Enregistrer dans un fichier', en: 'Save to a file', es: 'Guardar en un archivo', it: 'Salva in un file', de: 'In Datei speichern' },
+    ob_fichier_ok: { fr: 'Fichier enregistré ({n} gestes).', en: 'File saved ({n} steps).', es: 'Archivo guardado ({n} pasos).', it: 'File salvato ({n} passi).', de: 'Datei gespeichert ({n} Schritte).' },
     ob_envoye: { fr: 'Observation envoyée ✓ ({n} étapes)', en: 'Observation sent ✓ ({n} steps)', es: 'Observación enviada ✓ ({n} pasos)', it: 'Osservazione inviata ✓ ({n} passi)', de: 'Beobachtung gesendet ✓ ({n} Schritte)' },
     ob_ko: { fr: 'Pas fait. Réessaie.', en: 'Not done. Try again.', es: 'No se hizo. Inténtalo de nuevo.', it: 'Non fatto. Riprova.', de: 'Nicht erledigt. Versuch es noch einmal.' },
     sr_titre: { fr: 'Sauvegarde de mes réglages', en: 'Backup of my settings', es: 'Copia de mis ajustes', it: 'Backup delle mie impostazioni', de: 'Sicherung meiner Einstellungen' },

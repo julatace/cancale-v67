@@ -5345,7 +5345,7 @@ function vrmVerifVisible(sel) {
     const sous = actif ? TU('ob_en_cours', { min: reste, n: o.n || 0 }) : o && o.n ? TU('ob_fini', { n: o.n }) : TU('ob_eteint');
     return `<section class="grp5" data-observation="${actif ? 'on' : 'off'}" data-observation-n="${Number(o && o.n) || 0}"><h3>${esc(TU('ob_titre'))}</h3><p class="note5">${esc(TU('ob_note'))}</p>
       <label class="rg6"><span><b>${esc(TU('ob_switch'))}</b><small data-obs-sous>${esc(sous)}</small></span><span class="v6"><input type="checkbox" data-obs-switch${actif ? ' checked' : ''}${obsEnVol ? ' disabled' : ''} aria-label="${esc(TU('ob_switch'))}"></span></label>
-      ${o && o.n ? `<div class="outils"><button type="button" class="vu-btn" data-obs-envoyer${obsEnVol ? ' disabled' : ''}>${esc(TU('ob_envoyer'))}</button></div>` : ''}
+      ${o && o.n ? `<div class="outils"><button type="button" class="vu-btn" data-obs-envoyer${obsEnVol ? ' disabled' : ''}>${esc(TU('ob_envoyer'))}</button><button type="button" class="vu-btn" data-obs-fichier${obsEnVol ? ' disabled' : ''}>${esc(TU('ob_fichier'))}</button></div>` : ''}
       ${obsTexte ? `<p class="note5" role="status" data-obs-etat>${esc(obsTexte)}</p>` : ''}
     </section>`;
   }
@@ -5364,6 +5364,17 @@ function vrmVerifVisible(sel) {
     if (sw) sw.addEventListener('change', () => envoyerObs(sw.checked ? 'demarrer' : 'arreter', () => {}));
     const env = R.querySelector('[data-obs-envoyer]');
     if (env) env.addEventListener('click', () => envoyerObs('envoyer', (r) => { obsTexte = TU('ob_envoye', { n: r.n || 0 }); }));
+    // (26 nov., 5.453.3) Le fichier de l'observation, téléchargé sur SON ordinateur (formes seulement, voir `<observation-regle>`).
+    const fic = R.querySelector('[data-obs-fichier]');
+    if (fic) fic.addEventListener('click', () => envoyerObs('fichier', (r) => {
+      try {
+        const blob = new Blob([JSON.stringify(r.fichier, null, 1)], { type: 'application/json' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = `observation-vinted-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`;
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        obsTexte = TU('ob_fichier_ok', { n: r.n || 0 });
+      } catch (_) { obsTexte = TU('ob_ko'); }
+    }));
   }
   function cadenceHtml() {
     const c0 = listes && listes.automatisations && listes.automatisations.cadence;
