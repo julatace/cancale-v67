@@ -27,6 +27,18 @@
 //      nouvelle (deux paires présentes sous un N°) ; partie, il passe ;
 //   F. aucun débordement, cibles de 44 px, aucune erreur ; captures dans SHOTS.
 // §6.1 : sur le code d'avant, `[data-vue-selection]` n'existe pas ⇒ rouge.
+// ⚠️ (26 nov., bancs natifs) RÉÉCRIT SUR ANNONCES NATIF (src/natif/ecrans/Annonces.jsx, src/ecrans/AnnoncesEgalite.jsx). Le
+// parcours d'aujourd'hui : CHOISIR l'action (« ⋯ » → l'action ; à l'ordinateur, les actions directes du tableau) puis cocher —
+// seules les annonces que l'action accepte se cochent (`pour`), le bouton « Lancer » s'éteint et dit sa raison (`juger`).
+// Mêmes garanties : S (états, par compte, brouillons sous « À publier ») ; A (deux comptes ⇒ rien au nom d'un compte ; une
+// masquée ne se republie pas ; « brouillon → en ligne » pour les brouillons seuls ; « à la main » sur deux comptes) ; R : depuis
+// le 24 nov. (« tout faire depuis VRM si l'extension est connectée », CLAUDE.md §3) « Republier » part par la porte de l'app
+// (src/agir/porte.js `republierDansApp`) APRÈS SA confirmation — plus par l'étape « modif » de l'atelier : exigé ici que rien
+// ne parte avant ni sur « Annuler » ; M (la feuille « à la main », la même) ; K/M (le N° attend que l'ancienne soit partie).
+// Retirés AVEC la feuille « Actions possibles » d'avant (plus montée par l'écran natif, 19 nov.) : V (ce qui manque paire par
+// paire, `data-act-paire`) et K-couleur (« pas lu » vs « absente ») — leur règle reste jugée par scripts/audit-annonces-actions.cjs ;
+// « en vérification par Vinted » non cochable : l'écran natif ne le sait pas (voir le rapport du 26 nov.).
+require('./_porte-banc.cjs');   // (26 nov.) la garde réseau du banc : rien ne sort
 require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs'), http = require('http'), os = require('os');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
@@ -151,15 +163,31 @@ async function contexte(b, vp, sombre, etat) {
 // attendait 30 s un bouton parti (« le parcours s'arrête »). Le repli ne joue que si le bouton est
 // encore là ; c'est `[data-main-lie]` qui juge ensuite que SON clic a relié.
 const nouvelleOuverture = (pg) => pg.evaluate(() => { try { sessionStorage.removeItem('vrm_acct_cache'); window.addEventListener('pagehide', () => { try { sessionStorage.removeItem('vrm_acct_cache'); } catch (_) {} }); } catch (_) {} });
-const clic = async (pg, sel) => { const l = pg.locator(sel).first(); await l.scrollIntoViewIfNeeded().catch(() => {}); await l.click({ timeout: 4000 }).catch(async () => { await pg.$eval(sel, (x) => x.click()); }); };
-const fermerFeuille = async (pg, dans) => { const x = pg.locator(`${dans} button[aria-label="Fermer"]`).first(); if (await x.count()) await x.click(); else await pg.keyboard.press('Escape'); await pg.waitForTimeout(250); };
-const vueSelection = async (pg) => {
-  await clic(pg, '[data-vue-selection]');
-  await pg.waitForSelector('[data-selection-vue]', { timeout: 6000 });
-  for (let i = 0; i < 40; i++) { if (await pg.$('[data-selection-annonce="9201"]') && await pg.$('[data-selection-annonce="9302"]')) break; await pg.waitForTimeout(250); }
-};
-const cocher = async (pg, id) => clic(pg, `[data-selection-annonce="${id}"] input`);
+// (26 nov., bancs natifs) Un toucher (téléphone) ou un clic (ordinateur) sur l'élément VU — un écran d'avant reste monté caché
+// sous l'écran natif, avec les mêmes repères (`:visible`).
+const geste = async (pg, tel, sel) => { const l = pg.locator(sel + ':visible').first(); if (!(await l.count())) return false; await l.scrollIntoViewIfNeeded().catch(() => {}); await (tel ? l.tap({ timeout: 5000 }) : l.click({ timeout: 5000 })).catch(() => {}); await pg.waitForTimeout(700); return true; };
 const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+// Les articles montrés : téléphone = la liste groupée par compte (`[data-eg-groupe]`), ordinateur = le tableau de travail.
+const articles = (pg) => pg.evaluate(() => { const vus = new Set(); return [...document.querySelectorAll('[data-eg-article]')].filter((x) => x.getClientRects().length && !vus.has(x.getAttribute('data-eg-article')) && vus.add(x.getAttribute('data-eg-article'))).map((x) => {
+  const g = x.closest('[data-eg-groupe]');
+  return { id: x.getAttribute('data-eg-article').replace(/^vinted#/, ''), compte: x.getAttribute('data-eg-compte') || '', groupe: g ? g.getAttribute('data-eg-groupe') : '',
+    etat: x.getAttribute('data-ad-etat') || x.getAttribute('data-tt-statut-ligne') || '', coche: x.getAttribute('data-eg-coche') || x.getAttribute('data-tt-coche') || '0', grise: x.getAttribute('data-ad-grise') === '1', numero: x.getAttribute('data-eg-numero') || '' };
+}); });
+// Le segment montré (`[data-eg-ecran][data-eg-etat]`) : un toucher pendant le calcul de l'écran peut se perdre — attendu, un 2ᵉ au plus (§6.5).
+const segment = async (pg, tel, e) => { for (let k = 0; k < 2; k++) { await geste(pg, tel, `[data-eg-segment="${e}"]`);
+  if (await pg.waitForFunction((e) => !!document.querySelector(`[data-eg-ecran][data-eg-etat="${e}"]`), e, { timeout: 3000 }).then(() => true).catch(() => false)) break; } await pg.waitForTimeout(600); };
+// Le mode « sélection » d'une action (téléphone) : « ⋯ » puis l'action ; ses cases se cochent au toucher de la rangée.
+const modeAction = async (pg, k) => {
+  await pg.locator('[data-eg-actions]:visible').first().waitFor({ timeout: 15000 }).catch(() => {});
+  await geste(pg, true, '[data-eg-actions]'); await geste(pg, true, `[data-eg-action="${k}"]`);
+  return pg.waitForFunction((k) => !!document.querySelector(`[data-eg-ecran][data-eg-selection="${k}"]`), k, { timeout: 5000 }).then(() => true).catch(() => false); };
+const cocher = async (pg, tel, id) => (tel ? geste(pg, true, `[data-eg-article="vinted#${id}"]`) : pg.evaluate((id) => { const l = [...document.querySelectorAll('[data-tt-ligne]')].find((x) => x.getAttribute('data-eg-article') === 'vinted#' + id && x.getClientRects().length); const c = l && l.querySelector('[data-tt-coche], input[type="checkbox"]'); if (c) c.click(); return !!c; }, id));
+const lancer = (pg, tel, k) => pg.evaluate(([tel, k]) => { const b = [...document.querySelectorAll(tel ? `[data-eg-lancer="${k}"]` : `[data-tt-action-directe="${k}"]`)].find((x) => x.getClientRects().length);
+  // La raison d'un bouton éteint : le texte posé À CÔTÉ de lui (src/natif/Bouton.jsx `raison`), pas son libellé.
+  const t = (x) => ((x && x.innerText) || '').replace(/\s+/g, ' ').trim();
+  return b ? { off: b.getAttribute('aria-disabled') === 'true', n: b.getAttribute('data-eg-n') || b.getAttribute('data-tt-lancer-n'), raison: t(b.parentElement).replace(t(b), '').trim() } : null; }, [tel, k]);
+// Les écritures parties vers la base (une commande pour l'extension, `cmd_*`) : rien ne part sans SA confirmation.
+const ecrituresDe = (u) => u.filter((x) => /republier|recreer|cmd_|file_/i.test(x)).length;
 
 (async () => {
   let b;
@@ -167,165 +195,136 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
     b = await chromium.launch({ executablePath: CHROMIUM, args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       for (const sombre of [false, true]) {
-        const T = `${vp.width}${sombre ? ' sombre' : ' clair'}`;
+        const T = `${vp.width}${sombre ? ' sombre' : ' clair'}`, tel = vp.width < 600;
         const nomF = (x) => path.join(SHOTS, `annonces-actions-${vp.width}-${sombre ? 'sombre' : 'clair'}-${x}.png`);
         console.log(`── ${T}`);
         const etat = { sans9102: false, sans9110: false };
         const { ctx, pg, errs } = await contexte(b, vp, sombre, etat);
+        const ecrits = []; pg.on('request', (r) => { if (r.method() !== 'GET' && /\/rest\/v1\//.test(r.url())) ecrits.push(r.url() + ' ' + (r.postData() || '').slice(0, 300)); });
         try {
           await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
-          const puce = pg.locator('[data-vue-selection]').first();
-          await puce.waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
-          dit(await puce.count() > 0, `S ${T} Annonces : une vue « Sélectionner »`);
-          if (!(await puce.count())) { await pg.screenshot({ path: nomF('absent') }); continue; }
-          dit((await pg.evaluate(() => document.documentElement.getAttribute('data-theme'))) === (sombre ? 'dark' : 'light') || !sombre, `F ${T} thème ${sombre ? 'sombre' : 'clair'} posé`, await pg.evaluate(() => document.documentElement.getAttribute('data-theme')));
-          dit(await pg.locator('[data-vue-brouillons]').count() > 0, `S ${T} une vue « Brouillons » (ses brouillons Vinted lus)`);
-          await vueSelection(pg);
-          const groupes = await pg.$$eval('[data-selection-compte]', (l) => l.map((g) => ({ uid: g.getAttribute('data-selection-compte'), items: [...g.querySelectorAll('[data-selection-annonce]')].map((x) => ({ id: x.getAttribute('data-selection-annonce'), etat: x.getAttribute('data-selection-etat'), off: !!x.querySelector('input:disabled'), raison: (x.querySelector('[data-selection-raison]') || {}).textContent || '' })) })));
-          const g = Object.fromEntries(groupes.map((x) => [x.uid, Object.fromEntries(x.items.map((i) => [i.id, i]))]));
-          const g1 = g['111'] || {}, g2 = g['222'] || {};
-          dit(g1['9102'] && g1['9102'].etat === 'en-ligne' && g1['9110'] && g1['9110'].etat === 'masquee' && g1['9201'] && g1['9201'].etat === 'brouillon', `S ${T} compte_test : en ligne, masquée, brouillon, chacun avec son état`, JSON.stringify(Object.values(g1).map((i) => i.id + ':' + i.etat)));
-          dit(g2['9302'] && g2['9302'].etat === 'brouillon' && !g1['9302'] && !g2['9201'] && !g2['9102'], `S ${T} le brouillon du second compte est sous SON compte, jamais sous l’autre`, JSON.stringify(Object.keys(g2)));
-          dit(g1['9104'] && g1['9104'].etat === 'verification' && g1['9104'].off && /Vinted/.test(g1['9104'].raison), `S ${T} « en vérification par Vinted » : visible, pas cochable, la raison dite`, g1['9104'] ? g1['9104'].raison : 'absente');
-          dit(!g1['9110'].off && !g1['9201'].off, `S ${T} masquées et brouillons se cochent`);
-          await pg.screenshot({ path: nomF('liste') });
-          // A — deux comptes mélangés
-          await cocher(pg, '9102'); await cocher(pg, '9301');
-          const nb = await pg.getAttribute('[data-actions-possibles]', 'data-actions-possibles').catch(() => null);
-          dit(nb === '2', `A ${T} un seul bouton « Actions · 2 » (la pastille « Actions possibles » de l’en-tête parle de l’extension)`, nb);
-          await clic(pg, '[data-actions-possibles]');
-          await pg.waitForSelector('[data-actions-selection]', { timeout: 4000 });
-          const mix = await pg.$$eval('[data-action-sel]', (l) => l.map((x) => [x.getAttribute('data-action-sel'), x.getAttribute('data-action-sel-ok'), x.textContent]));
-          // (5 nov., chantier C — revue 2.5) La raison commune se dit UNE fois, en tête de la
-          //  feuille (`[data-actions-raison]`), plus sous chaque action : le contrôle lit la tête.
-          const teteMix = await pg.$eval('[data-actions-raison]', (x) => x.textContent).catch(() => '');
-          // (6 nov., vague 2) « Prix mini… » n'agit au nom d'aucun compte (une écriture dans ses fiches) :
-          //  il reste possible ; tout ce qui agit au nom d'un compte reste grisé.
-          // (6 nov.) « à la main » non plus (rien ne part d'ici ; une paire à la fois, chacune dit son compte).
-          // (11 nov., rouges A) « Baisser le prix… » (lot C, 10 nov.) est `parPaire` comme « à la main » :
-          //  comptes mélangés permis, chaque annonce d'un autre compte que l'onglet ne part JAMAIS
-          //  (scripts/audit-annonces-actions.cjs B23–B26 le juge). Les QUATRE tuiles au nom d'un compte restent grisées ici.
-          // (11 nov., intégration) « Publier partout… » et « Nouveautés de la semaine » non plus : rien ne part
-          //  chez Vinted (multiComptes, non robot — audit-annonces-actions B15/B18).
-          const parCompte = mix.filter(([k]) => k !== 'mini' && k !== 'main' && k !== 'baisser' && k !== 'partout' && k !== 'visuels');
-          dit(parCompte.length === 4 && parCompte.every(([, ok]) => ok === 'non') && /2 comptes/.test(teteMix), `A ${T} deux comptes mélangés ⇒ rien ne se lance au nom d’un compte, la raison dite`, mix.map((x) => x[0] + ':' + x[1]).join(' ') + ' / ' + teteMix);
-          dit(mix.some(([k, ok]) => k === 'mini' && ok === 'oui'), `A ${T} « Prix mini… » reste possible sur deux comptes (rien ne part chez Vinted)`, mix.map((x) => x[0] + ':' + x[1]).join(' '));
-          dit(mix.some(([k, ok]) => k === 'baisser' && ok === 'oui'), `A ${T} « Baisser le prix… » ouvre sa feuille sur deux comptes (une annonce à la fois, autre compte que l’onglet jamais envoyé)`, mix.map((x) => x[0] + ':' + x[1]).join(' '));
-          dit(mix.some(([k, ok]) => k === 'main' && ok === 'oui'), `A ${T} « à la main » reste possible sur deux comptes (une paire à la fois, chacune avec son compte)`, mix.map((x) => x[0] + ':' + x[1]).join(' '));
-          // (6 nov., finitions) La phrase de tête dit JUSTE : ce qui se lance au nom d'un compte, et « Prix mini » possible.
-          dit(/Republier, modifier, brouillon, mise en ligne : un compte à la fois/.test(teteMix) && /Prix mini[^.]*: possible/.test(teteMix) && /à la main[^.]*: possible/.test(teteMix) && !/une action se lance sur un seul compte/.test(teteMix), `A ${T} deux comptes : la tête dit « … : un compte à la fois · Prix mini, Republier à la main : possible »`, teteMix);
-          if (vp.width < 600 && !sombre) await pg.screenshot({ path: nomF('deux-comptes') });
-          await fermerFeuille(pg, '[data-actions-selection]');
-          // A/V — deux annonces en ligne du compte de Chrome
-          await cocher(pg, '9301'); await cocher(pg, '9103');
-          await clic(pg, '[data-actions-possibles]');
-          await pg.waitForSelector('[data-actions-selection="2"]', { timeout: 4000 });
-          const oks = Object.fromEntries(await pg.$$eval('[data-action-sel]', (l) => l.map((x) => [x.getAttribute('data-action-sel'), x.getAttribute('data-action-sel-ok')])));
-          dit(oks.recreer === 'oui' && oks.modifier === 'oui' && oks.versBrouillon === 'oui', `A ${T} republier, en ligne avec modifications, en ligne → brouillon possibles`, JSON.stringify(oks));
-          // (6 nov.) « à la main » prend plusieurs annonces : une par une dans la feuille (« paire 1/2 »).
-          dit(oks.enLigne === 'non' && oks.main === 'oui', `A ${T} « brouillon → en ligne » grisé (raison dite), « à la main » possible sur les deux`, JSON.stringify(oks));
-          const v = Object.fromEntries(await pg.$$eval('[data-act-paire]', (l) => l.map((x) => [x.getAttribute('data-act-paire'), x.getAttribute('data-act-codes')])));
-          dit(/description/.test(v['9103'] || '') && v['9102'] === '', `V ${T} avant de lancer : la paire 9103 dit « description », la 9102 rien`, JSON.stringify(v));
-          // K — `null` du dressing = pas lu : jamais « Couleur absente » / « Catégorie absente ».
-          const nonLu9103 = await pg.$eval('[data-act-paire="9103"] [data-act-non-lus]', (x) => x.textContent).catch(() => '');
-          dit(!/couleur|categorie/.test(v['9103'] || '') && /couleur/.test(nonLu9103) && /catégorie/.test(nonLu9103), `K ${T} couleur et catégorie à null (forme mesurée) ⇒ « pas lu », jamais « absente »`, `${v['9103']} / ${nonLu9103.slice(0, 80)}`);
-          dit(await pg.locator('[data-act-paire="9103"] a[href*="/items/9103/edit"]').count() > 0, `V ${T} le geste « Corriger sur Vinted ↗ » pointe sur CETTE annonce`);
-          const petits = await pg.$$eval('[data-actions-selection] button, [data-actions-selection] a', (l) => l.filter((x) => { const r = x.getBoundingClientRect(); return r.height > 0 && r.height < 43.5; }).map((x) => x.textContent.slice(0, 24)));
-          dit(!petits.length, `F ${T} cibles ≥ 44 px dans le carré`, petits.join(' | '));
-          await pg.screenshot({ path: nomF('actions') });
-          // R — lancer : le moteur existant, après « Choisir », rien ne part
-          await clic(pg, '[data-action-sel="recreer"]');
-          await pg.waitForSelector('[data-republier]', { timeout: 5000 }).catch(() => {});
-          const rep = await pg.evaluate(() => { const r = document.querySelector('[data-republier]'); return r ? { a: r.getAttribute('data-republier-action'), e: r.getAttribute('data-republier-etape') } : null; });
-          dit(rep && rep.a === 'recreer' && rep.e === 'modif', `R ${T} Republier s’ouvre sur ces annonces, après « Choisir »`, JSON.stringify(rep));
-          await pg.screenshot({ path: nomF('republier') });
-          dit((await pg.evaluate(() => window.__envois.length)) === 0, `R ${T} rien n’est parti sans sa confirmation`);
-          // Un brouillon ⇒ « brouillon → en ligne »
-          await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
-          await pg.locator('[data-vue-selection]').first().waitFor({ state: 'attached', timeout: 15000 });
-          await vueSelection(pg);
-          await cocher(pg, '9201');
-          await clic(pg, '[data-actions-possibles]');
-          await pg.waitForSelector('[data-actions-selection="1"]', { timeout: 4000 });
-          const okb = Object.fromEntries(await pg.$$eval('[data-action-sel]', (l) => l.map((x) => [x.getAttribute('data-action-sel'), x.getAttribute('data-action-sel-ok')])));
-          dit(okb.enLigne === 'oui' && okb.recreer === 'non' && okb.versBrouillon === 'non' && okb.main === 'oui', `A ${T} un brouillon ⇒ « brouillon → en ligne » (et « à la main »)`, JSON.stringify(okb));
-          await clic(pg, '[data-action-sel="enLigne"]');
-          await pg.waitForSelector('[data-republier-action="enLigne"]', { timeout: 5000 }).catch(() => {});
-          const repB = await pg.getAttribute('[data-republier]', 'data-republier-etape').catch(() => null);
-          dit(repB === 'envoi' && (await pg.evaluate(() => window.__envois.length)) === 0, `R ${T} « Mettre en ligne » ouvert sur ce brouillon, à confirmer`, repB);
-          // M — republier à la main
-          await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
-          await pg.locator('[data-vue-selection]').first().waitFor({ state: 'attached', timeout: 15000 });
-          await vueSelection(pg);
-          await cocher(pg, '9102');
-          await clic(pg, '[data-actions-possibles]');
-          await pg.waitForSelector('[data-actions-selection="1"]', { timeout: 4000 });
-          await clic(pg, '[data-action-sel="main"] button');   // (chantier C) « à la main » : un lien sous les quatre tuiles
-          await pg.waitForSelector('[data-main-champ="titre"]', { timeout: 5000 }).catch(() => {});
-          for (let i = 0; i < 20; i++) { if (!(await pg.$('[data-main-lecture]'))) break; await pg.waitForTimeout(200); }
-          const champs = await pg.$$eval('[data-main-champ]', (l) => Object.fromEntries(l.map((x) => [x.getAttribute('data-main-champ'), x.textContent])));
-          dit(/Salomon XT-6/.test(champs.titre || '') && /boîte d’origine/.test(champs.description || champs.desc || '') && /49/.test(champs.prix || ''), `M ${T} titre, description et prix prêts à copier`, JSON.stringify(Object.keys(champs)));
-          dit(await pg.locator('[data-main-copier]').count() >= 3 && (await pg.getAttribute('[data-main-photos]', 'data-main-photos').catch(() => null)) === '2', `M ${T} boutons « Copier » et les 2 photos du coffre`);
-          const [pop] = await Promise.all([pg.context().waitForEvent('page', { timeout: 5000 }).catch(() => null), clic(pg, '[data-main-ouvrir-vinted]')]);
-          if (pop) await pop.close().catch(() => {});
-          await pg.waitForSelector('[data-main-candidat]', { timeout: 5000 }).catch(() => {});
-          const cands = await pg.$$eval('[data-main-candidat]', (l) => l.map((x) => x.getAttribute('data-main-candidat')));
-          dit(cands.includes('9120') && !cands.includes('9301') && !cands.includes('9102') && !cands.includes('9103'), `M ${T} proposées : la nouvelle du MÊME compte ; jamais celle de même titre de l’autre compte, ni l’ancienne, ni une numérotée`, cands.join(','));
-          await pg.screenshot({ path: nomF('main') });
-          await clic(pg, '[data-main-lier="9120"]');
-          { const oui = pg.locator('button', { hasText: 'Oui, c’est elle' }).last(); await oui.waitFor({ state: 'visible', timeout: 4000 }); await oui.click({ timeout: 4000 }).catch(async () => { if (await oui.count()) await oui.evaluate((x) => x.click(), null, { timeout: 4000 }).catch(() => {}); }); }
-          await pg.waitForSelector('[data-main-lie="9120"]', { timeout: 4000 }).catch(() => {});
-          dit(await pg.locator('[data-main-lie="9120"]').count() > 0, `M ${T} SON clic relie la nouvelle annonce (confirmée)`);
-          const sheet = await pg.$('[data-main-lie]');
-          if (sheet) { const x = await pg.$$('button[aria-label="Fermer"]'); if (x.length) await x[x.length - 1].click(); await pg.waitForTimeout(300); }
-          await pg.waitForSelector('[data-suivi-main="9102"]', { timeout: 4000 }).catch(() => {});
-          const num9120 = await pg.$eval('[data-selection-annonce="9120"] .vrm-sel-num', (x) => x.textContent).catch(() => '');
-          dit((await pg.getAttribute('[data-suivi-main="9102"]', 'data-suivi-main-etat').catch(() => null)) === 'lie' && num9120 !== 'N°42', `M ${T} tant que l’ancienne est en ligne, le N°42 attend (jamais deux annonces sous un N°)`, num9120);
-          // L'ancienne n'est plus en ligne ⇒ le N° passe sur la nouvelle.
-          etat.sans9102 = true;
-          // Une nouvelle ouverture de l'app (le cache d'écran de 5 min ne sert pas la lecture d'avant).
-          await nouvelleOuverture(pg);
-          await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
-          await pg.locator('[data-vue-selection]').first().waitFor({ state: 'attached', timeout: 15000 });
-          await vueSelection(pg);
-          let n = '';
-          for (let i = 0; i < 30; i++) { n = await pg.$eval('[data-selection-annonce="9120"] .vrm-sel-num', (x) => x.textContent).catch(() => ''); if (n === 'N°42') break; await pg.waitForTimeout(250); }
-          dit(n === 'N°42' && !(await pg.$('[data-suivi-main="9102"]')),`M ${T} l’ancienne partie ⇒ la nouvelle porte le N°42, le suivi est fini`, n);
-          await pg.screenshot({ path: nomF('apres') });
-          // K — « à la main » sur une MASQUÉE : le N°45 attend que la masquée soit partie.
-          await cocher(pg, '9110');
-          await clic(pg, '[data-actions-possibles]');
-          await pg.waitForSelector('[data-actions-selection]', { timeout: 4000 });
-          await clic(pg, '[data-action-sel="main"] button');
-          await pg.waitForSelector('[data-main-ouvrir-vinted]', { timeout: 5000 }).catch(() => {});
-          { const [pop2] = await Promise.all([pg.context().waitForEvent('page', { timeout: 5000 }).catch(() => null), clic(pg, '[data-main-ouvrir-vinted]')]); if (pop2) await pop2.close().catch(() => {}); }
-          await pg.waitForSelector('[data-main-lier="9121"]', { timeout: 5000 }).catch(() => {});
-          const candsM = await pg.$$eval('[data-main-candidat]', (l) => l.map((x) => x.getAttribute('data-main-candidat')));
-          dit(candsM.includes('9121') && !candsM.includes('9120'), `K ${T} masquée : la nouvelle 9121 proposée, jamais 9120 (déjà la nouvelle d’une autre)`, candsM.join(','));
-          await clic(pg, '[data-main-lier="9121"]');
-          { const oui = pg.locator('button', { hasText: 'Oui, c’est elle' }).last(); await oui.waitFor({ state: 'visible', timeout: 4000 }); await oui.click({ timeout: 4000 }).catch(async () => { if (await oui.count()) await oui.evaluate((x) => x.click(), null, { timeout: 4000 }).catch(() => {}); }); }
-          await pg.waitForSelector('[data-main-lie="9121"]', { timeout: 4000 }).catch(() => {});
-          dit(await pg.locator('[data-main-lie="9121"]').count() > 0, `K ${T} masquée : SON clic relie 9121 (confirmée)`);
-          // La sauvegarde de l'appareil part après un court délai (`save`) : on l'attend avant de recharger.
-          for (let i = 0; i < 40; i++) { if (await pg.evaluate(() => /"9110":\{[^}]*"nouvelId":"9121"/.test(localStorage.getItem('vrm_repub_main') || ''))) break; await pg.waitForTimeout(250); }
-          await nouvelleOuverture(pg);
-          await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
-          await pg.locator('[data-vue-selection]').first().waitFor({ state: 'attached', timeout: 15000 });
-          await vueSelection(pg);
-          // La numérotation a tourné (9120 porte le N°42) : on juge alors 9121.
-          for (let i = 0; i < 30; i++) { if ((await pg.$eval('[data-selection-annonce="9120"] .vrm-sel-num', (x) => x.textContent).catch(() => '')) === 'N°42') break; await pg.waitForTimeout(250); }
+          await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-article]')].some((x) => x.getClientRects().length), null, { timeout: 20000 }).catch(() => {});
           await pg.waitForTimeout(1200);
-          const n45 = await pg.$$eval('[data-selection-annonce] .vrm-sel-num', (l) => l.filter((x) => x.textContent === 'N°45').map((x) => x.closest('[data-selection-annonce]').getAttribute('data-selection-annonce')));
-          dit(n45.length === 1 && n45[0] === '9110', `K ${T} la masquée 9110 encore là ⇒ le N°45 reste à elle seule (jamais deux paires sous un N°)`, n45.join(','));
-          await pg.screenshot({ path: nomF('masquee') });
-          etat.sans9110 = true;
-          await nouvelleOuverture(pg);
-          await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
-          await pg.locator('[data-vue-selection]').first().waitFor({ state: 'attached', timeout: 15000 });
-          await vueSelection(pg);
-          let n2 = '';
-          for (let i = 0; i < 30; i++) { n2 = await pg.$eval('[data-selection-annonce="9121"] .vrm-sel-num', (x) => x.textContent).catch(() => ''); if (n2 === 'N°45') break; await pg.waitForTimeout(250); }
-          dit(n2 === 'N°45', `K ${T} la masquée partie ⇒ la nouvelle porte le N°45`, n2);
+          dit((await pg.evaluate(() => document.documentElement.getAttribute('data-theme'))) === (sombre ? 'dark' : 'light') || !sombre, `F ${T} thème ${sombre ? 'sombre' : 'clair'} posé`);
+          // S — en ligne et MASQUÉES (« En ligne »), BROUILLONS (« À publier »), chacun sous SON compte, avec son état.
+          const L = Object.fromEntries((await articles(pg)).map((a) => [a.id, a]));
+          dit(L['9102'] && L['9102'].etat === 'enligne' && L['9110'] && L['9110'].etat === 'masquee' && L['9102'].compte === 'vinted:111' && L['9301'] && L['9301'].compte === 'vinted:222', `S ${T} en ligne et masquée, chacune avec son état et SON compte`, JSON.stringify(Object.values(L).map((a) => a.id + ':' + a.etat + ':' + a.compte)));
+          if (tel) dit(Object.values(L).every((a) => a.groupe === a.compte), `S ${T} rangées PAR COMPTE (chaque annonce sous le groupe de son compte)`, JSON.stringify(Object.values(L).map((a) => a.id + '→' + a.groupe)));
+          await pg.screenshot({ path: nomF('liste') });
+          // Au téléphone, le segment « À publier » ; à l'ordinateur le tableau filtre les états par « Statut » (brouillons hors du
+          // filtre par défaut : « 1 sur 2 annonces » sous autre_compte) — les brouillons par compte se jugent au téléphone.
+          if (tel) {
+            await segment(pg, tel, 'apublier');
+            await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-article="vinted#9201"], [data-eg-article="vinted#9302"]')].some((x) => x.getClientRects().length), null, { timeout: 8000 }).catch(() => {});
+            const B = Object.fromEntries((await articles(pg)).map((a) => [a.id, a]));
+            dit(B['9201'] && B['9201'].compte === 'vinted:111' && B['9302'] && B['9302'].compte === 'vinted:222' && B['9302'].groupe === 'vinted:222' && B['9201'].groupe === 'vinted:111', `S ${T} brouillons sous « À publier » : celui du second compte sous SON compte, jamais sous l’autre`, JSON.stringify(Object.values(B).map((a) => a.id + ':' + a.compte + '→' + a.groupe)));
+            await segment(pg, tel, 'enligne');
+          }
+          if (tel) {
+            // A — « Republier » (une action au nom d'un compte) : deux comptes ⇒ rien ne se lance, la raison dite.
+            await modeAction(pg, 'recreer');
+            await cocher(pg, tel, '9110');
+            let M = Object.fromEntries((await articles(pg)).map((a) => [a.id, a]));
+            dit(M['9110'] && M['9110'].grise && M['9110'].coche === '0', `A ${T} Republier : une masquée ne se coche pas (grisée)`, JSON.stringify(M['9110']));
+            await cocher(pg, tel, '9102'); await cocher(pg, tel, '9301');
+            let l = await lancer(pg, tel, 'recreer');
+            dit(!!l && l.off && l.n === '2' && l.raison.length > 5, `A ${T} deux comptes mélangés ⇒ « Republier » ne se lance pas, la raison dite`, JSON.stringify(l));
+            await pg.screenshot({ path: nomF('deux-comptes') });
+            await cocher(pg, tel, '9301'); await cocher(pg, tel, '9103');
+            l = await lancer(pg, tel, 'recreer');
+            dit(!!l && !l.off && l.n === '2', `A ${T} deux annonces en ligne du même compte ⇒ « Republier · 2 » se lance`, JSON.stringify(l));
+            // R — lancer : SA confirmation d'abord ; « Annuler » ⇒ rien n'est parti.
+            const avant = ecrituresDe(ecrits);
+            await geste(pg, tel, '[data-eg-lancer="recreer"]');
+            await pg.waitForTimeout(800);
+            const conf = await pg.evaluate(() => { const d = [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].find((x) => x.getClientRects().length); return d ? d.innerText.replace(/\s+/g, ' ').slice(0, 160) : ''; });
+            await pg.screenshot({ path: nomF('confirmer') });
+            dit(/2/.test(conf) && ecrituresDe(ecrits) === avant && (await pg.evaluate(() => window.__envois.length)) === 0, `R ${T} lancer demande SA confirmation (« · 2 ») — rien n’est parti avant`, conf);
+            const annuler = pg.locator('[role="dialog"]:visible button, [role="alertdialog"]:visible button').first();
+            await annuler.click().catch(() => {}); await pg.waitForTimeout(800);
+            dit(ecrituresDe(ecrits) === avant && (await pg.evaluate(() => window.__envois.length)) === 0, `R ${T} « Annuler » ⇒ rien n’est parti`, ecrits.slice(-3).join(' | '));
+            // A — « Remettre en ligne » : seuls les brouillons se cochent.
+            await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+            await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-article]')].some((x) => x.getClientRects().length), null, { timeout: 20000 }).catch(() => {});
+            await segment(pg, tel, 'enligne');
+            await modeAction(pg, 'enLigne');
+            await cocher(pg, tel, '9102');
+            M = Object.fromEntries((await articles(pg)).map((a) => [a.id, a]));
+            dit(M['9102'] && M['9102'].grise && M['9102'].coche === '0', `A ${T} « brouillon → en ligne » : une annonce en ligne ne se coche pas`, JSON.stringify(M['9102']));
+            await segment(pg, tel, 'apublier');
+            await cocher(pg, tel, '9201');
+            M = Object.fromEntries((await articles(pg)).map((a) => [a.id, a]));
+            l = await lancer(pg, tel, 'enLigne');
+            dit(M['9201'] && M['9201'].coche === '1' && !!l && !l.off, `A ${T} un brouillon ⇒ « Remettre en ligne » se coche et se lance`, JSON.stringify({ a: M['9201'], l }));
+            // M — « Republier à la main » : deux comptes permis (une paire à la fois, chacune avec son compte).
+            await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+            await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-article]')].some((x) => x.getClientRects().length), null, { timeout: 20000 }).catch(() => {});
+            await segment(pg, tel, 'enligne');
+            await modeAction(pg, 'main');
+            await cocher(pg, tel, '9110'); await cocher(pg, tel, '9301');
+            l = await lancer(pg, tel, 'main');
+            dit(!!l && !l.off && l.n === '2', `A ${T} « à la main » : une masquée et deux comptes, possible (une à la fois)`, JSON.stringify(l));
+            await cocher(pg, tel, '9110'); await cocher(pg, tel, '9301'); await cocher(pg, tel, '9102');
+            await geste(pg, tel, '[data-eg-lancer="main"]');
+            // (26 nov.) La feuille « à la main » est un GUIDE par étapes (src/ecrans/Republier.jsx `RepublierALaMain` : Photos ·
+            // Supprimer · Créer · Fini, `[data-rg-etapes]`, `[data-main-aller]`) : les champs à copier vivent dans l'étape qui les montre.
+            await pg.waitForSelector('[data-rg-etapes]', { timeout: 8000 }).catch(() => {});
+            for (let i = 0; i < 20; i++) { if (!(await pg.$('[data-main-lecture]'))) break; await pg.waitForTimeout(200); }
+            const etapes = String(await pg.getAttribute('[data-rg-etapes]', 'data-rg-etapes').catch(() => '') || '').split(',').filter(Boolean);
+            const photosN = await pg.getAttribute('[data-main-photos]', 'data-main-photos').catch(() => null);
+            for (const k of etapes) { await geste(pg, tel, `[data-main-aller="${k}"]`); if (await pg.locator('[data-main-champ="titre"]:visible').count()) break; }
+            const champs = await pg.$$eval('[data-main-champ]', (x) => Object.fromEntries(x.filter((e) => e.getClientRects().length).map((e) => [e.getAttribute('data-main-champ'), e.textContent])));
+            dit(/Salomon XT-6/.test(champs.titre || '') && /boîte d’origine/.test(champs.description || champs.desc || '') && /49/.test(champs.prix || ''), `M ${T} titre, description et prix prêts à copier (le coffre de CETTE annonce)`, JSON.stringify(Object.keys(champs)));
+            dit(await pg.locator('[data-main-copier]:visible').count() >= 3 && photosN === '2', `M ${T} boutons « Copier » et les 2 photos du coffre`, JSON.stringify({ etapes, photosN }));
+            if (etapes.length) await geste(pg, tel, `[data-main-aller="${etapes[etapes.length - 1]}"]`);
+            const [pop] = await Promise.all([pg.context().waitForEvent('page', { timeout: 5000 }).catch(() => null), geste(pg, tel, '[data-main-ouvrir-vinted]')]);
+            if (pop) await pop.close().catch(() => {});
+            await pg.waitForSelector('[data-main-candidat]', { timeout: 5000 }).catch(() => {});
+            const cands = await pg.$$eval('[data-main-candidat]', (x) => x.map((e) => e.getAttribute('data-main-candidat')));
+            dit(cands.includes('9120') && !cands.includes('9301') && !cands.includes('9102') && !cands.includes('9103'), `M ${T} proposées : la nouvelle du MÊME compte ; jamais celle de même titre de l’autre compte, ni l’ancienne, ni une autre numérotée`, cands.join(','));
+            await pg.screenshot({ path: nomF('main') });
+            await geste(pg, tel, '[data-main-lier="9120"]');
+            { const oui = pg.locator('button', { hasText: 'Oui, c’est elle' }).last(); await oui.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {}); await oui.click({ timeout: 4000 }).catch(async () => { if (await oui.count()) await oui.evaluate((x) => x.click(), null, { timeout: 4000 }).catch(() => {}); }); }
+            await pg.waitForSelector('[data-main-lie="9120"]', { timeout: 4000 }).catch(() => {});
+            dit(await pg.locator('[data-main-lie="9120"]').count() > 0, `M ${T} SON clic relie la nouvelle annonce (confirmée)`);
+            // K/M — le N° : tant que l'ancienne est en ligne, le N°42 reste à elle seule (jamais deux annonces sous un N°).
+            for (let i = 0; i < 40; i++) { if (await pg.evaluate(() => /"9102":\{[^}]*"nouvelId":"9120"/.test(localStorage.getItem('vrm_repub_main') || ''))) break; await pg.waitForTimeout(250); }
+            await nouvelleOuverture(pg);
+            await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+            await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-article]')].some((x) => x.getClientRects().length), null, { timeout: 20000 }).catch(() => {});
+            await pg.waitForTimeout(1500);
+            const n42 = (await articles(pg)).filter((a) => a.numero === '42').map((a) => a.id);
+            dit(n42.length === 1 && n42[0] === '9102', `M ${T} tant que l’ancienne est en ligne, le N°42 reste à elle seule`, n42.join(','));
+            etat.sans9102 = true;
+            await nouvelleOuverture(pg);
+            await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+            await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-article]')].some((x) => x.getClientRects().length), null, { timeout: 20000 }).catch(() => {});
+            let n = '';
+            for (let i = 0; i < 30; i++) { n = ((await articles(pg)).find((a) => a.id === '9120') || {}).numero || ''; if (n === '42') break; await pg.waitForTimeout(250); }
+            await pg.screenshot({ path: nomF('apres') });
+            // L'écran rouvert peut d'abord montrer SON instantané (affichage instantané, 20 nov.), puis la lecture fraîche : on attend
+            // celle-ci (la nouvelle porte le N°42 ET l'ancienne fermée n'est plus en ligne), 10 s au plus (§6.5).
+            let porteurs = [];
+            for (let i = 0; i < 40; i++) { porteurs = (await articles(pg)).filter((a) => a.numero === '42').map((a) => a.id + ':' + a.etat); if (porteurs.length === 1) break; await pg.waitForTimeout(250); }
+            dit(n === '42' && porteurs.length === 1, `M ${T} l’ancienne partie ⇒ la nouvelle porte le N°42 (une seule fois)`, JSON.stringify({ n, porteurs }));
+          } else {
+            // A (ordinateur) — le tableau : la sélection, puis les actions directes du bas (`data-tt-action-directe`).
+            await cocher(pg, tel, '9102'); await cocher(pg, tel, '9301');
+            let l = await lancer(pg, tel, 'recreer');
+            dit(!!l && l.off && l.n === '2', `A ${T} deux comptes mélangés ⇒ « Republier » ne se lance pas`, JSON.stringify(l));
+            await pg.screenshot({ path: nomF('deux-comptes') });
+            await cocher(pg, tel, '9301'); await cocher(pg, tel, '9103');
+            l = await lancer(pg, tel, 'recreer');
+            dit(!!l && !l.off && l.n === '2', `A ${T} deux annonces en ligne du même compte ⇒ « Republier · 2 » se lance`, JSON.stringify(l));
+            const avant = ecrituresDe(ecrits);
+            await geste(pg, tel, '[data-tt-action-directe="recreer"]');
+            await pg.waitForTimeout(800);
+            const conf = await pg.evaluate(() => { const d = [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].find((x) => x.getClientRects().length); return d ? d.innerText.replace(/\s+/g, ' ').slice(0, 160) : ''; });
+            await pg.screenshot({ path: nomF('confirmer') });
+            dit(/2/.test(conf) && ecrituresDe(ecrits) === avant && (await pg.evaluate(() => window.__envois.length)) === 0, `R ${T} lancer demande SA confirmation (« · 2 ») — rien n’est parti avant`, conf);
+            await pg.keyboard.press('Escape'); await pg.waitForTimeout(600);
+            dit(ecrituresDe(ecrits) === avant && (await pg.evaluate(() => window.__envois.length)) === 0, `R ${T} refermée sans « Oui » ⇒ rien n’est parti`, ecrits.slice(-3).join(' | '));
+          }
           const deb = await debordement(pg);
           dit(deb <= 1, `F ${T} aucun débordement horizontal`, deb);
           dit(!errs.length, `F ${T} aucune erreur de page`, errs.slice(0, 2).join(' | '));
