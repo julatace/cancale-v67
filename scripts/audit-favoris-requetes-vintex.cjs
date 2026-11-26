@@ -23,13 +23,13 @@ const fs = require('fs'), path = require('path'), os = require('os'), cp = requi
 const { faireFond } = require('./_fond-vm.cjs');
 let BG = path.join(__dirname, '..', 'vinted-sync-extension', 'background.js');
 const MUTATIONS = {
-  'sans-personne': ["if(opp.length!==1||opp[0]!==body.recipientId){noterDiag('favori_vintex_autre_personne');", "if(false){"],
+  'sans-personne': ["if(opp.length!==1||opp[0]!==body.recipientId){noterDiag('favori_req_autre_personne');", "if(false){"],
   'sans-historique': ['if(ecritsAvant>0||(cv.pagination', 'if(false&&(cv.pagination'],
   'sans-article-tx': ["if(!tr||artTx!==body.itemId){", "if(!tr){"],
   'offre-ignoree': ["if(!offreFaite)return o.status", "if(false)return o.status"],
   'porte-ouverte': ['function ecritureFavoriPermise(adresse) { const a = String(adresse || \'\'); return ECRITURES_FAVORI.some((re) => re.test(a)); }', 'function ecritureFavoriPermise(adresse) { return true; }'],
   'telephone-ignore': ["if(await telephoneAVerifierVinted(acc)===true){", "if(false){"],
-  'chemin-ignore': ["if((await cheminFavoris())==='vintex'){", "if(true){"],
+  'chemin-ignore': ["if((await cheminFavoris())==='requetes'){", "if(true){"],
 };
 const argMut = (() => { const a = process.argv.find((x) => x.startsWith('--mutation=')); return a ? a.slice(11) : ''; })();
 if (process.argv.includes('--prouve')) {

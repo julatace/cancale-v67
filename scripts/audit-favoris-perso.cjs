@@ -130,7 +130,7 @@ async function verifier(SRC, BG) {
     dit(a1.prix === '50.00' && a2.prix === '48.00', 'P8 offre : remontée au plancher / au % réglé sans plancher : ' + JSON.stringify([a1, a2]));
     const ex = fonction(BG, 'executerMessageFavori');
     // 26 nov. (5.455, `favorisvintex`) : DEUX chemins exclusifs (Vintex par défaut, l'interface en réserve) — une fois CHACUN.
-    const kV = ex.indexOf("(await cheminFavoris())==='vintex'"), kC = ex.indexOf("etape('cloche')");
+    const kV = ex.indexOf("(await cheminFavoris())==='requetes'"), kC = ex.indexOf("etape('cloche')");
     const nbV = kV >= 0 && kC > kV ? (ex.slice(kV, kC).match(/choixMessageFavori\(/g) || []).length : -1;
     const nb = (ex.match(/choixMessageFavori\(/g) || []).length;
     dit(nbV === 1 && nb === 2, 'P10 executerMessageFavori doit appeler choixMessageFavori une fois par chemin (Vintex : ' + nbV + ', total : ' + nb + ')');
