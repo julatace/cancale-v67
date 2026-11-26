@@ -24,7 +24,7 @@ export default {
   "acc.ext.iphone.1": "Installiere die App Orion auf dem iPhone.",
   "acc.ext.iphone.2": "Öffne vrm.center in Orion.",
   "acc.ext.inconnu.1": "Öffne vrm.center auf dem Computer.",
-  "acc.ext.inconnu.2": "Installiere die Erweiterung in Chrome oder Edge.",
+  "acc.ext.inconnu.2": "Installiere die Erweiterung auf deinem Computer.",
   "acc.geste.extension.chromium": "Für {nav} installieren",
   "acc.geste.extension.firefox": "Für Firefox installieren",
   "acc.geste.extension.orion": "Für Orion installieren",
@@ -41,9 +41,9 @@ export default {
   "acc.lecture.2": "Geh zurück zu Heute.",
   "acc.geste.lecture": "Das Einlesen ansehen",
   "acc.numeros.titre": "Eine Nummer pro Artikel",
-  "acc.numeros.phrase": "Eine Nummer pro Artikel, auf dem Karton.",
+  "acc.numeros.phrase": "Eine Nummer pro Artikel, dort, wo er liegt.",
   "acc.numeros.1": "Öffne Anzeigen: jeder Artikel hat eine Nummer.",
-  "acc.numeros.2": "Schreib sie auf den Karton.",
+  "acc.numeros.2": "Schreib sie dort hin, wo du den Artikel lagerst.",
   "acc.geste.numeros": "Anzeigen öffnen",
   "acc.fiscal.titre": "Dein Status, einmal",
   "acc.fiscal.phrase": "Dein Status, nur einmal.",
@@ -54,6 +54,6 @@ export default {
   "acc.extension.pourquoi": "Die Erweiterung liest deine Verkäufe, Pakete und Etiketten in deinem Browser. Nichts geht woandershin.",
   "acc.compte.pourquoi": "Vinted, Leboncoin, Vestiaire oder eBay: die Erweiterung erkennt das in deinem Browser geöffnete Konto.",
   "acc.lecture.pourquoi": "Anzeigen und Verkäufe werden einsortiert, Heute füllt sich. Lass die Seite eine Minute offen.",
-  "acc.numeros.pourquoi": "Die Nummer auf dem Karton findet den Artikel in einer Sekunde.",
+  "acc.numeros.pourquoi": "Die Nummer an seinem Platz findet den Artikel in einer Sekunde.",
   "acc.fiscal.pourquoi": "Privat, Kleinunternehmer oder Firma: VRM passt deine Zahlen an. Nichts wird geraten. Du kannst es jederzeit ändern."
 };

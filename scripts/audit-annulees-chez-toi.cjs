@@ -155,7 +155,9 @@ const sansCommentaires = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/
   // (16 nov.) Le texte est passé par tr() (lot traduction) : la clé posée sur `paire.annulee`, et le français qui dit « rien à supprimer ».
   const FR_RG = (() => { try { return fs.readFileSync(path.join(SRC, 'i18n', 'langues', 'fr', 'republierGuide.js'), 'utf8'); } catch (_) { return ''; } })();
   dit(/paire\.annulee[\s\S]{0,200}rien à supprimer/.test(APP)
-    || (/paire\.annulee \? <div[^>]*>\{tr\(paire\.retour \? 'rg\.creer\.annuleeRetour' : 'rg\.creer\.annulee'\)\}/.test(APP) && /"rg\.creer\.annulee": "[^"]*fermée[^"]*rien à supprimer/.test(FR_RG) && /"rg\.creer\.annuleeRetour": "[^"]*fermée[^"]*rien à supprimer/.test(FR_RG)), 'S6 « à la main » dit que l’ancienne est fermée : rien à supprimer');
+    || (/paire\.annulee \? <div[^>]*>\{tr\(paire\.retour \? 'rg\.creer\.annuleeRetour' : 'rg\.creer\.annulee'\)\}/.test(APP) && /"rg\.creer\.annulee": "[^"]*fermée[^"]*rien à supprimer/.test(FR_RG) && /"rg\.creer\.annuleeRetour": "[^"]*fermée[^"]*rien à supprimer/.test(FR_RG))
+    // (26 nov., lot republier-feuille) la feuille « à la main » dit plus court : « Vente annulée : rien à supprimer. »
+    || (/paire\.annulee \? <p[^>]*>\{tr\(paire\.retour \? 'rg2\.creer\.annuleeRetour' : 'rg2\.creer\.annulee'\)\}/.test(APP) && /"rg2\.creer\.annulee": "[^"]*annulée[^"]*rien à supprimer/.test(FR_RG) && /"rg2\.creer\.annuleeRetour": "[^"]*rien à supprimer/.test(FR_RG)), 'S6 « à la main » dit que l’ancienne est fermée : rien à supprimer');
   dit(!/useEffect\([^;]*remettreEnVente/.test(APP), 'S7 rien n’est remis en vente tout seul (aucun effet n’appelle « Remettre en vente »)');
 
   console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`);

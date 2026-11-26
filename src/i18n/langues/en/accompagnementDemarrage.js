@@ -24,7 +24,7 @@ export default {
   "acc.ext.iphone.1": "Install the Orion app on your iPhone.",
   "acc.ext.iphone.2": "Open vrm.center in Orion.",
   "acc.ext.inconnu.1": "Open vrm.center on your computer.",
-  "acc.ext.inconnu.2": "Install the extension in Chrome or Edge.",
+  "acc.ext.inconnu.2": "Install the extension on your computer.",
   "acc.geste.extension.chromium": "Install for {nav}",
   "acc.geste.extension.firefox": "Install for Firefox",
   "acc.geste.extension.orion": "Install for Orion",
@@ -41,9 +41,9 @@ export default {
   "acc.lecture.2": "Come back to Today.",
   "acc.geste.lecture": "See the reading",
   "acc.numeros.titre": "One number per item",
-  "acc.numeros.phrase": "One number per item, on the box.",
+  "acc.numeros.phrase": "One number per item, where it is stored.",
   "acc.numeros.1": "Open Listings: each item gets a number.",
-  "acc.numeros.2": "Write it on the box.",
+  "acc.numeros.2": "Write it where you store the item.",
   "acc.geste.numeros": "Open Listings",
   "acc.fiscal.titre": "Your status, once",
   "acc.fiscal.phrase": "Your status, just once.",
@@ -54,6 +54,6 @@ export default {
   "acc.extension.pourquoi": "The extension reads your sales, parcels and labels from your browser. Nothing goes anywhere else.",
   "acc.compte.pourquoi": "Vinted, Leboncoin, Vestiaire or eBay: the extension recognises the account open in your browser.",
   "acc.lecture.pourquoi": "Your listings and sales are filed and Today fills up. Keep the site open for a minute.",
-  "acc.numeros.pourquoi": "The number written on the box finds the item in a second.",
+  "acc.numeros.pourquoi": "The number written at its spot finds the item in a second.",
   "acc.fiscal.pourquoi": "Individual, micro-entrepreneur or company: VRM adapts your figures. Nothing is guessed. You can change it any time."
 };

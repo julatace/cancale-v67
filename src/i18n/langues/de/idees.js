@@ -136,4 +136,7 @@ export default {
   "ia.vm.encoreEnLigne": "Die Anzeige ist noch auf Vinted online: entferne sie, sonst kann sie ein zweites Mal verkauft werden.",
   "ia.vm.remisSansCase": "N°{num} zurück im Bestand — sein Platz ist belegt: räum es ein",
   "ia.vm.annulee": "Verkauf rückgängig: nichts gezählt, das Paar ist wieder im Bestand.",
+  "lt.quoi.rangee": "Im Lager eingeräumt",
+  "lt.src.rangement": "sein Lagerfach",
+  "lt.pasSu.rangement": "das Lagerfach"
 };

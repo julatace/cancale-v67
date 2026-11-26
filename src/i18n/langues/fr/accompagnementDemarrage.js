@@ -24,7 +24,7 @@ export default {
   "acc.ext.iphone.1": "Installe l’app Orion sur ton iPhone.",
   "acc.ext.iphone.2": "Ouvre vrm.center dans Orion.",
   "acc.ext.inconnu.1": "Ouvre vrm.center sur ton ordinateur.",
-  "acc.ext.inconnu.2": "Installe l’extension dans Chrome ou Edge.",
+  "acc.ext.inconnu.2": "Installe l’extension sur ton ordinateur.",
   "acc.geste.extension.chromium": "Installer pour {nav}",
   "acc.geste.extension.firefox": "Installer pour Firefox",
   "acc.geste.extension.orion": "Installer pour Orion",
@@ -41,9 +41,9 @@ export default {
   "acc.lecture.2": "Reviens sur Aujourd’hui.",
   "acc.geste.lecture": "Voir la lecture",
   "acc.numeros.titre": "Un numéro par article",
-  "acc.numeros.phrase": "Un numéro par article, sur le carton.",
+  "acc.numeros.phrase": "Un numéro par article, là où il est rangé.",
   "acc.numeros.1": "Ouvre Annonces : chaque article a son numéro.",
-  "acc.numeros.2": "Écris-le sur le carton.",
+  "acc.numeros.2": "Écris-le là où tu ranges l’article.",
   "acc.geste.numeros": "Ouvrir Annonces",
   "acc.fiscal.titre": "Ton statut, une fois",
   "acc.fiscal.phrase": "Ton statut, une seule fois.",
@@ -54,6 +54,6 @@ export default {
   "acc.extension.pourquoi": "L’extension lit tes ventes, colis et bordereaux depuis ton navigateur. Rien ne part ailleurs.",
   "acc.compte.pourquoi": "Vinted, Leboncoin, Vestiaire ou eBay : l’extension reconnaît le compte ouvert dans ton navigateur.",
   "acc.lecture.pourquoi": "Tes annonces et tes ventes se rangent, Aujourd’hui se remplit. Garde le site ouvert une minute.",
-  "acc.numeros.pourquoi": "Le numéro écrit sur le carton retrouve l’article en une seconde.",
+  "acc.numeros.pourquoi": "Le numéro écrit à sa place retrouve l’article en une seconde.",
   "acc.fiscal.pourquoi": "Particulier, micro-entrepreneur ou société : VRM adapte tes chiffres. Rien n’est deviné. Tu peux le changer quand tu veux."
 };

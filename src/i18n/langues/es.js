@@ -18,6 +18,7 @@ import ecran_depot from './es/depot.js';   // (21 nov., ext. 5.429) brouillons p
 import ecran_avenir from './es/avenir.js';
 import ecran_journee_stats from './es/journeeStats.js';   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_rentabilite from './es/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
+import ecran_gains from './es/gains.js';   // (24 nov.) ce que tu gagnes vraiment
 import ecran_transp_depenses from './es/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './es/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_a_distance from './es/aDistance.js';
@@ -126,6 +127,8 @@ import ecran_parrainage20 from './es/parrainage.js';   // (25 nov.) le parrainag
 import ecran_actions_ext from './es/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './es/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 import ecran_accompagnement_demarrage from './es/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
+import ecran_litiges_tous from './es/litigesTous.js';   // (23 nov.) Litiges et retours, tous les sites
+import ecran_achats_hors_vinted from './es/achatsHorsVinted.js';   // (23 nov.) Nouvel achat : ticket à plusieurs articles
 export default {
   ...ecran_accessibilite,
   ...ecran_groupes,
@@ -2416,6 +2419,7 @@ export default {
   ...ecran_verre2,
   ...ecran_journee_stats,
   ...ecran_rentabilite,
+  ...ecran_gains,
   ...ecran_transp_depenses,
   ...ecran_file_actions,
   ...ecran_ext5428,
@@ -2445,6 +2449,8 @@ export default {
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,
   ...ecran_accompagnement_demarrage,
+  ...ecran_litiges_tous,
+  ...ecran_achats_hors_vinted,
   ...ecran_parcours_nouveau,
   ...ecran_stock_rangement,
   ...ecran_stock_etiquetage,

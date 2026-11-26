@@ -146,22 +146,51 @@ function RetoursParModele({ bi }) {
   );
 }
 
-export default function LitigesEnCours({ r, bi, Photo = null, entete = null, onDossier = null, onPasAPas = null }) {
+// (23 nov., lot litiges-retours) UN RETOUR D'ACHAT en cours (src/litigesTousSites.js) : son N°, ce qui se passe en un
+// mot, la date limite LUE (sinon « Date limite non lue »), le geste = un LIEN vers sa commande sur Vinted (son clic).
+// Jamais une carte de VENTE (`data-litige-carte`) : les deux sens ne se mélangent pas.
+function LigneRetourAchat({ l }) {
+  return (
+    <article className="vrm-lit-carte vrm-lit-achat" data-retour-achat-ligne={l.cle} data-retour-achat-etape={l.etape} data-retour-achat-limite-lue={l.limiteLue ? '1' : '0'}
+      data-retour-achat-presse={l.presse ? '1' : '0'} data-litige-sens="achat">
+      <div className="vrm-lit-haut">
+        <span className="vrm-lit-tuile" aria-hidden="true">{ICONES.carton}</span>
+        <div className="vrm-lit-textes">
+          <span className="vrm-lit-num">{l.num ? `N°${l.num}` : tr('ventes.sans')}</span>
+          <span className="vrm-lit-genre">{tr('lit2.genre.retourAchat')} · {tr('lit2.etape.' + l.etape)}</span>
+          <span className={'vrm-lit-limite' + (l.presse ? ' is-presse' : '')} data-litige-phrase-limite="">{l.limiteLue ? tr('lit2.avant', { d: l.limiteTexte }) : tr('lit2.nonLue')}</span>
+        </div>
+      </div>
+      {l.titre ? <p className="vrm-lit-titre" title={l.titre}>{l.titre}</p> : null}
+      {l.geste ? <a className="vrm-lit-geste" href={l.geste.url} target="_blank" rel="noreferrer" data-litige-geste={l.geste.url}>{tr('lit2.geste.' + l.geste.cle)} ↗</a> : null}
+    </article>
+  );
+}
+
+// `ra` (23 nov.) : l'assemblage TOUS SITES, ventes ET achats (`litigesEtRetours`) — facultatif : sans lui, l'écran d'avant.
+export default function LitigesEnCours({ r, bi, ra = null, Photo = null, entete = null, onDossier = null, onPasAPas = null }) {
   if (!r) return null;
   const n = r.cartes.length;
   const partiel = r.manques.length > 0;
+  const achats = ra ? ra.lignes.filter((l) => l.sens === 'achat') : [];
+  const etatAchats = ra ? (ra.parSite.find((p) => p.sens === 'achat') || {}).etat : null;
+  const total = ra ? ra.lignes.length : null;
   return (
-    <div className="vrm-lit" data-litiges-ecran={r.etat} data-litiges-n={r.etat === 'lu' ? n : ''} data-litiges-partiel={partiel ? '1' : '0'}>
+    <div className="vrm-lit" data-litiges-ecran={r.etat} data-litiges-n={r.etat === 'lu' ? n : ''} data-litiges-partiel={partiel ? '1' : '0'}
+      data-litiges-total={ra && ra.etat === 'lu' ? total : undefined} data-litiges-achats={ra ? achats.length : undefined} data-litiges-total-partiel={ra && ra.partiel ? '1' : undefined}>
       {entete}
       {r.etat === 'encours' ? <p className="vrm-lit-note" role="status">{tr('stats.lectureVentes')}</p> : null}
       {r.etat === 'passu' ? <p className="vrm-lit-note" data-litiges-passu="">{tr('ventes.ventesOntPu2')}</p> : null}
-      {r.etat === 'lu' && n > 0 ? (
-        <div className="vrm-lit-resume" data-litiges-resume={n}>
-          {partiel ? <span>{tr('stats.moins2')}</span> : null}<b className="vrm-lit-total">{n}</b><span>{tr('ventes.cours')}</span>
+      {/* (23 nov., lot litiges-retours) UN nombre : avec l'assemblage tous sites, le total ventes + retours d'achat (« au moins »
+          dès qu'un site ou un sens n'est pas lu) ; jamais deux fois sur l'écran (§7). */}
+      {r.etat === 'lu' && (ra ? total > 0 : n > 0) ? (
+        <div className="vrm-lit-resume" data-litiges-resume={n} data-litiges-total-ligne={ra ? total : undefined}>
+          {(ra ? ra.partiel : partiel) ? <span>{tr('stats.moins2')}</span> : null}<b className="vrm-lit-total">{ra ? total : n}</b><span>{tr('ventes.cours')}</span>
+          {ra && ra.nPresses ? <span className="vrm-lit-presses">· {tr('lit2.dontPresses', { n: ra.nPresses })}</span> : null}
         </div>
       ) : null}
       {r.etat === 'lu' && n > 0 ? <div className="vrm-lit-grille">{r.cartes.map((c) => <Carte key={c.cle} c={c} Photo={Photo} onDossier={onDossier} onPasAPas={onPasAPas}/>)}</div> : null}
-      {r.etat === 'lu' && n === 0 ? (
+      {r.etat === 'lu' && n === 0 && !achats.length ? (
         <div className="vrm-lit-vide vrm-vide-dessin" data-litiges-vide={partiel ? 'partiel' : 'zero'}>
           <svg width="72" height="72" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="34" fill="currentColor" opacity=".10"/><path d="M22 37.5 31.5 47 50 26" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           <p className="vrm-lit-vide-titre">{partiel ? tr('ventes.aucunLitigeDans') : tr('ventes.aucunLitigeCours')}</p>
@@ -173,12 +202,25 @@ export default function LitigesEnCours({ r, bi, Photo = null, entete = null, onD
           <div className="vrm-lit-grille">{r.anciennes.map((c) => <Carte key={c.cle} c={c} Photo={Photo} onDossier={onDossier} onPasAPas={onPasAPas}/>)}</div>
         </details>
       ) : null}
-      {r.plateformes.length > 1 || partiel ? (
+      {ra ? (
+        <section className="vrm-lit-achats" data-retours-achat-section={etatAchats || ''} aria-label={tr('lit2.achats.titre')}>
+          <h2 className="vrm-lit-h2">{tr('lit2.achats.titre')}</h2>
+          {etatAchats === 'encours' ? <p className="vrm-lit-note" role="status">{tr('messages.lecture')}</p> : null}
+          {etatAchats === 'passu' && !achats.length ? <p className="vrm-lit-note" data-retours-achat-passu="">{tr('lit2.achats.passu')}</p> : null}
+          {etatAchats === 'lu' && !achats.length ? <p className="vrm-lit-note" data-retours-achat-vide="">{tr('lit2.achats.vide')}</p> : null}
+          {achats.length ? <div className="vrm-lit-grille">{achats.map((l) => <LigneRetourAchat key={l.cle} l={l}/>)}</div> : null}
+        </section>
+      ) : null}
+      {r.plateformes.length > 1 || partiel || ra ? (
         <GroupeIos titre={tr('ventes.vrmLit')} data-litiges-plateformes="" className="vrm-lit-sites">
           {r.plateformes.map((p) => (
             <RangeeIos key={p.site} data-litiges-site={p.site} data-litiges-site-etat={p.etat}
               titre={NOM_SITE[p.site] || p.site} detail={p.raison || null} valeur={p.etat === 'lu' ? '✓' : p.etat === 'encours' ? '…' : '—'}/>
           ))}
+          {ra ? (() => { const p = ra.parSite.find((x) => x.sens === 'achat') || { etat: 'passu' }; return (
+            <RangeeIos key="achats" data-litiges-site="vinted-achats" data-litiges-site-etat={p.etat}
+              titre={tr('lit2.site.achats')} detail={p.raison || null} valeur={p.etat === 'lu' ? '✓' : p.etat === 'encours' ? '…' : '—'}/>
+          ); })() : null}
         </GroupeIos>
       ) : null}
       <RetoursParModele bi={bi}/>

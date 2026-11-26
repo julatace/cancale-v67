@@ -1,0 +1,135 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   REPUBLIER / PUBLIER À LA MAIN — LA FEUILLE REFAITE (23 nov.)
+   ═══════════════════════════════════════════════════════════════════════════
+   Julien, sur trois captures iPhone : « ça doit être beaucoup mieux, plus pratique » ; puis « trop de texte, pas assez de
+   beaux boutons ». Une étape à la fois, une barre de progression fine, la grille de TOUTES les photos (sélection, ordre
+   au glisser), UN bouton plein en bas, la retouche repliée avec de vrais curseurs (un seul trait, poignée ronde, valeur
+   à droite), une phrase courte par étape (le détail sous « Pourquoi ? »). Couleurs : les gris et l'accent du design
+   natif (`--n-*`), AUCUN orange, aucun grand aplat noir (le plein suit `--n-plein`). Cibles au doigt 44 px. */
+.rg2-feuille { --rg2-r: 14px; }
+.rg2-feuille .rg2-muet { margin: 0; font: var(--n-t-second, 400 13px/1.4 system-ui); color: var(--n-encre-2, #5F636A); }
+.rg2-feuille .rg2-ligne { margin: 0; font: var(--n-t-corps, 400 15px/1.4 system-ui); color: var(--n-encre, #16181D); }
+.rg2-feuille .rg2-fort { font-weight: 600; }
+.rg2-feuille .rg2-rangee { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* La paire, en tête : une ligne. */
+.rg2-paire { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.rg2-paire-photo { width: 44px; height: 44px; flex: none; border-radius: 10px; overflow: hidden; background: var(--n-carte-2, #F1F1EF); display: block; }
+.rg2-paire-texte { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.rg2-paire-nom { display: flex; align-items: center; gap: 8px; min-width: 0; font: var(--n-t-corps-fort, 600 15px/1.3 system-ui); color: var(--n-encre, #16181D); }
+.rg2-paire-nom > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* La barre de progression : un trait de 3 px par étape (plein jusqu'à l'étape courante), le mot dessous. */
+.rg2-progres ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rg2-progres li { min-width: 0; }
+html body .rg2-feuille button.rg2-seg {
+  all: unset; box-sizing: border-box; width: 100%; min-height: 44px; display: flex; flex-direction: column; justify-content: center; gap: 6px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.rg2-seg:focus-visible { outline: 2px solid var(--n-accent, #16181D); outline-offset: 2px; border-radius: 6px; }
+.rg2-trait { display: block; height: 3px; border-radius: 999px; background: var(--n-trait, #E4E4E0); }
+.rg2-seg[data-rg-seg="avant"] .rg2-trait, .rg2-seg[data-rg-seg="ici"] .rg2-trait, .rg2-seg[data-main-etape-fait] .rg2-trait { background: var(--n-accent, #16181D); }
+.rg2-mot { display: inline-flex; align-items: center; gap: 3px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: var(--n-t-legende, 400 12px/1.3 system-ui); color: var(--n-encre-2, #5F636A); }
+.rg2-seg[aria-current="step"] .rg2-mot { color: var(--n-encre, #16181D); font-weight: 600; }
+
+/* Une étape : son titre, une ligne, le contenu ; de l'air, pas de cadre. */
+.rg2-feuille .rg2-section { display: flex; flex-direction: column; gap: 12px; }
+.rg2-feuille .rg2-section[hidden] { display: none; }
+.rg2-titre { margin: 4px 0 0; font: 700 22px/1.2 var(--n-police, system-ui); letter-spacing: -.01em; color: var(--n-encre, #16181D); }
+
+/* Ce qui manque : une ligne et UN bouton, en gris (jamais une alerte orange). */
+.rg2-manque { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 12px; border-radius: var(--rg2-r); background: var(--n-carte-2, #F1F1EF); font: var(--n-t-second-fort, 600 13px/1.4 system-ui); color: var(--n-encre, #16181D); }
+
+/* La grille : TOUTES les photos ; sur la tuile seulement la photo, son rang (ou « Couverture ») et la case ronde. */
+.rg2-grille { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; -webkit-user-select: none; user-select: none; }
+@media (min-width: 600px) { .rg2-grille { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; } }
+.rg2-tuile { position: relative; aspect-ratio: 1 / 1; border-radius: 12px; overflow: hidden; background: var(--n-carte-2, #F1F1EF); transition: transform 160ms ease-out, box-shadow 160ms ease-out; }
+.rg2-tuile[data-rg-tenue] { transform: scale(.94); opacity: .7; }
+.rg2-tuile[data-rg-cible] { box-shadow: 0 0 0 3px var(--n-accent, #16181D); }
+html body .rg2-feuille button.rg2-tuile-b {
+  all: unset; box-sizing: border-box; position: absolute; inset: 0; display: block; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none; touch-action: manipulation;
+}
+.rg2-tuile-b:focus-visible { outline: 3px solid var(--n-accent, #16181D); outline-offset: -3px; border-radius: 12px; }
+.rg2-tuile-b img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; -webkit-user-drag: none; transition: opacity 160ms ease; }
+.rg2-tuile-b[aria-pressed="false"] img { opacity: .35; filter: grayscale(1) !important; }
+.rg2-rang {
+  position: absolute; left: 6px; bottom: 6px; max-width: calc(100% - 12px); box-sizing: border-box; padding: 2px 7px; border-radius: 999px;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: 600 11px/1.45 var(--n-police, system-ui); font-variant-numeric: tabular-nums;
+  color: #16181D; background: rgb(255 255 255 / .9);
+}
+.rg2-coche {
+  position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 999px; display: grid; place-items: center; box-sizing: border-box;
+  background: rgb(255 255 255 / .78); border: 1.5px solid rgb(22 24 29 / .28); color: var(--n-sur-plein, #fff);
+}
+.rg2-tuile-b[aria-pressed="true"] .rg2-coche { background: var(--n-plein, #16181D); border-color: transparent; }
+
+/* La retouche, repliée : une rangée de 44 px « Retouche · Aucune › ». */
+.rg2-feuille .rg2-repli { border-radius: var(--rg2-r); background: var(--n-carte-2, #F1F1EF); padding: 0 14px; }
+.rg2-feuille .rg2-repli > summary {
+  min-height: 48px; display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; -webkit-tap-highlight-color: transparent;
+  font: var(--n-t-corps-fort, 600 15px/1.3 system-ui); color: var(--n-encre, #16181D);
+}
+.rg2-feuille .rg2-repli > summary::-webkit-details-marker { display: none; }
+.rg2-feuille .rg2-repli > summary > span:first-child { flex: 1; }
+.rg2-repli-etat { font: var(--n-t-second, 400 13px/1.4 system-ui); color: var(--n-encre-2, #5F636A); }
+.rg2-repli > summary > svg { color: var(--n-encre-3, #8E9197); transition: transform 160ms ease-out; }
+.rg2-repli[open] > summary > svg { transform: rotate(90deg); }
+.rg2-repli[open] { padding-bottom: 14px; }
+.rg2-repli[open] > :not(summary) + :not(summary) { margin-top: 12px; }
+
+.rg2-retouche { display: flex; flex-direction: column; gap: 4px; }
+.rg2-avant-apres { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+.rg2-avant-apres figure { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.rg2-ap-photo { display: block; aspect-ratio: 4 / 5; max-height: 220px; border-radius: 12px; overflow: hidden; background: var(--n-carte, #fff); }
+.rg2-avant-apres figcaption { text-align: center; font: var(--n-t-legende, 400 12px/1.3 system-ui); color: var(--n-encre-2, #5F636A); }
+.rg2-puces { margin: 4px 0; }
+
+/* UN curseur : nom à gauche · UNE piste (le trait plein va du zéro à la valeur) avec sa poignée ronde · valeur à droite.
+   La piste est dessinée ici ; le curseur natif est posé dessus, invisible (doigt, clavier, lecteur d'écran). Sa poignée
+   fait 28 px : la piste dessinée est rentrée de 14 px de chaque côté, la poignée dessinée tombe sous le doigt. */
+.rg2-curseur { display: grid; grid-template-columns: minmax(84px, 7.5em) minmax(0, 1fr) 3.6em; align-items: center; gap: 10px; min-height: 44px; }
+.rg2-curseur label { font: var(--n-t-corps, 400 15px/1.3 system-ui); color: var(--n-encre, #16181D); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rg2-curseur output { text-align: right; font: 600 14px/1.3 var(--n-police, system-ui); font-variant-numeric: tabular-nums; color: var(--n-encre, #16181D); }
+.rg2-curseur[data-rg-curseur-neutre] output { font-weight: 500; color: var(--n-encre-2, #5F636A); }
+.rg2-zone { position: relative; display: block; height: 44px; }
+.rg2-piste { position: absolute; left: 14px; right: 14px; top: 50%; height: 4px; margin-top: -2px; border-radius: 999px; background: var(--n-trait, #E4E4E0); }
+.rg2-rempli { position: absolute; top: 0; bottom: 0; border-radius: 999px; background: var(--n-accent, #16181D); }
+.rg2-zero { position: absolute; top: -4px; width: 2px; height: 12px; margin-left: -1px; border-radius: 1px; background: var(--n-encre-3, #8E9197); }
+.rg2-poignee {
+  position: absolute; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 999px; box-sizing: border-box;
+  background: #fff; border: .5px solid rgb(0 0 0 / .06); box-shadow: 0 1px 2px rgb(0 0 0 / .18), 0 3px 8px rgb(0 0 0 / .12);
+}
+html body .rg2-feuille input.rg2-natif {
+  -webkit-appearance: none; appearance: none; position: absolute; inset: 0; width: 100%; height: 44px; margin: 0; padding: 0; opacity: 0; cursor: pointer;
+  background: transparent; touch-action: pan-y;
+}
+html body .rg2-feuille input.rg2-natif::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 44px; }
+html body .rg2-feuille input.rg2-natif::-moz-range-thumb { width: 28px; height: 44px; border: 0; }
+.rg2-zone:focus-within .rg2-poignee { box-shadow: 0 0 0 3px var(--n-teinte, rgb(22 24 29 / .12)), 0 1px 2px rgb(0 0 0 / .18); }
+
+/* L'ancienne annonce : son état en une ligne, « Relire » au bout. */
+.rg2-etat { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; }
+.rg2-etat p, .rg2-etat .vrm-acc-apres { margin: 0; }
+
+/* Le pied, collé en bas de la feuille : Retour · Passer · LE geste (plein, qui prend la place). */
+.rg2-feuille .rg2-pied {
+  position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 8px;
+  margin: 8px -16px -16px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--n-carte, #fff); border-top: .5px solid var(--n-trait, #E4E4E0);
+}
+.rg2-feuille .rg2-pied > :last-child { flex: 1; min-width: 0; }
+.rg2-feuille .rg2-pied > :last-child .n-bouton, .rg2-feuille .rg2-pied > .n-bouton:last-child { width: 100%; min-height: 50px; justify-content: center; border-radius: 14px; }
+.rg2-feuille .rg2-pied > :not(:last-child) { flex: none; }
+.rg2-feuille .rg2-pied .n-bouton { white-space: nowrap; }
+/* (23 nov., banc H10) « Pass / er », « Ret / our » : la coque remet `white-space` du bouton (revert-layer, sélecteur à id)
+   et le libellé natif coupe partout (`overflow-wrap: anywhere`) — le libellé du pied tient donc sur UNE ligne. */
+.rg2-feuille .rg2-pied .n-bouton-libelle { white-space: nowrap; overflow-wrap: normal; }
+/* Le plein de la feuille suit le plein natif (`--n-plein`) : l'ardoise du design gris clair dès qu'il est sur main. */
+
+/* « Supprimée », « dans ta galerie » : la ligne de résultat, sans encadré. */
+.rg2-feuille .vrm-acc-apres { margin: 0; }
+/* Aucun orange dans la feuille : ce qui était « ambre » est en gras, dans l'encre. */
+.rg2-feuille .vrm-rm-ambre { color: var(--n-encre, #16181D) !important; font-weight: 600; background: none !important; }
+/* L'échec (photo pas lue, partage refusé) : un point gris foncé, pas ambre — la phrase dit ce qu'il faut faire. */
+.rg2-feuille .vrm-acc-point { background: var(--n-encre-2, #5F636A) !important; }

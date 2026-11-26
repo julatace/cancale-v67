@@ -113,7 +113,9 @@ const res = (pg) => pg.evaluate(() => ({
         await r.pg.click('[data-zoom-choix="pres"]'); await r.pg.waitForTimeout(250);
         const l2 = await larg();
         await r.pg.click('[data-zoom-choix="loin"]'); await r.pg.waitForTimeout(250);
-        dit(l1 > 0 && l1 <= 66 && l2 > l1 + 10, `${t} : vue de loin par défaut (cases ≤ 64 px), « De près » les agrandit`, `${l1} → ${l2}`);
+        // (16 nov., lot stock-mieux) À 390, le meuble est une CARTE (marges du verre) : 4 colonnes « de près » prennent
+        // toute la largeur restante (≈ 69 px, contre 75 sans la carte) : au téléphone, « agrandit » suffit.
+        dit(l1 > 0 && l1 <= 66 && (tel ? l2 > l1 : l2 > l1 + 10), `${t} : vue de loin par défaut (cases ≤ 64 px), « De près » les agrandit`, `${l1} → ${l2}`);
         // Règles : colonnes au-dessus, rangées à gauche.
         const regle = await r.pg.evaluate(() => ({ c: [...document.querySelectorAll('[data-meuble="mA"] [data-regle-col]')].map((x) => x.innerText).join(','), r: [...document.querySelectorAll('[data-meuble="mA"] [data-regle-rang]')].map((x) => x.innerText).join(',') }));
         dit(regle.c === '1,2,3,4' && regle.r === '1,2,3', `${t} : le meuble porte ses repères (colonnes 1-4, rangées 1-3)`, JSON.stringify(regle));

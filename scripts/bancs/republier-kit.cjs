@@ -213,14 +213,17 @@ const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySele
           await poseeLa(pg, '[data-repub-main]');
           dit((await pg.getAttribute('[data-repub-main]', 'data-main-rang')) === '1/2' && !(await pg.$('[data-kit-main]')), `P ${T} « Pas à pas » : la feuille en cinq étapes, « Paire 1/2 », le kit fermé`);
           await clic(pg, '[data-main-aller="photos"]');
-          await clic(pg, '[data-main-telecharger]');
-          await attendre(pg, () => document.querySelector('[data-main-photo-une="1"]') ? 1 : null);
+          // (23 nov., Julien : « Une seule ? Touche son bouton sur la photo » — confus) Une photo seule : retirer l'autre
+          //  d'un toucher dans la grille, puis LE bouton du pied ⇒ seule la 2e part (VRM-42-01.jpg : la 1re de celles qui restent).
+          await attendre(pg, () => document.querySelector('[data-repub-main] [data-rg-photo-choix="0"]') ? 1 : null);
+          await clic(pg, '[data-repub-main] [data-rg-photo-choix="0"]');
+          await attendre(pg, () => { const x = document.querySelector('[data-repub-main] [data-main-telecharger]'); return x && x.getAttribute('data-rg-photos-pretes') === '1' ? 1 : null; }, 20000);
           const avant = dl.length, avantP = (await pg.evaluate(() => window.__partages.length));
-          await clic(pg, '[data-main-photo-une="1"]');
-          await pg.waitForTimeout(600);
-          const une = await pg.evaluate(() => ({ p: window.__partages.slice(-1)[0] || [], fait: (document.querySelector('[data-main-photo-une="1"]') || {}).getAttribute ? document.querySelector('[data-main-photo-une="1"]').getAttribute('data-main-photo-une-fait') : null }));
-          const seule = tel ? (await pg.evaluate(() => window.__partages.length)) === avantP + 1 && une.p.join(',') === 'VRM-42-02.jpg' : dl.slice(avant).join(',') === 'VRM-42-02.jpg';
-          dit(seule && une.fait === '1', `P ${T} une photo préparée s’enregistre SEULE (VRM-42-02.jpg)`, JSON.stringify({ une, dl: dl.slice(avant) }));
+          await clic(pg, '[data-repub-main] [data-rg-pied] [data-main-telecharger]');
+          await pg.waitForTimeout(800);
+          const une = await pg.evaluate(() => ({ p: window.__partages.slice(-1)[0] || [], tuile: !!document.querySelector('[data-repub-main] [data-rg-photo] [data-main-photo-une]') }));
+          const seule = tel ? (await pg.evaluate(() => window.__partages.length)) === avantP + 1 && une.p.join(',') === 'VRM-42-01.jpg' : dl.slice(avant).join(',') === 'VRM-42-01.jpg';
+          dit(seule && !une.tuile, `P ${T} une photo seule : l’autre retirée d’un toucher, puis le bouton du pied (aucun bouton posé sur la tuile)`, JSON.stringify({ une, dl: dl.slice(avant) }));
           const p2 = await petitsDans(pg, '[data-repub-main]');
           if (tel) dit(!p2.length, `F ${T} cibles ≥ 44 px (photos)`, p2.join(' | '));
           await pg.screenshot({ path: nomF('3-photo-seule') });
