@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (26 nov., ext-5454 — six lots de l'extension réunis : republication, Vestiaire, Leboncoin, anciens lots, adaptatif, quatre sites) docs/passation/2026-11-26-ext-5454.md
+  { id: 'extension-5454', date: '2026-11-26', titre: 'Extension 5.454 : six chantiers réunis', phrase: 'Republier, Vestiaire, Leboncoin, quatre sites : une seule version.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (26 nov., couleurs-14-15 — Julien : « j'aime bien le 14 et 15 » → « 14 en sombre, 15 en clair ») src/natif/jetons.css
   { id: 'couleurs-14-15', date: '2026-11-26', titre: 'Nouvelles couleurs : blanc et graphite', phrase: 'Clair : noir et blanc. Sombre : graphite et vert.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (26 nov., classement-propre — capture de Julien : « c'est de la merde ») src/communaute/Communaute.jsx · communaute.css
@@ -112,6 +114,22 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'favoris-ancien', date: '2026-11-24', titre: 'Favoris : plus de « trop ancien » à tort', phrase: 'Les notifications sont lues jusqu’au bout avant de sauter un favori.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (24 nov., style-graphite — Julien : « un peu plus foncé en gris […] améliore tous les boutons […] change de style pour l'iPhone ») docs/passation/2026-11-24-style-graphite.md
   { id: 'styles-a-essayer', date: '2026-11-24', titre: 'Onze styles à essayer, dont Monochrome', phrase: 'Paramètres → Apparence → Style : touche, c’est appliqué.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (24 nov., ext. 5.447) docs/passation/2026-11-24-republication-reperage.md
+  { id: 'repub-reperage', date: '2026-11-24', titre: 'Republier : VRM retrouve seul chaque bouton', phrase: 'Un bouton en double ou introuvable : rien ne part, c’est dit.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (24 nov., ext-anciens-lots — repris de #1219, Julien : « VRM la reconnaît parce que la photo utilisée est exactement la même »)
+  // docs/passation/2026-11-24-ext-anciens-lots.md
+  { id: 'photo-origine', date: '2026-11-24', titre: 'Même photo d’origine : déjà reliée', phrase: 'Envoyée depuis ton Chrome sur Leboncoin : elle prend le N° Vinted.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (24 nov., ext. 5.448 — Julien : « elle doit pouvoir marcher sur tous les sites, s'adapter ») docs/passation/2026-11-24-ext-adaptatif.md
+  { id: 'extension-sante-sites', date: '2026-11-24', titre: 'Santé de chaque site dans l’extension', phrase: '« Tout marche », ou ce qui ne marche plus et le geste.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'extension-adaptative', date: '2026-11-24', titre: 'L’extension s’adapte quand un site change', phrase: 'Vinted, Leboncoin, Vestiaire, eBay : bouton retrouvé, sinon arrêt expliqué.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (24 nov., quatre-sites — Julien : « 1 paire → 4 sites ») docs/passation/2026-11-24-quatre-sites.md
+  { id: 'mettre-aussi-sur', date: '2026-11-24', titre: 'Une annonce Vinted sur trois autres sites', phrase: 'Fiche d’une paire → Ailleurs : Leboncoin, Vestiaire et eBay en un geste.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (24 nov., lbc-numero-ecrit — Julien : « Oui, relie par le N° ») docs/passation/2026-11-24-lbc-numero-ecrit.md
+  { id: 'lbc-numero-ecrit', date: '2026-11-24', titre: 'Leboncoin : relié par le N° écrit', phrase: 'Finis la description par « N°132 » : l’annonce rejoint la paire 132.', tab: 'leboncoin', pour: 'tous', mode: 'tous' },
+  // (23 nov., extension 5.444 — Julien : « le panneau de l'extension n'affiche rien ») docs/passation/2026-11-23-vestiaire-complet.md
+  { id: 'vestiaire-complet', date: '2026-11-24', titre: 'Vestiaire : litiges, achats et panneau réparés', phrase: 'Ventes à l’état juste, frise datée, achats et favoris dans l’extension.', tab: 'plat_vestiaire', pour: 'tous', mode: 'tous' },
+  // (23 nov., ext. 5.445 — Julien : « pareil pour Leboncoin ») docs/passation/2026-11-23-leboncoin-complet.md
+  { id: 'lbc-panneau', date: '2026-11-24', titre: 'Leboncoin : le panneau montre tout', phrase: 'Annonces, ventes, achats, colis, messages, porte-monnaie, sur leboncoin.fr.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., lot historique-paire) docs/passation/2026-11-23-historique-paire.md
   { id: 'historique-rangee', date: '2026-11-23', titre: 'Quand ta paire a été rangée', phrase: 'La case du Stock entre dans l’histoire de la paire.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (23 nov., lot rentabilite-source) docs/passation/2026-11-23-rentabilite-source.md
@@ -126,20 +144,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'revue-ux-23nov', date: '2026-11-23', titre: 'Achats et fiches plus clairs', phrase: 'La liste d’abord, le prix d’achat dans la fiche, photos des disparues.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov. soir, ext. 5.440.1 — Julien : « 0 envoyé · 1 sauté », phrase coupée) docs/passation/2026-11-23-favoris-identite.md
   { id: 'favoris-identite', date: '2026-11-23', titre: 'Messages aux favoris : le nouveau lien de Vinted', phrase: 'Un favori pas confirmé est dit et sauté, la file continue.', tab: 'extension', pour: 'tous', mode: 'tous' },
-  // (24 nov., ext. 5.447) docs/passation/2026-11-24-republication-reperage.md
-  { id: 'repub-reperage', date: '2026-11-24', titre: 'Republier : VRM retrouve seul chaque bouton', phrase: 'Un bouton en double ou introuvable : rien ne part, c’est dit.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., ext. 5.441) docs/passation/2026-11-23-favoris-541.md
   { id: 'relances-texte-neuf', date: '2026-11-23', titre: 'Relance : jamais deux fois le même message', phrase: 'Une même personne ne reçoit jamais deux fois le même texte.', tab: 'extension', pour: 'tous', mode: 'tous' },
-  // (24 nov., ext-anciens-lots — repris de #1219, Julien : « VRM la reconnaît parce que la photo utilisée est exactement la même »)
-  // docs/passation/2026-11-24-ext-anciens-lots.md
-  { id: 'photo-origine', date: '2026-11-24', titre: 'Même photo d’origine : déjà reliée', phrase: 'Envoyée depuis ton Chrome sur Leboncoin : elle prend le N° Vinted.', tab: 'annonces', pour: 'tous', mode: 'tous' },
-  // (24 nov., ext. 5.448 — Julien : « elle doit pouvoir marcher sur tous les sites, s'adapter ») docs/passation/2026-11-24-ext-adaptatif.md
-  { id: 'extension-sante-sites', date: '2026-11-24', titre: 'Santé de chaque site dans l’extension', phrase: '« Tout marche », ou ce qui ne marche plus et le geste.', tab: 'extension', pour: 'tous', mode: 'tous' },
-  { id: 'extension-adaptative', date: '2026-11-24', titre: 'L’extension s’adapte quand un site change', phrase: 'Vinted, Leboncoin, Vestiaire, eBay : bouton retrouvé, sinon arrêt expliqué.', tab: 'extension', pour: 'tous', mode: 'tous' },
-  // (24 nov., quatre-sites — Julien : « 1 paire → 4 sites ») docs/passation/2026-11-24-quatre-sites.md
-  { id: 'mettre-aussi-sur', date: '2026-11-24', titre: 'Une annonce Vinted sur trois autres sites', phrase: 'Fiche d’une paire → Ailleurs : Leboncoin, Vestiaire et eBay en un geste.', tab: 'annonces', pour: 'tous', mode: 'tous' },
-  // (24 nov., lbc-numero-ecrit — Julien : « Oui, relie par le N° ») docs/passation/2026-11-24-lbc-numero-ecrit.md
-  { id: 'lbc-numero-ecrit', date: '2026-11-24', titre: 'Leboncoin : relié par le N° écrit', phrase: 'Finis la description par « N°132 » : l’annonce rejoint la paire 132.', tab: 'leboncoin', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md
   { id: 'vente-email-partout', date: '2026-11-23', titre: 'Une vente reçue par e-mail se voit partout', phrase: 'Ventes, Ma journée et Colis, avant même le passage de l’extension.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov. au soir, lot retours-suivi — Julien : « le transporteur inconnu, le logo mal mis ») docs/passation/2026-11-23-retours-suivi.md
@@ -148,10 +154,6 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'retours-achat-suivi', date: '2026-11-23', titre: 'Tes retours suivis jusqu’au remboursement', phrase: 'Chaque étape cochée, mise à jour toute seule, boutons clairs.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov., photos-nettes — Julien : « toutes les photos sont floues ») docs/passation/2026-11-23-photos-nettes.md
   { id: 'photos-nettes', date: '2026-11-23', titre: 'Photos plus nettes, surtout en grand', phrase: 'La plus grande taille connue s’affiche dès qu’elle est chargée.', tab: 'achats', pour: 'tous', mode: 'tous' },
-  // (23 nov., extension 5.444 — Julien : « le panneau de l'extension n'affiche rien ») docs/passation/2026-11-23-vestiaire-complet.md
-  { id: 'vestiaire-complet', date: '2026-11-24', titre: 'Vestiaire : litiges, achats et panneau réparés', phrase: 'Ventes à l’état juste, frise datée, achats et favoris dans l’extension.', tab: 'plat_vestiaire', pour: 'tous', mode: 'tous' },
-  // (23 nov., ext. 5.445 — Julien : « pareil pour Leboncoin ») docs/passation/2026-11-23-leboncoin-complet.md
-  { id: 'lbc-panneau', date: '2026-11-24', titre: 'Leboncoin : le panneau montre tout', phrase: 'Annonces, ventes, achats, colis, messages, porte-monnaie, sur leboncoin.fr.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., ext. 5.440 — Julien : « l'app doit s'adapter toute seule au bouton favoris ») docs/passation/2026-11-23-favoris-auto.md
   { id: 'favoris-sans-geste', date: '2026-11-23', titre: 'Messages aux favoris : plus aucun geste demandé', phrase: 'VRM trouve seul la cloche de Vinted et montre chaque envoi.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., audit « chaque bouton marche ») docs/passation/2026-11-23-audit-boutons.md

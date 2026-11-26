@@ -179,6 +179,8 @@ const PAGE_VC = (o) => `<!doctype html><html lang="fr"><head><meta charset="utf-
 <header><b style="margin-right:auto">Vestiaire Collective</b><input type="search" placeholder="Rechercher" style="width:240px;margin:0"></header><main>${o.corps}</main>
 <script>(() => {
   window.__envoye = [];
+  // (5.454) le pont de vc.js (canal privé de la 5.446) : ici la page du banc joue les deux bouts, par window.
+  window.__vrmVcPont = Object.freeze({ ecouter: (f) => window.addEventListener('message', (ev) => f(ev.data)), envoyer: (m) => { window.postMessage(m, location.origin); return true; } });
   window.addEventListener('message', (ev) => { const d = ev.data; if (!d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'convouverte') return; window.postMessage({ __tag: 'CANCALE_VC', kind: 'vcconvouverte', jeton: d.jeton, conv: '${VCONV}', moi: 'vc-moi', at: Date.now() }, location.origin); });
   document.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('button'); if (!b || !b.hasAttribute('data-envoi')) return;
