@@ -127,7 +127,7 @@ const achat = (tx, title, t, status = FINI, prix = '35.0', extra = {}) => ({ tra
   const sv = S.suggestionsAchat({ cible: { titre: cible.titre, marque: 'adidas', taille: '42', dateRef: cible.dateRef, curTx: '' }, achats: [auPoint], liens: new Map(), ...regles });
   dit(sv.length === 0, 'C14 l’ancienne suggestion (`suggestionsAchat`) ne propose pas non plus un achat au point');
   // L'app : la règle publiée, passée à chaque feuille, le geste « Je l'ai retiré ».
-  dit(/publierChezMoi\(m\)/.test(APPs) && /etatChezMoi\(o, \{ retireClic: !!\(pickupDone\[tx\]/.test(APPs) && /finiSuivi: !!\(pickupUnion\.txFinis/.test(APPs),
+  dit(/publierChezMoi\((m|chezMoiParTx)\)/.test(APPs) && /etatChezMoi\(o, \{ retireClic: !!\(pickupDone\[tx\]/.test(APPs) && /finiSuivi: !!\(pickupUnion\.txFinis/.test(APPs),
     'C15 l’écran Achats PUBLIE la règle avec SES preuves (toucher « Je l’ai retiré », retrait prouvé par le suivi)');
   dit(/<LierAchatGrille[\s\S]{0,400}chezMoiDe=\{chezMoiDe\} onRetire=\{markPickupDone\}/.test(APPs) && /<RelierAchatCorps[\s\S]{0,900}chezMoiDe=\{chezMoiDe\} chezMoiCle=\{chezMoiParTx\} onRetire=\{markPickupDone\}/.test(APPs)
     && /recuDe=\{\(a\)=>chezMoiDe\(a\)\.chez\}/.test(APPs), 'C16 « Lier à un achat », « Relier un achat » et « Relier achats et ventes » reçoivent la règle et « Je l’ai retiré »');

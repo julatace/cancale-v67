@@ -71,12 +71,19 @@ test("A1 — aucune écriture d'offre vers Vinted ne part plus de l'app", () => 
   assert.doesNotMatch(app, /transactions\/\$\{[^}]*\}\/offers/, "aucune contre-offre");
   assert.doesNotMatch(app, /\bconst\s+actionOffre\s*=/, "le geste retiré n'est pas revenu");
 });
-test("A2 — la carte d'offre ouvre le panneau de l'extension sur CETTE conversation", () => {
+// (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3 « tout faire depuis VRM si l'extension est connectée ») la carte
+// d'offre AGIT depuis VRM par la porte, sur CETTE conversation (son n°, tx, offer_request_id) ; pas connecté ⇒ éteinte avec
+// sa raison. Le panneau (lien `offres` ⇒ Messages, UN n° la choisit) reste le chemin de l'extension.
+test("A2 — la carte d'offre agit sur CETTE conversation (depuis VRM par la porte ; le panneau la choisit par son n°)", async () => {
   const app = fs.readFileSync(new URL("../../src/App.jsx", import.meta.url), "utf8");
-  const i = app.indexOf("data-offre-panneau={String(openConv.convId");
+  const i = app.indexOf("data-offre-app={String(openConv.convId");
   assert.ok(i > 0, "la carte d'offre porte le n° de la conversation ouverte");
   const bloc = app.slice(i, app.indexOf("</div>", i));
-  assert.match(bloc, /<BoutonExtension[^>]*action="offres"[^>]*ids=\{\[String\(openConv\.convId\|\|''\)\]\}/, "le bouton ouvre le panneau avec CETTE conversation");
+  assert.match(bloc, /<GestesOffreVinted compte=\{String\(openConv\.acc\?\.vinted_user_id\|\|''\)\} tx=\{off\.tx\} oid=\{off\.oid\} conv=\{openConv\.convId\}/, "les gestes visent CETTE conversation, CETTE offre, SON compte");
+  const AGIR = sansCommentaires(fs.readFileSync(new URL("../../src/agir/Agir.jsx", import.meta.url), "utf8"));
+  const r = await require("../_porte-agir.cjs").offreVinted(sansCommentaires(app), AGIR);
+  assert.ok(r.ok, "par la porte (exécutée), CETTE offre, Accepter confirmé : " + r.detail);
+  assert.match(AGIR, /const ids = \{ tx: String\(tx\), oid: String\(oid\), \.\.\.\(conv != null \? \{ conv: String\(conv\) \} : \{\}\) \};/, "le n° de la conversation part avec le geste");
   const url = new URL(lienPanneau({ site: "vinted", page: ACTIONS_EXTENSION.offres.page, ids: ["301"], action: ACTIONS_EXTENSION.offres.action }));
   assert.equal(url.hostname, "www.vinted.fr");
   assert.equal(url.searchParams.get("vrm"), "panneau");

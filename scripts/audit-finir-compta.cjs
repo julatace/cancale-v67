@@ -63,7 +63,11 @@ function controle(APP, MSG) {
   dit(ps && /pas lues/i.test(ps.note), 'A. commandes eBay illisibles (null) : « pas lues », jamais « pas encore de vente »', ps && ps.note);
   let ec; try { ec = ctx.caParPlateforme({ caEncaisse: 1 }, { ventes: [] }, null, undefined).find((x) => x.nom === 'eBay'); } catch (e) { ec = { note: 'ERREUR' }; }
   dit(ec && /en cours/i.test(ec.note), 'A. lecture pas finie : « lecture en cours »', ec && ec.note);
-  dit(/<Dashboard [^>]*ebayCommandes=\{ebayCommandes\}/.test(APP), 'A. la coque passe les commandes eBay au Tableau de bord');
+  // (24 nov., main-vert) `<Dashboard pilotage={… <StatsPilotageApp …/> …}` : un `>` vit dans ses props ⇒ on lit la balise
+  // jusqu'à SON `/>` (la fin de GardeEcran), plus jusqu'au premier `>`.
+  const iDash = APP.indexOf('<Dashboard ');
+  const baliseDash = iDash >= 0 ? APP.slice(iDash, APP.indexOf('</GardeEcran>', iDash)) : '';
+  dit(/\sebayCommandes=\{ebayCommandes\}/.test(baliseDash), 'A. la coque passe les commandes eBay au Tableau de bord');
 
   // ── B ─────────────────────────────────────────────────────────────────────
   let regle = null;

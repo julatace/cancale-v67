@@ -24,7 +24,7 @@ import {favorisDepuisNotifications,indexerContactsFavoris} from '../../src/favor
 import {etatFavori,pseudoFavori,titreNotification,itemIdFavori} from '../../src/favorisEcran.js';
 import {etatDressingAuto,etatAnnonceAuto} from '../../src/favorisAuto.js';
 import {personnaliserMessageFavori,prixOffreFavori} from '../../src/favorisMessage.js';
-import {progressionFavoris} from '../../src/favorisProgression.js';
+import {progressionFavoris,bilanFavoris} from '../../src/favorisProgression.js';
 
 // Une fois lancée depuis la carte, la file part au rythme des gardes de l'extension :
 // 15 favoris par heure au plus (sécurité des comptes). La carte propose donc les 15
@@ -41,12 +41,16 @@ const titreItem = (it) => (it && typeof it.title === 'string' ? it.title.replace
 // Le suivi de la file, en nombres (rien d'autre) : ce que la carte montre pendant l'envoi.
 export function resumeFileCarte(vue, maintenant = Date.now()) {
   if (!vue || !Array.isArray(vue.jobs)) return null;
-  const p = progressionFavoris(vue, maintenant);
+  const p = progressionFavoris(vue, maintenant), b = bilanFavoris(p.jobs);
   const raisons = {};
   for (const j of p.jobs) if (['refuse', 'incertain'].includes(j.etat)) raisons[j.raison || j.etat] = (raisons[j.raison || j.etat] || 0) + 1;
   return { active: vue.active === true, total: p.total, envoyes: p.envoyes, ignores: p.ignores, attente: p.attente, encours: p.encours,
     incertains: p.incertains, refuses: p.refuses, annules: p.annules, prochain: vue.active && Number(vue.prochain) > 0 ? Number(vue.prochain) : null,
-    raison: vue.raison || '', raisons };
+    raison: vue.raison || '', raisons,
+    // 5.440.1 : les nombres de la fenêtre et du panneau viennent de LA règle du bilan (`bilanFavoris`) : un « pas envoyé »
+    //    n'est jamais compté « sauté », et l'inverse ; la raison d'une file en pause porte son code (traduit par l'extension).
+    sautes: b.sautes, pasEnvoyes: b.refuses,
+    ...(vue.raisonCode ? { raisonCode: vue.raisonCode, ...(vue.raisonRefus ? { raisonRefus: vue.raisonRefus } : {}), ...(vue.raisonN ? { raisonN: vue.raisonN } : {}) } : {}) };
 }
 
 // 5.379 : les favoris LUS, pour les montrer (jamais pour envoyer) : les plus récents d'abord

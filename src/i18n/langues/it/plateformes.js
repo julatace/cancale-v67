@@ -32,4 +32,7 @@ export default {
   "plateformes.vc.chercher": "N°, titolo…",
   "plateformes.vc.chercherLabel": "Cerca un annuncio Vestiaire (N°, titolo)",
   "plateformes.vendreEbay": "Vendi su eBay",
+  "fp.libelle": "Filtra per piattaforma",
+  "fp.toutes": "Tutte",
+  "fp.seulement": "Solo {site}",
 };

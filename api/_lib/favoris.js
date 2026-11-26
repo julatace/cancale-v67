@@ -3,7 +3,7 @@ import {vendeurExige,lireCommeVendeur} from './session.js';
 import {modifierNeutre} from './neutre-cas.js';
 import {resoudreCiblesFavoris} from './favoris-cibles.js';
 import {lirePreuvesConversationsFavoris} from './favoris-preuves.js';
-import {initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,reprendreFile,RefusFavoris} from './favoris-file.js';
+import {ordreRecents,initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,trancherIncertain,reprendreFile,RefusFavoris} from './favoris-file.js';
 import {validerReglagesFavoris} from '../../src/reglagesFavoris.js';
 import {sendPushToAll,pushCategorieActive} from './push.js';
 import {contexteVendeur} from './owner.js';
@@ -268,6 +268,7 @@ export async function routeFavoris(req,res){
             targets=resoudreCiblesFavoris({...opts,conversations,parametresAilleurs});
           }
         }
+        targets=ordreRecents(targets,t=>{const n=parId.get(t.notificationId);return n&&(n.updated_at||n.created_at);});
         const lot=randomUUID();const offre=p.offreMode?{mode:p.offreMode,valeur:p.offreMode==='pct'?p.pourcentage:p.offreValeur,arrondi:p.arrondi===true}:null;
         decision=d=>lancerFile(d,{owner,targets,message,variantes:p.variantes||null,intervalleMinutes:p.intervalleMinutes,intervalleMax:p.intervalleMaxMinutes,maintenant,lot,pourcentage:p.pourcentage,offre,
           // (19 nov., 5.409) Le rythme : celui choisi pour CET envoi (étape « Rythme » de la carte), sinon ses réglages ;
@@ -311,6 +312,7 @@ export async function routeFavoris(req,res){
         decision=d=>verifierReservation(d,{owner,jeton:c.jeton,maintenant});
       }else if(c.action==='arreter')decision=d=>arreterFile(d,owner);
       else if(c.action==='clore')decision=d=>cloreIncertains(d,{owner,maintenant});
+      else if(c.action==='trancher')decision=d=>trancherIncertain(d,{owner,notificationId:c.notificationId,parti:c.parti,maintenant});   // 26 nov. : SON choix sur un envoi incertain
       else throw new RefusFavoris('Commande inconnue.',400);
     }
     const r=await modifierNeutre(cle,decision);

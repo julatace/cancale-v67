@@ -15,6 +15,7 @@ export default {
   "scan.r.taper": "Nummer eintippen",
   "scan.r.saisie": "Sendungsnummer",
   "scan.r.ok": "OK",
+  "scan.r.okRaison": "Gib zuerst die Sendungsnummer ein",
   "scan.r.attente": "Deine Verkäufe und Käufe werden gelesen…",
   "scan.r.autre": "Weiteres Paket scannen",
   "scan.r.sansTitre": "Ohne Titel",

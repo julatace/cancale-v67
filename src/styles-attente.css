@@ -12,7 +12,10 @@
 .vrm-attente-cache { position: absolute; left: 0; right: 0; top: 0; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; }
 /* Il arrive d'UN bloc, en fondu (opacité seule : un transform décalerait les
    feuilles en position fixe). `backwards`, jamais `both` (index.html). */
-.vrm-attente-pret { animation: vrm-attente-apparait .18s cubic-bezier(.22, 1, .36, 1) backwards; }
+/* (25 nov., chargement propre) 140 ms (≤ 150 ms) : une section entière apparaît d'un coup, jamais élément par élément ;
+   rien sous « réduire les animations ». */
+.vrm-attente-pret { animation: vrm-attente-apparait .14s cubic-bezier(.22, 1, .36, 1) backwards; }
+@media (prefers-reduced-motion: reduce) { .vrm-attente-pret { animation: none; } }
 /* (22 nov., « zéro saut ») Le fondu part de 0,85 (comme le passage d’onglet) : parti de 0, sa première image restait vide au téléphone occupé (banc couches-chargement : un clignotement de ~100 ms). */
 @keyframes vrm-attente-apparait { from { opacity: .85; } to { opacity: 1; } }
 
