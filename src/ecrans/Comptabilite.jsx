@@ -1146,7 +1146,8 @@ const transpParSuivi = (transp) => (Array.isArray(transp) ? indexTranspParSuivi(
 // Mondial Relay, 3 en Shop2Shop) — se limiter aux 3 plus récentes faisait donc
 // disparaître un transporteur sur deux, et avec lui les points où Julien dépose
 // réellement la moitié de ses colis.
-const fetchDropOffPoints = async (uidsVivants) => {
+const fetchDropOffPoints = (uidsVivants) => capturePartagee('depot:' + [...(uidsVivants || [])].map(String).sort().join(','), () => fetchDropOffPointsBase(uidsVivants));
+const fetchDropOffPointsBase = async (uidsVivants) => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_pickup_points&select=id,cap:meta->>capturedAt`, { headers: sbAuth() });
     if (!res.ok) return { carriers: [], capturedAt: null };
@@ -1356,6 +1357,28 @@ const LIGNES_RETOUR_CACHE = { v: undefined, at: 0, p: null };
 // Ma journée). Les QUATRE lectures sont partagées 15 s pour le MÊME vendeur ; une lecture ratée (un seul rejet) ou
 // une écriture vers ces lignes, un signal de l'extension (tout vidé, src/lecturesPartagees.js) ⇒ relue. Le calcul,
 // lui, reste fait par chaque appelant sur SES ventes et annonces.
+// (26 nov., vitesse-webkit) UNE LECTURE DE CAPTURES PARTAGÉE ENTRE LES ÉCRANS MONTÉS (points relais, détails des achats) :
+// chaque `Comptabilite` monté (Aujourd'hui, Achats, Colis…) la lançait à son tour (banc budget-vitesse, Achats : ×2 et ×3).
+// La lecture EN COURS et sa réponse servent 20 s, pour le MÊME vendeur ; oubliées à tout signal de l'extension, au retour du
+// réseau et à toute écriture qui peut porter des captures (`lecturesPartagees`). Une réponse « pas su » (`null`) n'est
+// jamais gardée.
+const _capturesPartagees = new Map();   // cle -> { qui, at, p }
+const oublierCapturesPartagees = () => _capturesPartagees.clear();
+try {
+  const lp0 = typeof window !== 'undefined' ? window.__vrmLecturesPartagees : null;
+  if (lp0 && typeof lp0.abonner === 'function') lp0.abonner('app_data?id=like.harvest_*', oublierCapturesPartagees);
+  if (typeof window !== 'undefined') { window.addEventListener('vrm:ext', oublierCapturesPartagees); window.addEventListener('online', oublierCapturesPartagees); }
+} catch (_) {}
+const capturePartagee = (cle, lire) => {
+  const qui = AUTH.user?.id || '';
+  const e = _capturesPartagees.get(cle);
+  if (e && e.qui === qui && Date.now() - e.at < 20000) return e.p;
+  const p = Promise.resolve().then(lire);
+  const n = { qui, at: Date.now(), p };
+  _capturesPartagees.set(cle, n);
+  p.then((v) => { if (v == null && _capturesPartagees.get(cle) === n) _capturesPartagees.delete(cle); }, () => { if (_capturesPartagees.get(cle) === n) _capturesPartagees.delete(cle); });
+  return p;
+};
 const LECTURES_AILLEURS = { owner: '', at: 0, p: null };
 const oublierLecturesAilleurs = () => { LECTURES_AILLEURS.p = null; LECTURES_AILLEURS.at = 0; };
 try {
@@ -1497,7 +1520,8 @@ const extractPickupPoints = (payload) => {
 // Lit les points relais OFFICIELS captés par l'extension quand Vinted les charge
 // (lignes harvest_{uid}_pickup_points). C'est LA liste que Vinted utilise, autour
 // de l'adresse de livraison. Fusionne tous les comptes, sans doublon.
-const fetchHarvestPickupPoints = async () => {
+const fetchHarvestPickupPoints = () => capturePartagee('points-vinted', fetchHarvestPickupPointsBase);
+const fetchHarvestPickupPointsBase = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_pickup_points&select=id,data`, {
       headers: sbAuth(),
@@ -12721,12 +12745,16 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     let vivant = true;
     (async () => {
       try {
-        const r = await fetch('/api/email-rattacher?mode=reclasser', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: '{}' });
+        // (26 nov., vitesse-webkit) `vrmInvalideSiChange` : le passage ne vide plus TOUTES les lectures partagées au départ et
+        // au retour (banc budget-vitesse : empreintes de photos, reçus… relus à l'ouverture d'Achats) ; c'est ICI qu'elles
+        // sont vidées, et seulement s'il a rangé quelque chose (il peut rejouer un e-mail : tout est vidé, comme avant).
+        const r = await fetch('/api/email-rattacher?mode=reclasser', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: '{}', vrmInvalideSiChange: true });
         if (!r.ok) return;
         const j = await r.json().catch(() => null);
         try { localStorage.setItem('vrm_reclasse_retours_at', String(Date.now())); } catch (_) {}
         // (15 nov., lot retour-parfait) + un transporteur lu sur l'étiquette d'un bordereau de retour d'avant : relu.
         if (vivant && j && ((Array.isArray(j.faits) && j.faits.length) || (Array.isArray(j.transporteurs) && j.transporteurs.length))) {
+          try { const lp = window.__vrmLecturesPartagees; if (lp && typeof lp.invalider === 'function') lp.invalider(); viderLecturesMemo(); } catch (_) {}
           RETOURS_ACHAT_CACHE.v = undefined; RETOURS_ACHAT_CACHE.at = 0; EMAILS_LITIGES_CACHE.v = undefined; EMAILS_LITIGES_CACHE.at = 0;
           setRetoursVersion((n) => n + 1);
         }
@@ -17011,7 +17039,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     if (!besoinDetailsAchats || detailsAchats !== undefined) return undefined;
     let stop = false;
     (async () => {
-      const rows = await lireTout(SELECT_DETAILS_ACHATS, { strict: true }).catch(() => null);
+      const rows = await capturePartagee('details-achats', () => lireTout(SELECT_DETAILS_ACHATS, { strict: true }).catch(() => null));
       if (!stop) setDetailsAchats(detailsDeLignes(rows));
     })();
     return () => { stop = true; };

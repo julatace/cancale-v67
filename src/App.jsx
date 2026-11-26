@@ -9106,7 +9106,13 @@ const fetchProInvoices = async ({metadata=false}={}) => {
 const SELECT_RECUS_ACHAT = 'id,subject:meta->>subject,article:meta->>article,prix:meta->>prix,transaction:meta->>transaction,'
   + 'account:meta->>account,uid:meta->>uid,receivedAt:meta->>receivedAt,filename:meta->>filename,type:meta->>type,'
   + 'texte:data->>texte,pdf:meta->>_pdf';
-const fetchEmailAchats = async () => {
+// (26 nov., vitesse-webkit) Achats, Ventes, la feuille du reçu… : chaque écran monté relisait les reçus à l'ouverture (banc
+// budget-vitesse, Achats : ×2). Une réponse RÉUSSIE sert 20 s aux voisins (src/memoCourt.js : jamais un « pas su », jamais un
+// autre vendeur, oubliée à toute écriture et à tout signal de l'extension) ; chaque appelant reçoit SES lignes (copiées).
+const _memoRecusAchat = creerMemoCourt({ dureeMs: 20000 });
+const fetchEmailAchats = () => _memoRecusAchat.lire((AUTH.user && AUTH.user.id) || '', fetchEmailAchatsBase)
+  .then((v) => (Array.isArray(v) ? v.map((x) => ({ ...x })) : v));
+const fetchEmailAchatsBase = async () => {
   try {
     // (1er nov.) Toutes les pages ; une page ratée = pas su (`null`).
     const rows = await lireTout(`id=like.email_achat_*&select=${SELECT_RECUS_ACHAT}`, { strict: true });
@@ -9553,13 +9559,14 @@ const lireTxnMeta = () => {
 const MEMO_LECTURES_MS = 20000;
 const _memoCaptures = creerMemoCourt({ dureeMs: MEMO_LECTURES_MS });
 const _memoPreuvesTxn = creerMemoCourt({ dureeMs: MEMO_LECTURES_MS });
-const oublierMemosLectures = () => { _memoCaptures.oublier(); _memoPreuvesTxn.oublier(); _memoEmpreintesPhotos.oublier(); _memoEmailBords.oublier(); };
+const oublierMemosLectures = () => { _memoCaptures.oublier(); _memoPreuvesTxn.oublier(); _memoEmpreintesPhotos.oublier(); _memoEmailBords.oublier(); _memoRecusAchat.oublier(); };
 try {
   const lp = typeof window !== 'undefined' ? window.__vrmLecturesPartagees : null;
   if (lp && typeof lp.abonner === 'function') {
     lp.abonner('app_data?id=like.harvest_*', () => _memoCaptures.oublier());
     lp.abonner('app_data?id=like.photo_emprunte_*', () => _memoEmpreintesPhotos.oublier());
     lp.abonner('app_data?id=like.email_bord_*', () => _memoEmailBords.oublier());
+    lp.abonner('app_data?id=like.email_achat_*', () => _memoRecusAchat.oublier());
     lp.abonner(`app_data?id=eq.${ID_BORD_TRANSPORTEURS}`, () => _memoEmailBords.oublier());
     // (et la mémoire de 60 s des transactions, `_txnMeta` : une écriture qui peut les toucher la fait oublier)
     lp.abonner('app_data?id=like.harvest_%25_txn_%25', () => { _memoPreuvesTxn.oublier(); _txnMeta = null; });
