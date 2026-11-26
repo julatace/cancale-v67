@@ -127,7 +127,6 @@ import ecran_offres_photos from './it/offresPhotos.js';   // (22 nov.) offres sa
 import ecran_actions_ext from './it/actionsExt.js';
 import ecran_ebay_series from './it/ebaySeries.js';   // (23 nov.) eBay en série   // (20 nov.) « … dans l’extension »
 import ecran_parrainage20 from './it/parrainage.js';   // (25 nov.) le parrainage à 20 %
-import ecran_actions_ext from './it/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './it/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 import ecran_accompagnement_demarrage from './it/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
 import ecran_litiges_tous from './it/litigesTous.js';   // (23 nov.) Litiges et retours, tous les sites
