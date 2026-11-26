@@ -27,7 +27,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 // Les sortes d'événement, dans l'ordre du cycle (pour départager deux dates égales).
-export const QUOI = ['achetee', 'recue', 'numerotee', 'renumerotee', 'photographiee', 'publiee', 'vueEnLigne', 'republiee', 'baisse', 'hausse', 'prix',
+export const QUOI = ['achetee', 'recue', 'numerotee', 'renumerotee', 'rangee', 'photographiee', 'publiee', 'vueEnLigne', 'republiee', 'baisse', 'hausse', 'prix',
   'offreRecue', 'offreFaite', 'offre', 'masquee', 'visible', 'disparue',
   'vendue', 'bordereau', 'partie', 'relais', 'livree', 'retourColis', 'versement', 'annulee', 'retourRecu', 'remiseStock'];
 
@@ -77,6 +77,11 @@ export function ligneDeTemps(h, x = {}) {
   else if (relie && x.reception === undefined) pasSu.push('recue');
   // NUMÉROTÉE — `numberedAt` de la fiche ; un N° qui remplace un autre est dit.
   for (const e of evDe('numero')) pose({ quoi: e.sorte === 'reattribue' ? 'renumerotee' : 'numerotee', at: e.at, preuve: e.preuve });
+  // (23 nov., lot historique-paire) RANGÉE — la case du Stock posée sur LA fiche de CE N° (`vrm_fiches_neuves` :
+  // `case` + `caseAt`, sinon `rangeAt`), par la clé du N° (`rangementDuNumero`) ; deux fiches sous ce N° ⇒ rien (on ne
+  // choisit pas) ; pas lu ⇒ nommé ; une case sans date ⇒ « date inconnue » (jamais une date déduite).
+  if (x.rangement === null) pasSu.push('rangement');
+  else if (x.rangement && typeof x.rangement === 'object') pose({ quoi: 'rangee', at: x.rangement.at || null, preuve: 'rangement' });
   // PHOTOGRAPHIÉE — la première photo du studio de VRM sous CE N° (et combien).
   if (x.studio === null) pasSu.push('studio');
   else if (x.studio && Array.isArray(x.studio.dates)) {
@@ -164,4 +169,26 @@ export function studioDe(rows) {
   const dates = [];
   for (const r of rows) for (let i = 0; i < 12; i++) { const v = r && r['a' + i]; if (v != null && v !== '') dates.push(String(v)); }
   return { dates };
+}
+
+// (23 nov., lot historique-paire) LA CASE DU STOCK DE CE N°, par IDENTITÉ (la clé du N°, jamais un titre) :
+// `fiches` = `vrm_fiches_neuves` ({ id: { numero, case, caseAt?, rangeAt? } }) — pas un objet ⇒ null (pas lu) ;
+// aucune fiche, plusieurs fiches (on ne choisit pas), ou pas de case ⇒ false (aucun événement) ;
+// une fiche avec sa case ⇒ { at: iso | null }.
+// `slots` (facultatif) = `vrm_slots` ({ N°: case }, le Stock) : sans fiche datée, une case notée pour CE N° (par sa clé)
+// ⇒ { at: null } (« date inconnue » : le Stock ne date pas la pose).
+export function rangementDuNumero(fiches, num, cleNum, slots = undefined) {
+  if (!fiches || typeof fiches !== 'object' || Array.isArray(fiches)) return null;
+  const cn = typeof cleNum === 'function' ? cleNum : (v) => str(v).toUpperCase();
+  const k = str(num) ? cn(num) : '';
+  if (!k) return false;
+  const l = Object.values(fiches).filter((f) => f && typeof f === 'object' && str(f.numero) && cn(f.numero) === k);
+  if (l.length > 1) return false;
+  const f = l[0];
+  if (f && f.case && typeof f.case === 'object') return { at: isoDe(f.caseAt) || isoDe(f.rangeAt) };
+  if (slots && typeof slots === 'object' && !Array.isArray(slots)) {
+    const cles = Object.keys(slots).filter((n) => slots[n] && cn(n) === k);
+    if (cles.length === 1) return { at: null };
+  }
+  return false;
 }

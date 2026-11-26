@@ -38929,7 +38929,9 @@ function AppCoeur() {
             extraTemps={{ reception: ex ? ex.reception : undefined, crees: numData ? (numData.crees === undefined ? null : numData.crees) : undefined, lireStudio: lireStudioDates,
               // (15 nov., historique complet) masquages (par annonce), SES retours (par transaction d'une vente de CE N°).
               ids: (rn.annonces || []).map((x) => String(x.id)), txs: ((rn.ventes && rn.ventes.vinted) || []).map((v) => String(v._tx || '')).filter(Boolean),
-              moderation: ex ? ex.moderation : undefined, retours: { recus: load('vinted_retours_recus', {}) || {}, remis: load('vinted_retours_remis', {}) || {} } }}
+              moderation: ex ? ex.moderation : undefined, retours: { recus: load('vinted_retours_recus', {}) || {}, remis: load('vinted_retours_remis', {}) || {} },
+              // (23 nov., lot historique-paire) la case du Stock de CE N° (par la clé du N°, `vrm_fiches_neuves`).
+              fichesNeuves: load('vrm_fiches_neuves', {}), slots: load('vrm_slots', {}), cleNum }}
             // (14 nov., idée 157) « Dans une autre taille » : une fiche « À publier », N° neuf par `dupliquerNumero`.
             // ⚠️ §5 : deux paires sous ce N° ⇒ aucune copie (on ne choisit pas laquelle) ; « Je numérote moi-même »
             // allumé ⇒ VRM ne donne pas de N° (la règle des lots) : la feuille le dit, rien n'est créé.

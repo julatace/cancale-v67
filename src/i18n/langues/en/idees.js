@@ -136,4 +136,7 @@ export default {
   "ia.vm.encoreEnLigne": "Its listing is still online on Vinted: remove it, or it may sell a second time.",
   "ia.vm.remisSansCase": "N°{num} back in stock — its spot is taken: store it",
   "ia.vm.annulee": "Sale undone: nothing counted, the pair is back in stock.",
+  "lt.quoi.rangee": "Put away in Stock",
+  "lt.src.rangement": "its Stock slot",
+  "lt.pasSu.rangement": "the Stock slot"
 };
