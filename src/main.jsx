@@ -302,7 +302,10 @@ if ('serviceWorker' in navigator) {
   });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((reg) => {
-      try { reg.update(); } catch (_) {}
+      // (26 nov., vitesse-webkit) Plus de `reg.update()` ici : le navigateur vérifie déjà le service worker à chaque
+      // navigation (« soft update », le fichier relu sans cache) et à son premier enregistrement. Le second appel
+      // retéléchargeait sw.js (≈ 14 Ko compressés) à CHAQUE ouverture, appareil neuf compris (banc budget-vitesse :
+      // 2ᵉ ouverture 27 Ko → 14). La mise à jour de l'app reste celle de sa version (src/miseAJour.js).
       // (14 nov., ouverture instantanée) L'APP (pas la page d'accueil) fait ranger sa coquille dès la
       // 1re ouverture : la 2e ne repasse plus par le réseau (public/sw.js, `VRM_RANGER_COQUILLE`).
       if (versApp()) navigator.serviceWorker.ready.then((r) => { try { if (r && r.active) r.active.postMessage({ type: 'VRM_RANGER_COQUILLE', langue: langueInitiale() }); } catch (_) {} }).catch(() => {});

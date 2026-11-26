@@ -23892,7 +23892,10 @@ function SourceAgir({ comptesVinted }) {
   useEffect(() => {
     let mort = false;
     const lireEbay = async () => {
-      let j = null; try { const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'status' }) }); j = r.ok ? await r.json() : null; } catch (_) { j = null; }
+      let j = null; try { const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'status' }),
+        // (26 nov., vitesse-webkit) « status » n'écrit que le registre `ebay_comptes` et les jetons `ebay_tokens*` (api/ebay.js,
+        // apprendrePrincipal / apprendreTypes / accessToken) : seules ces lectures sont oubliées, pas TOUTES (banc budget-vitesse).
+        vrmEcritLignes: ['ebay_comptes', 'ebay_tokens'] }); j = r.ok ? await r.json() : null; } catch (_) { j = null; }
       if (mort) return;
       if (!j || j.ok !== true) { setEbayJetons((x) => (x === undefined ? null : x)); return; }
       const m = {};
