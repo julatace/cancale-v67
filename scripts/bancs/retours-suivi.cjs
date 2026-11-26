@@ -191,7 +191,9 @@ const carte = (pg, cle) => pg.evaluate((k) => {
         await pg.waitForTimeout(1500);
         const a = await carte(pg, 'r:990009601'), z = await carte(pg, 'r:990009602');
         // (15 nov., lot retour-parfait) la phrase est devenue les ÉTAPES : « Déposé · <date> » coché, « En route vers le vendeur » ici.
-        dit(a && a.etape === 'en-route' && a.fait === 'email' && /^Bordereau reçu[\s\S]*\nDéposé\s+\d{1,2} \S+\s+En route vers le vendeur\s+Livré au vendeur\s+Remboursé$/.test(a.phrase) && /e-mail Mondial Relay/.test(a.source), `${nom} : 990009601 avance SEULE — « Déposé le … · en route vers le vendeur », « lu dans l’e-mail Mondial Relay »`, JSON.stringify(a));
+        // (23 nov., lot retours-suivi) frise HORIZONTALE : libellés courts (« Bordereau », « En route ») — la règle (les états) inchangée.
+        // (25 nov., achats-retours-design) « Livré au vendeur » se coupait sous son point (« Livré au ven- deur ») : l'étape dit « Reçu ».
+        dit(a && a.etape === 'en-route' && a.fait === 'email' && /^Bordereau[\s\S]*\nDéposé\s+\d{1,2} \S+\s+En route\s+Reçu\s+Remboursé$/.test(a.phrase) && /e-mail Mondial Relay/.test(a.source), `${nom} : 990009601 avance SEULE — « Déposé le … · en route vers le vendeur », « lu dans l’e-mail Mondial Relay »`, JSON.stringify(a));
         dit(a && !a.limite && !a.depose && !a.imprimer, `${nom} : déposé ⇒ plus de date limite, ni « Déposé », ni « Imprimer » (le fait remplace le geste)`, JSON.stringify(a));
         dit(a && a.logo === 'mondialrelay' && a.copier && /81239601/.test(a.copier.txt) && a.copier.h >= 44 && /^https:\/\/www\.mondialrelay\.fr\/suivi-de-colis\/\?numeroExpedition=81239601/.test(a.suivre || ''), `${nom} : le logo Mondial Relay, le n° copiable (44 px), « Suivre ↗ » vers la page PUBLIQUE de Mondial Relay`, JSON.stringify(a));
         dit(z && z.etape === 'a-deposer' && z.limite && z.depose && !z.fait, `${nom} : 990009602 (aucun fait lu) garde sa limite et son « Déposé »`, JSON.stringify(z));

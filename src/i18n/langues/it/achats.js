@@ -226,7 +226,7 @@ export default {
   "achats.codeRetraitSuivi": "Codice di ritiro, tracciamento, nota, ricevuta, etichetta",
   "achats.plusActionsAchat": "Altre azioni per questo acquisto",
   "achats.prixPayeCopie": "Prezzo pagato copiato: {prixPaye} € — incollalo alla numerazione",
-  "achats.copierPrixPaye": "Copia il prezzo pagato (per la numerazione)",
+  "achats.copierPrixPaye": "Copia prezzo pagato",
   "achats.modifierNoteInterne": "Modifica la nota interna",
   "achats.ajouterNoteInterne": "Aggiungi una nota interna",
   "achats.attestationAchat": "Attestato d’acquisto",

@@ -47,7 +47,7 @@ export default {
   "v2.af.titre": "Colis",
   "v2.af.rienEnvoyer": "rien à envoyer",
   "v2.af.rienRetirer": "rien à retirer",
-  "v2.af.toutesStats": "Toutes les statistiques",
+  "v2.af.toutesStats": "Statistiques",
   "v2.af.toutesStatsSous": "Pilotage et finances, sur 7, 30 ou 90 jours",
   "v2.perso.carte.colis": "Colis",
   "v2.perso.phrase.colis": "À envoyer et à retirer, d’un coup d’œil",
@@ -163,5 +163,6 @@ export default {
   "ext.sante.r.refus": "Vinted a refusé une demande ces dernières 24 h : évite les séries.",
   "ext.sante.r.verification_recente": "Une vérification de Vinted ces dernières 24 h : évite les séries.",
   "ext.sante.r.pas_vu": "Un geste n’a pas été vu à l’écran : regarde l’onglet de travail.",
-  "ext.sante.r.presque_plafond": "Près du plafond (80 %)."
+  "ext.sante.r.presque_plafond": "Près du plafond (80 %).",
+  "v2.dv.enLecture": "Vente — détail en cours de lecture",
 };

@@ -401,8 +401,10 @@ function ARelier({ comptes, onRelier }) {
     <p className="n-mail-arelier-titre"><b>{n > 1 ? tr('emails.comptesEnvoientAucun', { x: String(n) }) : tr('emails.compteEnvoieAucun')}</b></p>
     <ul>
       {comptes.map((c) => <li key={c.uid} data-boite-a-relier-compte={c.uid}>
-        <span className="n-mail-arelier-qui"><b>{c.login}</b> · {phraseARelier(c)}</span>
-        <Bouton variante="texte" onClick={() => onRelier(c.uid)} attrs={{ 'data-boite-relier-compte': c.uid }}>{trj('emails.relierBoite', { login: c.login })}</Bouton>
+        {/* (26 nov., capture de Julien : « fais en sorte que ça soit plus beau ») Une rangée par compte : le nom, la raison dessous,
+            un vrai bouton « Relier » à droite (la phrase entière reste son nom accessible). */}
+        <span className="n-mail-arelier-qui"><b className="n-mail-arelier-nom">{c.login}</b><span className="n-mail-arelier-pourquoi">{phraseARelier(c)}</span></span>
+        <Bouton variante="teinte" onClick={() => onRelier(c.uid)} attrs={{ 'data-boite-relier-compte': c.uid, 'aria-label': trj('emails.relierBoite', { login: c.login }) }}>{tr('emails.relierCourt')}</Bouton>
       </li>)}
     </ul>
   </div>;

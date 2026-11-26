@@ -12,6 +12,7 @@ import { nomPlateforme } from '../plateformes.js';
 import { photoArticle } from '../photosArticles.js';
 import { ordreRecent, quandLeboncoin, quandVestiaire } from '../ordreRecent.js';
 import { STYLE_FLOU } from '../flouCompte.js';
+import { publierAchatsSite } from './nombresAchatsSites.js';
 import { Icon, ilYaCourt, fmt, lbcEuro, lbcAnnulee, lbcFinalisee, lbcExpediee, dateCourteVc } from '../App.jsx';
 
 function Liste({ site, etat, maj = null, geste = '', enRoute = [], recus = [], annules = [] }) {
@@ -39,6 +40,13 @@ const date = (d) => (d && !isNaN(d) ? d.toLocaleDateString(localeCourante(), { d
 
 // `floute(o)` : la ligne d'un AUTRE compte que celui ouvert (lbcFloute / vcFloute de l'écran) — estompée, inerte.
 export default function AchatsSite({ site, lbcVentes = null, d = undefined, floute = () => false }) {
+  // (25 nov., filtre par plateforme d'Achats) Le nombre d'achats que CE site montre, publié (src/achats/nombresAchatsSites.js) ;
+  // pas encore lu ou pas su ⇒ rien publié (aucune entrée, jamais « 0 » inventé).
+  const nPub = site === 'leboncoin'
+    ? (lbcVentes && (Array.isArray(lbcVentes.achats) || lbcVentes.maj) ? (lbcVentes.achats || []).length : null)
+    : (d && d.achats ? Object.values(d.achats).filter((v) => v && typeof v === 'object').length : null);
+  React.useEffect(() => { publierAchatsSite(site, 'liste', nPub); }, [site, nPub]);
+  React.useEffect(() => () => publierAchatsSite(site, 'liste', null), [site]);
   if (site === 'leboncoin') {
     const achats = (lbcVentes && lbcVentes.achats) || [];
     const etape = (o) => (lbcAnnulee(o) ? '' : lbcFinalisee(o) ? tr('achats.site.recus') : lbcExpediee(o) ? tr('achats.site.enRoute') : String(o.stepLabel || '').trim());

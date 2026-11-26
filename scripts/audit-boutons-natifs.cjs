@@ -35,6 +35,8 @@ const PROPRES = [
 ];
 const EXCEPTIONS = [
   ['src/natif/ecrans/AchatsTableau.jsx', /className="n-eg-cellule n-tt-code"/, 'une CELLULE du tableau (le code de retrait) : la cellule entière se touche, comme une rangée'],
+  // (24 nov., main-vert) Le n° de suivi d'un achat, VALEUR d'une cellule du tableau : le toucher le copie (comme la cellule du code).
+  ['src/natif/ecrans/AchatsTableau.jsx', /className="n-tt-suivi-n" data-suivi-copier=/, 'la VALEUR d\'une cellule du tableau (le n° de suivi) : la toucher la copie, comme la cellule du code de retrait'],
   ['src/natif/ecrans/Annonces.jsx', /className="n-eg-cellule"/, 'une CELLULE du tableau à égalité (prix mini, achat, N°) : elle se change en la touchant'],
   // (21 nov., Annonces « Dressing ») L'INTERTITRE d'un compte replie son groupe (comme l'en-tête d'un Groupe `repli`) ; « À régler »
   // est UNE RANGÉE entière (point ambre, chevron) posée sur le fond, au-dessus d'une grille de cartes (pas de carte dans une carte).
@@ -140,7 +142,8 @@ async function executer(boutonSrc) {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-boutons-'));
   fs.mkdirSync(path.join(d, 'natif'), { recursive: true });
   fs.writeFileSync(path.join(d, 'natif', 'Bouton.jsx'), boutonSrc);
-  fs.copyFileSync(path.join(RACINE, 'src', 'natif', 'outils.js'), path.join(d, 'natif', 'outils.js'));
+  // (25 nov.) outils.js importe `tr` (src/i18n) depuis le 24 nov. (`estLecture`) : la même traduction de banc que Bouton.jsx.
+  fs.writeFileSync(path.join(d, 'natif', 'outils.js'), fs.readFileSync(path.join(RACINE, 'src', 'natif', 'outils.js'), 'utf8').replace(/from '\.\.\/i18n\/index\.js'/, "from '../i18n.js'"));
   fs.writeFileSync(path.join(d, 'i18n.js'), "export const tr = (k) => ({ 'natif.bouton.echec': 'ECHEC_PAR_DEFAUT', 'natif.bouton.confirmer': 'CONFIRMER' }[k] || k);");
   const boutonPatch = fs.readFileSync(path.join(d, 'natif', 'Bouton.jsx'), 'utf8').replace(/from '\.\.\/i18n\/index\.js'/, "from '../i18n.js'");
   fs.writeFileSync(path.join(d, 'natif', 'Bouton.jsx'), boutonPatch);

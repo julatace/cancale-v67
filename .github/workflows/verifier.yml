@@ -95,15 +95,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # nouveau-vendeur seul : le plus long (chaque écran, 2 largeurs, 2 thèmes).
+          # (24 nov., ci-rapide) Les MÊMES 21 bancs qu'avant, répartis par durée mesurée en CI
+          # (scripts/lancer-bancs.cjs, DUREES_CI) et lancés 3 à la fois dans chaque part
+          # (BANCS_PARALLELE) : la part 2 dépassait 45 min et était annulée à chaque PR —
+          # accessibilite et barre-achats n'avaient plus tourné depuis des jours. Liste
+          # complète, avant/après : python3 -I scripts/ci-controles.py --diff origin/main (docs/passation/2026-11-24-ci-rapide.md).
+          # Les bancs longs sont lancés en MORCEAUX de leur propre variable de choix
+          # (`banc@VAR=…`, tous couverts : scripts/ci-controles.py le vérifie) : ventes-e2 (~19 min
+          # seul) par SCENARIOS, accessibilite (~19 min) par BANC_LARGEUR, budget-vitesse (> 20 min,
+          # arrêté à sa durée maximale le 24 nov. : ses derniers écrans n'étaient jamais jugés)
+          # par ECRANS. Parts équilibrées à ~15 min (3 ouvriers), durées mesurées en CI le 24 nov.
           - part: 1
-            lot: nouveau-vendeur garde-ecrans imprimer-compte-exact defilement-navigation achats-annules ventes-ligne-propre
-          # budget-vitesse (11 nov.) : lectures, octets, doublons, lignes entières et JS par
-          # écran principal, contre scripts/budget-vitesse.json (~5 min).
+            lot: budget-vitesse@ECRANS=journee,ventes,annonces,achats budget-vitesse@ECRANS=garage,messages,compta,emails accessibilite@BANC_LARGEUR=390 defilement-navigation imprimer-compte-exact annonces-actions barre-achats journee-coherence retraits-suivi
           - part: 2
-            lot: navigation-tache ventes-e2 journee-coherence morceau-perime statut-colis budget-vitesse accessibilite barre-achats
+            lot: accessibilite@BANC_LARGEUR=1512 ventes-e2@SCENARIOS=annul,ko ventes-e2@SCENARIOS=egal,gros,vide accessibilite-clavier chiffres-coherents ventes-ligne-propre garde-ecrans
           - part: 3
-            lot: colis-retirer-propre annonces-actions iphone-reprise argent-mois chiffres-coherents retraits-suivi accessibilite-clavier
+            lot: navigation-tache ventes-e2@SCENARIOS=jeu,exclu argent-mois nouveau-vendeur iphone-reprise morceau-perime statut-colis colis-retirer-propre achats-annules
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -127,6 +134,7 @@ jobs:
       - name: Lancer les bancs
         env:
           BANCS_PORT_BASE: '10000'
+          BANCS_PARALLELE: '3'
         run: node scripts/lancer-bancs.cjs ${{ matrix.lot }}
 
   bancs-webkit:
@@ -170,7 +178,10 @@ jobs:
           BANCS_PORT_BASE: '10030'
           BANCS_TIMEOUT_S: '1800'
           LARGEURS: '390'
-        run: node scripts/lancer-bancs.cjs connexion-claire journee-coherence ventes-e2 colis-retirer-propre retraits-suivi tout-imprimer iphone-reprise nouveau-vendeur defilement-navigation ventes-ligne-propre barre-depuis-journee
+          # (24 nov., ci-rapide) Les mêmes 11 bancs, 3 à la fois (37 à 67 min l'un après l'autre) ;
+          # ventes-e2 (16 min sous WebKit) en trois morceaux de scénarios.
+          BANCS_PARALLELE: '3'
+        run: node scripts/lancer-bancs.cjs connexion-claire journee-coherence ventes-e2@SCENARIOS=jeu,exclu ventes-e2@SCENARIOS=annul,ko ventes-e2@SCENARIOS=egal,gros,vide colis-retirer-propre retraits-suivi tout-imprimer iphone-reprise nouveau-vendeur defilement-navigation ventes-ligne-propre barre-depuis-journee
 
   e2e-extension:
     # (11 nov.) L'APP ET LA VRAIE EXTENSION ENSEMBLE : un vrai Chromium (nouveau
