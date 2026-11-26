@@ -27,7 +27,8 @@ import { attribuerVentesFavoris } from '../favorisVentes.js';
 
 const JOUR = 86400000;
 export const FENETRES = ['7', '30', '90'];
-export const SEGMENTS_STATS = ['pilotage', 'finances', 'transporteurs'];
+// (24 nov., lot gains-reels) « Gains » : Ce que tu gagnes vraiment (src/natif/ecrans/StatsGains.jsx).
+export const SEGMENTS_STATS = ['pilotage', 'finances', 'gains', 'transporteurs'];
 // Les bornes d'une fenêtre : du minuit d'il y a (n − 1) jours jusqu'à demain minuit (aujourd'hui compris en entier).
 export function fenetre(cle, maintenant = Date.now()) {
   const n = Number(cle) || 30;

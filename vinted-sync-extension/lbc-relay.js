@@ -80,7 +80,7 @@
     if(d.kind==='lbcgestevu'||d.kind==='lbcconvvue'){for(const f of ecoutesEcrire.slice())try{f(d);}catch(_){}return;}
     if(d.kind==='lbcetat'&&typeof d.jeton==='string'){const r=etatsEnAttente.get(d.jeton);if(r){etatsEnAttente.delete(d.jeton);r({moi:/^[a-z0-9_-]{1,64}$/i.test(String(d.moi||''))?String(d.moi):'',conv:/^[\w-]{3,64}$/.test(String(d.conv||''))?String(d.conv):'',convAt:Number(d.convAt)||0});}return;}
     // 5.370 : l'import de l'historique (modèle vu, résultat d'une page) — canal privé seulement.
-    if(d.kind==='lbcimportmodele'&&typeof d.url==='string'){try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcImportModele',url:d.url.slice(0,600),moi:/^[a-z0-9_-]{1,64}$/i.test(String(d.moi||''))?String(d.moi):''});}catch(_){}}
+    if(d.kind==='lbcimportmodele'&&typeof d.url==='string'){try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcImportModele',url:d.url.slice(0,600),moi:/^[a-z0-9_-]{1,64}$/i.test(String(d.moi||''))?String(d.moi):''},()=>{void chrome.runtime.lastError;});}catch(_){}}
     else if(d.kind==='lbcimportresultat'&&typeof d.jeton==='string'){const r=importsEnAttente.get(d.jeton);if(r){importsEnAttente.delete(d.jeton);r({ ok: true, statut: Number(d.statut) || 0, erreur: String(d.erreur || '').slice(0, 40), url: typeof d.url === 'string' ? d.url.slice(0, 600) : '', corps: typeof d.corps === 'string' ? d.corps.slice(0, 200000) : '', session: typeof d.session === 'string' ? d.session.slice(0, 80) : '', moi: /^[a-z0-9_-]{1,64}$/i.test(String(d.moi || '')) ? String(d.moi) : '' }); } }
   };
   window.addEventListener('message',event=>{
@@ -112,11 +112,11 @@
       }),
     }),configurable:false,writable:false});
   }catch(_){}
-  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.440.0',capteurVersion});}catch(_){}};
+  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.454.0',capteurVersion},()=>{void chrome.runtime.lastError;});}catch(_){}};
   diagnostic(false);
   // Enregistrer l'identité avant de traiter les annonces arrivées ensuite.
   const file=[];let enCours=false,tailleFile=0,identiteRefusee=false;
-  const signaler=erreurCapture=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur:true,erreurCapture});}catch(_){}};
+  const signaler=erreurCapture=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur:true,erreurCapture},()=>{void chrome.runtime.lastError;});}catch(_){}};
   // 5.335 (9 nov.) : ce que la page a lu PENDANT que l'extension n'était pas
   // connectée à VRM (le fond répond `sansSession`) n'est plus jeté : gardé ici
   // (en mémoire, ce document seulement, 48 messages / 4 Mo / 30 min au plus) et
@@ -158,7 +158,7 @@
     const {m,taille}=file.shift();tailleFile-=taille;
     let fini=false;const suite=(ok,sansSession)=>{
       if(fini)return;fini=true;clearTimeout(timer);
-      if(m.action==='lbcVente'&&Number.isSafeInteger(m.sequence))try{window.postMessage({__tag:'CANCALE_LBC_ACCUSE',sequence:m.sequence,ok:ok===true},'*');}catch(_){}
+      if(m.action==='lbcVente'&&Number.isSafeInteger(m.sequence))versCapteur({__tag:'CANCALE_LBC_ACCUSE',sequence:m.sequence,ok:ok===true});   // 5.446 : par le canal privé, plus jamais `window` (revue basse 119)
       if(!ok&&sansSession===true&&REJOUABLES.includes(m.action)){
         garderPourSession(m,taille);
         if(m.action==='lbcSessionPrivee')signaler('session');
@@ -184,14 +184,18 @@
     if(Number.isSafeInteger(d.__vrmSequence)){if(vus.has(d.__vrmSequence))return;vus.add(d.__vrmSequence);if(vus.size>256)vus.delete(vus.values().next().value);}
     if(d.kind==='lbcsessionprivee'&&d.preuve){try{transmettre({from:'cancale-lbc',action:'lbcSessionPrivee',url:d.url,preuve:d.preuve});}catch(_){}return;}
     if (d.kind === 'lbcraw' && d.body) { try { transmettre({ from: 'cancale-lbc', action: 'lbcRaw', url: d.url, body: d.body, session: typeof d.session === 'string' ? d.session.slice(0, 80) : '' }); } catch (_) {} }
-    else if (d.kind === 'lbccatalogue' && d.body) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcCatalogue', url: d.url, body: d.body, coupe: !!d.coupe }); } catch (_) {} }
-    else if (d.kind === 'lbcenvoi' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcEnvoi', url: d.url, methode: d.methode || '', cles: d.cles }); } catch (_) {} }
+    else if (d.kind === 'lbccatalogue' && d.body) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcCatalogue', url: d.url, body: d.body, coupe: !!d.coupe },()=>{void chrome.runtime.lastError;}); } catch (_) {} }
+    else if (d.kind === 'lbcenvoi' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcEnvoi', url: d.url, methode: d.methode || '', cles: d.cles },()=>{void chrome.runtime.lastError;}); } catch (_) {} }
     else if (d.kind === 'lbcvente' && d.body) { try { transmettre({ from: 'cancale-lbc', action: 'lbcVente', sequence:d.__vrmSequence,url: d.url, body: d.body, coupe: !!d.coupe,session:typeof d.session==='string'?d.session.slice(0,80):'' }); } catch (_) {} }
     else if(d.kind==='lbcblocage'){signaler(d.raison==='taille'?'taille':null);}
-    else if (d.kind === 'lbcpaths' && d.paths) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcPaths', paths: d.paths, url: location.href }); } catch (_) {} }
-    else if (d.kind === 'lbcschema' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcSchema', endpoint: d.endpoint, cles: d.cles }); } catch (_) {} }
+    else if (d.kind === 'lbcphotoorigine') { try { if (d.fichier && /^[0-9a-f]{40}$/.test(String(d.fichier)) && /^[0-9a-f]{64}$/.test(String(d.code || ''))) transmettre({ from: 'cancale-lbc', action: 'lbcPhotoOrigine', fichier: String(d.fichier), code: String(d.code) }); else chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcPhotoOrigine', fichier: null },()=>{void chrome.runtime.lastError;}); } catch (_) {} }   // 16 nov. (5.401)
+    else if (d.kind === 'lbcpaths' && d.paths) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcPaths', paths: d.paths, url: location.href },()=>{void chrome.runtime.lastError;}); } catch (_) {} }
+    else if (d.kind === 'lbcschema' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcSchema', endpoint: d.endpoint, cles: d.cles },()=>{void chrome.runtime.lastError;}); } catch (_) {} }
     // La messagerie : le NOMBRE de non-lus d'un compte, et la liste de ses comptes
     // liés (sans email). Jamais un texte de message (voir lbc-inject.js).
+    // 5.445 : la liste des conversations (article, aperçu, date, non-lus ; jamais un nom) et le porte-monnaie (deux nombres).
+    else if (d.kind === 'lbcconvs' && /^[0-9a-f-]{8,64}$/i.test(String(d.moi || '')) && Array.isArray(d.liste)) { try { transmettre({ from: 'cancale-lbc', action: 'lbcConversations', moi: String(d.moi), liste: d.liste.slice(0, 60) }); } catch (_) {} }
+    else if (d.kind === 'lbcporte') { const nb = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 1e9 ? v : null); try { transmettre({ from: 'cancale-lbc', action: 'lbcPorteMonnaie', available: nb(d.available), incoming: nb(d.incoming) }); } catch (_) {} }
     else if (d.kind === 'lbcmsgcompteur' && d.userId) { try { transmettre({ from: 'cancale-lbc', action: 'lbcMsgCompteur', userId: String(d.userId).slice(0, 64), unread: Number(d.unread) }); } catch (_) {} }
     // 22 oct. : une liste COMPLÈTE d'un vendeur (identifiants + total), dans la
     // MÊME file que ses annonces — elle arrive après elles.
@@ -216,7 +220,7 @@
       try { transmettre({ from: 'cancale-lbc', action: 'lbcFil', conv: String(d.conv), messages, offres, formeOffre, lus: Number(d.lus) || 0, moi: /^[0-9a-z_-]{1,64}$/i.test(String(d.moi || '')) ? String(d.moi) : '', page: String(d.page || '').slice(0, 160), forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 80).map((c) => String(c).slice(0, 120)), annonce: /^\d{6,12}$/.test(String(d.annonce || '')) ? String(d.annonce) : '' }); } catch (_) {}   // 5.410 : l'annonce de la conversation
     }
     // 5.362 : la recette apprise et le résultat d'un envoi ne viennent QUE du canal privé (`traiterCanal`).
-    else if (d.kind === 'lbccomptes' && Array.isArray(d.comptes)) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcComptes', comptes: d.comptes.slice(0, 10).map((c) => ({ id: String(c.id || '').slice(0, 64), name: String(c.name || '').slice(0, 60), pro: !!c.pro })) }); } catch (_) {} }
+    else if (d.kind === 'lbccomptes' && Array.isArray(d.comptes)) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcComptes', comptes: d.comptes.slice(0, 10).map((c) => ({ id: String(c.id || '').slice(0, 64), name: String(c.name || '').slice(0, 60), pro: !!c.pro })) },()=>{void chrome.runtime.lastError;}); } catch (_) {} }
   }, false);
   // 5.365 : UNE page de l'historique (liste ou détail), commandée par le fond seulement ;
   // pas de réponse en 25 s ⇒ « muet » (rien n'avance).

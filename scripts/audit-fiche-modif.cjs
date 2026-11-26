@@ -68,7 +68,8 @@ function page(repondre, src = INJECT) {
     document: { hidden: true, addEventListener() {} },          // onglet caché : la moisson de la page ne part pas
     localStorage: { getItem: () => null, setItem() {} },
     addEventListener() {},
-    postMessage(data) { posts.push(data); },
+    postMessage(data) { if (!(data && data.__tag === 'CANCALE_VINTED_CANAL')) posts.push(data); },
+    MessageChannel: require('./_canal-faux.cjs').canalVersBanc((data) => posts.push(data)),   // 5.396 : inject.js ne parle plus que par son canal
     XMLHttpRequest: FauxXHR,
     fetch: async (url, init) => {
       const r = repondre(String(url), (init && init.method) || 'GET');

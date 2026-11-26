@@ -22,7 +22,7 @@
 //     <Tuile libelle="CA vendu" valeur="497" unite="€" detail="−12 % vs la semaine dernière" onClick={ouvrir}/>
 //   </Tuiles>
 import React from 'react';
-import { cx, TIRET } from './outils.js';
+import { cx, TIRET, attenteDe, attrsAttente } from './outils.js';
 import './complements.css';
 
 export function Carte({ titre = '', n = null, sousTitre = '', tonSous = 'neutre', action = null, className = '', attrs = null, children }) {
@@ -59,17 +59,18 @@ export function Tuiles({ titre = '', action = null, pied = null, className = '',
 }
 
 // `graphe` (22 nov., style-clarte) : une petite forme sous le chiffre (<Etincelle>), facultative.
-export function Tuile({ libelle, valeur = null, unite = '', detail = '', ton = 'neutre', onClick = null, className = '', attrs = null, graphe = null }) {
+export function Tuile({ libelle, valeur = null, unite = '', detail = '', ton = 'neutre', onClick = null, className = '', attrs = null, graphe = null, enCours = null }) {
   const su = !(valeur == null || valeur === '');
+  const att = attenteDe(enCours, su, detail);   // (24 nov., livrable) en lecture : un squelette, jamais « — · lecture… »
   const contenu = (
     <>
       <span className="n-tuile-libelle">{libelle}</span>
       <span className="n-tuile-ligne">
-        <span className="n-tuile-valeur" data-n-vide={su ? undefined : '1'}>{su ? valeur : TIRET}</span>
+        <span className="n-tuile-valeur" data-n-vide={su ? undefined : '1'} {...attrsAttente(att, 'valeur')}>{su ? valeur : TIRET}</span>
         {su && unite ? <span className="n-tuile-unite">{unite}</span> : null}
         {graphe ? <span className="n-tuile-graphe">{graphe}</span> : null}
       </span>
-      <span className="n-tuile-detail" data-n-ton={ton}>{detail || ' '}</span>
+      <span className="n-tuile-detail" data-n-ton={ton} {...attrsAttente(att, 'note')}>{detail || ' '}</span>
     </>
   );
   return (

@@ -238,8 +238,13 @@ function copierElague(src, coupe, marquer = null) {
   for (const c of src.childNodes) {
     if (c.nodeType === 3) { dst.appendChild(c.cloneNode(false)); continue; }
     if (c.nodeType !== 1) continue;
-    if (c.hasAttribute('data-copie-exclure') || c.hasAttribute('data-copie-ecran') || c.classList.contains('vrm-sq-barre') || c.classList.contains('n-os')) continue;
+    // (25 nov., régressions — captures iPhone de Julien) `vrm-skeleton` : l'attente d'un morceau (src/Chargement.jsx, trois rangées
+    // grises) n'est pas une brique `.n-os` : la copie la gardait, et la rouvrait ensuite sous « Personnaliser » à chaque ouverture.
+    if (c.hasAttribute('data-copie-exclure') || c.hasAttribute('data-copie-ecran') || c.classList.contains('vrm-sq-barre') || c.classList.contains('n-os') || c.classList.contains('vrm-skeleton')) continue;
     if (coupe(c)) continue;
+    // `data-copie-vide` : la BOÎTE est gardée (rien ne bouge), pas son texte — une heure relative (« Mis à jour à l'instant »)
+    // copiée il y a 5 h se contredisait avec la mention de la copie (« Mis à jour il y a 5 h »), capture de Julien, Annonces.
+    if (c.hasAttribute('data-copie-vide')) { dst.appendChild(c.cloneNode(false)); continue; }
     dst.appendChild(copierElague(c, coupe, marquer));
   }
   return dst;

@@ -15,7 +15,7 @@
 //  AUTOTEST=1 : le robot se prouve lui-même — sept éléments FAUTIFS sont posés dans la page (bouton mort, trop petit, grisé
 //  sans raison, recouvert, qui lève une erreur, lien cassé, montant qui avale la virgule) ; il doit les attraper TOUS, sinon rouge.
 //  BANC_DIST=<dist d'avant> pour prouver qu'un contrôle était rouge.   Sortie ≠ 0 s'il reste un défaut non admis
-//  (scripts/bancs/chaque-bouton-admis.json : chaque exception avec sa raison).   Un banc ne meurt pas : il rapporte.
+//  (scripts/bancs/_chaque-bouton-admis.cjs : chaque exception avec sa raison).   Un banc ne meurt pas : il rapporte.
 // ═════════════════════════════════════════════════════════════════════════════
 const path = require('path'), fs = require('fs'), os = require('os');
 const B = require('./_bt-commun.cjs');
@@ -47,7 +47,7 @@ const POSER_FAUTIFS = () => {
   const sain = b('cb-test sain'); sain.setAttribute('aria-pressed', 'false'); sain.onclick = () => sain.setAttribute('aria-pressed', sain.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
   document.body.appendChild(d);
 };
-const ADMIS = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'chaque-bouton-admis.json'), 'utf8')); } catch (_) { return []; } })();
+const ADMIS = (() => { try { return require('./_chaque-bouton-admis.cjs'); } catch (_) { return []; } })();
 const admis = (d) => ADMIS.find((a) => (!a.vue || a.vue === d.vue) && a.defaut === d.type && new RegExp(a.cle, 'i').test(d.cle));
 
 // ── Ce qui tourne DANS la page (posé avant l'app) ────────────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ const DANS_LA_PAGE = () => {
   const auBruit = (cible, n) => { C.bruit.add(cible); C.lieux.add(lieu(n)); };
   const note = (type, d) => { try { C.evts.push({ type, d: String(d == null ? '' : d).slice(0, 200) }); } catch (_) {} };
   // Les sorties vers l'extérieur : constatées, jamais suivies.
-  const fauxFenetre = () => ({ close() {}, focus() {}, print() { note('imprimer', 'fenêtre'); }, postMessage() {}, closed: false, location: { href: '', replace() {}, assign() {} }, document: { open() {}, write() {}, close() {}, title: '', body: { innerHTML: '', appendChild() {} }, head: { appendChild() {} }, createElement: (t) => document.createElement(t) }, addEventListener() {}, opener: null });
+  const fauxFenetre = () => ({ close() {}, focus() {}, print() { note('imprimer', 'fenêtre'); }, postMessage() {}, closed: false, location: { href: '', replace() {}, assign() {} }, document: { open() {}, write() { note('ecrire', 'document'); }, close() {}, title: '', body: { innerHTML: '', appendChild() {} }, head: { appendChild() {} }, createElement: (t) => document.createElement(t) }, addEventListener() {}, opener: null });
   try { window.open = (u) => { note('ouvrir', u); return fauxFenetre(); }; } catch (_) {}
   try { window.print = () => note('imprimer', 'page'); } catch (_) {}
   try { if (navigator.clipboard) { navigator.clipboard.writeText = (t) => { note('copier', t); return Promise.resolve(); }; navigator.clipboard.write = () => { note('copier', 'objet'); return Promise.resolve(); }; } } catch (_) {}
@@ -182,7 +182,8 @@ const DANS_LA_PAGE = () => {
     }
     const attrs = {}; for (const a of ['aria-pressed', 'aria-checked', 'aria-selected', 'aria-expanded', 'aria-current', 'open', 'data-etat']) attrs[a] = el.getAttribute(a);
     attrs.checked = el.checked; attrs.value = 'value' in el ? String(el.value).slice(0, 80) : undefined;
-    const numerique = el.tagName === 'INPUT' && (el.type === 'number' || /decimal|numeric/.test(el.getAttribute('inputmode') || '') || /prix|montant|€|price|co[uû]t|taux|%|frais|seuil|plafond/i.test(texte(el) + ' ' + (el.name || '') + ' ' + (el.id || '') + ' ' + ((el.labels && el.labels[0] && el.labels[0].innerText) || '')));
+    const entier = /^numeric$/.test(el.getAttribute('inputmode') || '') || el.getAttribute('step') === '1';   // (23 nov.) un compteur entier (colonnes, rangées) n'est pas un montant
+    const numerique = el.tagName === 'INPUT' && ((!entier && (el.type === 'number' || /decimal/.test(el.getAttribute('inputmode') || ''))) || /prix|montant|€|price|co[uû]t|taux|%|frais|seuil|plafond/i.test(texte(el) + ' ' + (el.name || '') + ' ' + (el.id || '') + ' ' + ((el.labels && el.labels[0] && el.labels[0].innerText) || '')));
     return { x, y, l: Math.round(b.width), h: Math.round(b.height), horsEcran, recouvert, par: recouvert ? desc(t) : '', petit, grise, raison: String(raison).slice(0, 120), attrs, numerique, editable: el.isContentEditable, lectureSeule: !!el.readOnly, options: el.tagName === 'SELECT' ? el.options.length : -1 };
   };
   C.attrs = () => { const el = document.querySelector('[data-cb-cible]'); if (!el) return null; const attrs = {}; for (const a of ['aria-pressed', 'aria-checked', 'aria-selected', 'aria-expanded', 'aria-current', 'open', 'data-etat']) attrs[a] = el.getAttribute(a); attrs.checked = el.checked; attrs.value = 'value' in el ? String(el.value).slice(0, 80) : undefined; return attrs; };
@@ -372,6 +373,8 @@ async function parcourir(nav, relancer, ICI, vue, R) {
         }
         { const e1 = await P((t) => window.__cb.examiner(t), tactile); if (e1 && !e1.horsEcran) { e.x = e1.x; e.y = e1.y; e.attrs = e1.attrs; } }   // l'écran a pu se poser entre-temps : on vise où l'élément EST
         const nErr = erreursVraies().length; ext.requetes = 0; ext.dialogues = []; ext.fichiers = 0; ext.telech = 0;
+        // (23 nov., 2ᵉ passe) Le doigt resté dans un champ d'un toucher d'avant cachait l'effet « focus dans un champ » du suivant.
+        await P(() => { const a = document.activeElement; if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && !a.hasAttribute('data-cb-cible') && a.blur) a.blur(); });
         const avant = await instant();
         await P(() => window.__cb.armer());
         let choix = false;
@@ -438,7 +441,7 @@ async function parcourir(nav, relancer, ICI, vue, R) {
         for (const v of (apres ? apres.evts : [])) {
           if (v.type === 'lien' && /^CASSÉ|^https?:\/\/[^/]*$|undefined|null|\/\/$/.test(v.d) && !/^https?:\/\/[a-z0-9.-]+\.[a-z]{2,}\/?$/i.test(v.d)) await defaut('lien-casse', v.d);
           if (v.type === 'lien-local' && !fs.existsSync(path.join(B.DIST, decodeURIComponent(v.d)))) await defaut('lien-casse', 'fichier absent du site : ' + v.d);
-          if ((v.type === 'ouvrir') && (!v.d || /undefined|null/.test(v.d))) await defaut('lien-casse', 'fenêtre ouverte sans adresse valable : « ' + v.d + ' »');
+          if ((v.type === 'ouvrir') && (!v.d || /undefined|null/.test(v.d)) && !(apres.evts || []).some((x) => x.type === 'ecrire')) await defaut('lien-casse', 'fenêtre ouverte sans adresse valable : « ' + v.d + ' »');
         }
         const errs = erreursVraies().slice(nErr);
         if (errs.length) await defaut('erreur', errs.slice(0, 2).join(' ¦ '));
@@ -479,7 +482,10 @@ async function parcourir(nav, relancer, ICI, vue, R) {
 
         // ── Un nouvel endroit ? Il sera exploré à son tour. ──
         const segment = (genre === 'etat' && effet.startsWith('onglet →')) || genre === 'etat' && /tab|radio|menuitemradio/.test(o.role) || (genre === 'etat' && attrChange.some((a) => /selected|pressed|current/.test(a)) && /segment|onglet|filtre/i.test(o.fam));
-        if (apres && (genre === 'feuille' || genre === 'navigation' || segment) && S.prof < PROFONDEUR && kB !== '(page rechargée)') {
+        // (23 nov., 2ᵉ passe) BORNE=1 : on n'explore pas un écran hors du morceau (un lien de la coque mène à Aujourd'hui,
+        // Annonces… — touché et jugé, mais pas parcouru : il a son propre morceau).
+        const horsMorceau = process.env.BORNE === '1' && genre === 'navigation' && apres && !RACINES.includes(apres.cle.ecran);
+        if (apres && !horsMorceau && (genre === 'feuille' || genre === 'navigation' || segment) && S.prof < PROFONDEUR && kB !== '(page rechargée)') {
           const kN = kB + (segment ? ' > ' + o.lib.slice(0, 30) : '');
           if (!vusEtat.has(kN) && !etats.some((x) => x.cleProm === kN)) etats.push({ racine: S.racine, chemin: S.chemin.concat(o.sig), prof: S.prof + 1, nom: S.nom + ' → ' + o.lib.slice(0, 30), cleVoulue: segment ? null : kB, cleProm: kN, segment: segment ? o.lib.slice(0, 30) : (S.segment || '') });
         }
@@ -491,7 +497,7 @@ async function parcourir(nav, relancer, ICI, vue, R) {
           if (!ferme) { const f = await P(() => window.__cb.fermeture()); if (f) { await toucher(f.x, f.y); await pg.waitForTimeout(600); ferme = (await cle()).n <= avant.cle.n; } }
           if (!ferme) { await P(() => history.back()); await pg.waitForTimeout(600); ferme = (await cle()).n <= avant.cle.n; if (ferme && tactile) ligne.retour = 'geste retour (pas de ×)'; }
           if (!ferme) { await defaut('ne-se-ferme-pas', `« ${apres.cle.couches[apres.cle.couches.length - 1]} » : ni ×, ni Échap, ni retour`); await etablir(S, true); }
-          else if (cleTexte(await cle()) !== kA) await defaut('retour-ailleurs', `feuille fermée, mais on n'est plus au même endroit : « ${cleTexte(await cle())} » au lieu de « ${kA} »`);
+          else if (cleTexte(await cle()) !== kA && !/^menuitem/.test(o.role)) await defaut('retour-ailleurs', `feuille fermée, mais on n'est plus au même endroit : « ${cleTexte(await cle())} » au lieu de « ${kA} »`);
         } else if (genre === 'navigation' && o.zone !== 'coque' && apres && !/^(Retour|Fermer|Annuler|Terminé)/i.test(o.lib) && !memeBarre(avant.cle.ecran, apres.cle.ecran)) {
           // Le geste « retour » du téléphone / du navigateur ramène d'où l'on vient (une feuille quittée en naviguant reste fermée).
           await P(() => history.back());
@@ -548,6 +554,13 @@ async function main() {
       const ok = !!l && (attendu === '' ? types.length === 0 : (attendu === 'petit' && !tact) ? true : types.includes(attendu));
       if (!ok) rate++;
       console.log(`${ok ? '✅' : '❌'} autotest [${vue}] ${nom} : attendu « ${attendu || 'aucun défaut'} », constaté « ${l ? (types.join(', ') || 'aucun défaut') + ' · ' + l.effet : 'pas touché'} »`);
+    }
+    // (23 nov., 2ᵉ passe, reprise) Une exception qui ne reconnaît plus SA clé réelle ne sert à rien (deux l'ont fait : « || »
+    // suivi d'un espace dans la clé, absent de leur motif) : chaque exception qui porte un `exemple` (une clé relevée par le robot)
+    // doit le reconnaître.
+    for (const a of ADMIS) for (const ex of [].concat(a.exemple || [])) {
+      const ok = new RegExp(a.cle, 'i').test(ex); if (!ok) rate++;
+      console.log(`${ok ? '✅' : '❌'} autotest exception « ${a.cle} » reconnaît sa clé « ${ex} »`);
     }
     console.log(rate ? `AUTOTEST ROUGE : ${rate} fautif(s) non attrapé(s)` : 'AUTOTEST VERT : le robot attrape chaque fautif et laisse passer le bouton sain');
     process.exitCode = rate ? 1 : 0;

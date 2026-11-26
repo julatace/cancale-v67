@@ -37,6 +37,7 @@ async function auditer({ module: modSrc, app, serveur }) {
   catch (e) { M = {}; dit(false, 'le module se charge', e.message); }
   // Un audit ne meurt pas : une fonction absente (code d'avant) rend un faux résultat, compté rouge.
   const sur = (f, vide) => (...x) => { try { return typeof f === 'function' ? f(...x) : vide; } catch (_) { return vide; } };
+  const bordSeul = sur(M.ventesDuBordereauSeul, null);
   M = { colisVentesEmail: sur(M.colisVentesEmail, []), decisionNumeroVenteEmail: sur(M.decisionNumeroVenteEmail, { etat: '?', numero: '?' }),
     numeroEcritDansArticle: sur(M.numeroEcritDansArticle, '?'), phraseImprimeSansNumero: sur(M.phraseImprimeSansNumero, '') };
   dit(Object.values(M).length === 4 && modSrc.includes('export function colisVentesEmail'), 'la règle existe (src/bordereauVenteEmail.js)');
@@ -55,6 +56,28 @@ async function auditer({ module: modSrc, app, serveur }) {
   dit(C({ ventesEmail: [{ ...ve('101'), _venteEmail: false }], bordsParTx: { 101: bd('101') } }) === '', '§1 une ligne qui n’est pas une vente e-mail ⇒ rien');
   dit(C({ ventesEmail: [ve('101'), ve('101')], bordsParTx: { 101: bd('101') } }) === '101', '§1 deux lignes du même n° ⇒ un seul colis');
   dit(C({ ventesEmail: null, bordsParTx: { 101: bd('101') } }) === '' && C({ ventesEmail: [ve('101')], bordsParTx: null }) === '', '§1 pas su (null) ⇒ rien');
+
+  // §6 (23 nov., bugs-totale) le BORDEREAU reçu d'une vente pas encore relue (compte particulier : sa vente e-mail n'a pas de n°)
+  {
+    const T = Date.parse('2026-11-22T12:00:00Z'), hA = (x) => new Date(T - x * 3600000).toISOString();
+    const A = { vinted_user_id: '9001' }, Bc = { vinted_user_id: '9002' };
+    const b = (x = {}) => ({ transaction: '24538718331', uid: '9001', receivedAt: hA(1), article: 'Paire inventée', hasPdf: true, filename: 'b.pdf', ...x });
+    const base6 = { comptes: [A, Bc], ventes: [{ transaction_id: 111, _acc: A, date: hA(30) }], lectures: { 9001: T - 5 * 3600000, 9002: T - 5 * 3600000 }, ko: [], maintenant: T };
+    const S = (bs, o = {}) => { const r = bordSeul({ ...base6, bords: bs, ...o }); return Array.isArray(r) ? r : null; };
+    const r1 = S([b()]);
+    dit(r1 && r1.length === 1 && r1[0].transaction_id === '24538718331' && r1[0]._venteEmail && r1[0]._bordSeul && r1[0]._acc === A && r1[0].price && r1[0].price.amount === null, '§6 bordereau d’un compte lié, après la lecture, n° absent ⇒ un colis (ligne au n°, aucun prix inventé)', JSON.stringify(r1));
+    dit(S([b({ receivedAt: hA(6) })])?.length === 0, '§6 bordereau AVANT la dernière lecture ⇒ rien (la lecture fait foi : vente annulée, compte supprimé)');
+    dit(S([b({ uid: '7777' })], { lectures: { 9001: T - 5 * 3600000, 7777: T - 5 * 3600000 } })?.length === 0 && S([b({ uid: '' })])?.length === 0, '§6 compte de réception non lié ou absent ⇒ rien');
+    dit(S([b()], { ecarte: (u) => u === '9001' })?.length === 0 && S([b()], { ko: ['9001'] })?.length === 0 && S([b()], { lectures: {} })?.length === 0, '§6 compte écarté, liste pas lue, aucune lecture datée ⇒ rien (pas su)');
+    dit(S([b({ transaction: '111' })])?.length === 0, '§6 n° déjà dans la liste Vinted ⇒ rien (sa ligne gagne)');
+    dit(S([b()], { dejaTx: new Set(['24538718331']) })?.length === 0, '§6 n° déjà porté par une vente e-mail ⇒ rien (c’est elle qui fait le colis : jamais deux)');
+    dit(S([b({ transaction: 'abc' })])?.length === 0 && S([b({ transaction: '' })])?.length === 0, '§6 sans n° numérique ⇒ rien');
+    dit(S([b({ receivedAt: new Date(T - 22 * 86400000).toISOString() })], { lectures: { 9001: T - 30 * 86400000 } })?.length === 0, '§6 reçu il y a plus de 21 jours ⇒ rien');
+    dit(S([b(), b({ receivedAt: hA(0.5) })])?.length === 1, '§6 deux lignes du même n° ⇒ un colis');
+    dit(S(null) && S(null).length === 0 && S([b()], { ventes: null })?.length === 0, '§6 pas su (null) ⇒ rien');
+    const cc = M.colisVentesEmail({ ventesEmail: r1 || [], bordsParTx: { 24538718331: b() } });
+    dit(cc.length === 1 && cc[0].txn === '24538718331', '§6 la règle du colis le relie à SON bordereau par le n°');
+  }
 
   // §2 la décision
   const D = M.decisionNumeroVenteEmail;
@@ -106,7 +129,10 @@ async function auditer({ module: modSrc, app, serveur }) {
   // §5 le câblage
   const corps = (debut, fin) => { const i = app.indexOf(debut); if (i < 0) return ''; const j = app.indexOf(fin, i + debut.length); return app.slice(i, j < 0 ? i + 6000 : j); };
   const expCalc = corps('  const expeditionsCalc = () => {', '\n  };\n');
-  dit(/colisVentesEmail\(\{\s*ventesEmail,\s*bordsParTx:\s*parTxn/.test(expCalc) && /items\.push\(\{[^}]*venteEmail:\s*true/.test(expCalc), '§5 Colis (`expeditionsCalc`) ajoute les colis des ventes e-mail par la règle');
+  dit(/colisVentesEmail\(\{\s*ventesEmail(?::\s*colisEmailSources)?,\s*bordsParTx:\s*parTxn/.test(expCalc) && /items\.push\(\{[^}]*venteEmail:\s*true/.test(expCalc), '§5 Colis (`expeditionsCalc`) ajoute les colis des ventes e-mail par la règle');
+  const srcColis = corps('  const colisEmailSources = useMemo(() => {', '\n  }, [');
+  dit(/ventesDuBordereauSeul\(\{/.test(srcColis) && /return seuls\.length \? \[\.\.\.\(ventesEmail \|\| \[\]\), \.\.\.seuls\]/.test(srcColis), '§6 Colis et Ma journée reçoivent les bordereaux seuls (`colisEmailSources`), jamais la liste de Ventes');
+  dit(!/ventesListe[^\n]*colisEmailSources|avecVentesEmail\([^)]*colisEmailSources/.test(app), '§6 les bordereaux seuls n’entrent ni dans la liste de Ventes ni dans le CA');
   const toShip = corps('  const toShip = useMemo(() => {', '\n  }, [');
   dit(/colisVentesEmail\(/.test(toShip) && /isShipDone\(x\.o\)/.test(toShip), '§5 Ma journée / cloche (`toShip`) comptent les mêmes colis');
   const nfb = corps('  const numForBord = (b) => {', '\n  };\n');
@@ -125,6 +151,10 @@ async function auditer({ module: modSrc, app, serveur }) {
 }
 
 const MUTATIONS = [
+  ['module : bordereau seul sans la lecture', 'm', "    if (!(t > lu)) continue;                                                // (c) la lecture fait foi", ''],
+  ['module : bordereau seul sans le compte lié', 'm', "const acc = /^\\d+$/.test(uid) ? parUid.get(uid) : null; if (!acc) continue;", "const acc = parUid.get(uid) || { vinted_user_id: uid };"],
+  ['module : bordereau seul doublé avec la vente e-mail', 'm', "if (connues.has(tx) || deja.has(tx) || out.has(tx)) continue;", "if (connues.has(tx) || out.has(tx)) continue;"],
+  ['app : Colis sans les bordereaux seuls', 'a', "return seuls.length ? [...(ventesEmail || []), ...seuls] : ventesEmail;", "return ventesEmail;"],
   ['module : le colis sans l’identité du n°', 'm', "if (!b || String(b.transaction) !== tx) continue;", 'if (!b) continue;'],
   ['module : une vente partie reste', 'm', "if (typeof partie === 'function' && partie(o, b)) continue;", ''],
   ['module : la liste Vinted ne gagne plus', 'm', "if (typeof connues === 'function' && connues(tx)) continue;", ''],

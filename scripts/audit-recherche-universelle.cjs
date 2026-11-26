@@ -143,6 +143,10 @@ function sansCommentaires(t) {
   const cles = (res, g) => res.groupes[g].map((r) => r.e.cle);
 
   essaie('chaque type trouve SON objet', () => {
+    // (26 nov., capture de Julien) « 262 » sous « Tout sur le N°262 » ramenait la conversation de « liza2627 » (une autre paire).
+    { const ix = R.indexRecherche({ messages: [{ uid: '1', conv: '99', tx: '', titre: 'adidas spezial noir taille 38,5', pseudo: 'liza2627', date: '' }] });
+      dit(!R.chercherPartout(ix, '262', { numero: '262' }).groupes.message.length, '« 262 » (un N°) ne ramène jamais le pseudo « liza2627 »');
+      dit(R.chercherPartout(ix, 'liza2627').groupes.message.length === 1, 'le pseudo écrit avec ses lettres trouve toujours SA conversation'); }
     let r = ch('141');
     dit(r.groupes.paire.some((x) => x.e.numero === '141'), '« 141 » ⇒ la paire N°141 (N° partiel)', cles(r, 'paire').slice(0, 5));
     r = ch('141', { numero: '141' });

@@ -136,4 +136,7 @@ export default {
   "ia.vm.encoreEnLigne": "Su anuncio sigue en línea en Vinted: retíralo, o podría venderse una segunda vez.",
   "ia.vm.remisSansCase": "N°{num} de vuelta al stock — su hueco está ocupado: guárdalo",
   "ia.vm.annulee": "Venta deshecha: no se cuenta nada, el par vuelve al stock.",
+  "lt.quoi.rangee": "Guardada en el Stock",
+  "lt.src.rangement": "su casilla del Stock",
+  "lt.pasSu.rangement": "la casilla del Stock"
 };

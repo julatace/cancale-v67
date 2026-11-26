@@ -13,6 +13,7 @@ export default {
   "vcventes.etat.paiement": "Paiement le {date}",
   "vcventes.etat.valideePaiement": "Validée · paiement à venir",
   "vcventes.etat.livreeControle": "Livrée · contrôle",
+  "vcventes.etat.litige": "En litige · Vestiaire examine",
   "vcventes.etat.controle": "Contrôle par Vestiaire",
   "vcventes.etat.expediee": "Expédiée · en livraison",
   "vcventes.etat.plusAExpedier": "Plus à envoyer (envoyée ou annulée)",

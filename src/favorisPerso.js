@@ -126,14 +126,20 @@ function fpGroupes(reglage, ancien, ctx, fav, lotPermis) {
 }
 // ── LE CHOIX ──────────────────────────────────────────────────────────────
 // x = { reglage, ancien, fav, offre ({ prix } ou null), ctx ({ heure, jour }), lotPermis, sur(texte)→bool,
-//       refusee(modele)→bool, derniere: { acheteur, compte } (clés de version), hasard }
+//       refusee(modele)→bool, derniere: { acheteur, compte } (clés de version), hasard,
+//       deja(modele)→bool (5.441 : ce texte a DÉJÀ été envoyé à CETTE personne pour CET article) }
 // → { ok: true, source, cas, regle, version: { cle, n, lot, modele, texte }, possibles }  (`texte` = variables nouvelles posées)
-//   { ok: false, source, raison: 'aucun_message' | 'texte_interdit' | 'variable', manque: [...] }
+//   { ok: false, source, raison: 'aucun_message' | 'texte_interdit' | 'variable' | 'deja_envoye', manque: [...] }
+// 5.441 (Julien, 23 nov.) : les RELANCES sont permises — une personne peut recevoir un nouveau message plus tard — mais
+//   JAMAIS deux fois le même texte à la même personne pour le même article : un texte déjà envoyé est écarté pour de bon
+//   (pas seulement « pas le dernier ») ; tous déjà envoyés ⇒ `deja_envoye`, rien ne part (le favori est sauté).
 function choisirMessageFavori(x) {
   const o = x && typeof x === 'object' ? x : {};
   const val = fpValeurs(o.fav, o.offre);
   const { source, groupes } = fpGroupes(o.reglage, o.ancien, o.ctx || {}, o.fav || {}, o.lotPermis === true);
   const sur = typeof o.sur === 'function' ? o.sur : () => true, refusee = typeof o.refusee === 'function' ? o.refusee : () => false;
+  const deja = typeof o.deja === 'function' ? o.deja : () => false;
+  let vuDeja = false;
   const d = o.derniere && typeof o.derniere === 'object' ? o.derniere : {};
   const tirer = typeof o.hasard === 'function' ? o.hasard : Math.random;
   let vuInterdit = false; const manques = new Set();
@@ -145,6 +151,7 @@ function choisirMessageFavori(x) {
       if (m.length) { m.forEach((k) => manques.add(k)); continue; }
       const texte = fpPreremplir(v.modele, val);
       if (!sur(texte) || refusee(v.modele)) { vuInterdit = true; continue; }
+      if (deja(v.modele)) { vuDeja = true; continue; }
       possibles.push(Object.assign({}, v, { texte }));
     }
     if (!possibles.length) continue;
@@ -154,6 +161,27 @@ function choisirMessageFavori(x) {
     const v = cands[Math.min(cands.length - 1, Math.max(0, Math.floor((Number.isFinite(h) ? h : 0) * cands.length)))];
     return { ok: true, source, cas: g.cas, regle: g.regle, version: v, possibles: possibles.length };
   }
+  // 5.450 : le SEUL manque est le pseudo (la nouvelle messagerie ne l'a pas dit) ⇒ la version NEUTRE : la même, sans
+  //    {pseudo} / {username} / {prénom} (« Bonjour {pseudo}, … » ⇒ « Bonjour, … ») — jamais un autre nom, jamais refusé pour ça.
+  if (manques.size && [...manques].every((k) => k === 'pseudo' || k === 'prenom') && !val.pseudo) {
+    const neutre = (m) => String(m).replace(/[ \t]*\{(?:pseudo|username|prénom|prenom)\}/g, '').replace(/ +([,.!?])/g, '$1');
+    for (const g of groupes) {
+      const possibles = [];
+      for (const v of g.versions) {
+        const mod = neutre(v.modele);
+        if (fpErreurTexte(mod) || fpManque(mod, val).length) continue;
+        if (deja(v.modele) || deja(mod)) { vuDeja = true; continue; }   // 5.454 : la règle 5.441 vaut aussi pour la version neutre
+        const texte = fpPreremplir(mod, val);
+        if (!texte.trim() || !sur(texte) || refusee(v.modele)) continue;
+        possibles.push(Object.assign({}, v, { modele: mod, texte, neutre: true }));
+      }
+      if (!possibles.length) continue;
+      const h = Number(tirer());
+      const v = possibles[Math.min(possibles.length - 1, Math.max(0, Math.floor((Number.isFinite(h) ? h : 0) * possibles.length)))];
+      return { ok: true, source, cas: g.cas, regle: g.regle, version: v, possibles: possibles.length, neutre: true };
+    }
+  }
+  if (vuDeja && !vuInterdit) return { ok: false, source, raison: 'deja_envoye', manque: [] };
   if (manques.size && !vuInterdit) return { ok: false, source, raison: 'variable', manque: [...manques] };
   return { ok: false, source, raison: groupes.some((g) => g.versions.length) ? 'texte_interdit' : 'aucun_message', manque: [...manques] };
 }

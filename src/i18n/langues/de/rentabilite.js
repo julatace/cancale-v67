@@ -54,5 +54,21 @@ export default {
   "rt.couv.autres": "{n} nicht erkannt (Andere)",
   "rt.regroupe": "Was zusammengefasst wurde",
   "rt.regroupe.sous": "{n} Gruppen · nur zur Anzeige, nie zum Verknüpfen",
-  "rt.regroupe.reste": "und {n} weitere"
+  "rt.regroupe.reste": "und {n} weitere",
+  "rt.axe.source": "Quelle",
+  "rs.tousAchats": "Alle Einkäufe, nach Quelle",
+  "rs.auPlus": "höchstens {p}",
+  "rs.rienRevendu": "nichts weiterverkauft",
+  "rs.revendus": "{k} von {n} weiterverkauft",
+  "rs.achetes": "{n} gekauft",
+  "rs.taux": "{t} % weiterverkauft",
+  "rs.surDatees": "bei {n} datierten",
+  "rs.pasSu": "Noch nicht berechnet: öffne Einkäufe",
+  "rs.pasSaisie": "Quelle nicht angegeben",
+  "rs.couv": "Schnitt über {k} von {n} Weiterverkäufen",
+  "rs.couv.sansAchat": "{n} Verkäufe ohne verknüpften Einkauf",
+  "rs.couv.pasLu": "{n} Einkäufe hier nicht gelesen",
+  "rs.couv.vintedPasLus": "Vinted-Einkäufe nicht gelesen",
+  "rs.pourquoi": "Warum?",
+  "rs.pourquoi.texte": "Ein Verkauf zählt für eine Quelle nur, wenn er mit seinem Einkauf verknüpft ist (Transaktionsnummer oder die auf dem Einkauf notierte Nummer) – nie über den Titel. Der Durchschnittsgewinn gilt nur für Weiterverkäufe mit bekanntem Einkaufspreis; die Quote = weiterverkauft ÷ gekauft; die Dauer reicht vom Kauf bis zum Verkauf. Gilt für alle Einkäufe, nicht für den gewählten Zeitraum."
 };

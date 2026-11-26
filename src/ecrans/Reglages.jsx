@@ -1,4 +1,7 @@
 import { PlateformesSetting } from '../App.jsx';
+import { VacancesAgir } from '../agir/Agir.jsx';   // (24 nov., lot agir-tout)
+import '../natif/ecrans/parametres-visuel.css';   // (24 nov., visuel-argent) médaillons des sections, interrupteurs clairs
+import { liensLbcLus } from '../App.jsx';   // (24 nov., lot ext-anciens-lots) les liens Leboncoin LUS (+ photo d'origine, src/photoIdentite.js)
 import { fusion3 } from '../fusionNuage.js';
 import { modifierLigneCas, ecrireDifference } from '../ligneCas.js';
 import { signalDelai } from '../compatSafari.js';
@@ -147,14 +150,16 @@ import { TableauProprietaire } from "../composants/TableauProprietaire.jsx";
 import { SimulationCompte } from "../SimulationCompte.jsx";
 import { OuvrirPaiements } from "../composants/OuvrirPaiements.jsx";   // (12 nov.) propriétaire seul
 import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
-import Partenaires from '../partenaires/Partenaires.jsx';   // (15 nov.) le programme partenaire, Julien seul
+import Partenaires from '../partenaires/Partenaires.jsx';
+import { ParrainsAVerser, CarteFilleul, useFilleulParraine } from '../parrainage/EcranParrainage.jsx';   // (25 nov.) le parrainage à 20 % : son écran, la vue de Julien   // (15 nov.) le programme partenaire, Julien seul
 import { etatAbonnement, lienParrainage, lectureSeuleActive, EXPORT_FERME } from '../abonnement/etatAbonnement.js';
-import { PHRASE_PARRAINAGE, TEXTE_PARTAGE, texteEtatFilleul, jourCourt, moisGagnes, offertPar, prendreDemandeParrainage } from '../parrainage/parrainage.js';   // (13 nov., lot 54)
+import { parrainageOuvertConnu, lireParrainageOuvert, suivreParrainageOuvert } from '../parrainage/parrainage.js';   // (13 nov., lot 54)
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
 // ⟦← App.jsx #12⟧
 import { VAPID_PUBLIC_KEY } from "../vapid.js";
 // ⟦← App.jsx #13⟧
 import TesDonnees from '../composants/TesDonnees.jsx';
+import NavigateursExtension from '../NavigateursExtension.jsx';   // (23 nov.) les navigateurs de l'extension
 import { deconnecterPartout, deconnecterAutres, texteConfirmationPartout, ligneJournal, filtrerJournal, comptesDuJournal, FILTRES_TYPE } from '../securiteCompte.js';
 // ⟦← App.jsx #14⟧
 import { DISCORD_ERREURS } from "../communaute/discordErreurs.js";
@@ -174,8 +179,10 @@ import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) les composa
 import { RangeeTouchable } from '../designV2/BoutonV2.jsx';   // (17 nov., phase 2) les rangées de Paramètres
 import { Bouton as BoutonNatif, BoutonIcone as BoutonIconeNatif } from '../natif/Bouton.jsx';
 import { Glyphe as GlypheNatif } from '../natif/icones.jsx';
+import { TuileRadio as TuileRadioNatif } from '../natif/Segmente.jsx';   // (24 nov., style-graphite) les tuiles de style
 import { Groupe as GroupeNatif } from '../natif/Groupe.jsx';   // (21 nov., ux-reglages) Paramètres en liste groupée native
 import { Rangee as RangeeNatif } from '../natif/Rangee.jsx';
+import { STYLES as STYLES_CHOIX, styleLu, choisirStyle } from '../natif/styleChoix.js';   // (24 nov., style-graphite) les dix styles à essayer
 // (21 nov., ux-reglages) « Comme l'iPhone » sur un iPhone, « Comme l'appareil » ailleurs (le même mode `auto`).
 const surIphone = () => { try { return /iP(hone|od)/.test(navigator.userAgent); } catch (_) { return false; } };
 const libelleApparence = (m) => (m === 'auto' ? tr(surIphone() ? 'uxr.apparence.autoIphone' : 'uxr.apparence.auto') : tr('uxr.apparence.' + m));
@@ -1796,7 +1803,7 @@ function PushPrefsSetting({ comptes, onMuets }) {
 // jamais cachée.
 const GROUPES_NOTIF = [
   { id: 'argent', titre: 'Ventes, argent et rappels', ids: ['ventes', 'doublevente', 'rappels'] },
-  { id: 'colis', titre: 'Colis', ids: ['poster', 'arrives'] },
+  { id: 'colis', titre: 'Colis', ids: ['poster', 'arrives', 'colisdanger', 'envois'] },
   { id: 'echanges', titre: 'Échanges avec les acheteurs', ids: ['offres', 'messages'] },
   { id: 'comptes', titre: 'Comptes et avis', ids: ['comptes', 'avis'] },
   { id: 'achats', titre: 'Achats', ids: ['alertesebay'] },
@@ -1977,7 +1984,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
           {M==='email' && resteEmail > 0 && <div role="status" data-auth-attente={resteEmail} style={{fontSize:13,color:C.text,marginTop:8,lineHeight:1.4}}>{TEXTE_DELAI_EMAIL_BOUTON}</div>}
           <div style={{display:'flex',gap:9,marginTop:16}}>
             <Bouton variante="discret" onClick={close} style={{flex:1}}>Annuler</Bouton>
-            <Bouton variante="primaire" onClick={valider} occupe={!!acct.busy} disabled={(M!=='out' && !acct.val.trim()) || (M==='email' && resteEmail > 0)}
+            <Bouton variante="primaire" onClick={valider} occupe={!!acct.busy} disabled={(M!=='out' && !acct.val.trim()) || (M==='email' && resteEmail > 0)} title={M!=='out' && !acct.val.trim() ? tr(M==='email' ? 'uxr.acct.raisonEmail' : 'uxr.acct.raisonMdp') : undefined}
               style={{flex:2,opacity:((M!=='out'&&!acct.val.trim())||(M==='email'&&resteEmail>0))?0.5:1}}>
               {acct.busy ? (M==='out' ? 'Déconnexion…' : 'Enregistrement…') : M==='out' ? 'Se déconnecter' : (M==='email' && resteEmail > 0) ? `Réessaie dans ${resteEmail} s` : 'Enregistrer'}
             </Bouton>
@@ -2199,7 +2206,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (11 nov., lot sante-comptes) Chaque compte Vinted : en forme / à surveiller, LA raison et LE geste, chaque point lisible (src/SanteComptes.jsx).
       { id:'santecomptes', type:'panneau', ic:'star', lib:tr('reglages.santecomptes.lib'), desc:tr('reglages.santecomptes.desc'), data:{ 'data-reglage-santecomptes':'' }, el:<SanteComptes variante="reglages" comptes={comptes||[]}/> },
       // (22 nov., ext. 5.436) « Mes comptes » : chaque compte et ton ordinateur, les gestes à distance (src/aDistance/).
-      { id:'adistance', type:'nav', ic:'users', lib:tr('nav.adistance'), desc:tr('adist.reglages.desc'), data:{ 'data-reglage-adistance':'' }, onClick:()=>setTab('adistance') },
+      // (24 nov.) « Connexions de l'extension » : chaque navigateur (version, vu quand, ce qu'il lit, son problème) et chaque compte (src/connexions/).
+      { id:'connexionsext', type:'nav', ic:'relier', lib:tr('cnx.reglages.lib'), desc:tr('cnx.reglages.desc'), data:{ 'data-reglage-connexions-ext':'' }, onClick:()=>setTab('connexions') },
+      { id:'adistance', type:'nav', ic:'ordi', lib:tr('nav.adistance'), desc:tr('adist.reglages.desc'), data:{ 'data-reglage-adistance':'' }, onClick:()=>setTab('adistance') },
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:tr('reglages.liens.desc'), onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:tr('reglages.connexions.lib'), desc:tr('reglages.connexions.desc'), titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (11 nov., lot import-depart) Tout l'historique Vinted (ventes, achats), lu par l'extension ; « Tout récupérer » pour le compte de l'onglet.
@@ -2207,7 +2216,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (10 nov., lot O) Tous ses comptes en vacances puis rouverts, compte par compte, sur SON clic (src/ModeVacances.jsx).
       // (11 nov., lot securite-vinted) Julien : « faire comme Vintex, pour ne pas se faire bannir » — une phrase par compte, ses réglages, « Tout arrêter » (src/SecuriteComptes.jsx).
       { id:'securite-comptes', type:'panneau', ic:'sleep', lib:tr('reglages.securite.lib'), desc:tr('reglages.securite.desc'), data:{ 'data-reglage-securite-comptes':'' }, el:<SecuriteComptes comptes={comptes||[]}/> },
-      { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<div data-vacances-panneau="" style={{ padding: '8px 0' }}><BoutonExtension action="vacances" large/></div> },
+      { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<div data-vacances-panneau="" style={{ padding: '8px 0' }}><VacancesAgir comptes={comptes||[]}/></div> },   // (24 nov., lot agir-tout) depuis VRM, compte par compte
       // (12 nov., ext. 5.370) La discrétion : plafond par jour, vérification demandée par Vinted, freins des 7 jours (src/Discretion.jsx).
       { id:'discretion', type:'panneau', ic:'pin', lib:tr('reglages.discretion.lib'), desc:tr('reglages.discretion.desc'), data:{ 'data-reglage-discretion':'' }, el:<PanneauDiscretion uids={(comptes||[]).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean)} nomCompte={(u) => { const a = (comptes||[]).find((x) => String(x && x.vinted_user_id) === String(u)); return (a && (a.label || a.login)) || null; }}/> },
       // (12 nov., sécurité des comptes) Un zip par compte Vinted, fait dans le navigateur, envoyé nulle part (src/CopieAnnonces.jsx).
@@ -2215,7 +2224,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:tr('reglages.ebay.lib'), desc:tr('reglages.ebay.desc'), el:ebayCompte },
       // (20 nov. soir) Les rangées par plateforme ont quitté la barre de gauche : les recherches et alertes eBay s'ouvrent d'ici.
-      ebayCompte && { id:'ebay-recherches', type:'nav', ic:'search', lib:tr('ebay.recherches.titre'), desc:'', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:ebay-recherches')); } catch (_) {} }, data:{ 'data-reglage-ebay-recherches':'' } },
+      ebayCompte && { id:'ebay-recherches', type:'nav', ic:'jumelles', lib:tr('ebay.recherches.titre'), desc:'', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:ebay-recherches')); } catch (_) {} }, data:{ 'data-reglage-ebay-recherches':'' } },
     ]},
     { id:'emails-reglages', titre:tr('reglages.groupe.emails-reglages'), items:[
       // (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : l'ancien sous-écran est devenu
@@ -2388,6 +2397,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (11 nov., agent2-cloisonnement) Le parcours d'un nouveau vendeur joué sur des comptes FICTIFS (src/simulationCompte.js) : propriétaire seul.
       // (15 nov.) « Ce que voit un nouveau » : l'aperçu en bac à sable et où s'arrêtent les vrais inscrits (403 à tout autre compte).
       proprioInst && { id:'nouveaux-comptes', type:'panneau', nu:true, ic:'nouveauCompte', lib:tr('nc.lib'), desc:tr('nc.desc'), data:{ 'data-reglage-nouveaux-comptes':'' }, el:<NouveauxComptes entetes={enTeteSession}/> },
+      // (23 nov., Julien) « Voir tous les pop-ups » : chaque carte d'événement du registre des notifications, en exemple (src/natif/GaleriePops.jsx).
+      proprioInst && { id:'galerie-pops', type:'panneau', nu:true, ic:'pile', lib:tr('gal.lib'), desc:tr('gal.desc'), data:{ 'data-reglage-galerie-pops':'' }, el:<div className="vrm-galerie-ouvrir" style={{padding:'8px 16px 12px'}}><Bouton variant="secondary" onClick={()=>{ try{ window.dispatchEvent(new Event('vrm:galerie-pops')); }catch(_){} }} data-galerie-ouvrir="">{tr('gal.ouvrir')}</Bouton></div> },
       proprioInst && { id:'simulation-compte', type:'panneau', nu:true, ic:'home', lib:tr('reglages.simulation.lib'), desc:tr('reglages.simulation.desc'), data:{ 'data-reglage-simulation-compte':'' }, el:<SimulationCompte/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:tr('reglages.depannage.lib'),desc:tr('reglages.depannage.desc'),el:<div className="vrm-settings-help">
       <details data-aide-statut=""><summary>{tr('reglages.depannage.statut.q')}</summary><p>{tr('reglages.depannage.statut.r')}</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>{tr('reglages.depannage.statut.bouton')}</Bouton></details>
@@ -2425,7 +2436,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // (17 oct.) L'abonnement a SON onglet (« Abonnement ») ; ici, un renvoi.
     AUTH.user && { id:'abonnement', titre:tr('reglages.groupe.abonnement-lien'), items:[
       { id:'abonnement', type:'panneau', nu:true, paresseux:true, ic:'wallet', lib:tr('reglages.abonnement-ouvrir.lib'), desc:tr('reglages.abonnement-ouvrir.desc'), data:{ 'data-reglage-abonnement':'', 'data-vue':'abonnement' },
-        el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/>{proprioInst === true ? <Partenaires enTete={enTeteSession} toast={toast}/> : <Parrainage/>}</div> },
+        el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/>{proprioInst === true ? <><Partenaires enTete={enTeteSession} toast={toast}/><ParrainsAVerser/></> : null}<EntreeParrainage onOuvrir={() => setTab('parrainage')}/></div> },
     ]},
     AUTH.user && { id:'boutique', titre:tr('reglages.groupe.boutique'), items:[
       // (30 oct.) « Abonnement et factures » retiré : l'onglet « Abonnement » du haut fait la même chose.
@@ -2551,7 +2562,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     return (
       <button key={c.id} type="button" className="vrm-set-ligne vrm-pm-cat-ligne" data-categorie-ouvrir={c.id} data-categorie-contient={` ${c.ids.join(' ')} `}
         {...(c.id === 'compte' ? { 'data-vue': 'compte' } : {})} aria-current={actif ? 'true' : undefined} onClick={surClic}>
-        <span className="vrm-pm-cat-ic" aria-hidden="true"><Icon name={c.ic} size={17}/></span>
+        <span className="vrm-pm-cat-ic" aria-hidden="true" data-pm-cat={c.id}><Icon name={c.ic} size={17}/></span>
         <span className="vrm-set-lib"><b style={{color:C.text}}>{titreCat(c.id)}</b><small className="vrm-set-desc" style={{color:C.muted}}>{tr(`parametres.cat.${c.id}.desc`)}</small></span>
         {v && <span className="vrm-set-val" data-categorie-valeur={c.id} style={{color: ambre ? C.warn : C.muted}}>{v}</span>}
         {chevron}
@@ -2582,7 +2593,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     const ambre = (c.id === 'donnees' || c.id === 'securite-donnees') && derniereSauvegarde.old;
     return (
       <RangeeTouchable key={c.id} className="v2-pm-rangee" onClick={() => ouvrirCategorie(c.id)} attrs={{ 'data-categorie-ouvrir': c.id, 'data-categorie-contient': ` ${c.ids.join(' ')} ` }}>
-        <span className="v2-pm-ic" aria-hidden="true"><Icon name={c.ic} size={18}/></span>
+        <span className="v2-pm-ic" aria-hidden="true" data-pm-cat={c.id}><Icon name={c.ic} size={18}/></span>
         <span className="v2-pm-lib">{titreCat(c.id)}<span className="vg-sr">{' — ' + tr(`parametres.cat.${c.id}.desc`)}</span></span>
         {v ? <span className={'v2-pm-val' + (ambre ? ' is-ambre' : '')} data-categorie-valeur={c.id}>{v}</span> : null}
         <span className="v2-pm-chev" aria-hidden="true">{chevron}</span>
@@ -2608,7 +2619,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   };
   const ecranCategorie = (c, { avecTitre }) => (
     <section key={c.id} id={`parametres-${c.id}`} className="vrm-pm-cat" data-categorie-ecran={c.id}>
-      {avecTitre && <h2 className="vrm-pm-cat-h" style={{color:C.text}}><span className="vrm-pm-cat-ic" aria-hidden="true"><Icon name={c.ic} size={17}/></span>{titreCat(c.id)}</h2>}
+      {avecTitre && <h2 className="vrm-pm-cat-h" style={{color:C.text}}><span className="vrm-pm-cat-ic" aria-hidden="true" data-pm-cat={c.id}><Icon name={c.ic} size={17}/></span>{titreCat(c.id)}</h2>}
       {c.expert && <p className="vrm-pm-expert" data-reglages-expert="" style={{color:C.muted}}>{tr('parametres.expert')}</p>}
       {teteCategorie(c.id)}
       {c.groupes.map((g) => groupe({ id: g.id, titre: g.titreCle ? tr(g.titreCle) : (g.titre || null), items: g.items, pied: g.pied }))}
@@ -2620,6 +2631,12 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const resultats = q ? filtrerReglages((designV2 ? catsV2 : categories).flatMap((c) => c.groupes.map((g) => ({ id: g.id, titre: [titreCat(c.id), g.titreCle ? tr(g.titreCle) : (g.titre || '')].filter(Boolean).join(' · '), items: g.items }))), q) : null;
   const nTrouves = resultats ? resultats.reduce((n, g) => n + g.items.length, 0) : 0;
   const catOuverte = etroit && cat ? (designV2 ? catsV2.find((c) => c.id === idV2(cat)) : categories.find((c) => c.id === cat)) || null : null;
+  // (22 nov., bugs-totale) La barre du haut du téléphone disait « ‹ Menu » au-dessus du « ‹ Paramètres » de la page (deux
+  // retours, deux destinations). Une page de Paramètres ouverte le dit à la barre, qui porte alors SON retour (le même
+  // libellé, le geste retour) ; celui de la page se tait au téléphone (styles-reglages.css).
+  const pageReglages = etroit && !q && (ouvert || catOuverte) ? (ouvert ? titreRetour : tr('ecran.settings')) : '';
+  React.useEffect(() => { try { window.__vrmPageReglages = pageReglages || ''; window.dispatchEvent(new Event('vrm:page-reglages')); } catch (_) {} }, [pageReglages]);
+  React.useEffect(() => () => { try { window.__vrmPageReglages = ''; window.dispatchEvent(new Event('vrm:page-reglages')); } catch (_) {} }, []);
 
   return (
     <div ref={racine} className="vrm-set vrm-pm" data-espace="autres" data-reglages-disposition={etroit ? 'telephone' : 'ordinateur'} data-sous-ecran-ouvert={ouvert ? ouvert.id : ''}
@@ -2638,6 +2655,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {signaler && <SignalerProblemeFeuille onClose={()=>setSignaler(false)}/>}
       {support && <EcrireSupportFeuille depuis="reglages" onClose={()=>setSupport(false)}/>}
       {feuilleAdresseVrm && <FeuilleAdresseVrm headers={sbAuth} FermeAuRetour={FermeAuRetour} proprio={proprioInst===true} onBoite={()=>setTab('emails')} onFermer={()=>setFeuilleAdresseVrm(false)}/>}
+      {/* (22 nov., bugs-totale) Au téléphone, une catégorie ou un panneau ouvert est une page POUSSÉE : le geste retour de
+          l'iPhone la referme (avant : il quittait Paramètres pour le Menu, la catégorie perdue). UNE entrée tant qu'une page
+          est ouverte (passer de la catégorie à un de ses panneaux n'en ajoute pas ; le retour revient d'un cran). */}
+      {etroit && !q && (ouvert || catOuverte) ? <FermeAuRetour fermer={() => { if (ouvert) fermerSous(); else fermerCategorie(); }}/> : null}
       {ouvert ? (
         // ── LE PANNEAU D'UN RÉGLAGE : « ‹ sa catégorie » (téléphone) ou « ‹ Paramètres » ──
         // (21 nov., ux-reglages, audit design n° 34) UN retour : « ‹ Paramètres » (ou « ‹ sa catégorie ») en texte accent,
@@ -3194,6 +3215,7 @@ function AppareilsConnectes() {
           )}
         </>
       )}
+      <NavigateursExtension owner={(AUTH.user && AUTH.user.id) || ''} lireTout={lireTout} quand={quandCourt}/>
       <div style={{ marginTop: 12, textAlign: 'center' }}>
         <button type="button" className="vrm-lien-action" data-deconnexion-partout="" onClick={seDeconnecterPartout} style={{ minHeight: 44, border: 0, background: 'transparent', font: 'inherit', fontSize: 15, padding: '0 12px', cursor: 'pointer' }}>Se déconnecter partout</button>
       </div>
@@ -3854,6 +3876,8 @@ function MonAbonnement() {
         </span>}>
         {RETOUR_ABONNEMENT === 'merci' && <div className="vrm-abo-phrase">Paiement reçu : ton abonnement arrive ici dans quelques secondes.</div>}
         <OffresSoloPro x={e} prixSolo={prixLisible(e.prix)} prixProAffiche={`${PRIX_PRO_MOIS} € / mois`}/>
+        {/* (25 nov.) Le filleul voit SA remise avant de payer (−10 % sur le 1er mois, posée par le serveur au paiement). */}
+        <RemiseFilleul/>
         <CaseCgv cases={cases} onChange={setCases}/>
         <div className="vrm-abo-actions">
           <Bouton variante="primaire" plein disabled={!!occupe || !cgv} data-sabonner="" data-essai={e.essaiDispo ? '' : undefined} onClick={() => agir('checkout')}  title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : e.essaiDispo ? `Commencer l'essai gratuit de ${e.essaiJours || 7} jours` : "S'abonner"}</Bouton>
@@ -3893,128 +3917,20 @@ function FacturesAbonnement({ fx }) {
   );
 }
 
-// ── PARRAINAGE (8 nov. ; clair et visible le 13 nov., lot 54) ────────────────
-// « Parraine un vendeur : 1 mois offert pour toi et pour lui. » Un lien
-// personnel (copier · partager, le partage natif sur téléphone), le total de
-// mois gagnés, l'état de CHAQUE filleul (« inscrit », « a payé son 1er mois »
-// ⇒ mois offert) SANS identité, et le nom qui s'affiche chez le filleul
-// (« Offert par … ») — choisi ici, jamais un pseudo Vinted (règle au serveur).
-// Règle et anti-abus : api/_lib/parrainage.js, CGV article 2 bis.
-// Trois états : `undefined` en cours · `null` pas su · l'objet lu. Pas installé
-// (027 pas passée) ou parrainage fermé : on le dit, sans lien à partager.
-async function lireParrainage() {
-  try {
-    const r = await fetch('/api/compte?mode=parrainage', { headers: enTeteSession(), cache: 'no-store' });
-    if (!r.ok) return null;
-    const j = await r.json();
-    return j && j.ok ? j : null;
-  } catch (_) { return null; }
-}
-function NomParrain({ nom, onChange }) {
-  // `nom` : le nom choisi · `null` rien de choisi · `undefined` pas su.
-  const [ouvert, setOuvert] = React.useState(false);
-  const [v, setV] = React.useState('');
-  const [msg, setMsg] = React.useState('');
-  const [occupe, setOccupe] = React.useState(false);
-  const ouvrir = () => { setV(nom || String(load('vrm_prenom', '') || '').trim().slice(0, 24)); setMsg(''); setOuvert(true); };
-  const envoyer = async (valeur) => {
-    if (occupe) return;
-    setOccupe(true); setMsg('');
-    try {
-      const r = await fetch('/api/compte?mode=parrainage', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'nom', nom: valeur }) });
-      const j = await r.json().catch(() => null);
-      if (r.ok && j && j.ok) { onChange(j.nom || null); setOuvert(false); toast(j.nom ? 'Enregistré' : 'Retiré'); }
-      else setMsg((j && j.message) || 'Pas enregistré. Réessaie dans un instant.');
-    } catch (_) { setMsg('Pas enregistré. Réessaie dans un instant.'); }
-    setOccupe(false);
-  };
-  if (!ouvert) {
-    return <RangeeIos titre="Ton nom chez tes filleuls" detail={nom ? `Ils lisent « Offert par ${nom} »` : 'Ils lisent « Offert par un vendeur VRM »'}
-      valeur={<span data-parrainage-nom={nom || ''}>{nom === undefined ? '—' : (nom || 'Choisir')}</span>} onClick={ouvrir} data-parrainage-nom-ouvrir=""/>;
-  }
-  return (
-    <div className="vrm-ios-rangee" style={{ padding: '10px 16px', display: 'block' }} data-parrainage-nom-form="">
-      <label htmlFor="vrm-parrain-nom" style={{ display: 'block', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Ton nom chez tes filleuls</label>
-      <input id="vrm-parrain-nom" className="vrm-set-champ" style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, textAlign: 'left' }} value={v} maxLength={24}
-        onChange={(e) => { setV(e.target.value.slice(0, 24)); setMsg(''); }} placeholder="Ton prénom ou un pseudo VRM" autoComplete="given-name" disabled={occupe}/>
-      <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>Ton prénom ou un pseudo VRM, jamais ton pseudo Vinted. Rien d’autre ne se voit.</div>
-      {msg ? <div role="alert" data-parrainage-nom-refus="" style={{ fontSize: 13, color: C.text, marginTop: 6 }}>{msg}</div> : null}
-      <div className="vrm-abo-actions" style={{ marginTop: 10 }}>
-        <Bouton variante="primaire"  disabled={occupe || !v.trim()} onClick={() => envoyer(v)} data-parrainage-nom-enregistrer="">{occupe ? 'Enregistrement…' : 'Enregistrer'}</Bouton>
-        {nom ? <Bouton variante="secondaire"  disabled={occupe} onClick={() => envoyer('')}>Ne plus montrer de nom</Bouton> : null}
-        <Bouton variante="secondaire"  disabled={occupe} onClick={() => setOuvert(false)}>Annuler</Bouton>
-      </div>
-    </div>
-  );
-}
-function Parrainage() {
-  const [p, setP] = React.useState(undefined);
+// (25 nov.) Le parrainage a son ÉCRAN (src/parrainage/EcranParrainage.jsx) : ici, une rangée qui y mène.
+// Programme fermé : la rangée n'est montrée qu'au propriétaire (rien n'est promis aux vendeurs).
+function EntreeParrainage({ onOuvrir }) {
   const proprio = useEstProprietaire();
-  const racine = React.useRef(null);
-  React.useEffect(() => { let mort = false; lireParrainage().then((x) => { if (!mort) setP(x); }); return () => { mort = true; }; }, []);
-  // Venu du menu « Plus » (« Parrainer ») ou de `?tab=parrainage` : le groupe est amené à l'écran.
-  React.useEffect(() => {
-    if (!p || !racine.current) return;
-    const amener = () => { try { racine.current && racine.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} };
-    // Ce qui est au-dessus (l'abonnement, les factures) finit parfois de se lire APRÈS : on ramène encore deux fois.
-    const minuteurs = [];
-    const plusieurs = () => { amener(); minuteurs.push(setTimeout(amener, 600), setTimeout(amener, 1500)); };
-    if (prendreDemandeParrainage()) requestAnimationFrame(plusieurs);
-    const f = () => { prendreDemandeParrainage(); plusieurs(); };
-    window.addEventListener('vrm:voir-parrainage', f);
-    return () => { window.removeEventListener('vrm:voir-parrainage', f); minuteurs.forEach(clearTimeout); };
-  }, [p]);
-  if (p === undefined) return null;
-  if (p === null) return <GroupeIos titre="Parrainage" data-parrainage="pas-su"><RangeeIos titre="Parrainage pas lu" detail="Rouvre cet écran dans un instant."/></GroupeIos>;
-  if (!p.installe || !p.ouvert) {
-    // Fermé : rien n'est promis au vendeur ; le propriétaire lit le geste.
-    if (!proprio) return null;
-    return <GroupeIos titre="Parrainage" data-parrainage="ferme" pied={!p.installe ? 'À activer : passer la migration 027, puis vrm_reglages.parrainage = 1.' : 'Éteint : vrm_reglages.parrainage = 1 l’ouvre (un mois offert au parrain et au filleul).'}><RangeeIos titre="Parrainage pas encore ouvert"/></GroupeIos>;
-  }
-  const lien = lienParrainage(p.code);
-  const s = p.suivi || { inscrits: 0, payes: 0, moisOfferts: 0, enAttente: 0 };
-  const gagnes = moisGagnes(p);
-  const filleuls = Array.isArray(p.filleuls) ? p.filleuls : null;
-  const f = p.filleul || null;
-  const peutPartager = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
-  const copier = async () => {
-    try { await navigator.clipboard.writeText(lien); toast('Lien copié'); } catch (_) { toast('Copie impossible ici — sélectionne le lien'); }
-  };
-  const partager = async () => {
-    try { if (!peutPartager) { copier(); return; } await navigator.share({ title: 'VRM — 1 mois offert', text: TEXTE_PARTAGE, url: lien }); } catch (e) { if (!(e && e.name === 'AbortError')) copier(); }
-  };
-  return (
-    <div ref={racine} data-parrainage="ouvert" data-inscrits={s.inscrits} data-payes={s.payes} data-mois-gagnes={gagnes == null ? '' : gagnes} data-parrainage-test={p.modeTest ? '1' : undefined} style={{ scrollMarginTop: 72 }}>
-      <GroupeIos titre="Parrainage"
-        pied={`${p.modeTest ? 'Mode test : aucun vrai paiement pour l’instant. ' : ''}Ton ami s’inscrit avec ton lien. À son 1er paiement, chacun de vous deux reçoit un mois offert${Number.isFinite(p.moisCentimes) ? ' (' + (p.moisCentimes / 100).toFixed(2).replace('.', ',') + ' €)' : ''}, déduit de sa prochaine facture. Un nouveau compte VRM et un compte Vinted jamais vu dans VRM ; 12 mois offerts par an au plus.`}>
-        <div className="vrm-ios-rangee" style={{ padding: '12px 16px', display: 'block' }}>
-          <div data-parrainage-titre="" style={{ fontSize: 17, fontWeight: 600, color: C.text, lineHeight: 1.35, marginBottom: 10 }}>{PHRASE_PARRAINAGE}</div>
-          <div className="vrm-abo-lien"><code data-lien-parrainage="">{lien}</code></div>
-          <div className="vrm-abo-actions" style={{ marginTop: 10 }}>
-            <Bouton variante="primaire"  onClick={copier} data-copier-parrainage="">Copier le lien</Bouton>
-            {peutPartager ? <Bouton variante="secondaire"  onClick={partager} data-partager-parrainage="">Partager</Bouton> : null}
-          </div>
-        </div>
-        <RangeeIos titre="Mois gagnés" detail={s.enAttente ? `${s.enAttente} en attente de ton premier abonnement` : undefined} valeur={<span data-chiffre-mois="">{gagnes == null ? '—' : gagnes}</span>}/>
-        <NomParrain nom={p.nom} onChange={(nom) => setP((x) => ({ ...x, nom }))}/>
-      </GroupeIos>
-      {f && f.parraine ? (
-        <GroupeIos titre="Ton parrainage" data-parraine={f.moisOffert ? 'offert' : f.attendVinted ? 'attend-vinted' : 'en-cours'}>
-          <RangeeIos titre={`Offert par ${offertPar(f.offertPar) || 'un vendeur VRM'}`}
-            detail={f.moisOffert ? 'Ton mois offert est crédité.' : f.attendVinted ? 'Relie ton compte Vinted pour recevoir ton mois offert.' : 'Ton mois offert arrive avec ton 1er paiement.'}/>
-        </GroupeIos>
-      ) : null}
-      <GroupeIos titre="Tes filleuls" data-filleuls={filleuls ? filleuls.length : ''}
-        pied={<span data-parrainage-phrase="">{s.inscrits} personne{s.inscrits > 1 ? 's' : ''} venue{s.inscrits > 1 ? 's' : ''} par toi · {s.payes} abonnée{s.payes > 1 ? 's' : ''}</span>}>
-        {filleuls === null ? <RangeeIos titre="Liste pas lue" detail="Rouvre cet écran dans un instant."/>
-          : !filleuls.length ? <RangeeIos titre="Personne pour l’instant" detail="Partage ton lien : chaque inscription apparaît ici."/>
-          : filleuls.map((x) => { const t = texteEtatFilleul(x.etat); return (
-            <RangeeIos key={x.rang} data-filleul={x.etat} titre={`Filleul ${x.rang}`} detail={`${x.inscritLe ? 'inscrit le ' + jourCourt(x.inscritLe) + ' · ' : ''}${t.detail}`}
-              valeur={t.court}/>
-          ); })}
-      </GroupeIos>
-    </div>
-  );
+  const [ouvert, setOuvert] = React.useState(parrainageOuvertConnu());
+  React.useEffect(() => { lireParrainageOuvert(); return suivreParrainageOuvert(setOuvert); }, []);
+  if (ouvert !== true && proprio !== true) return null;
+  return <GroupeNatif titre={tr('parrain.titre')} attrs={{ 'data-parrainage-entree': '' }}>
+    <RangeeNatif icone={<Icon name="cadeau" size={22}/>} titre={tr('parrain.titre')} sousTitre={tr('parrain.entree.desc')} fin="chevron" onClick={onOuvrir}/>
+  </GroupeNatif>;
+}
+function RemiseFilleul() {
+  const f = useFilleulParraine();
+  return f ? <div data-parrainage-remise=""><CarteFilleul filleul={f.filleul} regle={f.regle} compacte/></div> : null;
 }
 // ⟦← App.jsx #41⟧
 
@@ -4404,7 +4320,7 @@ function NumeroEcritSetting({ onAnnonces }) {
       if (l && Array.isArray(jv) && Array.isArray(ja)) {
         const items = l.items || {}, ventes = (jv[0] && jv[0].v) || {};
         const prouves = new Set([...comptesLbcProuves(ventes, items), ...comptesLbcSession((ja[0] && ja[0].a) || {})]);
-        const vendues = annoncesLbcVendues(ventes); const liens = load('vrm_lbc_liens', {}) || {};
+        const vendues = annoncesLbcVendues(ventes); const liens = liensLbcLus();
         const ads = Object.values(items).filter((ad) => ad && ad.id != null && annonceLbcALui(ad, prouves) && annonceLbcEnVente(ad, vendues));
         out.leboncoin = apercuNumeroEcrit(ads.map((ad) => { const li = liens[String(ad.id)]; return { id: String(ad.id), site: 'leboncoin', titre: ad.subject || '', lecture: lectureEcriteLbc(ad), connu: li != null && String(li).trim() ? cleNum(li) : '', presente: true }; }), { reprenable: rep });
       } else out.leboncoin = null;
@@ -4908,9 +4824,37 @@ function ApparenceSetting({ valeur, onChoisir }) {
           attrs={{ 'data-apparence': m, 'data-apparence-coche': valeur === m ? '1' : '0' }} onClick={() => onChoisir && onChoisir(m)}/>
       ))}
     </GroupeNatif>
-    {/* (19 nov., « VRM natif », docs/design/NATIF.md) UN seul design : les réglages « Style » (Apple · Studio bleu) et « Ancien design » ont disparu. */}
+    {/* (24 nov., style-graphite) « Style » : dix styles à essayer (jetons seulement), « Actuel » = le défaut, inchangé. */}
+    <StyleSetting/>
     {/* (19 nov.) Le réglage « Barre d'onglets » (cinq dessins de l'ancienne barre) est RETIRÉ : la barre native n'a qu'un dessin, il n'avait plus d'effet. */}
   </>);
+}
+// (24 nov., style-graphite — Julien : « essaye un peu de changer de style pour l'iPhone », dix styles à essayer DANS l'app)
+// LE STYLE : une tuile d'aperçu par style (une rangée et un bouton, dessinés par les jetons de CE style : la tuile porte
+// son propre `data-style`), un toucher l'applique tout de suite, « Actuel » revient au défaut. Rangé sur cet appareil.
+function StyleSetting() {
+  const [style, setStyle] = React.useState(styleLu);
+  React.useEffect(() => { const f = (e) => setStyle(e.detail || ''); window.addEventListener('vrm-style', f); return () => window.removeEventListener('vrm-style', f); }, []);
+  const ids = [''].concat(STYLES_CHOIX);
+  return (
+    <div className="g-styles-bloc" data-style-choix={style || 'actuel'}>
+      <h3 className="n-groupe-titre" style={{ margin: '16px 0 4px' }}>{tr('v2.style.lib')}</h3>
+      <p style={{ margin: '0 0 8px', font: 'var(--n-t-second)', color: 'var(--n-encre-2)' }}>{tr('v2.style.phrase')}</p>
+      <div className="g-styles" role="radiogroup" aria-label={tr('v2.style.lib')}>
+        {ids.map((id) => {
+          const nom = tr('v2.style.' + (id || 'actuel')), choisi = style === id;
+          return (
+            <TuileRadioNatif key={id || 'actuel'} choisi={choisi} className="g-tuile" onChoisir={() => setStyle(choisirStyle(id))}
+              attrs={{ 'data-style': id, 'data-style-tuile': id || 'actuel', 'aria-label': nom + ' — ' + tr('v2.style.' + (id || 'actuel') + '.desc'), title: tr('v2.style.' + (id || 'actuel') + '.desc') }}>
+              <span className="g-tuile-rangee" aria-hidden="true"><span className="g-tuile-photo"/><span className="g-tuile-lignes"><span className="g-tuile-ligne"/><span className="g-tuile-ligne"/></span><span className="g-tuile-chip"/></span>
+              <span className="g-tuile-plein" aria-hidden="true"/>
+              <span className="g-tuile-nom"><span>{nom}</span>{choisi ? <span className="g-tuile-coche">✓</span> : null}</span>
+            </TuileRadioNatif>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 // (11 nov., lot traduction) LA LANGUE : la même liste d'iOS que l'Apparence. Chaque langue
 // est écrite DANS sa langue (on la retrouve sans comprendre la langue courante) ; le choix

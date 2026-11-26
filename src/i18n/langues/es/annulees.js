@@ -32,6 +32,7 @@ export default {
   "vcmod.refusee": "Rechazada por Vestiaire",
   "vcmod.enLigne": "En línea",
   "vcmod.autre": "Estado Vestiaire: {mot}",
+  "vcmod.aConfirmerVieille": "Por confirmar · leído {quand}",
   "vcmod.corrigerGeste": "Corregir en Vestiaire",
   "vcmod.cpt.titre": "En Vestiaire",
   "vcmod.cpt.attente": "{n} pendiente(s) de validación",

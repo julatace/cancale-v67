@@ -17,26 +17,32 @@
 //  sinon `vrm_articles_sites` sous l'identifiant de l'annonce de SON site), relus juste avant : carte pas lue ⇒ rien.
 //  Les actions passent par l'écran Annonces Vinted d'hier (monté, caché) : `demanderActionAnnonces`.
 // ══════════════════════════════════════════════════════════════════════════
-import { useComptesBloques } from '../compteBloqueEtat.js';
+import { agirMaintenant, envoyerSerie, dire, republierDansApp, useFaitsAgir } from '../agir/porte.js';   // (24 nov., lot agir-tout)
+import { texteRaison } from '../agir/Agir.jsx';
+import { useComptesBloques } from '../compteBloqueEtat.js';   // 5.454 : + le N° écrit en fin de description (src/lbcNumeroEcrit.js), lot lbc-numero-ecrit
+import { liensLbcLus } from '../App.jsx';   // (24 nov., lot ext-anciens-lots) les liens Leboncoin LUS (+ photo d'origine, src/photoIdentite.js)
 import { etatLienLu, propositionLu, relierDepuisListe, queSurCeSite, ouvrirLiaison, abonnerLiaison, demanderLiaison } from '../liaisonEtat.js';   // (20 nov.) relier depuis la liste
 import React from 'react';
 import { lazySur } from '../chargementSur.js';
 import { tr } from '../i18n/index.js';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
 import { Bouton as BoutonNatifAE } from '../natif/Bouton.jsx';   // (21 nov., ux-reglages) le geste de l'état vide
-import { LogoSite } from '../SelecteurSites.jsx';   // (20 nov.) le logo du site dans l'en-tête de chaque compte
+import { LogoSite } from '../natif/LogoSite.jsx';   // (25 nov., logo-vinted-pp) le logo du site dans l'en-tête de chaque compte : le MÊME V que sur Ventes (couleur de marque, 20 px) — l'ancien (SelecteurSites, à l'encre) sortait noir
+import { poserSourcePhotosComptes } from '../natif/visuel/photosProfil.js';   // (25 nov.) la photo de profil de chaque compte, une lecture partagée
 import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES, statutTableau, comptesDesArticles, SITES } from '../articles/modele.js';
 import { annoncesVinted, annoncesLeboncoin, annoncesEbay, annoncesVestiaire, annoncesVintedVendues } from '../articles/sources.js';
+import { venduesParMail, LIENS_VENTE_MAIL } from '../venteMailAnnonce.js';   // (24 nov.) l'annonce vendue par e-mail
 import { photoArticle } from '../photosArticles.js';
 import { groupesParCompte } from '../natif/ecrans/annoncesComptes.js';   // (22 nov.) le nombre de rangées d'un site (filtre Site)   // (22 nov.) la photo d'une vente Vinted (« Vendue »)
 import { CLE_VUES_LUES, noterVuesLues, vuesFavorisEnLigne, publierVuesFavoris, lectureUtile } from '../vuesFavoris.js';
 import { valeurStockAffiche, publierStockValeur } from '../stockValeurAffiche.js';
 import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
-import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
+import { numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
+import { etatDeVc } from '../enLigneVc.js';   // (26 nov.) « en ligne » / « vendue » Vestiaire : LA règle (Stock, écran Vestiaire)
 import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, photoKey, STUDIO_BASE } from '../App.jsx';
-import { ouvrirPanneau } from '../ouvrirPanneau.js';
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, lireTout, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, lireVentesEmail, photoKey, STUDIO_BASE } from '../App.jsx';
+import { ouvrirPanneau, panneauEnRetard, gesteDuPanneau } from '../ouvrirPanneau.js';
 // (22 nov., choix n° 35) « Photo en double » : la règle d'identité par le FICHIER photo exact (src/photoEnDouble.js).
 import { photosEnDouble, numerosEnExemplaires, refuserGroupe, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
 import PhotoEnDouble from '../natif/ecrans/PhotoEnDouble.jsx';
@@ -45,19 +51,21 @@ import { republierEnPriorite, lireReglagePrio, publierPriorite, CLE_SEUIL_DORMEN
 import RepublierPriorite, { usePrioSelection, PleinRepublier } from '../natif/ecrans/RepublierPriorite.jsx';
 import { comptesPersonnels, CLE_ROLES_COMPTES } from '../rolesComptes.js';
 import { enLitigeConnus, abonnerLitiges } from '../litigesEnCours.js';
-import { ACTIONS_EXTENSION } from '../actionsExtension.js';
+import { ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from '../actionsExtension.js';
 import { plusVue, joursPlusVue, CLE_PLUS_VUE_JOURS } from '../plusVue.js';   // (22 nov., choix 27) « Plus vue depuis N j »
 import { lireRelevesEnLigne } from '../plusVueLecture.js';
+import { useFiltrePlateforme, optionTableau } from '../natif/FiltrePlateformes.jsx';   // (25 nov.) le filtre par plateforme de l'onglet
+import { TOUTES, nombresPlateformes, optionsPlateformes, choixEffectif } from '../filtrePlateforme.js';
 import { lireSupprimes } from '../comptesSupprimes.js';   // (21 nov.) un compte supprimé pour de bon n'est jamais relu   // (20 nov.) la pause Leboncoin : dans l'extension
 
 const JOUR = 24 * 3600 * 1000;
 const ACTIONS = [
-  { cle: 'recreer', libelle: 'egalite.action.republier', icone: 'sync', etats: ['enligne'], robot: true },
+  { cle: 'recreer', libelle: 'egalite.action.republier', icone: 'sync', etats: ['enligne'], robot: true, courante: true },
   { cle: 'main', libelle: 'egalite.action.main', icone: 'pencil', etats: ['enligne', 'masquee', 'brouillon'] },
   { cle: 'versBrouillon', libelle: 'egalite.action.versBrouillon', icone: 'archive', etats: ['enligne'], robot: true },
   { cle: 'enLigne', libelle: 'egalite.action.enLigne', icone: 'play', etats: ['brouillon'], robot: true },
-  { cle: 'baisser', libelle: 'egalite.action.baisser', icone: 'tag', etats: ['enligne'] },
-  { cle: 'partout', libelle: 'egalite.action.partout', icone: 'link', etats: ['enligne'], tousSites: true },
+  { cle: 'baisser', libelle: 'egalite.action.baisser', icone: 'tag', etats: ['enligne'], courante: true },
+  { cle: 'partout', libelle: 'egalite.action.partout', icone: 'link', etats: ['enligne'], tousSites: true, courante: true },
   // (19 nov., publier-agent) « Publier sur… » : l'agent sans IA remplit chaque site depuis la fiche article neutre (src/publier/).
   { cle: 'agent', libelle: 'agent.action', icone: 'link', etats: ['enligne'], tousSites: true },
 ];
@@ -116,7 +124,7 @@ export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis 
   const accs = (accounts || []).filter((a) => { if (!a || a.vinted_user_id == null) return false; const u = String(a.vinted_user_id);
     return !horsCompte({ accountId: u }) || (!!bloqueDe(u) && !supprimes.has(u)); });
   const manque = [];
-  const [vinted, ls, vr, eb, vc, annu] = await Promise.all([
+  const [vinted, ls, vr, eb, vc, annu, vcv] = await Promise.all([
     Promise.all(accs.map(async (acc) => {
       const uid = String(acc.vinted_user_id);
       let r; try { r = await borneLecture(fetchVintedListings(acc, 1, {})); } catch (_) { r = null; }
@@ -133,6 +141,9 @@ export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis 
     borneLecture(lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items')),
     borneLecture(lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`)),
     borneLecture(lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`)),
+    // (26 nov., fiabilité VC) Les ventes Vestiaire (projetées) : une vente lue, pas annulée, prouve « vendue » — comme l'écran
+    // Vestiaire et le Stock. Avant, aucune n'était lue ici : une annonce vendue restait « En ligne » jusqu'à la relecture.
+    borneLecture(lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`)),
   ]);
   const journal = load('vrm_liaison_sites', {}) || {};
   const out = [];
@@ -149,7 +160,7 @@ export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis 
   // Leboncoin
   if (ls && ls.items && Array.isArray(vr)) {
     const vendues = annoncesLbcVendues((vr[0] && vr[0].ventes) || {});
-    const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
+    const liens = { ...liensLbcLus() };
     const noms = Array.isArray(annu) ? annuaireLbc((annu[0] && annu[0].a) || {}) : null;
     // (20 nov.) Seules SES annonces : compte prouvé par une vente ou une session vue, ou référence VRM (`annonceLbcALui`).
     const prouves = new Set([...comptesLbcProuves((vr[0] && vr[0].ventes) || {}, ls.items), ...(Array.isArray(annu) ? comptesLbcSession((annu[0] && annu[0].a) || {}) : [])]);
@@ -177,8 +188,9 @@ export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis 
     const auto = numerosVcEffectifs();
     const liensVc = load('vrm_vc_liens', {}) || {};
     const t = Date.parse(L.capturedAt || '');
+    // Ventes pas lues ⇒ rien n'en est tiré (« vendue » seulement si l'annonce le dit), jamais une vente devinée.
     out.push(...annoncesVestiaire(L.items || {}, {
-      etatDe: (id, it) => etatAnnonceVcBrut(it, false, L.capturedAt),
+      etatDe: etatDeVc({ capturedAt: L.capturedAt, ventesLues: vcv }),
       numeroDe: (id, it) => numVcAnnonce(id, it, { ...(L.liens || {}) }, auto),
       vintedDe: (id) => { const x = liensVc[String(id)]; return x && typeof x === 'object' && x.item ? String(x.item) : ''; },
       vieille: !(Number.isFinite(t) && Date.now() - t < JOUR) }));
@@ -221,7 +233,14 @@ export function tracesFiches(bloques, preuves) {
 // (rien n'est écrit) ; une lecture ratée ne l'efface pas, elle ne s'y substitue pas non plus (« pas su » reste dit).
 const _derniereLecture = { cle: '', lu: undefined };
 const cleLecture = (cleComptes) => ((AUTH.user && AUTH.user.id) || '') + '|' + cleComptes;
+// (25 nov., logo-vinted-pp) Le logo d'un site dans l'en-tête de chaque compte (liste et tableau) : celui des ventes.
+const logoDuSite = (s) => <LogoSite site={s} taille={20}/>;
+// La photo de profil de chaque compte (le rond `AvatarCompte`) : UNE lecture projetée, au premier rond monté, pour CETTE
+// session ; rendue par PhotoVinted (la règle des photos du CDN de Vinted).
+const PhotoProfil = (p) => <PhotoVinted {...p}/>;
+poserSourcePhotosComptes({ lire: (q) => lireTout(q), qui: () => (AUTH.user && AUTH.user.id) || '', Photo: PhotoProfil });
 export default function AnnoncesEgalite({ accounts: accountsTous = [], siteInitial = 'tous', onEcranSite = null }) {
+  useFaitsAgir();   // (25 nov.) les gestes du tableau se rejugent quand la porte change (extension connectée ou non)
   // (19 nov., intégration — lot compte-bloque) Un compte que Vinted a bloqué et que le vendeur a mis EN PAUSE (son choix) :
   // ses annonces sortent de la liste, comme dans l'écran d'avant (`annBase`) ; la ligne « N annonces en pause » les dit.
   // (21 nov.) Plus retirées : elles restent lisibles sous « Comptes bloqués » (dernière lecture connue, datée), hors de « en ligne »
@@ -237,8 +256,11 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   // (19 nov. soir, tableau de travail) « Mis à jour il y a … » : l'heure de la dernière lecture RÉUSSIE ; ⟳ relance la MÊME lecture.
   const [majLe, setMajLe] = React.useState(() => (memo ? memo.le : undefined));
   const [relit, setRelit] = React.useState(false);
-  const [filtreT, setFiltreT] = React.useState({ site: siteInitial || 'tous', compte: '', dort: 'toutes' });
-  const [filtre, setFiltre] = React.useState({ site: siteInitial || 'tous', etat: 'enligne' });
+  // (25 nov., Julien : « un filtre avec toutes les plateformes et par plateforme dans les onglets ») LE site de l'écran est le
+  // filtre de l'onglet (src/filtrePlateforme.js, retenu sur cet appareil) : le même pour la liste du téléphone et le tableau.
+  const [choixP, choisirP] = useFiltrePlateforme('annonces');
+  const [filtreT0, setFiltreT] = React.useState({ compte: '', dort: 'toutes' });
+  const [filtreE, setFiltre] = React.useState({ etat: 'enligne' });
   const [q, setQ] = React.useState('');
   React.useEffect(() => {
     const prendre = () => { try { if (prendreVue('arepublier')) setFiltre((f) => ({ ...f, etat: 'arepublier' })); else if (prendreVue('photodouble')) setFiltre((f) => ({ ...f, etat: 'photodouble' })); else if (prendreVue('dorment')) setFiltre((f) => ({ ...f, etat: 'dorment' })); } catch (_) {} };
@@ -256,13 +278,19 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
       // (21 nov.) Un compte bloqué : ses fiches arrivent en second temps, après les preuves de vente (la liste ne les attend pas).
       // (22 nov., Julien : « j'ai fait 3 ventes mais pas que sur Leboncoin ») … et les annonces Vinted VENDUES : prouvées
       // (<preuve-vente-regle>), reliées à leur vente par le n° de transaction (jamais le titre) — `annoncesVintedVendues`.
-      if (r) Promise.all([lirePreuvesVenteVinted().catch(() => null), fetchTxnItemIds().catch(() => ({})), ventesLuesBientot()]).then(([p, txnItem, ventes]) => {
+      if (r) Promise.all([lirePreuvesVenteVinted().catch(() => null), fetchTxnItemIds().catch(() => ({})), ventesLuesBientot(), lireVentesEmail().catch(() => null)]).then(([p, txnItem, ventes, mails]) => {
         const plus = r.bloques && r.bloques.length ? tracesFiches(r.bloques, p) : [];
         const vendues = annoncesVintedVendues({ ventes, txnItem, vendus: p && p.vendus instanceof Set ? p.vendus : null, comptes: (r.vendusCtx || {}).comptes, dressing: (r.vendusCtx || {}).dressing, photoDe: (o) => photoArticle(o) || null });
-        if (!plus.length && !vendues.length) return;
+        // (24 nov., vente-mail-annonce) L'annonce EN LIGNE qu'un e-mail de vente désigne (son clic, ou la photo exacte — la règle
+        // de src/venteMailAnnonce.js, la même que Ventes et la fiche), lue avant l'e-mail : « Vendue · par e-mail, en attente de
+        // Vinted » — hors d'« En ligne » et des totaux, rien de supprimé ; la relecture du dressing fait foi ensuite.
+        const parMail = venduesParMail({ ventes: mails, annonces: r.annonces.filter((x) => x && x.site === 'vinted' && x.etat === 'enligne').map((x) => ({ id: String(x.id), uid: String(x.compte || ''), photo: x.photo, lu: x.lu })),
+          liens: load(LIENS_VENTE_MAIL, {}) || {}, fiches: load('vinted_annonce_numeros', {}) || {} });
+        if (!plus.length && !vendues.length && !parMail.size) return;
         const parId = new Map(vendues.map((v) => [v.id, v]));
         // Une annonce déjà là (« retirée », trace) et PROUVÉE vendue devient « vendue » ; les autres s'ajoutent.
-        const annonces = r.annonces.map((x) => (x && x.site === 'vinted' && parId.has(String(x.id)) ? { ...x, etat: 'vendue', bloque: null, venduLe: parId.get(String(x.id)).venduLe } : x));
+        const annonces = r.annonces.map((x) => (x && x.site === 'vinted' && parId.has(String(x.id)) ? { ...x, etat: 'vendue', bloque: null, venduLe: parId.get(String(x.id)).venduLe }
+          : x && x.site === 'vinted' && x.etat === 'enligne' && parMail.has(String(x.id)) ? { ...x, etat: 'vendue', venteMail: true, bloque: null, venduLe: parMail.get(String(x.id)).t } : x));
         const deja = new Set(annonces.filter((x) => x && x.site === 'vinted').map((x) => String(x.id)));
         const complet = { ...r, annonces: [...annonces, ...plus.filter((x) => !parId.has(String(x.id))), ...vendues.filter((v) => !deja.has(v.id))] };
         if (_derniereLecture.lu === r) _derniereLecture.lu = complet;
@@ -273,7 +301,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cleComptes, cleBloques, tic]);
   React.useEffect(() => {
-    const f = (e) => { const k = e && e.detail && e.detail.k; if ([CLE_ARTICLES, 'vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', 'vrm_slots', CLE_PHOTO_DOUBLE_NON, 'vinted_bleam'].includes(k)) setTic((t) => t + 1); };
+    const f = (e) => { const k = e && e.detail && e.detail.k; if ([CLE_ARTICLES, LIENS_VENTE_MAIL, 'vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', 'vrm_slots', CLE_PHOTO_DOUBLE_NON, 'vinted_bleam'].includes(k)) setTic((t) => t + 1); };
     const g = (e) => { const d = e && e.detail; if (d && d.type === 'maj') setTic((t) => t + 1); };
     // Une lecture arrivée après sa borne (`borneLecture`) : une relecture, une seule à la fois (le minuteur les regroupe).
     let tr2 = 0; const h = () => { clearTimeout(tr2); tr2 = setTimeout(() => setTic((t) => t + 1), 300); };
@@ -322,6 +350,15 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     return d.length ? Math.floor((opts.maintenant - Math.min(...d)) / JOUR) : null;
   };
   const comptes = modele ? compterArticles(modele.articles, opts) : null;
+  // (25 nov.) Les entrées du filtre de l'onglet : les sites PRÉSENTS (la règle commune, src/filtrePlateforme.js, sur les annonces
+  // de chaque article), chacune avec le nombre de SON segment (`compterArticles`, la règle des segments) au téléphone ; le tableau
+  // de l'ordinateur compte ses rangées (`nRangeesSite`, plus bas). Un choix retenu sans entrée ⇒ « Toutes » (jamais un filtre vide).
+  const presenceP = modele ? optionsPlateformes(nombresPlateformes(modele.articles)) : [];
+  const effP = choixEffectif(choixP, presenceP);
+  const siteP = effP === TOUTES ? 'tous' : effP;
+  const filtre = { ...filtreE, site: siteP };
+  const filtreT = { ...filtreT0, site: siteP };
+  const optionsTelP = presenceP.map((o) => { const c = comptes && comptes[o.cle === TOUTES ? 'tous' : o.cle]; return { ...o, n: c && Number.isFinite(c[filtre.etat]) ? c[filtre.etat] : null }; });
   // ── (21 nov., prio-recherche) « À REPUBLIER EN PRIORITÉ » ── LA règle « Dorment » au site Vinted, ses exclusions (vendue,
   // masquée, litige ou retour en cours, compte bloqué ou en pause, compte personnel ou d'achats), son classement. Lecture en
   // cours ⇒ undefined ; ratée ⇒ null (jamais « rien à republier »). Publié pour Aujourd'hui (cet appareil), jamais sur un doute.
@@ -351,9 +388,12 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   }, [modele]);
   React.useEffect(() => {
     if (!sigEnLigne || sigEnLigne === '{}') return undefined;
-    let mort = false;
-    const t = setTimeout(() => { lireRelevesEnLigne(STUDIO_BASE, JSON.parse(sigEnLigne)).then((r) => { if (!mort) setReleves(r); }).catch(() => {}); }, 600);
-    return () => { mort = true; clearTimeout(t); };
+    let mort = false, idle = 0;
+    // (24 nov., vitesse-lectures-toucher) Les relevés partent quand l'écran est CALME (`requestIdleCallback`, au plus 3 s ;
+    // sans lui, Safari : 1,5 s) — ils ne prennent plus le réseau ni le processeur pendant les premières images de l'écran.
+    const lire = () => { if (mort) return; let sig = null; try { sig = JSON.parse(sigEnLigne); } catch (_) { return; } lireRelevesEnLigne(STUDIO_BASE, sig).then((r) => { if (!mort) setReleves(r); }).catch(() => {}); };
+    const t = setTimeout(() => { try { if (typeof window.requestIdleCallback === 'function') { idle = window.requestIdleCallback(lire, { timeout: 3000 }); return; } } catch (_) {} setTimeout(lire, 900); }, 600);
+    return () => { mort = true; clearTimeout(t); try { if (idle) window.cancelIdleCallback(idle); } catch (_) {} };
   }, [sigEnLigne]);
   const plusVueAnnonce = (x) => {
     if (!releves || !x || x.site !== 'vinted' || x.etat !== 'enligne') return null;
@@ -363,7 +403,10 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   };
   const plusVueDe = (a) => { if (!releves || !a) return null; let m = null; for (const x of a.annonces) { const j = plusVueAnnonce(x); if (j != null && (m == null || j > m)) m = j; } return m; };
   // « Republier » d'une annonce plus vue : la feuille Avant | Après de CETTE paire dans le panneau (5.429, `republier-direct`).
-  const republierUne = (x) => { const A = ACTIONS_EXTENSION.republierMaintenant; ouvrirPanneau({ site: 'vinted', page: A.page, ids: [String(x.id)], action: A.action }); };
+  const republierUne = (x) => { const A = ACTIONS_EXTENSION.republierMaintenant; const compte = String(x.compte || x.uid || ''); (async () => {   // (24 nov., lot agir-tout) depuis VRM, sinon le panneau gardé
+    const r = await republierDansApp([{ compte, id: String(x.id) }], confirmerRepub);
+    if (r.ok) { dire(tr('agir.envoi.ici')); return; }
+    if (!r.annule) ouvrirPanneau({ site: 'vinted', compte: compte || '*', page: A.page, ids: [String(x.id)], action: A.action }); })(); };
   const plusVuesHorsPrio = React.useMemo(() => {
     if (!modele || !releves || !prio) return [];
     const dans = new Set(prio.liste.map((l) => 'vinted#' + l.annonce.id));
@@ -376,13 +419,19 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   const lignesPrio = prio ? (qPrio ? prio.liste.filter((l) => [l.article.titre, l.numero ? 'n' + l.numero + ' ' + l.numero : '', l.annonce.pseudo].join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(qPrio)) : prio.liste) : [];
   const selPrio = usePrioSelection(lignesPrio);
   // SON toucher sur « Republier N » : l'atelier Republier du PANNEAU de l'extension, sur vinted.fr, ces annonces cochées. Rien ne part d'ici.
-  const republierPrio = ({ ids }) => { const a = ACTIONS_EXTENSION.republier; ouvrirPanneau({ site: 'vinted', page: a.page, ids, action: a.action }); };
+  // (24 nov., lot agir-tout) « Republier N » DEPUIS VRM (la file, UNE confirmation, au nom du compte de la sélection) ;
+  // la porte dit non ⇒ le panneau (gardé lui aussi, il dit pourquoi).
+  const confirmerRepub = (n) => askConfirm({ title: n > 1 ? tr('agir.republier') + ' · ' + n : tr('agir.republier'), desc: tr('agir.republier.confirmer'), ok: tr('agir.republier.oui') });
+  const republierPrio = ({ ids, compte }) => { const a = ACTIONS_EXTENSION.republier; (async () => {
+    const r = await republierDansApp((ids || []).map((id) => ({ compte: String(compte || ''), id: String(id) })), confirmerRepub);
+    if (r.ok) { dire(tr('agir.envoi.ici') + (r.n > 1 ? ' · ' + r.n : '')); return; }
+    if (!r.annule) ouvrirPanneau({ site: 'vinted', compte: compte ? String(compte) : '*', page: a.page, ids, action: a.action }); })(); };
   const priorite = {
     n: prio ? prio.liste.length : undefined,
     plein: prio && lignesPrio.length ? <PleinRepublier lignes={lignesPrio} coches={selPrio.coches} onRepublier={republierPrio}/> : null,
     contenu: <RepublierPriorite res={prio} lignes={lignesPrio} coches={selPrio.coches} onBasculer={selPrio.onBasculer} onTout={selPrio.onTout} onReglage={(r) => { if (r && r.plusVue != null) { poserJoursPV(r.plusVue); return; } poserRegPrio(r); }}
       plusVue={{ jours: joursPV, de: (l) => plusVueAnnonce(l.article.annonces.find((x) => x.site === 'vinted' && String(x.id) === String(l.annonce.id)) || null), autres: plusVuesHorsPrio, republier: republierUne }}
-      Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>} Logo={(s) => <LogoSite site={s}/>} euros={(n) => fmt(n)} Icon={Icon}/>,
+      Photo={(src, o) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>} Logo={logoDuSite} euros={(n) => fmt(n)} Icon={Icon}/>,
   };
   // ── (22 nov., Julien — choix n° 35) « PHOTO EN DOUBLE » ── deux annonces Vinted EN LIGNE (l'état que <enligne-regle> a
   // donné, jamais « à confirmer » ni masquées) au MÊME fichier photo (`photoKey`, ou la clé `photoK` de leur fiche). Un
@@ -414,11 +463,21 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     return { ok: true };
   };
   const actions = ACTIONS.map((A) => ({
-    cle: A.cle, libelle: tr(A.libelle), icone: A.icone, phrase: A.cle === 'agent' ? tr('agent.action.phrase') : tr('egalite.action.' + cleActionTr[A.cle] + '.phrase'),
+    cle: A.cle, libelle: tr(A.libelle), icone: A.icone, courante: !!A.courante, phrase: A.cle === 'agent' ? tr('agent.action.phrase') : tr('egalite.action.' + cleActionTr[A.cle] + '.phrase'),
     pour: (a) => (A.tousSites ? !!a.numero && a.annonces.some((x) => x.etat === 'enligne') : (() => { const v = vintedDe(a); return !!v && A.etats.includes(v.etat); })()),
     juger: (sel) => {
       if (!sel.length) return { ok: false, raison: tr('egalite.selection.aucune') };
+      // (25 nov., e2e-extension-vert) Un geste du panneau, et l'extension d'ici ne sait pas ouvrir le panneau : fermé, dit.
+      if (PANNEAU_DE_SELECTION[A.cle] && panneauEnRetard()) return { ok: false, raison: panneauEnRetard() };
       if (A.robot) { const c = new Set(sel.map((a) => (vintedDe(a) || {}).compte)); if (c.size > 1) return { ok: false, raison: tr('egalite.action.vintedSeul') }; }
+      // (25 nov., décision du 24 nov. — CLAUDE.md §3) Aucun compte de la sélection n'est connecté (ni par la file, ni par le
+      //    panneau) ⇒ le geste est ÉTEINT et dit pourquoi — avant : le bouton restait allumé et le toucher ne faisait rien.
+      if (PANNEAU_DE_SELECTION[A.cle]) {
+        const X = ACTIONS_EXTENSION[PANNEAU_DE_SELECTION[A.cle]] || {}, g = gesteDuPanneau(X.page, X.action);
+        const comptes = [...new Set(sel.map((a) => (vintedDe(a) || {}).compte).filter((c) => c != null && c !== ''))];
+        const verdicts = comptes.map((c) => agirMaintenant('vinted', String(c), g, 'file')).concat(comptes.map((c) => agirMaintenant('vinted', String(c), g, 'panneau')));
+        if (comptes.length && !verdicts.some((v) => v && v.ok)) return { ok: false, raison: texteRaison(verdicts[0]) };
+      }
       return { ok: true };
     },
   }));
@@ -434,11 +493,16 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     // (20 nov., décision de Julien) La pause Leboncoin se fait dans le panneau de l'extension, sur leboncoin.fr.
     { cle: 'pauseLbc', libelle: tr('actionsExt.pause'), icone: 'archive', phrase: tr('actionsExt.phrase', { site: 'Leboncoin' }),
       pour: (a) => lbcEnLigne(a).length > 0,
-      juger: (sel) => (!sel.length ? { ok: false, raison: tr('egalite.selection.aucune') } : { ok: true }) });
+      juger: (sel) => (!sel.length ? { ok: false, raison: tr('egalite.selection.aucune') } : panneauEnRetard() ? { ok: false, raison: panneauEnRetard() } : { ok: true }) });
   const pauserLbc = (choisis) => {
-    const ids = choisis.flatMap((a) => lbcEnLigne(a).map((x) => String(x.id)));
-    if (!ids.length) return;
-    ouvrirPanneau({ site: 'leboncoin', page: 'annonces', ids, action: 'pause' });
+    const l = choisis.flatMap((a) => lbcEnLigne(a).map((x) => ({ id: String(x.id), compte: String(x.compte || '').replace(/^lbc-account:/i, ''), numero: a.numero || '' })));
+    if (!l.length) return;
+    // (24 nov., lot agir-tout) DEPUIS VRM, compte par compte (la file, par la porte) ; ce qui n'y passe pas : le panneau (gardé).
+    (async () => {
+      const ok = l.filter((x) => agirMaintenant('leboncoin', x.compte, 'pause', 'file').ok), reste = l.filter((x) => !ok.includes(x));
+      if (ok.length) { const r = await envoyerSerie('pause', 'pause', ok.map((x) => ({ site: 'leboncoin', compte: x.compte, num: x.numero, args: { id: x.id } }))); dire(r.n ? tr('agir.envoi.ici') + (r.n > 1 ? ' · ' + r.n : '') : (texteRaison(r.verdict) || tr('agir.envoi.base'))); }
+      if (reste.length) { const c1 = [...new Set(reste.map((x) => x.compte))]; ouvrirPanneau({ site: 'leboncoin', compte: c1.length === 1 && c1[0] ? c1[0] : '*', page: 'annonces', ids: reste.map((x) => x.id), action: 'pause' }); }
+    })();
   };
   const onAction = (k, choisis) => {
     if (k === 'prixSites') { const a = choisis[0]; if (a && a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } return; }
@@ -478,8 +542,9 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     filtres: [
       // (22 nov., Julien : « applique un filtre par plateforme, les filtres ne sont pas précis ») « Site », nommé, à côté de
       // Statut, chaque site avec SON nombre de rangées (tous statuts, Ancienneté appliquée) — la même règle que le tableau.
-      ...(sites.length > 1 ? [{ cle: 'site', libelle: tr('tableau.col.site'), valeur: filtreT.site, onChange: (v) => setFiltreT((f) => ({ ...f, site: v, compte: '' })),
-        options: [{ cle: 'tous', libelle: tr('egalite.site.tous'), n: nRangeesSite('tous') }, ...SITES.filter((s) => sites.includes(s)).map((s) => ({ cle: s, libelle: nomSite(s), n: nRangeesSite(s) }))] }] : []),
+      // (25 nov.) Les entrées sont celles du filtre de l'onglet (sites PRÉSENTS, src/filtrePlateforme.js), chacune avec son logo.
+      ...(presenceP.length ? [{ cle: 'site', libelle: tr('tableau.col.site'), valeur: effP, onChange: (v) => { choisirP(v); setFiltreT((f) => ({ ...f, compte: '' })); },
+        options: presenceP.map((o) => { const s = o.cle === TOUTES ? 'tous' : o.cle; return { ...optionTableau(o.cle), n: nRangeesSite(s) }; }) }] : []),
       ...(cpts.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreT.compte || 'tous', onChange: (v) => setFiltreT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
         options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cpts.map((c) => ({ cle: c.cle, libelle: nomCompte(c) }))] }] : []),
       { cle: 'dort', libelle: tr('tableau.filtre.anciennete'), valeur: filtreT.dort, onChange: (v) => { if (v === 'arepublier') { setFiltre((f) => ({ ...f, etat: 'arepublier' })); return; } setFiltreT((f) => ({ ...f, dort: v })); },
@@ -506,15 +571,20 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     autre: (l) => { if (l) ouvrirLiaison({ site: l.site, id: l.id }); },
     propre: (l) => { if (l) queSurCeSite({ site: l.site, id: l.id }); },
     lot: (ls) => { const cles = ls.filter((l) => l && l.prop && l.prop.niveau === 'sur').map((l) => `${l.site}:${l.id}`); if (cles.length) ouvrirLiaison({ vue: 'lot', cles }); },
-    Photo: (src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>,
+    Photo: (src, o) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>,
   };
   return (
     <>
-    <VueAnnonces priorite={priorite} photoDouble={photoDouble} plusVueDe={plusVueDe} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={(s) => <LogoSite site={s}/>} dortDe={dortDe} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>}
-      onCompleter={(sujet) => { try { window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet, num: '', lot: false, at: Date.now() } })); } catch (_) {} }} liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
+    <VueAnnonces parMail={modele && Array.isArray(modele.articles) ? modele.articles.filter((a) => a && a.venteMail) : null} priorite={priorite} photoDouble={photoDouble} plusVueDe={plusVueDe} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={logoDuSite} dortDe={dortDe} Photo={(src, o) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>}
+      onCompleter={(sujet) => { try { window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet, num: '', lot: false, at: Date.now() } })); } catch (_) {} }} liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} fp={{ options: optionsTelP, valeur: effP, onChange: choisirP }} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
       onRelier={(a) => { const x = a.annonces.find((y) => y.site !== 'vinted'); if (x) { try { window.dispatchEvent(new CustomEvent('vrm:liaison-ouvrir', { detail: { site: NOM_SITE[x.site], id: String(x.id), vue: null } })); } catch (_) {} } }}
+      // (23 nov., Julien : « pas de Relier à un achat dans le ⋯ d'une annonce, ce n'est pas normal ») La MÊME feuille que Ventes et Achats
+      // (« Relier achats et ventes », src/relierGlisser.js) ouverte sur CETTE annonce (son identifiant Vinted, `a:{id}`) : c'est SON
+      // toucher puis son « Oui » qui relient, jamais une ressemblance. Une annonce déjà reliée ouvre sa fiche (Délier, Reçu).
+      onRelierAchat={(a) => { if (a.achat != null && a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(a.numero) })); } catch (_) {} return; }
+        const v = a.annonces.find((y) => y.site === 'vinted' && y.id != null); try { window.__vrmRelierCible = { cible: v ? 'a:' + String(v.id) : '', at: Date.now() }; window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=achats' })); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:relier-ouvrir')); } catch (_) {} }, 300); } catch (_) {} }}
       onPublier={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} }}
       // (19 nov., fiche directe) Un toucher sur un article numéroté ouvre SA fiche complète (par son N°, l'identité de l'article).
       onFiche={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(a.numero) })); } catch (_) {} } }}

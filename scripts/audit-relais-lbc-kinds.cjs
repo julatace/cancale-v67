@@ -34,11 +34,14 @@ dit(kinds.size >= 10, 'les kinds envoyés par le capteur sont lus dans son code'
 // Un message plausible, à la forme que le capteur envoie (les gardes du relais
 // exigent ces champs).
 const exemple = {
+  lbcconvs: { moi: '11111111-2222-4333-8444-555555555555', liste: [{ conv: 'aaaaaaaa-0000-4000-8000-000000000001', titre: 'x', nonlus: 1 }] },   // 5.445
+  lbcporte: { available: 0, incoming: 0 },   // 5.445
   lbcraw: { url: 'https://api.leboncoin.fr/x', body: '{}' },
   lbcvente: { url: 'https://api.leboncoin.fr/x', body: '{}', __vrmSequence: 7 },
   lbccatalogue: { url: 'u', body: '{}' },
   lbcenvoi: { url: 'u', methode: 'POST', cles: ['a'] },
   lbcpaths: { paths: ['GET a → 200 [json]'] },
+  lbcphotoorigine: { fichier: 'ab'.repeat(20), code: 'cd'.repeat(32) },   // (24 nov., ext-anciens-lots) le code d'origine d'une photo envoyée
   lbcschema: { endpoint: 'e', cles: ['a'] },
   lbcmsgcompteur: { userId: 'abc', unread: 2 },
   lbclistecomplete: { owner: 'o', ids: ['1'], total: 1 },
