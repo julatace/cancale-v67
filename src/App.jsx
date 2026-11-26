@@ -8785,6 +8785,17 @@ const publierVentesCoque = (ventes, ko) => {
 };
 // (22 nov.) Les mêmes, lues hors d'un composant (Annonces · « Vendue ») : `undefined` pas lu · `null` aucune lecture · tableau.
 const ventesCoqueLues = () => _ventesCoquePub.ventes;
+// (26 nov., vitesse-webkit) Les ventes de la coque PAR COMPTE, pour `lirePreuvesVenteVinted({ ventesConnues })` : seuls les
+// comptes dont la coque a LU des ventes (jamais un compte en échec, `ko` ; un compte sans vente lue n'y est pas ⇒ relu).
+// `null` tant que rien n'est lu. Annonces relisait sinon les ventes de tous les comptes (≈ 650 Ko) à chaque ouverture.
+const ventesConnuesCoque = () => {
+  const v = _ventesCoquePub.ventes;
+  if (!Array.isArray(v)) return null;
+  const ko = new Set((_ventesCoquePub.ko || []).map(String));
+  const out = {};
+  for (const o of v) { const u = o && o._acc && o._acc.vinted_user_id != null ? String(o._acc.vinted_user_id) : ''; if (!u || ko.has(u)) continue; (out[u] = out[u] || []).push(o); }
+  return out;
+};
 function useVentesCoque() {
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -39674,4 +39685,4 @@ export { RepriseAppareil };   // (22 nov., choix n° 23) lu par ecrans/Comptabil
 export { NET_VENTES };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { CLE_FORFAIT_EMBALLAGE };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { prendreVue };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx et ecrans/AnnoncesEgalite.jsx
-export { ventesCoqueLues };   // (22 nov.) Annonces · « Vendue » : toutes les ventes Vinted PROUVÉES
+export { ventesCoqueLues, ventesConnuesCoque };   // (22 nov.) Annonces · « Vendue » : toutes les ventes Vinted PROUVÉES
