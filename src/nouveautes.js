@@ -28,9 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
-  // (26 nov., ext-5454 — six lots de l'extension réunis : republication, Vestiaire, Leboncoin, anciens lots, adaptatif, quatre sites) docs/passation/2026-11-26-ext-5454.md
-  { id: 'extension-5454', date: '2026-11-26', titre: 'Extension 5.454 : six chantiers réunis', phrase: 'Republier, Vestiaire, Leboncoin, quatre sites : une seule version.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (26 nov., fiabilite-vc-lbc — Julien : « les données doivent être fiables, pense à Vestiaire Co et Leboncoin ») src/enLigneVc.js
+  { id: 'observation-fichier', date: '2026-11-26', titre: 'Observer Vinted : enregistrer un fichier', phrase: 'Extension 5.454.1 : la frise en fichier.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'fiabilite-vc-lbc', date: '2026-11-26', titre: 'Vestiaire : en ligne et vendue, plus justes', phrase: 'Vente annulée : la paire reste. Lecture ancienne : à confirmer.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (26 nov., couleurs-14-15 — Julien : « j'aime bien le 14 et 15 » → « 14 en sombre, 15 en clair ») src/natif/jetons.css
   // (26 nov., loupe-retour — Julien : « la recherche se met automatiquement ») src/rechercheEcran.js loupeAFermerAuRetour
@@ -160,8 +159,6 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'revue-ux-23nov', date: '2026-11-23', titre: 'Achats et fiches plus clairs', phrase: 'La liste d’abord, le prix d’achat dans la fiche, photos des disparues.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov. soir, ext. 5.440.1 — Julien : « 0 envoyé · 1 sauté », phrase coupée) docs/passation/2026-11-23-favoris-identite.md
   { id: 'favoris-identite', date: '2026-11-23', titre: 'Messages aux favoris : le nouveau lien de Vinted', phrase: 'Un favori pas confirmé est dit et sauté, la file continue.', tab: 'extension', pour: 'tous', mode: 'tous' },
-  // (23 nov., ext. 5.441) docs/passation/2026-11-23-favoris-541.md
-  { id: 'relances-texte-neuf', date: '2026-11-23', titre: 'Relance : jamais deux fois le même message', phrase: 'Une même personne ne reçoit jamais deux fois le même texte.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md
   { id: 'vente-email-partout', date: '2026-11-23', titre: 'Une vente reçue par e-mail se voit partout', phrase: 'Ventes, Ma journée et Colis, avant même le passage de l’extension.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov. au soir, lot retours-suivi — Julien : « le transporteur inconnu, le logo mal mis ») docs/passation/2026-11-23-retours-suivi.md

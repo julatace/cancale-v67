@@ -44,7 +44,6 @@ import ecran_vente_mail from './de/venteMail.js';   // (24 nov.) la vente vue pa
 import ecran_egalite from './de/egalite.js';
 import ecran_tableau from './de/tableau.js';   // (19 nov. soir) le tableau de travail
 import ecran_publierAgent from './de/publierAgent.js';
-import ecran_quatreSites from './de/quatreSites.js';
 import ecran_ecrans_restes from './de/ecransRestes.js';   // (16 nov.) lot ecrans-restes : stock importé, date limite, loupe   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './de/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_transporteur_connu from './de/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
@@ -2448,7 +2447,6 @@ export default {
   ...ecran_egalite,
   ...ecran_tableau,
   ...ecran_publierAgent,
-  ...ecran_quatreSites,
   ...ecran_ecrans_restes,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,

@@ -3,21 +3,23 @@ async function lire() {
   await new Promise((r) => chrome.runtime.sendMessage({ obs: 'vider' }, () => r()));
   return chrome.storage.local.get(['obsJournal', 'obsActif']);
 }
-function rapport(j) {
+function rapport(j0) {
+  const j = [...j0].sort((a, b) => a.t - b.t);
   const t0 = j.length ? j[0].t : 0;
   return JSON.stringify({
-    outil: 'VRM Observateur 1.1.0',
+    outil: 'VRM Observateur 2.0.0',
     genereLe: new Date().toISOString(),
     n: j.length,
     // t = millisecondes depuis la première requête, d = depuis la précédente
-    requetes: j.map((e, i) => Object.assign({ t: e.t - t0, d: i ? e.t - j[i - 1].t : 0, heure: new Date(e.t).toISOString() }, e, { t: undefined })),
+    // 2.0 : requêtes ET gestes dans la même frise, dans l'ordre (k = sorte du geste ; sans k = une requête)
+    frise: j.map((e, i) => Object.assign({ t: e.t - t0, d: i ? e.t - j[i - 1].t : 0, heure: new Date(e.t).toISOString() }, e, { t: undefined })),
   }, (k, v) => (v === undefined ? undefined : v), 1);
 }
 async function maj() {
   const s = await lire();
   const j = s.obsJournal || [];
   const on = s.obsActif !== false;
-  $('etat').textContent = (on ? 'Enregistre · ' : 'En pause · ') + j.length + ' requête' + (j.length > 1 ? 's' : '') + ' notée' + (j.length > 1 ? 's' : '');
+  $('etat').textContent = (on ? 'Enregistre · ' : 'En pause · ') + j.length + ' entrée' + (j.length > 1 ? 's' : '') + ' notée' + (j.length > 1 ? 's' : '');
   $('bascule').textContent = on ? 'Mettre en pause' : 'Reprendre';
 }
 $('bascule').onclick = async () => {

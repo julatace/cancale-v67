@@ -224,8 +224,7 @@ function mondePage(repondre) {
     document: { hidden: true, addEventListener() {} },
     localStorage: { getItem: () => String(Date.now()), setItem() {} },     // la moisson de la page ne démarre pas
     addEventListener(type, fn) { (ecoute[type] = ecoute[type] || []).push(fn); },
-    postMessage(data) { if (!(data && data.__tag === 'CANCALE_VINTED_CANAL')) posts.push(data); },
-    MessageChannel: require('./_canal-faux.cjs').canalVersBanc((data) => posts.push(data)),   // 5.396 : inject.js ne parle plus que par son canal
+    postMessage(data) { posts.push(data); },
     XMLHttpRequest: FauxXHR,
     fetch: async (url, init) => {
       const m = String((init && init.method) || 'GET');
