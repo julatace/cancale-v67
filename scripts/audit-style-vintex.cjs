@@ -103,7 +103,7 @@ function juger(depot = {}, { sousAudits = true } = {}) {
   const blocClair = jet.slice(0, iSombre), blocSombre = jet.slice(iSombre);
   const val = (bloc, nom) => { const m = new RegExp('--n-' + nom + '\\s*:\\s*([^;]+);').exec(bloc); return m ? m[1].trim().toLowerCase() : null; };
   const attendus = [
-    [blocClair, 'clair', { accent: '#19222c', fond: '#878b92', carte: '#f1f2f4', bord: '#b9bdc3' }],   // (25 nov., Julien : « gris moyen c'est d'accord ») ; avant (23 nov.) gris clair #dfe1e5, accent ardoise #3d4b5b
+    [blocClair, 'clair', { accent: '#19222c', fond: '#a1a5ac', carte: '#f1f2f4', bord: '#b9bdc3' }],   // (25 nov., Julien : « gris moyen c'est d'accord ») ; avant (23 nov.) gris clair #dfe1e5, accent ardoise #3d4b5b
     [blocSombre, 'sombre', { accent: '#f4f4f5', fond: '#1c1c20', carte: '#2a2a2f' }],   // (23 nov., Julien) la nuit = le gris de vrm.center
   ];
   for (const [bloc, nom, att] of attendus) {

@@ -23,7 +23,7 @@
 @layer vrm-natif {
   :root {
     /* ── couleurs du contrat ── */
-    --n-fond: #878B92;   /* (25 nov., Julien : « gris moyen c'est d'accord » — entre le clair #DFE1E5 et la nuit #1C1C20 ; avant, 23 nov. : « gris clair ») */
+    --n-fond: #A1A5AC;   /* (26 nov., Julien : « un peu plus clair le gris » ; 25 nov. #878B92) (25 nov., Julien : « gris moyen c'est d'accord » — entre le clair #DFE1E5 et la nuit #1C1C20 ; avant, 23 nov. : « gris clair ») */
     --n-laterale: #999DA3;            /* la barre latérale (25 nov.) : un cran plus CLAIR que la page grise (secondaire 5,9:1, entrée active 4,9:1) */
     --n-carte: #F1F2F4;
     --n-carte-2: #E3E5E9;             /* bande de groupe, champ dans une feuille */
@@ -55,7 +55,7 @@
     --n-inverse: #19222C;             /* fond du toast */
     --n-sur-inverse: #FFFFFF;
     --n-appui: #DDDEE0;               /* fond d'une rangée enfoncée, d'un choix actif */
-    --n-barre: rgb(135 139 146 / .94);/* barre de titre / d'onglets (blanche comme les cartes) */
+    --n-barre: rgb(161 165 172 / .94);/* barre de titre / d'onglets (blanche comme les cartes) */
     --n-voile: rgb(26 26 30 / .40);   /* derrière une feuille */
     --n-ombre: 0 8px 30px rgb(26 26 30 / .14);   /* la feuille et le volet */
     --n-ombre-carte: 0 1px 2px rgb(26 26 30 / .04), 0 2px 6px rgb(26 26 30 / .04);   /* une carte, un groupe */

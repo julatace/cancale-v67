@@ -358,7 +358,7 @@ html body .v2-feuille-corps .vrm-filtres > button[data-site] { min-height: 44px 
 /* Un champ de recherche d'écran : le remplissage d'iOS, sans ombre ni verre (il flottait avec une ombre portée). */
 html body .vrm-main .vrm-champ-recherche { background: var(--ap-remplir) !important; background-image: none !important; box-shadow: none !important; border-color: transparent !important; border-radius: 10px !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 /* (25 nov., gris moyen — « gris moyen c'est d'accord ») En clair, ces champs (Paramètres, Messages, Stock, E-mails…) posaient le
-   remplissage gris d'iOS : sur la page #878B92 il disparaissait. Un blanc voilé et un filet ; l'anneau de focus d'origine reste ;
+   remplissage gris d'iOS : sur la page #A1A5AC il disparaissait. Un blanc voilé et un filet ; l'anneau de focus d'origine reste ;
    la nuit ne change pas. */
 html:not([data-theme="dark"]) body :is(.vrm-champ-recherche, .vrm-ui-outils-champ) { background: var(--ap-puits) !important; }
 html:not([data-theme="dark"]) body :is(.vrm-champ-recherche, .vrm-ui-outils-champ):not(:focus-within) { box-shadow: inset 0 0 0 1px var(--n-bord, #B9BDC3) !important; }
