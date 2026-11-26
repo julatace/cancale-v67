@@ -37777,7 +37777,7 @@ function AppCoeur() {
         {/* (11 nov., intégration colis — arbitrage b) Les outils SUIVENT le filtre de site, même règle que la liste : ce qu'ils
             portent (à confirmer, à vérifier, e-mails de suivi, argent à vérifier) vient des achats Vinted et des e-mails —
             montrés sur Vinted (l'écran d'arrivée, qui montre tout), jamais sous eBay, Leboncoin ou Vestiaire. */}
-        {site==='toutes'||site==='vinted' ? <GardeEcran nom="achats:retirer"><div data-colis-retraits="outils" hidden={!(effA==='toutes'||effA==='vinted')}><Comptabilite key="colis_achats_outils" {...commun} only="achats" vueAchats="retraits" retraitsOutils dansPlateforme/></div></GardeEcran> : null}
+        {site==='toutes'||site==='vinted' ? <GardeEcran nom="achats:retirer"><div data-colis-retraits="outils"><div hidden={!(effA==='toutes'||effA==='vinted')} data-colis-retraits-filtre={effA}><Comptabilite key="colis_achats_outils" {...commun} only="achats" vueAchats="retraits" retraitsOutils dansPlateforme/></div></div></GardeEcran> : null}
       </section>
       </RepliRetirerAchats>);
     return null;

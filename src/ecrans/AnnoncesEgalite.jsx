@@ -50,7 +50,7 @@ import { enLitigeConnus, abonnerLitiges } from '../litigesEnCours.js';
 import { ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from '../actionsExtension.js';
 import { plusVue, joursPlusVue, CLE_PLUS_VUE_JOURS } from '../plusVue.js';   // (22 nov., choix 27) « Plus vue depuis N j »
 import { lireRelevesEnLigne } from '../plusVueLecture.js';
-import { useFiltrePlateforme, filtreTableau } from '../natif/FiltrePlateformes.jsx';   // (25 nov.) le filtre par plateforme de l'onglet
+import { useFiltrePlateforme, optionTableau } from '../natif/FiltrePlateformes.jsx';   // (25 nov.) le filtre par plateforme de l'onglet
 import { TOUTES, nombresPlateformes, optionsPlateformes, choixEffectif } from '../filtrePlateforme.js';
 import { lireSupprimes } from '../comptesSupprimes.js';   // (21 nov.) un compte supprimé pour de bon n'est jamais relu   // (20 nov.) la pause Leboncoin : dans l'extension
 
@@ -511,7 +511,9 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     filtres: [
       // (22 nov., Julien : « applique un filtre par plateforme, les filtres ne sont pas précis ») « Site », nommé, à côté de
       // Statut, chaque site avec SON nombre de rangées (tous statuts, Ancienneté appliquée) — la même règle que le tableau.
-      ...[filtreTableau(presenceP.map((o) => ({ ...o, n: nRangeesSite(o.cle === TOUTES ? 'tous' : o.cle) })), effP, (v) => { choisirP(v); setFiltreT((f) => ({ ...f, compte: '' })); })].filter(Boolean),
+      // (25 nov.) Les entrées sont celles du filtre de l'onglet (sites PRÉSENTS, src/filtrePlateforme.js), chacune avec son logo.
+      ...(presenceP.length ? [{ cle: 'site', libelle: tr('tableau.col.site'), valeur: effP, onChange: (v) => { choisirP(v); setFiltreT((f) => ({ ...f, compte: '' })); },
+        options: presenceP.map((o) => { const s = o.cle === TOUTES ? 'tous' : o.cle; return { ...optionTableau(o.cle), n: nRangeesSite(s) }; }) }] : []),
       ...(cpts.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreT.compte || 'tous', onChange: (v) => setFiltreT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
         options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cpts.map((c) => ({ cle: c.cle, libelle: nomCompte(c) }))] }] : []),
       { cle: 'dort', libelle: tr('tableau.filtre.anciennete'), valeur: filtreT.dort, onChange: (v) => { if (v === 'arepublier') { setFiltre((f) => ({ ...f, etat: 'arepublier' })); return; } setFiltreT((f) => ({ ...f, dort: v })); },

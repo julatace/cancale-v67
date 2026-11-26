@@ -58,10 +58,12 @@ export function FiltrePlateformes({ ecran, options, valeur, onChange, className 
 }
 
 // L'entrée du menu de filtres du tableau de travail (ordinateur) : la MÊME liste, le logo devant chaque site.
+// Une entrée de ce menu : son nom et son logo (le nombre, l'écran le pose de SA règle).
+export const optionTableau = (cle) => ({ cle, libelle: nom(cle), icone: cle === TOUTES ? null : <LogoSite site={cle} taille={16}/> });
 export function filtreTableau(options, valeur, onChange) {
   if (!Array.isArray(options) || options.length < 3) return null;
   return { cle: 'site', libelle: tr('tableau.col.site'), valeur, onChange,
-    options: options.map((o) => ({ cle: o.cle, libelle: nom(o.cle), n: Number.isFinite(o.n) ? o.n : undefined, icone: o.cle === TOUTES ? null : <LogoSite site={o.cle} taille={16}/> })) };
+    options: options.map((o) => ({ ...optionTableau(o.cle), n: Number.isFinite(o.n) ? o.n : undefined })) };
 }
 
 // « Leboncoin seulement » : la phrase d'un nombre filtré (un total partiel ne se présente jamais comme complet, §5).
