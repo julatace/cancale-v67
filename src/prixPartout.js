@@ -121,7 +121,9 @@ export function sitesDuNumero(cle, { rn, fiches, lbcItems, vcItems } = {}, o = {
     const url = /^https:\/\/(www\.)?leboncoin\.fr\//i.test(str(ad.url)) ? str(ad.url) : `https://www.leboncoin.fr/ad/${encodeURIComponent(id)}`;
     // (19 nov.) Leboncoin : le même geste (`lbcPrix`, recette APPRISE). Recette connue PAS apprise ⇒ dit, une phrase.
     const pl = montant(ad.price), rl = o.recettes ? o.recettes.leboncoin : null;
-    sites.push({ cle: 'leboncoin:' + id, site: 'leboncoin', id: String(id), titre: ad.subject || ad.title || '', prix: pl,
+    // (24 nov., agir-si-connecte) le compte de l'annonce, par SON identité (`account` / `lbcUser`, « lbc-account: » retiré) : la porte le juge.
+    const compteL = str(ad.account || ad.lbcUser).replace(/^lbc-account:/i, '') || null;
+    sites.push({ cle: 'leboncoin:' + id, site: 'leboncoin', id: String(id), compte: compteL, titre: ad.subject || ad.title || '', prix: pl,
       mode: pl != null && rl !== false && /^\d{6,12}$/.test(String(id)) ? 'ext' : 'site', raison: pl == null ? 'prix actuel pas lu' : rl === false ? 'recette' : null, lien: url });
   }
   // Vestiaire : le N° donné au produit (`numVc`).
@@ -131,7 +133,7 @@ export function sitesDuNumero(cle, { rn, fiches, lbcItems, vcItems } = {}, o = {
     if (!meme(o.numVc ? o.numVc(id, it) : null)) continue;
     // (19 nov.) Vestiaire : le même geste (`vcPrix`, recette APPRISE).
     const pv = montant(it.prix && typeof it.prix === 'object' ? it.prix.valeur : it.prix), rv = o.recettes ? o.recettes.vestiaire : null;
-    sites.push({ cle: 'vestiaire:' + id, site: 'vestiaire', id: String(id), titre: it.titre || '', prix: pv,
+    sites.push({ cle: 'vestiaire:' + id, site: 'vestiaire', id: String(id), compte: str(it.compte) || null, titre: it.titre || '', prix: pv,
       mode: pv != null && rv !== false && /^\d{3,15}$/.test(String(id)) ? 'ext' : 'site', raison: pv == null ? 'prix actuel pas lu' : rv === false ? 'recette' : null, lien: 'https://fr.vestiairecollective.com/' });
   }
   return { sites, manques };

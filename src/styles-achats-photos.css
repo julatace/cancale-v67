@@ -14,13 +14,15 @@
    Rien de métier : aucun texte, chiffre ni `data-*` n'est décidé ici.
    ════════════════════════════════════════════════════════════════════════════ */
 
+/* (23 nov. au soir, décision de Julien du 23 : « aucun orange ni ambre ») La pastille d'un geste à faire (« À retirer », retour)
+   garde son nom mais passe à l'ardoise : fond gris-ardoise doux, encre ardoise (clair) ou encre claire (sombre). */
 :root {
-  --a-ambre-fond: rgba(255, 149, 0, .16);
-  --a-ambre-encre: #A65A00;
+  --a-ambre-fond: rgb(61 75 91 / .12);
+  --a-ambre-encre: #3D4B5B;
 }
 :root[data-theme="dark"] {
-  --a-ambre-fond: rgba(255, 159, 10, .22);
-  --a-ambre-encre: #FFB340;
+  --a-ambre-fond: rgb(244 244 245 / .12);
+  --a-ambre-encre: #F4F4F5;
 }
 
 @layer vrm-premium {
@@ -256,6 +258,9 @@
 /* 5 bis · « À RETIRER » rangé dans UNE ligne (App.jsx, `RepliRetirerAchats`) : une rangée d'iOS, le nombre à droite,
    un point ambre si un retrait presse ; ouverte, la section d'avant dessous, telle quelle. */
 :root:root:root body .vrm-achats-retirer-repli { margin: 8px 16px 0; }
+/* (23 nov., revue UX #7) Rien à retirer ni attendu sous un point (téléphone) : la section ne garde AUCUNE place (la bande dit
+   « 0 À retirer ») — seulement quand rien d'autre n'y est montré (retours, Mondial Relay, sortis, note, lecture). */
+:root:root:root body .vrm-achats-retirer-repli:has([data-achats-retraits-tus]):not(:has([data-rp], [data-v2-detail-retraits], [data-retraits-sortis], [data-mr-bloc], [data-achats-retours-route], [data-pickup-sans-compte], .vrm-colis-vide, .vrm-colis-note, [data-retraits-suivis-ko], [data-colis-vestiaire-route], [data-vc-route])) { display: none; }
 :root:root:root body .vrm-achats-retirer-repli > .vrm-achats-retirer-ligne[hidden] { display: none !important; }
 :root:root:root body .vrm-achats-retirer-repli:has(> .vrm-achats-retirer-ligne[hidden]):not(:has(> #vrm-achats-retirer-corps:not([hidden]))) { display: none !important; }
 :root:root:root body .vrm-achats-retirer-ligne {
@@ -386,3 +391,71 @@
 }
 :root:root:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero.vrm-carte-stats .vrm-fu-modifier { top: 0 !important; right: 12px !important; }
 @media (min-width: 1024px) { :root:root:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero.vrm-carte-stats { margin: 0 0 12px !important; max-width: none !important; left: 0 !important; } }
+
+/* ── (24 nov., lot retrait-parfait — captures iPhone de Julien : « regarde c'est moche, corrige ») LE HAUT D'ACHATS AU TÉLÉPHONE ──
+   « Relier achats et ventes » coupé au bord droit, « Modifier » seul au-dessus d'un chiffre, la bande de chiffres serrée, les
+   onglets coupés (« Annu… ») à côté de ✓ et « ⋯ ». Mêmes éléments, mêmes data-*, rien d'enlevé : la place seulement.
+   · les deux gestes (Calculette, Relier) partagent la largeur, dans la marge de la page (16 px) ;
+   · la bande : une carte blanche ; « Novembre » et « Modifier » sur la même ligne (Modifier discret, 13 px) ; Dépensé en grand
+     sur toute la largeur ; En route · À retirer · Arrivés en trois colonnes égales, sous un filet ;
+   · les onglets prennent toute la ligne (chacun sa part, jamais coupés) ; ✓ et « ⋯ » passent sur la ligne d'après, à droite. */
+/* Dans la couche `vrm-premium` : une déclaration !important d'une couche passe AVANT toute déclaration !important hors couche
+   (la bande y est réglée) — ici la même couche, un sélecteur plus fort. */
+@layer vrm-premium {
+@media (max-width: 599px) {
+  :root:root:root:root:root:root body .vrm-main .vrm-achats-scan { display: flex !important; flex-wrap: wrap !important; gap: 8px !important; margin: 0 16px 12px !important; padding: 0 !important; justify-content: stretch !important; box-sizing: border-box !important; max-width: calc(100% - 32px) !important; }
+  :root:root:root:root:root:root body .vrm-main .vrm-achats-scan > * { flex: 1 1 140px !important; min-width: 0 !important; max-width: 100% !important; margin: 0 !important; }
+  :root:root:root:root:root:root body .vrm-main .vrm-achats-scan > * :is(button, a), :root:root:root:root:root:root body .vrm-main .vrm-achats-scan > :is(button, a) { width: 100% !important; max-width: 100% !important; white-space: normal !important; justify-content: center !important; text-align: center !important; }
+  :root:root:root:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important; grid-template-areas: "sur sur mod" "n1 n1 n1" "l1 l1 l1" "c2 c3 c4" !important; grid-template-rows: auto !important;
+    margin: 0 16px 12px !important; left: 0 !important; max-width: calc(100% - 32px) !important; box-sizing: border-box !important; padding: 10px 14px 12px !important;
+    background: var(--n-carte, #FFFFFF) !important; border: 1px solid var(--n-bord, rgba(0,0,0,.08)) !important; border-radius: var(--n-r-carte, 14px) !important;
+  }
+  :root:root:root:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-modifier { position: static !important; grid-area: mod !important; justify-self: end !important; align-self: center !important;
+    height: 44px !important; min-height: 44px !important; margin: -10px -6px -10px 0 !important; padding: 0 6px !important; font-size: var(--d-t-13, 13px) !important; color: var(--n-encre-2, #6E6E73) !important; }
+  :root:root:root:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-sous { padding: 0 0 4px !important; }
+  :root:root:root:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) { margin-top: 8px !important; padding-top: 10px !important; border-top: 1px solid var(--n-trait, rgba(0,0,0,.08)) !important; min-width: 0 !important; }
+  :root:root:root:root:root:root body .vrm-main .vrm-achats-barre { flex-wrap: wrap !important; justify-content: flex-end !important; row-gap: 4px !important; padding-left: 16px !important; padding-right: 16px !important; box-sizing: border-box !important; max-width: 100% !important; }
+  :root:root:root:root:root:root body .vrm-main .vrm-achats-barre > .vrm-seg { flex: 1 1 100% !important; min-width: 0 !important; max-width: 100% !important; overflow: visible !important; display: flex !important; }
+  :root:root:root:root:root:root body .vrm-main .vrm-achats-barre > .vrm-seg > .vrm-seg-btn { flex: 1 1 0 !important; min-width: 0 !important; padding-left: 4px !important; padding-right: 4px !important; justify-content: center !important; }
+}
+}
+/* (23 nov., revue UX #7) Seulement « Bientôt au point » (une ligne repliée) : la section ne pose rien d'autre (ni marge, ni filet). */
+:root:root:root body .vrm-achats-retirer-repli:has([data-rp-compact]):not(:has(.n-rp-cartes [data-rp-colis]:not([data-rp-colis="0"]))) { margin: 4px 0 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; background: none !important; }
+:root:root:root body .vrm-achats-retirer-repli:has([data-rp-compact]) :is(.v2-achats-retirer, section) { margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; background: none !important; }
+:root:root:root body .vrm-achats-retirer-repli:has([data-rp-compact]) .n-rp-compact { margin: 0 16px !important; }
+:root:root:root body .vrm-achats-retirer-repli:has([data-rp-compact]) .n-rp-compact-tete { min-height: 44px; }
+/* (25 nov., achats-retours-design) « ✓ Sélectionner » et « ⋯ Plus » ne flottent plus seuls sous les étapes : ils sont rendus
+   dans la tête de la tâche, à côté de « Retrouver » et « Arrivée » (src/ecrans/Comptabilite.jsx, `data-achats-tete-place`).
+   Même rond que leurs voisins (le fond de la carte du style, 44, rond), dans chaque style ; ouvert = enfoncé. `!important` : le
+   pont des contrôles natifs (src/coque-native.css, `all: revert-layer` sous un id) effacerait sinon ces règles hors couche. */
+:root:root:root body [data-achats-tete-place] > :is(.vrm-achats-selection, .vrm-achats-plus) {
+  flex: none !important; width: 44px !important; height: 44px !important; min-width: 44px !important; padding: 0 !important; border: 0 !important; border-radius: 50% !important;
+  background: var(--n-carte, #FFFFFF) !important; box-shadow: none !important; color: var(--n-encre, #1D1D1F) !important; }
+:root:root:root body [data-achats-tete-place] > :is(.vrm-achats-selection, .vrm-achats-plus):is([aria-expanded="true"], [aria-pressed="true"]) {
+  background: var(--n-carte-2, #F2F3F5) !important; box-shadow: inset 0 0 0 1.5px var(--n-encre, #1D1D1F) !important; }
+:root:root:root body [data-achats-tete-place] > :is(.vrm-achats-selection, .vrm-achats-plus):focus-visible {
+  outline: 3px solid var(--n-encre, #1D1D1F) !important; outline-offset: 2px !important; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   (26 nov., capture de Julien sur iPhone : « ici c'est pas beau »)
+   1. L'état d'un achat est un MOT dans la sous-ligne (« Arrivé · 15 nov. · N°253 »), plus une pilule
+      seule sur sa ligne : la rangée perd une ligne entière. Un geste à faire (au relais, retour) en gras.
+   2. La rangée des pastilles (lot, reçu, facture) disparaît quand elle est vide.
+   3. La barre recherche + filtres n'est plus collée : `top: 0` la glissait SOUS l'en-tête opaque, il n'en
+      restait qu'une bande claire (couleur du thème clair) posée sur la liste.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-premium {
+:root:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > .vrm-buy-statut {
+  display: inline !important; height: auto !important; padding: 0 !important; border-radius: 0 !important; background: none !important;
+  color: inherit !important; font-size: inherit !important; font-weight: 500 !important;
+}
+:root:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > .vrm-buy-statut[data-achat-etat="geste"] { color: var(--w-encre, currentColor) !important; font-weight: 700 !important; background: none !important; }
+:root:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-pastilles:empty { display: none !important; }
+:root:root:root:root body .vrm-main .vrm-achats .vrm-achats-filtres {
+  position: static !important; background: transparent !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+}
+@media (max-width: 599px) {
+  :root:root:root:root body .vrm-main .vrm-achats .vrm-buy-list > .vrm-buy-row { min-height: 0 !important; }
+}
+} /* fin @layer vrm-premium (26 nov.) */

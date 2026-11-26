@@ -10,10 +10,14 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { tr } from '../i18n/index.js';
 import { IconeV } from './VentesVerre.jsx';
+// (24 nov., parcours iPhone) Le geste « retour » d'iPhone ferme la feuille (CLAUDE.md §7 : toute feuille plein
+// écran porte FermeAuRetour) — avant, il QUITTAIT VRM en laissant le code ouvert.
+import { FermeAuRetourUi, retourDisponible } from '../ui/retour.jsx';
 
 export function CodeComptoir({ code, lieu = '', adresse = '', plan = null, transporteur = '', echeance = '', echeanceAmbre = false, titre = '', photo = null, sous = '', onRetire = null, onFermer }) {
   const [copie, setCopie] = React.useState(false);
   React.useEffect(() => {
+    if (retourDisponible()) return undefined; // FermeAuRetour porte déjà Échap
     const k = (e) => { if (e.key === 'Escape') onFermer && onFermer(); };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [onFermer]);
@@ -21,6 +25,7 @@ export function CodeComptoir({ code, lieu = '', adresse = '', plan = null, trans
   const corps = (
     <div className="va-voile" data-va-comptoir-voile="" onClick={(e) => { if (e.target === e.currentTarget) onFermer && onFermer(); }}>
       <div className="va-feuille" role="dialog" aria-modal="true" aria-label={tr('va.comptoir.titre')} data-va-comptoir={code}>
+        <FermeAuRetourUi fermer={onFermer}/>
         <span className="va-grab" aria-hidden="true"/>
         <button type="button" className="va-fx" aria-label={tr('va.comptoir.fermer')} onClick={onFermer}><IconeV nom="x" taille={18} trait={2.2}/></button>
         <p className="va-fc-t">{tr('va.comptoir.titre')}</p>

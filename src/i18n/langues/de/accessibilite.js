@@ -4,4 +4,6 @@ export default {
   "a11y.fiche.fermer": "Karte schließen",
   "a11y.allerContenu": "Zum Inhalt springen",
   "a11y.enLigneSur": "Online auf {site}",
+  "a11y.conversationSur": "{site}-Unterhaltung",
+  "a11y.filMessages": "Nachrichtenverlauf",
 };

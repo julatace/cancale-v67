@@ -272,7 +272,8 @@ function texteApp() {
   // reste la même : il part, à la 1re ouverture comme aux suivantes.
   const rech = /rechaufferPlusTard = \(cache\) => [^\n]*\.then\(\(\) => rechaufferMorceaux\(cache\)\)/.test(sw) ? '(?:Morceaux|PlusTard)' : 'Morceaux';
   dit(new RegExp('relireCoquille\\(req, cache\\)\\.then\\(\\(\\) => rechauffer' + rech + '\\(cache\\)\\)').test(sw) && new RegExp('purgerAncienneVersion\\(fresh\\.clone\\(\\)\\)\\.then\\(\\(\\) => rechauffer' + rech + '\\(cache\\)\\)').test(sw), '15. le service worker range les morceaux, à la 1re ouverture comme aux suivantes');
-  dit(/new Set\(\[\.\.\.noms, \.\.\.\(await nomsGardesHorsLigne\(cache\)\)\]\)/.test(sw), '15. la purge d\'un déploiement garde les morceaux de la liste');
+  // (24 nov., morceaux-perimes) d'autres listes gardées peuvent s'AJOUTER (pages encore ouvertes) ; ces deux-là restent exigées.
+  dit(/new Set\(\[\.\.\.noms, \.\.\.\(await nomsGardesHorsLigne\(cache\)\)(?:, \.\.\.\(await [A-Za-z]+\(cache\)\))*\]\)/.test(sw), '15. la purge d\'un déploiement garde les morceaux de la liste');
   return ko;
 }
 

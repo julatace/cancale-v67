@@ -28,8 +28,100 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (26 nov., couleurs-14-15 — Julien : « j'aime bien le 14 et 15 » → « 14 en sombre, 15 en clair ») src/natif/jetons.css
+  { id: 'couleurs-14-15', date: '2026-11-26', titre: 'Nouvelles couleurs : blanc et graphite', phrase: 'Clair : noir et blanc. Sombre : graphite et vert.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (26 nov., classement-propre — capture de Julien : « c'est de la merde ») src/communaute/Communaute.jsx · communaute.css
+  { id: 'classement-propre', date: '2026-11-26', titre: 'Classement plus net', phrase: 'Vrais boutons, pas de podium quand tu es seul.', tab: 'communaute', pour: 'tous', mode: 'tous' },
+  // (26 nov., achats-rangee-compacte — capture de Julien sur iPhone : « ici c'est pas beau ») src/styles-achats-photos.css (fin)
+  { id: 'achats-rangee-compacte', date: '2026-11-26', titre: 'Achats : des rangées plus nettes', phrase: 'L’état s’écrit à côté de la date.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (26 nov., loupe-fondue — captures de Julien : « les couleurs sont moches, c'est mal fondu ») src/styles-recherche.css (fin)
+  { id: 'loupe-fondue', date: '2026-11-26', titre: 'La recherche par N°, plus douce', phrase: 'Cartes arrondies, icônes légères, champ fin.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (26 nov., journee-fondue — capture de Julien d'Aujourd'hui : « ça rend pas hyper bien ») src/natif/natif.css · src/natif/jeu.css
+  { id: 'journee-fondue', date: '2026-11-26', titre: 'Cartes sans halo sur le gris', phrase: 'Dernières ventes : la 1re photo ne touche plus le bord.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (26 nov., emails-plus-beau — Julien : « fais en sorte que ça soit plus beau ») src/emails-mail.css · src/BoiteEmails.jsx
+  { id: 'emails-plus-beau', date: '2026-11-26', titre: 'E-mails : comptes à relier plus clairs', phrase: 'Une rangée par compte, un bouton « Relier ».', tab: 'emails', pour: 'tous', mode: 'tous' },
+  // (26 nov., feuille-retour-jeu — Julien : « change l'affichage du pop up message, ça doit faire mieux, jeu vidéo ») src/capteNotif/FeuilleArrivee.jsx
+  { id: 'retour-comme-un-jeu', date: '2026-11-26', titre: 'Ton retour sur l’app, comme un jeu', phrase: 'Qui écrit, la photo, le message ; « Tout vu » en un toucher.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (25 nov., favoris-gestes-humains — Julien : « tu dois faire tous les gestes que je fais », « ça doit être humain ») ext. 5.453
+  { id: 'favoris-gestes-humains', date: '2026-11-25', titre: 'Favoris : l’extension écrit comme toi', phrase: 'Elle lit, tape lettre à lettre, puis touche Envoyer.', tab: 'favoris', pour: 'tous', mode: 'tous' },
+  { id: 'extension-connexion-claire', date: '2026-11-25', titre: 'Connexion de l’extension plus claire', phrase: 'Deux champs, l’œil du mot de passe, un bouton.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (25 nov. soir, filtre-plateformes — Julien : « un filtre avec toutes les plateformes et par plateforme dans les onglets ») docs/passation/2026-11-25-filtre-plateformes.md
+  { id: 'filtre-plateformes', date: '2026-11-25', titre: 'Filtre par plateforme dans chaque onglet', phrase: 'Toutes, ou un seul site : Annonces, Ventes, Achats.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (25 nov., sombre-par-defaut — Julien : « La deuxième couleur est pas mal, mets en mode sombre ») docs/passation/historique-interface-stock.md (fin)
+  { id: 'sombre-par-defaut', date: '2026-11-25', titre: 'VRM s’ouvre en sombre', phrase: 'Le clair reste au choix : Paramètres → Apparence.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (25 nov., ventes-rangee — Julien : « c'est atroce, la mise en page est catastrophique ») docs/passation/2026-11-25-ventes-rangee.md
+  { id: 'ventes-rangee-compacte', date: '2026-11-25', titre: 'Ventes : des lignes compactes avec photo', phrase: 'Photo, prix, un seul état, le transporteur entier : sept ventes par écran.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (25 nov., aujourdhui-moins-texte — Julien : « C'est pas mal mais trop de texte, améliore. ») docs/passation/2026-11-25-aujourdhui-moins-texte.md
+  { id: 'aujourdhui-moins-texte', date: '2026-11-25', titre: 'Aujourd’hui : deux fois moins de texte', phrase: 'Un titre court, un chiffre ; le détail derrière ›.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (25 nov., achats-retours-design — Julien : « tu peux améliorer ce design ») docs/passation/2026-11-25-achats-retours-design.md
+  { id: 'retours-cartes-compactes', date: '2026-11-25', titre: 'Tes retours tiennent en un coup d’œil', phrase: 'Un état, un bouton ; les retours remboursés se replient.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (25 nov., logo-vinted-pp — Julien : « le logo de Vinted, mais pour le compte la pp du compte Vinted ») docs/passation/2026-11-25-logo-vinted-pp.md
+  { id: 'logo-vinted-pp', date: '2026-11-25', titre: 'Chaque compte avec sa photo de profil', phrase: 'Le V Vinted en couleur, puis la photo du compte.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (25 nov., gris-moyen — Julien : « fais entre les deux, la couleur », puis « gris moyen c'est d'accord ») docs/passation/2026-11-25-gris-moyen.md
+  { id: 'clair-gris-moyen', date: '2026-11-25', titre: 'Le clair passe au gris moyen', phrase: 'Entre le clair et le sombre : cartes claires, texte bien noir.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (25 nov., parrainage-20 — Julien : « le parrain touche 20 % … tant que son filleul paye ») docs/passation/2026-11-25-parrainage-20.md
+  //   `proprietaire` tant que le programme est éteint (vrm_reglages.parrainage) : passer à 'tous' en l'ouvrant.
+  { id: 'parrainage-20', date: '2026-11-25', titre: 'Parrainage : 20 % chaque mois', phrase: 'Ton filleul a −10 %, toi 20 % de chaque mois payé.', tab: 'parrainage', pour: 'proprietaire', mode: 'tous' },
+  // (25 nov., style-c3 — Julien : « fait un mélange c3 vintex », « le gris de fond un peu foncé ») docs/passation/2026-11-25-style-c3.md
+  { id: 'style-c3-doux', date: '2026-11-25', titre: 'Un douzième style : C3', phrase: 'Gris un peu foncé, cartes blanches, boutons nets : à essayer.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (25 nov., chargement-propre — Julien : « je dois fermer l'app et la rouvrir pour avoir les nouvelles infos ») docs/passation/2026-11-25-chargement-propre.md
+  { id: 'maj-sans-relancer', date: '2026-11-25', titre: 'Les nouvelles infos arrivent seules', phrase: 'Vente, e-mail, retour sur l’app : à jour sans la rouvrir.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (25 nov., chargement-propre — Julien : « quand les données s'affichent c'est moche, long et déstructuré ») même récit
+  { id: 'chargement-propre', date: '2026-11-25', titre: 'Les écrans se remplissent sans sauter', phrase: 'Un chiffre pas encore lu se dessine, rien ne bouge.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (25 nov., envoi-messages-offres, ext. 5.452 — Julien : « ça envoie pas bien les messages et les offres ») docs/passation/2026-11-25-envoi-messages-offres.md
+  { id: 'envoi-confirme', date: '2026-11-25', titre: 'Envoyé seulement quand Vinted confirme', phrase: 'Sinon la raison, et l’heure où ça repart.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (23 nov., lot litiges-retours) docs/passation/2026-11-23-litiges-retours.md
   { id: 'litiges-retours-tous', date: '2026-11-24', titre: 'Litiges et retours : ventes et achats ensemble', phrase: 'Chaque litige ou retour, sa date limite lue et le lien.', tab: 'litiges', pour: 'tous', mode: 'tous' },
+  // (24 nov., messages-pro — Julien : « ça fait encore beaucoup trop vieux ») docs/passation/2026-11-24-messages-pro.md
+  { id: 'messages-pro', date: '2026-11-24', titre: 'Conversations : une offre claire, un champ moderne', phrase: 'L’offre dans le fil, ta marge, et « Lecture seule » dit une fois.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (24 nov., agir-tout, ext. 5.450) docs/passation/2026-11-24-agir-tout.md
+  { id: 'agir-tout', date: '2026-11-24', titre: 'Favoris, vacances, prix : tout depuis VRM', phrase: 'Leboncoin et Vestiaire aussi, si l’extension a le compte ouvert.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (24 nov., agir-si-connecte) Julien : « faire absolument tout si l'extension est connectée ». docs/passation/2026-11-24-agir-si-connecte.md
+  { id: 'agir-si-connecte', date: '2026-11-24', titre: 'Répondre et republier depuis VRM', phrase: 'Si l’extension a ce compte ouvert ; sinon, lecture seule.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (24 nov., connexions-extension) Paramètres → Connexions de l'extension.
+  { id: 'connexions-extension', date: '2026-11-24', titre: 'Chaque navigateur et chaque compte, en clair', phrase: 'Version, vu quand, ce qu’il lit, et quoi faire.', tab: 'connexions', pour: 'tous', mode: 'tous' },
+  // (24 nov., suivi-ventes — Julien : « retrait des articles vendus, fais un vrai suivi ») docs/passation/2026-11-24-suivi-ventes.md
+  { id: 'suivi-envois', date: '2026-11-24', titre: 'Tes colis vendus, du dépôt au versement', phrase: 'Au point, retiré, argent versé : chaque étape lue, datée.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (24 nov., lot retrait-parfait — Julien : « pour le retrait tu dois vraiment faire quelque chose de parfait ») docs/passation/2026-11-24-retrait-parfait.md
+  { id: 'retrait-comptoir', date: '2026-11-24', titre: 'Au comptoir : tous les codes du point', phrase: 'Code en grand, QR, Retiré d’un geste, même hors ligne.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (24 nov., parcours-iphone — Julien : « elle bug trop encore ») docs/passation/2026-11-24-parcours-iphone.md
+  { id: 'comptoir-retour', date: '2026-11-24', titre: 'Code au comptoir : le retour le ferme', phrase: 'Sur iPhone, le geste retour ne quitte plus VRM.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (24 nov., visuel-annonces — Julien : « toute l'application visuelle », « sans latence ») docs/passation/2026-11-24-visuel-annonces.md
+  { id: 'visuel-annonces', date: '2026-11-24', titre: 'Annonces en grandes photos, comme un inventaire', phrase: 'Le N°, le compte, les vues et favoris sur chaque photo.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (24 nov., visuel-argent — Julien : « toute l'application visuelle », « sans latence ») docs/passation/2026-11-24-visuel-argent.md
+  { id: 'visuel-argent', date: '2026-11-24', titre: 'Argent en un coup d’œil', phrase: 'Anneau de l’objectif, seuils en jauges, à venir en cartes.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (24 nov., livrable-2) docs/passation/2026-11-24-livrable.md (Suite)
+  { id: 'aujourdhui-sans-saut', date: '2026-11-24', titre: 'Aujourd’hui ne bouge plus au chargement', phrase: 'Chaque carte tient sa place avant ses chiffres.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (24 nov., visuel-jeu — Julien : « c'est pas visuel, hésite pas à faire des designs comme jeu vidéo ») docs/passation/2026-11-24-visuel-jeu.md
+  { id: 'visuel-jeu', date: '2026-11-24', titre: 'Pop-ups et ventes en grandes photos', phrase: 'La paire en grand, son N°, une petite fête par vente.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (24 nov., livrable — Julien : « écran de chargement etc., tout doit être parfait ») docs/passation/2026-11-24-livrable.md
+  { id: 'chargement-squelette', date: '2026-11-24', titre: 'Ouverture plus calme, sans tirets', phrase: 'Les chiffres en lecture se dessinent à leur place.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (24 nov., wcag-aa — Julien : plugin fairmind-design, accessibilité) docs/passation/2026-11-24-wcag-aa.md
+  { id: 'wcag-aa-24nov', date: '2026-11-24', titre: 'Plus lisible, aussi avec un lecteur d’écran', phrase: 'Le bilan se lit la nuit ; feuilles et messages sont bien annoncés.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (24 nov., moderation-carte réconciliée avec la revue UX — Julien : « c'est moche ») src/AlerteModeration.jsx
+  { id: 'annonces-disparues-groupees', date: '2026-11-24', titre: 'Annonces disparues : leurs photos et un geste', phrase: 'Une ligne par compte ; touche-la : photos, N°, quoi faire.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (24 nov., ext. 5.440.3 — Julien : « capte absolument tout ce que fait Bleam ») docs/passation/2026-11-24-observation-vinted.md
+  { id: 'observer-vinted', date: '2026-11-24', titre: 'Observer Vinted pendant un envoi', phrase: 'Le chemin de la page Vinted noté 10 min, sans tes données.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (24 nov., vente-mail-annonce — Julien : « la vente a été détectée par les mails […] l'annonce n'a pas encore été supprimée ») docs/passation/2026-11-24-vente-mail-annonce.md
+  { id: 'vente-mail-annonce', date: '2026-11-24', titre: 'Vendue par e-mail : l’annonce quitte « en ligne »', phrase: 'La vente prend son N°, sinon « Relier à l’annonce ».', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (24 nov., ext. 5.440.2 — Julien : « Sauté · Favori trop ancien » pour des favoris de la veille) docs/passation/2026-11-24-favoris-ancien.md
+  { id: 'favoris-ancien', date: '2026-11-24', titre: 'Favoris : plus de « trop ancien » à tort', phrase: 'Les notifications sont lues jusqu’au bout avant de sauter un favori.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (24 nov., style-graphite — Julien : « un peu plus foncé en gris […] améliore tous les boutons […] change de style pour l'iPhone ») docs/passation/2026-11-24-style-graphite.md
+  { id: 'styles-a-essayer', date: '2026-11-24', titre: 'Onze styles à essayer, dont Monochrome', phrase: 'Paramètres → Apparence → Style : touche, c’est appliqué.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (23 nov., colis-danger — Julien : « te prévient avant qu'il reparte ») docs/passation/2026-11-23-colis-danger.md
+  { id: 'colis-en-danger', date: '2026-11-23', titre: 'Colis pas retiré : VRM te prévient', phrase: 'Vinted Go : la veille et le jour où il repart.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (23 nov., revue UX) docs/passation/2026-11-23-revue-ux.md
+  { id: 'revue-ux-23nov', date: '2026-11-23', titre: 'Achats et fiches plus clairs', phrase: 'La liste d’abord, le prix d’achat dans la fiche, photos des disparues.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (23 nov. soir, ext. 5.440.1 — Julien : « 0 envoyé · 1 sauté », phrase coupée) docs/passation/2026-11-23-favoris-identite.md
+  { id: 'favoris-identite', date: '2026-11-23', titre: 'Messages aux favoris : le nouveau lien de Vinted', phrase: 'Un favori pas confirmé est dit et sauté, la file continue.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md
+  { id: 'vente-email-partout', date: '2026-11-23', titre: 'Une vente reçue par e-mail se voit partout', phrase: 'Ventes, Ma journée et Colis, avant même le passage de l’extension.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (23 nov. au soir, lot retours-suivi — Julien : « le transporteur inconnu, le logo mal mis ») docs/passation/2026-11-23-retours-suivi.md
+  { id: 'retraits-point-clair', date: '2026-11-23', titre: 'Points relais nommés, plus clairs, sans orange', phrase: 'Le nom du point Vinted Go, son logo, sa date limite.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot retours-suivi — Julien : « fais le suivi des colis retournés ») docs/passation/2026-11-23-retours-suivi.md
+  { id: 'retours-achat-suivi', date: '2026-11-23', titre: 'Tes retours suivis jusqu’au remboursement', phrase: 'Chaque étape cochée, mise à jour toute seule, boutons clairs.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (23 nov., photos-nettes — Julien : « toutes les photos sont floues ») docs/passation/2026-11-23-photos-nettes.md
+  { id: 'photos-nettes', date: '2026-11-23', titre: 'Photos plus nettes, surtout en grand', phrase: 'La plus grande taille connue s’affiche dès qu’elle est chargée.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov., ext. 5.440 — Julien : « l'app doit s'adapter toute seule au bouton favoris ») docs/passation/2026-11-23-favoris-auto.md
   { id: 'favoris-sans-geste', date: '2026-11-23', titre: 'Messages aux favoris : plus aucun geste demandé', phrase: 'VRM trouve seul la cloche de Vinted et montre chaque envoi.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., audit « chaque bouton marche ») docs/passation/2026-11-23-audit-boutons.md

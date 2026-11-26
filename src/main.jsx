@@ -99,6 +99,7 @@ if (typeof window !== 'undefined') {
 const PiluleMiseAJour = lazySur(() => import('./AppInstallable.jsx').then((m) => ({ default: m.PiluleMiseAJour })));
 const AideInstallation = lazySur(() => import('./AppInstallable.jsx').then((m) => ({ default: m.AideInstallation })));
 import { decisionMaj, estSaisie, CLE_MAJ_REFUSEE } from './miseAJour.js';
+import { reserverMaVersion } from './reserveMorceaux.js';
 // Android (Chrome, Edge, Samsung) offre l'installation : gardée pour l'aide,
 // qui la propose UNE fois (src/aideInstallation.js). Plus de mini-bandeau surprise.
 if (typeof window !== 'undefined') {
@@ -305,6 +306,9 @@ if ('serviceWorker' in navigator) {
       // (14 nov., ouverture instantanée) L'APP (pas la page d'accueil) fait ranger sa coquille dès la
       // 1re ouverture : la 2e ne repasse plus par le réseau (public/sw.js, `VRM_RANGER_COQUILLE`).
       if (versApp()) navigator.serviceWorker.ready.then((r) => { try { if (r && r.active) r.active.postMessage({ type: 'VRM_RANGER_COQUILLE', langue: langueInitiale() }); } catch (_) {} }).catch(() => {});
+      // (24 nov., morceaux-perimes) La page fait ranger, au repos, les fichiers de SA version (src/reserveMorceaux.js) :
+      // une mise en ligne pendant qu'elle est ouverte ne lui retire plus un écran jamais ouvert.
+      if (versApp()) reserverMaVersion({ langue: langueInitiale() });
       // ⚠️ RAFRAÎCHIR L'ABONNEMENT PUSH À CHAQUE OUVERTURE. Le jeton d'abonnement
       // tourne (surtout iOS) et l'ancien devient muet → « je ne reçois plus de
       // notif ». Si la permission est accordée : on récupère l'abonnement

@@ -57,6 +57,12 @@ self.addEventListener('message', event => {
     })().catch(() => {}));
     return;
   }
+  // (24 nov., morceaux-perimes) Une page dit la version qu'elle fait tourner et ses fichiers
+  // (src/reserveMorceaux.js) : le ménage (`purgerAncienneVersion`) ne les retire pas tant qu'elle est ouverte.
+  if (event.data && event.data.type === 'VRM_GARDER_VERSION' && event.source && event.source.id) {
+    event.waitUntil(noterPage(event.source.id, event.data.version, event.data.fichiers).catch(() => {}));
+    return;
+  }
   if (event.data && event.data.type === 'STORE_PDF') {
     pdfStore[event.data.id] = event.data.base64;
     if (event.ports[0]) event.ports[0].postMessage({ ok: true });
@@ -80,12 +86,47 @@ async function purgerAncienneVersion(res) {
   const cache = await caches.open(CACHE);
   const avant = await cache.match(REPERE);
   if (avant && (await avant.text()) === principal) return;
-  const garder = new Set([...noms, ...(await nomsGardesHorsLigne(cache))]);
+  const garder = new Set([...noms, ...(await nomsGardesHorsLigne(cache)), ...(await nomsDesPagesOuvertes(cache))]);
   for (const r of await cache.keys()) {
     const p = new URL(r.url).pathname;
     if (p.startsWith('/assets/') && !garder.has(p)) await cache.delete(r);
   }
   await cache.put(REPERE, new Response(principal));
+}
+
+// ── (24 nov., morceaux-perimes) LES FICHIERS D'UNE PAGE ENCORE OUVERTE ─────────────
+// Une page restée sur une ancienne version (l'iPhone : des heures en arrière-plan ; un 2e onglet) demande
+// plus tard un écran jamais ouvert : son fichier n'existe plus sur le serveur (Vercel ne sert que la mise
+// en ligne courante — mesuré : 404). Le ménage ci-dessus ne garde plus seulement la nouvelle version : il
+// garde aussi les fichiers de chaque page OUVERTE (dite par elle, `VRM_GARDER_VERSION`), tant qu'elle
+// l'est. Une page fermée ⇒ sa ligne part au ménage suivant, ses fichiers avec. Au plus 8 pages notées.
+const CLE_PAGES = '/__vrm_pages';
+const RE_FICHIER_PAGE = /^\/assets\/[A-Za-z0-9._-]+\.(?:js|css|woff2)$/;
+async function lirePages(cache) {
+  try { const r = await cache.match(CLE_PAGES); const j = r ? await r.json() : null; return j && typeof j === 'object' && !Array.isArray(j) ? j : {}; } catch (_) { return {}; }
+}
+async function noterPage(id, version, fichiers) {
+  if (typeof id !== 'string' || !id || typeof version !== 'string' || !Array.isArray(fichiers)) return;
+  const cache = await caches.open(CACHE);
+  const pages = await lirePages(cache);
+  pages[id] = { v: version.slice(0, 80), f: fichiers.filter((n) => typeof n === 'string' && RE_FICHIER_PAGE.test(n)).slice(0, 600), at: Date.now() };
+  const ids = Object.keys(pages).sort((a, b) => pages[b].at - pages[a].at).slice(0, 8);
+  const garde = {}; for (const k of ids) garde[k] = pages[k];
+  await cache.put(CLE_PAGES, new Response(JSON.stringify(garde), { headers: { 'content-type': 'application/json' } }));
+}
+// Les fichiers des pages encore ouvertes ; les pages fermées sont oubliées au passage.
+async function nomsDesPagesOuvertes(cache) {
+  try {
+    const pages = await lirePages(cache);
+    const ouvertes = new Set((await self.clients.matchAll({ type: 'window', includeUncontrolled: true })).map((c) => c.id));
+    const garde = {}, noms = [];
+    for (const [id, p] of Object.entries(pages)) {
+      if (!ouvertes.has(id) || !p || !Array.isArray(p.f)) continue;
+      garde[id] = p; noms.push(...p.f);
+    }
+    await cache.put(CLE_PAGES, new Response(JSON.stringify(garde), { headers: { 'content-type': 'application/json' } }));
+    return noms;
+  } catch (_) { return []; }
 }
 
 // ── La coquille de l'app (11 nov., lot app-installable) ──────────────────────
@@ -220,6 +261,23 @@ const avecNotif = (url, n) => {
 // L'image n'arrive que prouvée (la photo de l'e-mail de CETTE vente).
 const cheminApp = (u) => (typeof u === 'string' && u.startsWith('/') && !u.startsWith('//') ? u : '/');
 const ICONE_VRM = '/vrm-icon-v5-192.png', BADGE_VRM = '/vrm-badge-96.png';
+const SAFARI = (() => { try { const u = String(self.navigator && self.navigator.userAgent || ''); return /AppleWebKit/.test(u) && !/Chrome|Chromium|CriOS|Edg|OPR|Android/.test(u); } catch (_) { return false; } })();
+async function signalerApp() {
+  const fen = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const c of fen) { try { if (estCoquille(new URL(c.url))) c.postMessage({ type: 'vrm-signal' }); } catch (_) {} }
+}
+async function montrerDansApp(ev) {
+  try {
+    const fen = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const c = fen.find((x) => { try { return estCoquille(new URL(x.url)) && x.visibilityState === 'visible' && x.focused !== false; } catch (_) { return false; } });
+    if (!c) return false;
+    return await new Promise((ok) => {
+      const canal = new MessageChannel(); const t = setTimeout(() => ok(false), 800);
+      canal.port1.onmessage = (m) => { clearTimeout(t); ok(!!(m && m.data && m.data.montree)); };
+      try { c.postMessage({ type: 'vrm-evenement', ev }, [canal.port2]); } catch (_) { clearTimeout(t); ok(false); }
+    });
+  } catch (_) { return false; }
+}
 self.addEventListener('push', event => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (_) { data = { body: event.data ? event.data.text() : '' }; }
@@ -250,10 +308,22 @@ self.addEventListener('push', event => {
   if (typeof data.lang === 'string' && /^(fr|en|es|it|de)$/.test(data.lang)) opts.lang = data.lang;
   if (typeof data.image === 'string' && /^https:\/\/images\d*\.vinted\.net\//.test(data.image)) opts.image = data.image;
   event.waitUntil((async () => {
+    // (25 nov., Julien : « elle doit se mettre à jour si elle reçoit un mail ou que quelque chose se met à jour sur Vinted »)
+    // Toute fenêtre de l'app (visible ou en arrière-plan) reçoit « du neuf » : elle sonde les VERSIONS de ses lignes au
+    // plus tôt (src/VeilleTempsReel.jsx) — une page gelée par iOS le reçoit à son retour. Aucune donnée dans le message.
+    signalerApp().catch(() => {});
     if (data.tagGroupe && genre && self.registration.getNotifications) {
       try { for (const n of await self.registration.getNotifications()) if (n.data && n.data.genre === genre) n.close(); } catch (_) {}
     }
+    // (23 nov., Julien : « quand une vente arrive […] je veux un beau pop-up, là c'est moche ») L'app OUVERTE ET AU PREMIER
+    // PLAN montre elle-même la carte (src/natif/PopEvenements.jsx) avec les MÊMES données : titre, texte, adresse, photo
+    // prouvée, geste. Elle répond « montrée » sur le canal ; sans réponse en 800 ms (écran de connexion, app pas montée),
+    // la notification du système part comme avant. Safari (iPhone, Mac) exige une notification à chaque envoi : elle part
+    // puis se referme aussitôt quand l'app l'a montrée.
+    const montree = await montrerDansApp({ title, body: opts.body, url: opts.data.url, image: opts.image || null, genre, tag, actions: actions.map((x) => ({ title: x.title, url: opts.data.actions[x.action] })) });
+    if (montree && !SAFARI) return;
     await self.registration.showNotification(title, opts);
+    if (montree && self.registration.getNotifications) { try { for (const n of await self.registration.getNotifications({ tag })) n.close(); } catch (_) {} }
   })());
 });
 

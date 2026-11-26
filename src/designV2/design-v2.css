@@ -355,6 +355,10 @@ html[data-design="v2"] body .vrm-app-header .vrm-header-actions { gap: 8px !impo
 .v2-tete-tache h1 { margin: 0; font-size: 34px; font-weight: 700; line-height: 40px; letter-spacing: -.02em; color: var(--v2-page-texte); }
 .v2-tete-tache .vrm-fu-date-tete { font-size: 13px; color: var(--v2-page-muet); }
 .v2-tete-tache .vrm-tache-retrouver { position: absolute; right: 16px; top: 8px; }
+/* (24 nov., robot chaque-bouton, 2ᵉ passe) Au téléphone, Ventes · eBay « À traiter » : le grand titre est dans la coque, la tête
+   ne porte plus QUE ce rond — posé en absolu, il tombait sur les segments (« Offres » le couvrait, il cachait le mot). Sans
+   titre à côté, il reprend sa place dans le flux, à droite (banc retrouver-libre). */
+.v2-tete-tache:not(:has(h1)) > .vrm-tache-retrouver { position: static; align-self: flex-end; }
 /* (20 nov., intégration) Achats porte DEUX ronds dans cet hôte (Retrouver, Arrivée) : côte à côte, le titre leur laisse la place. */
 .vrm-tache-retrouver { display: inline-flex; align-items: center; gap: 8px; }
 .v2-tete-tache:has(.vrm-tache-retrouver [data-arv-bouton]) h1 { padding-right: 108px; }

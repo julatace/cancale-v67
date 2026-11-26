@@ -232,18 +232,18 @@ const dernierPdf = async (pg, viaPartage) => {
         const n = await carte(pg, '[data-retours-achat]', TXN), a = await carte(pg, '[data-retours-achat]', TXA);
         const etats = (c) => c ? c.etapes.map((e) => e.cle + ':' + e.etat).join(' ') : '';
         const reBande = new RegExp(`^À déposer avant ${motsJour(DANS8.j).replace(/\./g, '\\.')} 10 h$`);
-        dit(a && reBande.test(a.bande || '') && /^dans 8 jours · sinon tu gardes l’article et le vendeur est payé$/.test(a.sous || ''), `${nom} : la bande « ${a && a.bande} · ${a && a.sous} » (date en clair, heure de Paris)`, JSON.stringify(a && [a.bande, a.sous]));
+        dit(a && reBande.test(a.bande || '') && /^dans 8 jours$/.test(a.sous || ''), `${nom} : l’état « ${a && a.bande} · ${a && a.sous} » (date en clair, heure de Paris ; « sinon… » sous « Pourquoi ? » depuis le 23 nov.)`, JSON.stringify(a && [a.bande, a.sous]));
         dit(a && a.contraste >= 4.5, `${nom} : la bande se lit (contraste ${a && a.contraste}:1 ≥ 4,5)`, JSON.stringify(a && a.contraste));
         dit(a && a.ctrCarte.length >= 4 && a.ctrCarte.every(([, v]) => v >= 4.5), `${nom} : la carte « À renvoyer » se lit (Achats) (titre, compte, n°, liens ≥ 4,5:1 : ${a && a.ctrCarte.map(([k, v]) => v).join(' · ')})`, JSON.stringify(a && a.ctrCarte));
         dit(a && a.titre === AUTRY && a.photo && /banc_cancale/.test(a.meta), `${nom} : photo + titre (par SON n° de transaction) + compte`, JSON.stringify(a && [a.titre, a.meta, a.photo]));
-        dit(a && a.imprimer >= (vp.width < 600 ? 44 : 40) && a.depose >= (vp.width < 600 ? 44 : 40) && a.logo === 'chronopost' && a.copier && a.copier.txt.includes(SA) && a.copier.h >= 44 && a.suivre === `https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=${SA}`,
+        dit(a && a.imprimer >= (vp.width < 600 ? 44 : 40) && a.depose >= (vp.width < 600 ? 44 : 40) && a.logo === 'chronopost' && a.copier && a.copier.txt.includes(SA) && a.copier.h >= 44 && a.suivre === null /* (23 nov., lot retours-suivi) une action par état : « Suivre » vient APRÈS le dépôt (Nike, plus bas) */,
           `${nom} : Imprimer, Déposé, logo Chronopost, n° copiable, « Suivre ↗ » vers la page publique de Chronopost`, JSON.stringify(a && { i: a.imprimer, d: a.depose, logo: a.logo, c: a.copier, s: a.suivre }));
-        dit(n && n.etape === 'en-route' && etats(n) === 'bordereau:fait deposer:fait route:ici livre:avenir rembourse:avenir' && /^\d{1,2} \S+$/.test(n.etapes[1].det) && n.etapes[1].lib === 'Déposé' && n.etapes[2].lib === 'En route vers le vendeur',
+        dit(n && n.etape === 'en-route' && etats(n) === 'bordereau:fait deposer:fait route:ici livre:avenir rembourse:avenir' && /^\d{1,2} \S+$/.test(n.etapes[1].det) && n.etapes[1].lib === 'Déposé' && n.etapes[2].lib === 'En route',
           `${nom} : Nike — « Déposé · ${n && n.etapes[1] && n.etapes[1].det} » ✓, « En route vers le vendeur » ici, puis livré, remboursé`, JSON.stringify(n && n.etapes));
         dit(n && /lu dans l’e-mail Mondial Relay/.test(n.source) && n.bande === null && !n.imprimer && !n.depose && n.logo === 'mondialrelay' && /^https:\/\/www\.mondialrelay\.fr\/suivi-de-colis\/\?numeroExpedition=81230048/.test(n.suivre || ''),
           `${nom} : Nike — source dite, plus de bande ni d’Imprimer ni de Déposé (le fait les remplace), logo et suivi Mondial Relay`, JSON.stringify(n && { s: n.source, b: n.bande, i: n.imprimer, d: n.depose, l: n.logo, u: n.suivre }));
         dit(n && a && [...n.ctrCarte, ...a.ctrCarte].every(([, v]) => v >= 4.5), `${nom} : les cartes d’Achats se lisent (≥ 4,5:1)`, JSON.stringify(n && a && [n.ctrCarte, a.ctrCarte]));
-        dit(a && etats(a) === 'bordereau:fait deposer:ici route:avenir livre:avenir rembourse:avenir' && a.etapes[0].det === 'Chronopost' && a.etapes[0].lib === 'Bordereau reçu',
+        dit(a && etats(a) === 'bordereau:fait deposer:ici route:avenir livre:avenir rembourse:avenir' && a.etapes[0].det === 'Chronopost' && a.etapes[0].lib === 'Bordereau',
           `${nom} : Autry — « Bordereau reçu · Chronopost » ✓, « À déposer » ici`, JSON.stringify(a && a.etapes));
         const txt = await pg.evaluate(() => (document.querySelector('[data-retours-achat]') || {}).innerText || '');
         dit(!/à retirer/i.test(txt), `${nom} : jamais « à retirer » sur un retour`, txt.slice(0, 200));
@@ -297,6 +297,8 @@ const dernierPdf = async (pg, viaPartage) => {
         await pg.goto(`http://localhost:${PORT}/?tab=achats`, { waitUntil: 'domcontentloaded' });
         await pg.waitForSelector(`[data-retours-achat] [data-retour-achat="${TXA}"][data-retour-etape="rembourse"]`, { timeout: 40000 }).catch(() => {});
         await pg.waitForTimeout(1000);
+        // (25 nov., achats-retours-design) Un retour remboursé est une rangée REPLIÉE : son toucher la déplie (frise, n°, gestes).
+        await pg.evaluate(() => document.querySelectorAll('[data-retours-achat] details.vrm-rt-fini').forEach((d) => { d.open = true; }));
         a = await carte(pg, '[data-retours-achat]', TXA);
         dit(a && a.etape === 'rembourse' && a.etapes.every((e) => e.etat === 'fait') && /^34,32\s€$/.test(a.etapes[4].det), `${nom} : livré puis remboursé ⇒ toutes les étapes cochées, « Remboursé · ${a && a.etapes[4] && a.etapes[4].det} »`, JSON.stringify(a && a.etapes));
         await pg.locator(`[data-retours-achat] [data-retour-achat="${TXA}"]`).first().screenshot({ path: path.join(SHOTS, `retour-parfait-rembourse-${suff}.png`) }).catch(() => {});

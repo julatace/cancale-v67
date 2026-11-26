@@ -249,6 +249,14 @@ const TXT = {
     retourVeilleCorps: 'Imprime le bordereau, emballe, dépose le colis.',
     retourJour: 'Dernier jour pour ton retour',
     retourJourCorps: (h) => (h ? `À déposer avant ${h}` : 'À déposer aujourd’hui'),
+    // (23 nov., « Colis en danger ») Le colis VENDU attend l'acheteur au point et va repartir (date LUE).
+    danger: 'Colis pas encore retiré',
+    dangerCorps: (d) => (d ? `Préviens ton acheteur : son colis repart le ${d}` : 'Préviens ton acheteur : son colis va repartir'),
+    // (24 nov., lot suivi-ventes) Le colis d'une VENTE, lu chez le transporteur : arrivé au point, retiré (api/_lib/suivi-envoi.js).
+    envoiPoint: 'Colis au point relais',
+    envoiPointCorps: (l) => (l ? `Il attend ton acheteur · ${l}` : 'Il attend ton acheteur'),
+    envoiRetire: 'Colis retiré par l’acheteur',
+    envoiRetireCorps: 'L’argent arrive quand il confirme que tout va bien.',
     offre: (e) => (e ? `Offre de ${e}` : 'Nouvelle offre'),
     offreCorps: 'Accepte, refuse ou contre-propose',
     expire24: 'expire dans 24 h',
@@ -298,6 +306,12 @@ const TXT = {
     retourVeilleCorps: 'Print the label, pack it, drop the parcel off.',
     retourJour: 'Last day for your return',
     retourJourCorps: (h) => (h ? `Drop it off before ${h}` : 'Drop it off today'),
+    danger: 'Parcel not picked up yet',
+    dangerCorps: (d) => (d ? `Tell your buyer: the parcel goes back on ${d}` : 'Tell your buyer: the parcel will go back'),
+    envoiPoint: 'Parcel at the pickup point',
+    envoiPointCorps: (l) => (l ? `It is waiting for your buyer · ${l}` : 'It is waiting for your buyer'),
+    envoiRetire: 'Parcel picked up by the buyer',
+    envoiRetireCorps: 'The money comes once they confirm all is well.',
     offre: (e) => (e ? `Offer of ${e}` : 'New offer'),
     offreCorps: 'Accept, decline or counter',
     expire24: 'expires in 24 h',
@@ -346,6 +360,12 @@ const TXT = {
     retourVeilleCorps: 'Imprime la etiqueta, embala y entrega el paquete.',
     retourJour: 'Último día para tu devolución',
     retourJourCorps: (h) => (h ? `Entrégala antes de las ${h}` : 'Entrégala hoy'),
+    danger: 'Paquete aún sin recoger',
+    dangerCorps: (d) => (d ? `Avisa a tu comprador: el paquete se devuelve el ${d}` : 'Avisa a tu comprador: el paquete se devolverá'),
+    envoiPoint: 'Paquete en el punto de recogida',
+    envoiPointCorps: (l) => (l ? `Espera a tu comprador · ${l}` : 'Espera a tu comprador'),
+    envoiRetire: 'Paquete recogido por el comprador',
+    envoiRetireCorps: 'El dinero llega cuando confirme que todo está bien.',
     offre: (e) => (e ? `Oferta de ${e}` : 'Nueva oferta'),
     offreCorps: 'Acepta, rechaza o contraoferta',
     expire24: 'caduca en 24 h',
@@ -394,6 +414,12 @@ const TXT = {
     retourVeilleCorps: 'Stampa l’etichetta, imballa e consegna il pacco.',
     retourJour: 'Ultimo giorno per il tuo reso',
     retourJourCorps: (h) => (h ? `Consegnalo entro le ${h}` : 'Consegnalo oggi'),
+    danger: 'Pacco non ancora ritirato',
+    dangerCorps: (d) => (d ? `Avvisa il tuo acquirente: il pacco torna indietro il ${d}` : 'Avvisa il tuo acquirente: il pacco tornerà indietro'),
+    envoiPoint: 'Pacco al punto di ritiro',
+    envoiPointCorps: (l) => (l ? `Aspetta il tuo acquirente · ${l}` : 'Aspetta il tuo acquirente'),
+    envoiRetire: 'Pacco ritirato dall’acquirente',
+    envoiRetireCorps: 'Il denaro arriva quando conferma che va tutto bene.',
     offre: (e) => (e ? `Offerta di ${e}` : 'Nuova offerta'),
     offreCorps: 'Accetta, rifiuta o fai una controfferta',
     expire24: 'scade tra 24 h',
@@ -442,6 +468,12 @@ const TXT = {
     retourVeilleCorps: 'Etikett drucken, einpacken, Paket abgeben.',
     retourJour: 'Letzter Tag für deine Rücksendung',
     retourJourCorps: (h) => (h ? `Abgeben bis ${h}` : 'Heute abgeben'),
+    danger: 'Paket noch nicht abgeholt',
+    dangerCorps: (d) => (d ? `Sag deinem Käufer Bescheid: das Paket geht am ${d} zurück` : 'Sag deinem Käufer Bescheid: das Paket geht zurück'),
+    envoiPoint: 'Paket am Abholpunkt',
+    envoiPointCorps: (l) => (l ? `Es wartet auf deinen Käufer · ${l}` : 'Es wartet auf deinen Käufer'),
+    envoiRetire: 'Paket vom Käufer abgeholt',
+    envoiRetireCorps: 'Das Geld kommt, sobald er bestätigt, dass alles passt.',
     offre: (e) => (e ? `Angebot über ${e}` : 'Neues Angebot'),
     offreCorps: 'Annehmen, ablehnen oder Gegenangebot',
     expire24: 'läuft in 24 h ab',
@@ -553,6 +585,25 @@ const SORTES = {
     }
     const av = avantClair(d.heure === false && d.jour ? d.jour : d.limite, ctx);
     return { title: couperMot(T.retourVeille(av), TITRE_MAX), body: joindre(a, T.retourVeilleCorps), ligne: a };
+  },
+  // (23 nov., « Colis en danger ») Le colis d'une VENTE au point relais de l'acheteur, qui repart à la date LUE
+  // chez le transporteur (api/_lib/colis-danger.js). Le jour en clair, jamais « demain » (lue plus tard).
+  colisDanger: (d, T, ctx) => {
+    const a = nomCourt(d.article);
+    const dc = dateClaire(d.limite, { maintenant: ctx.maintenant, langue: ctx.langue, relatif: false });
+    const { title, reste } = titreAvecObjet(T.danger, a, d.article);
+    return { title, body: joindre(T.dangerCorps(dc ? dc.texte : ''), reste), ligne: a };
+  },
+  // (24 nov., lot suivi-ventes) Le colis d'une VENTE lu chez le transporteur : au point (le nom du point LU), retiré.
+  envoiPoint: (d, T) => {
+    const a = nomCourt(d.article);
+    const { title, reste } = titreAvecObjet(T.envoiPoint, a, d.article);
+    return { title, body: joindre(T.envoiPointCorps(espaces(d.lieu).slice(0, 40)), reste), ligne: a };
+  },
+  envoiRetire: (d, T) => {
+    const a = nomCourt(d.article);
+    const { title, reste } = titreAvecObjet(T.envoiRetire, a, d.article);
+    return { title, body: joindre(reste, T.envoiRetireCorps), ligne: a };
   },
   rembourse: (d, T, ctx) => {
     const e = montantClair(d.montant, ctx.langue), a = nomCourt(d.article);

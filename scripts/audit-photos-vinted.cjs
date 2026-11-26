@@ -157,6 +157,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'BrandIcon :: source': 'logos locaux : dictionnaire fermé /brands/{vinted,leboncoin,ebay}.svg',
       'PhotoVente :: secours': 'octets raster du secours serveur, convertis en data:image (type et taille vérifiés)',
       'PhotoVinted :: *': 'la règle elle-même (no-referrer, secours, pictogramme)',
+      'PhotoVintedBase :: *': 'la règle elle-même : PhotoVinted (23 nov., photos-nettes) choisit la taille connue puis passe ici (no-referrer, secours, pictogramme)',
       'PhotoVc :: url': 'photo d’une annonce VESTIAIRE (1er nov., 5.296) : `url` n’est posée que pour https://*.vestiairecollective.com, sans identifiants — jamais une adresse Vinted ; repli « — » si elle ne charge pas',
       'Photo :: url': 'AnnoncesLeboncoin (catalogue, 22 oct., main) : `ad.images[0]` d’une annonce LEBONCOIN lue par l’extension (CDN de Leboncoin) — jamais une adresse Vinted ; https seulement, repli « — » si elle ne charge pas',
       'AbonnementRequis :: "/vrm-logo-96.png"': 'logo de l’app (fichier du site, logo officiel)',

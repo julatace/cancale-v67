@@ -1,0 +1,43 @@
+/* ── src/natif/finitions.css — LE DESSIN FIN (23 nov., Julien : « tu peux mieux travailler les bords des boutons etc. ») ──────
+   Un filet NET (1 px, 0,5 px sur écran Retina), un rayon cohérent (boutons 11, pastilles 6–7, segmentés 10/8, cartes 16),
+   un relief très doux sur les boutons secondaires (reflet en haut, ombre de 1 px dessous), un état appuyé visible (enfoncé,
+   plus sombre), les disques d'action dessinés (filet + reflet, plus de gros cercle plat). Le jour seulement : la nuit garde
+   ses filets clairs (jetons). Jetons de couleur seulement — aucune nouvelle couleur. */
+@layer vrm-natif {
+  :root { --n-filet: 1px; --n-filet-c: rgb(29 29 31 / .16); --n-reflet: inset 0 1px 0 rgb(255 255 255 / .85); --n-relief: 0 1px 1.5px rgb(29 29 31 / .07); }
+  @media (min-resolution: 2dppx) { :root { --n-filet: .5px; --n-filet-c: rgb(29 29 31 / .24); } }
+
+  :root:not([data-theme="dark"]) .n-bouton[data-n-variante="teinte"]:not([data-n-ton="ambre"]) {
+    background: linear-gradient(180deg, #FFFFFF, var(--n-carte)); color: var(--n-encre);
+    box-shadow: inset 0 0 0 var(--n-filet) var(--n-filet-c), var(--n-reflet), var(--n-relief); border-radius: 11px; }
+  :root:not([data-theme="dark"]) .n-bouton[data-n-variante="teinte"]:not([data-n-ton="ambre"]):active {
+    background: var(--n-appui); box-shadow: inset 0 0 0 var(--n-filet) var(--n-filet-c), inset 0 1px 2px rgb(29 29 31 / .10); transform: scale(.98); }
+  :root:not([data-theme="dark"]) .n-bouton[data-n-variante="plein"] {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / .16), inset 0 0 0 var(--n-filet) rgb(0 0 0 / .18), 0 1px 2px rgb(29 29 31 / .18); }
+  :root:not([data-theme="dark"]) .n-bouton[data-n-variante="plein"]:active { filter: brightness(.9); transform: scale(.98); box-shadow: inset 0 1px 2px rgb(0 0 0 / .25); }
+  .n-bouton { transition: transform 100ms ease-out, background-color 100ms ease-out, filter 100ms ease-out, box-shadow 100ms ease-out; }
+
+  /* Pastilles : le N° (plaque) et les statuts — un filet net, un fond à peine teinté, des chiffres alignés. */
+  :root:not([data-theme="dark"]) .n-plaque:not([data-n-doublon]) { border-radius: 6px; background: linear-gradient(180deg, #FFFFFF, var(--n-carte-2)); box-shadow: inset 0 0 0 var(--n-filet) var(--n-filet-c); }
+  :root:not([data-theme="dark"]) .n-pastille:not([data-n-ton]) { box-shadow: inset 0 0 0 var(--n-filet) var(--n-filet-c); }
+  .n-pastille, .n-plaque { -webkit-font-smoothing: antialiased; }
+
+  /* Champ de recherche : le creux d'un champ (ombre intérieure d'un pixel), un filet net, rayon 11. */
+  :root:not([data-theme="dark"]) .n-recherche { border-radius: 11px; background-color: var(--n-carte);
+    box-shadow: inset 0 0 0 var(--n-filet) var(--n-filet-c), inset 0 1px 2px rgb(29 29 31 / .05); }
+
+  /* Segmenté : le rail en creux, l'onglet actif blanc posé dessus (ombre douce + filet). */
+  :root:not([data-theme="dark"]) .n-segmente { border-radius: 10px; background: rgb(29 29 31 / .06); box-shadow: inset 0 0 0 var(--n-filet) rgb(29 29 31 / .06), inset 0 1px 1px rgb(29 29 31 / .04); }
+  :root:not([data-theme="dark"]) .n-segmente-curseur { border-radius: 8px; background: #FFFFFF; box-shadow: 0 0 0 var(--n-filet) rgb(29 29 31 / .08), 0 1px 2px rgb(29 29 31 / .12), 0 2px 6px rgb(29 29 31 / .05); }
+  .n-segmente-choix[aria-checked="true"] { font-weight: 600; }
+
+  /* Disques d'action : un filet net, un reflet, une ombre d'un pixel ; le plein garde son reflet ; l'icône au pixel. */
+  :root:not([data-theme="dark"]) .n-action-ronde-disque { background: linear-gradient(180deg, #FFFFFF, var(--n-carte)); box-shadow: inset 0 0 0 var(--n-filet) var(--n-filet-c), var(--n-reflet), var(--n-relief); }
+  :root:not([data-theme="dark"]) .n-action-ronde[data-n-plein] .n-action-ronde-disque { background: var(--n-plein); box-shadow: inset 0 1px 0 rgb(255 255 255 / .16), 0 1px 2px rgb(29 29 31 / .2); }
+  .n-action-ronde:active .n-action-ronde-disque { filter: brightness(.95); }
+  .n-action-ronde-disque svg, .n-bouton-icone svg, .n-pop-ic svg { display: block; shape-rendering: geometricPrecision; }
+
+  /* Cartes : le même filet net et une ombre très douce (une feuille posée, pas un cadre). */
+  :root:not([data-theme="dark"]) .n-carte-corps, :root:not([data-theme="dark"]) .n-tuiles-pied { border: 0; box-shadow: 0 0 0 var(--n-filet) var(--n-filet-c), 0 1px 3px rgb(29 29 31 / .05); }
+  :root:not([data-theme="dark"]) .n-heros { box-shadow: inset 0 0 0 var(--n-filet) var(--n-filet-c), var(--n-reflet), 0 1px 3px rgb(29 29 31 / .05); }
+}

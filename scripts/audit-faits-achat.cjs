@@ -115,7 +115,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(/user_side=eq\.buyer/.test(sel) && !/(select=|,)data(,|&|$)/.test(sel) && /size_title/.test(sel) && /seller->>login/.test(sel), 'S1 · la lecture est une PROJECTION côté acheteur (jamais select=data)', sel.slice(0, 120));
   const app = sansCommentaires(lire('src/App.jsx'));
   dit(/lireTout\(SELECT_DETAILS_ACHATS/.test(app) && /setDetailsAchats\(detailsDeLignes\(rows\)\)/.test(app), 'S2 · App lit les détails par cette projection et les range par `detailsDeLignes`');
-  dit(/besoinDetailsAchats = !!\(pickerFor \|\| glisserOuvert \|\| relierColis(?: \|\| only === 'completer')?\)/.test(app), 'S3 · lus à l\'ouverture d\'une des trois feuilles de liaison');
+  dit(/besoinDetailsAchats = !!\(pickerFor \|\| glisserOuvert \|\| relierColis(?: \|\| only === 'completer')?(?: \|\| curSub === 'achats')?\)/.test(app), 'S3 · lus à l\'ouverture d\'une des trois feuilles de liaison (et, 23 nov. photos-nettes, sur l\'écran Achats : la photo f800 de l\'achat)');
   const nb = (app.match(/details=\{detailsAchats\}/g) || []).length + (app.match(/<FaitsAchat achat=\{o\} details=\{detailsAchats/g) || []).length;
   dit(nb >= 3, 'S4 · les trois feuilles reçoivent les détails (Relier un achat, Relier achats et ventes, colis à relier)', String(nb));
   const ach = sansCommentaires(lire('src/ecrans/Achats.jsx'));

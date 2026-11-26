@@ -25,7 +25,7 @@
 //  formulaire et la réponse attendue.
 // ════════════════════════════════════════════════════════════════════════════
 (() => {
-  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 7) return;
+  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 7.5) return;
   const SEL = Object.freeze({
     vendre: 'a[data-testid="header-upload-item-button"]',
     photos: 'input[data-testid="add-photos-input"]',
@@ -260,6 +260,101 @@
     if (nomA && IRREVERSIBLE_APPRIS.test(nomA) && !(APPRIS[nomA] && APPRIS[nomA].confirme === true)) { const e = new Error('appris-a-confirmer'); e.vrmAConfirmer = nomA; throw e; }
     try { el.scrollIntoView({ block: 'center' }); } catch (_) {} el.click();
   };
+  // ══ 5.453 (`favorishumains`, Julien, 25 nov. : « tu dois faire tous les gestes que je fais pour faire les favoris »,
+  //    « ça doit être humain ») — LES GESTES D'UN FAVORI COMME UNE PERSONNE ATTENTIVE ═══════════════════════════════════
+  //  Dans les règles déjà VALIDÉES (CLAUDE.md §3 « Discrétion », 12 nov. ; 5.437 `formulairerythme`), pour les étapes d'un
+  //  favori seulement (`d.favori` / `d.humain`) :
+  //   · `regarder(k)` : un temps de lecture quand l'écran vient de changer (0,4 à 1,4 s) ;
+  //   · `toucher(el)` : l'élément amené au milieu de l'écran (`scrollIntoView` : la position est posée, c'est le navigateur
+  //     qui défile), une courte hésitation (0,25 à 0,9 s), puis le clic de `clic` (ses gardes : appris non confirmé ⇒ rien) ;
+  //   · `taperHumain(el, texte, cible)` : lettre à lettre, plus long après une espace ou une ponctuation, parfois une pause de
+  //     réflexion entre deux mots ; le tout ramené au TEMPS D'ÉCRITURE que le fond a tiré (`cible`, la règle du 12 nov.),
+  //     chaque lettre bornée (55 ms à 0,9 s) ; la valeur EXACTE, les mêmes événements qu'avant (`saisir`).
+  //  Tout au hasard, jamais deux fois de suite le même temps (`tirerUnique`). Les attentes passent par `attenteFrappe`
+  //  (aucune minuterie : l'onglet de travail peut être en arrière-plan). Rien de maquillé : ni isTrusted, ni souris inventée,
+  //  ni débogueur — refusés (§3).
+  const _derniers = {};
+  function tirerUnique(k, a, b) { let ms = Math.round(entre(a, b)); for (let i = 0; i < 6 && _derniers[k] != null && Math.round(ms / 10) === Math.round(_derniers[k] / 10); i++) ms = Math.round(entre(a, b)); _derniers[k] = ms; return ms; }
+  async function regarder(k) { const ms = tirerUnique('regarder', 400, 1400); noterDelai('regarder:' + String(k || ''), ms); await attenteFrappe(ms); }
+  async function toucher(el, k) {
+    try { el.scrollIntoView({ block: 'center' }); } catch (_) {}
+    const ms = tirerUnique('hesite', 250, 900); noterDelai('hesite:' + String(k || ''), ms); await attenteFrappe(ms);
+    if (captcha()) { const e = new Error('captcha'); e.vrmCaptcha = true; throw e; }
+    clic(el);
+  }
+  const H = (d) => !!(d && (d.humain === true || d.favori === true));
+  const valeurDe = (el) => { try { return el && el.isContentEditable ? String(el.textContent || '') : String((el && el.value) || ''); } catch (_) { return ''; } };
+  function delaisHumains(texte, cible) {
+    const l = Array.from(String(texte));
+    const brut = l.map((ch, i) => {
+      let x = entre(60, 190);
+      if (ch === ' ') x *= 1.5; else if (/[,.;:!?'’-]/.test(ch)) x *= 1.8;
+      if (ch === ' ' && i > 0 && Math.random() < 0.12) x += entre(400, 1200);   // on cherche le mot suivant
+      else if (Math.random() < 0.03) x += entre(250, 700);
+      return x;
+    });
+    const somme = brut.reduce((a, b) => a + b, 0) || 1;
+    const k = Number(cible) > 0 ? Math.min(2.5, Math.max(0.5, Number(cible) / somme)) : 1;
+    return brut.map((x) => Math.round(Math.min(900, Math.max(55, x * k))));
+  }
+  // 5.453.2 (Julien, 26 nov. : « dans la conversation, RIEN n'est parti, ni message ni texte dans le champ ») : la valeur posée
+  //    par le setter (ou `textContent` d'un champ riche) n'arrive pas toujours dans l'ÉTAT de l'éditeur de Vinted (React / éditeur
+  //    riche) : le champ se vide au rendu suivant, « Envoyer » ne part pas. Chaque lettre passe désormais par la commande
+  //    d'édition du navigateur (`document.execCommand('insertText')`, champ ayant le focus) — le même chemin qu'une frappe pour
+  //    l'éditeur (beforeinput / input) ; elle n'a rien pris ⇒ l'ancienne pose (setter natif + `input`). Rien de maquillé.
+  const valeurNette = (el) => valeurDe(el).replace(/ /g, ' ').replace(/\r\n?/g, '\n').replace(/\n$/, '');
+  function viderChamp(el) {
+    if (!valeurDe(el)) return;
+    try { el.focus(); } catch (_) {}
+    try {
+      if (el.isContentEditable) { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+      else el.select();
+      document.execCommand('delete', false);
+    } catch (_) {}
+    if (valeurDe(el)) {
+      if (el.isContentEditable) { el.textContent = ''; el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' })); }
+      else { setterDe(el)(''); el.dispatchEvent(new Event('input', { bubbles: true })); }
+    }
+  }
+  function insererLettre(el, ch, v) {
+    try { if (document.activeElement !== el) el.focus(); } catch (_) {}
+    const avant = valeurDe(el);
+    let pris = false;
+    try { pris = document.execCommand('insertText', false, ch) && valeurDe(el) !== avant; } catch (_) { pris = false; }
+    if (pris) return 'commande';
+    if (el.isContentEditable) el.textContent = v; else setterDe(el)(v);
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, data: ch, inputType: ch === '\n' ? 'insertLineBreak' : 'insertText' }));
+    return 'pose';
+  }
+  async function taperHumain(el, texte, cible) {
+    const t = String(texte), l = Array.from(t), dl = delaisHumains(t, cible);
+    try { el.scrollIntoView({ block: 'center' }); } catch (_) {}
+    try { el.focus(); } catch (_) {}
+    viderChamp(el);
+    let v = '', voie = '';
+    for (let i = 0; i < l.length; i++) {
+      const ch = l[i];
+      v += ch; voie = insererLettre(el, ch, v) || voie;
+      noterDelai(ch === ' ' ? 'mot' : 'lettre-favori', dl[i]);
+      await attenteFrappe(dl[i]);
+      if (ch === ' ' && captcha()) return { captcha: true };
+    }
+    if (!el.isContentEditable) el.dispatchEvent(new Event('change', { bubbles: true }));
+    // La valeur RELUE après un temps de rendu (un éditeur qui ne l'a pas prise la remet à vide) : sinon rien ne part.
+    await attenteFrappe(400);
+    return { ok: valeurNette(el) === t.replace(/\r\n?/g, '\n').replace(/\n$/, ''), voie };
+  }
+  // 5.453.2 (Julien : « quand on appuie sur le favori, ça propose DIRECTEMENT l'offre ») : la fenêtre « Faire une offre » de
+  //    Vinted ouverte par-dessus la conversation — une seule fenêtre visible qui porte un champ de prix.
+  function dialogueOffre() { const dl = dialogue(); return dl && champPrix(dl).el ? dl : null; }
+  // La fermer (rien n'est envoyé) : son bouton « Fermer » / « Annuler », sinon Échap.
+  async function fermerDialogueOffre(dl) {
+    const b = [...dl.querySelectorAll('button, [role="button"]')].filter((x) => visible(x) && /fermer|close|annuler|cancel|chiudi|annulla|cerrar|cancelar|schlie|abbrechen/i.test(norm(nomAcc(x)) + ' ' + (x.getAttribute('data-testid') || '')));
+    if (b.length) clic(b[0]);
+    else { try { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true })); } catch (_) {} }
+    const fin = Date.now() + 3000; while (Date.now() < fin) { if (!dialogueOffre()) return true; await nap(150); }
+    return !dialogueOffre();
+  }
 
   // ── 5.414 : les aides des gestes par l'interface (messagerie, offre, annonce) ─────────────────────────────
   // Un nom accessible (la règle de la cloche des favoris, 5.356) : aria-labelledby, aria-label, texte, title.
@@ -407,10 +502,48 @@
   function lienFavoriVisible(lien, itemId, receiverId) {
     const norme = (v) => { try { const u = new URL(v, location.href); if (u.origin !== location.origin) return null; u.hash = ''; u.searchParams.sort(); return u.href; } catch (_) { return null; } };
     const attendu = lien ? norme(lien) : null;
-    const natif = (v) => { try { const u = new URL(v, location.href); const ks = [...u.searchParams.keys()].sort().join(','); if (ks !== 'item_id,receiver_id' || u.searchParams.getAll('item_id').length !== 1 || u.searchParams.getAll('receiver_id').length !== 1) return false; return u.origin === location.origin && u.searchParams.get('item_id') === itemId && u.searchParams.get('receiver_id') === receiverId; } catch (_) { return false; } };
-    const l = [...document.querySelectorAll('a[href]')].filter((a) => visible(a) && ((attendu && norme(a.href) === attendu) || natif(a.href)));
+    // 5.440.1 : la notification porte désormais `item_id` + `user_id` (lien d'application mesuré le 23 nov.) ; la ligne de la page
+    //    peut donc dire la personne par `receiver_id` OU `user_id` (une seule des deux, avec éventuellement `portal`) — toujours
+    //    les DEUX identités exactes du favori, sur vinted.fr même.
+    const natif = (v) => { try { const u = new URL(v, location.href); const q = u.searchParams; const ks = [...q.keys()].filter((k) => k !== 'portal').sort().join(','); const qui = ks === 'item_id,receiver_id' ? 'receiver_id' : ks === 'item_id,user_id' ? 'user_id' : ''; if (!qui || q.getAll('item_id').length !== 1 || q.getAll(qui).length !== 1 || q.getAll('portal').length > 1) return false; return u.origin === location.origin && q.get('item_id') === itemId && q.get(qui) === receiverId; } catch (_) { return false; } };
+    const l = [...document.querySelectorAll('a[href]')].filter((a) => visible(a) && ((attendu && norme(a.href) === attendu) || natif(a.href) || identiteLigneFavori(a.href, itemId, receiverId)));
     return l.length === 1 ? { el: l[0] } : { el: null, ambigu: l.length > 1 };
   }
+  // 5.440.2 (Julien, 24 nov. 17:45 : « Sauté · Favori trop ancien » pour des favoris de 0 à 2 jours, rangs 1, 2 et 4 de la
+  //    liste de Vinted) : la ligne d'un favori se reconnaît par ses DEUX identités, quelle que soit la forme exacte de son
+  //    adresse sur la page — l'article (`/items/N/…` ou `item_id=N`) ET la personne (`offering_id`, `receiver_id` ou
+  //    `user_id`, une seule clé, une seule valeur), sur vinted.fr même, dans une adresse de favori (`want_it`) ou la
+  //    forme native `?item_id=&receiver_id=`. Un autre paramètre d'identité (`…_id`) qui n'est pas l'un des deux ⇒ refusée
+  //    (une autre personne, un autre article) ; un paramètre de suivi (`ref`, `source`…) ne change pas qui elle désigne.
+  //    Jamais un titre, jamais un pseudo.
+  function identiteLigneFavori(href, itemId, receiverId) {
+    try {
+      const u = new URL(href, location.href); if (u.origin !== location.origin) return false;
+      const q = u.searchParams, ks = [...new Set([...q.keys()])];
+      if (ks.some((k) => q.getAll(k).length !== 1)) return false;
+      const m = /^\/items\/([1-9]\d{0,19})(?:-[^/]*)?\/want_it(?:\/new)?\/?$/.exec(u.pathname);
+      const favori = !!m || /^\/(?:inbox\/)?want_it(?:\/new)?\/?$/.test(u.pathname);
+      if (!favori) return false;
+      const article = m ? m[1] : q.get('item_id');
+      if (m && q.has('item_id') && q.get('item_id') !== m[1]) return false;
+      const qui = ['offering_id', 'receiver_id', 'user_id'].filter((k) => q.has(k));
+      if (qui.length !== 1) return false;
+      if (ks.some((k) => /_id$/i.test(k) && k !== 'item_id' && k !== qui[0])) return false;
+      return article === itemId && q.get(qui[0]) === receiverId && itemId !== receiverId;
+    } catch (_) { return false; }
+  }
+  // Les lignes de notification montrées (pour savoir si la page en a chargé assez) : un lien de favori, d'article ou une ligne native.
+  const lignesNotif = () => [...document.querySelectorAll('a[href*="/want_it"], a[href*="receiver_id="], a[href*="offering_id="], a[href*="/items/"], [data-testid*="notification" i]')].filter((x) => !x.closest('header, footer, [role="banner"]')).length;
+  // Le bouton qui charge la suite de la liste (« Afficher plus »…), seul ; jamais une ligne, jamais un lien.
+  const RE_PLUS = /^(?:afficher plus|voir plus|charger plus|plus de notifications|show more|load more|see more|view more|mostrar m[aá]s|ver m[aá]s|cargar m[aá]s|mostra altro|carica altro|vedi altro|mehr anzeigen|mehr laden|weitere laden)$/;
+  const boutonPlus = () => { const l = [...document.querySelectorAll('button, [role="button"]')].filter((b) => visible(b) && actif(b) && !deVrm(b) && RE_PLUS.test(norm(nomAcc(b)))); return l.length === 1 ? l[0] : null; };
+  // Le bloc qui défile (la liste peut vivre dans un conteneur, pas dans la fenêtre) : l'ancêtre défilant de la dernière ligne.
+  const blocDefilant = () => {
+    const l = [...document.querySelectorAll('a[href*="/want_it"], a[href*="/items/"], [data-testid*="notification" i]')].filter(visible);
+    let e = l.length ? l[l.length - 1].parentElement : null;
+    while (e && e !== document.body && e !== document.documentElement) { try { const st = getComputedStyle(e); if (/(auto|scroll)/.test(st.overflowY) && e.scrollHeight > e.clientHeight + 4) return e; } catch (_) {} e = e.parentElement; }
+    return null;
+  };
   async function attendreChemin(re, ms) {
     let r = null; try { r = re instanceof RegExp ? re : new RegExp(String(re || '^/')); } catch (_) { return { ok: false }; }
     const fin = Date.now() + ms;
@@ -626,7 +759,11 @@
       //     chemin de « Voir tout » : le fond ouvre la page complète et rappelle l'étape (`liste`) ;
       //   · sur la page complète, pas trouvée après l'avoir fait défiler     ⇒ `absent` : ce favori est SAUTÉ, la file continue.
       // Seule la ligne dont le lien porte CET article ET CETTE personne est cliquée — jamais une autre notification.
-      let l = lienFavoriVisible(lien, itemId, receiverId);
+      // 5.440.2 (`direct`) : le fond a OUVERT l'adresse native de CE favori dans l'onglet de travail (le lien de sa notification,
+      //    lu dans la liste de Vinted, article ET personne vérifiés) ; c'est la page de Vinted qui ouvre la conversation —
+      //    aucune ligne à chercher, aucun clic, aucun défilement (rien ne dépend du rendu d'un onglet en arrière-plan).
+      const direct = !!(d && d.direct === true);
+      let l = direct ? { el: null } : lienFavoriVisible(lien, itemId, receiverId);
       if (l.ambigu) return manque('favori-notification-ambigue');
       const trouver = async (ms, pendant) => {
         const fin = Date.now() + ms;
@@ -641,24 +778,53 @@
         }
       };
       const absent = (extra) => Object.assign(manque('favori-notification'), { absent: true }, extra || {});
-      if (!l.el && d && d.liste === true) {
-        // La page complète des notifications : on la fait défiler (lecture seule, bornée) jusqu'à la ligne.
-        // (La suite se charge au défilement : on remonte d'un cran puis on redescend tout en bas, pour que la page le voie
-        //  même si elle y était déjà ; « plus rien ne vient » = ni la hauteur ni le nombre de liens ne bougent.)
-        let tours = 0, vu = '', stable = 0;
-        const t = await trouver(25000, async () => {
-          const h = document.documentElement.scrollHeight, etat = h + ':' + document.querySelectorAll('a[href]').length;
-          stable = etat === vu ? stable + 1 : 0; vu = etat;
-          if (tours >= 8 && stable >= 3) return 'fini';
-          if (stable >= 7) return 'fini';
-          if ((stable === 2 || tours === 0) && tours < 8) { tours++; try { window.scrollTo(0, Math.max(0, h - window.innerHeight - 240)); window.scrollTo(0, h); } catch (_) {} }
-          return '';
-        });
+      if (direct) { /* l'adresse est déjà ouverte : la suite attend la conversation */ } else if (!l.el && d && d.liste === true) {
+        // La page complète des notifications : lue (lecture seule) jusqu'à la ligne, en chargeant la SUITE autant qu'il faut.
+        // ⚠️ 5.440.2 (Julien, 24 nov. : « Sauté · Favori trop ancien » pour des favoris de la veille) : avant, la lecture
+        //    s'arrêtait dès que la page ne bougeait plus pendant ~1,4 s, en ne faisant défiler que la FENÊTRE — une liste qui
+        //    vit dans un conteneur, ou dont la suite met plus de temps à venir, était déclarée « lue » sans l'être. Désormais :
+        //    la fenêtre ET le bloc qui défile, le bouton « Afficher plus » s'il est seul, une attente de 4 s pour chaque
+        //    suite ; la lecture ne s'arrête que (a) ligne trouvée, (b) trois tentatives de suite sans rien de nouveau (le
+        //    BOUT), ou (c) 90 s. Le fond ne conclut JAMAIS « trop ancien » de cette lecture (voir `executerMessageFavori`) :
+        //    seule la liste de Vinted lue jusqu'à sa dernière page le prouve.
+        let compte = lignesNotif(), hauteur = 0, sansRien = 0, fin = 'temps';
+        const tFin = Date.now() + 90000;
+        const t = await (async () => {
+          for (;;) {
+            if (captcha()) return { captcha: true };
+            const x = lienFavoriVisible(lien, itemId, receiverId);
+            if (x.ambigu) return { ambigu: true };
+            if (x.el) return { el: x.el };
+            if (sansRien >= 3) { fin = 'bout'; return { absent: true }; }
+            if (Date.now() > tFin) { fin = 'temps'; return { absent: true }; }
+            // Charger la suite : bas de la fenêtre et du bloc qui défile (un cran plus haut d'abord, pour que la page le voie), puis « Afficher plus ».
+            const b = blocDefilant();
+            // ⚠️ Aucun événement fabriqué (`dispatchEvent` ⇒ isTrusted:false, une preuve d'automatisation, CLAUDE.md §3) : seules
+            //    les positions sont posées (fenêtre, bloc qui défile) ; c'est le NAVIGATEUR qui envoie son propre « scroll ».
+            //    Onglet de travail en arrière-plan : le navigateur peut ne rien envoyer (aucun rendu) ⇒ la suite ne vient pas,
+            //    le favori n'est PAS trouvé sur cette page : le fond ouvre alors son adresse native (`favoriLien`), sans défilement.
+            try { const h = document.documentElement.scrollHeight; window.scrollTo(0, Math.max(0, h - window.innerHeight - 240)); window.scrollTo(0, h); } catch (_) {}
+            if (b) { try { b.scrollTop = Math.max(0, b.scrollHeight - b.clientHeight - 240); b.scrollTop = b.scrollHeight; } catch (_) {} }
+            await nap(250);
+            const p = boutonPlus(); if (p) { try { p.click(); } catch (_) {} }
+            // La suite attendue 4 s au plus (relue toutes les 200 ms) : nouvelles lignes ou page plus haute.
+            const t0 = Date.now(); let neuf = false;
+            while (Date.now() - t0 < 4000) {
+              if (captcha()) return { captcha: true };
+              const y = lienFavoriVisible(lien, itemId, receiverId); if (y.el || y.ambigu) break;
+              const n = lignesNotif(), h2 = document.documentElement.scrollHeight + (b ? b.scrollHeight : 0);
+              if (n > compte || (hauteur && h2 > hauteur)) { neuf = true; compte = Math.max(compte, n); hauteur = h2; break; }
+              hauteur = hauteur || h2;
+              await nap(200);
+            }
+            sansRien = neuf ? 0 : sansRien + 1;
+          }
+        })();
         if (t.captcha) return vuCaptcha(); if (t.ambigu) return manque('favori-notification-ambigue');
         // 5.440 : « absent » ne se dit que sur une VRAIE liste de notifications (au moins une ligne de favori ou de notification
         //    native) ; une page qui n'en montre aucune n'est pas la liste (adresse changée, page d'erreur) ⇒ nommé, rien sauté.
         if (t.absent && !document.querySelector('a[href*="/want_it/"], a[href*="receiver_id="], a[href*="offering_id="], [data-testid*="notification" i]')) return manque('notifications-introuvables');
-        if (t.absent) return absent({ liste: true });
+        if (t.absent) return absent({ liste: true, fin, lignes: compte });
         try { t.el.scrollIntoView({ block: 'center' }); } catch (_) {}
         l = { el: t.el };
       } else if (!l.el) {
@@ -675,13 +841,15 @@
           if (c.ambigu) return manque('cloche-ambigue'); if (!c.el) return manque('cloche');
           // Un LIEN vers la page des notifications : la même liste, complète — le fond l'ouvre (`favoriListe`).
           if (c.el.tagName === 'A') { const ch = cheminNotif(c.el); if (ch) return absent({ cloche: true, voirTout: ch, lienCloche: true }); }
-          if (c.el.getAttribute('aria-expanded') !== 'true') clic(c.el);
+          if (c.el.getAttribute('aria-expanded') !== 'true') { if (H(d)) await toucher(c.el, 'cloche'); else clic(c.el); }
         }
         // La ligne attendue 8 s au plus ; dès que la liste est ouverte (« Voir tout » montré) depuis 2,5 s sans elle, c'est su.
         let ouverteDepuis = p ? Date.now() : 0;
         const t = await trouver(8000, async () => { p = panneauCloche(); if (p && !ouverteDepuis) ouverteDepuis = Date.now(); return p && Date.now() - ouverteDepuis > 2500 ? 'fini' : ''; });
         if (t.captcha) return vuCaptcha(); if (t.ambigu) return manque('favori-notification-ambigue');
-        if (t.absent) return absent({ cloche: !!p, voirTout: (p && p.voirTout) || '' });
+        // 5.440.2 : combien de lignes la cloche montre (lignes de favori ou de notification visibles) — le fond s'en sert pour
+        //    aller DIRECTEMENT à la page complète quand la ligne d'un favori est plus bas dans la liste de Vinted.
+        if (t.absent) { const vues = [...document.querySelectorAll('a[href*="/want_it"], a[href*="receiver_id="], a[href*="offering_id="], a[href*="/items/"]')].filter((x) => visible(x) && !x.closest('header, footer, [role="banner"]')).length; return absent({ cloche: !!p, voirTout: (p && p.voirTout) || '', lignes: vues }); }
         l = { el: t.el };
       }
       // 2. La ligne du favori (le lien porte l'article ET la personne) : un clic ; la page ouvre la conversation.
@@ -690,12 +858,24 @@
       //    n° que la page a lu de Vinted (`__vrmConvCore`), jamais deviné.
       let rep = null, repVue = false;
       reponseDe('POST', /(?:\/api\/v2\/conversations|\/messaging\/main\/inquiries)\/?$/, 25000, d && d.cle).then((x) => { rep = x; repVue = true; });
-      clic(l.el);
+      const _cheminAvantClic = direct ? '' : location.pathname;
+      if (!direct) { if (H(d)) await toucher(l.el, 'ligne'); else clic(l.el); }
+      // ⚠️ 24 nov. (simulation de bout en bout, vraie extension) : `conv` et `route` sont relus de l'adresse ACTUELLE à chaque
+      //    tour, jamais gardés d'un tour d'avant. Avant : à partir du 2ᵉ favori, l'onglet de travail montrait la conversation
+      //    PRÉCÉDENTE ; une fois l'adresse passée au nouvel uuid mais sa relecture pas encore reçue (`coeurDe` inconnu), `conv`
+      //    restait l'ancien n° de la conversation précédente, apparié au NOUVEL uuid — la vérification relisait une autre
+      //    conversation (autre acheteur) et le favori finissait « pas envoyé ». La conversation montrée AVANT le clic ne compte
+      //    que si la réponse de création dit qu'elle est la même (conversation déjà ouverte).
+      const avantClic = String(_cheminAvantClic || '');
       const fin = Date.now() + 25000; let conv = '', route = '';
       for (;;) {
         if (captcha()) return Object.assign(vuCaptcha(), { parti: true });
-        const m = /^\/inbox\/([1-9]\d{0,19})\/?$/.exec(location.pathname); if (m) conv = m[1];
-        const u = uuidIci(); if (u) { route = u; const c = coeurDe(u); if (c) conv = c; }
+        let ici = '', rIci = '';
+        const m = /^\/inbox\/([1-9]\d{0,19})\/?$/.exec(location.pathname); if (m) ici = m[1];
+        const u = uuidIci(); if (u) { rIci = u; ici = coeurDe(u) || ''; }
+        const rj = rep && rep.json;
+        const memeQuAvant = location.pathname === avantClic && !(rj && ((typeof rj.conversation_id === 'string' && rIci && rj.conversation_id === rIci) || (rj.conversation && ici && String(rj.conversation.id) === ici)));
+        conv = memeQuAvant ? '' : ici; route = memeQuAvant ? '' : rIci;
         if (!conv && rep && rep.json && rep.json.conversation && /^[1-9]\d{0,19}$/.test(String(rep.json.conversation.id))) conv = String(rep.json.conversation.id);
         // La conversation montrée ; la réponse de création attendue encore 3 s (une conversation déjà là n'en a pas).
         if (conv && (repVue || Date.now() > fin - 22000)) break;
@@ -708,27 +888,66 @@
       const txN = rep && rep.json && /^[1-9]\d{0,19}$/.test(String(rep.json.transaction_id || '')) ? String(rep.json.transaction_id) : '';
       // Rien vu partir (aucune requête de création, aucune conversation montrée) : la page n'a rien écrit — arrêt, rien ne part.
       // Une conversation montrée (uuid) dont l'ancien n° n'a pas été lu : ouverte, mais pas prouvée ⇒ « partie », jamais rejouée.
-      if (!conv) return rep || route ? { ok: true, rep, conv: '', route, envoye: !!rep, nonProuvee: true } : manque('conversation-pas-ouverte');
-      return { ok: true, rep, conv, route, tx: txN, envoye: !!rep, chemin: location.pathname };
+      // 5.453.2 : la fenêtre « Faire une offre » que Vinted ouvre d'elle-même en touchant le favori (attendue 2,5 s) — dite au fond,
+      //    qui fait alors l'offre D'ABORD (dans cette fenêtre), puis le message.
+      let offreOuverte = false;
+      if (conv || rep || route) { const f2 = Date.now() + 2500; while (Date.now() < f2) { if (dialogueOffre()) { offreOuverte = true; break; } await nap(200); } }
+      const plusO = offreOuverte ? { offreOuverte: true } : {};
+      if (!conv) return rep || route ? { ok: true, rep, conv: '', route, envoye: !!rep, nonProuvee: true, ...plusO } : manque('conversation-pas-ouverte');
+      return { ok: true, rep, conv, route, tx: txN, envoye: !!rep, chemin: location.pathname, ...plusO };
     },
     // La même étape sur la PAGE complète des notifications (« Voir tout ») : la cloche n'y est pas touchée.
     async favoriListe(d) { return ETAPES.favoriOuvrir(Object.assign({}, d || {}, { liste: true })); },
     // 5.440 : la même étape depuis l'accueil de Vinted (l'en-tête complet), quand la messagerie ne montre pas la cloche.
     async favoriAccueil(d) { return ETAPES.favoriOuvrir(Object.assign({}, d || {}, { liste: false })); },
+    // 5.440.2 : l'adresse native du favori ouverte par le fond ⇒ la conversation que la page ouvre elle-même.
+    async favoriLien(d) { return ETAPES.favoriOuvrir(Object.assign({}, d || {}, { direct: true })); },
     async message(d) {
       const conv = String((d && d.conv) || ''), texte = String((d && d.texte) || '');
       if (!/^[1-9]\d{0,19}$/.test(conv) || !texte.trim()) return { ok: false, code: 'etape' };
-      if (!(await attendreConv(conv, d, 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
+      const h = H(d);
+      if (!(await attendreConv(conv, d, h ? 15000 : 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
+      // 5.453.2 : la fenêtre d'offre encore ouverte par-dessus le champ (le favori l'ouvre d'elle-même) : fermée d'abord (rien
+      //    n'est envoyé) ; elle ne se ferme pas ⇒ rien ne part, c'est dit.
+      if (h) { const dlo = dialogueOffre(); if (dlo && !(await fermerDialogueOffre(dlo))) return manque('offre-fenetre-ouverte'); }
       const z = await attendreN('message-champ', () => { const x = composeur(); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (z.captcha) return vuCaptcha(); if (z.absent) return manque('message-champ'); if (z.el === 'AMBIGU') return manque('message-champ-ambigu');
       const champ = z.el;
-      { const env = ouAppris('message-envoyer', boutonEnvoyer(champ)); if (env.ambigu) return manque('message-envoyer-ambigu'); if (!env.el) return manque('message-envoyer'); }
-      const avant = occurrences(texte);
-      const okT = await saisir(champ, texte, { garderFocus: true });
-      if (!okT) return { ok: false, code: 'valeur', manque: 'message-champ' };
+      // 5.453 (`favorishumains`) : comme une personne — le champ d'abord, le texte tapé, PUIS « Envoyer » (souvent éteint tant
+      //    que le champ est vide : il n'est plus exigé AVANT la frappe). `taper` : l'étape tape et s'ARRÊTE (rien n'est envoyé) ;
+      //    le fond revoit ses gardes (Tout arrêter, pause, compte de l'onglet) puis rappelle l'étape, qui trouve le texte
+      //    déjà là et ne fait plus que toucher « Envoyer ».
+      if (!h) { const env = ouAppris('message-envoyer', boutonEnvoyer(champ)); if (env.ambigu) return manque('message-envoyer-ambigu'); if (!env.el) return manque('message-envoyer'); }
+      const memeTexte = () => valeurNette(champ) === texte.replace(/\r\n?/g, "\n").replace(/\n$/, "");
+      const deja = h && memeTexte();
+      // 5.453.2 : le texte compté HORS du champ (un champ riche est dans `innerText` : tapé, il comptait déjà « une fois »).
+      const horsChamp = () => Math.max(0, occurrences(texte) - (champ.isContentEditable && norm(champ.innerText || '').includes(norm(texte).slice(0, 80)) ? 1 : 0));
+      const avant = horsChamp();
+      if (!deja) {
+        if (h) {
+          await regarder('message');
+          const t = await taperHumain(champ, texte, Number(d && d.frappeMs) || 0);
+          if (t.captcha) return vuCaptcha();
+          if (!t.ok) return { ok: false, code: 'valeur', manque: 'message-champ' };
+        } else {
+          const okT = await saisir(champ, texte, { garderFocus: true });
+          if (!okT) return { ok: false, code: 'valeur', manque: 'message-champ' };
+        }
+      }
       if (captcha()) return vuCaptcha();
       if (!surConv(conv, d)) return { ok: false, code: 'identite', chemin: location.pathname };
-      const b2 = ouAppris('message-envoyer', boutonEnvoyer(champ)); if (!b2.el || b2.ambigu) return manque('message-envoyer');
+      if (h && d.taper === true) return memeTexte() ? { ok: true, tape: true, vu: true, chemin: location.pathname } : { ok: false, code: 'valeur', manque: 'message-champ' };
+      let b2;
+      if (h) {
+        const w = await attendreN('message-envoyer', () => { const x = ouAppris('message-envoyer', boutonEnvoyer(champ)); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 6000);
+        if (w.captcha) return vuCaptcha(); if (w.el === 'AMBIGU') return manque('message-envoyer-ambigu'); if (!w.el) return manque('message-envoyer');
+        b2 = { el: w.el };
+        if (!memeTexte()) return { ok: false, code: 'valeur', manque: 'message-champ' };
+        try { b2.el.scrollIntoView({ block: 'center' }); } catch (_) {}
+        const ms = tirerUnique('hesite', 250, 900); noterDelai('hesite:envoyer', ms); await attenteFrappe(ms);
+        if (captcha()) return vuCaptcha();
+        if (!surConv(conv, d)) return { ok: false, code: 'identite', chemin: location.pathname };
+      } else { b2 = ouAppris('message-envoyer', boutonEnvoyer(champ)); if (!b2.el || b2.ambigu) return manque('message-envoyer'); }
       ecouter();
       // 5.440 : l'ancienne messagerie (`/api/v2/conversations/{n°}/replies`) ou la nouvelle (`…/messaging/main/
       //    conversations/{uuid}/replies`, l'uuid de CETTE page, vérifié par `surConv`).
@@ -736,39 +955,58 @@
       const att = reponseDe('POST', uIci ? new RegExp(`(?:/api/v2/conversations/${conv}|/messaging/main/conversations/${uIci})/replies$`) : new RegExp(`/api/v2/conversations/${conv}/replies$`), 30000, d && d.cle);
       clic(b2.el);
       const r = repMessageNormale(await att, conv);
-      if (!r) return { ok: false, code: 'sans-reponse', parti: true };
+      // 5.453.2 : AUCUNE requête d'envoi vue, le texte TOUJOURS dans le champ et rien de plus dans le fil ⇒ la page n'a rien
+      //    envoyé : « pas parti », certain (avant : « incertain », et la file se bloquait sur « Vérifie les envois incertains »).
+      if (!r) { if (h && memeTexte() && champ.isConnected && horsChamp() <= avant) return { ok: false, code: 'valeur', manque: 'message-non-parti', chemin: location.pathname }; return { ok: false, code: 'sans-reponse', parti: true }; }
       if (r.captcha) return Object.assign(vuCaptcha(), { parti: true });
       if (!r.ok) return { ok: true, rep: r, vu: false };
-      // La preuve à l'écran : le message est apparu dans le fil (une occurrence de plus qu'avant l'envoi).
-      const v = await attendre(() => (occurrences(texte) > avant ? true : null), 12000);
-      return { ok: true, rep: r, vu: v.el === true };
+      // La preuve à l'écran : le message est apparu dans le fil (une occurrence de plus qu'avant l'envoi), relue jusqu'à 12 s.
+      const v = await attendre(() => (horsChamp() > avant ? true : null), 12000);
+      if (v.el === true) return { ok: true, rep: r, vu: true };
+      // 5.453.2 : sinon, la RÉPONSE de Vinted à CET envoi porte CE texte (le message enregistré chez Vinted) — une preuve aussi.
+      const j = r.json && typeof r.json === 'object' ? r.json : {};
+      const dit = [j.content, j.body, j.data && j.data.content, j.data && j.data.body, j.message && j.message.body, j.message && j.message.content, j.reply && j.reply.body].find((x) => typeof x === 'string');
+      return { ok: true, rep: r, vu: !!(dit && norm(dit) === norm(texte)), ...(dit && norm(dit) === norm(texte) ? { vuPar: 'reponse' } : {}) };
     },
     async offre(d) {
       const conv = String((d && d.conv) || ''), tx = String((d && d.tx) || ''), prix = Number(d && d.prix);
       if (!/^[1-9]\d{0,19}$/.test(conv) || !/^[1-9]\d{0,19}$/.test(tx) || !(prix > 0)) return { ok: false, code: 'etape' };
-      if (!(await attendreConv(conv, d, 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
-      const b = await attendreN('offre-bouton', () => { let x = parNom(RE_FAIRE_OFFRE, document, /make[-_]?offer|offer[-_]?(button|cta)/i, /accept|decline|reject|cancel/i); if (!x.el && !x.ambigu && T()) { const r = T().trouver('boutonOffre', {}); noterTrouve('boutonOffre', r); x = { el: r.el || null, ambigu: !!r.ambigu }; } return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
+      if (!(await attendreConv(conv, d, H(d) ? 15000 : 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
+      // 5.453.2 : la fenêtre d'offre DÉJÀ ouverte (le favori l'ouvre d'elle-même) : on y travaille, sans toucher « Faire une offre ».
+      const dejaOuverte = H(d) ? dialogueOffre() : null;
+      const b = dejaOuverte ? { el: null } : await attendreN('offre-bouton', () => { let x = parNom(RE_FAIRE_OFFRE, document, /make[-_]?offer|offer[-_]?(button|cta)/i, /accept|decline|reject|cancel/i); if (!x.el && !x.ambigu && T()) { const r = T().trouver('boutonOffre', {}); noterTrouve('boutonOffre', r); x = { el: r.el || null, ambigu: !!r.ambigu }; } return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (b.captcha) return vuCaptcha(); if (b.absent) return manque('offre-bouton'); if (b.el === 'AMBIGU') return manque('offre-bouton-ambigu');
       const avant = occurrencesPrix(prix);
-      clic(b.el);
-      const dl = await attendreN('offre-fenetre', () => dialogue(), 15000); if (dl.captcha) return vuCaptcha(); if (dl.absent) return manque('offre-fenetre');
+      const h = H(d);   // 5.453 : « Faire une offre » touché après une hésitation, la fenêtre regardée, le prix tapé, « Proposer » touché
+      if (!dejaOuverte) { if (h) await toucher(b.el, 'offre'); else clic(b.el); }
+      const dl = dejaOuverte ? { el: dejaOuverte } : await attendreN('offre-fenetre', () => dialogue(), 15000); if (dl.captcha) return vuCaptcha(); if (dl.absent) return manque('offre-fenetre');
+      if (h) await regarder('offre');
       const inp = await attendreN('offre-prix', () => { const x = champPrix(dl.el); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 10000);
       if (inp.captcha) return vuCaptcha(); if (inp.absent) return manque('offre-prix'); if (inp.el === 'AMBIGU') return manque('offre-prix-ambigu');
-      const okT = await saisir(inp.el, texteMontant(prix), { garderFocus: true });
+      const okT = h ? await taperHumain(inp.el, texteMontant(prix), 0).then((t) => (t.captcha ? 'captcha' : t.ok)) : await saisir(inp.el, texteMontant(prix), { garderFocus: true });
+      if (okT === 'captcha') return vuCaptcha();
       if (!okT) return { ok: false, code: 'valeur', manque: 'offre-prix' };
+      // 5.453.2 : un champ de MESSAGE dans la fenêtre d'offre (un seul, hors prix) : le message y est tapé, il part avec l'offre.
+      const tMsg = String((d && d.texteMessage) || '');
+      let champMsg = null, avantMsg = 0;
+      if (h && tMsg.trim()) { const l = [...dl.el.querySelectorAll('textarea, [contenteditable="true"]')].filter((x) => visible(x) && !x.disabled && !x.readOnly && x !== inp.el); if (l.length === 1) champMsg = l[0]; }
+      if (champMsg) { avantMsg = occurrences(tMsg); const tm = await taperHumain(champMsg, tMsg, Number(d && d.frappeMs) || 0); if (tm.captcha) return vuCaptcha(); if (!tm.ok) champMsg = null; }
       let s = ouAppris('offre-valider', parNom(RE_VALIDER_OFFRE, dl.el, /submit|confirm|send|offer/i, /cancel|close|annul/i, true));
       if (!s.el && !s.ambigu && T()) { const r = T().trouver('offreValider', {}); noterTrouve('offreValider', r); s = { el: r.el || null, ambigu: !!r.ambigu }; }
       if (s.ambigu) return manque('offre-valider-ambigu'); if (!s.el) return manque('offre-valider');
       if (captcha()) return vuCaptcha();
       ecouter();
-      const att = reponseDe('POST', new RegExp(`/api/v2/transactions/${tx}/offers$`), 30000, d && d.cle);
+      if (h) { try { s.el.scrollIntoView({ block: 'center' }); } catch (_) {} const ms = tirerUnique('hesite', 250, 900); noterDelai('hesite:proposer', ms); await attenteFrappe(ms); if (captcha()) return vuCaptcha(); }
+      const att = reponseDe('POST', dejaOuverte ? new RegExp(`(?:/api/v2/transactions/${tx}/offers|/offers)$`) : new RegExp(`/api/v2/transactions/${tx}/offers$`), 30000, d && d.cle);
       clic(s.el);
       const r = await att;
       if (!r) return { ok: false, code: 'sans-reponse', parti: true };
       if (r.captcha) return Object.assign(vuCaptcha(), { parti: true });
       if (!r.ok) return { ok: true, rep: r, vu: false };
       const v = await attendre(() => (occurrencesPrix(prix) > avant ? true : null), 12000);
-      return { ok: true, rep: r, vu: v.el === true };
+      // Le message tapé dans la fenêtre n'est « parti » que VU dans le fil ; sinon le fond le tape dans la conversation.
+      const msgVu = champMsg ? (await attendre(() => (occurrences(tMsg) > avantMsg ? true : null), 6000)).el === true : false;
+      return { ok: true, rep: r, vu: v.el === true, ...(dejaOuverte ? { fenetreFavori: true } : {}), ...(msgVu ? { messageDansOffre: true } : {}), ...(champMsg && !msgVu ? { messageIncertain: true } : {}) };
     },
     async repondreOffre(d) {
       const conv = String((d && d.conv) || ''), tx = String((d && d.tx) || ''), oid = String((d && d.oid) || ''), accepter = !!(d && d.accepter);
@@ -958,7 +1196,7 @@
       return x ? { ok: true, rep: x } : { ok: false, code: 'sans-reponse' };
     },
   };
-  globalThis.__vrmFormulaireV = 7;   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
+  globalThis.__vrmFormulaireV = 7.5;   // 5.453.2 : 7.5 (frappe par la commande d'édition, fenêtre d'offre du favori, « pas parti » certain)   // 5.453 : 7.4 (gestes d'un favori comme une personne : regarder, hésiter, taper, puis « Envoyer »)   // 5.440.2 : 7.3 (ligne du favori par ses deux identités, page complète lue jusqu'au bout)   // 5.440.1 : 7.2 (conversation ouverte relue de l'adresse à chaque tour) ; 7.1 (ligne du favori par `user_id`)   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
   globalThis.__vrmFormulaireSel = SEL;
   globalThis.__vrmFormulaire = async (etape, d) => {
     if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(location.hostname)) return { ok: false, code: 'hors-vinted' };
@@ -970,6 +1208,6 @@
     MEMOIRE = {}; try { const m = d && d.memoire && typeof d.memoire === 'object' ? d.memoire : {}; for (const k of Object.keys(m).slice(0, 20)) if (/^[a-zA-Z]{2,30}$/.test(k) && /^[a-z]{2,20}$/.test(String(m[k] || ''))) MEMOIRE[k] = String(m[k]); } catch (_) {}
     TROUVES.length = 0;
     const avecTrouves = (o) => { try { if (o && typeof o === 'object' && TROUVES.length) { o.trouves = TROUVES.slice(); o.verPage = T() ? T().versionPage() : ''; } } catch (_) {} return o; };
-    try { return avecTrouves(await f(d || {})); } catch (e) { if (e && e.vrmAConfirmer) return { ok: false, code: 'appris-a-confirmer', manque: String(e.vrmAConfirmer), chemin: location.pathname }; return { ok: false, code: 'erreur', raison: String((e && e.message) || e).slice(0, 120) }; }
+    try { return avecTrouves(await f(d || {})); } catch (e) { if (e && e.vrmCaptcha) return vuCaptcha(); if (e && e.vrmAConfirmer) return { ok: false, code: 'appris-a-confirmer', manque: String(e.vrmAConfirmer), chemin: location.pathname }; return { ok: false, code: 'erreur', raison: String((e && e.message) || e).slice(0, 120) }; }
   };
 })();

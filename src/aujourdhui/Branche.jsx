@@ -63,7 +63,7 @@ function cartesEnPlus({ valeurSel, objectif: O, live, maintenant, regles, benefi
     const couv = brut != null && Number.isFinite(Bb.n) && nV != null && nV > Bb.n ? `${Bb.n}/${nV}` : '';
     const ecart = V.valeur != null && !V.partiel && A.valeur != null && !A.partiel && A.valeur > 0 ? Math.round(((V.valeur - A.valeur) / A.valeur) * 100) : null;
     return { vendu: V.valeur == null ? null : V.valeur, partiel: !!V.partiel, raison: V.valeur == null ? raisonCourte(V) : '', ventes: N.valeur == null ? null : N.valeur, ventesPartiel: !!N.partiel,
-      brut, brutCouv: couv, ecart };
+      brut, brutCouv: couv, ecart, manque: nV != null && Number.isFinite(Bb.n) ? Math.max(0, nV - Bb.n) : null };
   };
   courbe.fenetres = { 7: fen(7), 30: fen(30), mois: fen('mois') };
   courbe.joursMois = new Date(maintenant).getDate();   // le nombre de jours du mois écoulés (la fenêtre « Mois » du graphique)
@@ -144,7 +144,7 @@ export default function AujourdhuiBranche({ calculer = null, alerte = null, vent
   const maintenant = Date.now();
   const capte = L.capte === undefined || !outils ? undefined : L.capte ? lu(() => Mo.capteDuJour(Mo.fusionner(L.capte), maintenant)) : null;
   const vrm = L.journal === undefined || !outils ? undefined : lu(() => Mo.vrmDuJour(L.journal, maintenant));
-  return <Aujourdhui {...reste} {...plus} teteDroite={reste.Icon ? <TeteDroite Icon={reste.Icon}/> : null} enDirect={<><EnDirect lieu="journee"/><LigneOrdinateur onNav={reste.onNav} Icon={reste.Icon}/></>} alerte={a} ventes={v} capte={capte} vrm={vrm} cartes={cartes}
+  return <Aujourdhui {...reste} {...plus} teteDroite={reste.Icon ? <TeteDroite Icon={reste.Icon}/> : null} enDirect={<EnDirect lieu="journee"/>} ligneOrdi={<LigneOrdinateur onNav={reste.onNav} Icon={reste.Icon}/>} alerte={a} ventes={v} capte={capte} vrm={vrm} cartes={cartes}
     onDorment={outils && outils.vue ? () => { outils.vue('dorment'); if (reste.onNav) reste.onNav('cat_annonces'); } : null}
     aRepublier={(() => { const r = outils && outils.uid ? rangeeAujourdhui(lirePriorite(outils.uid())) : null;
       return r && outils.vue ? { ...r, ouvrir: () => { outils.vue('arepublier'); try { window.dispatchEvent(new CustomEvent('vrm:vue', { detail: 'arepublier' })); } catch (_) {} if (reste.onNav) reste.onNav('cat_annonces'); } } : null; })()}

@@ -402,7 +402,12 @@ async function a7() {
   const ecran = fs.readFileSync(F.ecran, 'utf8').replace(/\/\/[^\n]*/g, '');
   const appels = ecran.match(/envoyer\(\{[^}]*\}/g) || [];
   // (20 nov., décision de Julien) L'offre aux personnes qui aiment se fait dans le PANNEAU de l'extension : l'écran n'envoie rien.
-  dit(appels.length === 0 && /<BoutonExtension className="sb-touche avc-geste" action="favoris" site="vestiaire" ids=\{\[String\(x\.produit\)\]\}/.test(ecran), 'A7 · (20 nov.) l’écran n’envoie rien : « Écrire aux favoris dans l’extension » sur CET article');
+  // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) l'offre aux personnes qui aiment part DEPUIS VRM par la porte, UNE
+  // commande pour CET article (son identifiant), au nom de SON compte ; pas connecté ⇒ le bouton du panneau sur CET article.
+  const rA = await require('./_porte-agir.cjs').regle({ code: ecran,
+    porte: /const ok = usePeutAgir\('vestiaire', x\.compte \|\| '', 'favoris', 'file'\)\.ok;[\s\S]*envoyerGeste\(\{ site: 'vestiaire', compte: x\.compte \|\| '', geste: 'favoris', distGeste: 'aimes', args: \{ produit: String\(x\.produit\)/,
+    repli: /if \(!ok\) return <BoutonExtension className="sb-touche avc-geste" action="favoris" site="vestiaire" compte=\{x\.compte \|\| '\*'\} ids=\{\[String\(x\.produit\)\]\}/ });
+  dit(appels.length === 0 && rA.ok, 'A7 · (24 nov.) l’offre aux personnes qui aiment : DEPUIS VRM par la porte sur CET article ; sinon le panneau sur CET article', rA.detail);
   const VC = fs.readFileSync(path.join(racine, 'src/ecrans/Vestiaire.jsx'), 'utf8');
   dit(/<AimesVestiaire etat=\{lignesAimes\(/.test(VC) && /id=eq\.vc_aimes&select=produits:data->produits,envoi:data->envoi/.test(VC), 'A7 · Messages Vestiaire montre « Ont aimé tes articles » (des nombres, projetés)');
   const lbc = fs.readFileSync(F.lbc, 'utf8');
