@@ -78,7 +78,7 @@
 .vrm-arr-extrait { font: 400 14px/19px var(--n-police); color: var(--n-texte, var(--n-encre)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-arr-meta { font: var(--n-t-legende); color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .vrm-arr-carte > .vrm-arr-nouveau { grid-column: 3; grid-row: 1; align-self: start; justify-self: end; margin-top: 2px; padding: 3px 7px; border-radius: 999px;
-  background: var(--n-teinte); color: var(--n-sur-teinte, var(--n-encre)); font: 800 10px/12px var(--n-police); letter-spacing: .06em; text-transform: uppercase; }
+  background: var(--n-teinte); color: var(--n-sur-teinte, var(--n-encre)); font: 700 11px/13px var(--n-police); letter-spacing: .01em; }
 .vrm-arr-carte > .vrm-arr-chevron { grid-column: 3; grid-row: 1; align-self: end; justify-self: end; margin-bottom: 4px; color: var(--n-encre-3); }
 .n-feuille .vrm-arr-autres { appearance: none; -webkit-appearance: none; display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 44px; margin: 0; padding: 0 12px;
   border: 0; border-radius: 12px; background: transparent; color: var(--n-accent); font: var(--n-t-corps-fort); cursor: pointer; -webkit-tap-highlight-color: transparent; }
