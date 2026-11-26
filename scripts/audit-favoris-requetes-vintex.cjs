@@ -9,6 +9,7 @@
 //   V2  la conversation relue porte une AUTRE personne ⇒ ni offre ni message
 //   V3  la conversation porte déjà un message écrit ⇒ ni offre ni message (« déjà contactée »)
 //   V4  la transaction porte un AUTRE article ⇒ ni offre ni message
+//   V11 un 400 quand Vinted exige de vérifier le téléphone ⇒ « telephone_a_verifier », la version du texte n'est PAS punie
 //   V5  l'offre refusée par Vinted (422) ⇒ aucun message (jamais une offre annoncée qui n'existe pas)
 //   V6  Vinted freine (429) dès la conversation ⇒ plus rien ne part, le frein est dit
 //   V7  `vintedPageFavori` refuse toute autre écriture (supprimer, prix, ancienne messagerie) : rien ne part
@@ -27,6 +28,7 @@ const MUTATIONS = {
   'sans-article-tx': ["if(!tr||artTx!==body.itemId){", "if(!tr){"],
   'offre-ignoree': ["if(!offreFaite)return o.status", "if(false)return o.status"],
   'porte-ouverte': ['function ecritureFavoriPermise(adresse) { const a = String(adresse || \'\'); return ECRITURES_FAVORI.some((re) => re.test(a)); }', 'function ecritureFavoriPermise(adresse) { return true; }'],
+  'telephone-ignore': ["if(await telephoneAVerifierVinted(acc)===true){", "if(false){"],
   'chemin-ignore': ["if((await cheminFavoris())==='vintex'){", "if(true){"],
 };
 const argMut = (() => { const a = process.argv.find((x) => x.startsWith('--mutation=')); return a ? a.slice(11) : ''; })();
@@ -61,7 +63,8 @@ function monter(o = {}) {
       if (e.methode === 'GET' && e.chemin === '/api/v2/conversations/301') return { status: 200, body: { conversation: { id: 301, opposite_user: { id: 201 }, transaction: { id: 5001, item_id: 101 } } } };
       if (e.methode === 'GET' && e.chemin === '/api/v2/transactions/5001') return { status: 200, body: { transaction: Object.assign({ id: 5001, item_id: 101, buyer_id: 201, item_title: 'Baskets banc', item: { id: 101, price: { amount: '50.0', currency_code: 'EUR' } } }, o.tx || {}) } };
       if (e.methode === 'POST' && e.chemin === '/api/v2/transactions/5001/offers') return o.offre || { status: 200, body: { code: 0 } };
-      if (e.methode === 'POST' && e.chemin === `/messaging/main/conversations/${UUID}/replies`) return { status: 201, body: { conversation_id: UUID, data: { content: 'x' } } };
+      if (e.methode === 'GET' && e.chemin === '/api/v2/authorization/check/phone_verification') return o.tel || { status: 200, body: { code: 0 } };
+      if (e.methode === 'POST' && e.chemin === `/messaging/main/conversations/${UUID}/replies`) return o.reponse || { status: 201, body: { conversation_id: UUID, data: { content: 'x' } } };
       return { status: 404, body: {} };
     } });
   const fetchFond = f.ctx.fetch;
@@ -100,6 +103,11 @@ const court = (f, r) => JSON.stringify({ r: r && (r.json || r.erreur), v: f.j.vi
     dit(res(r).resultat === 'ignore' && ecr(f).length === 1, 'V3 conversation déjà écrite ⇒ ni offre ni message', court(f, r)); }
   { const f = monter({ tx: { item_id: 102, item: { id: 102, price: { amount: '50.0', currency_code: 'EUR' } } } }); const r = await jouer(f);
     dit(res(r).resultat === 'refuse' && res(r).raison === 'identite_non_confirmee' && ecr(f).length === 1, 'V4 transaction d’un autre article ⇒ ni offre ni message', court(f, r)); }
+  { const f = monter({ reponse: { status: 400, body: { code: 106 } }, tel: { status: 400, body: { code: 106 } } }); const r = await jouer(f);
+    const refusees = JSON.stringify(Object.entries(f.store || {}).filter(([k]) => /refus/i.test(k)));
+    dit(res(r).resultat === 'refuse' && res(r).raison === 'telephone_a_verifier' && !/Bonjour/.test(refusees), 'V11 400 + téléphone à vérifier ⇒ « telephone_a_verifier », le texte n’est pas puni', court(f, r) + refusees); }
+  { const f = monter({ reponse: { status: 400, body: { code: 99 } } }); const r = await jouer(f);
+    dit(res(r).resultat === 'refuse' && res(r).raison === 'texte_refuse', 'V11b 400 avec téléphone vérifié ⇒ texte refusé (comme avant)', court(f, r)); }
   { const f = monter({ offre: { status: 422, body: { code: 99, message: 'non' } } }); const r = await jouer(f);
     dit(res(r).resultat === 'refuse' && !ecr(f).some((x) => /replies$/.test(x.chemin)), 'V5 offre refusée ⇒ aucun message', court(f, r)); }
   { const f = monter({ inquiry: { status: 429, body: {} } }); const r = await jouer(f);

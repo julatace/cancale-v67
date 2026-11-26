@@ -16671,6 +16671,18 @@ async function vintedPageFavori(acc, adresse, corps, options = {}) {
     } catch (_) { return { status: 0, ok: false, json: null, incertain: true }; }
   }, acc);
 }
+// 5.455 (4ᵉ export de l'Observateur, 26 nov. : tous les 400 de Bleam venaient de là) : quand Vinted exige de vérifier le
+//  numéro de téléphone du compte, TOUTE écriture répond 400 et la page part sur /users/verification/phone. Un 400 se relit
+//  donc par la question même de la page (`authorization/check/phone_verification` : 400 = à vérifier, 200 = fait) — jamais
+//  confondu avec un texte refusé. Lecture seule ; « pas su » (null) ne conclut rien.
+async function telephoneAVerifierVinted(acc) {
+  try {
+    const r = await vintedPage(acc, 'GET', '/api/v2/authorization/check/phone_verification', null, { timeoutMs: 12000 });
+    if (r && r.status === 400) return true;
+    if (r && r.ok) return false;
+  } catch (_) {}
+  return null;
+}
 // La conversation créée (réponse de `inquiries`) : son uuid, cherché seulement dans des champs d'identifiant plausibles.
 const RE_UUID_FAV = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function uuidConversationCree(j) {
@@ -22564,6 +22576,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     if(q.rienParti)return rep('refuse',0,'onglet_vinted');
     if(frein)return rep('refuse',q.status);
     if(q.incertain||(!q.status))return rep('incertain',0,'creation_non_confirmee');
+    if(!q.ok&&q.status===400){if(await telephoneAVerifierVinted(acc)===true){noterDiag('favori_telephone_a_verifier');return rep('refuse',q.status,'telephone_a_verifier');}}
     if(!q.ok&&[400,404,422].includes(q.status)){noterDiag('favori_vintex_conversation_refusee_'+q.status);try{Promise.resolve(echantillonRate('favori_vintex_inquiry',String(q.status),JSON.stringify(formeJson(q.json)).slice(0,600))).catch(()=>{});}catch(_){}return rep('ignore',q.status,'conversation_refusee');}
     if(!q.ok)return rep(q.status>=400&&q.status<500?'refuse':'incertain',q.status);
     const uuid=uuidConversationCree(q.json);
@@ -22629,6 +22642,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
       if(o.rienParti)return rep('refuse',0,'onglet_vinted');
       if(frein)return rep('refuse',o.status);
       if(o.incertain||!o.status)return rep('incertain',0,'offre_incertaine');
+      if(!o.ok&&o.status===400){if(await telephoneAVerifierVinted(acc)===true){noterDiag('favori_telephone_a_verifier');return rep('refuse',o.status,'telephone_a_verifier');}}
       const offreFaite=!!(o.ok&&(o.json==null||o.json.code==null||Number(o.json.code)===0));
       noterDiag(offreFaite?'favori_offre_ok':'favori_offre_refusee_'+(o.status||'reseau'));
       if(!offreFaite)return o.status>=400&&o.status<500||o.ok?rep('refuse',o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');
@@ -22659,6 +22673,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     if(frein)return rep('refuse',r.status);
     if(r.incertain||!r.status){await noterTexteRecent(uid,texteV);return rep('incertain',0,'reponse_inconnue');}
     if(r.ok){noterDiag('favori_vintex_envoye');variante=Number.isInteger(versionV.n)&&versionV.n>0?versionV.n:null;await noterVarianteDerniere(uid,'favori',variante);await noterChoixFavori(uid,body,uuid,versionV,prixOffreFait!=null);await noterTexteRecent(uid,texteV);etape('confirmation');return rep('envoye',r.status);}
+    if(r.status===400){if(await telephoneAVerifierVinted(acc)===true){noterDiag('favori_telephone_a_verifier');return rep('refuse',r.status,'telephone_a_verifier');}}
     if([400,422].includes(r.status)){await noterVersionRefusee(uid,versionV.modele||versionV.texte);noterDiag('favori_message_refuse_'+r.status);try{Promise.resolve(echantillonRate('favori_refus_forme',String(r.status),JSON.stringify(formeJson(r.json)).slice(0,600))).catch(()=>{});}catch(_){}return rep('refuse',r.status,'texte_refuse');}
     return rep(r.status>=400&&r.status<500?'refuse':'incertain',r.status);
   }
