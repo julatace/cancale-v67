@@ -58,4 +58,18 @@ export default {
   "etag.site.masquee": "hidden by Vinted",
   "etag.site.depuis": "since {date}",
   "etag.glisser": "Drag “{nom}” up or down",
+  // (16 nov., lot stock-mieux) le plan lisible
+  "etag.rangeesSur": "{n} / {total} stored",
+  "etag.modifier": "Edit",
+  "etag.gerer": "Edit or move “{nom}”",
+  "etag.monterCourt": "Move up",
+  "etag.descendreCourt": "Move down",
+  "etag.somme.rangees": "stored",
+  "etag.somme.rangee": "stored",
+  "etag.somme.sortir": "to take out",
+  "etag.somme.libres": "free slots",
+  "etag.somme.libre": "free slot",
+  "etag.zoom.loin": "Far",
+  "etag.zoom.normal": "Normal",
+  "etag.zoom.pres": "Close",
 };

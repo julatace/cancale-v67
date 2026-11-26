@@ -426,6 +426,8 @@ export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot compta-donnees) docs/passation/2026-11-16-compta-donnees.md
   { id: 'partenaires-prorata', date: '2026-11-16', titre: 'Partenaires : remboursement partiel, commission au prorata', phrase: '1 € rendu sur 16,99 € : il reste 2,82 € dus.', tab: 'settings', pour: 'proprietaire', mode: 'tous' },
   { id: 'serie-facture-vrm', date: '2026-11-16', titre: 'Factures en série : envoyer avec VRM', phrase: 'Ta boîte pas connectée ? VRM les envoie, toi en copie.', tab: 'compta', pour: 'pro', mode: 'tous' },
+  // (16 nov., lot stock-mieux) docs/passation/2026-11-16-stock-mieux.md
+  { id: 'stock-plan-lisible', date: '2026-11-16', titre: 'Stock : le N° en grand sur chaque case', phrase: 'Les cases vides se taisent ; cherche un N°, sa case s’allume.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (16 nov., lot transporteurs-suivi) docs/passation/2026-11-16-transporteurs-suivi.md
   { id: 'mondial-relay-ventes', date: '2026-11-16', titre: 'Tes colis Mondial Relay vendus sont suivis', phrase: 'Le code postal du point est lu sur ton étiquette.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., lot impression-retours) docs/passation/2026-11-16-impression-retours.md

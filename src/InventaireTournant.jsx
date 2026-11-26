@@ -30,10 +30,14 @@ export default function InventaireTournant({ unites, uid = '', lire, ecrire, onF
   };
   const numDe = (cle) => { const u = (unites || []).find((x) => x && Array.isArray(x.cles) && x.cles.includes(cle)); return u ? u.numero : cle; };
   return (
-    <section className="vrm-cf" data-inventaire-tournant={tirage.length} data-inventaire-faits={nFaits}>
-      <button type="button" className="vrm-cf-carte" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, border: 0, textAlign: 'left', cursor: 'pointer', font: 'inherit', color: 'inherit' }} onClick={() => setOuvert((x) => !x)} aria-expanded={ouvert} data-inventaire-tournant-ouvrir="">
-        <span className="vrm-cf-txt"><b>{tr('confort.tournant.titre', { n: tirage.length })}</b><small>{nFaits >= tirage.length ? tr('confort.tournant.fini') : tr('confort.tournant.fait', { n: nFaits, total: tirage.length })}{absents.length ? ` · ${tr('confort.tournant.aChercher', { n: absents.length })}` : ''}</small></span>
+    // (16 nov., lot stock-mieux) UNE carte : la tête (« 10 N° à vérifier aujourd'hui », « 3 sur 10 vus », une barre
+    // d'avancée, un chevron) ET la liste dépliée dedans — avant, la liste sortait de la carte, sous un titre « Aujourd'hui · … ».
+    <section className="vrm-cf vrm-cf-carte vrm-it" data-inventaire-tournant={tirage.length} data-inventaire-faits={nFaits} data-ouvert={ouvert ? '' : undefined}>
+      <button type="button" className="vrm-it-tete" onClick={() => setOuvert((x) => !x)} aria-expanded={ouvert} data-inventaire-tournant-ouvrir="">
+        <span className="vrm-cf-txt"><b>{tr('confort.tournant.titre', { n: tirage.length })}</b><small>{nFaits >= tirage.length ? tr('confort.tournant.fini') : tr('confort.tournant.fait', { n: nFaits, total: tirage.length })}{absents.length ? ` · ${tr('confort.tournant.aChercher', { n: absents.length })}` : ''}</small>
+          <i className="vrm-it-barre" aria-hidden="true"><i style={{ width: `${Math.round((100 * nFaits) / Math.max(1, tirage.length))}%` }} /></i></span>
         {absents.length ? <i className="vrm-cf-point" aria-hidden="true"/> : null}
+        <span className="vrm-it-chevron" aria-hidden="true">›</span>
       </button>
       {ouvert ? <div className="vrm-cf-pile" style={{ marginTop: 12 }}>
         <p className="vrm-cf-doux">{tr('confort.tournant.explique', { n: TOURNANT_PAR_JOUR })}</p>
