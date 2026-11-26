@@ -18,7 +18,7 @@
 
 import { MQ_ORDINATEUR } from './coque.js';
 
-export const DUREE_FONDU_MS = 160;
+export const DUREE_FONDU_MS = 150;   // (25 nov., passages d'onglet) ≤ 150 ms, au téléphone comme à l'ordinateur
 export const DEPART_FONDU_TEL = 0.85;
 export const COURBE_FONDU = 'cubic-bezier(.22, 1, .36, 1)';
 export const mouvementReduit = () => {
@@ -33,5 +33,5 @@ export function fonduEntree(el) {
   // fondu part de 0,85 et plus de 0 : parti de 0, la première image du nouvel écran était VIDE (mesuré, banc
   // couches-chargement : Aujourd'hui → vide → Ventes, un clignotement à chaque toucher d'onglet).
   let bureau = false; try { bureau = window.matchMedia(MQ_ORDINATEUR).matches; } catch (_) {}
-  try { return el.animate([{ opacity: bureau ? 0.9 : DEPART_FONDU_TEL }, { opacity: 1 }], { duration: bureau ? 180 : DUREE_FONDU_MS, easing: bureau ? 'ease' : COURBE_FONDU }); } catch (_) { return null; }
+  try { return el.animate([{ opacity: bureau ? 0.9 : DEPART_FONDU_TEL }, { opacity: 1 }], { duration: DUREE_FONDU_MS, easing: bureau ? 'ease' : COURBE_FONDU }); } catch (_) { return null; }
 }

@@ -13,6 +13,9 @@
 import React from 'react';
 import { cx } from './outils.js';
 
+// (24 nov., main-vert) Un `radio` dit son état par `aria-checked` : un `aria-pressed` venu des anciens appelants (attrs) est
+// INTERDIT sur ce rôle (axe aria-allowed-attr, critique) — il est retiré ici, une fois pour tous les appelants.
+const sansPresse = (a) => { if (!a) return {}; const { 'aria-pressed': _p, ...reste } = a; return reste; };
 export function Segmente({ options = [], valeur, onChange, libelle = '', className = '' }) {
   const ref = React.useRef(null);
   const i = Math.max(0, options.findIndex((o) => o.cle === valeur));
@@ -49,7 +52,7 @@ export function Segmente({ options = [], valeur, onChange, libelle = '', classNa
           aria-checked={k === i ? 'true' : 'false'}
           tabIndex={k === i ? 0 : -1}
           onClick={() => choisir(k)}
-          {...(o.attrs || {})}
+          {...sansPresse(o.attrs)}
         >
           <span className="n-segmente-libelle">{o.libelle}</span>
           {o.n ? <span className="n-segmente-n">{o.n}</span> : null}
@@ -59,4 +62,9 @@ export function Segmente({ options = [], valeur, onChange, libelle = '', classNa
   );
 }
 
+// Un choix en TUILE dans un groupe radio (`role="radiogroup"` posé par le parent) : l'aperçu en enfant, coché ou non.
+// (24 nov., style-graphite) Les tuiles de style de Paramètres → Apparence passent par lui, jamais par un <button> brut.
+export function TuileRadio({ choisi = false, onChoisir, className = '', attrs = null, children }) {
+  return <button type="button" role="radio" aria-checked={choisi} className={cx(className)} onClick={onChoisir} {...(attrs || {})}>{children}</button>;
+}
 export default Segmente;

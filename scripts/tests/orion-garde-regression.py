@@ -40,6 +40,12 @@ def mots_retire(f):
     for c in m['content_scripts']:
         if 'vrm-mots.js' in c['js']:c['js']=[x for x in c['js'] if x!='vrm-mots.js'];break
     f['manifest.json']=json.dumps(m).encode()
+def trouver_ailleurs(f):
+    # (24 nov., 5.450) un membre approuvé nommément (vrm-trouver.js) posé dans un bloc où la base commune ne le met pas
+    m=json.loads(f['manifest.json'])
+    for c in m['content_scripts']:
+        if c['js']==['compat-orion.js','bridge.js']:c['js']=['compat-orion.js','bridge.js','vrm-trouver.js'];break
+    f['manifest.json']=json.dumps(m).encode()
 assert essai().returncode==0,'La livraison actuelle doit être reconnue'
 cas={
  'fichier inattendu':lambda f:f.update({'inattendu.js':b'inattendu'}),
@@ -54,6 +60,7 @@ cas={
  'infos Vinted élargies à tous les sites':elargir_infos,
  'vrm-mots.js dans un bloc non approuvé':mots_bloc_en_plus,
  'vrm-mots.js retiré d’un bloc':mots_retire,
+ 'membre approuvé dans un bloc non commun':trouver_ailleurs,
 }
 for nom,modifier in cas.items():
     r=essai(modifier);assert r.returncode!=0,nom+' accepté à tort';print('REFUS confirmé : '+nom)

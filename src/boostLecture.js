@@ -34,3 +34,30 @@ export async function lireSeries(base, uid, ids) {
     return out;
   } catch (_) { return null; }
 }
+// (24 nov., vitesse-lectures-toucher) Les séries de PLUSIEURS comptes en UNE lecture (au plus 60 annonces en tout) :
+// `parUid` = { [uid]: [id, …] }. `id=in.(vinted_suivi_{uid},…)`, chaque série projetée (`data->items->>i{id}`, jamais la
+// ligne entière, §4.4). Rend { [uid]: { [id]: texte } } — un compte sans ligne : `{}` (rien relevé, comme `lireSeries`) —
+// ou null (pas su, pour TOUS les comptes de la lecture). Une annonce n'est lue que sur la ligne de SON compte.
+export async function lireSeriesComptes(base, parUid) {
+  const uids = Object.keys(parUid || {}).filter(ok);
+  const par = {}; let n = 0;
+  for (const uid of uids) { const l = [...new Set((parUid[uid] || []).map(String).filter((x) => /^\d{1,15}$/.test(x)))]; par[uid] = l; n += l.length; }
+  if (n > 60) return null;
+  if (!uids.length) return {};
+  if (!n) return Object.fromEntries(uids.map((u) => [u, {}]));
+  try {
+    const sel = ['id', ...uids.flatMap((u) => par[u].map((id) => `s${id}:data->items->>i${id}`))].join(',');
+    const r = await fetch(`${base.url}/rest/v1/app_data?id=in.(${uids.map((u) => 'vinted_suivi_' + u).join(',')})&select=${sel}`, { headers: base.auth() });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return null;
+    const out = {};
+    for (const uid of uids) {
+      const row = rows.find((x) => x && x.id === 'vinted_suivi_' + uid) || {};
+      const s = {};
+      for (const id of par[uid]) if (typeof row['s' + id] === 'string' && row['s' + id]) s[id] = row['s' + id];
+      out[uid] = s;
+    }
+    return out;
+  } catch (_) { return null; }
+}

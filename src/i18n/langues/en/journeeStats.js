@@ -47,7 +47,7 @@ export default {
   "v2.af.titre": "Parcels",
   "v2.af.rienEnvoyer": "nothing to send",
   "v2.af.rienRetirer": "nothing to pick up",
-  "v2.af.toutesStats": "All statistics",
+  "v2.af.toutesStats": "Statistics",
   "v2.af.toutesStatsSous": "Activity and finances, over 7, 30 or 90 days",
   "v2.perso.carte.colis": "Parcels",
   "v2.perso.phrase.colis": "To send and to pick up, at a glance",
@@ -163,5 +163,6 @@ export default {
   "ext.sante.r.refus": "Vinted refused a request in the last 24 h: avoid batches.",
   "ext.sante.r.verification_recente": "A Vinted check in the last 24 h: avoid batches.",
   "ext.sante.r.pas_vu": "An action wasn’t seen on screen: look at the work tab.",
-  "ext.sante.r.presque_plafond": "Close to the limit (80%)."
+  "ext.sante.r.presque_plafond": "Close to the limit (80%).",
+  "v2.dv.enLecture": "Sale — details still loading",
 };

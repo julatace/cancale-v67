@@ -45,6 +45,7 @@ export default {
   "emails.compteEnvoieAucun": "Un account non invia nessuna e-mail a VRM",
   "emails.codesRetraitBordereaux": "codici di ritiro, etichette e messaggi non arrivano.",
   "emails.relierBoite": "Collega la casella di {login}",
+  "emails.relierCourt": "Collega",
   "emails.enregistreAutresAppareils": "Non salvato sugli altri dispositivi — riprova tra poco.",
   "emails.chercherEMail": "Cerca un’e-mail",
   "emails.articleCodeSuivi": "Articolo, codice, n° di tracciamento…",

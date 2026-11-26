@@ -147,8 +147,8 @@ export default {
   "adist.bord.aGenerer": "label to generate",
   "adist.bord.absent": "The PDF isn’t stored yet: try again in a moment",
   "adist.bord.passu": "I couldn’t tell whether the label is already ready",
-  "adist.jour.allume": {"one": "Your computer ({nom}) is on · {n} account", "other": "Your computer ({nom}) is on · {n} accounts"},
-  "adist.jour.eteint": "Your computer ({nom}) has been off since {heure}",
+  "adist.jour.allume": {"one": "Computer on · {n} account", "other": "Computer on · {n} accounts"},
+  "adist.jour.eteint": "Computer off · {heure}",
   "adist.jour.attente": {"one": "{n} action is waiting for your computer", "other": "{n} actions are waiting for your computer"},
   "adist.jour.sous": "Your accounts remotely: messages, offers, prices, labels",
   "adist.reglages.desc": "Every account from your phone: your computer does the work, nothing goes through the cloud."

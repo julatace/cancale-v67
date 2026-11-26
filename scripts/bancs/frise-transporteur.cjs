@@ -68,8 +68,13 @@ function baseFrise() {
         .filter((x) => /\bLivr[ée]/.test(x.t) && !/non\s+livr/i.test(x.t) && !(x.n >= 3)));
       dit(!contra.length, `${th} : aucune rangée ne dit « Livré » à côté d'étapes avant « livré » (${contra.length})`, contra.slice(0, 4));
       await pg.locator(`[data-vn-route$="${tx}"]`).first().click({ timeout: 6000 }).catch(() => {});
-      const vuF = await attendre(pg, (tx) => !!document.querySelector(`[data-vn-etapes$="${tx}"]`), 15000, tx);
-      const f = await pg.evaluate((tx) => { const e = document.querySelector(`[data-vn-etapes$="${tx}"]`); const g = (k) => (e && e.querySelector(`[data-etape="${k}"]`) || { getAttribute: () => null }).getAttribute('data-fait');
+      // (24 nov., lot suivi-ventes) Un colis PARTI : la fiche porte la piste de l'envoi (`data-vn-parcours`, src/SuiviEnvoi.jsx) à la
+      // place des quatre étapes — « Livré » y est « Au point » ou « Retiré » (lus chez le transporteur), « Validé » l'argent (Vinted seul).
+      const vuF = await attendre(pg, (tx) => !!document.querySelector(`[data-vn-etapes$="${tx}"], [data-vn-parcours$="${tx}"]`), 15000, tx);
+      const f = await pg.evaluate((tx) => { const pc = document.querySelector(`[data-vn-parcours$="${tx}"]`);
+        if (pc) { const g = (k) => ((pc.querySelector(`[data-envoi-etape="${k}"]`) || { getAttribute: () => null }).getAttribute('data-envoi-etat') === 'fait' ? '1' : '0');
+          return { livre: g('aupoint') === '1' || g('retire') === '1' ? '1' : '0', valide: g('argent'), depose: g('depose') === '1' || g('enroute') === '1' ? '1' : '0', piste: 1 }; }
+        const e = document.querySelector(`[data-vn-etapes$="${tx}"]`); const g = (k) => (e && e.querySelector(`[data-etape="${k}"]`) || { getAttribute: () => null }).getAttribute('data-fait');
         return { livre: g('livre'), valide: g('valide'), depose: g('depose') }; }, tx);
       dit(vuF && f.livre === '1' && f.depose === '1' && f.valide === '0', `${th} : la fiche dit « Livré » (et donc « Déposé »), « Validé » reste à Vinted`, f);
       await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(SHOTS, `frise-natif-${th}.png`) });

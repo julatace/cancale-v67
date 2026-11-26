@@ -78,13 +78,17 @@ async function regle(src, ok) {
   ok(lot.length === 2 && lot[1] && lot[0].qui === 'N°12' && lot[0].code === 'photos' && lot[1].qui === 'Sac' && lot[1].code === 'marque', 'A12 Republier : une ligne par problème, préfixée du N° (ou du titre)', JSON.stringify(lot));
 }
 
-function app(ok) {
+async function app(ok) {
   const s = fs.readFileSync(APP, 'utf8').replace(/\/\/[^\n]*/g, '');
   const entre = (a, b) => { const i = s.indexOf(a); const j = i < 0 ? -1 : s.indexOf(b, i); return i < 0 || j < 0 ? '' : s.slice(i, j); };
   // Leboncoin : la fiche.
   const lbc = entre('const publier = async (confirme) => {', 'const basculerPhoto');
   // (20 nov., décision de Julien) la publication Leboncoin / Vestiaire se fait dans le PANNEAU de l'extension, qui vérifie l'annonce (règle src/verifAnnonce.js) avant SON dépôt : l'app n'envoie rien.
-  ok(!/cmd: 'lbcPublier'/.test(s) && /action="publier" site="leboncoin"/.test(s + fs.readFileSync(require('path').join(require('path').dirname(APP), 'ecrans', 'Leboncoin.jsx'), 'utf8')), 'B1 (20 nov.) « Publier sur Leboncoin » : dans l’extension (rien ne part d’ici)');
+  // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) « Publier sur Leboncoin » : DEPUIS VRM par la porte (une commande pour
+  // CETTE fiche, exécutée par l'extension), sinon le panneau sur CETTE fiche ; aucune requête d'ici.
+  { const P = require('path'), L = fs.readFileSync(P.join(P.dirname(APP), 'ecrans', 'Leboncoin.jsx'), 'utf8').replace(/\/\/[^\n]*/g, '');
+    const r = await require('./_porte-agir.cjs').publierLbc(L, fs.readFileSync(P.join(P.dirname(APP), 'agir', 'Agir.jsx'), 'utf8'), /onClick=\{\(\) => publierLbcDepuisVrm\(String\(id\), \{ panneau: \(\) => ouvrirPanneau\(\{ site: 'leboncoin', page: 'publier', ids: \[String\(id\)\], action: 'publier' \}\) \}\)\}/);
+    ok(!/cmd: 'lbcPublier'/.test(s) && !/cmd: 'lbcPublier'/.test(L) && r.ok, 'B1 (24 nov.) « Publier sur Leboncoin » : DEPUIS VRM par la porte sur CETTE fiche, sinon le panneau (rien n’est requêté d’ici)', r.detail); }
   ok(/achat: \(\(\) => \{ try \{ return prixAchatDe\(e, load\('vinted_buyprice_by_num'/.test(s), 'B1b le prix d’achat est celui de la fiche du N° (prixAchatDe), jamais deviné');
   // eBay : les deux chemins.
   const ebP = entre('const publier = async (opts = {}) => {', 'const lab = {');
@@ -112,7 +116,7 @@ async function audit(src, bavard) {
   let ko = 0;
   const ok = (c, m, d) => { if (!c) ko++; if (bavard) console.log(`${c ? '✅' : '❌'} ${m}${!c && d != null ? ` — ${d}` : ''}`); };
   try { await regle(src, ok); } catch (e) { ok(false, 'la règle a tourné', e.message); }
-  if (bavard) app(ok);
+  if (bavard) await app(ok);
   return ko;
 }
 

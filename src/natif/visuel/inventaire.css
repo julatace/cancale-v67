@@ -1,0 +1,148 @@
+/* ── src/natif/visuel/inventaire.css — l'inventaire Annonces (24 nov., lot visuel-annonces) ───────────────────────────────
+   La grille virtualisée (GrilleInventaire.jsx), la carte-tuile d'une annonce (AnnoncesCartes.jsx), les ronds de compte.
+   Le langage de src/natif/jeu.css : la photo en grand, l'étiquette papier du N° (jamais orange), des pastilles « verre » pour
+   les vues et favoris, un point d'état calme. Hauteurs FIXES (photo carrée + corps --n-inv-corps) : rien ne saute. */
+@layer vrm-natif {
+  /* ── La grille : la hauteur totale est réservée, seules les rangées proches de l'écran sont montées. ── */
+  .n-inv-grille { position: relative; contain: layout; min-width: 0; }
+  .n-inv-case { position: absolute; display: grid; }
+  .n-inv-case > * { min-width: 0; }
+  .n-ad-section .n-inv-grille, [data-ad-attente] .n-inv-grille { margin: 0 var(--n-marge); }
+  .n-tt-grille-ecran.n-inv-grille { padding: 0; margin: 0 var(--n-marge); display: block; }
+
+  /* ── Le squelette : la FORME exacte de la carte (photo carrée + deux lignes). ── */
+  .n-inv-os { display: grid; grid-template-rows: minmax(0, 1fr) var(--n-inv-corps); border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; }
+  .n-inv-os .n-os { display: block; background: var(--n-squelette, var(--n-carte-2)); border-radius: 0; }
+  .n-inv-os .n-inv-os-photo { width: 100%; height: 100%; }
+  .n-inv-os-l { height: 14px; margin: 12px 12px 0; border-radius: 4px !important; }
+  .n-inv-os-l[data-court] { width: 40%; margin-top: 10px; }
+
+  /* ── La carte-tuile : photo carrée + corps fixe. ── */
+  .n-ad-carte.n-inv { display: grid; grid-template-rows: minmax(0, 1fr) var(--n-inv-corps, 96px); height: 100%; box-shadow: 0 0 0 .5px var(--n-trait), 0 1px 2px rgb(29 29 31 / .06); }
+  .n-ad-carte.n-inv .n-inv-photo { aspect-ratio: auto; height: 100%; min-height: 0; }
+  .n-inv-photo > .n-tuile-paire { --n-tuile-t: 100%; position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; display: grid; }
+  .n-inv-photo .n-tuile-img { width: 100% !important; height: 100% !important; border-radius: 0; box-shadow: none; object-fit: cover; }
+  .n-inv-photo .n-tuile-vide { border-radius: 0; }
+  /* L'étiquette du N° : un peu plus grande sur une tuile d'inventaire, posée en bas à gauche, sans sortir de la carte. */
+  .n-inv-photo .n-tuile-paire > .n-etiq { left: 8px; bottom: 10px; font-size: 14px; line-height: 18px; padding: 2px 8px 2px 14px; }
+
+  /* Les ronds des comptes (en haut à droite) — teintés par identité, jamais orange. */
+  .n-inv-avatars { position: absolute; top: 8px; right: 8px; z-index: 3; display: inline-flex; flex-direction: row-reverse; }
+  .n-inv-avatars > .n-inv-avatar + .n-inv-avatar { margin-right: -6px; }
+  .n-inv-avatar { --n-av: #3D4B5B; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; flex: none; background: var(--n-av); color: #FFFFFF;
+    font: 700 12px/1 var(--n-police); box-shadow: 0 0 0 2px var(--n-carte), 0 1px 3px rgb(0 0 0 / .2); }
+  .n-inv-avatar[data-inv-teinte="1"] { --n-av: #26272B; }
+  .n-inv-avatar[data-inv-teinte="2"] { --n-av: #0D6A6B; }
+  .n-inv-avatar[data-inv-teinte="3"] { --n-av: #4C5A73; }
+  .n-inv-avatar[data-inv-teinte="4"] { --n-av: #17744A; }
+  .n-inv-avatar-plus { --n-av: var(--n-carte); color: var(--n-encre); font-size: 11px; }
+  .n-inv-avatar-petit { width: 20px; height: 20px; font-size: 10px; }
+  /* (25 nov., logo-vinted-pp) La photo de profil du compte : ronde, recadrée, un filet fin pour la détacher du fond. */
+  .n-inv-avatar[data-inv-photo] { position: relative; overflow: hidden; background: var(--n-carte-2); }
+  .n-inv-avatar[data-inv-photo]::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .14); pointer-events: none; }
+  :root[data-theme="dark"] .n-inv-avatar[data-inv-photo]::after { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .2); }
+  .n-inv-avatar-img { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+  span.n-inv-avatar-img { display: grid; place-items: center; background: var(--n-av); color: #FFFFFF; }
+
+  /* (24 nov., retouches) La BANDE claire du bas de la photo : l'étiquette du N° à gauche, vues et favoris à droite en texte
+     + icône. Elle ne pose rien SUR la chaussure (au milieu de la photo) ; verre clair le jour, gris profond la nuit. */
+  .n-inv-bande { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; height: 32px; padding: 0 8px; display: flex; align-items: center; gap: 6px;
+    background: rgb(255 255 255 / .86); box-shadow: 0 -.5px 0 rgb(29 29 31 / .08); }
+  :root[data-theme="dark"] .n-inv-bande { background: rgb(28 28 30 / .84); box-shadow: 0 -.5px 0 rgb(255 255 255 / .08); }
+  .n-inv-bande > .n-etiq { flex: none; font-size: 13px; line-height: 16px; }
+  .n-inv-espace { flex: 1 1 auto; min-width: 0; }
+  .n-inv-stats { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+  .n-inv-stat { display: inline-flex; align-items: center; gap: 3px; font: 600 12px/1 var(--n-police); font-variant-numeric: tabular-nums; color: #1D1D1F; }
+  .n-inv-stat svg { flex: none; color: #3D4B5B; }
+  :root[data-theme="dark"] .n-inv-stat { color: #F4F4F5; }
+  :root[data-theme="dark"] .n-inv-stat svg { color: #C9D2DE; }
+  .n-inv-bande > .n-inv-plaque { position: static; flex: none; }
+
+  /* L'état, calme : en haut à gauche, une pastille seulement quand ce n'est pas « en ligne ». */
+  .n-ad-carte.n-inv .n-ad-bandeau { left: 8px; right: auto; top: 8px; bottom: auto; max-width: calc(100% - 56px); padding: 3px 9px; border-radius: 11px; font: 600 12px/16px var(--n-police);
+    color: #1D1D1F; background: rgb(255 255 255 / .9); box-shadow: 0 1px 3px rgb(0 0 0 / .16); }
+  :root[data-theme="dark"] .n-ad-carte.n-inv .n-ad-bandeau { color: #F4F4F5; background: rgb(28 28 30 / .82); }
+  .n-ad-carte.n-inv .n-ad-conseil { left: 8px; right: auto; top: 8px; bottom: auto; max-width: calc(100% - 56px); padding: 3px 9px; font: 600 12px/16px var(--n-police); }
+  .n-ad-carte.n-inv .n-ad-coche { left: auto; right: 8px; }
+
+  /* Le corps : le titre (2 lignes), puis UNE ligne — logos · prix · point d'état · « ⋯ ». */
+  .n-ad-carte.n-inv .n-ad-corps { padding: 8px 10px 0 12px; gap: 0; overflow: hidden; }
+  .n-ad-carte.n-inv .n-ad-titre { font: 400 14px/19px var(--n-police); min-height: 38px; height: 38px; }
+  .n-ad-carte.n-inv[data-inv-trace] .n-ad-titre { -webkit-line-clamp: 1; min-height: 19px; height: 19px; }
+  .n-ad-carte.n-inv .n-ad-trace { font: 400 12px/16px var(--n-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-ad-carte.n-inv .n-ad-ligne { margin-top: 2px; gap: 6px; height: var(--n-cible); justify-content: flex-start; }
+  .n-ad-carte.n-inv .n-ad-ligne > .n-logo-site, .n-ad-carte.n-inv .n-ad-ligne > [data-logo] { flex: none; }
+  .n-ad-carte.n-inv .n-ad-prix { font: 700 15px/20px var(--n-police); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .n-ad-carte.n-inv .n-ad-plus { margin: 0 -8px 0 0; }
+  /* L'état en « présence » sur le rond du compte (vert : en ligne ; anneau : à confirmer ; gris : masquée, en pause). */
+  .n-inv-avatars { padding-bottom: 0; }
+  .n-inv-photo .n-inv-statut { position: absolute; top: 26px; right: 6px; z-index: 4; box-shadow: 0 0 0 2px var(--n-carte); }
+  .n-inv-statut { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--n-encre-3); }
+  .n-inv-statut[data-inv-statut="enligne"] { background: var(--n-vert); }
+  .n-inv-statut[data-inv-statut="aconfirmer"] { background: var(--n-carte); box-shadow: inset 0 0 0 2px var(--n-encre-2), 0 0 0 2px var(--n-carte); }
+
+  /* Appui : la carte s'enfonce à peine (feedback < 100 ms, 120 ms ease-out). */
+  @media (prefers-reduced-motion: no-preference) {
+    .n-ad-carte.n-inv { transition: transform 120ms cubic-bezier(.23, 1, .32, 1); }
+    .n-ad-carte.n-inv:active { transform: scale(.98); }
+  }
+  @media (prefers-reduced-motion: reduce) { .n-ad-carte.n-inv { transition: none; } .n-ad-carte.n-inv:active { transform: none; } }
+}
+@layer vrm-natif {
+  /* L'intertitre d'un compte pendant la lecture : sa hauteur exacte (44), une barre courte. */
+  .n-inv-tete-os { display: flex; align-items: center; height: var(--n-cible); }
+  .n-inv-tete-os > .n-os { display: block; width: 132px; height: 14px; border-radius: 4px; background: var(--n-squelette, var(--n-carte-2)); }
+}
+@layer vrm-natif {
+  .n-tt-nombre-os { display: inline-block; width: 84px; height: 12px; border-radius: 4px; background: var(--n-squelette, var(--n-carte-2)); }
+}
+
+/* ── (24 nov., 2e direction — Julien : « améliore le design et la praticité ») LA LISTE : rangées nettes de 72 px, virtualisées,
+   glisser pour les gestes rapides, puces de tri et de filtre au pouce. ── */
+@layer vrm-natif {
+  .n-ad-section .n-inv-grille.n-inv-liste, [data-ad-attente] .n-inv-grille.n-inv-liste { margin: 0; }
+  .n-inv-liste { background: var(--n-carte); border-block: .5px solid var(--n-trait); }
+  .n-inv-liste .n-ar { height: 100%; overflow: hidden; content-visibility: visible; contain-intrinsic-size: none; }
+  .n-ar-glisse { position: relative; z-index: 1; display: flex; align-items: stretch; width: 100%; height: 100%; background: var(--n-carte); touch-action: pan-y; will-change: transform;
+    transition: transform 220ms cubic-bezier(.23, 1, .32, 1); }
+  .n-inv-liste .n-ar-corps { height: 100%; min-height: 0; }
+  .n-inv-liste .n-ar-photo { width: 60px; height: 60px; border-radius: 10px; }
+  .n-inv-liste .n-ar-titre { font: 400 15px/19px var(--n-police); }
+  .n-inv-liste .n-ar-prix { font: 600 15px/19px var(--n-police); font-variant-numeric: tabular-nums; }
+  .n-inv-liste .n-ar-meta { gap: 6px; margin-top: 3px; }
+  .n-inv-liste .n-inv-case + .n-inv-case .n-ar::before { content: ""; position: absolute; top: 0; right: 0; z-index: 2; left: calc(var(--n-marge) + 60px + 12px); border-top: .5px solid var(--n-trait); pointer-events: none; }
+  .n-ar-etiq.n-etiq { font-size: 11px; line-height: 14px; padding: 1px 6px 1px 11px; box-shadow: inset 0 0 0 1px var(--n-jeu-papier-bord), 0 .5px 1px rgb(0 0 0 / .14); }
+  /* Ce qui ne tient pas sur la ligne passe à la ligne… cachée : un bout s'efface en entier, jamais coupé à moitié. */
+  .n-ar-stats { display: inline-flex; align-items: center; flex: 1 1 auto; flex-wrap: wrap; column-gap: 9px; row-gap: 8px; min-width: 0; height: 18px; overflow: hidden; }
+  .n-ar-stats > * { flex: none; }
+  .n-ar-stats .n-ad-stat { gap: 3px; }
+  /* Les gestes rapides, sous la rangée (révélés en la glissant vers la gauche) : 84 × 72, au pouce. */
+  .n-ar-rapides { position: absolute; top: 0; right: 0; bottom: 0; z-index: 0; display: flex; }
+  .n-ar-rapide { appearance: none; border: 0; margin: 0; padding: 0 6px; flex: 1 1 0; min-width: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    font: 600 12px/15px var(--n-police); color: #FFFFFF; background: #3D4B5B; cursor: pointer; text-align: center; }
+  .n-ar-rapide + .n-ar-rapide { background: #4C5A73; }
+  :root[data-theme="dark"] .n-ar-rapide { background: #4C5A73; } :root[data-theme="dark"] .n-ar-rapide + .n-ar-rapide { background: #3A3D44; }
+  .n-ar-rapide:focus-visible { outline: 2px solid #FFFFFF; outline-offset: -4px; }
+  /* Les puces : une rangée qui défile de côté, 44 au doigt, la pilule 32. */
+  .n-ad-puces { display: flex; gap: 8px; overflow-x: auto; padding: 0 var(--n-marge); margin: 2px 0 6px; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .n-ad-puces::-webkit-scrollbar { display: none; }
+  /* (25 nov.) Le filtre par plateforme (src/natif/FiltrePlateformes.jsx) : la même rangée ; `n-fp-nu` dans un hôte qui a déjà sa marge. */
+  .n-ad-puces.n-fp-nu { padding-left: 0; padding-right: 0; }
+  /* Le logo à l'encre (Vestiaire) sur la puce choisie (fond plein) prend la couleur du texte de la puce : visible en clair et en sombre. */
+  .n-ad-puce[aria-pressed="true"] .n-logo-site[data-site="vestiaire"] { background: currentColor; }
+  .n-ad-puce { appearance: none; border: 0; background: none; padding: 0; margin: 0; flex: none; min-height: var(--n-cible); display: inline-flex; align-items: center; cursor: pointer; color: var(--n-encre); font: inherit; touch-action: manipulation; }
+  .n-ad-puce-pilule { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 16px; background: var(--n-carte); box-shadow: inset 0 0 0 .5px var(--n-trait);
+    font: 500 14px/1 var(--n-police); white-space: nowrap; }
+  .n-ad-puce-pilule .n-inv-avatar { margin-left: -6px; box-shadow: none; }
+  .n-ad-puce-n { font-variant-numeric: tabular-nums; color: var(--n-encre-2); }
+  .n-ad-puce[aria-pressed="true"] .n-ad-puce-pilule { background: var(--n-plein); color: var(--n-sur-plein); box-shadow: none; }
+  .n-ad-puce[aria-pressed="true"] .n-ad-puce-n { color: inherit; }
+  .n-ad-puce:focus-visible { outline: none; } .n-ad-puce:focus-visible .n-ad-puce-pilule { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  /* Le squelette d'une rangée : la même géométrie (photo 60 à la marge, deux lignes). */
+  .n-ar-os { display: flex; align-items: center; gap: 12px; height: 100%; padding: 0 var(--n-marge); background: var(--n-carte); box-sizing: border-box; }
+  .n-ar-os .n-os { display: block; background: var(--n-squelette, var(--n-carte-2)); border-radius: 4px; }
+  .n-ar-os-photo { flex: none; width: 60px; height: 60px; border-radius: 10px !important; }
+  .n-ar-os-texte { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; }
+  .n-ar-os-texte > .n-os { height: 14px; width: 72%; } .n-ar-os-texte > .n-os[data-court] { width: 40%; }
+  @media (prefers-reduced-motion: reduce) { .n-ar-glisse { transition: none; } }
+}

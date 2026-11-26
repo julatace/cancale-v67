@@ -36,7 +36,26 @@ jobs:
           for audit in argent-a-venir comparer-mois frais-plateformes journal-semaine objectif-mois questions-ebay stats-offres achats-sourcing comptes-securite selection-bordereaux; do
             node "scripts/audit-$audit.cjs"
           done
+  # (24 nov., ci-rapide) dist/ construit UNE fois pour les 7 écrans (avant : `npm run build`
+  # dans chacun, ~1 min × 7). Même commande, même arbre, partagé comme dans verifier.yml.
+  construire-ecrans:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-ecrans
+          path: dist
+          retention-days: 2
   ecrans:
+    needs: construire-ecrans
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
@@ -50,7 +69,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-ecrans
+          path: dist
       - name: Installer Chromium
         run: |
           npx playwright install --with-deps chromium

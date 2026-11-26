@@ -74,8 +74,10 @@
   .n-eg-recherche > :first-child { flex: 1 1 auto; min-width: 0; }
   .n-eg-outils:not([data-eg-outils]) { display: none; }
   .n-eg-compte { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
-  .n-eg-compte-logo { display: inline-flex; flex: 0 0 auto; width: 16px; height: 16px; align-items: center; justify-content: center; }
-  .n-eg-compte-logo > * { max-width: 16px; max-height: 16px; }
+  /* (25 nov., logo-vinted-pp) Le logo du site d’un compte : le MÊME que sur Ventes (src/natif/LogoSite.jsx, 20 px, couleur de marque). */
+  .n-eg-compte-logo { display: inline-flex; flex: 0 0 auto; width: 20px; height: 20px; align-items: center; justify-content: center; }
+  .n-eg-compte-logo > * { max-width: 20px; max-height: 20px; }
+  .n-ad-compte .n-inv-avatar-petit, .n-eg-compte .n-inv-avatar-petit { width: 24px; height: 24px; font-size: 11px; }
   .n-page-contenu[data-eg-ecran] > .n-page-plein { padding-bottom: 16px; }
   .n-tt-intertitre-th { padding: 20px 12px 6px; text-align: start; font: var(--n-t-legende-fort); letter-spacing: normal; text-transform: none; color: var(--n-encre-2); background: var(--n-fond); }
   .n-tt-intertitre-n { margin-inline-start: 8px; font-weight: 400; text-transform: none; letter-spacing: normal; }
@@ -212,3 +214,9 @@
   .n-ad-plus { appearance: none; border: 0; margin: -6px 0 -6px -6px; padding: 0; background: none; flex: none; width: var(--n-cible); height: var(--n-cible); display: inline-flex; align-items: center; justify-content: center; color: var(--n-encre-2); cursor: pointer; }
   .n-ad-plus:focus-visible { outline: 2px solid var(--n-accent); outline-offset: -4px; border-radius: var(--n-r-rond); }
 }
+/* (23 nov., Julien : plus d'orange — nouvelle apparence) « N à régler » : à l'encre, un point gris ; le chevron dit que ça s'ouvre. */
+.n-ad-afaire.n-ad-aregler { color: var(--n-encre); }
+.n-ad-afaire.n-ad-aregler .n-ad-point { background: var(--n-encre-2); }
+/* (25 nov., régressions) Un état déjà dit par l'en-tête du compte (« Pas revue récemment ») : sur la rangée, un point gris discret,
+   jamais la phrase répétée (src/natif/ecrans/Annonces.jsx `etatGroupe`). Gris, jamais ambre (plus d'orange, 23 nov.). */
+.n-ar-meta .n-ad-point[data-ad-signe] { width: 6px; height: 6px; background: var(--n-encre-2); }
