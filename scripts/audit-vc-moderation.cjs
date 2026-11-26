@@ -68,8 +68,7 @@ const pilote = (() => {
   const t = fs.readFileSync(path.join(__dirname, 'audit-capture-vc-lbc.cjs'), 'utf8');
   const i = t.indexOf('function pageVc() {'), j = t.indexOf('const senderVc =');
   if (i < 0 || j < 0) throw new Error('pilote de page introuvable dans audit-capture-vc-lbc.cjs');
-  // (5.446) le pilote sert le canal privé Vestiaire (`FauxCanal`, scripts/_canal-faux.cjs).
-  return new Function('fs', 'vm', 'F', 'copie', 'attendre', 'API', 'ORIGINE', 'URL', 'Buffer', 'console', 'FauxCanal', t.slice(i, j) + '\nreturn { pageVc, relais };')(fs, vm, F, copie, attendre, API, ORIGINE, URL, Buffer, console, require('./_canal-faux.cjs').FauxCanal);
+  return new Function('fs', 'vm', 'F', 'copie', 'attendre', 'API', 'ORIGINE', 'URL', 'Buffer', 'console', t.slice(i, j) + '\nreturn { pageVc, relais };')(fs, vm, F, copie, attendre, API, ORIGINE, URL, Buffer, console);
 })();
 const senderVc = (tab) => ({ tab: { id: tab, url: ORIGINE + '/listings/' }, frameId: 0, url: ORIGINE + '/listings/' });
 // La forme MESURÉE de « Mes articles » : une enveloppe `{ type, [type]: { product: {…}, listingDate } }`.
@@ -111,7 +110,7 @@ const env = (type, id, titre) => ({ type, [type]: { product: { id, headline: tit
     dit(b0 > 0 && b1 > b0, 'E1 · le bloc <vc-moderation-regle> existe dans background.js');
     const cx = {}; vm.createContext(cx);
     vm.runInContext(bg.slice(b0, b1) + '\nthis.familleModVc = familleModVc; this.transitionModVc = transitionModVc;', cx);
-    const MOTS = ['published', 'onSale', 'waitingValidation', 'waitingPicture', 'refused', 'rejected', 'sold', 'unpublished', 'unreceived', 'draft', 'inReview', 'unpublishedSubmitted', 'zorglub', '', 'approved', 'invalid', 'toCorrect'];
+    const MOTS = ['published', 'onSale', 'waitingValidation', 'waitingPicture', 'refused', 'rejected', 'sold', 'unpublished', 'unreceived', 'draft', 'inReview', 'zorglub', '', 'approved', 'invalid', 'toCorrect'];
     const ecartsF = MOTS.filter((m) => (cx.familleModVc(m) || 'pas-dit') !== fam(m));
     const ecartsT = []; for (const a of MOTS) for (const b of MOTS) if (cx.transitionModVc(a, b) !== T(a, b)) ecartsT.push(a + '→' + b);
     dit(ecartsF.length === 0 && ecartsT.length === 0, `E1 · extension et app : mêmes familles (${MOTS.length} mots) et mêmes transitions (${MOTS.length * MOTS.length} paires)`, JSON.stringify({ ecartsF, ecartsT: ecartsT.slice(0, 5) }));

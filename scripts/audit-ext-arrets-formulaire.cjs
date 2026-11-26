@@ -98,10 +98,8 @@ const compteDevient = (f, uid) => { f.ctx.activeAccountId = async () => uid; f.c
 
   // A1 — un AUTRE compte dans l'onglet au milieu des champs.
   { const f = monterRepub({ page: (e, d, ff) => { if (e === 'champ' && d.quoi === 'description') compteDevient(ff, '222'); return undefined; } });
-    // (23 nov.) L'ordre des champs varie (5.437, `ordreChampsVariable`) : « le champ suivant » n'est pas toujours `marque` —
-    // la règle jugée : RIEN n'est saisi après la description (le champ où l'onglet change de compte).
     const r = await recreer(f); const s = noms(f);
-    dit(r && r.accepte === false && !s.includes('brouillon') && !s.includes('supprimer') && !s.includes('publier') && s[s.length - 1] === 'description' && f.v.ancienne === 'en-ligne' && f.v.brouillon === null,
+    dit(r && r.accepte === false && !s.includes('brouillon') && !s.includes('supprimer') && !s.includes('publier') && s.indexOf('marque') < 0 && f.v.ancienne === 'en-ligne' && f.v.brouillon === null,
       'A1 autre compte dans l’onglet pendant le remplissage ⇒ le champ suivant n’est pas saisi, aucun brouillon, aucune suppression', JSON.stringify({ r, s }));
     dit(r && String(r.raison || r.error || '').length > 10 && places(f) === 0, 'A1 la raison est dite, les places sont rendues', JSON.stringify({ raison: r && (r.raison || r.error), p: places(f) })); }
 

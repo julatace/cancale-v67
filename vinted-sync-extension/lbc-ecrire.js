@@ -91,51 +91,10 @@
     liste = liste.filter((el) => visible(el) && (sig.ce ? el.isContentEditable === true : true) && (!sig.mot || propre(el.textContent).slice(0, 40) === sig.mot) && !(el.closest && el.closest('#vrm-badge,[data-vrm]')));
     return { el: liste.length === 1 ? liste[0] : null, n: liste.length };
   }
-  // ══ 5.448 (`adaptatif`) — LE GESTE APPRIS QUE LEBONCOIN A CHANGÉ ════════════════════════════════════════════════
-  //  Avant : la signature exacte de SON geste ne désignait plus rien ⇒ arrêt « refais ce geste une fois à la main ».
-  //  Maintenant, dans l'ordre, chaque étape s'arrêtant au premier qui désigne UN élément :
-  //   1. la signature exacte (inchangé) — plusieurs ⇒ arrêt « ambigu », rien n'est cliqué ;
-  //   2. la signature SOUPLE (vrm-trouver.js : ce qui reste vrai de la signature, le mot du bouton exigé, un seul gagnant) ;
-  //   3. la TABLE du site (le champ du message, « Envoyer », le champ du prix : nom accessible en 5 langues, indications,
-  //      contexte — le formulaire du champ —, exclusions — en-tête, recherche, filtres —, un seul gagnant).
-  //  Ce qui a gagné (ou, rien trouvé, chaque stratégie et son compte — jamais un texte) est rendu au fond : mémoire par
-  //  version de la page et journal (`trouveJournal`). La preuve « la page a envoyé CETTE écriture » reste exigée.
-  const TT = () => { try { return globalThis.__vrmTrouver || null; } catch (_) { return null; } };
-  const TROUVES = [];
-  let MEMO = {};
-  const noterTrouve = (nom, r) => { try { if (!r) return; TROUVES.push({ nom, s: r.el ? String(r.strategie || '') : '', ambigu: !!r.ambigu, essais: (r.essais || []).map((e) => ({ s: String(e.s || ''), n: Number(e.n) || 0 })).slice(0, 8) }); while (TROUVES.length > 12) TROUVES.shift(); } catch (_) {} };
-  async function chargerMemo() {
-    MEMO = {};
-    try { const m = (await chrome.storage.local.get('vrmTrouve_lbc')).vrmTrouve_lbc; const ver = TT() ? TT().versionPage() : ''; if (m && m.el && (!m.ver || !ver || m.ver === ver)) for (const k of Object.keys(m.el).slice(0, 20)) if (m.el[k] && /^[a-z]{2,20}$/.test(String(m.el[k].s || ''))) MEMO[k] = m.el[k].s; } catch (_) {}
-  }
-  function rendreTrouves(etape) {
-    if (!TROUVES.length || !vivant()) return;
-    const trouves = TROUVES.splice(0);
-    try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'trouveJournal', etape: String(etape || '').slice(0, 20), trouves, verPage: TT() ? TT().versionPage() : '' }, () => { void chrome.runtime.lastError; }); } catch (_) {}
-  }
-  // `table` : l'élément de la table Leboncoin à essayer en dernier ; `ctx` : son contexte (le champ du message pour « Envoyer »).
-  function trouverAdapte(sig, dans, table, ctx) {
-    const r = trouver(sig, dans);
-    if (r.el || r.n > 1) return r;
-    const t = TT(); if (!t) return r;
-    const exclus = (el) => !(el.closest && el.closest('#vrm-badge,[data-vrm]'));
-    if (sig && t.souple) {
-      const s = t.souple(sig, { dans: dans || document, garder: exclus });
-      if (s.el || s.ambigu) { noterTrouve(table || 'appris', s); return { el: s.el || null, n: s.el ? 1 : 2, adapte: 'souple' }; }
-    }
-    if (table) {
-      const x = t.trouver('lbc.' + table, Object.assign({ prefere: MEMO[table] || '' }, ctx || {}));
-      noterTrouve(table, x);
-      if (x.el && dans && dans !== document && !dans.contains(x.el)) return { el: null, n: 0 };
-      return { el: x.el || null, n: x.el ? 1 : x.ambigu ? 2 : 0, adapte: x.el ? 'table' : '' };
-    }
-    return r;
-  }
-  async function trouverAttendu(sig, dans, ms, table, ctx) {
+  async function trouverAttendu(sig, dans, ms) {
     const fin = Date.now() + ms;
     let r = trouver(sig, dans);
     while (!r.el && Date.now() < fin) { await attendre(250); r = trouver(sig, dans); }
-    if (!r.el && !r.n) r = trouverAdapte(sig, dans, table, ctx);
     return r;
   }
 
@@ -353,7 +312,7 @@
       const dans = e.portee === 'ligne' ? rangee : document;
       if (e.portee === 'ligne' && (!rangee || !document.contains(rangee))) return { r: arret('rangee-perdue', { geste: k > 0, etape: k + 1 }) };
       // La PREUVE à l'écran que l'étape d'avant a pris : l'élément de celle-ci apparaît (6 s au plus).
-      const t = await trouverAttendu(e.sig, dans, k === 0 ? 1500 : 6000, e.table || '', e.ctx || null);
+      const t = await trouverAttendu(e.sig, dans, k === 0 ? 1500 : 6000);
       if (!t.el) return { r: arret(t.n ? 'etape-ambigue' : 'etape-introuvable', { geste: k > 0, etape: k + 1, element: nomDe(e.sig), derniere: k === etapes.length - 1 }) };
       if (k === etapes.length - 1) { const p = vu(); await cliquer(t.el); return { p }; }
       await cliquer(t.el);
@@ -366,9 +325,7 @@
     if (!['pause', 'supprime', 'prix', 'message', 'reprise'].includes(quoi)) return arret('invalide');   // 5.426 : + reprise (réactiver)
     if (ordreEnCours) return arret('en-cours');
     ordreEnCours = true;
-    TROUVES.length = 0;
     try {
-      await chargerMemo();
       if (!brancher()) return arret('canal');
       if (verificationVisible()) return arret('verification', { defi: true });
       // 1. Le compte privé de la PAGE, celui que le fond attend.
@@ -407,7 +364,7 @@
         if (!ID_AD.test(id) || !(nouveau >= 1) || !Number.isFinite(avantE)) return arret('invalide');
         // L'annonce : son identifiant dans l'ADRESSE de la page.
         if (!new RegExp(`(^|[^0-9])${id}([^0-9]|$)`).test(location.pathname + location.search)) return arret('pas-ouverte');
-        const c = await trouverAttendu(ui.champ, document, 8000, 'champPrix');
+        const c = await trouverAttendu(ui.champ, document, 8000);
         if (!c.el) return arret(c.n ? 'champ-ambigu' : 'champ-introuvable', { element: 'le champ du prix' });
         const champ = c.el;
         // La preuve que c'est la BONNE fiche : la page montre le prix que VRM a lu (sinon rien n'est touché).
@@ -440,7 +397,7 @@
       let co = null;
       for (let i = 0; i < 20; i++) { co = await pont().etat(); if (co && co.conv === conv) break; await attendre(500); }
       if (!co || co.conv !== conv) return arret(co && co.conv ? 'autre-conversation' : 'conversation-pas-chargee');
-      const c = trouverAdapte(ui.champ, document, 'champMessage');
+      const c = trouver(ui.champ, document);
       if (!c.el) return arret(c.n ? 'champ-ambigu' : 'champ-introuvable', { element: 'le champ du message' });
       const champ = c.el;
       if (contenu(champ)) return arret('champ-pas-vide');   // jamais mêler son brouillon au nôtre
@@ -450,12 +407,12 @@
       if (contenu(champ) !== propre(texte)) return arret('saisie-differente', { geste: true });
       let attente = null;
       const vu = () => (attente = attendreVu((g) => g.quoi === 'message' && g.conv === conv && propre(g.texte) === propre(texte), 15000));
-      const d = await derouler([ui.envoi.entree ? { entree: true } : { sig: ui.envoi.sig, portee: 'page', table: 'envoyer', ctx: { champ } }], null, vu, null);
+      const d = await derouler([ui.envoi.entree ? { entree: true } : { sig: ui.envoi.sig, portee: 'page' }], null, vu, null);
       if (d.r) return Object.assign(d.r, { geste: true });
       const g = await d.p;
       if (g && !moiOk(g)) return arret('autre-ecriture', { geste: true, envoye: true });
       return fini(g);
-    } finally { ordreEnCours = false; rendreTrouves(quoi); }
+    } finally { ordreEnCours = false; }
   }
   try {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -470,5 +427,5 @@
       sendResponse({ ok: true, canal: brancher() && !!(pont() && pont().pret()), href: String(location.href).slice(0, 300) });
     });
   } catch (_) {}
-  try { window.__vrmLbcEcrireTest = { signature, trouver, trouverAdapte, rangeesDe, executer, verificationVisible, actes }; } catch (_) {}
+  try { window.__vrmLbcEcrireTest = { signature, trouver, rangeesDe, executer, verificationVisible, actes }; } catch (_) {}
 })();

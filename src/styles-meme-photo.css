@@ -36,6 +36,3 @@
 .vrm-mph-choix .vrm-mph-raison { padding-left: 0; }
 .vrm-mph-diode { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sb-diode, #16181D); box-shadow: 0 0 0 3px color-mix(in oklab, var(--sb-diode, #16181D) 18%, transparent); }
 .vrm-mph-choix .vrm-mph-sur, .vrm-mph-choix .vrm-mph-averifier { font-size: 12px; margin: 0; }
-/* (24 nov., lot ext-anciens-lots, repris de #1219) Reconnue par la photo d'origine : rien à faire, ton neutre, lue en entier. */
-.vrm-mph-ligne.is-reconnue { margin: 0; }
-.vrm-mph-ligne.is-reconnue .vrm-mph-ligne-texte { flex: 1; min-width: 0; font-weight: 500; white-space: normal; line-height: 1.3; padding: 6px 0; color: var(--sb-encre-2, inherit); }

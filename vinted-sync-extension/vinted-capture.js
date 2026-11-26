@@ -248,7 +248,7 @@
     const e = pilule(texte, resa && resa.ok ? 'Ce numéro est réservé pour cette annonce : VRM le lui donnera après la publication.' : '');
     e.setAttribute('data-vrm-num-depot', resa && resa.ok ? String(resa.numero) : 'pas-su');
     e.style.whiteSpace = 'normal'; e.style.maxWidth = 'min(100%, 320px)'; e.style.lineHeight = '1.3';
-    if (!(resa && resa.ok)) e.style.borderColor = '#3D4B5B';
+    if (!(resa && resa.ok)) e.style.borderColor = '#B45309';
     if (b && b.parentElement) { e.style.marginLeft = '10px'; b.insertAdjacentElement('afterend', e); }
     else { e.style.position = 'fixed'; e.style.left = '16px'; e.style.bottom = '16px'; e.style.zIndex = '2147483000'; document.body.appendChild(e); }
   }

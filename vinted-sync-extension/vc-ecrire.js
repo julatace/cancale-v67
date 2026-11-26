@@ -35,13 +35,10 @@
   const attentesVu = [];          // { conv, texte, depuis, ok }
   const attentesConv = new Map(); // jeton → résoudre
   let ordreEnCours = false;
-  // 5.446 (lot ext-anciens-lots, revue moyennes 60-62) : « envoi vu » et « conversation ouverte » ne
-  // viennent plus que du CANAL PRIVÉ de vc-inject.js, par le pont de vc.js (`__vrmVcPont`, monde isolé de
-  // l'extension) — avant, `window`, qu'un script de la page pouvait forger (« envoyé » sans que rien ne parte).
-  const pont = (() => { try { const p = window.__vrmVcPont; return p && typeof p.ecouter === 'function' ? p : null; } catch (_) { return null; } })();
   try {
-    if (pont) pont.ecouter((d) => {
-      if (!d || d.__tag !== 'CANCALE_VC') return;
+    window.addEventListener('message', (event) => {
+      const d = event && event.data;
+      if (event.source !== window || !d || d.__tag !== 'CANCALE_VC') return;
       if (d.kind === 'vcenvoivu') {
         const conv = String(d.conv || ''), t = propre(d.t);
         for (const a of attentesVu.slice()) if (a.conv === conv && propre(a.texte) === t) { attentesVu.splice(attentesVu.indexOf(a), 1); a.ok(); }
@@ -58,7 +55,7 @@
     const jeton = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2, 10);
     const t = setTimeout(() => { if (attentesConv.delete(jeton)) res(null); }, 3000);
     attentesConv.set(jeton, (r) => { clearTimeout(t); res(r); });
-    if (!pont || !pont.envoyer({ __tag: 'CANCALE_VC_ORDRE', kind: 'convouverte', jeton })) { if (attentesConv.delete(jeton)) { clearTimeout(t); res(null); } }
+    window.postMessage({ __tag: 'CANCALE_VC_ORDRE', kind: 'convouverte', jeton }, location.origin);
   });
 
   // ── La signature d'un élément (jamais son texte, jamais une valeur saisie) ──
@@ -81,37 +78,6 @@
     try { liste = [...document.querySelectorAll(sel)]; } catch (_) { return { el: null, n: 0 }; }
     liste = liste.filter((el) => visible(el) && (sig.ce ? el.isContentEditable === true : true) && (!sig.mot || propre(el.textContent).slice(0, 30) === sig.mot));
     return { el: liste.length === 1 ? liste[0] : null, n: liste.length };
-  }
-
-  // ══ 5.448 (`adaptatif`) — LE CHAMP ET LE BOUTON APPRIS QUE VESTIAIRE A CHANGÉS ══════════════════════════════════
-  //  La signature exacte d'abord (inchangé ; plusieurs ⇒ arrêt). Rien ⇒ la signature SOUPLE (ce qui reste vrai, le mot du
-  //  bouton exigé, un seul gagnant), puis la TABLE Vestiaire de vrm-trouver.js (champ du message, « Envoyer » de SON
-  //  formulaire ; 5 langues, en-tête et recherche exclus, un seul gagnant). Ce qui a gagné, ou rien trouvé avec chaque
-  //  stratégie et son compte (jamais un texte), est rendu au fond (`trouveJournal`) : mémoire par version, journal.
-  const TT = () => { try { return globalThis.__vrmTrouver || null; } catch (_) { return null; } };
-  const TROUVES = [];
-  let MEMO = {};
-  const noterTrouve = (nom, r) => { try { if (!r) return; TROUVES.push({ nom, s: r.el ? String(r.strategie || '') : '', ambigu: !!r.ambigu, essais: (r.essais || []).map((e) => ({ s: String(e.s || ''), n: Number(e.n) || 0 })).slice(0, 8) }); while (TROUVES.length > 12) TROUVES.shift(); } catch (_) {} };
-  async function chargerMemo() {
-    MEMO = {};
-    try { const m = (await chrome.storage.local.get('vrmTrouve_vc')).vrmTrouve_vc; const ver = TT() ? TT().versionPage() : ''; if (m && m.el && (!m.ver || !ver || m.ver === ver)) for (const k of Object.keys(m.el).slice(0, 20)) if (m.el[k] && /^[a-z]{2,20}$/.test(String(m.el[k].s || ''))) MEMO[k] = m.el[k].s; } catch (_) {}
-  }
-  function rendreTrouves() {
-    if (!TROUVES.length || !vivant()) return;
-    const trouves = TROUVES.splice(0);
-    try { chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'trouveJournal', etape: 'message', trouves, verPage: TT() ? TT().versionPage() : '' }, () => { void chrome.runtime.lastError; }); } catch (_) {}
-  }
-  function trouverAdapte(sig, table, ctx) {
-    const r = trouver(sig);
-    if (r.el || r.n > 1) return r;
-    const t = TT(); if (!t) return r;
-    if (sig && t.souple) {
-      const s = t.souple(sig, {});
-      if (s.el || s.ambigu) { noterTrouve(table, s); return { el: s.el || null, n: s.el ? 1 : 2, adapte: 'souple' }; }
-    }
-    const x = t.trouver('vc.' + table, Object.assign({ prefere: MEMO[table] || '' }, ctx || {}));
-    noterTrouve(table, x);
-    return { el: x.el || null, n: x.el ? 1 : x.ambigu ? 2 : 0, adapte: x.el ? 'table' : '' };
   }
 
   // ── Apprendre de SON envoi fait à la main ──
@@ -181,9 +147,7 @@
     if (!/(^|\.)vestiairecollective\.com$/i.test(location.hostname)) return { ok: true, statut: 0, erreur: 'pas-vestiaire' };
     if (ordreEnCours) return { ok: true, statut: 0, erreur: 'en-cours' };
     ordreEnCours = true;
-    TROUVES.length = 0;
     try {
-      await chargerMemo();
       if (verificationVisible()) return { ok: true, statut: 0, erreur: 'verification', defi: true };
       // 1. Le BON destinataire, par identifiant : l'adresse porte la conversation ET la page l'a ouverte.
       if (!String(location.href).includes(conv)) return { ok: true, statut: 0, erreur: 'pas-ouverte' };
@@ -197,7 +161,7 @@
       let ui = null;
       try { ui = (await chrome.storage.local.get(CLE_UI))[CLE_UI] || null; } catch (_) { return { ok: true, statut: 0, erreur: 'stockage' }; }
       if (!ui || !ui.champ || !ui.envoi) return { ok: true, statut: 0, erreur: 'pas-appris' };
-      const c = trouverAdapte(ui.champ, 'champMessage');
+      const c = trouver(ui.champ);
       if (!c.el) return { ok: true, statut: 0, erreur: c.n ? 'champ-ambigu' : 'champ-introuvable' };
       const champ = c.el;
       if (contenu(champ)) return { ok: true, statut: 0, erreur: 'champ-pas-vide' };   // jamais mêler son brouillon au nôtre
@@ -217,7 +181,7 @@
       // 4. Le geste d'envoi appris.
       const vu = new Promise((ok) => attentesVu.push({ conv, texte, depuis: Date.now(), ok }));
       if (ui.envoi.mode === 'bouton') {
-        const b = trouverAdapte(ui.envoi, 'envoyer', { champ });
+        const b = trouver(ui.envoi);
         if (!b.el) return { ok: true, statut: 0, erreur: b.n ? 'bouton-ambigu' : 'bouton-introuvable', tape: true };
         b.el.click();
       } else {
@@ -229,7 +193,7 @@
       for (const a of attentesVu.slice()) if (a.conv === conv) attentesVu.splice(attentesVu.indexOf(a), 1);
       if (r) return { ok: true, statut: 200, confirme: true };
       return { ok: true, statut: 0, erreur: verificationVisible() ? 'verification' : 'pas-vu', defi: verificationVisible(), envoye: true };
-    } finally { ordreEnCours = false; rendreTrouves(); }
+    } finally { ordreEnCours = false; }
   }
   try {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -245,5 +209,5 @@
       sendResponse({ ok: true, href: String(location.href).slice(0, 300) });
     });
   } catch (_) {}
-  try { window.__vrmVcEcrireTest = { signature, trouver, trouverAdapte, ecrire, verificationVisible }; } catch (_) {}
+  try { window.__vrmVcEcrireTest = { signature, trouver, ecrire, verificationVisible }; } catch (_) {}
 })();

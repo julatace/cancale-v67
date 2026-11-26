@@ -47,9 +47,6 @@ function monterFavori({ message = 'Bonjour !', variantes, pendant = null, f: f0 
     f.ctx.fetch = async (url, o = {}) => {
       if (String(url).startsWith('https://vrm.center/api/compte')) {
         const c = JSON.parse(o.body || '{}');
-        // 5.441 : chaque envoi de la série est une AUTRE personne (le banc garde le même fil) : le registre « déjà envoyé à
-        //   cette personne pour cet article » est vidé à chaque autorisation — on juge ici la rotation, pas la règle de relance.
-        if (c.action === 'consommer' && f.store) delete f.store.vrmFavTextesEnvoyes;
         const j = c.action === 'consommer'
           ? { ok: true, uid: UID, suivi: 's', travail: { itemId: '101', recipientId: '201', initiator: 'native-fixture', message: f.__message, ...(f.__variantes ? { variantes: f.__variantes } : {}) } }
           : { ok: true, autorise: true, uid: UID };

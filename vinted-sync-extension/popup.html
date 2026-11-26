@@ -12,15 +12,15 @@
     :root { color-scheme: light dark;
       --n-fond: #F2F2F7; --n-carte: #FFFFFF; --n-carte-2: #F2F2F7; --n-trait: rgb(60 60 67 / .18);
       --n-encre: #111114; --n-encre-2: #6C6C70; --n-accent: #0F6B4C; --n-plein: #0F6B4C; --n-sur-plein: #FFFFFF;
-      --n-ambre: #3D4B5B; --n-ok: #248A3D; --n-teinte: rgb(15 107 76 / .12); }
+      --n-ambre: #8A4B00; --n-ok: #248A3D; --n-teinte: rgb(15 107 76 / .12); }
     @media (prefers-color-scheme: dark) {
       :root { --n-fond: #000000; --n-carte: #1C1C1E; --n-carte-2: #2C2C2E; --n-trait: rgb(84 84 88 / .60);
-        --n-encre: #FFFFFF; --n-encre-2: #98989F; --n-accent: #3FD49A; --n-ambre: #B9C4D0; --n-ok: #30D158; --n-teinte: rgb(63 212 154 / .20); }
+        --n-encre: #FFFFFF; --n-encre-2: #98989F; --n-accent: #3FD49A; --n-ambre: #FFB340; --n-ok: #30D158; --n-teinte: rgb(63 212 154 / .20); }
     }
     :root[data-theme="clair"] { color-scheme: light; --n-fond: #F2F2F7; --n-carte: #FFFFFF; --n-carte-2: #F2F2F7; --n-trait: rgb(60 60 67 / .18);
-      --n-encre: #111114; --n-encre-2: #6C6C70; --n-accent: #0F6B4C; --n-ambre: #3D4B5B; --n-ok: #248A3D; --n-teinte: rgb(15 107 76 / .12); }
+      --n-encre: #111114; --n-encre-2: #6C6C70; --n-accent: #0F6B4C; --n-ambre: #8A4B00; --n-ok: #248A3D; --n-teinte: rgb(15 107 76 / .12); }
     :root[data-theme="sombre"] { color-scheme: dark; --n-fond: #000000; --n-carte: #1C1C1E; --n-carte-2: #2C2C2E; --n-trait: rgb(84 84 88 / .60);
-      --n-encre: #FFFFFF; --n-encre-2: #98989F; --n-accent: #3FD49A; --n-ambre: #B9C4D0; --n-ok: #30D158; --n-teinte: rgb(63 212 154 / .20); }
+      --n-encre: #FFFFFF; --n-encre-2: #98989F; --n-accent: #3FD49A; --n-ambre: #FFB340; --n-ok: #30D158; --n-teinte: rgb(63 212 154 / .20); }
     * { box-sizing: border-box; }
     html { background: var(--n-fond); }
     body { width: 340px; margin: 0; padding: 16px 16px 20px; background: var(--n-fond); color: var(--n-encre);
@@ -50,7 +50,7 @@
       color: var(--n-accent); font-size: 15px; font-weight: 400; text-align: left; text-decoration: none; }
     .lien:active { opacity: .6; }
     .actions { display: flex; flex-wrap: wrap; gap: 0 16px; justify-content: center; margin-top: 4px; }
-    .err { margin: 10px 16px 0; color: var(--n-ambre); font-weight: 700; font-size: 13px; line-height: 18px; }
+    .err { margin: 10px 16px 0; color: var(--n-ambre); font-size: 13px; line-height: 18px; }
     .champ { display: block; width: 100%; min-height: 44px; margin: 0; padding: 0 16px; border: 0; background: transparent; color: var(--n-encre); font: inherit; font-size: 16px; outline: none; }
     .champ + .champ { border-top: .5px solid var(--n-trait); }
     #mdpForm .titre-groupe { margin: 0 16px 6px; color: var(--n-encre-2); font-size: 13px; line-height: 18px; }

@@ -149,7 +149,7 @@ async function lancer(R) {
     dit(L9 && L9.etat === 'en-pause' && !L9.publier && V9.length === 4 && V9.every((r) => ['hors-ligne', 'attente', 'refusee', 'corriger'].includes(r.etat) && !r.publier) && V9[0].etat === 'corriger', 'S9 la fiche : sa rangée « en pause » / « hors ligne », et pas « Publier » (elle y est encore)', etats(r9));
   }
   const srcApp9 = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
-  dit(/for \(const x of annoncesHorsLigneAutresSitesFiche\(numF, ex\)\)/.test(srcApp9) && /numLbc: \(ad, id\) => numeroLbcIdentite\(\{ itemId: id \}, \{ \[id\]: ad \}, (?:load\('vrm_lbc_liens', \{\}\) \|\| \{\}|liensLbcLus\(\))\),\n  numVc: \(id, it\) => numeroVcIdentite\(id, it, extra \? extra\.vcLiens : null\),\n  etatLbc/.test(srcApp9), 'S9 branché dans la fiche (sitesAutresFiche) avec les identités de la règle du prix', '');
+  dit(/for \(const x of annoncesHorsLigneAutresSitesFiche\(numF, ex\)\)/.test(srcApp9) && /numLbc: \(ad, id\) => numeroLbcIdentite\(\{ itemId: id \}, \{ \[id\]: ad \}, load\('vrm_lbc_liens', \{\}\) \|\| \{\}\),\n  numVc: \(id, it\) => numeroVcIdentite\(id, it, extra \? extra\.vcLiens : null\),\n  etatLbc/.test(srcApp9), 'S9 branché dans la fiche (sitesAutresFiche) avec les identités de la règle du prix', '');
   dit(/!\(x\.site === 'leboncoin' && pauseLbcF\.has\(String\(x\.id\)\)\)/.test(srcApp9), 'S9 une annonce Leboncoin mise en pause par VRM n’est pas aussi « en ligne » (une rangée, pas deux)');
 
   // S7 le branchement
