@@ -10,7 +10,7 @@
 //   T3. l'offre prévue (5.410.8) : toujours ; remontée au plancher (prix mini, sinon achat + 10 %), sans plancher au % réglé ;
 //   T4. filtres en segments (Tous · Pas encore contactés · Envoyés · Ignorés) avec leurs nombres, recherche, tri ;
 //   T5. « tout cocher » (les pas encore contactés seulement) ⇒ la barre basse collée « Envoyer à N favoris » (15 au plus) ;
-//   T6. la feuille de confirmation (message, versions, offre, rythme) ; RIEN ne part avant « Confirmer l'envoi », puis
+//   T6. la feuille de confirmation (5.420 : en étapes — sélection, taux, message, récapitulatif) ; RIEN ne part avant « Lancer », puis
 //       `lancer` reçoit exactement des favoris cochables, `confirme: true` ;
 //   T7. pendant l'envoi : « 3 sur 15 », « Tout arrêter », les rangées passent En attente → Envoi en cours → Message envoyé ;
 //   T8. un refus du serveur (« déjà préparés ») se dit SUR les rangées concernées, aucune feuille qui reste ouverte ;
@@ -32,6 +32,12 @@ const { pathToFileURL } = require('url');
 const BADGE = fs.readFileSync(path.join(EXT, 'vrm-badge.js'), 'utf8');
 const UI = fs.existsSync(path.join(EXT, 'vrm-ui.js')) ? fs.readFileSync(path.join(EXT, 'vrm-ui.js'), 'utf8') : '';
 const LOGO = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extension', 'logo-vrm-96.png'));
+// (26 nov.) LA POLICE DU PANNEAU, la même partout. Le panneau se dessine en « Inter VRM », Inter, puis la police du système
+// (SF Pro, Segoe UI…). Sans elle, la page prenait la police de la MACHINE du banc : Inter installée ici, DejaVu Sans (bien plus
+// large) sur la CI — les rangées « remontée au prix mini » passaient à 149 px au téléphone et le banc était rouge là-bas seulement.
+// On charge l'Inter du dépôt (src/design/polices, la police de l'app) sous le nom « Inter VRM », sans réseau (FontFace sur les
+// octets) : les hauteurs jugées sont celles de la police voulue, sur toute machine. Les seuils ne changent pas.
+const INTER = fs.readFileSync(path.join(RACINE, 'src', 'design', 'polices', 'inter-latin-wght-normal.woff2')).toString('base64');
 const SORTIE = process.env.BANC_CAPTURES ? path.join(process.env.BANC_CAPTURES, 'panneau-favoris-tableau') : path.join(__dirname, 'captures', 'panneau-favoris-tableau');
 let ko = 0, ok = 0;
 const dit = (bon, quoi, detail) => { if (bon) { ok++; console.log(`  ✅ ${quoi}`); } else { ko++; console.log(`  ❌ ${quoi}${detail ? ' — ' + String(detail).slice(0, 600) : ''}`); } };
@@ -81,6 +87,13 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
     return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;background:#fff;font-family:sans-serif"><header style="height:64px;border-bottom:1px solid #ddd;padding:20px">Une page Vinted</header><main style="padding:20px;height:2000px">Annonces…</main></body></html>' });
   });
   await pg.goto(url);
+  const police = await pg.evaluate(async (b64) => {
+    const octets = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const f = new FontFace('Inter VRM', octets.buffer, { weight: '100 900', style: 'normal' });
+    document.fonts.add(await f.load());
+    return document.fonts.check('16px "Inter VRM"');
+  }, INTER);
+  if (!police) throw new Error('la police « Inter VRM » du banc n’est pas chargée');
   await pg.evaluate(({ e, js, ui, ap, L }) => {
     window.__envoyes = []; window.__ouverts = []; const ouvrirVrai = window.open; window.open = (u) => { window.__ouverts.push(String(u)); return null; };
     const copie = (x) => JSON.parse(JSON.stringify(x));
@@ -156,7 +169,10 @@ const lireF = (pg) => pg.evaluate(() => {
     etats: Object.fromEntries(rangs.map((li) => [li.getAttribute('data-fav-qui'), li.getAttribute('data-fav-etat6') + '|' + ((li.querySelector('.et6') || {}).textContent || '') + '|' + ((li.querySelector('.rs6') || {}).textContent || '')])),
     offres: Object.fromEntries(rangs.map((li) => { const o = li.querySelector('[data-fav-offre6]'); return [li.getAttribute('data-fav-qui'), o ? o.getAttribute('data-fav-offre6') + ':' + (o.getAttribute('data-offre') || '') : '']; })),
     cases: rangs.map((li) => !!li.querySelector('input[data-fav-coche]')), coches: rangs.filter((li) => li.hasAttribute('data-coche')).map((li) => li.getAttribute('data-fav-qui')),
-    hauteurs: rangs.filter(vis).map((li) => Math.round(li.getBoundingClientRect().height)),
+    hauteurs: rangs.filter(vis).filter((li) => !li.querySelector('[data-fav6-trancher-ligne]')).map((li) => Math.round(li.getBoundingClientRect().height)),
+    // 5.453.2 (Julien, 26 nov.) : un envoi « À vérifier » se tranche SUR sa ligne (« C'est parti » · « Pas parti ») — la rangée
+    // porte une ligne de boutons de plus ; jugée à part : ses deux boutons, et une seule ligne de boutons en plus (≤ +48 px).
+    tranche: rangs.filter(vis).filter((li) => li.querySelector('[data-fav6-trancher-ligne]')).map((li) => ({ id: li.getAttribute('data-fav-qui'), h: Math.round(li.getBoundingClientRect().height), b: Array.from(li.querySelectorAll('[data-fav6-trancher]')).map((b) => b.getAttribute('data-fav6-trancher')).join(',') })),
     plaques: r.querySelectorAll('.fav6-table .plaque').length, vignettes: r.querySelectorAll('.fav6-table .vig').length,
     segs: Array.from(r.querySelectorAll('[data-fav6-filtre]')).map((b) => b.getAttribute('data-fav6-filtre') + ':' + b.querySelector('b').textContent + (b.getAttribute('aria-pressed') === 'true' ? '*' : '')),
     tri: q('.fav6-table') ? q('.fav6-table').getAttribute('data-tri') : null,
@@ -175,6 +191,21 @@ const lireF = (pg) => pg.evaluate(() => {
   };
 });
 const clic = async (pg, sel) => { await pg.evaluate((s) => { const b = document.getElementById('vrm-badge').shadowRoot.querySelector(s); if (b) b.click(); }, sel); await pg.waitForTimeout(220); };
+// (26 nov.) 5.420 (`favorisetapes`, CLAUDE.md §8) : la feuille « confirmer » du grand panneau est un parcours en 4 étapes
+// (1 la sélection · 2 la réduction · 3 le message · 4 le récapitulatif et « Lancer ») ; RIEN ne part avant « Lancer ». On
+// relève, à chaque étape, ce qu'elle montre et ce qui est parti, sans jamais toucher « Lancer » en chemin.
+const etapes = async (pg) => {
+  const lire = () => pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot, f = r.querySelector('.fav6-feuille[data-fav6-feuille="confirmer"]'), q = (s) => (f ? f.querySelector(s) : null);
+    const sec = q('[data-fav-etape]');
+    return { k: sec ? Number(sec.getAttribute('data-fav-etape')) : null, taux: q('[data-fav-env-taux]') ? q('[data-fav-env-taux]').getAttribute('data-fav-env-taux') : (q('[data-fav-r="taux"]') ? q('[data-fav-r="taux"]').getAttribute('data-taux') : null),
+      msg: q('[data-fav-message]') ? q('[data-fav-message]').textContent : '', rythme: q('[data-fav-rythme]') ? q('[data-fav-rythme]').getAttribute('data-fav-rythme') : null,
+      lancer: q('[data-fav-lancer]') ? !q('[data-fav-lancer]').disabled : null, suivant: q('[data-fav-etape-suivant]') ? !q('[data-fav-etape-suivant]').disabled : null,
+      partis: window.__envoyes.filter((m) => m.action === 'favorisCarte' && m.quoi === 'lancer').length }; });
+  const vu = [];
+  let e = await lire(); vu.push(e);
+  for (let i = 0; i < 4 && e.k != null && e.k < 4 && e.suivant; i++) { await clic(pg, '.fav6-feuille [data-fav-etape-suivant]'); await pg.waitForTimeout(500); e = await lire(); vu.push(e); }
+  return { vu, fin: e, taux: (vu.find((x) => x.k === 2) || {}).taux, msg: (vu.find((x) => x.k === 3) || {}).msg || '', partis: Math.max(...vu.map((x) => x.partis)) };
+};
 const montrer = async (pg, mobile) => {
   const b = await pg.evaluate(() => { const x = document.getElementById('vrm-badge').shadowRoot.querySelector('.btn').getBoundingClientRect(); return { x: x.left + x.width / 2, y: x.top + x.height / 2 }; });
   if (mobile) await pg.touchscreen.tap(b.x, b.y); else { await pg.mouse.move(5, 5); await pg.mouse.move(b.x, b.y); await pg.mouse.click(b.x, b.y); }
@@ -202,7 +233,8 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
       if (!o.mobile) dit(a.entetes.join('|') === 'Article|Prix|Acheteur|Favori le|État', `${T} : colonnes Article · Prix · Acheteur · Favori le · État, triables`, a.entetes.join('|'));
       dit(a.ids.length === FAV2.length && a.dates.every((d, i) => i === 0 || a.dates[i - 1] >= d), `${T} : ${FAV2.length} rangées, du plus récent au plus ancien`, JSON.stringify(a.ids));
       dit(a.vignettes === FAV2.length && a.plaques === FAV2.filter((x) => x.num).length, `${T} : chaque rangée a sa photo, la plaque N° quand il y en a un`, `${a.vignettes} ${a.plaques}`);
-      dit(a.hauteurs.length > 0 && a.hauteurs.every((h) => h >= 56 && h <= (o.mobile ? 140 : 76)), `${T} : rangées de 56 à ${o.mobile ? 140 : 72} px`, a.hauteurs.slice(0, 8).join(','));
+      dit(a.hauteurs.length > 0 && a.hauteurs.every((h) => h >= 56 && h <= (o.mobile ? 140 : 76)), `${T} : rangées de 56 à ${o.mobile ? 140 : 72} px`, a.hauteurs.join(','));
+      dit(a.tranche.length === 1 && a.tranche[0].id === 'f12' && a.tranche[0].b === 'parti,pas' && a.tranche[0].h >= 56 && a.tranche[0].h <= (o.mobile ? 140 : 76) + 48, `${T} : 5.453.2 : la rangée « À vérifier » (et elle seule) porte « C'est parti » · « Pas parti », une ligne de boutons de plus au plus`, JSON.stringify(a.tranche));
       const E = (id) => a.etats[id] || '';
       dit(/^nouveau\|Pas encore contacté/.test(E('f0')) && /^offre\|Offre faite/.test(E('f4')) && /^envoye\|Message envoyé/.test(E('f7')) && /^ignore\|Ignoré\|acheteur pas encore confirmé/.test(E('f9')) && /^verifier\|À vérifier/.test(E('f12')) && /^ignore\|Ignoré\|écarté par tes filtres/.test(E('f15')),
         `${T} : l’état en étiquette (pas encore contacté, offre faite, message envoyé, à vérifier, ignoré + raison)`, JSON.stringify([E('f0'), E('f4'), E('f7'), E('f9'), E('f12'), E('f15')]));
@@ -228,10 +260,11 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
       dit(a.coches.length === COCHABLES.length && a.coches.every((id) => COCHABLES.includes(id)), `${T} : « tout cocher » coche les ${COCHABLES.length} pas encore contactés, aucun autre`, a.coches.join(','));
       dit(!!a.bas && a.bas.vis && a.bas.colle === 'sticky' && a.bas.bouton === 'Envoyer à 15 favoris' && !a.bas.off && a.bas.bas <= a.bas.corps + 1, `${T} : barre basse collée « Envoyer à 15 favoris » (15 au plus par envoi), visible`, JSON.stringify(a.bas));
       await cap(t.pg, N('2-selection'));
-      // T6 : confirmation
-      await clic(t.pg, '[data-fav-envoyer]'); a = await lireF(t.pg);
-      dit(a.feuille && a.feuille.k === 'confirmer' && a.feuille.vis && a.feuille.lancer && /acheteur_/.test(a.feuille.msg) && a.feuille.taux === '10' && a.feuille.rythme === 'normal', `${T} : la feuille de confirmation (5.419) : message pré-rempli, taux réglé (10 %), rythme au hasard, « Confirmer l’envoi »`, JSON.stringify(a.feuille));
-      dit(a.envoyes.length === 0, `${T} : rien n’est parti avant « Confirmer l’envoi »`, JSON.stringify(a.envoyes));
+      // T6 : confirmation — le parcours en étapes (5.420) : 1 → 2 (le taux réglé) → 3 (le message pré-rempli) → 4 (« Lancer »)
+      await clic(t.pg, '[data-fav-envoyer]');
+      const P = await etapes(t.pg); a = await lireF(t.pg);
+      dit(a.feuille && a.feuille.k === 'confirmer' && a.feuille.vis && P.vu[0].k === 1 && P.fin.k === 4 && P.fin.lancer === true && /acheteur_/.test(P.msg) && P.taux === '10' && P.fin.rythme === 'normal', `${T} : la feuille de confirmation (5.419) : message pré-rempli, taux réglé (10 %), rythme au hasard, « Confirmer l’envoi »`, JSON.stringify(P.vu));
+      dit(a.envoyes.length === 0 && P.partis === 0, `${T} : rien n’est parti avant « Confirmer l’envoi »`, JSON.stringify(a.envoyes));
       dit(!a.petits.length, `${T} : feuille : cibles ≥ 44 px`, JSON.stringify(a.petits.slice(0, 6)));
       await cap(t.pg, N('3-confirmer'));
       await clic(t.pg, '.fav6-feuille [data-fav-rythme-b="prudent"]');
@@ -264,7 +297,7 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
       await clic(t2.pg, '.fav6-table li[data-fav-qui="f1"] .art6');
       let a = await lireF(t2.pg);
       dit(a.coches.join(',') === 'f0,f1' && a.bas && a.bas.n === '2', `${T} : cocher la case, puis toucher la rangée entière : 2 cochés`, JSON.stringify({ c: a.coches, b: a.bas }));
-      await clic(t2.pg, '[data-fav-envoyer]'); await clic(t2.pg, '.fav6-feuille [data-fav-lancer]'); await t2.pg.waitForTimeout(300); a = await lireF(t2.pg);
+      await clic(t2.pg, '[data-fav-envoyer]'); await etapes(t2.pg); await clic(t2.pg, '.fav6-feuille [data-fav-lancer]'); await t2.pg.waitForTimeout(300); a = await lireF(t2.pg);
       dit(!a.feuille && /^refus\|Pas parti\|Ces destinataires ont déjà été préparés/.test(a.etats.f0) && /^refus\|/.test(a.etats.f1) && /^nouveau\|/.test(a.etats.f5) && /déjà été préparés/.test(a.erreur), `${T} : refus du serveur ⇒ dit SUR les deux rangées (et en haut), la feuille fermée, les autres intactes`, JSON.stringify({ f0: a.etats.f0, f5: a.etats.f5, e: a.erreur, fe: a.feuille }));
       await cap(t2.pg, N('5-refus'));
       await clic(t2.pg, '[data-fav6-reglages]'); a = await lireF(t2.pg);
@@ -297,7 +330,7 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
       a = await lireF(t.pg);
       dit(a.bas && a.bas.n === '2' && a.cochesVues === 2 && /Annuler l’ancienne file et envoyer à 2/.test(a.bas.bouton), `${T} : 2 cases cochées ⇒ « 2 cochés » et « Annuler l’ancienne file et envoyer à 2 »`, JSON.stringify({ b: a.bas, c: a.cochesVues }));
       await cap(t.pg, N('2-remplacer'));
-      await clic(t.pg, '[data-fav-envoyer]'); await clic(t.pg, '.fav6-feuille [data-fav-lancer]'); await t.pg.waitForTimeout(300); a = await lireF(t.pg);
+      await clic(t.pg, '[data-fav-envoyer]'); await etapes(t.pg); await clic(t.pg, '.fav6-feuille [data-fav-lancer]'); await t.pg.waitForTimeout(300); a = await lireF(t.pg);
       const L = a.envoyes[0] || {};
       dit(a.envoyes.length === 1 && L.remplacer === true && L.confirme === true && L.selection.slice().sort().join(',') === 'n0,n31', `${T} : « Confirmer l’envoi » ⇒ \`lancer\` des 2 favoris avec \`remplacer\` (l’ancienne file annulée d’abord)`, JSON.stringify(L).slice(0, 240));
     });

@@ -9,7 +9,9 @@ export default {
   "memePhoto.relier": "Vincular a N.º {numero}",
   "memePhoto.pasLaMeme": "No es el mismo",
   "memePhoto.deuxPaires": {"one": "Esta foto está en {n} par: ¿cuál?", "other": "Esta foto está en {n} pares: ¿cuál?"},
+  "memePhoto.deuxPaires.art": {"one": "Esta foto está en {n} artículo: ¿cuál?", "other": "Esta foto está en {n} artículos: ¿cuál?"},
   "memePhoto.numeroDouble": "El N.º {numero} lo llevan dos pares: mira la caja antes de vincular.",
+  "memePhoto.numeroDouble.art": "El N.º {numero} lo llevan dos artículos: mira dónde están guardados antes de vincular.",
   "memePhoto.sansNumero": "Sin N.º",
   "memePhoto.cestLui": "Es el N.º {numero}",
   "memePhoto.aucune": "Ninguno de estos",
@@ -27,6 +29,7 @@ export default {
   "memePhoto.pasPret": "Tus datos aún no se han cargado: inténtalo en un momento",
   "memePhoto.outil": "Misma foto · por vincular",
   "memePhoto.outilDesc": "Un anuncio en otro sitio con la foto de un par de Vinted",
+  "memePhoto.outilDesc.art": "Un anuncio en otro sitio con la foto de un artículo de Vinted",
   "memePhoto.surSites": "Misma foto en {sites} · por vincular",
   "memePhoto.sur": "Misma foto · seguro",
   "memePhoto.aVerifier": "Por comprobar",
@@ -56,5 +59,6 @@ export default {
   "ug.original": "Originales restaurados.",
   "ug.alt": "Mejorada",
   "ug.pourquoi": "¿Por qué?",
-  "ug.pourquoi.texte": "Todo ocurre en este navegador, gratis: no se envía nada, sin IA. El mismo ajuste se aplica a cada foto del par; el original queda al lado. El fondo solo se blanquea si es uniforme, y no es un recorte."
+  "ug.pourquoi.texte": "Todo ocurre en este navegador, gratis: no se envía nada, sin IA. El mismo ajuste se aplica a cada foto del par; el original queda al lado. El fondo solo se blanquea si es uniforme, y no es un recorte.",
+  "ug.pourquoi.texte.art": "Todo ocurre en este navegador, gratis: no se envía nada, sin IA. El mismo ajuste se aplica a cada foto del artículo; el original queda al lado. El fondo solo se blanquea si es uniforme, y no es un recorte.",
 };

@@ -2,6 +2,7 @@
 export default {
   "ergonomie.republierNum": "Republier N°{n} à la main",
   "ergonomie.republierNumSous": "Le kit de cette paire : photos, texte, N° — c’est toi qui publies",
+  "ergonomie.republierNumSous.art": "Le kit de cet article : photos, texte, N° — c’est toi qui publies",
   "ergonomie.partoutNum": "Publier N°{n} partout",
   "ergonomie.partoutNumSous": "Leboncoin, eBay, Vestiaire — rien ne part avant « Publier »",
   "ergonomie.republierAucune": "N°{n} n’est en ligne sur aucun compte Vinted lu : rien à republier.",

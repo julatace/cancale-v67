@@ -73,6 +73,7 @@ export default {
   "agir.offre.refuser": "Rechazar",
   "agir.offre.contre": "Proponer {prix}",
   "agir.offre.confirmer": "Aceptar vende el par. ¿Confirmas?",
+  "agir.offre.confirmer.art": "Aceptar vende el artículo. ¿Confirmas?",
   "agir.offre.confirmerOui": "Sí, aceptar",
   "agir.republier": "Volver a publicar",
   "agir.republier.confirmer": "Volver a publicar borra el anuncio anterior. ¿Confirmas?",

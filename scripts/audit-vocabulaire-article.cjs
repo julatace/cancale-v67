@@ -19,7 +19,13 @@
 //      (scripts/_fond-vm.cjs) range « article » pour un vendeur « autre », « paire » pour
 //      le propriétaire en automatique (lu chez vrm.center), les textes d'avant sans rien ;
 //   S  relevé STATIQUE (@babel/parser) de src/, api/ et de l'extension : tout texte qui
-//      dit « paire(s) » est dans la liste FERMÉE ci-dessous, avec sa raison ;
+//      dit « paire(s) » est dans la liste FERMÉE ci-dessous, avec sa raison, OU est la
+//      forme Sneakers d'une clé À DEUX FORMES (26 nov.) : sa sœur `cle.art` (traductions,
+//      choisie par t() hors Sneakers), `cle_art` (textes de l'extension, choisie par T()),
+//      `champArt` (« Quoi de neuf ») existe et ne dit pas « paire » ; ou elle est dans
+//      une nouveauté `pour: 'sneakers'` (montrée aux seuls vendeurs Sneakers) ;
+//   E4 t() EXÉCUTÉ : hors Sneakers, chaque clé à deux formes rend sa forme « article »
+//      (sans « paire »), en Sneakers le texte d'avant ; « Quoi de neuf » de même ;
 //   B  le branchement : la source posée par l'app, l'aide du « ? », Ma semaine, l'offre
 //      par e-mail, les erreurs eBay, le manifeste (vrm-mots.js avant chaque page).
 //  `--prouve` : chaque mutation doit rendre l'audit ROUGE. `--recopie` : refabrique la copie.
@@ -83,11 +89,48 @@ const PERMIS = [
   ['src/rechercheUnique.js', /^Paires$/, 'GROUPES_LOUPE : l’étiquette « Paires » est remplacée par `motsVendeur().Noms` dans la recherche (App.jsx, B9)'],
   ['api/_lib/agent-ebay-rappel.js', /^aucune paire proposée$/, 'raison de diagnostic du cron (réponse JSON), jamais montrée au vendeur'],
   ['api/_lib/veille-plantages.js', /^Fiche d’une paire$/, 'alerte TECHNIQUE envoyée au seul propriétaire de l’installation (VRM_OWNER_UID)'],
+  ['src/reponsesRapides.js', /^vraie paire$/, 'MOT-CLÉ cherché dans le message d’un ACHETEUR (réponses rapides, « est-ce une vraie paire ? ») : jamais affiché'],
+  ['vinted-sync-extension/background.js', /^vraie paire$/, 'la même liste de mots-clés des réponses rapides (message d’un ACHETEUR), jamais affichée'],
+  ['src/accueil/tempsGagne.js', /^À la main : enregistrer les photos.*Avec VRM : cocher la paire et lancer/, '`GESTES_JOURNAL[].pourquoi` : la JUSTIFICATION écrite d’une durée de référence (§2.3), jamais affichée (`secondesGeste` ne lit que sans/avec)'],
+  ['src/recherchePhrase.js', /^le la les l de du des .* paire paires /, 'mots VIDES de la recherche en phrase (retirés de ce qu’il tape), jamais affichés'],
 ];
 // Une ligne gardée par « sneakers » (même ligne) : le texte de Sneakers, l'autre branche dit article.
-const GARDE = /seul: 'sneakers'|(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)|\b(?:sn|snEx) \?|vend !== 'sneakers'/;
+const GARDE = /seul: 'sneakers'|(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)|\b(?:sn|snEx) \?|vend !== 'sneakers'|\.nom ?=== ?'paire' \?/;
 const MOT = /\b[Pp]aires?\b/;
 
+// (26 nov.) LES CLÉS À DEUX FORMES : le nom de la propriété qui porte le texte (en sautant les
+// langues et les formes du pluriel) et la sœur qui porte la forme « article ».
+const FORMES = new Set(['fr', 'en', 'es', 'it', 'de', 'one', 'other', 'zero', 'two', 'few', 'many']);
+const nomCle = (k) => (k && (k.type === 'Identifier' ? k.name : k.type === 'StringLiteral' ? k.value : null));
+const SOEURS = (k) => [k + '.art', k + '_art', k + 'Art', ...(/\.sneakers$/.test(k) ? [k.replace(/\.sneakers$/, '.autre')] : [])];   // + les variantes par profil (« nn.notif.sneakers » / « .autre »)
+function textesDeNoeud(n) {
+  const out = [];
+  const w = (x) => { if (!x || typeof x !== 'object') return; if (Array.isArray(x)) { x.forEach(w); return; } if (x.type === 'StringLiteral') out.push(x.value); else if (x.type === 'TemplateElement') out.push(x.value.cooked || ''); for (const k of Object.keys(x)) if (!['loc', 'start', 'end', 'leadingComments', 'trailingComments'].includes(k) && x[k] && typeof x[k] === 'object') w(x[k]); };
+  w(n);
+  return out;
+}
+// Rend une raison si le littéral est la forme Sneakers d'une clé à deux formes, ou une nouveauté Sneakers.
+function deuxFormes(p) {
+  let q = p.parentPath;
+  for (let i = 0; q && i < 6; i++, q = q.parentPath) {
+    const n = q.node;
+    if (n.type !== 'ObjectProperty') continue;
+    const k = nomCle(n.key);
+    if (!k || FORMES.has(k)) continue;
+    const obj = q.parentPath && q.parentPath.node;
+    if (!obj || obj.type !== 'ObjectExpression') return null;
+    if (obj.properties.some((pr) => pr.type === 'ObjectProperty' && nomCle(pr.key) === 'pour' && pr.value.type === 'StringLiteral' && pr.value.value === 'sneakers')) return 'nouveauté pour Sneakers';
+    const soeur = obj.properties.find((pr) => pr.type === 'ObjectProperty' && SOEURS(k).includes(nomCle(pr.key)));
+    if (!soeur) return null;
+    const t = textesDeNoeud(soeur.value);
+    return t.length && !t.some((x) => MOT.test(x)) ? 'deux formes' : null;
+  }
+  return null;
+}
+// Le mot VISIBLE : hors commentaires CSS/HTML, et pas collé à un nom de code (« data-atelier-paire », « nav.paires »,
+// « [data-espace="paires"] », « p:data->paires »).
+const visible = (v) => /(?:^|[^\w\-.:>"=[])[Pp]aires?(?![\w-])/.test(String(v).replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/<!--[\s\S]*?-->/g, ' '));
+const CLE_CODE = /^[a-z][\w-]*(?:\.[\w-]+)+$/i;   // une clé de traduction (« studio.paires.fermer »)
 function textesDe(racine, rel, parse, traverse) {
   const src = lire(racine, rel);
   let ast;
@@ -95,11 +138,18 @@ function textesDe(racine, rel, parse, traverse) {
   const L = src.split('\n'), out = [];
   const iA = L.findIndex((l) => l.startsWith(MARQUE_A)), iB = L.findIndex((l) => l.startsWith(MARQUE_B));
   const dansCopie = COPIES.includes(rel) && iA >= 0 && iB > iA ? [iA + 1, iB + 1] : null;
+  // (26 nov.) Le bloc <gardes-app> de background.js est RECOPIÉ de src/ par scripts/recopier-gardes-extension.cjs
+  // (`--verifie` le tient identique) : chacun de ses textes est jugé dans SON fichier de src/.
+  const gA = L.findIndex((l) => l.startsWith('// <gardes-app>')), gB = L.findIndex((l) => l.startsWith('// </gardes-app>'));
+  const dansGardes = rel === 'vinted-sync-extension/background.js' && gA >= 0 && gB > gA ? [gA + 1, gB + 1] : null;
   traverse(ast, {
     'StringLiteral|JSXText|TemplateElement'(p) {
       const n = p.node, v = n.type === 'TemplateElement' ? n.value.cooked : n.value;
-      if (!v || !MOT.test(v)) return;
+      if (!v || !MOT.test(v) || !visible(v)) return;
+      if (CLE_CODE.test(v.trim())) return;
       const par = p.parent;
+      // une valeur posée dans un attribut de code (data-*, className, key, id), même dans une expression
+      for (let q = p.parentPath, i = 0; q && i < 4; q = q.parentPath, i++) if (q.node.type === 'JSXAttribute' && q.node.name && /^(className|data-|key$|id$)/.test(q.node.name.name)) return;
       if (n.type === 'StringLiteral') {
         if ((par.type === 'ObjectProperty' || par.type === 'ObjectMethod') && par.key === n) return;
         if (par.type === 'ImportDeclaration' || par.type === 'ExportNamedDeclaration') return;
@@ -122,7 +172,8 @@ function textesDe(racine, rel, parse, traverse) {
       if (n.type !== 'JSXText' && /^\s*[a-z_:.\[\]="-]*[-:_[][a-z_:.\[\]="-]*\s*$/.test(v)) return;
       const ligne = n.loc.start.line;
       if (dansCopie && ligne > dansCopie[0] && ligne < dansCopie[1]) return;   // la copie de la table (R1)
-      out.push({ rel, ligne, v: v.replace(/\s+/g, ' ').trim(), code: L[ligne - 1] || '' });
+      if (dansGardes && ligne > dansGardes[0] && ligne < dansGardes[1]) return;   // recopié de src/ (jugé là-bas)
+      out.push({ rel, ligne, v: v.replace(/\s+/g, ' ').trim(), code: L[ligne - 1] || '', deux: deuxFormes(p) });
     },
   });
   return { l: out };
@@ -202,6 +253,40 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
   if (arbreAvant) dit(!change.length, `E2 Sneakers : ${egaux.length}/${TEMOINS.length} modules rendent EXACTEMENT les textes d’avant (${avant})`, change);
   dit(!pasDit.length, 'E3 pour un vendeur « autre », aucun texte témoin ne dit « paire »', pasDit);
 
+  // ── E4 (26 nov.) : t() EXÉCUTÉ sur les clés à deux formes, dans les cinq langues ──
+  try {
+    const I = await imp(racine, 'src/i18n/index.js');
+    const FR = (await imp(racine, 'src/i18n/langues/fr.js')).default;
+    I.ajouterSourceApp(FR);
+    const bases = Object.keys(FR).filter((k) => /\.art$/.test(k) && FR[k.slice(0, -4)] != null).map((k) => k.slice(0, -4));
+    const PAIR = { fr: MOT, en: /\bpairs?\b/i, es: /\bpar(?:es)?\b/i, it: /\bpai[oa]\b/i, de: /\bPaar(?:e|en|s|es)?\b/ };
+    const rendre = (k) => [I.t(k, { n: 1 }), I.t(k, { n: 2 })];
+    const disent = [], changes = [], absentes = [];
+    for (const l of ['fr', 'en', 'es', 'it', 'de']) {
+      if (!(await I.appliquerLangue(l))) { absentes.push(l); continue; }
+      I.poserVarianteArticle(null);
+      const avant = Object.fromEntries(bases.map((k) => [k, JSON.stringify(rendre(k))]));
+      I.poserVarianteArticle(() => false);
+      for (const k of bases) if (JSON.stringify(rendre(k)) !== avant[k]) changes.push(`${l}:${k}`);
+      I.poserVarianteArticle(() => true);
+      for (const k of bases) if (rendre(k).some((x) => PAIR[l].test(x) || x === k)) disent.push(`${l}:${k} → ${rendre(k)[1]}`);
+    }
+    I.poserVarianteArticle(null); await I.appliquerLangue('fr');
+    dit(bases.length >= 130 && !absentes.length && !disent.length, `E4 t() hors Sneakers : les ${bases.length} clés à deux formes rendent leur forme « article », dans les cinq langues`, { absentes, disent: disent.slice(0, 20) });
+    dit(!changes.length, 'E5 t() en Sneakers (ou sans source) : chaque clé rend EXACTEMENT son texte d’avant', changes.slice(0, 20));
+  } catch (e) { dit(false, 'E4 src/i18n/index.js et fr.js se chargent', e.message); }
+  // « Quoi de neuf » : hors Sneakers, aucune nouveauté montrée ne dit « paire » ; Sneakers mot pour mot.
+  try {
+    const N = await imp(racine, 'src/nouveautes.js');
+    const ctx = { inscritLe: '2020-01-01', mode: 'complet', proprietaire: true, pro: true };
+    const aut = N.nouveautesDuCompte({ ...ctx, vend: 'autre', categories: ['vetements'] });
+    const sn = N.nouveautesDuCompte({ ...ctx, vend: 'sneakers', categories: ['sneakers'] });
+    const disent = aut.filter((n) => MOT.test(n.titre) || MOT.test(n.phrase)).map((n) => n.id);
+    const brut = new Map(N.NOUVEAUTES.map((n) => [n.id, n]));
+    const changes = sn.filter((n) => n.titre !== brut.get(n.id).titre || n.phrase !== brut.get(n.id).phrase).map((n) => n.id);
+    dit(aut.length > 100 && !disent.length && !changes.length, `E6 « Quoi de neuf » : hors Sneakers, aucune des ${aut.length} nouveautés ne dit « paire » ; Sneakers mot pour mot`, { disent, changes });
+  } catch (e) { dit(false, 'E6 src/nouveautes.js se charge', e.message); }
+
   // ── V : serveur et extension = la règle de l'app ──
   let MS;
   try { MS = await imp(racine, 'api/_lib/mots-vendeur.js'); } catch (e) { dit(false, 'api/_lib/mots-vendeur.js se charge', e.message); }
@@ -275,7 +360,7 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
   try { ({ parse } = require(path.join(racine, 'node_modules/@babel/parser'))); traverse = require(path.join(racine, 'node_modules/@babel/traverse')).default; }
   catch (e) { dit(false, 'S0 @babel/parser et @babel/traverse sont là', e.message); return ko; }
   const hors = [], erreurs = [];
-  let nTextes = 0, nPermis = 0, nGardes = 0;
+  let nTextes = 0, nPermis = 0, nGardes = 0, nDeux = 0;
   for (const rel of fichiersDe(racine)) {
     const { l, erreur } = textesDe(racine, rel, parse, traverse);
     if (erreur) { erreurs.push(`${rel} : ${erreur}`); continue; }
@@ -283,17 +368,24 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
       nTextes++;
       if (PERMIS.some(([fi, re]) => fi === rel && (!re || re.test(t.v)))) { nPermis++; continue; }
       if (GARDE.test(t.code)) { nGardes++; continue; }
+      if (t.deux) { nDeux++; continue; }
       hors.push(`${rel}:${t.ligne} ${t.v.slice(0, 110)}`);
     }
   }
   dit(!erreurs.length, 'S0 chaque fichier se lit', erreurs);
   if (process.env.VOCAB_TOUT) console.log(hors.join("\n"));
-  dit(!hors.length, `S1 aucun texte ne dit « paire(s) » hors Sneakers (${nPermis} permis, ${nGardes} gardés par « sneakers »)`, hors);
+  dit(!hors.length, `S1 aucun texte ne dit « paire(s) » hors Sneakers (${nPermis} permis, ${nGardes} gardés par « sneakers », ${nDeux} à deux formes)`, hors);
 
   // ── B : le branchement ──
   // (24 nov., main-vert) App.jsx découpé (src/ecrans/*.jsx) : l'app se lit RECOLLÉE (_source-app.cjs).
   const app = require('./_source-app.cjs').sourceApp(racine);
   dit(/poserSourceVend\(\(\) => vendActuel\(\)\);/.test(app), 'B1 l’app pose la source du vocabulaire (`poserSourceVend(() => vendActuel())`)');
+  dit(/poserVarianteArticle\(\(\) => vendCourant\(\) !== 'sneakers'\);/.test(app), 'B11 l’app pose la source des clés à deux formes (`poserVarianteArticle(() => vendCourant() !== \'sneakers\')`)');
+  {
+    const ui = lire(racine, 'vinted-sync-extension/vrm-ui.js'), dep = lire(racine, 'vinted-sync-extension/vrm-depot.js');
+    dit(/const m = \(MOTS\[cle \+ '_art'\] && horsSneakers\(\) \? MOTS\[cle \+ '_art'\] : null\) \|\| MOTS\[cle\];/.test(ui) && /VRM_MOTS\.vend\(\) !== 'sneakers'/.test(ui)
+      && /const m = \(hors && MOTS\[cle \+ '_art'\]\) \|\| MOTS\[cle\];/.test(dep), 'B12 extension : T() (vrm-ui.js, vrm-depot.js) prend `cle_art` hors Sneakers (`VRM_MOTS.vend()`)');
+  }
   const aide = lire(racine, 'src/composants/AideEcran.jsx');
   dit(/phraseVendeur\(e, vend\)/.test(aide) && /phraseVendeur\(qq, vend\)/.test(aide) && /phraseVendeur\(r, vend\)/.test(aide), 'B2 l’aide du « ? » (étapes, questions, réponses) passe par `phraseVendeur`');
   try {
@@ -325,8 +417,8 @@ const MUTATIONS = [
   ['src/profilVendeur.js', 'la forme « article » redit paire', "Ce: 'Cet article',", "Ce: 'Cette paire',"],
   ['src/profilVendeur.js', 'sans source ⇒ article (Sneakers changé)', "const v = sourceVend ? sourceVend() : 'sneakers';", "const v = sourceVend ? sourceVend() : 'autre';"],
   ['src/App.jsx', 'la source n’est plus posée', 'poserSourceVend(() => vendActuel());', ''],
-  ['src/App.jsx', 'un texte remis en « paire »', '`${motsVendeur().Aucune} à baisser`', "'Aucune paire à baisser'"],
-  ['src/App.jsx', 'un texte remis en « paire » (JSX)', '>Régler par {motsVendeur().nom}, voir l’historique ›</button>', '>Régler par paire, voir l’historique ›</button>'],
+  ['src/ecrans/Comptabilite.jsx', 'un texte remis en « paire »', '`${motsVendeur().Aucune} à baisser`', "'Aucune paire à baisser'"],
+  ['src/ecrans/Comptabilite.jsx', 'un texte remis en « paire » (JSX)', '>Régler par {motsVendeur().nom}, voir l’historique ›</button>', '>Régler par paire, voir l’historique ›</button>'],
   ['src/aTrancher.js', 'une règle pure remise en « paire »', "get 'numeros-double'() { return `N° portés par deux ${motsVendeur().noms}`; },", "'numeros-double': 'N° portés par deux paires',"],
   ['src/composants/AideEcran.jsx', 'l’aide ne passe plus par phraseVendeur', 'pourVendeur(phraseVendeur(r, vend), vend)', 'pourVendeur(r, vend)'],
   ['src/profilVendeur.js', 'une phrase d’aide sans version article', "  'Range chaque paire là où VRM l’indique.': 'Range chaque article là où VRM l’indique.',\n", ''],
@@ -341,6 +433,18 @@ const MUTATIONS = [
   ['vinted-sync-extension/background.js', 'le fond ne range plus le mot', "  try { await chrome.storage.local.set({ vrm_vend_ext: { vend, owner, at: Date.now() } }); } catch (_) {}\n", ''],
   ['vinted-sync-extension/vrm-mots.js', 'la page ignore le mot rangé', "vend = v && typeof v === 'object' && v.vend === 'autre' ? 'autre' : 'sneakers';", "vend = 'sneakers';"],
   ['vinted-sync-extension/vinted-infos.js', 'l’encart remis en paire', "r.aConfirmer ? `${(globalThis.VRM_MOTS", "r.aConfirmer ? 'Aucune paire proche en ligne. Des comptes sont à relire.' || `${(globalThis.VRM_MOTS"],
+  // (26 nov.) les clés à deux formes
+  ['src/i18n/index.js', 't() ignore la forme « article »', '  let e = variante(cle);\n', '  let e = null;\n'],
+  ['src/App.jsx', 'la source des clés à deux formes n’est plus posée', "poserVarianteArticle(() => vendCourant() !== 'sneakers');\n", ''],
+  ['src/i18n/langues/fr/deuxComptes.js', 'une forme « article » retirée', '  "deuxComptes.titre.art": "Deux comptes, un article",\n', ''],
+  ['src/i18n/langues/fr/deuxComptes.js', 'une forme « article » qui redit paire', '"deuxComptes.titre.art": "Deux comptes, un article"', '"deuxComptes.titre.art": "Deux comptes, une paire"'],
+  ['src/i18n/langues/en/deuxComptes.js', 'une forme « article » anglaise qui redit pair', '"deuxComptes.titre.art": "Two accounts, one item"', '"deuxComptes.titre.art": "Two accounts, one pair"'],
+  ['src/nouveautes.js', '« Quoi de neuf » ignore la version article', '.map((n) => pourSonMot(n, ctx.vend));', ';'],
+  ['src/nouveautes.js', 'une nouveauté sans sa version article', ", titreArt: 'Comparer deux articles côte à côte'", ''],
+  ['vinted-sync-extension/vrm-ui.js', 'T() de l’extension ignore `cle_art`', "const m = (MOTS[cle + '_art'] && horsSneakers() ? MOTS[cle + '_art'] : null) || MOTS[cle];", 'const m = MOTS[cle];'],
+  ['vinted-sync-extension/vrm-ui.js', 'un texte de l’extension sans forme article', '    rp_rien_art: {', '    rp_rien_x: {'],
+  ['vinted-sync-extension/background.js', 'un texte du fond remis en paire', "get 'repub-serie'() { return `Compte précieux : pas de republication en série — ${motsExt().un} à la fois, sur ton toucher.`; },", "'repub-serie': 'Compte précieux : pas de republication en série — une paire à la fois, sur ton toucher.',"],
+  ['api/_lib/retraits-retard-notif.js', 'une notification serveur remise en paire', "`⚠️ ${m.Un} vendu${m.e} encore en ligne`", "'⚠️ Une paire vendue encore en ligne'"],
   ['src/favorisAuto.js', 'une raison remise en paire (accord oublié)', 'get reservee() { return `${motsVendeur().Nom} réservé${motsVendeur().e} : aucun message.`; },', "reservee: 'Paire réservée : aucun message.',"],
 ];
 
@@ -356,7 +460,9 @@ const MUTATIONS = [
   }
   // --prouve : chaque mutation, sur une copie de l'arbre, doit rendre ROUGE.
   let attrapees = 0;
-  for (const [f, quoi, de, vers] of MUTATIONS) {
+  // `VOCAB_MUT=<regex>` : seulement les mutations dont le nom correspond (relancer celles qu'on vient d'écrire).
+  const choisies = process.env.VOCAB_MUT ? MUTATIONS.filter(([, quoi]) => new RegExp(process.env.VOCAB_MUT).test(quoi)) : MUTATIONS;
+  for (const [f, quoi, de, vers] of choisies) {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vocab-mut-'));
     for (const d of ['src', 'api', 'vinted-sync-extension']) fs.cpSync(path.join(RACINE, d), path.join(tmp, d), { recursive: true });
     fs.symlinkSync(path.join(RACINE, 'node_modules'), path.join(tmp, 'node_modules'));
@@ -370,6 +476,6 @@ const MUTATIONS = [
     if (ko) attrapees++;
     fs.rmSync(tmp, { recursive: true, force: true });
   }
-  console.log(`${attrapees}/${MUTATIONS.length} mutations attrapées`);
-  process.exit(attrapees === MUTATIONS.length ? 0 : 1);
+  console.log(`${attrapees}/${choisies.length} mutations attrapées`);
+  process.exit(attrapees === choisies.length ? 0 : 1);
 })();

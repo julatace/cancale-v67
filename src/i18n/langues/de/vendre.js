@@ -27,6 +27,7 @@ export default {
   "bc.r.comparables.modele": "deine {nom} gehen in {j} T weg ({n} Verkäufe)",
   "bc.r.comparables.marque": "deine {nom} gehen in {j} T weg ({n} Verkäufe)",
   "bc.r.comparables.tranche": "deine Paare zu {nom} gehen in {j} T weg ({n} Verkäufe)",
+  "bc.r.comparables.tranche.art": "deine Artikel zu {nom} gehen in {j} T weg ({n} Verkäufe)",
   "bc.r.achat": "Einkaufspreis nicht eingegeben: ohne deine Untergrenze schlägt VRM nichts vor",
   "bc.r.recente": "vor weniger als {n} T gesenkt: gib ihr Zeit",
   "bc.r.proposee": "eine Senkung wurde dir schon vor weniger als {n} T vorgeschlagen",

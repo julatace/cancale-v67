@@ -75,8 +75,10 @@ export default {
   "pn.comptes.plusTard": "VRM lo vedrà alla tua prima visita",
 
   "pn.numeros.titre": "Chi numera le tue paia?",
+  "pn.numeros.titre.art": "Chi numera i tuoi articoli?",
   "pn.numeros.titreAutre": "Chi numera i tuoi articoli?",
   "pn.numeros.phrase": "Il numero scritto sulla scatola trova il paio in un secondo. Un numero non viene mai riassegnato.",
+  "pn.numeros.phrase.art": "Il numero scritto dove è riposto trova l’articolo in un secondo. Un numero non viene mai riassegnato.",
   "pn.numeros.vrm": "Numera VRM",
   "pn.numeros.vrm.desc": "Ogni nuovo annuncio riceve un numero da scrivere sulla sua scatola.",
   "pn.numeros.moi": "Numero io",

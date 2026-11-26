@@ -28,6 +28,7 @@ export default {
   "bc.r.comparables.modele": "tes {nom} partent en {j} j ({n} ventes)",
   "bc.r.comparables.marque": "tes {nom} partent en {j} j ({n} ventes)",
   "bc.r.comparables.tranche": "tes paires à {nom} partent en {j} j ({n} ventes)",
+  "bc.r.comparables.tranche.art": "tes articles à {nom} partent en {j} j ({n} ventes)",
   "bc.r.achat": "prix d’achat pas saisi : VRM ne propose rien sans ton plancher",
   "bc.r.recente": "baissée il y a moins de {n} j : laisse-lui le temps",
   "bc.r.proposee": "une baisse t’a déjà été proposée il y a moins de {n} j",

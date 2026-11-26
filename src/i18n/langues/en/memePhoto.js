@@ -9,7 +9,9 @@ export default {
   "memePhoto.relier": "Link to No. {numero}",
   "memePhoto.pasLaMeme": "It’s not the same one",
   "memePhoto.deuxPaires": {"one": "This photo is on {n} pair: which one?", "other": "This photo is on {n} pairs: which one?"},
+  "memePhoto.deuxPaires.art": {"one": "This photo is on {n} item: which one?", "other": "This photo is on {n} items: which one?"},
   "memePhoto.numeroDouble": "No. {numero} is on two pairs: check the box before linking.",
+  "memePhoto.numeroDouble.art": "No. {numero} is on two items: check where they are stored before linking.",
   "memePhoto.sansNumero": "No number",
   "memePhoto.cestLui": "It’s No. {numero}",
   "memePhoto.aucune": "None of these",
@@ -27,6 +29,7 @@ export default {
   "memePhoto.pasPret": "Your data isn’t loaded yet: try again in a moment",
   "memePhoto.outil": "Same photo · to link",
   "memePhoto.outilDesc": "A listing elsewhere with the photo of a Vinted pair",
+  "memePhoto.outilDesc.art": "A listing elsewhere with the photo of a Vinted item",
   "memePhoto.surSites": "Same photo on {sites} · to link",
   "memePhoto.sur": "Same photo · sure",
   "memePhoto.aVerifier": "To check",
@@ -56,5 +59,6 @@ export default {
   "ug.original": "Originals restored.",
   "ug.alt": "Improved",
   "ug.pourquoi": "Why?",
-  "ug.pourquoi.texte": "Everything happens in this browser, for free: nothing is sent, no AI. The same setting applies to every photo of the pair; the original stays next to it. The background is only whitened if it is even, and it is not a cut-out."
+  "ug.pourquoi.texte": "Everything happens in this browser, for free: nothing is sent, no AI. The same setting applies to every photo of the pair; the original stays next to it. The background is only whitened if it is even, and it is not a cut-out.",
+  "ug.pourquoi.texte.art": "Everything happens in this browser, for free: nothing is sent, no AI. The same setting applies to every photo of the item; the original stays next to it. The background is only whitened if it is even, and it is not a cut-out.",
 };

@@ -16,6 +16,8 @@ const RACINE = path.resolve(__dirname, '../..');
 
 // Une ligne verte : « ✅ … » / « ✓ … » (audits, bancs) ou « ok N - … » (node --test).
 const VERT = /^\s*(?:✅|✓|ok \d+ - )/;
+// Une ligne rouge : « ❌ … » / « ✗ … » (audits, bancs), « not ok N - … » (node --test), ou une erreur levée.
+const ROUGE = /^\s*(?:❌|✗|not ok \d+ - |\w*Error\b)/;
 
 function juger(nom, garanties, juges) {
   const sorties = {};
@@ -24,7 +26,10 @@ function juger(nom, garanties, juges) {
     const j = juges[cle]; if (!j) throw new Error(`juge inconnu : ${cle}`);
     const r = spawnSync(process.execPath, j.args, { cwd: RACINE, encoding: 'utf8', timeout: 600000, maxBuffer: 64 * 1024 * 1024, env: { ...process.env, ...(j.env || {}) } });
     const texte = `${r.stdout || ''}\n${r.stderr || ''}`;
-    sorties[cle] = { code: r.status, verts: texte.split('\n').filter((l) => VERT.test(l)), queue: texte.trim().split('\n').slice(-6).join('\n') };
+    // (26 nov.) Un juge rouge dit POURQUOI : ses lignes rouges (« ❌ », « ✗ », « not ok », une erreur levée), puis sa fin.
+    //    La fin seule ne suffisait pas : un banc qui finit par ses dernières sections (vertes) ne montrait aucun rouge en CI.
+    const rouges = texte.split('\n').filter((l) => ROUGE.test(l)).slice(0, 40);
+    sorties[cle] = { code: r.status, verts: texte.split('\n').filter((l) => VERT.test(l)), queue: (rouges.length ? rouges.join('\n') + '\n  …\n' : '') + texte.trim().split('\n').slice(-6).join('\n') };
     console.log(`  · ${cle} (${j.args.join(' ')}) : code ${r.status}, ${sorties[cle].verts.length} ligne(s) verte(s)`);
     return sorties[cle];
   };

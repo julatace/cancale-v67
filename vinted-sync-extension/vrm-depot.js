@@ -53,6 +53,7 @@
     brPublie: { fr: 'N°{n} est en ligne.', en: 'No. {n} is online.', es: 'N.º {n} está en línea.', it: 'N. {n} è online.', de: 'Nr. {n} ist online.' },
     brSeul: { fr: 'Préparé seul', en: 'Prepared automatically', es: 'Preparado solo', it: 'Preparata da sola', de: 'Automatisch vorbereitet' },
     brPrixMini: { fr: 'Dis d’abord ton prix minimum pour cette paire (ou « Passer »).', en: 'First give your minimum price for this item (or “Skip”).', es: 'Indica primero tu precio mínimo para este artículo (o «Omitir»).', it: 'Indica prima il tuo prezzo minimo per questo articolo (o «Salta»).', de: 'Gib zuerst deinen Mindestpreis an (oder „Überspringen“).' },
+    brPrixMini_art: { fr: "Dis d’abord ton prix minimum pour cet article (ou « Passer »).", en: "First give your minimum price for this item (or “Skip”).", es: "Indica primero tu precio mínimo para este artículo (o «Omitir»).", it: "Indica prima il tuo prezzo minimo per questo articolo (o «Salta»).", de: "Gib zuerst deinen Mindestpreis an (oder „Überspringen“)." },
     confirmer: { fr: 'Confirmer le dépôt', en: 'Confirm', es: 'Confirmar', it: 'Conferma', de: 'Bestätigen' },
     retour: { fr: 'Retour', en: 'Back', es: 'Volver', it: 'Indietro', de: 'Zurück' },
     envoi: { fr: 'Envoi…', en: 'Sending…', es: 'Enviando…', it: 'Invio…', de: 'Wird gesendet…' },
@@ -93,7 +94,8 @@
     m_colis: { fr: 'le colis', en: 'parcel', es: 'el paquete', it: 'il pacco', de: 'Paket' }, m_prix: { fr: 'le prix', en: 'price', es: 'el precio', it: 'il prezzo', de: 'Preis' },
     variable: { fr: 'la variable {v} n’a pas de valeur', en: 'variable {v} has no value', es: 'la variable {v} no tiene valor', it: 'la variabile {v} non ha valore', de: 'Variable {v} hat keinen Wert' },
   };
-  const T = (cle, vars) => { const m = MOTS[cle]; const s = m ? (m[LANGUE] || m.fr) : String(cle); return vars ? String(s).replace(/\{(\w+)\}/g, (x, k) => (k in vars ? String(vars[k]) : x)) : s; };
+  // (5.455.1) `cle_art` hors Sneakers (vrm-mots.js), comme T() de vrm-ui.js.
+  const T = (cle, vars) => { let hors = false; try { hors = !!(globalThis.VRM_MOTS && globalThis.VRM_MOTS.vend() !== 'sneakers'); } catch (_) {} const m = (hors && MOTS[cle + '_art']) || MOTS[cle]; const s = m ? (m[LANGUE] || m.fr) : String(cle); return vars ? String(s).replace(/\{(\w+)\}/g, (x, k) => (k in vars ? String(vars[k]) : x)) : s; };
   const pluriel = (n, un, plusieurs) => T(Number(n) === 1 ? un : plusieurs, { n });
   const euros = (n) => { const x = Number(n); if (!(x > 0)) return ''; const c = Math.round(x * 100); return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €'; };
   const heure = (t) => { try { return new Date(Number(t)).toLocaleTimeString(LANGUE, { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
