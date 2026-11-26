@@ -19,7 +19,12 @@ export const DEBUT_BIEN_DEMARRER = '2026-11-21';
 const etat = (v) => (v === true ? 'fait' : v === false ? 'afaire' : 'passu');
 
 // Les preuves : { extension, comptes, lecture, numeros, fiscal } — chacune true · false · null/undefined (pas su).
+// (23 nov., lot demarrage-guide) `autres` : un compte Leboncoin, Vestiaire ou eBay RELIÉ (lu) compte aussi — un vendeur qui
+// ne vend pas sur Vinted réussit son démarrage. Vinted relié OU un autre site relié ⇒ fait ; les deux lus vides ⇒ à faire ;
+// sinon pas su (jamais coché sur un silence).
+const ouLu = (a, b) => (a === true || b === true ? true : a === false && b === false ? false : null);
 export function etapesBienDemarrer(p = {}) {
+  p = { ...p, comptes: p.autres === undefined ? p.comptes : ouLu(p.comptes, p.autres) };
   const compte = p.comptes === true;
   const extension = p.extension === true || compte ? true : p.extension;
   return ETAPES_BIEN_DEMARRER.map((cle) => ({ cle, etat: etat(cle === 'extension' ? extension : cle === 'compte' ? p.comptes : p[cle]) }));

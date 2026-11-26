@@ -1503,8 +1503,9 @@ import './styles-mode-depot.css'; // (8 nov.) style de ./ModeDepot.jsx, gardé �
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
 import { CLE_NOUVEAUTES_VUES, CLE_NOUVEAU_FEUILLE } from './nouveautesCle.js';
-import { etapesBienDemarrer, bienDemarrerAMontrer, CLE_BIEN_DEMARRER, reglageMasque as reglageMasqueBD } from './bienDemarrer/regle.js';   // (21 nov., ux-reglages) « Bien démarrer 3/5 »
+import { etapesBienDemarrer, bienDemarrerAMontrer, CLE_BIEN_DEMARRER, DEBUT_BIEN_DEMARRER, reglageMasque as reglageMasqueBD } from './bienDemarrer/regle.js';   // (21 nov., ux-reglages) « Bien démarrer 3/5 »
 import BienDemarrer from './bienDemarrer/BienDemarrer.jsx';
+import Accompagnement from './bienDemarrer/Accompagnement.jsx';   // (23 nov., lot demarrage-guide) l'accompagnement animé, étape par étape
 // (20 nov., iphone-rapide) LA LISTE « QUOI DE NEUF » HORS DU DÉMARRAGE (src/nouveautes.js, ~20 Ko compressés) : la carte
 // ne se montre qu'une fois le nuage lu (`pret`, plus bas) ; la liste et ses règles arrivent avec le premier rendu du
 // crochet. Pas encore là ⇒ rien à montrer (le même « [] » qu'avant le nuage) ; les règles sont les MÊMES fonctions.
@@ -22130,10 +22131,17 @@ function BienDemarrerApp({ comptes, comptesLus, lecture, numeros, onNav }) {
   const regime = useRegimeFiscal();
   const [reglage, setReglage] = useStateCle(CLE_BIEN_DEMARRER, () => load(CLE_BIEN_DEMARRER, null));
   const nComptes = Array.isArray(comptes) ? comptes.length : null;
+  // (23 nov., lot demarrage-guide) Un compte Leboncoin, Vestiaire ou eBay relié compte aussi (lu par le chemin de
+  // Paramètres → Mes comptes, seulement pour un compte NOUVEAU : jamais pour le propriétaire) ; l'accompagnement ouvert.
+  const nouveauCompte = proprio === false && String((AUTH.user && AUTH.user.created_at) || '').slice(0, 10) >= DEBUT_BIEN_DEMARRER;
+  const [autresLus] = useComptesAutresSites(nouveauCompte);
+  const listes = [autresLus.leboncoin, autresLus.vestiaire, autresLus.ebay];
+  const autres = listes.some((x) => Array.isArray(x) && x.length > 0) ? true : listes.every((x) => Array.isArray(x)) ? false : null;
+  const [guide, setGuide] = React.useState(null);
   const etapes = etapesBienDemarrer({
     extension: ext.present ? true : null,
-    comptes: comptesLus ? nComptes > 0 : null,
-    lecture: comptesLus && nComptes === 0 ? false : lecture,
+    comptes: comptesLus ? nComptes > 0 : null, autres,
+    lecture: comptesLus && nComptes === 0 ? (autres === true ? true : false) : lecture,
     numeros, fiscal: regime === undefined ? null : regime != null,
   }).map((e) => (e.cle === 'lecture' && e.etat !== 'fait' && nComptes === 0 ? { ...e, etat: 'afaire', attente: 'uxr.bd.lectureAttend' } : e.cle === 'lecture' && e.etat !== 'fait' && nComptes > 0 ? { ...e, attente: 'uxr.bd.enCours' } : e.cle === 'extension' && e.etat === 'passu' ? { ...e, etat: 'afaire' } : e));
   if (!bienDemarrerAMontrer({ etapes, reglage, proprietaire: proprio, inscritLe: AUTH.user && AUTH.user.created_at, exemple: exempleActif() })) return null;
@@ -22144,7 +22152,11 @@ function BienDemarrerApp({ comptes, comptesLus, lecture, numeros, onNav }) {
     if (cle === 'numeros') return onNav('annonces');
     if (cle === 'fiscal') { DEMANDE_REGLAGE_SOUS.id = 'regime'; onNav('settings'); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} }, 60); }
   };
-  return <BienDemarrer etapes={etapes} Icon={Icon} onEtape={allerA} onMasquer={() => { const v = reglageMasqueBD(); save(CLE_BIEN_DEMARRER, v); setReglage(v); }}/>;
+  return <>
+    <BienDemarrer etapes={etapes} Icon={Icon} onEtape={allerA} onGuider={setGuide} onMasquer={() => { const v = reglageMasqueBD(); save(CLE_BIEN_DEMARRER, v); setReglage(v); }}/>
+    {guide ? <Accompagnement ouverte Icon={Icon} etapes={etapes} cle={guide} setCle={setGuide} nav={boutiqueIci().nav} mobile={mobileIci()}
+      onGeste={(cle) => { setGuide(null); allerA(cle); }} onFermer={() => setGuide(null)}/> : null}
+  </>;
 }
 // ── LE PARCOURS D'UN NOUVEAU, BRANCHÉ (15 nov., src/parcoursNouveau/) ───────────
 // Les PREUVES de chaque étape, lues par les chemins de toujours (aucune nouvelle requête
