@@ -485,20 +485,19 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **26 nov. soir · EXT. 5.454.1 servie, 5.454.0 retirée** (favoris cassés ; lots sur `claude/ext-5454`) ; **Observateur 2.0** (`vrm-observateur-extension/`) : Vintex = favoris par la messagerie (inquiries → offers → replies), Bleam bloqué par la vérification du téléphone de Vinted. Détail : `historique-divers.md`, fin. Geste : valider son téléphone sur le compte bloqué.
 - **26 nov. · Vestiaire/LBC fiables** : vente VC annulée ≠ « Vendue », lecture VC > 24 h = « à confirmer », Annonces lit `vc_ventes`, « LBC n » pas su sans ventes. `2026-11-26-fiabilite-vc-lbc.md`. Geste : aucun.
-- **26 nov. · Favoris réparés, ext. 5.453.2** : fenêtre d’offre, frappe `execCommand`, « C’est parti / Pas parti ». `2026-11-25-favoris-sequence-repare.md`. Geste : 5.453.2.
-- **26 nov. · COULEURS (Julien : « 14 en sombre, 15 en clair »)** : clair = monochrome (#FFFFFF, encre noire) ; sombre = graphite et vert (#22262B, accent #5BD68F). `src/natif/jetons.css`. Geste : aucun.
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.440.3** (24 nov., « Observer Vinted » ; avant 5.440.2, favoris : liste lue jusqu'au bout ; avant 5.440.1, lien d'application ; 5.440.0, favoris sans geste ; versions servies avant : `historique-divers.md`, « Extension servie », fin). **À lire en premier : `docs/passation/2026-11-23-passation-generale.md`** (23 nov. soir), puis `docs/passation/2026-11-22-passation-generale.md` (22 nov.), puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passation-generale.md` (la plus complète : en ligne, prêt, en pause, en file, refusé, gestes), puis `2026-11-16-passation.md`, `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.454.1** (26 nov. soir ; avant 5.453.2 ; 5.440.3, 24 nov., « Observer Vinted » ; avant 5.440.2, favoris : liste lue jusqu'au bout ; avant 5.440.1, lien d'application ; 5.440.0, favoris sans geste ; versions servies avant : `historique-divers.md`, « Extension servie », fin). **À lire en premier : `docs/passation/2026-11-23-passation-generale.md`** (23 nov. soir), puis `docs/passation/2026-11-22-passation-generale.md` (22 nov.), puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passation-generale.md` (la plus complète : en ligne, prêt, en pause, en file, refusé, gestes), puis `2026-11-16-passation.md`, `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter « Ma facture » (Argent → Factures : SIRET, forme, régime de TVA, son e-mail) ; poser `RELANCES_SMTP_*` + `RELANCES_EXPEDITEUR` (SPF/DKIM, Brevo 300/j) — VRM envoie par défaut.
-- Installer l’extension **5.453.2** (26 nov. : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). Versions d’avant : `historique-divers.md`.
+- Installer l’extension **5.454.1** (26 nov. soir : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). Versions d’avant : `historique-divers.md`.
 - Les 6 paires renumérotées le 2 oct. (543→266…, historique numéros) : regarder le carton.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
