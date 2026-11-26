@@ -70,7 +70,7 @@ const QR_A_APPROUVER = typeof window !== 'undefined' ? ticketDeLAdresse() : '';
 const LIEN_AIDE_JETON = typeof window !== 'undefined' ? jetonAideDeLAdresse() : '';
 // ⟦→ ecrans/Comptabilite.jsx #10⟧
 import { JourneePersoEditeur, nCachees as nCartesCachees } from './JourneePerso.jsx';
-import { CLE_AFFICHAGE, CLE_JE_VENDS, affichageEffectif, jeVendsEffectif, entreeMontree, siteMontre, caseJourneeMontree, motsArticle, champsFacultatifs, ventesSur30j, lireReglageJeVends, poserSourceVend, motsVendeur, motArticle } from './profilVendeur.js';
+import { CLE_AFFICHAGE, CLE_JE_VENDS, affichageEffectif, jeVendsEffectif, entreeMontree, siteMontre, caseJourneeMontree, motsArticle, champsFacultatifs, ventesSur30j, lireReglageJeVends, poserSourceVend, motsVendeur, motArticle, vendCourant } from './profilVendeur.js';
 import { exemplesVendeur, motTaille } from './vocabulaireVendeur.js';   // (11 nov., lot DJ2) exemples et petits mots selon ce qu'il vend
 // (9 nov.) Le bandeau discret d'un incident ouvert par les sondes de /statut.
 import { bandeauStatut, CLE_VUS as CLE_STATUT_VUS } from './statutBandeau.js';
@@ -1748,7 +1748,7 @@ import { langueNavigateur, poserLangueUneFois, alignerLangueCompte } from "./lan
 // (11 nov., lot traduction) Les textes visibles passent par `tr()` (src/i18n/index.js) :
 // `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
 import ChoixLangue from "./i18n/ChoixLangue.jsx";
-import { tr, aCle as aCleTr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, monnaie as monnaieI18n, ajouterSourceApp, abonnerLangue } from "./i18n/index.js";
+import { tr, aCle as aCleTr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, monnaie as monnaieI18n, ajouterSourceApp, abonnerLangue, poserVarianteArticle } from "./i18n/index.js";
 // ⟦→ ecrans/Comptabilite.jsx #113⟧
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
 import frApp from "./i18n/langues/fr.js";
@@ -32898,6 +32898,8 @@ function vendActuel() {
 }
 // (11 nov., lot vocabulaire-article) La source du vocabulaire de TOUT module (`motsVendeur()`).
 poserSourceVend(() => vendActuel());
+// (26 nov., lot vocabulaire-article) Et des clés de traduction à deux formes : hors Sneakers, `tr(cle)` rend `cle.art`.
+poserVarianteArticle(() => vendCourant() !== 'sneakers');
 // Les mots (« paire » / « article ») du vendeur, pour un écran qui s'abonne.
 function useMotsArticle() { const p = useProfilVendeur(); return motsArticle(p.vend || vendActuel()); }
 // (11 nov., lot DJ2) Les EXEMPLES (note, annonce, placeholders) selon ce qu'il vend

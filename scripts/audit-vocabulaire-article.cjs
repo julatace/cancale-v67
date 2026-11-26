@@ -19,7 +19,13 @@
 //      (scripts/_fond-vm.cjs) range « article » pour un vendeur « autre », « paire » pour
 //      le propriétaire en automatique (lu chez vrm.center), les textes d'avant sans rien ;
 //   S  relevé STATIQUE (@babel/parser) de src/, api/ et de l'extension : tout texte qui
-//      dit « paire(s) » est dans la liste FERMÉE ci-dessous, avec sa raison ;
+//      dit « paire(s) » est dans la liste FERMÉE ci-dessous, avec sa raison, OU est la
+//      forme Sneakers d'une clé À DEUX FORMES (26 nov.) : sa sœur `cle.art` (traductions,
+//      choisie par t() hors Sneakers), `cle_art` (textes de l'extension, choisie par T()),
+//      `champArt` (« Quoi de neuf ») existe et ne dit pas « paire » ; ou elle est dans
+//      une nouveauté `pour: 'sneakers'` (montrée aux seuls vendeurs Sneakers) ;
+//   E4 t() EXÉCUTÉ : hors Sneakers, chaque clé à deux formes rend sa forme « article »
+//      (sans « paire »), en Sneakers le texte d'avant ; « Quoi de neuf » de même ;
 //   B  le branchement : la source posée par l'app, l'aide du « ? », Ma semaine, l'offre
 //      par e-mail, les erreurs eBay, le manifeste (vrm-mots.js avant chaque page).
 //  `--prouve` : chaque mutation doit rendre l'audit ROUGE. `--recopie` : refabrique la copie.
@@ -83,11 +89,47 @@ const PERMIS = [
   ['src/rechercheUnique.js', /^Paires$/, 'GROUPES_LOUPE : l’étiquette « Paires » est remplacée par `motsVendeur().Noms` dans la recherche (App.jsx, B9)'],
   ['api/_lib/agent-ebay-rappel.js', /^aucune paire proposée$/, 'raison de diagnostic du cron (réponse JSON), jamais montrée au vendeur'],
   ['api/_lib/veille-plantages.js', /^Fiche d’une paire$/, 'alerte TECHNIQUE envoyée au seul propriétaire de l’installation (VRM_OWNER_UID)'],
+  ['src/reponsesRapides.js', /^vraie paire$/, 'MOT-CLÉ cherché dans le message d’un ACHETEUR (réponses rapides, « est-ce une vraie paire ? ») : jamais affiché'],
+  ['vinted-sync-extension/background.js', /^vraie paire$/, 'la même liste de mots-clés des réponses rapides (message d’un ACHETEUR), jamais affichée'],
+  ['src/recherchePhrase.js', /^le la les l de du des .* paire paires /, 'mots VIDES de la recherche en phrase (retirés de ce qu’il tape), jamais affichés'],
 ];
 // Une ligne gardée par « sneakers » (même ligne) : le texte de Sneakers, l'autre branche dit article.
-const GARDE = /seul: 'sneakers'|(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)|\b(?:sn|snEx) \?|vend !== 'sneakers'/;
+const GARDE = /seul: 'sneakers'|(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)|\b(?:sn|snEx) \?|vend !== 'sneakers'|\.nom ?=== ?'paire' \?/;
 const MOT = /\b[Pp]aires?\b/;
 
+// (26 nov.) LES CLÉS À DEUX FORMES : le nom de la propriété qui porte le texte (en sautant les
+// langues et les formes du pluriel) et la sœur qui porte la forme « article ».
+const FORMES = new Set(['fr', 'en', 'es', 'it', 'de', 'one', 'other', 'zero', 'two', 'few', 'many']);
+const nomCle = (k) => (k && (k.type === 'Identifier' ? k.name : k.type === 'StringLiteral' ? k.value : null));
+const SOEURS = (k) => [k + '.art', k + '_art', k + 'Art'];
+function textesDeNoeud(n) {
+  const out = [];
+  const w = (x) => { if (!x || typeof x !== 'object') return; if (Array.isArray(x)) { x.forEach(w); return; } if (x.type === 'StringLiteral') out.push(x.value); else if (x.type === 'TemplateElement') out.push(x.value.cooked || ''); for (const k of Object.keys(x)) if (!['loc', 'start', 'end', 'leadingComments', 'trailingComments'].includes(k) && x[k] && typeof x[k] === 'object') w(x[k]); };
+  w(n);
+  return out;
+}
+// Rend une raison si le littéral est la forme Sneakers d'une clé à deux formes, ou une nouveauté Sneakers.
+function deuxFormes(p) {
+  let q = p.parentPath;
+  for (let i = 0; q && i < 6; i++, q = q.parentPath) {
+    const n = q.node;
+    if (n.type === 'ObjectExpression' && n.properties.some((pr) => pr.type === 'ObjectProperty' && nomCle(pr.key) === 'pour' && pr.value.type === 'StringLiteral' && pr.value.value === 'sneakers')) return 'nouveauté pour Sneakers';
+    if (n.type !== 'ObjectProperty') continue;
+    const k = nomCle(n.key);
+    if (!k || FORMES.has(k)) continue;
+    const obj = q.parentPath && q.parentPath.node;
+    if (!obj || obj.type !== 'ObjectExpression') return null;
+    const soeur = obj.properties.find((pr) => pr.type === 'ObjectProperty' && SOEURS(k).includes(nomCle(pr.key)));
+    if (!soeur) return null;
+    const t = textesDeNoeud(soeur.value);
+    return t.length && !t.some((x) => MOT.test(x)) ? 'deux formes' : null;
+  }
+  return null;
+}
+// Le mot VISIBLE : hors commentaires CSS/HTML, et pas collé à un nom de code (« data-atelier-paire », « nav.paires »,
+// « [data-espace="paires"] », « p:data->paires »).
+const visible = (v) => /(?:^|[^\w\-.:>"=[])[Pp]aires?(?![\w-])/.test(String(v).replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/<!--[\s\S]*?-->/g, ' '));
+const CLE_CODE = /^[a-z][\w-]*(?:\.[\w-]+)+$/i;   // une clé de traduction (« studio.paires.fermer »)
 function textesDe(racine, rel, parse, traverse) {
   const src = lire(racine, rel);
   let ast;
@@ -95,11 +137,18 @@ function textesDe(racine, rel, parse, traverse) {
   const L = src.split('\n'), out = [];
   const iA = L.findIndex((l) => l.startsWith(MARQUE_A)), iB = L.findIndex((l) => l.startsWith(MARQUE_B));
   const dansCopie = COPIES.includes(rel) && iA >= 0 && iB > iA ? [iA + 1, iB + 1] : null;
+  // (26 nov.) Le bloc <gardes-app> de background.js est RECOPIÉ de src/ par scripts/recopier-gardes-extension.cjs
+  // (`--verifie` le tient identique) : chacun de ses textes est jugé dans SON fichier de src/.
+  const gA = L.findIndex((l) => l.startsWith('// <gardes-app>')), gB = L.findIndex((l) => l.startsWith('// </gardes-app>'));
+  const dansGardes = rel === 'vinted-sync-extension/background.js' && gA >= 0 && gB > gA ? [gA + 1, gB + 1] : null;
   traverse(ast, {
     'StringLiteral|JSXText|TemplateElement'(p) {
       const n = p.node, v = n.type === 'TemplateElement' ? n.value.cooked : n.value;
-      if (!v || !MOT.test(v)) return;
+      if (!v || !MOT.test(v) || !visible(v)) return;
+      if (CLE_CODE.test(v.trim())) return;
       const par = p.parent;
+      // une valeur posée dans un attribut de code (data-*, className, key, id), même dans une expression
+      for (let q = p.parentPath, i = 0; q && i < 4; q = q.parentPath, i++) if (q.node.type === 'JSXAttribute' && q.node.name && /^(className|data-|key$|id$)/.test(q.node.name.name)) return;
       if (n.type === 'StringLiteral') {
         if ((par.type === 'ObjectProperty' || par.type === 'ObjectMethod') && par.key === n) return;
         if (par.type === 'ImportDeclaration' || par.type === 'ExportNamedDeclaration') return;
@@ -122,7 +171,8 @@ function textesDe(racine, rel, parse, traverse) {
       if (n.type !== 'JSXText' && /^\s*[a-z_:.\[\]="-]*[-:_[][a-z_:.\[\]="-]*\s*$/.test(v)) return;
       const ligne = n.loc.start.line;
       if (dansCopie && ligne > dansCopie[0] && ligne < dansCopie[1]) return;   // la copie de la table (R1)
-      out.push({ rel, ligne, v: v.replace(/\s+/g, ' ').trim(), code: L[ligne - 1] || '' });
+      if (dansGardes && ligne > dansGardes[0] && ligne < dansGardes[1]) return;   // recopié de src/ (jugé là-bas)
+      out.push({ rel, ligne, v: v.replace(/\s+/g, ' ').trim(), code: L[ligne - 1] || '', deux: deuxFormes(p) });
     },
   });
   return { l: out };
@@ -275,7 +325,7 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
   try { ({ parse } = require(path.join(racine, 'node_modules/@babel/parser'))); traverse = require(path.join(racine, 'node_modules/@babel/traverse')).default; }
   catch (e) { dit(false, 'S0 @babel/parser et @babel/traverse sont là', e.message); return ko; }
   const hors = [], erreurs = [];
-  let nTextes = 0, nPermis = 0, nGardes = 0;
+  let nTextes = 0, nPermis = 0, nGardes = 0, nDeux = 0;
   for (const rel of fichiersDe(racine)) {
     const { l, erreur } = textesDe(racine, rel, parse, traverse);
     if (erreur) { erreurs.push(`${rel} : ${erreur}`); continue; }
@@ -283,12 +333,13 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
       nTextes++;
       if (PERMIS.some(([fi, re]) => fi === rel && (!re || re.test(t.v)))) { nPermis++; continue; }
       if (GARDE.test(t.code)) { nGardes++; continue; }
+      if (t.deux) { nDeux++; continue; }
       hors.push(`${rel}:${t.ligne} ${t.v.slice(0, 110)}`);
     }
   }
   dit(!erreurs.length, 'S0 chaque fichier se lit', erreurs);
   if (process.env.VOCAB_TOUT) console.log(hors.join("\n"));
-  dit(!hors.length, `S1 aucun texte ne dit « paire(s) » hors Sneakers (${nPermis} permis, ${nGardes} gardés par « sneakers »)`, hors);
+  dit(!hors.length, `S1 aucun texte ne dit « paire(s) » hors Sneakers (${nPermis} permis, ${nGardes} gardés par « sneakers », ${nDeux} à deux formes)`, hors);
 
   // ── B : le branchement ──
   // (24 nov., main-vert) App.jsx découpé (src/ecrans/*.jsx) : l'app se lit RECOLLÉE (_source-app.cjs).
