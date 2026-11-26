@@ -4,7 +4,7 @@
 //  lignesReleve → gainsReels), à 390 × 844 tactile et 1512, en clair et en sombre :
 //   B1 la carte existe dans le segment « Gains » ; le net total, sa couverture et le délai moyen = RECOMPTE ici, par un
 //      code à part, depuis les ventes inventées (compte écarté, GBP et non finalisée hors) ;
-//   B2 partiel ⇒ « sur K des N ventes » visible ; jamais « au moins » ; l'autre devise est dite ;
+//   B2 partiel ⇒ « sur K/N ventes » visible ; jamais « au moins » ; l'autre devise est dite ;
 //   B3 « Saisir » et chaque vente sans prix d'achat ouvrent la saisie (`vrm:completer`, sujet achat, SON N°) ;
 //   B4 les quatre vues (paire, modèle, source, compte) : rien n'est classé sous 3 ventes au prix connu (le 550 : 2) ;
 //   B5 natif : pas de carte dans une carte, aucun débordement, aucune cible < 44 px, ni NaN ni « undefined » ;
@@ -76,7 +76,7 @@ const NATIF = () => {
         const a = await pg.evaluate(() => { const t = document.querySelector('[data-gr-tuiles] [data-gr-net]'); return t ? { net: t.getAttribute('data-gr-net'), n: t.getAttribute('data-gr-n'), k: t.getAttribute('data-gr-nnet') } : null; });
         dit(a && a.net === String(R.net) && a.n === String(R.n) && a.k === String(R.k), `B1 net total ${R.net / 100} € sur ${R.k} des ${R.n} = recompte (compte écarté, GBP, non finalisée hors)`, { a, R });
         const txt = await pg.evaluate(() => document.querySelector('[data-ps-bloc="gains"]').innerText);
-        dit(txt.includes(`sur ${R.k} des ${R.n} ventes`) && !/au moins/i.test(txt), 'B2 « sur K des N ventes » visible, jamais « au moins »', txt.slice(0, 160));
+        dit(txt.includes(`sur ${R.k}/${R.n} ventes`) && !/au moins/i.test(txt), 'B2 « sur K/N ventes » visible, jamais « au moins »', txt.slice(0, 160));
         dit(/autre devise/.test(txt) && /eBay dans une autre devise/.test(txt), 'B2 l’autre devise est écartée ET dite');
         dit(txt.includes(`${R.sans} ventes sans prix d’achat`), 'B2 le manque est nommé (« N ventes sans prix d’achat »)');
         await pg.screenshot({ path: path.join(SHOTS, `gains-modele-${W}-${th}.png`), fullPage: true });
