@@ -126,6 +126,7 @@ import ecran_offres_photos from './en/offresPhotos.js';   // (22 nov.) offres sa
 import ecran_parrainage20 from './en/parrainage.js';   // (25 nov.) le parrainage à 20 %
 import ecran_actions_ext from './en/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './en/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
+import ecran_litiges_tous from './en/litigesTous.js';   // (23 nov.) Litiges et retours, tous les sites
 import ecran_achats_hors_vinted from './en/achatsHorsVinted.js';   // (23 nov.) Nouvel achat : ticket à plusieurs articles
 export default {
   ...ecran_accessibilite,
@@ -2446,6 +2447,7 @@ export default {
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,
+  ...ecran_litiges_tous,
   ...ecran_achats_hors_vinted,
   ...ecran_parcours_nouveau,
   ...ecran_stock_rangement,
