@@ -73,7 +73,15 @@ export default function GrilleInventaire({ items, cle = (x) => x && x.cle, rendu
     const surDefile = () => { if (image) return; image = requestAnimationFrame(() => { image = 0; calculer(); }); };
     window.addEventListener('scroll', surDefile, { capture: true, passive: true });
     window.addEventListener('resize', surDefile, { passive: true });
-    return () => { window.removeEventListener('scroll', surDefile, { capture: true }); window.removeEventListener('resize', surDefile); if (image) cancelAnimationFrame(image); };
+    // (26 nov., capture de Julien : Annonces → Vestiaire, « Sans compte · 3 » et UNE seule rangée sous une place vide pour trois)
+    // La grille peut BOUGER sans défilement ni redimensionnement de la fenêtre : ce qui est au-dessus rétrécit (squelette remplacé,
+    // filtre changé, groupe replié, bandeau retiré). Sa fenêtre, calculée quand elle était encore sous l'écran, gardait 0 rangée
+    // de plus que la 1re. Toute variation de hauteur de la page relance le calcul (une fois par image, et rien si rien ne change).
+    // Deux témoins : la grille qui ENTRE à l'écran (ou en sort) — IntersectionObserver —, et la page qui change de hauteur.
+    let ro = null, io = null;
+    try { ro = new ResizeObserver(surDefile); ro.observe(document.body); } catch (_) { /* sans ResizeObserver : le défilement suffit */ }
+    try { if (ref.current) { io = new IntersectionObserver(surDefile, { threshold: [0, 0.01, 0.5, 1] }); io.observe(ref.current); } } catch (_) { /* idem */ }
+    return () => { window.removeEventListener('scroll', surDefile, { capture: true }); window.removeEventListener('resize', surDefile); if (ro) ro.disconnect(); if (io) io.disconnect(); if (image) cancelAnimationFrame(image); };
   }, [calculer]);
 
   const de = fenetre.a * g.cols, a = Math.min(n, (fenetre.b + 1) * g.cols);
