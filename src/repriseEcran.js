@@ -29,7 +29,10 @@ import { lireParcours, garderParcours } from './parcoursQuotidien.js';
 
 export const NOM_REPRISE = 'reprise';
 const FORME_SUB = /^[a-z_]{2,20}(\.[a-z_]{2,20})?$/;
-const COLIS_OK = ['envoyer', 'envoyes', 'retirer'];
+// (26 nov., banc iphone-reprise R1) `toutes` : « Terminées » de Ventes (le segmenté natif, src/natif/ecrans/Ventes.jsx) est
+// un onglet choisi À LA MAIN comme les autres — sans lui, rouvrir Ventes rendait « À envoyer » et perdait le filtre de site
+// posé sous « Terminées ».
+const COLIS_OK = ['envoyer', 'envoyes', 'retirer', 'toutes'];
 
 // Le stockage de la reprise : celui de l'appareil. Absent ou bloqué (navigation
 // privée, données du site effacées) ⇒ null, et rien n'est rangé ni relu.

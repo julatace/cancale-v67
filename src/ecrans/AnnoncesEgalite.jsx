@@ -40,7 +40,7 @@ import { annuaireLbc } from '../plateformes.js';
 import { numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { etatDeVc } from '../enLigneVc.js';   // (26 nov.) « en ligne » / « vendue » Vestiaire : LA règle (Stock, écran Vestiaire)
 import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, lireTout, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, lireVentesEmail, photoKey, STUDIO_BASE } from '../App.jsx';
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, lireTout, useVueSession, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, lireVentesEmail, photoKey, STUDIO_BASE } from '../App.jsx';
 import { ouvrirPanneau, panneauEnRetard, gesteDuPanneau } from '../ouvrirPanneau.js';
 // (22 nov., choix n° 35) « Photo en double » : la règle d'identité par le FICHIER photo exact (src/photoEnDouble.js).
 import { photosEnDouble, numerosEnExemplaires, refuserGroupe, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
@@ -260,7 +260,10 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   const [choixP, choisirP] = useFiltrePlateforme('annonces');
   const [filtreT0, setFiltreT] = React.useState({ compte: '', dort: 'toutes' });
   const [filtreE, setFiltre] = React.useState({ etat: 'enligne' });
-  const [q, setQ] = React.useState('');
+  // ⚠️ (26 nov., banc iphone-reprise R3) LA RECHERCHE REVIENT (5 nov., Julien : « quand on rouvre l'app, revenir au même endroit,
+  // dans le même état ») : le même rangement que la recherche d'Annonces d'avant (`useVueSession('annonces-recherche')`, synchronisé
+  // par compte VRM, rendu seulement s'il a été quitté il y a moins de 10 min) — l'écran natif la tenait en simple état local.
+  const [q, setQ] = useVueSession('annonces-recherche', '');
   React.useEffect(() => {
     const prendre = () => { try { if (prendreVue('arepublier')) setFiltre((f) => ({ ...f, etat: 'arepublier' })); else if (prendreVue('photodouble')) setFiltre((f) => ({ ...f, etat: 'photodouble' })); else if (prendreVue('dorment')) setFiltre((f) => ({ ...f, etat: 'dorment' })); } catch (_) {} };
     prendre(); window.addEventListener('vrm:vue', prendre);
