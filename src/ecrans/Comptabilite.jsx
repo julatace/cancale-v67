@@ -22644,6 +22644,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           if (a.job === 'sans-numero' && (modeNum === 'moi' || nouveauxAEcrire.length > 0)) continue;
           // (15 nov.) … ni quand ce sont les annonces de « N°x republiée ? » (elles attendent SA réponse : dit une fois).
           if (a.job === 'sans-numero' && propositionsRepub.length > 0 && Number(a.n) <= propositionsRepub.length) continue;
+          // ⚠️ (26 nov., banc journee-coherence E5) … ni quand l'entrée « N infos à compléter » est là : depuis le 19 nov. (Julien :
+          // « l'outil doit être pratique, pas chiant ») les annonces sans numéro sont UN des trois manques de cette entrée
+          // (src/designV2/aRegler.js `SUJETS_COMPLETER`) — la carte de la cloche la redisait juste au-dessus (§7, jamais deux fois).
+          // Sans l'entrée (rien à compléter selon l'atelier), la carte reste : rien ne disparaît en silence (§4.11).
+          if (a.job === 'sans-numero' && compteursCpl && Number.isInteger(compteursCpl.questions) && compteursCpl.questions > 0) continue;
           // (15 nov., retrait-ailleurs) Déjà dans « À retirer ailleurs » (en tête, avec son geste) : pas redite ici.
           if (a.dv && a.retrait && alerteCouverte(fusionPlan(RA.plan, RA.gardes), a.retrait.plat, a.retrait.nums, cleNum)) continue;
           if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.doublon:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1, avant:a.avant, lbcSuppr:Array.isArray(a.lbcSuppr)&&a.lbcSuppr.length?a.lbcSuppr:null, photos:a.photos});

@@ -100,6 +100,9 @@
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h4L19 9l-4-4L4 16z'/%3E%3Cpath d='M13.5 6.5l4 4'/%3E%3C/svg%3E") center / contain no-repeat !important;
           mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h4L19 9l-4-4L4 16z'/%3E%3Cpath d='M13.5 6.5l4 4'/%3E%3C/svg%3E") center / contain no-repeat !important;
 }
+/* ⚠️ (26 nov., banc journee-coherence E6) À l'ordinateur (`[data-sj-ordi]`), le crayon « Modifier » (44 × 44, en haut à droite)
+   était posé SUR la case « Bénéfice · mois » (un bouton) : deux cibles l'une sur l'autre. La rangée des cases lui laisse sa colonne (44 px). */
+:root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-mois .vrm-fu-cases { padding-right: 44px !important; box-sizing: border-box !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-mois .vrm-fu-cases { grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)) !important; gap: 0 !important; align-items: start !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-mois .vrm-fu-cases:has(> .vrm-fu-case:nth-child(3):last-child) { grid-template-columns: minmax(0, .9fr) minmax(0, 1fr) minmax(0, 1.4fr) !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-mois .vrm-fu-case {
