@@ -64,6 +64,7 @@ export default {
   "egalite.refus.identite": "VRM doesn't know which listing this is: nothing was written.",
   "egalite.relier.titre": "Also on Vinted?",
   "egalite.relier.sous": "Tell VRM whether it's a pair already live on Vinted, or a separate pair.",
+  "egalite.relier.sous.art": "Tell VRM whether it's an item already live on Vinted, or a separate item.",
   "egalite.selection.tout": "Select all",
   "egalite.selection.rien": "Deselect all",
   "egalite.selection.annuler": "Cancel",

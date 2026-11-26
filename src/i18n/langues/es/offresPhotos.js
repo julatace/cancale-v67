@@ -3,12 +3,15 @@ export default {
   "egalite.etat.photodouble": "Foto duplicada",
   "egalite.vide.photodouble": "Ninguna foto duplicada en tus anuncios en línea.",
   "photoDouble.titre": "Misma foto en {n} anuncios: {nums} — ¿el mismo par dos veces?",
+  "photoDouble.titre.art": "Misma foto en {n} anuncios: {nums} — ¿el mismo artículo dos veces?",
   "photoDouble.et": "{a} y {b}",
   "photoDouble.num": "N.º {n}",
   "photoDouble.sansNum": "sin N.º",
   "photoDouble.pasDoublon": "No es un duplicado",
   "photoDouble.note": "VRM solo compara el archivo exacto de la foto. No se modifica ni se vincula nada: mira los anuncios y retira el sobrante en su sitio si es el mismo par.",
+  "photoDouble.note.art": "VRM solo compara el archivo exacto de la foto. No se modifica ni se vincula nada: mira los anuncios y retira el sobrante en su sitio si es el mismo artículo.",
   "photoDouble.journeeSous": "{nums} — ¿el mismo par dos veces?",
+  "photoDouble.journeeSous.art": "{nums} — ¿el mismo artículo dos veces?",
   "photoDouble.journeeSousN": "Para revisar en Anuncios",
   "photoDouble.filtre": "Foto",
   "photoDouble.toutes": "Todas",
@@ -16,6 +19,7 @@ export default {
     "one": "{n} par con varios ejemplares (stock auto) no se señala.",
     "other": "{n} pares con varios ejemplares (stock auto) no se señalan."
   },
+  "photoDouble.ecartes.art": {"one": "{n} artículo con varios ejemplares (stock auto) no se señala.", "other": "{n} artículos con varios ejemplares (stock auto) no se señalan."},
   "osr.titre": "Ofertas sin respuesta",
   "osr.journee": {
     "one": "{n} oferta sin respuesta",

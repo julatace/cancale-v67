@@ -147,6 +147,14 @@ function analyser(R, fr, textes) {
   const lue = (k, ex, pr, su) => ex.has(k) || pr.some((p) => k.startsWith(p)) || su.some((s) => k.endsWith(s));
   const base = {}, reste = {};
   for (const [k, v] of Object.entries(fr)) (lue(k, exacts, P, S) ? base : reste)[k] = v;
+  // (26 nov., vocabulaire-article) `cle.art` (la forme « article » d'une clé, choisie par t() hors Sneakers)
+  // part AVEC sa clé : t() la lit chaque fois qu'il lit `cle`.
+  for (const k of Object.keys(fr)) {
+    if (!/\.art$/.test(k)) continue;
+    const b = k.slice(0, -4);
+    if (!(b in fr)) continue;
+    if (b in base) { base[k] = fr[k]; delete reste[k]; } else { reste[k] = fr[k]; delete base[k]; }
+  }
   const clesReste = Object.keys(reste);
   // les entrées qui PEUVENT lire une clé du reste (elles importent fr-reste en premier)
   const injecter = new Set();

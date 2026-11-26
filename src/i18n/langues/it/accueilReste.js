@@ -10,6 +10,7 @@ export default {
   "vis.journee.chiffres.p": "Tocca un numero: VRM ti dice da dove viene.",
   "vis.journee.loupe.t": "Tutto su un N.",
   "vis.journee.loupe.p": "Scrivi un N.: il paio, la vendita, il pacco.",
+  "vis.journee.loupe.p.art": "Scrivi un N.: l’articolo, la vendita, il pacco.",
   "vis.journee.aide.t": "Una domanda?",
   "vis.journee.aide.p": "Il «?» di ogni schermata: video, gesti e risposte.",
   "vis.annonces.cherche.t": "Trovare un annuncio",

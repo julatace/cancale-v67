@@ -32,6 +32,7 @@ export default {
   "plus.infos.enregistre": "Datos guardados",
   "plus.infos.efface": "Datos borrados",
   "plus.infos.cachees": "Datos ocultos: N.º en dos pares",
+  "plus.infos.cachees.art": "Datos ocultos: N.º en dos artículos",
   "plus.infos.ajouter": "Talla real, defectos, plantilla: por rellenar",
   "plus.infos.ajouter.neutre": "Talla real, defectos: por rellenar",
   "plus.achats.titre": "Para comprar mejor",

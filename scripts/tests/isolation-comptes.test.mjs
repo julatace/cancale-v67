@@ -19,7 +19,10 @@ test('liste des comptes : filtre obligatoire, rejet d’un propriétaire étrang
  function authB(){return {user:{id:B},session:{access_token:'token-b'}};}
 });
 test('les sauvegardes différées du vendeur A ne sont pas écrites après une bascule vers B dans un autre onglet',()=>{
- const code=extraire(app,'let _saveTimers = {}','// ── « ANNULER » PARTOUT');let travail,ecrit=0;
+ // (26 nov.) Le bloc porte une ligne `export { lireComptaPourEcrire };` (module ES, lue par Argent) : un script vm ne l'accepte pas.
+ // On retire SEULEMENT les lignes `export { … };` (aucun code exécuté) ; tout le reste du bloc tourne tel quel.
+ const brut=extraire(app,'let _saveTimers = {}','// ── « ANNULER » PARTOUT'),code=brut.replace(/^export \{[\w\s,]+\};$/gm,'');let travail,ecrit=0;
+ assert.ok(code.length>brut.length-200&&!/^\s*export\b/m.test(code),'seules les lignes export ont été retirées');
  const c=vm.createContext({AUTH:auth(),readSession:()=>({user:{id:B}}),setTimeout:fn=>(travail=fn,1),clearTimeout(){},localStorage:{setItem(){ecrit++;}},SYNC_KEYS:[],window:{dispatchEvent(){}},CustomEvent:class{},cloudPush(){throw Error('Interdit');},fabriquerModifierCle,chargerPublie:()=>null});
  vm.runInContext(code+';globalThis.sauver=save;',c);c.sauver('vinted_sales',[{id:'vente-a'}]);travail();assert.equal(ecrit,0);
 });

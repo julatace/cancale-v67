@@ -9,7 +9,9 @@ export default {
   "memePhoto.relier": "Relier à N°{numero}",
   "memePhoto.pasLaMeme": "Ce n’est pas la même",
   "memePhoto.deuxPaires": {"one": "Cette photo est sur {n} paire : laquelle ?", "other": "Cette photo est sur {n} paires : laquelle ?"},
+  "memePhoto.deuxPaires.art": {"one": "Cette photo est sur {n} article : lequel ?", "other": "Cette photo est sur {n} articles : lequel ?"},
   "memePhoto.numeroDouble": "N°{numero} est porté par deux paires : regarde le carton avant de relier.",
+  "memePhoto.numeroDouble.art": "N°{numero} est porté par deux articles : regarde leur rangement avant de relier.",
   "memePhoto.sansNumero": "Sans N°",
   "memePhoto.cestLui": "C’est N°{numero}",
   "memePhoto.aucune": "Aucune de celles-là",
@@ -27,6 +29,7 @@ export default {
   "memePhoto.pasPret": "Tes données ne sont pas encore chargées : réessaie dans un instant",
   "memePhoto.outil": "Même photo · à relier",
   "memePhoto.outilDesc": "Une annonce d’ailleurs avec la photo d’une paire Vinted",
+  "memePhoto.outilDesc.art": "Une annonce d’ailleurs avec la photo d’un article Vinted",
   "memePhoto.surSites": "Même photo sur {sites} · à relier",
   "memePhoto.sur": "Même photo · sûr",
   "memePhoto.aVerifier": "À vérifier",
@@ -56,5 +59,6 @@ export default {
   "ug.original": "Originaux remis.",
   "ug.alt": "Améliorée",
   "ug.pourquoi": "Pourquoi ?",
-  "ug.pourquoi.texte": "Tout se fait dans ce navigateur, gratuitement : rien n’est envoyé, aucune IA. Le même réglage s’applique à chaque photo de la paire ; l’original reste à côté. Le fond n’est blanchi que s’il est uni, et ce n’est pas un détourage."
+  "ug.pourquoi.texte": "Tout se fait dans ce navigateur, gratuitement : rien n’est envoyé, aucune IA. Le même réglage s’applique à chaque photo de la paire ; l’original reste à côté. Le fond n’est blanchi que s’il est uni, et ce n’est pas un détourage.",
+  "ug.pourquoi.texte.art": "Tout se fait dans ce navigateur, gratuitement : rien n’est envoyé, aucune IA. Le même réglage s’applique à chaque photo de l’article ; l’original reste à côté. Le fond n’est blanchi que s’il est uni, et ce n’est pas un détourage.",
 };

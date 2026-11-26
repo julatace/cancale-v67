@@ -3,12 +3,15 @@ export default {
   "egalite.etat.photodouble": "Duplicate photo",
   "egalite.vide.photodouble": "No duplicate photo on your live listings.",
   "photoDouble.titre": "Same photo on {n} listings: {nums} — the same pair twice?",
+  "photoDouble.titre.art": "Same photo on {n} listings: {nums} — the same item twice?",
   "photoDouble.et": "{a} and {b}",
   "photoDouble.num": "No. {n}",
   "photoDouble.sansNum": "no number",
   "photoDouble.pasDoublon": "Not a duplicate",
   "photoDouble.note": "VRM only compares the exact photo file. Nothing is changed or linked: look at the listings, then remove the extra one on its site if it is the same pair.",
+  "photoDouble.note.art": "VRM only compares the exact photo file. Nothing is changed or linked: look at the listings, then remove the extra one on its site if it is the same item.",
   "photoDouble.journeeSous": "{nums} — the same pair twice?",
+  "photoDouble.journeeSous.art": "{nums} — the same item twice?",
   "photoDouble.journeeSousN": "To check in Listings",
   "photoDouble.filtre": "Photo",
   "photoDouble.toutes": "All",
@@ -16,6 +19,7 @@ export default {
     "one": "{n} pair with several copies (auto stock) is not flagged.",
     "other": "{n} pairs with several copies (auto stock) are not flagged."
   },
+  "photoDouble.ecartes.art": {"one": "{n} item with several copies (auto stock) is not flagged.", "other": "{n} items with several copies (auto stock) are not flagged."},
   "osr.titre": "Unanswered offers",
   "osr.journee": {
     "one": "{n} unanswered offer",

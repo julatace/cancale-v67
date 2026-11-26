@@ -16,7 +16,8 @@
 //      4. une relecture des conversations qui n'a pas encore vu l'acceptation (ou qui a échoué) ne repasse pas
 //         l'offre confirmée « à trancher » ; le moteur automatique ne la retraite pas ;
 //      5. un refus métier en HTTP 200 (`code` ≠ 0) ne confirme rien, et un nouvel essai reste possible ;
-//      6. « rien n'est parti » (VRM le sait) n'est pas une issue incertaine ; sans confirmation, rien ne part ;
+//      6. « rien n'est parti » (VRM le sait) n'est pas une issue incertaine ; sans confirmation, rien ne part ; une
+//         acceptation sur une note d'acheteur pas lue s'arrête sur l'avertissement (5.430), rien ne part ;
 //      7. un worker tué PENDANT l'envoi (MV3, loi §4.9) : le blocage est déjà dans chrome.storage.local, le
 //         worker suivant ne renvoie rien sur cette conversation.
 //   Ce qui est déjà jugé ailleurs, sur le même chemin : la bascule de compte PENDANT l'attente dans la file Vinted
@@ -56,7 +57,9 @@ function monde(repondre, store) {
   f.ctx.offresEnAttente = async () => [Object.assign({}, OFFRE)]; // la relecture des conversations : l'offre y est encore
   f.basculer = (u) => { compte = u; };
   f.ecritures = () => f.j.vinted.filter((x) => x.methode !== "GET");
-  f.geste = (quoi, extra = {}) => f.envoyer({ from: "vrm-badge", action: "offreCarte", quoi, tx: OFFRE.tx, oid: OFFRE.oid, confirme: true, avisVu: true, ...extra }, ONGLET);
+  // `noteVue` : son second « Oui » après l'avertissement sur la note de l'acheteur (5.430, `noteacheteur`) — l'offre du
+  // banc n'a pas de note lue (« pas su »), l'avertissement lui-même est jugé en B6.
+  f.geste = (quoi, extra = {}) => f.envoyer({ from: "vrm-badge", action: "offreCarte", quoi, tx: OFFRE.tx, oid: OFFRE.oid, confirme: true, avisVu: true, noteVue: true, ...extra }, ONGLET);
   return f;
 }
 const tenue = () => { let lacher; const p = new Promise((r) => (lacher = r)); return { p, lacher: (x) => lacher(x) }; };
@@ -196,6 +199,17 @@ test("B6 — « rien n'est parti » n'est pas incertain ; sans confirmation rien
   const r = await f.envoyer({ from: "vrm-badge", action: "offreCarte", quoi: "accept", tx: OFFRE.tx, oid: OFFRE.oid }, ONGLET);
   assert.equal(r.code, "confirmation");
   assert.equal(f.ecritures().length, 0);
+  // (26 nov.) 5.430 `noteacheteur` : une acceptation à la main sur un acheteur dont la note n'est PAS lue s'arrête sur
+  // l'avertissement (`code: note`, « pas su ») — rien ne part, l'offre n'est ni bloquée ni close ; son second « Oui »
+  // (`noteVue`, ce que `f.geste` envoie partout ailleurs) fait partir UNE requête.
+  const n = await f.geste("accept", { noteVue: false });
+  assert.equal(n.code, "note", JSON.stringify(n));
+  assert.equal(n.decision, "pas-su");
+  assert.equal(f.ecritures().length, 0, "l'avertissement sur la note n'envoie rien");
+  assert.ok(!Object.keys(f.store.vrmOffresCarte || {}).length, "aucune trace « en vol » : l'offre n'est pas bloquée");
+  assert.ok(!(f.store.vrmOffresFaites || {})[OFFRE.oid], "ni close pour le moteur");
+  assert.equal((await f.geste("accept")).ok, true, "après son second « Oui », l'acceptation part");
+  assert.equal(f.ecritures().length, 1);
 });
 test("B7 — un worker tué pendant l'envoi : le worker suivant ne renvoie rien sur cette conversation", async () => {
   const t = tenue();

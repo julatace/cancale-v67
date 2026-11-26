@@ -3,12 +3,15 @@ export default {
   "egalite.etat.photodouble": "Photo en double",
   "egalite.vide.photodouble": "Aucune photo en double sur tes annonces en ligne.",
   "photoDouble.titre": "Même photo sur {n} annonces : {nums} — la même paire en double ?",
+  "photoDouble.titre.art": "Même photo sur {n} annonces : {nums} — le même article en double ?",
   "photoDouble.et": "{a} et {b}",
   "photoDouble.num": "N°{n}",
   "photoDouble.sansNum": "sans N°",
   "photoDouble.pasDoublon": "Ce n’est pas un doublon",
   "photoDouble.note": "VRM compare seulement le fichier exact de la photo. Rien n’est modifié ni relié : regarde les annonces, puis retire celle en trop sur son site si c’est la même paire.",
+  "photoDouble.note.art": "VRM compare seulement le fichier exact de la photo. Rien n’est modifié ni relié : regarde les annonces, puis retire celle en trop sur son site si c’est le même article.",
   "photoDouble.journeeSous": "{nums} — la même paire en double ?",
+  "photoDouble.journeeSous.art": "{nums} — le même article en double ?",
   "photoDouble.journeeSousN": "À regarder dans Annonces",
   "photoDouble.filtre": "Photo",
   "photoDouble.toutes": "Toutes",
@@ -16,6 +19,7 @@ export default {
     "one": "{n} paire en plusieurs exemplaires (stock auto) n’est pas signalée.",
     "other": "{n} paires en plusieurs exemplaires (stock auto) ne sont pas signalées."
   },
+  "photoDouble.ecartes.art": {"one": "{n} article en plusieurs exemplaires (stock auto) n’est pas signalé.", "other": "{n} articles en plusieurs exemplaires (stock auto) ne sont pas signalés."},
   "osr.titre": "Offres sans réponse",
   "osr.journee": {
     "one": "{n} offre sans réponse",

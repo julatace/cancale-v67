@@ -1,6 +1,7 @@
 // es · « Rentabilité : ce que tu vends le mieux, coût réel de chaque vente » (21 nov., lot rentabilite) — docs/passation/2026-11-21-rentabilite.md
 export default {
   "cr.net": "Beneficio neto del par",
+  "cr.net.art": "Beneficio neto del artículo",
   "cr.commission": "Comisión anotada",
   "cr.emballage": "Embalaje",
   "cr.boost": "Impulso, destacado",
@@ -41,6 +42,7 @@ export default {
   "rt.racheter": "Recomprar primero",
   "rt.racheter.peu": "Aún no hay ventas suficientes: al menos {n} ventas vinculadas y fechadas por grupo",
   "rt.parPaire": "{p} por par",
+  "rt.parPaire.art": "{p} por artículo",
   "rt.parJour": "{p} / día",
   "rt.delai": "vendido en {d}",
   "rt.prixMoyen": "precio medio {p}",
@@ -54,6 +56,7 @@ export default {
   "rt.couv.autres": "{n} no reconocidas (Otros)",
   "rt.regroupe": "Lo que se agrupó",
   "rt.regroupe.sous": "{n} grupos · solo para mostrar, nunca para vincular un par",
+  "rt.regroupe.sous.art": "{n} grupos · solo para mostrar, nunca para vincular un artículo",
   "rt.regroupe.reste": "y {n} más",
   "rt.axe.source": "Origen",
   "rs.tousAchats": "Todas tus compras, por origen",

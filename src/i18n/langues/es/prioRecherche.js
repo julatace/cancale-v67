@@ -55,7 +55,9 @@ export default {
   "prio.reglages.jours": "{n} d",
   "prio.reglages.parJour": "Cuántos al día",
   "prio.reglages.note": "La misma antigüedad que el segmento «Duermen». Los pares vendidos, ocultos por Vinted, en disputa o de una cuenta bloqueada o personal nunca se proponen.",
+  "prio.reglages.note.art": "La misma antigüedad que el segmento «Duermen». Los artículos vendidos, ocultos por Vinted, en disputa o de una cuenta bloqueada o personal nunca se proponen.",
   "prio.journee": {"one": "{n} par que republicar", "other": "{n} pares que republicar"},
+  "prio.journee.art": {"one": "{n} artículo que republicar", "other": "{n} artículos que republicar"},
   "prio.journeeSous": "En línea desde {jours} d o más, ordenados",
   "rech.approx": "con una letra de diferencia"
 };
