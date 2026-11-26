@@ -10,6 +10,7 @@ export default {
   "vis.journee.chiffres.p": "Tippe auf eine Zahl: VRM sagt dir, woher sie kommt.",
   "vis.journee.loupe.t": "Alles zu einer Nr.",
   "vis.journee.loupe.p": "Gib eine Nr. ein: Paar, Verkauf, Paket.",
+  "vis.journee.loupe.p.art": "Gib eine Nr. ein: Artikel, Verkauf, Paket.",
   "vis.journee.aide.t": "Eine Frage?",
   "vis.journee.aide.p": "Das „?“ jedes Bildschirms: Video, Schritte, Antworten.",
   "vis.annonces.cherche.t": "Anzeige finden",

@@ -27,6 +27,7 @@ export default {
   "bc.r.comparables.modele": "your {nom} sell in {j} d ({n} sales)",
   "bc.r.comparables.marque": "your {nom} sell in {j} d ({n} sales)",
   "bc.r.comparables.tranche": "your pairs at {nom} sell in {j} d ({n} sales)",
+  "bc.r.comparables.tranche.art": "your items at {nom} sell in {j} d ({n} sales)",
   "bc.r.achat": "purchase price not entered: VRM suggests nothing without your floor",
   "bc.r.recente": "dropped less than {n} d ago: give it time",
   "bc.r.proposee": "a drop was already suggested less than {n} d ago",

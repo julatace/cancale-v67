@@ -16,6 +16,8 @@ import { sbCle } from './cle.js';
 import { fetchAvecDelai } from './fetch-delai.js';
 import { sendPushToAll } from './push.js';
 import { lienNotif } from './lien-notif.js';
+import { MAIN_MOTS, motsServeur } from './mots-vendeur.js';
+import { motsArticle } from '../../src/profilVendeur.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const cle = () => process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
@@ -47,13 +49,14 @@ export function retraitsEnRetard(items, maintenant = Date.now()) {
   }
   return out.sort((a, b) => a.depuis - b.depuis);
 }
-export function texteRetraits(l) {
-  const n = l.length;
+// (26 nov., vocabulaire-article) `mots` : « paire » (Sneakers, le texte d'avant) ou « article » (`motsServeur`).
+export function texteRetraits(l, mots = motsArticle('sneakers')) {
+  const n = l.length, m = mots || motsArticle('sneakers');
   const sites = [...new Set(l.map((x) => NOM[x.site]))].join(', ');
   const nums = l.slice(0, 3).map((x) => (x.num ? 'N°' + x.num : '')).filter(Boolean).join(', ');
   return {
-    title: n > 1 ? `⚠️ ${n} paires vendues encore en ligne` : '⚠️ Une paire vendue encore en ligne',
-    body: `${nums ? nums + ' · ' : ''}${sites} : pas encore retirée${n > 1 ? 's' : ''} depuis 30 min — risque de double vente. Ouvre ${sites} ou retire-la${n > 1 ? 's' : ''} toi-même.`,
+    title: n > 1 ? `⚠️ ${n} ${m.noms} vendu${m.es} encore en ligne` : `⚠️ ${m.Un} vendu${m.e} encore en ligne`,
+    body: `${nums ? nums + ' · ' : ''}${sites} : pas encore retiré${m.e}${n > 1 ? 's' : ''} depuis 30 min — risque de double vente. Ouvre ${sites} ou retire-${n > 1 ? 'les' : m.la} toi-même.`,
   };
 }
 
@@ -65,6 +68,9 @@ export async function notifierRetraitsEnRetard({ maintenant = Date.now() } = {})
   const l = retraitsEnRetard(rows[0] && rows[0].items, maintenant);
   if (!l.length) return { status: 200, envoye: false, n: 0, raison: 'aucun retrait en retard' };
   const tag = 'vrm-retraits-' + l.map((x) => x.cle + '@' + x.depuis).join(',').replace(/[^\w:@,-]/g, '').slice(0, 120);
-  const envoi = await sendPushToAll({ cat: 'capture', urgent: true, ...texteRetraits(l), tag, url: lienNotif('ventes') });
+  const jv = await lire(`app_data?id=eq.main&select=jv:data->>${MAIN_MOTS}`);
+  let reglage = null;
+  try { reglage = jv && jv[0] && jv[0].jv ? JSON.parse(jv[0].jv) : null; } catch (_) { reglage = null; }
+  const envoi = await sendPushToAll({ cat: 'capture', urgent: true, ...texteRetraits(l, motsServeur(reglage, proprietaireCourant())), tag, url: lienNotif('ventes') });
   return { status: 200, envoye: !!(envoi && envoi.sent), n: l.length, raison: (envoi && (envoi.coupe || envoi.erreur || (envoi.calme ? 'heures calmes' : ''))) || '' };
 }

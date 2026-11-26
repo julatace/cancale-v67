@@ -199,8 +199,26 @@ const remplir = (s, vars) => (vars ? String(s).replace(/\{(\w+)\}/g, (m, k) => {
   const v = vars[k];
   return typeof v === 'number' ? nombre(v) : String(v == null ? '' : v);
 }) : String(s));
+// (26 nov., lot vocabulaire-article) LES CLÉS À DEUX FORMES : `cle` dit « paire » (Sneakers, mot pour
+// mot) et `cle.art` dit « article ». Hors Sneakers, `t(cle)` rend `cle.art` quand elle existe — chaque
+// écran garde SA clé. La source (« vend-il des sneakers ? ») est posée par l'app (`poserVarianteArticle`,
+// App.jsx, la même que `motsVendeur()`) ; sans source (banc, page sans app) ⇒ les textes d'avant.
+// Garde : scripts/audit-vocabulaire-article.cjs (S1, E4).
+let horsSneakers = null;
+export const poserVarianteArticle = (f) => { horsSneakers = typeof f === 'function' ? f : null; };
+const variante = (cle) => {
+  if (!horsSneakers) return null;
+  let h = false;
+  try { h = horsSneakers() === true; } catch (_) { h = false; }
+  if (!h) return null;
+  const a = dict[cle + '.art'];
+  if (a != null) return a;
+  // une langue qui a la clé mais pas sa forme « article » garde SA phrase (jamais du français au milieu)
+  return dict !== fr && dict[cle] != null ? null : fr[cle + '.art'];
+};
 export function t(cle, vars) {
-  let e = dict[cle];
+  let e = variante(cle);
+  if (e == null) e = dict[cle];
   if (e == null) e = fr[cle];
   if (e == null) { cleEnAttente(cle); return cle; }
   if (typeof e === 'object') e = choisirPluriel(e, vars && (vars.n != null ? vars.n : vars.count));

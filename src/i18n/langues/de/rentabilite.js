@@ -1,6 +1,7 @@
 // de · « Rentabilité : ce que tu vends le mieux, coût réel de chaque vente » (21 nov., lot rentabilite) — docs/passation/2026-11-21-rentabilite.md
 export default {
   "cr.net": "Nettogewinn des Paars",
+  "cr.net.art": "Nettogewinn des Artikels",
   "cr.commission": "Notierte Gebühr",
   "cr.emballage": "Verpackung",
   "cr.boost": "Boost, Hervorhebung",
@@ -41,6 +42,7 @@ export default {
   "rt.racheter": "Zuerst nachkaufen",
   "rt.racheter.peu": "Noch zu wenige Verkäufe: mindestens {n} verknüpfte, datierte Verkäufe pro Gruppe",
   "rt.parPaire": "{p} pro Paar",
+  "rt.parPaire.art": "{p} pro Artikel",
   "rt.parJour": "{p} / Tag",
   "rt.delai": "verkauft in {d}",
   "rt.prixMoyen": "Durchschnittspreis {p}",
@@ -54,6 +56,7 @@ export default {
   "rt.couv.autres": "{n} nicht erkannt (Andere)",
   "rt.regroupe": "Was zusammengefasst wurde",
   "rt.regroupe.sous": "{n} Gruppen · nur zur Anzeige, nie zum Verknüpfen",
+  "rt.regroupe.sous.art": "{n} Gruppen · nur zur Anzeige, nie zum Verknüpfen",
   "rt.regroupe.reste": "und {n} weitere",
   "rt.axe.source": "Quelle",
   "rs.tousAchats": "Alle Einkäufe, nach Quelle",

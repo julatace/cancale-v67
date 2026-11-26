@@ -32,6 +32,7 @@ export default {
   "plus.infos.enregistre": "Details saved",
   "plus.infos.efface": "Details cleared",
   "plus.infos.cachees": "Details hidden: number on two pairs",
+  "plus.infos.cachees.art": "Details hidden: number on two items",
   "plus.infos.ajouter": "True fit, flaws, insole: to fill in",
   "plus.infos.ajouter.neutre": "True fit, flaws: to fill in",
   "plus.achats.titre": "Buy smarter",

@@ -17,7 +17,7 @@
 //   caché) : les autres écrans et le widget restent justes.
 // Aucune règle de calcul ici : ce module ne décide que de l'ORDRE et de la
 // VISIBILITÉ. Pur (aucun import de l'app), exécuté par audit-journee-perso.cjs.
-import { caseJourneeMontree } from './profilVendeur.js';
+import { caseJourneeMontree, motsVendeur } from './profilVendeur.js';
 
 export const CLE_JOURNEE_PERSO = 'vrm_journee_perso';
 
@@ -43,7 +43,7 @@ export const CARTES_JOURNEE = [
   { id: 'avis-bas', zone: 'afaire', nom: 'Avis négatif reçu', desc: 'Un avis de 3★ ou moins, à lire.' },   // (11 nov., lot avis-negatif, intégration)
   { id: 'photos-comptes', zone: 'afaire', nom: 'Photos sur deux comptes', desc: 'La même photo sur deux comptes Vinted.' },
   // (15 nov., lot meme-photo) Une annonce Leboncoin / eBay / Vestiaire sans lien, à la MÊME photo qu'une paire Vinted.
-  { id: 'meme-photo', zone: 'afaire', nom: 'Même photo · à relier', desc: 'Une annonce d’ailleurs avec la photo d’une paire Vinted.' },
+  { id: 'meme-photo', zone: 'afaire', nom: 'Même photo · à relier', get desc() { return `Une annonce d’ailleurs avec la photo d’${motsVendeur().un} Vinted.`; } },
   { id: 'envoyer', zone: 'afaire', nom: 'Colis à envoyer', desc: 'Revient seule si un colis est pressé.', urgent: true },
   { id: 'retirer', zone: 'afaire', nom: 'Colis à retirer', desc: 'Revient seule au dernier jour.', urgent: true },
   { id: 'messages', zone: 'afaire', nom: 'Messages', desc: 'Tes messages pas lus.' },

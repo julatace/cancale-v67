@@ -75,8 +75,10 @@ export default {
   "pn.comptes.plusTard": "VRM will see it on your first visit",
 
   "pn.numeros.titre": "Who numbers your pairs?",
+  "pn.numeros.titre.art": "Who numbers your items?",
   "pn.numeros.titreAutre": "Who numbers your items?",
   "pn.numeros.phrase": "The number written on the box finds the pair in a second. A number is never reused.",
+  "pn.numeros.phrase.art": "The number written where it is stored finds the item in a second. A number is never reused.",
   "pn.numeros.vrm": "VRM numbers them",
   "pn.numeros.vrm.desc": "Each new listing gets a number to write on its box.",
   "pn.numeros.moi": "I number them myself",

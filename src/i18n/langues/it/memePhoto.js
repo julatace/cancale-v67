@@ -9,7 +9,9 @@ export default {
   "memePhoto.relier": "Collega al N° {numero}",
   "memePhoto.pasLaMeme": "Non è lo stesso",
   "memePhoto.deuxPaires": {"one": "Questa foto è su {n} paio: quale?", "other": "Questa foto è su {n} paia: quale?"},
+  "memePhoto.deuxPaires.art": {"one": "Questa foto è su {n} articolo: quale?", "other": "Questa foto è su {n} articoli: quale?"},
   "memePhoto.numeroDouble": "Il N° {numero} è su due paia: guarda la scatola prima di collegare.",
+  "memePhoto.numeroDouble.art": "Il N° {numero} è su due articoli: guarda dove sono riposti prima di collegare.",
   "memePhoto.sansNumero": "Senza N°",
   "memePhoto.cestLui": "È il N° {numero}",
   "memePhoto.aucune": "Nessuno di questi",
@@ -27,6 +29,7 @@ export default {
   "memePhoto.pasPret": "I tuoi dati non sono ancora caricati: riprova tra un attimo",
   "memePhoto.outil": "Stessa foto · da collegare",
   "memePhoto.outilDesc": "Un annuncio altrove con la foto di un paio Vinted",
+  "memePhoto.outilDesc.art": "Un annuncio altrove con la foto di un articolo Vinted",
   "memePhoto.surSites": "Stessa foto su {sites} · da collegare",
   "memePhoto.sur": "Stessa foto · sicuro",
   "memePhoto.aVerifier": "Da verificare",
@@ -56,5 +59,6 @@ export default {
   "ug.original": "Originali ripristinati.",
   "ug.alt": "Migliorata",
   "ug.pourquoi": "Perché?",
-  "ug.pourquoi.texte": "Tutto avviene in questo browser, gratis: niente viene inviato, nessuna IA. La stessa regolazione vale per ogni foto del paio; l’originale resta accanto. Lo sfondo si sbianca solo se è uniforme, e non è uno scontorno."
+  "ug.pourquoi.texte": "Tutto avviene in questo browser, gratis: niente viene inviato, nessuna IA. La stessa regolazione vale per ogni foto del paio; l’originale resta accanto. Lo sfondo si sbianca solo se è uniforme, e non è uno scontorno.",
+  "ug.pourquoi.texte.art": "Tutto avviene in questo browser, gratis: niente viene inviato, nessuna IA. La stessa regolazione vale per ogni foto dell’articolo; l’originale resta accanto. Lo sfondo si sbianca solo se è uniforme, e non è uno scontorno.",
 };
