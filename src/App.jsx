@@ -531,6 +531,15 @@ const RienARetirer = aLaDemandeDiscret(() => import('./natif/RetraitsPoints.jsx'
 // (20 nov., chasse-bugs) Montée HORS des portes (à côté du cœur) : sa lecture `capte_journal_*` n'a le droit de partir qu'une fois la
 // porte de confidentialité passée (`_confidentialiteUid`) — sinon « rien pas su », relu au `onCloudReady` (banc hors-ligne-froid B–H).
 const FeuilleArrivee = aLaDemandeDiscret(() => import('./capteNotif/FeuilleArrivee.jsx'));
+// (25 nov., « jeu vidéo ») Ce que la feuille d'arrivée montre de chaque nouveauté vient des copies DÉJÀ captées du MÊME compte
+// (aucun appel à Vinted) : sa boîte (`inbox`) ou ses commandes (`sold`/`purchased`). Lecture ratée ⇒ `null` (la ligne reste nue) ;
+// le rapprochement, par n° de conversation ou de transaction seulement, est dans src/capteNotif/details.js.
+async function lireCopieArrivee(compte, ou) {
+  if (MULTI_USER && (!AUTH.user || _confidentialiteUid !== AUTH.user.id)) return null;
+  if (ou === 'inbox') { const h = await fetchHarvest(compte, 'inbox'); return h && Array.isArray(h.conversations) ? h.conversations : null; }
+  if (ou === 'sold' || ou === 'purchased') { const p = await fetchHarvestOrders(compte, ou); return p && Array.isArray(p.my_orders) ? p.my_orders : null; }
+  return null;
+}
 const VentesTableau = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx'));
 // (21 nov., ventes-lisibles) Terminées au téléphone : la rangée native de Ventes (vignette 64, titre entier, l'achat en un toucher).
 const VentesListeTel = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx').then((m) => ({ default: m.VentesListeTel })));
@@ -33698,7 +33707,7 @@ export default function App() {
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
   return <>{(MULTI_USER && authState.user)
     ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onRafraichir={()=>authRefresh()} onVerifier={uid=>{_confidentialiteUid=uid;}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
-    : coeur}<VisionneusePdf/><PlaceurTampon/><ApercuUnCoque/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}{authState.user && authState.user.id ? <CapteNotif feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}{authState.user && authState.user.id ? <FeuilleArrivee pret lire={(q)=>(MULTI_USER&&(!AUTH.user||_confidentialiteUid!==AUTH.user.id))?Promise.resolve(null):lireTout(q,{strict:true})} load={load} save={save} onCloudReady={onCloudReady} nomCompte={(p,c)=>p==='vinted'?String((load('vinted_account_labels',{})||{})[c]||''):''} exclu={(p,c)=>p==='vinted'&&!!lireComptesExclus()[c]} feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}</>;
+    : coeur}<VisionneusePdf/><PlaceurTampon/><ApercuUnCoque/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}{authState.user && authState.user.id ? <CapteNotif feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}{authState.user && authState.user.id ? <FeuilleArrivee pret lire={(q)=>(MULTI_USER&&(!AUTH.user||_confidentialiteUid!==AUTH.user.id))?Promise.resolve(null):lireTout(q,{strict:true})} load={load} save={save} onCloudReady={onCloudReady} nomCompte={(p,c)=>p==='vinted'?String((load('vinted_account_labels',{})||{})[c]||''):''} exclu={(p,c)=>p==='vinted'&&!!lireComptesExclus()[c]} lireCopie={lireCopieArrivee} feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}</>;
 }
 
 // ── Le code Discord (revue de sécurité du 21 octobre) ─────────────────────────

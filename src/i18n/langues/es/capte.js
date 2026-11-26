@@ -23,6 +23,12 @@ export default {
   // (19 nov., ext. 5.409) « Depuis ta dernière visite » — src/capteNotif/FeuilleArrivee.jsx
   "capte.arrivee.titre": "Desde tu última visita",
   "capte.arrivee.cestVu": "Visto",
+  // (25 nov., « jeu vidéo ») la feuille d’arrivée refaite — src/capteNotif/FeuilleArrivee.jsx
+  "capte.arrivee.toutVu": "Todo visto",
+  "capte.arrivee.nouveau": "Nuevo",
+  "capte.arrivee.nouveautes": {"one": "{n} novedad desde tu última visita", "other": "{n} novedades desde tu última visita"},
+  "capte.arrivee.nouveautesMot": {"one": "novedad", "other": "novedades"},
+  "capte.arrivee.offre": "Oferta: {montant}",
   "capte.arrivee.aLinstant": "ahora mismo",
   "capte.arrivee.minutes": {"one": "hace {n} min", "other": "hace {n} min"},
   "capte.arrivee.heures": {"one": "hace {n} h", "other": "hace {n} h"},
