@@ -114,8 +114,16 @@ async function scenarioA(nav, largeur, sombre) {
     dit(await masq.locator('a[data-moderation-modifier]').getAttribute('href') === 'https://www.vinted.fr/items/1000042/edit' && /vinted\.fr\/help/.test(await masq.locator('a[data-moderation-contacter]').getAttribute('href')), `${nom} : 5.438 « Modifier » (l’édition de CETTE annonce) et « Contacter Vinted »`);
     const rev = c.locator('[data-moderation-sorte="visible"]');
     dit((await rev.count()) === 1 && /Asics Gel-Kayano 14 taille 41 est à nouveau visible/.test(await rev.innerText()) && (await rev.getAttribute('data-moderation-item')) === '1000055', `${nom} : 5.438 « Asics Gel-Kayano 14 taille 41 est à nouveau visible »`, (await rev.count()) ? await rev.innerText() : '');
-    const disp = c.locator('[data-moderation-sorte="disparue"]');
-    dit(/a disparu/.test(await disp.innerText()) && /Peut-être retirée par Vinted/.test(await disp.innerText()) && /1000077/.test(await disp.innerText()) && !/N°/.test(await disp.innerText()), `${nom} : disparue, formulé prudemment, sans fiche ⇒ l’identifiant (jamais un N° deviné)`, await disp.innerText());
+    // (24 nov., réconciliée avec la revue UX) la disparue vit dans la LIGNE de son compte (« 1 annonce a disparu de
+    // compte ») ; au toucher, la feuille : l'explication prudente sous « Pourquoi ? » (textContent : repliée), la case dit
+    // l'identifiant (jamais un N° deviné).
+    const disp = c.locator('[data-moderation-groupe="disparue"]');
+    const ligneDisp = await disp.innerText();
+    await disp.click(); await pg.locator('[data-moderation-feuille]').waitFor({ timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(400);
+    const fd = pg.locator('[data-moderation-feuille]');
+    const caseDisp = (await fd.locator('[data-moderation-case="1000077"]').count()) ? await fd.locator('[data-moderation-case="1000077"]').innerText() : '';
+    dit(/1 annonce a disparu de[  ]shop_cancale/.test(ligneDisp) && /Peut-être retirée par Vinted/.test(await fd.textContent()) && /1000077/.test(caseDisp) && !/N°/.test(caseDisp) && !/N°/.test(ligneDisp), `${nom} : disparue, formulé prudemment, sans fiche ⇒ l’identifiant (jamais un N° deviné)`, ligneDisp + ' | ' + caseDisp);
+    await pg.keyboard.press('Escape'); await fd.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(200);
     const lim = c.locator('[data-moderation-sorte="restreint"]');
     dit(/Vinted limite le compte/.test(await lim.innerText()) && /Listing restricted/.test(await lim.innerText()) && /Pause conseillée/.test(await lim.innerText()) && /Vérifie tes messages Vinted/.test(await lim.innerText()), `${nom} : compte limité : la raison de Vinted, la pause, le geste`, await lim.innerText());
     dit(/Vue le /.test(await masq.innerText()), `${nom} : quand`);
@@ -153,7 +161,7 @@ async function scenarioB(nav) {
     dit(await attendre(pg), 'B : la carte paraît (la masquée)');
     await pg.waitForFunction(() => { const c = document.querySelector('[data-moderation]'); return c && c.getAttribute('data-moderation') === '1'; }, null, { timeout: 15000 }).catch(() => {});
     const c = pg.locator(CARTE).first();
-    dit(await c.getAttribute('data-moderation') === '1' && (await c.locator('[data-moderation-sorte="disparue"]').count()) === 0, 'B : la disparue VENDUE (transaction finalisée de cette annonce) n’est pas une alerte', await c.getAttribute('data-moderation'));
+    dit(await c.getAttribute('data-moderation') === '1' && (await c.locator('[data-moderation-sorte="disparue"], [data-moderation-groupe="disparue"]').count()) === 0, 'B : la disparue VENDUE (transaction finalisée de cette annonce) n’est pas une alerte', await c.getAttribute('data-moderation'));
     await capture(pg, 'B');
     dit(!etat.erreurs.length, 'B : aucune erreur d’app', etat.erreurs.join(' | ').slice(0, 300));
   } finally { await ctx.close(); }

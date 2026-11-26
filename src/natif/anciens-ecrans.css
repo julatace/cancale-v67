@@ -26,6 +26,7 @@ html {
   --ap-carte: var(--n-carte, #FFFFFF);
   --ap-carte-2: var(--n-carte-2, #F2F2F7);
   --ap-remplir: rgb(118 118 128 / .12);              /* le remplissage d'iOS (piste d'un segmenté, champ) : pas de jeton natif */
+  --ap-puits: rgb(255 255 255 / .55);                /* (25 nov., gris moyen) le creux d’un champ de recherche : clair sur la page grise */
   --ap-filet: var(--n-trait, rgb(60 60 67 / .18));
   --ap-encre: var(--n-encre, #111114);
   /* L'encre seconde du natif tient 4,5:1 sur la carte et sur le fond ; les anciens écrans la posent AUSSI sur un remplissage
@@ -98,7 +99,8 @@ html:root {
   --sb-porcelaine-degrade: linear-gradient(var(--ap-carte), var(--ap-carte)) !important;
   --sb-creux: var(--ap-remplir) !important; --sb-socle: var(--ap-fond) !important;
   --sb-verre: var(--ap-matiere) !important; --sb-verre-plan: var(--ap-carte) !important; --sb-verre-flou: none !important;
-  --sb-puits: var(--ap-remplir) !important; --sb-puits-ombre: none !important;
+  /* (25 nov., gris moyen) le champ creusé : un blanc voilé + un filet (le remplissage gris disparaissait sur la page grise) */
+  --sb-puits: var(--ap-puits) !important; --sb-puits-ombre: inset 0 0 0 1px var(--n-bord, #B9BDC3) !important;
   --sb-encre: var(--ap-encre) !important; --sb-encre-2: var(--ap-gris) !important;
   --sb-diode: var(--ap-bleu-vif) !important; --sb-lien: var(--ap-bleu) !important;
   --sb-ambre: var(--ap-ambre) !important; --sb-ambre-point: var(--ap-ambre-point) !important;
@@ -140,7 +142,7 @@ html:root {
   --v2-kraft-bord: rgb(46 38 25 / .16) !important; --v2-kraft-trou: var(--ap-carte) !important;
 }
 html[data-theme="dark"]:root {
-  --sb-puits: var(--ap-remplir) !important;
+  --sb-puits: var(--ap-remplir) !important; --sb-puits-ombre: none !important;
   --sb-ombre-avant: 0 0 0 .5px rgb(255 255 255 / .08), 0 12px 40px -12px rgb(0 0 0 / .9) !important;
   --v2-socle: var(--ap-carte-2) !important; --sb-socle: var(--ap-carte-2) !important;
   --v2-kraft: #34302A !important; --v2-kraft-encre: #EFE6D6 !important; --v2-kraft-doux: #C4B69E !important;
@@ -355,6 +357,11 @@ html body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-discret:not(:disabled) { col
 html body .v2-feuille-corps .vrm-filtres > button[data-site] { min-height: 44px !important; min-width: 44px !important; }
 /* Un champ de recherche d'écran : le remplissage d'iOS, sans ombre ni verre (il flottait avec une ombre portée). */
 html body .vrm-main .vrm-champ-recherche { background: var(--ap-remplir) !important; background-image: none !important; box-shadow: none !important; border-color: transparent !important; border-radius: 10px !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+/* (25 nov., gris moyen — « gris moyen c'est d'accord ») En clair, ces champs (Paramètres, Messages, Stock, E-mails…) posaient le
+   remplissage gris d'iOS : sur la page #878B92 il disparaissait. Un blanc voilé et un filet ; l'anneau de focus d'origine reste ;
+   la nuit ne change pas. */
+html:not([data-theme="dark"]) body :is(.vrm-champ-recherche, .vrm-ui-outils-champ) { background: var(--ap-puits) !important; }
+html:not([data-theme="dark"]) body :is(.vrm-champ-recherche, .vrm-ui-outils-champ):not(:focus-within) { box-shadow: inset 0 0 0 1px var(--n-bord, #B9BDC3) !important; }
 /* L'aide : le numéro d'une étape — une pastille pleine, blanc dessus (à l'encre sur le bleu : 3,55:1 ; les suivantes étaient grises). */
 html body .vrm-aide-etape-n { background: var(--ap-plein) !important; color: var(--ap-sur-plein) !important; }
 /* Le Stock, « comment ranger » : le numéro d'une étape, à l'encre (le film baisse l'étape à venir à .7 : à l'encre seconde

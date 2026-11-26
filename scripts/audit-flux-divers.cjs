@@ -292,9 +292,11 @@ const faireRes = () => { const r = { code: null, corps: null }; r.status = (n) =
     const oc = (ts) => ({ acc: { vinted_user_id: 111 }, inboxUpdatedAt: ts, messages: [], conversation: { transaction: { item_id: 9001, current_user_side: 'seller' } } });
     dit(typeof fil === 'function' && fil(oc('2026-10-29T10:00:00Z')) === true && fil(oc('2026-10-31T10:00:00Z')) === false && fil(oc(null)) === false && fil({ ...oc('2026-10-29T10:00:00Z'), conversation: { transaction: { item_id: 9001, current_user_side: 'buyer' } } }) === false,
       'A13 `annonceDuFilPartie` (exécutée) : partie seulement si une lecture complète APRÈS la dernière activité ne la montre plus ; sinon, et côté acheteur, pas su');
+    // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) répondre depuis VRM par la porte (src/agir/Agir.jsx `ComposerReponse`).
+    const rep = await require('./_porte-agir.cjs').repondre(CODE, sansCommentaires(fs.readFileSync(path.join(__dirname, '..', 'src', 'agir', 'Agir.jsx'), 'utf8')), 'vinted');
     dit(/const annonceDuFilPartie = \(oc\) => \{[\s\S]{0,700}majAuGeste\(oc\.inboxUpdatedAt \|\| null, oc\.messages\)[\s\S]{0,500}annonceOffreEnVente\([\s\S]{0,300}lectureOffres\) === 'non';/.test(CODE)
-      && /<BoutonExtension action="repondre" ids=\{\[String\(openConv\.convId\|\|''\)\]\} large\/>/.test(CODE),
-      'A13 (20 nov.) la règle `annonceDuFilPartie` reste ; la réponse (et ses réponses rapides) se fait dans le panneau de l’extension');
+      && rep.ok && /onChoisir=\{\(t\)=>remplirReponse\('vinted', String\(openConv\.convId/.test(CODE),
+      'A13 (24 nov.) la règle `annonceDuFilPartie` reste ; la réponse part DEPUIS VRM par la porte sur CETTE conversation (une réponse rapide REMPLIT le champ), sinon lecture seule', rep.detail);
   });
 
   // ── A14. `vinted_sales_hidden` n'est plus rapatriée ───────────────────────

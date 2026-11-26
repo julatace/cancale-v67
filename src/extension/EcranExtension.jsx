@@ -26,6 +26,7 @@ import { nomCompteLie } from '../comptesLies.js';
 import { useComptesBloques, choixComptesBloquesChange } from '../compteBloqueEtat.js';
 import { CLE_COMPTES_BLOQUES, cbPhase, choixPose } from '../compteBloque.js';
 import EnDirect from './EnDirect.jsx';   // (21 nov., ext. 5.428) « En direct »
+import ObservationVinted from './ObservationVinted.jsx';   // (24 nov., ext. 5.440.3) « Observer Vinted (10 min) »
 import './extension.css';
 
 const NOMS_NAV = { chrome: 'Chrome', edge: 'Edge', opera: 'Opera', firefox: 'Firefox', orion: 'Orion' };
@@ -279,7 +280,7 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
 
       {!etapesFaites ? (
         <Groupe titre={tr('ext.groupe.premier')} attrs={{ 'data-ext-groupe': 'premier' }}>
-          {vm.etapes.map((e) => <Rangee key={e.cle} titre={tr('ext.etape.' + e.cle)} valeur={e.fait === true ? tr('ext.etape.vu') : e.fait === null ? tr('ext.etape.encours') : tr('ext.etape.attente')} valeurForte={e.fait === true}
+          {vm.etapes.map((e) => <Rangee key={e.cle} titre={tr('ext.etape.' + e.cle)} lignes={2} valeur={e.fait === true ? tr('ext.etape.vu') : e.fait === null ? tr('ext.etape.encours') : tr('ext.etape.attente')} valeurForte={e.fait === true}
             fin={e.fait === true ? 'coche' : null} attrs={{ 'data-ext-etape': e.cle, 'data-ext-fait': e.fait === true ? '1' : e.fait === null ? '?' : '0' }}/>)}
         </Groupe>
       ) : null}
@@ -295,6 +296,10 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
             valeur={a.aJour ? tr('ext.aJour') : tr('ext.enRetard')} attrs={{ 'data-ext-appareil': a.id, 'data-ext-a-jour': a.aJour ? '1' : '0' }}/>)}
         </Groupe>
       ) : null}
+
+      {/* (24 nov., ext. 5.440.3 `observation`) « Observer Vinted (10 min) » : le chemin de la page Vinted pendant un envoi à un
+          favori (à la main ou avec un autre outil), formes seulement ; la frise en lecture seule. */}
+      {!chargement ? <ObservationVinted/> : null}
     </Page>
   );
 }

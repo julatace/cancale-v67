@@ -34,7 +34,7 @@ export const CATEGORIES = [
     { id: 'supprimer', items: ['fermer'] },
   ] },
   { id: 'plateformes', ic: 'grid', groupes: [
-    { id: 'comptes', items: ['liens', 'connexions', 'verifier', 'ebay'] },
+    { id: 'comptes', items: ['adistance', 'connexionsext', 'liens', 'connexions', 'verifier', 'ebay', 'ebay-recherches'] },
     { id: 'onglets', titre: 'parametres.g.onglets', items: ['mes-plateformes', 'historique'] },
     { id: 'emails', titre: 'reglages.groupe.emails-reglages', items: ['adresses', 'adresse-vrm', 'import'] },
   ] },
@@ -138,7 +138,7 @@ export const LIENS_PROFONDS = [
   'verifier', 'toutvabien', 'connexions', 'depannage', 'appareils', 'double', 'equipe', 'abonnement', 'widget',
   'mes-plateformes', 'mes-signalements', 'nouveaux-comptes', 'presentation',
   // `DEMANDE_REGLAGE_SOUS` posé ailleurs (cloche, conseils, ligne de fraîcheur, santé, MFA, sections)
-  'sante', 'santecomptes', 'discretion', 'rappels', 'importer', 'demandes-aide', 'fermer', 'signalements', 'ebay', 'securite-comptes', 'historique', 'copieannonces', 'journal-vrm', 'tes-donnees',
+  'sante', 'santecomptes', 'discretion', 'rappels', 'importer', 'demandes-aide', 'fermer', 'signalements', 'ebay', 'securite-comptes', 'historique', 'copieannonces', 'journal-vrm', 'tes-donnees', 'quoi-de-neuf',
 ];
 // Deux noms pour la même rangée : l'ancienne ligne « Mon abonnement » (un renvoi vers l'onglet) et la section.
 export const ALIAS_LIENS = { 'abonnement-ouvrir': 'abonnement', notifications: 'push' };

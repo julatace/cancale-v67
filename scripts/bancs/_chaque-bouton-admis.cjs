@@ -1,0 +1,64 @@
+// Les exceptions du robot « chaque bouton marche » (scripts/bancs/chaque-bouton.cjs), chacune avec sa raison.
+// (24 nov., main-vert) Un module, plus un .json : le dossier des bancs ne porte AUCUN .json (audit-bancs, dépôt PUBLIC :
+// aucune donnée) ; ceci n'est pas une donnée, c'est la liste des défauts admis.
+'use strict';
+module.exports = [
+ {
+  "cle": "vrm-cp-t\\|(#|Effacer|Virgule)\\|",
+  "defaut": "aucun-effet",
+  "raison": "Pavé numérique de « Compléter » : un « 0 » en tête, une 2ᵉ virgule et « ⌫ » sur un montant vide ne changent rien, comme sur toute calculette (les autres touches écrivent)."
+ },
+ {
+  "cle": "› (Actions|Colis) \\|\\|",
+  "defaut": "retour-ailleurs",
+  "raison": "Les feuilles « Actions » d'Annonces et « Colis » de Ventes (menu « … ») sont des feuilles d'actions : le geste choisi les ferme et ouvre le sien ; on revient à l'écran, pas au menu (comme sur iOS)."
+ },
+ {
+  "cle": "› [^|]+ \\|\\|.*\\|(Revoir la visite de cet écran|Signaler un problème)\\|",
+  "defaut": "retour-ailleurs",
+  "raison": "L'aide d'un écran (« ? ») se ferme d'abord quand on lance la visite ou « Signaler un problème » (décision du 14 nov., src/composants/AideEcran.jsx)."
+ },
+ {
+  "cle": "› Tu vends quoi \\? \\|\\|.*Passer cette étape",
+  "defaut": "retour-ailleurs",
+  "raison": "« Configure VRM » : passer l'étape la quitte (assistant pas à pas)."
+ },
+ {
+  "cle": "^garage .*vrm-cv-porte\\|# sans prix ›",
+  "defaut": "retour-ailleurs",
+  "raison": "Rejoué à la main (sonde, 23 nov.) : Stock → « N sans prix › » → Annonces, puis retour ⇒ Stock. Le robot arrive au Stock par un saut d'écran (`vrm:aller`) dont l'entrée d'historique n'est pas celle d'un vrai toucher."
+ },
+ {
+  "cle": "^achats .*vrm-fu-case\\|À retirer",
+  "defaut": "aucun-effet",
+  "vue": "ordi",
+  "raison": "À l'ordinateur, la section « À retirer » est déjà ouverte et en vue à gauche de la bande : la case la signale (contour 1,4 s, `data-vrm-signale`), rien d'autre à montrer."
+ },
+ {
+  "cle": "› N° ?# · [^|]* \\|\\|",
+  "defaut": "retour-ailleurs",
+  "raison": "La feuille « Gestes » d'une annonce ou d'une vente (« N°… · titre », ouverte par « … ») est une feuille d'actions : le geste choisi (Republier, Relier, Prix…) la ferme et ouvre le sien ; refermé, on revient à la liste."
+ },
+ {
+  "cle": "\\|\\| A\\|\\|\\|\\|[^|]*@[^|]*\\|",
+  "defaut": "petit",
+  "raison": "Une adresse e-mail écrite DANS une phrase (lien en ligne) : la règle des 44 px ne s'applique pas à un lien dans le texte (exception « en ligne » de WCAG 2.5.8) ; l'adresse se copie aussi d'un appui long.",
+  "exemple": [
+   "emails || A||||contact@exemple.fr|0"
+  ]
+ },
+ {
+  "cle": "› Relier un achat \\|\\|.*\\|Relier achats et ventes\\|",
+  "defaut": "retour-ailleurs",
+  "raison": "« Relier achats et ventes » dans la feuille « Relier un achat » passe à l'atelier Glisser (plein écran) : la feuille se ferme, l'atelier la remplace (src/ecrans/Comptabilite.jsx, ouvrirGlisser)."
+ },
+ {
+  "cle": "› Statut( · #)? \\|\\| (INPUT|BUTTON\\|\\|button\\|[^|]*\\|Tout afficher)",
+  "defaut": "retour-ailleurs",
+  "raison": "Rejoué à la main (sonde, 23 nov.) : cocher un statut dans le menu « Statut » des tableaux garde le menu ouvert (filtre à plusieurs choix) ; le robot compte la liste filtrée qui rétrécit comme une couche fermée. « Tout afficher » remet le filtre à zéro et referme le menu (voulu).",
+  "exemple": [
+   "ventes › Statut || INPUT||checkbox|n-tt-case-boite|Bordereau prêt #|0",
+   "achats › Statut · # || BUTTON||button|n-tt-lien|Tout afficher|0"
+  ]
+ }
+];

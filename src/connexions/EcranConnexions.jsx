@@ -8,6 +8,7 @@
 // visible (aucune lecture quand l'onglet est caché). `undefined` on lit · `null` pas su (« — » et la raison) · valeur.
 // `LigneConnexionsJournee` : la ligne d'Aujourd'hui, montrée seulement quand un geste est à faire (une lecture, pas de minuteur).
 // ═══════════════════════════════════════════════════════════════════════════
+import { BadgeLectureSeule } from '../agir/Agir.jsx';   // (24 nov., lot agir-si-connecte) le compte où VRM ne peut pas agir
 import React from 'react';
 import { tr, dateRelative } from '../i18n/index.js';
 import { Page, Groupe, Rangee, Actions, Pourquoi, Pastille, Attente, poserIcone, iconePosee } from '../natif/index.js';
@@ -109,7 +110,7 @@ function RangeeNavigateur({ n, maintenant, iciVrm, homonyme = false }) {
   return (
     <Rangee titre={nom} sousTitre={[vu, lienVrm ? tr('cnx.vrm.' + lienVrm) : ''].filter(Boolean).join(' · ')} valeur={valeur} valeurForte={v.etat === 'ancienne'}
       icone={<Icon name={n.sys === 'iphone' || n.sys === 'android' || n.sys === 'ipad' ? 'device' : 'ecrans'} size={22}/>}
-      note={lit.length ? lit.map((t, i) => <React.Fragment key={i}>{i ? ' · ' : ''}<span>{t}</span></React.Fragment>) : tr('cnx.lit.rien')}
+      note={lit.length ? lit.map((t, i) => <React.Fragment key={'lit-' + t}>{i ? ' · ' : ''}<span>{t}</span></React.Fragment>) : tr('cnx.lit.rien')}
       pied={p ? (
         <div className="cnx-probleme" data-cnx-probleme={p.code}>
           <p className="cnx-phrase">{phrase}{p.at ? <span className="cnx-quand"> · {ilYa(p.at, maintenant)}</span> : null}</p>
@@ -135,7 +136,7 @@ function RangeeCompte({ c, maintenant }) {
   const phrase = arret ? tr('cnx.compte.' + arret) : c.relu === 'vieux' ? tr('cnx.compte.vieux') : '';
   const prudence = c.jauge && c.jauge.prudence ? tr('cnx.prudence') : '';
   return (
-    <Rangee titre={c.nom || '—'} sousTitre={[NOMS_SITES[c.site], relu].filter(Boolean).join(' · ')} note={par}
+    <Rangee titre={<>{c.nom || '—'} <BadgeLectureSeule site={c.site} compte={c.id}/></>} sousTitre={[NOMS_SITES[c.site], relu].filter(Boolean).join(' · ')} note={par}
       valeur={c.site === 'vinted' ? texteJauge(c.jauge) : null} detailValeur={c.site === 'vinted' && c.jauge ? (prudence || tr('cnx.jauge.heure')) : ''}
       pied={phrase ? (
         <div className="cnx-probleme" data-cnx-compte-probleme={arret || 'vieux'}>

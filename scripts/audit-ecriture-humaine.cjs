@@ -115,8 +115,14 @@ const places = (f) => ((f.store.vrmActions || {})[UID] || []).length;
     dit(e.length === 1 && e[0][0] === 'ecriture:serie' && e[0][1] >= 5000 && e[0][1] <= 45000 && e[0][2] === 'Bonjour pseudo_banc !'.length, "favori : un temps d'écriture sur la longueur du texte envoyé, 5–45 s", JSON.stringify(e));
     // ⚠️ 5.414 (`toutinterface`, Julien : « on ne fait plus les requêtes ») : le message est TAPÉ et envoyé par l'interface
     //    (l'étape de page « message », une seule) — plus aucune requête du message fabriquée par VRM.
+    // ⚠️ 5.453 (`favorishumains`, Julien, 25 nov. : « tu dois faire tous les gestes que je fais ») : le temps d'écriture se
+    //    PASSE à écrire — une lecture (1,2–3,2 s) au fond, puis le texte TAPÉ dans la page (une étape `taper`, rien ne part),
+    //    les gardes revues, puis UNE étape « Envoyer ». Lecture + frappe = le temps tiré (la règle du 12 nov. ne change pas).
     const etM = ((f.j && f.j.etapesPage) || []).filter((x) => x.etape === 'message');
-    dit(etM.length === 1 && replies(f).length === 1, "pendant et après l'attente : UNE étape de page « message » (tapé, « Envoyer »), un seul message parti", JSON.stringify(etM));
+    const frappes = etM.filter((x) => x.taper), envois = etM.filter((x) => !x.taper);
+    dit(frappes.length === 1 && envois.length === 1 && etM.indexOf(frappes[0]) < etM.indexOf(envois[0]) && replies(f).length === 1, "pendant et après l'attente : le texte TAPÉ dans la page (rien ne part), puis UNE étape « Envoyer », un seul message parti", JSON.stringify(etM));
+    const lec = (f.ctx.__vrmPausesVues || []).filter((x) => /^lecture:/.test(x[0]));
+    dit(lec.length === 1 && e.length === 1 && lec[0][1] >= 1200 && lec[0][1] <= 3200 && lec[0][1] + lec[0][2] === e[0][1], "favori : le temps d'écriture = une lecture (1,2–3,2 s) + la frappe dans la page (le même total)", JSON.stringify([lec, e]));
     dit(places(f) === 2, 'favori sans offre : 2 actions réservées, comme avant (rien de plus pour l’attente)', places(f));
   }
   { const f = monterFavori({ message: 'Version un', variantes: ['Version deux', 'Version trois'] });

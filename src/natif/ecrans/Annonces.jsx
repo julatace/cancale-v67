@@ -37,6 +37,7 @@ import { Plaque } from '../Plaque.jsx';
 import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site de chaque annonce
 import { Vide } from '../Vide.jsx';
 import { Attente } from '../Attente.jsx';
+import { attrsAttente } from '../outils.js';   // (25 nov., chargement propre) « mis à jour » en cours de lecture = un squelette
 import { Toast } from '../Toast.jsx';
 import { useOrdinateur } from '../Coque.jsx';
 import '../jetons.css';
@@ -44,16 +45,23 @@ import '../natif.css';
 import './annonces.css';
 import AnnoncesTableau from './AnnoncesTableau.jsx';   // (19 nov. soir) l'ordinateur : le tableau de travail
 import { Glyphe } from '../icones.jsx';
-import { groupesParCompte, lireReplis, ecrireReplis } from './annoncesComptes.js';   // (20 nov.) la liste divisée par compte
+import { groupesParCompte, lireReplis, ecrireReplis } from './annoncesComptes.js';
+import { BadgeLectureSeule } from '../../agir/Agir.jsx';   // (24 nov., lot agir-si-connecte)   // (20 nov.) la liste divisée par compte
 import { CarteAnnonce, RangeeArticle, lireVueTel, ecrireVueTel, traceDe, texteTrace, seulementBloque, bandeauDe, tailleDansTitre } from './AnnoncesCartes.jsx';   // (21 nov.) la grille « Dressing »
 import { depuisMaj } from '../TableauTravail.jsx';
+import GrilleInventaire from '../visuel/GrilleInventaire.jsx';
+import { useArrive } from '../Jeu.jsx';
+import { FiltrePlateformes } from '../FiltrePlateformes.jsx';   // (25 nov.) le filtre par plateforme de l'onglet (règle : src/filtrePlateforme.js)
+import { Puce } from '../Puce.jsx';   // (24 nov., visuel-annonces) les puces de filtre, natives
+import { AvatarCompte } from '../visuel/Inventaire.jsx';   // (24 nov.) le rond du compte, le même que sur ses tuiles   // (24 nov., lot visuel-annonces) la grille d'inventaire virtualisée
 
 const PAR_PAGE = 60;
 // Les segments (audit d'utilité du 19 nov.) : En ligne · À publier · Dorment.
 const ETATS = ['enligne', 'apublier', 'dorment'];
 // (21 nov.) « Bloqués » : le segment n'apparaît que s'il y a la dernière trace d'un compte bloqué (jamais un segment vide).
 const ETATS_AVEC_BLOQUE = [...ETATS, 'bloque'];
-const etatMot = (e) => tr('egalite.etatAnnonce.' + e);
+// (24 nov.) Une annonce vendue d'après l'e-mail de vente (Vinted pas encore relu) le dit : « Vendue · par e-mail, en attente de Vinted ».
+const etatMot = (e, x) => (e === 'vendue' && x && x.venteMail ? tr('vm.statut') : tr('egalite.etatAnnonce.' + e));
 
 // Ce que dit la 2e ligne d'une rangée (20 nov., Julien : « améliore le visuel » — NATIF §1 bis) : COURTE, après la plaque N° :
 // « T. 40 · sur 2 sites · acheté 30 € ». Le compte et le site sont dans l'en-tête du groupe (la liste est divisée par compte) ;
@@ -63,7 +71,7 @@ function sousDe(a, nomSite, filtreSite, euros = (n) => String(n)) {
   const bouts = [];
   if (a.taille) bouts.push(tr('egalite.taille', { t: a.taille }));
   // (20 nov. soir) Les sites de l'article sont dits par leurs logos, devant le N° : plus de « sur N sites ».
-  if (a.etat !== 'enligne') bouts.push(etatMot(a.etat));
+  if (a.etat !== 'enligne') bouts.push(etatMot(a.etat, a));
   if (a.achat != null) bouts.push(tr('egalite.achete', { p: euros(a.achat) }));
   // (20 nov.) « à relier » n'est plus sur la ligne : il est dit UNE fois, en tête du groupe (« N à relier › »).
   return bouts.join(' · ');
@@ -107,7 +115,7 @@ function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSai
       {a ? <>
         <Groupe>
           <Rangee vignette={<Vignette src={a.photo || ''} alt=""/>} titre={a.titre} lignes={2} plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null}
-            sousTitre={[a.taille ? tr('egalite.taille', { t: a.taille }) : '', a.condition, etatMot(a.etat)].filter(Boolean).join(' · ')}/>
+            sousTitre={[a.taille ? tr('egalite.taille', { t: a.taille }) : '', a.condition, etatMot(a.etat, a)].filter(Boolean).join(' · ')}/>
         </Groupe>
         <Groupe>
           <Faits colonnes={2}>
@@ -122,7 +130,7 @@ function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSai
           </Faits>
         </Groupe>
         <Groupe titre={tr('egalite.col.sites')}>
-          {a.annonces.map((x) => <Rangee key={x.site + x.id} titre={nomSite(x.site) + (x.pseudo ? ' · ' + x.pseudo : '')} sousTitre={[etatMot(x.etat), x.depuis != null ? depuisTexte(x.depuis) : '', x.favoris != null ? tr('egalite.favoris', { n: x.favoris }) : ''].filter(Boolean).join(' · ')}
+          {a.annonces.map((x) => <Rangee key={x.site + x.id} titre={nomSite(x.site) + (x.pseudo ? ' · ' + x.pseudo : '')} sousTitre={[etatMot(x.etat, x), x.depuis != null ? depuisTexte(x.depuis) : '', x.favoris != null ? tr('egalite.favoris', { n: x.favoris }) : ''].filter(Boolean).join(' · ')}
             valeur={x.prix != null ? euros(x.prix) : null} fin={x.url ? 'chevron' : null} href={x.url || ''} attrs={{ 'data-eg-annonce': x.site + ':' + x.id }}/>)}
           {l && l.etat === 'aRelier' ? <PropositionLiaison l={l} forme="fiche" onRelier={liaison.relier} onAutre={liaison.autre} onPropre={liaison.propre} Photo={liaison.Photo || null}/>
             : a.aRelier && onRelier ? <Rangee ton="ambre" titre={tr('egalite.relier.titre')} sousTitre={tr('egalite.relier.sous')} fin="chevron" onClick={() => onRelier(a)} attrs={{ 'data-eg-relier': a.cle }}/> : null}
@@ -134,9 +142,9 @@ function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSai
 }
 
 export default function VueAnnonces({ articles, comptes = null, filtre = { site: 'tous', etat: 'enligne' }, onFiltre, sites = [], recherche = '', onRecherche,
-  aRegler = [], actions: actionsEcran = [], onAction: onActionEcran, onFait, onNumero = null, onPlace = null, onPrix = null, onRelier = null, onFiche = null, limites = [], manque = '', liaison = null,
+  aRegler = [], actions: actionsEcran = [], onAction: onActionEcran, onFait, onNumero = null, onPlace = null, onPrix = null, onRelier = null, onRelierAchat = null, onFiche = null, limites = [], manque = '', liaison = null,
   euros = (n) => String(n) + ' €', depuisTexte = () => '', nomSite = (s) => s, Icon = null, onPublier = null, onEcranSite = null, travail = null,
-  filtreSite = true, Logo = null, onCompleter = null, dortDe = null, plusVueDe = null, Photo = null, formeRangee = 'a', videAction = null, priorite = null, photoDouble = null }) {   // (22 nov., choix 27) plusVueDe(a) → jours ou null   // (22 nov., choix n° 35) photoDouble : { n, contenu } — le segment « Photo en double »   // (21 nov., prio-recherche) priorite : { n, contenu, plein } — le segment « À republier »   // (21 nov., ux-reglages) videAction : LE geste de l'état vide (« Relier un compte »)   // (21 nov., 2e passe) formeRangee : 'a' | 'b'   // (21 nov.) dortDe(a) → jours (règle « Dorment ») ou null   // Logo(site) : le logo d'un site ; onCompleter(sujet) : ouvre « Compléter »   // (20 nov.) faux ⇒ le site vient du sélecteur global de l'app : pas de menu des sites ici
+  filtreSite = true, Logo = null, onCompleter = null, dortDe = null, plusVueDe = null, Photo = null, formeRangee = 'a', videAction = null, priorite = null, photoDouble = null, parMail = null, fp = null }) {   // (22 nov., choix 27) plusVueDe(a) → jours ou null   // (22 nov., choix n° 35) photoDouble : { n, contenu } — le segment « Photo en double »   // (21 nov., prio-recherche) priorite : { n, contenu, plein } — le segment « À republier »   // (21 nov., ux-reglages) videAction : LE geste de l'état vide (« Relier un compte »)   // (21 nov., 2e passe) formeRangee : 'a' | 'b'   // (21 nov.) dortDe(a) → jours (règle « Dorment ») ou null   // Logo(site) : le logo d'un site ; onCompleter(sujet) : ouvre « Compléter »   // (20 nov.) faux ⇒ le site vient du sélecteur global de l'app : pas de menu des sites ici
   const ordinateur = useOrdinateur();
   // (20 nov.) RELIER DEPUIS LA LISTE : l'état du lien et LA proposition de chaque annonce (`liaison.de(a)`, lu dans
   // src/liaisonEtat.js) ; « Relier les N sûres » est une action de la sélection comme les autres (la relecture, puis un geste).
@@ -163,7 +171,36 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   // (20 nov., Julien : « divise par comptes ») Un groupe par compte, au site choisi ; seuls les groupes qui ont un résultat.
   // Chaque compte montre ses `max` premières annonces (« Voir N de plus » les allonge toutes) : un compte n'est jamais caché
   // derrière la pagination d'un autre.
-  const groupes = React.useMemo(() => groupesParCompte(liste, filtre.site), [liste, filtre.site]);
+  // (24 nov., lot visuel-annonces — « la praticité ») Au pouce, sous les segments : un tri et des puces (Sans N°, À confirmer, un
+  // compte). Elles filtrent ce que l'écran a DÉJÀ donné (aucune lecture, aucune règle) ; « Dorment » reste un segment.
+  const [puce, setPuce] = React.useState('');
+  const [tri, setTri] = React.useState('recent');
+  const [menuTri, setMenuTri] = React.useState(false);
+  const groupesTous = React.useMemo(() => groupesParCompte(liste, filtre.site), [liste, filtre.site]);
+  const listeVue = React.useMemo(() => {
+    let l = liste;
+    if (puce === 'sansnum') l = l.filter((a) => !a.numero);
+    else if (puce === 'aconfirmer') l = l.filter((a) => a.annonces.some((x) => x.etat === 'aconfirmer'));
+    else if (puce.startsWith('compte:')) { const g = groupesTous.find((x) => 'compte:' + x.cle === puce); const dans = new Set(g ? g.articles.map((a) => a.cle) : []); l = l.filter((a) => dans.has(a.cle)); }
+    const n = (v) => (v == null ? -Infinity : v);
+    if (tri === 'prixHaut') l = l.slice().sort((x, y) => n(y.prix) - n(x.prix));
+    else if (tri === 'prixBas') l = l.slice().sort((x, y) => (x.prix == null ? Infinity : x.prix) - (y.prix == null ? Infinity : y.prix));
+    else if (tri === 'vues') l = l.slice().sort((x, y) => n(y.vues) - n(x.vues));
+    else if (tri === 'favoris') l = l.slice().sort((x, y) => n(y.favoris) - n(x.favoris));
+    else if (tri === 'anciennes') l = l.slice().sort((x, y) => (x.depuis == null ? Infinity : x.depuis) - (y.depuis == null ? Infinity : y.depuis));
+    return l;
+  }, [liste, puce, tri, groupesTous]);
+  const groupes = React.useMemo(() => groupesParCompte(listeVue, filtre.site), [listeVue, filtre.site]);
+  // (24 nov., lot visuel-annonces) « Sans latence » : le contenu DÉJÀ connu s'affiche tel quel ; seule la liste qui ARRIVE (la
+  // lecture finie pendant que l'écran est ouvert) se dévoile, une fois (GrilleInventaire fige les rangs). Calculé AU RENDU.
+  const arrivee = React.useRef({ vide: articles === undefined, liste: null });
+  if (articles === undefined) arrivee.current.vide = true;
+  else if (arrivee.current.vide && Array.isArray(articles)) { arrivee.current.vide = false; arrivee.current.liste = articles; }
+  // `useArrive` (Jeu.jsx) : déjà montrée une fois dans la session (retour sur l'onglet) ⇒ plus jamais de cascade.
+  const arriveeSession = useArrive(Array.isArray(articles), 'annonces');
+  const enArrivee = arriveeSession && Array.isArray(articles) && articles === arrivee.current.liste;
+  // La cascade continue d'un compte au suivant : chacun compte les cases de SA 1re fenêtre (5 rangées ; 2 colonnes en « Détaillé »).
+  const debutDe = (cle) => { let n = 0; for (const g of groupes) { if (g.cle === cle) return n; if (!replis.has(g.cle)) n += Math.min(g.articles.length, vueTel === 'grille' ? 10 : 5); } return n; };
   const resteGroupes = groupes.reduce((n, g) => n + Math.max(0, g.articles.length - max), 0);
   const A = action ? actions.find((x) => x.cle === action) : null;
   const cochable = (a) => !A || !A.pour || A.pour(a);
@@ -224,7 +261,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   // Une cellule du tableau : la valeur, ou « — » qui se touche et ouvre SA saisie.
   const cellule = (a, cle, valeur, onModifier) => (
     <td className="n-eg-td" data-eg-col={cle} data-eg-vide={valeur == null ? '1' : undefined}>
-      {onModifier && !A ? <button type="button" className="n-eg-cellule" data-eg-modifier={cle} aria-label={tr('egalite.modifier', { quoi: tr('egalite.col.' + cle), article: a.titre })} onClick={(e) => { e.stopPropagation(); onModifier(); }}>{valeur == null ? '—' : valeur}</button>
+      {onModifier && !A ? <button type="button" data-n-famille="lien" className="n-eg-cellule" data-eg-modifier={cle} aria-label={(valeur == null ? '— · ' : typeof valeur === 'string' || typeof valeur === 'number' ? String(valeur) + ' · ' : '') + tr('egalite.modifier', { quoi: tr('egalite.col.' + cle), article: a.titre })} onClick={(e) => { e.stopPropagation(); onModifier(); }}>{valeur == null ? '—' : valeur}</button>
         : <span className="n-eg-valeur">{valeur == null ? '—' : valeur}</span>}
     </td>
   );
@@ -243,8 +280,8 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
                 data-eg-coche={A ? (sel.has(a.cle) ? '1' : '0') : undefined} onClick={() => ouvrir(a)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ouvrir(a); } }}>
                 {A ? <td className="n-eg-td n-eg-td-case"><input type="checkbox" className="n-eg-coche" checked={sel.has(a.cle)} disabled={!!grise} aria-label={a.titre} onChange={() => basculer(a)} onClick={(e) => e.stopPropagation()}/></td> : null}
                 <td className="n-eg-td n-eg-td-article" data-eg-col="article"><Vignette src={a.photo || ''} alt="" taille={44}/><span className="n-eg-article"><span className="n-eg-article-titre">{a.titre || tr('egalite.sansTitre')}</span>
-                  <span className="n-eg-article-sous">{[a.taille ? tr('egalite.taille', { t: a.taille }) : '', a.condition, a.etat !== 'enligne' ? etatMot(a.etat) : ''].filter(Boolean).join(' · ') || ' '}</span></span></td>
-                <td className="n-eg-td" data-eg-col="numero">{a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : (onNumero && !A ? <button type="button" className="n-eg-cellule" data-eg-modifier="numero" aria-label={tr('egalite.modifier', { quoi: tr('egalite.col.numero'), article: a.titre })} onClick={(e) => { e.stopPropagation(); onNumero(a); }}>—</button> : <span className="n-eg-valeur">—</span>)}</td>
+                  <span className="n-eg-article-sous">{[a.taille ? tr('egalite.taille', { t: a.taille }) : '', a.condition, a.etat !== 'enligne' ? etatMot(a.etat, a) : ''].filter(Boolean).join(' · ') || ' '}</span></span></td>
+                <td className="n-eg-td" data-eg-col="numero">{a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : (onNumero && !A ? <button type="button" data-n-famille="lien" className="n-eg-cellule" data-eg-modifier="numero" aria-label={'— · ' + tr('egalite.modifier', { quoi: tr('egalite.col.numero'), article: a.titre })} onClick={(e) => { e.stopPropagation(); onNumero(a); }}>—</button> : <span className="n-eg-valeur">—</span>)}</td>
                 <td className="n-eg-td" data-eg-col="sites"><span className="n-eg-sites">{a.sites.map((s) => nomSite(s)).join(' · ')}</span>
                   {a.aRelier ? <span className="n-eg-arelier" data-eg-arelier="">{tr('egalite.aRelier')}</span> : (a.annonces.length === 1 && a.annonces[0].pseudo ? <span className="n-eg-article-sous">{a.annonces[0].pseudo}</span> : null)}</td>
                 {cellule(a, 'prix', a.prix != null ? euros(a.prix) : null, onPrix ? () => onPrix(a) : null)}
@@ -263,6 +300,13 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   // (19 nov. soir, NATIF.md §2 bis) À l'ordinateur : le TABLEAU DE TRAVAIL (barre d'outils, Statut à compteurs, colonnes,
   // sélection). Mêmes articles, mêmes saisies, mêmes actions ; la fiche s'ouvre en panneau à droite, la liste reste visible.
   const actionsTableau = actions;
+  // (24 nov., vente-mail-annonce) Les annonces VENDUES d'après l'e-mail de vente, Vinted pas encore relu : hors d'« En ligne » et des
+  // totaux, dites ici une fois (gris, jamais ambre) — « Vendue · par e-mail, en attente de Vinted » ; un toucher ouvre SA fiche.
+  const parMailHaut = Array.isArray(parMail) && parMail.length && filtre.etat === 'enligne' && !A ? <Groupe titre={tr('vm.statut')} attrs={{ 'data-vm-annonces': String(parMail.length) }}>
+    {parMail.map((a) => <Rangee key={a.cle} vignette={<Vignette src={a.photo || ''} alt="" taille={44} image={a.photo && Photo ? Photo(a.photo) : null}/>} titre={a.titre || tr('egalite.sansTitre')} lignes={2}
+      plaque={a.numero ? <Plaque numero={a.numero}/> : null} sousTitre={(a.annonces || []).map((x) => x.pseudo).filter(Boolean)[0] || ''} fin={onFiche && a.numero ? 'chevron' : null}
+      onClick={onFiche && a.numero ? () => onFiche(a) : null} attrs={{ 'data-vm-annonce': a.cle, 'data-vm-annonce-num': a.numero || '' }}/>)}
+  </Groupe> : null;
   const aReglerHaut = aRegler.length ? <Groupe titre={tr('egalite.aRegler')} repli={{ ouvert: reglerOuvert, onBascule: () => setReglerOuvert((o) => !o), n: aRegler.length }} attrs={{ 'data-eg-regler': String(aRegler.length) }}>
     {aRegler.map((r) => <Rangee key={r.cle} titre={r.titre} sousTitre={r.sousTitre || ''} valeur={r.valeur != null ? r.valeur : null} ton={r.doublon ? 'neutre' : 'ambre'} plaque={r.doublon ? <Plaque numero={r.doublon} doublon/> : null} fin={r.onClick ? 'chevron' : null} onClick={r.onClick || null} attrs={{ 'data-eg-regle': r.cle }}/>)}
   </Groupe> : null;
@@ -272,9 +316,9 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
     return (
       <>
         <AnnoncesTableau site={travail.site || 'tous'} Logo={Logo} dortDe={dortDe} plusVueDe={plusVueDe} Photo={Photo} liaison={liaison} articles={listeTableau} filtres={travail.filtres || []} compte={travail.compte || ''} majLe={travail.majLe} onRafraichir={travail.onRafraichir} rafraichit={!!travail.rafraichit}
-          actions={actionsTableau} onAction={onAction} onOuvrir={(a) => { if (onFiche && a.numero) onFiche(a); else setOuvert(a.cle); }} saisir={saisir} onNumero={onNumero} onPrix={onPrix} onRelier={onRelier} onFiche={onFiche}
+          actions={actionsTableau} onAction={onAction} onOuvrir={(a) => { if (onFiche && a.numero) onFiche(a); else setOuvert(a.cle); }} saisir={saisir} onNumero={onNumero} onPrix={onPrix} onRelier={onRelier} onRelierAchat={onRelierAchat} onFiche={onFiche}
           onPublier={onPublier || null}
-          haut={aReglerHaut} pied={manque || ''} onAutomatisations={travail.onAutomatisations || null} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} sites={sites}/>
+          haut={<>{parMailHaut}{aReglerHaut}</>} pied={manque || ''} onAutomatisations={travail.onAutomatisations || null} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} sites={sites}/>
         <FeuilleFait cible={saisie} euros={euros} onFait={onFait} onFermer={(ok) => { const s = saisie; setSaisie(null); if (ok && s) setDit({ id: Date.now(), message: tr('egalite.enregistre', { quoi: tr('egalite.col.' + (s.champ === 'min' ? 'prixMini' : 'achat')) }) }); }}/>
         <FicheArticle liaison={liaison} a={articleOuvertT} ouverte={!!articleOuvertT} cote onRetour={() => setOuvert('')} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} onSaisir={saisir}
           onNumero={onNumero} onPlace={onPlace} onPrix={onPrix} onRelier={onRelier} onFiche={onFiche} Icon={Icon}/>
@@ -293,8 +337,14 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
     const l = lienDe(a);
     const out = actions.filter((x) => x.cle !== 'relierSurs' && (!x.pour || x.pour(a))).map((x) => ({ cle: 'action:' + x.cle, libelle: x.libelle, icone: x.icone,
       onClick: () => { const j = x.juger ? x.juger([a]) : { ok: true }; if (j && j.ok) onAction(x.cle, [a]); else setDit({ id: Date.now(), message: (j && j.raison) || tr('egalite.selection.aucune') }); } }));
+    // (23 nov.) « Relier un achat » : EN TÊTE quand l'article n'a pas d'achat relié ; sinon « Achat relié » (sa fiche : Délier, Reçu).
+    if (onRelierAchat) { const g = { cle: 'relierAchat', libelle: a.achat == null ? tr('ventes.relierAchat2') : tr('ru.ann.achatRelie'), icone: 'link', onClick: () => onRelierAchat(a) }; if (a.achat == null) out.unshift(g); else out.push(g); }
     out.push({ cle: 'mini', libelle: tr('egalite.saisie.min'), icone: 'tag', onClick: () => saisir(a, 'min') });
     out.push({ cle: 'achat', libelle: tr('egalite.saisie.buyPrice'), icone: 'pencil', onClick: () => saisir(a, 'buyPrice') });
+    // (24 nov.) « Copier le lien » : l'adresse LUE de l'annonce (jamais fabriquée) ; sans adresse, pas de geste.
+    const url = (a.annonces.find((x) => x && x.url && /^https:\/\//.test(x.url)) || {}).url;
+    if (url) out.push({ cle: 'lien', libelle: tr('inv.copier'), icone: 'link', onClick: () => { const dire = (ok) => setDit({ id: Date.now(), message: tr(ok ? 'inv.lienCopie' : 'inv.lienPasCopie') });
+      try { navigator.clipboard.writeText(url).then(() => dire(true), () => dire(false)); } catch (_) { dire(false); } } });
     // (le balayage d'avant : « Relier N° » · « Autre… » · « Que sur ce site ») — les mêmes gestes, dans la feuille.
     if (l && l.etat === 'aRelier' && liaison) {
       if (l.prop) out.push({ cle: 'relier', libelle: tr('liaL.relierN', { numero: l.prop.numero }), icone: 'link', ambre: true, onClick: () => liaison.relier(l) });
@@ -306,30 +356,54 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   };
   const articleGestes = gestesDe ? liste.find((x) => x.cle === gestesDe) || null : null;
   const gestesOuverts = articleGestes ? lesGestes(articleGestes) : [];
-  const carte = (a, cleCompte) => (
-    <CarteAnnonce key={a.cle + '|' + cleCompte} a={a} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon}
+  const carte = (a, cleCompte, rv = null, etatDit = null) => (
+    <CarteAnnonce key={a.cle + '|' + cleCompte} a={a} revele={rv} groupe etatDit={etatDit} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon}
       Photo={Photo} dort={dortDe && !A ? dortDe(a) : null} plusVue={plusVueDe && !A ? plusVueDe(a) : null}
       selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), onBascule: () => basculer(a) } : null}
       attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined, 'data-eg-compte': cleCompte }}/>
   );
   // La liste « Articles » au téléphone (21 nov., 2e passe) : `RangeeArticle`, forme A ou B (`formeRangee`), pleine largeur, filets fins.
-  const rangeeTel = (a, cleCompte) => (
-    <RangeeArticle key={a.cle + '|' + cleCompte} a={a} forme={formeRangee} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte}
+  // Glisser la rangée : « Baisser le prix » et « Republier » (les actions EXISTANTES de l'écran, jugées sur cet article).
+  const rapidesDe = (a) => {
+    if (A || seulementBloque(a)) return null;
+    const out = [];
+    for (const cle of ['baisser', 'recreer']) {
+      const x = actions.find((y) => y.cle === cle); if (!x || (x.pour && !x.pour(a))) continue;
+      out.push({ cle, libelle: cle === 'baisser' ? tr('inv.rapide.baisser') : tr('inv.rapide.republier'), icone: x.icone || (cle === 'baisser' ? 'tag' : 'sync'),
+        onClick: () => { const j = x.juger ? x.juger([a]) : { ok: true }; if (j && j.ok) onAction(x.cle, [a]); else setDit({ id: Date.now(), message: (j && j.raison) || tr('egalite.selection.aucune') }); } });
+    }
+    return out.length ? out : null;
+  };
+  const rangeeTel = (a, cleCompte, rv = null, etatDit = null) => (
+    <RangeeArticle key={a.cle + '|' + cleCompte} a={a} forme={formeRangee} groupe etatDit={etatDit} revele={rv} rapides={rapidesDe(a)} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte}
       nomSite={nomSite} Icon={Icon} Photo={Photo} plusVue={plusVueDe && !A ? plusVueDe(a) : null} selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), onBascule: () => basculer(a) } : null}
       attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined, 'data-eg-compte': cleCompte }}/>
   );
+  // (25 nov., régressions — capture iPhone de Julien : « Pas revue récemment » écrit sur CHAQUE rangée) Une même phrase sur
+  // chaque ligne est UNE phrase, dans l'en-tête du groupe (CLAUDE.md §7) : dès que deux rangées d'un compte portent le même
+  // état « à confirmer », l'en-tête le dit une fois (avec leur nombre quand ce ne sont pas toutes) ; chaque rangée concernée ne
+  // garde qu'un point discret (son nom au lecteur d'écran). Aucune règle ne change : c'est l'état de `bandeauDe`.
+  const etatGroupe = (g) => {
+    const k = g.articles.filter((a) => bandeauDe(a) === 'aconfirmer').length;
+    return k >= 2 ? { cle: 'aconfirmer', n: k, tous: k === g.articles.length } : null;
+  };
   const enTeteCompte = (g, n) => {
     const titre = g.cle === 'sans' ? tr('egalite.groupe.sansCompte') : (g.pseudo || ('#' + g.compte));
+    const eg = etatGroupe(g);
     const ouvertG = !replis.has(g.cle);
     const bloque = g.articles.length > 0 && g.articles.every((x) => x.annonces.some((y) => y.etat === 'bloque' && (y.site + ':' + y.compte) === g.cle));
     const trace = bloque ? g.articles.map(traceDe).filter((t) => t && t.le != null).sort((x, y) => y.le - x.le)[0] || null : null;
     return (
       <div className="n-ad-tete-compte" data-ad-bloque={bloque ? '1' : undefined}>
-        <button type="button" className="n-ad-compte" aria-expanded={ouvertG ? 'true' : 'false'} onClick={() => basculerRepli(g.cle)} data-ad-repli={g.cle}>
+        <button type="button" className="n-ad-compte" data-n-famille="rangee" aria-expanded={ouvertG ? 'true' : 'false'} onClick={() => basculerRepli(g.cle)} data-ad-repli={g.cle}>
           {Logo && g.site ? <span className="n-eg-compte-logo" aria-hidden="true">{Logo(g.site)}</span> : null}
+          {g.cle !== 'sans' ? <AvatarCompte pseudo={titre} cle={g.cle} petit/> : null}
           <span className="n-ad-compte-nom">{titre}<span className="n-ad-compte-n"> · {n}</span></span>
           {g.site ? <span className="n-eg-sr"> · {nomSite(g.site)} · {tr('egalite.groupe.n', { n })}</span> : null}
           {bloque ? <span className="n-ad-etiquette" data-ad-bandeau="bloque">{tr('tableau.etat.bloque')}</span> : null}
+          {/* (24 nov.) « Lecture seule » : l'extension n'a ce compte dans aucun onglet — ses annonces restent visibles, ses gestes éteints. */}
+          {['vinted', 'leboncoin', 'vestiaire'].includes(g.site) && g.compte ? <BadgeLectureSeule site={g.site} compte={g.compte}/> : null}
+          {!bloque && eg ? <span className="n-ad-etiquette" data-ad-bandeau={eg.cle} data-ad-etat-groupe={String(eg.n)}>{tr('tableau.etat.' + eg.cle) + (eg.tous ? '' : ' · ' + eg.n)}</span> : null}
           <span className="n-ad-chevron" data-ouvert={ouvertG ? '1' : '0'} aria-hidden="true"><Glyphe nom="chevron" taille={16}/></span>
         </button>
         {bloque && ouvertG ? <p className="n-ad-phrase" data-ad-phrase-bloque="">{trace ? tr('egalite.d.bloque.phraseDate', { d: texteTrace(trace) }) : tr('egalite.d.bloque.phrase')}</p> : null}
@@ -347,53 +421,65 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   // (21 nov., 2e passe) « À régler » et « Mis à jour » sur UNE ligne fine : « Mis à jour il y a 18 min · ● 24 à régler › · ⟳ ».
   const nRegler = sujets.reduce((t, x) => t + x.n, 0);
   const aReglerTel = sujets.length ? (
-    <button type="button" className="n-ad-afaire n-ad-aregler" data-ad-aregler={String(nRegler)} aria-label={tr('egalite.aRegler') + ' · ' + sujets.map((x) => x.libelle).join(' · ')}
+    <button type="button" data-n-famille="lien" className="n-ad-afaire n-ad-aregler" data-ad-aregler={String(nRegler)} aria-label={tr('egalite.d.aReglerN', { n: nRegler }) + ' · ' + sujets.map((x) => x.libelle).join(' · ')}
       onClick={() => (sujets.length === 1 ? sujets[0].go() : setReglerTel(true))}>
       <span className="n-ad-point" aria-hidden="true"/><span className="n-ad-afaire-texte">{tr('egalite.d.aReglerN', { n: nRegler })}</span><Glyphe nom="chevron" taille={14}/>
     </button>) : null;
   const barreHaut = (
     <div className="n-eg-recherche">
       <ChampRecherche valeur={recherche} onChange={onRecherche} placeholder={tr('egalite.chercher')} libelle={tr('egalite.chercherNom')}/>
-      <BoutonIcone libelle={vueG ? tr('egalite.d.vueListe') : tr('egalite.d.vueGrille')} icone={Icon ? <Icon name={vueG ? 'menu' : 'grid'} size={20}/> : <Glyphe nom="image" taille={20}/>}
-        onClick={basculerVue} attrs={{ 'data-ad-bascule': vueG ? 'grille' : 'liste' }}/>
       {(actions.length || onPublier || (onEcranSite && filtre.site !== 'tous')) && !A && articles !== undefined ? <BoutonIcone libelle={tr('egalite.actions')} icone={<Glyphe nom="more" taille={22}/>} onClick={() => setMenuActions(true)} attrs={{ 'data-eg-actions': '' }}/> : null}
     </div>
   );
-  const attenteGrille = <div className="n-ad-grille" data-ad-attente="" aria-busy="true">{Array.from({ length: 4 }, (_, i) => <span key={i} className="n-ad-carte n-ad-carte-attente" aria-hidden="true"><span className="n-ad-photo"/><span className="n-ad-corps"><span className="n-ad-ligne-attente"/><span className="n-ad-ligne-attente" data-court=""/></span></span>)}</div>;
+  // (24 nov., lot visuel-annonces) Le squelette a la FORME finale : l'intertitre d'un compte, puis la grille aux mêmes cases.
+  const attenteGrille = <div data-ad-attente="" aria-busy="true" aria-label={tr('inv.chargement')}><section className="n-ad-section"><div className="n-ad-tete-compte n-inv-tete-os" aria-hidden="true"><span className="n-os"/></div>
+    <GrilleInventaire items={undefined} attente={6} corps={96}/></section></div>;
   return (
     <>
       <Page titre={tr('egalite.titre')} plein={plein} attrs={{ 'data-eg-ecran': '', 'data-eg-site': filtre.site, 'data-eg-etat': filtre.etat, 'data-eg-selection': A ? A.cle : undefined, 'data-eg-vue': ordinateur ? 'tableau' : 'liste', 'data-ad-vue': vueG ? 'grille' : 'liste' }}
         recherche={barreHaut}>
         {tete}
+        {fp && !A && !ordinateur ? <FiltrePlateformes ecran="annonces" options={fp.options} valeur={fp.valeur} onChange={fp.onChange}/> : null}
+        {/* Pendant la lecture, la rangée des puces est déjà là (même hauteur) : rien ne saute à l'arrivée. */}
+        {!A && !enPrio && articles === undefined && !ordinateur ? <div className="n-ad-puces" aria-hidden="true" data-ad-puces-os="">{[96, 84, 110].map((w) => <span key={'os-' + w} className="n-ad-puce"><span className="n-ad-puce-pilule n-os" style={{ width: w }}/></span>)}</div> : null}
+        {!A && !enPrio && Array.isArray(articles) && liste.length ? <div className="n-ad-puces" role="toolbar" aria-label={tr('inv.puces')} data-ad-puces="">
+          <Puce className="n-ad-puce" onClick={() => setMenuTri(true)} attrs={{ 'data-ad-tri': tri, 'aria-haspopup': 'dialog' }}><span className="n-ad-puce-pilule">{Icon ? <Icon name="filter" size={15}/> : null}{tr('inv.tri.' + tri)}</span></Puce>
+          {[['sansnum', liste.filter((a) => !a.numero).length], ['aconfirmer', liste.filter((a) => a.annonces.some((x) => x.etat === 'aconfirmer')).length]].filter(([, k]) => k > 0 || puce)
+            .map(([c, k]) => <Puce key={c} className="n-ad-puce" presse={puce === c} onClick={() => setPuce((p) => (p === c ? '' : c))} attrs={{ 'data-ad-puce': c, 'data-ad-puce-n': String(k) }}><span className="n-ad-puce-pilule">{tr('inv.puce.' + c)}<span className="n-ad-puce-n">{k}</span></span></Puce>)}
+          {groupesTous.length > 1 ? groupesTous.filter((g) => g.cle !== 'sans').map((g) => <Puce key={g.cle} className="n-ad-puce" presse={puce === 'compte:' + g.cle} attrs={{ 'data-ad-puce': 'compte:' + g.cle }}
+            onClick={() => setPuce((p) => (p === 'compte:' + g.cle ? '' : 'compte:' + g.cle))}><span className="n-ad-puce-pilule"><AvatarCompte pseudo={g.pseudo || g.compte} cle={g.cle} petit/>{g.pseudo || ('#' + g.compte)}</span></Puce>) : null}
+        </div> : null}
         {(travail || aReglerTel) && !A && !ordinateur ? <div className="n-ad-maj" data-ad-maj={!travail ? 'aucun' : majLe === undefined ? 'lecture' : majLe == null ? 'passu' : 'lu'}>
-          <span className="n-ad-maj-texte">{travail ? depuisMaj(majLe, maintenantMaj) : ''}</span>
+          <span className="n-ad-maj-texte" data-copie-vide="" {...(attrsAttente(!!travail && majLe === undefined, 'valeur') || {})}>{travail ? depuisMaj(majLe, maintenantMaj) : ''}</span>
           {aReglerTel}
           {travail && travail.onRafraichir ? <BoutonIcone libelle={tr('tableau.rafraichir')} indisponible={!!travail.rafraichit} icone={Icon ? <Icon name="sync" size={18}/> : null}
             onClick={() => { if (!travail.rafraichit) travail.onRafraichir(); }} className="n-ad-rafraichir" attrs={{ 'data-ad-rafraichir': '', 'aria-busy': travail.rafraichit ? 'true' : undefined }}/> : null}
         </div> : null}
+        {!enPrio ? parMailHaut : null}
         {aRegler.length && !A && !enPrio ? <Groupe titre={tr('egalite.aRegler')} repli={{ ouvert: reglerOuvert, onBascule: () => setReglerOuvert((o) => !o), n: aRegler.length }} attrs={{ 'data-eg-regler': String(aRegler.length) }}>
           {aRegler.map((r) => <Rangee key={r.cle} titre={r.titre} sousTitre={r.sousTitre || ''} valeur={r.valeur != null ? r.valeur : null} ton={r.doublon ? 'neutre' : 'ambre'} plaque={r.doublon ? <Plaque numero={r.doublon} doublon/> : null} fin={r.onClick ? 'chevron' : null} onClick={r.onClick || null} attrs={{ 'data-eg-regle': r.cle }}/>)}
         </Groupe> : null}
         {enPhoto ? photoDouble.contenu : enPrio ? priorite.contenu
-          : articles === undefined ? (vueG ? attenteGrille : <Attente forme="rangees" n={6} vignette={56} titre/>)
+          : articles === undefined ? (vueG ? attenteGrille : <div data-ad-attente="" aria-busy="true" aria-label={tr('inv.chargement')}><section className="n-ad-section"><div className="n-ad-tete-compte n-inv-tete-os" aria-hidden="true"><span className="n-os"/></div>
+              <GrilleInventaire items={undefined} attente={9} ligne={72} gap={0} squelette={() => <span className="n-ar-os" aria-hidden="true"><span className="n-os n-ar-os-photo"/><span className="n-ar-os-texte"><span className="n-os"/><span className="n-os" data-court=""/></span></span>}/></section></div>)
           : articles === null ? <Vide icone={Icon ? <Icon name="alert" size={40}/> : null} phrase={tr('egalite.pasSu')} detail={manque}/>
           // (20 nov., chasse-bugs) Rien d'affiché ET une lecture ratée (`manque`) : « VRM n'a pas pu lire », jamais « Aucune annonce » (§5 : rien lu ≠ rien).
           : !liste.length && manque && !recherche ? <Vide icone={Icon ? <Icon name="alert" size={40}/> : null} phrase={tr('egalite.pasSu')}/>
           : !liste.length ? <Vide icone={Icon ? <Icon name="tag" size={40}/> : null} phrase={recherche ? tr('egalite.videRecherche') : tr('egalite.vide.' + filtre.etat)} action={!recherche ? videAction : null}/>
           : ordinateur ? tableau
-          : <div data-eg-liste="" data-eg-groupes={String(groupes.length)} data-ad-liste={vueG ? 'grille' : 'liste'}>{groupes.map((g) => {
+          : <div data-eg-liste="" data-eg-groupes={String(groupes.length)} data-inv-arrivee={enArrivee ? '1' : undefined} data-ad-liste={vueG ? 'grille' : 'liste'}>{groupes.map((g) => {
               const n = g.articles.length;
               const ouvertG = !replis.has(g.cle);
               return (
                 <section key={g.cle} className="n-ad-section" data-eg-groupe={g.cle} data-eg-groupe-n={String(n)}>
                   {enTeteCompte(g, n)}
                   {ouvertG ? <>
-                    {vueG ? <div className="n-ad-grille">{g.articles.slice(0, max).map((a) => carte(a, g.cle))}</div>
-                      : <div className="n-ar-liste" data-ad-forme={formeRangee}>{g.articles.slice(0, max).map((a) => rangeeTel(a, g.cle))}</div>}
+                    {vueG ? <GrilleInventaire items={g.articles} cle={(a) => a.cle + '|' + g.cle} rendu={(a, i, rv) => carte(a, g.cle, rv, etatGroupe(g))} corps={96} revele={enArrivee} debut={debutDe(g.cle)} attrs={{ 'data-ad-grille': g.cle }}/>
+                      : <GrilleInventaire items={g.articles} ligne={72} gap={0} cle={(a) => a.cle + '|' + g.cle} rendu={(a, i, rv) => rangeeTel(a, g.cle, rv, etatGroupe(g))} revele={enArrivee} debut={debutDe(g.cle)} className="n-ar-liste" attrs={{ 'data-ad-forme': formeRangee, 'data-ad-liste-compte': g.cle }}/>}
                   </> : null}
                 </section>);
             })}</div>}
-        {!enPrio && (ordinateur ? liste.length > max : resteGroupes > 0) ? <Groupe nu><Bouton variante="texte" large onClick={() => setMax((m) => m + PAR_PAGE)} attrs={{ 'data-eg-plus': '' }}>{tr('egalite.plus', { n: ordinateur ? liste.length - max : resteGroupes })}</Bouton></Groupe> : null}
+        {!enPrio && (ordinateur && liste.length > max) ? <Groupe nu><Bouton variante="texte" large onClick={() => setMax((m) => m + PAR_PAGE)} attrs={{ 'data-eg-plus': '' }}>{tr('egalite.plus', { n: ordinateur ? liste.length - max : resteGroupes })}</Bouton></Groupe> : null}
         {/* (20 nov., « téléphone bâclé ») Sous la liste, seulement ce qui MANQUE (un site pas lu : « rien lu » n'est pas « rien »). */}
         {!enPrio && Array.isArray(articles) && manque ? <Groupe nu pied={manque} attrs={{ 'data-eg-pied': '' }}/> : null}
       </Page>
@@ -408,6 +494,11 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
         </> : null}
       </Feuille>
 
+      <Feuille ouverte={menuTri} onFermer={() => setMenuTri(false)} titre={tr('inv.tri.titre')} attrs={{ 'data-ad-menu-tri': '' }}>
+        <Groupe>{['recent', 'prixHaut', 'prixBas', 'vues', 'favoris', 'anciennes'].map((t) => <Rangee key={t} titre={tr('inv.tri.' + t)} fin={tri === t ? 'coche' : null}
+          onClick={() => { setTri(t); setMenuTri(false); }} attrs={{ 'data-ad-tri-choix': t }}/>)}</Groupe>
+      </Feuille>
+
       <Feuille ouverte={reglerTel && sujets.length > 1} onFermer={() => setReglerTel(false)} titre={tr('egalite.aRegler')} attrs={{ 'data-ad-feuille-regler': '' }}>
         <Groupe>{sujets.map((x) => <Rangee key={x.cle} titre={x.libelle} ton="ambre" fin="chevron" onClick={() => { setReglerTel(false); x.go(); }} attrs={{ 'data-eg-manque': x.cle, 'data-eg-manque-n': String(x.n) }}/>)}</Groupe>
       </Feuille>
@@ -420,6 +511,11 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
       <Feuille ouverte={menuActions} onFermer={() => setMenuActions(false)} titre={tr('egalite.actions')} attrs={{ 'data-eg-menu-actions': '' }}>
         {onPublier && !ordinateur ? <Groupe><Rangee icone={Icon ? <Icon name="plus" size={22}/> : <Glyphe nom="plus" taille={22}/>} titre={tr('egalite.publier')} fin="chevron"
           onClick={() => { setMenuActions(false); onPublier(); }} attrs={{ 'data-eg-publier': '' }}/></Groupe> : null}
+        {/* (24 nov.) L'affichage vit ici (plus dans la barre du haut) : Liste par défaut, Détaillé (les tuiles). */}
+        {!ordinateur ? <Groupe titre={tr('inv.affichage')} attrs={{ 'data-ad-affichage': vueG ? 'grille' : 'liste' }}>
+          {['liste', 'grille'].map((v) => <Rangee key={v} icone={Icon ? <Icon name={v === 'liste' ? 'menu' : 'grid'} size={22}/> : null} titre={tr('inv.vue.' + v)} fin={vueTel === v ? 'coche' : null}
+            onClick={() => { setMenuActions(false); if (vueTel !== v) basculerVue(); }} attrs={{ 'data-ad-vue-choix': v }}/>)}
+        </Groupe> : null}
         <Groupe>{actions.map((x) => <Rangee key={x.cle} icone={Icon && x.icone ? <Icon name={x.icone} size={22}/> : null} titre={x.libelle} sousTitre={x.court || ''} fin="chevron"
           onClick={() => { setMenuActions(false); setSel(new Set()); setAction(x.cle); }} attrs={{ 'data-eg-action': x.cle }}/>)}</Groupe>
         {/* (21 nov., lot relier-code) « Relier mes achats en série » : annonce après annonce, la meilleure proposition en tête. */}
