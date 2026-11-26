@@ -4,12 +4,12 @@ require('./_porte-banc.cjs');
 //  (le jeu de `nouveau-vendeur.cjs` : 2 comptes Vinted, ventes, achats, colis).
 //  390 px tactile ET 1512 px, clair ET sombre. Ce qui est jugé : des `data-*`,
 //  des nombres rendus et des requêtes — jamais un libellé.
-//   A. Changer de compte en un tap : une rangée de puces (Tous + 2 comptes) en
-//      haut de Ventes · Vinted, 44 px au doigt ; un tap filtre l'écran (la vente
-//      de l'autre compte n'est plus nette) ; le choix survit au rechargement ;
-//      la liste native (bancs plus anciens) dit la même valeur.
-//   B. Cacher les montants : (5 nov.) le bouton « Stream » de la tête, qui remplace
-//      l'œil (src/modeStream.js, montants cachés par défaut), puis CHAQUE écran —
+//   A. Les comptes dans Ventes (natif, 26 nov.) : chaque vente porte SON compte ;
+//      à l'ordinateur, le filtre « Compte » du tableau de « Terminées » montre les
+//      ventes de CE compte et elles seules (par n° de transaction). La rangée de
+//      puces d'avant n'est plus rendue (sans sélecteur, 20 nov.).
+//   B. Cacher les montants : l'interrupteur « Mode stream » de l'écran Menu (natif ;
+//      avant : le bouton de la tête, src/modeStream.js), puis CHAQUE écran —
 //      aucun nombre suivi de « € » ne reste lisible ; les N° restent ; mémorisé ;
 //      éteint, les montants reviennent.
 //   C. Appareils connectés : la liste rendue, « Cet appareil » sans bouton, un
@@ -22,6 +22,9 @@ require('./_porte-banc.cjs');
 //  `SHOTS=dossier` : une capture par étape (à REGARDER). `PARTIES=A,B,…`.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+// (26 nov., bancs natifs) L'app RÉELLE (« VRM natif », 19 nov.) : jamais le DOM d'avant le 17 nov. (échafaudage
+// `vrm_banc_dom_ancien`, _garde-reseau.cjs, src/designV2/reglage.js).
+process.env.BANC_DESIGN_V2 = process.env.BANC_DESIGN_V2 || 'defaut';
 const path = require('path'), fs = require('fs');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const NV = require('./nouveau-vendeur.cjs');
@@ -55,36 +58,58 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
       const sombre = theme === 'sombre', tag = `${W}-${theme}`;
       // ── A. Les puces de compte ─────────────────────────────────────────────
       if (PARTIES.includes('A')) {
-        const { ctx, pg, tel } = await NV.ouvrir(nav, { W, sombre, base: base(), tab: 'plat_vinted' });
-        await pg.waitForSelector('[data-compte-puces]', { timeout: 15000 }).catch(() => {});
-        const p = await pg.evaluate(() => [...document.querySelectorAll('[data-compte-puces="vrm-sel-compte"] [data-compte-puce]')].map((b) => { const r = b.getBoundingClientRect(); return { v: b.getAttribute('data-compte-puce'), a: b.getAttribute('aria-checked'), h: r.height, top: r.top }; }));
-        dit(p.length === 3 && p[0].v === '*', `A ${tag} : la rangée « Tous » + 2 comptes`, JSON.stringify(p));
-        if (tel) dit(p.every((x) => x.h >= 43.5), `A ${tag} : 44 px au doigt`, JSON.stringify(p.map((x) => x.h)));
-        const carte = await pg.evaluate(() => { const c = document.querySelector('.vrm-market-space .vrm-fu-ecran, .vrm-market-space [data-carte-stats]'); return c ? c.getBoundingClientRect().top : null; });
-        if (p.length && carte != null) dit(p[0].top < carte, `A ${tag} : les puces sont AU-DESSUS de la carte`, `${p[0].top} vs ${carte}`);
+        // (26 nov., bancs natifs) La rangée de puces de compte de Ventes · Vinted (`[data-compte-puces="vrm-sel-compte"]`, 4 nov.)
+        // n'est plus rendue : Ventes est l'écran natif où TOUS les sites et comptes sont mêlés (« plus de sélecteur de
+        // plateforme », Julien, 20 nov. soir — docs/passation/2026-11-20-sans-selecteur.md) ; le choix du compte ne vivait plus
+        // que dans le menu d'un site, qui n'est plus jamais ouvert (`site === 'vinted'`). Ce qui reste, et qui est jugé :
+        //   · chaque vente porte SON compte (comptes séparés, jamais mélangés en silence) ;
+        //   · à l'ordinateur, le filtre « Compte » du tableau de « Terminées » (`data-tt-filtre="compte"`) montre les ventes de
+        //     CE compte et elles seules — jugé par IDENTITÉ (les n° de transaction du compte dans le jeu), jamais par le titre.
+        // Le choix n'est plus mémorisé (état de l'écran) et le téléphone n'a pas de filtre de compte : dit dans le rapport.
+        const b0 = base();
+        const txDe = (uid) => (((b0.lignes.find((l) => l.id === `harvest_${uid}_orders_sold`) || {}).data || {}).payload || {}).my_orders.map((o) => String(o.transaction_id)).sort();
+        const tx111 = txDe('111'), tx222 = txDe('222');
+        const { ctx, pg, tel } = await NV.ouvrir(nav, { W, sombre, base: b0, tab: 'ventes' });
+        await pg.locator('[data-colis-onglet-choix="toutes"]').first().click({ timeout: 15000 });
+        await pg.waitForSelector('[data-toutes-vente]', { timeout: 15000 }).catch(() => {});
+        await attendre(800);
+        const rangees = () => pg.evaluate(() => [...document.querySelectorAll('[data-toutes-vente="vinted"]')].filter((r) => r.getClientRects().length).map((r) => ({ id: r.getAttribute('data-toutes-id'), compte: r.getAttribute('data-toutes-compte') })));
+        const r0 = await rangees();
+        const ids0 = r0.map((x) => x.id).sort();
+        dit(JSON.stringify(ids0) === JSON.stringify([...tx111, ...tx222].sort()), `A ${tag} : « Terminées » montre les ventes des DEUX comptes`, JSON.stringify({ vu: ids0, attendu: [...tx111, ...tx222] }));
+        dit(r0.every((x) => (tx111.includes(x.id) && x.compte === 'vendeuse_a') || (tx222.includes(x.id) && x.compte === 'vendeuse_b')), `A ${tag} : chaque vente porte SON compte`, JSON.stringify(r0));
         await capture(pg, `A-${tag}-avant`);
-        await pg.click('[data-compte-puces="vrm-sel-compte"] [data-compte-puce="222"]');
-        await attendre(600);
-        const apres = await pg.evaluate(() => ({ actif: (document.querySelector('[data-compte-puces="vrm-sel-compte"] [aria-checked="true"]') || {}).getAttribute && document.querySelector('[data-compte-puces="vrm-sel-compte"] [aria-checked="true"]').getAttribute('data-compte-puce'), select: (document.querySelector('#vrm-sel-compte') || {}).value, memo: localStorage.getItem('vrm_compte_choisi') }));
-        dit(apres.actif === '222' && apres.select === '222', `A ${tag} : un tap choisit le compte (puce et liste disent la même valeur)`, JSON.stringify(apres));
-        dit(/"vinted":"222"/.test(apres.memo || ''), `A ${tag} : mémorisé PAR SITE`, apres.memo);
-        await capture(pg, `A-${tag}-choisi`);
-        await pg.goto(`http://localhost:${NV.PORT}/?tab=plat_vinted`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('[data-compte-puces]', { timeout: 15000 }).catch(() => {}); await attendre(800);
-        const rel = await pg.evaluate(() => { const b = document.querySelector('[data-compte-puces="vrm-sel-compte"] [aria-checked="true"]'); return b && b.getAttribute('data-compte-puce'); });
-        dit(rel === '222', `A ${tag} : le choix survit au rechargement`, rel);
-        // Un autre site ne reçoit pas ce choix.
-        await pg.goto(`http://localhost:${NV.PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' }); await attendre(1500);
-        const memoEbay = await pg.evaluate(() => localStorage.getItem('vrm_compte_choisi'));
-        dit(!/"ebay"/.test(memoEbay || ''), `A ${tag} : un autre site ne reçoit pas le choix de Vinted`, memoEbay);
-        await pg.click('[data-compte-puces="vrm-sel-compte"] [data-compte-puce="*"]').catch(() => {});
+        if (!tel) {
+          await pg.click('[data-tt-filtre="compte"]');
+          await pg.click('[data-tt-filtre-choix="compte:vendeuse_b"]');
+          await attendre(600);
+          const r1 = await rangees();
+          dit(JSON.stringify(r1.map((x) => x.id).sort()) === JSON.stringify(tx222), `A ${tag} : le filtre « Compte » = vendeuse_b montre SES ventes et elles seules (par n° de transaction)`, JSON.stringify(r1));
+          const v = await pg.evaluate(() => (document.querySelector('[data-tt-filtre="compte"]') || { getAttribute: () => null }).getAttribute('data-tt-filtre-valeur'));
+          dit(v === 'vendeuse_b', `A ${tag} : le filtre dit le compte choisi`, v);
+          await capture(pg, `A-${tag}-choisi`);
+          await pg.click('[data-tt-filtre="compte"]');
+          await pg.click('[data-tt-filtre-choix="compte:tous"]');
+          await attendre(600);
+          dit((await rangees()).length === ids0.length, `A ${tag} : « Tous les comptes » rend toutes les ventes`);
+        }
         await ctx.close();
       }
       // ── B. Cacher les montants ─────────────────────────────────────────────
       if (PARTIES.includes('B')) {
-        const { ctx, pg } = await NV.ouvrir(nav, { W, sombre, base: base(), tab: 'plat_vinted' });
+        // (26 nov., bancs natifs) Coque native : l'interrupteur « Mode stream » (`data-bouton-stream`, `data-stream-on`) est une
+        // rangée de l'écran Menu (`?tab=menu`, EcranMenu, App.jsx) — le bouton de la tête d'avant (`BoutonStream`) n'est rendu
+        // que par l'ancienne coque. Mêmes règles : chaque écran sans montant lisible, N° lisibles, mémorisé, éteint ⇒ revenus.
+        const { ctx, pg } = await NV.ouvrir(nav, { W, sombre, base: base(), tab: 'ventes' });
         await attendre(2500);
         const avant = await MONTANTS(pg);
-        dit(avant.n > 0, `B ${tag} : Ventes · Vinted montre des montants avant (le banc n'est pas vide)`, JSON.stringify(avant));
+        dit(avant.n > 0, `B ${tag} : Ventes montre des montants avant (le banc n'est pas vide)`, JSON.stringify(avant));
+        const menuStream = async () => {
+          await pg.goto(`http://localhost:${NV.PORT}/?tab=menu`, { waitUntil: 'domcontentloaded' });
+          await pg.waitForSelector('[data-bouton-stream]', { timeout: 15000 });
+          await attendre(300);
+        };
+        await menuStream();
         await pg.click('[data-bouton-stream]');
         await attendre(400);
         let pire = null, totalNums = 0;
@@ -98,14 +123,17 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
           if (['journee', 'compta', 'ventes'].includes(e)) await capture(pg, `B-${tag}-${e}`);
         }
         dit(totalNums > 0, `B ${tag} : les N° restent lisibles`, totalNums);
-        const etat = await pg.evaluate(() => ({ racine: document.documentElement.getAttribute('data-stream'), memo: localStorage.getItem('vrm_stream'), bouton: (document.querySelector('[data-bouton-stream]') || {}).getAttribute && document.querySelector('[data-bouton-stream]').getAttribute('aria-pressed') }));
-        dit(etat.racine === '1' && etat.memo === '1' && etat.bouton === 'true', `B ${tag} : mémorisé sur l'appareil, le bouton « Stream » le dit`, JSON.stringify(etat));
-        // Rendu à la main : les montants reviennent sans recharger.
-        await pg.goto(`http://localhost:${NV.PORT}/?tab=plat_vinted`, { waitUntil: 'domcontentloaded' }); await attendre(2200);
+        await menuStream();
+        const etat = await pg.evaluate(() => ({ racine: document.documentElement.getAttribute('data-stream'), memo: localStorage.getItem('vrm_stream'), bouton: (document.querySelector('[data-bouton-stream]') || { getAttribute: () => null }).getAttribute('data-stream-on') }));
+        dit(etat.racine === '1' && etat.memo === '1' && etat.bouton === '1', `B ${tag} : mémorisé sur l'appareil, l'interrupteur « Stream » le dit`, JSON.stringify(etat));
+        // Éteint à la main : les montants reviennent SANS recharger (l'onglet Ventes rejoint par la navigation de l'app).
         await pg.click('[data-bouton-stream]'); await attendre(400);
+        await pg.locator(W < 600 ? '[data-n-onglet="ventes"]' : '[data-n-laterale] [data-n-entree="ventes"], [data-n-laterale] [data-nav-entree="ventes"]').first().click();
+        await pg.waitForSelector('[data-tache="ventes"]', { timeout: 15000 }).catch(() => {}); await attendre(2200);
         const rendu = await MONTANTS(pg);
         dit(rendu.n > 0, `B ${tag} : « Stream » éteint rend les montants`, JSON.stringify(rendu));
         // Une valeur qui CHANGE pendant que c'est caché reste cachée (React réécrit le nœud).
+        await menuStream();
         await pg.click('[data-bouton-stream]'); await attendre(300);
         await pg.evaluate(() => { const d = document.createElement('div'); d.id = 'banc-montant'; d.className = 'vrm-main'; document.body.appendChild(d); d.textContent = '12'; const s = document.createElement('span'); s.textContent = ' €'; d.appendChild(s); });
         await attendre(100);
@@ -184,11 +212,12 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
           { at: t(3), type: 'republication', site: 'vinted', compte: '111', cle: { item: '77777', ancien: '51001' }, resultat: 'ok' },
           { at: t(30), type: 'ebay_retrait', site: 'ebay', compte: 'principal', cle: { sku: 'VRM-12' }, resultat: 'ok' },
         ] }) }));
-        await pg.goto(`http://localhost:${NV.PORT}/?tab=settings&vue=compte`, { waitUntil: 'domcontentloaded' }); await attendre(1800);
-        await pg.click('[data-onglets-reglages] [data-vue="compte"]').catch(() => {}); await attendre(400);   // (8 nov.) `?vue=compte` n'est lu qu'au premier chargement
-        await pg.click('[data-sous-ouvrir="journal-vrm"]').catch(() => {});
-        await pg.waitForSelector('[data-journal-ligne]', { timeout: 8000 }).catch(() => {});
-        const L = await pg.evaluate(() => [...document.querySelectorAll('[data-journal-ligne]')].map((l) => ({ type: l.getAttribute('data-journal-ligne'), res: l.getAttribute('data-journal-resultat'), txt: l.innerText.replace(/\s+/g, ' ') })));
+        // (26 nov., bancs natifs) Paramètres natif : « Journal : ce que VRM a fait » est une rubrique de « Tes données »
+        // (src/parametres/categories.js) ; elle s'ouvre par son lien profond `reglage=journal-vrm`. Les lignes se lisent
+        // VISIBLES (une ligne montée mais cachée rend son texte collé : « N°4 » + « 20:11 » = « N°420:11 »).
+        await pg.goto(`http://localhost:${NV.PORT}/?tab=settings&reglage=journal-vrm`, { waitUntil: 'domcontentloaded' }); await attendre(1800);
+        await pg.waitForSelector('[data-journal-ligne]', { state: 'visible', timeout: 8000 }).catch(() => {});
+        const L = await pg.evaluate(() => [...document.querySelectorAll('[data-journal-ligne]')].filter((l) => l.getClientRects().length).map((l) => ({ type: l.getAttribute('data-journal-ligne'), res: l.getAttribute('data-journal-resultat'), txt: l.innerText.replace(/\s+/g, ' ') })));
         dit(L.length === 4, `E ${tag} : 4 lignes`, JSON.stringify(L));
         dit(L[0] && /N°4\b/.test(L[0].txt), `E ${tag} : le N° vient de la fiche de l'identifiant (51003 ⇒ N°4)`, L[0] && L[0].txt);
         dit(L[1] && !/N°/.test(L[1].txt) && /99999/.test(L[1].txt), `E ${tag} : un identifiant sans fiche n'a JAMAIS de N°`, L[1] && L[1].txt);
@@ -198,12 +227,12 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
         dit(trous.pasLu && trous.non === 2, `E ${tag} : ce qui n'a pas pu être lu et ce qui n'est pas noté est dit`, JSON.stringify(trous));
         await capture(pg, `E-${tag}-journal`);
         await pg.click('[data-journal-type="ebay"]'); await attendre(300);
-        const nE = await pg.evaluate(() => document.querySelectorAll('[data-journal-ligne]').length);
+        const nE = await pg.evaluate(() => [...document.querySelectorAll('[data-journal-ligne]')].filter((l) => l.getClientRects().length).length);
         dit(nE === 1, `E ${tag} : filtre eBay`, nE);
         await pg.click('[data-journal-type="tous"]'); await attendre(300);
         await pg.click('[data-compte-puces="vrm-journal-compte"] [data-compte-puce="111"]').catch(() => {});
         await attendre(300);
-        const n111 = await pg.evaluate(() => [...document.querySelectorAll('[data-journal-ligne]')].length);
+        const n111 = await pg.evaluate(() => [...document.querySelectorAll('[data-journal-ligne]')].filter((l) => l.getClientRects().length).length);
         dit(n111 === 2, `E ${tag} : filtre de compte (2 lignes du compte 111)`, n111);
         await ctx.close();
       }
