@@ -122,6 +122,40 @@ const OBS = (() => {
     }
     return e;
   }
-  return { cheminNormalise, forme, formeCorps, entree, estVinted, poserSel, empreinte };
+  // ── 2.0 (26 nov., Julien : « tous les faits et gestes doivent être reproduits ») LES GESTES DANS LA PAGE ──
+  // Un geste = sa SORTE (clic, frappe, défilement…), s'il vient d'un vrai doigt (`isTrusted`) ou d'un script, et la
+  // SIGNATURE de l'élément touché : balise, rôle, type, data-testid, nom de champ, et le libellé d'un BOUTON (texte
+  // d'interface, chiffres remplacés par #, 30 signes au plus). Jamais une valeur tapée (sa longueur), jamais un lien
+  // vers une personne (un libellé avec @ ou un identifiant tombe).
+  const propre = (v, n = 40) => { const t = String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); if (!t || /@/.test(t)) return undefined; return t.replace(/\d+/g, '#').slice(0, n); };
+  function signature(el) {
+    if (!el || typeof el !== 'object') return null;
+    const tag = String(el.tag || '').toLowerCase().slice(0, 20);
+    const bouton = tag === 'button' || el.role === 'button' || el.role === 'menuitem' || el.role === 'tab' || el.role === 'option' || (tag === 'input' && /^(submit|button)$/.test(el.type || ''));
+    const o = { tag };
+    if (el.role) o.role = propre(el.role, 20);
+    if (el.type) o.type = propre(el.type, 20);
+    if (el.testid) o.testid = propre(el.testid, 60);
+    if (el.name) o.nom = propre(el.name, 40);
+    if (el.aria) o.aria = propre(el.aria, 40);
+    if (el.placeholder) o.indice = propre(el.placeholder, 40);
+    if (bouton && el.texte) o.texte = propre(el.texte, 30);
+    if (el.href) { try { const u = new URL(el.href); o.lien = estVinted(u.hostname) ? cheminNormalise(u.pathname) : u.hostname; } catch (_) {} }
+    if (Array.isArray(el.ancetres)) { const a = el.ancetres.map((x) => propre(x, 60)).filter(Boolean).slice(0, 4); if (a.length) o.dans = a; }
+    return o;
+  }
+  const SORTES = ['clic', 'appui', 'frappe', 'touche', 'focus', 'defile', 'envoi', 'page', 'onglet', 'visible'];
+  function geste(g) {
+    if (!g || !SORTES.includes(g.k)) return null;
+    const e = { k: g.k, t: Math.round(Number(g.t) || 0), vrai: g.vrai === true, onglet: Number.isFinite(g.onglet) ? g.onglet : undefined };
+    if (g.el) { const s = signature(g.el); if (s) e.el = s; }
+    if (g.k === 'frappe') e.longueur = Math.min(Number(g.longueur) || 0, 100000);
+    if (g.k === 'touche') e.touche = ['lettre', 'chiffre', 'Enter', 'Backspace', 'Tab', 'Escape', 'espace', 'fleche', 'autre'].includes(g.touche) ? g.touche : 'autre';
+    if (g.k === 'defile') e.y = Math.round(Number(g.y) || 0);
+    if (g.k === 'page' || g.k === 'onglet') { try { const u = new URL(g.url); e.h = u.hostname; e.p = estVinted(u.hostname) ? cheminNormalise(u.pathname) : ''; e.q = estVinted(u.hostname) ? [...u.searchParams.keys()].slice(0, 20) : undefined; } catch (_) { return null; } if (g.quoi) e.quoi = propre(g.quoi, 20); }
+    if (g.k === 'visible') e.etat = g.etat === 'visible' ? 'visible' : 'cache';
+    return e;
+  }
+  return { cheminNormalise, forme, formeCorps, entree, estVinted, poserSel, empreinte, signature, geste };
 })();
 if (typeof module !== 'undefined') module.exports = OBS;
