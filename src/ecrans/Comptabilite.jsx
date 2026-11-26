@@ -283,7 +283,8 @@ import { resumeVenteLot, titreDitLot } from "../venteLot.js";
 // ⟦← App.jsx #29⟧
 import CoutsVente from "../CoutsVente.jsx";
 // ⟦← App.jsx #30⟧
-import { SELECT_DETAILS_ACHATS, detailsDeLignes, sansTailleLue } from "../faitsAchat.js";   // (17 nov., lot relier-taille)
+import { SELECT_DETAILS_ACHATS, detailsDeLignes, sansTailleLue } from "../faitsAchat.js";
+import { lireFamilleCopiee, VERSION_META } from '../App.jsx';   // (26 nov., vitesse-webkit) offres des conversations gardées sur l'appareil   // (17 nov., lot relier-taille)
 import { FaitsAchat, NoteTailleAchats } from "../FaitsAchat.jsx";
 // ⟦← App.jsx #31⟧   // (17 nov., lot relier-tout-achat) la feuille « Relier un achat »
 import { CLE_FOURNISSEURS, lireRegistre, avecFournisseur, sansFournisseur, avecAchatGros, sansAchatGros, avecRepartition, achatGros, reliesDuLot, partsDuLot, planPrixGros, ecrituresPrixGros, ecritureLienGros, ecritureDelierGros, origineDuPrix, horsRattachables, avecHors, sansHors, avecGardes, bilanFournisseurs, eurosC as eurosFo } from "../fournisseurs.js";
@@ -1631,7 +1632,13 @@ const fetchOffresConversations = async (uid=null) => {
   try {
     if(uid!=null&&!/^\d+$/.test(String(uid)))return null;
     const filtre=uid==null?'id=like.harvest_%25_conv_%25':`id=like.harvest_${uid}_conv_%25`;
-    const rows = await lireTout(`${filtre}&${OFFRES_CONV_FILTRE}&${OFFRES_CONV_SELECT}`, { strict: true });
+    // (26 nov., vitesse-webkit) Toutes les conversations (Aujourd'hui, Messages) : la famille GARDÉE sur l'appareil et revalidée
+    // par sa version (`lireFamilleCopiee`, src/copieLignes.js — le nombre de lignes, puis seulement celles écrites depuis ; un
+    // compte qui ne tombe pas juste ⇒ relue entière ; ratée ⇒ `null`). Avec leurs messages entiers, elle pesait ~300 Ko à
+    // CHAQUE ouverture d'Aujourd'hui (banc budget-vitesse, 2e ouverture). Les mêmes champs, la même règle ensuite.
+    const rows = uid == null
+      ? await lireFamilleCopiee('offresconv', `${filtre}&${OFFRES_CONV_FILTRE}`, `${VERSION_META},${OFFRES_CONV_SELECT.replace(/^select=id,/, '')}`)
+      : await lireTout(`${filtre}&${OFFRES_CONV_FILTRE}&${OFFRES_CONV_SELECT}`, { strict: true });
     if (rows === null) return null;
     const mr = messagesRetires();
     const out = new Map();

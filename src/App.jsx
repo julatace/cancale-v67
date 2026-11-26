@@ -39694,4 +39694,4 @@ export { RepriseAppareil };   // (22 nov., choix n° 23) lu par ecrans/Comptabil
 export { NET_VENTES };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { CLE_FORFAIT_EMBALLAGE };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { prendreVue };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx et ecrans/AnnoncesEgalite.jsx
-export { ventesCoqueLues, ventesConnuesCoque };   // (22 nov.) Annonces · « Vendue » : toutes les ventes Vinted PROUVÉES
+export { ventesCoqueLues, ventesConnuesCoque, lireFamilleCopiee, VERSION_META };   // (22 nov.) Annonces · « Vendue » : toutes les ventes Vinted PROUVÉES
