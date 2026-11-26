@@ -26822,6 +26822,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 {/* (23 nov., capture de Julien : « 12 nov. · · Relais », « 13 nov.   ·  N°247 ») La sous-ligne se construit des
                     seuls morceaux présents, un séparateur unique entre eux (`data-sep="js"` éteint les séparateurs dessinés en CSS). */}
                 <div className="vrm-buy-meta" data-sep="js" style={{color:C.muted}}>
+                  {/* (26 nov., capture de Julien : « ici c'est pas beau ») L'état en MOT, premier de la sous-ligne — plus une pilule seule sur sa ligne. */}
+                  <span className="vrm-buy-statut" data-achat-etat={cancelled?'annule':(st.retour||st.step===3)?'geste':'neutre'}><i style={{background:st.color}}/>{st.label}</span>
                   {/* (5 nov., revue 2.16) Achats : le compte en mots, sans pastille de couleur (hors palette). */}
                   {!unCompte && !achatsGroupees && <AcctTag acc={o._acc} name={accNameOf(o._acc)} pastille={false}/>}
                   <span style={{whiteSpace:'nowrap'}}>{o.date?dateFr(o.date, new Date(o.date).getFullYear()===new Date().getFullYear() ? {day:'numeric',month:'short'} : {day:'numeric',month:'short',year:'numeric'}):''}
@@ -26843,8 +26845,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     de transaction (une identité, jamais le titre, §5). Visible sur
                     la ligne — il n'était que dans le menu ⋯. Son contenu (et un
                     PDF joint) ne se lit qu'au clic. */}
-                <div className="vrm-buy-pastilles">
-                  <span className="vrm-buy-statut" data-achat-etat={cancelled?'annule':(st.retour||st.step===3)?'geste':'neutre'}><i style={{background:st.color}}/>{st.label}</span>
+                {/* (26 nov.) La rangée des pastilles n'existe que si elle porte quelque chose (lot, reçu, facture). */}
+                {((!cancelled && texteLotRangee(o)) || rc || (facturesAchat.factures && facturesAchat.factures[cleFacture('tx', o.transaction_id)])) ? <div className="vrm-buy-pastilles">
                   {/* (22 nov., lot achats-lot) Un lot PROUVÉ par SA transaction, peut-être un lot (le titre), ou un achat DIVISÉ (ses N°) :
                       l'étiquette se touche et ouvre « Diviser cet achat » (un toucher). Jamais affirmé par le titre seul. */}
                   {!cancelled && (()=>{ const tl = texteLotRangee(o); if (!tl) return null; const l = lotDeRangee(o);
@@ -26862,7 +26864,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   )}
                   {(()=>{ const cf = cleFacture('tx', o.transaction_id); const fa = facturesAchat.factures && facturesAchat.factures[cf];
                     return fa ? <PastilleFacture cle={cf} f={fa} onOuvrir={facturesAchat.ouvrir} enCours={facturesAchat.enCours===cf} Icon={Icon}/> : null; })()}
-                </div>
+                </div> : null}
                 {/* (24 oct.) Ce que dit le transporteur, par le n° de CET achat.
                     (11 nov., soir — capture de Julien en production : « le logo prend toute la page, c'est moche […]
                     mettre le numéro de suivi à côté de chaque achat ») UNE ligne compacte, sur CHAQUE achat qui a un
