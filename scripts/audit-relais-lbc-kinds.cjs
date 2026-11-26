@@ -34,6 +34,8 @@ dit(kinds.size >= 10, 'les kinds envoyés par le capteur sont lus dans son code'
 // Un message plausible, à la forme que le capteur envoie (les gardes du relais
 // exigent ces champs).
 const exemple = {
+  lbcconvs: { moi: '11111111-2222-4333-8444-555555555555', liste: [{ conv: 'aaaaaaaa-0000-4000-8000-000000000001', titre: 'x', nonlus: 1 }] },   // 5.445
+  lbcporte: { available: 0, incoming: 0 },   // 5.445
   lbcraw: { url: 'https://api.leboncoin.fr/x', body: '{}' },
   lbcvente: { url: 'https://api.leboncoin.fr/x', body: '{}', __vrmSequence: 7 },
   lbccatalogue: { url: 'u', body: '{}' },

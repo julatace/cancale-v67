@@ -192,6 +192,9 @@
     else if (d.kind === 'lbcschema' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcSchema', endpoint: d.endpoint, cles: d.cles }); } catch (_) {} }
     // La messagerie : le NOMBRE de non-lus d'un compte, et la liste de ses comptes
     // liés (sans email). Jamais un texte de message (voir lbc-inject.js).
+    // 5.445 : la liste des conversations (article, aperçu, date, non-lus ; jamais un nom) et le porte-monnaie (deux nombres).
+    else if (d.kind === 'lbcconvs' && /^[0-9a-f-]{8,64}$/i.test(String(d.moi || '')) && Array.isArray(d.liste)) { try { transmettre({ from: 'cancale-lbc', action: 'lbcConversations', moi: String(d.moi), liste: d.liste.slice(0, 60) }); } catch (_) {} }
+    else if (d.kind === 'lbcporte') { const nb = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 1e9 ? v : null); try { transmettre({ from: 'cancale-lbc', action: 'lbcPorteMonnaie', available: nb(d.available), incoming: nb(d.incoming) }); } catch (_) {} }
     else if (d.kind === 'lbcmsgcompteur' && d.userId) { try { transmettre({ from: 'cancale-lbc', action: 'lbcMsgCompteur', userId: String(d.userId).slice(0, 64), unread: Number(d.unread) }); } catch (_) {} }
     // 22 oct. : une liste COMPLÈTE d'un vendeur (identifiants + total), dans la
     // MÊME file que ses annonces — elle arrive après elles.

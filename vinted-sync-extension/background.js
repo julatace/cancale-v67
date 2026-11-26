@@ -5151,6 +5151,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'lbcSchema' && msg.endpoint && Array.isArray(msg.cles)) { await storeLbcRecon({ schemaOne: { endpoint: msg.endpoint, cles: msg.cles } }); sendResponse({ ok: true }); return; }
           // La messagerie Leboncoin : le nombre de non-lus d'un compte, et ses
           // comptes liés. Rangés dans `lbc_messages` (voir storeLbcMessages).
+          // 5.445 : la liste des conversations et le porte-monnaie — cadre principal d'un onglet leboncoin.fr, compte de CET onglet.
+          if (msg.action === 'lbcConversations') { sendResponse(await rangerLbcConversations(msg, sender).catch(() => ({ ok: false }))); return; }
+          if (msg.action === 'lbcPorteMonnaie') { sendResponse(await rangerLbcPorteMonnaie(msg, sender).catch(() => ({ ok: false }))); return; }
           if (msg.action === 'lbcMsgCompteur' && msg.userId) {
             const id=String(msg.userId).slice(0,64);if(!/^[0-9a-f-]{8,64}$/i.test(id)){sendResponse({ok:false});return;}
             await storeLbcMessages({compteur:{userId:id,unread:Number(msg.unread)}});
@@ -26899,10 +26902,11 @@ async function etatSite(url,tabId) {
   // calculé et publié (`lbc_a_retirer`) — la carte le dit, sans rien recalculer.
   // 5.335 : seulement les lignes PROUVÉES encore en ligne (lecture complète < 24 h).
   let lectureLbc = null;
-  if (plateforme === 'leboncoin') { const ll = local.vrmLbcLecture, u = vrm && vrm.connecte ? String((await loadSession().catch(() => null))?.user_id || '') : ''; lectureLbc = ll && u && ll.u === u ? (ll.comptes || {}) : null; }
+  let txLuLbc = null;
+  if (plateforme === 'leboncoin') { const ll = local.vrmLbcLecture, u = vrm && vrm.connecte ? String((await loadSession().catch(() => null))?.user_id || '') : ''; lectureLbc = ll && u && ll.u === u ? (ll.comptes || {}) : null; try { const tl = (await chrome.storage.local.get('vrmLbcTxLu')).vrmLbcTxLu; txLuLbc = tl && u && tl.u === u ? (tl.comptes || {}) : null; } catch (_) {} }
   const aRetirerBrut = plateforme === 'leboncoin' && vrm && vrm.connecte ? await lbcARetirerPourCarte().catch(() => null) : null;
   const aRetirer = aRetirerBrut ? { at: aRetirerBrut.at, liste: aRetirerProuveCarte(aRetirerBrut.liste, lectureLbc, Date.now()) } : null;
-  const lbc = plateforme === 'leboncoin' ? resumeCarteLbc({ vrm, transport, connu: local.vrmLbcCompte, lecture: lectureLbc, code: CODE_VERSION, maintenant: Date.now() }) : null;
+  const lbc = plateforme === 'leboncoin' ? resumeCarteLbc({ vrm, transport, connu: local.vrmLbcCompte, lecture: lectureLbc, code: CODE_VERSION, maintenant: Date.now(), txLu: txLuLbc }) : null;
   const oauthRevenu = await oauthRevenuPour(tabId).catch(() => null);
   // 5.354 : le mini-résumé du mois (connecté seulement ; compte de l'onglet prouvé).
   const mois = vrm && vrm.connecte === true ? await moisPourCarte(plateforme, site, tabId).catch(() => null) : null;
@@ -27533,18 +27537,74 @@ async function aimesVcCarte(msg, sender) {
 // annonces (`vc_listings`, favoris lus), ventes (`vc_ventes` : état, transporteur, bordereau) ; pas de date de mise en
 // ligne. Messages : les fils restent sur le site (la carte ne les recopie pas encore) — dit une fois.
 const STATUT_LBC = { active: 'en_vente', inactive: 'masque', paused: 'masque', deleted: 'supprime', sold: 'vendu' };
+// 5.445 (23 nov., « pareil pour Leboncoin ») — <lbc-tx-regle> UNE TRANSACTION LEBONCOIN, LA MÊME RÈGLE QUE L'APP
+//    (src/App.jsx `lbcAnnulee` / `lbcFinalisee` / `lbcExpediee`, recopiées mot pour mot ; `audit-lbc-panneau.cjs` les
+//    exécute côte à côte sur les mêmes lignes et exige le même verdict). Mesuré sur sa base (23 nov.) : `lbc_ventes` mêle
+//    ses VENTES (`isSeller === true`) et ses ACHATS (`isSeller === false`) ; une ligne de la liste v3 sans détail n'a pas
+//    `isSeller` ⇒ son sens n'est PAS deviné (« pas su », comptée à part, jamais rangée en vente ni en achat, §5). Une
+//    vente « validation » dont le colis est `finished` est FINALISÉE (le panneau d'avant la disait « à expédier »).
+function lbcTxAnnulee(o) { return o.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((o.parcelStatus || '') + ' ' + (o.stepStatus || '') + ' ' + (o.stepLabel || '')); }
+function lbcTxFinalisee(o) {
+  if (o.parcelColor) return o.parcelColor === 'finished';
+  if (o.parcelStatus) return /delivered|livr[ée]/i.test(o.parcelStatus);
+  if (o.stepStatus === 'done') return true;
+  if (o.stepStatus === 'cancelled') return false;
+  return /paiement effectu|termin[ée]|finalis|cl[oô]tur|livr[ée]|colis re[çc]u|\bclos/i.test((o.stepLabel || '') + ' ' + (o.stepStatus || ''));
+}
+function lbcTxExpediee(o) {
+  const t = [o.parcelStatus, o.stepStatus, o.stepLabel].filter(Boolean).join(' ').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  if (/(?:a|avant) (?:envoyer|expedier)|attente (?:de |du )?(?:depot|expedition|prise en charge)/.test(t)) return false;
+  return /in[_ -]?transit|out[_ -]?for[_ -]?delivery|shipped|dispatched|collected|en cours de livraison|colis (?:envoye|depose|remis)|expedie(?:e|s)?\b|pris en charge|collecte par/.test(t);
+}
+// </lbc-tx-regle>
+const TRANSP_LBC = { mondial_relay: 'mondialrelay', mondialrelay: 'mondialrelay', shop2shop: 'shop2shop', colissimo: 'colissimo', chronopost: 'chronopost', relais_colis: 'relaiscolis', relaiscolis: 'relaiscolis', dpd: 'dpd', ups: 'ups' };
+// Une ligne de `lbc_ventes` ⇒ ce que le panneau montre. `sens` : 'vente' | 'achat' | null (pas su). L'état d'une VENTE :
+// annulee · finalisee · en_route (partie) · a_expedier (vente prouvée, ni finalisée ni partie, comme l'onglet Colis de
+// l'app) ; d'un ACHAT : annulee · finalisee (reçu) · en_route · pas_su (payé, pas encore parti). Le n° de suivi est
+// celui que Leboncoin a mis sur l'étiquette (`label.reference`), jamais un autre champ ; l'adresse de suivi seulement
+// chez un transporteur connu (https), sinon rien.
+const HOTES_SUIVI_LBC = /^https:\/\/(?:www\.)?(?:mondialrelay\.(?:fr|be|com)|shop2shop\.fr|laposte\.fr|colissimo\.fr|chronopost\.fr|relaiscolis\.com|dpd\.fr|ups\.com)\//i;
+function txLbcPanneau(x) {
+  if (!x || typeof x !== 'object') return null;
+  const sens = x.isSeller === true ? 'vente' : x.isSeller === false ? 'achat' : null;
+  const euro = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.round(n) / 100 : null; };   // `price` Leboncoin : en CENTIMES (mesuré le 23 nov. : 5800 pour une vente à 58 € ; l'app divise aussi par 100, `lbcEuro`)
+  const etat = lbcTxAnnulee(x) ? 'annulee' : lbcTxFinalisee(x) ? 'finalisee' : lbcTxExpediee(x) ? 'en_route' : sens === 'vente' ? 'a_expedier' : 'pas_su';
+  const lab = x.label && typeof x.label === 'object' ? x.label : null;
+  const ref = lab && /^[A-Z0-9-]{5,30}$/i.test(String(lab.reference || '')) ? String(lab.reference) : '';
+  const url = lab && HOTES_SUIVI_LBC.test(String(lab.trackingUrl || '')) ? String(lab.trackingUrl) : '';
+  const cle = TRANSP_LBC[String(x.deliveryMethod || '').toLowerCase()] || '';
+  const img = /^https:\/\/img\.leboncoin\.fr\//.test(String(x.image || '')) ? String(x.image) : '';
+  return {
+    tx: String(x.txId || ''), sens, titre: String(x.title || '').slice(0, 120), prix: euro(x.price), photo: img,
+    date: Date.parse(x.dateVente || '') || null, etat, vendue: sens === 'vente' && etat !== 'annulee', num: '',
+    transporteur: x.deliveryLabel ? String(x.deliveryLabel).slice(0, 30) : (cle ? TRANSPORTEURS_CARTE[cle] || '' : ''), ...(cle ? { transporteurCle: cle } : {}),
+    ...(ref ? { suivi: ref } : {}), ...(url ? { suiviUrl: url } : {}), statutSite: x.stepLabel ? String(x.stepLabel).slice(0, 60) : '', bordereau: null, limite: '',
+    lien: /^\d{4,15}$/.test(String(x.txId || '')) ? 'https://www.leboncoin.fr/compte/part/transaction/' + String(x.txId) : '',
+  };
+}
+const STATUT_VC = { published: 'en_vente', on_sale: 'en_vente', draft: 'brouillon', pending: 'a_confirmer', sold: 'vendu', reserved: 'reserve', hidden: 'masque' };
+// 5.445 : les NOMBRES relevés sur la page « Statistiques » d'une annonce (`stats`, `noterStatsAnnonceLbc`) — vues, favoris,
+//    messages ; jamais relevés ⇒ null (« — »), jamais 0 inventé. Leboncoin ne dit jamais QUI.
+function nombresAnnonceLbc(x) {
+  const st = x && x.stats && typeof x.stats === 'object' ? x.stats : null;
+  const nb = (v) => (Number.isInteger(v) && v >= 0 ? v : null);
+  return { favoris: st ? nb(st.favoris) : null, vues: st ? nb(st.vues) : null, messagesAnnonce: st ? nb(st.messages) : null };
+}
 async function carteListesSite(plateforme, o, sender) {
   const s = await loadSession().catch(() => null);
-  if (!(s && s.user_id && !s.mort)) return { ok: true, plateforme, connecte: false };
+  // 5.445 : chaque sortie anticipée DIT pourquoi (`attente`) — le panneau d'avant lisait « annonces : null » comme « pas pu
+  //    être lues » et gardait cette réponse 60 s, même après que le compte de l'onglet avait été reconnu (captures de Julien,
+  //    23 nov. : « Tes annonces n'ont pas pu être lues » SUR « Mes annonces », 9 annonces captées à la même minute).
+  if (!(s && s.user_id && !s.mort)) return { ok: true, plateforme, connecte: false, attente: 'vrm' };
   const oc = await compteOngletCapte(o.url, sender && sender.tab ? sender.tab.id : null);
   const moi = oc && oc.id ? cleCompteCapte(oc.id) : '';
-  if (!moi) return { ok: true, plateforme, compte: null };
+  if (!moi) return { ok: true, plateforme, compte: null, attente: 'compte' };
   // 5.444 (capture de Julien : le prix des ventes Vestiaire « — ») : les prix rangés par l'extension sont `{ valeur, devise, cle }` ;
   // ils n'étaient pas lus (seuls `amount` / `value`). Une autre devise que l'euro n'est jamais montrée comme des euros.
   const euro = (v) => { if (v && typeof v === 'object' && v.devise && String(v.devise).toUpperCase() !== 'EUR') return null; const n = Number(String(v == null ? '' : (typeof v === 'object' ? (v.amount != null ? v.amount : v.value != null ? v.value : v.valeur) : v)).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
   const photoSure = (u) => (/^https:\/\/[\w.-]+\//.test(String(u || '')) ? String(u) : '');
   const statuts = { en_vente: 0, brouillon: 0, masque: 0, reserve: 0, vendu: 0, a_confirmer: 0, examen: 0, a_corriger: 0, refusee: 0, retiree: 0 };
-  let annonces = null, ventes = null, sansCompte = 0;
+  let annonces = null, ventes = null, achats = null, porteMonnaie = null, sansCompte = 0;   // 5.454 : `achats` déclaré ici (Leboncoin le lit plus bas, Vestiaire ensuite)
   if (plateforme === 'leboncoin') {
     const la = await sbGet('app_data?id=eq.lbc_listings&select=it:data->items,at:data->>updatedAt');
     if (Array.isArray(la)) {
@@ -27559,15 +27619,18 @@ async function carteListesSite(plateforme, o, sender) {
         if (st === 'supprime') continue;
         statuts[st]++;
         const pub = Date.parse(x.publieeLe || '') || null;
-        a.push({ id: String(x.id || x.ref || ''), titre: String(x.subject || '').slice(0, 120), prix: euro(x.price), photo: photoSure(Array.isArray(x.images) ? x.images[0] : ''), photos: (Array.isArray(x.images) ? x.images : []).map(photoSure).filter(Boolean).slice(0, 8), num: x.numEcrit && x.numEcrit.cle ? String(x.numEcrit.cle) : '', jours: pub ? Math.max(0, Math.floor((Date.now() - pub) / 864e5)) : null, description: String(x.body || '').slice(0, 600), statut: st, url: /^https:\/\/www\.leboncoin\.fr\//.test(String(x.url || '')) ? String(x.url) : '' });
+        a.push({ id: String(x.id || x.ref || ''), titre: String(x.subject || '').slice(0, 120), prix: euro(x.price), photo: photoSure(Array.isArray(x.images) ? x.images[0] : ''), photos: (Array.isArray(x.images) ? x.images : []).map(photoSure).filter(Boolean).slice(0, 8), num: x.numEcrit && x.numEcrit.cle ? String(x.numEcrit.cle) : '', jours: pub ? Math.max(0, Math.floor((Date.now() - pub) / 864e5)) : null, description: String(x.body || '').slice(0, 600), statut: st, ...nombresAnnonceLbc(x), url: /^https:\/\/www\.leboncoin\.fr\//.test(String(x.url || '')) ? String(x.url) : '' });
       }
       annonces = { lu: Date.parse((la[0] && la[0].at) || '') || null, aConfirmer: false, total: a.length, liste: a.filter((x) => x.statut === 'en_vente').slice(0, CARTE_LISTE_MAX), toutes: a.slice(0, CARTE_TOUTES_MAX), nTous: a.length, statuts, sansCompte };
     }
-    const lv = await sbGet('app_data?id=eq.lbc_ventes&select=v:data->ventes');
+    const lv = await sbGet('app_data?id=eq.lbc_ventes&select=v:data->ventes,at:data->>updatedAt');
     if (Array.isArray(lv)) {
-      const vs = Object.values((lv[0] && lv[0].v) || {}).filter((x) => x && cleCompteCapte(x.account || '') === moi);
-      const etat = (x) => (x.stepStatus === 'cancelled' ? 'annulee' : x.stepStatus === 'done' ? 'finalisee' : x.stepStatus === 'validation' ? 'a_expedier' : 'pas_su');
-      ventes = { lu: null, total: vs.length, liste: vs.map((x) => ({ tx: String(x.txId || ''), titre: String(x.title || '').slice(0, 120), prix: euro(x.price), date: Date.parse(x.dateVente || x.at || '') || null, etat: etat(x), vendue: etat(x) !== 'annulee', num: '' })).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, CARTE_LISTE_MAX) };
+      const lus = Object.values((lv[0] && lv[0].v) || {}).filter((x) => x && cleCompteCapte(x.account || '') === moi).map(txLbcPanneau).filter((x) => x && x.tx);
+      const tri = (l) => l.sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, CARTE_LISTE_MAX);
+      const lu = Date.parse((lv[0] && lv[0].at) || '') || null;
+      const vs = lus.filter((x) => x.sens === 'vente'), as = lus.filter((x) => x.sens === 'achat');
+      ventes = { lu, total: vs.length, liste: tri(vs), inconnues: lus.filter((x) => !x.sens).length };
+      achats = { lu, site: 'leboncoin', total: as.length, liste: tri(as).map((x) => Object.assign({ id: x.tx, statut: x.statutSite || '' }, x)) };   // 5.454 : aussi lisible par l'onglet « Achats » (5.444)
     }
   } else {
     const la = await sbGet('app_data?id=eq.vc_listings&select=it:data->items,at:data->>capturedAt');
@@ -27623,8 +27686,29 @@ async function carteListesSite(plateforme, o, sender) {
     if (Array.isArray(f) || Array.isArray(cm)) {
       const fils = (Array.isArray(f) ? f : []).filter((x) => x && cleCompteCapte(x.compte || '') === moi);
       const cpt = Array.isArray(cm) && cm[0] && cm[0].c && typeof cm[0].c === 'object' ? (cm[0].c[moi] || cm[0].c[moi.replace(/^lbc-account:/, '')] || null) : null;
-      messages = { lu: null, site: 'leboncoin', nonlusSite: cpt && Number.isFinite(Number(cpt.unread)) ? Number(cpt.unread) : null, liste: fils.map((x) => ({ conv: String(x.id).replace(/^lbc_fil_/, ''), qui: String(x.qui || x.titre || '').slice(0, 60), texte: String(x.apercu || '').slice(0, 160), at: Date.parse(x.at || '') || null, nonlu: x.nonlu === 'true', photo: '' })).sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, CARTE_LISTE_MAX) };
+      // 5.445 : la LISTE des conversations de CE compte (`lbc_conversations`, rangée par la page « Messages » : article, aperçu,
+      //    date, non-lus — jamais un nom), complétée par les fils ouverts (`lbc_fil_*`), une ligne par conversation.
+      const lc = await sbGet('app_data?id=eq.lbc_conversations&select=c:data->comptes->"' + moi.toLowerCase().replace(/[^0-9a-f-]/g, '') + '"').catch(() => null);
+      const cl = Array.isArray(lc) && lc[0] && lc[0].c && typeof lc[0].c === 'object' ? lc[0].c : null;
+      const parConv = new Map();
+      for (const x of (cl && Array.isArray(cl.liste) ? cl.liste : [])) {
+        if (!x || !/^[0-9a-f-]{8,64}$/i.test(String(x.conv || ''))) continue;
+        parConv.set(String(x.conv), { conv: String(x.conv), qui: String(x.titre || '').slice(0, 60), texte: String(x.apercu || '').slice(0, 160), at: Date.parse(x.at || '') || null, nonlu: Number(x.nonlus) > 0, photo: /^https:\/\/img\.leboncoin\.fr\//.test(String(x.photo || '')) ? String(x.photo) : '', annonce: /^\d{4,15}$/.test(String(x.annonce || '')) ? String(x.annonce) : '' });
+      }
+      for (const x of fils) {
+        const conv = String(x.id).replace(/^lbc_fil_/, ''), a = parConv.get(conv), at = Date.parse(x.at || '') || null;
+        if (a && (a.at || 0) >= (at || 0)) continue;
+        parConv.set(conv, { conv, qui: String(x.titre || (a && a.qui) || '').slice(0, 60), texte: String(x.apercu || '').slice(0, 160), at, nonlu: x.nonlu === 'true', photo: (a && a.photo) || '', annonce: (a && a.annonce) || '' });
+      }
+      messages = { lu: cl && Date.parse(cl.at || '') || null, site: 'leboncoin', nonlusSite: cpt && Number.isFinite(Number(cpt.unread)) ? Number(cpt.unread) : null, liste: [...parConv.values()].sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, CARTE_LISTE_MAX) };
     }
+    // 5.445 : le porte-monnaie de CE compte (`lbc_porte_monnaie`, rangé quand la page l'a demandé à Leboncoin :
+    //    `ewallet` {available, incoming}). Mesuré : la forme ; PAS l'unité (seul un solde à 0 a été vu) ⇒ un montant non nul
+    //    n'est jamais converti au hasard : 0 se dit « 0,00 € », un autre nombre se dit « lu, à vérifier sur Leboncoin ».
+    const pm = await sbGet('app_data?id=eq.lbc_porte_monnaie&select=c:data->comptes->"' + moi.toLowerCase().replace(/[^0-9a-f-]/g, '') + '"').catch(() => null);
+    const pc = Array.isArray(pm) && pm[0] && pm[0].c && typeof pm[0].c === 'object' ? pm[0].c : null;
+    const nbPm = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
+    porteMonnaie = pm === null ? null : pc ? { disponible: nbPm(pc.available), aVenir: nbPm(pc.incoming), at: Date.parse(pc.at || '') || null } : { jamais: true };
   }
   const nom = await nomCompteCapte(plateforme, moi).catch(() => '');
   const n = await notificationsCarte(moi).catch(() => null);
@@ -27634,7 +27718,7 @@ async function carteListesSite(plateforme, o, sender) {
   if (plateforme === 'vestiaire') notifsSite = await notifsVcCarte(moi, annonces, ventes).catch(() => null);
   // 5.444 — ACHATS (« ajoute les achats pour toutes les plateformes ») : Vestiaire = `vc_achats` de CE compte (la page
   // « Commandes » les donne au passage) ; Leboncoin : VRM ne lit pas encore tes achats (dit, jamais « aucun »).
-  let achats = null;
+  // 5.454 : Leboncoin LIT maintenant ses achats (`lbc_ventes`, `isSeller === false`, plus haut) ; lecture ratée ⇒ null (« pas su »).
   if (plateforme === 'vestiaire') {
     const ra = await sbGet('app_data?id=eq.vc_achats&select=a:data->achats,l:data->lecture');
     if (Array.isArray(ra)) {
@@ -27642,11 +27726,11 @@ async function carteListesSite(plateforme, o, sender) {
       const lst = r0 ? Object.entries(r0.a || {}).filter(([, x]) => x && String(x.compte || '') === moi) : [];
       achats = { lu: r0 && r0.l ? (Date.parse(r0.l.at || '') || null) : null, site: 'vestiaire', liste: lst.map(([k, x]) => ({ id: k, titre: String(x.nom || '').slice(0, 120), prix: euro(x.montant && x.montant.valeur), date: Date.parse(x.date || x.premiereVue || '') || null, statut: String(x.etat || '').slice(0, 40), suivi: String(x.suivi || '').replace(/[^\w-]/g, '').slice(0, 40), transporteur: String(x.transporteur || '').slice(0, 30) })).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, CARTE_LISTE_MAX) };
     }
-  } else achats = { site: 'leboncoin', pasLu: true, liste: [] };
+  }
   // 5.410 : la baisse par règle de CE compte (Leboncoin `lbc:{id}`, Vestiaire `vc:{id}`), réglée dans le panneau.
   const automatisations = await (async () => { const m = await lireMain([REGLE_BAISSE_CLE]).catch(() => null); if (!m) return null; const cle = (plateforme === 'leboncoin' ? 'lbc:' : 'vc:') + moi; const c = m[REGLE_BAISSE_CLE] && m[REGLE_BAISSE_CLE].comptes && m[REGLE_BAISSE_CLE].comptes[cle]; const r = regleBaisseDe(m[REGLE_BAISSE_CLE], cle); return { site: plateforme, cle, baisse: r ? { actif: true, pct: r.pct, jours: r.jours } : { actif: false, pct: c && Number(c.pct) || null, jours: c && Number(c.jours) || null } }; })().catch(() => null);
   const retraits = await retraitsPourPanneau().catch(() => null);   // 5.426 : « Vendue → retirée sur »
-  return { ok: true, plateforme, compte: { id: moi, nom }, annonces, ventes, achats, messages, automatisations, notifications, notifsSite, retraits, autres: null, fenetre: o.fenetre };
+  return { ok: true, plateforme, compte: { id: moi, nom }, annonces, ventes, achats, ...(plateforme === 'leboncoin' ? { porteMonnaie } : {}), messages, automatisations, notifications, notifsSite, retraits, autres: null, fenetre: o.fenetre };
 }
 // 5.444 : l'état d'un ACHAT Vinted pour le panneau — a_retirer (règle `AT_RELAY` sur le texte de Vinted) · termine
 // (`completed`) · annule (`failed`, ou annulé / remboursé dit par Vinted) · en_cours (tout le reste, jamais « à retirer »).
@@ -27990,7 +28074,7 @@ async function carteListes(msg, sender) {
   const plateforme = plateformeDe(o.url);
   // 5.409 (Julien : « tout doit marcher aussi pour Leboncoin et Vestiaire Collective ») : le grand panneau sur ces
   // sites, compte de l'onglet de CE site, avec ce que l'extension a déjà rangé (aucune requête de plus).
-  if (plateforme === 'leboncoin' || plateforme === 'vestiaire') return await carteListesSite(plateforme, o, sender).catch(() => ({ ok: true, plateforme, pasDeListe: true }));
+  if (plateforme === 'leboncoin' || plateforme === 'vestiaire') return await carteListesSite(plateforme, o, sender).catch((e) => { noterDiag('carte_listes_site_leve_' + plateforme); void e; return { ok: true, plateforme, pasDeListe: true, attente: 'erreur' }; });
   if (plateforme !== 'vinted') return { ok: true, plateforme, pasDeListe: true };
   const s = await loadSession().catch(() => null);
   if (!(s && s.user_id && !s.mort)) return { ok: true, plateforme, connecte: false };
@@ -42284,6 +42368,14 @@ async function noterReceptionLbc(famille,resultat,sender){
     const etat=etats.includes(resultat?.etat)?resultat.etat:'format-non-reconnu';
     cartes[tab]={...avant,receptions:{...(avant.receptions||{}),[famille]:{etat,nombre:Math.max(0,Math.min(10000,Number(resultat?.nombre)||0)),photos:Math.max(0,Math.min(10000,Number(resultat?.photos)||0)),at:Date.now()}},at:Date.now()};
     await chrome.storage.local.set({vrmLbcTransport:Object.fromEntries(Object.entries(cartes).sort((a,b)=>b[1].at-a[1].at).slice(0,32))});
+    // 5.445 : « Mes transactions » lue pour CE compte est notée aussi PAR COMPTE (ce navigateur, ce compte VRM) : un autre
+    //    onglet du même compte ne redemande plus « Ouvre « Mes transactions » » (capture de Julien : 12 ventes lues, et le
+    //    bandeau restait sur chaque écran du panneau parce qu'il ne regardait que l'onglet).
+    const nu=avant.compte&&!avant.ambigue?cleCompteCapte(avant.compte):'';
+    if(famille==='transactions'&&nu&&(etat==='enregistre'||etat==='liste-vide')){
+      const u=String((await loadSession())?.user_id||'');
+      if(u){const b=(await chrome.storage.local.get('vrmLbcTxLu')).vrmLbcTxLu;const l=b&&b.u===u&&b.comptes&&typeof b.comptes==='object'?b:{u,comptes:{}};l.comptes[nu]={etat,nombre:Math.max(0,Math.min(10000,Number(resultat?.nombre)||0)),at:Date.now()};await chrome.storage.local.set({vrmLbcTxLu:l});}
+    }
   }catch(_){}
 }
 // 5.335 (9 nov.) : la lecture COMPLÈTE de « Mes annonces » d'un compte, notée
@@ -42315,7 +42407,7 @@ async function noterLectureCompleteLbc(owner, ids, total, sender) {
 // ce qu'il se passe, et UN SEUL geste (le premier qui débloque). `{quand}` est
 // remplacé par la carte (« il y a 2 min »). Fonction PURE (testée telle quelle).
 const LBC_LECTURE_FRAICHE_MS = 24 * 3600e3;
-function resumeCarteLbc({ vrm, transport, connu, lecture, code, maintenant }) {
+function resumeCarteLbc({ vrm, transport, connu, lecture, code, maintenant, txLu }) {
   const t = transport || null, now = Number(maintenant) || Date.now();
   const R = (ok, texte, geste, at) => ({ ok, texte, geste: geste || '', at: at || null });
   const RECHARGE = 'Recharge cette page Leboncoin.';
@@ -42349,7 +42441,10 @@ function resumeCarteLbc({ vrm, transport, connu, lecture, code, maintenant }) {
   else annonces = R(null, 'pas encore lues', 'Ouvre « Mes annonces ».');
   // Ventes : ce que la page « Mes transactions » a rendu.
   let ventes;
-  const rv = t && t.receptions && t.receptions.transactions;
+  // 5.445 : la réception de CET onglet, sinon celle de CE compte notée dans ce navigateur (`vrmLbcTxLu`, < 7 jours).
+  const rvOnglet = t && t.receptions && t.receptions.transactions;
+  const rvCompte = !rvOnglet && nu && txLu && txLu[nu] && now - Number(txLu[nu].at) <= 7 * 864e5 ? txLu[nu] : null;
+  const rv = rvOnglet || rvCompte;
   if (!compteOk && !(rv && rv.etat === 'enregistre')) ventes = R(null, 'en attente du compte Leboncoin');
   else if (rv && rv.etat === 'enregistre') { const n = Number(rv.nombre) || 0; ventes = R(true, `${n} lue${n > 1 ? 's' : ''} {quand}`, '', rv.at); }
   else if (rv && rv.etat === 'liste-vide') ventes = R(true, 'aucune vente sur ce compte ({quand})', '', rv.at);
@@ -43347,6 +43442,53 @@ function storeLbcMessages(patch) {
   const run = _lbcMessagesChaine.then(() => storeLbcMessagesUneFois(patch), () => storeLbcMessagesUneFois(patch));
   _lbcMessagesChaine = run.then(() => {}, () => {});
   return run;
+}
+// ── 5.445 (23 nov.) LES CONVERSATIONS ET LE PORTE-MONNAIE LEBONCOIN, PAR COMPTE ─────────────────────────────────
+// Deux lignes dédiées, chacune `comptes[{id Leboncoin}]` : `lbc_conversations` (60 conversations au plus : identifiant,
+// article, titre, photo, aperçu, date, non-lus — JAMAIS un nom) et `lbc_porte_monnaie` ({available, incoming, at}).
+// Le compte est celui de L'ONGLET (`vrmLbcTransport`, session privée, pas ambigu) ; pour les conversations, la page doit
+// aussi le dire (`metadata.current_user`) et ce doit être un de SES comptes. Lire-fusionner-réécrire, une lecture ratée
+// n'écrit rien (§5), une file par ligne. Seul CE compte est remplacé : les autres restent tels quels.
+let _chaineLbcCompteLignes = Promise.resolve();
+async function compteOngletLbcPrive(sender) {
+  const tab = sender && sender.tab ? sender.tab.id : null;
+  if (tab == null || (sender && sender.frameId > 0) || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(String((sender.tab && sender.tab.url) || ''))) return '';
+  const vu = ((await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport || {})[tab];
+  return vu && vu.compte && !vu.ambigue ? cleCompteCapte(vu.compte) : '';
+}
+function ecrireLigneCompteLbc(id, compte, valeur) {
+  const p = _chaineLbcCompteLignes.then(async () => {
+    const owner = (await loadSession())?.user_id; if (!owner) return { ok: false, sansSession: true };
+    const rows = await sbGetLbc(`app_data?id=eq.${id}&select=data`);
+    if (rows === null) { noterDiag(id + '_lecture_ratee'); return { ok: false }; }
+    const cur = (rows[0] && rows[0].data) || {};
+    const comptes = Object.assign({}, cur.comptes || {}, { [compte]: valeur });
+    const ok = await supabaseUpsert('app_data', [{ id, data: { comptes, updatedAt: new Date().toISOString(), ver: EXT_VERSION } }], 'id');
+    return { ok: ok !== false };
+  });
+  _chaineLbcCompteLignes = p.catch(() => {});
+  return p;
+}
+async function rangerLbcConversations(msg, sender) {
+  const moi = String((msg && msg.moi) || '').toLowerCase();
+  const onglet = await compteOngletLbcPrive(sender);
+  if (!/^[0-9a-f-]{8,64}$/.test(moi) || !onglet || onglet.toLowerCase() !== moi) { noterDiag('lbc_convs_autre_compte'); return { ok: false }; }
+  const miens = new Set([...(await comptesMiens())].map((c) => cleCompteCapte(c).toLowerCase()));
+  if (!miens.has(moi)) { noterDiag('lbc_convs_pas_a_lui'); return { ok: true }; }
+  const txt = (v, n) => String(v == null ? '' : v).slice(0, n);
+  const liste = (Array.isArray(msg.liste) ? msg.liste : []).slice(0, 60).map((x) => ({
+    conv: /^[0-9a-f-]{8,64}$/i.test(String((x && x.conv) || '')) ? String(x.conv) : '', annonce: /^\d{4,15}$/.test(String((x && x.annonce) || '')) ? String(x.annonce) : '',
+    titre: txt(x && x.titre, 120), photo: /^https:\/\/img\.leboncoin\.fr\//.test(String((x && x.photo) || '')) ? String(x.photo) : '', at: Number.isFinite(Date.parse((x && x.at) || '')) ? new Date(Date.parse(x.at)).toISOString() : '',
+    apercu: txt(x && x.apercu, 300), nonlus: Number.isInteger(x && x.nonlus) && x.nonlus >= 0 && x.nonlus < 1e5 ? x.nonlus : null, aMoi: !!(x && x.aMoi === true) })).filter((x) => x.conv);
+  return ecrireLigneCompteLbc('lbc_conversations', moi, { liste, at: new Date().toISOString() });
+}
+async function rangerLbcPorteMonnaie(msg, sender) {
+  const onglet = await compteOngletLbcPrive(sender);
+  if (!onglet) { noterDiag('lbc_porte_compte_pas_su'); return { ok: false }; }
+  const nb = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 1e9 ? v : null);
+  const available = nb(msg && msg.available), incoming = nb(msg && msg.incoming);
+  if (available == null && incoming == null) return { ok: false };
+  return ecrireLigneCompteLbc('lbc_porte_monnaie', onglet.toLowerCase(), { available, incoming, at: new Date().toISOString() });
 }
 async function storeLbcMessagesUneFois(patch) {
   try {

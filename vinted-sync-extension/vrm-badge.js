@@ -760,6 +760,17 @@ function vrmVerifVisible(sel) {
   .carte[data-grand] .panneau > .lu, .carte[data-grand] .panneau > .val { padding: 10px 16px; }
   .carte[data-grand] .rangs { max-height: none !important; overflow: visible; margin: 0; padding: 0; }
   .carte[data-grand] .rangs > li + li { border-top: .5px solid var(--n-trait); }
+  /* 5.445 : une transaction Leboncoin (Ventes · Achats) — photo, titre, date et étape, transporteur et n° de suivi ; prix et état à droite ; les liens en dessous, à droite. */
+  .lbtx6-l { list-style: none; margin: 0; padding: 0 12px; }
+  .lbtx6 { padding: 12px 4px; } .lbtx6 + .lbtx6 { border-top: .5px solid var(--n-trait); }
+  .lbtx6-h { display: flex; gap: 12px; align-items: center; min-width: 0; }
+  .lbtx6-m { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .lbtx6-m b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lbtx6-m small { color: var(--n-encre-2, #6b7280); font-size: 12.5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .lbtx6-d { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .lbtx6-a { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 8px; }
+  .lbtx6-a .vu-btn, .lbtx6-d .vu-btn { min-height: 44px; }
+  .carte[data-grand] [data-lb-inconnues], .carte[data-grand] [data-favoris-site="leboncoin"] { padding: 8px 16px; margin: 0; }
   .carte[data-grand] .rang { min-height: 72px; padding: 8px 16px; width: 100%; text-align: left; background: transparent; border: 0; font: inherit; color: inherit; cursor: pointer; display: flex; align-items: center; gap: 12px; text-decoration: none; }
   .carte[data-grand] .rang .vig { width: 56px; height: 56px; border-radius: 10px; flex: none; object-fit: cover; background: var(--n-carte-2); }
   .carte[data-grand] .rang .ti { font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
@@ -3268,7 +3279,7 @@ function vrmVerifVisible(sel) {
   const eurosL = (n) => { const x = Number(n); if (!(x > 0)) return '—'; const c = Math.round(x * 100); return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €'; };
   // 5.409 (captures « Commandes » de Vintex) : l'état en mots clairs — « Action requise : à expédier » en ambre, le reste neutre.
   const ETAT_VENTE = { a_expedier: 'Action requise : à expédier', en_route: 'En route : rien à faire', finalisee: 'Terminée', annulee: 'Annulée — pas une vente', pas_su: 'État pas encore lu' };
-  let relectureEssais = 0;
+  let relectureEssais = 0, attenteEssais = 0, lbSens = 'ventes';
   function chargerListes(force) {
     if (listesEnVol || !vivant()) return;
     if (!force && listes && Date.now() - listesAt < 60000 && (!porteeTous || Array.isArray(listes.autres))) return;
@@ -3284,6 +3295,11 @@ function vrmVerifVisible(sel) {
           const ts = (r.annonces && Array.isArray(r.annonces.toutes)) ? r.annonces.toutes : [];
           if (ts.length) { geste6.ids = geste6.ids.filter((id) => ts.some((x) => x.id === id)); if (!geste6.ids.length) { geste6 = null; geste6Etat = null; } }
         }
+        // 5.445 (captures de Julien, 23 nov.) : une réponse « pas encore » (compte de l'onglet pas encore reconnu, VRM pas
+        //    connecté, lecture levée) n'est PAS une liste : elle est redemandée seule toutes les 4 s (8 fois), et jamais
+        //    gardée 60 s comme une liste lue — le panneau disait « Tes annonces n'ont pas pu être lues » sur « Mes annonces ».
+        if (r && r.ok && r.attente && !LISTES) { if (attenteEssais < 8) { attenteEssais++; listesAt = 0; setTimeout(() => { if (carte.classList.contains('on')) chargerListes(true); }, 4000); } }
+        else if (r && r.ok) attenteEssais = 0;
         // 5.410.2 : le dressing de CE compte est en relecture (budget de lecture, compte de l'onglet, une requête à la
         // fois — `retourSurVinted` du fond) ⇒ la liste est redemandée seule quand elle a eu le temps d'arriver (3 fois au
         // plus) : ses annonces redeviennent « En vente » sans geste.
@@ -4018,6 +4034,10 @@ function vrmVerifVisible(sel) {
     } catch (_) { impEnVol = false; impEtat = { ton: 'ambre', texte: TU('imp_passu') }; rendre(); }
   }
   function brancherImpression(racine) {
+    // 5.445 : Leboncoin — Ventes / Achats, « Réessayer ».
+    racine.querySelectorAll('[data-lb-sens]').forEach((b) => { if (b.tagName === 'BUTTON') b.addEventListener('click', () => { lbSens = b.getAttribute('data-lb-sens') === 'achats' ? 'achats' : 'ventes'; rendre(); }); });
+    racine.querySelectorAll('[data-lb-baisser]').forEach((b) => b.addEventListener('click', () => { const id = b.getAttribute('data-lb-baisser'); ongletListe = 'annonces'; annSel.clear(); annSel.add(id); geste6 = { k: 'prix', ids: [id], prix: {} }; geste6Etat = null; rendre(); }));
+    racine.querySelectorAll('[data-lb-reessayer]').forEach((b) => b.addEventListener('click', () => { attenteEssais = 0; chargerListes(true); rendre(); }));
     racine.querySelectorAll('[data-imprimer]').forEach((b) => b.addEventListener('click', (ev) => { ev.stopPropagation(); imprimerBordereaux([b.getAttribute('data-imprimer')]); }));
     const tous = racine.querySelector('[data-imprimer-n]'); if (tous) tous.addEventListener('click', () => imprimerBordereaux(String(tous.getAttribute('data-imprimer-n')).split(',')));
     racine.querySelectorAll('[data-ven-sel]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ven-sel'); if (c.checked) venSel.add(k); else venSel.delete(k); venConfirme = null; rendre(); }));
@@ -4620,7 +4640,7 @@ function vrmVerifVisible(sel) {
     if (!listes) return `<div class="val gris" role="status" data-listes-charge>${esc(TU('m_charge'))}</div>`;
     const m = listes.messages;
     if (!m) return `<div class="val gris" data-messages="pas_su">${esc(TU('m_pas_su'))}</div>`;
-    if (!m.liste.length) return m.site ? `<div class="val gris" data-messages="0" data-messages-site="${esc(m.site)}">${esc(m.nonlusSite != null ? TU('m_site_nonlus', { n: m.nonlusSite }) : TU('m_site_rien'))}${m.sansCompte ? ' ' + esc(TU('m_sans_compte', { n: m.sansCompte })) : ''}</div>` : `<div class="val gris" data-messages="0">${esc(TU('m_aucun'))}</div>`;
+    if (!m.liste.length) return m.site ? `<div class="val gris" data-messages="0" data-messages-site="${esc(m.site)}">${esc(m.site === 'leboncoin' ? (m.nonlusSite != null ? TU('lb_nonlus', { n: m.nonlusSite }) + ' · ' : '') + TU('lb_conv_vide') : m.nonlusSite != null ? TU('m_site_nonlus', { n: m.nonlusSite }) : TU('m_site_rien'))}${m.sansCompte ? ' ' + esc(TU('m_sans_compte', { n: m.sansCompte })) : ''}</div>` : `<div class="val gris" data-messages="0">${esc(TU('m_aucun'))}</div>`;
     const ici = ORIGINE_ICI && !LISTES ? ORIGINE_ICI : 'https://www.vinted.fr';
     const nl = m.liste.filter((x) => x.nonlu).length;
     const q = msgCherche.trim().toLowerCase();
@@ -5806,7 +5826,7 @@ function vrmVerifVisible(sel) {
     const auj = new Date(); auj.setHours(0, 0, 0, 0);
     const ventesJour = l.ventes && Array.isArray(l.ventes.liste) ? l.ventes.liste.filter((x) => Number(x.date) >= auj.getTime() && x.etat !== 'annulee').length : null;
     const aExpedier = l.ventes && Array.isArray(l.ventes.liste) ? l.ventes.liste.filter((x) => x.etat === 'a_expedier').length : null;
-    const nonLus = l.messages && Array.isArray(l.messages.liste) ? l.messages.liste.filter((x) => x.nonlu).length : (l.messages && l.messages.nonlusSite != null ? l.messages.nonlusSite : null);
+    const nonLus = l.messages && l.messages.site === 'leboncoin' && l.messages.nonlusSite != null ? l.messages.nonlusSite : l.messages && Array.isArray(l.messages.liste) ? l.messages.liste.filter((x) => x.nonlu).length : (l.messages && l.messages.nonlusSite != null ? l.messages.nonlusSite : null);   // 5.445 : Leboncoin — le compteur du site (toutes ses conversations)
     const enVente = l.annonces && l.annonces.statuts ? l.annonces.statuts.en_vente : (l.annonces ? l.annonces.total : null);
     const j = e && e.plateforme === 'vinted' ? site.jauge : null;
     const tuile = (k, n, page, ton) => `<button type="button" class="tu6" data-onglet-b="${page}" data-accueil="${k}"${ton ? ` data-ton="${ton}"` : ''}><span>${esc(TU(k))}</span><b>${n == null ? '—' : Number(n).toLocaleString('fr-FR')}</b></button>`;
@@ -5820,8 +5840,9 @@ function vrmVerifVisible(sel) {
         ${e && e.plateforme === 'vinted' ? noteAccueilHtml() : ''}
       </section>
       <section class="sec6"><h3>${esc(TU('v6_aujourdhui'))}</h3><div class="tuiles6">
-        ${tuile('v6_ventes_jour', ventesJour, 'ventes')}${tuile('v6_a_expedier', aExpedier, 'ventes', aExpedier ? 'ambre' : '')}${tuile('v6_non_lus', nonLus, 'messages')}${tuile('v6_en_vente', enVente, 'annonces')}
+        ${tuile('v6_ventes_jour', ventesJour, 'ventes')}${tuile('v6_a_expedier', aExpedier, 'ventes', aExpedier ? 'ambre' : '')}${tuile('v6_non_lus', nonLus, 'messages')}${tuile('v6_en_vente', enVente, 'annonces')}${l.plateforme === 'leboncoin' && l.achats !== undefined ? tuile('lb_achats_cours', l.achats && Array.isArray(l.achats.liste) ? l.achats.liste.filter((x) => x.etat === 'pas_su' || x.etat === 'en_route').length : null, 'ventes').replace('<button ', '<button data-lb-sens="achats" ') : ''}
       </div>${j ? `<p class="note5" data-accueil-jauge>${esc(TU(j.complet ? 'c_heure' : 'c_heure_min', { n: nbFr(j.h), max: nbFr(j.maxH) }))} · ${esc(TU('c_jour', { n: nbFr(j.j), max: j.maxJ ? nbFr(j.maxJ) : '—' }))}</p>` : ''}</section>
+      ${porteMonnaieLbcHtml(l)}
       ${l.retraits && l.retraits.lu && (l.retraits.lignes || []).length ? `<section class="sec6" data-accueil-retraits><h3>${esc(TU('rp_tableau'))}</h3>${retraitsTableHtml(l.retraits, 8)}</section>` : ''}
       <section class="sec6"><h3>${esc(TU('v6_capte'))}</h3>${impEtat ? `<p class="note5 imp-etat6" role="status" data-imp-etat${impEtat.ton ? ` data-ton="${impEtat.ton}"` : ''}>${esc(impEtat.texte)}</p>` : ''}${capte === null ? `<p class="note5">—</p>` : capte.length ? capte.map((x) => { const vt = (x.s === 'ventes' || x.s === 'bordereaux') && l.ventes && Array.isArray(l.ventes.liste) ? l.ventes.liste.find((y) => y.tx === String(x.id || '').split(':')[0]) : null;
         // 5.410.2 : une vente captée dit son livreur, son n° de suivi, sa date limite et s'imprime d'ici.
@@ -5856,6 +5877,48 @@ function vrmVerifVisible(sel) {
       </div>
     </div>`;
   }
+  // ══ 5.445 — LEBONCOIN DANS LE PANNEAU (« pareil pour Leboncoin ») ══
+  //    « Pas encore » se dit (et se réessaie), jamais « pas pu être lues » ; Commandes = Ventes · Achats, chacune avec
+  //    l'état (la règle de l'app, `txLbcPanneau` du fond), le transporteur, le n° de suivi, la date, le prix ; rien
+  //    d'inventé (« — »). Aucun geste ici n'écrit chez Leboncoin : « Voir » et « Suivre » ouvrent leurs pages.
+  function attenteSiteHtml() {
+    const a = listes && listes.attente;
+    const k = a === 'vrm' ? 'lb_attente_vrm' : a === 'erreur' ? 'lb_attente_erreur' : attenteEssais >= 8 ? 'lb_attente_longue' : 'lb_attente_compte';
+    return `<div class="val gris" role="status" data-attente="${esc(a || '')}">${esc(TU(k))}</div>${a === 'vrm' ? '' : `<div class="ge5"><button type="button" class="vu-btn vu-sec" data-lb-reessayer>${esc(TU('lb_reessayer'))}</button></div>`}`;
+  }
+  const ETAT_LB = { vente: { a_expedier: ['lb_a_envoyer', 'ambre'], en_route: ['lb_en_route', ''], finalisee: ['lb_terminee', ''], annulee: ['lb_annulee', ''], pas_su: ['v_pas_su', ''] },
+    achat: { pas_su: ['lb_paye', ''], en_route: ['lb_en_route', ''], finalisee: ['lb_recu', ''], annulee: ['lb_annulee', ''], a_expedier: ['v_pas_su', ''] } };
+  function commandesLbcHtml() {
+    if (listesErreur) return `<div class="val gris" role="status">${esc(listesErreur)}</div>`;
+    const V = listes.ventes, A = listes.achats;
+    const seg = `<div class="vu-seg seg6" role="group" aria-label="${esc(TU('v6_commandes'))}">${[['ventes', V], ['achats', A]].map(([k, l]) => `<button type="button" data-lb-sens="${k}" aria-pressed="${lbSens === k}"><span>${esc(TU('lb_' + k))}</span> <b data-n="${l ? l.total : ''}">${l ? l.total : '—'}</b></button>`).join('')}</div>`;
+    const sens = lbSens === 'achats' ? 'achat' : 'vente', L = sens === 'achat' ? A : V;
+    if (!L) return seg + `<div class="val gris" data-lb-tx="pas_su">${esc(TU('lb_attente_erreur'))}</div><div class="ge5"><button type="button" class="vu-btn vu-sec" data-lb-reessayer>${esc(TU('lb_reessayer'))}</button></div>`;
+    const note = V && V.inconnues ? `<p class="note5" data-lb-inconnues="${Number(V.inconnues)}">${esc(TU('lb_inconnues', { n: Number(V.inconnues) }))}</p>` : '';
+    if (!L.liste.length) return seg + `<div class="val gris" data-lb-tx="0" data-lb-sens-vu="${sens}">${esc(TU(sens === 'achat' ? 'lb_aucun_achat' : 'lb_aucune_vente'))}</div>` + note;
+    const rang = (x) => { const et = (ETAT_LB[sens][x.etat] || ETAT_LB[sens].pas_su);
+      const lien = x.suiviUrl ? `<a class="vu-btn vu-sec" href="${esc(x.suiviUrl)}" target="_blank" rel="noopener" data-lb-suivre>${esc(TU('lb_suivre'))}</a>` : '';
+      const voir = x.lien ? `<a class="vu-btn vu-sec" href="${esc(x.lien)}" target="_top" data-lb-voir>${esc(TU('lb_voir'))}</a>` : '';
+      const tr = x.transporteur ? `${x.transporteurCle && U.logoTransp ? U.logoTransp(x.transporteurCle, 16) : ''}<span>${esc(x.transporteur)}</span>${x.suivi ? `<span data-suivi="${esc(x.suivi)}">· n° ${esc(x.suivi)}</span>` : ''}` : (x.suivi ? `<span data-suivi="${esc(x.suivi)}">n° ${esc(x.suivi)}</span>` : '');
+      return `<li class="lbtx6" data-lb-tx-id="${esc(x.tx)}" data-lb-etat="${esc(x.etat)}" data-lb-sens="${sens}"><div class="lbtx6-h">${vignette(x.photo)}<span class="lbtx6-m"><b title="${esc(x.titre || '')}">${esc(x.titre || '—')}</b><small>${esc([jourCourt5(x.date), x.statutSite].filter(Boolean).join(' · ') || '—')}</small>${tr ? `<small>${tr}</small>` : ''}</span><span class="lbtx6-d"><b>${esc(eurosL(x.prix))}</b>${etiquette5(x.etat, TU(et[0]), et[1])}</span></div>${lien || voir ? `<div class="lbtx6-a">${lien}${voir}</div>` : ''}</li>`; };
+    return seg + `<div class="n6"><span data-lb-n="${L.liste.length}">${esc(TU('v_n_commandes', { n: L.total }))}</span></div><ul class="lbtx6-l" data-lb-liste="${sens}" data-defil="ventes">${L.liste.map(rang).join('')}</ul>` + note;
+  }
+  // Favoris Leboncoin : le NOMBRE par annonce (relevé sur « Statistiques »), jamais qui ; le seul geste proposé est
+  //    « Baisser le prix » (la baisse gardée de toujours, sur SON clic), sans promettre que quelqu'un sera prévenu.
+  function favorisLbcHtml() {
+    const l = (listes.annonces.liste || []).slice().sort((a, b) => (Number(b.favoris) || -1) - (Number(a.favoris) || -1));
+    const rang = (x) => `<li class="lbtx6" data-lb-fav="${esc(x.id)}" data-lb-fav-n="${x.favoris == null ? '' : x.favoris}"><div class="lbtx6-h">${vignette(x.photo)}<span class="lbtx6-m"><b title="${esc(x.titre || '')}">${esc(x.titre || '—')}</b><small>${esc(x.favoris == null ? TU('lb_favoris_passu') : TU('lb_favoris_n', { n: x.favoris }))}${x.vues != null ? ' · ' + esc(String(x.vues)) + ' vues' : ''}</small></span><span class="lbtx6-d"><b>${esc(eurosL(x.prix))}</b><button type="button" class="vu-btn vu-sec" data-lb-baisser="${esc(x.id)}">${esc(TU('lb_baisser'))}</button></span></div></li>`;
+    const manque = l.some((x) => x.favoris == null);
+    return `<p class="note5" data-favoris-site="leboncoin">${esc(TU('lb_fav_note'))}${manque ? ' ' + esc(TU('lb_fav_stats')) : ''}</p>` + (l.length ? `<ul class="lbtx6-l" data-lb-favoris="${l.length}">${l.map(rang).join('')}</ul>` : `<div class="val gris">${esc(TU('a_aucune'))}</div>`);
+  }
+  function porteMonnaieLbcHtml(l) {
+    const p = l && l.porteMonnaie;
+    if (!l || l.plateforme !== 'leboncoin' || p === undefined) return '';
+    const m = (v) => (v == null ? '—' : v === 0 ? '0,00 €' : TU('lb_solde_verifier'));
+    const corps = !p ? `<p class="note5" data-lb-porte="pas_su">—</p>` : p.jamais ? `<p class="note5" data-lb-porte="jamais">${esc(TU('lb_solde_jamais'))}</p>`
+      : `<div class="rg6" data-lb-porte="lu" data-lb-solde="${p.disponible == null ? '' : p.disponible}"><span><b>${esc(TU('lb_solde'))}</b><small>${esc(depuis(p.at) || '')}</small></span><span class="v6"><b>${esc(m(p.disponible))}</b></span></div><div class="rg6"><span><b>${esc(TU('lb_a_venir'))}</b></span><span class="v6">${esc(m(p.aVenir))}</span></div>`;
+    return `<section class="sec6" data-accueil-porte><h3>${esc(TU('lb_porte'))}</h3>${corps}</section>`;
+  }
   function listesHtml(e, parametres) {
     if (ongletListe === 'accueil' && (LISTES || !carte.hasAttribute('data-grand'))) ongletListe = 'messages';
     const vinted = !e || e.plateforme === 'vinted';
@@ -5864,9 +5927,12 @@ function vrmVerifVisible(sel) {
     if (ongletListe === 'accueil' && !LISTES && carte.hasAttribute('data-grand')) panneau = accueilHtml(e);
     else if (ongletListe === 'sante' && carte.hasAttribute('data-grand')) panneau = santeHtml();
     else if (ongletListe === 'file' && carte.hasAttribute('data-grand')) panneau = fileHtml();
+    else if (ongletListe === 'favoris' && e && e.plateforme === 'leboncoin' && !LISTES && listes && listes.plateforme === 'leboncoin' && listes.annonces) panneau = favorisLbcHtml();
     else if (ongletListe === 'favoris') panneau = !vinted ? (e.plateforme === 'vestiaire' && !LISTES ? aimesVcHtml() : `<div class="val gris" data-favoris-site="${esc(e.plateforme)}">${e.plateforme === 'vestiaire' ? esc(TU('f_vc_aimes')) : `${esc(nomSite)} ne dit pas qui a mis tes annonces en favori : il n’y a personne à qui écrire d’ici.`}</div>`)
       : LISTES ? '<div class="val gris" data-favoris-fenetre>Les messages aux favoris partent de l’onglet Vinted : ouvre vinted.fr, puis touche le logo VRM.</div>'
       : (favorisOngletHtml(e) || '<div class="val gris">Pas encore de favoris lus : ouvre la cloche de Vinted une fois.</div>');
+    else if (!vinted && carte.hasAttribute('data-grand') && listes && listes.plateforme === e.plateforme && listes.attente && ['annonces', 'ventes', 'messages', 'notifications'].includes(ongletListe)) panneau = attenteSiteHtml();
+    else if (e && e.plateforme === 'leboncoin' && carte.hasAttribute('data-grand') && ongletListe === 'ventes' && listes && listes.plateforme === 'leboncoin') panneau = commandesLbcHtml();
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'automatisations' && listes && listes.automatisations && listes.automatisations.baisse) panneau = `<p class="note5" data-auto-site="${esc(e.plateforme)}">${esc(TU(e.plateforme === 'leboncoin' ? 'au_site_lbc' : 'au_site_vc'))}</p>` + automatisationsHtml();
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'automatisations') panneau = `<div class="par5" data-auto-site="${esc(e.plateforme)}"><p class="note5">${esc(TU(e.plateforme === 'leboncoin' ? 'au_site_lbc' : 'au_site_vc'))}</p></div>`;
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'annonces' && listes && listes.plateforme === e.plateforme) panneau = annoncesHtml(e) + (listes.annonces && listes.annonces.sansCompte ? `<div class="val gris" data-sans-compte="${Number(listes.annonces.sansCompte)}">${esc(TU('a_sans_compte', { n: listes.annonces.sansCompte }))}</div>` : '');
@@ -6325,7 +6391,10 @@ function vrmVerifVisible(sel) {
     const lbcLignes = e.plateforme === 'leboncoin' && e.lbc && e.capte && !(v && v.connecte === false)
       ? `<div class="ligne"><div class="lib">Annonces</div>${lbcVal(e.lbc.annonces)}</div><div class="ligne"><div class="lib">Ventes</div>${lbcVal(e.lbc.ventes)}</div>` : '';
     const RECHARGER = /^Recharge/.test(String((e.lbc && e.lbc.geste) || ''));
-    const diagnosticLbc = e.plateforme === 'leboncoin' && e.lbc && e.lbc.geste && !(v && v.connecte === false)
+    // 5.445 (captures de Julien) : le geste de la carte Leboncoin se dit sur l'Accueil seulement (plus sur chaque écran), et
+    //    « Ouvre « Mes transactions » » se tait quand ses ventes ou ses achats de CE compte sont déjà rangés.
+    const gesteTxInutile = !!(e.lbc && e.lbc.ventes && e.lbc.geste && e.lbc.geste === e.lbc.ventes.geste && listes && listes.plateforme === 'leboncoin' && ((listes.ventes && listes.ventes.total > 0) || (listes.achats && listes.achats.total > 0)));
+    const diagnosticLbc = e.plateforme === 'leboncoin' && e.lbc && e.lbc.geste && !(v && v.connecte === false) && !gesteTxInutile && (!carte.hasAttribute('data-grand') || ongletListe === 'accueil')
       ? `<div class="geste" data-lbc-geste>${esc(e.lbc.geste)}${RECHARGER ? '<button class="b sec" data-lbc-recharger>Recharger la page</button>' : ''}</div>` : '';
     // (29 oct.) Les paires vendues sur Vinted, encore en ligne sur Leboncoin — ce
     // que VRM a calculé (une règle, dans l'app) ; la carte ne recalcule rien.
