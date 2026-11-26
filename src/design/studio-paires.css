@@ -603,7 +603,7 @@
 :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils-champ {
   min-height: 44px !important; height: 44px !important; border-radius: 14px !important; border: 0 !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; color: var(--sbp-encre2) !important;
 }
-:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils-champ input { background: transparent !important; color: var(--sbp-encre) !important; font: 500 15px/1 var(--sbp-texte) !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils-champ input { background: transparent !important; color: var(--sbp-encre) !important; font: 500 16px/1 var(--sbp-texte) !important; }
 :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils-champ input::placeholder { color: var(--sbp-encre2) !important; opacity: 1 !important; }
 :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils :is(.vrm-ui-icone, button) { background: transparent !important; box-shadow: none !important; color: var(--sbp-encre2) !important; }
 /* « • À faire · N › » : un lien, pas une carte. */
@@ -763,7 +763,7 @@
 /* Leur recherche, creusée ; leurs filtres, un plateau (actif = enfoncé + diode) : le dessin propre à l'espace Paires,
    le même que la liste Vinted (gardé à la fusion de la fondation : sans lui, Leboncoin et Vestiaire perdaient leur plateau). */
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-outils-champ { min-height: 44px !important; height: 44px !important; border-radius: 14px !important; border: 0 !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; }
-:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-outils-champ input { background: transparent !important; color: var(--sbp-encre) !important; font: 500 15px/1 var(--sbp-texte) !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-outils-champ input { background: transparent !important; color: var(--sbp-encre) !important; font: 500 16px/1 var(--sbp-texte) !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-icone { width: 44px !important; height: 44px !important; border-radius: 50% !important; background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; border: 0 !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtres { display: inline-flex !important; gap: 2px !important; padding: 3px !important; border-radius: 14px !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; margin-top: 8px !important; max-width: 100% !important; overflow-x: auto !important; scrollbar-width: none !important; }
 :root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtre { height: 38px !important; min-height: 38px !important; padding: 0 13px !important; border: 0 !important; border-radius: 11px !important; background: transparent !important; box-shadow: none !important; color: var(--sbp-encre2) !important; font: 600 14px/1 var(--sbp-texte) !important; position: relative !important; }

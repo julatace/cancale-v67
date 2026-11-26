@@ -37,11 +37,17 @@
   .n-mail-filtre { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px 0 12px; min-height: 44px; border-radius: 12px; background: var(--n-teinte); color: var(--n-sur-teinte); font: var(--n-t-second-fort); }
 
   /* Les comptes dont les e-mails n'arrivent pas : une note calme, un geste par compte. */
-  .n-mail-arelier { padding: 12px 16px 4px; border-radius: 12px; background: var(--n-ambre-fond); color: var(--n-encre); }
-  .n-mail-arelier-titre { margin: 0 0 4px; font: var(--n-t-second); }
+  /* (26 nov.) La carte des comptes à relier : la carte de l'écran (pas un aplat gris de plus), une rangée par compte séparée d'un
+     filet, le nom en gras, la raison dessous en secondaire, le bouton « Relier » à droite. */
+  .n-mail-arelier { padding: 14px 16px 4px; border-radius: var(--n-r-carte, 12px); background: var(--n-carte); color: var(--n-encre); }
+  .n-mail-arelier-titre { margin: 0 0 2px; font: var(--n-t-corps-fort, 600 15px/20px var(--n-police)); }
   .n-mail-arelier ul { list-style: none; margin: 0; padding: 0; }
-  .n-mail-arelier li { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font: var(--n-t-second); }
-  .n-mail-arelier-qui { min-width: 0; overflow-wrap: anywhere; }
+  .n-mail-arelier li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 8px 0; font: var(--n-t-second); }
+  .n-mail-arelier li + li { border-top: .5px solid var(--n-trait, rgb(0 0 0 / .12)); }
+  .n-mail-arelier-qui { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; overflow-wrap: anywhere; }
+  .n-mail-arelier-nom { font: var(--n-t-corps-fort, 600 15px/20px var(--n-police)); color: var(--n-encre); }
+  .n-mail-arelier-pourquoi { font: var(--n-t-legende, 400 12px/16px var(--n-police)); color: var(--n-encre-2); }
+  .n-mail-arelier li > .n-bouton { flex: none; white-space: nowrap; min-width: max-content; padding-inline: 16px; }
 
   /* ── LE CORPS : une colonne, ou deux volets ───────────────────────────────────────────────────── */
   .n-mail-corps { display: block; min-width: 0; }
@@ -77,9 +83,10 @@
   .n-mail-milieu { grid-area: milieu; display: grid; gap: 1px; min-width: 0; }
   .n-mail-sujet { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--n-t-second); color: var(--n-encre); }
   .n-mail-compris { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--n-t-legende); color: var(--n-encre-2); }
-  .n-mail-quoi { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--n-encre-2); }
+  /* (26 nov.) Le TYPE d'e-mail (« Offre reçue », « Message ») ne se coupe jamais : c'est l'article, déjà dans le sujet, qui cède. */
+  .n-mail-quoi { flex: 0 0 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--n-encre-2); }
   .n-mail-compris .n-mail-plaque { flex: 0 0 auto; display: flex; }
-  .n-mail-essentiel { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .n-mail-essentiel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .n-mail-geste { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--n-encre); }
   .n-mail-geste[data-ambre="1"] { color: var(--n-ambre); }
   .n-mail-ligne[data-boite-rien="1"] .n-mail-sujet { color: var(--n-encre-2); }

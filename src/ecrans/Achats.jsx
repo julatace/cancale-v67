@@ -7,7 +7,8 @@ import { nombreLot } from '../achatsSourcing.js';   // (17 nov., lot relier-tout
 import { propositionsArticle, pistesArticle } from '../liaisonAchat.js';
 import { FaitsAchat, NoteTailleAchats } from '../FaitsAchat.jsx';   // (17 nov., lot relier-taille)
 import { sansTailleLue } from '../faitsAchat.js';
-import { texteDejaRelieTr } from '../relierAutreAchat.js';   // (17 nov., lot relier-tout-achat)
+import { texteDejaRelieTr } from '../relierAutreAchat.js';
+import { metaDistincte } from '../achatDistinct.js';   // (23 nov., revue UX #10) n° court + date et heure : deux achats ne se ressemblent jamais   // (17 nov., lot relier-tout-achat)
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { tr } from '../i18n/index.js';
 import { createPortal } from 'react-dom';
@@ -825,9 +826,8 @@ function RelierAchatCorps({ cible, achats: achatsBruts, liens, curTx, compteDe, 
     const ph = orderPhoto(a), px = prixDe(a);
     const l = lotDe(a), nLie = (liens && liens.get(String(a.transaction_id))) || 0;
     const arts = l.lot ? ((detailDe(a) || {}).articles || []) : [];
-    const d = a.date ? new Date(a.date) : null;
     return (
-      <div key={a.transaction_id} {...attrs} data-relier-lot={l.lot ? `${nLie}/${l.n || ''}` : undefined} className="vrm-relier-ligne" style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${C.border}`, minHeight: 60 }}>
+      <div key={a.transaction_id} {...attrs} data-relier-distinct={metaDistincte(a)} data-relier-photo={ph ? '1' : '0'} data-relier-lot={l.lot ? `${nLie}/${l.n || ''}` : undefined} className="vrm-relier-ligne" style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${C.border}`, minHeight: 60 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flex: 1, minWidth: 0 }}>
           <div style={{ width: 56, height: 56, borderRadius: 12, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -840,7 +840,7 @@ function RelierAchatCorps({ cible, achats: achatsBruts, liens, curTx, compteDe, 
               </li>)}
             </ul> : null}
             <FaitsAchat achat={a} details={details || null} cible={cible} marqueDe={marqueDe} couleursDe={couleursDe} avant={null}
-              date={d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : ''} compte={compteDe(a) ? `Vinted · ${compteDe(a)}` : 'Vinted'}/>
+              date={metaDistincte(a, { avecTx: true })} compte={compteDe(a) ? `Vinted · ${compteDe(a)}` : 'Vinted'}/>
             {l.lot ? <div data-relier-lot-prix style={{ fontSize: 12, color: C.muted, marginTop: 2, overflowWrap: 'anywhere' }}>{tr('relierTout.lotPrix', { total: String(l.n || '?'), prix: px != null ? prixCourt(px) : '—' })}</div> : null}
             {pris ? <div data-relier-deja={pris} style={{ fontSize: 12, fontWeight: 600, color: C.text, marginTop: 2, overflowWrap: 'anywhere' }}>{pris}</div> : null}
           </div>

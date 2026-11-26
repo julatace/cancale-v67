@@ -24,7 +24,7 @@ require('./_porte-banc.cjs');
 //   V6 image absente (404) ⇒ rien ne s'ouvre ;
 //   A1 Achats : une rangée par achat, plus récent en haut parmi « Tous » d'une même
 //      étape, vignette ≥ 48 px (14 nov., « 1 000 articles » : 48–56), prix calé à droite et tabulaire, l'état en UNE
-//      pastille (fond rempli, rayon ≥ moitié de la hauteur), groupe rayon ≥ 20 (le système, 13 nov.) ;
+//      état en un MOT dans la sous-ligne, sans fond (26 nov. ; avant : pastille remplie), groupe rayon ≥ 20 (le système, 13 nov.) ;
 //   A2 aucune phrase de plus de 12 mots dans une rangée d'achat ;
 //   F1 « Joindre une facture » (menu ⋯) : une photo part dans SA ligne
 //      (`achat_facture_tx_<n°>`, owner = la session, id par identité), la rangée
@@ -291,7 +291,7 @@ async function blocA(nav, W, sombre) {
           const textes = [...r.querySelectorAll('*')].filter((e) => !e.children.length && e.getBoundingClientRect().width > 0 && !e.closest('[role="menu"]')).map((e) => e.textContent.trim()).filter(Boolean);
           return { tx: r.getAttribute('data-achat-tx'), ph: phr ? Math.round(Math.min(phr.width, phr.height)) : 0,
             prixDroite: pr ? Math.round(rr.right - pr.right) : null, prixGauche: pr && phr ? pr.left > phr.right : false, tab: px ? getComputedStyle(px).fontVariantNumeric : '',
-            pastille: sts ? { fond, rayon: parseFloat(sts.borderTopLeftRadius), h: sr.height } : null,
+            pastille: sts ? { fond, rayon: parseFloat(sts.borderTopLeftRadius), h: sr.height, dansSousLigne: !!st.closest('.vrm-buy-meta'), mot: (st.textContent || '').trim() } : null,
             plusLongue: Math.max(0, ...textes.map(mots)), phrase: textes.sort((a, b) => mots(b) - mots(a))[0] || '' };
         }),
       };
@@ -302,8 +302,9 @@ async function blocA(nav, W, sombre) {
     for (const l of m.lignes) {
       dit(l.ph >= 48, `${T} A1 ${l.tx} vignette de liste (≥ 48 px, AJOUT 2 : 48–56)`, l.ph);
       dit(l.prixDroite != null && l.prixDroite <= 72 && l.prixGauche && /tabular/.test(l.tab), `${T} A1 ${l.tx} prix calé à droite, tabulaire`, JSON.stringify(l));
-      const p = l.pastille; const rempli = p && !/rgba\(0, 0, 0, 0\)|transparent/.test(p.fond);
-      dit(!!p && rempli && p.rayon >= p.h / 2 - 1, `${T} A1 ${l.tx} l'état en une pastille`, JSON.stringify(p));
+      // (26 nov., capture de Julien : « ici c'est pas beau ») L'état est un MOT dans la sous-ligne, sans fond — plus une pilule seule sur sa ligne.
+      const p = l.pastille; const vide = p && /rgba\(0, 0, 0, 0\)|transparent/.test(p.fond);
+      dit(!!p && p.dansSousLigne && vide && !!p.mot, `${T} A1 ${l.tx} l'état en un mot dans la sous-ligne`, JSON.stringify(p));
       dit(l.plusLongue <= 12, `${T} A2 ${l.tx} aucune phrase de plus de 12 mots`, `${l.plusLongue} : « ${l.phrase} »`);
     }
     dit(!erreurs.length, `${T} A aucune erreur`, erreurs.join(' | '));

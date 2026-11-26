@@ -4,7 +4,7 @@
    rare (les actions), montants à l'encre, mode sombre soigné autant que le clair.
    Jetons du système (`--d-*`, src/styles-systeme.css) avec leurs replis. */
 .vrm-an, .vrm-an-voile {
-  --an-fond: #FBFBFD; --an-carte: #FFFFFF; --an-encre: #1D1D1F; --an-gris: #6E6E73; --an-filet: rgba(60,60,67,.12);
+  --an-fond: #FBFBFD; --an-carte: #FFFFFF; --an-encre: #1D1D1F; --an-gris: #636366; --an-filet: rgba(60,60,67,.12);
   --an-accent: var(--d-accent, #16181D); --an-sur-accent: #FFFFFF; --an-teinte: rgba(22, 24, 29,.10);
   --an-ombre: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06);
   --an-lumiere: radial-gradient(120% 60% at 18% -8%, rgba(22, 24, 29,.20), transparent 62%), radial-gradient(90% 50% at 100% 0%, rgba(244, 244, 245,.16), transparent 60%);
@@ -49,6 +49,10 @@
 .vrm-an-principal { min-height: 50px; border: 0; border-radius: 999px; background: var(--an-accent); color: var(--an-sur-accent); font: 600 17px/1 inherit; font-family: inherit; cursor: pointer; padding: 0 22px; transition: transform .12s ease-out; }
 .vrm-an-principal:active { transform: scale(.97); }
 .vrm-an-principal:disabled { opacity: .55; }
+/* (24 nov., WCAG 1.4.3) La nuit, l'accent du système est CLAIR : le blanc dessus tombait à 1,1:1 (« Suivant » illisible,
+   banc wcag-aa B). Le bouton prend l'encre du thème et le fond pour texte : 19:1, le même aplat clair. */
+:root[data-theme="dark"] .vrm-an-principal { background: var(--an-encre); color: var(--an-fond); }
+:root[data-theme="dark"] .vrm-an-principal:focus-visible { outline-color: var(--an-encre); }
 .vrm-an-secondaire { min-height: 44px; border: 0; border-radius: 999px; background: transparent; color: var(--an-accent); font: 600 15px/1 inherit; font-family: inherit; cursor: pointer; padding: 0 16px; }
 .vrm-an-principal:focus-visible, .vrm-an-secondaire:focus-visible, .vrm-an-passer:focus-visible { outline: 2px solid var(--an-accent); outline-offset: 3px; }
 .vrm-an-liste { list-style: none; margin: 26px 0 0; padding: 6px 0; background: var(--an-carte); border-radius: 20px; box-shadow: var(--an-ombre); }

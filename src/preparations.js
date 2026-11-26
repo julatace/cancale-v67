@@ -34,11 +34,18 @@ export const enPreparation = (cle) => (actifs.get(cle) || 0) > 0;
 
 // L'écran qui publie `cle` : `actif` = il en est l'auteur ici ; `lu` = sa liste
 // principale est lue (la borne part de là).
+// (23 nov., latence-2) UNE préparation par écran monté : un écran GARDÉ (src/ecransGardes.jsx) qui se cache puis revient voit
+// React détacher puis rattacher ses effets de mise en page — la préparation repartait à chaque retour (alors que rien n'était
+// à recalculer) et chaque début / fin re-rendait tous les lecteurs (`Comptabilite` compris : 32 rendus par retour sur Achats,
+// banc `_sonde-style.cjs QUI2=Comptabilite`). Une préparation par MONTAGE : finie (publiée, bornée, ou l'écran caché), elle ne
+// recommence plus pour cette clé — l'écran revenu publie s'il a quelque chose à publier ; une clé qui change en relance une.
 export function usePreparation(cle, actif, lu) {
   const fin = React.useRef(null);
+  const terminee = React.useRef('');
   React.useLayoutEffect(() => {
-    if (!actif) return undefined;
-    const f = commencer(cle);
+    if (!actif || terminee.current === cle) return undefined;
+    const f0 = commencer(cle);
+    const f = () => { terminee.current = cle; f0(); };
     fin.current = f;
     const publie = (e) => { if (e && e.detail && e.detail.k === cle) f(); };
     window.addEventListener('vrm:save', publie);
@@ -55,8 +62,13 @@ export function usePreparation(cle, actif, lu) {
 export function useEnPreparation(cles) {
   const lire = () => cles.filter(enPreparation).join('|');
   const [v, setV] = React.useState(lire);
+  // (23 nov., latence-2) Rien n'est posé quand l'ensemble n'a pas changé. Mesuré (banc fluidite-generale, build « profiling »,
+  // `_sonde-style.cjs QUI2=Comptabilite`) : chaque préparation qui commence ou finit prévient TOUS les lecteurs, et
+  // `setV(même valeur)` re-rendait quand même `Comptabilite` (≈ 200 ms à 390 ×4) — React ne court-circuite une valeur égale
+  // que si le composant n'a aucune mise à jour en attente, jamais vrai pour un écran gardé qui revient. 112 poses par retour.
+  const dernier = React.useRef(v); dernier.current = v;
   React.useEffect(() => {
-    const f = () => setV(lire());
+    const f = () => { const n = lire(); if (n !== dernier.current) { dernier.current = n; setV(n); } };
     f();
     window.addEventListener('vrm:preparation', f);
     return () => window.removeEventListener('vrm:preparation', f);

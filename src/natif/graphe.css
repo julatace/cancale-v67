@@ -30,6 +30,18 @@
   .n-etincelle circle { fill: var(--n-encre); }
 
   .n-repartition { display: flex; flex-direction: column; gap: 12px; padding: 4px 16px 14px; }
+  /* (24 nov., livrable-2) La place de « Par site » pendant la lecture : la barre (10 px) et une ligne de légende (36 px). */
+  /* (24 nov., livrable-2) « Dernières ventes » pendant la lecture : cinq rangées de la hauteur des vraies (60 px au téléphone, 72 à
+     l'ordinateur ; vignette 44, deux lignes, le prix) — la carte a sa taille finale avant ses données. */
+  .n-dv-os { display: flex; align-items: center; gap: 12px; height: 60px; padding: 0 14px; box-sizing: border-box; }
+  .n-dv-os + .n-dv-os { box-shadow: inset 0 .5px 0 var(--n-trait); }
+  .n-dv-os-photo { width: 44px; height: 44px; border-radius: var(--n-r-vignette); flex: none; margin: 0; }
+  .n-dv-os-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  .n-dv-os-prix { width: 40px; flex: none; }
+  @media (min-width: 1024px) { .n-dv-os { height: 72px; padding: 0 16px; } }
+  .n-sites-attente { display: flex; flex-direction: column; gap: 12px; padding: 4px 16px 14px; }
+  .n-sites-attente-barre { width: 100%; height: 10px; border-radius: 999px; margin: 0; }
+  .n-sites-attente-ligne { width: 55%; height: 20px; margin: 8px 0; }
   .n-repartition-barre { display: block; width: 100%; height: 10px; border-radius: 999px; overflow: hidden; background: var(--n-trait); }
   .n-repartition-part[data-n-ton="1"] { fill: var(--n-encre); }
   .n-repartition-part[data-n-ton="2"] { fill: var(--n-accent); }
@@ -87,6 +99,9 @@
     .n-colonnes.n-colonnes-tb { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .n-colonnes-tb > .n-colonne[data-n-large] { grid-column: span 2; }
     .n-colonnes-tb > .n-colonne[data-n-pleine] { grid-column: 1 / -1; }
+    /* (23 nov., style-clarte-5) La colonne de droite (gestes, N° à écrire, Colis, porte-monnaie, Par site) court sur DEUX rangées :
+       « Dernières ventes » remonte sous le héros, plus de grand vide à gauche. */
+    .n-colonnes-tb > .n-colonne[data-tb="droite"] { grid-row: span 2; }
   }
 
   /* LA CARTE HÉROS (22 nov., « en noir ») : l'encre, le chiffre en grand, un reflet à peine plus clair en haut à droite ;
@@ -95,7 +110,7 @@
     background: radial-gradient(90% 70% at 100% 0%, var(--n-heros-2) 0%, transparent 70%), linear-gradient(160deg, var(--n-heros-2) 0%, var(--n-heros) 55%, var(--n-heros) 100%); color: var(--n-sur-heros);
     --n-graphe-barre: rgb(255 255 255 / .16); --n-graphe-barre-fort: rgb(255 255 255 / .34); --n-graphe-ligne: var(--n-heros-hausse);
     --n-graphe-courbe: #FFFFFF; --n-trait: var(--n-heros-trait); --n-bord: rgb(255 255 255 / .18); --n-encre: var(--n-sur-heros); --n-encre-2: var(--n-sur-heros-2); --n-encre-3: rgb(255 255 255 / .4); --n-accent: #FFFFFF; }
-  :root[data-theme="dark"] .n-heros { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .07); }
+  :root[data-theme="dark"] .n-heros { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .14), 0 18px 40px -18px rgb(0 0 0 / .8); }
   .n-heros-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; }
   .n-heros-titre { margin: 0; font: var(--n-t-second-fort); color: var(--n-sur-heros-2); text-transform: none; letter-spacing: normal; }
   .n-heros-action .n-segmente { background: rgb(255 255 255 / .10); box-shadow: none; border: 0; }
@@ -173,6 +188,76 @@
     .n-actions-rondes { gap: 2px; padding: 0; }
     .n-action-ronde { flex: 1 1 0; min-width: 0; }
     .n-action-ronde-libelle { max-width: 100%; font-size: 11.5px; letter-spacing: -.01em; }
+  }
+
+  /* (23 nov., style-clarte-5) Le « — » du pied du héros qui dit pourquoi et ouvre la saisie ; le geste du héros en vrai bouton clair. */
+  .n-heros-trio-porte { appearance: none; display: inline-flex; align-items: baseline; gap: 6px; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; text-align: start; max-width: 100%; }
+  .n-heros-trio-pourquoi { font: var(--n-t-legende); color: var(--n-sur-heros-2); text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-heros-porte { margin: 10px 0 0; }
+  .n-heros-porte .n-bouton { background: rgb(255 255 255 / .12); color: var(--n-sur-heros); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .22); border-radius: 10px; padding-inline: 14px; }
+  .n-tb-direct { display: flex; align-items: center; min-width: 0; margin-left: auto; }
+  .n-tb-direct .n-direct-puce { margin: 0; }
+
+  /* (23 nov., Julien : « j'aime pas le noir, je veux du gris clair ») LE HÉROS CLAIR (hors nuit) : un dégradé de gris très clair → gris
+     soutenu, un bord fin, la courbe à l'ardoise (l'accent), le texte foncé ; le segmenté et les filets en gris. */
+  :root:not([data-theme="dark"]) .n-heros {
+    background: linear-gradient(160deg, var(--n-heros-2) 0%, var(--n-heros) 100%); box-shadow: inset 0 0 0 1px var(--n-bord), 0 1px 2px rgb(29 29 31 / .04);
+    --n-graphe-courbe: var(--n-accent); --n-graphe-barre: rgb(29 29 31 / .10); --n-graphe-barre-fort: rgb(29 29 31 / .22); --n-graphe-ligne: var(--n-vert);
+    --n-trait: rgb(29 29 31 / .09); --n-bord: rgb(29 29 31 / .14); --n-encre: var(--n-sur-heros); --n-encre-2: var(--n-sur-heros-2); --n-encre-3: #8C8F98; --n-accent: #3D4B5B;
+  }
+  :root:not([data-theme="dark"]) .n-heros-action .n-segmente { background: rgb(29 29 31 / .07); }
+  :root:not([data-theme="dark"]) .n-heros-action .n-segmente-curseur { background: #FFFFFF; box-shadow: 0 1px 2px rgb(29 29 31 / .12); }
+  :root:not([data-theme="dark"]) .n-heros-action .n-segmente-choix[aria-checked="true"] { color: var(--n-sur-heros); }
+  :root:not([data-theme="dark"]) .n-heros-sous .n-heros-hausse { color: var(--n-vert); }
+  :root:not([data-theme="dark"]) .n-heros-sous .n-heros-baisse { color: var(--n-sur-heros); }
+  :root:not([data-theme="dark"]) .n-heros .n-pilotage-cle { background: rgb(29 29 31 / .18); }
+  :root:not([data-theme="dark"]) .n-heros .n-pilotage-cle[data-n-cle="aire"] { background: linear-gradient(180deg, rgb(61 75 91 / .55), rgb(61 75 91 / .08)); }
+  :root:not([data-theme="dark"]) .n-heros .n-pilotage-cle[data-n-cle="ligne"] { background: var(--n-vert); }
+  :root:not([data-theme="dark"]) .n-heros-porte .n-bouton { background: #FFFFFF; color: var(--n-sur-heros); box-shadow: inset 0 0 0 1px rgb(29 29 31 / .16); }
+  :root:not([data-theme="dark"]) .n-graphe-pt { stroke: #FFFFFF; }
+
+  /* (23 nov., Julien : « sur téléphone c'est pas ouf », « tu peux faire moins zoomé ») L'IPHONE, DENSITÉ D'APP NATIVE.
+     Le héros compact (~240 px) : libellé, gros chiffre 38 px, écart, une petite courbe SANS axes, quadrillage, moyenne ni
+     légende ; le détail d'un jour n'apparaît qu'au toucher de la courbe ; le segment discret ; le pied en une ligne de trois
+     chiffres. Les gestes ronds et les cases de Colis plus serrés : héros + gestes + Colis tiennent dans le premier écran.
+     Les cibles restent ≥ 44 px (zone de toucher), aucun champ sous 16 px. */
+  @media (max-width: 1023px) {
+    .n-heros { margin-bottom: 12px; padding: 12px 14px 10px; border-radius: 18px; }
+    .n-heros-tete { min-height: 32px; }
+    .n-heros-titre { font-size: 12.5px; }
+    .n-heros-action .n-segmente { min-height: 0; padding: 2px; }
+    .n-heros-action .n-segmente-choix { min-height: 28px; padding: 0 8px; font-size: 12px; position: relative; }
+    .n-heros-action .n-segmente-choix::after { content: ''; position: absolute; inset: -8px -2px; }
+    .n-heros-valeur { margin-top: 0; font-size: 38px; line-height: 42px; }
+    .n-heros-unite { font-size: 19px; line-height: 24px; }
+    .n-heros-sous { font-size: 12.5px; line-height: 17px; }
+    .n-heros-graphe { margin-top: 4px; }
+    .n-heros .n-graphe-svg { height: 56px; }
+    .n-heros .n-graphe-grille, .n-heros .n-graphe-base, .n-heros .n-graphe-moyenne, .n-heros .n-graphe-axe, .n-heros .n-pilotage-legende { display: none; }
+    .n-heros .n-graphe { margin: 0; }
+    .n-heros-jour { display: none; }
+    .n-heros-jour[data-pil-touche] { display: block; }
+    .n-heros-trio { margin-top: 8px; padding-top: 8px; }
+    .n-heros-trio-case + .n-heros-trio-case { padding-inline-start: 10px; }
+    .n-heros-trio dt { font-size: 11.5px; line-height: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .n-heros-trio dd { font-size: 15px; line-height: 20px; }
+    .n-heros-trio-porte { position: relative; flex-wrap: nowrap; }
+    .n-heros-trio-porte::after { content: ''; position: absolute; inset: -12px -6px; }
+    .n-heros-trio-porte:has(.n-heros-trio-pourquoi) { gap: 0; }
+    .n-heros-trio-porte:has(.n-heros-trio-pourquoi) > :not(.n-heros-trio-pourquoi) { display: none; }
+    .n-heros-trio-pourquoi { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--n-teinte); color: var(--n-sur-heros); text-decoration: none; font: 600 12px/18px var(--n-police); }
+    .n-actions-rondes { margin-bottom: 12px; }
+    .n-action-ronde { gap: 4px; }
+    .n-action-ronde-disque { width: 46px; height: 46px; }
+    .n-action-ronde-disque svg { width: 20px; height: 20px; }
+    .n-cc { min-height: 0; padding: 10px 14px 12px; }
+    .n-cc-tete { font-size: 12.5px; }
+    .n-cc-valeur { font-size: 26px; line-height: 32px; }
+    /* (24 nov., livrable-2) Deux lignes au plus, jamais coupé : « Ouvre ton porte-monnai… » se lisait rogné au téléphone. */
+    .n-cc-sous { min-height: 0; font-size: 12px; line-height: 16px; -webkit-line-clamp: 2; }
+    /* (24 nov., livrable-2) Le porte-monnaie réserve ses deux lignes (« Ouvre ton porte-monnaie Vinted » en prend deux) : la carte
+       a la même hauteur en lecture, lue ou pas su — rien ne saute dessous. */
+    .n-ccs-pm .n-cc-sous { min-height: 32px; }
   }
   @media (prefers-reduced-motion: reduce) { .n-graphe-barre, .n-action-ronde-disque { transition: none; } }
 }

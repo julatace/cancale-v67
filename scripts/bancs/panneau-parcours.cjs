@@ -55,8 +55,10 @@ const STORE = () => ({ vrmChoixComptes: { [P.UID]: { choix: 'oui', login: 'shop_
           const a = await clic(t.pg, '[data-sr-sauver]', 1200);
           const ex = depuis(t, n0, 'sauvegardeReglages', 'exporter')[0];
           dit(a && ex && ex.rep && ex.rep.ok === true && typeof ex.rep.texte === 'string' && ex.rep.texte.length > 20 && /\.json$/.test(String(ex.rep.nom || '')), `S ${cfg.nom} : « Sauvegarder » ⇒ le fond rend un fichier .json`, J(ex && ex.rep).slice(0, 200));
-          const telecharge = await R(t.pg, () => { const x = document.querySelector('a[data-sr-telecharge]'); return x ? { nom: x.getAttribute('download'), blob: /^blob:/.test(x.href) } : null; });
-          dit(telecharge && telecharge.blob && /\.json$/.test(telecharge.nom || ''), `S ${cfg.nom} : le fichier est proposé au téléchargement sous son nom`, J(telecharge));
+          // 5.450 : le fichier part par le service worker (`chrome.downloads`), plus par un lien cliqué dans la page.
+          const tl0 = Date.now(); let tl = null; while (!tl && Date.now() - tl0 < 4000) { tl = depuis(t, n0, 'telecharger')[0] || null; if (!tl) await new Promise((r) => setTimeout(r, 200)); }
+          const lienPage = await R(t.pg, () => !!document.querySelector('a[data-sr-telecharge], a[download]'));
+          dit(tl && /^data:application\/json;base64,/.test(String(tl.msg.url || '')) && /\.json$/.test(String(tl.msg.nom || '')) && !lienPage, `S ${cfg.nom} : le fichier est téléchargé par l'extension sous son nom (aucun lien cliqué dans la page)`, J(tl && { nom: tl.msg.nom, lienPage }));
           if (!(ex && ex.rep && ex.rep.texte)) return;
           // Un fichier qui n'est PAS une sauvegarde.
           const faux = path.join(os.tmpdir(), `vrm-banc-faux-${process.pid}.json`); fs.writeFileSync(faux, '{"bonjour":"ceci n’est pas une sauvegarde VRM"}');

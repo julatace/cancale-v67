@@ -34,4 +34,6 @@ export default {
   "uxr.bd.enCours": "En cours",
   "uxr.bd.lectureAttend": "Après le compte relié",
   "uxr.bd.extensionPasSu": "Je vérifie…",
+  "uxr.acct.raisonEmail": "Tape d’abord la nouvelle adresse",
+  "uxr.acct.raisonMdp": "Tape d’abord le nouveau mot de passe",
 };

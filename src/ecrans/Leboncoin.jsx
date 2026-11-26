@@ -1,5 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { pauseLbcAgir, supprimerLbcAgir, compteLbcDe, publierLbcDepuisVrm } from '../agir/Agir.jsx';   // (24 nov., lot agir-tout)
 import { problemesAnnonce } from '../verifAnnonce.js';
 import { bilanEnLigneLbc, quandLectureLbc, LIEN_MES_ANNONCES_LBC } from '../enLigneLbc.js';
 import { poserNombreAnnonces } from '../plateformes/nombresAnnonces.js';
@@ -137,7 +138,7 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null, on
   // (20 nov., décision de Julien) Leboncoin : la publication se fait dans le panneau de l'extension, sur leboncoin.fr,
   // depuis CETTE annonce Vinted (son identifiant). L'app ne remplit plus le dépôt. eBay reste ici.
   if (lbc) return <span data-bouton-publier={fait ? 'fait' : 'panneau'} data-id={id}>{fait ? <span style={{ fontSize: 13, color: C.muted }}>{tr('actionsExt.dejaPubliee')}</span>
-    : <BoutonExtension className="vrm-ao-second" action="publier" site="leboncoin" ids={[String(id)]}/>}</span>;
+    : <button type="button" className="vrm-ao-second" data-agir-publier-lbc={id} onClick={() => publierLbcDepuisVrm(String(id), { panneau: () => ouvrirPanneau({ site: 'leboncoin', page: 'publier', ids: [String(id)], action: 'publier' }) })}>{tr('agir.lbc.publier')}</button>}</span>;   // (24 nov., lot agir-tout) depuis VRM, sinon le panneau gardé
   return (
     <span data-bouton-publier={etat} data-id={id} data-photos={nPh == null ? undefined : nPh} data-photos-total={nTot == null ? undefined : nTot}
       style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
@@ -1346,7 +1347,8 @@ function LeboncoinScreen() {
   const [pauseEnVol, setPauseEnVol] = useState(null);
   const [pauseRes, setPauseRes] = useState([]);
   // (20 nov., décision de Julien) La pause se fait dans le panneau de l'extension : l'app ouvre leboncoin.fr sur CETTE annonce.
-  const mettreEnPause = (r) => { if (r && r.id) ouvrirPanneau({ site: 'leboncoin', page: 'annonces', ids: [String(r.id)], action: 'pause' }); };
+  // (24 nov., lot agir-tout) DEPUIS VRM si l'extension a CE compte Leboncoin dans un onglet (la file) ; sinon le panneau (gardé).
+  const mettreEnPause = (r) => { if (r && r.id) pauseLbcAgir(r, { panneau: () => ouvrirPanneau({ site: 'leboncoin', compte: compteLbcDe(r) || '*', page: 'annonces', ids: [String(r.id)], action: 'pause' }) }); };
   // ── SUPPRIMER DE LEBONCOIN, SUR SON CLIC CONFIRMÉ (29 octobre) ──────────
   // Julien : « je veux pouvoir sur VRM supprimer une annonce de Leboncoin ».
   // Même chemin que la pause : l'app n'envoie qu'UN identifiant et la
@@ -1363,7 +1365,8 @@ function LeboncoinScreen() {
   };
   const [supprRes, setSupprRes] = useState([]);
   // (20 nov., décision de Julien) Supprimer : dans le panneau de l'extension (sa confirmation y est demandée).
-  const supprimerSurLbc = (r) => { if (r && r.id) ouvrirPanneau({ site: 'leboncoin', page: 'annonces', ids: [String(r.id)], action: 'supprimer' }); };
+  // (24 nov., lot agir-tout) DEPUIS VRM, après SA confirmation « sans retour » ; sinon le panneau (gardé, il redemande).
+  const supprimerSurLbc = (r) => { if (r && r.id) supprimerLbcAgir(r, { confirmer: askConfirm, panneau: () => ouvrirPanneau({ site: 'leboncoin', compte: compteLbcDe(r) || '*', page: 'annonces', ids: [String(r.id)], action: 'supprimer' }) }); };
   const phraseSuppr = (x) => {
     const rp = x.rep;
     const cite = rp && rp.reponse ? ` « ${String(rp.reponse).slice(0, 160)} »` : '';

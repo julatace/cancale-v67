@@ -47,7 +47,7 @@ export default {
   "v2.af.titre": "Pacchi",
   "v2.af.rienEnvoyer": "niente da spedire",
   "v2.af.rienRetirer": "niente da ritirare",
-  "v2.af.toutesStats": "Tutte le statistiche",
+  "v2.af.toutesStats": "Statistiche",
   "v2.af.toutesStatsSous": "Attività e finanze, su 7, 30 o 90 giorni",
   "v2.perso.carte.colis": "Pacchi",
   "v2.perso.phrase.colis": "Da spedire e da ritirare, a colpo d’occhio",
@@ -163,5 +163,6 @@ export default {
   "ext.sante.r.refus": "Vinted ha rifiutato una richiesta nelle ultime 24 h: evita le serie.",
   "ext.sante.r.verification_recente": "Una verifica di Vinted nelle ultime 24 h: evita le serie.",
   "ext.sante.r.pas_vu": "Un’azione non è stata vista: guarda la scheda di lavoro.",
-  "ext.sante.r.presque_plafond": "Vicino al limite (80%)."
+  "ext.sante.r.presque_plafond": "Vicino al limite (80%).",
+  "v2.dv.enLecture": "Vendita — dettaglio in lettura",
 };

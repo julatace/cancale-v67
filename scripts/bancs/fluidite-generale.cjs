@@ -146,6 +146,8 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
             V.push({ t: Math.round(performance.now()), prio, qui: qui.join(' ; ') }); if (V.length > 300) V.splice(0, V.length - 300);
           } catch (_) {} } };
       });
+      // (23 nov., latence-2) GARDES=journee,achats,ventes,annonces : essayer une autre liste d'écrans gardés sur le MÊME build.
+      if (process.env.GARDES) await pg.addInitScript((l) => { window.__VRM_ECRANS_GARDABLES = l; window.__VRM_MAX_GARDES = Math.max(4, l.length); }, process.env.GARDES.split(','));
       if (process.env.SANS_SECOURS) await pg.addInitScript(() => { window.__vrmSansSecours = true; });
       pg.on('console', (m) => { const t = m.text(); if (/^dbg/.test(t)) console.log('      ' + t.slice(0, 260)); });
       // ── L. Lectures à l'ouverture de Ma journée ──

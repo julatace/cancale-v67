@@ -5,7 +5,8 @@ require('./_porte-banc.cjs');
 //  STYLE ET CLARTÉ, TRANCHE 2 (22 nov. soir, maquettes de Julien — docs/passation/2026-11-22-style-clarte.md §6)
 //    T1 Annonces (1512) : UNE recherche à l'écran (celle du tableau) et pas de bande vide au-dessus de la barre d'outils ;
 //    T2 le tableau : rangées denses (≤ 64 px), cadre à bord fin, en-tête sur un fond distinct de la carte ;
-//    T3 la barre de sélection (une annonce cochée) est NOIRE (l'encre) et son plein est clair ;
+//    T3 la barre de sélection (une annonce cochée) est GRISE, jamais noire (23 nov., Julien : « j'aime pas le noir ») ; son plein se
+//       détache d'elle ;
 //    T4 la fiche d'une annonce (1512) : le prix en très grand (≥ 40 px) ;
 //    T5 rien ne déborde, aucune erreur d'app (390 et 1512).
 //  `BANC_DIST=<dist d'avant>` : rouge sur la tranche 1 (T1, T2, T3, T4). `SHOTS=…` les captures.
@@ -44,10 +45,10 @@ async function annonces(nav, b, W) {
     if (W >= 1024) {
       await pg.locator('tr[data-tt-ligne] .n-tt-cible-case').first().click({ timeout: 5000 }).catch(() => {});
       await pg.waitForTimeout(600);
-      const s = await pg.evaluate(() => { const b = document.querySelector('[data-tt-barre-sel]'); if (!b) return null; const p = b.querySelector('[data-tt-lancer]');
+      const s = await pg.evaluate(() => { const b = document.querySelector('[data-tt-barre-sel]'); if (!b) return null; const p = b.querySelector('[data-tt-lancer], [data-tt-action-directe][data-v2-principal]');   /* (23 nov., revue UX #13) le plein de la barre : « Lancer » d'avant ou la 1re action directe */
         const lum = (c) => { const x = (c.match(/\d+(\.\d+)?/g) || []).map(Number); return x.length >= 3 ? (x[0] * 299 + x[1] * 587 + x[2] * 114) / 1000 : -1; };
         return { fond: lum(getComputedStyle(b).backgroundColor), plein: p ? lum(getComputedStyle(p).backgroundColor) : -1 }; });
-      dit(s && s.fond >= 0 && s.fond < 60 && s.plein > 200, `T3 ${W} : la barre de sélection est noire, son plein clair`, s);
+      dit(s && s.fond > 150 && s.plein >= 0 && Math.abs(s.plein - s.fond) > 15, `T3 ${W} : la barre de sélection est grise (jamais noire), son plein s'en détache`, s);
       await pg.screenshot({ path: path.join(SHOTS, `annonces-selection-${W}.png`) });
       await pg.keyboard.press('Escape').catch(() => {});
       await pg.locator('tr[data-tt-ligne] .n-tt-article').first().click({ timeout: 5000 }).catch(() => {});

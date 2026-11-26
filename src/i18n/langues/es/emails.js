@@ -45,6 +45,7 @@ export default {
   "emails.compteEnvoieAucun": "Una cuenta no envía ningún email a VRM",
   "emails.codesRetraitBordereaux": "no llegan códigos de recogida, etiquetas ni mensajes.",
   "emails.relierBoite": "Vincular el buzón de {login}",
+  "emails.relierCourt": "Vincular",
   "emails.enregistreAutresAppareils": "No guardado en tus otros dispositivos — reintenta en un momento.",
   "emails.chercherEMail": "Buscar un email",
   "emails.articleCodeSuivi": "Artículo, código, n° de seguimiento…",
