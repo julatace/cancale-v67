@@ -17,6 +17,7 @@
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
+const TR = require('./_travail-recherche.cjs');
 const SRC = path.join(__dirname, '..', 'src', 'rechercheUnique.js');
 
 const MUTATIONS = {
@@ -27,7 +28,12 @@ const MUTATIONS = {
   accents: [".normalize('NFD').replace(/[\u0300-\u036f]/g, '')", ''],
   memo: ['  if (_memo.cles && _memo.cles.length === cles.length && _memo.cles.every((x, i) => x === cles[i])) return _memo.index;', ''],
   'colis-double': ['    const p = parSuivi.get(k);', '    const p = null;'],
-  'mots-ordre': ['if (!par && e.t && mots.every((m) => e.t.includes(m)))', 'if (!par && e.t && e.t.includes(qn))'],
+  // (26 nov.) recalée : l'ancre d'avant (`mots.every((m) => e.t.includes(m))`) n'existait plus — « introuvable » était
+  // compté comme une mutation attrapée.
+  'mots-ordre': ['if (!par && e.t && (tests.every((f) => f(e.t)) ||', 'if (!par && e.t && (e.t.includes(qn) ||'],
+  // (26 nov.) LA VITESSE, sans horloge murale (scripts/_travail-recherche.cjs) : le vocabulaire des fautes recalculé pour
+  // CHAQUE entrée (une frappe quadratique) — rouge par le COMPTE des lectures, à toute charge de la machine.
+  'frappe-quadratique': ['tests.every((f, k) => f(e.t) || presDe(e, proches[k]))', 'tests.every((f, k) => f(e.t) || presDe(e, prochesDe(index, mots[k])))'],
   max: ['if (g && g.length < maxDe(k)) g.push(t);', 'if (g) g.push(t);'],
   // Le pseudo d'un e-mail attaché par TITRE (la jumelle reçoit aussi le pseudo).
   'pseudo-titre': ["  for (const o of Array.isArray(S.ventes) ? S.ventes : []) commande('vente', o);",
@@ -41,8 +47,10 @@ if (arg.includes('--prouve')) {
   for (const m of Object.keys(MUTATIONS)) {
     const r = spawnSync(process.execPath, [__filename, '--mutation=' + m], { encoding: 'utf8' });
     const rouges = ((r.stdout || '').match(/^❌/gm) || []).length;
-    console.log(`${r.status !== 0 && rouges ? '✅' : '❌'} mutation « ${m} » : ${rouges} rouge(s)`);
-    if (r.status !== 0 && rouges) ok++;
+    const introuvable = /ancre de mutation introuvable/.test(r.stdout || '');   // (26 nov.) une ancre absente ne mute rien
+    const pris = r.status !== 0 && rouges && !introuvable;
+    console.log(`${pris ? '✅' : '❌'} mutation « ${m} » : ${introuvable ? 'ANCRE INTROUVABLE' : rouges + ' rouge(s)'}${pris ? ' — ' + ((r.stdout || '').match(/^❌.*$/gm) || []).map((l) => l.slice(2, 80)).join(' | ') : ''}`);
+    if (pris) ok++;
   }
   console.log(`\n${ok}/${Object.keys(MUTATIONS).length} mutations attrapées.`);
   process.exit(ok === Object.keys(MUTATIONS).length ? 0 : 1);
@@ -102,7 +110,7 @@ if (arg.includes('--prouve')) {
 
   essaie('titre', () => {
     const t = cherche('spezial ADIDAS');
-    dit(cles(t, 'vente').sort().join() === 'vente:22314280001,vente:22314280002' && t.groupes.vente.every((r) => r.par === 'titre'), 'titre (mots dans n’importe quel ordre) ⇒ les DEUX jumelles, deux lignes', cles(t, 'vente'));
+    dit(cles(t, 'vente').sort().join() === 'vente:22314280001,vente:22314280002' && t.groupes.vente.every((r) => r.par === 'titre' && !r.approx), 'titre (mots dans n’importe quel ordre) ⇒ les DEUX jumelles, deux lignes, trouvées EXACTEMENT (pas « à une lettre près »)', cles(t, 'vente'));
     const d = t.groupes.vente.map((r) => R.destinationResultat(r));
     dit(d.length === 2 && d[0].cible.tx !== d[1].cible.tx && d.every((x) => x.tab === 'ventes' && x.cible.type === 'vente'), 'chaque jumelle ouvre SA transaction', d);
     dit(cles(cherche('legere'), 'vente').join() === 'vente:22314280003', 'sans accents : « legere » trouve « Légère »');
@@ -121,25 +129,32 @@ if (arg.includes('--prouve')) {
   });
 
   essaie('vitesse et mémo', () => {
-    const N = 6000;
+    // (26 nov.) Le temps CPU du fil, plus le temps mural (4 audits sur 4 cœurs le rougissaient sans que la règle change),
+    // et le travail EXACT d'une frappe à n puis à 2n entrées (aucune horloge) — scripts/_travail-recherche.cjs.
+    const grand = (N) => {
     const V = Array.from({ length: N }, (_, i) => ({ transaction_id: 22000000000 + i, title: `Modèle ${i % 300} Nike Air taille ${36 + (i % 10)}`, status: 'Commande finalisée', date: new Date(1.79e12 + i * 6e4).toISOString() }));
-    const A = Array.from({ length: 3000 }, (_, i) => ({ transaction_id: 23000000000 + i, title: `Achat ${i} Adidas`, status: 'x' }));
-    const P = V.slice(0, 2000).map((o, i) => ({ tx: String(o.transaction_id), pseudo: 'acheteur_' + i }));
-    const B = V.slice(0, 2000).map((o, i) => ({ tx: String(o.transaction_id), suivi: 'XW' + String(100000000 + i) + 'FR' }));
-    const C = Array.from({ length: 1500 }, (_, i) => ({ id: 'c' + i, suivi: 'MR' + (5000000 + i), code: String(100000 + i), status: 'available' }));
-    const big = { ventes: V, achats: A, pseudos: P, bordereaux: B, colis: C };
-    let t0 = performance.now();
-    const I1 = R.indexMemo(big);
-    const tIndex = performance.now() - t0;
-    dit(tIndex < 800, `index de ${I1.n} entrées en ${Math.round(tIndex)} ms`, Math.round(tIndex));
-    t0 = performance.now();
-    const I2 = R.indexMemo({ ...big });
-    dit(I2 === I1 && performance.now() - t0 < 5, 'les mêmes sources ⇒ le MÊME index (mémo, aucune reconstruction)');
+    const A = Array.from({ length: N / 2 }, (_, i) => ({ transaction_id: 23000000000 + i, title: `Achat ${i} Adidas`, status: 'x' }));
+    const P = V.slice(0, N / 3).map((o, i) => ({ tx: String(o.transaction_id), pseudo: 'acheteur_' + i }));
+    const B = V.slice(0, N / 3).map((o, i) => ({ tx: String(o.transaction_id), suivi: 'XW' + String(100000000 + i) + 'FR' }));
+    const C = Array.from({ length: N / 4 }, (_, i) => ({ id: 'c' + i, suivi: 'MR' + (5000000 + i), code: String(100000 + i), status: 'available' }));
+    return { ventes: V, achats: A, pseudos: P, bordereaux: B, colis: C };
+    };
+    const N = 6000;
+    const big = grand(N);
+    const mi = TR.mesureCpu(() => R.indexMemo(big));
+    const I1 = mi.r, tIndex = mi.ms;
+    dit(tIndex < 800, `index de ${I1.n} entrées en ${Math.round(tIndex)} ms de ${TR.SOURCE_CPU}`, Math.round(tIndex));
+    const m2 = TR.mesureCpu(() => R.indexMemo({ ...big }));
+    const I2 = m2.r;
+    dit(I2 === I1 && m2.ms < 5, 'les mêmes sources ⇒ le MÊME index (mémo, aucune reconstruction)');
     const qs = ['nike air', 'acheteur_1999', 'XW100001999', '101499', '22000005999', 'modele 299 taille 45', 'adid'];
-    t0 = performance.now();
-    for (let k = 0; k < 5; k++) for (const q of qs) R.chercherPartout(I1, q);
-    const parFrappe = (performance.now() - t0) / (5 * qs.length);
-    dit(parFrappe < 40, `une frappe sur ${I1.n} entrées : ${parFrappe.toFixed(1)} ms`, parFrappe);
+    const parFrappe = TR.mesureCpu(() => { for (let k = 0; k < 5; k++) for (const q of qs) R.chercherPartout(I1, q); }).ms / (5 * qs.length);
+    dit(parFrappe < 40, `une frappe sur ${I1.n} entrées : ${parFrappe.toFixed(1)} ms de ${TR.SOURCE_CPU}`, parFrappe);
+    const Ib = R.indexRecherche(grand(2 * N));
+    const w = qs.map((q) => ({ q, a: TR.travailFrappe(R, I1, q), b: TR.travailFrappe(R, Ib, q) }));
+    console.log('   travail d’une frappe (lectures) : ' + w.map((x) => `${x.q} ${x.a.entrees}/${x.a.n} → ${x.b.entrees}/${x.b.n} (index ${x.a.index} → ${x.b.index})`).join(' · '));
+    dit(Ib.n > 1.9 * I1.n && w.every((x) => x.b.parEntree <= x.a.parEntree * 1.15 + 0.5), 'une frappe lit chaque entrée un nombre BORNÉ de fois : à 2n, par entrée, au plus le facteur log du tri des trouvailles (×1,15), jamais ×2 (aucune horloge)', w.map((x) => [x.q, +x.a.parEntree.toFixed(2), +x.b.parEntree.toFixed(2)]));
+    dit(w.every((x) => x.b.index <= x.a.index && x.a.index <= 20), 'l’index lui-même est lu un nombre de fois qui ne dépend pas de n (vocabulaire des fautes fait UNE fois)', w.map((x) => [x.q, x.a.index, x.b.index]));
     const r = R.chercherPartout(I1, 'acheteur_1999');
     dit(r.groupes.vente.length === 1 && r.groupes.vente[0].e.tx === '22000001999', 'le pseudo exact trouve SA vente parmi 6 000', r.groupes.vente.map((x) => x.e.tx));
     const lot = R.chercherPartout(I1, 'nike');
