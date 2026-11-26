@@ -27,6 +27,7 @@ require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lect
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
+const TR = require('./_travail-recherche.cjs');
 const RAC = path.join(__dirname, '..');
 const F_REGLE = path.join(RAC, 'src', 'rechercheUnique.js');
 const F_ECRAN = path.join(RAC, 'src', 'rechercheEcran.js');
@@ -136,7 +137,8 @@ function sansCommentaires(t) {
 
   let tIndex = 0, idx = null;
   essaie('index', () => {
-    const t0 = performance.now(); idx = R.indexRecherche(S); tIndex = performance.now() - t0;
+    // (26 nov.) Temps CPU du fil (scripts/_travail-recherche.cjs), plus le temps mural : instable en parallèle, vert seul.
+    const t0 = TR.cpuMs(); idx = R.indexRecherche(S); tIndex = TR.cpuMs() - t0;
     dit(idx.n > 8000, `index de ${idx.n} entrées (ventes, achats, colis, fiches, annonces, factures)`, idx.n);
   });
   const ch = (q, o) => R.chercherPartout(idx, q, { max: 500, ...(o || {}) });
@@ -243,12 +245,12 @@ function sansCommentaires(t) {
 
   essaie('vitesse', () => {
     const qs = ['141', 'nike air', 'poupacho', 'XW300000777FR', '500123', '22000002999', '52 €', 'samba og taille 37', 'onitsuka 44,5', 'PRO-2026-0007', 'jordan chicago', 'a', 'ad', 'adi', 'adid', 'adida', 'adidas'];
-    const t0 = performance.now();
+    const t0 = TR.cpuMs();
     for (let k = 0; k < 3; k++) for (const q of qs) R.chercherPartout(idx, q, { max: { paire: 12, vente: 8, achat: 8, colis: 8, annonce: 8, facture: 6 } });
-    const parFrappe = (performance.now() - t0) / (3 * qs.length);
+    const parFrappe = (TR.cpuMs() - t0) / (3 * qs.length);
     dit(tIndex + parFrappe < 300, `première recherche (index ${Math.round(tIndex)} ms + frappe ${parFrappe.toFixed(1)} ms) < 300 ms sur ${idx.n} entrées`, [tIndex, parFrappe]);
     dit(parFrappe < 16, `une frappe : ${parFrappe.toFixed(1)} ms (< 16 ms, une image)`, parFrappe);
-    const I1 = R.indexMemo(S); const t1 = performance.now(); const I2 = R.indexMemo({ ...S }); const tMemo = performance.now() - t1;
+    const I1 = R.indexMemo(S); const t1 = TR.cpuMs(); const I2 = R.indexMemo({ ...S }); const tMemo = TR.cpuMs() - t1;
     dit(I1 === I2 && tMemo < 5, 'les mêmes sources ⇒ le MÊME index (mémo, aucune reconstruction à la frappe)', tMemo);
     let k = 0; const f = () => { k++; return { v: k }; };
     const a = E.memoSur('x', [S.fiches, S.annonces], f), b = E.memoSur('x', [S.fiches, S.annonces], f), c = E.memoSur('x', [S.fiches, null], f);
