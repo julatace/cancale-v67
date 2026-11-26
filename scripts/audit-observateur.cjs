@@ -26,5 +26,17 @@ dit(a && JSON.stringify(a.q) === '["page","per_page"]' && !a.qid, "les paramètr
 const OBS2 = charger();
 if (OBS2.poserSel) OBS2.poserSel('autre-ordinateur');
 dit(OBS2.empreinte && OBS2.empreinte('9988776655') !== OBS.empreinte('9988776655'), "l'empreinte dépend du sel de l'ordinateur (pas une table publique)");
+// 2.0 (26 nov.) LES GESTES : la sorte, vrai doigt ou script, la signature de l'élément — jamais une valeur ni une personne.
+if (OBS.geste) {
+  const g1 = OBS.geste({ k: 'clic', t: 5, vrai: false, el: { tag: 'BUTTON', texte: 'Envoyer 12', testid: 'send', ancetres: ['conversation-reply'] } });
+  const g2 = OBS.geste({ k: 'frappe', t: 6, vrai: true, longueur: 19, el: { tag: 'textarea', name: 'body', texte: 'Bonjour Jean' } });
+  const g3 = OBS.geste({ k: 'clic', t: 7, vrai: true, el: { tag: 'a', texte: 'jean@x.fr', href: 'https://www.vinted.fr/member/123456-jean' } });
+  const g4 = OBS.geste({ k: 'page', t: 8, url: 'https://www.vinted.fr/inbox/12345678?item_id=7123456789' });
+  const tg = JSON.stringify([g1, g2, g3, g4]);
+  dit(g1 && g1.vrai === false && g1.el.texte === 'Envoyer #' && g1.el.testid === 'send', "un clic de script est noté « vrai: false », le bouton par son libellé d'interface", JSON.stringify(g1));
+  dit(g2 && g2.longueur === 19 && !g2.el.texte, "la frappe : sa LONGUEUR, jamais le texte (un champ n'a pas de libellé gardé)", JSON.stringify(g2));
+  dit(!/Jean|jean|123456|7123456789|12345678|Bonjour|@/.test(tg), "aucun geste ne garde un nom, un identifiant ou un texte tapé", tg);
+  dit(OBS.geste({ k: 'inconnu', t: 1 }) === null, "une sorte de geste inconnue tombe");
+}
 console.log(ko ? `\n❌ audit-observateur : ${ko} rouge(s)` : `\n✅ audit-observateur : ${ok} contrôles`);
 process.exit(ko ? 1 : 0);
