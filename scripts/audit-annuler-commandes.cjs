@@ -122,7 +122,7 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
   const corps = m ? m[1] : '';
   dit(m && !/\bsave\(|vmrCmd|fetch\(|gesteVrm|cloudPush|askConfirm|appliquerPrix|batchBordereaux|ouvrirLot\(/.test(corps), 'E2 elle n’écrit rien et n’envoie rien (ni save, ni vmrCmd, ni fetch, ni impression)');
   dit(/const actionsGs = actionsPour\(qBrut/.test(A) && /data-recherche-action=\{a\.id\}/.test(A) && /className="vrm-recherche-ligne" onClick=\{\(\)=>lancerActionRecherche/.test(A), 'E3 la loupe rend les actions comme ses lignes (vrm-recherche-ligne : ↑ ↓ Entrée)');
-  dit(/\{q && estNumQ && <ToutSurLeNumero[\s\S]{0,700}\}\/>\}\s*\{q && estNumQ && blocActions\}/.test(A), 'E4 un N° tapé : « Tout sur le N° » reste en tête, les actions après');
+  dit(/\{q && estNumQ && <ToutSurLeNumero[\s\S]{0,700}\}\/>\}\s*\{q && estNumQ && blocActions(?:Num)?\}/.test(A), 'E4 un N° tapé : « Tout sur le N° » reste en tête, les actions après');
 
   console.log(`\n${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);

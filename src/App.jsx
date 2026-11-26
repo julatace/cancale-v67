@@ -947,7 +947,7 @@ import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/
 import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat, suggestions as suggestionsRecherche, montantCherche, reconnaitreRequete, GENRES_REQUETE, GROUPES_LOUPE, IDENTITES_EXACTES, phraseNonLues } from "./rechercheUnique.js";
 // (6 nov., v36) La loupe universelle : les adaptateurs de l'écran (src/rechercheEcran.js).
 import { Vivant as RechercheVivante } from "./LoupeVivante.jsx";
-import { FIL_RECHERCHE, poserTexteRecherche, piloterEmails, memoSur, annoncesDesLignes, numerosDesVentes, facturesPourRecherche, emailsDeLaReponse, motPastille, MOTIFS as MOTIFS_RECHERCHE, lireRecents, noterRecent, oublierRecents, demanderOuverture, prendreDemande, requeteEmails, ventesAutresPourRecherche, messagesPourRecherche, messagesAutresSitesPourRecherche, voisinClavier } from "./rechercheEcran.js";
+import { FIL_RECHERCHE, poserTexteRecherche, piloterEmails, memoSur, annoncesDesLignes, numerosDesVentes, facturesPourRecherche, emailsDeLaReponse, motPastille, MOTIFS as MOTIFS_RECHERCHE, lireRecents, noterRecent, oublierRecents, demanderOuverture, prendreDemande, requeteEmails, ventesAutresPourRecherche, messagesPourRecherche, messagesAutresSitesPourRecherche, voisinClavier, loupeAFermerAuRetour } from "./rechercheEcran.js";
 import { ligneEmail, siteExpediteur, monogramme } from "./boiteEmails.js";
 import { expediteurLisible } from "./journalEmail.js";
 import { requeteJsonBornee } from "./requeteJsonBornee.js";
@@ -35117,6 +35117,9 @@ function AppCoeur() {
   const ouvrirRecherche=React.useCallback(()=>{ flushSync(()=>setGsOpen(true)); const el=gsChampRef.current; if(el){ try{ el.focus({preventScroll:true}); }catch(_){} } },[]);
   // (22 nov. soir, maquettes de Julien) La loupe ronde de l'en-tête d'Aujourd'hui (ordinateur) ouvre LA recherche de la coque.
   useEffect(()=>{ const f=()=>ouvrirRecherche(); window.addEventListener('vrm:recherche-ouvrir',f); return ()=>window.removeEventListener('vrm:recherche-ouvrir',f); },[ouvrirRecherche]);
+  // (26 nov.) L'app revenue au premier plan après 10 min ou plus : la loupe laissée ouverte est fermée et vidée (src/rechercheEcran.js, loupeAFermerAuRetour).
+  const gsOpenRef=useRef(gsOpen); gsOpenRef.current=gsOpen;
+  useEffect(()=>{ let cacheeA=0; const f=()=>{ if(document.visibilityState==='hidden'){ cacheeA=Date.now(); return; } if(loupeAFermerAuRetour({ ouverte: gsOpenRef.current, cacheeA })){ setGsQ(''); fermerRecherche(); } cacheeA=0; }; document.addEventListener('visibilitychange',f); window.addEventListener('pagehide',f); return ()=>{ document.removeEventListener('visibilitychange',f); window.removeEventListener('pagehide',f); }; },[fermerRecherche]);
   React.useLayoutEffect(()=>{ if(!gsOpen) return; const h=document.querySelector('.vrm-app-header'); if(h){ const b=h.getBoundingClientRect().bottom; if(b>0) setHautRecherche(Math.round(b)); } },[gsOpen]);
   // Échap ou un toucher hors du champ et du panneau referment ; rien d'autre ne
   // bouge (la page derrière garde sa place). Une feuille ouverte par-dessus (un
@@ -38491,6 +38494,15 @@ function AppCoeur() {
             <span style={{fontSize:17,color:C.muted}}>›</span>
           </button>))}</div> : null;
         const blocActions = actionsGs.length ? <div data-recherche-groupe="action" data-recherche-n={actionsGs.length}>{entete('Actions', null, 'action')}{actionsGs.map(ligneAction)}</div> : null;
+        // (26 nov., Julien : « c'est moche ») Les actions d'UN N° : des tuiles (icône + verbe court) — le nom complet reste
+        // celui que lit le lecteur d'écran ; mêmes attributs, même geste (`lancerActionRecherche`) que la ligne.
+        const COURT_NUM = { 'baisser-prix': 'loupe.act.baisser', 'republier-num': 'loupe.act.republier', 'partout-num': 'loupe.act.partout', 'stock-num': 'loupe.act.stock', 'vente-main-num': 'loupe.act.venteMain', 'ouvrir-num': 'loupe.act.ouvrir' };
+        const tuileAction = (a) => { const plein = a.cle ? tr(a.cle, { n: String(a.num || '') }) : a.libelle; return (
+          <button key={'action-' + a.id + (a.num || '')} type="button" className="vrm-recherche-ligne vrm-loupe-tuile" onClick={()=>lancerActionRecherche(a, qBrut)} data-recherche-resultat="action" data-recherche-action={a.id} data-recherche-num={a.num || undefined} aria-label={plein}>
+            <span className="vrm-loupe-tuile-ico" aria-hidden="true"><Icon name={a.icone} size={19}/></span>
+            <span className="vrm-loupe-tuile-mot" aria-hidden="true">{COURT_NUM[a.id] ? tr(COURT_NUM[a.id]) : plein}</span>
+          </button>); };
+        const blocActionsNum = actionsGs.length ? <div data-recherche-groupe="action" data-recherche-n={actionsGs.length}>{entete('Actions', null, 'action')}<div className="vrm-loupe-tuiles">{actionsGs.map(tuileAction)}</div></div> : null;
         // (14 nov., chantier 92) LA PHRASE (src/recherchePhrase.js) : « nike 42 pas vendue depuis 2 mois », « colis mondial
         // relay demain ». Des FILTRES en capsules (on les change ou on les retire), appliqués à ce que la loupe a LU :
         // paires et annonces (l'index), ventes et achats (l'index), colis à retirer (la publication de Colis,
@@ -38593,7 +38605,7 @@ function AppCoeur() {
             {q && total===0 && !nPhrase && !estNumQ && !actionsGs.length && !fichesGs.length && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.45}}>{gsData?<>Aucun résultat pour « {qBrut.trim()} ».<br/>Essaie un N° (« B125 »), un pseudo, un suivi ou deux mots.</>:'Je lis tes ventes, achats et colis…'}</div>}
             {q && estNumQ && exacteNumero && <div data-recherche-exacte-numero="" style={{padding:'8px 2px 0',fontSize:12,color:C.muted,lineHeight:1.4}}>Correspondance exacte · trouvé par son N° — pas par ressemblance.</div>}
             {q && estNumQ && <ToutSurLeNumero q={qBrut} numData={numData} comptes={vintedAccounts} onNav={(tab,cible)=>{ setGsOpen(false); if(cible) poserCible(cible, redirigerOnglet(tab, null, ONGLETS_DEPLACES).tab); setTab(tab); }} onFiche={(n)=>{ ficheDeLoupe.current=String(n); setFicheNum(String(n)); }} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
-            {q && estNumQ && blocActions}
+            {q && estNumQ && blocActionsNum}
             {/* Les résultats, groupés par type : chaque ligne dit PAR QUOI elle a été trouvée et
                 ouvre SON objet par son identité. 50 paires au même titre = 50 lignes (« Voir les N autres »). */}
             {q && GROUPES.map(([type,lib])=>{ const liste = groupe(type); if (!liste.length) return null; const n = totalDe(type);

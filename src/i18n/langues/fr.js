@@ -134,7 +134,9 @@ import ecran_extension from './fr/extension.js';   // (19 nov., demande H) la pa
 import ecran_accompagnement_demarrage from './fr/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
 import ecran_litiges_tous from './fr/litigesTous.js';   // (23 nov.) Litiges et retours, tous les sites
 import ecran_achats_hors_vinted from './fr/achatsHorsVinted.js';   // (23 nov.) Nouvel achat : ticket à plusieurs articles
+import ecran_loupe_num from './fr/loupeNum.js';   // (26 nov.) « Tout sur le N° » refait
 export default {
+  ...ecran_loupe_num,
   ...ecran_accessibilite,
   ...ecran_groupes,
   ...ecran_perso,
