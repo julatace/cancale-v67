@@ -4,4 +4,6 @@ export default {
   "a11y.fiche.fermer": "Cerrar la ficha",
   "a11y.allerContenu": "Ir al contenido",
   "a11y.enLigneSur": "Publicado en {site}",
+  "a11y.conversationSur": "Conversación de {site}",
+  "a11y.filMessages": "Hilo de mensajes",
 };

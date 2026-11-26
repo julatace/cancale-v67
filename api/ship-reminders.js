@@ -32,12 +32,14 @@ import { lireJournal, lireLu } from './_lib/journal-notifs.js';
 import { DESTINATIONS, lienNotif } from './_lib/lien-notif.js';
 import { passageFacturesAuto } from './_lib/factures-auto.js';
 // (revue du 5 nov.) Les textes des rappels soir et « offres au mini » : un propriétaire, celui de l'aperçu.
-import { texteSoir, texteOffresMini, texteRetourRappel, texteRetourDepose, texteRetourLivre, texteVendu } from './_lib/notif-apercus.js';
+import { texteSoir, texteOffresMini, texteRetourRappel, texteRetourDepose, texteRetourLivre, texteVendu, texteColisDanger, texteEnvoiPoint, texteEnvoiRetire } from './_lib/notif-apercus.js';
 // (16 nov., lot plateformes-restes) « Vendu ! » pour Leboncoin, eBay et Vestiaire, d'après ce que VRM lit déjà.
 import { MEMO_VENTES_SITES, ventesDesSites, ventesANotifier, donneesVendu } from './_lib/ventes-sites-notif.js';
 import { lbcAnnulee as lbcAnnuleeServeur } from './_lib/ventes-regle.js';
 import { etatCommandeEbay as etatCommandeEbayServeur } from './_lib/ebay-etat-commande.js';
 import { passeNotifsRetours } from './_lib/retour-notifs.js';   // (15 nov., lot retour-parfait)
+import { passeColisDanger } from './_lib/colis-danger.js';
+import { passeSuiviEnvoi } from './_lib/suivi-envoi.js';   // (24 nov., lot suivi-ventes) « au point », « retiré »   // (23 nov., « Colis en danger »)
 import { ID_RETOURS_DEPOSES_CHAMP } from './_lib/retour-suivi.js';
 import { modifierCas } from './_lib/suivi-vinted.js';
 import { nomTransporteur } from './_lib/transporteurs.js';
@@ -896,6 +898,40 @@ async function notifsRetoursAchat(moment = 'matin', maintenant = instantNotif())
     lien: (n) => DESTINATIONS.retour({ tx: n.tx }),
   });
 }
+// (23 nov., « Colis en danger », api/_lib/colis-danger.js) Le colis d'une VENTE au point relais de l'acheteur
+// (Vinted Go), pas encore retiré, avec la date où il repart LUE : la veille et le jour même, une fois chacun
+// (`push_dedup`). Une lecture ratée n'envoie rien. Appelée au cron du matin et à chaque passage « colis ».
+async function notifsColisDanger(maintenant = Date.now()) {
+  return passeColisDanger({
+    maintenant,
+    lire: (q) => fetchPaginated(scoped(q)),
+    reserver: async (cle) => {
+      const r = await modifierCas('push_dedup', (d) => { const ks = (d && Array.isArray(d.keys)) ? d.keys.filter((x) => typeof x === 'string') : []; if (ks.includes(cle)) return undefined; return { ...(d || {}), keys: [cle, ...ks].slice(0, 300) }; });
+      return r === true ? true : r === false ? false : null;
+    },
+    envoyer: (n) => sendPushToAll(n),
+    texte: (n) => texteColisDanger({ article: n.article, limite: n.limiteAt }),
+    active: () => pushCategorieActive('colisdanger'),
+    lien: (n) => DESTINATIONS.vente({ tx: n.tx }),
+  });
+}
+// (24 nov., lot suivi-ventes, api/_lib/suivi-envoi.js) Le colis d'une VENTE lu chez le transporteur : « au point
+// relais » puis « retiré par l'acheteur » — une fois par colis et par étape (`push_dedup`), seulement d'une lecture
+// fraîche d'un événement récent. Une lecture ratée n'envoie rien. Cron du matin et chaque passage « colis ».
+async function notifsSuiviEnvoi(maintenant = Date.now()) {
+  return passeSuiviEnvoi({
+    maintenant,
+    lire: (q) => fetchPaginated(scoped(q)),
+    reserver: async (cle) => {
+      const r = await modifierCas('push_dedup', (d) => { const ks = (d && Array.isArray(d.keys)) ? d.keys.filter((x) => typeof x === 'string') : []; if (ks.includes(cle)) return undefined; return { ...(d || {}), keys: [cle, ...ks].slice(0, 300) }; });
+      return r === true ? true : r === false ? false : null;
+    },
+    envoyer: (n) => sendPushToAll(n),
+    texte: (n) => (n.etape === 'aupoint' ? texteEnvoiPoint({ article: n.article, lieu: n.lieu }) : texteEnvoiRetire({ article: n.article })),
+    active: () => pushCategorieActive('envoi'),
+    lien: (n) => DESTINATIONS.vente({ tx: n.tx }),
+  });
+}
 // (15 nov.) La purge des PDF de bordereaux pour le vendeur du tour : lectures `scoped` et
 // paginées (`fetchPaginated`, §4.5), l'écriture par la fonction de la base (migration 044).
 async function purgeBordereauxDuVendeur(maintenant = Date.now()) {
@@ -978,9 +1014,15 @@ async function traiterVendeur() {
   // (15 nov., lot retour-parfait) Les retours d'achat : « Dernier jour pour ton retour » (la limite est aujourd'hui), déposé/livré lus chez le transporteur.
   let retoursAchat = null;
   try { retoursAchat = await notifsRetoursAchat('matin'); } catch (e) { retoursAchat = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  // (23 nov.) « Colis en danger » : le colis d'une vente qui va repartir du point de l'acheteur.
+  let colisDanger = null;
+  try { colisDanger = await notifsColisDanger(); } catch (e) { colisDanger = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  // (24 nov.) « Au point » et « retiré » : le colis d'une vente, lu chez le transporteur.
+  let suiviEnvoi = null;
+  try { suiviEnvoi = await notifsSuiviEnvoi(); } catch (e) { suiviEnvoi = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
   const rappels = await rappelsPersoSur();
-  return { ...out, rappels, retoursAchat, ...(bilanMois ? { bilanMois } : {}), ...(bilanMoisPush ? { bilanMoisPush } : {}), seuils, ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf, purgeBordereaux, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
+  return { ...out, rappels, retoursAchat, colisDanger, suiviEnvoi, ...(bilanMois ? { bilanMois } : {}), ...(bilanMoisPush ? { bilanMoisPush } : {}), seuils, ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf, purgeBordereaux, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
@@ -1836,7 +1878,13 @@ async function passageDuCron(req, res, moment, bailEtat) {
       clOk = true;
       r = await passageColisFrequent({
         lire: fetchPaginated, exclus: [PROPRIETAIRE_NEUTRE], maintenant: Date.now(),
-        traiter: (o) => contexteVendeur.run({ owner: o }, () => lireTransporteursDuVendeur({ max: MAX_LECTURES_VENDEUR, maxDeparts: MAX_DEPARTS_VENDEUR, budgetMs: BUDGET_VENDEUR_MS })),
+        // (23 nov.) Puis « Colis en danger » sur ce qui vient d'être relu (une panne n'efface pas le bilan des lectures).
+        traiter: (o) => contexteVendeur.run({ owner: o }, async () => {
+          const bilan = await lireTransporteursDuVendeur({ max: MAX_LECTURES_VENDEUR, maxDeparts: MAX_DEPARTS_VENDEUR, budgetMs: BUDGET_VENDEUR_MS });
+          try { await notifsColisDanger(); } catch (_) { /* dit au cron du matin ; rien envoyé */ }
+          try { await notifsSuiviEnvoi(); } catch (_) { /* (24 nov.) dit au cron du matin ; rien envoyé */ }
+          return bilan;
+        }),
       });
     } catch (e) { r = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
     // (9 nov. au soir, « transporteurs parfaits ») PUIS les étiquettes pas encore lues (api/_lib/colis-frequent.js

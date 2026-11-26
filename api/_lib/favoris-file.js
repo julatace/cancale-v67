@@ -21,6 +21,12 @@ export const DELAI_VINTEX_MS=[6000,9600];
 // QUOTA_ATTENTES_MAX fois (jamais de boucle sans fin) ; c'est toujours l'extension qui compte et refuse.
 export const QUOTA_ATTENTE_MS=10*60000;
 export const QUOTA_ATTENTES_MAX=12;
+// 5.440.2 (Julien, 24 nov. 17:45 : « Sauté · Favori trop ancien » pour des favoris de la veille) : la ligne d'un favori
+// que la PAGE de Vinted n'a pas montrée (`notification_pas_trouvee`, rien d'écrit) n'est jamais SAUTÉE : le favori ATTEND
+// un nouvel essai (NOTIF_ATTENTE_MS), au plus NOTIF_ATTENTES_MAX fois ; ensuite « pas envoyé » avec sa raison, la file
+// continue. Seule la liste de Vinted lue jusqu'à sa dernière page dit « trop ancien » (côté extension).
+export const NOTIF_ATTENTE_MS=3*60000;
+export const NOTIF_ATTENTES_MAX=1;
 export function delaiFavori(min,max,jeton){
   const a=Number(min),b=Number.isInteger(max)&&max>a?max:a;
   let h=0x811c9dc5;for(const c of String(jeton||''))h=Math.imul(h^c.charCodeAt(0),0x01000193)>>>0;
@@ -81,6 +87,14 @@ export const exige5281=j=>/[{}]/.test(String(j?.message||'')+(Array.isArray(j?.v
 // (12 nov., ext. 5.369) `variantes` : ses autres versions du message (2 à 5), copiées dans
 // chaque tentative ; l'extension en tire une, jamais celle du message précédent.
 const variantesValides=v=>Array.isArray(v)&&v.length>=1&&v.length<=4&&v.every(x=>typeof x==='string'&&x.trim()&&x.length<=2000);
+// 5.440.2 (Julien, 24 nov. : « traite d'abord les favoris dont la ligne est visible, puis va chercher les plus anciens ») :
+// la file part des favoris les PLUS RÉCENTS (date de leur notification chez Vinted, la plus récente d'abord — ceux que la
+// cloche montre), puis les plus anciens ; une date inconnue garde sa place relative, après les datés. Tri stable.
+export function ordreRecents(targets,dateDe){
+  const l=(Array.isArray(targets)?targets:[]).map((t,i)=>{const v=Date.parse(String(dateDe(t)||''));return {t,i,v:Number.isFinite(v)?v:null};});
+  l.sort((a,b)=>a.v!=null&&b.v!=null?(b.v-a.v)||(a.i-b.i):a.v!=null?-1:b.v!=null?1:a.i-b.i);
+  return l.map(x=>x.t);
+}
 export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMinutes,intervalleMax=null,maintenant,lot=String(maintenant),pourcentage=null,offre=null,rythme=null,plage=null}){
   const ry=RYTHMES_FAVORIS[rythme]?rythme:null;
   const pl=ry==='prudent'?null:plageValide(plage);
@@ -162,7 +176,7 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
   if(resultat==='ignore'){
     d.tentatives=d.tentatives.filter(t=>t!==e.at);g.prochain=e.prochainAvant||0;d.prochainGlobal=e.globalAvant||0;
   }else{d.tentatives=d.tentatives.map(t=>t===e.at?fin:t);g.prochain=Math.max(g.prochain||0,fin+(Number.isSafeInteger(e.delai)?e.delai:j.intervalleMinutes*60000));d.prochainGlobal=g.prochain;}
-  const raisons=['article_vendu','ecran_inactif','compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue','onglet_vinted','offre_refusee','offre_prix_inconnu','offre_incertaine','conversation_existante','vinted_frein','vinted_robot','tout_arrete','trop_tard','annonce_indisponible','texte_interdit','texte_refuse','offre_sous_plancher','conversation_refusee','element_introuvable','favori_trop_ancien'];
+  const raisons=['article_vendu','ecran_inactif','compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue','onglet_vinted','offre_refusee','offre_prix_inconnu','offre_incertaine','conversation_existante','vinted_frein','vinted_robot','tout_arrete','trop_tard','annonce_indisponible','texte_interdit','texte_refuse','offre_sous_plancher','conversation_refusee','element_introuvable','favori_trop_ancien','notification_pas_trouvee'];
   if(raisons.includes(raison))j.raison=raison;
   j.etat=resultat;d.enCours=null;delete g.raisonCode;delete g.raisonRefus;delete g.raisonN;
   // (22 nov.) L'étape et la classe de la cause, rangées sur la ligne (liste blanche : des noms de code, jamais un texte).
@@ -196,8 +210,13 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
   const attendQuota=!j.auto&&resultat==='refuse'&&j.raison==='quota_extension'&&j.ecrits===0&&(Number(j.attentesQuota)||0)<QUOTA_ATTENTES_MAX;
   // (20 nov., ext. 5.410 `messagesmalins`) Vinted a refusé UNE version du texte : l'extension ne la tire plus jamais ;
   // s'il en reste d'autres, la file CONTINUE (au plus 2 refus de texte par lot, puis elle s'arrête et le dit).
+  const attendNotif=!j.auto&&resultat==='refuse'&&j.raison==='notification_pas_trouvee'&&j.ecrits===0&&(Number(j.attentesNotif)||0)<NOTIF_ATTENTES_MAX;
   const autreVersion=!j.auto&&resultat==='refuse'&&j.raison==='texte_refuse'&&Array.isArray(j.variantes)&&j.variantes.length>0&&(Number(g.refusTexte)||0)<2;
-  if(autreVersion){g.refusTexte=(Number(g.refusTexte)||0)+1;g.raison='Vinted a refusé une version de ton message : VRM ne la réutilise plus et continue avec tes autres versions.';if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
+  if(attendNotif){j.etat='attente';delete j.raison;delete j.traiteLe;j.attentesNotif=(Number(j.attentesNotif)||0)+1;
+    // Les AUTRES favoris passent d'abord (ce favori repart en fin de file) ; seul, il attend NOTIF_ATTENTE_MS.
+    if(g.jobs.some(x=>x!==j&&x.etat==='attente')){g.jobs.splice(g.jobs.indexOf(j),1);g.jobs.push(j);}else{g.prochain=Math.max(g.prochain||0,fin+NOTIF_ATTENTE_MS);d.prochainGlobal=g.prochain;}
+    g.raison='Notification d’un favori en recherche : rien n’est parti pour lui, VRM le réessaie seul après les autres.';}
+  else if(autreVersion){g.refusTexte=(Number(g.refusTexte)||0)+1;g.raison='Vinted a refusé une version de ton message : VRM ne la réutilise plus et continue avec tes autres versions.';if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
   // (22 nov.) Un refus qui ne tient qu'à CE favori, rien d'écrit : il est sauté, la file CONTINUE (au plus REFUS_LOCAUX_MAX de suite).
   else if(refusLocalIci){g.refusLocaux=(Number(g.refusLocaux)||0)+1;
     // 5.440.1 (Julien, 23 nov. : « plusieurs favoris de suite » dit après UN seul refus) : la phrase nomme CE refus (sa raison),
@@ -252,6 +271,19 @@ export function reprendreFile(d,{owner,maintenant}){
   if(!g||g.active===true||!g.jobs.some(x=>x.etat==='attente'&&!x.auto&&(!g.lot||x.lot===g.lot)))throw new RefusFavoris('Il n’y a plus rien à reprendre : relance depuis la liste de tes favoris.',409);
   // 5.440.1 : « Reprendre » repart d'un compte de refus « de suite » à zéro.
   g.active=true;g.raison='';g.refusLocaux=0;delete g.raisonCode;delete g.raisonRefus;delete g.raisonN;g.prochain=maintenant;d.prochainGlobal=maintenant;
+  return {data:d,valeur:vueFile(d,owner)};
+}
+// 26 nov. (Julien, ext. 5.453.2 : « Pas parti · Vérifie les envois incertains », toute la file bloquée sans geste) : SON choix
+// tranche UN envoi incertain, sur sa ligne. « C'est parti » ⇒ envoyé (jamais recontacté) ; « Pas parti » ⇒ refusé SANS écriture
+// (`ecrits: 0` : il pourra être choisi à nouveau, par lui). Jamais un renvoi automatique : rien ne repart d'ici.
+export function trancherIncertain(d,{owner,notificationId,parti,maintenant}){
+  d=initialiserFile(d);const g=d.groupes[owner];
+  if(typeof notificationId!=='string'||!notificationId||notificationId.length>160||typeof parti!=='boolean')throw new RefusFavoris('Choix invalide.',400);
+  const j=g&&g.jobs.find(x=>x.notificationId===notificationId&&x.etat==='incertain');
+  if(!j)throw new RefusFavoris('Cet envoi n’est plus à vérifier.');
+  if(parti){j.etat='envoye';j.raison='confirme_vendeur';}else{j.etat='refuse';j.raison='pas_parti_vendeur';j.ecrits=0;}
+  j.traiteLe=maintenant;j.tranche=parti?'parti':'pas_parti';
+  if(!g.jobs.some(x=>x.etat==='incertain')&&/vérifi/i.test(String(g.raison||'')))delete g.raison;
   return {data:d,valeur:vueFile(d,owner)};
 }
 export function cloreIncertains(d,{owner,maintenant}){

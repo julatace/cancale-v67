@@ -6,7 +6,26 @@
 // montant), « Envoyer l'offre de 237 € à 3 personnes », une fois par personne, relue par
 // Vestiaire. Sans recette apprise de SON propre geste : rien ne part, et on dit comment.
 // Règle : src/aimesVestiaire.js ; envoi : `offrirAuxAimesVc` (background.js).
-import { BoutonExtension } from './BoutonExtension.jsx';   // (20 nov.) l'offre aux personnes qui aiment : dans l'extension
+import { BoutonExtension } from './BoutonExtension.jsx';
+import { BoutonAgir, issueTexte } from './agir/Agir.jsx';   // (24 nov., lot agir-tout)
+import { usePeutAgir, envoyerGeste } from './agir/porte.js';
+// (24 nov., lot agir-tout) L'offre aux personnes qui aiment, DEPUIS VRM : SON choix de remise (arrondie à l'euro, toujours
+// sous le prix), UNE commande `aimes` au nom du compte de l'article (la file ; recette APPRISE, sinon l'extension refuse et le
+// dit). Sans extension sur ce compte : le panneau, gardé.
+function OffreAimesAgir({ x }) {
+  const [issue, setIssue] = React.useState(null);
+  const ok = usePeutAgir('vestiaire', x.compte || '', 'favoris', 'file').ok;
+  if (!ok) return <BoutonExtension className="sb-touche avc-geste" action="favoris" site="vestiaire" compte={x.compte || '*'} ids={[String(x.produit)]} attrs={{ 'data-aimes-vc-ouvrir': x.produit }}/>;
+  return (
+    <span className="avc-gestes" data-aimes-vc-app={x.produit} style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+      {remises(x.prixCents).slice(0, 3).map((r) => (
+        <BoutonAgir key={r.p} site="vestiaire" compte={x.compte || ''} geste="favoris" par="file" taille="compact" attrs={{ 'data-aimes-vc-remise': r.p }}
+          onClick={async () => setIssue(await envoyerGeste({ site: 'vestiaire', compte: x.compte || '', geste: 'favoris', distGeste: 'aimes', args: { produit: String(x.produit), prix: r.cents / 100, prixAvant: x.prixCents / 100 }, num: x.numero || '' }))}>
+          {'−' + r.p + ' % · ' + (r.cents / 100).toLocaleString(undefined, { style: 'currency', currency: 'EUR', minimumFractionDigits: 0 })}</BoutonAgir>))}
+      {issue ? <small className="vrm-agir-issue" role="status" data-agir-issue={issue.ok ? 'ok' : issue.raison || 'non'}>{issueTexte(issue)}</small> : null}
+    </span>
+  );
+}   // (20 nov.) l'offre aux personnes qui aiment : dans l'extension
 import React from 'react';
 import { tr, monnaie, heure } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
@@ -37,7 +56,7 @@ export default function AimesVestiaire({ etat, recette, cap, versionExt = '', en
                 <small>{tr('aimesVc.personnes', { n: x.n })}{x.prevenues ? ` · ${tr('aimesVc.dejaPrevenues', { n: x.prevenues })}` : ''}</small>
               </span>
               {x.aPrevenir > 0 && Number.isInteger(x.prixCents)
-                ? <BoutonExtension className="sb-touche avc-geste" action="favoris" site="vestiaire" ids={[String(x.produit)]} attrs={{ 'data-aimes-vc-ouvrir': x.produit }}/>
+                ? <OffreAimesAgir x={x}/>
                 : <span className="avc-fait">{x.aPrevenir > 0 ? tr('aimesVc.prixPasLu') : tr('aimesVc.toutes')}</span>}
             </li>
           ))}

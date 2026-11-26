@@ -553,11 +553,12 @@ export default function StockV2({ s }) {
           </Groupe>) : null}
         {nonRangees.length > aRangerVus.length ? <div className="sm-gestes"><Bouton variante="texte" attrs={{ 'data-sm-a-ranger-tous': '' }} onClick={() => { if (tousARanger) setMax((x) => x + PAR_PAGE); else setTousARanger(true); }}>{tr('sm.voirAutres', { n: nombre(Math.min(tousARanger ? PAR_PAGE : 9999, nonRangees.length - aRangerVus.length)) })}</Bouton></div> : null}
 
-        {/* Meubles · Articles : les deux façons de regarder le stock. */}
+        {/* Meubles · Articles : les deux façons de regarder le stock. (23 nov., revue UX P2) Un nombre partiel s'écrit « 36+ » (au moins 36),
+            plus « ≥ 36 » que personne ne lisait. */}
         <div className="sm-bloc" data-sr-segment={vue}>
           <Segmente libelle={tr('sr.seg.label')} valeur={vue} onChange={(v) => { setVue(v); setZoom(null); }}
             options={[{ cle: 'meubles', libelle: tr('sm.seg.meubles'), n: s.meubles.length ? nombre(s.meubles.length) : null },
-              { cle: 'articles', libelle: mots.Noms, n: s.nombres.enLigne != null ? (s.nombres.auMoins ? '≥ ' : '') + nombre(s.nombres.enLigne) : null }]}/>
+              { cle: 'articles', libelle: mots.Noms, n: s.nombres.enLigne != null ? (s.nombres.auMoins ? tr('ru.stock.auMoins', { n: nombre(s.nombres.enLigne) }) : nombre(s.nombres.enLigne)) : null }]}/>
         </div>
         {vue === 'meubles' ? <Meubles s={s} zoom={zoom} setZoom={(z) => { setZoom(z); setVise(null); }} vise={vise}/> : <>
           {rangees.length ? (

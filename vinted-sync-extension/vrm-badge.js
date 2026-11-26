@@ -2637,7 +2637,10 @@ function vrmVerifVisible(sel) {
     }
     if (c === 'acheteur') return esc(x.pseudo || TU('fl_acheteur'));
     if (c === 'date') return x.date ? `<span title="${esc(dateCourte5(Date.parse(x.date)))}">${esc(dateCourte5(Date.parse(x.date)).replace(/^(\d\d\/\d\d)\/\d{4}/, '$1 ·'))}</span>` : '<span class="gris6">—</span>';
-    return `${etiquette5(et.k, et.t, et.ton === 'ambre' ? 'ambre' : et.ton === 'accent' ? 'accent' : '')}${et.raison ? `<small class="rs6" data-fav-raison6="${esc(et.k)}">${esc(et.raison)}</small>` : ''}`;
+    // 5.453.2 (Julien, 26 nov. : file bloquée sur « Vérifie les envois incertains », sans geste) : un envoi À VÉRIFIER se tranche
+    //    sur SA ligne — il regarde la conversation sur Vinted, puis « C'est parti » ou « Pas parti ». Jamais renvoyé seul.
+    const tranche = et.k === 'verifier' ? `<span class="tr6" data-fav6-trancher-ligne="${esc(x.id)}"><button type="button" class="vu-btn" data-fav6-trancher="parti" data-id="${esc(x.id)}">${esc(TU('f6_parti'))}</button><button type="button" class="vu-btn" data-fav6-trancher="pas" data-id="${esc(x.id)}">${esc(TU('f6_pas_parti'))}</button></span>` : '';
+    return `${etiquette5(et.k, et.t, et.ton === 'ambre' ? 'ambre' : et.ton === 'accent' ? 'accent' : '')}${et.raison ? `<small class="rs6" data-fav-raison6="${esc(et.k)}">${esc(et.raison)}</small>` : ''}${tranche}`;
   }
   // ══ 5.420 (Julien, 21 nov. : « sauf si j'ai activé les messages aux favoris automatiques ») — L'AUTOMATIQUE ═══════════
   // Allumé pour ce compte : les NOUVEAUX favoris reçoivent le message sans passer par les étapes (le pilote de toujours,
@@ -3044,6 +3047,12 @@ function vrmVerifVisible(sel) {
     const fermer = () => { favFeuille = null; vueFav = null; favEnv = null; rendre(); };
     const fileGeste = (quoi) => { if (favOccupe) return; favOccupe = true; favErreur = ''; rendre();
       try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisCarte', quoi, uid }, (r) => { void chrome.runtime.lastError; favOccupe = false; if (!r || !r.ok) favErreur = (r && r.raison) || TU('ra_ko'); apercuFav = null; apercuFavAt = 0; rafraichir(); }); } catch (_) { favOccupe = false; rendre(); } };
+    racine.querySelectorAll('[data-fav6-trancher]').forEach((b) => b.addEventListener('click', (ev) => {
+      ev.stopPropagation(); if (favOccupe) return;
+      const parti = b.getAttribute('data-fav6-trancher') === 'parti', notificationId = b.getAttribute('data-id') || '';
+      favOccupe = true; favErreur = ''; rendre();
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisCarte', quoi: 'trancher', uid, notificationId, parti }, (r) => { void chrome.runtime.lastError; favOccupe = false; favRefus = null; if (!r || !r.ok) favErreur = (r && r.raison) || TU('ra_ko'); apercuFav = null; apercuFavAt = 0; rafraichir(); }); } catch (_) { favOccupe = false; rendre(); }
+    }));
     const cont = racine.querySelector('[data-fav6-continuer]'); if (cont) cont.addEventListener('click', () => fileGeste('continuer'));
     const ann = racine.querySelector('[data-fav6-annuler]'); if (ann) ann.addEventListener('click', () => fileGeste('arreter'));
     carte.querySelectorAll('[data-fav6-fermer]').forEach((b) => b.addEventListener('click', fermer));
@@ -3113,6 +3122,10 @@ function vrmVerifVisible(sel) {
       });
     } catch (_) { favEnVol = false; }
   }
+  // 5.440.2 (Julien : « c'est à l'extension d'aller capter les favoris et d'actualiser l'écran, pas à moi ») : dès que le
+  //    fond a lu la liste des notifications de Vinted (`vrmFavorisListeLue`), la liste des favoris de la carte ouverte est
+  //    redemandée à VRM et redessinée — sans attendre la minute de l'aperçu, sans aucun geste.
+  try { chrome.storage.onChanged.addListener((ch, zone) => { if (zone !== 'local' || !ch.vrmFavorisListeLue) return; apercuFavAt = 0; if (!LISTES && vivant() && carte.classList.contains('on')) rendre(); }); } catch (_) {}
   function brancherFavoris(e) {
     const uid = e && e.site && e.site.id ? String(e.site.id) : '';
     const demander = (quoi, extra, fin) => {
@@ -3161,6 +3174,8 @@ function vrmVerifVisible(sel) {
           return;
         }
         favErreur = (r && r.raison) || 'Rien n’est parti : l’extension n’a pas répondu.';
+        // 5.453.2 : un envoi À VÉRIFIER retient la file : la phrase dit le geste (sur SA ligne), la sélection n'est pas « pas partie ».
+        if (r && /incertain/i.test(String(r.raison || ''))) { favErreur = TU('f6_incertain_geste'); favFeuille = null; vueFav = null; apercuFav = null; apercuFavAt = 0; rafraichir(); return; }
         // 5.410.7 : le refus se dit SUR les rangées concernées (celles que le fond nomme, sinon le lot choisi), la feuille se ferme.
         if (grand6()) { favRefus = { ids: new Set((r && Array.isArray(r.ids) && r.ids.length ? r.ids : selection).map(String)), raison: favErreur }; for (const id of favRefus.ids) selFav.delete(id); garderSelection(uid); favFeuille = null; vueFav = null; if (r && r.code === 'selection') { apercuFavAt = 0; } }
         rendre();
@@ -3245,6 +3260,12 @@ function vrmVerifVisible(sel) {
         void chrome.runtime.lastError;
         listesEnVol = false;
         if (r && r.ok) { listes = r; listesAt = Date.now(); } else listesErreur = 'L’extension n’a pas répondu. Réessaie dans un instant.';
+        // 5.440.4 : la feuille du prix ouverte par le lien de l'app ne garde que les annonces du compte de l'onglet (lues) ;
+        //    aucune ⇒ elle se ferme (le lien d'une paire d'un autre compte n'ouvre rien). Une liste vide ne décide rien.
+        if (r && r.ok && geste6 && geste6.k === 'prix' && geste6.lien && !geste6.aa) {
+          const ts = (r.annonces && Array.isArray(r.annonces.toutes)) ? r.annonces.toutes : [];
+          if (ts.length) { geste6.ids = geste6.ids.filter((id) => ts.some((x) => x.id === id)); if (!geste6.ids.length) { geste6 = null; geste6Etat = null; } }
+        }
         // 5.410.2 : le dressing de CE compte est en relecture (budget de lecture, compte de l'onglet, une requête à la
         // fois — `retourSurVinted` du fond) ⇒ la liste est redemandée seule quand elle a eu le temps d'arriver (3 fois au
         // plus) : ses annonces redeviennent « En vente » sans geste.
@@ -3910,6 +3931,15 @@ function vrmVerifVisible(sel) {
     if (!r || r.assembler !== true || typeof A !== 'function') return null;
     try { const x = await A((r.pdfs || []).map((p) => ({ tx: String(p.tx), b64: p.b64 }))); return x && (x.ok || x.code === 'illisibles') ? x : null; } catch (_) { return null; }
   }
+  // 5.450 (§3, audit-confiance-publique G5) : un fichier pour LUI se télécharge par le service worker (`chrome.downloads`,
+  //    permission « downloads » déjà là) ; le contenu voyage en data: (le worker ne lit pas une adresse blob: de la page).
+  function telechargerParExtension(blob, nom) {
+    try {
+      const fr = new FileReader();
+      fr.onload = () => { try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'telecharger', url: String(fr.result || ''), nom: String(nom || 'vrm.pdf') }, () => { void chrome.runtime.lastError; }); } catch (_) {} };
+      fr.readAsDataURL(blob);
+    } catch (_) {}
+  }
   function imprimerBordereaux(txs) {
     const ids = [...new Set(txs.map(String).filter((t) => /^\d{1,20}$/.test(t)))].slice(0, 10);
     if (!ids.length || impEnVol) return;
@@ -3922,7 +3952,8 @@ function vrmVerifVisible(sel) {
       let url = ''; try { url = URL.createObjectURL(blob); } catch (_) { return ''; }
       setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 120000);
       if (!premierPris && fen) { premierPris = true; try { fen.location.href = url; return 'ouvert'; } catch (_) {} }
-      try { const a = document.createElement('a'); a.href = url; a.download = nom; a.rel = 'noopener'; a.click(); return 'telecharge'; } catch (_) { return ''; }
+      // 5.450 : téléchargé par le service worker (`chrome.downloads`), jamais un clic simulé dans la page (§3).
+      telechargerParExtension(blob, nom); return 'telecharge';
     };
     const fini = (r, un) => {
       impEnVol = false;
@@ -5261,7 +5292,8 @@ function vrmVerifVisible(sel) {
       srEnVol = true; srEtat = null; rendre();
       try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'sauvegardeReglages', quoi: 'exporter' }, (r) => { void chrome.runtime.lastError; srEnVol = false;
         if (r && r.ok && typeof r.texte === 'string') {
-          try { const url = URL.createObjectURL(new Blob([r.texte], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = r.nom || 'vrm-reglages.json'; a.style.display = 'none'; a.setAttribute('data-sr-telecharge', r.nom || ''); (document.body || document.documentElement).appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 60000);
+          // 5.450 : le fichier part par le service worker (`chrome.downloads`) — aucun lien ajouté à la page de Vinted, aucun clic simulé.
+          try { telechargerParExtension(new Blob([r.texte], { type: 'application/json' }), r.nom || 'vrm-reglages.json');
             srEtat = { ok: true, texte: TU('sr_sauve', { nom: r.nom || '' }) }; } catch (_) { srEtat = { ok: false, texte: TU('ra_ko') }; }
         } else srEtat = { ok: false, texte: (r && r.raison) || TU('ra_ko') };
         rendre(); }); } catch (_) { srEnVol = false; rendre(); }
@@ -5287,6 +5319,51 @@ function vrmVerifVisible(sel) {
         srEtat = r && r.ok ? { ok: !(r.refus || []).length, texte: TU(Number(r.faits) === 1 ? 'sr_fait_1' : 'sr_fait', { n: Number(r.faits) || 0 }) + ((r.refus || []).length ? ' ' + TU('sr_refuses', { n: r.refus.length }) : '') } : { ok: false, texte: (r && r.raison) || TU('ra_ko') };
         rendre(); }); } catch (_) { srEnVol = false; rendre(); }
     });
+  }
+  // 5.440.3 : « Observer Vinted (10 min) » — l'interrupteur, l'état (minutes restantes, étapes notées) et « Envoyer
+  //    l'observation ». L'état est lu au fond (`vrmObservation`) ; la frise n'est jamais montrée ici (seulement dans VRM).
+  let obsVue = null, obsTexte = '', obsEnVol = false, obsLu = 0, obsRelire = null;
+  function lireObservation(forcer) {
+    if (!forcer && Date.now() - obsLu < 4000) return;
+    obsLu = Date.now();
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'observation', quoi: 'etat' }, (r) => {
+        void chrome.runtime.lastError;
+        if (!(r && r.ok)) return;
+        const avant = JSON.stringify(obsVue); obsVue = r;
+        if (JSON.stringify(obsVue) !== avant) rendre();
+      });
+    } catch (_) {}
+    clearTimeout(obsRelire);
+    if (obsVue && obsVue.actif) obsRelire = setTimeout(() => lireObservation(true), 5000);
+  }
+  function observationHtml(e) {
+    if (!e || e.plateforme !== 'vinted') return '';
+    lireObservation(false);
+    const o = obsVue, actif = !!(o && o.actif);
+    const reste = actif ? Math.max(1, Math.ceil((Number(o.fin) - Date.now()) / 60000)) : 0;
+    const sous = actif ? TU('ob_en_cours', { min: reste, n: o.n || 0 }) : o && o.n ? TU('ob_fini', { n: o.n }) : TU('ob_eteint');
+    return `<section class="grp5" data-observation="${actif ? 'on' : 'off'}" data-observation-n="${Number(o && o.n) || 0}"><h3>${esc(TU('ob_titre'))}</h3><p class="note5">${esc(TU('ob_note'))}</p>
+      <label class="rg6"><span><b>${esc(TU('ob_switch'))}</b><small data-obs-sous>${esc(sous)}</small></span><span class="v6"><input type="checkbox" data-obs-switch${actif ? ' checked' : ''}${obsEnVol ? ' disabled' : ''} aria-label="${esc(TU('ob_switch'))}"></span></label>
+      ${o && o.n ? `<div class="outils"><button type="button" class="vu-btn" data-obs-envoyer${obsEnVol ? ' disabled' : ''}>${esc(TU('ob_envoyer'))}</button></div>` : ''}
+      ${obsTexte ? `<p class="note5" role="status" data-obs-etat>${esc(obsTexte)}</p>` : ''}
+    </section>`;
+  }
+  function brancherObservation(R) {
+    const envoyerObs = (quoi, apres) => {
+      obsEnVol = true; obsTexte = ''; rendre();
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'observation', quoi }, (r) => {
+          void chrome.runtime.lastError; obsEnVol = false;
+          if (r && r.ok) { if (quoi !== 'envoyer') obsVue = r; apres(r); } else obsTexte = (r && r.raison) || TU('ob_ko');
+          lireObservation(true); rendre();
+        });
+      } catch (_) { obsEnVol = false; obsTexte = TU('ob_ko'); rendre(); }
+    };
+    const sw = R.querySelector('[data-obs-switch]');
+    if (sw) sw.addEventListener('change', () => envoyerObs(sw.checked ? 'demarrer' : 'arreter', () => {}));
+    const env = R.querySelector('[data-obs-envoyer]');
+    if (env) env.addEventListener('click', () => envoyerObs('envoyer', (r) => { obsTexte = TU('ob_envoye', { n: r.n || 0 }); }));
   }
   function cadenceHtml() {
     const c0 = listes && listes.automatisations && listes.automatisations.cadence;
@@ -6244,6 +6321,7 @@ function vrmVerifVisible(sel) {
       ${e.capte && !(e.plateforme === 'leboncoin' && e.lbc) ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}
       ${e.mesure ? `<div class="ligne"><div class="lib">Mesure</div><div class="val gris">VRM apprend à lire ${esc(nomSite)} : il relève la forme des pages, jamais leur contenu. Aucune vente ni annonce n'est encore captée.</div>${(() => { const f = e.flux || {}; return f.koAt && (!f.okAt || f.koAt > f.okAt) ? `<div class="val alerte">Dernier relevé refusé ${esc(depuis(f.koAt))}</div>` : f.okAt ? `<div class="val gris">Relevé envoyé ${esc(depuis(f.okAt))}</div>` : ''; })()}</div>` : ''}
       ${outils ? `<div class="outils">${outils}</div>` : ''}${rapTexte ? `<div class="rep" data-rapport-etat role="status">${esc(rapTexte)}</div>` : ''}
+      ${v && v.connecte ? observationHtml(e) : ''}
       </details>`;
     const lienVrm = (q, k) => `<a class="rg5" href="https://vrm.center/${q}" target="_blank" rel="noopener" data-reglage-vrm="${esc(k)}"><span>${esc(TU(k))}</span><i aria-hidden="true">›</i></a>`;
     const parametres5 = grand5 ? `<div class="par5" data-parametres>
@@ -6291,6 +6369,7 @@ function vrmVerifVisible(sel) {
     if (grand5) garderPanneau();
     brancherReparer();
     brancherRapport();
+    brancherObservation(carte);
     const det = carte.querySelector('[data-detail]');
     if (det) det.addEventListener('toggle', () => { if (resume.etat !== 'geste') detailOuvert = det.open; });
     brancherFavoris(e);
@@ -6911,7 +6990,10 @@ function vrmVerifVisible(sel) {
     if ((lienPanneau.action === 'masquer' || lienPanneau.action === 'afficher') && lienPanneau.ids.length && lienPanneau.ids.length <= 10) annConfirme = { k: lienPanneau.action, ids: lienPanneau.ids.slice() };
     // 5.432 (`prixpartout`) : « Changer le prix » d'une paire depuis l'app ⇒ la feuille du prix s'ouvre sur elle (ses autres
     //    sites lus par identité, « sur tous les sites » coché d'office) ; rien ne part avant SON « Lancer ».
-    else if (lienPanneau.action === 'changer' && lienPanneau.page === 'annonces' && lienPanneau.ids.length && lienPanneau.ids.length <= 20) { geste6 = { k: 'prix', ids: lienPanneau.ids.slice(0, 20), prix: {} }; annActionPre = 'baisser'; }
+    // 5.440.4 (25 nov.) : « Baisser » / « Remettre les prix » aussi — avant, l'action n'était que PRÉ-CHOISIE dans le menu, et
+    //    re-choisir l'option déjà choisie ne déclenche rien : il fallait passer par une autre option. La feuille du prix
+    //    s'ouvre donc sur la paire, comme « Changer » ; rien ne part avant SON « Revoir » puis « Lancer ».
+    else if ((lienPanneau.action === 'changer' || lienPanneau.action === 'baisser' || lienPanneau.action === 'remettre') && lienPanneau.page === 'annonces' && lienPanneau.ids.length && lienPanneau.ids.length <= 20) { geste6 = { k: 'prix', ids: lienPanneau.ids.slice(0, 20), prix: {}, lien: true }; annActionPre = 'baisser'; }
     else if (ACTION_MENU[lienPanneau.action]) annActionPre = ACTION_MENU[lienPanneau.action];
     if (lienPanneau.page === 'favoris' && lienPanneau.ids.length === 1) filtreAnnonce = lienPanneau.ids[0];
     if (lienPanneau.action === 'vacances') hote.setAttribute('data-lien-vacances', '');   // 5.420 : la section « Mode vacances » de Paramètres

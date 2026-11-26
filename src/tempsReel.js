@@ -36,8 +36,16 @@
 //     des lecteurs qu'elle réveille.
 // ════════════════════════════════════════════════════════════════════════════
 
-export const PERIODE_MS = 25000;
+// (25 nov., mise à jour sans relancer — Julien : « je dois fermer l'app et la rouvrir pour avoir les nouvelles infos »)
+// 25 s ⇒ 15 s : la sonde ne lit que des VERSIONS (scalaires, lignes écrites ces 10 dernières minutes, quelques centaines
+// d'octets) — 4 lectures légères par minute, onglet visible seulement.
+export const PERIODE_MS = 15000;
 export const PERIODE_REALTIME_MS = 120000;
+// Revenu au premier plan après au moins ce temps caché : la prise Realtime est rouverte d'office (iOS gèle une app de
+// l'écran d'accueil en arrière-plan ; sa prise peut se dire ouverte et ne plus rien recevoir).
+export const REPRISE_FORCEE_MS = 30000;
+// Deux sondes « au réveil » (retour au premier plan, focus, réseau revenu, signal du service worker) : au plus une par…
+export const REVEIL_MIN_MS = 2000;
 export const BUDGET_LIGNE_MS = 10000;
 export const FENETRE_MS = 10 * 60000;
 export const SEL_VEILLE = 'id,updated_at,cap:meta->>capturedAt,rev:meta->>rev,sup:meta->>supprime,pg:meta->>purgedAt';
@@ -77,13 +85,16 @@ const REGLES = [
   // sur une relecture (aucune boucle).
   [/^email_track_[a-z0-9]{1,30}_[A-Za-z0-9_.-]{1,120}$/, 'colis'],
   [/^panel_colis_relais$/, 'retrait'],
+  // (23 nov., lot retours-suivi) Un e-mail de RETOUR d'achat rangé par le serveur (bordereau de retour, « Retourne ta
+  // commande », remboursement) : Achats → « À renvoyer » relit ses retours (projection scalaire) ; l'app n'écrit jamais ces lignes.
+  [/^email_(?:bordretour|retourdemande|rembachat)_[A-Za-z0-9_.-]{1,80}$/, 'retours'],
   // (23 nov., « tous les colis en temps réel » — Julien) Un BORDEREAU reçu par e-mail (`email_bord_{tx}`, écrit par
   // api/email-inbound.js) : Colis / Ventes / Ma journée relisent la liste des bordereaux (`fetchEmailBordereaux`,
   // scalaires) — sans ceci, une vente à expédier arrivée pendant que l'écran est ouvert n'y paraissait qu'en
   // changeant d'écran. Relire n'écrit rien (aucune boucle).
   [/^email_bord_[A-Za-z0-9_.-]{3,80}$/, 'bordereaux'],
 ];
-const SANS_COMPTE = new Set(['transp', 'lbc', 'vestiaire', 'emails', 'colis', 'retrait', 'bordereaux']);
+const SANS_COMPTE = new Set(['transp', 'lbc', 'vestiaire', 'emails', 'colis', 'retrait', 'retours', 'bordereaux']);
 export function quoiDe(id) {
   const s = String(id == null ? '' : id);
   for (const [re, quoi] of REGLES) { const m = re.exec(s); if (m) return { quoi, uid: SANS_COMPTE.has(quoi) ? null : m[1] }; }
@@ -238,6 +249,18 @@ export function ouvrirCanal({ url, cleApi, jeton, uid, surLigne, surEtat = () =>
   }
   ouvrir();
   return {
+    // (25 nov.) L'app revient au premier plan : une prise fermée (ou en attente de reprise, jusqu'à 5 min) est rouverte
+    // TOUT DE SUITE ; `force` la rouvre même « ouverte » (gelée par iOS, elle ne reçoit plus rien). Refusée (pas de
+    // migration 040, droits) : rien.
+    reprendre({ force = false } = {}) {
+      if (ferme || refuse) return;
+      const ouverte = !!(ws && ws.readyState === 1);
+      if (ouverte && !force) return;
+      if (reprise) { annuler(reprise); reprise = null; }
+      essais = 0;
+      if (ws) { const w = ws; ws = null; nettoyer(); try { w.onclose = null; w.close(); } catch (_) {} }
+      ouvrir();
+    },
     fermer() { ferme = true; nettoyer(); if (reprise) { annuler(reprise); reprise = null; } try { if (ws) ws.close(); } catch (_) {} ws = null; poser('ferme'); },
     etat: () => etat,
   };

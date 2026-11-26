@@ -95,7 +95,7 @@ export default function AnnoncesLeboncoin({outils=null,annonces=[],ventes={},lec
      </span>
      <b className="vrm-ui-ligne-valeur">{euros(ad.price)}</b>
      <DansFiche cle={fl['data-fiche-ligne']}><span className="vrm-pf-gestes">{lien&&<a href={lien} target="_blank" rel="noreferrer" aria-label={`Gérer l’annonce : ${ad.subject||ad.title||ad.id}`} title="Gérer sur Leboncoin"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 17 17 7M7 7h10v10"/></svg></a>}
-     {typeof onSupprimer==='function'&&SUPPRIMABLE.has(etat)&&ad.status!=='deleted'&&<button type="button" data-lbc-supprimer={ad.id} disabled={!!enVol} onClick={()=>onSupprimer({id:String(ad.id),numero:num,title:ad.subject||ad.title||'',prix:ad.price})} aria-label={`${tr('actionsExt.supprimer')} : ${ad.subject||ad.title||ad.id}`} data-vrm-panneau="supprimer" data-vrm-panneau-site="leboncoin">{tr('actionsExt.supprimer')}</button>}</span></DansFiche>
+     {typeof onSupprimer==='function'&&SUPPRIMABLE.has(etat)&&ad.status!=='deleted'&&<button type="button" data-lbc-supprimer={ad.id} disabled={!!enVol} onClick={()=>onSupprimer({id:String(ad.id),compte:String(ad.account||ad.lbcUser||''),numero:num,title:ad.subject||ad.title||'',prix:ad.price})} aria-label={`${tr('actionsExt.supprimer')} : ${ad.subject||ad.title||ad.id}`} data-vrm-panneau="supprimer" data-vrm-panneau-site="leboncoin">{tr('actionsExt.supprimer')}</button>}</span></DansFiche>
      <span className="sb-avant-place" data-sb-avant-place=""/>
     </li>;}}/></ul>}
    <PaireAvantSiteHote site="leboncoin" achatDe={achatDe}/>

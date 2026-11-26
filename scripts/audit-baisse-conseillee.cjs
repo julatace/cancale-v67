@@ -166,13 +166,21 @@ const MUTATIONS = [
   let ko = await controles(SRC, true);
   // H — l'app (lue en texte, commentaires retirés)
   const sans = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"\\])\/\/[^\n]*/g, '$1');
+  const PORTE = require('./_porte-agir.cjs');
   const APP = sans(lire('src/App.jsx')), F = sans(lire('src/BaissesConseillees.jsx')), BPS = '';   // (20 nov.) la feuille de baisse en série est retirée : la baisse se fait dans l'extension
   const dit = (c, m) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m); };
   dit(/baisseConseillee\(\{ conseil: c,/.test(APP) && /commeConseil\(d, tr\)/.test(APP), 'H1 la carte `conseilsPrix` (fiche, repricing, qui dorment) passe par la règle');
   dit(/cible: l\.d\.sugg/.test(APP) && /setBaisseSel\(l2\.map/.test(APP), 'H2 « Appliquer » ouvre la baisse en série EXISTANTE avec le prix conseillé');
   dit(F.length > 0 && !/vmrCmd|fetch\(|baisserPrixVinted/.test(F), 'H3 la feuille « Baisses conseillées » n\'envoie rien elle-même');
   void BPS;
-  dit(/<FeuilleAnnoncesExtension action="baisser" annonces=\{baisseSel\}/.test(APP) && /a\.cible != null \? '→ ' \+ prixLigneExt\(a\.cible\)/.test(APP), 'H4 (20 nov.) « Appliquer » montre les cibles et ouvre « Baisser dans l’extension » sur ces annonces');
+  // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) « Appliquer » ouvre la baisse en série DEPUIS VRM : chaque annonce
+  // montre SA cible (« prix → cible ») et part au nom de SON compte, par la porte ; un compte pas connecté reste en lecture
+  // seule (sa raison sur sa ligne), rien ne part pour lui.
+  { const BS = sans(lire('src/agir/BaisseSerie.jsx'));
+    const r = await PORTE.regle({ code: (APP.match(/<BaisseSerie annonces=\{baisseSel\}[^\n]*/) || [''])[0] + '\n' + BS,
+      porte: /<BaisseSerie annonces=\{baisseSel\}[\s\S]*const v = agirMaintenant\('vinted', a\.uid, 'baisser', 'file'\);[\s\S]*const vers = x >= 1 && x <= 90 \? prixBaisse\(a\.prix, x\) : cibleDe\(a\);[\s\S]*const partent = l\.filter\(\(r\) => r\.v\.ok && r\.vers != null\);[\s\S]*envoyerSerie\('baisser', 'prix', partent\.map\(\(p\) => \(\{ site: 'vinted', compte: p\.a\.uid, id: p\.a\.id[\s\S]*args: \{ id: String\(p\.a\.id\), prix: p\.vers/,
+      repli: /sousTitre=\{v\.ok \? \(a\.compte \|\| ''\) : texteRaison\(v\)\}[\s\S]*valeur=\{vers != null \? `\$\{eur\(a\.prix\)\} → \$\{eur\(vers\)\}`/ });
+    dit(r.ok, 'H4 (24 nov.) « Appliquer » montre les cibles et les baisse DEPUIS VRM, annonce par annonce, par la porte ; pas connecté ⇒ lecture seule' + (r.ok ? '' : ' — ' + r.detail)); }
   dit(/lireExtrasRepartition\(\)/.test(APP) && /indexComparables\(ventesComparablesDuReleve\(/.test(APP), 'H5 les comparables viennent de SES ventes (la lecture partagée de Statistiques)');
   let koM = 0;
   if (PROUVE && fs.existsSync(path.join(SRC, 'baisseConseillee.js'))) {

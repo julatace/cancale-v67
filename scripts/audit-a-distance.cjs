@@ -52,6 +52,7 @@ async function chargerApp(texte) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'a-distance-'));
   fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
   fs.writeFileSync(path.join(dir, 'aDistance.js'), texte);
+  fs.copyFileSync(path.join(RACINE, 'src', 'compatSafari.js'), path.join(dir, 'compatSafari.js'));   // (24 nov.) son seul import
   try { return await import(pathToFileURL(path.join(dir, 'aDistance.js')).href); }
   finally { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {} }
 }

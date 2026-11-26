@@ -119,7 +119,10 @@ async function controles(SRC, APP, parler) {
   dit(/liste=\{listings\.items==null \? null : listeDormantes\}/.test(A) && /onGeste=\{/.test(A) && /onPrixAchat=\{\(a\)=>saisirPrixAnnonce\(a\.it\)\}/.test(A), 'E3 la vue reçoit la liste, le geste et « Prix d’achat ? » (la saisie existante)');
   dit(/onPrixAchat=\{\(pp\)=>\{ if \(pp && pp\.idFiche\) setAchatFiche/.test(A) && /<FeuillePrixAchat ventes=\{\[achatFiche\]\} onEnregistrer=\{poserPrixAchatVente\} onFermer=\{\(\)=>setAchatFiche\(null\)\} Feuille=\{SheetShellSurFiche\}/.test(A), 'E4 la fiche : « Saisir » ouvre « Combien tu l’avais payée ? » sur SA fiche (même écriture que la saisie rapide)');
   // (20 nov., décision de Julien) « Baisser à X € » : dans le PANNEAU de l'extension, sur CETTE annonce.
-  dit(/baisser: \(\)=>\{ fermer\(\); ouvrirPanneau\(\{ site: 'vinted', page: 'prix', ids: \[String\(it\.id\)\], action: 'baisser' \}\); \}/.test(A), 'E5 (20 nov.) « Baisser à X € » ouvre « Baisser dans l’extension » sur CETTE annonce');
+  // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) « Baisser à X € » reste au panneau, lui-même gardé par la porte :
+  // au nom du compte de CETTE annonce, sur CETTE annonce ; pas connecté ⇒ rien ne s'ouvre, la raison est dite.
+  { const r = require('./_porte-agir.cjs').panneauGarde({ code: A, appel: /baisser: \(\)=>\{ fermer\(\); ouvrirPanneau\(\{ site: 'vinted', compte: uidIt, page: 'prix', ids: \[String\(it\.id\)\], action: 'baisser' \}\); \}/ });
+    dit(r.ok, 'E5 (24 nov.) « Baisser à X € » : le panneau GARDÉ par la porte, au nom de SON compte, sur CETTE annonce' + (r.ok ? '' : ' — ' + r.detail)); }
   dit(/fusionEntreeVente\(e, null, buyByNum\)/.test(A.slice(A.indexOf('const listeDormantes'), A.indexOf('const listeDormantes') + 3000)), 'E6 le prix d’achat de la liste est lu comme partout (`fusionEntreeVente`)');
   return ko;
 }

@@ -58,7 +58,10 @@ async function verifier(SRC, BG) {
   r = ch({ reglage: { un: [{ id: 'u1', texte: 'Bonjour {prénom}' }] }, fav: Object.assign({}, fav, { pseudo: 'jean.dupont' }) });
   dit(r.ok && r.version.texte === 'Bonjour jean.dupont', 'P2 {prénom} n’est pas le pseudo lu (prénom inventé ?) : ' + JSON.stringify(r.version && r.version.texte));
   r = ch({ reglage: { un: [{ id: 'u1', texte: 'Bonjour {prénom}' }] }, fav: Object.assign({}, fav, { pseudo: '' }) });
-  dit(!r.ok && r.raison === 'variable', 'P2 sans pseudo lu, {prénom} part quand même (trou)');
+  // 5.450 (coordinateur, simulations F1P) : sans pseudo lu, la version NEUTRE part (le même texte sans le pseudo) — jamais un nom.
+  dit(r.ok && r.neutre === true && r.version.texte === 'Bonjour' && !/[{}]/.test(r.version.texte), 'P2 sans pseudo lu : la version neutre, sans nom ni accolade : ' + JSON.stringify(r.version && r.version.texte));
+  r = ch({ reglage: { un: [{ id: 'u1', texte: 'Bonjour {prénom}, la {marque} ?' }] }, fav: Object.assign({}, fav, { pseudo: '', marque: '' }) });
+  dit(!r.ok && r.raison === 'variable', 'P2 un AUTRE manque que le pseudo ({marque}) refuse toujours');
   r = ch({ reglage: { un: [{ id: 'u1', texte: 'La {marque} ?' }, { id: 'u2', texte: 'Elle te plaît ?' }] }, fav: Object.assign({}, fav, { marque: '' }), hasard: () => 0 });
   dit(r.ok && r.version.cle === 'u2', 'P2 une version à {marque} pas sue n’est pas sautée');
   r = ch({ reglage: { un: [{ id: 'u1', texte: 'Remise {remise}' }, { id: 'u2', texte: 'Coucou' }] }, fav, offre: null });
