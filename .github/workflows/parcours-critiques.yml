@@ -143,9 +143,17 @@ jobs:
           NODE_OPTIONS: --require=${{ github.workspace }}/scripts/bancs/_garde-reseau.cjs
       - name: Préparer le moteur PDF de contrôle
         run: |
-          mkdir -p "$RUNNER_TEMP/vrm-pdfjs"
-          curl --fail --silent --show-error https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js --output "$RUNNER_TEMP/vrm-pdfjs/pdf.min.js"
-          curl --fail --silent --show-error https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js --output "$RUNNER_TEMP/vrm-pdfjs/pdf.worker.min.js"
+          # (26 nov., zero-rouge-bancs) Un seul essai vers jsDelivr faisait tomber le job (« curl: (35) TLS connect error … unexpected
+          # eof », #1433). Source : le paquet npm (registry.npmjs.org, celui de npm ci, réessais de npm) — mêmes fichiers, mêmes
+          # empreintes (vérifié le 26 nov.) ; secours : jsDelivr, avec réessais. L'empreinte juge toujours ce qui est posé.
+          mkdir -p "$RUNNER_TEMP/vrm-pdfjs" "$RUNNER_TEMP/vrm-pdfjs-paquet"
+          if (cd "$RUNNER_TEMP/vrm-pdfjs-paquet" && npm pack pdfjs-dist@3.11.174 --silent && tar -xzf pdfjs-dist-3.11.174.tgz package/build/pdf.min.js package/build/pdf.worker.min.js); then
+            cp "$RUNNER_TEMP/vrm-pdfjs-paquet/package/build/pdf.min.js" "$RUNNER_TEMP/vrm-pdfjs-paquet/package/build/pdf.worker.min.js" "$RUNNER_TEMP/vrm-pdfjs/"
+          else
+            for f in pdf.min.js pdf.worker.min.js; do
+              curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/$f" --output "$RUNNER_TEMP/vrm-pdfjs/$f"
+            done
+          fi
           (cd "$RUNNER_TEMP/vrm-pdfjs" && sha256sum -c "$GITHUB_WORKSPACE/scripts/pdfjs-test.sha256")
           echo "VRM_PDFJS_DIR=$RUNNER_TEMP/vrm-pdfjs" >> "$GITHUB_ENV"
         env:
