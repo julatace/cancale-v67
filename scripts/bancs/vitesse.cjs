@@ -385,7 +385,9 @@ const PLAFONDS = { journee: 62, cat_ventes: 82, cat_bord: 82, cat_annonces: 66, 
 const ECRANS = [
   // (6 nov., vitesse 2) `data-vendu-mois` n'est plus rendu par l'écran actuel (rouge d'avant, voir la
   // passation du 6 nov.) : le premier écran UTILE est aussi « <montant> € · Vendu · mois » écrit.
-  ['journee', () => !!document.querySelector('[data-vendu-mois],[data-vendu-pas-su]') || /\d\s?€\s*Vendu · mois/.test(document.body.innerText) || /pas pu s'afficher/.test(document.body.innerText)],
+  // (26 nov., vitesse-webkit) « · » est collé au mot d'avant par une espace insécable depuis le 23 nov. (483a41d39,
+  // CarteMois) : « Vendu\u00a0· mois » — la règle lit toute espace (\s), jamais l'espace ordinaire seule.
+  ['journee', () => !!document.querySelector('[data-vendu-mois],[data-vendu-pas-su]') || /\d\s?€\s*Vendu\s·\s*mois/.test(document.body.innerText) || /pas pu s'afficher/.test(document.body.innerText)],
   ['cat_ventes', () => document.querySelectorAll('[data-vente],[data-tx]').length > 0 || /\d+ ventes/.test(document.body.innerText), 'input[aria-label="Rechercher dans les ventes Vinted"]'],
   ['cat_bord', () => /bordereau/i.test(document.body.innerText)],
   ['cat_annonces', () => /en ligne/i.test(document.body.innerText), 'input[aria-label="Rechercher une annonce"]'],
