@@ -105,7 +105,8 @@ const imp = async (f) => { try { return await import('file://' + path.join(R, f)
     'prix Vinted absent ⇒ 0': {},
     '(+x.prix || 0)': {},
     'Number(valeur(m)) || 0': {},
-    'médiane = élément du haut': {},
+    // (26 nov., photos en un geste) la médiane des PIXELS du bord d'une photo (couleur du fond) : pas un montant, pas un « pas su ».
+    'médiane = élément du haut': { 'src/ameliorerPhoto.js': 1 },
   };
   const textes = fichiers(path.join(R, 'src')).map((f) => [((r) => (r === 'src/ecrans/Comptabilite.jsx' ? 'src/App.jsx' : r))(path.relative(R, f).split(path.sep).join('/')), sansCommentaires(fs.readFileSync(f, 'utf8'))]);   // (22 nov.) Comptabilite = App.jsx découpé
   for (const [nom, re] of Object.entries(MOTIFS)) {
