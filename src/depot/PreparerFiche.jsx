@@ -9,6 +9,7 @@
 import React from 'react';
 import { Feuille, Groupe, Rangee, Bouton, ListeOrdonnee, Champ } from '../natif/index.js';
 import { tr } from '../i18n/index.js';
+import { motsVendeur } from '../profilVendeur.js';   // (26 nov.) exemples de Sneakers seulement chez qui vend des sneakers
 import { ETATS_DEPOT, COLIS_DEPOT, CHAMPS_DEPOT, manquesDepot, ordrePhotos, descriptionProposee, couleursDe } from './regles.js';
 import './preparer.css';
 
@@ -74,9 +75,9 @@ export default function PreparerFiche({ fiche, lireStudio, modeles = [], onEnreg
         <div className="prep-champs">
           {champ('titre')}
           {champ('marque')}
-          {champ('modele', { placeholder: tr('depot.modeleEx') })}
+          {champ('modele', { placeholder: motsVendeur().nom === 'paire' ? tr('depot.modeleEx') : tr('depot.modeleEx.neutre') })}
           {champ('taille', { placeholder: '42' })}
-          {champ('categorie', { placeholder: tr('depot.categorieEx') })}
+          {champ('categorie', { placeholder: motsVendeur().nom === 'paire' ? tr('depot.categorieEx') : tr('depot.categorieEx.neutre') })}
           {champ('prix', { inputMode: 'decimal', suffixe: '€' })}
         </div>
       </Groupe>

@@ -83,6 +83,7 @@ export default {
   "ia.vm.sous": "El N°, luego el precio: el par sale del stock.",
   "ia.vm.numeroLib": "N° o búsqueda",
   "ia.vm.numeroExemple": "124, B125 o «dunk 42»",
+  "ia.vm.numeroExemple.neutre": "124, B125 o «lámpara»",
   "ia.vm.aucune": "Ningún par con el N°{num} en tus anuncios.",
   "ia.vm.plusieurs": {"one": "El N°{num} lo lleva {n} par: ¿cuál?", "other": "{n} pares llevan el N°{num}: ¿cuál vendiste?"},
   "ia.vm.propositions": "Propuestos por el título: toca el bueno.",

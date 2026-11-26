@@ -53,13 +53,33 @@ const PERMIS = [
   // montrées seulement pour un article de cette catégorie, le texte est celui de Vestiaire.
   ...['fr', 'en', 'es', 'it', 'de'].map((l) => [`src/i18n/langues/${l}.js`, /^"vcPhotos\.vue\.(semelle|pointure)"/, 'photo exigée par Vestiaire pour la catégorie chaussures, montrée pour cette catégorie seulement', 'ligne']),
   ['src/aideFiches.js', /^'(la mauvaise chaussure)'$/, 'côté Sneakers de la table de mots (remplacé par « le mauvais article » hors Sneakers)'],
+  // ── (26 nov., zero-rouge-audits) Nommés un par un, chacun lu. ──
+  // Les CATALOGUES des sites : libellés EXACTS servis par Leboncoin, Vestiaire, eBay, Vinted (catégories, chemins, critères),
+  // modules PURS de correspondance (publier-agent, 19 nov.) — une catégorie « Chaussures » y vit à côté des autres, et n'est
+  // proposée que pour un article de cette catégorie. Ce ne sont ni des exemples ni des phrases de VRM.
+  ['src/correspondances.js', /./, 'catalogues des sites (LBC_RUBRIQUES, LBC_VALEURS, TABLE_VINTED, requêtes eBay) : libellés exacts des sites'],
+  ['src/publier/tables.js', /./, 'catégories VRM neutres ⇄ catégories des sites (familles chaussures/vêtements/…), données de correspondance'],
+  ['src/publier/listes.js', /./, 'listes COMPLÈTES du catalogue de dépôt Vestiaire et des marques Leboncoin (relevées sur le site)'],
+  ['src/publier/agent.js', /^'Pointure EU'$/, 'nom du champ LU dans l’annonce eBay (`localizedAspects`) : une clé du site, jamais affichée'],
+  ['src/publierPartout.js', /^'Pointure'$/, 'nom du champ Leboncoin, seulement quand la catégorie LBC est une catégorie chaussure (`/chaussure/` sur la même ligne)'],
+  ...['fr', 'en', 'es', 'it', 'de'].map((l) => [`src/i18n/langues/${l}/publierAgent.js`, /^"agent\.(type\.[\w-]+|champ\.pointure)"/, 'nom d’une catégorie VRM (famille chaussures parmi les autres) et le champ « Pointure » d’un article de cette catégorie (PublierAgent ne le liste hors Sneakers que si l’article en porte une)', 'ligne']),
+  ...['fr', 'en', 'es', 'it', 'de'].map((l) => [`src/i18n/langues/${l}/arrivee.js`, /^"arr\.cat\.baskets"/, 'une des catégories proposées à l’arrivée d’un achat (Baskets, Vêtements, Sacs, Accessoires, Autre) : un choix, comme « Sneakers » dans Réglages', 'ligne']),
+  ['src/i18n/langues/fr/correspondances.js', /^"corr\.champ\.pointure(EU)?"/, 'nom du champ pointure d’une correspondance, montré seulement quand la fiche porte ce champ (catégorie chaussure)', 'ligne'],
+  ['src/i18n/langues/fr/plus.js', /^"plus\.(aide\.manque\.semelle|sujet\.mesures)"/, 'clés appelées par leur nom calculé : AideReponse.jsx écarte la semelle hors Sneakers (`sn`) et dit « mesures ? » (`.neutre`)', 'ligne'],
+  ['src/infosPaire.js', /^'Longueur de semelle : \{v\} cm\.'$/, 'phrase de la semelle saisie : le champ n’existe que chez Sneakers (InfosPaire.jsx, `sn`), AideReponse l’écarte sinon'],
+  ['src/autreTaille/autreTaille.js', /^'\(\?:taille\|pointure/, 'expression de lecture d’un titre (aucun texte affiché)'],
+  ['src/ventes/marqueTaille.js', /^'\(\?:\^\|\[\^a-z0-9\]\)\(\?:taille\|pointure/, 'expression de lecture d’un titre (aucun texte affiché)'],
+  ['src/questionsFrequentes.js', /^'semelle interieure'$/, 'mot-clé RECONNU dans la question d’un acheteur (lecture), jamais affiché'],
+  ['src/recherchePhrase.js', /^'le la les l de du des d un une /, 'mots vides de la recherche (lecture d’une phrase), jamais affichés'],
+  ['src/rechercheReglages.js', /^'vends sneakers vetements categorie'$/, 'mots-clés qui retrouvent le réglage « Je vends » dans la recherche (jamais affichés)'],
 ];
 const MOTS = /\b(chaussures?|baskets?|sneakers?|pointures?|semelles?|lacets?)\b/i;
 // Les exemples de baskets (S3) et les fichiers qui ne contiennent que des LISTES de lecture
 // (marques, modèles : reconnaître un titre) ou la démo publique de l'accueil (pour Julien).
 // (16 nov.) Bornes en LETTRES Unicode : « añadidas » (es) n'est pas « adidas » (\b de JS ne voit pas « ñ » comme une lettre).
 const MARQUES_BASKET = /(?<![\p{L}\d])(nike|adidas|air ?max|spezial|salomon|gel-lyte|p-6000|jordan|new balance|asics|samba|dunk)(?![\p{L}\d])/iu;
-const MARQUES_PERMIS_FICHIERS = ['src/vocabulaireVendeur.js', 'src/etiquetteNumero.js', 'src/ceQuiRapporte.js', 'src/agentEbay.js', 'src/repereEbay.js', 'src/accueil-demo.js', 'src/exempleDonnees.js', 'src/dejaEnStock.js', 'src/remiseEnLigne.js'];
+// (26 nov.) + src/publier/listes.js : les marques du catalogue Vestiaire et de Leboncoin, relevées sur les sites (listes de lecture).
+const MARQUES_PERMIS_FICHIERS = ['src/publier/listes.js', 'src/vocabulaireVendeur.js', 'src/etiquetteNumero.js', 'src/ceQuiRapporte.js', 'src/agentEbay.js', 'src/repereEbay.js', 'src/accueil-demo.js', 'src/exempleDonnees.js', 'src/dejaEnStock.js', 'src/remiseEnLigne.js'];
 const sansCom = (s) => s.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).split('\n').map((l) => (/^\s*\/\//.test(l) ? '' : l.replace(/(^|[^:'"`\\])\/\/\s.*$/, '$1'))).join('\n');
 const fichiersSrc = (racine) => { const out = []; const w = (d) => { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); if (f.isDirectory()) w(p); else if (/\.jsx?$/.test(f.name)) out.push(p); } }; w(path.join(racine, 'src')); return out; };
 
@@ -161,6 +181,7 @@ async function verifier(racine, { muet = false } = {}) {
         if (/(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)|nom === 'paire'|\b(?:sn|snEx|sneakers) \?/.test(l)) continue;
         { const k = cleDeLigneDico(rel, l); if (k && cleGardee(k)) continue; }
         if (lits.length >= 4 && !/placeholder|titre=|title=|setErreur/.test(l)) continue;   // une liste de lecture (marques, modèles)
+        if (rel === 'src/liaisonAchat.js' && x === "'air jordan'" && /^US_EU\.jordan = US_EU\.nike; US_EU\['air jordan'\] = US_EU\.nike;$/.test(l.trim())) continue;   // (26 nov.) clé de la table des pointures US→EU par marque (lecture d'un titre), pas un exemple
         if (rel === 'src/FacturePro.jsx' && /^'Nike Air Max 90 — taille 42 \(exemple\)'$/.test(x) && /deps\.vendActuel\(\) !== 'sneakers'/.test(l0(f))) continue;   // remplacé hors Sneakers
         marques.push(`${rel}:${i + 1} ${x.slice(0, 90)}`);
       }
@@ -211,7 +232,8 @@ async function verifier(racine, { muet = false } = {}) {
     ['src/configurationDepart.js', 'trois cartes d’affichage', "  { v: 'complet', titre: 'Complet',", "  { v: 'auto', titre: 'Laisser VRM choisir', pourQui: 'x', apercu: 1, puces: [{ ic: 'menu', t: 'a' }, { ic: 'menu', t: 'b' }, { ic: 'menu', t: 'c' }] },\n  { v: 'complet', titre: 'Complet',"],
     ['src/App.jsx', 'note : l’exemple de chaussure remis', 'placeholder: exemplesActuels().note,', "placeholder: 'ex : petite tache semelle gauche',"],
     ['src/App.jsx', 'recherche : « une paire » pour tous', "aria-label={mobile ? 'Rechercher : N°, pseudo, suivi, code, titre' : `Rechercher ${motsArticle(PROFIL_VENDEUR.vend || vendActuel()).un}`}", "aria-label={mobile ? 'Rechercher : N°, pseudo, suivi, code, titre' : 'Rechercher une paire'}"],
-    ['src/App.jsx', '« Pointure » pour tous', "placeholder={motTaille(vendActuel())} inputMode=\"decimal\"", 'placeholder="Pointure" inputMode="decimal"'],
+    ['src/ecrans/Comptabilite.jsx', '« Pointure » pour tous',   // (26 nov.) le champ a déménagé avec la découpe d'App.jsx
+     "placeholder={motTaille(vendActuel())} inputMode=\"decimal\"", 'placeholder="Pointure" inputMode="decimal"'],
     ['src/aTrancher.js', '« sur leurs cartons » remis', "à écrire là où ${pl(n, 'l’article est rangé', 'les articles sont rangés')}`", "à écrire sur ${pl(n, 'son carton', 'leurs cartons')}`"],
     ['src/PreparerColis.jsx', '« vérifie sur son carton » remis', '`Le N°${n} est à vérifier là où l’article est rangé.`', '`Le N°${n} est à vérifier sur son carton.`'],
     ['src/ecrans/Stock.jsx', 'Stock : « Paires » pour tous', '<StatBox label={motsStock.noms.charAt(0).toUpperCase() + motsStock.noms.slice(1)} value={counts.all}/>', '<StatBox label="Paires" value={counts.all}/>'],

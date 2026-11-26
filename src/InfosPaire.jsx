@@ -10,13 +10,15 @@
 // ══════════════════════════════════════════════════════════════════════════════
 import React, { useState } from 'react';
 import { tr, langueCourante } from './i18n/index.js';
+import { motsVendeur } from './profilVendeur.js';   // (26 nov.) exemples de Sneakers seulement chez qui vend des sneakers
 import { Feuille } from './ui/Feuille.jsx';
 import { semelleCm, cmTexte } from './infosPaire.js';
 import './styles-aide-reponse.css';
 
 export function InfosPaireVue({ infos = null, onEditer = null, numero = '' }) {
+  const sn = motsVendeur().nom === 'paire';   // la semelle : Sneakers seulement
   if (infos && infos.cachee) return <p className="vrm-plus-vide" data-infos-paire="cachee">{tr('plus.infos.cachees')}</p>;
-  const morceaux = infos ? [infos.taille ? `${tr('plus.infos.taille')} : ${infos.taille}` : '', infos.defauts ? `${tr('plus.infos.defauts')} : ${infos.defauts}` : '', infos.semelle != null ? tr('plus.aide.puceSemelle', { cm: cmTexte(infos.semelle, langueCourante()) }) : ''].filter(Boolean) : [];
+  const morceaux = infos ? [infos.taille ? `${tr('plus.infos.taille')} : ${infos.taille}` : '', infos.defauts ? `${tr('plus.infos.defauts')} : ${infos.defauts}` : '', (sn ? infos.semelle != null : false) ? tr('plus.aide.puceSemelle', { cm: cmTexte(infos.semelle, langueCourante()) }) : ''].filter(Boolean) : [];
   if (!onEditer && !morceaux.length) return null;
   return (
     <button type="button" className="vrm-ui-ligne" data-infos-paire={morceaux.length ? 'lues' : 'ajout'} data-infos-num={numero || undefined} onClick={onEditer || undefined} disabled={!onEditer}>
@@ -25,7 +27,7 @@ export function InfosPaireVue({ infos = null, onEditer = null, numero = '' }) {
       </span>
       <span className="vrm-ui-ligne-textes">
         <span className="vrm-ui-ligne-titre"><span>{tr('plus.infos.titre')}</span></span>
-        <span className="vrm-ui-ligne-sous">{morceaux.length ? morceaux.join(' · ') : tr('plus.infos.ajouter')}</span>
+        <span className="vrm-ui-ligne-sous">{morceaux.length ? morceaux.join(' · ') : sn ? tr('plus.infos.ajouter') : tr('plus.infos.ajouter.neutre')}</span>
       </span>
       <svg className="vrm-ui-chevron" width="8" height="14" viewBox="0 0 8 14" aria-hidden="true"><path d="m1.5 1.5 5 5.5-5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
     </button>
@@ -36,7 +38,8 @@ export function InfosPaireFeuille({ valeur = null, numero = '', onEnregistrer, o
   const [taille, setTaille] = useState((valeur && valeur.taille) || '');
   const [defauts, setDefauts] = useState((valeur && valeur.defauts) || '');
   const [semelle, setSemelle] = useState(valeur && valeur.semelle != null ? cmTexte(valeur.semelle, langueCourante()) : '');
-  const semelleKo = String(semelle).trim() !== '' && semelleCm(semelle) == null;
+  const sn = motsVendeur().nom === 'paire';   // la semelle : Sneakers seulement (gardée telle quelle sinon)
+  const semelleKo = sn && String(semelle).trim() !== '' && semelleCm(semelle) == null;
   return (
     <Feuille titre={numero ? tr('plus.infos.titreNum', { n: numero }) : tr('plus.infos.titre')} onClose={onClose} data-infos-feuille="" className="vrm-ui-feuille vrm-plus-feuille">
       <p className="vrm-plus-desc">{tr('plus.infos.desc')}</p>
@@ -44,11 +47,9 @@ export function InfosPaireFeuille({ valeur = null, numero = '', onEnregistrer, o
         <input data-infos-champ="taille" value={taille} maxLength={160} placeholder={tr('plus.infos.tailleEx')} onChange={(e) => setTaille(e.target.value)}/>
       </label>
       <label className="vrm-plus-champ">{tr('plus.infos.defauts')}
-        <input data-infos-champ="defauts" value={defauts} maxLength={160} placeholder={tr('plus.infos.defautsEx')} onChange={(e) => setDefauts(e.target.value)}/>
+        <input data-infos-champ="defauts" value={defauts} maxLength={160} placeholder={sn ? tr('plus.infos.defautsEx') : tr('plus.infos.defautsEx.neutre')} onChange={(e) => setDefauts(e.target.value)}/>
       </label>
-      <label className="vrm-plus-champ">{tr('plus.infos.semelle')}
-        <input data-infos-champ="semelle" inputMode="decimal" value={semelle} maxLength={6} placeholder={tr('plus.infos.semelleEx')} onChange={(e) => setSemelle(e.target.value)}/>
-      </label>
+      {sn ? <label className="vrm-plus-champ">{tr('plus.infos.semelle')}<input data-infos-champ="semelle" inputMode="decimal" value={semelle} maxLength={6} placeholder={tr('plus.infos.semelleEx')} onChange={(e) => setSemelle(e.target.value)}/></label> : null}
       {semelleKo ? <p className="vrm-plus-erreur" role="status">{tr('plus.infos.semelleKo')}</p> : null}
       <div className="vrm-plus-actions">
         <button type="button" className="vrm-plus-principal" data-infos-enregistrer="" disabled={semelleKo}
