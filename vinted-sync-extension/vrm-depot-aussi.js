@@ -299,13 +299,13 @@
       if (!(k in friseEtat)) continue;
       const s = document.createElement('span'); s.setAttribute('data-aussi-etape', k); s.setAttribute('data-etat', friseEtat[k]);
       s.textContent = (friseEtat[k] === 'ok' ? '✓ ' : friseEtat[k] === 'ko' ? '✕ ' : '… ') + (NOM[k] || 'Publier');
-      s.style.cssText = 'padding:2px 8px;border-radius:999px;background:' + (friseEtat[k] === 'ok' ? '#E6F4EA' : friseEtat[k] === 'ko' ? '#FFF4DD' : '#F2F2F7') + ';color:' + (friseEtat[k] === 'ko' ? '#8A4B00' : '#111114');
+      s.style.cssText = 'padding:2px 8px;border-radius:999px;background:' + (friseEtat[k] === 'ok' ? '#E6F4EA' : friseEtat[k] === 'ko' ? '#ECEFF3' : '#F2F2F7') + ';color:' + (friseEtat[k] === 'ko' ? '#3D4B5B' : '#111114');
       frise.appendChild(s);
     }
     if (issue) {
       const p = document.createElement('p'); p.setAttribute('data-aussi-issue', issue.etat);
       p.textContent = issue.etat === 'publiee' ? 'Publiée — l’annonce est reliée à son N° dans VRM.' : (issue.etat === 'pas-su' ? 'À vérifier : ' : 'Arrêté avant « Publier » : ') + issue.raison;
-      p.style.cssText = 'flex-basis:100%;margin:2px 0 0;padding:6px 10px;border-radius:10px;background:' + (issue.etat === 'publiee' ? '#E6F4EA' : '#FFF4DD') + ';color:' + (issue.etat === 'publiee' ? '#1F7A3A' : '#8A4B00');
+      p.style.cssText = 'flex-basis:100%;margin:2px 0 0;padding:6px 10px;border-radius:10px;background:' + (issue.etat === 'publiee' ? '#E6F4EA' : '#ECEFF3') + ';color:' + (issue.etat === 'publiee' ? '#1F7A3A' : '#3D4B5B');
       frise.appendChild(p);
       return;
     }

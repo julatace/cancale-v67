@@ -8,7 +8,7 @@
 // `statutVc`, le mot `etat` rangé dans une famille connue), jamais par le code
 // brut. Il rend une CLÉ (les mots passent par tr(), `vcventes.etat.*`, 5 langues) :
 //   annulee · colisFait · envoyeeTransporteur · aExpedier* · payee · paiement ·
-//   valideePaiement · livreeControle · controle · expediee · plusAExpedier ·
+//   valideePaiement · litige · livreeControle · controle · expediee · plusAExpedier ·
 //   vendue · inconnu.
 // « À expédier » est LA règle partagée (`aExpedierVc`, api/_lib/vestiaire-regle.js :
 // l'état le plus frais gagne) — la même que la tête « N à expédier », Colis, Ma
@@ -58,6 +58,10 @@ export function etatVenteVc(v, { fait = null, depart = null, lectures = null, ma
   }
   const e = objet(v.etapesVc), m = etapeMotVc(v);
   if (mot(e, 'sellerPayment') === 'done' || m === 'versee' || m === 'terminee') return { cle: 'payee', ton: '' };
+  // (23 nov., 5.444) LE LITIGE, LU (jamais deviné) : la frise de Vestiaire dit que l'acheteur a signalé un problème et
+  // que le paiement est mis en attente (`litigeVc`, règle `litigeDeFriseVc` de api/_lib/vestiaire-regle.js, rangée par
+  // l'extension). « En litige · Vestiaire examine » : hors reçu et hors CA déclaré (pas versée), à regarder (ambre).
+  if (v.litigeVc === true) return { cle: 'litige', ton: 'action' };
   if (mot(e, 'sellerConformity') === 'done') {
     const estime = String(v.paiementEstime || '').trim();
     return estime ? { cle: 'paiement', ton: '', estime: estime.slice(0, 40), estimeT: datePaiementEstimeVc(estime) } : { cle: 'valideePaiement', ton: '' };
@@ -74,4 +78,4 @@ export function etatVenteVc(v, { fait = null, depart = null, lectures = null, ma
 // Le rang de l'étape sur la frise de la ligne (Vendue · Postée · Livrée · Payée), pour le tri
 // et les attributs (`data-vc-vente-etape`) ; `null` = pas su.
 export const RANG_ETAT_VC = Object.freeze({ annulee: null, colisFait: 0, aExpedier: 0, aExpedierSansDate: 0, aExpedierPassee: 0, aExpedierAujourdhui: 0, aExpedierDemain: 0,
-  envoyeeTransporteur: 1, expediee: 1, controle: 1, livreeControle: 2, valideePaiement: 2, paiement: 2, payee: 3, plusAExpedier: null, vendue: 0, inconnu: null });
+  envoyeeTransporteur: 1, expediee: 1, controle: 1, livreeControle: 2, litige: 2, valideePaiement: 2, paiement: 2, payee: 3, plusAExpedier: null, vendue: 0, inconnu: null });

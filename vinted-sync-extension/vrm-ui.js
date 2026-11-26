@@ -829,7 +829,70 @@
     au_site_lbc: { fr: 'Leboncoin ne dit pas qui a mis une annonce en favori et n’a pas d’offres : pas de messages aux favoris ni de négociation ici. Tes intéressés sont dans Articles ; la baisse par règle de ce compte se règle ci-dessous, jamais sous le plancher.', en: 'Leboncoin does not say who saved a listing and has no offers: no messages to favourites or negotiation here. Your interested buyers are in Items; this account’s rule-based price drop is set below, never under the floor.', es: 'Leboncoin no dice quién guardó un anuncio y no tiene ofertas: aquí no hay mensajes a favoritos ni negociación. Tus interesados están en Artículos; la bajada por regla de esta cuenta se ajusta abajo, nunca bajo el mínimo.', it: 'Leboncoin non dice chi ha salvato un annuncio e non ha offerte: qui niente messaggi ai preferiti né negoziazione. I tuoi interessati sono in Articoli; il ribasso a regola di questo account si imposta qui sotto, mai sotto la soglia.', de: 'Leboncoin sagt nicht, wer eine Anzeige gemerkt hat, und hat keine Angebote: hier keine Nachrichten an Favoriten und keine Verhandlung. Deine Interessenten stehen unter Artikel; die Preissenkung nach Regel für dieses Konto stellst du unten ein, nie unter der Untergrenze.' },
     au_site_vc: { fr: 'Vestiaire : les offres à ceux qui ont « aimé » tes articles partent du parcours Favoris. La baisse par règle de ce compte se règle ci-dessous ; pas encore de négociation par paliers ici.', en: 'Vestiaire: offers to people who “liked” your items start from the Favourites flow. This account’s rule-based price drop is set below; no tiered negotiation here yet.', es: 'Vestiaire: las ofertas a quienes «les gusta» tus artículos salen del recorrido Favoritos. La bajada por regla de esta cuenta se ajusta abajo; aún no hay negociación por escalones aquí.', it: 'Vestiaire: le offerte a chi ha messo «mi piace» partono dal percorso Preferiti. Il ribasso a regola di questo account si imposta qui sotto; qui ancora nessuna negoziazione a scaglioni.', de: 'Vestiaire: Angebote an alle, die deine Artikel „geliked“ haben, starten im Favoriten-Ablauf. Die Preissenkung nach Regel für dieses Konto stellst du unten ein; hier noch keine Verhandlung in Stufen.' },
     f_vc_aimes: { fr: 'Les personnes qui ont aimé tes articles se voient dans le panneau ouvert sur l’onglet vestiairecollective.com (Favoris).', en: 'People who liked your items are shown in the panel opened on the vestiairecollective.com tab (Favourites).', es: 'Las personas a las que les gustaron tus artículos se ven en el panel abierto en la pestaña vestiairecollective.com (Favoritos).', it: 'Le persone a cui sono piaciuti i tuoi articoli si vedono nel pannello aperto sulla scheda vestiairecollective.com (Preferiti).', de: 'Personen, denen deine Artikel gefallen, siehst du im Panel auf dem Tab vestiairecollective.com (Favoriten).' },
-    a_sans_compte: { fr: '{n} annonce(s) lue(s) sans compte : pas montrées ici (jamais attribuées au hasard).', en: '{n} listing(s) read without an account: not shown here (never guessed).', es: '{n} anuncio(s) leído(s) sin cuenta: no se muestran aquí (nunca se adivina).', it: '{n} annuncio/i letto/i senza account: non mostrati qui (mai attribuiti a caso).', de: '{n} Anzeige(n) ohne Konto gelesen: hier nicht gezeigt (nie geraten).' },
+    // 5.444 — Vestiaire complet : ventes (frise, litige), achats toutes plateformes, notifications du site, offre aux aimés.
+    v6_ventes: { fr: "Ventes", en: "Sales", es: "Ventas", it: "Vendite", de: "Verkäufe" },
+    v6_achats: { fr: "Achats", en: "Purchases", es: "Compras", it: "Acquisti", de: "Käufe" },
+    s_examen: { fr: "En cours d’examen", en: "Under review", es: "En revisión", it: "In revisione", de: "In Prüfung" },
+    s_a_corriger: { fr: "À corriger", en: "To fix", es: "Por corregir", it: "Da correggere", de: "Zu korrigieren" },
+    s_refusee: { fr: "Refusée", en: "Rejected", es: "Rechazado", it: "Rifiutato", de: "Abgelehnt" },
+    s_retiree: { fr: "Retirée", en: "Withdrawn", es: "Retirado", it: "Ritirato", de: "Zurückgezogen" },
+    vc_offre_faire: { fr: "Faire une offre", en: "Make an offer", es: "Hacer una oferta", it: "Fai un’offerta", de: "Angebot machen" },
+    vc_offre_prix: { fr: "Ton offre (sous {p})", en: "Your offer (below {p})", es: "Tu oferta (por debajo de {p})", it: "La tua offerta (sotto {p})", de: "Dein Angebot (unter {p})" },
+    vc_offre_q: { fr: "Envoyer {p} à {n} personne(s), une à la fois ?", en: "Send {p} to {n} person(s), one at a time?", es: "¿Enviar {p} a {n} persona(s), una a una?", it: "Inviare {p} a {n} persona/e, una alla volta?", de: "{p} an {n} Person(en) senden, eine nach der anderen?" },
+    vc_offre_oui: { fr: "Oui, envoyer l’offre", en: "Yes, send the offer", es: "Sí, enviar la oferta", it: "Sì, invia l’offerta", de: "Ja, Angebot senden" },
+    vc_offre_envoyer: { fr: "Envoyer l’offre", en: "Send the offer", es: "Enviar la oferta", it: "Invia l’offerta", de: "Angebot senden" },
+    vc_offre_partie: { fr: "C’est parti : {n} offre(s), une à la fois.", en: "Started: {n} offer(s), one at a time.", es: "En marcha: {n} oferta(s), una a una.", it: "Avviato: {n} offerta/e, una alla volta.", de: "Gestartet: {n} Angebot(e), eins nach dem anderen." },
+    vc_offre_pas_appris: { fr: "Pour « Faire une offre » d’ici : sur Vestiaire, ouvre une notification « vient d’aimer » et fais UNE offre toi-même.", en: "To “Make an offer” from here: on Vestiaire, open a “liked” notification and make ONE offer yourself.", es: "Para «Hacer una oferta» desde aquí: en Vestiaire, abre una notificación «le ha gustado» y haz UNA oferta tú mismo.", it: "Per «Fai un’offerta» da qui: su Vestiaire apri una notifica «ha messo mi piace» e fai UN’offerta tu stesso.", de: "Für „Angebot machen“ von hier: öffne auf Vestiaire eine „gefällt“-Mitteilung und mache EIN Angebot selbst." },
+    vce_vente: { fr: "Vente confirmée", en: "Sale confirmed", es: "Venta confirmada", it: "Vendita confermata", de: "Verkauf bestätigt" },
+    vce_envoi: { fr: "Article expédié", en: "Item shipped", es: "Artículo enviado", it: "Articolo spedito", de: "Artikel versendet" },
+    vce_livraison: { fr: "Article livré", en: "Item delivered", es: "Artículo entregado", it: "Articolo consegnato", de: "Artikel zugestellt" },
+    vce_evaluation: { fr: "Évaluation de l’article", en: "Item review", es: "Evaluación del artículo", it: "Valutazione dell’articolo", de: "Prüfung des Artikels" },
+    vce_paiement: { fr: "Paiement", en: "Payment", es: "Pago", it: "Pagamento", de: "Zahlung" },
+    vcv_n: { fr: "{n} vente(s)", en: "{n} sale(s)", es: "{n} venta(s)", it: "{n} vendita/e", de: "{n} Verkauf/Verkäufe" },
+    vcv_suivi: { fr: "Suivi", en: "Tracking", es: "Seguimiento", it: "Tracciamento", de: "Sendung" },
+    vcv_frise_pas_lue: { fr: "Le suivi de cette vente n’a pas encore été lu : ouvre-la une fois sur Vestiaire.", en: "This sale’s timeline hasn’t been read yet: open it once on Vestiaire.", es: "El seguimiento de esta venta aún no se ha leído: ábrela una vez en Vestiaire.", it: "Il percorso di questa vendita non è ancora stato letto: aprila una volta su Vestiaire.", de: "Der Verlauf dieses Verkaufs wurde noch nicht gelesen: öffne ihn einmal auf Vestiaire." },
+    vcv_aucune: { fr: "Aucune vente lue sur ce compte : ouvre « Ventes » sur Vestiaire une fois.", en: "No sale read on this account: open “Sales” on Vestiaire once.", es: "Ninguna venta leída en esta cuenta: abre «Ventas» en Vestiaire una vez.", it: "Nessuna vendita letta su questo account: apri «Vendite» su Vestiaire una volta.", de: "Kein Verkauf auf diesem Konto gelesen: öffne einmal „Verkäufe“ auf Vestiaire." },
+    vcv_pour_vous: { fr: "pour vous {p}", en: "for you {p}", es: "para ti {p}", it: "per te {p}", de: "für dich {p}" },
+    vcv_ref: { fr: "Réf. {r}", en: "Ref. {r}", es: "Ref. {r}", it: "Rif. {r}", de: "Ref. {r}" },
+    vcs_annulee: { fr: "Annulée", en: "Cancelled", es: "Cancelada", it: "Annullata", de: "Storniert" },
+    vcs_a_expedier: { fr: "À expédier", en: "To ship", es: "Por enviar", it: "Da spedire", de: "Zu versenden" },
+    vcs_payee: { fr: "Payée", en: "Paid", es: "Pagada", it: "Pagata", de: "Bezahlt" },
+    vcs_litige: { fr: "En litige · Vestiaire examine", en: "In dispute · Vestiaire is reviewing", es: "En disputa · Vestiaire lo examina", it: "In contestazione · Vestiaire esamina", de: "Streitfall · Vestiaire prüft" },
+    vcs_paiement: { fr: "Validée · paiement à venir", en: "Approved · payment coming", es: "Validada · pago próximo", it: "Convalidata · pagamento in arrivo", de: "Bestätigt · Zahlung folgt" },
+    vcs_livree_controle: { fr: "Livrée · évaluation en cours", en: "Delivered · review in progress", es: "Entregada · evaluación en curso", it: "Consegnata · valutazione in corso", de: "Zugestellt · Prüfung läuft" },
+    vcs_expediee: { fr: "Expédiée", en: "Shipped", es: "Enviada", it: "Spedita", de: "Versendet" },
+    vcs_vendue: { fr: "Vendue", en: "Sold", es: "Vendida", it: "Venduta", de: "Verkauft" },
+    vcs_pas_su: { fr: "État pas encore lu", en: "Status not read yet", es: "Estado aún no leído", it: "Stato non ancora letto", de: "Status noch nicht gelesen" },
+    vcv_litige_note: { fr: "L’acheteur a signalé un problème : le paiement est en attente pendant que Vestiaire examine. Rien n’est compté comme reçu.", en: "The buyer reported a problem: payment is on hold while Vestiaire reviews. Nothing is counted as received.", es: "El comprador señaló un problema: el pago está en espera mientras Vestiaire lo examina. Nada se cuenta como recibido.", it: "L’acquirente ha segnalato un problema: il pagamento è sospeso mentre Vestiaire esamina. Nulla è contato come ricevuto.", de: "Der Käufer hat ein Problem gemeldet: Die Zahlung ist angehalten, während Vestiaire prüft. Nichts zählt als erhalten." },
+    vcv_ouvrir: { fr: "Ouvrir sur Vestiaire", en: "Open on Vestiaire", es: "Abrir en Vestiaire", it: "Apri su Vestiaire", de: "Auf Vestiaire öffnen" },
+    ach_a_retirer: { fr: "À retirer", en: "To pick up", es: "Por recoger", it: "Da ritirare", de: "Abzuholen" },
+    ach_en_cours: { fr: "En cours", en: "In progress", es: "En curso", it: "In corso", de: "Unterwegs" },
+    ach_termine: { fr: "Terminé", en: "Completed", es: "Terminado", it: "Completato", de: "Abgeschlossen" },
+    ach_annule: { fr: "Annulé", en: "Cancelled", es: "Cancelado", it: "Annullato", de: "Storniert" },
+    ach_pas_su: { fr: "Tes achats n’ont pas pu être lus pour l’instant : rien n’est affiché plutôt qu’une liste fausse.", en: "Your purchases couldn’t be read right now: nothing is shown rather than a wrong list.", es: "Tus compras no se han podido leer por ahora: no se muestra nada antes que una lista falsa.", it: "I tuoi acquisti non sono stati letti per ora: niente viene mostrato piuttosto che una lista falsa.", de: "Deine Käufe konnten gerade nicht gelesen werden: lieber nichts als eine falsche Liste." },
+    ach_pas_lu_site: { fr: "VRM ne lit pas encore tes achats sur {site} : ajoute-les dans VRM → Achats.", en: "VRM doesn’t read your purchases on {site} yet: add them in VRM → Purchases.", es: "VRM aún no lee tus compras en {site}: añádelas en VRM → Compras.", it: "VRM non legge ancora i tuoi acquisti su {site}: aggiungili in VRM → Acquisti.", de: "VRM liest deine Käufe auf {site} noch nicht: füge sie in VRM → Käufe hinzu." },
+    ach_n: { fr: "{n} achat(s)", en: "{n} purchase(s)", es: "{n} compra(s)", it: "{n} acquisto/i", de: "{n} Kauf/Käufe" },
+    ach_n_retirer: { fr: "{n} à retirer", en: "{n} to pick up", es: "{n} por recoger", it: "{n} da ritirare", de: "{n} abzuholen" },
+    ach_aucun_lu: { fr: "Aucun achat sur ce compte (dernière lecture).", en: "No purchase on this account (last read).", es: "Ninguna compra en esta cuenta (última lectura).", it: "Nessun acquisto su questo account (ultima lettura).", de: "Kein Kauf auf diesem Konto (letzte Lesung)." },
+    ach_jamais_vc: { fr: "Tes achats Vestiaire n’ont pas encore été lus : ouvre « Commandes » sur Vestiaire une fois.", en: "Your Vestiaire purchases haven’t been read yet: open “Orders” on Vestiaire once.", es: "Tus compras de Vestiaire aún no se han leído: abre «Pedidos» en Vestiaire una vez.", it: "I tuoi acquisti Vestiaire non sono ancora stati letti: apri «Ordini» su Vestiaire una volta.", de: "Deine Vestiaire-Käufe wurden noch nicht gelesen: öffne einmal „Bestellungen“ auf Vestiaire." },
+    ach_jamais: { fr: "Tes achats n’ont pas encore été lus : ouvre une fois la page de tes achats sur le site.", en: "Your purchases haven’t been read yet: open your purchases page on the site once.", es: "Tus compras aún no se han leído: abre una vez la página de tus compras en el sitio.", it: "I tuoi acquisti non sono ancora stati letti: apri una volta la pagina dei tuoi acquisti sul sito.", de: "Deine Käufe wurden noch nicht gelesen: öffne einmal die Seite deiner Käufe auf der Website." },
+    vcn_titre: { fr: "Sur Vestiaire", en: "On Vestiaire", es: "En Vestiaire", it: "Su Vestiaire", de: "Auf Vestiaire" },
+    vcn_aucune: { fr: "Rien d’utile dans la cloche de Vestiaire ces 7 derniers jours.", en: "Nothing useful in Vestiaire’s bell over the last 7 days.", es: "Nada útil en la campana de Vestiaire en los últimos 7 días.", it: "Niente di utile nella campanella di Vestiaire negli ultimi 7 giorni.", de: "Nichts Wichtiges in der Vestiaire-Glocke in den letzten 7 Tagen." },
+    vcn_jamais: { fr: "La cloche de Vestiaire n’a pas encore été lue : ouvre-la une fois sur le site.", en: "Vestiaire’s bell hasn’t been read yet: open it once on the site.", es: "La campana de Vestiaire aún no se ha leído: ábrela una vez en el sitio.", it: "La campanella di Vestiaire non è ancora stata letta: aprila una volta sul sito.", de: "Die Vestiaire-Glocke wurde noch nicht gelesen: öffne sie einmal auf der Website." },
+    vcn_ignorees: { fr: "{n} publicité(s) ignorée(s).", en: "{n} ad(s) ignored.", es: "{n} anuncio(s) ignorado(s).", it: "{n} pubblicità ignorata/e.", de: "{n} Werbung(en) ignoriert." },
+    vcn_aime: { fr: "Quelqu’un a aimé", en: "Someone liked", es: "A alguien le gustó", it: "A qualcuno è piaciuto", de: "Jemandem gefällt" },
+    vcn_message: { fr: "Message", en: "Message", es: "Mensaje", it: "Messaggio", de: "Nachricht" },
+    vcn_vente: { fr: "Vente", en: "Sale", es: "Venta", it: "Vendita", de: "Verkauf" },
+    vcn_offre: { fr: "Offre", en: "Offer", es: "Oferta", it: "Offerta", de: "Angebot" },
+    vcn_prix: { fr: "Prix", en: "Price", es: "Precio", it: "Prezzo", de: "Preis" },
+    vcn_colis: { fr: "Colis", en: "Parcel", es: "Paquete", it: "Pacco", de: "Paket" },
+    vcn_paiement: { fr: "Paiement", en: "Payment", es: "Pago", it: "Pagamento", de: "Zahlung" },
+    vcn_litige: { fr: "Problème signalé", en: "Problem reported", es: "Problema señalado", it: "Problema segnalato", de: "Problem gemeldet" },
+    vcn_annonce: { fr: "Annonce", en: "Listing", es: "Anuncio", it: "Annuncio", de: "Anzeige" },
+    vcn_voir_favoris: { fr: "Voir", en: "See", es: "Ver", it: "Vedi", de: "Ansehen" },
+    vcn_voir_messages: { fr: "Lire", en: "Read", es: "Leer", it: "Leggi", de: "Lesen" },
+    m_sans_compte: { fr: "{n} conversation(s) lue(s) avant la liaison du compte : rouvre ta messagerie Vestiaire pour les voir ici.", en: "{n} conversation(s) read before the account was linked: reopen your Vestiaire inbox to see them here.", es: "{n} conversación(es) leída(s) antes de vincular la cuenta: vuelve a abrir tu mensajería de Vestiaire para verlas aquí.", it: "{n} conversazione/i letta/e prima del collegamento dell’account: riapri i messaggi Vestiaire per vederle qui.", de: "{n} Unterhaltung(en) vor der Kontoverknüpfung gelesen: öffne dein Vestiaire-Postfach erneut, um sie hier zu sehen." },
+    a_sans_compte: { fr: '{n} annonce(s) lue(s) avant la liaison du compte : rouvre tes annonces sur le site pour les relire.', en: '{n} listing(s) read before the account was linked: reopen your listings on the site to read them again.', es: '{n} anuncio(s) leído(s) antes de vincular la cuenta: vuelve a abrir tus anuncios en el sitio para releerlos.', it: '{n} annuncio/i letto/i prima del collegamento dell’account: riapri i tuoi annunci sul sito per rileggerli.', de: '{n} Anzeige(n) vor der Kontoverknüpfung gelesen: öffne deine Anzeigen auf der Website erneut, um sie neu zu lesen.' },
     au_baisse_regle: { fr: 'Règle', en: 'Rule', es: 'Regla', it: 'Regola', de: 'Regel' },
     au_baisse_pct: { fr: '−{p} % tous les {j} jours sans vente', en: '−{p}% every {j} days without a sale', es: '−{p} % cada {j} días sin venta', it: '−{p} % ogni {j} giorni senza vendita', de: '−{p} % alle {j} Tage ohne Verkauf' },
     au_baisse_plancher: { fr: 'Jamais sous le prix mini (sinon l’achat + 10 %) ; sans l’un ni l’autre, pas de baisse.', en: 'Never below the lowest price (otherwise cost + 10%); with neither, no drop.', es: 'Nunca por debajo del precio mínimo (si no, compra + 10 %); sin ninguno, no hay bajada.', it: 'Mai sotto il prezzo minimo (altrimenti acquisto + 10 %); senza nessuno dei due, nessun ribasso.', de: 'Nie unter dem Mindestpreis (sonst Einkauf + 10 %); ohne beides keine Senkung.' },
@@ -1915,19 +1978,19 @@
     --vu-ombre:0 .5px 0 rgb(0 0 0/.05),0 1px 2px rgb(0 0 0/.06),0 10px 24px -14px rgb(0 0 0/.22);
     --vu-plein:#111114;--vu-plein-appui:#2C2C2E;--vu-plein-encre:#FFFFFF;--vu-plein-sur-plaque:#111114;--vu-plein-sur-plaque-encre:#FFFFFF;
     --vu-teinte:rgb(118 118 128/.12);--vu-teinte-appui:rgb(118 118 128/.22);--vu-teinte-encre:#111114;--vu-lien:#111114;--vu-anneau:0 0 0 3px rgb(15 107 76/.35);
-    --vu-ambre:#8A4B00;--vu-ambre-point:#E08A12;--vu-ok:#1F7A3A;--vu-socle:#E5E5EA;--vu-barre:#0F6B4C;
+    --vu-ambre:#3D4B5B;--vu-ambre-point:#3D4B5B;--vu-ok:#1F7A3A;--vu-socle:#E5E5EA;--vu-barre:#0F6B4C;
     --vu-kraft:#F1F2F4;--vu-kraft-encre:#16181D;--vu-kraft-doux:#5F646C;--vu-kraft-bord:#E3E5E9;
     --vu-voile:rgb(0 0 0/.42);--vu-toast:#111114;--vu-toast-encre:#F2F2F7;
-    --vu-chg:#E6F4EA;--vu-chg-encre:#1F5A33;--vu-ambre-fond:#FFF4DD;`;
+    --vu-chg:#E6F4EA;--vu-chg-encre:#1F5A33;--vu-ambre-fond:#ECEFF3;`;
   const NUIT = `--vu-coque-uni:#0E0F11;--vu-coque:#0E0F11;
     --vu-sur:#F2F3F5;--vu-sur-2:#B0B4BB;--vu-plaque:#17181B;--vu-plaque-2:#1D1F23;--vu-encre:#F2F3F5;--vu-muet:#B0B4BB;--vu-filet:#2C2F35;
     --vu-ombre:0 0 0 .5px rgb(255 255 255/.06),0 12px 26px -14px rgb(0 0 0/.85);
     --vu-plein:#F2F2F7;--vu-plein-appui:#D1D1D6;--vu-plein-encre:#111114;--vu-plein-sur-plaque:#F2F2F7;--vu-plein-sur-plaque-encre:#111114;
     --vu-teinte:rgb(118 118 128/.24);--vu-teinte-appui:rgb(118 118 128/.34);--vu-teinte-encre:#F2F2F7;--vu-lien:#F2F2F7;--vu-anneau:0 0 0 3px rgb(63 212 154/.45);
-    --vu-ambre:#FFB340;--vu-ambre-point:#F2A33A;--vu-ok:#7FD39A;--vu-socle:#2C2C2E;--vu-barre:#3FD49A;
+    --vu-ambre:#B9C4D0;--vu-ambre-point:#B9C4D0;--vu-ok:#7FD39A;--vu-socle:#2C2C2E;--vu-barre:#3FD49A;
     --vu-kraft:#24272C;--vu-kraft-encre:#F2F3F5;--vu-kraft-doux:#B0B4BB;--vu-kraft-bord:#33363D;
     --vu-voile:rgb(0 0 0/.62);--vu-toast:#F2F2F7;--vu-toast-encre:#111114;
-    --vu-chg:rgb(48 209 88/.16);--vu-chg-encre:#7FD39A;--vu-ambre-fond:rgb(255 179 64/.16);`;
+    --vu-chg:rgb(48 209 88/.16);--vu-chg-encre:#7FD39A;--vu-ambre-fond:rgb(185 196 208/.16);`;
   const CSS = `
   :host, .vu-racine { ${JOUR} }
   @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])), .vu-racine:not([data-theme="clair"]) { ${NUIT} } }
@@ -1981,7 +2044,7 @@
   .vu-sur-coque .vu-barre > i { background: var(--vu-sur); }
   /* Le point d'état : neutre quand tout va bien (§7), ambre pour un geste, creux pour une pause. */
   .vu-point { display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: #7FD39A; flex: none; box-shadow: 0 0 0 3px rgb(127 211 154/.22); }
-  .vu-point[data-k="geste"] { background: var(--vu-ambre-point); box-shadow: 0 0 0 3px rgb(224 138 18/.25); }
+  .vu-point[data-k="geste"] { background: var(--vu-ambre-point); box-shadow: 0 0 0 3px rgb(61 75 91/.25); }
   .vu-point[data-k="pause"], .vu-point[data-k="prudence"], .vu-point[data-k="attente"], .vu-point[data-k="reseau"], .vu-point[data-k="arrete"] { background: transparent; box-shadow: inset 0 0 0 2px currentColor; }
   /* Le bandeau fin (une nouvelle version) et la ligne secondaire. */
   .vu-bandeau { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 4px 4px 14px; border-radius: 14px; background: var(--vu-teinte); color: var(--vu-sur); font: 600 13px/1.3 var(--vu-police); }
@@ -1995,7 +2058,7 @@
   /* 5.430 — l'étiquette de NOTE d'un acheteur : douce, neutre ; ambre seulement quand il y a quelque chose à surveiller. */
   .vu-note { display: inline-flex; align-items: center; flex: none; height: 22px; padding: 0 8px; border-radius: 999px; background: var(--vu-socle); color: var(--vu-muet);
     font: 600 12px/1 var(--vu-police); white-space: nowrap; font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
-  .vu-note[data-k="ambre"] { color: var(--vu-ambre); background: rgb(224 138 18/.13); }
+  .vu-note[data-k="ambre"] { color: var(--vu-ambre); background: rgb(61 75 91/.13); }
   /* 5.430 — un texte TRADUIT sur l'appareil, sous l'original : un filet à gauche, la provenance en petit. */
   .vu-trad { margin: 6px 0 0; padding: 2px 0 2px 10px; border-left: 2px solid var(--vu-filet); font: 400 14px/1.4 var(--vu-police); white-space: pre-wrap; overflow-wrap: anywhere; }
   .vu-trad small { display: block; margin-top: 3px; font-size: 12px; color: var(--vu-muet); }

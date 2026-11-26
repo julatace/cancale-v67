@@ -185,7 +185,7 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   fs.mkdirSync(SORTIE, { recursive: true });
   const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SORTIE, nom + '.png') }); } catch (_) {} };
-  const NAV_ATTENDU = ['accueil', 'annonces', 'ventes', 'messages', 'favoris', 'notifications', 'automatisations', 'file', 'sante', 'parametres'];   // 5.433 : la page « File d’actions »
+  const NAV_ATTENDU = ['accueil', 'annonces', 'ventes', 'messages', 'achats', 'favoris', 'notifications', 'automatisations', 'file', 'sante', 'parametres'];   // 5.433 : la page « File d’actions »
   try {
     for (const [largeur, hauteur, mobile, orion] of [[1512, 900, false, false], [1280, 800, false, false], [390, 844, true, false], [390, 844, true, true]]) for (const scheme of (orion || largeur === 1280 ? ['light'] : ['light', 'dark'])) {
       const T = `${largeur}${orion ? ' Orion' : ''} ${scheme}`;
@@ -346,7 +346,7 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         await clic(t.pg, '[data-onglet-b="ventes"]');
         a = await lire(t.pg);
         await cap(t.pg, N('commandes'));
-        dit(a.vx.titre === 'Commandes' && a.ventesT.length === 5 && a.sousTitres === 5, `${T} : Commandes : 5 lignes, le statut Vinted sous chaque titre`, JSON.stringify({ t: a.vx.titre, v: a.ventesT, s: a.sousTitres }));
+        dit(a.vx.titre === 'Ventes' && a.ventesT.length === 5 && a.sousTitres === 5, `${T} : Commandes : 5 lignes, le statut Vinted sous chaque titre`, JSON.stringify({ t: a.vx.titre, v: a.ventesT, s: a.sousTitres }));
         dit(a.logos === 2, `${T} : transporteur avec SON logo (Chronopost, Mondial Relay) ; inconnu ⇒ rien`, a.logos);
         // 5.410.2 : le bordereau de chaque vente (prêt ⇒ « Imprimer le bordereau » ; pas fourni ⇒ « Pas encore de bordereau »).
         { const imp = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { imp: Array.from(r.querySelectorAll('.table6 [data-imprimer]')).map((b) => b.getAttribute('data-imprimer')), manque: Array.from(r.querySelectorAll('.table6 [data-bordereau-manque]')).map((b) => b.getAttribute('data-bordereau-manque')), n: !!r.querySelector('[data-imprimer-n]'), texte: r.querySelector('.carte').innerText }; });

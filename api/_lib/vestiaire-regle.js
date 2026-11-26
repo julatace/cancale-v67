@@ -66,6 +66,20 @@ export const vcVenteAnnulee = (v) => !!v && !aExpedierVc(v) && etapeMotVc(v) ===
 // annulée, Vestiaire ne dit pas laquelle).
 export const vcVentePartie = (v) => !!v && !aExpedierVc(v) && (['en-route', 'controle', 'livree', 'terminee', 'versee'].includes(etapeMotVc(v)) || expeditionVc(v).prouvee);
 
+// ── LE LITIGE (23 nov., extension 5.444) ───────────────────────────────────
+// <vc-litige-regle> — même règle que vinted-sync-extension/background.js `litigeDeFriseVc` (l'extension la range dans
+// `litigeVc` au moment où elle lit la frise du vendeur ; scripts/audit-vc-complet.cjs exige que les deux répondent pareil).
+// La frise : [{ k, statut, date, cle, titre, texte, probleme }] ; `probleme` = la clé ou le texte de Vestiaire DIT un
+// problème signalé / un paiement mis en attente. Litige = une étape EN COURS (ou en attente) avec `probleme` vrai ;
+// une étape de conformité lue sans ce signe ⇒ false ; rien lu ⇒ null (pas su).
+export function litigeDeFriseVc(f) {
+  const en = (Array.isArray(f) ? f : []).filter((x) => x && /^(ongoing|pending|onhold|on_hold|blocked)$/i.test(String(x.statut || '')));
+  if (en.some((x) => x.probleme === true)) return true;
+  const conf = (Array.isArray(f) ? f : []).find((x) => x && /conformity/i.test(String(x.k || '')));
+  return conf && conf.probleme === false ? false : null;
+}
+// </vc-litige-regle>
+
 // ── « À EXPÉDIER » : L'ÉTAT LE PLUS FRAIS GAGNE (15 nov., §5) ──────────────
 // Mesuré en production (15 nov.) : une vente Vestiaire EXPÉDIÉE le 7 nov. était
 // encore « À envoyer · date limite passée » dans VRM. `aExpedier: true` venait de
@@ -313,6 +327,8 @@ export function resumeColisVc(liste) {
 // ne sont PAS « retirée » : la paire est toujours chez lui (présente), seulement pas en ligne.
 // ⚠️ L'ordre compte : « waiting picture » avant « waiting » ; « unpublished » avant « published ».
 export const VC_ANNONCE_ETATS = [
+  // (23 nov., 5.444) MESURÉ : « En cours d'examen » est `unpublishedSubmitted` — « unpublish » le rangeait en « retirée ».
+  ['attente', /^unpublished.?submitted$/i, 'En attente de validation'],
   ['vendue', /sold|vendu/i, 'Vendue'],
   ['retiree', /withdraw|retir|delet|supprim|archiv|expir|inactiv|unpublish|deactiv|cancel|annul|unreceived/i, 'Retirée'],
   ['refusee', /invalid|reject|refus/i, 'Refusée par Vestiaire'],

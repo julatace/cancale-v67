@@ -219,6 +219,8 @@ export function argentAVenir({ vinted, lbc, ebay, vestiaire, versements, etatTx,
     const ts = Date.parse(v.date || '') || null;
     const et2 = etapeVcAVenir(v, R.parcoursVc ? R.parcoursVc(v) : null);
     if (et2 === 'bloquee') { bloquees.push({ id, plateforme: 'Vestiaire', compte, titre, eur: r.eur, ts, raison: 'refus' }); continue; }
+    // (23 nov., 5.444) l'acheteur a signalé un problème, paiement mis en attente (frise LUE, `litigeVc`) : à part, hors total.
+    if (v.litigeVc === true) { bloquees.push({ id, plateforme: 'Vestiaire', compte, titre, eur: r.eur, ts, raison: 'litige' }); continue; }
     lignes.push({ id, plateforme: 'Vestiaire', compte, titre, eur: r.eur, prevu: dateEcriteLue(v.paiementEstime), ts, etape: et2 });
   }
 

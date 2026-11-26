@@ -110,7 +110,7 @@ const env = (type, id, titre) => ({ type, [type]: { product: { id, headline: tit
     dit(b0 > 0 && b1 > b0, 'E1 · le bloc <vc-moderation-regle> existe dans background.js');
     const cx = {}; vm.createContext(cx);
     vm.runInContext(bg.slice(b0, b1) + '\nthis.familleModVc = familleModVc; this.transitionModVc = transitionModVc;', cx);
-    const MOTS = ['published', 'onSale', 'waitingValidation', 'waitingPicture', 'refused', 'rejected', 'sold', 'unpublished', 'unreceived', 'draft', 'inReview', 'zorglub', '', 'approved', 'invalid', 'toCorrect'];
+    const MOTS = ['published', 'onSale', 'waitingValidation', 'waitingPicture', 'refused', 'rejected', 'sold', 'unpublished', 'unreceived', 'draft', 'inReview', 'unpublishedSubmitted', 'zorglub', '', 'approved', 'invalid', 'toCorrect'];
     const ecartsF = MOTS.filter((m) => (cx.familleModVc(m) || 'pas-dit') !== fam(m));
     const ecartsT = []; for (const a of MOTS) for (const b of MOTS) if (cx.transitionModVc(a, b) !== T(a, b)) ecartsT.push(a + '→' + b);
     dit(ecartsF.length === 0 && ecartsT.length === 0, `E1 · extension et app : mêmes familles (${MOTS.length} mots) et mêmes transitions (${MOTS.length * MOTS.length} paires)`, JSON.stringify({ ecartsF, ecartsT: ecartsT.slice(0, 5) }));

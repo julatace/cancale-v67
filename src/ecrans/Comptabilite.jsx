@@ -8277,6 +8277,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // et la date de l'envoi (« Commande livrée » = 400). En mémoire seulement : le
   // pseudo d'un tiers n'est rangé nulle part. undefined en cours · lu.
   const [infosTxAchats,setInfosTxAchats]=useState(undefined);
+  // 5.443 : l'extension vient de ranger le détail d'achats (« Lot · N » prouvé) : la lecture des transactions repart.
+  const [detailsAchatsRelus,setDetailsAchatsRelus]=useState(0);
   // (22 nov., lot achats-lot) LES ACHATS DIVISÉS (src/achatDivise.js) : { [tx]: division } — écrits sur SON toucher seulement
   // (« Diviser », « Changer la répartition », « Regrouper »), synchronisés. Déclarés ICI (avant `linkedBuyIds`, `buyNumByTxn`,
   // `liensAchats` qui les lisent : §4.6, pas de TDZ). `diviserTx` : l'achat dont la feuille est ouverte.
@@ -14317,7 +14319,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       if(!stop)setPhotosTxAchats(prev=>JSON.stringify(prev)===JSON.stringify(resultat)?prev:resultat);
       if(!stop)setInfosTxAchats(prev=>prev&&JSON.stringify(prev)===JSON.stringify(infos)?prev:infos);
     })();return()=>{stop=true;};
-  },[demandesSuivis]);
+  },[demandesSuivis,detailsAchatsRelus]);
   // ── LA LIGNE DE SUIVI VINTED ET LES N° AJOUTÉS À LA MAIN (23 oct.) ────────
   // Sur Achats et Ma journée (les colis à retirer s'y décident), relues à
   // l'ouverture et quand l'extension prévient (`maj suivi`). Scalaires seulement.
@@ -14516,6 +14518,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         try { oublierAcct('purchased'); } catch (_) {}
         if (buysCharges.current) loadOrders('purchased', setBuys, false, { silencieux: true });
       }
+      // 5.443 : le détail d'achats rangé par l'extension (« Lot · N ») : les transactions des achats sont relues.
+      else if (ev.quoi === 'achatsdetails') setDetailsAchatsRelus((n) => n + 1);
       // Un code de retrait lu dans une conversation (5.155) : on relit la ligne.
       else if (ev.quoi === 'retrait') relireColisRelais();
       // (23 oct.) Le suivi d'un achat relevé sur Vinted par l'extension.

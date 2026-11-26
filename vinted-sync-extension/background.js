@@ -4304,6 +4304,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       filVcCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
     }
+    // 5.444 : « Faire une offre » aux personnes qui ont aimé UN article, depuis le panneau, sur SON clic CONFIRMÉ — le
+    // même chemin que depuis l'app (`offrirAuxAimesVc` : recette apprise et rejouable, prix lu = celui de l'aperçu,
+    // garde du prix, onglet sur CE compte, porte des favoris, 45/h réserve 5, pause 429/403, une personne à la fois).
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'offreAimesCarte') {
+      (async () => {
+        const o = ongletCarte(sender);
+        if (!o || o.fenetre || plateformeDe(o.url) !== 'vestiaire') return { ok: false, code: 'origine', raison: 'L’offre part seulement de l’onglet vestiairecollective.com.' };
+        if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : confirme d’abord.' };
+        const r = await offrirAuxAimesVc({ produit: msg.produit, avantCents: Number(msg.avantCents), prixCents: Number(msg.prixCents), gardeConfirmeC: msg.gardeConfirmeC });
+        return Object.assign({ ok: !!(r && r.accepte) }, r || {});
+      })().then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'aimesVcCarte') {
       aimesVcCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
@@ -4680,8 +4693,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // 5.299 : … et seulement si la PAGE dit le même (`compteVcCapture`) : un onglet où l'on vient de changer de compte n'étiquette rien.
           const compteOnglet = await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi);
           if (compteOnglet) secuLectureNormale('vestiaire', compteOnglet).catch(() => {});   // (5.366) sa page Vestiaire lit normalement
-          const ok = await rangerVcAnnonces({ items: msg.items, offset: msg.offset, total: msg.total, lus: msg.lus, forme: msg.forme, compte: compteOnglet, complet: msg.complet, inconnu: msg.inconnu });
-          if (Array.isArray(msg.inconnu)) { noterDiag('vc_format_inconnu_annonces'); await noterVcCapte('annonces', ok === true, 0, { inconnu: true }); } else await noterVcCapte('annonces', ok === true, Array.isArray(msg.items) ? msg.items.length : 0);
+          const ok = await rangerVcAnnonces({ items: msg.items, offset: msg.offset, total: msg.total, lus: msg.lus, forme: msg.forme, compte: compteOnglet, complet: msg.complet, inconnu: msg.inconnu, inconnues: Number(msg.inconnues) || 0 });
+          // 5.444 : des annonces lues À CÔTÉ d'enveloppes illisibles comptent comme une capture (diag à part).
+          if (Array.isArray(msg.inconnu) && Number(msg.inconnues) > 0 && Array.isArray(msg.items) && msg.items.length) { noterDiag('vc_annonces_en_partie_inconnues'); await noterVcCapte('annonces', ok === true, msg.items.length); }
+          else if (Array.isArray(msg.inconnu)) { noterDiag('vc_format_inconnu_annonces'); await noterVcCapte('annonces', ok === true, 0, { inconnu: true }); } else await noterVcCapte('annonces', ok === true, Array.isArray(msg.items) ? msg.items.length : 0);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -4825,6 +4840,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     // 5.319 : tes OFFRES Vestiaire et la recette d'une réponse faite par toi sur la page.
     // 5.392 : les personnes qui ont aimé TES articles (gardées dans CE navigateur ; la base n'en reçoit que des nombres).
+    // 5.444 : les notifications de Vestiaire (gardées dans CE navigateur, compte de l'onglet ET de la page seulement).
+    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcNotifs') {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          sendResponse({ ok: (await rangerVcNotifs(msg.cartes, await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi))) === true });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
     if (msg && msg.from === 'cancale-vc' && msg.action === 'vcAimes') {
       (async () => {
         try {
@@ -14548,6 +14574,8 @@ async function visiteVintedUnPassage() {
     // `/payouts` (aucune requête ajoutée) ; ici on ne va chercher que les mois
     // PASSÉS encore absents, deux par visite au plus.
     await capterReleves(uid);
+    // 5.443 : le détail des achats (« Lot… » d'abord), APRÈS l'argent et les colis, sous leur réserve.
+    await capterDetailsAchats(uid);
     // 5.214 : le suivi que Vinted montre de ses achats en cours (« Suivre le
     // colis »), puis les notifications « une étape de plus » restées en file.
     // ⚠️ (revue du 24 oct.) APRÈS l'argent et les colis : ce n'est pas une
@@ -21178,7 +21206,8 @@ const lecteursPrioritaires = () => ({ versement: VERSEMENT_PART_VISITE, releve: 
 //    deux réserves). La relecture note elle aussi ce qui lui reste
 //    (`noterLecturesDues(uid, 'enligne', …)`) ; « pas su » garde sa réserve.
 // 5.344 : l'import de départ aussi (`importerHistorique`) — les photos lui laissent un passage.
-const lecteursAvantPhotos = () => ({ enligne: ENLIGNE_MAX_PAR_VISITE, import: IMPORT_PAGES_PAR_PASSAGE });
+// 5.443 : le détail des achats aussi (seulement ce qu'il a NOTÉ, comme l'import).
+const lecteursAvantPhotos = () => ({ enligne: ENLIGNE_MAX_PAR_VISITE, import: IMPORT_PAGES_PAR_PASSAGE, achat: ACHAT_DETAIL_MAX_PAR_VISITE });
 async function noterLecturesDues(uid, quoi, reste, plus) {
   try {
     const cur = (await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {};
@@ -21214,7 +21243,7 @@ async function reserveLectures(uid, classe = 'photos') {
     const connu = d && Date.now() - Number(d.at || 0) < LECTURES_DUES_VALIDITE_MS;
     // 5.344 : l'import ne réserve que ce qu'il a NOTÉ (chaque passage le note) ;
     // un compte sans import en cours ne prive pas les photos.
-    r += connu ? Math.min(Number(d.reste) || 0, max[k]) : (k === 'import' ? 0 : max[k]);   // pas su ⇒ réserve entière
+    r += connu ? Math.min(Number(d.reste) || 0, max[k]) : ((k === 'import' || k === 'achat') ? 0 : max[k]);   // pas su ⇒ réserve entière
   }
   return r;
 }
@@ -21258,7 +21287,7 @@ async function gardeLecture(uid, acc, classe = 'photos', plafondMax = LECTURES_M
   // 5.341 : `plafondMax` — le rattrapage des dates de versement s'arrête AVANT la
   // réserve des autres lecteurs prioritaires (`reserveAutresQueVersement`).
   // 5.344 : 'import' (l'historique de départ) : au même étage que la relecture.
-  const plafond = prioritaire ? Math.min(LECTURES_MAX_HEURE, Number(plafondMax) || LECTURES_MAX_HEURE) : LECTURES_MAX_HEURE - (await reserveLectures(uid, (classe === 'enligne' || classe === 'suivi' || classe === 'import') ? 'enligne' : 'photos'));
+  const plafond = prioritaire ? Math.min(LECTURES_MAX_HEURE, Number(plafondMax) || LECTURES_MAX_HEURE) : LECTURES_MAX_HEURE - (await reserveLectures(uid, (classe === 'enligne' || classe === 'suivi' || classe === 'import' || classe === 'achat') ? 'enligne' : 'photos'));   // 5.443 : 'achat' (détail des achats) au même étage
   const c = await compterLecture(String(uid), plafond);
   if (!c.ok && c.code === 'stockage') return { ok: false, code: 'stockage', error: RAISON_STOCKAGE };
   if (!c.ok) return prioritaire
@@ -27406,7 +27435,8 @@ async function repondreCarte(msg, sender) {
     if (!moi) return { ok: false, code: 'compte', raison: 'Le compte de cet onglet n’est pas reconnu : rien n’est parti.' };
     if (pf === 'vestiaire') {
       const m = await sbGet('app_data?id=eq.vc_messages&select=c:data->conversations');
-      const x = Array.isArray(m) && m[0] && m[0].c ? Object.values(m[0].c).find((y) => y && String(y.ref) === conv) : null;
+      // 5.444 : une conversation est rangée SOUS son identifiant (la clé de `conversations`) ; `ref` est presque toujours vide.
+      const x = Array.isArray(m) && m[0] && m[0].c ? (m[0].c[conv] && typeof m[0].c[conv] === 'object' ? m[0].c[conv] : Object.values(m[0].c).find((y) => y && y.ref && String(y.ref) === conv)) || null : null;
       if (!x || String(x.compte || '') !== moi) return { ok: false, code: 'autre-compte', raison: 'Cette conversation n’est pas sur le compte de cet onglet : rien n’est parti.' };
       const r = await repondreVestiaire({ conv, texte, tabId: sender && sender.tab ? sender.tab.id : null });
       return r && r.accepte && r.etape === 'fait' ? { ok: true } : { ok: false, code: (r && (r.etape === 'incertain' ? 'incertain' : r.code)) || 'refus', raison: (r && r.raison) || 'Rien n’est parti.', ...(r && r.code === 'ouvrir' && adresseConvVcSure(r.url, conv) ? { url: String(r.url) } : {}) };
@@ -27468,25 +27498,33 @@ async function aimesVcCarte(msg, sender) {
   const oc = await compteOngletCapte(o.url, sender && sender.tab ? sender.tab.id : null);
   const moi = oc && oc.id ? String(oc.id) : '';
   if (!moi) return { ok: false, code: 'compte', raison: 'Le compte de cet onglet n’est pas reconnu : recharge la page Vestiaire.' };
-  let aimes = {}, ecrits = {}, faits = {}, ui = null;
-  try { const l = await chrome.storage.local.get([VC_AIMES, VC_AIMES_ECRITS, VC_AIMES_FAITS, VC_UI]); aimes = l[VC_AIMES] || {}; ecrits = l[VC_AIMES_ECRITS] || {}; faits = l[VC_AIMES_FAITS] || {}; ui = l[VC_UI] || null; } catch (_) { return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
+  let aimes = {}, ecrits = {}, faits = {}, ui = null, infos = {}, recOffre = null;
+  try { const l = await chrome.storage.local.get([VC_AIMES, VC_AIMES_ECRITS, VC_AIMES_FAITS, VC_UI, VC_AIMES_INFOS, VC_RECETTE_OFFRES]); aimes = l[VC_AIMES] || {}; ecrits = l[VC_AIMES_ECRITS] || {}; faits = l[VC_AIMES_FAITS] || {}; ui = l[VC_UI] || null; infos = l[VC_AIMES_INFOS] || {}; recOffre = l[VC_RECETTE_OFFRES] && l[VC_RECETTE_OFFRES].favori && l[VC_RECETTE_OFFRES].favori.recette || null; } catch (_) { return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
   const rows = await sbGet('app_data?id=eq.vc_listings&select=items:data->items');
   if (rows === null) return { ok: false, code: 'pas-su', raison: 'La base VRM n’a pas répondu.' };
   const items = rows && rows[0] && rows[0].items && typeof rows[0].items === 'object' ? rows[0].items : {};
   const articles = []; let sansArticle = 0;
   for (const [p, par] of Object.entries(aimes)) {
     if (!/^\d{3,15}$/.test(p) || !par || typeof par !== 'object') continue;
-    const it = items[p];
-    if (!it || typeof it !== 'object') { sansArticle++; continue; }   // article jamais lu : on ne sait pas à quel compte il est
-    if (String(it.compte || '') !== moi) continue;                     // un autre compte : jamais montré ici
+    // 5.444 (capture de Julien : « personne n'a encore été vu » alors que la cloche liste des « vient d'aimer ») : l'article
+    // aimé appartient au compte de la NOTIFICATION (`vrmVcAimesInfos`, compte de l'onglet ET de la page) quand « Mes
+    // articles » ne l'a pas (encore) rangé sous un compte ; un article rangé sous un AUTRE compte n'est jamais montré.
+    const it = items[p] && typeof items[p] === 'object' ? items[p] : null;
+    const inf = infos[p] && typeof infos[p] === 'object' ? infos[p] : {};
+    const proprio = it && it.compte ? String(it.compte) : String(inf.compte || '');
+    if (!proprio) { sansArticle++; continue; }                          // on ne sait pas à quel compte il est
+    if (proprio !== moi) continue;                                      // un autre compte : jamais montré ici
     const gens = Object.keys(par).filter((k) => /^\d{3,15}$/.test(k) && k !== moi)
       .map((k) => ({ url: adresseConvVc(o.url, `${k}-${p}`, ui), conv: `${k}-${p}`, at: Date.parse(par[k] || '') || null, ecrit: !!ecrits[p + '|' + k], offre: !!faits[p + '|' + k] }))
       .sort((a, b) => (b.at || 0) - (a.at || 0));
     if (!gens.length) continue;
-    articles.push({ produit: p, titre: String(it.titre || '').slice(0, 120), photo: /^https:\/\/images\.vestiairecollective\.com\//.test(String(it.photo || '')) ? String(it.photo) : '', n: gens.length, ecrits: gens.filter((g) => g.ecrit).length, gens: gens.slice(0, AIMES_CARTE_MAX), dernier: gens[0].at });
+    const photoIt = it && /^https:\/\/images\.vestiairecollective\.com\//.test(String(it.photo || '')) ? String(it.photo) : (/^https:\/\/images\.vestiairecollective\.com\//.test(String(inf.photo || '')) ? String(inf.photo) : '');
+    const prixC = it ? centsPrixVc(it.prix) : null;
+    articles.push({ produit: p, titre: it ? String(it.titre || '').slice(0, 120) : '', photo: photoIt, n: gens.length, ecrits: gens.filter((g) => g.ecrit).length, offres: gens.filter((g) => g.offre).length, gens: gens.slice(0, AIMES_CARTE_MAX), dernier: gens[0].at, prixC: prixC == null ? null : prixC });
   }
   articles.sort((a, b) => (b.dernier || 0) - (a.dernier || 0));
-  return { ok: true, compte: moi, appris: !!(ui && ui.champ && ui.envoi), articles, sansArticle };
+  // `offre` : la recette « favori » APPRISE de son propre geste et rejouable (sinon le bouton « Faire une offre » n'existe pas).
+  return { ok: true, compte: moi, appris: !!(ui && ui.champ && ui.envoi), offre: !!(recOffre && recOffre.rejouable === true), articles, sansArticle };
 }
 // 5.409 — LEBONCOIN ET VESTIAIRE DANS LE GRAND PANNEAU. Le compte est celui de L'ONGLET (`compteOngletCapte` :
 // la session Leboncoin, l'onglet Vestiaire) ; une annonce ou une vente n'est montrée que si elle porte CE compte
@@ -27495,16 +27533,17 @@ async function aimesVcCarte(msg, sender) {
 // annonces (`vc_listings`, favoris lus), ventes (`vc_ventes` : état, transporteur, bordereau) ; pas de date de mise en
 // ligne. Messages : les fils restent sur le site (la carte ne les recopie pas encore) — dit une fois.
 const STATUT_LBC = { active: 'en_vente', inactive: 'masque', paused: 'masque', deleted: 'supprime', sold: 'vendu' };
-const STATUT_VC = { published: 'en_vente', on_sale: 'en_vente', draft: 'brouillon', pending: 'a_confirmer', sold: 'vendu', reserved: 'reserve', hidden: 'masque' };
 async function carteListesSite(plateforme, o, sender) {
   const s = await loadSession().catch(() => null);
   if (!(s && s.user_id && !s.mort)) return { ok: true, plateforme, connecte: false };
   const oc = await compteOngletCapte(o.url, sender && sender.tab ? sender.tab.id : null);
   const moi = oc && oc.id ? cleCompteCapte(oc.id) : '';
   if (!moi) return { ok: true, plateforme, compte: null };
-  const euro = (v) => { const n = Number(String(v == null ? '' : (typeof v === 'object' ? (v.amount != null ? v.amount : v.value) : v)).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
+  // 5.444 (capture de Julien : le prix des ventes Vestiaire « — ») : les prix rangés par l'extension sont `{ valeur, devise, cle }` ;
+  // ils n'étaient pas lus (seuls `amount` / `value`). Une autre devise que l'euro n'est jamais montrée comme des euros.
+  const euro = (v) => { if (v && typeof v === 'object' && v.devise && String(v.devise).toUpperCase() !== 'EUR') return null; const n = Number(String(v == null ? '' : (typeof v === 'object' ? (v.amount != null ? v.amount : v.value != null ? v.value : v.valeur) : v)).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
   const photoSure = (u) => (/^https:\/\/[\w.-]+\//.test(String(u || '')) ? String(u) : '');
-  const statuts = { en_vente: 0, brouillon: 0, masque: 0, reserve: 0, vendu: 0, a_confirmer: 0 };
+  const statuts = { en_vente: 0, brouillon: 0, masque: 0, reserve: 0, vendu: 0, a_confirmer: 0, examen: 0, a_corriger: 0, refusee: 0, retiree: 0 };
   let annonces = null, ventes = null, sansCompte = 0;
   if (plateforme === 'leboncoin') {
     const la = await sbGet('app_data?id=eq.lbc_listings&select=it:data->items,at:data->>updatedAt');
@@ -27539,17 +27578,30 @@ async function carteListesSite(plateforme, o, sender) {
         const c = String(x.compte || '');
         if (!c) { sansCompte++; continue; }
         if (c !== moi) continue;
-        const st = STATUT_VC[String(x.statut || '').toLowerCase()] || 'a_confirmer';
-        statuts[st]++;
-        { const dp = depuisAnnonceVc(x); a.push({ id: String(x.ref || ''), titre: String(x.titre || '').slice(0, 120), prix: euro(x.prix), photo: photoSure(x.photo), photos: x.photo ? [photoSure(x.photo)] : [], num: '', jours: dp ? Math.max(0, Math.floor((Date.now() - dp.t) / 864e5)) : null, depuis: dp ? dp.t : null, depuisAuMoins: !!(dp && !dp.exacte), favoris: Number.isFinite(Number(x.favoris)) ? Number(x.favoris) : null, statut: st }); }
+        const st = statutCarteVc(x.statut);
+        statuts[st] = (statuts[st] || 0) + 1;
+        { const dp = depuisAnnonceVc(x); a.push({ id: String(x.ref || ''), titre: String(x.titre || '').slice(0, 120), prix: euro(x.prix), photo: photoSure(x.photo), photos: x.photo ? [photoSure(x.photo)] : [], num: '', jours: dp ? Math.max(0, Math.floor((Date.now() - dp.t) / 864e5)) : null, depuis: dp ? dp.t : null, depuisAuMoins: !!(dp && !dp.exacte), favoris: Number.isFinite(Number(x.favoris)) ? Number(x.favoris) : null, statut: st,
+          ...(/^\d{3,15}$/.test(String(x.ref || '')) ? { url: 'https://fr.vestiairecollective.com/listings/' } : {}) }); }
       }
       annonces = { lu: Date.parse((la[0] && la[0].at) || '') || null, aConfirmer: false, total: a.length, liste: a.filter((x) => x.statut === 'en_vente').slice(0, CARTE_LISTE_MAX), toutes: a.slice(0, CARTE_TOUTES_MAX), nTous: a.length, statuts, sansCompte };
     }
-    const lv = await sbGet('app_data?id=eq.vc_ventes&select=v:data->ventes');
+    const lv = await sbGet('app_data?id=eq.vc_ventes&select=v:data->ventes,l:data->lectures');
     if (Array.isArray(lv)) {
+      const lectures = (lv[0] && lv[0].l) || null;
       const vs = Object.values((lv[0] && lv[0].v) || {}).filter((x) => x && String(x.compte || '') === moi);
-      const etat = (x) => (x.aExpedier === true || x.etat === 'ACTION_NEEDED' ? 'a_expedier' : x.etat === 'IN_PROGRESS' ? 'en_route' : x.etat === 'COMPLETED' || x.etat === 'DONE' ? 'finalisee' : x.etat === 'CANCELLED' ? 'annulee' : 'pas_su');
-      ventes = { lu: null, total: vs.length, liste: vs.map((x) => ({ tx: String(x.productId || x.ref || ''), titre: String(x.titre || '').slice(0, 120), prix: euro(x.prixVente != null ? x.prixVente : x.montant), photo: photoSure(x.photo), date: Date.parse(x.date || x.premiereVue || '') || null, etat: etat(x), vendue: etat(x) !== 'annulee', num: '', bordereau: etat(x) === 'a_expedier' ? !!(x.bordereau || x.etiquette) : null, transporteur: x.transporteur ? String(x.transporteur).slice(0, 30) : undefined })).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, CARTE_LISTE_MAX) };
+      // 5.444 (capture de Julien : la vente livrée en litige montrée « À expédier », une autre « En route » sans preuve) :
+      // l'état vient de la RÈGLE de l'app (`etatVenteVcCarte`, copie de src/etatVenteVc.js — l'état le plus frais gagne,
+      // la frise du vendeur avant le mot brut), plus jamais de `aExpedier` seul ni du mot « IN_PROGRESS ».
+      ventes = { lu: Date.parse((lectures && lectures.ventes && lectures.ventes.at) || '') || null, total: vs.length, liste: vs.map((x) => {
+        const ev = etatVenteVcCarte(x, lectures), seau = SEAU_VENTE_VC[ev] || 'pas_su';
+        const sv = String(x.suivi || '').replace(/[^\w-]/g, '').slice(0, 40);
+        // « pour vous » : le montant rangé sous une clé qui DIT ce que le vendeur reçoit (`sellerEarning`), sinon rien.
+        const pourVous = x.montant && /earning|seller.?net|net/i.test(String(x.montant.cle || '')) ? euro(x.montant) : null;
+        return { tx: String(x.productId || x.ref || ''), ref: /^\d{3,15}$/.test(String(x.productId || '')) ? String(x.productId) : '', titre: String(x.titre || '').slice(0, 120), prix: euro(x.prixVente != null ? x.prixVente : x.montant), pourVous, photo: photoSure(x.photo), date: Date.parse(x.date || x.premiereVue || '') || null,
+          etat: seau, etatVc: ev, vendue: ev !== 'annulee', num: '', bordereau: seau === 'a_expedier' ? !!(x.bordereau || x.etiquette) : null, transporteur: x.transporteur ? String(x.transporteur).slice(0, 30) : undefined, suivi: sv || undefined, limite: seau === 'a_expedier' && x.limite ? String(x.limite).slice(0, 40) : undefined,
+          frise: Array.isArray(x.friseVc) ? x.friseVc.slice(0, 12).map((f) => ({ k: String(f.k || ''), statut: String(f.statut || ''), date: String(f.date || ''), titre: String(f.titre || ''), texte: String(f.texte || ''), probleme: f.probleme === true })) : (x.etapesVc && typeof x.etapesVc === 'object' ? Object.entries(x.etapesVc).slice(0, 12).map(([k, v]) => ({ k, statut: String(v || ''), date: '', titre: '', texte: '', probleme: false })) : []),
+          lien: /^\d{3,15}$/.test(String(x.productId || '')) ? 'https://fr.vestiairecollective.com/my-account/orders-sales/?section=2' : '' };
+      }).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, CARTE_LISTE_MAX) };
     }
   }
   // Messages : Vestiaire — les conversations RANGÉES (`vc_messages`, celles de CE compte) ; Leboncoin — le nombre de
@@ -27558,8 +27610,12 @@ async function carteListesSite(plateforme, o, sender) {
   if (plateforme === 'vestiaire') {
     const m = await sbGet('app_data?id=eq.vc_messages&select=c:data->conversations,at:data->>capturedAt');
     if (Array.isArray(m)) {
-      const cs = Object.values((m[0] && m[0].c) || {}).filter((x) => x && String(x.compte || '') === moi && /^[\w-]{3,40}$/.test(String(x.ref || '')));
-      messages = { lu: Date.parse((m[0] && m[0].at) || '') || null, site: 'vestiaire', liste: cs.map((x) => ({ conv: String(x.ref), qui: String(x.titre || '').slice(0, 60), texte: String(x.apercu || '').slice(0, 160), at: Date.parse(x.date || x.vuAt || '') || null, nonlu: x.nonLu === true, photo: photoSure(x.photo) })).sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, CARTE_LISTE_MAX) };
+      // 5.444 (capture de Julien : « aucune conversation lue » alors que 103 sont rangées) : une conversation est rangée
+      // SOUS son identifiant (`{personne}-{article}`, la clé de `vc_messages.conversations`) ; `ref` (la référence VRM-…)
+      // est presque toujours vide. Le filtre lisait `ref` : il les écartait TOUTES. ⇒ l'identifiant est la clé.
+      const cs = Object.entries((m[0] && m[0].c) || {}).filter(([k, x]) => x && String(x.compte || '') === moi && /^[\w-]{3,40}$/.test(k));
+      const sansCompteM = Object.values((m[0] && m[0].c) || {}).filter((x) => x && !x.compte).length;
+      messages = { lu: Date.parse((m[0] && m[0].at) || '') || null, site: 'vestiaire', sansCompte: sansCompteM, liste: cs.map(([k, x]) => ({ conv: k, qui: String(x.titre || '').slice(0, 60), texte: (x.apercuDeMoi === true ? '↩ ' : '') + String(x.apercu || '').slice(0, 160), deMoi: x.apercuDeMoi === true, at: Date.parse(x.date || x.vuAt || '') || null, nonlu: x.nonLu === true, photo: photoSure(x.photo) })).sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, CARTE_LISTE_MAX) };
     }
   } else {
     const f = await sbGetTout('app_data?id=like.lbc_fil_*&select=id,compte:data->>compte,titre:data->>titre,qui:data->>interlocuteur,at:data->>majAt,apercu:data->>apercu,nonlu:data->>nonLu').catch(() => null);
@@ -27573,10 +27629,92 @@ async function carteListesSite(plateforme, o, sender) {
   const nom = await nomCompteCapte(plateforme, moi).catch(() => '');
   const n = await notificationsCarte(moi).catch(() => null);
   const notifications = n ? { vu: n.vu, liste: n.liste.filter((e) => e.p === plateforme && e.c === moi) } : null;
+  // 5.444 : les notifications de VESTIAIRE (la cloche du site), celles de CE compte, utiles seulement (le reste compté).
+  let notifsSite = null;
+  if (plateforme === 'vestiaire') notifsSite = await notifsVcCarte(moi, annonces, ventes).catch(() => null);
+  // 5.444 — ACHATS (« ajoute les achats pour toutes les plateformes ») : Vestiaire = `vc_achats` de CE compte (la page
+  // « Commandes » les donne au passage) ; Leboncoin : VRM ne lit pas encore tes achats (dit, jamais « aucun »).
+  let achats = null;
+  if (plateforme === 'vestiaire') {
+    const ra = await sbGet('app_data?id=eq.vc_achats&select=a:data->achats,l:data->lecture');
+    if (Array.isArray(ra)) {
+      const r0 = ra[0] || null;
+      const lst = r0 ? Object.entries(r0.a || {}).filter(([, x]) => x && String(x.compte || '') === moi) : [];
+      achats = { lu: r0 && r0.l ? (Date.parse(r0.l.at || '') || null) : null, site: 'vestiaire', liste: lst.map(([k, x]) => ({ id: k, titre: String(x.nom || '').slice(0, 120), prix: euro(x.montant && x.montant.valeur), date: Date.parse(x.date || x.premiereVue || '') || null, statut: String(x.etat || '').slice(0, 40), suivi: String(x.suivi || '').replace(/[^\w-]/g, '').slice(0, 40), transporteur: String(x.transporteur || '').slice(0, 30) })).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, CARTE_LISTE_MAX) };
+    }
+  } else achats = { site: 'leboncoin', pasLu: true, liste: [] };
   // 5.410 : la baisse par règle de CE compte (Leboncoin `lbc:{id}`, Vestiaire `vc:{id}`), réglée dans le panneau.
   const automatisations = await (async () => { const m = await lireMain([REGLE_BAISSE_CLE]).catch(() => null); if (!m) return null; const cle = (plateforme === 'leboncoin' ? 'lbc:' : 'vc:') + moi; const c = m[REGLE_BAISSE_CLE] && m[REGLE_BAISSE_CLE].comptes && m[REGLE_BAISSE_CLE].comptes[cle]; const r = regleBaisseDe(m[REGLE_BAISSE_CLE], cle); return { site: plateforme, cle, baisse: r ? { actif: true, pct: r.pct, jours: r.jours } : { actif: false, pct: c && Number(c.pct) || null, jours: c && Number(c.jours) || null } }; })().catch(() => null);
   const retraits = await retraitsPourPanneau().catch(() => null);   // 5.426 : « Vendue → retirée sur »
-  return { ok: true, plateforme, compte: { id: moi, nom }, annonces, ventes, messages, automatisations, notifications, retraits, autres: null, fenetre: o.fenetre };
+  return { ok: true, plateforme, compte: { id: moi, nom }, annonces, ventes, achats, messages, automatisations, notifications, notifsSite, retraits, autres: null, fenetre: o.fenetre };
+}
+// 5.444 : l'état d'un ACHAT Vinted pour le panneau — a_retirer (règle `AT_RELAY` sur le texte de Vinted) · termine
+// (`completed`) · annule (`failed`, ou annulé / remboursé dit par Vinted) · en_cours (tout le reste, jamais « à retirer »).
+function etatAchatCarte(x) {
+  const st = String((x && x.status) || ''), tus = String((x && x.transaction_user_status) || '').toLowerCase();
+  if (AT_RELAY(st)) return 'a_retirer';
+  if (tus === 'failed' || /annul|rembours/i.test(st)) return 'annule';
+  if (tus === 'completed' || /finalis|termin/i.test(st)) return 'termine';
+  return 'en_cours';
+}
+// ── 5.444 : L'ÉTAT D'UNE VENTE VESTIAIRE POUR LE PANNEAU ─────────────────────────────────────────────────────────
+// <vc-etat-carte-regle> — COPIE de src/etatVenteVc.js `etatVenteVc` (et de `aExpedierVc`/`expeditionVc` de
+// api/_lib/vestiaire-regle.js), plus le litige (5.444) ; scripts/audit-vc-complet.cjs exige que les deux rendent le
+// même état sur les mêmes ventes. Clés : annulee · a_expedier · payee · litige · paiement · livree_controle · expediee ·
+// vendue · pas_su. « Colis fait » et « envoyée au transporteur » (preuves de l'app) n'existent pas ici : à expédier.
+const ETAPES_APRES_ENVOI_VC = ['sellerShipment', 'sellerDelivery', 'sellerConformity', 'sellerPayment'];
+const msDateVc = (x) => { const t = Date.parse(x || ''); return Number.isFinite(t) && t > 0 ? t : 0; };
+function etatVenteVcCarte(v, lectures) {
+  if (!v || typeof v !== 'object') return 'pas_su';
+  const e = v.etapesVc && typeof v.etapesVc === 'object' && !Array.isArray(v.etapesVc) ? v.etapesVc : {};
+  const mot = (k) => String(e[k] == null ? '' : e[k]).trim().toLowerCase();
+  const etape = ETAPES_APRES_ENVOI_VC.find((k) => mot(k) === 'done');
+  const preuve = !!etape || /^deliveryInProgress$/i.test(String(v.statutVc || '').trim());
+  const tPreuve = preuve ? msDateVc(v.etapesAt) : 0;
+  const la = lectures && typeof lectures === 'object' ? lectures['a-expedier'] : null;
+  const tAe = msDateVc(v.aExpedierAt) || (la ? Math.max(msDateVc(la.at), msDateVc(la.partielleAt)) : 0);
+  const aExp = v.aExpedier === true && (!preuve || !!(tPreuve && tAe && tAe > tPreuve));
+  const brut = String(v.etat || '').trim();
+  const motVc = !brut ? '' : /cancel|annul|refund|rembours|return|retour|litige|dispute/i.test(brut) ? 'annulee' : /payout|paid.?out|vers[ée]|virement|transferred|credited|cr[ée]dit/i.test(brut) ? 'versee' : /complet|finali|termin|closed|done|clotur/i.test(brut) ? 'terminee' : '';
+  if (!aExp && motVc === 'annulee') return 'annulee';
+  if (aExp) return 'a_expedier';
+  if (mot('sellerPayment') === 'done' || motVc === 'versee' || motVc === 'terminee') return 'payee';
+  if (v.litigeVc === true) return 'litige';
+  if (mot('sellerConformity') === 'done') return 'paiement';
+  if (mot('sellerDelivery') === 'done' || ['pending', 'ongoing'].includes(mot('sellerConformity'))) return 'livree_controle';
+  if (preuve) return 'expediee';
+  if (!brut || /^(in_progress|action_needed)$/i.test(brut) || mot('sellerSale') === 'done') return 'vendue';
+  return 'pas_su';
+}
+// </vc-etat-carte-regle>
+// Le « seau » du tableau des ventes (filtres communs à toutes les plateformes) ; le mot exact est `etatVc`.
+const SEAU_VENTE_VC = { annulee: 'annulee', a_expedier: 'a_expedier', payee: 'finalisee', litige: 'litige', paiement: 'en_route', livree_controle: 'en_route', expediee: 'en_route', vendue: 'pas_su', pas_su: 'pas_su' };
+// <vc-statut-annonce-regle> le mot de Vestiaire d'une annonce rangé pour le panneau (familles de la modération,
+// `familleModVc`) : en ligne, en cours d'examen, à corriger, refusée, vendue, retirée, brouillon ; inconnu ⇒ « pas revue ».
+function statutCarteVc(mot) {
+  const b = String(mot || '').trim();
+  if (!b) return 'a_confirmer';
+  if (/draft|brouillon/i.test(b)) return 'brouillon';
+  if (/hidden|masqu/i.test(b)) return 'masque';
+  if (/reserv/i.test(b)) return 'reserve';
+  return { 'en-ligne': 'en_vente', attente: 'examen', corriger: 'a_corriger', refusee: 'refusee', vendue: 'vendu', retiree: 'retiree' }[familleModVc(b)] || 'a_confirmer';
+}
+// </vc-statut-annonce-regle>
+// Les notifications Vestiaire de CE compte (gardées par `rangerVcNotifs`), utiles seulement, 7 jours, titre et photo
+// de l'article par IDENTITÉ (son identifiant : `vc_listings` / `vc_ventes`), jamais devinés.
+async function notifsVcCarte(moi, annonces, ventes) {
+  let cur = {};
+  try { cur = (await chrome.storage.local.get(VC_NOTIFS))[VC_NOTIFS] || {}; } catch (_) { return null; }
+  const titres = {};
+  for (const x of (annonces && annonces.toutes) || []) if (x && x.id) titres[x.id] = { titre: x.titre, photo: x.photo };
+  for (const x of (ventes && ventes.liste) || []) if (x && x.tx && !titres[x.tx]) titres[x.tx] = { titre: x.titre, photo: x.photo };
+  const limite = Date.now() - 7 * 864e5;
+  const toutes = Object.values(cur).filter((c) => c && c.compte === String(moi) && (Date.parse(c.at || c.vu || '') || 0) >= limite);
+  const utiles = toutes.filter(notifVcUtile);
+  const sorteDe = (c) => (c.sorte === 'aime' ? 'aime' : c.sorte === 'message' ? 'message' : (() => { const m = (c.mots || []).join(' '); return /offer|nego/i.test(m) ? 'offre' : /price|prix/i.test(m) ? 'prix' : /ship|deliver|livr|parcel|colis/i.test(m) ? 'colis' : /payment|payout|paiement/i.test(m) ? 'paiement' : /order|sale|sold|vente|commande/i.test(m) ? 'vente' : /return|retour|claim|dispute/i.test(m) ? 'litige' : 'annonce'; })());
+  return { lu: toutes.length ? Math.max(...toutes.map((c) => Date.parse(c.vu || '') || 0)) || null : null, ignorees: toutes.length - utiles.length,
+    liste: utiles.map((c) => ({ id: c.id, at: Date.parse(c.at || '') || null, lu: c.lu, sorte: sorteDe(c), produit: c.produit || '', titre: (titres[c.produit] && titres[c.produit].titre) || '', photo: (titres[c.produit] && titres[c.produit].photo) || (/^https:\/\/images\.vestiairecollective\.com\//.test(String(c.photo || '')) ? c.photo : '') }))
+      .sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 60) };
 }
 // 5.409 — MASQUER / AFFICHER DEPUIS LE PANNEAU, sur SON clic (`confirme`), par le geste APPRIS de la règle « vendue
 // ailleurs » (`PUT /api/v2/items/{id}/is_hidden`, `masquerAppris` sur SES gestes rangés : jamais appris ⇒ rien ne part,
@@ -28008,7 +28146,17 @@ async function carteListes(msg, sender) {
   const atelierProg = await atelierProgPour(u).catch(() => null);   // 5.422 : la republication programmée de CE compte
   const retraits = await retraitsPourPanneau().catch(() => null);   // 5.426 : « Vendue → retirée sur »
   const progVerif = await progVerifPour(u).catch(() => null);   // 5.438 : la programmation d'avant en pause « en vérification »
-  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, automatisations, notifications, offres, atelier, atelierProg, retraits, autres, progVerif, fenetre: o.fenetre };
+  // ── 5.444 : ACHATS de CE compte (la liste RANGÉE `harvest_{uid}_orders_purchased`, ses plus récents) — l'état du colis
+  //    par le champ machine de Vinted (`transaction_user_status`) et « au point relais » par LA règle `AT_RELAY` (= `isAtRelayStatus`
+  //    de l'app : `needs_action` n'est PAS « à retirer », CLAUDE.md §5) ; le texte de Vinted montré tel quel. Pas su ⇒ null.
+  let achats = null;
+  const la = await sbGet(`app_data?id=eq.harvest_${u}_orders_purchased&select=cap:data->>capturedAt,n:data->>nItems,${idxCarte('o', 'data->payload->my_orders', CARTE_LISTE_MAX)}`);
+  if (la !== null) {
+    const r0 = (la && la[0]) || null;
+    const os = r0 ? Array.from({ length: CARTE_LISTE_MAX }, (_, i) => r0['o' + i]).filter((x) => x && typeof x === 'object' && x.transaction_id != null) : [];
+    achats = { lu: r0 ? (Date.parse(r0.cap || '') || null) : null, total: r0 ? Number(r0.n) || os.length : 0, site: 'vinted', liste: os.map((x) => ({ id: String(x.transaction_id), conv: /^[1-9]\d{0,19}$/.test(String(x.conversation_id == null ? '' : x.conversation_id)) ? String(x.conversation_id) : '', titre: String(x.title || '').slice(0, 120), prix: prixCarte(x.price), photo: photoCarte(x), date: Date.parse(x.date || '') || null, statut: String(x.status || '').slice(0, 90), etat: etatAchatCarte(x) })).sort((a, b) => (Number(b.date) || 0) - (Number(a.date) || 0)) };
+  }
+  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, achats, messages, automatisations, notifications, offres, atelier, atelierProg, retraits, autres, progVerif, fenetre: o.fenetre };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
@@ -31613,6 +31761,8 @@ async function capterSuivisAchats(uid) {
         const rt = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
         if (!rt || !rt.ok || !rt.json) { noterDiag(`suivi_transaction_refuse_${(rt && rt.status) || 0}`); if (memoApresEchec(memo, tx, rt, SUIVI_RETRY_MS)) break; continue; }
         if (estErreurVinted(rt.json)) { noterDiag('suivi_erreur_vinted'); continue; }
+        // 5.443 : la transaction de l'achat vient d'être lue — elle est rangée (vendeur, articles, état ; aucune requête de plus).
+        try { if ((await rangerTransactionAchat(uid, acc, tx, rt.json)) === true) notifierApp({ type: 'maj', quoi: 'achatsdetails', uid: String(uid) }); } catch (_) {}
         const st = suiviDeTransaction(rt.json);
         await rangerFormeSuivi('transaction', formeSuivi(rt.json), st ? 'reconnue' : 'inconnue');
         if (!st) { noterDiag('suivi_transaction_forme_inconnue'); continue; }
@@ -32052,6 +32202,127 @@ async function capterDatesVersementUn(uid, opts) {
     return n;
   } catch (_) { return 0; }
 }
+// ═══ 5.443 (23 nov.) — LE DÉTAIL DES ACHATS : « LOT · N » PROUVÉ ══════════════════════════════════════════════
+// Julien (22 nov.) : « quand je fais un achat en lot, l'app comprend que c'est un lot, divise l'achat et propose de
+// répartir le prix ». L'app sait le faire (src/achatDivise.js, `lotDeLAchat`) dès qu'elle a la TRANSACTION de l'achat
+// (`harvest_{uid}_txn_{tx}` : `items_count`, `order.items[]` — id, titre, prix, photos de chaque article).
+// MESURÉ (base de prod, lecture seule, 23 nov.) : 3 479 achats dans les listes, 144 ont leur transaction rangée ;
+// 112 titres commencent par « Lot », 107 d'entre eux SANS transaction ⇒ « Lot ? » (le titre ne prouve rien, §5).
+// La forme est connue (43 transactions côté acheteur déjà rangées, `order.items[]` aux clés id/title/price/photos).
+// ⇒ Elle est LUE ici, achat par achat, exactement comme les dates de versement :
+//  · une LECTURE de ses propres achats (GET `/api/v2/transactions/{tx}`), rien n'est écrit chez Vinted ;
+//  · le compte de l'onglet seulement (`gardeLecture` : cookie lu, sinon rien), une requête à la fois (`vintedGet`),
+//    pause aléatoire 2–5 s, 429/403 ⇒ pause posée et série ARRÊTÉE (`memoApresEchec`), prudence ⇒ rien ;
+//  · budget de LECTURE partagé (20/h, tous Chrome), classe 'achat' : SOUS la réserve des codes de retrait, preuves de
+//    vente, dates de versement, relevés et suivis (« pas su » ⇒ réserve entière) — jamais leur place ; au plus
+//    `ACHAT_DETAIL_MAX_HEURE` par heure et `ACHAT_DETAIL_MAX_PAR_VISITE` par passage ;
+//  · L'ORDRE : les achats dont le titre commence par « Lot » d'abord (le plus récent d'abord), puis les autres sans
+//    détail (le plus récent d'abord) ; un essai raté n'est pas refait avant 24 h ;
+//  · rangé seulement si la réponse est CETTE transaction (`id` = le n°) vue CÔTÉ ACHETEUR ; sinon rien (noté) ;
+//  · le partage du prix reste SON toucher dans l'app (rien n'est divisé ici).
+const ACHAT_DETAIL_MAX_PAR_VISITE = 6;
+const ACHAT_DETAIL_MAX_HEURE = 8;
+const ACHAT_DETAIL_RETRY_MS = 24 * 60 * 60 * 1000;
+const ACHAT_DETAIL_LUS = 'vrmAchatDetailLus';     // { [uid]: [ms, …] } — les lectures de l'heure (§4.9)
+const ACHAT_DETAIL_FAITS = 'vrmAchatDetailFaits'; // { [uid]: { [tx]: ms } } — le dernier essai
+const RE_TITRE_LOT = /^\s*lot\b/i;
+// La liste à lire, dans l'ordre : les « Lot… » d'abord, puis les autres ; le plus récent d'abord dans chaque groupe.
+// (23 nov., mesure de l'agent scan-achat : 0 transaction d'achat captée sur 114 achats des 30 derniers jours) : les achats
+// EN COURS (ni finalisés, ni annulés, ni remboursés — à recevoir, à retirer) passent les premiers : leur détail porte le
+// vendeur, l'état, le suivi, le point relais. Puis les « Lot… », puis le reste ; le plus récent d'abord dans chaque groupe.
+const RE_ACHAT_FINI = /finalis|annul|cancel|rembours|refund|termin|retourn|suspend|[ée]chou|failed/i;
+const achatEnCours = (o) => !RE_ACHAT_FINI.test(String((o && o.status) || ''));
+function ordreDetailsAchats(achats) {
+  const l = ordrePlusRecentes((achats || []).filter((o) => o && /^\d{4,20}$/.test(String(o.transaction_id == null ? '' : o.transaction_id))));
+  const lot = (o) => RE_TITRE_LOT.test(String(o.title || ''));
+  return [...l.filter(achatEnCours), ...l.filter((o) => !achatEnCours(o) && lot(o)), ...l.filter((o) => !achatEnCours(o) && !lot(o))];
+}
+// Range la transaction d'un ACHAT lue chez Vinted : CETTE transaction (id = n°), côté ACHETEUR, sinon rien.
+// → true rangée · false pas rangée (pas la bonne, noté) · null notre base a refusé.
+async function rangerTransactionAchat(uid, acc, tx, json) {
+  const t = json && typeof json === 'object' ? json.transaction : null;
+  if (!t || typeof t !== 'object') { noterDiag('achat_detail_sans_transaction'); return false; }
+  if (String(t.id == null ? '' : t.id) !== String(tx)) { noterDiag('achat_detail_autre_tx'); return false; }
+  if (String(t.user_side || '') !== 'buyer') { noterDiag('achat_detail_pas_acheteur'); return false; }
+  if (!(t.order && typeof t.order === 'object' && Array.isArray(t.order.items))) noterDiag('achat_detail_sans_articles');
+  const data = { type: 'transaction', uid: String(uid), domain: (acc && acc.domain) || 'www.vinted.fr',
+    capturedAt: new Date().toISOString(), payload: alleger('transaction', json) };
+  const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_txn_${tx}`, data }], 'id');
+  if (ok === false) { noterDiag('achat_detail_ecriture_ratee'); return null; }
+  noterDiag(Number(t.items_count) > 1 || (Array.isArray(t.order && t.order.items) && t.order.items.length > 1) ? 'achat_detail_lot' : 'achat_detail_ecrit');
+  return true;
+}
+async function detailsAchatsLusHeure(uid) {
+  try { return (((await chrome.storage.local.get(ACHAT_DETAIL_LUS))[ACHAT_DETAIL_LUS] || {})[String(uid)] || []).filter((x) => x > Date.now() - 3600000); } catch (_) { return null; }
+}
+async function noterDetailAchatLu(uid) {
+  try {
+    const cur = (await chrome.storage.local.get(ACHAT_DETAIL_LUS))[ACHAT_DETAIL_LUS] || {};
+    const t = Date.now();
+    cur[String(uid)] = (cur[String(uid)] || []).filter((x) => x > t - 3600000).concat([t]);
+    await chrome.storage.local.set({ [ACHAT_DETAIL_LUS]: cur });
+  } catch (_) {}
+}
+let _detailsAchatsEnCours = null;
+async function capterDetailsAchats(uid) {
+  if (_detailsAchatsEnCours) { try { noterDiag('achat_detail_deja_en_cours'); } catch (_) {} return 0; }
+  _detailsAchatsEnCours = capterDetailsAchatsUn(uid).finally(() => { _detailsAchatsEnCours = null; });
+  return _detailsAchatsEnCours;
+}
+async function capterDetailsAchatsUn(uid) {
+  try {
+    if (!uid) return 0;
+    if (await compteNonCapte(uid)) return 0;
+    const accts = await getStoredAccounts();
+    const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    const achats = await achatsDuCompte(uid);
+    if (achats === null) return 0;                                         // pas su
+    const det = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id`);
+    if (det === null) return 0;                                            // pas su
+    const avecDetail = new Set();
+    for (const r of det) { const tx = (/_txn_(\d+)$/.exec(String((r && r.id) || '')) || [])[1]; if (tx) avecDetail.add(tx); }
+    let faits = {};
+    try { faits = (((await chrome.storage.local.get(ACHAT_DETAIL_FAITS))[ACHAT_DETAIL_FAITS] || {})[String(uid)]) || {}; } catch (_) { return 0; }
+    for (const k of Object.keys(faits)) if (Date.now() - Number(faits[k]) > ACHAT_DETAIL_RETRY_MS) delete faits[k];
+    const aLire = (o) => { const tx = String(o.transaction_id); return !avecDetail.has(tx) && !(faits[tx] && Date.now() - Number(faits[tx]) < ACHAT_DETAIL_RETRY_MS); };
+    const cibles = ordreDetailsAchats([...achats.values()]).filter(aLire);
+    const lotsRestants = () => cibles.filter((o) => RE_TITRE_LOT.test(String(o.title || '')) && aLire(o)).length;
+    if (!cibles.length) { await noterLecturesDues(uid, 'achat', 0, { lots: 0 }); return 0; }
+    let n = 0, ecrits = 0;
+    for (const o of cibles) {
+      if (n >= ACHAT_DETAIL_MAX_PAR_VISITE) break;
+      const tx = String(o.transaction_id);
+      const lus = await detailsAchatsLusHeure(uid);
+      if (lus === null) { noterDiag('achat_detail_compteur_muet'); break; }
+      if (lus.length >= ACHAT_DETAIL_MAX_HEURE) { noterDiag('achat_detail_plafond_heure'); break; }
+      if (n > 0) await pauseLectureArgent();
+      const refus = await gardeLecture(uid, acc, 'achat');
+      if (refus) { noterDiag(`achat_detail_refus_${String(refus.code || '').replace(/[^a-z-]/g, '').slice(0, 24)}`); break; }
+      await noterDetailAchatLu(uid);
+      faits[tx] = Date.now();
+      n++;
+      const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
+      if (!rep || !rep.ok || !rep.json) { noterDiag(`achat_detail_refuse_${(rep && rep.status) || 0}`); if (memoApresEchec(faits, tx, rep, ACHAT_DETAIL_RETRY_MS)) break; continue; }
+      if (estErreurVinted(rep.json)) { noterDiag('achat_detail_erreur_vinted'); continue; }
+      // L'identité : CETTE transaction, côté acheteur (`rangerTransactionAchat`). Autre chose ⇒ rien n'est rangé.
+      const rg = await rangerTransactionAchat(uid, acc, tx, rep.json);
+      if (rg === null) { delete faits[tx]; break; }   // notre base refuse : relu au passage suivant
+      if (rg === true) { avecDetail.add(tx); ecrits++; }
+    }
+    try {
+      const cur = (await chrome.storage.local.get(ACHAT_DETAIL_FAITS))[ACHAT_DETAIL_FAITS] || {};
+      cur[String(uid)] = Object.fromEntries(Object.entries(faits).sort((a, b) => b[1] - a[1]).slice(0, 4000));
+      await chrome.storage.local.set({ [ACHAT_DETAIL_FAITS]: cur });
+    } catch (_) {}
+    await noterLecturesDues(uid, 'achat', cibles.filter(aLire).length, { lots: lotsRestants() });
+    if (ecrits) {
+      logActivity(`🧾 ${ecrits} détail${ecrits > 1 ? 's' : ''} d'achat récupéré${ecrits > 1 ? 's' : ''}`);
+      notifierApp({ type: 'maj', quoi: 'achatsdetails', uid: String(uid) });
+    }
+    return n;
+  } catch (_) { return 0; }
+}
 // Le passage de fond (alarme `vrm-versement`, 20 min) : seulement avec un onglet
 // vinted.fr ouvert, le compte de son cookie, une session VRM, aucune pause, une
 // base qui répond, un compte capté ; et seulement s'il reste des dates à lire
@@ -32077,6 +32348,9 @@ async function tickVersements() {
     // 5.378 : d'abord les mois du relevé (une lecture date tout un mois), seulement
     // avec une recette apprise et des mois que Vinted liste ; mêmes gardes, même budget.
     try { if (await recetteReleve(uid)) await capterReleves(uid); } catch (_) {}
+    // 5.443 : le détail des achats (« Lot… » d'abord) — sous la réserve des lecteurs prioritaires, 8/h au plus.
+    try { const da = (((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}).achat || null;
+      if (!(da && Date.now() - Number(da.at || 0) < LECTURES_DUES_VALIDITE_MS && !(Number(da.reste) > 0))) await capterDetailsAchats(uid); } catch (_) {}
     let d = null;
     try { d = (((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}).versement || null; } catch (_) { return 0; }
     if (d && Date.now() - Number(d.at || 0) < LECTURES_DUES_VALIDITE_MS && !(Number(d.reste) > 0)) return 0;
@@ -40053,6 +40327,19 @@ try { chrome.storage.local.remove(['vrmVcBrutIds', 'vrmVcBrutAutres']); } catch 
 // un bordereau Vinted, §3 « générer un bordereau et récupérer son PDF »), vérifie
 // « %PDF » et le range dans `vc_label_{produit}` ; la vente porte
 // `bordereau: { id, at }`. Une adresse expirée ou illisible ⇒ rien rangé, dit.
+// 5.444 — <vc-litige-regle> (même règle que api/_lib/vestiaire-regle.js `litigeDeFriseVc`, audit-vc-complet.cjs les compare) :
+// la frise rebâtie champ par champ ; le litige = une étape EN COURS (ou en attente) dont `probleme` est vrai.
+function friseVcPropre(f) {
+  return (Array.isArray(f) ? f : []).slice(0, 12).filter((x) => x && typeof x === 'object' && /^[A-Za-z][\w-]{0,39}$/.test(String(x.k || '')))
+    .map((x) => ({ k: String(x.k), statut: String(x.statut || '').slice(0, 20), date: String(x.date || '').slice(0, 40), cle: /^[\w.:-]{1,60}$/.test(String(x.cle || '')) ? String(x.cle) : '', titre: coupeVc(x.titre || '', 80), texte: coupeVc(x.texte || '', 240), probleme: x.probleme === true ? true : x.probleme === false ? false : null }));
+}
+function litigeDeFriseVc(f) {
+  const en = (Array.isArray(f) ? f : []).filter((x) => x && /^(ongoing|pending|onhold|on_hold|blocked)$/i.test(String(x.statut || '')));
+  if (en.some((x) => x.probleme === true)) return true;
+  const conf = (Array.isArray(f) ? f : []).find((x) => x && /conformity/i.test(String(x.k || '')));
+  return conf && conf.probleme === false ? false : null;
+}
+// </vc-litige-regle>
 async function rangerVcTimeline(m, compte) {
   const pid = String(m.productId || '');
   if (!/^\d{3,15}$/.test(pid)) return false;
@@ -40080,6 +40367,10 @@ async function rangerVcTimeline(m, compte) {
       // 5.383 : l'heure où CETTE frise a été lue (comparée à `aExpedierAt` par l'app : l'état le plus frais gagne).
       ...((m.etapes && Object.keys(m.etapes).length) || m.statut ? { etapesAt: new Date().toISOString() } : {}),
       paiementEstime: m.paiementEstime || prev.paiementEstime || '',
+      // 5.444 : la frise DATÉE (étapes dans l'ordre de Vestiaire, date affichée, clé, texte borné) et le LITIGE lu
+      // (`litigeDeFriseVc` : une étape en cours dont la clé ou le texte de Vestiaire DIT un problème signalé / un paiement
+      // mis en attente ⇒ true ; une étape de conformité lue sans ce signe ⇒ false ; rien lu ⇒ on garde l'avant).
+      ...(Array.isArray(m.frise) && m.frise.length ? (() => { const f = friseVcPropre(m.frise); const l = litigeDeFriseVc(f); return Object.assign({ friseVc: f }, l === null ? {} : { litigeVc: l }); })() : {}),
       // 5.435 (choix 2b) le colis RETOUR que la frise nomme : le n° et le transporteur gardés, la 1re fois vue datée
       // (le début du retour pour la règle `api/_lib/retour-vente-suivi.js`), jamais effacés par une lecture qui ne les dit pas.
       ...(m.retour && typeof m.retour === 'object' && (m.retour.suivi || m.retour.statut || m.retour.cle) ? { retourVc: {
@@ -40096,11 +40387,59 @@ async function rangerVcTimeline(m, compte) {
   return run;
 }
 let _vcAnnoncesChaine = Promise.resolve();
-function rangerVcAnnonces(patch) {
-  const run = _vcAnnoncesChaine.then(() => rangerVcAnnoncesMaintenant(patch)).catch(() => false);
-  _vcAnnoncesChaine = run.then(() => {}, () => {});
-  return run;
+// ══ 5.443 (23 nov.) — « MES ARTICLES » RANGÉS UNE FOIS PAR VISITE ══════════════════════════════════════════
+// Mesuré au banc (scripts/audit-vc-annonces-une-fois.cjs, 1 000 annonces inventées) : la page charge « Mes articles »
+// par pages (5 de 200) et ses compteurs ; CHAQUE réponse relisait toute la ligne `vc_listings` (`select=data`, les
+// 1 000 fiches), la réécrivait en entier et réveillait l'app, qui la relisait à son tour : 6 lectures complètes et
+// 6 écritures complètes par visite. La cause : un rangement par réponse (`rangerVcAnnonces` → une lecture-fusion-
+// écriture à chaque fois), pas plusieurs déclencheurs ni des onglets en double (vc-inject.js ne s'installe qu'une
+// fois par page, `__vrmVcInjected`, et la page ne recommence pas sa pagination).
+// ⇒ Les réponses d'une même visite sont MISES EN FILE et rangées ENSEMBLE : une lecture de la ligne, chaque réponse
+// appliquée DANS L'ORDRE (exactement la règle d'avant, page par page : une liste entière ne fait foi que lue en
+// entier, une page partielle complète sans rien retirer — jamais une partielle par-dessus une complète), UNE
+// écriture, UN réveil de l'app. La file part : quand la liste est lue EN ENTIER (`complet`), quand un lien de
+// publication arrive (on l'attend), après 2,5 s sans nouvelle réponse, et au plus tard 15 s après la première
+// (fraîcheur). Chaque réponse n'est dite « rangée » à la page qu'une fois l'écriture faite (base qui refuse ⇒ faux,
+// comme avant). La file vit aussi dans chrome.storage.local (§4.9) : un service worker tué avant la fin la reprend
+// au réveil suivant (réappliquer une page déjà rangée ne change rien).
+const VC_ANNONCES_CALME_MS = 2500;
+const VC_ANNONCES_MAX_MS = 15000;
+const VC_ANNONCES_FILE = 'vrmVcAnnoncesFile';
+let _vcFile = [];                 // [{ patch, fin }] — les réponses pas encore rangées
+let _vcFileMinuteur = null, _vcFileDebut = 0;
+function garderFileVc() {
+  try { return chrome.storage.local.set({ [VC_ANNONCES_FILE]: { at: Date.now(), patches: _vcFile.map((x) => x.patch).slice(-40) } }).catch(() => {}); } catch (_) { return Promise.resolve(); }
 }
+function rangerVcAnnonces(patch) {
+  return new Promise((fin) => {
+    _vcFile.push({ patch: patch || {}, fin });
+    if (!_vcFileDebut) _vcFileDebut = Date.now();
+    garderFileVc();
+    const tout = !!(patch && (patch.liens || patch.complet)) || Date.now() - _vcFileDebut >= VC_ANNONCES_MAX_MS;
+    if (_vcFileMinuteur) { clearTimeout(_vcFileMinuteur); _vcFileMinuteur = null; }
+    if (tout) viderFileVc();
+    else _vcFileMinuteur = setTimeout(() => { viderFileVc(); }, VC_ANNONCES_CALME_MS);
+  });
+}
+function viderFileVc() {
+  if (_vcFileMinuteur) { clearTimeout(_vcFileMinuteur); _vcFileMinuteur = null; }
+  const lot = _vcFile; _vcFile = []; _vcFileDebut = 0;
+  if (!lot.length) return _vcAnnoncesChaine.then(() => true);
+  const run = _vcAnnoncesChaine.then(() => rangerVcAnnoncesMaintenant(lot.map((x) => x.patch))).catch(() => false);
+  _vcAnnoncesChaine = run.then(() => {}, () => {});
+  return run.then((ok) => { garderFileVc(); for (const x of lot) { try { x.fin(ok); } catch (_) {} } return ok; });
+}
+// Au réveil du service worker : une file restée en stockage (worker tué pendant l'attente) est rangée.
+async function reprendreFileVc() {
+  try {
+    const g = (await chrome.storage.local.get(VC_ANNONCES_FILE))[VC_ANNONCES_FILE];
+    const patches = g && Array.isArray(g.patches) ? g.patches.filter((x) => x && typeof x === 'object') : [];
+    if (!patches.length || _vcFile.length) return false;
+    for (const patch of patches) _vcFile.push({ patch, fin: () => {} });
+    return await viderFileVc();
+  } catch (_) { return false; }
+}
+try { setTimeout(() => { reprendreFileVc().catch(() => {}); }, 1500); } catch (_) {}
 // ── L'ANNONCE VESTIAIRE PUBLIÉE PAR VRM, RETROUVÉE PAR IDENTITÉ (19 nov., 5.409) ──
 // Mesuré le 19 nov. : les 3 liens de publication étaient rangés sous l'identifiant du brouillon IA (36 caractères,
 // `ai-product-drafts`), alors que « Mes annonces » liste l'annonce sous son identifiant NUMÉRIQUE (8 chiffres) : aucun ne
@@ -40147,6 +40486,8 @@ function liensPublieesVc(publiees, lus, liens) {
 // ce que Vestiaire a TRANCHÉ entre deux lectures de la MÊME annonce (son identifiant) : jamais déduit d'une
 // disparition, il faut le NOUVEAU mot.
 const VC_MOD_FAMILLES = [
+  // (23 nov., 5.444) MESURÉ : « En cours d'examen » est `unpublishedSubmitted` — « unpublish » le rangeait en « retirée ».
+  ['attente', /^unpublished.?submitted$/i],
   ['vendue', /sold|vendu/i],
   ['retiree', /withdraw|retir|delet|supprim|archiv|expir|inactiv|unpublish|deactiv|cancel|annul|unreceived/i],
   ['refusee', /invalid|reject|refus/i],
@@ -40192,11 +40533,35 @@ function annoncerModerationVc(evts) {
 }
 // Un clic sur la notification ouvre Vestiaire dans VRM (jamais une adresse reçue).
 try { if (chrome.notifications && chrome.notifications.onClicked) chrome.notifications.onClicked.addListener((id) => { if (/^vrm-vc-mod-/.test(String(id || ''))) { try { chrome.tabs.create({ url: 'https://vrm.center/?tab=plat_vestiaire' }); } catch (_) {} try { chrome.notifications.clear(id); } catch (_) {} } }); } catch (_) {}
-async function rangerVcAnnoncesMaintenant(patch) {
+// 5.443 : `patches` — les réponses d'une visite, rangées ensemble (UNE lecture, UNE écriture, voir plus haut) ;
+// chacune est appliquée sur l'état laissé par la précédente, exactement comme si elle était rangée seule.
+async function rangerVcAnnoncesMaintenant(patches) {
+  const liste = (Array.isArray(patches) ? patches : [patches]).filter((x) => x && typeof x === 'object');
+  if (!liste.length) return true;
   const rows = await sbGet('app_data?id=eq.vc_listings&select=data');
-  if (rows === null) return false;
-  const cur = (rows && rows[0] && rows[0].data) || {};
+  if (rows === null) return false;                                     // lecture ratée : RIEN n'est écrit
+  let cur = (rows && rows[0] && rows[0].data) || {};
   const maintenant = new Date().toISOString();
+  let change = false, reveil = false;
+  const evtsMod = [], captes = [];
+  for (const patch of liste) {
+    const r = await appliquerPatchVc(cur, patch, maintenant, evtsMod);
+    if (r.change) { change = true; cur = r.data; }
+    if (r.change && (Array.isArray(patch.items) || patch.compteurs)) reveil = true;
+    if (r.change && Array.isArray(patch.items)) captes.push(patch);
+  }
+  if (!change) return true;
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_listings', data: cur }], 'id');
+  if (ok === true && reveil) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  if (ok === true && evtsMod.length) annoncerModerationVc(evtsMod);
+  if (ok === true) for (const patch of captes) {
+    const compte = /^[\w-]{1,40}$/.test(String(patch.compte || '')) ? String(patch.compte) : '';
+    await capteVc('annonces', compte, patch.items.slice(0, 200).filter((x) => x && /^[\w-]{1,40}$/.test(String(x.id || ''))).map((x) => ({ id: String(x.id), t: x.date || x.creeLe || null })));   // 5.377
+  }
+  return ok === true;
+}
+// Une réponse appliquée à l'état `cur` (rien n'est lu ni écrit ici) → { change, data }.
+async function appliquerPatchVc(cur, patch, maintenant, evtsMod) {
   const data = Object.assign({}, cur, { items: Object.assign({}, cur.items || {}), liens: Object.assign({}, cur.liens || {}), capturedAt: cur.capturedAt || null, complet: !!cur.complet, total: cur.total == null ? null : cur.total });
   const compte = /^[\w-]{1,40}$/.test(String(patch.compte || '')) ? String(patch.compte) : '';
   let change = false;
@@ -40205,7 +40570,6 @@ async function rangerVcAnnoncesMaintenant(patch) {
     if (data.liens[k] !== String(v)) { data.liens[k] = String(v); change = true; }
   }
   // 5.439 : les compteurs de Vestiaire pour CE compte (jamais sans compte : on ne saurait pas à qui ils sont).
-  const evtsMod = [];
   if (patch.compteurs && compte) {
     const c = compteursVcPropres(patch.compteurs, maintenant);
     if (c) { data.compteurs = Object.assign({}, cur.compteurs || {}, { [compte]: c }); change = true; }
@@ -40248,15 +40612,12 @@ async function rangerVcAnnoncesMaintenant(patch) {
     else data.items = Object.assign(data.items, lus);
     data.complet = entier; data.total = total; data.capturedAt = maintenant; change = true;
     if (data.formeInconnue) delete data.formeInconnue;
+    // 5.444 : des enveloppes illisibles à côté des annonces lues ⇒ leur forme est gardée (noms de clés), la page n'a pas fait foi.
+    if (Number(patch.inconnues) > 0 && Array.isArray(patch.inconnu)) { data.formeInconnue = patch.inconnu.slice(0, 60).map((c) => String(c).slice(0, 120)); data.inconnues = Math.min(200, Number(patch.inconnues)); } else if (data.inconnues) delete data.inconnues;
     if (compte) data.lectures = Object.assign({}, cur.lectures || {}, { [compte]: { at: maintenant, total, complet: entier } });
     if (Array.isArray(patch.forme) && patch.forme.length) data.forme = patch.forme.slice(0, 120).map((c) => String(c).slice(0, 120));
   }
-  if (!change) return true;
-  const ok = await supabaseUpsert('app_data', [{ id: 'vc_listings', data }], 'id');
-  if (ok === true && (Array.isArray(patch.items) || patch.compteurs)) notifierApp({ type: 'maj', quoi: 'vestiaire' });
-  if (ok === true && evtsMod.length) annoncerModerationVc(evtsMod);
-  if (ok === true && Array.isArray(patch.items)) await capteVc('annonces', compte, patch.items.slice(0, 200).filter((x) => x && /^[\w-]{1,40}$/.test(String(x.id || ''))).map((x) => ({ id: String(x.id), t: x.date || x.creeLe || null })));   // 5.377
-  return ok === true;
+  return { change, data };
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -40805,6 +41166,7 @@ async function repondreOffreVestiaire(msg) {
 //    Vestiaire renvoie TON offre à ce prix. Un refus arrête tout (rien n'est relancé seul).
 const VC_AIMES = 'vrmVcAimes';
 const VC_AIMES_FAITS = 'vrmVcAimesFaits';
+const VC_AIMES_INFOS = 'vrmVcAimesInfos';   // 5.444 (LOCAL) : { [article]: { compte, photo } } — de la notification du compte de l'onglet
 const VC_AIMES_MAX_ARTICLES = 400, VC_AIMES_MAX_PAR_ARTICLE = 200;
 const VC_AIMES_PAR_TOUCHER = 10;
 // (20 nov., 5.410) ALIGNÉ sur le rythme des favoris Vinted du 19 nov. (« on garde toujours le temps aléatoire » :
@@ -40855,9 +41217,49 @@ async function rangerVcAimesMaintenant(m, compte) {
     const recent = (p) => Object.values(tout[p] || {}).map(String).sort().pop() || '';
     for (const p of articles.sort((a, b) => recent(a).localeCompare(recent(b))).slice(0, articles.length - VC_AIMES_MAX_ARTICLES)) delete tout[p];
   }
+  // 5.444 : l'article aimé est un article de CE compte — la notification « … vient d'aimer VOTRE pièce » est celle du
+  // compte de l'onglet ET de la page (`compteVcCapture`, sinon '' : rien n'est posé). Gardé dans CE navigateur avec la
+  // photo de la carte (`vrmVcAimesInfos`) : le panneau montre l'article même s'il n'a pas (encore) été lu dans « Mes
+  // articles », et ne le montre qu'à CE compte.
+  let infosChange = false;
+  try {
+    const o = await chrome.storage.local.get(VC_AIMES_INFOS); const infos = o[VC_AIMES_INFOS] || {};
+    for (const x of neufs) {
+      const p = String(x.produit), cur = infos[p] || {};
+      const nv = { compte: compte && /^[\w-]{1,40}$/.test(String(compte)) ? String(compte) : (cur.compte || ''), photo: /^https:\/\/images\.vestiairecollective\.com\//.test(String(x.photo || '')) ? String(x.photo) : (cur.photo || '') };
+      if (nv.compte !== (cur.compte || '') || nv.photo !== (cur.photo || '')) { infos[p] = nv; infosChange = true; }
+    }
+    const ks = Object.keys(infos); if (ks.length > VC_AIMES_MAX_ARTICLES) for (const k of ks.slice(0, ks.length - VC_AIMES_MAX_ARTICLES)) delete infos[k];
+    if (infosChange) await chrome.storage.local.set({ [VC_AIMES_INFOS]: infos });
+  } catch (_) {}
   if (!change) return true;
   try { await chrome.storage.local.set({ [VC_AIMES]: tout }); } catch (_) { return false; }
   return await publierAimesVc(tout, faits, compte);
+}
+// ── 5.444 LES NOTIFICATIONS DE VESTIAIRE (vc-inject `noteNotifsVc`) ─────────────────────────────────────────────
+// Gardées dans CE navigateur (`vrmVcNotifs`, 150 au plus, par identifiant de carte), avec le compte de l'onglet ET de la
+// page (sinon rien n'est gardé : on ne saurait pas à qui elles sont). Aucune n'est envoyée en base. Le panneau n'en
+// montre que les UTILES (`notifVcUtile`) : un « j'aime », un message, ou une carte dont les mots machine disent une
+// vente, une commande, une offre, un prix, un colis, un paiement, une annonce (modération) ; le reste (publicité,
+// « nos trouvailles », « offre exclusive ») est compté, jamais montré.
+const VC_NOTIFS = 'vrmVcNotifs';
+const RE_NOTIF_VC_UTILE = /order|sale|sold|vente|commande|offer|nego|price|prix|ship|deliver|livr|parcel|colis|payment|payout|paiement|listing|product.?(valid|refus|reject|approv|moder)|moderat|review|return|retour|claim|dispute/i;
+function notifVcUtile(c) { return !!c && (c.sorte === 'aime' || c.sorte === 'message' || (Array.isArray(c.mots) && c.mots.some((m) => RE_NOTIF_VC_UTILE.test(String(m))))); }
+async function rangerVcNotifs(cartes, compte) {
+  if (!/^[\w-]{1,40}$/.test(String(compte || ''))) return false;
+  const liste = (Array.isArray(cartes) ? cartes : []).filter((c) => c && /^[\w-]{1,64}$/.test(String(c.id || ''))).slice(0, 100);
+  if (!liste.length) return false;
+  let cur;
+  try { cur = (await chrome.storage.local.get(VC_NOTIFS))[VC_NOTIFS] || {}; } catch (_) { return false; }
+  const vu = new Date().toISOString();
+  for (const c of liste) {
+    const k = String(compte) + '|' + String(c.id), p = cur[k] || {};
+    cur[k] = { compte: String(compte), id: String(c.id), at: String(c.at || p.at || ''), lu: c.lu === true ? true : c.lu === false ? false : (p.lu == null ? null : p.lu), sorte: c.sorte || p.sorte || 'autre', produit: String(c.produit || p.produit || ''), photo: String(c.photo || p.photo || ''), mots: Array.isArray(c.mots) && c.mots.length ? c.mots.slice(0, 5) : (p.mots || []), vu: p.vu || vu };
+  }
+  const ks = Object.keys(cur).sort((a, b) => String(cur[b].at || cur[b].vu).localeCompare(String(cur[a].at || cur[a].vu)));
+  for (const k of ks.slice(150)) delete cur[k];
+  try { await chrome.storage.local.set({ [VC_NOTIFS]: cur }); } catch (_) { return false; }
+  return true;
 }
 // (15 nov., coordinateur : « les mêmes techniques que pour Vinted, aléatoirement ») — la série suit
 // EXACTEMENT les favoris Vinted, en RÉUTILISANT leurs fonctions :
@@ -40928,7 +41330,9 @@ async function offrirAuxAimesVc(msg) {
     const lu = centsPrixVc(it.prix);
     if (lu == null) return { accepte: false, code: 'prix-pas-lu', raison: "le prix de cet article n'a pas été lu — ouvre « Mes articles » sur Vestiaire, rien n'est parti" };
     if (lu !== avant) return { accepte: false, code: 'prix-change', prixVu: lu / 100, raison: `le prix lu n'est plus celui de l'aperçu (${(lu / 100).toFixed(2).replace('.', ',')} €) — rien n'est parti` };
-    const compte = String(it.compte || '');
+    // 5.444 : l'article non rangé sous un compte prend celui de SA notification « vient d'aimer » (compte de l'onglet ET de la page).
+    let compte = String(it.compte || '');
+    if (!compte) { try { const inf = ((await chrome.storage.local.get(VC_AIMES_INFOS))[VC_AIMES_INFOS] || {})[produit]; compte = inf && /^[\w-]{1,40}$/.test(String(inf.compte || '')) ? String(inf.compte) : ''; } catch (_) { compte = ''; } }
     if (!compte) return { accepte: false, code: 'session', raison: "je ne sais pas à quel compte Vestiaire appartient cet article — recharge « Mes articles » sur Vestiaire (connecté sur ton compte), puis réessaie" };
     // 5.432 (`gardeprix`) : la garde du prix de l'offre (SON clic : un prix suspect attend la confirmation du chiffre).
     const gpVa = await gardePrixEcriture({ sorte: 'offre', site: 'vestiaire', uid: compte, id: produit, prixC: prix, actuelC: lu, mode: 'main', confirmeC: msg && msg.gardeConfirmeC });
@@ -41113,7 +41517,9 @@ async function baisserPrixVestiaire(msg) {
     const lu = centsPrixVc(it.prix);
     if (lu == null) return { accepte: false, code: 'prix-pas-lu', raison: "le prix de cette annonce n'a pas été lu — ouvre « Mes articles » sur Vestiaire, rien n'est parti" };
     if (lu !== avant) return { accepte: false, code: 'prix-change', prixVu: lu / 100, raison: `le prix lu n'est plus celui de l'aperçu (${(lu / 100).toFixed(2).replace('.', ',')} €) — rien n'est parti` };
-    const compte = String(it.compte || '');
+    // 5.444 : l'article non rangé sous un compte prend celui de SA notification « vient d'aimer » (compte de l'onglet ET de la page).
+    let compte = String(it.compte || '');
+    if (!compte) { try { const inf = ((await chrome.storage.local.get(VC_AIMES_INFOS))[VC_AIMES_INFOS] || {})[produit]; compte = inf && /^[\w-]{1,40}$/.test(String(inf.compte || '')) ? String(inf.compte) : ''; } catch (_) { compte = ''; } }
     if (!compte) return { accepte: false, code: 'session', raison: "je ne sais pas à quel compte Vestiaire appartient cette annonce — recharge « Mes articles » sur Vestiaire (connecté sur ton compte), puis réessaie" };
     // 5.432 (`gardeprix`) : la garde du prix (à la main : confirmation du chiffre ; règle automatique : rien ne part).
     const gpVp = await gardePrixEcriture({ sorte: 'prix', site: 'vestiaire', uid: compte, id: produit, num: msg.num, prixC: apres, actuelC: lu, mode: msg.auto === true ? 'auto' : 'main', confirmeC: msg.gardeConfirmeC });

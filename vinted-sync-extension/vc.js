@@ -81,7 +81,7 @@
           // 5.410 : la date de mise en ligne LUE chez Vestiaire (`listingDate`), et les négociations (trois nombres).
           misEnLigne: /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(String((x && x.misEnLigne) || '')) ? String(x.misEnLigne).slice(0, 30) : '',
           negos: x && x.negos && typeof x.negos === 'object' ? { total: Number.isInteger(x.negos.total) ? x.negos.total : null, enCours: Number.isInteger(x.negos.enCours) ? x.negos.enCours : null, aToi: Number.isInteger(x.negos.aToi) ? x.negos.aToi : null } : null }));
-        chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vc', action: 'vcAnnonces', items, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, suite(d)), () => { void chrome.runtime.lastError; });
+        chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vc', action: 'vcAnnonces', items, inconnues: Number.isInteger(d.inconnues) && d.inconnues > 0 ? Math.min(d.inconnues, 200) : 0, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, suite(d)), () => { void chrome.runtime.lastError; });
         return;
       }
       // 5.439 : les compteurs de « Mes articles » (en vente, en attente de validation, de photos, refusées) — six nombres ou null.
@@ -95,7 +95,10 @@
       // 5.316 : le suivi d'UNE vente (transporteur, n° de suivi, bordereau PDF signé, étapes).
       if (d.kind === 'vctimeline' && /^\d{3,15}$/.test(String(d.productId || ''))) {
         const et = d.etapes && typeof d.etapes === 'object' ? Object.fromEntries(Object.entries(d.etapes).slice(0, 12).map(([k, v]) => [String(k).slice(0, 30), String(v).slice(0, 20)])) : {};
-        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcTimeline', productId: String(d.productId), transporteur: String(d.transporteur || '').slice(0, 40), suivi: /^[A-Z0-9]{6,40}$/i.test(String(d.suivi || '')) ? String(d.suivi) : '', bordereau: /^https:\/\/[\w.-]+\.amazonaws\.com\//i.test(String(d.bordereau || '')) ? String(d.bordereau).slice(0, 2000) : '', typeBordereau: String(d.typeBordereau || '').slice(0, 30), statut: String(d.statut || '').slice(0, 40), etapes: et, paiementEstime: String(d.paiementEstime || '').slice(0, 40), moi: moiDe(d), retour: d.retour && typeof d.retour === 'object' ? { cle: String(d.retour.cle || '').slice(0, 40), statut: String(d.retour.statut || '').slice(0, 20), suivi: /^[A-Z0-9]{6,40}$/i.test(String(d.retour.suivi || '')) ? String(d.retour.suivi) : '', transporteur: String(d.retour.transporteur || '').slice(0, 40) } : null }, () => { void chrome.runtime.lastError; });
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcTimeline', productId: String(d.productId), transporteur: String(d.transporteur || '').slice(0, 40), suivi: /^[A-Z0-9]{6,40}$/i.test(String(d.suivi || '')) ? String(d.suivi) : '', bordereau: /^https:\/\/[\w.-]+\.amazonaws\.com\//i.test(String(d.bordereau || '')) ? String(d.bordereau).slice(0, 2000) : '', typeBordereau: String(d.typeBordereau || '').slice(0, 30), statut: String(d.statut || '').slice(0, 40), etapes: et, paiementEstime: String(d.paiementEstime || '').slice(0, 40), moi: moiDe(d),
+          // 5.444 : la frise datée (statut, date affichée, clé, titre et texte de Vestiaire bornés, « problème » lu).
+          frise: (Array.isArray(d.frise) ? d.frise : []).slice(0, 12).map((x) => (x && typeof x === 'object' && /^[A-Za-z][\w-]{0,39}$/.test(String(x.k || '')) ? { k: String(x.k), statut: String(x.statut || '').slice(0, 20), date: String(x.date || '').slice(0, 40), cle: /^[\w.:-]{1,60}$/.test(String(x.cle || '')) ? String(x.cle) : '', titre: String(x.titre || '').slice(0, 80), texte: String(x.texte || '').slice(0, 240), probleme: x.probleme === true ? true : x.probleme === false ? false : null } : null)).filter(Boolean),
+          retour: d.retour && typeof d.retour === 'object' ? { cle: String(d.retour.cle || '').slice(0, 40), statut: String(d.retour.statut || '').slice(0, 20), suivi: /^[A-Z0-9]{6,40}$/i.test(String(d.retour.suivi || '')) ? String(d.retour.suivi) : '', transporteur: String(d.retour.transporteur || '').slice(0, 40) } : null }, () => { void chrome.runtime.lastError; });
         return;
       }
       // 5.374 : une liste de ventes demandée par la page AVANT le capteur, relue sans succès (code seul).
@@ -181,8 +184,18 @@
       // 5.392 : les personnes qui ont aimé TES articles (article + identifiant numérique + date ; rien d'autre).
       if (d.kind === 'vcaimes') {
         const aimes = (Array.isArray(d.aimes) ? d.aimes : []).slice(0, 200).map((x) => (x && /^\d{3,15}$/.test(String(x.produit || '')) && /^\d{3,15}$/.test(String(x.acheteur || ''))
-          ? { produit: String(x.produit), acheteur: String(x.acheteur), at: /^\d{4}-\d{2}-\d{2}T[\w:.+-]{0,24}$/.test(String(x.at || '')) ? String(x.at) : '' } : null)).filter(Boolean);
+          ? { produit: String(x.produit), acheteur: String(x.acheteur), at: /^\d{4}-\d{2}-\d{2}T[\w:.+-]{0,24}$/.test(String(x.at || '')) ? String(x.at) : '', photo: /^https:\/\/images\.vestiairecollective\.com\/produit\/[\w.-]{1,60}$/i.test(String(x.photo || '')) ? String(x.photo) : '' } : null)).filter(Boolean);
         if (aimes.length) chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcAimes', aimes, moi: moiDe(d) }, () => { void chrome.runtime.lastError; });
+        return;
+      }
+      // 5.444 : les notifications de Vestiaire (sorte, date, lue, mots machine, article et sa photo — jamais un texte ni une personne).
+      if (d.kind === 'vcnotifs') {
+        const cartes = (Array.isArray(d.cartes) ? d.cartes : []).slice(0, 100).map((x) => (x && /^[\w-]{1,64}$/.test(String(x.id || '')) ? {
+          id: String(x.id), at: /^\d{4}-\d{2}-\d{2}T[\w:.+-]{0,24}$/.test(String(x.at || '')) ? String(x.at) : '', lu: x.lu === true ? true : x.lu === false ? false : null,
+          sorte: /^(aime|message|autre)$/.test(String(x.sorte)) ? String(x.sorte) : 'autre', produit: /^\d{3,15}$/.test(String(x.produit || '')) ? String(x.produit) : '',
+          photo: /^https:\/\/images\.vestiairecollective\.com\/produit\/[\w.-]{1,60}$/i.test(String(x.photo || '')) ? String(x.photo) : '',
+          mots: (Array.isArray(x.mots) ? x.mots : []).slice(0, 5).map(String).filter((m) => /^[\w.:-]{1,40}$/.test(m)) } : null)).filter(Boolean);
+        if (cartes.length) chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcNotifs', cartes, moi: moiDe(d) }, () => { void chrome.runtime.lastError; });
         return;
       }
       if (d.kind === 'vcoffreappris') {

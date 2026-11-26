@@ -138,7 +138,7 @@ function vrmVerifVisible(sel) {
      sombre de Vinted, qui la rendait GRISE (capture de Julien, 15 nov.). */
   :host { all: initial;
     --fond: #000000; --carte: #1C1C1E; --bord: rgba(255,255,255,.10); --filet: rgba(255,255,255,.08); --texte: #F2F2F7; --doux: #98989F; --pale: #8E8E93;
-    --accent: #3FD49A; --ambre: #F2B65E; --survol: rgba(255,255,255,.06); --remplir: rgb(28 28 30 / .9); --verre: #1C1C1E;
+    --accent: #3FD49A; --ambre: #B9C4D0; --survol: rgba(255,255,255,.06); --remplir: rgb(28 28 30 / .9); --verre: #1C1C1E;
     --champ: rgb(0 0 0 / .22); --anneau: rgba(63,212,154,.35);
     --ombre: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95);
     --fond-carte: linear-gradient(180deg, #1C1C1E 0%, #141416 100%);
@@ -151,7 +151,7 @@ function vrmVerifVisible(sel) {
      choix connu, le système décide, comme avant. */
   @media (prefers-color-scheme: light) {
     :host(:not([data-theme="sombre"])) { --carte: #FFFFFF; --bord: rgba(60,60,67,.12); --filet: rgba(60,60,67,.10); --texte: #111114; --doux: #3C3C43; --pale: #6C6C70;
-      --accent: #0F6B4C; --ambre: #764300; --survol: rgba(60,60,67,.05); --remplir: rgb(255 255 255 / .82); --verre: #F2F2F7;
+      --accent: #0F6B4C; --ambre: #3D4B5B; --survol: rgba(60,60,67,.05); --remplir: rgb(255 255 255 / .82); --verre: #F2F2F7;
       --champ: #FFFFFF; --anneau: rgba(15,107,76,.25);
       --ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .10), 0 2px 5px rgb(60 60 67 / .08), 0 34px 60px -26px rgb(60 60 67 / .48);
       --fond-carte: linear-gradient(180deg, #F7F7F8 0%, #EDEDF0 100%);
@@ -161,7 +161,7 @@ function vrmVerifVisible(sel) {
       --plein-fond: radial-gradient(120% 90% at 50% 0%, #2C2C2E 0%, #111114 55%); --plein-encre: #FFFFFF; --plein-ombre: inset 0 .5px 0 rgb(255 255 255 / .25), 0 1px 2px rgb(60 60 67 / .25), 0 12px 22px -10px rgb(60 60 67 / .6); }
   }
   :host([data-theme="clair"]) { --carte: #FFFFFF; --bord: rgba(60,60,67,.12); --filet: rgba(60,60,67,.10); --texte: #111114; --doux: #3C3C43; --pale: #6C6C70;
-      --accent: #0F6B4C; --ambre: #764300; --survol: rgba(60,60,67,.05); --remplir: rgb(255 255 255 / .82); --verre: #F2F2F7;
+      --accent: #0F6B4C; --ambre: #3D4B5B; --survol: rgba(60,60,67,.05); --remplir: rgb(255 255 255 / .82); --verre: #F2F2F7;
       --champ: #FFFFFF; --anneau: rgba(15,107,76,.25);
       --ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .10), 0 2px 5px rgb(60 60 67 / .08), 0 34px 60px -26px rgb(60 60 67 / .48);
       --fond-carte: linear-gradient(180deg, #F7F7F8 0%, #EDEDF0 100%);
@@ -392,6 +392,7 @@ function vrmVerifVisible(sel) {
   .me { font-size: 12px; color: var(--doux); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .me .ambre { color: var(--ambre); font-weight: 600; }
   .rang .px { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  .rang .px small { display: block; font-weight: 400; font-size: 12px; color: var(--vu-muet); text-align: right; }
   /* Les autres comptes : lisibles en gros, floutés dans le détail, « inert » (aucune action). */
   .autres { margin-top: 10px; display: grid; gap: 8px; }
   .autre { padding: 8px 10px; border-radius: 12px; background: var(--remplir); }
@@ -735,16 +736,16 @@ function vrmVerifVisible(sel) {
   .carte[data-grand] { --n-fond:#F2F2F7; --n-carte:#FFFFFF; --n-carte-2:#F2F2F7; --n-trait:rgb(60 60 67/.18); --n-encre:#111114; --n-encre-2:#6C6C70; --n-accent:#0F6B4C; --n-teinte:rgb(15 107 76/.10); --n-neutre:rgb(118 118 128/.12); --n-vert:#1F7A3A; --n-vert-fond:#E6F4EA; --n-teal:#2C6E73; --n-teal-fond:#E3F1F1;
     --vu-coque-uni:var(--n-fond); --vu-coque:none; --vu-sur:var(--n-encre); --vu-sur-2:var(--n-encre-2); --vu-plaque:var(--n-carte); --vu-plaque-2:var(--n-carte-2); --vu-encre:var(--n-encre); --vu-muet:var(--n-encre-2);
     --vu-filet:var(--n-trait); --vu-ombre:none; --vu-plein:#111114; --vu-plein-appui:#2C2C2E; --vu-plein-encre:#FFFFFF; --vu-plein-sur-plaque:#111114; --vu-plein-sur-plaque-encre:#FFFFFF;
-    --vu-teinte:var(--n-neutre); --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#E5E5EA; --vu-barre:var(--n-accent); --vu-ambre:#8A4B00;
+    --vu-teinte:var(--n-neutre); --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#E5E5EA; --vu-barre:var(--n-accent); --vu-ambre:#3D4B5B;
     position: fixed; top: 4vh; bottom: 4vh; right: 2vw; left: auto; width: min(1100px, 76vw) !important; max-height: none; height: auto; border-radius: 16px; border: 0;
     padding: 12px 20px 20px; background: var(--n-fond) !important; color: var(--n-encre); box-shadow: 0 8px 30px rgb(0 0 0/.12), 0 0 0 100vmax rgb(0 0 0/.28); overflow-y: auto; overscroll-behavior: contain; }
-  @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#3FD49A; --n-teinte:rgb(63 212 154/.16); --n-neutre:rgb(118 118 128/.24); --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.16); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.16); --vu-plein:#F2F2F7; --vu-plein-appui:#D1D1D6; --vu-plein-encre:#111114; --vu-plein-sur-plaque:#F2F2F7; --vu-plein-sur-plaque-encre:#111114; --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#2C2C2E; --vu-barre:var(--n-accent); --vu-ambre:#FFB340; } }
-  :host([data-theme="sombre"]) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#3FD49A; --n-teinte:rgb(63 212 154/.16); --n-neutre:rgb(118 118 128/.24); --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.16); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.16); --vu-plein:#F2F2F7; --vu-plein-appui:#D1D1D6; --vu-plein-encre:#111114; --vu-plein-sur-plaque:#F2F2F7; --vu-plein-sur-plaque-encre:#111114; --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#2C2C2E; --vu-barre:var(--n-accent); --vu-ambre:#FFB340; }
+  @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#3FD49A; --n-teinte:rgb(63 212 154/.16); --n-neutre:rgb(118 118 128/.24); --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.16); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.16); --vu-plein:#F2F2F7; --vu-plein-appui:#D1D1D6; --vu-plein-encre:#111114; --vu-plein-sur-plaque:#F2F2F7; --vu-plein-sur-plaque-encre:#111114; --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#2C2C2E; --vu-barre:var(--n-accent); --vu-ambre:#B9C4D0; } }
+  :host([data-theme="sombre"]) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#3FD49A; --n-teinte:rgb(63 212 154/.16); --n-neutre:rgb(118 118 128/.24); --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.16); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.16); --vu-plein:#F2F2F7; --vu-plein-appui:#D1D1D6; --vu-plein-encre:#111114; --vu-plein-sur-plaque:#F2F2F7; --vu-plein-sur-plaque-encre:#111114; --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#2C2C2E; --vu-barre:var(--n-accent); --vu-ambre:#B9C4D0; }
   @media (max-width: 760px) { .carte[data-grand] { top: 0; bottom: 0; right: 0; left: 0; width: 100vw !important; height: 100dvh; border-radius: 0; padding: max(8px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); box-shadow: none; } }
-  /* 5.410.2 : l'ambre (un geste à faire) défini dans les deux teintes — en sombre, #8A4B00 sur #1C1C1E ne se lisait pas. */
-  .carte[data-grand] { --n-ambre: #8A4B00; --n-ambre-fond: #FFF4DD; }
-  @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-ambre: #FFB340; --n-ambre-fond: rgb(255 159 10 / .18); } }
-  :host([data-theme="sombre"]) .carte[data-grand] { --n-ambre: #FFB340; --n-ambre-fond: rgb(255 159 10 / .18); }
+  /* 5.410.2 : l'ambre (un geste à faire) défini dans les deux teintes — en sombre, #3D4B5B sur #1C1C1E ne se lisait pas. */
+  .carte[data-grand] { --n-ambre: #3D4B5B; --n-ambre-fond: #ECEFF3; }
+  @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-ambre: #B9C4D0; --n-ambre-fond: rgb(185 196 208 / .18); } }
+  :host([data-theme="sombre"]) .carte[data-grand] { --n-ambre: #B9C4D0; --n-ambre-fond: rgb(185 196 208 / .18); }
   .carte[data-grand] .t5 { min-height: 52px; }
   .carte.on[data-grand] ~ .btn { display: none !important; }   /* 5.410.2 : le rond VRM ne recouvre plus le coin du panneau (son × ferme) */
   .carte[data-grand] .t5 .nom { font: 700 28px/34px -apple-system, "SF Pro Display", Inter, system-ui, sans-serif; max-width: 70%; color: var(--n-encre); }
@@ -769,6 +770,23 @@ function vrmVerifVisible(sel) {
   .pt5 { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--n-accent, #0F6B4C); margin-right: 6px; vertical-align: middle; }
   .carte[data-grand] li[data-ouverte] > .rang { background: var(--n-neutre); }
   .fiche5 { padding: 4px 16px 16px; }
+  /* 5.444 — la frise datée d'une vente Vestiaire : un point par étape (fait = vert, en cours = encre, annulé / problème = ambre, à venir = gris). */
+  .frise10 { list-style: none; margin: 8px 0 12px; padding: 0; display: grid; gap: 10px; }
+  .frise10 li { display: grid; grid-template-columns: 14px 1fr; gap: 10px; align-items: start; }
+  .frise10 li i { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; background: var(--vu-filet); box-shadow: 0 0 0 2px var(--vu-plaque); }
+  .frise10 li[data-etat="fait"] i { background: var(--vu-ok); }
+  .frise10 li[data-etat="encours"] i { background: var(--vu-encre); }
+  .frise10 li[data-etat="annule"] i, .frise10 li[data-probleme] i { background: var(--vu-ambre-point); }
+  .frise10 li span { display: grid; gap: 2px; min-width: 0; }
+  .frise10 li b { font-weight: 600; font-size: 14px; color: var(--vu-encre); }
+  .frise10 li small { font-size: 12.5px; color: var(--vu-muet); }
+  .frise10 li em { font-style: normal; font-size: 13px; color: var(--vu-encre); line-height: 1.4; overflow-wrap: anywhere; }
+  .frise10 li[data-probleme] em { color: var(--vu-ambre); }
+  .rang > .vu-btn[data-onglet-b] { margin-left: auto; flex: none; }
+  /* 24 nov. (Julien : « plus d'orange/ambre nulle part ») — « à faire » = GRAS + accent ardoise #3D4B5B ; le rouge reste au seul doublon de N°. */
+  [data-ton="ambre"], .ambre, .frise10 li[data-probleme] em, .frise10 li[data-probleme] b { font-weight: 700 !important; }
+  [data-vc-offre] { padding: 8px 16px 14px; max-width: 420px; }
+  .h10 { font-size: 13px; font-weight: 600; color: var(--vu-muet); margin: 4px 0 6px; }
   .ph5 { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 8px 0; }
   .ph5 img { flex: none; height: 240px; max-width: 80%; border-radius: 12px; object-fit: cover; scroll-snap-align: start; background: var(--n-carte-2); }
   @media (max-width: 760px) { .ph5 img { height: 200px; } }
@@ -826,7 +844,7 @@ function vrmVerifVisible(sel) {
   .lot5 { margin: 0 16px 12px; }
   .carte .lot5 .rang .me, .carte [data-rel] .rang .me, .carte [data-ag-decisions] .rang .me { white-space: normal; overflow: visible; text-overflow: clip; }
   .lot5-t { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0; }
-  .lot5 [data-ambre], .rangs [data-ambre], .note5[data-ambre] { color: var(--n-ambre, #8A4B00); }
+  .lot5 [data-ambre], .rangs [data-ambre], .note5[data-ambre] { color: var(--n-ambre, #3D4B5B); }
   .ag5-g { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 6px 0 10px; }
   @media (max-width: 520px) { .ag5-g { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .ag5-t { border: 1px solid var(--n-trait, rgb(60 60 67/.18)); border-radius: 10px; padding: 8px 10px; display: grid; }
@@ -878,7 +896,7 @@ function vrmVerifVisible(sel) {
   .cel5 { font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); font-variant-numeric: tabular-nums; }
   .lc5 { display: none; }
   .st5 { display: inline-block; padding: 2px 8px; border-radius: 6px; background: var(--n-carte-2); color: var(--n-encre-2); font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; }
-  .st5[data-statut="nouveau"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
+  .st5[data-statut="nouveau"] { background: var(--n-ambre-fond, #ECEFF3); color: var(--n-ambre, #3D4B5B); }
   li[data-coche] > .tr5, li[data-coche] > .case5 { background: var(--n-neutre); }
   @media (max-width: 760px) {
     .th5 { display: none; }
@@ -1034,7 +1052,7 @@ function vrmVerifVisible(sel) {
   .imp6:hover { background: var(--n-neutre); } .imp6:active { transform: scale(.97); } .imp6:disabled { opacity: .55; cursor: default; }
   .imp6:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
   .pas6 { font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
-  .imp-etat6 { padding: 8px 16px; } .imp-etat6[data-ton="ambre"] { color: var(--n-ambre, #8A4B00); }
+  .imp-etat6 { padding: 8px 16px; } .imp-etat6[data-ton="ambre"] { color: var(--n-ambre, #3D4B5B); }
   .revue6 { padding: 8px 16px 0; margin: 0; }
   .acc6 .imp-etat6 { padding: 4px 0; }
   .vte6 > span:first-child { min-width: 0; display: flex; flex-direction: column; gap: 2px; } .vte6 > span:first-child b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1042,13 +1060,13 @@ function vrmVerifVisible(sel) {
   @media (prefers-reduced-motion: reduce) { .imp6 { transition: none; } }
   .vu-transp { display: inline-flex; border-radius: 5px; overflow: hidden; flex: none; }
   .et6 { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--n-carte-2); color: var(--n-encre-2); font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; white-space: nowrap; }
-  .et6[data-ton="ambre"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
+  .et6[data-ton="ambre"] { background: var(--n-ambre-fond, #ECEFF3); color: var(--n-ambre, #3D4B5B); }
   /* 5.426 : « Vendue → retirée sur » — une rangée par paire, une étiquette douce par site (ambre = encore à retirer). */
   .rp6 .rp6-l > span { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   .rp6-sites { display: flex; flex-wrap: wrap; gap: 4px 6px; }
   .rp6-s { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--n-carte-2); color: var(--n-encre-2); font: 500 12px/18px -apple-system, Inter, system-ui, sans-serif; }
-  .rp6-s[data-ton="ambre"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
-  .note5[data-ton="ambre"] { color: var(--n-ambre, #8A4B00); }
+  .rp6-s[data-ton="ambre"] { background: var(--n-ambre-fond, #ECEFF3); color: var(--n-ambre, #3D4B5B); }
+  .note5[data-ton="ambre"] { color: var(--n-ambre, #3D4B5B); }
   .et6[data-statut="en_vente"] { background: var(--n-vert-fond); color: var(--n-vert); }
   .et6[data-statut="en_route"] { background: var(--n-teal-fond); color: var(--n-teal); }
   .et6[data-statut="finalisee"] { background: var(--n-vert-fond); color: var(--n-vert); }
@@ -1068,7 +1086,7 @@ function vrmVerifVisible(sel) {
   .cel6 .of6, .cel6 .rs6 { display: block; margin-top: 2px; font: 400 12px/16px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); white-space: normal; }
   .cel6[data-col="etat"] { white-space: normal; }
   .fav6-envoi { margin: 12px 16px 0; }
-  .fav6-file { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 12px 16px 0; padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
+  .fav6-file { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 12px 16px 0; padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--n-ambre-fond, #ECEFF3); color: var(--n-ambre, #3D4B5B); }
   .fav6-file > span { flex: 1 1 220px; display: flex; flex-direction: column; font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; }
   .fav6-file small { font-weight: 400; font-size: 13px; line-height: 18px; }
   .fav6-file .vu-btn { min-height: 44px; padding: 0 16px; border-radius: 12px; }
@@ -1094,7 +1112,7 @@ function vrmVerifVisible(sel) {
   .rl6-m small { color: var(--n-encre-2); font-size: 13px; }
   .rl6-m textarea { width: 100%; box-sizing: border-box; min-height: 88px; border-radius: 10px; border: 1px solid var(--n-trait); padding: 8px 10px; font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; background: var(--n-carte); color: var(--n-encre); }
   .rl6-m .ge5 .vu-btn { width: auto; min-height: 44px; }
-  .rl6-ko { margin: 6px 0 0 56px; color: var(--n-ambre, #8A4B00); }
+  .rl6-ko { margin: 6px 0 0 56px; color: var(--n-ambre, #3D4B5B); }
   .rl6-reg .champ6 input[type="number"] { max-width: 120px; min-height: 44px; }
   .rl6-reg textarea { min-height: 88px; }
   .rl6-reg select { min-height: 44px; }
@@ -1104,7 +1122,7 @@ function vrmVerifVisible(sel) {
   .tc6-seg { margin: 0 0 8px; display: flex; flex-wrap: wrap; }
   .tc6-seg button { flex: 1 1 auto; min-height: 44px; }
   .tc6-r { display: block; color: var(--n-encre-2); font-size: 12px; line-height: 16px; }
-  .tc6-r[data-urgent] { color: var(--n-ambre, #8A4B00); }
+  .tc6-r[data-urgent] { color: var(--n-ambre, #3D4B5B); }
   .tc6-pt { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: middle; }
   @media (max-width: 760px) { .rl6-m, .rl6-ko { margin-left: 0; } .rl6-t { flex-direction: column; align-items: stretch; gap: 8px; } .rl6-t .vu-btn { width: 100%; } .rl6-r { padding: 10px 8px; } .rl6-l { gap: 8px; } .rl6-l .v6 { align-self: flex-start; } }
   .ven6-seg button { flex: 1 1 auto; min-height: 44px; }
@@ -1232,7 +1250,7 @@ function vrmVerifVisible(sel) {
   /* 5.438 : la rangée « Note de santé » de l'Accueil se touche (elle mène à Santé) — une rangée, pas un bouton. */
   .rg6.sn6-b { width: 100%; background: none; border: 0; border-bottom: .5px solid var(--n-trait); border-radius: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; padding: 6px 0; min-height: 52px; }
   .rg6.sn6-b:active { background: var(--n-presse, rgba(0,0,0,.04)); }
-  .sn6-n[data-ton="ambre"] { color: var(--n-ambre, #8A4B00); }
+  .sn6-n[data-ton="ambre"] { color: var(--n-ambre, #3D4B5B); }
   [data-bm-section="lotFavoris"] .rg6 { flex-wrap: wrap; gap: 8px; } [data-bm-section="lotFavoris"] .rg6 .vu-seg { flex: 1 1 100%; }
   .rg6 .md6-g { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
   .rg6 .md6-g .vu-lien { min-height: 44px; display: inline-flex; align-items: center; }
@@ -1321,7 +1339,7 @@ function vrmVerifVisible(sel) {
   .q7-c { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .q7-c b { font-weight: 600; overflow-wrap: anywhere; }
   .q7-c small { color: var(--n-encre-2); font-size: 12.5px; overflow-wrap: anywhere; }
-  .q7-c .q7-essai { color: var(--vu-ambre, #b45309); }
+  .q7-c .q7-essai { color: var(--vu-ambre, #3D4B5B); }
   .q7-g { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; }
   .q7-g .vu-btn { min-height: 44px; }
   .q7-g .rond6[disabled] { opacity: .3; cursor: default; }
@@ -1358,7 +1376,7 @@ function vrmVerifVisible(sel) {
   .tu6 { appearance: none; border: 0; background: var(--n-carte-2); transition: background-color .16s ease; border-radius: 12px; padding: 12px 14px; text-align: left; cursor: pointer; color: var(--n-encre); }
   .tu6 span { display: block; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .tu6 b { display: block; font: 700 28px/34px -apple-system, Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
-  .tu6[data-ton="ambre"] b { color: var(--n-ambre, #8A4B00); }
+  .tu6[data-ton="ambre"] b { color: var(--n-ambre, #3D4B5B); }
   /* Au téléphone / Orion : la barre latérale devient une rangée défilante en haut ; le tableau, des rangées empilées. */
   @media (max-width: 760px) {
     .carte[data-grand] { top: 0 !important; bottom: 0 !important; left: 0 !important; right: 0 !important; border-radius: 0; }
@@ -1478,7 +1496,7 @@ function vrmVerifVisible(sel) {
      qui ne recouvre jamais le centre de la vérification ; la toucher rouvre le panneau. */
   .verif6 { position: fixed; top: var(--verif-haut, 12px); right: 12px; max-width: min(320px, calc(100vw - 24px)); min-height: 44px; padding: 10px 14px;
     display: flex; align-items: center; gap: 10px; text-align: left; border: 0; border-radius: 14px; cursor: pointer; pointer-events: auto;
-    background: #FFF4DD; color: #3D2600; font: 600 14px/1.35 -apple-system, "SF Pro Text", Inter, system-ui, sans-serif; box-shadow: 0 6px 20px rgb(0 0 0 / .22); }
+    background: #ECEFF3; color: #3D2600; font: 600 14px/1.35 -apple-system, "SF Pro Text", Inter, system-ui, sans-serif; box-shadow: 0 6px 20px rgb(0 0 0 / .22); }
   .verif6[hidden] { display: none !important; }
   .verif6 .pv { width: 8px; height: 8px; border-radius: 4px; background: #B26A00; flex: none; }
   .verif6[data-verif="faite"] { background: #FFFFFF; color: #111114; }
@@ -1494,16 +1512,16 @@ function vrmVerifVisible(sel) {
      accent vert sapin rare (onglet actif, interrupteurs, progression) ; aucun bleu, rouge seulement doublon de N°. */
   .carte[data-grand] { --n-fond:#F1F3F6; --n-carte:#FFFFFF; --n-carte-2:#F8F9FA; --n-trait:#E4E4E7; --n-filet:#EEF0F2; --n-encre:#16181D; --n-encre-2:#5F646C; --n-encre-3:#6E737B;
     --n-neutre:#F1F2F4; --n-vert:#17744A; --n-vert-fond:#DDF4E6; --n-vert-bord:#C3EAD2; --n-teal:#0D6A6B; --n-teal-fond:#DAF0F0; --n-teal-bord:#BCE3E3;
-    --n-ambre:#874600; --n-ambre-fond:#FFEBC4; --n-ambre-bord:#F8D79B; --n-gris:#4C525B; --n-gris-fond:#ECEEF1; --n-gris-bord:#DFE2E6;
+    --n-ambre:#3D4B5B; --n-ambre-fond:#ECEFF3; --n-ambre-bord:#CBD3DC; --n-gris:#4C525B; --n-gris-fond:#ECEEF1; --n-gris-bord:#DFE2E6;
     --n-ombre-xs:0 1px 2px rgb(16 24 40/.05); --n-ombre:0 1px 2px rgb(16 24 40/.04), 0 2px 6px rgb(16 24 40/.04); --n-police:var(--vu-police, Inter, -apple-system, system-ui, sans-serif);
     --vu-socle:var(--n-neutre); --vu-kraft:#F1F2F4; --vu-kraft-encre:#16181D; --vu-kraft-doux:#5F646C; --vu-kraft-bord:#E3E5E9; --vu-plein:#16181D; --vu-plein-sur-plaque:#16181D; }
   @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-fond:#0E0F11; --n-carte:#17181B; --n-carte-2:#1D1F23; --n-trait:#2C2F35; --n-filet:#24272C; --n-encre:#F2F3F5; --n-encre-2:#B0B4BB; --n-encre-3:#90959D;
     --n-neutre:#24272C; --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.14); --n-vert-bord:rgb(48 209 88/.28); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.14); --n-teal-bord:rgb(124 201 206/.28);
-    --n-ambre:#FFB340; --n-ambre-fond:rgb(255 159 10/.16); --n-ambre-bord:rgb(255 159 10/.32); --n-gris:#C3C7CE; --n-gris-fond:#24272C; --n-gris-bord:#33363D;
+    --n-ambre:#B9C4D0; --n-ambre-fond:rgb(185 196 208/.16); --n-ambre-bord:rgb(185 196 208/.32); --n-gris:#C3C7CE; --n-gris-fond:#24272C; --n-gris-bord:#33363D;
     --n-ombre-xs:none; --n-ombre:0 0 0 1px rgb(255 255 255/.02); --vu-kraft:#24272C; --vu-kraft-encre:#F2F3F5; --vu-kraft-doux:#A0A5AD; --vu-kraft-bord:#33363D; --vu-plein:#F2F3F5; --vu-plein-sur-plaque:#F2F3F5; } }
   :host([data-theme="sombre"]) .carte[data-grand] { --n-fond:#0E0F11; --n-carte:#17181B; --n-carte-2:#1D1F23; --n-trait:#2C2F35; --n-filet:#24272C; --n-encre:#F2F3F5; --n-encre-2:#B0B4BB; --n-encre-3:#90959D;
     --n-neutre:#24272C; --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.14); --n-vert-bord:rgb(48 209 88/.28); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.14); --n-teal-bord:rgb(124 201 206/.28);
-    --n-ambre:#FFB340; --n-ambre-fond:rgb(255 159 10/.16); --n-ambre-bord:rgb(255 159 10/.32); --n-gris:#C3C7CE; --n-gris-fond:#24272C; --n-gris-bord:#33363D;
+    --n-ambre:#B9C4D0; --n-ambre-fond:rgb(185 196 208/.16); --n-ambre-bord:rgb(185 196 208/.32); --n-gris:#C3C7CE; --n-gris-fond:#24272C; --n-gris-bord:#33363D;
     --n-ombre-xs:none; --n-ombre:0 0 0 1px rgb(255 255 255/.02); --vu-kraft:#24272C; --vu-kraft-encre:#F2F3F5; --vu-kraft-doux:#A0A5AD; --vu-kraft-bord:#33363D; --vu-plein:#F2F3F5; --vu-plein-sur-plaque:#F2F3F5; }
   /* La petite carte et la question (hors du grand panneau) : la même plaque N° fine. */
   .plaque { height: 20px; padding: 0 6px; border-radius: 5px; clip-path: none; box-shadow: inset 0 0 0 1px var(--vu-kraft-bord); font-weight: 600; font-size: 12px; line-height: 20px; }
@@ -3243,7 +3261,7 @@ function vrmVerifVisible(sel) {
   // Tout vient du service worker (`carteListes`, lecture seule) ; pas su ⇒ « — », dit.
   // 5.409 (Julien, 19 nov. : « Fais un onglet Messages (très important), Mes annonces / mon dressing, Favoris, et
   // Ventes […] Tu peux faire des Paramètres dans l'extension ») : cinq onglets ; « Messages » d'abord.
-  const ONGLETS5 = ['accueil', 'messages', 'annonces', 'favoris', 'ventes', 'notifications', 'automatisations', 'sante', 'parametres'];
+  const ONGLETS5 = ['accueil', 'messages', 'annonces', 'favoris', 'ventes', 'achats', 'notifications', 'automatisations', 'sante', 'parametres'];
   let ficheOuverte = '';   // 'a:{id}' (une annonce) ou 'v:{tx}' (une vente) dépliée — une à la fois
   let menuCompteOuvert = false, ongletListe = 'accueil', porteeTous = false, listes = null, listesAt = 0, listesEnVol = false, listesErreur = '';
   try { chrome.storage.local.get(['vrmCarteOnglet', 'vrmCartePortee'], (g) => { try { void chrome.runtime.lastError; } catch (_) {} g = g || {}; if (ONGLETS5.includes(g.vrmCarteOnglet) && !hote.hasAttribute('data-lien-panneau')) ongletListe = g.vrmCarteOnglet; if (g.vrmCartePortee === 'tous') porteeTous = true; }); } catch (_) {}
@@ -3275,7 +3293,9 @@ function vrmVerifVisible(sel) {
       });
     } catch (_) { listesEnVol = false; }
   }
-  const vignette = (u) => (u && /^https:\/\/[\w.-]*vinted\.net\//.test(u) ? `<img class="vig" src="${esc(u)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '<span class="vig" aria-hidden="true"></span>');
+  // 5.444 (capture de Julien : les ventes Vestiaire « sans photo ») : la vignette accepte aussi les photos des sites
+  // (Vestiaire, Leboncoin, eBay), toujours en https, sans référent.
+  const vignette = (u) => (u && /^https:\/\/([\w.-]*vinted\.net|images\.vestiairecollective\.com|img\.leboncoin\.fr|i\.ebayimg\.com)\//.test(u) ? `<img class="vig" src="${esc(u)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '<span class="vig" aria-hidden="true"></span>');
   // 5.379 (capture de Julien : une case « — » au début de chaque vente) : la plaque N° ne
   // s'affiche que quand le N° est CONNU (par identité d'annonce, `carteListes`) ; une liste
   // où aucune ligne n'a de N° n'a pas de colonne N° ; une ligne sans N° dans une liste qui
@@ -3296,7 +3316,10 @@ function vrmVerifVisible(sel) {
   // glissaient d'une ligne à l'autre et les en-têtes ne tombaient pas au-dessus de leur colonne.
   const W6 = { prix: '76px', date: '148px', vues: '60px', favoris: '72px', statut: '150px', mini: '84px', achat: '84px', place: '140px' };
   const W6V = { prix: '72px', date: '96px', transporteur: '156px', limite: '112px', statut: '108px', bordereau: '128px' };
-  const STATUTS5 = ['en_vente', 'brouillon', 'masque', 'reserve', 'vendu', 'a_confirmer'];
+  const STATUTS5 = ['en_vente', 'examen', 'a_corriger', 'refusee', 'brouillon', 'masque', 'reserve', 'vendu', 'retiree', 'a_confirmer'];
+  // 5.444 : les statuts de modération de Vestiaire (en cours d'examen, à corriger, refusée) et « retirée » ne s'affichent
+  // dans le filtre que s'il y en a (comme « pas revues »).
+  const STATUTS5_RARES = ['examen', 'a_corriger', 'refusee', 'retiree', 'a_confirmer'];
   let annConfirme = null, annEnVol = false, annResultat = null, annActionPre = '';
   // ══ 5.410 — LES GESTES DU PANNEAU (l'app ne les fait plus) : prix, atelier Republier, publier, offres ══
   //    Chacun passe par le chemin gardé du fond ; rien n'ouvre vrm.center.
@@ -3869,7 +3892,7 @@ function vrmVerifVisible(sel) {
     const gestes = site === 'leboncoin' ? ['baisser', 'supprimer', 'ouvrir'] : site === 'vestiaire' ? ['baisser', 'ouvrir'] : ['republier_direct', 'republier', 'baisser', 'aussi', 'masquer', 'afficher', 'favoris', 'ouvrir'];
     const actions = `<select class="act5" data-ann-action aria-label="${esc(TU('a_choisir'))}"${nSel ? '' : ' disabled'}><option value="">${esc(nSel ? TU('a_choisir_n', { n: nSel }) : TU('a_choisir'))}</option>`
       + gestes.map((k) => `<option value="${k}"${((k === 'ouvrir' || k === 'supprimer' || k === 'publier') && nSel !== 1) || ((k === 'masquer' || k === 'afficher' || k === 'aussi') && nSel > 10) ? ' disabled' : ''}${annActionPre === k ? ' selected' : ''}>${esc(TU('ac_' + k))}</option>`).join('') + '</select>';
-    const statutMenu = `<details class="cols5 statut6" data-ann-statut-menu${annStatutOuvert ? ' open' : ''}><summary>${esc(TU('a_statut'))}${annStatuts ? ` · ${annStatuts.size}` : ''}</summary><div class="cols5-l">${STATUTS5.filter((k) => k !== 'a_confirmer' || (st && st.a_confirmer)).map((k) => `<label><input type="checkbox" data-ann-statut="${k}"${choisis.has(k) ? ' checked' : ''}> <span>${esc(TU(k === 'a_confirmer' ? 's_pas_revues' : 's_' + k))}</span><b>${st ? Number(st[k] || 0).toLocaleString('fr-FR') : '—'}</b></label>`).join('')}</div></details>`;
+    const statutMenu = `<details class="cols5 statut6" data-ann-statut-menu${annStatutOuvert ? ' open' : ''}><summary>${esc(TU('a_statut'))}${annStatuts ? ` · ${annStatuts.size}` : ''}</summary><div class="cols5-l">${STATUTS5.filter((k) => !STATUTS5_RARES.includes(k) || (st && st[k])).map((k) => `<label><input type="checkbox" data-ann-statut="${k}"${choisis.has(k) ? ' checked' : ''}> <span>${esc(TU(k === 'a_confirmer' ? 's_pas_revues' : 's_' + k))}</span><b>${st ? Number(st[k] || 0).toLocaleString('fr-FR') : '—'}</b></label>`).join('')}</div></details>`;
     const outils = `<div class="barre5 barre6">${actions}<input type="search" class="cherche5" data-ann-cherche placeholder="${esc(TU('a_chercher'))}" aria-label="${esc(TU('a_chercher'))}" value="${esc(annCherche)}">${statutMenu}</div>`
       + (st ? '' : `<div class="val gris" data-statuts-pas-su>${esc(TU('a_statuts_pas_su'))}</div>`) + noteRevue5(a);
     const ligneN = `<div class="n6"><span data-ann-n="${vus.length}">${esc(TU('a_n_articles', { n: vus.length }))}</span><span class="n6-d"><span class="vu-seg vue5" role="group" aria-label="${esc(TU('a_vue'))}"><button type="button" data-ann-vue="liste" aria-pressed="${annVue === 'liste'}" aria-label="${esc(TU('a_liste'))}">☰</button><button type="button" data-ann-vue="grille" aria-pressed="${annVue === 'grille'}" aria-label="${esc(TU('a_grille'))}">▦</button></span>`
@@ -3892,7 +3915,7 @@ function vrmVerifVisible(sel) {
     const cellule = (x, c) => {
       if (c === 'prix') return `<b>${esc(eurosL(x.prix))}</b>`;
       if (c === 'date') return x.depuis ? (x.depuisAuMoins ? `<span data-date-au-moins title="${esc(TU('g6_au_moins_note'))}">${esc(TU('g6_au_moins', { d: dateCourte5(x.depuis) }))}</span>` : esc(dateCourte5(x.depuis))) : '—';
-      if (c === 'statut') return etiquette5(x.statut || '', libStatut5(x.statut || 'a_confirmer'), x.statut === 'brouillon' ? 'ambre' : '');   // 5.410.2 : « pas revue » est gris (rien à faire ici)
+      if (c === 'statut') return etiquette5(x.statut || '', libStatut5(x.statut || 'a_confirmer'), ['brouillon', 'a_corriger', 'refusee'].includes(x.statut) ? 'ambre' : '');   // 5.410.2 : « pas revue » est gris (rien à faire ici)
       return celluleAnn(x, c);
     };
     const enTete = `<div class="tr6 th6r" style="--n6:${cols.length};--g6:${cols.map((c) => W6[c] || '96px').join(' ')}"><label class="case5"><input type="checkbox" data-ann-tout${tout ? ' checked' : ''} aria-label="${esc(TU('a_tout'))}"></label>${enTeteTri5('titre', TU('c5_article'), 'data-ann-tri')}<span class="cels6">${cols.map((c) => enTeteTri5(c, TU('c5_' + c), 'data-ann-tri')).join('')}</span><span></span></div>`;
@@ -4500,10 +4523,95 @@ function vrmVerifVisible(sel) {
     if (aimesVc.charge) return `<div class="val gris" role="status" data-vc-aimes="charge">${esc(TU('m_charge'))}</div>`;
     if (!aimesVc.data) return `<div class="val gris" data-vc-aimes="pas-su">${esc(aimesVc.raison)}</div>`;
     const d = aimesVc.data;
-    const tete = `<p class="note5" data-vc-aimes-note>${esc(TU('vc_aimes_note'))}</p>` + (d.appris ? '' : `<p class="note5" data-vc-aimes-appris="non">${esc(TU('vc_pas_appris'))}</p>`);
+    const tete = `<p class="note5" data-vc-aimes-note>${esc(TU('vc_aimes_note'))}</p>` + (d.appris ? '' : `<p class="note5" data-vc-aimes-appris="non">${esc(TU('vc_pas_appris'))}</p>`) + (d.offre ? '' : `<p class="note5" data-vc-offre-appris="non">${esc(TU('vc_offre_pas_appris'))}</p>`);
     if (!d.articles.length) return tete + `<div class="val gris" data-vc-aimes="0">${esc(TU(d.sansArticle ? 'vc_aimes_sans_article' : 'vc_aimes_aucun'))}</div>`;
     return tete + `<ul class="rangs" data-vc-aimes="${d.articles.length}">${d.articles.map((a) => `<li data-vc-aime-article="${esc(a.produit)}"><div class="rang">${a.photo ? `<img class="vig" src="${esc(a.photo)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '<span class="vig" aria-hidden="true"></span>'}<span class="mil"><span class="ti">${esc(a.titre || '—')}</span><span class="me">${esc(TU('vc_aimes_n', { n: a.n, e: a.ecrits }))}</span></span></div>`
-      + `<div class="ge5">${a.gens.map((g, i) => `<a class="vu-btn vu-sec" href="${esc(g.url)}" target="_top" data-vc-aime="${g.ecrit ? 'ecrit' : 'a-ecrire'}">${esc(TU(g.ecrit ? 'vc_aime_ecrit' : 'vc_aime_ecrire', { n: i + 1 }))}${g.at ? ' · ' + esc(depuis(g.at)) : ''}</a>`).join('')}</div></li>`).join('')}</ul>`;
+      + `<div class="ge5">${a.gens.map((g, i) => `<a class="vu-btn vu-sec" href="${esc(g.url)}" target="_top" data-vc-aime="${g.ecrit ? 'ecrit' : 'a-ecrire'}">${esc(TU(g.ecrit ? 'vc_aime_ecrit' : 'vc_aime_ecrire', { n: i + 1 }))}${g.at ? ' · ' + esc(depuis(g.at)) : ''}</a>`).join('')}${d.offre && offreVc.ouvert !== a.produit ? offreAimesHtml(a) : ''}</div>${d.offre && offreVc.ouvert === a.produit ? offreAimesHtml(a) : ''}</li>`).join('')}</ul>`;
+  }
+  // ══ 5.444 — FAIRE UNE OFFRE AUX PERSONNES QUI ONT AIMÉ (Vestiaire), sur SON clic confirmé : le prix est tapé par lui
+  //    (jamais proposé), sous le prix lu de l'article ; « Envoyer » demande une confirmation ; le fond refait toutes les
+  //    vérifications (`offreAimesCarte` → `offrirAuxAimesVc`). Sans recette apprise : pas de bouton, une phrase.
+  const offreVc = { ouvert: '', prix: '', confirme: false, enVol: false, etat: null };
+  function offreAimesHtml(a) {
+    if (offreVc.ouvert !== a.produit) return `<button type="button" class="vu-btn vu-sec" data-vc-offre-ouvrir="${esc(a.produit)}"${a.prixC ? '' : ' disabled'}>${esc(TU('vc_offre_faire'))}</button>`;
+    const c = Math.round(Number(String(offreVc.prix).replace(',', '.')) * 100);
+    const ok = Number.isInteger(c) && c >= 100 && a.prixC && c < a.prixC;
+    return `<div class="rep5" data-vc-offre="${esc(a.produit)}"><label class="champ6"><b>${esc(TU('vc_offre_prix', { p: eurosL(a.prixC / 100) }))}</b><input type="text" inputmode="decimal" data-vc-offre-prix value="${esc(offreVc.prix)}" aria-label="${esc(TU('vc_offre_prix', { p: eurosL(a.prixC / 100) }))}"></label>`
+      + (offreVc.etat ? `<div class="${offreVc.etat.ok ? 'val' : 'err'}" role="status" data-vc-offre-etat="${offreVc.etat.ok ? 'ok' : 'ko'}">${esc(offreVc.etat.texte)}</div>` : '')
+      + (offreVc.confirme ? `<p class="note5" data-vc-offre-q>${esc(TU('vc_offre_q', { n: Math.max(0, a.n - (a.offres || 0)), p: eurosL(c / 100) }))}</p><div class="ge5"><button type="button" class="vu-btn vu-plein" data-vc-offre-oui="${esc(a.produit)}" data-avant="${a.prixC}"${offreVc.enVol ? ' disabled' : ''}>${esc(TU('vc_offre_oui'))}</button><button type="button" class="vu-btn vu-sec" data-vc-offre-non>${esc(TU('ra_annuler'))}</button></div>`
+        : `<div class="ge5"><button type="button" class="vu-btn vu-plein" data-vc-offre-envoyer${ok ? '' : ' disabled'}>${esc(TU('vc_offre_envoyer'))}</button><button type="button" class="vu-btn vu-sec" data-vc-offre-non>${esc(TU('ra_annuler'))}</button></div>`) + '</div>';
+  }
+  function brancherOffreVc(racine) {
+    racine.querySelectorAll('[data-vc-offre-ouvrir]').forEach((b) => b.addEventListener('click', () => { offreVc.ouvert = b.getAttribute('data-vc-offre-ouvrir'); offreVc.prix = ''; offreVc.confirme = false; offreVc.etat = null; rendre(); }));
+    racine.querySelectorAll('[data-vc-offre-non]').forEach((b) => b.addEventListener('click', () => { offreVc.ouvert = ''; offreVc.confirme = false; offreVc.etat = null; rendre(); }));
+    const ch = racine.querySelector('[data-vc-offre-prix]');
+    if (ch) ch.addEventListener('input', () => { offreVc.prix = ch.value.slice(0, 10); offreVc.confirme = false; const b = racine.querySelector('[data-vc-offre-envoyer]'); const a = aimesVc && aimesVc.data && aimesVc.data.articles.find((x) => x.produit === offreVc.ouvert); const c = Math.round(Number(String(offreVc.prix).replace(',', '.')) * 100); if (b) b.disabled = !(a && Number.isInteger(c) && c >= 100 && c < a.prixC); });
+    const env = racine.querySelector('[data-vc-offre-envoyer]');
+    if (env) env.addEventListener('click', () => { offreVc.confirme = true; rendre(); });
+    racine.querySelectorAll('[data-vc-offre-oui]').forEach((b) => b.addEventListener('click', () => {
+      if (offreVc.enVol) return; offreVc.enVol = true; rendre();
+      const produit = b.getAttribute('data-vc-offre-oui'), avant = Number(b.getAttribute('data-avant')), prix = Math.round(Number(String(offreVc.prix).replace(',', '.')) * 100);
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'offreAimesCarte', confirme: true, produit, avantCents: avant, prixCents: prix }, (r) => {
+          void chrome.runtime.lastError; offreVc.enVol = false; offreVc.confirme = false;
+          offreVc.etat = r && r.ok ? { ok: true, texte: TU('vc_offre_partie', { n: Number(r.n) || 0 }) } : { ok: false, texte: (r && r.raison) || TU('m_pas_parti') };
+          if (r && r.ok) aimesVc = null;
+          rendre();
+        });
+      } catch (_) { offreVc.enVol = false; offreVc.etat = { ok: false, texte: TU('m_pas_parti') }; rendre(); }
+    }));
+  }
+  // ══ 5.444 — VESTIAIRE · VENTES (captures de Julien : Ref., photo, prix « pour vous », frise datée « Vente confirmée →
+  //    Article expédié → Article livré (Suivi …) → Évaluation de l'article », « ANNULÉ · Vente annulée car … ») : une carte
+  //    par vente, l'état de la RÈGLE de l'app (`etatVc`, jamais le mot brut ni `aExpedier` seul), la frise telle que
+  //    Vestiaire l'a écrite (statut, date affichée, texte des étapes en cours ou annulées), le n° de suivi (lien vers le
+  //    suivi de Vestiaire). Un litige est en ambre : « En litige · Vestiaire examine », jamais compté comme reçu.
+  const TON_VC = { a_expedier: 'ambre', litige: 'ambre' };
+  const LIB_ETAPE_VC = { sellerSale: 'vce_vente', sellerShipment: 'vce_envoi', sellerDelivery: 'vce_livraison', sellerConformity: 'vce_evaluation', sellerPayment: 'vce_paiement' };
+  function ventesVcHtml(e) {
+    const v = listes.ventes;
+    const lu = depuis(v.lu);
+    const tete = `<div class="lu" data-ventes-total="${v.liste.length}">${esc(TU('vcv_n', { n: v.liste.length }))}${lu ? ' · ' + esc(TU('c_lu', { quand: lu })) : ''}</div>`;
+    const frise = (x) => (Array.isArray(x.frise) && x.frise.length ? `<ol class="frise10" data-vc-frise="${x.frise.length}">${x.frise.map((f) => {
+      const st = String(f.statut || '').toLowerCase(), cl = /done/.test(st) ? 'fait' : /cancel/.test(st) ? 'annule' : /ongoing|pending/.test(st) ? 'encours' : 'avenir';
+      const lib = f.titre || (LIB_ETAPE_VC[f.k] ? TU(LIB_ETAPE_VC[f.k]) : f.k);
+      return `<li data-etape="${esc(f.k)}" data-etat="${cl}"${f.probleme ? ' data-probleme' : ''}><i aria-hidden="true"></i><span><b>${esc(lib)}</b>${f.date ? `<small>${esc(f.date)}</small>` : ''}${f.k === 'sellerDelivery' && x.suivi ? `<small data-vc-suivi>${esc(TU('vcv_suivi'))} ${esc(x.suivi)}</small>` : ''}${f.texte ? `<em>${esc(f.texte)}</em>` : ''}</span></li>`;
+    }).join('')}</ol>` : `<p class="note5" data-vc-frise="0">${esc(TU('vcv_frise_pas_lue'))}</p>`);
+    if (!v.liste.length) return tete + `<div class="val gris" data-ventes="0">${esc(TU('vcv_aucune'))}</div>`;
+    return tete + `<ul class="rangs vc10" data-ventes="${v.liste.length}" data-defil="ventes">${v.liste.map((x) => `<li${ficheOuverte === 'v:' + x.tx ? ' data-ouverte' : ''}><button type="button" class="rang" data-vente="${esc(x.tx)}" data-vente-etat="${esc(x.etat)}" data-vc-etat="${esc(x.etatVc || '')}" data-fiche-b="v:${esc(x.tx)}" aria-expanded="${ficheOuverte === 'v:' + x.tx ? 'true' : 'false'}">${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || '—')}</span><span class="me">${etiquette5(x.etatVc || 'pas_su', TU('vcs_' + (x.etatVc || 'pas_su')), TON_VC[x.etatVc] || '')}${x.ref ? ` · <span class="sg" data-vc-ref>${esc(TU('vcv_ref', { r: x.ref }))}</span>` : ''}${x.date ? ' · <span class="sg">' + esc(jourCourt5(x.date)) + '</span>' : ''}</span></span><span class="px">${esc(eurosL(x.prix))}${x.pourVous ? `<small data-vc-pour-vous>${esc(TU('vcv_pour_vous', { p: eurosL(x.pourVous) }))}</small>` : ''}</span></button>`
+      + (ficheOuverte === 'v:' + x.tx ? `<div class="fiche5" data-fiche="v:${esc(x.tx)}"><div class="g5">${fait5('p_transporteur', x.transporteur || null, 'transporteur')}${fait5('p_suivi', x.suivi || null, 'suivi')}${x.etatVc === 'a_expedier' ? fait5('c6_limite', x.limite || null, 'limite') : ''}</div>${frise(x)}${x.etatVc === 'litige' ? `<p class="note5" data-vc-litige>${esc(TU('vcv_litige_note'))}</p>` : ''}<div class="ge5">${x.lien ? `<a class="vu-btn vu-sec" href="${esc(x.lien)}" target="_top" data-geste="ouvrir">${esc(TU('vcv_ouvrir'))}</a>` : ''}</div></div>` : '') + '</li>').join('')}</ul>`;
+  }
+  // ══ 5.444 — ACHATS, TOUTES PLATEFORMES (« ajoute les achats pour toutes les plateformes dans l'extension ») : ce que VRM
+  //    a RANGÉ pour le compte de l'onglet — Vinted (la liste de tes achats, l'état du colis par la règle de l'app : « au
+  //    point relais » seulement prouvé), Vestiaire (« Commandes »). Leboncoin et eBay : VRM ne lit pas encore tes achats
+  //    sur ces sites — dit, jamais « aucun achat ».
+  const LIB_ACHAT = { a_retirer: ['ach_a_retirer', 'ambre'], en_cours: ['ach_en_cours', ''], termine: ['ach_termine', ''], annule: ['ach_annule', ''] };
+  function achatsHtml(e) {
+    if (listesErreur) return `<div class="val gris" role="status">${esc(listesErreur)}</div>`;
+    if (!listes) return `<div class="val gris" role="status" data-listes-charge>${esc(TU('m_charge'))}</div>`;
+    const a = listes.achats;
+    const site = (e && e.plateforme) || listes.plateforme || 'vinted';
+    if (!a) return `<div class="val gris" data-achats="pas_su">${esc(TU('ach_pas_su'))}</div>`;
+    if (a.pasLu) return `<div class="val gris" data-achats="pas-lu" data-achats-site="${esc(site)}">${esc(TU('ach_pas_lu_site', { site: NOM_SITE[site] || site }))}</div>`;
+    const lu = depuis(a.lu);
+    const nR = a.liste.filter((x) => x.etat === 'a_retirer').length;
+    const tete = `<div class="lu" data-achats-n="${a.liste.length}" data-achats-retirer="${nR}">${esc(TU('ach_n', { n: a.total || a.liste.length }))}${nR ? ' · ' + esc(TU('ach_n_retirer', { n: nR })) : ''}${lu ? ' · ' + esc(TU('c_lu', { quand: lu })) : ''}</div>`;
+    if (!a.liste.length) return tete + `<div class="val gris" data-achats="0">${esc(TU(a.lu ? 'ach_aucun_lu' : (site === 'vestiaire' ? 'ach_jamais_vc' : 'ach_jamais')))}</div>`;
+    const ici = ORIGINE_ICI && !LISTES ? ORIGINE_ICI : 'https://www.vinted.fr';
+    return tete + `<ul class="rangs" data-achats="${a.liste.length}" data-defil="achats">${a.liste.map((x) => {
+      const et = LIB_ACHAT[x.etat] || null;
+      const corps = `${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || '—')}</span><span class="me">${et ? etiquette5(x.etat, TU(et[0]), et[1]) + ' · ' : ''}${x.statut ? `<span class="sg" data-achat-statut>${esc(x.statut)}</span>` : ''}${x.suivi ? ` · <span class="sg">${esc(TU('vcv_suivi'))} ${esc(x.suivi)}</span>` : ''}${x.date ? ' · <span class="sg">' + esc(jourCourt5(x.date)) + '</span>' : ''}</span></span><span class="px">${esc(eurosL(x.prix))}</span>`;
+      return site === 'vinted' && /^[1-9]\d{0,19}$/.test(String(x.conv || '')) ? `<li><a class="rang" data-achat="${esc(x.id)}" data-achat-etat="${esc(x.etat || '')}" href="${esc(ici + '/inbox/' + x.conv)}" target="_top">${corps}</a></li>` : `<li><div class="rang" data-achat="${esc(x.id)}" data-achat-etat="${esc(x.etat || '')}">${corps}</div></li>`;
+    }).join('')}</ul>`;
+  }
+  // ══ 5.444 — VESTIAIRE · NOTIFICATIONS DU SITE (la cloche de Vestiaire, lue au passage) : « X a aimé · article »,
+  //    message, vente, offre, colis… — jamais le texte de la carte ni un nom ; la publicité est comptée, pas montrée.
+  function notifsSiteHtml() {
+    const n = listes && listes.notifsSite;
+    if (!n) return '';
+    const tete = `<h3 class="h10">${esc(TU('vcn_titre'))}</h3>`;
+    if (!n.liste.length) return `<section class="sec6" data-vc-notifs="0">${tete}<p class="note5">${esc(TU(n.lu ? 'vcn_aucune' : 'vcn_jamais'))}${n.ignorees ? ' ' + esc(TU('vcn_ignorees', { n: n.ignorees })) : ''}</p></section>`;
+    return `<section class="sec6" data-vc-notifs="${n.liste.length}">${tete}<ul class="rangs">${n.liste.map((c) => `<li><div class="rang${c.lu === false ? ' nonlu' : ''}" data-vc-notif="${esc(c.sorte)}">${vignette(c.photo)}<span class="mil"><span class="ti">${c.lu === false ? '<i class="pt5" aria-label="non lu"></i>' : ''}${esc(TU('vcn_' + c.sorte))}${c.titre ? ' · ' + esc(c.titre) : ''}</span><span class="me">${esc(c.at ? depuis(c.at) : '')}</span></span>${c.sorte === 'aime' ? `<button type="button" class="vu-btn vu-sec" data-onglet-b="favoris">${esc(TU('vcn_voir_favoris'))}</button>` : c.sorte === 'message' ? `<button type="button" class="vu-btn vu-sec" data-onglet-b="messages">${esc(TU('vcn_voir_messages'))}</button>` : ''}</div></li>`).join('')}</ul>${n.ignorees ? `<p class="note5">${esc(TU('vcn_ignorees', { n: n.ignorees }))}</p>` : ''}</section>`;
   }
   // 5.410 (comme Vintex) : l'avatar de l'acheteur (sa photo Vinted, sinon son initiale sur un rond neutre).
   const avatar6 = (x) => (x.avatar ? `<img class="av6" src="${esc(x.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span class="av6" aria-hidden="true">${esc(String(x.qui || '?').trim().charAt(0).toUpperCase() || '?')}</span>`);
@@ -4512,7 +4620,7 @@ function vrmVerifVisible(sel) {
     if (!listes) return `<div class="val gris" role="status" data-listes-charge>${esc(TU('m_charge'))}</div>`;
     const m = listes.messages;
     if (!m) return `<div class="val gris" data-messages="pas_su">${esc(TU('m_pas_su'))}</div>`;
-    if (!m.liste.length) return m.site ? `<div class="val gris" data-messages="0" data-messages-site="${esc(m.site)}">${esc(m.nonlusSite != null ? TU('m_site_nonlus', { n: m.nonlusSite }) : TU('m_site_rien'))}</div>` : `<div class="val gris" data-messages="0">${esc(TU('m_aucun'))}</div>`;
+    if (!m.liste.length) return m.site ? `<div class="val gris" data-messages="0" data-messages-site="${esc(m.site)}">${esc(m.nonlusSite != null ? TU('m_site_nonlus', { n: m.nonlusSite }) : TU('m_site_rien'))}${m.sansCompte ? ' ' + esc(TU('m_sans_compte', { n: m.sansCompte })) : ''}</div>` : `<div class="val gris" data-messages="0">${esc(TU('m_aucun'))}</div>`;
     const ici = ORIGINE_ICI && !LISTES ? ORIGINE_ICI : 'https://www.vinted.fr';
     const nl = m.liste.filter((x) => x.nonlu).length;
     const q = msgCherche.trim().toLowerCase();
@@ -5392,6 +5500,9 @@ function vrmVerifVisible(sel) {
   function notificationsHtml() {
     if (listesErreur) return `<div class="val gris" role="status">${esc(listesErreur)}</div>`;
     if (!listes) return `<div class="val gris" role="status" data-listes-charge>${esc(TU('m_charge'))}</div>`;
+    return notifsSiteHtml() + notificationsVrmHtml();
+  }
+  function notificationsVrmHtml() {
     const n = listes.notifications;
     if (!n) return `<div class="val gris" data-notifs="pas_su">${esc(TU('no_pas_su'))}</div>`;
     const vu = Number(n.vu) || 0;
@@ -5426,13 +5537,14 @@ function vrmVerifVisible(sel) {
   // 5.413 (téléphone) : la barre du bas a CINQ onglets égaux (Accueil · Articles · Commandes · Messagerie · Plus) ; « Plus »
   // ouvre une feuille du bas avec les quatre autres pages. À l'ordinateur, rien ne change (la feuille est la barre latérale).
   let vxPlus = false;
-  const PLUS6 = ['favoris', 'notifications', 'automatisations', 'file', 'sante', 'parametres'];
+  const PLUS6 = ['achats', 'favoris', 'notifications', 'automatisations', 'file', 'sante', 'parametres'];
   try { chrome.storage.local.get(['vrmPanneauReduit'], (g) => { try { void chrome.runtime.lastError; } catch (_) {} vxReduit = !!(g && g.vrmPanneauReduit === true); }); } catch (_) {}
   const ICO6 = {
     accueil: '<path d="M4 11.5 12 5l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/>',
     annonces: '<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/>',
     ventes: '<path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20 8H6.2"/><circle cx="9" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/>',
     messages: '<path d="M4 5h16v11H9l-5 4z"/>',
+    achats: '<path d="M6 8h12l-1 12H7z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>',
     favoris: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
     notifications: '<path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
     automatisations: '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16.5h5"/>',
@@ -5441,11 +5553,11 @@ function vrmVerifVisible(sel) {
     parametres: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>',
   };
   const ico6 = (k) => `<svg class="ico6" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICO6[k] || ''}</svg>`;
-  const PAGES6 = { accueil: 'v6_accueil', annonces: 'v6_articles', ventes: 'v6_commandes', messages: 'v6_messagerie', favoris: 'c_favoris', notifications: 'c_notifications', automatisations: 'c_automatisations', file: 'q7_titre', sante: 'sa_titre', parametres: 'c_parametres' };
+  const PAGES6 = { accueil: 'v6_accueil', annonces: 'v6_articles', ventes: 'v6_ventes', achats: 'v6_achats', messages: 'v6_messagerie', favoris: 'c_favoris', notifications: 'c_notifications', automatisations: 'c_automatisations', file: 'q7_titre', sante: 'sa_titre', parametres: 'c_parametres' };
   // L'heure de la dernière lecture de CE que la page montre (jamais une heure inventée ; « — » sinon).
   function luDeLaPage(e) {
     const l = listes || {};
-    const pick = ongletListe === 'annonces' ? l.annonces && l.annonces.lu : ongletListe === 'ventes' ? l.ventes && l.ventes.lu : ongletListe === 'messages' ? l.messages && l.messages.lu : null;
+    const pick = ongletListe === 'annonces' ? l.annonces && l.annonces.lu : ongletListe === 'ventes' ? l.ventes && l.ventes.lu : ongletListe === 'messages' ? l.messages && l.messages.lu : ongletListe === 'achats' ? l.achats && l.achats.lu : null;
     return Number(pick) || Number(listesAt) || Number(e && e.flux && e.flux.okAt) || 0;
   }
   // L'ACCUEIL : un petit tableau de bord — le compte de l'onglet et sa liaison à VRM, les chiffres du jour, la jauge,
@@ -5721,7 +5833,7 @@ function vrmVerifVisible(sel) {
   // à l'ordinateur la feuille se fond dans la barre latérale (display: contents) et « Plus » ne se montre pas.
   function barreTelephone6(cle, nav) {
     return `<button type="button" class="nav6 plusb6" data-vx-plus aria-expanded="${vxPlus ? 'true' : 'false'}" aria-current="${PLUS6.includes(cle) ? 'page' : 'false'}" title="${esc(TU('v6_plus'))}"><svg class="ico6" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg><span>${esc(TU('v6_plus'))}</span></button>
-        <div class="plus6g" data-vx-plus-feuille role="group" aria-label="${esc(TU('v6_plus_titre'))}"><b class="plus6t">${esc(TU('v6_plus_titre'))}</b>${nav('favoris')}${nav('notifications')}${nav('automatisations')}${nav('file')}${nav('sante')}
+        <div class="plus6g" data-vx-plus-feuille role="group" aria-label="${esc(TU('v6_plus_titre'))}"><b class="plus6t">${esc(TU('v6_plus_titre'))}</b>${nav('achats')}${nav('favoris')}${nav('notifications')}${nav('automatisations')}${nav('file')}${nav('sante')}
         <div class="bas6">${nav('parametres')}</div></div>
       </nav>${vxPlus ? '<div class="voile6" data-vx-plus-voile aria-hidden="true"></div>' : ''}`;
   }
@@ -5758,7 +5870,8 @@ function vrmVerifVisible(sel) {
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'automatisations' && listes && listes.automatisations && listes.automatisations.baisse) panneau = `<p class="note5" data-auto-site="${esc(e.plateforme)}">${esc(TU(e.plateforme === 'leboncoin' ? 'au_site_lbc' : 'au_site_vc'))}</p>` + automatisationsHtml();
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'automatisations') panneau = `<div class="par5" data-auto-site="${esc(e.plateforme)}"><p class="note5">${esc(TU(e.plateforme === 'leboncoin' ? 'au_site_lbc' : 'au_site_vc'))}</p></div>`;
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'annonces' && listes && listes.plateforme === e.plateforme) panneau = annoncesHtml(e) + (listes.annonces && listes.annonces.sansCompte ? `<div class="val gris" data-sans-compte="${Number(listes.annonces.sansCompte)}">${esc(TU('a_sans_compte', { n: listes.annonces.sansCompte }))}</div>` : '');
-    else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'ventes' && listes && listes.plateforme === e.plateforme) panneau = ventesHtml(e);
+    else if (ongletListe === 'achats') panneau = achatsHtml(e);
+    else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'ventes' && listes && listes.plateforme === e.plateforme) panneau = e.plateforme === 'vestiaire' ? ventesVcHtml(e) : ventesHtml(e);
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'notifications') panneau = notificationsHtml();
     else if (!vinted && ongletListe === 'messages') panneau = carte.hasAttribute('data-grand') && listes && listes.plateforme === e.plateforme && listes.messages ? messagesHtml() : (!listes && carte.hasAttribute('data-grand') ? `<div class="val gris" role="status" data-listes-charge>${esc(TU('m_charge'))}</div>` : `<div class="val gris" data-liste-site="${esc(e.plateforme)}">${esc(TU('m_site', { site: nomSite }))}</div>`);
     else if (!vinted) panneau = `<div class="val gris" data-liste-site="${esc(e.plateforme)}">Sur ${esc(nomSite)}, tes ${ongletListe === 'ventes' ? 'ventes' : 'annonces'} sont dans les pages du site (liens ci-dessous) : la carte ne les recopie pas encore.</div>`;
@@ -5779,6 +5892,7 @@ function vrmVerifVisible(sel) {
   }
   function brancherListes(racine, e) {
     brancherImpression(racine);
+    try { brancherOffreVc(racine); } catch (_) {}
     try { brancherGestes6(racine); } catch (_) {}
     racine.querySelectorAll('[data-onglet-b]').forEach((b) => b.addEventListener('click', () => {
       ongletListe = b.getAttribute('data-onglet-b'); vxPlus = false; ranger({ vrmCarteOnglet: ongletListe });
@@ -6958,7 +7072,7 @@ function vrmVerifVisible(sel) {
   //    `vrm*` sont retirés de l'adresse (un rechargement ne rouvre rien) ; ids : chiffres et tirets seulement, 50 au plus.
   // Le vocabulaire de l'app (src/actionsExtension.js du chantier actions-extension) ET celui du panneau : une page
   // inconnue ⇒ Accueil ; une action inconnue ⇒ aucune. Une action n'est jamais FAITE : elle est pré-choisie.
-  const PAGES_LIEN = { articles: 'annonces', annonces: 'annonces', commandes: 'ventes', ventes: 'ventes', messagerie: 'messages', messages: 'messages', offres: 'messages', notifications: 'notifications', automatisations: 'automatisations', favoris: 'favoris', republier: 'annonces', prix: 'annonces', publier: 'annonces', vacances: 'parametres', accueil: 'accueil', parametres: 'parametres' };
+  const PAGES_LIEN = { articles: 'annonces', annonces: 'annonces', commandes: 'ventes', ventes: 'ventes', achats: 'achats', messagerie: 'messages', messages: 'messages', offres: 'messages', notifications: 'notifications', automatisations: 'automatisations', favoris: 'favoris', republier: 'annonces', prix: 'annonces', publier: 'annonces', vacances: 'parametres', accueil: 'accueil', parametres: 'parametres' };
   const ACTIONS_LIEN = ['baisser', 'changer', 'remettre', 'masquer', 'afficher', 'republier-direct', 'republier', 'mettre-en-ligne', 'brouillon', 'creer', 'deposer', 'publier', 'pause', 'supprimer', 'favoris', 'envoyer', 'ouvrir', 'offre', 'repondre', 'regler', 'vacances', 'relancer'];
   // L'action pré-choisie dans « Choisir une action » du tableau (seulement si ce geste y existe pour ce site).
   const ACTION_MENU = { baisser: 'baisser', changer: 'baisser', remettre: 'baisser', republier: 'republier', 'mettre-en-ligne': 'republier', brouillon: 'republier', masquer: 'masquer', afficher: 'afficher', favoris: 'favoris', envoyer: 'favoris' };
