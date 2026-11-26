@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.453.2';
+const CODE_VERSION = '5.454.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -21771,14 +21771,20 @@ function fpGroupes(reglage, ancien, ctx, fav, lotPermis) {
 }
 // ── LE CHOIX ──────────────────────────────────────────────────────────────
 // x = { reglage, ancien, fav, offre ({ prix } ou null), ctx ({ heure, jour }), lotPermis, sur(texte)→bool,
-//       refusee(modele)→bool, derniere: { acheteur, compte } (clés de version), hasard }
+//       refusee(modele)→bool, derniere: { acheteur, compte } (clés de version), hasard,
+//       deja(modele)→bool (5.441 : ce texte a DÉJÀ été envoyé à CETTE personne pour CET article) }
 // → { ok: true, source, cas, regle, version: { cle, n, lot, modele, texte }, possibles }  (`texte` = variables nouvelles posées)
-//   { ok: false, source, raison: 'aucun_message' | 'texte_interdit' | 'variable', manque: [...] }
+//   { ok: false, source, raison: 'aucun_message' | 'texte_interdit' | 'variable' | 'deja_envoye', manque: [...] }
+// 5.441 (Julien, 23 nov.) : les RELANCES sont permises — une personne peut recevoir un nouveau message plus tard — mais
+//   JAMAIS deux fois le même texte à la même personne pour le même article : un texte déjà envoyé est écarté pour de bon
+//   (pas seulement « pas le dernier ») ; tous déjà envoyés ⇒ `deja_envoye`, rien ne part (le favori est sauté).
 function choisirMessageFavori(x) {
   const o = x && typeof x === 'object' ? x : {};
   const val = fpValeurs(o.fav, o.offre);
   const { source, groupes } = fpGroupes(o.reglage, o.ancien, o.ctx || {}, o.fav || {}, o.lotPermis === true);
   const sur = typeof o.sur === 'function' ? o.sur : () => true, refusee = typeof o.refusee === 'function' ? o.refusee : () => false;
+  const deja = typeof o.deja === 'function' ? o.deja : () => false;
+  let vuDeja = false;
   const d = o.derniere && typeof o.derniere === 'object' ? o.derniere : {};
   const tirer = typeof o.hasard === 'function' ? o.hasard : Math.random;
   let vuInterdit = false; const manques = new Set();
@@ -21790,6 +21796,7 @@ function choisirMessageFavori(x) {
       if (m.length) { m.forEach((k) => manques.add(k)); continue; }
       const texte = fpPreremplir(v.modele, val);
       if (!sur(texte) || refusee(v.modele)) { vuInterdit = true; continue; }
+      if (deja(v.modele)) { vuDeja = true; continue; }
       possibles.push(Object.assign({}, v, { texte }));
     }
     if (!possibles.length) continue;
@@ -21808,6 +21815,7 @@ function choisirMessageFavori(x) {
       for (const v of g.versions) {
         const mod = neutre(v.modele);
         if (fpErreurTexte(mod) || fpManque(mod, val).length) continue;
+        if (deja(v.modele) || deja(mod)) { vuDeja = true; continue; }   // 5.454 : la règle 5.441 vaut aussi pour la version neutre
         const texte = fpPreremplir(mod, val);
         if (!texte.trim() || !sur(texte) || refusee(v.modele)) continue;
         possibles.push(Object.assign({}, v, { modele: mod, texte, neutre: true }));
@@ -21818,6 +21826,7 @@ function choisirMessageFavori(x) {
       return { ok: true, source, cas: g.cas, regle: g.regle, version: v, possibles: possibles.length, neutre: true };
     }
   }
+  if (vuDeja && !vuInterdit) return { ok: false, source, raison: 'deja_envoye', manque: [] };
   if (manques.size && !vuInterdit) return { ok: false, source, raison: 'variable', manque: [...manques] };
   return { ok: false, source, raison: groupes.some((g) => g.versions.length) ? 'texte_interdit' : 'aucun_message', manque: [...manques] };
 }
@@ -22027,6 +22036,15 @@ const FAV_VERSION_CLE = 'vrmFavVersionCle';
 async function versionCleDerniere(uid, acheteur) {
   try { const m = (await chrome.storage.local.get(FAV_VERSION_CLE))[FAV_VERSION_CLE] || {}; return { compte: m[String(uid)] || null, acheteur: acheteur ? m[String(uid) + '|' + String(acheteur)] || null : null }; } catch (_) { return {}; }
 }
+// 5.441 (Julien, 23 nov.) : les textes DÉJÀ envoyés à une personne pour un article (empreintes du modèle, jamais le texte),
+//    par compte ; une relance plus tard choisit un AUTRE texte, jamais le même (règle `choisirMessageFavori`, `deja`).
+const FAV_TEXTES_ENVOYES = 'vrmFavTextesEnvoyes', FAV_TEXTES_MAX_CLES = 3000;
+const cleTextesFavori = (uid, acheteur, item) => `${String(uid)}|${String(acheteur)}|${String(item)}`;
+async function textesDejaEnvoyes(uid, acheteur, item) { try { const m = (await chrome.storage.local.get(FAV_TEXTES_ENVOYES))[FAV_TEXTES_ENVOYES] || {}; const l = m[cleTextesFavori(uid, acheteur, item)]; return new Set(Array.isArray(l) ? l.map(String) : []); } catch (_) { return null; } }
+async function noterTexteEnvoyeFavori(uid, acheteur, item, modele) {
+  if (!acheteur || !item || typeof modele !== 'string' || !modele) return;
+  try { const m = (await chrome.storage.local.get(FAV_TEXTES_ENVOYES))[FAV_TEXTES_ENVOYES] || {}; const k = cleTextesFavori(uid, acheteur, item); const l = Array.isArray(m[k]) ? m[k] : []; const e = empreinteMessage(modele); delete m[k]; m[k] = [...new Set([...l, e])].slice(-12); const ks = Object.keys(m); for (const x of ks.slice(0, Math.max(0, ks.length - FAV_TEXTES_MAX_CLES))) delete m[x]; await chrome.storage.local.set({ [FAV_TEXTES_ENVOYES]: m }); } catch (_) {}
+}
 async function noterVersionCle(uid, acheteur, cle) {
   if (typeof cle !== 'string' || !cle) return;
   try { const m = (await chrome.storage.local.get(FAV_VERSION_CLE))[FAV_VERSION_CLE] || {}; m[String(uid)] = cle; if (acheteur) { delete m[String(uid) + '|' + String(acheteur)]; m[String(uid) + '|' + String(acheteur)] = cle; } const k = Object.keys(m); if (k.length > 3000) for (const x of k.slice(0, k.length - 3000)) delete m[x]; await chrome.storage.local.set({ [FAV_VERSION_CLE]: m }); } catch (_) {}
@@ -22053,9 +22071,12 @@ async function choixMessageFavori(x) {
   const fav = { pseudo: String((c && c.opposite_user && c.opposite_user.login) || ''), article: String((c && c.transaction && c.transaction.item_title) || ''), prix: Number(prixAnnonce) > 0 ? Number(prixAnnonce) : null, marque: fiche.marque, taille: fiche.taille };
   const op = offre && /^[1-9]\d{0,19}$/.test(String(tx || '')) ? await offreAvecPlancher(body.itemId, prixAnnonce, offre) : null;
   const derniere = await versionCleDerniere(uid, body.recipientId);
+  // 5.441 : « pas su » (stockage illisible) ne vaut pas « jamais envoyé » : rien ne part sur un doute.
+  const dejaEnv = await textesDejaEnvoyes(uid, body.recipientId, body.itemId);
+  if (dejaEnv === null) { noterDiag('favori_textes_envoyes_illisible'); return { ok: false, source: '', raison: 'deja_envoye', manque: [], op: null }; }
   if (!derniere.compte) { const n = await varianteDerniere(uid, 'favori'); if (Number.isInteger(n)) derniere.compte = 'a' + n; }
   const r = choisirMessageFavori({ reglage: perso, ancien: { message: body.message, variantes: body.variantes, lot: lotTexte }, fav, offre: op && op.prix ? { prix: Number(op.prix) } : null,
-    ctx: fpContexteParis(Date.now()), lotPermis: lotPermis === true, sur: (t) => texteSurVinted(t).ok, refusee: (m) => !!(refusees && refusees.has(empreinteMessage(m))), derniere });
+    ctx: fpContexteParis(Date.now()), lotPermis: lotPermis === true, sur: (t) => texteSurVinted(t).ok, refusee: (m) => !!(refusees && refusees.has(empreinteMessage(m))), derniere, deja: (m) => dejaEnv.has(empreinteMessage(m)) });
   if (r.ok) noterDiag('favori_perso_' + r.source + '_' + r.cas);
   return Object.assign(r, { op });
 }
@@ -22063,6 +22084,7 @@ async function noterChoixFavori(uid, body, conv, version, offreFaite) {
   if (!version) return;
   if (version.lot) { await noterLotEnvoye(uid, body.recipientId); }
   await noterVersionCle(uid, body.recipientId, version.cle);
+  await noterTexteEnvoyeFavori(uid, body.recipientId, body.itemId, version.modele || version.texte || '');
   await noterEnvoiFavori(uid, conv, Number.isInteger(version.n) ? version.n : 0, body.itemId, body.recipientId, { k: version.cle, o: offreFaite === true, au: !!(body && body.auto === true) });   // 5.420 : « auto » dans les statistiques
 }
 // 5.414 : la raison (connue du serveur de la file) d'un geste par l'interface qui s'est arrêté AVANT de partir.
@@ -22125,6 +22147,7 @@ async function sequenceFavoriBleam(x) {
       await pauseFavori('offre', uid);
       if (await gardeStricte(uid, acc, { lecture: true })) return { resultat: 'refuse' };
       etape('offre');
+      await noterTexteEnvoyeFavori(uid, body.recipientId, body.itemId, (version && (version.modele || version.texte)) || '');   // 5.454 : le texte peut partir DANS la fenêtre d'offre ⇒ noté AVANT (règle 5.441)
       const o0 = await interfaceVinted(acc, 'offre', { conv: String(convId), route: x.convRoute || '', tx: String(tx), prix: Number(op0.prix), garde: gp0.ticket, favori: true, texteMessage: texte });
       if (partie(o0)) compterEcrit();
       const faite = !!(o0 && o0.ok && (o0.json == null || o0.json.code == null || Number(o0.json.code) === 0));
@@ -22153,6 +22176,7 @@ async function sequenceFavoriBleam(x) {
   etape('envoi');
   // 5.414 (`toutinterface`) : le message TAPÉ dans le champ de CETTE conversation (vérifiée dans l'adresse), « Envoyer »,
   //    puis la preuve à l'écran (le message apparu dans le fil) ; pas vu ⇒ « incertain », JAMAIS renvoyé.
+  await noterTexteEnvoyeFavori(uid, body.recipientId, body.itemId, (version && (version.modele || version.texte)) || '');   // 5.441 : noté AVANT l'envoi
   const r = await interfaceVinted(acc, 'message', { conv: String(convId), route: x.convRoute || '', texte, favori: true, humain: true });
   if (partie(r)) compterEcrit();
   if (r.rienParti && !r.pause) return { resultat: 'refuse', raison: raisonFavoriInterface(r), cause: causeFavoriInterface(r) };
@@ -22621,6 +22645,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   //    sues seulement, jamais la dernière version de cet acheteur ni du compte. La séquence d'envoi ne change pas :
   //    elle reçoit `version` ({ cle, n, lot, modele, texte }) comme avant.
   const choixP=await choixMessageFavori({uid,body,c,prixAnnonce,offre,tx,perso:persoF,lotPermis:!texteEnvoi&&!!cbF.favoris&&Number(body.aimes)>=2&&!(await lotDejaEnvoye(uid,body.recipientId)),lotTexte:cbF.messageLot,refusees:refuseesIci});
+  if(!choixP.ok&&choixP.raison==='deja_envoye'){noterDiag('favori_perso_deja_envoye');return rep('ignore',0,'conversation_deja_contactee');}   // 5.441 : jamais deux fois le même texte (rien n'est écrit)
   if(!choixP.ok){noterDiag('favori_perso_'+choixP.raison);return rep('refuse',0,choixP.raison==='variable'?(choixP.manque.some(k=>/prix|remise/.test(k))?'offre_prix_inconnu':'identite_non_confirmee'):'texte_interdit');}
   if(cbF.favoris){
     const versionB=choixP.version;
@@ -22695,6 +22720,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   etape('envoi');
   // 5.414 : le message TAPÉ dans le champ de CETTE conversation, « Envoyer », puis VU dans le fil (sinon incertain, jamais renvoyé).
+  await noterTexteEnvoyeFavori(uid,body.recipientId,body.itemId,version.modele||version.texte||'');   // 5.441 : noté AVANT l'envoi — une issue incertaine ne fera jamais repartir le même texte
   const r=await interfaceVinted(acc,'message',{conv:String(convId),route:convRoute,texte:texteFinal,favori:true,humain:true});
   if(partie(r))ecrits++;
   // (29 oct., revue) Pas d'onglet, onglet hors de Vinted, ou pause : le message n'est PAS

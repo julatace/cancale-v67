@@ -126,6 +126,10 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'revue-ux-23nov', date: '2026-11-23', titre: 'Achats et fiches plus clairs', phrase: 'La liste d’abord, le prix d’achat dans la fiche, photos des disparues.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov. soir, ext. 5.440.1 — Julien : « 0 envoyé · 1 sauté », phrase coupée) docs/passation/2026-11-23-favoris-identite.md
   { id: 'favoris-identite', date: '2026-11-23', titre: 'Messages aux favoris : le nouveau lien de Vinted', phrase: 'Un favori pas confirmé est dit et sauté, la file continue.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (24 nov., ext. 5.447) docs/passation/2026-11-24-republication-reperage.md
+  { id: 'repub-reperage', date: '2026-11-24', titre: 'Republier : VRM retrouve seul chaque bouton', phrase: 'Un bouton en double ou introuvable : rien ne part, c’est dit.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (23 nov., ext. 5.441) docs/passation/2026-11-23-favoris-541.md
+  { id: 'relances-texte-neuf', date: '2026-11-23', titre: 'Relance : jamais deux fois le même message', phrase: 'Une même personne ne reçoit jamais deux fois le même texte.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md
   { id: 'vente-email-partout', date: '2026-11-23', titre: 'Une vente reçue par e-mail se voit partout', phrase: 'Ventes, Ma journée et Colis, avant même le passage de l’extension.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov. au soir, lot retours-suivi — Julien : « le transporteur inconnu, le logo mal mis ») docs/passation/2026-11-23-retours-suivi.md
