@@ -1,6 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
 const s=fs.readFileSync(new URL('../../vinted-sync-extension/background.js',import.meta.url),'utf8'),a=s.indexOf('function extraireVentesLbc('),b=s.indexOf('// ⚠️⚠️ (20 oct.',a);
 const c={labelInfoDe:()=>null,imageDeVente:()=>'',dateVenteLbc:()=>''};vm.createContext(c);vm.runInContext(s.slice(a,b),c);
+// (26 nov.) extraireVentesLbc appelle retourLbcDe (retours Leboncoin, 5.436) : on charge la VRAIE fonction et ses motifs, jamais un bouchon.
+const ra=s.indexOf('const CLE_RETOUR_LBC'),rb=s.indexOf('async function rangerLbcVentes(',ra);assert.ok(ra>0&&rb>ra,'retourLbcDe introuvable');vm.runInContext(s.slice(ra,rb),c);
 const d={purchase_id:42,is_seller:true,item:{id:7,prices:{final:2500,total:2928}},step:{status:'done'}};
 test('un identifiant de transaction contradictoire ne peut pas remplacer une autre vente',()=>{
  assert.equal(c.extraireVentesLbc('https://api.leboncoin.fr/api/consumergoods/proxy/v2/pages/transactions/43',d).length,0);
