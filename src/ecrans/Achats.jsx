@@ -15,7 +15,7 @@ import { createPortal } from 'react-dom';
 import { pairesDuModele } from '../dejaEnStock.js';
 import { cleFacture, verifierFichier } from '../factureAchat.js';
 import { lireTicketAchat, lireTexteTicket, texteMontantSaisie } from '../depensesTicket.js';
-import { ticketVersBrouillon, prixEncoreLu, champEncoreLu, resumeTicket } from '../achatTicket.js';
+import { ticketVersBrouillon, prixEncoreLu, champEncoreLu, resumeTicket, lotFormulaireDuTicket } from '../achatTicket.js';
 import { PastilleFacture } from '../FactureAchat.jsx';
 import { BlocGrosLot, LOT0, repartitionDuLot, casesDuLot } from '../GrosLot.jsx';
 import { nombreArticles, centimesTapes, listeRangs } from '../grosLot.js';
@@ -589,8 +589,19 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
                 {t && t.etat !== 'lecture' ? (
                   <div role="status" aria-live="polite" data-achat-ticket-resume="" style={{ fontSize: 13, lineHeight: 1.4, color: t.etat === 'lu' ? C.text : C.muted, padding: '8px 4px 0' }}>
                     {resume}
-                    {t.articles > 1 ? <span data-achat-ticket-articles={t.articles} style={{ display: 'block', color: C.muted }}>{tr('achats.articlesTicketTotal', { articles: String(t.articles) })}</span> : null}
+                    {t.articles > 1 && !t.lot ? <span data-achat-ticket-articles={t.articles} style={{ display: 'block', color: C.muted }}>{tr('achats.articlesTicketTotal', { articles: String(t.articles) })}</span> : null}
                   </div>
+                ) : null}
+                {/* (23 nov., lot achats-hors-vinted) Un ticket à PLUSIEURS articles, dont la somme des lignes est EXACTEMENT le total lu :
+                    « Diviser en N articles » remplit le lot (src/achatTicket.js `lotDuTicket`) — rien n'est écrit, c'est SON « Ajouter le lot ». */}
+                {t && t.lot && lot && form.mode !== 'lot' ? (
+                  <Bouton variante="secondaire" data-achat-ticket-lot={t.lot.n} style={{ marginTop: 8, minHeight: 44 }}
+                    onClick={() => { setErreur(''); setErreursNum(null); setForm(d => d && ({ ...d, mode: 'lot', lot: lotFormulaireDuTicket(d.lot, t.lot, texteMontantSaisie), price: String(d.price || '').trim() ? d.price : texteMontantSaisie(t.lot.total) })); }}>
+                    <Icon name="receipt" size={18} style={{ marginRight: 6, verticalAlign: '-3px' }} />{tr('ahv.diviser', { n: t.lot.n })}
+                  </Bouton>
+                ) : null}
+                {t && t.lot && form.mode === 'lot' && form.lot && form.lot.duTicket ? (
+                  <p data-achat-ticket-lot-lu={t.lot.n} style={{ margin: '8px 4px 0', fontSize: 13, color: C.muted }}>{tr('ahv.verifie', { n: t.lot.n })}</p>
                 ) : null}
               </div>
             );

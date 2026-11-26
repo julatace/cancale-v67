@@ -20,6 +20,7 @@
   --rtv-ambre-fond: #FFF1D6;
   --rtv-ambre-bord: #F2C879;
   --rtv-ambre: #764300;
+  --rtv-vert-fond: #DDF4E6; --rtv-vert-bord: #C3EAD2; --rtv-vert: #17744A;
   --rtv-filet: rgb(28 28 32 / .10);
   position: fixed; inset: 0; z-index: 18000;
   display: flex; flex-direction: column;
@@ -31,6 +32,7 @@
 :root[data-theme="dark"] .vrm-rtv {
   --rtv-porcelaine: #212126; --rtv-porcelaine-2: #2D2D33; --rtv-encre: #F1F2F4; --rtv-gris: #9CB0C6; --rtv-lien: #F4F4F5;
   --rtv-ambre-fond: rgb(242 182 94 / .14); --rtv-ambre-bord: rgb(242 182 94 / .45); --rtv-ambre: #F2B65E; --rtv-filet: rgb(241 242 244 / .12);
+  --rtv-vert-fond: rgb(63 212 154 / .14); --rtv-vert-bord: rgb(63 212 154 / .26); --rtv-vert: #6FE3B5;
 }
 .vrm-rtv *, .vrm-rtv *::before, .vrm-rtv *::after { box-sizing: border-box; }
 
@@ -201,3 +203,14 @@ html[data-scan-retrouver] body .vrm-app-shell { visibility: hidden !important; }
 .vrm-rtv-viseur.is-lu .vrm-rtv-ligne { animation: none; opacity: 0; }
 /* Le zoom « 2× / 1× » : un rond du même jeu que la lampe, le chiffre au lieu d'une icône. */
 .vrm-rtv-zoom { font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+
+/* (23 nov., lot scan-achat) SON N° et le geste suivant : le N° de CET achat sur sa plaque, sa case (notée : vert « fait »,
+   proposée : neutre), la vente qui l'attend (ambre : un geste à faire). Un seul plein dessous, il nomme ce geste. */
+.vrm-rtv-num { margin-top: 12px; }
+.vrm-rtv-num .vrm-rtv-etat-txt b { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 0; }
+.vrm-rtv-num .vrm-rtv-plaque.is-petite { font-size: 15px; padding: 1px 8px; }
+.vrm-rtv-etat.is-fait { background: var(--rtv-vert-fond); box-shadow: 0 0 0 1px var(--rtv-vert-bord) inset; color: var(--rtv-vert); }
+.vrm-rtv-etat.is-fait .vrm-rtv-etat-point { background: var(--rtv-vert); }
+.vrm-rtv-num-ligne { display: flex; align-items: baseline; gap: 2px; flex-wrap: wrap; }
+.vrm-rtv-num-ligne + .vrm-rtv-num-ligne { margin-top: 4px; }
+.vrm-rtv-touche.vrm-rtv-large { margin-top: 10px; width: 100%; }
