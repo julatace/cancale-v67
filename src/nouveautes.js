@@ -29,6 +29,7 @@ export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
   // (26 nov., fiabilite-vc-lbc — Julien : « les données doivent être fiables, pense à Vestiaire Co et Leboncoin ») src/enLigneVc.js
+  { id: 'favoris-requetes', date: '2026-11-26', titre: 'Favoris envoyés sans clic', phrase: 'Extension 5.455.0 : plus fiable.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'observation-fichier', date: '2026-11-26', titre: 'Observer Vinted : enregistrer un fichier', phrase: 'Extension 5.454.1 : la frise en fichier.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'fiabilite-vc-lbc', date: '2026-11-26', titre: 'Vestiaire : en ligne et vendue, plus justes', phrase: 'Vente annulée : la paire reste. Lecture ancienne : à confirmer.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (26 nov., couleurs-14-15 — Julien : « j'aime bien le 14 et 15 » → « 14 en sombre, 15 en clair ») src/natif/jetons.css
@@ -356,7 +357,7 @@ export const NOUVEAUTES = Object.freeze([
   // (19 nov. soir, NATIF.md §2 bis) docs/passation/2026-11-19-app-tableaux.md
   { id: 'app-tableaux', date: '2026-11-19', titre: 'Annonces, ventes, achats en tableaux de travail', phrase: 'Statut à compteurs, colonnes, tri, sélection ; et l’écran Automatisations.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (19 nov., Julien : « un agent 100 % autonome, sans IA » ; « c'est l'extension qui va publier ») docs/passation/2026-11-19-publier-agent.md
-  { id: 'publier-agent', date: '2026-11-19', titre: 'Publier sur… : VRM remplit chaque site', phrase: 'Catégorie, marque, pointure posées seules ; une question s’il doute.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'publier-agent', date: '2026-11-19', titre: 'Publier sur… : VRM remplit chaque site', phrase: 'Catégorie, marque, taille posées seules ; une question s’il doute.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (19 nov., Julien : « l'onglet e-mails est absolument catastrophique » ; « relier la boîte : beaucoup plus accompagné ») docs/passation/2026-11-19-emails-mail.md
   { id: 'emails-mail', date: '2026-11-19', titre: 'E-mails comme Mail, plein écran', phrase: 'Segments en haut, la liste en grand, l’e-mail lisible à côté.', tab: 'emails', pour: 'tous', mode: 'tous' },
   { id: 'relier-boite-guide', date: '2026-11-19', titre: 'Relier ta boîte, pas à pas', phrase: 'Gmail, Outlook, iCloud : une étape par écran, essai vérifié en direct.', tab: 'emails', pour: 'tous', mode: 'tous' },

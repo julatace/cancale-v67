@@ -138,9 +138,8 @@ async function page(b, o = {}) {
     return r.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ channel: { id: conv ? conv[1] : 'x', type: 'messaging', cid: 'messaging:' + (conv ? conv[1] : 'x') }, messages: [], read: [] }) });
   });
   await pg.route(`${ORIGINE}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: PAGE(o) }));
-  // (26 nov., zero-rouge-bancs) Le cadre de vérification posé par `o.captcha` vise la VRAIE adresse de DataDome (c'est son `src`
-  // que vc-ecrire.js reconnaît) : il est servi ici, rien ne part sur Internet (garde réseau rouge en CI, réponse de 52.27.95.148).
-  await pg.route('https://geo.captcha-delivery.com/**', (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<!doctype html><title>captcha</title>' }));
+  // Le cadre de vérification (E6) est SERVI par le banc : aucun banc ne joint Internet (garde réseau).
+  await pg.route('https://geo.captcha-delivery.com/**', (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<!doctype html><p>vérification (banc)</p>' }));
   await pg.addInitScript({ content: `window.__store = ${JSON.stringify(o.store || {})};` });
   await pg.addInitScript({ content: INJ });
   await pg.goto(`${ORIGINE}/chat${o.sansId ? '' : '?id=' + CONV}`);

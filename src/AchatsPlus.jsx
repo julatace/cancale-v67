@@ -13,6 +13,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 import React, { useEffect, useMemo, useState } from 'react';
 import { tr } from './i18n/index.js';
+import { motsVendeur } from './profilVendeur.js';   // (26 nov.) exemples de Sneakers seulement chez qui vend des sneakers
 import { Feuille } from './ui/Feuille.jsx';
 import { Ligne } from './ui/Ligne.jsx';
 import { groupesMemeAnnonce } from './achatMemeAnnonce.js';
@@ -112,7 +113,7 @@ function FeuilleRecherche({ liste, onChanger, extEtat, extVersion, onClose }) {
       </div> : <p className="vrm-plus-vide">{tr('plus.recherche.aucune')}</p>}
       <h3 className="vrm-plus-entete">{tr('plus.recherche.nouvelle')}</h3>
       <label className="vrm-plus-champ">{tr('plus.recherche.marque')}<input data-recherche-champ="marque" value={marque} maxLength={40} placeholder="Nike" onChange={(e) => setMarque(e.target.value)}/></label>
-      <label className="vrm-plus-champ">{tr('plus.recherche.modele')}<input data-recherche-champ="modele" value={modele} maxLength={80} placeholder="air max 90" onChange={(e) => setModele(e.target.value)}/></label>
+      <label className="vrm-plus-champ">{tr('plus.recherche.modele')}<input data-recherche-champ="modele" value={modele} maxLength={80} placeholder={motsVendeur().nom === 'paire' ? 'air max 90' : tr('plus.recherche.modeleEx.neutre')} onChange={(e) => setModele(e.target.value)}/></label>
       <label className="vrm-plus-champ">{tr('plus.recherche.tailles')}<input data-recherche-champ="tailles" value={tailles} maxLength={60} placeholder="42,5 / 43" onChange={(e) => setTailles(e.target.value)}/></label>
       <label className="vrm-plus-champ">{tr('plus.recherche.prixMax')}<input data-recherche-champ="prix" inputMode="decimal" value={prixMax} maxLength={7} placeholder="80" onChange={(e) => setPrixMax(e.target.value)}/></label>
       {(marque || modele || tailles || prixMax) && !brouillon ? <p className="vrm-plus-erreur" role="status">{tr('plus.recherche.trop')}</p> : null}

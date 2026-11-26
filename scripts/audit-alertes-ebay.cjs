@@ -309,7 +309,10 @@ const ops = (veilles) => ({ version: 1, revision: 3, missions: [], reservations:
 
   // ══ W : la route `alertes` d'api/ebay.js ══════════════════════════════════
   await essaie('W', async () => {
-    const appel = async (corps, jwt = JWT_J) => { const r = faireRes(); await M({ method: 'POST', headers: { authorization: 'Bearer ' + jwt, 'content-type': 'application/json' }, query: {}, body: { action: 'alertes', ...corps } }, r); return r; };
+    // La route lit l'heure (`Date.now`) pour garder 14 jours d'annonces : le banc la TIENT juste après son
+    // dernier passage (T0 + 13 h), comme `passer` — sans quoi, 14 jours après T0, la liste se vidait sur la
+    // vraie horloge et W2 rougissait (bombe à retardement, 26 nov.). W7 joue la garde elle-même.
+    const appel = async (corps, jwt = JWT_J, t = T0 + 13 * H) => { const vrai = Date.now; Date.now = () => t; try { const r = faireRes(); await M({ method: 'POST', headers: { authorization: 'Bearer ' + jwt, 'content-type': 'application/json' }, query: {}, body: { action: 'alertes', ...corps } }, r); return r; } finally { Date.now = vrai; } };
     const r0 = await appel({ op: 'lire' }, 'eyJh.inconnu.sig');
     dit(r0.code === 401, 'W1 sans session ⇒ 401', String(r0.code));
     journal.length = 0;
@@ -323,6 +326,8 @@ const ops = (veilles) => ({ version: 1, revision: 3, missions: [], reservations:
     const r3 = await appel({ op: 'ecarter', itemIds: ['<script>'] });
     dit(r3.code === 400, 'W5 un identifiant illisible n’écrit rien (400)', String(r3.code));
     dit(!journal.some((x2) => x2.ou === 'ebay' && /\/buy\/browse\//.test(x2.u)), 'W6 lire la liste ne coûte aucun appel à eBay');
+    const r4 = await appel({ op: 'lire' }, JWT_J, T0 + 16 * 86400e3);
+    dit(r4.code === 200 && Array.isArray(r4.corps.nouvelles) && r4.corps.nouvelles.length === 0, 'W7 au-delà de 14 jours, une annonce n’est plus dans la liste (garde)', String(r4.corps && r4.corps.nouvelles && r4.corps.nouvelles.length));
   });
 
   // ══ Sources : 12 fonctions, le cron GitHub ═══════════════════════════════

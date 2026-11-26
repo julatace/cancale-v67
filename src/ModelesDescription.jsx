@@ -5,6 +5,7 @@
 import React from 'react';
 import { lireModeles, remplirModele, insererDans, nouveauModele, VARIABLES } from './modelesDescription.js';
 import { tr } from './i18n/index.js';
+import { motsVendeur } from './profilVendeur.js';   // (26 nov.) exemples de Sneakers seulement chez qui vend des sneakers
 import { VARIABLES_MODELE, modeleValide } from './depot/regles.js';
 import './styles-annonces-outils.css';
 
@@ -41,7 +42,7 @@ export function MesModeles({ modeles, onChange, confirmer }) {
                 {['', 'defaut', 'marque', 'modele'].map((k) => <button key={k || 'inserer'} type="button" role="radio" aria-checked={(m.portee || '') === k} onClick={() => maj(m.id, { portee: k })} data-modele-portee-choix={k || 'inserer'}>{tr('modeles.portee.' + (k || 'inserer'))}</button>)}
               </div>
               {m.portee === 'marque' || m.portee === 'modele' ? <input aria-label={tr('modeles.marque')} placeholder={tr('modeles.marque')} value={m.marque || ''} maxLength={40} onChange={(e) => maj(m.id, { marque: e.target.value })} data-modele-marque=""/> : null}
-              {m.portee === 'modele' ? <input aria-label={tr('modeles.modele')} placeholder={tr('modeles.modeleEx')} value={m.modele || ''} maxLength={60} onChange={(e) => maj(m.id, { modele: e.target.value })} data-modele-modele=""/> : null}
+              {m.portee === 'modele' ? <input aria-label={tr('modeles.modele')} placeholder={motsVendeur().nom === 'paire' ? tr('modeles.modeleEx') : tr('modeles.modeleEx.neutre')} value={m.modele || ''} maxLength={60} onChange={(e) => maj(m.id, { modele: e.target.value })} data-modele-modele=""/> : null}
               {modeleValide(m) && m.portee ? <p className="vrm-ao-note" data-modele-invalide={modeleValide(m)}>{tr('modeles.invalide.' + modeleValide(m))}</p> : null}
               <div className="vrm-ao-modele-pied">
                 <button type="button" className="vrm-ao-second" onClick={() => setOuvert(null)} data-modele-ok="">OK</button>
