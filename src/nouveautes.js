@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (26 nov., loupe-fondue — captures de Julien : « les couleurs sont moches, c'est mal fondu ») src/styles-recherche.css (fin)
+  { id: 'loupe-fondue', date: '2026-11-26', titre: 'La recherche par N°, plus douce', phrase: 'Cartes arrondies, icônes légères, champ fin.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (26 nov., journee-fondue — capture de Julien d'Aujourd'hui : « ça rend pas hyper bien ») src/natif/natif.css · src/natif/jeu.css
   { id: 'journee-fondue', date: '2026-11-26', titre: 'Cartes sans halo sur le gris', phrase: 'Dernières ventes : la 1re photo ne touche plus le bord.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (26 nov., feuille-retour-jeu — Julien : « change l'affichage du pop up message, ça doit faire mieux, jeu vidéo ») src/capteNotif/FeuilleArrivee.jsx
