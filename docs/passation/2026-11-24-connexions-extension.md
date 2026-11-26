@@ -7,7 +7,7 @@ Julien : « que on soit bcp plus informé sur les connexions d'extensions ».
 - **Paramètres → Mes comptes → « Connexions de l'extension »** (onglet `connexions`, `?tab=connexions`) :
   `src/connexions/EcranConnexions.jsx`, règle PURE `src/connexions/connexions.js`, textes `cnx.*` (5 langues,
   `src/i18n/langues/*/connexions.js`), styles `src/connexions/connexions.css` (gris clair, accent ardoise, aucun ambre).
-  - **Tes navigateurs** : une rangée par installation vue depuis moins de 7 j — « Chrome · Mac » (+ « #1a2b » quand deux
+  - **Tes navigateurs** : une rangée par installation vue depuis moins de 3 j — « Chrome · Mac » (+ « #1a2b » quand deux
     portent le même nom, + « ce navigateur »), « En ligne maintenant » / « Vu il y a 5 h » / « Pas vu depuis 2 j »,
     « À jour » ou « 5.418 → 5.440 », les comptes qu'il lit (« Vinted : shop_a, shop_b · Leboncoin relu il y a 2 h »),
     pour CE navigateur « relié à ton compte VRM / à un autre compte VRM / pas relié à VRM » ; puis LE problème du moment
@@ -17,7 +17,7 @@ Julien : « que on soit bcp plus informé sur les connexions d'extensions ».
     a … », par QUEL navigateur, la jauge « 12/50 cette heure » (« prudence 24 h » quand elle court) ; « Vinted demande une
     vérification » / « Session Vinted expirée » (lus dans `actions_compte_*`) ; « Pas relu depuis 24 h : ouvre Vinted sur
     shop_x » avec « Ouvrir Vinted ».
-  - **Anciennes installations** (repli, compte) : celles plus vues depuis 7 j ; rien n'est effacé.
+  - **Anciennes installations** (repli, compte) : celles plus vues depuis 3 j ; rien n'est effacé.
   - « Pourquoi ? » replié : d'où viennent les lignes, pourquoi la jauge est par compte, pourquoi les anciennes sont à
     part, pourquoi « — » avant 5.448.
   - Relue à l'ouverture puis **toutes les 60 s tant que la page est visible** ; rien ne part quand l'onglet est caché
@@ -27,6 +27,15 @@ Julien : « que on soit bcp plus informé sur les connexions d'extensions ».
   (« Extension ancienne 5.418 : installe la 5.440 ») ; un compte relu un jour mais plus depuis 24 h. Rien sur « pas su »,
   rien sur une vieille installation. Une lecture, aucun minuteur.
 - `nouveautes.js` : « Chaque navigateur et chaque compte, en clair ».
+
+## La règle par compte, pour la porte « agir seulement si connecté »
+
+Règle de Julien relayée le 24 nov. : depuis l'app il agit sur un compte seulement si l'extension est connectée pour
+CE compte, sinon lecture seule ; la porte `peutAgir(plateforme, compte, capacite)` (branche `claude/agir-si-connecte`)
+lit `etatConnexionCompte` (src/connexions/etatConnexionCompte.js, pure) : `connecte` true = un navigateur a vu ce compte
+ouvert dans son onglet il y a moins de 30 min ; false = pas depuis 30 min / jamais ; **null = pas su ⇒ NON pour une
+porte** (lecture en cours ou ratée ; Leboncoin et Vestiaire, qui ne publient pas leurs comptes vus : `compte-non-publie`).
+`aJour` / `installer` : la version de l'extension qui l'a vu. Nom transmis à « main ».
 
 ## Mesures de la vraie base (24 nov., lecture seule, projections, rien de personnel copié)
 
@@ -66,20 +75,29 @@ réinstallation laisse sa vieille ligne (22 lignes pour quelques navigateurs ré
 suivante (pas de nom d'ordinateur, id neuf). « Un navigateur connecté n'a plus été vu depuis N heures alors que des
 onglets Vinted servaient » sonnerait donc à CHAQUE mise à jour par dossier (l'ancienne ligne se tait pour toujours),
 et rien ne dit qu'un onglet Vinted était ouvert ailleurs à ce moment. Pas de notification ; la page dit « Pas vu depuis
-2 j » et range à part ce qui dépasse 7 j. À reprendre si l'extension publie un identifiant d'ORDINATEUR stable.
+2 j » et range à part ce qui dépasse 3 j. À reprendre si l'extension publie un identifiant d'ORDINATEUR stable.
 
 ## Preuves
 
-- `node scripts/audit-connexions-extension.cjs` : **33 verts**, fixtures à la forme réelle (3 navigateurs vivants dont un
-  5.418 et un Orion pas vu depuis 2 j, une ligne sans champs, une installation de 9 j, un doublon d'id ; 4 comptes Vinted
-  dont un pas relu depuis 24 h, Leboncoin). `--prouve` : **8 mutations, 8 rouges** (`passu-ok`, `sante-ok`, `doublon`,
-  `anciens`, `alerte-absent`, `select-data`, `arret-brut`, `jamais-frais`). Sur origin/main : le module n'existe pas.
+- `node scripts/audit-connexions-extension.cjs` : **39 verts** (dont 6 pour `etatConnexionCompte`), fixtures à la forme réelle (3 navigateurs vivants dont un
+  5.418 et un Orion pas vu depuis 2 j, une ligne sans champs, une installation de 9 j (rangée à part au-delà de 3 j : mesuré 20 lignes vues en 7 j, 15 en 3 j), un doublon d'id ; 4 comptes Vinted
+  dont un pas relu depuis 24 h, Leboncoin). `--prouve` : **9 mutations, 9 rouges** (`passu-ok`, `sante-ok`, `doublon`,
+  `anciens`, `alerte-absent`, `select-data`, `arret-brut`, `connecte-vieux`, `jamais-frais`). Sur origin/main : le module n'existe pas.
 - `scripts/bancs/connexions-extension.cjs` : la page rendue à 390 tactile et 1512, clair et sombre, puis Aujourd'hui (la
-  ligne et « Voir »), Paramètres (l'entrée), et « tout va bien ⇒ aucune ligne ». Voir l'ÉTAT ci-dessous pour les chiffres.
+  ligne et « Voir »), Paramètres (l'entrée), et « tout va bien ⇒ aucune ligne » : **70 verts, 0 rouge** (dont « aucun texte
+  visible de plus de 8 mots », « aucun texte ambre », cibles ≥ 44 px, aucun débordement). `--prouve` (mutations du BUILD) :
+  `version-ok` rouge (10), `sante-ok` rouge (8). Captures regardées (390 clair/sombre, 1512 clair/sombre, Aujourd'hui).
+  Sur origin/main : l'onglet `connexions` n'existe pas (absent d'`ONGLETS_LIENS`) ⇒ la page ne se monte pas, le banc
+  rougit à son premier contrôle (pas relancé sur un build de main : machine saturée, charge 37).
+- `textes-visibles` (ECRANS=connexions,journee) : 4 verts, plafonds `connexions@390/1512` posés à 0.
 - Audits voisins : `traduction` 45 verts, `coherence` vert, `quoi-de-neuf` vert, `icones` vert, `fonctions-api` vert.
 
 ## ÉTAT À LA REPRISE
 
-Voir la fin de ce fichier (complétée après le banc).
+- PR #1357 (base main), à fusionner APRÈS #1326 (style-clair, d'où part la branche) et #1342 (appareils-connectes ;
+  sa carte « Navigateurs avec l'extension VRM » dans Sécurité reste : elle sert « Se déconnecter partout », celle-ci
+  sert le diagnostic). Pas fusionnée.
+- Quand la 5.448 arrive sur main : `santesites: '5.448.0'` dans `EXT_CAPACITES` (voir plus haut).
+- Pas fait : la notification « navigateur plus vu » (raison plus haut) ; la jauge PAR navigateur (aucune identité commune).
 
 Geste de Julien : aucun (la page lit ce que ses extensions publient déjà ; les champs 5.448 s'allumeront seuls avec la 5.448).

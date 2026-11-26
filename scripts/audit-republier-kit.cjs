@@ -28,8 +28,9 @@ const MUTATIONS = {
   main_secondaire: { f: 'app', m: (s) => s.replace('<Bouton variante="primaire" icone="shield" data-republier-main-lancer', '<Bouton variante="secondaire" icone="shield" data-republier-main-lancer') },
   sans_conseil: { f: 'app', m: (s) => s.replace('data-republier-conseil="main"', 'data-x=""') },
   kit_copie_texte: { f: 'app', m: (s) => s.replace('const annK = annonceRepubliee(', 'const annK0 = annonceRepubliee(').replace('    return { k, p, f, ann: annK, photos, lue };', '    const annK = { ...annK0, description: String(fo.desc || \'\') };\n    return { k, p, f, ann: annK, photos, lue };') },
-  kit_photos_brutes: { f: 'app', m: (s) => s.replace('const { ph, pretes, enregistrer, libelle } = usePhotosReglees(photos, regs.photo, p.numero);', 'const ph = null, pretes = false, libelle = \'Photos\'; const enregistrer = () => photos.forEach((u) => window.open(u));') },
-  une_photo_retiree: { f: 'app', m: (s) => s.replace('data-main-photo-une={i}', 'data-x={i}') },
+  kit_photos_brutes: { f: 'app', m: (s) => s.replace('const { ph, pretes, enregistrer, libelle } = usePhotosReglees(photos, regs.photo, p.numero, { source: { id: p.id, uid: p.uid } });', 'const ph = null, pretes = false, libelle = \'Photos\'; const enregistrer = () => photos.forEach((u) => window.open(u));') },
+  une_photo_retiree: { f: 'app', m: (s) => s.replace('if (onBasculer) onBasculer(u);', '') },
+  bouton_sur_tuile: { f: 'app', m: (s) => s.replace('<span className="rg2-coche" aria-hidden="true">', '<Bouton variante="discret" data-main-photo-une={i}/><span className="rg2-coche" aria-hidden="true">') },
   kit_envoie: { f: 'app', m: (s) => s.replace("onClick={() => onOuvrirVinted && onOuvrirVinted()}", "onClick={() => { onOuvrirVinted && onOuvrirVinted(); vmrCmd({ cmd: 'recreerVinted' }); }}") },
   main_sans_regle: { f: 'app', m: (s) => s.replace(".find(x=>x.k==='main');\n              if (!r || !r.ok) { toast((r && r.raison) || 'À la main n’est pas possible pour cette sélection.'); return; }", ".find(x=>x.k==='main');") },
   num_par_titre: { f: 'app', m: (s) => s.replace("if (p.numero && !repubMain[String(p.id)]) poserRepubMain(String(p.id),", "if (p.numero && !repubMain[String(p.id)]) poserRepubMain(String((annSelectionnables.find(x=>x.titre===p.titre)||p).id),") },
@@ -71,7 +72,11 @@ async function auditer(src) {
   dit(/data-republier-conseil="main"/.test(vue) && /<Bouton variante="primaire" icone="shield" data-republier-main-lancer/.test(vue) && /<Bouton variante="secondaire" data-republier-lancer/.test(vue), 'B1 vue Republier : « À la main » conseillé, bouton principal ; « Par VRM » en second');
   dit(/const annK = annonceRepubliee\(/.test(kit) && /ann: annK/.test(kit) && !/lotAppliquePrix\(|lotAppliqueTitre\(|brightness\(|\.rotate\(/.test(kit), 'B2 le kit écrit chaque texte par LA règle de l’atelier (aucune copie)');
   dit(/usePhotosReglees\(photos, regs\.photo, p\.numero(?:, \{ source: \{[^}]*\} \})?\)/.test(kit) && /usePhotosReglees\((?:photos|choisies), regs\.photo, paire\.numero[,)]/.test(main) && /dessinerPhotoReglee\(ctx, img, w, h, r\)/.test(hook) && /navigator\.share\(\{ files/.test(hook), 'B3 les photos du kit et du pas à pas : LE même dessin, menu de partage avec fichiers');
-  dit(/enregistrerUne/.test(hook) && /data-main-photo-une=\{[ij]\}/.test(main + photosMain) && /onClick=\{\(\) => enregistrerUne\([ij]\)\}/.test(main + photosMain), 'B4 une photo préparée s’enregistre aussi seule');
+  // (23 nov., Julien : « Une seule ? Touche son bouton sur la photo » — confus, et ce bouton chevauchait la vignette) Une
+  //  seule photo : SES touchers retirent les autres dans la grille, puis LE bouton du pied ; plus aucun bouton posé sur la tuile.
+  { const grille = tranche(app, 'function GrillePhotos(', '\nfunction SectionPhotos(');
+    dit(/if \(onBasculer\) onBasculer\(u\);/.test(grille) && /data-rg-photo-choix=\{i\}/.test(grille) && !/<Bouton|enregistrerUne|data-main-photo-une/.test(grille) && /usePhotosReglees\(choisies, regs\.photo, paire\.numero/.test(main),
+      'B4 une seule photo : ses touchers retirent les autres, le bouton du pied enregistre CELLES qui restent ; aucun bouton sur la tuile', grille ? '' : 'GrillePhotos absente'); }
   dit(/data-kit-copier-num/.test(kit) && /data-kit-copier-desc/.test(kit) && /copier\('tout', texteKit\(kit\)\)/.test(kit) && /description: x\.lue === true \? x\.ann\.description : ''/.test(kit), 'B5 N° et description à copier, une à une ou toutes (une description pas lue n’est pas copiée)');
   dit(!/vmrCmd|executerCommande|method:\s*'(POST|PUT|DELETE|PATCH)'/.test(kit + hook), 'B6 rien ne part chez Vinted depuis le kit (c’est lui qui publie)');
   dit(/select=title:data->>title,desc:data->>desc,price:data->>price,photos:data->photos/.test(kit) && !/select=data[&`]/.test(kit), 'B7 la fiche se lit en projection (jamais select=data)');

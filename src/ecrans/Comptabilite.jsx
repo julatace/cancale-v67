@@ -346,6 +346,7 @@ import VoirEmailColis from "../VoirEmailColis.jsx";
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "../litiges.js";
 import { ordreDesGroupes, ordonnerLot } from "../lotTransporteurs.js";
 import { trouverParScan, candidatsRetrait } from "../scanColis.js";
+import { suiteAchatScan, numerosDeLAchat, numerosVendus } from '../scanAchatSuite.js';
 import { chercherCodeDansEtiquettes } from "../etiquettesScan.js";
 // ⟦← App.jsx #66⟧
 import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau, resumeLot, nombreAImprimer, libelleImprimer, texteExclus } from "../lotSelection.js";
@@ -19952,6 +19953,19 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         marque: extractBrand(o.title || '') || '',
         signaler: o.conversation_id ? `https://www.vinted.fr/inbox/${encodeURIComponent(o.conversation_id)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`,
         details: () => detailsAchatScan(uid, tx),
+        // (23 nov., lot scan-achat) SON N° et le geste suivant (src/scanAchatSuite.js), lus AU MOMENT où la fiche
+        // s'affiche : les N° de CET achat par identité (son n° de transaction), sa case, la vente qui porte ce N°.
+        suite: () => {
+          // Nuage pas encore lu ⇒ pas su (null) ; lu, une clé absente est vide (jamais écrite).
+          const lu = isCloudReady();
+          const nums = numerosDeLAchat({ tx, fiches: numeros, rangees: lu ? (load(CLE_FICHES_RANGEES, {}) || {}) : null, cleNum });
+          const vendus = numerosVendus({ ventes: Array.isArray(sales.items) ? sales.items : null, identiteAnnonce, fiches: numeros, corrections: saleOv, annulee: (v) => classifyOrderStatus(v.status) === 'cancelled', cleNum });
+          const m = lu ? load('vrm_meubles', []) : null, s = lu ? load('vrm_slots', {}) : null;
+          return suiteAchatScan({ numeros: nums, slots: s && typeof s === 'object' && !Array.isArray(s) ? s : null, meubles: Array.isArray(m) ? m : null, vendus, cleNum });
+        },
+        lienVente: (vtx) => `?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(vtx)}`,
+        // « Déjà vendue ? Relier à une vente » : la feuille d'Achats (« Relier à une vente / annonce »), SON clic relie.
+        relierVente: () => setRelierDepuis({ tx }),
         ranger: () => { const e = entreeAvecPaye(o, suivis && suivis[0] ? { suivi: suivis[0] } : {}); if (!e) return; noterArrivees([e]); ouvrirAtelierArrivee([e]); },
         // (20 nov., lot arrivee-scan) L'achat pour l'écran d'arrivée (le scanner de l'arrivée) : le même que « J'ai retiré ».
         entree: () => entreeAvecPaye(o, suivis && suivis[0] ? { suivi: suivis[0] } : {}) };
@@ -32589,7 +32603,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         const suivanteM = fileM && fileM.i < fileM.liste.length-1 ? (encours)=>{ const j=fileM.i+1; setRepubMainFile({ ...fileM, i:j, encours: encours||null }); setRepubMainOuvert(fileM.liste[j]); } : null;
         // (15 nov., parcours guidé) L'ancienne annonce, d'après la lecture de ses annonces (la même que la reprise du N°) :
         // 'en-ligne' · 'partie' · undefined (pas su). « C'est republié » relu ⇒ une ligne dans « Ce que VRM a fait ».
-        const ancienneM = paire.annulee ? undefined : etatAncienne(paire.id, Array.isArray(listings.items) ? listings.items : null, { erreur: !!listings.error });
+        const ancienneM = paire.annulee ? undefined : etatAncienne(paire.id, Array.isArray(listings.items) ? listings.items : null, { erreur: !!listings.error, uid: paire.uid, complets: listings.complets || null, ko: listings.ko || null, aConfirmer: listings.aConfirmer || null, masquees: listings.masquees || null });   // (23 nov.) « partie » prouvée seulement sur une lecture complète de CE compte
         const finiM = (w)=>{ noterGesteFait({ sorte:w.sorte, titre:tr(w.cle, { num:w.article.num||'' }), article:w.article, texte:tr('rg.journal.texte', { compte:w.compte||'' }) }); };
         const toutesM = fileM ? ()=>{ const l=fileM.liste.map(a=>{ const fl = prixAchatDe(numeros[a.id]||{}, buyByNum); return { ...a, floor: fl!=null && !isNaN(fl) ? Number(fl) : null }; }); setRepubMainOuvert(null); setRepubMainFile(null); setKitMain(l); } : null;
         return <RepublierALaMain key={paire.uid+':'+paire.id} paire={paireM} rang={rangM} onSuivante={suivanteM} encours={fileM ? fileM.encours || null : null} suivi={s} candidats={cands} etatSuivi={etatS} ancienne={ancienneM} onFini={finiM} onToutes={toutesM} onDebut={debut} onClose={fermerM} onRelire={()=>loadListings(true)}

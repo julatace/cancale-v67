@@ -99,9 +99,20 @@ export function nFaites(mode, etats) { return etapesGuide(mode).filter((k) => et
 
 // L'ANCIENNE ANNONCE, d'après la lecture de ses annonces (les mêmes que la reprise du N°,
 // `repriseNumerosRecreation` : `enLigneIds`). `items` absent ou en erreur ⇒ undefined (pas su).
-export function etatAncienne(id, items, { erreur = false } = {}) {
+// ⚠️ (23 nov., capture de Julien : « Supprimer » cochée alors qu'il était à l'étape 1) L'ABSENCE ne prouve
+//    « partie » que si la lecture de CE compte est COMPLÈTE et a répondu (`complets[uid]`, pas dans `ko`) et que
+//    l'annonce n'est ni « à confirmer » (lecture de plus de 24 h) ni masquée : une annonce hors de `items` parce que
+//    sa lecture est partielle, ancienne, ratée, ou masquée est toujours chez lui — « pas su », jamais « partie »
+//    (CLAUDE.md §5 : jamais déduit d'une absence, « rien lu » ≠ « rien »). Sans `uid` ni `complets` : pas su.
+export function etatAncienne(id, items, { erreur = false, uid = '', complets = null, ko = null, aConfirmer = null, masquees = null } = {}) {
   if (!id || erreur || !Array.isArray(items)) return undefined;
-  return items.some((x) => x && String(x.id) === String(id)) ? 'en-ligne' : 'partie';
+  const meme = (x) => x && String(x.id) === String(id);
+  if (items.some(meme)) return 'en-ligne';
+  const u = String(uid || '');
+  if (!u || !complets || complets[u] !== true) return undefined;
+  if (Array.isArray(ko) && ko.map(String).includes(u)) return undefined;
+  if ((Array.isArray(aConfirmer) && aConfirmer.some(meme)) || (Array.isArray(masquees) && masquees.some(meme))) return undefined;
+  return 'partie';
 }
 
 // LE RÉSULTAT, en clés de traduction (`rg.fini.*`) : ce que la dernière étape dit.
@@ -157,4 +168,21 @@ export function photosDeLAnnonce({ coffre = null, detail = null, liste = null, c
 export function photosChoisies(photos, exclues) {
   const ex = exclues instanceof Set ? exclues : new Set(Array.isArray(exclues) ? exclues : []);
   return (Array.isArray(photos) ? photos : []).filter((u, i) => !ex.has(i) && !ex.has(u));
+}
+
+// (23 nov., « une grille de TOUTES les photos, sélection, ordre par glisser ») L'ORDRE choisi par lui : `ordre` est la
+// liste des adresses dans SON ordre (glisser) ; une photo connue qui n'y est pas encore (lue après coup) va à la fin,
+// une adresse qui n'est plus connue sort. Pur : la feuille garde `ordre`, la règle range.
+export function photosRangees(photos, ordre) {
+  const l = Array.isArray(photos) ? photos.filter(Boolean) : [];
+  const o = Array.isArray(ordre) ? ordre.filter((u) => l.includes(u)) : [];
+  return [...new Set([...o, ...l])];
+}
+// Déplacer une photo de la place `de` à la place `vers` (glisser), sans rien perdre ni doubler.
+export function deplacerPhoto(liste, de, vers) {
+  const l = Array.isArray(liste) ? liste.slice() : [];
+  const a = Number(de), b = Number(vers);
+  if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || a >= l.length || b < 0 || b >= l.length || a === b) return l;
+  const [x] = l.splice(a, 1); l.splice(b, 0, x);
+  return l;
 }
