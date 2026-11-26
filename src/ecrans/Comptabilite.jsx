@@ -229,7 +229,7 @@ import { listesDesSuivisVinted, liensContredits } from '../memeColis.js';
 import {sourcesDuColis,codeLuDeLigne,verdictCode,codesDesLignes,NOMS_SOURCES,texteVerifie} from '../sourcesRetrait.js';
 import { dateLocale } from '../formatsDate.js';
 import {achatParConversation, regrouperArrivees, temoinsDe, texteDuBrut} from '../../api/_lib/achat-arrive-relais.js';
-import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} from '../retraitPreuves.js';
+import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis, absorberAVerifierParCode} from '../retraitPreuves.js';
 // ⟦← App.jsx #17⟧
 import { statutAVerifier } from '../statutAVerifier.js';
 import { garderSelonAnnules, nombreAnnules, FILTRE_ANNULES } from '../achatsAnnules.js';
@@ -8956,6 +8956,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       }
       if (garderV.length !== aVerifier.length) aVerifier.splice(0, aVerifier.length, ...garderV);
     }
+    // (26 nov.) Un « à vérifier » au CODE d'un colis compté est ce colis (src/retraitPreuves.js) : une carte, pas deux.
+    { const ab = absorberAVerifierParCode(emailList, aVerifier, { codeDe: codeLigne, suiviDe: suiviDeLigne, fusion: fusionLignesMemeSuivi });
+      if (ab.liste !== emailList) {
+        ab.liste.forEach((t, i) => { const a = emailList[i]; if (a !== t && cmdParColis.has(colisKey(a)) && !cmdParColis.has(colisKey(t))) cmdParColis.set(colisKey(t), cmdParColis.get(colisKey(a))); });
+        emailList.splice(0, emailList.length, ...ab.liste); aVerifier.splice(0, aVerifier.length, ...ab.aVerifier); } }
     // Le transporteur ÉCRIT que le colis repart (statut « retour », 23 oct.).
     // Gardé 30 jours : c'est le temps de vérifier le remboursement.
     for (const t of (trackingRetrait || [])) {
