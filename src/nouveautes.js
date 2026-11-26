@@ -70,6 +70,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'chargement-propre', date: '2026-11-25', titre: 'Les écrans se remplissent sans sauter', phrase: 'Un chiffre pas encore lu se dessine, rien ne bouge.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., envoi-messages-offres, ext. 5.452 — Julien : « ça envoie pas bien les messages et les offres ») docs/passation/2026-11-25-envoi-messages-offres.md
   { id: 'envoi-confirme', date: '2026-11-25', titre: 'Envoyé seulement quand Vinted confirme', phrase: 'Sinon la raison, et l’heure où ça repart.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (23 nov., captures iPhone de Julien : « ça doit être beaucoup mieux, plus pratique ») docs/passation/2026-11-23-republier-main-feuille.md
+  { id: 'republier-main-refait', date: '2026-11-24', titre: 'Republier à la main, plus simple', phrase: 'Une étape à la fois, toutes les photos, à ranger au doigt.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (24 nov., messages-pro — Julien : « ça fait encore beaucoup trop vieux ») docs/passation/2026-11-24-messages-pro.md
   { id: 'messages-pro', date: '2026-11-24', titre: 'Conversations : une offre claire, un champ moderne', phrase: 'L’offre dans le fil, ta marge, et « Lecture seule » dit une fois.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (24 nov., agir-tout, ext. 5.450) docs/passation/2026-11-24-agir-tout.md
