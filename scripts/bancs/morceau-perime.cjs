@@ -84,7 +84,8 @@ async function scenario(nav, { W, panne, jsSeul = false }) {
       return route.fulfill({ response: r, body: renommer(html) });
     });
     // (22 nov., latence-totale) La version en 60 octets (`/version-app.json`, lue d'abord) dit la même chose que la page.
-    await ctx.route((u) => { const x = new URL(u); return /^localhost$|^127\./.test(x.hostname) && x.pathname === '/version-app.json'; }, async (route) => {
+    // (26 nov.) La liste des morceaux du service worker (`/hors-ligne-assets.json`) aussi : une vraie mise en ligne la renomme.
+    await ctx.route((u) => { const x = new URL(u); return /^localhost$|^127\./.test(x.hostname) && (x.pathname === '/version-app.json' || x.pathname === '/hors-ligne-assets.json'); }, async (route) => {
       if (!etat.nouvelle || panne || route.request().method() !== 'GET') return route.fallback();
       const r = await route.fetch(); const t = await r.text();
       return route.fulfill({ response: r, body: renommer(t) });
@@ -94,7 +95,12 @@ async function scenario(nav, { W, panne, jsSeul = false }) {
     await ctx.route(/\/assets\//, (route) => {
       const p = new URL(route.request().url()).pathname;
       if (/\/assets\/(index-)?NEUF/.test(p)) return route.fallback();
-      if (etat.relu && /\/assets\/index-[\w-]+\.js$/.test(p)) etat.ancienApres.push(p);   // la page relue vise l'ANCIEN point d'entrée
+      // (26 nov., zero-rouge-bancs) La PAGE relue seulement : le service worker range en fond, UN PAR UN, les morceaux de
+      // `/hors-ligne-assets.json` (public/sw.js `rechaufferMorceaux`) ; lancé avant la mise en ligne, il continue sur la liste
+      // d'AVANT (ordre alphabétique : « index-CMT5… » puis « index-DzKSh… », exactement le rouge de la CI du 26 nov.). Ce ne
+      // sont pas des imports de la page (un 404 n'y casse rien) ; la règle jugée — main.jsx exécuté deux fois — est celle de la page.
+      let duSw = false; try { duSw = !!(route.request().serviceWorker && route.request().serviceWorker()); } catch (_) {}
+      if (etat.relu && !duSw && /\/assets\/index-[\w-]+\.js$/.test(p)) etat.ancienApres.push(p);   // la page relue vise l'ANCIEN point d'entrée
       // `jsSeul` (14 nov.) : la feuille de style est déjà là (gardée, ou un morceau sans CSS) — seul le JS manque.
       if (etat.deploye && !etat.charges.has(p) && !(jsSeul && /\.css$/.test(p))) { etat.refus.push(p); return route.fulfill({ status: 404, contentType: 'text/plain', body: 'Not Found' }); }
       etat.charges.add(p);

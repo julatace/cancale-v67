@@ -95,7 +95,7 @@
 /* Les libellés complets restent dans le bouton sur un petit écran. */
 :root:root body .vrm-b:not(.vrm-b-icone) { white-space:normal !important; overflow-wrap:anywhere; height:auto; padding-block:8px; }
 .vrm-boite-aide-recherche { margin:0; color:var(--d-gris,#6e6e73); font-size:12px; line-height:1.4; }
-:root:root body .vrm-b-rangee:not(:has(>:not(.vrm-b))) { align-items:stretch; }
+:root:root body .vrm-b-rangee:not(:has(>:not(.vrm-b, .n-bouton, .n-bouton-bloc))) { align-items:stretch; }   /* (26 nov.) le bouton natif aussi */
 
 /* 8 novembre : colonne par tâches, hiérarchie calme, sans doublons de site. */
 .vrm-saisie-erreur { display: block; flex-basis: 100%; font-size: 12px; color: var(--vrm-ink); line-height: 1.5; margin-top: 5px; max-width: 32rem; }
