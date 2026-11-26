@@ -34,4 +34,6 @@ export default {
   "uxr.bd.enCours": "Läuft",
   "uxr.bd.lectureAttend": "Nach dem Verknüpfen",
   "uxr.bd.extensionPasSu": "Wird geprüft…",
+  "uxr.acct.raisonEmail": "Gib zuerst die neue Adresse ein",
+  "uxr.acct.raisonMdp": "Gib zuerst das neue Passwort ein",
 };

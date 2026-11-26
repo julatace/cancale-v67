@@ -25,6 +25,11 @@ import { prixTape, minisAuDessus, NOM_SITE, toutEstDit } from './prixPartout.js'
 import { commandeCourante } from './prixAttente.js';
 import { gardePrixRegle } from './gardePrix.js';
 import { tr } from './i18n/index.js';
+// (24 nov., lot agir-tout) Une BAISSE sur Vinted / Leboncoin / Vestiaire part DEPUIS VRM (la file `cmd_dist_*`, geste `prix`,
+// baisse seulement, le prix vu voyage) quand la porte le permet pour le compte de l'annonce ; sinon la rangée garde le
+// panneau de l'extension (gardé lui aussi). Une hausse ne part jamais par la file : elle ouvre le panneau.
+import { useFaitsAgir, agirMaintenant, envoyerGeste } from './agir/porte.js';
+import { texteRaison } from './agir/Agir.jsx';
 import './prix-partout.css';
 
 // « 1 250 € », « 1 199,50 € » : milliers séparés par une espace fine insécable, jamais coupés.
@@ -77,7 +82,10 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
   const champPrixRef = React.useRef(null);
   React.useEffect(() => { if (!focusPrix) return undefined; const t = setTimeout(() => { try { if (champPrixRef.current) champPrixRef.current.focus(); } catch (_) {} }, 120); return () => clearTimeout(t); }, [focusPrix]);
   const [prix, setPrix] = React.useState('');
-  const [coches, setCoches] = React.useState(() => new Set(sites.filter((s) => s.site === 'ebay').map((s) => s.cle)));
+  useFaitsAgir();
+  // La porte, par rangée : une rangée Vinted / Leboncoin / Vestiaire « en file » se coche comme eBay.
+  const enFile = (s) => s.site !== 'ebay' && s.mode === 'ext' && s.prix != null && agirMaintenant(s.site, s.compte, 'baisser', 'file').ok;
+  const [coches, setCoches] = React.useState(() => new Set(sites.filter((s) => s.site === 'ebay' || enFile(s)).map((s) => s.cle)));
   const [etats, setEtats] = React.useState({});
   const [enCours, setEnCours] = React.useState(false);
   const [annule, setAnnule] = React.useState(null);     // la commande qu'il annule (un toucher, pas deux)
@@ -93,7 +101,7 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
     const neufs = sites.filter((s) => !vus.current.has(s.cle));
     if (!neufs.length) return;
     neufs.forEach((s) => vus.current.add(s.cle));
-    setCoches((c) => { const n = new Set(c); neufs.filter((s) => s.site === 'ebay').forEach((s) => n.add(s.cle)); return n; });
+    setCoches((c) => { const n = new Set(c); neufs.filter((s) => s.site === 'ebay' || enFile(s)).forEach((s) => n.add(s.cle)); return n; });
   }, [sites]);
   const p = prixTape(prix);
   const minis = minisAuDessus(sites, p);
@@ -111,8 +119,24 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
     if (suspects.length) { setGardeConf(suspects); return; }
     setEnCours(true); setEtats({});
     let r = null;
-    try { r = await onAppliquer({ coches: new Set(coches), prix: p, gardeConfirme: { ...gardeOk.current }, surEtat: (cle, e) => setEtats((x) => ({ ...x, [cle]: e })) }); }
+    const surEtat = (cle, e) => setEtats((x) => ({ ...x, [cle]: e }));
+    // Les rangées « en file » : UNE commande `prix` par annonce, au nom du compte de l'annonce (la porte relue au geste).
+    const resFile = {};
+    for (const s of sites.filter((x) => x.site !== 'ebay' && coches.has(x.cle))) {
+      const cible = prixDe ? prixDe(s.site, p) : p;
+      if (cible == null || s.prix == null) { resFile[s.cle] = { etat: 'a-faire', raison: 'prix actuel pas lu' }; surEtat(s.cle, resFile[s.cle]); continue; }
+      if (Math.round(cible * 100) >= Math.round(s.prix * 100)) { resFile[s.cle] = { etat: 'hausse' }; surEtat(s.cle, resFile[s.cle]); continue; }
+      surEtat(s.cle, { etat: 'envoi' });
+      const x = await envoyerGeste({ site: s.site, compte: s.compte, geste: 'baisser', distGeste: 'prix', args: { id: s.id, prix: cible, prixAvant: s.prix }, num: String(num || ''), avant: s.prix });
+      resFile[s.cle] = x.ok || x.raison === 'deja' ? { etat: 'attente', idCmd: x.id || null, compte: s.compte, prix: cible } : { etat: 'refuse', code: x.raison === 'base' ? 'base' : 'porte', raison: x.verdict ? texteRaison(x.verdict) : null };
+      surEtat(s.cle, resFile[s.cle]);
+    }
+    // eBay : le jeton (la porte) — expiré ou pas relié ⇒ rien ne part, dit sur la rangée.
+    const cochesEbay = new Set([...coches].filter((c) => { if (!String(c).startsWith('ebay:')) return false; const s = sites.find((x) => x.cle === c); const v = agirMaintenant('ebay', (s && s.compte) || 'principal', 'x');
+      if (!v.ok && (v.raison === 'ebay-expire' || v.raison === 'ebay-jeton')) { surEtat(c, { etat: 'refuse', code: 'porte', raison: texteRaison(v) }); return false; } return true; }));
+    try { r = cochesEbay.size ? await onAppliquer({ coches: cochesEbay, prix: p, gardeConfirme: { ...gardeOk.current }, surEtat }) : { res: {} }; }
     finally { setEnCours(false); }
+    if (r) r = { ...r, res: { ...(r.res || {}), ...resFile } };
     // Tout est fait ou en attente : rien à lire, la feuille se ferme et le dit en une ligne.
     if (r && r.res && toutEstDit(r.res)) {
       const enAttente = sites.filter((s) => r.res[s.cle] && r.res[s.cle].etat === 'attente');
@@ -146,9 +170,9 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
   const rangees = sites.map((s) => {
     const e = etatDe(s);
     const ph = phrase(e, s, compteDe);
-    if (s.site !== 'ebay') {
+    if (s.site !== 'ebay' && !enFile(s)) {
       // Vinted, Leboncoin, Vestiaire : le prix lu, l'état d'une baisse rangée plus tôt (lecture), et LE lien du panneau.
-      const cible = { site: s.site, page: 'prix', ids: [s.id], action: 'changer' };
+      const cible = { site: s.site, compte: s.compte || '*', page: 'prix', ids: [s.id], action: 'changer' };
       const url = lienPanneau(cible);
       if (ph && ph.annuler && onAnnuler) aAnnuler.push({ s, e });
       const sousExt = <span className="pp-etat is-calme">{[ph ? ph.texte : '', tr('actionsExt.changerPrix'), s.site === 'vinted' ? phraseExt : (extensionIci() ? '' : tr('actionsExt.phrase', { site: NOM_SITE[s.site] }))].filter(Boolean).join(' · ')}</span>;
@@ -172,12 +196,12 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
         fin={lien ? 'chevron' : coche ? 'coche' : <span className="pp-sans-coche" aria-hidden="true"/>}
         onClick={enCours ? null : lien ? () => { try { window.open(lien, '_blank', 'noopener,noreferrer'); } catch (_) {} } : () => basculer(s.cle)}
         className="pp-rangee"
-        attrs={{ 'data-prix-site': s.site, 'data-prix-cle': s.cle, 'data-prix-mode': s.mode, 'data-prix-etat': e && !e.avant ? e.etat : '', 'data-prix-relu': e && e.relu ? '1' : '',
+        attrs={{ 'data-prix-site': s.site, 'data-prix-cle': s.cle, 'data-prix-mode': s.mode, 'data-prix-file': enFile(s) ? '1' : undefined, 'data-prix-etat': e && !e.avant ? e.etat : '', 'data-prix-relu': e && e.relu ? '1' : '',
           'data-prix-coche': lien ? undefined : s.cle, 'data-prix-coche-etat': coche ? '1' : '0', ...(lien ? { 'data-prix-lien': s.cle } : {}) }}/>
     );
   });
   const raison = p == null ? tr('prixPartout.raisonPrix') : !nCoches ? tr('prixPartout.raisonSite') : '';
-  const aEbay = sites.some((s) => s.site === 'ebay');
+  const aEbay = sites.some((s) => s.site === 'ebay' || enFile(s));   // (24 nov.) le champ et « Appliquer » : eBay OU une rangée en file
   return (
     <Feuille ouverte onFermer={fermer} titre={tr('prixPartout.aria', { num })} className="pp-feuille" attrs={{ 'data-prix-partout': num }}
       pied={aEbay && !(gardeConf && gardeConf.length) ? <Bouton variante="plein" className="pp-plein" chargement={enCours} indisponible={!enCours && !!raison} raison={raison} onClick={appliquer} attrs={{ 'data-prix-appliquer': '' }}>{tr('prixPartout.appliquerEbay')}</Bouton> : null}>

@@ -31,3 +31,72 @@
 @keyframes vrm-capte-entree { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .vrm-capte { animation: vrm-capte-fondu .18s ease-out both; } }
 @keyframes vrm-capte-fondu { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── « Depuis ta dernière visite » comme l'écran de retour d'un jeu (25 nov., Julien : « ça doit faire mieux, jeu vidéo ») ──
+   src/capteNotif/FeuilleArrivee.jsx. Les jetons du natif (--n-*, clair et sombre) et du langage « jeu » (src/natif/jeu.css).
+   Aucune couleur neuve : les médaillons reprennent ceux des tuiles sans photo (jeu.css), la pastille « NOUVEAU » la teinte neutre.
+   Le mouvement : transform et opacité seulement, ≤ 400 ms, rien qui bloque (remplissage `backwards` : une carte arrivée
+   s'enfonce sous le doigt) ; `prefers-reduced-motion` ⇒ rien ne bouge. */
+.vrm-arr-tete { display: flex; align-items: center; gap: 14px; padding: 6px var(--n-marge, 16px) 14px; }
+.vrm-arr-medaille { flex: 0 0 auto; width: 52px; height: 52px; display: grid; place-items: center; border-radius: 50%; color: #FFFFFF;
+  background: radial-gradient(120% 90% at 30% 10%, rgb(255 255 255 / .30), transparent 55%), linear-gradient(150deg, #5A6B7E, #3D4B5B);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .16), inset 0 -6px 12px rgb(0 0 0 / .16), 0 4px 12px rgb(29 29 31 / .18); }
+.vrm-arr-score { display: flex; align-items: baseline; gap: 8px; min-width: 0; color: var(--n-encre); }
+.vrm-arr-n { display: inline-block; min-width: calc(var(--vrm-arr-chiffres, 1) * .62em); font: 800 44px/1 var(--n-police); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.vrm-arr-score-l { font: 600 16px/20px var(--n-police); color: var(--n-encre-2); }
+.vrm-arr-groupe { margin: 0 0 14px; }
+.vrm-arr-groupe-t { margin: 0; padding: 0 var(--n-marge, 16px) 6px; font: var(--n-t-section); color: var(--n-encre); }
+.vrm-arr-liste { display: grid; gap: 8px; padding: 0 var(--n-marge, 16px); }
+.n-feuille .vrm-arr-carte {
+  appearance: none; -webkit-appearance: none; position: relative; display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; column-gap: 12px;
+  box-sizing: border-box; width: 100%; min-height: 72px; margin: 0; padding: 8px 10px 8px 8px; border: 0; border-radius: 14px; text-align: left;
+  background: var(--n-carte-2); color: var(--n-encre); box-shadow: inset 0 0 0 1px var(--n-trait), 0 1px 2px rgb(0 0 0 / .05);
+  font: var(--n-t-corps); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+  transition: transform 100ms ease-out;
+}
+.n-feuille .vrm-arr-carte[data-nue] { min-height: 64px; }
+.n-feuille .vrm-arr-carte:active { transform: scale(.97); }
+.n-feuille .vrm-arr-carte:focus-visible, .n-feuille .vrm-arr-autres:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+.vrm-arr-vignette { position: relative; width: 56px; height: 56px; border-radius: 12px; display: grid; color: #FFFFFF;
+  background: radial-gradient(120% 90% at 30% 10%, rgb(255 255 255 / .26), transparent 55%), linear-gradient(150deg, #5A6B7E, #3D4B5B);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12); }
+.vrm-arr-carte[data-nue] .vrm-arr-vignette { width: 48px; height: 48px; margin-left: 4px; }
+.vrm-arr-vignette[data-sorte="ventes"], .vrm-arr-vignette[data-sorte="versements"] { background: radial-gradient(120% 90% at 30% 10%, rgb(255 255 255 / .26), transparent 55%), linear-gradient(150deg, #2E9466, #17744A); }
+.vrm-arr-vignette[data-sorte="codes"], .vrm-arr-vignette[data-sorte="bordereaux"] { background: radial-gradient(120% 90% at 30% 10%, rgb(255 255 255 / .26), transparent 55%), linear-gradient(150deg, #2C8A8B, #0D6A6B); }
+.vrm-arr-vignette[data-sorte="refus"] { background: linear-gradient(150deg, #3A3D44, #1D1D1F); }
+.vrm-arr-vignette-icone { grid-area: 1 / 1; display: grid; place-items: center; }
+.vrm-arr-photo { grid-area: 1 / 1; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; background: var(--n-carte); box-shadow: inset 0 0 0 1px var(--n-trait); }
+.vrm-arr-avatar { position: absolute; right: -6px; bottom: -6px; width: 26px; height: 26px; border-radius: 50%; object-fit: cover; background: var(--n-carte);
+  box-shadow: 0 0 0 2px var(--n-carte-2), 0 2px 4px rgb(0 0 0 / .18); }
+.vrm-arr-pile { position: absolute; top: -6px; right: -6px; min-width: 22px; height: 22px; padding: 0 5px; box-sizing: border-box; display: grid; place-items: center;
+  border-radius: 11px; background: var(--n-plein); color: var(--n-sur-plein); font: 700 12px/1 var(--n-police); font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px var(--n-carte-2); }
+.vrm-arr-corps { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.vrm-arr-titre { font: 600 15px/20px var(--n-police); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Une ligne nue (« Vinted a demandé de ralentir : VRM attend ») ne se coupe pas au milieu : deux lignes au plus. */
+.vrm-arr-carte[data-nue] .vrm-arr-titre { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.vrm-arr-extrait { font: 400 14px/19px var(--n-police); color: var(--n-texte, var(--n-encre)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-arr-meta { font: var(--n-t-legende); color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vrm-arr-carte > .vrm-arr-nouveau { grid-column: 3; grid-row: 1; align-self: start; justify-self: end; margin-top: 2px; padding: 3px 7px; border-radius: 999px;
+  background: var(--n-teinte); color: var(--n-sur-teinte, var(--n-encre)); font: 700 11px/13px var(--n-police); letter-spacing: .01em; }
+.vrm-arr-carte > .vrm-arr-chevron { grid-column: 3; grid-row: 1; align-self: end; justify-self: end; margin-bottom: 4px; color: var(--n-encre-3); }
+.n-feuille .vrm-arr-autres { appearance: none; -webkit-appearance: none; display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 44px; margin: 0; padding: 0 12px;
+  border: 0; border-radius: 12px; background: transparent; color: var(--n-accent); font: var(--n-t-corps-fort); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.n-feuille .vrm-arr-autres:active { opacity: .6; }
+.vrm-arr-pied { position: relative; display: block; }
+.vrm-arr-coche { display: inline-grid; place-items: center; }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* L'entrée sur un ressort (la sortie garde la courbe de la feuille). */
+  .n-feuille-couche[data-n-etat="ouverte"] .n-feuille.vrm-arr-feuille { transition: transform 380ms var(--n-jeu-ressort, cubic-bezier(.34, 1.36, .5, 1)), opacity 200ms ease-out, height 250ms ease-out; }
+  .vrm-arr-medaille { animation: vrm-arr-medaille 380ms var(--n-jeu-tampon, cubic-bezier(.3, 1.7, .5, 1)) 60ms backwards; }
+  .vrm-arr-carte { animation: vrm-arr-pop 300ms var(--n-jeu-ressort, cubic-bezier(.34, 1.36, .5, 1)) calc(var(--vrm-arr-i, 0) * 40ms) backwards; }
+  .vrm-arr-carte > .vrm-arr-nouveau { animation: vrm-arr-pastille 260ms var(--n-jeu-tampon, cubic-bezier(.3, 1.7, .5, 1)) calc(var(--vrm-arr-i, 0) * 40ms + 120ms) backwards; }
+  .vrm-arr-pied[data-eclat] .vrm-arr-coche { animation: vrm-arr-coche 320ms var(--n-jeu-tampon, cubic-bezier(.3, 1.7, .5, 1)) backwards; }
+  .vrm-arr-pied[data-eclat] .n-bouton { animation: vrm-arr-presse 300ms var(--n-jeu-ressort, cubic-bezier(.34, 1.36, .5, 1)); }
+}
+@keyframes vrm-arr-medaille { from { opacity: 0; transform: scale(.4) rotate(-24deg); } to { opacity: 1; transform: none; } }
+@keyframes vrm-arr-pop { from { opacity: 0; transform: translate3d(0, 10px, 0) scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes vrm-arr-pastille { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: none; } }
+@keyframes vrm-arr-coche { from { opacity: 0; transform: scale(.2) rotate(-30deg); } to { opacity: 1; transform: none; } }
+@keyframes vrm-arr-presse { 0% { transform: scale(1); } 35% { transform: scale(.96); } 100% { transform: scale(1); } }

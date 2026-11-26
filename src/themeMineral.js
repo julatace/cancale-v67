@@ -46,11 +46,13 @@
 // fond #F1F3F6, cartes blanches, contours #E4E4E7, encre #16181D, gris #62676F, accent VERT SAPIN #16181D (nuit #F4F4F5,
 // texte sombre dessus), ambre pour un geste, rouge au seul doublon. Plus aucun bleu (docs/passation/2026-11-21-style-vintex.md).
 // (22 nov., décision de Julien : « j'aime bien en noir ») l'accent devient l'ENCRE (#16181D ; nuit #F4F4F5).
+// (25 nov., Julien : « gris moyen c'est d'accord ») le clair passe au GRIS MOYEN : page #878B92, cartes #F1F2F4, encre #0E0F12,
+// secondaire #1F2226 (posé aussi sur la page : 4,67:1), accent = plein #19222C (4,70:1 sur la page) — src/natif/jetons.css.
 export const MINERAL = Object.freeze({
- bg:'#F4F4F2',haut:'#F4F4F2',surface:'#FFFFFF',card:'#FFFFFF',card2:'#F7F7F5',
- border:'#E5E4E0',text:'#16181D',muted:'#5F636A',faint:'#5F636A',
- accent:'#16181D',accentTexte:'#16181D',accentSoft:'#2E3136',onAccent:'#FFFFFF',
- danger:'#874600',doublon:'#BF2A21',warn:'#874600',onWarn:'#FFFFFF',warnSoft:'#FFEBC4',gold:'#874600',blue:'#62676F',purple:'#62676F',
+ bg:'#FFFFFF',haut:'#FFFFFF',surface:'#F3F3F3',card:'#F3F3F3',card2:'#E9E9E9',
+ border:'#D6D6D6',text:'#000000',muted:'#555555',faint:'#555555',
+ accent:'#000000',accentTexte:'#000000',accentSoft:'#2C3846',onAccent:'#FFFFFF',
+ danger:'#19222C',doublon:'#BF2A21',warn:'#19222C',onWarn:'#FFFFFF',warnSoft:'#D9DBDE',gold:'#19222C',blue:'#1F2226',purple:'#1F2226',
  shadow:'none',
  shadowMd:'0 1px 2px rgba(26,26,30,.04), 0 2px 6px rgba(26,26,30,.04)',
  shadowLg:'0 8px 30px rgba(26,26,30,.14)',
@@ -61,19 +63,21 @@ export const MINERAL = Object.freeze({
  carteSombre:'radial-gradient(120% 90% at 100% 0%, #26302C 0%, #16181D 60%)',carteSombreClair:'#26302C',
  caseSombre:'rgba(255,255,255,.1)',surSombre:'#FFFFFF',surSombre2:'rgba(255,255,255,.7)'
 });
+// (23 nov., Julien : « le gris de l'écran d'accueil ») LA NUIT = le gris-ardoise de vrm.center (fond #1C1C20, haut #27272B, cartes #2A2A2F,
+// texte blanc, gris #B8B8C0) : l'apparence PAR DÉFAUT de l'app (src/apparence.js). Ancien commentaire :
 // La nuit du studio : bleu-nuit profond (#0C1829), la porcelaine #16273C, le creux #091320, l'encre
 // #EAF2FB, le gris #9CB0C6 (≥ 6,8:1), l'aplat d'accent #1F6FD6 au texte blanc (5,0:1), les liens #6CB4FF.
 export const MINERAL_DARK = Object.freeze({
- bg:'#0F0F11',haut:'#0F0F11',surface:'#18181B',card:'#18181B',card2:'#1F1F23',
- border:'#2E2E33',text:'#F4F4F5',muted:'#A1A1AA',faint:'#A1A1AA',
- accent:'#F4F4F5',accentTexte:'#F4F4F5',accentSoft:'#D4D4D8',onAccent:'#18181B',
- danger:'#FFB340',doublon:'#FF6B5E',warn:'#FFB340',onWarn:'#1C1300',warnSoft:'#2A2213',gold:'#FFB340',blue:'#A1A1AA',purple:'#A1A1AA',
+ bg:'#22262B',haut:'#22262B',surface:'#2E3339',card:'#2E3339',card2:'#383E45',
+ border:'#474E56',text:'#FFFFFF',muted:'#A8B1AC',faint:'#A8B1AC',
+ accent:'#5BD68F',accentTexte:'#5BD68F',accentSoft:'#A9E9C4',onAccent:'#13241A',
+ danger:'#FFC266',doublon:'#FF7A6E',warn:'#FFC266',onWarn:'#1C1300',warnSoft:'#3A3020',gold:'#FFC266',blue:'#A8B1AC',purple:'#A8B1AC',
  shadow:'none',shadowMd:'0 0 0 1px rgba(255,255,255,.02)',shadowLg:'0 8px 30px rgba(0,0,0,.45)',
- ring:'rgba(244,244,245,.30)',glass:'#18181B',bar:'#0F0F11',hair:'rgba(255,255,255,.08)',
- sidebar:'#18181B',chrome:'#0F0F11',onChrome:'#F4F4F5',chromeMuted:'#A1A1AA',chromeLine:'#2E2E33',
- chromeGradient:'#0F0F11',photo:'#1F1F23',
- s1:'#F4F4F5',s2:'#6FE3B5',selection:'#F4F4F5',
- carteSombre:'radial-gradient(120% 90% at 100% 0%, #233A31 0%, #1B1B1F 55%, #18181B 100%)',carteSombreClair:'#233A31',
+ ring:'rgba(244,244,245,.30)',glass:'#2E3339',bar:'#22262B',hair:'rgba(255,255,255,.10)',
+ sidebar:'#2E3339',chrome:'#22262B',onChrome:'#FFFFFF',chromeMuted:'#A8B1AC',chromeLine:'#474E56',
+ chromeGradient:'#22262B',photo:'#383E45',
+ s1:'#FFFFFF',s2:'#7BE8BE',selection:'#F4F4F5',
+ carteSombre:'radial-gradient(120% 90% at 100% 0%, #3D4B5B 0%, #1C1D22 60%, #15161A 100%)',carteSombreClair:'#3D4B5B',
  caseSombre:'rgba(255,255,255,.1)',surSombre:'#FFFFFF',surSombre2:'rgba(255,255,255,.82)'
 });
 // (6 nov., vague 3) LA CARTE SOMBRE (`CarteStats` / `CarteMois`, la tête de Ma journée) : son fond

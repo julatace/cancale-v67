@@ -80,3 +80,14 @@ export function textePlancher(p, { offre = null, mini = null } = {}) {
   const miniDit = mini != null && miniSousPlancher(mini, p) ? `Ton prix mini (${eurosC(cts(mini))}) est sous ce plancher.` : '';
   return { niveau: f ? f.niveau : 'plancher', ligne, precision, offre: offreDit, mini: miniDit, plancher: p.plancher, partiel };
 }
+
+// (24 nov., lot messages-pro) LA MARGE D'UNE OFFRE, en centimes signés : offre − plancher (le MÊME plancher que
+// `offreFacePlancher`, donc la même règle que le bénéfice). Rien ne se compare (pas de prix d'achat, montant illisible)
+// ⇒ null : l'écran ne montre AUCUNE marge (jamais « 0 € »). `partiel` : les frais ne sont pas tous confirmés — la vraie
+// marge est AU PLUS celle-ci (le plancher réel est au moins le nôtre), et une perte est AU MOINS celle-ci.
+export function margeFacePlancher(offreEuros, p) {
+  const f = offreFacePlancher(offreEuros, p);
+  if (!f) return null;
+  const marge = cts(offreEuros) - p.plancher;
+  return { niveau: f.niveau, marge, partiel: p.etat !== 'ok', plancher: p.plancher };
+}

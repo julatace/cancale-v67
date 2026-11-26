@@ -65,7 +65,7 @@ export default {
   "lia.s.propre": "Elle n’est que sur {site}",
   "lia.s.plusTard": "Plus tard",
   // Une question (un vrai doute) — une seule.
-  "lia.q.deuxNumeros": "Quel N° est écrit sur le carton ?",
+  "lia.q.deuxNumeros": "Quel N° est écrit sur son rangement ?",
   "lia.q.jeRegarde": "Je regarde le carton",
   "lia.q.prix": "Prix très différents : {a} ici, {p} pour N°{numero}.",
   "lia.q.marque": "Les marques ne sont pas les mêmes.",
@@ -132,6 +132,6 @@ export default {
   "lia.fait.plusTard": "Remise à plus tard",
   "lia.fait.repris": "Remise dans la file",
   "lia.fait.propre": "Notée : que sur ce site",
-  "lia.fait.propreNumero": "N°{numero} donné · écris-le sur le carton",
+  "lia.fait.propreNumero": "N°{numero} donné · écris-le sur son rangement",
   "lia.fait.garde": "Gardé",
 };

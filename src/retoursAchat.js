@@ -289,21 +289,33 @@ export function retoursAchat({ bords, demandes = [], achats, remb, transp, track
 // Rend [{ cle, etat: 'fait'|'ici'|'avenir', at?, montant?, transporteur? }] (5 étapes, dans l'ordre).
 export const ETAPES_RETOUR = Object.freeze(['bordereau', 'deposer', 'route', 'livre', 'rembourse']);
 const RANG_ETAPE = { 'a-deposer': 1, depose: 2, 'en-route': 2, revient: 2, 'relais-vendeur': 3, 'recu-vendeur': 4, rembourse: 5 };
-// États : 'fait' (prouvé) · 'ici' (où il en est) · 'avenir' · 'saute' (passé, mais RIEN ne le prouve :
-// un remboursement arrivé sans fait du transporteur — l'étape n'est pas cochée, elle est grisée).
+// États : 'fait' (prouvé) · 'ici' (où il en est) · 'avenir' · 'saute' (passé, mais RIEN ne le prouve).
+// ⚠️ (23 nov., Julien, sur ses captures : « Remboursé ✓ » avec « En route ○ · Livré au vendeur ○ ») UNE ÉTAPE POSTÉRIEURE
+// PROUVÉE IMPLIQUE LES PRÉCÉDENTES : elles sont « faites » (`implicite: true`) avec « date pas vue » — JAMAIS une date
+// inventée (`at` reste null). La seule exception est le cas où le remboursement ne prouve PAS que le colis a voyagé :
+//   · remboursement PARTIEL (l'article est souvent gardé : rien n'a été renvoyé) ;
+//   · aucun bordereau, aucun dépôt (ni lu, ni noté par lui), aucun fait du transporteur (Vinted a pu rembourser sans retour).
+// Là, les étapes du colis restent 'saute' (grisées) : « pas su » ne vaut pas « oui ».
 export function etapesRetour(c) {
   if (!c) return [];
   const f = c.faits || null;
   const r = RANG_ETAPE[c.etape] || 1;                                            // où il en est
-  const rf = c.etape === 'rembourse' ? (f ? (RANG_ETAPE[f.etape] || 2) : c.depose ? 2 : 1) : r;   // ce qui est PROUVÉ du chemin
+  const rf = c.etape === 'rembourse' ? (f ? (RANG_ETAPE[f.etape] || 2) : c.depose ? 2 : 1) : r;   // ce qui est PROUVÉ du chemin (avec sa date)
   const deposeAt = (f && f.deposeAt) || (c.depose && c.depose.le) || null;
-  const passe = (i) => (rf > i ? 'fait' : 'saute');
+  const remb = c.rembourse && c.rembourse.etat === 'oui' ? c.rembourse : null;
+  // Le chemin a-t-il voyagé ? (seulement utile quand le remboursement est la preuve la plus haute)
+  const voyage = c.etape !== 'rembourse' || (!(remb && remb.partiel) && !!(c.pdf || c.source === 'bordereau' || c.depose || f));
+  const impl = () => (voyage ? 'fait' : 'saute');
+  // i = rang de l'étape ; prouvée directement (rf > i) ⇒ 'fait' daté ; impliquée ⇒ 'fait' + implicite (sans date).
+  const passe = (i) => (rf > i ? 'fait' : impl());
+  const implicite = (i) => rf <= i && voyage;
+  const bordFait = c.pdf || c.source === 'bordereau';
   return [
-    { cle: 'bordereau', etat: c.pdf ? 'fait' : r > 1 ? 'saute' : 'ici', transporteur: str(c.transporteur || (f && f.carrier) || '') },
-    { cle: 'deposer', etat: r > 1 ? passe(1) : c.pdf ? 'ici' : 'avenir', at: rf > 1 ? deposeAt : null, parLui: rf > 1 && !f && !!c.depose },
-    { cle: 'route', etat: r > 2 ? passe(2) : r === 2 ? 'ici' : 'avenir', revient: c.etape === 'revient' },
-    { cle: 'livre', etat: r === 3 ? 'ici' : r >= 4 ? (rf >= 4 ? 'fait' : 'saute') : 'avenir', relais: c.etape === 'relais-vendeur', at: f && rf >= 3 && (f.etape === 'relais-vendeur' || f.etape === 'recu-vendeur') ? f.at : null },
-    { cle: 'rembourse', etat: r === 5 ? 'fait' : r === 4 ? 'ici' : 'avenir', montant: c.rembourse && c.rembourse.etat === 'oui' ? c.rembourse.montant : null, at: c.rembourse && c.rembourse.etat === 'oui' && c.rembourse.at ? c.rembourse.at : null },
+    { cle: 'bordereau', etat: bordFait ? 'fait' : r > 1 ? impl() : 'ici', implicite: !bordFait && r > 1 && voyage, transporteur: str(c.transporteur || (f && f.carrier) || '') },
+    { cle: 'deposer', etat: r > 1 ? passe(1) : c.pdf ? 'ici' : 'avenir', implicite: r > 1 && implicite(1), at: rf > 1 ? deposeAt : null, parLui: rf > 1 && !f && !!c.depose },
+    { cle: 'route', etat: r > 2 ? passe(2) : r === 2 ? 'ici' : 'avenir', implicite: r > 2 && implicite(2), revient: c.etape === 'revient' },
+    { cle: 'livre', etat: r === 3 ? 'ici' : r >= 4 ? (rf >= 4 ? 'fait' : impl()) : 'avenir', implicite: r >= 4 && rf < 4 && voyage, relais: c.etape === 'relais-vendeur', at: f && rf >= 3 && (f.etape === 'relais-vendeur' || f.etape === 'recu-vendeur') ? f.at : null },
+    { cle: 'rembourse', etat: r === 5 ? 'fait' : r === 4 ? 'ici' : 'avenir', implicite: false, montant: remb ? remb.montant : null, at: remb && remb.at ? remb.at : null },
   ];
 }
 // Combien de jours (calendrier, Paris) jusqu'à la limite : 0 aujourd'hui, 1 demain, … ; null sans limite.

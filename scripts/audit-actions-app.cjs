@@ -22,6 +22,12 @@
 //  L. Le lien : `lienPanneau` rend EXACTEMENT
 //     https://www.vinted.fr/?vrm=panneau&page=…&ids=…&action=… (format partagé avec
 //     le chantier du panneau), le bon domaine par site.
+//  G. (25 nov., décision de Julien du 24 nov. : « faire absolument tout si l'extension est connectée ; pas connectée sur un
+//     compte, on voit les données mais on ne peut pas agir », CLAUDE.md §3) Un geste DEPUIS VRM passe par LA PORTE
+//     (src/agir/porte.js sur src/agir/peutAgir.js) : une COMMANDE pour l'extension (jamais une requête de l'app), déposée
+//     seulement si la porte dit oui pour CE compte ; refusée ⇒ rien ne part, le panneau (lui-même gardé :
+//     src/ouvrirPanneau.js) ou la lecture seule. Lu (les gardes sont dans le code) ET exécuté (scripts/_porte-agir.cjs :
+//     connecté ⇒ SA confirmation puis UNE commande pour CET article ; pas connecté ⇒ rien, le panneau de CET article).
 //  Y. eBay reste dans l'app : la feuille « Changer le prix » coche et applique eBay
 //     seul (route `revise`), « Publier partout » garde la case eBay.
 //
@@ -45,7 +51,7 @@ const NON_GESTES = {
   ebayMarque: 'une marque dans SA base (eBay)', lbcMarque: 'une marque dans SA base', vcMarque: 'une marque dans SA base',
   etatBaisses: 'lecture', exec: 'canal brut : les écritures sont refusées par vmrExec', fileReseauAnnuler: 'annule un geste en attente (rien ne part)',
   importSiteTout: 'lecture (import)', importTout: 'lecture (import)', lbcQuota: 'lecture', lbcRelire: 'lecture', listesVinted: 'lecture',
-  photos: 'lecture des photos', verifierRepub: 'lecture (contrôle avant de republier, atelier du panneau)', rapportExtension: 'rapport local', secuArret: 'arrêt de sécurité', toutArreter: 'arrêt d\'urgence', ventes: 'lecture', fileFile: 'pause / reprise de la file d\'actions (rien ne part chez une plateforme)',
+  photos: 'lecture des photos', verifierRepub: 'lecture (contrôle avant de republier, atelier du panneau)', rapportExtension: 'rapport local', observation: 'observation de la page Vinted (5.440.3 : lecture seule, rien ne part chez Vinted)', secuArret: 'arrêt de sécurité', toutArreter: 'arrêt d\'urgence', ventes: 'lecture', fileFile: 'pause / reprise de la file d\'actions (rien ne part chez une plateforme)',
 };
 const RETIRES = ['src/CreerSurVinted.jsx', 'src/LbcBaissePrix.jsx', 'src/BaissePrixSerie.jsx', 'src/BaissePrixVestiaire.jsx', 'src/ModeVacances.jsx',
   'src/NegociationPaliers.jsx', 'src/PiloteFavorisAuto.jsx', 'src/FavorisVinted.jsx', 'src/AutomatisationFavoris.jsx', 'src/ModeAutoFavoris.jsx',
@@ -79,7 +85,9 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
 function executerModule(texte) {
   if (!texte) return null;
   const noms = [];
-  const corps = texte.replace(/^export (const|function|let) (\w+)/gm, (_, k, n) => { noms.push(n); return `${k} ${n}`; }).replace(/^export default \w+;?$/gm, '');
+  // (24 nov., lot agir-si-connecte) la porte importée par ouvrirPanneau.js : remplacée par un « oui » (le lien seul est jugé ici ;
+  // la porte est jugée par scripts/audit-agir-si-connecte.cjs).
+  const corps = texte.replace(/^import \{ agirMaintenant \} from '\.\/agir\/porte\.js';$/m, "const agirMaintenant = () => ({ ok: true });").replace(/^export (const|function|let) (\w+)/gm, (_, k, n) => { noms.push(n); return `${k} ${n}`; }).replace(/^export default \w+;?$/gm, '');
   try { return new Function(`${corps}\nreturn { ${noms.join(', ')} };`)(); } catch (e) { return { erreur: String(e) }; }
 }
 
@@ -87,6 +95,11 @@ function executerModule(texte) {
 function juger(t) {
   const ko = [], ok = [];
   const verif = (cond, texte) => (cond ? ok : ko).push(texte);
+  // G. la porte : ses gardes sont dans le code (envoi, panneau, republier) — retirées ⇒ rouge.
+  { const porte = t.src['src/agir/porte.js'] || '', op = t.src['src/ouvrirPanneau.js'] || '';
+    const G = require('./_porte-agir.cjs').GARDES_PORTE;
+    verif(G.every(([g]) => porte.includes(g)) && op.includes("if (!v.ok) { try { window.dispatchEvent(new CustomEvent('vrm:agir-refus', { detail: v })); } catch (_) {} return null; }"),
+      'G la porte garde chaque geste depuis VRM (envoi, panneau, republier) : refusée ⇒ rien ne part'); }
   const reg = executerModule(t.src['src/actionsExtension.js']);
   const CMDS = reg && Array.isArray(reg.CMDS_PLATEFORME) ? reg.CMDS_PLATEFORME : [];
   verif(CMDS.length > 0 && reg && typeof reg.refusPanneau === 'function', 'P0 le registre src/actionsExtension.js se charge (CMDS_PLATEFORME, refusPanneau)');
@@ -146,6 +159,10 @@ function juger(t) {
   const SEL = (reg && reg.PANNEAU_DE_SELECTION) || {};
   const sansBouton = Object.keys(A).filter((k) => {
     if (new RegExp(`action=["']${k}["']`).test(tout) || new RegExp(`'data-vrm-panneau':\\s*'${k}'`).test(tout) || Object.values(SEL).includes(k)) return false;
+    // (24 nov., Julien : « répondre à mes messages […] dans l'application si l'extension est connectée ») répondre se fait DEPUIS
+    // VRM, par la porte (src/agir/Agir.jsx `ComposerReponse`) — plus par le panneau.
+    if (k === 'vacances' && /<VacancesAgir comptes=/.test(tout)) return false;   // (24 nov., lot agir-tout) depuis VRM, compte par compte
+    if (k === 'repondre' && /<ComposerReponse site="vinted"/.test(tout) && /<ComposerReponse site="leboncoin"/.test(tout) && /<ComposerReponse site="vestiaire"/.test(tout)) return false;
     if (new RegExp(`'${k}'`).test((/const act = [^;]+;/.exec(tout) || [''])[0])) return false;
     return !new RegExp(`ouvrirPanneau\\(\\{[^}]*page:\\s*'${A[k].page}'[^}]*action:\\s*'${A[k].action}'`).test(tout);
   });
@@ -157,7 +174,7 @@ function juger(t) {
   const fr = t.dico.fr || '';
   verif(/"actionsExt\.phrase":\s*"s’ouvre sur \{site\} avec l’extension"/.test(fr), 'B3 la phrase discrète dit « s\'ouvre sur {site} avec l\'extension »');
   const bouton = sansCommentaires(t.src['src/BoutonExtension.jsx'] || '');
-  verif(/ouvrirPanneau\(c\)/.test(bouton) && /data-vrm-panneau-lien/.test(bouton) && /extensionIci\(\)/.test(bouton), 'B4 le bouton ouvre le lien du panneau, le porte (data-vrm-panneau-lien) et dit la phrase sans extension ici');
+  verif(/ouvrirPanneau\(\{ \.\.\.c, compte \}\)/.test(bouton) && /usePeutAgir\(/.test(bouton) && /data-vrm-panneau-lien/.test(bouton) && /extensionIci\(\)/.test(bouton), 'B4 le bouton ouvre le lien du panneau, le porte (data-vrm-panneau-lien) et dit la phrase sans extension ici');
 
   // L. le lien
   const op = executerModule(t.src['src/ouvrirPanneau.js']);
@@ -177,7 +194,9 @@ function juger(t) {
 
   // Y. eBay reste
   const pp = sansCommentaires(t.src['src/PrixPartout.jsx'] || '');
-  verif(/sites\.filter\(\(s\) => s\.site === 'ebay'\)\.map\(\(s\) => s\.cle\)/.test(pp) && /s\.site !== 'ebay'/.test(pp) && /'data-vrm-panneau': 'changerPrix'/.test(pp), 'Y1 « Changer le prix » : eBay se coche et s\'applique ici, les autres sites ouvrent le panneau');
+  // (24 nov., lot agir-tout) Les autres sites se cochent aussi quand la porte permet la file pour le compte de l'annonce
+  // (`enFile`, une BAISSE par `cmd_dist_*`) ; sinon ils ouvrent le panneau, gardé.
+  verif(/sites\.filter\(\(s\) => s\.site === 'ebay' \|\| enFile\(s\)\)\.map\(\(s\) => s\.cle\)/.test(pp) && /s\.site !== 'ebay' && !enFile\(s\)/.test(pp) && /'data-vrm-panneau': 'changerPrix'/.test(pp), 'Y1 « Changer le prix » : eBay et les baisses permises par la porte se cochent et s\'appliquent ici, les autres sites ouvrent le panneau');
   verif(/action: 'revise'/.test(t.src['src/prixPartout.js'] || ''), 'Y2 eBay passe toujours par la route serveur (revise)');
   verif(/x\.site !== 'ebay'/.test(sansCommentaires(t.src['src/PublierPartout.jsx'] || '')), 'Y3 « Publier partout » garde la case eBay, Leboncoin/Vestiaire ouvrent le panneau');
   return { ok, ko };
@@ -196,7 +215,10 @@ const MUTATIONS = {
   'format du lien changé': (t) => { t.src['src/ouvrirPanneau.js'] = t.src['src/ouvrirPanneau.js'].replace(".join(',')", ".join(';')"); },
   'commande nouvelle pas classée': (t) => { t.fond += "\nif (cmd === 'vintedMasquerTout') {}\n"; },
   'écran Automatisations remonté': (t) => { t.src['src/App.jsx'] += "\nconst AutomatisationsLazy = aLaDemande(() => import('./automatisations/Branchement.jsx'));\n"; },
-  'bouton manquant (vacances)': (t) => { t.src['src/ecrans/Reglages.jsx'] = t.src['src/ecrans/Reglages.jsx'].replace('action="vacances"', 'action="automatisations"'); },
+  // (24 nov., lot agir-tout) les vacances se font depuis VRM (`VacancesAgir`) : la mutation retire ce chemin.
+  'garde de la porte retirée (envoyerGeste)': (t) => { t.src['src/agir/porte.js'] = t.src['src/agir/porte.js'].replace(require('./_porte-agir.cjs').GARDES_PORTE[0][0], ''); },
+  'garde du panneau retirée (ouvrirPanneau)': (t) => { t.src['src/ouvrirPanneau.js'] = t.src['src/ouvrirPanneau.js'].replace("if (!v.ok) { try { window.dispatchEvent(new CustomEvent('vrm:agir-refus', { detail: v })); } catch (_) {} return null; }", ''); },
+  'bouton manquant (vacances)': (t) => { t.src['src/ecrans/Reglages.jsx'] = t.src['src/ecrans/Reglages.jsx'].replace('<VacancesAgir comptes=', '<VacancesRetire comptes='); },
 };
 
 if (args.includes('--mutation')) {
@@ -213,8 +235,12 @@ if (args.includes('--mutation')) {
   process.exit(0);
 }
 
+(async () => {
 const r = juger(charger(null));
+// G (exécuté) : la porte servie de faits inventés (connecté / pas connecté / pas su) — `MUTATION_PORTE=1` la retire ⇒ rouge.
+{ const p = await require('./_porte-agir.cjs').porteTient(); (p.ok ? r.ok : r.ko).push('G la porte EXÉCUTÉE : connecté ⇒ SA confirmation puis UNE commande pour CET article ; pas connecté ou pas su ⇒ rien, le panneau de CET article' + (p.ok ? '' : ' — ' + p.fautes.join(' · '))); }
 r.ok.forEach((x) => console.log('  ✅ ' + x));
 r.ko.forEach((x) => console.log('  ❌ ' + x));
 if (r.ko.length) { console.log(`\n❌ audit-actions-app : ${r.ko.length} contrôle(s) rouge(s) — un geste de plateforme part encore de l'app`); process.exit(1); }
 console.log(`\n✅ audit-actions-app : aucun geste de plateforme dans l'app (sauf eBay) — ${r.ok.length} contrôles`);
+})();

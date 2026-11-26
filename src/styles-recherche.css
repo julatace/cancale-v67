@@ -99,3 +99,37 @@ html body [data-cible-eclaire][data-cible-eclaire]:not(#_):not(#_) {
   .vrm-main > .vrm-barre-haut { box-shadow: 0 -32px 0 0 var(--vrm-bg, #FFFFFF); }
   .vrm-main[data-vrm-d2] { scroll-padding-top: 72px; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   (26 nov., captures de Julien, loupe « Tout sur le N°246 » : « les couleurs sont moches, c'est mal fondu »)
+   Ces retouches n'existaient que sous un « style au choix » (src/natif/styles-choix.css) : l'apparence de
+   tous les jours ne les voyait pas. Elles valent désormais partout.
+   1. Les groupes Actions / Messages / E-mails : une carte arrondie comme « Tout sur le N° », plus des bandes
+      carrées collées aux bords.
+   2. L'icône d'une action : une petite tuile douce (32, voile d'encre), plus une grosse case grise de 44.
+   3. « L'ancien N°B… existe aussi » : une rangée normale, flèche à droite, plus un lien souligné centré.
+   4. Les phrases de méthode (« Je cherche un N°. », « Correspondance exacte… ») : pour le lecteur d'écran seul.
+   5. Le champ : un filet fin, plus un cadre noir épais doublé de blanc (voir la couche vrm-a11y plus bas).
+   ════════════════════════════════════════════════════════════════════════════ */
+:root .vrm-recherche-panneau [data-recherche-groupe] > .vrm-recherche-ligne:first-of-type { border-top-left-radius: var(--n-r-carte, 12px) !important; border-top-right-radius: var(--n-r-carte, 12px) !important; }
+:root .vrm-recherche-panneau [data-recherche-groupe] > .vrm-recherche-ligne:last-of-type { border-bottom-left-radius: var(--n-r-carte, 12px) !important; border-bottom-right-radius: var(--n-r-carte, 12px) !important; }
+:root .vrm-recherche-panneau .vrm-recherche-ligne[data-recherche-resultat="action"] > div:first-child {
+  width: 32px !important; height: 32px !important; min-width: 32px !important; margin-inline: 6px; border-radius: 9px !important;
+  background: color-mix(in srgb, var(--n-encre, #0E0F12) 7%, transparent) !important;
+}
+:root .vrm-recherche-panneau [data-tout-ancien] {
+  display: flex !important; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px;
+  margin: 4px 0 0 !important; padding: 8px 0 !important; text-align: left !important; text-decoration: none !important;
+  color: var(--n-encre, inherit) !important; font: var(--n-t-second-fort, 600 13px/18px system-ui) !important; background: transparent !important; border: 0 !important;
+}
+:root .vrm-recherche-panneau [data-tout-ancien]::after { content: "›"; flex: none; font: 400 20px/1 var(--n-police, system-ui); color: var(--n-encre-2, currentColor); }
+:root .vrm-recherche-panneau :is([data-recherche-compris], [data-recherche-exacte-numero]) {
+  position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip-path: inset(50%) !important; white-space: nowrap !important;
+}
+:root .vrm-app-shell .vrm-recherche-champ { border: 0 !important; box-shadow: inset 0 0 0 1px var(--n-encre-3, rgb(0 0 0 / .2)) !important; background: var(--n-carte, #fff) !important; }
+@layer vrm-a11y {
+  :root:root .vrm-app-shell .vrm-recherche-champ:focus-visible { outline: 1.5px solid var(--n-encre) !important; outline-offset: -1.5px !important; box-shadow: none !important; }
+}
+/* 6. La carte « Tout sur le N° » prend le même arrondi que les groupes, et sa flèche l'encre douce (elle était bleutée). */
+:root .vrm-recherche-panneau [data-tout-num] { border-radius: var(--n-r-carte, 12px) !important; }
+:root .vrm-recherche-panneau .vrm-tout-num-ligne > span[aria-hidden="true"]:last-child { color: var(--n-encre-2, currentColor) !important; }

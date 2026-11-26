@@ -6,7 +6,8 @@
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
 import ecran_accessibilite from './fr/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './fr/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
-import ecran_suivi_vente from './fr/suiviVente.js';   // (16 nov.) le suivi des colis vendus
+import ecran_suivi_vente from './fr/suiviVente.js';
+import ecran_envois from './fr/envois.js';   // (24 nov.) le suivi d’un envoi, « Mes envois »   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './fr/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './fr/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './fr/journee.js';
@@ -24,15 +25,26 @@ import ecran_journee_stats from './fr/journeeStats.js';   // (21 nov.) Ma journ�
 import ecran_rentabilite from './fr/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
 import ecran_transp_depenses from './fr/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './fr/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
-import ecran_a_distance from './fr/aDistance.js';   // (22 nov., ext. 5.436) « Mes comptes » à distance
+import ecran_a_distance from './fr/aDistance.js';
+import ecran_agir from './fr/agir.js';   // (24 nov.) agir seulement si l'extension est connectée
+import ecran_messagesPro from './fr/messagesPro.js';   // (24 nov.) la conversation refaite
+import ecran_connexions_ext from './fr/connexions.js';   // (24 nov.) « Connexions de l'extension »   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './fr/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
-import ecran_styleClarte from './fr/styleClarte.js';   // (22 nov.) style et clarté : tableau de bord, état de l’extension
+import ecran_styleClarte from './fr/styleClarte.js';
+import ecran_moinsTexte from './fr/moinsTexte.js';
+import ecran_revueUx from './fr/revueUx.js';   // (23 nov.) revue UX   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './fr/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5438 from './fr/ext5438.js';   // (22 nov.) ext. 5.438
+import ecran_visuelAnnonces from './fr/visuelAnnonces.js';   // (24 nov.) l'inventaire Annonces / Stock
+import ecran_argentVisuel from './fr/argentVisuel.js';   // (24 nov.) Argent, Messages, Paramètres visuels   // (24 nov.) le langage « jeu vidéo »   // (23 nov.) « Vinted a agi » regroupée
+import ecran_visuelJeu from './fr/visuelJeu.js';   // (24 nov.) le langage « jeu vidéo »   // (23 nov.) « Vinted a agi » regroupée
+import ecran_moderationCarte from './fr/moderationCarte.js';   // (23 nov.) « Vinted a agi » regroupée
+import ecran_observation from './fr/observation.js';   // (24 nov.) ext. 5.440.3 « Observer Vinted »
 import ecran_ext5428 from './fr/ext5428.js';   // (21 nov.) ext. 5.428   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_relier_retires from './fr/relierRetires.js';   // (21 nov.) relier ce qui est chez moi, colis non retirés, remboursés hors dépenses
 import ecran_verre2 from './fr/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './fr/fiched.js';
+import ecran_vente_mail from './fr/venteMail.js';   // (24 nov.) la vente vue par e-mail et son annonce
 import ecran_egalite from './fr/egalite.js';
 import ecran_tableau from './fr/tableau.js';   // (19 nov. soir) le tableau de travail
 import ecran_publierAgent from './fr/publierAgent.js';
@@ -115,6 +127,7 @@ import ecran_ux_reglages from './fr/uxReglages.js';   // (21 nov.) Paramètres, 
 import ecran_natif from './fr/natif.js';
 import ecran_menu_onglets from './fr/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './fr/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
+import ecran_parrainage20 from './fr/parrainage.js';   // (25 nov.) le parrainage à 20 %
 import ecran_actions_ext from './fr/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './fr/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 import ecran_accompagnement_demarrage from './fr/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
@@ -467,7 +480,7 @@ export default {
   "auth.lier.extension": "Connecte-toi ici : l'extension {navigateur} se connecte aussi, rien à taper.",
   "auth.parrain.offertPar": "Offert par {nom}",
   "auth.parrain.offertVendeur": "Offert par un vendeur VRM",
-  "auth.parrain.texte": "1 mois de VRM offert à ton premier paiement, pour toi et pour la personne qui t’invite.",
+  "auth.parrain.texte": "−10 % sur ton 1er mois de VRM et 1 semaine offerte à ton premier paiement.",
   "auth.parrain.texteConnexion": "Déjà un compte ? Connecte-toi : le parrainage est réservé aux nouveaux comptes.",
   "auth.lier.pasOuverte": "La connexion avec {nom} n’est pas encore ouverte sur VRM. Connecte-toi ici avec ton e-mail et ton mot de passe VRM : l’extension sera connectée en même temps.",
   "auth.lier.pasVerifie": "Je n’ai pas pu vérifier la connexion avec {nom}. Réessaie les moyens de connexion ci-dessous, ou connecte-toi avec ton e-mail : l’extension sera connectée en même temps.",
@@ -2396,6 +2409,7 @@ export default {
   ...ecran_liaison,
   ...ecran_completer,
   ...ecran_suivi_vente,
+  ...ecran_envois,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
@@ -2412,11 +2426,22 @@ export default {
   ...ecran_ext5428,
   ...ecran_lotachat,
   ...ecran_ext5438,
+  ...ecran_moderationCarte,
+  ...ecran_visuelJeu,
+  ...ecran_visuelAnnonces,
+  ...ecran_argentVisuel,
+  ...ecran_observation,
   ...ecran_a_distance,
+  ...ecran_connexions_ext,
+  ...ecran_agir,
+  ...ecran_messagesPro,
   ...ecran_apresFinale,
   ...ecran_styleClarte,
+  ...ecran_moinsTexte,
+  ...ecran_revueUx,
   ...ecran_relier_retires,
   ...ecran_fiched,
+  ...ecran_vente_mail,
   ...ecran_egalite,
   ...ecran_tableau,
   ...ecran_publierAgent,
@@ -2438,4 +2463,5 @@ export default {
   ...ecran_extension,
   ...ecran_actions_ext,
   ...ecran_offres_photos,
+  ...ecran_parrainage20,
 };

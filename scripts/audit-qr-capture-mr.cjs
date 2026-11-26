@@ -154,7 +154,7 @@ async function verifier(src, bavard) {
     dit(appels.length === 1 && /dessinerQrCapture\(j\.contenu$/.test(appels[0]) && !/from ['"]qrcode-generator['"]/.test(app) && !/\bqrcode\(/.test(app), 'E5 la recopie ne reçoit QUE le contenu jugé (jamais le code ni le n°) ; aucun générateur de QR dans l’app', appels.join(' | '));
     const aj = app.slice(app.indexOf('const ajouterQrCapture = async'), app.indexOf('const retirerQrPose ='));
     dit(/if \(j\.etat === 'pose'\) \{\s*const p = \{ contenu: j\.contenu/.test(aj) && (aj.match(/save\(CLE_QR_POSES/g) || []).length === 1 && /const k = t \? suiviDeLigne\(t\) : ''/.test(aj), 'E6 rangé seulement si le jugement dit « pose », sous le n° du colis de SON clic');
-    dit(/'vrm_colis_qr_poses',/.test(app.slice(0, app.indexOf('const save = (k,v)'))) && /setQrPoses\(n => vide\(n\) \? load\(CLE_QR_POSES/.test(app), 'E7 synchronisé (SYNC_KEYS) et relu du nuage au montage');
+    dit(/'vrm_colis_qr_poses',/.test(app.slice(0, app.indexOf('const save = (k,v)'))) && /setQrPoses\(n => vide\(n\) \? (pareil\(n, )?load\(CLE_QR_POSES/.test(app), 'E7 synchronisé (SYNC_KEYS) et relu du nuage au montage');
     const lq = sansCommentaires(src.lire);
     dit(lq.length > 200 && /import\('jsqr'\)/.test(lq) && /BarcodeDetector/.test(lq) && !/fetch\(|XMLHttpRequest|https?:\/\/|sendBeacon|createElement\('script'\)/.test(lq), 'E8 lu DANS la page : BarcodeDetector, sinon jsQR embarqué — aucun envoi, aucun script d’ailleurs');
   } catch (e) { dit(false, 'les modules ont pu s’exécuter', String(e.message || e).slice(0, 160)); }

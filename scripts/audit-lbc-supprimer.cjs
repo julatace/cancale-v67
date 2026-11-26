@@ -304,7 +304,10 @@ function fond(seed, local0, opts = {}) {
   await essaie('app', async () => {
     const i = APP.indexOf('const supprimerSurLbc = (r) =>');
     const corpsF = i >= 0 ? APP.slice(i, APP.indexOf('\n', i)) : '';
-    dit(/ouvrirPanneau\(\{ site: 'leboncoin', page: 'annonces', ids: \[String\(r\.id\)\], action: 'supprimer' \}\)/.test(corpsF), 'supprimer ouvre le panneau sur CETTE annonce (par son identifiant)');
+    // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) DEPUIS VRM par la porte : SA confirmation « sans retour », puis UNE
+    // commande pour CETTE annonce ; pas connecté ⇒ le panneau sur CETTE annonce (par son identifiant).
+    const r = await require('./_porte-agir.cjs').supprimerLbc(corpsF, fs.readFileSync(path.join(__dirname, '..', 'src', 'agir', 'Agir.jsx'), 'utf8'));
+    dit(r.ok, 'supprimer : depuis VRM par la porte (confirmé) sur CETTE annonce ; sinon le panneau sur CETTE annonce (par son identifiant)', r.detail);
     dit(!/cmd: 'lbcSupprime'/.test(APP), 'aucune suppression n’est envoyée de l’écran Leboncoin');
   });
 

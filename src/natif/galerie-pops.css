@@ -1,0 +1,14 @@
+/* ── src/natif/galerie-pops.css — la barre de « Voir tous les pop-ups » (propriétaire seulement) ── */
+@layer vrm-natif {
+  .n-galerie { position: fixed; z-index: 30600; left: 50%; transform: translateX(-50%); bottom: calc(var(--n-h-onglets, 56px) + env(safe-area-inset-bottom, 0px) + 12px);
+    display: flex; align-items: center; gap: 2px; padding: 4px 6px; border-radius: 999px; max-width: calc(100vw - 16px);
+    background: color-mix(in srgb, var(--n-carte) 94%, transparent); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: inset 0 0 0 1px var(--n-bord), 0 10px 30px rgb(29 29 31 / .16); color: var(--n-encre); }
+  @media (min-width: 1024px) { .n-galerie { bottom: 24px; left: calc(50% + var(--n-l-laterale, 240px) / 2); } }
+  .n-galerie-b { appearance: none; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; touch-action: manipulation; }
+  .n-galerie-b:focus-visible { outline: 2px solid var(--n-accent); outline-offset: -2px; }
+  @media (hover: hover) and (pointer: fine) { .n-galerie-b:hover { background: var(--n-appui); } }
+  .n-galerie-fleche-g { display: inline-flex; transform: rotate(180deg); }
+  .n-galerie-pause { display: inline-flex; gap: 4px; } .n-galerie-pause i { width: 4px; height: 14px; border-radius: 2px; background: currentColor; }
+  .n-galerie-n { padding: 0 8px; font: 600 13px/18px var(--n-police); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+}

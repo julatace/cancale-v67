@@ -68,6 +68,7 @@ async function charger(src) {
   try { return await import(f); } finally { try { fs.unlinkSync(f); } catch (_) {} }
 }
 
+const PORTE = require('./_porte-agir.cjs');   // (25 nov.) la règle « agir si connecté » (Julien, 24 nov.)
 async function auditer(sources) {
   const out = [];
   const dit = (ok, m, d) => out.push({ ok: !!ok, m, d });
@@ -92,7 +93,7 @@ async function auditer(sources) {
     // (6 nov., vague 2) « Prix mini… » (`multiComptes`) n'agit pas au nom d'un compte : une écriture
     // dans ses fiches. Toutes les AUTRES actions restent bloquées par le mélange des comptes.
     // (6 nov.) « à la main » non plus : rien ne part chez Vinted, chaque paire dit son compte.
-    const parCompte = Object.values(a).filter((x) => x.k !== 'mini' && x.k !== 'main' && x.k !== 'baisser' && x.k !== 'partout' && x.k !== 'visuels');   // (11 nov.) « Publier partout… » : rien ne part chez Vinted (Leboncoin, Vestiaire, eBay) ; (11 nov., lot visuels-reseaux) un visuel n'agit au nom d'aucun compte   // (10 nov.) « Baisser le prix… » : chaque annonce SON compte, la feuille dit « ouvre ce compte »
+    const parCompte = Object.values(a).filter((x) => x.k !== 'mini' && x.k !== 'main' && x.k !== 'baisser' && x.k !== 'partout' && x.k !== 'visuels' && x.k !== 'masquer' && x.k !== 'afficher');   // (25 nov.) masquer / afficher partent PAR PAIRE, chacune au nom de SON compte par la porte (F3b)   // (11 nov.) « Publier partout… » : rien ne part chez Vinted (Leboncoin, Vestiaire, eBay) ; (11 nov., lot visuels-reseaux) un visuel n'agit au nom d'aucun compte   // (10 nov.) « Baisser le prix… » : chaque annonce SON compte, la feuille dit « ouvre ce compte »
     dit(parCompte.length >= 4 && parCompte.every((x) => !x.ok && /2 comptes/.test(x.raison) && /compte_a/.test(x.raison) && /compte_b/.test(x.raison)), 'B2 deux comptes mélangés ⇒ aucune action qui agit au nom d’un compte, les comptes nommés', a.recreer.raison);
     dit(a.mini && a.mini.ok && a.mini.robot === false, 'B16 « Prix mini… » sur deux comptes ⇒ possible (rien ne part chez Vinted, aucun robot)', a.mini && a.mini.raison);
     dit(a.visuels && a.visuels.ok && a.visuels.robot === false, 'B24 « Nouveautés de la semaine » sur deux comptes ⇒ possible (un visuel dessiné dans le navigateur, rien ne part chez Vinted)', a.visuels && a.visuels.raison);
@@ -192,7 +193,20 @@ async function auditer(sources) {
   const app = sources.app;
   dit(/actionsPossibles\(\{ selection:/.test(app) && /<ChoixAnnoncesVinted /.test(app) && /<ActionsSelectionFeuille /.test(app), 'F1 la sélection et le carré « Actions possibles » sont rendus');
   dit(/repriseNumerosRecreation\(\{[\s\S]{0,600}?recrees: recreesEff,/.test(app) && /fusionLiensRecrees\(recreesNum, liensRepubMain\(repubMain, \{ presentes: pres, dejaRecrees: recreesNum \|\| \{\} \}\)\)/.test(app), 'F2 la table de SES liens s’ajoute à celle de l’extension (même règle de reprise), anciennes encore présentes écartées');
-  dit(/if \(PANNEAU_DE_SELECTION\[k\]\) \{ const a = ACTIONS_EXTENSION\[PANNEAU_DE_SELECTION\[k\]\]; ouvrirPanneau\(\{ site:'vinted', page:a\.page, ids:choisies\.map/.test(app), 'F3 (20 nov.) Republier, modifier, brouillon, mise en ligne, baisse depuis la sélection ⇒ le panneau de l’extension, les annonces cochées');
+  // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) « Republier » part DEPUIS VRM par la porte, compte par compte,
+  // pour les annonces cochées (leur identité) ; refusé (pas connecté) ⇒ le panneau, gardé, sur ces mêmes annonces. Les
+  // autres gestes de la sélection : le panneau (lui-même gardé par la porte, src/ouvrirPanneau.js).
+  { const i = app.indexOf('if (PANNEAU_DE_SELECTION[k])'), j = i < 0 ? -1 : app.indexOf('panneau(); return; }', i);
+    const r = await PORTE.regle({ code: i < 0 || j < 0 ? '' : app.slice(i, j + 21),
+      porte: /republierAgir\(choisies\.filter\(x=>x\.etat==='en-ligne'\)\.map\(x=>\(\{ compte:String\(x\.uid\), id:String\(x\.id\)/,
+      repli: /const panneau = \(\) => ouvrirPanneau\(\{ site:'vinted', compte:[^\n]*ids:choisies\.map\(x=>String\(x\.id\)\), action:a\.action \}\)[\s\S]*republierAgir\([^\n]*, panneau\)[\s\S]*panneau\(\); return; \}/ });
+    dit(r.ok, 'F3 (24 nov.) Republier depuis la sélection ⇒ par la porte, compte par compte, les annonces cochées ; pas connecté ⇒ le panneau sur ces annonces', r.detail); }
+  { const i = app.indexOf("if (k==='masquer' || k==='afficher')"), j = i < 0 ? -1 : app.indexOf('return; }', i);
+    const r = await PORTE.regle({ code: i < 0 || j < 0 ? '' : app.slice(i, j + 9),
+      porte: /envoyerSerie\('masquer', k, choisies\.map\(x=>\(\{ compte:String\(x\.uid\), id:String\(x\.id\), args:\{ id:String\(x\.id\) \}/,
+      repli: /texteRaisonAgir\(r\.verdict\)/ });
+    const am = (R.ACTIONS_SELECTION || []).find((x) => x.k === 'masquer');
+    dit(r.ok && am && am.parPaire === true, 'F3b (24 nov.) Masquer / afficher : une commande par annonce cochée, au nom de SON compte, par la porte ; refusé ⇒ la raison dite', r.detail); }
   dit(/'vrm_repub_main',/.test(app.slice(app.indexOf('const SYNC_KEYS'), app.indexOf('\n];', app.indexOf('const SYNC_KEYS')))), 'F4 `vrm_repub_main` est synchronisé');
   dit((/problemesAnnonce\(a\.verif \|\| \{\}, 'vinted'\)/.test(app) || (/const verifV = \{ \.\.\.\(a\.verif \|\| \{\}\), facultatifs: /.test(app) && /problemesAnnonce\(verifV, 'vinted'\)/.test(app))) && /champsNonJuges\((a\.verif|verifV)/.test(app), 'F5 le carré dit, paire par paire, ce qui manque (la règle de « vérifier avant »)');
   dit(!/titre[^;\n]{0,40}===[^;\n]{0,40}titre/.test(app.slice(app.indexOf('function RepublierALaMain'), app.indexOf('function RepublierVinted('))), 'F6 « à la main » ne relie jamais par le titre');
