@@ -103,14 +103,14 @@ function juger(depot = {}, { sousAudits = true } = {}) {
   const blocClair = jet.slice(0, iSombre), blocSombre = jet.slice(iSombre);
   const val = (bloc, nom) => { const m = new RegExp('--n-' + nom + '\\s*:\\s*([^;]+);').exec(bloc); return m ? m[1].trim().toLowerCase() : null; };
   const attendus = [
-    [blocClair, 'clair', { accent: '#19222c', fond: '#878b92', carte: '#f1f2f4', bord: '#b9bdc3' }],   // (25 nov., Julien : « gris moyen c'est d'accord ») ; avant (23 nov.) gris clair #dfe1e5, accent ardoise #3d4b5b
-    [blocSombre, 'sombre', { accent: '#f4f4f5', fond: '#1c1c20', carte: '#2a2a2f' }],   // (23 nov., Julien) la nuit = le gris de vrm.center
+    [blocClair, 'clair', { accent: '#000000', fond: '#ffffff', carte: '#f3f3f3', bord: '#d6d6d6' }],   // (26 nov., Julien : « 14 en sombre, 15 en clair ») clair = monochrome   // (25 nov., Julien : « gris moyen c'est d'accord ») ; avant (23 nov.) gris clair #dfe1e5, accent ardoise #3d4b5b
+    [blocSombre, 'sombre', { accent: '#5bd68f', fond: '#22262b', carte: '#2e3339' }],   // (26 nov.) sombre = graphite et vert   // (23 nov., Julien) la nuit = le gris de vrm.center
   ];
   for (const [bloc, nom, att] of attendus) {
     for (const [k, v] of Object.entries(att)) dit(val(bloc, k) === v, `S2 --n-${k} (${nom}) vaut ${v}`, val(bloc, k));
     // (23 nov.) Le plein : à l'ARDOISE (l'accent) en clair — plus jamais un aplat noir ; à l'encre la nuit.
     if (nom === 'clair') dit(val(bloc, 'plein') === val(bloc, 'accent'), `S2 le bouton plein (${nom}) est à l'ardoise (--n-plein = --n-accent, jamais noir)`, `${val(bloc, 'plein')} / ${val(bloc, 'accent')}`);
-    else dit(val(bloc, 'plein') === val(bloc, 'encre'), `S2 le bouton plein (${nom}) est à l'encre (--n-plein = --n-encre)`, `${val(bloc, 'plein')} / ${val(bloc, 'encre')}`);
+    else dit(val(bloc, 'plein') === val(bloc, 'accent'), `S2 le bouton plein (${nom}) est à l'accent vert (--n-plein = --n-accent, 26 nov.)`, `${val(bloc, 'plein')} / ${val(bloc, 'accent')}`);
     // (23 nov., « j'aime pas le orange ») « à faire » n'est plus orange : l'ambre du clair EST l'accent.
     if (nom === 'clair') dit(val(bloc, 'ambre') === val(bloc, 'accent'), `S2 plus d'orange (${nom}) : --n-ambre = --n-accent`, val(bloc, 'ambre'));
     COULEUR.lastIndex = 0; let m;
@@ -118,7 +118,7 @@ function juger(depot = {}, { sousAudits = true } = {}) {
   }
   // S2 bis — themeMineral (les couleurs que lit le code d'avant) suit les jetons.
   const th = lire('src/themeMineral.js');
-  for (const [nomTheme, acc] of [['MINERAL', '#19222c'], ['MINERAL_DARK', '#f4f4f5']]) {
+  for (const [nomTheme, acc] of [['MINERAL', '#000000'], ['MINERAL_DARK', '#5bd68f']]) {
     const m = new RegExp('export const ' + nomTheme + '\\s*=\\s*Object\\.freeze\\(\\{([\\s\\S]*?)\\}\\);').exec(th);
     if (!dit(!!m, `S2 ${nomTheme} lisible dans themeMineral.js`)) continue;
     const a = (/\baccent\s*:\s*'(#[0-9a-fA-F]{6})'/.exec(m[1]) || [])[1];

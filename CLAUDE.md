@@ -485,8 +485,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **26 nov. · COULEURS (Julien : « 14 en sombre, 15 en clair »)** : clair = monochrome (page #FFFFFF, cartes #F3F3F3, encre et accent noirs) ; sombre = graphite et vert (#22262B, cartes #2E3339, accent #5BD68F). `src/natif/jetons.css`, `themeMineral.js`, démarrage. Remplace le gris moyen (§3 Palette). Geste : aucun.
 - **25 nov. soir · Sombre par défaut (`claude/sombre-par-defaut`, Julien : « La deuxième couleur est pas mal, mets en mode sombre »)** : aucun choix ⇒ sombre (règle, démarrage, `<html>`, theme-color, manifeste #1C1C20) ; un choix déjà posé ne change pas. `historique-interface-stock.md` (fin). Geste : aucun.
-- **25 nov. · Ventes, la rangée compacte (`claude/ventes-rangee`)** : photo par SES sources (identité), titre + prix, UN état, logo entier, ~84 px ; achat au balayage et dans la fiche. `2026-11-25-ventes-rangee.md`. Geste : aucun.
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier

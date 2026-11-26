@@ -13,8 +13,8 @@
     "minimal-ui"
   ],
   "orientation": "portrait",
-  "background_color": "#1C1C20",
-  "theme_color": "#1C1C20",
+  "background_color": "#22262B",
+  "theme_color": "#22262B",
   "categories": [
     "business",
     "productivity",
