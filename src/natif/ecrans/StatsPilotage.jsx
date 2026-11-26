@@ -20,7 +20,7 @@ const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Mat
 
 // `M` : le modèle de `statsFenetre` (ou null tant que rien n'est calculé) ; `etats` : { ventes, journal, releve } ∈
 // 'encours' | 'passu' | 'lu' ; `montant(x)` : « 1 284 € » ; `seg`/`setSeg`, `f`/`setF` : le segment et la fenêtre.
-export default function StatsPilotage({ M = null, etats = {}, montant = (x) => String(x), seg = 'pilotage', setSeg, f = '30', setF, Icon, onNav = null, onJournal = null, onDorment = null, automatisations = null, onAutomatisations = null, transporteurs = null, etatsTransp = {}, nonRetires = null }) {
+export default function StatsPilotage({ M = null, etats = {}, montant = (x) => String(x), seg = 'pilotage', setSeg, f = '30', setF, Icon, onNav = null, onJournal = null, onDorment = null, automatisations = null, onAutomatisations = null, transporteurs = null, etatsTransp = {}, nonRetires = null, sources = undefined }) {
   const [jour, setJour] = React.useState(null);
   const lecture = (k) => (etats[k] || 'encours') === 'encours';
   // (22 nov., chasse P1-5) Le « pas su » dit CE qui n'est pas lu : « ventes pas encore lues » se lisait sur le journal de
@@ -160,7 +160,7 @@ export default function StatsPilotage({ M = null, etats = {}, montant = (x) => S
       </Colonne>
       {/* (21 nov., lot rentabilite — choix n° 36) Les marques, modèles et tailles : UNE carte « Ce que tu vends le mieux » (axe, tri,
           à racheter, classement, ce qui a été regroupé) — src/natif/ecrans/StatsVendsMieux.jsx, sur M.mieux (src/vendsMieux.js). */}
-      <StatsVendsMieux mieux={M ? M.mieux : undefined} sur={sur} montant={montant} lecture={lecture('releve')} raison={R === null ? tr('v2.st.raison.releve') : ''}/>
+      <StatsVendsMieux mieux={M ? M.mieux : undefined} sur={sur} montant={montant} lecture={lecture('releve')} raison={R === null ? tr('v2.st.raison.releve') : ''} sources={sources}/>
     </>
   );
   return (

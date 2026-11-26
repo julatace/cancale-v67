@@ -223,9 +223,11 @@ const shot = async (pg, nom) => { if (SHOTS) await pg.screenshot({ path: path.jo
         await shot(pg, `D-relie-${sombre ? 'sombre' : 'clair'}`);
         // E — « Ranger » ⇒ l'atelier d'arrivée.
         await pg.click('[data-scan-a-ranger]');
-        await pg.waitForSelector('[data-atelier-arrivee]', { timeout: 10000 }).catch(() => {});
-        const atelier = await pg.evaluate(() => !!document.querySelector('[data-atelier-arrivee]') && !document.querySelector('[data-scan-r]'));
-        dit(atelier, `${T} E « Ranger » ⇒ le scanner se ferme, l'atelier d'arrivée s'ouvre`);
+        // (23 nov.) Depuis le 20 nov. (arrivee-scan), « Ranger » ouvre l'ÉCRAN D'ARRIVÉE de CET achat (N°, case) — plus
+        // l'atelier en six étapes : on attend l'écran de SON achat (`data-arv-achat` = son n° de transaction).
+        await pg.waitForSelector('[data-arv-achat="9401"]', { timeout: 10000 }).catch(() => {});
+        const atelier = await pg.evaluate(() => !!document.querySelector('[data-arv-achat="9401"]') && !document.querySelector('[data-scan-r]'));
+        dit(atelier, `${T} E « Ranger » ⇒ le scanner se ferme, l'écran d'arrivée de CET achat s'ouvre`);
         await shot(pg, `E-ranger-${sombre ? 'sombre' : 'clair'}`);
         dit(errs.length === 0, `${T} aucune erreur d'app`, errs.join(' | '));
       } catch (x) { dit(false, `${T} le banc a tourné jusqu'au bout`, String(x && x.message)); }

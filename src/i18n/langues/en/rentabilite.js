@@ -54,5 +54,21 @@ export default {
   "rt.couv.autres": "{n} not recognised (Other)",
   "rt.regroupe": "What was grouped",
   "rt.regroupe.sous": "{n} groups · display only, never to link a pair",
-  "rt.regroupe.reste": "and {n} more"
+  "rt.regroupe.reste": "and {n} more",
+  "rt.axe.source": "Source",
+  "rs.tousAchats": "All your purchases, by source",
+  "rs.auPlus": "at most {p}",
+  "rs.rienRevendu": "nothing resold",
+  "rs.revendus": "{k} resold of {n}",
+  "rs.achetes": "{n} bought",
+  "rs.taux": "{t}% resold",
+  "rs.surDatees": "over {n} dated",
+  "rs.pasSu": "Not calculated yet: open Purchases",
+  "rs.pasSaisie": "Source not entered",
+  "rs.couv": "Average over {k} of {n} resales",
+  "rs.couv.sansAchat": "{n} sales without linked purchase",
+  "rs.couv.pasLu": "{n} purchases not read here",
+  "rs.couv.vintedPasLus": "Vinted purchases not read",
+  "rs.pourquoi": "Why?",
+  "rs.pourquoi.texte": "A sale only counts for a source if it is linked to its purchase (its transaction number, or the number written on the purchase) — never by title. The average profit only covers resales with a known purchase price; the rate = resold ÷ bought; the delay runs from purchase to sale. This covers all your purchases, not the chosen period."
 };
