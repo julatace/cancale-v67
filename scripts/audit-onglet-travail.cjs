@@ -105,9 +105,15 @@ const lancer = (F, extra) => F.envoyer(Object.assign({ from: 'vrm-badge', action
     const F = monde();
     await lancer(F);
     const cree = (F.j.ongletsCrees || [])[0] || {};
+    // (26 nov.) Fermé APRÈS le lancement : `travailFermeDepuis` compare `fermeAt > debut` (strict) ; fermé dans la MÊME
+    // milliseconde que le lancement (le banc est plus rapide qu'une main), la fermeture ne comptait pas — 1 rouge sur
+    // 15 à 40, seul comme en parallèle (mesuré : debut 1795726666944, fermeAt 1795726666944). On attend que l'horloge ait
+    // passé `debut`, puis que le fond ait NOTÉ la fermeture (une condition, pas un délai fixe).
+    const debut = Number((F.store.vrmFavorisCarte || {}).debut) || 0;
+    while (Date.now() <= debut) await new Promise((r) => setTimeout(r, 1));
     const i = F.onglets.findIndex((t) => t.id === cree.id); if (i >= 0) F.onglets.splice(i, 1);
     for (const f of F.j.surFerme || []) f(cree.id, {});
-    await new Promise((r) => setTimeout(r, 60));
+    for (let k = 0; k < 400 && !(F.store.vrmOngletTravail || {}).fermeAt; k++) await new Promise((r) => setTimeout(r, 5));
     await F.ctx.tickFavorisCarte();
     const st = F.store.vrmFavorisCarte || {};
     dit(st.actif === false && st.fin && st.fin.raison === 'travail_ferme' && F.h.arrets === 1, 'la file est arrêtée chez VRM, la fin dit « onglet de travail fermé »', JSON.stringify({ actif: st.actif, fin: st.fin, arrets: F.h.arrets }));
