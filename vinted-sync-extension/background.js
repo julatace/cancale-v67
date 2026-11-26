@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.453.2';
+const CODE_VERSION = '5.454.1';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -26715,6 +26715,15 @@ async function commandeObservation(msg) {
   if (quoi === 'demarrer') return demarrerObservation();
   if (quoi === 'arreter') return arreterObservation('manuel');
   if (quoi === 'envoyer') return envoyerObservation();
+  // (26 nov., 5.453.3 — Julien : « tous les faits et gestes doivent être reproduits ») « Enregistrer dans un fichier » :
+  // la MÊME frise que la ligne (chaque entrée rebâtie par `entreeObservation`, formes seulement), rendue au panneau qui
+  // en fait un fichier JSON sur SON ordinateur. Rien n'est envoyé nulle part.
+  if (quoi === 'fichier') {
+    const { s, ev } = await lireObsBrut();
+    const e2 = ev.map((x) => entreeObservation(x, x && x.o)).filter(Boolean);
+    if (!e2.length) return { ok: false, code: 'vide', raison: 'Rien d’observé pour l’instant : allume « Observer Vinted », puis fais ton envoi sur Vinted.' };
+    return { ok: true, n: e2.length, fichier: { v: 1, ver: CODE_VERSION, at: new Date().toISOString(), debut: Number(s && s.debut) || null, fin: Number(s && s.fin) || null, raison: (s && s.raison) || '', n: e2.length, ev: e2 } };
+  }
   if (await finObsSiEchue().catch(() => false)) await ecrireLigneObservation().catch(() => null);
   const { s, ev } = await lireObsBrut();
   return Object.assign({ ok: true }, vueObservation(s, ev.length));
