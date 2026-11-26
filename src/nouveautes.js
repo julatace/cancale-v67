@@ -32,6 +32,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'loupe-fondue', date: '2026-11-26', titre: 'La recherche par N°, plus douce', phrase: 'Cartes arrondies, icônes légères, champ fin.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (26 nov., journee-fondue — capture de Julien d'Aujourd'hui : « ça rend pas hyper bien ») src/natif/natif.css · src/natif/jeu.css
   { id: 'journee-fondue', date: '2026-11-26', titre: 'Cartes sans halo sur le gris', phrase: 'Dernières ventes : la 1re photo ne touche plus le bord.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (26 nov., emails-plus-beau — Julien : « fais en sorte que ça soit plus beau ») src/emails-mail.css · src/BoiteEmails.jsx
+  { id: 'emails-plus-beau', date: '2026-11-26', titre: 'E-mails : comptes à relier plus clairs', phrase: 'Une rangée par compte, un bouton « Relier ».', tab: 'emails', pour: 'tous', mode: 'tous' },
   // (26 nov., feuille-retour-jeu — Julien : « change l'affichage du pop up message, ça doit faire mieux, jeu vidéo ») src/capteNotif/FeuilleArrivee.jsx
   { id: 'retour-comme-un-jeu', date: '2026-11-26', titre: 'Ton retour sur l’app, comme un jeu', phrase: 'Qui écrit, la photo, le message ; « Tout vu » en un toucher.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov. soir, filtre-plateformes — Julien : « un filtre avec toutes les plateformes et par plateforme dans les onglets ») docs/passation/2026-11-25-filtre-plateformes.md
