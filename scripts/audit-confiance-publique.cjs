@@ -157,7 +157,15 @@ const PREUVES = {
   // Une exception, NOMMÉE et bornée : la petite carte VRM (vrm-badge.js) dessine SON formulaire
   // de connexion à VRM dans une shadow root FERMÉE (la page ne la voit pas) et y vide son propre
   // champ (un seul `dispatchEvent(new Event('blur'))`) — rien n'y touche la page de Vinted.
-  const CARTE = 'vrm-badge.js', carte = sansCommentaires(lire('vinted-sync-extension/' + CARTE));
+  const CARTE = 'vrm-badge.js', carteBrute = sansCommentaires(lire('vinted-sync-extension/' + CARTE));
+  // (26 nov., 5.454.1) + « Enregistrer dans un fichier » d'« Observer Vinted » : sur SON toucher, la carte
+  // fabrique SON lien de téléchargement (`document.createElement('a')`, adresse `blob:` de SON fichier,
+  // attribut `download`) et le déclenche pour poser le fichier sur SON ordinateur. Ce n'est ni un élément
+  // de Vinted ni un geste joué sur Vinted : UNE seule forme exacte est admise (lien neuf ⇒ blob ⇒ download
+  // ⇒ clic ⇒ retiré) ; tout autre `.click()` de la carte (un bouton, un lien de la page) reste rouge.
+  const TELECHARGER = /const (\w+) = document\.createElement\('a'\); \1\.href = URL\.createObjectURL\(blob\);\s*\n\s*\1\.download = `[^`\n]*`;\s*\n\s*(?:document\.body\.appendChild\(\1\); )?\1\.click\(\); (?:\1\.remove\(\); )?/g;
+  const telechargements = carteBrute.match(TELECHARGER) || [];
+  const carte = telechargements.length <= 1 ? carteBrute.replace(TELECHARGER, '') : carteBrute;
   // (16 nov.) + la liste cochable des favoris DE LA CARTE (14 nov.) : toucher la ligne coche SA case et lui envoie `change`
   // (`li.querySelector('[data-fav-coche]')`, dans la même shadow root) — jamais un élément de la page.
   const envoisCarte = carte.match(/[\w.]+\.dispatchEvent\s*\([^)]*\)\)?/g) || [];

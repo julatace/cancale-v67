@@ -14,6 +14,7 @@ import React from 'react';
 import './idees-argent.css';
 import { tr, langueCourante, LOCALES } from '../i18n/index.js';
 import { useLangue } from '../i18n/react.js';
+import { motsVendeur } from '../profilVendeur.js';   // (26 nov.) exemples de Sneakers seulement chez qui vend des sneakers
 import { SheetShell, load, toast, gesteVrm, cleNum, lireObjet, emettreClesRelues, PhotoVinted, telechargerFichier, onCloudReady, sortieCaseStock, texteAvecDescentes } from '../App.jsx';
 import { chercherParMots, estUnNumero, opsVenteMain, opsAnnulerVenteMain, ventesMainRecentes, lignesRecu, PAIEMENTS, aujourdhui, dateValide } from './venteMain.js';
 
@@ -181,7 +182,7 @@ function FeuilleVenteMain({ num0 = '', pret = false, verdict = null, onFermer })
         </>) : (<form onSubmit={valider} noValidate className="ia">
           <label>
             <span className="ia-lib">{tr('ia.vm.numeroLib')}</span>
-            <input className="sb-champ" data-ia-recherche="" autoFocus={!num0} value={q} placeholder={tr('ia.vm.numeroExemple')} autoComplete="off" enterKeyHint="next"
+            <input className="sb-champ" data-ia-recherche="" autoFocus={!num0} value={q} placeholder={motsVendeur().nom === 'paire' ? tr('ia.vm.numeroExemple') : tr('ia.vm.numeroExemple.neutre')} autoComplete="off" enterKeyHint="next"
               onChange={(e) => { setQ(e.target.value); setChoisie(null); setParToucher(false); setFaux(''); }}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (refPrix.current) refPrix.current.focus(); } }}/>
           </label>

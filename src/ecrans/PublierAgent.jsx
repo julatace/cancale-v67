@@ -14,6 +14,7 @@
 // ══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr } from '../i18n/index.js';
+import { motsVendeur } from '../profilVendeur.js';   // (26 nov.) la pointure : Sneakers, ou un article qui en porte une
 import { PagePoussee } from '../natif/Page.jsx';
 import { Groupe } from '../natif/Groupe.jsx';
 import { Rangee, Vignette } from '../natif/Rangee.jsx';
@@ -342,7 +343,7 @@ function FeuilleQuestionOuFiche({ l, onFermer, onEnregistrer, texteRelu, etatCas
   const de = (k) => (ch[k] ? (ch[k].de === 'reponse' ? tr('agent.fiche.reponse') : tr('agent.fiche.lu', { site: NOM[String(ch[k].de).replace(/-vignette$/, '')] || ch[k].de })) : tr('agent.fiche.pasLu'));
   return (
     <Feuille ouverte onFermer={onFermer} titre={tr('agent.fiche.titre')} detentes={['moitie', 'pleine']} attrs={{ 'data-pa-fiche': l.f.cle }}>
-      <Groupe>{['categorie', 'marque', 'pointure', 'etat', 'couleurs', 'matieres', 'photos', 'prix'].map((k) => <Rangee key={k} titre={tr('agent.champ.' + k)}
+      <Groupe>{['categorie', 'marque', ...(motsVendeur().nom === 'paire' || ch.pointure ? ['pointure'] : []), 'etat', 'couleurs', 'matieres', 'photos', 'prix'].map((k) => <Rangee key={k} titre={tr('agent.champ.' + k)}
         sousTitre={de(k)} valeur={val(k) || '—'} attrs={{ 'data-pa-champ': k, 'data-pa-lu': ch[k] ? '1' : '0' }}/>)}</Groupe>
       <Groupe>{l.plans.map((p) => <Rangee key={p.site} titre={tr('agent.fiche.sur', { site: NOM[p.site] })} lignes={2} sousLignes={3}
         sousTitre={p.refus ? tr('agent.refus.' + p.refus.code, { marque: p.refus.marque || '' }) : texteRelu(l, p) || Object.entries(p.valeurs).filter(([k, v]) => typeof v === 'string' && !['rubrique', 'sous'].includes(k)).map(([k, v]) => v + ' (' + tr('agent.origine.' + (p.origine[k] || 'fiche')) + ')').join(' · ')}

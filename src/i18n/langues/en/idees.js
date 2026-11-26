@@ -83,6 +83,7 @@ export default {
   "ia.vm.sous": "The N°, then the price: the pair leaves your stock.",
   "ia.vm.numeroLib": "N° or search",
   "ia.vm.numeroExemple": "124, B125 or “dunk 42”",
+  "ia.vm.numeroExemple.neutre": "124, B125 or “lamp”",
   "ia.vm.aucune": "No pair with N°{num} in your listings.",
   "ia.vm.plusieurs": {"one": "N°{num} is on {n} pair: which one?", "other": "{n} pairs carry N°{num}: which one did you sell?"},
   "ia.vm.propositions": "Suggested from the title: tap the right one.",

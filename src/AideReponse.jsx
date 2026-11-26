@@ -12,6 +12,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 import React, { useMemo } from 'react';
 import { tr, langueCourante } from './i18n/index.js';
+import { motsVendeur } from './profilVendeur.js';   // (26 nov.) exemples de Sneakers seulement chez qui vend des sneakers
 import { propositionsPour, questionEnAttente, langueDuMessage } from './questionsFrequentes.js';
 import { morceauxInfos, insererDansReponse, cmTexte } from './infosPaire.js';
 import './styles-aide-reponse.css';
@@ -25,14 +26,15 @@ export default function AideReponse({ messages = [], infos = null, tailleFiche =
   const langueApp = langueCourante();
   const langue = (question && langueDuMessage(question)) || langueApp;
   const propositions = useMemo(() => propositionsPour(question, { langueApp, infos, tailleFiche, partie }), [question, langueApp, infos, tailleFiche, partie]);
-  const morceaux = useMemo(() => morceauxInfos(infos, langue), [infos, langue]);
+  const sn = motsVendeur().nom === 'paire';   // la semelle : Sneakers seulement
+  const morceaux = useMemo(() => morceauxInfos(infos, langue).filter((m) => sn || m.champ !== 'semelle'), [infos, langue, sn]);
   const cachees = !!(infos && infos.cachee);
-  const manques = propositions.filter((p) => !p.texte && ['taille', 'defauts', 'semelle'].includes(p.manque));
+  const manques = propositions.filter((p) => !p.texte && ['taille', 'defauts', 'semelle'].includes(p.manque) && (sn || p.manque !== 'semelle'));
   const pretes = propositions.filter((p) => p.texte);
   if (!pretes.length && !morceaux.length && !manques.length && !onEditerInfos && !cachees) return null;
   const inserer = (t) => { if (!desactive && typeof onInserer === 'function') onInserer(insererDansReponse(valeur, t)); };
-  const libInfo = (m) => (m.champ === 'semelle' ? tr('plus.aide.puceSemelle', { cm: cmTexte(infos.semelle, langueApp) }) : m.champ === 'taille' ? tr('plus.aide.puceTaille') : tr('plus.aide.puceDefauts'));
-  const sujets = propositions.map((p) => tr('plus.sujet.' + p.sujet)).join(' · ');
+  const libInfo = (m) => (m.champ === 'semelle' && sn ? tr('plus.aide.puceSemelle', { cm: cmTexte(infos.semelle, langueApp) }) : m.champ === 'taille' ? tr('plus.aide.puceTaille') : tr('plus.aide.puceDefauts'));
+  const sujets = propositions.map((p) => tr('plus.sujet.' + p.sujet + (p.sujet === 'mesures' && !sn ? '.neutre' : ''))).join(' · ');
   return (
     <div className="vrm-aide-rep" data-aide-reponse="" data-aide-langue={langue} role="group" aria-label={tr('plus.aide.titre')}>
       {propositions.length ? <p className="vrm-aide-rep-q" data-aide-question={propositions.map((p) => p.sujet).join(' ')}>{tr('plus.aide.question', { sujets })}</p> : null}
