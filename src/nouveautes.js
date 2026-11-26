@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (26 nov., classement-propre — capture de Julien : « c'est de la merde ») src/communaute/Communaute.jsx · communaute.css
+  { id: 'classement-propre', date: '2026-11-26', titre: 'Classement plus net', phrase: 'Vrais boutons, pas de podium quand tu es seul.', tab: 'communaute', pour: 'tous', mode: 'tous' },
   // (26 nov., achats-rangee-compacte — capture de Julien sur iPhone : « ici c'est pas beau ») src/styles-achats-photos.css (fin)
   { id: 'achats-rangee-compacte', date: '2026-11-26', titre: 'Achats : des rangées plus nettes', phrase: 'L’état s’écrit à côté de la date.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (26 nov., loupe-fondue — captures de Julien : « les couleurs sont moches, c'est mal fondu ») src/styles-recherche.css (fin)
