@@ -73,6 +73,7 @@ export default {
   "agir.offre.refuser": "Decline",
   "agir.offre.contre": "Offer {prix}",
   "agir.offre.confirmer": "Accepting sells the pair. Confirm?",
+  "agir.offre.confirmer.art": "Accepting sells the item. Confirm?",
   "agir.offre.confirmerOui": "Yes, accept",
   "agir.republier": "Relist",
   "agir.republier.confirmer": "Relisting deletes the old listing. Confirm?",

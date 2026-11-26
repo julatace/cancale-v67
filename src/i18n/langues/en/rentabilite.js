@@ -1,6 +1,7 @@
 // en · « Rentabilité : ce que tu vends le mieux, coût réel de chaque vente » (21 nov., lot rentabilite) — docs/passation/2026-11-21-rentabilite.md
 export default {
   "cr.net": "Net profit on this pair",
+  "cr.net.art": "Net profit on this item",
   "cr.commission": "Fee noted",
   "cr.emballage": "Packaging",
   "cr.boost": "Boost, promotion",
@@ -41,6 +42,7 @@ export default {
   "rt.racheter": "Buy again first",
   "rt.racheter.peu": "Not enough sales yet: at least {n} linked, dated sales per group",
   "rt.parPaire": "{p} per pair",
+  "rt.parPaire.art": "{p} per item",
   "rt.parJour": "{p} / day",
   "rt.delai": "sold in {d}",
   "rt.prixMoyen": "average price {p}",
@@ -54,6 +56,7 @@ export default {
   "rt.couv.autres": "{n} not recognised (Other)",
   "rt.regroupe": "What was grouped",
   "rt.regroupe.sous": "{n} groups · display only, never to link a pair",
+  "rt.regroupe.sous.art": "{n} groups · display only, never to link an item",
   "rt.regroupe.reste": "and {n} more",
   "rt.axe.source": "Source",
   "rs.tousAchats": "All your purchases, by source",

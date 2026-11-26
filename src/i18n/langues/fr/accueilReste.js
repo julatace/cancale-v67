@@ -11,6 +11,7 @@ export default {
   "vis.journee.chiffres.p": "Touche un chiffre : VRM te dit d’où il vient.",
   "vis.journee.loupe.t": "Tout sur un N°",
   "vis.journee.loupe.p": "Tape un N° : la paire, sa vente, son colis.",
+  "vis.journee.loupe.p.art": "Tape un N° : l’article, sa vente, son colis.",
   "vis.journee.aide.t": "Une question ?",
   "vis.journee.aide.p": "Le « ? » de chaque écran : vidéo, gestes et réponses.",
   "vis.annonces.cherche.t": "Trouver une annonce",

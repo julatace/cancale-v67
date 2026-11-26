@@ -75,8 +75,10 @@ export default {
   "pn.comptes.plusTard": "VRM le verra à ta première visite",
 
   "pn.numeros.titre": "Qui numérote tes paires ?",
+  "pn.numeros.titre.art": "Qui numérote tes articles ?",
   "pn.numeros.titreAutre": "Qui numérote tes articles ?",
   "pn.numeros.phrase": "Le N° écrit sur la boîte retrouve la paire en une seconde. Un N° n’est jamais redonné.",
+  "pn.numeros.phrase.art": "Le N° écrit sur son rangement retrouve l’article en une seconde. Un N° n’est jamais redonné.",
   "pn.numeros.vrm": "VRM numérote",
   "pn.numeros.vrm.desc": "Chaque nouvelle annonce reçoit un N° à écrire sur sa boîte.",
   "pn.numeros.moi": "Je numérote moi-même",

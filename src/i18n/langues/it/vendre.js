@@ -27,6 +27,7 @@ export default {
   "bc.r.comparables.modele": "le tue {nom} si vendono in {j} g ({n} vendite)",
   "bc.r.comparables.marque": "le tue {nom} si vendono in {j} g ({n} vendite)",
   "bc.r.comparables.tranche": "le tue paia a {nom} si vendono in {j} g ({n} vendite)",
+  "bc.r.comparables.tranche.art": "i tuoi articoli a {nom} si vendono in {j} g ({n} vendite)",
   "bc.r.achat": "prezzo d’acquisto non inserito: VRM non propone nulla senza il tuo minimo",
   "bc.r.recente": "abbassato meno di {n} g fa: dagli tempo",
   "bc.r.proposee": "un ribasso ti è già stato proposto meno di {n} g fa",

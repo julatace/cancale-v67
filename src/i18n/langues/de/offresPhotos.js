@@ -3,12 +3,15 @@ export default {
   "egalite.etat.photodouble": "Doppeltes Foto",
   "egalite.vide.photodouble": "Kein doppeltes Foto in deinen Online-Anzeigen.",
   "photoDouble.titre": "Gleiches Foto in {n} Anzeigen: {nums} — dasselbe Paar doppelt?",
+  "photoDouble.titre.art": "Gleiches Foto in {n} Anzeigen: {nums} — derselbe Artikel doppelt?",
   "photoDouble.et": "{a} und {b}",
   "photoDouble.num": "Nr. {n}",
   "photoDouble.sansNum": "ohne Nr.",
   "photoDouble.pasDoublon": "Kein Duplikat",
   "photoDouble.note": "VRM vergleicht nur die exakte Fotodatei. Nichts wird geändert oder verknüpft: Sieh dir die Anzeigen an und entferne die überzählige auf ihrer Seite, wenn es dasselbe Paar ist.",
+  "photoDouble.note.art": "VRM vergleicht nur die exakte Fotodatei. Nichts wird geändert oder verknüpft: Sieh dir die Anzeigen an und entferne die überzählige auf ihrer Seite, wenn es derselbe Artikel ist.",
   "photoDouble.journeeSous": "{nums} — dasselbe Paar doppelt?",
+  "photoDouble.journeeSous.art": "{nums} — derselbe Artikel doppelt?",
   "photoDouble.journeeSousN": "In Anzeigen prüfen",
   "photoDouble.filtre": "Foto",
   "photoDouble.toutes": "Alle",
@@ -16,6 +19,7 @@ export default {
     "one": "{n} Paar in mehreren Exemplaren (Auto-Bestand) wird nicht gemeldet.",
     "other": "{n} Paare in mehreren Exemplaren (Auto-Bestand) werden nicht gemeldet."
   },
+  "photoDouble.ecartes.art": {"one": "{n} Artikel in mehreren Exemplaren (Auto-Bestand) wird nicht gemeldet.", "other": "{n} Artikel in mehreren Exemplaren (Auto-Bestand) werden nicht gemeldet."},
   "osr.titre": "Unbeantwortete Angebote",
   "osr.journee": {
     "one": "{n} unbeantwortetes Angebot",
