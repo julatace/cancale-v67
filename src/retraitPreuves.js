@@ -85,3 +85,29 @@ export function explicationEnDouble(n) {
     + `${un ? 'C’est sans doute le même carton vu deux fois : il ne compte pas.' : 'Ce sont sans doute les mêmes cartons vus deux fois : ils ne comptent pas.'} `
     + 'Pour les relier : relis sur Vinted le compte de l’achat, ou relie l’adresse qui reçoit ces e-mails (E-mails → Relier ma boîte).';
 }
+
+// ── (26 nov.) UN COLIS « À VÉRIFIER » AU CODE D'UN COLIS DÉJÀ COMPTÉ : LE MÊME COLIS ─────────
+// Julien (capture) : au même point, « 978 216 · Au point 20 nov. » compté, puis sous « Pas compté
+// dans à retirer » la MÊME paire, au MÊME code, avec son QR et « date limite dépassée ». Les deux
+// e-mails (Vinted et le transporteur) ont été jugés séparément : l'un est passé « à vérifier » par la
+// garde de SA date, l'autre est resté compté, et `fusionnerParCode` ne regarde que les comptés.
+// Un code de retrait n'existe que pour UN colis (§5) : la ligne « à vérifier » complète la ligne comptée
+// (QR, second code, lieu, limite — `fusion`) et disparaît. Deux n° de suivi différents : rien n'est
+// fusionné (on ne choisit pas). Un INCIDENT du transporteur (`etat: 'transporteur'`) reste à part : c'est
+// un fait sur le colis, pas une date. Rend `{ liste, aVerifier }` (les mêmes tableaux si rien ne bouge).
+export function absorberAVerifierParCode(liste, aVerifier, { codeDe, suiviDe, fusion = (m, s) => ({ ...s, ...m }) } = {}) {
+  const parCode = new Map();
+  (liste || []).forEach((t, i) => { const c = t ? codeDe(t) : ''; if (c && !parCode.has(c)) parCode.set(c, i); });
+  if (!parCode.size) return { liste, aVerifier };
+  const L = [...(liste || [])]; const garde = []; let bouge = false;
+  for (const x of aVerifier || []) {
+    const t = x && x.kind === 'email' ? x.t : null;
+    const c = t ? codeDe(t) : '';
+    const i = c ? parCode.get(c) : undefined;
+    if (i === undefined || (x.e && x.e.etat === 'transporteur')) { garde.push(x); continue; }
+    const sm = suiviDe(L[i]), sv = suiviDe(t);
+    if (sm && sv && sm !== sv) { garde.push(x); continue; }
+    L[i] = fusion(L[i], t); bouge = true;
+  }
+  return bouge ? { liste: L, aVerifier: garde } : { liste, aVerifier };
+}
