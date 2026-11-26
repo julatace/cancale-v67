@@ -180,7 +180,7 @@ async function a1a3() {
   const x = de(a, 'vcaimes')[0];
   const l = x ? x.aimes.map((y) => `${y.acheteur}-${y.produit}`).sort() : [];
   dit(!!x && l.join(',') === [`${P1}-${ART}`, `${P2}-${ART}`, `${P3}-${ART2}`].join(','), 'A1 · trois cartes « j’aime » ⇒ trois personnes (article + identifiant) ; la carte vendue, une autre carte communauté et soi-même : rien', JSON.stringify(x));
-  dit(!!x && !JSON.stringify(x).includes(PSEUDO) && x.aimes.every((y) => Object.keys(y).sort().join() === 'acheteur,at,produit'), 'A1 · ni le pseudo ni le texte de la carte ne sortent de la page', JSON.stringify(x && x.aimes[0]));
+  dit(!!x && !JSON.stringify(x).includes(PSEUDO) && x.aimes.every((y) => { const k = Object.keys(y).sort().join(); return k === 'acheteur,at,produit' || (k === 'acheteur,at,photo,produit' && (y.photo === '' || /^https:\/\/[\w.-]+\//.test(y.photo))); })   /* (5.454) + la photo de l'ARTICLE (lot vestiaire-complet 5.444), jamais celle de la personne */, 'A1 · ni le pseudo ni le texte de la carte ne sortent de la page', JSON.stringify(x && x.aimes[0]));
   // A3 — SA première offre à la main.
   const corps = JSON.stringify({ buyerId: Number(P1), price: { cents: 23700, currency: 'EUR' } });
   const b = await p.appel('POST', URL_NEGO, nego('900000001', P1, [ev('offer', 'seller', 23700)]), 200, corps);
