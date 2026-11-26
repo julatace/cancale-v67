@@ -83,6 +83,7 @@ export default {
   "ia.vm.sous": "Die N°, dann der Preis: das Paar verlässt den Bestand.",
   "ia.vm.numeroLib": "N° oder Suche",
   "ia.vm.numeroExemple": "124, B125 oder „dunk 42“",
+  "ia.vm.numeroExemple.neutre": "124, B125 oder „Lampe“",
   "ia.vm.aucune": "Kein Paar mit N°{num} in deinen Anzeigen.",
   "ia.vm.plusieurs": {"one": "N°{num} steht auf {n} Paar: welches?", "other": "{n} Paare tragen N°{num}: welches hast du verkauft?"},
   "ia.vm.propositions": "Nach Titel vorgeschlagen: tippe auf das richtige.",
