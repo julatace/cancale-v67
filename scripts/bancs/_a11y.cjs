@@ -115,8 +115,14 @@ async function ouvrir(b, { largeur, sombre, tab, zoom, url, attente }) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   const ecrits = [];
   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', JSON.stringify(s)); } catch (_) {} }, !!sombre);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
-  await pg.route(/images1\.vinted\.net/, (r) => r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PNG }));
+  // (26 nov., zero-rouge-bancs) Sur le CONTEXTE, pas la page : le service worker de l'app (public/sw.js) range les photos
+  // Vinted vues (fetch `no-cors`) — ses requêtes ne passent pas par les routes de la PAGE. Mesuré : 12 photos
+  // `images1.vinted.net/t/01_banc*` parties sur Internet (garde réseau rouge, accessibilite 390/1512 et -clavier).
+  // Tout autre hôte réel est refusé, plus seulement les images : l'aperçu d'impression chargeait pdf.js de cdn.jsdelivr.net
+  // (2 requêtes notées par la garde, feuille « Tout imprimer »). L'aperçu sans pdf.js dit qu'il ne peut pas se dessiner ; la
+  // feuille, ses noms et son focus restent jugés.
+  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+  await ctx.route(/images1\.vinted\.net/, (r) => r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PNG }));
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));
