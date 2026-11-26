@@ -562,6 +562,10 @@
   .n-onglet[aria-current="page"] .n-onglet-icone { background: var(--n-teinte); color: var(--n-accent); }
   .n-onglet:active .n-onglet-icone { transform: scale(.92); }
   .n-onglet-libelle { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* (26 nov., zero-rouge-bancs) Un téléphone de 320 px donne 64 px par onglet : « Aujourd’hui » allumé (600) y était coupé
+     (« Aujourd’h… », banc barre-achats A2). Le libellé garde sa taille (10,5 px) ; il se serre d'un rien, le bouton perd
+     ses 2 px de bord. */
+  @media (max-width: 359px) { .n-onglet { padding: 0; } .n-onglet-libelle { letter-spacing: -.3px; } }
   .n-onglet-pastille { position: absolute; top: -4px; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px; font: 600 10px/16px var(--n-police); box-shadow: 0 0 0 2px var(--n-carte); }
 
   /* ── Avatar ─────────────────────────────────────────────────────────────── */
