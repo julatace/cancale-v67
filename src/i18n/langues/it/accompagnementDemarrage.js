@@ -41,7 +41,7 @@ export default {
   "acc.lecture.2": "Torna su Oggi.",
   "acc.geste.lecture": "Vedi la lettura",
   "acc.numeros.titre": "Un numero per articolo",
-  "acc.numeros.phrase": "Un numero per articolo, dove è riposto.",
+  "acc.numeros.phrase": "Un numero per articolo, al suo posto.",
   "acc.numeros.1": "Apri Annunci: ogni articolo ha un numero.",
   "acc.numeros.2": "Scrivilo dove riponi l’articolo.",
   "acc.geste.numeros": "Apri Annunci",

@@ -41,7 +41,7 @@ export default {
   "acc.lecture.2": "Come back to Today.",
   "acc.geste.lecture": "See the reading",
   "acc.numeros.titre": "One number per item",
-  "acc.numeros.phrase": "One number per item, where it is stored.",
+  "acc.numeros.phrase": "One number per item, at its spot.",
   "acc.numeros.1": "Open Listings: each item gets a number.",
   "acc.numeros.2": "Write it where you store the item.",
   "acc.geste.numeros": "Open Listings",

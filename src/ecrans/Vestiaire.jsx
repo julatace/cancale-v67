@@ -6,6 +6,7 @@ import DansFiche from '../DansFiche.jsx';
 import { attrsFicheLigne } from '../ficheLigne.js';
 import { attrsAvantSite, clicAvantSite, PaireAvantSiteHote } from '../paires/PaireAvantSite.jsx';   // (16 nov.) la rangée touchée monte à sa place
 import { poserNombreAnnonces, compterVcEnLigne } from '../plateformes/nombresAnnonces.js';
+import { etatVcLu, vendusVc } from '../enLigneVc.js';   // (26 nov.) « en ligne » et « vendue » : une règle (Stock, Annonces, sélecteur)
 import { problemesAnnonce } from '../verifAnnonce.js';
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
 import { motifDeLApercu } from '../antiArnaque.js';
@@ -260,7 +261,10 @@ function ClePhotoroom({ cadre = true }) {
 function etatAnnonceVc(it, vendueParVente, capturedAt) {
   if (vendueParVente) return { etat: 'vendue', label: 'Vendue', brut: (it && it.statut) || '' };
   const brut = String((it && it.statut) || '').trim();
-  const etatR = etatAnnonceVcBrut(it, false, capturedAt);
+  // (26 nov., fiabilité VC) LA règle de src/enLigneVc.js : une lecture de plus de 24 h ne dit plus « En ligne »
+  // (« à confirmer », comme le Stock et Leboncoin — §5 `<enligne-regle>`) ; le mot lu juge le reste.
+  const { etat: etatR, vieille } = etatVcLu('', it, { capturedAt });
+  if (vieille) return { etat: 'a-confirmer', label: tr('vcmod.aConfirmerVieille', { quand: ageCourtVc(capturedAt) }), brut, vieille: true };
   // (1er nov., 5.299) UNE ANNONCE QUI N'EST PLUS DANS LES LECTURES n'est pas
   // « en ligne ». Une liste en plusieurs pages n'était jamais lue en entier :
   // une annonce vendue ou supprimée gardait son dernier mot (« on_sale ») et
@@ -304,8 +308,8 @@ function AnnoncesVestiaire() {
     if (!Array.isArray(rl)) { setD(null); return; }
     const r = rl[0] || {};
     // Les ventes ne servent qu'à PROUVER « vendue » ; illisibles ⇒ on n'en tire rien.
-    const vendus = new Set();
-    if (Array.isArray(rv) && rv[0] && rv[0].ventes && typeof rv[0].ventes === 'object') for (const v of Object.values(rv[0].ventes)) if (v && v.productId) vendus.add(String(v.productId));
+    // (26 nov., fiabilité VC) Une vente ANNULÉE ne prouve rien : l'article reste chez lui (src/enLigneVc.js, `vendusVc`).
+    const vendus = (Array.isArray(rv) && rv[0] ? vendusVc(rv[0].ventes) : null) || new Set();
     setD({ items: r.items && typeof r.items === 'object' ? r.items : null, liens: (r.liens && typeof r.liens === 'object') ? r.liens : {}, capturedAt: r.capturedAt || '', complet: r.complet === true, total: typeof r.total === 'number' ? r.total : null, compteurs: r.compteurs && typeof r.compteurs === 'object' ? r.compteurs : null, vendus, ventesKO: !Array.isArray(rv), inconnu: Array.isArray(r.inconnu) && r.inconnu.length > 0 });
   }, []);
   useEffect(() => { relire(); }, [relire]);

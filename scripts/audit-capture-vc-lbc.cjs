@@ -326,6 +326,8 @@ function fonctionsApp() {
     vm.createContext(ctx);
     let regle = '';
     try { regle = fs.readFileSync(path.join(__dirname, '..', 'api', '_lib', 'vestiaire-regle.js'), 'utf8').replace(/^import .*$/mg, '').replace(/^export /mg, '') + '\nconst cleNum = (v) => String(v == null ? "" : v).trim().toUpperCase();\nconst joursAvant = () => null;\n'; } catch (_) {}
+    // (26 nov.) « en ligne » à l'écran passe par src/enLigneVc.js (`etatVcLu`) : chargé avec la règle.
+    try { regle += '\n' + fs.readFileSync(path.join(__dirname, '..', 'src', 'enLigneVc.js'), 'utf8').replace(/^import .*$/mg, '').replace(/^export /mg, '') + '\n'; } catch (_) {}
     vm.runInContext((/const VC_ANNONCE_ETATS/.test(src.slice(i, j)) ? '' : regle) + src.slice(i, j) + '\n;this.etatAnnonceVc = etatAnnonceVc; this.nonLusVestiaire = typeof nonLusVestiaire === "function" ? nonLusVestiaire : null;', ctx);
     _app = ctx;
   } catch (e) { _app = null; }
