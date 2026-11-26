@@ -231,6 +231,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'PhotoStockHl :: a': 'adressePhotoHl (src/stockHorsLigne.js) : /hl-photo?u=… de l’origine de l’app seulement, servi par le service worker (public/sw.js, fetch no-referrer, credentials omit) ; adresse hors liste ⇒ null, repli pictogramme',
       'PhotosPaire :: p.detoure || p.img': 'photos du STUDIO de la paire (studio_photos_{N°}, src/studioPhoto.js) : la même source que StudioPhoto :: ph.img / ph.detoure — data:image fabriquée par le canvas, jamais une adresse Vinted',
       'EtapePhotos :: p.detoure || p.img': 'photos du STUDIO sous CE N° (coque.lireStudio → studio_photos_{N°}) : la même source que StudioPhoto — data:image du canvas, jamais une adresse Vinted',
+      'StudioPhoto :: ph.ameliore': 'photo AMÉLIORÉE du studio (src/ameliorerPhoto.js : canvas.toDataURL) rangée à côté de l’original — data:image, jamais une adresse Vinted (26 nov., photos en un geste)',
       'RechercheCouleur :: e.src': '<img> rendu SEULEMENT si e.src est une data:image (test /^data:image\// juste avant) ; toute autre adresse passe par Photo (PhotoVinted)',
     };
     const fichiers = fs.readdirSync(path.join(R, 'src')).filter((f) => /\.jsx?$/.test(f));

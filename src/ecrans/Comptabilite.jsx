@@ -269,6 +269,7 @@ import { trierARefaire } from "../brouillonsARefaire.js";
 // ⟦← App.jsx #24⟧
 import { CLE_SANTE, publierSante } from "../santeDonnees.js";
 // ⟦← App.jsx #26⟧
+import { litigesEtRetours } from '../litigesTousSites.js';   // (23 nov., lot litiges-retours)
 import { RetoursAchatBloc, RetoursAImprimer, RetoursLot, PasAPasRetour, ARenvoyerJournee, RetoursLitigesJournee, RetoursAVerifier } from "../RetoursLitiges.jsx";
 // ⟦← App.jsx #27⟧
 import { lireBordereauRetour, lireDemandeRetourAchat, estBordereauRetour, PREFIXE_DEMANDE_RETOUR } from '../../api/_lib/retour-email.js';   // (15 nov., lot retours) LA règle du serveur, relue ici
@@ -15876,10 +15877,15 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       if (versements === undefined) return;
       const r0 = chargerPublie('vrm_stats_ventes', null);
       const releveSur = garderDatesConnues(releve, r0 && Array.isArray(r0.l) ? r0.l : null);
-      if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releveSur))) save('vrm_stats_ventes', { v: 1, l: releveSur, at: Date.now() });
+      // (24 nov., lot gains-reels) Les commandes eBay payées dans une AUTRE devise que l'euro : hors du relevé (jamais
+      // converties, `montantRecuEbay`), mais COMPTÉES pour que « Ce que tu gagnes vraiment » les dise. Les mêmes filtres
+      // que `ventesAutresBenefice` (payée, engagée, compte pas écarté). eBay pas lu ⇒ null (pas su), jamais 0.
+      const ebayHorsEuro = Array.isArray(ebayCmd) ? ebayCmd.filter((o) => o && o.orderId && String(o.orderPaymentStatus || '').toUpperCase() === 'PAID' && commandeEbayEngagee(o)
+        && !(excluAutre && excluAutre('ebay', o)) && /^devise /.test(montantRecuEbay(o).raison || '')).length : null;
+      if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releveSur) && (r0.ebayHorsEuro ?? null) === ebayHorsEuro)) save('vrm_stats_ventes', { v: 1, l: releveSur, ebayHorsEuro, at: Date.now() });
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice, ventesVc, versements, excluAutre, lotsTx, lotLiens, forfaitSig]);
+  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice, ventesVc, versements, excluAutre, lotsTx, lotLiens, forfaitSig, ebayCmd]);
 
   // ── Achats HORS VINTED (brocante, fournisseur, particulier…) ──────────
   // Paires/objets achetés ailleurs que sur Vinted. Saisie manuelle : désignation,
@@ -19202,6 +19208,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   }, [litigesVentesEcran]);
   // BI : pour chaque modèle (src/ceQuiRapporte.js `modeleSur`, un regroupement, jamais une
   // identité), combien de ventes prouvées ont fini en retour ou en litige. Sur Litiges seulement.
+  // (23 nov., lot litiges-retours) L'assemblage TOUS SITES : les litiges de vente (ci-dessus) et les retours d'ACHAT
+  // en cours (`retoursAchatVus`, la règle d'Achats) — aucune règle refaite (src/litigesTousSites.js).
+  const litigesTousSites = useMemo(() => litigesEtRetours({ ventes: litigesVentesEcran, achats: retoursAchatVus }), [litigesVentesEcran, retoursAchatVus]);
   const retoursModeles = useMemo(() => {
     if (curSub !== 'litiges') return null;
     const ventes = sales.items === null || !txnPret ? undefined : (sales.error ? null : (sales.items || []).filter((o) => !acctOffOf(o)));
@@ -24600,7 +24609,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         </div>
       )}
 
-      {curSub==='litiges' && <LitigesEnCours r={litigesVentesEcran} bi={retoursModeles} Photo={PhotoVinted} onDossier={fabriquerDossierLitige} onPasAPas={(c) => setPapCle(c.cle)} entete={<ScreenHead icon="alert" title="Litiges en cours"/>}/>}
+      {/* (23 nov., lot litiges-retours) « Litiges et retours » : TOUS les sites, ventes ET retours d'achat (src/litigesTousSites.js). */}
+      {curSub==='litiges' && <LitigesEnCours r={litigesVentesEcran} bi={retoursModeles} ra={litigesTousSites} Photo={PhotoVinted} onDossier={fabriquerDossierLitige} onPasAPas={(c) => setPapCle(c.cle)} entete={<ScreenHead icon="alert" title={tr('lit2.titre')}/>}/>}
       {/* (11 nov., lot retours-litiges) La feuille « Pas à pas » d'une carte (src/retourPasAPas.js) : recalculée à
           chaque rendu — « Paire revenue » passe par `remettreDepuisCarte` (SON N°, conflit DEMANDÉ). */}
       {curSub==='litiges' && papCle && (() => {

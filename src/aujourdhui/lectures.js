@@ -19,7 +19,9 @@ export function lignesReleve(rows, x, enLigne) {
     return { plateforme, compte, id, ts, eur, achat, frais, titre, marqueLue: String((it && it.brand) || '').trim(), modele: modeleSur((it && it.brand) || '', titre),
       taille: String((it && it.size) || '').trim(), enLigne: it && enLigne ? enLigne(it, (x && x.dates) || null) : null,
       // (21 nov., lot rentabilite) l'identifiant de L'ANNONCE vendue (par SA transaction) : le taux de vente ne la compte qu'une fois.
-      item: itemLot || (t && t.item ? String(t.item) : null) };
+      item: itemLot || (t && t.item ? String(t.item) : null),
+      // (24 nov., lot gains-reels) le N° de la fiche ([8] du relevé) : la porte de saisie du prix d'achat de CETTE paire.
+      num: String(r[8] || '') };
   });
 }
 
@@ -35,7 +37,10 @@ export function annoncesLues(x, enLigne) {
 export function useLectures(o, { avecCapte = true } = {}) {
   const [journal, setJournal] = React.useState(undefined), [capte, setCapte] = React.useState(undefined), [extras, setExtras] = React.useState(undefined);
   const lireReleve = () => { try { const x = o ? o.load('vrm_stats_ventes', null) : null; return x && Array.isArray(x.l) ? x.l : null; } catch (_) { return null; } };
+  // (24 nov., lot gains-reels) les commandes eBay dans une autre devise, publiées avec le relevé (jamais converties) : null = pas su.
+  const lireHorsEuro = () => { try { const x = o ? o.load('vrm_stats_ventes', null) : null; return x && Number.isSafeInteger(x.ebayHorsEuro) ? x.ebayHorsEuro : null; } catch (_) { return null; } };
   const [releve, setReleve] = React.useState(lireReleve);
+  const [horsEuro, setHorsEuro] = React.useState(lireHorsEuro);
   React.useEffect(() => {
     if (!o) return undefined;
     let vivant = true;
@@ -44,10 +49,10 @@ export function useLectures(o, { avecCapte = true } = {}) {
       if (avecCapte) { try { const rows = await o.lireTout(SELECT_JOURNAL_CAPTE); if (vivant) setCapte(Array.isArray(rows) ? rows : null); } catch (_) { if (vivant) setCapte(null); } }
       try { const x = o.extras ? await o.extras() : null; if (vivant) setExtras(x || null); } catch (_) { if (vivant) setExtras(null); }
     })();
-    const f = (e) => { if (e && e.detail && e.detail.k === 'vrm_stats_ventes') setReleve(lireReleve()); };
+    const f = (e) => { if (e && e.detail && e.detail.k === 'vrm_stats_ventes') { setReleve(lireReleve()); setHorsEuro(lireHorsEuro()); } };
     window.addEventListener('vrm:save', f);
     return () => { vivant = false; window.removeEventListener('vrm:save', f); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [o]);
-  return { journal, capte, extras, releve };
+  return { journal, capte, extras, releve, horsEuro };
 }

@@ -72,6 +72,16 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'chargement-propre', date: '2026-11-25', titre: 'Les écrans se remplissent sans sauter', phrase: 'Un chiffre pas encore lu se dessine, rien ne bouge.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., envoi-messages-offres, ext. 5.452 — Julien : « ça envoie pas bien les messages et les offres ») docs/passation/2026-11-25-envoi-messages-offres.md
   { id: 'envoi-confirme', date: '2026-11-25', titre: 'Envoyé seulement quand Vinted confirme', phrase: 'Sinon la raison, et l’heure où ça repart.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot demarrage-guide) docs/passation/2026-11-23-demarrage-guide.md
+  { id: 'demarrage-accompagne', date: '2026-11-24', titre: 'Bien démarrer : guidé pas à pas', phrase: 'Une courte animation par étape, et la reprise où tu t’es arrêté.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (24 nov., lot scanner-universel — Julien : « un bouton scanner, je vise n'importe quoi ») docs/passation/2026-11-24-scanner-universel.md
+  { id: 'scanner-universel', date: '2026-11-24', titre: 'Un scanner pour tout', phrase: 'Colis, vente, achat ou carton N° : VRM ouvre la bonne fiche.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot litiges-retours) docs/passation/2026-11-23-litiges-retours.md
+  { id: 'litiges-retours-tous', date: '2026-11-24', titre: 'Litiges et retours : ventes et achats ensemble', phrase: 'Chaque litige ou retour, sa date limite lue et le lien.', tab: 'litiges', pour: 'tous', mode: 'tous' },
+  // (24 nov., lot gains-reels — choisi par Julien) docs/passation/2026-11-24-gains-reels.md
+  { id: 'gains-reels', date: '2026-11-24', titre: 'Ce que tu gagnes vraiment', phrase: 'Par paire, modèle, source et compte, avec le délai de vente.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot export-comptable) docs/passation/2026-11-23-export-comptable.md
+  { id: 'export-depenses-sites', date: '2026-11-24', titre: 'Export comptable : dépenses et reçu par site', phrase: 'Tes frais notés et l’argent reçu par plateforme, dans le tableur.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (23 nov., lot achats-hors-vinted) docs/passation/2026-11-23-achats-hors-vinted.md
   { id: 'ticket-plusieurs-articles', date: '2026-11-24', titre: 'Un ticket, plusieurs articles', phrase: 'Vide-grenier ou magasin : chaque article lu devient un achat.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov., captures iPhone de Julien : « ça doit être beaucoup mieux, plus pratique ») docs/passation/2026-11-23-republier-main-feuille.md
@@ -112,10 +122,12 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'favoris-ancien', date: '2026-11-24', titre: 'Favoris : plus de « trop ancien » à tort', phrase: 'Les notifications sont lues jusqu’au bout avant de sauter un favori.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (24 nov., style-graphite — Julien : « un peu plus foncé en gris […] améliore tous les boutons […] change de style pour l'iPhone ») docs/passation/2026-11-24-style-graphite.md
   { id: 'styles-a-essayer', date: '2026-11-24', titre: 'Onze styles à essayer, dont Monochrome', phrase: 'Paramètres → Apparence → Style : touche, c’est appliqué.', tab: 'settings', pour: 'tous', mode: 'tous' },
-  // (23 nov., lot historique-paire) docs/passation/2026-11-23-historique-paire.md
-  { id: 'historique-rangee', date: '2026-11-23', titre: 'Quand ta paire a été rangée', phrase: 'La case du Stock entre dans l’histoire de la paire.', tab: 'garage', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot photos-un-geste) docs/passation/2026-11-23-photos-un-geste.md
+  { id: 'photos-un-geste', date: '2026-11-23', titre: 'Tes photos améliorées en un geste', phrase: 'Lumière, cadrage et fond uni sur toutes les photos, original gardé.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   // (23 nov., lot rentabilite-source) docs/passation/2026-11-23-rentabilite-source.md
   { id: 'rentabilite-source', date: '2026-11-23', titre: 'Rentabilité par source d’achat', phrase: 'Bénéfice moyen, taux de revente et délai, par lieu d’achat.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot historique-paire) docs/passation/2026-11-23-historique-paire.md
+  { id: 'historique-rangee', date: '2026-11-23', titre: 'Quand ta paire a été rangée', phrase: 'La case du Stock entre dans l’histoire de la paire.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (23 nov., lot appareils-connectes) docs/passation/2026-11-23-appareils-connectes.md
   { id: 'appareils-extension', date: '2026-11-23', titre: 'Appareils connectés : tes navigateurs avec l’extension', phrase: 'Chaque navigateur, sa version, sa dernière lecture ; déconnexion partout.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (23 nov., lot scan-achat — Julien : « fais tout parfaitement ») docs/passation/2026-11-23-scan-achat.md
@@ -418,6 +430,8 @@ export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot compta-donnees) docs/passation/2026-11-16-compta-donnees.md
   { id: 'partenaires-prorata', date: '2026-11-16', titre: 'Partenaires : remboursement partiel, commission au prorata', phrase: '1 € rendu sur 16,99 € : il reste 2,82 € dus.', tab: 'settings', pour: 'proprietaire', mode: 'tous' },
   { id: 'serie-facture-vrm', date: '2026-11-16', titre: 'Factures en série : envoyer avec VRM', phrase: 'Ta boîte pas connectée ? VRM les envoie, toi en copie.', tab: 'compta', pour: 'pro', mode: 'tous' },
+  // (16 nov., lot stock-mieux) docs/passation/2026-11-16-stock-mieux.md
+  { id: 'stock-plan-lisible', date: '2026-11-16', titre: 'Stock : le N° en grand sur chaque case', phrase: 'Les cases vides se taisent ; cherche un N°, sa case s’allume.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (16 nov., lot transporteurs-suivi) docs/passation/2026-11-16-transporteurs-suivi.md
   { id: 'mondial-relay-ventes', date: '2026-11-16', titre: 'Tes colis Mondial Relay vendus sont suivis', phrase: 'Le code postal du point est lu sur ton étiquette.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., lot impression-retours) docs/passation/2026-11-16-impression-retours.md

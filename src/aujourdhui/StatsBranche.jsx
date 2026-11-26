@@ -12,6 +12,7 @@ import { useLectures, lignesReleve, annoncesLues } from './lectures.js';
 import { delaisPar, margesPar } from '../statsVentes.js';
 import { raisonCourte } from '../design/carteChiffres.js';
 import { rentabiliteParSource, lireMeilleures, CLE_MEILLEURES, EVT_MEILLEURES } from '../rentabiliteSource.js';   // (23 nov.) par source d'achat
+import { gainsReels } from '../gainsReels.js';   // (24 nov.) « Ce que tu gagnes vraiment »
 
 const SEL_TOUT = { site: 'toutes', compte: null, periode: null };
 const lire = (k, ok, d) => { try { const v = localStorage.getItem(k); return ok.includes(v) ? v : d; } catch (_) { return d; } };
@@ -59,6 +60,17 @@ export default function StatsBranche({ valeurSel, live, outils, montant, Icon, o
     return () => { window.removeEventListener(EVT_MEILLEURES, relire); window.removeEventListener('storage', surStockage); };
   }, [owner]);
   const sources = React.useMemo(() => { try { return rentabiliteParSource(bilanSrc); } catch (_) { return null; } }, [bilanSrc]);
+  // (24 nov., lot gains-reels) « Ce que tu gagnes vraiment » : le relevé de la période (le MÊME que « Ce que tu vends le
+  // mieux »), la publication des sources, les commandes eBay hors euro. Aucune règle ici (src/gainsReels.js).
+  const gains = React.useMemo(() => {
+    try {
+      const releve = L.extras === undefined ? undefined : lignesReleve(L.releve, L.extras, outils && outils.enLigne);
+      if (!Array.isArray(releve)) return releve === undefined ? undefined : null;
+      const F = fenetre(f);
+      return gainsReels({ lignes: releve.filter((l) => l && Number.isFinite(l.ts) && l.ts >= F.de && l.ts < F.a), bilan: bilanSrc, horsEuro: L.horsEuro });
+    } catch (_) { return null; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [f, L.extras, L.releve, L.horsEuro, bilanSrc]);
   const T = React.useMemo(() => { try { const F = fenetre(f); return statsTransporteurs({ ventes: pubT.ventes, achats: pubT.achats, de: F.de, a: F.a, site: siteT }); } catch (_) { return null; } }, [f, pubR, siteT]);
   const NR = React.useMemo(() => { try { const F = fenetre(f); return pubT.nonRetires ? { periode: statsNonRetires({ achats: pubT.nonRetires, de: F.de, a: F.a }), tout: statsNonRetires({ achats: pubT.nonRetires }) } : null; } catch (_) { return null; } }, [f, pubR]);
   const lignes = live && Array.isArray(live.venduLignes) ? live.venduLignes : (live && live.venduPasSu ? null : undefined);
@@ -83,7 +95,7 @@ export default function StatsBranche({ valeurSel, live, outils, montant, Icon, o
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [f, L.journal, L.extras, L.releve, lignes, valeurSel, repFav]);
   return <StatsPilotage M={M} etats={etats} montant={montant} Icon={Icon} onNav={onNav} onDorment={onDorment} automatisations={automatisations} onAutomatisations={onAutomatisations}
-    sources={sources} transporteurs={T} etatsTransp={{ ventes: pubT.ventes ? 'lu' : 'passu', achats: pubT.achats ? 'lu' : 'passu', nonRetires: pubT.nonRetires ? 'lu' : 'passu', pasLus: { ventes: pubR.ventes.pasLus, achats: pubR.achats.pasLus },
+    sources={sources} gains={gains} transporteurs={T} etatsTransp={{ ventes: pubT.ventes ? 'lu' : 'passu', achats: pubT.achats ? 'lu' : 'passu', nonRetires: pubT.nonRetires ? 'lu' : 'passu', pasLus: { ventes: pubR.ventes.pasLus, achats: pubR.achats.pasLus },
       site: siteT, setSite: (x) => { setSiteT(x); garder('vrm_stats_transp_site', x); } }} nonRetires={NR}
     seg={seg} setSeg={(x) => { setSeg(x); garder('vrm_stats_seg', x); }} f={f} setF={(x) => { setF(x); garder('vrm_stats_fenetre', x); }}
     onJournal={onNav ? () => onNav('settings') : null}/>;
