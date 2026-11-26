@@ -160,7 +160,10 @@ const MESSAGES = [
     try { const { execFileSync } = require('child_process'); base = execFileSync('git', ['-C', path.join(__dirname, '..'), 'show', 'origin/main:vinted-sync-extension/background.js'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }); } catch (_) {}
     // 5.414 (`toutinterface`) : la file des GESTES d'interface (`interfaceVinted`, une écriture faite par la page à la place
     //    d'une requête du fond) n'est pas une requête de plus — elle remplace celles qui partaient par `vintedPage`.
-    const sansGestes = (s) => { const i = s.indexOf('async function interfaceVinted('); if (i < 0) return s; const k = s.indexOf('\nasync function ', i + 10); return s.slice(0, i) + s.slice(k < 0 ? s.length : k); };
+    // 5.455 (`favorisrequetes`, Julien, 26 nov. : « fais comme Vintex ») : la porte des favoris (`vintedPageFavori`, trois
+    //    écritures de la page et elles seules) remplace les gestes d'interface des favoris — pas une requête de plus non plus.
+    const ote = (s, nom) => { const i = s.indexOf('async function ' + nom + '('); if (i < 0) return s; const k = s.indexOf('\nasync function ', i + 10); return s.slice(0, i) + s.slice(k < 0 ? s.length : k); };
+    const sansGestes = (s) => ote(ote(s, 'interfaceVinted'), 'vintedPageFavori');
     if (base != null) dit(compter(sansGestes(bg)) <= compter(sansGestes(base)), `111 · appels de requeteVinted dans background.js : ${compter(sansGestes(bg))} hors file des gestes (origin/main : ${compter(sansGestes(base))}) — aucun ajouté`);
     // Le chemin de l'encart, EXÉCUTÉ dans le vrai fond (`_fond-vm.cjs`) : la page d'une
     // annonce d'un AUTRE vendeur, sa liste de recherche et ses achats dans la base VRM.

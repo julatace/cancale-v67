@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.454.1';
+const CODE_VERSION = '5.455.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -16612,6 +16612,117 @@ async function vintedPage(acc, method, endpoint, body, options = {}) {
     } catch (_) { return { status: 0, ok: false, json: null }; }
   }, acc);
 }
+// ══ 5.455 (`favorisrequetes`, Julien, 26 nov. soir : « A, fais comme Vintex ») — LES FAVORIS PAR LES REQUÊTES DE LA PAGE ══
+//  Remplace, pour les SEULS messages aux favoris, la règle du 21 nov. « on ne fait plus les requêtes » (5.414), sur SA
+//  décision après les rapports de l'Observateur (26 nov., 16:51) : Vintex envoie chaque favori depuis l'onglet vinted.fr,
+//  sans aucun clic : `POST api.vinted.fr/messaging/main/inquiries {item_ids:[id], receiver_id}` (201, la conversation),
+//  `GET …/messaging/main/conversations/{uuid}`, `GET www/api/v2/transactions/{tx}`, `POST …/transactions/{tx}/offers
+//  {offer:{currency, price}}`, `POST api.vinted.fr/messaging/main/conversations/{uuid}/replies {content,
+//  is_personal_data_sharing_check_skipped:false, photo_temp_uuids:null}`. Ces TROIS écritures-là, et elles seules
+//  (`ECRITURES_FAVORI`), partent de la page (`executerMain`, cookies et jeton de la page, jamais un `Authorization`).
+//  Toute autre écriture reste refusée (`vintedPage`, `audit-tout-interface` T1–T5). Garde-fous inchangés : compte de
+//  l'onglet, plafonds réservés d'avance, pause 403/429, captcha, une requête à la fois (`requeteVinted`).
+const ECRITURES_FAVORI = [
+  /^https:\/\/api\.vinted\.(fr|com|it|de)\/messaging\/main\/inquiries$/,
+  /^\/api\/v2\/transactions\/[1-9]\d{0,19}\/offers$/,
+  /^https:\/\/api\.vinted\.(fr|com|it|de)\/messaging\/main\/conversations\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/replies$/i,
+];
+// Le chemin des favoris : « vintex » (défaut, sa décision du 26 nov.) ; « interface » (les clics de la 5.414, gardés en réserve).
+async function cheminFavoris() { try { const v = (await chrome.storage.local.get('vrmFavorisChemin')).vrmFavorisChemin; return v === 'interface' ? 'interface' : 'requetes'; } catch (_) { return 'requetes'; } }
+function ecritureFavoriPermise(adresse) { const a = String(adresse || ''); return ECRITURES_FAVORI.some((re) => re.test(a)); }
+function adresseMessagerieApi(domaine, suite) { const d = String(domaine || 'www.vinted.fr').toLowerCase().replace(/^www\./, ''); return /^vinted\.(fr|com|it|de)$/.test(d) ? `https://api.${d}/messaging/main/${suite}` : ''; }
+async function vintedPageFavori(acc, adresse, corps, options = {}) {
+  if (!ecritureFavoriPermise(adresse)) { noterDiag('favori_req_adresse_refusee'); return { status: 0, ok: false, json: null, rienParti: true, sansPage: 'ecriture', raison: RAISON_ECRITURE_REQUETE }; }
+  return requeteVinted('api', async () => {
+    const pg = await pageVintedPour(acc);
+    if (pg.refus) { noterDiag('page_' + pg.refus); return { status: 0, ok: false, json: null, rienParti: true, sansPage: pg.refus }; }
+    try {
+      const res = await executerMain(pg.tabId, async (adr, json, csrfFond, delai) => {
+        const L = (typeof location !== 'undefined') ? location : null;
+        const hote = String((L && L.hostname) || ''), origine = String((L && L.origin) || '');
+        if (!/(^|\.)vinted\.(fr|com|it|de)$/i.test(hote)) return { status: 0, ok: false, json: null, horsVinted: true, origine };
+        let csrf = '';
+        try { const mt = typeof document !== 'undefined' && document.querySelector('meta[name="csrf-token"]'); csrf = (mt && mt.getAttribute('content')) || ''; } catch (_) {}
+        if (!csrf) csrf = csrfFond || '';
+        let anon = '';
+        try { const mm = typeof document !== 'undefined' && /(?:^|;\s*)anon_id=([^;]+)/.exec(document.cookie || ''); anon = mm ? decodeURIComponent(mm[1]) : ''; } catch (_) {}
+        const h = { accept: ['application/json', 'text/plain', '*' + '/' + '*'].join(', '), 'content-type': 'application/json' };   // écrit en morceaux : la suite « étoile-barre-étoile » brouille les lecteurs de code qui ôtent les commentaires
+        if (csrf) h['x-csrf-token'] = csrf;
+        if (anon) h['x-anon-id'] = anon;
+        try {
+          const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+          const t = ctl ? setTimeout(() => { try { ctl.abort(); } catch (_) {} }, delai || 30000) : null;
+          const r = await fetch(adr, { method: 'POST', credentials: 'include', headers: h, body: JSON.stringify(json), ...(ctl ? { signal: ctl.signal } : {}) });
+          if (t) clearTimeout(t);
+          const ent = {};
+          try { for (const k of ['content-type', 'x-datadome', 'x-dd-b', 'cf-mitigated', 'retry-after']) { const v = r.headers && r.headers.get(k); if (v) ent[k] = String(v).slice(0, 200); } } catch (_) {}
+          let brut = ''; try { brut = await r.text(); } catch (_) {}
+          let j = null; try { j = brut ? JSON.parse(brut) : null; } catch (_) {}
+          return { status: r.status, ok: r.ok, json: j, origine, entetes: ent, texte: j == null ? String(brut || '').slice(0, 3000) : '' };
+        } catch (_) { return { status: 0, ok: false, json: null, origine, reseau: true }; }
+      }, [String(adresse), corps, lastCsrfByDomain[acc.domain || 'www.vinted.fr'] || '', Number(options.timeoutMs) || 30000]);
+      const o = res && res[0] && res[0].result;
+      // Aucune réponse lue : la requête a PU partir ⇒ « incertain », jamais « rien n'est parti ».
+      if (!o || typeof o !== 'object') return { status: 0, ok: false, json: null, incertain: true };
+      if (o.horsVinted) { noterDiag('page_hors_vinted'); return { status: 0, ok: false, json: null, rienParti: true, sansPage: 'onglet' }; }
+      const ent = o.entetes && typeof o.entetes === 'object' ? o.entetes : {};
+      await secuObserver('vinted', acc && acc.vinted_user_id, { status: o.status, json: o.json, texte: o.texte, entetes: ent });
+      return { status: o.status, ok: o.ok, json: o.json, viaPage: true, incertain: !!o.reseau, retryAfter: ent['retry-after'] || null };
+    } catch (_) { return { status: 0, ok: false, json: null, incertain: true }; }
+  }, acc);
+}
+// 5.455 (4ᵉ export de l'Observateur, 26 nov. : tous les 400 de Bleam venaient de là) : quand Vinted exige de vérifier le
+//  numéro de téléphone du compte, TOUTE écriture répond 400 et la page part sur /users/verification/phone. Un 400 se relit
+//  donc par la question même de la page (`authorization/check/phone_verification` : 400 = à vérifier, 200 = fait) — jamais
+//  confondu avec un texte refusé. Lecture seule ; « pas su » (null) ne conclut rien.
+async function telephoneAVerifierVinted(acc) {
+  try {
+    const r = await vintedPage(acc, 'GET', '/api/v2/authorization/check/phone_verification', null, { timeoutMs: 12000 });
+    if (r && r.status === 400) return true;
+    if (r && r.ok) return false;
+  } catch (_) {}
+  return null;
+}
+// La conversation créée (réponse de `inquiries`) : son uuid, cherché seulement dans des champs d'identifiant plausibles.
+const RE_UUID_FAV = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function uuidConversationCree(j) {
+  if (!j || typeof j !== 'object') return '';
+  const c = [j.conversation_id, j.id, j.conversation && j.conversation.id, j.conversation && j.conversation.uuid, j.data && j.data.conversation_id, j.data && j.data.id];
+  const u = c.find((v) => typeof v === 'string' && RE_UUID_FAV.test(v));
+  return u ? u.toLowerCase() : '';
+}
+// La transaction d'une conversation de la nouvelle messagerie (Vintex la lit juste après) : champs d'identifiant seulement.
+function txConversationMessagerie(j) {
+  const c = j && typeof j === 'object' ? (j.conversation && typeof j.conversation === 'object' ? j.conversation : j) : null;
+  if (!c) return '';
+  const d = c.data && typeof c.data === 'object' ? c.data : {};
+  const num = (v) => ((typeof v === 'number' && Number.isSafeInteger(v) && v > 0) || (typeof v === 'string' && /^[1-9]\d{0,19}$/.test(v))) ? String(v) : '';
+  const direct = num(d.transaction_id) || num(c.transaction_id) || num(d.transaction && d.transaction.id) || num(c.transaction && c.transaction.id) || num(d.legacy_transaction_id);
+  if (direct) return direct;
+  // Ailleurs dans la conversation (forme pas encore mesurée) : un champ NOMMÉ `transaction_id` (4 niveaux au plus), et
+  // seulement s'il n'y a qu'UNE valeur — la transaction relue ensuite doit porter CET article, sinon rien ne part.
+  const vus = new Set();
+  const fouiller = (o, p) => { if (!o || typeof o !== 'object' || p > 4 || vus.size > 3) return; for (const k of Object.keys(o).slice(0, 80)) { const v = o[k]; if (k === 'transaction_id' && num(v)) vus.add(num(v)); else if (v && typeof v === 'object') fouiller(v, p + 1); } };
+  fouiller(c, 0);
+  return vus.size === 1 ? [...vus][0] : '';
+}
+// Un message ÉCRIT par une personne (pas un message du système) : la forme la plus prudente — un type de texte connu,
+// ou un contenu texte non vide porté par un auteur. Forme inconnue ⇒ compté comme écrit (on n'écrit pas par-dessus).
+function messagesEcritsMessagerie(liste) {
+  if (!Array.isArray(liste)) return -1;
+  let n = 0;
+  for (const m of liste) {
+    if (!m || typeof m !== 'object') { n++; continue; }
+    const t = String(m.entity_type || m.type || m.kind || '').toLowerCase();
+    if (/^(message|text|text_message|user_message|reply|offer_request_message)$/.test(t)) { n++; continue; }
+    if (/(status|system|transaction|offer|event|action|notification|info)/.test(t)) continue;
+    const contenu = typeof m.content === 'string' ? m.content : typeof m.body === 'string' ? m.body : (m.data && typeof m.data.content === 'string') ? m.data.content : '';
+    if (contenu.trim() || !t) n++;
+  }
+  return n;
+}
+// Le prix de l'offre au format de la page (Vintex : « 45.0 », « 42.5 ») — un nombre sûr, sinon rien.
+function prixOffrePage(p) { const n = Math.round(Number(p) * 100) / 100; if (!(n > 0) || n > 100000) return ''; return Number.isInteger(n) ? n.toFixed(1) : String(n); }
 // Une republication refusée faute d'onglet : la phrase dite à l'app.
 function raisonSansPage(r) {
   if (!r || !r.sansPage) return '';
@@ -22447,6 +22558,125 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   try{
   // 5.410.3 (`favorisbleam`, « tout comme Bleam ») : la conversation s'ouvre comme chez l'outil observé (`seller_enters_notification`).
   const cbF=await reglagesCommeBleam();
+  // ⚠️⚠️ 5.455 (`favorisrequetes`, Julien, 26 nov. soir : « A, fais comme Vintex ») : le chemin de Vintex, par les requêtes de
+  //    la PAGE (voir `vintedPageFavori`) : conversation, relecture, transaction, offre, message. Aucun clic, aucune cloche.
+  //    Chaque identité est relue AVANT d'écrire ; un doute ⇒ rien de plus ne part.
+  if((await cheminFavoris())==='requetes'){
+    etape('verification');
+    try{
+      const ra=await fetch(`https://vrm.center/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({action:'verifier',jeton}),signal:AbortSignal.timeout(12000)});
+      if(!ra.ok)return rep('refuse',ra.status,'autorisation_expiree');const ja=await ra.json();if(!ja.ok||!ja.autorise||String(ja.uid)!==String(uid))return rep('refuse');
+    }catch{return rep('refuse');}
+    if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
+    etape('conversation');
+    const adrQ=adresseMessagerieApi(acc.domain,'inquiries');
+    if(!adrQ)return rep('refuse',0,'onglet_vinted');
+    const q=await vintedPageFavori(acc,adrQ,{item_ids:[body.itemId],receiver_id:body.recipientId});
+    if(!q.rienParti&&partie(q))ecrits++;
+    if(q.rienParti)return rep('refuse',0,'onglet_vinted');
+    if(frein)return rep('refuse',q.status);
+    if(q.incertain||(!q.status))return rep('incertain',0,'creation_non_confirmee');
+    if(!q.ok&&q.status===400){if(await telephoneAVerifierVinted(acc)===true){noterDiag('favori_telephone_a_verifier');return rep('refuse',q.status,'telephone_a_verifier');}}
+    if(!q.ok&&[400,404,422].includes(q.status)){noterDiag('favori_req_conversation_refusee_'+q.status);try{Promise.resolve(echantillonRate('favori_req_inquiry',String(q.status),JSON.stringify(formeJson(q.json)).slice(0,600))).catch(()=>{});}catch(_){}return rep('ignore',q.status,'conversation_refusee');}
+    if(!q.ok)return rep(q.status>=400&&q.status<500?'refuse':'incertain',q.status);
+    const uuid=uuidConversationCree(q.json);
+    if(!uuid){noterDiag('favori_req_uuid_absent');await noterFormeFavori('inquiry','uuid_absent',formeCles(q.json));return rep('incertain',q.status,'creation_non_confirmee');}
+    await pauseFavori('fil',uid);
+    // La conversation relue (comme Vintex, aussitôt) : CETTE personne seule en face, CET article, aucun message écrit.
+    const ln=await vintedPage(acc,'GET',adresseMessagerieVinted(acc.domain,uuid),null,{timeoutMs:12000});
+    if(!frein)frein=freinFavoriAuto(ln);
+    if(ln.sansPage)return rep('refuse',0,'onglet_vinted');
+    if(frein)return rep('refuse',ln.status);
+    const cv=ln.ok&&ln.json&&typeof ln.json==='object'?(ln.json.conversation&&typeof ln.json.conversation==='object'?ln.json.conversation:ln.json):null;
+    if(!cv||String(cv.id||'').toLowerCase()!==uuid){noterDiag('favori_req_fil_illisible_'+(ln.status||0));return rep('refuse',ln.status,'identite_non_confirmee');}
+    const idsDe=(l)=>(Array.isArray(l)?l:[]).map((x)=>x&&typeof x==='object'?String(x.id!=null?x.id:x.user_id!=null?x.user_id:x.item_id!=null?x.item_id:''):String(x)).filter((v)=>/^[1-9]\d{0,19}$/.test(v));
+    const opp=idsDe(cv.opposite_users);
+    if(opp.length!==1||opp[0]!==body.recipientId){noterDiag('favori_req_autre_personne');return rep('refuse',ln.status,'identite_non_confirmee');}
+    const its=idsDe(cv.data&&cv.data.items);
+    if(its.length&&(its.length!==1||its[0]!==body.itemId)){noterDiag('favori_req_autre_article');return rep('refuse',ln.status,'identite_non_confirmee');}
+    if(cv.allow_reply===false)return rep('ignore',ln.status,'conversation_refusee');
+    etape('historique');
+    const ecritsAvant=messagesEcritsMessagerie(cv.messages);
+    if(ecritsAvant<0){noterDiag('favori_req_historique_forme');await noterFormeFavori('conversation','messages',formeCles(cv));return rep('refuse',ln.status,'historique_non_verifie');}
+    if(ecritsAvant>0||(cv.pagination&&cv.pagination.has_next===true))return rep('ignore',ln.status,body.auto===true?'conversation_existante':'conversation_deja_contactee');
+    const login=(Array.isArray(cv.opposite_users)?cv.opposite_users:[]).map((x)=>x&&typeof x==='object'&&typeof x.login==='string'&&/^[\w.\-]{1,80}$/.test(x.login)?x.login:'').find(Boolean)||'';
+    // La transaction (comme Vintex) : l'article doit être CELUI du favori ; elle porte le prix pour l'offre.
+    let tx=txConversationMessagerie(ln.json);
+    // Pas de transaction dans la nouvelle messagerie : l'ancienne lecture de CETTE conversation (son ancien n°, lu chez Vinted).
+    const core=String(Number(cv.core_id_deprecated)||'');
+    if(!id(tx)&&id(core)){const lo=await vintedPage(acc,'GET',`/api/v2/conversations/${core}`,null,{timeoutMs:12000});if(!frein)frein=freinFavoriAuto(lo);if(frein)return rep('refuse',lo.status);const co=lo.ok&&lo.json&&lo.json.conversation;const tco=co&&co.transaction?String(co.transaction.id||''):'';if(co&&String(co.opposite_user&&co.opposite_user.id)===body.recipientId&&id(tco)){tx=tco;noterDiag('favori_req_tx_ancienne');}}
+    let prixAnnonce=null,devise='EUR',titre='';
+    if(id(tx)){
+      await pauseFavori('transaction',uid);
+      const t=await vintedPage(acc,'GET',`/api/v2/transactions/${tx}`,null,{timeoutMs:12000});
+      if(!frein)frein=freinFavoriAuto(t);
+      if(t.sansPage)return rep('refuse',0,'onglet_vinted');
+      if(frein)return rep('refuse',t.status);
+      const tr=t.ok?(t.json&&t.json.transaction||t.json):null;
+      const artTx=String(tr&&(tr.item_id||(tr.item&&tr.item.id)||(tr.offer&&tr.offer.item_id))||'');
+      if(!tr||artTx!==body.itemId){noterDiag('favori_req_tx_'+(tr?'autre_article':'illisible'));return rep('refuse',t.status,'identite_non_confirmee');}
+      const acheteurTx=String(tr.buyer_id||(tr.buyer&&tr.buyer.id)||'');
+      if(acheteurTx&&acheteurTx!==body.recipientId){noterDiag('favori_req_tx_autre_acheteur');return rep('refuse',t.status,'identite_non_confirmee');}
+      {const ind=annonceIndisponible(tr.item&&typeof tr.item==='object'?tr.item:null,null,null);if(ind){noterDiag('favori_annonce_tx_'+ind);return rep('ignore',t.status,'annonce_indisponible');}}
+      const pr=prixDeTransaction(tr);if(pr){prixAnnonce=pr.montant;devise=pr.devise;}
+      titre=String(tr.item_title||(tr.item&&tr.item.title)||'');
+    }else{noterDiag('favori_req_sans_transaction');await noterFormeFavori('conversation','transaction',formeCles(cv)+'|data:'+formeCles(cv.data));}
+    if(!its.length&&!id(tx))return rep('refuse',ln.status,'identite_non_confirmee');   // ni article lu ni transaction : l'article n'est pas prouvé
+    const cP={id:uuid,opposite_user:{id:body.recipientId,...(login?{login}:{})},item_id:body.itemId,...(id(tx)?{transaction:{id:tx,item_id:body.itemId,item_title:titre}}:{}),messages:[]};
+    const choixV=await choixMessageFavori({uid,body,c:cP,prixAnnonce,offre,tx:id(tx)?tx:'',perso:persoF,lotPermis:!texteEnvoi&&!!cbF.favoris&&Number(body.aimes)>=2&&!(await lotDejaEnvoye(uid,body.recipientId)),lotTexte:cbF.messageLot,refusees:refuseesIci});
+    if(!choixV.ok){noterDiag('favori_perso_'+choixV.raison);return rep('refuse',0,choixV.raison==='variable'?(choixV.manque.some(k=>/prix|remise/.test(k))?'offre_prix_inconnu':'identite_non_confirmee'):'texte_interdit');}
+    let prixOffreFait=null;
+    if(offre){
+      if(!id(tx)){noterDiag('favori_offre_sans_transaction');return rep('refuse',0,'offre_prix_inconnu');}
+      const op=choixV.op||await offreAvecPlancher(body.itemId,prixAnnonce,offre);
+      if(op.raison==='offre_sous_plancher'){noterDiag('favori_offre_sous_plancher');return rep('ignore',0,'offre_sous_plancher');}
+      const prixTxt=op.prix?prixOffrePage(op.prix):'';
+      if(!prixTxt){noterDiag('favori_offre_prix_inconnu');return rep('refuse',0,'offre_prix_inconnu');}
+      const gpV=await gardePrixEcriture({sorte:'offre',site:'vinted',uid,id:String(body.itemId||''),prixC:Math.round(Number(op.prix)*100),actuelC:Number(prixAnnonce)>0?Math.round(Number(prixAnnonce)*100):null,mode:'auto'});
+      if(!gpV.ok){noterDiag('favori_offre_garde');return rep('ignore',0,'offre_garde_prix');}
+      await pauseFavori('offre',uid);
+      if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
+      etape('offre');
+      const o=await vintedPageFavori(acc,`/api/v2/transactions/${tx}/offers`,{offer:{currency:/^[A-Z]{3}$/.test(String(devise))?devise:'EUR',price:prixTxt}});
+      if(!o.rienParti&&partie(o))ecrits++;
+      if(o.rienParti)return rep('refuse',0,'onglet_vinted');
+      if(frein)return rep('refuse',o.status);
+      if(o.incertain||!o.status)return rep('incertain',0,'offre_incertaine');
+      if(!o.ok&&o.status===400){if(await telephoneAVerifierVinted(acc)===true){noterDiag('favori_telephone_a_verifier');return rep('refuse',o.status,'telephone_a_verifier');}}
+      const offreFaite=!!(o.ok&&(o.json==null||o.json.code==null||Number(o.json.code)===0));
+      noterDiag(offreFaite?'favori_offre_ok':'favori_offre_refusee_'+(o.status||'reseau'));
+      if(!offreFaite)return o.status>=400&&o.status<500||o.ok?rep('refuse',o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');
+      prixOffreFait=Number(op.prix);
+    }
+    const versionV=choixV.version;
+    if(!versionV)return rep('refuse',400);
+    const infosV={article:titre,prix:prixOffreFait!=null?prixOffreFait:prixAnnonce};
+    if(prixRequisFavori(versionV.texte)&&!prixTexteFavori(infosV.prix))return rep('refuse',0,'offre_prix_inconnu');
+    const brutV=personnaliserMessageFavori(versionV.texte,login,undefined,infosV).slice(0,2000);
+    const texteV=texteJamaisRepete(brutV,login,await textesRecents(uid));
+    if(texteV==null){noterDiag('favori_texte_repete');return rep('refuse',0,'historique_non_verifie');}
+    if(!texteV.trim())return rep('refuse',400);
+    if(!texteSurVinted(texteV).ok){noterDiag('favori_texte_final_interdit');return rep('refuse',0,'texte_interdit');}
+    if(prixOffreFait!=null){
+      attente=jeton;
+      const att=await attendreOffreMessage(jeton,{uid:String(uid),convId:uuid,texte:texteV,variante:versionV.n,tRes,suivi:grant.suivi||null,acc},(nom,x)=>{if(grant.suivi)notifierApp({type:'favoris',uid:String(uid),suivi:grant.suivi,etape:nom,...(x||{})});});
+      if(!att.ok){noterDiag('favori_message_pas_parti_'+att.raison);return rep('refuse',0,att.raison);}
+    }
+    etape('ecriture');
+    const ec=await attendreEcriture(uid,acc,texteV,premier?'premier':'serie');
+    if(!ec.ok)return rep('refuse',0,ec.code==='vinted-pause'?'pause_vinted':ec.code==='vinted-autre'?'compte_vinted_different':ec.code==='secu-robot'?'vinted_robot':ec.code==='tout-arrete'?(prixOffreFait!=null?'tout_arrete':'autorisation_expiree'):'compte_vinted_absent');
+    if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
+    etape('envoi');
+    const r=await vintedPageFavori(acc,adresseMessagerieApi(acc.domain,`conversations/${uuid}/replies`),{content:texteV,is_personal_data_sharing_check_skipped:false,photo_temp_uuids:null});
+    if(!r.rienParti&&partie(r))ecrits++;
+    if(r.rienParti)return rep('refuse',0,'onglet_vinted');
+    if(frein)return rep('refuse',r.status);
+    if(r.incertain||!r.status){await noterTexteRecent(uid,texteV);return rep('incertain',0,'reponse_inconnue');}
+    if(r.ok){noterDiag('favori_req_envoye');variante=Number.isInteger(versionV.n)&&versionV.n>0?versionV.n:null;await noterVarianteDerniere(uid,'favori',variante);await noterChoixFavori(uid,body,uuid,versionV,prixOffreFait!=null);await noterTexteRecent(uid,texteV);etape('confirmation');return rep('envoye',r.status);}
+    if(r.status===400){if(await telephoneAVerifierVinted(acc)===true){noterDiag('favori_telephone_a_verifier');return rep('refuse',r.status,'telephone_a_verifier');}}
+    if([400,422].includes(r.status)){await noterVersionRefusee(uid,versionV.modele||versionV.texte);noterDiag('favori_message_refuse_'+r.status);try{Promise.resolve(echantillonRate('favori_refus_forme',String(r.status),JSON.stringify(formeJson(r.json)).slice(0,600))).catch(()=>{});}catch(_){}return rep('refuse',r.status,'texte_refuse');}
+    return rep(r.status>=400&&r.status<500?'refuse':'incertain',r.status);
+  }
   // 5.410.8 (export de l'Observateur, 21 nov. : « Bleam appuie sur la cloche ») : avant CHAQUE favori, la LISTE de la cloche
   //    (le même appel que le clic sur la cloche, depuis la page) ; le favori est pris dans CETTE réponse — absent (trop
   //    ancien pour Vinted) ⇒ rien n'est écrit, il est sauté et c'est dit ; puis au moins 3,8 s (au hasard) avant d'ouvrir.
