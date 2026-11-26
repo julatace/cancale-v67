@@ -87,7 +87,7 @@ const sansCommentaires = (f) => fs.readFileSync(path.join(T, f), 'utf8').replace
   const ne = sansCommentaires('src/NavigateursExtension.jsx');
   dit(/requeteNavigateurs\(owner\)/.test(ne) && /lireTout\(q\)/.test(ne) && !/fetch\(/.test(ne), 'N5b elle lit par `requeteNavigateurs(SON id)` et `lireTout` (pagination), rien d’autre');
   const sec = sansCommentaires('src/securiteCompte.js');
-  dit(/\/auth\/v1\/logout\?scope=global/.test(sec) && /askConfirm\(\{ title: 'Se déconnecter partout \?'/.test(reg), '« Se déconnecter partout » : confirmé, scope global');
+  dit(/\/auth\/v1\/logout\?scope=global/.test(sec) && (/askConfirm\(\{ title: 'Se déconnecter partout \?'/.test(reg) || (/askConfirm\(\{ title: tr\('appareils\.partout\.titre'\)[\s\S]{0,300}danger: true/.test(reg) && /"appareils\.partout\.titre": "Se déconnecter partout \?"/.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'i18n', 'langues', 'fr', 'textesRestes.js'), 'utf8')))), '« Se déconnecter partout » : confirmé, scope global');
   const cles = [...new Set([...ne.matchAll(/tr\('([^']+)'/g)].map((m) => m[1]).filter((k) => k.startsWith('parametres.')))];
   const manque = [];
   for (const l of ['fr', 'en', 'es', 'it', 'de']) { const t = fs.readFileSync(path.join(T, `src/i18n/langues/${l}/parametres.js`), 'utf8'); for (const k of cles) if (!t.includes(JSON.stringify(k))) manque.push(l + ':' + k); }

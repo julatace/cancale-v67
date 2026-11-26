@@ -2208,7 +2208,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (24 nov.) « Connexions de l'extension » : chaque navigateur (version, vu quand, ce qu'il lit, son problème) et chaque compte (src/connexions/).
       { id:'connexionsext', type:'nav', ic:'relier', lib:tr('cnx.reglages.lib'), desc:tr('cnx.reglages.desc'), data:{ 'data-reglage-connexions-ext':'' }, onClick:()=>setTab('connexions') },
       { id:'adistance', type:'nav', ic:'ordi', lib:tr('nav.adistance'), desc:tr('adist.reglages.desc'), data:{ 'data-reglage-adistance':'' }, onClick:()=>setTab('adistance') },
-      { id:'liens', type:'nav', ic:'link', lib:tr('reglages.liens.lib'), desc:tr('reglages.liens.desc'), onClick:()=>setTab('vintedaccounts') },
+      { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:tr('reglages.liens.desc'), onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:tr('reglages.connexions.lib'), desc:tr('reglages.connexions.desc'), titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (11 nov., lot import-depart) Tout l'historique Vinted (ventes, achats), lu par l'extension ; « Tout récupérer » pour le compte de l'onglet.
       { id:'historique', type:'panneau', ic:'box', lib:tr('reglages.historique.lib'), desc:tr('reglages.historique.desc'), data:{ 'data-reglage-historique':'' }, el:<><HistoriqueVinted comptes={comptes||[]} variante="reglages"/><HistoriqueSites/></> },
