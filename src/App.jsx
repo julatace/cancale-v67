@@ -2575,7 +2575,7 @@ const detectSchema = async () => {
 // (26 nov., vitesse-webkit) Lue par Annonces (doublons de photos) ET par « même photo » : à l'ouverture, deux fois la même
 // famille à quelques secondes d'écart (banc budget-vitesse, Ma journée, Annonces, Achats). Une réponse RÉUSSIE sert 20 s
 // au voisin (src/memoCourt.js : jamais un « pas su », jamais un autre vendeur, oubliée à toute écriture, signal de
-// l'extension, retour du réseau et `onCloudReady` — `oublierMemosLectures`).
+// l'extension et au retour du réseau — voir `oublierMemosLectures`).
 const _memoEmpreintesPhotos = creerMemoCourt({ dureeMs: 20000 });
 const lireEmpreintesPhotos = () => _memoEmpreintesPhotos.lire((AUTH.user && AUTH.user.id) || '', lireEmpreintesPhotosBase);
 const lireEmpreintesPhotosBase = async () => {
@@ -9559,7 +9559,7 @@ const lireTxnMeta = () => {
 const MEMO_LECTURES_MS = 20000;
 const _memoCaptures = creerMemoCourt({ dureeMs: MEMO_LECTURES_MS });
 const _memoPreuvesTxn = creerMemoCourt({ dureeMs: MEMO_LECTURES_MS });
-const oublierMemosLectures = () => { _memoCaptures.oublier(); _memoPreuvesTxn.oublier(); _memoEmpreintesPhotos.oublier(); _memoEmailBords.oublier(); _memoRecusAchat.oublier(); };
+const oublierMemosLectures = () => { _memoCaptures.oublier(); _memoPreuvesTxn.oublier(); _memoEmailBords.oublier(); _memoRecusAchat.oublier(); };
 try {
   const lp = typeof window !== 'undefined' ? window.__vrmLecturesPartagees : null;
   if (lp && typeof lp.abonner === 'function') {
@@ -9572,6 +9572,10 @@ try {
     lp.abonner('app_data?id=like.harvest_%25_txn_%25', () => { _memoPreuvesTxn.oublier(); _txnMeta = null; });
   }
   if (typeof window !== 'undefined') { window.addEventListener('vrm:ext', oublierMemosLectures); window.addEventListener('online', oublierMemosLectures); }
+  // Les empreintes de photos : oubliées au signal de l'extension et au retour du réseau, PAS à `onCloudReady` — leur lecture
+  // exige la session (sans elle : refusée, rien de gardé) et le nuage prêt ne change pas ces lignes ; oubliées là, la 1re
+  // lecture (avant le nuage) repartait une 2e fois à l'ouverture (banc budget-vitesse : Ventes, Achats, Messages ×2).
+  if (typeof window !== 'undefined') { const f = () => _memoEmpreintesPhotos.oublier(); window.addEventListener('vrm:ext', f); window.addEventListener('online', f); }
 } catch (_) {}
 onCloudReady(oublierMemosLectures);
 // Les transactions des preuves de vente (`lirePreuvesVenteVinted`) : la MÊME famille que `lireTxnMeta` (gardée sur
