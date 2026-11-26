@@ -2572,7 +2572,13 @@ const detectSchema = async () => {
 // `photo_emprunte_{uid}`) : { 'vinted:<uid>': { [idAnnonce]: { [clé de photo]: empreinte } } }.
 // Une projection (jamais `select=data`), toutes les lignes (`Range`). Lecture ratée ⇒ `null`
 // (« pas vérifié », jamais « aucun doublon ») ; rien rangé ⇒ `{}`.
-const lireEmpreintesPhotos = async () => {
+// (26 nov., vitesse-webkit) Lue par Annonces (doublons de photos) ET par « même photo » : à l'ouverture, deux fois la même
+// famille à quelques secondes d'écart (banc budget-vitesse, Ma journée, Annonces, Achats). Une réponse RÉUSSIE sert 20 s
+// au voisin (src/memoCourt.js : jamais un « pas su », jamais un autre vendeur, oubliée à toute écriture, signal de
+// l'extension, retour du réseau et `onCloudReady` — `oublierMemosLectures`).
+const _memoEmpreintesPhotos = creerMemoCourt({ dureeMs: 20000 });
+const lireEmpreintesPhotos = () => _memoEmpreintesPhotos.lire((AUTH.user && AUTH.user.id) || '', lireEmpreintesPhotosBase);
+const lireEmpreintesPhotosBase = async () => {
   try {
     const out = {};
     for (let debut = 0; debut < 20000; debut += 1000) {
@@ -8481,7 +8487,14 @@ const lireRetoursAchat = async (c) => {
 };
 // Bordereaux reçus par EMAIL (pipeline usevrm) : lignes app_data email_bord_*
 // = { numero, modele, taille, transaction, pdfB64, ... }. Le PDF est en base64.
-const fetchEmailBordereaux = async () => {
+// (26 nov., vitesse-webkit) Lue par chaque écran monté (Aujourd'hui, Ventes, Achats… : un `Comptabilite` par onglet) et par
+// les colis sortants : à l'ouverture, la famille partait TROIS fois (banc budget-vitesse, Achats). Une réponse RÉUSSIE sert
+// 20 s aux voisins (src/memoCourt.js : jamais un « pas su », jamais un autre vendeur, oubliée à toute écriture et à tout
+// signal de l'extension) ; chaque appelant reçoit SA copie (lignes copiées). `force` relit (étiquettes lues).
+const _memoEmailBords = creerMemoCourt({ dureeMs: 20000 });
+const fetchEmailBordereaux = (opts = {}) => _memoEmailBords.lire((AUTH.user && AUTH.user.id) || '', fetchEmailBordereauxBase, { force: !!(opts && opts.force) })
+  .then((v) => (Array.isArray(v) ? v.map((x) => ({ ...x })) : v));
+const fetchEmailBordereauxBase = async () => {
   try {
     // ⚠️ SURTOUT PAS `select=data` : chaque bordereau embarque son PDF en
     // base64 (deux fois : brut + tamponné). Mesuré, 51 bordereaux = 6 Mo dont
@@ -9529,11 +9542,14 @@ const lireTxnMeta = () => {
 const MEMO_LECTURES_MS = 20000;
 const _memoCaptures = creerMemoCourt({ dureeMs: MEMO_LECTURES_MS });
 const _memoPreuvesTxn = creerMemoCourt({ dureeMs: MEMO_LECTURES_MS });
-const oublierMemosLectures = () => { _memoCaptures.oublier(); _memoPreuvesTxn.oublier(); };
+const oublierMemosLectures = () => { _memoCaptures.oublier(); _memoPreuvesTxn.oublier(); _memoEmpreintesPhotos.oublier(); _memoEmailBords.oublier(); };
 try {
   const lp = typeof window !== 'undefined' ? window.__vrmLecturesPartagees : null;
   if (lp && typeof lp.abonner === 'function') {
     lp.abonner('app_data?id=like.harvest_*', () => _memoCaptures.oublier());
+    lp.abonner('app_data?id=like.photo_emprunte_*', () => _memoEmpreintesPhotos.oublier());
+    lp.abonner('app_data?id=like.email_bord_*', () => _memoEmailBords.oublier());
+    lp.abonner(`app_data?id=eq.${ID_BORD_TRANSPORTEURS}`, () => _memoEmailBords.oublier());
     // (et la mémoire de 60 s des transactions, `_txnMeta` : une écriture qui peut les toucher la fait oublier)
     lp.abonner('app_data?id=like.harvest_%25_txn_%25', () => { _memoPreuvesTxn.oublier(); _txnMeta = null; });
   }

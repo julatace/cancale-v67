@@ -791,7 +791,9 @@ function FichesNeuves({ annonces = null }) {
   const [prep, setPrep] = React.useState(null);
   const [deposees, setDeposees] = React.useState(() => new Set());
   React.useEffect(() => { let mort = false;
-    lireTout('id=like.vinted_brouillon_*&select=id,f:data->>ficheId').then((r) => { if (!mort && Array.isArray(r)) setDeposees(new Set(r.map((x) => String((x && x.f) || '')).filter(Boolean))); }).catch(() => {});
+    // (26 nov., vitesse-webkit) Deux listes de fiches montées ensemble (Annonces) relisaient la même famille : partagée 20 s
+    // (`cachedRow` : la lecture EN COURS aussi ; un « pas su » n'est jamais gardé).
+    cachedRow(`brouillons-fiches:${AUTH.user?.id || ''}`, () => lireTout('id=like.vinted_brouillon_*&select=id,f:data->>ficheId'), 20000).then((r) => { if (!mort && Array.isArray(r)) setDeposees(new Set(r.map((x) => String((x && x.f) || '')).filter(Boolean))); }).catch(() => {});
     return () => { mort = true; }; }, []);
   const toutes0 = load('vrm_fiches_neuves', {}) || {};
   // Le brouillon créé DEPUIS une fiche porte le N° de cette fiche (par l'identifiant rendu
@@ -1347,7 +1349,31 @@ const fetchCapturedLabelMetas = async (uid) => {
 // Les retours eBay lus sur Colis (10 min, une fois pour toutes les ouvertures).
 const RETOURS_EBAY_CACHE = { v: undefined, at: 0 };
 // (21 nov., lot 77) Les lignes du colis RETOUR rangées par l'extension (5.431, `harvest_{uid}_retour_{tx}`) : 2 min.
-const LIGNES_RETOUR_CACHE = { v: undefined, at: 0 };
+const LIGNES_RETOUR_CACHE = { v: undefined, at: 0, p: null };
+// (26 nov., vitesse-webkit) LES LECTURES DE « VENDUS AILLEURS » (`chargerRetraitsMulti`) : la garde des offres, « masquer
+// ailleurs / retirer partout » et la carte « Vendus ailleurs » les lancent chacune, et chaque écran monté (Aujourd'hui,
+// Ventes…) aussi — Leboncoin et Vestiaire (blobs `items`/`ventes`) relus deux fois à l'ouverture (banc budget-vitesse,
+// Ma journée). Les QUATRE lectures sont partagées 15 s pour le MÊME vendeur ; une lecture ratée (un seul rejet) ou
+// une écriture vers ces lignes, un signal de l'extension (tout vidé, src/lecturesPartagees.js) ⇒ relue. Le calcul,
+// lui, reste fait par chaque appelant sur SES ventes et annonces.
+const LECTURES_AILLEURS = { owner: '', at: 0, p: null };
+const oublierLecturesAilleurs = () => { LECTURES_AILLEURS.p = null; LECTURES_AILLEURS.at = 0; };
+try {
+  const lp = typeof window !== 'undefined' ? window.__vrmLecturesPartagees : null;
+  if (lp && typeof lp.abonner === 'function') {
+    lp.abonner('app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_listings,vc_ventes)', oublierLecturesAilleurs);
+    lp.abonner('app_data?id=like.ebay_*', oublierLecturesAilleurs);
+  }
+  if (typeof window !== 'undefined') { window.addEventListener('vrm:ext', oublierLecturesAilleurs); window.addEventListener('online', oublierLecturesAilleurs); }
+} catch (_) {}
+const lireLecturesAilleurs = (owner, lire) => {
+  const c = LECTURES_AILLEURS;
+  if (c.p && c.owner === owner && Date.now() - c.at < 15000) return c.p;
+  const p = Promise.allSettled(lire());
+  c.owner = owner; c.at = Date.now(); c.p = p;
+  p.then((r) => { if (c.p === p && r.some((x) => x.status !== 'fulfilled')) oublierLecturesAilleurs(); });
+  return p;
+};
 // (3 nov.) Les e-mails de litige (src/litiges.js) : une lecture par 10 min, partagée par les écrans.
 const EMAILS_LITIGES_CACHE = { v: undefined, at: 0 };
 // ⟦← App.jsx #152⟧
@@ -12575,20 +12601,30 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     (async () => {
       const c = LIGNES_RETOUR_CACHE;
       if (c.v !== undefined && Date.now() - c.at < 2 * 60 * 1000 && !lignesRetourV) { if (vivant) setLignesRetour(c.v); return; }
-      let v;
-      try {
-        const rows = await lireTout('id=like.harvest_*_retour_*&select=id,tx:meta->>tx,suivi:meta->>suivi,sc:meta->>suiviCourant,sv:meta->>suivisVinted,transporteur:meta->>transporteur,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,cap:meta->>capturedAt,etapes:data->etapes', { strict: true });
-        if (!Array.isArray(rows)) v = null;
-        else {
-          v = {};
-          for (const r of rows) {
-            const m = RE_LIGNE_RETOUR.exec(String((r && r.id) || '')); if (!m) continue;
-            if (r.tx && String(r.tx) !== m[2]) continue;          // une ligne qui contredit son identifiant ne relie rien
-            v[m[2]] = { ...r, uid: m[1], tx: m[2], etapes: Array.isArray(r.etapes) ? r.etapes.slice(0, 30) : [] };
+      // (26 nov., vitesse-webkit) Plusieurs écrans montés ensemble (Aujourd'hui, Achats, Ventes…) partaient chacun lire la
+      // MÊME famille avant que la première réponse soit rangée (banc budget-vitesse, Achats : ×2). La lecture EN COURS est
+      // partagée ; un « relire » demandé (`lignesRetourV`) relit toujours.
+      if (c.p && !lignesRetourV) { const v0 = await c.p; if (vivant) setLignesRetour((prev) => (v0 === null && prev && typeof prev === 'object' ? prev : v0)); return; }
+      const lecture = (async () => {
+        let v;
+        try {
+          const rows = await lireTout('id=like.harvest_*_retour_*&select=id,tx:meta->>tx,suivi:meta->>suivi,sc:meta->>suiviCourant,sv:meta->>suivisVinted,transporteur:meta->>transporteur,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,cap:meta->>capturedAt,etapes:data->etapes', { strict: true });
+          if (!Array.isArray(rows)) v = null;
+          else {
+            v = {};
+            for (const r of rows) {
+              const m = RE_LIGNE_RETOUR.exec(String((r && r.id) || '')); if (!m) continue;
+              if (r.tx && String(r.tx) !== m[2]) continue;          // une ligne qui contredit son identifiant ne relie rien
+              v[m[2]] = { ...r, uid: m[1], tx: m[2], etapes: Array.isArray(r.etapes) ? r.etapes.slice(0, 30) : [] };
+            }
           }
-        }
-      } catch (_) { v = null; }
-      if (v !== null || c.v === undefined) { c.v = v; c.at = Date.now(); }
+        } catch (_) { v = null; }
+        if (v !== null || c.v === undefined) { c.v = v; c.at = Date.now(); }
+        return v;
+      })();
+      c.p = lecture;
+      lecture.finally(() => { if (c.p === lecture) c.p = null; }).catch(() => {});
+      const v = await lecture;
       if (vivant) setLignesRetour((prev) => (v === null && prev && typeof prev === 'object' ? prev : v));
     })();
     return () => { vivant = false; };
@@ -14126,7 +14162,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // une étiquette lue ⇒ les bordereaux sont relus (le transporteur apparaît sans recharger la page).
   useEffect(() => { if (Array.isArray(emailBords) && (curSub==='bordereaux'||curSub==='ventes'||curSub==='journee')) lireEtiquettesManquantes(emailBords); /* eslint-disable-next-line */ }, [emailBords, sub]);
   useEffect(() => {
-    const relire = () => { fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } }); };
+    const relire = () => { fetchEmailBordereaux({ force: true }).then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } }); };
     // (22 nov., défaut « Argent bloqué ») Un écran gardé CACHÉ ne recopie pas sa liste (React le rendrait quand même, en
     // arrière-plan, à chaque signal) : il note, et redessine UNE fois à son retour.
     let aRedessiner = false;
@@ -14522,7 +14558,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // (23 oct.) Le suivi d'un achat relevé sur Vinted par l'extension.
       else if (ev.quoi === 'suivi') relireSuivisVinted();
       // (21 nov., 5.431) Le colis RETOUR d'une vente relu par l'extension.
-      else if (ev.quoi === 'retour') { LIGNES_RETOUR_CACHE.at = 0; setLignesRetourV((n) => n + 1); }
+      else if (ev.quoi === 'retour') { LIGNES_RETOUR_CACHE.at = 0; LIGNES_RETOUR_CACHE.p = null; setLignesRetourV((n) => n + 1); }
       // 5.204 : une confirmation (« Tout est OK ») lue ou réglée dans une conversation.
       else if (ev.quoi === 'confirmer') relireAConfirmer();
       // (24 oct., 5.290) Un statut lu chez le transporteur par l'extension
@@ -21821,7 +21857,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const annonces = [],
       ventes = [],
       completes = [];
-    const resultats = await Promise.allSettled([
+    const resultats = await lireLecturesAilleurs(owner, () => [
       lireTout(
         `owner=eq.${encodeURIComponent(owner)}&id=in.(lbc_listings,lbc_ventes,lbc_accounts)&select=id,owner,items:data->items,ventes:data->ventes,accounts:data->accounts,lectures:data->lectures`,
         { strict: true },
