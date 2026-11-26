@@ -136,4 +136,7 @@ export default {
   "ia.vm.encoreEnLigne": "Son annonce est encore en ligne sur Vinted : retire-la, sinon elle peut se vendre une deuxième fois.",
   "ia.vm.remisSansCase": "N°{num} remis en stock — sa case est prise : range-la",
   "ia.vm.annulee": "Vente annulée : rien n’est compté, la paire est de nouveau au stock.",
+  "lt.quoi.rangee": "Rangée dans le Stock",
+  "lt.src.rangement": "sa case du Stock",
+  "lt.pasSu.rangement": "la case du Stock"
 };
