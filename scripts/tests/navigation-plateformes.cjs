@@ -1,5 +1,7 @@
 // Navigateur réel, données synthétiques, aucune requête vers une vraie boutique.
 require('../bancs/_porte-banc.cjs');
+// (26 nov., bancs natifs) L'app RÉELLE (« VRM natif ») : jamais le DOM d'avant le 17 nov. (échafaudage `vrm_banc_dom_ancien`).
+process.env.BANC_DESIGN_V2 = process.env.BANC_DESIGN_V2 || 'defaut';
 const assert=require('assert/strict'),fs=require('fs'),path=require('path');const NV=require('../bancs/nouveau-vendeur.cjs');const{chromium}=require('playwright');
 (async()=>{await new Promise(r=>NV.srv.listen(NV.PORT,r));const b=await chromium.launch({executablePath:process.env.VRM_CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});let n=0;const ok=(v,m)=>{assert.ok(v,m);n++;};
 try{for(const W of[390,1512])for(const sombre of[false,true]){const sansVinted=W===1512&&sombre;const base={lignes:[],comptes:[],ecritures:0};const{pg,ctx,journal}=await NV.ouvrir(b,{W,sombre,base,tab:'journee'});await pg.clock.resume();
@@ -17,9 +19,16 @@ for(let i=0;i<30&&!base.lignes.some(r=>r.id==='main'&&r.data?.vrm_plateformes_af
 // parcours de SES plateformes (carte « Démarrer » / « Reprendre »), la liste « Relie tes comptes » seulement après. La règle
 // jugée reste : ce qui le guide (l'un ou l'autre) ne lui demande jamais de relier Vinted.
 if(sansVinted){const guide=pg.locator('[data-guide-sites], [data-guide-demarrage], [data-pn-carte]');await guide.first().waitFor();const txt=(await guide.allInnerTexts()).join(' ');ok(txt.trim().length>0&&!txt.includes('Vinted'),'eBay-only onboarding does not ask to connect Vinted');}
-await pg.goto('http://localhost:'+NV.PORT+'/?tab=annonces');await pg.waitForTimeout(1800);const sites=await pg.locator('[data-filtre-site=annonces] [data-site]').evaluateAll(es=>es.map(e=>e.dataset.site));ok((sansVinted ? sites.length===0 : sites.includes('ebay')&&sites.includes('vinted'))&&!sites.includes('leboncoin')&&!sites.includes('vestiaire'),'saved selection controls actual task filters');if(sansVinted)ok(await pg.locator('[data-tache=annonces]').getAttribute('data-tache-site')==='ebay','single selected platform opens its actual task without redundant filters');
+// (26 nov., bancs natifs) Depuis « plus de sélecteur de plateforme » (20 nov. soir, docs/passation/2026-11-20-sans-selecteur.md), le filtre
+// de site d'une tâche est le filtre « Site » du TABLEAU à l'ordinateur (`data-tt-filtre="site"`, src/natif/FiltrePlateformes.jsx
+// `filtreTableau` : rien sous deux sites) ; le téléphone n'a aucun filtre de site (même décision). La règle jugée reste : les
+// sites proposés sont ceux de SA sélection (et de ses comptes reliés), jamais un site qu'il n'a pas choisi.
+const sitesFiltre=async()=>{const b=pg.locator('[data-tt-filtre="site"]');if(!(await b.count()))return [];await b.first().click();await pg.locator('[data-tt-filtre-choix^="site:"]').first().waitFor({timeout:5000});const v=await pg.locator('[data-tt-filtre-choix^="site:"]').evaluateAll(es=>es.map(e=>e.getAttribute('data-tt-filtre-choix').slice(5)));await pg.keyboard.press('Escape');await pg.waitForTimeout(150);return v.filter(x=>x!=='toutes');};
+await pg.goto('http://localhost:'+NV.PORT+'/?tab=annonces');await pg.locator('[data-tache=annonces]').waitFor({state:'attached',timeout:20000});await pg.waitForTimeout(1800);
+if(W>1000){const sites=await sitesFiltre();ok((sansVinted ? sites.length===0 : sites.includes('ebay')&&sites.includes('vinted'))&&!sites.includes('leboncoin')&&!sites.includes('vestiaire'),'saved selection controls actual task filters: '+sites.join(','));if(sansVinted)ok(await pg.locator('[data-tt-filtre="site"]').count()===0,'single selected platform opens its actual task without redundant filters');}
+else ok(await pg.locator('[data-tt-filtre="site"], [data-filtre-site]').count()===0,'phone: no site filter (sans sélecteur, 20 nov.)');
 // Extension connection observed while app stays open, without changing preferences.
-base.lignes.push({id:'lbc_accounts',data:{accounts:{'synthetic-lbc':{id:'synthetic-lbc',name:'Exemple'}}}});await pg.evaluate(()=>window.dispatchEvent(new CustomEvent('vrm:ext',{detail:{type:'maj',quoi:'lbc'}})));await pg.waitForFunction(()=>!!document.querySelector('[data-filtre-site=annonces] [data-site=leboncoin]'));ok(true,'real own connection automatically enables its site');
+base.lignes.push({id:'lbc_accounts',data:{accounts:{'synthetic-lbc':{id:'synthetic-lbc',name:'Exemple'}}}});await pg.evaluate(()=>window.dispatchEvent(new CustomEvent('vrm:ext',{detail:{type:'maj',quoi:'lbc'}})));if(W>1000){let s2=[];for(let i=0;i<40&&!s2.includes('leboncoin');i++){await pg.waitForTimeout(250);s2=await sitesFiltre();}ok(s2.includes('leboncoin'),'real own connection automatically enables its site: '+s2.join(','));}
 await pg.goto('http://localhost:'+NV.PORT+'/?tab=settings&reglage=mes-plateformes');await pg.waitForTimeout(1800);
 // (11 nov.) Depuis le 8 nov. (Julien : « quand de nouveaux comptes sont liés, je veux un accompagnement »), un compte relié ouvre UNE fois la feuille
 // d'accueil (src/CompteRelie.jsx) : elle se referme comme toute feuille avant d'aller au réglage.
