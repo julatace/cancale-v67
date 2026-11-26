@@ -8,6 +8,20 @@ import { offresSansReponse } from '../offresSansReponse.js';
 import { photosEnDouble, numerosEnExemplaires, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
 import OffresSansReponseListe from '../natif/ecrans/OffresSansReponse.jsx';
 import { BoutonExtension, RangeeExtension, FeuilleExtension } from '../BoutonExtension.jsx';
+import { ComposerReponse, GestesOffreVinted, BadgeLectureSeule, remplirReponse, texteRaison as texteRaisonAgir, issueTexte as issueTexteAgir, BandeauLectureSeule, SiAgir, idBandeau } from '../agir/Agir.jsx';
+import { CarteOffre } from '../agir/CarteOffre.jsx';   // (24 nov., lot messages-pro) la carte d'offre du fil
+import { republierDansApp, envoyerSerie, usePeutAgir as usePeutAgirC, agirOuPanneau as agirOuPanneauC, agirMaintenant as agirMaintenantC, envoyerGeste as envoyerGesteC } from '../agir/porte.js';
+import BaisseSerie from '../agir/BaisseSerie.jsx';   // (24 nov., lot agir-tout)
+// (24 nov.) Republier DEPUIS VRM : la file si l'extension a CE compte dans un onglet, sinon le panneau (gardé, il dit pourquoi).
+const confirmerRepubAgir = (n) => askConfirm({ title: n > 1 ? tr('agir.republier') + ' · ' + n : tr('agir.republier'), desc: tr('agir.republier.confirmer'), ok: tr('agir.republier.oui') });
+const numDeAnnonceAgir = (id) => { try { const f = (load('vinted_annonce_numeros', {}) || {})[String(id)]; return f && f.numero ? String(f.numero).slice(0, 12) : ''; } catch (_) { return ''; } };
+async function republierAgir(annonces, panneau) {
+  const r = await republierDansApp(annonces, confirmerRepubAgir);
+  if (r.ok) { toast(tr('agir.envoi.ici') + (r.n > 1 ? ' · ' + r.n : '') + (r.refusees ? ' · ' + tr('agir.badge') + ' ' + r.refusees : '')); return; }
+  if (r.annule) return;
+  if (typeof panneau === 'function') { panneau(); return; }   // le panneau est gardé : refusé, il dit lui-même pourquoi
+  const t = texteRaisonAgir(r.verdict); if (t) toast(t);
+}   // (24 nov., lot agir-si-connecte) agir depuis VRM si l'extension a CE compte
 import { lienAnnonceLeboncoin, etatAnnonceLeboncoin } from '../etatAnnonceLeboncoin.js';
 import { planRetirerAilleurs } from '../retirerAilleurs.js';
 import { fusionPlan, aReprendre, alerteCouverte } from '../aRetirerAilleurs.js';
@@ -880,7 +894,9 @@ async function verserPhotosVrmExtension() {
 // ⟦← App.jsx #130⟧
 function FeuilleAnnoncesExtension({ action, site = 'vinted', annonces, onFermer, titre = '' }) {
   const l = (annonces || []).filter((a) => a && a.id != null);
-  return <FeuilleExtension action={action} site={site} titre={titre} ids={l.map((a) => String(a.id))} onFermer={onFermer} attrs={{ 'data-feuille-annonces-ext': l.length }}>
+  // (24 nov., lot agir-tout) Le compte des annonces, s'il n'y en a qu'un (la porte le juge) ; plusieurs ⇒ le compte de l'onglet.
+  const u1 = [...new Set(l.map((a) => String(a.uid || '')))];
+  return <FeuilleExtension action={action} site={site} compte={u1.length === 1 && u1[0] ? u1[0] : '*'} titre={titre} ids={l.map((a) => String(a.id))} onFermer={onFermer} attrs={{ 'data-feuille-annonces-ext': l.length }}>
     <Natif.Groupe>{l.slice(0, 40).map((a) => <Natif.Rangee key={String(a.uid || '') + ':' + a.id} titre={a.titre || a.title || tr('actionsExt.sansTitre')} sousTitre={a.compte || ''}
       plaque={a.numero ? <Natif.Plaque numero={a.numero}/> : null}
       valeur={[prixLigneExt(a.prix), a.cible != null ? '→ ' + prixLigneExt(a.cible) : ''].filter(Boolean).join(' ')} attrs={{ 'data-annonce-ext': String(a.id) }}/>)}
@@ -4121,9 +4137,16 @@ const rechaufferQr = async (photo) => {
   } catch (_) {}
 };
 // ⟦← App.jsx #214⟧
-function FavorisDansExtension({ nomCompte = '' }) {
+function FavorisDansExtension({ nomCompte = '', uid = '' }) {
+  // (24 nov., lot agir-tout) « Envoyer aux favoris » DEPUIS VRM : la file des favoris de l'extension (5.440.1 : SES réglages,
+  // les favoris cochables, plancher, 15/h, cloche par identité) lancée au nom de CE compte, après SA confirmation. Sans
+  // extension sur ce compte : la rangée du panneau, gardée, dit pourquoi.
+  const ok = usePeutAgirC('vinted', uid, 'favoris', 'file').ok;
+  const lancer = async () => { const r = await agirOuPanneauC({ site: 'vinted', compte: uid, geste: 'favoris', distGeste: 'favoris', args: { ids: [] },
+    confirmer: () => askConfirm({ title: tr('agir.favoris.titre', { compte: nomCompte || '' }), desc: tr('agir.favoris.desc'), ok: tr('agir.favoris.oui') }), textes: { issue: issueTexteAgir } }); void r; };
   return <Natif.Groupe titre={tr('actionsExt.favoris.titre')} pied={tr('actionsExt.favoris.pied')} attrs={{ 'data-favoris-panneau': '' }}>
-    <RangeeExtension action="favoris" sousTitre={nomCompte}/>
+    {ok ? <Natif.Rangee titre={tr('agir.favoris.lancer')} sousTitre={nomCompte} fin="chevron" onClick={lancer} attrs={{ 'data-agir-favoris': uid, 'data-agir': 'ok' }}/>
+      : <RangeeExtension action="favoris" compte={uid || '*'} sousTitre={nomCompte}/>}
     <RangeeExtension action="automatisations" ids={['favoris']} libelle={tr('actionsExt.favoris.auto')}/>
   </Natif.Groupe>;
 }
@@ -6424,9 +6447,19 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // résultat qui n'est pas « supprimée » arrête tout et se dit.
   const [lbcSupprEnVol, setLbcSupprEnVol] = useState(false);
   // (20 nov., décision de Julien) Supprimer de Leboncoin : dans le panneau de l'extension, sur ces annonces (par identité).
+  // (24 nov., lot agir-tout) DEPUIS VRM : UNE confirmation « sans retour » qui nomme chaque N°, puis une commande `supprimer`
+  // par annonce (la file, au nom du compte de CHAQUE annonce) ; ce qui ne passe pas la porte : le panneau (gardé).
   const supprimerLbcJournee = (liste) => {
-    const ids = (Array.isArray(liste) ? liste : []).filter((r) => r && r.id).map((r) => String(r.id));
-    if (ids.length) ouvrirPanneau({ site: 'leboncoin', page: 'annonces', ids, action: 'supprimer' });
+    const l = (Array.isArray(liste) ? liste : []).filter((r) => r && r.id).map((r) => ({ id: String(r.id), compte: String(r.compte || r.account || r.lbcUser || '').replace(/^lbc-account:/i, ''), numero: String(r.numero || ''), titre: String(r.titre || r.title || r.subject || '') }));
+    if (!l.length) return;
+    (async () => {
+      const ok = l.filter((x) => agirMaintenantC('leboncoin', x.compte, 'supprimer', 'file').ok), reste = l.filter((x) => !ok.includes(x));
+      if (ok.length && await askConfirm({ title: tr('agir.lbc.supprimerTitre', { n: ok.map((x) => x.numero).filter(Boolean).join(', ') }), desc: tr('agir.lbc.sansRetour'), ok: tr('agir.lbc.supprimerOui'), danger: true })) {
+        let n = 0; for (const x of ok) { const r = await envoyerGesteC({ site: 'leboncoin', compte: x.compte, geste: 'supprimer', distGeste: 'supprimer', args: { id: x.id, numero: x.numero, titre: x.titre }, num: x.numero, confirme: true }); if (r.ok) n++; }
+        if (n) toast(tr('agir.baisse.parti', { n }));
+      }
+      if (reste.length) { const c1 = [...new Set(reste.map((x) => x.compte))]; ouvrirPanneau({ site: 'leboncoin', compte: c1.length === 1 && c1[0] ? c1[0] : '*', page: 'annonces', ids: reste.map((x) => x.id), action: 'supprimer' }); }
+    })();
   };
   const repondreCycle = async (c, choix) => {
     if (!c || cycleEnVol) return;
@@ -7758,7 +7791,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const allerDormante = (a) => {
     const it = a.it, e = numeros[it.id] || {};
     const fermer = () => setDortAgir(null);
-    const versRepub = (act) => { fermer(); const a = ACTIONS_EXTENSION[PANNEAU_DE_SELECTION[act] || 'republier']; ouvrirPanneau({ site: 'vinted', page: a.page, ids: [String(it.id)], action: a.action }); };   // (20 nov.) dans l'extension
+    const versRepub = (act) => { fermer(); const a = ACTIONS_EXTENSION[PANNEAU_DE_SELECTION[act] || 'republier']; const panneau = () => ouvrirPanneau({ site: 'vinted', compte: uidIt, page: a.page, ids: [String(it.id)], action: a.action });
+      if (act === 'recreer') { republierAgir([{ compte: uidIt, id: String(it.id) }], panneau); return; } panneau(); };   // (24 nov.) republier depuis VRM si l'extension a CE compte   // (20 nov.) dans l'extension
     // (9 nov., « vendre plus ») Les gestes viennent d'UNE règle (`gestesDormeuse`,
     // src/vendrePlus.js) : chacun ouvre l'écran EXISTANT, sur SON clic, rien ne part
     // tout seul et aucun prix n'est proposé. Republier : la paire pré-choisie dans
@@ -7781,10 +7815,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // La file « Envoyer une offre aux favoris » (Messages → Favoris reçus) du compte
       // de l'annonce : c'est LUI qui choisit et envoie.
       // (20 nov., décision de Julien) Écrire aux favoris de CETTE annonce : dans le panneau de l'extension.
-      favoris: ()=>{ fermer(); ouvrirPanneau({ site: 'vinted', page: 'favoris', ids: [String(it.id)], action: 'envoyer' }); },
+      favoris: ()=>{ fermer(); ouvrirPanneau({ site: 'vinted', compte: uidIt, page: 'favoris', ids: [String(it.id)], action: 'envoyer' }); },
       // « Baisser à X € » : la feuille « Baisser le prix » existante sur CETTE annonce, la baisse proposée tapée
       // d'avance (sans « Varier ») ; rien ne part avant SA confirmation là-bas.
-      baisser: ()=>{ fermer(); ouvrirPanneau({ site: 'vinted', page: 'prix', ids: [String(it.id)], action: 'baisser' }); },   // (20 nov.) dans l'extension
+      baisser: ()=>{ fermer(); ouvrirPanneau({ site: 'vinted', compte: uidIt, page: 'prix', ids: [String(it.id)], action: 'baisser' }); },   // (20 nov.) dans l'extension
     };
     return { aller, urlFiche };
   };
@@ -10348,7 +10382,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   }, [offresConv, lectureOffres, vcEtat, listings.items, numeros, accountUids, hiddenAccts, panelAcctOff]);
   // Le toucher : la conversation dans le PANNEAU de l'extension (page « offres », l'identifiant de la conversation ou de
   // l'offre Vestiaire) — c'est là qu'il accepte, refuse ou fait une contre-offre (§3). Rien ne part d'ici.
-  const ouvrirOffreSR = (l) => { if (!l) return; ouvrirPanneau({ site: l.site === 'vestiaire' ? 'vestiaire' : 'vinted', page: 'offres', ids: [l.site === 'vestiaire' ? l.oid : l.conv], action: 'repondre' }); };
+  const ouvrirOffreSR = (l) => { if (!l) return; ouvrirPanneau({ site: l.site === 'vestiaire' ? 'vestiaire' : 'vinted', compte: l.uid || l.compte || '*', page: 'offres', ids: [l.site === 'vestiaire' ? l.oid : l.conv], action: 'repondre' }); };
   // ── (22 nov., Julien — choix n° 35) LA MÊME PHOTO SUR DEUX ANNONCES EN LIGNE (src/photoEnDouble.js) ──────────────
   // Les annonces que <enligne-regle> dit EN LIGNE (`listings.items`, jamais « à confirmer » ni masquées), la VRAIE clé de
   // photo (`photoKey` : le fichier exact) et la clé `photoK` des fiches ; une paire en plusieurs exemplaires (stock auto)
@@ -12233,7 +12267,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const r = actionsPossibles({ selection: [{ id: a.id, uid: a.uid, etat: a.etat }], chrome: vc === undefined ? undefined : (vc ? String(vc.uid || '') : null),
         capOk: (cap) => extSait(cap) === 'ok', nomCompte: (u) => { const x = (accounts || []).find((y) => String(y.vinted_user_id) === String(u)); return x ? accNameOf(x) : ''; } }).find((x) => x.k === 'recreer');
       if (!r || !r.ok) { toast((r && r.raison) || tr('annonces.republierPossibleSelection')); return; }
-      fermer(); ouvrirPanneau({ site: 'vinted', page: 'republier', ids: [String(a.id)], action: 'republier' });   // (20 nov.) dans l'extension
+      fermer(); republierAgir([{ compte: uid, id: String(a.id), num: numDeAnnonceAgir(a.id) }], () => ouvrirPanneau({ site: 'vinted', compte: uid, page: 'republier', ids: [String(a.id)], action: 'republier' }));   // (24 nov.) depuis VRM, sinon le panneau
     };
     return (<>
       <button type="button" className="sb-rond sb-avant-fermer" data-sb-avant-fermer="" aria-label={tr('studio.paires.fermer')} onClick={fermer}><Icon name="close" size={21}/></button>
@@ -21474,7 +21508,15 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const lancerActionSel=(k, choisies)=>{
     // (20 nov., décision de Julien) Republier, modifier, brouillon, mise en ligne, baisse : le PANNEAU de l'extension
     // sur vinted.fr, les annonces cochées (leurs identifiants Vinted) déjà choisies. Rien ne part d'ici.
-    if (PANNEAU_DE_SELECTION[k]) { const a = ACTIONS_EXTENSION[PANNEAU_DE_SELECTION[k]]; ouvrirPanneau({ site:'vinted', page:a.page, ids:choisies.map(x=>String(x.id)), action:a.action }); return; }
+    // (24 nov.) La porte : le panneau ne s'ouvre que sur le compte de la sélection, s'il est dans un onglet ; « Republier »
+    // (recreer) part d'abord DEPUIS VRM (la file), compte par compte.
+    if (PANNEAU_DE_SELECTION[k]) { const a = ACTIONS_EXTENSION[PANNEAU_DE_SELECTION[k]]; const u1 = [...new Set(choisies.map(x=>String(x.uid)))];
+      const panneau = () => ouvrirPanneau({ site:'vinted', compte: u1.length===1 ? u1[0] : '*', page:a.page, ids:choisies.map(x=>String(x.id)), action:a.action });
+      if (k==='recreer') { republierAgir(choisies.filter(x=>x.etat==='en-ligne').map(x=>({ compte:String(x.uid), id:String(x.id), num:numDeAnnonceAgir(x.id) })), panneau); return; }
+      panneau(); return; }
+    // (24 nov., lot agir-tout) Masquer / afficher sur Vinted DEPUIS VRM : une commande par annonce, par la porte.
+    if (k==='masquer' || k==='afficher') { (async () => { const r = await envoyerSerie('masquer', k, choisies.map(x=>({ compte:String(x.uid), id:String(x.id), args:{ id:String(x.id) }, num:numDeAnnonceAgir(x.id) })));
+      if (r.n) toast(tr('agir.envoi.ici') + (r.n>1?' · '+r.n:'') + (r.refusees?' · '+tr('agir.badge')+' '+r.refusees:'')); else if (r.deja) toast(tr('agir.envoi.deja')); else { const t = texteRaisonAgir(r.verdict); if (t) toast(t); } })(); return; }
     if (k==='main') { const a=choisies[0]; if (a) { setRepubMainFile(choisies.length>1 ? { liste:choisies, i:0 } : null); setRepubMainOuvert(a); } return; }
     if (k==='mini') { setMiniSel(choisies); return; }
     // (11 nov.) « Publier partout » sur les annonces cochées : la même feuille, par leur N°.
@@ -21529,7 +21571,32 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       blocs: [{ cle:'rangement', lib:'Rangée', val: fc.rangement }, { cle:'attention', lib:'Attention', val: attention.join(' · ') }],
       lien: fc.url ? { href: fc.url, texte: 'Voir l’annonce sur Vinted ↗' } : null }}/>;
   };
-  const rendreConversation=()=>openConv && (
+  // (24 nov., lot messages-pro) LA CARTE D'OFFRE DU FIL : la même offre (`offreDuFil` : tx + offer_request_id, §5), le
+  // même prix mini (par l'item_id), le même plancher (`plancherDeItem`), les mêmes gestes (`GestesOffreVinted`, la porte) —
+  // montrés en UNE carte posée dans le fil à la place de l'évènement de l'offre (comme Vinted), plus dans le pied qui
+  // écrasait la conversation. Rien n'est accepté tout seul : Accepter DEMANDE (il vend la paire).
+  const carteOffreDuFil=()=>{
+    if(!openConv||openConv.loading||openConv.error||offrePartieDuFil(openConv)) return null;
+    const off=offreDuFil(openConv); if(!off) return null;
+    const itemF = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.item_id;
+    const minF = itemF!=null ? Number(String((numeros[String(itemF)]||{}).min ?? '').replace(',','.')) : NaN;
+    const mini = Number.isFinite(minF)&&minF>0 ? minF : null;
+    const auDessusMini = !!(mini!=null && off.prix >= mini);
+    const pc=paireDeConv(String(openConv.acc?.vinted_user_id||''),openConv.convId,openConv.conversation);
+    const contreMini = pc && (pc.devise||'EUR')==='EUR' ? contreOffreMini(off.prix, pc.prix, mini) : null;
+    const uid=String(openConv.acc?.vinted_user_id||'');
+    const afficheCompare=prixAnnoncePourOffre(listings.items,itemF,uid);
+    const evt=(openConv.messages||[]).find(m=>m&&m.kind==='offer'&&m.offre&&String(m.offre.oid)===String(off.oid));
+    const decrit=idBandeau('vinted',openConv.convId);
+    return { oid:String(off.oid), el:(
+      <div className="vrm-chat-offre-traiter vrm-mp-offre-fil" data-cible="offre" data-offre="attente" data-offre-au-dessus-mini={auDessusMini?String(Math.round(mini)):undefined} data-offre-mini={mini!=null?String(mini):undefined} data-offre-contre={contreMini!=null?String(contreMini):undefined}>
+        <CarteOffre qui={openConv.header?.login||''} offre={off.prix} affiche={afficheCompare} mini={mini} fmt={fmtE} quand={evt&&evt.ts||null}
+          plancher={<LignePlancher plancher={plancherDeItem(itemF,pc?.devise)} puce offre={off.prix} mini={mini} ambre={C.warn} onSaisir={annonceParId.get(String(itemF))?()=>saisirPrixAnnonce(annonceParId.get(String(itemF))):null}/>}
+          gestes={<div className="vrm-chat-offre-actions" data-offre-app={String(openConv.convId||'')}><GestesOffreVinted compte={String(openConv.acc?.vinted_user_id||'')} tx={off.tx} oid={off.oid} conv={openConv.convId} prix={off.prix} contre={contreMini!=null&&contreMini>=1?contreMini:null} decrit={decrit}/></div>}/>
+        {offreMsg && (offreMsg.err ? <AccEchec geste="offre.vinted" erreur={offreMsg.err}/> : <AccApres geste="offre.vinted" texte={offreMsg.ok} ensuite={null}/>)}
+      </div>) };
+  };
+  const rendreConversation=()=>{ if(!openConv) return openConv; const carteOffre=carteOffreDuFil(); let carteOffrePosee=false; return (
 <ResponsiveChatPortal><div className={curSub==='messages'?'vrm-chat-overlay vrm-chat-inline':'vrm-chat-overlay'} onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
   <FermeAuRetour fermer={()=>setOpenConv(null)}/>
           <div className="vrm-chat-panel" role="dialog" aria-label={tr('a11y.conversationSur',{site:'Vinted'})} aria-modal={curSub!=='messages'||telFil()?'true':undefined} onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -21545,6 +21612,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               {/* (5 nov., revue 3.8) Un fil en panne a SON « Réessayer » : l'icône de relecture se tait. */}
               {!openConv.error&&<button className="vrm-icon-control vrm-chat-sync" type="button" aria-label={openConv.refreshing?"Actualisation en cours":"Actualiser la conversation"} disabled={openConv.loading||openConv.refreshing} aria-busy={!!openConv.refreshing} onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>}
             </TeteFil>
+            {/* (24 nov., lot messages-pro) LECTURE SEULE dite UNE fois, en tête du fil (la raison de la porte + « Ouvrir Vinted ») :
+                les gestes éteints dessous ne la répètent pas, le champ devient une barre fine. */}
+            {!openConv.loading && !openConv.error && openConv.convId && <BandeauLectureSeule site="vinted" compte={String(openConv.acc?.vinted_user_id||'')} conv={openConv.convId} gestes={['repondre','offre']} lien={`https://www.vinted.fr/inbox/${openConv.convId}`}/>}
             {/* (21 nov., ext. 5.430) La NOTE de l'acheteur (la conversation la porte : feedback_reputation, review_count) ; à
                 SON seuil ou moins, la phrase dit que VRM n'accepte jamais seul — c'est à lui. */}
             {!openConv.loading && !openConv.error && openConv.conversation?.opposite_user && (()=>{ const regNa = bleamDe(load('vinted_bleam', null), String(openConv.acc?.vinted_user_id||'')).noteAcheteurs;
@@ -21613,6 +21683,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 const j = m.ts ? cleJour(m.ts) : null;
                 const jPrec = (()=>{ for (let k=i-1;k>=0;k--) { const x=openConv.messages[k]; if (x.ts && visible(x)) return cleJour(x.ts); } return null; })();
                 const sep = j && j!==jPrec ? <div className="vrm-chat-jour" data-jour-sep={j} style={{color:C.muted,background:C.card2||C.card}}>{libelleJour(m.ts)}</div> : null;
+                // (24 nov., lot messages-pro) L'offre à trancher : SA carte prend la place de son évènement (même oid).
+                if (m.kind==='offer' && carteOffre && m.offre && String(m.offre.oid)===carteOffre.oid && !carteOffrePosee) { carteOffrePosee=true; return <React.Fragment key={'offre-' + carteOffre.oid}>{sep}{carteOffre.el}</React.Fragment>; }
                 return <React.Fragment key={i}>{sep}{(
                 m.kind==='offer'
                   ? (()=>{
@@ -21646,6 +21718,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:12}}/>:null;})}</div>}
                       </>}/>
               )}</React.Fragment>; })}
+              {carteOffre && !carteOffrePosee ? carteOffre.el : null}
               {/* (21 nov., ext. 5.430) Navigateur sans traducteur intégré : UNE ligne dit pourquoi il n'y a pas « Traduire ». */}
               {!openConv.loading && !openConv.error && <TraductionAbsente textes={(openConv.messages||[]).filter((m)=>m && !m.mine && m.kind!=='event' && m.kind!=='offer' && m.body).slice(-6).map((m)=>String(m.body))}/>}
               {/* (11 nov.) L'ENVOI SE VOIT DANS LE FIL : la bulle « Envoi… » pendant, « Envoyé ✓ » quand Vinted l'a
@@ -21673,79 +21746,24 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 {/* Lecture seule : CE fil-ci, nommé par son compte (ce qui le
                     distingue) — la raison générale est dite une fois au-dessus
                     de la liste (§7). */}
-                {ro && (
+                {/* (24 nov., lot messages-pro) Quand la porte est fermée, le bandeau du haut dit déjà « Lecture seule » : cette
+                    note ne se montre que si la porte, elle, laisse agir (la raison une fois par écran). */}
+                {ro && <SiAgir site="vinted" compte={String(openConv.acc?.vinted_user_id||'')} gestes={['repondre','offre']}>
                   <div className="vrm-chat-note" data-conv-lecture-seule={String(openConv.acc.vinted_user_id)} style={{color:C.text}}>
                     <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="eye" size={14}/></span>
                     <span><b>Lecture seule</b> — pour répondre, ouvre vinted.fr connecté sur <b>{accName(openConv.acc)}</b> {msgRelais ? 'dans le navigateur de ton ordinateur' : NAV.dansNu} (il est sur {msgNomActif()||(msgRelais?'aucun compte':'un autre compte')}).</span>
                   </div>
-                )}
-                {/* ── L'OFFRE (5.135) : trancher celle de l'acheteur, ou en faire
-                    une. Par l'extension, sur le compte connecté dans Chrome. */}
-                {(()=>{
-                  // (29 oct.) Une offre dont l'annonce est PROUVÉE partie (une lecture
-                  // complète du dressing, faite après l'offre, ne la montre plus) :
-                  // plus d'Accepter / Refuser — dit, avec la raison (`offreDuFil`).
-                  // (revue) UNE voix : « Annonce plus en vente » est dit par la bande
-                  // d'état en haut ; ce bloc porte la raison et LE geste (le bouton
-                  // de l'en-tête n'a qu'une icône sur téléphone).
-                  const offCapturee = offrePartieDuFil(openConv);
-                  const off = offCapturee ? null : offreDuFil(openConv);
-                  if (offCapturee) return (
+                </SiAgir>}
+                {/* (24 nov., lot messages-pro) L'offre « annonce partie » reste ici ; l'offre à trancher est une carte DANS le fil
+                    (`carteOffreDuFil`), à la place de l'évènement de l'offre — le pied ne garde que les réponses et le champ. */}
+                {(()=>{ const offCapturee = offrePartieDuFil(openConv); if (!offCapturee) return null; return (
                     <div className="vrm-chat-offre vrm-chat-offre-info" data-cible="offre" data-offre="annonce-partie" style={{background:C.bg,border:`1px solid ${C.border}`}}>
                       <div className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(offCapturee.prix)}</b></div>
                       <div className="vrm-chat-offre-p" style={{color:C.muted}}>Annonce plus dans ton dressing : offre plus acceptable.</div>
                       <button type="button" className="vrm-chat-offre-retirer" data-offre-retirer="" onClick={()=>retirerConvDeLaListe(openConv)} style={{color:C.text,borderColor:C.border}}>Retirer de la liste</button>
                     </div>
-                  );
-                  const tx = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.id;
-                  if (!off && !tx) return null;
-                  // (27 oct.) Prix mini posé sur CETTE annonce (par identité, l'item_id,
-                  // §5). Une offre ≥ mini est pré-approuvée : l'Accepter est mis en avant.
-                  // Rien n'est accepté tout seul — c'est TON tap (garde stricte, §3).
-                  const itemF = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.item_id;
-                  const minF = itemF!=null ? Number(String((numeros[String(itemF)]||{}).min ?? '').replace(',','.')) : NaN;
-                  const auDessusMini = !!(off && isFinite(minF) && minF>0 && off.prix >= minF);
-                  const pc=paireDeConv(String(openConv.acc?.vinted_user_id||''),openConv.convId,openConv.conversation);
-                  // (3 nov.) « Proposer X € » : X depuis SON prix mini seulement (`contreOffreMini`).
-                  const contreMini = off && pc && (pc.devise||'EUR')==='EUR' ? contreOffreMini(off.prix, pc.prix, isFinite(minF)&&minF>0?minF:null) : null;
-                  const etat = msgRelais ? 'ok' : extSait('messagerie');
-                  // (20 nov.) Plus d'extension requise ici : l'offre se tranche dans le panneau. Sans offre, rien à montrer.
-                  void etat; void contreMini;
-                  if (!off) return null;
-                  return (
-                    <div className="vrm-chat-offre" data-cible={off?'offre':undefined} data-offre={off?'attente':'libre'} data-offre-ro={ro?'1':undefined} style={{background:C.bg,border:`1px solid ${C.border}`,opacity:ro?0.55:1}}>
-                      {/* (31 oct., maquettes Messages) LA CARTE D'OFFRE : « Offre de X € — ton
-                          mini : Y € » (le mini posé à côté du N°, par identité), puis
-                          Refuser · contre-offre proposée · Accepter. Les MÊMES gestes
-                          qu'avant (`actionOffre`) : Accepter demande confirmation, la
-                          contre-offre ne fait que REMPLIR le prix — rien ne part sans
-                          « Envoyer l'offre ». Aucun geste automatique (§3). */}
-                      {off && (()=>{
-                        const mini = Number.isFinite(minF)&&minF>0 ? minF : null;
-                        const contre = contreMini;
-                        const afficheCompare=prixAnnoncePourOffre(listings.items,itemF,String(openConv.acc?.vinted_user_id||''));
-                        return (
-                        <div className="vrm-chat-offre-l vrm-chat-offre-traiter" data-offre-au-dessus-mini={auDessusMini?String(Math.round(minF)):undefined} data-offre-mini={mini!=null?String(mini):undefined} data-offre-contre={contre!=null?String(contre):undefined}>
-                          <ResumeOffre affiche={afficheCompare} offre={off.prix} mini={mini} fmt={fmtE} titre={pc?.titre||''} photo={pc?.photo?<PhotoVinted src={pc.photo} size={44}/>:null} qui={openConv.header?.login||''} verre/>
-                          {/* (9 nov., lot F) Le plancher : prix d'achat SAISI + frais connus — jamais un prix conseillé. */}
-                          <LignePlancher plancher={plancherDeItem(itemF,pc?.devise)} offre={off.prix} mini={mini} ambre={C.warn} onSaisir={annonceParId.get(String(itemF))?()=>saisirPrixAnnonce(annonceParId.get(String(itemF))):null}/>
-                          <AccAvant geste="offre.vinted"/>
-                          {/* (15 nov., maquette « Verre dépoli » validée : « le plein va à Proposer N € ») Quand une
-                              contre-offre est calculée depuis SON prix mini, « Proposer N € » est le plein, en tête ;
-                              « Accepter N € » et « Refuser » en touches dessous. Sans prix mini : comme avant (Accepter
-                              reste le plein, il DEMANDE confirmation). Les mêmes gestes (`actionOffre`), les mêmes data-*. */}
-                          {/* (20 nov., décision de Julien) Accepter, refuser, contre-offre : dans le panneau de l'extension, sur CETTE conversation. */}
-                          <div className="vrm-chat-offre-actions" data-offre-panneau={String(openConv.convId||'')}>
-                            <BoutonExtension className="vrm-chat-btn vrm-chat-btn-p" action="offres" ids={[String(openConv.convId||'')]}/>
-                          </div>
-                        </div>);
-                      })()}
-
-                      {/* (14 nov., lot accompagnement) Le résultat en mots, ou la raison et le geste — plus de rouge (§7 : le rouge est au doublon de N°). */}
-                      {offreMsg && (offreMsg.err ? <AccEchec geste="offre.vinted" erreur={offreMsg.err}/> : <AccApres geste="offre.vinted" texte={offreMsg.ok} ensuite={null}/>)}
-                    </div>
-                  );
-                })()}
+                  ); })()}
+                {offreMsg && !carteOffre && (offreMsg.err ? <AccEchec geste="offre.vinted" erreur={offreMsg.err}/> : <AccApres geste="offre.vinted" texte={offreMsg.ok} ensuite={null}/>)}
                 {openConv.conversation?.allow_reply===false && <div role="status" style={{fontSize:12,color:C.muted,marginBottom:8}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
                 {msgRelais && !ro && <EtatRelaisConv vinted={msgRelaisVinted}/>}
                 {replyNotice&&<div className="vrm-chat-retour" role="status">{replyNotice}</div>}
@@ -21759,17 +21777,19 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     L'app montre le fil (lecture) ; elle n'envoie plus rien. */}
                 {/* (21 nov., ext. 5.421) SES réponses rapides : la question repérée par mots-clés (sans IA), SA réponse remplie
                     par l'IDENTITÉ de l'annonce de la conversation ; elle attend son toucher « Envoyer » dans le panneau. */}
-                {(()=>{ const itR = openConv.conversation?.transaction?.item_id; const annR = itR!=null ? annonceParId.get(String(itR)) : null;
+                {/* (24 nov., lot messages-pro) Répondre DEPUIS VRM si l'extension a CE compte (l'uid du fil) dans un onglet : SES
+                    réponses rapides en puces au-dessus d'une pilule ; sinon une barre fine (la raison est dans le bandeau du haut). */}
+                <div className="vrm-chat-foot-ext" data-vinted-repondre="app">{openConv.conversation?.allow_reply===false ? null : <ComposerReponse site="vinted" compte={String(openConv.acc?.vinted_user_id||'')} conv={String(openConv.convId||'')} decrit={idBandeau('vinted',openConv.convId)}
+                  puces={(()=>{ const itR = openConv.conversation?.transaction?.item_id; const annR = itR!=null ? annonceParId.get(String(itR)) : null;
                   const pR = annR && annR.price!=null && annR.price!=='' ? Number(annR.price) : null;
                   const varsR = { pseudo: openConv.header?.login||'', article: (annR && annR.title) || openConv.conversation?.transaction?.item_title || '', taille: (annR && (annR.size || annR.size_title)) || '', prix: isFinite(pR)&&pR>0 ? pR : null, prix_mini: itR!=null ? Number(String((numeros[String(itR)]||{}).min ?? '').replace(',','.')) || null : null };
                   const filR = (openConv.messages||[]).filter((m)=>m && m.kind!=='event' && m.kind!=='offer').map((m)=>({ deMoi: !!m.mine, texte: String(m.body||'') }));
-                  return <ReponsesRapidesAppP messages={filR} vars={varsR} partie={!!offrePartieDuFil(openConv)} reglage={load('vrm_reponses_rapides', null)}/>; })()}
-                <div className="vrm-chat-foot-ext" data-vinted-repondre="panneau"><BoutonExtension action="repondre" ids={[String(openConv.convId||'')]} large/></div>
+                  return <ReponsesRapidesAppP puces messages={filR} vars={varsR} partie={!!offrePartieDuFil(openConv)} reglage={load('vrm_reponses_rapides', null)} onChoisir={(t)=>remplirReponse('vinted', String(openConv.convId||''), t)}/>; })()}/>}</div>
               </div>
             ); })()}
           </div>
         </div></ResponsiveChatPortal>
-  );
+  ); };
 
   const chargerRetraitsMulti = async () => {
     const owner = AUTH.user?.id;
@@ -27560,11 +27580,15 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               // (9 nov., lot AL) La vue « Republier » lance LE MÊME atelier que la tuile « Republier »
               // de la feuille Actions (`RepublierVinted`, action `recreer`), avec la même règle
               // (`actionsPossibles` : un compte, celui de l'onglet, extension à jour) — refus ⇒ sa raison.
+              // (24 nov., Julien : « republier dans l'application ») D'abord DEPUIS VRM (la file, compte par compte, par la porte) ;
+              // aucune annonce dont le compte passe la porte ⇒ l'ancien chemin (le panneau, gardé lui aussi).
+              republierAgir(choisies.filter(a=>a.etat==='en-ligne').map(a=>({ compte:String(a.uid), id:String(a.id), num:numDeAnnonceAgir(a.id) })), () => {
               const vc = vintedDeChrome();
               const r = actionsPossibles({ selection: choisies.map(a=>({ id:a.id, uid:a.uid, etat:a.etat })), chrome: vc === undefined ? undefined : (vc ? String(vc.uid||'') : null),
                 capOk: (cap)=>extSait(cap)==='ok', nomCompte: (u)=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(u)); return a ? accNameOf(a) : ''; } }).find(x=>x.k==='recreer');
-              if (!r || !r.ok) { toast((r && r.raison) || tr('annonces.republierPossibleSelection')); return; }
-              ouvrirPanneau({ site:'vinted', page:'republier', ids:choisies.map(a=>String(a.id)), action:'republier' }); }}
+              if (!r || !r.ok) { toast((r && r.raison) || tr('annonces.republierPossibleSelection')); return null; }
+              const u1 = [...new Set(choisies.map(a=>String(a.uid)))];
+              return ouvrirPanneau({ site:'vinted', compte: u1.length===1 ? u1[0] : '*', page:'republier', ids:choisies.map(a=>String(a.id)), action:'republier' }); }); }}
             onALaMain={(choisies)=>{
               // (10 nov., lot AP) « À la main » : la règle de la tuile « Republier à la main » (chaque paire SON compte connu).
               const r = actionsPossibles({ selection: choisies.map(a=>({ id:a.id, uid:a.uid, etat:a.etat })), chrome: undefined, capOk: ()=>true }).find(x=>x.k==='main');
@@ -28430,7 +28454,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         <div hidden={zoneFav==='offres'} style={{display:zoneFav==='offres'?'none':undefined}}>
         {/* (20 nov., décision de Julien) Les messages aux favoris (choisir, écrire, envoyer, mode automatique) se font dans le
             panneau de l'extension sur vinted.fr. L'app ne les envoie plus : l'ancien écran (src/FavorisVinted.jsx) est retiré. */}
-        <FavorisDansExtension nomCompte={favorisCompte?accNameOf(favorisCompte):''}/>
+        <FavorisDansExtension nomCompte={favorisCompte?accNameOf(favorisCompte):''} uid={favorisCompte?String(favorisCompte.vinted_user_id):''}/>
         </div>
         </div>
         <div className="vrm-message-workspace" hidden={zoneMessages!=='conversations'} style={{display:zoneMessages==='conversations'?undefined:'none'}}><div className="vrm-inbox-column">
@@ -28685,7 +28709,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 const montres = groupes.map((g)=>{ const max = plusGroupeV2[g.uid] || 15; return { ...g, total: g.convs.length, convs: g.convs.slice(0, max) }; }).filter((g)=>g.convs.length);
                 return <div className="v2m-liste" data-v2-msg-liste="" data-v2-msg-groupes={montres.length}>
                   {montres.map((g)=>(
-                    <GroupeConversationsV2 key={g.uid} titre={g.nom || tr('v2.msg.compte')} sous={prioMsg ? (g.onglet ? tr('v2.msg.ouvert', { nav: NAV.dansNu }) : tr('v2.msg.lectureSeule')) : ''}
+                    <GroupeConversationsV2 key={g.uid} titre={g.nom || tr('v2.msg.compte')} sous={prioMsg && g.onglet ? tr('v2.msg.ouvert', { nav: NAV.dansNu }) : ''} badge={<BadgeLectureSeule site="vinted" compte={g.uid}/>}
                       attrs={{ 'data-v2-msg-groupe': g.uid, 'data-v2-msg-onglet': g.onglet ? '1' : '0', 'data-v2-msg-groupe-n': String(g.convs.length) }}>
                       {g.convs.map((c)=>{
                         const paire = paireDeConv(uidC(c), c.id, null);
@@ -32531,7 +32555,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       {baisseSel && (
         // (20 nov., décision de Julien) « Baisser le prix » en série se fait dans l'extension : la feuille montre les
         // annonces choisies (prix lu, prix conseillé) et ouvre le panneau sur elles. L'ancien atelier est retiré.
-        <FeuilleAnnoncesExtension action="baisser" annonces={baisseSel} onFermer={()=>{ setBaisseSel(null); setBaisseSelInit(null); setQdSel(new Set()); }}/>
+        // (24 nov., lot agir-tout) DEPUIS VRM : −X %, une commande `prix` par annonce (file, par la porte) ; une annonce d'un compte
+        // ouvert nulle part reste visible en lecture seule.
+        <BaisseSerie annonces={baisseSel} onFermer={()=>{ setBaisseSel(null); setBaisseSelInit(null); setQdSel(new Set()); }}/>
       )}
       {repubMainOuvert && (()=>{
         const p = repubMainOuvert; const s = repubMain[String(p.ancienId||p.id)] || null;

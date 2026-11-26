@@ -192,7 +192,13 @@ const base = (r, nom) => {
       const r = await rendre(nav, CO, { mode: 'onglet', capture: 'popup-connecte' });
       base(r, 'connectée');
       dit(r.etat === 'connecte' && r.vrm === 'vendeur@exemple.test' && r.vinted === 'vendeur_a', 'le compte VRM et le compte Vinted de ce navigateur sont nommés', `${r.vrm} · ${r.vinted}`);
-      dit(/data-ouvrir-vrm/.test(r.pleinAttr), 'le plein est « Ouvrir VRM »', r.pleinAttr);
+      // 5.453 (Julien, 25 nov. : « la connexion à l'extension doit ouvrir le panneau ») : connectée, le plein est « Ouvrir le
+      //    panneau » ; « Ouvrir VRM » reste (contour). Rouvrir la fenêtre déjà connectée n'ouvre RIEN tout seul.
+      dit(/data-ouvrir-panneau/.test(r.pleinAttr), 'le plein est « Ouvrir le panneau », « Ouvrir VRM » reste', r.pleinAttr);
+      dit(!actions(r).includes('ouvrirPanneauAccueil') && !r.ferme, 'fenêtre rouverte déjà connectée : le panneau ne s’ouvre pas tout seul', JSON.stringify(actions(r)));
+      const pn = await rendre(nav, CO, { geste: (pg) => pg.click('[data-ouvrir-panneau]') });
+      const mp = pn.envoyes.find((m) => m.action === 'ouvrirPanneauAccueil');
+      dit(!!mp && mp.tab === 4321 && pn.ferme, '« Ouvrir le panneau » : le panneau sur l’onglet Vinted de départ, la fenêtre se ferme', JSON.stringify(pn.envoyes.slice(-2)));
       const o = await rendre(nav, CO, { geste: (pg) => pg.click('[data-ouvrir-vrm]') });
       dit(o.ouverts.some((u) => /^https:\/\/vrm\.center\/\?tab=plat_vinted$/.test(u)), '« Ouvrir VRM » ouvre VRM sur l’écran du site de l’onglet', JSON.stringify(o.ouverts));
       const d = await rendre(nav, CO, { mode: 'onglet', faux: { apres: UN }, geste: async (pg) => { await pg.evaluate((un) => { window.__etat = Object.assign({}, un, { voulue: true }); }, UN); await pg.click('[data-se-deconnecter]'); } });
@@ -238,6 +244,7 @@ const base = (r, nom) => {
       dit(!JSON.stringify(deux.mem).includes('mot-de-passe-fictif'), 'le mot de passe n’est rangé nulle part par la fenêtre');
       const refus = await rendre(nav, UN, { faux: { login: { ok: false, error: 'Email ou mot de passe incorrect.' } }, geste: async (pg) => { await ouvrir(pg); await pg.fill('#mail', 'vendeur@exemple.test'); await pg.fill('#pw', 'essai'); await pg.click('#inBtn'); await pg.waitForTimeout(400); } });
       dit(/incorrect/.test(refus.erreurForm), 'refus : la raison est dite', refus.erreurForm);
+      dit(!actions(refus).includes('ouvrirPanneauAccueil') && !refus.ferme, 'refus : le panneau ne s’ouvre pas, la fenêtre reste', JSON.stringify(actions(refus)));
       // Une relecture (stockage) pendant la saisie ne l'efface pas.
       const tape = await rendre(nav, UN, { geste: async (pg) => { await ouvrir(pg); await pg.fill('#mail', 'vendeur@exemple.test'); await pg.evaluate(() => window.__surStock({ vrmLiaison: { newValue: {} } }, 'local')); await pg.waitForTimeout(400); } });
       dit(tape.mailVal === 'vendeur@exemple.test', 'une relecture pendant la saisie ne redessine pas le formulaire (le texte tapé reste)', tape.mailVal);
@@ -245,6 +252,8 @@ const base = (r, nom) => {
       dit(actions(att).includes('annulerLiaison') && att.champs.join() === 'mail,pw', 'pendant l’attente, « Me connecter ici » arrête l’attente et montre le formulaire', JSON.stringify(actions(att)));
       const ok1 = await rendre(nav, UN, { geste: async (pg) => { await pg.fill('#mail', 'vendeur@exemple.test'); await pg.fill('#pw', 'mot-de-passe-fictif'); await pg.evaluate((co) => { window.__etat = co; }, CO); await pg.click('#inBtn'); await pg.waitForTimeout(600); } });
       dit(ok1.etat === 'connecte' && ok1.vrm === 'vendeur@exemple.test', 'chemin 1 joué jusqu’au bout : « Me connecter » ⇒ « Connecté à VRM », le compte nommé', `${ok1.etat} ${ok1.vrm}`);
+      { const m = ok1.envoyes.find((x) => x.action === 'ouvrirPanneauAccueil'), i = actions(ok1).indexOf('authLogin');
+        dit(!!m && m.tab === 4321 && actions(ok1).indexOf('ouvrirPanneauAccueil') > i && ok1.ferme, '5.453 « Me connecter » réussi ⇒ le panneau s’ouvre (onglet Vinted de départ) et la fenêtre se ferme', JSON.stringify(ok1.envoyes.slice(-3))); }
     });
 
     console.log('\n── Service worker d’avant (code périmé), ou muet');

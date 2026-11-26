@@ -6,6 +6,7 @@
 // Props : articles [{ a: article, statut }] (déjà au site et au compte choisis) · undefined · null ; filtres ; compte ; majLe ;
 // onRafraichir ; rafraichit ; actions [{ cle, libelle, pour(a), juger([a]) }] ; onAction(cle, [a]) ; onOuvrir(a) ; saisir(a, champ) ;
 // onNumero(a) ; onPrix(a) ; onRelier(a) ; onFiche(a) ; plein ; haut ; pied ; euros ; depuisTexte ; nomSite ; Icon.
+import { BadgeLectureSeule } from '../../agir/Agir.jsx';   // (24 nov., lot agir-si-connecte) « Lecture seule » par compte
 import React from 'react';
 import { tr } from '../../i18n/index.js';
 import { TableauTravail } from '../TableauTravail.jsx';
@@ -38,7 +39,7 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     for (const g of groupesParCompte(garde, site)) {
       // (23 nov., revue UX P2) Le nombre du groupe = ses lignes AFFICHÉES (filtres compris), « 36 sur 82 » quand un filtre en cache : la
       // même règle et le même mot (« annonces ») que le nombre en tête du tableau.
-      const titre = (n, total) => <span className="n-eg-compte" data-eg-compte-cle={g.cle}>{Logo && g.site ? <span className="n-eg-compte-logo" aria-hidden="true">{Logo(g.site)}</span> : null}{g.cle !== 'sans' ? <AvatarCompte pseudo={g.pseudo || ('#' + g.compte)} cle={g.cle} petit/> : null}{g.cle === 'sans' ? tr('egalite.groupe.sansCompte') : (g.pseudo || ('#' + g.compte))}<span className="n-tt-intertitre-n" data-eg-groupe-n={String(n)} data-eg-groupe-total={String(total)}>{n < total ? tr('egalite.groupe.nSur', { k: n, n: total }) : tr('egalite.groupe.n', { n })}</span></span>;
+      const titre = (n, total) => <span className="n-eg-compte" data-eg-compte-cle={g.cle}>{Logo && g.site ? <span className="n-eg-compte-logo" aria-hidden="true">{Logo(g.site)}</span> : null}{g.cle !== 'sans' ? <AvatarCompte pseudo={g.pseudo || ('#' + g.compte)} cle={g.cle} petit/> : null}{g.cle === 'sans' ? tr('egalite.groupe.sansCompte') : (g.pseudo || ('#' + g.compte))}<span className="n-tt-intertitre-n" data-eg-groupe-n={String(n)} data-eg-groupe-total={String(total)}>{n < total ? tr('egalite.groupe.nSur', { k: n, n: total }) : tr('egalite.groupe.n', { n })}</span>{['vinted', 'leboncoin', 'vestiaire'].includes(g.site) && g.compte ? <> <BadgeLectureSeule site={g.site} compte={g.compte}/></> : null}</span>;
       // (22 nov., Julien : « les filtres ne sont pas précis ») La rangée d'un COMPTE porte l'état de SON annonce (vendue sur Vinted,
       // en ligne sur Leboncoin : deux rangées, « Vendue » et « En ligne ») — le compteur de chaque statut = ses rangées.
       for (const a of g.articles) out.push({ a, statut: (g.cle !== 'sans' && statutTableau(a, { site: g.site, compte: g.compte })) || statutDe.get(a.cle), groupe: { cle: g.cle, titre } });

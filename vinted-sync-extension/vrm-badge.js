@@ -2637,7 +2637,10 @@ function vrmVerifVisible(sel) {
     }
     if (c === 'acheteur') return esc(x.pseudo || TU('fl_acheteur'));
     if (c === 'date') return x.date ? `<span title="${esc(dateCourte5(Date.parse(x.date)))}">${esc(dateCourte5(Date.parse(x.date)).replace(/^(\d\d\/\d\d)\/\d{4}/, '$1 ·'))}</span>` : '<span class="gris6">—</span>';
-    return `${etiquette5(et.k, et.t, et.ton === 'ambre' ? 'ambre' : et.ton === 'accent' ? 'accent' : '')}${et.raison ? `<small class="rs6" data-fav-raison6="${esc(et.k)}">${esc(et.raison)}</small>` : ''}`;
+    // 5.453.2 (Julien, 26 nov. : file bloquée sur « Vérifie les envois incertains », sans geste) : un envoi À VÉRIFIER se tranche
+    //    sur SA ligne — il regarde la conversation sur Vinted, puis « C'est parti » ou « Pas parti ». Jamais renvoyé seul.
+    const tranche = et.k === 'verifier' ? `<span class="tr6" data-fav6-trancher-ligne="${esc(x.id)}"><button type="button" class="vu-btn" data-fav6-trancher="parti" data-id="${esc(x.id)}">${esc(TU('f6_parti'))}</button><button type="button" class="vu-btn" data-fav6-trancher="pas" data-id="${esc(x.id)}">${esc(TU('f6_pas_parti'))}</button></span>` : '';
+    return `${etiquette5(et.k, et.t, et.ton === 'ambre' ? 'ambre' : et.ton === 'accent' ? 'accent' : '')}${et.raison ? `<small class="rs6" data-fav-raison6="${esc(et.k)}">${esc(et.raison)}</small>` : ''}${tranche}`;
   }
   // ══ 5.420 (Julien, 21 nov. : « sauf si j'ai activé les messages aux favoris automatiques ») — L'AUTOMATIQUE ═══════════
   // Allumé pour ce compte : les NOUVEAUX favoris reçoivent le message sans passer par les étapes (le pilote de toujours,
@@ -3044,6 +3047,12 @@ function vrmVerifVisible(sel) {
     const fermer = () => { favFeuille = null; vueFav = null; favEnv = null; rendre(); };
     const fileGeste = (quoi) => { if (favOccupe) return; favOccupe = true; favErreur = ''; rendre();
       try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisCarte', quoi, uid }, (r) => { void chrome.runtime.lastError; favOccupe = false; if (!r || !r.ok) favErreur = (r && r.raison) || TU('ra_ko'); apercuFav = null; apercuFavAt = 0; rafraichir(); }); } catch (_) { favOccupe = false; rendre(); } };
+    racine.querySelectorAll('[data-fav6-trancher]').forEach((b) => b.addEventListener('click', (ev) => {
+      ev.stopPropagation(); if (favOccupe) return;
+      const parti = b.getAttribute('data-fav6-trancher') === 'parti', notificationId = b.getAttribute('data-id') || '';
+      favOccupe = true; favErreur = ''; rendre();
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisCarte', quoi: 'trancher', uid, notificationId, parti }, (r) => { void chrome.runtime.lastError; favOccupe = false; favRefus = null; if (!r || !r.ok) favErreur = (r && r.raison) || TU('ra_ko'); apercuFav = null; apercuFavAt = 0; rafraichir(); }); } catch (_) { favOccupe = false; rendre(); }
+    }));
     const cont = racine.querySelector('[data-fav6-continuer]'); if (cont) cont.addEventListener('click', () => fileGeste('continuer'));
     const ann = racine.querySelector('[data-fav6-annuler]'); if (ann) ann.addEventListener('click', () => fileGeste('arreter'));
     carte.querySelectorAll('[data-fav6-fermer]').forEach((b) => b.addEventListener('click', fermer));
@@ -3165,6 +3174,8 @@ function vrmVerifVisible(sel) {
           return;
         }
         favErreur = (r && r.raison) || 'Rien n’est parti : l’extension n’a pas répondu.';
+        // 5.453.2 : un envoi À VÉRIFIER retient la file : la phrase dit le geste (sur SA ligne), la sélection n'est pas « pas partie ».
+        if (r && /incertain/i.test(String(r.raison || ''))) { favErreur = TU('f6_incertain_geste'); favFeuille = null; vueFav = null; apercuFav = null; apercuFavAt = 0; rafraichir(); return; }
         // 5.410.7 : le refus se dit SUR les rangées concernées (celles que le fond nomme, sinon le lot choisi), la feuille se ferme.
         if (grand6()) { favRefus = { ids: new Set((r && Array.isArray(r.ids) && r.ids.length ? r.ids : selection).map(String)), raison: favErreur }; for (const id of favRefus.ids) selFav.delete(id); garderSelection(uid); favFeuille = null; vueFav = null; if (r && r.code === 'selection') { apercuFavAt = 0; } }
         rendre();
@@ -3920,6 +3931,15 @@ function vrmVerifVisible(sel) {
     if (!r || r.assembler !== true || typeof A !== 'function') return null;
     try { const x = await A((r.pdfs || []).map((p) => ({ tx: String(p.tx), b64: p.b64 }))); return x && (x.ok || x.code === 'illisibles') ? x : null; } catch (_) { return null; }
   }
+  // 5.450 (§3, audit-confiance-publique G5) : un fichier pour LUI se télécharge par le service worker (`chrome.downloads`,
+  //    permission « downloads » déjà là) ; le contenu voyage en data: (le worker ne lit pas une adresse blob: de la page).
+  function telechargerParExtension(blob, nom) {
+    try {
+      const fr = new FileReader();
+      fr.onload = () => { try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'telecharger', url: String(fr.result || ''), nom: String(nom || 'vrm.pdf') }, () => { void chrome.runtime.lastError; }); } catch (_) {} };
+      fr.readAsDataURL(blob);
+    } catch (_) {}
+  }
   function imprimerBordereaux(txs) {
     const ids = [...new Set(txs.map(String).filter((t) => /^\d{1,20}$/.test(t)))].slice(0, 10);
     if (!ids.length || impEnVol) return;
@@ -3932,7 +3952,8 @@ function vrmVerifVisible(sel) {
       let url = ''; try { url = URL.createObjectURL(blob); } catch (_) { return ''; }
       setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 120000);
       if (!premierPris && fen) { premierPris = true; try { fen.location.href = url; return 'ouvert'; } catch (_) {} }
-      try { const a = document.createElement('a'); a.href = url; a.download = nom; a.rel = 'noopener'; a.click(); return 'telecharge'; } catch (_) { return ''; }
+      // 5.450 : téléchargé par le service worker (`chrome.downloads`), jamais un clic simulé dans la page (§3).
+      telechargerParExtension(blob, nom); return 'telecharge';
     };
     const fini = (r, un) => {
       impEnVol = false;
@@ -5271,7 +5292,8 @@ function vrmVerifVisible(sel) {
       srEnVol = true; srEtat = null; rendre();
       try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'sauvegardeReglages', quoi: 'exporter' }, (r) => { void chrome.runtime.lastError; srEnVol = false;
         if (r && r.ok && typeof r.texte === 'string') {
-          try { const url = URL.createObjectURL(new Blob([r.texte], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = r.nom || 'vrm-reglages.json'; a.style.display = 'none'; a.setAttribute('data-sr-telecharge', r.nom || ''); (document.body || document.documentElement).appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 60000);
+          // 5.450 : le fichier part par le service worker (`chrome.downloads`) — aucun lien ajouté à la page de Vinted, aucun clic simulé.
+          try { telechargerParExtension(new Blob([r.texte], { type: 'application/json' }), r.nom || 'vrm-reglages.json');
             srEtat = { ok: true, texte: TU('sr_sauve', { nom: r.nom || '' }) }; } catch (_) { srEtat = { ok: false, texte: TU('ra_ko') }; }
         } else srEtat = { ok: false, texte: (r && r.raison) || TU('ra_ko') };
         rendre(); }); } catch (_) { srEnVol = false; rendre(); }

@@ -1,6 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
-import { BoutonExtension } from '../BoutonExtension.jsx';   // (20 nov.) « Répondre dans l'extension »
+import { ComposerReponse } from '../agir/Agir.jsx';   // (24 nov.) répondre depuis VRM si l'extension a CE compte dans un onglet
 import { STYLE_FLOU, lbcFloute } from '../flouCompte.js';
 import { motsVendeur } from '../profilVendeur.js';
 import React, { useState, useEffect } from 'react';
@@ -34,7 +34,7 @@ const etiquetteResultatLbc = (r) => {
   if (r.accepte === true && r.etape === 'refuse') return { ton: 'ko', texte: r.raison || tr('messages.leboncoinRefuseMessage') };
   return { ton: 'ko', texte: (r.raison ? r.raison.charAt(0).toUpperCase() + r.raison.slice(1) : "Rien n'est parti.") + (/[.!]$/.test(r.raison || '') ? '' : '.') };
 };
-function FilLeboncoin({ conv, nom, envoi, annonce = false, onFerme }) {
+function FilLeboncoin({ conv, nom, compte = '', envoi, annonce = false, onFerme }) {
   const [fil, setFil] = React.useState(undefined);   // undefined en cours · null pas su · objet
   const [texte, setTexte] = React.useState('');
   const [enCours, setEnCours] = React.useState(false);
@@ -42,9 +42,9 @@ function FilLeboncoin({ conv, nom, envoi, annonce = false, onFerme }) {
   // (12 nov.) L'envoi se voit DANS le fil (src/envoiFil.js) : { etat, texte, depuis }.
   const [envoiFil, setEnvoiFil] = React.useState(null);
   const relire = React.useCallback(async () => {
-    const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_fil_${encodeURIComponent(conv)}&select=messages:data->messages,page:data->>page`);
+    const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_fil_${encodeURIComponent(conv)}&select=messages:data->messages,page:data->>page,compte:data->>compte`);
     if (!Array.isArray(j)) { setFil(null); return; }
-    setFil(j[0] ? { messages: Array.isArray(j[0].messages) ? j[0].messages : [], page: j[0].page || '' } : { messages: null, page: '' });
+    setFil(j[0] ? { messages: Array.isArray(j[0].messages) ? j[0].messages : [], page: j[0].page || '', compte: String(j[0].compte || '') } : { messages: null, page: '' });
   }, [conv]);
   React.useEffect(() => { relire(); }, [relire]);
   React.useEffect(() => {
@@ -76,11 +76,14 @@ function FilLeboncoin({ conv, nom, envoi, annonce = false, onFerme }) {
   const page = fil && /^\/messages[\w/.-]*$/.test(fil.page || '') ? fil.page : '/messages';
   const lien = `https://www.leboncoin.fr${page}`;
   const resultat = res && <div role="status" data-lbc-resultat={res.ton} style={{ fontSize: 13, color: res.ton === 'ko' ? C.warn : res.ton === 'ok' ? C.text : C.muted, lineHeight: 1.5, marginBottom: 8 }}>{res.texte}</div>;
-  // (20 nov., décision de Julien) Répondre se fait dans le panneau de l'extension, sur leboncoin.fr, dans CETTE conversation.
+  // (24 nov., Julien : « répondre à mes messages […] si l'extension est connectée ») Répondre DEPUIS VRM, par la porte
+  // (src/agir/peutAgir.js) : le compte du fil (rangé par l'extension) doit être le compte privé d'un onglet leboncoin.fr
+  // d'une extension connectée ; sinon le champ reste visible, éteint, avec la raison et le geste.
   void peut; void resultat; void lien;
+  const compteFil = (fil && fil.compte) || compte || '';
   const pied = (
-    <div className="vrm-chat-foot" data-lbc-repondre="panneau" style={{ borderTop: `1px solid ${C.border}`, background: C.card, padding: 12 }}>
-      <BoutonExtension action="repondre" site="leboncoin" ids={[String(conv)]} large/>
+    <div className="vrm-chat-foot" data-lbc-repondre="app" style={{ borderTop: `1px solid ${C.border}`, background: C.card, padding: 12 }}>
+      <ComposerReponse site="leboncoin" compte={compteFil} conv={conv}/>
     </div>
   );
   return (
@@ -241,7 +244,7 @@ function ConversationsLeboncoin() {
           <a href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" className="vrm-pied-lien" data-pied-lien="ouvrir-lbc" style={{ marginTop: 6 }}>{tr('messages.ouvrirLeboncoin')}</a>
         </div>
         <div className="vrm-chat-column">{filChoisi ? (
-          <FilLeboncoin key={filChoisi.conv} conv={filChoisi.conv} nom={nomDe(filChoisi.compte)} envoi={d.envoi} annonce={!!filChoisi.ap || Number(filChoisi.n) > 0} onFerme={() => setOuvertConv('')}/>
+          <FilLeboncoin key={filChoisi.conv} conv={filChoisi.conv} nom={nomDe(filChoisi.compte)} compte={filChoisi.compte || ''} envoi={d.envoi} annonce={!!filChoisi.ap || Number(filChoisi.n) > 0} onFerme={() => setOuvertConv('')}/>
         ) : choisi ? (
           <CadreFil etiquette={tr('a11y.conversationSur', { site: 'Leboncoin' })} onFermer={() => setOuvert('')} attrs={{ 'data-lbc-fil': choisi.id }}>
             <TeteFil onFermer={() => setOuvert('')} nom={choisi.nom} titre={choisi.type ? 'compte ' + choisi.type : ''} compte="Leboncoin"/>

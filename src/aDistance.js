@@ -47,10 +47,17 @@ const ADIST_GESTES = {
   republier: ['vinted'],
   bordereau: ['vinted'],
   relire: ['vinted', 'leboncoin'],
+  // 5.450 (24 nov., Julien : « faire absolument TOUT depuis VRM si l'extension est connectée ») — par les chemins du clic
+  // existants, avec leurs gardes : messages aux favoris (la file 5.440.1), mode vacances, créer un brouillon ; Leboncoin
+  // pause, suppression (confirmée, sans retour), publication ; Vestiaire réponse à une offre, offre aux « aimés » (recettes
+  // APPRISES de son propre geste). Publier sur Vestiaire n'y est PAS : VRM n'y clique jamais « Publier » à sa place.
+  favoris: ['vinted'], vacances: ['vinted'], creer: ['vinted'],
+  pause: ['leboncoin'], supprimer: ['leboncoin'], publier: ['leboncoin'],
+  offre: ['vestiaire'], aimes: ['vestiaire'],
 };
 // Les gestes qui engagent l'argent ou ne se défont pas (§2.10 : la SEULE confirmation) :
 // accepter vend la paire ; republier supprime l'ancienne annonce.
-const ADIST_CONFIRMER = ['accepter', 'republier'];
+const ADIST_CONFIRMER = ['accepter', 'republier', 'favoris', 'supprimer'];   // 5.450 : écrire à des personnes ; supprimer (sans retour)
 // Les raisons où RIEN n'est parti et où le geste redeviendra possible tout seul (le bon compte
 // ouvert, une place dans l'heure, la fin d'une pause, la vérification faite) : il ATTEND.
 const ADIST_ATTENDRE = ['absent', 'autre-compte', 'deux-comptes', 'onglet', 'pause', 'verification', 'plafond', 'plafond-jour', 'quota-jour',
@@ -126,6 +133,50 @@ function adistCommande(d) {
   if (geste === 'bordereau') {
     if (!adistNum(a.tx)) return { refus: 'arguments' };
     return out({ tx: String(a.tx) }, a.tx);
+  }
+  // ── 5.450 ──
+  if (geste === 'favoris') {
+    const ids = Array.isArray(a.ids) ? a.ids : [];
+    if (ids.length > 50 || ids.some((x) => typeof x !== 'string' || !/^[\w:.-]{1,160}$/.test(x))) return { refus: 'arguments' };
+    const texte = a.texte == null ? null : typeof a.texte === 'string' ? a.texte.replace(/\r\n?/g, '\n').trim() : '';
+    if (texte === '' || (texte && texte.length > 2000)) return { refus: 'arguments' };
+    const taux = a.taux == null ? null : Number(a.taux);
+    if (taux != null && !(Number.isInteger(taux) && taux >= 1 && taux <= 90)) return { refus: 'arguments' };
+    const args = Object.assign({ ids: [...new Set(ids)] }, texte ? { texte } : {}, taux != null ? { taux } : {});
+    return out(args, ids.length ? adistEmpreinte({ v: 1, args: [...new Set(ids)].sort() }).slice(0, 8) : 'tous');
+  }
+  if (geste === 'vacances') {
+    if (typeof a.vacances !== 'boolean') return { refus: 'arguments' };
+    return out({ vacances: a.vacances }, a.vacances ? 'on' : 'off');
+  }
+  if (geste === 'creer') {
+    const f = a.fiche && typeof a.fiche === 'object' && !Array.isArray(a.fiche) ? a.fiche : null;
+    let taille = 0; try { taille = JSON.stringify(a).length; } catch (_) { taille = 1e9; }
+    // Une fiche LÉGÈRE seulement (des adresses de photos, jamais des images en base64) : la file n'est pas un transport de fichiers.
+    if (!f || !/^[\w-]{1,40}$/.test(String(f.id || '')) || taille > 30000 || !Array.isArray(f.photos) || !f.photos.length || f.photos.length > 20
+      || f.photos.some((u) => typeof u !== 'string' || !/^https:\/\//.test(u) || u.length > 600)) return { refus: 'arguments' };
+    return out({ fiche: f, ...(a.reponses && typeof a.reponses === 'object' && !Array.isArray(a.reponses) ? { reponses: a.reponses } : {}) }, String(f.id));
+  }
+  if (geste === 'pause' || geste === 'publier') {
+    const id = String(a.id == null ? '' : a.id);
+    if (!(geste === 'pause' ? /^\d{6,12}$/ : /^\d{1,20}$/).test(id)) return { refus: 'arguments' };
+    return out({ id }, id);
+  }
+  if (geste === 'supprimer') {
+    const id = String(a.id == null ? '' : a.id);
+    if (!/^\d{6,12}$/.test(id)) return { refus: 'arguments' };
+    return out({ id, numero: String(a.numero || '').slice(0, 12), titre: String(a.titre || '').slice(0, 120) }, id);
+  }
+  if (geste === 'offre') {
+    const nego = String(a.nego == null ? '' : a.nego), g2 = String(a.geste || '');
+    const c = a.prix == null ? null : adistCents(a.prix);
+    if (!/^\d{3,15}$/.test(nego) || !['accepter', 'refuser', 'contre'].includes(g2) || (g2 === 'contre' && !(Number.isInteger(c) && c >= 100 && c < 10000000))) return { refus: 'arguments' };
+    return out(Object.assign({ nego, geste: g2 }, g2 === 'contre' ? { prix: c / 100 } : {}), nego + ':' + g2);
+  }
+  if (geste === 'aimes') {
+    const produit = String(a.produit == null ? '' : a.produit), c = adistCents(a.prix), av = adistCents(a.prixAvant);
+    if (!/^\d{3,15}$/.test(produit) || !Number.isInteger(c) || !Number.isInteger(av) || c < 100 || av >= 10000000 || !(c < av)) return { refus: c >= av ? 'hausse' : 'arguments' };
+    return out({ produit, prix: c / 100, prixAvant: av / 100 }, produit);
   }
   return out({}, 'compte');                    // relire : le compte seulement
 }
@@ -248,8 +299,21 @@ export async function lireUneCommande(dep, id, maintenant = Date.now()) {
   const rows = await json(await appel(dep, `app_data?id=eq.${enc(id)}&select=${SELECT_DISTANCE}`, { headers: dep.entetes(), cache: 'no-store' }));
   return rows ? (rows[0] ? vueCommandeDistance(rows[0], maintenant) : { absente: true }) : null;
 }
+// (25 nov., budget-vitesse) UNE lecture des présences partagée : la porte d'« agir » (App.jsx `SourceAgir`) et « À distance » la
+// demandaient chacune au même moment (lecture en double). Une lecture en cours sert tous ceux qui la demandent ; une lecture
+// RÉUSSIE sert 5 s ; une lecture ratée (null, « pas su ») n'est jamais gardée.
+let presencesEnCours = null, presencesLues = null;
 export async function lirePresences(dep, maintenant = Date.now()) {
-  const rows = await json(await appel(dep, `app_data?id=like.presence_*&select=${SELECT_PRESENCE}&limit=20`, { headers: dep.entetes(), cache: 'no-store' }));
+  let rows;
+  if (presencesLues && Date.now() - presencesLues.at < 5000) rows = presencesLues.rows;
+  else {
+    if (!presencesEnCours) {
+      presencesEnCours = (async () => json(await appel(dep, `app_data?id=like.presence_*&select=${SELECT_PRESENCE}&limit=20`, { headers: dep.entetes(), cache: 'no-store' })))()
+        .then((r) => { if (Array.isArray(r)) presencesLues = { at: Date.now(), rows: r }; return r; }, () => null)
+        .finally(() => { presencesEnCours = null; });
+    }
+    rows = await presencesEnCours;
+  }
   return rows ? rows.map((r) => adistPresence(r, maintenant)).filter(Boolean) : null;
 }
 // Dépose UNE commande. Une commande qui attend déjà pour le MÊME geste sur la MÊME chose (`cle`) n'est pas doublée :

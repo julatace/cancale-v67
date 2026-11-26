@@ -273,6 +273,19 @@ export function reprendreFile(d,{owner,maintenant}){
   g.active=true;g.raison='';g.refusLocaux=0;delete g.raisonCode;delete g.raisonRefus;delete g.raisonN;g.prochain=maintenant;d.prochainGlobal=maintenant;
   return {data:d,valeur:vueFile(d,owner)};
 }
+// 26 nov. (Julien, ext. 5.453.2 : « Pas parti · Vérifie les envois incertains », toute la file bloquée sans geste) : SON choix
+// tranche UN envoi incertain, sur sa ligne. « C'est parti » ⇒ envoyé (jamais recontacté) ; « Pas parti » ⇒ refusé SANS écriture
+// (`ecrits: 0` : il pourra être choisi à nouveau, par lui). Jamais un renvoi automatique : rien ne repart d'ici.
+export function trancherIncertain(d,{owner,notificationId,parti,maintenant}){
+  d=initialiserFile(d);const g=d.groupes[owner];
+  if(typeof notificationId!=='string'||!notificationId||notificationId.length>160||typeof parti!=='boolean')throw new RefusFavoris('Choix invalide.',400);
+  const j=g&&g.jobs.find(x=>x.notificationId===notificationId&&x.etat==='incertain');
+  if(!j)throw new RefusFavoris('Cet envoi n’est plus à vérifier.');
+  if(parti){j.etat='envoye';j.raison='confirme_vendeur';}else{j.etat='refuse';j.raison='pas_parti_vendeur';j.ecrits=0;}
+  j.traiteLe=maintenant;j.tranche=parti?'parti':'pas_parti';
+  if(!g.jobs.some(x=>x.etat==='incertain')&&/vérifi/i.test(String(g.raison||'')))delete g.raison;
+  return {data:d,valeur:vueFile(d,owner)};
+}
 export function cloreIncertains(d,{owner,maintenant}){
   d=initialiserFile(d);const g=d.groupes[owner];
   if(!g||g.active)throw new RefusFavoris('Arrête la file avant de clôturer la vérification.');

@@ -29,6 +29,7 @@ import { LogoSite } from '../SelecteurSites.jsx';
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
 import { motifDeLApercu } from '../antiArnaque.js';
 import { FilLeboncoin } from './MessagesLeboncoin.jsx';
+import { BadgeLectureSeule } from '../agir/Agir.jsx';   // (24 nov., lot agir-si-connecte)
 import { FilVestiaire, ficheDuNumero } from './Vestiaire.jsx';
 import { CLE_FILS_RELIES, convVinted, convLeboncoin, convVestiaire, convEbay, regrouperFils, suggestionsFils, relierFils, refuserFils, delierFil, messagesDuFil, conversationDeReponse } from '../filUnique.js';
 import { trj } from '../i18n/react.js';
@@ -409,6 +410,8 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                       {g.plateforme ? <span className="vg-ms-logo" aria-hidden="true"><LogoSite site={g.plateforme}/></span> : null}
                       <b className={g.plateforme === 'vinted' ? 'vrm-sensible' : undefined}>{g.nom || NOM_SITE[g.plateforme] || tr('avenir.compteSans')}</b>
                       {g.onglet ? <span className="vg-ms-onglet">{tr('verre2.msg.compteOnglet')}</span> : null}
+                      {/* (24 nov.) « Lecture seule » : aucune extension n'a ce compte dans un onglet — ses fils restent lisibles. */}
+                      {['vinted', 'leboncoin', 'vestiaire'].includes(g.plateforme) && g.compte ? <BadgeLectureSeule site={g.plateforme} compte={String(g.compte).replace(/^lbc-account:/, '')}/> : null}
                     </h3>
                     <div className="vrm-msg-list vg-ms-liste">
                       {vus.map((f, i) => {

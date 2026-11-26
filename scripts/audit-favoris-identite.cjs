@@ -115,6 +115,8 @@ function monter(o = {}) {
   f.ctx.interfaceVinted = async (acc, geste, d, op) => {
     f.gestes.push({ geste, lien: d && d.lien });
     if (o.nouvelle && geste === 'favoriOuvrir') return { viaPage: true, interface: true, geste, status: 200, ok: true, json: null, sansRequete: true, vu: false, conv: '301', route: UUID, envoye: false };
+    // 5.453 (`favorishumains`) : l'étape « taper » (le texte dans le champ, rien n'est envoyé) précède « Envoyer ».
+    if (o.nouvelle && geste === 'message' && d && d.taper === true) return { viaPage: true, interface: true, geste, status: 200, ok: true, json: null, sansRequete: true, tape: true, vu: true, envoye: false };
     if (o.nouvelle && (geste === 'message' || geste === 'offre')) { f.gestes[f.gestes.length - 1].tape = true; return { viaPage: true, interface: true, geste, status: 200, ok: true, json: { code: 0 }, vu: true }; }
     return bg(acc, geste, d, op);
   };

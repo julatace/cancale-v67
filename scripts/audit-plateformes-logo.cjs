@@ -164,7 +164,12 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(!!hote && !/vmrCmd|appelEbay|fetch\([^)]*\/api\//.test(PAsrc + hote), 'B18 le parcours n’envoie rien : ni commande à l’extension, ni appel eBay (les moteurs existants publient)');
   dit(!/AgentEbay|agentEbay|ebay\.agent|autoPub/.test(PAsrc + hote), 'B19 l’agent eBay n’est pas réintroduit');
   // (20 nov., décision de Julien) Leboncoin et Vestiaire : le panneau de l'extension sur CET article ; eBay : son formulaire.
-  dit(/if \(sx === 'leboncoin' \|\| sx === 'vestiaire'\) \{ ouvrirPanneau\(\{ site: sx, page: 'publier', ids: \[id\], action: 'publier' \}\)/.test(hote) && /DEMANDE_EBAY_PAIRE\.id = id/.test(hote), 'B20 « Publier » : Leboncoin / Vestiaire dans l’extension sur CET article, eBay dans son formulaire');
+  // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) Leboncoin : DEPUIS VRM par la porte (sinon le panneau) ; Vestiaire : le
+  // panneau, gardé par la porte ; CET article ; eBay : son formulaire.
+  { const PORTE = require('./_porte-agir.cjs'), agir = sansCommentaires(fs.readFileSync(path.join(SRC, 'agir', 'Agir.jsx'), 'utf8'));
+    const rl = await PORTE.publierLbc(hote, agir, /if \(sx === 'leboncoin'\) \{ publierLbcDepuisVrm\(id, \{ panneau: \(\) => ouvrirPanneau\(\{ site: sx, page: 'publier', ids: \[id\], action: 'publier' \}\) \}\); onFermer\(\); return; \}/);
+    const rv = PORTE.panneauGarde({ code: hote, appel: /if \(sx === 'vestiaire'\) \{ ouvrirPanneau\(\{ site: sx, page: 'publier', ids: \[id\], action: 'publier' \}\); onFermer\(\); return; \}/ });
+    dit(rl.ok && rv.ok && /DEMANDE_EBAY_PAIRE\.id = id/.test(hote), 'B20 (24 nov.) « Publier » : Leboncoin DEPUIS VRM par la porte (sinon le panneau), Vestiaire au panneau gardé — CET article ; eBay dans son formulaire', [rl.detail, rv.detail].filter(Boolean).join(' · ')); }
 
   // ── C. Relier un achat : les filtres ──
   const A = [

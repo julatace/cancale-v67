@@ -45,7 +45,8 @@ import '../natif.css';
 import './annonces.css';
 import AnnoncesTableau from './AnnoncesTableau.jsx';   // (19 nov. soir) l'ordinateur : le tableau de travail
 import { Glyphe } from '../icones.jsx';
-import { groupesParCompte, lireReplis, ecrireReplis } from './annoncesComptes.js';   // (20 nov.) la liste divisée par compte
+import { groupesParCompte, lireReplis, ecrireReplis } from './annoncesComptes.js';
+import { BadgeLectureSeule } from '../../agir/Agir.jsx';   // (24 nov., lot agir-si-connecte)   // (20 nov.) la liste divisée par compte
 import { CarteAnnonce, RangeeArticle, lireVueTel, ecrireVueTel, traceDe, texteTrace, seulementBloque, bandeauDe, tailleDansTitre } from './AnnoncesCartes.jsx';   // (21 nov.) la grille « Dressing »
 import { depuisMaj } from '../TableauTravail.jsx';
 import GrilleInventaire from '../visuel/GrilleInventaire.jsx';
@@ -400,6 +401,8 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
           <span className="n-ad-compte-nom">{titre}<span className="n-ad-compte-n"> · {n}</span></span>
           {g.site ? <span className="n-eg-sr"> · {nomSite(g.site)} · {tr('egalite.groupe.n', { n })}</span> : null}
           {bloque ? <span className="n-ad-etiquette" data-ad-bandeau="bloque">{tr('tableau.etat.bloque')}</span> : null}
+          {/* (24 nov.) « Lecture seule » : l'extension n'a ce compte dans aucun onglet — ses annonces restent visibles, ses gestes éteints. */}
+          {['vinted', 'leboncoin', 'vestiaire'].includes(g.site) && g.compte ? <BadgeLectureSeule site={g.site} compte={g.compte}/> : null}
           {!bloque && eg ? <span className="n-ad-etiquette" data-ad-bandeau={eg.cle} data-ad-etat-groupe={String(eg.n)}>{tr('tableau.etat.' + eg.cle) + (eg.tous ? '' : ' · ' + eg.n)}</span> : null}
           <span className="n-ad-chevron" data-ouvert={ouvertG ? '1' : '0'} aria-hidden="true"><Glyphe nom="chevron" taille={16}/></span>
         </button>

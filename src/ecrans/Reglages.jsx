@@ -1,4 +1,5 @@
 import { PlateformesSetting } from '../App.jsx';
+import { VacancesAgir } from '../agir/Agir.jsx';   // (24 nov., lot agir-tout)
 import '../natif/ecrans/parametres-visuel.css';   // (24 nov., visuel-argent) médaillons des sections, interrupteurs clairs
 import { fusion3 } from '../fusionNuage.js';
 import { modifierLigneCas, ecrireDifference } from '../ligneCas.js';
@@ -2203,6 +2204,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (11 nov., lot sante-comptes) Chaque compte Vinted : en forme / à surveiller, LA raison et LE geste, chaque point lisible (src/SanteComptes.jsx).
       { id:'santecomptes', type:'panneau', ic:'star', lib:tr('reglages.santecomptes.lib'), desc:tr('reglages.santecomptes.desc'), data:{ 'data-reglage-santecomptes':'' }, el:<SanteComptes variante="reglages" comptes={comptes||[]}/> },
       // (22 nov., ext. 5.436) « Mes comptes » : chaque compte et ton ordinateur, les gestes à distance (src/aDistance/).
+      // (24 nov.) « Connexions de l'extension » : chaque navigateur (version, vu quand, ce qu'il lit, son problème) et chaque compte (src/connexions/).
+      { id:'connexionsext', type:'nav', ic:'relier', lib:tr('cnx.reglages.lib'), desc:tr('cnx.reglages.desc'), data:{ 'data-reglage-connexions-ext':'' }, onClick:()=>setTab('connexions') },
       { id:'adistance', type:'nav', ic:'ordi', lib:tr('nav.adistance'), desc:tr('adist.reglages.desc'), data:{ 'data-reglage-adistance':'' }, onClick:()=>setTab('adistance') },
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:tr('reglages.liens.desc'), onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:tr('reglages.connexions.lib'), desc:tr('reglages.connexions.desc'), titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
@@ -2211,7 +2214,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (10 nov., lot O) Tous ses comptes en vacances puis rouverts, compte par compte, sur SON clic (src/ModeVacances.jsx).
       // (11 nov., lot securite-vinted) Julien : « faire comme Vintex, pour ne pas se faire bannir » — une phrase par compte, ses réglages, « Tout arrêter » (src/SecuriteComptes.jsx).
       { id:'securite-comptes', type:'panneau', ic:'sleep', lib:tr('reglages.securite.lib'), desc:tr('reglages.securite.desc'), data:{ 'data-reglage-securite-comptes':'' }, el:<SecuriteComptes comptes={comptes||[]}/> },
-      { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<div data-vacances-panneau="" style={{ padding: '8px 0' }}><BoutonExtension action="vacances" large/></div> },
+      { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<div data-vacances-panneau="" style={{ padding: '8px 0' }}><VacancesAgir comptes={comptes||[]}/></div> },   // (24 nov., lot agir-tout) depuis VRM, compte par compte
       // (12 nov., ext. 5.370) La discrétion : plafond par jour, vérification demandée par Vinted, freins des 7 jours (src/Discretion.jsx).
       { id:'discretion', type:'panneau', ic:'pin', lib:tr('reglages.discretion.lib'), desc:tr('reglages.discretion.desc'), data:{ 'data-reglage-discretion':'' }, el:<PanneauDiscretion uids={(comptes||[]).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean)} nomCompte={(u) => { const a = (comptes||[]).find((x) => String(x && x.vinted_user_id) === String(u)); return (a && (a.label || a.login)) || null; }}/> },
       // (12 nov., sécurité des comptes) Un zip par compte Vinted, fait dans le navigateur, envoyé nulle part (src/CopieAnnonces.jsx).

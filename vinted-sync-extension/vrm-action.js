@@ -385,7 +385,13 @@
     for (const x of l) { if (x.etat === 'envoye') c.envoye++; else if (x.etat === 'saute') c.saute++; else if (x.etat === 'pas') c.pas++; else if (x.etat === 'verifier') c.verifier++; else if (x.etat === 'annule') c.annule++; else c.reste++; }
     return c;
   }
+  const ATTENTES_FAV = { tout_arrete: 'fa_e_att_tout_arrete', reseau: 'fa_e_att_reseau', autre_compte: 'fa_e_att_autre_compte', onglet: 'fa_e_att_onglet', vrm: 'fa_e_att_vrm', garde: 'fa_e_att_garde' };
   function favEtapeHtml(a) {
+    // 5.450 : Vinted a demandé une pause (429) ⇒ « En pause (Vinted) jusqu'à 14:32 », jamais « En attente du prochain favori ».
+    if (a.attente === 'pause') { const j = Number(a.pauseVintedJusqua) || 0; return `<div class="fav-etape" role="status" data-fav-etape="pause-vinted"><span class="pu" aria-hidden="true"></span><span>${esc(j > Date.now() ? T('fa_e_pause_vinted', { h: new Date(j).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }) : T('fa_e_pause_vinted_sans'))}</span></div>`; }
+    // 5.453.1 (Julien, 25 nov. : « il n'y a plus personne », sans un mot) : une file RETENUE par une garde le dit, avec le geste
+    //    à faire — jamais « En attente du prochain favori » pendant qu'elle ne peut pas partir.
+    if (ATTENTES_FAV[String(a.attente || '')] && !a.enCours) return `<div class="fav-etape" role="status" data-fav-etape="retenue" data-fav-attente="${esc(String(a.attente))}"><span class="pu" aria-hidden="true"></span><span>${esc(T(ATTENTES_FAV[String(a.attente)]))}</span></div>`;
     const cours = Number(a.prochain) > Date.now() && !a.enCours ? Number(a.prochain) : 0;
     if (cours) return `<div class="fav-etape" role="status" data-fav-etape="attente"><span class="pu" aria-hidden="true"></span><span data-action-dans="${cours}">${esc(T('a_ensuite', { dans: U.duree(cours - Date.now()) }))}</span></div>`;
     const k = ETAPES_FAV[String(a.etapeFav || '')] || (a.enCours ? 'fa_e_preparation' : 'fa_e_attente');

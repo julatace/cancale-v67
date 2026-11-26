@@ -42,6 +42,9 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'emails-plus-beau', date: '2026-11-26', titre: 'E-mails : comptes à relier plus clairs', phrase: 'Une rangée par compte, un bouton « Relier ».', tab: 'emails', pour: 'tous', mode: 'tous' },
   // (26 nov., feuille-retour-jeu — Julien : « change l'affichage du pop up message, ça doit faire mieux, jeu vidéo ») src/capteNotif/FeuilleArrivee.jsx
   { id: 'retour-comme-un-jeu', date: '2026-11-26', titre: 'Ton retour sur l’app, comme un jeu', phrase: 'Qui écrit, la photo, le message ; « Tout vu » en un toucher.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (25 nov., favoris-gestes-humains — Julien : « tu dois faire tous les gestes que je fais », « ça doit être humain ») ext. 5.453
+  { id: 'favoris-gestes-humains', date: '2026-11-25', titre: 'Favoris : l’extension écrit comme toi', phrase: 'Elle lit, tape lettre à lettre, puis touche Envoyer.', tab: 'favoris', pour: 'tous', mode: 'tous' },
+  { id: 'extension-connexion-claire', date: '2026-11-25', titre: 'Connexion de l’extension plus claire', phrase: 'Deux champs, l’œil du mot de passe, un bouton.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (25 nov. soir, filtre-plateformes — Julien : « un filtre avec toutes les plateformes et par plateforme dans les onglets ») docs/passation/2026-11-25-filtre-plateformes.md
   { id: 'filtre-plateformes', date: '2026-11-25', titre: 'Filtre par plateforme dans chaque onglet', phrase: 'Toutes, ou un seul site : Annonces, Ventes, Achats.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (25 nov., sombre-par-defaut — Julien : « La deuxième couleur est pas mal, mets en mode sombre ») docs/passation/historique-interface-stock.md (fin)
@@ -65,6 +68,16 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'maj-sans-relancer', date: '2026-11-25', titre: 'Les nouvelles infos arrivent seules', phrase: 'Vente, e-mail, retour sur l’app : à jour sans la rouvrir.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., chargement-propre — Julien : « quand les données s'affichent c'est moche, long et déstructuré ») même récit
   { id: 'chargement-propre', date: '2026-11-25', titre: 'Les écrans se remplissent sans sauter', phrase: 'Un chiffre pas encore lu se dessine, rien ne bouge.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (25 nov., envoi-messages-offres, ext. 5.452 — Julien : « ça envoie pas bien les messages et les offres ») docs/passation/2026-11-25-envoi-messages-offres.md
+  { id: 'envoi-confirme', date: '2026-11-25', titre: 'Envoyé seulement quand Vinted confirme', phrase: 'Sinon la raison, et l’heure où ça repart.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (24 nov., messages-pro — Julien : « ça fait encore beaucoup trop vieux ») docs/passation/2026-11-24-messages-pro.md
+  { id: 'messages-pro', date: '2026-11-24', titre: 'Conversations : une offre claire, un champ moderne', phrase: 'L’offre dans le fil, ta marge, et « Lecture seule » dit une fois.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (24 nov., agir-tout, ext. 5.450) docs/passation/2026-11-24-agir-tout.md
+  { id: 'agir-tout', date: '2026-11-24', titre: 'Favoris, vacances, prix : tout depuis VRM', phrase: 'Leboncoin et Vestiaire aussi, si l’extension a le compte ouvert.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (24 nov., agir-si-connecte) Julien : « faire absolument tout si l'extension est connectée ». docs/passation/2026-11-24-agir-si-connecte.md
+  { id: 'agir-si-connecte', date: '2026-11-24', titre: 'Répondre et republier depuis VRM', phrase: 'Si l’extension a ce compte ouvert ; sinon, lecture seule.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (24 nov., connexions-extension) Paramètres → Connexions de l'extension.
+  { id: 'connexions-extension', date: '2026-11-24', titre: 'Chaque navigateur et chaque compte, en clair', phrase: 'Version, vu quand, ce qu’il lit, et quoi faire.', tab: 'connexions', pour: 'tous', mode: 'tous' },
   // (24 nov., suivi-ventes — Julien : « retrait des articles vendus, fais un vrai suivi ») docs/passation/2026-11-24-suivi-ventes.md
   { id: 'suivi-envois', date: '2026-11-24', titre: 'Tes colis vendus, du dépôt au versement', phrase: 'Au point, retiré, argent versé : chaque étape lue, datée.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (24 nov., lot retrait-parfait — Julien : « pour le retrait tu dois vraiment faire quelque chose de parfait ») docs/passation/2026-11-24-retrait-parfait.md
