@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (26 nov., loupe-fondue — captures de Julien : « les couleurs sont moches, c'est mal fondu ») src/styles-recherche.css (fin)
+  { id: 'loupe-fondue', date: '2026-11-26', titre: 'La recherche par N°, plus douce', phrase: 'Cartes arrondies, icônes légères, champ fin.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (26 nov., emails-plus-beau — Julien : « fais en sorte que ça soit plus beau ») src/emails-mail.css · src/BoiteEmails.jsx
   { id: 'emails-plus-beau', date: '2026-11-26', titre: 'E-mails : comptes à relier plus clairs', phrase: 'Une rangée par compte, un bouton « Relier ».', tab: 'emails', pour: 'tous', mode: 'tous' },
   // (26 nov., feuille-retour-jeu — Julien : « change l'affichage du pop up message, ça doit faire mieux, jeu vidéo ») src/capteNotif/FeuilleArrivee.jsx

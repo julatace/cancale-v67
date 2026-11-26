@@ -485,8 +485,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **26 nov. · Colis en double au point (`claude/retrait-double-code`)** : un « à vérifier » au même code de retrait qu'un colis compté = ce colis, une carte (`absorberAVerifierParCode`, `src/retraitPreuves.js`, `audit-retrait-preuves` A8–A10). Geste : aucun.
 - **25 nov. soir · Sombre par défaut (`claude/sombre-par-defaut`, Julien : « La deuxième couleur est pas mal, mets en mode sombre »)** : aucun choix ⇒ sombre (règle, démarrage, `<html>`, theme-color, manifeste #1C1C20) ; un choix déjà posé ne change pas. `historique-interface-stock.md` (fin). Geste : aucun.
-- **25 nov. · Ventes, la rangée compacte (`claude/ventes-rangee`)** : photo par SES sources (identité), titre + prix, UN état, logo entier, ~84 px ; achat au balayage et dans la fiche. `2026-11-25-ventes-rangee.md`. Geste : aucun.
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
