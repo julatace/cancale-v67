@@ -724,7 +724,7 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
       </Feuille>
       {defait ? <Toast key={defait.id} message={tr('v2.perso.remis')} onAnnuler={() => { poser(defait.ordre, new Set(defait.montrees)); setDefait(null); }} onFin={() => setDefait(null)}/> : null}
       <Feuille ouverte={objOuvert} onFermer={() => setObjOuvert(false)} titre={tr('v2.obj.titre')} detente="moitie"
-        pied={<Bouton variante="plein" onClick={enregistrerObjectif}>{tr('v2.obj.enregistrer')}</Bouton>}>
+        pied={<Bouton variante="plein" onClick={enregistrerObjectif} attrs={{ 'data-v2-objectif-enregistrer': '' }}>{tr('v2.obj.enregistrer')}</Bouton>}>
         <Champ libelle={tr('v2.obj.libelle')} valeur={saisie} onChange={(v) => { setSaisie(v); setSaisieKo(false); }} inputMode="decimal" suffixe="€" attrs={{ 'data-v2-objectif-saisie': '' }}/>
         {saisieKo ? <Groupe pied={tr('v2.obj.invalide')}/> : null}
         {objectif && objectif.cible && objectif.retirer ? <Groupe><Rangee titre={tr('v2.obj.retirer')} onClick={() => { objectif.retirer(); setObjOuvert(false); }}/></Groupe> : null}

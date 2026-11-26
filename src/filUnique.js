@@ -93,10 +93,12 @@ export function convVestiaire(v) {
 // (11 nov., ebay-complet) eBay : un échange `GetMemberMessages` lu en direct (VRM ne
 // le range pas). L'annonce eBay (ItemID) et l'acheteur eBay sont des IDENTITÉS de
 // SA plateforme (préfixées) : jamais confondues avec une annonce Vinted.
-export function convEbay(m, compte) {
+// `num` : le N° que porte l'annonce de CET échange (son ItemID ⇒ son SKU `VRM-{n°}` ou le lien posé à la main, lu par
+// `numEbayLu` dans l'app) — jamais déduit du titre ; vide ⇒ aucun N° (26 nov., la règle de l'écran Messages · eBay d'avant).
+export function convEbay(m, compte, num = '') {
   if (!m || !txt(m.id)) return null;
   const rep = Array.isArray(m.responses) ? m.responses.filter(Boolean) : [];
-  return entree({ plateforme: 'ebay', compte: compte || 'principal', conv: m.id, annonce: m.itemId, interlocuteur: m.sender,
+  return entree({ plateforme: 'ebay', compte: compte || 'principal', conv: m.id, annonce: m.itemId, interlocuteur: m.sender, num,
     at: m.date, apercu: rep.length ? rep[rep.length - 1] : (m.body || m.subject || ''), deMoi: rep.length > 0,
     nonLu: /^unanswered$/i.test(String(m.status || '')) ? true : rep.length ? false : null, titre: m.titre, nom: '' });
 }
