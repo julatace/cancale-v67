@@ -15,6 +15,27 @@ const PORT = Number(process.env.BANC_PORT) || (20000 + Math.floor(Math.random() 
 const CAPTURES = process.env.BANC_CAPTURES || path.join(require('os').tmpdir(), 'banc-accessibilite');
 try { fs.mkdirSync(CAPTURES, { recursive: true }); } catch (_) {}
 const PNG = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'icon-512.png'));
+// (26 nov., zero-rouge-bancs) pdf.js de l'aperçu d'impression : l'app le charge de cdn.jsdelivr.net (src/App.jsx, PDFJS_V). Le banc
+// le SERT depuis une copie locale (BANC_PDFJS_DIR, sinon celle que tirent imprimante.cjs / equipe.cjs, une fois, depuis le
+// registre npm — hors du navigateur) : sans lui, « Imprimer » de l'aperçu restait grisé ; avec le vrai CDN, le banc sortait sur Internet.
+const PDFJS_V = '3.11.174';
+let _pdfjs;
+function dossierPdfjs() {
+  if (_pdfjs !== undefined) return _pdfjs;
+  _pdfjs = null;
+  try {
+    if (process.env.BANC_PDFJS_DIR && fs.existsSync(path.join(process.env.BANC_PDFJS_DIR, 'pdf.min.js'))) return (_pdfjs = process.env.BANC_PDFJS_DIR);
+    const base = path.join(require('os').tmpdir(), 'vrm-banc-pdfjs-' + PDFJS_V), build = path.join(base, 'package', 'build');
+    if (!fs.existsSync(path.join(build, 'pdf.min.js'))) {
+      fs.mkdirSync(base, { recursive: true });
+      const tgz = path.join(base, 'pdfjs.tgz'), { execFileSync } = require('child_process');
+      execFileSync('curl', ['-sSL', '-m', '180', '-o', tgz, `https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-${PDFJS_V}.tgz`]);
+      execFileSync('tar', ['-xzf', tgz, '-C', base]);
+    }
+    if (fs.existsSync(path.join(build, 'pdf.min.js'))) _pdfjs = build;
+  } catch (_) { _pdfjs = null; }
+  return _pdfjs;
+}
 const auj = new Date();
 const ilYa = (h) => new Date(Date.now() - h * 3600e3).toISOString();
 const photo = (n) => `https://images1.vinted.net/t/01_banc${n}/f800/170000000${n}.jpeg`;
@@ -119,9 +140,13 @@ async function ouvrir(b, { largeur, sombre, tab, zoom, url, attente }) {
   // Vinted vues (fetch `no-cors`) — ses requêtes ne passent pas par les routes de la PAGE. Mesuré : 12 photos
   // `images1.vinted.net/t/01_banc*` parties sur Internet (garde réseau rouge, accessibilite 390/1512 et -clavier).
   // Tout autre hôte réel est refusé, plus seulement les images : l'aperçu d'impression chargeait pdf.js de cdn.jsdelivr.net
-  // (2 requêtes notées par la garde, feuille « Tout imprimer »). L'aperçu sans pdf.js dit qu'il ne peut pas se dessiner ; la
-  // feuille, ses noms et son focus restent jugés.
+  // (2 requêtes notées par la garde, feuille « Tout imprimer ») — servi plus bas depuis une copie locale (`dossierPdfjs`).
   await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+  await ctx.route(new RegExp('^https://cdn\\.jsdelivr\\.net/npm/pdfjs-dist@' + PDFJS_V.replace(/\./g, '\\.') + '/build/([\\w.-]+)$'), (r) => {
+    const dir = dossierPdfjs(), f = dir && path.join(dir, path.basename(new URL(r.request().url()).pathname));
+    if (!f || !fs.existsSync(f)) return r.abort();
+    return r.fulfill({ status: 200, contentType: 'text/javascript', headers: { 'access-control-allow-origin': '*' }, body: fs.readFileSync(f) });
+  });
   await ctx.route(/images1\.vinted\.net/, (r) => r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PNG }));
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request();
@@ -157,8 +182,21 @@ const EXCEPTIONS = [];
 const excuse = (regle, cible) => EXCEPTIONS.find((e) => e.regle === regle && new RegExp(e.cible).test(cible));
 // Les animations d'entrée finies d'abord (un texte en fondu à opacité 0 serait sauté par axe).
 const finirAnimations = (pg) => pg.evaluate(() => { try { for (const a of document.getAnimations()) { try { a.finish(); } catch (_) {} } } catch (_) {} });
+// (26 nov., zero-rouge-bancs) L'écran est jugé POSÉ : une entrée qui démarre APRÈS `finirAnimations` (une liste montée quand ses
+// données arrivent — en CI, plus lente, pendant le passage d'axe) était mesurée à mi-fondu. Mesuré : l'en-tête du tableau natif
+// sous `.vrm-attente-pret` (src/styles-attente.css, fondu de 0,85 à 1 en 0,14 s, `backwards`) donnait #6f6f6f sur #ececec
+// (4,25:1) = exactement #555555 sur #E9E9E9 (les jetons, 6,1:1) vus à 85 % d'opacité. On finit les animations FINIES jusqu'à ce
+// qu'aucune ne reparte (500 ms de calme, 8 s au plus) ; les animations sans fin (reflet d'attente, roue) ne comptent pas.
+const enMouvement = (pg) => pg.evaluate(() => { try { return document.getAnimations().filter((a) => { const t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null; return a.playState === 'running' && t && Number.isFinite(t.endTime); }).length; } catch (_) { return 0; } });
+async function attendrePose(pg) {
+  for (let calme = 0, i = 0; i < 40 && calme < 2; i++) {
+    await finirAnimations(pg);
+    await pg.waitForTimeout(250);
+    calme = (await enMouvement(pg)) ? 0 : calme + 1;
+  }
+}
 async function axe(pg, contexte) {
-  await finirAnimations(pg);
+  await attendrePose(pg);
   await pg.evaluate(AXE);
   return pg.evaluate(async ({ tags, ctx }) => {
     // Les règles WCAG A/AA (2.0, 2.1) + deux règles « bonnes pratiques » tenues aussi : un rôle ARIA
