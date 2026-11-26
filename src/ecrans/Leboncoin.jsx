@@ -1,7 +1,9 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { pauseLbcAgir, supprimerLbcAgir, compteLbcDe, publierLbcDepuisVrm } from '../agir/Agir.jsx';   // (24 nov., lot agir-tout)
+import { avecNumeroEcritLbc } from '../App.jsx';   // (24 nov., lot lbc-numero-ecrit) + le N° écrit en fin de description (src/lbcNumeroEcrit.js)
 import { problemesAnnonce } from '../verifAnnonce.js';
+import { avecPhotoLbc } from '../App.jsx';   // (24 nov., lot ext-anciens-lots) les liens Leboncoin LUS (+ photo d'origine, src/photoIdentite.js)
 import { bilanEnLigneLbc, quandLectureLbc, LIEN_MES_ANNONCES_LBC } from '../enLigneLbc.js';
 import { poserNombreAnnonces } from '../plateformes/nombresAnnonces.js';
 import { suivreReceptionLeboncoin } from '../rafraichissementLeboncoin.js';
@@ -981,7 +983,8 @@ function LeboncoinScreen() {
     //    même règle vit dans l'extension (`adRefKeys`), sinon l'app relie et le
     //    panneau ne relie pas (§11). La copie locale prime sur le nuage : elle
     //    est plus récente que la dernière synchro (l'envoi est différé).
-    const liens = { ...(main.vrm_lbc_liens || {}), ...(load('vrm_lbc_liens', {}) || {}) };
+    // (24 nov., lot ext-anciens-lots) + la photo d'origine là où il n'a rien décidé (src/photoIdentite.js) : une identité, jamais écrite.
+    const liens = avecPhotoLbc(avecNumeroEcritLbc({ ...(main.vrm_lbc_liens || {}), ...(load('vrm_lbc_liens', {}) || {}) }));   // 5.454 : + le N° écrit (lot lbc-numero-ecrit), avant la photo
     // Toutes les clés passent par `cleNum` (« VRM-b125 » = « B125 »), des deux
     // côtés — la même règle que l'extension (`adRefKeys`, §11).
     const adKeys = (ad) => clesAnnonceLbc(ad, liens);

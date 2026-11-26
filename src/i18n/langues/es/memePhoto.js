@@ -38,6 +38,8 @@ export default {
   "memePhoto.nAVerifier": {"one": "{n} por comprobar", "other": "{n} por comprobar"},
   "memePhoto.extensionSure": "La extensión {v} confirma «seguro»: actualízala. Mientras tanto, todo está «por comprobar».",
   "memePhoto.aideSure": "«Seguro»: dos medidas distintas dicen que es la misma foto. «Por comprobar»: mira las dos fotos. Nada se vincula sin tu toque.",
+  "memePhoto.aussiSurOrigine": "También en {sites} · reconocido por la foto original",
+  "memePhoto.limiteOrigine": "Foto original: el mismo archivo subido desde tu ordenador con la extensión. Publicado desde una app móvil, VRM no lo ve.",
   "ug.titre": "Mejorar en un gesto",
   "ug.sous": "Mismos ajustes, original guardado.",
   "ug.r.lumiere": "Luz",

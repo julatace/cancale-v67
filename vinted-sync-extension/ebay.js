@@ -111,6 +111,54 @@
     }
     return null;
   }
+  // ══ 5.448 (`adaptatif`) — UN SEUL CHAMP, OU AUCUN ════════════════════════════════════════════════════════════════
+  //  Avant : `champ()` prenait le PREMIER champ dont le nom ou le libellé contenait « titre » / « prix »… (français et
+  //  anglais seulement) : deux candidats, et le titre pouvait tomber dans le mauvais. Maintenant la table eBay de
+  //  vrm-trouver.js (nom/identifiant, libellé et indication en 5 langues, en-tête/recherche/filtres « min / max » exclus)
+  //  désigne UN champ — deux au même score ⇒ AUCUN n'est rempli, et le bandeau dit lequel remplir toi-même. Sans la couche
+  //  (ancien paquet), la règle d'avant. Rien trouvé au bout du remplissage ⇒ journal (`trouveJournal`, jamais un texte).
+  const TT = () => { try { return globalThis.__vrmTrouver || null; } catch (_) { return null; } };
+  const etatChamps = {};   // titre | description | prix | sku → { r: 'rempli' | 'ambigu' | 'absent', t: dernier résultat }
+  function champAdapte(nom, motifs) {
+    const t = TT();
+    if (!t || !t.sites || !Array.isArray(t.sites.ebay) || !t.sites.ebay.includes(nom)) return champ(motifs);
+    const x = t.trouver('ebay.' + nom, {});
+    const e = etatChamps[nom] || (etatChamps[nom] = { r: 'absent', t: null });
+    if (e.r !== 'rempli') { e.r = x.el ? 'trouve' : x.ambigu ? 'ambigu' : 'absent'; e.t = x; }
+    if (x.el || x.ambigu) return x.el || null;
+    // Rien au-dessus du seuil : les motifs d'avant, mais UN SEUL candidat (jamais « le premier »).
+    const u = champUnique(motifs);
+    if (u.n > 1 && e.r !== 'rempli') e.r = 'ambigu';
+    return u.el;
+  }
+  function champUnique(patterns) {
+    const els = Array.from(document.querySelectorAll('input, textarea')).filter((el) => el.type !== 'hidden' && !el.disabled && !DANS_ENTETE(el) && !el.closest('[id^="vrm-"]'));
+    for (const p of patterns) {
+      const l = els.filter((el) => {
+        const lab = (el.labels && el.labels[0] && el.labels[0].innerText) || '';
+        const hay = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.placeholder || '') + ' ' + lab).toLowerCase();
+        return !PAS_UN_CHAMP_DE_DEPOT.test(hay) && p.test(hay);
+      });
+      if (l.length) return { el: l.length === 1 ? l[0] : null, n: l.length };
+    }
+    return { el: null, n: 0 };
+  }
+  const NOMS_CHAMPS_EBAY = { titre: 'le titre', description: 'la description', prix: 'le prix', sku: 'la référence (VRM-…)' };
+  function champsARemplir() { return Object.keys(etatChamps).filter((k) => etatChamps[k].r === 'ambigu').map((k) => NOMS_CHAMPS_EBAY[k] || k); }
+  function rendreJournalEbay() {
+    const trouves = Object.keys(etatChamps).filter((k) => etatChamps[k].r !== 'rempli' && etatChamps[k].t).map((k) => { const x = etatChamps[k].t; return { nom: k, s: x.el ? String(x.strategie || '') : '', ambigu: !!x.ambigu, essais: (x.essais || []).map((q) => ({ s: String(q.s || ''), n: Number(q.n) || 0 })).slice(0, 8) }; });
+    for (const k of Object.keys(etatChamps)) if (etatChamps[k].r === 'rempli' && etatChamps[k].t && etatChamps[k].t.el) trouves.push({ nom: k, s: String(etatChamps[k].t.strategie || ''), ambigu: false, essais: [] });
+    if (!trouves.length) return;
+    send({ action: 'trouveJournal', etape: 'depot', trouves: trouves.slice(0, 12), verPage: TT() ? TT().versionPage() : '' });
+  }
+  try { window.__vrmEbayTest = { champAdapte, champsARemplir, rendreJournalEbay }; } catch (_) {}   // les bancs seulement (monde isolé : la page ne le voit pas)
+  function remplirChamp(nom, motifs, val) {
+    const el = champAdapte(nom, motifs);
+    const ok = setField(el, val);
+    if (ok && etatChamps[nom]) etatChamps[nom].r = 'rempli';
+    return ok;
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // LES PHOTOS S'ATTACHENT (mesuré dans Chromium, voir l'en-tête du fichier)
   // ══════════════════════════════════════════════════════════════════════════
@@ -258,10 +306,10 @@
   }
   function remplir(ad) {
     let n = 0;
-    if (setField(champ([/titre|title|subject/]), ad.title)) n++;
-    if (setField(champ([/description|texte|body|détail|detail/]), ad.description)) n++;
-    if (setField(champ([/prix|price|montant|buy.?it.?now|start.?price/]), String(ad.price || ''))) n++;
-    if (setField(champ([/\bsku\b|référ|referen|custom.?label|numéro.?de.?référence/]), ad.sku)) n++;
+    if (remplirChamp('titre', [/titre|title|subject/], ad.title)) n++;
+    if (remplirChamp('description', [/description|texte|body|détail|detail/], ad.description)) n++;
+    if (remplirChamp('prix', [/prix|price|montant|buy.?it.?now|start.?price/], String(ad.price || ''))) n++;
+    if (remplirChamp('sku', [/\bsku\b|référ|referen|custom.?label|numéro.?de.?référence/], ad.sku)) n++;
     // ⚠️ « ça ne met pas la catégorie ni le reste » (Julien, 13 septembre, sur
     //    Leboncoin) : les listes déroulantes ne sont pas des `input`, `champ()`
     //    ne les voyait même pas. L'état, la marque et la pointure en sont, et
@@ -295,7 +343,10 @@
     const fini = arrete
       ? `<div style="color:#F5A524;margin-top:6px">Je ne remplis plus tout seul (c'est fini après 1 min 30). La mise en vente se fait en plusieurs étapes : à chaque nouvelle étape, clique <b>Re-remplir</b>.</div>`
       : '';
-    poserHtml(el, (n > 0
+    // 5.448 : un champ VU en double (deux candidats pareils) n'est jamais rempli au hasard — il est NOMMÉ ici.
+    const aRemplir = champsARemplir();
+    const doublons = aRemplir.length ? `<div style="color:#F5A524;margin-top:6px">${esc(aRemplir.join(', '))} : VRM voit deux champs pareils sur cette page et n'a rien mis. Remplis-${aRemplir.length > 1 ? 'les' : 'le'} toi-même (le texte est dans « Copier la description » ou ton presse-papier).</div>` : '';
+    poserHtml(el, doublons + (n > 0
       ? `<b>N°${esc(ad.numero)}</b> — ${n} champ${n > 1 ? 's' : ''} rempli${n > 1 ? 's' : ''}. ${photos} Relis tout, choisis la catégorie proposée par eBay, puis publie.`
       : `<b>N°${esc(ad.numero)}</b> — je n'ai reconnu aucun champ sur cette page. ${photos} Le texte complet est dans ton presse-papier, colle-le.`)
       + fini
@@ -328,7 +379,7 @@
         photosFaites = true;
         attacherPhotos(ad).then((r2) => { photosEtat = r2; bandeau(faits, ad); });
       }
-      if (essais > 90) { clearInterval(minuteur); arrete = true; bandeau(faits, ad); }
+      if (essais > 90) { clearInterval(minuteur); arrete = true; bandeau(faits, ad); rendreJournalEbay(); }
     }, 1000);
   }
   function relancer(ad) {

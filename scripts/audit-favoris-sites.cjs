@@ -27,6 +27,7 @@
 //  `--prouve` : chaque règle réaffaiblie doit faire rougir l'audit.
 // ════════════════════════════════════════════════════════════════════════════
 require('./_source-app.cjs').brancher();
+const { FauxCanal } = require('./_canal-faux.cjs');
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
@@ -129,7 +130,10 @@ function chrome2(bus) {
   const rep = (m, u, init) => { const r = routes[m + ' ' + u] || routes['* ' + u] || { status: 404, body: { message: 'introuvable' } }; return typeof r === 'function' ? r(init) : r; };
   const ecoutesPage = [], ecoutesRel = [];
   const winP = {}, winR = {};
-  const diffuser = (m) => { const d = copie(m); posts.push(d); for (const f of ecoutesPage.slice()) f({ source: winP, data: copie(d) }); for (const f of ecoutesRel.slice()) f({ source: winR, data: copie(d) }); };
+  // 5.396 : `postMessage(m, origine, ports)` — le port du canal privé passe avec la lettre (livré
+  // juste après, comme le navigateur) ; ce que le capteur poste sur SON port est noté dans `posts`.
+  const diffuser = (m, o, ports) => { const d = copie(m); posts.push(d); if (ports) { setTimeout(() => { for (const f of ecoutesRel.slice()) f({ source: winR, origin: ORIGINE, data: copie(d), ports }); }, 0); return; } for (const f of ecoutesPage.slice()) f({ source: winP, origin: ORIGINE, data: copie(d) }); for (const f of ecoutesRel.slice()) f({ source: winR, origin: ORIGINE, data: copie(d) }); };
+  const CanalEspion = function () { const c = new FauxCanal(); const pm = c.port1.postMessage; c.port1.postMessage = (x) => { posts.push(copie(x)); pm(x); }; return c; };
   Object.assign(winP, { postMessage: diffuser, addEventListener: (t, f) => { if (t === 'message') ecoutesPage.push(f); },
     fetch: async (u, init) => {
       const m = String((init && init.method) || 'GET').toUpperCase();
@@ -140,7 +144,7 @@ function chrome2(bus) {
       return { status: r.status, ok: r.status >= 200 && r.status < 300, headers: { get: () => ct }, clone() { return this; }, text: async () => texte, arrayBuffer: async () => new ArrayBuffer(0) };
     } });
   winP.top = winP; winP.self = winP;
-  const ctxP = { window: winP, document: { currentScript: {}, createElement: () => ({}), head: { appendChild() {} }, addEventListener() {}, getElementById: () => null, readyState: 'complete' },
+  const ctxP = { MessageChannel: CanalEspion, window: winP, document: { currentScript: {}, createElement: () => ({}), head: { appendChild() {} }, addEventListener() {}, getElementById: () => null, readyState: 'complete' },
     location: { origin: ORIGINE, hostname: 'fr.vestiairecollective.com', pathname: '/chat/', href: ORIGINE + '/chat/' }, history: { pushState() {}, replaceState() {} },
     URL, console: { log() {}, warn() {}, error() {} }, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {}, JSON, Date, Math, Map, Set, Promise, encodeURIComponent, btoa: (x) => Buffer.from(x, 'latin1').toString('base64'), Uint8Array, ArrayBuffer, String, Number };
   vm.createContext(ctxP); vm.runInContext(INJ, ctxP, { filename: 'vc-inject.js' });
@@ -150,7 +154,7 @@ function chrome2(bus) {
   const uuid = () => 'aaaaaaaa-bbbb-cccc-dddd-' + String(Math.floor(Math.random() * 1e12)).padStart(12, '0');
   const ctxR = { window: winR, self: { crypto: { randomUUID: uuid } }, crypto: { randomUUID: uuid },
     chrome: { runtime: { id: 'banc', sendMessage: (m, cb) => { if (bus) bus(copie(m)); if (cb) cb(); }, lastError: null, onMessage: { addListener(f) { ecouteOrdre.push(f); } } } },
-    location: { href: ORIGINE + '/chat/' }, URL, console, setTimeout, clearTimeout, JSON, Date, Math, Map, Set, Number, String };
+    location: { origin: ORIGINE, href: ORIGINE + '/chat/' }, URL, console, setTimeout, clearTimeout, JSON, Date, Math, Map, Set, Number, String };
   vm.createContext(ctxR); vm.runInContext(REL, ctxR, { filename: 'vc.js' });
   const ordre = (m) => new Promise((res) => {
     let rendu = false;
@@ -176,7 +180,7 @@ async function a1a3() {
   const x = de(a, 'vcaimes')[0];
   const l = x ? x.aimes.map((y) => `${y.acheteur}-${y.produit}`).sort() : [];
   dit(!!x && l.join(',') === [`${P1}-${ART}`, `${P2}-${ART}`, `${P3}-${ART2}`].join(','), 'A1 · trois cartes « j’aime » ⇒ trois personnes (article + identifiant) ; la carte vendue, une autre carte communauté et soi-même : rien', JSON.stringify(x));
-  dit(!!x && !JSON.stringify(x).includes(PSEUDO) && x.aimes.every((y) => Object.keys(y).sort().join() === 'acheteur,at,produit'), 'A1 · ni le pseudo ni le texte de la carte ne sortent de la page', JSON.stringify(x && x.aimes[0]));
+  dit(!!x && !JSON.stringify(x).includes(PSEUDO) && x.aimes.every((y) => { const k = Object.keys(y).sort().join(); return k === 'acheteur,at,produit' || (k === 'acheteur,at,photo,produit' && (y.photo === '' || /^https:\/\/[\w.-]+\//.test(y.photo))); })   /* (5.454) + la photo de l'ARTICLE (lot vestiaire-complet 5.444), jamais celle de la personne */, 'A1 · ni le pseudo ni le texte de la carte ne sortent de la page', JSON.stringify(x && x.aimes[0]));
   // A3 — SA première offre à la main.
   const corps = JSON.stringify({ buyerId: Number(P1), price: { cents: 23700, currency: 'EUR' } });
   const b = await p.appel('POST', URL_NEGO, nego('900000001', P1, [ev('offer', 'seller', 23700)]), 200, corps);

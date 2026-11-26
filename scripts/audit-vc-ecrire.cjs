@@ -116,6 +116,7 @@ let chromium;
 try { ({ chromium } = require('playwright')); } catch (_) { ({ chromium } = require(path.join(racine, 'node_modules', 'playwright'))); }
 const INJ = fs.readFileSync(F.inject, 'utf8');
 const ECR = fs.readFileSync(F.ecrire, 'utf8');
+const REL = fs.readFileSync(path.join(path.dirname(F.ecrire), 'vc.js'), 'utf8');   // 5.446 : le relais qui tient le canal privé
 // `chrome.*` minimal du monde isolé (le banc tient vc-ecrire.js dans la page : la DOM est la même).
 const CHROME = `window.__envois = []; window.__store = window.__store || {}; window.__ecoutes = [];
 window.chrome = { runtime: { id: 'x', lastError: null, sendMessage: (m, cb) => { window.__envois.push(JSON.parse(JSON.stringify(m))); if (cb) cb({ ok: true }); }, onMessage: { addListener: (f) => window.__ecoutes.push(f) } },
@@ -139,9 +140,12 @@ async function page(b, o = {}) {
   });
   await pg.route(`${ORIGINE}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: PAGE(o) }));
   await pg.addInitScript({ content: `window.__store = ${JSON.stringify(o.store || {})};` });
+  // (24 nov., ext 5.446) « envoi vu » et « conversation ouverte » passent par le CANAL PRIVÉ de vc-inject.js, que le VRAI
+  // vc.js reçoit à document_start et prête à vc-ecrire.js (`__vrmVcPont`) : le banc pose vc.js AVANT la page, comme Chrome.
+  await pg.addInitScript({ content: CHROME + '\n' + REL });
   await pg.addInitScript({ content: INJ });
   await pg.goto(`${ORIGINE}/chat${o.sansId ? '' : '?id=' + CONV}`);
-  await pg.evaluate(CHROME + '\n' + ECR);
+  await pg.evaluate(ECR);
   await pg.waitForTimeout(150);
   return { ctx, pg, envoisStream };
 }
@@ -159,7 +163,10 @@ async function navigateur() {
       uiAppris = st.vrmVcUi || null;
       dit(envoisStream.length === 1 && !!uiAppris && uiAppris.champ && uiAppris.champ.tag === 'textarea' && uiAppris.champ.attrs['data-testid'] === 'chat-input' && uiAppris.envoi.mode === 'bouton' && uiAppris.envoi.attrs['data-testid'] === 'send-message',
         'E1 · SON envoi à la main ⇒ le champ et le bouton sont retenus (signature : balise, attributs stables)', JSON.stringify(uiAppris));
-      dit(!JSON.stringify(st).includes('Merci') && !JSON.stringify(env).includes('Merci'), 'E1 · son TEXTE n’est retenu nulle part (ni la signature, ni ce qui part au fond)', JSON.stringify(env));
+      // (5.446) le VRAI vc.js est dans la page du banc : ses relais de LECTURE de la messagerie (`vcMessages`, `vcFil`… — lire tes
+      // conversations, voulu) ne sont pas ce que vc-ecrire.js retient ; on juge ce que vc-ecrire.js envoie.
+      const envE = env.filter((m) => !/^vc(Messages|Moi|Fil|Recon|Capte|Compteurs?|Timeline)$/i.test(String(m && m.action || '')));
+      dit(!JSON.stringify(st).includes('Merci') && !JSON.stringify(envE).includes('Merci'), 'E1 · son TEXTE n’est retenu nulle part (ni la signature, ni ce qui part au fond)', JSON.stringify(envE));
       dit(env.some((m) => m.action === 'vcUiAppris' && m.mode === 'bouton' && m.conv === CONV), 'E1 · le fond est prévenu (« appris », le mode), rien d’autre', JSON.stringify(env));
       dit(uiAppris && uiAppris.adresse && uiAppris.adresse.modele === '/chat?id={conv}' && env.some((m) => m.action === 'vcUiAppris' && m.adresse === 'oui'), 'E1 · l’ADRESSE d’une conversation est apprise du même geste (`/chat?id={conv}`, jamais devinée) ; le fond ne reçoit qu’un mot', JSON.stringify(uiAppris && uiAppris.adresse));
       await ctx.close();
@@ -219,11 +226,13 @@ async function navigateur() {
     // E7 — plus de recette de requête.
     {
       const { ctx, pg } = await page(b);
-      await pg.evaluate(`window.__tout = []; window.addEventListener('message', (e) => { const d = e.data; if (d && d.__tag === 'CANCALE_VC') window.__tout.push(d); });`);
+      // (5.446) « vu » arrive par le CANAL PRIVÉ (le pont de vc.js), plus jamais par `window`.
+      await pg.evaluate(`window.__tout = []; window.__surWindow = []; window.addEventListener('message', (e) => { const d = e.data; if (d && d.__tag === 'CANCALE_VC') window.__surWindow.push(d); }); window.__vrmVcPont.ecouter((d) => window.__tout.push(d));`);
       await pg.click('textarea'); await pg.keyboard.type('Oui'); await pg.click('[data-testid="send-message"]');
       await pg.waitForTimeout(400);
-      const tout = await pg.evaluate('window.__tout');
-      dit(!tout.some((d) => d.kind === 'vcenvoiappris') && tout.some((d) => d.kind === 'vcenvoivu' && d.conv === CONV), 'E7 · un envoi de la page n’est plus appris comme REQUÊTE à rejouer (seulement « vu », pour la vérification)', JSON.stringify(tout.map((d) => d.kind)));
+      const tout = await pg.evaluate('window.__tout'), surW = await pg.evaluate('window.__surWindow');
+      dit(!surW.some((d) => /^vcenvoi/.test(String(d.kind))), 'E7 · « envoi vu » ne passe JAMAIS par window (une page ne peut ni le lire ni le forger)', JSON.stringify(surW.map((d) => d.kind)));
+      dit(![...tout, ...surW].some((d) => d.kind === 'vcenvoiappris') && tout.some((d) => d.kind === 'vcenvoivu' && d.conv === CONV), 'E7 · un envoi de la page n’est plus appris comme REQUÊTE à rejouer (seulement « vu », pour la vérification)', JSON.stringify(tout.map((d) => d.kind)));
       await ctx.close();
     }
   } finally { await b.close(); }

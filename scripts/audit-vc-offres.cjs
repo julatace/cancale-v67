@@ -30,6 +30,7 @@
 //  `--prouve` : chaque règle réaffaiblie doit faire rougir l'audit.
 // ════════════════════════════════════════════════════════════════════════════
 require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
+const { FauxCanal } = require('./_canal-faux.cjs');
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const { spawnSync } = require('child_process');
 const { faireFond } = require('./_fond-vm.cjs');
@@ -120,7 +121,10 @@ function chrome2(bus) {
   const rep = (m, u) => routes[m + ' ' + u] || routes['* ' + u] || { status: 404, body: { message: 'introuvable' } };
   const ecoutesPage = [], ecoutesRel = [];
   const winP = {}, winR = {};
-  const diffuser = (m) => { const d = copie(m); posts.push(d); for (const f of ecoutesPage.slice()) f({ source: winP, data: copie(d) }); for (const f of ecoutesRel.slice()) f({ source: winR, data: copie(d) }); };
+  // 5.396 : `postMessage(m, origine, ports)` — le port du canal privé passe avec la lettre ;
+  // ce que le capteur poste sur SON port est aussi noté dans `posts` (le banc le regarde).
+  const diffuser = (m, o, ports) => { const d = copie(m); posts.push(d); if (ports) { setTimeout(() => { for (const f of ecoutesRel.slice()) f({ source: winR, origin: ORIGINE, data: copie(d), ports }); }, 0); return; } for (const f of ecoutesPage.slice()) f({ source: winP, origin: ORIGINE, data: copie(d), ports }); for (const f of ecoutesRel.slice()) f({ source: winR, origin: ORIGINE, data: copie(d), ports }); };
+  const CanalEspion = function () { const c = new FauxCanal(); const pm = c.port1.postMessage; c.port1.postMessage = (x) => { posts.push(copie(x)); pm(x); }; return c; };
   Object.assign(winP, { postMessage: diffuser, addEventListener: (t, f) => { if (t === 'message') ecoutesPage.push(f); },
     fetch: async (u, init) => {
       const m = String((init && init.method) || 'GET').toUpperCase();
@@ -130,7 +134,7 @@ function chrome2(bus) {
       return { status: r.status, ok: r.status >= 200 && r.status < 300, headers: { get: () => 'application/json; charset=utf-8' }, clone() { return this; }, text: async () => texte, arrayBuffer: async () => new ArrayBuffer(0) };
     } });
   winP.top = winP; winP.self = winP;
-  const ctxP = { window: winP, document: { currentScript: {}, createElement: () => ({}), head: { appendChild() {} }, addEventListener() {}, getElementById: () => null, readyState: 'complete' },
+  const ctxP = { MessageChannel: CanalEspion, window: winP, document: { currentScript: {}, createElement: () => ({}), head: { appendChild() {} }, addEventListener() {}, getElementById: () => null, readyState: 'complete' },
     location: { origin: ORIGINE, hostname: 'fr.vestiairecollective.com', pathname: '/my-account/offers/', href: ORIGINE + '/my-account/offers/' }, history: { pushState() {}, replaceState() {} },
     URL, console: { log() {}, warn() {}, error() {} }, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {}, JSON, Date, Math, Map, Set, Promise, encodeURIComponent, btoa: (x) => Buffer.from(x, 'latin1').toString('base64'), Uint8Array, ArrayBuffer, String, Number };
   vm.createContext(ctxP); vm.runInContext(INJ, ctxP, { filename: 'vc-inject.js' });
@@ -139,7 +143,7 @@ function chrome2(bus) {
   winR.top = winR;
   const ctxR = { window: winR, self: { crypto: { randomUUID: () => 'aaaaaaaa-bbbb-cccc-dddd-' + String(Date.now()).padStart(12, '0') } }, crypto: { randomUUID: () => 'aaaaaaaa-bbbb-cccc-dddd-' + String(Math.floor(Math.random() * 1e12)).padStart(12, '0') },
     chrome: { runtime: { id: 'banc', sendMessage: (m, cb) => { envois.push(copie(m)); if (bus) bus(copie(m)); if (cb) cb(); }, lastError: null, onMessage: { addListener(f) { if (!ecouteOrdre || true) ecouteOrdre = ecouteOrdre ? [].concat(ecouteOrdre, f) : f; } } } },
-    location: { href: ORIGINE + '/my-account/offers/' }, URL, console, setTimeout, clearTimeout, JSON, Date, Math, Map, Set, Number, String };
+    location: { origin: ORIGINE, href: ORIGINE + '/my-account/offers/' }, URL, console, setTimeout, clearTimeout, JSON, Date, Math, Map, Set, Number, String };
   vm.createContext(ctxR); vm.runInContext(REL, ctxR, { filename: 'vc.js' });
   // Ce que fait Chrome : l'ordre du fond arrive aux écouteurs de vc.js.
   const ordre = (m) => new Promise((res) => {

@@ -1,6 +1,7 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { signalDelai } from '../compatSafari.js';
+import { liensLbcLus } from '../App.jsx';   // (24 nov., lot ext-anciens-lots) les liens Leboncoin LUS (+ photo d'origine, src/photoIdentite.js)
 import { ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from '../actionsExtension.js';
 import { ouvrirPanneau } from '../ouvrirPanneau.js';
 // (22 nov., choix n° 33 et 35 de Julien) Les offres reçues restées sans réponse, la même photo sur deux annonces en ligne.
@@ -6572,7 +6573,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const lbcAussi = React.useMemo(() => {
     const posted = lbcPostesEncoreEnVente(lbcPosted, numeros, lbcSortisAnn);
     if (!lbcVentesAnn || !posted.size || !annoncesLbcVendues(lbcVentesAnn).size) return posted;
-    const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
+    const liens = { ...liensLbcLus() };
     const { doublons } = doublesVenteLbc({ ventes: lbcVentesAnn, items: lbcItemsAnn || {}, liens, numeros, enLigne: posted });
     const ici = new Set(doublons.flatMap((d) => d.surVinted || []));
     if (!ici.size) return posted;
@@ -6646,7 +6647,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         const ra = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`, { headers: sbAuth() });
         if (ra.ok) { const ar = await ra.json(); if (Array.isArray(ar)) { const accs = (ar[0] && ar[0].data && ar[0].data.accounts) || {}; preuve = { lectures: ls.lectures || {}, comptes: new Set([...comptesLbcProuves(ventes, ls.items), ...comptesLbcSession(accs)]), depuis: postedDepuis }; } }
       } catch (_) {}
-      setLbcSortisAnn(numerosLbcSortis(ls.items, { ...(load('vrm_lbc_liens', {}) || {}) }, annoncesLbcVendues(ventes), preuve).prouves);
+      setLbcSortisAnn(numerosLbcSortis(ls.items, { ...liensLbcLus() }, annoncesLbcVendues(ventes), preuve).prouves);
     } catch (_) { /* pas su ⇒ Set vide ⇒ aucune pastille, jamais un faux « publiée » */ }
   })(); }, []);
   // Ses VENTES Leboncoin — demande de Julien (21 sept.) : « je veux une partie
@@ -8278,6 +8279,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // et la date de l'envoi (« Commande livrée » = 400). En mémoire seulement : le
   // pseudo d'un tiers n'est rangé nulle part. undefined en cours · lu.
   const [infosTxAchats,setInfosTxAchats]=useState(undefined);
+  // 5.443 : l'extension vient de ranger le détail d'achats (« Lot · N » prouvé) : la lecture des transactions repart.
+  const [detailsAchatsRelus,setDetailsAchatsRelus]=useState(0);
   // (22 nov., lot achats-lot) LES ACHATS DIVISÉS (src/achatDivise.js) : { [tx]: division } — écrits sur SON toucher seulement
   // (« Diviser », « Changer la répartition », « Regrouper »), synchronisés. Déclarés ICI (avant `linkedBuyIds`, `buyNumByTxn`,
   // `liensAchats` qui les lisent : §4.6, pas de TDZ). `diviserTx` : l'achat dont la feuille est ouverte.
@@ -14318,7 +14321,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       if(!stop)setPhotosTxAchats(prev=>JSON.stringify(prev)===JSON.stringify(resultat)?prev:resultat);
       if(!stop)setInfosTxAchats(prev=>prev&&JSON.stringify(prev)===JSON.stringify(infos)?prev:infos);
     })();return()=>{stop=true;};
-  },[demandesSuivis]);
+  },[demandesSuivis,detailsAchatsRelus]);
   // ── LA LIGNE DE SUIVI VINTED ET LES N° AJOUTÉS À LA MAIN (23 oct.) ────────
   // Sur Achats et Ma journée (les colis à retirer s'y décident), relues à
   // l'ouverture et quand l'extension prévient (`maj suivi`). Scalaires seulement.
@@ -14517,6 +14520,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         try { oublierAcct('purchased'); } catch (_) {}
         if (buysCharges.current) loadOrders('purchased', setBuys, false, { silencieux: true });
       }
+      // 5.443 : le détail d'achats rangé par l'extension (« Lot · N ») : les transactions des achats sont relues.
+      else if (ev.quoi === 'achatsdetails') setDetailsAchatsRelus((n) => n + 1);
       // Un code de retrait lu dans une conversation (5.155) : on relit la ligne.
       else if (ev.quoi === 'retrait') relireColisRelais();
       // (23 oct.) Le suivi d'un achat relevé sur Vinted par l'extension.
@@ -15624,7 +15629,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // Leboncoin (banc `vitesse.cjs`, Ma journée). Seules les annonces lues sont un état.
   const lbcBesoinAnnonces = useMemo(() => {
     if (lbcLu !== true) return false;
-    const liens = load('vrm_lbc_liens', {}) || {};
+    const liens = liensLbcLus();
     return (lbcVentes.ventes || []).some(v => v && v.isSeller === true && v.itemId != null && !lbcAnnulee(v) && lbcFinalisee(v) && !(liens[String(v.itemId)] != null && String(liens[String(v.itemId)]).trim()));
   }, [lbcLu, lbcVentes]);
   const [lbcItemsLus, setLbcItemsLus] = useState(undefined);
@@ -15644,7 +15649,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const autresBenefice = useMemo(() => {
     if (lbcLu !== true || !Array.isArray(ebayCmd) || !lbcItemsBenef) return null;
     try {
-      const liens = load('vrm_lbc_liens', {}) || {};
+      const liens = liensLbcLus();
       // (11 nov.) les frais saisis sur la fiche, comme Vinted ; Vestiaire verse DÉJÀ sans sa commission (pas comptée deux fois).
       const fraisFicheAutres = (f, pl) => coutsVente(ficheDeLaRegle(pl, f)).total;   // (21 nov., lot rentabilite) eBay : jamais le port ; Vestiaire : jamais la commission notée (src/coutReel.js)
       return ventesAutresBenefice({ lbc: lbcVentes.ventes || [], ebay: ebayCmd, vestiaire: ventesVc || [], numeros,
@@ -19004,7 +19009,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // rien ; un N° encore à poster ailleurs (Vinted, Leboncoin, eBay) non plus.
     const aPoster = new Set();
     const lbcOk = lbcLu === true && lbcItemsBenef && typeof lbcItemsBenef === 'object';
-    const liensLbc = load('vrm_lbc_liens', {}) || {};
+    const liensLbc = liensLbcLus();
     const numLbcDe = (v) => { try { return numeroLbcIdentite(v, lbcItemsBenef || {}, liensLbc); } catch (_) { return null; } };
     const lbcSorties = [], ebaySorties = [];
     if (lbcOk) for (const v of (lbcVentes.ventes || [])) {
@@ -19861,7 +19866,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // (16 nov., lot plateformes-restes) eBay (n° de commande, SKU « VRM-{N°} ») et Leboncoin (n° de
     // transaction, n° du bordereau Mondial Relay) — PAR IDENTITÉ (src/douchette.js `lignesAutresSites`).
     try {
-      const liensLbcD = load('vrm_lbc_liens', {}) || {};
+      const liensLbcD = liensLbcLus();
       L.push(...lignesAutresSites({
         // Tous les sites, quel que soit le filtre affiché : un colis scanné se trouve même hors du filtre.
         ebay: Array.isArray(ebayCmd) ? ebayCmd : null,
@@ -21864,7 +21869,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       if (!rows.some((r) => r.id === "lbc_ventes"))
         manques.push("ventes Leboncoin jamais reçues");
     } else manques.push("Leboncoin non relu");
-    const liens = load("vrm_lbc_liens", {}) || {},
+    const liens = liensLbcLus(),
       comptesProuves = new Set(
         [
           ...comptesLbcProuves(ventesL, items),
@@ -32853,7 +32858,7 @@ async function lireLbcPreuve() {
   try {
     const ls = await lbcListingsSession();
     if (!ls || !ls.items) return null;
-    const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
+    const liens = { ...liensLbcLus() };
     const comptes = new Set();
     let sansIdentite = 0;
     for (const ad of Object.values(ls.items || {})) {

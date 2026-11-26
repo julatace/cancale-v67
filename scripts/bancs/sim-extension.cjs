@@ -204,7 +204,9 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     const parItem = () => Object.fromEntries(jobs().map((x) => [String(x.itemId || String(x.id || '').split(':')[0]), `${x.etat}${x.raison ? ':' + x.raison : ''}${x.cause ? '/' + x.cause : ''}${x.etape ? '@' + x.etape : ''}`]));
     const reset = async () => {
       S.d = null; V.st.req = []; V.st.ancienneConv = 200; V.st.sansLogin = false; Object.assign(V.st, { avant: 0, intercale: null, paginer: false, clocheN: 0, pageTaille: 20, suiteMs: 0, offreAuFavori: false, champRiche: false }); REGLAGES.message = MSG_PSEUDO; V.st.forcer = []; V.st.captchaSur = null; V.st.commande = {}; V.st.convs.clear(); seed();
-      await dansSW(async () => { await chrome.storage.local.remove(['vrmFavorisCarte', 'vrmActionEnCours', 'vrmPauseVinted', 'vrmCaptcha', 'vrmFavorisApercu', 'vrmTextesRecents', 'vrmToutArrete', 'vrmSortes', 'vrmActions']); });
+      await dansSW(async () => { await chrome.storage.local.remove(['vrmFavorisCarte', 'vrmActionEnCours', 'vrmPauseVinted', 'vrmCaptcha', 'vrmFavorisApercu', 'vrmTextesRecents', 'vrmFavTextesEnvoyes', 'vrmToutArrete', 'vrmSortes', 'vrmActions']); });
+      // (5.454) `vrmFavTextesEnvoyes` (5.441 : jamais deux fois le même texte à la même personne pour le même article) : les
+      //    scénarios reprennent les mêmes favoris (91010001…) — chacun part d'un registre vide ; la règle est jugée par favoris-auto.
       // (25 nov.) `vrmSortes` (15 favoris/h) et `vrmActions` (50 actions/h, réserve 5 ⇒ 45) : chaque scénario part d'une heure
       // vide — depuis que F1P réussit (5.450), F1…F1P font 15 favoris = 45 actions (ouverture, message, offre) et F1T restait
       // « en attente » du plafond d'actions de l'heure.
