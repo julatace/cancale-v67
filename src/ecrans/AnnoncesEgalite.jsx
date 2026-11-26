@@ -19,7 +19,7 @@
 // ══════════════════════════════════════════════════════════════════════════
 import { agirMaintenant, envoyerSerie, dire, republierDansApp, useFaitsAgir } from '../agir/porte.js';   // (24 nov., lot agir-tout)
 import { texteRaison } from '../agir/Agir.jsx';
-import { useComptesBloques } from '../compteBloqueEtat.js';
+import { useComptesBloques } from '../compteBloqueEtat.js';   // 5.454 : + le N° écrit en fin de description (src/lbcNumeroEcrit.js), lot lbc-numero-ecrit
 import { liensLbcLus } from '../App.jsx';   // (24 nov., lot ext-anciens-lots) les liens Leboncoin LUS (+ photo d'origine, src/photoIdentite.js)
 import { etatLienLu, propositionLu, relierDepuisListe, queSurCeSite, ouvrirLiaison, abonnerLiaison, demanderLiaison } from '../liaisonEtat.js';   // (20 nov.) relier depuis la liste
 import React from 'react';

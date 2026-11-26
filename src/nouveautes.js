@@ -136,6 +136,10 @@ export const NOUVEAUTES = Object.freeze([
   // (24 nov., ext. 5.448 — Julien : « elle doit pouvoir marcher sur tous les sites, s'adapter ») docs/passation/2026-11-24-ext-adaptatif.md
   { id: 'extension-sante-sites', date: '2026-11-24', titre: 'Santé de chaque site dans l’extension', phrase: '« Tout marche », ou ce qui ne marche plus et le geste.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'extension-adaptative', date: '2026-11-24', titre: 'L’extension s’adapte quand un site change', phrase: 'Vinted, Leboncoin, Vestiaire, eBay : bouton retrouvé, sinon arrêt expliqué.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (24 nov., quatre-sites — Julien : « 1 paire → 4 sites ») docs/passation/2026-11-24-quatre-sites.md
+  { id: 'mettre-aussi-sur', date: '2026-11-24', titre: 'Une annonce Vinted sur trois autres sites', phrase: 'Fiche d’une paire → Ailleurs : Leboncoin, Vestiaire et eBay en un geste.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (24 nov., lbc-numero-ecrit — Julien : « Oui, relie par le N° ») docs/passation/2026-11-24-lbc-numero-ecrit.md
+  { id: 'lbc-numero-ecrit', date: '2026-11-24', titre: 'Leboncoin : relié par le N° écrit', phrase: 'Finis la description par « N°132 » : l’annonce rejoint la paire 132.', tab: 'leboncoin', pour: 'tous', mode: 'tous' },
   // (23 nov., bugs-totale — Julien : « une vente reçue par mail […] pas actualisée dans l'application ») docs/passation/2026-11-22-bugs-totale.md
   { id: 'vente-email-partout', date: '2026-11-23', titre: 'Une vente reçue par e-mail se voit partout', phrase: 'Ventes, Ma journée et Colis, avant même le passage de l’extension.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov. au soir, lot retours-suivi — Julien : « le transporteur inconnu, le logo mal mis ») docs/passation/2026-11-23-retours-suivi.md

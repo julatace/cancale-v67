@@ -234,8 +234,8 @@ let ID_C1 = null;
         dit(Object.keys(im).length === 1 && im['cd'.repeat(20)] && (f.store.vrm_origine_file || []).length === 1, 'E4 · lecture ratée de la ligne ⇒ RIEN écrit (l’existant intact), la file reste', JSON.stringify({ im: Object.keys(im), file: (f.store.vrm_origine_file || []).length })); }
       { const cv = /const CODE_VERSION = '([\d.]+)'/.exec(fs.readFileSync(BG, 'utf8')); const cap = /photoorigine:\s*'([\d.]+)'/.exec(APP_BRUT);
         const vn = (x) => String(x || '').split('.').map(Number).reduce((t, n) => t * 1000 + n, 0);
-        dit(cap && cap[1] === '5.446.0' && cv && vn(cv[1]) >= vn('5.446.0') && /photoorigine:'rangerOrigineMaintenant'/.test(fs.readFileSync(path.join(RACINE, 'scripts', 'audit-coherence.cjs'), 'utf8')),
-          'E5 · `EXT_CAPACITES.photoorigine` = 5.446.0, extension ≥ 5.446.0', JSON.stringify({ cap: cap && cap[1], cv: cv && cv[1] })); }
+        dit(cap && vn(cap[1]) >= vn('5.446.0') && cv && vn(cv[1]) >= vn(cap[1])   /* (5.454) la 5.446 n'a jamais été servie seule : seuil 5.454.0 */ && /photoorigine:'rangerOrigineMaintenant'/.test(fs.readFileSync(path.join(RACINE, 'scripts', 'audit-coherence.cjs'), 'utf8')),
+          'E5 · `EXT_CAPACITES.photoorigine` ≥ 5.446.0, extension ≥ son seuil', JSON.stringify({ cap: cap && cap[1], cv: cv && cv[1] })); }
     }
 
     // ── S1 : l'app ──
@@ -253,7 +253,7 @@ let ID_C1 = null;
       // Chaque lecture des liens POSÉS seuls doit être d'une sorte permise : les N° déjà pris (un N° reconnu par la photo est
       // déjà celui d'une fiche Vinted), la définition, le calcul lui-même, ses gestes (écrire part de ses liens posés).
       const PERMIS = [/\.forEach\(add\)/, /out\.push\(n\)/, /portes\.add\(cleNum\(n\)\)/, /est déjà relié sur Leboncoin/, /function liensLbcAvecPhoto|function liensLbcPoses/,
-        /sans = load\('vrm_lbc_pas_de_paire'/, /\[String\(id\)\]: String\(n\)/, /const avant = \(load\('vrm_lbc_liens'/, /ecrireCopieLocale\('vrm_lbc_liens'/, /avecPhotoLbc\(\{ \.\.\.\(main\.vrm_lbc_liens/];
+        /sans = load\('vrm_lbc_pas_de_paire'/, /\[String\(id\)\]: String\(n\)/, /const avant = \(load\('vrm_lbc_liens'/, /ecrireCopieLocale\('vrm_lbc_liens'/, /avecPhotoLbc\((?:avecNumeroEcritLbc\()?\{ \.\.\.\(main\.vrm_lbc_liens/];   // (5.454) + le N° écrit (#1372), composé dedans
       const brutes = tout.split('\n').filter((l) => /load\(['"]vrm_lbc_liens['"], *\{\}\)/.test(l) && !/^\s*\/\//.test(l));
       const horsRegle = brutes.filter((l) => !PERMIS.some((re) => re.test(l)));
       dit(!horsRegle.length, `S1 · les ${brutes.length} lectures des liens posés seuls sont toutes permises (N° déjà pris, définition, calcul, gestes)`, horsRegle.map((l) => l.trim().slice(0, 110)).join(' | '));
