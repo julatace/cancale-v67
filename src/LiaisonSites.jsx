@@ -355,7 +355,7 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
           <Cote src={a.photo} Photo={Photo} legende={siteCompte(a)} sous={a.titre}/>
           {article ? <Cote src={article.photo} Photo={Photo} legende={<><Plaque numero={article.numero}/> {origineTxt(article)}</>} sous={article.titre}/> : null}
         </Face>
-        <p className="n-lia-phrase" data-liaison-fiche-etat={entree.etat} data-liaison-preuve={entree.etat === 'relie' && entree.preuve ? entree.preuve : undefined}>
+        <p className="n-lia-phrase" data-liaison-fiche-etat={entree.etat}>
           {entree.etat === 'propre' ? (entree.numero ? tr('liaE.seuleNumero', { site: a.plateforme, numero: entree.numero }) : tr('liaE.seule', { site: a.plateforme })) : entree.etat === 'aVerifier' ? tr('liaE.aVerifier') : tr('liaE.relie', { numero: entree.numero })}
           {entree.etat === 'relie' && entree.preuve ? <span className="n-lia-legende-sous">{faits(tr('lia.preuve.' + entree.preuve), dateCourte(entree.lieLe))}</span> : null}
         </p>
@@ -396,8 +396,6 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
           <span className="n-lia-annonce-site">{siteCompte(a)}</span>
           <h2 className="n-lia-annonce-titre">{a.titre || '—'}</h2>
           <span className="n-lia-annonce-faits">{faits(tailleTxt(a), prixTxt(a.prix), entree.numeroSite ? 'N°' + entree.numeroSite : '')}</span>
-          {/* (24 nov., lot lbc-numero-ecrit) Un N° écrit à la fin de sa description qui ne désigne pas UNE paire : pas relié, la raison dite (neutre). */}
-          {a.numeroEcrit && a.numeroEcrit.raison ? <span className="n-lia-annonce-ecrit" data-liaison-ecrit={a.numeroEcrit.raison} data-numero={a.numeroEcrit.numero || undefined}>{tr('lia.ecrit.' + a.numeroEcrit.raison, { numero: a.numeroEcrit.numero || '' })}</span> : null}
           {a.lien ? <a className="n-lia-annonce-lien" href={a.lien} target="_blank" rel="noopener noreferrer">{tr('lia.ouvrir')} ↗</a> : null}
         </div>
       </section>

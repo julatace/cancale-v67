@@ -60,8 +60,7 @@
     try { document.removeEventListener('DOMContentLoaded', announce); } catch (_) {}
     try { if (globalThis.__vrmPontVivant === moi) delete globalThis.__vrmPontVivant; } catch (_) {}
   };
-  // 5.446 (lot ext-anciens-lots, revue basse 120) : à l'origine exacte de vrm.center, plus jamais '*'.
-  const poster = (m) => { try { window.postMessage(m, location.origin); } catch (_) {} };
+  const poster = (m) => { try { window.postMessage(m, '*'); } catch (_) {} };
   // 5.165 : l'IDENTIFIANT de l'extension voyage avec la version. Deux extensions
   //    VRM installées dans le même Chrome exécutaient CHAQUE commande de l'app
   //    deux fois (mesuré le 9 octobre) ; l'app compte les ponts qui répondent à

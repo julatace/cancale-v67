@@ -64,9 +64,7 @@ const fuite = (o) => { const s = JSON.stringify(o == null ? null : o); return PE
         return r.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': 'https://fr.vestiairecollective.com', 'access-control-allow-credentials': 'true', 'access-control-allow-headers': '*' }, body: JSON.stringify(body) });
       });
       await p.goto('https://fr.vestiairecollective.com/messages/');
-      // 5.396 : le banc tient le bout « relais » du canal privé que vc-inject.js remet (comme vc.js) ;
-      // les résultats et les recettes n'arrivent QUE par ce port, les ordres partent par lui.
-      await p.addScriptTag({ content: 'window.__msgs=[];window.__surPort=[];window.addEventListener("message",(e)=>{if(e.data&&e.data.__tag==="CANCALE_VC_CANAL"&&e.ports&&e.ports[0]&&!window.__port){window.__port=e.ports[0];window.__port.onmessage=(ev)=>{if(ev.data&&ev.data.__tag==="CANCALE_VC"){window.__msgs.push(ev.data);for(const f of window.__surPort)f(ev.data);}};return;}if(e.data&&e.data.__tag==="CANCALE_VC")window.__msgs.push(e.data)});' });
+      await p.addScriptTag({ content: 'window.__msgs=[];window.addEventListener("message",(e)=>{if(e.data&&e.data.__tag==="CANCALE_VC")window.__msgs.push(e.data)});' });
       await p.addScriptTag({ content: inj });
       return { c, p, recues, msgs: (k) => p.evaluate((kk) => window.__msgs.filter((m) => m.kind === kk), k) };
     };

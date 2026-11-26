@@ -35,7 +35,6 @@
 //  d'avant). `--prouve` : chaque règle réaffaiblie doit faire rougir l'audit.
 // ════════════════════════════════════════════════════════════════════════════
 require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
-const { FauxCanal } = require('./_canal-faux.cjs');
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const { spawnSync } = require('child_process');
 const { faireFond } = require('./_fond-vm.cjs');
@@ -137,13 +136,10 @@ const LISTE = { channels: [
 function pageVc() {
   const INJ = fs.readFileSync(F.inject, 'utf8');
   const posts = [], ecoutes = [], appels = [];
-  let portRelais = null;
   const routes = {};   // 'METHODE url' → { status, body }
   const rep = (m, u) => routes[m + ' ' + u] || routes['* ' + u] || { status: 404, body: { message: 'introuvable' } };
   const win = {
-    // 5.396 : le capteur remet le port de son canal privé (le banc tient le bout du relais) ;
-    // les ordres passent par ce port, ce qui en revient (résultats, recettes) arrive par lui.
-    postMessage: (m, o, ports) => { if (m && m.__tag === 'CANCALE_VC_CANAL' && ports && ports[0]) { portRelais = ports[0]; portRelais.onmessage = (e) => posts.push(copie(e.data)); return; } if (m && m.__tag === 'CANCALE_VC_ORDRE') { if (portRelais) portRelais.postMessage(copie(m)); return; } posts.push(copie(m)); },
+    postMessage: (m) => { if (m && m.__tag === 'CANCALE_VC_ORDRE') { for (const f of ecoutes.slice()) f({ source: win, data: copie(m) }); return; } posts.push(copie(m)); },
     fetch: async (u, init) => {
       const m = String((init && init.method) || 'GET').toUpperCase();
       appels.push({ u: String(u), m });
@@ -172,7 +168,7 @@ function pageVc() {
   const ctx = { window: win, XMLHttpRequest: FauxXhr, document: { currentScript: {}, createElement: () => ({}), head: { appendChild() {} }, addEventListener() {}, getElementById: () => null, readyState: 'complete' },
     location: { origin: ORIGINE, hostname: 'fr.vestiairecollective.com', pathname: '/chat/', href: ORIGINE + '/chat/' }, history: { pushState() {}, replaceState() {} },
     URL, console: { log() {}, warn() {}, error() {} }, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {}, JSON, Date, Math, Map, Set, Promise, encodeURIComponent, btoa: (x) => Buffer.from(x, 'latin1').toString('base64'), Uint8Array, ArrayBuffer, String };
-  ctx.MessageChannel = FauxCanal; vm.createContext(ctx); vm.runInContext(INJ, ctx, { filename: 'vc-inject.js' });
+  vm.createContext(ctx); vm.runInContext(INJ, ctx, { filename: 'vc-inject.js' });
   const appel = async (m, url, corps, status = 200, viaXhr = false, envoye) => {
     routes[m + ' ' + url] = { status, body: corps };
     const n = posts.length;
@@ -186,16 +182,12 @@ function pageVc() {
 // Le VRAI relais vc.js : ce qu'il transmet au fond.
 function relais() {
   const RELAIS = fs.readFileSync(F.relais, 'utf8');
-  const envois = []; let ecoute = null; const ecoutes = [];
-  const win = { addEventListener: (t, f) => { if (t === 'message') { ecoute = f; ecoutes.push(f); } }, postMessage() {} };
+  const envois = []; let ecoute = null;
+  const win = { addEventListener: (t, f) => { if (t === 'message') ecoute = f; }, postMessage() {} };
   win.top = win;
-  const ctx = { window: win, self: {}, chrome: { runtime: { id: 'banc', sendMessage: (m, cb) => { envois.push(copie(m)); if (cb) cb(); }, lastError: null, onMessage: { addListener() {} } } }, location: { origin: ORIGINE, href: ORIGINE + '/chat/' }, URL, console, setTimeout, clearTimeout, JSON, Date, Math, Map, Set };
+  const ctx = { window: win, self: {}, chrome: { runtime: { id: 'banc', sendMessage: (m, cb) => { envois.push(copie(m)); if (cb) cb(); }, lastError: null, onMessage: { addListener() {} } } }, location: { href: ORIGINE + '/chat/' }, URL, console, setTimeout, clearTimeout, JSON, Date, Math, Map, Set };
   vm.createContext(ctx); vm.runInContext(RELAIS, ctx, { filename: 'vc.js' });
-  // 5.396 : le capteur remet d'abord le port de son canal privé (comme vc-inject.js) ; ses
-  // lettres arrivent par ce port (livrées tout de suite : le banc lit la suite aussitôt).
-  const mc = new FauxCanal();
-  for (const f of ecoutes.slice()) f({ source: win, origin: ctx.location.origin, data: { __tag: 'CANCALE_VC_CANAL' }, ports: [mc.port2] });
-  return (d) => { const n = envois.length; if (mc.port2.onmessage) mc.port2.onmessage({ data: copie(d) }); return envois.slice(n); };
+  return (d) => { const n = envois.length; if (ecoute) ecoute({ source: win, data: d }); return envois.slice(n); };
 }
 const senderVc = (tab) => ({ tab: { id: tab, url: ORIGINE + '/chat/' }, frameId: 0, url: ORIGINE + '/chat/' });
 const de = (posts, k) => posts.filter((x) => x.kind === k);

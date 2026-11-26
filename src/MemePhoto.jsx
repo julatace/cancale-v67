@@ -55,22 +55,14 @@ export function LigneMemePhotoNumero({ numero, cle, charger }) {
   const res = useMemePhoto(charger);
   const k = typeof cle === 'function' ? cle(numero) : String(numero || '');
   const l = k && res && res.lu && res.parNumero ? res.parNumero.get(k) || [] : [];
-  // (24 nov., lot ext-anciens-lots, repris de #1219) Reconnue par la PHOTO D'ORIGINE (le même fichier, src/photoOrigine.js) :
-  // « Aussi sur Leboncoin · reconnue par la photo d'origine » — rien à faire (ton neutre), la limite dans le titre.
-  const rec = k && res && res.reconnuesParNumero ? res.reconnuesParNumero.get(k) || [] : [];
-  const sitesRec = [...new Set(rec.map((p) => p.plateforme))];
-  const aussi = rec.length ? (
-    <p className="vrm-mph-ligne is-reconnue" data-meme-photo-aussi={k} data-par="code" data-n={String(rec.length)} data-sites={sitesRec.join(' ')} title={tr('memePhoto.limiteOrigine')}>
-      <span className="vrm-mph-ligne-texte">{tr('memePhoto.aussiSurOrigine', { sites: sitesRec.join(' · ') })}</span>
-    </p>) : null;
-  if (!l.length) return aussi;
+  if (!l.length) return null;
   const sites = [...new Set(l.map((p) => p.annonce.plateforme))];
-  return (<>{aussi}
+  return (
     <button type="button" className="sb-lien vrm-mph-ligne" data-meme-photo-numero={k} data-n={String(l.length)} onClick={() => ouvrirMemePhoto(sites.length === 1 ? sites[0] : null)}>
       <span className="sb-point-ambre" aria-hidden="true"/>
       <span className="vrm-mph-ligne-texte">{tr('memePhoto.surSites', { sites: sites.join(' · ') })}</span>
       <span aria-hidden="true" className="vrm-mph-chevron">›</span>
-    </button></>
+    </button>
   );
 }
 

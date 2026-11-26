@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.454.0';
+const CODE_VERSION = '5.453.2';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -297,9 +297,6 @@ function ouvrirVRMDepuis(urlActive, opts) {
 }
 // Le clic sur l'icône (nommé : un banc peut le jouer — Playwright ne touche pas la barre de Chrome).
 async function surClicIcone(tab) {
-  // 5.446 (lot ext-anciens-lots, revue basse 90) : sans menu (Orion) et sans session EN MÉMOIRE, la
-  //   fenêtre de connexion s'ouvre TOUT DE SUITE, dans le geste (`openPopup` le perd après un `await`).
-  if (sansMenuIcone() && !(VRM_SESSION && VRM_SESSION.access_token)) { try { const r = chrome.action.openPopup(); if (r && typeof r.catch === 'function') r.catch(() => {}); return; } catch (_) {} }
   // Le clic n'arrive ici que si le popup est vide, donc si une session
   // existe. Si elle a expiré entre-temps, on remet la fenêtre de connexion.
   const e = await authEtat().catch(() => ({ connecte: true }));
@@ -1437,20 +1434,7 @@ async function withOwner(row) {
 async function appDataConflict() { return 'owner,id'; }
 
 // Dernier csrf-token vu par domaine (fourni par inject.js).
-// 5.446 (lot ext-anciens-lots ; revue, basse 79) : recopié dans `chrome.storage.session` (§4.9 : une variable de
-//   module meurt avec le worker — au réveil, `x-csrf-token: ''` jusqu'à la page suivante).
-//   Session : effacé à la fermeture du navigateur ; c'est un jeton que la page a déjà.
 const lastCsrfByDomain = {};
-const CSRF_STORE = 'vrmCsrf';
-try { const S = chrome.storage && chrome.storage.session; if (S) S.get(CSRF_STORE).then((o) => { const v = o && o[CSRF_STORE]; if (v && typeof v === 'object') for (const [d, t] of Object.entries(v)) if (!lastCsrfByDomain[d] && typeof t === 'string' && t.length <= 400) lastCsrfByDomain[d] = t; }).catch(() => {}); } catch (_) {}
-// Rend vrai si le jeton a CHANGÉ (basse 102 : seulement alors on relit le compte).
-function noterCsrf(domain, csrf) {
-  const d = String(domain || ''), t = String(csrf || '').slice(0, 400);
-  if (!d || !t || lastCsrfByDomain[d] === t) return false;
-  lastCsrfByDomain[d] = t;
-  try { const S = chrome.storage && chrome.storage.session; if (S) S.set({ [CSRF_STORE]: Object.assign({}, lastCsrfByDomain) }).catch(() => {}); } catch (_) {}
-  return true;
-}
 
 // --- Utilitaires -----------------------------------------------------------
 
@@ -2259,19 +2243,12 @@ async function captureAllAccounts() {
 // ── JOURNAL D'ACTIVITÉ (l'« interface quand je fais des actions ») ───────────
 // Petit fil des dernières choses faites par l'extension, montré dans le panneau
 // VRM. Anneau de 15 événements dans chrome.storage.local (léger, local).
-// 5.446 (lot ext-anciens-lots ; revue, basse 86) : une écriture à la fois (chaîne de module) — deux événements
-// simultanés ne s'écrasent plus ; une lecture ratée n'écrit rien (le fil n'est pas vidé).
-let _chaineActivite = Promise.resolve();
-function logActivity(text) {
-  const suite = _chaineActivite.then(async () => {
-    let cur;
-    try { cur = (await chrome.storage.local.get('vrmActivity')).vrmActivity || []; } catch (_) { return; }
-    if (!Array.isArray(cur)) cur = [];
+async function logActivity(text) {
+  try {
+    const cur = (await chrome.storage.local.get('vrmActivity')).vrmActivity || [];
     cur.unshift({ t: Date.now(), text: String(text || '').slice(0, 90) });
-    try { await chrome.storage.local.set({ vrmActivity: cur.slice(0, 15) }); } catch (_) {}
-  });
-  _chaineActivite = suite.then(() => {}, () => {});
-  return suite.catch(() => {});
+    await chrome.storage.local.set({ vrmActivity: cur.slice(0, 15) });
+  } catch (_) {}
 }
 
 // --- Capture passive des donnees ------------------------------------------
@@ -2314,10 +2291,7 @@ let _diagFlushAt = 0;
 function majTampon(fn) {
   _diagChaine = _diagChaine.then(async () => {
     let buf = {};
-    // 5.446 (lot ext-anciens-lots ; revue, basse 84) : stockage illisible ⇒ rien n'est écrit (avant : `{}` réécrit
-    // par-dessus le tampon existant, ses compteurs perdus). Ce compteur-ci est perdu, pas les autres.
-    try { const s = await chrome.storage.local.get(DIAG_BUF); buf = (s && s[DIAG_BUF]) || {}; } catch (_) { return; }
-    if (!buf || typeof buf !== 'object') buf = {};
+    try { const s = await chrome.storage.local.get(DIAG_BUF); buf = (s && s[DIAG_BUF]) || {}; } catch (_) {}
     buf.n = buf.n || {}; buf.rates = buf.rates || {};
     fn(buf);
     try { await chrome.storage.local.set({ [DIAG_BUF]: buf }); } catch (_) {}
@@ -2329,17 +2303,6 @@ function majTampon(fn) {
   return _diagChaine;
 }
 
-const DIAG_N_MAX = 600, DIAG_RATES_MAX = 80;
-// Les compteurs les plus grands, et toujours ceux qu'on vient d'ajouter (`neufs`).
-function bornerCompteurs(n, neufs, max) {
-  const cles = Object.keys(n || {});
-  if (cles.length <= max) return n;
-  const garde = new Set(Object.keys(neufs || {}));
-  const reste = cles.filter((k) => !garde.has(k)).sort((a, b) => (Number(n[b]) || 0) - (Number(n[a]) || 0));
-  for (const k of reste) { if (garde.size >= max) break; garde.add(k); }
-  const out = {}; for (const k of cles) if (garde.has(k)) out[k] = n[k];
-  return out;
-}
 // Envoie le tampon en base et ne le vide QUE si l'écriture a abouti.
 async function viderTampon(buf) {
   const aDesN = Object.keys(buf.n || {}).length, aDesR = Object.keys(buf.rates || {}).length;
@@ -2349,26 +2312,20 @@ async function viderTampon(buf) {
   // (5.362 : la ligne de DIAGNOSTIC reste en lire-fusionner-réécrire — la passer en
   //  comparer-et-échanger, comme `seen_urls` et les statuts d'offres, est noté dans
   //  le récit ; deux Chrome peuvent encore s'y perdre quelques compteurs, rien d'autre.)
-  // 5.446 (lot ext-anciens-lots ; revue, moyenne 71 et basse 85) : COMPARER-ET-ÉCHANGER sur `data.rev`
-  //  (`modifierLigneCas`) — deux Chrome ne s'écrasent plus leurs compteurs ; et la ligne
-  //  est BORNÉE : 600 compteurs au plus (les plus grands gardés, ceux de ce tampon toujours),
-  //  80 échantillons (les plus récents). « Pas su » (lecture ou écriture ratée, devancé) ⇒
-  //  le tampon local n'est PAS vidé.
+  const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
+  if (rows === null) return;
   const ver = (() => { try { return String(chrome.runtime.getManifest().version || ''); } catch (_) { return ''; } })();
-  const okDiag = await modifierLigneCas('panel_diag_capture', (d) => {
+  const okDiag = await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: ((d) => {
     const tout = Object.assign({}, d || {}); delete tout.rev;
     const n = { ...(tout.n || {}) };
     for (const k in buf.n) n[k] = (n[k] || 0) + buf.n[k];
-    const nBorne = bornerCompteurs(n, buf.n, DIAG_N_MAX);
     // 5.362 (moyenne 49) : les anciens échantillons perdent leur `tete` (un morceau du corps).
-    let rates = {};
+    const rates = {};
     for (const [k, v] of Object.entries(Object.assign({}, tout.rates || {}, buf.rates || {}))) { if (v && typeof v === 'object') { const c = Object.assign({}, v); delete c.tete; rates[k] = c; } }
-    const cr = Object.keys(rates);
-    if (cr.length > DIAG_RATES_MAX) rates = Object.fromEntries(cr.map((k) => [k, rates[k]]).sort((a, b) => String(b[1].at || '').localeCompare(String(a[1].at || ''))).slice(0, DIAG_RATES_MAX));
-    return { ...tout, n: nBorne, rates, majAt: new Date().toISOString(),
+    return { ...tout, n, rates, majAt: new Date().toISOString(),
       ...(ver ? { ver, verAt: new Date().toISOString() } : {}), verCode: CODE_VERSION };
-  });
-  if (okDiag !== true) return;
+  })((rows[0] && rows[0].data) || {}) }], 'id');
+  if (okDiag === false) return;
   buf.n = {}; buf.rates = {};
   try { await chrome.storage.local.set({ [DIAG_BUF]: buf }); } catch (_) {}
 }
@@ -3208,7 +3165,6 @@ function signalerForme(uid, d) {
       if (!ok) return;
       u[d.type] = { at: Date.now(), sig }; st[String(uid)] = u;
       await chrome.storage.local.set({ [FORMES_VUES]: st });
-      majSanteSites().catch(() => {});
     } catch (_) {}
   });
 }
@@ -3225,7 +3181,6 @@ function formeRevenue(uid, type) {
       delete u[type]; st[String(uid)] = u;
       await chrome.storage.local.set({ [FORMES_VUES]: st });
       noterDiag(`forme_revenue_${type}`);
-      majSanteSites().catch(() => {});
     } catch (_) {}
   });
 }
@@ -3970,7 +3925,7 @@ async function commandeParcours(msg,sender){return parcoursSerie(async()=>{
 });}
 
 // --- Messages venant de content.js ----------------------------------------
-const PAGE_SORTES_PREUVE = new Set(['label', 'receipt', 'suppression', 'vacances', 'writereq', 'fiche', 'publication', 'brouillon', 'brouillonPublie', 'photoOrigine', 'annoncePhotos']);
+const PAGE_SORTES_PREUVE = new Set(['label', 'receipt', 'suppression', 'vacances', 'writereq', 'fiche', 'publication', 'brouillon', 'brouillonPublie']);
 function canalPageDouteux(msg) {
   if (msg && msg.canal === 'douteux') return true;
   let orion = false; try { orion = !!globalThis.__vrmOrionCompat; } catch (_) {}
@@ -4349,19 +4304,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       filVcCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
     }
-    // 5.444 : « Faire une offre » aux personnes qui ont aimé UN article, depuis le panneau, sur SON clic CONFIRMÉ — le
-    // même chemin que depuis l'app (`offrirAuxAimesVc` : recette apprise et rejouable, prix lu = celui de l'aperçu,
-    // garde du prix, onglet sur CE compte, porte des favoris, 45/h réserve 5, pause 429/403, une personne à la fois).
-    if (msg && msg.from === 'vrm-badge' && msg.action === 'offreAimesCarte') {
-      (async () => {
-        const o = ongletCarte(sender);
-        if (!o || o.fenetre || plateformeDe(o.url) !== 'vestiaire') return { ok: false, code: 'origine', raison: 'L’offre part seulement de l’onglet vestiairecollective.com.' };
-        if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : confirme d’abord.' };
-        const r = await offrirAuxAimesVc({ produit: msg.produit, avantCents: Number(msg.avantCents), prixCents: Number(msg.prixCents), gardeConfirmeC: msg.gardeConfirmeC });
-        return Object.assign({ ok: !!(r && r.accepte) }, r || {});
-      })().then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
-      return true;
-    }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'aimesVcCarte') {
       aimesVcCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
@@ -4601,19 +4543,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       })();
       return true;
     }
-    // 5.448 (`adaptatif`) : ce que la couche de repérage a vu sur Leboncoin, Vestiaire ou eBay (le gagnant, ou les stratégies
-    //    essayées et leurs comptes — jamais un texte de la page) ⇒ la mémoire de CE site et le journal. Le site est celui de
-    //    l'ONGLET qui parle (pas celui que le message dit), cadre principal seulement.
-    if (msg && msg.action === 'trouveJournal' && (msg.from === 'cancale-lbc' || msg.from === 'cancale-vc' || msg.from === 'cancale-ebay')) {
-      (async () => {
-        let site = '';
-        try { const h = new URL((sender && sender.tab && sender.tab.url) || '').hostname; site = /(^|\.)leboncoin\.fr$/i.test(h) ? 'lbc' : /(^|\.)vestiairecollective\.com$/i.test(h) ? 'vc' : /(^|\.)ebay\.[a-z.]+$/i.test(h) ? 'ebay' : ''; } catch (_) {}
-        if (!site || (sender && sender.frameId > 0) || !sender || sender.id !== chrome.runtime.id) { sendResponse({ ok: false }); return; }
-        await retenirTrouves(String(msg.etape || '').slice(0, 20), { trouves: Array.isArray(msg.trouves) ? msg.trouves.slice(0, 12) : [], verPage: msg.verPage }, site).catch(() => {});
-        sendResponse({ ok: true });
-      })();
-      return true;
-    }
     // (11 nov., 5.339) vinted-infos.js : la ligne sous SES annonces, l'encart d'achat.
     if (msg && msg.from === 'cancale-vinfos') {
       (async () => {
@@ -4638,10 +4567,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'getPending') {
             const g = await chrome.storage.local.get('vrmPendingEbay');
             const p = g && g.vrmPendingEbay;
-            const ad = (p && p.at && (Date.now() - p.at) < 30 * 60 * 1000) ? p.ad : null;
-            // 5.446 (lot ext-anciens-lots ; revue, moyenne 65) : la paire ne se remplit QUE dans l'onglet ouvert pour
-            // elle (`ebay:{id}`.tabId) — deux onglets eBay ne la remplissent plus deux fois.
-            sendResponse({ ok: true, ad: ad && (await ongletDuDepot('ebay:' + String(ad.id), sender)) ? ad : null }); return;
+            sendResponse({ ok: true, ad: (p && p.at && (Date.now() - p.at) < 30 * 60 * 1000) ? p.ad : null }); return;
           }
           // ⚠️ JE N'AI JAMAIS VU LE FORMULAIRE eBAY. Plutôt que de deviner ses
           //    champs, l'extension me les RAPPORTE depuis son navigateur : c'est
@@ -4657,14 +4583,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const prev = await sbGet('app_data?id=eq.panel_ebay_form&select=data');
             if (prev === null) { sendResponse({ ok: false, error: 'lecture' }); return; }   // « pas su » ≠ « rien »
             const cur = (prev && prev[0] && prev[0].data) || {};
-            let etapes = Object.assign({}, cur.etapes || {});
-            // 5.446 (lot ext-anciens-lots ; revue, basse 99) : la clé est NORMALISÉE (chemin sans requête ni chiffres,
-            //   120 signes) et la ligne BORNÉE à 24 étapes (les plus récentes), comme Vestiaire.
-            const cleEtape = String(msg.etape || (() => { try { return new URL(String(msg.url || '')).pathname; } catch (_) { return String(msg.url || ''); } })() || Object.keys(etapes).length).replace(/\d{3,}/g, '{n}').slice(0, 120);
-            etapes[cleEtape] =
-              { url: String(msg.url || '').split('?')[0].slice(0, 300), fields: msg.fields.slice(0, 150), selects: (msg.selects || []).slice(0, 30), fichiers: Number(msg.fichiers) || 0, at: new Date().toISOString() };
-            const cles = Object.keys(etapes);
-            if (cles.length > 24) etapes = Object.fromEntries(cles.map((k) => [k, etapes[k]]).sort((a, b) => String((b[1] && b[1].at) || '').localeCompare(String((a[1] && a[1].at) || ''))).slice(0, 24));
+            const etapes = Object.assign({}, cur.etapes || {});
+            etapes[String(msg.etape || msg.url || Object.keys(etapes).length)] =
+              { url: msg.url, fields: msg.fields.slice(0, 150), selects: (msg.selects || []).slice(0, 30), fichiers: msg.fichiers || 0, at: new Date().toISOString() };
             await supabaseUpsert('app_data', [{ id: 'panel_ebay_form', data: { ...cur, url: msg.url, fields: msg.fields.slice(0, 150), etapes, at: new Date().toISOString() } }], 'id');
             sendResponse({ ok: true }); return;
           }
@@ -4759,10 +4680,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // 5.299 : … et seulement si la PAGE dit le même (`compteVcCapture`) : un onglet où l'on vient de changer de compte n'étiquette rien.
           const compteOnglet = await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi);
           if (compteOnglet) secuLectureNormale('vestiaire', compteOnglet).catch(() => {});   // (5.366) sa page Vestiaire lit normalement
-          const ok = await rangerVcAnnonces({ items: msg.items, offset: msg.offset, total: msg.total, lus: msg.lus, forme: msg.forme, compte: compteOnglet, complet: msg.complet, inconnu: msg.inconnu, inconnues: Number(msg.inconnues) || 0 });
-          // 5.444 : des annonces lues À CÔTÉ d'enveloppes illisibles comptent comme une capture (diag à part).
-          if (Array.isArray(msg.inconnu) && Number(msg.inconnues) > 0 && Array.isArray(msg.items) && msg.items.length) { noterDiag('vc_annonces_en_partie_inconnues'); await noterVcCapte('annonces', ok === true, msg.items.length); }
-          else if (Array.isArray(msg.inconnu)) { noterDiag('vc_format_inconnu_annonces'); await noterVcCapte('annonces', ok === true, 0, { inconnu: true }); } else await noterVcCapte('annonces', ok === true, Array.isArray(msg.items) ? msg.items.length : 0);
+          const ok = await rangerVcAnnonces({ items: msg.items, offset: msg.offset, total: msg.total, lus: msg.lus, forme: msg.forme, compte: compteOnglet, complet: msg.complet, inconnu: msg.inconnu });
+          if (Array.isArray(msg.inconnu)) { noterDiag('vc_format_inconnu_annonces'); await noterVcCapte('annonces', ok === true, 0, { inconnu: true }); } else await noterVcCapte('annonces', ok === true, Array.isArray(msg.items) ? msg.items.length : 0);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -4906,17 +4825,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     // 5.319 : tes OFFRES Vestiaire et la recette d'une réponse faite par toi sur la page.
     // 5.392 : les personnes qui ont aimé TES articles (gardées dans CE navigateur ; la base n'en reçoit que des nombres).
-    // 5.444 : les notifications de Vestiaire (gardées dans CE navigateur, compte de l'onglet ET de la page seulement).
-    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcNotifs') {
-      (async () => {
-        try {
-          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
-          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
-          sendResponse({ ok: (await rangerVcNotifs(msg.cartes, await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi))) === true });
-        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
-      })();
-      return true;
-    }
     if (msg && msg.from === 'cancale-vc' && msg.action === 'vcAimes') {
       (async () => {
         try {
@@ -4959,12 +4867,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // Les OCTETS des photos, pour les ATTACHER au formulaire au lieu de
           // les télécharger sur son disque. Le fond les lit parce que le CDN de
           // Vinted ne renvoie aucun en-tête CORS : la page seule ne peut pas.
-          // 16 nov. (5.401) : le code d'origine (SHA-256) d'une photo qu'il vient d'envoyer à Leboncoin (2xx).
-          if (msg.action === 'lbcPhotoOrigine') {
-            if (sender?.frameId > 0 || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(sender?.tab?.url || '')) { sendResponse({ ok: false }); return; }
-            const ok = msg.fichier ? await noterPhotoOrigineLbc(msg) : (noterDiag('origine_lbc_forme_inconnue'), false);
-            sendResponse({ ok: ok === true }); return;
-          }
           if (msg.action === 'photoBytes' && Array.isArray(msg.urls)) { const ph = await photosEnOctets(msg.urls, msg.max); sendResponse({ ok: true, photos: ph }); return; }
           // Ce que la page Leboncoin porte vraiment. Aucune donnée d'annonce :
           // juste de quoi savoir si la capture a pu lire quelque chose. Sans ça,
@@ -5223,9 +5125,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'lbcSchema' && msg.endpoint && Array.isArray(msg.cles)) { await storeLbcRecon({ schemaOne: { endpoint: msg.endpoint, cles: msg.cles } }); sendResponse({ ok: true }); return; }
           // La messagerie Leboncoin : le nombre de non-lus d'un compte, et ses
           // comptes liés. Rangés dans `lbc_messages` (voir storeLbcMessages).
-          // 5.445 : la liste des conversations et le porte-monnaie — cadre principal d'un onglet leboncoin.fr, compte de CET onglet.
-          if (msg.action === 'lbcConversations') { sendResponse(await rangerLbcConversations(msg, sender).catch(() => ({ ok: false }))); return; }
-          if (msg.action === 'lbcPorteMonnaie') { sendResponse(await rangerLbcPorteMonnaie(msg, sender).catch(() => ({ ok: false }))); return; }
           if (msg.action === 'lbcMsgCompteur' && msg.userId) {
             const id=String(msg.userId).slice(0,64);if(!/^[0-9a-f-]{8,64}$/i.test(id)){sendResponse({ok:false});return;}
             await storeLbcMessages({compteur:{userId:id,unread:Number(msg.unread)}});
@@ -5265,10 +5164,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             //    ouverte (un dépôt abandonné, puis relancé ailleurs) la reprenait
             //    au premier retour sur l'onglet — et publiait une seconde fois.
             //    Sans onglet connu (dépôt lancé autrement) : comme avant.
-            //    5.446 (lot ext-anciens-lots ; revue, basse 101) : et SEULEMENT là — sans onglet retenu pour ce dépôt
-            //    (dépôt fermé, abandonné, jamais ouvert par VRM), aucun onglet ne la reçoit.
             let ad = frais ? p.ad : null;
-            if (ad && !(await ongletDuDepot('lbc:' + String(ad.id), sender))) ad = null;
+            if (ad && sender && sender.tab && sender.tab.id != null) {
+              const job = (await lireCmds())['lbc:' + String(ad.id)];
+              if (job && job.tabId != null && job.tabId !== sender.tab.id) ad = null;
+            }
             sendResponse({ ok: true, ad }); return;
           }
           sendResponse({ ok: false, error: 'action inconnue' });
@@ -5300,9 +5200,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   //    marque tient le canal pour douteux.
   if (PAGE_SORTES_PREUVE.has(String(msg.kind || '')) && canalPageDouteux(msg)) { noterDiag('page_canal_douteux_' + String(msg.kind).slice(0, 20)); return; }
   if (msg.kind === 'csrf' && msg.csrf) {
-    // On rattache le csrf au compte actif (mise a jour legere) — 5.446 (basse 102) :
-    // seulement quand le jeton CHANGE (avant : à chaque requête de la page qui le portait).
-    if (noterCsrf(domain, msg.csrf)) captureDomain(domain);
+    lastCsrfByDomain[domain] = msg.csrf;
+    // On rattache le csrf au compte actif (mise a jour legere).
+    captureDomain(domain);
   } else if (msg.kind === 'harvest' && msg.body) {
     storeHarvest(domain,msg.type,msg.id,msg.body,msg.url,sender?.frameId>0?null:sender?.tab?.id,msg.method,msg.httpStatus).then(()=>sendResponse({recu:true}),()=>sendResponse({recu:false}));
     return true;
@@ -5325,12 +5225,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   } else if (msg.kind === 'publication') {
     if (msg.itemId) noterPublication(sender && sender.tab ? sender.tab.id : null, msg.itemId, msg.status);
     else noterDiag('publication_forme_inconnue');
-  } else if (msg.kind === 'photoOrigine') {
-    // 16 nov. (5.401) : le code d'origine (SHA-256) d'une photo qu'il vient d'envoyer à Vinted (2xx).
-    if (msg.photoId && !(sender && sender.frameId > 0)) noterPhotoOrigineVinted(msg, domain).catch(() => {});
-    else noterDiag('origine_photo_forme_inconnue');
-  } else if (msg.kind === 'annoncePhotos') {
-    if (msg.itemId && !(sender && sender.frameId > 0)) noterAnnoncePhotosVinted(msg, domain).catch(() => {});
   } else if (msg.kind === 'brouillon') {
     // 28 oct. : un brouillon qu'il vient d'ENREGISTRER sur Vinted (2xx) — son
     // corps, pour le mettre en ligne depuis VRM (`noterBrouillonVinted`).
@@ -5736,7 +5630,7 @@ async function rangerSuppressions() {
 //     un titre. Inconnu ⇒ rien.
 const RESA_LIGNE = 'panel_num_reserves';
 const RESA_ATTENTE_MS = 3 * 3600e3;
-const RESA_ITEMS_MAX = 400, RESA_ITEMS_DUR = 2000, RESA_ITEMS_JOURS = 30;
+const RESA_ITEMS_MAX = 400;
 const RESA_LOCAL = 'vrmNumResaOnglets';
 let _chaineResa = Promise.resolve();
 const unResaALaFois = (fn) => { const p = _chaineResa.then(fn, fn); _chaineResa = p.catch(() => {}); return p; };
@@ -5782,11 +5676,7 @@ function resaPropre(data, maintenant) {
   for (const h of Object.values(haut)) attente[h.n] = h.v;
   const its = Object.entries((data && data.items) || {}).filter(([id, v]) => /^\d{4,15}$/.test(id) && v && v.numero);
   its.sort((a, b) => String(b[1].at || '').localeCompare(String(a[1].at || '')));
-  // 5.446 (lot ext-anciens-lots ; revue, basse 92) : une liaison annonce → N° de moins de 30 jours n'est JAMAIS
-  //   coupée par la borne (l'app ne l'a peut-être pas encore reprise) — les 400 plus récentes
-  //   comme avant, plus toutes celles du mois, 2 000 au plus (une ligne qui reste légère).
-  const recent = Date.now() - RESA_ITEMS_JOURS * 86400000;
-  its.forEach(([id, v], i) => { if (i < RESA_ITEMS_MAX || (i < RESA_ITEMS_DUR && Date.parse(String(v.at || '')) >= recent)) items[id] = v; });
+  for (const [id, v] of its.slice(0, RESA_ITEMS_MAX)) items[id] = v;
   return { attente, items };
 }
 async function lireResa() {
@@ -9634,93 +9524,6 @@ async function empreintesSitesUnTour() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 5.401 (16 nov.) — LE CODE D'ORIGINE DE SES PHOTOS (lot photo-identite-sites)
-// ══════════════════════════════════════════════════════════════════════════════
-// Julien : « non pas à quoi elle ressemble, mais son CODE » ; « vas-y, fais ça au moins ».
-// MESURÉ : Vinted et Leboncoin réencodent ce qu'il téléverse (tailles refaites, une « règle » par
-// taille) : le code des photos SERVIES ne se retrouve jamais d'un site à l'autre. Le code exact
-// (SHA-256) est donc celui du FICHIER D'ORIGINE, calculé dans la page au moment où LUI l'envoie
-// (inject.js / lbc-inject.js) — une LECTURE de son geste, aucune requête de plus vers un site.
-//   · Vinted : photo envoyée (identifiant rendu par Vinted ⇒ code), gardée ici 3 jours au plus,
-//     puis l'annonce qu'il enregistre (`assigned_photos`) ⇒ `photo_origine_vinted.annonces[itemId]`
-//     = { codes, compte, at } — seulement pour le compte CONNECTÉ dans l'onglet (porte `compteNonCapte`) ;
-//   · Leboncoin : le nom d'image rendu ⇒ `photo_origine_lbc.images[nom]` = { code, at }.
-// Lire-fusionner-réécrire : une lecture ratée n'écrit rien (la file reste) ; lignes bornées.
-// L'app (src/photoOrigine.js) : un code porté par UN seul N° ⇒ l'annonce Leboncoin porte ce N°.
-const ORIGINE_PHOTOS_VINTED = 'vrm_origine_photos_vinted';   // { [photoId]: { code, uid, at } }
-const ORIGINE_FILE = 'vrm_origine_file';                    // [{ ligne, cle, val }]
-const LIGNE_ORIGINE = { vinted: 'photo_origine_vinted', lbc: 'photo_origine_lbc' };
-const ORIGINE_ATTENTE_MS = 3 * 24 * 3600e3, ORIGINE_ATTENTE_MAX = 400, ORIGINE_LIGNE_MAX = 4000;
-const codeOrigineValide = (c) => typeof c === 'string' && /^[0-9a-f]{64}$/.test(c);
-let _origineChaine = Promise.resolve();
-const enChaineOrigine = (f) => { const r = _origineChaine.then(f, f); _origineChaine = r.then(() => {}, () => {}); return r; };
-async function noterPhotoOrigineVinted(msg, domain) {
-  const id = String((msg && msg.photoId) || ''), code = String((msg && msg.code) || '');
-  if (!/^\d{1,15}$/.test(id) || !codeOrigineValide(code) || !/(^|\.)vinted\.[a-z.]+$/i.test(String(domain || ''))) { noterDiag('origine_photo_refusee'); return false; }
-  let uid = null; try { uid = await activeUidForDomain(domain); } catch (_) { uid = null; }
-  if (!uid) { noterDiag('origine_photo_sans_compte'); return false; }
-  if (await compteNonCapte(uid)) { noterDiag('origine_photo_compte_non_capte'); return false; }
-  return enChaineOrigine(async () => {
-    let m = {}; try { m = (await chrome.storage.local.get(ORIGINE_PHOTOS_VINTED))[ORIGINE_PHOTOS_VINTED] || {}; } catch (_) { return false; }
-    const now = Date.now();
-    m[id] = { code, uid: String(uid), at: now };
-    const vivants = Object.entries(m).filter(([, e]) => e && now - Number(e.at || 0) < ORIGINE_ATTENTE_MS).sort((a, b) => Number(b[1].at) - Number(a[1].at)).slice(0, ORIGINE_ATTENTE_MAX);
-    try { await chrome.storage.local.set({ [ORIGINE_PHOTOS_VINTED]: Object.fromEntries(vivants) }); } catch (_) { return false; }
-    noterDiag('origine_photo_notee');
-    return true;
-  });
-}
-async function noterAnnoncePhotosVinted(msg, domain) {
-  const itemId = String((msg && msg.itemId) || '');
-  const ids = Array.isArray(msg && msg.photoIds) ? msg.photoIds.map(String).filter((x) => /^\d{1,15}$/.test(x)).slice(0, 30) : [];
-  if (!/^\d{4,15}$/.test(itemId) || !ids.length || !/(^|\.)vinted\.[a-z.]+$/i.test(String(domain || ''))) return false;
-  let uid = null; try { uid = await activeUidForDomain(domain); } catch (_) { uid = null; }
-  if (!uid || await compteNonCapte(uid)) return false;
-  // La photo envoyée juste avant (même onglet) peut être encore dans la chaîne : on l'attend.
-  await enChaineOrigine(async () => true);
-  let m = {}; try { m = (await chrome.storage.local.get(ORIGINE_PHOTOS_VINTED))[ORIGINE_PHOTOS_VINTED] || {}; } catch (_) { return false; }
-  // Seulement les photos envoyées par CE compte (jamais celles d'un autre compte du même Chrome).
-  const codes = [...new Set(ids.map((p) => m[p]).filter((e) => e && String(e.uid) === String(uid) && codeOrigineValide(e.code)).map((e) => e.code))];
-  if (!codes.length) return false;
-  return enfilerOrigine({ ligne: LIGNE_ORIGINE.vinted, cle: itemId, val: { codes, compte: String(uid), at: new Date().toISOString() } });
-}
-async function noterPhotoOrigineLbc(msg) {
-  const nom = String((msg && msg.fichier) || ''), code = String((msg && msg.code) || '');
-  if (!/^[0-9a-f]{40}$/.test(nom) || !codeOrigineValide(code)) { noterDiag('origine_lbc_refusee'); return false; }
-  return enfilerOrigine({ ligne: LIGNE_ORIGINE.lbc, cle: nom, val: { code, at: new Date().toISOString() } });
-}
-async function enfilerOrigine(e) {
-  return enChaineOrigine(async () => {
-    let f = []; try { f = (await chrome.storage.local.get(ORIGINE_FILE))[ORIGINE_FILE] || []; } catch (_) { return false; }
-    f.push(e);
-    try { await chrome.storage.local.set({ [ORIGINE_FILE]: f.slice(-2000) }); } catch (_) { return false; }
-    return rangerOrigineMaintenant();
-  });
-}
-// Lire-fusionner-réécrire chaque ligne ; une lecture ou une écriture ratée garde la file (rejouée au prochain geste).
-async function rangerOrigineMaintenant() {
-  let f = []; try { f = (await chrome.storage.local.get(ORIGINE_FILE))[ORIGINE_FILE] || []; } catch (_) { return false; }
-  if (!f.length) return true;
-  const restent = [];
-  for (const ligne of [...new Set(f.map((e) => e && e.ligne).filter(Boolean))]) {
-    const liste = f.filter((e) => e && e.ligne === ligne);
-    const champ = ligne === LIGNE_ORIGINE.lbc ? 'images' : 'annonces';
-    const r = await sbGet(`app_data?id=eq.${ligne}&select=${champ === 'images' ? 'a:data->payload->images' : 'a:data->payload->annonces'}`);   // (26 nov.) deux chemins écrits en entier : aucun identifiant interpolé nu
-    if (r === null) { restent.push(...liste); noterDiag('origine_lecture_ratee'); continue; }
-    const carte = Object.assign({}, (r[0] && r[0].a && typeof r[0].a === 'object') ? r[0].a : {});
-    for (const e of liste) {
-      if (champ === 'annonces') { const avant = carte[e.cle] && Array.isArray(carte[e.cle].codes) ? carte[e.cle].codes : []; carte[e.cle] = Object.assign({}, e.val, { codes: [...new Set([...avant, ...e.val.codes])].slice(0, 30) }); }
-      else carte[e.cle] = e.val;
-    }
-    const gardes = Object.entries(carte).sort((a, b) => String((b[1] && b[1].at) || '').localeCompare(String((a[1] && a[1].at) || ''))).slice(0, ORIGINE_LIGNE_MAX);
-    const ok = await supabaseUpsert('app_data', [{ id: ligne, data: { type: 'photo_origine', capturedAt: new Date().toISOString(), nItems: gardes.length, payload: { version: 1, [champ]: Object.fromEntries(gardes) } } }], 'id');
-    if (ok === false) { restent.push(...liste); noterDiag('origine_ecriture_ratee'); } else noterDiag('origine_ecrite');
-  }
-  try { await chrome.storage.local.set({ [ORIGINE_FILE]: restent }); } catch (_) {}
-  return !restent.length;
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
 // 5.388 (15 nov.) — « MÊME PHOTO · SÛR » : LA DEUXIÈME MESURE (lot meme-photo-sure)
 // ══════════════════════════════════════════════════════════════════════════════
 // Julien : « Est-ce que tu peux faire la reconnaissance d'image et que ça soit parfaitement
@@ -12881,82 +12684,11 @@ function afficherRappelLbc(version){
   }
   bloc.append(titre,texte,actions);(document.body||document.documentElement)?.appendChild(bloc);
 }
-// 5.446 (lot ext-anciens-lots ; revue, moyenne 66) : Vinted et Vestiaire aussi. Après une mise à jour, leurs onglets
-//   ouverts gardent les scripts de l'ANCIENNE version, orphelins (captures muettes) — et le
-//   capteur de la page ne peut pas être reposé sans recharger (son canal privé est remis UNE
-//   fois, au chargement). La page n'est JAMAIS rechargée à sa place : le même encart lui dit
-//   de recharger, c'est son clic.
-function afficherRappelSite(version, site){
-  if(document.querySelector('[data-vrm-maj-site]'))return;
-  const bloc=document.createElement('aside');bloc.setAttribute('data-vrm-maj-site',String(site||''));bloc.setAttribute('data-vrm-maj-version',version);bloc.setAttribute('role','status');
-  Object.assign(bloc.style,{position:'fixed',left:'16px',bottom:'76px',zIndex:'2147483647',maxWidth:'calc(100vw - 32px)',width:'320px',boxSizing:'border-box',padding:'14px',background:'#203d47',color:'#fff',borderRadius:'12px',boxShadow:'0 6px 24px #0004',font:'13px/1.5 system-ui,sans-serif'});
-  const titre=document.createElement('b');titre.textContent='VRM · Mise à jour '+version;
-  const texte=document.createElement('p');texte.textContent='Recharge cet onglet '+site+' pour que VRM le lise à nouveau.';texte.style.margin='6px 0 10px';
-  const actions=document.createElement('div');Object.assign(actions.style,{display:'flex',gap:'8px'});
-  for(const [lib,agir]of [['Recharger '+site,()=>location.reload()],['Plus tard',()=>bloc.remove()]]){
-    const b=document.createElement('button');b.type='button';b.textContent=lib;Object.assign(b.style,{minHeight:'44px',padding:'7px 10px',border:'1px solid #ffffff66',borderRadius:'8px',background:'transparent',color:'#fff',font:'600 12px system-ui,sans-serif',cursor:'pointer'});b.onclick=agir;actions.appendChild(b);
-  }
-  bloc.append(titre,texte,actions);(document.body||document.documentElement)?.appendChild(bloc);
-}
 async function rappelerMiseAJourLbc(){
   try{const tabs=await chrome.tabs.query({url:['https://*.leboncoin.fr/*']});for(const t of tabs||[])try{await chrome.scripting.executeScript({target:{tabId:t.id},func:afficherRappelLbc,args:[CODE_VERSION]});}catch(_){}}catch(_){}
-  for(const [site,urls] of [['Vinted',['https://*.vinted.fr/*','https://*.vinted.com/*','https://*.vinted.it/*','https://*.vinted.de/*']],['Vestiaire',['https://*.vestiairecollective.com/*']]]){
-    try{const tabs=await chrome.tabs.query({url:urls});for(const t of tabs||[])try{await chrome.scripting.executeScript({target:{tabId:t.id,frameIds:[0]},func:afficherRappelSite,args:[CODE_VERSION,site]});}catch(_){}}catch(_){}
-  }
 }
-// ══ 5.448 (`autocontrole`) — AU DÉMARRAGE, L'EXTENSION VÉRIFIE QU'ELLE EST BIEN DANS CHAQUE ONGLET OUVERT ══════════
-//  Julien : « va encore plus loin ». Après une mise à jour ou un redémarrage, un onglet Vinted / Leboncoin / Vestiaire /
-//  eBay ouvert AVANT garde l'ancienne page, sans les scripts de VRM : rien n'y est lu, aucun geste n'y répond — en
-//  silence. Ici, 20 s après le démarrage : chaque onglet de ces sites est sondé (dans le monde isolé de l'extension, une
-//  lecture du DOM, aucune requête au site) — les scripts de VRM sont-ils là ? Sinon :
-//   · l'onglet n'est PAS celui que tu regardes et n'est pas un formulaire (dépôt, mise en vente, message en cours) ⇒
-//     rechargé UNE fois par VRM (une fois par onglet et par démarrage) ;
-//   · sinon (tu y es, ou tu y tapes peut-être) ⇒ jamais rechargé : la ligne de santé du site et une notification disent
-//     « recharge l'onglet … ».
-const SITES_CONTROLE = [
-  { site: 'vinted', re: /^https:\/\/[^/]*\.vinted\.(fr|com|it)\//, signe: 'vinted', nom: 'Vinted' },
-  { site: 'lbc', re: /^https:\/\/[^/]*\.leboncoin\.fr\//, signe: 'lbc', nom: 'Leboncoin' },
-  { site: 'vc', re: /^https:\/\/[^/]*\.vestiairecollective\.com\//, signe: 'vc', nom: 'Vestiaire' },
-  { site: 'ebay', re: /^https:\/\/[^/]*\.ebay\.fr\//, signe: 'ebay', nom: 'eBay' },
-];
-const RE_FORMULAIRE_ONGLET = /\/items\/new|\/items\/\d+\/edit|\/deposer|\/ai\/form|\/sell|\/sl\/|\/lstng|\/inbox|\/messages|\/messagerie|\/conversation/i;
-async function scriptsDansOnglet(tabId, signe) {
-  try {
-    const r = await chrome.scripting.executeScript({ target: { tabId, frameIds: [0] }, args: [signe], func: (s) => (s === 'vinted' ? !!globalThis.VRM_UI : s === 'lbc' ? !!window.__vrmLbcEcrire : s === 'vc' ? !!window.__vrmVcEcrire : !!window.__vrmEbayLoaded) });
-    return r && r[0] ? r[0].result === true : null;
-  } catch (_) { return null; }   // pas su (onglet fermé, accès au site retiré) : rien n'est conclu
-}
-async function autoControleOnglets() {
-  const out = [];
-  let tabs = []; try { tabs = await chrome.tabs.query({}); } catch (_) { return null; }
-  let actifs = new Set(); try { for (const t of await chrome.tabs.query({ active: true })) actifs.add(t.id); } catch (_) {}
-  let deja = {}; try { deja = (await chrome.storage.session.get('vrmAutoControle')).vrmAutoControle || {}; } catch (_) { deja = {}; }
-  const manquants = {};
-  for (const t of tabs || []) {
-    const sc = SITES_CONTROLE.find((x) => x.re.test(String(t && t.url || '')));
-    if (!sc || t.status !== 'complete' || t.discarded) continue;
-    const la = await scriptsDansOnglet(t.id, sc.signe);
-    if (la !== false) continue;
-    const prudent = actifs.has(t.id) || RE_FORMULAIRE_ONGLET.test(String(t.url || ''));
-    if (!prudent && !deja[t.id]) {
-      deja[t.id] = Date.now();
-      try { await chrome.storage.session.set({ vrmAutoControle: deja }); } catch (_) {}
-      noterDiag('autocontrole_recharge_' + sc.site);
-      try { await chrome.tabs.reload(t.id); out.push({ site: sc.site, tabId: t.id, geste: 'recharge' }); continue; } catch (_) {}
-    }
-    noterDiag('autocontrole_a_recharger_' + sc.site);
-    manquants[sc.site] = Date.now();
-    out.push({ site: sc.site, tabId: t.id, geste: 'dire' });
-  }
-  try { await chrome.storage.local.set({ vrmOngletsSansVrm: manquants }); } catch (_) {}
-  majSanteSites().catch(() => {});
-  return out;
-}
-function autoControlePlusTard() { setTimeout(() => { autoControleOnglets().catch(() => {}); }, 20000); }
-// Un onglet signalé « sans VRM » qui vient de (re)charger : revérifié 3 s après (la ligne de santé s'efface d'elle-même).
-try { chrome.tabs.onUpdated.addListener((tabId, info, tab) => { if (!info || info.status !== 'complete') return; const sc = SITES_CONTROLE.find((x) => x.re.test(String((tab && tab.url) || ''))); if (!sc) return; chrome.storage.local.get('vrmOngletsSansVrm').then((g) => { if (g && g.vrmOngletsSansVrm && g.vrmOngletsSansVrm[sc.site]) setTimeout(() => { autoControleOnglets().catch(() => {}); }, 3000); }, () => {}); }); } catch (_) {}
-chrome.runtime.onInstalled.addListener((details) => { fullSync(); if (raisonReinjecte(details)){reinjecterPont();rappelerMiseAJourLbc();} autoControlePlusTard(); });
-chrome.runtime.onStartup.addListener(() => { fullSync(); try { distanceReveil('demarrage').catch(() => {}); } catch (_) {} autoControlePlusTard(); });   // 5.436 : Chrome relancé ⇒ présence et file à distance tout de suite
+chrome.runtime.onInstalled.addListener((details) => { fullSync(); if (raisonReinjecte(details)){reinjecterPont();rappelerMiseAJourLbc();} });
+chrome.runtime.onStartup.addListener(() => { fullSync(); try { distanceReveil('demarrage').catch(() => {}); } catch (_) {} });   // 5.436 : Chrome relancé ⇒ présence et file à distance tout de suite
 
 // ⚠️ 11 octobre (mesuré au banc, dans un vrai Chromium) : `chrome.alarms.create`
 //    REMET À ZÉRO une alarme qui existe déjà. Refait à CHAQUE réveil du service
@@ -13020,9 +12752,6 @@ function surAlarme(a) {
   else if (a.name === 'vrm-versement') { lance('versement', () => tickVersements()); lance('bordereaux', () => tickBordereaux()); }   // 5.376 : les bordereaux qui manquent
   // 5.344 : l'historique de départ, onglet Vinted ouvert (voir `tickImport`).
   else if (a.name === 'vrm-import') { lance('import', () => tickImport()); lance('importsites', () => tickImportSites()); }   // 5.365 : et Leboncoin / Vestiaire
-  // 5.446 (lot ext-anciens-lots ; basse 94) : le passage « une minute après la visite », par alarme (survit au worker).
-  else if (a.name === 'vrm-import-bientot') { _importMinuteur = null; lance('import', () => tickImport()); }
-  else if (a.name === 'vrm-importsites-bientot') { _impSiteMinuteur = null; lance('importsites', () => tickImportSites()); }
   // 5.358 : l'empreinte des photos de ses annonces (voir `tickEmpreintes`).
   else if (a.name === 'vrm-empreintes') lance('empreintes', () => tickEmpreintes());
   // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
@@ -14397,9 +14126,6 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg, pseudo = '',
   // 5.410.4 : aussi après une acceptation, SON message d'acceptation (versions au hasard, {price} = le prix accepté).
   const sorteMsg = quoi === 'accept' ? 'accepte' : 'refus';
   if ((quoi === 'reject' || quoi === 'accept') && r && r.ok && conv && versionsRefus.length) {
-    // 5.446 (lot ext-anciens-lots, revue basse 96) : la SECONDE requête revérifie le compte de l'onglet
-    //   et la pause 429/403 (le geste a pu poser une pause, ou le compte basculer) — sans prendre de place.
-    if (await garde(uid, acc, { compter: false, sorte: 'offre' })) { noterDiag('offre_auto_message_garde'); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
     const c2 = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
     if (!c2.ok) { noterDiag('offre_auto_refus_message_' + (c2.code === 'stockage' ? 'stockage' : 'plafond')); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
     const version = choisirVariante(versionsRefus, await varianteDerniere(uid, sorteMsg));
@@ -14493,11 +14219,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
     if (!offres.length) return 0;
     const st = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
     const limite = Date.now() - 7 * 86400000;
-    // 5.446 (lot ext-anciens-lots ; revue, basse 95) : un mémo de plus de 7 jours n'est effacé que si l'offre n'est
-    //   PLUS en attente dans la lecture d'aujourd'hui — sinon une offre restée ouverte plus d'une
-    //   semaine aurait été traitée une seconde fois.
-    const encoreLa = new Set(offres.map((o) => String(o.oid)));
-    for (const k in st) if (!st[k] || (st[k] < limite && !encoreLa.has(String(k)))) delete st[k];
+    for (const k in st) if (!st[k] || st[k] < limite) delete st[k];
     let faites = 0;
     const pv = (await chrome.storage.local.get('vrmOffresPrevues')).vrmOffresPrevues || {};
     for (const k in pv) if (!pv[k] || st[k] || pv[k].at < Date.now() - 2 * 86400000) delete pv[k];
@@ -14579,8 +14301,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
       // 5.356 : le mémo RELU juste avant le geste (jamais l'instantané du début).
       const stFrais = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
       if (stFrais[o.oid]) { st[o.oid] = stFrais[o.oid]; continue; }
-      // 5.446 (lot ext-anciens-lots, revue basse 95) : la relecture ne ramène pas un mémo purgé (plus de 7 j ET offre partie).
-      for (const k in stFrais) if (!st[k] && !(stFrais[k] < limite && !encoreLa.has(String(k)))) st[k] = stFrais[k];
+      for (const k in stFrais) if (!st[k]) st[k] = stFrais[k];
       // (5.398) Une PREUVE que l'annonce n'est plus disponible (vendue, réservée, masquée,
       //    fermée, supprimée — dernier dressing capté de ce compte, suppressions vues) : jamais
       //    une acceptation (elle vendrait une paire qui n'est plus là). Dit une fois par offre ;
@@ -14827,8 +14548,6 @@ async function visiteVintedUnPassage() {
     // `/payouts` (aucune requête ajoutée) ; ici on ne va chercher que les mois
     // PASSÉS encore absents, deux par visite au plus.
     await capterReleves(uid);
-    // 5.443 : le détail des achats (« Lot… » d'abord), APRÈS l'argent et les colis, sous leur réserve.
-    await capterDetailsAchats(uid);
     // 5.214 : le suivi que Vinted montre de ses achats en cours (« Suivre le
     // colis »), puis les notifications « une étape de plus » restées en file.
     // ⚠️ (revue du 24 oct.) APRÈS l'argent et les colis : ce n'est pas une
@@ -15311,10 +15030,10 @@ async function grilleParPage(uid, acc, cat) {
     let chemin = ''; try { chemin = new URL(String((await chrome.tabs.get(ot.tabId)).url || '')).pathname; } catch (_) { chemin = ''; }
     if (!/^\/items\/new\/?$/.test(chemin) && !(await naviguerTravail(ot.tabId, `https://${domaine}/items/new`, /\/items\/new/))) return { raison: RAISON_ONGLET_VINTED };
     const fp = await etapeFormulaire(acc, ot.tabId, 'formulairePret');
-    if (!fp.ok) return { raison: fp.code === 'captcha' ? PHRASE_CAPTCHA : `${PHRASE_SELECTEUR(fp.manque || fp.code)}. ${gesteElement(fp.manque || fp.code)}` };
+    if (!fp.ok) return { raison: fp.code === 'captcha' ? PHRASE_CAPTCHA : PHRASE_SELECTEUR(fp.manque || fp.code) };
     const nc = await nomCategorieVinted(cat);
     const o = await etapeFormulaire(acc, ot.tabId, 'grille', { id: cat, nom: nc && nc.nom, recherche: nc && nc.nom });
-    if (!o.ok || !o.rep) return { raison: o.code === 'captcha' ? PHRASE_CAPTCHA : o.code === 'selecteur' ? `${PHRASE_SELECTEUR(o.manque)}. ${gesteElement(o.manque)}` : "Vinted n'a pas rendu la liste des tailles" };
+    if (!o.ok || !o.rep) return { raison: o.code === 'captcha' ? PHRASE_CAPTCHA : o.code === 'selecteur' ? PHRASE_SELECTEUR(o.manque) : "Vinted n'a pas rendu la liste des tailles" };
     return { status: Number(o.rep.status) || 0, ok: !!o.rep.ok, json: o.rep.json };
   } finally { _grilleEnCours = null; fin(); }
 }
@@ -18394,148 +18113,26 @@ async function apprendreElement(acc, tabId, nom) {
 //  Aucune question à Julien : c'est une mémoire, pas un apprentissage par son clic.
 const ETAPES_SANS_APPRENDRE = new Set(['favoriOuvrir', 'favoriLien', 'favoriListe', 'favoriAccueil']);
 const TROUVE_CLE = 'vrmTrouve', TROUVE_JOURNAL = 'vrmTrouverJournal', TROUVE_JOURNAL_MAX = 40;
-// 5.448 (`adaptatif`) : une mémoire PAR SITE (Vinted garde sa clé d'avant ; `vrmTrouve_lbc`, `_vc`, `_ebay`), chacune rangée
-//    par version de la page de CE site ; un seul journal, chaque entrée porte son site.
-const SITES_TROUVER = new Set(['vinted', 'lbc', 'vc', 'ebay']);
-const cleTrouveSite = (site) => (!site || site === 'vinted' ? TROUVE_CLE : TROUVE_CLE + '_' + site);
-async function memoireTrouver(site) {
-  const TROUVE_CLE_S = cleTrouveSite(site);
-  try { const m = (await chrome.storage.local.get(TROUVE_CLE_S))[TROUVE_CLE_S]; if (!m || typeof m !== 'object' || !m.el) return {}; const out = {}; for (const k of Object.keys(m.el).slice(0, 20)) { const e = m.el[k]; if (e && /^[a-z]{2,20}$/.test(String(e.s || '')) && (!m.ver || !e.ver || e.ver === m.ver)) out[k] = e.s; } return out; } catch (_) { return {}; }
+async function memoireTrouver() {
+  try { const m = (await chrome.storage.local.get(TROUVE_CLE))[TROUVE_CLE]; if (!m || typeof m !== 'object' || !m.el) return {}; const out = {}; for (const k of Object.keys(m.el).slice(0, 20)) { const e = m.el[k]; if (e && /^[a-z]{2,20}$/.test(String(e.s || '')) && (!m.ver || !e.ver || e.ver === m.ver)) out[k] = e.s; } return out; } catch (_) { return {}; }
 }
-async function retenirTrouves(etape, o, siteDit) {
+async function retenirTrouves(etape, o) {
   if (!o || typeof o !== 'object' || !Array.isArray(o.trouves) || !o.trouves.length) return;
-  const site = SITES_TROUVER.has(siteDit) ? siteDit : 'vinted';
-  const TROUVE_CLE_S = cleTrouveSite(site), pre = site === 'vinted' ? '' : site + '_';
   const ver = String(o.verPage || '').slice(0, 40);
-  let m = null; try { m = (await chrome.storage.local.get(TROUVE_CLE_S))[TROUVE_CLE_S]; } catch (_) { return; }
+  let m = null; try { m = (await chrome.storage.local.get(TROUVE_CLE))[TROUVE_CLE]; } catch (_) { return; }
   if (!m || typeof m !== 'object' || !m.el) m = { v: 1, ver, el: {} };
   if (ver && m.ver && m.ver !== ver) m = { v: 1, ver, el: {} };   // une autre version de Vinted : la mémoire repart de zéro
   if (ver) m.ver = ver;
   const journal = [];
   for (const t of o.trouves.slice(0, 12)) {
     const nom = String((t && t.nom) || '').replace(/[^a-zA-Z]/g, '').slice(0, 30); if (!nom) continue;
-    if (t.s && /^[a-z]{2,20}$/.test(t.s)) { m.el[nom] = { s: t.s, ver, at: Date.now() }; noterDiag('trouve_' + pre + nom + '_' + t.s); }
-    else { noterDiag((t.ambigu ? 'trouve_ambigu_' : 'trouve_rien_') + pre + nom); journal.push({ site, nom, etape: String(etape || '').slice(0, 20), at: Date.now(), ambigu: !!t.ambigu, essais: (Array.isArray(t.essais) ? t.essais : []).slice(0, 8).map((e) => ({ s: String((e && e.s) || '').slice(0, 20), n: Math.max(0, Math.min(999, Number(e && e.n) || 0)) })) }); }
+    if (t.s && /^[a-z]{2,20}$/.test(t.s)) { m.el[nom] = { s: t.s, ver, at: Date.now() }; noterDiag('trouve_' + nom + '_' + t.s); }
+    else { noterDiag((t.ambigu ? 'trouve_ambigu_' : 'trouve_rien_') + nom); journal.push({ nom, etape: String(etape || '').slice(0, 20), at: Date.now(), ambigu: !!t.ambigu, essais: (Array.isArray(t.essais) ? t.essais : []).slice(0, 8).map((e) => ({ s: String((e && e.s) || '').slice(0, 20), n: Math.max(0, Math.min(999, Number(e && e.n) || 0)) })) }); }
   }
   try {
-    await chrome.storage.local.set({ [TROUVE_CLE_S]: m });
+    await chrome.storage.local.set({ [TROUVE_CLE]: m });
     if (journal.length) { const j = (await chrome.storage.local.get(TROUVE_JOURNAL))[TROUVE_JOURNAL]; const l = (Array.isArray(j) ? j : []).concat(journal).slice(-TROUVE_JOURNAL_MAX); await chrome.storage.local.set({ [TROUVE_JOURNAL]: l }); }
   } catch (_) {}
-  majSanteSites().catch(() => {});
-}
-// ══ 5.448 (`santesites`) — UNE LIGNE PAR SITE : « tout marche » / « X ne marche plus : fais Y » ══════════════════
-//  Julien : « l'extension doit être intelligente ». Ce que l'extension SAIT déjà, lu sans aucune requête :
-//   · le journal de la couche de repérage (`vrmTrouverJournal`) : un élément introuvable ou en double, et PAS retrouvé
-//     depuis (la mémoire du site, `vrmTrouve*`, garde l'heure du dernier succès de chaque élément) — 7 jours au plus ;
-//   · une RÉPONSE de forme changée : Vinted (`vrmFormesVues`, posées par `signalerForme`, retirées par `formeRevenue`),
-//     Vestiaire (`vrmVcCapte[…].inconnu`), Leboncoin (`vrmLbcForme`, sa liste « Mes annonces ») — rien n'a été rangé.
-//  Verdict : une forme changée d'abord (« Vinted a changé sa page des ventes : VRM attend la correction »), puis un
-//  élément (le bouton par son nom, et LE geste), sinon « tout marche » ; rien jamais vu ici ⇒ « pas encore vu ici ».
-//  Chaque NOUVEAU problème d'un site est dit UNE fois par une notification de l'ordinateur (là où Chrome le permet) ;
-//  la ligne reste dans la carte tant qu'il dure. Jamais un silence, jamais une alarme répétée.
-const SANTE_SITES = 'vrmSanteSites', SANTE_JOURNAL_MS = 7 * 864e5;
-const NOMS_SITES_SANTE = { vinted: 'Vinted', lbc: 'Leboncoin', vc: 'Vestiaire', ebay: 'eBay' };
-const LIB_ELEMENTS_SITES = {
-  lbc: { champMessage: 'le champ du message', envoyer: 'le bouton « Envoyer »', champPrix: 'le champ du prix', appris: 'un bouton appris' },
-  vc: { champMessage: 'le champ du message', envoyer: 'le bouton « Envoyer »', appris: 'un bouton appris' },
-  ebay: { titre: 'le champ du titre', description: 'le champ de la description', prix: 'le champ du prix', sku: 'le champ de la référence' },
-};
-// La table de vrm-trouver.js ↔ le nom de l'étape (celui des phrases de Vinted).
-const TABLE_VERS_MANQUE = { supprimerConfirmation: 'supprimer-confirmation', supprimerConfirmer: 'supprimer-confirmation', publier: 'ajouter', champMessage: 'message-champ', envoyer: 'message-envoyer', boutonOffre: 'offre-bouton', offreValider: 'offre-valider' };
-const FORMES_PAGES_SANTE = { listings: 'sa page des annonces', orders_sold: 'sa page des ventes', orders_purchased: 'sa page des achats', inbox: 'sa messagerie', transaction: 'le détail des ventes', conversation: 'ses conversations', profile: 'la page du profil', billing: 'le porte-monnaie' };
-function verdictElement(site, nom, ambigu) {
-  const n = NOMS_SITES_SANTE[site];
-  if (site === 'vinted') { const m = TABLE_VERS_MANQUE[nom] || nom; return { k: 'element', nom, t: `${quoiElement(m + (ambigu ? '-ambigu' : ''))}. ${gesteElement(m + (ambigu ? '-ambigu' : ''))}` }; }
-  const lib = (LIB_ELEMENTS_SITES[site] || {})[nom] || `l'élément « ${nom} »`;
-  const geste = site === 'ebay' ? 'Geste : remplis-le toi-même sur eBay cette fois, puis touche « Envoyer un rapport » dans la fenêtre de l’extension.'
-    : `Geste : fais ce geste une fois toi-même sur ${site === 'lbc' ? 'leboncoin.fr' : 'vestiairecollective.com'}, dans ce Chrome (VRM réapprend), puis touche « Envoyer un rapport ».`;
-  return { k: 'element', nom, t: `${n} : ${lib} ${ambigu ? 'est en double sur la page (VRM ne choisit jamais)' : 'ne marche plus (la page a changé)'}. ${geste}` };
-}
-async function santeSites() {
-  let st = {};
-  try { st = await chrome.storage.local.get([TROUVE_JOURNAL, TROUVE_CLE, TROUVE_CLE + '_lbc', TROUVE_CLE + '_vc', TROUVE_CLE + '_ebay', FORMES_VUES, 'vrmVcCapte', 'vrmLbcForme', 'vrmFlux', 'vrmOngletsSansVrm']); } catch (_) { return null; }
-  const t = Date.now(), out = {};
-  const journal = Array.isArray(st[TROUVE_JOURNAL]) ? st[TROUVE_JOURNAL] : [];
-  for (const site of ['vinted', 'lbc', 'vc', 'ebay']) {
-    const n = NOMS_SITES_SANTE[site];
-    const mem = st[cleTrouveSite(site)], el = (mem && mem.el) || {};
-    let v = null;
-    // 1. une réponse de forme changée (rien n'est rangé) — la plus grave : des données manquent.
-    if (site === 'vinted') { const fv = st[FORMES_VUES] || {}; for (const uid of Object.keys(fv)) for (const ty of Object.keys(fv[uid] || {})) if (!v) v = { k: 'forme', nom: ty, t: `Vinted a changé ${FORMES_PAGES_SANTE[ty] || 'une page'} : VRM ne la lit plus et n'en range rien de faux ; il attend la correction (la prochaine version). Geste : touche « Envoyer un rapport » dans la fenêtre de l’extension.` }; }
-    if (site === 'vc') { const c = st.vrmVcCapte || {}; const q = Object.keys(c).find((k) => c[k] && c[k].inconnu === true); if (q) v = { k: 'forme', nom: q, t: `Vestiaire a changé sa page (${q}) : VRM ne la lit plus et n'en range rien de faux ; il attend la correction. Geste : touche « Envoyer un rapport » dans la fenêtre de l’extension.` }; }
-    if (site === 'lbc' && st.vrmLbcForme && t - Number(st.vrmLbcForme.at || 0) < SANTE_JOURNAL_MS) v = { k: 'forme', nom: 'mes-annonces', t: "Leboncoin a changé ta page « Mes annonces » : VRM ne la lit plus et n'en range rien de faux ; il attend la correction. Geste : touche « Envoyer un rapport » dans la fenêtre de l’extension." };
-    // 1 bis. (5.448 `autocontrole`) un onglet ouvert de ce site où les scripts de VRM ne sont pas (pas rechargé par prudence).
-    if (!v && st.vrmOngletsSansVrm && Number(st.vrmOngletsSansVrm[site]) > 0) v = { k: 'onglet', nom: 'onglet', t: `${n} : un onglet ouvert n'a pas VRM chargé (il date d'avant la mise à jour) ; rien n'y est lu. Geste : recharge cet onglet ${n} (⟳ du navigateur).` };
-    // 2. un élément introuvable ou en double, pas retrouvé depuis.
-    if (!v) {
-      const siens = journal.filter((e) => e && (e.site || 'vinted') === site && t - Number(e.at || 0) < SANTE_JOURNAL_MS).sort((a, b) => Number(b.at) - Number(a.at));
-      for (const e of siens) { const ok = el[e.nom]; if (ok && Number(ok.at || 0) > Number(e.at || 0)) continue; v = verdictElement(site, String(e.nom || ''), !!e.ambigu); break; }
-    }
-    const vu = Object.keys(el).length || journal.some((e) => (e && (e.site || 'vinted')) === site) || (site === 'vinted' && st.vrmFlux && st.vrmFlux.vinted) || (site === 'vc' && st.vrmVcCapte && Object.keys(st.vrmVcCapte).length) || (site === 'lbc' && st.vrmFlux && st.vrmFlux.leboncoin);
-    out[site] = v ? Object.assign({ ok: false }, v) : vu ? { ok: true, k: 'ok', t: `${n} : tout marche.` } : { ok: null, k: 'pas-vu', t: `${n} : pas encore vu dans ce Chrome.` };
-  }
-  return out;
-}
-async function champsSanteAppareil() {
-  const out = {};
-  const v = await santeSites().catch(() => null);
-  if (v) { out.sante = {}; for (const k of Object.keys(v)) out.sante[k] = { k: String(v[k].k || ''), nom: String(v[k].nom || '').replace(/[^a-zA-Z_-]/g, '').slice(0, 40) }; }
-  try {
-    const g = await chrome.storage.local.get([ARRETS_DERNIERS, 'vrmVersionServie']);
-    const l = g[ARRETS_DERNIERS]; const d = Array.isArray(l) && l.length ? l[l.length - 1] : null;
-    if (d) out.arret = { site: String(d.site || ''), geste: String(d.geste || ''), code: String(d.code || ''), at: Number(d.at) || 0 };
-    const sv = g.vrmVersionServie && VERSION_RE.test(String(g.vrmVersionServie.v || '')) ? String(g.vrmVersionServie.v) : '';
-    if (sv) { out.servie = sv; out.depassee = versionPlusRecente(sv, CODE_VERSION); }
-  } catch (_) {}
-  return out;
-}
-// Recalcule, range, et dit UNE fois chaque nouveau problème (même site, même cause ⇒ jamais deux fois).
-let _santeSitesEnVol = null;
-function majSanteSites() {
-  if (_santeSitesEnVol) return _santeSitesEnVol;
-  _santeSitesEnVol = (async () => {
-    try {
-      const v = await santeSites(); if (!v) return null;
-      let avant = {}; try { avant = (await chrome.storage.local.get(SANTE_SITES))[SANTE_SITES] || {}; } catch (_) { avant = {}; }
-      const dits = Object.assign({}, avant.dits || {});
-      for (const site of Object.keys(v)) {
-        const x = v[site]; if (x.ok !== false) { delete dits[site]; continue; }
-        const cle = x.k + ':' + x.nom;
-        if (dits[site] === cle) continue;
-        dits[site] = cle;
-        noterDiag('sante_' + site + '_' + x.k);
-        try { if (chrome.notifications && chrome.notifications.create) chrome.notifications.create('vrm-sante-' + site, { type: 'basic', iconUrl: 'icon-128.png', title: 'VRM · ' + NOMS_SITES_SANTE[site], message: String(x.t).slice(0, 240), priority: 0 }, () => { void chrome.runtime.lastError; }); } catch (_) {}
-      }
-      await chrome.storage.local.set({ [SANTE_SITES]: { at: Date.now(), sites: v, dits } });
-      return v;
-    } catch (_) { return null; } finally { _santeSitesEnVol = null; }
-  })();
-  return _santeSitesEnVol;
-}
-// 5.448 (`rapportreperage`) : les 20 derniers ARRÊTS (site, geste, raison en code — jamais un texte de page, jamais un
-//    pseudo), pour « Envoyer un rapport » : avec le journal de repérage, la panne se lit sans rien demander à Julien.
-const ARRETS_DERNIERS = 'vrmArrets', ARRETS_MAX = 20;
-async function noterArret(site, geste, code) {
-  try {
-    const l = (await chrome.storage.local.get(ARRETS_DERNIERS))[ARRETS_DERNIERS];
-    const x = (Array.isArray(l) ? l : []).concat([{ site: String(site).slice(0, 10), geste: String(geste || '').replace(/[^a-zA-Z-]/g, '').slice(0, 24), code: String(code || '').replace(/[^a-z0-9-]/g, '').slice(0, 40), at: Date.now() }]).slice(-ARRETS_MAX);
-    await chrome.storage.local.set({ [ARRETS_DERNIERS]: x });
-  } catch (_) {}
-}
-// ══ 5.448 (`reglesservies`) — UNE VERSION DÉPASSÉE NE FAIT PAS UN GESTE DONT LA RÈGLE A CHANGÉ ══════════════════════
-//  Julien : « va encore plus loin ». Mesuré le 24 nov. : ses Chrome tournaient sur 5.409 à 5.440 en même temps. Une
-//  version dépassée continue de LIRE (rien n'est refusé), mais un GESTE dont la règle a changé depuis sa version (la
-//  liste `regles` de vrm.center/extension-version.json, lue avec la version servie) n'est pas fait avec l'ancienne
-//  règle : rien ne part, et la phrase dit la version installée, la version à installer et LE geste.
-async function regleDepassee(cle) {
-  try {
-    const g = (await chrome.storage.local.get('vrmVersionServie')).vrmVersionServie;
-    const min = g && g.regles && g.regles[cle];
-    if (!min || !VERSION_RE.test(String(min)) || !versionPlusRecente(min, CODE_VERSION)) return null;
-    noterDiag('regle_depassee_' + String(cle).replace(/[^a-z-]/g, '_').slice(0, 30));
-    const servie = VERSION_RE.test(String(g.v || '')) ? g.v : min;
-    return `Ton extension (${CODE_VERSION}) suit une ancienne règle pour ce geste : VRM ne le fait pas avec elle, rien n'est parti (les lectures continuent). Geste : installe la ${servie} — télécharge vrm.center/VRM-extension.zip, remplace le dossier, puis ⟳ dans chrome://extensions (sur l'iPhone : VRM-Orion.xpi).`;
-  } catch (_) { return null; }
 }
 // ══ 5.440 — uuid de la nouvelle messagerie ↔ ancien n° de la conversation (appris de la page, jamais deviné) ══════════
 const CONV_ROUTES = 'vrmConvRoutes', CONV_ROUTES_MAX = 300;
@@ -18545,13 +18142,12 @@ async function retenirRouteConv(conv, route) {
   try { const m = (await chrome.storage.local.get(CONV_ROUTES))[CONV_ROUTES] || {}; m[String(conv)] = { r: String(route), at: Date.now() }; const k = Object.keys(m).sort((a, b) => (m[b].at || 0) - (m[a].at || 0)); for (const x of k.slice(CONV_ROUTES_MAX)) delete m[x]; await chrome.storage.local.set({ [CONV_ROUTES]: m }); } catch (_) {}
 }
 async function routeDeConv(conv) { try { const m = (await chrome.storage.local.get(CONV_ROUTES))[CONV_ROUTES]; const e = m && m[String(conv)]; return e && RE_UUID_CONV.test(String(e.r || '')) ? String(e.r) : ''; } catch (_) { return ''; } }
-const PHRASE_PAS_PRETE = (m, n) => `${quoiElement(m)}, même après ${n} nouveaux essais : rien n'est parti. ${gesteElement(m)}`;
+const PHRASE_PAS_PRETE = (m, n) => `${PHRASE_ELEMENT(m)} (${n} nouveaux essais faits). « Reprendre » quand la page est chargée.`;
 async function etapeFormulaire(acc, tabId, etape, d) {
   // AUCUNE écriture hors file (choix n° 97) : une étape qui touche la page sans action en cours y entre elle-même (elle
   // n'attend jamais : file occupée par un autre compte, ou en pause ⇒ refusée, rien n'est parti).
   const uidEtape = String((acc && acc.vinted_user_id) || '');
   const dansLaSienne = () => !!(_fileCourante && (!_fileCourante.uid || _fileCourante.uid === uidEtape));
-  if (!ETAPES_LECTURE_FORM.has(etape)) { const dep = await regleDepassee('vinted:' + etape); if (dep) { noterArret('vinted', etape, 'version-depassee'); return { ok: false, code: 'version-depassee', raison: dep }; } }
   if (!ETAPES_LECTURE_FORM.has(etape) && !dansLaSienne()) {
     noterDiag('formulaire_hors_file');
     const r = await auPassageFile({ sorte: SORTE_ETAPE_FILE[etape] || 'autre', site: 'vinted', uid: acc && acc.vinted_user_id, itemId: (d && (d.id || d.draftId)) || '' }, () => (dansLaSienne() ? etapeFormulaire(acc, tabId, etape, d) : { ok: false, code: 'hors-file', raison: PHRASE_HORS_FILE }));
@@ -18598,7 +18194,7 @@ async function arretFormulaire(uid, acc) {
   { const fr = await lireFreinRepub(uid); if (fr) return { code: 'frein-refus', raison: phraseFreinRepub(fr) }; }
   return null;
 }
-const PHRASE_SELECTEUR = (m) => quoiElement(m);
+const PHRASE_SELECTEUR = (m) => `Vinted a changé sa page (élément « ${String(m || '?')} » introuvable) : VRM s'arrête proprement`;
 // Les valeurs de la fiche, telles que le formulaire les demande (identifiants de Vinted).
 function champsFormulaire(item) {
   const it = item && typeof item === 'object' ? item : {};
@@ -18711,7 +18307,7 @@ async function recreerParFormulaire(c) {
   const arret = async () => arretFormulaire(uid, acc);
   const stopAvant = (s) => fin({ accepte: false, code: s.code, raison: `${s.raison} — rien n'a été créé ni supprimé, ton annonce est intacte.` });
   const echecAvant = (o) => fin(o.code === 'captcha' ? { accepte: false, code: 'verification', raison: `${PHRASE_CAPTCHA} Rien n'a été créé ni supprimé, ton annonce est intacte.` }
-    : o.code === 'selecteur' ? { accepte: true, etape: 'echec', code: 'selecteur', manque: o.manque, raison: `${PHRASE_SELECTEUR(o.manque)} — rien n'a été créé ni supprimé, ton annonce est intacte. ${gesteElement(o.manque)}` }
+    : o.code === 'selecteur' ? { accepte: true, etape: 'echec', code: 'selecteur', manque: o.manque, raison: `${PHRASE_SELECTEUR(o.manque)} — rien n'a été créé ni supprimé, ton annonce est intacte.` }
       : o.code === 'refus' ? { accepte: true, etape: 'echec', raison: `Vinted a refusé une photo (${o.status || 0}) — rien n'a été créé ni supprimé, ton annonce est intacte.` }
         : { accepte: true, etape: 'echec', raison: `le formulaire de Vinted n'a pas répondu (${o.code || 'onglet'}) — rien n'a été créé ni supprimé, ton annonce est intacte.` });
   // 3. L'annonce ENREGISTRÉE dans VRM avant tout geste (même forme que la méthode directe : « Reprendre » la relit).
@@ -18827,7 +18423,7 @@ async function supprimerParFormulaire(acc, uid, id, tab, draftId, versB) {
   const o = await etapeFormulaire(acc, tab, 'supprimer', { id, cle: 's' + id });
   const pas = (cause, raison) => majVersBrouillon(uid, id, { etat: versB ? 'fait' : 'a-publier', draftId, supprime: false, cause }).then(() => ({ ok: false, parti: false, r: { accepte: true, etape: 'echec', draftId, raison } }));
   if (!o.ok && o.code === 'captcha' && !o.parti) return pas('verification', `${PHRASE_CAPTCHA} L'ancienne annonce n'a PAS été supprimée ; le brouillon attend.`);
-  if (!o.ok && o.code === 'selecteur') return pas('formulaire-selecteur', `${PHRASE_SELECTEUR(o.manque)} — l'ancienne annonce n'a PAS été supprimée ; le brouillon attend (« Reprendre »). ${gesteElement(o.manque)}`);
+  if (!o.ok && o.code === 'selecteur') return pas('formulaire-selecteur', `${PHRASE_SELECTEUR(o.manque)} — l'ancienne annonce n'a PAS été supprimée ; le brouillon attend (« Reprendre »).`);
   const rd = o.rep || null;
   if (!rd || !rd.status || rd.status >= 500) {
     await poserVerrouRecreer(id);
@@ -18853,11 +18449,11 @@ async function publierParFormulaire(acc, uid, id, tab, draftId, j) {
   if (await lireVerrouRecreer('b' + draftId)) { await majVersBrouillon(uid, id, { etat: 'mise-en-ligne-incertaine', draftId }); return { parti: false, r: { accepte: true, etape: 'incertain', draftId, raison: "une autre mise en ligne de ce brouillon est partie sans réponse claire — VRM n'en renvoie pas une seconde. Regarde ton dressing." } }; }
   etapeRepub(id, 'en-ligne');
   if (!(await naviguerTravail(tab, `https://${domaine}/items/${draftId}/edit`, new RegExp(`/items/${draftId}/edit`)))) { await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: "l'onglet de Vinted n'a pas ouvert le brouillon — il n'a pas été mis en ligne : « Reprendre » le fait, sans en créer un autre." } }; }
-  { const f = await etapeFormulaire(acc, tab, 'formulairePret'); if (!f.ok) { await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: 'formulaire-' + (f.code || 'ko') }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, ...(f.code === 'captcha' ? { code: 'verification' } : {}), raison: f.code === 'captcha' ? `${PHRASE_CAPTCHA} Le brouillon attend.` : `${PHRASE_SELECTEUR(f.manque)} — le brouillon attend (« Reprendre »). ${gesteElement(f.manque)}` } }; } }
+  { const f = await etapeFormulaire(acc, tab, 'formulairePret'); if (!f.ok) { await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: 'formulaire-' + (f.code || 'ko') }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, ...(f.code === 'captcha' ? { code: 'verification' } : {}), raison: f.code === 'captcha' ? `${PHRASE_CAPTCHA} Le brouillon attend.` : `${PHRASE_SELECTEUR(f.manque)} — le brouillon attend (« Reprendre »).` } }; } }
   await pauseFormulaire('champ', uid);
   await poserVerrouRecreer('b' + draftId);
   const o = await etapeFormulaire(acc, tab, 'publier', { draftId, cle: 'p' + draftId });
-  if (!o.ok && !o.parti && (o.code === 'captcha' || o.code === 'selecteur')) { await leverVerrouRecreer('b' + draftId); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, ...(o.code === 'captcha' ? { code: 'verification' } : {}), raison: o.code === 'captcha' ? `${PHRASE_CAPTCHA} Le brouillon attend.` : `${PHRASE_SELECTEUR(o.manque)} — le brouillon attend (« Reprendre »). ${gesteElement(o.manque)}` } }; }
+  if (!o.ok && !o.parti && (o.code === 'captcha' || o.code === 'selecteur')) { await leverVerrouRecreer('b' + draftId); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, ...(o.code === 'captcha' ? { code: 'verification' } : {}), raison: o.code === 'captcha' ? `${PHRASE_CAPTCHA} Le brouillon attend.` : `${PHRASE_SELECTEUR(o.manque)} — le brouillon attend (« Reprendre »).` } }; }
   const rc = o.rep || null;
   if (!rc || !rc.status || rc.status >= 500) {
     noterDiag('formulaire_mise_en_ligne_incertaine');
@@ -18983,28 +18579,7 @@ const GESTES_INTERFACE = Object.freeze({
 const ID_INTERFACE = /^[1-9]\d{0,19}$/;
 // Le chemin de « Voir tout » : lettres, chiffres, tirets, / — et il parle de notifications ; sinon la page connue.
 function pageNotificationsSure(p) { const c = String(p || '').replace(/\/+$/, ''); return /^\/[\w\-/]{1,80}$/.test(c) && /notif/i.test(c) && !/\.\./.test(c) ? c : '/member/notifications'; }
-// 5.448 (`adaptatif`) — CHAQUE ARRÊT DIT, EN MOTS SIMPLES, CE QUI MANQUE ET LE SEUL GESTE À FAIRE. Avant : « élément
-//    « message-envoyer » introuvable ou en double » (un nom de code, aucun geste). Maintenant : le bouton par SON nom à
-//    l'écran (`LIBELLES_APPRIS`), « introuvable » ou « deux boutons pareils » (VRM ne choisit jamais), « rien n'est parti »,
-//    puis UN geste : un bouton que VRM sait apprendre ⇒ relancer, il demandera de le toucher une fois ; un bouton des
-//    messages aux favoris (jamais appris) ou un autre ⇒ « Envoyer un rapport » (la fenêtre de l'extension), et le faire
-//    soi-même sur vinted.fr en attendant. Une vérification anti-robot n'est jamais un élément manquant (PHRASE_CAPTCHA).
-function phraseElement(m) {
-  const brut = String(m || '').toLowerCase();
-  const ambigu = /-ambigue?$/.test(brut);
-  const nom = brut.replace(/-(ambigue?|a-confirmer)$/, '');
-  const LIB_FAVORIS = { cloche: 'la cloche des notifications', 'favori-notification': 'la notification du favori', 'notifications-introuvables': 'la liste des notifications', 'conversation-pas-ouverte': 'la conversation' };
-  const lib = LIBELLES_APPRIS[nom] ? `le bouton « ${LIBELLES_APPRIS[nom]} »` : LIB_FAVORIS[nom] || (nom && nom !== 'geste' ? `l'élément « ${nom} »` : 'le bon élément');
-  const quoi = ambigu ? `VRM voit deux ${LIBELLES_APPRIS[nom] ? `boutons « ${LIBELLES_APPRIS[nom]} »` : 'éléments pareils'} sur la page Vinted et ne choisit jamais à ta place` : `VRM ne trouve plus ${lib} sur la page Vinted (Vinted a changé sa page)`;
-  const geste = APPRENABLES.has(nom) && !ambigu
-    ? "Geste : relance ; si VRM ne le retrouve toujours pas, il te demandera de toucher ce bouton UNE fois dans l'onglet de travail, puis il s'en souviendra."
-    : "Geste : fais-le toi-même sur vinted.fr cette fois, et touche « Envoyer un rapport » dans la fenêtre de l'extension : la correction arrive avec la prochaine version.";
-  return `${quoi} : rien n'est parti. ${geste}`;
-}
-const PHRASE_ELEMENT = (m) => phraseElement(m);
-// Le même texte en deux morceaux pour les phrases qui disent elles-mêmes ce qui n'est pas parti (republication, brouillon).
-const quoiElement = (m) => phraseElement(m).split(" : rien n'est parti. ")[0];
-const gesteElement = (m) => phraseElement(m).split(" : rien n'est parti. ")[1] || '';
+const PHRASE_ELEMENT = (m) => `Vinted a changé sa page (élément « ${String(m || '?')} » introuvable ou en double) : VRM s'arrête proprement, rien n'est parti.`;
 const PHRASE_IDENTITE = "la page de Vinted ne montre pas la bonne conversation / la bonne annonce : VRM s'arrête, rien n'est parti.";
 // Les codes d'une étape qui s'arrête AVANT le geste (rien n'a été cliqué) : certain, « rien n'est parti ».
 const AVANT_LE_GESTE = new Set(['selecteur', 'identite', 'captcha', 'etape', 'valeur', 'hors-vinted', 'script', 'onglet', 'photos-absentes', 'hors-file']);
@@ -19026,7 +18601,6 @@ function resultatInterface(o, geste) {
 // 5.433 (`filevisible`) : chaque geste d'interface entre dans la file (une étape de l'action en cours, ou une action à lui).
 const SORTE_GESTE_FILE = { 'message': 'message', 'offre': 'offre', 'favoriOuvrir': 'favori', 'favoriLien': 'favori', 'favoriListe': 'favori', 'favoriAccueil': 'favori', 'ouvrir': 'message', 'repondreOffre': 'reponse', 'masquer': 'masquer', 'supprimer': 'supprimer', 'prix': 'prix', 'bordereau': 'bordereau', 'evaluation': 'evaluation', 'vacances': 'vacances' };
 async function interfaceVinted(acc, geste, d, opts = {}) {
-  { const dep = await regleDepassee('vinted:' + geste); if (dep) { noterArret('vinted', geste, 'version-depassee'); return { status: 0, ok: false, json: null, rienParti: true, sansPage: 'element', manque: 'version', raison: dep }; } }
   const g = GESTES_INTERFACE[geste];
   const uid = String((acc && acc.vinted_user_id) || '');
   const x = d && typeof d === 'object' ? Object.assign({}, d) : {};
@@ -19062,7 +18636,6 @@ async function interfaceVinted(acc, geste, d, opts = {}) {
     if ((geste === 'favoriOuvrir' || geste === 'favoriLien' || geste === 'favoriListe' || geste === 'favoriAccueil') && r.ok && !r.conv) { try { const m = /^\/inbox\/([1-9]\d{0,19})\/?$/.exec(new URL(String((await chrome.tabs.get(tab)).url || '')).pathname); if (m) r.conv = m[1]; } catch (_) {} }
     if (r.ok && r.json && r.json.conversation && ID_INTERFACE.test(String(r.json.conversation.id)) && !r.conv) r.conv = String(r.json.conversation.id);
     noterDiag(`interface_${geste}_${r.ok ? (r.vu === false && ['message', 'offre'].includes(geste) ? 'pas_vu' : 'ok') : r.rienParti ? 'rien_' + String(r.manque || r.sansPage || 'parti').replace(/[^a-z-]/g, '').slice(0, 30) : 'incertain'}`);
-    if (!r.ok && r.rienParti) noterArret('vinted', geste, String(r.manque || r.sansPage || 'rien'));
     if (r.ok && r.vu === false && ['message', 'offre', 'masquer', 'vacances'].includes(geste)) noterCarnet(uid, 'pasvu');   // 5.420 : la santé du compte le compte
     // 5.438 (`santenote`) : Vinted a RÉPONDU non (4xx hors 401/403/429, déjà comptés ailleurs ; ou un refus dans une réponse 2xx) —
     //    jamais un « rien n'est parti » de VRM, jamais un doute : seulement SA réponse lue.
@@ -19416,7 +18989,7 @@ async function creerVintedFiche(msg, suivi) {
     if (ot.refus) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage({ sansPage: ot.refus === 'travail-ferme' ? 'onglet' : ot.refus, travailFerme: ot.refus === 'travail-ferme' }) };
     const tab = ot.tabId, domaine = acc.domain || 'www.vinted.fr';
     if (!(await naviguerTravail(tab, `https://${domaine}/items/new`, /\/items\/new/))) return { accepte: false, code: 'onglet-vinted', raison: RAISON_ONGLET_VINTED };
-    const echecF = (o) => (o.code === 'captcha' ? { accepte: false, code: 'verification', raison: `${PHRASE_CAPTCHA} Rien n’a été créé sur Vinted.` } : o.code === 'selecteur' ? { accepte: true, etape: 'echec', code: 'selecteur', manque: o.manque, raison: `${PHRASE_SELECTEUR(o.manque)} — rien n’a été créé sur Vinted. ${gesteElement(o.manque)}` } : { accepte: true, etape: 'echec', raison: `le formulaire de Vinted n'a pas répondu (${o.code || 'onglet'}) — rien n’a été créé sur Vinted.` });
+    const echecF = (o) => (o.code === 'captcha' ? { accepte: false, code: 'verification', raison: `${PHRASE_CAPTCHA} Rien n’a été créé sur Vinted.` } : o.code === 'selecteur' ? { accepte: true, etape: 'echec', code: 'selecteur', manque: o.manque, raison: `${PHRASE_SELECTEUR(o.manque)} — rien n’a été créé sur Vinted.` } : { accepte: true, etape: 'echec', raison: `le formulaire de Vinted n'a pas répondu (${o.code || 'onglet'}) — rien n’a été créé sur Vinted.` });
     let o = await etapeFormulaire(acc, tab, 'formulairePret'); if (!o.ok) return echecF(o);
     o = await etapeFormulaire(acc, tab, 'photos', { photos: ph.photos }); if (!o.ok) return o.code === 'refus' ? { accepte: true, etape: 'echec', raison: `Vinted n’a pas accepté une photo (${o.status || 0}) — rien n’a été créé sur Vinted` } : echecF(o);
     const envoyes = Array.isArray(o.envoyes) ? o.envoyes : null;   // 5.429 : chaque fichier ↔ l'identifiant rendu par Vinted
@@ -21605,8 +21178,7 @@ const lecteursPrioritaires = () => ({ versement: VERSEMENT_PART_VISITE, releve: 
 //    deux réserves). La relecture note elle aussi ce qui lui reste
 //    (`noterLecturesDues(uid, 'enligne', …)`) ; « pas su » garde sa réserve.
 // 5.344 : l'import de départ aussi (`importerHistorique`) — les photos lui laissent un passage.
-// 5.443 : le détail des achats aussi (seulement ce qu'il a NOTÉ, comme l'import).
-const lecteursAvantPhotos = () => ({ enligne: ENLIGNE_MAX_PAR_VISITE, import: IMPORT_PAGES_PAR_PASSAGE, achat: ACHAT_DETAIL_MAX_PAR_VISITE });
+const lecteursAvantPhotos = () => ({ enligne: ENLIGNE_MAX_PAR_VISITE, import: IMPORT_PAGES_PAR_PASSAGE });
 async function noterLecturesDues(uid, quoi, reste, plus) {
   try {
     const cur = (await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {};
@@ -21642,7 +21214,7 @@ async function reserveLectures(uid, classe = 'photos') {
     const connu = d && Date.now() - Number(d.at || 0) < LECTURES_DUES_VALIDITE_MS;
     // 5.344 : l'import ne réserve que ce qu'il a NOTÉ (chaque passage le note) ;
     // un compte sans import en cours ne prive pas les photos.
-    r += connu ? Math.min(Number(d.reste) || 0, max[k]) : ((k === 'import' || k === 'achat') ? 0 : max[k]);   // pas su ⇒ réserve entière
+    r += connu ? Math.min(Number(d.reste) || 0, max[k]) : (k === 'import' ? 0 : max[k]);   // pas su ⇒ réserve entière
   }
   return r;
 }
@@ -21686,7 +21258,7 @@ async function gardeLecture(uid, acc, classe = 'photos', plafondMax = LECTURES_M
   // 5.341 : `plafondMax` — le rattrapage des dates de versement s'arrête AVANT la
   // réserve des autres lecteurs prioritaires (`reserveAutresQueVersement`).
   // 5.344 : 'import' (l'historique de départ) : au même étage que la relecture.
-  const plafond = prioritaire ? Math.min(LECTURES_MAX_HEURE, Number(plafondMax) || LECTURES_MAX_HEURE) : LECTURES_MAX_HEURE - (await reserveLectures(uid, (classe === 'enligne' || classe === 'suivi' || classe === 'import' || classe === 'achat') ? 'enligne' : 'photos'));   // 5.443 : 'achat' (détail des achats) au même étage
+  const plafond = prioritaire ? Math.min(LECTURES_MAX_HEURE, Number(plafondMax) || LECTURES_MAX_HEURE) : LECTURES_MAX_HEURE - (await reserveLectures(uid, (classe === 'enligne' || classe === 'suivi' || classe === 'import') ? 'enligne' : 'photos'));
   const c = await compterLecture(String(uid), plafond);
   if (!c.ok && c.code === 'stockage') return { ok: false, code: 'stockage', error: RAISON_STOCKAGE };
   if (!c.ok) return prioritaire
@@ -22199,20 +21771,14 @@ function fpGroupes(reglage, ancien, ctx, fav, lotPermis) {
 }
 // ── LE CHOIX ──────────────────────────────────────────────────────────────
 // x = { reglage, ancien, fav, offre ({ prix } ou null), ctx ({ heure, jour }), lotPermis, sur(texte)→bool,
-//       refusee(modele)→bool, derniere: { acheteur, compte } (clés de version), hasard,
-//       deja(modele)→bool (5.441 : ce texte a DÉJÀ été envoyé à CETTE personne pour CET article) }
+//       refusee(modele)→bool, derniere: { acheteur, compte } (clés de version), hasard }
 // → { ok: true, source, cas, regle, version: { cle, n, lot, modele, texte }, possibles }  (`texte` = variables nouvelles posées)
-//   { ok: false, source, raison: 'aucun_message' | 'texte_interdit' | 'variable' | 'deja_envoye', manque: [...] }
-// 5.441 (Julien, 23 nov.) : les RELANCES sont permises — une personne peut recevoir un nouveau message plus tard — mais
-//   JAMAIS deux fois le même texte à la même personne pour le même article : un texte déjà envoyé est écarté pour de bon
-//   (pas seulement « pas le dernier ») ; tous déjà envoyés ⇒ `deja_envoye`, rien ne part (le favori est sauté).
+//   { ok: false, source, raison: 'aucun_message' | 'texte_interdit' | 'variable', manque: [...] }
 function choisirMessageFavori(x) {
   const o = x && typeof x === 'object' ? x : {};
   const val = fpValeurs(o.fav, o.offre);
   const { source, groupes } = fpGroupes(o.reglage, o.ancien, o.ctx || {}, o.fav || {}, o.lotPermis === true);
   const sur = typeof o.sur === 'function' ? o.sur : () => true, refusee = typeof o.refusee === 'function' ? o.refusee : () => false;
-  const deja = typeof o.deja === 'function' ? o.deja : () => false;
-  let vuDeja = false;
   const d = o.derniere && typeof o.derniere === 'object' ? o.derniere : {};
   const tirer = typeof o.hasard === 'function' ? o.hasard : Math.random;
   let vuInterdit = false; const manques = new Set();
@@ -22224,7 +21790,6 @@ function choisirMessageFavori(x) {
       if (m.length) { m.forEach((k) => manques.add(k)); continue; }
       const texte = fpPreremplir(v.modele, val);
       if (!sur(texte) || refusee(v.modele)) { vuInterdit = true; continue; }
-      if (deja(v.modele)) { vuDeja = true; continue; }
       possibles.push(Object.assign({}, v, { texte }));
     }
     if (!possibles.length) continue;
@@ -22243,7 +21808,6 @@ function choisirMessageFavori(x) {
       for (const v of g.versions) {
         const mod = neutre(v.modele);
         if (fpErreurTexte(mod) || fpManque(mod, val).length) continue;
-        if (deja(v.modele) || deja(mod)) { vuDeja = true; continue; }   // 5.454 : la règle 5.441 vaut aussi pour la version neutre
         const texte = fpPreremplir(mod, val);
         if (!texte.trim() || !sur(texte) || refusee(v.modele)) continue;
         possibles.push(Object.assign({}, v, { modele: mod, texte, neutre: true }));
@@ -22254,7 +21818,6 @@ function choisirMessageFavori(x) {
       return { ok: true, source, cas: g.cas, regle: g.regle, version: v, possibles: possibles.length, neutre: true };
     }
   }
-  if (vuDeja && !vuInterdit) return { ok: false, source, raison: 'deja_envoye', manque: [] };
   if (manques.size && !vuInterdit) return { ok: false, source, raison: 'variable', manque: [...manques] };
   return { ok: false, source, raison: groupes.some((g) => g.versions.length) ? 'texte_interdit' : 'aucun_message', manque: [...manques] };
 }
@@ -22464,15 +22027,6 @@ const FAV_VERSION_CLE = 'vrmFavVersionCle';
 async function versionCleDerniere(uid, acheteur) {
   try { const m = (await chrome.storage.local.get(FAV_VERSION_CLE))[FAV_VERSION_CLE] || {}; return { compte: m[String(uid)] || null, acheteur: acheteur ? m[String(uid) + '|' + String(acheteur)] || null : null }; } catch (_) { return {}; }
 }
-// 5.441 (Julien, 23 nov.) : les textes DÉJÀ envoyés à une personne pour un article (empreintes du modèle, jamais le texte),
-//    par compte ; une relance plus tard choisit un AUTRE texte, jamais le même (règle `choisirMessageFavori`, `deja`).
-const FAV_TEXTES_ENVOYES = 'vrmFavTextesEnvoyes', FAV_TEXTES_MAX_CLES = 3000;
-const cleTextesFavori = (uid, acheteur, item) => `${String(uid)}|${String(acheteur)}|${String(item)}`;
-async function textesDejaEnvoyes(uid, acheteur, item) { try { const m = (await chrome.storage.local.get(FAV_TEXTES_ENVOYES))[FAV_TEXTES_ENVOYES] || {}; const l = m[cleTextesFavori(uid, acheteur, item)]; return new Set(Array.isArray(l) ? l.map(String) : []); } catch (_) { return null; } }
-async function noterTexteEnvoyeFavori(uid, acheteur, item, modele) {
-  if (!acheteur || !item || typeof modele !== 'string' || !modele) return;
-  try { const m = (await chrome.storage.local.get(FAV_TEXTES_ENVOYES))[FAV_TEXTES_ENVOYES] || {}; const k = cleTextesFavori(uid, acheteur, item); const l = Array.isArray(m[k]) ? m[k] : []; const e = empreinteMessage(modele); delete m[k]; m[k] = [...new Set([...l, e])].slice(-12); const ks = Object.keys(m); for (const x of ks.slice(0, Math.max(0, ks.length - FAV_TEXTES_MAX_CLES))) delete m[x]; await chrome.storage.local.set({ [FAV_TEXTES_ENVOYES]: m }); } catch (_) {}
-}
 async function noterVersionCle(uid, acheteur, cle) {
   if (typeof cle !== 'string' || !cle) return;
   try { const m = (await chrome.storage.local.get(FAV_VERSION_CLE))[FAV_VERSION_CLE] || {}; m[String(uid)] = cle; if (acheteur) { delete m[String(uid) + '|' + String(acheteur)]; m[String(uid) + '|' + String(acheteur)] = cle; } const k = Object.keys(m); if (k.length > 3000) for (const x of k.slice(0, k.length - 3000)) delete m[x]; await chrome.storage.local.set({ [FAV_VERSION_CLE]: m }); } catch (_) {}
@@ -22499,12 +22053,9 @@ async function choixMessageFavori(x) {
   const fav = { pseudo: String((c && c.opposite_user && c.opposite_user.login) || ''), article: String((c && c.transaction && c.transaction.item_title) || ''), prix: Number(prixAnnonce) > 0 ? Number(prixAnnonce) : null, marque: fiche.marque, taille: fiche.taille };
   const op = offre && /^[1-9]\d{0,19}$/.test(String(tx || '')) ? await offreAvecPlancher(body.itemId, prixAnnonce, offre) : null;
   const derniere = await versionCleDerniere(uid, body.recipientId);
-  // 5.441 : « pas su » (stockage illisible) ne vaut pas « jamais envoyé » : rien ne part sur un doute.
-  const dejaEnv = await textesDejaEnvoyes(uid, body.recipientId, body.itemId);
-  if (dejaEnv === null) { noterDiag('favori_textes_envoyes_illisible'); return { ok: false, source: '', raison: 'deja_envoye', manque: [], op: null }; }
   if (!derniere.compte) { const n = await varianteDerniere(uid, 'favori'); if (Number.isInteger(n)) derniere.compte = 'a' + n; }
   const r = choisirMessageFavori({ reglage: perso, ancien: { message: body.message, variantes: body.variantes, lot: lotTexte }, fav, offre: op && op.prix ? { prix: Number(op.prix) } : null,
-    ctx: fpContexteParis(Date.now()), lotPermis: lotPermis === true, sur: (t) => texteSurVinted(t).ok, refusee: (m) => !!(refusees && refusees.has(empreinteMessage(m))), derniere, deja: (m) => dejaEnv.has(empreinteMessage(m)) });
+    ctx: fpContexteParis(Date.now()), lotPermis: lotPermis === true, sur: (t) => texteSurVinted(t).ok, refusee: (m) => !!(refusees && refusees.has(empreinteMessage(m))), derniere });
   if (r.ok) noterDiag('favori_perso_' + r.source + '_' + r.cas);
   return Object.assign(r, { op });
 }
@@ -22512,7 +22063,6 @@ async function noterChoixFavori(uid, body, conv, version, offreFaite) {
   if (!version) return;
   if (version.lot) { await noterLotEnvoye(uid, body.recipientId); }
   await noterVersionCle(uid, body.recipientId, version.cle);
-  await noterTexteEnvoyeFavori(uid, body.recipientId, body.itemId, version.modele || version.texte || '');
   await noterEnvoiFavori(uid, conv, Number.isInteger(version.n) ? version.n : 0, body.itemId, body.recipientId, { k: version.cle, o: offreFaite === true, au: !!(body && body.auto === true) });   // 5.420 : « auto » dans les statistiques
 }
 // 5.414 : la raison (connue du serveur de la file) d'un geste par l'interface qui s'est arrêté AVANT de partir.
@@ -22575,7 +22125,6 @@ async function sequenceFavoriBleam(x) {
       await pauseFavori('offre', uid);
       if (await gardeStricte(uid, acc, { lecture: true })) return { resultat: 'refuse' };
       etape('offre');
-      await noterTexteEnvoyeFavori(uid, body.recipientId, body.itemId, (version && (version.modele || version.texte)) || '');   // 5.454 : le texte peut partir DANS la fenêtre d'offre ⇒ noté AVANT (règle 5.441)
       const o0 = await interfaceVinted(acc, 'offre', { conv: String(convId), route: x.convRoute || '', tx: String(tx), prix: Number(op0.prix), garde: gp0.ticket, favori: true, texteMessage: texte });
       if (partie(o0)) compterEcrit();
       const faite = !!(o0 && o0.ok && (o0.json == null || o0.json.code == null || Number(o0.json.code) === 0));
@@ -22604,7 +22153,6 @@ async function sequenceFavoriBleam(x) {
   etape('envoi');
   // 5.414 (`toutinterface`) : le message TAPÉ dans le champ de CETTE conversation (vérifiée dans l'adresse), « Envoyer »,
   //    puis la preuve à l'écran (le message apparu dans le fil) ; pas vu ⇒ « incertain », JAMAIS renvoyé.
-  await noterTexteEnvoyeFavori(uid, body.recipientId, body.itemId, (version && (version.modele || version.texte)) || '');   // 5.441 : noté AVANT l'envoi
   const r = await interfaceVinted(acc, 'message', { conv: String(convId), route: x.convRoute || '', texte, favori: true, humain: true });
   if (partie(r)) compterEcrit();
   if (r.rienParti && !r.pause) return { resultat: 'refuse', raison: raisonFavoriInterface(r), cause: causeFavoriInterface(r) };
@@ -23073,7 +22621,6 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   //    sues seulement, jamais la dernière version de cet acheteur ni du compte. La séquence d'envoi ne change pas :
   //    elle reçoit `version` ({ cle, n, lot, modele, texte }) comme avant.
   const choixP=await choixMessageFavori({uid,body,c,prixAnnonce,offre,tx,perso:persoF,lotPermis:!texteEnvoi&&!!cbF.favoris&&Number(body.aimes)>=2&&!(await lotDejaEnvoye(uid,body.recipientId)),lotTexte:cbF.messageLot,refusees:refuseesIci});
-  if(!choixP.ok&&choixP.raison==='deja_envoye'){noterDiag('favori_perso_deja_envoye');return rep('ignore',0,'conversation_deja_contactee');}   // 5.441 : jamais deux fois le même texte (rien n'est écrit)
   if(!choixP.ok){noterDiag('favori_perso_'+choixP.raison);return rep('refuse',0,choixP.raison==='variable'?(choixP.manque.some(k=>/prix|remise/.test(k))?'offre_prix_inconnu':'identite_non_confirmee'):'texte_interdit');}
   if(cbF.favoris){
     const versionB=choixP.version;
@@ -23148,7 +22695,6 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   etape('envoi');
   // 5.414 : le message TAPÉ dans le champ de CETTE conversation, « Envoyer », puis VU dans le fil (sinon incertain, jamais renvoyé).
-  await noterTexteEnvoyeFavori(uid,body.recipientId,body.itemId,version.modele||version.texte||'');   // 5.441 : noté AVANT l'envoi — une issue incertaine ne fera jamais repartir le même texte
   const r=await interfaceVinted(acc,'message',{conv:String(convId),route:convRoute,texte:texteFinal,favori:true,humain:true});
   if(partie(r))ecrits++;
   // (29 oct., revue) Pas d'onglet, onglet hors de Vinted, ou pause : le message n'est PAS
@@ -26078,7 +25624,6 @@ async function noterVcCapte(quoi, ok, n, extra) {
     const cur = (await chrome.storage.local.get('vrmVcCapte')).vrmVcCapte || {};
     if (ok) cur[quoi] = Object.assign({ at: Date.now(), n: Number(n) || 0 }, extra && extra.inconnu ? { inconnu: true } : {});
     await chrome.storage.local.set({ vrmVcCapte: cur });
-    if (ok) majSanteSites().catch(() => {});
     await noterFlux('vestiaire', ok);
   } catch (_) {}
 }
@@ -26189,12 +25734,7 @@ async function publierAppareilUn(force) {
       refus: (Array.isArray(x.refus) ? x.refus.slice(-5) : []) }, x.secours ? { secours: x.secours } : {});
   }
   const data = { v: 1, appareil: decrireAppareil(), ver, code: CODE_VERSION, at: new Date(t).toISOString(), atMs: t, flux: fl, vus: local[COMPTES_VUS_STORE] || {},
-    ...(local[DIAG_NAV] ? { diag: local[DIAG_NAV] } : {}),   // 5.409 : le diagnostic des lectures de CE navigateur
-    // 5.448 (`santesites`) : pour l'app (« Tout va bien ? », page Extension) — des CODES seulement, jamais une phrase de page :
-    //   sante   { vinted|lbc|vc|ebay: { k: 'ok'|'element'|'forme'|'onglet'|'pas-vu', nom: code de l'élément ou de la page } }
-    //   arret   le dernier arrêt { site, geste, code, at } (`noterArret`) ;  servie / depassee : la version servie lue et
-    //           « ce navigateur est en retard » (true/false ; absent = pas su).
-    ...(await avecDelai(champsSanteAppareil(), 400, {}).catch(() => ({}))) };
+    ...(local[DIAG_NAV] ? { diag: local[DIAG_NAV] } : {}) };   // 5.409 : le diagnostic des lectures de CE navigateur
   // Son propre échec ne doit pas devenir « le dernier refus » d'une capture.
   const garde = [_statutDernierRefus, _familleDernierRefus, _octetsDernierRefus];
   let ok = false;
@@ -26454,11 +25994,7 @@ async function versionServieConnue({ attendre = false } = {}) {
         let j = null; try { j = await r.json(); } catch (_) { j = null; }
         const v = j && typeof j.version === 'string' ? j.version : '';
         if (!VERSION_RE.test(v)) { noterDiag('version_servie_forme'); return null; }
-        // 5.448 (`reglesservies`) : les gestes dont la RÈGLE a changé, avec la version où elle a changé (« vinted:supprimer »
-        //    → « 5.448.0 »). Forme inconnue ⇒ rien retenu (aucun geste n'est bloqué sur une liste illisible).
-        const regles = {};
-        if (j && j.regles && typeof j.regles === 'object' && !Array.isArray(j.regles)) for (const k of Object.keys(j.regles).slice(0, 60)) if (/^(vinted|lbc|vc):[a-zA-Z-]{2,30}$/.test(k) && VERSION_RE.test(String(j.regles[k]))) regles[k] = String(j.regles[k]);
-        try { await chrome.storage.local.set({ vrmVersionServie: { v, at: Date.now(), regles } }); } catch (_) {}
+        try { await chrome.storage.local.set({ vrmVersionServie: { v, at: Date.now() } }); } catch (_) {}
         return v;
       } catch (_) { return null; }
     })().finally(() => { _versionServieEnVol = null; });
@@ -26891,7 +26427,7 @@ function etiquetteRapport(s) {
 async function construireRapport() {
   const t = Date.now();
   let local = {};
-  try { local = await chrome.storage.local.get([DIAG_BUF, 'vrmFlux', 'vrmDiagRecents', 'vrmFileReseau', REPUB_TEMOIN, 'vrmToutArrete', TROUVE_JOURNAL, ARRETS_DERNIERS]); } catch (_) { local = {}; }
+  try { local = await chrome.storage.local.get([DIAG_BUF, 'vrmFlux', 'vrmDiagRecents', 'vrmFileReseau', REPUB_TEMOIN, 'vrmToutArrete']); } catch (_) { local = {}; }
   const heure = (x) => { const n = Number(x); return n > 0 && n <= t + 60000 ? n : null; };
   const flux = {};
   for (const [pf, f] of Object.entries(local.vrmFlux || {})) {
@@ -26924,10 +26460,6 @@ async function construireRapport() {
     flux, compteurs, erreurs,
     files: { commandes: parEtape, reseau: fileReseau },
     pauses: { vinted: pause, toutArrete: !!(local.vrmToutArrete && local.vrmToutArrete.on === true), republication: heure(local[REPUB_TEMOIN]) },
-    // 5.448 (`rapportreperage`) : le journal de repérage (élément, stratégies essayées et leurs comptes) et les derniers
-    //    arrêts (site, geste, code) — des ÉTIQUETTES seulement (`etiquetteRapport`), jamais un texte de page ni un pseudo.
-    reperage: (Array.isArray(local[TROUVE_JOURNAL]) ? local[TROUVE_JOURNAL] : []).slice(-40).map((x) => ({ site: etiquetteRapport(x && (x.site || 'vinted')), nom: etiquetteRapport(x && x.nom), etape: etiquetteRapport(x && x.etape), at: heure(x && x.at), ambigu: !!(x && x.ambigu), essais: (Array.isArray(x && x.essais) ? x.essais : []).slice(0, 8).map((q) => ({ s: etiquetteRapport(q && q.s), n: Math.max(0, Math.min(999, Math.floor(Number(q && q.n) || 0))) })) })),
-    arrets: (Array.isArray(local[ARRETS_DERNIERS]) ? local[ARRETS_DERNIERS] : []).slice(-ARRETS_MAX).map((x) => ({ site: etiquetteRapport(x && x.site), geste: etiquetteRapport(String((x && x.geste) || '').toLowerCase()), code: etiquetteRapport(x && x.code), at: heure(x && x.at) })),
   };
 }
 async function envoyerRapport(extra = null) {
@@ -27312,11 +26844,10 @@ async function etatSite(url,tabId) {
   // calculé et publié (`lbc_a_retirer`) — la carte le dit, sans rien recalculer.
   // 5.335 : seulement les lignes PROUVÉES encore en ligne (lecture complète < 24 h).
   let lectureLbc = null;
-  let txLuLbc = null;
-  if (plateforme === 'leboncoin') { const ll = local.vrmLbcLecture, u = vrm && vrm.connecte ? String((await loadSession().catch(() => null))?.user_id || '') : ''; lectureLbc = ll && u && ll.u === u ? (ll.comptes || {}) : null; try { const tl = (await chrome.storage.local.get('vrmLbcTxLu')).vrmLbcTxLu; txLuLbc = tl && u && tl.u === u ? (tl.comptes || {}) : null; } catch (_) {} }
+  if (plateforme === 'leboncoin') { const ll = local.vrmLbcLecture, u = vrm && vrm.connecte ? String((await loadSession().catch(() => null))?.user_id || '') : ''; lectureLbc = ll && u && ll.u === u ? (ll.comptes || {}) : null; }
   const aRetirerBrut = plateforme === 'leboncoin' && vrm && vrm.connecte ? await lbcARetirerPourCarte().catch(() => null) : null;
   const aRetirer = aRetirerBrut ? { at: aRetirerBrut.at, liste: aRetirerProuveCarte(aRetirerBrut.liste, lectureLbc, Date.now()) } : null;
-  const lbc = plateforme === 'leboncoin' ? resumeCarteLbc({ vrm, transport, connu: local.vrmLbcCompte, lecture: lectureLbc, code: CODE_VERSION, maintenant: Date.now(), txLu: txLuLbc }) : null;
+  const lbc = plateforme === 'leboncoin' ? resumeCarteLbc({ vrm, transport, connu: local.vrmLbcCompte, lecture: lectureLbc, code: CODE_VERSION, maintenant: Date.now() }) : null;
   const oauthRevenu = await oauthRevenuPour(tabId).catch(() => null);
   // 5.354 : le mini-résumé du mois (connecté seulement ; compte de l'onglet prouvé).
   const mois = vrm && vrm.connecte === true ? await moisPourCarte(plateforme, site, tabId).catch(() => null) : null;
@@ -27339,10 +26870,7 @@ async function etatSite(url,tabId) {
   if (plateforme === 'vinted' && site && site.id && vrm && vrm.connecte === true && site.choix !== 'non') site.favoris = await favorisPourCarte(String(site.id), true).catch(() => null);
   // 5.377 : le réglage « Dire ce que l'extension capte » (true · false · null = pas su).
   const capteCoupeEtat = await capteCoupe();
-  // 5.448 (`santesites`) : la ligne de santé de CE site (« tout marche » / « X ne marche plus : fais Y ») — `null` = pas su.
-  const santeToutes = await avecDelai(santeSites(), 400, null).catch(() => null);
-  const santeSite = santeToutes ? santeToutes[{ vinted: 'vinted', leboncoin: 'lbc', vestiaire: 'vc', ebay: 'ebay' }[plateforme]] || null : null;
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu, toutArrete, maj, aReparer, enAttenteReseau, secu, liens, capture, capteCoupe: capteCoupeEtat, santeSite };
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer, lbc, mois, oauthFenetre: oauthFenetrePossible(), oauthRevenu, toutArrete, maj, aReparer, enAttenteReseau, secu, liens, capture, capteCoupe: capteCoupeEtat };
 }
 // ══ 5.376 — « PLUS SIMPLE POUR TOUT LE MONDE » : CE QUI MANQUE, EN UNE PHRASE ══
 // Julien : « que ce soit beaucoup mieux et beaucoup plus simple pour tout le
@@ -27852,8 +27380,7 @@ async function repondreCarte(msg, sender) {
     if (!moi) return { ok: false, code: 'compte', raison: 'Le compte de cet onglet n’est pas reconnu : rien n’est parti.' };
     if (pf === 'vestiaire') {
       const m = await sbGet('app_data?id=eq.vc_messages&select=c:data->conversations');
-      // 5.444 : une conversation est rangée SOUS son identifiant (la clé de `conversations`) ; `ref` est presque toujours vide.
-      const x = Array.isArray(m) && m[0] && m[0].c ? (m[0].c[conv] && typeof m[0].c[conv] === 'object' ? m[0].c[conv] : Object.values(m[0].c).find((y) => y && y.ref && String(y.ref) === conv)) || null : null;
+      const x = Array.isArray(m) && m[0] && m[0].c ? Object.values(m[0].c).find((y) => y && String(y.ref) === conv) : null;
       if (!x || String(x.compte || '') !== moi) return { ok: false, code: 'autre-compte', raison: 'Cette conversation n’est pas sur le compte de cet onglet : rien n’est parti.' };
       const r = await repondreVestiaire({ conv, texte, tabId: sender && sender.tab ? sender.tab.id : null });
       return r && r.accepte && r.etape === 'fait' ? { ok: true } : { ok: false, code: (r && (r.etape === 'incertain' ? 'incertain' : r.code)) || 'refus', raison: (r && r.raison) || 'Rien n’est parti.', ...(r && r.code === 'ouvrir' && adresseConvVcSure(r.url, conv) ? { url: String(r.url) } : {}) };
@@ -27915,33 +27442,25 @@ async function aimesVcCarte(msg, sender) {
   const oc = await compteOngletCapte(o.url, sender && sender.tab ? sender.tab.id : null);
   const moi = oc && oc.id ? String(oc.id) : '';
   if (!moi) return { ok: false, code: 'compte', raison: 'Le compte de cet onglet n’est pas reconnu : recharge la page Vestiaire.' };
-  let aimes = {}, ecrits = {}, faits = {}, ui = null, infos = {}, recOffre = null;
-  try { const l = await chrome.storage.local.get([VC_AIMES, VC_AIMES_ECRITS, VC_AIMES_FAITS, VC_UI, VC_AIMES_INFOS, VC_RECETTE_OFFRES]); aimes = l[VC_AIMES] || {}; ecrits = l[VC_AIMES_ECRITS] || {}; faits = l[VC_AIMES_FAITS] || {}; ui = l[VC_UI] || null; infos = l[VC_AIMES_INFOS] || {}; recOffre = l[VC_RECETTE_OFFRES] && l[VC_RECETTE_OFFRES].favori && l[VC_RECETTE_OFFRES].favori.recette || null; } catch (_) { return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
+  let aimes = {}, ecrits = {}, faits = {}, ui = null;
+  try { const l = await chrome.storage.local.get([VC_AIMES, VC_AIMES_ECRITS, VC_AIMES_FAITS, VC_UI]); aimes = l[VC_AIMES] || {}; ecrits = l[VC_AIMES_ECRITS] || {}; faits = l[VC_AIMES_FAITS] || {}; ui = l[VC_UI] || null; } catch (_) { return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
   const rows = await sbGet('app_data?id=eq.vc_listings&select=items:data->items');
   if (rows === null) return { ok: false, code: 'pas-su', raison: 'La base VRM n’a pas répondu.' };
   const items = rows && rows[0] && rows[0].items && typeof rows[0].items === 'object' ? rows[0].items : {};
   const articles = []; let sansArticle = 0;
   for (const [p, par] of Object.entries(aimes)) {
     if (!/^\d{3,15}$/.test(p) || !par || typeof par !== 'object') continue;
-    // 5.444 (capture de Julien : « personne n'a encore été vu » alors que la cloche liste des « vient d'aimer ») : l'article
-    // aimé appartient au compte de la NOTIFICATION (`vrmVcAimesInfos`, compte de l'onglet ET de la page) quand « Mes
-    // articles » ne l'a pas (encore) rangé sous un compte ; un article rangé sous un AUTRE compte n'est jamais montré.
-    const it = items[p] && typeof items[p] === 'object' ? items[p] : null;
-    const inf = infos[p] && typeof infos[p] === 'object' ? infos[p] : {};
-    const proprio = it && it.compte ? String(it.compte) : String(inf.compte || '');
-    if (!proprio) { sansArticle++; continue; }                          // on ne sait pas à quel compte il est
-    if (proprio !== moi) continue;                                      // un autre compte : jamais montré ici
+    const it = items[p];
+    if (!it || typeof it !== 'object') { sansArticle++; continue; }   // article jamais lu : on ne sait pas à quel compte il est
+    if (String(it.compte || '') !== moi) continue;                     // un autre compte : jamais montré ici
     const gens = Object.keys(par).filter((k) => /^\d{3,15}$/.test(k) && k !== moi)
       .map((k) => ({ url: adresseConvVc(o.url, `${k}-${p}`, ui), conv: `${k}-${p}`, at: Date.parse(par[k] || '') || null, ecrit: !!ecrits[p + '|' + k], offre: !!faits[p + '|' + k] }))
       .sort((a, b) => (b.at || 0) - (a.at || 0));
     if (!gens.length) continue;
-    const photoIt = it && /^https:\/\/images\.vestiairecollective\.com\//.test(String(it.photo || '')) ? String(it.photo) : (/^https:\/\/images\.vestiairecollective\.com\//.test(String(inf.photo || '')) ? String(inf.photo) : '');
-    const prixC = it ? centsPrixVc(it.prix) : null;
-    articles.push({ produit: p, titre: it ? String(it.titre || '').slice(0, 120) : '', photo: photoIt, n: gens.length, ecrits: gens.filter((g) => g.ecrit).length, offres: gens.filter((g) => g.offre).length, gens: gens.slice(0, AIMES_CARTE_MAX), dernier: gens[0].at, prixC: prixC == null ? null : prixC });
+    articles.push({ produit: p, titre: String(it.titre || '').slice(0, 120), photo: /^https:\/\/images\.vestiairecollective\.com\//.test(String(it.photo || '')) ? String(it.photo) : '', n: gens.length, ecrits: gens.filter((g) => g.ecrit).length, gens: gens.slice(0, AIMES_CARTE_MAX), dernier: gens[0].at });
   }
   articles.sort((a, b) => (b.dernier || 0) - (a.dernier || 0));
-  // `offre` : la recette « favori » APPRISE de son propre geste et rejouable (sinon le bouton « Faire une offre » n'existe pas).
-  return { ok: true, compte: moi, appris: !!(ui && ui.champ && ui.envoi), offre: !!(recOffre && recOffre.rejouable === true), articles, sansArticle };
+  return { ok: true, compte: moi, appris: !!(ui && ui.champ && ui.envoi), articles, sansArticle };
 }
 // 5.409 — LEBONCOIN ET VESTIAIRE DANS LE GRAND PANNEAU. Le compte est celui de L'ONGLET (`compteOngletCapte` :
 // la session Leboncoin, l'onglet Vestiaire) ; une annonce ou une vente n'est montrée que si elle porte CE compte
@@ -27950,74 +27469,17 @@ async function aimesVcCarte(msg, sender) {
 // annonces (`vc_listings`, favoris lus), ventes (`vc_ventes` : état, transporteur, bordereau) ; pas de date de mise en
 // ligne. Messages : les fils restent sur le site (la carte ne les recopie pas encore) — dit une fois.
 const STATUT_LBC = { active: 'en_vente', inactive: 'masque', paused: 'masque', deleted: 'supprime', sold: 'vendu' };
-// 5.445 (23 nov., « pareil pour Leboncoin ») — <lbc-tx-regle> UNE TRANSACTION LEBONCOIN, LA MÊME RÈGLE QUE L'APP
-//    (src/App.jsx `lbcAnnulee` / `lbcFinalisee` / `lbcExpediee`, recopiées mot pour mot ; `audit-lbc-panneau.cjs` les
-//    exécute côte à côte sur les mêmes lignes et exige le même verdict). Mesuré sur sa base (23 nov.) : `lbc_ventes` mêle
-//    ses VENTES (`isSeller === true`) et ses ACHATS (`isSeller === false`) ; une ligne de la liste v3 sans détail n'a pas
-//    `isSeller` ⇒ son sens n'est PAS deviné (« pas su », comptée à part, jamais rangée en vente ni en achat, §5). Une
-//    vente « validation » dont le colis est `finished` est FINALISÉE (le panneau d'avant la disait « à expédier »).
-function lbcTxAnnulee(o) { return o.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((o.parcelStatus || '') + ' ' + (o.stepStatus || '') + ' ' + (o.stepLabel || '')); }
-function lbcTxFinalisee(o) {
-  if (o.parcelColor) return o.parcelColor === 'finished';
-  if (o.parcelStatus) return /delivered|livr[ée]/i.test(o.parcelStatus);
-  if (o.stepStatus === 'done') return true;
-  if (o.stepStatus === 'cancelled') return false;
-  return /paiement effectu|termin[ée]|finalis|cl[oô]tur|livr[ée]|colis re[çc]u|\bclos/i.test((o.stepLabel || '') + ' ' + (o.stepStatus || ''));
-}
-function lbcTxExpediee(o) {
-  const t = [o.parcelStatus, o.stepStatus, o.stepLabel].filter(Boolean).join(' ').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  if (/(?:a|avant) (?:envoyer|expedier)|attente (?:de |du )?(?:depot|expedition|prise en charge)/.test(t)) return false;
-  return /in[_ -]?transit|out[_ -]?for[_ -]?delivery|shipped|dispatched|collected|en cours de livraison|colis (?:envoye|depose|remis)|expedie(?:e|s)?\b|pris en charge|collecte par/.test(t);
-}
-// </lbc-tx-regle>
-const TRANSP_LBC = { mondial_relay: 'mondialrelay', mondialrelay: 'mondialrelay', shop2shop: 'shop2shop', colissimo: 'colissimo', chronopost: 'chronopost', relais_colis: 'relaiscolis', relaiscolis: 'relaiscolis', dpd: 'dpd', ups: 'ups' };
-// Une ligne de `lbc_ventes` ⇒ ce que le panneau montre. `sens` : 'vente' | 'achat' | null (pas su). L'état d'une VENTE :
-// annulee · finalisee · en_route (partie) · a_expedier (vente prouvée, ni finalisée ni partie, comme l'onglet Colis de
-// l'app) ; d'un ACHAT : annulee · finalisee (reçu) · en_route · pas_su (payé, pas encore parti). Le n° de suivi est
-// celui que Leboncoin a mis sur l'étiquette (`label.reference`), jamais un autre champ ; l'adresse de suivi seulement
-// chez un transporteur connu (https), sinon rien.
-const HOTES_SUIVI_LBC = /^https:\/\/(?:www\.)?(?:mondialrelay\.(?:fr|be|com)|shop2shop\.fr|laposte\.fr|colissimo\.fr|chronopost\.fr|relaiscolis\.com|dpd\.fr|ups\.com)\//i;
-function txLbcPanneau(x) {
-  if (!x || typeof x !== 'object') return null;
-  const sens = x.isSeller === true ? 'vente' : x.isSeller === false ? 'achat' : null;
-  const euro = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.round(n) / 100 : null; };   // `price` Leboncoin : en CENTIMES (mesuré le 23 nov. : 5800 pour une vente à 58 € ; l'app divise aussi par 100, `lbcEuro`)
-  const etat = lbcTxAnnulee(x) ? 'annulee' : lbcTxFinalisee(x) ? 'finalisee' : lbcTxExpediee(x) ? 'en_route' : sens === 'vente' ? 'a_expedier' : 'pas_su';
-  const lab = x.label && typeof x.label === 'object' ? x.label : null;
-  const ref = lab && /^[A-Z0-9-]{5,30}$/i.test(String(lab.reference || '')) ? String(lab.reference) : '';
-  const url = lab && HOTES_SUIVI_LBC.test(String(lab.trackingUrl || '')) ? String(lab.trackingUrl) : '';
-  const cle = TRANSP_LBC[String(x.deliveryMethod || '').toLowerCase()] || '';
-  const img = /^https:\/\/img\.leboncoin\.fr\//.test(String(x.image || '')) ? String(x.image) : '';
-  return {
-    tx: String(x.txId || ''), sens, titre: String(x.title || '').slice(0, 120), prix: euro(x.price), photo: img,
-    date: Date.parse(x.dateVente || '') || null, etat, vendue: sens === 'vente' && etat !== 'annulee', num: '',
-    transporteur: x.deliveryLabel ? String(x.deliveryLabel).slice(0, 30) : (cle ? TRANSPORTEURS_CARTE[cle] || '' : ''), ...(cle ? { transporteurCle: cle } : {}),
-    ...(ref ? { suivi: ref } : {}), ...(url ? { suiviUrl: url } : {}), statutSite: x.stepLabel ? String(x.stepLabel).slice(0, 60) : '', bordereau: null, limite: '',
-    lien: /^\d{4,15}$/.test(String(x.txId || '')) ? 'https://www.leboncoin.fr/compte/part/transaction/' + String(x.txId) : '',
-  };
-}
 const STATUT_VC = { published: 'en_vente', on_sale: 'en_vente', draft: 'brouillon', pending: 'a_confirmer', sold: 'vendu', reserved: 'reserve', hidden: 'masque' };
-// 5.445 : les NOMBRES relevés sur la page « Statistiques » d'une annonce (`stats`, `noterStatsAnnonceLbc`) — vues, favoris,
-//    messages ; jamais relevés ⇒ null (« — »), jamais 0 inventé. Leboncoin ne dit jamais QUI.
-function nombresAnnonceLbc(x) {
-  const st = x && x.stats && typeof x.stats === 'object' ? x.stats : null;
-  const nb = (v) => (Number.isInteger(v) && v >= 0 ? v : null);
-  return { favoris: st ? nb(st.favoris) : null, vues: st ? nb(st.vues) : null, messagesAnnonce: st ? nb(st.messages) : null };
-}
 async function carteListesSite(plateforme, o, sender) {
   const s = await loadSession().catch(() => null);
-  // 5.445 : chaque sortie anticipée DIT pourquoi (`attente`) — le panneau d'avant lisait « annonces : null » comme « pas pu
-  //    être lues » et gardait cette réponse 60 s, même après que le compte de l'onglet avait été reconnu (captures de Julien,
-  //    23 nov. : « Tes annonces n'ont pas pu être lues » SUR « Mes annonces », 9 annonces captées à la même minute).
-  if (!(s && s.user_id && !s.mort)) return { ok: true, plateforme, connecte: false, attente: 'vrm' };
+  if (!(s && s.user_id && !s.mort)) return { ok: true, plateforme, connecte: false };
   const oc = await compteOngletCapte(o.url, sender && sender.tab ? sender.tab.id : null);
   const moi = oc && oc.id ? cleCompteCapte(oc.id) : '';
-  if (!moi) return { ok: true, plateforme, compte: null, attente: 'compte' };
-  // 5.444 (capture de Julien : le prix des ventes Vestiaire « — ») : les prix rangés par l'extension sont `{ valeur, devise, cle }` ;
-  // ils n'étaient pas lus (seuls `amount` / `value`). Une autre devise que l'euro n'est jamais montrée comme des euros.
-  const euro = (v) => { if (v && typeof v === 'object' && v.devise && String(v.devise).toUpperCase() !== 'EUR') return null; const n = Number(String(v == null ? '' : (typeof v === 'object' ? (v.amount != null ? v.amount : v.value != null ? v.value : v.valeur) : v)).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
+  if (!moi) return { ok: true, plateforme, compte: null };
+  const euro = (v) => { const n = Number(String(v == null ? '' : (typeof v === 'object' ? (v.amount != null ? v.amount : v.value) : v)).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
   const photoSure = (u) => (/^https:\/\/[\w.-]+\//.test(String(u || '')) ? String(u) : '');
-  const statuts = { en_vente: 0, brouillon: 0, masque: 0, reserve: 0, vendu: 0, a_confirmer: 0, examen: 0, a_corriger: 0, refusee: 0, retiree: 0 };
-  let annonces = null, ventes = null, achats = null, porteMonnaie = null, sansCompte = 0;   // 5.454 : `achats` déclaré ici (Leboncoin le lit plus bas, Vestiaire ensuite)
+  const statuts = { en_vente: 0, brouillon: 0, masque: 0, reserve: 0, vendu: 0, a_confirmer: 0 };
+  let annonces = null, ventes = null, sansCompte = 0;
   if (plateforme === 'leboncoin') {
     const la = await sbGet('app_data?id=eq.lbc_listings&select=it:data->items,at:data->>updatedAt');
     if (Array.isArray(la)) {
@@ -28032,18 +27494,15 @@ async function carteListesSite(plateforme, o, sender) {
         if (st === 'supprime') continue;
         statuts[st]++;
         const pub = Date.parse(x.publieeLe || '') || null;
-        a.push({ id: String(x.id || x.ref || ''), titre: String(x.subject || '').slice(0, 120), prix: euro(x.price), photo: photoSure(Array.isArray(x.images) ? x.images[0] : ''), photos: (Array.isArray(x.images) ? x.images : []).map(photoSure).filter(Boolean).slice(0, 8), num: x.numEcrit && x.numEcrit.cle ? String(x.numEcrit.cle) : '', jours: pub ? Math.max(0, Math.floor((Date.now() - pub) / 864e5)) : null, description: String(x.body || '').slice(0, 600), statut: st, ...nombresAnnonceLbc(x), url: /^https:\/\/www\.leboncoin\.fr\//.test(String(x.url || '')) ? String(x.url) : '' });
+        a.push({ id: String(x.id || x.ref || ''), titre: String(x.subject || '').slice(0, 120), prix: euro(x.price), photo: photoSure(Array.isArray(x.images) ? x.images[0] : ''), photos: (Array.isArray(x.images) ? x.images : []).map(photoSure).filter(Boolean).slice(0, 8), num: x.numEcrit && x.numEcrit.cle ? String(x.numEcrit.cle) : '', jours: pub ? Math.max(0, Math.floor((Date.now() - pub) / 864e5)) : null, description: String(x.body || '').slice(0, 600), statut: st, url: /^https:\/\/www\.leboncoin\.fr\//.test(String(x.url || '')) ? String(x.url) : '' });
       }
       annonces = { lu: Date.parse((la[0] && la[0].at) || '') || null, aConfirmer: false, total: a.length, liste: a.filter((x) => x.statut === 'en_vente').slice(0, CARTE_LISTE_MAX), toutes: a.slice(0, CARTE_TOUTES_MAX), nTous: a.length, statuts, sansCompte };
     }
-    const lv = await sbGet('app_data?id=eq.lbc_ventes&select=v:data->ventes,at:data->>updatedAt');
+    const lv = await sbGet('app_data?id=eq.lbc_ventes&select=v:data->ventes');
     if (Array.isArray(lv)) {
-      const lus = Object.values((lv[0] && lv[0].v) || {}).filter((x) => x && cleCompteCapte(x.account || '') === moi).map(txLbcPanneau).filter((x) => x && x.tx);
-      const tri = (l) => l.sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, CARTE_LISTE_MAX);
-      const lu = Date.parse((lv[0] && lv[0].at) || '') || null;
-      const vs = lus.filter((x) => x.sens === 'vente'), as = lus.filter((x) => x.sens === 'achat');
-      ventes = { lu, total: vs.length, liste: tri(vs), inconnues: lus.filter((x) => !x.sens).length };
-      achats = { lu, site: 'leboncoin', total: as.length, liste: tri(as).map((x) => Object.assign({ id: x.tx, statut: x.statutSite || '' }, x)) };   // 5.454 : aussi lisible par l'onglet « Achats » (5.444)
+      const vs = Object.values((lv[0] && lv[0].v) || {}).filter((x) => x && cleCompteCapte(x.account || '') === moi);
+      const etat = (x) => (x.stepStatus === 'cancelled' ? 'annulee' : x.stepStatus === 'done' ? 'finalisee' : x.stepStatus === 'validation' ? 'a_expedier' : 'pas_su');
+      ventes = { lu: null, total: vs.length, liste: vs.map((x) => ({ tx: String(x.txId || ''), titre: String(x.title || '').slice(0, 120), prix: euro(x.price), date: Date.parse(x.dateVente || x.at || '') || null, etat: etat(x), vendue: etat(x) !== 'annulee', num: '' })).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, CARTE_LISTE_MAX) };
     }
   } else {
     const la = await sbGet('app_data?id=eq.vc_listings&select=it:data->items,at:data->>capturedAt');
@@ -28054,30 +27513,17 @@ async function carteListesSite(plateforme, o, sender) {
         const c = String(x.compte || '');
         if (!c) { sansCompte++; continue; }
         if (c !== moi) continue;
-        const st = statutCarteVc(x.statut);
-        statuts[st] = (statuts[st] || 0) + 1;
-        { const dp = depuisAnnonceVc(x); a.push({ id: String(x.ref || ''), titre: String(x.titre || '').slice(0, 120), prix: euro(x.prix), photo: photoSure(x.photo), photos: x.photo ? [photoSure(x.photo)] : [], num: '', jours: dp ? Math.max(0, Math.floor((Date.now() - dp.t) / 864e5)) : null, depuis: dp ? dp.t : null, depuisAuMoins: !!(dp && !dp.exacte), favoris: Number.isFinite(Number(x.favoris)) ? Number(x.favoris) : null, statut: st,
-          ...(/^\d{3,15}$/.test(String(x.ref || '')) ? { url: 'https://fr.vestiairecollective.com/listings/' } : {}) }); }
+        const st = STATUT_VC[String(x.statut || '').toLowerCase()] || 'a_confirmer';
+        statuts[st]++;
+        { const dp = depuisAnnonceVc(x); a.push({ id: String(x.ref || ''), titre: String(x.titre || '').slice(0, 120), prix: euro(x.prix), photo: photoSure(x.photo), photos: x.photo ? [photoSure(x.photo)] : [], num: '', jours: dp ? Math.max(0, Math.floor((Date.now() - dp.t) / 864e5)) : null, depuis: dp ? dp.t : null, depuisAuMoins: !!(dp && !dp.exacte), favoris: Number.isFinite(Number(x.favoris)) ? Number(x.favoris) : null, statut: st }); }
       }
       annonces = { lu: Date.parse((la[0] && la[0].at) || '') || null, aConfirmer: false, total: a.length, liste: a.filter((x) => x.statut === 'en_vente').slice(0, CARTE_LISTE_MAX), toutes: a.slice(0, CARTE_TOUTES_MAX), nTous: a.length, statuts, sansCompte };
     }
-    const lv = await sbGet('app_data?id=eq.vc_ventes&select=v:data->ventes,l:data->lectures');
+    const lv = await sbGet('app_data?id=eq.vc_ventes&select=v:data->ventes');
     if (Array.isArray(lv)) {
-      const lectures = (lv[0] && lv[0].l) || null;
       const vs = Object.values((lv[0] && lv[0].v) || {}).filter((x) => x && String(x.compte || '') === moi);
-      // 5.444 (capture de Julien : la vente livrée en litige montrée « À expédier », une autre « En route » sans preuve) :
-      // l'état vient de la RÈGLE de l'app (`etatVenteVcCarte`, copie de src/etatVenteVc.js — l'état le plus frais gagne,
-      // la frise du vendeur avant le mot brut), plus jamais de `aExpedier` seul ni du mot « IN_PROGRESS ».
-      ventes = { lu: Date.parse((lectures && lectures.ventes && lectures.ventes.at) || '') || null, total: vs.length, liste: vs.map((x) => {
-        const ev = etatVenteVcCarte(x, lectures), seau = SEAU_VENTE_VC[ev] || 'pas_su';
-        const sv = String(x.suivi || '').replace(/[^\w-]/g, '').slice(0, 40);
-        // « pour vous » : le montant rangé sous une clé qui DIT ce que le vendeur reçoit (`sellerEarning`), sinon rien.
-        const pourVous = x.montant && /earning|seller.?net|net/i.test(String(x.montant.cle || '')) ? euro(x.montant) : null;
-        return { tx: String(x.productId || x.ref || ''), ref: /^\d{3,15}$/.test(String(x.productId || '')) ? String(x.productId) : '', titre: String(x.titre || '').slice(0, 120), prix: euro(x.prixVente != null ? x.prixVente : x.montant), pourVous, photo: photoSure(x.photo), date: Date.parse(x.date || x.premiereVue || '') || null,
-          etat: seau, etatVc: ev, vendue: ev !== 'annulee', num: '', bordereau: seau === 'a_expedier' ? !!(x.bordereau || x.etiquette) : null, transporteur: x.transporteur ? String(x.transporteur).slice(0, 30) : undefined, suivi: sv || undefined, limite: seau === 'a_expedier' && x.limite ? String(x.limite).slice(0, 40) : undefined,
-          frise: Array.isArray(x.friseVc) ? x.friseVc.slice(0, 12).map((f) => ({ k: String(f.k || ''), statut: String(f.statut || ''), date: String(f.date || ''), titre: String(f.titre || ''), texte: String(f.texte || ''), probleme: f.probleme === true })) : (x.etapesVc && typeof x.etapesVc === 'object' ? Object.entries(x.etapesVc).slice(0, 12).map(([k, v]) => ({ k, statut: String(v || ''), date: '', titre: '', texte: '', probleme: false })) : []),
-          lien: /^\d{3,15}$/.test(String(x.productId || '')) ? 'https://fr.vestiairecollective.com/my-account/orders-sales/?section=2' : '' };
-      }).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, CARTE_LISTE_MAX) };
+      const etat = (x) => (x.aExpedier === true || x.etat === 'ACTION_NEEDED' ? 'a_expedier' : x.etat === 'IN_PROGRESS' ? 'en_route' : x.etat === 'COMPLETED' || x.etat === 'DONE' ? 'finalisee' : x.etat === 'CANCELLED' ? 'annulee' : 'pas_su');
+      ventes = { lu: null, total: vs.length, liste: vs.map((x) => ({ tx: String(x.productId || x.ref || ''), titre: String(x.titre || '').slice(0, 120), prix: euro(x.prixVente != null ? x.prixVente : x.montant), photo: photoSure(x.photo), date: Date.parse(x.date || x.premiereVue || '') || null, etat: etat(x), vendue: etat(x) !== 'annulee', num: '', bordereau: etat(x) === 'a_expedier' ? !!(x.bordereau || x.etiquette) : null, transporteur: x.transporteur ? String(x.transporteur).slice(0, 30) : undefined })).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, CARTE_LISTE_MAX) };
     }
   }
   // Messages : Vestiaire — les conversations RANGÉES (`vc_messages`, celles de CE compte) ; Leboncoin — le nombre de
@@ -28086,12 +27532,8 @@ async function carteListesSite(plateforme, o, sender) {
   if (plateforme === 'vestiaire') {
     const m = await sbGet('app_data?id=eq.vc_messages&select=c:data->conversations,at:data->>capturedAt');
     if (Array.isArray(m)) {
-      // 5.444 (capture de Julien : « aucune conversation lue » alors que 103 sont rangées) : une conversation est rangée
-      // SOUS son identifiant (`{personne}-{article}`, la clé de `vc_messages.conversations`) ; `ref` (la référence VRM-…)
-      // est presque toujours vide. Le filtre lisait `ref` : il les écartait TOUTES. ⇒ l'identifiant est la clé.
-      const cs = Object.entries((m[0] && m[0].c) || {}).filter(([k, x]) => x && String(x.compte || '') === moi && /^[\w-]{3,40}$/.test(k));
-      const sansCompteM = Object.values((m[0] && m[0].c) || {}).filter((x) => x && !x.compte).length;
-      messages = { lu: Date.parse((m[0] && m[0].at) || '') || null, site: 'vestiaire', sansCompte: sansCompteM, liste: cs.map(([k, x]) => ({ conv: k, qui: String(x.titre || '').slice(0, 60), texte: (x.apercuDeMoi === true ? '↩ ' : '') + String(x.apercu || '').slice(0, 160), deMoi: x.apercuDeMoi === true, at: Date.parse(x.date || x.vuAt || '') || null, nonlu: x.nonLu === true, photo: photoSure(x.photo) })).sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, CARTE_LISTE_MAX) };
+      const cs = Object.values((m[0] && m[0].c) || {}).filter((x) => x && String(x.compte || '') === moi && /^[\w-]{3,40}$/.test(String(x.ref || '')));
+      messages = { lu: Date.parse((m[0] && m[0].at) || '') || null, site: 'vestiaire', liste: cs.map((x) => ({ conv: String(x.ref), qui: String(x.titre || '').slice(0, 60), texte: String(x.apercu || '').slice(0, 160), at: Date.parse(x.date || x.vuAt || '') || null, nonlu: x.nonLu === true, photo: photoSure(x.photo) })).sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, CARTE_LISTE_MAX) };
     }
   } else {
     const f = await sbGetTout('app_data?id=like.lbc_fil_*&select=id,compte:data->>compte,titre:data->>titre,qui:data->>interlocuteur,at:data->>majAt,apercu:data->>apercu,nonlu:data->>nonLu').catch(() => null);
@@ -28099,119 +27541,16 @@ async function carteListesSite(plateforme, o, sender) {
     if (Array.isArray(f) || Array.isArray(cm)) {
       const fils = (Array.isArray(f) ? f : []).filter((x) => x && cleCompteCapte(x.compte || '') === moi);
       const cpt = Array.isArray(cm) && cm[0] && cm[0].c && typeof cm[0].c === 'object' ? (cm[0].c[moi] || cm[0].c[moi.replace(/^lbc-account:/, '')] || null) : null;
-      // 5.445 : la LISTE des conversations de CE compte (`lbc_conversations`, rangée par la page « Messages » : article, aperçu,
-      //    date, non-lus — jamais un nom), complétée par les fils ouverts (`lbc_fil_*`), une ligne par conversation.
-      const lc = await sbGet('app_data?id=eq.lbc_conversations&select=c:data->comptes->"' + moi.toLowerCase().replace(/[^0-9a-f-]/g, '') + '"').catch(() => null);
-      const cl = Array.isArray(lc) && lc[0] && lc[0].c && typeof lc[0].c === 'object' ? lc[0].c : null;
-      const parConv = new Map();
-      for (const x of (cl && Array.isArray(cl.liste) ? cl.liste : [])) {
-        if (!x || !/^[0-9a-f-]{8,64}$/i.test(String(x.conv || ''))) continue;
-        parConv.set(String(x.conv), { conv: String(x.conv), qui: String(x.titre || '').slice(0, 60), texte: String(x.apercu || '').slice(0, 160), at: Date.parse(x.at || '') || null, nonlu: Number(x.nonlus) > 0, photo: /^https:\/\/img\.leboncoin\.fr\//.test(String(x.photo || '')) ? String(x.photo) : '', annonce: /^\d{4,15}$/.test(String(x.annonce || '')) ? String(x.annonce) : '' });
-      }
-      for (const x of fils) {
-        const conv = String(x.id).replace(/^lbc_fil_/, ''), a = parConv.get(conv), at = Date.parse(x.at || '') || null;
-        if (a && (a.at || 0) >= (at || 0)) continue;
-        parConv.set(conv, { conv, qui: String(x.titre || (a && a.qui) || '').slice(0, 60), texte: String(x.apercu || '').slice(0, 160), at, nonlu: x.nonlu === 'true', photo: (a && a.photo) || '', annonce: (a && a.annonce) || '' });
-      }
-      messages = { lu: cl && Date.parse(cl.at || '') || null, site: 'leboncoin', nonlusSite: cpt && Number.isFinite(Number(cpt.unread)) ? Number(cpt.unread) : null, liste: [...parConv.values()].sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, CARTE_LISTE_MAX) };
+      messages = { lu: null, site: 'leboncoin', nonlusSite: cpt && Number.isFinite(Number(cpt.unread)) ? Number(cpt.unread) : null, liste: fils.map((x) => ({ conv: String(x.id).replace(/^lbc_fil_/, ''), qui: String(x.qui || x.titre || '').slice(0, 60), texte: String(x.apercu || '').slice(0, 160), at: Date.parse(x.at || '') || null, nonlu: x.nonlu === 'true', photo: '' })).sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, CARTE_LISTE_MAX) };
     }
-    // 5.445 : le porte-monnaie de CE compte (`lbc_porte_monnaie`, rangé quand la page l'a demandé à Leboncoin :
-    //    `ewallet` {available, incoming}). Mesuré : la forme ; PAS l'unité (seul un solde à 0 a été vu) ⇒ un montant non nul
-    //    n'est jamais converti au hasard : 0 se dit « 0,00 € », un autre nombre se dit « lu, à vérifier sur Leboncoin ».
-    const pm = await sbGet('app_data?id=eq.lbc_porte_monnaie&select=c:data->comptes->"' + moi.toLowerCase().replace(/[^0-9a-f-]/g, '') + '"').catch(() => null);
-    const pc = Array.isArray(pm) && pm[0] && pm[0].c && typeof pm[0].c === 'object' ? pm[0].c : null;
-    const nbPm = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
-    porteMonnaie = pm === null ? null : pc ? { disponible: nbPm(pc.available), aVenir: nbPm(pc.incoming), at: Date.parse(pc.at || '') || null } : { jamais: true };
   }
   const nom = await nomCompteCapte(plateforme, moi).catch(() => '');
   const n = await notificationsCarte(moi).catch(() => null);
   const notifications = n ? { vu: n.vu, liste: n.liste.filter((e) => e.p === plateforme && e.c === moi) } : null;
-  // 5.444 : les notifications de VESTIAIRE (la cloche du site), celles de CE compte, utiles seulement (le reste compté).
-  let notifsSite = null;
-  if (plateforme === 'vestiaire') notifsSite = await notifsVcCarte(moi, annonces, ventes).catch(() => null);
-  // 5.444 — ACHATS (« ajoute les achats pour toutes les plateformes ») : Vestiaire = `vc_achats` de CE compte (la page
-  // « Commandes » les donne au passage) ; Leboncoin : VRM ne lit pas encore tes achats (dit, jamais « aucun »).
-  // 5.454 : Leboncoin LIT maintenant ses achats (`lbc_ventes`, `isSeller === false`, plus haut) ; lecture ratée ⇒ null (« pas su »).
-  if (plateforme === 'vestiaire') {
-    const ra = await sbGet('app_data?id=eq.vc_achats&select=a:data->achats,l:data->lecture');
-    if (Array.isArray(ra)) {
-      const r0 = ra[0] || null;
-      const lst = r0 ? Object.entries(r0.a || {}).filter(([, x]) => x && String(x.compte || '') === moi) : [];
-      achats = { lu: r0 && r0.l ? (Date.parse(r0.l.at || '') || null) : null, site: 'vestiaire', liste: lst.map(([k, x]) => ({ id: k, titre: String(x.nom || '').slice(0, 120), prix: euro(x.montant && x.montant.valeur), date: Date.parse(x.date || x.premiereVue || '') || null, statut: String(x.etat || '').slice(0, 40), suivi: String(x.suivi || '').replace(/[^\w-]/g, '').slice(0, 40), transporteur: String(x.transporteur || '').slice(0, 30) })).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, CARTE_LISTE_MAX) };
-    }
-  }
   // 5.410 : la baisse par règle de CE compte (Leboncoin `lbc:{id}`, Vestiaire `vc:{id}`), réglée dans le panneau.
   const automatisations = await (async () => { const m = await lireMain([REGLE_BAISSE_CLE]).catch(() => null); if (!m) return null; const cle = (plateforme === 'leboncoin' ? 'lbc:' : 'vc:') + moi; const c = m[REGLE_BAISSE_CLE] && m[REGLE_BAISSE_CLE].comptes && m[REGLE_BAISSE_CLE].comptes[cle]; const r = regleBaisseDe(m[REGLE_BAISSE_CLE], cle); return { site: plateforme, cle, baisse: r ? { actif: true, pct: r.pct, jours: r.jours } : { actif: false, pct: c && Number(c.pct) || null, jours: c && Number(c.jours) || null } }; })().catch(() => null);
   const retraits = await retraitsPourPanneau().catch(() => null);   // 5.426 : « Vendue → retirée sur »
-  return { ok: true, plateforme, compte: { id: moi, nom }, annonces, ventes, achats, ...(plateforme === 'leboncoin' ? { porteMonnaie } : {}), messages, automatisations, notifications, notifsSite, retraits, autres: null, fenetre: o.fenetre };
-}
-// 5.444 : l'état d'un ACHAT Vinted pour le panneau — a_retirer (règle `AT_RELAY` sur le texte de Vinted) · termine
-// (`completed`) · annule (`failed`, ou annulé / remboursé dit par Vinted) · en_cours (tout le reste, jamais « à retirer »).
-function etatAchatCarte(x) {
-  const st = String((x && x.status) || ''), tus = String((x && x.transaction_user_status) || '').toLowerCase();
-  if (AT_RELAY(st)) return 'a_retirer';
-  if (tus === 'failed' || /annul|rembours/i.test(st)) return 'annule';
-  if (tus === 'completed' || /finalis|termin/i.test(st)) return 'termine';
-  return 'en_cours';
-}
-// ── 5.444 : L'ÉTAT D'UNE VENTE VESTIAIRE POUR LE PANNEAU ─────────────────────────────────────────────────────────
-// <vc-etat-carte-regle> — COPIE de src/etatVenteVc.js `etatVenteVc` (et de `aExpedierVc`/`expeditionVc` de
-// api/_lib/vestiaire-regle.js), plus le litige (5.444) ; scripts/audit-vc-complet.cjs exige que les deux rendent le
-// même état sur les mêmes ventes. Clés : annulee · a_expedier · payee · litige · paiement · livree_controle · expediee ·
-// vendue · pas_su. « Colis fait » et « envoyée au transporteur » (preuves de l'app) n'existent pas ici : à expédier.
-const ETAPES_APRES_ENVOI_VC = ['sellerShipment', 'sellerDelivery', 'sellerConformity', 'sellerPayment'];
-const msDateVc = (x) => { const t = Date.parse(x || ''); return Number.isFinite(t) && t > 0 ? t : 0; };
-function etatVenteVcCarte(v, lectures) {
-  if (!v || typeof v !== 'object') return 'pas_su';
-  const e = v.etapesVc && typeof v.etapesVc === 'object' && !Array.isArray(v.etapesVc) ? v.etapesVc : {};
-  const mot = (k) => String(e[k] == null ? '' : e[k]).trim().toLowerCase();
-  const etape = ETAPES_APRES_ENVOI_VC.find((k) => mot(k) === 'done');
-  const preuve = !!etape || /^deliveryInProgress$/i.test(String(v.statutVc || '').trim());
-  const tPreuve = preuve ? msDateVc(v.etapesAt) : 0;
-  const la = lectures && typeof lectures === 'object' ? lectures['a-expedier'] : null;
-  const tAe = msDateVc(v.aExpedierAt) || (la ? Math.max(msDateVc(la.at), msDateVc(la.partielleAt)) : 0);
-  const aExp = v.aExpedier === true && (!preuve || !!(tPreuve && tAe && tAe > tPreuve));
-  const brut = String(v.etat || '').trim();
-  const motVc = !brut ? '' : /cancel|annul|refund|rembours|return|retour|litige|dispute/i.test(brut) ? 'annulee' : /payout|paid.?out|vers[ée]|virement|transferred|credited|cr[ée]dit/i.test(brut) ? 'versee' : /complet|finali|termin|closed|done|clotur/i.test(brut) ? 'terminee' : '';
-  if (!aExp && motVc === 'annulee') return 'annulee';
-  if (aExp) return 'a_expedier';
-  if (mot('sellerPayment') === 'done' || motVc === 'versee' || motVc === 'terminee') return 'payee';
-  if (v.litigeVc === true) return 'litige';
-  if (mot('sellerConformity') === 'done') return 'paiement';
-  if (mot('sellerDelivery') === 'done' || ['pending', 'ongoing'].includes(mot('sellerConformity'))) return 'livree_controle';
-  if (preuve) return 'expediee';
-  if (!brut || /^(in_progress|action_needed)$/i.test(brut) || mot('sellerSale') === 'done') return 'vendue';
-  return 'pas_su';
-}
-// </vc-etat-carte-regle>
-// Le « seau » du tableau des ventes (filtres communs à toutes les plateformes) ; le mot exact est `etatVc`.
-const SEAU_VENTE_VC = { annulee: 'annulee', a_expedier: 'a_expedier', payee: 'finalisee', litige: 'litige', paiement: 'en_route', livree_controle: 'en_route', expediee: 'en_route', vendue: 'pas_su', pas_su: 'pas_su' };
-// <vc-statut-annonce-regle> le mot de Vestiaire d'une annonce rangé pour le panneau (familles de la modération,
-// `familleModVc`) : en ligne, en cours d'examen, à corriger, refusée, vendue, retirée, brouillon ; inconnu ⇒ « pas revue ».
-function statutCarteVc(mot) {
-  const b = String(mot || '').trim();
-  if (!b) return 'a_confirmer';
-  if (/draft|brouillon/i.test(b)) return 'brouillon';
-  if (/hidden|masqu/i.test(b)) return 'masque';
-  if (/reserv/i.test(b)) return 'reserve';
-  return { 'en-ligne': 'en_vente', attente: 'examen', corriger: 'a_corriger', refusee: 'refusee', vendue: 'vendu', retiree: 'retiree' }[familleModVc(b)] || 'a_confirmer';
-}
-// </vc-statut-annonce-regle>
-// Les notifications Vestiaire de CE compte (gardées par `rangerVcNotifs`), utiles seulement, 7 jours, titre et photo
-// de l'article par IDENTITÉ (son identifiant : `vc_listings` / `vc_ventes`), jamais devinés.
-async function notifsVcCarte(moi, annonces, ventes) {
-  let cur = {};
-  try { cur = (await chrome.storage.local.get(VC_NOTIFS))[VC_NOTIFS] || {}; } catch (_) { return null; }
-  const titres = {};
-  for (const x of (annonces && annonces.toutes) || []) if (x && x.id) titres[x.id] = { titre: x.titre, photo: x.photo };
-  for (const x of (ventes && ventes.liste) || []) if (x && x.tx && !titres[x.tx]) titres[x.tx] = { titre: x.titre, photo: x.photo };
-  const limite = Date.now() - 7 * 864e5;
-  const toutes = Object.values(cur).filter((c) => c && c.compte === String(moi) && (Date.parse(c.at || c.vu || '') || 0) >= limite);
-  const utiles = toutes.filter(notifVcUtile);
-  const sorteDe = (c) => (c.sorte === 'aime' ? 'aime' : c.sorte === 'message' ? 'message' : (() => { const m = (c.mots || []).join(' '); return /offer|nego/i.test(m) ? 'offre' : /price|prix/i.test(m) ? 'prix' : /ship|deliver|livr|parcel|colis/i.test(m) ? 'colis' : /payment|payout|paiement/i.test(m) ? 'paiement' : /order|sale|sold|vente|commande/i.test(m) ? 'vente' : /return|retour|claim|dispute/i.test(m) ? 'litige' : 'annonce'; })());
-  return { lu: toutes.length ? Math.max(...toutes.map((c) => Date.parse(c.vu || '') || 0)) || null : null, ignorees: toutes.length - utiles.length,
-    liste: utiles.map((c) => ({ id: c.id, at: Date.parse(c.at || '') || null, lu: c.lu, sorte: sorteDe(c), produit: c.produit || '', titre: (titres[c.produit] && titres[c.produit].titre) || '', photo: (titres[c.produit] && titres[c.produit].photo) || (/^https:\/\/images\.vestiairecollective\.com\//.test(String(c.photo || '')) ? c.photo : '') }))
-      .sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 60) };
+  return { ok: true, plateforme, compte: { id: moi, nom }, annonces, ventes, messages, automatisations, notifications, retraits, autres: null, fenetre: o.fenetre };
 }
 // 5.409 — MASQUER / AFFICHER DEPUIS LE PANNEAU, sur SON clic (`confirme`), par le geste APPRIS de la règle « vendue
 // ailleurs » (`PUT /api/v2/items/{id}/is_hidden`, `masquerAppris` sur SES gestes rangés : jamais appris ⇒ rien ne part,
@@ -28487,7 +27826,7 @@ async function carteListes(msg, sender) {
   const plateforme = plateformeDe(o.url);
   // 5.409 (Julien : « tout doit marcher aussi pour Leboncoin et Vestiaire Collective ») : le grand panneau sur ces
   // sites, compte de l'onglet de CE site, avec ce que l'extension a déjà rangé (aucune requête de plus).
-  if (plateforme === 'leboncoin' || plateforme === 'vestiaire') return await carteListesSite(plateforme, o, sender).catch((e) => { noterDiag('carte_listes_site_leve_' + plateforme); void e; return { ok: true, plateforme, pasDeListe: true, attente: 'erreur' }; });
+  if (plateforme === 'leboncoin' || plateforme === 'vestiaire') return await carteListesSite(plateforme, o, sender).catch(() => ({ ok: true, plateforme, pasDeListe: true }));
   if (plateforme !== 'vinted') return { ok: true, plateforme, pasDeListe: true };
   const s = await loadSession().catch(() => null);
   if (!(s && s.user_id && !s.mort)) return { ok: true, plateforme, connecte: false };
@@ -28643,17 +27982,7 @@ async function carteListes(msg, sender) {
   const atelierProg = await atelierProgPour(u).catch(() => null);   // 5.422 : la republication programmée de CE compte
   const retraits = await retraitsPourPanneau().catch(() => null);   // 5.426 : « Vendue → retirée sur »
   const progVerif = await progVerifPour(u).catch(() => null);   // 5.438 : la programmation d'avant en pause « en vérification »
-  // ── 5.444 : ACHATS de CE compte (la liste RANGÉE `harvest_{uid}_orders_purchased`, ses plus récents) — l'état du colis
-  //    par le champ machine de Vinted (`transaction_user_status`) et « au point relais » par LA règle `AT_RELAY` (= `isAtRelayStatus`
-  //    de l'app : `needs_action` n'est PAS « à retirer », CLAUDE.md §5) ; le texte de Vinted montré tel quel. Pas su ⇒ null.
-  let achats = null;
-  const la = await sbGet(`app_data?id=eq.harvest_${u}_orders_purchased&select=cap:data->>capturedAt,n:data->>nItems,${idxCarte('o', 'data->payload->my_orders', CARTE_LISTE_MAX)}`);
-  if (la !== null) {
-    const r0 = (la && la[0]) || null;
-    const os = r0 ? Array.from({ length: CARTE_LISTE_MAX }, (_, i) => r0['o' + i]).filter((x) => x && typeof x === 'object' && x.transaction_id != null) : [];
-    achats = { lu: r0 ? (Date.parse(r0.cap || '') || null) : null, total: r0 ? Number(r0.n) || os.length : 0, site: 'vinted', liste: os.map((x) => ({ id: String(x.transaction_id), conv: /^[1-9]\d{0,19}$/.test(String(x.conversation_id == null ? '' : x.conversation_id)) ? String(x.conversation_id) : '', titre: String(x.title || '').slice(0, 120), prix: prixCarte(x.price), photo: photoCarte(x), date: Date.parse(x.date || '') || null, statut: String(x.status || '').slice(0, 90), etat: etatAchatCarte(x) })).sort((a, b) => (Number(b.date) || 0) - (Number(a.date) || 0)) };
-  }
-  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, achats, messages, automatisations, notifications, offres, atelier, atelierProg, retraits, autres, progVerif, fenetre: o.fenetre };
+  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, automatisations, notifications, offres, atelier, atelierProg, retraits, autres, progVerif, fenetre: o.fenetre };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
@@ -28738,8 +28067,6 @@ async function etatPourApp() {
       avecDelai(etatIciPourApp(uid && !vintedPasSu ? String(uid) : ''), 900, null).catch(() => null).then((ici) => ({ ici })),
       // 5.420 (`santecomptes`) : la santé de chaque compte de CE navigateur (le dernier calcul de 30 s au plus) — `null` = pas su.
       avecDelai(santeComptes(), 250, null).catch(() => null).then((sante) => ({ sante })),
-      // 5.448 (`santesites`) : une ligne par site (« tout marche » / « X ne marche plus : fais Y ») — `null` = pas su.
-      avecDelai(santeSites(), 250, null).catch(() => null).then((sitesSante) => ({ sitesSante })),
       // 5.433 (`filevisible`) : la file des actions de CE navigateur (ce qui passe, ce qui attend, la pause) — `null` = pas su.
       avecDelai(vueFileApp(), 250, null).catch(() => null).then((file) => ({ file })),
       // 5.428 (`endirect`) : ce que fait l'extension en ce moment — `null` = pas su.
@@ -28978,16 +28305,6 @@ async function ongletDepotVivant(onglet, id, lbc, reprendre, recent) {
 async function ongletOuvert(tabId) {
   if (tabId == null || !chrome.tabs || typeof chrome.tabs.get !== 'function') return undefined;
   try { const t = await chrome.tabs.get(Number(tabId)); return t && t.id != null ? t : null; } catch (_) { return null; }
-}
-// 5.446 (lot ext-anciens-lots, revue moyenne 65 et basse 101) : la page qui demande la paire en dépôt
-// est-elle l'onglet que VRM a ouvert POUR elle (`vrmCmds[jobId].tabId`) ? Pas de commande, pas d'onglet
-// retenu, onglet inconnu ou lecture ratée ⇒ non (« pas su » ne vaut pas « oui »).
-async function ongletDuDepot(jobId, sender) {
-  const tab = sender && sender.tab && sender.tab.id;
-  if (tab == null) return false;
-  let job = null;
-  try { job = (await lireCmds())[jobId] || null; } catch (_) { return false; }
-  return !!(job && job.tabId != null && job.tabId === tab);
 }
 // Un onglet de dépôt fermé ⇒ le dépôt est abandonné, l'app le sait aussitôt.
 async function depotOngletFerme(tabId) {
@@ -29246,9 +28563,6 @@ async function executerCommande(msg) {
   BORD_EN_COURS.add(jobId);
   let parti = false;                              // vrai dès que la file a pris le relais
   let acc = null;
-  // 5.446 (lot ext-anciens-lots ; revue, basse 91) : la place réservée pour la génération est RENDUE si aucune
-  //   génération ne part (refus à son tour dans la file, PDF déjà là chez Vinted).
-  const recuBord = {};
   try {
     // ⚠️⚠️ L'ACCUSÉ NE DÉPEND PLUS D'UNE BASE LENTE (revue du 9 octobre). La liste
     //    des comptes et « ce PDF est-il déjà rangé ? » se lisaient SANS délai
@@ -29286,7 +28600,7 @@ async function executerCommande(msg) {
         return { accepte: false, code: 'lot',
                  raison: `${BORD_MAX_PAR_VISITE} bordereaux demandés ces ${Math.round(BORD_CMD_FENETRE_MS / 60000)} dernières minutes sur ce compte — jamais plus d'affilée chez Vinted. La suite dans ${min} min.` };
       }
-      const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, sorte: 'bordereau', recu: recuBord });
+      const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, sorte: 'bordereau' });
       if (stop) return await refusDe(stop);
       await noterBordereauCommande(uid);
       return null;
@@ -29296,7 +28610,6 @@ async function executerCommande(msg) {
     parti = true;
   } finally { if (!parti) BORD_EN_COURS.delete(jobId); }
   // L'exécution part dans la file ; l'app reçoit l'accusé TOUT DE SUITE.
-  let genere = false;
   avecVinted(async () => {
     // 5.162 : un 429/403 reçu EN ROUTE arrête la commande sur place, avec la
     // raison — pas une génération ni une insistance de plus.
@@ -29323,7 +28636,6 @@ async function executerCommande(msg) {
         if (await arretSiPause()) return;
         if (!connu.t) {
           await majCmd(jobId, { etape: 'generation' });
-          genere = true;
           const g = await genererBordereau(uid, tx, { gardeFaite: true });
           if (!g.ok && !g.deja) {
             if (await arretSiPause()) return;
@@ -29347,10 +28659,7 @@ async function executerCommande(msg) {
       }
     } catch (e) {
       await majCmd(jobId, { etape: 'echec', code: 'erreur', raison: String(e && e.message || e).slice(0, 120) });
-    } finally {
-      BORD_EN_COURS.delete(jobId);
-      if (!genere && recuBord.at) { try { await rendreActions(String(uid), recuBord.at, 1); } catch (_) {} }
-    }
+    } finally { BORD_EN_COURS.delete(jobId); }
   });
   return { accepte: true, jobId, etape: 'file', vivant: true };
 }
@@ -32278,8 +31587,6 @@ async function capterSuivisAchats(uid) {
         const rt = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
         if (!rt || !rt.ok || !rt.json) { noterDiag(`suivi_transaction_refuse_${(rt && rt.status) || 0}`); if (memoApresEchec(memo, tx, rt, SUIVI_RETRY_MS)) break; continue; }
         if (estErreurVinted(rt.json)) { noterDiag('suivi_erreur_vinted'); continue; }
-        // 5.443 : la transaction de l'achat vient d'être lue — elle est rangée (vendeur, articles, état ; aucune requête de plus).
-        try { if ((await rangerTransactionAchat(uid, acc, tx, rt.json)) === true) notifierApp({ type: 'maj', quoi: 'achatsdetails', uid: String(uid) }); } catch (_) {}
         const st = suiviDeTransaction(rt.json);
         await rangerFormeSuivi('transaction', formeSuivi(rt.json), st ? 'reconnue' : 'inconnue');
         if (!st) { noterDiag('suivi_transaction_forme_inconnue'); continue; }
@@ -32719,127 +32026,6 @@ async function capterDatesVersementUn(uid, opts) {
     return n;
   } catch (_) { return 0; }
 }
-// ═══ 5.443 (23 nov.) — LE DÉTAIL DES ACHATS : « LOT · N » PROUVÉ ══════════════════════════════════════════════
-// Julien (22 nov.) : « quand je fais un achat en lot, l'app comprend que c'est un lot, divise l'achat et propose de
-// répartir le prix ». L'app sait le faire (src/achatDivise.js, `lotDeLAchat`) dès qu'elle a la TRANSACTION de l'achat
-// (`harvest_{uid}_txn_{tx}` : `items_count`, `order.items[]` — id, titre, prix, photos de chaque article).
-// MESURÉ (base de prod, lecture seule, 23 nov.) : 3 479 achats dans les listes, 144 ont leur transaction rangée ;
-// 112 titres commencent par « Lot », 107 d'entre eux SANS transaction ⇒ « Lot ? » (le titre ne prouve rien, §5).
-// La forme est connue (43 transactions côté acheteur déjà rangées, `order.items[]` aux clés id/title/price/photos).
-// ⇒ Elle est LUE ici, achat par achat, exactement comme les dates de versement :
-//  · une LECTURE de ses propres achats (GET `/api/v2/transactions/{tx}`), rien n'est écrit chez Vinted ;
-//  · le compte de l'onglet seulement (`gardeLecture` : cookie lu, sinon rien), une requête à la fois (`vintedGet`),
-//    pause aléatoire 2–5 s, 429/403 ⇒ pause posée et série ARRÊTÉE (`memoApresEchec`), prudence ⇒ rien ;
-//  · budget de LECTURE partagé (20/h, tous Chrome), classe 'achat' : SOUS la réserve des codes de retrait, preuves de
-//    vente, dates de versement, relevés et suivis (« pas su » ⇒ réserve entière) — jamais leur place ; au plus
-//    `ACHAT_DETAIL_MAX_HEURE` par heure et `ACHAT_DETAIL_MAX_PAR_VISITE` par passage ;
-//  · L'ORDRE : les achats dont le titre commence par « Lot » d'abord (le plus récent d'abord), puis les autres sans
-//    détail (le plus récent d'abord) ; un essai raté n'est pas refait avant 24 h ;
-//  · rangé seulement si la réponse est CETTE transaction (`id` = le n°) vue CÔTÉ ACHETEUR ; sinon rien (noté) ;
-//  · le partage du prix reste SON toucher dans l'app (rien n'est divisé ici).
-const ACHAT_DETAIL_MAX_PAR_VISITE = 6;
-const ACHAT_DETAIL_MAX_HEURE = 8;
-const ACHAT_DETAIL_RETRY_MS = 24 * 60 * 60 * 1000;
-const ACHAT_DETAIL_LUS = 'vrmAchatDetailLus';     // { [uid]: [ms, …] } — les lectures de l'heure (§4.9)
-const ACHAT_DETAIL_FAITS = 'vrmAchatDetailFaits'; // { [uid]: { [tx]: ms } } — le dernier essai
-const RE_TITRE_LOT = /^\s*lot\b/i;
-// La liste à lire, dans l'ordre : les « Lot… » d'abord, puis les autres ; le plus récent d'abord dans chaque groupe.
-// (23 nov., mesure de l'agent scan-achat : 0 transaction d'achat captée sur 114 achats des 30 derniers jours) : les achats
-// EN COURS (ni finalisés, ni annulés, ni remboursés — à recevoir, à retirer) passent les premiers : leur détail porte le
-// vendeur, l'état, le suivi, le point relais. Puis les « Lot… », puis le reste ; le plus récent d'abord dans chaque groupe.
-const RE_ACHAT_FINI = /finalis|annul|cancel|rembours|refund|termin|retourn|suspend|[ée]chou|failed/i;
-const achatEnCours = (o) => !RE_ACHAT_FINI.test(String((o && o.status) || ''));
-function ordreDetailsAchats(achats) {
-  const l = ordrePlusRecentes((achats || []).filter((o) => o && /^\d{4,20}$/.test(String(o.transaction_id == null ? '' : o.transaction_id))));
-  const lot = (o) => RE_TITRE_LOT.test(String(o.title || ''));
-  return [...l.filter(achatEnCours), ...l.filter((o) => !achatEnCours(o) && lot(o)), ...l.filter((o) => !achatEnCours(o) && !lot(o))];
-}
-// Range la transaction d'un ACHAT lue chez Vinted : CETTE transaction (id = n°), côté ACHETEUR, sinon rien.
-// → true rangée · false pas rangée (pas la bonne, noté) · null notre base a refusé.
-async function rangerTransactionAchat(uid, acc, tx, json) {
-  const t = json && typeof json === 'object' ? json.transaction : null;
-  if (!t || typeof t !== 'object') { noterDiag('achat_detail_sans_transaction'); return false; }
-  if (String(t.id == null ? '' : t.id) !== String(tx)) { noterDiag('achat_detail_autre_tx'); return false; }
-  if (String(t.user_side || '') !== 'buyer') { noterDiag('achat_detail_pas_acheteur'); return false; }
-  if (!(t.order && typeof t.order === 'object' && Array.isArray(t.order.items))) noterDiag('achat_detail_sans_articles');
-  const data = { type: 'transaction', uid: String(uid), domain: (acc && acc.domain) || 'www.vinted.fr',
-    capturedAt: new Date().toISOString(), payload: alleger('transaction', json) };
-  const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_txn_${tx}`, data }], 'id');
-  if (ok === false) { noterDiag('achat_detail_ecriture_ratee'); return null; }
-  noterDiag(Number(t.items_count) > 1 || (Array.isArray(t.order && t.order.items) && t.order.items.length > 1) ? 'achat_detail_lot' : 'achat_detail_ecrit');
-  return true;
-}
-async function detailsAchatsLusHeure(uid) {
-  try { return (((await chrome.storage.local.get(ACHAT_DETAIL_LUS))[ACHAT_DETAIL_LUS] || {})[String(uid)] || []).filter((x) => x > Date.now() - 3600000); } catch (_) { return null; }
-}
-async function noterDetailAchatLu(uid) {
-  try {
-    const cur = (await chrome.storage.local.get(ACHAT_DETAIL_LUS))[ACHAT_DETAIL_LUS] || {};
-    const t = Date.now();
-    cur[String(uid)] = (cur[String(uid)] || []).filter((x) => x > t - 3600000).concat([t]);
-    await chrome.storage.local.set({ [ACHAT_DETAIL_LUS]: cur });
-  } catch (_) {}
-}
-let _detailsAchatsEnCours = null;
-async function capterDetailsAchats(uid) {
-  if (_detailsAchatsEnCours) { try { noterDiag('achat_detail_deja_en_cours'); } catch (_) {} return 0; }
-  _detailsAchatsEnCours = capterDetailsAchatsUn(uid).finally(() => { _detailsAchatsEnCours = null; });
-  return _detailsAchatsEnCours;
-}
-async function capterDetailsAchatsUn(uid) {
-  try {
-    if (!uid) return 0;
-    if (await compteNonCapte(uid)) return 0;
-    const accts = await getStoredAccounts();
-    const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
-    if (!acc) return 0;
-    const achats = await achatsDuCompte(uid);
-    if (achats === null) return 0;                                         // pas su
-    const det = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id`);
-    if (det === null) return 0;                                            // pas su
-    const avecDetail = new Set();
-    for (const r of det) { const tx = (/_txn_(\d+)$/.exec(String((r && r.id) || '')) || [])[1]; if (tx) avecDetail.add(tx); }
-    let faits = {};
-    try { faits = (((await chrome.storage.local.get(ACHAT_DETAIL_FAITS))[ACHAT_DETAIL_FAITS] || {})[String(uid)]) || {}; } catch (_) { return 0; }
-    for (const k of Object.keys(faits)) if (Date.now() - Number(faits[k]) > ACHAT_DETAIL_RETRY_MS) delete faits[k];
-    const aLire = (o) => { const tx = String(o.transaction_id); return !avecDetail.has(tx) && !(faits[tx] && Date.now() - Number(faits[tx]) < ACHAT_DETAIL_RETRY_MS); };
-    const cibles = ordreDetailsAchats([...achats.values()]).filter(aLire);
-    const lotsRestants = () => cibles.filter((o) => RE_TITRE_LOT.test(String(o.title || '')) && aLire(o)).length;
-    if (!cibles.length) { await noterLecturesDues(uid, 'achat', 0, { lots: 0 }); return 0; }
-    let n = 0, ecrits = 0;
-    for (const o of cibles) {
-      if (n >= ACHAT_DETAIL_MAX_PAR_VISITE) break;
-      const tx = String(o.transaction_id);
-      const lus = await detailsAchatsLusHeure(uid);
-      if (lus === null) { noterDiag('achat_detail_compteur_muet'); break; }
-      if (lus.length >= ACHAT_DETAIL_MAX_HEURE) { noterDiag('achat_detail_plafond_heure'); break; }
-      if (n > 0) await pauseLectureArgent();
-      const refus = await gardeLecture(uid, acc, 'achat');
-      if (refus) { noterDiag(`achat_detail_refus_${String(refus.code || '').replace(/[^a-z-]/g, '').slice(0, 24)}`); break; }
-      await noterDetailAchatLu(uid);
-      faits[tx] = Date.now();
-      n++;
-      const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
-      if (!rep || !rep.ok || !rep.json) { noterDiag(`achat_detail_refuse_${(rep && rep.status) || 0}`); if (memoApresEchec(faits, tx, rep, ACHAT_DETAIL_RETRY_MS)) break; continue; }
-      if (estErreurVinted(rep.json)) { noterDiag('achat_detail_erreur_vinted'); continue; }
-      // L'identité : CETTE transaction, côté acheteur (`rangerTransactionAchat`). Autre chose ⇒ rien n'est rangé.
-      const rg = await rangerTransactionAchat(uid, acc, tx, rep.json);
-      if (rg === null) { delete faits[tx]; break; }   // notre base refuse : relu au passage suivant
-      if (rg === true) { avecDetail.add(tx); ecrits++; }
-    }
-    try {
-      const cur = (await chrome.storage.local.get(ACHAT_DETAIL_FAITS))[ACHAT_DETAIL_FAITS] || {};
-      cur[String(uid)] = Object.fromEntries(Object.entries(faits).sort((a, b) => b[1] - a[1]).slice(0, 4000));
-      await chrome.storage.local.set({ [ACHAT_DETAIL_FAITS]: cur });
-    } catch (_) {}
-    await noterLecturesDues(uid, 'achat', cibles.filter(aLire).length, { lots: lotsRestants() });
-    if (ecrits) {
-      logActivity(`🧾 ${ecrits} détail${ecrits > 1 ? 's' : ''} d'achat récupéré${ecrits > 1 ? 's' : ''}`);
-      notifierApp({ type: 'maj', quoi: 'achatsdetails', uid: String(uid) });
-    }
-    return n;
-  } catch (_) { return 0; }
-}
 // Le passage de fond (alarme `vrm-versement`, 20 min) : seulement avec un onglet
 // vinted.fr ouvert, le compte de son cookie, une session VRM, aucune pause, une
 // base qui répond, un compte capté ; et seulement s'il reste des dates à lire
@@ -32865,9 +32051,6 @@ async function tickVersements() {
     // 5.378 : d'abord les mois du relevé (une lecture date tout un mois), seulement
     // avec une recette apprise et des mois que Vinted liste ; mêmes gardes, même budget.
     try { if (await recetteReleve(uid)) await capterReleves(uid); } catch (_) {}
-    // 5.443 : le détail des achats (« Lot… » d'abord) — sous la réserve des lecteurs prioritaires, 8/h au plus.
-    try { const da = (((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}).achat || null;
-      if (!(da && Date.now() - Number(da.at || 0) < LECTURES_DUES_VALIDITE_MS && !(Number(da.reste) > 0))) await capterDetailsAchats(uid); } catch (_) {}
     let d = null;
     try { d = (((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}).versement || null; } catch (_) { return 0; }
     if (d && Date.now() - Number(d.at || 0) < LECTURES_DUES_VALIDITE_MS && !(Number(d.reste) > 0)) return 0;
@@ -33173,23 +32356,9 @@ async function publierImport(uid, st) {
 let _importEnCours = null;
 // UN passage d'import pour le compte `uid` (celui de l'onglet). Rend le nombre
 // de pages lues. `opts.force` : « Tout récupérer » (repart de la page 1).
-// 5.446 (lot ext-anciens-lots ; revue, basse 93) : un import à la fois (une requête Vinted à la fois, §3) — mais une
-//   demande pour un AUTRE compte n'est plus perdue (« 0 » sans le dire) : elle passe APRÈS
-//   celui en cours (une seule en attente par compte).
-let _importCompte = null;
-const _importApres = new Map();
 function importerHistorique(uid, opts = {}) {
-  const u = String(uid);
-  if (_importEnCours) {
-    if (_importCompte === u) { try { noterDiag('import_deja_en_cours'); } catch (_) {} return _importEnCours.then(() => 0, () => 0); }
-    if (_importApres.has(u)) return _importApres.get(u);
-    try { noterDiag('import_autre_compte_apres'); } catch (_) {}
-    const p = _importEnCours.then(() => 0, () => 0).then(() => { _importApres.delete(u); return importerHistorique(u, opts); });
-    _importApres.set(u, p);
-    return p;
-  }
-  _importCompte = u;
-  _importEnCours = importerHistoriqueUn(uid, opts).catch(() => 0).finally(() => { _importEnCours = null; _importCompte = null; });
+  if (_importEnCours) { try { noterDiag('import_deja_en_cours'); } catch (_) {} return _importEnCours.then(() => 0, () => 0); }
+  _importEnCours = importerHistoriqueUn(uid, opts).catch(() => 0).finally(() => { _importEnCours = null; });
   return _importEnCours;
 }
 // 5.375 : ce que dit un refus de la garde, dans l'état (pause ou souci).
@@ -33355,13 +32524,8 @@ async function importerAnnonces(uid, acc, st) {
 // Après une visite : un passage 1 min plus tard (la rafale de la visite est
 // passée). Un seul minuteur ; le service worker endormi ⇒ l'alarme de 5 min.
 let _importMinuteur = null;
-// 5.446 (lot ext-anciens-lots ; revue, basse 94) : par une ALARME d'une minute (elle survit au service worker,
-//   §4.9) quand le navigateur en a ; sinon le minuteur d'avant (rattrapé par l'alarme de 5 min).
 function planifierImport() {
-  try {
-    if (chrome.alarms && typeof chrome.alarms.create === 'function') { if (_importMinuteur) return; _importMinuteur = true; chrome.alarms.create('vrm-import-bientot', { delayInMinutes: 1 }); return; }
-    if (_importMinuteur) return; _importMinuteur = setTimeout(() => { _importMinuteur = null; tickImport(); }, 60000);
-  } catch (_) {}
+  try { if (_importMinuteur) return; _importMinuteur = setTimeout(() => { _importMinuteur = null; tickImport(); }, 60000); } catch (_) {}
 }
 // Le passage de fond (alarme `vrm-import`, 5 min) : onglet vinted.fr ouvert, le
 // compte de son cookie, une session VRM, aucune pause, une base qui répond, un
@@ -33701,12 +32865,8 @@ async function importerSiteUn(site, compte, opts) {
   return n;
 }
 let _impSiteMinuteur = null;
-// 5.446 (lot ext-anciens-lots, revue basse 94) : par une ALARME d'une minute (elle survit au worker, §4.9).
 function planifierImportSites() {
-  try {
-    if (chrome.alarms && typeof chrome.alarms.create === 'function') { if (_impSiteMinuteur) return; _impSiteMinuteur = true; chrome.alarms.create('vrm-importsites-bientot', { delayInMinutes: 1 }); return; }
-    if (_impSiteMinuteur) return; _impSiteMinuteur = setTimeout(() => { _impSiteMinuteur = null; tickImportSites(); }, 60000);
-  } catch (_) {}
+  try { if (_impSiteMinuteur) return; _impSiteMinuteur = setTimeout(() => { _impSiteMinuteur = null; tickImportSites(); }, 60000); } catch (_) {}
 }
 // Le passage de fond (alarme `vrm-import`) : chaque compte ouvert dans un onglet
 // Leboncoin / Vestiaire qui a un modèle et quelque chose à lire — un à la fois.
@@ -39285,9 +38445,6 @@ async function sbGetMemo(query) {
   // à Vinted un bordereau qui existe déjà. `sbGetTout` rend `null` si une page
   // échoue, comme `sbGet` sur un échec.
   const p = /[?&]id=like\./.test(query) ? sbGetTout(query) : sbGet(query);
-  // 5.446 (lot ext-anciens-lots ; revue, basse 82) : les entrées périmées partent à chaque insertion (la carte ne
-  //   grossit plus pendant toute la vie du worker), 200 au plus.
-  { const t = Date.now(); for (const [k, v] of _memoVisite) if (!v || t - v.at >= VISITE_MEMO_MS) _memoVisite.delete(k); while (_memoVisite.size >= 200) _memoVisite.delete(_memoVisite.keys().next().value); }
   _memoVisite.set(cle, { at: Date.now(), p });
   const resultat=await p;return (await loadSession())?.user_id===session.user_id?resultat:null;
 }
@@ -40870,19 +40027,6 @@ try { chrome.storage.local.remove(['vrmVcBrutIds', 'vrmVcBrutAutres']); } catch 
 // un bordereau Vinted, §3 « générer un bordereau et récupérer son PDF »), vérifie
 // « %PDF » et le range dans `vc_label_{produit}` ; la vente porte
 // `bordereau: { id, at }`. Une adresse expirée ou illisible ⇒ rien rangé, dit.
-// 5.444 — <vc-litige-regle> (même règle que api/_lib/vestiaire-regle.js `litigeDeFriseVc`, audit-vc-complet.cjs les compare) :
-// la frise rebâtie champ par champ ; le litige = une étape EN COURS (ou en attente) dont `probleme` est vrai.
-function friseVcPropre(f) {
-  return (Array.isArray(f) ? f : []).slice(0, 12).filter((x) => x && typeof x === 'object' && /^[A-Za-z][\w-]{0,39}$/.test(String(x.k || '')))
-    .map((x) => ({ k: String(x.k), statut: String(x.statut || '').slice(0, 20), date: String(x.date || '').slice(0, 40), cle: /^[\w.:-]{1,60}$/.test(String(x.cle || '')) ? String(x.cle) : '', titre: coupeVc(x.titre || '', 80), texte: coupeVc(x.texte || '', 240), probleme: x.probleme === true ? true : x.probleme === false ? false : null }));
-}
-function litigeDeFriseVc(f) {
-  const en = (Array.isArray(f) ? f : []).filter((x) => x && /^(ongoing|pending|onhold|on_hold|blocked)$/i.test(String(x.statut || '')));
-  if (en.some((x) => x.probleme === true)) return true;
-  const conf = (Array.isArray(f) ? f : []).find((x) => x && /conformity/i.test(String(x.k || '')));
-  return conf && conf.probleme === false ? false : null;
-}
-// </vc-litige-regle>
 async function rangerVcTimeline(m, compte) {
   const pid = String(m.productId || '');
   if (!/^\d{3,15}$/.test(pid)) return false;
@@ -40910,10 +40054,6 @@ async function rangerVcTimeline(m, compte) {
       // 5.383 : l'heure où CETTE frise a été lue (comparée à `aExpedierAt` par l'app : l'état le plus frais gagne).
       ...((m.etapes && Object.keys(m.etapes).length) || m.statut ? { etapesAt: new Date().toISOString() } : {}),
       paiementEstime: m.paiementEstime || prev.paiementEstime || '',
-      // 5.444 : la frise DATÉE (étapes dans l'ordre de Vestiaire, date affichée, clé, texte borné) et le LITIGE lu
-      // (`litigeDeFriseVc` : une étape en cours dont la clé ou le texte de Vestiaire DIT un problème signalé / un paiement
-      // mis en attente ⇒ true ; une étape de conformité lue sans ce signe ⇒ false ; rien lu ⇒ on garde l'avant).
-      ...(Array.isArray(m.frise) && m.frise.length ? (() => { const f = friseVcPropre(m.frise); const l = litigeDeFriseVc(f); return Object.assign({ friseVc: f }, l === null ? {} : { litigeVc: l }); })() : {}),
       // 5.435 (choix 2b) le colis RETOUR que la frise nomme : le n° et le transporteur gardés, la 1re fois vue datée
       // (le début du retour pour la règle `api/_lib/retour-vente-suivi.js`), jamais effacés par une lecture qui ne les dit pas.
       ...(m.retour && typeof m.retour === 'object' && (m.retour.suivi || m.retour.statut || m.retour.cle) ? { retourVc: {
@@ -40930,59 +40070,11 @@ async function rangerVcTimeline(m, compte) {
   return run;
 }
 let _vcAnnoncesChaine = Promise.resolve();
-// ══ 5.443 (23 nov.) — « MES ARTICLES » RANGÉS UNE FOIS PAR VISITE ══════════════════════════════════════════
-// Mesuré au banc (scripts/audit-vc-annonces-une-fois.cjs, 1 000 annonces inventées) : la page charge « Mes articles »
-// par pages (5 de 200) et ses compteurs ; CHAQUE réponse relisait toute la ligne `vc_listings` (`select=data`, les
-// 1 000 fiches), la réécrivait en entier et réveillait l'app, qui la relisait à son tour : 6 lectures complètes et
-// 6 écritures complètes par visite. La cause : un rangement par réponse (`rangerVcAnnonces` → une lecture-fusion-
-// écriture à chaque fois), pas plusieurs déclencheurs ni des onglets en double (vc-inject.js ne s'installe qu'une
-// fois par page, `__vrmVcInjected`, et la page ne recommence pas sa pagination).
-// ⇒ Les réponses d'une même visite sont MISES EN FILE et rangées ENSEMBLE : une lecture de la ligne, chaque réponse
-// appliquée DANS L'ORDRE (exactement la règle d'avant, page par page : une liste entière ne fait foi que lue en
-// entier, une page partielle complète sans rien retirer — jamais une partielle par-dessus une complète), UNE
-// écriture, UN réveil de l'app. La file part : quand la liste est lue EN ENTIER (`complet`), quand un lien de
-// publication arrive (on l'attend), après 2,5 s sans nouvelle réponse, et au plus tard 15 s après la première
-// (fraîcheur). Chaque réponse n'est dite « rangée » à la page qu'une fois l'écriture faite (base qui refuse ⇒ faux,
-// comme avant). La file vit aussi dans chrome.storage.local (§4.9) : un service worker tué avant la fin la reprend
-// au réveil suivant (réappliquer une page déjà rangée ne change rien).
-const VC_ANNONCES_CALME_MS = 2500;
-const VC_ANNONCES_MAX_MS = 15000;
-const VC_ANNONCES_FILE = 'vrmVcAnnoncesFile';
-let _vcFile = [];                 // [{ patch, fin }] — les réponses pas encore rangées
-let _vcFileMinuteur = null, _vcFileDebut = 0;
-function garderFileVc() {
-  try { return chrome.storage.local.set({ [VC_ANNONCES_FILE]: { at: Date.now(), patches: _vcFile.map((x) => x.patch).slice(-40) } }).catch(() => {}); } catch (_) { return Promise.resolve(); }
-}
 function rangerVcAnnonces(patch) {
-  return new Promise((fin) => {
-    _vcFile.push({ patch: patch || {}, fin });
-    if (!_vcFileDebut) _vcFileDebut = Date.now();
-    garderFileVc();
-    const tout = !!(patch && (patch.liens || patch.complet)) || Date.now() - _vcFileDebut >= VC_ANNONCES_MAX_MS;
-    if (_vcFileMinuteur) { clearTimeout(_vcFileMinuteur); _vcFileMinuteur = null; }
-    if (tout) viderFileVc();
-    else _vcFileMinuteur = setTimeout(() => { viderFileVc(); }, VC_ANNONCES_CALME_MS);
-  });
-}
-function viderFileVc() {
-  if (_vcFileMinuteur) { clearTimeout(_vcFileMinuteur); _vcFileMinuteur = null; }
-  const lot = _vcFile; _vcFile = []; _vcFileDebut = 0;
-  if (!lot.length) return _vcAnnoncesChaine.then(() => true);
-  const run = _vcAnnoncesChaine.then(() => rangerVcAnnoncesMaintenant(lot.map((x) => x.patch))).catch(() => false);
+  const run = _vcAnnoncesChaine.then(() => rangerVcAnnoncesMaintenant(patch)).catch(() => false);
   _vcAnnoncesChaine = run.then(() => {}, () => {});
-  return run.then((ok) => { garderFileVc(); for (const x of lot) { try { x.fin(ok); } catch (_) {} } return ok; });
+  return run;
 }
-// Au réveil du service worker : une file restée en stockage (worker tué pendant l'attente) est rangée.
-async function reprendreFileVc() {
-  try {
-    const g = (await chrome.storage.local.get(VC_ANNONCES_FILE))[VC_ANNONCES_FILE];
-    const patches = g && Array.isArray(g.patches) ? g.patches.filter((x) => x && typeof x === 'object') : [];
-    if (!patches.length || _vcFile.length) return false;
-    for (const patch of patches) _vcFile.push({ patch, fin: () => {} });
-    return await viderFileVc();
-  } catch (_) { return false; }
-}
-try { setTimeout(() => { reprendreFileVc().catch(() => {}); }, 1500); } catch (_) {}
 // ── L'ANNONCE VESTIAIRE PUBLIÉE PAR VRM, RETROUVÉE PAR IDENTITÉ (19 nov., 5.409) ──
 // Mesuré le 19 nov. : les 3 liens de publication étaient rangés sous l'identifiant du brouillon IA (36 caractères,
 // `ai-product-drafts`), alors que « Mes annonces » liste l'annonce sous son identifiant NUMÉRIQUE (8 chiffres) : aucun ne
@@ -41029,8 +40121,6 @@ function liensPublieesVc(publiees, lus, liens) {
 // ce que Vestiaire a TRANCHÉ entre deux lectures de la MÊME annonce (son identifiant) : jamais déduit d'une
 // disparition, il faut le NOUVEAU mot.
 const VC_MOD_FAMILLES = [
-  // (23 nov., 5.444) MESURÉ : « En cours d'examen » est `unpublishedSubmitted` — « unpublish » le rangeait en « retirée ».
-  ['attente', /^unpublished.?submitted$/i],
   ['vendue', /sold|vendu/i],
   ['retiree', /withdraw|retir|delet|supprim|archiv|expir|inactiv|unpublish|deactiv|cancel|annul|unreceived/i],
   ['refusee', /invalid|reject|refus/i],
@@ -41076,35 +40166,11 @@ function annoncerModerationVc(evts) {
 }
 // Un clic sur la notification ouvre Vestiaire dans VRM (jamais une adresse reçue).
 try { if (chrome.notifications && chrome.notifications.onClicked) chrome.notifications.onClicked.addListener((id) => { if (/^vrm-vc-mod-/.test(String(id || ''))) { try { chrome.tabs.create({ url: 'https://vrm.center/?tab=plat_vestiaire' }); } catch (_) {} try { chrome.notifications.clear(id); } catch (_) {} } }); } catch (_) {}
-// 5.443 : `patches` — les réponses d'une visite, rangées ensemble (UNE lecture, UNE écriture, voir plus haut) ;
-// chacune est appliquée sur l'état laissé par la précédente, exactement comme si elle était rangée seule.
-async function rangerVcAnnoncesMaintenant(patches) {
-  const liste = (Array.isArray(patches) ? patches : [patches]).filter((x) => x && typeof x === 'object');
-  if (!liste.length) return true;
+async function rangerVcAnnoncesMaintenant(patch) {
   const rows = await sbGet('app_data?id=eq.vc_listings&select=data');
-  if (rows === null) return false;                                     // lecture ratée : RIEN n'est écrit
-  let cur = (rows && rows[0] && rows[0].data) || {};
+  if (rows === null) return false;
+  const cur = (rows && rows[0] && rows[0].data) || {};
   const maintenant = new Date().toISOString();
-  let change = false, reveil = false;
-  const evtsMod = [], captes = [];
-  for (const patch of liste) {
-    const r = await appliquerPatchVc(cur, patch, maintenant, evtsMod);
-    if (r.change) { change = true; cur = r.data; }
-    if (r.change && (Array.isArray(patch.items) || patch.compteurs)) reveil = true;
-    if (r.change && Array.isArray(patch.items)) captes.push(patch);
-  }
-  if (!change) return true;
-  const ok = await supabaseUpsert('app_data', [{ id: 'vc_listings', data: cur }], 'id');
-  if (ok === true && reveil) notifierApp({ type: 'maj', quoi: 'vestiaire' });
-  if (ok === true && evtsMod.length) annoncerModerationVc(evtsMod);
-  if (ok === true) for (const patch of captes) {
-    const compte = /^[\w-]{1,40}$/.test(String(patch.compte || '')) ? String(patch.compte) : '';
-    await capteVc('annonces', compte, patch.items.slice(0, 200).filter((x) => x && /^[\w-]{1,40}$/.test(String(x.id || ''))).map((x) => ({ id: String(x.id), t: x.date || x.creeLe || null })));   // 5.377
-  }
-  return ok === true;
-}
-// Une réponse appliquée à l'état `cur` (rien n'est lu ni écrit ici) → { change, data }.
-async function appliquerPatchVc(cur, patch, maintenant, evtsMod) {
   const data = Object.assign({}, cur, { items: Object.assign({}, cur.items || {}), liens: Object.assign({}, cur.liens || {}), capturedAt: cur.capturedAt || null, complet: !!cur.complet, total: cur.total == null ? null : cur.total });
   const compte = /^[\w-]{1,40}$/.test(String(patch.compte || '')) ? String(patch.compte) : '';
   let change = false;
@@ -41113,6 +40179,7 @@ async function appliquerPatchVc(cur, patch, maintenant, evtsMod) {
     if (data.liens[k] !== String(v)) { data.liens[k] = String(v); change = true; }
   }
   // 5.439 : les compteurs de Vestiaire pour CE compte (jamais sans compte : on ne saurait pas à qui ils sont).
+  const evtsMod = [];
   if (patch.compteurs && compte) {
     const c = compteursVcPropres(patch.compteurs, maintenant);
     if (c) { data.compteurs = Object.assign({}, cur.compteurs || {}, { [compte]: c }); change = true; }
@@ -41155,12 +40222,15 @@ async function appliquerPatchVc(cur, patch, maintenant, evtsMod) {
     else data.items = Object.assign(data.items, lus);
     data.complet = entier; data.total = total; data.capturedAt = maintenant; change = true;
     if (data.formeInconnue) delete data.formeInconnue;
-    // 5.444 : des enveloppes illisibles à côté des annonces lues ⇒ leur forme est gardée (noms de clés), la page n'a pas fait foi.
-    if (Number(patch.inconnues) > 0 && Array.isArray(patch.inconnu)) { data.formeInconnue = patch.inconnu.slice(0, 60).map((c) => String(c).slice(0, 120)); data.inconnues = Math.min(200, Number(patch.inconnues)); } else if (data.inconnues) delete data.inconnues;
     if (compte) data.lectures = Object.assign({}, cur.lectures || {}, { [compte]: { at: maintenant, total, complet: entier } });
     if (Array.isArray(patch.forme) && patch.forme.length) data.forme = patch.forme.slice(0, 120).map((c) => String(c).slice(0, 120));
   }
-  return { change, data };
+  if (!change) return true;
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_listings', data }], 'id');
+  if (ok === true && (Array.isArray(patch.items) || patch.compteurs)) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  if (ok === true && evtsMod.length) annoncerModerationVc(evtsMod);
+  if (ok === true && Array.isArray(patch.items)) await capteVc('annonces', compte, patch.items.slice(0, 200).filter((x) => x && /^[\w-]{1,40}$/.test(String(x.id || ''))).map((x) => ({ id: String(x.id), t: x.date || x.creeLe || null })));   // 5.377
+  return ok === true;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -41437,7 +40507,6 @@ async function repondreVestiaire(msg) {
   try {
     const pause = await pauseVc();
     if (pause) return { accepte: false, code: 'vc-pause', raison: `Vestiaire a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };
-    { const dep = await regleDepassee('vc:message'); if (dep) { noterArret('vc', 'message', 'version-depassee'); return { accepte: false, code: 'version-depassee', raison: dep }; } }
     let ui;
     try { ui = (await chrome.storage.local.get(VC_UI))[VC_UI] || null; } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
     if (!ui || !ui.champ || !ui.envoi) return { accepte: false, code: 'pas-appris', raison: RAISONS_UI_VC['pas-appris'] };
@@ -41464,14 +40533,6 @@ async function repondreVestiaire(msg) {
     const depuis = Number(cpt.at) || (Date.now() - 5);   // SES places (X8)
     let rep = null;
     try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'vcEcrireUI', conv, texte, compte: o.compte }, { frameId: 0 }), 45000 + texte.length * 250, null); } catch (_) { rep = null; }
-    // 5.448 (`repriseseule`) : la messagerie de SON onglet n'avait pas fini de se charger (rien tapé) ⇒ 2 s, puis le même
-    //    ordre UNE fois de plus (son onglet n'est jamais rechargé : il peut y être en train d'écrire).
-    if (repriseSeule(rep)) {
-      noterDiag('vc_reprise_' + String(rep.erreur).replace(/[^a-z-]/g, '').slice(0, 30));
-      await new Promise((ok) => setTimeout(ok, 2000));
-      try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'vcEcrireUI', conv, texte, compte: o.compte }, { frameId: 0 }), 45000 + texte.length * 250, null); } catch (_) { rep = null; }
-    }
-    if (rep && rep.ok === true && !rep.statut && rep.erreur) noterArret('vc', 'message', rep.erreur);
     if (!rep || rep.ok !== true) { noterDiag('vc_ecrire_muet'); return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si le message est parti : regarde la conversation sur Vestiaire avant de renvoyer" }; }
     const e = String(rep.erreur || '');
     if (rep.defi === true || e === 'verification') {
@@ -41668,7 +40729,6 @@ async function repondreOffreVestiaire(msg) {
     const statut = (rep && Number(rep.statut)) || 0;
     if (!rep || rep.ok !== true) {
       if (rep && rep.code === 'invalide') { await rendreActions('vc:' + ot.compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'geste refusé par la page — rien n’est parti' }; }
-      if (rep && rep.code === 'canal') { await rendreActions('vc:' + ot.compte, depuis, 1); return { accepte: false, code: 'canal', raison: "recharge la page Vestiaire, puis réessaie — rien n'est parti" }; }   // 5.446 (lot ext-anciens-lots) : pas de canal privé — rien n’est parti
       noterDiag('vc_offre_muet');
       return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si ta réponse est partie : regarde l'offre sur Vestiaire avant de recommencer" };
     }
@@ -41719,7 +40779,6 @@ async function repondreOffreVestiaire(msg) {
 //    Vestiaire renvoie TON offre à ce prix. Un refus arrête tout (rien n'est relancé seul).
 const VC_AIMES = 'vrmVcAimes';
 const VC_AIMES_FAITS = 'vrmVcAimesFaits';
-const VC_AIMES_INFOS = 'vrmVcAimesInfos';   // 5.444 (LOCAL) : { [article]: { compte, photo } } — de la notification du compte de l'onglet
 const VC_AIMES_MAX_ARTICLES = 400, VC_AIMES_MAX_PAR_ARTICLE = 200;
 const VC_AIMES_PAR_TOUCHER = 10;
 // (20 nov., 5.410) ALIGNÉ sur le rythme des favoris Vinted du 19 nov. (« on garde toujours le temps aléatoire » :
@@ -41770,49 +40829,9 @@ async function rangerVcAimesMaintenant(m, compte) {
     const recent = (p) => Object.values(tout[p] || {}).map(String).sort().pop() || '';
     for (const p of articles.sort((a, b) => recent(a).localeCompare(recent(b))).slice(0, articles.length - VC_AIMES_MAX_ARTICLES)) delete tout[p];
   }
-  // 5.444 : l'article aimé est un article de CE compte — la notification « … vient d'aimer VOTRE pièce » est celle du
-  // compte de l'onglet ET de la page (`compteVcCapture`, sinon '' : rien n'est posé). Gardé dans CE navigateur avec la
-  // photo de la carte (`vrmVcAimesInfos`) : le panneau montre l'article même s'il n'a pas (encore) été lu dans « Mes
-  // articles », et ne le montre qu'à CE compte.
-  let infosChange = false;
-  try {
-    const o = await chrome.storage.local.get(VC_AIMES_INFOS); const infos = o[VC_AIMES_INFOS] || {};
-    for (const x of neufs) {
-      const p = String(x.produit), cur = infos[p] || {};
-      const nv = { compte: compte && /^[\w-]{1,40}$/.test(String(compte)) ? String(compte) : (cur.compte || ''), photo: /^https:\/\/images\.vestiairecollective\.com\//.test(String(x.photo || '')) ? String(x.photo) : (cur.photo || '') };
-      if (nv.compte !== (cur.compte || '') || nv.photo !== (cur.photo || '')) { infos[p] = nv; infosChange = true; }
-    }
-    const ks = Object.keys(infos); if (ks.length > VC_AIMES_MAX_ARTICLES) for (const k of ks.slice(0, ks.length - VC_AIMES_MAX_ARTICLES)) delete infos[k];
-    if (infosChange) await chrome.storage.local.set({ [VC_AIMES_INFOS]: infos });
-  } catch (_) {}
   if (!change) return true;
   try { await chrome.storage.local.set({ [VC_AIMES]: tout }); } catch (_) { return false; }
   return await publierAimesVc(tout, faits, compte);
-}
-// ── 5.444 LES NOTIFICATIONS DE VESTIAIRE (vc-inject `noteNotifsVc`) ─────────────────────────────────────────────
-// Gardées dans CE navigateur (`vrmVcNotifs`, 150 au plus, par identifiant de carte), avec le compte de l'onglet ET de la
-// page (sinon rien n'est gardé : on ne saurait pas à qui elles sont). Aucune n'est envoyée en base. Le panneau n'en
-// montre que les UTILES (`notifVcUtile`) : un « j'aime », un message, ou une carte dont les mots machine disent une
-// vente, une commande, une offre, un prix, un colis, un paiement, une annonce (modération) ; le reste (publicité,
-// « nos trouvailles », « offre exclusive ») est compté, jamais montré.
-const VC_NOTIFS = 'vrmVcNotifs';
-const RE_NOTIF_VC_UTILE = /order|sale|sold|vente|commande|offer|nego|price|prix|ship|deliver|livr|parcel|colis|payment|payout|paiement|listing|product.?(valid|refus|reject|approv|moder)|moderat|review|return|retour|claim|dispute/i;
-function notifVcUtile(c) { return !!c && (c.sorte === 'aime' || c.sorte === 'message' || (Array.isArray(c.mots) && c.mots.some((m) => RE_NOTIF_VC_UTILE.test(String(m))))); }
-async function rangerVcNotifs(cartes, compte) {
-  if (!/^[\w-]{1,40}$/.test(String(compte || ''))) return false;
-  const liste = (Array.isArray(cartes) ? cartes : []).filter((c) => c && /^[\w-]{1,64}$/.test(String(c.id || ''))).slice(0, 100);
-  if (!liste.length) return false;
-  let cur;
-  try { cur = (await chrome.storage.local.get(VC_NOTIFS))[VC_NOTIFS] || {}; } catch (_) { return false; }
-  const vu = new Date().toISOString();
-  for (const c of liste) {
-    const k = String(compte) + '|' + String(c.id), p = cur[k] || {};
-    cur[k] = { compte: String(compte), id: String(c.id), at: String(c.at || p.at || ''), lu: c.lu === true ? true : c.lu === false ? false : (p.lu == null ? null : p.lu), sorte: c.sorte || p.sorte || 'autre', produit: String(c.produit || p.produit || ''), photo: String(c.photo || p.photo || ''), mots: Array.isArray(c.mots) && c.mots.length ? c.mots.slice(0, 5) : (p.mots || []), vu: p.vu || vu };
-  }
-  const ks = Object.keys(cur).sort((a, b) => String(cur[b].at || cur[b].vu).localeCompare(String(cur[a].at || cur[a].vu)));
-  for (const k of ks.slice(150)) delete cur[k];
-  try { await chrome.storage.local.set({ [VC_NOTIFS]: cur }); } catch (_) { return false; }
-  return true;
 }
 // (15 nov., coordinateur : « les mêmes techniques que pour Vinted, aléatoirement ») — la série suit
 // EXACTEMENT les favoris Vinted, en RÉUTILISANT leurs fonctions :
@@ -41883,9 +40902,7 @@ async function offrirAuxAimesVc(msg) {
     const lu = centsPrixVc(it.prix);
     if (lu == null) return { accepte: false, code: 'prix-pas-lu', raison: "le prix de cet article n'a pas été lu — ouvre « Mes articles » sur Vestiaire, rien n'est parti" };
     if (lu !== avant) return { accepte: false, code: 'prix-change', prixVu: lu / 100, raison: `le prix lu n'est plus celui de l'aperçu (${(lu / 100).toFixed(2).replace('.', ',')} €) — rien n'est parti` };
-    // 5.444 : l'article non rangé sous un compte prend celui de SA notification « vient d'aimer » (compte de l'onglet ET de la page).
-    let compte = String(it.compte || '');
-    if (!compte) { try { const inf = ((await chrome.storage.local.get(VC_AIMES_INFOS))[VC_AIMES_INFOS] || {})[produit]; compte = inf && /^[\w-]{1,40}$/.test(String(inf.compte || '')) ? String(inf.compte) : ''; } catch (_) { compte = ''; } }
+    const compte = String(it.compte || '');
     if (!compte) return { accepte: false, code: 'session', raison: "je ne sais pas à quel compte Vestiaire appartient cet article — recharge « Mes articles » sur Vestiaire (connecté sur ton compte), puis réessaie" };
     // 5.432 (`gardeprix`) : la garde du prix de l'offre (SON clic : un prix suspect attend la confirmation du chiffre).
     const gpVa = await gardePrixEcriture({ sorte: 'offre', site: 'vestiaire', uid: compte, id: produit, prixC: prix, actuelC: lu, mode: 'main', confirmeC: msg && msg.gardeConfirmeC });
@@ -41962,7 +40979,6 @@ async function deroulerAimesVc() {
       let rep = null;
       try { rep = await avecDelai(chrome.tabs.sendMessage(ot.tabId, { from: 'vrm-fond', action: 'vcOffre', geste: 'favori', produit, acheteur: k, prixCents: prix, recette, compte: ot.compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
       const statut = (rep && Number(rep.statut)) || 0;
-      if (rep && rep.code === 'canal') { await rendreActions('vc:' + ot.compte, depuis, 1); await noter(null); await finir('arret', "recharge la page Vestiaire, puis réessaie — rien n'est parti"); break; }   // 5.446 (lot ext-anciens-lots) : pas de canal privé — rien n’est parti
       if (!rep || rep.ok !== true) { noterDiag('vc_aime_muet'); await noter('incertaine'); f.suivi.incertaines++; await finir('arret', "l'onglet Vestiaire n'a pas répondu — regarde sur Vestiaire avant de recommencer"); break; }
       if (!statut) {
         const e = String(rep.erreur || '');
@@ -42071,9 +41087,7 @@ async function baisserPrixVestiaire(msg) {
     const lu = centsPrixVc(it.prix);
     if (lu == null) return { accepte: false, code: 'prix-pas-lu', raison: "le prix de cette annonce n'a pas été lu — ouvre « Mes articles » sur Vestiaire, rien n'est parti" };
     if (lu !== avant) return { accepte: false, code: 'prix-change', prixVu: lu / 100, raison: `le prix lu n'est plus celui de l'aperçu (${(lu / 100).toFixed(2).replace('.', ',')} €) — rien n'est parti` };
-    // 5.444 : l'article non rangé sous un compte prend celui de SA notification « vient d'aimer » (compte de l'onglet ET de la page).
-    let compte = String(it.compte || '');
-    if (!compte) { try { const inf = ((await chrome.storage.local.get(VC_AIMES_INFOS))[VC_AIMES_INFOS] || {})[produit]; compte = inf && /^[\w-]{1,40}$/.test(String(inf.compte || '')) ? String(inf.compte) : ''; } catch (_) { compte = ''; } }
+    const compte = String(it.compte || '');
     if (!compte) return { accepte: false, code: 'session', raison: "je ne sais pas à quel compte Vestiaire appartient cette annonce — recharge « Mes articles » sur Vestiaire (connecté sur ton compte), puis réessaie" };
     // 5.432 (`gardeprix`) : la garde du prix (à la main : confirmation du chiffre ; règle automatique : rien ne part).
     const gpVp = await gardePrixEcriture({ sorte: 'prix', site: 'vestiaire', uid: compte, id: produit, num: msg.num, prixC: apres, actuelC: lu, mode: msg.auto === true ? 'auto' : 'main', confirmeC: msg.gardeConfirmeC });
@@ -42094,7 +41108,6 @@ async function baisserPrixVestiaire(msg) {
     const statut = (rep && Number(rep.statut)) || 0;
     if (!rep || rep.ok !== true) {
       if (rep && rep.code === 'invalide') { await rendreActions('vc:' + ot.compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'baisse refusée par la page — rien n’est parti' }; }
-      if (rep && rep.code === 'canal') { await rendreActions('vc:' + ot.compte, depuis, 1); return { accepte: false, code: 'canal', raison: "recharge la page Vestiaire, puis réessaie — rien n'est parti" }; }   // 5.446 (lot ext-anciens-lots) : pas de canal privé — rien n’est parti
       noterDiag('vc_prix_muet');
       return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si le prix a changé : regarde l'annonce sur Vestiaire avant de recommencer" };
     }
@@ -42839,14 +41852,6 @@ async function noterReceptionLbc(famille,resultat,sender){
     const etat=etats.includes(resultat?.etat)?resultat.etat:'format-non-reconnu';
     cartes[tab]={...avant,receptions:{...(avant.receptions||{}),[famille]:{etat,nombre:Math.max(0,Math.min(10000,Number(resultat?.nombre)||0)),photos:Math.max(0,Math.min(10000,Number(resultat?.photos)||0)),at:Date.now()}},at:Date.now()};
     await chrome.storage.local.set({vrmLbcTransport:Object.fromEntries(Object.entries(cartes).sort((a,b)=>b[1].at-a[1].at).slice(0,32))});
-    // 5.445 : « Mes transactions » lue pour CE compte est notée aussi PAR COMPTE (ce navigateur, ce compte VRM) : un autre
-    //    onglet du même compte ne redemande plus « Ouvre « Mes transactions » » (capture de Julien : 12 ventes lues, et le
-    //    bandeau restait sur chaque écran du panneau parce qu'il ne regardait que l'onglet).
-    const nu=avant.compte&&!avant.ambigue?cleCompteCapte(avant.compte):'';
-    if(famille==='transactions'&&nu&&(etat==='enregistre'||etat==='liste-vide')){
-      const u=String((await loadSession())?.user_id||'');
-      if(u){const b=(await chrome.storage.local.get('vrmLbcTxLu')).vrmLbcTxLu;const l=b&&b.u===u&&b.comptes&&typeof b.comptes==='object'?b:{u,comptes:{}};l.comptes[nu]={etat,nombre:Math.max(0,Math.min(10000,Number(resultat?.nombre)||0)),at:Date.now()};await chrome.storage.local.set({vrmLbcTxLu:l});}
-    }
   }catch(_){}
 }
 // 5.335 (9 nov.) : la lecture COMPLÈTE de « Mes annonces » d'un compte, notée
@@ -42878,7 +41883,7 @@ async function noterLectureCompleteLbc(owner, ids, total, sender) {
 // ce qu'il se passe, et UN SEUL geste (le premier qui débloque). `{quand}` est
 // remplacé par la carte (« il y a 2 min »). Fonction PURE (testée telle quelle).
 const LBC_LECTURE_FRAICHE_MS = 24 * 3600e3;
-function resumeCarteLbc({ vrm, transport, connu, lecture, code, maintenant, txLu }) {
+function resumeCarteLbc({ vrm, transport, connu, lecture, code, maintenant }) {
   const t = transport || null, now = Number(maintenant) || Date.now();
   const R = (ok, texte, geste, at) => ({ ok, texte, geste: geste || '', at: at || null });
   const RECHARGE = 'Recharge cette page Leboncoin.';
@@ -42912,10 +41917,7 @@ function resumeCarteLbc({ vrm, transport, connu, lecture, code, maintenant, txLu
   else annonces = R(null, 'pas encore lues', 'Ouvre « Mes annonces ».');
   // Ventes : ce que la page « Mes transactions » a rendu.
   let ventes;
-  // 5.445 : la réception de CET onglet, sinon celle de CE compte notée dans ce navigateur (`vrmLbcTxLu`, < 7 jours).
-  const rvOnglet = t && t.receptions && t.receptions.transactions;
-  const rvCompte = !rvOnglet && nu && txLu && txLu[nu] && now - Number(txLu[nu].at) <= 7 * 864e5 ? txLu[nu] : null;
-  const rv = rvOnglet || rvCompte;
+  const rv = t && t.receptions && t.receptions.transactions;
   if (!compteOk && !(rv && rv.etat === 'enregistre')) ventes = R(null, 'en attente du compte Leboncoin');
   else if (rv && rv.etat === 'enregistre') { const n = Number(rv.nombre) || 0; ventes = R(true, `${n} lue${n > 1 ? 's' : ''} {quand}`, '', rv.at); }
   else if (rv && rv.etat === 'liste-vide') ventes = R(true, 'aucune vente sur ce compte ({quand})', '', rv.at);
@@ -43329,27 +42331,7 @@ async function noterUiLbc(msg) {
 // Le geste, dans un ONGLET DE TRAVAIL ouvert à l'adresse apprise. `{ rien: true, … }` = rien n'est parti (certain) ;
 // `{ rep }` = la réponse de lbc-ecrire.js (null : muet — on ne SAIT PAS).
 const SORTE_LBC_FILE = { pause: 'pause', supprime: 'retrait', prix: 'prix', repondre: 'message' };
-// ══ 5.448 (`repriseseule`) — LA PAGE PAS PRÊTE SE RATTRAPE SEULE ═══════════════════════════════════════════════════
-//  Julien : « l'extension doit être intelligente ». Une page de travail qui n'a pas encore dit son compte, dont le canal
-//  ne répond pas, ou dont la conversation n'est pas encore chargée n'est PAS une panne : l'onglet est rechargé (Leboncoin)
-//  ou réinterrogé (Vestiaire) UNE fois, puis l'ordre repart — seulement quand la page a répondu « rien n'est parti »
-//  (aucun clic, rien tapé). Sinon, l'arrêt d'avant, avec sa phrase et son geste. Aucune requête au site, aucun geste
-//  de plus : la même commande, dans la même place du plafond.
-const CODES_PAGE_PAS_PRETE = new Set(['page-muette', 'canal', 'conversation-pas-chargee', 'compte-pas-su', 'autre-conversation']);
-function repriseSeule(rep) {
-  return !!(rep && rep.ok === true && !rep.statut && rep.geste !== true && rep.envoye !== true && rep.tape !== true && CODES_PAGE_PAS_PRETE.has(String(rep.erreur || '')));
-}
-async function rechargerOnglet(tabId) {
-  try { await chrome.tabs.reload(tabId); } catch (_) { return false; }
-  for (const fin = Date.now() + 15000; Date.now() < fin;) {
-    let t = null; try { t = await chrome.tabs.get(tabId); } catch (_) { return false; }
-    if (t && t.status === 'complete') return true;
-    await new Promise((ok) => setTimeout(ok, 300));
-  }
-  return false;
-}
 async function gesteLbcInterface(quoi, compte, url, ordre, budgetMs) {
-  { const dep = await regleDepassee('lbc:' + quoi); if (dep) { noterArret('lbc', quoi, 'version-depassee'); return { rien: true, code: 'version-depassee', raison: dep }; } }
   // 5.433 (`filevisible`) : le geste entre dans la file (une étape de l'action en cours de CE compte, ou une action à lui).
   const uidF = 'lbc:' + String(compte || '').replace(/[^\w-]/g, '').slice(0, 30);
   if (!(_fileCourante && (!_fileCourante.uid || _fileCourante.uid === uidF))) return auPassageFile({ sorte: SORTE_LBC_FILE[quoi] || 'autre', site: 'leboncoin', uid: uidF, itemId: ordre && (ordre.ad || ordre.id) ? String(ordre.ad || ordre.id) : '' }, () => gesteLbcInterface(quoi, compte, url, ordre, budgetMs));
@@ -43360,33 +42342,19 @@ async function gesteLbcInterface(quoi, compte, url, ordre, budgetMs) {
   try { t = await chrome.tabs.create({ url, active: false }); } catch (_) { t = null; }
   if (!t || t.id == null) return { rien: true, code: 'onglet', raison: "VRM n'a pas pu ouvrir l'onglet Leboncoin de travail — rien n'est parti" };
   try {
-    let c = await attendreSessionOnglet(t.id, LBC_PAUSE_ATTENTE_SESSION_MS);
-    // 5.448 : la page n'a pas encore dit son compte ⇒ rechargée UNE fois, la session relue.
-    if (!c || c.ambigue || !c.compte) { noterDiag('lbc_reprise_session'); if (await rechargerOnglet(t.id)) c = await attendreSessionOnglet(t.id, LBC_PAUSE_ATTENTE_SESSION_MS); }
+    const c = await attendreSessionOnglet(t.id, LBC_PAUSE_ATTENTE_SESSION_MS);
     if (!c || c.ambigue || !c.compte) return { rien: true, code: 'session', raison: "Leboncoin ne m'a pas dit quel compte est connecté dans l'onglet de travail — ouvre leboncoin.fr connecté sur le bon compte, puis réessaie (rien n'est parti)" };
     if (c.compte !== 'lbc-account:' + compte) return { rien: true, code: 'autre-compte', autre: idCompteLbc(c.compte) };
-    const attendrePret = async () => {
-      for (const fin = Date.now() + LBC_UI_PRET_MS; Date.now() < fin;) {
-        let r = null;
-        try { r = await avecDelai(chrome.tabs.sendMessage(t.id, { from: 'vrm-fond', action: 'lbcEcrirePret' }, { frameId: 0 }), 2000, null); } catch (_) { r = null; }
-        if (r && r.ok === true && r.canal === true) return true;
-        await new Promise((ok) => setTimeout(ok, 500));
-      }
-      return false;
-    };
-    let pret = await attendrePret();
-    if (!pret) { noterDiag('lbc_reprise_canal'); if (await rechargerOnglet(t.id)) pret = await attendrePret(); }
+    let pret = false;
+    for (const fin = Date.now() + LBC_UI_PRET_MS; Date.now() < fin;) {
+      let r = null;
+      try { r = await avecDelai(chrome.tabs.sendMessage(t.id, { from: 'vrm-fond', action: 'lbcEcrirePret' }, { frameId: 0 }), 2000, null); } catch (_) { r = null; }
+      if (r && r.ok === true && r.canal === true) { pret = true; break; }
+      await new Promise((ok) => setTimeout(ok, 500));
+    }
     if (!pret) return { rien: true, code: 'canal', raison: "la page Leboncoin de travail ne répond pas à VRM — recharge leboncoin.fr, puis réessaie (rien n'est parti)" };
     let rep = null;
     try { rep = await avecDelai(chrome.tabs.sendMessage(t.id, Object.assign({}, ordre, { from: 'vrm-fond', action: 'lbcGesteUI', quoi, compte }), { frameId: 0 }), budgetMs, null); } catch (_) { rep = null; }
-    // 5.448 : la page a répondu « pas prête, rien n'est parti » ⇒ rechargée UNE fois, le même ordre repart.
-    if (repriseSeule(rep)) {
-      noterDiag('lbc_reprise_' + String(rep.erreur).replace(/[^a-z-]/g, '').slice(0, 30));
-      if (await rechargerOnglet(t.id) && await attendrePret()) {
-        try { rep = await avecDelai(chrome.tabs.sendMessage(t.id, Object.assign({}, ordre, { from: 'vrm-fond', action: 'lbcGesteUI', quoi, compte }), { frameId: 0 }), budgetMs, null); } catch (_) { rep = null; }
-      }
-    }
-    if (rep && rep.ok === true && !rep.statut && rep.erreur) noterArret('lbc', quoi, rep.erreur);
     return { rep };
   } finally { try { await chrome.tabs.remove(t.id); } catch (_) {} }
 }
@@ -43947,53 +42915,6 @@ function storeLbcMessages(patch) {
   const run = _lbcMessagesChaine.then(() => storeLbcMessagesUneFois(patch), () => storeLbcMessagesUneFois(patch));
   _lbcMessagesChaine = run.then(() => {}, () => {});
   return run;
-}
-// ── 5.445 (23 nov.) LES CONVERSATIONS ET LE PORTE-MONNAIE LEBONCOIN, PAR COMPTE ─────────────────────────────────
-// Deux lignes dédiées, chacune `comptes[{id Leboncoin}]` : `lbc_conversations` (60 conversations au plus : identifiant,
-// article, titre, photo, aperçu, date, non-lus — JAMAIS un nom) et `lbc_porte_monnaie` ({available, incoming, at}).
-// Le compte est celui de L'ONGLET (`vrmLbcTransport`, session privée, pas ambigu) ; pour les conversations, la page doit
-// aussi le dire (`metadata.current_user`) et ce doit être un de SES comptes. Lire-fusionner-réécrire, une lecture ratée
-// n'écrit rien (§5), une file par ligne. Seul CE compte est remplacé : les autres restent tels quels.
-let _chaineLbcCompteLignes = Promise.resolve();
-async function compteOngletLbcPrive(sender) {
-  const tab = sender && sender.tab ? sender.tab.id : null;
-  if (tab == null || (sender && sender.frameId > 0) || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(String((sender.tab && sender.tab.url) || ''))) return '';
-  const vu = ((await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport || {})[tab];
-  return vu && vu.compte && !vu.ambigue ? cleCompteCapte(vu.compte) : '';
-}
-function ecrireLigneCompteLbc(id, compte, valeur) {
-  const p = _chaineLbcCompteLignes.then(async () => {
-    const owner = (await loadSession())?.user_id; if (!owner) return { ok: false, sansSession: true };
-    const rows = await sbGetLbc(`app_data?id=eq.${id}&select=data`);
-    if (rows === null) { noterDiag(id + '_lecture_ratee'); return { ok: false }; }
-    const cur = (rows[0] && rows[0].data) || {};
-    const comptes = Object.assign({}, cur.comptes || {}, { [compte]: valeur });
-    const ok = await supabaseUpsert('app_data', [{ id, data: { comptes, updatedAt: new Date().toISOString(), ver: EXT_VERSION } }], 'id');
-    return { ok: ok !== false };
-  });
-  _chaineLbcCompteLignes = p.catch(() => {});
-  return p;
-}
-async function rangerLbcConversations(msg, sender) {
-  const moi = String((msg && msg.moi) || '').toLowerCase();
-  const onglet = await compteOngletLbcPrive(sender);
-  if (!/^[0-9a-f-]{8,64}$/.test(moi) || !onglet || onglet.toLowerCase() !== moi) { noterDiag('lbc_convs_autre_compte'); return { ok: false }; }
-  const miens = new Set([...(await comptesMiens())].map((c) => cleCompteCapte(c).toLowerCase()));
-  if (!miens.has(moi)) { noterDiag('lbc_convs_pas_a_lui'); return { ok: true }; }
-  const txt = (v, n) => String(v == null ? '' : v).slice(0, n);
-  const liste = (Array.isArray(msg.liste) ? msg.liste : []).slice(0, 60).map((x) => ({
-    conv: /^[0-9a-f-]{8,64}$/i.test(String((x && x.conv) || '')) ? String(x.conv) : '', annonce: /^\d{4,15}$/.test(String((x && x.annonce) || '')) ? String(x.annonce) : '',
-    titre: txt(x && x.titre, 120), photo: /^https:\/\/img\.leboncoin\.fr\//.test(String((x && x.photo) || '')) ? String(x.photo) : '', at: Number.isFinite(Date.parse((x && x.at) || '')) ? new Date(Date.parse(x.at)).toISOString() : '',
-    apercu: txt(x && x.apercu, 300), nonlus: Number.isInteger(x && x.nonlus) && x.nonlus >= 0 && x.nonlus < 1e5 ? x.nonlus : null, aMoi: !!(x && x.aMoi === true) })).filter((x) => x.conv);
-  return ecrireLigneCompteLbc('lbc_conversations', moi, { liste, at: new Date().toISOString() });
-}
-async function rangerLbcPorteMonnaie(msg, sender) {
-  const onglet = await compteOngletLbcPrive(sender);
-  if (!onglet) { noterDiag('lbc_porte_compte_pas_su'); return { ok: false }; }
-  const nb = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 1e9 ? v : null);
-  const available = nb(msg && msg.available), incoming = nb(msg && msg.incoming);
-  if (available == null && incoming == null) return { ok: false };
-  return ecrireLigneCompteLbc('lbc_porte_monnaie', onglet.toLowerCase(), { available, incoming, at: new Date().toISOString() });
 }
 async function storeLbcMessagesUneFois(patch) {
   try {
@@ -45207,14 +44128,11 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
   const quota = detectLbcQuota(data);
   // Recon : un échantillon du corps (tronqué) + l'URL, pour inspecter la vraie forme.
   await storeLbcRecon({ url, quota: quota || undefined, sample: { url, at: new Date().toISOString(), found: found.length, quota, body: String(body).slice(0, 9000) } },owner);
-  if (found.length) { if (listeMoi) { try { await chrome.storage.local.remove('vrmLbcForme'); } catch (_) {} majSanteSites().catch(() => {}); } return await storeLbcListings(url, found,owner); }
+  if (found.length) return await storeLbcListings(url, found,owner);
   if(listeMoi&&sessListe&&(Array.isArray(data?.ads)||Array.isArray(data?.data?.ads))&&racine.length===0)return {ok:true,etat:'liste-vide',nombre:0,photos:0};
   // (1er nov., 5.296) Le tableau de bord pro qui rend `Ads: []` (Total 0) est une
   // liste VIDE, pas un format inconnu.
   if(/\/classifieds\/analysis\/list/i.test(String(url||''))&&data&&Array.isArray(data.Ads)&&data.Ads.length===0)return {ok:true,etat:'liste-vide',nombre:0,photos:0};
-  // 5.448 (`adaptatif`) : SA liste « Mes annonces » d'une forme que VRM ne reconnaît plus : rien n'est rangé (ci-dessus),
-  //    la forme est dans `lbc_recon` ; le compteur rend la panne visible dans le diagnostic (comme `forme_inconnue_*` sur Vinted).
-  if (listeMoi) { noterDiag('lbc_forme_inconnue_mes_annonces'); try { await chrome.storage.local.set({ vrmLbcForme: { at: Date.now() } }); } catch (_) {} majSanteSites().catch(() => {}); }
   return {ok:true,etat:'aucune-annonce-reconnue',nombre:0,photos:0};
 }
 // Télécharge les photos d'une paire en FICHIERS (fini les onglets). Rangées dans

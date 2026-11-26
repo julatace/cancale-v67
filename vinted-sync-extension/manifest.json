@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VRM — outil du revendeur",
-  "version": "5.454.0",
+  "version": "5.453.2",
   "description": "Relie tes comptes Vinted, Leboncoin, eBay et Vestiaire à VRM : annonces, ventes, colis et bordereaux, depuis ton navigateur.",
   "homepage_url": "https://vrm.center",
   "minimum_chrome_version": "111",
@@ -145,7 +145,6 @@
         "https://*.leboncoin.fr/*"
       ],
       "js": [
-        "vrm-trouver.js",
         "lbc-ecrire.js",
         "vrm-depot-aussi.js"
       ],
@@ -170,7 +169,6 @@
       ],
       "js": [
         "vrm-ui.js",
-        "vrm-trouver.js",
         "ebay.js"
       ],
       "run_at": "document_idle",
@@ -205,7 +203,6 @@
         "vrm-ui.js",
         "vrm-mots.js",
         "vc-depot.js",
-        "vrm-trouver.js",
         "vc-ecrire.js",
         "vrm-depot-aussi.js"
       ],
@@ -314,6 +311,6 @@
     "128": "icon-128.png"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; frame-ancestors 'self' https://vrm.center https://*.vinted.fr https://*.vinted.com https://*.vinted.it https://*.vinted.de https://*.leboncoin.fr https://*.ebay.fr https://*.ebay.com https://*.vestiairecollective.com"
+    "extension_pages": "script-src 'self'; object-src 'self'"
   }
 }
