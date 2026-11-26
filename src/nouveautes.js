@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (26 nov., achats-rangee-compacte — capture de Julien sur iPhone : « ici c'est pas beau ») src/styles-achats-photos.css (fin)
+  { id: 'achats-rangee-compacte', date: '2026-11-26', titre: 'Achats : des rangées plus nettes', phrase: 'L’état s’écrit à côté de la date.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (26 nov., loupe-fondue — captures de Julien : « les couleurs sont moches, c'est mal fondu ») src/styles-recherche.css (fin)
   { id: 'loupe-fondue', date: '2026-11-26', titre: 'La recherche par N°, plus douce', phrase: 'Cartes arrondies, icônes légères, champ fin.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (26 nov., journee-fondue — capture de Julien d'Aujourd'hui : « ça rend pas hyper bien ») src/natif/natif.css · src/natif/jeu.css
