@@ -167,7 +167,9 @@
    rangées pleine largeur sur fond blanc (pas de carte dans une carte), vignette 52 arrondie, titre 15/20 normal sur 2 lignes, une
    ligne méta 13/18 grise, filets fins qui partent du texte, « ⋯ » discret. Deux formes : A (prix à droite) · B (prix dans la méta). */
 @layer vrm-natif {
-  .n-ar-liste { background: var(--n-carte); border-block: .5px solid var(--n-trait); }
+  /* (26 nov., capture de Julien : « arrondis les bords des cases ») La liste d'un compte est une carte arrondie, en retrait des bords
+     (comme sous un style au choix), plus une bande collée d'un bord à l'autre. */
+  .n-ar-liste { background: var(--n-carte); border: 0; border-radius: var(--n-r-carte, 12px); overflow: hidden; }
   .n-ar { position: relative; display: flex; align-items: stretch; background: var(--n-carte); content-visibility: auto; contain-intrinsic-size: auto 68px; }
   .n-ar + .n-ar::before { content: ""; position: absolute; top: 0; right: 0; left: calc(var(--n-marge) + 52px + 12px); border-top: .5px solid var(--n-trait); pointer-events: none; }
   .n-ar-corps { appearance: none; border: 0; margin: 0; background: none; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 64px;

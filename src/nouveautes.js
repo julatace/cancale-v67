@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (26 nov., annonces-arrondies — Julien : « arrondis les bords des cases ») src/natif/visuel/inventaire.css · src/natif/ecrans/annonces.css
+  { id: 'annonces-arrondies', date: '2026-11-26', titre: 'Annonces en cartes arrondies', phrase: 'Chaque compte, une carte aux bords arrondis.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (26 nov., feuille-retour-jeu — Julien : « change l'affichage du pop up message, ça doit faire mieux, jeu vidéo ») src/capteNotif/FeuilleArrivee.jsx
   { id: 'retour-comme-un-jeu', date: '2026-11-26', titre: 'Ton retour sur l’app, comme un jeu', phrase: 'Qui écrit, la photo, le message ; « Tout vu » en un toucher.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov. soir, filtre-plateformes — Julien : « un filtre avec toutes les plateformes et par plateforme dans les onglets ») docs/passation/2026-11-25-filtre-plateformes.md
