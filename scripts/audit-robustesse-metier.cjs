@@ -61,7 +61,8 @@ const MUTATIONS = {
 
 (async () => {
   if (process.argv.includes('--prouve')) return prouver(__filename, R, MUTATIONS);
-  const APP = sansCommentaires(lire('src/App.jsx'));
+  // (24 nov., main-vert) App.jsx découpé (src/ecrans/*.jsx) : l'app se lit RECOLLÉE (_source-app.cjs).
+  const APP = sansCommentaires(require('./_source-app.cjs').sourceApp(R));
   const STOCK = sansCommentaires(lire('src/ecrans/Stock.jsx'));
   const COMPTA = sansCommentaires(lire('src/ecrans/Compta.jsx'));
   const ACHATS = sansCommentaires(lire('src/ecrans/Achats.jsx'));
@@ -171,7 +172,10 @@ const MUTATIONS = {
     // (20 nov., décision de Julien) Accepter une offre se fait dans le PANNEAU de l'extension : l'app n'accepte plus rien. La règle
     // `avisAcceptationManuelle` (H1-H3) reste — c'est au panneau de la lire avant SA confirmation (récit 2026-11-20-actions-extension).
     dit(!/const actionOffre = async/.test(APP) && !/offer_requests/.test(APP), 'H4 (20 nov.) l’app n’accepte aucune offre (plus de chemin d’acceptation ici)');
-    dit(/<BoutonExtension className="vrm-chat-btn vrm-chat-btn-p" action="offres"/.test(APP), 'H5 (20 nov.) la carte d’offre ouvre le panneau de l’extension (où la garde est relue)');
+    // (25 nov., décision de Julien du 24 nov. — CLAUDE.md §3) la carte d'offre agit DEPUIS VRM par la porte (Accepter CONFIRMÉ) ;
+    // pas connecté ⇒ éteinte, la raison dite.
+    { const r = await require('./_porte-agir.cjs').offreVinted(APP, fs.readFileSync(path.join(__dirname, '..', 'src', 'agir', 'Agir.jsx'), 'utf8').replace(/\/\/[^\n]*/g, ''));
+      dit(r.ok, 'H5 (24 nov.) la carte d’offre agit DEPUIS VRM sur CETTE offre, Accepter confirmé, par la porte ; sinon éteinte avec sa raison', r.detail); }
   });
 
   // ── I. Baisse en euros ────────────────────────────────────────────────────
@@ -204,7 +208,10 @@ const MUTATIONS = {
   // ── L. N° par cleNum ──────────────────────────────────────────────────────
   {
     const i = APP.indexOf('const bordForItem = '), g = i < 0 ? '' : APP.slice(i, APP.indexOf('\n  };', i));
-    dit(/cleNum\(bb\.numero\) === cleNum\(numero\)/.test(g), 'L1 bordereau ⇄ fiche par `cleNum` (« 07 » = « 7 »)');
+    // (20 nov., bugs-terrain) `bordForItem` passe par un INDEX (`indexBordsItem`) rangé par `cleNum(bb.numero)`, lu par `cleNum(numero)`.
+    const jIx = APP.indexOf('const indexBordsItem = '), ix = jIx < 0 ? '' : APP.slice(jIx, APP.indexOf('\n};', jIx));
+    dit(/cleNum\(bb\.numero\) === cleNum\(numero\)/.test(g)
+      || (/const k = cleNum\(numero\);/.test(g) && /ix\.parNum\.get\(k\)/.test(g) && /const k = cleNum\(bb\.numero\);[^\n]*parNum\.set\(k,/.test(ix)), 'L1 bordereau ⇄ fiche par `cleNum` (« 07 » = « 7 »)');
     const j = STOCK.indexOf('const numeroExists ='), h = j < 0 ? '' : STOCK.slice(j, j + 300);
     dit(/cleNum\(/.test(h) && !/toLowerCase\(\)/.test(h), 'L2 inventaire : un N° déjà pris se reconnaît par `cleNum`');
   }

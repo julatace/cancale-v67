@@ -7,7 +7,7 @@ export default {
   "fd.etat.vendueLe": "Vendue {prix} le {date}",
   "fd.etat.vendue": "Vendue {prix}",
   "fd.etat.vendueSansPrix": "Vendue",
-  "fd.etat.passu": "Ventes pas encore lues",
+  "fd.etat.passu": "Pas encore relue",
   "fd.etat.enVente": "En vente {prix}",
   "fd.etat.enVenteDepuis": {"one": "En vente {prix} depuis {j} jour", "other": "En vente {prix} depuis {j} jours"},
   "fd.etat.enVenteSites": "En vente {prix} · sur {n} sites",

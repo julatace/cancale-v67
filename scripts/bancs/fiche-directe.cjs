@@ -157,6 +157,10 @@ function mesurerFiche() {
     texte: (() => { const c = f.cloneNode(true); c.querySelectorAll('[data-fd-plus], [data-fiche-plus]').forEach((x) => x.remove()); return c.textContent.replace(/\s+/g, ' '); })(),
     // (21 nov., fiche-sites — choix 5 de Julien) « Sur les sites » nomme les QUATRE sites (Vinted « Pas publiée » compris) :
     // A3 juge le reste de la fiche (aucun « relie à Vinted »).
+    // (23 nov., revue UX #11/#12) vues et favoris lus dans « Sur les sites » (une colonne chacun) ; le prix d'achat en LIGNE d'Informations.
+    sitesVF: [...f.querySelectorAll('[data-fiche-site]')].filter(vis).map((x) => ({ vues: ((x.querySelector('.nf-c-vues') || {}).innerText || '').replace(/\D/g, ''), fav: ((x.querySelector('.nf-c-fav') || {}).innerText || '').replace(/\D/g, '') })),
+    interetInfos: !!f.querySelector('[data-nf-infos] [data-fd-fait="interet"]'), achatInfos: !!f.querySelector('[data-nf-infos] [data-nf-ligne-prix="achat"] [data-fd-fait="achat"]'),
+    achatPastille: !!f.querySelector('.nf-pastilles [data-fd-fait="achat"], .nf-pastilles [data-fd-fait="mini"]'),
     texteHorsSites: (() => { const c = f.cloneNode(true); c.querySelectorAll('[data-fd-plus], [data-fiche-plus], section[data-fd-sites]').forEach((x) => x.remove()); return c.textContent.replace(/\s+/g, ' '); })(),
     pleins: pleins.map((b) => ({ txt: b.innerText.trim(), vu: dansEcran(b), ...R(b) })),
     action: (f.querySelector('[data-fd-action]') || { getAttribute: () => '' }).getAttribute('data-fd-action'),
@@ -195,7 +199,8 @@ function jugerFiche(m, n, suf, tel) {
   if (m.action) dit(m.pleins.length === 1 && m.pleins[0].vu, `F5 ${suf} : le bouton principal (« ${m.pleins[0] && m.pleins[0].txt} ») est au premier écran`, m.pleins);
   dit(m.pleins.length <= 1, `Q1 ${suf} : un seul plein`, m.pleins.map((x) => x.txt).join(' | '));
   // Un fait pas su : « Ajouter » (ou « Relier ») quand il se corrige — c'est la porte ; sinon « — » et sa raison. Jamais 0.
-  dit(m.faits.filter((x) => !x.su).every((x) => (x.porte ? /Ajouter|Relier/.test(x.txt) : /—/.test(x.txt) && x.txt.replace(/—/g, '').trim().split(' ').length >= 2)) && !m.zeros.length, `F6 ${suf} : un fait pas su dit « Ajouter » (s'il se corrige) ou « — » et sa raison, jamais 0`, m.faits.filter((x) => !x.su).map((x) => x.txt).join(' | '));
+  // (23 nov., revue UX #11) La porte d'un prix (achat, mini) est un CHAMP vide « — € » posé dans Informations : il se tape sur place.
+  dit(m.faits.filter((x) => !x.su).every((x) => (x.porte ? /Ajouter|Relier/.test(x.txt) || ((x.porte === 'achat' || x.porte === 'mini') && /^—\s?€$/.test(x.txt)) : /—/.test(x.txt) && x.txt.replace(/—/g, '').trim().split(' ').length >= 2)) && !m.zeros.length, `F6 ${suf} : un fait pas su dit « Ajouter » (s'il se corrige) ou « — » et sa raison, jamais 0`, m.faits.filter((x) => !x.su).map((x) => x.txt).join(' | '));
   dit(!!m.actionsOuvrir && m.actionsOuvrir.vu, `P2 ${suf} : « Choisir une action » est au premier écran (les gestes à un toucher)`, m.actionsOuvrir);
   dit(!m.plusSeul.length, `P3 ${suf} : aucun montant ni date seulement derrière « ⋯ »`, m.plusSeul.join(' | '));
   dit(m.plusOuvrir === 0, `P4 ${suf} : aucun menu « ⋯ »`, String(m.plusOuvrir));
@@ -207,7 +212,10 @@ function jugerFiche(m, n, suf, tel) {
   if (tel) dit(!!m.toast && m.toast.zones >= 2 && m.toast.couvre === 0, `Q4 ${suf} : un message passager ne couvre ni la barre ni la photo de la fiche`, m.toast);
   if (n === '3119') dit(il('achat') && !il('achat').su && il('achat').porte && il('benefice') && !il('benefice').su, `F8 ${suf} : vendue sans achat — « Achat — » est la porte, le bénéfice dit « — » et pourquoi`, m.faits.map((x) => x.txt).join(' | '));
   if (n === '3120') dit(il('benefice') && il('benefice').su && /\+58\s?€/.test(il('benefice').txt) && !/au moins/i.test(il('benefice').txt) && m.action === 'bordereau', `F8 ${suf} : vendue reliée — bénéfice +58 €, jamais « au moins », plein « bordereau »`, { b: il('benefice'), a: m.action });
-  if (n === '3102') dit(m.action === 'baisser' && il('mini') && il('interet') && /4\s·\s61/.test(il('interet').txt) && m.sites.annonces === 2, `F8 ${suf} : en vente sur 2 sites — prix mini, favoris · vues (4 · 61), plein « baisser »`, { a: m.action, f: cles });
+  // (23 nov., revue UX #12) vues et favoris dits UNE fois : dans « Sur les sites », plus dans Informations.
+  if (m.sites) dit(!m.interetInfos && m.sitesVF.length > 0, `R12 ${suf} : vues et favoris une seule fois (tableau « Sur les sites »), pas dans Informations`, { infos: m.interetInfos, sites: m.sitesVF });
+  dit(m.achatInfos && !m.achatPastille, `R11 ${suf} : le prix d'achat est une vraie ligne d'Informations (plus une puce à côté du prix)`, { ligne: m.achatInfos, puce: m.achatPastille });
+  if (n === '3102') dit(m.action === 'baisser' && il('mini') && m.sitesVF.some((x) => x.vues === '61') && m.sitesVF.some((x) => x.fav === '4') && m.sites.annonces === 2, `F8 ${suf} : en vente sur 2 sites — prix mini, favoris · vues (4 · 61), plein « baisser »`, { a: m.action, f: cles });
   if (n === '3104') dit(il('prix') && /1\s?250\s?€/.test(il('prix').txt) && il('achat') && /1\s?020\s?€/.test(il('achat').txt), `F8 ${suf} : prix à quatre chiffres écrits en entier`, m.faits.map((x) => x.txt).join(' | '));
   if (n === '3103') dit(!!m.photo && !m.photo.image && m.photo.vu, `F8 ${suf} : sans photo — la place de la photo reste (une image dessinée), rien ne saute`, m.photo);
   if (n === '3107' || n === '3108') {
@@ -216,7 +224,7 @@ function jugerFiche(m, n, suf, tel) {
     dit(il('prix') && il('prix').su && il('quand') && il('quand').su && !!m.sites && m.sites.annonces === 1 && m.sitesListe.join() === site + ':en-ligne', `A2 ${suf} : prix, jours en ligne et site lus sur ${site} — rien de vide`, { f: m.faits.map((x) => x.txt), s: m.sitesListe });
     dit(!/vinted/i.test(m.texteHorsSites), `A3 ${suf} : rien ne dit « Vinted » hors « Sur les sites » (ni « relie à Vinted »)`, (m.texteHorsSites.match(/.{0,30}vinted.{0,30}/i) || [''])[0]);
     dit(!!m.actionsOuvrir && m.actionsOuvrir.vu && m.pleins.length === 1, `A4 ${suf} : « Choisir une action » et UN bouton principal`, m.pleins);
-    if (n === '3107') dit(il('achat') && il('achat').su && /60\s?€/.test(il('achat').txt) && il('si-vendue') && il('si-vendue').su && il('interet') && /3/.test(il('interet').txt), `A5 ${suf} : achat 60 € (posé par N°), bénéfice prévu, 3 favoris lus chez Leboncoin`, m.faits.map((x) => x.txt).join(' | '));
+    if (n === '3107') dit(il('achat') && il('achat').su && /60\s?€/.test(il('achat').txt) && il('si-vendue') && il('si-vendue').su && m.sitesVF.some((x) => x.fav === '3'), `A5 ${suf} : achat 60 € (posé par N°), bénéfice prévu, 3 favoris lus chez Leboncoin`, m.faits.map((x) => x.txt).join(' | '));
     if (n === '3108') dit(il('achat') && !il('achat').su && il('achat').porte === 'achat', `A5 ${suf} : « Achat — » se tape sur place, sans annonce Vinted`, il('achat'));
   }
   if (n === '3106') dit(m.faits.filter((x) => !x.su).length >= 5, `F8 ${suf} : tout pas su — cinq faits au moins disent « — »`, m.faits.map((x) => x.txt).join(' | '));

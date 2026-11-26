@@ -154,6 +154,25 @@ function choisirMessageFavori(x) {
     const v = cands[Math.min(cands.length - 1, Math.max(0, Math.floor((Number.isFinite(h) ? h : 0) * cands.length)))];
     return { ok: true, source, cas: g.cas, regle: g.regle, version: v, possibles: possibles.length };
   }
+  // 5.450 : le SEUL manque est le pseudo (la nouvelle messagerie ne l'a pas dit) ⇒ la version NEUTRE : la même, sans
+  //    {pseudo} / {username} / {prénom} (« Bonjour {pseudo}, … » ⇒ « Bonjour, … ») — jamais un autre nom, jamais refusé pour ça.
+  if (manques.size && [...manques].every((k) => k === 'pseudo' || k === 'prenom') && !val.pseudo) {
+    const neutre = (m) => String(m).replace(/[ \t]*\{(?:pseudo|username|prénom|prenom)\}/g, '').replace(/ +([,.!?])/g, '$1');
+    for (const g of groupes) {
+      const possibles = [];
+      for (const v of g.versions) {
+        const mod = neutre(v.modele);
+        if (fpErreurTexte(mod) || fpManque(mod, val).length) continue;
+        const texte = fpPreremplir(mod, val);
+        if (!texte.trim() || !sur(texte) || refusee(v.modele)) continue;
+        possibles.push(Object.assign({}, v, { modele: mod, texte, neutre: true }));
+      }
+      if (!possibles.length) continue;
+      const h = Number(tirer());
+      const v = possibles[Math.min(possibles.length - 1, Math.max(0, Math.floor((Number.isFinite(h) ? h : 0) * possibles.length)))];
+      return { ok: true, source, cas: g.cas, regle: g.regle, version: v, possibles: possibles.length, neutre: true };
+    }
+  }
   if (manques.size && !vuInterdit) return { ok: false, source, raison: 'variable', manque: [...manques] };
   return { ok: false, source, raison: groupes.some((g) => g.versions.length) ? 'texte_interdit' : 'aucun_message', manque: [...manques] };
 }

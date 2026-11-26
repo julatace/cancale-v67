@@ -48,7 +48,7 @@ async function verifier({ src, dem, app }, bavard = true) {
   for (const mode of MODES) for (const ancien of [undefined, false, true]) for (const sys of [false, true]) for (let h = 0; h < 24; h++) {
     const stock = {}; if (mode !== undefined) stock.vrm_apparence = JSON.stringify(mode); if (ancien !== undefined) stock.vinted_dark = JSON.stringify(ancien);
     const d = new Date(2026, 10, 8, h, 30, 0);
-    const react = A.sombreEffectif(A.apparenceDe(mode === undefined ? null : mode, ancien === true), { date: d, systemeSombre: sys });
+    const react = A.sombreEffectif(A.apparenceDe(mode === undefined ? null : mode, ancien === undefined ? null : ancien), { date: d, systemeSombre: sys });
     const r = lanceDemarrage(stock, h, sys);
     n++;
     if (r.erreur || (r.theme === 'dark') !== react) ecarts.push(`${mode}/${ancien}/${sys ? 'sys-sombre' : 'sys-clair'}/${h}h : React ${react ? 'sombre' : 'clair'}, démarrage ${r.erreur || r.theme}`);
@@ -68,7 +68,16 @@ async function verifier({ src, dem, app }, bavard = true) {
   dit(S('soir', 19) && S('soir', 23) && S('soir', 0) && S('soir', 6), '« Le soir » : sombre de 19 h à 6 h 59');
   dit(!S('soir', 7) && !S('soir', 12) && !S('soir', 18), '« Le soir » : clair de 7 h à 18 h 59');
   dit(S('auto', 12, true) && !S('auto', 22, false), '« Automatique » : la préférence de l’appareil, jamais l’heure');
-  dit(S(null, 12, false, true) && !S(null, 22, true, false), 'rien de choisi ⇒ le choix d’avant (`vinted_dark`), ni l’heure ni le système');
+  dit(S(null, 12, false, true) && !S(null, 22, true, false), 'pas de `vrm_apparence` ⇒ le choix d’avant (`vinted_dark`), ni l’heure ni le système');
+  // (25 nov., Julien : « La deuxième couleur est pas mal, mets en mode sombre ») AUCUN choix posé ⇒ SOMBRE, à toute heure,
+  // quel que soit le système ; un choix posé (Clair, ou l'ancien `vinted_dark` à false) ne change jamais.
+  dit(S(null, 12, false, null) && S(null, 3, true, null) && A.apparenceDe(undefined, undefined) === 'sombre' && A.apparenceDe('n_importe', null) === 'sombre', 'rien de choisi (ni `vrm_apparence` ni `vinted_dark`) ⇒ SOMBRE (défaut du 25 nov.)');
+  dit(!S('clair', 12, false, null) && !S(null, 12, true, false) && !S('soir', 12, false, null), 'un choix posé gagne sur le défaut : Clair reste clair, « Le soir » reste clair le jour');
+  const rVide = lanceDemarrage({}, 12, false), rCasse = lanceDemarrage({ vrm_apparence: '{', vinted_dark: '{' }, 12, false);
+  dit(rVide.theme === 'dark' && rCasse.theme === 'dark', 'le démarrage, sans aucun réglage (ou illisible), pose SOMBRE avant le premier rendu', `${rVide.theme} / ${rCasse.theme}`);
+  const rClair = lanceDemarrage({ vrm_apparence: '"clair"' }, 12, true);
+  dit(rClair.theme === 'light' && String(rClair.meta || '').toUpperCase() !== nuitDemarrage, 'le démarrage, Clair choisi, reste clair (barre d’état claire), même téléphone en sombre', `${rClair.theme} / ${rClair.meta}`);
+  dit(/<html[^>]*\sdata-theme="dark"/.test(html) && /<meta name="theme-color" content="(#[0-9A-Fa-f]{6})"/.exec(html)?.[1]?.toUpperCase() === nuitDemarrage, 'index.html part déjà en sombre avant tout script (`<html data-theme="dark">`, theme-color de nuit) : aucun éclair clair');
   dit(S('sombre', 12) && !S('clair', 22, true), 'Clair et Sombre : toujours, quoi qu’il arrive');
   const w1 = A.ecrituresApparence('sombre'), w2 = A.ecrituresApparence('soir');
   dit(w1 && w1.vinted_dark === true && w1.vrm_apparence === 'sombre' && w2 && !('vinted_dark' in w2), 'un choix explicite écrit aussi `vinted_dark` ; « Le soir » ne le touche pas');
@@ -92,7 +101,10 @@ async function verifier({ src, dem, app }, bavard = true) {
       ['démarrage : automatique ignoré', (b) => ({ ...b, dem: b.dem.replace("if (mode === 'auto') return systeme === true;", '') })],
       ['règle : le soir finit à 8 h', (b) => ({ ...b, src: b.src.replace('SOIR_FIN = 7', 'SOIR_FIN = 8') })],
       ['règle : explicite n’écrit plus vinted_dark', (b) => ({ ...b, src: b.src.replace("if (mode === 'sombre') out.vinted_dark = true;", '') })],
-      ['règle : absent ⇒ clair', (b) => ({ ...b, src: b.src.replace("return ancienSombre === true ? 'sombre' : 'clair';", "return 'clair';") })],
+      ['règle : absent ⇒ clair', (b) => ({ ...b, src: b.src.replace("if (ancienSombre === true) return 'sombre';", "return 'clair';") })],
+      ['règle : défaut redevenu clair', (b) => ({ ...b, src: b.src.replace("export const APPARENCE_PAR_DEFAUT = 'sombre';", "export const APPARENCE_PAR_DEFAUT = 'clair';") })],
+      ['démarrage : défaut redevenu clair', (b) => ({ ...b, dem: b.dem.replace("mode = ancien === false ? 'clair' : 'sombre';", "mode = ancien === true ? 'sombre' : 'clair';") })],
+      ['règle : vinted_dark=false ignoré', (b) => ({ ...b, src: b.src.replace("if (ancienSombre === false) return 'clair';", '') })],
       ['app : plus synchronisé', (b) => ({ ...b, app: b.app.replace("  'vrm_apparence',\n", '\n') })],
     ];
     let rates = 0;
