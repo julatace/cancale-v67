@@ -537,6 +537,15 @@ const RienARetirer = aLaDemandeDiscret(() => import('./natif/RetraitsPoints.jsx'
 // (20 nov., chasse-bugs) Montée HORS des portes (à côté du cœur) : sa lecture `capte_journal_*` n'a le droit de partir qu'une fois la
 // porte de confidentialité passée (`_confidentialiteUid`) — sinon « rien pas su », relu au `onCloudReady` (banc hors-ligne-froid B–H).
 const FeuilleArrivee = aLaDemandeDiscret(() => import('./capteNotif/FeuilleArrivee.jsx'));
+// (25 nov., « jeu vidéo ») Ce que la feuille d'arrivée montre de chaque nouveauté vient des copies DÉJÀ captées du MÊME compte
+// (aucun appel à Vinted) : sa boîte (`inbox`) ou ses commandes (`sold`/`purchased`). Lecture ratée ⇒ `null` (la ligne reste nue) ;
+// le rapprochement, par n° de conversation ou de transaction seulement, est dans src/capteNotif/details.js.
+async function lireCopieArrivee(compte, ou) {
+  if (MULTI_USER && (!AUTH.user || _confidentialiteUid !== AUTH.user.id)) return null;
+  if (ou === 'inbox') { const h = await fetchHarvest(compte, 'inbox'); return h && Array.isArray(h.conversations) ? h.conversations : null; }
+  if (ou === 'sold' || ou === 'purchased') { const p = await fetchHarvestOrders(compte, ou); return p && Array.isArray(p.my_orders) ? p.my_orders : null; }
+  return null;
+}
 const VentesTableau = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx'));
 // (21 nov., ventes-lisibles) Terminées au téléphone : la rangée native de Ventes (vignette 64, titre entier, l'achat en un toucher).
 const VentesListeTel = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx').then((m) => ({ default: m.VentesListeTel })));
@@ -907,6 +916,7 @@ import {etatRetrait, estAVerifier, urgenceTri, lieuDepuisExtrait, limiteRetraitD
 import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction, TEXTE_ESTIMEE_DEPASSEE, heureCourte as heureCourteJ} from '../api/_lib/limite-envoi.js';
 // ⟦→ ecrans/Comptabilite.jsx #62⟧
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
+import { photoVentePubliee, useVersionPhotosVentes } from "./ventes/photosVentesPub.js";
 import { ecrireEmailsLus } from "./emailsLusEcriture.js";
 // ⟦→ ecrans/Comptabilite.jsx #63⟧
 import {ResponsiveChatPortal, telFil} from "./ChatPortal.jsx";
@@ -1717,6 +1727,9 @@ import './designV2/design-v2.css'; // (8 nov.) style de ./designV2/LigneAnnonce.
 import './designV2/signature.css'; // (8 nov.) style de ./designV2/LigneAnnonce.jsx, gardé à sa place (son écran est chargé à la demande)
 import './designV2/signature.css'; // (8 nov.) style de ./designV2/Signature.jsx, gardé à sa place (son écran est chargé à la demande)
 import * as Natif from "./natif/index.js";
+import { FiltrePlateformes, useFiltrePlateforme, filtreTableau } from "./natif/FiltrePlateformes.jsx";   // (25 nov.) le filtre par plateforme des onglets
+import { TOUTES as TOUTES_PLATEFORMES, nombresPlateformes, optionsPlateformes, choixEffectif as choixPlateformeEffectif, filtrerPlateforme } from "./filtrePlateforme.js";
+import { FiltreAchats, MorceauSite } from "./achats/FiltreAchats.jsx";   // (25 nov.) le filtre par plateforme d'Achats
 // (19 nov.) « VRM natif » : la coque (docs/design/NATIF.md)
 // (19 nov., « VRM natif ») `designV2/barre.jsx` n'est plus importé au démarrage (barre native) : seul Réglages le charge encore.
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
@@ -33800,7 +33813,7 @@ export default function App() {
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
   return <>{(MULTI_USER && authState.user)
     ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onRafraichir={()=>authRefresh()} onVerifier={uid=>{_confidentialiteUid=uid;}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
-    : coeur}<VisionneusePdf/><PlaceurTampon/><ApercuUnCoque/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}{authState.user && authState.user.id ? <CapteNotif feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}{authState.user && authState.user.id ? <FeuilleArrivee pret lire={(q)=>(MULTI_USER&&(!AUTH.user||_confidentialiteUid!==AUTH.user.id))?Promise.resolve(null):lireTout(q,{strict:true})} load={load} save={save} onCloudReady={onCloudReady} nomCompte={(p,c)=>p==='vinted'?String((load('vinted_account_labels',{})||{})[c]||''):''} exclu={(p,c)=>p==='vinted'&&!!lireComptesExclus()[c]} feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}</>;
+    : coeur}<VisionneusePdf/><PlaceurTampon/><ApercuUnCoque/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}{authState.user && authState.user.id ? <CapteNotif feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}{authState.user && authState.user.id ? <FeuilleArrivee pret lire={(q)=>(MULTI_USER&&(!AUTH.user||_confidentialiteUid!==AUTH.user.id))?Promise.resolve(null):lireTout(q,{strict:true})} load={load} save={save} onCloudReady={onCloudReady} nomCompte={(p,c)=>p==='vinted'?String((load('vinted_account_labels',{})||{})[c]||''):''} exclu={(p,c)=>p==='vinted'&&!!lireComptesExclus()[c]} lireCopie={lireCopieArrivee} feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}</>;
 }
 
 // ── Le code Discord (revue de sécurité du 21 octobre) ─────────────────────────
@@ -33956,6 +33969,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sites && sites.has('vestiaire')]);
   const sigPlanT = signaturePlan();
+  const versionPhotos = useVersionPhotosVentes();   // (25 nov., ventes-rangee) une photo publiée par Ventes redessine la liste
   const toutesLignes = React.useMemo(() => {
     const out = [];
     const ts = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? t : null; };
@@ -33971,7 +33985,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         out.push({ cle: 'vinted:' + tx, site: 'vinted', id: tx, titre: o.title || '(sans titre)', t: ts(o.date),
           prix: euro(o.price && typeof o.price === 'object' ? o.price.amount : o.price), devise: (o.price && o.price.currency_code) || 'EUR',
           etat: etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).label,
-          compte: labels[uid] || (o._acc && o._acc.login) || '', num: '', photo: photosVenteVintedCandidates(o)[0] || null,
+          compte: labels[uid] || (o._acc && o._acc.login) || '', num: '', photo: photosVenteVintedCandidates(o)[0] || photoVentePubliee(tx) || null,   // (25 nov.) sinon la photo de SES sources, publiée par Ventes
           // (21 nov.) « Marque · T42 » sur la rangée (affichage seulement : jamais une identité).
           marque: (o.brand_title || o.brand || extractBrand(String(o.title || '')) || ''), taille: typeof o.size_title === 'string' ? o.size_title : '',
           tr: bordTParTx[tx] ? transporteurDeVente({ bord: bordTParTx[tx] }) : null });
@@ -34024,7 +34038,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     // (jamais datée au hasard). La règle unique (src/ordreRecent.js, lot AJ du 9 nov.).
     return ordreRecent(out, (l) => l.t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sites, ventesVinted, panelOff, lbcVentes, lbcLu, ebayTous, vc, annLbc, vcLocDep.departsCle, bordTParTx, sigPlanT]);
+  }, [sites, ventesVinted, panelOff, lbcVentes, lbcLu, ebayTous, vc, annLbc, vcLocDep.departsCle, bordTParTx, sigPlanT, versionPhotos]);
   // (22 nov., Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées ») LES ANNULÉES de cette
   // liste, par IDENTITÉ (`site:n°`), d'après la règle commune (src/ventesAnnulees.js — chaque plateforme par SA règle).
   // Chaque ligne annulée porte son motif (`annul`) ; au téléphone elles sont rangées dans UN groupe replié « Annulées ».
@@ -34038,7 +34052,14 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     return new Map(A.lignes.map((x) => [SITE[x.plateforme] + ':' + x.id, x]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sites, ventesVinted, lbcVentes, lbcLu, ebayTous, vc]);
-  const lignes = React.useMemo(() => toutesLignes.filter((l) => !l.hp).map((l) => { const x = annulParCle.get(l.cle); return x ? { ...l, annul: { motif: x.motif, sorte: x.sorte }, detail: ['passu', 'remboursee'].includes(x.motif) ? '' : tr('annul.motif.' + x.motif) } : l; }), [toutesLignes, annulParCle]);
+  const lignesTous = React.useMemo(() => toutesLignes.filter((l) => !l.hp).map((l) => { const x = annulParCle.get(l.cle); return x ? { ...l, annul: { motif: x.motif, sorte: x.sorte }, detail: ['passu', 'remboursee'].includes(x.motif) ? '' : tr('annul.motif.' + x.motif) } : l; }), [toutesLignes, annulParCle]);
+  // (25 nov., « un filtre avec toutes les plateformes et par plateforme dans les onglets ») « Terminées » suit LE filtre de
+  // l'onglet Ventes (le même choix qu'« À envoyer » et « En route », retenu sur cet appareil) : chaque site PRÉSENT, son logo,
+  // son nombre ; la règle : src/filtrePlateforme.js (la ligne porte SON site, posé par SA lecture).
+  const [choixP, choisirP] = useFiltrePlateforme('ventes');
+  const optionsP = React.useMemo(() => optionsPlateformes(nombresPlateformes(lignesTous)), [lignesTous]);
+  const effP = choixPlateformeEffectif(choixP, optionsP);
+  const lignes = React.useMemo(() => filtrerPlateforme(lignesTous, effP), [lignesTous, effP]);
   // Au téléphone : la liste d'abord (sans les annulées), puis le groupe « Annulées » (les annulations, pas les retours :
   // un retour a déjà son groupe « Retours et litiges »).
   const lignesTel = React.useMemo(() => lignes.filter((l) => !(l.annul && l.annul.sorte === 'annulee')), [lignes]);
@@ -34100,10 +34121,12 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   // se replie en UNE ligne, le geste dedans ; « lu il y a… » ne se redit plus (la
   // fraîcheur vit dans la coque, revue 2.30). Une lecture en cours, ratée ou partielle
   // reste écrite, en clair : elle change ce que la liste veut dire.
-  const visibles = etats.filter((e) => e[1] === 'lecture' || e[1] === 'pas-su' || e[1] === 'partiel');
+  // (25 nov.) Sous un site choisi (filtre par plateforme), seul l'état de lecture de CE site est dit.
+  const etatsF = effP === TOUTES_PLATEFORMES ? etats : etats.filter((e) => e[0] === effP);
+  const visibles = etatsF.filter((e) => e[1] === 'lecture' || e[1] === 'pas-su' || e[1] === 'partiel');
   const sansCompteVinted = etats.some((e) => e[0] === 'vinted' && e[1] === 'jamais');
   // Aucun compte Vinted et aucune vente : l'état vide dit déjà ce geste — le repli ne le redit pas.
-  const jamais = etats.filter((e) => e[1] === 'jamais' && !(e[0] === 'vinted' && lignes.length === 0));
+  const jamais = etatsF.filter((e) => e[1] === 'jamais' && !(e[0] === 'vinted' && lignes.length === 0));
   const NOMS_SITES = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
   const listeNoms = (l) => l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' et ' + l[l.length - 1];
   // L'état d'une vente : le mot retenu (« À envoyer », « En route »), et l'ambre
@@ -34123,15 +34146,14 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   // lignes, la même étiquette d'état, le même ordre ; ce qui change : Statut à compteurs, colonnes, tri, sélection, et
   // « Imprimer les bordereaux » des ventes cochées (le chemin `imprimerLot` des colis, `vrm:imprimer-choix`).
   if (ordiT) {
-    const sitesT = [...new Set(lignes.map((l) => l.site))];
     const cptsT = [...new Set(lignes.filter((l) => filtreT.site === 'tous' || l.site === filtreT.site).map((l) => l.compte).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
     const depuisT = { tout: null, j7: 7, j30: 30 }[filtreT.periode];
     const lignesT = enCours && !lignes.length ? undefined : (visibles.some((e) => e[1] === 'pas-su') && !lignes.length ? null
       : lignes.filter((l) => (filtreT.site === 'tous' || l.site === filtreT.site) && (!filtreT.compte || l.compte === filtreT.compte)
         && (depuisT == null || (l.t != null && Date.now() - l.t <= depuisT * 86400000))));
+    const filtreSiteT = filtreTableau(optionsP, effP, (v) => { choisirP(v); setFiltreT((f) => ({ ...f, compte: '' })); });
     const filtresT = [
-      ...(sitesT.length > 1 ? [{ cle: 'site', libelle: tr('egalite.site.titre'), valeur: filtreT.site, onChange: (v) => setFiltreT((f) => ({ ...f, site: v, compte: '' })),
-        options: [{ cle: 'tous', libelle: tr('egalite.site.tous') }, ...sitesT.map((x) => ({ cle: x, libelle: NOM[x] || x }))] }] : []),
+      ...(filtreSiteT ? [filtreSiteT] : []),
       ...(cptsT.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreT.compte || 'tous', onChange: (v) => setFiltreT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
         options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cptsT.map((x) => ({ cle: x, libelle: x }))] }] : []),
       { cle: 'periode', libelle: tr('tableau.filtre.periode'), valeur: filtreT.periode, onChange: (v) => setFiltreT((f) => ({ ...f, periode: v })),
@@ -34152,6 +34174,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   }
   return (
     <div className="vrm-ventes-toutes" data-ventes-toutes={enCours ? 'lecture' : 'lu'} data-n={String(lignes.length)} style={{ padding: '4px 16px 16px' }}>
+      <FiltrePlateformes ecran="ventes" options={optionsP} valeur={effP} onChange={choisirP} className="n-fp-nu"/>
       {visibles.length > 0 && (
         <div className="vrm-toutes-etats" style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '4px 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
           {visibles.map(([s, k, txt]) => <div key={s} data-toutes-etat-site={s} data-etat={k} style={{ color: (k === 'pas-su' || k === 'partiel') ? C.warn : C.muted }}>{txt}</div>)}
@@ -37830,7 +37853,7 @@ function AppCoeur() {
   // codes, QR, Mode relais, hors ligne, Scanner, et ses outils : à confirmer, à vérifier, e-mails,
   // argent à vérifier…) celle d'Achats. Les MÊMES composants (`Comptabilite only="bordereaux"`,
   // `colisDans`), aucune copie ; les anciens chemins (`cat_bord`, `retraits`…) mènent ici (`setTab`).
-  const rendreColisSection=(t,site)=>{
+  const rendreColisSection=(t,site,effA='toutes')=>{   // (25 nov.) effA : le filtre par plateforme d'Achats (src/achats/FiltreAchats.jsx)
     if(baseKO) return null;
     if(t==='ventes'&&site==='leboncoin') return (
       <section className="vrm-colis-section" data-colis-hote="ventes" data-colis-site="leboncoin" aria-label={L.aEnvoyer}>
@@ -37859,14 +37882,14 @@ function AppCoeur() {
             de « Toutes » : sur Vinted (l'écran d'arrivée, celui où mènent Ma journée et les notifications), TOUS les
             colis à retirer restent montrés — un achat Leboncoin au relais n'est jamais caché derrière le filtre
             (banc colis-qr : 9 colis, = vrm_colis_retirer). */}
-        <GardeEcran nom="achats:colis"><Comptabilite key="colis_achats" {...commun} only="bordereaux" colisDans="achats" siteColisDemande={site==='toutes'||site==='vinted'?null:site} sitesPresents={sitesPresents}
+        <GardeEcran nom="achats:colis"><Comptabilite key="colis_achats" {...commun} only="bordereaux" colisDans="achats" siteColisDemande={effA && effA!=='toutes' ? effA : (site==='toutes'||site==='vinted'?null:site)} sitesPresents={sitesPresents}
           ongletColis="retirer" onOngletColis={choisirOngletColis}/></GardeEcran>
         {/* Les OUTILS de retrait (à confirmer, à vérifier, suivis, e-mails reçus, argent à vérifier), sous la liste,
             une fois — les mêmes qu'hier sous Colis → À retirer (`retraitsOutils`). */}
         {/* (11 nov., intégration colis — arbitrage b) Les outils SUIVENT le filtre de site, même règle que la liste : ce qu'ils
             portent (à confirmer, à vérifier, e-mails de suivi, argent à vérifier) vient des achats Vinted et des e-mails —
             montrés sur Vinted (l'écran d'arrivée, qui montre tout), jamais sous eBay, Leboncoin ou Vestiaire. */}
-        {site==='toutes'||site==='vinted' ? <GardeEcran nom="achats:retirer"><div data-colis-retraits="outils"><Comptabilite key="colis_achats_outils" {...commun} only="achats" vueAchats="retraits" retraitsOutils dansPlateforme/></div></GardeEcran> : null}
+        {site==='toutes'||site==='vinted' ? <GardeEcran nom="achats:retirer"><div data-colis-retraits="outils"><div hidden={!(effA==='toutes'||effA==='vinted')} data-colis-retraits-filtre={effA}><Comptabilite key="colis_achats_outils" {...commun} only="achats" vueAchats="retraits" retraitsOutils dansPlateforme/></div></div></GardeEcran> : null}
       </section>
       </RepliRetirerAchats>);
     return null;
@@ -37984,7 +38007,7 @@ function AppCoeur() {
             était posée sous les 30 colis à expédier, à 5 500 px du haut. Mêmes chiffres, même carte, seulement montée.
             (15 nov., Ventes « Verre dépoli », maquette validée) Le segment À expédier · En route · Toutes et le grand chiffre
             ouvrent l'écran ; la bande du mois passe JUSTE SOUS les colis (en tête de « Toutes », qui replie les colis). */}
-        {(t==='achats' || (t==='ventes' && (!sous || sec==='ventes'))) ? rendreColisSection(t,site) : null}
+        {t==='achats' ? <FiltreAchats rangee>{(effA)=>rendreColisSection(t,site,effA)}</FiltreAchats> : (t==='ventes' && (!sous || sec==='ventes')) ? rendreColisSection(t,site) : null}
         {/* (20 nov., Julien : « tu dois appliquer les mêmes dispositions sur toutes les plateformes ») Ventes · eBay ouvre la MÊME
             liste que Ventes · Vinted (l'écran natif : À envoyer · En route · Terminées) ; ce qu'eBay a EN PLUS (tableau, à traiter,
             offres, argent, santé) est un groupe de rangées sous la liste, chacune ouvre sa section (rien n'est perdu, §4.11). */}
@@ -38014,7 +38037,7 @@ function AppCoeur() {
             aEnvoyer={(o) => aExpedier(o) && !(load('vinted_ship_done', {}) || {})[String(o.transaction_id)]} prix={(o) => (o.price && o.price.amount != null ? fmt(Number(o.price.amount)) : '')}
             onPro={() => voirAbonnement(setTab)}/></div>}</>)
           : (sitesPresents && !sitesPresents.has(site)) ? <OngletManque site={site} onglet={t} onNav={setTab}/>
-          : site==='vinted' ? rendreVinted(sec)
+          : site==='vinted' ? (t==='achats' && !libre ? <FiltreAchats>{(effA)=><MorceauSite site="vinted" eff={effA}>{rendreVinted(sec)}</MorceauSite>}</FiltreAchats> : rendreVinted(sec))
           : site==='leboncoin' ? rendreLeboncoin(sec)
           : site==='ebay' ? rendreEbay(sec)
           : rendreVestiaire(t)}
@@ -38023,9 +38046,10 @@ function AppCoeur() {
         {t==='achats' && site==='vinted' && !libre && !baseKO ? (SITES_RELIES_COQUE.v||[]).filter((x)=>x!=='vinted').map((x)=>(
           /* (21 nov., captures de Julien) Plus de grand intertitre à logo par site (trois logos avec rien dessous) : chaque site rend ses
              groupes seulement s'il a des achats, son nom dans le titre du groupe (src/achats/AchatsSite.jsx). */
-          <div key={x} data-achats-autre={x}>
+          /* (25 nov.) Sous le filtre par plateforme d'Achats : montré sous « Toutes » et sous SON site, caché (monté) sinon. */
+          <FiltreAchats key={x}>{(effA)=><MorceauSite site={x} eff={effA}><div data-achats-autre={x}>
             {x==='leboncoin' ? rendreLeboncoin('achats') : x==='ebay' ? rendreEbay('achats') : rendreVestiaire('achats')}
-          </div>)) : null}
+          </div></MorceauSite>}</FiltreAchats>)) : null}
         </GardeEcran>
         </CacheSiV2>
       </section>

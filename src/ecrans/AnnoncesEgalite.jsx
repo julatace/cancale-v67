@@ -52,6 +52,8 @@ import { enLitigeConnus, abonnerLitiges } from '../litigesEnCours.js';
 import { ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from '../actionsExtension.js';
 import { plusVue, joursPlusVue, CLE_PLUS_VUE_JOURS } from '../plusVue.js';   // (22 nov., choix 27) « Plus vue depuis N j »
 import { lireRelevesEnLigne } from '../plusVueLecture.js';
+import { useFiltrePlateforme, optionTableau } from '../natif/FiltrePlateformes.jsx';   // (25 nov.) le filtre par plateforme de l'onglet
+import { TOUTES, nombresPlateformes, optionsPlateformes, choixEffectif } from '../filtrePlateforme.js';
 import { lireSupprimes } from '../comptesSupprimes.js';   // (21 nov.) un compte supprimé pour de bon n'est jamais relu   // (20 nov.) la pause Leboncoin : dans l'extension
 
 const JOUR = 24 * 3600 * 1000;
@@ -248,8 +250,11 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   // (19 nov. soir, tableau de travail) « Mis à jour il y a … » : l'heure de la dernière lecture RÉUSSIE ; ⟳ relance la MÊME lecture.
   const [majLe, setMajLe] = React.useState(() => (memo ? memo.le : undefined));
   const [relit, setRelit] = React.useState(false);
-  const [filtreT, setFiltreT] = React.useState({ site: siteInitial || 'tous', compte: '', dort: 'toutes' });
-  const [filtre, setFiltre] = React.useState({ site: siteInitial || 'tous', etat: 'enligne' });
+  // (25 nov., Julien : « un filtre avec toutes les plateformes et par plateforme dans les onglets ») LE site de l'écran est le
+  // filtre de l'onglet (src/filtrePlateforme.js, retenu sur cet appareil) : le même pour la liste du téléphone et le tableau.
+  const [choixP, choisirP] = useFiltrePlateforme('annonces');
+  const [filtreT0, setFiltreT] = React.useState({ compte: '', dort: 'toutes' });
+  const [filtreE, setFiltre] = React.useState({ etat: 'enligne' });
   const [q, setQ] = React.useState('');
   React.useEffect(() => {
     const prendre = () => { try { if (prendreVue('arepublier')) setFiltre((f) => ({ ...f, etat: 'arepublier' })); else if (prendreVue('photodouble')) setFiltre((f) => ({ ...f, etat: 'photodouble' })); else if (prendreVue('dorment')) setFiltre((f) => ({ ...f, etat: 'dorment' })); } catch (_) {} };
@@ -339,6 +344,15 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     return d.length ? Math.floor((opts.maintenant - Math.min(...d)) / JOUR) : null;
   };
   const comptes = modele ? compterArticles(modele.articles, opts) : null;
+  // (25 nov.) Les entrées du filtre de l'onglet : les sites PRÉSENTS (la règle commune, src/filtrePlateforme.js, sur les annonces
+  // de chaque article), chacune avec le nombre de SON segment (`compterArticles`, la règle des segments) au téléphone ; le tableau
+  // de l'ordinateur compte ses rangées (`nRangeesSite`, plus bas). Un choix retenu sans entrée ⇒ « Toutes » (jamais un filtre vide).
+  const presenceP = modele ? optionsPlateformes(nombresPlateformes(modele.articles)) : [];
+  const effP = choixEffectif(choixP, presenceP);
+  const siteP = effP === TOUTES ? 'tous' : effP;
+  const filtre = { ...filtreE, site: siteP };
+  const filtreT = { ...filtreT0, site: siteP };
+  const optionsTelP = presenceP.map((o) => { const c = comptes && comptes[o.cle === TOUTES ? 'tous' : o.cle]; return { ...o, n: c && Number.isFinite(c[filtre.etat]) ? c[filtre.etat] : null }; });
   // ── (21 nov., prio-recherche) « À REPUBLIER EN PRIORITÉ » ── LA règle « Dorment » au site Vinted, ses exclusions (vendue,
   // masquée, litige ou retour en cours, compte bloqué ou en pause, compte personnel ou d'achats), son classement. Lecture en
   // cours ⇒ undefined ; ratée ⇒ null (jamais « rien à republier »). Publié pour Aujourd'hui (cet appareil), jamais sur un doute.
@@ -522,8 +536,9 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     filtres: [
       // (22 nov., Julien : « applique un filtre par plateforme, les filtres ne sont pas précis ») « Site », nommé, à côté de
       // Statut, chaque site avec SON nombre de rangées (tous statuts, Ancienneté appliquée) — la même règle que le tableau.
-      ...(sites.length > 1 ? [{ cle: 'site', libelle: tr('tableau.col.site'), valeur: filtreT.site, onChange: (v) => setFiltreT((f) => ({ ...f, site: v, compte: '' })),
-        options: [{ cle: 'tous', libelle: tr('egalite.site.tous'), n: nRangeesSite('tous') }, ...SITES.filter((s) => sites.includes(s)).map((s) => ({ cle: s, libelle: nomSite(s), n: nRangeesSite(s) }))] }] : []),
+      // (25 nov.) Les entrées sont celles du filtre de l'onglet (sites PRÉSENTS, src/filtrePlateforme.js), chacune avec son logo.
+      ...(presenceP.length ? [{ cle: 'site', libelle: tr('tableau.col.site'), valeur: effP, onChange: (v) => { choisirP(v); setFiltreT((f) => ({ ...f, compte: '' })); },
+        options: presenceP.map((o) => { const s = o.cle === TOUTES ? 'tous' : o.cle; return { ...optionTableau(o.cle), n: nRangeesSite(s) }; }) }] : []),
       ...(cpts.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreT.compte || 'tous', onChange: (v) => setFiltreT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
         options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cpts.map((c) => ({ cle: c.cle, libelle: nomCompte(c) }))] }] : []),
       { cle: 'dort', libelle: tr('tableau.filtre.anciennete'), valeur: filtreT.dort, onChange: (v) => { if (v === 'arepublier') { setFiltre((f) => ({ ...f, etat: 'arepublier' })); return; } setFiltreT((f) => ({ ...f, dort: v })); },
@@ -555,7 +570,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   return (
     <>
     <VueAnnonces parMail={modele && Array.isArray(modele.articles) ? modele.articles.filter((a) => a && a.venteMail) : null} priorite={priorite} photoDouble={photoDouble} plusVueDe={plusVueDe} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={logoDuSite} dortDe={dortDe} Photo={(src, o) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>}
-      onCompleter={(sujet) => { try { window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet, num: '', lot: false, at: Date.now() } })); } catch (_) {} }} liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
+      onCompleter={(sujet) => { try { window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet, num: '', lot: false, at: Date.now() } })); } catch (_) {} }} liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} fp={{ options: optionsTelP, valeur: effP, onChange: choisirP }} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
       onRelier={(a) => { const x = a.annonces.find((y) => y.site !== 'vinted'); if (x) { try { window.dispatchEvent(new CustomEvent('vrm:liaison-ouvrir', { detail: { site: NOM_SITE[x.site], id: String(x.id), vue: null } })); } catch (_) {} } }}

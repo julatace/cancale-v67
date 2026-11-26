@@ -18,7 +18,8 @@
 //   majLe         ms de la dernière lecture (undefined : en cours · null : pas su) ; onRafraichir() relance la lecture EXISTANTE
 //   lignes        undefined (lecture) · null (pas su) · [{ cle, titre, sous?, photo?, texte?, statut, plaque?, grise? … }]
 //   statuts       [{ cle, libelle, ton: 'neutre'|'ambre'|'accent' }] — l'ordre du menu ; statutsDefaut [cle] cochés au départ
-//   filtres       [{ cle, libelle, valeur, options: [{ cle, libelle, n? }], onChange }] — les filtres de l'écran (un choix)
+//   filtres       [{ cle, libelle, valeur, options: [{ cle, libelle, n?, icone? }], onChange }] — les filtres de l'écran (un choix ;
+//                 `icone` : le logo d'une plateforme, dans le menu et sur le bouton quand elle est choisie — 25 nov.)
 //   colonnes      [{ cle, libelle, num?, tri?(l), rendu?(l), defaut? (true), titreCourt? }] — 'article' et 'statut' sont posées
 //   triDefaut     { cle, sens: 'asc'|'desc' } — sans : l'ordre reçu (le plus récent d'abord, la règle de l'écran)
 //   actions       [{ cle, libelle, pour?(l) → bool, juger?(lignes) → { ok, raison } }] — « Choisir une action ▾ »
@@ -93,11 +94,11 @@ function CaseMenu({ coche, onChange, libelle, n = null, attrs = null, indisponib
     </label>
   );
 }
-function ChoixMenu({ choisi, onClick, libelle, n = null, attrs = null, indisponible = false, raison = '' }) {
+function ChoixMenu({ choisi, onClick, libelle, n = null, attrs = null, indisponible = false, raison = '', icone = null }) {
   return (
     <button type="button" className="n-tt-choix" role="menuitemradio" aria-checked={choisi ? 'true' : 'false'} aria-disabled={indisponible ? 'true' : undefined} title={raison || undefined}
       onClick={indisponible ? undefined : onClick} {...(attrs || {})}>
-      <span className="n-tt-choix-libelle">{libelle}{raison ? <span className="n-tt-choix-raison">{raison}</span> : null}</span>
+      {icone}<span className="n-tt-choix-libelle">{libelle}{raison ? <span className="n-tt-choix-raison">{raison}</span> : null}</span>
       {n != null ? <span className="n-tt-case-n">{n}</span> : null}
       <span className="n-tt-choix-coche" aria-hidden="true">{choisi ? '✓' : ''}</span>
     </button>
@@ -298,7 +299,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   );
   const corpsFiltre = (f) => (
     <div className="n-tt-pop-liste" role="menu" aria-label={f.libelle}>
-      {f.options.map((o) => <ChoixMenu key={o.cle} choisi={f.valeur === o.cle} libelle={o.libelle} n={o.n != null ? o.n : null} onClick={() => { f.onChange(o.cle); setMenu(''); }} attrs={{ 'data-tt-filtre-choix': f.cle + ':' + o.cle }}/>)}
+      {f.options.map((o) => <ChoixMenu key={o.cle} choisi={f.valeur === o.cle} libelle={o.libelle} icone={o.icone || null} n={o.n != null ? o.n : null} onClick={() => { f.onChange(o.cle); setMenu(''); }} attrs={{ 'data-tt-filtre-choix': f.cle + ':' + o.cle }}/>)}
     </div>
   );
   const libFiltre = (f) => { const o = f.options.find((x) => x.cle === f.valeur); return o && f.options[0] && o.cle !== f.options[0].cle ? o.libelle : f.libelle; };
@@ -320,7 +321,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
       {actions.length && !(ordinateur && cases && !pilote) ? outil('action', A ? A.libelle : tr('tableau.choisirAction'), corpsActions, { actif: !!A, attrs: { 'data-tt-action-choisie': A ? A.cle : '' } }) : null}
       <div className="n-tt-recherche" data-tt-recherche="" ref={refChamp}>{recherche}</div>
       {statuts.length ? outil('statut', nStatuts ? tr('tableau.statutN', { n: nStatuts }) : tr('tableau.statut'), corpsStatut, { icone: ic('filter', 16), actif: nStatuts > 0 }) : null}
-      {filtres.map((f) => outil('filtre:' + f.cle, libFiltre(f), corpsFiltre(f), { actif: f.options[0] && f.valeur !== f.options[0].cle, attrs: { 'data-tt-filtre': f.cle, 'data-tt-filtre-valeur': f.valeur } }))}
+      {filtres.map((f) => outil('filtre:' + f.cle, libFiltre(f), corpsFiltre(f), { icone: (f.options.find((x) => x.cle === f.valeur) || {}).icone || null, actif: f.options[0] && f.valeur !== f.options[0].cle, attrs: { 'data-tt-filtre': f.cle, 'data-tt-filtre-valeur': f.valeur } }))}
       {outilsPlus ? <><span className="n-tt-espace"/>{outilsPlus}</> : null}
     </div>
   );

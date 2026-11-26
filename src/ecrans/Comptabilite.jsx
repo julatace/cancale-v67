@@ -118,6 +118,7 @@ import { indexRecusParTransaction, recuDeLAchat, bilanRecusAchat } from '../../a
 import { etatRetrait, estAVerifier, urgenceTri, GARDE_MAX_J, limiteEstimee } from '../../api/_lib/retrait-colis.js';
 import { DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction, TEXTE_ESTIMEE_DEPASSEE, heureCourte as heureCourteJ } from '../../api/_lib/limite-envoi.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from '../photosArticles.js';
+import { publierPhotosVentes } from '../ventes/photosVentesPub.js';
 import { ResponsiveChatPortal, telFil } from '../ChatPortal.jsx';
 import { installerExtensionIci, estAndroid, pageExtensionsIci } from '../navigateurExtension.js';
 import { enregistrerSourceColis, ouvrirRetrouver, EV_RELIER_COLIS } from '../retrouverColis.js';
@@ -242,7 +243,7 @@ import { listesDesSuivisVinted, liensContredits } from '../memeColis.js';
 import {sourcesDuColis,codeLuDeLigne,verdictCode,codesDesLignes,NOMS_SOURCES,texteVerifie} from '../sourcesRetrait.js';
 import { dateLocale } from '../formatsDate.js';
 import {achatParConversation, regrouperArrivees, temoinsDe, texteDuBrut} from '../../api/_lib/achat-arrive-relais.js';
-import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} from '../retraitPreuves.js';
+import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis, absorberAVerifierParCode} from '../retraitPreuves.js';
 // ⟦← App.jsx #17⟧
 import { statutAVerifier } from '../statutAVerifier.js';
 import { garderSelonAnnules, nombreAnnules, FILTRE_ANNULES } from '../achatsAnnules.js';
@@ -547,6 +548,7 @@ import { bleamDe } from '../reglagesAutoLigne.js';   // (22 nov., intégration f
 import { BoutonTraduire, TraductionAbsente, NoteAcheteurApp, NoteAcheteurAvis } from '../TraduireLocal.jsx';   // (22 nov., intégration finale)
 import { etatChezMoi, publierChezMoi, etatAchatChezMoi } from '../achatChezMoi.js';   // (22 nov., intégration finale)
 import { avecRemboursements, coutAchatNet, enAttenteDe, publierRemboursements, coutFicheNet } from '../coutAchatNet.js';   // (22 nov., intégration finale)
+import { publierAchatsSite } from '../achats/nombresAchatsSites.js';   // (25 nov.) le nombre d'achats Vinted montrés, pour le filtre par plateforme d'Achats
 
 // ⟦← App.jsx #6⟧
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : {ComparaisonComptesVinted,HistoriqueArticle} (était importé en statique)
@@ -8536,6 +8538,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const buysBase = useMemo(() => { const l = avecRemboursements((buys.items || []).filter(o => !acctOffOf(o)), { remb: rembAchatsParTx, txn: etatTxn, montantDe: montantCommandeLu }); publierRemboursements(l); return l; },
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [buys.items, hiddenAccts, blockedAccts, rembAchatsParTx, vMemTxn]);
+  // (25 nov., filtre par plateforme d'Achats) La liste des achats Vinted publie SON nombre (src/achats/nombresAchatsSites.js) :
+  // lue ⇒ ses achats ; en cours ou ratée ⇒ rien (« pas su » n'est jamais « 0 »).
+  const publieAchatsV = only === 'achats' && vueAchats === 'achats';
+  useEffect(() => { if (publieAchatsV) publierAchatsSite('vinted', 'liste', Array.isArray(buys.items) && !buys.error ? buysBase.length : null); }, [publieAchatsV, buys.items, buys.error, buysBase]);
+  useEffect(() => () => { if (publieAchatsV) publierAchatsSite('vinted', 'liste', null); }, [publieAchatsV]);
   // (5 nov.) LES ACHATS, PUBLIÉS JOUR PAR JOUR (`vrm_achats_jours`, synchronisé) et
   // achat par achat (`vrm_achats_releve`, cet appareil) — la règle de « Dépensé »
   // (hors annulés, `achatAnnule`, `montantCommande`, date de l'achat), son
@@ -8983,6 +8990,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       }
       if (garderV.length !== aVerifier.length) aVerifier.splice(0, aVerifier.length, ...garderV);
     }
+    // (26 nov.) Un « à vérifier » au CODE d'un colis compté est ce colis (src/retraitPreuves.js) : une carte, pas deux.
+    { const ab = absorberAVerifierParCode(emailList, aVerifier, { codeDe: codeLigne, suiviDe: suiviDeLigne, fusion: fusionLignesMemeSuivi });
+      if (ab.liste !== emailList) {
+        ab.liste.forEach((t, i) => { const a = emailList[i]; if (a !== t && cmdParColis.has(colisKey(a)) && !cmdParColis.has(colisKey(t))) cmdParColis.set(colisKey(t), cmdParColis.get(colisKey(a))); });
+        emailList.splice(0, emailList.length, ...ab.liste); aVerifier.splice(0, aVerifier.length, ...ab.aVerifier); } }
     // Le transporteur ÉCRIT que le colis repart (statut « retour », 23 oct.).
     // Gardé 30 jours : c'est le temps de vérifier le remboursement.
     for (const t of (trackingRetrait || [])) {
@@ -14245,6 +14257,33 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     })();
     return()=>{stop=true;};
   },[sales.items,listings.items,txnItem,curSub,photosVentesForcees]);
+  // (25 nov., lot ventes-rangee — Julien : « la vignette photo VIDE sur chaque ligne ») LA PHOTO D'UNE VENTE pour les rangées natives :
+  // la liste des ventes de Vinted n'a la photo que d'une vente sur quatre ; les autres ont la leur dans les sources déjà lues
+  // ci-dessus (l'annonce de CETTE transaction, la transaction rangée, le coffre, la fiche N° de CETTE annonce) — par IDENTITÉ,
+  // jamais par titre (§5), la règle de la liste d'avant (`preparerLigneVente`). Calculée une fois par version des sources (annonces
+  // indexées par identifiant : jamais un parcours de toutes les annonces par vente), publiée pour « Terminées » (src/ventes/photosVentesPub.js).
+  const photoVenteParTx = React.useMemo(() => {
+    const m = new Map();
+    const items = Array.isArray(sales.items) ? sales.items : [];
+    if (!items.length) return m;
+    const lst = listings.items || _acctCache.listings?.items || [];
+    const parId = new Map();
+    for (const a of lst) { const id = a && (a.id ?? a.itemId); if (id == null) continue; const k = String(id); const t = parId.get(k); if (t) t.push(a); else parId.set(k, [a]); }
+    for (const o of items) {
+      if (!o || o.transaction_id == null || photoArticle(o)) continue;
+      const tx = String(o.transaction_id);
+      const id = txnItem[tx] ?? o.item_id ?? (o.item && o.item.id);
+      const fiche = txnItem[tx] != null ? (numeros || {})[String(txnItem[tx])] || null : null;
+      let ph = null;
+      try { ph = photosVenteVintedCandidates(o, id != null ? (parId.get(String(id)) || []) : [], txnItem[tx], photosVentesArchivees, photosVentesTransactions, fiche)[0] || null; } catch (_) { ph = null; }
+      if (ph) m.set(tx, ph);
+    }
+    return m;
+  }, [sales.items, listings.items, txnItem, photosVentesArchivees, photosVentesTransactions, numeros]);
+  useEffect(() => { publierPhotosVentes(photoVenteParTx); }, [photoVenteParTx]);
+  useEffect(() => () => publierPhotosVentes(new Map()), []);
+  // La photo d'une vente Vinted : celle de la commande, sinon celle de SES sources (ci-dessus) ; rien ⇒ null (le repli dessiné).
+  const photoVenteNatif = (o) => (o ? (orderPhoto(o) || photoVenteParTx.get(String(o.transaction_id)) || null) : null);
   // ⚠️ Ma journée aussi (revue visuelle du 17 oct.) : sans les emails de suivi,
   // sa tuile « À retirer » comptait les seuls colis vus par Vinted (1) quand
   // l'écran Achats en montrait 2 — la même notion, deux nombres (§11).
@@ -21036,7 +21075,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           } });
       }
       const o = e.o, b = e.b;
-      const photo = o ? orderPhoto(o) : bordPhoto(b);
+      const photo = o ? photoVenteNatif(o) : bordPhoto(b);
       const titre = o ? (o.title || '') : ((b && (b.modele || b.article)) || 'Bordereau');
       const num = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
       const capte = e.txn ? labelsCaptes[e.txn] : null;
@@ -21217,7 +21256,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const prix = x.site === 'vinted' && o && o.price ? montant(o.price, { etrangere: 'ecarter' }) : '';
     return rangeeRoute({ cle, site: x.site, tx, compte: o && o._acc ? accNameOf(o._acc) : '', achat: x.site === 'vinted' ? (o ? achatNatifDe(o) : null) : achatAutreSiteDe({ site: x.site, num: x.num || '', annonce: x.lo ? (x.lo.itemId || null) : null, titre: x.titre || '' }),
       marque: (o && (o.brand_title || o.brand)) || extractBrand(String(x.titre || '')) || '', acheteur: pseudoAcheteur(o), num: x.num || '', titre: x.titre || '',
-      taille: o && typeof o.size_title === 'string' ? o.size_title : '', photo: x.photo && !imgMortes.has(x.photo) ? x.photo : null,
+      taille: o && typeof o.size_title === 'string' ? o.size_title : '', photo: (() => { const ph = x.photo || (x.site === 'vinted' && o ? photoVenteNatif(o) : null); return ph && !imgMortes.has(ph) ? ph : null; })(),
       prix, pourToi: x.site === 'vinted', lues: x.lues || {}, etat: so.t, etatAmbre: so.ambre, transporteur: x.tr && x.tr.nom, transporteurCle: x.tr && x.tr.cle,
       t: [o && o.date, x.v && x.v.date, x.lo && x.lo.date, x.t], suivi: su,
       lienSuivi: su ? trackUrl((x.tr && x.tr.cle) || '', su) : '',
@@ -29243,6 +29282,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       basculer: (cle) => setCochesVentes((c) => basculerCoche(Ltous, c, cle)), basculerRetour: (cle) => setCochesRetours((c) => basculerCoche(Lret, c, cle)),
                       // LE PLEIN : rien touché ⇒ le lot d'office (le PDF préparé d'avance part dans CE toucher) ; une case changée ⇒ SA sélection.
                       imprimer: () => { if (nCochesV + nNR <= 0) return; if (defNV && defNR) { if (nLot + nRetLot > 0) imprimerLot(); else ouvrirLot(); } else imprimerLot(choixNV, { retours: choixNR }); },
+                      // (25 nov., filtre par plateforme) Le lot RESTREINT aux colis montrés : les cases cochées de CES rangées (et les
+                      // retours seulement si le filtre les montre) — la même règle du lot (`resumeLot`, `pleinImprimer`, `imprimerLot`).
+                      parmi: (cles, avecRet) => { const k = new Set((cles || []).map(String)); const c = new Set([...choixNV].filter((x) => k.has(String(x)))); const r = avecRet ? choixNR : new Set();
+                        const nC = resumeLot(Ltous, c).partent, nR = avecRet ? nNR : 0;
+                        return { plein: pleinImprimer({ nC, nR, occupe: !!batchBusy || !!imprBusy, total: c.size + (avecRet ? Lret.length : 0) }), imprimer: () => { if (nC + nR <= 0) return; imprimerLot(c, { retours: r }); } }; },
                       relire: voitSite('vinted') ? () => loadOrders('sold', setSales, true) : null,
                       format: () => setChoixPapier({ puis: null }), choisir: ouvrirLot,
                       scanner: () => setScanOuvert('envoi'), retrouver: () => ouvrirRetrouver('ventes'),

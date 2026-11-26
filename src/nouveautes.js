@@ -28,9 +28,19 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (26 nov., loupe-fondue — captures de Julien : « les couleurs sont moches, c'est mal fondu ») src/styles-recherche.css (fin)
+  { id: 'loupe-fondue', date: '2026-11-26', titre: 'La recherche par N°, plus douce', phrase: 'Cartes arrondies, icônes légères, champ fin.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (26 nov., feuille-retour-jeu — Julien : « change l'affichage du pop up message, ça doit faire mieux, jeu vidéo ») src/capteNotif/FeuilleArrivee.jsx
+  { id: 'retour-comme-un-jeu', date: '2026-11-26', titre: 'Ton retour sur l’app, comme un jeu', phrase: 'Qui écrit, la photo, le message ; « Tout vu » en un toucher.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., favoris-gestes-humains — Julien : « tu dois faire tous les gestes que je fais », « ça doit être humain ») ext. 5.453
   { id: 'favoris-gestes-humains', date: '2026-11-25', titre: 'Favoris : l’extension écrit comme toi', phrase: 'Elle lit, tape lettre à lettre, puis touche Envoyer.', tab: 'favoris', pour: 'tous', mode: 'tous' },
   { id: 'extension-connexion-claire', date: '2026-11-25', titre: 'Connexion de l’extension plus claire', phrase: 'Deux champs, l’œil du mot de passe, un bouton.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (25 nov. soir, filtre-plateformes — Julien : « un filtre avec toutes les plateformes et par plateforme dans les onglets ») docs/passation/2026-11-25-filtre-plateformes.md
+  { id: 'filtre-plateformes', date: '2026-11-25', titre: 'Filtre par plateforme dans chaque onglet', phrase: 'Toutes, ou un seul site : Annonces, Ventes, Achats.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (25 nov., sombre-par-defaut — Julien : « La deuxième couleur est pas mal, mets en mode sombre ») docs/passation/historique-interface-stock.md (fin)
+  { id: 'sombre-par-defaut', date: '2026-11-25', titre: 'VRM s’ouvre en sombre', phrase: 'Le clair reste au choix : Paramètres → Apparence.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (25 nov., ventes-rangee — Julien : « c'est atroce, la mise en page est catastrophique ») docs/passation/2026-11-25-ventes-rangee.md
+  { id: 'ventes-rangee-compacte', date: '2026-11-25', titre: 'Ventes : des lignes compactes avec photo', phrase: 'Photo, prix, un seul état, le transporteur entier : sept ventes par écran.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (25 nov., aujourdhui-moins-texte — Julien : « C'est pas mal mais trop de texte, améliore. ») docs/passation/2026-11-25-aujourdhui-moins-texte.md
   { id: 'aujourdhui-moins-texte', date: '2026-11-25', titre: 'Aujourd’hui : deux fois moins de texte', phrase: 'Un titre court, un chiffre ; le détail derrière ›.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., achats-retours-design — Julien : « tu peux améliorer ce design ») docs/passation/2026-11-25-achats-retours-design.md
