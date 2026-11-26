@@ -108,6 +108,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'favoris-ancien', date: '2026-11-24', titre: 'Favoris : plus de « trop ancien » à tort', phrase: 'Les notifications sont lues jusqu’au bout avant de sauter un favori.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (24 nov., style-graphite — Julien : « un peu plus foncé en gris […] améliore tous les boutons […] change de style pour l'iPhone ») docs/passation/2026-11-24-style-graphite.md
   { id: 'styles-a-essayer', date: '2026-11-24', titre: 'Onze styles à essayer, dont Monochrome', phrase: 'Paramètres → Apparence → Style : touche, c’est appliqué.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot rentabilite-source) docs/passation/2026-11-23-rentabilite-source.md
+  { id: 'rentabilite-source', date: '2026-11-23', titre: 'Rentabilité par source d’achat', phrase: 'Bénéfice moyen, taux de revente et délai, par lieu d’achat.', tab: 'stats', pour: 'tous', mode: 'tous' },
   // (23 nov., lot appareils-connectes) docs/passation/2026-11-23-appareils-connectes.md
   { id: 'appareils-extension', date: '2026-11-23', titre: 'Appareils connectés : tes navigateurs avec l’extension', phrase: 'Chaque navigateur, sa version, sa dernière lecture ; déconnexion partout.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (23 nov., lot scan-achat — Julien : « fais tout parfaitement ») docs/passation/2026-11-23-scan-achat.md
