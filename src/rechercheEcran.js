@@ -294,3 +294,16 @@ export function requeteEmails(q) {
   const t = str(q).normalize('NFC').replace(/[^\p{L}\p{N} @._'’-]+/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
   return t.length >= 2 ? t : '';
 }
+
+// ── (26 nov., Julien : « la recherche se met automatiquement, c'est bizarre ») ──
+// Sur iPhone, l'app laissée en arrière-plan revient EXACTEMENT comme on l'a laissée, loupe ouverte
+// comprise, même des heures plus tard : à l'ouverture, Julien retrouvait « Tout sur le N°262 » qu'il n'avait
+// pas demandé. Même règle que la recherche d'un écran (src/repriseSynchro.js, DUREE_RECHERCHE) : la loupe
+// ne revient que si l'app a été quittée il y a MOINS de 10 min ; au-delà, elle est fermée et vidée au retour.
+export const LOUPE_RETOUR_MS = 10 * 60000;
+export function loupeAFermerAuRetour({ ouverte, cacheeA, maintenant = Date.now() } = {}) {
+  if (!ouverte) return false;
+  const t = Number(cacheeA);
+  if (!Number.isFinite(t) || t <= 0) return false;
+  return maintenant - t >= LOUPE_RETOUR_MS;
+}

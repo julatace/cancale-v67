@@ -947,7 +947,7 @@ import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/
 import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat, suggestions as suggestionsRecherche, montantCherche, reconnaitreRequete, GENRES_REQUETE, GROUPES_LOUPE, IDENTITES_EXACTES, phraseNonLues } from "./rechercheUnique.js";
 // (6 nov., v36) La loupe universelle : les adaptateurs de l'écran (src/rechercheEcran.js).
 import { Vivant as RechercheVivante } from "./LoupeVivante.jsx";
-import { FIL_RECHERCHE, poserTexteRecherche, piloterEmails, memoSur, annoncesDesLignes, numerosDesVentes, facturesPourRecherche, emailsDeLaReponse, motPastille, MOTIFS as MOTIFS_RECHERCHE, lireRecents, noterRecent, oublierRecents, demanderOuverture, prendreDemande, requeteEmails, ventesAutresPourRecherche, messagesPourRecherche, messagesAutresSitesPourRecherche, voisinClavier } from "./rechercheEcran.js";
+import { FIL_RECHERCHE, poserTexteRecherche, piloterEmails, memoSur, annoncesDesLignes, numerosDesVentes, facturesPourRecherche, emailsDeLaReponse, motPastille, MOTIFS as MOTIFS_RECHERCHE, lireRecents, noterRecent, oublierRecents, demanderOuverture, prendreDemande, requeteEmails, ventesAutresPourRecherche, messagesPourRecherche, messagesAutresSitesPourRecherche, voisinClavier, loupeAFermerAuRetour } from "./rechercheEcran.js";
 import { ligneEmail, siteExpediteur, monogramme } from "./boiteEmails.js";
 import { expediteurLisible } from "./journalEmail.js";
 import { requeteJsonBornee } from "./requeteJsonBornee.js";
@@ -35117,6 +35117,9 @@ function AppCoeur() {
   const ouvrirRecherche=React.useCallback(()=>{ flushSync(()=>setGsOpen(true)); const el=gsChampRef.current; if(el){ try{ el.focus({preventScroll:true}); }catch(_){} } },[]);
   // (22 nov. soir, maquettes de Julien) La loupe ronde de l'en-tête d'Aujourd'hui (ordinateur) ouvre LA recherche de la coque.
   useEffect(()=>{ const f=()=>ouvrirRecherche(); window.addEventListener('vrm:recherche-ouvrir',f); return ()=>window.removeEventListener('vrm:recherche-ouvrir',f); },[ouvrirRecherche]);
+  // (26 nov.) L'app revenue au premier plan après 10 min ou plus : la loupe laissée ouverte est fermée et vidée (src/rechercheEcran.js, loupeAFermerAuRetour).
+  const gsOpenRef=useRef(gsOpen); gsOpenRef.current=gsOpen;
+  useEffect(()=>{ let cacheeA=0; const f=()=>{ if(document.visibilityState==='hidden'){ cacheeA=Date.now(); return; } if(loupeAFermerAuRetour({ ouverte: gsOpenRef.current, cacheeA })){ setGsQ(''); fermerRecherche(); } cacheeA=0; }; document.addEventListener('visibilitychange',f); window.addEventListener('pagehide',f); return ()=>{ document.removeEventListener('visibilitychange',f); window.removeEventListener('pagehide',f); }; },[fermerRecherche]);
   React.useLayoutEffect(()=>{ if(!gsOpen) return; const h=document.querySelector('.vrm-app-header'); if(h){ const b=h.getBoundingClientRect().bottom; if(b>0) setHautRecherche(Math.round(b)); } },[gsOpen]);
   // Échap ou un toucher hors du champ et du panneau referment ; rien d'autre ne
   // bouge (la page derrière garde sa place). Une feuille ouverte par-dessus (un
