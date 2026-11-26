@@ -158,6 +158,7 @@ import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
 import { VAPID_PUBLIC_KEY } from "../vapid.js";
 // ⟦← App.jsx #13⟧
 import TesDonnees from '../composants/TesDonnees.jsx';
+import NavigateursExtension from '../NavigateursExtension.jsx';   // (23 nov.) les navigateurs de l'extension
 import { deconnecterPartout, deconnecterAutres, texteConfirmationPartout, ligneJournal, filtrerJournal, comptesDuJournal, FILTRES_TYPE } from '../securiteCompte.js';
 // ⟦← App.jsx #14⟧
 import { DISCORD_ERREURS } from "../communaute/discordErreurs.js";
@@ -3213,6 +3214,7 @@ function AppareilsConnectes() {
           )}
         </>
       )}
+      <NavigateursExtension owner={(AUTH.user && AUTH.user.id) || ''} lireTout={lireTout} quand={quandCourt}/>
       <div style={{ marginTop: 12, textAlign: 'center' }}>
         <button type="button" className="vrm-lien-action" data-deconnexion-partout="" onClick={seDeconnecterPartout} style={{ minHeight: 44, border: 0, background: 'transparent', font: 'inherit', fontSize: 15, padding: '0 12px', cursor: 'pointer' }}>Se déconnecter partout</button>
       </div>

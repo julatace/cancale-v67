@@ -106,6 +106,7 @@ const COUPLES = {
   'src/alertesSeuils.js|entreprendre.service-public.gouv.fr': ['lien', LIEN + ' — la source officielle d’un seuil'],
   'src/alertesSeuils.js|eur-lex.europa.eu': ['lien', LIEN + ' — la source officielle d’un seuil (DAC7)'],
   'src/deuxComptes.js|www.vinted.fr': ['lien', LIEN + ' — l’annonce sur Vinted'],
+  'src/litigesTousSites.js|www.vinted.fr': ['lien', LIEN + ' — « Litiges et retours » : la conversation ou la transaction d’un retour d’achat, ouverte dehors (23 nov., lot A)'],
   'src/ouVendre.js|www.vinted.fr': ['lien', LIEN + ' — les pages d’aide de Vinted'],
   'src/ouVendre.js|www.leboncoin.fr': ['lien', LIEN + ' — les pages d’aide de Leboncoin'],
   'src/parcoursArrivee.js|www.leboncoin.fr': ['lien', LIEN + ' — « Mes annonces » sur le site'],
