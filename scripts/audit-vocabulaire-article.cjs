@@ -417,8 +417,8 @@ const MUTATIONS = [
   ['src/profilVendeur.js', 'la forme « article » redit paire', "Ce: 'Cet article',", "Ce: 'Cette paire',"],
   ['src/profilVendeur.js', 'sans source ⇒ article (Sneakers changé)', "const v = sourceVend ? sourceVend() : 'sneakers';", "const v = sourceVend ? sourceVend() : 'autre';"],
   ['src/App.jsx', 'la source n’est plus posée', 'poserSourceVend(() => vendActuel());', ''],
-  ['src/App.jsx', 'un texte remis en « paire »', '`${motsVendeur().Aucune} à baisser`', "'Aucune paire à baisser'"],
-  ['src/App.jsx', 'un texte remis en « paire » (JSX)', '>Régler par {motsVendeur().nom}, voir l’historique ›</button>', '>Régler par paire, voir l’historique ›</button>'],
+  ['src/ecrans/Comptabilite.jsx', 'un texte remis en « paire »', '`${motsVendeur().Aucune} à baisser`', "'Aucune paire à baisser'"],
+  ['src/ecrans/Comptabilite.jsx', 'un texte remis en « paire » (JSX)', '>Régler par {motsVendeur().nom}, voir l’historique ›</button>', '>Régler par paire, voir l’historique ›</button>'],
   ['src/aTrancher.js', 'une règle pure remise en « paire »', "get 'numeros-double'() { return `N° portés par deux ${motsVendeur().noms}`; },", "'numeros-double': 'N° portés par deux paires',"],
   ['src/composants/AideEcran.jsx', 'l’aide ne passe plus par phraseVendeur', 'pourVendeur(phraseVendeur(r, vend), vend)', 'pourVendeur(r, vend)'],
   ['src/profilVendeur.js', 'une phrase d’aide sans version article', "  'Range chaque paire là où VRM l’indique.': 'Range chaque article là où VRM l’indique.',\n", ''],
@@ -460,7 +460,9 @@ const MUTATIONS = [
   }
   // --prouve : chaque mutation, sur une copie de l'arbre, doit rendre ROUGE.
   let attrapees = 0;
-  for (const [f, quoi, de, vers] of MUTATIONS) {
+  // `VOCAB_MUT=<regex>` : seulement les mutations dont le nom correspond (relancer celles qu'on vient d'écrire).
+  const choisies = process.env.VOCAB_MUT ? MUTATIONS.filter(([, quoi]) => new RegExp(process.env.VOCAB_MUT).test(quoi)) : MUTATIONS;
+  for (const [f, quoi, de, vers] of choisies) {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vocab-mut-'));
     for (const d of ['src', 'api', 'vinted-sync-extension']) fs.cpSync(path.join(RACINE, d), path.join(tmp, d), { recursive: true });
     fs.symlinkSync(path.join(RACINE, 'node_modules'), path.join(tmp, 'node_modules'));
@@ -474,6 +476,6 @@ const MUTATIONS = [
     if (ko) attrapees++;
     fs.rmSync(tmp, { recursive: true, force: true });
   }
-  console.log(`${attrapees}/${MUTATIONS.length} mutations attrapées`);
-  process.exit(attrapees === MUTATIONS.length ? 0 : 1);
+  console.log(`${attrapees}/${choisies.length} mutations attrapées`);
+  process.exit(attrapees === choisies.length ? 0 : 1);
 })();
