@@ -952,6 +952,7 @@ import { ligneEmail, siteExpediteur, monogramme } from "./boiteEmails.js";
 import { expediteurLisible } from "./journalEmail.js";
 import { requeteJsonBornee } from "./requeteJsonBornee.js";
 // ⟦→ ecrans/Comptabilite.jsx #65⟧
+import { pairesDuScan } from "./scanUniversel.js";   // (24 nov., lot scanner-universel) la source des paires du scanner
 import { enregistrerSourceColis, ouvrirRetrouver, sourcePrincipalePresente, EV_RETROUVER, EV_RETROUVER_CODE, EV_RELIER_COLIS, demanderRelierColis, scannerRetrouverOuvert } from "./retrouverColis.js";
 import { lireCodeColis } from "./scanColis.js";
 // ⟦→ ecrans/Comptabilite.jsx #66⟧
@@ -16616,7 +16617,7 @@ const DICTEE_OK = typeof window !== 'undefined' && typeof (window.SpeechRecognit
 function BoutonScanRecherche() {
   return (
     <Natif.BoutonIcone libelle={tr('v2.scanner')} icone={<Icon name="scan" size={20}/>} className="vrm-micro" onClick={(e) => { e.preventDefault(); ouvrirRetrouver('loupe'); }}
-      attrs={{ 'data-recherche-scanner': '', 'data-geste-disque': 'scanner' }}/>
+      attrs={{ 'data-recherche-scanner': '', 'data-geste-disque': 'scanner', 'data-scan-universel': 'loupe' }}/>
   );
 }
 function BoutonPhotoRecherche() {
@@ -17902,12 +17903,13 @@ function HoteRetrouver({ onAttendreSources, onChercher }) {
   const [ouvert, setOuvert] = useState(false);
   const [code0, setCode0] = useState('');
   const [arrivee, setArrivee] = useState(false);   // (20 nov., lot arrivee-scan) le scanner de l'arrivée (achats seulement)
+  const [depuis, setDepuis] = useState('');        // (24 nov., lot scanner-universel) d'où il est ouvert (entrée universelle ⇒ ouverture directe)
   const ref = useRef({}); ref.current = { onAttendreSources, onChercher };
   const attendre = React.useCallback(() => { try { if (ref.current.onAttendreSources) ref.current.onAttendreSources(); } catch (_) {} }, []);
   const chercher = React.useCallback((n) => { try { if (ref.current.onChercher) ref.current.onChercher(n); } catch (_) {} }, []);
   useEffect(() => {
     // (16 nov., lot scan-achat) Un code DÉJÀ lu (la douchette) : le scanner s'ouvre sur son résultat ; déjà ouvert ⇒ il le résout.
-    const o = (ev) => { const c = (ev && ev.detail && ev.detail.code) || ''; setArrivee(!!(ev && ev.detail && ev.detail.mode === 'arrivee')); if (c && scannerRetrouverOuvert()) { try { window.dispatchEvent(new CustomEvent(EV_RETROUVER_CODE, { detail: { code: c } })); } catch (_) {} return; } setCode0(c); setOuvert(true); if (!sourcePrincipalePresente()) attendre(); };
+    const o = (ev) => { const c = (ev && ev.detail && ev.detail.code) || ''; setArrivee(!!(ev && ev.detail && ev.detail.mode === 'arrivee')); setDepuis(String((ev && ev.detail && ev.detail.depuis) || '')); if (c && scannerRetrouverOuvert()) { try { window.dispatchEvent(new CustomEvent(EV_RETROUVER_CODE, { detail: { code: c } })); } catch (_) {} return; } setCode0(c); setOuvert(true); if (!sourcePrincipalePresente()) attendre(); };
     window.addEventListener(EV_RETROUVER, o); return () => window.removeEventListener(EV_RETROUVER, o);
   }, [attendre]);
   if (!ouvert) return null;
@@ -17918,7 +17920,7 @@ function HoteRetrouver({ onAttendreSources, onChercher }) {
   // (19 nov., Julien redemande : « c'est à toi de le faire avec le code de retrait ») Plus de « Relier à un achat » depuis le
   // scanner : un colis inconnu se dit (transporteur, n°, « Chercher »), il ne se relie plus à la main. Le lien vient de
   // l'identité (n° de suivi lu par l'extension, conversation, code), docs/passation/2026-11-19-colis-achat-auto.md.
-  return <ScannerRetrouver key={arrivee ? 'arrivee' : 'retrouver'} Photo={PhotoVinted} onFermer={fermer} onChercher={chercher} onAttendreSources={attendre} codeInitial={code0} zIndex={Z_CONFIRMATION - 2} arrivee={arrivee} onArrivee={versArrivee} indexHorsLigne={lireIndexArrivee}><FermeAuRetour fermer={fermer}/></ScannerRetrouver>;
+  return <ScannerRetrouver key={arrivee ? 'arrivee' : 'retrouver'} Photo={PhotoVinted} onFermer={fermer} onChercher={chercher} onAttendreSources={attendre} codeInitial={code0} zIndex={Z_CONFIRMATION - 2} arrivee={arrivee} onArrivee={versArrivee} indexHorsLigne={lireIndexArrivee} depuis={depuis}><FermeAuRetour fermer={fermer}/></ScannerRetrouver>;
 }
 const poserCible = (c, tab) => {
   // (11 nov., lot DJ3) Une cible de colis À RETIRER vit dans Achats (src/colisPlace.js).
@@ -18743,6 +18745,9 @@ function TeteNative({ tab, setTab, ordi, titre, nonLus = 0, rechercheOuverte = f
   // La pastille de la bulle est ancrée DANS la bulle (natif.css) : elle ne chevauche plus la photo.
   const nMsg = Number(nonLus) > 0 ? Number(nonLus) : 0;
   const actions = ordi ? null : (<>
+    {/* (24 nov., lot scanner-universel) LE SCANNER, dans la barre du haut de chaque écran : un code lu ⇒ la vente, le colis,
+        l'achat ou la paire (src/scanUniversel.js), ouvert directement. */}
+    <Natif.BoutonIcone libelle={tr('scan.u.bouton')} icone={<Icon name="scan" size={22}/>} onClick={() => ouvrirRetrouver('tete')} attrs={{ 'data-n-tete-scanner': '', 'data-scan-universel': 'tete' }}/>
     {rechercheOuverte || sansRecherche ? null : <Natif.BoutonIcone libelle={tr('menu.chercher')} icone={<Icon name="search" size={22}/>} onClick={ouvrirRecherche} attrs={{ 'data-recherche-loupe': '', 'data-recherche-zone': '', 'data-n-tete-loupe': '', ...(gestesLoupe || {}) }}/>}
     <Natif.ActionsCoque ecran libelleCompte={tr('menu.ouvrirCompte')} sansCompte={tab === 'menu'} onPlus={() => { revenirSurOnglet(); if (setTab) setTab('menu'); }} pointPlus={!!(etat && etat.ton === 'ambre')}
       messages={tab === 'messages' ? null : { n: nMsg || undefined, libelle: tr('nav.messages'), libellePastille: nMsg ? `${tr('nav.messages')} · ${nMsg}` : '', icone: <Icon name="chat" size={24}/>, onOuvrir: () => { revenirSurOnglet(); ouvrirEntree(ONGLET_MESSAGES, setTab); } }}
@@ -35782,6 +35787,15 @@ function AppCoeur() {
     return { pret: true, enregistrements: E, manques: [] };
   };
   useEffect(() => enregistrerSourceColis('leboncoin', () => lbcSourceRef.current()), []);
+  // (24 nov., lot scanner-universel) LA SOURCE DES PAIRES du scanner universel : un enregistrement par N° SERVI (fiches
+  // numérotées, fiches rangées à l'arrivée, pool append-only), par SA clé (`cleNum`) — src/scanUniversel.js `pairesDuScan`.
+  // Elle donne aussi les RÈGLES du N° de l'app (`cleNum`, la lettre d'archive de la migration 013) : un « 230 » de carton
+  // est proposé avec « B230 » quand les deux existent, jamais deviné. Nuage pas lu ⇒ pas prête (« pas lu » n'est pas « rien »).
+  useEffect(() => enregistrerSourceColis('paires', () => {
+    const regles = { cleNum, archive: archiveNumeros() };
+    if (!isCloudReady()) return { pret: false, enregistrements: [], manques: [], regles };
+    return { pret: true, regles, manques: [], enregistrements: pairesDuScan({ fiches: load('vinted_annonce_numeros', {}) || {}, neuves: load('vrm_fiches_neuves', {}) || {}, pool: load('vinted_used_numeros', null), cleNum }) };
+  }), []);
   // CA eBay pour le Tableau de bord / le Collectif : la somme des commandes
   // PAYÉES captées (`caEbayPayees`, la MÊME règle que la carte « payées » de
   // l'écran eBay, §11). `null` tant qu'aucune vente payée n'est captée — le
@@ -38976,6 +38990,10 @@ function AppCoeur() {
           {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
           {((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}
           <BoutonPresentation/>
+          {/* (24 nov., lot scanner-universel) Le scanner universel, à l'ordinateur aussi (webcam ou douchette) : sur chaque écran. */}
+          <button className="vrm-hbtn" type="button" data-n-tete-scanner="" data-scan-universel="tete" aria-label={tr('scan.u.bouton')} title={tr('scan.u.bouton')} onClick={() => ouvrirRetrouver('tete')}>
+            <Icon name="scan" size={21}/>
+          </button>
         </>}/> : null}
       <PastillePresentation/>
       {/* (20 nov., Julien : « même les écrans de chargement sont atroces ») Plus de barre bleue de progression en haut : elle
@@ -39094,7 +39112,7 @@ function AppCoeur() {
         {ordi && !troisVolets && tab !== 'ventes' && tab !== 'journee' && <BarreHaut champ={null} ronds={<RondsBarreHaut onChercher={ouvrirRecherche}/>} poserSlot={setSlotBarre}/>}
         {/* (19 nov., intégration) Trois volets (Ventes, Annonces natifs) : pas de barre du haut, mais la recherche (⌘K, « / »,
             « Tout sur le N° ») s'ouvre quand même — son panneau, gardé comme une feuille (banc garde-ecrans P5 à 1512). */}
-        {ordi && gsOpen ? <div className="vrm-recherche vrm-recherche-volets" data-recherche-zone="" data-recherche-ouverte="1" style={{ position: 'fixed', top: 12, left: 'calc(var(--n-l-laterale, 240px) + 24px)', right: 24, zIndex: 18500 }}><label className="vrm-barre-recherche" data-barre-recherche=""><Icon name="search" size={18}/>{champRecherche(false)}</label>{panneauRecherche}</div> : null}
+        {ordi && gsOpen ? <div className="vrm-recherche vrm-recherche-volets" data-recherche-zone="" data-recherche-ouverte="1" style={{ position: 'fixed', top: 12, left: 'calc(var(--n-l-laterale, 240px) + 24px)', right: 24, zIndex: 18500 }}><label className="vrm-barre-recherche" data-barre-recherche=""><Icon name="search" size={18}/>{champRecherche(false)}<BoutonScanRecherche/></label>{panneauRecherche}</div> : null}
         <RepriseRetenue tab={tab} compteChoisi={!!compteSel&&compteSel!=='*'} effacerCompte={()=>setCompteSel('')}/>
         <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <CibleNotif tab={tab} sub={platSub}/>
