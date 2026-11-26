@@ -11,6 +11,10 @@
 //     /aide/videos/<id>.mp4 ; la requête .mp4 part (et seulement celle de cette vidéo) ;
 //     le fichier servi est un MP4 ≤ 1,5 Mo, sa piste .vtt existe ;
 //  D. le colis hors onglet : `vrm:aide` { ecran: 'colis' } ouvre la feuille sur « Retirer un colis ».
+//  (17 nov., lot aide-videos) E. avant le toucher, LA réponse de la vidéo est écrite au-dessus ;
+//     au toucher : 5 pistes de sous-titres (fr en es it de), « Plein écran » (44 px), et le RETOUR
+//     ferme la vidéo sans fermer la feuille ; F. la recherche « bordereau » montre la vidéo de
+//     Ventes ; G. 1512 px en sombre : la feuille et la réponse (captures).
 // `BANC_PORT` (défaut : au hasard 22000-22499), `BANC_DIST` (défaut dist/), `BANC_CAPTURES=dossier`,
 // `BANC_ECRANS=journee,ventes` (quelques écrans seulement).
 // `BANC_MUTATION=` (le JS ou la page servis sont réécrits, la règle doit rougir) :
@@ -58,9 +62,10 @@ const srv = http.createServer((q, r) => {
 });
 srv.on('error', (e) => { console.log(`  ❌ le port ${PORT} est pris (${e.code}) — BANC_PORT=…`); process.exit(1); });
 
-async function ouvrir(nav, tab) {
+async function ouvrir(nav, tab, { large = false, sombre = false } = {}) {
   const m = monde();
-  const ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, locale: 'fr-FR', timezoneId: 'Europe/Paris', serviceWorkers: 'block' });
+  const ctx = await nav.newContext({ ...(large ? { viewport: { width: 1512, height: 950 } } : { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }), colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris', serviceWorkers: 'block' });
+  if (sombre) await ctx.addInitScript(() => { try { localStorage.setItem('vinted_dark', 'true'); } catch (_) {} });
   await ctx.clock.install({ time: new Date(m.maintenant) });
   await servirBase(ctx, m);
   const session = { access_token: m.jeton, refresh_token: 'r', expires_at: Date.parse(m.maintenant) + 864e5, user: { id: m.uid, email: m.email } };
@@ -109,6 +114,8 @@ const videos = (pg) => pg.evaluate(() => [...document.querySelectorAll('video')]
           dit(avant.length === 0, `${tab} : feuille ouverte, aucune vidéo ni piste demandée avant le toucher`, avant.map((r) => r.u).join(', '));
           dit((await videos(pg)).length === 0, `${tab} : feuille ouverte, aucun <video> avant le toucher`);
           if (!tuiles.length) return;
+          const rep0 = await feuille.locator(`[data-aide-video-reponse="${tuiles[0]}"]`).first().innerText().catch(() => '');
+          dit(rep0.trim().length > 20, `${tab} : la réponse est écrite au-dessus de « Regarder » (sans regarder)`, rep0);
           const n0 = requetes.length;
           await feuille.locator(`[data-aide-video="${tuiles[0]}"]`).first().tap();
           await pg.locator(`[data-aide-video-lecteur="${tuiles[0]}"] video`).first().waitFor({ timeout: 10000 });
@@ -126,6 +133,9 @@ const videos = (pg) => pg.evaluate(() => [...document.querySelectorAll('video')]
           dit(v.src === `/aide/videos/${tuiles[0]}.mp4`, `${tab} : le lecteur lit /aide/videos/${tuiles[0]}.mp4`, v.src);
           dit(v.muted && v.inline && v.controls, `${tab} : sans son, en ligne, avec ses commandes`);
           dit((v.pistes || []).includes(`/aide/videos/${tuiles[0]}.vtt`), `${tab} : piste de sous-titres .vtt`);
+          dit(['en', 'es', 'it', 'de'].every((l) => (v.pistes || []).includes(`/aide/videos/${tuiles[0]}.${l}.vtt`) && fs.existsSync(path.join(DIST, 'aide', 'videos', `${tuiles[0]}.${l}.vtt`))), `${tab} : sous-titres en 5 langues (fr en es it de), fichiers servis`, (v.pistes || []).join(', '));
+          const plein = await pg.locator('[data-aide-video-plein]').first().boundingBox().catch(() => null);
+          dit(!!plein && plein.height >= 44, `${tab} : « Plein écran » au doigt (≥ 44 px)`, JSON.stringify(plein));
           const apres = requetes.slice(n0).filter((r) => /\.mp4$/.test(r.u));
           dit(apres.length > 0 && apres.every((r) => r.u === `/aide/videos/${tuiles[0]}.mp4`), `${tab} : au toucher, la requête part — celle de CETTE vidéo seulement`, apres.map((r) => r.u).join(', ') || 'aucune');
           const fichier = path.join(DIST, 'aide', 'videos', `${tuiles[0]}.mp4`);
@@ -134,6 +144,9 @@ const videos = (pg) => pg.evaluate(() => [...document.querySelectorAll('video')]
           dit(taille > 0 && taille <= POIDS_MAX && tete === 'ftyp', `${tab} : le fichier est un MP4 ≤ 1,5 Mo`, `${taille} octets`);
           dit(fs.existsSync(path.join(DIST, 'aide', 'videos', `${tuiles[0]}.vtt`)) && fs.existsSync(path.join(DIST, 'aide', 'videos', `${tuiles[0]}.jpg`)), `${tab} : sa piste .vtt et son aperçu .jpg existent`);
           if (CAPTURES) { fs.mkdirSync(CAPTURES, { recursive: true }); await pg.screenshot({ path: path.join(CAPTURES, `${tab}-lecteur.png`) }); }
+          await pg.goBack().catch(() => {});
+          await pg.waitForTimeout(700);
+          dit(!(await pg.locator('[data-aide-video-lecteur]').count()) && (await pg.locator(`[data-aide-feuille="${cle}"]`).count()) > 0, `${tab} : le retour ferme la vidéo, la feuille reste ouverte`);
           dit(!erreurs.length, `${tab} : aucune erreur de page`, erreurs.join(' | '));
         } finally { await ctx.close(); }
       });
@@ -149,6 +162,35 @@ const videos = (pg) => pg.evaluate(() => [...document.querySelectorAll('video')]
         const tuiles = await feuille.locator('[data-aide-video]').evaluateAll((l) => l.map((e) => e.getAttribute('data-aide-video')));
         dit(tuiles[0] === 'colis', 'colis : la feuille propose d\'abord « Retirer un colis »', tuiles.join(', '));
         dit(!requetes.some((r) => /\.mp4$/.test(r.u)), 'colis : rien de lu avant le toucher');
+      } finally { await ctx.close(); }
+    });
+    // F. La recherche par mots trouve la vidéo d'un autre écran.
+    console.log('· recherche');
+    await essaie('recherche', async () => {
+      const { ctx, pg } = await ouvrir(nav, 'achats');
+      try {
+        await pg.locator('[data-aide-ouvrir="achats"]').first().tap();
+        const feuille = pg.locator('[data-aide-feuille="achats"]').first(); await feuille.waitFor({ timeout: 15000 });
+        await feuille.locator('[data-aide-champ]').fill('bordereau');
+        await pg.waitForTimeout(500);
+        const t = await feuille.locator('[data-aide-video]').evaluateAll((l) => l.map((e) => e.getAttribute('data-aide-video')));
+        dit(t.includes('ventes') && !t.includes('journee'), 'recherche « bordereau » : la vidéo « Imprimer tes bordereaux » (Ventes), pas une autre', t.join(', '));
+        if (CAPTURES) await pg.screenshot({ path: path.join(CAPTURES, 'recherche-bordereau.png') });
+      } finally { await ctx.close(); }
+    });
+    // G. Grand écran, sombre : la feuille de Ventes et sa réponse.
+    console.log('· 1512 sombre');
+    await essaie('1512 sombre', async () => {
+      const { ctx, pg } = await ouvrir(nav, 'ventes', { large: true, sombre: true });
+      try {
+        await pg.locator('[data-aide-ouvrir="ventes"]').first().click();
+        const feuille = pg.locator('[data-aide-feuille="ventes"]').first(); await feuille.waitFor({ timeout: 15000 });
+        const r = await feuille.locator('[data-aide-video-reponse="ventes"]').first().innerText().catch(() => '');
+        dit(r.trim().length > 20, '1512 sombre : la réponse de Ventes est écrite', r);
+        await pg.waitForTimeout(600);
+        if (CAPTURES) await pg.screenshot({ path: path.join(CAPTURES, 'ventes-1512-sombre.png') });
+        const sw = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        dit(sw <= 1, '1512 sombre : aucun débordement horizontal', String(sw));
       } finally { await ctx.close(); }
     });
   } finally { await nav.close(); srv.close(); }

@@ -52,51 +52,55 @@ const SCENARIOS = {
     await f.jouer(2.0); f.cle('geste');
     await finir(f, 1.0);
   },
-  // Ventes : « À expédier » → Tout imprimer → l'aperçu, le N° tamponné → Imprimer.
+  // Ventes (16 nov., refait sur l'écran actuel) : les colis à envoyer cochés → « Imprimer les N
+  // bordereaux » → l'imprimante choisie UNE fois → le PDF se prépare, N° tamponné.
+  // ⚠️ Le lecteur PDF de Chromium sans écran fait TOMBER la page : le cadre du PDF n'est pas
+  //    chargé pendant le tournage (rien d'autre ne change), la vidéo s'arrête sur la préparation.
   async ventes(f) {
+    await f.app.evaluate(() => {
+      const sa = Element.prototype.setAttribute;
+      Element.prototype.setAttribute = function (n, v) { if (this.tagName === 'IFRAME' && n === 'src' && /^blob:/.test(String(v))) return; return sa.call(this, n, v); };
+      const d = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'src');
+      Object.defineProperty(HTMLIFrameElement.prototype, 'src', { get: d.get, set(v) { if (/^blob:/.test(String(v))) return; d.set.call(this, v); }, configurable: true });
+    });
     await debut(f, 'Ventes : en haut, ce qui part.', 'Les colis à envoyer, de tous tes sites.');
-    await f.viser('[data-lot-ouvrir]', { zoom: 1.38, dur: 1.0, dy: 140 });
+    await f.viser('[data-imprimer-prets]', { zoom: 1.3, dur: 1.0, dy: -160 });
     await f.jouer(1.6); f.cle('plan');
-    f.titre('Tout imprimer, d’un geste.', { duree: 3.0 });
-    await f.toucher('[data-lot-ouvrir]', { apres: 0.4 });
-    await f.attendreQue('[data-lot-section="partent"]', 4);
+    f.titre('Coche ce qui part.', { sous: 'Le N° et la place de chaque paire.', duree: 3.6 });
+    await f.viser('texte:Couloir', { zoom: 1.45, dur: 1.0, dy: -60 });
+    await f.jouer(2.0); f.cle('coches');
+    f.titre('Un geste : imprimer.', { duree: 2.8 });
+    await f.viser('[data-imprimer-prets]', { zoom: 1.38, dur: 0.8 });
+    await f.toucher('[data-imprimer-prets]', { avant: 0.4, apres: 0.5 });
+    await f.attendreQue('[data-impr-papier-choix="normale"]', 4);
+    f.titre('Ton imprimante, une seule fois.', { sous: 'VRM la garde pour la suite.', duree: 3.4 });
     f.repos_(0.8);
-    await f.jouer(1.4); f.cle('feuille');
-    f.titre('Coche ce qui part.', { sous: 'L’aperçu montre le N° de chaque paire.', duree: 4.0 });
-    await f.defilerVers('[data-lot-section="apercu"]', { marge: 80, dur: 0.9 });
-    await f.viser('[data-lot-apercu="81001"]', { zoom: 1.45, zmax: 1.45, dur: 1.1 });
-    await f.jouer(1.8); f.cle('apercu-lot');
-    f.repos_(0.8); await f.jouer(0.3);
-    await f.toucher('texte:Imprimer (2)', { avant: 0.4, apres: 0.4 });
-    await f.attendreQue('[data-placeur-tampon="pret"]', 6);
-    f.titre('Le N° est tamponné sur le bordereau.', { sous: 'Tu emballes la bonne paire, sans hésiter.', duree: 4.6 });
-    await f.jouer(0.3);
-    await f.viser('[data-tampon-scene]', { zoom: 1.38, dur: 1.1, part: [0, 0, 1, 0.45] });
-    await f.jouer(2.4); f.cle('tampon');
-    f.repos_(0.8); await f.jouer(0.3);
-    f.titre('Imprimer : c’est prêt.', { duree: 2.8 });
-    await f.toucher('[data-tampon-imprimer]', { avant: 0.4, apres: 0.6 });
+    await f.jouer(1.4); f.cle('imprimante');
+    f.titre('Le N° est tamponné sur chaque bordereau.', { sous: 'Tu emballes la bonne paire.', duree: 3.4 });
+    await f.viser('[data-impr-papier-choix="normale"]', { zoom: 1.3, dur: 0.8 });
     await f.jouer(1.2); f.cle('imprime');
-    await finir(f, 0.6);
+    // Le toucher lance la préparation ; la vidéo s'arrête avant que le PDF ne s'affiche.
+    await f.toucher('[data-impr-papier-choix="normale"]', { avant: 0.3, apres: 0.2 });
+    await f.jouer(0.3);
   },
-  // Colis à retirer (Achats) : un point relais = une carte → le code → copier → en grand.
+  // Colis à retirer (Achats, 16 nov. refait) : un toucher sur le colis ⇒ son code en grand,
+  // le point relais, « Copier le code » ; au comptoir, il se lit de loin.
   async colis(f) {
     await debut(f, 'Tes colis à retirer, par point relais.', 'Le code de chacun, sans fouiller tes messages.', 3.6);
-    await f.defilerVers('texte:Relais du Marché', { marge: 60, dur: 1.0 });
-    await f.viser('texte:Relais du Marché', { zoom: 1.3, dur: 1.0, dy: 130 });
-    await f.jouer(1.8); f.cle('plan');
-    f.titre('Touche un colis : tout s’affiche.', { duree: 3.2 });
+    await f.defilerVers('[data-rp-comptoir]', { marge: 120, dur: 1.0 });
+    await f.viser('[data-rp-comptoir]', { zoom: 1.3, dur: 1.0, dy: 60 });
+    await f.jouer(1.6); f.cle('plan');
+    f.titre('Touche un colis : son code en *grand*.', { sous: 'Il se lit de loin, au comptoir.', duree: 4.4 });
     await f.toucher('1@[data-rp-comptoir]', { apres: 0.5 });
-    await f.viser('[aria-label^="Copier code de retrait"]', { zoom: 1.38, dur: 0.9, dy: 60 });
-    await f.jouer(1.2); f.cle('deplie');
-    f.titre('Copier le code.', { duree: 2.4 });
-    await f.toucher('[aria-label^="Copier code de retrait"]', { apres: 0.8 });
-    f.titre('Le code en *grand*, au comptoir.', { sous: 'Il se lit de loin.', duree: 5.4 });
-    await f.toucher('[data-colis-plein-ecran]', { avant: 0.36, apres: 0.3 });
-    f.repos_(1.0);
-    await f.jouer(1.0);
-    await f.viser('texte:Code de retrait', { zoom: 1.38, dur: 1.0, dy: 30 });
-    await f.jouer(2.2); f.cle('en-grand');
+    await f.attendreQue('[data-va-copier]', 4);
+    f.repos_(0.8);
+    await f.jouer(0.4);
+    await f.viser('texte:Montre ce code au comptoir', { zoom: 1.3, dur: 1.0, dy: 120 });
+    await f.jouer(2.0); f.cle('en-grand');
+    f.titre('Copier le code, ou l’itinéraire.', { duree: 3.0 });
+    await f.viser('[data-va-copier]', { zoom: 1.3, dur: 0.8, dy: -60 });
+    await f.toucher('[data-va-copier]', { avant: 0.4, apres: 0.8 });
+    await f.jouer(1.0); f.cle('copie');
     await finir(f, 0.8);
   },
   // Achats : « + Ajouter » un achat de brocante → titre, prix, lieu, N° → enregistré.
@@ -168,28 +172,25 @@ const SCENARIOS = {
     await f.jouer(1.2); f.cle('rangee');
     await finir(f, 0.8);
   },
-  // Argent : Déclarer → le montant du mois (daté au versement) → Copier → « J'ai déclaré ».
+  // Argent (16 nov., refait) : le résumé → « URSSAF · à déclarer » (daté au versement) →
+  // « J'ai déclaré » → tu notes le montant déclaré → Enregistrer.
   async compta(f) {
     await debut(f, 'Ton argent : vendu, reçu, gagné.', 'Et ce qu’il te reste à déclarer.');
-    await f.viser('texte:À déclarer', { zoom: 1.38, dur: 1.0, dy: 30 });
-    await f.jouer(1.6); f.cle('plan');
-    f.titre('*Déclarer* : le montant du mois.', { sous: 'Daté au jour du versement.', duree: 4.4 });
-    f.repos_(0.7);
-    await f.toucher('texte:Déclarer', { apres: 0.5 });
-    await f.viser('texte:Chiffre d’affaires', { zoom: 1.38, dur: 1.0, dy: 40 });
-    await f.jouer(1.8); f.cle('montant');
-    f.titre('Copie-le, recopie-le sur l’URSSAF.', { duree: 3.2 });
-    await f.toucher('texte:Copier', { avant: 0.4, apres: 1.0 });
-    await f.jouer(0.6);
-    f.titre('Puis « J’ai déclaré » : tu notes le montant.', { sous: 'Le mois est rangé, le suivant prend sa place.', duree: 6.0 });
-    await f.viser('texte:Ouvrir l’URSSAF', { zoom: 1.38, dur: 0.9 });
+    await f.defilerVers('texte:à déclarer pour', { marge: 220, dur: 0.9 });
+    await f.viser('texte:à déclarer pour', { zoom: 1.32, dur: 1.0, dy: 40 });
+    await f.jouer(1.4); f.cle('plan');
+    f.titre('Le montant du mois.', { sous: 'Daté au jour du versement.', duree: 3.8 });
+    await f.jouer(2.4); f.cle('montant');
+    f.titre('Déclaré sur l’URSSAF ? Note-le ici.', { sous: 'Rien n’est envoyé : tu déclares sur son site.', duree: 5.2 });
     await f.toucher('texte:J’ai déclaré', { avant: 0.4, apres: 0.8 });
+    await f.attendreQue('[data-decl-enregistrer]', 4);
     f.repos_(0.9);
-    await f.jouer(0.6);
+    await f.jouer(0.4);
     await f.toucher('input[placeholder^="ex. 1"]', { avant: 0.3, apres: 0.2 });
     await f.taper('1643,90', { cps: 10 });
     f.cle('declare');
-    await f.toucher('texte:Enregistrer', { avant: 0.4, apres: 1.2 });
+    f.titre('Le mois est rangé.', { duree: 2.6 });
+    await f.toucher('[data-decl-enregistrer]', { avant: 0.4, apres: 1.0 });
     await finir(f, 0.8);
   },
   // Messages : la liste, un fil ouvert, la paire (N°, rangement), l'offre et ce qu'elle laisse.

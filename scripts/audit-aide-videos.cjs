@@ -42,6 +42,17 @@ const MUTATIONS = {
   'demarrage': (x) => { x.sources['src/App.jsx'] += "\nconst V = '/aide/videos/journee.mp4';"; },
   'video-toujours': (x) => { x.sources['src/composants/AideVideo.jsx'] = x.sources['src/composants/AideVideo.jsx'].replace('{v ? (', '{true ? ('); },
   'pseudo-reel': (x) => { x.vtt.journee += '\nvanessa5723'; },
+  // (17 nov., lot aide-videos)
+  'video-autre-ecran': (x) => { x.ecran.dashboard = ['journee']; },
+  'sans-reponse': (x) => { delete x.fr['av.garage.reponse']; },
+  'reponse-longue': (x) => { x.langues.de['av.emails.reponse'] = 'Les e-mails de tes plateformes arrivent ici, rangés par sorte, avec leur code, leur lieu, leur date limite, et le reste encore, et encore une phrase de plus.'; },
+  'langue-oubliee': (x) => { delete x.langues.it['av.ventes.reponse']; },
+  'piste-absente': (x) => { x.pistes = { defauts: ['compta.de.vtt absent'] }; },
+  'sans-plein-ecran': (x) => { x.sources['src/composants/AideVideo.jsx'] = x.sources['src/composants/AideVideo.jsx'].replace('onClick={() => demanderPleinEcran(ref.current)}', ''); },
+  'retour-ignore': (x) => { x.sources['src/composants/AideVideo.jsx'] = x.sources['src/composants/AideVideo.jsx'].replace('<FermeAuRetour fermer={() => setLue(null)}/>', ''); },
+  'piste-fr-seule': (x) => { x.sources['src/composants/AideVideo.jsx'] = x.sources['src/composants/AideVideo.jsx'].replace('{LANGUES_SOUS_TITRES.map((l) =>', '{[\'fr\'].map((l) =>'); },
+  'recherche-sourde': (x) => { x.chercher = () => []; },
+  'precharge-lourd': (x) => { x.sources['src/composants/AideVideo.jsx'] = x.sources['src/composants/AideVideo.jsx'].replace('preload="metadata"', 'preload="auto"'); },
 };
 
 // ── Le MP4, boîte par boîte (ISO/IEC 14496-12) ──
@@ -89,7 +100,13 @@ async function etat() {
   for (const f of tous('src')) sources[f] = lire(f);
   const vtt = {};
   for (const id of Object.keys(m.VIDEOS_AIDE)) vtt[id] = lire(path.join('public', 'aide', 'videos', id + '.vtt'));
+  // (17 nov.) Les textes par langue (titre, geste, réponse), les pistes des 4 autres langues, la recherche.
+  const langues = {};
+  for (const l of ['fr', 'en', 'es', 'it', 'de']) { try { langues[l] = (await import(pathToFileURL(path.join(RAC, 'src', 'i18n', 'langues', l, 'aide-videos.js')).href)).default; } catch (_) { langues[l] = {}; } }
+  let pistes = { defauts: ['scripts/films/aide-sous-titres.cjs absent'] };
+  try { pistes = require(path.join(RAC, 'scripts', 'films', 'aide-sous-titres.cjs')).tout({ verifier: true, dossier: DOSSIER }); } catch (_) {}
   return { aide: { ...m.VIDEOS_AIDE }, ecran: JSON.parse(JSON.stringify(m.VIDEOS_ECRAN)), cles: Object.keys(ae.AIDE_ECRANS), sw: lire('public/sw.js'), sources, vtt,
+    fr: langues.fr, langues, pistes, chercher: typeof m.chercherVideos === 'function' ? (q) => m.chercherVideos(q, (id) => `${langues.fr['av.' + id + '.titre'] || ''} ${langues.fr['av.' + id + '.geste'] || ''} ${langues.fr['av.' + id + '.reponse'] || ''}`) : () => [],
     scenarios: lire('scripts/films/_aide-scenarios.cjs') + lire('scripts/films/_monde.cjs') + lire('scripts/films/_monde-emails.cjs'),
     poids: () => null, duree: () => null, son: () => false };
 }
@@ -106,6 +123,19 @@ function juger(x) {
   }
   dit((x.ecran.achats || []).includes('colis'), 'achats : « Retirer un colis » proposé aussi (Colis vit dans Achats)');
   for (const [e, l] of Object.entries(x.ecran)) for (const id of l) dit(!!x.aide[id], `${e} → ${id} : vidéo connue`);
+  // (17 nov.) Chaque « ? » : SA vidéo, ou aucune — jamais celle d'un autre écran (sauf Achats → « Retirer un colis »,
+  // Colis → « Imprimer », écrits). Un écran à « ? » sans vidéo à lui (Statistiques, Communauté) n'en montre aucune.
+  const PERMIS = { achats: ['colis'], colis: ['ventes'] };
+  for (const e of x.cles) { const l = x.ecran[e] || []; const autres = l.filter((id) => id !== e && !(PERMIS[e] || []).includes(id)); dit(!autres.length && (!l.length || l[0] === e), `« ? » de ${e} : ${l.length ? 'sa vidéo d’abord' : 'aucune vidéo'}${autres.length ? ' — celle d’un autre écran : ' + autres.join(', ') : ''}`); }
+  // (17 nov.) La réponse en deux lignes AU-DESSUS de chaque vidéo, et ses textes dans les 5 langues.
+  for (const id of Object.keys(x.aide)) {
+    // Deux lignes sur un téléphone (390 px, 14 px) : 95 signes au plus, dans CHAQUE langue.
+    const longues = Object.entries(x.langues).filter(([, d]) => !(d['av.' + id + '.reponse'] || '').trim() || d['av.' + id + '.reponse'].length > 95).map(([l, d]) => `${l} ${(d['av.' + id + '.reponse'] || '').length}`);
+    dit(!longues.length, `${id} : une réponse de deux lignes au plus, dans les 5 langues${longues.length ? ' — ' + longues.join(', ') : ''}`);
+    for (const [l, d] of Object.entries(x.langues)) dit(['titre', 'geste', 'reponse'].every((k) => typeof d['av.' + id + '.' + k] === 'string' && d['av.' + id + '.' + k].trim()), `${id} : titre, geste et réponse en ${l}`);
+  }
+  dit(!(x.pistes.defauts || []).length, `sous-titres en/es/it/de : une piste par vidéo, aux instants de la française, toutes les lignes traduites${(x.pistes.defauts || []).length ? ' — ' + x.pistes.defauts.slice(0, 3).join(' · ') : ''}`);
+  dit(x.chercher('bordereau').includes('ventes') && x.chercher('code grand').includes('colis') && x.chercher('déclarer').includes('compta') && x.chercher('declarer').length === 1 && !x.chercher('zzzz').length, 'recherche : « bordereau » ⇒ Ventes, « code grand » ⇒ Colis, « déclarer » ⇒ Argent seulement (accents ignorés), un mot inconnu ⇒ rien');
   // 2. Les fichiers.
   const listes = fs.existsSync(DOSSIER) ? fs.readdirSync(DOSSIER) : [];
   for (const id of Object.keys(x.aide)) {
@@ -131,7 +161,7 @@ function juger(x) {
     const longues = cues.flatMap((b) => b.split('\n').slice(2)).filter((l) => l.length > 60);
     dit(/^WEBVTT/.test(t) && cues.length >= 2 && !longues.length && fins.every((s) => s <= (duree || 0) + 0.05), `${id}.vtt : WEBVTT, ${cues.length} sous-titres courts, dans la durée${longues.length ? ' — trop long : ' + longues[0] : ''}`);
   }
-  const intrus = listes.filter((n) => !/^[a-z]+\.(mp4|jpg|vtt)$/.test(n) || !x.aide[n.split('.')[0]]);
+  const intrus = listes.filter((n) => !/^[a-z]+\.(mp4|jpg|vtt|(en|es|it|de)\.vtt)$/.test(n) || !x.aide[n.split('.')[0]]);
   dit(!intrus.length, `public/aide/videos/ ne contient que les vidéos de la table${intrus.length ? ' — en trop : ' + intrus.join(', ') : ''}`);
   const ailleurs = [];
   const fouille = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) { if (p !== DOSSIER) fouille(p); } else if (/\.(mp4|webm|mov|m4v)$/i.test(e.name)) ailleurs.push(path.relative(RAC, p)); } };
@@ -157,6 +187,11 @@ function juger(x) {
   dit(/\{v \? \(\s*<figure/.test(av) && (av.match(/<video\b[^>]*\bsrc=/g) || []).length === 1, 'AideVideo : le seul <video> n\'existe qu\'une vidéo choisie (au toucher)');
   dit(/\bmuted\b/.test(av) && /playsInline/.test(av) && /<track kind="captions"/.test(av), 'AideVideo : sans son, en ligne, piste de sous-titres');
   dit(/loading="lazy"/.test(av), 'AideVideo : l\'aperçu attend d\'être vu (loading="lazy")');
+  // (17 nov.) Lecture qui démarre vite sans tout précharger, plein écran au doigt, retour qui ferme, 5 pistes.
+  dit(/preload="metadata"/.test(av) && !/preload="auto"/.test(av) && /poster=\{urlVideo\(lue, 'jpg'\)\}/.test(av), 'AideVideo : un aperçu (poster) et un préchargement léger (metadata)');
+  dit(/onClick=\{\(\) => demanderPleinEcran\(ref\.current\)\}/.test(av) && /webkitEnterFullscreen/.test(av), 'AideVideo : « Plein écran » au doigt (iPhone : le lecteur natif)');
+  dit(/<FermeAuRetour fermer=\{\(\) => setLue\(null\)\}\/>/.test(av), 'AideVideo : le retour ferme la vidéo (FermeAuRetour)');
+  dit(/\{LANGUES_SOUS_TITRES\.map\(\(l\) => <track kind="captions" src=\{urlSousTitres\(lue, l\)\}/.test(av) && /default=\{l === langue/.test(av), 'AideVideo : une piste de sous-titres par langue, celle de l’app par défaut');
   dit(/startsWith\('\/aide\/'\)\) return;/.test(x.sw) && !/\.mp4|aide\/videos/.test(x.sw), 'sw.js : /aide/ au réseau, aucune vidéo nommée ni mise en réserve');
   // 4. Données inventées.
   const tout = x.scenarios + Object.values(x.vtt).join('\n');
