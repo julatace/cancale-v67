@@ -55,7 +55,7 @@ export default {
   "fiab.sante.g.moderation": "Vinted a modéré ce compte : regarde ce qui s’est passé, puis touche Reprendre.",
   "fiab.sante.g.deconnecte": "Ce compte n’est plus connecté : reconnecte-toi sur le site, VRM reprendra.",
   "fiab.sante.g.panne": "Ouvre {site} dans le navigateur où est l’extension VRM.",
-  "fiab.sante.g.delie": "Relie-le dans Paramètres → Comptes liés.",
+  "fiab.sante.g.delie": "Relie-le dans Paramètres → Mes plateformes → Comptes liés.",
   "fiab.sante.g.relire": "Ouvre {site} sur ce compte, dans le navigateur où est l’extension VRM.",
   "fiab.sante.g.ventes": "Ouvre Vinted › Mes commandes › Ventes sur ce compte.",
   "fiab.sante.g.extension": "Installe la {v} sur {appareil}.",

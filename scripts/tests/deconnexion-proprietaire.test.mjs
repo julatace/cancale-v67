@@ -9,7 +9,7 @@ const code = source.slice(source.indexOf('const seDeconnecterPartout = async () 
 function fixture() {
   let confirmer, terminer, appels=0, sorties=0;
   const timers=[];
-  const c = vm.createContext({ SUPABASE_URL:'https://base.invalid',SUPABASE_KEY:'fictive', AUTH:{user:{id:'A'},session:{access_token:'A'}}, vmrExtPresent:()=>false,extSait:()=> 'ok', texteConfirmationPartout:()=>'', askConfirm:()=>new Promise(r=>confirmer=r), deconnecterPartout:()=>{appels++;return new Promise(r=>terminer=r);}, toast(){}, authSignOut:()=>sorties++,location:{reload(){}},setTimeout:fn=>timers.push(fn) });
+  const c = vm.createContext({ SUPABASE_URL:'https://base.invalid',SUPABASE_KEY:'fictive', AUTH:{user:{id:'A'},session:{access_token:'A'}}, vmrExtPresent:()=>false,extSait:()=> 'ok', cleConfirmationPartout:()=>'', tr:(k)=>k, askConfirm:()=>new Promise(r=>confirmer=r), deconnecterPartout:()=>{appels++;return new Promise(r=>terminer=r);}, toast(){}, authSignOut:()=>sorties++,location:{reload(){}},setTimeout:fn=>timers.push(fn) });
   vm.runInContext(code,c);
   return {c,timers,confirm:()=>confirmer(true),done:()=>terminer('ok'),calls:()=>appels,logouts:()=>sorties};
 }

@@ -1,4 +1,5 @@
 // ESPAÑOL — traducción de fr.js (la fuente). Mismas claves, mismas {variables}.
+import ecran_textes_restes from './es/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
 import ecran_accessibilite from './es/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './es/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './es/suiviVente.js';
@@ -132,6 +133,7 @@ import ecran_litiges_tous from './es/litigesTous.js';   // (23 nov.) Litiges et 
 import ecran_achats_hors_vinted from './es/achatsHorsVinted.js';   // (23 nov.) Nouvel achat : ticket à plusieurs articles
 import ecran_loupe_num from './es/loupeNum.js';   // (26 nov.) « Tout sur le N° » refait
 export default {
+  ...ecran_textes_restes,
   ...ecran_loupe_num,
   ...ecran_accessibilite,
   ...ecran_groupes,
@@ -1259,7 +1261,7 @@ export default {
   "suivi.arreter.non": "Continuar",
   "suivi.arreter.oui": "Detener",
   "suivi.fermer": "Cerrar",
-  "suivi.garde": "El detalle queda en Ajustes → Lo que hizo VRM.",
+  "suivi.garde": "El detalle queda en Ajustes → Seguridad de los datos → «Registro: lo que ha hecho VRM».",
   "suivi.passes.titre": "Trabajos seguidos en este dispositivo",
   "suivi.reprise.sansEcran": "Vuelve a abrir la pantalla del trabajo para reanudar.",
   // (11 nov., lot sante-comptes) la santé de chaque compte Vinted (src/SanteComptes.jsx)
@@ -1633,7 +1635,7 @@ export default {
   "ebay.err.incertain": "No sé si el anuncio salió.",
   "ebay.err.incertain.geste": "Relee tus anuncios de eBay antes de reintentar.",
   "ebay.err.jeton": "El acceso de esta cuenta de eBay caducó.",
-  "ebay.err.jeton.geste": "Ajustes → Cuentas de eBay → «Reconectar».",
+  "ebay.err.jeton.geste": "Ajustes → Mis plataformas → Cuentas de eBay, y luego «Reconectar».",
   "ebay.err.droit": "Esta cuenta no dio este permiso a VRM.",
   "ebay.err.droit.geste": "Reconéctala: eBay volverá a pedir acceso.",
   "ebay.err.deja": "Este par ya está en venta o programado en eBay.",

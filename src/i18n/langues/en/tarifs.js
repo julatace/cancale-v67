@@ -42,7 +42,7 @@ export default {
   "tarifs.essai.uneFois": "Only once per email address and per Vinted account.",
   "tarifs.apres.titre": "And then?",
   "tarifs.apres.resilier.titre": "Cancel in two taps",
-  "tarifs.apres.resilier.texte": "Settings → Subscription → Cancel. You keep access until the end of the period, with no further charge.",
+  "tarifs.apres.resilier.texte": "Settings → My account → My subscription, then “Cancel”. You keep access until the end of the period, with no further charge.",
   "tarifs.apres.rien.titre": "Nothing is deleted",
   "tarifs.apres.rien.texte": "Without a subscription, you see a preview of your data; the rest is kept. Resuming brings everything back.",
   "tarifs.apres.retract.titre": "14 days to withdraw",

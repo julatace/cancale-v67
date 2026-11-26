@@ -83,7 +83,7 @@ export default {
   "liaison.relieSous": "Utile {benef}",
   "liaison.relieSousAffiche": "Utile {benef} al prezzo indicato",
   "liaison.recu": "Ricevuta",
-  "glisser.aideCible": "Tocca l’acquisto di questo articolo.",
+  "glisser.aideCible": "Tocca l’acquisto di questo paio.",
   "glisser.choisiAchat": "Acquisto scelto",
   "glisser.choisiCible": "Articolo scelto",
   "glisser.changer": "Cambia",

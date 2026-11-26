@@ -42,7 +42,7 @@ export default {
   "tarifs.essai.uneFois": "Una sola vez por correo y por cuenta de Vinted.",
   "tarifs.apres.titre": "¿Y después?",
   "tarifs.apres.resilier.titre": "Cancela en dos gestos",
-  "tarifs.apres.resilier.texte": "Ajustes → Suscripción → Cancelar. Mantienes el acceso hasta el final del periodo, sin más cobros.",
+  "tarifs.apres.resilier.texte": "Ajustes → Mi cuenta → Mi suscripción, y luego «Cancelar». Mantienes el acceso hasta el final del periodo, sin más cobros.",
   "tarifs.apres.rien.titre": "No se borra nada",
   "tarifs.apres.rien.texte": "Sin suscripción ves un avance de tus datos; el resto se guarda. Volver lo devuelve todo.",
   "tarifs.apres.retract.titre": "14 días para desistir",

@@ -107,7 +107,7 @@ export default {
   "pn.abonnement.offert": "VRM is free for now: everything is open.",
   "pn.abonnement.essai": { one: "Free trial: {n} day left.", other: "Free trial: {n} days left." },
   "pn.abonnement.actif": "Your subscription is active.",
-  "pn.abonnement.passu": "Subscription status: not read. Settings → My account → Subscription.",
+  "pn.abonnement.passu": "Subscription status: not read. Settings → My account → My subscription.",
   "pn.abonnement.solo": "Solo",
   "pn.abonnement.solo.desc": "1 seller account per platform",
   "pn.abonnement.pro": "Pro",

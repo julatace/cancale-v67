@@ -65,7 +65,11 @@ const MIGRES = [
   ['src/CorrespondancesPartout.jsx', ['*']],   // (15 nov.) catégories qui correspondent d'un site à l'autre
   ['src/main.jsx', ['DernierFilet']],
   ['src/App.jsx', ['AuthScreen', 'CaptchaConnexion', 'LiensLegaux', 'titreEcran', 'SideBar']],
-  ['src/ecrans/Reglages.jsx', ['LangueSetting', 'SettingsScreen:groupes', 'ImpressionBordereaux', 'nomPapier']],
+  ['src/ecrans/Reglages.jsx', ['LangueSetting', 'SettingsScreen:groupes', 'ImpressionBordereaux', 'nomPapier',
+    // (24 nov., textes-restes) Paramètres → Mon compte → Appareils connectés : sessions, boutons, confirmations.
+    'AppareilsConnectes', 'seDeconnecterPartout', 'deconnecterLesAutres', 'quandCourt']],
+  // (24 nov., textes-restes) La porte de confidentialité : le premier écran si la vérification échoue.
+  ['src/PorteConfidentialite.jsx', ['PorteConfidentialite', 'heureCourte']],
   // (11 nov., lot vestiaire-plus) Vestiaire : le parcours, les photos exigées, la baisse de prix, les offres.
   ['src/ParcoursVestiaire.jsx', ['*']],
   ['src/PhotosVestiaire.jsx', ['*']],

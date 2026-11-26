@@ -27,7 +27,7 @@ export default {
   "liaL.relier": "Link",
   "liaL.relierN": "Link No. {numero}",
   "liaL.autre": "Other…",
-  "liaL.aucune": "No close item",
+  "liaL.aucune": "No close pair",
   "liaL.propre": "Only on {site}",
   "liaL.propreCourt": "Only on this site",
   "liaL.lot": "Link the sure ones",

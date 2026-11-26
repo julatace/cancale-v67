@@ -83,7 +83,7 @@ export default {
   "liaison.relieSous": "Gewinn {benef}",
   "liaison.relieSousAffiche": "Gewinn {benef} zum Angebotspreis",
   "liaison.recu": "Beleg",
-  "glisser.aideCible": "Tippe den Kauf dieses Artikels an.",
+  "glisser.aideCible": "Tippe den Kauf dieses Paars an.",
   "glisser.choisiAchat": "Kauf gewählt",
   "glisser.choisiCible": "Artikel gewählt",
   "glisser.changer": "Ändern",

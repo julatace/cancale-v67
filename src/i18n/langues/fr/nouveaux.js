@@ -70,7 +70,7 @@ export default {
   "nouveaux.parcours.ebay.titre": "Relie ton compte eBay",
   "nouveaux.parcours.ebay.geste": "Relier eBay",
   "nouveaux.parcours.ebay.pourquoi": "eBay donne tes commandes à VRM par sa connexion officielle. Pas besoin d’extension.",
-  "nouveaux.parcours.ebay.ligne": "Paramètres → Comptes eBay → Relier un compte.",
+  "nouveaux.parcours.ebay.ligne": "Paramètres → Mes plateformes → Comptes eBay → Relier un compte.",
   "nouveaux.parcours.ebay.ok": "Compte eBay relié",
   "nouveaux.parcours.attente": "Compte vu. Lecture de tes annonces…",
   "nouveaux.aide.video": "Voir le geste en vidéo",

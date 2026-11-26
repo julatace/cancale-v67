@@ -1,4 +1,5 @@
 // ENGLISH — translation of fr.js (the source). Same keys, same {variables}.
+import ecran_textes_restes from './en/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
 import ecran_accessibilite from './en/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './en/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './en/suiviVente.js';
@@ -132,6 +133,7 @@ import ecran_litiges_tous from './en/litigesTous.js';   // (23 nov.) Litiges et 
 import ecran_achats_hors_vinted from './en/achatsHorsVinted.js';   // (23 nov.) Nouvel achat : ticket à plusieurs articles
 import ecran_loupe_num from './en/loupeNum.js';   // (26 nov.) « Tout sur le N° » refait
 export default {
+  ...ecran_textes_restes,
   ...ecran_loupe_num,
   ...ecran_accessibilite,
   ...ecran_groupes,
@@ -1259,7 +1261,7 @@ export default {
   "suivi.arreter.non": "Keep going",
   "suivi.arreter.oui": "Stop",
   "suivi.fermer": "Close",
-  "suivi.garde": "The details stay in Settings → What VRM did.",
+  "suivi.garde": "The details stay in Settings → Data security → “Log: what VRM did”.",
   "suivi.passes.titre": "Tasks tracked on this device",
   "suivi.reprise.sansEcran": "Reopen the task’s screen to resume.",
   // (11 nov., lot sante-comptes) la santé de chaque compte Vinted (src/SanteComptes.jsx)
@@ -1633,7 +1635,7 @@ export default {
   "ebay.err.incertain": "I don't know if the listing went through.",
   "ebay.err.incertain.geste": "Re-read your eBay listings before trying again.",
   "ebay.err.jeton": "This eBay account's access has expired.",
-  "ebay.err.jeton.geste": "Settings → eBay accounts → “Reconnect”.",
+  "ebay.err.jeton.geste": "Settings → My platforms → eBay accounts, then “Reconnect”.",
   "ebay.err.droit": "This account did not grant VRM this right.",
   "ebay.err.droit.geste": "Reconnect it: eBay will ask for access again.",
   "ebay.err.deja": "This pair is already listed or scheduled on eBay.",

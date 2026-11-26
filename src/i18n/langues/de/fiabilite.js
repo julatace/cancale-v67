@@ -55,7 +55,7 @@ export default {
   "fiab.sante.g.moderation": "Vinted hat dieses Konto moderiert: sieh nach, was passiert ist, und tippe dann auf Fortsetzen.",
   "fiab.sante.g.deconnecte": "Dieses Konto ist nicht mehr angemeldet: melde dich auf der Seite an, VRM macht weiter.",
   "fiab.sante.g.panne": "Öffne {site} im Browser, in dem die VRM-Erweiterung ist.",
-  "fiab.sante.g.delie": "Verknüpfe es erneut unter Einstellungen → Verknüpfte Konten.",
+  "fiab.sante.g.delie": "Verknüpfe es erneut unter Einstellungen → Meine Plattformen → Verknüpfte Konten.",
   "fiab.sante.g.relire": "Öffne {site} mit diesem Konto im Browser, in dem die VRM-Erweiterung ist.",
   "fiab.sante.g.ventes": "Öffne Vinted › Meine Bestellungen › Verkauft mit diesem Konto.",
   "fiab.sante.g.extension": "Installiere die {v} auf {appareil}.",

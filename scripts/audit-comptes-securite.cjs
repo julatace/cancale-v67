@@ -85,7 +85,10 @@ async function audit(fichiers, bavard) {
     dit(await S.deconnecterPartout({ fetch: faux(503), url: 'https://x', apikey: 'k', jeton: 'j' }) === 'injoignable', '3.3 503 ⇒ « pas fait » (rien n\'est effacé ici)');
     dit(await S.deconnecterPartout({ fetch: faux('jette'), url: 'https://x', apikey: 'k', jeton: 'j' }) === 'injoignable', '3.4 réseau coupé ⇒ « pas fait »');
     dit(await S.deconnecterPartout({ fetch: faux(401), url: 'https://x', apikey: 'k', jeton: 'j' }) === 'refuse', '3.5 401 ⇒ session déjà morte');
-    dit(/extension/i.test(S.texteConfirmationPartout({ extension: 'liaison' })) && /mot de passe/.test(S.texteConfirmationPartout({ extension: 'ancienne' })), '3.6 la confirmation dit ce que devient l\'extension');
+    // (24 nov., textes-restes) La phrase vit dans le dictionnaire (cinq langues) : la règle rend sa CLÉ, jugée sur le français.
+    const frTR = (await import(pathToFileURL(path.join(R, 'src/i18n/langues/fr/textesRestes.js')).href)).default;
+    const phr = (x) => frTR[S.cleConfirmationPartout({ extension: x })] || '';
+    dit(/extension/i.test(phr('liaison')) && /mot de passe/.test(phr('ancienne')) && /extension/i.test(phr('inconnue')) && new Set(['liaison', 'ancienne', 'inconnue'].map(phr)).size === 3, '3.6 la confirmation dit ce que devient l\'extension');
     const fiches = { 51003: { numero: '4' }, 51001: { numero: '2' } };
     const nd = (id) => (fiches[id] && fiches[id].numero) || null;
     const L1 = S.ligneJournal({ type: 'favori', resultat: 'ok', cle: { item: '51003' } }, { numeroDeItem: nd });

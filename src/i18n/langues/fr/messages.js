@@ -61,7 +61,7 @@ export default {
   "messages.statistiques": "statistiques",
   "messages.annonceLeboncoinChiffre": "de l'annonce sur Leboncoin : le chiffre suit.",
   "messages.releverChiffreFaut": "Pour relever ce chiffre, il faut l'extension",
-  "messages.metsJourDepuis": ": mets-la à jour depuis Paramètres → État des connexions, puis ouvre les",
+  "messages.metsJourDepuis": ": mets-la à jour depuis Paramètres → Mes plateformes → État des connexions, puis ouvre les",
   "messages.annonceLeboncoin": "de l'annonce sur Leboncoin.",
   "messages.extensionInstalleeReleve2": "C'est l'extension, là où elle est installée, qui relève ce chiffre quand tu ouvres les",
   "messages.annonceLeboncoin2": "d'une annonce sur Leboncoin.",

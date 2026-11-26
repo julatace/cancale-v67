@@ -61,7 +61,7 @@ export default {
   "messages.statistiques": "estadísticas",
   "messages.annonceLeboncoinChiffre": "del anuncio en Leboncoin: la cifra llega.",
   "messages.releverChiffreFaut": "Para leer esta cifra hace falta la extensión",
-  "messages.metsJourDepuis": ": actualízala desde Ajustes → Estado de las conexiones, luego abre las",
+  "messages.metsJourDepuis": ": actualízala desde Ajustes → Mis plataformas → Estado de las conexiones, luego abre las",
   "messages.annonceLeboncoin": "del anuncio en Leboncoin.",
   "messages.extensionInstalleeReleve2": "Es la extensión, allí donde está instalada, la que lee esta cifra cuando abres las",
   "messages.annonceLeboncoin2": "de un anuncio en Leboncoin.",

@@ -42,7 +42,7 @@ export default {
   "tarifs.essai.uneFois": "Nur einmal pro E-Mail-Adresse und Vinted-Konto.",
   "tarifs.apres.titre": "Und danach?",
   "tarifs.apres.resilier.titre": "In zwei Schritten kündigen",
-  "tarifs.apres.resilier.texte": "Einstellungen → Abo → Kündigen. Zugang bis zum Periodenende, keine weitere Abbuchung.",
+  "tarifs.apres.resilier.texte": "Einstellungen → Mein Konto → Mein Abo, dann „Kündigen“. Zugang bis zum Periodenende, keine weitere Abbuchung.",
   "tarifs.apres.rien.titre": "Nichts wird gelöscht",
   "tarifs.apres.rien.texte": "Ohne Abo siehst du eine Vorschau deiner Daten; der Rest bleibt. Fortsetzen bringt alles zurück.",
   "tarifs.apres.retract.titre": "14 Tage Widerrufsrecht",

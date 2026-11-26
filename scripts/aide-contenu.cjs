@@ -42,7 +42,7 @@ const ARTICLES = [
         'Touche ce raccourci : vinted.fr s’ouvre dans Orion, avec l’extension VRM.',
       ] },
       { titre: 'La version de l’extension', id: 'version' },
-      'La version servie aujourd’hui est la **5.409.0**. VRM te dit dans **Paramètres → Aide et « Tout va bien ? » → Vérifier mon installation** si la tienne est en retard ; une mise à jour se fait comme une installation, en remplaçant le dossier.',
+      'La version servie aujourd’hui est la **5.409.0**. VRM te dit dans **Paramètres → Mes plateformes → Vérifier mon installation** si la tienne est en retard ; une mise à jour se fait comme une installation, en remplaçant le dossier.',
       'Firefox : la version de l’extension n’est pas encore publiée dans sa boutique. En attendant, utilise Chrome, Edge, Brave ou Opera.',
     ],
     voir: ['boite-email', 'tout-va-bien'],
@@ -104,7 +104,7 @@ const ARTICLES = [
       { titre: 'Retrouver une paire', id: 'stock' },
       'Dans **Stock**, cherche un numéro : VRM te dit le meuble et la case.',
       { titre: '« Je numérote moi-même »', id: 'moi-meme' },
-      'Tu as déjà ta numérotation ? Choisis **Paramètres → Stock et numéros → Numéros de rangement → Qui numérote ? Moi**. VRM ne donne plus aucun numéro : il lit le tien (fin de description, titre, SKU eBay, référence Leboncoin). Deux numéros dans une annonce, ou un numéro qui contredit l’autre site : la paire est « à vérifier », et c’est toi qui tranches.',
+      'Tu as déjà ta numérotation ? Choisis **Paramètres → Stock et numéros → Numéros de rangement**, puis **Moi** à « Qui numérote ? ». VRM ne donne plus aucun numéro : il lit le tien (fin de description, titre, SKU eBay, référence Leboncoin). Deux numéros dans une annonce, ou un numéro qui contredit l’autre site : la paire est « à vérifier », et c’est toi qui tranches.',
     ],
     voir: ['bordereau', 'tout-va-bien'],
   },
@@ -112,10 +112,10 @@ const ARTICLES = [
     slug: 'bordereau', titre: 'Imprimer un bordereau',
     resume: 'Les colis prêts, le bordereau tamponné du numéro, la date limite d’envoi.',
     mots: 'bordereau étiquette imprimer pdf colis expédier envoyer date limite imprimante thermique a4 ebay leboncoin vinted',
-    chapo: 'Quand une paire se vend, le bordereau arrive avec la vente. VRM le range dans **Colis**, tamponné du numéro de rangement : tu imprimes, tu prends la bonne paire là où elle est rangée, tu déposes.',
+    chapo: 'Quand une paire se vend, le bordereau arrive avec la vente. VRM le range dans **Ventes → À envoyer**, tamponné du numéro de rangement : tu imprimes, tu prends la bonne paire là où elle est rangée, tu déposes.',
     blocs: [
       { etapes: [
-        'Ouvre **Colis**. En haut : les colis **prêts à imprimer**.',
+        'Ouvre **Ventes → À envoyer**. En haut : les colis **prêts à imprimer**.',
         'Touche un colis pour ouvrir son bordereau, puis imprime-le. Le numéro de rangement y est tamponné.',
         'Prends la paire rangée sous ce numéro (carton, étagère, bac…), emballe-la, colle le bordereau, dépose le colis.',
       ] },
@@ -136,16 +136,16 @@ const ARTICLES = [
     slug: 'retirer-colis', titre: 'Retirer un colis au point relais',
     resume: 'Le code et le QR de chaque point relais, même sans réseau.',
     mots: 'retirer retrait code qr point relais mondial relay chronopost vinted go colissimo date limite hors connexion en grand',
-    chapo: 'Tes achats arrivés au point relais sont dans **Colis → À retirer** : une carte par point relais, avec le code de retrait et son QR.',
+    chapo: 'Tes achats arrivés au point relais sont dans **Achats → À retirer** : une carte par point relais, avec le code de retrait et son QR.',
     blocs: [
       { etapes: [
-        'Ouvre **Colis → À retirer**.',
+        'Ouvre **Achats → À retirer**.',
         'Au comptoir, touche **En grand** : le code et le QR s’affichent en grand, faciles à scanner.',
         'Une fois le colis en main, touche **J’ai retiré**. Pendant 5 secondes, **Annuler** le remet.',
       ] },
       { capture: 'a-retirer.jpg', alt: 'L’écran À retirer de VRM sur iPhone, avec le code de retrait d’un point relais', legende: 'À retirer : une carte par point relais, le code à côté.', h: 844 },
       { liste: [
-        '**Sans réseau** (au fond d’un magasin), Colis s’ouvre avec le dernier état connu : codes et QR compris.',
+        '**Sans réseau** (au fond d’un magasin), Achats s’ouvre avec le dernier état connu : codes et QR compris.',
         'La date limite et le lieu viennent de l’e-mail du transporteur ; sinon VRM compte la durée de garde du transporteur. Au-delà, le colis passe « à vérifier ».',
         'Quand le transporteur dit que le colis est retiré, il sort de la liste tout seul, avec la raison (« Mondial Relay : retiré le 5 nov. »).',
       ] },
@@ -168,12 +168,12 @@ const ARTICLES = [
       { capture: 'compta.jpg', alt: 'L’écran Comptabilité de VRM sur iPhone', legende: 'Compta commence par ton statut : VRM ne devine jamais ton régime.', h: 844 },
       { titre: 'Déclarer', id: 'declarer' },
       { etapes: [
-        'Ouvre **Compta** : le montant du mois est en haut.',
+        'Ouvre **Argent → Déclarer** : le montant du mois est en haut.',
         'Touche **Déclarer** et suis les trois étapes.',
         'Une fois déclaré sur le site de l’URSSAF, touche **J’ai déclaré ce mois** : VRM ne le coche jamais à ta place.',
       ] },
       { liste: [
-        'Le taux par défaut est **12,4 %** (micro-entreprise, achat-revente). Ton régime n’est jamais deviné : choisis-le dans Compta.',
+        'Le taux par défaut est **12,4 %** (micro-entreprise, achat-revente). Ton régime n’est jamais deviné : choisis-le dans **Argent → Déclarer**.',
         'Seuls les **comptes sélectionnés** entrent dans les totaux ; un compte exclu n’entre dans aucun.',
         '« **Au moins** » devant un total : il manque une donnée (un prix d’achat, une date de versement). VRM la nomme à côté.',
         'Le bénéfice a besoin de tes prix d’achat : tu les saisis toi-même, VRM ne les devine pas.',
@@ -257,14 +257,14 @@ const ARTICLES = [
     blocs: [
       { liste: [
         '**Mon compte** : profil, **Mon abonnement**, connexion, double vérification, équipe.',
-        '**Mes plateformes** : tes comptes Vinted, Leboncoin, Vestiaire, **Comptes eBay**, plateformes affichées, **Mon adresse VRM** et tes e-mails.',
+        '**Mes plateformes** : tes comptes Vinted, Leboncoin, Vestiaire, **Comptes eBay**, **Vérifier mon installation**, plateformes affichées, **Mon adresse VRM** et tes e-mails.',
         '**Ventes et colis** : **Imprimante et bordereaux**, colis, modèles d’annonce.',
         '**Stock et numéros** : **Numéros de rangement** (qui numérote), ce que tu vends, Organisation.',
         '**Argent** : statut, URSSAF, prix d’achat, objectif du mois.',
         '**Notifications** : **Notifications du téléphone**, rappels, agenda.',
-        '**Apparence et langue** : langue, mode sombre, taille du texte, Ma journée.',
+        '**Apparence et langue** : langue, mode sombre, taille du texte, **Ma configuration**.',
         '**Sécurité des comptes** : rythme humain, mode vacances, discrétion.',
-        '**Aide et « Tout va bien ? »** : **Vérifier mon installation**, Centre d’aide, **Écrire au support**, **Signaler un problème**, **Mes signalements**.',
+        '**Aide et « Tout va bien ? »** : **Tout va bien ?**, **Résoudre un problème**, Centre d’aide, **Écrire au support**, **Signaler un problème**, **Mes signalements**.',
         '**Sécurité des données** : sauvegarde, retour en arrière, corbeille, confidentialité.',
       ] },
     ],
@@ -309,7 +309,7 @@ const ARTICLES = [
     chapo: 'Tu as mis la même paire sur Leboncoin, eBay ou Vestiaire sans dire que c’était elle ? VRM compare les **photos exactes** (jamais le titre) et te propose de relier.',
     blocs: [
       { liste: [
-        'Où : **Ma journée** (« N annonces à relier »), **Annonces → Leboncoin / eBay / Vestiaire**, **Annonces → Outils → Même photo · à relier**, et la fiche de la paire.',
+        'Où : **Aujourd’hui** (la carte « Même photo · à relier »), **Annonces** sur Leboncoin, eBay ou Vestiaire (le menu du site en haut), et la fiche de la paire.',
         '**Relier à N°124** : c’est TON toucher qui relie. « Ce n’est pas la même » : la proposition ne revient plus.',
         'Deux paires possibles : VRM te montre les deux, tu choisis. Une photo trop commune est ignorée.',
       ] },

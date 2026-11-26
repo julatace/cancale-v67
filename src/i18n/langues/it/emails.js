@@ -147,7 +147,7 @@ export default {
   "emails.articleCompteTransaction": "Articolo, account o transazione",
   "emails.aucunRecuRecherche": "Nessuna ricevuta per questa ricerca.",
   "emails.aucunRecuAchat": "Ancora nessuna ricevuta d’acquisto arrivata via e-mail.",
-  "emails.achatSansLigne": "Un acquisto senza «{nom}» sulla sua riga: VRM non gli ha collegato nessuna ricevuta. Se VRM non riceve le e-mail Vinted di un tuo account, inoltrale al tuo indirizzo VRM (Impostazioni → Ricezione e-mail).",
+  "emails.achatSansLigne": "Un acquisto senza «{nom}» sulla sua riga: VRM non gli ha collegato nessuna ricevuta. Se VRM non riceve le e-mail Vinted di un tuo account, inoltrale al tuo indirizzo VRM (Impostazioni → Le mie piattaforme → Il mio indirizzo VRM).",
   "emails.1AutreE": "1 altra e-mail d’ordine (aggiornamento, conferma, reso) non è una ricevuta: non è elencata qui.",
   "emails.autresEMails": "{autres} altre e-mail d’ordine (aggiornamenti, conferme, resi) non sono ricevute: non sono elencate qui.",
   "emails.recuAchatVinted": "Ricevuta d’acquisto Vinted",

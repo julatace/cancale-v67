@@ -75,6 +75,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'chargement-propre', date: '2026-11-25', titre: 'Les écrans se remplissent sans sauter', phrase: 'Un chiffre pas encore lu se dessine, rien ne bouge.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., envoi-messages-offres, ext. 5.452 — Julien : « ça envoie pas bien les messages et les offres ») docs/passation/2026-11-25-envoi-messages-offres.md
   { id: 'envoi-confirme', date: '2026-11-25', titre: 'Envoyé seulement quand Vinted confirme', phrase: 'Sinon la raison, et l’heure où ça repart.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (24 nov., textes-restes) docs/passation/2026-11-24-textes-restes.md
+  { id: 'aide-chemins', date: '2026-11-24', titre: 'L’aide mène aux bons écrans', phrase: 'Chaque chemin de l’aide suit la barre du bas.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (23 nov., lot demarrage-guide) docs/passation/2026-11-23-demarrage-guide.md
   { id: 'demarrage-accompagne', date: '2026-11-24', titre: 'Bien démarrer : guidé pas à pas', phrase: 'Une courte animation par étape, et la reprise où tu t’es arrêté.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (24 nov., lot scanner-universel — Julien : « un bouton scanner, je vise n'importe quoi ») docs/passation/2026-11-24-scanner-universel.md

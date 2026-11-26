@@ -1,4 +1,5 @@
 // ITALIANO — traduzione di fr.js (la fonte). Stesse chiavi, stesse {variabili}.
+import ecran_textes_restes from './it/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
 import ecran_accessibilite from './it/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './it/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './it/suiviVente.js';
@@ -132,6 +133,7 @@ import ecran_litiges_tous from './it/litigesTous.js';   // (23 nov.) Litiges et 
 import ecran_achats_hors_vinted from './it/achatsHorsVinted.js';   // (23 nov.) Nouvel achat : ticket à plusieurs articles
 import ecran_loupe_num from './it/loupeNum.js';   // (26 nov.) « Tout sur le N° » refait
 export default {
+  ...ecran_textes_restes,
   ...ecran_loupe_num,
   ...ecran_accessibilite,
   ...ecran_groupes,
@@ -1259,7 +1261,7 @@ export default {
   "suivi.arreter.non": "Continua",
   "suivi.arreter.oui": "Ferma",
   "suivi.fermer": "Chiudi",
-  "suivi.garde": "Il dettaglio resta in Impostazioni → Cosa ha fatto VRM.",
+  "suivi.garde": "Il dettaglio resta in Impostazioni → Sicurezza dei dati → «Registro: cosa ha fatto VRM».",
   "suivi.passes.titre": "Lavori seguiti su questo dispositivo",
   "suivi.reprise.sansEcran": "Riapri la schermata del lavoro per riprendere.",
   // (11 nov., lot sante-comptes) la santé de chaque compte Vinted (src/SanteComptes.jsx)
@@ -1633,7 +1635,7 @@ export default {
   "ebay.err.incertain": "Non so se l'annuncio è partito.",
   "ebay.err.incertain.geste": "Rileggi i tuoi annunci eBay prima di riprovare.",
   "ebay.err.jeton": "L'accesso di questo account eBay è scaduto.",
-  "ebay.err.jeton.geste": "Impostazioni → Account eBay → «Ricollega».",
+  "ebay.err.jeton.geste": "Impostazioni → Le mie piattaforme → Account eBay, poi «Ricollega».",
   "ebay.err.droit": "Questo account non ha dato questo permesso a VRM.",
   "ebay.err.droit.geste": "Ricollegalo: eBay richiederà l'accesso.",
   "ebay.err.deja": "Questo paio è già in vendita o programmato su eBay.",

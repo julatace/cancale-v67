@@ -54,7 +54,9 @@ const lire = (p) => { try { return fs.readFileSync(path.join(RACINE, p), 'utf8')
   const REG = lire('src/ecrans/Reglages.jsx');
   const comp = (/function AppareilsConnectes\(\) \{[\s\S]*?\n\}\n/.exec(REG) || [''])[0];
   dit(/grouperAppareils\(/.test(comp) && /\{ouvert\(grp\.appareil\) && detail\(grp\)\}/.test(comp) && /data-deconnexion-autres/.test(comp), 'G4 l’écran : groupes, détail par connexion SEULEMENT déplié, un bouton pour les autres');
-  dit(/askConfirm\(\{ title: 'Déconnecter les autres appareils \?'/.test(REG), 'G4 « Déconnecter les autres appareils » est confirmé');
+  // (24 nov., textes-restes) Le titre passe par tr() : la règle est « confirmé », le texte est celui du dictionnaire.
+  const frTR = lire('src/i18n/langues/fr/textesRestes.js');
+  dit(/askConfirm\(\{ title: tr\('appareils\.autres\.titre'\)/.test(REG) && /"appareils\.autres\.titre": "Déconnecter les autres appareils \?"/.test(frTR), 'G4 « Déconnecter les autres appareils » est confirmé');
   if (N && N.nouveauxAppareils) {
     const s = (id, ua) => ({ id, user_agent: ua });
     const CH = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36';

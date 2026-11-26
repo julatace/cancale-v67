@@ -4,6 +4,7 @@
 // absente d'une langue, une variable `{x}` qui n'est pas la même partout, ou un pluriel
 // sans `other`. Clés : `<écran>.<élément>[.<précision>]`, jamais le texte lui-même.
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
+import ecran_textes_restes from './fr/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
 import ecran_accessibilite from './fr/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './fr/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './fr/suiviVente.js';
@@ -137,6 +138,7 @@ import ecran_litiges_tous from './fr/litigesTous.js';   // (23 nov.) Litiges et 
 import ecran_achats_hors_vinted from './fr/achatsHorsVinted.js';   // (23 nov.) Nouvel achat : ticket à plusieurs articles
 import ecran_loupe_num from './fr/loupeNum.js';   // (26 nov.) « Tout sur le N° » refait
 export default {
+  ...ecran_textes_restes,
   ...ecran_loupe_num,
   ...ecran_accessibilite,
   ...ecran_groupes,
@@ -1264,7 +1266,7 @@ export default {
   "suivi.arreter.non": "Continuer",
   "suivi.arreter.oui": "Arrêter",
   "suivi.fermer": "Fermer",
-  "suivi.garde": "Le détail reste dans Paramètres → Mon compte → Journal.",
+  "suivi.garde": "Le détail reste dans Paramètres → Sécurité des données → « Journal : ce que VRM a fait ».",
   "suivi.passes.titre": "Travaux suivis sur cet appareil",
   "suivi.reprise.sansEcran": "Rouvre l’écran du travail pour reprendre.",
   // (11 nov., lot sante-comptes) la santé de chaque compte Vinted (src/SanteComptes.jsx)
@@ -1638,7 +1640,7 @@ export default {
   "ebay.err.incertain": "Je ne sais pas si l'annonce est partie.",
   "ebay.err.incertain.geste": "Relis tes annonces eBay avant de recommencer.",
   "ebay.err.jeton": "L'autorisation de ce compte eBay a expiré.",
-  "ebay.err.jeton.geste": "Paramètres → Comptes eBay → « Reconnecter ».",
+  "ebay.err.jeton.geste": "Paramètres → Mes plateformes → Comptes eBay, puis « Reconnecter ».",
   "ebay.err.droit": "Ce compte n'a pas donné ce droit à VRM.",
   "ebay.err.droit.geste": "Reconnecte-le : eBay redemandera l'accès.",
   "ebay.err.deja": "Déjà en vente ou programmée sur eBay.",
