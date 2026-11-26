@@ -76,8 +76,14 @@ export const colonnesSuffisantes = (colonnes) => ['date', 'titre', 'prix'].filte
 export function decoderTexte(octets) {
   const u = octets instanceof Uint8Array ? octets : new Uint8Array(octets || []);
   try { return new TextDecoder('utf-8', { fatal: true }).decode(u).replace(/^﻿/, ''); } catch (_) {}
-  try { return new TextDecoder('windows-1252').decode(u); } catch (_) { return ''; }
+  // (26 nov.) Décodé ICI, octet par octet : certains moteurs (Node 22, mesuré) lisent « windows-1252 » comme latin1 et
+  // perdent « € » (0x80), « ’ » (0x92)… — « 12,50 € » devenait un prix illisible. 0x80-0x9F : la table de windows-1252
+  // (WHATWG : un octet sans caractère reste son point de code) ; le reste = latin1.
+  let t = '';
+  for (let i = 0; i < u.length; i++) { const c = u[i]; t += c >= 0x80 && c < 0xa0 ? CP1252_80[c - 0x80] : String.fromCharCode(c); }
+  return t;
 }
+const CP1252_80 = '\u20ac\u0081\u201a\u0192\u201e\u2026\u2020\u2021\u02c6\u2030\u0160\u2039\u0152\u008d\u017d\u008f\u0090\u2018\u2019\u201c\u201d\u2022\u2013\u2014\u02dc\u2122\u0161\u203a\u0153\u009d\u017e\u0178';
 const separateur = (ligne) => {
   let best = ';', n = -1;
   for (const s of [';', '\t', ',']) {

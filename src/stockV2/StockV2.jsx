@@ -25,6 +25,7 @@
 import React from 'react';
 import { tr, nombre } from '../i18n/index.js';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
+import { motsVendeur } from '../profilVendeur.js';   // (26 nov.) exemples de Sneakers seulement chez qui vend des sneakers
 import MenuPlateforme from '../designV2/MenuPlateforme.jsx';
 import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : l'inventaire en cours, les nouveaux N° à écrire
 import { Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Feuille, Attente, Champ, Vide } from '../natif/index.js';
@@ -514,7 +515,7 @@ export default function StockV2({ s }) {
             placeholder={tr('sr.cherche.place')} aria-label={tr('stock.retrouverArticleDans')} data-sr-cherche=""
             onKeyDown={(e) => { if (e.key === 'Escape') s.setQ(''); if (e.key === 'Enter' && un && s.ouEst(un)) { e.preventDefault(); voir(un); } }}/>
           <span className="sr-cherche-mic">{s.q ? <button type="button" className="sr-rond is-petit" aria-label={tr('reglages.recherche.effacer')} onClick={() => s.setQ('')}><Icon name="close" size={18}/></button>
-            : <>{s.dicteeOk ? <Mic nu titre={tr('stock.chercherVoixNumero')} onText={(t) => s.setQ(requeteDeLaVoix(t).requete)}/> : null}
+            : <>{s.dicteeOk ? <Mic nu titre={motsVendeur().nom === 'paire' ? tr('stock.chercherVoixNumero') : tr('stock.chercherVoixNumero2')} onText={(t) => s.setQ(requeteDeLaVoix(t).requete)}/> : null}
               <button type="button" className="sr-rond is-petit" aria-label={tr('stock.trouverPhoto')} title={tr('stock.trouverPhoto')} data-sr-photo="" onClick={s.ouvrirPhoto}><Icon name="camera" size={20}/></button></>}</span>
         </div>
       </div>

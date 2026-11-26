@@ -99,7 +99,11 @@ const compteDevient = (f, uid) => { f.ctx.activeAccountId = async () => uid; f.c
   // A1 — un AUTRE compte dans l'onglet au milieu des champs.
   { const f = monterRepub({ page: (e, d, ff) => { if (e === 'champ' && d.quoi === 'description') compteDevient(ff, '222'); return undefined; } });
     const r = await recreer(f); const s = noms(f);
-    dit(r && r.accepte === false && !s.includes('brouillon') && !s.includes('supprimer') && !s.includes('publier') && s.indexOf('marque') < 0 && f.v.ancienne === 'en-ligne' && f.v.brouillon === null,
+    // (26 nov.) Depuis la 5.437 (`formulairerythme`) les champs se remplissent dans un ordre VARIABLE : « marque » peut venir
+    // avant « description ». La règle jugée : AUCUN champ n'est saisi APRÈS celui pendant lequel le compte a changé.
+    const iBascule = f.pas.findIndex((p) => p.etape === 'champ' && p.quoi === 'description');
+    const champsApres = iBascule < 0 ? null : f.pas.slice(iBascule + 1).filter((p) => p.etape === 'champ').length;
+    dit(r && r.accepte === false && !s.includes('brouillon') && !s.includes('supprimer') && !s.includes('publier') && champsApres === 0 && f.v.ancienne === 'en-ligne' && f.v.brouillon === null,
       'A1 autre compte dans l’onglet pendant le remplissage ⇒ le champ suivant n’est pas saisi, aucun brouillon, aucune suppression', JSON.stringify({ r, s }));
     dit(r && String(r.raison || r.error || '').length > 10 && places(f) === 0, 'A1 la raison est dite, les places sont rendues', JSON.stringify({ raison: r && (r.raison || r.error), p: places(f) })); }
 

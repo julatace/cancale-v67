@@ -87,6 +87,7 @@ export default {
   "ia.vm.sous.art": "Il N°, poi il prezzo: l’articolo esce dallo stock.",
   "ia.vm.numeroLib": "N° o ricerca",
   "ia.vm.numeroExemple": "124, B125 o «dunk 42»",
+  "ia.vm.numeroExemple.neutre": "124, B125 o «lampada»",
   "ia.vm.aucune": "Nessun paio con il N°{num} nei tuoi annunci.",
   "ia.vm.aucune.art": "Nessun articolo con il N°{num} nei tuoi annunci.",
   "ia.vm.plusieurs": {"one": "Il N°{num} è su {n} paio: quale?", "other": "{n} paia portano il N°{num}: quale hai venduto?"},

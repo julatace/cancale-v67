@@ -48,7 +48,8 @@ export const CORPS_MAX = CORPS_R;
 // jointures. Les lettres, chiffres, « € », « N° », « · » restent.
 const PICTO = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}︎️‍⃣]/gu;
 export function sansEmoji(s) {
-  return String(s == null ? '' : s).replace(PICTO, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/[^\S\u00a0\u202f]+/g, ' ')
+  // (26 nov.) ★ n'est pas un décor : c'est l'unité d'une NOTE (« Avis 2★ », « 3★ ou moins ») — sans elle, « Avis 2 reçu » ne veut plus rien dire.
+  return String(s == null ? '' : s).replace(PICTO, (c) => (c === '★' ? c : ' ')).replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/[^\S\u00a0\u202f]+/g, ' ')
     .replace(/^[\s·:—–-]+/, '').replace(/[\s·:—–-]+$/, '').trim();
 }
 // (15 nov.) Coupé sur un MOT (« … »), jamais au milieu.
