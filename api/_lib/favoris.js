@@ -3,7 +3,7 @@ import {vendeurExige,lireCommeVendeur} from './session.js';
 import {modifierNeutre} from './neutre-cas.js';
 import {resoudreCiblesFavoris} from './favoris-cibles.js';
 import {lirePreuvesConversationsFavoris} from './favoris-preuves.js';
-import {ordreRecents,initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,reprendreFile,RefusFavoris} from './favoris-file.js';
+import {ordreRecents,initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,trancherIncertain,reprendreFile,RefusFavoris} from './favoris-file.js';
 import {validerReglagesFavoris} from '../../src/reglagesFavoris.js';
 import {sendPushToAll,pushCategorieActive} from './push.js';
 import {contexteVendeur} from './owner.js';
@@ -312,6 +312,7 @@ export async function routeFavoris(req,res){
         decision=d=>verifierReservation(d,{owner,jeton:c.jeton,maintenant});
       }else if(c.action==='arreter')decision=d=>arreterFile(d,owner);
       else if(c.action==='clore')decision=d=>cloreIncertains(d,{owner,maintenant});
+      else if(c.action==='trancher')decision=d=>trancherIncertain(d,{owner,notificationId:c.notificationId,parti:c.parti,maintenant});   // 26 nov. : SON choix sur un envoi incertain
       else throw new RefusFavoris('Commande inconnue.',400);
     }
     const r=await modifierNeutre(cle,decision);

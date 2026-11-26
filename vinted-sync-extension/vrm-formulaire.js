@@ -25,7 +25,7 @@
 //  formulaire et la réponse attendue.
 // ════════════════════════════════════════════════════════════════════════════
 (() => {
-  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 7.4) return;
+  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 7.5) return;
   const SEL = Object.freeze({
     vendre: 'a[data-testid="header-upload-item-button"]',
     photos: 'input[data-testid="add-photos-input"]',
@@ -297,24 +297,63 @@
     const k = Number(cible) > 0 ? Math.min(2.5, Math.max(0.5, Number(cible) / somme)) : 1;
     return brut.map((x) => Math.round(Math.min(900, Math.max(55, x * k))));
   }
+  // 5.453.2 (Julien, 26 nov. : « dans la conversation, RIEN n'est parti, ni message ni texte dans le champ ») : la valeur posée
+  //    par le setter (ou `textContent` d'un champ riche) n'arrive pas toujours dans l'ÉTAT de l'éditeur de Vinted (React / éditeur
+  //    riche) : le champ se vide au rendu suivant, « Envoyer » ne part pas. Chaque lettre passe désormais par la commande
+  //    d'édition du navigateur (`document.execCommand('insertText')`, champ ayant le focus) — le même chemin qu'une frappe pour
+  //    l'éditeur (beforeinput / input) ; elle n'a rien pris ⇒ l'ancienne pose (setter natif + `input`). Rien de maquillé.
+  const valeurNette = (el) => valeurDe(el).replace(/ /g, ' ').replace(/\r\n?/g, '\n').replace(/\n$/, '');
+  function viderChamp(el) {
+    if (!valeurDe(el)) return;
+    try { el.focus(); } catch (_) {}
+    try {
+      if (el.isContentEditable) { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+      else el.select();
+      document.execCommand('delete', false);
+    } catch (_) {}
+    if (valeurDe(el)) {
+      if (el.isContentEditable) { el.textContent = ''; el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' })); }
+      else { setterDe(el)(''); el.dispatchEvent(new Event('input', { bubbles: true })); }
+    }
+  }
+  function insererLettre(el, ch, v) {
+    try { if (document.activeElement !== el) el.focus(); } catch (_) {}
+    const avant = valeurDe(el);
+    let pris = false;
+    try { pris = document.execCommand('insertText', false, ch) && valeurDe(el) !== avant; } catch (_) { pris = false; }
+    if (pris) return 'commande';
+    if (el.isContentEditable) el.textContent = v; else setterDe(el)(v);
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, data: ch, inputType: ch === '\n' ? 'insertLineBreak' : 'insertText' }));
+    return 'pose';
+  }
   async function taperHumain(el, texte, cible) {
     const t = String(texte), l = Array.from(t), dl = delaisHumains(t, cible);
     try { el.scrollIntoView({ block: 'center' }); } catch (_) {}
     try { el.focus(); } catch (_) {}
-    if (el.isContentEditable) { el.textContent = ''; el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' })); }
-    else { const p0 = setterDe(el); p0(''); el.dispatchEvent(new Event('input', { bubbles: true })); }
-    const poser = el.isContentEditable ? (v) => { el.textContent = v; } : setterDe(el);
-    let v = '';
+    viderChamp(el);
+    let v = '', voie = '';
     for (let i = 0; i < l.length; i++) {
       const ch = l[i];
-      v += ch; poser(v);
-      el.dispatchEvent(new InputEvent('input', { bubbles: true, data: ch, inputType: ch === '\n' ? 'insertLineBreak' : 'insertText' }));
+      v += ch; voie = insererLettre(el, ch, v) || voie;
       noterDelai(ch === ' ' ? 'mot' : 'lettre-favori', dl[i]);
       await attenteFrappe(dl[i]);
       if (ch === ' ' && captcha()) return { captcha: true };
     }
     if (!el.isContentEditable) el.dispatchEvent(new Event('change', { bubbles: true }));
-    return { ok: valeurDe(el) === t };
+    // La valeur RELUE après un temps de rendu (un éditeur qui ne l'a pas prise la remet à vide) : sinon rien ne part.
+    await attenteFrappe(400);
+    return { ok: valeurNette(el) === t.replace(/\r\n?/g, '\n').replace(/\n$/, ''), voie };
+  }
+  // 5.453.2 (Julien : « quand on appuie sur le favori, ça propose DIRECTEMENT l'offre ») : la fenêtre « Faire une offre » de
+  //    Vinted ouverte par-dessus la conversation — une seule fenêtre visible qui porte un champ de prix.
+  function dialogueOffre() { const dl = dialogue(); return dl && champPrix(dl).el ? dl : null; }
+  // La fermer (rien n'est envoyé) : son bouton « Fermer » / « Annuler », sinon Échap.
+  async function fermerDialogueOffre(dl) {
+    const b = [...dl.querySelectorAll('button, [role="button"]')].filter((x) => visible(x) && /fermer|close|annuler|cancel|chiudi|annulla|cerrar|cancelar|schlie|abbrechen/i.test(norm(nomAcc(x)) + ' ' + (x.getAttribute('data-testid') || '')));
+    if (b.length) clic(b[0]);
+    else { try { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true })); } catch (_) {} }
+    const fin = Date.now() + 3000; while (Date.now() < fin) { if (!dialogueOffre()) return true; await nap(150); }
+    return !dialogueOffre();
   }
 
   // ── 5.414 : les aides des gestes par l'interface (messagerie, offre, annonce) ─────────────────────────────
@@ -849,8 +888,13 @@
       const txN = rep && rep.json && /^[1-9]\d{0,19}$/.test(String(rep.json.transaction_id || '')) ? String(rep.json.transaction_id) : '';
       // Rien vu partir (aucune requête de création, aucune conversation montrée) : la page n'a rien écrit — arrêt, rien ne part.
       // Une conversation montrée (uuid) dont l'ancien n° n'a pas été lu : ouverte, mais pas prouvée ⇒ « partie », jamais rejouée.
-      if (!conv) return rep || route ? { ok: true, rep, conv: '', route, envoye: !!rep, nonProuvee: true } : manque('conversation-pas-ouverte');
-      return { ok: true, rep, conv, route, tx: txN, envoye: !!rep, chemin: location.pathname };
+      // 5.453.2 : la fenêtre « Faire une offre » que Vinted ouvre d'elle-même en touchant le favori (attendue 2,5 s) — dite au fond,
+      //    qui fait alors l'offre D'ABORD (dans cette fenêtre), puis le message.
+      let offreOuverte = false;
+      if (conv || rep || route) { const f2 = Date.now() + 2500; while (Date.now() < f2) { if (dialogueOffre()) { offreOuverte = true; break; } await nap(200); } }
+      const plusO = offreOuverte ? { offreOuverte: true } : {};
+      if (!conv) return rep || route ? { ok: true, rep, conv: '', route, envoye: !!rep, nonProuvee: true, ...plusO } : manque('conversation-pas-ouverte');
+      return { ok: true, rep, conv, route, tx: txN, envoye: !!rep, chemin: location.pathname, ...plusO };
     },
     // La même étape sur la PAGE complète des notifications (« Voir tout ») : la cloche n'y est pas touchée.
     async favoriListe(d) { return ETAPES.favoriOuvrir(Object.assign({}, d || {}, { liste: true })); },
@@ -863,6 +907,9 @@
       if (!/^[1-9]\d{0,19}$/.test(conv) || !texte.trim()) return { ok: false, code: 'etape' };
       const h = H(d);
       if (!(await attendreConv(conv, d, h ? 15000 : 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
+      // 5.453.2 : la fenêtre d'offre encore ouverte par-dessus le champ (le favori l'ouvre d'elle-même) : fermée d'abord (rien
+      //    n'est envoyé) ; elle ne se ferme pas ⇒ rien ne part, c'est dit.
+      if (h) { const dlo = dialogueOffre(); if (dlo && !(await fermerDialogueOffre(dlo))) return manque('offre-fenetre-ouverte'); }
       const z = await attendreN('message-champ', () => { const x = composeur(); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (z.captcha) return vuCaptcha(); if (z.absent) return manque('message-champ'); if (z.el === 'AMBIGU') return manque('message-champ-ambigu');
       const champ = z.el;
@@ -871,8 +918,11 @@
       //    le fond revoit ses gardes (Tout arrêter, pause, compte de l'onglet) puis rappelle l'étape, qui trouve le texte
       //    déjà là et ne fait plus que toucher « Envoyer ».
       if (!h) { const env = ouAppris('message-envoyer', boutonEnvoyer(champ)); if (env.ambigu) return manque('message-envoyer-ambigu'); if (!env.el) return manque('message-envoyer'); }
-      const deja = h && valeurDe(champ) === texte;
-      const avant = occurrences(texte);
+      const memeTexte = () => valeurNette(champ) === texte.replace(/\r\n?/g, "\n").replace(/\n$/, "");
+      const deja = h && memeTexte();
+      // 5.453.2 : le texte compté HORS du champ (un champ riche est dans `innerText` : tapé, il comptait déjà « une fois »).
+      const horsChamp = () => Math.max(0, occurrences(texte) - (champ.isContentEditable && norm(champ.innerText || '').includes(norm(texte).slice(0, 80)) ? 1 : 0));
+      const avant = horsChamp();
       if (!deja) {
         if (h) {
           await regarder('message');
@@ -886,13 +936,13 @@
       }
       if (captcha()) return vuCaptcha();
       if (!surConv(conv, d)) return { ok: false, code: 'identite', chemin: location.pathname };
-      if (h && d.taper === true) return valeurDe(champ) === texte ? { ok: true, tape: true, vu: true, chemin: location.pathname } : { ok: false, code: 'valeur', manque: 'message-champ' };
+      if (h && d.taper === true) return memeTexte() ? { ok: true, tape: true, vu: true, chemin: location.pathname } : { ok: false, code: 'valeur', manque: 'message-champ' };
       let b2;
       if (h) {
         const w = await attendreN('message-envoyer', () => { const x = ouAppris('message-envoyer', boutonEnvoyer(champ)); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 6000);
         if (w.captcha) return vuCaptcha(); if (w.el === 'AMBIGU') return manque('message-envoyer-ambigu'); if (!w.el) return manque('message-envoyer');
         b2 = { el: w.el };
-        if (valeurDe(champ) !== texte) return { ok: false, code: 'valeur', manque: 'message-champ' };
+        if (!memeTexte()) return { ok: false, code: 'valeur', manque: 'message-champ' };
         try { b2.el.scrollIntoView({ block: 'center' }); } catch (_) {}
         const ms = tirerUnique('hesite', 250, 900); noterDelai('hesite:envoyer', ms); await attenteFrappe(ms);
         if (captcha()) return vuCaptcha();
@@ -905,43 +955,58 @@
       const att = reponseDe('POST', uIci ? new RegExp(`(?:/api/v2/conversations/${conv}|/messaging/main/conversations/${uIci})/replies$`) : new RegExp(`/api/v2/conversations/${conv}/replies$`), 30000, d && d.cle);
       clic(b2.el);
       const r = repMessageNormale(await att, conv);
-      if (!r) return { ok: false, code: 'sans-reponse', parti: true };
+      // 5.453.2 : AUCUNE requête d'envoi vue, le texte TOUJOURS dans le champ et rien de plus dans le fil ⇒ la page n'a rien
+      //    envoyé : « pas parti », certain (avant : « incertain », et la file se bloquait sur « Vérifie les envois incertains »).
+      if (!r) { if (h && memeTexte() && champ.isConnected && horsChamp() <= avant) return { ok: false, code: 'valeur', manque: 'message-non-parti', chemin: location.pathname }; return { ok: false, code: 'sans-reponse', parti: true }; }
       if (r.captcha) return Object.assign(vuCaptcha(), { parti: true });
       if (!r.ok) return { ok: true, rep: r, vu: false };
-      // La preuve à l'écran : le message est apparu dans le fil (une occurrence de plus qu'avant l'envoi).
-      const v = await attendre(() => (occurrences(texte) > avant ? true : null), 12000);
-      return { ok: true, rep: r, vu: v.el === true };
+      // La preuve à l'écran : le message est apparu dans le fil (une occurrence de plus qu'avant l'envoi), relue jusqu'à 12 s.
+      const v = await attendre(() => (horsChamp() > avant ? true : null), 12000);
+      if (v.el === true) return { ok: true, rep: r, vu: true };
+      // 5.453.2 : sinon, la RÉPONSE de Vinted à CET envoi porte CE texte (le message enregistré chez Vinted) — une preuve aussi.
+      const j = r.json && typeof r.json === 'object' ? r.json : {};
+      const dit = [j.content, j.body, j.data && j.data.content, j.data && j.data.body, j.message && j.message.body, j.message && j.message.content, j.reply && j.reply.body].find((x) => typeof x === 'string');
+      return { ok: true, rep: r, vu: !!(dit && norm(dit) === norm(texte)), ...(dit && norm(dit) === norm(texte) ? { vuPar: 'reponse' } : {}) };
     },
     async offre(d) {
       const conv = String((d && d.conv) || ''), tx = String((d && d.tx) || ''), prix = Number(d && d.prix);
       if (!/^[1-9]\d{0,19}$/.test(conv) || !/^[1-9]\d{0,19}$/.test(tx) || !(prix > 0)) return { ok: false, code: 'etape' };
       if (!(await attendreConv(conv, d, H(d) ? 15000 : 8000))) return { ok: false, code: 'identite', chemin: location.pathname };
-      const b = await attendreN('offre-bouton', () => { let x = parNom(RE_FAIRE_OFFRE, document, /make[-_]?offer|offer[-_]?(button|cta)/i, /accept|decline|reject|cancel/i); if (!x.el && !x.ambigu && T()) { const r = T().trouver('boutonOffre', {}); noterTrouve('boutonOffre', r); x = { el: r.el || null, ambigu: !!r.ambigu }; } return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
+      // 5.453.2 : la fenêtre d'offre DÉJÀ ouverte (le favori l'ouvre d'elle-même) : on y travaille, sans toucher « Faire une offre ».
+      const dejaOuverte = H(d) ? dialogueOffre() : null;
+      const b = dejaOuverte ? { el: null } : await attendreN('offre-bouton', () => { let x = parNom(RE_FAIRE_OFFRE, document, /make[-_]?offer|offer[-_]?(button|cta)/i, /accept|decline|reject|cancel/i); if (!x.el && !x.ambigu && T()) { const r = T().trouver('boutonOffre', {}); noterTrouve('boutonOffre', r); x = { el: r.el || null, ambigu: !!r.ambigu }; } return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
       if (b.captcha) return vuCaptcha(); if (b.absent) return manque('offre-bouton'); if (b.el === 'AMBIGU') return manque('offre-bouton-ambigu');
       const avant = occurrencesPrix(prix);
       const h = H(d);   // 5.453 : « Faire une offre » touché après une hésitation, la fenêtre regardée, le prix tapé, « Proposer » touché
-      if (h) await toucher(b.el, 'offre'); else clic(b.el);
-      const dl = await attendreN('offre-fenetre', () => dialogue(), 15000); if (dl.captcha) return vuCaptcha(); if (dl.absent) return manque('offre-fenetre');
+      if (!dejaOuverte) { if (h) await toucher(b.el, 'offre'); else clic(b.el); }
+      const dl = dejaOuverte ? { el: dejaOuverte } : await attendreN('offre-fenetre', () => dialogue(), 15000); if (dl.captcha) return vuCaptcha(); if (dl.absent) return manque('offre-fenetre');
       if (h) await regarder('offre');
       const inp = await attendreN('offre-prix', () => { const x = champPrix(dl.el); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 10000);
       if (inp.captcha) return vuCaptcha(); if (inp.absent) return manque('offre-prix'); if (inp.el === 'AMBIGU') return manque('offre-prix-ambigu');
       const okT = h ? await taperHumain(inp.el, texteMontant(prix), 0).then((t) => (t.captcha ? 'captcha' : t.ok)) : await saisir(inp.el, texteMontant(prix), { garderFocus: true });
       if (okT === 'captcha') return vuCaptcha();
       if (!okT) return { ok: false, code: 'valeur', manque: 'offre-prix' };
+      // 5.453.2 : un champ de MESSAGE dans la fenêtre d'offre (un seul, hors prix) : le message y est tapé, il part avec l'offre.
+      const tMsg = String((d && d.texteMessage) || '');
+      let champMsg = null, avantMsg = 0;
+      if (h && tMsg.trim()) { const l = [...dl.el.querySelectorAll('textarea, [contenteditable="true"]')].filter((x) => visible(x) && !x.disabled && !x.readOnly && x !== inp.el); if (l.length === 1) champMsg = l[0]; }
+      if (champMsg) { avantMsg = occurrences(tMsg); const tm = await taperHumain(champMsg, tMsg, Number(d && d.frappeMs) || 0); if (tm.captcha) return vuCaptcha(); if (!tm.ok) champMsg = null; }
       let s = ouAppris('offre-valider', parNom(RE_VALIDER_OFFRE, dl.el, /submit|confirm|send|offer/i, /cancel|close|annul/i, true));
       if (!s.el && !s.ambigu && T()) { const r = T().trouver('offreValider', {}); noterTrouve('offreValider', r); s = { el: r.el || null, ambigu: !!r.ambigu }; }
       if (s.ambigu) return manque('offre-valider-ambigu'); if (!s.el) return manque('offre-valider');
       if (captcha()) return vuCaptcha();
       ecouter();
       if (h) { try { s.el.scrollIntoView({ block: 'center' }); } catch (_) {} const ms = tirerUnique('hesite', 250, 900); noterDelai('hesite:proposer', ms); await attenteFrappe(ms); if (captcha()) return vuCaptcha(); }
-      const att = reponseDe('POST', new RegExp(`/api/v2/transactions/${tx}/offers$`), 30000, d && d.cle);
+      const att = reponseDe('POST', dejaOuverte ? new RegExp(`(?:/api/v2/transactions/${tx}/offers|/offers)$`) : new RegExp(`/api/v2/transactions/${tx}/offers$`), 30000, d && d.cle);
       clic(s.el);
       const r = await att;
       if (!r) return { ok: false, code: 'sans-reponse', parti: true };
       if (r.captcha) return Object.assign(vuCaptcha(), { parti: true });
       if (!r.ok) return { ok: true, rep: r, vu: false };
       const v = await attendre(() => (occurrencesPrix(prix) > avant ? true : null), 12000);
-      return { ok: true, rep: r, vu: v.el === true };
+      // Le message tapé dans la fenêtre n'est « parti » que VU dans le fil ; sinon le fond le tape dans la conversation.
+      const msgVu = champMsg ? (await attendre(() => (occurrences(tMsg) > avantMsg ? true : null), 6000)).el === true : false;
+      return { ok: true, rep: r, vu: v.el === true, ...(dejaOuverte ? { fenetreFavori: true } : {}), ...(msgVu ? { messageDansOffre: true } : {}), ...(champMsg && !msgVu ? { messageIncertain: true } : {}) };
     },
     async repondreOffre(d) {
       const conv = String((d && d.conv) || ''), tx = String((d && d.tx) || ''), oid = String((d && d.oid) || ''), accepter = !!(d && d.accepter);
@@ -1131,7 +1196,7 @@
       return x ? { ok: true, rep: x } : { ok: false, code: 'sans-reponse' };
     },
   };
-  globalThis.__vrmFormulaireV = 7.4;   // 5.453 : 7.4 (gestes d'un favori comme une personne : regarder, hésiter, taper, puis « Envoyer »)   // 5.440.2 : 7.3 (ligne du favori par ses deux identités, page complète lue jusqu'au bout)   // 5.440.1 : 7.2 (conversation ouverte relue de l'adresse à chaque tour) ; 7.1 (ligne du favori par `user_id`)   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
+  globalThis.__vrmFormulaireV = 7.5;   // 5.453.2 : 7.5 (frappe par la commande d'édition, fenêtre d'offre du favori, « pas parti » certain)   // 5.453 : 7.4 (gestes d'un favori comme une personne : regarder, hésiter, taper, puis « Envoyer »)   // 5.440.2 : 7.3 (ligne du favori par ses deux identités, page complète lue jusqu'au bout)   // 5.440.1 : 7.2 (conversation ouverte relue de l'adresse à chaque tour) ; 7.1 (ligne du favori par `user_id`)   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
   globalThis.__vrmFormulaireSel = SEL;
   globalThis.__vrmFormulaire = async (etape, d) => {
     if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(location.hostname)) return { ok: false, code: 'hors-vinted' };

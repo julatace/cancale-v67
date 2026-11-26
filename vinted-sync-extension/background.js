@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.453.1';
+const CODE_VERSION = '5.453.2';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -18588,7 +18588,7 @@ function cleInterface(geste) { _cleInterface = (_cleInterface + 1) % 1e6; return
 // Le résultat d'une étape de page, rendu sous la forme d'une réponse de Vinted (celle que la PAGE a reçue) :
 // les appelants gardent leurs règles (code 0, 4xx, 5xx…), plus `vu` (la preuve à l'écran) et `rienParti`.
 function resultatInterface(o, geste) {
-  const base = { viaPage: true, interface: true, geste, ...(o && o.tape === true ? { tape: true } : {}) };   // 5.423 : la page a tapé le prix
+  const base = { viaPage: true, interface: true, geste, ...(o && o.tape === true ? { tape: true } : {}), ...(o && o.offreOuverte === true ? { offreOuverte: true } : {}), ...(o && o.messageDansOffre === true ? { messageDansOffre: true } : {}), ...(o && o.messageIncertain === true ? { messageIncertain: true } : {}), ...(o && o.fenetreFavori === true ? { fenetreFavori: true } : {}) };   // 5.453.2 : la fenêtre d'offre ouverte par le favori   // 5.423 : la page a tapé le prix
   if (!o || typeof o !== 'object') return { ...base, status: 0, ok: false, json: null, incertain: true };
   if (o.ok && o.rep && typeof o.rep === 'object') return { ...base, status: Number(o.rep.status) || 0, ok: !!o.rep.ok, json: o.rep.json == null ? null : o.rep.json, vu: o.vu === true, conv: o.conv || '', route: RE_UUID_CONV.test(String(o.route || '')) ? o.route : '', ...(ID_INTERFACE.test(String(o.tx || '')) ? { tx: String(o.tx) } : {}), envoye: o.envoye !== false, autre: !!o.autre, ...(typeof o.etat === 'boolean' ? { etat: o.etat } : {}) };
   if (o.ok) return { ...base, status: 200, ok: true, json: null, sansRequete: true, vu: o.vu === true, conv: o.conv || '', route: RE_UUID_CONV.test(String(o.route || '')) ? o.route : '', envoye: false, ...(o.deja === true ? { deja: true } : {}), ...(typeof o.etat === 'boolean' ? { etat: o.etat } : {}) };
@@ -22112,6 +22112,36 @@ async function sequenceFavoriBleam(x) {
   if (!texteSurVinted(texte).ok) { noterDiag('favori_texte_final_interdit'); return { resultat: 'refuse', raison: 'texte_interdit' }; }
   // 1. (5.410.5) PLUS de `PUT mark_as_read` : l'export de l'Observateur (20 nov.) montre que Bleam ne marque PAS
   //    lue la conversation qu'il ouvre pour un favori (ses `mark_as_read` vont aux conversations où l'acheteur a écrit).
+  // 1 bis. ⚠️ 5.453.2 (Julien, 26 nov. : « quand on appuie sur le favori, ça propose DIRECTEMENT l'offre ») : la page a ouvert
+  //    d'elle-même la fenêtre « Faire une offre » par-dessus la conversation. L'offre se fait D'ABORD, dans cette fenêtre (la
+  //    garde du prix, le plancher), le message dans le champ de la fenêtre s'il y en a un, sinon ensuite dans la conversation.
+  //    Avant : VRM cherchait le champ du message sous la fenêtre ⇒ rien tapé, « incertain », la file bloquée.
+  let offreDeja = null;
+  if (x.offreOuverte && offre && id(tx)) {
+    noterDiag('favori_offre_ouverte');
+    const op0 = await offreAvecPlancher(body.itemId, prixAnnonce, offre);
+    const gp0 = op0.prix ? await gardePrixEcriture({ sorte: 'offre', site: 'vinted', uid, id: String(body.itemId || ''), prixC: Math.round(Number(op0.prix) * 100), actuelC: Number(prixAnnonce) > 0 ? Math.round(Number(prixAnnonce) * 100) : null, mode: 'auto' }) : { ok: false };
+    if (gp0.ok) {
+      await pauseFavori('offre', uid);
+      if (await gardeStricte(uid, acc, { lecture: true })) return { resultat: 'refuse' };
+      etape('offre');
+      const o0 = await interfaceVinted(acc, 'offre', { conv: String(convId), route: x.convRoute || '', tx: String(tx), prix: Number(op0.prix), garde: gp0.ticket, favori: true, texteMessage: texte });
+      if (partie(o0)) compterEcrit();
+      const faite = !!(o0 && o0.ok && (o0.json == null || o0.json.code == null || Number(o0.json.code) === 0));
+      noterDiag(faite ? (o0.vu ? 'favori_offre_fenetre_ok' : 'favori_offre_fenetre_pas_vue') : 'favori_offre_fenetre_' + String((o0 && (o0.manque || o0.sansPage || o0.status)) || 'non').replace(/[^a-z0-9-]/g, '').slice(0, 30));
+      if (o0 && o0.pause) return { resultat: 'refuse', raison: o0.robot ? 'vinted_robot' : 'pause_vinted' };
+      if (o0 && o0.incertain) return { resultat: 'incertain', status: 0, raison: 'offre_incertaine' };
+      if (faite) {
+        offreDeja = { vu: o0.vu === true };
+        if (o0.messageIncertain) { await noterTexteRecent(uid, texte); return { resultat: 'incertain', status: o0.status, raison: 'reponse_inconnue', offreFaite: true }; }
+        if (o0.messageDansOffre) {
+          if (version.lot) await noterLotEnvoye(uid, body.recipientId); else await noterVarianteDerniere(uid, 'favori', version.n);
+          await noterTexteRecent(uid, texte);
+          return { resultat: 'envoye', status: o0.status, variante: version.lot ? null : version.n, offreFaite: true };
+        }
+      } else if (o0 && !o0.rienParti && o0.ok === false && o0.status >= 400) noterDiag('favori_offre_fenetre_refusee_' + o0.status);
+    }
+  }
   // 2. Le message : le temps d'écriture, puis l'envoi.
   await pauseFavori('reponse', uid);
   etape('ecriture');
@@ -22137,6 +22167,7 @@ async function sequenceFavoriBleam(x) {
   else { await noterVarianteDerniere(uid, 'favori', version.n); }
   await noterTexteRecent(uid, texte);
   const fini = { resultat: 'envoye', status: r.status, variante: version.lot ? null : version.n };
+  if (offreDeja) { fini.offreFaite = true; return fini; }   // 5.453.2 : l'offre est déjà faite (la fenêtre du favori)
   // 3. L'offre, dans la même conversation, 8 à 15 s après (jamais deux fois le même délai), au prix de SA règle.
   if (!offre || !id(tx)) return fini;
   const op = await offreAvecPlancher(body.itemId, prixAnnonce, offre);
@@ -22594,7 +22625,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   if(cbF.favoris){
     const versionB=choixP.version;
     if(versionB&&!(offre&&(prixRequisFavori(versionB.modele)||annonceOffreFavori(versionB.modele)))){
-      const r=await sequenceFavoriBleam({uid,acc,body,offre,convId,convRoute,c,tx,prixAnnonce,devise,version:versionB,cb:cbF,etape,partie,compterEcrit:()=>{ecrits++;},tRes,premier});
+      const r=await sequenceFavoriBleam({uid,acc,body,offre,convId,convRoute,c,tx,prixAnnonce,devise,version:versionB,cb:cbF,etape,partie,compterEcrit:()=>{ecrits++;},tRes,premier,offreOuverte:!!(creation&&creation.offreOuverte)});
       if(r.variante!=null)variante=r.variante;
       if(r.resultat==='envoye')await noterChoixFavori(uid,body,convId,versionB,r.offreFaite===true);
       return rep(r.resultat,r.status||0,r.raison,r.cause||'');
@@ -22917,6 +22948,16 @@ async function favorisCarte(msg, sender) {
     if (st && st.uid === o.uid) { st.actif = false; st.attente = null; st.fin = { at: Date.now(), raison: 'arret' }; if (r.json && r.json.carte) st.file = r.json.carte; await poserEtatFavorisCarte(st); }
     await finirActionEnCours('arret');
     return { ok: !!r.ok, etat: st, raison: r.ok ? '' : ((r.json && r.json.message) || 'VRM n’a pas confirmé l’arrêt. Réessaie.') };
+  }
+  // 5.453.2 : SON choix sur UN envoi incertain (« C'est parti » / « Pas parti »), sur sa ligne — rien n'est renvoyé d'ici.
+  if (quoi === 'trancher') {
+    const nid = typeof msg.notificationId === 'string' && msg.notificationId.length <= 160 ? msg.notificationId : '';
+    if (!nid || typeof msg.parti !== 'boolean') return { ok: false, code: 'selection', raison: 'Choix invalide : rien n’a changé.' };
+    const r = await apiFavorisCarte(o.uid, 'trancher', { notificationId: nid, parti: msg.parti });
+    if (!r.ok) return { ok: false, code: 'serveur', raison: (r.json && r.json.message) || 'VRM n’a pas enregistré ton choix. Réessaie.' };
+    await noterApercuCarte(o.uid, { etat: '', total: 0 }).catch(() => {});
+    logActivity(`💬 Favori à vérifier tranché : ${msg.parti ? 'parti' : 'pas parti'}.`);
+    return { ok: true };
   }
   if (quoi === 'reprendre') { const ot = await travailDabord(o, sender); const rr = await reprendreApresVerification(sender, msg.captcha === true); if (rr && !rr.ok && ot && ot.tabId != null) await marquerOngletTravail(ot.tabId, rr.raison); return rr; }
   if (quoi === 'oublier') {

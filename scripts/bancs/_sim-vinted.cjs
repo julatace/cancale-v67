@@ -157,7 +157,7 @@ function fauxVinted({ jetonVinted, lireJwt }) {
 
 // ── LA PAGE (une SPA minimale qui fait ce que fait Vinted quand on clique) ────────────────────────────────────
 function PAGE(st, uid) {
-  const O = { lienWeb: st.lienWeb, captcha: st.captchaSur ? st.captchaSur.source : '', clocheN: st.clocheN, pageTaille: st.pageTaille, suiteMs: st.suiteMs };
+  const O = { lienWeb: st.lienWeb, captcha: st.captchaSur ? st.captchaSur.source : '', clocheN: st.clocheN, pageTaille: st.pageTaille, suiteMs: st.suiteMs, offreAuFavori: !!st.offreAuFavori, champRiche: !!st.champRiche };
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Vinted (simulation)</title><style>
 body{margin:0;font-family:system-ui,sans-serif;background:#f6f6f6;color:#111}header{display:flex;gap:14px;align-items:center;height:60px;padding:0 20px;background:#fff;border-bottom:1px solid #ddd}
 header .logo{color:#09b1ba;font-weight:700;font-size:24px;margin-right:auto}header button,header a{min-width:44px;height:44px;display:inline-grid;place-items:center;background:none;border:0;color:#111;text-decoration:none;font-size:15px}
@@ -176,21 +176,39 @@ textarea{width:420px;min-height:44px;display:block;margin:8px 0}.btn{height:44px
   const captcha = () => { if (O.captcha && new RegExp(O.captcha).test(location.pathname) && !document.getElementById('ddc')) { const f = document.createElement('iframe'); f.id = 'ddc'; f.src = 'https://geo.captcha-delivery.com/captcha/?initialCid=sim'; f.style.cssText = 'position:fixed;top:80px;left:40px;width:400px;height:300px;border:2px solid #c00;background:#fff;z-index:99'; document.body.appendChild(f); } };
   const rendreFil = async (u) => {
     const r = await api('/messaging/main/conversations/' + u); const j = await r.json(); const c = j.conversation || {};
-    m.innerHTML = '<h1>Conversation</h1><div id="fil"></div><button type="button" class="btn" id="offreB">Faire une offre</button><form id="f"><textarea data-testid="conversation-message-input" placeholder="Écris un message"></textarea><button type="submit" class="btn" aria-label="Envoyer">Envoyer</button></form>';
+    // 26 nov. (Julien, 5.453.1) — « champRiche » : le champ du message est un éditeur riche (contenteditable) qui ne garde QUE ce que
+    //    le navigateur y tape (événements d'édition de confiance : frappe, execCommand) ; une valeur posée à la main est remise
+    //    à l'état de l'éditeur au rendu suivant (comme un éditeur React). « Envoyer » envoie l’ÉTAT, éteint s’il est vide.
+    const champ = O.champRiche ? '<div contenteditable="true" role="textbox" aria-label="Écris un message" data-testid="conversation-message-input" style="min-height:44px;width:420px;background:#fff;border:1px solid #ccc;margin:8px 0"></div>' : '<textarea data-testid="conversation-message-input" placeholder="Écris un message"></textarea>';
+    m.innerHTML = '<h1>Conversation</h1><div id="fil"></div><button type="button" class="btn" id="offreB">Faire une offre</button><form id="f">' + champ + '<button type="submit" class="btn" aria-label="Envoyer">Envoyer</button></form>';
     const fil = document.getElementById('fil'); for (const x of c.messages || []) { const p = document.createElement('p'); p.textContent = (x.data && x.data.body) || ''; fil.appendChild(p); }
-    document.getElementById('offreB').onclick = () => {
-      const d = document.createElement('div'); d.setAttribute('role', 'dialog'); d.innerHTML = '<h2>Faire une offre</h2><input type="text" inputmode="decimal" aria-label="Prix" name="price"><div style="margin-top:12px"><button type="button" class="btn" id="prop">Proposer</button></div>';
+    const ed = m.querySelector('[contenteditable]'), envB = m.querySelector('#f button');
+    let etat = '';
+    if (ed) {
+      envB.disabled = true;
+      ed.addEventListener('input', (e) => { if (e.isTrusted) etat = ed.textContent; queueMicrotask(() => { if (ed.textContent !== etat) ed.textContent = etat; envB.disabled = !etat.trim(); }); });
+    }
+    const ouvrirOffre = () => {
+      const d = document.createElement('div'); d.setAttribute('role', 'dialog'); d.innerHTML = '<h2>Faire une offre</h2><input type="text" inputmode="decimal" aria-label="Prix" name="price"><div style="margin-top:12px"><button type="button" class="btn" id="fermerO" aria-label="Fermer">✕</button><button type="button" class="btn" id="prop">Proposer</button></div>';
       document.body.appendChild(d);
+      // L'écran d'offre REMPLACE le champ du message tant qu'il est ouvert.
+      const f = document.getElementById('f'); if (f) f.style.display = 'none';
+      const fin = () => { d.remove(); if (f) f.style.display = ''; };
+      d.querySelector('#fermerO').onclick = fin;
       d.querySelector('#prop').onclick = async () => {
         const prix = String(d.querySelector('input').value).replace(',', '.').replace(/[^0-9.]/g, '');
         const r2 = await fetch('/api/v2/transactions/' + c.data.transaction_id + '/offers', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ offer: { price: prix, currency: 'EUR' } }) });
-        d.remove(); if (r2.ok) { const p = document.createElement('p'); p.textContent = 'Offre : ' + Number(prix).toFixed(2).replace('.', ',') + ' €'; fil.appendChild(p); }
+        fin(); if (r2.ok) { const p = document.createElement('p'); p.textContent = 'Offre : ' + Number(prix).toFixed(2).replace('.', ',') + ' €'; fil.appendChild(p); }
       };
     };
+    document.getElementById('offreB').onclick = ouvrirOffre;
+    // « offreAuFavori » : la conversation ouverte EN TOUCHANT LE FAVORI montre d'elle-même la fenêtre « Faire une offre ».
+    if (O.offreAuFavori && sessionStorage.getItem('simOffreAuto') === u) { sessionStorage.removeItem('simOffreAuto'); setTimeout(ouvrirOffre, 300); }
     document.getElementById('f').onsubmit = async (e) => {
-      e.preventDefault(); const t = m.querySelector('textarea').value;
+      e.preventDefault(); const t = ed ? etat : m.querySelector('textarea').value;
+      if (!String(t).trim()) return;
       const r3 = await api('/messaging/main/conversations/' + u + '/replies', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: t }) });
-      if (r3.ok) { const p = document.createElement('p'); p.textContent = t; fil.appendChild(p); m.querySelector('textarea').value = ''; }
+      if (r3.ok) { const p = document.createElement('p'); p.textContent = t; fil.appendChild(p); if (ed) { etat = ''; ed.textContent = ''; envB.disabled = true; } else m.querySelector('textarea').value = ''; }
     };
   };
   // L'adresse d'un favori ouverte directement (comme au clic de sa ligne) : la page ouvre la conversation elle-même
@@ -198,7 +216,7 @@ textarea{width:420px;min-height:44px;display:block;margin:8px 0}.btn{height:44px
   const ouvrirFavori = async (u) => {
     const iw = (u.pathname.match(/^\\/items\\/(\\d+)\\//) || [])[1];
     const r = await api('/messaging/main/inquiries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: iw || u.searchParams.get('item_id'), receiver_id: u.searchParams.get('receiver_id') || u.searchParams.get('user_id') || u.searchParams.get('offering_id') }) });
-    if (!r.ok) return; const j = await r.json(); history.pushState({}, '', '/inbox/' + j.conversation_id); return route();
+    if (!r.ok) return; const j = await r.json(); if (O.offreAuFavori) sessionStorage.setItem('simOffreAuto', j.conversation_id); history.pushState({}, '', '/inbox/' + j.conversation_id); return route();
   };
   const route = () => {
     captcha();

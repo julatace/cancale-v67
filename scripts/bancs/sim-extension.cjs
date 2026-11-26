@@ -203,7 +203,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     const jobs = () => (vue().jobs || []);
     const parItem = () => Object.fromEntries(jobs().map((x) => [String(x.itemId || String(x.id || '').split(':')[0]), `${x.etat}${x.raison ? ':' + x.raison : ''}${x.cause ? '/' + x.cause : ''}${x.etape ? '@' + x.etape : ''}`]));
     const reset = async () => {
-      S.d = null; V.st.req = []; V.st.ancienneConv = 200; V.st.sansLogin = false; Object.assign(V.st, { avant: 0, intercale: null, paginer: false, clocheN: 0, pageTaille: 20, suiteMs: 0 }); REGLAGES.message = MSG_PSEUDO; V.st.forcer = []; V.st.captchaSur = null; V.st.commande = {}; V.st.convs.clear(); seed();
+      S.d = null; V.st.req = []; V.st.ancienneConv = 200; V.st.sansLogin = false; Object.assign(V.st, { avant: 0, intercale: null, paginer: false, clocheN: 0, pageTaille: 20, suiteMs: 0, offreAuFavori: false, champRiche: false }); REGLAGES.message = MSG_PSEUDO; V.st.forcer = []; V.st.captchaSur = null; V.st.commande = {}; V.st.convs.clear(); seed();
       await dansSW(async () => { await chrome.storage.local.remove(['vrmFavorisCarte', 'vrmActionEnCours', 'vrmPauseVinted', 'vrmCaptcha', 'vrmFavorisApercu', 'vrmTextesRecents', 'vrmToutArrete', 'vrmSortes', 'vrmActions']); });
       // (25 nov.) `vrmSortes` (15 favoris/h) et `vrmActions` (50 actions/h, réserve 5 ⇒ 45) : chaque scénario part d'une heure
       // vide — depuis que F1P réussit (5.450), F1…F1P font 15 favoris = 45 actions (ouverture, message, offre) et F1T restait
@@ -500,9 +500,15 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
     //    de VRAIS clics de Playwright (cocher, « Envoyer », les étapes, « Lancer ») — jamais un appel direct à `favorisCarte`.
     //    On juge ce que la PAGE de Vinted reçoit ensuite : la cloche ouverte, la ligne du favori touchée (la conversation
     //    ouverte par la page), le texte TAPÉ dans le champ, « Envoyer », puis l'offre. Et, si rien ne part, la phrase du panneau.
-    if (veut('P1')) {
-      console.log('\n── P1. depuis le PANNEAU : cocher un favori, « Envoyer », les étapes, « Lancer » (vrais clics) ⇒ cloche, ligne, conversation, texte tapé, Envoyer, offre');
+    // P2 (26 nov., Julien, 5.453.1 : « Pas parti · Vérifie les envois incertains », file bloquée ; « quand on appuie sur le favori,
+    //    ça propose DIRECTEMENT l'offre » ; « rien n'est parti, ni texte dans le champ ») : la même chose, mais la conversation
+    //    ouverte par le favori montre d'elle-même la fenêtre d'offre (qui remplace le champ), et le champ du message est un
+    //    éditeur riche qui ne garde que ce que le navigateur y tape (une valeur posée à la main est effacée).
+    for (const P of ['P1', 'P2']) if (veut(P)) {
+      console.log(P === 'P1' ? '\n── P1. depuis le PANNEAU : cocher un favori, « Envoyer », les étapes, « Lancer » (vrais clics) ⇒ cloche, ligne, conversation, texte tapé, Envoyer, offre'
+        : '\n── P2. depuis le PANNEAU, la VRAIE forme de Julien : le favori ouvre d’abord la fenêtre d’offre, champ du message = éditeur riche ⇒ offre, message tapé et parti, rien d’incertain, la file continue');
       await reset(); V.st.ancienneConv = 404; REGLAGES.message = MSG_SIMPLE;
+      if (P === 'P2') Object.assign(V.st, { offreAuFavori: true, champRiche: true });
       for (const f of FAVORIS) f.forme = 'app';
       let pp = await page('https://www.vinted.fr/inbox');
       const R = () => pp.locator('#vrm-badge');
@@ -511,7 +517,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       { const oui = R().getByText('Oui, capter ce compte'); if (await attendreQue(async () => (await oui.count()) > 0, 15000, 500)) { await oui.first().click().catch(() => {}); await attendre(2500); } }
       await pp.goto('https://www.vinted.fr/inbox?vrm=panneau&page=favoris', { waitUntil: 'domcontentloaded' }).catch(() => {});
       const rang = await attendreQue(async () => (await dans(`li[data-fav-qui="${FAVORIS[0].nid}"] input[data-fav-coche]`).count()) > 0, 60000, 800);
-      await shot(pp, 'P1-0-panneau');
+      await shot(pp, P + '-0-panneau');
       dit(!!rang, 'le panneau montre les favoris du compte (la liste à cocher)', await R().evaluate((h) => (h.shadowRoot ? h.shadowRoot.textContent : '').replace(/\s+/g, ' ').slice(0, 400)).catch((e) => String(e)));
       const etapesPanneau = [];
       if (rang) {
@@ -528,7 +534,7 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
           if (off) { await attendre(2500); }
           await sv.first().click({ timeout: 8000 }).catch((e) => etapesPanneau.push('suivant:' + e.message.slice(0, 80)));
         }
-        await shot(pp, 'P1-1-confirmer');
+        await shot(pp, P + '-1-confirmer');
         const lc = dans('.fav6-feuille [data-fav-lancer]');
         await attendreQue(async () => (await lc.count()) && !(await lc.first().isDisabled()), 20000, 500);
         etapesPanneau.push('lancer' + ((await lc.count()) ? ((await lc.first().isDisabled()) ? '(éteint)' : '') : '(absent)'));
@@ -550,9 +556,11 @@ const extId = (dir) => crypto.createHash('sha256').update(path.resolve(dir)).dig
       dit(msgs.length === 1 && /ton favori est toujours dispo/.test(String(msgs[0] && msgs[0].corps)), 'le texte tapé puis « Envoyer » : le message part de la page', msgs.map((e) => e.corps).join(' | '));
       dit(offres.length === 1, 'l’offre est faite (« Faire une offre », prix, « Proposer »)', offres.map((e) => e.corps).join(' | '));
       dit(!!res, 'la file se termine', JSON.stringify(parItem()));
+      dit(!jobs().some((x) => x.etat === 'incertain') && FP.bilanFavoris(jobs()).envoyes === 1, 'VRM : 1/1 envoyé, rien d’« incertain » (la file n’est pas bloquée)', JSON.stringify(parItem()));
       const txt = await R().evaluate((h) => (h.shadowRoot ? h.shadowRoot.textContent : '').replace(/\s+/g, ' ')).catch(() => '');
       if (!(msgs.length === 1)) note('panneau à la fin : ' + txt.slice(0, 600) + ' · fenêtre ' + JSON.stringify(await fenetre()).slice(0, 600));
-      await shot(pp, 'P1-2-fin');
+      { const tw = ctx.pages().find((p) => /vinted\.fr\/inbox\//.test(p.url()) && p !== pp); if (tw) await shot(tw, P + '-travail'); }
+      await shot(pp, P + '-2-fin');
       await pp.close().catch(() => {});
     }
     // ══ D1 (25 nov., Julien, 5.453.0 : « demander à l'extension … il n'y a plus personne ») : « Envoyer aux favoris » DEPUIS

@@ -2637,7 +2637,10 @@ function vrmVerifVisible(sel) {
     }
     if (c === 'acheteur') return esc(x.pseudo || TU('fl_acheteur'));
     if (c === 'date') return x.date ? `<span title="${esc(dateCourte5(Date.parse(x.date)))}">${esc(dateCourte5(Date.parse(x.date)).replace(/^(\d\d\/\d\d)\/\d{4}/, '$1 ·'))}</span>` : '<span class="gris6">—</span>';
-    return `${etiquette5(et.k, et.t, et.ton === 'ambre' ? 'ambre' : et.ton === 'accent' ? 'accent' : '')}${et.raison ? `<small class="rs6" data-fav-raison6="${esc(et.k)}">${esc(et.raison)}</small>` : ''}`;
+    // 5.453.2 (Julien, 26 nov. : file bloquée sur « Vérifie les envois incertains », sans geste) : un envoi À VÉRIFIER se tranche
+    //    sur SA ligne — il regarde la conversation sur Vinted, puis « C'est parti » ou « Pas parti ». Jamais renvoyé seul.
+    const tranche = et.k === 'verifier' ? `<span class="tr6" data-fav6-trancher-ligne="${esc(x.id)}"><button type="button" class="vu-btn" data-fav6-trancher="parti" data-id="${esc(x.id)}">${esc(TU('f6_parti'))}</button><button type="button" class="vu-btn" data-fav6-trancher="pas" data-id="${esc(x.id)}">${esc(TU('f6_pas_parti'))}</button></span>` : '';
+    return `${etiquette5(et.k, et.t, et.ton === 'ambre' ? 'ambre' : et.ton === 'accent' ? 'accent' : '')}${et.raison ? `<small class="rs6" data-fav-raison6="${esc(et.k)}">${esc(et.raison)}</small>` : ''}${tranche}`;
   }
   // ══ 5.420 (Julien, 21 nov. : « sauf si j'ai activé les messages aux favoris automatiques ») — L'AUTOMATIQUE ═══════════
   // Allumé pour ce compte : les NOUVEAUX favoris reçoivent le message sans passer par les étapes (le pilote de toujours,
@@ -3044,6 +3047,12 @@ function vrmVerifVisible(sel) {
     const fermer = () => { favFeuille = null; vueFav = null; favEnv = null; rendre(); };
     const fileGeste = (quoi) => { if (favOccupe) return; favOccupe = true; favErreur = ''; rendre();
       try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisCarte', quoi, uid }, (r) => { void chrome.runtime.lastError; favOccupe = false; if (!r || !r.ok) favErreur = (r && r.raison) || TU('ra_ko'); apercuFav = null; apercuFavAt = 0; rafraichir(); }); } catch (_) { favOccupe = false; rendre(); } };
+    racine.querySelectorAll('[data-fav6-trancher]').forEach((b) => b.addEventListener('click', (ev) => {
+      ev.stopPropagation(); if (favOccupe) return;
+      const parti = b.getAttribute('data-fav6-trancher') === 'parti', notificationId = b.getAttribute('data-id') || '';
+      favOccupe = true; favErreur = ''; rendre();
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisCarte', quoi: 'trancher', uid, notificationId, parti }, (r) => { void chrome.runtime.lastError; favOccupe = false; favRefus = null; if (!r || !r.ok) favErreur = (r && r.raison) || TU('ra_ko'); apercuFav = null; apercuFavAt = 0; rafraichir(); }); } catch (_) { favOccupe = false; rendre(); }
+    }));
     const cont = racine.querySelector('[data-fav6-continuer]'); if (cont) cont.addEventListener('click', () => fileGeste('continuer'));
     const ann = racine.querySelector('[data-fav6-annuler]'); if (ann) ann.addEventListener('click', () => fileGeste('arreter'));
     carte.querySelectorAll('[data-fav6-fermer]').forEach((b) => b.addEventListener('click', fermer));
@@ -3165,6 +3174,8 @@ function vrmVerifVisible(sel) {
           return;
         }
         favErreur = (r && r.raison) || 'Rien n’est parti : l’extension n’a pas répondu.';
+        // 5.453.2 : un envoi À VÉRIFIER retient la file : la phrase dit le geste (sur SA ligne), la sélection n'est pas « pas partie ».
+        if (r && /incertain/i.test(String(r.raison || ''))) { favErreur = TU('f6_incertain_geste'); favFeuille = null; vueFav = null; apercuFav = null; apercuFavAt = 0; rafraichir(); return; }
         // 5.410.7 : le refus se dit SUR les rangées concernées (celles que le fond nomme, sinon le lot choisi), la feuille se ferme.
         if (grand6()) { favRefus = { ids: new Set((r && Array.isArray(r.ids) && r.ids.length ? r.ids : selection).map(String)), raison: favErreur }; for (const id of favRefus.ids) selFav.delete(id); garderSelection(uid); favFeuille = null; vueFav = null; if (r && r.code === 'selection') { apercuFavAt = 0; } }
         rendre();
