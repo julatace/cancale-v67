@@ -486,8 +486,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **26 nov. · Favoris réparés, ext. 5.453.2** : depuis VRM (`distFavoris`) et depuis le panneau (fenêtre d’offre ouverte par le favori, frappe par `execCommand`, « C’est parti / Pas parti » sur un incertain). `2026-11-25-favoris-sequence-repare.md`. Geste : 5.453.2.
-- **26 nov. · Colis en double au point (`claude/retrait-double-code`)** : un « à vérifier » au même code de retrait qu'un colis compté = ce colis, une carte (`absorberAVerifierParCode`, `src/retraitPreuves.js`, `audit-retrait-preuves` A8–A10). Geste : aucun.
+- **26 nov. · Favoris réparés, ext. 5.453.2** : fenêtre d’offre, frappe `execCommand`, « C’est parti / Pas parti ». `2026-11-25-favoris-sequence-repare.md`. Geste : 5.453.2.
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
