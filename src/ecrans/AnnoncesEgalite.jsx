@@ -37,7 +37,8 @@ import { CLE_VUES_LUES, noterVuesLues, vuesFavorisEnLigne, publierVuesFavoris, l
 import { valeurStockAffiche, publierStockValeur } from '../stockValeurAffiche.js';
 import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
-import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
+import { numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
+import { etatDeVc } from '../enLigneVc.js';   // (26 nov.) « en ligne » / « vendue » Vestiaire : LA règle (Stock, écran Vestiaire)
 import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
   annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, lireTout, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, lireVentesEmail, photoKey, STUDIO_BASE } from '../App.jsx';
 import { ouvrirPanneau, panneauEnRetard, gesteDuPanneau } from '../ouvrirPanneau.js';
@@ -122,7 +123,7 @@ export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis 
   const accs = (accounts || []).filter((a) => { if (!a || a.vinted_user_id == null) return false; const u = String(a.vinted_user_id);
     return !horsCompte({ accountId: u }) || (!!bloqueDe(u) && !supprimes.has(u)); });
   const manque = [];
-  const [vinted, ls, vr, eb, vc, annu] = await Promise.all([
+  const [vinted, ls, vr, eb, vc, annu, vcv] = await Promise.all([
     Promise.all(accs.map(async (acc) => {
       const uid = String(acc.vinted_user_id);
       let r; try { r = await borneLecture(fetchVintedListings(acc, 1, {})); } catch (_) { r = null; }
@@ -139,6 +140,9 @@ export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis 
     borneLecture(lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items')),
     borneLecture(lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`)),
     borneLecture(lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`)),
+    // (26 nov., fiabilité VC) Les ventes Vestiaire (projetées) : une vente lue, pas annulée, prouve « vendue » — comme l'écran
+    // Vestiaire et le Stock. Avant, aucune n'était lue ici : une annonce vendue restait « En ligne » jusqu'à la relecture.
+    borneLecture(lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`)),
   ]);
   const journal = load('vrm_liaison_sites', {}) || {};
   const out = [];
@@ -183,8 +187,9 @@ export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis 
     const auto = numerosVcEffectifs();
     const liensVc = load('vrm_vc_liens', {}) || {};
     const t = Date.parse(L.capturedAt || '');
+    // Ventes pas lues ⇒ rien n'en est tiré (« vendue » seulement si l'annonce le dit), jamais une vente devinée.
     out.push(...annoncesVestiaire(L.items || {}, {
-      etatDe: (id, it) => etatAnnonceVcBrut(it, false, L.capturedAt),
+      etatDe: etatDeVc({ capturedAt: L.capturedAt, ventesLues: vcv }),
       numeroDe: (id, it) => numVcAnnonce(id, it, { ...(L.liens || {}) }, auto),
       vintedDe: (id) => { const x = liensVc[String(id)]; return x && typeof x === 'object' && x.item ? String(x.item) : ''; },
       vieille: !(Number.isFinite(t) && Date.now() - t < JOUR) }));

@@ -32,6 +32,7 @@ export default {
   "vcmod.refusee": "Declined by Vestiaire",
   "vcmod.enLigne": "Online",
   "vcmod.autre": "Vestiaire status: {mot}",
+  "vcmod.aConfirmerVieille": "To confirm · read {quand}",
   "vcmod.corrigerGeste": "Fix on Vestiaire",
   "vcmod.cpt.titre": "At Vestiaire",
   "vcmod.cpt.attente": "{n} awaiting validation",
