@@ -16646,7 +16646,7 @@ async function vintedPageFavori(acc, adresse, corps, options = {}) {
         if (!csrf) csrf = csrfFond || '';
         let anon = '';
         try { const mm = typeof document !== 'undefined' && /(?:^|;\s*)anon_id=([^;]+)/.exec(document.cookie || ''); anon = mm ? decodeURIComponent(mm[1]) : ''; } catch (_) {}
-        const h = { accept: 'application/json, text/plain, */*', 'content-type': 'application/json' };
+        const h = { accept: ['application/json', 'text/plain', '*' + '/' + '*'].join(', '), 'content-type': 'application/json' };   // écrit en morceaux : la suite « étoile-barre-étoile » brouille les lecteurs de code qui ôtent les commentaires
         if (csrf) h['x-csrf-token'] = csrf;
         if (anon) h['x-anon-id'] = anon;
         try {
