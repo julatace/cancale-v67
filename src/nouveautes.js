@@ -106,6 +106,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'favoris-ancien', date: '2026-11-24', titre: 'Favoris : plus de « trop ancien » à tort', phrase: 'Les notifications sont lues jusqu’au bout avant de sauter un favori.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (24 nov., style-graphite — Julien : « un peu plus foncé en gris […] améliore tous les boutons […] change de style pour l'iPhone ») docs/passation/2026-11-24-style-graphite.md
   { id: 'styles-a-essayer', date: '2026-11-24', titre: 'Onze styles à essayer, dont Monochrome', phrase: 'Paramètres → Apparence → Style : touche, c’est appliqué.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot scan-achat — Julien : « fais tout parfaitement ») docs/passation/2026-11-23-scan-achat.md
+  { id: 'scan-achat-numero', date: '2026-11-23', titre: 'Colis d’achat scanné : son N°, le geste', phrase: 'Rangé, à ranger dans telle case, à numéroter, ou déjà vendu.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov., colis-danger — Julien : « te prévient avant qu'il reparte ») docs/passation/2026-11-23-colis-danger.md
   { id: 'colis-en-danger', date: '2026-11-23', titre: 'Colis pas retiré : VRM te prévient', phrase: 'Vinted Go : la veille et le jour où il repart.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (23 nov., revue UX) docs/passation/2026-11-23-revue-ux.md
