@@ -17,7 +17,7 @@ juger('favoris-automatisation-interface', [
   { garantie: 'aucun envoi au montage', ou: [['file', /aucun effet réseau au lancement/], ['panneau', /rien n’est parti avant « Confirmer l’envoi »/]] },
   { garantie: 'le bouton reste touchable pour expliquer le blocage', retiree: 'bouton « Lancer les envois sélectionnés » de AutomatisationFavoris.jsx retiré ; le panneau montre la barre d’envoi seulement avec une sélection (panneau : « sans sélection, pas de barre d’envoi »)' },
   { garantie: 'sans extension : aucun lancement', ou: [['liste', /aucun aperçu lu sur ce navigateur ⇒ rien ne part/]] },
-  { garantie: 'réglages manquants : rien ne part sans la confirmation qui les montre', ou: [['panneau', /la feuille de confirmation : message, versions, offre, rythme au hasard/], ['liste', /sans confirmation ⇒ refusé/]] },
+  { garantie: 'réglages manquants : rien ne part sans la confirmation qui les montre', ou: [['panneau', /la feuille de confirmation \(5\.419\) : message pré-rempli, taux réglé \(10 %\), rythme au hasard/], ['liste', /sans confirmation ⇒ refusé/]] },
   { garantie: 'un seul départ, même après une réponse perdue', ou: [['file', /une réservation en cours ne repart jamais sur un autre appel, même après réponse perdue/]] },
   { garantie: 'seule la sélection est lancée', ou: [['liste', /VRM reçoit EXACTEMENT la sélection/], ['liste', /la file ne contient que ces 3 favoris/]] },
   { garantie: '« envoyé » seulement après l’accusé du serveur', ou: [['file', /la progression distingue envoyés, ignorés et incertains/], ['panneau', /en direct : la rangée passe « Message envoyé »/]] },
