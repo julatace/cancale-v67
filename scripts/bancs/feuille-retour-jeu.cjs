@@ -144,9 +144,11 @@ const lire = (pg) => pg.evaluate(() => {
   const srv = http.createServer((q, r) => { const f = path.join(out, q.url === '/' ? 'index.html' : q.url.split('?')[0]); if (!fs.existsSync(f)) { r.writeHead(404); r.end(); return; } r.writeHead(200, { 'content-type': f.endsWith('.js') ? 'text/javascript' : f.endsWith('.css') ? 'text/css' : 'text/html' }); r.end(fs.readFileSync(f)); });
   await new Promise((ok2) => srv.listen(PORT, ok2));
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
-  const ouvrir = async (W, Hh, mobile, scheme, init, { reduit = false, attendre = 1900 } = {}) => {
-    const ctx = await nav.newContext(Object.assign({ colorScheme: scheme, reducedMotion: reduit ? 'reduce' : 'no-preference', viewport: { width: W, height: Hh } }, mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}));
+  const ouvrir = async (W, Hh, mobile, scheme, init, { reduit = false, attendre = 1900, video = false } = {}) => {
+    const ctx = await nav.newContext(Object.assign({ colorScheme: scheme, reducedMotion: reduit ? 'reduce' : 'no-preference', viewport: { width: W, height: Hh } }, mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {},
+      video ? { recordVideo: { dir: fs.mkdtempSync(path.join(os.tmpdir(), 'frj-video-')), size: { width: W, height: Hh } } } : {}));
     const pg = await ctx.newPage();
+    const tv = Date.now();
     const erreurs = []; pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 200)));
     // Les photos « Vinted » synthétiques : des photos d'exemple de l'app, servies ici (jamais Internet).
     await pg.route(/^https:\/\/images1\.vinted\.net\//, (route) => { const k = (/banc-([a-z-]+)\//.exec(route.request().url()) || [])[1]; const f = EX[k] && path.join(RACINE, 'public', 'exemple', EX[k]);
@@ -155,30 +157,35 @@ const lire = (pg) => pg.evaluate(() => {
       if (o.sombre) { const poser = () => document.documentElement && document.documentElement.setAttribute('data-theme', 'dark'); if (document.documentElement) poser(); else document.addEventListener('readystatechange', poser, { once: true }); } }, init);
     await pg.goto(`http://127.0.0.1:${PORT}/`);
     if (attendre) await pg.waitForTimeout(attendre);
-    return { ctx, pg, erreurs };
+    return { ctx, pg, erreurs, tv };
   };
-  const film = async (pg, nom, n = 16) => {
+  // Le film : la vidéo enregistrée par Playwright, une image toutes les 60 ms à partir de `depuisMs` ; un GIF et une planche.
+  const film = (video, nom, depuisMs, n = 16) => {
     const dossier = path.join(SHOTS, 'film-' + nom); fs.rmSync(dossier, { recursive: true, force: true }); fs.mkdirSync(dossier, { recursive: true });
-    const t0 = Date.now(); const temps = [];
-    for (let i = 0; i < n; i++) { await pg.screenshot({ path: path.join(dossier, String(i).padStart(2, '0') + '.png') }); temps.push(Date.now() - t0); const reste = (i + 1) * 60 - (Date.now() - t0); if (reste > 0) await pg.waitForTimeout(reste); }
-    try { execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', '16', '-i', path.join(dossier, '%02d.png'), '-vf', 'scale=390:-1:flags=lanczos', path.join(SHOTS, 'film-' + nom + '.gif')]); } catch (_) {}
-    try { execFileSync('convert', [...fs.readdirSync(dossier).sort().map((f) => path.join(dossier, f)), '-resize', '25%', '+append', path.join(SHOTS, 'film-' + nom + '-planche.png')]); } catch (_) {}
-    return temps;
+    try {
+      execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-ss', String(Math.max(0, depuisMs) / 1000), '-i', video, '-vf', 'fps=50/3', '-frames:v', String(n), path.join(dossier, '%02d.png')]);
+      execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', '50/3', '-i', path.join(dossier, '%02d.png'), path.join(SHOTS, 'film-' + nom + '.gif')]);
+      execFileSync('convert', [...fs.readdirSync(dossier).sort().map((x) => path.join(dossier, x)), '-resize', '40%', '+append', path.join(SHOTS, 'film-' + nom + '-planche.png')]);
+    } catch (e) { console.log('  (film ' + nom + ' : ' + String(e.message).slice(0, 120) + ')'); }
   };
   try {
     for (const [W, Hh, mobile] of [[390, 844, true], [1512, 900, false]]) for (const scheme of ['light', 'dark']) {
       const T = `${W} ${scheme}`; console.log('\n' + T);
       const sombre = scheme === 'dark';
       // ── Ouverture : le film d'abord (avant toute attente), puis le contenu.
-      let t = await ouvrir(W, Hh, mobile, scheme, { rows: JOURNAL, nuage: VU, copies: COPIES, sombre }, { attendre: 0 });
+      let t = await ouvrir(W, Hh, mobile, scheme, { rows: JOURNAL, nuage: VU, copies: COPIES, sombre }, { attendre: 0, video: FILM && W === 390 });
       await t.pg.waitForSelector('[data-capte-arrivee]', { timeout: 8000 }).catch(() => {});
+      const te = Date.now() - t.tv;
       let tot = await t.pg.evaluate(() => { const c = document.querySelector('[data-capte-compteur]'); return c ? Number(c.textContent) : null; });
-      if (FILM && W === 390) await film(t.pg, 'ouverture-' + scheme); else await t.pg.waitForTimeout(900);
+      await t.pg.waitForTimeout(900);
       let a = await lire(t.pg);
       await t.pg.screenshot({ path: path.join(SHOTS, `retour-${W}-${scheme}.png`) });
-      await t.pg.evaluate(() => { const f = document.querySelector('.n-feuille'); const p = f && f.querySelector('.n-feuille-poignee'); if (p) p.click(); });
+      if (mobile) { await t.pg.focus('.n-feuille-poignee').catch(() => {}); await t.pg.keyboard.press('Enter'); }
       await t.pg.waitForTimeout(450);
       await t.pg.screenshot({ path: path.join(SHOTS, `retour-${W}-${scheme}-pleine.png`) });
+      await t.pg.evaluate(() => { const c = document.querySelector('.n-feuille-corps'); if (c) c.scrollTop = c.scrollHeight; });
+      await t.pg.waitForTimeout(450);
+      await t.pg.screenshot({ path: path.join(SHOTS, `retour-${W}-${scheme}-bas.png`) });
       const carte = (pseudo) => a.cartes.find((c) => c.pseudo === pseudo);
       const c1 = carte('acheteuse_lyon'), c2 = carte('marc.b'), co = carte('paul_75');
       dit(a.vis && a.n === N, `${T} : la feuille s’ouvre avec ${N} nouveautés`, JSON.stringify({ vis: a.vis, n: a.n }));
@@ -201,6 +208,7 @@ const lire = (pg) => pg.evaluate(() => {
       dit(a.petits.length === 0 && !a.debord, `${T} F : cibles ≥ 44 px, rien ne déborde`, JSON.stringify(a.petits));
       dit(t.erreurs.length === 0, `${T} : aucune erreur de page`, JSON.stringify(t.erreurs));
       await t.ctx.close();
+      if (FILM && W === 390) film(await t.pg.video().path(), 'ouverture-' + scheme, te - 380, 16);
       // ── Toucher une carte : SA conversation, la feuille se ferme, « vu » posé.
       t = await ouvrir(W, Hh, mobile, scheme, { rows: JOURNAL, nuage: VU, copies: COPIES, sombre });
       await t.pg.click('[data-capte-pseudo="acheteuse_lyon"]');
@@ -210,15 +218,17 @@ const lire = (pg) => pg.evaluate(() => {
         `${T} D : toucher la carte ⇒ SA conversation, la feuille se ferme, « vu » posé`, JSON.stringify({ vis: a.vis, al: a.allers, s: a.saves }));
       await t.ctx.close();
       // ── « Tout vu » : l'éclat, « vu » posé au toucher, puis la feuille se ferme.
-      t = await ouvrir(W, Hh, mobile, scheme, { rows: JOURNAL, nuage: VU, copies: COPIES, sombre });
+      t = await ouvrir(W, Hh, mobile, scheme, { rows: JOURNAL, nuage: VU, copies: COPIES, sombre }, { video: FILM && W === 390 });
+      const tc = Date.now() - t.tv;
       await t.pg.click('[data-capte-arrivee-vu]');
       a = await lire(t.pg);
       const pendant = { vis: a.vis, confettis: a.confettis, eclat: a.eclat, vu: a.saves.some(([k, v]) => k === 'vrm_capte_vu' && v && v.at === T0 - 3 * MIN) };
-      if (FILM && W === 390) await film(t.pg, 'tout-vu-' + scheme, 12); else await t.pg.waitForTimeout(800);
+      await t.pg.waitForTimeout(800);
       a = await lire(t.pg);
       dit(pendant.vis && pendant.confettis && pendant.eclat && pendant.vu && !a.vis && a.allers.length === 0,
         `${T} D : « Tout vu » ⇒ éclat (confettis + coche), « vu » posé au toucher, puis la feuille se ferme`, JSON.stringify({ pendant, apres: a.vis }));
       await t.ctx.close();
+      if (FILM && W === 390) film(await t.pg.video().path(), 'tout-vu-' + scheme, tc - 60, 12);
     }
     // ── E. Mouvement réduit : aucune animation, même contenu, « Tout vu » ferme aussitôt.
     console.log('\nmouvement réduit');
