@@ -149,7 +149,7 @@
   .n-os-affiche { width: 55%; height: 40px; margin: 6px 0; }
   .n-os.n-vignette { border-radius: var(--n-r-vignette); margin: 0; }
   .n-attente-texte { padding: 0 var(--n-marge); }
-  @media (prefers-reduced-motion: reduce) { .n-os { animation: none; background-image: none; } .n-roue { animation-duration: 1.6s; } }
+  @media (prefers-reduced-motion: reduce) { .n-os { animation: none; background-image: none; } .n-roue { animation: none; } }   /* (26 nov.) « prefers-reduced-motion ⇒ rien ne bouge » (mouvements.css) : la roue reste dessinée, immobile */
 
   /* ── Faits ──────────────────────────────────────────────────────────────── */
   .n-faits {
