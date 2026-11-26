@@ -70,6 +70,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'chargement-propre', date: '2026-11-25', titre: 'Les écrans se remplissent sans sauter', phrase: 'Un chiffre pas encore lu se dessine, rien ne bouge.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (25 nov., envoi-messages-offres, ext. 5.452 — Julien : « ça envoie pas bien les messages et les offres ») docs/passation/2026-11-25-envoi-messages-offres.md
   { id: 'envoi-confirme', date: '2026-11-25', titre: 'Envoyé seulement quand Vinted confirme', phrase: 'Sinon la raison, et l’heure où ça repart.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (23 nov., lot export-comptable) docs/passation/2026-11-23-export-comptable.md
+  { id: 'export-depenses-sites', date: '2026-11-24', titre: 'Export comptable : dépenses et reçu par site', phrase: 'Tes frais notés et l’argent reçu par plateforme, dans le tableur.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (23 nov., lot achats-hors-vinted) docs/passation/2026-11-23-achats-hors-vinted.md
   { id: 'ticket-plusieurs-articles', date: '2026-11-24', titre: 'Un ticket, plusieurs articles', phrase: 'Vide-grenier ou magasin : chaque article lu devient un achat.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov., captures iPhone de Julien : « ça doit être beaucoup mieux, plus pratique ») docs/passation/2026-11-23-republier-main-feuille.md
