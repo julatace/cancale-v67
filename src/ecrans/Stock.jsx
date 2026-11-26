@@ -880,15 +880,15 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
               aria-label={tr('etag.glisser', { nom: String(m.name) })} title={tr('etag.glisser', { nom: String(m.name) })}><Icon name="menu" size={16}/></button>}
           {meublesVus.length > 1
             ? <span className="vrm-etag-menu-hote">
-                <button className="sb-touche vrm-etag-modifier" type="button" data-meuble-menu={m.id} aria-haspopup="menu" aria-expanded={menuMeuble === m.id} aria-label={tr('etag.gerer', { nom: String(m.name) })}
-                  onClick={() => setMenuMeuble((x) => (x === m.id ? null : m.id))}><Icon name="pencil" size={15} /><span>{tr('etag.modifier')}</span></button>
+                <Bouton variante="secondaire" icone="pencil" className="vrm-etag-modifier" data-meuble-menu={m.id} aria-haspopup="menu" aria-expanded={menuMeuble === m.id} aria-label={tr('etag.gerer', { nom: String(m.name) })}
+                  onClick={() => setMenuMeuble((x) => (x === m.id ? null : m.id))}>{tr('etag.modifier')}</Bouton>
                 <span className="vrm-etag-menu" role="menu" data-meuble-menu-liste={m.id} hidden={menuMeuble !== m.id}>
                   <button role="menuitem" type="button" data-meuble-modifier={m.id} aria-label={tr('stock.modifierMeuble')} onClick={() => { setMenuMeuble(null); ouvrirEditeurMeuble(m); }}><Icon name="pencil" size={15} /><span>{tr('stock.modifierMeuble')}</span></button>
                   <button role="menuitem" type="button" data-meuble-monter={m.id} disabled={rang === 0} aria-label={tr('etag.monter', { nom: String(m.name) })} onClick={() => { setMenuMeuble(null); deplacer(m.id, -1); }}><Icon name="chevron" size={15} style={{ transform: 'rotate(-90deg)' }} /><span>{tr('etag.monterCourt')}</span></button>
                   <button role="menuitem" type="button" data-meuble-descendre={m.id} disabled={rang === meublesVus.length - 1} aria-label={tr('etag.descendre', { nom: String(m.name) })} onClick={() => { setMenuMeuble(null); deplacer(m.id, 1); }}><Icon name="chevron" size={15} style={{ transform: 'rotate(90deg)' }} /><span>{tr('etag.descendreCourt')}</span></button>
                 </span>
               </span>
-            : <button className="sb-touche vrm-etag-modifier" type="button" data-meuble-modifier={m.id} aria-label={tr('stock.modifierMeuble')} onClick={() => ouvrirEditeurMeuble(m)}><Icon name="pencil" size={15} /><span>{tr('etag.modifier')}</span></button>}
+            : <Bouton variante="secondaire" icone="pencil" className="vrm-etag-modifier" data-meuble-modifier={m.id} aria-label={tr('stock.modifierMeuble')} onClick={() => ouvrirEditeurMeuble(m)}>{tr('etag.modifier')}</Bouton>}
           </span>
         </div>
         {desc && !replie ? <div className="vrm-etag-descente" data-descente={desc.cles.join(',')} role="status" aria-live="polite"><span>{desc.texte}</span><button className="sb-lien" type="button" onClick={() => setDescente(null)}>{tr('etag.compris')}</button></div> : null}
@@ -1744,7 +1744,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
               <span data-legende="vendue"><i className="vrm-s2d-pastille is-vendue" aria-hidden="true" />{tr('stock.vendueSortir')}</span>
               <span data-legende="plusenligne"><i className="vrm-s2d-pastille is-plusenligne" aria-hidden="true" />{tr('stock.plusLigne3')}</span>
             </div>
-            {!explication && <button className="sb-lien vrm-etag-aide" type="button" data-stock-explication-ouvrir="" onClick={() => setExplication(true)}>{tr('stock.commentCaMarche')}</button>}
+            {!explication && <Bouton variante="discret" className="vrm-etag-aide" data-stock-explication-ouvrir="" onClick={() => setExplication(true)}>{tr('stock.commentCaMarche')}</Bouton>}
           </div>
         </div>);
     })()}
@@ -1759,7 +1759,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     <div className="vrm-etag-pied" data-meubles-pied="">
       <button className={meubles.length ? 'sb-touche' : 'vrm-b vrm-b-primaire'} type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })}>{tr('stock.ajouterMeuble')}</button>
       {/* (23 nov., intégration de stock-mieux) Avec des meubles, « Comment ça marche ? » est sous la légende ; pièce vide : ici. */}
-      {!meubles.length && !explication && <button className="sb-lien" type="button" data-stock-explication-ouvrir="" onClick={() => setExplication(true)}>{tr('stock.commentCaMarche')}</button>}
+      {!meubles.length && !explication && <Bouton variante="discret" data-stock-explication-ouvrir="" onClick={() => setExplication(true)}>{tr('stock.commentCaMarche')}</Bouton>}
     </div>
     {explication && <StockExplication sneakers={motsStock.nom === 'paire'} onFermer={() => setExplication(false)} />}
 
