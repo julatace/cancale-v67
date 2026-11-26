@@ -147,8 +147,8 @@ export default {
   "adist.bord.aGenerer": "bordereau à générer",
   "adist.bord.absent": "Le PDF n’est pas encore rangé : réessaie dans un instant",
   "adist.bord.passu": "je n’ai pas pu savoir si le bordereau est déjà prêt",
-  "adist.jour.allume": {"one": "Ton ordinateur ({nom}) est allumé · {n} compte", "other": "Ton ordinateur ({nom}) est allumé · {n} comptes"},
-  "adist.jour.eteint": "Ton ordinateur ({nom}) est éteint depuis {heure}",
+  "adist.jour.allume": {"one": "Ordinateur allumé · {n} compte", "other": "Ordinateur allumé · {n} comptes"},
+  "adist.jour.eteint": "Ordinateur éteint · {heure}",
   "adist.jour.attente": {"one": "{n} geste attend ton ordinateur", "other": "{n} gestes attendent ton ordinateur"},
   "adist.jour.sous": "Tes comptes à distance : messages, offres, prix, bordereaux",
   "adist.reglages.desc": "Chaque compte depuis ton téléphone : ton ordinateur exécute, rien ne passe par le cloud."

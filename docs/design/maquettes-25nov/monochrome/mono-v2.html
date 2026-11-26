@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="fr" data-style="mono-v2">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VRM · Monochrome v2</title>
+<script>
+  (function(){ var q = new URLSearchParams(location.search), r = document.documentElement;
+    if (q.get('theme') === 'dark') r.setAttribute('data-theme','dark');
+    if (q.get('gris')) r.setAttribute('data-gris', q.get('gris')); })();
+</script>
+<link rel="stylesheet" href="jetons-mono-v2.css">
+<link rel="stylesheet" href="mono-v2.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    
+    <symbol id="i-boite" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" d="M3.5 7.5 12 3.5l8.5 4v9L12 20.5l-8.5-4zM3.5 7.5 12 11.5l8.5-4M12 11.5v9"/></symbol>
+    <symbol id="i-relais" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3" fill="none" stroke="currentColor" stroke-width="1.75"/></symbol>
+    <symbol id="i-bulle" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" d="M4 5.5h16v10.5H10l-4.5 3.5V16H4z"/></symbol>
+    <symbol id="i-euro" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" d="M17.5 6.4A7 7 0 1 0 17.5 17.6M4.5 10.2h9M4.5 13.8h9"/></symbol>
+    <symbol id="i-soleil" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.75"/><path stroke="currentColor" stroke-width="1.75" stroke-linecap="round" d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></symbol>
+    <symbol id="i-etiquette" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" d="M3.5 12.6V4.5a1 1 0 0 1 1-1h8.1l8 8a1 1 0 0 1 0 1.4l-7.7 7.7a1 1 0 0 1-1.4 0z"/><circle cx="8.2" cy="8.2" r="1.5" fill="currentColor"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9.5 6 6 6-6 6"/></symbol>
+    <symbol id="i-retour" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" d="m14.5 5.5-6.5 6.5 6.5 6.5"/></symbol>
+    <symbol id="i-imprimer" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" d="M7 9V3.5h10V9M7 17H4.5V9h15v8H17M7 13.5h10v7H7z"/></symbol>
+    <symbol id="i-loupe" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="1.75"/><path stroke="currentColor" stroke-width="1.75" stroke-linecap="round" d="m15 15 5 5"/></symbol>
+    <symbol id="i-filtre" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" d="M4 7h16M7 12h10M10 17h4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-copier" viewBox="0 0 24 24"><rect x="8" y="8" width="11.5" height="11.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.75"/><path fill="none" stroke="currentColor" stroke-width="1.75" d="M15.5 8V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2"/></symbol>
+    <symbol id="i-envoyer" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" d="M12 19V5.5M6 11.5l6-6 6 6"/></symbol>
+    <symbol id="i-plus-rond" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="18.5" cy="12" r="1.6" fill="currentColor"/></symbol>
+  <symbol id="s-course" viewBox="0 0 64 40"><path fill="var(--u)" d="M6 30c0-5.6 3.8-8.7 9.1-9.8l11.3-2.4c3.4-.7 5.4-5.4 8-8.3 1.8-2 5.1-2 6.9-.1 3.7 4.7 8.6 8.5 15.6 10.4 3 .8 4.6 3.2 4.6 6.2V30z"/><path fill="var(--s)" d="M5 30h57.5c0 2.6-1.7 4.3-4.3 4.3H8.7C6.6 34.3 5 32.6 5 30z"/><ellipse cx="51.5" cy="32.1" rx="4.6" ry="1.5" fill="var(--d)" opacity=".55"/><path fill="none" stroke="var(--d)" stroke-width="1.2" stroke-linecap="round" d="M13.5 25.6c11-1.6 26-2.3 40.5-.8M31 15.5l3.4 2.4M33.6 12.8l3.4 2.4"/></symbol>
+<symbol id="s-basse" viewBox="0 0 64 40"><path fill="var(--u)" d="M6 29c0-4.2 3.2-6.5 7.4-7l13.4-1.6c3.2-.4 5-4.4 7.4-6.6 2.4-2 6.3-2 8.4.1 3.6 3.6 7.7 6.6 13.5 8 3.1.8 4.9 3 4.9 6V29z"/><path fill="var(--d)" d="M6 29c0-4.2 3.2-6.5 7.4-7l9.4-1.1c-.2 3.2-.9 5.9-2.1 8.1zM50.3 19.6c2.4 1.1 4.6 1.9 7.3 2.6 2.4.6 3.5 2.4 3.5 4.6V29h-9c-.8-3.1-1.4-6.2-1.8-9.4z" opacity=".9"/><path fill="var(--s)" d="M5 29h57.5v2.4c0 1.7-1.3 3-3 3H8c-1.7 0-3-1.3-3-3z"/><path fill="none" stroke="var(--u)" stroke-width=".9" stroke-dasharray="1.6 1.6" opacity=".55" d="M7 31.3h54"/></symbol>
+<symbol id="s-montante" viewBox="0 0 64 40"><path fill="var(--u)" d="M6 29c0-4.2 3.2-6.5 7.4-7l11.8-1.4c3-.4 4.8-3.6 5.6-7.6l1-8.1c.1-1 1-1.7 2-1.6l12 .5c1.3.1 2.3 1.1 2.5 2.4.8 6.1 3.4 11.8 8.5 14.4 2.9 1.4 4.3 3.4 4.3 6.2V29z"/><path fill="var(--d)" d="M33.3 3.9l12 .5c1.3.1 2.3 1.1 2.5 2.4l.5 3.8-15.3-.6z" opacity=".9"/><path fill="var(--d)" d="M6 29c0-4.2 3.2-6.5 7.4-7l8.6-1c-.3 3.1-1 5.8-2.2 8z" opacity=".75"/><path fill="none" stroke="var(--d)" stroke-width="1.2" stroke-linecap="round" d="M31.5 12.5l4 1.2M31.9 16l4 1.2M30 19.5l4 1.2"/><path fill="var(--s)" d="M5 29h57.5v2.4c0 1.7-1.3 3-3 3H8c-1.7 0-3-1.3-3-3z"/></symbol>
+<symbol id="s-epaisse" viewBox="0 0 64 40"><path fill="var(--u)" d="M6 27c0-5.4 4-8 9.2-8.8l9.8-1.5c3.5-.6 5.6-5.6 8.6-8.3 2-1.8 5.5-1.8 7.4.2 3.8 4.4 8.9 8 15.5 9.6 3 .8 4.5 3 4.5 5.8v3z"/><path fill="none" stroke="var(--d)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="M16 25.5l9-6.5 5 5 8-8M44 24l4-6"/><path fill="var(--d)" d="M5 27h57.5v3.8H5z" opacity=".55"/><path fill="var(--s)" d="M5 30.8h57.5v.9c0 1.5-1.2 2.7-2.7 2.7H7.7C6.2 34.4 5 33.2 5 31.7z"/></symbol>
+<symbol id="s-trail" viewBox="0 0 64 40"><path fill="var(--u)" d="M6.5 29.5c0-5 3.5-8.2 8.6-9.3l10.6-2.3c3.6-.8 5.6-5.3 8.4-8 2-1.9 5.4-1.9 7.3.2 3.7 4.3 8.6 8 15 9.6 3.1.8 4.6 3.2 4.6 6.1v3.7z"/><path fill="none" stroke="var(--d)" stroke-width="1.1" stroke-linecap="round" d="M28 22l8-11M32 23l8.5-10.5M36 23.5l8.5-9.5M22.5 26.5c10-1.3 23-1.7 35.5-.6"/><path fill="var(--d)" d="M6.5 29.5c0-2.3.8-4.3 2.2-5.7 3 .6 5.6 1.9 7.5 5.7z" opacity=".8"/><path fill="var(--s)" d="M5 29.5h57.5v2.2l-2 2.7-2.5-1.9-2.5 1.9-2.5-1.9-2.5 1.9-2.5-1.9-2.5 1.9-2.5-1.9-2.5 1.9-2.5-1.9-2.5 1.9-2.5-1.9-2.5 1.9-2.5-1.9-2.5 1.9-2.5-1.9-2.5 1.9-2.5-1.9-2.5 1.9-2.5-1.9-2 1.9L5 31.7z"/></symbol>
+<symbol id="i-comptes" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2" fill="none" stroke="currentColor" stroke-width="1.75"/><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.3c1.7.6 2.8 2.2 3.1 4.7"/></symbol>
+<symbol id="i-coeur" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" d="M12 19.5s-7.5-4.4-7.5-9.6A4.1 4.1 0 0 1 12 7.6a4.1 4.1 0 0 1 7.5 2.3c0 5.2-7.5 9.6-7.5 9.6z"/></symbol>
+<symbol id="i-horloge" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.75"/><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" d="M12 7.5V12l3 2"/></symbol>
+<symbol id="i-relu" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M19 12a7 7 0 1 1-2.05-4.95M19 4.5V8h-3.5"/></symbol>
+<symbol id="i-bas" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m7 10 5 5 5-5"/></symbol>
+<symbol id="i-trombone" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
+<!-- pictos PLEINS pour l’onglet actif (iOS : trait au repos, plein quand choisi) -->
+<symbol id="f-soleil" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.6" fill="currentColor"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.4 5.4l1.6 1.6M17 17l1.6 1.6M5.4 18.6 7 17M17 7l1.6-1.6"/></symbol>
+<symbol id="f-etiquette" viewBox="0 0 24 24"><path fill="currentColor" d="M3 4.5a1.5 1.5 0 0 1 1.5-1.5h8.3l8.3 8.3a1.5 1.5 0 0 1 0 2.1l-7.6 7.6a1.5 1.5 0 0 1-2.1 0L3 12.6zM8.2 6.6a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2z" fill-rule="evenodd"/></symbol>
+<symbol id="f-bulle" viewBox="0 0 24 24"><path fill="currentColor" d="M3.5 5.5A1.5 1.5 0 0 1 5 4h14a1.5 1.5 0 0 1 1.5 1.5v10A1.5 1.5 0 0 1 19 17h-8.6l-4.9 3.6V17H5a1.5 1.5 0 0 1-1.5-1.5z"/></symbol>
+</defs></svg>
+<main class="scene">
+<section class="cadre">
+<div class="phone" id="journee" aria-label="Ma journée">
+  <div class="statut" aria-hidden="true"><span>7:42</span><span class="pictos"><svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5" width="3" height="7" rx="1" fill="currentColor"/><rect x="10" y="2.5" width="3" height="9.5" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="26" height="12" viewBox="0 0 26 12"><rect x=".5" y=".5" width="22" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="15" height="8" rx="2" fill="currentColor"/></svg></span></div>
+  <div class="defile">
+    <header class="tete">
+      <h1>Ma journée</h1>
+      <button class="comptes" type="button" aria-label="4 comptes affichés. Changer">
+        <svg width="20" height="20" aria-hidden="true"><use href="#i-comptes"/></svg><span class="comptes-mot"><b>4</b> comptes</span><svg width="16" height="16" aria-hidden="true"><use href="#i-bas"/></svg>
+      </button>
+    </header>
+
+    <article class="carte heros" aria-labelledby="t-exp">
+      <div class="etiquette"><h2 class="nom" id="t-exp"><span class="point" aria-hidden="true"></span>À expédier</h2><span class="quand"><svg width="16" height="16" aria-hidden="true"><use href="#i-horloge"/></svg>mer. 18&#8239;h</span></div>
+      <div class="heros-ligne">
+        <b class="grand">3</b>
+        <span class="pile" aria-hidden="true"><span class="paire ton-gris" style="--t:52px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-course"/></svg></span><span class="paire ton-blanc" style="--t:52px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-basse"/></svg></span><span class="paire ton-noir" style="--t:52px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-basse"/></svg></span></span>
+      </div>
+      <ul class="liste">
+        <li><button class="ligne" type="button"><span class="plaque"><i class="no">N°</i>124</span><span class="titre">Air Max 90</span><span class="glyphes"><span class="marque" role="img" aria-label="Vinted">V</span><span class="marque" role="img" aria-label="Mondial Relay">MR</span></span><svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button></li>
+        <li><button class="ligne" type="button"><span class="plaque"><i class="no">N°</i>57</span><span class="titre">New Balance 550</span><span class="glyphes"><span class="marque" role="img" aria-label="Vinted">V</span><span class="marque" role="img" aria-label="Vinted Go">VG</span></span><svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button></li>
+        <li><button class="ligne" type="button"><span class="plaque">B230</span><span class="titre">Dunk Low Panda</span><span class="glyphes"><span class="marque" role="img" aria-label="eBay">eB</span></span><svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button></li>
+      </ul>
+      <button class="bouton plein" type="button"><svg width="20" height="20" aria-hidden="true"><use href="#i-imprimer"/></svg>Imprimer</button>
+    </article>
+
+    <article class="carte" aria-labelledby="t-ret">
+      <div class="etiquette"><h2 class="nom" id="t-ret"><span class="point" aria-hidden="true"></span><b class="compte">2</b>À retirer</h2><span class="quand"><svg width="16" height="16" aria-hidden="true"><use href="#i-horloge"/></svg>jeu. 27</span></div>
+      <button class="ligne grande" type="button"><span class="assiette-ic" aria-hidden="true"><svg width="22" height="22" aria-hidden="true"><use href="#i-relais"/></svg></span><span class="corps"><span class="titre">Tabac du Marché</span><span class="l2"><svg width="14" height="14" aria-hidden="true"><use href="#i-horloge"/></svg>19&#8239;h</span></span><svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <div class="puits"><span class="code" aria-label="Code de retrait 4K7-29Q">4K7<i>-</i>29Q</span><button class="rond" type="button" aria-label="Copier le code"><svg width="20" height="20" aria-hidden="true"><use href="#i-copier"/></svg></button></div>
+    </article>
+
+    <article class="carte" aria-labelledby="t-rep">
+      <button class="etiquette tete-lien" type="button" aria-label="5 messages. Tout voir"><h2 class="nom" id="t-rep"><b class="compte">5</b>Messages</h2><svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <ul class="liste">
+        <li><button class="ligne grande" type="button"><span class="paire ton-noir" style="--t:40px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-epaisse"/></svg></span><span class="corps"><span class="titre">lea.runs</span><span class="l2"><span class="plaque petite"><i class="no">N°</i>118</span></span></span><span class="etat accent">Offre 98<span class="eur">&#8239;€</span></span><svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button></li>
+        <li><button class="ligne grande" type="button"><span class="paire ton-gris" style="--t:40px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-trail"/></svg></span><span class="corps"><span class="titre">m_kicks92</span><span class="l2"><span class="plaque petite"><i class="no">N°</i>31</span>« Taille grand&#8239;? »</span></span><svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button></li>
+      </ul>
+    </article>
+
+    <button class="carte mois" type="button" aria-label="Novembre : vendu 1 840 euros, reçu 1 512 euros. Ouvrir Argent">
+      <span class="mois-col"><span class="lib">Vendu</span><b>1&#8239;840<span class="eur">&#8239;€</span></b></span>
+      <span class="mois-col"><span class="lib">Reçu</span><b>1&#8239;512<span class="eur">&#8239;€</span></b></span>
+      <svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg>
+    </button>
+  </div>
+  <nav class="onglets" aria-label="Navigation">
+    <button class="onglet" type="button" aria-current="page"><span class="onglet-ic"><svg width="24" height="24" aria-hidden="true"><use href="#f-soleil"/></svg></span><span class="onglet-mot">Journée</span></button>
+    <button class="onglet" type="button"><span class="onglet-ic"><svg width="24" height="24" aria-hidden="true"><use href="#i-etiquette"/></svg></span><span class="onglet-mot">Annonces</span></button>
+    <button class="onglet" type="button" aria-label="Colis, quelque chose t’attend"><span class="onglet-ic"><svg width="24" height="24" aria-hidden="true"><use href="#i-boite"/></svg><i class="pt" aria-hidden="true"></i></span><span class="onglet-mot">Colis</span></button>
+    <button class="onglet" type="button" aria-label="Messages, quelque chose t’attend"><span class="onglet-ic"><svg width="24" height="24" aria-hidden="true"><use href="#i-bulle"/></svg><i class="pt" aria-hidden="true"></i></span><span class="onglet-mot">Messages</span></button>
+    <button class="onglet" type="button"><span class="onglet-ic"><svg width="24" height="24" aria-hidden="true"><use href="#i-euro"/></svg></span><span class="onglet-mot">Argent</span></button>
+    <i class="indicateur" aria-hidden="true"></i>
+  </nav>
+</div></section>
+<section class="cadre">
+<div class="phone" id="annonces" aria-label="Annonces">
+  <div class="statut" aria-hidden="true"><span>7:43</span><span class="pictos"><svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5" width="3" height="7" rx="1" fill="currentColor"/><rect x="10" y="2.5" width="3" height="9.5" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="26" height="12" viewBox="0 0 26 12"><rect x=".5" y=".5" width="22" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="15" height="8" rx="2" fill="currentColor"/></svg></span></div>
+  <div class="defile">
+    <header class="tete">
+      <h1>Annonces</h1>
+      <button class="rond" type="button" aria-label="Nouvelle annonce"><svg width="22" height="22" aria-hidden="true"><use href="#i-plus"/></svg></button>
+    </header>
+    <div class="segmente" role="group" aria-label="Afficher">
+      <button type="button" aria-pressed="true">En ligne <span class="n">196</span></button>
+      <button type="button" aria-pressed="false">Vendues</button>
+      <button type="button" aria-pressed="false">Brouillons <span class="n">6</span></button>
+    </div>
+    <label class="champ" aria-label="Chercher une annonce"><svg width="20" height="20" aria-hidden="true"><use href="#i-loupe"/></svg><input type="search" placeholder="N°, marque, taille"></label>
+    <div class="puces" role="group" aria-label="Plateforme">
+      <button class="puce" type="button" aria-pressed="true">Tout</button>
+      <button class="puce" type="button" aria-pressed="false" aria-label="Vinted">Vinted</button>
+      <button class="puce" type="button" aria-pressed="false" aria-label="Leboncoin"><span class="marque" role="img" aria-label="Leboncoin">lbc</span></button>
+      <button class="puce" type="button" aria-pressed="false" aria-label="eBay"><span class="marque" role="img" aria-label="eBay">eB</span></button>
+    </div>
+
+    <div class="groupe-tete"><b><span class="marque" role="img" aria-label="Vinted">V</span>sneak_lab</b><span><svg width="14" height="14" aria-hidden="true"><use href="#i-relu"/></svg>5 min</span></div>
+    <div class="carte liste-carte">
+      <ul class="liste">
+        <li><button class="ligne annonce" type="button"><span class="paire ton-gris" style="--t:48px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-course"/></svg></span><span class="corps"><span class="l1"><span class="plaque"><i class="no">N°</i>124</span><span class="titre">Air Max 90</span></span><span class="l2"><span class="etat-pt"><i class="pt-vert" aria-hidden="true"></i>À expédier</span></span></span><span class="prix">75<span class="eur">&#8239;€</span></span><svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button></li>
+        <li><button class="ligne annonce" type="button"><span class="paire ton-noir" style="--t:48px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-epaisse"/></svg></span><span class="corps"><span class="l1"><span class="plaque"><i class="no">N°</i>118</span><span class="titre">Samba OG</span></span><span class="l2">42<i class="sep"></i><svg width="14" height="14" aria-hidden="true"><use href="#i-coeur"/></svg>12<i class="sep"></i>9&#8239;j</span></span><span class="prix">110<span class="eur">&#8239;€</span></span><svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button></li>
+        <li><button class="ligne annonce" type="button"><span class="paire ton-blanc" style="--t:48px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-montante"/></svg></span><span class="corps"><span class="l1"><span class="plaque doublon"><i class="no">N°</i>88</span><span class="titre">Jordan 1 Mid</span></span><span class="l2"><span class="etat-pt"><i class="pt-rouge" aria-hidden="true"></i>Doublon</span></span></span><span class="prix">130<span class="eur">&#8239;€</span></span><svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button></li>
+        <li><button class="ligne annonce" type="button"><span class="paire ton-gris" style="--t:48px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-trail"/></svg></span><span class="corps"><span class="l1"><span class="plaque"><i class="no">N°</i>96</span><span class="titre">Gel-Kayano 14</span></span><span class="l2"><span class="etat-pt"><i class="pt-gris" aria-hidden="true"></i>Masquée</span><i class="sep"></i>43</span></span><span class="prix">68<span class="eur">&#8239;€</span></span><svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button></li>
+      </ul>
+    </div>
+
+    <div class="groupe-tete"><b><span class="marque" role="img" aria-label="Leboncoin">lbc</span>kicks_atelier</b><span><svg width="14" height="14" aria-hidden="true"><use href="#i-relu"/></svg>hier</span></div>
+    <div class="carte liste-carte">
+      <ul class="liste">
+        <li><button class="ligne annonce" type="button"><span class="paire ton-blanc" style="--t:48px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-basse"/></svg></span><span class="corps"><span class="l1"><span class="plaque">B312</span><span class="titre">Air Force 1</span></span><span class="l2"><span class="etat-pt"><i class="pt-creux" aria-hidden="true"></i>À confirmer</span><i class="sep"></i>41</span></span><span class="prix">55<span class="eur">&#8239;€</span></span><svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button></li>
+      </ul>
+    </div>
+  </div>
+  <nav class="onglets" aria-label="Navigation">
+    <button class="onglet" type="button"><span class="onglet-ic"><svg width="24" height="24" aria-hidden="true"><use href="#i-soleil"/></svg></span><span class="onglet-mot">Journée</span></button>
+    <button class="onglet" type="button" aria-current="page"><span class="onglet-ic"><svg width="24" height="24" aria-hidden="true"><use href="#f-etiquette"/></svg></span><span class="onglet-mot">Annonces</span></button>
+    <button class="onglet" type="button" aria-label="Colis, quelque chose t’attend"><span class="onglet-ic"><svg width="24" height="24" aria-hidden="true"><use href="#i-boite"/></svg><i class="pt" aria-hidden="true"></i></span><span class="onglet-mot">Colis</span></button>
+    <button class="onglet" type="button" aria-label="Messages, quelque chose t’attend"><span class="onglet-ic"><svg width="24" height="24" aria-hidden="true"><use href="#i-bulle"/></svg><i class="pt" aria-hidden="true"></i></span><span class="onglet-mot">Messages</span></button>
+    <button class="onglet" type="button"><span class="onglet-ic"><svg width="24" height="24" aria-hidden="true"><use href="#i-euro"/></svg></span><span class="onglet-mot">Argent</span></button>
+    <i class="indicateur" aria-hidden="true"></i>
+  </nav>
+</div></section>
+<section class="cadre">
+<div class="phone" id="messages" aria-label="Messages">
+  <div class="statut" aria-hidden="true"><span>7:45</span><span class="pictos"><svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5" width="3" height="7" rx="1" fill="currentColor"/><rect x="10" y="2.5" width="3" height="9.5" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="26" height="12" viewBox="0 0 26 12"><rect x=".5" y=".5" width="22" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="15" height="8" rx="2" fill="currentColor"/></svg></span></div>
+  <div class="nav">
+    <button class="rond" type="button" aria-label="Retour aux messages"><svg width="22" height="22" aria-hidden="true"><use href="#i-retour"/></svg></button>
+    <div class="qui"><span class="avatar" aria-hidden="true">l</span><b>lea.runs</b><span class="marque" role="img" aria-label="Vinted">V</span></div>
+    <button class="rond" type="button" aria-label="Plus d’actions"><svg width="22" height="22" aria-hidden="true"><use href="#i-plus-rond"/></svg></button>
+  </div>
+  <button class="objet" type="button"><span class="paire ton-noir" style="--t:40px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-epaisse"/></svg></span><span class="plaque"><i class="no">N°</i>118</span><span class="titre">Samba OG</span><svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+  <div class="fil">
+    <div class="jour">Aujourd’hui</div>
+    <div class="bulle eux">Bonjour, elle taille comment&#8239;?</div>
+    <div class="bulle moi">Taille normale, je fais du 42.</div>
+    <div class="heure d">7:12</div>
+    <div class="bulle eux">Merci, je vous fais une offre.</div>
+
+    <section class="carte offre" aria-labelledby="t-offre">
+      <div class="etiquette"><h2 class="nom" id="t-offre"><span class="point" aria-hidden="true"></span>Offre</h2><span class="quand"><svg width="16" height="16" aria-hidden="true"><use href="#i-horloge"/></svg>23&#8239;h</span></div>
+      <div class="montant"><b>98<span class="eur">&#8239;€</span></b><s aria-label="prix affiché 110 euros">110<span class="eur">&#8239;€</span></s></div>
+      <div class="jauge" role="img" aria-label="Offre 98 euros, ton prix mini 100 euros, prix affiché 110 euros">
+        <span class="jauge-piste"><i class="jauge-plein" style="width:89.0909090909091%"></i><i class="jauge-mini" style="left:90.9090909090909%"></i></span>
+        <span class="jauge-lib" style="--x:90.9090909090909%">mini 100<span class="eur">&#8239;€</span></span>
+      </div>
+      <button class="bouton plein" type="button">Accepter</button>
+      <div class="rangee-boutons">
+        <button class="bouton second" type="button"><span>Proposer 104<span class="eur">&#8239;€</span></span></button>
+        <button class="lien centre" type="button">Refuser</button>
+      </div>
+    </section>
+  </div>
+  <div class="reponses" role="group" aria-label="Réponses rapides">
+    <button class="puce" type="button">Disponible</button>
+    <button class="puce" type="button">Envoi demain</button>
+    <button class="puce" type="button">Merci&#8239;!</button>
+  </div>
+  <div class="composer">
+    <button class="rond" type="button" aria-label="Joindre une photo"><svg width="20" height="20" aria-hidden="true"><use href="#i-trombone"/></svg></button>
+    <label class="champ capsule" aria-label="Écrire à lea.runs"><input type="text" placeholder="Écrire…"></label>
+    <button class="rond envoyer" type="button" aria-label="Envoyer"><svg width="20" height="20" aria-hidden="true"><use href="#i-envoyer"/></svg></button>
+    <i class="indicateur" aria-hidden="true"></i>
+  </div>
+</div></section>
+</main>
+<section class="boutons" id="boutons" aria-label="Les boutons">
+<div class="planche">
+  <div class="pl-col">
+    <div class="pl-titre">Se touche</div>
+    <div class="pl-rang"><span class="pl-lib">Principal</span><button class="bouton plein" type="button">Imprimer</button><button class="bouton plein est-appui" type="button">Appuyé</button><button class="bouton plein est-focus" type="button">Focus</button></div>
+    <div class="pl-rang"><span class="pl-lib">Secondaire</span><button class="bouton second" type="button">Proposer</button><button class="bouton second est-appui" type="button">Appuyé</button><button class="bouton second est-focus" type="button">Focus</button></div>
+    <div class="pl-rang"><span class="pl-lib">Tertiaire</span><button class="lien" type="button">Tout voir<svg width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button><button class="lien centre" type="button">Refuser</button><button class="lien est-focus" type="button">Focus</button></div>
+    <div class="pl-rang"><span class="pl-lib">Icône</span><button class="rond" type="button" aria-label="Copier"><svg width="20" height="20" aria-hidden="true"><use href="#i-copier"/></svg></button><button class="rond est-appui" type="button" aria-label="Copier, appuyé"><svg width="20" height="20" aria-hidden="true"><use href="#i-copier"/></svg></button><button class="rond est-focus" type="button" aria-label="Copier, focus"><svg width="20" height="20" aria-hidden="true"><use href="#i-copier"/></svg></button><button class="rond envoyer" type="button" aria-label="Envoyer"><svg width="20" height="20" aria-hidden="true"><use href="#i-envoyer"/></svg></button><button class="comptes" type="button" aria-label="4 comptes affichés"><svg width="20" height="20" aria-hidden="true"><use href="#i-comptes"/></svg><span class="comptes-mot"><b>4</b> comptes</span><svg width="16" height="16" aria-hidden="true"><use href="#i-bas"/></svg></button></div>
+    <div class="pl-rang"><span class="pl-lib">Filtre</span><button class="puce" type="button" aria-pressed="true">Tout</button><button class="puce" type="button" aria-pressed="false">Vinted</button><button class="puce est-focus" type="button" aria-pressed="false">Focus</button></div>
+    <div class="pl-rang"><span class="pl-lib">Rangée</span><button class="ligne pl-ligne" type="button"><span class="plaque"><i class="no">N°</i>57</span><span class="titre">New Balance 550</span><svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button><button class="ligne pl-ligne est-appui" type="button"><span class="plaque"><i class="no">N°</i>57</span><span class="titre">Appuyée</span><svg class="chevron" width="16" height="16" aria-hidden="true"><use href="#i-chevron"/></svg></button></div>
+    <div class="pl-rang"><span class="pl-lib">Champ</span><label class="champ" style="flex:1;margin:0"><svg width="20" height="20" aria-hidden="true"><use href="#i-loupe"/></svg><input type="search" placeholder="N°, marque"></label><label class="champ est-champ-focus" style="flex:1;margin:0"><svg width="20" height="20" aria-hidden="true"><use href="#i-loupe"/></svg><input type="search" value="N°57"></label></div>
+  </div>
+  <div class="pl-col">
+    <div class="pl-titre">Ne se touche pas</div>
+    <div class="pl-rang"><span class="pl-lib">État</span><span class="etat-pt"><i class="pt-vert" aria-hidden="true"></i>À expédier</span><span class="etat-pt"><i class="pt-gris" aria-hidden="true"></i>Masquée</span><span class="etat-pt"><i class="pt-creux" aria-hidden="true"></i>À confirmer</span><span class="etat-pt"><i class="pt-rouge" aria-hidden="true"></i>Doublon</span></div>
+    <div class="pl-rang"><span class="pl-lib">Étiquette</span><span class="etat accent">Offre 98<span class="eur">&#8239;€</span></span></div>
+    <div class="pl-rang"><span class="pl-lib">N°</span><span class="plaque"><i class="no">N°</i>124</span><span class="plaque">B230</span><span class="plaque doublon"><i class="no">N°</i>88</span></div>
+    <div class="pl-rang"><span class="pl-lib">Plateforme</span><span class="marque" role="img" aria-label="Vinted">V</span><span class="marque" role="img" aria-label="Leboncoin">lbc</span><span class="marque" role="img" aria-label="eBay">eB</span><span class="marque" role="img" aria-label="Mondial Relay">MR</span><span class="marque" role="img" aria-label="Vinted Go">VG</span></div>
+    <div class="pl-rang"><span class="pl-lib">Paire</span><span class="paire ton-noir" style="--t:48px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-epaisse"/></svg></span><span class="paire ton-gris" style="--t:48px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-course"/></svg></span><span class="paire ton-blanc" style="--t:48px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-basse"/></svg></span><span class="paire ton-blanc" style="--t:48px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-montante"/></svg></span><span class="paire ton-gris" style="--t:48px" aria-hidden="true"><svg viewBox="0 0 64 40"><use href="#s-trail"/></svg></span></div>
+    <div class="pl-rang"><span class="pl-lib">Code</span><div class="puits" style="flex:1;margin:0"><span class="code">4K7<i>-</i>29Q</span></div></div>
+  </div>
+</div></section>
+</body>
+</html>

@@ -79,6 +79,30 @@ const vivante = () => ({ access_token: 'x.' + Buffer.from(JSON.stringify({ sub: 
   const b = /function brancherExtensionApp\(\) \{[^\n]*\}/.exec(APP);
   dit(!!b && /assurerSessionExtension\(\{ geste: true \}\)/.test(b[0]) && /force: lierIci \|\| gesteIci/.test(APP), 'S6 l’app : « Brancher à mon compte » est un geste (force)', b ? b[0] : 'introuvable');
 
+  // S7 — 5.453 (Julien, 25 nov. : « la connexion à l'extension doit ouvrir le panneau, comme ça on voit à quoi ça ressemble ») :
+  //    « Relier par vrm.center » DEMANDÉ depuis la fenêtre ⇒ la session arrive ⇒ l'onglet Vinted de départ passe sur le lien du
+  //    panneau (son accueil, `?vrm=panneau`, le même que l'app) ; une liaison que l'app fait seule n'ouvre rien ; la fenêtre ne
+  //    peut pas ouvrir le panneau sans session.
+  {
+    const panneau = (g) => (g.j.navigations || []).concat(g.j.ongletsCrees || []).filter((n) => /\/\?vrm=panneau$/.test(String(n.url || '')));
+    const g = faireFond({ src: SRC, store: { __sansSession: true }, onglets: [{ id: 7, url: 'https://www.vinted.fr/items/1-paire', status: 'complete', windowId: 1 }] });
+    const refus = await g.envoyer({ from: 'cancale-popup', action: 'ouvrirPanneauAccueil', tab: 7 });
+    dit(refus && refus.ok === false && !panneau(g).length, 'S7 sans session : « ouvrir le panneau » refusé, rien ne s’ouvre', JSON.stringify(refus));
+    await g.envoyer({ from: 'cancale-popup', action: 'lierAvecVRM', urlActive: '', retourTab: 7 });
+    const d = await g.ctx.demanderLiaison({ pour: UID });
+    const r = d && d.nonce ? await g.ctx.recevoirSessionAdressee({ nonce: d.nonce, session: vivante() }) : null;
+    await new Promise((ok2) => setTimeout(ok2, 700));
+    const p = panneau(g);
+    dit(r && r.ok && p.length === 1 && p[0].id === 7 && p[0].url === 'https://www.vinted.fr/?vrm=panneau', 'S7 « Relier par vrm.center » réussi ⇒ le panneau s’ouvre sur son accueil, dans l’onglet Vinted de départ', JSON.stringify({ r, p }));
+    const ok7 = await g.envoyer({ from: 'cancale-popup', action: 'ouvrirPanneauAccueil', tab: 7 });
+    dit(ok7 && ok7.ok === true && panneau(g).length === 2, 'S7 connectée : « Me connecter » réussi / « Ouvrir le panneau » ⇒ le panneau (même lien)', JSON.stringify(ok7));
+    const h = faireFond({ src: SRC, store: { __sansSession: true }, onglets: [{ id: 7, url: 'https://www.vinted.fr/items/1-paire', status: 'complete', windowId: 1 }] });
+    const d2 = await h.ctx.demanderLiaison({ pour: UID, force: true });
+    const r2 = d2 && d2.nonce ? await h.ctx.recevoirSessionAdressee({ nonce: d2.nonce, session: vivante() }) : null;
+    await new Promise((ok2) => setTimeout(ok2, 700));
+    dit(r2 && r2.ok && !panneau(h).length, 'S7 une liaison que l’app fait sans sa demande : aucun panneau ouvert', JSON.stringify({ r2, p: panneau(h) }));
+  }
+
   console.log(`\n${ko ? '❌' : '✅'} connexion simple : ${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

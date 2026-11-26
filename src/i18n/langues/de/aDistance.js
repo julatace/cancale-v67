@@ -147,8 +147,8 @@ export default {
   "adist.bord.aGenerer": "Etikett zu erstellen",
   "adist.bord.absent": "Das PDF ist noch nicht gespeichert: versuch es gleich noch einmal",
   "adist.bord.passu": "ich konnte nicht feststellen, ob das Etikett schon bereit ist",
-  "adist.jour.allume": {"one": "Dein Computer ({nom}) ist an · {n} Konto", "other": "Dein Computer ({nom}) ist an · {n} Konten"},
-  "adist.jour.eteint": "Dein Computer ({nom}) ist seit {heure} aus",
+  "adist.jour.allume": {"one": "Computer an · {n} Konto", "other": "Computer an · {n} Konten"},
+  "adist.jour.eteint": "Computer aus · {heure}",
   "adist.jour.attente": {"one": "{n} Aktion wartet auf deinen Computer", "other": "{n} Aktionen warten auf deinen Computer"},
   "adist.jour.sous": "Deine Konten aus der Ferne: Nachrichten, Angebote, Preise, Etiketten",
   "adist.reglages.desc": "Jedes Konto vom Telefon aus: dein Computer führt aus, nichts läuft über die Cloud."

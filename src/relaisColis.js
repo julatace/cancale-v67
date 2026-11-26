@@ -39,7 +39,7 @@ export const cpDe = (s) => { const m = /\b(\d{5})\b/.exec(String(s || '')); retu
 //     quand l'e-mail ne donne que « 40 RUE DU PORT 35260 CANCALE » (« Cancale »).
 // Le nom propre est rendu, ou '' : un point sans nom reste un point (son
 // adresse le désigne), jamais un nom inventé.
-const TYPE_EN_TETE = /^(?:(?:votre|ton|le|la|au|en|dans)\s+)?(?:point\s+relais|point\s+de\s+retrait|relais\s+pick-?up|consigne(?:\s+vinted\s*go|\s+pick-?up|\s+automatique)?|locker(?:\s*24\s*\/?\s*7)?(?:\s+vinted\s*go)?|casier|vinted\s*go|mondial\s+relay|relais\s+colis|chrono\s*relais|relais\s+shop2shop|chronopost(?:\s+pick-?up)?)\b\s*[:,\-–]?\s*/i;
+const TYPE_EN_TETE = /^(?:(?:votre|ton|le|la|au|en|dans)\s+)?(?:relais\s+vinted(?:\s*go)?|point\s+relais|point\s+de\s+retrait|relais\s+pick-?up|consigne(?:\s+vinted\s*go|\s+pick-?up|\s+automatique)?|locker(?:\s*24\s*\/?\s*7)?(?:\s+vinted\s*go)?|casier|vinted\s*go|mondial\s+relay|relais\s+colis|chrono\s*relais|relais\s+shop2shop|chronopost(?:\s+pick-?up)?)\b\s*[:,\-–]?\s*/i;
 // (1er nov., « plus fiable ») Le TYPE peut aussi venir EN QUEUE : « Kusmi Tea -
 // Consigne Vinted Go », « TABAVAP (Point Relais) ». Il est retiré de la même façon.
 const TYPE_EN_QUEUE = /\s*(?:[,\-–(]\s*)(?:point\s+relais|point\s+de\s+retrait|relais\s+pick-?up|consigne(?:\s+vinted\s*go|\s+pick-?up)?|locker(?:\s+vinted\s*go)?|vinted\s*go)\s*\)?\s*$/i;

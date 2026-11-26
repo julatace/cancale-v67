@@ -116,9 +116,18 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const iV = a.indexOf('function VentesToutes(');
   const corpsV = iV >= 0 ? a.slice(iV, a.indexOf('\nfunction ', iV + 10)) : '';
   const def = /const ficheToutes = \(l\) => \(l\.site === 'vinted' && l\.id \? attrsFicheLigne\(\{[^}]*contexte: 'vente'[^}]*tx: l\.id[^}]*\}\)/.test(corpsV);
-  const pose = /className="vrm-toutes-ligne"[^>]*\{\.\.\.ficheToutes\(l\)\}/.test(corpsV);
+  // (24 nov., main-vert) La refonte native : les lignes sont rendues par `VentesListeTel` (src/natif/ecrans/VentesTableau.jsx),
+  // qui pose `attrsDe(l)` sur la rangée ; chaque appel lui passe `ficheToutes(l)` et ouvre par `ouvrirToutes`.
+  const appelsTel = [...corpsV.matchAll(/<VentesListeTel\b/g)].map((m) => corpsV.slice(m.index, m.index + 900));
+  const tel = sansCommentaires(lire('src/natif/ecrans/VentesTableau.jsx') || '');
+  const iTel = tel.indexOf('export function VentesListeTel(');
+  const corpsTel = iTel >= 0 ? tel.slice(iTel, tel.indexOf('\nexport function ', iTel + 10)) : '';
+  const pose = /className="vrm-toutes-ligne"[^>]*\{\.\.\.ficheToutes\(l\)\}/.test(corpsV)
+    || (appelsTel.length > 0 && appelsTel.every((t) => /attrsDe=\{\(l\) => (?:ficheToutes\(l\)|\(\{ \.\.\.ficheToutes\(l\))/.test(t) && /onOuvrir=\{ouvrirToutes\}/.test(t))
+      && /attrs=\{\{[^\n]*\.\.\.attrsDe\(l\) \}\}/.test(corpsTel) && /onClick=\{onOuvrir \? \(\) => onOuvrir\(l\) : null\}/.test(corpsTel));
   dit(def && pose, 'V1 la ligne Vinted porte l’identité de SA vente (`attrsFicheLigne`, contexte vente, n° de transaction) — jamais le titre', `définie ${def} · posée ${pose}`);
-  dit(/onClick=\{\(\) => \{ if \(!ficheToutes\(l\)\['data-fiche-ligne'\]\) onOuvrir\(l\); \}\}/.test(corpsV), 'V2 le toucher d’une vente Vinted ne redessine plus l’écran Vinted (Leboncoin, Vestiaire, eBay : leur écran, comme avant)');
+  dit(/onClick=\{\(\) => \{ if \(!ficheToutes\(l\)\['data-fiche-ligne'\]\) onOuvrir\(l\); \}\}/.test(corpsV)
+    || (appelsTel.length > 0 && /const ouvrirToutes = \(l\) => \{ const a = ficheToutes\(l\); if \(a\['data-fiche-ligne'\]\) \{[^\n]*ouvrirLigne\(x\); return; \} onOuvrir\(l\); \};/.test(corpsV)), 'V2 le toucher d’une vente Vinted ne redessine plus l’écran Vinted (Leboncoin, Vestiaire, eBay : leur écran, comme avant)');
   fs.rmSync(tmp, { recursive: true, force: true });
   console.log(`\naudit-gestes-fluides : ${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);

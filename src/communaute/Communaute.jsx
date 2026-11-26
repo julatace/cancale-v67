@@ -621,16 +621,18 @@ function Classement({ api, moi, groupe }) {
     {etat === 'charge' ? <p role="status" className="vrm-cm-note">Lecture du classement…</p>
       : c.n === 0 && !groupe ? <div className="vrm-cm-carton vrm-cm-vide" data-cm-classement-vide><b>Personne n’est encore dans le classement.</b><p>Sois le premier à y entrer.</p></div>
       : <div className="vrm-cm-carton">
-        <div className="vrm-cm-palmares-tete"><div><span className="vrm-cm-sur-titre">LA COMMUNAUTÉ VRM</span><h2>Classement des vendeurs</h2><p>{PERIODES.find(([k])=>k===periode)?.[1]} · {c.n} membre{c.n>1?'s':''}</p></div><span className="vrm-cm-palmares-metrique">Ventes Vinted</span></div>
+        <div className="vrm-cm-palmares-tete"><div><h2>Classement des vendeurs</h2><p>{PERIODES.find(([k])=>k===periode)?.[1]} · {c.n} membre{c.n>1?'s':''}</p></div><span className="vrm-cm-palmares-metrique">Ventes Vinted</span></div>
         {c.moi ? <div className="vrm-cm-rang-moi" data-cm-rang-moi={c.moi.rang}><span>Ta position <b>{rangTexte(c.moi.rang)} <small>/ {c.n}</small></b></span><span><b>{c.moi.ventes}</b> vente{c.moi.ventes>1?'s':''}</span></div>
           : <p className="vrm-cm-note">Le nombre de ventes est partagé uniquement par les membres inscrits.</p>}
-        {c.lignes.some(l=>l.rang<=3)&&<div className="vrm-cm-podium" aria-label="Les premières places">{c.lignes.filter(l=>l.rang<=3).slice(0,3).map(l=><div className={'vrm-cm-laureat place-'+l.rang} key={l.pid}><span className="vrm-cm-place">{rangTexte(l.rang)}</span><AvatarProfil profil={l} grand/><b title={l.pseudo}>{l.pseudo}{l.moi?' · toi':''}</b><small>{l.ville}</small><span className="vrm-cm-score">{l.ventes}<small> ventes</small></span></div>)}</div>}
-        <div className="vrm-cm-entete-liste"><span>Position et membre</span><span>Ventes</span></div>
+        {/* (26 nov., capture de Julien : « c'est de la merde ») Le podium seulement à 2 membres ou plus : seul, il répétait « Ta position » et la liste. */}
+        {c.n>=2&&c.lignes.some(l=>l.rang<=3)&&<div className="vrm-cm-podium" aria-label="Les premières places">{c.lignes.filter(l=>l.rang<=3).slice(0,3).map(l=><div className={'vrm-cm-laureat place-'+l.rang} key={l.pid}><span className="vrm-cm-place">{rangTexte(l.rang)}</span><AvatarProfil profil={l} grand/><b title={l.pseudo}>{l.pseudo}{l.moi?' · toi':''}</b><small>{l.ville}</small><span className="vrm-cm-score">{l.ventes}<small> vente{l.ventes>1?'s':''}</small></span></div>)}</div>}
+        {!(c.n<2&&c.moi)&&<><div className="vrm-cm-entete-liste"><span>Position et membre</span><span>Ventes</span></div>
         <ol className="vrm-cm-classement">{c.lignes.map((l) => <li key={l.pid} className={l.moi ? 'moi' : ''} data-cm-ligne={l.pid} data-cm-ligne-ventes={l.ventes} data-cm-ligne-moi={l.moi ? 'oui' : 'non'}>
           <span className="vrm-cm-rang">{rangTexte(l.rang)}</span>
           <span className="vrm-cm-qui"><AvatarProfil profil={l}/><span><b>{l.pseudo}</b>{l.moi && <span className="vrm-cm-badge"> toi</span>}<small>{l.ville}</small></span></span>
           <span className="vrm-cm-ventes"><b>{l.ventes}</b><small> vente{l.ventes>1?'s':''}</small></span>
-        </li>)}</ol>
+        </li>)}</ol></>}
+        {c.n<2&&c.moi&&<p className="vrm-cm-note" data-cm-seul="">Tu es seul pour l’instant : les autres vendeurs apparaîtront ici dès qu’ils entreront.</p>}
       </div>}
     {note}
   </div>;

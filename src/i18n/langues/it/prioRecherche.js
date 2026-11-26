@@ -55,10 +55,7 @@ export default {
   "prio.reglages.jours": "{n} g",
   "prio.reglages.parJour": "Quanti al giorno",
   "prio.reglages.note": "La stessa età del segmento «Fermi». Le paia vendute, nascoste da Vinted, in contestazione o di un account bloccato o personale non sono mai proposte.",
-  "prio.journee": {
-    "one": "{n} paio da ripubblicare per primo",
-    "other": "{n} paia da ripubblicare per prime"
-  },
+  "prio.journee": {"one": "{n} paio da ripubblicare", "other": "{n} paia da ripubblicare"},
   "prio.journeeSous": "Online da {jours} g o più, in ordine",
   "rech.approx": "a meno di una lettera"
 };

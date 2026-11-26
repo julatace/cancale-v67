@@ -142,7 +142,10 @@ const msgEscrow = (oid, j) => {
       await f.envoyer(msgEscrow(OID, expedition()), TAB);
       await f.envoyer(msgEscrow(OID2, { ...expedition(), pickup_point_name: null, pickup_point_address: null }), TAB);
       await pause(300);
-      dit(!ligne(lignes, TX), 'commande d’aucun achat, ou point pas dit ⇒ rien d’écrit', JSON.stringify(ligne(lignes, TX)));
+      // 5.449 (mesuré : la forme réelle sans point était TOUJOURS « inattendue ») : le point pas dit n'invente aucun point,
+      //    mais le transporteur de l'achat prouvé est rangé (audit-suivi-escrow-forme.cjs) ; la commande d'aucun achat, rien.
+      const d4 = ligne(lignes, TX);
+      dit(!!d4 && !d4.relaisNom && !d4.relaisRue && d4.transporteur === 'Relais Banc' && d4.etapes.length === 0, 'commande d’aucun achat ⇒ rien ; point pas dit ⇒ aucun point, le transporteur seul', JSON.stringify(d4));
     });
 
     console.log('\n── A. Voie active : un achat en route lit l’expédition de SA commande');

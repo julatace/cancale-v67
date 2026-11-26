@@ -234,6 +234,10 @@
   .n-groupe-fleche { color: var(--n-encre-3); transition: transform var(--n-duree) var(--n-courbe); }
   .n-groupe-repli[aria-expanded="true"] .n-groupe-fleche { transform: rotate(90deg); }
   .n-groupe-carte { border-radius: var(--n-r-carte); background: var(--n-surface, var(--n-carte)); overflow: hidden; border: 1px solid var(--n-bord); box-shadow: var(--n-ombre-carte); }
+  /* (26 nov., capture de Julien d'Aujourd'hui : « ça rend pas hyper bien ») Sur la page grise, le contour #B9BDC3 des cartes et des
+     tuiles de chiffres dessinait un halo clair autour du blanc : « mal fondu ». La carte se détache par son TON (blanc sur gris),
+     sans filet — la règle déjà écrite pour les tuiles (« ni filet ni ombre », complements.css). Le sombre garde le sien. */
+  :root:not([data-theme="dark"]) :is(.n-groupe-carte, .n-tuile) { border-color: transparent; }
   .n-groupe-pied { margin: 6px 4px 0; font: var(--n-t-legende); color: var(--n-encre-2); }
 
   /* ── Rangee ─────────────────────────────────────────────────────────────── */
@@ -403,6 +407,16 @@
     border-bottom: 1px solid var(--n-bord); opacity: 0; transition: opacity var(--n-duree) ease-out;
   }
   .n-barre-titre[data-n-reduit]::before, .n-barre-titre[data-n-fond]::before { opacity: 1; }
+  /* (25 nov., régressions — capture iPhone de Julien : « Dernières ventes » et le carrousel visibles SOUS la barre, loupe et bulle
+     posées sur les photos) Au téléphone la barre est TOUJOURS opaque, du fond de la page : le contenu ne passe jamais dessous,
+     même quand l'état « défilé » (`data-n-fond`, posé par Page.jsx au défilement) manque — copie d'écran rouverte (src/CopieEcran.jsx,
+     prise page en haut), image de défilement pas encore relue, fondu de 200 ms en cours. En haut de page la barre a la couleur du
+     fond : elle ne se voit pas ; seul le filet (et le petit titre) attend le défilement. */
+  @media (max-width: 759px) {
+    .n-barre-titre::before { opacity: 1; background: var(--n-fond); -webkit-backdrop-filter: none; backdrop-filter: none; border-bottom-color: transparent; transition: border-color var(--n-duree) ease-out; }
+    .n-barre-titre[data-n-reduit]::before, .n-barre-titre[data-n-fond]::before { border-bottom-color: var(--n-bord); }
+    .n-barre-titre::after { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 64px; background: var(--n-fond); pointer-events: none; }
+  }
   /* (20 nov., capture de Julien : des rangées visibles au-dessus et derrière l'en-tête) Dès que du contenu passe dessous, la barre
      est OPAQUE et son fond monte jusqu'au bord haut de l'écran (une marge du défileur laissait voir les rangées au-dessus). */
   .n-barre-titre[data-n-fond]::before { background: var(--n-fond); -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -567,6 +581,11 @@
   .n-coque[data-n-defile="ecran"] { --n-bas: 0px; display: flex; flex-direction: column; height: 100%; min-height: 0; }
   .n-coque[data-n-defile="ecran"] > .n-coque-ecran { flex: 1 1 auto; min-height: 0; padding-bottom: 0 !important; /* (19 nov.) ni le style en ligne ni les vieilles feuilles : le plein collant touche la barre d'onglets */ overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; }
   .n-coque[data-n-defile="ecran"] > .n-onglets { position: relative; flex: 0 0 auto; }
+  /* (23 nov., Julien : « le gris de l'écran d'accueil ») LE FOND DE LA NUIT = celui de vrm.center : le dégradé gris-ardoise
+     (`--n-fond-degrade`, haut #27272B → #1C1C20 → bas #0F0F10, reflet en haut à gauche) sous tout l'écran ; les pages laissent
+     voir ce fond (leurs bandeaux collés gardent l'aplat `--n-fond`). */
+  :root[data-theme="dark"] body, :root[data-theme="dark"] .n-coque { background-color: var(--n-fond); background-image: var(--n-fond-degrade); background-attachment: fixed; }
+  :root[data-theme="dark"] .n-page { background: transparent; }
   /* (23 nov., style-clarte-4) Les ronds de l'en-tête à l'ordinateur (loupe, cloche) : les mêmes qu'Aujourd'hui, posés aussi dans la
      barre du haut des autres écrans (src/App.jsx `RondsBarreHaut`). */
   .vrm-barre-haut-ronds { display: flex; align-items: center; gap: 8px; margin-left: auto; padding-left: 8px; flex: 0 0 auto; }
@@ -590,7 +609,7 @@
   .n-laterale {
     position: sticky; top: 0; align-self: start; box-sizing: border-box; display: flex; flex-direction: column;
     width: var(--n-l-laterale); height: 100dvh; padding: 12px; overflow-y: auto; overscroll-behavior: contain;
-    background: var(--n-carte); border-right: 1px solid var(--n-bord); color: var(--n-encre); font: var(--n-t-corps);
+    background: var(--n-laterale, var(--n-carte)); border-right: 1px solid var(--n-bord); color: var(--n-encre); font: var(--n-t-corps);
   }
   .n-laterale-tete { padding: 4px 8px 16px; }
   .n-laterale-liste { flex: 1 1 auto; }
@@ -777,3 +796,12 @@
 [data-vrm-signale] { outline: 2px solid var(--n-encre, currentColor); outline-offset: 4px; border-radius: 12px; animation: vrm-signale 1.4s ease-out forwards; }
 @keyframes vrm-signale { 0%, 60% { outline-color: var(--n-encre, currentColor); } 100% { outline-color: transparent; } }
 @media (prefers-reduced-motion: reduce) { [data-vrm-signale] { animation: none; } }
+/* (23 nov.) Achats au téléphone : le menu « ⋯ » d'une rangée en feuille d'actions (rangées 48, icônes alignées). */
+.vrm-buy-menu-feuille { display: flex; flex-direction: column; padding: 0 0 8px; }
+.vrm-buy-menu-feuille > :is(button, a) { min-height: 48px !important; padding: 0 16px !important; font-weight: 500 !important; border-radius: 10px; }
+.vrm-buy-menu-feuille svg { width: 18px; height: 18px; flex: none; }
+/* (23 nov., revue UX #7) Achats au téléphone : des achats attendus à un point, rien à retirer ⇒ une ligne repliée. */
+.n-rp-compact { margin: 0 var(--n-marge, 16px) 8px; border: 1px solid var(--n-trait); border-radius: 12px; background: var(--n-carte); }
+.n-rp-compact-tete { list-style: none; display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 14px; font: var(--n-t-corps-fort); color: var(--n-encre); cursor: pointer; }
+.n-rp-compact-tete::-webkit-details-marker { display: none; }
+.n-rp-compact[open] .n-rp-compact-tete { border-bottom: 1px solid var(--n-trait); }

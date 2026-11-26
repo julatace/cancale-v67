@@ -20,6 +20,7 @@ import {useBrouillonCommande} from './brouillonsCommandesEbay.js';
 import {useConversationFocus} from './conversationFocus.js';
 import {createPortal} from 'react-dom';
 import React,{useEffect,useState,useRef} from 'react';
+import { publierAchatsSite } from './achats/nombresAchatsSites.js';   // (25 nov.) le nombre d'achats eBay montrés (filtre par plateforme d'Achats)
 // (5 nov., chantier G) Messages · eBay : « Actualiser » est le bouton commun (jetons), plus un bouton aux couleurs écrites en dur.
 import {BoutonBase} from './composants/Bouton.jsx';
 
@@ -168,7 +169,7 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
    {rows && ((pages!=null && page<pages) || (pages==null && rows.length>=50*page)) && <button type="button" disabled={busy} onClick={()=>charger(page+1)} style={{...S.button,marginTop:10}}>Charger la suite</button>}
    <p style={{fontSize:11,color:C.muted}}>Échanges remontés par eBay sur les 90 derniers jours.</p>
   </div><div className="vrm-chat-column">
-   {selected?<CadreFil etiquette="Conversation eBay" onFermer={fermerConversation} refPanneau={chatPanel}>
+   {selected?<CadreFil etiquette={trEbt('a11y.conversationSur',{site:'eBay'})} onFermer={fermerConversation} refPanneau={chatPanel}>
     <TeteFil onFermer={fermerConversation} libelleFermer="Fermer la conversation eBay" nom={selected.sender || 'Acheteur'} sensible titre={selected.titre || selected.subject} compte="eBay"/>
     {codes.length>0 && <div style={{display:'flex',flexWrap:'wrap',gap:6,padding:8}}>{codes.map(code=><button key={code} type="button" aria-label={`Copier le code eBay ${code}`} style={S.button} onClick={async()=>{try{await navigator.clipboard.writeText(code);setCodeCopie(code);}catch(_){setCodeCopie('erreur');}}}>{code} · {codeCopie===code?'Copié':'Copier'}</button>)}{codeCopie==='erreur' && <span role="status" style={{fontSize:11}}>Copie indisponible. Le code reste visible.</span>}</div>}
     <div style={{padding:'0 16px 8px',flexShrink:0}}><input type="search" aria-label="Rechercher dans la conversation eBay" placeholder="Rechercher un message ou un code…" value={historySearch} onChange={e=>setHistorySearch(e.target.value)} style={S.input}/></div>
@@ -385,6 +386,9 @@ export function EbayAchats({compte='principal',headers,theme:C,sansTitre=false})
  const S=styleUI(C),[rows,setRows]=useState(undefined),[raison,setRaison]=useState(''),[busy,setBusy]=useState(false);
  async function charger(){setBusy(true);try{const j=await call('achats',{},headers);setRows(Array.isArray(j.achats)?j.achats:null);setRaison('');}catch(e){setRows(null);setRaison(e.message);}finally{setBusy(false);}}
  useEffect(()=>{charger();},[]);
+ // (25 nov., filtre par plateforme d'Achats) Le nombre d'achats de CE compte eBay, publié (lu seulement : pas su ⇒ rien).
+ useEffect(()=>{ publierAchatsSite('ebay','compte:'+compte,Array.isArray(rows)?rows.length:null); },[rows,compte]);
+ useEffect(()=>()=>publierAchatsSite('ebay','compte:'+compte,null),[compte]);
  return <section data-ebay-achats={rows===undefined?'en-cours':rows===null?'pas-su':rows.length}>
   <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 10px'}}>{!sansTitre && <h3 className="vrm-ebay-titre-onglet" style={{margin:0,fontSize:15,color:C.text}}>Achats eBay · 60 derniers jours</h3>}<button type="button" onClick={charger} disabled={busy} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div>
   {rows===undefined && <p style={{fontSize:12,color:C.muted}}>Lecture de tes achats…</p>}

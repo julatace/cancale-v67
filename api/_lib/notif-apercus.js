@@ -88,6 +88,11 @@ export const texteRetourLivre = ({ article = '' } = {}) => fabrique('retourLivre
 export const texteRembourse = ({ montant = null, article = '' } = {}) => fabrique('rembourse', { montant, article });
 // (15 nov., lot retour-parfait) Le rappel de la date limite d'un retour pas encore déposé (cron : soir = la veille, matin = le jour).
 export const texteRetourRappel = ({ article = '', limite = '', quand = 'veille', heure = true, jour = '' } = {}) => fabrique('retourRappel', { article, limite, quand, heure, jour });
+// (23 nov., « Colis en danger ») Le colis d'une vente au point relais de l'acheteur, qui repart à la date LUE (api/_lib/colis-danger.js).
+export const texteColisDanger = ({ article = '', limite = '' } = {}) => fabrique('colisDanger', { article, limite });
+// (24 nov., lot suivi-ventes) Le colis d'une vente lu chez le transporteur : au point (son nom LU), retiré (api/_lib/suivi-envoi.js).
+export const texteEnvoiPoint = ({ article = '', lieu = '' } = {}) => fabrique('envoiPoint', { article, lieu });
+export const texteEnvoiRetire = ({ article = '' } = {}) => fabrique('envoiRetire', { article });
 
 // Le rappel du cron « offres au-dessus de ton prix mini » (api/ship-reminders.js).
 export const texteOffresMini = (n) => ({
@@ -223,6 +228,21 @@ export const APERCUS_NOTIF = {
     quoi: 'Une nouvelle annonce eBay pour une recherche dont tu as allumé l’alerte. VRM n’achète rien.',
     exemples: [
       (() => { const n = notifAlertes([{ itemId: 'v1|1|0', recherche: 'Samba 42', titre: 'Adidas Samba OG 42', prix: 6500, port: 500, total: 7000 }]); return { title: n.title, body: n.body, mene: 'eBay · Achats' }; })(),
+    ],
+  },
+  // (23 nov.) Le colis d'une VENTE pas encore retiré par l'acheteur, qui repart à la date lue (Vinted Go).
+  colisdanger: {
+    quoi: 'Ton acheteur n’a pas retiré son colis Vinted Go : la veille et le jour où il repart.',
+    exemples: [
+      { ...texteColisDanger({ article: 'Air Max 90 blanche T42', limite: '2026-11-12T10:34:00Z' }), mene: 'Ventes · la vente, ouverte' },
+    ],
+  },
+  // (24 nov.) Le colis d'une VENTE, lu chez le transporteur : au point de l'acheteur, puis retiré.
+  envois: {
+    quoi: 'Ton colis vendu est arrivé au point de l’acheteur, puis il l’a retiré : une fois par étape, lu chez le transporteur.',
+    exemples: [
+      { ...texteEnvoiPoint({ article: 'Air Max 90 blanche T42', lieu: 'Tabac du Centre' }), mene: 'Ventes · la vente, ouverte' },
+      { ...texteEnvoiRetire({ article: 'Air Max 90 blanche T42' }), mene: 'Ventes · la vente, ouverte' },
     ],
   },
   // (17 nov.) Un coucou reçu dans un groupe : le vrai texte (api/_lib/coucou.js), sans contenu.

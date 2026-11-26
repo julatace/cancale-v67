@@ -10,6 +10,8 @@ entre les onglets ». Le 18 nov. : l'app qu'il trouve belle sur iPhone, c'est Ap
 titres, listes groupées, barre d'onglets standard, feuilles, gestes de balayage, trois volets à l'ordinateur. Un seul
 style, pas de réglage « Style », pas d'« Ancien design ». Moins de CSS = onglets plus rapides.
 
+## 0 ter. ⚠️⚠️ (25 nov. 2026, décision de Julien : « fais entre les deux, la couleur », puis « gris moyen c'est d'accord ») LE CLAIR PAR DÉFAUT EST LE GRIS MOYEN — page `--n-fond` **#878B92** (latérale #999DA3, un cran plus claire), cartes `--n-carte` #F1F2F4 / `--n-carte-2` #E3E5E9, contour #B9BDC3, encre #0E0F12 (5,60:1 sur la page), corps #16181C, secondaire `--n-encre-2` #1F2226 (posé aussi sur la page : 4,67:1 ; 14,3:1 sur la carte), accent = plein = « à faire » #19222C (4,70:1 sur la page, 16:1 sous le blanc du plein). Sur un gris moyen, ni l'encre ni le blanc n'ont de marge : tout texte posé sur la page est à l'encre, jamais un gris clair ni du blanc (3,9:1). Le mode sombre (#1C1C20) ne change pas. Récit : `docs/passation/2026-11-25-gris-moyen.md`. Les valeurs claires du tableau §1 ci-dessous sont celles d'avant (la vérité est `src/natif/jetons.css`).
+
 ## 0 bis. ⚠️⚠️ (22 nov. 2026, décision de Julien : « un mélange de 2 et 1 », « j'aime bien en noir ») L'ACCENT EST L'ENCRE NOIRE (`--n-accent` #16181D, nuit #F4F4F5) — fond #F4F4F2, carte héros à l'encre sur Aujourd'hui (`Heros`, `ActionsRondes`, `GrapheJours`, `Etincelle`, `Repartition`), vert seulement pour un écart positif ou « fait » ; récit `docs/passation/2026-11-22-style-clarte.md`. Le reste de §0 (mesures, étiquettes) tient ; « vert sapin » y est remplacé par l'encre.
 
 ## 0. ⚠️⚠️ STYLE « COMME VINTEX — 2ᵉ JET » (décision de Julien, 21 nov. 2026) — il REMPLACE les valeurs d'avant
@@ -27,7 +29,7 @@ onglet actif, capitales, violet et rouge hors doublon — mutations comprises).
 
 | jeton | clair | sombre | usage |
 |---|---|---|---|
-| `--n-fond` | #F1F3F6 | #0F0F11 | la page (à peine teintée) |
+| `--n-fond` | #878B92 (25 nov., gris moyen ; avant #F1F3F6) | #0F0F11 | la page |
 | `--n-carte` | #FFFFFF | #18181B | cartes, groupes, barres |
 | `--n-carte-2` | #F8F9FA | #1F1F23 | bande de groupe, champ dans une feuille |
 | `--n-bord` | #E4E4E7 | #2E2E33 | contour d'un contrôle, d'une carte ; filet de structure |

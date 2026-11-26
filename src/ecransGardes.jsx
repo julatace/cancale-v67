@@ -44,7 +44,10 @@ import { createPortal } from 'react-dom';
 // d'abord le haut ; elle reste remontée à chaque visite, comme avant.
 // (11 nov., lot DJ3) Colis n'est plus un écran (« À expédier » en tête de Ventes, « À retirer » en tête d'Achats) :
 // Achats, qui prend sa place dans la barre, est gardé à sa place.
-export const ECRANS_GARDABLES = ['journee', 'achats', 'ventes'];
+// (23 nov., latence-2) Annonces REJOINT les écrans gardés : sa grille d'hier ne se rend plus (montée cachée, src/annoncesCachees.js)
+// et sa liste se pose par paquets — le retour tel quel est mesuré 834 → 336 ms (banc fluidite-generale `GARDES=…`, 390 ×4, même build),
+// contre un remontage qui recalculait le moteur caché d'hier à chaque visite.
+export const ECRANS_GARDABLES = ['journee', 'achats', 'ventes', 'annonces'];
 export const MAX_GARDES = 4;
 export const AGE_MAX_CACHE_MS = 10 * 60 * 1000;
 // Clés dont la sauvegarde ne rend aucun écran périmé : des préférences d'affichage

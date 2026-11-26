@@ -104,6 +104,10 @@ export const DESSINS_TRANSPORTEURS = Object.freeze({
   // (13 nov.) La Poste : l'oiseau qui file vers le haut, bleu (#003DA5) et bleu clair (#39A8E5) du groupe, sur le jaune La Poste, dans la marge
   // commune ; le mot « La Poste » (illisible à 20 px) est retiré du dessin, il reste dans le nom.
   laposte: { fond: '#FFCD00', svg: `<path d="M4.5 19.5 27.5 8.5 15.6 21.4Z" fill="#003DA5"/><path d="M15.6 21.4 27.5 8.5 19.4 25Z" fill="#39A8E5"/>` },
+  // (23 nov., revue UX — Julien : « il ne peut pas manquer un logo de transporteur ») Amazon (colis d'un achat livré par Amazon
+  // Logistics, `CARRIERS.amazon` de l'app) : aucun tracé libre ⇒ son nom écrit en minuscules, à l'encre de la marque, et la
+  // flèche-sourire orange simplifiée dessous (usage nominatif, comme les autres mots-symboles ici).
+  amazon: { fond: '#FFFFFF', svg: `<text x="16" y="17.2" text-anchor="middle" fill="#232F3E" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="9.4" letter-spacing="-0.3" textLength="24" lengthAdjust="spacingAndGlyphs">amazon</text><path d="M7.4 20.6C12.6 23.6 19.6 23.6 24.2 20.4" fill="none" stroke="#FF9900" stroke-width="1.9" stroke-linecap="round"/><path d="M22.2 19.4 24.6 20.2 23.9 22.6" fill="none" stroke="#FF9900" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>` },
   colisprive: { fond: '#EE7203', svg: `<text x="16" y="14.6" text-anchor="middle" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="8.8" letter-spacing="-0.3" textLength="20" lengthAdjust="spacingAndGlyphs">Colis</text><text x="16" y="24.4" text-anchor="middle" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="8.8" letter-spacing="-0.3" textLength="20" lengthAdjust="spacingAndGlyphs">Privé</text>` },
 });
 
@@ -127,6 +131,7 @@ export const TRANSPORTEURS = Object.freeze({
   inpost:       { nom: 'Mondial Relay', logos: [], marque: { fond: '#C8105F', encre: '#FFFFFF', sigle: 'MR' } },
   dhl:          { nom: 'DHL',           logos: [], marque: { fond: '#FFCC00', encre: '#1D1D1B', sigle: 'DHL' } },
   fedex:        { nom: 'FedEx',         logos: [], marque: { fond: '#FFFFFF', encre: '#1D1D1F', sigle: 'FX' } },
+  amazon:       { nom: 'Amazon',        logos: [], marque: { fond: '#FFFFFF', encre: '#232F3E', sigle: 'AZ' } },
 });
 
 const sansAccents = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -155,6 +160,7 @@ export function cleTransporteur(raw) {
   if (/\bgls\b/.test(s)) return 'gls';
   if (/\bdhl\b/.test(s)) return 'dhl';
   if (/fedex/.test(s)) return 'fedex';
+  if (/amazon/.test(s)) return 'amazon';
   return null;
 }
 
