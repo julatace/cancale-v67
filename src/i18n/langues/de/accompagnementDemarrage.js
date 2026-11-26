@@ -41,7 +41,7 @@ export default {
   "acc.lecture.2": "Geh zurück zu Heute.",
   "acc.geste.lecture": "Das Einlesen ansehen",
   "acc.numeros.titre": "Eine Nummer pro Artikel",
-  "acc.numeros.phrase": "Eine Nummer pro Artikel, dort, wo er liegt.",
+  "acc.numeros.phrase": "Eine Nummer pro Artikel, an seinem Platz.",
   "acc.numeros.1": "Öffne Anzeigen: jeder Artikel hat eine Nummer.",
   "acc.numeros.2": "Schreib sie dort hin, wo du den Artikel lagerst.",
   "acc.geste.numeros": "Anzeigen öffnen",

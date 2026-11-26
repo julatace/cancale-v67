@@ -2294,3 +2294,13 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **24 nov. · Connexions de l'extension (`claude/connexions-extension`)** : Paramètres → « Connexions de l'extension » : chaque navigateur (nom, version « à jour » ou « 5.418 → 5.440 », vu quand, comptes lus, dernier problème + son geste), chaque compte (lu par qui, quand, jauge 50/h), installations plus vues depuis 3 j repliées ; `etatConnexionCompte` (connecté par compte, pour la porte `peutAgir`) ; une ligne sur Aujourd'hui seulement si un geste attend ; champs 5.448 (`sante`, `arret`, `servie`) lus présents, sinon « — ». `2026-11-24-connexions-extension.md`. Geste : aucun.
 - **23 nov. · Republier à la main refait** : une étape à la fois, grille de toutes les photos (glisser), un plein en bas, vrais curseurs, aucun orange ; « Supprimer » cochée sur lecture complète seulement. `2026-11-23-republier-main-feuille.md`. Geste : aucun.
 - **23 nov. · Appareils connectés : navigateurs de l'extension (`claude/appareils-connectes`)** : lignes `ext_appareil_*` (`owner=eq.`) sous les sessions. `2026-11-23-appareils-connectes.md`. Geste : aucun.
+- **23 nov. · Scan d'un colis d'achat : son N° et le geste** : N° de CET achat (par son n° de transaction), « Rangé · case », « Ranger en … », « Numéroter » ou « déjà vendue » ⇒ la vente ; transaction / code de retrait tapés. `2026-11-23-scan-achat.md`. Geste : aucun.
+
+
+## Déplacé de CLAUDE.md §9 « Gestes encore attendus de Julien » le 26 nov. (taille du fichier)
+
+- Les 6 paires renumérotées le 2 oct. (543→266…, historique numéros) : regarder le carton.
+
+
+### Geste « Installer l’extension » tel qu’il était dans CLAUDE.md jusqu’au 26 nov.
+- Installer l’extension **5.440.1** (23 nov. nuit ; avant 5.440.0, 23 nov. ; avant 5.436.0, 22 nov., intégration 2 ; avant 5.434.0, puis 5.419.0, 21 nov. nuit ; avant 5.418.0, 21 nov. soir ; avant 5.410.8, 21 nov. ; avant 5.410.2, 20 nov. : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip` ; mesuré le 19 nov. : Chrome 5.406, 5.400, 5.329, Orion 5.377, 5.368, 5.336). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.

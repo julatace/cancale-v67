@@ -32,6 +32,7 @@ export default {
   "vcmod.refusee": "Von Vestiaire abgelehnt",
   "vcmod.enLigne": "Online",
   "vcmod.autre": "Vestiaire-Status: {mot}",
+  "vcmod.aConfirmerVieille": "Zu bestätigen · gelesen {quand}",
   "vcmod.corrigerGeste": "Auf Vestiaire korrigieren",
   "vcmod.cpt.titre": "Bei Vestiaire",
   "vcmod.cpt.attente": "{n} warten auf Freigabe",

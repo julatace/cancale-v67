@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (26 nov., fiabilite-vc-lbc — Julien : « les données doivent être fiables, pense à Vestiaire Co et Leboncoin ») src/enLigneVc.js
+  { id: 'fiabilite-vc-lbc', date: '2026-11-26', titre: 'Vestiaire : en ligne et vendue, plus justes', phrase: 'Vente annulée : la paire reste. Lecture ancienne : à confirmer.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (26 nov., couleurs-14-15 — Julien : « j'aime bien le 14 et 15 » → « 14 en sombre, 15 en clair ») src/natif/jetons.css
   // (26 nov., loupe-retour — Julien : « la recherche se met automatiquement ») src/rechercheEcran.js loupeAFermerAuRetour
   { id: 'loupe-retour', date: '2026-11-26', titre: 'Tout sur le N° : plus clair', phrase: 'La paire en tête, les actions en tuiles.', tab: 'journee', pour: 'tous', mode: 'tous' },
