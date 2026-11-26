@@ -67,6 +67,19 @@ async function controles(src, dit) {
   const F = P.fusionnerParCode(L, { codeDe, suiviDe, fusion: (m, s) => ({ ...s, ...m, fusion: [m.id, s.id] }) });
   dit(F.length === 3 && F.some((t) => t.id === 'b' && t.fusion) && !F.some((t) => t.id === 'a'), 'A6 une ligne par code de retrait (celle qui a le n° garde la place)', JSON.stringify(F.map((t) => t.id)));
   dit(F.some((t) => t.id === 'c') && F.some((t) => t.id === 'd'), 'A7 même code, deux n° différents : rien n\'est fusionné');
+  // (26 nov., capture de Julien) « 978 216 » compté au point, et la MÊME paire au MÊME code sous « Pas compté » (QR, limite dépassée).
+  if (typeof P.absorberAVerifierParCode !== 'function') { dit(false, 'A8 src/retraitPreuves.js exporte absorberAVerifierParCode'); }
+  else {
+    const fus = (m, s) => ({ ...s, ...m, qr: m.qr || s.qr, fusion: [m.id, s.id] });
+    const compte = [{ id: 'v', code: '978216', suivi: '', lieu: 'point' }];
+    const av = [{ kind: 'email', t: { id: 'q', code: '978216', suivi: '', qr: 'img' }, e: { etat: 'garde_depassee' } }, { kind: 'email', t: { id: 'z', code: '111111', suivi: '' }, e: {} }];
+    const r = P.absorberAVerifierParCode(compte, av, { codeDe, suiviDe, fusion: fus });
+    dit(r.liste.length === 1 && r.liste[0].qr === 'img' && r.aVerifier.length === 1 && r.aVerifier[0].t.id === 'z', 'A8 « à vérifier » au code d\'un colis compté : une carte (son QR la complète), plus rien sous « Pas compté »', JSON.stringify(r));
+    const r2 = P.absorberAVerifierParCode([{ id: 'v', code: '5', suivi: '1' }], [{ kind: 'email', t: { id: 'q', code: '5', suivi: '2' }, e: {} }], { codeDe, suiviDe, fusion: fus });
+    dit(r2.aVerifier.length === 1 && r2.liste[0].id === 'v' && !r2.liste[0].fusion, 'A9 même code, deux n° différents : rien n\'est fusionné');
+    const r3 = P.absorberAVerifierParCode(compte, [{ kind: 'email', t: { id: 'q', code: '978216', suivi: '' }, e: { etat: 'transporteur' } }], { codeDe, suiviDe, fusion: fus });
+    dit(r3.aVerifier.length === 1, 'A10 un incident du transporteur reste « à vérifier »');
+  }
 
   // ── B. Le doute « même point » ───────────────────────────────────────────
   const at = (j) => new Date(Date.UTC(2026, 10, 5, 9) + j * 864e5).toISOString();
@@ -111,12 +124,13 @@ async function controles(src, dit) {
 
 function cablage(dit) {
   const app = sansCommentaires(lire('src/App.jsx'));
-  const pu = app.slice(app.indexOf('const pickupUnion = useMemo('), app.indexOf('const groupesRelais = useMemo(') > 0 ? app.indexOf('const groupesRelais = useMemo(') : app.indexOf('const pickupUnion = useMemo(') + 40000);
+  const pu = app.slice(app.indexOf('const pickupUnion = useMemoParesseux('), app.indexOf('const groupesRelais = useMemoParesseux(') > 0 ? app.indexOf('const groupesRelais = useMemoParesseux(') : app.indexOf('const pickupUnion = useMemoParesseux(') + 40000);
   dit(/finParIdentite\(t, preuvesIdentite\(t, cmd\)\)/.test(pu) && /fi === 'retire'/.test(pu), 'D1 pickupUnion juge la fin par les autres identités (commande, code)');
   dit(/fusionnerParCode\(emailList/.test(pu), 'D2 pickupUnion : une ligne par code de retrait');
+  dit(/absorberAVerifierParCode\(emailList, aVerifier/.test(pu), 'D2b pickupUnion : un « à vérifier » au code d\'un colis compté est ce colis');
   dit(/regrouperArrivees\(emailList, \{[^}]*temoins, sansIdentite(?:, temoinActif: [^}]*)? \}\)/.test(pu), 'D3 pickupUnion donne les témoins (finis compris) et la règle « sans identité »');
   dit(/enDouble/.test(pu) && /doute_meme_relais/.test(pu), 'D4 les doubles possibles sont à part : ni « à retirer », ni « à vérifier »');
-  const tfb = app.slice(app.indexOf('const colisParTx = useMemo('), app.indexOf('const achatStage ='));
+  const tfb = app.slice(app.indexOf('const colisParTx = useLecteurParesseux('), app.indexOf('const achatStage ='));
   dit(tfb.length > 0 && !/normTitle/.test(tfb) && /achatParConversation|parConv/.test(tfb), 'D5 l\'écran Achats relie un colis à SA commande par identité, jamais par le titre');
   const eq = app.slice(app.indexOf('function ColisEquipe('), app.indexOf('function ColisEquipe(') + 6000);
   dit(!/needs_action/.test(eq.slice(eq.indexOf('const achats = d.achats'), eq.indexOf('const achats = d.achats') + 300)), 'D6 équipe : `needs_action` n\'est pas « à retirer » (« Commande livrée ! » le porte)');
@@ -139,6 +153,8 @@ function cablage(dit) {
       ['fin par la commande ignorée', 'preuves', (s) => s.replace('if (commande) for (const s of suivisDeAchat(commande) || []) if (s) out.add(s);', '')],
       ['fin par le code ignorée', 'preuves', (s) => s.replace('if (c && codes.has(c)) for (const s of codes.get(c)) out.add(s);', '')],
       ['pas de fusion par code', 'preuves', (s) => s.replace('if (!retire.size) return liste;', 'return liste;')],
+      ['« à vérifier » jamais absorbé par son code', 'preuves', (s) => s.replace('if (!parCode.size) return { liste, aVerifier };', 'return { liste, aVerifier };')],
+      ['« à vérifier » absorbé malgré deux n°', 'preuves', (s) => s.replace('if (sm && sv && sm !== sv) { garde.push(x); continue; }', '')],
       ['témoins finis ignorés (règle d\'avant)', 'arrivee', (s) => s.replace('const doute = Array.isArray(temoins)', 'const doute = false')],
       ['adresse de réception ignorée', 'arrivee', (s) => s.replace('if (a.a && b.a) return a.a === b.a;\n  if (a.r && b.r) return a.r === b.r;', '')],
       ['fenêtre de jours ignorée', 'arrivee', (s) => s.replace('Math.abs(aw - at) <= fenetreJ * 86400000', 'true')],

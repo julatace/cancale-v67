@@ -94,9 +94,11 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const theme = fs.readFileSync(path.join(R, 'public', 'demarrage-theme.js'), 'utf8');
   const clair = (/BOOT_CLAIR = '(#[0-9A-F]{6})'/.exec(theme) || [])[1], nuit = (/BOOT_NUIT = '(#[0-9A-F]{6})'/.exec(theme) || [])[1];
   dit(clair === clairN && nuit === nuitN && /data-vrm-boot/.test(theme), 'la barre d\'état prend le fond natif (`--n-fond`) pendant le démarrage', clair + ' / ' + nuit);
-  dit(new RegExp('<meta name="theme-color" content="' + clair + '"').test(html), 'la balise theme-color d\'index.html part déjà de ce fond (avant tout script)');
+  // (25 nov., Julien : « mets en mode sombre ») l'apparence PAR DÉFAUT est le sombre : avant tout script, la balise
+  // theme-color et la racine partent de la NUIT (le script de démarrage remet le clair pour qui l'a choisi).
+  dit(new RegExp('<meta name="theme-color" content="' + nuit + '"').test(html) && /<html[^>]*\sdata-theme="dark"/.test(html), 'la balise theme-color d\'index.html part déjà du fond de nuit, et la racine est déjà sombre (avant tout script : défaut sombre)');
   const man = JSON.parse(fs.readFileSync(path.join(R, 'public', 'manifest.webmanifest'), 'utf8'));
-  dit(String(man.background_color).toUpperCase() === clairN && String(man.theme_color).toUpperCase() === clairN, 'manifeste : fond de lancement et couleur du thème = fond natif clair (`--n-fond`), plus de bleu', man.background_color + ' / ' + man.theme_color);
+  dit(String(man.background_color).toUpperCase() === nuitN && String(man.theme_color).toUpperCase() === nuitN, 'manifeste : fond de lancement et couleur du thème = fond natif de NUIT (`--n-fond` sombre, défaut du 25 nov.) : aucun éclair clair au lancement', man.background_color + ' / ' + man.theme_color);
 
   console.log(ko ? `\n❌ audit-ouverture : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ audit-ouverture : ${ok} vert(s)`);
   process.exit(ko ? 1 : 0);

@@ -2156,6 +2156,10 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Lignes du §9 de CLAUDE.md déplacées le 23 nov. (finitions du design), telles quelles
 - **22 nov. soir · Design noir encre, tranche 1 (`claude/style-clarte`)** : les maquettes de Julien : en-tête d'Aujourd'hui à l'ordinateur (date, « Mis à jour il y a … » = dernière lecture réussie de la veille, relire, loupe, cloche), héros en courbe 7 j / 30 j / Mois (« vs octobre au même jour »), pied Vendu · Reçu · À venir, Colis en deux cases, Notifications dans Gestion, « N comptes Vinted · Pro » en pied, « Une mise à jour est prête » dans la feuille de l'extension. `docs/passation/2026-11-22-style-clarte.md`. Geste : aucun.
 
+## Lignes du §9 de CLAUDE.md déplacées le 23 nov. (le gris de vrm.center), telles quelles
+- **23 nov. · Design noir encre, finitions (`claude/style-clarte-3`)** : le grand chiffre d'Aujourd'hui suit la fenêtre (7 j · 30 j · Mois), « En direct » rien ou une puce, Publier / Relier dans les actions, toast qui réserve sa place. `docs/passation/2026-11-22-style-clarte.md` §7. Geste : aucun.
+- **23 nov. · Latence** : listes de colis par paquets (`src/composants/ParPaquets.jsx`) ; Achats 1,98 → 0,82 s, Ventes 1,12 → 0,74 s (390 ×4), chiffres identiques. `2026-11-22-latence.md`. Geste : aucun.
+- **23 nov. · Design noir encre, tranche 2 (`claude/style-clarte-2`)** : Ventes/Annonces en tableau dense à bord fin (en-tête gris, rangées 60), barre de sélection NOIRE (plein blanc), fiche au prix énorme, une seule recherche sur Annonces (⌘K garde celle de la coque) ; CSS seulement (`src/natif/encre-tableaux.css`), banc `style-clarte-2`. `docs/passation/2026-11-22-style-clarte.md` §6. Geste : aucun.
 ## Ligne du §9 de CLAUDE.md déplacée le 23 nov. (annulées + validation Vestiaire), telle quelle
 
 ## Lignes du §9 de CLAUDE.md déplacées le 23 nov. (tranche 4), telles quelles
@@ -2165,13 +2169,144 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée le 23 nov. (favoris-auto), telle quelle
 - **23 nov. · Ventes annulées partout + Vestiaire « en attente de validation » (ext. 5.439.0)** : annulées comptées par site (`src/ventesAnnulees.js`, chaque site par SA règle, jamais dans le CA ni le bénéfice) dans Statistiques → Annulations et Ventes → « Annulées · N » ; Vestiaire : attente / à corriger / refusée = états distincts (pas « hors ligne », pas « en ligne »), sur la rangée, la fiche et les compteurs. `2026-11-22-annulees-vc.md`. Geste : installer 5.439.0, ouvrir « Mes articles » sur Vestiaire avec une annonce en attente.
 - **23 nov. · Design noir encre, tranche 4 (`claude/style-clarte-4`)** : les N° neufs = une carte en ligne d'Aujourd'hui (plus de toast) ; messages courts dans la place du bas (jamais sur un chiffre) ; loupe et cloche rondes en haut de chaque écran à l'ordinateur ; Achats à 16 px. `docs/passation/2026-11-22-style-clarte.md` §8. Geste : aucun.
+- **23 nov. · Design noir encre, finitions (`claude/style-clarte-3`)** : le grand chiffre d'Aujourd'hui suit la fenêtre (7 j · 30 j · Mois), « En direct » rien ou une puce, Publier / Relier dans les actions, toast qui réserve sa place. `docs/passation/2026-11-22-style-clarte.md` §7. Geste : aucun.
+
+
+### Lignes de la table §8 de CLAUDE.md déplacées le 23 nov. (taille du fichier), mot pour mot
+
+| `vcecrireui` `vcfilpanneau` `vcaimespanneau` | `vc-ecrire.js:ecrire` · `filVcCarte` · `aimesVcCarte` | **5.412.0** (21 nov.) | Vestiaire au panneau : fil, réponse par l'INTERFACE (champ, bouton, adresse appris de SON envoi, vu sinon arrêt), « aimés » ⇒ leur conversation ; plus de requête d'écriture — `2026-11-21-vestiaire-messages.md` |
+| `relaisprevu` | `relaisDestinationEscrow` | **5.411.0** (21 nov.) | point relais d'arrivée d'un achat en route (expédition de SA commande, budget lecture) ⇒ « En route vers ce point » — `2026-11-21-relais-prevision.md` |
+
+### Lignes du §9 de CLAUDE.md déplacées le 23 nov. (taille du fichier), mot pour mot
+
+- **23 nov. · Mode présentation (`claude/presentation`)** : Paramètres → Apparence et langue (aussi menu du compte, « Plus », bouton à côté de l’œil de la barre latérale) : montants, pseudos, adresses, codes, n° de suivi cachés, comptes « Compte 1, 2… » ; photos, titres, N° visibles ; pastille « Présentation » ; propre à l’appareil, rien en base ; règle du stream à programme fixe + composants marqués. Banc `mode-presentation`. `docs/passation/2026-11-23-presentation.md`. Geste : aucun.
+- **23 nov. · Achats à l'ordinateur, moitié gauche vide (`claude/achats-ordi-casse`)** : la grille deux colonnes d'Achats (codes à gauche) ne s'allume plus avec le tableau de travail ; banc `largeur-ordi` (app telle qu'en production). `2026-11-23-achats-ordi-casse.md`. Geste : aucun.
 - **23 nov. · Favoris sans geste (ext. 5.440)** : Vinted a basculé sa messagerie (uuid, `inquiries`) ; cloche trouvée seule (`vrm-trouver.js`), plus de « touche le bouton », fenêtre refaite. `2026-11-23-favoris-auto.md`. Geste : installer 5.440.0.
 
 
 ## Lignes déplacées de CLAUDE.md §9 (23 nov. soir, passation)
 - **23 nov. · Mode présentation (`claude/presentation`)** : Paramètres → Apparence et langue (aussi menu du compte, « Plus », bouton à côté de l’œil de la barre latérale) : montants, pseudos, adresses, codes, n° de suivi cachés, comptes « Compte 1, 2… » ; photos, titres, N° visibles ; pastille « Présentation » ; propre à l’appareil, rien en base ; règle du stream à programme fixe + composants marqués. Banc `mode-presentation`. `docs/passation/2026-11-23-presentation.md`. Geste : aucun.
 - **23 nov. · Achats à l'ordinateur, moitié gauche vide (`claude/achats-ordi-casse`)** : la grille deux colonnes d'Achats (codes à gauche) ne s'allume plus avec le tableau de travail ; banc `largeur-ordi` (app telle qu'en production). `2026-11-23-achats-ordi-casse.md`. Geste : aucun.
+- **23 nov. · Photos nettes (`claude/photos-nettes`)** : chaque photo Vinted prend la plus petite taille DÉJÀ LUE du même fichier qui donne 2 px réels par point (`src/photoTaille.js`) ; visionneuse progressive (petite puis grande) ; aucune adresse fabriquée (chaque taille a sa signature). Achats : souvent 150x210 seule. `docs/passation/2026-11-23-photos-nettes.md`. Geste : aucun.
+- **23 nov. · Bugs (`claude/bugs-totale`)** : vente par e-mail partout — le bordereau reçu d'une vente pas relue (particulier : vente sans n°) fait le colis (Colis, Ma journée, jamais Ventes ni CA), la photo exacte tranche la fenêtre ambiguë ; colis à retirer sans photo (`Icon`) ; boucle de rendus : `onVmrExt` ne prévient que sur changement d'empreinte (11 → 6 validations/10 s au téléphone, banc `rendus-repos`). `2026-11-22-bugs-totale.md`. Geste : aucun.
+- **23 nov. · Isolement + colis en direct** : RLS prouvée par vendeur (0 ligne d'un autre, 8 vendeurs) ; un bordereau reçu par e-mail paraît sur Colis sans changer d'écran (veille `bordereaux`). `docs/passation/2026-11-23-isolement-temps-reel.md`. Geste : aucun.
+- **23 nov. (nuit) · Favoris 5.440.1** : la cloche de son compte porte un lien d'application (`vintedfr://messaging?item_id&user_id`) que la 5.440 refusait avant tout clic (« Conversation pas vérifiée ») ; reconnu par ses DEUX identités, identité par la commande si la conversation n'a pas d'article, un refus local saute CE favori (compteur remis à zéro à chaque envoi/Reprendre), phrase entière, un mot par état. `2026-11-23-favoris-identite.md`. Geste : installer la 5.440.1, relancer, dire ce que dit chaque ligne.
+- **23 nov. · Gris clair étagé (`claude/style-clair`)** : variante A validée (gris froid, accent ardoise), sombre = gris choisi ; iPhone compact ; dessin fin ; pop-up d'événement + galerie du propriétaire. `docs/passation/2026-11-23-style-clair.md`. Geste : essayer le pop-up sur un vrai iPhone.
+- **24 nov. · Morceaux périmés (`claude/morceaux-perimes`)** : la page ouverte pendant une mise en ligne ne repart plus — elle fait ranger les fichiers de SA version au repos (`src/reserveMorceaux.js`), le ménage du service worker garde ceux d'une page ouverte ; un écran introuvable recharge SUR cet écran, jamais pendant une saisie ou une feuille (sinon page cachée) ; un 404 /assets/ de la prod porte `immutable`. Banc `morceaux-perimes`, audit. `2026-11-24-morceaux-perimes.md`. Geste : aucun.
+- **24 nov. · CI ≈ 222 → ≈ 121 min-machine par PR, job le plus long 68 → 17 min (`claude/ci-rapide`)** : mêmes contrôles (`python3 -I scripts/ci-controles.py --diff origin/main`), bancs 3 à la fois (`BANCS_PARALLELE`), ventes-e2, accessibilite et budget-vitesse en morceaux, parts rééquilibrées, `dist/` partagé pour les écrans ; la part 2/3 (annulée à 45 min à chaque PR) finit. `2026-11-24-ci-rapide.md`. Geste : aucun.
 
 
 ## « Extension servie » : historique des versions, déplacé tel quel de CLAUDE.md §9 (23 nov. soir, train)
 **Extension servie : 5.440.0** (23 nov., favoris sans geste ; avant, 5.439.0 ; avant, 5.438.0, 22 nov., train de l'extension : note de santé, compte précieux, relances, lots et brouillons seuls ; 5.437 jamais servie seule ; avant, 5.436.0, intégration 2 : « À distance », sauvegarde des réglages, Leboncoin/Vestiaire à égalité ; 5.435 jamais servie seule ; avant, 5.434.0 : les 5.420 à 5.433 en une version — file d'actions, garde du prix, avant/après, programmation, publier aussi, retirer partout, relances, courbes, note des acheteurs, traduction sur l'appareil, suivi des retours ; avant, 5.419.0, 21 nov. nuit : favoris immédiats, taux et message pré-rempli, Commandes en lot ; avant, 5.418.0, 21 nov. soir : 5.418.0 rassemble les 5.410.9 à 5.417 — interface seule, connexion, Leboncoin et Vestiaire par l'interface, favoris personnalisés, panneau au téléphone, points relais ; avant, 5.410.8, 21 nov. : favoris corrigés, onglet voilé, offre toujours ; 5.410.7 : favoris en tableau, onglet de travail épinglé ouvert d'abord ; 5.410.6 : fausse vérification corrigée ; 5.410.5 : onglet de travail comme Bleam, faux anti-robot ; 20 nov. nuit : tout « comme Bleam », 5.410.3 contenue ; avant, 5.410.2, 20 nov. soir : le panneau reste ouvert jusqu'à son ×, bordereau et livreur de chaque vente, « Pas revue depuis N j » ; avant, 5.410.1, 20 nov. : panneau de l'extension « comme Vintex », toute action de plateforme dedans, cadence par compte, republier fidèle + contrôle, intéressés Leboncoin, baisse Vestiaire ; avant, 5.409.0, 19 nov. : un seul lot pour le train — prix en attente, baisse par règle, vendue ailleurs masquée, compte bloqué, suivi des achats expédiés, page Extension, « Depuis ta dernière visite » ; avant, 17 nov. : 5.408 republication parfaite — chaque étape visible, reprise ; 5.407 favoris en liste à cocher ; 5.406 carte v2 ; 5.403 tous les n° de suivi d'un achat à deux transporteurs ; avant, 5.400.0 extension-restes — InPost = Mondial Relay, N° de la fiche à « Publier », empreintes eBay ; règles d’achat recopiées ; contient 5.399 plateformes-restes — catégorie Vestiaire à « Publier partout » ; contient 5.398 favoris et offres, et aussi 5.386 verre de la carte, 5.388 même photo sûre, 5.390 versements, 5.392 deux comptes/aimés Vestiaire — jamais servies seules). **À lire en premier : `docs/passation/2026-11-22-passation-generale.md`** (22 nov.), puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passation-generale.md` (la plus complète : en ligne, prêt, en pause, en file, refusé, gestes), puis `2026-11-16-passation.md`, `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+
+<!-- déplacée telle quelle de CLAUDE.md §9 le 24 nov. (lot connexions-extension) -->
+
+<!-- déplacé tel quel de CLAUDE.md §9 le 24 nov. (lot agir-si-connecte) -->
+
+<!-- déplacé tel quel de CLAUDE.md §9 le 24 nov. (lot agir-si-connecte, après la fusion de main) -->
+- **23 nov. · Isolement + colis en direct** : RLS prouvée par vendeur (0 ligne d'un autre, 8 vendeurs) ; un bordereau reçu par e-mail paraît sur Colis sans changer d'écran (veille `bordereaux`). `docs/passation/2026-11-23-isolement-temps-reel.md`. Geste : aucun.
+
+<!-- déplacé tel quel de CLAUDE.md §9 le 24 nov. (lot agir-tout) -->
+- **23 nov. (nuit) · Favoris 5.440.1** : la cloche de son compte porte un lien d'application (`vintedfr://messaging?item_id&user_id`) que la 5.440 refusait avant tout clic (« Conversation pas vérifiée ») ; reconnu par ses DEUX identités, identité par la commande si la conversation n'a pas d'article, un refus local saute CE favori (compteur remis à zéro à chaque envoi/Reprendre), phrase entière, un mot par état. `2026-11-23-favoris-identite.md`. Geste : installer la 5.440.1, relancer, dire ce que dit chaque ligne.
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., ci-rapide)
+- **23 nov. · Bugs (`claude/bugs-totale`)** : vente par e-mail partout — le bordereau reçu d'une vente pas relue (particulier : vente sans n°) fait le colis (Colis, Ma journée, jamais Ventes ni CA), la photo exacte tranche la fenêtre ambiguë ; colis à retirer sans photo (`Icon`) ; boucle de rendus : `onVmrExt` ne prévient que sur changement d'empreinte (11 → 6 validations/10 s au téléphone, banc `rendus-repos`). `2026-11-22-bugs-totale.md`. Geste : aucun.
+- **23 nov. · Photos nettes (`claude/photos-nettes`)** : chaque photo Vinted prend la plus petite taille DÉJÀ LUE du même fichier qui donne 2 px réels par point (`src/photoTaille.js`) ; visionneuse progressive (petite puis grande) ; aucune adresse fabriquée (chaque taille a sa signature). Achats : souvent 150x210 seule. `docs/passation/2026-11-23-photos-nettes.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., morceaux-perimes)
+- **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
+<!-- déplacé tel quel de CLAUDE.md §9 le 24 nov. (lot style-graphite) -->
+- **23 nov. · « Vinted a agi » regroupée (`claude/moderation-carte`)** : disparues d'un compte = un groupe (compte et dates une fois, « Pourquoi ? », un bouton « Vérifier sur Vinted », lignes photo + N° + « Vu ») ; ni orange ni trait de bord ; règle inchangée. `docs/passation/2026-11-23-moderation-carte.md`. Geste : aucun.
+
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., vente-mail-annonce)
+- **23 nov. · Gris clair étagé (`claude/style-clair`)** : variante A validée (gris froid, accent ardoise), sombre = gris choisi ; iPhone compact ; dessin fin ; pop-up d'événement + galerie du propriétaire. `docs/passation/2026-11-23-style-clair.md`. Geste : essayer le pop-up sur un vrai iPhone.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1377)
+- **24 nov. · Bugs terrain (`claude/bugs-terrain-24nov`)** : mesuré (Vercel 0 erreur/72 h ; 3 plantages app/72 h dont `Icon` déjà corrigé) ; une photo Leboncoin n'est plus demandée par `fetch` (refusée par `connect-src` : `src/lisibleParLaPage.js`, `audit-lecture-csp`) ; restent : morceaux périmés au téléphone (~15/jour), suivi `escrow` de l'extension jamais reconnu. `2026-11-24-bugs-terrain.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1377)
+- **24 nov. · Français du démarrage 79,96 → 73,6 Ko** (budget 80 inchangé) : l'accueil des nouveaux à la demande. `2026-11-24-francais-demarrage.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1386)
+- **24 nov. · Favoris 5.440.2 (`claude/favoris-ancien`)** : « trop ancien » faux (rangs 1, 2, 4 de la liste) ⇒ liste de Vinted indexée et lue jusqu'au bout, ligne pas montrée ⇒ son adresse native ouverte (onglet en arrière-plan), sinon « en recherche ». `2026-11-24-favoris-ancien.md`. Geste : installer 5.440.2.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1386)
+- **24 nov. · Vente vue par e-mail ↔ son annonce (`claude/vente-mail-annonce`)** : l'annonce EN LIGNE qu'un e-mail de vente du même compte désigne (SON clic « Relier à l'annonce », sinon l'image exacte dossier+fichier ; dressing lu avant l'e-mail) passe « Vendue · par e-mail, en attente de Vinted » (hors d'« en ligne » et des totaux, rien supprimé) et la vente reçoit son N° ; « Délier » défait ; fiche « pas su » dite une fois + « Pourquoi ? ». `src/venteMailAnnonce.js`, `2026-11-24-vente-mail-annonce.md`. Geste : aucun.
+- **23 nov. · Revue UX (`claude/revue-ux`)** : Achats iPhone liste d'abord (retraits à 0 tus, gestes rares dans « ⋯ », « Filtres »), Relier distinct (n° court + heure), fiche « Prix d'achat » en ligne, sélection Annonces à un toucher, Argent une ligne ambre, verdict extension, logos (audit). `docs/passation/2026-11-23-revue-ux.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion de #1346 dans visuel-jeu)
+- **23 nov. · Revue UX (`claude/revue-ux`)** : Achats iPhone liste d'abord (retraits à 0 tus, gestes rares dans « ⋯ », « Filtres »), Relier distinct (n° court + heure), fiche « Prix d'achat » en ligne, sélection Annonces à un toucher, Argent une ligne ambre, verdict extension, logos (audit). `docs/passation/2026-11-23-revue-ux.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion de #1346 dans visuel-jeu)
+- **24 nov. · Observer Vinted (ext. 5.440.3, `claude/observation-vinted`)** : interrupteur 10 min (carte du logo, page Extension) ; la page note pages, requêtes (clés et types), clics (`isTrusted`), cloche — formes seulement, rebâties par le fond, ligne `observation_vinted_{compte}_{nav}`, « Envoyer l'observation » ; rien envoyé à Vinted. `2026-11-24-observation-vinted.md`. Geste : installer, Observer, un envoi (Bleam ou main), Envoyer l'observation.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1341)
+- **23 nov. · Retours d'achat suivis ; À retirer en C, choisie (`claude/retours-suivi`, après #1326)** : étape plus loin ⇒ précédentes « faites, date pas vue » ; point Vinted Go nommé (« Relais Vinted Go, … »), sinon le transporteur en titre ; en-tête sur une ligne, logo entier, plus d'orange (nuit comprise). `2026-11-23-retours-suivi.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1373)
+- **24 nov. · Chargement sans tirets (`claude/livrable`)** : un chiffre EN COURS de lecture se dessine en squelette (composants natifs : héros, tuiles, cases, rangées d'Argent), « — » et sa raison rendus au bout de 15 s ; pas su = « — » dit, inchangé ; ⚠️ un banc sans `BANC_DESIGN_V2=defaut` voit l'ancien DOM. `2026-11-24-livrable.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1361)
+- **24 nov. · « Vinted a agi » : UNE carte** (#1321+#1346) : ligne par compte, feuille aux photos (N°), un geste. `2026-11-23-moderation-carte.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1380)
+- **24 nov. · Visuel « jeu vidéo » (`claude/visuel-jeu`)** : pop-ups en notifications de jeu (photo par identité, étiquette N°, médaillon, ressort, balayage, « +2 », vente fêtée) ; disparues en grille ; anneau des colis prêts ; ventes en tuiles ; pièces `src/natif/Jeu.jsx` (README `src/natif/visuel/`). `2026-11-24-visuel-jeu.md`. Geste : regarder la galerie des pop-ups sur l'iPhone.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1380)
+- **24 nov. · Livrable 2 (`claude/livrable-2`)** : Argent ne dit plus « pas calculé / ouvre Ventes » pendant la lecture (publication pas encore relue = en lecture) ; Ventes sans ligne coupée ; Aujourd'hui sans saut (places tenues, 0 px mesuré à 390 et 1512). `2026-11-24-livrable.md` (Suite). Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1351)
+- **24 nov. · Argent, Messages, Paramètres visuels (`claude/visuel-argent`)** : anneau, jauges micro/TVA, « À venir » en cartes, tuiles de paire ; affichage seul. `2026-11-24-visuel-argent.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1351)
+- **24 nov. · Annonces + Stock (`claude/visuel-annonces`)** : la LISTE reste par défaut, rangée nette 72 px (photo 60, étiquette N°, ♡ 👁, jamais « 0 j »), glisser ⇒ Baisser/Republier, puces au pouce, liste virtualisée, sans latence ; « Détaillé » (tuiles) dans ⋯ ; Stock : étiquette papier, creux. `2026-11-24-visuel-annonces.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1378)
+- **24 nov. · Styles au choix (`claude/style-graphite`, PR #1380)** : Paramètres → Apparence → Style, tuiles (Actuel + 11 styles dont Monochrome), clair/sombre, un toucher applique ; jetons par `scripts/styles-generer.cjs` (table, AA, zéro orange), famille de boutons `src/natif/styles-choix.css`. Banc `styles-choix`. `2026-11-24-style-graphite.md`. Geste : essayer, dire lequel garder.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1381)
+- **24 nov. · Parcours iPhone (`claude/parcours-iphone`, APRÈS #1326)** : un robot joue sa journée au doigt (banc `parcours-iphone`, WebKit dans `iphone-webkit.yml`) ; corrigés : le code au comptoir que le « retour » ne fermait pas (VRM quitté), « Colis mondial_relay » dans la loupe ; rapportés : sauts d'Achats/Argent/loupe (données lues après). `2026-11-24-parcours-iphone.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1369)
+- **24 nov. · À retirer parfait (`claude/retrait-parfait`, après #1341, #1351, #1326)** : le COMPTOIR d'un point (toucher un code : tous ses colis à glisser, code énorme et QR max sur blanc, « Retiré » / Annuler, écran allumé, retour, hors ligne), ouverture calculée sur les horaires lus, date lue par colis, « à vérifier » + un geste ; rappel exact (heure limite lue seule). `2026-11-24-retrait-parfait.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1369)
+- **24 nov. · Audit boutons, 2ᵉ passe** : retour piégé après « Relier eBay », rond « Retrouver » sur les segments eBay, 2 exceptions du robot. `2026-11-23-audit-boutons-2.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., agir-tout 5.450.1, fusion de main)
+- **24 nov. · Simulations de bout en bout (`claude/ext-simulations`, ext. 5.449.0)** : la vraie extension chargée contre des sites simulés aux formes mesurées (`scripts/bancs/sim-extension.cjs`) ; suivi des achats : l'expédition d'une commande à sa forme réelle (sans point) n'est plus « inattendue », le transporteur est rangé (`audit-suivi-escrow-forme`). `2026-11-24-simulations-extension.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., agir-tout 5.450.1, fusion de main)
+- **24 nov. · Connexions de l'extension (`claude/connexions-extension`)** : Paramètres → « Connexions de l'extension » : chaque navigateur (nom, version « à jour » ou « 5.418 → 5.440 », vu quand, comptes lus, dernier problème + son geste), chaque compte (lu par qui, quand, jauge 50/h), vieilles installations repliées ; une ligne sur Aujourd'hui seulement si un geste attend ; champs 5.448 (`sante`, `arret`, `servie`) lus présents, sinon « — ». `2026-11-24-connexions-extension.md`. Geste : aucun.
+
+## Lignes déplacées telles quelles de CLAUDE.md §9 (25 nov., fusion de #1388 dans #1393, < 60 000)
+- **23 nov. · Colis en danger (`claude/colis-danger`)** : colis VENDU Vinted Go relu jusqu'à sa remise ; date de départ LUE (`expiration_time`) gardée sur `depart_vinted_*`, relu toutes les 2 h ; famille « Colis en danger » la veille et le jour (`api/_lib/colis-danger.js`) ; 0 vente Vinted Go en base au 23 nov. `2026-11-23-colis-danger.md`. Geste : aucun.
+- **24 nov. · Observer Vinted (ext. 5.440.3, `claude/observation-vinted`)** : interrupteur 10 min (carte du logo, page Extension) ; la page note pages, requêtes (clés et types), clics (`isTrusted`), cloche — formes seulement, rebâties par le fond, ligne `observation_vinted_{compte}_{nav}`, « Envoyer l'observation » ; rien envoyé à Vinted. `2026-11-24-observation-vinted.md`. Geste : installer, Observer, un envoi (Bleam ou main), Envoyer l'observation.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (24 nov., train : fusion #1394)
+- **24 nov. · Suivi des envois (`claude/suivi-ventes`)** : la piste d'un colis vendu (Déposé → En route → Au point « nom », à retirer avant → Retiré → finalisée = argent versé), chaque étape LUE ou « pas encore su » (`api/_lib/suivi-envoi.js`) ; « Mes envois » en 4 groupes ; notifications « au point » / « retiré » (famille `envois`). Mesuré : Vinted Go 0 vente, XU jamais lus, aucune date limite hors Vinted Go. `2026-11-24-suivi-ventes.md`. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (25 nov., lot achats-retours-design)
+## Ligne déplacée telle quelle de CLAUDE.md §9 (25 nov., logo-vinted-pp, < 60 000)
+## Ligne déplacée telle quelle de CLAUDE.md §9 (25 nov., style-c3)
+- **24 nov. · Vitesse PR B (`claude/vitesse-lectures-toucher`)** : 1re visite d'Achats 4,7 → 3,5 s (calculs refaits une fois par version des données), relevés « plus vue » groupés ; à froid = PR A (pas de comparaison pendant le 1er nuage) ; chiffres 35/35. `2026-11-24-vitesse-ecran-montre.md` §8. Geste : aucun.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (25 nov., ventes-rangee)
+- **25 nov. · Banc `e2e-extension` vert (`claude/e2e-extension-vert`)** : étapes 3/4 lisaient l'ancien écran (Ventes, « Qui dorment ») ⇒ portées sur le natif et le panneau ; vrais défauts corrigés : extension **5.440.4** (copie du dressing oubliée quand il est rangé : le panneau perdait la paire du lien), app (« Baisser » refusé et « mets à jour » pour une extension d'avant le lien du panneau). `2026-11-25-e2e-extension-vert.md`. Geste : installer la 5.440.4.
+## Ligne déplacée telle quelle de CLAUDE.md §9 (25 nov., gris-moyen)
+- **25 nov. · Style « C3 doux » (mélange C3 × Vintex) (`claude/style-c3`, au choix, PAS par défaut)** : 12e style (gris `#DADDE2`, cartes blanches, plaque gravée, capsule du bas ; forme chargée seulement si choisi) ; Monochrome fond `#E2E4E8` ; À retirer, loupe, Argent nettoyés pour tout style choisi. `docs/passation/2026-11-25-style-c3.md`. Geste : regarder les planches.
+- **25 nov. · Achats : retours compacts (`claude/achats-retours-design`)** : carte en cours ~1/3 d'écran (état écrit une fois, frise en points, UN bouton + liens), remboursé = rangée repliée, « À vérifier » = une rangée, ✓ ⋯ dans la tête ; aucune règle touchée. `2026-11-25-achats-retours-design.md`. Geste : regarder les planches.
+- **25 nov. · Logo Vinted + photo du compte (`claude/logo-vinted-pp`)** : en tête de compte d'Annonces, le V de Ventes (`src/natif/LogoSite.jsx`, couleur de marque ; l'ancien était à l'encre ⇒ noir) puis la photo de profil du compte (`harvest_{uid}_profile` du même uid, une lecture, `src/natif/visuel/photosProfil.js`), sinon l'initiale. `docs/passation/2026-11-25-logo-vinted-pp.md`. Geste : aucun.
+
+## Lignes déplacées telles quelles de CLAUDE.md §9 (25 nov. soir, agir-tout : fusion de main, < 60 000)
+- **24 nov. · Agir si connecté + Agir tout (ext. 5.450)** : tous les gestes depuis VRM par `peutAgir` (sinon « Lecture seule »). `2026-11-24-agir-si-connecte.md`, `-agir-tout.md`. Geste : installer.
+- **25 nov. · Aujourd'hui, moitié moins de texte (`claude/aujourdhui-moins-texte`)** : titres courts (« 5 annonces disparues », « En pause », « Ordinateur éteint · 07:37 », « 24 N° à écrire »), ±0 % neutre sans flèche, « ≥ » pour « au moins » (plus coupé), « Par site » seulement à 2 sites ; 213 → 100 mots (390 px), 249 → 123 (1512). `2026-11-25-aujourdhui-moins-texte.md`. Geste : regarder les planches.
+- **25 nov. · Le clair par défaut passe au GRIS MOYEN (`claude/gris-moyen-essai`, Julien : « gris moyen c'est d'accord »)** : page #878B92, cartes #F1F2F4, encre #0E0F12, secondaire #1F2226 (posé sur la page : 4,67:1), accent = plein #19222C ; la nuit ne change pas ; tout texte posé sur la page est à l'encre. `2026-11-25-gris-moyen.md`, NATIF.md §0 ter. Geste : aucun.
+- **25 nov. · Le clair par défaut passe au GRIS MOYEN (`claude/gris-moyen-essai`, Julien : « gris moyen c'est d'accord »)** : page #878B92, cartes #F1F2F4, encre #0E0F12, secondaire #1F2226 (posé sur la page : 4,67:1), accent = plein #19222C ; la nuit ne change pas ; tout texte posé sur la page est à l'encre. `2026-11-25-gris-moyen.md`, NATIF.md §0 ter. Geste : aucun.
+- **25 nov. · Envoi des messages et des offres (ext. 5.452)** : refus de Vinted (200) jamais « fait » ; plafond/pause/onglet/session attendent (heure dite) ; l'app suit l'issue, jamais deux dépôts. `2026-11-25-envoi-messages-offres.md`. Geste : installer 5.452.
+- **25 nov. · Régressions iPhone (`claude/regressions-25nov`)** : 3 cartes grises d'Aujourd'hui (versements eBay en attente muette), barre du haut opaque, ligne d'une vente en rangée (ordre des feuilles), « Pas revue récemment » une fois par compte, copie sans squelette ni heure. `2026-11-25-regressions.md`, banc `regressions-25nov`. Geste : aucun.
+## Ligne déplacée telle quelle de CLAUDE.md §9 (25 nov., sombre-par-defaut, < 60 000)
+- **25 nov. · Ventes, la rangée compacte (`claude/ventes-rangee`)** : photo par SES sources (identité), titre + prix, UN état, logo entier, ~84 px ; achat au balayage et dans la fiche. `2026-11-25-ventes-rangee.md`. Geste : aucun.
+- **25 nov. · Favoris tapés comme lui, popup refaite (ext. 5.453.0)** : `2026-11-25-favoris-gestes-humains.md`. Geste : installer la 5.453.0.
+- **25 nov. soir · Sombre par défaut (`claude/sombre-par-defaut`, Julien : « La deuxième couleur est pas mal, mets en mode sombre »)** : aucun choix ⇒ sombre (règle, démarrage, `<html>`, theme-color, manifeste #1C1C20) ; un choix déjà posé ne change pas. `historique-interface-stock.md` (fin). Geste : aucun.
+- **26 nov. · Colis en double au point (`claude/retrait-double-code`)** : un « à vérifier » au même code de retrait qu'un colis compté = ce colis, une carte (`absorberAVerifierParCode`, `src/retraitPreuves.js`, `audit-retrait-preuves` A8–A10). Geste : aucun.

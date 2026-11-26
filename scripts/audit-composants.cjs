@@ -236,7 +236,9 @@ async function audit(M, bavard) {
   const sansRaison = rendre(h(M.BoutonBase, { disabled: true, title: 'Aucun bordereau prêt.' }, 'Imprimer'));
   dit(/data-n-raison/.test(sansRaison) && /Aucun bordereau prêt\./.test(sansRaison) && /aria-describedby=/.test(sansRaison), 'Bouton : indisponible ⇒ sa raison (title) est DITE sous le bouton', sansRaison);
   const sg = rendre(h(M.SegmenteBase, { label: 'Site', value: 'a', onChange: () => {}, options: [{ v: 'a', l: 'Vinted', n: 3 }, { v: 'b', l: '', icone: 'search', titre: 'eBay' }] }));
-  dit(/aria-pressed="true"/.test(sg) && /aria-checked="true"/.test(sg) && /class="n-segmente/.test(sg) && /aria-label="eBay"/.test(sg) && /title="eBay"/.test(sg) && /n-segmente-n/.test(sg), 'Segmente : le segmenté natif, choix pressé, segment en icône seule NOMMÉ, compte', sg);
+  // (24 nov., main-vert) Un `role="radio"` dit son choix par `aria-checked` ; `aria-pressed` lui est INTERDIT (axe aria-allowed-attr,
+  // critique, bancs accessibilite) : le choix est dit par aria-checked, et aucun aria-pressed n'est posé.
+  dit(!/aria-pressed=/.test(sg) && /aria-checked="true"/.test(sg) && /class="n-segmente/.test(sg) && /aria-label="eBay"/.test(sg) && /title="eBay"/.test(sg) && /n-segmente-n/.test(sg), 'Segmente : le segmenté natif, choix pressé, segment en icône seule NOMMÉ, compte', sg);
 
   return ko;
 }

@@ -15,7 +15,8 @@
 //     (Nominatim restait nommé, pour la communauté seulement) ;
 //   · « lien » : une adresse que la personne OUVRE d'un clic (rien ne part tout
 //     seul) ; « vrm » : VRM lui-même ; « eteint » : chargé seulement quand un
-//     réglage l'allume (dit, pas exigé).
+//     réglage l'allume (dit, pas exigé) ; « recopie » (24 nov.) : une liste qui
+//     RECOPIE la politique de sécurité (connect-src) sans rien contacter.
 // Un couple inconnu ⇒ ROUGE : un nouvel hôte appelé par le navigateur se
 // déclare (politique + cette liste), il ne passe pas en silence.
 // `--prouve` réaffaiblit la politique ou le code : chaque mutation ⇒ ROUGE.
@@ -81,9 +82,18 @@ const COUPLES = {
   // (16 nov., audits-vert-main) Arrivés du 9 au 15 nov., lus un à un : une recherche du navigateur (la carte des ventes)
   // et des liens ouverts d'un clic.
   'src/CarteVentes.jsx|api-adresse.data.gouv.fr': ['politique', 'ventes'],
+  'src/lisibleParLaPage.js|lgonxzrzjcqthjtbdpzo.supabase.co': ['recopie', 'copie de connect-src (vercel.json) : sert à savoir si la page a le DROIT de lire une adresse, ce fichier ne contacte rien (24 nov., bugs-terrain ; audit-lecture-csp exige l’égalité avec vercel.json)'],
+  'src/lisibleParLaPage.js|tiles.openfreemap.org': ['recopie', 'copie de connect-src (vercel.json) : sert à savoir si la page a le DROIT de lire une adresse, ce fichier ne contacte rien (24 nov., bugs-terrain ; audit-lecture-csp exige l’égalité avec vercel.json)'],
+  'src/lisibleParLaPage.js|cdn.jsdelivr.net': ['recopie', 'copie de connect-src (vercel.json) : sert à savoir si la page a le DROIT de lire une adresse, ce fichier ne contacte rien (24 nov., bugs-terrain ; audit-lecture-csp exige l’égalité avec vercel.json)'],
+  'src/lisibleParLaPage.js|api-adresse.data.gouv.fr': ['recopie', 'copie de connect-src (vercel.json) : sert à savoir si la page a le DROIT de lire une adresse, ce fichier ne contacte rien (24 nov., bugs-terrain ; audit-lecture-csp exige l’égalité avec vercel.json)'],
+  'src/lisibleParLaPage.js|nominatim.openstreetmap.org': ['recopie', 'copie de connect-src (vercel.json) : sert à savoir si la page a le DROIT de lire une adresse, ce fichier ne contacte rien (24 nov., bugs-terrain ; audit-lecture-csp exige l’égalité avec vercel.json)'],
   'src/notifsBonMoment.js|vrm.center': ['vrm', 'VRM lui-même (base pour lire le lien d’une notification, jamais appelé)'],
   // (22 nov., intégration) ext. 5.428 / 5.424 : des liens ouverts d'un clic.
+  'src/parrainage/EcranParrainage.jsx|wa.me': ['lien', LIEN + ' — « WhatsApp » du parrainage : le lien de partage (25 nov.)'],
   'src/AlerteModeration.jsx|www.vinted.fr': ['lien', LIEN + ' — l’annonce masquée par Vinted, ou la messagerie'],
+  'src/connexions/EcranConnexions.jsx|www.vinted.fr': ['lien', LIEN + ' — « Connexions de l’extension » : ouvrir le site du compte pour le reconnecter (24 nov., agir-tout)'],
+  'src/connexions/EcranConnexions.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Connexions de l’extension » : ouvrir le site du compte pour le reconnecter (24 nov., agir-tout)'],
+  'src/connexions/EcranConnexions.jsx|www.vestiairecollective.com': ['lien', LIEN + ' — « Connexions de l’extension » : ouvrir le site du compte pour le reconnecter (24 nov., agir-tout)'],
   'src/publier/aussi.js|www.leboncoin.fr': ['lien', LIEN + ' — l’annonce créée par « Publier aussi sur… »'],
   'src/publier/aussi.js|fr.vestiairecollective.com': ['lien', LIEN + ' — l’annonce créée par « Publier aussi sur… »'],
   'src/ficheSites.js|www.leboncoin.fr': ['lien', LIEN + ' — la fiche « Sur les sites » : l’annonce Leboncoin en pause (22 nov., 5.435)'],
@@ -328,7 +338,7 @@ function juger(fichiers, politique, { muet = false } = {}) {
   const lignes = lignesPolitique(politique);
   dit(lignes.length > 5, 'le tableau des prestataires de la politique se lit', lignes.length + ' lignes');
   const inconnus = [...couples.keys()].filter((k) => !COUPLES[k]);
-  dit(inconnus.length === 0, 'chaque adresse https:// du code est dans la liste fermée (politique · lien · VRM · éteint)', inconnus.map((k) => k + ':' + couples.get(k)[0]).join(' · '));
+  dit(inconnus.length === 0, 'chaque adresse https:// du code est dans la liste fermée (politique · lien · VRM · éteint · recopie)', inconnus.map((k) => k + ':' + couples.get(k)[0]).join(' · '));
   for (const [k, [classe, quoi]] of Object.entries(COUPLES)) {
     if (!couples.has(k)) { if (!muet) console.log('ℹ️  ' + k + ' : plus écrit dans le code (rien à exiger)'); continue; }
     if (classe !== 'politique') continue;

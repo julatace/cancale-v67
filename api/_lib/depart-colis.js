@@ -34,6 +34,9 @@
 //    ne les lit (`ligneTranspDeMeta` n'accepte que `transp_`). Un colis VENDU
 //    arrivé au point relais est celui de l'ACHETEUR : il ne devient JAMAIS « à
 //    retirer » chez Julien, et rien ne sonne.
+//    (23 nov.) Seule exception, voulue par Julien : la famille « Colis en danger »
+//    (api/_lib/colis-danger.js) prévient le VENDEUR quand le colis de son acheteur
+//    va repartir du point — jamais « à retirer », jamais un code de retrait.
 //
 // QUI EST LU (mesuré dans le code, 8 nov. — voir docs/passation/2026-11-08-colis-sortants.md) :
 //  · Chronopost (Vestiaire écrit « Chronopost » et dépose un bordereau Chronopost
@@ -61,7 +64,12 @@ const RE_ID_DEPART = /^depart_(chronopost|vinted|mondialrelay)_([A-Z0-9]+)$/;
 export const cleDepart = (carrier, suivi) => `depart_${carrier}_${normaliserSuivi(suivi)}`;
 // (11 nov., suivi des commandes) + le DERNIER évènement lu (libellé, lieu, date)
 // et le lieu du point : ce que Ventes affiche (« Pris en charge · Vannes · hier 18:02 »).
-export const SELECT_DEPART_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,priseAt:meta->>priseAt,arriveeAt:meta->>arriveeAt,lu:meta->>lu,essai:meta->>essai,essaiRes:meta->>essaiRes,essais:meta->>essais,fini:meta->>fini,clos:meta->>clos,derLib:meta->>derLib,derLieu:meta->>derLieu,derAt:meta->>derAt,lieuNom:meta->>lieuNom,lieuVille:meta->>lieuVille,cp:meta->>cp,cpsPdf:meta->>cpsPdf,cpsRefuses:meta->>cpsRefuses,cpsLu:meta->>cpsLu';
+export const SELECT_DEPART_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,priseAt:meta->>priseAt,arriveeAt:meta->>arriveeAt,lu:meta->>lu,essai:meta->>essai,essaiRes:meta->>essaiRes,essais:meta->>essais,fini:meta->>fini,clos:meta->>clos,derLib:meta->>derLib,derLieu:meta->>derLieu,derAt:meta->>derAt,lieuNom:meta->>lieuNom,lieuVille:meta->>lieuVille,cp:meta->>cp,cpsPdf:meta->>cpsPdf,cpsRefuses:meta->>cpsRefuses,cpsLu:meta->>cpsLu,limite:meta->>limite,limiteAt:meta->>limiteAt,limiteSure:meta->>limiteSure';
+// (23 nov., « Colis en danger ») Un colis VENDU au point relais de l'acheteur : la date où il REPART, LUE chez
+// le transporteur (Vinted Go `expiration_time`, `limiteSure`) — jamais estimée. Tant qu'elle est connue, le colis
+// est relu plus souvent (le vendeur doit savoir s'il est retiré avant d'être prévenu) : api/_lib/colis-danger.js.
+export const RYTHME_DANGER_MS = 2 * 3600000;
+export const limiteDepartLue = (t) => !!t && t.carrier === 'vinted' && t.etat === 'disponible' && (t.limiteSure === true || t.limiteSure === 'true') && msDe(t.limiteAt) != null;
 // Le rythme : une lecture toutes les 2 h tant que le colis n'est pas pris en
 // charge ; un échec recule (30 min → 6 h) ; « introuvable » 3 fois ⇒ on arrête.
 export const RYTHME_DEPART_MS = 2 * 3600000;
@@ -84,15 +92,28 @@ const isoDe = (ms) => (Number.isFinite(ms) ? new Date(ms).toISOString() : null);
 // Le transporteur LISIBLE comme départ d'un n° : celui qu'écrit la plateforme,
 // sinon la forme PROPRE du n° (Chronopost XW/ZW…TS/SP, Vinted Go VGS…). Mondial
 // Relay, Colissimo… ⇒ null (voir l'en-tête).
-function formeDepart(n) {
+// (24 nov., lot suivi-xu) + Chrono Relais Europe « XU/ZU + 9 chiffres + JF ». MESURÉ (lecture seule) sur
+// les bordereaux de vente des 60 derniers jours : 14 n° de cette forme (13 XU, 1 ZU), aucun lu chez le
+// transporteur — `nomDuBordereau` ne garde pas le nom « chronopost » et la forme XU n'était pas reconnue.
+// Toutes les étiquettes de cette forme dont le PDF a été lu (5 sur 5, et le bordereau de retour du 15 nov.)
+// nomment Chronopost (« Chrono Relais Europe », pied « Chronopost … 75014 Paris ») ; leur PDF est le MÊME
+// gabarit que les XW…TS (iText). « JF » n'est pas un pays : ce n'est pas un n° postal S10 (CP…IE).
+// La lecture reste celle des XW : `trackSkybillV2`, écho du `skybillNumber` exigé, un n° inconnu ⇒
+// « introuvable » (3 fois au plus, puis plus jamais relu) — rien n'est jamais déduit de la forme seule.
+export const FORME_CHRONO_RELAIS_EUROPE = /^[XZ]U\d{9}JF$/;
+// (25 nov.) Cette forme vaut pour un colis VENDU seulement : un bordereau de RETOUR (`rt:`, le colis qu'il
+// renvoie) n'est lu chez Chronopost qu'avec le transporteur LU sur son étiquette (`transporteurPdf`, lot
+// retour-parfait, audit-retour-parfait T3) — la forme seule ne lui suffit pas.
+function formeDepart(n, { vente = false } = {}) {
   if (/^[XZ]W\d{9}(?:TS|SP)$/.test(n)) return 'chronopost';
+  if (vente && FORME_CHRONO_RELAIS_EUROPE.test(n)) return 'chronopost';
   if (/^VGS\d{13}$/.test(n)) return 'vinted';
   return '';
 }
-export function carrierDepart(transporteur, suivi) {
+export function carrierDepart(transporteur, suivi, { vente = false } = {}) {
   const n = normaliserSuivi(suivi);
   if (!n) return null;
-  const c = carrierLisible(transporteur || '', n) || carrierLisible(formeDepart(n), n);
+  const c = carrierLisible(transporteur || '', n) || carrierLisible(formeDepart(n, { vente }), n);
   return c && DEPART_CARRIERS.includes(c) ? c : null;
 }
 
@@ -138,6 +159,12 @@ export function ligneDepartApresEssai(avant, lu, { carrier, suivi, maintenant = 
     // fois lue : quand l'acheteur retire le colis, `etatAt` devient la date du retrait et l'arrivée était perdue. Posée par
     // la première lecture qui la prouve, jamais remplacée ni effacée (comme `priseAt`).
     if ((out.etat === 'disponible' || out.etat === 'livre') && msDe(out.etatAt) != null && msDe(a.arriveeAt) == null) out.arriveeAt = out.etatAt;
+    // (23 nov., « Colis en danger ») La date où le colis REPART du point : seulement LUE (Vinted Go
+    // `expiration_time`, `limiteSure`) et seulement tant qu'il y attend. Un autre état, ou une date estimée
+    // (`limiteSure: false`), l'efface : « pas su » ⇒ aucune alerte.
+    if (carrier === 'vinted' && out.etat === 'disponible' && lu.limiteSure === true && msDe(lu.limiteAt) != null) {
+      out.limiteAt = isoDe(msDe(lu.limiteAt)); out.limite = /^\d{4}-\d{2}-\d{2}$/.test(String(lu.limite || '')) ? String(lu.limite) : null; out.limiteSure = true;
+    } else { delete out.limite; delete out.limiteAt; delete out.limiteSure; }
     // (11 nov.) Le DERNIER évènement lu (le plus récent) : libellé, lieu, date —
     // recopiés tels quels, bornés. Le lieu du point quand l'analyseur le porte.
     const evs = Array.isArray(lu.evenements) ? lu.evenements.filter((x) => x && msDe(x.at) != null) : [];
@@ -182,6 +209,10 @@ export function departDeMeta(x) {
     derAt: msDe(x.derAt) != null ? isoDe(msDe(x.derAt)) : null,
     lieuNom: x.lieuNom ? String(x.lieuNom).slice(0, 60) : '', lieuVille: x.lieuVille ? String(x.lieuVille).slice(0, 40) : '',
     cp: /^\d{5}$/.test(String(x.cp || '')) ? String(x.cp) : '', cpsPdf: listeCp(x.cpsPdf).join(','), cpsRefuses: listeCp(x.cpsRefuses).join(','), cpsLu: x.cpsLu || null,
+    // (23 nov.) La date où il repart, LUE (Vinted Go seulement) ; sinon rien.
+    limite: /^\d{4}-\d{2}-\d{2}$/.test(String(x.limite || '')) ? String(x.limite) : null,
+    limiteAt: msDe(x.limiteAt) != null ? isoDe(msDe(x.limiteAt)) : null,
+    limiteSure: x.limiteSure === true || x.limiteSure === 'true',
   };
 }
 
@@ -292,7 +323,8 @@ export function prochainEssaiDepart(t) {
   if (r === 'expire') return Infinity;
   if (r === 'introuvable') return (Number(t.essais) || 0) >= INTROUVABLE_MAX ? Infinity : e + INTROUVABLE_MS;
   if (r === 'passu' || r === 'bloque' || r === 'forme' || r === 'cp-inconnu') return e + RECUL_MS[Math.min(Math.max((Number(t.essais) || 1) - 1, 0), RECUL_MS.length - 1)];
-  return e + (pris ? RYTHME_SUIVI_MS : RYTHME_DEPART_MS);
+  // (23 nov.) Au point relais de l'acheteur avec une date de départ LUE : relu toutes les 2 h.
+  return e + (limiteDepartLue(t) ? RYTHME_DANGER_MS : pris ? RYTHME_SUIVI_MS : RYTHME_DEPART_MS);
 }
 export function departsAInterroger({ sortants = [], departs = new Map(), entrants = new Set(), maintenant = Date.now(), max = 3, parTransporteur = 3 } = {}) {
   const ambigus = suivisAmbigus(sortants, entrants);
@@ -301,7 +333,7 @@ export function departsAInterroger({ sortants = [], departs = new Map(), entrant
     const k = normaliserSuivi(s && s.suivi);
     if (!k || vus.has(k) || ambigus.has(k)) continue;
     vus.add(k);
-    const carrier = carrierDepart(s.transporteur, k);
+    const carrier = carrierDepart(s.transporteur, k, { vente: !s.retour });
     if (!carrier) continue;
     const v = msDe(s.venteMs);
     if (v != null && maintenant - v > FENETRE_DEPART_J * 86400000) continue;
@@ -367,7 +399,7 @@ export function sortantsDuVendeur({ vcVentes = null, bords = [], retours = [] } 
   }
   for (const r of Array.isArray(retours) ? retours : []) {
     if (!r || !r.suivi) continue;
-    out.push({ cle: 'rt:' + String(r.transaction || r.suivi), suivi: r.suivi, transporteur: r.transporteurPdf || '', venteMs: msDe(r.receivedAt) });
+    out.push({ cle: 'rt:' + String(r.transaction || r.suivi), suivi: r.suivi, transporteur: r.transporteurPdf || '', venteMs: msDe(r.receivedAt), retour: true });
   }
   return out;
 }

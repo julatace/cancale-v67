@@ -21,11 +21,15 @@ import { tr } from '../i18n/index.js';
 import { attrCible } from '../cibleNotif.js';   // (22 nov., ext. 5.435) la loupe mène à CE fil (Vinted, Leboncoin, Vestiaire)
 import { Bouton as BoutonNatif, BoutonIcone } from '../natif/Bouton.jsx';
 import { Segmente } from '../natif/Segmente.jsx';
+import { Attente } from '../natif/Attente.jsx';   // (25 nov., chargement propre) le squelette à la forme des rangées
 import { Glyphe } from '../natif/icones.jsx';
+import { TuilePaire } from '../natif/Jeu.jsx';
+import '../natif/ecrans/messages-visuel.css';   // (24 nov., visuel-argent) la paire en tuile, l'avatar du compte sur son coin
 import { LogoSite } from '../SelecteurSites.jsx';
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
 import { motifDeLApercu } from '../antiArnaque.js';
 import { FilLeboncoin } from './MessagesLeboncoin.jsx';
+import { BadgeLectureSeule } from '../agir/Agir.jsx';   // (24 nov., lot agir-si-connecte)
 import { FilVestiaire, ficheDuNumero } from './Vestiaire.jsx';
 import { CLE_FILS_RELIES, convVinted, convLeboncoin, convVestiaire, convEbay, regrouperFils, suggestionsFils, relierFils, refuserFils, delierFil, messagesDuFil, conversationDeReponse } from '../filUnique.js';
 import { trj } from '../i18n/react.js';
@@ -125,11 +129,11 @@ function FilFusionne({ fil, vintedDe, lireVinted, ebayDe, onRepondre, onDelier, 
   const via = parConv ? conversationDeReponse(fil, messages) : null;
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55, textAlign: 'center', padding: '20px 0' };
   return (
-    <CadreFil etiquette="Fil de messages" onFermer={onFermer} attrs={{ 'data-fil-fusionne': fil.cle, 'data-fil-n': String(fil.convs.length) }}>
+    <CadreFil etiquette={tr('a11y.filMessages')} onFermer={onFermer} attrs={{ 'data-fil-fusionne': fil.cle, 'data-fil-n': String(fil.convs.length) }}>
       <TeteFil onFermer={onFermer} nom={nomDe(fil)} titre={fil.num ? `N°${fil.num}` : ''} compte={fil.plateformes.map((p) => NOM_SITE[p]).join(' · ')}/>
       <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {parConv ? <AlerteArnaque site={fil.plateformes.length === 1 ? fil.plateformes[0] : ''} messages={messages}/> : null}
-        {parConv === undefined ? <div role="status" data-fil-etat="charge" style={style}>{tr('messages.lecture')}</div>
+        {parConv === undefined ? <div data-fil-etat="charge" style={style}><Attente forme="texte" n={3}/></div>
           : !messages.length ? <div data-fil-etat="vide" style={style}>—</div>
           : messages.map((m, i) => (
             <BulleConv key={m.conv + ':' + m.rang} moi={m.deMoi === true} qui={m.deMoi === true ? 'Toi' : m.deMoi === false ? "L'autre personne" : ''} texte={m.t} quand={m.at} avecDate
@@ -209,6 +213,8 @@ function FilEbay({ x, onFerme, onEnvoye }) {
   );
 }
 
+// L'initiale d'un compte (sans le « @ » ni la ponctuation de tête).
+const initialeCompte = (t) => String(t || '').trim().replace(/^[^\p{L}\p{N}]+/u, '').charAt(0).toUpperCase() || '·';
 export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, rendreVinted, lireVinted, compteOnglet = '', pairesLues = true }) {
   const autres = useAutresSites();
   const [ebayTous, relireEbay] = useEbayTous();
@@ -383,7 +389,8 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
               Messages au 2e toucher : 0,3 s « vide » entre la copie et la liste). */}
           {chargement && !fils.length ? <><div className="vg-ms-vues" data-msg-vues={vue}><Segmente libelle={tr('verre2.msg.filtre')} valeur={vue} onChange={setVue}
               options={[['toutes', tr('verre2.msg.toutes')], ['offres', tr('verre2.msg.offres')], ['nonlues', tr('verre2.msg.nonLues')]].map(([k, l]) => ({ cle: k, libelle: l, attrs: { 'data-msg-vue': k, 'aria-pressed': vue === k ? 'true' : 'false' } }))}/></div>
-            <div role="status" data-fils-lecture="" style={{ ...muted, padding: '12px 0' }}>{tr('messages.lecture')}</div></>
+            {/* (25 nov., chargement propre) La liste en cours de lecture : des rangées de squelette à la place du mot « Lecture… ». */}
+            <div data-fils-lecture=""><Attente forme="rangees" n={6} vignette={44}/></div></>
             : !fils.length ? <div data-fils-vide="" style={{ ...muted, padding: '12px 0' }}>{tr('messages.aucuneConversationLue')}</div>
             : motCherche && !filsVus.length ? <div data-fils-rien="" className="vrm-ms-rien">{tr('ms.msg.rien', { x: cherche.trim() })}</div>
             : <><CompteurArnaque n={fils.filter((f) => { const d = f.dernier || f.convs[f.convs.length - 1]; return d && motifDeLApercu(d.apercu, d.deMoi); }).length}/>
@@ -403,6 +410,8 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                       {g.plateforme ? <span className="vg-ms-logo" aria-hidden="true"><LogoSite site={g.plateforme}/></span> : null}
                       <b className={g.plateforme === 'vinted' ? 'vrm-sensible' : undefined}>{g.nom || NOM_SITE[g.plateforme] || tr('avenir.compteSans')}</b>
                       {g.onglet ? <span className="vg-ms-onglet">{tr('verre2.msg.compteOnglet')}</span> : null}
+                      {/* (24 nov.) « Lecture seule » : aucune extension n'a ce compte dans un onglet — ses fils restent lisibles. */}
+                      {['vinted', 'leboncoin', 'vestiaire'].includes(g.plateforme) && g.compte ? <BadgeLectureSeule site={g.plateforme} compte={String(g.compte).replace(/^lbc-account:/, '')}/> : null}
                     </h3>
                     <div className="vrm-msg-list vg-ms-liste">
                       {vus.map((f, i) => {
@@ -417,8 +426,14 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                             data-fil={f.cle} data-fil-convs={String(f.convs.length)} data-fil-sites={f.plateformes.join(',')} data-fil-num={f.num || undefined} data-nonlu={f.nonLu === true ? '1' : undefined}
                             data-fil-at={f.at != null ? String(f.at) : ''} data-fil-offre={offre ? String(offre.prix) : undefined}
                             data-cible={attrCible(...f.convs.flatMap((c) => [['conv', c.conv], c.compte != null && c.compte !== '' ? ['conv', String(c.compte).replace(/^lbc-account:/, ''), c.conv] : null]).filter(Boolean))}
-                            onClick={() => ouvrir(f)} aria-label={`Ouvrir le fil ${nomF}`}>
-                            {ordinateur ? <span className="vg-fil-ph n-fil-avatar" aria-hidden="true"><span className={sensible ? 'vrm-sensible' : undefined}>{String(nomF || '?').trim().charAt(0).toUpperCase() || '?'}</span></span> : <span className="vg-fil-ph" aria-hidden="true">{photo ? <PhotoVinted src={photo} alt="" loading="lazy" decoding="async" width={44} height={44}/> : <span className={sensible ? 'vrm-sensible' : undefined}>{String(nomF || '').trim().charAt(0).toUpperCase() || '·'}</span>}</span>}
+                            onClick={() => ouvrir(f)}>
+                            {/* (24 nov., visuel-argent) La PAIRE en tuile (sa photo vient de la fiche reliée PAR IDENTITÉ, `convVinted` ⇒
+                                `paire.photo` ; jamais l'avatar de l'acheteur ; sans photo, un médaillon) et l'AVATAR DU COMPTE (l'initiale du
+                                groupe) sur son coin — au téléphone comme à l'ordinateur (la vignette de droite est devenue cette tuile). */}
+                            <span className="vg-fil-tuile" aria-hidden="true" data-fil-tuile={photo ? 'photo' : 'medaillon'}>
+                              <TuilePaire photo={photo || ''} Photo={PhotoVinted} Icon={Icon} icone={offre ? 'tag' : photo ? '' : 'chat'} genre={offre ? 'offre' : 'message'} taille="m"/>
+                              {(g.nom || NOM_SITE[g.plateforme]) ? <span className={'vg-fil-compte-av' + (g.plateforme === 'vinted' ? ' vrm-sensible' : '')} data-fil-compte-av="" data-stream-type="compte">{initialeCompte(g.nom || NOM_SITE[g.plateforme])}</span> : null}
+                            </span>
                             <span className="vg-fil-mid">
                               <span className="vg-fil-1">
                                 <b className={sensible ? 'vrm-sensible' : undefined} data-stream-type={sensible ? 'acheteur' : undefined}>{nomF}</b>
@@ -426,13 +441,12 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                               </span>
                               <span className="vg-fil-2">
                                 {f.num ? <span className="sb-plaque vg-fil-plaque"><small>N°</small>{f.num}</span> : null}
-                                <span className={'vg-fil-extrait' + (offre ? ' is-offre' : '')}>{offre ? tr('verre2.msg.offreDe', { m: montantCourt(offre.prix) }) : <>{d && d.apercu && d.deMoi === true ? <span className="vg-fil-toi">{tr('messages.toi')} </span> : null}{d ? d.apercu : ''}</>}</span>
+                                <span className={'vg-fil-extrait' + (offre ? ' is-offre' : '')}>{offre ? <span className="vg-fil-puce-offre" data-fil-offre-puce=""><Icon name="tag" size={13}/><span>{tr('verre2.msg.offreDe', { m: montantCourt(offre.prix) })}</span></span> : <>{d && d.apercu && d.deMoi === true ? <span className="vg-fil-toi">{tr('messages.toi')} </span> : null}{d ? d.apercu : ''}</>}</span>
                                 {f.convs.length > 1 ? <span className="vrm-msg-etat vg-fil-etat" data-fil-relie="">{trj('messages.conv', { x: f.convs.length })}</span> : null}
                                 <PastilleArnaque motif={motif}/>
                                 {f.plateformes.length > 1 ? <Marques plateformes={f.plateformes}/> : null}
                               </span>
                             </span>
-                            {ordinateur && photo ? <span className="n-fil-vignette" aria-hidden="true"><PhotoVinted src={photo} alt="" loading="lazy" decoding="async" width={44} height={44}/></span> : null}
                           </button>
                         );
                       })}

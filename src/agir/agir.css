@@ -1,0 +1,106 @@
+/* (24 nov., lot agir-si-connecte) La porte : un badge gris clair « Lecture seule », le champ « Répondre », les gestes
+   d'une offre. Gris étagé, AUCUN orange (décision du 23 nov.) ; l'accent n'est pas utilisé ici. */
+.vrm-agir-badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  line-height: 18px; color: var(--n-encre-2, #6e6e73); background: var(--n-inactif, rgba(118,118,128,0.12)); white-space: nowrap; vertical-align: middle; }
+.vrm-agir-badge-point { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.55; }
+.vrm-agir-composer { display: flex; flex-direction: column; gap: 8px; padding: 8px 0 0; }
+.vrm-agir-composer textarea { width: 100%; box-sizing: border-box; min-height: 64px; font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--n-filet, rgba(60,60,67,0.18)); background: var(--n-carte, #fff); color: var(--n-encre, #1d1d1f); resize: vertical; }
+.vrm-agir-composer textarea:disabled { background: var(--n-inactif, rgba(118,118,128,0.12)); color: var(--n-encre-2, #6e6e73); }
+.vrm-agir-offre { display: flex; flex-direction: column; gap: 8px; }
+.vrm-agir-issue { margin: 0; font-size: 13px; color: var(--n-encre-2, #6e6e73); }
+.vrm-agir-feuille-p { margin: 0 var(--n-marge, 16px) 12px; color: var(--n-encre-2, #6e6e73); }
+.vrm-agir-repub { display: inline-flex; flex-direction: column; gap: 4px; }
+.vrm-chat-offre-actions > .vrm-agir-offre { grid-column: 1 / -1; }
+
+/* ══ (24 nov., lot messages-pro) LA CONVERSATION REFAITE ════════════════════════════════════════════════════════════════
+   Julien : « ça fait encore beaucoup trop vieux ». Une messagerie de 2026 : bandeau « Lecture seule » unique en tête,
+   carte d'offre dans le fil, puces de réponses, champ en pilule. Jetons natifs seulement (--n-*, --g-* du style choisi),
+   aucune couleur écrite en dur, aucun orange ; grille de 4 pt ; cibles 44 px. Les classes sont neuves (`vrm-mp-*`) : les
+   couches d'avant (`.vrm-chat-offre`, bord doré) ne les touchent pas. */
+.vrm-chat-panel { --mp-r-carte: 20px; --mp-ombre: 0 1px 2px rgb(26 26 30 / .05), 0 8px 24px -12px rgb(26 26 30 / .16); }
+:root[data-theme="dark"] .vrm-chat-panel { --mp-ombre: 0 1px 0 rgb(255 255 255 / .04) inset, 0 10px 28px -14px rgb(0 0 0 / .7); }
+
+/* ── le bandeau « Lecture seule » : une fois, en tête du fil ── */
+.vrm-mp-bandeau { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; grid-template-areas: "ic titre btn" "ic raison raison";
+  column-gap: 12px; row-gap: 2px; align-items: center; margin: 8px 16px 4px; padding: 12px 12px 12px 12px; border-radius: 16px;
+  background: var(--n-carte); color: var(--n-encre); box-shadow: var(--n-ombre-carte); flex-shrink: 0; }
+.vrm-mp-bandeau-a { grid-row: 1 / span 2; align-self: center; }
+.vrm-mp-bandeau-ic { grid-area: ic; align-self: start; width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--n-teinte); color: var(--n-accent); }
+.vrm-mp-bandeau-t { display: contents; }
+.vrm-mp-bandeau-t > b { grid-area: titre; font-size: 15px; line-height: 20px; font-weight: 600; letter-spacing: -0.01em; }
+.vrm-mp-bandeau-t > span { grid-area: raison; font-size: 13px; line-height: 18px; color: var(--n-encre-2); text-wrap: pretty; }
+.vrm-mp-bandeau-a { grid-area: btn; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px; margin: -6px -2px -6px 0;
+  border-radius: var(--g-r-bouton, 999px); background: var(--g-second-fond, var(--n-teinte)); color: var(--n-sur-teinte); font-size: 14px; font-weight: 600;
+  text-decoration: none; white-space: nowrap; -webkit-tap-highlight-color: transparent; transition: transform var(--n-duree-appui, 80ms) ease-out; }
+.vrm-mp-bandeau-a:active { transform: scale(.97); }
+.vrm-mp-bandeau-a:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+
+/* ── la carte d'offre, dans le fil, du côté de l'acheteur ── */
+.vrm-mp-offre-fil { align-self: flex-start; width: min(100%, 352px); margin: 4px 0 8px; display: flex; flex-direction: column; gap: 8px; }
+.vrm-mp-offre { box-sizing: border-box; width: 100%; padding: 16px; border-radius: var(--mp-r-carte); background: var(--n-carte); color: var(--n-encre); box-shadow: var(--mp-ombre); }
+.vrm-mp-offre-qui { margin: 0 0 4px; font-size: 13px; line-height: 18px; color: var(--n-encre-2); }
+.vrm-mp-offre-qui time { font-variant-numeric: tabular-nums; }
+.vrm-mp-offre-prix { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; row-gap: 0; }
+.vrm-mp-offre-de { font-size: 17px; line-height: 24px; font-weight: 500; }
+.vrm-mp-offre-prix > b { font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.vrm-mp-offre-affiche { font-size: 15px; line-height: 20px; color: var(--n-encre-2); font-variant-numeric: tabular-nums; text-decoration-thickness: 1.5px; }
+.vrm-mp-offre-puces { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.vrm-mp-puce { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 12px; border-radius: var(--g-r-chip, 999px); background: var(--n-teinte);
+  color: var(--n-sur-teinte); font-size: 13px; line-height: 18px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-mp-puce[data-marge-niveau="sous"], .vrm-mp-puce[data-offre-niveau="sous-minimum"] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--n-accent); color: var(--n-accent); font-weight: 700; }
+.vrm-mp-lien, .vrm-chat-panel button.vrm-mp-lien { display: inline-flex; align-items: center; min-height: 44px; margin: -8px 0; padding: 0 2px; border: 0; background: none; font: inherit; font-size: 14px;
+  font-weight: 600; color: var(--n-accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.vrm-mp-lien:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; border-radius: 4px; }
+.vrm-mp-offre .vrm-chat-offre-actions { display: block; margin-top: 16px; }
+.vrm-mp-gestes { display: flex; flex-direction: column; gap: 4px; }
+.vrm-mp-gestes-l { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 8px; }
+.vrm-mp-gestes-l > .n-bouton-bloc, .vrm-mp-gestes > .n-bouton-bloc { width: 100%; min-width: 0; margin: 0; }
+.vrm-mp-gestes .n-bouton { width: 100%; min-height: 48px; border-radius: var(--g-r-bouton, 14px); font-size: 16px; font-weight: 600; }
+.vrm-mp-gestes .vrm-mp-contre { min-height: 44px; font-size: 15px; }
+.vrm-mp-gestes .vrm-agir-issue { text-align: center; padding-top: 4px; }
+
+/* ── le pied : puces de réponses + champ en pilule ── */
+.vrm-mp-compose { display: flex; flex-direction: column; gap: 8px; padding: 0; min-width: 0; }
+.vrm-mp-puces { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: none;
+  margin: 0; padding: 0 0 2px; -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 16px), transparent 100%);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 16px), transparent 100%); }
+.vrm-mp-puces::-webkit-scrollbar { display: none; }
+.vrm-mp-rr, .vrm-chat-panel button.vrm-mp-rr { flex: none; scroll-snap-align: start; display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 0; border-radius: var(--g-r-chip, 999px);
+  background: var(--n-teinte); color: var(--n-sur-teinte); font: inherit; font-size: 15px; line-height: 20px; font-weight: 500; white-space: nowrap; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: transform var(--n-duree-appui, 80ms) ease-out, background-color 150ms ease-out; }
+.vrm-mp-rr:active { transform: scale(.97); background: var(--n-appui); }
+.vrm-mp-rr[aria-disabled="true"] { background: var(--n-inactif); color: var(--n-sur-inactif); cursor: default; }
+.vrm-mp-rr:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+.vrm-mp-compose-l { display: flex; align-items: flex-end; gap: 8px; }
+.vrm-chat-panel .vrm-mp-compose textarea.vrm-mp-champ, .vrm-mp-compose textarea.vrm-mp-champ { flex: 1; min-width: 0; box-sizing: border-box; min-height: 44px; max-height: 132px; margin: 0;
+  padding: 11px 16px; border-radius: 22px; border: 1px solid var(--n-bord); background: var(--n-carte); color: var(--n-encre); font: inherit; font-size: 16px; line-height: 20px;
+  resize: none; overflow-y: auto; box-shadow: none; caret-color: var(--n-accent); transition: border-color 150ms ease-out, box-shadow 150ms ease-out; }
+.vrm-mp-compose textarea.vrm-mp-champ::placeholder { color: var(--n-encre-2); opacity: 1; }
+.vrm-mp-compose textarea.vrm-mp-champ:focus, .vrm-mp-compose textarea.vrm-mp-champ:focus-visible { outline: none; border-color: var(--n-accent); box-shadow: 0 0 0 3px var(--n-teinte); }
+.vrm-mp-compose-l > .n-bouton-bloc { flex: none; width: auto; min-width: 0; margin: 0; }
+.vrm-chat-panel .vrm-mp-compose .n-bouton.vrm-mp-envoyer.vrm-mp-envoyer, .vrm-mp-compose .n-bouton.vrm-mp-envoyer.vrm-mp-envoyer.vrm-mp-envoyer { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 50%; background-clip: border-box; gap: 0; }
+.vrm-mp-compose .n-bouton.vrm-mp-envoyer .n-bouton-icone { margin: 0; }
+.vrm-chat-panel .vrm-mp-compose .n-bouton.vrm-mp-envoyer.vrm-mp-envoyer[data-mp-vide] { background: var(--n-inactif); color: var(--n-sur-inactif); box-shadow: none; }
+.vrm-mp-compose-ro { flex-direction: row; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 22px; background: var(--n-carte-2);
+  color: var(--n-encre-2); font-size: 14px; line-height: 18px; font-weight: 500; }
+.vrm-mp-compose-ro-ic { display: inline-flex; flex: none; }
+.vrm-mp-compose-ro-t { min-width: 0; text-wrap: pretty; }
+.vrm-mp-compose .vrm-agir-issue { padding: 0 4px; }
+@media (prefers-reduced-motion: reduce) { .vrm-mp-rr, .vrm-mp-bandeau-a { transition: none; } .vrm-mp-rr:active, .vrm-mp-bandeau-a:active { transform: none; } }
+
+/* Les couches d'avant (`@layer vrm-premium`, studio) peignent les bulles reçues et les champs du fil avec des variables
+   (--sb-porcelaine, --sb-creux) qui n'existent pas toujours ⇒ bulle reçue transparente. On leur donne les jetons natifs,
+   ici, sur le panneau : la bulle reçue redevient une carte claire, le champ une pilule. */
+.vrm-chat-panel { --sb-porcelaine: var(--n-carte); --sb-porcelaine-2: var(--n-carte); --sb-creux: var(--n-carte); --sb-r-champ: 22px; }
+/* Le bouton d'envoi est ROND : ses jetons de rayon et de relief posés sur lui (les couches qui les lisent suivent). */
+.vrm-mp-compose .n-bouton.vrm-mp-envoyer { --n-r-bouton: 50%; --n-r-plein: 50%; --g-r-bouton: 50%; --g-plein-relief: none; --g-plein-relief-appui: none; }
+/* La bulle REÇUE : les couches d'avant la peignent par variables (--v2-socle, --d-bulle-autre, --sb-porcelaine, --vrm-card2…)
+   qui valent le gris du fond en clair ⇒ bulle invisible (mesuré : rgb(223,225,229) = --n-fond). Sur SA rangée seulement,
+   ces variables prennent la carte claire : la bulle de l'autre personne redevient une bulle (comme iMessage, WhatsApp). */
+.vrm-chat-panel .vrm-bulle-l:not(.vrm-bulle-moi) { --v2-socle: var(--n-carte); --d-bulle-autre: var(--n-carte); --sb-porcelaine: var(--n-carte); --sb-porcelaine-2: var(--n-carte);
+  --vrm-card2: var(--n-carte); --vrm-surface: var(--n-carte); }
+/* L'heure dans SA bulle : une couche d'avant la force en blanc (!important en couche) ⇒ invisible sur la bulle blanche du
+   mode sombre. La couleur PEINTE suit l'encre de la bulle pleine, quel que soit le thème. */
+.vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi .vrm-bulle-h { -webkit-text-fill-color: var(--n-sur-plein); opacity: .72; }

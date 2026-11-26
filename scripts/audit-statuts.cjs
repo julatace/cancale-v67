@@ -240,7 +240,7 @@ essaie('(g) délai', () => {
 // aucun email transporteur ne porte le titre (192/192).
 essaie('(h) dédoublonnage des colis à retirer', () => {
   const src = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
-  const i = src.indexOf('const pickupUnion = useMemo(');
+  const i = src.indexOf('const pickupUnion = useMemoParesseux(');
   const corps = i >= 0 ? src.slice(i, src.indexOf('\n  }, [', i)) : '';
   const code = corps.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
   const iExtra = code.indexOf('const extra');
