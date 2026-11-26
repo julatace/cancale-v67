@@ -152,7 +152,7 @@ const attendre = async (pg, f, ms = 8000) => { const t = Date.now(); let v; whil
 const pressePapier = (pg) => pg.evaluate(async () => { try { return await navigator.clipboard.readText(); } catch (_) { return null; } });
 const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel} summary`, (l) => l.filter((x) => { if (x.closest('[hidden]')) return false; const r = x.getBoundingClientRect(); return r.height && r.height < 43.5; }).map((x) => (x.getAttribute('aria-label') || x.textContent || x.tagName).trim().slice(0, 24)));
 // Les pleins VISIBLES dans la feuille (Studio : un par écran au plus).
-const pleins = (pg, sel) => pg.$$eval(`${sel} .vrm-b-primaire`, (l) => l.filter((x) => !x.closest('[hidden]') && !x.closest('details:not([open])') && x.getBoundingClientRect().height > 0).map((x) => x.textContent.trim().slice(0, 30)));
+const pleins = (pg, sel) => pg.$$eval(`${sel} [data-n-variante="plein"], ${sel} .vrm-b-primaire`, (l) => l.filter((x) => !x.closest('[hidden]') && !x.closest('details:not([open])') && x.getBoundingClientRect().height > 0).map((x) => x.textContent.trim().slice(0, 30)));
 const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySelector(${JSON.stringify(sel)}); if (!f) return null; const r = f.getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight - 150 && !document.getAnimations().some((a) => a.playState === 'running') ? 1 : null; })()`, 12000);
 const ls = (pg, k) => pg.evaluate((k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } }, k);
 const premierPlan = (pg) => pg.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
@@ -199,10 +199,10 @@ const premierPlan = (pg) => pg.evaluate(() => document.dispatchEvent(new Event('
           const parts = await pg.evaluate(() => window.__partages);
           if (tel) dit(parts.length === 1 && parts[0].noms.join(',') === 'VRM-42-01.jpg,VRM-42-02.jpg' && parts[0].types.every((t) => t === 'image/jpeg') && parts[0].geste, `R2 ${T} iPhone : UN partage, DANS le geste, avec les 2 photos réglées (JPEG)`, parts);
           else { await pg.waitForTimeout(500); dit(dl.join(',') === 'VRM-42-01.jpg,VRM-42-02.jpg' && !parts.length, `R2 ${T} ordinateur : les 2 photos réglées téléchargées d’un toucher`, dl); }
-          dit(apres && (tel ? /2 photos sont prêtes dans ta galerie : tout a été envoyé/.test(apres) : /2 photos sont enregistrées dans tes téléchargements/.test(apres)), `R2 ${T} après : le message le dit (${tel ? 'galerie, tout envoyé' : 'téléchargements'})`, apres);
+          dit(apres && (tel ? /2 photos dans ta galerie/.test(apres) : /2 photos téléchargées/.test(apres)), `R2 ${T} après : le message le dit (${tel ? 'galerie' : 'téléchargements'}) — court depuis le 23 nov.`, apres);
           dit((await pg.getAttribute(`${F} [data-main-aller="photos"]`, 'data-rg-etat')) === 'fait', `R2 ${T} l’étape Photos est cochée`);
-          const suivPlein = await pg.evaluate(() => (document.querySelector('[data-repub-main] [data-main-suivant]') || {}).className || '');
-          dit(/vrm-b-primaire/.test(suivPlein) && (await pleins(pg, F)).length === 1, `F ${T} fait : « Suivant » devient LE plein (un seul)`, (await pleins(pg, F)).join(' | '));
+          const suivPlein = await pg.evaluate(() => { const x = document.querySelector('[data-repub-main] [data-main-suivant]'); return x ? (x.getAttribute('data-n-variante') || '') + ' ' + (x.className || '') : ''; });
+          dit(/plein|vrm-b-primaire/.test(suivPlein) && (await pleins(pg, F)).length === 1, `F ${T} fait : « Suivant » devient LE plein (un seul)`, (await pleins(pg, F)).join(' | '));
           await pg.screenshot({ path: nomF('2-photos-envoyees') });
           // ── R3 : supprimer l'ancienne, sur SON clic, chez Vinted ──
           await clic(pg, `${F} [data-main-suivant="supprimer"]`);
@@ -217,7 +217,7 @@ const premierPlan = (pg) => pg.evaluate(() => document.dispatchEvent(new Event('
           etat.phase = 'apres';
           await premierPlan(pg);
           const partie = await attendre(pg, () => { const x = document.querySelector('[data-repub-main] [data-rg-ancienne]'); return x && x.getAttribute('data-rg-ancienne') === 'partie' ? x.textContent : null; }, 12000);
-          dit(partie && /n’est plus dans la dernière lecture/.test(partie), `R3 ${T} de retour dans VRM, relu sans toucher : l’ancienne n’est plus en ligne`, partie);
+          dit(partie && /Supprimée/.test(partie), `R3 ${T} de retour dans VRM, relu sans toucher : l’ancienne n’est plus en ligne (« Supprimée »)`, partie);
           dit((await pg.evaluate(() => window.__envois.filter((e) => /suppr|delete|recreer|republier|publier/i.test(e.cmd)).length)) === 0, `R3 ${T} VRM n’a rien supprimé ni publié (c’est lui, sur Vinted)`);
           // ── R4 : créer la nouvelle, chaque champ « Copier » ──
           await clic(pg, `${F} [data-main-suivant="creer"]`);
@@ -245,7 +245,7 @@ const premierPlan = (pg) => pg.evaluate(() => document.dispatchEvent(new Event('
           const num = await attendre(pg, () => { try { const v = JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); return v['9201'] && String(v['9201'].numero) === '42' ? '42' : null; } catch (_) { return null; } }, 15000);
           dit(num === '42', `R5 ${T} la paire GARDE son N° : le N°42 passe sur la nouvelle annonce (par SON clic, relu)`, num);
           const fin = await attendre(pg, () => { const x = document.querySelector('[data-repub-main] [data-rg-fin]'); return x && x.getAttribute('data-rg-fin') === 'fait' ? x.textContent : null; }, 15000);
-          dit(fin && /C’est republié : la nouvelle annonce porte le N°42, relu par VRM/.test(fin), `R5 ${T} « C’est republié », relu`, fin);
+          dit(fin && /C’est republié · N°42/.test(fin), `R5 ${T} « C’est republié · N°42 », relu`, fin);
           const trav = await attendre(pg, () => { try { const l = JSON.parse(localStorage.getItem('vrm_suivi_travaux') || '[]'); const x = l.find((t) => t && t.id === 'm-republier-main-9201'); return x ? { titre: x.titre, sorte: x.sorte, ok: x.articles[0].etat } : null; } catch (_) { return null; } });
           dit(trav && trav.sorte === 'republier-main' && trav.ok === 'ok' && /N°42/.test(trav.titre), `R5 ${T} noté dans « Ce que VRM a fait »`, trav);
           const pasTouchesRepub = touchers;
@@ -265,7 +265,7 @@ const premierPlan = (pg) => pg.evaluate(() => document.dispatchEvent(new Event('
           const FG = '[data-repub-main="9104"]';
           await pg.waitForSelector(FG, { timeout: 8000 }); await poseeLa(pg, FG);
           const huit = await attendre(pg, () => { const x = document.querySelector('[data-repub-main] [data-main-telecharger]'); return x && x.getAttribute('data-rg-photos-pretes') === '8' ? 8 : null; }, 90000);
-          const grille = await pg.evaluate(() => { const g = document.querySelector('[data-repub-main] [data-main-photos]'); return g ? { n: g.getAttribute('data-main-photos'), ch: g.getAttribute('data-rg-photos-choisies'), srcs: [...g.querySelectorAll('img')].map((i) => i.getAttribute('src') || '').map((u) => (u.match(/\/(\d)\.jpeg/) || [])[1] || u.slice(0, 20)).join(','), couv: !!g.querySelector('[data-rg-photo="0"] .vrm-rg-couverture') } : null; });
+          const grille = await pg.evaluate(() => { const g = document.querySelector('[data-repub-main] [data-main-photos]'); return g ? { n: g.getAttribute('data-main-photos'), ch: g.getAttribute('data-rg-photos-choisies'), srcs: [...g.querySelectorAll('img')].map((i) => i.getAttribute('src') || '').map((u) => (u.match(/\/(\d)\.jpeg/) || [])[1] || u.slice(0, 20)).join(','), couv: /Couverture/.test((g.querySelector('[data-rg-photo="0"] .rg2-rang') || {}).textContent || '') } : null; });
           dit(huit === 8 && grille && grille.n === '8' && grille.ch === '8' && grille.couv, `G ${T} une annonce de 8 photos (vignette seule au dressing) : les 8, la 1re en couverture, toutes préparées`, grille);
           dit(!(await pg.$(`${FG} [data-rg-photos-manque]`)), `G ${T} rien ne manque : aucune mise en garde`);
           // Le même réglage pour toutes : la barre « Luminosité », puis « Recadrer ».
@@ -310,7 +310,7 @@ const premierPlan = (pg) => pg.evaluate(() => document.dispatchEvent(new Event('
           await attendre(pg, () => (document.querySelector('[data-republier-main-lancer]') ? 1 : null));
           await clic(pg, '[data-republier-main-lancer]', false);
           const couvSeule = await attendre(pg, () => { const x = document.querySelector('[data-repub-main="9103"] [data-rg-photos-manque]'); return x ? { m: x.getAttribute('data-rg-photos-manque'), lien: (x.querySelector('[data-rg-ouvrir-annonce]') || {}).getAttribute ? x.querySelector('[data-rg-ouvrir-annonce]').getAttribute('href') : null, relire: !!x.querySelector('[data-rg-relire-photos]') } : null; }, 12000);
-          dit(couvSeule && couvSeule.lien === 'https://www.vinted.fr/items/9103' && couvSeule.relire && (couvSeule.m === 'couverture' || Number(couvSeule.m) > 0), `G ${T} VRM n’a pas toutes les photos : il le dit, avec le lien de l’annonce et « Relire les photos »`, couvSeule);
+          dit(couvSeule && couvSeule.lien === 'https://www.vinted.fr/items/9103' && !couvSeule.relire && (couvSeule.m === 'couverture' || Number(couvSeule.m) > 0), `G ${T} VRM n’a pas toutes les photos : il le dit, avec le lien de l’annonce (plus de « Relire les photos » : il relit seul au retour)`, couvSeule);
           await pg.screenshot({ path: nomF('10-photos-manquent') });
           await clic(pg, '[data-repub-main] button[aria-label="Fermer"]', false); await pg.waitForTimeout(300);
           // ── P : publier à la main, une fiche « À publier » ──
@@ -342,7 +342,7 @@ const premierPlan = (pg) => pg.evaluate(() => document.dispatchEvent(new Event('
           // Une annonce lue porte maintenant le N°45 (la preuve qui sort la fiche de « À publier »).
           await pg.evaluate(() => { const v = JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); v['9301'] = { numero: '45' }; localStorage.setItem('vinted_annonce_numeros', JSON.stringify(v)); window.dispatchEvent(new CustomEvent('vrm:save', { detail: { k: 'vinted_annonce_numeros' } })); });
           const finP = await attendre(pg, () => { const x = document.querySelector('[data-publier-main] [data-rg-fin]'); return x && x.getAttribute('data-rg-fin') === 'fait' ? x.textContent : null; }, 8000);
-          dit(finP && /C’est publié : une annonce porte le N°45/.test(finP), `P ${T} « C’est publié », relu par le N° de la fiche`, finP);
+          dit(finP && /C’est publié · N°45/.test(finP), `P ${T} « C’est publié · N°45 », relu par le N° de la fiche`, finP);
           const travP = await attendre(pg, () => { try { const l = JSON.parse(localStorage.getItem('vrm_suivi_travaux') || '[]'); return l.some((t) => t && t.id === 'm-publier-main-fiche-banc-1') ? 1 : null; } catch (_) { return null; } });
           dit(travP === 1, `P ${T} noté dans « Ce que VRM a fait »`);
           const poolApres = JSON.stringify(await ls(pg, 'vinted_used_numeros'));

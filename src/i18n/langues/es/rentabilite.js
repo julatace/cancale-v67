@@ -54,5 +54,21 @@ export default {
   "rt.couv.autres": "{n} no reconocidas (Otros)",
   "rt.regroupe": "Lo que se agrupó",
   "rt.regroupe.sous": "{n} grupos · solo para mostrar, nunca para vincular un par",
-  "rt.regroupe.reste": "y {n} más"
+  "rt.regroupe.reste": "y {n} más",
+  "rt.axe.source": "Origen",
+  "rs.tousAchats": "Todas tus compras, por origen",
+  "rs.auPlus": "como mucho {p}",
+  "rs.rienRevendu": "nada revendido",
+  "rs.revendus": "{k} revendidos de {n}",
+  "rs.achetes": "{n} comprados",
+  "rs.taux": "{t} % revendidos",
+  "rs.surDatees": "sobre {n} con fecha",
+  "rs.pasSu": "Aún no calculado: abre Compras",
+  "rs.pasSaisie": "Origen sin indicar",
+  "rs.couv": "Media sobre {k} de {n} reventas",
+  "rs.couv.sansAchat": "{n} ventas sin compra vinculada",
+  "rs.couv.pasLu": "{n} compras no leídas aquí",
+  "rs.couv.vintedPasLus": "compras de Vinted no leídas",
+  "rs.pourquoi": "¿Por qué?",
+  "rs.pourquoi.texte": "Una venta solo cuenta para un origen si está vinculada a su compra (su n.º de transacción, o el número escrito en la compra), nunca por el título. El beneficio medio solo cubre las reventas con precio de compra conocido; la tasa = revendidos ÷ comprados; el plazo va de la compra a la venta. Cubre todas tus compras, no el periodo elegido."
 };

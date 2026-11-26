@@ -9,11 +9,11 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr, date as dateLoc, monnaie } from '../i18n/index.js';
-import { ligneDeTemps, studioDe } from './ligneDeTemps.js';
+import { ligneDeTemps, studioDe, rangementDuNumero } from './ligneDeTemps.js';
 import './idees.css';
 
 const quand = (iso) => dateLoc(iso, { day: 'numeric', month: 'short', year: 'numeric' });
-const PREUVE_CLE = { clic: 'lt.src.clic', livraison: 'lt.src.livraison', studio: 'lt.src.studio', moderation: 'lt.src.moderation', clicRetour: 'lt.src.clicRetour' };
+const PREUVE_CLE = { clic: 'lt.src.clic', livraison: 'lt.src.livraison', studio: 'lt.src.studio', moderation: 'lt.src.moderation', clicRetour: 'lt.src.clicRetour', rangement: 'lt.src.rangement' };
 
 function libelle(e) {
   if (e.quoi === 'photographiee') return tr('lt.photos', { n: e.n || 1 });
@@ -58,11 +58,13 @@ export default function LigneDeTemps({ h, extra = {} }) {
     Promise.resolve(extra.lireStudio(cle)).then((rows) => { if (vivant) setStudio(studioDe(rows)); }).catch(() => { if (vivant) setStudio(null); });
     return () => { vivant = false; };
   }, [cle, extra.lireStudio]);
-  const lt = React.useMemo(() => ligneDeTemps(h, { reception: extra.reception, crees: extra.crees, studio, ids: extra.ids, txs: extra.txs, moderation: extra.moderation, retours: extra.retours }),
-    [h, extra.reception, extra.crees, studio, extra.ids, extra.txs, extra.moderation, extra.retours]);
+  // (23 nov., lot historique-paire) la case du Stock de CE N° (`vrm_fiches_neuves`, par la clé du N°) ; `undefined` = pas demandé.
+  const rangement = React.useMemo(() => { if (extra.fichesNeuves === undefined) return undefined; try { return rangementDuNumero(extra.fichesNeuves, cle, extra.cleNum, extra.slots); } catch (_) { return null; } }, [extra.fichesNeuves, cle, extra.cleNum, extra.slots]);
+  const lt = React.useMemo(() => ligneDeTemps(h, { reception: extra.reception, crees: extra.crees, studio, ids: extra.ids, txs: extra.txs, moderation: extra.moderation, retours: extra.retours, rangement }),
+    [h, extra.reception, extra.crees, studio, extra.ids, extra.txs, extra.moderation, extra.retours, rangement]);
   if (!lt) return null;
   const double = !!(h && h.double);
-  const PAS_SU = { recue: 'lt.pasSu.recue', studio: 'lt.pasSu.studio', crees: 'lt.pasSu.crees', moderation: 'lt.pasSu.moderation' };
+  const PAS_SU = { recue: 'lt.pasSu.recue', studio: 'lt.pasSu.studio', crees: 'lt.pasSu.crees', moderation: 'lt.pasSu.moderation', rangement: 'lt.pasSu.rangement' };
   const pasSu = lt.pasSu.map((r) => (PAS_SU[r] ? tr(PAS_SU[r]) : r));
   return (
     <section className="vrm-idees vrm-lt" aria-label={tr('lt.titre')} data-ligne-temps={cle} data-lt-n={lt.evenements.length} data-lt-sans-date={lt.sansDate.length} data-lt-studio={studio === undefined ? 'encours' : studio === null ? 'passu' : String(studio.dates.length)}>

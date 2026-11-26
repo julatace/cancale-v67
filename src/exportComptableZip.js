@@ -64,8 +64,17 @@ export function feuillesExport(d) {
   for (const m of (d.caParMois || [])) ca.push([m.mois, m.n, n2(m.ca), micro ? n2(m.urssaf) : 'non calculée', m.declare ? 'oui' : '']);
   if (d.caParMois) ca.push([{ t: d.partielCa ? 'Total (au moins)' : 'Total', gras: true }, null, d.caDeclare == null ? '—' : { n: n2(d.caDeclare) }, micro && d.urssaf != null ? { n: n2(d.urssaf) } : '', '']);
   else ca.push(['CA déclaré pas encore calculé : ouvre Ventes une fois']);
+  // (23 nov., lot export-comptable) Le reçu par plateforme et les dépenses notées (src/exportComptable.js).
+  const sites = [['Plateforme', 'Ventes versées', 'Montant reçu (€)', 'Frais lus (€)', 'Note']];
+  for (const g of (d.parPlateforme || [])) sites.push([g.plateforme, g.n, n2(g.montant), g.fraisLus ? n2(g.frais) : null, g.sansMontant ? `au moins (${g.sansMontant} montant(s) pas lu(s))` : '']);
+  const depenses = [['Date', 'Sorte', 'Catégorie', 'Libellé', 'Montant (€)', 'Ticket joint']];
+  for (const x of (d.depenses || [])) depenses.push([x.date, x.sorte === 'pack' ? 'pack' : 'dépense', x.categorie, x.libelle, n2(x.montant), x.ticket ? 'oui' : '']);
+  if (d.depenses) depenses.push(['', '', '', { t: 'Total', gras: true }, { n: n2(d.totalDepenses) }, '']);
+  else depenses.push(['Dépenses pas lues']);
   return [
     { nom: 'Résumé', lignes: resume, largeurs: [42, 30], entete: false },
+    { nom: 'Reçu par site', lignes: sites, largeurs: [14, 14, 16, 14, 30] },
+    ...(d.nDepenses !== undefined ? [{ nom: 'Dépenses', lignes: depenses, largeurs: [12, 10, 16, 36, 13, 12] }] : []),
     { nom: 'Recettes', lignes: recettes, largeurs: [14, 13, 11, 16, 7, 14, 40, 15, 12, 30] },
     { nom: 'À dater', lignes: aDater, largeurs: [13, 11, 16, 7, 14, 40, 15, 30] },
     { nom: 'Achats', lignes: achats, largeurs: [12, 11, 22, 14, 7, 40, 14, 14, 18, 30, 30] },
