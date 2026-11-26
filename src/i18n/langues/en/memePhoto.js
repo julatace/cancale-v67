@@ -39,7 +39,7 @@ export default {
   "memePhoto.extensionSure": "Extension {v} confirms “sure”: update it. Until then, everything is “to check”.",
   "memePhoto.aideSure": "“Sure”: two different measures say it’s the same photo. “To check”: look at both photos. Nothing is linked without your tap.",
   "memePhoto.aussiSurOrigine": "Also on {sites} · recognised by the original photo",
-  "memePhoto.limiteOrigine": "Original photo: the same file uploaded from your Chrome with the extension. Posted from a mobile app, VRM can’t see it.",
+  "memePhoto.limiteOrigine": "Original photo: the same file uploaded from your computer with the extension. Posted from a mobile app, VRM can’t see it.",
   "ug.titre": "Improve in one tap",
   "ug.sous": "Same settings everywhere, original kept.",
   "ug.r.lumiere": "Light",

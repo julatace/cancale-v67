@@ -9705,7 +9705,7 @@ async function rangerOrigineMaintenant() {
   for (const ligne of [...new Set(f.map((e) => e && e.ligne).filter(Boolean))]) {
     const liste = f.filter((e) => e && e.ligne === ligne);
     const champ = ligne === LIGNE_ORIGINE.lbc ? 'images' : 'annonces';
-    const r = await sbGet(`app_data?id=eq.${ligne}&select=a:data->payload->${champ}`);
+    const r = await sbGet(`app_data?id=eq.${ligne}&select=${champ === 'images' ? 'a:data->payload->images' : 'a:data->payload->annonces'}`);   // (26 nov.) deux chemins écrits en entier : aucun identifiant interpolé nu
     if (r === null) { restent.push(...liste); noterDiag('origine_lecture_ratee'); continue; }
     const carte = Object.assign({}, (r[0] && r[0].a && typeof r[0].a === 'object') ? r[0].a : {});
     for (const e of liste) {

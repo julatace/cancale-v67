@@ -129,7 +129,7 @@ export default function MettreAussiSur({ ouverte = true, lecture = false, avis =
                   <div className="q4-photos-rang">
                     {forme.photos.slice(0, 24).map((u, i) => (
                       <span key={u} className="q4-photo">
-                        {Photo ? <Photo src={u}/> : <img src={u} alt="" loading="lazy"/>}
+                        {Photo ? <Photo src={u}/> : null}
                         {forme.photos.length > 1 && !occupe ? <button type="button" className="q4-photo-x" aria-label={tr('q4.photoRetirer', { n: i + 1 })}
                           onClick={() => onModifier('photos', forme.photos.filter((x) => x !== u))}>×</button> : null}
                       </span>

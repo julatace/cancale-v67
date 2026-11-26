@@ -130,7 +130,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'repub-reperage', date: '2026-11-24', titre: 'Republier : VRM retrouve seul chaque bouton', phrase: 'Un bouton en double ou introuvable : rien ne part, c’est dit.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (24 nov., ext-anciens-lots — repris de #1219, Julien : « VRM la reconnaît parce que la photo utilisée est exactement la même »)
   // docs/passation/2026-11-24-ext-anciens-lots.md
-  { id: 'photo-origine', date: '2026-11-24', titre: 'Même photo d’origine : déjà reliée', phrase: 'Envoyée depuis ton Chrome sur Leboncoin : elle prend le N° Vinted.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'photo-origine', date: '2026-11-24', titre: 'Même photo d’origine : déjà reliée', phrase: 'Envoyée depuis ton ordinateur sur Leboncoin : elle prend le N° Vinted.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (24 nov., ext. 5.448 — Julien : « elle doit pouvoir marcher sur tous les sites, s'adapter ») docs/passation/2026-11-24-ext-adaptatif.md
   { id: 'extension-sante-sites', date: '2026-11-24', titre: 'Santé de chaque site dans l’extension', phrase: '« Tout marche », ou ce qui ne marche plus et le geste.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'extension-adaptative', date: '2026-11-24', titre: 'L’extension s’adapte quand un site change', phrase: 'Vinted, Leboncoin, Vestiaire, eBay : bouton retrouvé, sinon arrêt expliqué.', tab: 'extension', pour: 'tous', mode: 'tous' },
