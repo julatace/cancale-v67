@@ -1376,6 +1376,7 @@
     fa_r_compte_vinted_absent: { fr: 'Compte Vinted pas connecté', en: 'Vinted account not signed in', es: 'Cuenta de Vinted no conectada', it: 'Account Vinted non connesso', de: 'Vinted-Konto nicht angemeldet' },
     fa_r_pause_vinted: { fr: 'Vinted demande une pause', en: 'Vinted asked for a pause', es: 'Vinted pide una pausa', it: 'Vinted chiede una pausa', de: 'Vinted bittet um eine Pause' },
     fa_r_vinted_robot: { fr: 'Vinted demande une vérification', en: 'Vinted asks for a check', es: 'Vinted pide una verificación', it: 'Vinted chiede una verifica', de: 'Vinted verlangt eine Prüfung' },
+    fa_r_telephone_a_verifier: { fr: 'Vérifie ton téléphone sur Vinted', en: 'Verify your phone on Vinted', es: 'Verifica tu teléfono en Vinted', it: 'Verifica il telefono su Vinted', de: 'Bestätige dein Telefon bei Vinted' },
     fa_r_texte_refuse: { fr: 'Message refusé par Vinted', en: 'Message refused by Vinted', es: 'Mensaje rechazado por Vinted', it: 'Messaggio rifiutato da Vinted', de: 'Nachricht von Vinted abgelehnt' },
     fa_r_texte_interdit: { fr: 'Message à revoir', en: 'Message needs editing', es: 'Mensaje por revisar', it: 'Messaggio da rivedere', de: 'Nachricht überarbeiten' },
     fa_r_offre_refusee: { fr: 'Offre refusée par Vinted', en: 'Offer refused by Vinted', es: 'Oferta rechazada por Vinted', it: 'Offerta rifiutata da Vinted', de: 'Angebot von Vinted abgelehnt' },
