@@ -65,6 +65,8 @@ const JJMMAAAA = `${String(dateTicket.getDate()).padStart(2, '0')}/${String(date
 const ISO_TICKET = `${dateTicket.getFullYear()}-${String(dateTicket.getMonth() + 1).padStart(2, '0')}-${String(dateTicket.getDate()).padStart(2, '0')}`;
 const TICKET_OK = ['FRIPERIE DU PORT', '12 RUE INVENTEE', `LE ${JJMMAAAA} 14:32`, '', 'BASKET CUIR 38        30,00', 'BASKET TOILE 41       15,00', 'SAC TOILE              5,00', '3 ARTICLES', 'SOUS-TOTAL            50,00', 'REMISE                -5,00', 'TOTAL TTC             45,00', 'ESPECES               50,00', 'RENDU                  5,00', '', 'MERCI DE VOTRE VISITE'];
 const TICKET_SANS_TOTAL = ['BON DE DEPOT', 'BASKET CUIR 38', 'BASKET TOILE 41', 'SAC TOILE'];
+// (23 nov., lot achats-hors-vinted) Un vide-grenier : trois lignes dont la somme est EXACTEMENT le total ⇒ « Diviser en 3 articles ».
+const TICKET_LOT = ['VIDE GRENIER DU QUARTIER', `LE ${JJMMAAAA} 10:05`, '', 'NIKE AIR MAX 90        25,00', 'ADIDAS SAMBA           15,00', 'NEW BALANCE 550        12,50', '', 'TOTAL                  52,50', 'CB                     52,50'];
 const ecrireTicket = async (b, lignes, nom) => {
   const pg = await b.newPage({ viewport: { width: 520, height: 60 + lignes.length * 34 }, deviceScaleFactor: 1 });
   await pg.setContent(`<!doctype html><meta charset="utf-8"><body style="margin:0;background:#fff"><pre style="margin:0;padding:28px 30px;font:22px/34px 'DejaVu Sans Mono',monospace;color:#111">${lignes.join('\n')}</pre>`);
@@ -127,7 +129,7 @@ async function passe(b, nom, ctxOpts, sombre, tickets, tessOk) {
   await capture(pg, `achat-ticket-${nom}-1-form`);
   if (!t1 || !t1.bt) {
     // Un banc ne meurt pas, il rapporte : sans le bouton, chaque contrôle du parcours est dit rouge.
-    for (const k of ['T2', 'T3a', 'T3b', 'T3c', 'T3d', 'T3e', 'T3f', 'T3g', 'T4', 'T5a', 'T5b', 'T6', 'T7']) dit(false, `${nom} · ${k} · pas joué : aucun bouton « Photo du ticket »`);
+    for (const k of ['T2', 'T3a', 'T3b', 'T3c', 'T3d', 'T3e', 'T3f', 'T3g', 'T4', 'T5a', 'T5b', 'T6', 'T7', 'T8']) dit(false, `${nom} · ${k} · pas joué : aucun bouton « Photo du ticket »`);
     await ctx.close(); return;
   }
 
@@ -150,7 +152,7 @@ async function passe(b, nom, ctxOpts, sombre, tickets, tessOk) {
     return { prix: q('[data-champ="prix"]').value, prixLu: q('[data-champ="prix"]').getAttribute('data-prix-lu'), note: (q('[data-prix-lu-note]') || {}).textContent || '',
       date: q('[data-champ="date"]').value, lieu: q('[data-champ="lieu"]').value, articles: (q('[data-achat-ticket-articles]') || { getAttribute: () => null }).getAttribute('data-achat-ticket-articles'),
       bouton: q('[data-achat-hors-enregistrer]').textContent, aValider: q('[data-achat-hors-enregistrer]').getAttribute('data-prix-a-valider'),
-      facture: !!q('[data-facture-du-ticket="1"]'), resume: (q('[data-achat-ticket-resume]') || {}).textContent || '' };
+      facture: !!q('[data-facture-du-ticket="1"]'), lotPropose: !!q('[data-achat-ticket-lot]'), resume: (q('[data-achat-ticket-resume]') || {}).textContent || '' };
   });
   console.log(`     (lecture : ${duree} s · « ${t3.resume} » · servis : ${[...servis].join(', ')})`);
   const detecteur = await pg.evaluate(() => 'TextDetector' in window);
@@ -160,6 +162,7 @@ async function passe(b, nom, ctxOpts, sombre, tickets, tessOk) {
   dit(t3.date === ISO_TICKET, `${nom} · T3c · la date du ticket (${ISO_TICKET})`, t3.date);
   dit(/friperie du port/i.test(t3.lieu), `${nom} · T3d · le lieu écrit sur le ticket`, t3.lieu);
   dit(t3.articles === '3', `${nom} · T3e · « 3 articles sur ce ticket »`, String(t3.articles));
+  dit(!t3.lotPropose, `${nom} · T3h · remise : la somme des lignes n'est pas le total ⇒ aucune division proposée`);
   dit(/Valider 45,00\s€ et ajouter/.test(t3.bouton) && t3.aValider === '1', `${nom} · T3f · le bouton dit « Valider 45,00 € et ajouter »`, t3.bouton);
   dit(t3.facture, `${nom} · T3g · « Ticket joint comme facture »`);
   await pg.locator('[data-achat-ticket]').evaluate((x) => x.scrollIntoView({ block: 'start' }));
@@ -195,6 +198,19 @@ async function passe(b, nom, ctxOpts, sombre, tickets, tessOk) {
   dit(e7 === 'rien' && t7.prix === '' && /Tape le prix/.test(t7.dit), `${nom} · T7 · sans total ⇒ prix vide, « Tape le prix »`, JSON.stringify({ e7, ...t7 }));
   await capture(pg, `achat-ticket-${nom}-7-rien`);
 
+  // T8. (23 nov., lot achats-hors-vinted) Un ticket à plusieurs articles dont la somme = le total ⇒ « Diviser en 3 articles » ;
+  //     le toucher remplit le lot (rien d'écrit) ; le ticket friperie (remise : la somme n'est pas le total) n'en propose aucun.
+  await ouvrir();
+  await pg.setInputFiles('[data-achat-ticket-fichier]', tickets.lot);
+  await finLecture(pg, 120000);
+  const t8 = await pg.evaluate(() => { const b = document.querySelector('[data-achat-ticket-lot]'); return { n: b ? b.getAttribute('data-achat-ticket-lot') : null, h: b ? b.getBoundingClientRect().height : 0, prix: (document.querySelector('[data-champ="prix"]') || {}).value }; });
+  dit(t8.n === '3' && t8.h >= 44 && t8.prix === '52,50', `${nom} · T8a · « Diviser en 3 articles » proposé (somme = total 52,50), ≥ 44 px`, JSON.stringify(t8));
+  const ecritsAvant = ecrits.length;
+  await pg.locator('[data-achat-ticket-lot]').first().click().catch(() => {});
+  await pg.waitForTimeout(400);
+  const t8b = await pg.evaluate(() => ({ lu: (document.querySelector('[data-achat-ticket-lot-lu]') || { getAttribute: () => null }).getAttribute('data-achat-ticket-lot-lu') }));
+  dit(t8b.lu === '3' && ecrits.length === ecritsAvant, `${nom} · T8b · le toucher remplit le lot de 3, rien n'est écrit`, JSON.stringify({ ...t8b, ecrits: ecrits.length - ecritsAvant }));
+  await capture(pg, `achat-ticket-${nom}-8-lot`);
   dit(await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `${nom} · aucun défilement horizontal`);
   dit(!errs.length, `${nom} · aucune erreur de page`, errs.slice(0, 2).join(' | '));
   if (tactile) console.log('     gestes : avant 7 (nom, prix, lieu, date, facture ×2, ajouter) · après 4 (ticket ×2, nom, valider)');
@@ -207,7 +223,7 @@ async function passe(b, nom, ctxOpts, sombre, tickets, tessOk) {
   dit(tessOk, 'les paquets Tesseract officiels sont là (lecture réelle)');
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
-    const tickets = { ok: await ecrireTicket(b, TICKET_OK, 'ticket-ok'), sans: await ecrireTicket(b, TICKET_SANS_TOTAL, 'ticket-sans') };
+    const tickets = { ok: await ecrireTicket(b, TICKET_OK, 'ticket-ok'), sans: await ecrireTicket(b, TICKET_SANS_TOTAL, 'ticket-sans'), lot: await ecrireTicket(b, TICKET_LOT, 'ticket-lot') };
     if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); fs.copyFileSync(tickets.ok, path.join(SHOTS, 'ticket-invente.png')); }
     const seul = (process.env.BANC_PASSES || '').split(',').filter(Boolean);
     const passes = [
