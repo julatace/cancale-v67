@@ -485,6 +485,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **26 nov. · Vestiaire/LBC fiables** : vente VC annulée ≠ « Vendue », lecture VC > 24 h = « à confirmer », Annonces lit `vc_ventes`, « LBC n » pas su sans ventes. `2026-11-26-fiabilite-vc-lbc.md`. Geste : aucun.
 - **26 nov. · Favoris réparés, ext. 5.453.2** : fenêtre d’offre, frappe `execCommand`, « C’est parti / Pas parti ». `2026-11-25-favoris-sequence-repare.md`. Geste : 5.453.2.
 - **26 nov. · COULEURS (Julien : « 14 en sombre, 15 en clair »)** : clair = monochrome (#FFFFFF, encre noire) ; sombre = graphite et vert (#22262B, accent #5BD68F). `src/natif/jetons.css`. Geste : aucun.
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
@@ -512,7 +513,6 @@ vérifier par `curl https://vrm.center/api/sante`.
 - Migration **016** (mode équipe) : pas à pas sans terminal dans `2026-11-11-equipe-pret.md` §4.
 - Repasser sur Vinted connecté sur les comptes dont la lecture est ancienne (la ligne de
   fraîcheur les nomme).
-- Les 6 paires renumérotées le 2 oct. (543→266…, historique numéros) : regarder le carton.
 - Boutiques d'extensions (AMO Firefox, Edge, Opera) : `docs/boutiques-extension.md`.
 - Décider : second cron le dimanche soir ; garder ou non le retrait eBay automatique
   (ALLUMÉ chez lui) ; libellés de la barre du bas à 9 px.

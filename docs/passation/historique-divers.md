@@ -2318,3 +2318,8 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **23 nov. · Republier à la main refait** : une étape à la fois, grille de toutes les photos (glisser), un plein en bas, vrais curseurs, aucun orange ; « Supprimer » cochée sur lecture complète seulement. `2026-11-23-republier-main-feuille.md`. Geste : aucun.
 - **23 nov. · Appareils connectés : navigateurs de l'extension (`claude/appareils-connectes`)** : lignes `ext_appareil_*` (`owner=eq.`) sous les sessions. `2026-11-23-appareils-connectes.md`. Geste : aucun.
 - **23 nov. · Scan d'un colis d'achat : son N° et le geste** : N° de CET achat (par son n° de transaction), « Rangé · case », « Ranger en … », « Numéroter » ou « déjà vendue » ⇒ la vente ; transaction / code de retrait tapés. `2026-11-23-scan-achat.md`. Geste : aucun.
+
+
+## Déplacé de CLAUDE.md §9 « Gestes encore attendus de Julien » le 26 nov. (taille du fichier)
+
+- Les 6 paires renumérotées le 2 oct. (543→266…, historique numéros) : regarder le carton.
