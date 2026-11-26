@@ -41,7 +41,7 @@ export default {
   "acc.lecture.2": "Reviens sur Aujourd’hui.",
   "acc.geste.lecture": "Voir la lecture",
   "acc.numeros.titre": "Un numéro par article",
-  "acc.numeros.phrase": "Un numéro par article, là où il est rangé.",
+  "acc.numeros.phrase": "Un numéro par article, à sa place.",
   "acc.numeros.1": "Ouvre Annonces : chaque article a son numéro.",
   "acc.numeros.2": "Écris-le là où tu ranges l’article.",
   "acc.geste.numeros": "Ouvrir Annonces",

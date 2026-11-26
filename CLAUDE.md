@@ -485,6 +485,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **26 nov. · Vestiaire/LBC fiables** : vente VC annulée ≠ « Vendue », lecture VC > 24 h = « à confirmer », Annonces lit `vc_ventes`, « LBC n » pas su sans ventes. `2026-11-26-fiabilite-vc-lbc.md`. Geste : aucun.
 - **26 nov. · Favoris réparés, ext. 5.453.2** : fenêtre d’offre, frappe `execCommand`, « C’est parti / Pas parti ». `2026-11-25-favoris-sequence-repare.md`. Geste : 5.453.2.
 - **26 nov. · COULEURS (Julien : « 14 en sombre, 15 en clair »)** : clair = monochrome (#FFFFFF, encre noire) ; sombre = graphite et vert (#22262B, accent #5BD68F). `src/natif/jetons.css`. Geste : aucun.
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
@@ -497,7 +498,8 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter « Ma facture » (Argent → Factures : SIRET, forme, régime de TVA, son e-mail) ; poser `RELANCES_SMTP_*` + `RELANCES_EXPEDITEUR` (SPF/DKIM, Brevo 300/j) — VRM envoie par défaut.
-- Installer l’extension **5.440.1** (23 nov. nuit ; avant 5.440.0, 23 nov. ; avant 5.436.0, 22 nov., intégration 2 ; avant 5.434.0, puis 5.419.0, 21 nov. nuit ; avant 5.418.0, 21 nov. soir ; avant 5.410.8, 21 nov. ; avant 5.410.2, 20 nov. : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip` ; mesuré le 19 nov. : Chrome 5.406, 5.400, 5.329, Orion 5.377, 5.368, 5.336). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
+- Installer l’extension **5.453.2** (26 nov. : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). Versions d’avant : `historique-divers.md`.
+- Les 6 paires renumérotées le 2 oct. (543→266…, historique numéros) : regarder le carton.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
@@ -512,7 +514,6 @@ vérifier par `curl https://vrm.center/api/sante`.
 - Migration **016** (mode équipe) : pas à pas sans terminal dans `2026-11-11-equipe-pret.md` §4.
 - Repasser sur Vinted connecté sur les comptes dont la lecture est ancienne (la ligne de
   fraîcheur les nomme).
-- Les 6 paires renumérotées le 2 oct. (543→266…, historique numéros) : regarder le carton.
 - Boutiques d'extensions (AMO Firefox, Edge, Opera) : `docs/boutiques-extension.md`.
 - Décider : second cron le dimanche soir ; garder ou non le retrait eBay automatique
   (ALLUMÉ chez lui) ; libellés de la barre du bas à 9 px.

@@ -8,7 +8,7 @@
 // sélecteur lit. « Pas su » ⇒ rien écrit (jamais un 0 deviné) ; une lecture ratée
 // remet le site à « pas su ». En mémoire seulement (rien n'est écrit en base) ; vidé à
 // la déconnexion (`viderNombresAnnonces`).
-import { etatAnnonceVcBrut } from '../../api/_lib/vestiaire-regle.js';
+import { compterVcEnLigneRegle } from '../enLigneVc.js';
 
 const etat = { v: Object.freeze({}), auditeurs: new Set() };
 
@@ -26,17 +26,9 @@ export function viderNombresAnnonces() { etat.v = Object.freeze({}); for (const 
 export const lireNombresAnnonces = () => etat.v;
 export function abonnerNombresAnnonces(f) { etat.auditeurs.add(f); return () => etat.auditeurs.delete(f); }
 
-// Vestiaire : le nombre d'annonces « En ligne » de SA liste (src/ecrans/Vestiaire.jsx, `etatAnnonceVc`) —
-// une vente lue (même identifiant d'article) la dit vendue, sinon le mot lu sur Vestiaire (la règle partagée
-// `etatAnnonceVcBrut`). Liste jamais lue (pas de date de lecture) ⇒ null (pas su), jamais 0.
-export function compterVcEnLigne(lst, ventes) {
-  if (!lst || typeof lst !== 'object' || !lst.items || typeof lst.items !== 'object' || !lst.capturedAt) return null;
-  const vendus = new Set();
-  if (ventes && typeof ventes === 'object') for (const v of Object.values(ventes)) if (v && v.productId) vendus.add(String(v.productId));
-  let n = 0;
-  for (const [id, it] of Object.entries(lst.items)) {
-    if (!it || typeof it !== 'object' || vendus.has(String(id))) continue;
-    if (etatAnnonceVcBrut(it, false, lst.capturedAt) === 'en-ligne') n++;
-  }
-  return n;
+// Vestiaire : le nombre d'annonces « En ligne » de SA liste (src/ecrans/Vestiaire.jsx) — LA règle de
+// src/enLigneVc.js (26 nov.) : une vente lue ET pas annulée la dit vendue, une lecture de plus de 24 h
+// ne compte plus rien « en ligne » (« à confirmer »). Liste jamais lue ⇒ null (pas su), jamais 0.
+export function compterVcEnLigne(lst, ventes, maintenant = Date.now()) {
+  return compterVcEnLigneRegle(lst, ventes, maintenant);
 }
