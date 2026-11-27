@@ -181,7 +181,7 @@ const ouvrirVente = async (pg, tx) => {
   return id;
 };
 const fermerVente = async (pg) => { const croix = pg.locator('.vrm-ledger-drawer-host:not([hidden]) .vrm-recap-fermer'); if (await croix.count()) { await croix.first().click(); await pg.waitForTimeout(300); } };
-const ligneFacture = (pg, tx) => pg.locator(`.vrm-sale-row[data-tx="${tx}"] [data-fp-forme="ligne"]`).first();
+const ligneFacture = (pg, tx) => pg.locator(`.vrm-sale-row[data-tx="${tx}"] [data-fp-forme="ligne"]:visible`).first();
 
 const mesurer = (pg, sel) => pg.evaluate((sel) => {
   const d = document.querySelector(sel); if (!d) return null;
@@ -204,25 +204,53 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
       await essaie('V1 les lignes', async () => {
         await ligneFacture(pg, '7001').waitFor({ timeout: 8000 });
         const l1 = ligneFacture(pg, '7001');
-        dit(await l1.locator('[data-fp-vente="a-faire"]').count() === 1 && await l1.locator('[data-fp-bon-retour="vinted"]').count() === 1, 'V1 7001 prouvée : « Envoyer la facture » ET « Bon de retour » (celui de Vinted) à côté de la vente', (await l1.innerText()).replace(/\s+/g, ' '));
-        const l6 = ligneFacture(pg, '7006');
-        dit(await l6.locator('[data-fp-vente="a-faire"]').count() === 0 && await l6.locator('[data-fp-bon-retour="vrm"]').count() === 1, 'V1 7006 (Pro, acheteur pas prouvé) : pas de facture, mais « Bon de retour » (celui de VRM)', (await l6.innerText()).replace(/\s+/g, ' '));
+        // (16 nov., lot factures-mieux — Julien : « pour facture envoyée, fais mieux ») La facture est une PASTILLE
+        // dans la rangée « N° · compte · taille » ; « Envoyer la facture » et « Bon de retour » sont dans SA feuille.
+        dit(await l1.locator('[data-fp-pastille="aenvoyer"][data-fp-vente="a-faire"]').count() === 1 && await pg.locator('.vrm-sale-row[data-tx="7001"] [data-fp-bon-retour]').count() === 0, 'V1 7001 prouvée : la pastille « Facture à envoyer » sur la ligne, plus de gros bouton sous la ligne', (await l1.innerText()).replace(/\s+/g, ' '));
+        dit(await pg.locator('.vrm-sale-row[data-tx="7006"] [data-fp-pastille], .vrm-sale-row[data-tx="7006"] [data-fp-bon-retour]').count() === 0, 'V1 7006 (Pro, acheteur pas prouvé) : aucune pastille ni bouton sous la ligne (la raison est en tête et dans la fiche)');
         dit(await pg.locator('.vrm-sale-row[data-tx="8001"] [data-fp-forme], .vrm-sale-row[data-tx="8001"] [data-fp-bon-retour]').count() === 0, 'V1 compte PARTICULIER : ni facture ni bon de retour');
+        // Les rectangles : la pastille DANS la rangée du N° (l2), la ligne pas plus haute que celle d'un compte particulier.
+        const r = await pg.evaluate(() => {
+          const rect = (el) => el && el.getBoundingClientRect();
+          const pe = [...document.querySelectorAll('.vrm-sale-row[data-tx="7001"] [data-fp-pastille]')].find((e) => e.getClientRects().length);
+          const p = rect(pe && pe.querySelector('svg') ? pe : pe);
+          const l2 = rect(pe && pe.closest('.vrm-ledger-sale-toggle'));   // DANS la ligne (à droite de l'état, sous la frise)
+          // La hauteur de la ligne AVEC la pastille, puis SANS (la pastille retirée un instant).
+          const ligne = document.querySelector('.vrm-sale-row[data-tx="7001"]');
+          const avec = ligne ? ligne.getBoundingClientRect().height : -1;
+          const hotes = [...document.querySelectorAll('.vrm-sale-row[data-tx="7001"] .vrm-fp-pastille-hote')];
+          // retirée du DOM un instant (un style en ligne ne gagne pas sur un `!important`), puis remise à sa place
+          const places = hotes.map((h) => [h, h.parentNode, h.nextSibling]);
+          places.forEach(([h, par]) => par.removeChild(h));
+          const sans = ligne ? ligne.getBoundingClientRect().height : -1;
+          places.forEach(([h, par, suiv]) => par.insertBefore(h, suiv));
+          // Elle ne recouvre aucun autre texte de la ligne.
+          const touche = [];
+          // (le rectangle du TEXTE lui-même, par Range — pas celui de son conteneur, qui peut être pleine largeur)
+          if (pe && ligne) { const w = document.createTreeWalker(ligne, NodeFilter.SHOW_TEXT); for (let n = w.nextNode(); n; n = w.nextNode()) { if (!n.textContent.trim() || pe.contains(n)) continue; const cs = n.parentElement && getComputedStyle(n.parentElement); if (!cs || cs.visibility === 'hidden' || Number(cs.opacity) === 0 || (cs.clip && cs.clip !== 'auto') || (cs.clipPath && cs.clipPath !== 'none') || parseFloat(cs.width) <= 1) continue; /* un texte pour lecteur d'écran (caché) ne compte pas */ const rg = document.createRange(); rg.selectNodeContents(n); for (const q of rg.getClientRects()) { if (!q.width) continue; if (q.left < p.right - 1 && q.right > p.left + 1 && q.top < p.bottom - 1 && q.bottom > p.top + 1) touche.push(n.textContent.trim().slice(0, 20)); } } }
+          if (pe && ligne) for (const g of ligne.querySelectorAll('.vrm-fu-seg, img, svg')) { if (pe.contains(g)) continue; const q = g.getBoundingClientRect(); if (q.width && q.left < p.right - 1 && q.right > p.left + 1 && q.top < p.bottom - 1 && q.bottom > p.top + 1) touche.push(g.className && g.className.baseVal !== undefined ? 'svg' : String(g.className || g.tagName)); }   /* ni les traits de la frise, ni une image */
+          return { p: p && { t: p.top, b: p.bottom }, l2: l2 && { t: l2.top, b: l2.bottom }, h7001: Math.round(avec), h8001: Math.round(sans), touche };
+        });
+        dit(r.p && r.l2 && r.p.t >= r.l2.t - 2 && r.p.b <= r.l2.b + 2 && r.h7001 <= r.h8001 + 1 && !r.touche.length, 'V1 la pastille tient DANS la ligne sans rien recouvrir : aucune hauteur de ligne ajoutée', JSON.stringify(r));
         if (SHOTS) { await l1.scrollIntoViewIfNeeded(); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(SHOTS, `fvp-lignes-${nf}.png`) }); }
         const m = await mesurer(pg, `.vrm-sale-row[data-tx="7001"]`);
         dit(m && m.deb <= 1 && !m.hors.length, 'V1 la ligne ne déborde pas', m && `${m.deb}px ${m.hors.join(' | ')}`);
-        if (tel) dit(m && !m.petites.filter((x) => /Envoyer|Bon de/.test(x)).length, 'V1 cibles de 44 px (facture, bon de retour)', m && m.petites.join(' | '));
       });
       await essaie('V2 bon de retour de Vinted', async () => {
         const avant = lectures.filter((u) => /retourB64/.test(u)).length;
         dit(avant === 0, 'V2 le formulaire de retour n’est JAMAIS lu dans la liste (§4.4)', String(avant));
+        await ligneFacture(pg, '7001').locator('[data-fp-pastille]').dispatchEvent('click');
+        const f = pg.locator('[data-fp-feuille-vente="7001"]');
+        await f.locator('[data-fp-bon-retour="vinted"]').waitFor({ timeout: 6000 });
         const pop = ctx.waitForEvent('page', { timeout: 4000 }).catch(() => null);
-        await ligneFacture(pg, '7001').locator('[data-fp-bon-retour]').click();
+        await f.locator('[data-fp-bon-retour]').click();
         await pg.waitForTimeout(800);
         const lus = lectures.filter((u) => /retourB64/.test(u));
-        dit(lus.length === 1 && /id=eq\.email_invoice_tx7001/.test(lus[0]) && !/select=data(&|$)/.test(lus[0]), 'V2 au clic : SON formulaire (email_invoice_tx7001), projeté, une lecture', lus.join(' | '));
+        dit(lus.length === 1 && /id=eq\.email_invoice_tx7001/.test(lus[0]) && !/select=data(&|$)/.test(lus[0]), 'V2 dans la feuille de la facture : SON formulaire (email_invoice_tx7001), projeté, une lecture', lus.join(' | '));
         const p = await pop; if (p) await p.close().catch(() => {});
         await pg.getByRole('button', { name: 'Fermer' }).first().click({ timeout: 3000 }).catch(() => {});
+        await pg.keyboard.press('Escape').catch(() => {});
+        await pg.waitForTimeout(500);
       });
       await essaie('V3 l’e-mail arrive après l’ouverture', async () => {
         const l10 = ligneFacture(pg, '7010');
@@ -237,8 +265,11 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
       });
       await essaie('V4 bon de retour dessiné par VRM', async () => {
         const avant = lectures.length;
-        await ligneFacture(pg, '7006').locator('[data-fp-bon-retour="vrm"]').scrollIntoViewIfNeeded();
-        await ligneFacture(pg, '7006').locator('[data-fp-bon-retour="vrm"]').click();
+        // (16 nov.) Plus sous la ligne : dans la fiche de la vente (toucher la ligne).
+        await pg.locator('.vrm-sale-row[data-tx="7006"] .vrm-ledger-sale-toggle').first().dispatchEvent('click');
+        const bon = pg.locator('[data-fp-bon-retour="vrm"]').first();
+        await bon.waitFor({ timeout: 8000 });
+        await bon.click();
         const vue = await pg.getByRole('button', { name: 'Fermer' }).first().waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
         dit(vue && !lectures.slice(avant).some((u) => /retourB64/.test(u)), 'V4 7006 : le bon de retour de VRM s’ouvre (aucun formulaire Vinted lu pour une vente qui n’en a pas)');
         if (SHOTS) { await pg.waitForTimeout(1500); await pg.screenshot({ path: path.join(SHOTS, `fvp-bon-vrm-${nf}.png`) }); }

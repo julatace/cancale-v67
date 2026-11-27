@@ -100,6 +100,7 @@ import { motsInsecables } from '../motsInsecables.jsx';
 import { colisEbay } from '../../api/_lib/ebay-a-expedier.js';
 import { stockVestiaire, retraitsVestiaire, etapeMotVc, vcVenteAnnulee, numVcVente, montantRecuVc, dateVenteVc, colisVcAPoster, colisVcPartisLus, aExpedierVc, expeditionVc } from '../../api/_lib/vestiaire-regle.js';
 import { txVintedParties, mrSansCodePostal } from '../../api/_lib/depart-colis.js';
+import '../rapport-comptable.css'; // (16 nov., lot factures-mieux) lignes du rapport comptable
 import { publierDepartsVinted } from '../departVente.js';
 import { quandRelu } from '../fraicheurComptes.js';
 import { FRAICHEUR_ACHATS_J } from '../fraicheur.js';
@@ -2359,6 +2360,14 @@ const extraireBordereaux = async (compo, cles) => {
 };
 // ⟦← App.jsx #180⟧
 
+// (16 nov., lot factures-mieux) Le reçu GÉNÉRÉ (aucun e-mail Vinted) s'ouvre dans la MÊME
+// feuille que le reçu reconstruit depuis l'e-mail (`FeuilleRecuAchat`) ; son bouton « PDF »
+// fabrique le PDF de la même mise en page. Un vrai reçu e-mail reste prioritaire (l'appelant).
+const recuGenereVue = async (o, opts = {}) => {
+  const { champsRecuGenere } = await import('../recuAchat.js');
+  return { _genere: champsRecuGenere(o, { account: opts.account, numero: opts.numero }), _pdfGenere: () => generateAchatJustificatif(o, { ...opts, ouvrir: true }) };
+};
+
 // Petit helper partagé : télécharge des octets PDF.
 const _telechargerPdf = (bytes, nom) => {
   const blob = new Blob([bytes], { type: 'application/pdf' });
@@ -2405,11 +2414,13 @@ const generateRemboursementAttestation = async (o, opts = {}) => {
   line('Compte acheteur', opts.account || '—');
   y -= 4;
   const notes = [
-    'Attestation d\'un achat annule ou retourne, rembourse par Vinted.',
-    'Recapitulatif etabli par VRM d\'apres les donnees de la commande Vinted. Ce n\'est pas une facture emise par Vinted.',
-    'Etabli le ' + new Date().toLocaleDateString('fr-FR') + '.',
+    // (16 nov., lot factures-mieux) Les accents écrits (Helvetica de pdf-lib sait le WinAnsi).
+    'Attestation d\'un achat annulé ou retourné, remboursé par Vinted.',
+    'Récapitulatif établi par VRM d\'après les données de la commande Vinted. Ce n\'est pas une facture émise par Vinted.',
+    'Établi le ' + new Date().toLocaleDateString('fr-FR') + '.',
   ];
-  notes.forEach(n => { page.drawText(n.slice(0, 74), { x: 32, y, size: 8, font: reg, color: G }); y -= 13; });
+  // Coupé en lignes (jamais tronqué : la phrase « pas une facture émise par Vinted » doit rester entière).
+  notes.forEach(n => { let l = ''; for (const m of n.split(' ')) { const e = l ? l + ' ' + m : m; if (reg.widthOfTextAtSize(e, 8) > 356 && l) { page.drawText(l, { x: 32, y, size: 8, font: reg, color: G }); y -= 11; l = m; } else l = e; } if (l) { page.drawText(l, { x: 32, y, size: 8, font: reg, color: G }); y -= 13; } });
   _telechargerPdf(await pdf.save(), `attestation-remboursement-${o.transaction_id || 'achat'}.pdf`);
 };
 
@@ -7528,7 +7539,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       setRecuOuverture('');
     }
     if (rc) { setReceiptView(rc); return; }
-    generateAchatJustificatif(a, { account: a._accName || accNameOf(a._acc), regime: load('vinted_regime', 'micro'), numero: numero || '', ouvrir: true });
+    setReceiptView(await recuGenereVue(a, { account: a._accName || accNameOf(a._acc), regime: load('vinted_regime', 'micro'), numero: numero || '' }));
   };
   // Géocodage des points relais (nom → coordonnées) pour la carte à épingle.
   // Nominatim (OpenStreetMap), gratuit, 1 requête/seconde, cache local.
@@ -18743,56 +18754,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   };
   // Export PDF du rapport (récapitulatif).
   const exportReportPdf = async () => {
-    const R=report;
-    const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
-    const pdf = await PDFDocument.create(); const page = pdf.addPage([595,842]);
-    const bold = await pdf.embedFont(StandardFonts.HelveticaBold); const reg = await pdf.embedFont(StandardFonts.Helvetica);
-    let y=800; const T=(t,x,s,f,c)=>page.drawText(String(t),{x,y,size:s,font:f||reg,color:c||rgb(0.1,0.1,0.1)});
-    T('Rapport comptable',40,22,bold,rgb(0,0.47,0.51)); y-=22; T(R.monthLabel+'  ·  '+(libelleRegime(R.regime)),40,11,reg,rgb(0.4,0.4,0.4)); y-=28;
-    const kv=(k,v,big)=>{ T(k,40,9,reg,rgb(0.45,0.45,0.45)); page.drawText(String(v),{x:40,y:y-14,size:big?15:12,font:big?bold:reg,color:rgb(0.1,0.1,0.1)}); y-=big?36:30; };
-    kv('Chiffre d\'affaires des ventes finalisees', R.ca.toFixed(2)+' EUR', true);
-    kv('Coût d\'achat', R.cout.toFixed(2)+' EUR ('+R.nbCout+'/'+R.nb+' renseignés)');
-    if (R.frais>0) kv('Boosts / mises en avant', R.frais.toFixed(2)+' EUR');
-    if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR', true); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
-    else { kv('Bénéfice net', (R.nbCout===0&&R.nb>0) ? 'inconnu — aucun prix d\'achat saisi' : R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:''), true); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
-    if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
-    if (R.nAttente>0) kv('Ventes de ce mois pas encore finalisees (hors CA)', R.nAttente+' — '+(R.caAttentePasLu?'au moins ':'')+R.caAttente.toFixed(2)+' EUR');
-    if (R.vinted==='passu') kv('ATTENTION', 'dates de versement Vinted illisibles : ventes Vinted absentes');
-    kv('Nombre de ventes', String(R.nb));
-    kv('Achats du mois (registre)', R.buyLines.length+' — '+(R.achatsPasLu?'au moins ':'')+R.achatsTotal.toFixed(2)+' EUR');
-    // ── Les REGISTRES, ligne par ligne (G2) : le comptable rapproche les ventes
-    // et les achats, il ne peut rien faire d'un total seul. Pagination : une
-    // nouvelle page dès que la ligne ne tient plus. Les polices standard de
-    // pdf-lib ne savent écrire que le WinAnsi : un emoji ou un caractère exotique
-    // dans un titre ferait échouer TOUT l'export — on le retire du texte.
-    let pg = page;
-    const propre = (t) => String(t==null?'':t).replace(/[^\x20-\x7E\u00A0-\u00FF\u20AC]/g,'').trim();
-    const coupe = (t,n) => { const x=propre(t); return x.length>n ? x.slice(0,n-3)+'...' : x; };
-    const W=(t,x,s,f,c)=>pg.drawText(propre(t),{x,y,size:s,font:f||reg,color:c||rgb(0.1,0.1,0.1)});
-    const place = (h) => { if (y-h < 50) { pg = pdf.addPage([595,842]); y = 800; } };
-    const entete = (titre, cols) => {
-      place(40); y-=10; W(titre,40,12,bold,rgb(0,0.47,0.51)); y-=16;
-      cols.forEach(([x,h])=>W(h,x,8,bold,rgb(0.35,0.35,0.35))); y-=4;
-      pg.drawLine({start:{x:40,y},end:{x:555,y},thickness:0.5,color:rgb(0.8,0.8,0.8)}); y-=12;
-    };
-    const colsV=[[40,'Date'],[92,'N°'],[125,'Article'],[365,'Vente'],[420,'Achat'],[470,'Boost'],[510,'Benefice']];
-    entete('Registre des ventes ('+R.saleLines.length+')', colsV);
-    R.saleLines.forEach(v=>{
-      place(14);
-      W(v.date?new Date(v.date).toLocaleDateString('fr-FR'):'',40,8); W(v.num||'',92,8); W(coupe((v.plateforme&&v.plateforme!=='Vinted'?'['+v.plateforme+'] ':'')+(v.title||''),48),125,8);
-      W(v.sell.toFixed(2),365,8); W(v.buy!=null?v.buy.toFixed(2):'-',420,8); W(v.fee?v.fee.toFixed(2):'',470,8);
-      W(v.buy!=null?(v.sell-v.buy-v.fee).toFixed(2):'-',510,8); y-=12;
-    });
-    place(16); W('TOTAL',125,8,bold); W(R.ca.toFixed(2),365,8,bold); W(R.cout.toFixed(2),420,8,bold); W(R.frais?R.frais.toFixed(2):'',470,8,bold); y-=18;
-    const colsA=[[40,'Date'],[92,'Vendeur'],[200,'Article'],[500,'Montant']];
-    entete('Registre des achats ('+R.buyLines.length+')', colsA);
-    R.buyLines.forEach(b=>{
-      place(14);
-      W(b.date?new Date(b.date).toLocaleDateString('fr-FR'):'',40,8); W(coupe(b.seller,20),92,8); W(coupe(b.title,58),200,8); W(b.montant==null?'—':b.montant.toFixed(2),500,8); y-=12;
-    });
-    place(16); W(R.achatsPasLu?'TOTAL (au moins)':'TOTAL',200,8,bold); W(R.achatsTotal.toFixed(2),500,8,bold); y-=20;
-    place(14); pg.drawText('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',{x:40,y,size:8,font:reg,color:rgb(0.55,0.55,0.55)});
-    const bytes=await pdf.save(); const blob=new Blob([bytes],{type:'application/pdf'}); const url=URL.createObjectURL(blob);
+    // (16 nov., lot factures-mieux) La mise en page vient de src/rapportPdf.js : bandeau, chiffres
+    // en rangées, registres en tableaux, format français (« 1 234,50 € »), accents écrits. Les
+    // chiffres sont ceux de `report`, rien de recalculé.
+    const { pdfRapport } = await import('../rapportPdf.js');
+    const bytes = await pdfRapport(report, { libelleRegime });
+    const blob=new Blob([bytes],{type:'application/pdf'}); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download=`rapport-${reportMonth}.pdf`; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),4000);
   };
@@ -25237,7 +25204,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               // pas de carte encadrée séparée — style démo, comme Achats).
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={lot && lot.lu ? lot.nums : (num?[num]:[])} plateforme="vinted" photo={photo} photoNoeud={<><CaseSerie serie={serieVentes} cle={txL} etiquette={o.title} surPhoto/>{photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:<PhotoVente src={photo} size={46} portrait/>}</>} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
                 {...avecSerie(gp, serieVentes.ligne(txL))} glisse={tiroirG} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
-                fl={{ tx: txL, item: String(identiteAnnonce(o) || '') }} data-fu-ligne="" fusion={{ lot: lot ? { n: lot.n, nums: lot.nums || [], nonRelies: lot.nonRelies || 0 } : null, transp: fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), /* (16 nov., relier-glisser) le bénéfice, discret, à côté du prix (la règle de la ligne) */ benefSu: lb.benefice!=null && st!=='cancelled' ? texteBenefice(lb) : '', nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: lot ? '' : String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} friseEtat={fuEtapes ? <Frise inline etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label={tr('ventes.vente3')}/> : null} frise={<>{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
+                fl={{ tx: txL, item: String(identiteAnnonce(o) || '') }} data-fu-ligne="" fusion={{ /* (16 nov., lot factures-mieux) la facture en PASTILLE dans la rangée N° · compte · taille (plus sous la ligne) */ facture: (o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne pastille deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null, lot: lot ? { n: lot.n, nums: lot.nums || [], nonRelies: lot.nonRelies || 0 } : null, transp: fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), /* (16 nov., relier-glisser) le bénéfice, discret, à côté du prix (la règle de la ligne) */ benefSu: lb.benefice!=null && st!=='cancelled' ? texteBenefice(lb) : '', nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: lot ? '' : String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} friseEtat={fuEtapes ? <Frise inline etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label={tr('ventes.vente3')}/> : null}
                 data-vente-email-tete={o._venteEmail && emailEnTete ? String(o._acc.vinted_user_id) : undefined}
                 bas={o._venteEmail && emailEnTete && !toShipEmailTx.has(txL) ? null : o._venteEmail ? <>
                   {emailEnTete ? null : <NoteVenteEmail o={o} bordLa={toShipEmailTx.has(txL)}/>}
@@ -27056,7 +27023,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); setNoteEdit({tid,title:o.title,val:note}); }}><Icon name="doc" size={15} style={{color:C.muted}}/>{note?tr('achats.modifierNoteInterne'):tr('achats.ajouterNoteInterne')}</button>
                     {/* (11 nov.) « Me le rappeler » : par le n° de transaction de l'achat (§5). */}
                     <BoutonRappel variante="menu" style={item} avant={close} cible={{ sorte: 'achat', tx: String(o.transaction_id || ''), num: numA || '', plat: 'vinted' }} libelle={numA ? `N°${numA} · ${o.title || ''}` : (o.title || '')}/>
-                    <button type="button" role="menuitem" style={item} onClick={()=>{ close(); if(rc){ setReceiptView(rc); } else generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>{rc?NOM_RECU_ACHAT:tr('achats.attestationAchat')}</button>
+                    <button type="button" role="menuitem" style={item} onClick={()=>{ close(); if(rc){ setReceiptView(rc); } else recuGenereVue(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }).then(setReceiptView); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>{rc?NOM_RECU_ACHAT:tr('achats.attestationAchat')}</button>
                     {rembourse && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateRemboursementAttestation(o,{ account:accNameOf(o._acc) }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>{tr('achats.attestationRemboursement')}</button>}
                     {(()=>{ const cf = cleFacture('tx', o.transaction_id); if (!cf) return null; const a = !!(facturesAchat.factures && facturesAchat.factures[cf]);
                       return <button type="button" role="menuitem" data-achat-joindre-facture={tid} style={item} onClick={()=>{ close(); facturesAchat.choisir(cf); }}><Icon name="doc" size={15} style={{color:C.muted}}/>{a?tr('achats.remplacerFacture'):tr('achats.joindreFacture')}</button>; })()}
@@ -31283,13 +31250,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               {buys.items!==null && annual.buyLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>Aucun achat cette année.</div>}
               <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:12,maxHeight:260,overflowY:'auto'}}>
                 {annual.buyLines.map((b,i)=>(
-                  <div key={'a'+String((b.o&&(b.o.transaction_id||b.o.id))||i)} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card}}>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:400,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title||'—'}</div>
-                      <div style={{fontSize:11,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
+                  <div key={'a'+String((b.o&&(b.o.transaction_id||b.o.id))||i)} className="vrm-rapport-ligne" data-rapport-ligne="achat">
+                    <div className="vrm-rapport-ligne-txt">
+                      <div className="vrm-rapport-ligne-titre">{b.title||'—'}</div>
+                      <div className="vrm-rapport-ligne-sous">{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
-                    <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{b.montant==null?'—':<>{b.montant.toFixed(2)}&nbsp;€</>}</div>
-                    <button className="vrm-icon-control" type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:annual.regime, numero:buyNumByTxn[String(b.o.transaction_id)]||'' })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
+                    <div className="vrm-rapport-ligne-montant" data-rapport-montant="">{b.montant==null?'—':montant(b.montant, { centimes:'toujours' })}</div>
+                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:annual.regime, numero:buyNumByTxn[String(b.o.transaction_id)]||'' })} title={tr('rapport.recu')} aria-label={tr('rapport.recu')} className="vrm-b vrm-b-secondaire vrm-rapport-recu" data-rapport-recu=""><Icon name="receipt" size={15}/>{tr('rapport.recuCourt')}</button>
                   </div>
                 ))}
               </div>
@@ -31704,7 +31671,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:8}}><Icon name="doc" size={17}/>Rapport comptable</div>
-                <div style={{fontSize:11,color:C.muted}}>{libelleRegime(report.regime)} · <span style={{opacity:0.8}}>statut modifiable dans Paramètres → Statut</span></div>
+                <div data-rapport-statut="" style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{tr('rapport.statut', { statut: libelleRegime(report.regime) })}</div>
               </div>
               <button type="button" onClick={()=>setShowReport(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
@@ -31956,12 +31923,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 : 'Aucune vente finalisée ce mois-ci.'}</div>}
               <div data-registre="ventes" style={{display:'flex',flexDirection:'column',gap:6,marginBottom:14}}>
                 {report.saleLines.map((v,i)=>(
-                  <div key={i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card}}>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:400,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{v.num?<span style={{fontWeight:700}}>N°{v.num} · </span>:null}{v.title||'—'}</div>
-                      <div style={{fontSize:11,color:C.muted}}>{v.plateforme||'Vinted'}{' · '}{v.date?new Date(v.date).toLocaleDateString('fr-FR'):''}{' · achat '}{v.buy!=null?fmtE(v.buy):'—'}{v.fee?` · frais ${fmtE(v.fee)}`:''}{v.buy!=null?` · bénéfice ${fmtE(v.sell-v.buy-v.fee)}`:''}</div>
+                  <div key={i} className="vrm-rapport-ligne" data-rapport-ligne="vente">
+                    <div className="vrm-rapport-ligne-txt">
+                      <div className="vrm-rapport-ligne-titre">{v.num?<b>N°{v.num} · </b>:null}{v.title||'—'}</div>
+                      <div className="vrm-rapport-ligne-sous">{v.plateforme||'Vinted'}{' · '}{v.date?new Date(v.date).toLocaleDateString('fr-FR'):''}{v.buy!=null?<>{' · '}{tr('rapport.achat', { m: montant(v.buy, { centimes:'toujours' }) })}</>:<>{' · '}<span data-rapport-achat-manque="">{tr('rapport.achatPasSaisi')}</span></>}{v.fee?<>{' · '}{tr('rapport.frais', { m: montant(v.fee, { centimes:'toujours' }) })}</>:null}{v.buy!=null?<>{' · '}{tr('rapport.benefice', { m: montant(v.sell-v.buy-v.fee, { centimes:'toujours' }) })}</>:null}</div>
                     </div>
-                    <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{fmtE(v.sell)}</div>
+                    <div className="vrm-rapport-ligne-montant" data-rapport-montant="">{montant(v.sell, { centimes:'toujours' })}</div>
                   </div>
                 ))}
               </div>
@@ -31970,20 +31937,20 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               {report.buyLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>Aucun achat ce mois-ci{buys.items===null?' (registre en cours de chargement)':''}.</div>}
               <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:8}}>
                 {report.buyLines.map((b,i)=>(
-                  <div key={'a'+String((b.o&&(b.o.transaction_id||b.o.id))||i)} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card}}>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:400,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title||'—'}</div>
-                      <div style={{fontSize:11,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
+                  <div key={'a'+String((b.o&&(b.o.transaction_id||b.o.id))||i)} className="vrm-rapport-ligne" data-rapport-ligne="achat">
+                    <div className="vrm-rapport-ligne-txt">
+                      <div className="vrm-rapport-ligne-titre">{b.title||'—'}</div>
+                      <div className="vrm-rapport-ligne-sous">{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
-                    <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{b.montant==null?'—':<>{b.montant.toFixed(2)}&nbsp;€</>}</div>
-                    <button className="vrm-icon-control" type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:report.regime })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
+                    <div className="vrm-rapport-ligne-montant" data-rapport-montant="">{b.montant==null?'—':montant(b.montant, { centimes:'toujours' })}</div>
+                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:report.regime })} title={tr('rapport.recu')} aria-label={tr('rapport.recu')} className="vrm-b vrm-b-secondaire vrm-rapport-recu" data-rapport-recu=""><Icon name="receipt" size={15}/>{tr('rapport.recuCourt')}</button>
                   </div>
                 ))}
               </div>
             </div>
             <div style={{display:'flex',gap:8,padding:'12px 16px',borderTop:`1px solid ${C.border}`,flexShrink:0}}>
-              <Bouton variante="secondaire" icone="save" data-rapport-csv onClick={exportReportCsv} style={{flex:1}}>CSV</Bouton>
-              <Bouton icone="doc" data-rapport-pdf onClick={exportReportPdf} style={{flex:1}}>PDF</Bouton>
+              <Bouton variante="secondaire" icone="save" data-rapport-csv onClick={exportReportCsv} style={{flex:1}}>{tr('rapport.csv')}</Bouton>
+              <Bouton icone="doc" data-rapport-pdf onClick={exportReportPdf} style={{flex:1}}>{tr('rapport.pdf')}</Bouton>
             </div>
           </div>
         </div>

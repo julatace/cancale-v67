@@ -708,7 +708,8 @@ enDur.length
   : nok("elles sont annoncées dans la modale");
 
 (/L\.push\(\[`Ventes de ce mois pas encore finalisees \(hors CA\)/.test(SRC) &&
- /kv\('Ventes de ce mois pas encore finalisees \(hors CA\)'/.test(SRC))
+ // (16 nov., lot factures-mieux) le PDF du rapport : src/rapportPdf.js, accents écrits.
+ /rangee\('Ventes du mois pas encore finalisées \(hors CA\)'/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'src/rapportPdf.js'), 'utf8')))
   ? ok("le CSV et le PDF emportent la réserve avec eux")
   : nok("le CSV et le PDF emportent la réserve");
 

@@ -129,9 +129,9 @@ const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-t
   }
   await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await ouvrirVente(p);
   let appelsFacture=0;await p.route('**/api/compte?mode=facture-pro',r=>{if(r.request().method()==='POST')appelsFacture++;return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,boite:{etat:'aucune'},fournisseurs:{}})});});
-  await p.locator('[data-fp-vente="a-faire"]').first().waitFor();
+  await p.locator('[data-fp-vente="a-faire"]:visible').first().waitFor();
   check((await p.locator('[data-fp-vente]').count())>0,'facture proposée sur une vente prouvée Pro (e-mail Vinted Pro de SA transaction, 60 s après, même prix — 6 nov.)');
-  await p.locator('[data-fp-vente="a-faire"]').first().click();
+  await p.locator('[data-fp-vente="a-faire"]:visible').first().dispatchEvent('click');
   await p.locator('[data-fp-feuille-vente]').first().waitFor();
   check(appelsFacture===0,'ouvrir la facture n’émet ni n’envoie rien');
   await p.keyboard.press('Escape');

@@ -76,7 +76,8 @@ async function auditer() {
   const recap = (appS.match(/data-recu-relie=\{String\(aRelie[^\n]*/) || [''])[0];
   dit(/ouvrirRecuRelie\(aRelie, num\)/.test(recap) && !/generateAchatJustificatif\(/.test(recap), '4 · récapitulatif de vente : « Reçu d’achat » ouvre');
   const ouvrir = (/const ouvrirRecuRelie = async[\s\S]*?\n  \};/.exec(appS) || [''])[0];
-  dit(/setReceiptView\(rc\)/.test(ouvrir) && /ouvrir: true/.test(ouvrir) && /recuDeLAchat\(/.test(ouvrir), '4 · reçu e-mail (par son n°) ⇒ la feuille d’Achats ; sinon l’attestation dans la visionneuse');
+  // (16 nov., lot factures-mieux) Sans reçu e-mail : le reçu GÉNÉRÉ dans la MÊME feuille (`recuGenereVue`), son PDF ouvert dans la visionneuse.
+  dit(/setReceiptView\(rc\)/.test(ouvrir) && /setReceiptView\(await recuGenereVue\(a, /.test(ouvrir) && /recuDeLAchat\(/.test(ouvrir) && /_pdfGenere: \(\) => generateAchatJustificatif\(o, \{ \.\.\.opts, ouvrir: true \}\)/.test(appS), '4 · reçu e-mail (par son n°) ⇒ la feuille d’Achats ; sinon le reçu généré dans la même feuille (PDF dans la visionneuse)');
   const gen = (/const generateAchatJustificatif = async[\s\S]*?\n};/.exec(appS) || [''])[0];
   dit(/if \(opts\.ouvrir\) \{ _poserVisionneuse\(/.test(gen) && gen.indexOf('opts.ouvrir') < gen.indexOf('a.download'), '4 · `ouvrir` : la visionneuse PDF AVANT tout lien de téléchargement');
   // 5

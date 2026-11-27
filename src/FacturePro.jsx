@@ -23,11 +23,11 @@
 // Les outils de l'app (lecture de la base, confirmation, notifications) sont
 // passés par `deps` : ce fichier n'importe rien d'App.jsx.
 import { fetchBorne, DELAI_ROUTE_MS, NOM_DELAI } from './reseauBorne.js';
-import { tr, localeCourante } from './i18n/index.js';
 import React from 'react';
 import './facture-pro.css';
 import './facture-tva.css';
-import { bi, EN, paiementAnglais, acheteurHorsFrance } from './facturePro/anglais.js';
+import { bi, EN, paiementAnglais, langueFactureParDefaut } from './facturePro/anglais.js';
+import { tr, date as dateLocale, heure as heureLocale, langueCourante, localeCourante } from './i18n/index.js';
 import { SheetShell } from './composants/SheetShell.jsx';
 import {
   REGIMES_TVA, FORMES, COULEURS, TAUX_TVA, estSociete, verifierSiret, manquantsVendeur, manquantsVente,
@@ -732,6 +732,17 @@ async function lireContenu(deps, id) {
   return Array.isArray(r) && r[0] && r[0].contenu ? r[0].contenu : null;
 }
 const heureParis = (t) => { try { return (globalThis.__vrmFmtHeureFP || (globalThis.__vrmFmtHeureFP = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }))).format(new Date(t)); } catch (_) { return ''; } };
+// (16 nov., lot factures-mieux) Le moment d'un envoi, dans la langue de l'app, à l'heure de
+// Paris : « 16 nov. » et « 16 h 01 ».
+const quandEnvoi = (t) => {
+  const d = new Date(t);
+  const jour = dateLocale(d, { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
+  const hm = heureLocale(d, { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  return { jour, heure: langueCourante() === 'fr' ? hm.replace(':', ' h ') : hm };
+};
+// UNE mention courte sur la ligne de la vente (le détail est dans la feuille).
+const etatLigne = (e, av) => (av && av.emiseLe ? 'annulee' : !e ? 'emise' : e.etat === 'envoyee' ? 'envoyee' : e.etat === 'en-cours' ? 'encours' : e.etat === 'incertaine' ? 'incertaine' : 'refusee');
+const motLigne = (e, av) => { const k = etatLigne(e, av); return tr(`fm.ligne.${k}`, k === 'envoyee' ? { jour: quandEnvoi(e.at).jour } : undefined); };
 const motEnvoi = (e, av) => (av && av.emiseLe ? `annulée par l'avoir ${av.numero}` : !e ? 'émise, pas encore envoyée' : e.etat === 'envoyee' ? `envoyée le ${jourParis(e.at)}` : e.etat === 'en-cours' ? 'envoi en cours…' : e.etat === 'incertaine' ? 'envoi incertain — à vérifier' : 'pas envoyée — touche pour voir pourquoi');
 
 // (8 nov., « restes ventes ») UNE PHRASE PAR GROUPE (CLAUDE.md §7) : le refus d'une ligne
@@ -784,7 +795,14 @@ export function FactureRaisonsTete({ ventes, deps }) {
 // `vente` = { tx, uid, compte, titre, centimes, venteLe, commandes:[ventes Vinted portant ce n°] }.
 // `ligne` : la forme courte, sur la ligne de la liste (à côté de la vente).
 // `groupe` (ligne seulement) : les ventes affichées — un refus commun est dit en tête, pas ici.
-export function FactureVente({ vente, deps, ligne = false, groupe = null }) {
+// (16 nov., lot factures-mieux — Julien, capture de la liste Ventes : « pour facture envoyée, fais
+// mieux ») `pastille` : sur la LIGNE de la vente, une pastille compacte dans la rangée « N° · compte ·
+// taille » (aucune hauteur ajoutée) — « Facturée », « Facture à envoyer », « Facture à vérifier »,
+// « Facture annulée » ; la toucher ouvre la feuille de la facture (Voir · Partager · Renvoyer · Bon
+// de retour · avoir). « Envoyer la facture » et « Bon de retour » ne sont plus sous la ligne : dans
+// cette feuille et dans la fiche de la vente. Une vente Pro dont l'acheteur n'est pas prouvé n'a pas
+// de pastille (la raison est dite en tête de la liste et dans la fiche).
+export function FactureVente({ vente, deps, ligne = false, groupe = null, pastille = false, ou = 'tel' }) {
   const d = useFactures(deps);
   const [ouverte, setOuverte] = React.useState(false);
   // (11 nov., lot DJ1) Une vente d'un compte Pro dont l'e-mail de vente n'est pas (encore)
@@ -805,11 +823,28 @@ export function FactureVente({ vente, deps, ligne = false, groupe = null }) {
   const e = f && f.envoi;
   let corps;
   let preuve = null;
+  if (pastille) {
+    if (!emise) preuve = preuveAcheteur({ tx, mails, commandes: vente.commandes || [], brouillon: f, adresseLisible: adresseVintedLisible });
+    if (!emise && !(preuve && preuve.prouve)) return null;
+    const k = emise ? etatLigne(e, av) : 'afaire';
+    const cle = { envoyee: 'facturee', emise: 'aenvoyer', refusee: 'aenvoyer', afaire: 'aenvoyer', encours: 'encours', incertaine: 'averifier', annulee: 'annulee' }[k] || 'aenvoyer';
+    const stop = (ev) => { ev.stopPropagation(); };
+    // Dans la ligne (un <button>) : la pastille est un <span> qui ouvre la feuille ; ses événements
+    // (et ceux de la feuille, rendue par un portail) ne remontent pas jusqu'à la ligne.
+    return <span className="vrm-fp-pastille-hote" data-ou={ou} data-fp-tx={tx} data-fp-forme="ligne" onClick={stop} onPointerDown={stop} onKeyDown={stop}>
+      <span className="vrm-fp-pastille" role="button" tabIndex={0} data-fp-pastille={cle} data-fp-vente={emise ? (e ? e.etat : 'emise') : 'a-faire'} data-fp-ligne-etat={emise ? k : undefined} title={emise ? f.numero : undefined}
+        onClick={() => setOuverte(true)} onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); setOuverte(true); } }}>
+        <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+        <span className="vrm-fp-pastille-long">{tr(`fm.pastille.${cle}`)}</span><span className="vrm-fp-pastille-court" aria-hidden="true">{tr(`fm.pastille.court.${cle}`)}</span>
+      </span>
+      {ouverte ? <FeuilleFactureVente vente={vente} preuve={preuve} facture={f} avoir={av} deps={deps} fermer={() => setOuverte(false)}/> : null}
+    </span>;
+  }
   if (emise) {
     corps = (
-      <button type="button" className={ligne ? 'vrm-fp-ligne-etat' : 'vrm-fp-vente-ligne'} data-fp-vente={e ? e.etat : 'emise'} data-sans-glisse="" onClick={() => setOuverte(true)}>
-        <b>{ligne ? (e && e.etat === 'envoyee' ? `Facture envoyée le ${jourParis(e.at)}` : `Facture ${f.numero}`) : `Facture ${f.numero}`}</b>
-        <span>{ligne ? (e && e.etat === 'envoyee' ? f.numero : motEnvoi(e, av)) : <>{motEnvoi(e, av)}{e && e.etat === 'envoyee' ? <> à <span className="vrm-sensible" data-stream-type="acheteur">{e.a}</span></> : null}</>}</span>
+      <button type="button" className={ligne ? 'vrm-fp-ligne-etat' : 'vrm-fp-vente-ligne'} data-fp-vente={e ? e.etat : 'emise'} data-fp-ligne-etat={etatLigne(e, av)} data-sans-glisse="" onClick={() => setOuverte(true)} title={ligne ? f.numero : undefined}>
+        {ligne ? <b>{motLigne(e, av)}</b>
+          : <><b>{`Facture ${f.numero}`}</b><span>{motEnvoi(e, av)}{e && e.etat === 'envoyee' ? <> à <span className="vrm-sensible" data-stream-type="acheteur">{e.a}</span></> : null}</span></>}
       </button>
     );
   } else {
@@ -906,7 +941,8 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
   const prouve = !!(preuve && preuve.prouve);
   // (10 nov., lot T) « Facture en anglais » : une option PAR facture, pré-cochée
   // seulement quand l'adresse prouvée finit par un pays étranger (un indice).
-  const [anglais, setAnglais] = React.useState(() => !!(prouve && acheteurHorsFrance(preuve.acheteur && preuve.acheteur.adresse)));
+  // (16 nov.) La MÊME règle que la série et l'envoi automatique (`langueFactureParDefaut`).
+  const [anglais, setAnglais] = React.useState(() => !!(prouve && langueFactureParDefaut(preuve.acheteur && preuve.acheteur.adresse) === 'en'));
   const donnees = prouve ? { acheteur: preuve.acheteur, designation, centimes: preuve.centimes, venteLe: preuve.venteLe, reference: tx, plateforme: 'Vinted' } : null;
   const emise = !!(facture && facture.emiseLe) || !!emiseIci;
   const numero = (emiseIci && emiseIci.numero) || (facture && facture.numero) || '';
@@ -970,23 +1006,28 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
       {cfg === undefined ? <p className="vrm-fp-muet">Lecture de ta fiche…</p>
         : cfg === null ? <p className="vrm-fp-muet">Ta fiche n'a pas pu être lue — réessaie dans un instant.</p>
         : emise ? <>
-          <div className="vrm-fp-etat" data-fp-envoi={(envoi && envoi.etat) || 'aucun'} data-acc-apres={envoi && envoi.etat === 'envoyee' ? 'facture.pro' : undefined}>
-            <b>{avoir && avoir.emiseLe ? `Annulée par l'avoir ${avoir.numero}` : envoi && envoi.etat === 'envoyee' ? `Facture envoyée le ${jourParis(envoi.at)} à ${heureParis(envoi.at)}` : envoi && envoi.etat === 'incertaine' ? 'Envoi incertain' : envoi && envoi.etat === 'refusee' ? 'Pas envoyée' : 'Émise, pas encore envoyée'}</b>
-            <span>{envoi && envoi.etat === 'envoyee' ? <>à <span className="vrm-sensible" data-stream-type="acheteur">{envoi.a}</span>{envoi.via === 'vrm' ? ', par VRM, toi en copie' : ''}{envoi.retour ? ', avec le formulaire de retour de Vinted' : ''}.</> : envoi && envoi.message ? envoi.message : 'Une facture émise ne se modifie plus.'}</span>
+          {/* (16 nov., lot factures-mieux) L'état en UNE ligne, puis à qui ; une rangée d'actions ;
+              l'historique replié seulement s'il dit autre chose que l'état ; l'avoir au bout. */}
+          <div className="vrm-fp-etat is-court" data-fp-envoi={(envoi && envoi.etat) || 'aucun'} data-fp-copie={envoi && envoi.etat === 'envoyee' && envoi.via === 'vrm' ? '1' : '0'} data-acc-apres={envoi && envoi.etat === 'envoyee' ? 'facture.pro' : undefined}>
+            <b>{avoir && avoir.emiseLe ? tr('fm.etat.annulee', { numero: avoir.numero })
+              : envoi && envoi.etat === 'envoyee' ? <>{tr('fm.etat.envoyee', quandEnvoi(envoi.at))}{envoi.via === 'vrm' ? <span className="vrm-fp-etat-copie"> · {tr('fm.etat.copie')}</span> : null}</>
+              : envoi && envoi.etat === 'incertaine' ? tr('fm.etat.incertaine') : envoi && envoi.etat === 'refusee' ? tr('fm.etat.refusee') : tr('fm.etat.emise')}</b>
+            <span>{envoi && envoi.etat === 'envoyee' ? <>{tr('fm.etat.a')} <span className="vrm-sensible" data-stream-type="acheteur">{envoi.a}</span>{envoi.retour ? <span data-fp-retour-joint=""> · {tr('fm.etat.retour')}</span> : null}</> : envoi && envoi.message ? envoi.message : tr('fm.etat.figee')}</span>
           </div>
-          <div className="vrm-fp-gestes">
-            <BoutonBase variante="secondaire"  disabled={!!occupe} onClick={() => voirPdf(false)} data-fp-pdf="">Voir le PDF</BoutonBase>
-            <BoutonBase variante="secondaire"  disabled={!!occupe} onClick={() => voirPdf(true)}>Partager</BoutonBase>
-            {!bloque && !(avoir && avoir.emiseLe) ? <BoutonBase variante="primaire"  disabled={!!occupe} data-fp-envoyer="" onClick={() => envoyerFacture(dejaParti)}>{occupe === 'envoyer' ? 'Envoi…' : dejaParti ? 'Renvoyer' : "Envoyer à l'acheteur"}</BoutonBase> : null}
-            {bloque && bloque.vrm && !(avoir && avoir.emiseLe) ? <BoutonBase variante="primaire"  disabled={!!occupe} data-fp-envoyer-vrm="" onClick={() => envoyerFacture(dejaParti, 'vrm')}>{occupe === 'envoyer' ? 'Envoi…' : dejaParti ? 'Renvoyer avec VRM' : 'Envoyer avec VRM'}</BoutonBase> : null}
+          <div className="vrm-fp-gestes is-rangee" data-fp-actions="">
+            <BoutonBase variante="secondaire" disabled={!!occupe} onClick={() => voirPdf(false)} data-fp-pdf="">{tr('fm.voir')}</BoutonBase>
+            <BoutonBase variante="secondaire" disabled={!!occupe} onClick={() => voirPdf(true)} data-fp-partager="">{tr('fm.partager')}</BoutonBase>
+            {!bloque && !(avoir && avoir.emiseLe) ? <BoutonBase variante={dejaParti ? 'secondaire' : 'primaire'} disabled={!!occupe} data-fp-envoyer="" onClick={() => envoyerFacture(dejaParti)}>{occupe === 'envoyer' ? tr('fm.envoi') : dejaParti ? tr('fm.renvoyer') : tr('fm.envoyer')}</BoutonBase> : null}
+            {bloque && bloque.vrm && !(avoir && avoir.emiseLe) ? <BoutonBase variante={dejaParti ? 'secondaire' : 'primaire'} disabled={!!occupe} data-fp-envoyer-vrm="" onClick={() => envoyerFacture(dejaParti, 'vrm')}>{occupe === 'envoyer' ? tr('fm.envoi') : dejaParti ? tr('fm.renvoyerVrm') : tr('fm.envoyerVrm')}</BoutonBase> : null}
           </div>
+          <BonRetour vente={vente} preuve={preuve} facture={facture} deps={deps} ligne={false}/>
           {bloque && !(avoir && avoir.emiseLe) && etat !== undefined ? <p className="vrm-fp-muet" data-fp-bloque="">{bloque.vrm ? 'Ta boîte n’est pas connectée.' : bloque.texte} {bloque.champ ? <button type="button" className="vrm-lien-action" onClick={() => setFiche(bloque.champ)}>{bloque.geste}</button> : null}</p> : null}
-          {envois.length ? <section className="vrm-fp-section" data-fp-journal={envois.length}>
-            <h3>Journal des envois</h3>
-            <ul className="vrm-fp-journal">{[...envois].reverse().map((x, i) => <li key={i} data-fp-journal-etat={x.etat}><b>{jourParis(x.at)} à {heureParis(x.at)}</b><span>{x.etat === 'envoyee' ? 'envoyée' : x.etat === 'incertaine' ? 'incertaine' : 'pas envoyée'} · à <span className="vrm-sensible" data-stream-type="acheteur">{x.a}</span>{x.via === 'vrm' ? ' · par VRM' : ' · depuis ta boîte'}</span></li>)}</ul>
-          </section> : null}
-          {avoir && avoir.emiseLe ? <BoutonBase variante="discret"  onClick={() => voirPdf(false, 'avoir')}>Voir l'avoir {avoir.numero}</BoutonBase>
-            : <details className="vrm-fp-plus"><summary>Vente annulée ou remboursée ?</summary><p className="vrm-fp-muet">Une facture ne se supprime pas : elle s'annule par un avoir.</p><BoutonBase variante="discret"  disabled={!!occupe} onClick={faireAvoir} data-fp-avoir="">Annuler par un avoir</BoutonBase></details>}
+          {envois.length > 1 ? <details className="vrm-fp-plus" data-fp-journal={envois.length}>
+            <summary>{tr('fm.historique', { n: envois.length })}</summary>
+            <ul className="vrm-fp-journal">{[...envois].reverse().map((x, i) => { const q = quandEnvoi(x.at); return <li key={i} data-fp-journal-etat={x.etat}><b>{q.jour} · {q.heure}</b><span>{tr(`fm.journal.${x.etat === 'envoyee' ? 'envoyee' : x.etat === 'incertaine' ? 'incertaine' : 'refusee'}`)} · <span className="vrm-sensible" data-stream-type="acheteur">{x.a}</span> · {tr(x.via === 'vrm' ? 'fm.journal.vrm' : 'fm.journal.boite')}</span></li>; })}</ul>
+          </details> : null}
+          {avoir && avoir.emiseLe ? <BoutonBase variante="discret" onClick={() => voirPdf(false, 'avoir')} data-fp-voir-avoir="">{tr('fm.voirAvoir', { numero: avoir.numero })}</BoutonBase>
+            : <details className="vrm-fp-plus" data-fp-annulee=""><summary>{tr('fm.annulee.q')}</summary><p className="vrm-fp-muet">{tr('fm.annulee.texte')}</p><BoutonBase variante="secondaire" disabled={!!occupe} onClick={faireAvoir} data-fp-avoir="">{tr('fm.annulee.geste')}</BoutonBase></details>}
         </> : !prouve ? <div className="vrm-fp-etat is-manque" data-fp-preuve={preuve ? preuve.code : 'inconnu'}><b>Pas de facture pour cette vente</b><span>{phraseRefus(preuve) || 'acheteur pas prouvé'}.</span></div>
         : <>
           {mv.length ? <div className="vrm-fp-etat is-manque" data-fp-etat={mv.length}><b>Ta fiche « Ma facture » n'est pas complète</b><span>Il manque {mv.map((m) => m.l).join(', ')}.</span>
@@ -1002,14 +1043,15 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
             <p className="vrm-fp-muet">Prix : <b className="vrm-fp-chiffre">{euros(preuve.centimes)}</b> — la vente Vinted, sans port ni protection acheteur.</p>
             <label className="vrm-fp-anglais" data-fp-anglais={anglais ? '1' : '0'}>
               <input type="checkbox" checked={anglais} onChange={(e) => setAnglais(e.target.checked)} disabled={!!occupe}/>
-              <span><b>Facture en anglais</b><small>Français et anglais côte à côte. Toujours en euros.</small></span>
+              <span><b>Facture en anglais</b><small>{tr('fm.anglais.aide')}</small></span>
             </label>
           </section>
           {mail ? <section className="vrm-fp-section" data-fp-mail="">
             <h3>L'e-mail</h3>
-            <div className="vrm-fp-mail"><small>De</small><span>{mail.nomExpediteur}{cfg.envoiPar === 'boite' ? '' : ` — réponses et copie à ${cfg.email || 'ton e-mail'}`}</span><small>Objet</small><b data-fp-objet="">{mail.sujet}</b><small>Message</small><pre className="vrm-sensible" data-stream-type="acheteur">{mail.texte}</pre><small>Pièce jointe</small><span>{nomFichier(apercu)}</span></div>
+            <div className="vrm-fp-mail"><small>De</small><span>{mail.nomExpediteur}{cfg.envoiPar === 'boite' ? '' : ` — réponses et copie à ${cfg.email || 'ton e-mail'}`}</span><small>Objet</small><b data-fp-objet="">{mail.sujet}</b><small>Message</small><pre className="vrm-sensible" data-stream-type="acheteur" data-fp-mail-langue={mail.langue}>{mail.message}</pre><small>Pièce jointe</small><span>{nomFichier(apercu)}</span></div>
           </section> : null}
           {apercu ? <section className="vrm-fp-section"><h3>Aperçu de la facture</h3><MiniatureFacture ouvrir={() => ouvrirPdf(apercuEnGrand(apercu), deps)}><ApercuFacture contenu={apercu} provisoire sensible numeroLibelle={etat && Number.isInteger(etat.prochain) && !numero ? `N° ${apercu.numero} (donné à l’émission)` : ''}/></MiniatureFacture></section> : null}
+          <BonRetour vente={vente} preuve={preuve} facture={facture} deps={deps} ligne={false}/>
           {!mv.length && mvt.length ? <p className="vrm-fp-muet" data-fp-manque-vente="">Il manque {mvt.map((m) => m.l).join(', ')}.</p> : null}
           <AccAvant geste="facture.pro"/>
           <div className="vrm-fp-gestes is-bas">

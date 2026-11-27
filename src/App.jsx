@@ -15472,15 +15472,13 @@ const mergeAndDownloadBordereaux = async (...a) => { try { return await mergeAnd
 // « l'ancien modèle » après un essai en deux colonnes (§5.36). On enrichit, on
 // ne réorganise pas.
 const generateAchatJustificatif = async (o, opts = {}) => {
-  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
-  const pdf = await PDFDocument.create();
-  const page = pdf.addPage([420, 560]);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const reg = await pdf.embedFont(StandardFonts.Helvetica);
-  const { height } = page.getSize();
-  const G = rgb(0.45,0.45,0.45), N = rgb(0.1,0.1,0.1);
-  let y = height - 44;
-
+  // (16 nov., lot factures-mieux — Julien : « fais les mêmes factures d'achat », puis la capture
+  // du reçu reconstruit depuis l'e-mail : « Je veux que ça soit comme ça ») LA MISE EN PAGE
+  // vient de src/recuAchat.js (bandeau Vinted, l'article en grand, « Montant payé » en très
+  // grand, les lignes, le pied) — la MÊME que la feuille de l'app. Les accents s'écrivent
+  // (« Reçu », « déductible », « Récapitulatif », « Établi ») : l'ancien texte était tapé sans.
+  // La photo n'y est plus : le modèle qu'il a choisi n'en a pas.
+  const { champsRecuGenere, pdfRecuAchat } = await import('./recuAchat.js');
   // QUI ACHÈTE. L'entité active des Factures (raison sociale, adresse, SIRET) —
   // aucun appelant ne la passait, donc chaque reçu disait « Ma boutique ».
   const ents = load('vinted_entreprises', []);
@@ -15488,76 +15486,18 @@ const generateAchatJustificatif = async (o, opts = {}) => {
   const ent = (Array.isArray(ents) && ents.length)
     ? (ents.find(e => e && String(e.id) === String(actif)) || ents[0])
     : load('vinted_invoice_settings', null);
-  const acheteur = [ent && ent.companyName, ent && ent.companyType].filter(Boolean).join(' ');
-
-  page.drawText('Recu d\'achat', { x:32, y, size:20, font:bold, color:N }); y -= 16;
-  page.drawText(acheteur || opts.shop || 'Achat de marchandise', { x:32, y, size:10, font:reg, color:G }); y -= 12;
+  const acheteur = [ent && ent.companyName, ent && ent.companyType].filter(Boolean).join(' ') || opts.shop || '';
   const adr = [ent && ent.companyAddress, (ent && ent.siret) ? 'SIRET ' + ent.siret : ''].filter(Boolean).join(' · ');
-  if (adr) { page.drawText(adr.slice(0,74), { x:32, y, size:8.5, font:reg, color:G }); y -= 12; }
-  y -= 12;
-  page.drawRectangle({ x:32, y, width:356, height:2, color:rgb(0.9,0.9,0.9) }); y -= 22;
-
-  // LA PAIRE : photo + ce qui l'identifie. ⚠️ Le CDN Vinted ne renvoie aucun
-  // en-tête CORS : les octets passent par l'extension (§5.28). Sans elle, le
-  // reçu se génère simplement sans photo — rien ne casse.
-  const src = (o && o.photo && (o.photo.url || o.photo)) || '';
-  let img = null;
-  if (src) {
-    try {
-      const dataUrl = await vmrPhoto(String(src));
-      if (dataUrl) {
-        const b64 = String(dataUrl).split(',')[1] || '';
-        const raw = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-        img = /png/i.test(dataUrl.slice(0,30)) ? await pdf.embedPng(raw) : await pdf.embedJpg(raw);
-      }
-    } catch (_) { img = null; }
-  }
-  const txtX = img ? 116 : 32;
-  const titre = String(o.title || '—');
-  const coupe = (t, max) => { const w=t.split(' '); const r=[]; let c=''; for(const x of w){ if((c+' '+x).trim().length>max){ r.push(c.trim()); c=x; } else c+=' '+x; } if(c.trim()) r.push(c.trim()); return r; };
-  const lignesTitre = coupe(titre, img ? 34 : 46).slice(0, 2);
-  const carac = [extractBrand(titre), extractSize(titre) ? motTaille(vendActuel()).toLowerCase() + ' ' + String(extractSize(titre)).replace('.',',') : ''].filter(Boolean).join(' · ');
-  // ⚠️ LA HAUTEUR DU BLOC SE CALCULE, elle n'est pas figée. Une hauteur fixe
-  // laissait un trou de 94 px quand il n'y a ni photo (pas d'extension) ni
-  // marque/pointure reconnue — sur un document d'une page, ça se voit tout de
-  // suite comme un défaut d'impression.
-  let by = y;
-  if (opts.numero) { page.drawText('N°' + opts.numero, { x:txtX, y:by-11, size:15, font:bold, color:N }); by -= 25; }
-  lignesTitre.forEach((l,i) => page.drawText(l, { x:txtX, y:by-11-i*14, size:11, font:reg, color:N }));
-  by -= 11 + lignesTitre.length*14;
-  if (carac) { page.drawText(carac, { x:txtX, y:by, size:9, font:reg, color:G }); by -= 13; }
-  // la photo fixe un plancher : le bloc ne peut pas être plus court qu'elle
-  if (img) page.drawImage(img, { x:32, y:y-76, width:72, height:72 });
-  y = Math.min(by - 8, img ? y - 84 : by - 8);
-  page.drawRectangle({ x:32, y, width:356, height:1, color:rgb(0.92,0.92,0.92) }); y -= 22;
-
-  const line = (label, val, o2={}) => {
-    page.drawText(label, { x:32, y, size:9, font:reg, color:G });
-    page.drawText(String(val==null?'—':val), { x:32, y:y-15, size:o2.big?15:12, font:o2.big?bold:reg, color:N });
-    y -= o2.gap || 38;
-  };
-  line('Date d\'achat', o.date ? dateFr(o.date) : '—');
-  line('N° de transaction Vinted', o.transaction_id || '—');
-  line('Vendeur', o.seller || o.user_login || (o.opposite_user && o.opposite_user.login) || '—');
-  // Virgule decimale : c'est un document comptable francais.
-  line('Montant payé (TTC)', o.price && o.price.amount!=null
-    ? `${Number(o.price.amount).toFixed(2).replace('.',',')} ${o.price.currency_code==='EUR'?'€':(o.price.currency_code||'')}` : '—', { big:true });
-  line('Compte acheteur', opts.account || '—');
-
-  y -= 4;
+  const champs = champsRecuGenere(o, { account: opts.account, numero: opts.numero });
+  // ⚠️ Le pied (`PIED_RECU_GENERE`, src/recuAchat.js) dit qu'il N'EST PAS la facture de Vinted :
+  // ne pas le retirer (Vinted n'en émet pas pour un achat entre particuliers).
   const notes = [
     opts.regime==='marge'
-      ? 'Achat de seconde main a un particulier : pas de TVA deductible. A conserver pour le regime de la marge (TVA sur la marge a la revente).'
-      : 'Achat de seconde main a un particulier : pas de TVA deductible.',
-    // ⚠️ NE PAS RETIRER. Sans cette phrase, le document se lit comme la facture
-    // de Vinted — or Vinted n'en emet pas pour un achat entre particuliers.
-    'Recapitulatif etabli par VRM d\'apres les donnees de la commande Vinted. Ce n\'est pas une facture emise par Vinted.',
-    'Etabli le ' + new Date().toLocaleDateString('fr-FR') + '.',
+      ? 'Achat de seconde main à un particulier : pas de TVA déductible. À conserver pour le régime de la marge (TVA sur la marge à la revente).'
+      : 'Achat de seconde main à un particulier : pas de TVA déductible.',
+    'Établi le ' + new Date().toLocaleDateString('fr-FR') + '.',
   ];
-  let ny = y;
-  notes.forEach(n => { coupe(n, 68).forEach(r => { page.drawText(r, { x:32, y:ny, size:8, font:reg, color:G }); ny -= 11; }); ny -= 4; });
-
-  const bytes = await pdf.save();
+  const bytes = await pdfRecuAchat(champs, { acheteur, acheteurDetail: adr, notes });
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
   const nomPdf = `recu-achat-${o.transaction_id || (o.title||'').replace(/[^\w\-]+/g,'_').slice(0,24)}.pdf`;
@@ -23429,7 +23369,9 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
       {/* (11 nov., lot ventes-achats-visuel) La frise FINE, dans la ligne : sous l'état au téléphone,
           dans la colonne « État » à l'ordinateur (une grille alignée : photo · N° + titre · état · prix ·
           bénéfice). Rien d'interactif dedans (des <span>) : un toucher ouvre la vente, comme avant. */}
-      {friseEtat ? <span className="vrm-ledger-sale-frise" data-frise-ligne="">{friseEtat}</span> : null}
+      {/* (16 nov., lot factures-mieux) Au téléphone, la facture en PASTILLE posée à droite de la ligne de l'état, dans
+          la rangée de la frise : au téléphone entre la légende et les traits, à l'ordinateur sous la frise. Aucune hauteur ajoutée. */}
+      {friseEtat ? <span className="vrm-ledger-sale-frise" data-frise-ligne="">{friseEtat}{fusion && fusion.facture ? fusion.facture : null}</span> : (fusion && fusion.facture ? fusion.facture : null)}
       <span className="vrm-ledger-sale-amount" data-prix-vente={montantCentimes ?? undefined}>{montant}</span>
       {benef ? <span className="vrm-ledger-sale-achat" data-achat-ligne={benef.achatCentimes ?? ''} data-achat-etat={benef.achatCentimes == null ? 'manque' : 'lu'}>{benef.achatTxt}</span> : null}
       {benef ? <span className="vrm-ledger-sale-benef" data-benef-ligne={benef.benefCentimes ?? ''} data-benef-etat={benef.etat} aria-label={benef.aria || undefined}>{benef.etat === 'partiel' ? <><span className="vrm-benef-borne">{tr('ventes.plus')} </span>{benef.benefTxt}</> : benef.benefTxt}</span> : null}

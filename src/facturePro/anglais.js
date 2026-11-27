@@ -102,8 +102,10 @@ export function traductionContenu({ mentions = [], venteJour = '', plateforme = 
 export const paiementAnglais = (c) => (!c || !c.anglais ? '' : c.type === 'avoir' ? paiementEn({ type: 'avoir' }) : String(c.anglais.paiement || ''));
 
 // ── L'E-MAIL ────────────────────────────────────────────────────────────────
-// Le message par défaut, anglais puis français (le vendeur qui a écrit SON
-// message le garde tel quel : on ne le traduit pas).
+// (16 nov., lot factures-mieux) L'e-mail parle UNE langue : l'anglais quand la
+// facture est en anglais, sinon le français (`langueEmail`, ./regle.js) — plus
+// jamais l'anglais PUIS le français empilés. Le vendeur qui a écrit SON message
+// le garde tel quel : on ne le traduit pas.
 export const MESSAGE_DEFAUT_EN = 'Hello {acheteur},\n\nPlease find attached invoice {numero} for your purchase "{article}".\n\nThank you for your trust,\n{boutique}';
 // (11 nov., lot DJ1) L'ancien pied « This invoice is sent to you by VRM on behalf of … » est RETIRÉ
 // (Julien : « je veux pas de ce message ») : l'e-mail ne porte que le texte du vendeur.
@@ -119,3 +121,33 @@ export function acheteurHorsFrance(adresse) {
   if (/\d/.test(dern) || /^france$/i.test(dern)) return false;
   return /\d/.test(l[l.length - 2]);
 }
+
+// (16 nov., lot factures-mieux) LA langue d'une facture quand personne ne l'a
+// choisie à la main : la même règle pour la case pré-cochée de la feuille, la
+// série (Ventes → Sélectionner, « Tout envoyer ») et l'envoi automatique du
+// serveur — une vente produit la MÊME facture par les trois chemins. Un indice
+// lu (l'adresse PROUVÉE finit par un pays étranger), jamais une langue devinée
+// d'un nom : sinon le français.
+export const langueFactureParDefaut = (adresse) => (acheteurHorsFrance(adresse) ? 'en' : 'fr');
+
+// Les mots fixes de l'e-mail, dans SA langue (une seule par e-mail).
+export const MOTS_EMAIL = {
+  fr: {
+    facture: 'Facture', avoir: 'Avoir',
+    sujetFacture: 'Votre facture', sujetAvoir: 'Votre avoir',
+    numeroFacture: 'N° de facture', numeroAvoir: "N° d'avoir", annule: 'Annule la facture',
+    date: "Date d'émission", article: 'Article', articles: (n) => `${n} articles`,
+    piece: 'Pièce jointe', pieces: 'Pièces jointes',
+    preentete: (doc, num) => `${doc} ${num} en pièce jointe (PDF).`,
+    dontTva: (taux, montant) => `Dont TVA ${taux}\u00a0% : ${montant}`,
+  },
+  en: {
+    facture: 'Invoice', avoir: 'Credit note',
+    sujetFacture: 'Your invoice', sujetAvoir: 'Your credit note',
+    numeroFacture: 'Invoice number', numeroAvoir: 'Credit note number', annule: 'Cancels invoice',
+    date: 'Issue date', article: 'Item', articles: (n) => `${n} items`,
+    piece: 'Attachment', pieces: 'Attachments',
+    preentete: (doc, num) => `${doc} ${num} attached (PDF).`,
+    dontTva: (taux, montant) => `Including VAT ${taux}%: ${montant}`,
+  },
+};

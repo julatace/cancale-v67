@@ -171,7 +171,7 @@ const ouvrirVente = async (pg, tx) => {
   return id;
 };
 const fermerVente = async (pg) => { const croix = pg.locator('.vrm-ledger-drawer-host:not([hidden]) .vrm-recap-fermer'); if (await croix.count()) { await croix.first().click(); await pg.waitForTimeout(300); } };
-const ligneFacture = (pg, tx) => pg.locator(`.vrm-sale-row[data-tx="${tx}"] [data-fp-forme="ligne"]`).first();
+const ligneFacture = (pg, tx) => pg.locator(`.vrm-sale-row[data-tx="${tx}"] [data-fp-forme="ligne"]:visible`).first();
 
 const mesurer = (pg, sel) => pg.evaluate((sel) => {
   const d = document.querySelector(sel); if (!d) return null;

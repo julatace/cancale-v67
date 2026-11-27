@@ -212,3 +212,44 @@ li[data-fp-a-envoyer-etat="a-annuler"] .vrm-fp-rangee-txt > span { color: var(--
 .vrm-fa-question { display: grid; gap: 8px; }
 /* (12 nov.) « Connecter ma boîte » dans la phrase du bas : un lien, cible de 44 px. */
 [data-fp-bloque] .vrm-lien-action { background: none; border: 0; padding: 0 2px; margin: 0; font: inherit; font-weight: 600; cursor: pointer; min-height: 44px; vertical-align: baseline; }
+
+/* (16 nov., lot factures-mieux) La feuille d'une facture émise : l'état en une ligne, puis
+   à qui ; UNE rangée d'actions de largeur égale (Voir · Partager · Renvoyer). */
+.vrm-fp-etat.is-court b { font-size: 15px; line-height: 1.35; }
+.vrm-fp-etat.is-court .vrm-fp-etat-copie { font-weight: 400; color: var(--vrm-muted); }
+.vrm-fp-etat.is-court > span { font-size: 14px; }
+.vrm-fp-gestes.is-rangee { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+.vrm-fp-gestes.is-rangee .vrm-b { min-height: 44px; width: 100%; min-width: 0; padding-left: 8px; padding-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-fp-ligne-etat[data-fp-ligne-etat] b { font-size: 13px; font-weight: 500; color: var(--vrm-muted); }
+.vrm-fp-ligne-etat[data-fp-ligne-etat="refusee"] b, .vrm-fp-ligne-etat[data-fp-ligne-etat="incertaine"] b { color: var(--vrm-warn, #b25000); }
+
+/* (16 nov., lot factures-mieux) La facture en PASTILLE sur la ligne de la vente, dans la rangée
+   « N° · compte · taille » : aucune hauteur ajoutée. Neutre (« Facturée ») ; ambre seulement pour un
+   geste à faire (« Facture à envoyer », « à vérifier ») — CLAUDE.md §7. */
+.vrm-fp-pastille-hote { display: inline; margin-left: 6px; }
+.vrm-fp-pastille { display: inline-flex; align-items: center; gap: 4px; vertical-align: baseline; padding: 0 7px; border-radius: 999px; border: 1px solid var(--vrm-line); font-size: 11.5px; line-height: 15px; font-weight: 500; color: var(--vrm-muted); white-space: nowrap; cursor: pointer; }
+.vrm-fp-pastille svg { flex-shrink: 0; }
+.vrm-fp-pastille[data-fp-pastille="aenvoyer"], .vrm-fp-pastille[data-fp-pastille="averifier"] { color: var(--vrm-warn, #b25000); border-color: color-mix(in srgb, var(--vrm-warn, #b25000) 40%, transparent); }
+.vrm-fp-pastille:focus-visible { outline: 2px solid var(--vrm-accent, #0071e3); outline-offset: 2px; }
+/* Posée à droite de la ligne de l'état, sous la frise, en position absolue (aucune hauteur) —
+   au téléphone comme à l'ordinateur (colonne « État »). */
+:root:root body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-frise:has(> .vrm-fp-pastille-hote), :root:root body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-sale-toggle:has(> .vrm-fp-pastille-hote) { position: relative; }
+:root:root body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-frise > .vrm-fp-pastille-hote[data-ou="tel"] { position: absolute; right: 0; bottom: 0; margin: 0; white-space: nowrap; z-index: 1; }
+:root:root body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-sale-toggle > .vrm-fp-pastille-hote[data-ou="tel"] { position: absolute; right: 52px; bottom: 10px; margin: 0; white-space: nowrap; z-index: 1; }
+/* La pastille ne grandit JAMAIS la ligne : aucune hauteur minimale de cible (la règle des 44 px
+   des boutons ne s'applique pas à elle) ; sa zone de toucher est agrandie SANS place prise. */
+:root:root body .vrm-fp-pastille { min-height: 0 !important; min-width: 0 !important; height: auto !important; position: relative; }
+.vrm-fp-pastille::after { content: ''; position: absolute; inset: -12px -6px; }
+
+/* (17 nov., après #1202 ventes-clair) Au téléphone, la rangée de la frise est « Payée ···· ====» : la pastille
+   (mot COURT : « Facturée », « À facturer ») se pose juste avant les quatre traits, en position absolue ; la
+   légende se coupe proprement avant elle. La hauteur reste celle de la rangée. À l'ordinateur (≥ 1024 px) :
+   sous la frise, le mot entier (plus haut). */
+.vrm-fp-pastille-court { display: none; }
+@media (max-width: 1023.98px) {
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-frise:has(> .vrm-fp-pastille-hote) { position: relative !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-frise > .vrm-fp-pastille-hote[data-ou="tel"] { position: absolute !important; right: 74px !important; top: 50% !important; bottom: auto !important; transform: translateY(-50%); margin: 0 !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-frise:has(> .vrm-fp-pastille-hote) .vrm-fu-legende { padding-right: 104px !important; box-sizing: border-box !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+  .vrm-fp-pastille-hote[data-ou="tel"] .vrm-fp-pastille-long { display: none; }
+  .vrm-fp-pastille-hote[data-ou="tel"] .vrm-fp-pastille-court { display: inline; }
+}
