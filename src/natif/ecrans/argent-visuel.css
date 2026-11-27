@@ -7,7 +7,7 @@
   .n-agv-pousse { transform-origin: left center; animation: n-agv-pousse 160ms cubic-bezier(.2, .7, .3, 1) both; }
   @keyframes n-agv-pousse { from { transform: scaleX(0); } to { transform: scaleX(1); } }
   .n-agv-apparait { animation: n-agv-apparait 160ms cubic-bezier(.2, .7, .3, 1) both; }
-  @keyframes n-agv-apparait { from { opacity: .4; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+  @keyframes n-agv-apparait { from { transform: translateY(3px); } to { transform: none; } }   /* (26 nov.) sans opacité : jamais sous AA */
   .n-agv-obj[data-agv-anime] .n-anneau-plein { animation: n-agv-anneau 160ms cubic-bezier(.2, .7, .3, 1) both; }
   @keyframes n-agv-anneau { from { stroke-dashoffset: var(--n-agv-c, 400); } }
   @media (prefers-reduced-motion: reduce) {

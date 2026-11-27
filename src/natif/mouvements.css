@@ -26,11 +26,12 @@
     .n-feuille-couche .n-voile { transition-duration: var(--n-feuille-duree); }
 
     /* Segment : le choix change de couleur en fondu ; le contenu marqué `data-n-fondu` (changé à chaque segment, par sa
-       `key`) arrive en fondu court. Il est LISIBLE dès la première image (opacité de départ 0,4). */
+       `key`) arrive en glissé court (2 px). Il est LISIBLE et à son contraste dès la première image (26 nov. : plus d'opacité). */
     .n-segmente-choix { transition: color var(--n-fondu-duree) ease-out; }
     [data-n-fondu] { animation: n-fondu-court var(--n-fondu-duree) ease-out both; }
   }
-  @keyframes n-fondu-court { from { opacity: .4; } to { opacity: 1; } }
+  /* (26 nov.) Plus d'opacité (0,4 au départ passait sous AA, contenu lisible dès la première image) : un glissé de 2 px. */
+  @keyframes n-fondu-court { from { transform: translateY(2px); } to { transform: none; } }
 
   /* La feuille « Nouveau » : « Plus tard » à gauche, « Voir tout » à droite. */
   .ux-nouveau-pied { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

@@ -164,8 +164,9 @@ async function main() {
     }
     // ── K1. Chaque écran atteint au clavier ─────────────────────────────────
     if (!SEUL || SEUL === 'K') await essaie('⌨️ K1', async () => {
+      // (26 nov., zero-rouge-bancs) La colonne est la BarreLaterale native (`nav[data-n-laterale]`, 21 nov.) ; ses entrées gardent `data-nav-entree`.
       const { pg, ctx, errs } = await A.ouvrir(b, { largeur: 1512, sombre: false, tab: 'journee' });
-      const entrees = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].filter((e) => e.getClientRects().length).map((e) => e.getAttribute('data-nav-entree')));
+      const entrees = await pg.evaluate(() => [...document.querySelectorAll(':is(.vrm-sidebar, [data-n-laterale]) [data-nav-entree]')].filter((e) => e.getClientRects().length).map((e) => e.getAttribute('data-nav-entree')));
       dit(entrees.length >= 8, '⌨️ K1 la colonne de navigation a ses entrées', JSON.stringify(entrees));
       const rates = [];
       for (const cible of entrees) {
@@ -175,12 +176,12 @@ async function main() {
         let trouve = false;
         for (let i = 0; i < 80 && !trouve; i++) {
           await pg.keyboard.press('Tab');
-          trouve = await pg.evaluate((c) => { const a = document.activeElement; return !!(a && a.getAttribute && a.getAttribute('data-nav-entree') === c && a.closest('.vrm-sidebar')); }, cible);
+          trouve = await pg.evaluate((c) => { const a = document.activeElement; return !!(a && a.getAttribute && a.getAttribute('data-nav-entree') === c && a.closest('.vrm-sidebar, [data-n-laterale]')); }, cible);
         }
         if (!trouve) { rates.push(cible + ' (pas atteinte)'); continue; }
         const avant = await pg.evaluate(() => location.search + '|' + (document.querySelector('main[data-ecran]') || {}).getAttribute?.('data-ecran'));
         await pg.keyboard.press('Enter'); await pg.waitForTimeout(900);
-        const apres = await pg.evaluate(() => ({ s: location.search + '|' + (document.querySelector('main[data-ecran]') || {}).getAttribute?.('data-ecran'), courant: (document.querySelector(`.vrm-sidebar [aria-current="page"]`) || {}).getAttribute?.('data-nav-entree') }));
+        const apres = await pg.evaluate(() => ({ s: location.search + '|' + (document.querySelector('main[data-ecran]') || {}).getAttribute?.('data-ecran'), courant: (document.querySelector(`:is(.vrm-sidebar, [data-n-laterale]) [aria-current="page"]`) || {}).getAttribute?.('data-nav-entree') }));
         if (apres.courant !== cible && apres.s === avant) rates.push(cible + ' (Entrée sans effet)');
       }
       dit(rates.length === 0, `⌨️ K1 chaque écran de la colonne est atteint par Tab et ouvert par Entrée (${entrees.length})`, rates.join(', '));

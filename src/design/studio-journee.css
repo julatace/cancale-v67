@@ -361,10 +361,9 @@
 
 /* ── 11. MOUVEMENT RÉDUIT, TRANSPARENCE RÉDUITE ───────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .sj-journee .sj-deplie { animation: sj-fondu 160ms ease both !important; }
+  .sj-journee .sj-deplie { animation: none !important; }   /* (26 nov.) ni mouvement ni fondu sous AA */
   .sj-journee .sb-btn-plein, .sj-journee .sb-touche, .sj-journee .sb-rond { transition: none !important; }
 }
-@keyframes sj-fondu { from { opacity: 0; } to { opacity: 1; } }
 
 } /* fin @layer sj-studio */
 

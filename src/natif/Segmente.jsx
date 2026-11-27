@@ -55,7 +55,8 @@ export function Segmente({ options = [], valeur, onChange, libelle = '', classNa
           {...sansPresse(o.attrs)}
         >
           <span className="n-segmente-libelle">{o.libelle}</span>
-          {o.n ? <span className="n-segmente-n">{o.n}</span> : null}
+          {/* (26 nov.) Un espace avant le compte : le nom lu est « À envoyer 3 », jamais « À envoyer3 » (test controles-finitions-interface). */}
+          {o.n ? <>{' '}<span className="n-segmente-n">{o.n}</span></> : null}
         </button>
       ))}
     </div>

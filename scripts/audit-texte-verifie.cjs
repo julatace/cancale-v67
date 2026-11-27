@@ -14,6 +14,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 const path = require('path'), fs = require('fs');
+const TR = require('./_travail-recherche.cjs');
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + JSON.stringify(d) : '')); } };
 const ancien = (ms, maintenant = Date.now(), par = null) => {
@@ -36,8 +37,10 @@ const ancien = (ms, maintenant = Date.now(), par = null) => {
   for (let i = 0; i < 5000; i++) { const ms = now - i * 1337e3; const p = pars[i % 4]; const a = ancien(ms, now, p), b = texteVerifie(ms, now, p); if (a !== b) { diff++; ex = ex || { a, b }; } }
   dit(diff === 0 && texteVerifie(NaN) === '', 'A : mêmes textes que l’écriture d’avant (5 000 instants)', ex);
   const N = 6000;
-  let t = process.hrtime.bigint(); for (let i = 0; i < N; i++) ancien(now - i * 1e5, now); const ta = Number(process.hrtime.bigint() - t) / 1e6;
-  t = process.hrtime.bigint(); for (let i = 0; i < N; i++) texteVerifie(now - i * 1e5, now); const tb = Number(process.hrtime.bigint() - t) / 1e6;
+  // (26 nov.) Temps CPU du fil (scripts/_travail-recherche.cjs), plus le temps mural : un rapport de deux durées murales
+  // rougit dès qu'un voisin prend le cœur pendant l'une d'elles (instable dans la part 2, 4 audits à la fois).
+  let t = TR.cpuMs(); for (let i = 0; i < N; i++) ancien(now - i * 1e5, now); const ta = (TR.cpuMs() - t);
+  t = TR.cpuMs(); for (let i = 0; i < N; i++) texteVerifie(now - i * 1e5, now); const tb = (TR.cpuMs() - t);
   dit(tb * 10 <= ta, `B : au moins 10× plus rapide (${N} appels : avant ${Math.round(ta)} ms, maintenant ${Math.round(tb)} ms)`);
   const src = fs.readFileSync(path.join(racine, 'src', 'sourcesRetrait.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
   const corps = (src.match(/export function texteVerifie[\s\S]*?\n}\n/) || [''])[0];
@@ -49,8 +52,8 @@ const ancien = (ms, maintenant = Date.now(), par = null) => {
   for (let ms = Date.UTC(2026, 0, 1); ms < Date.UTC(2027, 0, 1); ms += 7 * 60000 + 13) { const a = ref(ms), b = jourParis(ms); if (a !== b) { dj++; exj = exj || { ms, a, b }; } }
   dit(dj === 0, 'D : jourParis = le jour de Paris sur une année (changements d’heure compris)', exj);
   const M = 40000, base = Date.UTC(2026, 10, 20);
-  t = process.hrtime.bigint(); for (let i = 0; i < M; i++) ref(base + (i % 300) * 3600e3 + i); const tr = Number(process.hrtime.bigint() - t) / 1e6;
-  t = process.hrtime.bigint(); for (let i = 0; i < M; i++) jourParis(base + (i % 300) * 3600e3 + i); const tj = Number(process.hrtime.bigint() - t) / 1e6;
+  t = TR.cpuMs(); for (let i = 0; i < M; i++) ref(base + (i % 300) * 3600e3 + i); const tr = (TR.cpuMs() - t);
+  t = TR.cpuMs(); for (let i = 0; i < M; i++) jourParis(base + (i % 300) * 3600e3 + i); const tj = (TR.cpuMs() - t);
   dit(tj * 5 <= tr, `D : jourParis gardé par heure (${M} appels : formatToParts ${Math.round(tr)} ms, jourParis ${Math.round(tj)} ms)`);
   console.log(`\n${ko ? '❌' : '✅'} audit-texte-verifie : ${ok} verts, ${ko} rouges`);
   process.exit(ko ? 1 : 0);

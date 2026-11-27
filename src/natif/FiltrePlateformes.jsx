@@ -48,7 +48,9 @@ export function FiltrePlateformes({ ecran, options, valeur, onChange, className 
             <span className="n-ad-puce-pilule">
               {o.cle === TOUTES ? null : <LogoSite site={o.cle} taille={16}/>}
               {o.cle === 'ebay' ? null : nom(o.cle)}
-              {n != null ? <span className="n-ad-puce-n">{n}</span> : null}
+              {/* (26 nov.) Un espace entre le nom et le compte : le texte VU se lit « Toutes 5 », comme le nom « Toutes · 5 »
+                  (axe label-content-name-mismatch : « Toutes5 » collé n'était pas dans le nom ; banc accessibilite, 390 px). */}
+              {n != null ? <>{' '}<span className="n-ad-puce-n">{n}</span></> : null}
             </span>
           </Puce>
         );
