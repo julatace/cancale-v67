@@ -108,7 +108,7 @@ jobs:
           - part: 1
             lot: budget-vitesse@ECRANS=journee,ventes,annonces,achats budget-vitesse@ECRANS=garage,messages,compta,emails accessibilite@BANC_LARGEUR=390 defilement-navigation imprimer-compte-exact annonces-actions barre-achats journee-coherence retraits-suivi ecran-pret-une-fois
           - part: 2
-            lot: accessibilite@BANC_LARGEUR=1512 ventes-e2@SCENARIOS=annul,ko ventes-e2@SCENARIOS=egal,gros,vide accessibilite-clavier chiffres-coherents ventes-ligne-propre garde-ecrans
+            lot: accessibilite@BANC_LARGEUR=1512 ventes-e2@SCENARIOS=annul,ko ventes-e2@SCENARIOS=egal,gros,vide accessibilite-clavier chiffres-coherents ventes-ligne-propre garde-ecrans compta-export
           - part: 3
             lot: navigation-tache ventes-e2@SCENARIOS=jeu,exclu argent-mois nouveau-vendeur iphone-reprise morceau-perime statut-colis colis-retirer-propre achats-annules
     steps:
