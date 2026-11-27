@@ -14,10 +14,12 @@
    feuilles en position fixe). `backwards`, jamais `both` (index.html). */
 /* (25 nov., chargement propre) 140 ms (≤ 150 ms) : une section entière apparaît d'un coup, jamais élément par élément ;
    rien sous « réduire les animations ». */
-.vrm-attente-pret { animation: vrm-attente-apparait .14s cubic-bezier(.22, 1, .36, 1) backwards; }
-@media (prefers-reduced-motion: reduce) { .vrm-attente-pret { animation: none; } }
-/* (22 nov., « zéro saut ») Le fondu part de 0,85 (comme le passage d’onglet) : parti de 0, sa première image restait vide au téléphone occupé (banc couches-chargement : un clignotement de ~100 ms). */
-@keyframes vrm-attente-apparait { from { opacity: .85; } to { opacity: 1; } }
+/* (22 nov., « zéro saut ») Le fondu partait de 0,85 (comme le passage d’onglet) : parti de 0, sa première image restait vide au téléphone occupé (banc couches-chargement : un clignotement de ~100 ms). */
+/* ⚠️ (26 nov., zero-rouge-bancs — décision : « l'entrée ne baisse jamais le contraste sous AA ») PLUS AUCUN FONDU sur l'écran
+   prêt. Mesuré : au téléphone occupé, l'animation reste EN ATTENTE (0,7 à 1,5 s entre l'écran montré et son départ, banc
+   d'accessibilité) et `backwards` tient tout l'écran à 85 % d'opacité — l'en-tête du tableau tombait à 4,25:1 (jetons à 6,1:1).
+   Et pas de déplacement non plus : un transform sur l'hôte décalerait les feuilles en position fixe (voir plus haut). L'écran
+   arrive d'un bloc, net, à sa place. */
 
 /* ── Les briques ─────────────────────────────────────────────────────────── */
 .vrm-squelette { display: block; padding-bottom: 8px; animation: vrm-sq-pouls 1.6s ease-in-out infinite alternate; }

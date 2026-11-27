@@ -46,13 +46,15 @@ const TB = require('./tous-boutons.cjs');
         if(width>=1024 && box.filtres?.width && box.recherche) assert.ok(box.recherche.right<=box.filtres.left+1,`${width} ${tab} : recherche et filtres séparés`);
         if(tab==='ventes' && width>=1024) {
           assert.ok(await pg.locator('[data-toutes-vente]').count()>0,'les ventes de la fixture sont réellement affichées');
-          const meta=await pg.locator('.vrm-toutes-bureau').first().evaluate(e=>getComputedStyle(e).display);
-          assert.equal(meta,'contents','les informations des ventes ont leurs colonnes');
-          await pg.locator('.vrm-barre-haut-droite').getByRole('button',{name:'Vinted',exact:true}).click();
-          await pg.locator('.vrm-sale-row > .vrm-ledger-sale-toggle').first().waitFor();
-          const titre=await pg.locator('.vrm-sale-row .vrm-ledger-sale-title').first().evaluate(e=>({width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height,clip:getComputedStyle(e).clip}));
-          assert.ok(titre.width>100&&titre.height>10&&titre.clip==='auto','le vrai titre reste visible en colonnes');
-          const chevauchement=await pg.locator('.vrm-sale-row > .vrm-ledger-sale-toggle').evaluateAll(rows=>rows.some(row=>{
+          // (26 nov., zero-rouge-bancs) Ventes à l'ordinateur = le TABLEAU de travail natif (`.n-tt-ordi`, 25 nov.) : une vente est une
+          // rangée `tr[data-tt-ligne]`, ses informations des cellules `td[data-tt-col]` ; le choix du site vit dans le filtre du
+          // tableau (plus de bouton « Vinted » dans la barre du haut). Mêmes règles : des colonnes, le vrai titre visible, aucune
+          // cellule sur une autre.
+          const colonnes=await pg.locator('tr[data-tt-ligne]').first().evaluate(e=>[...e.querySelectorAll('td[data-tt-col]')].filter(c=>c.getBoundingClientRect().width>0).length);
+          assert.ok(colonnes>=3,'les informations des ventes ont leurs colonnes ('+colonnes+')');
+          const titre=await pg.locator('tr[data-tt-ligne] td[data-tt-col="article"]').first().evaluate(e=>({width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height,clip:getComputedStyle(e).clip,texte:(e.innerText||'').trim().length}));
+          assert.ok(titre.width>100&&titre.height>10&&titre.clip==='auto'&&titre.texte>0,'le vrai titre reste visible en colonnes');
+          const chevauchement=await pg.locator('tr[data-tt-ligne]').evaluateAll(rows=>rows.some(row=>{
             const nodes=[...row.children].filter(e=>getComputedStyle(e).display!=='none'&&getComputedStyle(e).visibility!=='hidden');
             const r=nodes.map(e=>e.getBoundingClientRect()).filter(r=>r.width&&r.height);
             return r.some((a,i)=>r.slice(i+1).some(b=>Math.min(a.right,b.right)-Math.max(a.left,b.left)>2&&Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>2));

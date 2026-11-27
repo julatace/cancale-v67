@@ -149,7 +149,7 @@
   .n-os-affiche { width: 55%; height: 40px; margin: 6px 0; }
   .n-os.n-vignette { border-radius: var(--n-r-vignette); margin: 0; }
   .n-attente-texte { padding: 0 var(--n-marge); }
-  @media (prefers-reduced-motion: reduce) { .n-os { animation: none; background-image: none; } .n-roue { animation-duration: 1.6s; } }
+  @media (prefers-reduced-motion: reduce) { .n-os { animation: none; background-image: none; } .n-roue { animation: none; } }   /* (26 nov.) « prefers-reduced-motion ⇒ rien ne bouge » (mouvements.css) : la roue reste dessinée, immobile */
 
   /* ── Faits ──────────────────────────────────────────────────────────────── */
   .n-faits {
@@ -563,6 +563,13 @@
   .n-onglet[aria-current="page"] .n-onglet-icone { background: var(--n-teinte); color: var(--n-accent); }
   .n-onglet:active .n-onglet-icone { transform: scale(.92); }
   .n-onglet-libelle { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* (26 nov., zero-rouge-bancs) Un téléphone de 320 px donne 64 px par onglet : « Aujourd’hui » allumé y était coupé
+     (« Aujourd’h… », banc barre-achats A2). La police de la barre est celle du SYSTÈME (--n-police : SF sur iPhone, sinon
+     Roboto, Segoe, DejaVu… — aucune police embarquée) : mesuré avec la police de repli d'un Linux (DejaVu, comme la CI),
+     « Aujourd’hui » fait 60 px en 500 mais 69 px en 600. Sous 360 px l'onglet allumé garde donc le poids 500 (il se dit
+     déjà par sa couleur et le fond de son icône), le libellé garde sa taille (10,5 px) et se serre d'un rien, le bouton
+     perd ses 2 px de bord : il tient dans 64 px quelle que soit la police. */
+  @media (max-width: 359px) { .n-onglet { padding: 0; } .n-onglet[aria-current="page"] { font-weight: 500; } .n-onglet-libelle { letter-spacing: -.3px; } }
   .n-onglet-pastille { position: absolute; top: -4px; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px; font: 600 10px/16px var(--n-police); box-shadow: 0 0 0 2px var(--n-carte); }
 
   /* ── Avatar ─────────────────────────────────────────────────────────────── */

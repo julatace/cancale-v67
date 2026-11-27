@@ -28,12 +28,13 @@ const essaie = async (nom, fn) => { try { await fn(); } catch (e) { dit(false, n
 const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { return null; } };
 
 (async () => {
+  // (26 nov.) `--sans-public` : l'audit ne réécrit plus public/ (d'autres audits y lisent le zip servi en même temps).
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vrm-nav-'));
   const zipFx = path.join(tmp, 'fx.zip'), zipCh = path.join(tmp, 'ch.zip');
   const fx = path.join(tmp, 'fx'), ch = path.join(tmp, 'ch');
   let construit = false;
   await essaie('le constructeur fabrique les paquets Chromium et Firefox', () => {
-    execFileSync('node', [path.join(RACINE, 'scripts', 'zip-extension.cjs'), '--store', zipCh, '--firefox', zipFx], { stdio: 'pipe' });
+    execFileSync('node', [path.join(RACINE, 'scripts', 'zip-extension.cjs'), '--sans-public', '--store', zipCh, '--firefox', zipFx], { stdio: 'pipe' });
     fs.mkdirSync(fx); fs.mkdirSync(ch);
     execFileSync('unzip', ['-q', zipFx, '-d', fx]); execFileSync('unzip', ['-q', zipCh, '-d', ch]);
     construit = fs.existsSync(path.join(fx, 'manifest.json'));
@@ -445,7 +446,7 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
   // ── I. Le paquet Safari (dossier pour le convertisseur d'Apple) ─────────────
   await essaie('paquet Safari', async () => {
     const zipSa = path.join(tmp, 'sa.zip'), sa = path.join(tmp, 'sa');
-    execFileSync('node', [path.join(RACINE, 'scripts', 'zip-extension.cjs'), '--safari', zipSa], { stdio: 'pipe' });
+    execFileSync('node', [path.join(RACINE, 'scripts', 'zip-extension.cjs'), '--sans-public', '--safari', zipSa], { stdio: 'pipe' });
     fs.mkdirSync(sa); execFileSync('unzip', ['-q', zipSa, '-d', sa]);
     const d = path.join(sa, 'VRM-safari');
     const m = JSON.parse(lire(path.join(d, 'manifest.json')) || '{}');

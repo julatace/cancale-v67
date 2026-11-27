@@ -37,7 +37,7 @@
   :root:root:root:root:root:root:root body .sb-rangee-site[data-sb-avant]:not(:has(> .vrm-ms-geste)) .vrm-s2d-txt { padding-right: 48px !important; }
   :root:root:root:root:root:root:root body .sb-rangee-site[data-sb-avant] > .sb-avant-place { flex: 1 0 100% !important; width: 100% !important; display: block !important; }
 }
-@keyframes vr-monte { from { transform: translateY(8px) scale(.985); opacity: .6; } to { transform: none; opacity: 1; } }
+@keyframes vr-monte { from { transform: translateY(8px) scale(.985); } to { transform: none; } }   /* (26 nov.) sans opacité */
 @media (prefers-reduced-motion: reduce) { :root:root:root:root:root:root:root body .sb-rangee-site[data-sb-avant] { animation: none !important; } }
 
 /* Le corps de la carte : les quatre chiffres (le prix en grand) et ses gestes — les mesures de la paire d'Annonces. */

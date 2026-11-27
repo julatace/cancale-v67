@@ -29,6 +29,7 @@ require('./_source-app.cjs').brancher();
 const fs = require('fs'), path = require('path'), os = require('os'), vm = require('vm');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
+const TR = require('./_travail-recherche.cjs');
 const RACINE = path.join(__dirname, '..');
 const F = {
   regle: path.join(RACINE, 'src', 'enLigneDeuxFois.js'),
@@ -159,9 +160,11 @@ const charger = async (src, nom) => {
         const l1 = [], l2 = [];
         for (let i = 0; i < nb; i++) (i % 2 ? l1 : l2).push(ann(String(1e7 + i), ph(`05_${i}_d`, `${17e8 + i}`)));
         l1.push(ann('99999991', ph('05_z_d', '1'))); l2.push(ann('99999992', ph('05_z_d', '1')));
-        const t0 = process.hrtime.bigint();
+        // (26 nov.) Le temps CPU du fil (scripts/_travail-recherche.cjs), plus le temps mural : sous charge le rapport
+        // 8 000 / 2 000 montait à 10–15 (rouge 1 fois sur 5, seul) sans que la règle change — l'attente d'un cœur.
+        const t0 = TR.cpuMs();
         let r; for (let k = 0; k < 3; k++) r = lancer({ vinted: [compte('111', l1), compte('222', l2)], fiches: {} });
-        return { ms: Number(process.hrtime.bigint() - t0) / 3e6, n: r.vinted.length };
+        return { ms: (TR.cpuMs() - t0) / 3, n: r.vinted.length };
       };
       tps(500);
       const a = tps(2000), b = tps(8000);

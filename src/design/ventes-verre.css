@@ -391,6 +391,12 @@
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-ouvrir { flex: 1 1 100% !important; min-width: 0 !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-quoi { flex: 1 1 auto !important; min-width: 0 !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-rang > .vrm-rpf-retire { flex: 1 1 auto !important; }
+  /* (26 nov., zero-rouge-bancs) Sans la colonne étroite — Achats au tableau d'ordinateur (`.n-tt-ordi`) : « À retirer » prend
+     toute la largeur (1 180 px) — la ligne reste sur UN étage, « J'ai retiré » à DROITE de la ligne (banc colis-retirer-propre,
+     « ouvrir et retrait restent côte à côte » : il tombait dessous, sous une ligne de 1 150 px). */
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"]:has(.n-tt-ordi) .vrm-rpf-rang { flex-wrap: nowrap !important; }
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"]:has(.n-tt-ordi) .vrm-rpf-ouvrir { flex: 1 1 0 !important; }
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"]:has(.n-tt-ordi) .vrm-rpf-rang > .vrm-rpf-retire { flex: 0 0 auto !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-code-gros.sb-plaque--grande { display: flex !important; gap: 6px !important; letter-spacing: 0 !important; min-height: 62px !important; margin: 6px 0 4px !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-code-gros .va-c {
     width: 44px !important; height: 62px !important; border-radius: 12px !important; display: grid !important; place-items: center !important; background: #FFFFFF !important;

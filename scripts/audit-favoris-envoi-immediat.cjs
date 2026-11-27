@@ -39,11 +39,14 @@ const SRC0 = iSrc >= 0 ? path.resolve(args[iSrc + 1]) : path.join(RACINE, 'vinte
 const MUTATIONS = {
   ouverture: ["const ouv = opts.manuel ? null : (await lireLocal('vrmOuverture'))[u];", "const ouv = (await lireLocal('vrmOuverture'))[u];"],
   tick: ["const av = await attenteAvantFavori(st.uid, 3, { manuel: true });", 'const av = await attenteAvantFavori(st.uid, 3);'],
-  premier: ["premier ? 'premier' : 'serie');   // 5.419", "'serie');   // 5.419"],
-  premier2: ["attendreEcriture(uid,acc,texteFinal,premier?'premier':'serie')", "attendreEcriture(uid,acc,texteFinal,'serie')"],
+  // (26 nov.) recalées sur le code de la 5.453 (`{ frappe: true }`, `{frappe:true}`) : introuvables, elles ne mutaient plus rien.
+  premier: ["premier ? 'premier' : 'serie', { frappe: true });   // 5.419", "'serie', { frappe: true });   // 5.419"],
+  premier2: ["attendreEcriture(uid,acc,texteFinal,premier?'premier':'serie',{frappe:true})", "attendreEcriture(uid,acc,texteFinal,'serie',{frappe:true})"],
   plage: ["if (msg.rythme !== 'prudent' && cad.pauseMax > cad.pauseMin) plage =", "if (msg.rythme !== 'prudent' && cad.poses.includes('pauseMin')) plage ="],
   defaut: ['const RA_CADENCE_DEFAUT = { favorisHeure: 15, actionsHeure: 50, parJour: null, pauseMin: 20, pauseMax: 60 };', 'const RA_CADENCE_DEFAUT = { favorisHeure: 15, actionsHeure: 50, parJour: null, pauseMin: 40, pauseMax: 90 };'],
   app: ["Object.assign({}, msg, { __manuel: false, __premier: false, __texte: null })", 'msg'],
+  // (26 nov.) une pause en plus de 0,6 s au pire (cloche 6,4 → 7 s : borne 15,15 s) : rouge À CHAQUE fois par le tirage au pire.
+  borne: ['cloche: [3800, 6400]', 'cloche: [3800, 7000]'],
   apresMin: ["filtrerApercuFavoris(r.json.apercu, Object.assign({}, RB.favoris, { apresMin: 0 }),", 'filtrerApercuFavoris(r.json.apercu, RB.favoris,'],
 };
 if (args.includes('--prouve')) {
@@ -129,9 +132,13 @@ async function monde(o = {}) {
 const lireSt = (f) => f.store.vrmFavorisCarte || {};
 const repliques = (f) => f.j.vinted.filter((v) => v.methode === 'POST' && /\/replies$/.test(v.chemin));
 // Les attentes VOULUES avant le 1er message (le banc raccourcit les minuteries : on somme ce que le fond a demandé).
+// (26 nov.) `lecture:<mode>` n'est PAS une attente en plus : depuis la 5.453 (`partageEcriture`) c'est la PART de
+// lecture DU temps d'écriture déjà noté `ecriture:<mode>` (lecture + frappe = ce temps). La compter une 2e fois
+// faisait dépasser 15 s au hasard (≈ 1 fois sur 6, seul ou en parallèle : cloche 6,1 + fil 1,3 + réponse 0,5 +
+// écriture 5,8 = 13,7 s, plus la lecture 2,8 s déjà dedans = 16,5 s).
 function attentesAvant(f) {
   const p = f.ctx.__vrmPausesVues || [];
-  return p.reduce((s, x) => s + (Number(x[1]) || 0), 0);
+  return p.filter((x) => !/^lecture:/.test(String(x[0]))).reduce((s, x) => s + (Number(x[1]) || 0), 0);
 }
 
 (async () => {
@@ -158,6 +165,17 @@ function attentesAvant(f) {
     console.log('\nI2. Le 1er message : le temps d’écriture de SON clic');
     dit(ec.length >= 1 && ec[0][0] === 'ecriture:premier' && ec[0][1] >= 2000 && ec[0][1] <= 6000, '1er message : « ecriture:premier », 2 à 6 s', JSON.stringify(ec));
     dit(lireSt(f).premierFait === true, 'l’état de la file retient que le 1er est parti', JSON.stringify(lireSt(f).premierFait));
+  }
+  // I1 au PIRE et au MIEUX du hasard (26 nov.) : la garantie « < 15 s » porte sur la BORNE, pas sur un tirage.
+  // Chaque `Math.random` du fond rend 0,999999 (puis 0) : toutes les pauses tirées à leur maximum (minimum).
+  for (const [nom, h] of [['pire', 0.999999], ['mieux', 0]]) {
+    const { f, sv } = await monde({ store: { vrmOuverture: { [UID]: { depuis: t, attente: 4 * MIN, vu: t } } } });
+    require('vm').runInContext(`Math.random = () => ${h};`, f.ctx);
+    await f.ctx.tickFavorisCarte();
+    const st = lireSt(f), total = attentesAvant(f);
+    const attenteGarde = st.prochain && sv.reservations === 0 ? st.prochain - Date.now() : 0;
+    console.log(`     hasard au ${nom} : ${s1(attenteGarde + total)} · ${JSON.stringify((f.ctx.__vrmPausesVues || []).map((x) => [x[0], Math.round(x[1])]))}`);
+    dit(repliques(f).length >= 1 && attenteGarde + total < 15000, `hasard au ${nom} : le 1er message part, moins de 15 s après « Confirmer l’envoi »`, s1(attenteGarde + total));
   }
   console.log('\nI2b. Même chose hors séquence « comme Bleam » (offre d’abord, puis le message)');
   {
