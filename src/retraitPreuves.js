@@ -86,28 +86,92 @@ export function explicationEnDouble(n) {
     + 'Pour les relier : relis sur Vinted le compte de l’achat, ou relie l’adresse qui reçoit ces e-mails (E-mails → Relier ma boîte).';
 }
 
-// ── (26 nov.) UN COLIS « À VÉRIFIER » AU CODE D'UN COLIS DÉJÀ COMPTÉ : LE MÊME COLIS ─────────
-// Julien (capture) : au même point, « 978 216 · Au point 20 nov. » compté, puis sous « Pas compté
-// dans à retirer » la MÊME paire, au MÊME code, avec son QR et « date limite dépassée ». Les deux
-// e-mails (Vinted et le transporteur) ont été jugés séparément : l'un est passé « à vérifier » par la
-// garde de SA date, l'autre est resté compté, et `fusionnerParCode` ne regarde que les comptés.
-// Un code de retrait n'existe que pour UN colis (§5) : la ligne « à vérifier » complète la ligne comptée
-// (QR, second code, lieu, limite — `fusion`) et disparaît. Deux n° de suivi différents : rien n'est
-// fusionné (on ne choisit pas). Un INCIDENT du transporteur (`etat: 'transporteur'`) reste à part : c'est
-// un fait sur le colis, pas une date. Rend `{ liste, aVerifier }` (les mêmes tableaux si rien ne bouge).
-export function absorberAVerifierParCode(liste, aVerifier, { codeDe, suiviDe, fusion = (m, s) => ({ ...s, ...m }) } = {}) {
-  const parCode = new Map();
-  (liste || []).forEach((t, i) => { const c = t ? codeDe(t) : ''; if (c && !parCode.has(c)) parCode.set(c, i); });
-  if (!parCode.size) return { liste, aVerifier };
-  const L = [...(liste || [])]; const garde = []; let bouge = false;
-  for (const x of aVerifier || []) {
-    const t = x && x.kind === 'email' ? x.t : null;
-    const c = t ? codeDe(t) : '';
-    const i = c ? parCode.get(c) : undefined;
-    if (i === undefined || (x.e && x.e.etat === 'transporteur')) { garde.push(x); continue; }
-    const sm = suiviDe(L[i]), sv = suiviDe(t);
-    if (sm && sv && sm !== sv) { garde.push(x); continue; }
-    L[i] = fusion(L[i], t); bouge = true;
+// ── (27 nov.) DEUX MOITIÉS DU MÊME COLIS, UNE COMPTÉE ET UNE « À VÉRIFIER » : UN COLIS, PAR IDENTITÉ ─────────
+// Julien (capture iPhone, Achats, point « Joubert Peintures ») : la MÊME paire au MÊME code 978 216, deux fois —
+// « Au point · 20 nov. » comptée, puis sous « Pas compté dans à retirer » « Au point · 19 nov. », son QR et « Date limite
+// dépassée ». Mesuré (passation du 23 nov.) : le colis Vinted Go est `email_track_vinted_{n°}`, code 978 216, au point
+// le 19, limite LUE le 25 ; le rappel du 22 est tombé sur la MÊME ligne (son n°). La 2e ligne est l'e-mail de Vinted
+// « ton achat t'attend » (`source: 'vinted-commande'`, relié à SA commande par la conversation, SANS code écrit, sans
+// limite). Jusqu'au 25, `regrouperArrivees` les fusionnait (même commande). Le 25 passé, l'e-mail Vinted Go est sorti
+// « à vérifier » AVANT ce regroupement ; la moitié Vinted est restée seule, comptée (aucune limite lue ⇒ rien de
+// dépassé). La règle du 26 nov. (`absorberAVerifierParCode`) ne regardait que le code ÉCRIT sur chaque ligne
+// (`t.code`) : la moitié Vinted n'en a pas — son code est celui de la conversation de SA commande.
+// LA RÈGLE (§5, une seule) : deux lignes qui partagent UNE identité — le code de retrait (le sien OU celui lu dans la
+// conversation de sa commande), le n° de suivi, la transaction — sont UN colis, sauf preuve du contraire : deux n° de
+// suivi différents sans la même transaction (on ne choisit pas), ou deux transactions différentes. Jamais le titre, le
+// lieu ni la date. Le colis réuni porte les identités des deux ; la ligne qui fait foi est celle du TRANSPORTEUR (sa date
+// d'arrivée lue, `fiable`), la moitié Vinted ne fait que compléter (une date Vinted n'est qu'une estimation) ; la limite
+// est celle qui a été LUE ; puis il est JUGÉ À NOUVEAU (`juger`) : limite lue et passée ⇒ « à vérifier », sinon compté.
+// Un INCIDENT du transporteur reste à part ; un « peut-être en double » qui partage une identité est CE colis, sans elle il reste seul.
+const ensemble = (v) => new Set((Array.isArray(v) ? v : [v]).map((x) => String(x == null ? '' : x).trim()).filter(Boolean));
+const croise = (a, b) => { for (const x of a) if (b.has(x)) return true; return false; };
+const unir = (a, b) => ({ codes: new Set([...a.codes, ...b.codes]), suivis: new Set([...a.suivis, ...b.suivis]), txs: new Set([...a.txs, ...b.txs]) });
+
+// Les identités d'une ligne : { codes, suivis, txs } (des ensembles de chaînes déjà normalisées par l'appelant).
+export function identitesColis(t, { codesDe = () => [], suiviDe = () => '', txDe = () => '' } = {}) {
+  return { codes: ensemble(codesDe(t)), suivis: ensemble(suiviDe(t)), txs: ensemble(txDe(t)) };
+}
+
+// Le même colis ? Une identité partagée ET aucune preuve contraire.
+export function memeColisParIdentite(a, b) {
+  if (!a || !b) return false;
+  const tx = croise(a.txs, b.txs), su = croise(a.suivis, b.suivis), co = croise(a.codes, b.codes);
+  if (!(tx || su || co)) return false;
+  if (a.txs.size && b.txs.size && !tx) return false;                       // deux commandes : deux colis
+  if (a.suivis.size && b.suivis.size && !su && !tx) return false;          // deux n° de suivi : on ne choisit pas
+  return true;
+}
+
+// Les groupes de lignes qui sont le MÊME colis (indices dans `items`) : chaque ligne rejoint le premier groupe dont
+// l'identité réunie la reconnaît sans contradiction, sinon ouvre le sien.
+export function grouperParIdentite(items, opts = {}) {
+  const groupes = [];
+  (items || []).forEach((t, i) => {
+    const id = identitesColis(t, opts);
+    const g = (id.codes.size || id.suivis.size || id.txs.size) ? groupes.find((x) => memeColisParIdentite(x.id, id)) : null;
+    if (g) { g.ids.push(i); g.id = unir(g.id, id); } else groupes.push({ ids: [i], id });
+  });
+  return groupes.map((g) => g.ids);
+}
+
+// `liste` : les colis comptés « à retirer » ; `aVerifier` : `{ kind, t, e, o }`. Rend `{ liste, aVerifier, fusions }`
+// (les MÊMES tableaux si rien ne bouge). `fusions` : `[{ t, de: [lignes réunies], o }]` (l'appelant y reporte la commande).
+// Options : `codesDe`, `suiviDe`, `txDe` (identités) · `score` (ligne la plus complète) · `fiable` (ligne du transporteur /
+// de l'e-mail du transporteur : sa date fait foi) · `fusion(m, s)` · `juger(t)` → l'état « à vérifier » ou null · `cle(t)`.
+export function reunirParIdentite(liste, aVerifier, { codesDe = () => [], suiviDe = () => '', txDe = () => '', score = () => 0, fiable = () => true, fusion = (m, s) => ({ ...s, ...m }), juger = () => null, cle = () => '' } = {}) {
+  const items = [];
+  (liste || []).forEach((t, i) => { if (t) items.push({ t, compte: true, i }); });
+  (aVerifier || []).forEach((x, i) => {
+    if (!x || x.kind !== 'email' || !x.t) return;
+    const et = x.e && x.e.etat;
+    // Un incident du transporteur est un fait à part. Un « peut-être en double » (`doute_meme_relais`) n'entre que s'il PARTAGE
+    // une identité (mesuré au banc du 27 nov. : la moitié Vinted sans code ÉCRIT, dont SA commande porte le code 978216, était
+    // jugée « sans identité » par le seul code de sa ligne) ; sans identité commune, `grouperParIdentite` le laisse seul.
+    if (et === 'transporteur') return;
+    items.push({ t: x.t, compte: false, i, x });
+  });
+  const groupes = grouperParIdentite(items.map((it) => it.t), { codesDe, suiviDe, txDe })
+    .map((ids) => ids.map((k) => items[k]))
+    .filter((g) => g.length > 1 && g.some((it) => !it.compte));         // deux comptés : les règles d'avant (n°, code, commande)
+  if (!groupes.length) return { liste, aVerifier, fusions: [] };
+  const L = [...(liste || [])], V = [...(aVerifier || [])];
+  const retirerL = new Set(), retirerV = new Set(), fusions = [];
+  for (const g of groupes) {
+    // La ligne qui fait foi : celle du transporteur d'abord (sa date est lue), puis la plus complète.
+    const ordre = [...g].sort((a, b) => (fiable(b.t) ? 1 : 0) - (fiable(a.t) ? 1 : 0) || score(b.t) - score(a.t));
+    let f = ordre[0].t; for (const s of ordre.slice(1)) f = fusion(f, s.t);
+    const suivi = ordre.map((it) => suiviDe(it.t)).find(Boolean);
+    const cles = [...new Set(g.flatMap((it) => (Array.isArray(it.t.clesMoities) && it.t.clesMoities.length ? it.t.clesMoities : [cle(it.t)])).filter(Boolean))];
+    f = { ...f, ...(suivi && !f.suivi ? { suivi } : {}), ...(cles.length ? { clesMoities: cles } : {}) };
+    const o = (g.find((it) => !it.compte && it.x.o) || {}).x?.o || null;
+    fusions.push({ t: f, de: g.map((it) => it.t), o });
+    const e = juger(f);
+    const premierL = g.filter((it) => it.compte).map((it) => it.i).sort((a, b) => a - b)[0];
+    const premierV = g.filter((it) => !it.compte).map((it) => it.i).sort((a, b) => a - b)[0];
+    for (const it of g) (it.compte ? retirerL : retirerV).add(it.i);
+    if (e) { V[premierV] = { kind: 'email', t: f, e, o }; retirerV.delete(premierV); }
+    else if (premierL !== undefined) { L[premierL] = f; retirerL.delete(premierL); }
+    else { L.push(f); }
   }
-  return bouge ? { liste: L, aVerifier: garde } : { liste, aVerifier };
+  return { liste: L.filter((_, i) => !retirerL.has(i)), aVerifier: V.filter((_, i) => !retirerV.has(i)), fusions };
 }
