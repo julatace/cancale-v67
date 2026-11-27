@@ -464,7 +464,9 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         // montré (ou son absence) est le même après réouverture.
         await allerPaire(pg, 'annonces');
         const champ = pg.locator(CHAMP_ANNONCES).first();
-        const champLa = (await champ.count()) > 0;
+        // (27 nov., CI chargée) l'écran Annonces se charge à la demande : on attend que SON champ soit monté (15 s au plus)
+        // au lieu de compter tout de suite — un comptage immédiat rendait « absent » un champ encore en chargement.
+        const champLa = await champ.waitFor({ state: 'visible', timeout: 15000 }).then(() => true, () => false);
         dit(champLa, `R3 ${qui} : le champ de recherche d'Annonces est là (sinon la reprise de la recherche n'est pas jugée)`);
         if (champLa) { await champ.fill('taille'); await pg.waitForTimeout(600); await pg.evaluate(() => document.activeElement && document.activeElement.blur()); }
         await pg.waitForTimeout(400);
@@ -474,6 +476,8 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         await pg.close();
         ({ pg } = await ouvrirPage(ctx));
         await pg.waitForTimeout(800);
+        // même raison : on laisse au champ (rechargé à la demande) le temps de se monter avant de lire l'écran repris.
+        await pg.locator(CHAMP_ANNONCES).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
         const r3 = await ecran(pg);
         await capture(pg, `reprise-annonces-${sombre ? 'sombre' : 'clair'}`);
         dit(r3avant.ecran === 'annonces' && r3.ecran === 'annonces' && r3.site === r3avant.site && r3.recherche === 'taille', `R3 ${qui} : rouverte, même écran, même filtre, même recherche`, JSON.stringify(r3));
