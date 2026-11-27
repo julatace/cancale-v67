@@ -3089,3 +3089,42 @@ Demande : une ligne par litige / retour / réclamation en cours, avec la DATE LI
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (17 nov., lot design-v2-argent, pour rester sous 59 000 octets)
 
 - **16 nov. · Scanner un colis d'achat (lot scan-achat)** : le n° de suivi scanné (caméra, douchette, saisie) ⇒ « Dans ce colis » : photo, titre, taille · état, lot en liste (lus dans SA transaction), payé, date, vendeur ; « Ranger » (atelier d'arrivée), « Signaler un problème » (sa conversation Vinted), « Ce n'est pas ça » ; inconnu ⇒ « Colis inconnu · Relier à un achat » (SON toucher, n° gardé comme identité). Mesuré : 43 achats sur 135 (30 j) ont un n°. `2026-11-16-scan-achat.md`. Geste : aucun.
+
+
+### « 978 216 » deux fois au même point, et le même point en deux cartes (27 nov., branche `claude/retrait-double-code`)
+Captures iPhone de Julien (27 nov. 09:02 et 10:20, Achats → À retirer, production) : au point « Joubert Peintures »
+(Vinted Go, 10 Rue du Bois Aurant, 35400 Saint-Malo) la paire « Payé 13,36 € » au code 978 216 DEUX fois — « Au point
+· 20 nov. » comptée, puis sous « Pas compté dans à retirer » la même, son QR, « Date limite dépassée · à vérifier », « Au
+point · 19 nov. » ; et plus bas une 2ᵉ carte « 10 Rue du Bois Aurant · Vinted Go · Saint-Malo » pour la MÊME adresse.
+(La capture de 10:20 est la production : la correction de la branche n'y était pas encore.)
+- **Cause (1), le colis** — forme mesurée le 23 nov. (passation `2026-11-23-retours-suivi.md`) : l'e-mail Vinted Go
+  `email_track_vinted_{n°}` (code écrit « 978 216 », QR, arrivé le 19, limite LUE le 25 ; le rappel du 22 est tombé sur la
+  MÊME ligne) + l'e-mail Vinted « Commande mise à jour » de SA conversation (`source: 'vinted-commande'`, `code` VIDE, sans
+  limite, le 20). Jusqu'au 25, `regrouperArrivees` les réunissait (même commande). Le 25 passé, l'e-mail Vinted Go sort
+  « à vérifier » (`delai_depasse`) AVANT ce regroupement, la moitié Vinted reste seule : comptée, ou (banc) « peut-être en
+  double » parce que `sansIdentite` ne regarde que le code ÉCRIT sur sa ligne. La règle du 26 nov.
+  (`absorberAVerifierParCode`) ne joignait que `t.code` des deux côtés : `''` ≠ `978216`. Les champs qui différaient :
+  `t.code` (« 978 216 » sur l'e-mail, vide sur la moitié Vinted ; le code de la moitié est `panel_colis_relais[tx].code`),
+  `suivi` (n° / vide), `arriveLe` (19 / 20), `limite` (25 / null), `source`.
+- **Règle** `src/retraitPreuves.js` `reunirParIdentite` (remplace `absorberAVerifierParCode`) : une ligne comptée ou « à
+  vérifier » (y compris un « peut-être en double ») et une autre qui partagent UNE identité — le code (écrit, OU lu dans la
+  conversation de SA commande), le n° de suivi, la transaction — sont un colis ; refus : deux n° sans la même transaction,
+  deux transactions. La ligne du transporteur fait foi (date lue), la limite lue est gardée, le colis réuni est REJUGÉ
+  (`leverGarde(etatColisEmail)`) : limite lue et passée ⇒ « à vérifier » avec le badge, sinon compté une fois. Il porte
+  `clesMoities` (aussi posé par `fusionLignesMemeSuivi`) : « Retiré » coche toutes ses moitiés (`clesDuColis`), une seule
+  ligne grise (`attenteMail` groupé par identité), et sa commande Vinted encore « au point relais » ne revient pas seule
+  (`txCoches`). Un incident du transporteur reste à part.
+- **Cause (2), le point** : le lieu du SUIVI Vinted Go (« <n° et rue>, <ville> », sans le commerce) arrive coupé en nom =
+  la rue, adresse = la ville ⇒ un point « seul » par colis. `src/relaisColis.js` `regrouperRelais` : cette forme devient
+  rue + ville ; rue + ville sans code postal est une adresse (plus « pas encore connu ») ; deux points se rejoignent à
+  ADRESSE identique (rue numérotée `normRue` + même code postal si les deux l'ont, sinon même ville) quand au plus l'un a
+  un vrai nom ; deux vrais noms, une consigne et un comptoir, un autre numéro, une autre ville : deux points.
+- **(3) Rappels** : vérifié, ce n'était pas la cause. La route range un rappel sur la ligne de SON n° (`rowId`), un rappel
+  sans n° avec code est « info » `sansSuivi` (⇒ « à vérifier » sauf code connu), un rappel seul ne porte ni code ni QR
+  (⇒ jamais compté, `emailSansCode`). `audit-rappels-colis.cjs` l'EXÉCUTE pour les 4 formes connues (+ rappel seul, rappel
+  puis arrivée lue après) : 48 verts.
+- **Preuves** : `audit-retrait-preuves.cjs` A8–A21 (dont 50 paires identiques jamais réunies) et C2–C11, 54 verts,
+  `--prouve` 24/24 ; rouge sur origin/main (8). Banc NOUVEAU `scripts/bancs/retrait-double-code.cjs` (vrai `dist/`,
+  `design-passe`, forme mesurée, 390/1512 clair/sombre) : 38 verts ; sur le build d'origin/main 21 rouges. Captures
+  regardées. Tous les `audit-retrait*`, `audit-retraits-*`, `audit-identite`, `audit-codes-retrait`, audits des points :
+  verts.
