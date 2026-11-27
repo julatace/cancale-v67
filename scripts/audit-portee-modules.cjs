@@ -19,7 +19,7 @@ const traverse = require(path.join(R, 'node_modules', '@babel', 'traverse')).def
 // Les globaux d'un navigateur, d'un service worker MV3 et de Node que le code lit (tout le reste doit être déclaré).
 const GLOBAUX = new Set(Object.getOwnPropertyNames(globalThis).concat(`chrome browser self window document navigator location fetch
   Request Response Headers importScripts clients registration caches crypto atob btoa console localStorage sessionStorage indexedDB
-  Blob File FileReader FormData AbortController DOMParser MutationObserver IntersectionObserver ResizeObserver PerformanceObserver
+  Blob File FileReader FormData AbortController DOMParser MutationObserver IntersectionObserver ResizeObserver PerformanceObserver FontFace
   CustomEvent Event KeyboardEvent MouseEvent PointerEvent TouchEvent DragEvent InputEvent FocusEvent WheelEvent ErrorEvent
   PromiseRejectionEvent StorageEvent BeforeUnloadEvent HashChangeEvent PopStateEvent DataTransfer ClipboardItem ClipboardEvent Image Option Audio
   HTMLElement HTMLInputElement HTMLTextAreaElement HTMLSelectElement HTMLCanvasElement HTMLImageElement HTMLVideoElement

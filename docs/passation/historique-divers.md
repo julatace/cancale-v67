@@ -2339,6 +2339,41 @@ Julien, après avoir lu le risque (requêtes sans le « bruit » de la page vs c
 - **L'audit** : S1 accepte une forme Sneakers seulement si sa sœur (`cle.art`, `cle_art`, `champArt`, `.sneakers`→`.autre`) existe et ne dit pas « paire », ou une nouveauté `pour: 'sneakers'` ; ne compte plus les clés de traduction (`a.b.c`), les commentaires CSS, les noms de code collés (`data-atelier-paire`, `nav.paires`), les attributs `data-*`, le bloc `<gardes-app>` (recopié de src/, jugé là-bas), la garde `.nom === 'paire' ?`. Trois PERMIS nouveaux, chacun avec sa raison (mots-clés d'un message d'ACHETEUR ×2, mots vides de la recherche, justification jamais affichée de tempsGagne). Nouveaux : E4 (t() exécuté dans les 5 langues : forme article sans « pair »), E5 (Sneakers mot pour mot), E6 (Quoi de neuf), B11, B12 ; 11 mutations de plus ; `VOCAB_MUT=<regex>` pour n'en rejouer que quelques-unes. Rouge sur l'arbre d'avant (E4, E6, S1, B11, B12).
 - Reste connu : le bloc `<gardes-app>` de background.js embarque sa propre copie de `profilVendeur.js` dont la source n'est jamais posée (elle dit donc toujours « paire » dans l'extension) — à brancher sur `motsExt()` si un texte de ce bloc s'affiche.
 
+## 27 nov. — extension 5.455.2 : la police du panneau, le mot du bloc `<gardes-app>`
+
+« Extension servie », déplacé tel quel de CLAUDE.md §9 (27 nov.) : **Extension servie : 5.455.1** (26 nov. ; avant 5.455.0, 5.454.1, 5.453.2 ; 5.440.3, 24 nov., « Observer Vinted » ; avant 5.440.2, favoris : liste lue jusqu'au bout ; avant 5.440.1, lien d'application ; 5.440.0, favoris sans geste ; versions servies avant : `historique-divers.md`, « Extension servie », fin).
+
+- **La police du panneau.** La pile du panneau (vrm-badge.js, vrm-ui.js) commence par « Inter VRM », Inter, -apple-system…
+  mais l'extension ne chargeait jamais « Inter VRM ». Sur une machine sans Inter, SF ni Segoe UI (la CI), Chromium prenait
+  DejaVu Sans, bien plus large : à 390 px, les rangées des favoris « offre … (remontée au prix mini) » montaient à 149 px
+  (seuil 140). Le banc `panneau-favoris-tableau` contournait en chargeant Inter lui-même.
+  **Correctif** : l'Inter de l'app (`src/design/polices/inter-latin-wght-normal.woff2`, licence OFL) est recopiée dans
+  l'extension (`inter-vrm.woff2`, avec `LICENCE-Inter-OFL.txt`), déclarée web-accessible (sites de l'extension), et
+  `vrm-ui.js` `police()` la donne au document par `FontFace` sur ses OCTETS (fetch de `chrome.runtime.getURL`, aucune URL
+  chargée par la page, sa CSP n'entre pas en jeu), sous le seul nom « Inter VRM » (qu'aucune règle du site n'emploie) —
+  une @font-face dans une shadow root n'est pas lue par Chrome. Demandée par `monter()` (les pièces de l'extension
+  seulement), une fois par page. Le contournement du banc est retiré ; le banc sert le fichier de l'extension jugée et
+  exige « la police vient de l'extension ».
+  **Preuve** (`FONTCONFIG_FILE` qui refuse Inter) : sans le correctif, rangées 149 px, 2 rouges ; avec, 164 verts ;
+  mutation (`police()` retiré de `monter`) : 3 rouges (police absente, 149 px).
+- **« paire » dans `<gardes-app>`.** Le bloc recopié de src/ par `scripts/recopier-gardes-extension.cjs` empaquette SA copie de
+  `src/profilVendeur.js` ; rien n'y posait la source du mot (`poserSourceVend`), donc `vendCourant()` ⇒ « sneakers » : par ex.
+  le geste « Une seule annonce par paire : vérifie l’autre » (`problemesAnnonce`) à tout vendeur. **Correctif** dans le
+  générateur (jamais à la main) : il exporte `poserSourceVend` et ajoute au bloc
+  `GARDES_APP.poserSourceVend(() => (motsExt() === MOTS_ARTICLE.autre ? 'autre' : 'sneakers'))` — le vocabulaire de
+  l'extension (`vrm_vend_ext`), lu à chaque texte. **Preuve** : `audit-vocabulaire-article` X8 (vendeur « autre » ⇒
+  « article »), X9 (rien de su ⇒ « paire »), X10 (un changement de « Je vends » est suivi), EXÉCUTÉS sur le vrai
+  background.js ; le background.js d'origin/main rend « … par paire … » ; deux mutations (source retirée, source figée
+  sur Sneakers) rouges.
+- **Le panneau après la connexion ne coupe plus une page qui charge** (banc e2e, commit 27ebb4d32 de
+  `claude/zero-rouge-bancs-2`). Depuis la 5.453, une liaison demandée ouvre le panneau 300 ms après la session
+  (`ouvrirPanneauAccueil`) ; sans onglet de départ, il prenait N'IMPORTE QUEL onglet vinted.fr ouvert (l'actif d'abord) et
+  le menait par `chrome.tabs.update` sur `/?vrm=panneau` : une page qu'il chargeait était coupée (net::ERR_ABORTED).
+  **Correctif** : `ongletEnCharge` (`status` ≠ `complete` ou `pendingUrl`) n'est jamais touché ; l'onglet de DÉPART d'abord
+  (s'il ne charge pas), sinon un onglet vinted.fr au repos (`ongletAuRepos` : chargé, pas actif), sinon un onglet NEUF
+  (sur le site de l'onglet de départ s'il est connu). **Preuve** : `audit-connexion-simple` S8 (5 contrôles, vrai
+  background.js par `_fond-vm.cjs`) : 5 rouges sur la 5.455.1, verts après ; mutation (`ongletAuRepos` sans les gardes) :
+  5 rouges ; S7 (5.453) inchangé et vert. Banc `e2e-extension` (attend `panneau_apres_connexion_*`, repris de 27ebb4d32).
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (27 nov., pour rester sous 60 Ko)
 
 - **26 nov. · Vestiaire/LBC fiables** : vente VC annulée ≠ « Vendue », lecture VC > 24 h = « à confirmer », Annonces lit `vc_ventes`, « LBC n » pas su sans ventes. `2026-11-26-fiabilite-vc-lbc.md`. Geste : aucun.
@@ -2346,3 +2381,4 @@ Julien, après avoir lu le risque (requêtes sans le « bruit » de la page vs c
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (27 nov., retour-fonctions, < 60 000)
 
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
+- **26 nov. · « article » hors Sneakers partout (ext. 5.455.1)** : `historique-divers.md`, fin.

@@ -15,6 +15,9 @@
 //   S5  la fenêtre lit un identifiant d'onglet à 10 chiffres (`depuis=`) : le retour
 //       à l'onglet de départ ne se perd pas (mesuré : 1 fois sur 3 au banc).
 //   S6  l'app : « Brancher à mon compte » est un geste (`geste: true` ⇒ `force`).
+//   S7  (5.453) une liaison DEMANDÉE ouvre le panneau sur son accueil.
+//   S8  (5.455.2) jamais dans un onglet qui charge (`loading`, `pendingUrl`) ni celui qu'il regarde : départ, sinon
+//       un onglet vinted.fr au repos, sinon un onglet NEUF.
 //  `--src chemin` : une autre copie de background.js (preuve sur le code d'avant).
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), path = require('path'), vm = require('vm');
@@ -101,6 +104,28 @@ const vivante = () => ({ access_token: 'x.' + Buffer.from(JSON.stringify({ sub: 
     const r2 = d2 && d2.nonce ? await h.ctx.recevoirSessionAdressee({ nonce: d2.nonce, session: vivante() }) : null;
     await new Promise((ok2) => setTimeout(ok2, 700));
     dit(r2 && r2.ok && !panneau(h).length, 'S7 une liaison que l’app fait sans sa demande : aucun panneau ouvert', JSON.stringify({ r2, p: panneau(h) }));
+
+    // S8 — 5.455.2 (banc e2e, 27 nov. : « page.goto: net::ERR_ABORTED ») : le panneau ne prend JAMAIS un onglet qu'il est en
+    //    train de charger (`status: 'loading'`, `pendingUrl`) ni celui qu'il regarde ; l'onglet de départ d'abord, sinon un
+    //    onglet vinted.fr au repos (chargé), sinon un onglet NEUF. La liaison DEMANDÉE ouvre toujours le panneau (5.453).
+    const lier = async (onglets, retourTab) => {
+      const f = faireFond({ src: SRC, store: { __sansSession: true }, onglets });
+      await f.envoyer({ from: 'cancale-popup', action: 'lierAvecVRM', urlActive: '', retourTab });
+      const dd = await f.ctx.demanderLiaison({ pour: UID });
+      const rr = dd && dd.nonce ? await f.ctx.recevoirSessionAdressee({ nonce: dd.nonce, session: vivante() }) : null;
+      await new Promise((ok2) => setTimeout(ok2, 700));
+      return { ok: !!(rr && rr.ok), nav: (f.j.navigations || []).map((n) => n.id), crees: (f.j.ongletsCrees || []).map((n) => n.url), p: panneau(f) };
+    };
+    const charge = await lier([{ id: 7, url: 'https://www.vinted.fr/catalog', pendingUrl: 'https://www.vinted.fr/member/111', status: 'loading', active: false, windowId: 1 }], null);
+    dit(charge.ok && !charge.nav.includes(7) && charge.crees.length === 1 && charge.crees[0] === 'https://www.vinted.fr/?vrm=panneau', 'S8 un onglet vinted.fr EN TRAIN DE CHARGER n’est pas touché : le panneau s’ouvre dans un onglet NEUF', JSON.stringify(charge));
+    const pend = await lier([{ id: 7, url: 'https://www.vinted.fr/catalog', pendingUrl: 'https://www.vinted.fr/member/111', status: 'complete', active: false, windowId: 1 }], null);
+    dit(pend.ok && !pend.nav.includes(7) && pend.crees.length === 1, 'S8 une navigation en cours (`pendingUrl`) n’est pas coupée : onglet NEUF', JSON.stringify(pend));
+    const actif = await lier([{ id: 7, url: 'https://www.vinted.fr/catalog', status: 'complete', active: true, windowId: 1 }], null);
+    dit(actif.ok && !actif.nav.includes(7) && actif.crees.length === 1, 'S8 l’onglet vinted.fr qu’il regarde (actif) n’est pas détourné : onglet NEUF', JSON.stringify(actif));
+    const repos = await lier([{ id: 9, url: 'https://www.vinted.fr/catalog', status: 'loading', active: false, windowId: 1 }, { id: 7, url: 'https://www.vinted.fr/catalog', status: 'complete', active: false, windowId: 1 }], null);
+    dit(repos.ok && repos.nav.length === 1 && repos.nav[0] === 7 && !repos.crees.length, 'S8 un onglet vinted.fr AU REPOS (chargé) est repris, celui qui charge laissé', JSON.stringify(repos));
+    const depart = await lier([{ id: 7, url: 'https://www.vinted.fr/items/1-paire', status: 'loading', windowId: 1 }], 7);
+    dit(depart.ok && !depart.nav.includes(7) && depart.crees.length === 1, 'S8 même l’onglet de départ, s’il charge, n’est pas coupé : onglet NEUF', JSON.stringify(depart));
   }
 
   console.log(`\n${ko ? '❌' : '✅'} connexion simple : ${ok} vert(s), ${ko} rouge(s)`);
