@@ -31,7 +31,11 @@ const iSa = args.indexOf('--safari');
 const safari = iSa >= 0 ? path.resolve(args[iSa + 1] || '') : '';
 const iOrion=args.indexOf('--orion');
 const orionPublic=path.join(racine,'public','VRM-Orion.xpi');
-const orion=iOrion>=0?path.resolve(args[iOrion+1]||''):orionPublic;
+// (26 nov.) `--sans-public` : rien n'est écrit dans public/ (ni VRM-extension.zip, ni les paquets Orion sauf `--orion`
+// donné). Pour les audits : audit-extension-navigateurs régénérait public/ (rm puis zip) pendant que d'autres audits,
+// lancés à côté (lancer-audits, 4 à la fois), y LISAIENT le zip servi — absent ou à moitié écrit le temps de la fenêtre.
+const sansPublic = args.includes('--sans-public');
+const orion=iOrion>=0?path.resolve(args[iOrion+1]||''):(sansPublic?'':orionPublic);
 const COMPAT = 'compat-firefox.js';
 
 // ── LE MANIFESTE FIREFOX (Firefox 128+, ordinateur et Android) ─────────────
@@ -173,10 +177,12 @@ try {
   const dossier = path.join(tmp, 'VRM-extension');
   fs.cpSync(src, dossier, { recursive: true });
   preparerArchive(dossier);
-  const sortie = path.join(racine, 'public', 'VRM-extension.zip');
-  fs.rmSync(sortie, { force: true });
-  execFileSync('zip', ['-qrX', sortie, 'VRM-extension'], { cwd: tmp });
-  console.log('✓', path.relative(racine, sortie));
+  if (!sansPublic) {
+    const sortie = path.join(racine, 'public', 'VRM-extension.zip');
+    fs.rmSync(sortie, { force: true });
+    execFileSync('zip', ['-qrX', sortie, 'VRM-extension'], { cwd: tmp });
+    console.log('✓', path.relative(racine, sortie));
+  }
   if (store) {
     fs.rmSync(store, { force: true });
     // README : documentation interne, inutile à la boutique.
