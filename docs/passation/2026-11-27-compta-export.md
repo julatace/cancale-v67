@@ -46,10 +46,23 @@ ventes dans une autre devise listées à part, un fichier qu'un logiciel de comp
   N°12 : prix 61, achat 20, port 3, bénéfice 38, réf. 7100001 (reçu) ; compte exclu dans aucun fichier ; 91004 « à
   dater » seulement ; fichier logiciel : une ligne d'en-tête, somme = l'écran. URSSAF : montant et cotisation = l'écran ;
   91009 (déclarée le mois d'avant) hors du mois et dans le sien ; rythme jamais deviné ; « régime à choisir ».
-- Rouge sur `origin/main` (arbre `git archive`, banc copié dedans) et sous 6 mutations : voir le compte rendu de la
-  session (déclarations ignorées, à dater comptée, compte exclu compté, bénéfice sans frais, rythme deviné, montant
-  recalculé depuis les lignes).
-- Audits compta/URSSAF/bénéfice/bilan/DAC7/argent/export, traduction, quoi-de-neuf, cohérence : verts. `npm run build`.
+- Rouge sur `origin/main` (arbre `git archive`, banc copié dedans, 1512 sombre + 390 clair) : 13 rouges (aucune carte
+  URSSAF, aucun bénéfice, et « 0 vente » le temps de lire les versements). Sous mutation (1512 sombre) : registre des
+  déclarations ignoré 9 rouges · « à dater » comptée 8 · compte exclu compté 8 · bénéfice sans frais 2 · rythme deviné
+  (trimestriel) 21 · « à dater » ajoutée au montant URSSAF 9.
+- Audits compta/URSSAF/bénéfice/bilan/DAC7/argent/export, traduction, quoi-de-neuf, cohérence, icônes, boutons :
+  verts. `audit-achats-export` (copie de statsVentes.js) et `audit-export-depenses` (motif suivi) remis au code étendu,
+  `--prouve` 8/8 et 7/7. `npm run build`. `ci-controles --diff origin/main` : un banc bloquant ajouté, rien retiré.
+- Bancs compta voisins verts : chiffres-coherents, argent-mois, livre-registre, recap-mois, rappel-urssaf.
+
+## Rouges DÉJÀ sur `origin/main` (pas de ce lot, identiques ligne à ligne avant/après)
+achats-export (A, saisie en série : 8), registres (achat en gros dans le tableur : 4), urssaf (carte du mois
+introuvable : 2), suivi-urssaf (8, `scrollIntoView` expiré), declare-urssaf (26), dac7-comptes (12 : la vente « à
+dater » vendue cette année est comptée par la règle du 6 nov. — `aDaterAnnee` — le banc attend l'ancienne), export-donnees
+(4), compta-claire (16, `data-benef-etat="lu"` caché), statut-fiscal (4), seuils-prevision (4). Et `audit-pas-su
+--prouve` 6/7, `audit-registres --prouve` 17/18 (motifs disparus). Aucun n'est dans la CI bloquante. Premier
+diagnostic : sélecteurs d'avant le design natif et données datées qui ont vieilli, pas une erreur de calcul vue — à
+reprendre banc par banc dans un lot à part.
 
 ## Décisions pour Julien
 1. Ailleurs dans l'app (`lireFreqUrssaf`, Suivi des déclarations), le rythme non choisi vaut **trimestriel** par défaut.
