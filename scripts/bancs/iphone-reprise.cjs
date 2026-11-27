@@ -35,6 +35,8 @@
 // O. L'ORDINATEUR (1512 × 950, puis fenêtres d'Edge : 1512 × 830, 1008 × 633
 //    à 150 %, zoom de l'app 125 %) : aucun libellé de la colonne coupé, le
 //    mot « VRM » entier, et rien ne passe PAR-DESSUS la colonne.
+// O3. (27 nov.) Aujourd'hui, dans ces mêmes fenêtres : chaque texte tient dans sa colonne (rien ne sort, rien de rogné,
+//    aucun mot cassé, rien sous un prix) — `_journee-tient.cjs`.
 // O2. (revue du 5 nov.) LA CAUSE DES LIBELLÉS COUPÉS : le bloc « Recharger »
 //    (numéros périmés, la capture Edge de Julien) rendu dans <main> héritait de
 //    la largeur bornée des écrans d'ordinateur (1360 px centrés) : à 1512 px il
@@ -63,6 +65,7 @@ const { chromium } = PW;
 const { lancer } = require('./_navigateur.cjs');
 const { metaVersData } = require('./_meta.cjs');
 const { getPath } = require('./_minipgrest.cjs');
+const TIENT = require('./_journee-tient.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 7951;
@@ -521,6 +524,13 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
             return { coupes, recouverts, logoEntier, largeur: Math.round(sr.width), reduite: side.getAttribute('data-n-reduite') === '1', groupes };
           });
           await capture(pg, `colonne-${c.w}x${c.h}${c.zoom ? '-z' : ''}-${c.sombre ? 'sombre' : 'clair'}`);
+          // O3 (27 nov.) AUJOURD'HUI TIENT DANS SES COLONNES : à 1008 × 633 (Edge à 150 %), trois colonnes de ~210 px
+          // rognaient « 2 146 € », posaient le compte sous le prix, cassaient « nouvea / ux » et le « S » de la semaine
+          // (_journee-tient.cjs). Chaque fenêtre d'ordinateur, chaque thème.
+          await pg.waitForSelector('.sj-journee[data-sj-ordi="1"] .sj-grille-colonnes .sj-v-ligne', { timeout: 8000 }).catch(() => {});
+          await pg.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
+          const tient = await pg.evaluate(TIENT.mesureTient);
+          TIENT.juger(dit, tient, `O3 ${qui} :`);
           dit(!!r && r.logoEntier && r.coupes.length === 0, `O ${qui} : le logo « VRM » entier et aucun libellé de la colonne coupé`, JSON.stringify(r));
           dit(!!r && r.recouverts.length === 0, `O ${qui} : rien ne passe par-dessus la colonne`, JSON.stringify(r && r.recouverts));
           // (9 nov.) Le groupe « Plateformes » est RETIRÉ de la colonne (décision du 8 nov.,
