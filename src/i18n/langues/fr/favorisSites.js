@@ -54,6 +54,6 @@ export default {
   "fav.bilan.r.variable_manquante": "variable du message inconnue pour cet article",
   "fav.bilan.r.historique_non_verifie": "conversation pas vérifiée",
   "fav.bilan.r.fil_non_relu": "conversation pas relue chez Vinted",
-  "fav.bilan.r.offre_prix_inconnu": "prix de l’article pas lu en euros",
+  "fav.bilan.r.offre_prix_inconnu": "prix introuvable",
   "fav.bilan.r.autre": "autre refus",
 };

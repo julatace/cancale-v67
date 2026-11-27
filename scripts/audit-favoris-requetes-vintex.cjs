@@ -58,6 +58,11 @@ const MUTATIONS = {
   'registre-apres-message': ["    await noterRegistreFavori(uid,body.itemId,body.recipientId,'m');\n    if(attente){", "    if(attente){"],
   'reprise-uuid-jetee': ["(!uuidR && !/^[1-9]\\d{0,19}$/.test(String(e.convId || '')))", "!/^[1-9]\\d{0,19}$/.test(String(e.convId || ''))"],
   'terminer-perdu': ["if (!(await rejouerTerminers())) return attendre('vrm');", ""],
+  'dressing-ancien': ["const frais = lu && Date.now() - Date.parse(String(lu.capturedAt || '')) < DRESSING_FRAIS_MS;", "const frais = !!lu;"],
+  'sans-article-vivant': ["const r = await vintedPage(acc, 'GET', `/api/v2/items/${itemId}`, null, { timeoutMs: 12000 });", "const r = null;"],
+  'sans-page-annonce': ["const h = await vintedGetHtml(acc, `/items/${encodeURIComponent(itemId)}`);", "const h = null;"],
+  'sans-jeton-lecture': ["+(raw&&k<2?'?read_after_write_token='+encodeURIComponent(raw):'')", ""],
+  'sans-prix-demande': ["const b = prixDansObjet(reponseDemande); if (b) return Object.assign(b, { source: 'demande' });", ""],
   'autorisation-incertaine': ["}catch{noterDiag('favori_autorisation_injoignable');return rep('refuse',0,'autorisation_expiree','autorisation');}", "}catch{return rep('incertain');}"],
   'variable-bloque': ["if (manques.size && [...manques].every((k) => NEUTRES.includes(k) && !val[k])) {", "if (false) {"],
   'sans-historique': ['if(ecritsAvant>0||(cv.pagination', 'if(false&&(cv.pagination'],
@@ -89,16 +94,18 @@ const UID = '111', JETON = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', UUID = '01a1f
 const ACC = { vinted_user_id: UID, domain: 'www.vinted.fr', access_token: 'jeton' };
 function monter(o = {}) {
   const conv = o.convBrute || Object.assign({ id: UUID, core_id_deprecated: 301, allow_reply: true, opposite_users: [{ id: 201, login: 'pseudo_banc' }], data: { transaction_id: 5001, items: [{ id: 101 }] }, messages: [] }, o.conv || {});
-  const lignes = { main: { vinted_annonce_numeros: { '101': { numero: '41', min: '40' } } }, ...(o.dressing ? { [`harvest_${UID}_listings`]: { capturedAt: new Date().toISOString(), payload: { items: o.dressing } } } : {}) };
+  const lignes = { main: { vinted_annonce_numeros: { '101': { numero: '41', min: '40' } } }, ...(o.dressing ? { [`harvest_${UID}_listings`]: { capturedAt: new Date(Date.now() - (o.dressingAncien ? 3600000 : 0)).toISOString(), payload: { items: o.dressing } } } : {}) };
   let lectures = 0;
   const store = { __commeBleamDefaut: true, ...(o.chemin ? { vrmFavorisChemin: o.chemin } : { __favorisVintex: true }) };
   const f = faireFond({ src: BG, connecte: UID, comptes: [ACC], lignes, store,
     vinted: (e) => {
       if (e.methode === 'POST' && e.chemin === '/messaging/main/inquiries') return o.inquiry || { status: 201, body: { id: UUID, conversation_id: UUID, transaction_id: 5001 } };
-      if (e.methode === 'GET' && e.chemin === `/messaging/main/conversations/${UUID}`) { lectures++; if (o.convJamais || lectures <= (o.conv404 || 0)) return { status: 404, body: { code: 404 } }; return { status: 200, body: o.convPlate ? conv : { conversation: conv } }; }
+      if (e.methode === 'GET' && e.chemin.split('?')[0] === `/messaging/main/conversations/${UUID}`) { lectures++; if (o.convJamais || lectures <= (o.conv404 || 0)) return { status: 404, body: { code: 404 } }; return { status: 200, body: o.convPlate ? conv : { conversation: conv } }; }
       if (e.methode === 'GET' && e.chemin === '/api/v2/conversations/301') return o.ancienne404 ? { status: 404, body: { code: 404 } } : { status: 200, body: { conversation: { id: 301, opposite_user: { id: 201 }, transaction: { id: 5001, item_id: 101 } } } };
       if (e.methode === 'GET' && /^\/api\/v2\/transactions\/\d+$/.test(e.chemin)) { if (o.tx404) return { status: 404, body: { code: 404 } }; return { status: 200, body: { transaction: o.txBrute || Object.assign({ id: 5001, item_id: 101, buyer_id: 201, item_title: 'Baskets banc', item: { id: 101, price: { amount: '50.0', currency_code: 'EUR' } } }, o.tx || {}) } }; }
       if (e.methode === 'POST' && /^\/api\/v2\/transactions\/\d+\/offers$/.test(e.chemin)) return o.offre || { status: 200, body: { code: 0 } };
+      if (e.methode === 'GET' && e.chemin === '/api/v2/items/101') return o.article || { status: 404, body: { code: 404 } };
+      if (e.methode === 'GET' && e.chemin === '/items/101') return o.page ? { status: 200, body: o.page, texte: true } : { status: 404, body: '' };
       if (e.methode === 'GET' && e.chemin === '/api/v2/authorization/check/phone_verification') return o.tel || { status: 200, body: { code: 0 } };
       if (e.methode === 'POST' && e.chemin === `/messaging/main/conversations/${UUID}/replies`) return o.reponse || { status: 201, body: { conversation_id: UUID, data: { content: 'x' } } };
       return { status: 404, body: {} };
@@ -161,7 +168,7 @@ const court = (f, r) => JSON.stringify({ r: r && (r.json || r.erreur), v: f.j.vi
   { const f = monter({ sansOnglet: true }); const r = await jouer(f);
     dit(res(r).resultat === 'refuse' && !ecr(f).length, 'V9 sans onglet vinted.fr sur ce compte ⇒ rien ne part', court(f, r)); }
   // ── 5.455.3 : la forme MESURÉE de la nouvelle messagerie ──
-  const MESUREE = { inquiry: { status: 201, body: { inquiry_id: 'inq-1', transaction_id: 5002, conversation_id: UUID, read_after_write_token: 'eyJ.x.y' } },
+  const MESUREE = { inquiry: { status: 201, body: { inquiry_id: 'inq-1', transaction_id: 5002, conversation_id: UUID, read_after_write_token: 'eyJhbGc.x.y' } },
     convBrute: { id: UUID, core_id_deprecated: 302, conversation_type: 'inquiry', allow_reply: true, is_read: true, opposite_users: [{ id: 201, photo: null }], data: { id: 'd-1', order_id: '26000001', escrow_order_id: '26000001' }, messages: [] },
     ancienne404: true, txBrute: { id: 5002, item_id: 101, buyer_id: 201, seller_id: 111, item_title: 'Baskets banc', item: { id: 101, price: { amount: '53.0', currency_code: 'EUR' } } } };
   const parti = (f) => ecr(f).some((x) => /\/offers$/.test(x.chemin)) && ecr(f).some((x) => /replies$/.test(x.chemin));
@@ -215,8 +222,6 @@ const court = (f, r) => JSON.stringify({ r: r && (r.json || r.erreur), v: f.j.vi
     dit(res(r).resultat === 'envoye' && px === '49.5' && io >= 0 && im > io && !f.clics.length, 'V37 « offer_request » : l’offre faite par la transaction de la demande à 49,50 € (55 € − 10 %), confirmée, PUIS le message ; aucune case ouverte (aucun clic)', court(f, r) + ' prix=' + px); }
   { const f = monter(Object.assign({}, MESUREE, { txBrute: Object.assign({}, MESUREE.txBrute, { item: { id: 101, price: { amount: '55.0', currency_code: 'EUR' } } }), offre: { status: 200, body: { code: 106, message: 'refus' } } })); const r = await jouer(f);
     dit(res(r).resultat === 'refuse' && !ecr(f).some((x) => /replies$/.test(x.chemin)), 'V37b l’offre pas confirmée par Vinted (code ≠ 0) ⇒ AUCUN message qui annoncerait une offre absente', court(f, r)); }
-  { const src = fs.readFileSync(BG, 'utf8');
-    dit(/async function autreOutilFavoris\(/.test(src) && /if \(await autreOutilFavoris\(\)\)/.test(src.slice(src.indexOf('async function piloteFavorisTick'), src.indexOf("apiFavorisCarte(uid, 'suivant')", src.indexOf('async function piloteFavorisTick')))) && /envoy\[ée\]s\?\\s\+automatiquement/.test(src) || false, 'V38 le mode auto ne part pas si une page vinted.fr montre un autre outil de messages aux favoris (deux outils = deux offres)'); }
   // Julien (27 nov. 18:15) : « sur certains comptes, quand on ouvre le favori, l'offre est proposée directement ».
   for (const [nom, m] of [['invitation sans montant', { entity_type: 'offer_suggestion_message' }], ['message du système', { entity_type: 'status_message', content: '' }], ['invitation « offer » sans montant', { type: 'offer', data: {} }]]) {
     for (const auto of [false, true]) {
@@ -237,7 +242,21 @@ const court = (f, r) => JSON.stringify({ r: r && (r.json || r.erreur), v: f.j.vi
     dit(res(r).resultat === 'envoye' && /^Ta paire te plaît \?$/.test(t), 'V17 {marque} inconnue ⇒ la version neutre part : ' + JSON.stringify(t), court(f, r)); }
   { const f = monter(Object.assign({}, MESUREE, { tx404: true, dressing: [{ id: 101, title: 'Baskets dressing', price: { amount: '60.0', currency_code: 'EUR' } }] })); const r = await jouer(f);
     const o = ecr(f).find((x) => /\/offers$/.test(x.chemin)); let px = ''; try { px = JSON.parse(o.corps).offer.price; } catch (_) {}
-    dit(res(r).resultat === 'refuse' && res(r).raison === 'offre_prix_inconnu' && !px && !ecr(f).some((x) => /replies$/.test(x.chemin)), 'V18 transaction illisible ⇒ JAMAIS le prix (peut-être ancien) du dressing : ni offre ni message, sauté « prix pas lu »', court(f, r) + ' prix=' + px); }
+    dit(res(r).resultat === 'envoye' && px === '54.0', 'V18 transaction illisible, article et page muets ⇒ le prix de SON dressing lu À L’INSTANT (60 € − 10 % = 54), offre + message', court(f, r) + ' prix=' + px); }
+  { const f = monter(MESUREE); const r = await jouer(f); const lu = f.j.vinted.find((x) => x.methode === 'GET' && /\/messaging\/main\/conversations\//.test(x.chemin));
+    dit(res(r).resultat === 'envoye' && lu && /[?&]read_after_write_token=eyJhbGc\.x\.y/.test(lu.chemin), 'V41 (C4) la relecture porte le `read_after_write_token` rendu par la demande', court(f, r)); }
+  // 5.455.4 (Julien, 19:40 : « il doit voir le prix ») : les sources, dans l'ordre ; « prix introuvable » seulement si TOUTES échouent.
+  const SANS_PRIX = { txBrute: { id: 5002, item_id: 101, buyer_id: 201, seller_id: 111, item_title: 'Baskets banc', item: { id: 101 } } };
+  const prixOffre = (f) => { const o = ecr(f).find((x) => /\/offers$/.test(x.chemin)); try { return JSON.parse(o.corps).offer.price; } catch (_) { return ''; } };
+  { const f = monter(Object.assign({}, MESUREE, SANS_PRIX, { article: { status: 200, body: { item: { id: 101, price: { amount: '70.0', currency_code: 'EUR' } } } } })); const r = await jouer(f);
+    dit(res(r).resultat === 'envoye' && prixOffre(f) === '63.0' && f.j.vinted.some((x) => x.chemin === '/api/v2/items/101'), 'V39 la transaction sans prix ⇒ le prix lu sur l’ARTICLE (70 € − 10 % = 63), offre + message', court(f, r)); }
+  { const f = monter(Object.assign({}, MESUREE, SANS_PRIX, { inquiry: { status: 201, body: Object.assign({}, MESUREE.inquiry.body, { item: { id: 101, price: { amount: '80.0', currency_code: 'EUR' } } }) } })); const r = await jouer(f);
+    dit(res(r).resultat === 'envoye' && prixOffre(f) === '72.0', 'V39b le prix porté par la réponse de la demande ⇒ utilisé (80 € − 10 % = 72)', court(f, r)); }
+  { const f = monter(Object.assign({}, MESUREE, SANS_PRIX, { page: '<html><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"item":{"id":101,"title":"x","photos":[{"url":"https://images1.vinted.net/t/x.jpg"}],"price":{"amount":"90.0","currency_code":"EUR"}}}}}</script></html>' })); const r = await jouer(f);
+    dit(res(r).resultat === 'envoye' && prixOffre(f) === '81.0', 'V39c transaction et article muets ⇒ le prix lu sur la PAGE de l’annonce (90 € − 10 % = 81), offre + message', court(f, r) + ' ' + prixOffre(f)); }
+  { const f = monter(Object.assign({}, MESUREE, SANS_PRIX, { dressing: [{ id: 101, title: 'B', price: { amount: '60.0', currency_code: 'EUR' } }], dressingAncien: true })); const r = await jouer(f);
+    const essais = ['/api/v2/items/101', '/items/101'].every((c) => f.j.vinted.some((x) => x.chemin === c) || f.j.vinted.some((x) => x.url && /\/items\/101$/.test(x.url)));
+    dit(res(r).resultat === 'refuse' && res(r).raison === 'offre_prix_inconnu' && !prixOffre(f) && !ecr(f).some((x) => /replies$/.test(x.chemin)) && f.j.vinted.some((x) => x.chemin === '/api/v2/items/101'), 'V40 TOUTES les sources muettes (transaction, demande, article, page, dressing ANCIEN ignoré) ⇒ seulement alors « prix introuvable », ni offre ni message', court(f, r)); }
   { const f = monter(Object.assign({}, MESUREE, { message: 'Bonjour {pseudo} !', convBrute: Object.assign({}, MESUREE.convBrute, { opposite_users: [{ id: 201, login: 'lea.me' }] }) })); const r = await jouer(f);
     dit(res(r).resultat === 'refuse' && !ecr(f).some((x) => /\/offers$/.test(x.chemin)), 'V35 le texte final refusé (pseudo « lea.me » pris pour un lien) ⇒ jugé AVANT l’offre : aucune offre faite pour rien', court(f, r)); }
   // ── 5.455.4 : une relance après N'IMPORTE QUELLE interruption ne refait jamais une offre ni un message (registre) ──

@@ -227,6 +227,11 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
   else if(attendQuota){j.etat='attente';delete j.raison;delete j.traiteLe;j.attentesQuota=(Number(j.attentesQuota)||0)+1;const att=Number.isSafeInteger(apresMs)&&apresMs>=5000&&apresMs<=3600000?apresMs:QUOTA_ATTENTE_MS;g.prochain=Math.max(e.prochainAvant||0,fin+att);d.prochainGlobal=g.prochain;g.raison='La limite d’actions de l’heure est atteinte : les messages suivants partent dès qu’une place se libère.';}
   // 5.455.4 : un saut « conversation ouverte mais pas relue / historique illisible » compte dans les refus de suite ; au 3ᵉ, la
   //    file s'arrête et le dit (plus jamais une conversation vide ouverte avec chaque acheteur de la file).
+  // 5.455.4 (C4) : une conversation ouverte mais pas encore relue chez Vinted n'est pas perdue : le favori repart UNE fois, après
+  //    les autres (rien n'est parti pour lui : ni offre ni message, le registre de l'extension le dit) ; ensuite il compte ci-dessous.
+  else if(!j.auto&&resultat==='ignore'&&raison==='fil_non_relu'&&(Number(j.attentesFil)||0)<1){j.etat='attente';delete j.raison;delete j.traiteLe;j.attentesFil=(Number(j.attentesFil)||0)+1;
+    if(g.jobs.some(x=>x!==j&&x.etat==='attente')){g.jobs.splice(g.jobs.indexOf(j),1);g.jobs.push(j);}
+    g.raison='Une conversation pas encore relue chez Vinted : VRM réessaie ce favori après les autres.';}
   else if(!j.auto&&sautSuspect({resultat,raison,ecrits:j.ecrits})){g.refusLocaux=(Number(g.refusLocaux)||0)+1;
     if(g.refusLocaux>=REFUS_LOCAUX_MAX){g.active=false;g.raisonCode='locaux_suite';g.raisonRefus=raison;g.raisonN=g.refusLocaux;g.raison=phraseRaisonFile('locaux_suite',{refus:raison,n:g.refusLocaux});}
     else if(!g.jobs.some(x=>x.etat==='attente')){g.active=false;g.raison='Sélection traitée ou file arrêtée.';g.raisonCode='traitee';}}

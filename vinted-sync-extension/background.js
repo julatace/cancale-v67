@@ -16658,6 +16658,40 @@ async function noterRegistreFavori(uid, item, acheteur, quoi) {
     const cles = Object.keys(u); if (cles.length > 5000) for (const c of cles.slice(0, cles.length - 5000)) delete u[c];
     await chrome.storage.local.set({ [REGISTRE_FAVORIS]: m }); } catch (_) {}
 }
+// 5.455.4 (Julien, 27 nov. 19:40 : « il doit voir le prix ») : le prix de CET article, LU MAINTENANT, dans cet ordre :
+//    (a) la transaction de la demande (lue par l'appelant) ; (b) la réponse de la demande elle-même ; (c) `GET /api/v2/items/{id}`
+//    depuis la page ; (d) la page publique de l'annonce (`extraireDetailPage`, la lecture des fiches) ; (e) SON dressing s'il a été
+//    lu il y a moins de 10 min. Toujours par l'identifiant de l'article. Rend {montant, devise, source} ou null (tout a échoué).
+const DRESSING_FRAIS_MS = 10 * 60000;
+function prixDansObjet(o) {
+  if (!o || typeof o !== 'object') return null;
+  const c = [o.price, o.item && o.item.price, o.item_price, o.transaction && o.transaction.item && o.transaction.item.price, o.conversation && o.conversation.item && o.conversation.item.price];
+  for (const v of c) { const m = v && typeof v === 'object' ? Number(v.amount) : Number(v); if (Number.isFinite(m) && m > 0 && m < 100000) return { montant: m, devise: v && typeof v === 'object' && /^[A-Z]{3}$/.test(String(v.currency_code || '')) ? v.currency_code : (/^[A-Z]{3}$/.test(String(o.currency || '')) ? o.currency : 'EUR') }; }
+  return null;
+}
+async function prixFavoriVivant(acc, uid, itemId, reponseDemande) {
+  const b = prixDansObjet(reponseDemande); if (b) return Object.assign(b, { source: 'demande' });
+  try {
+    const r = await vintedPage(acc, 'GET', `/api/v2/items/${itemId}`, null, { timeoutMs: 12000 });
+    const it = r && r.ok && r.json ? (r.json.item || r.json) : null;
+    if (it && typeof it === 'object' && String(it.id || itemId) === String(itemId)) { const c = prixDansObjet(it); if (c) return Object.assign(c, { source: 'article', item: it }); }
+    if (r && freinFavoriAuto(r)) return { frein: freinFavoriAuto(r), status: r.status };
+  } catch (_) {}
+  try {
+    const h = await vintedGetHtml(acc, `/items/${encodeURIComponent(itemId)}`);
+    const det = h && h.ok && h.text ? extraireDetailPage(h.text, itemId) : null;
+    const px = det && det.codes ? Number(det.codes.price) : NaN;
+    if (Number.isFinite(px) && px > 0) return { montant: px, devise: /^[A-Z]{3}$/.test(String(det.codes.currency || '')) ? det.codes.currency : 'EUR', source: 'page' };
+  } catch (_) {}
+  try {
+    const lu = await dressingLu(String(uid));
+    const frais = lu && Date.now() - Date.parse(String(lu.capturedAt || '')) < DRESSING_FRAIS_MS;
+    const it = frais && Array.isArray(lu.items) ? lu.items.find((x) => x && String(x.id) === String(itemId)) : null;
+    const px = it ? Number(prixCarte(it.price)) : NaN;
+    if (Number.isFinite(px) && px > 0) return { montant: px, devise: it.price && typeof it.price === 'object' && /^[A-Z]{3}$/.test(String(it.price.currency_code || '')) ? it.price.currency_code : 'EUR', source: 'dressing_frais' };
+  } catch (_) {}
+  return null;
+}
 function ecritureFavoriPermise(adresse) { const a = String(adresse || ''); return ECRITURES_FAVORI.some((re) => re.test(a)); }
 function adresseMessagerieApi(domaine, suite) { const d = String(domaine || 'www.vinted.fr').toLowerCase().replace(/^www\./, ''); return /^vinted\.(fr|com|it|de)$/.test(d) ? `https://api.${d}/messaging/main/${suite}` : ''; }
 async function vintedPageFavori(acc, adresse, corps, options = {}) {
@@ -22672,7 +22706,10 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     let ln=null,cv=null;
     for(let k=0;k<3&&!cv;k++){
       if(k)await pauseFavori('relire',uid);
-      ln=await vintedPage(acc,'GET',adresseMessagerieVinted(acc.domain,uuid),null,{timeoutMs:12000});
+      // C4 : le `read_after_write_token` rendu par la demande accompagne la relecture (la lecture « après écriture » de Vinted) ;
+      //    refusé (4xx) ⇒ la lecture simple, et toujours jusqu'à 3 essais.
+      const raw=q.json&&typeof q.json.read_after_write_token==='string'&&/^[\w.\-]{8,2000}$/.test(q.json.read_after_write_token)?q.json.read_after_write_token:'';
+      ln=await vintedPage(acc,'GET',adresseMessagerieVinted(acc.domain,uuid)+(raw&&k<2?'?read_after_write_token='+encodeURIComponent(raw):''),null,{timeoutMs:12000});
       if(!frein)frein=freinFavoriAuto(ln);
       if(ln.sansPage)return rep('refuse',0,'onglet_vinted');
       if(frein)return rep('refuse',ln.status);
@@ -22712,6 +22749,12 @@ async function executerMessageFavori(uid,acc,body,opts={}){
         titre=String(tr.item_title||(tr.item&&tr.item.title)||'').slice(0,120);
       }else{noterDiag('favori_req_tx_illisible_'+(t.status||0));await noterFormeFavori('transaction','illisible',formeCles(tr));}
     }
+    // Le prix TOUJOURS vu (Julien, 19:40) : la transaction n'en dit rien ⇒ les autres sources, lues maintenant.
+    if(offre&&!(Number(prixAnnonce)>0)){const pv=await prixFavoriVivant(acc,uid,body.itemId,q.json);
+      if(pv&&pv.frein){if(!frein)frein=pv.frein;return rep('refuse',pv.status);}
+      if(pv){prixAnnonce=pv.montant;devise=pv.devise;noterDiag('favori_prix_'+pv.source);
+        if(pv.item){const ind=annonceIndisponible(pv.item,null,null);if(ind){noterDiag('favori_annonce_article_'+ind);return rep('ignore',0,'annonce_indisponible');}}}
+      else noterDiag('favori_prix_introuvable');}
     // Le titre ({article}) : la transaction, sinon SON dressing par l'identifiant de l'article (jamais un prix du dressing).
     if(!titre){const lu=await dressingLu(String(uid)).catch(()=>null);const it=lu&&Array.isArray(lu.items)?lu.items.find((x)=>x&&String(x.id)===body.itemId):null;if(it&&typeof it.title==='string')titre=it.title.slice(0,120);}
     // 5. Le texte, ENTIER, avant toute offre.
@@ -22723,7 +22766,8 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     // 4b. L'offre décidée (plancher, garde du prix) AVANT d'écrire quoi que ce soit.
     let op=null;
     if(offre){
-      if(!tx||!(Number(prixAnnonce)>0)){noterDiag('favori_offre_prix_inconnu');return rep('refuse',0,'offre_prix_inconnu');}
+      if(!(Number(prixAnnonce)>0)){noterDiag('favori_offre_prix_inconnu');return rep('refuse',0,'offre_prix_inconnu');}   // TOUTES les sources ont échoué
+      if(!tx){noterDiag('favori_offre_sans_transaction');return rep('refuse',0,'offre_prix_inconnu');}   // pas de transaction où poser l'offre
       if(String(devise)!=='EUR'){noterDiag('favori_offre_autre_devise');return rep('refuse',0,'offre_prix_inconnu');}   // l'argent reste en euros
       op=choixV.op||await offreAvecPlancher(body.itemId,prixAnnonce,offre);
       if(op.raison==='offre_sous_plancher'){noterDiag('favori_offre_sous_plancher');return rep('ignore',0,'offre_sous_plancher');}
@@ -25165,20 +25209,6 @@ async function eveilTick(maintenant = Date.now()) {
   try { await chrome.storage.local.set({ [EVEIL_CLE]: st }); } catch (_) {}
   return { garde: _eveilPose, liste, voulu };
 }
-// 5.455.4 (Julien, 27 nov. 19:17 : la page de sa messagerie dit « 1 message favoris envoyé automatiquement aujourd'hui » — une
-//    phrase qui n'est PAS de VRM, celle d'un autre outil installé dans ce Chrome) : deux outils qui écrivent aux mêmes favoris
-//    feraient deux offres ou deux messages. Le mode AUTO de VRM ne part pas tant qu'une page vinted.fr ouverte montre la trace
-//    d'un autre outil de messages aux favoris (lecture du texte de la page, rien d'écrit) ; c'est dit dans son journal. Un envoi
-//    qu'IL lance reste permis (son clic), protégé par la relecture de la conversation et le registre.
-const AUTRE_OUTIL_FAVORIS = /messages?\s+(?:aux\s+)?favoris\s+envoy[ée]s?\s+automatiquement|favorites?\s+messages?\s+sent\s+automatically/i;
-async function autreOutilFavoris() {
-  let tabs = []; try { tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.de/*'] }); } catch (_) { tabs = []; }
-  for (const t of (tabs || []).slice(0, 4)) {
-    if (!t || t.id == null || t.status !== 'complete') continue;
-    try { const r = await chrome.scripting.executeScript({ target: { tabId: t.id }, func: () => String((document.body && document.body.innerText) || '').slice(0, 200000) }); const txt = r && r[0] && r[0].result; if (typeof txt === 'string' && AUTRE_OUTIL_FAVORIS.test(txt)) return true; } catch (_) {}
-  }
-  return false;
-}
 async function piloteFavorisTick(maintenant = Date.now()) {
   if (_piloteEnVol) return { etat: 'en-vol' };
   _piloteEnVol = true;
@@ -25201,7 +25231,6 @@ async function piloteFavorisTick(maintenant = Date.now()) {
     }
     if (!r.actif) return fin('eteint', { uid });
     if (await precieuxBloque(uid, 'favoris-auto')) return fin('precieux', { uid });
-    if (await autreOutilFavoris()) { noterDiag('favori_auto_autre_outil'); try { await noterJournal(uid, 'favori_auto_autre_outil', { auto: true }); } catch (_) {} return fin('autre_outil', { uid }); }   // 5.438 : « compte précieux » ⇒ favoris à la main seulement
     const av = await attenteAvantFavori(uid, 3);
     if (av && av.stop) return fin(av.stop, { uid });     // captcha ('verification'), Tout arrêter, stockage : ARRÊT
     if (av && av.ms > 0) return fin('garde', { uid, quoi: av.quoi });

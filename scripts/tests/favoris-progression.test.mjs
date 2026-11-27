@@ -31,9 +31,16 @@ test('5.455.3 : contradiction lue à la vérification ⇒ CE favori sauté, rais
  const {d,owner}=unLot();const f=terminerFile(d,{owner,jeton:'j1',resultat:'refuse',raison:'variable_manquante',ecrits:1,etape:'historique',cause:'variable:marque',maintenant:102000});
  assert.equal(f.valeur.jobs[0].cause,'variable:marque');
 });
-test('5.455.3 : conversation pas relue ⇒ sautée, la file continue, le bilan la nomme',()=>{
- const {d,owner}=unLot();const f=terminerFile(d,{owner,jeton:'j1',resultat:'ignore',raison:'fil_non_relu',ecrits:1,etape:'verification',maintenant:102000});
- assert.equal(f.valeur.active,true);assert.equal(f.valeur.jobs[0].raison,'fil_non_relu');
+// 5.455.4 (C4) : une conversation pas encore relue n'est plus perdue — le favori repart UNE fois après les autres ; au 2ᵉ échec,
+//    sauté et nommé dans le bilan.
+test('5.455.4 : conversation pas relue ⇒ réessayée une fois après les autres, puis sautée et nommée',()=>{
+ let {d,owner}=unLot();let f=terminerFile(d,{owner,jeton:'j1',resultat:'ignore',raison:'fil_non_relu',ecrits:1,etape:'verification',maintenant:102000});d=f.data;
+ assert.equal(f.valeur.active,true);const j1=f.valeur.jobs.find(x=>x.notificationId==='n1');assert.equal(j1.etat,'attente');assert.equal(f.valeur.jobs[f.valeur.jobs.length-1].notificationId,'n1','repart après les autres');
+ // les deux autres passent (envoyés), puis n1 revient et échoue encore
+ let t=Math.max(103000,f.valeur.prochain||0);
+ for(const k of [2,3,4]){const r=reserverFile(d,{owner,maintenant:t,jeton:'k'+k,suivi:'s'});d=r.data;d=consommerFile(d,{owner,maintenant:t,jeton:'k'+k}).data;const id=r.valeur.travail.notificationId;
+  f=terminerFile(d,{owner,jeton:'k'+k,resultat:id==='n1'?'ignore':'envoye',raison:id==='n1'?'fil_non_relu':'',ecrits:id==='n1'?1:3,etape:'verification',maintenant:t+1000});d=f.data;t=Math.max(t+2000,f.valeur.prochain||0);}
+ const fin=f.valeur.jobs.find(x=>x.notificationId==='n1');assert.equal(fin.etat,'ignore');assert.equal(fin.raison,'fil_non_relu');
  const b=bilanFavoris(f.valeur.jobs);assert.equal(b.sautes,1);assert.equal(b.parSaut.fil_non_relu,1);assert.match(phraseBilanFavoris(b),/conversation pas relue chez Vinted/);
 });
 test('5.455.3 : le cas de Julien sur la 5.455.2 (identité refusée à l’étape « conversation ») arrêtait la file — la cause',()=>{
@@ -45,12 +52,12 @@ test('5.455.3 : le cas de Julien sur la 5.455.2 (identité refusée à l’étap
 test('5.455.4 : trois « conversation pas relue » de suite arrêtent la file ; le rythme est gardé',()=>{
  const owner='owner-fixture',targets=[1,2,3,4].map(i=>({notificationId:'n'+i,itemId:String(100+i),recipientId:String(200+i),initiator:'native-fixture'}));
  let d=lancerFile(null,{owner,targets,message:'Bonjour',intervalleMinutes:0,maintenant:100000,lot:'lot1'}).data;let t=100000,v=null;
- for(let k=1;k<=3;k++){const r=reserverFile(d,{owner,maintenant:t,jeton:'j'+k,suivi:'s'});assert.ok(r.valeur.travail,'réservé '+k);d=r.data;d=consommerFile(d,{owner,maintenant:t,jeton:'j'+k}).data;
+ for(let k=1;k<=7&&(!v||v.active!==false);k++){const r=reserverFile(d,{owner,maintenant:t,jeton:'j'+k,suivi:'s'});assert.ok(r.valeur.travail,'réservé '+k);d=r.data;d=consommerFile(d,{owner,maintenant:t,jeton:'j'+k}).data;
   const f=terminerFile(d,{owner,jeton:'j'+k,resultat:'ignore',raison:'fil_non_relu',ecrits:1,etape:'verification',maintenant:t+2000});d=f.data;v=f.valeur;
   if(k===1)assert.ok(v.prochain>t+2000,'rythme gardé après un saut qui a écrit');
   t=Math.max(t+3000,v.prochain||0);}
  assert.equal(v.active,false);assert.equal(v.raisonCode,'locaux_suite');assert.match(v.raison,/3 favoris de suite/);
- assert.equal(v.jobs.filter(x=>x.etat==='attente').length,1);
+ assert.ok(v.jobs.filter(x=>x.etat==='ignore').length===3,'chacun réessayé une fois avant de compter');
 });
 test('5.455.4 : « prix pas lu en euros » saute CE favori (refus local nommé)',()=>{
  const {d,owner}=unLot();const f=terminerFile(d,{owner,jeton:'j1',resultat:'refuse',raison:'offre_prix_inconnu',ecrits:1,etape:'historique',maintenant:102000});

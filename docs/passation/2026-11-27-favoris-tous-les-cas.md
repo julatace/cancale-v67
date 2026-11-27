@@ -56,6 +56,19 @@ d'ici (les formes sont notées sur SA machine) ; toutes sont retirées.
   d'un autre outil de messages aux favoris (`autreOutilFavoris`, journal `favori_auto_autre_outil`). Un envoi qu'il lance reste
   permis, protégé par la relecture et le registre.
 
+## Réponses de Julien (19:40), appliquées dans la même 5.455.4
+- « VRM envoie quand même » : le retrait du mode auto devant un autre outil (V38) est RETIRÉ. Reste la garantie de VRM : jamais
+  deux fois au même acheteur pour le même article (registre).
+- « Il doit voir le prix » : `prixFavoriVivant`, dans l'ordre — (a) la transaction de la demande, (b) la réponse de la demande,
+  (c) `GET /api/v2/items/{id}` depuis la page, (d) la page publique de l'annonce (`extraireDetailPage`), (e) SON dressing seulement
+  s'il a été lu il y a moins de 10 min. EUR seulement ; plancher et garde du prix inchangés. « Prix introuvable » (`offre_prix_inconnu`)
+  seulement quand TOUT a échoué (V39, V39b, V39c, V18, V40 ; mutations `sans-article-vivant`, `sans-prix-demande`,
+  `sans-page-annonce`, `dressing-ancien`).
+- L'invitation « offre proposée » et les messages du système ne bloquent pas (V36, inchangé).
+- C4 : la relecture porte le `read_after_write_token` de la demande (deux premiers essais ; le 3ᵉ sans lui, au cas où Vinted le
+  refuserait) (V41) ; `fil_non_relu` n'est plus définitif : le favori repart une fois après les autres, puis compte dans les
+  « de suite » (test `favoris-progression`).
+
 ## Preuves
 - `audit-favoris-requetes-vintex.cjs` (vrai background.js) : 48 verts ; sur la 5.455.3 : rouge sur V16b, V16c, V19, V21–V32 ;
   `--prouve` : chaque mutation rouge (voir le rapport de session).
