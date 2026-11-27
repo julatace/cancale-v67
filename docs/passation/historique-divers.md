@@ -2387,3 +2387,8 @@ Julien, après avoir lu le risque (requêtes sans le « bruit » de la page vs c
 ## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. (place sous 60 Ko)
 
 - **26 nov. soir · FAVORIS PAR REQUÊTES « comme Vintex » (Julien : « A, fais comme Vintex »), ext. 5.455.0** : inquiries → conversation → transaction → offre → message, depuis la page, SEULES écritures permises (`ECRITURES_FAVORI`) ; garde-fous inchangés ; clics en réserve (`vrmFavorisChemin: 'interface'`). Bleam fait pareil (ancienne messagerie). `historique-divers.md`, fin. Geste : installer 5.455.0.
+
+## Lignes de CLAUDE.md §9 déplacées telles quelles le 27 nov. soir (place pour la 5.455.3, sous 60 Ko)
+
+- **27 nov. · ext. 5.455.2** : police « Inter VRM » du panneau ; `<gardes-app>` dit « article » ; le panneau ne coupe plus un onglet qui charge. `historique-divers.md`, fin. Geste : installer 5.455.2.
+- **27 nov. · « 978 216 » deux fois, un point en deux cartes** : un colis = ses identités (code lu aussi dans SA commande, n°, transaction), « à vérifier » compris ; un point = son adresse. `historique-colis-retraits.md`, fin. Geste : aucun (après fusion).
