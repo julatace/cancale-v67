@@ -356,6 +356,17 @@ const fermerPanneauPg = async (pp) => { if (pp) await pp.close().catch(() => {})
       const band = vrm ? await attendreQue(() => vrm.evaluate(() => { const x = document.querySelector('[data-liaison]'); return x ? x.getAttribute('data-liaison') : null; }), 10000) : null;
       dit(band === 'ok' || band === 'deja', '1 : VRM le dit (« Extension connectée »)', String(band));
       await capture(vrm, '1-liaison');
+      // (27 nov.) 5.453 : une liaison DEMANDÉE ouvre le panneau sur son accueil, 300 ms après la session — dans un onglet
+      // Vinted déjà ouvert s'il y en a un (`ouvrirPanneauAccueil`, chrome.tabs.update), sinon un onglet neuf. Le banc
+      // n'attendait pas ce geste : l'onglet du dressing (2.) s'ouvrait PENDANT ce délai ; si le fond, plus lent (CI), le
+      // trouvait déjà sur vinted.fr, il le menait au panneau en pleine visite ⇒ « page.goto: net::ERR_ABORTED » sur
+      // /member/111 (PR #1438, job 140384857102). On attend la condition réelle : le fond a NOTÉ l'ouverture du panneau
+      // (`panneau_apres_connexion_*`, écrit après tabs.update/create), et son onglet a fini de charger.
+      const ouvert = await attendreQue(async () => { const l = await dansSW(ctx, ID, async () => (await chrome.storage.local.get('vrmDiagRecents')).vrmDiagRecents || []); const d = (Array.isArray(l) ? l : []).find((x) => /^panneau_apres_connexion_/.test(String(x && x.k))); return d ? d.k : null; }, 15000, 200);
+      dit(!!ouvert, '1 : la liaison demandée ouvre le panneau de l’extension sur son accueil (5.453), avant toute visite de Vinted', String(ouvert));
+      dit(ouvert === 'panneau_apres_connexion_nouveau', '1 : aucun onglet Vinted ouvert ⇒ dans un onglet NEUF', String(ouvert));
+      const pPan = await attendreQue(async () => ctx.pages().find((x) => /^https:\/\/www\.vinted\.fr\//.test(x.url())), 10000, 200);
+      if (pPan) await pPan.waitForLoadState('load').catch(() => {});
       await pop.close().catch(() => {});
     }
 

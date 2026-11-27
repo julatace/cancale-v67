@@ -292,7 +292,10 @@ async function tournee(nav, { W, sombre, scenario, base }) {
   const o = await ouvrir(nav, { W, sombre, base, tab: 'journee' });
   for (const [ecran, nom] of ECRANS) {
     const [tab, sous] = ecran.split(':');
-    await o.pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+    // (27 nov., vitesse-webkit) L'écran change par la navigation de l'APP (`vrm:aller`, comme un toucher), pas en
+    // rechargeant la page : sous WebKit, un rechargement coupe les lectures en cours et les dit « due to access control
+    // checks » (erreurs de page qui ne sont pas de l'app). Aucune erreur n'est écartée : une vraie reste rouge.
+    await o.pg.evaluate((t) => { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=' + t })); }, tab);
     // (11 nov., webkit-fiable) l'écran PRÊT (monté, chargé, DOM calme), plus 2,8 s fixes (§6.5).
     await ecranPret(o.pg, '', { max: 20000 });   // (un lien peut mener à un autre écran : aucun nom exigé)
     if (sous) {

@@ -40,7 +40,7 @@ import { annuaireLbc } from '../plateformes.js';
 import { numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { etatDeVc } from '../enLigneVc.js';   // (26 nov.) « en ligne » / « vendue » Vestiaire : LA règle (Stock, écran Vestiaire)
 import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, lireTout, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, lireVentesEmail, photoKey, STUDIO_BASE } from '../App.jsx';
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, lireTout, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, ventesConnuesCoque, lireVentesEmail, photoKey, STUDIO_BASE } from '../App.jsx';
 import { ouvrirPanneau, panneauEnRetard, gesteDuPanneau } from '../ouvrirPanneau.js';
 // (22 nov., choix n° 35) « Photo en double » : la règle d'identité par le FICHIER photo exact (src/photoEnDouble.js).
 import { photosEnDouble, numerosEnExemplaires, refuserGroupe, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
@@ -277,7 +277,10 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
       // (21 nov.) Un compte bloqué : ses fiches arrivent en second temps, après les preuves de vente (la liste ne les attend pas).
       // (22 nov., Julien : « j'ai fait 3 ventes mais pas que sur Leboncoin ») … et les annonces Vinted VENDUES : prouvées
       // (<preuve-vente-regle>), reliées à leur vente par le n° de transaction (jamais le titre) — `annoncesVintedVendues`.
-      if (r) Promise.all([lirePreuvesVenteVinted().catch(() => null), fetchTxnItemIds().catch(() => ({})), ventesLuesBientot(), lireVentesEmail().catch(() => null)]).then(([p, txnItem, ventes, mails]) => {
+      // (26 nov., vitesse-webkit) Les preuves partent APRÈS les ventes de la coque et prennent celles déjà lues
+      // (`ventesConnuesCoque`) : la relecture des ventes de tous les comptes (≈ 650 Ko, banc budget-vitesse, Annonces) ne
+      // part plus que pour un compte que la coque n'a pas lu. Même règle, mêmes preuves.
+      if (r) Promise.all([ventesLuesBientot().then(() => lirePreuvesVenteVinted({ ventesConnues: ventesConnuesCoque() || undefined })).catch(() => null), fetchTxnItemIds().catch(() => ({})), ventesLuesBientot(), lireVentesEmail().catch(() => null)]).then(([p, txnItem, ventes, mails]) => {
         const plus = r.bloques && r.bloques.length ? tracesFiches(r.bloques, p) : [];
         const vendues = annoncesVintedVendues({ ventes, txnItem, vendus: p && p.vendus instanceof Set ? p.vendus : null, comptes: (r.vendusCtx || {}).comptes, dressing: (r.vendusCtx || {}).dressing, photoDe: (o) => photoArticle(o) || null });
         // (24 nov., vente-mail-annonce) L'annonce EN LIGNE qu'un e-mail de vente désigne (son clic, ou la photo exacte — la règle
