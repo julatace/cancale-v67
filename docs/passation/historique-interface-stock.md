@@ -3612,3 +3612,34 @@ Et : « laisse le design de l'app actuel » — aucune couleur ne change, seul l
   dans le démarrage, « vinted_dark=false ignoré »), `audit-ouverture` (2 rouges avant : theme-color et manifeste), banc
   `contraste-clair` : `DEFAUT=1` retire tout choix et exige le sombre #1C1C20 (rouge sur le build d'avant : `light/#878B92`) ;
   sans variable il juge désormais « Clair choisi » (gris moyen #878B92), toujours vert.
+
+## 27 nov. · Aujourd'hui à l'ordinateur : chaque texte tient dans sa colonne (1008 × 633 et 1512)
+
+Deux défauts vus sur les captures du 27 nov., qu'aucun banc ne jugeait :
+
+1. **1008 × 633** (une fenêtre d'Edge à 150 %, coque d'ordinateur ; `iphone-reprise` O, `colonne-1008x633-clair.png`) : la
+   grille n'avait que ~676 px pour ses trois colonnes (258 / 198 / 188 px). Le grand chiffre du jour était écrasé à 2 px
+   (le « S » de la semaine rogné à gauche), « 2 146 € » coupé, le compte passait SOUS le prix d'« À envoyer »
+   (« boutique_c 44 € »), « À faire » cassait les mots (« nouvea / ux »). Au zoom 125 % de l'app (1512 px), le compte
+   passait aussi sous le prix.
+   **Correctif** (`src/design/verre-journee.css` §4 bis) : le nombre de colonnes suit la largeur de LA GRILLE, pas celle
+   de la fenêtre (la colonne de gauche, réduite ou non, et le zoom changent la place) : `.sj-journee[data-sj-ordi="1"]`
+   est un conteneur (`container: sj-journee / inline-size`). ≥ 860 px : trois colonnes (1512 : 1180 px ; 1280 : ~900 px,
+   inchangé) ; de 560 à 859 px : la 1re colonne (chiffre du jour, semaine, mois) en pleine largeur, puis « À envoyer » et
+   « À retirer / Messages / À faire » côte à côte (~330 px, la largeur de 1512) ; sous 560 px : une colonne. Et
+   `.sj-v-cpt` se tasse (`min-width: 0`, « … », le nom entier en `title`).
+2. **1512** (`journee-coherence`, `e1-plein-1512-clair.png`) : la raison (« Pas d'extension ici… ») posée À CÔTÉ de
+   « Écrire aux favoris dans l'extension » sortait de la carte « Relancer au bon moment » et y était coupée. Déjà corrigé
+   le matin même par c0db7aed (le geste passe à la ligne, la raison SOUS le verbe) ; il manquait le contrôle dans le banc
+   où le défaut avait été vu.
+
+**Contrôle** : `scripts/bancs/_journee-tient.cjs`, sur chaque nœud de texte visible de `.sj-grille-colonnes` (rectangles
+de `Range`) : T1 rien ne sort de sa colonne ; T2 rien n'est rogné par un ancêtre qui cache (sauf « … » voulu) ; T3 aucun
+mot cassé sur deux lignes (coupe permise après - / ·) ; T4 dans « À envoyer », aucun texte sous le prix. Branché dans
+`iphone-reprise` (O3, chaque fenêtre de O) et `journee-coherence` (E12, à l'ordinateur).
+
+**Preuves** : O3 rouge sur le code d'avant (1008 : T1–T4 ; zoom 125 % : T4), vert après (35 OK). E12 rouge sur
+`c0db7aed^` (T1, T2 : la raison à 1403–1667 px pour une colonne 1132–1468), vert aujourd'hui (16 OK). Mutations dans le
+CSS servi : conteneur retiré ⇒ O3 1008 rouge (T1, T2, T3) ; compte sans `min-width: 0` ⇒ O3 zoom T4 rouge ; `nowrap`
+remis sur `.sb-touche.vrm-rf-geste` ⇒ E12 rouge. `journee-1280` 12/12 vert. Captures regardées : 1008 clair, zoom 125 %,
+390 et 1512 clair/sombre.

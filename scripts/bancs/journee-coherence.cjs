@@ -34,6 +34,8 @@
 //                  Stock sur ce N°, puis la carte ne revient pas (une fois) ;
 //   E10 ALIGNÉ   — le texte de chaque carte « À faire » commence au même endroit ;
 //   E11 JOURS    — une marque (la barre du vendu, 9 nov.) sous chaque jour où il a vendu (aucune ailleurs) ;
+//   E12 TIENT    — (27 nov., ordinateur) chaque texte de la grille tient dans sa colonne : rien ne sort, rien de rogné,
+//                  aucun mot cassé, rien sous un prix (`_journee-tient.cjs`) ;
 //   E0 GÉNÉRAL   — aucune erreur JS, aucun débordement, 44 px au doigt dans la
 //                  zone, aucun « 0,00 € » sur la tête, aucun mot écarté.
 //  ⚠️ (26 nov., bancs natifs) Sur Aujourd'hui natif : E3 juge la frise dans SA tuile (`[data-jv2-argent]`) ; E5 compte
@@ -50,6 +52,7 @@
 process.env.BANC_PORT = process.env.BANC_PORT || '9121';
 const path = require('path'), fs = require('fs');
 const NV = require('./nouveau-vendeur.cjs');
+const TIENT = require('./_journee-tient.cjs');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 // (11 nov., webkit-fiable) `NAVIGATEUR=webkit` : le même banc sous le moteur de Safari (_navigateur.cjs).
 const { lancer, estWebkit } = require('./_navigateur.cjs');
@@ -255,6 +258,9 @@ async function tournee(nav, { W, theme, scenario }) {
   const m = await MESURE(pg, tel);
   if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, `e1-${scenario}-${W}-${theme}.png`), fullPage: true }); }
   if (!m.ecran) { dit(false, 'E0', `${T} l'écran Ma journée est rendu`); await o.ctx.close(); return; }
+  // E12 (27 nov.) À l'ordinateur, chaque texte tient dans sa colonne : la raison posée À CÔTÉ de « Écrire aux favoris dans
+  // l'extension » (« Relancer au bon moment ») sortait de la carte et y était coupée (capture e1-plein-1512-clair du 27 nov.).
+  if (!tel) { const t = await pg.evaluate(TIENT.mesureTient); TIENT.juger((v, quoi, det) => dit(v, 'E12', quoi, det), t, T); }
 
   // E1
   dit(m.gestesDit === m.nCartes, 'E1', `${T} « ${m.gestesTexte} » = ${m.nCartes} carte(s) visibles dans « À faire »`, `dit ${m.gestesDit}, vu ${m.nCartes} : ${m.cartes.map((c) => c.sorte).join(', ')}`);
