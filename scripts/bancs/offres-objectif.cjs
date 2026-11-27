@@ -10,7 +10,7 @@
 //      (80 → 70 et 130 → 115) ⇒ coût 25 €, remise moyenne 12,50 € ; les
 //      conversations : 3 reçues · 1 acceptée · 0 refusée · 1 contre-offre ;
 //      « Acceptées par le moteur : — » ;
-//   C. QUESTIONS eBAY : « Questions » par défaut, une ligne par annonce (2), la
+//   C. QUESTIONS eBAY (27 nov. : « Tous » met les questions sans réponse en tête, « À répondre », la plus ancienne d'abord) : « Questions » par défaut, une ligne par annonce (2), la
 //      plus ancienne sans réponse ouverte d'abord, navigation 1 · 2 ; un message
 //      qui n'est pas une question : pas de champ, « Ouvrir sur eBay » ; Envoyer ⇒
 //      SA confirmation ⇒ `repondre` avec `confirme:true` sur CETTE question ;
@@ -300,9 +300,15 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         // `confirme:true` sur CETTE question ; un message qui n'en est pas une : aucun champ, « Voir sur eBay » ; 44 px,
         // contraste d'Envoyer, aucun débordement.
         await aller(pg, 'tab=ebay_messages', '[data-fil^="ebay:"]');
-        const L = await pg.evaluate(() => [...document.querySelectorAll('[data-fil^="ebay:"]')].filter((x) => x.getBoundingClientRect().height > 0).map((x) => ({ fil: x.getAttribute('data-fil'), num: x.getAttribute('data-fil-num'), nonlu: x.getAttribute('data-nonlu') })));
+        const L = await pg.evaluate(() => [...document.querySelectorAll('[data-fil^="ebay:"]')].filter((x) => x.getBoundingClientRect().height > 0).map((x) => { const m = x.querySelector('[data-fil-a-repondre]'); const cs = m ? getComputedStyle(m) : null; return { fil: x.getAttribute('data-fil'), num: x.getAttribute('data-fil-num'), nonlu: x.getAttribute('data-nonlu'), aRep: !!(m && m.getClientRects().length), attente: x.getAttribute('data-fil-attente'), fw: cs ? Number(cs.fontWeight) : null, fond: cs ? cs.backgroundColor : null, coul: cs ? cs.color : null, cls: m ? m.className : '' }; }));
         const ids = L.map((x) => x.fil).join(',');
-        dit(ids === 'ebay:principal:q4,ebay:principal:q2,ebay:principal:q1,ebay:principal:q3', '« Tous » : un fil par échange eBay, par SON identité, du plus récent au plus ancien', ids);
+        // (27 nov., Julien) Les QUESTIONS sans réponse d'abord, la plus ANCIENNE en tête (q1 il y a 20 h, puis q2 il y a 3 h) ; le reste
+        // garde la règle du 12 nov., du plus récent au plus ancien (q4 qui n'est pas une question, q3 répondue). L'identité ne change pas.
+        dit(ids === 'ebay:principal:q1,ebay:principal:q2,ebay:principal:q4,ebay:principal:q3', '« Tous » : un fil par échange eBay, par SON identité ; les questions sans réponse d’abord (la plus ancienne), puis du plus récent au plus ancien', ids);
+        dit(L.filter((x) => x.aRep).map((x) => x.fil.split(':')[2]).join(',') === 'q1,q2' && L.filter((x) => x.attente === '1').length === 2, '« À répondre » sur les deux questions sans réponse, et elles seules (ni q4, message sans question, ni q3 répondue)', JSON.stringify(L));
+        dit(L.filter((x) => x.aRep).every((x) => x.fw >= 600), '« À répondre » se voit : en gras (le geste à faire, §7)', JSON.stringify(L.filter((x) => x.aRep)));
+        const premier = await pg.evaluate(() => { const f = [...document.querySelectorAll('[data-fil]')].filter((x) => x.getBoundingClientRect().height > 0)[0]; return f ? f.getAttribute('data-fil') : ''; });
+        dit(premier === 'ebay:principal:q1', '« Tous » : la plus ancienne question sans réponse est en TÊTE de la liste (avant les autres comptes)', premier);
         const num = Object.fromEntries(L.map((x) => [x.fil.split(':')[2], x.num]));
         dit(num.q1 === '80' && num.q2 === '80' && num.q3 === '81' && num.q4 === '81', 'le N° par le SKU de SON annonce (VRM-80, VRM-81)', JSON.stringify(num));
         dit(L.filter((x) => x.nonlu === '1').map((x) => x.fil.split(':')[2]).sort().join(',') === 'q1,q2,q4', 'sans réponse = non lu ; la question répondue (q3) ne l’est pas', JSON.stringify(L));

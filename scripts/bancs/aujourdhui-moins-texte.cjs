@@ -15,8 +15,12 @@ require('./_porte-banc.cjs');
 //    D  DOUBLON  — aucun montant (≥ 100 €) écrit deux fois dans l'écran ;
 //    G  GESTES   — chaque geste reste là : Reprendre, C'est écrit, Imprimer, les 2 cases Colis, la rangée de l'ordinateur,
 //                  la ligne des annonces disparues (qui ouvre sa feuille), le porte-monnaie (ses deux montants).
+//    P  PAUSE    — (27 nov., Julien sur « ● En pause · Reprendre » : « je ne comprends pas à quoi ça sert ») la carte « Tout
+//                  arrêter » dit ce qui est arrêté : un titre VU d'au moins 3 mots (plus « En pause » seul), une ligne VUE qui
+//                  nomme les sortes arrêtées (`data-tout-quoi` = offres favoris republications) et l'heure de l'arrêt
+//                  (`data-tout-depuis` = l'heure de Paris de `tout.at`, écrite dans la ligne), « Pourquoi ? » replié, le bouton ≥ 44 px.
 //  Réglages : `BANC_DIST` (un autre build : l'AVANT), `LARGEURS=390,1512`, `THEMES=clair,sombre`, `STYLES=,monochrome`,
-//  `SHOTS=<dossier>` (captures à REGARDER), `DSF=2`, `MOTS_MAX` (défaut : la moitié des mots VUS d'origin/main sur la même base, 106 à 390 px et 124 à 1512 px), `MUTATION=fleche|site|tronque` (rouge attendu).
+//  `SHOTS=<dossier>` (captures à REGARDER), `DSF=2`, `MOTS_MAX` (défaut : la moitié des mots VUS d'origin/main sur la même base, 106 à 390 px et 124 à 1512 px), `MUTATION=fleche|site|tronque|pause` (rouge attendu).
 //  Un banc ne meurt pas, il rapporte.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -31,7 +35,11 @@ const LARGEURS = liste('LARGEURS', '390,1512').filter(Boolean).map(Number), THEM
 const STYLES = liste('STYLES', ',monochrome');
 const DSF = Number(process.env.DSF || 1);
 // La moitié des mots VUS d'origin/main sur la même base (25 nov. : 213 à 390 px, 249 à 1512 px).
-const MOTS_MAX = (W) => Number(process.env.MOTS_MAX || (W < 600 ? 106 : 124));
+// (27 nov.) + 11 : la carte « Tout arrêter » DEMANDÉE claire (Julien sur « En pause » : « je ne comprends pas à quoi ça sert ») —
+// « Gestes automatiques arrêtés » · « Offres, favoris, republications : rien ne part · depuis HH:MM » · « Pourquoi ? » à la place
+// de « En pause » (mesuré : +11 mots à 390 et à 1512 sur cette base). Le reste de l'écran garde son budget.
+const MOTS_CARTE_PAUSE = 11;
+const MOTS_MAX = (W) => Number(process.env.MOTS_MAX || (W < 600 ? 106 : 124) + MOTS_CARTE_PAUSE);
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 600) : '')); } return c; };
 
@@ -112,6 +120,7 @@ async function ouvrir(nav, { W, sombre, style, b }) {
     // Les mutations remettent le défaut DANS la page : chacune doit rougir SA mesure.
     if (mut === 'fleche') { const e = document.querySelector('[data-pil-ecart]'); if (e) { e.className = 'n-heros-hausse'; e.textContent = '▲ ' + e.textContent; } }
     if (mut === 'site') { const h = document.querySelector('[data-v2-ecran="aujourdhui"]'); const c = document.createElement('section'); c.setAttribute('data-v2-bloc', 'sites'); c.textContent = 'Par site · 7 jours · Vinted 654,10 € 100 %'; h.appendChild(c); }
+    if (mut === 'pause') { const c = document.querySelector('[data-tout-arrete]'); if (c) { const t = c.querySelector('[data-tout-titre]'); if (t) t.textContent = 'En pause'; const l = c.querySelector('[data-tout-ligne]'); if (l) l.remove(); } }
     if (mut === 'tronque') { const e = document.querySelector('[data-pil-recu], [data-pil-benef-fen]'); if (e) { e.style.maxWidth = '40px'; e.style.overflow = 'hidden'; e.style.whiteSpace = 'nowrap'; e.style.display = 'block'; e.textContent = 'au moins 1 234,56 € reçus en novembre'; } }
   }, MUT);
   return { ctx, pg, erreurs };
@@ -151,10 +160,20 @@ const MESURER = () => {
     envoyer: g('[data-v2-cj-ligne="envoyer"]'), retirer: g('[data-v2-cj-ligne="retirer"]'), ordi: g('[data-adist-jour-rangee]'), disparues: g('[data-moderation-disparues]'),
     recuPartiel: !!document.querySelector('[data-pil-recu-partiel="1"]') || !document.querySelector('[data-pil-recu]'),
     pm: !!document.querySelector('[data-v2-bloc="portemonnaie"][data-pm-attente="216500"][data-pm-dispo="11109"]'), prio: g('[data-prio-journee]') };
-  return { mots: mots.length, texte, coupes, ecart, sites, nSites, doubles, gestes, ecran: !!ecran, debord: document.documentElement.scrollWidth > window.innerWidth + 1 };
+  // P : la carte « Tout arrêter ».
+  const vu = (e) => !!e && e.getClientRects().length > 0 && e.getBoundingClientRect().width > 1 && getComputedStyle(e).visibility !== 'hidden';
+  const nMots = (e) => (e && e.innerText || '').trim().split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+  const pc = document.querySelector('[data-tout-arrete]');
+  const pause = pc ? (() => { const t = pc.querySelector('[data-tout-titre]'), l = pc.querySelector('[data-tout-ligne]'), b = pc.querySelector('[data-tout-reprendre]');
+    return { at: Number(pc.getAttribute('data-tout-arrete')), quoi: (pc.getAttribute('data-tout-quoi') || '').split(/\s+/).filter(Boolean), depuis: pc.getAttribute('data-tout-depuis') || '',
+      titreVu: vu(t), titreMots: nMots(t), ligneVue: vu(l), ligneMots: nMots(l), ligneHeure: !!l && !!pc.getAttribute('data-tout-depuis') && l.innerText.includes(pc.getAttribute('data-tout-depuis')),
+      pourquoi: !!pc.querySelector('details[data-tout-pourquoi]'), bouton: b ? Math.round(b.getBoundingClientRect().height) : 0 }; })() : null;
+  return { pause, mots: mots.length, texte, coupes, ecart, sites, nSites, doubles, gestes, ecran: !!ecran, debord: document.documentElement.scrollWidth > window.innerWidth + 1 };
 };
 
-(async () => {
+// (27 nov.) La base et l'ouverture servent aussi le banc `actions-rondes-onglets.cjs` (la même capture de Julien).
+module.exports = { baseCapture, ouvrir };
+if (require.main === module) (async () => {
   const b = baseCapture();
   console.log(`Base : vendu 7 j ${b.attendu.sept} € · 7 j d'avant ${b.attendu.avant} €`);
   await new Promise((ok) => P.srv.listen(P.PORT, ok));
@@ -186,6 +205,11 @@ const MESURER = () => {
         dit(!r.doubles.length, 'D aucun montant écrit deux fois', r.doubles);
         const manque = Object.entries(r.gestes).filter(([, v]) => !v).map(([k]) => k);
         dit(!manque.length, 'G chaque geste est là', manque);
+        const pa = r.pause; const heureAt = pa && pa.at > 0 ? new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }).format(new Date(pa.at)) : '?';
+        dit(!!pa && pa.titreVu && pa.titreMots >= 3, 'P le titre de la carte « Tout arrêter » se voit et dit ce qui est arrêté (≥ 3 mots, plus « En pause » seul)', pa);
+        dit(!!pa && pa.ligneVue && pa.ligneMots >= 4 && ['offres', 'favoris', 'republications'].every((q) => pa.quoi.includes(q)), 'P la ligne VUE nomme ce qui ne part plus (offres, favoris, republications)', pa);
+        dit(!!pa && pa.depuis === heureAt && pa.ligneHeure, `P « depuis ${heureAt} » (heure de Paris de l'arrêt) écrit dans la ligne`, pa);
+        dit(!!pa && pa.pourquoi && pa.bouton >= 44, 'P « Pourquoi ? » replié et « Tout relancer » ≥ 44 px', pa);
       } catch (e) { dit(false, 'mesure ' + nom, String(e && e.stack || e).slice(0, 400)); }
       await ctx.close();
     }

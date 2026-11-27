@@ -42,6 +42,9 @@
   .n-tt-tel .n-tt-outils { border-bottom: 0; margin-bottom: 4px; }
   .n-tt-tel .n-tt-recherche { flex-basis: 100%; max-width: none; order: -1; }
   .n-tt-ancre { position: relative; display: inline-flex; min-width: 0; }
+  /* (27 nov.) Un filtre du tableau posé seul (FiltreSeul : « Compte » de Ventes · Terminées au téléphone) : discret, à droite. */
+  .n-vt-compte-tel { display: flex; justify-content: flex-end; margin: 0 0 6px; min-width: 0; }
+  .n-tt-filtre-seul .n-tt-bouton { max-width: min(100%, 280px); }
 
   /* Les menus : une carte posée sous le bouton. */
   .n-tt-pop {

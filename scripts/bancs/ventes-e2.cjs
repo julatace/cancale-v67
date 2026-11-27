@@ -22,6 +22,7 @@
 //   V8 LES COULEURS — aucun texte bleu en aplat d'accent (`C.accent`) ; aucun rouge ;
 //      l'ambre seulement sur un geste à faire ;
 //   V9 LE DOIGT — au téléphone, chaque commande de Ventes fait 44 px ;
+//   A2 (27 nov.) L'ALERTE rendue à Statistiques · Annulations : la règle du 5 nov., une ligne au-dessus des taux ;
 //   A  ANNULATIONS PAR COMPTE — un compte nettement au-dessus des autres sur 30 j
 //      est dit UNE fois, avec SES ventes annulées ; rien quand c'est à égalité, quand
 //      un compte n'a pas pu être lu (pas su), ni pour un compte exclu ;
@@ -253,6 +254,11 @@ const ANNUL = async (pg) => {
     return { etat: e ? e.getAttribute('data-sv-annul') : null, pasLues: e ? e.getAttribute('data-sv-annul-pas-lues') : null, manque: note ? note.getAttribute('data-sv-annul-manque') : null, total: (c.querySelector('[data-sv-annul-total]') || { getAttribute: () => null }).getAttribute('data-sv-annul-total'),
       comptes: [...c.querySelectorAll('[data-sv-annul-compte]')].map((d) => ({ uid: d.getAttribute('data-sv-annul-compte'), site: d.getAttribute('data-sv-annul-site'), n: d.getAttribute('data-n'), annulees: d.getAttribute('data-annulees'),
         ventes: [...d.querySelectorAll('[data-sv-annul-vente]')].map((x) => x.getAttribute('data-sv-annul-vente')).sort() })),
+      // (27 nov.) « Un compte annule plus que les autres » : la ligne au-dessus des taux (src/ventesEcran.js `comptesQuiAnnulent`).
+      alertes: [...c.querySelectorAll('[data-sv-annul-alerte]')].filter((x) => x.getClientRects().length).map((x) => { const l = x.closest('[data-sv-annul]'); const premier = l && l.querySelector('[data-sv-annul-compte]');
+        const pq = x.querySelector('[data-pourquoi]'); const r = (pq && pq.querySelector('summary') || x).getBoundingClientRect();
+        return { uid: x.getAttribute('data-sv-annul-alerte'), site: x.getAttribute('data-sv-annul-alerte-site'), taux: x.getAttribute('data-taux'), autres: x.getAttribute('data-taux-autres'), manque: x.getAttribute('data-sv-annul-alerte-manque'),
+          avant: !!(premier && (x.compareDocumentPosition(premier) & Node.DOCUMENT_POSITION_FOLLOWING)), pourquoi: !!pq, pourquoiTexte: pq ? (pq.querySelector('.vrm-pourquoi-texte') || pq).textContent.replace(/\s+/g, ' ').trim() : '', pourquoiH: Math.round(r.height), pourquoiW: Math.round(r.width), texte: x.innerText.replace(/\s+/g, ' ').trim() }; }),
       texte: c.textContent.replace(/\s+/g, ' ').slice(0, 300) };
   });
 };
@@ -325,6 +331,7 @@ async function tournee(nav, { W, theme, scenario }) {
   if (['annul', 'exclu', 'ko', 'egal'].includes(scenario)) {
     const A = await ANNUL(o.pg);
     await capture(o.pg, `e2-${scenario}-${W}-${theme}-annulations`);
+    if (SHOTS) await o.pg.locator('[data-stats-carte="sv-annulations"]').first().screenshot({ path: path.join(SHOTS, `e2-${scenario}-${W}-${theme}-carte-annulations.png`) }).catch(() => {});
     const de = (uid) => (A && A.comptes.find((c) => c.uid === uid && c.site === 'vinted')) || null;
     if (scenario === 'annul') {
       const b = de('222'), a = de('111');
@@ -336,11 +343,30 @@ async function tournee(nav, { W, theme, scenario }) {
       const b = de('222'), a = de('111');
       dit(!!a && !!b && a.annulees === '2' && b.annulees === '3', 'A', `${T} des parts proches : chaque compte sur SA ligne (2 et 3 annulées)`, JSON.stringify(A));
     }
+    // (27 nov.) L'ALERTE DU 5 NOV. RENDUE À STATISTIQUES : la MÊME règle (`comptesQuiAnnulent`, seuils `SEUILS_ANNULATIONS`) sur les
+    // lignes de la carte ; UNE ligne au-dessus des taux, le compte et son taux contre les autres, « Pourquoi ? » ; jamais quand c'est
+    // proche, jamais un compte exclu ; un compte pas lu n'est jamais comparé, il est dit pas lu.
+    const al = (A && A.alertes) || [];
+    if (scenario === 'annul') {
+      dit(al.length === 1 && al[0].uid === '222' && al[0].site === 'vinted' && al[0].taux === '50' && al[0].autres === '0', 'A2', `${T} vendeuse_b annule nettement plus : UNE ligne, SON compte, 50 % contre 0 %`, JSON.stringify(al));
+      dit(al.length === 1 && al[0].avant && /vendeuse_b/.test(al[0].texte), 'A2', `${T} la ligne est AU-DESSUS des taux par compte et nomme le compte`, JSON.stringify(al));
+      // (27 nov., « même nombre jamais deux fois ») La rangée du compte dit déjà 50 % : la ligne visible ne redit AUCUN taux ni nombre ;
+      // les chiffres, la période choisie et les seuils sont sous « Pourquoi ? ».
+      dit(al.length === 1 && !/\d/.test(al[0].texte), 'A2', `${T} la ligne visible ne redit aucun nombre (les taux sont sous « Pourquoi ? »)`, JSON.stringify(al));
+      dit(al.length === 1 && /50/.test(al[0].pourquoiTexte) && /\b0\b/.test(al[0].pourquoiTexte) && /période choisie/i.test(al[0].pourquoiTexte), 'A2', `${T} « Pourquoi ? » dit les taux et « sur la période choisie »`, JSON.stringify(al));
+      dit(al.length === 1 && al[0].pourquoi && (!tel || (al[0].pourquoiH >= 44 && al[0].pourquoiW >= 44)), 'A2', `${T} « Pourquoi ? » donne le détail${tel ? ' (44 px au doigt)' : ''}`, JSON.stringify(al));
+    }
+    if (scenario === 'egal') dit(!al.length, 'A2', `${T} des parts proches : aucune alerte`, JSON.stringify(al));
+    if (scenario === 'exclu') dit(!al.some((x) => x.uid === '222') && !al.some((x) => /vendeuse_b/.test(x.texte)), 'A2', `${T} un compte exclu n’est jamais comparé ni nommé`, JSON.stringify(al));
+    if (scenario === 'ko') dit(al.length === 1 && al[0].uid === 'passu' && String(al[0].manque).split(',').includes('333') && /vendeuse_c/.test(al[0].texte) && !al.some((x) => x.uid === '222'), 'A2', `${T} un compte pas lu : rien n’est comparé, la ligne le dit pas lu (jamais 0)`, JSON.stringify(al));
     if (scenario === 'exclu') dit(!!A && A.etat === 'lu' && !de('222') && !!de('111'), 'A', `${T} le compte EXCLU n’entre pas (aucune ligne, aucun total)`, JSON.stringify(A));
     if (scenario === 'ko') {
       dit(!!A && !de('333'), 'A', `${T} un compte pas lu : aucune ligne inventée pour lui`, JSON.stringify(A));
       // Le compte pas lu est NOMMÉ par son identité dans la note de la carte (`data-sv-annul-manque`) : jamais un total qui se dit complet.
-      dit(!!A && (A.etat !== 'lu' || String(A.manque || '').split(',').includes('333')), 'A', `${T} un compte pas lu : nommé, la carte ne se présente pas comme complète`, JSON.stringify(A));
+      // (27 nov.) Nommé UNE fois : dans la note de la carte, ou — quand la ligne d'alerte le dit déjà (« Pas comparé : … pas lu ») —
+      // par elle seule (`data-sv-annul-alerte-manque`), la note ne le redit pas.
+      const nommes = [...String(A && A.manque || '').split(','), ...((A && A.alertes) || []).flatMap((x) => String(x.manque || '').split(','))];
+      dit(!!A && (A.etat !== 'lu' || nommes.includes('333')), 'A', `${T} un compte pas lu : nommé, la carte ne se présente pas comme complète`, JSON.stringify(A));
     }
   }
   dit(!o.journal.erreurs.length, 'V0', `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));

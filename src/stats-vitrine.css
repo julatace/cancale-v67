@@ -136,6 +136,11 @@
 .vrm-stats-vitrine .vrm-sv-annul-nom > :first-child { flex: none; }
 .vrm-stats-vitrine .vrm-sv-annul-nom > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .vrm-stats-vitrine .vrm-sv-annul-mois { margin-top: 8px; }
+/* (27 nov.) « Un compte annule plus que les autres » : UNE ligne neutre au-dessus des taux (ni ambre ni rouge : aucun geste urgent). */
+.vrm-stats-vitrine .vrm-sv-annul-alerte { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 0 8px; margin-bottom: 4px; border-bottom: 1px solid var(--vrm-line); color: var(--vrm-ink); font-size: 13px; line-height: 1.4; }
+.vrm-stats-vitrine .vrm-sv-annul-alerte > svg { flex: none; color: var(--vrm-muted); }
+.vrm-stats-vitrine .vrm-sv-annul-alerte-texte { flex: 1 1 auto; min-width: 0; font-weight: 600; }
+.vrm-stats-vitrine .vrm-sv-annul-alerte[data-sv-annul-alerte="passu"] .vrm-sv-annul-alerte-texte { font-weight: 400; color: var(--vrm-muted); }
 .vrm-stats-vitrine .vrm-sv-annul-mois > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; list-style: none; }
 .vrm-stats-vitrine .vrm-sv-annul-mois > summary::-webkit-details-marker { display: none; }
 .vrm-stats-vitrine .vrm-sv-annul-mois > summary::after { content: '›'; margin-left: 8px; color: var(--vrm-muted); }

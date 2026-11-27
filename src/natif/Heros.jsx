@@ -41,9 +41,49 @@ export function Heros({ titre = '', valeur = null, unite = '', sous = '', tonSou
   );
 }
 
-export function ActionsRondes({ elements = [], libelle = '', className = '', attrs = null }) {
-  return (
-    <nav className={cx('n-actions-rondes', className)} aria-label={libelle || undefined} {...(attrs || {})}>
+// (27 nov., capture iPhone de Julien) `dock` : au téléphone (< 1024 px), tant que la PLACE de la rangée descend plus bas que
+// le haut de la barre d'onglets, la rangée se pose juste au-dessus d'elle (`data-n-colle`, src/natif/graphe.css) ; sa place
+// dans le flux garde sa hauteur (rien ne saute, aucun va-et-vient). Jugé au défilement (de n'importe quel conteneur), au
+// changement de taille, et par un IntersectionObserver (une carte qui arrive au-dessus et pousse la rangée).
+const TELEPHONE = '(max-width: 1023px)';
+function useColleAuxOnglets(actif, place) {
+  const [etat, setEtat] = React.useState({ colle: false, h: 0 });
+  React.useLayoutEffect(() => {
+    if (!actif || typeof window === 'undefined' || !place.current) return undefined;
+    const el = place.current;
+    let raf = 0, io = null, bas = -1, courant = { colle: false, h: 0 };
+    const poser = (nv) => { if (nv.colle !== courant.colle || (nv.colle && nv.h !== courant.h)) { courant = nv; setEtat(nv); } };
+    const barreHaut = () => { const b = document.querySelector('.n-onglets'); return b && b.getClientRects().length ? b.getBoundingClientRect().top : window.innerHeight; };
+    const planifier = () => { if (!raf) raf = window.requestAnimationFrame(juger); };
+    // L'observateur regarde la fenêtre moins la barre : il se réveille quand la place croise le haut des onglets.
+    const suivre = (haut) => {
+      const m = Math.max(0, Math.round(window.innerHeight - haut));
+      if (m === bas || typeof IntersectionObserver === 'undefined') return;
+      bas = m; if (io) io.disconnect();
+      try { io = new IntersectionObserver(planifier, { rootMargin: `0px 0px -${m}px 0px`, threshold: [0, 1] }); io.observe(el); } catch (_) { io = null; }
+    };
+    function juger() {
+      raf = 0;
+      let tel = false; try { tel = window.matchMedia(TELEPHONE).matches; } catch (_) { tel = false; }
+      if (!tel || !el.isConnected || !el.getClientRects().length) { poser({ colle: false, h: 0 }); return; }
+      const haut = barreHaut(); suivre(haut);
+      const r = el.getBoundingClientRect();
+      const h = courant.colle ? courant.h : Math.round(r.height);
+      poser(h > 0 && r.top + h > haut + 0.5 ? { colle: true, h } : { colle: false, h: 0 });
+    }
+    juger();
+    document.addEventListener('scroll', planifier, { capture: true, passive: true });
+    window.addEventListener('resize', planifier, { passive: true });
+    return () => { document.removeEventListener('scroll', planifier, { capture: true }); window.removeEventListener('resize', planifier); if (io) io.disconnect(); if (raf) window.cancelAnimationFrame(raf); };
+  }, [actif, place]);
+  return etat;
+}
+
+export function ActionsRondes({ elements = [], libelle = '', className = '', attrs = null, dock = false }) {
+  const place = React.useRef(null);
+  const { colle, h } = useColleAuxOnglets(dock, place);
+  const rangee = (
+    <nav className={cx('n-actions-rondes', className)} aria-label={libelle || undefined} data-n-dock={dock ? '' : undefined} data-n-colle={colle ? '' : undefined} {...(attrs || {})}>
       {elements.map((e) => (
         <button key={e.cle} type="button" className="n-action-ronde" data-n-plein={e.plein ? '' : undefined} onClick={e.onClick} disabled={!e.onClick} {...(e.attrs || {})}>
           <span className="n-action-ronde-disque" aria-hidden="true">{e.icone}{e.n > 0 ? <span className="n-action-ronde-n">{e.n > 99 ? '99+' : e.n}</span> : null}</span>
@@ -52,6 +92,8 @@ export function ActionsRondes({ elements = [], libelle = '', className = '', att
       ))}
     </nav>
   );
+  if (!dock) return rangee;
+  return <div ref={place} className="n-actions-rondes-place" style={colle ? { height: h } : undefined}>{rangee}</div>;
 }
 
 // (22 nov. soir, maquettes de Julien) DES CASES À CHIFFRE côte à côte (Colis : « 6 à envoyer » | « 3 à retirer ») : chaque case

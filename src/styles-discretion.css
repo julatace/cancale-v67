@@ -17,6 +17,13 @@
   background: var(--vrm-warn, #B25000); color: #fff; font: inherit; font-size: 15px; font-weight: 700;
 }
 .vrm-verif-reprendre:focus-visible { outline: 2px solid var(--w-encre, #1D1D1F); outline-offset: 2px; }
+/* (27 nov., Julien : « En pause… je ne comprends pas à quoi ça sert ») « Tout arrêter » posé : le titre, puis UNE ligne (ce qui
+   ne part plus, depuis quand), « Tout relancer » à droite ; « Pourquoi ? » replié sous toute la carte. */
+.vrm-tout-arrete .vrm-verif-texte { flex-basis: 220px; }   /* au téléphone, le titre tient sur une ligne ; le bouton passe dessous */
+.vrm-tout-arrete .vrm-verif-texte b { display: block; }
+.vrm-tout-arrete > .vrm-verif-reprendre { margin-inline-start: 18px; }
+.vrm-tout-ligne { display: block; margin-top: 2px; font-size: 13px; line-height: 1.35; color: var(--w-gris, #6E6E73); }
+.vrm-tout-arrete > .n-pourquoi { flex: 1 0 100%; margin: -4px 0 -6px; padding: 0 0 0 18px; }
 
 .vrm-disc { display: flex; flex-direction: column; gap: 4px; font-variant-numeric: tabular-nums; }
 .vrm-disc-reglage { padding: 0 0 8px; border-bottom: 0.5px solid var(--w-filet, rgba(60,60,67,.18)); }

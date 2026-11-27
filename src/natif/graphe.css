@@ -188,6 +188,22 @@
     .n-actions-rondes { gap: 2px; padding: 0; }
     .n-action-ronde { flex: 1 1 0; min-width: 0; }
     .n-action-ronde-libelle { max-width: 100%; font-size: 11.5px; letter-spacing: -.01em; }
+    /* (27 nov., capture iPhone de Julien) Les gestes d'Aujourd'hui tombaient juste sur le bord du premier écran : les disques
+       se voyaient, leurs libellés (« Imprimer », « Scanner »…) passaient SOUS la barre d'onglets. Tant que la place de la
+       rangée est plus bas que le haut des onglets, elle se pose juste au-dessus d'eux (`data-n-colle`, posé par
+       `ActionsRondes dock`, src/natif/Heros.jsx — sa place dans le flux est gardée, rien ne saute), puis la reprend en
+       défilant. Pas un `position: sticky` : les cartes d'alerte du haut sont hors de la page, la rangée collée ne pouvait
+       pas remonter au-dessus du début de la page (mesuré à 320 × 568). Pleine largeur, le fond de la page. Banc :
+       scripts/bancs/actions-rondes-onglets.cjs. */
+    .n-actions-rondes[data-n-colle] { position: fixed; z-index: 19; left: 0; right: 0; bottom: calc(var(--n-h-onglets) + var(--n-bas-sur)); margin: 0; padding: 8px var(--n-marge); background: var(--n-fond); }
+  }
+  /* (27 nov.) Sous 360 px, avec la police de repli d'un Linux (DejaVu, comme la CI), « Imprimer » et « Messages » finissaient en
+     « … » (59 px pour 56). Les cinq se partagent 8 px de plus de chaque côté et le libellé se serre d'un rien ; le disque garde
+     sa taille (cible ≥ 44 px). Banc : actions-rondes-onglets L. */
+  @media (max-width: 359px) {
+    .n-actions-rondes[data-n-dock] { margin-inline: 8px; }
+    .n-actions-rondes[data-n-colle] { margin: 0; padding-inline: 8px; }
+    .n-actions-rondes[data-n-dock] .n-action-ronde-libelle { font-size: 10.5px; letter-spacing: -.02em; }
   }
 
   /* (23 nov., style-clarte-5) Le « — » du pied du héros qui dit pourquoi et ouvre la saisie ; le geste du héros en vrai bouton clair. */

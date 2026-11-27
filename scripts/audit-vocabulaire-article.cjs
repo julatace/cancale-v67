@@ -16,6 +16,7 @@
 //   V  le serveur (`vendServeur`) et l'extension (`vendDeReglage`) disent la même chose
 //      que l'app (`jeVendsEffectif`) pour chaque réglage et chaque propriétaire ;
 //   X  l'extension EXÉCUTÉE : vrm-mots.js lit `vrm_vend_ext` ; le vrai background.js
+//      (X8-X10, 5.455.2 : le bloc <gardes-app> recopié de src/ suit le mot de l'extension, `motsExt()`)
 //      (scripts/_fond-vm.cjs) range « article » pour un vendeur « autre », « paire » pour
 //      le propriétaire en automatique (lu chez vrm.center), les textes d'avant sans rien ;
 //   S  relevé STATIQUE (@babel/parser) de src/, api/ et de l'extension : tout texte qui
@@ -31,7 +32,7 @@
 //  `--prouve` : chaque mutation doit rendre l'audit ROUGE. `--recopie` : refabrique la copie.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
-const path = require('path'), fs = require('fs'), os = require('os'), cp = require('child_process');
+const path = require('path'), fs = require('fs'), os = require('os'), cp = require('child_process'), vm = require('vm');
 const { pathToFileURL } = require('url');
 const RACINE = path.join(__dirname, '..');
 const lire = (racine, f) => fs.readFileSync(path.join(racine, f), 'utf8');
@@ -353,6 +354,17 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
     await new Promise((r) => setTimeout(r, 15));
     const conf = String((f5.ctx.RAISONS_COMMANDE || {}).confirmation || '') || (fond.match(/'confirmation': `[^`]*`/) || [''])[0];
     dit(f5.ctx.motsExt().nom === 'article' && /\$\{motsExt\(\)\.le\}/.test(conf), 'X7 fond : `vrm_vend_ext` rangé est relu au réveil du service worker ; « ce geste vend l’article »', conf.slice(0, 120));
+    // (27 nov., ext. 5.455.2) Le bloc <gardes-app> empaquette SA copie de src/profilVendeur.js : ses textes sont jugés dans
+    // src/ (relevé S), mais leur MOT vient de la source posée dans la copie. EXÉCUTÉ : un texte réel du bloc
+    // (`problemesAnnonce`, geste « Une seule annonce par … ») suit le vocabulaire de l'extension (`motsExt()`).
+    const gesteBloc = (f) => { try { return String(vm.runInContext("(GARDES_APP.problemesAnnonce({ dejaEnLigne: true }, 'vinted').find((x) => x.code === 'enligne') || {}).geste", f.ctx)); } catch (e) { return 'erreur : ' + e.message; } };
+    const gA = gesteBloc(f5), gS = gesteBloc(f4);
+    dit(/\barticle\b/.test(gA) && !MOT.test(gA), 'X8 fond : le bloc <gardes-app> (copie de src/) dit « article » à un vendeur « autre » (source du mot posée sur `motsExt()`)', gA);
+    dit(/\bpaire\b/.test(gS), 'X9 fond : le bloc <gardes-app>, rien de su ⇒ le texte d’avant (« paire »)', gS);
+    // la source est LUE à chaque texte (jamais figée au démarrage) : un changement de mot est suivi.
+    await f4.ctx.rafraichirVendExt({ choix: 'autre' }, 'owner-banc');
+    const g2 = gesteBloc(f4);
+    dit(/\barticle\b/.test(g2) && !MOT.test(g2), 'X10 fond : un changement de « Je vends » est suivi par le bloc <gardes-app>', g2);
   } catch (e) { dit(false, 'X3 le vrai background.js s’exécute (scripts/_fond-vm.cjs)', e.message); }
 
   // ── S : relevé statique ──
@@ -443,6 +455,8 @@ const MUTATIONS = [
   ['src/nouveautes.js', 'une nouveauté sans sa version article', ", titreArt: 'Comparer deux articles côte à côte'", ''],
   ['vinted-sync-extension/vrm-ui.js', 'T() de l’extension ignore `cle_art`', "const m = (MOTS[cle + '_art'] && horsSneakers() ? MOTS[cle + '_art'] : null) || MOTS[cle];", 'const m = MOTS[cle];'],
   ['vinted-sync-extension/vrm-ui.js', 'un texte de l’extension sans forme article', '    rp_rien_art: {', '    rp_rien_x: {'],
+  ['vinted-sync-extension/background.js', 'le bloc <gardes-app> sans source du mot', "GARDES_APP.poserSourceVend(() => (motsExt() === MOTS_ARTICLE.autre ? 'autre' : 'sneakers'));\n", ''],
+  ['vinted-sync-extension/background.js', 'le bloc <gardes-app> figé sur paire', "GARDES_APP.poserSourceVend(() => (motsExt() === MOTS_ARTICLE.autre ? 'autre' : 'sneakers'));", "GARDES_APP.poserSourceVend(() => 'sneakers');"],
   ['vinted-sync-extension/background.js', 'un texte du fond remis en paire', "get 'repub-serie'() { return `Compte précieux : pas de republication en série — ${motsExt().un} à la fois, sur ton toucher.`; },", "'repub-serie': 'Compte précieux : pas de republication en série — une paire à la fois, sur ton toucher.',"],
   ['api/_lib/retraits-retard-notif.js', 'une notification serveur remise en paire', "`⚠️ ${m.Un} vendu${m.e} encore en ligne`", "'⚠️ Une paire vendue encore en ligne'"],
   ['src/favorisAuto.js', 'une raison remise en paire (accord oublié)', 'get reservee() { return `${motsVendeur().Nom} réservé${motsVendeur().e} : aucun message.`; },', "reservee: 'Paire réservée : aucun message.',"],

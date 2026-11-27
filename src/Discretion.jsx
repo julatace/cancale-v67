@@ -16,7 +16,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { load, save, vmrCmd } from './App.jsx';
-import { tr } from './i18n/index.js';
+import { tr, heure as heureLoc } from './i18n/index.js';
+import { Pourquoi } from './natif/Actions.jsx';
 import { useLignesActions } from './JaugeActions.jsx';
 import { jaugeDuCompte, texteJauge, heureFr, toutArreteDe } from './jaugeActions.js';
 import { useComptesFeuille } from './moderationFeuille.js';
@@ -67,12 +68,17 @@ export function ToutArreter({ rows, variante = 'panneau' }) {
     try { vmrCmd({ cmd: 'toutArreter', on: v }); } catch (_) {}
   };
   if (variante === 'alerte') {
+    const depuis = Number(etat.at) > 0 ? heureLoc(Number(etat.at), { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }) : '';
     return (
-      <div className="vrm-verif" role="alert" data-tout-arrete={String(etat.at)}>
+      // (27 nov., Julien sur « ● En pause · Reprendre » : « c'est nul je ne comprends pas à quoi ça sert ») Ce qui est arrêté,
+      // dit d'un coup d'œil : un titre, UNE ligne (ce qui ne part plus, depuis quand — heure de Paris), « Tout relancer » ;
+      // ce que veut dire l'arrêt sous « Pourquoi ? ». QUI l'a posé (son bouton, le panneau, un arrêt automatique) n'est pas
+      // dit : l'état rangé (`vinted_discretion.tout`, `vrmToutArrete`) ne garde que { on, at } — rien n'est deviné.
+      <div className="vrm-verif vrm-tout-arrete" role="alert" data-tout-arrete={String(etat.at)} data-tout-quoi="offres favoris republications" data-tout-depuis={depuis || undefined}>
         <span className="vrm-verif-point" aria-hidden="true" />
-        {/* (25 nov., Julien : « trop de texte ») « Tout est en pause » + « Reprendre » sur UNE ligne ; la phrase entière au lecteur d'écran. */}
-        <p className="vrm-verif-texte"><b>{tr('disc.toutPause')}</b><span className="vrm-sr">{' · ' + tr('ext.avert.toutArrete')}</span></p>
-        <button type="button" className="vrm-verif-reprendre" data-tout-reprendre="" onClick={() => poser(false)}>{tr('direct.reprendre')}</button>
+        <p className="vrm-verif-texte"><b data-tout-titre="">{tr('disc.tout.titre')}</b><span className="vrm-tout-ligne" data-tout-ligne="">{tr('disc.tout.ligne') + (depuis ? ' · ' + tr('disc.tout.depuis', { heure: depuis }) : '')}</span></p>
+        <button type="button" className="vrm-verif-reprendre" data-tout-reprendre="" onClick={() => poser(false)}>{tr('disc.tout.relancer')}</button>
+        <Pourquoi attrs={{ 'data-tout-pourquoi': '' }}>{tr('disc.tout.pourquoi')}</Pourquoi>
       </div>
     );
   }
