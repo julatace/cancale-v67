@@ -89,7 +89,7 @@ export default {
   "egalite.action.partout": "Pubblica altrove…",
   "egalite.action.partout.phrase": "Gli annunci spuntati verso i tuoi altri siti, dalla loro scheda: stesso N°, stesso acquisto.",
   "egalite.action.vintedSeul": "Solo per un annuncio Vinted",
-  "egalite.action.verifVinted": "Vinted lo sta verificando: niente parte prima",
+  "egalite.action.verifVinted": "Vinted la verifica",
   "egalite.ecranSite": "Tutta la schermata {site}",
   "egalite.ecranSite.sous": "Gli strumenti propri di questo sito",
   "egalite.numerosDonnes": { one: "{n} nuovo N° da scrivere sulla sua scatola", other: "{n} nuovi N° da scrivere sulle loro scatole" },

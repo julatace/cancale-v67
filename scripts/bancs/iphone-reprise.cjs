@@ -380,6 +380,9 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         dit(e7b.ecran === 'ventes', `B7 ${qui} : un balayage au milieu ne change plus d'onglet (décision du 9 nov.)`, JSON.stringify({ y: y7, ...e7b }));
         // B8 · retoucher l'onglet courant
         await allerPaire(pg, 'annonces');
+        // (27 nov., WebKit) Annonces n'avait pas encore ses rangées (rien à défiler : 29 px) : on attend qu'il y ait de quoi
+        // défiler de plus de 100 px (10 s au plus) ; le seuil « avant > 100 » reste celui du contrôle.
+        await pg.waitForFunction(() => { const m = document.querySelector('.vrm-main'); return m && m.getAttribute('data-ecran') === 'annonces' && m.scrollHeight - m.clientHeight > 150; }, null, { timeout: 10000 }).catch(() => {});
         await pg.evaluate(() => { document.querySelector('.vrm-main').scrollTop = 400; }); await pg.waitForTimeout(300);
         const avant8 = await ecran(pg);
         await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="paires"]'); await pg.waitForTimeout(600);

@@ -172,6 +172,9 @@
   .n-ar + .n-ar::before { content: ""; position: absolute; top: 0; right: 0; left: calc(var(--n-marge) + 52px + 12px); border-top: .5px solid var(--n-trait); pointer-events: none; }
   .n-ar-corps { appearance: none; border: 0; margin: 0; background: none; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 64px;
     padding: 6px 0 6px var(--n-marge); color: var(--n-encre); text-align: start; cursor: pointer; -webkit-tap-highlight-color: transparent; font: var(--n-t-second); }
+  /* (27 nov., banc annonces-actions, capture 390) Sans le « ⋯ » à droite (mode sélection d'une action), le prix touchait le bord
+     de l'écran : la rangée garde sa marge. */
+  .n-ar-corps:last-child { padding-inline-end: var(--n-marge); }
   .n-ar-corps:active { background: var(--n-appui); }
   .n-ar-corps:focus-visible { outline: 2px solid var(--n-accent); outline-offset: -2px; }
   .n-ar[data-ad-grise="1"] .n-ar-corps { cursor: default; opacity: .5; }

@@ -89,7 +89,7 @@ export default {
   "egalite.action.partout": "List elsewhere…",
   "egalite.action.partout.phrase": "The ticked listings to your other sites, from their sheet: same No., same purchase.",
   "egalite.action.vintedSeul": "Only for a Vinted listing",
-  "egalite.action.verifVinted": "Vinted is reviewing it: nothing goes before",
+  "egalite.action.verifVinted": "Under Vinted review",
   "egalite.ecranSite": "Full {site} screen",
   "egalite.ecranSite.sous": "The tools specific to this site",
   "egalite.numerosDonnes": { one: "{n} new No. to write on its box", other: "{n} new Nos. to write on their boxes" },
