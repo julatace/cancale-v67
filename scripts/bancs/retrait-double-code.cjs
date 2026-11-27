@@ -27,6 +27,9 @@ const attendre = async (pg, f, ms = 40000) => { const t0 = Date.now(); while (Da
 const J = 86400000, H = 3600000;
 const iso = (ms) => new Date(Date.now() + ms).toISOString();
 const jourParis = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+// Un VRAI QR (qrcode-generator, déjà dans node_modules), inventé pour le banc.
+const qrcode = require(path.join(__dirname, '..', '..', 'node_modules', 'qrcode-generator'));
+const QRde = (texte) => { const q = qrcode(0, 'M'); q.addData(texte); q.make(); return Buffer.from(q.createSvgTag({ cellSize: 4, margin: 2, scalable: true })).toString('base64'); };
 const N = '1792000000000099';
 const RUE = '10 Rue des Essais', VILLE = 'Villeneuve-sur-Banc';
 const LIEU_NOMME = `Relais Vinted Go, Droguerie du Banc, ${RUE}, 35400 ${VILLE}`;
@@ -45,7 +48,7 @@ function baseDouble() {
   relais.data['99300002'] = { code: '431907', lieu: LIEU_NOMME, transporteur: 'vinted', at: iso(-7 * J) };
   // (1) l'e-mail Vinted Go : code écrit « 978 216 », QR, arrivé il y a 8 jours, limite LUE passée (il y a 2 jours) ; le rappel l'a réécrit.
   b.rows.push({ id: `email_track_vinted_${N}`, data: { type: 'suivi', carrier: 'vinted', suivi: N, status: 'available', statusLabel: 'Au point relais', subject: `Rappel : récupère ton colis avant le ${jourParis(Date.now() - 2 * J).split('-').reverse().join('/')} #${N}`,
-    receivedAt: iso(-5 * J), emailAt: iso(-5 * J), arriveLe: iso(-8 * J), code: '978 216', code2: null, lieu: LIEU_NOMME, limite: jourParis(Date.now() - 2 * J), consigne: false, qrUrl: 'https://p.vintedgo.com/public/v1/qr_codes/banc.png', account: b.accounts[0].login } });
+    receivedAt: iso(-5 * J), emailAt: iso(-5 * J), arriveLe: iso(-8 * J), code: '978 216', code2: null, lieu: LIEU_NOMME, limite: jourParis(Date.now() - 2 * J), consigne: false, qrB64: QRde('978216'), qrType: 'image/svg+xml', account: b.accounts[0].login } });
   // … et la moitié Vinted de SA conversation, sans code écrit, sans limite, le lendemain.
   const moitie = (tx, code) => ({ id: `email_track_autre_conv-${conv(tx)}`, data: { type: 'suivi', carrier: 'autre', suivi: '', status: 'available', statusLabel: 'Arrivé au point relais (Vinted)', subject: `Commande mise à jour pour ${TITRE}`,
     receivedAt: iso(-7 * J), emailAt: iso(-7 * J), arriveLe: iso(-7 * J), code, lieu: LIEU_NOMME, limite: null, consigne: false, conv: conv(tx), source: 'vinted-commande', cleLigne: `email_track_autre_conv-${conv(tx)}`, account: b.accounts[0].login } });

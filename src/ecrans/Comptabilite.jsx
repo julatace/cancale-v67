@@ -9124,6 +9124,16 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const txLiesEmail = new Set(); for (const t of vusEmail) { const c = commandeDuColis(t); if (c) txLiesEmail.add(String(c.transaction_id)); }
     // (27 nov.) + la commande d'un « à vérifier » reliée par identité (`x.o`) : son achat Vinted n'en refait pas un 2e.
     for (const x of aVerifier) if (x && x.kind === 'email' && x.o && x.o.transaction_id != null) txLiesEmail.add(String(x.o.transaction_id));
+    // (27 nov.) « Retiré » sur un colis réuni marque toutes ses lignes (`clesMoities`) : sa commande Vinted, encore « au point
+    // relais » chez Vinted tant qu'elle n'a pas enregistré le retrait, ne revient pas seule « à retirer ». Par identité seulement :
+    // la commande d'une ligne cochée (conversation, n° de suivi, code), ou le code de retrait d'une ligne cochée.
+    const txCoches = new Set(), codesCoches = new Set();
+    for (const t of lignesColis) {
+      if (!t || t.status !== 'available' || !collected || !collected.has(colisKey(t))) continue;
+      const c = commandeDuColis(t); if (c && c.transaction_id != null) txCoches.add(String(c.transaction_id));
+      const k = codeLigne(t); if (k) codesCoches.add(k);
+    }
+    for (const [tx, r] of Object.entries(colisRelais || {})) { const c = r ? normCode(r.code) : ''; if (c && codesCoches.has(c) && txParCode.get(c) === String(tx)) txCoches.add(String(tx)); }
     // ⚠️ (29 oct.) UN COLIS, UNE CARTE — PAR SON N° (§5). Un achat vu par Vinted
     // SANS code dont le n° de suivi est celui d'un colis déjà connu par un e-mail
     // (montré, coché, fini ou reparti) est CE colis : il ne s'affiche pas une
@@ -9162,6 +9172,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           if (tr && !ks.some(k => nRetourEmail.has(k)) && repartiAffichable(Date.parse(tr.etatAt || ''), maintenant)) repartis.push({ kind: 'vinted', o, statut: 'transporteur' }); }
         if (so) continue; }
       if (txLiesEmail.has(String(o.transaction_id))) continue;     // le même colis, déjà montré par son e-mail
+      if (txCoches.has(String(o.transaction_id))) continue;        // (27 nov.) son colis est coché « Retiré » (une de ses lignes, par identité)
       const r = colisRelais[String((o && o.transaction_id) || '')]; const c = r ? normCode(r.code) : '';
       if (c && codesEmail.has(c)) continue;
       if (!c && ks.some(k => nEmailConnus.has(k))) continue;       // (29 oct.) le même n° : déjà montré par son e-mail
