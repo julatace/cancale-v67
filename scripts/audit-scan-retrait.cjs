@@ -44,6 +44,7 @@ const MUTATIONS = [
   ['src/arriveeAchat.js', "if (deja.length) return { su: true, etat: 'range',", "if (false) return { su: true, etat: 'range',", 'D : le 2e scan range une 2e paire'],
   ['src/arriveeAchat.js', "&& prixRecu && prixRecu.source === 'recu'", "&& prixRecu", 'P : le prix de l’article seul écrit comme payé'],
   ['src/ScannerRetrouver.jsx', "const idPossible = (tape || arrivee) && normaliserN(brut).length >= 4;", "const idPossible = tape && normaliserN(brut).length >= 4;", 'B1 : la caméra ne lit plus le code de retrait'],
+  ['src/ecrans/Comptabilite.jsx', "x.ranger = () => { const e = en2();", "x.rangerX = () => { const e = en2();", 'B5 : « Ranger » du scanner universel oublie le retrait'],
   ['src/ArriveeAchat.jsx', "tr('arv.fait.ecris', { num: fait.numeros[0] })", "tr('arv.fait.titre')", 'B2 : « Écris N°X sur la boîte » oublié'],
 ];
 function prouver() {
@@ -141,6 +142,9 @@ if (PROUVE) prouver();
     dit(/tr\('arv\.fait\.ecris', \{ num: fait\.numeros\[0\] \}\)/.test(ar) && /'data-arv-ecrire'/.test(ar), 'B2 · rangé ⇒ « Écris N°X sur la boîte » (data-arv-ecrire)');
     const fr = lire('src/i18n/langues/fr/arriveeScan.js');
     dit(/"arv\.scan\.aucun": "À vérifier/.test(fr) && /"arv\.scan\.sansAchat": "À vérifier/.test(fr), 'B3 · « aucun » et « sansAchat » disent « À vérifier »');
+    const co = sansCommentaires(lire('src/ecrans/Comptabilite.jsx'));
+    dit(/x\.entree = \(\) => \{ const e = en\(\); return e \? \{ \.\.\.e, opsRetire: \(\) => opsRetraitScan\(c\) \} : e; \};[\s\S]{0,200}x\.ranger = \(\) => \{ const e = en2\(\);[\s\S]{0,120}ouvrirAtelierArrivee\(\[e\]/.test(co),
+      'B5 · « Ranger » depuis le scanner universel (achat à retirer) passe par l’entrée qui note le colis RETIRÉ (`opsRetire`)');
     const manque = ['fr', 'en', 'es', 'it', 'de'].filter((l) => { const s = lire(`src/i18n/langues/${l}/arriveeScan.js`); return !/"arv\.fait\.ecris":/.test(s) || !/"arv\.fait\.ecrisN":/.test(s); });
     dit(!manque.length, 'B4 · les 5 langues ont « Écris N°X sur la boîte »', manque);
   }
