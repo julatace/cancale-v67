@@ -277,9 +277,12 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
       dit(/^envoye\|/.test(a.etats[sel[0]]) && /^offre\|/.test(a.etats[sel[1]]) && /^encours\|Envoi en cours/.test(a.etats[sel[3]]) && /^attente\|En attente/.test(a.etats[sel[4]]) && !a.cases.some(Boolean), `${T} : les rangées disent Envoyé / Offre faite / Envoi en cours / En attente, aucune case pendant l’envoi`, JSON.stringify(sel.slice(0, 5).map((id) => a.etats[id])));
       await cap(t.pg, N('4-envoi'));
       const jobs2 = sel.map((id, i) => [id, i < 4 ? 'envoye' : 'attente', '', 0]);
-      await poserEtat(t.pg, { v: 1, uid: '111', actif: true, debut: Date.now() - 6 * MIN, total: 15, file: { total: 15, envoyes: 4, active: true }, enCours: null, sel, jobs: jobs2, prochain: Date.now() + 70000, quoi: 'rythme' });
+      await poserEtat(t.pg, { v: 1, uid: '111', actif: true, debut: Date.now() - 6 * MIN, total: 15, file: { total: 15, envoyes: 4, active: true }, enCours: null, sel, jobs: jobs2, prochain: Date.now() + 40000, quoi: 'rythme' });
       a = await lireF(t.pg);
-      dit(/^envoye\|Message envoyé/.test(a.etats[sel[3]]) && /^attente\|En attente · \d/.test(a.etats[sel[4]]) && /4 sur 15/.test(a.envoi && a.envoi.texte), `${T} : en direct : la rangée passe « Message envoyé », la suivante « En attente · heure prévue »`, JSON.stringify([a.etats[sel[3]], a.etats[sel[4]]]));
+      dit(/^envoye\|Message envoyé/.test(a.etats[sel[3]]) && /^attente\|En attente\|prochain dans \d+ s/.test(a.etats[sel[4]]) && /4 sur 15/.test(a.envoi && a.envoi.texte), `${T} : en direct : la rangée passe « Message envoyé », la suivante « En attente · heure prévue »`, JSON.stringify([a.etats[sel[3]], a.etats[sel[4]]]));
+      // 5.455.4 (Julien, 27 nov. 18:42 : « le chronomètre ne marche pas ») : le compte à rebours de la rangée AVANCE, sans requête.
+      { const sec = (x) => Number((/prochain dans (\d+) s/.exec(String(x || '')) || [])[1]); const s1 = sec(a.etats[sel[4]]); await t.pg.waitForTimeout(2600); const a2 = await lireF(t.pg); const s2 = sec(a2.etats[sel[4]]);
+        dit(s1 > 0 && s2 > 0 && s2 <= s1 - 2, `${T} : le compte à rebours de la rangée avance (${s1} → ${s2} s)`, JSON.stringify([a.etats[sel[4]], a2.etats[sel[4]]])); }
       await clic(t.pg, '.fav6-envoi [data-fav-arreter]');
       const arr = await t.pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'favorisCarte' && m.quoi === 'arreter').length);
       dit(arr === 1, `${T} : « Tout arrêter » demande l’arrêt au fond`, String(arr));

@@ -486,19 +486,19 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 - **27 nov. · Vrai bénéfice** : Statistiques › Gains « Par mois » (au versement, = l'export comptable, une seule fonction `beneficeReleve`) et « le compte qui vend le mieux » ; relevé [12] (frais confirmés, reçu). `2026-11-27-vrai-benefice.md`. Geste : aucun.
-- **27 nov. soir · FAVORIS RÉPARÉS (Julien : « tu dois faire comme les concurrents »), ext. 5.455.3** : l'identité est celle de la DEMANDE (`inquiries` article + personne) ; transaction rendue par la création ; relecture ×3 pour l'historique ; refus seulement sur contradiction LUE, raison nommée, CE favori sauté, la file continue. `2026-11-27-favoris-identite.md`. Geste : installer 5.455.3.
-- **27 nov. · « Fait la compta » + export URSSAF** : « Pour mon comptable » vente par vente (prix, achat, port, bénéfice, réf. achat, autre devise à part, fichier pour logiciel) ; nouvelle carte « Pour l'URSSAF » (rythme enregistré, jamais deviné ; registre des déclarations). `2026-11-27-compta-export.md`. Geste : aucun (3 décisions y sont posées).
-- **27 nov. · « Vas-y fais tout »** : À retirer garde la conversation de SA commande à la réunion par code (713 080 : photo, titre) ; « N prix manquants » ; « pas lu depuis N jours » (« Compris ») ; « Ordinateur éteint » + « Pourquoi ? ». `historique-divers.md`, fin.
+- **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.
+- **27 nov. nuit · FAVORIS, la suite, ext. 5.455.5** : bail de la tentative (fenêtres d'autorisation, envoi long, un compte à la fois) ; auto au prix lu maintenant ; fenêtre d'offre jamais laissée ouverte. `2026-11-27-favoris-suite.md`. Geste : installer 5.455.5.
+- **27 nov. nuit · FAVORIS « comme Vintex » réécrit + CHRONOMÈTRE, ext. 5.455.4** (arthuror2, 18:42) : seule une AUTRE PERSONNE refuse ; transaction de la DEMANDE ; registre jamais deux fois ; le prix toujours lu ; compte à rebours vivant. `2026-11-27-favoris-tous-les-cas.md`. Geste : installer 5.455.4.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.455.3** (27 nov. soir ; avant 5.455.2, 5.455.1 ; versions servies avant : `historique-divers.md`, « Extension servie », fin). **À lire en premier : `docs/passation/2026-11-23-passation-generale.md`** (23 nov. soir), puis `docs/passation/2026-11-22-passation-generale.md` (22 nov.), puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passation-generale.md` (la plus complète : en ligne, prêt, en pause, en file, refusé, gestes), puis `2026-11-16-passation.md`, `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.455.5** (27 nov. nuit ; avant 5.455.4, 5.455.3, 5.455.2, 5.455.1 ; versions servies avant : `historique-divers.md`, « Extension servie », fin). **À lire en premier : `docs/passation/2026-11-23-passation-generale.md`** (23 nov. soir), puis `docs/passation/2026-11-22-passation-generale.md` (22 nov.), puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passation-generale.md` (la plus complète : en ligne, prêt, en pause, en file, refusé, gestes), puis `2026-11-16-passation.md`, `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter « Ma facture » (Argent → Factures : SIRET, forme, régime de TVA, son e-mail) ; poser `RELANCES_SMTP_*` + `RELANCES_EXPEDITEUR` (SPF/DKIM, Brevo 300/j) — VRM envoie par défaut.
-- Installer l’extension **5.455.3** (27 nov. soir : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). Versions d’avant : `historique-divers.md`.
+- Installer l’extension **5.455.5** (27 nov. nuit : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). Versions d’avant : `historique-divers.md`.
 - Les 6 paires renumérotées le 2 oct. (543→266…, historique numéros) : regarder le carton.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
