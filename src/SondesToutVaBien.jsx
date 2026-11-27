@@ -67,12 +67,13 @@ export function SondesToutVaBien({ sondes, faire, gesteDe }) {
       {sondes.map((s) => {
         const g = gesteDe(s);
         const ext = s.cle === 'extension' && s.etat === 'geste';
+        // Une rangée verte n'a pas de « Pourquoi ? » (rien à expliquer), sauf l'extension : version attendue et dernier contact.
         const valeur = s.valeur === '—' ? '—' : s.valeur ? T(s.valeur) : s.etat === 'ok' ? tr('tvb.s.ok') : '';
         return (
           <Rangee key={s.cle} titre={T(s.titre)} sousTitre={T(s.sous)} valeur={valeur} ton={s.etat === 'geste' ? 'ambre' : 'neutre'}
             icone={<span className="vrm-tvb-sonde-point" data-ton={s.etat}/>}
             onClick={g ? () => faire(g) : null} className="vrm-tvb-sonde"
-            pied={s.pourquoi && s.pourquoi.length ? <Pourquoi attrs={{ 'data-tvb-sonde-pourquoi': s.cle }}>{s.pourquoi.map((p, i) => <p key={i} className="vrm-tvb-sonde-raison">{T(p)}</p>)}</Pourquoi> : null}
+            pied={s.pourquoi && s.pourquoi.length && (s.etat !== 'ok' || s.cle === 'extension') ? <Pourquoi attrs={{ 'data-tvb-sonde-pourquoi': s.cle }}>{s.pourquoi.map((p, i) => <p key={i} className="vrm-tvb-sonde-raison">{T(p)}</p>)}</Pourquoi> : null}
             attrs={{ 'data-tvb-sonde': s.cle, 'data-tvb-sonde-etat': s.etat, 'data-tvb-sonde-geste': g ? g.code : undefined,
               ...(ext ? { 'data-tvb-point': 'extension:ici', 'data-tvb-type': 'extension', 'data-tvb-geste-code': g ? g.code : '' } : {}) }}/>
         );

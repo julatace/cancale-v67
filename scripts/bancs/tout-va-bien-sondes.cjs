@@ -9,7 +9,7 @@ require('./_reglages-compat.cjs');   // Paramètres en catégories : la catégor
 //    A5 un site : compte à relire ⇒ le geste ; à jour ⇒ vert ; site pas lu ⇒ « — » ;
 //    A6 l'extension : en lecture ⇒ rien affirmé ; muette ⇒ « — » ; à jour ⇒ vert ; pas branchée ⇒ le geste ;
 //    A7 chaque rangée bloquée tient en 8 mots (sa phrase), en français, et porte un « Pourquoi ? ».
-//    `--prouve` : quatre mutations de la règle (un « pas su » rendu vert, un compte pas lu oublié, la borne
+//    À chaque passage (`--prouve` les force, BANC_SANS_MUTATIONS=1 les saute) : quatre mutations de la règle (un « pas su » rendu vert, un compte pas lu oublié, la borne
 //    des 24 h retirée, une réception pas lue rendue verte) ⇒ la partie A doit ROUGIR à chacune.
 //  Partie B — LA VRAIE APP (`dist`), une fausse base (projection `select=`), données INVENTÉES (dépôt public),
 //    une extension simulée (le pont `__vmr`, branchée, à la version attendue) :
@@ -22,7 +22,8 @@ require('./_reglages-compat.cjs');   // Paramètres en catégories : la catégor
 const path = require('path'), fs = require('fs'), http = require('http'), os = require('os');
 const { pathToFileURL } = require('url');
 const RACINE = process.env.BANC_RACINE || path.join(__dirname, '..', '..');
-const PROUVE = process.argv.includes('--prouve');
+// Les mutations tournent à chaque passage (quelques millisecondes) ; `BANC_SANS_MUTATIONS=1` les saute.
+const PROUVE = process.argv.includes('--prouve') || process.env.BANC_SANS_MUTATIONS !== '1';
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '❌ ') + m + (!c && d ? ' — ' + d : '')); };
 

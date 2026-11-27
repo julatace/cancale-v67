@@ -3643,3 +3643,29 @@ mot cassé sur deux lignes (coupe permise après - / ·) ; T4 dans « À envoyer
 CSS servi : conteneur retiré ⇒ O3 1008 rouge (T1, T2, T3) ; compte sans `min-width: 0` ⇒ O3 zoom T4 rouge ; `nowrap`
 remis sur `.sb-touche.vrm-rf-geste` ⇒ E12 rouge. `journee-1280` 12/12 vert. Captures regardées : 1008 clair, zoom 125 %,
 390 et 1512 clair/sombre.
+
+### « Tout va bien ? » — ce qui tourne, morceau par morceau (27 nov., branche `claude/tout-va-bien`)
+Retenu le 11 oct. (« page tout va bien ? »). La page existait (Paramètres → Aide et « Tout va bien ? », `src/ToutVaBien.jsx` :
+résumé, « À régler » par ordre d'importance, « Détails ») : elle est ÉTENDUE d'un groupe « Ce qui tourne », en tête, une
+rangée par morceau — l'extension de ce navigateur (version contre `EXT_ATTENDUE`, branchée à CE compte VRM, dernier
+contact), chaque site relié (Vinted, Leboncoin, Vestiaire, eBay : dernière lecture COMPLÈTE, règle des 24 h de
+`lignesFraicheur`), les e-mails (relevé de la boîte VRM et dernier e-mail rangé pour lui, `/api/email-rattacher?mode=reception`,
+plus `etat.emails` de `/api/sante`), la dernière capture (dernier envoi ACCEPTÉ d'une extension, lignes `ext_appareil_*`),
+la file des favoris de chaque compte Vinted (`/api/compte?mode=favoris&carte=1` : la décision GET de la file n'écrit rien,
+`api/_lib/neutre-cas.js`) et le serveur (`/api/sante`). La règle : `src/toutVaBienSondes.js` (pure) ; les lectures et la
+forme : `src/SondesToutVaBien.jsx` ; textes `src/i18n/langues/*/toutVaBienSondes.js` (5 langues).
+Chaque rangée : point VERT (`--n-vert`) quand ça marche ; bloquée : une phrase de 8 mots au plus et LE geste (Ouvrir le site,
+Voir, Brancher, Installer, Voir l'état), le reste sous « Pourquoi ? » ; une sonde qui n'a pas répondu : cercle creux, valeur
+« — » et la raison (jamais vert, jamais un geste inventé) ; un seul compte de favoris pas lu suffit à dire « — » pour la file.
+Une rangée verte n'a pas de « Pourquoi ? », sauf l'extension (version attendue, dernier contact).
+L'extension et les comptes portent LEUR geste dans « Ce qui tourne » : « À régler » ne les répète plus (l'attribut
+`data-tvb-point="extension:ici"` reste sur la rangée de l'extension). Le résumé compte aussi les e-mails, la capture, les
+favoris et le serveur ; une sonde « — » ⇒ « Je n'ai pas pu tout vérifier », jamais « Tout va bien ».
+La ligne « X pas relu depuis… » d'Aujourd'hui (`LigneConnexionsJournee`, code `relu`) : « Voir » mène à « Tout va bien ? »
+(les autres codes mènent toujours à Connexions).
+**Preuves** : `scripts/bancs/tout-va-bien-sondes.cjs` (CI, part 3) — rouge sur `origin/main` (41 rouges : règle absente, aucune
+rangée), vert après (124 verts) ; ses quatre mutations de la règle (un serveur muet rendu vert, un compte de favoris pas lu
+oublié, la borne des 24 h retirée, une réception pas lue rendue verte) rougissent chacune, à chaque passage. Captures
+regardées : 390 et 1512, clair et sombre (tout vert ; bloqué ; Aujourd'hui). `scripts/bancs/tout-va-bien.cjs` et la partie T de
+`demarrage-parcours.cjs` étaient déjà rouges sur `origin/main` (clic « Voir » de la ligne de fraîcheur, clic « Détails ») :
+hors de ce lot, non touchés (ni l'un ni l'autre n'est en CI).
