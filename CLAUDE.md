@@ -485,6 +485,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **27 nov. · Scan au relais ⇒ en stock ; « Ce matin »** : `2026-11-27-scan-ce-matin.md`.
 - **27 nov. · Aujourd'hui à 1008 px (Edge 150 %)** : les colonnes suivent la largeur de LA GRILLE (`@container sj-journee` : 3 dès 860 px, sinon 1 + 2, une sous 560) ; le compte d'« À envoyer » s'abrège. Bancs `iphone-reprise` O3 et `journee-coherence` E12 (`_journee-tient.cjs`). `historique-interface-stock.md`, fin. Geste : aucun.
 - **27 nov. · TROIS FONCTIONS RENDUES (Julien)** : filtre « Compte » de Ventes au téléphone (retenu par vendeur), alerte « un compte annule plus » dans Statistiques (règle du 5 nov. importée, un compte pas lu jamais comparé), questions eBay sans réponse en tête de Messages « À répondre ». `2026-11-27-retour-fonctions.md`. Geste : aucun.
 - **27 nov. · ext. 5.455.2** : police « Inter VRM » du panneau ; `<gardes-app>` dit « article » ; le panneau ne coupe plus un onglet qui charge. `historique-divers.md`, fin. Geste : installer 5.455.2.

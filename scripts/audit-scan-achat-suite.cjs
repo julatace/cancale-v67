@@ -133,7 +133,9 @@ if (PROUVE) prouver();
   const compta = sansCommentaires(lire('src/ecrans/Comptabilite.jsx'));
   dit(/const suite = React\.useMemo\(\(\) => lireSuite\(e\), \[e\]\);/.test(scan) && /<BlocNumero s=\{suite\}\/>/.test(scan), 'B la fiche d’achat du scanner dit le N° et le geste (`e.suite()`)');
   dit(/suite: \(\) => \{[\s\S]{0,200}numerosDeLAchat\(\{ tx, fiches: numeros/.test(compta) && /numerosVendus\(\{ ventes: Array\.isArray\(sales\.items\)/.test(compta) && /return suiteAchatScan\(/.test(compta), 'B la source d’Achats bâtit la suite par la règle (identité : n° de transaction)');
-  dit(/const idPossible = tape && /.test(scan) && /achatParIdentite\(brut, S\.enregistrements\)/.test(scan), 'B l’identité tapée (transaction, code) seulement pour un n° TAPÉ');
+  // (27 nov., lot scan-ce-matin) À l'ARRIVÉE (au point relais), la caméra lit aussi le code de retrait (une identité exacte) ;
+  // le n° de TRANSACTION reste réservé à la saisie (`tape && luId`), et hors arrivée rien ne change.
+  dit(/const idPossible = \(tape \|\| arrivee\) && /.test(scan) && /achatParIdentite\(brut, S\.enregistrements\)/.test(scan) && /tape && luId\) \{/.test(scan), 'B l’identité tapée (transaction) seulement pour un n° TAPÉ ; à l’arrivée, le code de retrait aussi à la caméra');
 
   console.log(ko ? `\n❌ audit-scan-achat-suite : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ audit-scan-achat-suite : ${ok} vert(s)`);
   process.exit(ko ? 1 : 0);
