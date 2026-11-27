@@ -36,7 +36,7 @@ export default function VentesTableau({ lignes, haut = null, pied = '', majLe, o
     return { ...l, v: l, titre: l.titre, photo: typeof l.photo === 'string' ? l.photo : '', statut: categorieVente(mot), statutLibelle: mot,
       sous: joint(marqueTaille(l), nomSite(l.site), l.compte),
       texte: [l.titre, l.num ? 'n' + l.num + ' n°' + l.num + ' ' + l.num : '', l.compte, nomSite(l.site), l.tr && l.tr.nom, l.id].filter(Boolean).join(' '),
-      prixGrille: prix(l), attrs: { 'data-vt-site': l.site, 'data-toutes-vente': l.site, 'data-toutes-id': l.id, 'data-ordre-t': l.t != null ? String(l.t) : '' } };
+      prixGrille: prix(l), attrs: { 'data-vt-site': l.site, 'data-toutes-vente': l.site, 'data-toutes-id': l.id, 'data-toutes-compte': l.compte || '', 'data-ordre-t': l.t != null ? String(l.t) : '' } };
   }) : lignes), [lignes, motEtat, nomSite, prix]);
   const colonnes = [
     // (20 nov.) « Achat » : relier CETTE vente à son achat (son toucher), ou voir l'achat relié — src/natif/ecrans/celluleAchat.jsx.

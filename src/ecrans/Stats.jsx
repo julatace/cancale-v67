@@ -2788,7 +2788,7 @@ function ObjectifDuMois({ liveStats }) {
           <PropositionObjectif type={type} sources={sources} regles={REGLES_CARTE} onViser={poserValeur}/>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input aria-label={eurT ? tr('stats.objectifEuros') : tr('stats.objectifNombreVentes')} type="text" inputMode={eurT ? 'decimal' : 'numeric'} value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={eurT ? '2 000' : '40'} data-objectif-saisie=""
-              style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 12, padding: '11px 12px', fontSize: 15, fontFamily: 'inherit', outline: 'none' }}/>
+              style={{ flex: 1, minWidth: 0, minHeight: 44, boxSizing: 'border-box', border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 12, padding: '11px 12px', fontSize: 15, fontFamily: 'inherit', outline: 'none' }}/>
             <span style={{ fontSize: 13, color: C.muted }}>{eurT ? '€' : 'ventes'}</span>
             <Bouton variante="primaire" disabled={lu == null} data-objectif-ok="" onClick={() => { if (lu != null) poserValeur(lu); }}>OK</Bouton>
           </div>

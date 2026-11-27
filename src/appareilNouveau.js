@@ -10,7 +10,12 @@ export async function verifierAppareilUneFois({ uid, enTete, stockage, fetch: f 
   const cle = `${CLE_VERIF_APPAREIL}_${uid}`;
   try { if (stockage && stockage.getItem(cle)) return 'deja'; } catch (_) {}
   try {
-    const r = await f('/api/compte?mode=appareils', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(enTete || {}) }, body: JSON.stringify({ action: 'verifier' }) });
+    const r = await f('/api/compte?mode=appareils', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(enTete || {}) }, body: JSON.stringify({ action: 'verifier' }),
+      // (26 nov., vitesse-webkit) La route n'écrit que SON registre (`vrm_appareils_vus`) et, s'il alerte, le centre des
+      // notifications (`push_journal*`, api/_lib/push.js) : seules ces lectures sont oubliées (src/lecturesPartagees.js,
+      // `vrmEcritLignes`). Sans la déclaration, son retour vidait TOUTES les lectures partagées au démarrage : la sonde des
+      // transactions, les comptes, les réglages repartaient une seconde fois (banc budget-vitesse).
+      vrmEcritLignes: ['vrm_appareils_vus', 'push_journal'] });
     if (!r || !r.ok) return 'pas-su';
     // Seule la réponse de la route compte (une page HTML de repli n'est pas un « fait »).
     const j = await r.json().catch(() => null);
