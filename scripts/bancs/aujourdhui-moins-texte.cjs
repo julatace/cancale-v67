@@ -154,7 +154,9 @@ const MESURER = () => {
   return { mots: mots.length, texte, coupes, ecart, sites, nSites, doubles, gestes, ecran: !!ecran, debord: document.documentElement.scrollWidth > window.innerWidth + 1 };
 };
 
-(async () => {
+// (27 nov.) La base et l'ouverture servent aussi le banc `actions-rondes-onglets.cjs` (la même capture de Julien).
+module.exports = { baseCapture, ouvrir };
+if (require.main === module) (async () => {
   const b = baseCapture();
   console.log(`Base : vendu 7 j ${b.attendu.sept} € · 7 j d'avant ${b.attendu.avant} €`);
   await new Promise((ok) => P.srv.listen(P.PORT, ok));
