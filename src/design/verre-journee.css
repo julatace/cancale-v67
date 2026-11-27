@@ -153,6 +153,14 @@
   font: 650 15.5px/1 Inter, system-ui, sans-serif !important; letter-spacing: -.005em !important; white-space: nowrap !important;
 }
 :root:root:root:root:root:root body .sj-journee :is(.sj-t-envoyer .sj-plein-place .sb-btn-plein, .vrm-so-plein) :is(svg, span) { color: inherit !important; font: inherit !important; }
+/* (27 nov., zero-rouge-bancs-2) À 1280 px la colonne « À envoyer » fait ~265 px : « Imprimer les 6 bordereaux » (nowrap) débordait
+   de son bouton, coupé à droite (police de repli, sans Inter). Le libellé passe à la ligne DANS le bouton plutôt que d'en sortir ;
+   l'icône ne se tasse pas. Rien ne change quand il tient sur une ligne. */
+:root:root:root:root:root:root body .sj-journee :is(.sj-t-envoyer .sj-plein-place .sb-btn-plein, .vrm-so-plein) {
+  height: auto !important; padding-block: 8px !important; white-space: normal !important; text-align: center !important; line-height: 1.2 !important;
+}
+:root:root:root:root:root:root body .sj-journee :is(.sj-t-envoyer .sj-plein-place .sb-btn-plein, .vrm-so-plein) > svg { flex: none !important; }
+:root:root:root:root:root:root body .sj-journee :is(.sj-t-envoyer .sj-plein-place .sb-btn-plein, .vrm-so-plein) > span { min-width: 0 !important; overflow-wrap: anywhere !important; line-height: 1.2 !important; }
 :root:root:root:root:root:root body .sj-journee :is(.sj-t-envoyer .sj-plein-place .sj-imprimer-touche, .vrm-so-touche) {
   display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 8px !important;
   width: 100% !important; height: 48px !important; min-height: 48px !important; padding: 0 16px !important; border-radius: 14px !important;

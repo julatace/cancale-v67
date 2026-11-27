@@ -31,7 +31,7 @@ jobs:
       - name: Installer WebKit
         run: |
           echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-vrm-retries >/dev/null
-          for essai in 1 2 3 4; do npx playwright install --with-deps webkit && break; [ "$essai" = 4 ] && exit 1; sleep $((essai * 20)); sudo apt-get update || true; done
+          bash scripts/ci-installer-navigateurs.sh webkit   # sans la source apt de Microsoft, 4 essais (scripts/ci-installer-navigateurs.sh)
       - name: Le banc sous WebKit
         env:
           NAVIGATEUR: webkit
