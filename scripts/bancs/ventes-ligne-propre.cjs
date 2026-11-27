@@ -85,7 +85,7 @@ const mesure = (pg) => pg.evaluate(() => {
       // « À envoyer » (l'ouverture) PUIS « Toutes » (la capture de Julien) : les lignes des deux listes.
       const m1 = await mesure(pg);
       // (24 nov., main-vert) « Toutes » est devenu le choix « Terminées » du segmenté natif (role=radio) : on attend SES rangées.
-      const toutes = pg.locator('.vrm-main').getByRole('radio', { name: /^Terminées/ }).first();
+      const toutes = pg.locator('.vrm-main [data-colis-onglet-choix="toutes"]').first();   // (27 nov.) la CLÉ du segment « Toutes », jamais son libellé
       if (await toutes.count()) { await toutes.tap().catch(() => {}); await pg.waitForSelector('.vrm-main .n-rangee[data-toutes-vente]', { timeout: 30000 }).catch(() => {}); }
       await pg.waitForSelector(LIGNE, { timeout: 30000 }).catch(() => {});
       await pg.waitForTimeout(2500);
