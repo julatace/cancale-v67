@@ -268,7 +268,10 @@
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne-ph > img { width: 100% !important; height: 100% !important; object-fit: cover !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne-mid { flex: 1 !important; min-width: 0 !important; display: block !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne-l1 { display: flex !important; align-items: center !important; gap: 8px !important; color: var(--sv-encre) !important; }
-  :root:root:root:root:root:root:root body .sj-journee .sj-v-cpt { font: 600 12.5px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; white-space: nowrap !important; }
+  /* (27 nov., banc iphone-reprise O3 T4) Le compte se TASSE (« boutique_d… ») : sans `min-width: 0` il gardait sa largeur et
+     passait SOUS le prix dans une colonne étroite (« boutique_c 44 € », 1008 px et zoom 125 %). La plaque et le site gardent la leur. */
+  :root:root:root:root:root:root:root body .sj-journee .sj-v-cpt { font: 600 12.5px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; white-space: nowrap !important; min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+  :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne-l1 > :not(.sj-v-cpt) { flex: none !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne-l2 { display: block !important; font: 550 12.5px/1.3 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; margin-top: 3px !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne-l2.sj-v-am { color: var(--sv-ambre) !important; font-weight: 700 !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne-prix { font: 750 15.5px/1 Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important; flex: none !important; }
@@ -291,6 +294,29 @@
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-carte:not(.vrm-so-d):not(.vrm-so-fin) { grid-template-columns: 110px minmax(0, 1fr) !important; }
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-ph { width: 110px !important; height: 110px !important; }
 }
+}
+
+/* ══ 4 bis. (27 nov.) LE NOMBRE DE COLONNES SUIT LA LARGEUR DE LA GRILLE, PAS CELLE DE LA FENÊTRE ═══════════════════
+   Vu sur la capture `iphone-reprise` O 1008 × 633 (une fenêtre d'Edge à 150 %, coque d'ordinateur) : la grille n'avait que
+   ~676 px pour trois colonnes (258 / 198 / 188 px) — « 2 146 € » rogné, le grand chiffre du jour écrasé à 2 px (le « S » de
+   la semaine coupé à gauche), le compte sous le prix d'« À envoyer », « nouvea / ux » cassé lettre à lettre dans « À faire ».
+   La fenêtre ne dit pas la place (la colonne de gauche, réduite ou non ; le zoom de l'app) : on juge LA GRILLE.
+   ≥ 860 px : les trois colonnes (1512 : 1180 px ; 1280 : ~900 px, inchangé) ; de 560 à 859 px : la 1re colonne (le chiffre
+   du jour, la semaine, le mois) en pleine largeur, puis « À envoyer » et « À retirer / Messages / À faire » côte à côte
+   (~330 px chacune, la largeur de 1512) ; sous 560 px : une seule colonne. Banc : `iphone-reprise` O3 (`_journee-tient.cjs`). */
+:root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] { container: sj-journee / inline-size; }
+@container sj-journee (max-width: 859.98px) {
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille.sj-grille-colonnes {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; grid-template-areas: "c1 c1" "c2 c3" !important;
+  }
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille-colonnes > .sj-col-c1 { grid-area: c1 !important; }
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille-colonnes > .sj-col-c2 { grid-area: c2 !important; }
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille-colonnes > .sj-col-c3 { grid-area: c3 !important; }
+}
+@container sj-journee (max-width: 559.98px) {
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille.sj-grille-colonnes {
+    grid-template-columns: minmax(0, 1fr) !important; grid-template-areas: "c1" "c2" "c3" !important;
+  }
 }
 
 /* ══ 5. « LA PAIRE À SORTIR EN PREMIER » (`e-sortir.cjs`) ═══════════════════════════════════════ */
