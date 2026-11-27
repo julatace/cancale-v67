@@ -210,7 +210,8 @@ const juge = (cs, quoi) => {
           dit(!!f && /300(?:,00)?[\s\u00a0\u202f]*€, 3 ventes/.test(f), `A ${T} : il porte le CA du mois (300 €, 3 ventes) — celui du rapport`, (f || '').replace(/\n/g, ' | ').slice(0, 160));
           if (f) {
             await touche(pg, '[data-decl-enregistrer]', vp);
-            await pg.waitForTimeout(2600);
+            await pg.waitForTimeout(1000);
+            for (let i = 0; i < 40 && !(opts.main && opts.main.vrm_urssaf_declare && opts.main.vrm_urssaf_declare['2026-09']); i++) await pg.waitForTimeout(250);   // (27 nov.) l'écriture, pas un délai
             const reg = await registre(pg);
             const s = reg && reg['2026-09'];
             dit(!!s && Array.isArray(s.ids) && s.ids.length === 3 && s.regle === 'versement', `A ${T} : septembre est noté, par l'IDENTITÉ de ses 3 ventes`, JSON.stringify(s).slice(0, 120));

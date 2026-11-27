@@ -209,7 +209,9 @@ const juge = (cs, quoi) => {
         await aller(pg, 'compta', '[data-statut-carte]', 1500);
         await ouvrirCarte(pg, '[data-statut="particulier"]');   // (27 nov.) « Ton statut » vit dans Argent → Déclarer, replié
         await touche(pg, '[data-statut="particulier"]', vp);
-        await pg.waitForTimeout(1600);
+        // (27 nov.) On attend l'ÉCRITURE (au plus 10 s), pas un délai fixe (§6.5) : l'envoi au nuage est regroupé.
+        for (let i = 0; i < 40 && !(opts.main && opts.main.vinted_regime === 'particulier'); i++) await pg.waitForTimeout(250);
+        await pg.waitForTimeout(300);
         dit(await pg.$('[data-statut-carte="particulier"]') != null, `A ${T} : « Particulier » choisi ⇒ sa carte, sans URSSAF`);
         dit(await pg.$('[data-declarer-urssaf]') == null, `A ${T} : toujours aucune déclaration URSSAF`);
         dit(opts.main && opts.main.vinted_regime === 'particulier', `A ${T} : le choix est rangé au nuage (synchronisé)`, opts.main && opts.main.vinted_regime);
@@ -235,7 +237,8 @@ const juge = (cs, quoi) => {
         dit(await pg.$('[data-declarer-urssaf]') != null, `C ${T} : micro ⇒ la carte de déclaration URSSAF`);
         await ouvrirCarte(pg, '[data-taux-option="liberatoire"]');   // (27 nov.) Argent → Déclarer, replié
         await touche(pg, '[data-taux-option="liberatoire"]', vp);
-        await pg.waitForTimeout(1600);
+        for (let i = 0; i < 40 && !(opts.main && Number(opts.main.vinted_urssaf_taux) === 13.4); i++) await pg.waitForTimeout(250);   // (27 nov.) l'écriture, pas un délai
+        await pg.waitForTimeout(300);
         const t1 = await attrs(pg, '[data-statut-taux]', 'data-statut-');
         dit(t1 && t1.taux === '13.4', `C ${T} : versement libératoire ⇒ 13,4 %`, JSON.stringify(t1));
         dit(opts.main && Number(opts.main.vinted_urssaf_taux) === 13.4, `C ${T} : le taux est rangé au nuage`, opts.main && String(opts.main.vinted_urssaf_taux));
