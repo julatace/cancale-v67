@@ -26,7 +26,7 @@ import { lireCodeColis, retrouverParSuivi, normaliserN } from './scanColis.js';
 import { useLectureCamera, raisonCamera, vibrer, creerBip, zoomDe, poserZoom } from './ScannerColis.jsx';
 import { lireSourcesColis, EV_RETROUVER_CODE, chercherCodeSources, sourcePrincipalePresente } from './retrouverColis.js';
 import { codeCherchable, normaliserCode } from './etiquettesScan.js';
-import { achatDuScan } from './arriveeAchat.js';
+import { achatDuRetraitScan } from './arriveeAchat.js';
 import { achatParIdentite } from './scanAchatSuite.js';
 import { cleLigne, ouvrirLigne } from './ficheLigne.js';
 import { reconnaitre } from './scanUniversel.js';
@@ -325,7 +325,9 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
     // (23 nov., lot scan-achat) Un n° TAPÉ (ou lu par la douchette) qui n'est pas un n° de suivi peut être le n° de
     // TRANSACTION d'un achat ou le CODE DE RETRAIT d'un colis : une identité exacte (`achatParIdentite`), cherchée une
     // fois les sources lues. Jamais pour une lecture de la caméra (un code quelconque ne doit rien ouvrir).
-    const idPossible = tape && normaliserN(brut).length >= 4;
+    // (27 nov., lot scan-ce-matin) À L'ARRIVÉE (au point relais), la CAMÉRA y a droit aussi : le QR / code-barres du
+    // retrait porte le code de retrait ENTIER — une identité exacte (`achatDuRetraitScan`, src/arriveeAchat.js).
+    const idPossible = (tape || arrivee) && normaliserN(brut).length >= 4;
     // (24 nov., lot scanner-universel) Hors arrivée, TOUT code lu est soumis à la reconnaissance universelle
     // (src/scanUniversel.js : suivi, transaction, code de retrait, N°, boîte) — identités exactes seulement.
     // Un code de la caméra déjà dit « inconnu » ne relance rien (la caméra le relit en boucle).
@@ -343,16 +345,20 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
       const trouvesId = parId.etat === 'un' ? [parId.trouve] : parId.etat === 'plusieurs' ? parId.trouves : [];
       if (arrivee) {
         n.current += 1;
-        if (!lu && !luId) { if (tape) { setRes({ etat: 'pasReconnu', brut: String(brut), n: n.current }); vibrer([30, 60, 30]); bip.current(false); } else { setRes(null); setIndice(court(brut)); } return; }
-        let ra = lu ? achatDuScan(lu, S.enregistrements) : { etat: 'aucun', lu: null };
-        if (ra.etat !== 'un' && ra.etat !== 'plusieurs' && luId) {
+        // (27 nov., lot scan-ce-matin) Le n° de suivi, puis le CODE DE RETRAIT ENTIER (caméra ou saisie) : `achatDuRetraitScan`
+        // (src/arriveeAchat.js). Tapé : le n° de TRANSACTION d'un achat aussi (`achatParIdentite`). Rien d'autre ne relie.
+        let ra = achatDuRetraitScan(brut, lu, S.enregistrements);
+        if (ra.etat !== 'un' && ra.etat !== 'plusieurs' && tape && luId) {
           const A = trouvesId.filter((x) => x.sorte === 'achat');
-          ra = A.length === 1 ? { etat: 'un', lu: luId, trouve: A[0] } : A.length > 1 ? { etat: 'plusieurs', lu: luId, trouves: A } : lu ? ra : { etat: 'sansAchat', lu: luId };
+          if (A.length === 1) ra = { etat: 'un', lu: luId, trouve: A[0] };
+          else if (A.length > 1) ra = { etat: 'plusieurs', lu: luId, trouves: A };
         }
+        // Ni n° de suivi ni code connu : la caméra se tait (un code quelconque n'ouvre rien), la saisie dit « pas reconnu ».
+        if (!lu && (ra.etat === 'aucun' || ra.etat === 'pasReconnu')) { if (tape) { setRes({ etat: 'pasReconnu', brut: String(brut), n: n.current }); vibrer([30, 60, 30]); bip.current(false); } else { setRes(null); setIndice(court(brut)); } return; }
         const bon = ra.etat === 'un' || ra.etat === 'plusieurs';
         vibrer(bon ? 40 : [30, 60, 30]); bip.current(bon); setChoisi(null);
         setRes({ ...ra, brut: String(brut), n: n.current, manques: incomplet || !bon ? S.manques : [], incomplet: !!incomplet });
-        if (ra.etat === 'un' && onArrivee) { const t = ra.trouve; setTimeout(() => { try { onArrivee(t, lu); } catch (_) {} }, 0); }
+        if (ra.etat === 'un' && onArrivee) { const t = ra.trouve; setTimeout(() => { try { onArrivee(t, ra.lu || lu); } catch (_) {} }, 0); }
         return;
       }
       // (24 nov., lot scanner-universel) LA RECONNAISSANCE UNIVERSELLE : n° de suivi, n° de transaction, code de retrait,

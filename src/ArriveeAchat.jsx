@@ -144,7 +144,10 @@ export default function ArriveeAchat({ entree, coque, onFermer, onSuivant = null
     );
   } else if (fait) {
     corps = (
-      <Groupe titre={tr('arv.fait.titre')} pied={fait.horsLigne ? tr('arv.fait.horsLigne') : tr('arv.fait.pied', { s: Math.round(DUREE_ANNULER_ARRIVEE / 1000) })} attrs={{ 'data-arv-etat': 'fait', 'data-arv-fait': (fait.numeros || []).join(',') }}>
+      // (27 nov., lot scan-ce-matin) Rangé ⇒ LA phrase du geste qui reste : « Écris N°X sur la boîte » (sauf qui imprime ses
+      // étiquettes : « Imprimer l'étiquette » est en dessous). Hors ligne, aucun N° n'est donné : rien à écrire.
+      <Groupe titre={!fait.horsLigne && !etiq && (fait.numeros || []).length ? ((fait.numeros || []).length === 1 ? tr('arv.fait.ecris', { num: fait.numeros[0] }) : tr('arv.fait.ecrisN', { n: fait.numeros.length })) : tr('arv.fait.titre')}
+        pied={fait.horsLigne ? tr('arv.fait.horsLigne') : tr('arv.fait.pied', { s: Math.round(DUREE_ANNULER_ARRIVEE / 1000) })} attrs={{ 'data-arv-etat': 'fait', 'data-arv-fait': (fait.numeros || []).join(','), 'data-arv-ecrire': !fait.horsLigne && !etiq ? (fait.numeros || []).join(',') : '' }}>
         {(fait.lignes || []).map((l, k) => <Rangee key={k} titre={l.titre || titre} plaque={<Plaque numero={l.numero} grand/>} sousTitre={l.case ? placeEnMots(l.case, meubles) : tr('arv.case.aucune')} attrs={{ 'data-arv-range': String(l.numero) }}/>)}
         {fait.horsLigne ? <Rangee titre={tr('arv.fait.note')} attrs={{ 'data-arv-note': '' }}/> : null}
         {fait.retire ? <Rangee titre={tr('arv.fait.retire')} attrs={{ 'data-arv-retire': '' }}/> : null}

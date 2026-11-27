@@ -30,6 +30,10 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (27 nov., lot scan-ce-matin — choix de Julien) src/aujourdhui/ceMatin.js, src/arriveeAchat.js `achatDuRetraitScan`
+  { id: 'ce-matin', date: '2026-11-27', titre: '« Ce matin » en tête d’Aujourd’hui', phrase: 'Acheteurs, bordereaux, colis, offres, comptes : dans l’ordre.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'scan-point-relais', date: '2026-11-27', titre: 'Scanne au point relais : la paire en stock', phrase: 'Le code de retrait suffit : retiré, numéroté, « Écris N° ».', tab: 'achats', pour: 'tous', mode: 'tous',
+    titreArt: 'Scanne au point relais : l’article en stock' },
   // (27 nov., retour-fonctions — Julien : trois fonctions d'avant les écrans natifs) src/filtrePlateforme.js, src/ecrans/Stats.jsx, src/filUnique.js
   { id: 'ventes-compte-telephone', date: '2026-11-27', titre: 'Ventes : « Toutes », et filtre par compte', phrase: '« Toutes » liste chaque vente ; un compte au choix, retenu.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'annulations-compte-alerte', date: '2026-11-27', titre: 'Un compte annule plus : VRM le dit', phrase: 'Dans Statistiques, au-dessus des taux d’annulation par compte.', tab: 'stats', pour: 'tous', mode: 'tous' },

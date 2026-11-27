@@ -16,7 +16,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { retardIci, santeDesComptes, pointsToutVaBien } from './regles.js';
+import { retardIci, santeDesComptes, pointsToutVaBien, comptesEnVerification } from './regles.js';
 import { etatControle, CONTROLES } from '../controleNuit.js';
 import { lireControleNuit, lireControleInstallation } from '../veilleLigne.js';
 import { nomPlateforme } from '../plateformes.js';
@@ -230,6 +230,21 @@ export function usePointsToutVaBien() {
   const ctl = useControleNuit();
   const ici = useRetardIci();
   return React.useMemo(() => pointsToutVaBien({ controle: ctl.vendeur, installation: ctl.installation, ici }), [ctl.vendeur, ctl.installation, ici]);
+}
+// (27 nov., lot scan-ce-matin) « Ce matin » : combien de SES comptes Vinted attendent une vérification (la règle de la carte de
+// santé, `arretDeJauge`). `uids` : les comptes retenus. undefined = on lit · null = pas su · nombre.
+export function useComptesEnVerification(uids, actif = true) {
+  const [rows, setRows] = React.useState(undefined);
+  React.useEffect(() => {
+    if (!actif) return undefined;
+    let mort = false;
+    const lire = () => lireLignesActions('').then((r) => { if (!mort) setRows(Array.isArray(r) ? r : null); }, () => { if (!mort) setRows(null); });
+    lire();
+    const m = setInterval(lire, 5 * 60000);
+    return () => { mort = true; clearInterval(m); };
+  }, [actif]);
+  const cle = (Array.isArray(uids) ? uids : []).join(',');
+  return React.useMemo(() => (rows === undefined ? undefined : comptesEnVerification({ actions: rows, uids, reprises: reprises() })), [rows, cle]);   // eslint-disable-line react-hooks/exhaustive-deps
 }
 export const textePoints = (p) => (p && p.n ? tr('fiab.points', { n: p.n }) : '');
 

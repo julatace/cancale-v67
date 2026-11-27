@@ -42,6 +42,38 @@ export function achatDuScan(lu, enregistrements) {
   return { etat: 'aucun', lu };
 }
 
+// ── 1 bis. AU POINT RELAIS : LE CODE SCANNÉ ⇒ L'ACHAT (27 nov., lot scan-ce-matin) ─────────────────────────────
+// Julien (27 nov.) : « je scanne au point relais, la paire entre dans le stock ». Le code visé par la CAMÉRA peut
+// être le n° de suivi (l'étiquette) OU le code de retrait (le QR / le code-barres du retrait) : DEUX identités, et
+// rien d'autre (CLAUDE.md §5 — jamais un titre, jamais un début de code). Le code de retrait vaut pour la caméra
+// comme pour la saisie : il est ENTIER (4 caractères au moins) et ÉGAL à celui d'UN colis à retirer.
+// `brut` : le texte lu · `lu` : `lireCodeColis(brut)` (ou null) · `enregistrements` : ceux des sources du scanner.
+// Rend { etat: 'un', lu, trouve, par } · { etat: 'plusieurs', lu, trouves, par } · { etat: 'sansAchat', lu, par }
+// (le colis existe mais aucun achat ne lui est relié : « à vérifier ») · { etat: 'aucun', lu } · { etat: 'pasReconnu' }.
+export const CODE_RETRAIT_MIN = 4;
+const normCode = (s) => String(s == null ? '' : s).toUpperCase().replace(/[^A-Z0-9]/g, '');
+export function achatDuRetraitScan(brut, lu, enregistrements) {
+  const L = Array.isArray(enregistrements) ? enregistrements.filter((e) => e && e.cle != null) : [];
+  // 1. Le n° de suivi (égalité exacte).
+  const parSuivi = lu && lu.suivi ? achatDuScan(lu, L) : { etat: 'pasReconnu' };
+  if (parSuivi.etat === 'un' || parSuivi.etat === 'plusieurs') return { ...parSuivi, par: 'suivi' };
+  // 2. Le code de retrait : le code ENTIER d'un colis à retirer (un achat, ou un colis sans achat relié).
+  const n = normCode(brut);
+  const luCode = { suivi: n, nom: null, transporteur: null, forme: 'code' };
+  if (n.length >= CODE_RETRAIT_MIN) {
+    const C = L.filter((e) => (e.sorte === 'achat' || e.sorte === 'colis') && e.code && normCode(e.code) === n);
+    const vus = new Map(); for (const e of C) vus.set(`${e.sorte}:${e.cle}`, e);
+    const U = [...vus.values()];
+    const A = U.filter((e) => e.sorte === 'achat');
+    if (A.length === 1) return { etat: 'un', lu: luCode, trouve: A[0], par: 'code' };
+    if (A.length > 1) return { etat: 'plusieurs', lu: luCode, trouves: A, par: 'code' };
+    if (U.length) return { etat: 'sansAchat', lu: luCode, par: 'code' };
+  }
+  if (parSuivi.etat === 'sansAchat') return { ...parSuivi, par: 'suivi' };
+  if (lu && lu.suivi) return { etat: 'aucun', lu };
+  return n.length >= CODE_RETRAIT_MIN ? { etat: 'aucun', lu: luCode } : { etat: 'pasReconnu' };
+}
+
 // ── 2. LE N° DE L'ARRIVÉE ────────────────────────────────────────────────────
 // fiches : `vrm_fiches_neuves` (LUES) · numsAchat : les N° déjà portés par CET achat (relié par identité :
 // `buyNumByTxn`) · tx : son n° de transaction.

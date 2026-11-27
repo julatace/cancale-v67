@@ -12,6 +12,8 @@ require('./_porte-banc.cjs');
 //      un seul geste « Annuler » ; « Déjà rangé » si on y revient (jamais deux fois) ;
 //   S  le SCAN (caméra SIMULÉE : un QR Mondial Relay dessiné dans le flux vidéo, lu par le vrai lecteur WebAssembly) :
 //      50 achats IDENTIQUES ⇒ celui du n° visé ; « Ranger ici » note aussi le colis retiré (même clé que « J'ai retiré ») ;
+//   C  (27 nov., lot scan-ce-matin) AU POINT RELAIS : le QR du RETRAIT (son code) lu par la caméra ⇒ l'arrivée de SON achat
+//      parmi deux au même titre ; rangé ⇒ « Écris N°13 sur la boîte », CE colis retiré ; rescanné ⇒ aucune 2e paire ;
 //   Q  n° tapé : inconnu ⇒ « Aucun achat » ; deux achats au même n° ⇒ la liste, SON toucher choisit ;
 //   L  un lot (3 articles dans SA transaction) ⇒ « Contient 3 paires », N°13·14·15, trois cases différentes ;
 //   H  hors ligne : l'achat reconnu (données en cache), « Le N° attend le réseau », « Noter l'arrivée » ;
@@ -66,6 +68,11 @@ function base(vide = false) {
 }
 const ACCOUNTS = [{ id: 1, vinted_user_id: UID, login: 'compte_banc', domain: 'www.vinted.fr', updated_at: iso(MS) }];
 // Le QR Mondial Relay d'une étiquette (forme mesurée : `exp=` porte le n° à 8 chiffres).
+// (27 nov., lot scan-ce-matin) Le QR du RETRAIT : il porte le code de retrait lui-même (texte brut).
+const matriceTexte = (t) => { const q = qrcode(0, 'M'); q.addData(String(t)); q.make(); const n = q.getModuleCount(); const m = []; for (let r = 0; r < n; r++) { const l = []; for (let c = 0; c < n; c++) l.push(q.isDark(r, c) ? 1 : 0); m.push(l); } return m; };
+// (27 nov.) La base du point relais : DEUX colis à retirer au MÊME titre (9423 et 9424), chacun SON code.
+const CODE_23 = '054321', CODE_24 = '054399';
+const baseCode = () => { const L = base(); const r = L.find((x) => x.id === 'panel_colis_relais'); r.data = { ...r.data, 9424: { code: CODE_24, lieu: 'Tabac de la gare, 22000 Autreville', transporteur: 'mondialrelay', at: iso(MS) } }; return L; };
 const matriceQr = (n) => { const q = qrcode(0, 'M'); q.addData(`https://www.mondialrelay.com/public/permanent/tracking.aspx?ens=MRVINTED&exp=${n}&language=FR&CodePostal=35260`); q.make(); const t = q.getModuleCount(); const m = []; for (let r = 0; r < t; r++) { const l = []; for (let c = 0; c < t; c++) l.push(q.isDark(r, c) ? 1 : 0); m.push(l); } return m; };
 
 // ── Le serveur de l'app ──
@@ -307,6 +314,35 @@ async function passe(b, vp, sombre) {
       const re = await attendre(() => pg.evaluate(() => !!document.querySelector('[data-scan-arrivee]')), 8000);
       dit(!!re, `${T} S3 · « Scanner le suivant » rouvre la caméra de l’arrivée`);
       dit(!errs.length, `${T} S · aucune erreur de page`, errs[0]);
+    } finally { await ctx.close(); }
+  });
+
+  // ── C · AU POINT RELAIS (27 nov., lot scan-ce-matin) : le QR du RETRAIT (son code) lu par la caméra ⇒ l'arrivée de CE colis,
+  //      parmi deux au MÊME titre ; rangé ⇒ « Écris N°13 sur la boîte » ; le même code rescanné ne crée aucune 2e paire. ──
+  await essaie(`${T} C`, async () => {
+    const { ctx, pg, errs, tactile } = await ouvrir(b, vp, sombre, baseCode(), { camera: true });
+    try {
+      await scannerArrivee(pg, tactile);
+      await attendre(() => pg.evaluate(() => { const e = document.querySelector('[data-scan-r]'); return e && e.getAttribute('data-scan-r-camera') === 'active'; }), 15000);
+      await pg.evaluate((m) => window.__viser(m), matriceTexte(CODE_24));
+      const e = await attendreArrivee(pg, 30000);
+      dit(!!e && e.tx === '9424', `${T} C1 · le code de retrait (caméra) ⇒ l’arrivée de SON achat (9424), jamais l’autre au même titre`, e || (await pg.evaluate(() => (document.querySelector('[data-scan-r]') || {}).innerText || '')).slice(0, 200));
+      if (!e) { await shot(pg, `C-echec-${suf}`); return; }
+      await toucher(pg, '[data-arv-ranger]', tactile);
+      const w = await attendre(async () => { const l = await lireLocal(pg); const f = Object.values(l.fiches)[0]; return f && l.pickup['9424'] ? { l, f } : null; }, 10000);
+      dit(!!w && w.f.achat.tx === '9424' && !w.l.pickup['9423'], `${T} C2 · rangé : la fiche de CET achat, CE colis noté retiré (pas l’autre)`, w ? { tx: w.f.achat.tx, pickup: w.l.pickup } : await lireLocal(pg));
+      const ecr = await attendre(() => pg.evaluate(() => { const g = document.querySelector('[data-arv-ecrire]'); return g ? g.getAttribute('data-arv-ecrire') : null; }), 5000);
+      dit(ecr === '13', `${T} C3 · « Écris N°13 sur la boîte » (data-arv-ecrire)`, ecr);
+      await pg.waitForTimeout(400); await shot(pg, `C3-ecris-${suf}`);
+      await toucher(pg, '[data-arv-suivant]', tactile);
+      await attendre(() => pg.evaluate(() => !!document.querySelector('[data-scan-arrivee]')), 8000);
+      await pg.evaluate((m) => window.__viser(m), matriceTexte(CODE_24));
+      await pg.waitForTimeout(6000);
+      const e2 = await ecran(pg);
+      const l2 = await lireLocal(pg);
+      const fiches = Object.values(l2.fiches || {}).filter((f) => f && f.achat && f.achat.tx === '9424');
+      dit(fiches.length === 1 && (!e2.ouvert || e2.etat === 'deja' || !!e2.deja), `${T} C4 · le même code rescanné : aucune 2e paire (une fiche, « déjà rangé » ou rien)`, { n: fiches.length, e2 });
+      dit(!errs.length, `${T} C · aucune erreur de page`, errs[0]);
     } finally { await ctx.close(); }
   });
 
