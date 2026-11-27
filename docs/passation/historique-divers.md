@@ -2460,3 +2460,7 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 ## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. nuit (fusion, sous 60 Ko)
 
 - **27 nov. · « Vas-y fais tout »** : À retirer garde la conversation de SA commande à la réunion par code (713 080 : photo, titre) ; « N prix manquants » ; « pas lu depuis N jours » (« Compris ») ; « Ordinateur éteint » + « Pourquoi ? ». `historique-divers.md`, fin.
+
+## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. 23 h (place pour la 5.455.7, sous 60 Ko)
+
+- **27 nov. nuit · FAVORIS « comme Vintex » réécrit + CHRONOMÈTRE, ext. 5.455.4** (arthuror2, 18:42) : seule une AUTRE PERSONNE refuse ; transaction de la DEMANDE ; registre jamais deux fois ; le prix toujours lu ; compte à rebours vivant. `2026-11-27-favoris-tous-les-cas.md`. Geste : installer 5.455.4.
