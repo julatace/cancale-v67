@@ -63,6 +63,7 @@ export default {
   "vb.sansAchat": {"one": "{n} ohne Einkaufspreis", "other": "{n} ohne Einkaufspreis"},
   "vb.fraisPasConfirmes": {"one": "{n} mit unbestätigten Kosten", "other": "{n} mit unbestätigten Kosten"},
   "vb.aDater": {"one": "{n} Verkauf noch nicht ausgezahlt: in keinem Monat", "other": "{n} Verkäufe noch nicht ausgezahlt: in keinem Monat"},
+  "vb.auPlusMot": "höchstens",
   "vb.portRecu": "Versand des Einkaufs inklusive (Beleg)",
   "vb.pourquoi": "Echter Gewinn = Verkaufspreis (eBay, Vestiaire: das erhaltene Geld) − Einkaufspreis − Plattformgebühren − Boosts und notierte Kosten. Der beim Einkauf bezahlte Versand steckt im Einkaufspreis: der Vinted-Beleg enthält ihn immer; von Hand eingegeben, rechne ihn ein. „Höchstens“: die Kosten eines Verkaufs sind nicht bestätigt, ein Boost kann fehlen. Ein Monat folgt dem Auszahlungsdatum, wie dein Export für die Buchhaltung: beide zeigen dieselbe Zahl. Nur deine ausgewählten Konten zählen.",
 };

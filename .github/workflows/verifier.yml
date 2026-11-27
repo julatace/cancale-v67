@@ -110,7 +110,7 @@ jobs:
           - part: 2
             lot: accessibilite@BANC_LARGEUR=1512 ventes-e2@SCENARIOS=annul,ko ventes-e2@SCENARIOS=egal,gros,vide accessibilite-clavier chiffres-coherents ventes-ligne-propre garde-ecrans compta-export
           - part: 3
-            lot: navigation-tache ventes-e2@SCENARIOS=jeu,exclu argent-mois nouveau-vendeur iphone-reprise morceau-perime statut-colis colis-retirer-propre achats-annules ce-matin retrait-contenu-code aujourdhui-portes-27nov
+            lot: navigation-tache ventes-e2@SCENARIOS=jeu,exclu argent-mois nouveau-vendeur iphone-reprise morceau-perime statut-colis colis-retirer-propre achats-annules ce-matin retrait-contenu-code aujourdhui-portes-27nov vrai-benefice
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

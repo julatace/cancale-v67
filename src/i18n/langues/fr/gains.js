@@ -63,6 +63,7 @@ export default {
   "vb.sansAchat": {"one": "{n} sans prix d’achat", "other": "{n} sans prix d’achat"},
   "vb.fraisPasConfirmes": {"one": "{n} aux frais pas confirmés", "other": "{n} aux frais pas confirmés"},
   "vb.aDater": {"one": "{n} vente pas encore versée : dans aucun mois", "other": "{n} ventes pas encore versées : dans aucun mois"},
+  "vb.auPlusMot": "au plus",
   "vb.portRecu": "port de l’achat compris (reçu)",
   "vb.pourquoi": "Le vrai bénéfice = prix de vente (eBay, Vestiaire : l’argent reçu) − prix d’achat − frais de la plateforme − boosts et frais notés. Le port payé à l’achat est dans le prix d’achat : celui du reçu Vinted le contient toujours ; saisi à la main, compte-le dedans. « Au plus » : les frais d’une vente ne sont pas confirmés, un boost peut manquer. Un mois suit la date du versement, comme ton export comptable : les deux disent le même chiffre. Seuls tes comptes sélectionnés comptent.",
 };

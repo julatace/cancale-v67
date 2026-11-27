@@ -63,6 +63,7 @@ export default {
   "vb.sansAchat": {"one": "{n} without purchase price", "other": "{n} without purchase price"},
   "vb.fraisPasConfirmes": {"one": "{n} with fees not confirmed", "other": "{n} with fees not confirmed"},
   "vb.aDater": {"one": "{n} sale not paid out yet: in no month", "other": "{n} sales not paid out yet: in no month"},
+  "vb.auPlusMot": "at most",
   "vb.portRecu": "purchase shipping included (receipt)",
   "vb.pourquoi": "True profit = sale price (eBay, Vestiaire: the money received) − purchase price − platform fees − boosts and noted fees. Shipping paid on the purchase is in the purchase price: the Vinted receipt always includes it; typed by hand, count it in. “At most”: a sale’s fees are not confirmed, a boost may be missing. A month follows the payout date, like your accountant export: both show the same figure. Only your selected accounts count.",
 };

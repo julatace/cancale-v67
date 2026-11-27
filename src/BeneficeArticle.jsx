@@ -30,7 +30,7 @@ export function BeneficeArticleDetail({ b, seulement = null, detail = false }) {
   return (
     <div className="vrm-ba" data-benef-article={b.etat} data-benef-article-valeur={b.benefice == null ? '' : String(b.benefice)} data-benef-article-manque={(b.manque || []).join(' ') || undefined}>
       {L.map((l) => (
-        <div key={l.cle} className={'vrm-ba-ligne' + (l.total ? ' vrm-ba-total' : '')} data-ba-ligne={l.cle} data-ba-valeur={l.v == null ? '' : String(l.v)}>
+        <div key={l.cle} className={'vrm-ba-ligne' + (l.total ? ' vrm-ba-total' : '')} data-ba-ligne={l.cle} data-ba-valeur={l.v == null ? '' : String(l.v)} data-vb-port-achat={l.cle === 'achat' && b.portAchat ? b.portAchat : undefined}>
           <span>{l.total ? NOM_APRES_FRAIS : l.nom}{l.note ? <small>{l.note}</small> : null}</span>
           <span className={'vrm-ba-v' + (l.v == null ? ' is-vide' : '')}>{l.total && l.auPlus && l.v != null ? `${tr('argentPlus.ba.auPlus')} ` : ''}{l.total ? eur(l.v) : l.v == null ? '—' : (l.cle === 'vente' || l.cle === 'recu' || l.zero || l.v === 0 ? eur(l.v) : `− ${eur(l.v)}`)}</span>
         </div>

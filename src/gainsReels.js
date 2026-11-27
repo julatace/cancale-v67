@@ -103,7 +103,9 @@ export function gainsPaires(lignes) {
     n += 1;
     const net = netLigne(l), d = delaiLigne(l);
     paires.push({ k: String(l.id || '') + '#' + i, id: String(l.id || ''), titre: String(l.titre || ''), num: String(l.num || ''), plateforme: String(l.plateforme || ''),
-      compte: String(l.compte || ''), ts: Number(l.ts), eur: Math.round(Number(l.eur) * 100), net, achatConnu: fini(l.achat), delai: d == null ? null : Math.round(d * 10) / 10 });
+      compte: String(l.compte || ''), ts: Number(l.ts), eur: Math.round(Number(l.eur) * 100), net, achatConnu: fini(l.achat), delai: d == null ? null : Math.round(d * 10) / 10,
+      // (27 nov., lot vrai-benefice) frais pas confirmés (pas de drapeau 'c', src/vraiBenefice.js) : un plafond, « au plus ».
+      plafond: net != null && !String(l.dr || '').includes('c') });
   });
   const connues = paires.filter((p) => p.net != null);
   const assez = connues.length >= MIN_CLASSEMENT;
@@ -148,6 +150,8 @@ export function gainsReels({ lignes, bilan = undefined, horsEuro = null } = {}) 
     caNet: connues.reduce((s, p) => s + p.eur, 0),
     delaiMoyen: js.length ? Math.round((js.reduce((s, x) => s + x, 0) / js.length) * 10) / 10 : null, nDelai: js.length,
     partiel: P.nNet < P.n,
+    // (27 nov., lot vrai-benefice) les ventes au net connu dont les frais ne sont pas confirmés : le total est « au plus ».
+    auPlus: connues.filter((p) => p.plafond).length,
   };
   return { total, paire: P, modele: gainsAxe(lignes, 'modele'), compte: gainsAxe(lignes, 'compte'), source: gainsSources(bilan) };
 }

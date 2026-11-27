@@ -63,6 +63,7 @@ export default {
   "vb.sansAchat": {"one": "{n} sin precio de compra", "other": "{n} sin precio de compra"},
   "vb.fraisPasConfirmes": {"one": "{n} con gastos sin confirmar", "other": "{n} con gastos sin confirmar"},
   "vb.aDater": {"one": "{n} venta aún sin abonar: en ningún mes", "other": "{n} ventas aún sin abonar: en ningún mes"},
+  "vb.auPlusMot": "como mucho",
   "vb.portRecu": "envío de la compra incluido (recibo)",
   "vb.pourquoi": "Beneficio real = precio de venta (eBay, Vestiaire: el dinero recibido) − precio de compra − comisiones de la plataforma − boosts y gastos anotados. El envío pagado en la compra está en el precio de compra: el recibo de Vinted siempre lo incluye; si lo escribes a mano, inclúyelo. «Como mucho»: los gastos de una venta no están confirmados, puede faltar un boost. Un mes sigue la fecha del abono, como tu exportación contable: ambas dan la misma cifra. Solo cuentan tus cuentas seleccionadas.",
 };

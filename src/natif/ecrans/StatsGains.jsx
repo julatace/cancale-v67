@@ -18,6 +18,9 @@ const VUES = [...VUES_GAINS, ...VUES_VRAI_BENEFICE];
 const lireVue = () => { try { const v = localStorage.getItem('vrm_stats_gains_vue'); return VUES.includes(v) ? v : 'modele'; } catch (_) { return 'modele'; } };
 const garderVue = (v) => { try { localStorage.setItem('vrm_stats_gains_vue', v); } catch (_) { /* rien */ } };
 const MAX_LISTE = 8, MAX_SANS = 5;
+// (27 nov., lot vrai-benefice) Cinq vues : au téléphone, « Par » se tait à l'écran (il reste lu par le lecteur d'écran),
+// « Article · Modèle · Source · Compte · Mois » tiennent sur la ligne (gains.css).
+const libelleVue = (t) => { const k = String(t).indexOf(' '); return k > 0 ? <><span className="n-gr-seg-pre">{t.slice(0, k + 1)}</span><span className="n-gr-seg-mot">{t.slice(k + 1)}</span></> : t; };
 
 export default function StatsGains({ G, VB = undefined, sur = '', montant = (x) => String(x), Icon = null }) {
   const [vue, setVue] = React.useState(lireVue);
@@ -30,7 +33,7 @@ export default function StatsGains({ G, VB = undefined, sur = '', montant = (x) 
 
   const segments = (
     <Segmente libelle={tr('gr.vue')} valeur={vue} onChange={(x) => { setVue(x); garderVue(x); }}
-      options={VUES.map((x) => ({ cle: x, libelle: tr('gr.vue.' + x) }))}/>
+      options={VUES.map((x) => ({ cle: x, libelle: libelleVue(tr('gr.vue.' + x)) }))}/>
   );
 
   // ── LE HAUT : gagné · par paire · délai, la couverture, ce qui manque (nommé, avec sa porte) ──
@@ -38,8 +41,8 @@ export default function StatsGains({ G, VB = undefined, sur = '', montant = (x) 
     <>
       <Tuiles attrs={{ 'data-gr-tuiles': '' }}>
         <Tuile libelle={tr('gr.gagne')} valeur={Tt && Tt.net != null ? signe(Tt.net) : null}
-          detail={!Tt ? (attente ? tr('v2.jour.lecture') : tr('gr.pasSu')) : Tt.net == null ? (Tt.n ? tr('gr.aucunAchat') : tr('gr.aucuneVente')) : Tt.partiel ? tr('gr.sur', { k: Tt.nNet, n: Tt.n }) : tr('gr.toutes', { n: Tt.n })}
-          attrs={{ 'data-gr-net': Tt ? c(Tt.net) : '', 'data-gr-n': Tt ? String(Tt.n) : '', 'data-gr-nnet': Tt ? String(Tt.nNet) : '', 'data-gr-partiel': Tt && Tt.partiel ? '1' : '' }}/>
+          detail={!Tt ? (attente ? tr('v2.jour.lecture') : tr('gr.pasSu')) : Tt.net == null ? (Tt.n ? tr('gr.aucunAchat') : tr('gr.aucuneVente')) : (Tt.auPlus ? tr('vb.auPlusMot') + ' · ' : '') + (Tt.partiel ? tr('gr.sur', { k: Tt.nNet, n: Tt.n }) : tr('gr.toutes', { n: Tt.n }))}
+          attrs={{ 'data-gr-net': Tt ? c(Tt.net) : '', 'data-gr-n': Tt ? String(Tt.n) : '', 'data-gr-nnet': Tt ? String(Tt.nNet) : '', 'data-gr-partiel': Tt && Tt.partiel ? '1' : '', 'data-gr-auplus': Tt ? String(Tt.auPlus || 0) : '' }}/>
         <Tuile libelle={tr('gr.parPaire')} valeur={Tt && Tt.netMoyen != null ? signe(Tt.netMoyen) : null}
           detail={Tt && Tt.netMoyen != null && Tt.caNet ? tr('gr.marge', { p: nombre(Math.round((Tt.net / Tt.caNet) * 100)) }) : ''} attrs={{ 'data-gr-moyen': Tt ? c(Tt.netMoyen) : '' }}/>
         <Tuile libelle={tr('gr.delai')} valeur={Tt && Tt.delaiMoyen != null ? jours(Tt.delaiMoyen) : null}
@@ -172,7 +175,7 @@ function VueMois({ VB, signe }) {
   return (
     <>
       <p className="n-gr-tete">{tr('vb.mois.tete')}</p>
-      <div data-vb-mois-liste={M.map((g) => g.ym).join('|')}>
+      <div data-vb-mois-liste={M.map((g) => g.ym).join(',')}>
         {M.map((g) => <Rangee key={g.ym} titre={nomMoisVb(g.ym)} sousTitre={sousVb(g)} sousLignes={2} valeur={valeurVb(g, signe)} valeurForte={g.net != null}
           attrs={{ 'data-vb-mois': g.ym, ...attrsVb(g) }}/>)}
       </div>
@@ -187,7 +190,7 @@ function VueComptes({ VB, signe }) {
   return (
     <>
       <p className="n-gr-tete">{tr('vb.comptes.tete')}</p>
-      <div data-vb-comptes={VB.comptes.map((g) => g.k).join('|')}>
+      <div data-vb-comptes={VB.comptes.map((g) => g.k).join(',')}>
         {VB.comptes.length ? VB.comptes.map((g) => <Rangee key={g.k} titre={g.nom} sousTitre={sousVb(g)} sousLignes={2} valeur={valeurVb(g, signe)} valeurForte={g.net != null}
           detailValeur={g.net != null ? tr('vb.total') : ''} attrs={{ 'data-vb-compte': g.k, ...attrsVb(g) }}/>) : <Rangee titre={tr('vb.aucune')}/>}
       </div>

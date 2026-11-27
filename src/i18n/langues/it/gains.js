@@ -63,6 +63,7 @@ export default {
   "vb.sansAchat": {"one": "{n} senza prezzo d’acquisto", "other": "{n} senza prezzo d’acquisto"},
   "vb.fraisPasConfirmes": {"one": "{n} con costi non confermati", "other": "{n} con costi non confermati"},
   "vb.aDater": {"one": "{n} vendita non ancora accreditata: in nessun mese", "other": "{n} vendite non ancora accreditate: in nessun mese"},
+  "vb.auPlusMot": "al massimo",
   "vb.portRecu": "spedizione dell’acquisto inclusa (ricevuta)",
   "vb.pourquoi": "Utile reale = prezzo di vendita (eBay, Vestiaire: i soldi ricevuti) − prezzo d’acquisto − commissioni della piattaforma − boost e costi annotati. La spedizione pagata all’acquisto è nel prezzo d’acquisto: la ricevuta Vinted la contiene sempre; se lo scrivi a mano, includila. «Al massimo»: i costi di una vendita non sono confermati, può mancare un boost. Un mese segue la data dell’accredito, come il tuo export contabile: entrambi danno la stessa cifra. Contano solo gli account selezionati.",
 };
