@@ -230,7 +230,7 @@ const vue=async(pg,cle)=>{
         const fermer=async()=>{ await pg.keyboard.press('Escape').catch(()=>{}); await pg.waitForTimeout(500); };
         const p1=await portDe('91001');
         dit(!!p1&&p1.port==='recu'&&/port de l’achat compris \(reçu\)/.test(p1.texte)&&p1.total==='1650','V6 · 91001 : la fiche dit « port de l’achat compris (reçu) », bénéfice 16,50 (= Par mois)',p1&&JSON.stringify(p1));
-                if(CAP&&p1){ await pg.waitForTimeout(900); await pg.screenshot({path:path.join(CAP,`vb-fiche-${nomCap}.png`)}).catch(()=>{}); await pg.locator('.vrm-ba').last().screenshot({path:path.join(CAP,`vb-fiche-detail-${nomCap}.png`)}).catch(()=>{}); }
+                if(CAP&&p1){ await pg.waitForTimeout(900); await pg.screenshot({path:path.join(CAP,`vb-fiche-${nomCap}.png`)}).catch(()=>{}); await pg.locator('.vrm-ba').last().scrollIntoViewIfNeeded().catch(()=>{}); await pg.locator('.vrm-ba').last().screenshot({path:path.join(CAP,`vb-fiche-detail-${nomCap}.png`)}).catch(()=>{}); }
         await fermer();
         const p2=await portDe('91002');
         dit(!!p2&&p2.port==='saisi'&&!/compris \(reçu\)/.test(p2.texte)&&p2.total==='3800','V6 · 91002 (prix saisi) : rien n’est affirmé sur le port ; bénéfice au plus 38,00',p2&&JSON.stringify(p2));
