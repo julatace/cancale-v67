@@ -1,15 +1,16 @@
 {
   "manifest_version": 3,
   "name": "VRM Observateur",
-  "version": "2.0.0",
-  "description": "Note la forme des requêtes et des gestes faits sur Vinted (clics, frappe, pages, onglets) — jamais une valeur tapée. Rien ne quitte ton ordinateur.",
+  "version": "2.1.0",
+  "description": "Note la forme des requêtes et des gestes faits sur Vinted et Vestiaire Collective (clics, frappe, pages, onglets) — jamais une valeur tapée. Rien ne quitte ton ordinateur.",
   "permissions": [
     "webRequest",
     "storage",
     "tabs"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "<all_urls>",
+    "https://*.vestiairecollective.com/*"
   ],
   "background": {
     "service_worker": "fond.js"
@@ -26,7 +27,8 @@
         "https://*.vinted.be/*",
         "https://*.vinted.es/*",
         "https://*.vinted.it/*",
-        "https://*.vinted.de/*"
+        "https://*.vinted.de/*",
+        "https://*.vestiairecollective.com/*"
       ],
       "js": [
         "page.js"
