@@ -38,3 +38,10 @@ Aucune donnée inventée en base, rien dans `vinted-sync-extension/`.
 | `comptes-securite` A | 2 KO au téléphone (aucun filtre) ; ordinateur vert (inchangé) | vert, 390/1512, clair/sombre, polices CI | `lireChoixCompte` sans le vendeur ⇒ KO « autre vendeur » |
 | `ventes-e2` A2 (`SCENARIOS=annul,egal,exclu,ko`) | 4 KO (aucune ligne) | vert | `partiel: false` ⇒ KO scénario `ko` |
 | `offres-objectif` C | 3 KO (ordre q4,q2,q1,q3) | vert (q1,q2,q4,q3) | `ordreARepondre` sans tri ⇒ 3 KO |
+
+## 4. (même jour) « Terminées » devient « Toutes »
+
+Décision de Julien : le segment `toutes` de Ventes (VentesToutes) liste TOUTES les ventes — c'est la seule liste complète. Libellé
+`vn.toutesVentes` (Toutes · All · Todas · Tutte · Alle) ; la liste ne change pas ; Leboncoin garde `vn.terminees`. Les bancs
+`rentabilite`, `ventes-ligne-propre`, `natif-ventes` lisent la clé `data-colis-onglet-choix="toutes"` (§6.4), plus le texte —
+verts après (82, 16, 58).
