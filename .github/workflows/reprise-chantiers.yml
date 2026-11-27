@@ -75,7 +75,7 @@ jobs:
           path: dist
       - name: Installer Chromium
         run: |
-          npx playwright install --with-deps chromium
+          bash scripts/ci-installer-navigateurs.sh chromium   # sans la source apt de Microsoft, 4 essais (scripts/ci-installer-navigateurs.sh)
           # Des bancs visent /opt/pw-browsers/chromium (le conteneur des sessions), comme dans verifier.yml.
           sudo mkdir -p /opt/pw-browsers
           sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
