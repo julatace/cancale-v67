@@ -48,7 +48,13 @@ export function resoudreCiblesFavoris(o){
   const notifs=Array.isArray(capture.payload?.notifications)?capture.payload.notifications:[];
   let favs;try{favs=new Set(favorisDepuisNotifications(capture.payload,capture.domain).lignes.map(x=>x.id));}catch{favs=new Set();}
   const directs=selection.map(nid=>{const ns=notifs.filter(n=>n&&n.id===nid);if(ns.length!==1||!favs.has(nid))return null;const d=identiteDirecteFavori(ns[0],uid,capture.domain);return d?{notificationId:nid,...d,initiator:INITIATEUR_FAVORI}:null;});
-  if(directs.every(Boolean))return directs;
+  if(directs.every(Boolean)){
+   // Une preuve APPRISE qui désigne une AUTRE personne pour ce favori : rien (jamais deux personnes pour un favori). Une preuve
+   //    apprise simplement absente ne change rien.
+   if(o.trace){let t=null;try{t=resoudreCiblesAppris(o);}catch(e){if(e&&(e.code==='favoris_contradiction'||/contredisent/.test(String(e.message))))throw new RefusFavoris('Deux preuves se contredisent pour un favori. Aucun envoi lancé.');}
+    if(Array.isArray(t)&&t.some((x,i)=>x.recipientId!==directs[i].recipientId||x.itemId!==directs[i].itemId))throw new RefusFavoris('Deux preuves se contredisent pour un favori. Aucun envoi lancé.');}
+   return directs;
+  }
   // Une partie seulement : l'ancienne preuve pour le reste, et jamais deux personnes pour un même favori.
   const anciens=resoudreCiblesAppris(o);
   return anciens.map((t,i)=>{const d=directs[i];if(!d)return t;if(d.recipientId!==t.recipientId||d.itemId!==t.itemId)throw new RefusFavoris('Deux preuves se contredisent pour un favori. Aucun envoi lancé.');return {...t,...d,initiator:t.initiator||d.initiator};});
@@ -120,6 +126,7 @@ function resoudreCiblesAppris({uid,capture,trace,selection,conversations=[],trac
   if(formes.has(l.forme)&&id(n.user_id))preuves.push({recipientId:id(n.user_id),initiator:corps.initiator});
   for(const p of parametres)if(p.forme===l.forme&&l.params.getAll(p.cle).length===1&&id(l.params.get(p.cle)))preuves.push({recipientId:id(l.params.get(p.cle)),initiator:p.initiator});
   const personnes=new Set(preuves.map(p=>p.recipientId));
+  if(personnes.size>1)throw erreurRaccordement('Deux preuves se contredisent pour un favori. Aucun envoi lancé.','favoris_contradiction');   // 5.455.6 : une vraie contradiction, distinguée d'une preuve absente
   if(personnes.size!==1||personnes.has(String(uid)))throw erreurRaccordement('Un favori sélectionné n’a pas de destinataire unique confirmé. Aucun envoi lancé.','favoris_identite_non_unique');
   return {notificationId,itemId:l.itemId,recipientId:[...personnes][0],initiator:preuves[0].initiator};
  });
