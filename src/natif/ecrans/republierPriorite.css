@@ -33,6 +33,15 @@
   .n-pdo-ligne:last-child { border-bottom: 0; }
   .n-pdo-actions { padding: 0 var(--n-marge) 12px; }
   .n-pdo-actions .n-bouton { min-height: var(--n-cible); }
+  /* Un geste que la porte (ou le plancher) refuse se voit éteint en clair comme en sombre : encre seconde, sans relief. */
+  .n-pdo-actions .n-bouton[aria-disabled="true"],
+  :root:not([data-theme="dark"]) .n-pdo-actions .n-bouton[data-n-variante="teinte"][aria-disabled="true"]:not([data-n-ton="ambre"]) {
+    background: var(--n-inactif); color: var(--n-sur-inactif); box-shadow: none; }
+  /* Au téléphone, « Baisser à 61 € » prend toute la largeur (le prix ne se coupe jamais), Republier et Favoris dessous. */
+  @media (max-width: 560px) {
+    .n-pdo-actions[data-n-actions="3"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .n-pdo-actions[data-n-actions="3"] > .n-bouton-bloc:nth-child(2) { grid-column: 1 / -1; order: -1; }
+  }
   .n-pdo-porte { padding: 0 calc(var(--n-marge) - 8px) 4px; }
   .n-pdo-porte .n-bouton { min-height: var(--n-cible); }
   .n-pdo-raison { display: flex; align-items: flex-start; gap: 6px; margin: 0; padding: 0 var(--n-marge) 8px; font: var(--n-t-legende); color: var(--n-encre-2); }
