@@ -107,11 +107,7 @@ async function ouvrir(nav, { W, sombre, base, tab = 'journee', bienvenue = true 
   const ctx = await nav.newContext({ ...(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width: 1512, height: 950 } }), colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris' });
   const pg = await ctx.newPage();
   const journal = { erreurs: [], console: [], http: [] };
-  // (26 nov., vitesse-webkit) WebKit signale une lecture COUPÉE par le départ de la page (le banc change d'écran) comme
-  // « <adresse> due to access control checks » — même pour un fichier de la MÊME origine (version-app.json) : ce n'est
-  // ni une erreur de l'app ni un refus CORS (le faux serveur le sert, _navigateur.cjs). Écartée comme dans
-  // achats-annules, defilement-navigation, ventes-ligne-propre ; toute autre erreur de page reste rouge.
-  pg.on('pageerror', (e) => { const t = String(e.message || e); if (!/ due to access control checks\.?$/.test(t)) journal.erreurs.push(t.slice(0, 240)); });
+  pg.on('pageerror', (e) => journal.erreurs.push(String(e.message || e).slice(0, 240)));
   pg.on('console', (m) => { if (m.type() === 'error' && !/^Failed to load resource: net::ERR_FAILED$/.test(m.text())) journal.console.push(m.text().slice(0, 240)); });
   pg.on('response', (r) => { const u = r.url(); if (r.status() >= 400 && /^http:\/\/localhost/.test(u) && !/favicon/.test(u)) journal.http.push(r.status() + ' ' + u.replace(/^http:\/\/localhost:\d+/, '').slice(0, 160)); });
   await pg.addInitScript(([s, bv, sombre]) => {
@@ -296,7 +292,10 @@ async function tournee(nav, { W, sombre, scenario, base }) {
   const o = await ouvrir(nav, { W, sombre, base, tab: 'journee' });
   for (const [ecran, nom] of ECRANS) {
     const [tab, sous] = ecran.split(':');
-    await o.pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+    // (27 nov., vitesse-webkit) L'écran change par la navigation de l'APP (`vrm:aller`, comme un toucher), pas en
+    // rechargeant la page : sous WebKit, un rechargement coupe les lectures en cours et les dit « due to access control
+    // checks » (erreurs de page qui ne sont pas de l'app). Aucune erreur n'est écartée : une vraie reste rouge.
+    await o.pg.evaluate((t) => { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=' + t })); }, tab);
     // (11 nov., webkit-fiable) l'écran PRÊT (monté, chargé, DOM calme), plus 2,8 s fixes (§6.5).
     await ecranPret(o.pg, '', { max: 20000 });   // (un lien peut mener à un autre écran : aucun nom exigé)
     if (sous) {
