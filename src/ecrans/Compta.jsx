@@ -2028,6 +2028,7 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
   React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === CLE_FOURNISSEURS || k === 'vinted_annonce_numeros' || k === 'vinted_offvinted_buys' || k === CLE_HORS_MASQUES) setTicAchats((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   const recettes = React.useMemo(() => {
     if (calc.etat !== 'lu') return calc.etat === 'passu' ? null : undefined;
+    if (versements === undefined) return undefined;   // (27 nov.) dates de versement en lecture : aucune vente Vinted datée encore, jamais « 0 »
     return recettesDe({ calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER });
   }, [calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER]);
   const registreAchats = React.useMemo(() => (achats === undefined ? undefined : registreAchatsDe({ achats, recus, periode, panelOff })),
@@ -2191,7 +2192,7 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
   // (27 nov., lot compta-export) Le relevé de Ventes (prix de vente, prix d'achat, frais notés, par identité) : pas
   // publié ⇒ null (les colonnes disent « — » et le récap le nomme).
   const [releveV, relevePret] = useLigneSynchro('vrm_stats_ventes', lireReleveVentes);
-  const pret = calc.etat !== 'encours' && achats !== undefined && recus !== undefined && regime !== undefined && relevePret;
+  const pret = calc.etat !== 'encours' && achats !== undefined && recus !== undefined && regime !== undefined && relevePret && versements !== undefined;   // (27 nov.) dates de versement encore en lecture ⇒ aucune vente Vinted n'est datée : on attend, jamais « 0 vente »
   const D = React.useMemo(() => {
     if (!pret) return undefined;
     const recettes = calc.etat === 'lu' ? recettesDe({ calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER }) : null;
@@ -2316,7 +2317,7 @@ function ExportUrssafCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
   const [periodeBrute, setPeriode] = React.useState('');
   const periode = choix.includes(periodeBrute) ? periodeBrute : (periodeUrssafParDefaut(rythme) || '');
   const U = React.useMemo(() => {
-    if (calc.etat === 'encours' || regime === undefined || ligne === undefined || !rythme || !periode) return undefined;
+    if (calc.etat === 'encours' || versements === undefined || regime === undefined || ligne === undefined || !rythme || !periode) return undefined;
     const recettes = calc.etat === 'lu' ? recettesDe({ calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER }) : null;
     const D = donneesExportComptable({ periode, recettes, achats: null, ligne, regime, taux: tauxUrssaf(), montantPeriode: montantPeriodeUrssaf, aPayer: aPayerUrssaf, libelleRegime });
     const an = Number(periode.slice(0, 4));

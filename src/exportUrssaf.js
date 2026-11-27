@@ -103,7 +103,7 @@ export function notesUrssaf(U) {
     L.push(`Seuils ${U.annee} : CA de l’année ${ca} — plafond micro ${eurosTexte(U.seuils.plafond)} ; TVA ${eurosTexte(U.seuils.tvaBase)} / ${eurosTexte(U.seuils.tvaMajore)}.`);
   }
   L.push(`DAC7 : chaque plateforme transmet aux impôts un vendeur à ${DAC7.ventes} ventes ou plus de ${eurosTexte(DAC7.centimes / 100)} dans l’année.`);
-  for (const p of (U.dac7 || [])) if (p.n != null) L.push(`· ${p.plateforme} ${U.annee} : ${p.partiel ? 'au moins ' : ''}${p.n} vente${p.n > 1 ? 's' : ''}, ${p.partiel ? 'au moins ' : ''}${eurosTexte(p.centimes / 100)}${p.verdict === 'atteint' ? ' — seuil atteint' : ''}.`);
+  for (const p of (U.dac7 || [])) if (p.n != null && (p.n > 0 || p.partiel)) L.push(`· ${p.plateforme} ${U.annee} : ${p.partiel ? 'au moins ' : ''}${p.n} vente${p.n > 1 ? 's' : ''}, ${p.partiel ? 'au moins ' : ''}${eurosTexte(p.centimes / 100)}${p.verdict === 'atteint' ? ' — seuil atteint' : ''}.`);
   return L;
 }
 
