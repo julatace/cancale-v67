@@ -5,6 +5,9 @@
 //  C · Ventes, filtre « Compte » (src/filtrePlateforme.js, PR #1444) : un compte = SON IDENTITÉ (`compteCle`, le site et
 //      l'identifiant lu), jamais son nom. Deux comptes Leboncoin au même nom affiché (« Julien ») et le même pseudo sur
 //      Vinted et sur eBay étaient UN choix : « Julien » montrait les ventes des deux comptes.
+//  L · Aujourd'hui, « Vinted pas lu depuis N jours » (src/lectureAncienne.js, PR #1451) : seule la lecture DU COMPTE le dit.
+//      La ligne de fraîcheur range sous `source: 'compte'` les ACHATS d'un compte frais (`achats:vinted:{id}`, daté de la
+//      lecture de ses achats, 2 j et plus) : la ligne disait « Vinted pas lu depuis 3 jours » d'un compte relu à l'instant.
 //  B · les branchements (texte de src/App.jsx, commentaires retirés) : chaque ligne de Ventes « Toutes » porte `compteCle`
 //      par `identiteCompteVente` ; le menu prend `x.cle` / `x.libelle`.
 //
@@ -27,6 +30,7 @@ const MUTATIONS = [
   ['src/filtrePlateforme.js', "if (typeof x.compteCle === 'string' && x.compteCle) return x.compteCle;", '', 'C : la clé redevient le nom'],
   ['src/filtrePlateforme.js', "return lignes.filter((x) => x && cleCompteLigne(x) === compte);", 'return lignes.filter((x) => x && x.compte === compte);', 'C : filtre par le nom'],
   ['src/filtrePlateforme.js', "c.libelle = `${c.libelle} · …${id.slice(-4)}`;", '', 'C : deux libellés identiques'],
+  ['src/lectureAncienne.js', "if (r.source === 'compte' && !String(r.cle || '').startsWith('compte:')) continue;", '', 'L : les achats disent « pas lu »'],
   ['src/App.jsx', "compteCle: identiteCompteVente('leboncoin', v) ? 'leboncoin:' + identiteCompteVente('leboncoin', v) : '',", '', 'B : la ligne Leboncoin sans identité'],
 ];
 
@@ -67,6 +71,20 @@ async function principal() {
   dit(F.comptesDeLignes(L2).length === 2 && F.filtrerCompte(L2, (F.comptesDeLignes(L2)[0] || {}).cle).length === 1, 'C6 · sans identifiant, un même nom sur deux sites : deux choix', F.comptesDeLignes(L2));
   dit(F.comptesDeLignes([{ site: 'ebay', compteCle: 'ebay:principal', compte: '' }]).length === 0, 'C7 · une ligne sans NOM de compte n’entre dans aucun choix (aucun identifiant brut montré)');
 
+  // ── L · la lecture ancienne ──
+  const LA = await imp('src/lectureAncienne.js');
+  const J = 864e5, now = Date.parse('2026-11-27T09:00:00Z');
+  // La FORME des lignes de src/fraicheur.js `fraicheurUnique` (étape 3 : le compte ; 3 bis : ses achats).
+  const frai = sansCommentaires(lire('src/fraicheur.js'));
+  dit(/cle: `achats:vinted:\$\{l\.id\}`, source: 'compte'/.test(frai) && /cle: `compte:\$\{l\.plateforme\}:\$\{l\.id\}`, source: 'compte'/.test(frai), 'L0 · la ligne de fraîcheur range bien les achats sous source « compte » (la forme servie ci-dessous)');
+  const achatsSeuls = { etat: 'retard', retards: [{ cle: 'achats:vinted:111', source: 'compte', plateforme: 'vinted', id: '111', depuisMs: now - 3 * J, nom: 'julien35', texte: 'achats pas relus depuis 3 j' }] };
+  dit(LA.lecturesAnciennes(achatsSeuls, now).length === 0, 'L1 · un compte relu dont seuls les ACHATS sont vieux : aucune ligne « pas lu depuis 3 jours »', LA.lecturesAnciennes(achatsSeuls, now));
+  const compteVieux = { etat: 'retard', retards: [{ cle: 'compte:vestiaire:9', source: 'compte', plateforme: 'vestiaire', id: '9', depuisMs: now - 5 * J - 3600e3, nom: 'vc' }, achatsSeuls.retards[0]] };
+  const r2 = LA.lecturesAnciennes(compteVieux, now);
+  dit(r2.length === 1 && r2[0].cle === 'vestiaire:9' && r2[0].jours === 5, 'L2 · un compte pas relu depuis 5 jours : sa ligne, seule', r2);
+  const panne = { etat: 'retard', retards: [{ cle: 'panne:vinted:111', source: 'panne', plateforme: 'vinted', id: '111', depuisMs: now - 2 * J, nom: 'julien35' }] };
+  dit(LA.lecturesAnciennes(panne, now).length === 1, 'L3 · un compte qui n’arrive plus (panne) garde sa ligne');
+
   // ── B · les branchements ──
   const app = sansCommentaires(lire('src/App.jsx'));
   dit(/compteCle: uid \? 'vinted:' \+ uid : ''/.test(app), 'B1 · la ligne Vinted porte son identité (uid)');
@@ -79,7 +97,7 @@ function prouver() {
   let rougies = 0;
   for (const [rel, de, vers, nom] of MUTATIONS) {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'chasse27-'));
-    const fichiers = ['src/filtrePlateforme.js', 'src/plateformes.js', 'src/stockageSur.js', 'src/App.jsx'];
+    const fichiers = ['src/filtrePlateforme.js', 'src/plateformes.js', 'src/stockageSur.js', 'src/App.jsx', 'src/lectureAncienne.js', 'src/fraicheur.js'];
     for (const f of fichiers) { fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.copyFileSync(path.join(RACINE, f), path.join(tmp, f)); }
     // les imports de src/plateformes.js et src/stockageSur.js
     for (const f of fs.readdirSync(path.join(RACINE, 'src'))) if (/\.js$/.test(f) && !fs.existsSync(path.join(tmp, 'src', f))) fs.copyFileSync(path.join(RACINE, 'src', f), path.join(tmp, 'src', f));
