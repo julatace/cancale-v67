@@ -1,4 +1,4 @@
-// VRM Observateur 2.0 — les GESTES faits dans une page Vinted (26 nov.).
+// VRM Observateur 2.0 — les GESTES faits dans une page Vinted (26 nov.) ; 2.1 (27 nov.) : et Vestiaire Collective.
 // Regarde seulement : aucun clic, aucune frappe, aucune requête. Chaque geste part au fond, qui le passe par la
 // règle (regle.js `geste`) avant de le ranger : on n'envoie ici que la sorte, l'heure, « vrai doigt ou script » et la
 // signature brute de l'élément ; le fond garde seulement ce que la règle laisse passer.
