@@ -78,6 +78,11 @@ const RELEVE = () => {
       dit(r.ordi && r.ordi.pourquoi && r.ordi.ferme && /Vinted/.test(r.ordi.manque) && /À distance/.test(r.ordi.manque) && /Chrome/.test(r.ordi.geste) && r.ordi.hSummary >= 44,
         `${nom} : 4 « Pourquoi ? » replié dit ce qui ne marche pas (À distance, Vinted) et quoi faire (Chrome)`, r.ordi);
       await pg.screenshot({ path: path.join(SHOTS, `portes-${nom}.png`), fullPage: false }).catch(() => {});
+      for (const [sel, q] of [['[data-lecture-ancienne]', 'lecture'], ['[data-pil-prix-manquants]', 'prix']]) {
+        const el = await pg.$(sel); if (!el) continue;
+        await el.evaluate((e) => e.scrollIntoView({ block: 'center' })).catch(() => {}); await pg.waitForTimeout(300);
+        await pg.screenshot({ path: path.join(SHOTS, `portes-${nom}-${q}.png`), fullPage: false }).catch(() => {});
+      }
       // 2. Toucher la porte ouvre la saisie (l'écran change, ou la saisie s'ouvre).
       if (th === 'clair') {
         const avant = await pg.evaluate(() => location.search + '|' + (document.querySelector('[data-v2-ecran]') || { getAttribute: () => '' }).getAttribute('data-v2-ecran'));
