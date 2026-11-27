@@ -129,6 +129,36 @@ const francaisDiffere = () => {
     },
   };
 };
+// (27 nov., budget-vitesse) LES SECTIONS DE `Comptabilite`, CHARGÉES AVEC LEUR ÉCRAN. Au build seulement, le
+// fichier livré de src/ecrans/Comptabilite.jsx rend ses sections Ventes / Achats / Annonces / Messages / Rapport
+// par des morceaux à la demande (le même JSX) : Aujourd'hui ne les télécharge plus. Le dépôt ne change pas.
+// Règle, refus et preuves : scripts/_sections-differees.cjs ; garde : scripts/audit-sections-differees.cjs.
+// `VRM_SANS_SECTIONS=1` livre Comptabilite d'un seul tenant (mesure avant/après).
+const sectionsOuverture = new Map();   // morceau d'une section -> l'écran qui la montre à l'ouverture (prechargerApp)
+const sectionsDifferees = () => {
+  const COMPTA = resoudreChemin(RACINE, 'src/ecrans/Comptabilite.jsx');
+  const morceaux = new Map();
+  return {
+    name: 'vrm-sections-differees',
+    apply: 'build',
+    enforce: 'pre',
+    transform(code, id) {
+      if (process.env.VRM_SANS_SECTIONS === '1' || resoudreChemin(id.split('?')[0]) !== COMPTA) return null;
+      const r = exiger('./scripts/_sections-differees.cjs').decouper(RACINE, COMPTA, code);
+      for (const x of r.refus) this.warn(`section « ${x.nom} » gardée dans Comptabilite : ${x.raison}`);
+      for (const [f, c] of Object.entries(r.morceaux)) morceaux.set(join(r.dirMorceau, f), c);
+      // l'écran d'ouverture de chaque section (Aujourd'hui, Ventes) : index.html la précharge quand il s'ouvre sur lui
+      for (const f of r.faites) if (f.ouverture) sectionsOuverture.set(join(r.dirMorceau, f.fichier), f.ouverture);
+      return { code: r.code, map: null };
+    },
+    resolveId(source, importer) {
+      if (!importer || !source.startsWith('.')) return null;
+      const abs = resoudreChemin(importer.split('?')[0], '..', source);
+      return morceaux.has(abs) ? abs : null;
+    },
+    load(id) { return morceaux.has(id) ? morceaux.get(id) : null; },
+  };
+};
 // (17 nov., lot vitesse-poids) LES NOMS COURTS, DONNÉS PAR FRÉQUENCE. esbuild minifie bien
 // mais nomme les variables locales sans regarder leur usage ; terser (`mangle` SEUL : aucune
 // réécriture du code, seulement les noms locaux) les nomme par fréquence, ce que gzip compresse
@@ -176,7 +206,18 @@ const prechargerApp = () => ({
       // préchargé lui aussi, mais en BASSE priorité (`data-js-ensuite`) — le morceau App passe d'abord.
       const compta = Object.values(bundle).find((c) => c.type === 'chunk' && (c.moduleIds || Object.keys(c.modules || {})).some((m) => /[\\/]src[\\/]ecrans[\\/]Comptabilite\.jsx$/.test(m)));
       const ensuite = compta ? [compta.fileName, ...(compta.imports || [])].filter((f) => !deja.has(f) && !js.includes(f)) : [];
-      const attrs = { src: '/demarrage-app.js', 'data-js': js.map(base).join(','), 'data-css': css.filter((f) => !deja.has(f)).map(base).join(','), 'data-js-ensuite': ensuite.map(base).join(',') };
+      // (27 nov., budget-vitesse) Les sections de Comptabilite que l'écran d'OUVERTURE montre (Aujourd'hui : sa section ;
+      // Ventes : « À envoyer ») : préchargées comme Comptabilite, en basse priorité, seulement quand l'app s'ouvre sur cet
+      // écran (demarrage-app.js lit `?tab=`, Aujourd'hui sans lien) — jamais un aller-retour de plus au premier écran.
+      const parEcran = {};
+      for (const c of Object.values(bundle)) {
+        const e = c.type === 'chunk' && c.facadeModuleId && sectionsOuverture.get(c.facadeModuleId);
+        if (!e) continue;
+        const l = (parEcran[e] = parEcran[e] || []);
+        for (const f of [c.fileName, ...(c.imports || [])]) if (!deja.has(f) && !js.includes(f) && !ensuite.includes(f) && !l.includes(f)) l.push(f);
+      }
+      const ouverture = Object.entries(parEcran).map(([e, l]) => e + '=' + l.map(base).join(',')).join(';');
+      const attrs = { src: '/demarrage-app.js', 'data-js': js.map(base).join(','), 'data-css': css.filter((f) => !deja.has(f)).map(base).join(','), 'data-js-ensuite': ensuite.map(base).join(','), 'data-js-ouverture': ouverture };
       // ⚠️ (8 nov., CI verte) JAMAIS avant `<meta name="referrer">` : posée en
       // `head-prepend`, cette balise (et les préchargements qu'elle pose) partait
       // avant que la page ait lu sa politique de référent — avec l'en-tête de Vercel
@@ -194,7 +235,7 @@ const prechargerApp = () => ({
   },
 });
 export default defineConfig({
-  plugins: [francaisDiffere(), react(), allegerIndex(), versionEtat(), versionApp(), prechargerApp(), listeHorsLigne(), nomsCourts()],
+  plugins: [francaisDiffere(), sectionsDifferees(), react(), allegerIndex(), versionEtat(), versionApp(), prechargerApp(), listeHorsLigne(), nomsCourts()],
   // (20 nov., affichage instantané) `VRM_COPIE_MUTATION=compte|panne` : la MUTATION des bancs copie-ecran (rouge attendu) ;
   // vide en production (le code mutant disparaît au build).
   define: { __BUILD__: JSON.stringify(BUILD), __VRM_COPIE_MUTATION__: JSON.stringify(process.env.VRM_COPIE_MUTATION || '') },

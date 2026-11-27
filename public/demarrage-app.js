@@ -34,5 +34,12 @@ try {
     (s.getAttribute('data-css') || '').split(',').forEach(function (u) { poser('preload', u, 'style'); });
     // (21 nov.) Le morceau de Comptabilite (Aujourd'hui) : demandé aussi, en BASSE priorité, après le morceau App.
     (s.getAttribute('data-js-ensuite') || '').split(',').forEach(function (u) { poser('modulepreload', u, null, true); });
+    // (27 nov., budget-vitesse) Les sections de Comptabilite que montre l'écran d'ouverture (`?tab=…`, Aujourd'hui sans
+    // lien) : demandées avec lui, en basse priorité (vite.config.js, `data-js-ouverture` : « ecran=/a.js,/b.js;… »).
+    var ecran = (/[?&]tab=([^&#]*)/.exec(q) || [])[1] || 'journee';
+    (s.getAttribute('data-js-ouverture') || '').split(';').forEach(function (bloc) {
+      var i = bloc.indexOf('=');
+      if (i > 0 && bloc.slice(0, i) === ecran) bloc.slice(i + 1).split(',').forEach(function (u) { poser('modulepreload', u, null, true); });
+    });
   }
 } catch (e) { /* rien : main.jsx demandera le morceau comme avant */ }
