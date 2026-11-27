@@ -25636,17 +25636,20 @@ const dateCourteVc = (iso) => { const t = tempsVc(iso || ''); return t > 0 ? new
 // liste, avec son N° par IDENTITÉ (`ventesVcDe`). Trois états : `undefined` en
 // cours · `null` pas su (le total le NOMME) · liste ([] = aucune vente lue).
 // Relue quand l'extension dit qu'elle a rangé du Vestiaire.
-const _vcVentesLecture = { p: null, at: 0, d: undefined };
+const _vcVentesLecture = { p: null, at: 0, d: undefined, ok: false };
 function lireVentesVestiaire(force = false) {
-  if (!force && _vcVentesLecture.p && Date.now() - _vcVentesLecture.at < 5000) return _vcVentesLecture.p;
-  _vcVentesLecture.at = Date.now();
+  // (27 nov., vitesse-webkit) Un écran qui se MONTE plus tard (Argent, ~10 s après l'ouverture) reprend la dernière
+  // lecture RÉUSSIE de moins d'une minute au lieu de relire (banc budget-vitesse : lue 2 fois à l'ouverture d'Argent).
+  // Une lecture ratée ne pose rien (`d` reste tel quel) : la suivante relit. `force` (l'extension a rangé) relit toujours.
+  if (!force && _vcVentesLecture.p && Date.now() - _vcVentesLecture.at < (_vcVentesLecture.ok ? 60000 : 5000)) return _vcVentesLecture.p;
+  _vcVentesLecture.at = Date.now(); _vcVentesLecture.ok = false;
   _vcVentesLecture.p = (async () => {
     try {
       const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens`);
       if (!Array.isArray(j)) return null;
       const par = Object.fromEntries(j.map((x) => [x.id, x]));
       const d = { ventes: (par.vc_ventes && par.vc_ventes.ventes) || null, liens: (par.vc_listings && par.vc_listings.liens) || {} };
-      _vcVentesLecture.d = d;
+      _vcVentesLecture.d = d; _vcVentesLecture.ok = true;
       return d;
     } catch (_) { return null; }
   })();
