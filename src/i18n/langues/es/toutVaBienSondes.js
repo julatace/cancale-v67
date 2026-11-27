@@ -81,5 +81,4 @@ export default {
   "tvb.s.srv.notifs.panne": "Notificaciones: no configuradas en el servidor.",
   "tvb.s.srv.notifs.passu": "Notificaciones: no se sabe.",
   "tvb.g.etat": "Ver estado",
-  "tvb.s.lienFraicheur": "¿Todo bien?",
 };
