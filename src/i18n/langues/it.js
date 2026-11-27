@@ -117,8 +117,8 @@ import ecran_journee_verre from './it/journee-verre.js';   // (15 nov.) Ma journ
 import ecran_arrivee from './it/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 import ecran_stock_rangement from './it/stockRangement.js';
 import ecran_arrivee_scan from './it/arriveeScan.js';
-import ecran_ce_matin from './it/ceMatin.js';
-import ecran_tvb_sondes from './it/toutVaBienSondes.js';   // (27 nov., lot tout-va-bien) ce qui tourne   // (27 nov., lot scan-ce-matin)
+import ecran_ce_matin from './it/ceMatin.js';   // (27 nov., lot scan-ce-matin)
+import ecran_tvb_sondes from './it/toutVaBienSondes.js';   // (27 nov., lot tout-va-bien) ce qui tourne
 import ecran_prio_recherche from './it/prioRecherche.js';   // (21 nov., lot prio-recherche)
 import ecran_roles_comptes from './it/rolesComptes.js';   // (20 nov., lot bleam-suite)   // (20 nov., lot arrivee-scan)
 import ecran_stock_etiquetage from './it/stockEtiquetage.js';   // (19 nov., lot stock-etiquetage)   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
