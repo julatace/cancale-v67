@@ -2365,3 +2365,12 @@ Julien, après avoir lu le risque (requêtes sans le « bruit » de la page vs c
   « article »), X9 (rien de su ⇒ « paire »), X10 (un changement de « Je vends » est suivi), EXÉCUTÉS sur le vrai
   background.js ; le background.js d'origin/main rend « … par paire … » ; deux mutations (source retirée, source figée
   sur Sneakers) rouges.
+- **Le panneau après la connexion ne coupe plus une page qui charge** (banc e2e, commit 27ebb4d32 de
+  `claude/zero-rouge-bancs-2`). Depuis la 5.453, une liaison demandée ouvre le panneau 300 ms après la session
+  (`ouvrirPanneauAccueil`) ; sans onglet de départ, il prenait N'IMPORTE QUEL onglet vinted.fr ouvert (l'actif d'abord) et
+  le menait par `chrome.tabs.update` sur `/?vrm=panneau` : une page qu'il chargeait était coupée (net::ERR_ABORTED).
+  **Correctif** : `ongletEnCharge` (`status` ≠ `complete` ou `pendingUrl`) n'est jamais touché ; l'onglet de DÉPART d'abord
+  (s'il ne charge pas), sinon un onglet vinted.fr au repos (`ongletAuRepos` : chargé, pas actif), sinon un onglet NEUF
+  (sur le site de l'onglet de départ s'il est connu). **Preuve** : `audit-connexion-simple` S8 (5 contrôles, vrai
+  background.js par `_fond-vm.cjs`) : 5 rouges sur la 5.455.1, verts après ; mutation (`ongletAuRepos` sans les gardes) :
+  5 rouges ; S7 (5.453) inchangé et vert. Banc `e2e-extension` (attend `panneau_apres_connexion_*`, repris de 27ebb4d32).

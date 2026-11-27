@@ -485,7 +485,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **27 nov. · ext. 5.455.2** : police « Inter VRM » chargée par le panneau ; `<gardes-app>` dit « article » hors Sneakers. `historique-divers.md`, fin. Geste : installer 5.455.2.
+- **27 nov. · ext. 5.455.2** : police « Inter VRM » du panneau ; `<gardes-app>` dit « article » ; le panneau ne coupe plus un onglet qui charge. `historique-divers.md`, fin. Geste : installer 5.455.2.
 - **26 nov. · « article » hors Sneakers partout (ext. 5.455.1)** : `historique-divers.md`, fin.
 - **26 nov. soir · FAVORIS PAR REQUÊTES « comme Vintex » (Julien : « A, fais comme Vintex »), ext. 5.455.0** : inquiries → conversation → transaction → offre → message, depuis la page, SEULES écritures permises (`ECRITURES_FAVORI`) ; garde-fous inchangés ; clics en réserve (`vrmFavorisChemin: 'interface'`). Bleam fait pareil (ancienne messagerie). `historique-divers.md`, fin. Geste : installer 5.455.0.
 - **26 nov. · Vestiaire/LBC fiables** : vente VC annulée ≠ « Vendue », lecture VC > 24 h = « à confirmer », Annonces lit `vc_ventes`, « LBC n » pas su sans ventes. `2026-11-26-fiabilite-vc-lbc.md`. Geste : aucun.

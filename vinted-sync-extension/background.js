@@ -938,16 +938,23 @@ async function revenirApresLiaison(retour) {
 //  Dès que la connexion RÉUSSIT (les deux chemins : « Me connecter » dans la fenêtre, et « Relier par vrm.center » quand la
 //  session arrive d'une liaison qu'il a demandée), le panneau s'ouvre sur SON ACCUEIL par le MÊME lien que l'app
 //  (src/ouvrirPanneau.js `lienPanneau` sans page : `?vrm=panneau`, lu par vrm-badge.js `lireLienPanneau`). L'onglet Vinted
-//  d'où il est parti (ou un onglet Vinted ouvert) passe devant sur ce lien ; sans onglet Vinted, un nouvel onglet.
+//  d'où il est parti (ou un onglet Vinted au repos, 5.455.2) passe devant sur ce lien ; sinon, un nouvel onglet.
 //  Jamais sur un échec, jamais à la simple réouverture de la fenêtre déjà connectée (un bouton « Ouvrir le panneau » y est).
 const PANNEAU_ACCUEIL = '/?vrm=panneau';
 const HOTE_PANNEAU = /^www\.vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i;
 function originePanneau(u) { try { const x = new URL(String(u || '')); return x.protocol === 'https:' && HOTE_PANNEAU.test(x.hostname) ? x.origin : ''; } catch (_) { return ''; } }
+// 5.455.2 (banc e2e, 27 nov.) — JAMAIS UN ONGLET QU'IL EST EN TRAIN DE CHARGER OU D'UTILISER. Avant, sans onglet de départ,
+//  `ouvrirPanneauAccueil` prenait N'IMPORTE QUEL onglet vinted.fr ouvert (l'actif d'abord) et le menait au panneau : une page
+//  Vinted qu'il chargeait à ce moment était coupée (net::ERR_ABORTED). Maintenant : l'onglet de DÉPART s'il n'est pas en
+//  train de charger ; sinon un onglet vinted.fr AU REPOS (chargé, aucune navigation en cours, pas celui qu'il regarde) ;
+//  sinon un onglet NEUF. Un onglet qui charge (`status: 'loading'` ou une `pendingUrl`) n'est jamais touché.
+const ongletEnCharge = (x) => !x || x.status !== 'complete' || !!x.pendingUrl;
+const ongletAuRepos = (x) => !!x && !ongletEnCharge(x) && !x.active && !!originePanneau(x.url);
 async function ouvrirPanneauAccueil(tabId) {
-  let t = null, o = '';
-  if (Number.isInteger(tabId) && tabId >= 0) { try { t = await chrome.tabs.get(tabId); o = t ? originePanneau(t.url) : ''; } catch (_) { t = null; } }
-  if (!o) { try { const l = (await chrome.tabs.query({})).filter((x) => x && originePanneau(x.url)); const a = l.find((x) => x.active) || l[0]; if (a) { t = a; o = originePanneau(a.url); } } catch (_) {} }
-  const url = (o || 'https://www.vinted.fr') + PANNEAU_ACCUEIL;
+  let t = null, o = '', site = '';
+  if (Number.isInteger(tabId) && tabId >= 0) { try { t = await chrome.tabs.get(tabId); site = t ? originePanneau(t.url) : ''; o = t && !ongletEnCharge(t) ? site : ''; } catch (_) { t = null; } }
+  if (!o) { t = null; try { const a = (await chrome.tabs.query({})).find(ongletAuRepos); if (a) { t = a; o = originePanneau(a.url); } } catch (_) {} }
+  const url = (o || site || 'https://www.vinted.fr') + PANNEAU_ACCUEIL;
   try {
     if (t && o) { await chrome.tabs.update(t.id, { url, active: true }); try { await chrome.windows.update(t.windowId, { focused: true }); } catch (_) {} noterDiag('panneau_apres_connexion_onglet'); return { ok: true, tab: t.id, nouveau: false }; }
     const n = await chrome.tabs.create({ url, active: true }); noterDiag('panneau_apres_connexion_nouveau'); return { ok: true, tab: n && n.id, nouveau: true };
