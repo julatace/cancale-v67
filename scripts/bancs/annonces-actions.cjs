@@ -247,7 +247,10 @@ const ecrituresDe = (u) => u.filter((x) => /republier|recreer|cmd_|file_/i.test(
             // R — lancer : SA confirmation d'abord ; « Annuler » ⇒ rien n'est parti.
             const avant = ecrituresDe(ecrits);
             await geste(pg, tel, '[data-eg-lancer="recreer"]');
-            await pg.waitForTimeout(800);
+            // (27 nov., CI chargée) attendre que SA confirmation soit affichée (8 s au plus), jamais un délai fixe (§6.5) :
+            // à 1512 la feuille arrivait après les 800 ms et le contrôle lisait « » — il reste rouge si elle ne vient pas.
+            await pg.waitForFunction(() => [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].some((x) => x.getClientRects().length), null, { timeout: 8000 }).catch(() => {});
+            await pg.waitForTimeout(300);
             const conf = await pg.evaluate(() => { const d = [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].find((x) => x.getClientRects().length); return d ? d.innerText.replace(/\s+/g, ' ').slice(0, 160) : ''; });
             await pg.screenshot({ path: nomF('confirmer') });
             dit(/2/.test(conf) && ecrituresDe(ecrits) === avant && (await pg.evaluate(() => window.__envois.length)) === 0, `R ${T} lancer demande SA confirmation (« · 2 ») — rien n’est parti avant`, conf);
@@ -340,7 +343,9 @@ const ecrituresDe = (u) => u.filter((x) => /republier|recreer|cmd_|file_/i.test(
             dit(!!l && !l.off && l.n === '2', `A ${T} deux annonces en ligne du même compte ⇒ « Republier · 2 » se lance`, JSON.stringify(l));
             const avant = ecrituresDe(ecrits);
             await geste(pg, tel, '[data-tt-action-directe="recreer"]');
-            await pg.waitForTimeout(800);
+            // même attente que plus haut : SA confirmation affichée (8 s au plus), jamais un délai fixe (§6.5).
+            await pg.waitForFunction(() => [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].some((x) => x.getClientRects().length), null, { timeout: 8000 }).catch(() => {});
+            await pg.waitForTimeout(300);
             const conf = await pg.evaluate(() => { const d = [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].find((x) => x.getClientRects().length); return d ? d.innerText.replace(/\s+/g, ' ').slice(0, 160) : ''; });
             await pg.screenshot({ path: nomF('confirmer') });
             dit(/2/.test(conf) && ecrituresDe(ecrits) === avant && (await pg.evaluate(() => window.__envois.length)) === 0, `R ${T} lancer demande SA confirmation (« · 2 ») — rien n’est parti avant`, conf);
