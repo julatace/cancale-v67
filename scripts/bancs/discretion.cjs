@@ -178,8 +178,9 @@ const ambre = (c) => { const [r, g, bb] = (/rgba?\(([^)]+)\)/.exec(c || '') || [
       await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
       await attendre(pg, '[data-tout-arrete]');
       await pg.waitForTimeout(500);
-      const s = await pg.evaluate(() => { const x = document.querySelector('[data-tout-arrete]'); return x ? { t: x.innerText, h: x.querySelector('[data-tout-reprendre]').getBoundingClientRect().height } : null; });
-      dit(s && /Tout est arrêté/.test(s.t) && s.h >= 44, 'Ma journée : « Tout est arrêté » (posé depuis un autre appareil) et « Reprendre » 44 px', JSON.stringify(s));
+      // (27 nov.) Jugé sur les data-* (la carte dit ce qui ne part plus : `data-tout-quoi`), plus sur son libellé.
+      const s = await pg.evaluate(() => { const x = document.querySelector('[data-tout-arrete]'); return x ? { at: Number(x.getAttribute('data-tout-arrete')), quoi: x.getAttribute('data-tout-quoi') || '', titre: !!x.querySelector('[data-tout-titre]'), h: x.querySelector('[data-tout-reprendre]').getBoundingClientRect().height } : null; });
+      dit(s && s.at > 0 && /offres/.test(s.quoi) && /favoris/.test(s.quoi) && /republications/.test(s.quoi) && s.titre && s.h >= 44, 'Ma journée : « Tout arrêter » posé depuis un autre appareil — la carte nomme ce qui ne part plus, et « Tout relancer » 44 px', JSON.stringify(s));
       const el = await pg.$('[data-verifications-journee]'); if (el) await el.screenshot({ path: path.join(SHOTS, `journee-tout-arrete-390.png`) });
       await ctx.close();
     });
