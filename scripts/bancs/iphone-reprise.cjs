@@ -478,9 +478,13 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         await pg.evaluate(() => { try { Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); } catch (_) {} });
         await pg.close();
         ({ pg } = await ouvrirPage(ctx));
-        await pg.waitForTimeout(800);
-        // même raison : on laisse au champ (rechargé à la demande) le temps de se monter avant de lire l'écran repris.
-        await pg.locator(CHAMP_ANNONCES).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        // (27 nov., R3 rouge une fois en CI : recherche null, défilement 0) On attend un ÉTAT, jamais un délai : l'écran Annonces
+        // prêt (`.vrm-attente[data-attente-ecran="annonces"]` à « pret » ou « plafond », src/AttenteEcran.jsx), puis SON champ
+        // monté et sa valeur rendue (la reprise la repose), puis le défilement reposé — chacun borné ; ce qui n'arrive pas
+        // est lu tel quel et rougit plus bas (le jugement ne change pas).
+        await pg.waitForFunction(() => !!document.querySelector('.vrm-main[data-ecran="annonces"] .vrm-attente[data-attente-ecran="annonces"]:is([data-attente="pret"], [data-attente="plafond"])'), null, { timeout: 30000 }).catch(() => {});
+        await pg.waitForFunction(([sel, v]) => { const c = document.querySelector(sel); return !!c && c.getClientRects().length > 0 && c.value === v; }, [CHAMP_ANNONCES, r3avant.recherche], { timeout: 15000 }).catch(() => {});
+        await pg.waitForFunction((h) => { const m = document.querySelector('.vrm-main'); return !!m && Math.abs(m.scrollTop - h) <= 4; }, r3avant.defile, { timeout: 10000 }).catch(() => {});
         const r3 = await ecran(pg);
         await capture(pg, `reprise-annonces-${sombre ? 'sombre' : 'clair'}`);
         dit(r3avant.ecran === 'annonces' && r3.ecran === 'annonces' && r3.site === r3avant.site && r3.recherche === 'taille', `R3 ${qui} : rouverte, même écran, même filtre, même recherche`, JSON.stringify(r3));
@@ -531,6 +535,19 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
           await pg.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
           const tient = await pg.evaluate(TIENT.mesureTient);
           TIENT.juger(dit, tient, `O3 ${qui} :`);
+          // O3 (27 nov., zoom 125 %) LE GRAND CHIFFRE DU JOUR ET SA PHRASE ne passent jamais SOUS la semaine : la grille « chiffre 1fr |
+          // semaine auto » écrasait « 80 € » à 8 px ; une rangée qui passe à la ligne la remplace (src/design/verre-journee.css). Chaque
+          // morceau de texte du chiffre (montant, « vendu aujourd'hui · … ») ne croise aucune barre ni lettre de la semaine.
+          const croise = await pg.evaluate(() => {
+            const a = [...document.querySelectorAll('.sj-journee[data-sj-ordi="1"] .vrm-jv2-argent')].find((x) => x.getClientRects().length); if (!a) return null;
+            const boites = (sel) => [...a.querySelectorAll(sel)].flatMap((e) => { const r = document.createRange(); r.selectNodeContents(e); return [...r.getClientRects()]; }).filter((q) => q.width > 0.5 && q.height > 0.5);
+            const chiffre = boites('.vrm-jv2-corps .vrm-jv2-grand, .vrm-jv2-corps .vrm-jv2-faits > span');
+            const semaine = boites('.vrm-jv2-frise .vrm-jv2-jour');
+            const x = [];
+            for (const p of chiffre) for (const q of semaine) if (p.left < q.right - 0.5 && q.left < p.right - 0.5 && p.top < q.bottom - 0.5 && q.top < p.bottom - 0.5) x.push([Math.round(p.left), Math.round(p.right), Math.round(q.left), Math.round(q.right)]);
+            return { n: chiffre.length, x };
+          });
+          dit(!!croise && croise.n > 0 && croise.x.length === 0, `O3 ${qui} : le grand chiffre et sa phrase ne passent pas sous la semaine`, JSON.stringify(croise));
           dit(!!r && r.logoEntier && r.coupes.length === 0, `O ${qui} : le logo « VRM » entier et aucun libellé de la colonne coupé`, JSON.stringify(r));
           dit(!!r && r.recouverts.length === 0, `O ${qui} : rien ne passe par-dessus la colonne`, JSON.stringify(r && r.recouverts));
           // (9 nov.) Le groupe « Plateformes » est RETIRÉ de la colonne (décision du 8 nov.,
