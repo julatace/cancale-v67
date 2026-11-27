@@ -219,11 +219,21 @@
   /* Le chiffre du jour : 64/700 (52 sous 1400 px), la semaine en barres à droite. */
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-col-c1 > .sj-affiche { margin: 0 !important; }
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] :is(.vrm-jv2-grand, .vrm-jv2-grand.vrm-fu-grand) { font-size: 64px !important; }
-  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .vrm-jv2-argent { grid-template-columns: minmax(0, 1fr) auto !important; gap: 4px 24px !important; }
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .vrm-jv2-frise { width: auto !important; grid-template-columns: repeat(7, 26px) !important; }
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .vrm-jv2-jour { width: 26px !important; min-width: 26px !important; }
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .vrm-jv2-barre { height: max(4px, calc(var(--h, 0) * 46px)) !important; width: 8px !important; }
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .vrm-jv2-pile-bouton { display: none !important; }
+  /* (27 nov., iphone-reprise O3 à 1512 × 950 zoom 125 %) LE GRAND CHIFFRE N'EST JAMAIS ÉCRASÉ. La grille « chiffre 1fr | semaine auto »
+     donnait d'abord à la semaine toute sa largeur (la ligne « Semaine du … · Ma semaine › » sans retour, ~320 px) et au chiffre
+     le reste : dans la colonne de 423 px, « 80 € » tombait à 8 px. Une rangée qui PASSE À LA LIGNE à la place : le chiffre prend
+     sa largeur (jamais moins), la semaine se met à côté s'il reste la place, sinon dessous ; la ligne « Semaine du … » dessous.
+     La phrase « vendu aujourd’hui · … » ne réclame que son plus long morceau insécable (elle s’étale ensuite sur la largeur du chiffre). Un montant plus large que la
+     colonne entière : le bloc est borné à 100 %, GrandChiffre réduit la taille (src/design/CarteMois.jsx). */
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .vrm-jv2-argent { display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; align-items: flex-end !important; gap: 4px 24px !important; }
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .vrm-jv2-corps { display: block !important; flex: 1 0 auto !important; min-width: 0 !important; max-width: 100% !important; }
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .vrm-jv2-faits { width: min-content !important; min-width: 100% !important; }
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .vrm-jv2-frise { flex: 0 0 auto !important; margin-left: auto !important; }
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .vrm-jv2-quand { flex: 1 0 100% !important; justify-content: flex-end !important; }
   /* « À sortir en premier » : UN verre ; la photo 150 px à gauche, le reste à droite ; la suite sous un filet. */
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] {
     margin: 0 !important; padding: 14px 16px 12px !important; border-radius: 22px !important; color: var(--sv-encre) !important;
