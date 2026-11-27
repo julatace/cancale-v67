@@ -48,6 +48,10 @@ const MUTATIONS = {
   'offre-pas-contact': ["    if (/offer/.test(t)) { n++; continue; }", ""],
   'auto-messages-systeme': ["if(body.auto===true&&cv.messages.length>0){", "if(false){"],
   'autre-devise': ["if(String(devise)!=='EUR'){", "if(false){"],
+  'sans-registre': ["if(deja&&(deja.o||deja.m)){", "if(false){"],
+  'registre-apres-message': ["    await noterRegistreFavori(uid,body.itemId,body.recipientId,'m');\n    if(attente){", "    if(attente){"],
+  'reprise-uuid-jetee': ["(!uuidR && !/^[1-9]\\d{0,19}$/.test(String(e.convId || '')))", "!/^[1-9]\\d{0,19}$/.test(String(e.convId || ''))"],
+  'terminer-perdu': ["if (!(await rejouerTerminers())) return attendre('vrm');", ""],
   'autorisation-incertaine': ["}catch{noterDiag('favori_autorisation_injoignable');return rep('refuse',0,'autorisation_expiree','autorisation');}", "}catch{return rep('incertain');}"],
   'sans-prix-dressing': ["if(it&&!(Number(prixAnnonce)>0)){", "if(false){"],
   'variable-bloque': ["if (manques.size && [...manques].every((k) => NEUTRES.includes(k) && !val[k])) {", "if (false) {"],
@@ -99,8 +103,10 @@ function monter(o = {}) {
   f.ctx.fetch = async (url, op = {}) => {
     if (String(url).startsWith('https://vrm.center/api/compte')) {
       const c = JSON.parse(op.body || '{}');
+      (f.appels = f.appels || []).push(c.action);
       if (o.vrmInjoignable && c.action === 'consommer') throw new Error('réseau');
-      const j = c.action === 'consommer' ? { ok: true, uid: UID, suivi: 's', travail: { notificationId: 'n-banc', itemId: '101', recipientId: '201', initiator: 'native-fixture', aimes: 1, ...(o.auto ? { auto: true } : {}), message: o.message || 'Bonjour, il te plaît toujours ?', offre: { mode: 'pct', valeur: 10, arrondi: false } } } : { ok: true, autorise: true, uid: UID };
+      if (o.terminerPanne && c.action === 'terminer' && o.terminerPanne-- > 0) return { ok: false, status: 503, json: async () => ({ message: 'panne' }) };
+      const j = c.action === 'consommer' ? { ok: true, uid: UID, suivi: 's', travail: { notificationId: 'n-banc', itemId: '101', recipientId: '201', initiator: 'native-fixture', aimes: 1, ...(o.auto ? { auto: true } : {}), message: o.message || 'Bonjour, il te plaît toujours ?', ...(o.sansOffre ? {} : { offre: { mode: 'pct', valeur: 10, arrondi: false } }) } } : { ok: true, autorise: true, uid: UID };
       return { ok: true, status: 200, json: async () => j };
     }
     return fetchFond(url, op);
@@ -205,6 +211,29 @@ const court = (f, r) => JSON.stringify({ r: r && (r.json || r.erreur), v: f.j.vi
   { const f = monter(Object.assign({}, MESUREE, { tx404: true, dressing: [{ id: 101, title: 'Baskets dressing', price: { amount: '60.0', currency_code: 'EUR' } }] })); const r = await jouer(f);
     const o = ecr(f).find((x) => /\/offers$/.test(x.chemin)); let px = ''; try { px = JSON.parse(o.corps).offer.price; } catch (_) {}
     dit(res(r).resultat === 'envoye' && px === '54.0', 'V18 transaction illisible ⇒ prix de SON dressing (60 € − 10 % = 54), offre + message', court(f, r) + ' prix=' + px); }
+  // ── 5.455.4 : une relance après N'IMPORTE QUELLE interruption ne refait jamais une offre ni un message (registre) ──
+  { const f = monter(MESUREE); const r1 = await jouer(f); const n1 = ecr(f).length; const r2 = await jouer(f);
+    dit(res(r1).resultat === 'envoye' && res(r2).resultat === 'ignore' && ecr(f).length === n1, 'V29 le même favori relancé après un envoi ⇒ sauté, rien de plus chez Vinted (ni demande, ni offre, ni message)', court(f, r2)); }
+  { const f = monter(Object.assign({}, MESUREE, { reponse: { status: 503, body: {} } })); const r1 = await jouer(f); const n1 = ecr(f).length; const r2 = await jouer(f);
+    dit(res(r1).resultat === 'incertain' && res(r2).resultat === 'ignore' && ecr(f).length === n1, 'V30 message à la réponse inconnue (503) puis relance (« Pas parti » choisi) ⇒ jamais un 2ᵉ message ni une 2ᵉ offre', court(f, r2)); }
+  { const f = monter(Object.assign({}, MESUREE, { sansOffre: true, reponse: { status: 503, body: {} } })); const r1 = await jouer(f); const n1 = ecr(f).length; const r2 = await jouer(f);
+    dit(res(r1).resultat === 'incertain' && res(r2).resultat === 'ignore' && ecr(f).length === n1, 'V30b SANS offre, message à la réponse inconnue puis relance ⇒ jamais un 2ᵉ message (registre posé AVANT l’envoi)', court(f, r2)); }
+  { const f = monter(Object.assign({}, MESUREE, { reponse: { status: 422, body: { code: 99 } }, offre: { status: 422, body: {} } })); const r1 = await jouer(f); const r2 = await jouer(f);
+    dit(res(r1).resultat === 'refuse' && res(r2).resultat !== 'ignore' && ecr(f).some((x, i, l) => /inquiries$/.test(x.chemin) && l.filter((y) => /inquiries$/.test(y.chemin)).length === 2), 'V31 rien n’est parti (offre refusée 422) ⇒ le favori reste renvoyable (le registre ne retient que ce qui a pu partir)', court(f, r2)); }
+  // La reprise après un worker tué entre l'offre et le message (uuid) : le message part UNE fois, le serveur est prévenu.
+  { const f = monter(MESUREE); const J2 = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    f.store.vrmFavoriAttente = { [J2]: { uid: UID, convId: UUID, texte: 'Bonjour, il te plaît toujours ?', variante: 1, tRes: 0, suivi: 's', itemId: '101', recipientId: '201', requetes: true, jusqua: Date.now() - 1000, s: 10, v: '5.455.4' } };
+    await f.ctx.reprendreMessagesFavoris(); const n1 = ecr(f).filter((x) => /replies$/.test(x.chemin)).length;
+    f.store.vrmFavoriAttente = { [J2]: Object.assign({}, { uid: UID, convId: UUID, texte: 'Bonjour, il te plaît toujours ?', itemId: '101', recipientId: '201', requetes: true, jusqua: Date.now() - 1000 }) };
+    await f.ctx.reprendreMessagesFavoris(); const n2 = ecr(f).filter((x) => /replies$/.test(x.chemin)).length;
+    dit(n1 === 1 && n2 === 1 && (f.appels || []).includes('terminer'), `V32 worker tué entre l’offre et le message (nouvelle messagerie) ⇒ le message part à la reprise, UNE seule fois (${n1} puis ${n2}), le serveur prévenu`, JSON.stringify(f.appels)); }
+  // `terminer` perdu (VRM en panne) : rangé, rejoué AVANT toute nouvelle réservation.
+  { const f = monter(Object.assign({}, MESUREE, { terminerPanne: 1 }));
+    await f.ctx.terminerFavoriServeur(UID, JETON, { ok: true, data: { resultat: 'envoye', ecrits: 3 } }); const garde = (f.store.vrmFavorisTerminer || []).length;
+    await f.ctx.rejouerTerminers(); const apres = (f.store.vrmFavorisTerminer || []).length;
+    dit(garde === 1 && apres === 0 && (f.appels || []).filter((a) => a === 'terminer').length === 2, `V33 compte rendu perdu (503) ⇒ rangé (${garde}) puis rejoué (${apres} restant)`, JSON.stringify(f.appels)); }
+  { const src = fs.readFileSync(BG, 'utf8'); const i = src.indexOf('async function tickFavorisCarte'), k = src.indexOf("apiFavorisCarte(st.uid, 'suivant')", i);
+    dit(i > 0 && k > i && /rejouerTerminers\(\)/.test(src.slice(i, k)), 'V34 la carte rejoue un compte rendu en souffrance AVANT de réserver le favori suivant'); }
   console.log(ko ? `❌ favoris par requêtes comme Vintex : ${ko} rouge(s), ${ok} vert(s)` : `✅ favoris par requêtes comme Vintex : ${ok} vert(s)`);
   process.exit(ko ? 1 : 0);
 })();

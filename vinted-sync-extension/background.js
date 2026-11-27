@@ -16642,6 +16642,22 @@ async function cheminFavoris() { try { const v = (await chrome.storage.local.get
 //    mode auto ne le reprenait jamais, et un 4xx propre à CE favori arrêtait la file au lieu de le sauter. 2xx, 5xx, réseau
 //    (incertain) : comptés (la requête a pu aboutir).
 function ecritureFavoriPartie(x) { if (!x || x.rienParti) return false; const s = Number(x.status) || 0; return !(s >= 400 && s < 500); }
+// 5.455.4 (Julien, 27 nov. : « tout comme Vintex » — garde-fou gardé : jamais deux fois) : LE REGISTRE de CE navigateur, par
+//    compte, article ET acheteur : l'offre faite (`o`), le message parti ou peut-être parti (`m`). Écrit AU MOMENT du geste (avant
+//    même le compte rendu au serveur) et LU AVANT la demande `inquiries` : une file relancée après n'importe quelle
+//    interruption (worker tué, « Pas parti » choisi, réponse perdue) ne refait jamais une offre ni un message déjà faits.
+const REGISTRE_FAVORIS = 'vrmFavorisFaits';
+const cleRegistreFavori = (item, acheteur) => String(item) + ':' + String(acheteur);
+async function registreFavori(uid) { try { const m = (await chrome.storage.local.get(REGISTRE_FAVORIS))[REGISTRE_FAVORIS] || {}; const u = m[String(uid)]; return u && typeof u === 'object' ? u : {}; } catch (_) { return null; } }
+async function effacerRegistreFavori(uid, item, acheteur, quoi) {
+  try { const m = (await chrome.storage.local.get(REGISTRE_FAVORIS))[REGISTRE_FAVORIS] || {}; const u = m[String(uid)]; const k = cleRegistreFavori(item, acheteur); if (!u || !u[k]) return; delete u[k][quoi]; if (!Object.keys(u[k]).length) delete u[k]; await chrome.storage.local.set({ [REGISTRE_FAVORIS]: m }); } catch (_) {}
+}
+async function noterRegistreFavori(uid, item, acheteur, quoi) {
+  try { const m = (await chrome.storage.local.get(REGISTRE_FAVORIS))[REGISTRE_FAVORIS] || {}; const u = m[String(uid)] = m[String(uid)] && typeof m[String(uid)] === 'object' ? m[String(uid)] : {};
+    const k = cleRegistreFavori(item, acheteur); u[k] = Object.assign({}, u[k], { [quoi]: Date.now() });
+    const cles = Object.keys(u); if (cles.length > 5000) for (const c of cles.slice(0, cles.length - 5000)) delete u[c];
+    await chrome.storage.local.set({ [REGISTRE_FAVORIS]: m }); } catch (_) {}
+}
 function ecritureFavoriPermise(adresse) { const a = String(adresse || ''); return ECRITURES_FAVORI.some((re) => re.test(a)); }
 function adresseMessagerieApi(domaine, suite) { const d = String(domaine || 'www.vinted.fr').toLowerCase().replace(/^www\./, ''); return /^vinted\.(fr|com|it|de)$/.test(d) ? `https://api.${d}/messaging/main/${suite}` : ''; }
 async function vintedPageFavori(acc, adresse, corps, options = {}) {
@@ -22625,6 +22641,9 @@ async function executerMessageFavori(uid,acc,body,opts={}){
       if(!ra.ok)return rep('refuse',ra.status,'autorisation_expiree');const ja=await ra.json();if(!ja.ok||!ja.autorise||String(ja.uid)!==String(uid))return rep('refuse');
     }catch{return rep('refuse');}
     if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
+    // 5.455.4 : le registre d'abord — une offre ou un message déjà faits à CET acheteur pour CET article ⇒ rien ne part (sauté).
+    //    Registre illisible ⇒ rien ne part non plus (« pas su » ne vaut pas « jamais contacté »).
+    {const rg=await registreFavori(uid);if(rg===null)return rep('refuse',0,'historique_non_verifie');const deja=rg[cleRegistreFavori(body.itemId,body.recipientId)];if(deja&&(deja.o||deja.m)){noterDiag('favori_req_registre_'+(deja.m?'message':'offre'));return rep('ignore',0,'conversation_deja_contactee');}}
     etape('conversation');
     const adrQ=adresseMessagerieApi(acc.domain,'inquiries');
     if(!adrQ)return rep('refuse',0,'onglet_vinted');
@@ -22757,6 +22776,8 @@ async function executerMessageFavori(uid,acc,body,opts={}){
       if(!o.ok&&o.status===400){if(await telephoneAVerifierVinted(acc)===true){noterDiag('favori_telephone_a_verifier');return rep('refuse',o.status,'telephone_a_verifier');}}
       const offreFaite=!!(o.ok&&(o.json==null||o.json.code==null||Number(o.json.code)===0));
       noterDiag(offreFaite?'favori_offre_ok':'favori_offre_refusee_'+(o.status||'reseau'));
+      // Registre : l'offre faite (ou peut-être faite) l'est pour toujours — jamais une 2ᵉ.
+      if(offreFaite||!(o.status>=400&&o.status<500))await noterRegistreFavori(uid,body.itemId,body.recipientId,'o');
       if(!offreFaite)return o.status>=400&&o.status<500||o.ok?rep('refuse',o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');
       prixOffreFait=Number(op.prix);
     }
@@ -22771,7 +22792,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     if(!texteSurVinted(texteV).ok){noterDiag('favori_texte_final_interdit');return rep('refuse',0,'texte_interdit');}
     if(prixOffreFait!=null){
       attente=jeton;
-      const att=await attendreOffreMessage(jeton,{uid:String(uid),convId:uuid,texte:texteV,variante:versionV.n,tRes,suivi:grant.suivi||null,acc},(nom,x)=>{if(grant.suivi)notifierApp({type:'favoris',uid:String(uid),suivi:grant.suivi,etape:nom,...(x||{})});});
+      const att=await attendreOffreMessage(jeton,{uid:String(uid),convId:uuid,texte:texteV,variante:versionV.n,tRes,suivi:grant.suivi||null,itemId:body.itemId,recipientId:body.recipientId,requetes:true,acc},(nom,x)=>{if(grant.suivi)notifierApp({type:'favoris',uid:String(uid),suivi:grant.suivi,etape:nom,...(x||{})});});
       if(!att.ok){noterDiag('favori_message_pas_parti_'+att.raison);return rep('refuse',0,att.raison);}
     }
     etape('ecriture');
@@ -22779,12 +22800,16 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     if(!ec.ok)return rep('refuse',0,ec.code==='vinted-pause'?'pause_vinted':ec.code==='vinted-autre'?'compte_vinted_different':ec.code==='secu-robot'?'vinted_robot':ec.code==='tout-arrete'?(prixOffreFait!=null?'tout_arrete':'autorisation_expiree'):'compte_vinted_absent');
     if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
     etape('envoi');
+    // Registre AVANT le message : s'il part (ou peut partir), il ne repartira jamais, même si le worker meurt pendant la requête.
+    await noterRegistreFavori(uid,body.itemId,body.recipientId,'m');
+    if(attente){await poserAttenteFavori(attente,null);_favorisAttenteIci.delete(attente);attente=null;}
     const r=await vintedPageFavori(acc,adresseMessagerieApi(acc.domain,`conversations/${uuid}/replies`),{content:texteV,is_personal_data_sharing_check_skipped:false,photo_temp_uuids:null});
     if(!r.rienParti&&partie(r)&&ecritureFavoriPartie(r))ecrits++;
     if(r.rienParti)return rep('refuse',0,'onglet_vinted');
     if(frein)return rep('refuse',r.status);
     if(r.incertain||!r.status){await noterTexteRecent(uid,texteV);return rep('incertain',0,'reponse_inconnue');}
     if(r.ok){noterDiag('favori_req_envoye');variante=Number.isInteger(versionV.n)&&versionV.n>0?versionV.n:null;await noterVarianteDerniere(uid,'favori',variante);await noterChoixFavori(uid,body,uuid,versionV,prixOffreFait!=null);await noterTexteRecent(uid,texteV);etape('confirmation');return rep('envoye',r.status);}
+    if(r.status>=400&&r.status<500)await effacerRegistreFavori(uid,body.itemId,body.recipientId,'m');
     if(r.status===400){if(await telephoneAVerifierVinted(acc)===true){noterDiag('favori_telephone_a_verifier');return rep('refuse',r.status,'telephone_a_verifier');}}
     if([400,422].includes(r.status)){await noterVersionRefusee(uid,versionV.modele||versionV.texte);noterDiag('favori_message_refuse_'+r.status);try{Promise.resolve(echantillonRate('favori_refus_forme',String(r.status),JSON.stringify(formeJson(r.json)).slice(0,600))).catch(()=>{});}catch(_){}return rep('refuse',r.status,'texte_refuse');}
     return rep(r.status>=400&&r.status<500?'refuse':'incertain',r.status);
@@ -23090,6 +23115,32 @@ async function apiFavorisCarte(uid, action, donnees) {
     let j = null; try { j = await r.json(); } catch (_) { j = null; }
     return { ok: !!(r.ok && j && j.ok), status: r.status, json: j };
   } catch (_) { return { ok: false, status: 0, json: null }; }
+}
+// 5.455.4 (revue C12) : LE COMPTE RENDU d'une tentative (`terminer`) n'est jamais perdu. Un échec réseau ou serveur (5xx) le
+//    range dans chrome.storage.local (un worker tué ne l'oublie pas) ; il est rejoué au tour suivant, AVANT toute nouvelle
+//    réservation, jusqu'à ce que le serveur l'ait lu (au plus 6 h). Le serveur l'ignore s'il ne correspond plus à rien : rejouer
+//    ne refait rien chez Vinted. Avant : un `terminer` perdu laissait la tentative « incertaine » après 2 min, la file bloquée.
+const TERMINER_EN_ATTENTE = 'vrmFavorisTerminer';
+async function terminerFavoriServeur(uid, jeton, brut) {
+  const r = await apiFavorisCarte(String(uid), 'terminer', { jeton, brut });
+  if (!r.ok && !(r.status >= 400 && r.status < 500)) {
+    try { const l = (await chrome.storage.local.get(TERMINER_EN_ATTENTE))[TERMINER_EN_ATTENTE]; const a = (Array.isArray(l) ? l : []).filter((x) => x && x.jeton !== jeton); a.push({ uid: String(uid), jeton: String(jeton), brut, at: Date.now() }); await chrome.storage.local.set({ [TERMINER_EN_ATTENTE]: a.slice(-20) }); } catch (_) {}
+    noterDiag('favori_terminer_en_attente');
+  }
+  return r;
+}
+async function rejouerTerminers() {
+  let l = []; try { l = (await chrome.storage.local.get(TERMINER_EN_ATTENTE))[TERMINER_EN_ATTENTE]; } catch (_) { return false; }
+  if (!Array.isArray(l) || !l.length) return true;
+  const reste = [];
+  for (const x of l) {
+    if (!x || !x.jeton || !(Date.now() - Number(x.at) < 6 * 3600000)) continue;
+    const r = await apiFavorisCarte(String(x.uid), 'terminer', { jeton: x.jeton, brut: x.brut });
+    if (r.ok || (r.status >= 400 && r.status < 500)) { noterDiag('favori_terminer_rejoue'); continue; }
+    reste.push(x);
+  }
+  try { await chrome.storage.local.set({ [TERMINER_EN_ATTENTE]: reste }); } catch (_) {}
+  return !reste.length;
 }
 async function lireEtatFavorisCarte() {
   try { const v = (await chrome.storage.local.get(FAVORIS_CARTE_CLE))[FAVORIS_CARTE_CLE]; return v && v.v === 1 && /^[1-9]\d{0,19}$/.test(String(v.uid || '')) ? v : null; } catch (_) { return null; }
@@ -25186,12 +25237,13 @@ async function piloteFavorisTick(maintenant = Date.now()) {
     const t = await apiFavorisCarte(uid, 'auto', { extension: { disponible: true } });
     if (!t.ok || !t.json) return fin('vrm', { uid });
     if (!t.json.ajoute) return fin(String(t.json.etat || 'rien').slice(0, 30), { uid });
+    if (!(await rejouerTerminers())) return fin('vrm', { uid });
     const s2 = await apiFavorisCarte(uid, 'suivant');
     const tr = s2.ok && s2.json && s2.json.travail;
     if (!tr || typeof tr.jeton !== 'string') return fin('pret', { uid });
     let x = null; try { x = await executerPourAppCoeur({ uid, method: 'POST', endpoint: '/vrm/favoris', body: tr, __carte: true }); } catch (_) { x = null; }
     const brut = x ? { ok: !!x.ok, code: x.code || undefined, data: x.data || null } : {};
-    await apiFavorisCarte(uid, 'terminer', { jeton: tr.jeton, brut });
+    await terminerFavoriServeur(uid, tr.jeton, brut);
     // 5.437 : le BILAN du mode auto (par compte et par jour) — envoyés, sautés avec leur raison (vendu, sous le prix mini,
     //    déjà contacté…), dit dans Automatisations ; un saut est aussi au journal du compte.
     const res = x ? ((x.data && typeof x.data === 'object' && (x.data.json || x.data)) || x.json || {}) : {};
@@ -25413,6 +25465,7 @@ async function tickFavorisCarte() {
         if (av.ms < 25000) planifierFavorisCarte(av.ms + 300);
         return;
       }
+      if (!(await rejouerTerminers())) return attendre('vrm');   // 5.455.4 : un compte rendu en souffrance d'abord
       const s = await apiFavorisCarte(st.uid, 'suivant');
       if (!s.ok || !s.json) return attendre('vrm');
       if (s.json.carte) st.file = s.json.carte;
@@ -25427,7 +25480,7 @@ async function tickFavorisCarte() {
       const premierIci = !st.premierFait;
       try { r = await executerPourAppCoeur({ uid: st.uid, method: 'POST', endpoint: '/vrm/favoris', body: t, __carte: true, __manuel: t.auto !== true, __premier: premierIci, __texte: typeof st.texteEnvoi === 'string' ? st.texteEnvoi : null }); } catch (_) { r = null; }
       const brut = r ? { ok: !!r.ok, code: r.code || undefined, data: r.data || null } : {};
-      const f = await apiFavorisCarte(st.uid, 'terminer', { jeton: t.jeton, brut });
+      const f = await terminerFavoriServeur(st.uid, t.jeton, brut);
       const st2 = (await lireEtatFavorisCarte()) || st;
       st2.enCours = null;
       if (r && r.ok) st2.premierFait = true;
@@ -25631,7 +25684,10 @@ async function reprendreMessagesFavoris() {
         logActivity(resultat === 'envoye' ? '💬 Message au favori envoyé après la reprise de l’extension (offre faite avant)' : `⚠️ Offre faite, message au favori PAS envoyé (${raison})`);
         try { notifierApp({ type: 'favoris', uid: String(e && e.uid || ''), suivi: e && e.suivi || null, etape: resultat === 'envoye' ? 'confirmation' : 'message_pas_parti', raison }); } catch (_) {}
       };
-      if (!e || !/^\d{1,20}$/.test(String(e.uid || '')) || !/^[1-9]\d{0,19}$/.test(String(e.convId || '')) || typeof e.texte !== 'string' || !e.texte.trim()) { await poserAttenteFavori(jeton, null); continue; }
+      // 5.455.4 (revue C3) : une attente de la NOUVELLE messagerie (uuid, chemin des requêtes) n'est plus jetée en silence : elle
+      //    repart par la même porte (`vintedPageFavori`, `ECRITURES_FAVORI`), une seule fois (registre `m` posé AVANT l'envoi).
+      const uuidR = e && e.requetes === true && RE_UUID_FAV.test(String(e.convId || '')) && /^[1-9]\d{0,19}$/.test(String(e.itemId || '')) && /^[1-9]\d{0,19}$/.test(String(e.recipientId || ''));
+      if (!e || !/^\d{1,20}$/.test(String(e.uid || '')) || (!uuidR && !/^[1-9]\d{0,19}$/.test(String(e.convId || ''))) || typeof e.texte !== 'string' || !e.texte.trim()) { await poserAttenteFavori(jeton, null); continue; }
       if (Date.now() > Number(e.jusqua) + FAVORI_ATTENTE_TROP_TARD_MS) { await finir('refuse', 'trop_tard'); continue; }
       _favorisAttenteIci.add(jeton);
       try {
@@ -25643,6 +25699,21 @@ async function reprendreMessagesFavoris() {
         if (!ec.ok) { await finir('refuse', ec.code === 'vinted-pause' ? 'pause_vinted' : 'compte_vinted_different'); continue; }
         const non = await arretAvantMessageFavori(e.uid, acc);
         if (non) { await finir('refuse', non); continue; }
+        if (uuidR) {
+          const rg = await registreFavori(e.uid);
+          if (rg === null || (rg[cleRegistreFavori(e.itemId, e.recipientId)] || {}).m) { await finir('refuse', 'historique_non_verifie'); continue; }
+          await noterRegistreFavori(e.uid, e.itemId, e.recipientId, 'm');
+          await poserAttenteFavori(jeton, null);
+          const rq = await vintedPageFavori(acc, adresseMessagerieApi(acc.domain, `conversations/${String(e.convId).toLowerCase()}/replies`), { content: e.texte, is_personal_data_sharing_check_skipped: false, photo_temp_uuids: null });
+          const okR = !!(rq && rq.ok);
+          if (rq && rq.status >= 400 && rq.status < 500) await effacerRegistreFavori(e.uid, e.itemId, e.recipientId, 'm');
+          if (okR) { if (Number.isInteger(e.variante)) await noterVarianteDerniere(e.uid, 'favori', e.variante); await noterTexteRecent(e.uid, e.texte); n++; }
+          // Le compte rendu au serveur (la file attend cette tentative) : envoyé, pas envoyé, ou incertain — jamais renvoyé.
+          const brut = okR ? { ok: true, data: { resultat: 'envoye', raison: '', ecrits: 3, etape: 'confirmation' } } : rq && rq.status >= 400 && rq.status < 500 ? { ok: false, data: { resultat: 'refuse', raison: 'vinted_refus', ecrits: 2, etape: 'envoi', cause: 'http_' + rq.status } } : { ok: false, data: { resultat: 'incertain', raison: 'reponse_inconnue', ecrits: 3, etape: 'envoi' } };
+          try { await terminerFavoriServeur(e.uid, jeton, brut); } catch (_) {}
+          await finir(okR ? 'envoye' : 'refuse', okR ? '' : 'reponse_inconnue');
+          continue;
+        }
         // 5.414 : par l'interface (tapé, « Envoyer », vu dans le fil).
         const r = await interfaceVinted(acc, 'message', { conv: String(e.convId), texte: e.texte });
         if (r && r.ok && r.json && r.json.code === 0) { if (Number.isInteger(e.variante)) await noterVarianteDerniere(e.uid, 'favori', e.variante); if (r.vu !== true) noterDiag('favori_message_pas_vu'); n++; await finir('envoye', ''); }
