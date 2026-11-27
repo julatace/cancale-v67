@@ -20,3 +20,22 @@
     .n-rp-liste { margin: 0 var(--n-marge); border: .5px solid var(--n-trait); border-radius: 0; }
   }
 }
+
+/* (27 nov.) « Paires qui dorment » — le plan (src/natif/ecrans/PairesDorment.jsx) : la même grammaire (rangées à filet, pas de
+   carte arrondie, pas de capitale) ; l'argent qui dort en tête, trois boutons d'action sous chaque rangée. Jetons seulement. */
+@layer vrm-natif {
+  .n-pdo { padding: 0 0 16px; }
+  .n-pdo-tete { display: grid; gap: 2px; padding: 4px var(--n-marge) 16px; }
+  .n-pdo-tete-lib { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-pdo-tete-m { font: var(--n-t-grand); color: var(--n-encre); font-variant-numeric: tabular-nums; }
+  .n-pdo-tete-sous { font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  .n-pdo-ligne { border-bottom: .5px solid var(--n-trait); }
+  .n-pdo-ligne:last-child { border-bottom: 0; }
+  .n-pdo-actions { padding: 0 var(--n-marge) 12px; }
+  .n-pdo-actions .n-bouton { min-height: var(--n-cible); }
+  .n-pdo-porte { padding: 0 calc(var(--n-marge) - 8px) 4px; }
+  .n-pdo-porte .n-bouton { min-height: var(--n-cible); }
+  .n-pdo-raison { display: flex; align-items: flex-start; gap: 6px; margin: 0; padding: 0 var(--n-marge) 8px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-pdo-raison-tete { padding: 0 var(--n-marge) 12px; }
+  .n-pdo-raison .n-glyphe { flex: none; margin-top: 1px; }
+}
