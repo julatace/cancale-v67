@@ -284,18 +284,20 @@ export function initialePseudo(pseudo){
 
 // Les refus qui viennent de Vinted lui-même (une puce « Refusé par Vinted »).
 const REFUS_VINTED=new Set(['vinted_refus','offre_refusee','vinted_frein','vinted_robot']);
-// La puce d'un favori « pas envoyé », en deux ou trois mots.
+// 5.455.7 (Julien, 27 nov. 23:00 : « l'extension ne doit pas refuser d'elle-même ») — LES MÊMES SIX ÉTATS que le panneau de
+//    l'extension (vrm-badge.js `etatFav6`) : Pas encore contacté · En attente · Envoi en cours · Message envoyé (déjà contacté
+//    compris) · Vendu / réservé · Refusé par Vinted (seulement quand Vinted a refusé). Plus aucun « Pas envoyé » ni « Ignoré ».
 const PUCE_RAISON={
-  conversation:'Déjà en conversation',contacte_30j:'Déjà contacté',deja_contacte:'Déjà contacté',
-  vendue:'Vendu',reservee:'Réservé',en_pause:'En pause',fermee:'Plus en ligne',annonce_absente:'Plus en ligne',
-  destinataire:'À ouvrir',expire:'Trop ancien',limite_heure:'Limite de l’heure',
+  conversation:'Message envoyé',contacte_30j:'Message envoyé',deja_contacte:'Message envoyé',conversation_deja_contactee:'Message envoyé',conversation_existante:'Message envoyé',
+  vendue:'Vendu / réservé',reservee:'Vendu / réservé',en_pause:'Vendu / réservé',fermee:'Vendu / réservé',annonce_absente:'Vendu / réservé',annonce_indisponible:'Vendu / réservé',article_vendu:'Vendu / réservé',
+  limite_heure:'En attente',quota_extension:'En attente',notification_pas_trouvee:'En attente',fil_non_relu:'En attente',pause_vinted:'Refusé par Vinted',
 };
-export function puceRaison(raison){return REFUS_VINTED.has(raison)?'Refusé par Vinted':PUCE_RAISON[raison]||'Pas envoyé';}
+export function puceRaison(raison){return REFUS_VINTED.has(raison)?'Refusé par Vinted':PUCE_RAISON[raison]||'Pas encore contacté';}
 // L'état d'une PERSONNE, en mots (feuille de détail d'un article).
 export function texteEtatPersonne(p){
-  if(p.etat==='envoye')return p.offre?'Offre faite':'Envoyé';
-  if(p.etat==='a_envoyer')return 'À envoyer';
-  if(p.etat==='en_cours')return 'En cours';
+  if(p.etat==='envoye')return p.offre?'Message envoyé · offre faite':'Message envoyé';
+  if(p.etat==='a_envoyer')return 'Pas encore contacté';
+  if(p.etat==='en_cours')return 'Envoi en cours';
   if(p.etat==='a_verifier')return 'À vérifier';
   return puceRaison(p.raison);
 }
@@ -352,12 +354,12 @@ export function articlesFavoris({lignes=[],statut=()=>null,journal=[],vendue=()=
 // UNE puce et UN geste par article. `ton` : 'neutre' · 'geste' (ambre : à toi de jouer).
 export function puceArticle(c,n){
   if(n.a_verifier)return {puce:{code:'a_verifier',texte:'À vérifier',ton:'geste'},geste:'verifier'};
-  if(n.en_cours)return {puce:{code:'en_cours',texte:'En cours',ton:'neutre'},geste:null};
+  if(n.en_cours)return {puce:{code:'en_cours',texte:'Envoi en cours',ton:'neutre'},geste:null};
   if(n.a_envoyer&&!c.vendu)return {puce:{code:'a_envoyer',texte:n.a_envoyer>1?`${n.a_envoyer} à envoyer`:'1 à envoyer',ton:'neutre'},geste:'envoyer'};
-  if(c.vendu)return {puce:{code:'vendu',texte:'Vendu',ton:'neutre'},geste:null};
+  if(c.vendu)return {puce:{code:'vendu',texte:'Vendu / réservé',ton:'neutre'},geste:null};
   if(n.refus)return {puce:{code:'refus',texte:'Refusé par Vinted',ton:'neutre'},geste:null};
-  if(n.offre)return {puce:{code:'offre',texte:'Offre faite',ton:'neutre'},geste:null};
-  if(n.envoye)return {puce:{code:'envoye',texte:'Envoyé',ton:'neutre'},geste:null};
+  if(n.offre)return {puce:{code:'offre',texte:'Message envoyé · offre faite',ton:'neutre'},geste:null};
+  if(n.envoye)return {puce:{code:'envoye',texte:'Message envoyé',ton:'neutre'},geste:null};
   const ouvrir=c.personnes.find(p=>p.ouvrir);
   if(ouvrir)return {puce:{code:'ouvrir',texte:'À ouvrir',ton:'geste'},geste:'ouvrir'};
   const p0=c.personnes.find(p=>p.etat==='pas_envoye');

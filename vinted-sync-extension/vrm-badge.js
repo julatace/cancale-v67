@@ -2801,6 +2801,9 @@ function vrmVerifVisible(sel) {
     const ligneN = `<div class="n6"><span data-fav6-n="${vus.length}">${esc(vus.length === 1 ? TU('f6_n1') : TU('f6_n', { n: vus.length.toLocaleString('fr-FR') }))}${total > tous.length ? ' · ' + esc(TU('fl_plus', { n: tous.length, total: total.toLocaleString('fr-FR') })) : ''}</span><span class="n6-d">${filtreAnnonce ? `<button type="button" class="vu-lien" data-fav6-annonce-tout>${esc(TU('fl_toutes'))}</button>` : ''}${cochablesVus.length ? `<button type="button" class="vu-lien tout6" data-fav-tout="${tout ? 'aucun' : 'tous'}">${esc(TU(tout ? 'fl_rien' : 'fl_tout'))}</button>` : ''}</span></div>`;
     const notes = [
       autoFavLigneHtml(),
+      // 5.455.7 (Julien, 27 nov. 23:10 : « sans crainte de se faire embêter ») : ses messages par défaut sont à lui seul, et les
+      //    protections actives, dites en clair (rien n'est réglé ici : ce sont celles de l'extension, inchangées).
+      `<p class="note5" data-fav6-uniques>${esc(TU('f6_uniques'))}</p><details class="sur6" data-fav6-sur><summary>${esc(TU('f6_sur_t'))}</summary><ul>${[1, 2, 3, 4, 5, 6, 7, 8].map((i) => `<li>${esc(TU('f6_sur_' + i))}</li>`).join('')}</ul></details>`,
       a.ventesAilleurs === 'pas_su' ? '<p class="note5 ambre6" data-fav-ailleurs>Tes ventes sur les autres sites n’ont pas été revérifiées récemment : assure-toi que ces articles ne sont pas vendus ailleurs.</p>' : '',
       Number(a.retires) > 0 ? `<p class="note5" data-fav-caches="${Number(a.retires)}">${esc(TU('fl_caches', { n: Number(a.retires) }))}</p>` : '',
       favErreur ? `<p class="note5 err6" role="alert" data-fav-erreur6>${esc(favErreur)}</p>` : '',

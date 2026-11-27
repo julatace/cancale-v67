@@ -2,6 +2,11 @@ import {createHash,randomUUID} from 'node:crypto';
 import {vendeurExige,lireCommeVendeur} from './session.js';
 import {modifierNeutre} from './neutre-cas.js';
 import {resoudreCiblesFavoris,raisonSansPreuveFavori} from './favoris-cibles.js';
+import {defautsFavorisUniques} from '../../src/favorisDefauts.js';
+import {MESSAGE_PAR_DEFAUT} from '../../src/reglagesFavoris.js';
+// 5.455.7 : un réglage qui porte le texte par défaut PARTAGÉ d'avant, sans autre version : SON jeu unique à la place (rien de
+//    ce qu'il a écrit n'est touché ; la ligne enregistrée ne change pas).
+function defautUniqueSiPartage(p,owner){if(!p||String(p.message||'').trim()!==MESSAGE_PAR_DEFAUT||(Array.isArray(p.variantes)&&p.variantes.length)||!owner)return null;const l=defautsFavorisUniques(String(owner),'fr',3);return {message:l[0],variantes:l.slice(1)};}
 import {lirePreuvesConversationsFavoris} from './favoris-preuves.js';
 import {ordreRecents,initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,trancherIncertain,reprendreFile,RefusFavoris,prolongerFile} from './favoris-file.js';
 import {validerReglagesFavoris} from '../../src/reglagesFavoris.js';
@@ -119,6 +124,7 @@ export async function tourAuto(req,{owner,uid,cle,maintenant,extension=null}){
     // (12 nov.) Un mot qui fait bannir dans le message enregistré : rien ne part, le geste est demandé.
     if(typeof prefs.message==='string'&&!messageAutoPermis(prefs.message,'vinted'))return await stop('message_risque');
     let p;try{p=validerReglagesFavoris(prefs);}catch{return await stop('reglages');}
+    {const u=defautUniqueSiPartage(p,owner);if(u){p.message=u.message;p.variantes=u.variantes;}}   // 5.455.7
     const message=preparerMessageFavori(p.message,p.pourcentage).message;if(!message)return await stop('reglages');
     const offre=p.offreMode?{mode:p.offreMode,valeur:p.offreMode==='pct'?p.pourcentage:p.offreValeur,arrondi:p.arrondi===true}:null;
     const archive=lire(ids[3]),capture0=lire(ids[0])||archive,trace=lire(ids[1]);
@@ -247,7 +253,7 @@ export async function routeFavoris(req,res){
         if(!Array.isArray(rows)||rows.some(x=>x.owner!==owner)||rows.filter(x=>x.id===ids[2]).length!==1||rows.filter(x=>x.id===ids[1]).length>1)throw new RefusFavoris('Capture ou réglages indisponibles. Actualise et enregistre tes réglages avant de lancer.');
         const lire=id=>rows.find(x=>x.id===id)?.data;
         const prefs=lire(ids[2]);if(prefs?.version!==1||prefs.envoisActifs!==false)throw new RefusFavoris('Relis et enregistre les réglages de ce compte.');
-        const p=validerReglagesFavoris(prefs),message=preparerMessageFavori(p.message,p.pourcentage).message;
+        const p=validerReglagesFavoris(prefs);
         if(!c.reglages||JSON.stringify(validerReglagesFavoris(c.reglages))!==JSON.stringify(p))throw new RefusFavoris('Les réglages ont changé dans une autre fenêtre. Actualise et vérifie l’aperçu avant de lancer.');
         const archive=rows.find(x=>x.id===archiveId)?.data,capture=lire(ids[0])||archive;
         if(!capture||capture.type!=='notifications'||String(capture.uid)!==uid)throw new RefusFavoris('La capture de ce compte doit être actualisée.');
@@ -272,6 +278,9 @@ export async function routeFavoris(req,res){
           }
         }
         targets=ordreRecents(targets,t=>{const n=parId.get(t.notificationId);return n&&(n.updated_at||n.created_at);});
+        // 5.455.7 : le message par défaut PARTAGÉ d'avant (jamais écrit par lui) ⇒ SON jeu unique (graine = son compte VRM).
+        {const u=defautUniqueSiPartage(p,owner);if(u){p.message=u.message;p.variantes=u.variantes;}}
+        const message=preparerMessageFavori(p.message,p.pourcentage).message;
         const lot=randomUUID();const offre=p.offreMode?{mode:p.offreMode,valeur:p.offreMode==='pct'?p.pourcentage:p.offreValeur,arrondi:p.arrondi===true}:null;
         decision=d=>lancerFile(d,{owner,targets,message,variantes:p.variantes||null,intervalleMinutes:p.intervalleMinutes,intervalleMax:p.intervalleMaxMinutes,maintenant,lot,pourcentage:p.pourcentage,offre,
           // (19 nov., 5.409) Le rythme : celui choisi pour CET envoi (étape « Rythme » de la carte), sinon ses réglages ;
