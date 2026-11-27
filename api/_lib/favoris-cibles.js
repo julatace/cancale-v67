@@ -12,10 +12,50 @@ function corpsNatif(trace,uid){
  let c;try{c=typeof trace.body==='string'&&trace.body.length<=100000?JSON.parse(trace.body):null;}catch{}
  return c&&Object.keys(c).sort().join(',')==='initiator,item_id,opposite_user_id'&&id(c.item_id)&&id(c.opposite_user_id)&&id(c.opposite_user_id)!==String(uid)&&typeof c.initiator==='string'&&c.initiator&&c.initiator.length<=80?{itemId:id(c.item_id),recipientId:id(c.opposite_user_id),initiator:c.initiator}:null;
 }
+// ══ 5.455.6 (Julien, 27 nov. 22:42, jujuf38 : 5 favoris « Ignoré · acheteur pas encore confirmé », rien ne peut partir) ══
+// Vintex et Bleam n'apprennent rien : la personne est DANS la notification. Formes MESURÉES (vraie base) :
+//  · lien d'application `vintedfr://messaging?item_id=X&user_id=Y[&portal=fr]` (23 nov., 3175765377 : « l'article et le
+//    destinataire du job, exactement ») ;
+//  · lien web `/items/X/want_it/new?offering_id=Y` (1 057 lignes ; le 28 oct., 77 favoris d'un compte résolus par des
+//    ouvertures natives : `offering_id` = le destinataire, 77 personnes distinctes, messages partis).
+//  La notification porte SES deux identités ⇒ prouvée, sans trace apprise. Jamais `n.user_id` (le même pour toutes : jamais une
+//  preuve), jamais un pseudo ni un titre. Clés exactes, une fois chacune, chiffres ; la personne ≠ le compte, ≠ l'article,
+//  ≠ `n.user_id`. Sinon `null` (l'ancienne preuve par trace reste un chemin en plus).
+const RE_LIEN_APP=/^vinted([a-z]{2})?:\/\/messaging\/?\?([^#]{1,300})$/i;
+export function identiteDirecteFavori(n,uid,domain){
+ const s=typeof n?.link==='string'?n.link:'';if(!s||s.length>400)return null;
+ const personne=(item,user)=>item&&user&&user!==String(uid)&&user!==item&&user!==id(n.user_id)?{itemId:item,recipientId:user}:null;
+ const m=RE_LIEN_APP.exec(s);
+ if(m){const q={};for(const part of m[2].split('&')){const kv=/^([a-z_]{1,20})=([a-z0-9]{1,20})$/i.exec(part);if(!kv||kv[1] in q)return null;q[kv[1]]=kv[2];}
+  if(Object.keys(q).some(k=>!['item_id','user_id','portal'].includes(k)))return null;
+  return personne(id(q.item_id),id(q.user_id));}
+ const l=lien(n,domain);if(!l||!/\/want_it$/.test(l.forme.split('?')[0]))return null;
+ const ks=[...l.params.keys()];if(ks.length!==1||ks[0]!=='offering_id'||l.params.getAll('offering_id').length!==1)return null;
+ return personne(l.itemId,id(l.params.get('offering_id')));
+}
+// La raison PRÉCISE d'un favori qu'aucune preuve ne relie : sa notification ne porte pas de personne.
+export function raisonSansPreuveFavori(capture,notificationId,uid){
+ const n=(Array.isArray(capture?.payload?.notifications)?capture.payload.notifications:[]).find(x=>x&&x.id===notificationId);
+ return n&&identiteDirecteFavori(n,uid,capture.domain)?'non_prouve':'sans_acheteur';
+}
+const INITIATEUR_FAVORI='seller_enters_notification';   // mesuré (Bleam, 26 nov.) ; le chemin des requêtes ne l'envoie pas
 // Native item/member pairs prove the role of user_id; an observed native link
 // can instead prove its recipient parameter, or that exact notification alone.
 // No identity is guessed from text, title, photo, username or parameter names.
-export function resoudreCiblesFavoris({uid,capture,trace,selection,conversations=[],traces=[],lectures=[],parametresAilleurs=[],parametresSeuls=false}){
+export function resoudreCiblesFavoris(o){
+ const {uid,capture,selection}=o;
+ if(capture?.type==='notifications'&&String(capture.uid)===String(uid)&&Array.isArray(selection)&&selection.length&&selection.length<=500&&new Set(selection).size===selection.length){
+  const notifs=Array.isArray(capture.payload?.notifications)?capture.payload.notifications:[];
+  let favs;try{favs=new Set(favorisDepuisNotifications(capture.payload,capture.domain).lignes.map(x=>x.id));}catch{favs=new Set();}
+  const directs=selection.map(nid=>{const ns=notifs.filter(n=>n&&n.id===nid);if(ns.length!==1||!favs.has(nid))return null;const d=identiteDirecteFavori(ns[0],uid,capture.domain);return d?{notificationId:nid,...d,initiator:INITIATEUR_FAVORI}:null;});
+  if(directs.every(Boolean))return directs;
+  // Une partie seulement : l'ancienne preuve pour le reste, et jamais deux personnes pour un même favori.
+  const anciens=resoudreCiblesAppris(o);
+  return anciens.map((t,i)=>{const d=directs[i];if(!d)return t;if(d.recipientId!==t.recipientId||d.itemId!==t.itemId)throw new RefusFavoris('Deux preuves se contredisent pour un favori. Aucun envoi lancé.');return {...t,...d,initiator:t.initiator||d.initiator};});
+ }
+ return resoudreCiblesAppris(o);
+}
+function resoudreCiblesAppris({uid,capture,trace,selection,conversations=[],traces=[],lectures=[],parametresAilleurs=[],parametresSeuls=false}){
  if(capture?.type!=='notifications'||String(capture.uid)!==String(uid)||String(trace?.uid)!==String(uid)||trace?.method!=='POST'||trace?.path!=='/api/v2/conversations')throw new RefusFavoris('Ouvre un favori sur Vinted avec ce compte, puis actualise : le raccordement natif doit être confirmé.');
  const corps=corpsNatif(trace,uid);if(!corps)throw new RefusFavoris('La création native de conversation ne confirme pas le format attendu.');
  if(!Array.isArray(selection)||!selection.length||selection.length>500||new Set(selection).size!==selection.length||selection.some(x=>typeof x!=='string'||!x||x.length>160))throw new RefusFavoris('Sélectionne au moins un favori, sans doublon.',400);   // 500 = la capacité de la file (jamais un plafond de messages)

@@ -29,13 +29,15 @@ const path = require('path'), fs = require('fs');
   const uB = '1000000002';
   const capB = { uid: uB, type: 'notifications', domain: 'www.vinted.fr', payload: { notifications: [N(3, 2000000003, 3000000003), N(4, 2000000003, 3000000004), N(5, 2000000004, 3000000005)] } };
   const sans = essaie(() => R.resoudreCiblesFavoris({ uid: uB, capture: capB, trace: trace(uB), selection: ['n3'] }));
-  dit(sans.erreur === 'favoris_preuve_absente', 'compte B sans preuve d\'ailleurs : refusé, rien n\'est envoyé', JSON.stringify(sans));
+  // 5.455.6 (Julien, 27 nov. 22:42) : `offering_id` d'un lien web de favori EST la personne (mesuré : 77 destinataires distincts) —
+  //    la notification se prouve seule, sans preuve apprise ailleurs.
+  dit(Array.isArray(sans) && sans.length === 1 && sans[0].recipientId === '3000000003', 'compte B sans preuve d\'ailleurs : la notification se prouve seule (offering_id), vers SA personne', JSON.stringify(sans));
   const r = essaie(() => R.resoudreCiblesFavoris({ uid: uB, capture: capB, trace: trace(uB), selection: ['n3', 'n4', 'n5'], parametresAilleurs: Array.isArray(params) ? params : [] }));
   const dest = Array.isArray(r) ? r.map((t) => t.recipientId) : r;
   dit(Array.isArray(r) && dest.join(',') === '3000000003,3000000004,3000000005', 'compte B avec la preuve de A : chaque favori part vers SA personne (offering_id)', JSON.stringify(dest));
   dit(Array.isArray(r) && !dest.includes(String(COMMUN)), 'jamais vers le user_id commun des notifications', JSON.stringify(dest));
   const contre = essaie(() => R.resoudreCiblesFavoris({ uid: uB, capture: capB, trace: trace(uB), selection: ['n3'], parametresAilleurs: [{ forme: 'vinted.fr/want_it?offering_id', cle: 'offering_id' }, { forme: 'vinted.fr/want_it?offering_id', cle: 'autre' }] }));
-  dit(!Array.isArray(contre), 'deux clés qui se contredisent pour une forme : refusé', JSON.stringify(contre));
+  dit(Array.isArray(contre) && contre[0].recipientId === '3000000003' && contre[0].recipientId !== String(COMMUN), 'deux clés apprises qui se contredisent : la preuve directe (offering_id) décide, jamais le user_id commun', JSON.stringify(contre));
   // La route ne lit que les comptes de CE vendeur.
   let route = fs.readFileSync(path.join(__dirname, '..', 'api', '_lib', 'favoris.js'), 'utf8');
   if (mut === 'owner') route = route.replace('app_data?owner=eq.${owner}&or=(', 'app_data?or=(');
