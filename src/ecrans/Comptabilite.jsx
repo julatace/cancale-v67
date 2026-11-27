@@ -5464,10 +5464,15 @@ const fusionLignesMemeSuivi = (m, s) => {
   // (27 nov.) Les clés de TOUTES les moitiés réunies : « Retiré » les marque toutes (`clesDuColis`).
   const cleDe = (x) => (Array.isArray(x.clesMoities) && x.clesMoities.length ? x.clesMoities : [typeof colisKey === 'function' ? colisKey(x) : '']);   // (les audits extraient cette fonction seule)
   const clesMoities = [...new Set([...cleDe(m), ...cleDe(s)].filter(Boolean))];
+  // (27 nov., Julien : « Contenu pas encore lu » aux codes 713 080 et 703 693, Vinted Go) La conversation de SA commande
+  // (`conv`, une identité) que seule la moitié Vinted porte était perdue à la réunion (`...m` garde la ligne du transporteur) :
+  // la ligne réunie ne trouvait plus son achat. Elle la garde — une seule conversation, jamais deux (désaccord ⇒ aucune).
+  const convs = [...new Set([m.conv, s.conv].map((v) => String(v || '').trim()).filter(Boolean))];
   return { ...m, lieu: lieuF || null, codesLus,
     code: src.code || null, code2: src.code2 || (memeCode ? autre.code2 : null) || null,
     qrB64: qrSrc.qrB64 || null, qrType: qrSrc.qrType || null, qrUrl: qrSrc.qrUrl || null, consigne: !!(m.consigne || s.consigne),
-    limite: p.limite || q.limite || null, limiteAt: p.limiteAt || q.limiteAt || null, ...(clesMoities.length > 1 ? { clesMoities } : {}) };
+    limite: p.limite || q.limite || null, limiteAt: p.limiteAt || q.limiteAt || null, ...(clesMoities.length > 1 ? { clesMoities } : {}),
+    conv: convs.length === 1 ? convs[0] : '' };
 };
 // ⟦← App.jsx #244⟧
 // DOSSIER de la photo, sans le nom de fichier. Quand une annonce est republiée

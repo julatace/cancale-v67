@@ -2400,6 +2400,41 @@ puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passati
 - **27 nov. · ext. 5.455.2** : police « Inter VRM » du panneau ; `<gardes-app>` dit « article » ; le panneau ne coupe plus un onglet qui charge. `historique-divers.md`, fin. Geste : installer 5.455.2.
 - **27 nov. · « 978 216 » deux fois, un point en deux cartes** : un colis = ses identités (code lu aussi dans SA commande, n°, transaction), « à vérifier » compris ; un point = son adresse. `historique-colis-retraits.md`, fin. Geste : aucun (après fusion).
 
+## 27 nov. · Améliorations (branche `claude/ameliorations-27nov`, Julien : « Vas-y fais tout »)
+
+1. **Contenu d'un colis à retirer (codes 713 080 et 703 693, Vinted Go, 10 Rue du Bois Aurant).** Cause trouvée dans le code :
+   l'e-mail du transporteur (n° de suivi, code) et l'e-mail Vinted de SA commande (conversation, MÊME code) sont réunis par le
+   code (`fusionnerParCode`, src/retraitPreuves.js) ; la réunion (`fusionLignesMemeSuivi`, src/ecrans/Comptabilite.jsx) gardait
+   la ligne du transporteur (`...m`) et PERDAIT `conv` : `commandeDuColis` ne trouvait plus l'achat ⇒ « Contenu pas encore lu ».
+   La ligne réunie garde la conversation (une seule ; deux conversations différentes au même code ⇒ aucune, rien n'est choisi).
+   Jamais le titre. Sans identité : « pas encore lu » et sa raison sous « Pourquoi ? » (inchangé). Banc `retrait-contenu-code`
+   (témoin au même titre, deux conversations au même code) ; `retrait-double-code` reste vert. Pas mesuré sur la vraie base
+   (aucun accès en lecture depuis cette session) : si ses deux colis restent « pas lu », c'est que l'e-mail Vinted de la commande
+   n'a pas porté le code — le n° de suivi lu côté achat (extension) reste alors la seule identité.
+2. **Bénéfice « — » sur Aujourd'hui** : la publication `vrm_benefice_jours` porte déjà `n` et `nCout` ; `valeurChiffre('brut')`
+   (src/design/carteChiffres.js) rend `prixManquants = n − nCout` (et pour les ventes faites, `vendus.prixManquants`) ; le héros
+   (fenêtre 7 j / 30 j / mois) et les tuiles Brut / Net disent « N prix manquants », la porte ouvre la saisie en série
+   (`onSaisirPrix`). Rien n'est deviné, un lot = une vente.
+3. **« Vinted pas lu depuis N jours »** : src/lectureAncienne.js (pur) lit la PUBLICATION de la ligne de fraîcheur
+   (`fraicheurPubliee`, src/fraicheur.js — comptes au-delà de 24 h ou en panne, date de LEUR lecture) ; une rangée sur
+   Aujourd'hui (src/aujourdhui/LigneLectureAncienne.jsx), le geste dessous, le compte et les autres sous « Pourquoi ? ».
+   « Compris » range CE compte à CETTE date de lecture (`vrm_lecture_ancienne_rangee`, confort de l'appareil) : elle ne
+   revient que si la lecture change.
+4. **« Ordinateur éteint · 21:20 »** (src/aDistance/LigneOrdinateur.jsx) : « Rien ne part tant qu'il est éteint » (7 mots) ;
+   « Pourquoi ? » : les gestes « À distance » attendent 24 h au plus, Vinted n'est plus relu, et le geste (allumer, Chrome
+   avec l'extension). Budget de mots d'`aujourdhui-moins-texte` + 8 (déjà rouge sur main avant : 118 > 117 et la coupure
+   « Saisis 2 prix › », réglée par main entre-temps).
+Banc `aujourdhui-portes-27nov` (390/1512, clair/sombre) : rouge sur l'avant (24) et sous mutation de chacune des règles.
+CI de la PR #1451 : « Chrome » en dur remplacé par « le navigateur où est l'extension VRM » (audit-chrome-en-dur, 5 langues : la
+phrase parle de l'ORDINATEUR, pas du navigateur d'ici) ; `conv` posé APRÈS `code:` dans `fusionLignesMemeSuivi`
+(audit-retraits-irreprochables lit `codesLus,` puis `code: src.code`) ; banc chiffres-coherents E : attendre le nombre réel
+de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
+
+## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. soir (ameliorations-27nov, place sous 60 Ko)
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (27 nov. soir, < 60 000)
 
 - **27 nov. · TROIS FONCTIONS RENDUES (Julien)** : filtre « Compte » de Ventes au téléphone (retenu par vendeur), alerte « un compte annule plus » dans Statistiques (règle du 5 nov. importée, un compte pas lu jamais comparé), questions eBay sans réponse en tête de Messages « À répondre ». `2026-11-27-retour-fonctions.md`. Geste : aucun.
+
+## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. soir (ameliorations-27nov, 2ᵉ fusion, place sous 60 Ko)
+
+- **27 nov. · Aujourd'hui à 1008 px (Edge 150 %)** : les colonnes suivent la largeur de LA GRILLE (`@container sj-journee` : 3 dès 860 px, sinon 1 + 2, une sous 560) ; le compte d'« À envoyer » s'abrège. Bancs `iphone-reprise` O3 et `journee-coherence` E12 (`_journee-tient.cjs`). `historique-interface-stock.md`, fin. Geste : aucun.
