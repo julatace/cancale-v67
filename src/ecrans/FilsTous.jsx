@@ -31,7 +31,7 @@ import { motifDeLApercu } from '../antiArnaque.js';
 import { FilLeboncoin } from './MessagesLeboncoin.jsx';
 import { BadgeLectureSeule } from '../agir/Agir.jsx';   // (24 nov., lot agir-si-connecte)
 import { FilVestiaire, ficheDuNumero } from './Vestiaire.jsx';
-import { CLE_FILS_RELIES, convVinted, convLeboncoin, convVestiaire, convEbay, regrouperFils, suggestionsFils, relierFils, refuserFils, delierFil, messagesDuFil, conversationDeReponse } from '../filUnique.js';
+import { CLE_FILS_RELIES, convVinted, convLeboncoin, convVestiaire, convEbay, regrouperFils, suggestionsFils, relierFils, refuserFils, delierFil, messagesDuFil, conversationDeReponse, ordreARepondre, attenteARepondre } from '../filUnique.js';
 import { trj } from '../i18n/react.js';
 import { heureListe } from '../ordreConversations.js';   // (15 nov., verre 2) la même heure que la liste Vinted
 import { montant } from '../format.js';
@@ -293,9 +293,14 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
     const nomVc = (g) => (!g.compte ? `${NOM_SITE.vestiaire} · ${tr('vcMsg.sansCompte')}` : vcOuvert && g.compte === String(vcOuvert) ? NOM_SITE.vestiaire : tr('vcMsg.autreCompte'));
     const L = [...m.values()].map((g) => ({ ...g, ...(g.plateforme === 'vestiaire' ? { nom: nomVc(g) } : {}),
       onglet: (g.plateforme === 'vinted' && !!compteOnglet && g.compte === String(compteOnglet)) || (g.plateforme === 'vestiaire' && !!vcOuvert && g.compte === String(vcOuvert)),
-      fils: g.fils.slice().sort((a, b) => t(b) - t(a)) }));
+      // (27 nov., Julien) Les questions eBay sans réponse d'abord, la plus ancienne en tête (src/filUnique.js `ordreARepondre`) ;
+      // le reste, du plus récent au plus ancien (règle du 12 nov.).
+      fils: ordreARepondre(g.fils.slice().sort((a, b) => t(b) - t(a))) }));
     L.sort((a, b) => (b.onglet - a.onglet) || (t(b.fils[0]) - t(a.fils[0])) || a.cle.localeCompare(b.cle));
-    return L;
+    // Un compte qui a une question à répondre passe en tête (la plus ancienne attente d'abord) ; les comptes restent séparés.
+    const attente = (g) => { const x = attenteARepondre(g.fils[0]); return x == null ? null : x; };
+    const avec = L.filter((g) => attente(g) != null).sort((a, b) => attente(a) - attente(b) || a.cle.localeCompare(b.cle));
+    return [...avec, ...L.filter((g) => attente(g) == null)];
   })();
   const filDe = (cle) => fils.find((f) => f.cle === cle) || null;
   const vintedDe = (e) => (parCle.get(e.cle) || {}).c || null;
@@ -433,7 +438,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                         return (
                           <button key={f.cle} type="button" className={'vg-fil' + (ouvert === f.cle ? ' is-current' : '')} style={i < 12 ? { '--i': i } : undefined}
                             data-fil={f.cle} data-fil-convs={String(f.convs.length)} data-fil-sites={f.plateformes.join(',')} data-fil-num={f.num || undefined} data-nonlu={f.nonLu === true ? '1' : undefined}
-                            data-fil-at={f.at != null ? String(f.at) : ''} data-fil-offre={offre ? String(offre.prix) : undefined}
+                            data-fil-at={f.at != null ? String(f.at) : ''} data-fil-offre={offre ? String(offre.prix) : undefined} data-fil-attente={attenteARepondre(f) != null ? '1' : undefined}
                             data-cible={attrCible(...f.convs.flatMap((c) => [['conv', c.conv], c.compte != null && c.compte !== '' ? ['conv', String(c.compte).replace(/^lbc-account:/, ''), c.conv] : null]).filter(Boolean))}
                             onClick={() => ouvrir(f)}>
                             {/* (24 nov., visuel-argent) La PAIRE en tuile (sa photo vient de la fiche reliée PAR IDENTITÉ, `convVinted` ⇒
@@ -451,6 +456,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                               <span className="vg-fil-2">
                                 {f.num ? <span className="sb-plaque vg-fil-plaque"><small>N°</small>{f.num}</span> : null}
                                 <span className={'vg-fil-extrait' + (offre ? ' is-offre' : '')}>{offre ? <span className="vg-fil-puce-offre" data-fil-offre-puce=""><Icon name="tag" size={13}/><span>{tr('verre2.msg.offreDe', { m: montantCourt(offre.prix) })}</span></span> : <>{d && d.apercu && d.deMoi === true ? <span className="vg-fil-toi">{tr('messages.toi')} </span> : null}{d ? d.apercu : ''}</>}</span>
+                                {attenteARepondre(f) != null ? <span className="vg-fil-etat vg-fil-a-repondre" data-fil-a-repondre="">{tr('verre2.msg.aRepondre')}</span> : null}
                                 {f.convs.length > 1 ? <span className="vrm-msg-etat vg-fil-etat" data-fil-relie="">{trj('messages.conv', { x: f.convs.length })}</span> : null}
                                 <PastilleArnaque motif={motif}/>
                                 {f.plateformes.length > 1 ? <Marques plateformes={f.plateformes}/> : null}

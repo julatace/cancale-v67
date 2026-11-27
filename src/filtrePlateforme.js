@@ -65,3 +65,36 @@ export function ecrireChoixPlateforme(ecran, choix) {
   if (!ECRANS_FILTRE.includes(ecran) || !(choix === TOUTES || connu(choix))) return false;
   return ecrireLocal(CLE_FILTRE_PLATEFORMES, { ...tous(), [ecran]: choix });
 }
+
+// ── (27 nov.) LE FILTRE « COMPTE » DES VENTES, au téléphone comme à l'ordinateur ─────────────────────────────────────────
+// Julien a choisi de rendre au téléphone le filtre « Compte » que le tableau de l'ordinateur avait déjà. UNE règle pour
+// les deux : une vente appartient au compte que SA lecture a posé sur sa ligne (`x.compte`, le compte sous lequel la vente
+// a été lue — jamais son titre, jamais une ressemblance, §5). Un compte exclu n'a aucune ligne (l'écran l'écarte avant,
+// `compteEcarte`) : il n'apparaît donc jamais ici.
+//   · comptesDeLignes(lignes) : les comptes présents, triés (fr) ; une ligne sans compte n'en ajoute aucun ;
+//   · choixCompteEffectif(choix, comptes) : le choix retenu s'il est encore présent, sinon '' (« Tous les comptes ») ;
+//   · filtrerCompte(lignes, compte) : les lignes de CE compte ('' ⇒ toutes).
+// Le choix est retenu comme celui du site (la même clé `vrm_filtre_plateformes`, jamais synchronisée), mais PAR VENDEUR
+// (l'identifiant de sa session VRM) : un autre vendeur sur le même appareil repart de « Tous les comptes ».
+export const COMPTE_TOUS = '';
+export function comptesDeLignes(lignes) {
+  return [...new Set((Array.isArray(lignes) ? lignes : []).map((x) => (x && typeof x.compte === 'string' ? x.compte : '')).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'fr'));
+}
+export function choixCompteEffectif(choix, comptes) {
+  return typeof choix === 'string' && choix && Array.isArray(comptes) && comptes.includes(choix) ? choix : COMPTE_TOUS;
+}
+export function filtrerCompte(lignes, compte) {
+  if (!Array.isArray(lignes) || !compte) return lignes;
+  return lignes.filter((x) => x && x.compte === compte);
+}
+const cleCompte = (ecran) => 'compte:' + ecran;
+export function lireChoixCompte(ecran, vendeur) {
+  const v = tous()[cleCompte(ecran)];
+  if (!v || typeof v !== 'object' || !vendeur || v.vendeur !== String(vendeur)) return COMPTE_TOUS;
+  return typeof v.compte === 'string' ? v.compte : COMPTE_TOUS;
+}
+export function ecrireChoixCompte(ecran, vendeur, compte) {
+  if (!ECRANS_FILTRE.includes(ecran) || !vendeur || typeof compte !== 'string') return false;
+  return ecrireLocal(CLE_FILTRE_PLATEFORMES, { ...tous(), [cleCompte(ecran)]: { vendeur: String(vendeur), compte } });
+}

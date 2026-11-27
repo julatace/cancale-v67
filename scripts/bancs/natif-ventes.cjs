@@ -123,14 +123,16 @@ function mesure(src) {
       morceaux: [...r.querySelectorAll('.n-rangee-sous-texte, .n-rangee-note, .n-rangee-detail')].flatMap((e) => e.textContent.split(' · ').map((x) => x.trim()).filter(Boolean)),
       ecart: t && v ? Math.round(R(v).left - R(t).right) : null,
       lTitre: t ? Math.round(t.getBoundingClientRect().width) : 0, lSous: (() => { const x = r.querySelector('.n-rangee-sous'); const pl = x && x.querySelector('.n-plaque'); return x ? Math.round(x.getBoundingClientRect().width - (pl ? pl.getBoundingClientRect().width : 0)) : 0; })(), haut: Math.round(R(r).top), bas: Math.round(R(r).bottom), larg: Math.round(R(r).width), gauche: Math.round(R(r).left) }; });
-  const seg = [...document.querySelectorAll('[data-vn="ventes"] .n-segmente [role="tab"], [data-vn="ventes"] .n-segmente button')].filter(vis).map((b) => b.textContent.replace(/\s+/g, ' ').trim());
+  const segEl = [...document.querySelectorAll('[data-vn="ventes"] .n-segmente [role="tab"], [data-vn="ventes"] .n-segmente button')].filter(vis);
+  const seg = segEl.map((b) => b.textContent.replace(/\s+/g, ' ').trim());
+  const segCles = segEl.map((b) => b.getAttribute('data-colis-onglet-choix') || '');
   const barre = [...document.querySelectorAll('.n-onglets, .vrm-tabbar, nav.v2-barre, [data-v2-barre]')].filter(vis).map((b) => Math.round(R(b).top));
   const hautBarre = barre.length ? Math.min(...barre) : innerHeight;
   const recherches = [...document.querySelectorAll('[data-n-recherche], input[type="search"], .vrm-recherche input')].filter(vis).filter((e) => !(e.matches('input') && e.closest('[data-n-recherche]'))).length;
   const detail = document.querySelector('[data-vn-detail]');
   return { faibles, nC: contrastes.length, minC: contrastes.length ? Math.min(...contrastes.map((x) => x.r)) : null, petits, vides, deb, pleins: pleins.length, pleinTxt: plein ? plein.textContent.trim() : '',
     pleinN: plein ? Number(plein.getAttribute('data-vn-plein')) : null, pleinBas: plein ? Math.round(R(plein).bottom) : null, hautBarre,
-    rg, seg, recherches, affiche: (document.querySelector('[data-vn-affiche]') || { getAttribute: () => null }).getAttribute('data-vn-affiche'),
+    rg, seg, segCles, recherches, affiche: (document.querySelector('[data-vn-affiche]') || { getAttribute: () => null }).getAttribute('data-vn-affiche'),
     detail: detail ? { cle: detail.getAttribute('data-vn-detail'), gauche: Math.round(R(detail).left), larg: Math.round(R(detail).width), vis: vis(detail) } : null,
     vide: !!document.querySelector('[data-vn="ventes"] .n-vide'), texte: ecran ? ecran.textContent.replace(/\s+/g, ' ').slice(0, 400) : '' };
 }
@@ -157,7 +159,7 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
       const m = await pg.evaluate(mesure, CONTRASTE);
       await pg.screenshot({ path: path.join(SHOTS, `ventes-${W}-${th}.png`) });
       dit(!!m.rg.length, `la liste « À envoyer » est rendue (${m.rg.length} rangées)`, m.texte);
-      dit(m.seg.length === 3 && /\d/.test(m.seg[0]) && /\d/.test(m.seg[1]) && /Termin/.test(m.seg[2]), 'segmenté À envoyer N · En route N · Terminées', m.seg);
+      dit(m.seg.length === 3 && /\d/.test(m.seg[0]) && /\d/.test(m.seg[1]) && m.segCles[2] === 'toutes', 'segmenté À envoyer N · En route N · Toutes (sa clé)', m.seg);
       const r = m.rg.filter((x) => x.bord != null);
       dit(r.length && r.every((x) => x.coche !== null), 'chaque rangée a sa case', r.filter((x) => x.coche === null).map((x) => x.cle));
       // La règle du lot (cochesParDefaut) : cochée d'office si le bordereau est là (ni imprimée, ni ancienne) ; JAMAIS sans.

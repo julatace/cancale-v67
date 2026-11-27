@@ -120,6 +120,7 @@ export default {
   "vn.filtrer": "Filtrer",
   "vn.plus": "Plus de gestes",
   "vn.terminees": "Terminées",
+  "vn.toutesVentes": "Toutes",
   "vn.etape": "{mot} · {n}/{m}",
   "vn.e.coches": {"one": "{n} coché", "other": "{n} cochés"},
   "vn.e.deposer": {"one": "{n} à déposer", "other": "{n} à déposer"},

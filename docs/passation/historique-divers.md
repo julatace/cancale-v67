@@ -2378,4 +2378,7 @@ Julien, après avoir lu le risque (requêtes sans le « bruit » de la page vs c
 
 - **26 nov. · Vestiaire/LBC fiables** : vente VC annulée ≠ « Vendue », lecture VC > 24 h = « à confirmer », Annonces lit `vc_ventes`, « LBC n » pas su sans ventes. `2026-11-26-fiabilite-vc-lbc.md`. Geste : aucun.
 
+## Ligne déplacée telle quelle de CLAUDE.md §9 (27 nov., retour-fonctions, < 60 000)
+
+- **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
 - **26 nov. · « article » hors Sneakers partout (ext. 5.455.1)** : `historique-divers.md`, fin.

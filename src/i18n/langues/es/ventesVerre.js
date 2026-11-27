@@ -120,6 +120,7 @@ export default {
   "vn.filtrer": "Filtrar",
   "vn.plus": "Más acciones",
   "vn.terminees": "Terminadas",
+  "vn.toutesVentes": "Todas",
   "vn.etape": "{mot} · {n}/{m}",
   "vn.e.coches": {"one": "{n} marcado", "other": "{n} marcados"},
   "vn.e.deposer": {"one": "{n} por entregar", "other": "{n} por entregar"},

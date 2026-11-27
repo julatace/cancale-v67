@@ -49,4 +49,8 @@ export default {
   "tableau.etat.attente": "Pendiente de validación",
   "tableau.etat.corriger": "Para corregir",
   "tableau.etat.refusee": "Rechazada por Vestiaire",
+  "annul.alerte": "{compte} anula mucho más que tus otras cuentas",
+  "annul.alertePourquoi": "En el periodo elegido: {a} anulaciones de {n} ventas ({taux}), frente a {aA} de {nA} ({autres}) en tus otras cuentas. VRM lo señala a partir de {minVentes} ventas y {minAnnulees} anulaciones, cuando la proporción es al menos {facteur} veces la de las otras cuentas y la supera en {points} puntos.",
+  "annul.alertePasLu": "Sin comparar: {comptes} sin leer",
+  "annul.alertePasLuPourquoi": "Una cuenta sin leer no tiene cifras: VRM no compara tus cuentas mientras falte, en lugar de contarla como 0.",
 };

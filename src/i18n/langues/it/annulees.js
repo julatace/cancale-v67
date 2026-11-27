@@ -49,4 +49,8 @@ export default {
   "tableau.etat.attente": "In attesa di convalida",
   "tableau.etat.corriger": "Da correggere",
   "tableau.etat.refusee": "Rifiutata da Vestiaire",
+  "annul.alerte": "{compte} annulla molto più dei tuoi altri account",
+  "annul.alertePourquoi": "Nel periodo scelto: {a} annullamenti su {n} vendite ({taux}), contro {aA} su {nA} ({autres}) sugli altri tuoi account. VRM lo segnala da {minVentes} vendite e {minAnnulees} annullamenti, quando la quota è almeno {facteur} volte quella degli altri account e la supera di {points} punti.",
+  "annul.alertePasLu": "Non confrontato: {comptes} non letto",
+  "annul.alertePasLuPourquoi": "Un account non letto non ha cifre: VRM non confronta i tuoi account finché manca, invece di contarlo come 0.",
 };

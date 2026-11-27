@@ -379,7 +379,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
   const actionPlateforme = <>{filtre}{surEnvoyer || g.sections ? <BoutonIcone libelle={tr('vn.plus')} icone={<Icon name="more" size={22}/>} onClick={() => setFeuilleGestes(true)} attrs={{ 'data-vn-plus': '' }}/> : null}</>;
   const segment = <Segmente libelle={tr('vv.seg.label')} valeur={m.onglet} onChange={g.onglet}
     options={[{ cle: 'envoyer', libelle: tr('vv.seg.expedier'), n: nEnvP || undefined, attrs: { 'data-colis-onglet-choix': 'envoyer', 'data-colis-onglet-n': nEnvP != null ? String(nEnvP) : '', 'data-fp-filtre': filtreP ? effP : undefined } },
-      { cle: 'envoyes', libelle: tr('vv.seg.route'), n: nRouteP || undefined, attrs: { 'data-colis-onglet-choix': 'envoyes', 'data-colis-onglet-n': nRouteP != null ? String(nRouteP) : '', 'data-fp-filtre': filtreP ? effP : undefined } }, { cle: 'toutes', libelle: tr('vn.terminees'), attrs: { 'data-colis-onglet-choix': 'toutes' } }]}/>;
+      { cle: 'envoyes', libelle: tr('vv.seg.route'), n: nRouteP || undefined, attrs: { 'data-colis-onglet-choix': 'envoyes', 'data-colis-onglet-n': nRouteP != null ? String(nRouteP) : '', 'data-fp-filtre': filtreP ? effP : undefined } }, { cle: 'toutes', libelle: tr('vn.toutesVentes'), attrs: { 'data-colis-onglet-choix': 'toutes' } }]}/>;
   // (24 nov., main-vert) Les repères d'avant (`data-colis-onglet-choix`, `data-colis-onglet-n`, VentesVerre) remis sur le segmenté
   // natif : la visite guidée (src/accueilReste/visiteEcrans.js, cible « envoyer ») et les bancs les touchent ; le natif les avait perdus.
   // (20 nov.) À l'ordinateur, « À envoyer » et « En route » sont le TABLEAU DE TRAVAIL (VentesBureau) ; « Terminées » est déjà le

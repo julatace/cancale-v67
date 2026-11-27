@@ -12,7 +12,7 @@ import { tr } from '../i18n/index.js';
 import { Puce } from './Puce.jsx';
 import { LogoSite } from './LogoSite.jsx';
 import { nomPlateforme } from '../plateformes.js';
-import { TOUTES, lireChoixPlateforme, ecrireChoixPlateforme } from '../filtrePlateforme.js';
+import { TOUTES, lireChoixPlateforme, ecrireChoixPlateforme, lireChoixCompte, ecrireChoixCompte } from '../filtrePlateforme.js';
 import './visuel/inventaire.css';
 
 const EVT = 'vrm:filtre-plateforme';
@@ -29,6 +29,15 @@ export function useFiltrePlateforme(ecran) {
     ecrireChoixPlateforme(ecran, c);
     try { window.dispatchEvent(new CustomEvent(EVT, { detail: { ecran, choix: c } })); } catch (_) { /* rien : le choix reste posé ici */ }
   }, [ecran]);
+  return [choix, choisir];
+}
+
+// (27 nov.) Le choix du filtre « Compte » d'un écran, retenu PAR VENDEUR (`vendeur` : l'identifiant de sa session VRM) sur
+// cet appareil, comme le choix du site (src/filtrePlateforme.js). Sans vendeur connu : rien n'est retenu, « Tous les comptes ».
+export function useFiltreCompte(ecran, vendeur) {
+  const [choix, setChoix] = React.useState(() => lireChoixCompte(ecran, vendeur));
+  React.useEffect(() => { setChoix(lireChoixCompte(ecran, vendeur)); }, [ecran, vendeur]);
+  const choisir = React.useCallback((c) => { setChoix(c); ecrireChoixCompte(ecran, vendeur, c); }, [ecran, vendeur]);
   return [choix, choisir];
 }
 

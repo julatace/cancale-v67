@@ -237,7 +237,7 @@ const ouvrirFiche = async (pg, tel, titre) => {
   const fermer = pg.locator('[data-fiche-paire] button').filter({ hasText: /Vente|Retour|Fermer/ }).first();
   if (await pg.locator('[data-fiche-paire]').count()) { await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(600); }
   if (await pg.locator('[data-fiche-paire]').count() && await fermer.count()) { await fermer.click().catch(() => {}); await pg.waitForTimeout(600); }
-  const seg = pg.locator('.n-segmente-choix').filter({ hasText: 'Terminées' });
+  const seg = pg.locator('[data-colis-onglet-choix="toutes"]');   // (27 nov.) la CLÉ du segment « Toutes », jamais son libellé
   if (await seg.count()) { await seg.first().click(); await pg.waitForTimeout(800); }
   const row = pg.getByText(titre, { exact: false }).first();
   await row.scrollIntoViewIfNeeded(); if (tel) await row.tap(); else await row.click();
@@ -302,7 +302,7 @@ async function ventes(b, port, tel, sombre) {
     const r2 = await ouvrirApp(b, port, tel, sombre, '?tab=ventes');
     try {
       await r2.pg.waitForTimeout(2500);
-      const seg = r2.pg.locator('.n-segmente-choix, [role="radio"]').filter({ hasText: /Terminées|Toutes/ });
+      const seg = r2.pg.locator('[data-colis-onglet-choix="toutes"]');   // (27 nov.) la CLÉ, jamais le libellé
       if (await seg.count()) { await seg.first().click(); await r2.pg.waitForTimeout(1500); }
       await r2.pg.waitForSelector('[data-ventes-tableau] [data-vt-net]', { timeout: 15000 }).catch(() => {});
       const nets = await r2.pg.evaluate(() => [...document.querySelectorAll('[data-ventes-tableau] [data-toutes-id]')].map((x) => { const n = x.querySelector('[data-vt-net]'); return [x.getAttribute('data-toutes-id'), n ? n.getAttribute('data-vt-net') : null]; }));

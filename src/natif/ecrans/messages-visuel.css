@@ -14,3 +14,8 @@
 :root:root:root:root:root:root body .vg-fil-puce-offre svg { flex: none; color: var(--n-accent, #3D4B5B); }
 :root[data-theme="dark"]:root:root:root:root:root body .vg-fil-puce-offre { background: rgb(244 244 245 / .12); color: #F4F4F5; }
 :root[data-theme="dark"]:root:root:root:root:root body .vg-fil-puce-offre svg { color: #F4F4F5; }
+/* (27 nov.) « À répondre » : une question eBay sans réponse, en tête de « Tous ». Le geste à faire = gras + l'accent ardoise (§7,
+   aucun orange), une pastille calme comme l'offre ; en sombre, l'encre claire. */
+:root:root:root:root:root:root body .vg-fil-a-repondre { border: 0; padding: 2px 8px; border-radius: 999px; font: 700 12px/1.3 var(--n-police, system-ui); white-space: nowrap;
+  background: color-mix(in srgb, var(--n-accent, #3D4B5B) 12%, transparent); color: var(--n-encre, #1D1D1F); }
+:root[data-theme="dark"]:root:root:root:root:root body .vg-fil-a-repondre { background: rgb(244 244 245 / .14); color: #F4F4F5; }

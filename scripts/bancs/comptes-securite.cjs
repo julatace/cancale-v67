@@ -65,7 +65,7 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
         //   · chaque vente porte SON compte (comptes séparés, jamais mélangés en silence) ;
         //   · à l'ordinateur, le filtre « Compte » du tableau de « Terminées » (`data-tt-filtre="compte"`) montre les ventes de
         //     CE compte et elles seules — jugé par IDENTITÉ (les n° de transaction du compte dans le jeu), jamais par le titre.
-        // Le choix n'est plus mémorisé (état de l'écran) et le téléphone n'a pas de filtre de compte : dit dans le rapport.
+        // (27 nov.) Le téléphone a de nouveau son filtre de compte, retenu par vendeur (plus bas).
         const b0 = base();
         const txDe = (uid) => (((b0.lignes.find((l) => l.id === `harvest_${uid}_orders_sold`) || {}).data || {}).payload || {}).my_orders.map((o) => String(o.transaction_id)).sort();
         const tx111 = txDe('111'), tx222 = txDe('222');
@@ -79,21 +79,68 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
         dit(JSON.stringify(ids0) === JSON.stringify([...tx111, ...tx222].sort()), `A ${tag} : « Terminées » montre les ventes des DEUX comptes`, JSON.stringify({ vu: ids0, attendu: [...tx111, ...tx222] }));
         dit(r0.every((x) => (tx111.includes(x.id) && x.compte === 'vendeuse_a') || (tx222.includes(x.id) && x.compte === 'vendeuse_b')), `A ${tag} : chaque vente porte SON compte`, JSON.stringify(r0));
         await capture(pg, `A-${tag}-avant`);
-        if (!tel) {
-          await pg.click('[data-tt-filtre="compte"]');
-          await pg.click('[data-tt-filtre-choix="compte:vendeuse_b"]');
+        // (27 nov., Julien : rendre au téléphone le filtre « Compte ») Le MÊME filtre au téléphone et à l'ordinateur : le bouton
+        // `data-tt-filtre="compte"` (la famille du tableau de travail ; au téléphone, ses choix dans une feuille), « Tous les
+        // comptes » par défaut, jugé par IDENTITÉ (n° de transaction du compte), jamais par le titre.
+        const filtreC = () => pg.evaluate(() => { const b = [...document.querySelectorAll('[data-tt-filtre="compte"]')].find((x) => x.getClientRects().length); if (!b) return null; const r = b.getBoundingClientRect(); return { v: b.getAttribute('data-tt-filtre-valeur'), h: Math.round(r.height), w: Math.round(r.width) }; });
+        const choisirC = async (cle) => {
+          await pg.locator('[data-tt-filtre="compte"]:visible').first().click();
+          await pg.locator(`[data-tt-filtre-choix="compte:${cle}"]:visible`).first().click({ timeout: 8000 });
           await attendre(600);
+        };
+        const f0 = await filtreC();
+        dit(!!f0 && f0.v === 'tous', `A ${tag} : un filtre « Compte » est là${tel ? ' au téléphone' : ''}, « Tous les comptes » par défaut`, JSON.stringify(f0));
+        if (tel) dit(!!f0 && f0.h >= 44 && f0.w >= 44, `A ${tag} : le filtre « Compte » fait 44 px au doigt`, JSON.stringify(f0));
+        if (f0) {
+          if (tel) {
+            await pg.locator('[data-tt-filtre="compte"]:visible').first().click();
+            await pg.waitForSelector('[data-tt-feuille="filtre:compte"] [data-tt-filtre-choix]', { timeout: 8000 }).catch(() => {});
+            const opts = await pg.evaluate(() => [...document.querySelectorAll('[data-tt-feuille="filtre:compte"] [data-tt-filtre-choix]')].filter((x) => x.getClientRects().length).map((x) => { const r = x.getBoundingClientRect(); return { c: x.getAttribute('data-tt-filtre-choix'), h: Math.round(r.height) }; }));
+            dit(opts.map((o) => o.c).join(',') === 'compte:tous,compte:vendeuse_a,compte:vendeuse_b' && opts.every((o) => o.h >= 44), `A ${tag} : la feuille propose « Tous les comptes » puis chaque compte (44 px)`, JSON.stringify(opts));
+            await capture(pg, `A-${tag}-feuille`);
+            await pg.locator('[data-tt-filtre-choix="compte:vendeuse_b"]:visible').first().click();
+            await attendre(600);
+          } else await choisirC('vendeuse_b');
           const r1 = await rangees();
           dit(JSON.stringify(r1.map((x) => x.id).sort()) === JSON.stringify(tx222), `A ${tag} : le filtre « Compte » = vendeuse_b montre SES ventes et elles seules (par n° de transaction)`, JSON.stringify(r1));
-          const v = await pg.evaluate(() => (document.querySelector('[data-tt-filtre="compte"]') || { getAttribute: () => null }).getAttribute('data-tt-filtre-valeur'));
-          dit(v === 'vendeuse_b', `A ${tag} : le filtre dit le compte choisi`, v);
+          dit(((await filtreC()) || {}).v === 'vendeuse_b', `A ${tag} : le filtre dit le compte choisi`);
           await capture(pg, `A-${tag}-choisi`);
-          await pg.click('[data-tt-filtre="compte"]');
-          await pg.click('[data-tt-filtre-choix="compte:tous"]');
-          await attendre(600);
-          dit((await rangees()).length === ids0.length, `A ${tag} : « Tous les comptes » rend toutes les ventes`);
+          if (tel) {
+            // Retenu PAR VENDEUR sur l'appareil, comme le choix du site (`vrm_filtre_plateformes`) : relu au retour.
+            const memo = await pg.evaluate(() => { try { return { v: JSON.parse(localStorage.getItem('vrm_filtre_plateformes') || '{}')['compte:ventes'], uid: localStorage.getItem('vrm_local_owner') }; } catch (_) { return null; } });
+            dit(!!memo && memo.v && memo.v.compte === 'vendeuse_b' && memo.v.vendeur === memo.uid, `A ${tag} : le choix est retenu pour CE vendeur`, JSON.stringify(memo));
+            const recharger = async () => { await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.locator('[data-colis-onglet-choix="toutes"]').first().click({ timeout: 15000 }); await pg.waitForSelector('[data-toutes-vente]', { timeout: 15000 }).catch(() => {}); await attendre(900); };
+            await recharger();
+            dit(JSON.stringify((await rangees()).map((x) => x.id).sort()) === JSON.stringify(tx222) && ((await filtreC()) || {}).v === 'vendeuse_b', `A ${tag} : relu au retour sur l'écran (même vendeur)`);
+            // Un AUTRE vendeur sur le même appareil : son choix ne vaut pas pour lui ⇒ « Tous les comptes ».
+            await pg.evaluate(() => { const o = JSON.parse(localStorage.getItem('vrm_filtre_plateformes') || '{}'); o['compte:ventes'] = { ...o['compte:ventes'], vendeur: 'un-autre-vendeur' }; localStorage.setItem('vrm_filtre_plateformes', JSON.stringify(o)); });
+            await recharger();
+            dit((await rangees()).length === ids0.length && ((await filtreC()) || {}).v === 'tous', `A ${tag} : le choix d'un autre vendeur ne s'applique pas`);
+            await pg.evaluate(() => { const o = JSON.parse(localStorage.getItem('vrm_filtre_plateformes') || '{}'); o['compte:ventes'] = { vendeur: localStorage.getItem('vrm_local_owner'), compte: 'vendeuse_b' }; localStorage.setItem('vrm_filtre_plateformes', JSON.stringify(o)); });
+            await recharger();
+          }
+          await choisirC('tous');
+          dit((await rangees()).length === ids0.length && ((await filtreC()) || {}).v === 'tous', `A ${tag} : « Tous les comptes » rend toutes les ventes`);
+        }
+        if (!tel) {
+          // L'ordinateur ne change pas : le choix retenu au téléphone ne s'y applique pas (son tableau garde SON filtre).
+          await pg.evaluate(() => { const o = JSON.parse(localStorage.getItem('vrm_filtre_plateformes') || '{}'); o['compte:ventes'] = { vendeur: localStorage.getItem('vrm_local_owner'), compte: 'vendeuse_b' }; localStorage.setItem('vrm_filtre_plateformes', JSON.stringify(o)); });
+          await pg.reload({ waitUntil: 'domcontentloaded' });
+          await pg.locator('[data-colis-onglet-choix="toutes"]').first().click({ timeout: 15000 });
+          await pg.waitForSelector('[data-toutes-vente]', { timeout: 15000 }).catch(() => {}); await attendre(900);
+          dit((await rangees()).length === ids0.length && ((await filtreC()) || {}).v === 'tous', `A ${tag} : à l'ordinateur, le tableau garde son filtre (le choix du téléphone ne s'y applique pas)`);
         }
         await ctx.close();
+        // Un compte EXCLU (`vinted_accounts_hidden`) n'apparaît jamais : ni ses ventes, ni un choix à son nom.
+        {
+          const b1 = base(); const m1 = b1.lignes.find((l) => l.id === 'main'); m1.data.vinted_accounts_hidden = ['222'];
+          const o1 = await NV.ouvrir(nav, { W, sombre, base: b1, tab: 'ventes' });
+          await o1.pg.locator('[data-colis-onglet-choix="toutes"]').first().click({ timeout: 15000 });
+          await o1.pg.waitForSelector('[data-toutes-vente]', { timeout: 15000 }).catch(() => {}); await attendre(900);
+          const r = await o1.pg.evaluate(() => ({ comptes: [...new Set([...document.querySelectorAll('[data-toutes-vente]')].filter((x) => x.getClientRects().length).map((x) => x.getAttribute('data-toutes-compte')))], choix: document.querySelectorAll('[data-tt-filtre-choix="compte:vendeuse_b"]').length, filtre: document.querySelectorAll('[data-tt-filtre="compte"]').length }));
+          dit(r.comptes.join(',') === 'vendeuse_a' && r.choix === 0 && r.filtre === 0, `A ${tag} : un compte exclu n'apparaît jamais (ni ses ventes, ni un choix « Compte »)`, JSON.stringify(r));
+          await o1.ctx.close();
+        }
       }
       // ── B. Cacher les montants ─────────────────────────────────────────────
       if (PARTIES.includes('B')) {
