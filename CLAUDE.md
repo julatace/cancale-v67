@@ -485,10 +485,10 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **27 nov. · TROIS FONCTIONS RENDUES (choix de Julien)** : filtre « Compte » de Ventes au téléphone (retenu par vendeur), alerte « un compte annule plus » dans Statistiques (règle du 5 nov. importée, un compte pas lu jamais comparé), questions eBay sans réponse en tête de Messages « À répondre ». `2026-11-27-retour-fonctions.md`. Geste : aucun.
+- **27 nov. · TROIS FONCTIONS RENDUES (Julien)** : filtre « Compte » de Ventes au téléphone (retenu par vendeur), alerte « un compte annule plus » dans Statistiques (règle du 5 nov. importée, un compte pas lu jamais comparé), questions eBay sans réponse en tête de Messages « À répondre ». `2026-11-27-retour-fonctions.md`. Geste : aucun.
+- **27 nov. · « 978 216 » deux fois, un point en deux cartes** : un colis = ses identités (code lu aussi dans SA commande, n°, transaction), « à vérifier » compris ; un point = son adresse. `historique-colis-retraits.md`, fin. Geste : aucun (après fusion).
 - **26 nov. · « article » hors Sneakers partout (ext. 5.455.1)** : `historique-divers.md`, fin.
 - **26 nov. soir · FAVORIS PAR REQUÊTES « comme Vintex » (Julien : « A, fais comme Vintex »), ext. 5.455.0** : inquiries → conversation → transaction → offre → message, depuis la page, SEULES écritures permises (`ECRITURES_FAVORI`) ; garde-fous inchangés ; clics en réserve (`vrmFavorisChemin: 'interface'`). Bleam fait pareil (ancienne messagerie). `historique-divers.md`, fin. Geste : installer 5.455.0.
-- **26 nov. · Vestiaire/LBC fiables** : vente VC annulée ≠ « Vendue », lecture VC > 24 h = « à confirmer », Annonces lit `vc_ventes`, « LBC n » pas su sans ventes. `2026-11-26-fiabilite-vc-lbc.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
