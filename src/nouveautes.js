@@ -30,6 +30,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (27 nov., lot vrai-benefice) src/vraiBenefice.js, Statistiques › Gains « Par mois » et « Par compte »
+  { id: 'vrai-benefice', date: '2026-11-27', titre: 'Ton vrai bénéfice, mois par mois', phrase: 'Et le compte qui vend le mieux : le même chiffre que l’export.', tab: 'stats', pour: 'tous', mode: 'tous' },
   // (27 nov., ameliorations-27nov — Julien : « Vas-y fais tout ») src/ecrans/Comptabilite.jsx fusionLignesMemeSuivi,
   // src/aujourdhui/modele.js prixManquants, src/aujourdhui/LigneLectureAncienne.jsx, src/aDistance/LigneOrdinateur.jsx
   { id: 'retrait-contenu-code', date: '2026-11-27', titre: 'À retirer : la photo de l’achat', phrase: 'Relié par le code de retrait de sa commande.', tab: 'achats', pour: 'tous', mode: 'tous' },

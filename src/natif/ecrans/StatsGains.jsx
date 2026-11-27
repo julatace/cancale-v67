@@ -6,18 +6,20 @@
 // porte de saisie). Jamais « au moins » sur un bénéfice : une paire au prix d'achat inconnu peut être vendue à perte
 // (src/beneficeNoms.js). Chaque nombre porte `data-gr-*` (centimes ou nombre, '' = « — ») : le banc lit les nombres.
 import React from 'react';
-import { tr, nombre } from '../../i18n/index.js';
+import { tr, nombre, date } from '../../i18n/index.js';
 import { Segmente, Colonne, Carte, Rangee, Tuiles, Tuile, Actions, Pourquoi } from '../index.js';
 import { VUES_GAINS, MIN_CLASSEMENT } from '../../gainsReels.js';
+import { VUES_VRAI_BENEFICE } from '../../vraiBenefice.js';   // (27 nov., lot vrai-benefice) « Par mois »
 import { ouvrirCompleter } from '../../completer/porte.js';
 import './gains.css';
 
 const c = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x))));
-const lireVue = () => { try { const v = localStorage.getItem('vrm_stats_gains_vue'); return VUES_GAINS.includes(v) ? v : 'modele'; } catch (_) { return 'modele'; } };
+const VUES = [...VUES_GAINS, ...VUES_VRAI_BENEFICE];
+const lireVue = () => { try { const v = localStorage.getItem('vrm_stats_gains_vue'); return VUES.includes(v) ? v : 'modele'; } catch (_) { return 'modele'; } };
 const garderVue = (v) => { try { localStorage.setItem('vrm_stats_gains_vue', v); } catch (_) { /* rien */ } };
 const MAX_LISTE = 8, MAX_SANS = 5;
 
-export default function StatsGains({ G, sur = '', montant = (x) => String(x), Icon = null }) {
+export default function StatsGains({ G, VB = undefined, sur = '', montant = (x) => String(x), Icon = null }) {
   const [vue, setVue] = React.useState(lireVue);
   const signe = (cents) => (cents == null ? '—' : (cents >= 0 ? '+' : '−') + montant(Math.abs(cents) / 100));
   const jours = (j) => (j == null ? '—' : tr('gr.jours', { j: nombre(Math.round(j)) }));
@@ -28,7 +30,7 @@ export default function StatsGains({ G, sur = '', montant = (x) => String(x), Ic
 
   const segments = (
     <Segmente libelle={tr('gr.vue')} valeur={vue} onChange={(x) => { setVue(x); garderVue(x); }}
-      options={VUES_GAINS.map((x) => ({ cle: x, libelle: tr('gr.vue.' + x) }))}/>
+      options={VUES.map((x) => ({ cle: x, libelle: tr('gr.vue.' + x) }))}/>
   );
 
   // ── LE HAUT : gagné · par paire · délai, la couverture, ce qui manque (nommé, avec sa porte) ──
@@ -63,8 +65,9 @@ export default function StatsGains({ G, sur = '', montant = (x) => String(x), Ic
         attrs={{ 'data-ps-bloc': 'gains', 'data-gr-vue': vue, 'aria-busy': attente ? 'true' : undefined }}>
         {segments}
         {haut}
-        {G == null ? null : vue === 'paire' ? <VuePaires P={G.paire} signe={signe} jours={jours}/> : <VueGroupes A={G[vue]} vue={vue} signe={signe} jours={jours}/>}
-        <Pourquoi attrs={{ 'data-gr-pourquoi': '' }}><p>{tr('gr.pourquoi.net')}</p><p>{tr('gr.pourquoi.racheter', { n: MIN_CLASSEMENT })}</p><p>{tr('gr.pourquoi.modele')}</p></Pourquoi>
+        {vue === 'mois' ? <VueMois VB={VB} signe={signe}/> : G == null ? null : vue === 'paire' ? <VuePaires P={G.paire} signe={signe} jours={jours}/> : (
+          <>{vue === 'compte' ? <VueComptes VB={VB} signe={signe}/> : null}<VueGroupes A={G[vue]} vue={vue} signe={signe} jours={jours}/></>)}
+        <Pourquoi attrs={{ 'data-gr-pourquoi': '' }}><p>{tr('vb.pourquoi')}</p><p>{tr('gr.pourquoi.net')}</p><p>{tr('gr.pourquoi.racheter', { n: MIN_CLASSEMENT })}</p><p>{tr('gr.pourquoi.modele')}</p></Pourquoi>
       </Carte>
     </Colonne>
   );
@@ -149,6 +152,45 @@ function Podium({ titre, cles, attr, vide, rendu }) {
     <>
       <p className="n-gr-tete">{titre}</p>
       <div {...{ ['data-gr-' + attr]: cles.join('|') }}>{cles.length ? cles.map(rendu) : vide ? <Rangee titre={vide} attrs={{ 'data-gr-peu': '' }}/> : null}</div>
+    </>
+  );
+}
+
+// ── (27 nov., lot vrai-benefice) LE VRAI BÉNÉFICE : par mois et par compte (src/vraiBenefice.js — la règle de l'export
+// comptable, la seule). Chaque nombre porte `data-vb-*` (centimes ; '' = « — ») : le banc compare à l'export. ──
+const attrsVb = (g) => ({ 'data-vb-net': c(g.net), 'data-vb-n': String(g.n), 'data-vb-nnet': String(g.nNet), 'data-vb-sansachat': String(g.sansAchat), 'data-vb-auplus': String(g.auPlus) });
+const valeurVb = (g, signe) => (g.net == null ? '—' : g.plafond ? tr('rs.auPlus', { p: signe(g.net) }) : signe(g.net));
+const sousVb = (g) => (!g.n ? tr('vb.aucune') : [g.partiel ? tr('gr.sur', { k: g.nNet, n: g.n }) : tr('gr.ventes', { n: g.n }),
+  g.sansAchat ? tr('vb.sansAchat', { n: g.sansAchat }) : '', g.auPlus ? tr('vb.fraisPasConfirmes', { n: g.auPlus }) : ''].filter(Boolean).join(' · '));
+const nomMoisVb = (ym) => { const [a, m] = String(ym).split('-').map(Number); return a && m ? date(new Date(a, m - 1, 15), { month: 'long', year: 'numeric' }) : ym; };
+
+function VueMois({ VB, signe }) {
+  if (VB === undefined) return <Rangee titre={tr('v2.jour.lecture')}/>;
+  if (!VB) return <Rangee titre={tr('gr.pasSu')} attrs={{ 'data-vb-passu': '' }}/>;
+  // Les deux mois les plus récents toujours ; avant, seulement les mois qui ont des ventes.
+  const M = VB.mois.filter((g, i) => g.n > 0 || i < 2);
+  return (
+    <>
+      <p className="n-gr-tete">{tr('vb.mois.tete')}</p>
+      <div data-vb-mois-liste={M.map((g) => g.ym).join('|')}>
+        {M.map((g) => <Rangee key={g.ym} titre={nomMoisVb(g.ym)} sousTitre={sousVb(g)} sousLignes={2} valeur={valeurVb(g, signe)} valeurForte={g.net != null}
+          attrs={{ 'data-vb-mois': g.ym, ...attrsVb(g) }}/>)}
+      </div>
+      {VB.aDater > 0 || VB.ecartees > 0 ? <p className="n-gr-note" data-vb-adater={String(VB.aDater)} data-vb-ecartees={String(VB.ecartees)}>
+        {[VB.aDater > 0 ? tr('vb.aDater', { n: VB.aDater }) : '', VB.ecartees > 0 ? tr('gr.ecartees', { n: VB.ecartees }) : ''].filter(Boolean).join(' · ')}</p> : null}
+    </>
+  );
+}
+
+function VueComptes({ VB, signe }) {
+  if (VB === undefined || !VB) return null;
+  return (
+    <>
+      <p className="n-gr-tete">{tr('vb.comptes.tete')}</p>
+      <div data-vb-comptes={VB.comptes.map((g) => g.k).join('|')}>
+        {VB.comptes.length ? VB.comptes.map((g) => <Rangee key={g.k} titre={g.nom} sousTitre={sousVb(g)} sousLignes={2} valeur={valeurVb(g, signe)} valeurForte={g.net != null}
+          detailValeur={g.net != null ? tr('vb.total') : ''} attrs={{ 'data-vb-compte': g.k, ...attrsVb(g) }}/>) : <Rangee titre={tr('vb.aucune')}/>}
+      </div>
     </>
   );
 }

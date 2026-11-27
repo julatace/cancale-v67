@@ -54,4 +54,15 @@ export default {
   "gr.pourquoi.racheter.art": "Volver a comprar: beneficio medio por artículo dividido por el plazo medio de venta, solo con {n} ventas o más con precio de compra conocido y fecha. Un hecho sobre tus ventas pasadas, no una promesa.",
   "gr.pourquoi.modele": "El modelo es solo una agrupación de pantalla (marca y palabras del modelo): nunca enlaza una venta con un par.",
   "gr.pourquoi.modele.art": "El modelo es solo una agrupación de pantalla (marca y palabras del modelo): nunca enlaza una venta con un artículo.",
+  // (27 nov., lot vrai-benefice) le vrai bénéfice par mois et par compte
+  "gr.vue.mois": "Por mes",
+  "vb.mois.tete": "El mes en que llegó el dinero",
+  "vb.comptes.tete": "La cuenta que mejor vende",
+  "vb.total": "en total",
+  "vb.aucune": "Ninguna venta",
+  "vb.sansAchat": {"one": "{n} sin precio de compra", "other": "{n} sin precio de compra"},
+  "vb.fraisPasConfirmes": {"one": "{n} con gastos sin confirmar", "other": "{n} con gastos sin confirmar"},
+  "vb.aDater": {"one": "{n} venta aún sin abonar: en ningún mes", "other": "{n} ventas aún sin abonar: en ningún mes"},
+  "vb.portRecu": "envío de la compra incluido (recibo)",
+  "vb.pourquoi": "Beneficio real = precio de venta (eBay, Vestiaire: el dinero recibido) − precio de compra − comisiones de la plataforma − boosts y gastos anotados. El envío pagado en la compra está en el precio de compra: el recibo de Vinted siempre lo incluye; si lo escribes a mano, inclúyelo. «Como mucho»: los gastos de una venta no están confirmados, puede faltar un boost. Un mes sigue la fecha del abono, como tu exportación contable: ambas dan la misma cifra. Solo cuentan tus cuentas seleccionadas.",
 };

@@ -54,4 +54,15 @@ export default {
   "gr.pourquoi.racheter.art": "Da ricomprare: utile medio per articolo diviso per il tempo medio di vendita, solo con {n} o più vendite con prezzo d’acquisto noto e datate. Un dato sulle vendite passate, non una promessa.",
   "gr.pourquoi.modele": "Il modello è solo un raggruppamento di visualizzazione (marca e parole del modello): non collega mai una vendita a un paio.",
   "gr.pourquoi.modele.art": "Il modello è solo un raggruppamento di visualizzazione (marca e parole del modello): non collega mai una vendita a un articolo.",
+  // (27 nov., lot vrai-benefice) le vrai bénéfice par mois et par compte
+  "gr.vue.mois": "Per mese",
+  "vb.mois.tete": "Il mese in cui sono arrivati i soldi",
+  "vb.comptes.tete": "L’account che vende meglio",
+  "vb.total": "in totale",
+  "vb.aucune": "Nessuna vendita",
+  "vb.sansAchat": {"one": "{n} senza prezzo d’acquisto", "other": "{n} senza prezzo d’acquisto"},
+  "vb.fraisPasConfirmes": {"one": "{n} con costi non confermati", "other": "{n} con costi non confermati"},
+  "vb.aDater": {"one": "{n} vendita non ancora accreditata: in nessun mese", "other": "{n} vendite non ancora accreditate: in nessun mese"},
+  "vb.portRecu": "spedizione dell’acquisto inclusa (ricevuta)",
+  "vb.pourquoi": "Utile reale = prezzo di vendita (eBay, Vestiaire: i soldi ricevuti) − prezzo d’acquisto − commissioni della piattaforma − boost e costi annotati. La spedizione pagata all’acquisto è nel prezzo d’acquisto: la ricevuta Vinted la contiene sempre; se lo scrivi a mano, includila. «Al massimo»: i costi di una vendita non sono confermati, può mancare un boost. Un mese segue la data dell’accredito, come il tuo export contabile: entrambi danno la stessa cifra. Contano solo gli account selezionati.",
 };

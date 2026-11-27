@@ -54,4 +54,15 @@ export default {
   "gr.pourquoi.racheter.art": "Buy again: average profit per item divided by the average time to sell, only with {n} or more sales with a known purchase price and dates. A fact about your past sales, not a promise.",
   "gr.pourquoi.modele": "A model is only a display grouping (brand and model words): it never links a sale to a pair.",
   "gr.pourquoi.modele.art": "A model is only a display grouping (brand and model words): it never links a sale to an item.",
+  // (27 nov., lot vrai-benefice) le vrai bénéfice par mois et par compte
+  "gr.vue.mois": "By month",
+  "vb.mois.tete": "The month the money arrived",
+  "vb.comptes.tete": "The account that sells best",
+  "vb.total": "in total",
+  "vb.aucune": "No sales",
+  "vb.sansAchat": {"one": "{n} without purchase price", "other": "{n} without purchase price"},
+  "vb.fraisPasConfirmes": {"one": "{n} with fees not confirmed", "other": "{n} with fees not confirmed"},
+  "vb.aDater": {"one": "{n} sale not paid out yet: in no month", "other": "{n} sales not paid out yet: in no month"},
+  "vb.portRecu": "purchase shipping included (receipt)",
+  "vb.pourquoi": "True profit = sale price (eBay, Vestiaire: the money received) − purchase price − platform fees − boosts and noted fees. Shipping paid on the purchase is in the purchase price: the Vinted receipt always includes it; typed by hand, count it in. “At most”: a sale’s fees are not confirmed, a boost may be missing. A month follows the payout date, like your accountant export: both show the same figure. Only your selected accounts count.",
 };
