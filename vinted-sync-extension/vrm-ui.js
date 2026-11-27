@@ -2134,8 +2134,35 @@
   [data-vrm-ui] button[style] ~ button[style] { background: var(--vu-teinte) !important; color: var(--vu-sur) !important; }
   @media (prefers-reduced-motion: reduce) { [data-vrm-ui] { transition: none !important; } }
   `;
+  // 5.455.2 — LA POLICE DU PANNEAU. La pile commence par « Inter VRM » : l'Inter de l'app (src/design/polices,
+  // licence OFL : LICENCE-Inter-OFL.txt, livrée avec), recopiée dans l'extension (inter-vrm.woff2, web-accessible).
+  // Sans elle, une machine sans Inter, SF ni Segoe UI prenait DejaVu Sans (bien plus large) et les rangées des
+  // favoris débordaient au téléphone. Une @font-face DANS une shadow root n'est pas lue par Chrome : la police est
+  // donnée au document par `FontFace` sur ses OCTETS (aucune URL chargée par la page, rien ne dépend de sa CSP),
+  // sous le seul nom « Inter VRM » — qu'aucune règle de la page n'emploie : aucun style du site ne change.
+  // Demandée par `monter` (les pièces de l'extension seulement), une fois par page.
+  const POLICE_NOM = 'Inter VRM', POLICE_FICHIER = 'inter-vrm.woff2';
+  const POLICE_PLAGE = 'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD';
+  let policeDemandee = null;
+  function police() {
+    if (policeDemandee) return policeDemandee;
+    policeDemandee = (async () => {
+      try {
+        if (typeof FontFace !== 'function' || !document.fonts || typeof document.fonts.add !== 'function') return false;
+        const rt = globalThis.chrome && globalThis.chrome.runtime;
+        if (!rt || typeof rt.getURL !== 'function') return false;
+        const r = await fetch(rt.getURL(POLICE_FICHIER));
+        if (!r || !r.ok) return false;
+        const f = new FontFace(POLICE_NOM, await r.arrayBuffer(), { weight: '100 900', style: 'normal', display: 'swap', unicodeRange: POLICE_PLAGE });
+        document.fonts.add(await f.load());
+        return true;
+      } catch (_) { return false; }
+    })();
+    return policeDemandee;
+  }
   // Pose la feuille dans une shadow root (ou un élément), une fois.
   function monter(racine) {
+    try { police(); } catch (_) {}
     try {
       if (!racine || racine.querySelector && racine.querySelector('style[data-vrm-ui-css]')) return;
       const st = document.createElement('style'); st.setAttribute('data-vrm-ui-css', ''); st.textContent = CSS;
@@ -2395,5 +2422,5 @@
   }
   const PM_CSS = '.pm7-g{margin:10px 0;padding:0}.pm7-g h4{margin:0 0 4px;font-size:13px}.pm7{display:flex;align-items:center;gap:8px;min-height:44px;border-top:1px solid var(--vu-filet,rgba(0,0,0,.08));padding:4px 0}.pm7-t{flex:1;min-width:0;display:flex;flex-direction:column}.pm7-t b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}.pm7-t small{color:var(--vu-gris,#6b6b70)}.pm7 .prix6{width:72px;min-height:36px}.pm7 .vu-btn{min-height:44px}';
   const PRIX_MINI = Object.freeze({ html: prixMiniHtml, lier: prixMiniLier, reponses: prixMiniReponses, cle: pmCle });
-  globalThis.VRM_UI = Object.freeze({ T, raisonFileFav, MOTS, LANGUES, langue: () => LANGUE, duree, esc, CSS, CSS_PAGE, monter, habiller, etiquette, barre, logoTransp, nomTransp, MODIF, noteAcheteur, nomLangue, traduction, PRIX_MINI });
+  globalThis.VRM_UI = Object.freeze({ T, raisonFileFav, MOTS, LANGUES, langue: () => LANGUE, duree, esc, CSS, CSS_PAGE, monter, police, habiller, etiquette, barre, logoTransp, nomTransp, MODIF, noteAcheteur, nomLangue, traduction, PRIX_MINI });
 })();

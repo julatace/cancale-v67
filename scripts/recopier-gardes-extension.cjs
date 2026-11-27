@@ -15,6 +15,7 @@
 //   · « Publier aussi sur… » (5.424, src/publier/aussi.js : feuilleAussi, relireFormulaire, dejaAussi, friseAussi…) ;
 //   · validerReglagesFavoris (src/reglagesFavoris.js) et validerAutoFavoris (src/favorisAuto.js) — les réglages des
 //     messages aux favoris écrits depuis le panneau passent par la règle de l'app (le serveur la reprend à l'envoi) ;
+//   · poserSourceVend (src/profilVendeur.js, 5.455.2) — la copie dit « article » hors Sneakers, comme l'extension ;
 // et les pose dans background.js entre `// <gardes-app>` et `// </gardes-app>` (`const GARDES_APP`).
 // `--verifie` : rouge si la copie n'est plus celle de l'app.
 const fs = require('fs'), path = require('path');
@@ -33,10 +34,15 @@ export { ficheArticle, planSite, envoiPour, retenirReponses } from './src/publie
 export { feuilleAussi, relireFormulaire, dejaAussi, friseAussi, lienAnnonce, reponsesAgent, pointureExacte, prixAussi, PCT_AUSSI, NOM_SITE_AUSSI, SITES_AUSSI } from './src/publier/aussi.js';
 export { paireVerif, resumeVerif, lancerPermis, partiraPas, reponsesDe } from './src/repubVerif.js';
 export { phraseBilanFavoris, RAISONS_SAUT } from './src/favorisProgression.js';
-export { manquesDepot, photosDepot, payloadDepot, ordreRelu, ordrePhotos } from './src/depot/regles.js';`;
+export { manquesDepot, photosDepot, payloadDepot, ordreRelu, ordrePhotos } from './src/depot/regles.js';
+export { poserSourceVend } from './src/profilVendeur.js';`;
 const out = esbuild.buildSync({ stdin: { contents: entree, resolveDir: R, loader: 'js' }, bundle: true, format: 'iife', globalName: '__gardesApp', write: false, platform: 'neutral', target: 'es2020', legalComments: 'none', charset: 'utf8' });
 const code = out.outputFiles[0].text.trim();
-const bloc = `// <gardes-app> — RECOPIÉ par scripts/recopier-gardes-extension.cjs depuis l'app (jamais à la main).\n${code}\nconst GARDES_APP = __gardesApp;\n// </gardes-app>`;
+// (27 nov., ext. 5.455.2) LE MOT DU VENDEUR. La copie empaquette SA src/profilVendeur.js : sans source posée, elle dit
+// « paire » à tout le monde (`vendCourant` ⇒ 'sneakers'). Dans l'app, App.jsx pose la source ; ici, c'est le vocabulaire
+// de l'extension (`motsExt()`, d'après `vrm_vend_ext` rangé depuis `vrm_je_vends`) — lu à chaque texte, jamais figé.
+const SOURCE_VEND = "GARDES_APP.poserSourceVend(() => (motsExt() === MOTS_ARTICLE.autre ? 'autre' : 'sneakers'));";
+const bloc = `// <gardes-app> — RECOPIÉ par scripts/recopier-gardes-extension.cjs depuis l'app (jamais à la main).\n${code}\nconst GARDES_APP = __gardesApp;\n${SOURCE_VEND}\n// </gardes-app>`;
 const bg = fs.readFileSync(F_BG, 'utf8');
 const a = bg.indexOf('// <gardes-app>'), b = bg.indexOf('// </gardes-app>');
 if (a < 0 || b < 0) { console.log('❌ bloc <gardes-app> absent de background.js'); process.exit(1); }

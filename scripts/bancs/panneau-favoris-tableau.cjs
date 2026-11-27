@@ -32,14 +32,9 @@ const { pathToFileURL } = require('url');
 const BADGE = fs.readFileSync(path.join(EXT, 'vrm-badge.js'), 'utf8');
 const UI = fs.existsSync(path.join(EXT, 'vrm-ui.js')) ? fs.readFileSync(path.join(EXT, 'vrm-ui.js'), 'utf8') : '';
 const LOGO = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extension', 'logo-vrm-96.png'));
-// (26 nov.) LA POLICE DU PANNEAU, la même partout. Le panneau se dessine en « Inter VRM », Inter, puis la police du système
-// (SF Pro, Segoe UI…). Sans elle, la page prenait la police de la MACHINE du banc : Inter installée ici, DejaVu Sans (bien plus
-// large) sur la CI — les rangées « remontée au prix mini » passaient à 149 px au téléphone et le banc était rouge là-bas seulement.
-// On charge l'Inter du dépôt (src/design/polices, la police de l'app) sous le nom « Inter VRM », sans réseau (FontFace sur les
-// octets) : les hauteurs jugées sont celles de la police voulue, sur toute machine. Les seuils ne changent pas.
-const INTER = fs.readFileSync(path.join(RACINE, 'src', 'design', 'polices', 'inter-latin-wght-normal.woff2')).toString('base64');
 const SORTIE = process.env.BANC_CAPTURES ? path.join(process.env.BANC_CAPTURES, 'panneau-favoris-tableau') : path.join(__dirname, 'captures', 'panneau-favoris-tableau');
 let ko = 0, ok = 0;
+let POLICE_DITE = false;
 const dit = (bon, quoi, detail) => { if (bon) { ok++; console.log(`  ✅ ${quoi}`); } else { ko++; console.log(`  ❌ ${quoi}${detail ? ' — ' + String(detail).slice(0, 600) : ''}`); } };
 const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++; console.log(`  ❌ ${quoi} — a levé : ${String(e && e.message).slice(0, 220)}`); return null; } };
 const MIN = 60000, H = 3600000, J = 86400000, T0 = Date.now();
@@ -83,17 +78,12 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
   await pg.route('**/*', (r) => {
     const u = r.request().url();
     if (/logo-vrm-96\.png/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: LOGO });
+    // 5.455.2 : la police du panneau, servie depuis l'EXTENSION jugée (chrome.runtime.getURL) — absente d'un arbre d'avant ⇒ 404.
+    if (/\/inter-vrm\.woff2$/.test(u)) return fs.existsSync(path.join(EXT, 'inter-vrm.woff2')) ? r.fulfill({ status: 200, contentType: 'font/woff2', body: fs.readFileSync(path.join(EXT, 'inter-vrm.woff2')) }) : r.fulfill({ status: 404, body: '' });
     if (/vinted\.net\/banc\//.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: PIXEL });
     return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;background:#fff;font-family:sans-serif"><header style="height:64px;border-bottom:1px solid #ddd;padding:20px">Une page Vinted</header><main style="padding:20px;height:2000px">Annonces…</main></body></html>' });
   });
   await pg.goto(url);
-  const police = await pg.evaluate(async (b64) => {
-    const octets = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-    const f = new FontFace('Inter VRM', octets.buffer, { weight: '100 900', style: 'normal' });
-    document.fonts.add(await f.load());
-    return document.fonts.check('16px "Inter VRM"');
-  }, INTER);
-  if (!police) throw new Error('la police « Inter VRM » du banc n’est pas chargée');
   await pg.evaluate(({ e, js, ui, ap, L }) => {
     window.__envoyes = []; window.__ouverts = []; const ouvrirVrai = window.open; window.open = (u) => { window.__ouverts.push(String(u)); return null; };
     const copie = (x) => JSON.parse(JSON.stringify(x));
@@ -130,6 +120,13 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
     const s = document.createElement('script'); s.textContent = js; document.documentElement.appendChild(s);
   }, { e: ETAT, js: BADGE, ui: UI, ap: AP, L });
   await pg.waitForTimeout(250);
+  // 5.455.2 : la police « Inter VRM » vient de l'extension (vrm-ui.js la donne au document) — le banc ne la charge plus
+  // lui-même. On attend qu'elle soit chargée (5 s au plus) ; absente, les hauteurs sont jugées avec la police de la machine.
+  const policeExt = await pg.evaluate(async () => {
+    for (let i = 0; i < 50; i++) { if ([...document.fonts].some((f) => /^"?Inter VRM"?$/.test(f.family) && f.status === 'loaded')) return true; await new Promise((r) => setTimeout(r, 100)); }
+    return false;
+  });
+  if (!POLICE_DITE) { POLICE_DITE = true; dit(policeExt, 'G : la police « Inter VRM » du panneau est chargée PAR L’EXTENSION (inter-vrm.woff2, FontFace de vrm-ui.js)'); }
   return { ctx, pg, erreurs };
 }
 // ── Les favoris inventés : 22 rangées, sur les 10 annonces inventées (TOUTES : prix mini sur les impaires, achat sur 7000) ──

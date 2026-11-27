@@ -52,6 +52,8 @@ nommément (un autre ajout reste refusé) :
       5.429 `vrm-depot.js` (dépôt par l'interface) : juste AVANT vrm-badge.js dans son bloc ;
       5.433 `vrm-appris.js` et 5.440 `vrm-trouver.js` : injectés À LA DEMANDE par background.js
       (`chrome.scripting.executeScript`, aucun bloc du manifeste) — rien d'autre.
+  · 5.455.2 (27 nov., police du panneau) : `inter-vrm.woff2` (Inter, la police de l'app) et
+    `LICENCE-Inter-OFL.txt` (sa licence) membres du paquet, chargés par `vrm-ui.js` (FontFace) — rien d'autre.
 """
 from pathlib import Path
 import zipfile
@@ -65,7 +67,7 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
         ['vrm-regles-achat.js', 'vinted-infos.js'],
         ['lbc-ecrire.js', 'vrm-depot-aussi.js'],  # 5.418 / 5.424 (24 nov., main-rouges-24nov)
     ]
-    membres_attendus = set(ancien.namelist()) | {'oauth-retour.js'} | {n for b in AJOUTS_COMMUNS for n in b} | {'vrm-mots.js'} | {'vrm-ui.js', 'vrm-action.js'} | {'vrm-dressing.js', 'vrm-formulaire.js'} | {'pdf-lib.min.js', 'pdf-lib.LICENSE.txt', 'vrm-pdf.js'} | {'vc-ecrire.js', 'vrm-depot.js', 'vrm-appris.js', 'vrm-trouver.js'}
+    membres_attendus = set(ancien.namelist()) | {'oauth-retour.js'} | {n for b in AJOUTS_COMMUNS for n in b} | {'vrm-mots.js'} | {'vrm-ui.js', 'vrm-action.js'} | {'vrm-dressing.js', 'vrm-formulaire.js'} | {'pdf-lib.min.js', 'pdf-lib.LICENSE.txt', 'vrm-pdf.js'} | {'vc-ecrire.js', 'vrm-depot.js', 'vrm-appris.js', 'vrm-trouver.js'} | {'inter-vrm.woff2', 'LICENCE-Inter-OFL.txt'}
     assert membres_attendus == noms, f'Membres ajoutés ou retirés : {sorted(membres_attendus ^ noms)}'
     version = json.loads(nouveau.read('manifest.json'))['version']
     attendue = json.loads((ext/'manifest.json').read_text('utf8'))['version']
@@ -149,6 +151,8 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
         m_ancien['homepage_url'] = commun['homepage_url']
     # L'ordre ENTRE blocs ne change pas ce qui est injecté ; le contenu de chaque bloc, si.
     cle = lambda c: json.dumps(c, sort_keys=True)
+    # 5.455.2 : la police du panneau, ressource accessible au panneau (FontFace de vrm-ui.js) — exactement elle, à la fin.
+    m_ancien['web_accessible_resources'] = [*m_ancien['web_accessible_resources'], 'inter-vrm.woff2']
     m_ancien['content_scripts'] = sorted(m_ancien['content_scripts'], key=cle)
     m_nouveau['content_scripts'] = sorted(m_nouveau['content_scripts'], key=cle)
     assert m_ancien == m_nouveau, 'Le manifeste Orion a changé de forme (permissions, hôtes, scripts, ressources) par rapport à la référence installable'
