@@ -1,65 +1,122 @@
-// Real background/exec/HTTP functions; only transport, cookies and session are
-// fixtures. Absolutely no real marketplace traffic.
-const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
-const scripts=path.resolve(__dirname,'..');
-let prefix=fs.readFileSync(path.join(scripts,'audit-exec.cjs'),'utf8').split('const REPONSE =')[0];
-prefix=prefix.split('\n').filter(l=>!l.includes('ctx.vintedSend =')&&!l.includes('ctx.vintedGet =')).join('\n');
-const bac={require:require('node:module').createRequire(path.join(scripts,'audit-exec.cjs')),__dirname:scripts,   // le préfixe d'audit-exec.cjs résout ses modules depuis scripts/
- console,setTimeout,clearTimeout,clearInterval,URL,TextDecoder,TextEncoder,Buffer};
-vm.runInNewContext(prefix+'\nglobalThis.creer=faireCtx;',bac);
-const UID='3175765377',jeton='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-let controles=0;const check=(v,m)=>{assert.ok(v,m);controles++;};
-function contexte(options={}){
- const f=bac.creer(),appels=[],evenements=[];let connecte=UID;
- Object.assign(f.ctx,{notifierApp:async e=>evenements.push(e),AbortSignal,authToken:async()=>options.sessionAbsente?null:({access_token:'session-fictive'}),compteConnecte:async()=>connecte,pauseVinted:async()=>null});
- f.ctx.fetch=async(url,o={})=>{
-  appels.push({url,o});let j,status=200;
-  if(url.startsWith('https://vrm.center/')){
-   const c=JSON.parse(o.body);assert.ok(['consommer','verifier'].includes(c.action));assert.equal(c.jeton,jeton);
-   if(options.grantPerdu)throw Error('transport interrompu');
-   if(options.grantRefuse||(options.arreteAvantReponse&&c.action==='verifier'))status=409;
-   j={ok:true,autorise:true,uid:UID,suivi:'suivi-non-secret',travail:{itemId:'101',recipientId:'201',initiator:'native-fixture',message:'Bonjour identique !'}};
-  }else{
-   assert.ok(url.startsWith('https://www.vinted.fr/'));
-   if(url.endsWith('/conversations')){status=options.creationStatus||200;j={conversation:{id:301},code:0};}
-   else if(url.endsWith('/conversations/301')){j={conversation:{id:301,opposite_user:{id:options.autreDestinataire?999:201},transaction:{item_id:options.autreArticle?999:101},allow_reply:!options.interdit,messages:options.sansHistorique?undefined:options.dejaContacte?[{entity_type:options.dejaContacte,entity:{user_id:201,body:'message existant'}}]:[],...(options.partiel?{has_more_messages:true}:{})}};if(options.bascule)connecte='999';}
-   else if(url.endsWith('/replies')){if(options.reponsePerdue)throw Error('réponse perdue après départ');status=options.replyStatus||200;j=options.sansAccuse?{}:{code:0};}
-   else throw Error('URL inattendue '+url);
-  }
-  return {ok:status>=200&&status<300,status,json:async()=>j,headers:{get:()=>null}};
- };
- // 5.280 : les requêtes partent de la page Vinted (comme Vintex) — même faux réseau, sans onglet si demandé.
- f.ctx.pageVintedPour=async()=>options.sansOnglet?{refus:'onglet'}:{tabId:1};
- f.ctx.vintedPage=async(acc,m,endpoint,body)=>{if(options.sansOnglet)return {ok:false,status:0,json:null,sansPage:'onglet'};let r;try{r=await f.ctx.fetch('https://www.vinted.fr'+endpoint,{method:m,body:body==null?undefined:JSON.stringify(body)});}catch{return {ok:false,status:0,json:null};}let json=null;try{json=await r.json();}catch{}return {ok:r.ok,status:r.status,json};};
- return {...f,appels,evenements,envoyer:()=>f.envoyer({uid:UID,method:'POST',endpoint:'/vrm/favoris',body:{jeton}})};
+// ════════════════════════════════════════════════════════════════════════════
+//  LE VRAI MOTEUR DES MESSAGES AUX FAVORIS DE L'EXTENSION (27 nov., porté sur le chemin d'aujourd'hui)
+//
+//  Ce test jouait le protocole du 29 oct. (5.280 : POST /api/v2/conversations puis /replies par `vintedPage`). Ce chemin
+//  a été remplacé exprès : 5.414 (`toutinterface`, docs/passation/2026-11-21-extension-interface.md), puis 5.455 (26 nov. soir,
+//  Julien : « A, fais comme Vintex ») — inquiries → conversation relue → transaction → offre → message, depuis la page,
+//  seules écritures permises (`ECRITURES_FAVORI`). Le test restait rouge sans être lancé par aucun workflow.
+//  Mêmes garanties, sur le VRAI `executerMessageFavori` de background.js (scripts/_fond-vm.cjs : fausse base, faux Vinted
+//  qui compte chaque requête, fausse page) ; seuls le serveur VRM (autorisation à usage unique) et Vinted sont simulés.
+//  Le canal direct de Chrome (`onMessageExternal`) est jugé sur le contexte d'audit-exec.cjs, comme avant.
+//  Données inventées. Aucune requête réelle.
+// ════════════════════════════════════════════════════════════════════════════
+'use strict';
+const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm'), assert = require('node:assert/strict');
+const scripts = path.resolve(__dirname, '..');
+const { faireFond } = require('../_fond-vm.cjs');
+const BG = path.join(scripts, '..', 'vinted-sync-extension', 'background.js');
+let controles = 0; const check = (v, m, d) => { assert.ok(v, m + (d ? ' — ' + String(d).slice(0, 700) : '')); controles++; };
+const UID = '111', JETON = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', UUID = '01a1fdff-71a1-4c2b-9d3e-0123456789ab', TEXTE = 'Bonjour identique !';
+const ACC = { vinted_user_id: UID, domain: 'www.vinted.fr', access_token: 'jeton' };
+const REPLIES = `/messaging/main/conversations/${UUID}/replies`;
+
+function monter(o = {}) {
+  const conv = Object.assign({ id: UUID, core_id_deprecated: 301, allow_reply: !o.interdit, opposite_users: [{ id: o.autreDestinataire ? 999 : 201, login: 'pseudo_banc' }], data: { transaction_id: 5001, items: [{ id: 101 }] }, messages: o.dejaContacte ? [{ entity_type: o.dejaContacte, content: 'message existant' }] : [] }, o.conv || {});
+  const lignes = { main: { vinted_annonce_numeros: { '101': { numero: '41', min: '40' } } } };
+  const store = { __commeBleamDefaut: true, __favorisVintex: true, ...(o.sessionAbsente ? { __sansSession: true } : {}) };
+  let f = null;
+  f = faireFond({ src: BG, connecte: UID, comptes: [ACC], lignes, store,
+    vinted: (e) => {
+      if (e.methode === 'POST' && e.chemin === '/messaging/main/inquiries') return o.creationStatus ? { status: o.creationStatus, body: {} } : { status: 201, body: { id: UUID, conversation_id: UUID } };
+      if (e.methode === 'GET' && e.chemin === `/messaging/main/conversations/${UUID}`) { if (o.bascule) { f.ctx.activeAccountId = async () => '999'; f.ctx.activeUidForDomain = async () => '999'; } return { status: 200, body: { conversation: conv } }; }
+      if (e.methode === 'GET' && e.chemin === '/api/v2/transactions/5001') return { status: 200, body: { transaction: { id: 5001, item_id: o.autreArticle ? 102 : 101, buyer_id: 201, item_title: 'Baskets banc', item: { id: o.autreArticle ? 102 : 101, price: { amount: '50.0', currency_code: 'EUR' } } } } };
+      if (e.methode === 'POST' && e.chemin === '/api/v2/transactions/5001/offers') return { status: 200, body: { code: 0 } };
+      if (e.methode === 'GET' && e.chemin === '/api/v2/authorization/check/phone_verification') return { status: 200, body: { code: 0 } };
+      if (e.methode === 'POST' && e.chemin === REPLIES) {
+        if (o.reponsePerdue) throw new Error('réponse perdue après départ');
+        return { status: o.replyStatus || 201, body: o.sansAccuse ? {} : { conversation_id: UUID, data: { content: TEXTE } } };
+      }
+      return { status: 404, body: {} };
+    } });
+  const fetchFond = f.ctx.fetch; const grants = [];
+  f.ctx.fetch = async (url, op = {}) => {
+    if (String(url).startsWith('https://vrm.center/api/compte')) {
+      const c = JSON.parse(op.body || '{}'); grants.push(c.action);
+      if (o.grantPerdu && c.action === 'consommer') throw new Error('transport interrompu');
+      if (o.grantRefuse || (o.arreteAvantReponse && c.action === 'verifier')) return { ok: false, status: 409, json: async () => ({ ok: false }) };
+      const j = c.action === 'consommer' ? { ok: true, uid: UID, suivi: 'suivi-non-secret', travail: { notificationId: 'n-banc', itemId: '101', recipientId: '201', initiator: 'native-fixture', aimes: 1, message: TEXTE } } : { ok: true, autorise: true, uid: UID };
+      return { ok: true, status: 200, json: async () => j };
+    }
+    return fetchFond(url, op);
+  };
+  f.evenements = [];
+  f.ctx.notifierApp = async (e) => { f.evenements.push({ ...e, ecritsAvant: f.j.vinted.filter((x) => x.methode !== 'GET').length }); };
+  if (o.sansOnglet) f.ctx.pageVintedPour = async () => ({ refus: 'onglet' });
+  f.clics = []; f.ctx.interfaceVinted = async (acc, geste) => { f.clics.push(geste); return { ok: false, rienParti: true, sansPage: 'element' }; };
+  f.grants = grants;
+  return f;
 }
-(async()=>{
- let c=contexte(),r=await c.envoyer();
- check(r.ok&&r.data.resultat==='envoye','chemin positif : message confirmé après création et lecture du bon fil');
- check(c.evenements.filter(e=>e.type==='favoris').map(e=>e.etape).join(',')==='autorisation,conversation,verification,historique,envoi,confirmation','les étapes émises suivent les appels réels');
- check(c.evenements.every(e=>!JSON.stringify(e).includes(jeton)&&!JSON.stringify(e).includes('Bonjour identique')),'aucun ticket ou texte privé dans les événements de progression');
- check(c.appels.length===5,'une consommation, une création, une lecture, une vérification, une réponse');
- const creation=JSON.parse(c.appels[1].o.body),reponse=JSON.parse(c.appels[4].o.body);
- check(JSON.stringify(creation)===JSON.stringify({initiator:'native-fixture',item_id:'101',opposite_user_id:'201'}),'format natif observé, sans champ inventé');
- check(reponse.reply.body==='Bonjour identique !','texte exact de l’autorisation serveur');
- for(const options of [{autreDestinataire:true},{autreArticle:true},{interdit:true},{bascule:true},{grantRefuse:true},{arreteAvantReponse:true},{sansHistorique:true},{partiel:true},{creationStatus:429},{creationStatus:401}]){
-  c=contexte(options);r=await c.envoyer();check(!r.ok,'blocage '+JSON.stringify(options));check(!c.appels.some(x=>x.url.endsWith('/replies')),'aucun message '+JSON.stringify(options));
- }
- for(const options of [{reponsePerdue:true},{sansAccuse:true},{replyStatus:503},{grantPerdu:true}]){
-  c=contexte(options);r=await c.envoyer();check(r.data.resultat==='incertain','incertitude explicite '+JSON.stringify(options));check(c.appels.filter(x=>x.url.endsWith('/replies')).length<=1,'aucun rejeu '+JSON.stringify(options));
- }
- for(const type of ['message','user_message','offer_request_message']){
-  c=contexte({dejaContacte:type});r=await c.envoyer();check(r.ok&&r.data.resultat==='ignore'&&r.data.raison==='conversation_deja_contactee','conversation existante ignorée '+type);check(!c.appels.some(x=>x.url.endsWith('/replies')),'aucun message supplémentaire '+type);
- }
- c=contexte();c.ctx.authEtatRapide=async()=>({connecte:true,user_id:'owner-fixture'});r=await c.versExt({type:'favorisEtat'});check(r.ok&&r.code===JSON.parse(require('node:fs').readFileSync('vinted-sync-extension/manifest.json','utf8')).version,'Chrome répond directement sans pont de page');check(c.appels.length===0,'la santé directe ne contacte pas Vinted');
- c=contexte();r=await c.versExt({type:'favorisExec',uid:UID,endpoint:'/vrm/favoris',body:{jeton}});check(r.ok&&r.data.resultat==='envoye','le canal Chrome adressé exécute l’opération autorisée');
- c=contexte();r=await c.versExt({type:'favorisExec',uid:UID,endpoint:'/api/v2/conversations/301/replies',body:{jeton}});check(!r.ok&&c.appels.length===0,'le canal direct ne devient pas un relais générique');
- c=contexte();r=await c.versExt({type:'favorisEtat'},'https://evil.invalid');check(!r.ok&&c.appels.length===0,'origine étrangère refusée aussi pour la santé directe');
- c=contexte({sansOnglet:true});r=await c.envoyer();check(!r.ok&&r.data.raison==='onglet_vinted','sans onglet Vinted : refus expliqué');check(!c.appels.some(x=>x.url.startsWith('https://www.vinted.fr/')),'sans onglet Vinted : aucun appel Vinted');
- c=contexte({sessionAbsente:true});r=await c.envoyer();check(r.data.raison==='session_extension','session extension absente expliquée');check(c.appels.length===0,'aucun appel Vinted sans session extension');
- c=contexte();r=await c.ctx.executerPourApp({uid:UID,method:'POST',endpoint:'/vrm/favoris',body:{jeton}},{origin:'https://vrm.center.imposteur.invalid'});
- check(!r.ok&&c.appels.length===0,'origine étrangère : aucun grant, aucun Vinted');
- c=contexte();r=await c.ctx.executerPourApp({uid:UID,method:'POST',endpoint:'/api/v2/conversations',body:{item_id:'101',opposite_user_id:'201'}},{origin:'https://vrm.center'});
- check(!r.ok&&c.appels.length===0,'la création native générique reste hors de la liste blanche');
- console.log(controles+' contrôles du vrai moteur extension réussis');
-})().catch(e=>{console.error(e);process.exitCode=1;});
+const jouer = async (f) => { const r = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON }).catch((e) => ({ erreur: String(e && e.stack || e) })); return (r && r.json) || r || {}; };
+const ecrits = (f) => f.j.vinted.filter((v) => v.methode !== 'GET');
+const reponses = (f) => ecrits(f).filter((v) => v.chemin === REPLIES);
+const court = (f, r) => JSON.stringify({ r, v: f.j.vinted.map((x) => x.methode + ' ' + x.chemin), g: f.grants }).slice(0, 700);
+
+(async () => {
+  // ── LE CHEMIN POSITIF ─────────────────────────────────────────────────────────────────────────────────────────────────────
+  { const f = monter(), r = await jouer(f);
+    check(r.resultat === 'envoye', 'chemin positif : message confirmé après création et lecture du bon fil', court(f, r));
+    const etapes = f.evenements.filter((e) => e.type === 'favoris').map((e) => e.etape);
+    check(etapes[0] === 'autorisation' && etapes[etapes.length - 1] === 'confirmation', 'les étapes émises vont de l’autorisation à la confirmation', etapes.join(','));
+    const at = (n) => (f.evenements.find((e) => e.etape === n) || {}).ecritsAvant;
+    check(at('autorisation') === 0 && at('conversation') <= 1 && at('envoi') === 1 && at('confirmation') === 2, 'les étapes émises suivent les écritures réelles (rien avant la conversation, le message avant la confirmation)', JSON.stringify(f.evenements.map((e) => [e.etape, e.ecritsAvant])));
+    check(f.evenements.every((e) => !JSON.stringify(e).includes(JETON) && !JSON.stringify(e).includes(TEXTE)), 'aucun ticket ou texte privé dans les événements de progression');
+    check(ecrits(f).length === 2 && f.grants[0] === 'consommer' && !f.clics.length, 'une consommation ; deux écritures (autorisation sans offre) : conversation, message ; aucun clic', court(f, r));
+    const [q, m] = ecrits(f).map((x) => JSON.parse(x.corps));
+    check(JSON.stringify(q) === JSON.stringify({ item_ids: ['101'], receiver_id: '201' }), 'format de la conversation observé chez Vinted, sans champ inventé', JSON.stringify(q));
+    check(m.content === TEXTE, 'texte exact de l’autorisation serveur', JSON.stringify(m)); }
+  // ── CE QUI BLOQUE : AUCUN MESSAGE ─────────────────────────────────────────────────────────────────────────────────────────
+  for (const o of [{ autreDestinataire: true }, { autreArticle: true }, { interdit: true }, { bascule: true }, { grantRefuse: true }, { arreteAvantReponse: true }, { creationStatus: 429 }, { creationStatus: 401 }]) {
+    const f = monter(o), r = await jouer(f);
+    check(r.resultat !== 'envoye', 'blocage ' + JSON.stringify(o), court(f, r));
+    check(!reponses(f).length, 'aucun message ' + JSON.stringify(o), court(f, r));
+  }
+  // ── INCERTAIN : DIT, JAMAIS REJOUÉ ────────────────────────────────────────────────────────────────────────────────────────
+  // (5.455) L'accusé d'un message est le 2xx de la messagerie de Vinted (cette API ne porte pas le `code: 0` de l'ancienne) :
+  //    le cas « 200 sans code » de l'ancien protocole n'existe plus ; restent la réponse perdue (aucun statut) et le 5xx.
+  for (const o of [{ reponsePerdue: true }, { replyStatus: 503 }, { replyStatus: 502 }]) {
+    const f = monter(o), r = await jouer(f);
+    check(r.resultat === 'incertain', 'incertitude explicite ' + JSON.stringify(o), court(f, r));
+    check(reponses(f).length <= 1, 'aucun rejeu ' + JSON.stringify(o), court(f, r));
+  }
+  { const f = monter({ grantPerdu: true }), r = await jouer(f);
+    check(r.resultat !== 'envoye' && !ecrits(f).length, 'autorisation perdue en route : rien ne part chez Vinted', court(f, r)); }
+  // ── DÉJÀ CONTACTÉ ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+  for (const type of ['message', 'user_message', 'offer_request_message']) {
+    const f = monter({ dejaContacte: type }), r = await jouer(f);
+    check(r.resultat === 'ignore', 'conversation existante ignorée ' + type, court(f, r));
+    check(!reponses(f).length && ecrits(f).length === 1, 'aucun message supplémentaire ' + type, court(f, r));
+  }
+  // ── SANS ONGLET, SANS SESSION ─────────────────────────────────────────────────────────────────────────────────────────────
+  { const f = monter({ sansOnglet: true }), r = await jouer(f);
+    check(r.resultat === 'refuse' && !ecrits(f).length, 'sans onglet Vinted : refus, aucun appel Vinted', court(f, r)); }
+  { const f = monter({ sessionAbsente: true }), r = await jouer(f);
+    check(r.resultat !== 'envoye' && !f.j.vinted.length && !f.grants.length, 'session extension absente : aucun appel Vinted ni VRM', court(f, r)); }
+
+  // ── LE CANAL DIRECT DE CHROME (contexte d'audit-exec.cjs, inchangé) ───────────────────────────────────────────────────────
+  let prefix = fs.readFileSync(path.join(scripts, 'audit-exec.cjs'), 'utf8').split('const REPONSE =')[0];
+  const bac = { require: require('node:module').createRequire(path.join(scripts, 'audit-exec.cjs')), __dirname: scripts, console, setTimeout, clearTimeout, clearInterval, URL, TextDecoder, TextEncoder, Buffer };
+  vm.runInNewContext(prefix + '\nglobalThis.creer=faireCtx;', bac);
+  const direct = () => { const c = bac.creer(), appels = []; c.ctx.fetch = async (url) => { appels.push(String(url)); return { ok: false, status: 503, json: async () => ({}) }; }; c.ctx.authEtatRapide = async () => ({ connecte: true, user_id: 'owner-fixture' }); return { ...c, appels }; };
+  { const c = direct(); const r = await c.versExt({ type: 'favorisEtat' });
+    check(r && r.ok && r.code === JSON.parse(fs.readFileSync(path.join(scripts, '..', 'vinted-sync-extension', 'manifest.json'), 'utf8')).version, 'Chrome répond directement sans pont de page', JSON.stringify(r));
+    check(!c.appels.some((u) => /vinted\./.test(u)), 'la santé directe ne contacte pas Vinted', c.appels.join(',')); }
+  { const c = direct(); const r = await c.versExt({ type: 'favorisExec', uid: '3175765377', endpoint: '/api/v2/conversations/301/replies', body: { jeton: JETON } });
+    check(!(r && r.ok) && !c.envois.length && !c.appels.some((u) => /vinted\./.test(u)), 'le canal direct ne devient pas un relais générique', JSON.stringify(r)); }
+  { const c = direct(); const r = await c.versExt({ type: 'favorisEtat' }, 'https://evil.invalid');
+    check(!(r && r.ok) && !c.appels.length, 'origine étrangère refusée aussi pour la santé directe', JSON.stringify(r)); }
+  { const c = direct(); const r = await c.ctx.executerPourApp({ uid: '3175765377', method: 'POST', endpoint: '/vrm/favoris', body: { jeton: JETON } }, { origin: 'https://vrm.center.imposteur.invalid' });
+    check(!(r && r.ok) && !c.appels.length && !c.envois.length, 'origine étrangère : aucune autorisation demandée, aucun Vinted', JSON.stringify(r)); }
+  { const c = direct(); const r = await c.ctx.executerPourApp({ uid: '3175765377', method: 'POST', endpoint: '/api/v2/conversations', body: { item_id: '101', opposite_user_id: '201' } }, { origin: 'https://vrm.center' });
+    check(!(r && r.ok) && !c.envois.length, 'la création de conversation générique reste hors de la liste blanche', JSON.stringify(r)); }
+  console.log(controles + ' contrôles du vrai moteur extension réussis');
+})().catch((e) => { console.error(e); process.exitCode = 1; });
