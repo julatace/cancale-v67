@@ -17,7 +17,8 @@
 require('./_porte-banc.cjs');
 const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
-const { ouvrirDetailCompta } = require('./_compta.cjs');
+const { corpsEcrit } = require('./_ecriture-representee.cjs');
+const { ouvrirDetailCompta, ouvrirCarte } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 6371;
@@ -81,10 +82,10 @@ async function rendre(b, vp, opts) {
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
     const panne = () => route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
     if (route.request().method() !== 'GET') {
-      try { const corps = JSON.parse(route.request().postData() || 'null'); for (const x of [].concat(corps || [])) if (x && x.id === 'main' && x.data && typeof x.data === 'object') opts.main = x.data; } catch (_) {}
+      try { const corps = JSON.parse(route.request().postData() || 'null'); const versMain = /[?&]id=eq\.main(&|$)/.test(decodeURIComponent(route.request().url())); for (const x of [].concat(corps || [])) if (x && (x.id === 'main' || (versMain && route.request().method() === 'PATCH')) && x.data && typeof x.data === 'object') opts.main = x.data; } catch (_) {}
       // (1er nov.) `main` s'écrit par PATCH conditionnel (sur `data.rev`) : on le garde et on rend la ligne.
       if (route.request().method() === 'PATCH' && /id=eq\.main/.test(u)) { try { const c = JSON.parse(route.request().postData() || 'null'); if (c && c.data && typeof c.data === 'object') opts.main = c.data; } catch (_) {} return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify([{ id: 'main', data: opts.main }]) }); }
-      return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
+      return route.fulfill({ status: route.request().method() === 'PATCH' ? 200 : 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: corpsEcrit(route.request()) });   // (27 nov.) la vraie forme : PATCH conditionnel sur `main` (src/ligneCas.js), _ecriture-representee.cjs
     }
     // Base CLOISONNÉE (la production l'est) : sinon l'app n'envoie rien au nuage
     // (`cloudPush` exige CLOISONNE) et l'écriture de la déclaration ne se voit pas.
@@ -111,6 +112,8 @@ const aller = async (pg, tab, repere, ms = 1500) => {
   // (2 nov., Comptabilité claire) Le suivi vit dans « Le détail », replié : on l'ouvre comme
   // Julien, d'un toucher sur son titre (sans effet sur un code d'avant).
   if (tab === 'compta') await ouvrirDetailCompta(pg, { attendre: 3000 }).catch(() => {});
+  // (27 nov., bancs-compta) La prévision (« Prochaine déclaration ») vit dans Argent → Déclarer (10 nov.) : on y va.
+  if (tab === 'compta') await ouvrirCarte(pg, '[data-prevision-carte]', { attendre: 8000 }).catch(() => {});
 };
 const touche = async (pg, sel, vp) => { const l = pg.locator(sel + ':visible').first(); await l.scrollIntoViewIfNeeded(); if (vp.width < 600) await l.tap(); else await l.click(); };
 
