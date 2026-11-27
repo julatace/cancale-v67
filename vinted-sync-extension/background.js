@@ -16808,7 +16808,9 @@ function messagesEcritsMessagerie(liste) {
     //    par-dessus. Julien (27 nov. 18:15 : « sur certains comptes, quand on ouvre le favori, l'offre est proposée directement ») :
     //    une INVITATION de Vinted à faire une offre (un type « offer… » SANS montant) n'est PAS un contact — l'offre part une
     //    fois (registre), puis le message, comme Vintex. (Formes jamais mesurées : les types vus sont notés à la relecture.)
-    if (/offer/.test(t)) { if (montantMessageOffre(m)) n++; continue; }
+    // (27 nov. soir) …et une offre de l'ACHETEUR qui porte un TEXTE à lui compte aussi comme contact, même si son montant
+    //    n'est pas lu (forme jamais mesurée) : mieux vaut sauter ce favori que d'écrire par-dessus une demande de l'acheteur.
+    if (/offer/.test(t)) { const txt = typeof m.content === 'string' ? m.content : typeof m.body === 'string' ? m.body : ''; if (montantMessageOffre(m) || txt.trim()) n++; continue; }
     if (/(status|system|transaction|offer|event|action|notification|info)/.test(t)) continue;
     const contenu = typeof m.content === 'string' ? m.content : typeof m.body === 'string' ? m.body : (m.data && typeof m.data.content === 'string') ? m.data.content : '';
     if (contenu.trim() || !t) n++;
