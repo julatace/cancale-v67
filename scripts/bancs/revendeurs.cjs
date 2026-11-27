@@ -77,7 +77,7 @@ async function brancher(p){
    finished:{txId:12,isSeller:true,title:'Colis finalisé',stepStatus:'done',stepLabel:'Terminé',label:{voucherUrl:'https://example.test/final.pdf'}}};
   await new Promise(ok=>server.listen(0,'127.0.0.1',ok));const base='http://127.0.0.1:'+server.address().port;
   b=await chromium.launch({executablePath:process.env.BANC_CHROMIUM||'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
-  const ctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const p=await ctx.newPage();await brancher(p);
+  const ctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'block'});   /* (27 nov.) le service worker de l'app (public/sw.js) n'est pas routé par page.route : ses requêtes d'images partaient vers images1.vinted.net (garde réseau rouge) */const p=await ctx.newPage();await brancher(p);
   const errors=[];p.on('pageerror',e=>errors.push(e.message));
   // (31 oct., navigation par tâche) Les chemins d'aujourd'hui, comme une personne au téléphone :
   //  la barre du bas (Journée · Annonces · Ventes · Colis · Plus), « Plus » pour le reste,
@@ -167,7 +167,9 @@ async function brancher(p){
    //  filtre allumé (À traiter eBay : Ventes · eBay · À traiter ; Achats : Achats · site).
    {const t=site==='ebay'?'ventes':'achats';await p.goto(base+'/?tab='+tab+'&section='+(site==='ebay'?'agent':'achats'));
     await p.locator(`[data-tache="${t}"][data-tache-site="${site}"]`).waitFor();
-    const pr=await p.evaluate(()=>{const b=document.querySelector('[data-filtre-site] button[aria-pressed="true"]');return b?b.getAttribute('data-site'):'';});
+    // (27 nov.) Le sélecteur à logos se tait quand un seul site a des données (SelecteurSites : moins de 2 options ⇒ rien) :
+    //  le filtre posé se lit sur la tâche elle-même (`data-tache-site`, la règle), le bouton allumé seulement s'il est montré.
+    const pr=await p.evaluate(()=>{const b=document.querySelector('[data-filtre-site] button[aria-pressed="true"]');return b?b.getAttribute('data-site'):(document.querySelector('[data-tache]')||{dataset:{}}).dataset.tacheSite||'';});
     const sec=await p.locator('[data-tache]').getAttribute('data-tache-section');
     check(pr===site && (site!=='ebay'||sec==='agent'),'ancien lien de section '+nom+' : la tâche du site, son filtre allumé');}
    await p.goto(base+'/?tab='+tab);await p.locator(`[data-tache="ventes"][data-tache-site="${site}"]`).waitFor();
