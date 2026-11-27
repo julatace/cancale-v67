@@ -78,7 +78,7 @@ function sousDe(a, nomSite, filtreSite, euros = (n) => String(n)) {
 }
 
 // La saisie d'UN fait (acheté, prix mini) : une feuille, un champ, « Enregistrer ».
-function FeuilleFait({ cible, onFermer, onFait, euros }) {
+export function FeuilleFait({ cible, onFermer, onFait, euros }) {   // (27 nov.) exportée : « Paires qui dorment » ouvre la MÊME saisie de l'achat
   const [v, setV] = React.useState('');
   const [etat, setEtat] = React.useState('');           // '' · 'envoi' · le texte d'un refus
   const champ = cible ? cible.champ : '';
@@ -144,7 +144,7 @@ function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSai
 export default function VueAnnonces({ articles, comptes = null, filtre = { site: 'tous', etat: 'enligne' }, onFiltre, sites = [], recherche = '', onRecherche,
   aRegler = [], actions: actionsEcran = [], onAction: onActionEcran, onFait, onNumero = null, onPlace = null, onPrix = null, onRelier = null, onRelierAchat = null, onFiche = null, limites = [], manque = '', liaison = null,
   euros = (n) => String(n) + ' €', depuisTexte = () => '', nomSite = (s) => s, Icon = null, onPublier = null, onEcranSite = null, travail = null,
-  filtreSite = true, Logo = null, onCompleter = null, dortDe = null, plusVueDe = null, Photo = null, formeRangee = 'a', videAction = null, priorite = null, photoDouble = null, parMail = null, fp = null }) {   // (22 nov., choix 27) plusVueDe(a) → jours ou null   // (22 nov., choix n° 35) photoDouble : { n, contenu } — le segment « Photo en double »   // (21 nov., prio-recherche) priorite : { n, contenu, plein } — le segment « À republier »   // (21 nov., ux-reglages) videAction : LE geste de l'état vide (« Relier un compte »)   // (21 nov., 2e passe) formeRangee : 'a' | 'b'   // (21 nov.) dortDe(a) → jours (règle « Dorment ») ou null   // Logo(site) : le logo d'un site ; onCompleter(sujet) : ouvre « Compléter »   // (20 nov.) faux ⇒ le site vient du sélecteur global de l'app : pas de menu des sites ici
+  filtreSite = true, Logo = null, onCompleter = null, dortDe = null, plusVueDe = null, Photo = null, formeRangee = 'a', videAction = null, priorite = null, photoDouble = null, parMail = null, fp = null, dorment = null }) {   // (27 nov.) dorment : { entree } — « Paires qui dorment », l'entrée du plan (src/natif/ecrans/PairesDorment.jsx), posée sur le segment « Dorment »   // (22 nov., choix 27) plusVueDe(a) → jours ou null   // (22 nov., choix n° 35) photoDouble : { n, contenu } — le segment « Photo en double »   // (21 nov., prio-recherche) priorite : { n, contenu, plein } — le segment « À republier »   // (21 nov., ux-reglages) videAction : LE geste de l'état vide (« Relier un compte »)   // (21 nov., 2e passe) formeRangee : 'a' | 'b'   // (21 nov.) dortDe(a) → jours (règle « Dorment ») ou null   // Logo(site) : le logo d'un site ; onCompleter(sujet) : ouvre « Compléter »   // (20 nov.) faux ⇒ le site vient du sélecteur global de l'app : pas de menu des sites ici
   const ordinateur = useOrdinateur();
   // (20 nov.) RELIER DEPUIS LA LISTE : l'état du lien et LA proposition de chaque annonce (`liaison.de(a)`, lu dans
   // src/liaisonEtat.js) ; « Relier les N sûres » est une action de la sélection comme les autres (la relecture, puis un geste).
@@ -318,7 +318,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
         <AnnoncesTableau site={travail.site || 'tous'} Logo={Logo} dortDe={dortDe} plusVueDe={plusVueDe} Photo={Photo} liaison={liaison} articles={listeTableau} filtres={travail.filtres || []} compte={travail.compte || ''} majLe={travail.majLe} onRafraichir={travail.onRafraichir} rafraichit={!!travail.rafraichit}
           actions={actionsTableau} onAction={onAction} onOuvrir={(a) => { if (onFiche && a.numero) onFiche(a); else setOuvert(a.cle); }} saisir={saisir} onNumero={onNumero} onPrix={onPrix} onRelier={onRelier} onRelierAchat={onRelierAchat} onFiche={onFiche}
           onPublier={onPublier || null}
-          haut={<>{parMailHaut}{aReglerHaut}</>} pied={manque || ''} onAutomatisations={travail.onAutomatisations || null} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} sites={sites}/>
+          haut={<>{parMailHaut}{aReglerHaut}{dorment && dorment.entree && !A ? dorment.entree : null}</>} pied={manque || ''} onAutomatisations={travail.onAutomatisations || null} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} sites={sites}/>
         <FeuilleFait cible={saisie} euros={euros} onFait={onFait} onFermer={(ok) => { const s = saisie; setSaisie(null); if (ok && s) setDit({ id: Date.now(), message: tr('egalite.enregistre', { quoi: tr('egalite.col.' + (s.champ === 'min' ? 'prixMini' : 'achat')) }) }); }}/>
         <FicheArticle liaison={liaison} a={articleOuvertT} ouverte={!!articleOuvertT} cote onRetour={() => setOuvert('')} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} onSaisir={saisir}
           onNumero={onNumero} onPlace={onPlace} onPrix={onPrix} onRelier={onRelier} onFiche={onFiche} Icon={Icon}/>
@@ -459,6 +459,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
         {aRegler.length && !A && !enPrio ? <Groupe titre={tr('egalite.aRegler')} repli={{ ouvert: reglerOuvert, onBascule: () => setReglerOuvert((o) => !o), n: aRegler.length }} attrs={{ 'data-eg-regler': String(aRegler.length) }}>
           {aRegler.map((r) => <Rangee key={r.cle} titre={r.titre} sousTitre={r.sousTitre || ''} valeur={r.valeur != null ? r.valeur : null} ton={r.doublon ? 'neutre' : 'ambre'} plaque={r.doublon ? <Plaque numero={r.doublon} doublon/> : null} fin={r.onClick ? 'chevron' : null} onClick={r.onClick || null} attrs={{ 'data-eg-regle': r.cle }}/>)}
         </Groupe> : null}
+        {dorment && dorment.entree && !A && !enPrio ? dorment.entree : null}
         {enPhoto ? photoDouble.contenu : enPrio ? priorite.contenu
           : articles === undefined ? (vueG ? attenteGrille : <div data-ad-attente="" aria-busy="true" aria-label={tr('inv.chargement')}><section className="n-ad-section"><div className="n-ad-tete-compte n-inv-tete-os" aria-hidden="true"><span className="n-os"/></div>
               <GrilleInventaire items={undefined} attente={9} ligne={72} gap={0} squelette={() => <span className="n-ar-os" aria-hidden="true"><span className="n-os n-ar-os-photo"/><span className="n-ar-os-texte"><span className="n-os"/><span className="n-os" data-court=""/></span></span>}/></section></div>)

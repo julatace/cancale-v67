@@ -2435,6 +2435,20 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 
 - **27 nov. · TROIS FONCTIONS RENDUES (Julien)** : filtre « Compte » de Ventes au téléphone (retenu par vendeur), alerte « un compte annule plus » dans Statistiques (règle du 5 nov. importée, un compte pas lu jamais comparé), questions eBay sans réponse en tête de Messages « À répondre ». `2026-11-27-retour-fonctions.md`. Geste : aucun.
 
+## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. nuit (place pour la 5.455.4, sous 60 Ko)
+
+- **27 nov. · Aujourd'hui à 1008 px (Edge 150 %)** : les colonnes suivent la largeur de LA GRILLE (`@container sj-journee` : 3 dès 860 px, sinon 1 + 2, une sous 560) ; le compte d'« À envoyer » s'abrège. Bancs `iphone-reprise` O3 et `journee-coherence` E12 (`_journee-tient.cjs`). `historique-interface-stock.md`, fin. Geste : aucun.
+
+## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. nuit (place pour la 5.455.5, sous 60 Ko)
+
+- **27 nov. · Scan au relais ⇒ en stock ; « Ce matin »** : `2026-11-27-scan-ce-matin.md`.
+- **27 nov. soir · FAVORIS RÉPARÉS (Julien : « tu dois faire comme les concurrents »), ext. 5.455.3** : l'identité est celle de la DEMANDE (`inquiries` article + personne) ; transaction rendue par la création ; relecture ×3 pour l'historique ; refus seulement sur contradiction LUE, raison nommée, CE favori sauté, la file continue. `2026-11-27-favoris-identite.md`. Geste : installer 5.455.3.
 ## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. soir (ameliorations-27nov, 2ᵉ fusion, place sous 60 Ko)
 
 - **27 nov. · Aujourd'hui à 1008 px (Edge 150 %)** : les colonnes suivent la largeur de LA GRILLE (`@container sj-journee` : 3 dès 860 px, sinon 1 + 2, une sous 560) ; le compte d'« À envoyer » s'abrège. Bancs `iphone-reprise` O3 et `journee-coherence` E12 (`_journee-tient.cjs`). `historique-interface-stock.md`, fin. Geste : aucun.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (27 nov., pour rester sous 60 Ko)
+- **27 nov. · Scan au relais ⇒ en stock ; « Ce matin »** : `2026-11-27-scan-ce-matin.md`.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (27 nov., paires-qui-dorment, pour rester sous 60 Ko)
+- **27 nov. · « Vas-y fais tout »** : À retirer garde la conversation de SA commande à la réunion par code (713 080 : photo, titre) ; « N prix manquants » ; « pas lu depuis N jours » (« Compris ») ; « Ordinateur éteint » + « Pourquoi ? ». `historique-divers.md`, fin.

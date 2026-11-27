@@ -30,6 +30,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (27 nov., paires-qui-dorment — choix de Julien) src/pairesDorment.js, src/natif/ecrans/PairesDorment.jsx
+  { id: 'paires-qui-dorment', date: '2026-11-27', titre: 'Paires qui dorment : l’argent immobilisé', phrase: 'Plus de 21 jours en ligne, par prix d’achat, un geste chacune.', tab: 'annonces', pour: 'tous', mode: 'tous',
+    titreArt: 'Articles qui dorment : l’argent immobilisé' },
   // (27 nov., ameliorations-27nov — Julien : « Vas-y fais tout ») src/ecrans/Comptabilite.jsx fusionLignesMemeSuivi,
   // src/aujourdhui/modele.js prixManquants, src/aujourdhui/LigneLectureAncienne.jsx, src/aDistance/LigneOrdinateur.jsx
   { id: 'retrait-contenu-code', date: '2026-11-27', titre: 'À retirer : la photo de l’achat', phrase: 'Relié par le code de retrait de sa commande.', tab: 'achats', pour: 'tous', mode: 'tous' },
@@ -47,6 +50,10 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'ventes-compte-telephone', date: '2026-11-27', titre: 'Ventes : « Toutes », et filtre par compte', phrase: '« Toutes » liste chaque vente ; un compte au choix, retenu.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'annulations-compte-alerte', date: '2026-11-27', titre: 'Un compte annule plus : VRM le dit', phrase: 'Dans Statistiques, au-dessus des taux d’annulation par compte.', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'ebay-questions-dabord', date: '2026-11-27', titre: 'Questions eBay sans réponse en premier', phrase: 'Dans Messages, la plus ancienne en tête, « À répondre ».', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (27 nov. nuit, ext. 5.455.5) docs/passation/2026-11-27-favoris-suite.md
+  { id: 'favoris-bail', date: '2026-11-27', titre: 'Favoris : un envoi long tient', phrase: 'Extension 5.455.5 : jamais « à vérifier » à tort.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (27 nov. 18:42, ext. 5.455.4 — Julien : « autre article dans la conversation », « le chronomètre ne marche pas ») docs/passation/2026-11-27-favoris-tous-les-cas.md
+  { id: 'favoris-conversation-rendue', date: '2026-11-27', titre: 'Favoris : envoyés comme les concurrents', phrase: 'Extension 5.455.4 : le compte à rebours avance.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (27 nov. 17:40, ext. 5.455.3 — Julien : « tu dois faire comme les concurrents ») docs/passation/2026-11-27-favoris-identite.md
   { id: 'favoris-comme-concurrents', date: '2026-11-27', titre: 'Favoris : les messages repartent', phrase: 'Extension 5.455.3 : un favori douteux est sauté, la file continue.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (27 nov., Julien sur « ● En pause · Reprendre » : « je ne comprends pas à quoi ça sert ») src/Discretion.jsx ToutArreter
