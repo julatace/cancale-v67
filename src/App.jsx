@@ -18677,21 +18677,43 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null,
   const mail = String((AUTH.user && AUTH.user.email) || '').trim();
   const nomCompte = (entreprise && entreprise.nom) || '';
   const nomCoque = useNomCoque({ owner: uid, headers: enTeteSession, nom: nomCompte, email: mail });
-  const actif = BAR_GROUPE[tab] || tab;
+  // (27 nov., zero-rouge-bancs-2) L'ENTRÉE TOUCHÉE S'ALLUME TOUT DE SUITE, comme l'onglet du téléphone (`allerA` de BottomBar,
+  // 7 et 22 nov.). Mesuré (banc visuel-argent, 1512 px) : toucher « Argent » ne changeait RIEN à l'écran avant que tout
+  // l'écran soit validé (133 à 634 ms) — `ouvrirEntree` posait `setTab` dans le même tour, d'un bloc. Maintenant l'entrée
+  // s'allume (mise à jour urgente, peinte), l'écran est demandé juste APRÈS cette image en tâche interruptible, avec le même
+  // filet (une transition qui n'aboutit pas en 1,5 s est rejouée en synchrone). Le même `setTab`, le même écran au bout.
+  const [vise, setVise] = React.useState(null);
+  const [enCours, demarrer] = React.useTransition();
+  const jetonRef = React.useRef(0), secoursRef = React.useRef(0), enCoursRef = React.useRef(false);
+  React.useLayoutEffect(() => { enCoursRef.current = enCours; });
+  React.useEffect(() => () => clearTimeout(secoursRef.current), []);
+  React.useEffect(() => { if (!enCours && !jetonRef.current) setVise(null); }, [enCours, tab]);
+  const setTabVite = React.useCallback((id) => {
+    const jeton = ++jetonRef.current; setVise(id);
+    let parti = false;
+    const partir = () => { if (parti) return; parti = true; if (jetonRef.current !== jeton) return; jetonRef.current = 0;
+      demarrer(() => setTab(id));
+      clearTimeout(secoursRef.current);
+      secoursRef.current = setTimeout(() => { if (enCoursRef.current && !window.__vrmSansSecours) { try { flushSync(() => setTab(id)); } catch (_) { setTab(id); } } }, 1500); };
+    try { requestAnimationFrame(() => setTimeout(partir, 0)); } catch (_) { partir(); }
+    setTimeout(partir, 120);
+  }, [setTab]);
+  const tabMontre = vise && (enCours || jetonRef.current) ? vise : tab;
+  const actif = BAR_GROUPE[tabMontre] || tabMontre;
   const parrainage = groupesVisibles(sites, () => true, true).some((g) => g.items.some((t) => t.id === 'parrainage'));
-  const e = (id) => entreeNative(ENTREE_NAV(id), tab, setTab, badges);
+  const e = (id) => entreeNative(ENTREE_NAV(id), tab, setTabVite, badges);
   // ⚠️⚠️ (21 nov., onglets-menu — Julien : « totalement réorganiser les onglets », « simplifiée et ergonomique ») LES MÊMES
   // GROUPES que l'écran « Menu » du téléphone (`groupesMenu`) : en tête ce que porte la barre du bas (Aujourd'hui, Annonces,
   // Ventes, Achats, Argent — les cinq onglets du téléphone), puis Gestion, Dans l'extension, Aide ; Paramètres = la carte du compte, en pied. Rien en double.
-  const groupes = groupesMenu({ tab, setTab, badges, sites, taille: 20, ordi: true }).map((g) => ({ titre: g.titre, entrees: g.tuiles.map((t) => ({ ...t, icone: t.icone, pastille: t.pastille || (t.valeur ? undefined : t.point) })) }));
+  const groupes = groupesMenu({ tab, setTab: setTabVite, badges, sites, taille: 20, ordi: true }).map((g) => ({ titre: g.titre, entrees: g.tuiles.map((t) => ({ ...t, icone: t.icone, pastille: t.pastille || (t.valeur ? undefined : t.point) })) }));
   const boiteOutils = outils ? <div className="n-laterale-outils" data-n-outils="">{outils}</div> : null;
   return (
     <Natif.BarreLaterale groupes={groupes} actif={actif} libelle={tr('coque.navigationPrincipale')} attrs={{ 'data-rail-natif': '' }} reduite={reduite} onReduire={onReduire} icone={<Icon name="menu" size={20}/>}
       tete={<div className="n-coque-marque" data-n-marque=""><VrmLogo size={30} anim={false}/><NomEntrepriseCoque entreprise={entreprise} className="n-coque-entreprise"/></div>}
       pied={uid ? (<>
         {boiteOutils}
-        <button type="button" className="n-laterale-compte" data-nav-compte="" data-nav-compte-ouvre="parametres" data-nav-entree="settings" data-n-entree="settings" aria-current={tab === 'settings' ? 'page' : undefined}
-          aria-label={`${nomCoque.texte} ${sousCompte} — ${tr('menu.parametres')}`} onClick={() => { revenirSurOnglet(); ouvrirEntree(ONGLET_PARAMETRES, setTab); }}>
+        <button type="button" className="n-laterale-compte" data-nav-compte="" data-nav-compte-ouvre="parametres" data-nav-entree="settings" data-n-entree="settings" aria-current={tabMontre === 'settings' ? 'page' : undefined}
+          aria-label={`${nomCoque.texte} ${sousCompte} — ${tr('menu.parametres')}`} onClick={() => { revenirSurOnglet(); ouvrirEntree(ONGLET_PARAMETRES, setTabVite); }}>
           <PastilleProfil owner={uid} headers={enTeteSession} nom={nomCompte} email={mail} taille={30} className="vrm-sensible"/>
           <span className="n-laterale-compte-textes"><span className="n-laterale-compte-nom vrm-sensible">{nomCoque.texte}</span>{' '}<span className="n-laterale-compte-sous" data-lat-sous="">{sousCompte}</span></span>
         </button>

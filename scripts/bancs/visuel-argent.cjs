@@ -162,18 +162,26 @@ async function toucherArgent(pg) {
   return pg.evaluate(() => new Promise((fin) => {
     const bouton = [...document.querySelectorAll('button, a')].find((e) => e.getClientRects().length && /^argent$/i.test((e.innerText || e.getAttribute('aria-label') || '').trim().split('\n').pop().trim()));
     if (!bouton) return fin({ trouve: false });
-    const t0 = performance.now(); let reaction = null, premier = null;
+    const t0 = performance.now(); let reaction = null, premier = null, nPremier = null, nContenu = null, n = 0;
     // `reaction` : le premier changement du DOM (l'onglet touché répond) ; `premier` : le premier contenu de l'écran Argent peint
     // (son squelette OU son titre : un élément de [data-espace="argent"] ou de la garde de l'écran, qui a une taille) ;
     // `contenu` : Argent · Mois monté.
-    const mo = new MutationObserver(() => {
+    // (27 nov., zero-rouge-bancs-2) Ce qui ne dépend pas de la vitesse de la machine (4 bancs en parallèle : 273 / 634 ms) :
+    // `dansSaTache` — le DOM a-t-il changé AVANT la tâche suivante du toucher (setTimeout 0 posé juste après le clic) ? Une
+    // réponse peinte au toucher même, quelle que soit la charge ; `nPremier` / `nContenu` — à quel lot de mutations (validation)
+    // le premier contenu d'Argent et son Mois arrivent : le même lot ⇒ Mois ne vient pas « après », quelle que soit la durée.
+    let dansSaTache = null;
+    const lot = () => {
+      n++;
       if (reaction == null) reaction = performance.now() - t0;
-      if (premier == null) { const e = document.querySelector('[data-espace="argent"], [data-garde-ecran="compta"], [data-v2-argent-mois]'); if (e && e.getClientRects().length) premier = performance.now() - t0; }
-      if (document.querySelector('[data-v2-argent-mois]')) { mo.disconnect(); requestAnimationFrame(() => fin({ trouve: true, reaction, premier, contenu: performance.now() - t0 })); }
-    });
+      if (premier == null) { const e = document.querySelector('[data-espace="argent"], [data-garde-ecran="compta"], [data-v2-argent-mois]'); if (e && e.getClientRects().length) { premier = performance.now() - t0; nPremier = n; } }
+      if (document.querySelector('[data-v2-argent-mois]')) { nContenu = n; mo.disconnect(); requestAnimationFrame(() => fin({ trouve: true, reaction, premier, contenu: performance.now() - t0, dansSaTache, nPremier, nContenu })); }
+    };
+    const mo = new MutationObserver(lot);
     mo.observe(document.body, { childList: true, subtree: true, attributes: true });
     bouton.click();
-    setTimeout(() => { mo.disconnect(); fin({ trouve: true, reaction, premier, contenu: null }); }, 8000);
+    setTimeout(() => { const r = mo.takeRecords(); if (r.length) lot(); if (dansSaTache == null) dansSaTache = reaction != null; }, 0);
+    setTimeout(() => { mo.disconnect(); fin({ trouve: true, reaction, premier, contenu: null, dansSaTache, nPremier, nContenu }); }, 8000);
   }));
 }
 
@@ -242,8 +250,17 @@ async function argent(nav, taille, sombre) {
     // avec BANC_T_STRICT=1 ; ce lot ne doit rien y AJOUTER : de l'écran monté à Mois rendu ≤ 100 ms.
     const ligneT = `T ${ou} toucher → premier contenu d'Argent : ${ms(t2.premier)} à la revisite (Mois monté ${ms(t2.contenu)} ; 1re fois ${ms(t1.premier)} / ${ms(t1.contenu)})`;
     if (process.env.BANC_T_STRICT === '1') dit(t2.premier != null && t2.premier < 100, ligneT + ' < 100 ms', { t1, t2 }); else console.log('  ℹ️  ' + ligneT);
-    dit(t2.contenu != null && t2.premier != null && t2.contenu - t2.premier <= 100, `T ${ou} de l'écran Argent monté à Mois rendu ≤ 100 ms (${ms(t2.contenu != null && t2.premier != null ? t2.contenu - t2.premier : null)})`);
-    dit(t2.trouve && t2.reaction != null && t2.reaction < 100, `T ${ou} le toucher réagit en < 100 ms (${t2.reaction == null ? '—' : t2.reaction.toFixed(0)} ms)`);
+    // (27 nov., zero-rouge-bancs-2) Les deux contrôles T mesuraient l'horloge (rouges à 4 bancs en parallèle, verts seuls) : ils
+    // jugent maintenant ce que l'horloge approchait, sans dépendre de la charge — les millisecondes restent dites.
+    // · Mois arrive dans la MÊME validation que l'écran (revisite : écran gardé, rien à recalculer) ;
+    // · le toucher change l'écran dans SA tâche (avant la tâche suivante), c'est-à-dire à l'image qui suit le doigt.
+    // Avec BANC_T_STRICT=1, les seuils de 100 ms d'avant sont rejugés EN PLUS (à lancer seul).
+    dit(t2.nPremier != null && t2.nContenu === t2.nPremier, `T ${ou} Mois arrive avec l'écran Argent, dans la même validation (lot ${t2.nPremier} / ${t2.nContenu} ; ${ms(t2.contenu != null && t2.premier != null ? t2.contenu - t2.premier : null)})`, { t2 });
+    dit(t2.trouve && t2.dansSaTache === true, `T ${ou} le toucher change l'écran dans sa propre tâche (${t2.reaction == null ? '—' : t2.reaction.toFixed(0)} ms)`, { t2 });
+    if (process.env.BANC_T_STRICT === '1') {
+      dit(t2.contenu != null && t2.premier != null && t2.contenu - t2.premier <= 100, `T ${ou} de l'écran Argent monté à Mois rendu ≤ 100 ms (${ms(t2.contenu != null && t2.premier != null ? t2.contenu - t2.premier : null)})`);
+      dit(t2.trouve && t2.reaction != null && t2.reaction < 100, `T ${ou} le toucher réagit en < 100 ms (${t2.reaction == null ? '—' : t2.reaction.toFixed(0)} ms)`);
+    }
     dit(!erreurs.length, `${ou} aucune erreur JS`, erreurs);
   } catch (e) { dit(false, `${ou} le contrôle est allé au bout`, String(e && e.stack || e).slice(0, 500)); }
   await ctx.close();
