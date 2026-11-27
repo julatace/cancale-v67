@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {progressionFavoris,dureeFavoris} from '../../src/favorisProgression.js';
+import {progressionFavoris,dureeFavoris,MOTS_REFUS,RAISONS_FAVORIS,refusLocal,bilanFavoris,phraseBilanFavoris} from '../../src/favorisProgression.js';
 import {lancerFile,reserverFile,consommerFile,terminerFile} from '../../api/_lib/favoris-file.js';
 test('la progression distingue envoyés, ignorés et incertains et ne compte que la sélection en cours',()=>{
  const p=progressionFavoris({lot:'actuel',active:true,prochain:160000,jobs:[{lot:'avant',etat:'envoye'},{lot:'actuel',etat:'envoye'},{lot:'actuel',etat:'ignore'},{lot:'actuel',etat:'incertain'},{lot:'actuel',etat:'attente'}]},100000);
@@ -15,4 +15,28 @@ test('une conversation déjà contactée est ignorée sans message, sans attendr
  const fini=terminerFile(d,{owner,jeton:'j1',resultat:'ignore',raison:'conversation_deja_contactee',maintenant:102000});d=fini.data;
  assert.equal(fini.valeur.jobs[0].etat,'ignore');assert.equal(fini.valeur.jobs[0].raison,'conversation_deja_contactee');assert.equal(d.tentatives.length,0);assert.equal(fini.valeur.active,true);
  assert.equal(reserverFile(d,{owner,maintenant:102000,jeton:'j2'}).valeur.travail.recipientId,'202');
+});
+// 5.455.3 (Julien, 27 nov. 17:31 : « Interrompu : L’article ou le destinataire du fil n’a pas été confirmé », la file arrêtée au
+//    PREMIER favori) : un refus d'identité de la relecture (rien d'écrit que la conversation vide, étape « vérification ») saute CE
+//    favori et la file continue, la raison NOMMÉE ; une conversation pas relue est SAUTÉE (ignore), dite dans le bilan.
+const unLot=()=>{const owner='owner-fixture',targets=[1,2,3].map(i=>({notificationId:'n'+i,itemId:String(100+i),recipientId:String(200+i),initiator:'native-fixture'}));
+ let d=lancerFile(null,{owner,targets,message:'Bonjour',intervalleMinutes:6,maintenant:100000,lot:'lot1'}).data;
+ d=reserverFile(d,{owner,maintenant:100000,jeton:'j1',suivi:'s1'}).data;d=consommerFile(d,{owner,maintenant:100000,jeton:'j1'}).data;return {d,owner};};
+test('5.455.3 : contradiction lue à la vérification ⇒ CE favori sauté, raison nommée, la file continue',()=>{
+ for(const raison of ['destinataire_different','article_different','variable_manquante']){
+  const {d,owner}=unLot();const f=terminerFile(d,{owner,jeton:'j1',resultat:'refuse',raison,ecrits:1,etape:raison==='variable_manquante'?'historique':'verification',maintenant:102000,cause:raison==='variable_manquante'?'variable:marque':null});
+  assert.equal(f.valeur.jobs[0].raison,raison);assert.equal(f.valeur.active,true,raison);assert.ok(MOTS_REFUS[raison]&&RAISONS_FAVORIS[raison],raison);
+  assert.ok(f.valeur.raison.includes(MOTS_REFUS[raison]),f.valeur.raison);assert.ok(refusLocal({resultat:'refuse',raison,ecrits:1,etape:'verification'}));
+ }
+ const {d,owner}=unLot();const f=terminerFile(d,{owner,jeton:'j1',resultat:'refuse',raison:'variable_manquante',ecrits:1,etape:'historique',cause:'variable:marque',maintenant:102000});
+ assert.equal(f.valeur.jobs[0].cause,'variable:marque');
+});
+test('5.455.3 : conversation pas relue ⇒ sautée, la file continue, le bilan la nomme',()=>{
+ const {d,owner}=unLot();const f=terminerFile(d,{owner,jeton:'j1',resultat:'ignore',raison:'fil_non_relu',ecrits:1,etape:'verification',maintenant:102000});
+ assert.equal(f.valeur.active,true);assert.equal(f.valeur.jobs[0].raison,'fil_non_relu');
+ const b=bilanFavoris(f.valeur.jobs);assert.equal(b.sautes,1);assert.equal(b.parSaut.fil_non_relu,1);assert.match(phraseBilanFavoris(b),/conversation pas relue chez Vinted/);
+});
+test('5.455.3 : le cas de Julien sur la 5.455.2 (identité refusée à l’étape « conversation ») arrêtait la file — la cause',()=>{
+ const {d,owner}=unLot();const f=terminerFile(d,{owner,jeton:'j1',resultat:'refuse',raison:'identite_non_confirmee',ecrits:1,etape:'conversation',maintenant:102000});
+ assert.equal(f.valeur.active,false);assert.ok(f.valeur.raison.startsWith(RAISONS_FAVORIS.identite_non_confirmee));
 });

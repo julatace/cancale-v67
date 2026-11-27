@@ -44,7 +44,7 @@ const MUTATIONS = {
   'sans-prix-dressing': ["if(it&&!(Number(prixAnnonce)>0)){", "if(false){"],
   'variable-bloque': ["if (manques.size && [...manques].every((k) => NEUTRES.includes(k) && !val[k])) {", "if (false) {"],
   'sans-historique': ['if(ecritsAvant>0||(cv.pagination', 'if(false&&(cv.pagination'],
-  'sans-article-tx': ["if(!tr||artTx!==body.itemId){", "if(!tr){"],
+  'sans-article-tx': ["if(artTx!==body.itemId){noterDiag('favori_req_tx_autre_article');", "if(false){"],
   'offre-ignoree': ["if(!offreFaite)return o.status", "if(false)return o.status"],
   'porte-ouverte': ['function ecritureFavoriPermise(adresse) { const a = String(adresse || \'\'); return ECRITURES_FAVORI.some((re) => re.test(a)); }', 'function ecritureFavoriPermise(adresse) { return true; }'],
   'telephone-ignore': ["if(await telephoneAVerifierVinted(acc)===true){", "if(false){"],
