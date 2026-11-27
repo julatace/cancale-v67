@@ -91,6 +91,9 @@ main{padding:16px;display:grid;gap:10px;max-width:720px}.cloche{position:absolut
       d.querySelector('[data-testid=offer-cancel]').addEventListener('click', () => { note('annule'); d.remove(); });
       d.querySelector('[data-testid=offer-submit-button]').addEventListener('click', () => { const p = d.querySelector('input').value.replace(',', '.'); note('proposer', { p }); envoi('POST', '/api/v2/transactions/' + (O.tx || '61000') + '/offers', { offer: { price: p, currency: 'EUR' } }).then((r) => { d.remove(); if (r.status === 200) { const b = document.createElement('div'); b.className = 'bulle'; b.textContent = 'Offre : ' + p.replace('.', ',') + ' €'; fil.appendChild(b); } }); });
     });
+    // 5.455.5 (Julien, 27 nov. 19:17, « /inbox/…?offer_request=true ») : la fenêtre « Faire une offre » OUVERTE d'elle-même,
+    //    le champ PRÉ-REMPLI au plein prix (« 55,00 € ») ; « sansProposer » : sans bouton pour la valider.
+    if (O.offreOuverte) { m.querySelector('[data-testid=make-offer-button]').click(); const i = document.querySelector('[role=dialog] input'); if (i) i.value = '55,00 €'; if (O.sansProposer) { const x = document.querySelector('[data-testid=offer-submit-button]'); if (x) x.remove(); } }
     const or = m.querySelector('#offre-recue');
     if (or) { const [acc, ref] = or.querySelectorAll('button');
       acc.addEventListener('click', () => { note('accepter'); envoi('PUT', '/api/v2/transactions/' + (O.tx || '61000') + '/offer_requests/' + (O.oid || '71000') + '/accept', null).then((r) => { if (r.status === 200) or.remove(); }); });
@@ -226,6 +229,17 @@ async function banc() {
     { const { ctx, pg } = await ouvrir(b, '/inbox/5000128', { tx: '61128', offreRefusee: true });
       const r = await etape(pg, 'offre', { conv: '5000128', tx: '61128', prix: 12, cle: 'o3' });
       dit(r.ok && r.rep && r.rep.ok === false && r.rep.status === 400 && r.vu === false, 'I7c — offre refusée par Vinted (400) ⇒ la réponse refusée est rendue, `vu:false` (le fond ne part pas sur le message)', JSON.stringify(r));
+      await ctx.close(); }
+    // ── I7d / I7e (5.455.5) : la fenêtre d'offre ouverte par Vinted au PLEIN prix
+    { const { ctx, pg } = await ouvrir(b, '/inbox/5000130', { tx: '61130', offreOuverte: true });
+      const r = await etape(pg, 'offre', { conv: '5000130', tx: '61130', prix: 49.5, cle: 'o4', favori: true });
+      const { R } = await lire(pg); const o = R.filter((x) => /\/offers$/.test(x.u)); let p = ''; try { p = JSON.parse(o[0].corps).offer.price; } catch (_) {}
+      dit(r.ok && r.vu === true && o.length === 1 && p === '49.50', 'I7d — fenêtre d’offre déjà ouverte, champ à « 55,00 € » ⇒ vidé, « 49,50 » tapé, proposé, VU (une seule offre)', JSON.stringify({ r, p, n: o.length }));
+      await ctx.close(); }
+    { const { ctx, pg } = await ouvrir(b, '/inbox/5000131', { tx: '61131', offreOuverte: true, sansProposer: true });
+      const r = await etape(pg, 'offre', { conv: '5000131', tx: '61131', prix: 49.5, cle: 'o5', favori: true });
+      const { R } = await lire(pg); const ouverte = await pg.evaluate(() => !!document.querySelector('[role=dialog]'));
+      dit(!r.ok && !R.some((x) => /\/offers$/.test(x.u)) && !ouverte, 'I7e — la fenêtre d’offre ne peut pas être validée ⇒ rien n’est proposé ET la fenêtre est REFERMÉE (jamais laissée ouverte)', JSON.stringify({ r, ouverte }));
       await ctx.close(); }
     // ── I8 : captcha visible / invisible
     { const { ctx, pg } = await ouvrir(b, '/inbox/5000129');

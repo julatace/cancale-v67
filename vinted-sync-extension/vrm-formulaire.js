@@ -980,12 +980,15 @@
       const h = H(d);   // 5.453 : « Faire une offre » touché après une hésitation, la fenêtre regardée, le prix tapé, « Proposer » touché
       if (!dejaOuverte) { if (h) await toucher(b.el, 'offre'); else clic(b.el); }
       const dl = dejaOuverte ? { el: dejaOuverte } : await attendreN('offre-fenetre', () => dialogue(), 15000); if (dl.captcha) return vuCaptcha(); if (dl.absent) return manque('offre-fenetre');
+      // 5.455.5 (Julien, 27 nov. 19:17 : la case « Faire une offre » laissée ouverte au plein prix) : une sortie en échec AVANT
+      //    d'avoir proposé referme la fenêtre (rien n'est envoyé) ; jamais une case laissée ouverte sur la conversation.
+      const ferme = async (x) => { try { if (dl.el && dl.el.isConnected) await fermerDialogueOffre(dl.el); } catch (_) {} return x; };
       if (h) await regarder('offre');
       const inp = await attendreN('offre-prix', () => { const x = champPrix(dl.el); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 10000);
-      if (inp.captcha) return vuCaptcha(); if (inp.absent) return manque('offre-prix'); if (inp.el === 'AMBIGU') return manque('offre-prix-ambigu');
+      if (inp.captcha) return vuCaptcha(); if (inp.absent) return ferme(manque('offre-prix')); if (inp.el === 'AMBIGU') return ferme(manque('offre-prix-ambigu'));
       const okT = h ? await taperHumain(inp.el, texteMontant(prix), 0).then((t) => (t.captcha ? 'captcha' : t.ok)) : await saisir(inp.el, texteMontant(prix), { garderFocus: true });
       if (okT === 'captcha') return vuCaptcha();
-      if (!okT) return { ok: false, code: 'valeur', manque: 'offre-prix' };
+      if (!okT) return ferme({ ok: false, code: 'valeur', manque: 'offre-prix' });
       // 5.453.2 : un champ de MESSAGE dans la fenêtre d'offre (un seul, hors prix) : le message y est tapé, il part avec l'offre.
       const tMsg = String((d && d.texteMessage) || '');
       let champMsg = null, avantMsg = 0;
@@ -993,7 +996,7 @@
       if (champMsg) { avantMsg = occurrences(tMsg); const tm = await taperHumain(champMsg, tMsg, Number(d && d.frappeMs) || 0); if (tm.captcha) return vuCaptcha(); if (!tm.ok) champMsg = null; }
       let s = ouAppris('offre-valider', parNom(RE_VALIDER_OFFRE, dl.el, /submit|confirm|send|offer/i, /cancel|close|annul/i, true));
       if (!s.el && !s.ambigu && T()) { const r = T().trouver('offreValider', {}); noterTrouve('offreValider', r); s = { el: r.el || null, ambigu: !!r.ambigu }; }
-      if (s.ambigu) return manque('offre-valider-ambigu'); if (!s.el) return manque('offre-valider');
+      if (s.ambigu) return ferme(manque('offre-valider-ambigu')); if (!s.el) return ferme(manque('offre-valider'));
       if (captcha()) return vuCaptcha();
       ecouter();
       if (h) { try { s.el.scrollIntoView({ block: 'center' }); } catch (_) {} const ms = tirerUnique('hesite', 250, 900); noterDelai('hesite:proposer', ms); await attenteFrappe(ms); if (captcha()) return vuCaptcha(); }

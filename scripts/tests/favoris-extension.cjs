@@ -75,11 +75,21 @@ const court = (f, r) => JSON.stringify({ r, v: f.j.vinted.map((x) => x.methode +
     check(JSON.stringify(q) === JSON.stringify({ item_ids: ['101'], receiver_id: '201' }), 'format de la conversation observé chez Vinted, sans champ inventé', JSON.stringify(q));
     check(m.content === TEXTE, 'texte exact de l’autorisation serveur', JSON.stringify(m)); }
   // ── CE QUI BLOQUE : AUCUN MESSAGE ─────────────────────────────────────────────────────────────────────────────────────────
-  for (const o of [{ autreDestinataire: true }, { autreArticle: true }, { interdit: true }, { bascule: true }, { grantRefuse: true }, { arreteAvantReponse: true }, { creationStatus: 429 }, { creationStatus: 401 }]) {
+  for (const o of [{ autreDestinataire: true }, { interdit: true }, { bascule: true }, { grantRefuse: true }, { arreteAvantReponse: true }, { creationStatus: 429 }, { creationStatus: 401 }]) {
     const f = monter(o), r = await jouer(f);
     check(r.resultat !== 'envoye', 'blocage ' + JSON.stringify(o), court(f, r));
     check(!reponses(f).length, 'aucun message ' + JSON.stringify(o), court(f, r));
   }
+  // (27 nov., 5.455.4 — Julien : « fais comme Vintex ») Le fil rouvert par Vinted avec CE même acheteur parle d'un AUTRE
+  //    article (sa transaction est celle de l'autre article) et l'inquiry ne rend pas de transaction : comme Vintex, le
+  //    message part dans ce fil ; mais AUCUNE offre n'est jamais posée sur la transaction de l'autre article.
+  { const f = monter({ autreArticle: true }), r = await jouer(f);
+    check(r.resultat === 'envoye' && reponses(f).length === 1, 'fil rouvert sur un autre article du même acheteur : le message part (comme Vintex)', court(f, r));
+    check(!ecrits(f).some((x) => /\/transactions\/5001\/offers$/.test(x.chemin)), 'jamais d’offre sur la transaction de l’autre article', court(f, r)); }
+  // (27 nov. soir) L'INVITATION de Vinted à faire une offre (un type « offer… » sans montant ni texte) n'est pas un contact :
+  //    l'offre et le message partent, comme Vintex.
+  { const f = monter({ conv: { messages: [{ entity_type: 'offer_request_message' }] } }), r = await jouer(f);
+    check(r.resultat === 'envoye' && reponses(f).length === 1, 'invitation à faire une offre (sans montant ni texte) : le message part', court(f, r)); }
   // ── INCERTAIN : DIT, JAMAIS REJOUÉ ────────────────────────────────────────────────────────────────────────────────────────
   // (5.455) L'accusé d'un message est le 2xx de la messagerie de Vinted (cette API ne porte pas le `code: 0` de l'ancienne) :
   //    le cas « 200 sans code » de l'ancien protocole n'existe plus ; restent la réponse perdue (aucun statut) et le 5xx.
