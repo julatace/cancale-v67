@@ -127,7 +127,10 @@ const sain = async (pg, ecran) => {
   dit(!m, `${ecran} : l'écran n'est pas tombé sur le garde-fou`, m && m[0]);
 };
 const formulaire = async (pg) => {
-  await pg.waitForFunction(() => document.querySelector('[data-decl-form]') || document.querySelector('[data-decl-bloque]'), null, { timeout: 25000 }).catch(() => {});
+  // (27 nov.) « Lecture en cours » est un état de passage (data-decl-bloque-etat="encours") : on attend le formulaire
+  // ou un VRAI refus (une lecture ratée, "rate"), jamais le premier instant du rapport.
+  // La feuille du rapport entre en glissant : le formulaire est jugé une fois VISIBLE (innerText non vide).
+  await pg.waitForFunction(() => { const f = document.querySelector('[data-decl-form]'); return (f && f.innerText.trim()) || document.querySelector('[data-decl-bloque-etat="rate"]'); }, null, { timeout: 25000 }).catch(() => {});
   await pg.waitForTimeout(400);
   return pg.evaluate(() => { const f = document.querySelector('[data-decl-form]'); return f ? f.innerText : null; });
 };
