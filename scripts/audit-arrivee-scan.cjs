@@ -214,7 +214,8 @@ if (PROUVE) prouver();
     const iPool = corps.indexOf("save('vinted_used_numeros'"), iGeste = corps.lastIndexOf('gesteVrm(texte');
     dit(iPool > 0 && iGeste > iPool && /numerosServisLus\(\)/.test(corps) && /if \(!pris\) return \{ ok: false, raison: 'lecture' \}/.test(corps), 'B2a · « Ranger ici » relit les N° servis (lecture ratée ⇒ rien), écrit le pool AVANT le geste annulable');
     dit(/\.\.\.r\.ops, \.\.\.retire\]/.test(corps) && /null, null, duree\)/.test(corps) && /DUREE_ANNULER_ARRIVEE = 10000/.test(lire('src/arriveeAchat.js')), 'B2b · un seul geste (fiche, case, prix du reçu, retrait), « Annuler » 10 s');
-    dit(/arrivee\) \{[\s\S]{0,600}achatDuScan\(lu, S\.enregistrements\)/.test(sr), 'B3 · le scanner de l’arrivée passe par `achatDuScan` (achats seulement, n° exact)');
+    // (27 nov., lot scan-ce-matin) Le n° de suivi (`achatDuScan`) puis le code de retrait ENTIER : `achatDuRetraitScan`.
+    dit(/arrivee\) \{[\s\S]{0,900}achatDuRetraitScan\(brut, lu, S\.enregistrements\)/.test(sr) && /export function achatDuRetraitScan[\s\S]{0,600}achatDuScan\(lu, L\)/.test(sansCommentaires(lire('src/arriveeAchat.js'))), 'B3 · le scanner de l’arrivée passe par `achatDuScan` (achats seulement, n° exact), puis le code de retrait exact');
     dit(!/fetch\(|save\(|localStorage\.setItem/.test(jsx), 'B4 · l’écran d’arrivée n’écrit rien lui-même (la coque écrit sur SON toucher)');
     dit(/horsLigne/.test(corps) && /noterArrivees\(\[sansFonctions\(e\)\]\)/.test(corps), 'B5 · hors ligne : aucun N° donné, l’arrivée notée, le retrait dans la file');
     dit(/indexHorsLigne === 'function' && typeof navigator !== 'undefined' && navigator\.onLine === false/.test(sr) && /if \(arrivee && achatsLus\(S\)\)/.test(sr), 'B6 · l’index de l’appareil ne sert QUE hors ligne (en ligne, les vraies sources sont relues)');

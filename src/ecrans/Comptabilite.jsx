@@ -395,7 +395,7 @@ import { lignesEnvois, publierEnvois } from "../santeComptes.js";
 import { useSanteComptes, titreJournee, texteRaison } from "../SanteComptes.jsx";
 // (16 nov., intégration de claude/fiabilite-auto) Le contrôle de cette nuit : plus une carte de Ma journée, des points
 // derrière « Tout va bien ? » (la même lecture partagée que Paramètres → Tout va bien ?).
-import { usePointsToutVaBien, ControleNuitLignes } from '../fiabilite/Fiabilite.jsx';   // (11 nov., lot sante-comptes) les envois et leur date limite lue
+import { usePointsToutVaBien, ControleNuitLignes, useComptesEnVerification } from '../fiabilite/Fiabilite.jsx';   // (11 nov., lot sante-comptes) les envois et leur date limite lue
 import { contenuDossierLitige, pdfDossierLitige, nomFichierDossier, imageEnOctets, echangesDossier } from "../dossierLitige.js";   // (10 nov., lot BJ) dossier de litige en PDF
 import { suivisAmbigus } from "../../api/_lib/depart-colis.js";
 // ⟦→ ecrans/Reglages.jsx #15⟧
@@ -521,6 +521,7 @@ import { ligneVente, ligneAchat, JOURS_PUB_TRANSP, clePubTransp, lignePubliee, l
 import { colisDuPoint } from "../retraitsVue.js";   // (20 nov.) rétention : comptés + « à vérifier » qui ont encore un code ou un QR
 import { prevoirRetraits } from "../relaisPrevision.js";   // (21 nov., ext. 5.411) « Demain : 3 colis chez Relais X »
 import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture, horairesDuJour } from "../../api/_lib/horaires-relais.js";
+import { fermeDuPoint } from '../aujourdhui/ceMatin.js';   // (27 nov., lot scan-ce-matin) l'heure où ferme le point, pour « Ce matin »
 // ⟦← App.jsx #111⟧
 import { GroupeConversations as GroupeConversationsV2, LigneConversation as LigneConversationV2 } from "../designV2/LigneConversation.jsx";
 // ⟦← App.jsx #112⟧
@@ -9595,7 +9596,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // (15 nov., finition — Julien : « fais ça mieux pour les colis ») + `depuis` : l'arrivée au point quand elle est SÛRE
       // (`arriveeColisEmail`, « oui » ; une borne n'est pas une date d'arrivée) — elle dit QUEL colis quand rien ne le nomme.
       const arr = arriveeColisEmail(t);
-      if (code || qr || desaccord) codes.push({ code: code || '', ...(desaccord ? { desaccord } : {}), lieu, carrier: t.carrier || '', suivi: t.suivi || '', titre: titreDuColis(commandeRetrait(t), t.artTitle), qr, id: identRetraitEmail(t), compte: comptesE.has(t), depuis: arr && arr.sur === 'oui' ? arr.ms : null });
+      // (27 nov., lot scan-ce-matin) + `horaires` : ceux que la ligne de suivi garde (lus dans l'e-mail ou chez le transporteur,
+      // api/_lib/horaires-relais.js) — « Ce matin » dit l'heure de fermeture du point, jamais une heure devinée.
+      if (code || qr || desaccord) codes.push({ horaires: t && t.horaires ? t.horaires : null, horairesMs: Date.parse((t && ((t.horairesDuTransporteur && t.horairesAt) || t.emailAt)) || '') || 0, code: code || '', ...(desaccord ? { desaccord } : {}), lieu, carrier: t.carrier || '', suivi: t.suivi || '', titre: titreDuColis(commandeRetrait(t), t.artTitle), qr, id: identRetraitEmail(t), compte: comptesE.has(t), depuis: arr && arr.sur === 'oui' ? arr.ms : null });
     }
     for (const o of pickupUnion.extra) {
       const r = colisRelais[String((o && o.transaction_id) || '')] || null;
@@ -20132,6 +20135,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           code: c.deja ? '' : code, lieu: c.deja ? '' : lieu,
           lien: tx ? `?tab=achats&cible=${c.deja ? 'achat' : 'retrait'}&tx=${encodeURIComponent(tx)}` : `?tab=achats&cible=retrait&suivi=${encodeURIComponent(suivis[0])}` };
         if (o && typeof x.entree === 'function' && !c.deja) { const en = x.entree; x.entree = () => { const e = en(); return e ? { ...e, opsRetire: () => opsRetraitScan(c) } : e; }; }
+        // (27 nov., lot scan-ce-matin) Le scanner universel (« Ranger » sur la fiche de l'achat trouvé par SON code de retrait ou
+        // SON n° de suivi) : le MÊME geste que l'arrivée — le colis noté retiré dans « Ranger ici » (un seul « Annuler »).
+        if (o && typeof x.entree === 'function' && !c.deja) { const en2 = x.entree; x.ranger = () => { const e = en2(); if (!e) return; noterArrivees([sansFonctions(e)]); ouvrirAtelierArrivee([e], { scan: true }); }; }
         if (tx) { const p = parTx.get(tx); if (p) { p.suivis = [...new Set([...p.suivis, ...suivis])]; continue; } parTx.set(tx, x); }
         E.push(x);
       }
@@ -22318,6 +22324,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // (16 nov., fiabilite-auto) Les écarts du contrôle de cette nuit (N° en double, vente sans N°, totaux…) comptent dans la
   // ligne « Tout va bien ? · N points » et se lisent dans sa feuille. L'extension en retard est dite par la ligne de fraîcheur.
   const pointsFiab = usePointsToutVaBien();
+  // (27 nov., lot scan-ce-matin) « Ce matin » : SES comptes Vinted (retenus) qui attendent une vérification — la règle de la
+  // carte de santé (`comptesEnVerification`, src/fiabilite/regles.js), lue seulement sur Aujourd'hui.
+  const verifCeMatin = useComptesEnVerification([...accountUids].filter((u) => !acctOff(u)).map(String), only === 'journee');
   const nCtlFiab = pointsFiab && Array.isArray(pointsFiab.points) ? pointsFiab.points.filter((x) => x.source === 'controle').length : 0;
   // Le meuble de la dernière paire sortie : à date égale, la suivante dans CE meuble vient d'abord (il est devant).
   const [dernierMeubleSorti, setDernierMeubleSorti] = useState(null);
@@ -24207,11 +24216,16 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             : nPrets ? (em.exact === false ? tr('v2.pretsAuMoins', { n: nPrets }) : tr('v2.tousPrets')) : tr('v2.aucunPret');
           const nR = lu(xR) ? (Number(xR.t.n) || 0) : null;
           // Les codes COMPTÉS (dans « à retirer »), groupés par point ; la plus proche date limite, de la publication.
-          let pointsJ = [], premierJ = null;
+          let pointsJ = [], premierJ = null, fermeJ = '';
           try {
             const codes = listeCodesRetrait().filter((c) => c && c.compte && c.code);
             const vus = new Map(); for (const c of codes) { const k = (c.lieu || '').trim() || '?'; if (!vus.has(k)) vus.set(k, { lieu: c.lieu || '', code: c.code }); }
             pointsJ = [...vus.values()];
+            // (27 nov., lot scan-ce-matin) L'heure où ferme, AUJOURD'HUI, le premier point OUVERT à fermer (ses horaires lus,
+            // `horairesDuPoint` / `etatOuverture`) — pas lus, fermé, 24 h/24 ⇒ rien de promis.
+            const parLieu = new Map(); for (const c of codes) { const k = (c.lieu || '').trim() || '?'; if (!parLieu.has(k)) parLieu.set(k, []); parLieu.get(k).push(c); }
+            const fermes = [...parLieu.values()].map((l) => fermeDuPoint(etatOuverture(horairesDuPoint(l, (c) => c.horairesMs), Date.now()))).filter(Boolean).sort();
+            fermeJ = fermes[0] || '';
             const pubR = load('vrm_colis_retirer', null);
             const lims = (pubR && Array.isArray(pubR.colis) ? pubR.colis : []).map((x) => x && x[0]).filter(Boolean).map((l) => joursAvant(l)).filter((j) => Number.isFinite(j));
             if (lims.length) { const j = Math.min(...lims); premierJ = { txt: j < 0 ? tr('v2.lim.depasse') : j === 0 ? tr('v2.lim.dernier') : j === 1 ? tr('v2.lim.demain') : tr('v2.lim.jours', { n: j }), ambre: j <= 1 }; }
@@ -24303,6 +24317,18 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               groupes={baseKO ? null : groupesJ} alerte={alerteJ} ventes={dernieresJ}
               plein={nPrets > 0 ? { n: nPrets, exact: !(em && em.exact === false), txt: tr('v2.imprimerCourt'), faire: () => { poserPendingBordPrint('imprimer'); if (onNav) onNav(xE.tab); } } : null}
               onScanner={() => ouvrirRetrouver('journee')}
+              // (27 nov., lot scan-ce-matin) « CE MATIN » : la liste ordonnée de Julien. Chaque nombre vient de SON propriétaire
+              // (aucun recompté ici) : la case « Messages » (`xM`), les bordereaux PRÊTS d'« À envoyer » (`nPrets`, le même que
+              // « Imprimer »), « À retirer » (`vrm_colis_retirer`, `xR`) et l'heure où ferme le point (ses horaires lus),
+              // « offres sans réponse » (`offresSR`), la santé des comptes (`verifCeMatin`). undefined = on lit · null = pas su.
+              ceMatin={baseKO ? null : {
+                messages: !xM ? undefined : lu(xM) ? { n: Number(xM.t.n) || 0, ouvrir: () => { if (onNav) onNav(xM.tab); } } : null,
+                bordereaux: !xE ? undefined : nE == null ? null : nE === 0 ? { n: 0 } : em ? { n: nPrets, ouvrir: () => { poserPendingBordPrint('imprimer'); if (onNav) onNav(xE.tab); } } : null,
+                retraits: !xR ? undefined : nR == null ? null : { n: nR, ferme: fermeJ, ouvrir: () => { if (onNav) onNav('retraits'); } },
+                offres: offresSR === undefined || (offresSR && offresSR.etat === 'encours') ? undefined : offresSR && offresSR.etat === 'lu' ? { n: Number(offresSR.n) || 0,
+                  ouvrir: () => { demanderVue('offressansreponse'); try { window.dispatchEvent(new CustomEvent('vrm:vue', { detail: 'offressansreponse' })); } catch (_) {} if (onNav) onNav('cat_msg'); } } : null,
+                verifications: verifCeMatin === undefined ? undefined : verifCeMatin === null ? null : { n: verifCeMatin, ouvrir: () => { if (onNav) onNav('extension'); } },
+              }}
               // (23 nov., style-clarte-3) « Publier » : le parcours existant (choisir l'article dans la feuille, `vrm:publier-ailleurs`) ;
               // « Relier » : Achats et sa feuille « Relier achats et ventes » (la même que son bouton).
               onPublier={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} }}
@@ -24426,7 +24452,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       const lieu = sortirJ && c.num ? emplacementDe(c.num, { slots: sortirJ.slots, meubles: sortirJ.meubles, cle: cleNum }).lieu : null;
                       return <span key={c.cle} className="sj-v-ligne">
                         <span className="sj-v-ligne-ph">{c.photo ? <PhotoVinted src={c.photo} alt="" loading="lazy" decoding="async" width={44} height={44}/> : <Icon name="box" size={18}/>}</span>
-                        <span className="sj-v-ligne-mid"><span className="sj-v-ligne-l1">{c.num ? <PlaqueJ num={c.num}/> : null}{c.site ? <MarqueSite site={c.site} taille={12}/> : null}{c.compte ? <span className="sj-v-cpt">{c.compte}</span> : null}</span>
+                        <span className="sj-v-ligne-mid"><span className="sj-v-ligne-l1">{c.num ? <PlaqueJ num={c.num}/> : null}{c.site ? <MarqueSite site={c.site} taille={12}/> : null}{c.compte ? <span className="sj-v-cpt" title={c.compte}>{c.compte}</span> : null}</span>
                           <span className={'sj-v-ligne-l2' + (c.e && c.e.ambre ? ' sj-v-am' : '')}>{[c.e ? c.e.txt : '', lieu ? `${lieu.nom || ''} r${lieu.rangee} c${lieu.colonne}`.trim() : ''].filter(Boolean).join(' · ')}</span></span>
                         <b className="sj-v-ligne-prix">{c.prix || ''}</b>
                       </span>; })}</span> : null}

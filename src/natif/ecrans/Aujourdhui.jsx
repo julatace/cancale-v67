@@ -22,6 +22,7 @@ import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site 
 import { tr, nombre, localeCourante } from '../../i18n/index.js';
 import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segmente, Colonnes, Colonne, Carte, Tuiles, Tuile, Pastille, Faits, Fait, Feuille, Courbe, Progression, Champ, ListeOrdonnee, Editable, Toast, useOrdinateur, GrapheJours, Etincelle, Repartition, Heros, ActionsRondes, CasesChiffres } from '../index.js';
 import { CARTES_AUJOURDHUI, CARTES_DEFAUT, cartesChoisies } from '../../aujourdhui/modele.js';
+import { lignesCeMatin } from '../../aujourdhui/ceMatin.js';   // (27 nov., lot scan-ce-matin) l'ordre de « Ce matin »
 import { publierARegler } from '../../designV2/aRegler.js';
 import { numsPhotoDouble } from './photoDoubleTexte.js';   // (22 nov.) « N°142 et N°157 »
 import { PlaceGardee } from '../PlaceGardee.jsx';   // (25 nov.) « Par site » : la place de la dernière fois
@@ -241,6 +242,28 @@ function PorteMonnaie({ pm, montant, Icon, enLecture = false }) {
 
 // (24 nov., livrable-2) La place de « Par site » tenue pendant la lecture : son titre, une barre et une ligne en squelette.
 // PAR SITE : la part de chaque site dans le vendu de la fenêtre (chaque total demandé au propriétaire avec { site }).
+// (27 nov., lot scan-ce-matin) « CE MATIN » — Julien : en tête, ce qui m'attend, DANS L'ORDRE (acheteurs qui attendent ma réponse,
+// bordereaux à imprimer, colis à retirer et l'heure où ferme le point, offres à trancher, comptes à vérifier). Une rangée par
+// chose à faire (le verbe, le nombre, le chevron) : la toucher ouvre LE geste. Rien à faire ⇒ « Rien d'urgent », une rangée.
+// Aucun nombre n'est compté ici : src/aujourdhui/ceMatin.js range ceux de leurs propriétaires. Tant qu'on lit, la place est
+// tenue par une rangée « Je lis… » (rien ne saute) ; une source pas lue est NOMMÉE sous la liste (« pas su » ≠ « rien »).
+const ICONE_CM = { messages: 'chat', bordereaux: 'printer', retraits: 'pin', offres: 'tag', verifications: 'shield' };
+export function CeMatin({ ceMatin, lecture = false, Icon }) {
+  const r = lignesCeMatin(ceMatin, { lecture });
+  const pied = r.etat === 'liste' && r.pasSu.length ? tr('cm.pasLu', { quoi: r.pasSu.map((k) => tr('cm.nom.' + k)).join(', ') }) : '';
+  return (
+    <Groupe titre={tr('cm.titre')} pied={pied} attrs={{ 'data-v2-bloc': 'ce-matin', 'data-cm-etat': r.etat, 'data-cm-ordre': r.lignes.map((l) => l.cle).join(','),
+      'data-cm-n': r.lignes.map((l) => l.n).join(','), 'data-cm-passu': r.pasSu.join(','), 'aria-busy': r.etat === 'lecture' ? 'true' : undefined }}>
+      {r.etat === 'liste' ? r.lignes.map((l) => (
+        <Rangee key={l.cle} icone={<Icon name={ICONE_CM[l.cle]} size={22}/>} titre={tr('cm.l.' + l.cle)} sousTitre={l.ferme ? tr('cm.ferme', { h: l.ferme }) : ''}
+          valeur={nombre(l.n)} valeurForte fin={l.ouvrir ? 'chevron' : null} onClick={l.ouvrir}
+          attrs={{ 'data-cm-ligne': l.cle, 'data-cm-ligne-n': String(l.n), 'data-cm-ferme': l.ferme || undefined }}/>
+      )) : <Rangee icone={<Icon name={r.etat === 'rien' ? 'check' : 'clock'} size={22}/>} titre={r.etat === 'rien' ? tr('cm.rien') : r.etat === 'lecture' ? tr('v2.jour.lecture') : tr('cm.passu')}
+        attrs={{ 'data-cm-vide': r.etat }}/>}
+    </Groupe>
+  );
+}
+
 const NOM_SITE = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
 function ParSite({ courbe, f, montant, nomMois = '' }) {
   const L = courbe && courbe.parSite ? courbe.parSite[f] : null;
@@ -263,7 +286,7 @@ function ParSite({ courbe, f, montant, nomMois = '' }) {
 export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true, affiche, colis = [], retraits = null, groupes = [], plein = null, Photo = null, Icon, onColis, onRetraits,
   onScanner = null, chiffres = null, alerte = null, ventes = null, aVenir = null, onVentes = null,
   objectif = null, courbe = null, comptes = null, capte = null, vrm = null, cartes = null, onMessages = null, onJournal = null,
-  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, teteDroite = null, onPublier = null, onRelier = null, aEcrire = null, porteMonnaie = undefined, ligneOrdi = null, ligneLecture = null, aRepublier = null, offresSR = null, photoDouble = null }) {   // (22 nov., choix n° 33 et 35) offresSR : { n, age, ouvrir } · photoDouble : { n, groupes, ouvrir } | null   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
+  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, teteDroite = null, onPublier = null, onRelier = null, aEcrire = null, porteMonnaie = undefined, ligneOrdi = null, ligneLecture = null, aRepublier = null, offresSR = null, photoDouble = null, ceMatin = undefined }) {   // (22 nov., choix n° 33 et 35) offresSR : { n, age, ouvrir } · photoDouble : { n, groupes, ouvrir } | null   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
   const ordinateur = useOrdinateur();
   const [modifier, setModifier] = React.useState(false);
   const [defait, setDefait] = React.useState(null);   // le choix d'avant « Remettre par défaut » (annulable 10 s)
@@ -659,6 +682,8 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
       {ordinateur ? <header className="n-tb-tete"><div className="n-tb-gauche"><h1 className="n-tb-titre">{titre}</h1><span className="n-tb-date">{dateLongue()}</span></div>{enDirect ? <div className="n-tb-direct" data-tb-direct="">{enDirect}</div> : null}{teteDroite}</header> : null}
       <Colonnes className="n-colonnes-tb">
         {haut ? <Colonne pleine>{haut}</Colonne> : null}
+        {/* (27 nov., lot scan-ce-matin) « Ce matin », en tête : la liste ordonnée de ce qui attend (src/aujourdhui/ceMatin.js). */}
+        {ceMatin !== undefined ? <Colonne pleine attrs={{ 'data-tb': 'ce-matin' }}><CeMatin ceMatin={ceMatin || {}} lecture={!pret} Icon={Icon}/></Colonne> : null}
         {/* (21 nov., ext. 5.428 `endirect`) Ce que fait l'extension EN CE MOMENT, en tête (src/extension/EnDirect.jsx). */}
         {/* (23 nov., Julien : « on n'a jamais d'extension sur iPhone ») au téléphone, plus rien de l'extension ici. */}
         {ligneOrdi ? <Colonne pleine>{ligneOrdi}</Colonne> : null}

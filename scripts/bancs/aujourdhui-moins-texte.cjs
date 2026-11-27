@@ -39,16 +39,22 @@ const DSF = Number(process.env.DSF || 1);
 // « Gestes automatiques arrêtés » · « Offres, favoris, republications : rien ne part · depuis HH:MM » · « Pourquoi ? » à la place
 // de « En pause » (mesuré : +11 mots à 390 et à 1512 sur cette base). Le reste de l'écran garde son budget.
 const MOTS_CARTE_PAUSE = 11;
+// (27 nov., lot scan-ce-matin — choix de Julien) + 14 : « Ce matin » en tête (« Ce matin » · « Répondre aux acheteurs 3 » ·
+// « Imprimer les bordereaux 2 » · « Retirer les colis 8 » sur cette base ; mesuré +14 à 390 et à 1512).
+const MOTS_CE_MATIN = 14;
 // (27 nov., ameliorations-27nov — Julien : « Ordinateur éteint · 21:20 », « Vas-y fais tout ») + 8 : la phrase DEMANDÉE sous
 // « Ordinateur éteint » (« Rien ne part tant qu’il est éteint », 7 mots) et son « Pourquoi ? » (mesuré : +8 à 390 et à 1512).
 const MOTS_ORDI_ETEINT = 8;
-const MOTS_MAX = (W) => Number(process.env.MOTS_MAX || (W < 600 ? 106 : 124) + MOTS_CARTE_PAUSE + MOTS_ORDI_ETEINT);
+const MOTS_MAX = (W) => Number(process.env.MOTS_MAX || (W < 600 ? 106 : 124) + MOTS_CARTE_PAUSE + MOTS_CE_MATIN + MOTS_ORDI_ETEINT);
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 600) : '')); } return c; };
 
 const J = 86400000;
 const minuit = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); };
 const APPAREIL = '0123456789abcdef';
+// (27 nov., lot scan-ce-matin) L'extension de la base = la version que l'app ATTEND (lue dans la source) : figée à 5.440.3, elle
+// faisait dire « Extension ancienne … : installe la 5.455.2 » (+8 mots) à chaque nouvelle version — le budget M rougissait sur main.
+const VERSION_EXT = (/EXT_ATTENDUE = '([\d.]+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1] || '5.440.3';
 const ICI = 'data:image/svg+xml,' ;
 const vignette = (i) => ICI + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="hsl(${(i * 47) % 360} 14% ${58 + (i % 4) * 7}%)"/><path d="M14 52c10-2 22-14 30-14s12 8 22 8v10H14z" fill="#fff" opacity=".85"/></svg>`);
 
@@ -63,10 +69,10 @@ function baseCapture() {
   for (const r of b.rows) { const u = r.data && r.data.payload && r.data.payload.user; if (u && String(u.id) === uid) u.login = 'shop_cancale'; }
   m.vinted_account_labels = { [uid]: 'shop_cancale' };
   // L'extension de ce navigateur : vue il y a une minute (la lecture « en ligne » reste fraîche).
-  b.rows.push({ id: 'ext_appareil_' + APPAREIL, data: { appareil: { paquet: 'chromium', nav: 'chrome', systeme: 'mac' }, ver: '5.440.3', code: '5.440.3', atMs: Date.now() - 60000, flux: {}, vus: { vinted: { [uid]: Date.now() - 120000 } } } });
+  b.rows.push({ id: 'ext_appareil_' + APPAREIL, data: { appareil: { paquet: 'chromium', nav: 'chrome', systeme: 'mac' }, ver: VERSION_EXT, code: VERSION_EXT, atMs: Date.now() - 60000, flux: {}, vus: { vinted: { [uid]: Date.now() - 120000 } } } });
   // L'ordinateur qui agit à distance : éteint depuis 07:37 aujourd'hui (sa présence date de là).
   const eteint = new Date(); eteint.setHours(7, 37, 0, 0); if (eteint.getTime() > Date.now()) eteint.setDate(eteint.getDate() - 1);
-  b.rows.push({ id: 'presence_' + APPAREIL, data: { v: 1, at: eteint.toISOString(), atMs: eteint.getTime(), ver: '5.440.3', code: '5.440.3', appareil: { paquet: 'chromium', nav: 'chrome', systeme: 'mac' },
+  b.rows.push({ id: 'presence_' + APPAREIL, data: { v: 1, at: eteint.toISOString(), atMs: eteint.getTime(), ver: VERSION_EXT, code: VERSION_EXT, appareil: { paquet: 'chromium', nav: 'chrome', systeme: 'mac' },
     comptes: [{ site: 'vinted', id: uid, nom: 'shop_cancale' }], retenues: [], enCours: '', rt: 'joint', lus: {} } });
   // « Tout arrêter » posé (le réglage de discrétion, synchronisé).
   m.vinted_discretion = { tout: { on: true, at: Date.now() - 3 * 3600000 } };

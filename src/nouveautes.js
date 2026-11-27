@@ -36,6 +36,10 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'benefice-prix-manquants', date: '2026-11-27', titre: 'Bénéfice : « N prix manquants »', phrase: 'Touche-le pour saisir les prix d’achat qui manquent.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'lecture-ancienne', date: '2026-11-27', titre: 'Un site pas lu depuis longtemps : dit', phrase: 'Une ligne, le geste, « Compris » la range.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'ordinateur-eteint-pourquoi', date: '2026-11-27', titre: 'Ordinateur éteint : ce qui attend', phrase: 'Ce qui ne marche pas, et quoi faire, sous « Pourquoi ? ».', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (27 nov., lot scan-ce-matin — choix de Julien) src/aujourdhui/ceMatin.js, src/arriveeAchat.js `achatDuRetraitScan`
+  { id: 'ce-matin', date: '2026-11-27', titre: '« Ce matin » en tête d’Aujourd’hui', phrase: 'Acheteurs, bordereaux, colis, offres, comptes : dans l’ordre.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'scan-point-relais', date: '2026-11-27', titre: 'Scanne au point relais : la paire en stock', phrase: 'Le code de retrait suffit : retiré, numéroté, « Écris N° ».', tab: 'achats', pour: 'tous', mode: 'tous',
+    titreArt: 'Scanne au point relais : l’article en stock' },
   // (27 nov., retour-fonctions — Julien : trois fonctions d'avant les écrans natifs) src/filtrePlateforme.js, src/ecrans/Stats.jsx, src/filUnique.js
   { id: 'ventes-compte-telephone', date: '2026-11-27', titre: 'Ventes : « Toutes », et filtre par compte', phrase: '« Toutes » liste chaque vente ; un compte au choix, retenu.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'annulations-compte-alerte', date: '2026-11-27', titre: 'Un compte annule plus : VRM le dit', phrase: 'Dans Statistiques, au-dessus des taux d’annulation par compte.', tab: 'stats', pour: 'tous', mode: 'tous' },

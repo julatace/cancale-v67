@@ -116,6 +116,7 @@ import ecran_journee_verre from './de/journee-verre.js';   // (15 nov.) Ma journ
 import ecran_arrivee from './de/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 import ecran_stock_rangement from './de/stockRangement.js';
 import ecran_arrivee_scan from './de/arriveeScan.js';
+import ecran_ce_matin from './de/ceMatin.js';   // (27 nov., lot scan-ce-matin)
 import ecran_prio_recherche from './de/prioRecherche.js';   // (21 nov., lot prio-recherche)
 import ecran_roles_comptes from './de/rolesComptes.js';   // (20 nov., lot bleam-suite)   // (20 nov., lot arrivee-scan)
 import ecran_stock_etiquetage from './de/stockEtiquetage.js';   // (19 nov., lot stock-etiquetage)   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
@@ -2461,6 +2462,7 @@ export default {
   ...ecran_stock_rangement,
   ...ecran_stock_etiquetage,
   ...ecran_arrivee_scan,
+  ...ecran_ce_matin,
   ...ecran_prio_recherche,
   ...ecran_roles_comptes,
   ...ecran_demarrage,

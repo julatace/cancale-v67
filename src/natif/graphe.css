@@ -261,7 +261,7 @@
     .n-heros-trio-porte::after { content: ''; position: absolute; inset: -12px -6px; }
     .n-heros-trio-porte:has(.n-heros-trio-pourquoi) { gap: 0; }
     .n-heros-trio-porte:has(.n-heros-trio-pourquoi) > :not(.n-heros-trio-pourquoi) { display: none; }
-    .n-heros-trio-pourquoi { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--n-teinte); color: var(--n-sur-heros); text-decoration: none; font: 600 12px/18px var(--n-police); }
+    .n-heros-trio-pourquoi { display: inline-block; padding: 2px 6px; max-width: 100%;   /* (27 nov.) « Saisis 2 prix › » débordait de 3 px à 390 (banc aujourdhui-moins-texte T) */ border-radius: 999px; background: var(--n-teinte); color: var(--n-sur-heros); text-decoration: none; font: 600 12px/18px var(--n-police); }
     /* (27 nov.) « 5 prix manquants » : la porte du bénéfice va à la ligne plutôt que d'être coupée (case de 110 px au téléphone). */
     [data-pil-prix-manquants] .n-heros-trio-pourquoi { white-space: normal; overflow: visible; text-overflow: clip; border-radius: 10px; }
     .n-actions-rondes { margin-bottom: 12px; }
