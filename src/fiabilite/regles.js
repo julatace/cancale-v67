@@ -53,6 +53,26 @@ export function retardIci({ on, v = '', attendue, nav = '', nomNav = '', inst = 
 // lignes `actions_compte_*` (null = pas lues) ; `reprises` : { uid: ms } (son « Reprendre »).
 // Rend [{ plateforme, id, nom, etat, ton, geste, lu, appareil, prudence, arret }] : le
 // geste d'abord, puis Vinted, Leboncoin, Vestiaire, eBay.
+// (27 nov., lot scan-ce-matin) L'ARRÊT d'un compte (Vinted demande une vérification, modération, déconnecté) : UNE règle,
+// lue par la carte de santé (`santeDesComptes`) et par « Ce matin » (`comptesEnVerification`). `j` : `jaugeDuCompte` ;
+// `reprise` : l'heure de SON « Reprendre » pour ce compte. Rend { quoi, depuis } ou null.
+export function arretDeJauge(j, reprise) {
+  if (!j || !j.captcha || !verificationEnCours(j.captcha, reprise)) return null;
+  return { quoi: ['captcha', 'moderation', 'deconnecte'].includes(j.arret) ? j.arret : 'captcha', depuis: j.captcha };
+}
+// Combien de SES comptes Vinted (`uids`, les comptes retenus) sont arrêtés et attendent une vérification. `actions` : les
+// lignes `actions_compte_*` (null = pas lues ⇒ null, jamais 0) ; `reprises` : { uid: ms }.
+export function comptesEnVerification({ actions, uids = [], reprises = {}, maintenant = Date.now() } = {}) {
+  if (!Array.isArray(actions)) return null;
+  const R = objet(reprises) || {};
+  const vus = new Set();
+  for (const u of Array.isArray(uids) ? uids : []) {
+    const id = String(u == null ? '' : u);
+    if (!/^\d{1,20}$/.test(id) || vus.has(id)) continue;
+    if (arretDeJauge(jaugeDuCompte(actions, id, maintenant), R[id])) vus.add(id);
+  }
+  return vus.size;
+}
 export const ETATS_SANTE = ['arret', 'panne', 'delie', 'jamais', 'a-relire', 'ventes', 'extension', 'prudence', 'banni', 'masque', 'ok'];
 const TON = { arret: 'geste', panne: 'geste', delie: 'geste', jamais: 'geste', 'a-relire': 'geste', ventes: 'geste', extension: 'geste', prudence: 'info', banni: 'neutre', masque: 'neutre', ok: 'ok' };
 export function santeDesComptes({ lignes, comptes = [], appareils = [], pannes = [], actions = null, reprises = {}, attendue = '', maintenant = Date.now() } = {}) {
@@ -76,7 +96,7 @@ export function santeDesComptes({ lignes, comptes = [], appareils = [], pannes =
     const j = Array.isArray(actions) && /^\d{1,20}$/.test(String(l.id)) ? jaugeDuCompte(actions, String(l.id), maintenant) : null;
     if (j) {
       if (j.prudence) prudence = j.prudence;
-      if (j.captcha && verificationEnCours(j.captcha, R[String(l.id)])) arret = { quoi: ['captcha', 'moderation', 'deconnecte'].includes(j.arret) ? j.arret : 'captcha', depuis: j.captcha };
+      arret = arretDeJauge(j, R[String(l.id)]);
     }
     const lu = l.plateforme === 'vinted' ? (ts(c.annoncesLu) || ts(l.lu)) : ts(l.lu);
     const masque = String(l.bloque || '').startsWith('masqué');

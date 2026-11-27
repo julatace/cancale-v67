@@ -2386,3 +2386,7 @@ Julien, après avoir lu le risque (requêtes sans le « bruit » de la page vs c
 ### Passations à lire, d'avant le 22 nov. (déplacé tel quel de CLAUDE.md §9 le 27 nov., taille)
 
 puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passation-generale.md` (la plus complète : en ligne, prêt, en pause, en file, refusé, gestes), puis `2026-11-16-passation.md`, `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`).
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (27 nov. soir, < 60 000)
+
+- **26 nov. soir · FAVORIS PAR REQUÊTES « comme Vintex » (Julien : « A, fais comme Vintex »), ext. 5.455.0** : inquiries → conversation → transaction → offre → message, depuis la page, SEULES écritures permises (`ECRITURES_FAVORI`) ; garde-fous inchangés ; clics en réserve (`vrmFavorisChemin: 'interface'`). Bleam fait pareil (ancienne messagerie). `historique-divers.md`, fin. Geste : installer 5.455.0.
