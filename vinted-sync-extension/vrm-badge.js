@@ -1783,7 +1783,7 @@ function vrmVerifVisible(sel) {
   .cx .verif .etat { margin-top: 0; }
   .cx .verif .etat[hidden] { display: none; }
   .fl6 { display: inline-block; max-width: 100%; height: 14px; border-radius: 7px; background: currentColor; opacity: .22; vertical-align: middle; }
-  @media (max-width: 760px) { .carte[data-hors-ligne] > .connexion { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); max-height: calc(100% - 48px); } }
+  @media (max-width: 760px) { .carte[data-hors-ligne] > .connexion { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); max-height: calc(100% - 150px); } }
   @media (prefers-reduced-motion: reduce) { .carte[data-hors-ligne] > .connexion { transition: none; } }
   /* ══ fin 5.456 ══ */
 </style>
@@ -6852,8 +6852,7 @@ function vrmVerifVisible(sel) {
       ${pied}
       ${fourn}
       <button type="button" class="b sec" data-basculer-mode>${esc(TU('cx_code_b'))}</button>
-      <div class="cx-liens"><button type="button" class="lien" data-cx-creer>${esc(TU('cx_creer_b'))}</button><a class="oubli" href="https://vrm.center/?connexion&amp;mot-de-passe-oublie" target="_blank" rel="noreferrer" data-oubli>${esc(TU('cx_oubli'))}</a></div>
-      <div class="cx-liens">${relier}</div>`;
+      <div class="cx-liens"><button type="button" class="lien" data-cx-creer>${esc(TU('cx_creer_b'))}</button><a class="oubli" href="https://vrm.center/?connexion&amp;mot-de-passe-oublie" target="_blank" rel="noreferrer" data-oubli>${esc(TU('cx_oubli'))}</a>${relier}</div>`;
     } else if (modeCx === 'creer') {
       corps = `<div class="envoye" data-cx-creer-titre><b>${esc(TU('cx_creer_titre'))}</b></div>
       ${mail}
