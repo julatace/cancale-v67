@@ -125,8 +125,12 @@ async function controles(src, dit) {
     dit(rT.aVerifier.length === 1 && rT.liste.length === 1, 'A18 même code, deux commandes différentes : deux colis');
     const rI = P.reunirParIdentite([moitieVinted()], [{ ...avGo(), e: { etat: 'transporteur' } }], opts());
     dit(rI.aVerifier.length === 1 && rI.liste.length === 1, 'A19 un incident du transporteur reste à part « à vérifier »');
-    const rD = P.reunirParIdentite([vintedGo()], [{ kind: 'email', t: moitieVinted(), e: { etat: 'doute_meme_relais' } }], opts());
-    dit(rD.aVerifier.length === 1 && rD.liste.length === 1, 'A20 un « peut-être en double » reste à part (il n\'a pas d\'identité commune par définition)');
+    // (banc du 27 nov.) La moitié Vinted classée « peut-être en double » (sa ligne n'écrit pas le code) alors que SA commande porte
+    // le code de l'e-mail Vinted Go : elle partage une identité, c'est CE colis — une ligne, « à vérifier » par la limite lue.
+    const rD = P.reunirParIdentite([], [{ kind: 'email', t: vintedGo(), e: { etat: 'delai_depasse' } }, { kind: 'email', t: moitieVinted(), e: { etat: 'doute_meme_relais' } }], opts());
+    dit(rD.aVerifier.length === 1 && rD.aVerifier[0].t.suivi === '1792000000000099' && rD.aVerifier[0].e.etat === 'delai_depasse', 'A20 un « peut-être en double » qui PARTAGE une identité (le code de SA commande) est ce colis : une ligne', JSON.stringify(rD.aVerifier.map((x) => [x.t.id, x.e.etat])));
+    const rD2 = P.reunirParIdentite([vintedGo()], [{ kind: 'email', t: { ...moitieVinted(), conv: 'c-autre' }, e: { etat: 'doute_meme_relais' } }], opts());
+    dit(rD2.aVerifier.length === 1 && rD2.liste.length === 1, 'A21 un « peut-être en double » SANS identité commune reste à part (jamais par le point ni la date)');
   }
 
   // ── B. Le doute « même point » ───────────────────────────────────────────
@@ -183,6 +187,9 @@ async function controles(src, dit) {
   dit(points(NOMME, { id: 'v', nom: 'Tabac du Centre', adresse: '10 Rue des Essais, 35400 Villeneuve' }).length === 2, 'C8 deux VRAIS noms différents à la même adresse (une galerie) : deux points (jamais la ressemblance des noms)');
   dit(points(NOMME, { id: 'v', nom: '10 Rue des Essais', ville: 'Villeneuve', sorte: 'consigne' }).length === 2, 'C9 une consigne et un comptoir à la même adresse : deux points');
   dit(points(NOMME, { id: 'v', nom: '10 Rue des Essais', transporteur: 'vinted' }).length === 2, 'C10 la rue SANS ville ni code postal : rien ne prouve l\'adresse, deux points');
+  // La forme RENDUE par l'écran (banc retrait-double-code) : le lieu du suivi « 10 Rue …, Ville » coupé en nom = la rue, adresse = la ville.
+  const deux = points(NOMME, { id: 'v', nom: '10 Rue des Essais', adresse: 'Villeneuve', transporteur: 'vinted' }, { id: 'w', nom: '10 Rue des Essais', adresse: 'Villeneuve', transporteur: 'vinted' });
+  dit(deux.length === 1 && deux[0].nArrives === 3 && deux[0].nom === 'Droguerie du Banc', 'C11 nom = la rue, adresse = la ville seule (forme rendue du suivi Vinted Go) : la même carte', JSON.stringify(deux.map((p) => [p.cle, p.nom, p.nArrives])));
 }
 
 function cablage(dit) {
@@ -228,7 +235,9 @@ function cablage(dit) {
       ['colis réuni pas rejugé', 'preuves', (s) => s.replace('const e = juger(f);', 'const e = null;')],
       ['la date Vinted fait foi', 'preuves', (s) => s.replace('(fiable(b.t) ? 1 : 0) - (fiable(a.t) ? 1 : 0) || ', '')],
       ['une seule clé pour « Retiré »', 'preuves', (s) => s.replace("...(cles.length ? { clesMoities: cles } : {})", '')],
-      ['incident du transporteur réuni', 'preuves', (s) => s.replace("if (et === 'transporteur' || et === 'doute_meme_relais') return;", "if (et === 'doute_meme_relais') return;")],
+      ['incident du transporteur réuni', 'preuves', (s) => s.replace("if (et === 'transporteur') return;", '')],
+      ['« peut-être en double » jamais réuni (règle d\'avant)', 'preuves', (s) => s.replace("if (et === 'transporteur') return;", "if (et === 'transporteur' || et === 'doute_meme_relais') return;")],
+      ['points : la rue en nom, la ville en adresse ⇒ point isolé (règle d\'avant)', 'relais', (s) => s.replace("      morceaux = { rue: String(nomLu).trim(), cp: '', ville: String(morceaux.rue).trim() };", '      {}')],
       ['témoins finis ignorés (règle d\'avant)', 'arrivee', (s) => s.replace('const doute = Array.isArray(temoins)', 'const doute = false')],
       ['adresse de réception ignorée', 'arrivee', (s) => s.replace('if (a.a && b.a) return a.a === b.a;\n  if (a.r && b.r) return a.r === b.r;', '')],
       ['fenêtre de jours ignorée', 'arrivee', (s) => s.replace('Math.abs(aw - at) <= fenetreJ * 86400000', 'true')],

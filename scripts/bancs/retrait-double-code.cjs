@@ -1,168 +1,121 @@
-// ════════════════════════════════════════════════════════════════════════════
-//  Banc : LE MÊME COLIS DEUX FOIS AU MÊME POINT — « 978 216 » (27 nov., capture iPhone de Julien, Achats).
-//  Point « Joubert Peintures » (Vinted Go) : la paire « Payé 13,36 € · shop_cancale » au code 978 216, deux fois —
-//  « Au point · 20 nov. » comptée, puis sous « Pas compté dans à retirer » la MÊME paire, son QR, « Date limite
-//  dépassée · à vérifier », « Au point · 19 nov. ».
-//  Base SYNTHÉTIQUE de la forme MESURÉE (passation du 23 nov. : `email_track_vinted_{n°}`, « Relais Vinted Go, <commerce>,
-//  <rue> », code, QR, arrivé le 19, limite LUE le 25 ; le rappel du 22 tombé sur la même ligne) + l'e-mail Vinted « Commande
-//  mise à jour » de SA conversation (`source: 'vinted-commande'`, SANS code écrit, sans limite, arrivé le 20) + l'achat
-//  (conversation lue : le code 978216) — aucune donnée réelle (dépôt public).
-//  Témoin (§5, l'esprit d'audit-identite) : un AUTRE achat, MÊME titre, même point, mêmes jours, un autre code et une autre
-//  commande ⇒ jamais réuni.
-//  Exige, sur les boîtes rendues (data-*) : le colis 978216 = UNE rangée, « à vérifier » (limite lue et passée), datée du
-//  19 nov. (le transporteur), avec son QR ; le témoin = une rangée à part ; « Retiré » sur la rangée réunie ⇒ plus aucune
-//  rangée 978216 (la moitié Vinted ne revient pas seule) ; le compte publié (`vrm_colis_retirer`) n'a jamais le colis deux
-//  fois. 390 tactile et 1512, clair et sombre. `BANC_PORT`, `BANC_DIST`, `SHOTS=dossier` (captures à regarder).
-// ════════════════════════════════════════════════════════════════════════════
 require('./_porte-banc.cjs');
-const path = require('path');
-let chromium, PW;
-try { PW = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright')); }
-catch (_) { PW = require('playwright'); }
-({ chromium } = PW);
-const { lancer, estWebkit } = require('./_navigateur.cjs');
-const { metaVersData } = require('./_meta.cjs');
-const fs = require('fs'), http = require('http');
-const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
-const PORT = Number(process.env.BANC_PORT || 4491);
-const MATIN = new Date('2026-11-27T09:02:00+01:00');
-const MS = MATIN.getTime();
-const iso = (t) => new Date(t).toISOString();
-const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: iso(MS) }];
-const cap = iso(MS - 3600e3);
-const SHOTS = process.env.SHOTS || '';
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//  Banc : LE MÊME COLIS DEUX FOIS, LE MÊME POINT EN DEUX CARTES (27 nov., captures iPhone de Julien, Achats → À retirer).
+//  (1) Point « Joubert Peintures » : la paire au code 978 216, deux fois — « Au point · 20 nov. » comptée, puis sous « Pas
+//      compté » la MÊME paire, son QR, « Date limite dépassée · à vérifier », « Au point · 19 nov. ».
+//  (2) La même adresse en DEUX cartes : « Joubert Peintures · Transporteur, 10 Rue du Bois Aurant, 35400 Saint-Malo » et
+//      « 10 Rue du Bois Aurant · Vinted Go · Saint-Malo » (le suivi Vinted Go ne donne que « <n° et rue>, <ville> »).
+//  Base INVENTÉE (dépôt public) à la forme MESURÉE (passation du 23 nov.) : l'e-mail Vinted Go `email_track_vinted_{n°}` (code
+//  « 978 216 », QR, arrivé 8 jours plus tôt, limite LUE il y a 2 jours ; le rappel tombé sur la même ligne) ; l'e-mail Vinted
+//  « Commande mise à jour » de SA conversation (`source: 'vinted-commande'`, SANS code écrit, sans limite, arrivé le lendemain) ;
+//  l'achat (code lu dans la conversation). Témoin (§5, esprit d'audit-identite) : un AUTRE achat au MÊME titre, même point, mêmes
+//  jours, autre code, autre commande ⇒ jamais réuni. Deux colis Vinted Go dont le lieu n'est que la rue et la ville (forme du
+//  suivi) au MÊME endroit ; un colis à la même rue, AUTRE numéro ⇒ autre point.
+//  Jugé sur les data-* RENDUS : 978216 = UNE rangée, « à vérifier » (`data-rp-verif="depasse"`), QR, « Au point » au jour du
+//  transporteur ; le témoin à part ; l'adresse = UNE carte (4 colis), l'autre numéro = une autre carte ; « Retiré » sur la
+//  rangée réunie ⇒ plus aucune rangée 978216. 390 tactile et 1512, clair et sombre. `SHOTS=dossier` (captures à regarder).
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+'use strict';
+const path = require('path'), fs = require('fs'), os = require('os');
+const P = require('./design-passe.cjs');
+const { ouvrir, base, srv, PORT, chromium } = P;
+const SHOTS = process.env.SHOTS || path.join(os.tmpdir(), 'banc-retrait-double-code');
+fs.mkdirSync(SHOTS, { recursive: true });
+let ok = 0, ko = 0;
+const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 900) : '')); } return c; };
+const attendre = async (pg, f, ms = 40000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await pg.evaluate(f).catch(() => false)) return true; await pg.waitForTimeout(300); } return false; };
+const J = 86400000, H = 3600000;
+const iso = (ms) => new Date(Date.now() + ms).toISOString();
+const jourParis = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
 const N = '1792000000000099';
-const LIEU = 'Relais Vinted Go, Droguerie du Banc, 10 Rue Inventée';
-const DEPOSE = "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais";
-const conv = (id) => `0000aaaa-0000-4000-8000-${String(id).padStart(12, '0')}`;
-const url = (k) => `https://images1.vinted.net/t/b${k}/f800/x${k}.jpeg?s=x`;
+const RUE = '10 Rue des Essais', VILLE = 'Villeneuve-sur-Banc';
+const LIEU_NOMME = `Relais Vinted Go, Droguerie du Banc, ${RUE}, 35400 ${VILLE}`;
 const TITRE = 'Nike Air Zoom Alphafly NEXT% Eliud Kipchoge 44';
-const achat = (id, k) => ({ transaction_id: id, conversation_id: conv(id), title: TITRE, price: { amount: '13.36', currency_code: 'EUR' }, status: DEPOSE, transaction_user_status: 'needs_action', date: iso(MS - 12 * 864e5), photo: { url: url(k) } });
-const QR = 'http://p.vintedgo.com/public/v1/qr_codes/0000aaaa.png';
-const LIGNES = [
-  { id: 'main', data: { vrm_ville: 'Saint-Malo' } },
-  { id: 'harvest_111_orders_purchased', data: { capturedAt: cap, payload: { my_orders: [achat(9401, 1), achat(9402, 2)] } } },
-  { id: 'harvest_111_orders_sold', data: { capturedAt: cap, payload: { my_orders: [] } } },
-  { id: 'panel_colis_relais', data: { 9401: { code: '978216', lieu: LIEU, transporteur: 'vinted', at: '2026-11-20T10:00:00.000Z' }, 9402: { code: '431907', lieu: LIEU, transporteur: 'vinted', at: '2026-11-20T10:00:00.000Z' } } },
-  // L'e-mail Vinted Go (arrivée du 19, rappel du 22 sur la MÊME ligne), code écrit « 978 216 », QR, limite LUE le 25.
-  { id: `email_track_vinted_${N}`, data: { type: 'suivi', carrier: 'vinted', suivi: N, status: 'available', statusLabel: 'Au point relais', subject: `Rappel : récupère ton colis avant le 25/11/2026 #${N}`,
-    receivedAt: '2026-11-22T08:00:00.000Z', emailAt: '2026-11-22T08:00:00.000Z', arriveLe: '2026-11-19T08:00:00.000Z', code: '978 216', lieu: LIEU, limite: '2026-11-25', consigne: false, qrUrl: QR, account: 'compte_a' } },
-  // La moitié Vinted : « Commande mise à jour » de SA conversation, SANS code écrit, sans limite, le 20.
-  { id: `email_track_autre_conv-${conv(9401)}`, data: { type: 'suivi', carrier: 'autre', suivi: '', status: 'available', statusLabel: 'Arrivé au point relais (Vinted)', subject: `Commande mise à jour pour ${TITRE}`,
-    receivedAt: '2026-11-20T09:00:00.000Z', emailAt: '2026-11-20T09:00:00.000Z', arriveLe: '2026-11-20T09:00:00.000Z', code: null, lieu: LIEU, limite: null, consigne: false, conv: conv(9401), source: 'vinted-commande', cleLigne: `email_track_autre_conv-${conv(9401)}`, account: 'compte_a' } },
-  // Le témoin : MÊME titre, même point, mêmes jours — un autre code, une autre commande.
-  { id: `email_track_autre_conv-${conv(9402)}`, data: { type: 'suivi', carrier: 'autre', suivi: '', status: 'available', statusLabel: 'Arrivé au point relais (Vinted)', subject: `Commande mise à jour pour ${TITRE}`,
-    receivedAt: '2026-11-20T09:00:00.000Z', emailAt: '2026-11-20T09:00:00.000Z', arriveLe: '2026-11-20T09:00:00.000Z', code: '431907', lieu: LIEU, limite: null, consigne: false, conv: conv(9402), source: 'vinted-commande', cleLigne: `email_track_autre_conv-${conv(9402)}`, account: 'compte_a' } },
-];
-let ko = 0, ok = 0;
-const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d && !c ? ' — ' + d : '')); };
-const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e.message || e).slice(0, 200)); } };
-const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2', '.mjs': 'text/javascript' };
-const srv = http.createServer((q, r) => {
-  let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
-  const p = path.join(DIST, f);
-  if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
-  r.writeHead(200, { 'content-type': types[path.extname(p)] || 'application/octet-stream' }); fs.createReadStream(p).pipe(r);
-});
-srv.on('error', (e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance avec BANC_PORT=…'); process.exit(1); });
-srv.listen(PORT);
-const metaDe = (d) => Object.fromEntries(Object.entries(d || {}).filter(([, v]) => v !== null && typeof v !== 'object' && String(v).length <= 600));
-const projette = (row, sel) => {
-  if (!sel || sel === '*') return row;
-  const out = {};
-  for (const part of sel.split(',')) {
-    const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue;
-    const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
-    if (src === 'id') { out[alias] = row.id; continue; }
-    if (src === 'data') { out[alias] = row.data; continue; }
-    if (src === 'meta') { out[alias] = metaDe(row.data); continue; }
-    if (src === 'updated_at') { out[alias] = cap; continue; }
-    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
-    out[alias] = v == null ? null : (/->>/.test(src) && typeof v !== 'string' ? String(v) : v);
-  }
-  return out;
-};
-const ouvrir = async (b, vp, sombre) => {
-  const ctx = await b.newContext({ viewport: vp, timezoneId: 'Europe/Paris', ...(vp.width < 600 ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
-  const pg = await ctx.newPage();
-  const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.clock.install({ time: MATIN });
-  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', JSON.stringify(s)); localStorage.setItem('vrm_visite_vue', JSON.stringify(true)); } catch (_) {} }, !!sombre);
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
-    const u = r.request().url();
-    if (/images1\.vinted\.net|vintedgo\.com/.test(u)) return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#dfe3e8"/></svg>' });
-    if (/api-adresse\.data\.gouv\.fr/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ features: [] }) });
-    if (/nominatim\.openstreetmap\.org/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
-    return ['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue();
-  });
-  await pg.route('**/rest/v1/**', (route) => {
-    const u = decodeURIComponent(metaVersData(route.request().url()));
-    if (route.request().method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
-    const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
-    if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
-    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
-    const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: cap, cap: r.data.capturedAt });
-    const filtres = [...u.matchAll(/[?&]data->>([a-zA-Z_]+)=(not\.)?is\.null/g)];
-    const passe = (r) => filtres.every(([, k, non]) => (r.data[k] == null) === !non);
-    const inn = /[?&]id=in\.\(([^)]*)\)/.exec(u);
-    if (inn) { const ids = inn[1].split(',').map((x) => x.replace(/^"|"$/g, '')); return j(LIGNES.filter((r) => ids.includes(r.id) && passe(r)).map(forme)); }
-    const eq = /[?&]id=eq\.([^&]*)/.exec(u);
-    if (eq) return j(LIGNES.filter((r) => r.id === eq[1] && passe(r)).map(forme));
-    const lk = /[?&]id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(LIGNES.filter((r) => re.test(r.id) && passe(r)).map(forme)); }
-    return j([]);
-  });
-  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-  await pg.goto(`http://localhost:${PORT}/?tab=achats`, { waitUntil: 'domcontentloaded' });
-  return { ctx, pg, errs };
-};
-const lire = (pg) => pg.evaluate(() => {
-  const rangs = [...document.querySelectorAll('[data-rp-point] [data-rp-colis]')].map((li) => ({
-    cle: li.getAttribute('data-rp-colis') || '', code: (li.getAttribute('data-rp-code') || li.getAttribute('data-v2-code') || '').replace(/\s+/g, ''),
-    verif: li.getAttribute('data-rp-verif') || '', qr: li.getAttribute('data-v2-qr-dispo') || '',
-    etapes: [...li.querySelectorAll('[data-rp-etape][data-rp-etape-lue="1"]')].map((e) => [e.getAttribute('data-rp-etape'), (e.getAttribute('data-rp-etape-at') || '').slice(0, 10)]),
-    texte: li.innerText.replace(/\s+/g, ' ').slice(0, 160) }));
+const DEPOSE = "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais";
+const conv = (tx) => `0000aaaa-0000-4000-8000-${String(tx).padStart(12, '0')}`;
+function baseDouble() {
+  const b = base();
+  const uid = b.accounts[0].vinted_user_id;
+  const my = (b.rows.find((r) => r.id === `harvest_${uid}_orders_purchased`) || {}).data.payload.my_orders;
+  const achat = (tx, titre) => my.unshift({ transaction_id: tx, conversation_id: conv(tx), title: titre, price: { amount: '13.36', currency_code: 'EUR' }, status: DEPOSE,
+    transaction_user_status: 'needs_action', date: iso(-12 * J), photo: { url: `https://images1.vinted.net/t/r${tx}/f800/p.jpeg` } });
+  achat(99300001, TITRE); achat(99300002, TITRE);
+  let relais = b.rows.find((r) => r.id === 'panel_colis_relais'); if (!relais) { relais = { id: 'panel_colis_relais', data: {} }; b.rows.push(relais); }
+  relais.data['99300001'] = { code: '978216', lieu: LIEU_NOMME, transporteur: 'vinted', at: iso(-7 * J) };
+  relais.data['99300002'] = { code: '431907', lieu: LIEU_NOMME, transporteur: 'vinted', at: iso(-7 * J) };
+  // (1) l'e-mail Vinted Go : code écrit « 978 216 », QR, arrivé il y a 8 jours, limite LUE passée (il y a 2 jours) ; le rappel l'a réécrit.
+  b.rows.push({ id: `email_track_vinted_${N}`, data: { type: 'suivi', carrier: 'vinted', suivi: N, status: 'available', statusLabel: 'Au point relais', subject: `Rappel : récupère ton colis avant le ${jourParis(Date.now() - 2 * J).split('-').reverse().join('/')} #${N}`,
+    receivedAt: iso(-5 * J), emailAt: iso(-5 * J), arriveLe: iso(-8 * J), code: '978 216', code2: null, lieu: LIEU_NOMME, limite: jourParis(Date.now() - 2 * J), consigne: false, qrUrl: 'https://p.vintedgo.com/public/v1/qr_codes/banc.png', account: b.accounts[0].login } });
+  // … et la moitié Vinted de SA conversation, sans code écrit, sans limite, le lendemain.
+  const moitie = (tx, code) => ({ id: `email_track_autre_conv-${conv(tx)}`, data: { type: 'suivi', carrier: 'autre', suivi: '', status: 'available', statusLabel: 'Arrivé au point relais (Vinted)', subject: `Commande mise à jour pour ${TITRE}`,
+    receivedAt: iso(-7 * J), emailAt: iso(-7 * J), arriveLe: iso(-7 * J), code, lieu: LIEU_NOMME, limite: null, consigne: false, conv: conv(tx), source: 'vinted-commande', cleLigne: `email_track_autre_conv-${conv(tx)}`, account: b.accounts[0].login } });
+  b.rows.push(moitie(99300001, null), moitie(99300002, '431907'));
+  // (2) deux colis Vinted Go dont le lieu est celui du SUIVI (« <n° et rue>, <ville> », sans le commerce), au même endroit,
+  // et un à la même rue, AUTRE numéro.
+  const vg = (suivi, code, lieu) => b.rows.push({ id: `email_track_vinted_${suivi}`, data: { type: 'suivi', carrier: 'vinted', suivi, status: 'available', statusLabel: 'Au point relais', subject: 'Ton colis Vinted Go est arrivé',
+    receivedAt: iso(-6 * H), emailAt: iso(-6 * H), arriveLe: iso(-6 * H), code, code2: null, lieu, limite: jourParis(Date.now() + 5 * J), consigne: false, account: '' } });
+  vg('1792000000000201', '713080', `${RUE}, ${VILLE}`);
+  vg('1792000000000202', '703693', `${RUE}, ${VILLE}`);
+  vg('1792000000000203', '555123', `12 Rue des Essais, ${VILLE}`);
+  return b;
+}
+const releve = () => {
+  const vis = (e) => !!e && e.getClientRects().length > 0;
+  const points = [...document.querySelectorAll('[data-rp-point]')].filter(vis).map((c) => ({
+    nom: ((c.querySelector('.n-rp-nom') || {}).textContent || '').trim(), texte: c.innerText.replace(/\s+/g, ' ').slice(0, 200),
+    colis: [...c.querySelectorAll('[data-rp-colis]')].map((li) => ({ cle: li.getAttribute('data-rp-colis') || '', code: String(li.getAttribute('data-rp-code') || li.getAttribute('data-v2-code') || '').replace(/\s+/g, ''),
+      verif: li.getAttribute('data-rp-verif') || '', qr: li.getAttribute('data-v2-qr-dispo') || '',
+      point: ((li.querySelector('[data-rp-etape="point"][data-rp-etape-lue="1"]') || { getAttribute: () => '' }).getAttribute('data-rp-etape-at') || '') })) }));
   let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) {}
-  return { rangs, pub };
-});
+  return { points, pub };
+};
 
 (async () => {
-  const b = await lancer(PW, { executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] }).catch((e) => { if (estWebkit) throw e; return chromium.launch(); });
+  await new Promise((r) => srv.listen(PORT, r));
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] }).catch(() => chromium.launch({ args: ['--no-sandbox'] }));
   try {
-    for (const [vp, sombre, nom] of [[{ width: 390, height: 844 }, false, '390-clair'], [{ width: 390, height: 844 }, true, '390-sombre'], [{ width: 1512, height: 982 }, false, '1512-clair'], [{ width: 1512, height: 982 }, true, '1512-sombre']]) {
-      console.log(`\n— 978 216 au même point · ${nom}`);
-      const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
-      await essaie(nom, async () => {
-        await pg.waitForFunction(() => document.querySelectorAll('[data-rp-point] [data-rp-colis]').length >= 2, null, { timeout: 40000 }).catch(() => {});
-        await pg.waitForTimeout(2500);
-        const r = await lire(pg);
-        if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); const el = await pg.$('[data-rp-point]'); if (el) { await el.scrollIntoViewIfNeeded().catch(() => {}); await el.screenshot({ path: path.join(SHOTS, `double-code-${nom}.png`) }).catch(() => {}); } }
-        const ceColis = r.rangs.filter((x) => x.code === '978216');
-        dit(ceColis.length === 1, `${nom} : le colis 978 216 (e-mail Vinted Go + moitié Vinted) = UNE rangée`, JSON.stringify(r.rangs));
-        const x = ceColis[0] || {};
-        dit(x.verif === 'depasse', `${nom} : sa limite LUE (25 nov.) est passée ⇒ « Date limite dépassée · à vérifier »`, JSON.stringify(x));
-        dit(x.qr === '1', `${nom} : il garde le QR de l'e-mail du transporteur`, JSON.stringify(x));
-        const auPoint = (x.etapes || []).find((e) => e[0] === 'point');
-        dit(!auPoint || auPoint[1] === '2026-11-19', `${nom} : « Au point » daté du 19 nov. (le transporteur), jamais du 20 (Vinted)`, JSON.stringify(x.etapes));
-        const temoin = r.rangs.filter((y) => y.code === '431907');
-        dit(temoin.length === 1, `${nom} : le témoin (même titre, même point, autre code, autre commande) : une rangée à part, jamais réunie`, JSON.stringify(r.rangs));
-        const pubIds = r.pub ? JSON.stringify([...(r.pub.colis || []), ...(r.pub.verif || [])]) : '';
-        dit(!!r.pub && (pubIds.match(new RegExp(N, 'g')) || []).length <= 1 && !(r.pub.colis || []).some((c) => String(c[3] || '').includes('9401')), `${nom} : le compte publié (Ma journée, widget) n'a jamais ce colis deux fois`, JSON.stringify(r.pub && { total: r.pub.total, colis: r.pub.colis, verif: r.pub.verif }));
-        if (vp.width < 600 && !sombre) {
-          const bouton = pg.locator('[data-rp-colis] [data-rp-verif-geste="retire"]').first();
-          if (await bouton.count()) { await bouton.click(); await pg.waitForTimeout(2500); }
-          const apres = await lire(pg);
-          if (SHOTS) { const el = await pg.$('[data-rp-point]'); if (el) await el.screenshot({ path: path.join(SHOTS, `double-code-${nom}-apres-retire.png`) }).catch(() => {}); }
-          const restes = apres.rangs.filter((y) => y.code === '978216' && !/gris|retir/i.test(y.verif));
-          dit(restes.length === 0, `${nom} : « Retiré » sur la rangée réunie ⇒ plus aucune rangée 978 216 (la moitié Vinted ne revient pas seule)`, JSON.stringify(apres.rangs));
-          dit(apres.rangs.filter((y) => y.code === '431907').length === 1, `${nom} : le témoin reste`, JSON.stringify(apres.rangs));
-        }
-      });
-      dit(!errs.length, `${nom} : aucune erreur`, errs.join(' | ').slice(0, 200));
+    for (const W of [390, 1512]) for (const th of ['clair', 'sombre']) {
+      const nom = `${W}-${th}`;
+      console.log(`\n── 978 216 et le point du 10 Rue · ${nom}`);
+      const b = baseDouble();
+      const { ctx, pg, erreurs } = await ouvrir(nav, { W, sombre: th === 'sombre', b, url: '/?tab=achats', dsf: 2 });
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_banc_dom_ancien'); localStorage.removeItem('vrm_banc_retrait_variante'); } catch (_) {} });
+      await pg.reload({ waitUntil: 'domcontentloaded' });
+      await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
+      await attendre(pg, () => document.querySelectorAll('[data-rp-point] [data-rp-colis]').length >= 5);
+      await pg.waitForTimeout(2000);
+      const r = await pg.evaluate(releve);
+      const tous = r.points.flatMap((p) => p.colis.map((c) => ({ ...c, pointNom: p.nom })));
+      const ceColis = tous.filter((c) => c.code === '978216');
+      dit(ceColis.length === 1, `${nom} : (1) le colis 978 216 (e-mail Vinted Go + moitié Vinted) = UNE rangée`, r.points.map((p) => [p.nom, p.colis.map((c) => c.code + ':' + c.verif)]));
+      const x = ceColis[0] || {};
+      dit(x.verif === 'depasse', `${nom} : (1) sa limite LUE est passée ⇒ « Date limite dépassée · à vérifier »`, x);
+      dit(x.qr === '1', `${nom} : (1) il garde le QR de l'e-mail du transporteur`, x);
+      dit(!x.point || jourParis(Date.parse(x.point)) === jourParis(Date.now() - 8 * J), `${nom} : (1) « Au point » au jour du transporteur (il y a 8 j), jamais celui de Vinted (7 j)`, x);
+      dit(tous.filter((c) => c.code === '431907').length === 1, `${nom} : (1) le témoin (même titre, même point, autre code, autre commande) : une rangée à part`, tous.map((c) => c.code));
+      const pub = r.pub ? JSON.stringify([...(r.pub.colis || []), ...(r.pub.verif || [])]) : '';
+      dit(!!r.pub && (pub.match(new RegExp(N, 'g')) || []).length <= 1, `${nom} : (1) le compte publié (Ma journée, widget) n'a jamais ce colis deux fois`, r.pub && { total: r.pub.total, colis: r.pub.colis, verif: r.pub.verif });
+      const auDix = r.points.filter((p) => p.colis.some((c) => ['713080', '703693', '978216', '431907'].includes(c.code)));
+      dit(auDix.length === 1 && /Droguerie du Banc/.test(auDix[0].nom) && auDix[0].colis.length === 4, `${nom} : (2) « Droguerie du Banc » et « ${RUE}, ${VILLE} » (le suivi Vinted Go) : UNE carte, au vrai nom, 4 colis`, auDix.map((p) => [p.nom, p.colis.map((c) => c.code)]));
+      const douze = r.points.filter((p) => p.colis.some((c) => c.code === '555123'));
+      dit(douze.length === 1 && !douze[0].colis.some((c) => c.code === '713080'), `${nom} : (2) le 12 de la même rue : une AUTRE carte`, douze.map((p) => p.nom));
+      const el = await pg.$('[data-rp-point]');
+      if (el) { await el.scrollIntoViewIfNeeded().catch(() => {}); await pg.screenshot({ path: path.join(SHOTS, `double-code-${nom}.png`), fullPage: false }).catch(() => {}); }
+      if (W < 600 && th === 'clair') {
+        const bouton = pg.locator('[data-rp-colis][data-rp-code*="978"] [data-rp-verif-geste="retire"], [data-rp-colis][data-v2-code*="978"] [data-rp-verif-geste="retire"]').first();
+        const n = await bouton.count();
+        if (n) { await bouton.click(); await pg.waitForTimeout(2500); }
+        const apres = await pg.evaluate(releve);
+        const reste = apres.points.flatMap((p) => p.colis).filter((c) => c.code === '978216');
+        dit(n > 0 && reste.length === 0, `${nom} : (1) « Retiré » sur la rangée réunie ⇒ plus aucune rangée 978 216 (la moitié Vinted ne revient pas seule)`, { bouton: n, reste });
+        dit(apres.points.flatMap((p) => p.colis).filter((c) => c.code === '431907').length === 1, `${nom} : (1) le témoin reste`);
+        await pg.screenshot({ path: path.join(SHOTS, `double-code-${nom}-apres-retire.png`), fullPage: false }).catch(() => {});
+      }
+      dit(!erreurs.length, `${nom} : aucune erreur de page`, erreurs.slice(0, 3));
       await ctx.close();
     }
-  } finally { await b.close(); srv.close(); }
-  console.log(`\n${ko ? '❌' : '✅'} retrait-double-code : ${ok} vert(s), ${ko} rouge(s)`);
+  } catch (e) { dit(false, 'le banc a rencontré une erreur', String(e && e.stack || e)); }
+  await nav.close(); srv.close();
+  console.log(`\n${ok} vert(s), ${ko} rouge(s) — captures : ${SHOTS}`);
   process.exit(ko ? 1 : 0);
 })();

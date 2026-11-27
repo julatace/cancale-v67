@@ -102,7 +102,7 @@ export function explicationEnDouble(n) {
 // lieu ni la date. Le colis réuni porte les identités des deux ; la ligne qui fait foi est celle du TRANSPORTEUR (sa date
 // d'arrivée lue, `fiable`), la moitié Vinted ne fait que compléter (une date Vinted n'est qu'une estimation) ; la limite
 // est celle qui a été LUE ; puis il est JUGÉ À NOUVEAU (`juger`) : limite lue et passée ⇒ « à vérifier », sinon compté.
-// Un INCIDENT du transporteur et un « peut-être en double » (sans identité, par définition) restent à part.
+// Un INCIDENT du transporteur reste à part ; un « peut-être en double » qui partage une identité est CE colis, sans elle il reste seul.
 const ensemble = (v) => new Set((Array.isArray(v) ? v : [v]).map((x) => String(x == null ? '' : x).trim()).filter(Boolean));
 const croise = (a, b) => { for (const x of a) if (b.has(x)) return true; return false; };
 const unir = (a, b) => ({ codes: new Set([...a.codes, ...b.codes]), suivis: new Set([...a.suivis, ...b.suivis]), txs: new Set([...a.txs, ...b.txs]) });
@@ -144,7 +144,10 @@ export function reunirParIdentite(liste, aVerifier, { codesDe = () => [], suiviD
   (aVerifier || []).forEach((x, i) => {
     if (!x || x.kind !== 'email' || !x.t) return;
     const et = x.e && x.e.etat;
-    if (et === 'transporteur' || et === 'doute_meme_relais') return;      // un fait du transporteur / sans identité : à part
+    // Un incident du transporteur est un fait à part. Un « peut-être en double » (`doute_meme_relais`) n'entre que s'il PARTAGE
+    // une identité (mesuré au banc du 27 nov. : la moitié Vinted sans code ÉCRIT, dont SA commande porte le code 978216, était
+    // jugée « sans identité » par le seul code de sa ligne) ; sans identité commune, `grouperParIdentite` le laisse seul.
+    if (et === 'transporteur') return;
     items.push({ t: x.t, compte: false, i, x });
   });
   const groupes = grouperParIdentite(items.map((it) => it.t), { codesDe, suiviDe, txDe })

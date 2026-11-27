@@ -140,6 +140,11 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     if (idc) { if (vu.has(idc)) return; vu.add(idc); }
     let morceaux = x.adresse != null && x.rue == null ? decouperAdresse(x.adresse) : { rue: x.rue || '', cp: x.cp || '', ville: x.ville || '' };
     let nomLu = x.nom;
+    // (27 nov., capture de Julien : « 10 Rue du Bois Aurant · Vinted Go · Saint-Malo ») Le lieu du SUIVI Vinted Go, « <n° et rue>,
+    // <ville> », arrive coupé en nom = la rue, adresse = la ville seule : la rue est la RUE du point et la ville sa VILLE (une
+    // adresse, donc un endroit), plus un « nom » isolé sans adresse.
+    if (!String(morceaux.rue || '').match(RUE) && RUE.test(String(nomLu || '').trim()) && !morceaux.cp && !morceaux.ville && /^[A-Za-zÀ-ÿ'’ -]{2,40}$/.test(String(morceaux.rue || '').trim()))
+      morceaux = { rue: String(nomLu).trim(), cp: '', ville: String(morceaux.rue).trim() };
     // (1er nov.) L'adresse COLLÉE au nom (« TABAVAP 29 RUE HOCHE VANNES » : sans
     // code postal, `cleanLieu` garde tout comme nom) : le nom est ce qui précède le
     // numéro de la rue, l'adresse ce qui suit. Sans quoi ce point était un « nom »
