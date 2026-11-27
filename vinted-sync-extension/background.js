@@ -252,6 +252,16 @@ function poserMenuIcone() {
 function surMenuIcone(info, tab) {
   const id = String((info && info.menuItemId) || '');
   if (!MENU_ICONE.some(([m]) => m === id)) return false;
+  // 5.456 : « Connexion à VRM », pas connecté ⇒ le panneau (flouté, la connexion dedans), plus la petite fenêtre.
+  if (id === 'vrm-connexion') {
+    loadSession().then((s) => {
+      if (!s || s.mort || !s.refresh_token) return ouvrirPanneauConnexion(tab);
+      const depuis = tab && Number.isInteger(tab.id) && tab.id >= 0 ? '&depuis=' + tab.id : '';
+      try { chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') + '?mode=onglet' + depuis }); } catch (_) {}
+      return null;
+    }).catch(() => {});
+    return true;
+  }
   const depuis = tab && Number.isInteger(tab.id) && tab.id >= 0 ? '&depuis=' + tab.id : '';
   try { chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') + '?mode=onglet' + (id === 'vrm-etat' ? '&vue=etat' : '') + depuis }); } catch (_) {}
   return true;
@@ -306,8 +316,9 @@ async function surClicIcone(tab) {
     majIcone(false);
     // 5.370 : sans menu (Orion iPhone), la fenêtre de connexion ; sinon VRM, page de connexion.
     if (sansMenuIcone()) { try { await chrome.action.openPopup(); return; } catch (_) {} }
-    // 5.415 : la MÊME demande que « Se connecter » de la fenêtre (notée, bornée, retour à l'onglet).
-    await lierAvecVRM(tab && tab.url, '', tab && tab.id, fenetre);
+    // 5.456 (Julien, 27 nov. : « je veux que ce soit le gros panneau directement qui s'affiche avec les données floutées
+    //    […] Et on se connecte ici ») : plus d'onglet vrm.center — LE PANNEAU, flouté, la connexion dedans.
+    await ouvrirPanneauConnexion(tab);
     return;
   }
   ouvrirVRMDepuis(tab && tab.url, { fenetre });
@@ -573,40 +584,49 @@ async function authToken() {
 // ⚠️ Le mot de passe n'est JAMAIS gardé : il part une fois chez Supabase, qui
 // renvoie deux jetons. Seuls les jetons sont stockés (`chrome.storage.local`,
 // zone locale de l'extension — un site web ne peut pas la lire).
-const MSG_MDP_CAPTCHA = 'La connexion par mot de passe n’est plus possible depuis l’extension : utilise « Se connecter avec VRM ».';
+// ══ 5.456 (27 nov., Julien : « avec l'adresse mail et le mot de passe […] ça ne marche pas très bien. Pareil, avec le
+//    code, ça ne marche pas ») — LA CAUSE, MESURÉE sur le vrai Supabase (27 nov., 22 h 55, clé publique, adresse
+//    inventée `nobody@example.invalid`, rien créé) : la protection anti-robot (Turnstile) est ALLUMÉE.
+//      POST /auth/v1/token?grant_type=password ⇒ 400 {"code":400,"error_code":"captcha_failed","msg":"captcha protection:
+//      request disallowed (no captcha_token found)"} ;  POST /auth/v1/otp ⇒ la MÊME réponse ;  /auth/v1/verify ⇒ 403
+//      `otp_expired` (pas protégé). L'extension n'envoyait AUCUN jeton : TOUT mot de passe et TOUTE demande de code étaient
+//      refusés, quel que soit le compte. Les bancs ne le voyaient pas : leur faux GoTrue n'avait pas de captcha.
+//    ⇒ Le jeton vient d'une petite page de VRM (`https://vrm.center/verif-extension.html`, la clé de site de vrm.center),
+//      posée en cadre DANS le formulaire de l'extension ; il part ICI, dans le corps, sous `gotrue_meta_security.
+//      captcha_token` (comme l'app, src/captcha.js). Aucune protection retirée : sans jeton, GoTrue refuse toujours.
+//      Un jeton ne sert qu'une fois (Turnstile) ; il n'est jamais rangé.
+const MSG_MDP_CAPTCHA = 'La vérification anti-robot n’est pas passée. Attends la coche de la vérification au-dessus du bouton, puis réessaie.';
 function estRefusCaptcha(j, brut) {
   return !!((j && /captcha/i.test(String(j.error_code || j.code || ''))) || /captcha/i.test(String(brut || '')));
 }
-async function authLogin(email, password) {
+// Un jeton Turnstile : une chaîne opaque (lettres, chiffres, . _ - :), 20 à 4096 caractères. Autre chose ⇒ aucun jeton.
+function jetonCaptcha(t) { const v = typeof t === 'string' ? t.trim() : ''; return /^[A-Za-z0-9._:-]{20,4096}$/.test(v) ? v : ''; }
+function avecCaptcha(corps, captcha) { const j = jetonCaptcha(captcha); return j ? Object.assign({}, corps, { gotrue_meta_security: { captcha_token: j } }) : corps; }
+function langueCompte() { try { const l = String((navigator && navigator.language) || 'fr').slice(0, 2).toLowerCase(); return ['fr', 'en', 'es', 'it', 'de'].includes(l) ? l : 'fr'; } catch (_) { return 'fr'; } }
+async function authLogin(email, password, captcha) {
   const mail = String(email || '').trim().toLowerCase();
-  if (!mail || !password) return { ok: false, error: 'Email et mot de passe requis.' };
+  if (!mail || !password) return { ok: false, error: 'Tape l’e-mail et le mot de passe de ton compte VRM.' };
   try {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: mail, password }),
+      body: JSON.stringify(avecCaptcha({ email: mail, password }, captcha)),
     });
     const j = await res.json().catch(() => ({}));
-    if (!res.ok || !j.access_token) {
-      // On traduit : « invalid_grant » n'aide personne à se connecter.
-      const brut = String(j.error_description || j.msg || j.error || '');
-      let msg = brut || 'Connexion refusée.';
-      // ⚠️ CAPTCHA (21 oct.) : le jour où Julien allume Turnstile dans Supabase,
-      //    GoTrue refuse `grant_type=password` sans jeton captcha (400,
-      //    `captcha_failed`, « captcha protection: request disallowed »). Une page
-      //    d'extension MV3 ne peut pas charger le script distant de Turnstile :
-      //    ce chemin est fermé pour de bon, le geste est « Se connecter avec VRM »
-      //    (session fabriquée par le serveur, exemptée du captcha).
-      if (estRefusCaptcha(j, brut)) {
-        return { ok: false, captcha: true, error: MSG_MDP_CAPTCHA };
-      }
-      if (/invalid login|invalid_grant|credentials/i.test(brut)) msg = 'Email ou mot de passe incorrect.';
-      else if (/not confirmed/i.test(brut)) msg = "Cette adresse n'est pas encore confirmée. Ouvre l'email de confirmation, ou confirme le compte depuis l'app.";
-      else if (/rate limit|too many/i.test(brut)) msg = 'Trop de tentatives. Réessaie dans quelques minutes.';
-      return { ok: false, error: msg };
+    if (!res.ok || !j.access_token || !j.refresh_token) {
+      // On traduit : « invalid_credentials » n'aide personne à se connecter. (GoTrue rend `{code, error_code, msg}`
+      // aujourd'hui, `{error, error_description}` avant : les deux formes sont lues.)
+      const quoi = String(j.error_code || j.error || '');
+      const brut = String(j.msg || j.error_description || j.message || j.error || '');
+      if (estRefusCaptcha(j, brut)) return { ok: false, captcha: true, error: MSG_MDP_CAPTCHA };
+      if (/email_not_confirmed/i.test(quoi) || /not confirmed/i.test(brut)) return { ok: false, nonConfirme: true, error: 'Cette adresse n’est pas encore confirmée. Ouvre l’e-mail de confirmation de VRM, ou touche « Recevoir un code » : le code confirme aussi l’adresse.' };
+      if (/invalid_credentials|invalid_grant/i.test(quoi) || /invalid login|credentials/i.test(brut)) return { ok: false, faux: true, error: 'E-mail ou mot de passe incorrect. Vérifie le mot de passe de vrm.center (pas celui de Vinted), ou touche « Recevoir un code ».' };
+      if (res.status === 429 || /rate.?limit|too many/i.test(quoi + ' ' + brut)) return { ok: false, error: 'Trop de tentatives. Réessaie dans quelques minutes, ou touche « Recevoir un code ».' };
+      if (res.ok) return { ok: false, error: 'VRM a répondu sans session. Réessaie dans un instant.' };
+      return { ok: false, error: `VRM n’a pas pu te connecter (erreur ${res.status}). Réessaie dans un instant.` };
     }
     return await adopterSessionAuth(j, mail, 'connexion');
-  } catch (e) { return { ok: false, error: 'Réseau indisponible — réessaie.' }; }
+  } catch (e) { return { ok: false, error: 'Réseau indisponible : vérifie ta connexion, puis réessaie.' }; }
 }
 // La session rendue par Supabase (mot de passe OU code reçu par e-mail) : le
 // MÊME rangement (`saveSession` ⇒ `rangerSession`, relu et vérifié), la même
@@ -652,7 +672,7 @@ async function lireEnvoiCode() {
   try { const c = (await chrome.storage.local.get(CODE_STORE))[CODE_STORE]; return c && typeof c.email === 'string' && Number(c.at) > 0 ? c : null; } catch (_) { return null; }
 }
 function secondesDuMessage(t) { const m = /(\d+)\s*(?:seconds?|secondes?|s\b)/i.exec(String(t || '')); return m ? Math.min(3600, Number(m[1])) : 0; }
-async function authCodeDemande(email) {
+async function authCodeDemande(email, captcha, creer) {
   const mail = String(email || '').trim().toLowerCase();
   if (!mail) return { ok: false, error: 'Tape l’e-mail de ton compte VRM.' };
   if (!MAIL_FORME.test(mail)) return { ok: false, error: 'Cet e-mail n’a pas la bonne forme (exemple : prenom@exemple.fr).' };
@@ -666,7 +686,9 @@ async function authCodeDemande(email) {
     res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: mail, create_user: false }),
+      // 5.456 : le jeton anti-robot (voir `authLogin`) ; « Créer un compte » (`creer`) : le code CRÉE le compte (la
+      //    langue suit le compte, comme l'inscription de l'app) — jamais sans SON toucher sur « Créer mon compte ».
+      body: JSON.stringify(avecCaptcha(creer === true ? { email: mail, create_user: true, data: { langue: langueCompte() } } : { email: mail, create_user: false }, captcha)),
       signal: AbortSignal.timeout(15000),
     });
     brut = await res.text().catch(() => '');
@@ -675,20 +697,21 @@ async function authCodeDemande(email) {
   if (!res.ok) {
     const quoi = String((j && (j.error_code || j.code || '')) || '');
     const texte = String((j && (j.msg || j.error_description || j.message || j.error)) || brut || '');
-    if (estRefusCaptcha(j, brut)) return { ok: false, captcha: true, error: 'VRM demande une vérification anti-robot que la carte ne sait pas afficher. Touche l’icône VRM dans les réglages de l’extension pour te connecter.' };
+    if (estRefusCaptcha(j, brut)) return { ok: false, captcha: true, error: MSG_MDP_CAPTCHA };
     if (res.status === 429 || /rate.?limit|too many|only request this/i.test(quoi + ' ' + texte)) {
       const s = secondesDuMessage(texte);
       return { ok: false, attendre: s || 60, error: s ? `Trop de demandes de code : réessaie dans ${s} s.` : 'Trop de demandes de code pour l’instant : réessaie dans quelques minutes.' };
     }
     if (/otp_disabled|signups? not allowed|user not found|not.?found/i.test(quoi + ' ' + texte) || res.status === 422) {
-      return { ok: false, inconnu: true, error: 'Aucun compte VRM avec cet e-mail. Vérifie l’adresse (celle de ton compte vrm.center), ou crée ton compte sur vrm.center.' };
+      if (creer === true) return { ok: false, error: 'Les inscriptions sont fermées pour le moment : aucun compte n’a été créé.' };
+      return { ok: false, inconnu: true, error: 'Aucun compte VRM avec cet e-mail. Vérifie l’adresse, ou touche « Créer un compte ».' };
     }
     return { ok: false, error: `VRM n’a pas pu envoyer le code (erreur ${res.status}). Réessaie dans un instant.` };
   }
   const at = Date.now();
   try { await chrome.storage.local.set({ [CODE_STORE]: { email: mail, at } }); } catch (_) {}
   Promise.resolve().then(() => noterDiag('code_demande')).catch(() => {});
-  return { ok: true, email: mail, at, renvoiDans: Math.ceil(CODE_RENVOI_MS / 1000) };
+  return { ok: true, email: mail, at, creer: creer === true, renvoiDans: Math.ceil(CODE_RENVOI_MS / 1000) };
 }
 async function authCodeVerif(email, code) {
   const mail = String(email || '').trim().toLowerCase();
@@ -711,7 +734,7 @@ async function authCodeVerif(email, code) {
     const quoi = String((j && (j.error_code || j.code || '')) || '');
     const texte = String((j && (j.msg || j.error_description || j.message || j.error)) || brut || '');
     if (res.status === 429 || /rate.?limit|too many/i.test(quoi + ' ' + texte)) return { ok: false, error: 'Trop d’essais : attends quelques minutes, puis demande un nouveau code.' };
-    if (estRefusCaptcha(j, brut)) return { ok: false, captcha: true, error: 'VRM demande une vérification anti-robot que la carte ne sait pas afficher.' };
+    if (estRefusCaptcha(j, brut)) return { ok: false, captcha: true, error: MSG_MDP_CAPTCHA };
     // GoTrue ne distingue pas « faux » et « expiré » (`otp_expired` pour les deux) :
     // on ne connaît que l'âge de NOTRE envoi.
     const vieux = envoi && envoi.email === mail && Date.now() - Number(envoi.at) > CODE_VIE_MS;
@@ -950,11 +973,36 @@ function originePanneau(u) { try { const x = new URL(String(u || '')); return x.
 //  sinon un onglet NEUF. Un onglet qui charge (`status: 'loading'` ou une `pendingUrl`) n'est jamais touché.
 const ongletEnCharge = (x) => !x || x.status !== 'complete' || !!x.pendingUrl;
 const ongletAuRepos = (x) => !!x && !ongletEnCharge(x) && !x.active && !!originePanneau(x.url);
+// ══ 5.456 (Julien, 27 nov., 23 h : « Je ne veux pas que ce soit un petit module à droite avec connexion à Google dans une
+//  autre page ou avec Discord. Je veux que ce soit le gros panneau directement qui s'affiche avec les données floutées […]
+//  Et on se connecte ici. ») — PAS CONNECTÉ : l'icône et « Connexion à VRM » ouvrent LE PANNEAU dans l'onglet du site
+//  (Vinted, Leboncoin, Vestiaire) qu'il regarde, SANS recharger la page (vrm-badge.js l'ouvre : `panneauConnexion`) ;
+//  la page n'a pas encore le script (ouverte avant l'installation) ⇒ le lien du panneau dans CET onglet ; ailleurs, un
+//  onglet vinted.fr neuf sur le panneau. Jamais vrm.center. Un onglet qui charge n'est jamais touché (5.455.2).
+const HOTE_SITE_PANNEAU = /^(?:[a-z0-9-]+\.)*(?:vinted\.(?:fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)|leboncoin\.fr|vestiairecollective\.com)$/i;
+function origineSitePanneau(u) { try { const x = new URL(String(u || '')); return x.protocol === 'https:' && HOTE_SITE_PANNEAU.test(x.hostname) ? x.origin : ''; } catch (_) { return ''; } }
+async function ouvrirPanneauConnexion(tab) {
+  const o = tab && Number.isInteger(tab.id) && tab.id >= 0 ? origineSitePanneau(tab.url) : '';
+  if (o && !ongletEnCharge(tab)) {
+    const r = await avecDelai(new Promise((res) => {
+      try { chrome.tabs.sendMessage(tab.id, { from: 'vrm-fond', action: 'panneauConnexion' }, (x) => { try { void chrome.runtime.lastError; } catch (_) {} res(x || null); }); } catch (_) { res(null); }
+    }), 2500, null);
+    if (r && r.ok) { noterDiag('panneau_connexion_ici'); return { ok: true, tab: tab.id, ici: true }; }
+    try { await chrome.tabs.update(tab.id, { url: o + PANNEAU_ACCUEIL, active: true }); noterDiag('panneau_connexion_lien'); return { ok: true, tab: tab.id, ici: false }; } catch (_) {}
+  }
+  try { const n = await chrome.tabs.create({ url: 'https://www.vinted.fr' + PANNEAU_ACCUEIL, active: true }); noterDiag('panneau_connexion_nouveau'); return { ok: true, tab: n && n.id, nouveau: true }; } catch (_) { return { ok: false }; }
+}
 async function ouvrirPanneauAccueil(tabId) {
   let t = null, o = '', site = '';
   if (Number.isInteger(tabId) && tabId >= 0) { try { t = await chrome.tabs.get(tabId); site = t ? originePanneau(t.url) : ''; o = t && !ongletEnCharge(t) ? site : ''; } catch (_) { t = null; } }
   if (!o) { t = null; try { const a = (await chrome.tabs.query({})).find(ongletAuRepos); if (a) { t = a; o = originePanneau(a.url); } } catch (_) {} }
   const url = (o || site || 'https://www.vinted.fr') + PANNEAU_ACCUEIL;
+  // 5.456 : l'onglet a déjà le panneau (flouté, pas connecté) ⇒ il s'ouvre et se dé-floute SUR PLACE, la page n'est pas
+  //    rechargée ; sans réponse (page sans le script), le lien du panneau comme avant.
+  if (t && o) {
+    const r = await avecDelai(new Promise((res) => { try { chrome.tabs.sendMessage(t.id, { from: 'vrm-fond', action: 'panneauConnexion' }, (x) => { try { void chrome.runtime.lastError; } catch (_) {} res(x || null); }); } catch (_) { res(null); } }), 2500, null);
+    if (r && r.ok) { try { await chrome.tabs.update(t.id, { active: true }); await chrome.windows.update(t.windowId, { focused: true }); } catch (_) {} noterDiag('panneau_apres_connexion_ici'); return { ok: true, tab: t.id, nouveau: false, ici: true }; }
+  }
   try {
     if (t && o) { await chrome.tabs.update(t.id, { url, active: true }); try { await chrome.windows.update(t.windowId, { focused: true }); } catch (_) {} noterDiag('panneau_apres_connexion_onglet'); return { ok: true, tab: t.id, nouveau: false }; }
     const n = await chrome.tabs.create({ url, active: true }); noterDiag('panneau_apres_connexion_nouveau'); return { ok: true, tab: n && n.id, nouveau: true };
@@ -4070,14 +4118,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // extension : `onMessage` n'entend qu'elle). Jamais d'onglet ouvert ensuite.
     if (msg && msg.from === 'vrm-badge' && msg.action === 'authLogin') {
       if (!sender || !sender.tab) { sendResponse({ ok: false, error: 'Connexion refusée.' }); return true; }
-      authLogin(msg.email, msg.password).then(sendResponse, () => sendResponse({ ok: false, error: 'Réseau indisponible — réessaie.' }));
+      authLogin(msg.email, msg.password, msg.captcha).then(sendResponse, () => sendResponse({ ok: false, error: 'Réseau indisponible — réessaie.' }));
       return true;
     }
     // 5.330 : « Me connecter avec un code » (e-mail) dans la carte du logo.
     // Seulement depuis un onglet (un script de contenu de CETTE extension).
     if (msg && msg.from === 'vrm-badge' && (msg.action === 'authCodeDemande' || msg.action === 'authCodeVerif' || msg.action === 'authCodeEtat')) {
       if (!sender || !sender.tab) { sendResponse({ ok: false, error: 'Connexion refusée.' }); return true; }
-      const p = msg.action === 'authCodeDemande' ? authCodeDemande(msg.email)
+      const p = msg.action === 'authCodeDemande' ? authCodeDemande(msg.email, msg.captcha, msg.creer === true)
         : msg.action === 'authCodeVerif' ? authCodeVerif(msg.email, msg.code) : authCodeEtat();
       p.then(sendResponse, () => sendResponse({ ok: false, error: 'Réseau indisponible — réessaie.' }));
       return true;
@@ -4087,7 +4135,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       // worker qui ouvre VRM après la connexion. La carte se referme dès que la
       // session change, AVANT d'avoir reçu cette réponse : elle n'ouvrait VRM
       // que 45 fois sur 50 (mesuré, 11 octobre).
-      authLogin(msg.email, msg.password).then((r) => {
+      authLogin(msg.email, msg.password, msg.captcha).then((r) => {
         if (r && r.ok && msg.ouvrir && sender && sender.tab) ouvrirVRMDepuis(sender.tab.url || '');
         sendResponse(r);
       });

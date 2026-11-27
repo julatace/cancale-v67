@@ -107,7 +107,10 @@ const MOTS = {
   e_forme: { fr: 'Cet e-mail n’a pas la bonne forme (exemple : prenom@exemple.fr).', en: 'This e-mail is not valid (example: name@example.com).', es: 'Este correo no es válido (ejemplo: nombre@ejemplo.es).', it: 'Questa e-mail non è valida (esempio: nome@esempio.it).', de: 'Diese E-Mail ist ungültig (Beispiel: name@beispiel.de).' },
   e_muet: { fr: 'L’extension n’a pas répondu. Réessaie dans un instant, ou touche « Relier par vrm.center ».', en: 'The extension did not answer. Try again in a moment, or tap “Link through vrm.center”.', es: 'La extensión no respondió. Reinténtalo en un momento, o toca «Vincular con vrm.center».', it: 'L’estensione non ha risposto. Riprova tra poco, oppure tocca «Collega tramite vrm.center».', de: 'Die Erweiterung hat nicht geantwortet. Versuche es gleich noch einmal oder tippe auf „Über vrm.center verbinden“.' },
   e_refus: { fr: 'Connexion refusée.', en: 'Sign-in refused.', es: 'Conexión rechazada.', it: 'Accesso rifiutato.', de: 'Anmeldung abgelehnt.' },
-  e_captcha: { fr: 'VRM demande une vérification que cette fenêtre ne sait pas afficher : touche « Relier par vrm.center ».', en: 'VRM asks for a check this window cannot show: tap “Link through vrm.center”.', es: 'VRM pide una verificación que esta ventana no puede mostrar: toca «Vincular con vrm.center».', it: 'VRM chiede una verifica che questa finestra non può mostrare: tocca «Collega tramite vrm.center».', de: 'VRM verlangt eine Prüfung, die dieses Fenster nicht anzeigen kann: tippe auf „Über vrm.center verbinden“.' },
+  v_attente: { fr: 'Vérification anti-robot…', en: 'Anti-robot check…', es: 'Verificación antirobot…', it: 'Verifica anti-robot…', de: 'Anti-Roboter-Prüfung…' },
+  v_case: { fr: 'Coche la case de la vérification, puis réessaie.', en: 'Tick the check box, then try again.', es: 'Marca la casilla de la verificación y vuelve a intentarlo.', it: 'Spunta la casella della verifica, poi riprova.', de: 'Setze das Häkchen der Prüfung und versuche es erneut.' },
+  v_titre: { fr: 'Vérification anti-robot', en: 'Anti-robot check', es: 'Verificación antirobot', it: 'Verifica anti-robot', de: 'Anti-Roboter-Prüfung' },
+  e_captcha: { fr: 'La vérification anti-robot ne se charge pas : désactive un bloqueur pour vrm.center, ou touche « Relier par vrm.center ».', en: 'VRM asks for a check this window cannot show: tap “Link through vrm.center”.', es: 'VRM pide una verificación que esta ventana no puede mostrar: toca «Vincular con vrm.center».', it: 'VRM chiede una verifica che questa finestra non può mostrare: tocca «Collega tramite vrm.center».', de: 'VRM verlangt eine Prüfung, die dieses Fenster nicht anzeigen kann: tippe auf „Über vrm.center verbinden“.' },
 };
 const LANGUE = (() => { try { const l = globalThis.VRM_UI && globalThis.VRM_UI.langue(); if (['fr', 'en', 'es', 'it', 'de'].includes(l)) return l; } catch (_) {} return 'fr'; })();
 const T = (cle, v) => { const m = MOTS[cle] || {}; let t = m[LANGUE] || m.fr || cle; for (const k of Object.keys(v || {})) t = t.split('{' + k + '}').join(String(v[k])); return t; };
@@ -312,6 +315,7 @@ function htmlFormulaire(e) {
         <div class="champ-mdp"><input class="champ" id="pw" type="password" aria-label="${esc(T('ph_pw'))}" placeholder="${esc(T('ph_pw'))}" autocomplete="current-password" enterkeyhint="go">
           <button class="oeil" id="oeilBtn" type="button" aria-pressed="false" aria-controls="pw" aria-label="${esc(T('b_voir'))}" title="${esc(T('b_voir'))}">${OEIL}</button></div>
       </div>
+      <div id="verifBox" data-verif></div>
       <button class="plein" id="inBtn" data-me-connecter>${esc(T('b_me_connecter'))}</button>
       <p class="err" id="authErr" role="alert" hidden></p>
       <p class="sep" aria-hidden="true"><span>${esc(T('sep_ou'))}</span></p>
@@ -328,8 +332,44 @@ async function ouvrirPanneauPuisFermer() {
   if (r && r.ok) { if (!ONGLET) { try { window.close(); } catch (_) {} } return true; }
   charger(); return false;
 }
+// ══ 5.456 — LA VÉRIFICATION ANTI-ROBOT (mesuré le 27 nov. : sans jeton Turnstile, Supabase refuse TOUT mot de passe,
+//    400 `captcha_failed`) : la petite page de VRM (`verif-extension.html`, clé de site de vrm.center) en cadre ; elle rend
+//    le jeton à CETTE page seulement (origine + nonce). Rien d'autre ne va vers ce cadre (ni e-mail ni mot de passe).
+const URL_VERIF = 'https://vrm.center/verif-extension.html';
+let verifEl = null, verifN = '', verifJeton = '', verifEtat = '', verifSuite = null, verifMinut = null;
+function poserVerif(box) {
+  const b = box.querySelector('#verifBox'); if (!b) return;
+  try { const a = new Uint8Array(12); crypto.getRandomValues(a); verifN = Array.from(a, (x) => x.toString(16).padStart(2, '0')).join(''); } catch (_) { verifN = String(Date.now()) + Math.random().toString(36).slice(2, 10); }
+  verifJeton = ''; verifEtat = 'charge';
+  const sombre = document.documentElement.getAttribute('data-theme') === 'sombre' || (document.documentElement.getAttribute('data-theme') !== 'clair' && (() => { try { return matchMedia('(prefers-color-scheme: dark)').matches; } catch (_) { return false; } })());
+  const f = document.createElement('iframe');
+  f.src = URL_VERIF + '?parent=' + encodeURIComponent(location.origin) + '&n=' + verifN + '&theme=' + (sombre ? 'sombre' : 'clair');
+  f.title = T('v_titre'); f.setAttribute('data-verif-cadre', '');
+  f.style.cssText = 'display:block;width:100%;height:0;border:0;margin:12px 0 0;background:transparent;color-scheme:normal;overflow:hidden;';
+  b.replaceChildren(f); verifEl = f;
+}
+function remettreVerif() { verifJeton = ''; verifEtat = 'charge'; try { if (verifEl && verifEl.contentWindow) verifEl.contentWindow.postMessage({ __vrmVerif: 'reset', n: verifN }, 'https://vrm.center'); } catch (_) {} }
+function prendreJeton(suite, annuler) {
+  const prendre = () => { const j = verifJeton; if (j) remettreVerif(); return j; };
+  if (verifJeton || !verifEl || verifEtat === 'erreur') { suite(prendre()); return; }
+  if (verifEtat === 'interactif') { annuler(T('v_case')); return; }
+  clearTimeout(verifMinut);
+  verifSuite = () => { clearTimeout(verifMinut); verifSuite = null; suite(prendre()); };
+  verifMinut = setTimeout(() => { if (verifSuite) verifSuite(); }, 12000);
+}
+try {
+  window.addEventListener('message', (ev) => {
+    if (ev.origin !== 'https://vrm.center') return;
+    const d = ev.data;
+    if (!d || typeof d !== 'object' || typeof d.__vrmVerif !== 'string' || !verifN || d.n !== verifN) return;
+    if (d.__vrmVerif === 'jeton' && typeof d.jeton === 'string' && d.jeton.length >= 20 && d.jeton.length <= 4096) { verifJeton = d.jeton; verifEtat = 'pret'; if (verifSuite) verifSuite(); }
+    else if (d.__vrmVerif === 'etat' && ['charge', 'interactif', 'expire', 'erreur'].includes(d.etat)) { verifEtat = d.etat === 'expire' ? 'charge' : d.etat; verifJeton = ''; if (d.etat === 'erreur' && verifSuite) verifSuite(); }
+    else if (d.__vrmVerif === 'hauteur' && verifEl) verifEl.style.height = Math.max(0, Math.min(140, Math.ceil(Number(d.h) || 0))) + 'px';
+  });
+} catch (_) {}
 function brancherFormulaire(box) {
   lireFournisseurs(rendreFournisseurs);
+  poserVerif(box);
   box.querySelector('#oubliLien').addEventListener('click', (ev) => {
     ev.preventDefault();
     const url = ev.currentTarget.href;
@@ -354,17 +394,21 @@ function brancherFormulaire(box) {
       if (fini) return; fini = true; clearTimeout(attente);
       enVol = false; btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = T('b_me_connecter'); err.classList.remove('info');
       if (r && r.ok) { rendre({ ok: true, etat: 'connecte', email: r.email || email }); ouvrirPanneauPuisFermer(); return; }   // 5.453 : le panneau s'ouvre sur son accueil
-      if (r && (r.captcha || /captcha/i.test(String(r.error || '')))) { dire(T('e_captcha')); return; }
+      if (r && (r.captcha || /captcha/i.test(String(r.error || '')))) { dire(verifEtat === 'erreur' || !verifEl ? T('e_captcha') : (r.error || T('v_case'))); return; }
       dire(muet ? T('e_muet') : ((r && r.error) || T('e_refus')));
     };
     // iOS peut suspendre le service worker en route : jamais un bouton figé.
-    const attente = setTimeout(() => finir(null, true), 20000);
-    try {
-      chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogin', email, password, ouvrir: false }, (r) => {
-        let e2 = null; try { e2 = chrome.runtime.lastError; } catch (_) { e2 = null; }
-        finir(e2 ? null : r, !!e2 || r === undefined);
-      });
-    } catch (_) { finir(null, true); }
+    let attente = null;
+    // 5.456 : le jeton anti-robot d'abord (Supabase refuse le mot de passe sans lui — mesuré le 27 nov.).
+    prendreJeton((captcha) => {
+      attente = setTimeout(() => finir(null, true), 20000);
+      try {
+        chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogin', email, password, captcha, ouvrir: false }, (r) => {
+          let e2 = null; try { e2 = chrome.runtime.lastError; } catch (_) { e2 = null; }
+          finir(e2 ? null : r, !!e2 || r === undefined);
+        });
+      } catch (_) { finir(null, true); }
+    }, (texte) => { fini = true; enVol = false; btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = T('b_me_connecter'); err.classList.remove('info'); dire(texte); });
   };
   btn.addEventListener('click', go);
   pw.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') go(); });
