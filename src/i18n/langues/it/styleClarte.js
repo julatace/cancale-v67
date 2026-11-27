@@ -82,7 +82,7 @@ export default {
   "tete.chercher": "Cerca (N°, utente, tracking…)",
   "tete.notifs": "Notifiche",
   "tete.notifsN": "Notifiche · {n} non lette",
-  "lat.comptes": "{n} account Vinted",
+  "lat.comptes": {"one": "{n} account Vinted", "other": "{n} account Vinted"},
   "ext.maj.titre": "Un aggiornamento è pronto",
   "ext.maj.texte": "Si installa nel tuo browser; le tue impostazioni restano.",
   "ext.maj.retard": "Questa versione è troppo vecchia per agire da VRM.",
