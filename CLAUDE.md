@@ -485,7 +485,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **27 nov. · Scan au point relais (code de retrait) ⇒ paire en stock, « Écris N°X » ; « Ce matin » en tête d'Aujourd'hui** : `2026-11-27-scan-ce-matin.md`.
+- **27 nov. · Scan au relais ⇒ en stock ; « Ce matin »** : `2026-11-27-scan-ce-matin.md`.
 - **27 nov. · TROIS FONCTIONS RENDUES (Julien)** : filtre « Compte » de Ventes au téléphone (retenu par vendeur), alerte « un compte annule plus » dans Statistiques (règle du 5 nov. importée, un compte pas lu jamais comparé), questions eBay sans réponse en tête de Messages « À répondre ». `2026-11-27-retour-fonctions.md`. Geste : aucun.
 - **27 nov. · ext. 5.455.2** : police « Inter VRM » du panneau ; `<gardes-app>` dit « article » ; le panneau ne coupe plus un onglet qui charge. `historique-divers.md`, fin. Geste : installer 5.455.2.
 - **27 nov. · « 978 216 » deux fois, un point en deux cartes** : un colis = ses identités (code lu aussi dans SA commande, n°, transaction), « à vérifier » compris ; un point = son adresse. `historique-colis-retraits.md`, fin. Geste : aucun (après fusion).
