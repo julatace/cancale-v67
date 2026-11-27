@@ -40,7 +40,7 @@ import { annuaireLbc } from '../plateformes.js';
 import { numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { etatDeVc } from '../enLigneVc.js';   // (26 nov.) « en ligne » / « vendue » Vestiaire : LA règle (Stock, écran Vestiaire)
 import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, lireTout, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, ventesConnuesCoque, lireVentesEmail, photoKey, STUDIO_BASE } from '../App.jsx';
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, lireTout, useVueSession, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, ventesConnuesCoque, lireVentesEmail, photoKey, STUDIO_BASE } from '../App.jsx';
 import { ouvrirPanneau, panneauEnRetard, gesteDuPanneau } from '../ouvrirPanneau.js';
 // (22 nov., choix n° 35) « Photo en double » : la règle d'identité par le FICHIER photo exact (src/photoEnDouble.js).
 import { photosEnDouble, numerosEnExemplaires, refuserGroupe, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
@@ -260,7 +260,10 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   const [choixP, choisirP] = useFiltrePlateforme('annonces');
   const [filtreT0, setFiltreT] = React.useState({ compte: '', dort: 'toutes' });
   const [filtreE, setFiltre] = React.useState({ etat: 'enligne' });
-  const [q, setQ] = React.useState('');
+  // ⚠️ (26 nov., banc iphone-reprise R3) LA RECHERCHE REVIENT (5 nov., Julien : « quand on rouvre l'app, revenir au même endroit,
+  // dans le même état ») : le même rangement que la recherche d'Annonces d'avant (`useVueSession('annonces-recherche')`, synchronisé
+  // par compte VRM, rendu seulement s'il a été quitté il y a moins de 10 min) — l'écran natif la tenait en simple état local.
+  const [q, setQ] = useVueSession('annonces-recherche', '');
   React.useEffect(() => {
     const prendre = () => { try { if (prendreVue('arepublier')) setFiltre((f) => ({ ...f, etat: 'arepublier' })); else if (prendreVue('photodouble')) setFiltre((f) => ({ ...f, etat: 'photodouble' })); else if (prendreVue('dorment')) setFiltre((f) => ({ ...f, etat: 'dorment' })); } catch (_) {} };
     prendre(); window.addEventListener('vrm:vue', prendre);
@@ -466,7 +469,10 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   };
   const actions = ACTIONS.map((A) => ({
     cle: A.cle, libelle: tr(A.libelle), icone: A.icone, courante: !!A.courante, phrase: A.cle === 'agent' ? tr('agent.action.phrase') : tr('egalite.action.' + cleActionTr[A.cle] + '.phrase'),
-    pour: (a) => (A.tousSites ? !!a.numero && a.annonces.some((x) => x.etat === 'enligne') : (() => { const v = vintedDe(a); return !!v && A.etats.includes(v.etat); })()),
+    // (27 nov., banc annonces-actions S — règle du 5 nov., src/annoncesActions.js `raisonPasSelectionnable`) une annonce que Vinted
+    // VÉRIFIE (lu, jamais deviné) ne se coche pour aucune action Vinted, et la raison est dite sur sa rangée.
+    pour: (a) => (A.tousSites ? !!a.numero && a.annonces.some((x) => x.etat === 'enligne') : (() => { const v = vintedDe(a); return !!v && A.etats.includes(v.etat) && !v.verif; })()),
+    raisonLigne: A.tousSites ? null : (a) => { const v = vintedDe(a); return v && v.verif ? tr('egalite.action.verifVinted') : ''; },
     juger: (sel) => {
       if (!sel.length) return { ok: false, raison: tr('egalite.selection.aucune') };
       // (25 nov., e2e-extension-vert) Un geste du panneau, et l'extension d'ici ne sait pas ouvrir le panneau : fermé, dit.
@@ -511,7 +517,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     if (k === 'pauseLbc') { pauserLbc(choisis); return; }
     if (k === 'agent') { setAgent(choisis); return; }
     if (k === 'partout') { const nums = choisis.map((a) => a.numero).filter(Boolean); if (nums.length) { try { window.dispatchEvent(new CustomEvent('vrm:publier-partout', { detail: { nums } })); } catch (_) {} } return; }
-    const sel = choisis.map(vintedDe).filter(Boolean).map((v) => ({ uid: v.compte, id: v.id }));
+    const sel = choisis.map(vintedDe).filter((v) => v && !v.verif).map((v) => ({ uid: v.compte, id: v.id }));
     if (!sel.length) { toast(tr('egalite.action.vintedSeul')); return; }
     demanderActionAnnonces(k, sel);
   };

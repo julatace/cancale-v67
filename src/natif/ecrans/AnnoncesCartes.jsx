@@ -121,6 +121,7 @@ export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, e
       <span className="n-ad-corps">
         <span className="n-ad-titre">{a.titre || tr('egalite.sansTitre')}</span>
         {trace ? <span className="n-ad-trace" data-ad-trace={trace.par}>{texteTrace(trace)}</span> : null}
+        {grise && selection.raison ? <span className="n-ad-trace" data-ad-raison="">{selection.raison}</span> : null}
         <span className="n-ad-ligne">
           {(!groupe || a.sites.length > 1) && a.sites.map((x) => <LogoSite key={x} site={x} taille={16} nom={nomSite(x)}/>)}
           <span className="n-ad-prix" data-ad-prix={a.prix != null ? '1' : '0'}>{a.prix != null ? euros(a.prix) : '—'}</span>
@@ -203,6 +204,7 @@ export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selec
               {(!groupe || a.sites.length > 1) ? a.sites.map((x) => <LogoSite key={x} site={x} taille={16} nom={nomSite(x)}/>) : null}
               {a.numero ? (a.doublon ? <Plaque numero={a.numero} doublon/> : <EtiquetteN numero={a.numero} className="n-ar-etiq" attrs={{ 'data-inv-n': a.numero }}/>) : null}
               {b && b !== 'bloque' ? <span className="n-ad-etiquette" data-ad-bandeau={b}>{tr('tableau.etat.' + b)}</span> : null}
+              {grise && selection.raison ? <span className="n-ad-etiquette" data-ad-raison="">{selection.raison}</span> : null}
               {signe ? <span className="n-ad-point" data-ad-signe={b0} role="img" aria-label={tr('tableau.etat.' + b0)}/> : null}
               {plusVue != null ? <span className="n-ad-etiquette" data-ad-conseil="plusvue" data-ad-plusvue={String(plusVue)}>{tr('af.pv.etiquette', { n: plusVue })}</span> : null}
               <span className="n-ar-stats">{bouts}</span>

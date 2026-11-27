@@ -43,6 +43,15 @@
 //    Servi ici par une version de numérotation relue différente. Il doit
 //    couvrir TOUTE la fenêtre (390 tactile, 1512 × 950 clair, 1512 × 830 sombre).
 //
+// ⚠️ (26 nov., bancs natifs — réécrit sur les écrans « VRM natif », src/natif/, docs/design/NATIF.md) Mêmes garanties,
+//    jugées sur les éléments d'aujourd'hui : la barre `nav[data-n-onglets] > .n-onglet` ; le « Plus » d'hier est l'écran Menu
+//    ouvert par la photo du compte (`[data-n-coque-compte]`, 21 nov. onglets-menu) ; le filtre de site d'un onglet est la
+//    rangée `[data-fp]` (25 nov.) ; la colonne est `[data-n-laterale]` (ses groupes : les cinq onglets du téléphone en tête,
+//    puis Gestion · Dans l'extension · Aide). Trois défauts de l'app trouvés et corrigés en le réécrivant : la grille de la
+//    coque d'ordinateur ne suivait pas LA règle de coque (O 1008×633 : l'écran passait sous la colonne, src/natif/natif.css),
+//    « Terminées » de Ventes n'était pas repris (src/repriseEcran.js), la recherche d'Annonces natif ne revenait pas
+//    (src/ecrans/AnnoncesEgalite.jsx) et le compte choisi dans Achats ne se redessinait qu'au rechargement
+//    (src/achats/FiltreAchats.jsx, enfant-fonction dans un écran gardé).
 // `BANC_PORT` (défaut 7951), `CAPTURES=<dossier>` pour garder les captures,
 // `BANC_PARTIE=B|R|O|O2` pour une seule partie.
 'use strict';
@@ -159,21 +168,32 @@ const ouvrirPage = async (ctx, query = '') => {
   });
   await pg.goto(`http://localhost:${PORT}/${query}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => document.querySelector('.vrm-main') || /pas pu s'afficher/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
+  // (27 nov., WebKit en CI) `.vrm-main` existe SOUS l'écran de démarrage (index.html `#vrm-demarrage`, `data-vrm-boot`) : sous
+  // WebKit chargé, il couvrait encore la page après 2,8 s (capture : « Ça prend plus de temps que d'habitude ») — la barre
+  // mesurée dessous, les touchers pris par lui (B1, B7, B8, R3 rouges). On attend qu'il soit parti (30 s au plus), comme
+  // _a11y-mesure.cjs `attendreDemarrage` ; s'il reste, les mesures le voient et rougissent.
+  await pg.waitForFunction(() => !document.getElementById('vrm-demarrage') && !document.documentElement.hasAttribute('data-vrm-boot'), null, { timeout: 30000 }).catch(() => {});
   await pg.waitForTimeout(2800);
   return { pg, errs };
 };
 const capture = async (pg, nom) => { if (!CAPTURES) return; try { fs.mkdirSync(CAPTURES, { recursive: true }); await pg.screenshot({ path: path.join(CAPTURES, nom + '.png'), fullPage: false }); } catch (_) {} };
-const CHAMP_ANNONCES = '[data-ann-recherche] input, input[aria-label="Rechercher une annonce"]';
+// (26 nov., bancs natifs) Annonces natif : le champ de la tête de liste (`.n-eg-recherche`, src/natif/ecrans/Annonces.jsx) —
+// l'ancien `[data-ann-recherche]` reste rendu, caché, par l'écran d'avant monté dessous : il n'est plus celui qu'on tape.
+const CHAMP_ANNONCES = '.vrm-main[data-ecran="annonces"] .n-eg-recherche [data-n-recherche] input';
 const ecran = (pg) => pg.evaluate((CHAMP_ANNONCES) => {
   const m = document.querySelector('.vrm-main');
   const t = document.querySelector('[data-tache]');
   const actif = document.querySelector('nav[data-n-onglets] > [aria-current="page"]');
   return {
     ecran: m ? m.getAttribute('data-ecran') : '',
-    site: t ? t.getAttribute('data-tache-site') : '',
+    // (26 nov., bancs natifs) Le filtre de site d'un onglet est la rangée `[data-fp]` (src/natif/FiltrePlateformes.jsx, 25 nov.) :
+    // son choix (`data-fp-choix`) ; l'ancien repère de la tâche (`data-tache-site`) reste lu s'il n'y en a pas.
+    site: (() => { const f = [...document.querySelectorAll('[data-fp]')].find((x) => x.getClientRects().length); return f ? f.getAttribute('data-fp-choix') : (t ? t.getAttribute('data-tache-site') : ''); })(),
+    segment: (() => { const v = [...document.querySelectorAll('[data-vn-onglet]')].find((x) => x.getClientRects().length); return v ? v.getAttribute('data-vn-onglet') : ''; })(),
     barre: actif ? (actif.getAttribute('data-nav-entree') || 'plus') : '',
     colis: (document.querySelector('[data-colis-onglet]') || { getAttribute: () => '' }).getAttribute('data-colis-onglet'),
-    puce: (document.querySelector('[data-compte-puce][data-actif="1"]') || { getAttribute: () => '' }).getAttribute('data-compte-puce'),
+    // (26 nov., bancs natifs) La puce choisie VISIBLE : un écran d'avant monté caché porte aussi une rangée de puces.
+    puce: ([...document.querySelectorAll('[data-compte-puce][data-actif="1"]')].find((x) => x.getClientRects().length) || { getAttribute: () => '' }).getAttribute('data-compte-puce'),
     // Le champ de recherche d'Annonces par son crochet `data-ann-recherche` (le libellé a changé
     // le 5 nov., chantier C : « Rechercher une annonce (titre, marque, N°) ») ; l'ancien libellé
     // reste pour juger un arbre d'avant.
@@ -206,7 +226,9 @@ const balayer = async (ctx, pg, x0, x1, y) => {
   await pg.waitForTimeout(800);
 };
 // (14 nov., choix n° 61) Annonces, Stock et Achats sont dans l'onglet « Paires » : l'onglet, puis le segment.
-const allerPaire = async (pg, id) => { await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="paires"]'); return toucher(pg, `[data-paires-segment="${id}"]`); };
+// (26 nov., bancs natifs) La barre native : l'onglet « Annonces » (`paires`) ouvre Annonces ; le segment n'existe plus (le Stock
+// est dans le Menu) — touché seulement s'il est là, et l'écran visé est vérifié par ceux qui appellent.
+const allerPaire = async (pg, id) => { await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="paires"]'); if (await pg.locator(`[data-paires-segment="${id}"]`).count()) return toucher(pg, `[data-paires-segment="${id}"]`); return true; };
 const toucher = async (pg, sel) => { const l = pg.locator(sel).first(); if (!(await l.count())) { console.log(`     (absent : ${sel})`); return false; } await l.tap({ timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(800);
   // (8 nov.) L'écran se calcule en tâche interruptible (startTransition) : on attend la fin du calcul
   // (`data-en-cours` de la barre, 4 s au plus), jamais un délai fixe seul (CLAUDE.md §6.5).
@@ -236,12 +258,14 @@ const mesureBarre = (pg) => pg.evaluate(() => {
   const r = nav.getBoundingClientRect();
   // (16 nov., barre-achats) Les ENTRÉES de la barre : ses onglets (`.vrm-tab`) — cinq depuis qu'Achats y est —, pas
   // le disque « + » du centre (14 nov.), qui comptait jusqu'ici pour la 5ᵉ entrée.
-  const entrees = [...nav.querySelectorAll(':scope > .vrm-tab, :scope > .vrm-nav-more')].map((x) => {
+  // (26 nov., bancs natifs) La barre NATIVE (src/natif/BarreOnglets.jsx, NATIF.md §2) : ses entrées sont `.n-onglet`
+  // (l'id de l'app sur `data-nav-entree`), le nombre de chaque onglet est sa pastille (`.n-onglet-pastille`).
+  const entrees = [...nav.querySelectorAll(':scope > .n-onglet')].map((x) => {
     const q = x.getBoundingClientRect(); const lab = x.querySelector('.n-onglet-libelle');
     const hit = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
     return { id: x.getAttribute('data-nav-entree') || 'plus', h: Math.round(q.height), w: Math.round(q.width), coupe: lab ? lab.scrollWidth > lab.clientWidth + 1 : true, touche: !!hit && x.contains(hit) };
   });
-  const nombres = [...nav.querySelectorAll('[data-badge-n]')].map((x) => x.getAttribute('data-badge-n')).filter((n) => /^\d+$/.test(n));
+  const nombres = [...nav.querySelectorAll('.n-onglet-pastille')].map((x) => x.textContent.trim()).filter((n) => /^\d+$/.test(n));
   // La zone sûre : la règle qui gagne doit la porter (Chromium vaut env() = 0).
   let zoneSure = false;
   for (const ss of document.styleSheets) { let rr; try { rr = ss.cssRules; } catch (_) { continue; } const tous = []; const plat = (l) => { for (const x of l) { if (x.selectorText) tous.push(x); if (x.cssRules && x.cssRules.length) plat(x.cssRules); } }; plat(rr); // (24 nov., main-vert) La barre NATIVE (`.n-onglets`, natif.css) porte la zone sûre par sa variable `--n-bas-sur`
@@ -280,42 +304,48 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         dit(!!m && m.zoneSure, `B1 ${qui} : la barre porte la zone sûre (safe-area-inset-bottom)`);
         dit(!!m && new Set(m.nombres).size === m.nombres.length, `B2 ${qui} : un nombre une seule fois dans la barre (§7)`, JSON.stringify(m && m.nombres));
         // (17 nov., chasse-bugs) CHOIX N° 61 DU 14 NOV. : plus de « Plus » dans la barre ; les autres écrans vivent dans le
-        // MENU DE L'AVATAR (en haut à droite, `[data-profil-tete]`). B3–B6 jugent ce menu, avec les mêmes exigences.
-        const TETE = '[data-profil-tete]';
+        // MENU DE L'AVATAR (en haut à droite). B3–B6 jugent ce menu, avec les mêmes exigences.
+        // ⚠️ (26 nov., bancs natifs) Depuis le 21 nov. (onglets-menu, App.jsx `EcranMenu`) la photo du compte ouvre un ÉCRAN, le
+        // Menu (`data-ecran="menu"`, `[data-n-menu]`), plus une feuille : ses entrées sont les tuiles et rangées `[data-n-plus-entree]`
+        // (l'écran visé sur `data-nav-entree`). Messages n'y est plus (la bulle en haut à droite) : B5 touche « E-mails ».
+        // Mêmes exigences : ≥ 44 px, touchables, libellés entiers ; « retour » ferme et reste dans VRM ; une entrée y va.
+        const TETE = '[data-n-coque-compte]';
         const menu = () => pg.evaluate(() => {
-          const g = document.querySelector('[data-nav-groupe]'); const f = g && (g.closest('.vrm-sheet, [role="dialog"]') || g.parentElement);
-          if (!f) return null;
-          const entrees = [...f.querySelectorAll('[data-nav-entree]')].map((e) => { const r = e.getBoundingClientRect(); const vis = r.height > 0 && r.top >= 0 && r.bottom <= innerHeight; const hit = vis ? document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) : null; const lib = e.querySelector('.vrm-profil-ligne-lib'); return { id: e.getAttribute('data-nav-entree'), h: Math.round(r.height), vis, touche: !vis || (!!hit && e.contains(hit)), coupe: lib ? lib.scrollWidth > lib.clientWidth + 1 : false }; });
-          return { entrees };
+          const f = document.querySelector('[data-n-menu]');
+          if (!f || !f.getClientRects().length) return null;
+          const barre = document.querySelector('nav[data-n-onglets]');
+          const bas = barre ? Math.min(innerHeight, barre.getBoundingClientRect().top) : innerHeight;
+          const entrees = [...f.querySelectorAll('[data-n-plus-entree]')].map((e) => { const r = e.getBoundingClientRect(); const vis = r.height > 0 && r.top >= 0 && r.bottom <= bas; const hit = vis ? document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) : null; const lib = e.querySelector('.n-tuile-menu-libelle, .n-rangee-titre, .n-carte-compte-nom'); return { id: e.getAttribute('data-n-plus-entree'), h: Math.round(r.height), vis, touche: !vis || (!!hit && e.contains(hit)), coupe: lib ? lib.scrollWidth > lib.clientWidth + 1 : false }; });
+          return { entrees, ecran: document.querySelector('.vrm-main').getAttribute('data-ecran') };
         });
         // B3 · le menu ouvert
         await toucher(pg, TETE);
         await pg.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {})))).catch(() => {});
         const p = await menu();
         await capture(pg, `menu-${mode}-${sombre ? 'sombre' : 'clair'}`);
-        dit(!!p && p.entrees.length >= 3, `B3 ${qui} : l’avatar ouvre le menu des autres écrans`, JSON.stringify(p));
+        dit(!!p && p.ecran === 'menu' && p.entrees.filter((e) => e.id !== 'settings').length >= 3, `B3 ${qui} : l’avatar ouvre le menu des autres écrans`, JSON.stringify(p));
         dit(!!p && p.entrees.every((e) => e.h >= 44 && e.touche && !e.coupe), `B3 ${qui} : entrées ≥ 44 px, touchables, libellés entiers`, JSON.stringify(p && p.entrees.filter((e) => !(e.h >= 44 && e.touche && !e.coupe))));
         // B4 · retour avec le menu ouvert
         await pg.goBack({ timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(800);
         const e4 = await ecran(pg).catch(() => ({ url: 'perdu' }));
         dit(/^http:\/\/localhost/.test(e4.url) && e4.ecran === 'journee', `B4 ${qui} : « retour » ferme le menu et reste dans VRM, sur Ma journée`, JSON.stringify(e4));
-        dit(!(await menu()), `B4 ${qui} : le menu est fermé`);
+        dit(/^http:\/\/localhost/.test(e4.url) && !(await menu().catch(() => 'perdu')), `B4 ${qui} : le menu est fermé`);
         let pg2 = pg;
         if (!/^http:\/\/localhost/.test(e4.url)) { await pg.close().catch(() => {}); ({ pg: pg2 } = await ouvrirPage(ctx, '?tab=journee')); }
         pg = pg2;
         // B5 · menu ouvert, toucher une entrée y va et le ferme
-        await toucher(pg, TETE); await toucher(pg, '[data-nav-groupe] [data-nav-entree="messages"]');
+        await toucher(pg, TETE); await toucher(pg, '[data-n-menu] [data-nav-entree="emails"]');
         const e5 = await ecran(pg);
-        dit(e5.ecran === 'messages' && !(await menu()), `B5 ${qui} : menu ouvert, toucher Messages y va et le ferme`, JSON.stringify(e5));
+        dit(e5.ecran === 'emails' && !(await menu()), `B5 ${qui} : menu ouvert, toucher E-mails y va et le ferme`, JSON.stringify(e5));
         // B6 · sur un écran du menu, la barre n'allume AUCUN autre onglet (l'onglet allumé = l'écran montré, ou rien)
         const vus = [];
-        for (const id of ['messages', 'garage', 'emails']) {
-          await toucher(pg, TETE); const ok = await toucher(pg, `[data-nav-groupe] [data-nav-entree="${id}"]`);
-          if (!ok) { await pg.keyboard.press('Escape').catch(() => {}); continue; }
+        for (const id of ['garage', 'emails', 'extension']) {
+          await toucher(pg, TETE); const ok = await toucher(pg, `[data-n-menu] [data-nav-entree="${id}"]`);
+          if (!ok) continue;
           vus.push(await pg.evaluate(() => { const a = document.querySelector('nav[data-n-onglets] [aria-current="page"]'); return { ecran: document.querySelector('.vrm-main').getAttribute('data-ecran'), actif: a ? a.getAttribute('data-nav-entree') : '' }; }));
         }
         const groupe = { garage: 'paires', annonces: 'paires', achats: 'achats' };
-        dit(vus.length >= 2 && vus.every((v) => !v.actif || v.actif === (groupe[v.ecran] || v.ecran)), `B6 ${qui} : sur chaque écran du menu, la barre n’allume que l’onglet de cet écran (ou aucun)`, JSON.stringify(vus));
+        dit(vus.length >= 2 && vus.every((v) => v.ecran !== 'menu' && (!v.actif || v.actif === (groupe[v.ecran] || v.ecran))), `B6 ${qui} : sur chaque écran du menu, la barre n’allume que l’onglet de cet écran (ou aucun)`, JSON.stringify(vus));
         // Les visites du menu ont empilé leurs écrans : B7–B9 repartent d'une page neuve (comme avant, où « Plus » n'empilait rien).
         await pg.close().catch(() => {}); ({ pg } = await ouvrirPage(ctx, '?tab=journee'));
         // B7 · balayages
@@ -350,6 +380,9 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         dit(e7b.ecran === 'ventes', `B7 ${qui} : un balayage au milieu ne change plus d'onglet (décision du 9 nov.)`, JSON.stringify({ y: y7, ...e7b }));
         // B8 · retoucher l'onglet courant
         await allerPaire(pg, 'annonces');
+        // (27 nov., WebKit) Annonces n'avait pas encore ses rangées (rien à défiler : 29 px) : on attend qu'il y ait de quoi
+        // défiler de plus de 100 px (10 s au plus) ; le seuil « avant > 100 » reste celui du contrôle.
+        await pg.waitForFunction(() => { const m = document.querySelector('.vrm-main'); return m && m.getAttribute('data-ecran') === 'annonces' && m.scrollHeight - m.clientHeight > 150; }, null, { timeout: 10000 }).catch(() => {});
         await pg.evaluate(() => { document.querySelector('.vrm-main').scrollTop = 400; }); await pg.waitForTimeout(300);
         const avant8 = await ecran(pg);
         await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="paires"]'); await pg.waitForTimeout(600);
@@ -384,17 +417,37 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         let { pg } = await ouvrirPage(ctx);
         dit((await ecran(pg)).ecran === 'journee', `R5 ${qui} : rien de rangé ⇒ Ma journée`);
         // R1 · Ventes · Leboncoin, rechargement
+        // (26 nov., bancs natifs) Ventes natif (src/natif/ecrans/Ventes.jsx) : le filtre de site vit sous « Terminées » (les
+        // listes « À envoyer » n'ont ici qu'un site : moins de deux sites ⇒ pas de filtre, src/filtrePlateforme.js). Même
+        // exigence : rechargé, même écran, même liste, même site.
         await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="ventes"]');
-        await toucher(pg, '[data-filtre-site] button[data-site="leboncoin"]');
+        await toucher(pg, '[data-colis-onglet-choix="toutes"]');
+        // Le segmenté vient de se monter : un toucher pendant son calcul peut se perdre — on attend « Terminées » montré, un 2ᵉ toucher au plus (§6.5).
+        if (!(await pg.waitForFunction(() => [...document.querySelectorAll('[data-vn-onglet="toutes"]')].some((x) => x.getClientRects().length), null, { timeout: 3000 }).then(() => true).catch(() => false))) {
+          await toucher(pg, '[data-colis-onglet-choix="toutes"]');
+          await pg.waitForFunction(() => [...document.querySelectorAll('[data-vn-onglet="toutes"]')].some((x) => x.getClientRects().length), null, { timeout: 3000 }).catch(() => {});
+        }
+        await toucher(pg, '[data-fp="ventes"] [data-fp-site="leboncoin"]');
+        const r1avant = await ecran(pg);
         await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(3000);
+        // Le filtre retenu ne s'affiche qu'une fois ses sites LUS (une entrée sans ligne n'existe pas, src/filtrePlateforme.js
+        // `choixEffectif`) : on attend la rangée montrée sur le site retenu, 10 s au plus (§6.5) — un choix perdu reste « toutes ».
+        await pg.waitForFunction(() => [...document.querySelectorAll('[data-fp="ventes"][data-fp-choix="leboncoin"]')].some((x) => x.getClientRects().length), null, { timeout: 10000 }).catch(() => {});
         const r1 = await ecran(pg);
-        dit(r1.ecran === 'ventes' && r1.site === 'leboncoin', `R1 ${qui} : rechargé, même écran (Ventes) et même filtre (Leboncoin)`, JSON.stringify(r1));
-        // R1 · compte choisi (Ventes · Vinted, compte 222)
-        await toucher(pg, '[data-filtre-site] button[data-site="vinted"]');
+        dit(r1avant.site === 'leboncoin' && r1.ecran === 'ventes' && r1.segment === 'toutes' && r1.site === 'leboncoin', `R1 ${qui} : rechargé, même écran (Ventes · Terminées) et même filtre (Leboncoin)`, JSON.stringify({ avant: r1avant, apres: r1 }));
+        // R1 · compte choisi (Achats, compte 222)
+        // (26 nov., bancs natifs) Ventes natif n'a plus de puces de compte (le compte est une colonne / un filtre du tableau) ;
+        // la rangée des comptes `[data-compte-puce]` vit dans Achats : la reprise du compte choisi y est jugée.
+        await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="achats"]');
         await toucher(pg, '[data-compte-puce="222"]');
+        await pg.waitForFunction(() => [...document.querySelectorAll('[data-compte-puce="222"][data-actif="1"]')].some((x) => x.getClientRects().length), null, { timeout: 4000 }).catch(() => {});
+        const r1bavant = await ecran(pg);
         await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(3000);
+        // (27 nov., WebKit) l'écran de démarrage parti, puis la rangée des comptes montrée (10 s au plus) — une puce perdue reste « * ».
+        await pg.waitForFunction(() => !document.getElementById('vrm-demarrage') && [...document.querySelectorAll('[data-compte-puce][data-actif="1"]')].some((x) => x.getClientRects().length), null, { timeout: 10000 }).catch(() => {});
         const r1b = await ecran(pg);
-        dit(r1b.ecran === 'ventes' && r1b.site === 'vinted' && r1b.puce === '222', `R1 ${qui} : rechargé, même compte choisi`, JSON.stringify(r1b));
+        dit(r1bavant.puce === '222' && r1b.ecran === 'achats' && r1b.puce === '222', `R1 ${qui} : rechargé, même compte choisi`, JSON.stringify({ avant: r1bavant, apres: r1b }));
+        await toucher(pg, '[data-compte-puce="*"]');
         // R2 · Colis · À retirer, app rouverte
         // (16 nov., barre-achats) Achats a son onglet dans la barre.
         await toucher(pg, 'nav[data-n-onglets] [data-nav-entree="achats"]');
@@ -406,10 +459,14 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         await capture(pg, `reprise-colis-${sombre ? 'sombre' : 'clair'}`);
         dit(r2avant.colis === 'retirer' && r2.ecran === 'achats' && r2.colis === 'retirer', `R2 ${qui} : rouverte, même écran (Achats, « À retirer » en tête — lot DJ3) et même liste (À retirer)`, JSON.stringify({ avant: r2avant.colis, apres: r2 }));
         // R3 · Annonces : recherche + défilement, app rouverte
+        // (26 nov., bancs natifs) Annonces natif : un seul site dans ces données ⇒ pas de rangée de filtre (src/filtrePlateforme.js,
+        // moins de deux sites) ; le filtre retenu par écran est jugé en R1 (même règle, `lireChoixPlateforme`). Ici : le filtre
+        // montré (ou son absence) est le même après réouverture.
         await allerPaire(pg, 'annonces');
-        await toucher(pg, '[data-filtre-site] button[data-site="vinted"]');
         const champ = pg.locator(CHAMP_ANNONCES).first();
-        const champLa = (await champ.count()) > 0;
+        // (27 nov., CI chargée) l'écran Annonces se charge à la demande : on attend que SON champ soit monté (15 s au plus)
+        // au lieu de compter tout de suite — un comptage immédiat rendait « absent » un champ encore en chargement.
+        const champLa = await champ.waitFor({ state: 'visible', timeout: 15000 }).then(() => true, () => false);
         dit(champLa, `R3 ${qui} : le champ de recherche d'Annonces est là (sinon la reprise de la recherche n'est pas jugée)`);
         if (champLa) { await champ.fill('taille'); await pg.waitForTimeout(600); await pg.evaluate(() => document.activeElement && document.activeElement.blur()); }
         await pg.waitForTimeout(400);
@@ -419,9 +476,11 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         await pg.close();
         ({ pg } = await ouvrirPage(ctx));
         await pg.waitForTimeout(800);
+        // même raison : on laisse au champ (rechargé à la demande) le temps de se monter avant de lire l'écran repris.
+        await pg.locator(CHAMP_ANNONCES).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
         const r3 = await ecran(pg);
         await capture(pg, `reprise-annonces-${sombre ? 'sombre' : 'clair'}`);
-        dit(r3.ecran === 'annonces' && r3.site === 'vinted' && r3.recherche === 'taille', `R3 ${qui} : rouverte, même écran, même filtre, même recherche`, JSON.stringify(r3));
+        dit(r3avant.ecran === 'annonces' && r3.ecran === 'annonces' && r3.site === r3avant.site && r3.recherche === 'taille', `R3 ${qui} : rouverte, même écran, même filtre, même recherche`, JSON.stringify(r3));
         dit(r3avant.defile > 200 && Math.abs(r3.defile - r3avant.defile) <= 4, `R3 ${qui} : rouverte, même défilement`, JSON.stringify({ avant: r3avant.defile, apres: r3.defile }));
         // R4 · un lien reçu gagne
         await pg.close();
@@ -444,31 +503,40 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
           const ctx = await appareil(b, 'ordi', loc);
           const { pg } = await ouvrirPage(ctx, '?tab=journee');
           await pg.setViewportSize({ width: c.w, height: c.h }); await pg.waitForTimeout(900);
+          // ⚠️ (26 nov., bancs natifs) LA COLONNE NATIVE (src/natif/BarreLaterale.jsx, App.jsx `LateraleNative`, 19–21 nov.) :
+          // libellés `.n-laterale-libelle`, titres de groupe `.n-laterale-titre`, la marque `[data-n-marque]` (le logo VRM, une
+          // image `alt="VRM"` : le « VI » coupé de la capture Edge serait un logo rogné par le bord de la colonne).
           const r = await pg.evaluate(() => {
             const side = document.querySelector('[data-n-laterale]'); if (!side) return null;
             const sr = side.getBoundingClientRect();
-            const libs = [...side.querySelectorAll('.vrm-rail-lib, .vrm-rail-section-label, .vrm-sidebar-mot')].filter((e) => e.getClientRects().length);
+            const libs = [...side.querySelectorAll('.n-laterale-libelle, .n-laterale-titre, .n-laterale-compte-nom')].filter((e) => e.getClientRects().length);
             const coupes = libs.filter((e) => { const q = e.getBoundingClientRect(); if (q.width <= 1 && q.height <= 1) return false; /* rangé pour les lecteurs d'écran (colonne réduite), pas coupé */ return e.scrollWidth > e.clientWidth + 1 || q.right > sr.right + 1 || q.left < sr.left - 1; }).map((e) => e.innerText);
             // Rien PAR-DESSUS la colonne : au milieu de chaque libellé visible, c'est la colonne qu'on touche.
-            const recouverts = libs.filter((e) => { const q = e.getBoundingClientRect(); if (q.bottom < 0 || q.top > innerHeight) return false; const h = document.elementFromPoint(q.left + Math.min(q.width - 1, 30), q.top + q.height / 2); return !h || !side.contains(h); }).map((e) => e.innerText);
-            const mot = side.querySelector('.vrm-sidebar-mot');
-            return { coupes, recouverts, mot: mot ? mot.innerText : '', largeur: Math.round(sr.width), groupes: [...side.querySelectorAll('[data-nav-groupe]')].map((g) => g.getAttribute('data-nav-groupe')), titresVus: [...side.querySelectorAll('[data-nav-groupe]')].filter((g) => { const l = g.querySelector('.vrm-rail-section-label'); return l && l.getClientRects().length; }).map((g) => g.getAttribute('data-nav-groupe')) };
+            const recouverts = libs.filter((e) => { const q = e.getBoundingClientRect(); if (q.width <= 1 || q.bottom < 0 || q.top > innerHeight) return false; const h = document.elementFromPoint(q.left + Math.min(q.width - 1, 30), q.top + q.height / 2); return !h || !side.contains(h); }).map((e) => e.innerText);
+            const logo = side.querySelector('[data-n-marque] img[alt="VRM"], [data-n-marque] svg');
+            const lq = logo ? logo.getBoundingClientRect() : null;
+            const hitLogo = lq ? document.elementFromPoint(lq.left + lq.width / 2, lq.top + lq.height / 2) : null;
+            const logoEntier = !!lq && lq.width >= 24 && lq.height >= 24 && lq.left >= sr.left - 0.5 && lq.right <= sr.right + 0.5 && lq.top >= sr.top - 0.5 && !!hitLogo && side.contains(hitLogo);
+            const groupes = [...side.querySelectorAll('.n-laterale-groupe')].map((g) => { const t = g.querySelector('.n-laterale-titre'); const tq = t ? t.getBoundingClientRect() : null; return { titre: !!t, titreVu: !!tq && tq.width > 1 && tq.height > 1 && t.scrollWidth <= t.clientWidth + 1, entrees: [...g.querySelectorAll('[data-n-entree]')].map((e) => e.getAttribute('data-n-entree')) }; });
+            return { coupes, recouverts, logoEntier, largeur: Math.round(sr.width), reduite: side.getAttribute('data-n-reduite') === '1', groupes };
           });
           await capture(pg, `colonne-${c.w}x${c.h}${c.zoom ? '-z' : ''}-${c.sombre ? 'sombre' : 'clair'}`);
-          dit(!!r && r.mot === 'VRM' && r.coupes.length === 0, `O ${qui} : « VRM » entier et aucun libellé de la colonne coupé`, JSON.stringify(r));
+          dit(!!r && r.logoEntier && r.coupes.length === 0, `O ${qui} : le logo « VRM » entier et aucun libellé de la colonne coupé`, JSON.stringify(r));
           dit(!!r && r.recouverts.length === 0, `O ${qui} : rien ne passe par-dessus la colonne`, JSON.stringify(r && r.recouverts));
           // (9 nov.) Le groupe « Plateformes » est RETIRÉ de la colonne (décision du 8 nov.,
-          // docs/passation/2026-11-08-navigation-plateformes.md : « tâches uniques, groupes
-          // Vendre / Gérer / Argent et Paramètres au pied », les sites dans les tâches). Les
-          // groupes se lisent sur `data-nav-groupe` (la règle), pas sur le texte affiché
-          // (mis en capitales par la feuille de style) ; les titres Vendre · Gérer · Argent
-          // doivent être VISIBLES (« Moi », au pied, peut taire son titre) ; « en entier » =
-          // le contrôle des libellés coupés ci-dessus.
-          // (11 nov.) Lot AO (10 nov.) : « Argent » est UNE entrée de « Gérer », plus un groupe.
-          // (17 nov., chasse-bugs) RÈGLE DU RAIL COMMUN (commit 9b4382f3d, maquettes ordinateur validées) : Ma journée · Vendre ·
-          // Ranger · Compter, Paramètres au pied ; sous 1400 px la colonne se réduit à 78 px et ses titres de groupe sont
-          // RANGÉS pour les lecteurs d'écran (1 px, voulu). Exige : les trois groupes là, sans « Plateformes » ; titres vus à 1400+.
-          dit(!!r && ['vendre', 'ranger', 'compter'].every((g) => r.groupes.includes(g)) && !r.groupes.includes('Plateformes') && !r.groupes.includes('Argent') && (r.largeur < 120 || ['vendre', 'ranger', 'compter'].every((g) => r.titresVus.includes(g))), `O ${qui} : les groupes Vendre · Ranger · Compter sont là (titres lisibles en colonne large), sans « Plateformes »`, JSON.stringify(r && { groupes: r.groupes, titresVus: r.titresVus, largeur: r.largeur }));
+          // docs/passation/2026-11-08-navigation-plateformes.md : des tâches uniques, les sites dans les tâches).
+          // ⚠️ (26 nov., bancs natifs) Les groupes Vendre · Ranger · Compter du rail commun (17 nov.) sont remplacés le 21 nov.
+          // (onglets-menu, App.jsx `groupesMenu` : « totalement réorganiser les onglets ») : en tête les CINQ onglets de la barre
+          // du téléphone (Aujourd'hui · Annonces · Ventes · Achats · Argent), puis des groupes titrés (Gestion, Dans l'extension,
+          // Aide), Paramètres = la carte du compte au pied. Exige, sur les ids (`data-n-entree`, jamais un libellé) : la tête =
+          // les cinq onglets, dans l'ordre ; au moins deux groupes titrés, titres lisibles en colonne large ; AUCUNE entrée par
+          // plateforme ; aucune entrée en double.
+          const PLATEFORMES = /^(plat_|vinted$|leboncoin$|ebay$|vestiaire$|lbc$|vc$)/;
+          const toutes = r ? r.groupes.flatMap((g) => g.entrees) : [];
+          dit(!!r && r.groupes.length > 0 && JSON.stringify(r.groupes[0].entrees) === JSON.stringify(['journee', 'annonces', 'ventes', 'achats', 'compta'])
+            && r.groupes.filter((g) => g.titre).length >= 2 && (r.reduite || r.largeur < 120 || r.groupes.filter((g) => g.titre).every((g) => g.titreVu))
+            && !toutes.some((id) => PLATEFORMES.test(id)) && new Set(toutes).size === toutes.length,
+          `O ${qui} : en tête les cinq onglets du téléphone, puis des groupes titrés (titres lisibles), aucune entrée par plateforme ni en double`, JSON.stringify(r && { groupes: r.groupes, largeur: r.largeur }));
           await ctx.close();
         });
       }
@@ -489,16 +557,18 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
             const q = bl.getBoundingClientRect();
             const dedans = (x, y) => { const h = document.elementFromPoint(x, y); return !!h && bl.contains(h); };
             const side = document.querySelector('[data-n-laterale]');
-            const libs = side ? [...side.querySelectorAll('.vrm-rail-lib, .vrm-rail-section-label, .vrm-sidebar-mot')].filter((e) => e.getClientRects().length) : [];
+            // (26 nov., bancs natifs) Les libellés de la colonne NATIVE (src/natif/BarreLaterale.jsx) et son logo : l'ancien
+            // `.vrm-rail-lib` n'existe plus, la liste était vide et le contrôle ne pouvait plus échouer — à l'ordinateur il en faut.
+            const libs = side ? [...side.querySelectorAll('.n-laterale-libelle, .n-laterale-titre, .n-laterale-compte-nom, [data-n-marque] img')].filter((e) => e.getClientRects().length && e.getBoundingClientRect().width > 1) : [];
             const railVisible = libs.filter((e) => { const r = e.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && !dedans(r.left + 4, r.top + r.height / 2); }).map((e) => e.innerText);
             const coins = [[2, 2], [innerWidth - 3, 2], [2, innerHeight - 3], [innerWidth - 3, innerHeight - 3], [innerWidth - 20, innerHeight / 2], [20, innerHeight / 2]];
-            return { rect: [q.left, q.top, q.width, q.height].map(Math.round), vw: innerWidth, vh: innerHeight, railVisible, coins: coins.map(([x, y]) => dedans(x, y)) };
+            return { rect: [q.left, q.top, q.width, q.height].map(Math.round), vw: innerWidth, vh: innerHeight, railVisible, nLibs: libs.length, coins: coins.map(([x, y]) => dedans(x, y)) };
           });
           await capture(pg, `recharger-${c.w}x${c.h}-${c.sombre ? 'sombre' : 'clair'}`);
           dit(!!r, `O2 ${qui} : le bloc « Recharger » est là`);
           dit(!!r && r.rect[0] === 0 && r.rect[1] === 0 && r.rect[2] === r.vw && r.rect[3] === r.vh, `O2 ${qui} : il couvre toute la fenêtre`, JSON.stringify(r && { rect: r.rect, vw: r.vw, vh: r.vh }));
           dit(!!r && r.coins.every(Boolean), `O2 ${qui} : bords et coins touchent le bloc (rien de lisible ni de touchable à côté)`, JSON.stringify(r && r.coins));
-          dit(!!r && r.railVisible.length === 0, `O2 ${qui} : la colonne n'apparaît pas dessous (aucun « Ven », « Gér », « VI »)`, JSON.stringify(r && r.railVisible));
+          dit(!!r && (c.mode !== 'ordi' || r.nLibs > 0) && r.railVisible.length === 0, `O2 ${qui} : la colonne n'apparaît pas dessous (aucun « Ven », « Gér », « VI »)`, JSON.stringify(r && { visibles: r.railVisible, libellesLus: r.nLibs }));
           await ctx.close();
         });
       }

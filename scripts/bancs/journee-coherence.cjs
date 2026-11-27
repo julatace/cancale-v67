@@ -36,6 +36,11 @@
 //   E11 JOURS    — une marque (la barre du vendu, 9 nov.) sous chaque jour où il a vendu (aucune ailleurs) ;
 //   E0 GÉNÉRAL   — aucune erreur JS, aucun débordement, 44 px au doigt dans la
 //                  zone, aucun « 0,00 € » sur la tête, aucun mot écarté.
+//  ⚠️ (26 nov., bancs natifs) Sur Aujourd'hui natif : E3 juge la frise dans SA tuile (`[data-jv2-argent]`) ; E5 compte
+//  « Compléter » (l'atelier, 19 nov.) parmi les gestes ; E8 ne juge que les surtitres VUS (≥ 1) ; E6 sur Ventes : la carte du
+//  mois n'y est plus montrée (Ventes natif, 27dbf1ad0) — montée, cachée, sans « Modifier » orphelin. Deux défauts de l'app
+//  corrigés : la carte « N annonces sans numéro » redisait l'entrée « Compléter » (Comptabilite.jsx) ; à l'ordinateur le crayon
+//  « Modifier » était posé sur la case « Bénéfice · mois » (verre-journee.css).
 //  Réglages : `BANC_PORT` (9100–9149, 9121 par défaut), `LARGEURS`, `THEMES`,
 //  `SCENARIOS=plein,calme`, `SHOTS=<dossier>` (captures à REGARDER),
 //  `BANC_DIST` (un autre dist/, pour juger la base).
@@ -96,7 +101,8 @@ const jeu = (scenario) => {
 
 // ── CE QUE LA PAGE MONTRE ───────────────────────────────────────────────────
 const MESURE = (pg, tel) => pg.evaluate((tel) => {
-  const vis = (e) => { if (!e || !e.getClientRects().length) return false; const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; for (let p = e; p && p !== document.documentElement; p = p.parentElement) { const s = getComputedStyle(p); if (s.visibility === 'hidden' || s.display === 'none' || Number(s.opacity) < 0.05) return false; } return !e.closest('details:not([open]) > :not(summary)'); };
+  // (26 nov., bancs natifs) Une boîte de 1 px (rangée pour les lecteurs d'écran : `clip`, src/design/verre-journee.css) n'est pas VUE.
+  const vis = (e) => { if (!e || !e.getClientRects().length) return false; const r = e.getBoundingClientRect(); if (r.width <= 1 || r.height <= 1) return false; for (let p = e; p && p !== document.documentElement; p = p.parentElement) { const s = getComputedStyle(p); if (s.visibility === 'hidden' || s.display === 'none' || Number(s.opacity) < 0.05) return false; } return !e.closest('details:not([open]) > :not(summary)'); };
   const R = (e) => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top + scrollY, w: r.width, h: r.height, r: r.right, b: r.bottom + scrollY }; };
   const txt = (e) => (e ? (e.innerText || '').trim().replace(/\s+/g, ' ') : '');
   const ecran = document.querySelector('.vrm-fu-journee');
@@ -139,7 +145,11 @@ const MESURE = (pg, tel) => pg.evaluate((tel) => {
     if (av.content !== 'none' && av.position === 'absolute' && /gradient/.test(av.backgroundImage) && h > 40) out.tete.b = Math.round(tete.getBoundingClientRect().top + scrollY + h); }
   out.sem = sem && vis(sem) ? R(sem) : null;
   const semB = ecran.querySelector('[data-jv2-semaine]');
-  out.semBouton = semB && vis(semB) ? { h: Math.round(semB.getBoundingClientRect().height), dansTete: !!(tete && tete.contains(semB)) } : null;
+  // ⚠️ (26 nov., bancs natifs) À l'ordinateur, Aujourd'hui natif (src/natif/ecrans/Aujourdhui.jsx, colonnes `sj-`) pose la frise
+  // dans SA tuile (`[data-jv2-argent]`, le vendu et ses jours), hors de la tête de salutation : la règle reste « la semaine se
+  // touche DANS la frise » — le bouton est dans le bloc qui porte les jours (`.vrm-fu-jour`).
+  const frise = semB ? semB.closest('[data-jv2-argent]') : null;
+  out.semBouton = semB && vis(semB) ? { h: Math.round(semB.getBoundingClientRect().height), dansTete: !!(frise && frise.querySelector('.vrm-fu-jour')) } : null;
   out.semCarteAPart = [...ecran.querySelectorAll('.vrm-journal-semaine')].filter(vis).length;
   out.carte0 = cartes[0] ? R(cartes[0]) : null;
   if (sem && vis(sem)) {
@@ -197,6 +207,11 @@ const MESURE = (pg, tel) => pg.evaluate((tel) => {
   return out;
 }, tel);
 
+// (27 nov.) Changer d'écran par le chemin de l'app (`vrm:aller`, comme _bt-commun.cjs `aller`), jamais par `pg.goto` pendant
+// que l'app tourne : WebKit refuse les lectures en vol pendant le rechargement (« due to access control checks », rendu en
+// `pageerror`) et E0 « aucune erreur JS » rougissait à tort sous NAVIGATEUR=webkit (CI). Les erreurs restent toutes comptées.
+const aller = (pg, t) => pg.evaluate((t) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=' + t })); } catch (_) {} }, t);
+
 // E4 — pixels : la couleur moyenne d'une zone de la capture (décodée dans le navigateur).
 async function moyenne(pg, nav, clip) {
   const png = await pg.screenshot({ clip });
@@ -214,7 +229,9 @@ async function moyenne(pg, nav, clip) {
 const lum = ({ r, g, b }) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
 const ecartCouleur = (a, b) => Math.sqrt((a.r - b.r) ** 2 + (a.g - b.g) ** 2 + (a.b - b.b) ** 2);
 
-const VERBES_GESTES = /^(Imprimer|Emballer|Noter|Supprimer|Réessayer|Répondre|Trancher|Renvoyer|Suivre|Chez moi|Vendu.*|Séparé.*|…)$/;
+// (26 nov.) « Compléter » : l'entrée « N infos à compléter » (19 nov., src/completer/) ouvre l'ATELIER où il remplit sur place —
+// un geste, comme « Imprimer », pas l'ouverture d'un écran.
+const VERBES_GESTES = /^(Imprimer|Emballer|Noter|Supprimer|Réessayer|Répondre|Trancher|Renvoyer|Suivre|Compléter|Chez moi|Vendu.*|Séparé.*|…)$/;
 // Les mots écartés (src/libelles.js). « Bénéfice brut » est le nom d'une AUTRE notion
 // (ventes − prix d'achat, audit-benefice-unique) : rapporté à part, pas jugé ici.
 // (`\b` ne voit pas une frontière avant « à » : les mots se cherchent entre espaces.)
@@ -230,6 +247,10 @@ async function tournee(nav, { W, theme, scenario }) {
   // La lecture « Vendus ailleurs » part au montage : on la laisse répondre (et la publication des
   // ventes prouvées, pour la sortie du Stock).
   await pg.waitForTimeout(5200);
+  // (27 nov.) Sous charge (police CI, quatre bancs à la fois), « À faire » montrait encore ses squelettes après 5,2 s : rien
+  // à compter (E1 « dit null, vu 0 », E10). On attend que « À faire » ait DIT son nombre de gestes (`[data-fu-gestes]`),
+  // 15 s au plus ; sans lui la mesure juge ce qui est là (une section absente reste un rouge E1).
+  await pg.waitForFunction(() => !!document.querySelector('.vrm-fu-journee .vrm-fu-afaire [data-fu-gestes]'), null, { timeout: 15000 }).catch(() => {});
   if (scenario === 'plein') await pg.waitForSelector('[data-stock-sortie]', { timeout: 8000 }).catch(() => {});
   const m = await MESURE(pg, tel);
   if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, `e1-${scenario}-${W}-${theme}.png`), fullPage: true }); }
@@ -250,7 +271,7 @@ async function tournee(nav, { W, theme, scenario }) {
   {
     await pg.locator('[data-jv2-semaine]').first().click().catch(() => {});
     await pg.waitForTimeout(500);
-    const w = await pg.evaluate(() => { const t = document.querySelector('.vrm-fu-tete'); const s = t && t.querySelector('[data-journal-semaine]'); if (!s) return null;
+    const w = await pg.evaluate(() => { const b = document.querySelector('[data-jv2-semaine]'); const t = b && b.closest('[data-jv2-argent]'); const s = t && t.querySelector('[data-journal-semaine]'); if (!s) return null;
       const filets = []; for (const e of s.querySelectorAll('*')) { const c = getComputedStyle(e); for (const k of ['Top', 'Bottom']) if (parseFloat(c['border' + k + 'Width']) > 0 && c['border' + k + 'Style'] !== 'none' && !/rgba\(\d+, \d+, \d+, 0\)/.test(c['border' + k + 'Color'])) filets.push(e.className + ' ' + k); }
       return { lundi: s.getAttribute('data-journal-semaine'), filets }; });
     dit(!!(w && w.lundi && !w.filets.length), 'E3', `${T} touchée, la semaine passée s'affiche dans la tête, sans filet de liste déroulante`, JSON.stringify(w));
@@ -263,7 +284,19 @@ async function tournee(nav, { W, theme, scenario }) {
     // mesure LÀ (coordonnées de la fenêtre). La carte « À trancher » (DJ4) pousse la 1re carte sous le pli.
     const ici = (sel, amener) => pg.evaluate(([q, a]) => { const e = document.querySelector(q); if (!e) return null; if (a) e.scrollIntoView({ block: 'nearest' }); const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, b: r.bottom }; }, [sel, amener]);
     const tv = await ici('.vrm-fu-tete', true);
-    const t = await moyenne(pg, nav, { x: tv.x + tv.w / 2 - 30, y: tv.y + 8, width: 60, height: 8 });   // en haut, au milieu : le fond de la tête (son bas porte, au téléphone, les tuiles du mois ; ses coins sont arrondis)
+    // (26 nov., bancs natifs) Le FOND de la tête, pas son texte : le point fixe « en haut, au milieu » tombait, sur Aujourd'hui
+    // natif, sur la date de la salutation (police DejaVu de la CI, plus large) ou sur le rond « ? » (Inter) — il mesurait un glyphe.
+    // On cherche dans la tête une zone de 24 × 6 où le doigt ne touche que des boîtes sans texte ni commande (le fond), en haut d'abord.
+    const fond = await pg.evaluate(() => { const t = document.querySelector('.vrm-fu-tete'); const q = t.getBoundingClientRect();
+      // Le fond de la TÊTE elle-même : aucune boîte peinte entre le point et elle (une carte posée dans la tête — « À retirer
+      // ailleurs » — n'est pas son fond).
+      const peinte = (e) => { const c = getComputedStyle(e); return !/rgba\(\d+, \d+, \d+, 0\)|transparent/.test(c.backgroundColor) || c.backgroundImage !== 'none'; };
+      const nu = (x, y) => { const e = document.elementFromPoint(x, y); if (!e || !t.contains(e)) return false; if (e.closest('button, a, svg, img, input, [role="button"]')) return false;
+        if ([...e.childNodes].some((n) => n.nodeType === 3 && /\S/.test(n.nodeValue))) return false;
+        for (let p = e; p && p !== t; p = p.parentElement) if (peinte(p)) return false; return true; };
+      for (let y = q.top + 4; y < q.bottom - 10; y += 4) for (let x = q.left + 8; x < q.right - 32; x += 8) { let ok = true; for (let dy = 0; dy <= 6 && ok; dy += 3) for (let dx = 0; dx <= 24 && ok; dx += 6) ok = nu(x + dx, y + dy); if (ok) return { x, y }; }
+      return null; });
+    const t = await moyenne(pg, nav, fond ? { x: fond.x, y: fond.y, width: 24, height: 6 } : { x: tv.x + tv.w / 2 - 30, y: tv.y + 8, width: 60, height: 8 });
     const cv = await ici('.vrm-fu-afaire [data-barre-jour] > :not([style*="contents"]), .vrm-fu-afaire [data-barre-jour] > [style*="contents"] > *', true);
     const c = await moyenne(pg, nav, { x: cv.x + cv.w - 40, y: cv.y + 4, width: 30, height: 8 });
     const rap = (Math.max(lum(t), lum(c)) + 0.05) / (Math.min(lum(t), lum(c)) + 0.05);
@@ -295,7 +328,9 @@ async function tournee(nav, { W, theme, scenario }) {
   dit(!sansRaison.length, 'E7', `${T} chaque « — » de la tête dit sa raison`, JSON.stringify(sansRaison));
   // E8
   const regles = [...new Set(m.surtitres.map((s) => s.regle))];
-  dit(m.surtitres.length >= 2 && regles.length === 1 && !/uppercase/.test(regles[0] || ''), 'E8', `${T} les surtitres suivent une règle (${m.surtitres.length} vus)`, m.surtitres.map((s) => `${s.classe.split(' ')[0]} « ${s.texte} » ${s.regle}`).join(' ¦ '));
+  // (26 nov., bancs natifs) Aujourd'hui natif : le nom de la frise (« Aujourd'hui ») est rangé pour les lecteurs d'écran (1 px) — un
+  // seul surtitre VU peut rester (la salutation) ; s'il y en a plusieurs, ils suivent toujours une seule règle.
+  dit(m.surtitres.length >= 1 && regles.length === 1 && !/uppercase/.test(regles[0] || ''), 'E8', `${T} les surtitres suivent une règle (${m.surtitres.length} vus)`, m.surtitres.map((s) => `${s.classe.split(' ')[0]} « ${s.texte} » ${s.regle}`).join(' ¦ '));
   // E9
   if (scenario === 'plein') {
     const s = m.stock[0];
@@ -327,7 +362,7 @@ async function tournee(nav, { W, theme, scenario }) {
     // (8 nov.) Depuis la vague 3 (6 nov.), un N° qui a SA case est visé sur la case (recherche vide) ;
     // sans case, la recherche s'ouvre sur lui. L'un OU l'autre, et seulement CE N°.
     dit(/42/.test(lieu.q) || (lieu.vise.length === 1 && lieu.vise[0] === '42'), 'E9', `${T} « Voir » ouvre le Stock sur le N°42`, JSON.stringify(lieu));
-    await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+    await aller(pg, 'journee');
     await pg.waitForSelector('.vrm-fu-journee', { timeout: 20000 }).catch(() => {});
     await pg.waitForTimeout(4000);
     const m2 = await MESURE(pg, tel);
@@ -335,8 +370,8 @@ async function tournee(nav, { W, theme, scenario }) {
   }
   // E6 sur Ventes (la même carte).
   if (scenario === 'plein') {
-    await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' });
-    await pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
+    await aller(pg, 'ventes');
+    await pg.waitForSelector('.vrm-main[data-ecran="ventes"]', { timeout: 20000 }).catch(() => {});
     await pg.waitForTimeout(3000);
     const v = await pg.evaluate(() => [...document.querySelectorAll('.vrm-fu-modifier')].length);
     const mv = await MESURE(pg, tel).catch(() => null);
@@ -360,7 +395,13 @@ async function tournee(nav, { W, theme, scenario }) {
     const ecV = ECARTES.filter((re) => re.test(texteCarte)).map(String);
     dit(!ecV.length, 'E0', `${T} Ventes : aucun mot écarté sur la carte sombre`, ecV.join(' ¦ '));
     for (const x of mods) dit(!x.touche.length && x.h >= 44, 'E6', `${T} Ventes : « Modifier » ne chevauche rien et fait 44 px`, `${x.h} px · ${x.touche.join(' ¦ ')}`);
-    if (!mods.length) dit(false, 'E6', `${T} Ventes : la carte sombre a son « Modifier »`);
+    // ⚠️ (26 nov., bancs natifs) Ventes natif ne MONTRE plus la carte sombre (bande du mois montée cachée : `CacheSiV2 si={natifV…}`,
+    // App.jsx, commit 27dbf1ad0 du 19 nov., la refonte « VRM natif ») : rien à chevaucher. Exigé : pas de « Modifier » orphelin
+    // (montré sans SA carte), et la bande reste montée (elle publie ses nombres).
+    if (!mods.length) {
+      const b = await pg.evaluate(() => ({ montee: document.querySelectorAll('.vrm-carte-stats, [data-carte-stats]').length, orphelin: [...document.querySelectorAll('.vrm-fu-modifier')].filter((m) => m.getClientRects().length && !m.closest('.vrm-carte-stats, .vrm-fu-carte, .vrm-fu-carte-nu, .vrm-fu-bande')).length }));
+      dit(b.montee > 0 && b.orphelin === 0, 'E6', `${T} Ventes : carte du mois montée (cachée sur l'écran natif), aucun « Modifier » orphelin`, JSON.stringify(b));
+    }
   }
   dit(!o.journal.erreurs.length, 'E0', `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
   await o.ctx.close();

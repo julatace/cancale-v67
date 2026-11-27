@@ -89,6 +89,7 @@ export default {
   "egalite.action.partout": "Woanders einstellen…",
   "egalite.action.partout.phrase": "Die angehakten Anzeigen zu deinen anderen Seiten, aus ihrem Datenblatt: gleiche Nr., gleicher Kauf.",
   "egalite.action.vintedSeul": "Nur für eine Vinted-Anzeige",
+  "egalite.action.verifVinted": "Vinted prüft sie",
   "egalite.ecranSite": "Ganzer {site}-Bildschirm",
   "egalite.ecranSite.sous": "Die Werkzeuge dieser Seite",
   "egalite.numerosDonnes": { one: "{n} neue Nr. für ihren Karton", other: "{n} neue Nrn. für ihre Kartons" },

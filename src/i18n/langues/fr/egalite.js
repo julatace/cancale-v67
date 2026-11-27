@@ -89,6 +89,7 @@ export default {
   "egalite.action.partout": "Publier ailleurs…",
   "egalite.action.partout.phrase": "Les annonces cochées vers tes autres sites, depuis leur fiche : même N°, même achat.",
   "egalite.action.vintedSeul": "Seulement pour une annonce Vinted",
+  "egalite.action.verifVinted": "Vinted la vérifie",
   "egalite.ecranSite": "Tout l'écran {site}",
   "egalite.ecranSite.sous": "Les outils propres à ce site",
   "egalite.numerosDonnes": { one: "{n} nouveau N° à écrire sur son rangement", other: "{n} nouveaux N° à écrire sur leurs rangements" },

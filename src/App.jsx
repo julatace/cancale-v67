@@ -1732,7 +1732,7 @@ import './designV2/signature.css'; // (8 nov.) style de ./designV2/Signature.jsx
 import * as Natif from "./natif/index.js";
 import { FiltrePlateformes, useFiltrePlateforme, useFiltreCompte, filtreTableau } from "./natif/FiltrePlateformes.jsx";   // (25 nov.) le filtre par plateforme des onglets
 import { TOUTES as TOUTES_PLATEFORMES, nombresPlateformes, optionsPlateformes, choixEffectif as choixPlateformeEffectif, filtrerPlateforme, comptesDeLignes, choixCompteEffectif, filtrerCompte } from "./filtrePlateforme.js";
-import { FiltreAchats, MorceauSite } from "./achats/FiltreAchats.jsx";   // (25 nov.) le filtre par plateforme d'Achats
+import { FiltreAchats, MorceauSite, useEffAchats } from "./achats/FiltreAchats.jsx";   // (25 nov.) le filtre par plateforme d'Achats
 // (19 nov.) « VRM natif » : la coque (docs/design/NATIF.md)
 // (19 nov., « VRM natif ») `designV2/barre.jsx` n'est plus importé au démarrage (barre native) : seul Réglages le charge encore.
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
@@ -34723,6 +34723,8 @@ function AppCoeur() {
   // une notification) ; null ⇒ l'écran choisit (l'onglet qui a de l'urgent).
   // `ongletColisMontre` = ce que l'écran montre (pour monter les outils de retrait).
   const [ongletColis,setOngletColis]=useState(()=>(reprise0&&reprise0.colis)||null);
+  // (26 nov.) Le site choisi d'Achats, lu ICI : ses morceaux sont des éléments (jamais un enfant-fonction dans un écran gardé, src/achats/FiltreAchats.jsx).
+  const effAchats=useEffAchats();
   const [ongletColisMontre,setOngletColisMontre]=useState(null);
   // (11 nov., lot DJ3) Plus d'onglet `cat_bord` : « retirer » demandé mène à Achats (`setTab`, src/colisPlace.js).
   React.useEffect(()=>{
@@ -38097,7 +38099,7 @@ function AppCoeur() {
             était posée sous les 30 colis à expédier, à 5 500 px du haut. Mêmes chiffres, même carte, seulement montée.
             (15 nov., Ventes « Verre dépoli », maquette validée) Le segment À expédier · En route · Toutes et le grand chiffre
             ouvrent l'écran ; la bande du mois passe JUSTE SOUS les colis (en tête de « Toutes », qui replie les colis). */}
-        {t==='achats' ? <FiltreAchats rangee>{(effA)=>rendreColisSection(t,site,effA)}</FiltreAchats> : (t==='ventes' && (!sous || sec==='ventes')) ? rendreColisSection(t,site) : null}
+        {t==='achats' ? <><FiltreAchats rangee/>{rendreColisSection(t,site,effAchats)}</> : (t==='ventes' && (!sous || sec==='ventes')) ? rendreColisSection(t,site) : null}
         {/* (20 nov., Julien : « tu dois appliquer les mêmes dispositions sur toutes les plateformes ») Ventes · eBay ouvre la MÊME
             liste que Ventes · Vinted (l'écran natif : À envoyer · En route · Terminées) ; ce qu'eBay a EN PLUS (tableau, à traiter,
             offres, argent, santé) est un groupe de rangées sous la liste, chacune ouvre sa section (rien n'est perdu, §4.11). */}
@@ -38127,7 +38129,7 @@ function AppCoeur() {
             aEnvoyer={(o) => aExpedier(o) && !(load('vinted_ship_done', {}) || {})[String(o.transaction_id)]} prix={(o) => (o.price && o.price.amount != null ? fmt(Number(o.price.amount)) : '')}
             onPro={() => voirAbonnement(setTab)}/></div>}</>)
           : (sitesPresents && !sitesPresents.has(site)) ? <OngletManque site={site} onglet={t} onNav={setTab}/>
-          : site==='vinted' ? (t==='achats' && !libre ? <FiltreAchats>{(effA)=><MorceauSite site="vinted" eff={effA}>{rendreVinted(sec)}</MorceauSite>}</FiltreAchats> : rendreVinted(sec))
+          : site==='vinted' ? (t==='achats' && !libre ? <MorceauSite site="vinted" eff={effAchats}>{rendreVinted(sec)}</MorceauSite> : rendreVinted(sec))
           : site==='leboncoin' ? rendreLeboncoin(sec)
           : site==='ebay' ? rendreEbay(sec)
           : rendreVestiaire(t)}
@@ -38137,9 +38139,9 @@ function AppCoeur() {
           /* (21 nov., captures de Julien) Plus de grand intertitre à logo par site (trois logos avec rien dessous) : chaque site rend ses
              groupes seulement s'il a des achats, son nom dans le titre du groupe (src/achats/AchatsSite.jsx). */
           /* (25 nov.) Sous le filtre par plateforme d'Achats : montré sous « Toutes » et sous SON site, caché (monté) sinon. */
-          <FiltreAchats key={x}>{(effA)=><MorceauSite site={x} eff={effA}><div data-achats-autre={x}>
+          <MorceauSite key={x} site={x} eff={effAchats}><div data-achats-autre={x}>
             {x==='leboncoin' ? rendreLeboncoin('achats') : x==='ebay' ? rendreEbay('achats') : rendreVestiaire('achats')}
-          </div></MorceauSite>}</FiltreAchats>)) : null}
+          </div></MorceauSite>)) : null}
         </GardeEcran>
         </CacheSiV2>
       </section>

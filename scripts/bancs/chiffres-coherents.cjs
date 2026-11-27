@@ -308,6 +308,12 @@ async function widget() {
       for (const tab of ['ventes', 'dashboard']) {
         const { ctx, pg, errs } = await ouvrir(b, vp, tab);
         await attendre(pg, () => document.querySelectorAll('[data-carte-chiffre]').length > 0, null, 30000);
+        // (27 nov., rouge en CI chargée : « 0 chiffre(s) montré(s) sur plusieurs écrans ») La carte s'annonce à l'écran
+        // (src/AttenteEcran.jsx, essentiel `carte`) : tant qu'elle prépare ses chiffres, l'écran est derrière son attente
+        // (`data-attente` ≠ `pret`) et ses cases n'ont pas encore leur valeur — lues après 2,5 s fixes sous charge, elles étaient
+        // vides et M n'avait rien à comparer. On attend que l'écran dise ses données TOUTES là (`pret`, 30 s au plus).
+        await attendre(pg, (tab) => { const h = [...document.querySelectorAll('.vrm-attente')].find((x) => x.getAttribute('data-attente-ecran') === tab);
+          return !h || h.getAttribute('data-attente') === 'pret'; }, tab, 30000);
         await pg.waitForTimeout(2500);
         toutes.push(...(await cartes(pg)).map((c) => ({ ...c, ecran: tab })));
         dit(!errs.length, `${T} Z ${tab} sans erreur`, errs.slice(0, 2).join(' | '));

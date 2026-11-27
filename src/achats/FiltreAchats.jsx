@@ -19,6 +19,16 @@ export function FiltreAchats({ rangee = false, children }) {
   </>;
 }
 
+// ⚠️ (26 nov., banc iphone-reprise R1) LE SITE CHOISI, LU PAR LA COQUE. Un enfant-FONCTION (`children(eff)`) rendu dans un écran
+// GARDÉ (src/ecransGardes.jsx) se compare à son TEXTE : un changement de la coque qu'il capture (le compte choisi, une lecture
+// arrivée) passait pour « le même rendu », et Achats ne se redessinait qu'au rechargement (toucher « atelier_test » : rien ne
+// bougeait). La coque lit donc ce choix elle-même (`useEffAchats`) et rend ses morceaux en ÉLÉMENTS ordinaires.
+export function useEffAchats() {
+  const [choix] = useFiltrePlateforme('achats');
+  const nombres = useNombresAchats();
+  return choixEffectif(choix, optionsPlateformes(nombres));
+}
+
 // Un morceau d'Achats : montré sous « Toutes » et sous SON site, caché (monté) sinon.
 export function MorceauSite({ site, eff, children }) {
   const vu = eff === 'toutes' || eff === site;

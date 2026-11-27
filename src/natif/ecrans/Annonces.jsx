@@ -359,7 +359,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   const carte = (a, cleCompte, rv = null, etatDit = null) => (
     <CarteAnnonce key={a.cle + '|' + cleCompte} a={a} revele={rv} groupe etatDit={etatDit} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon}
       Photo={Photo} dort={dortDe && !A ? dortDe(a) : null} plusVue={plusVueDe && !A ? plusVueDe(a) : null}
-      selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), onBascule: () => basculer(a) } : null}
+      selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), raison: A.raisonLigne && !cochable(a) ? A.raisonLigne(a) : '', onBascule: () => basculer(a) } : null}
       attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined, 'data-eg-compte': cleCompte }}/>
   );
   // La liste « Articles » au téléphone (21 nov., 2e passe) : `RangeeArticle`, forme A ou B (`formeRangee`), pleine largeur, filets fins.
@@ -376,7 +376,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   };
   const rangeeTel = (a, cleCompte, rv = null, etatDit = null) => (
     <RangeeArticle key={a.cle + '|' + cleCompte} a={a} forme={formeRangee} groupe etatDit={etatDit} revele={rv} rapides={rapidesDe(a)} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte}
-      nomSite={nomSite} Icon={Icon} Photo={Photo} plusVue={plusVueDe && !A ? plusVueDe(a) : null} selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), onBascule: () => basculer(a) } : null}
+      nomSite={nomSite} Icon={Icon} Photo={Photo} plusVue={plusVueDe && !A ? plusVueDe(a) : null} selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), raison: A.raisonLigne && !cochable(a) ? A.raisonLigne(a) : '', onBascule: () => basculer(a) } : null}
       attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined, 'data-eg-compte': cleCompte }}/>
   );
   // (25 nov., régressions — capture iPhone de Julien : « Pas revue récemment » écrit sur CHAQUE rangée) Une même phrase sur
