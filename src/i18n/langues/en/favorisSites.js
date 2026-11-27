@@ -38,6 +38,8 @@ export default {
   "fav.bilan.s.conversation_deja_contactee": "already in a conversation",
   "fav.bilan.s.offre_sous_plancher": "offer below the minimum price",
   "fav.bilan.s.conversation_refusee": "conversation refused by Vinted",
+  "fav.bilan.s.fil_non_relu": "conversation not reread on Vinted",
+  "fav.bilan.s.historique_non_verifie": "conversation not verified",
   "fav.bilan.s.autre": "others",
   "fav.bilan.r.texte_interdit": "text with a link, an email, a phone number or a payment outside Vinted",
   "fav.bilan.r.texte_refuse": "text refused by Vinted",
@@ -47,6 +49,9 @@ export default {
   "fav.bilan.r.element_introuvable": "button or field not found on the Vinted page",
   "fav.bilan.r.notification_pas_trouvee": "notification being searched (VRM retries by itself)",
   "fav.bilan.r.identite_non_confirmee": "item or recipient not confirmed",
+  "fav.bilan.r.destinataire_different": "another person in the conversation",
+  "fav.bilan.r.article_different": "another item in the conversation",
+  "fav.bilan.r.variable_manquante": "message variable unknown for this item",
   "fav.bilan.r.historique_non_verifie": "conversation not verified",
   "fav.bilan.r.autre": "other refusal",
 };

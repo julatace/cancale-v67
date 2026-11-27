@@ -2395,4 +2395,11 @@ puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passati
 
 ## Ligne déplacée telle quelle de CLAUDE.md §9 (27 nov., < 60 000)
 
+## Lignes de CLAUDE.md §9 déplacées telles quelles le 27 nov. soir (place pour la 5.455.3, sous 60 Ko)
+
+- **27 nov. · ext. 5.455.2** : police « Inter VRM » du panneau ; `<gardes-app>` dit « article » ; le panneau ne coupe plus un onglet qui charge. `historique-divers.md`, fin. Geste : installer 5.455.2.
 - **27 nov. · « 978 216 » deux fois, un point en deux cartes** : un colis = ses identités (code lu aussi dans SA commande, n°, transaction), « à vérifier » compris ; un point = son adresse. `historique-colis-retraits.md`, fin. Geste : aucun (après fusion).
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (27 nov. soir, < 60 000)
+
+- **27 nov. · TROIS FONCTIONS RENDUES (Julien)** : filtre « Compte » de Ventes au téléphone (retenu par vendeur), alerte « un compte annule plus » dans Statistiques (règle du 5 nov. importée, un compte pas lu jamais comparé), questions eBay sans réponse en tête de Messages « À répondre ». `2026-11-27-retour-fonctions.md`. Geste : aucun.
