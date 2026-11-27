@@ -168,6 +168,21 @@ async function controles(src, dit) {
   ] });
   const mj = pts.filter((p) => /journal/i.test(p.nom));
   dit(mj.length === 2 && mj.some((p) => p.cp === '35000' && p.nArrives === 3), 'C1 majuscules, tirets, virgules : UN point ; même nom ailleurs : un AUTRE point', JSON.stringify(pts.map((p) => [p.cle, p.nArrives])));
+  // (27 nov., capture de Julien) « Joubert Peintures · Transporteur, 10 Rue du Bois Aurant, 35400 Saint-Malo » ET « 10 Rue du Bois
+  // Aurant · Vinted Go · Saint-Malo » : la MÊME adresse, deux cartes. Adresse inventée, forme réelle (le suivi Vinted Go donne
+  // « <n° et rue>, <ville> » sans le nom du commerce).
+  const NOMME = { id: 'j', nom: 'Droguerie du Banc', adresse: '10 Rue des Essais, 35400 Villeneuve', transporteur: 'vinted' };
+  const points = (...xs) => R.regrouperRelais({ arrives: xs });
+  const un = (ps) => ps.length === 1 && ps[0].nArrives === 2 && ps[0].nom === 'Droguerie du Banc';
+  dit(un(points(NOMME, { id: 'v', nom: '10 Rue des Essais', rue: '', cp: '', ville: 'Villeneuve', transporteur: 'vinted' })), 'C2 le point nommé de sa RUE (suivi Vinted Go) et le point nommé, même rue + même ville : UNE carte, au vrai nom', JSON.stringify(points(NOMME, { id: 'v', nom: '10 Rue des Essais', ville: 'Villeneuve' }).map((p) => [p.cle, p.nom])));
+  dit(un(points(NOMME, { id: 'v', nom: '', rue: '10 rue des essais', ville: 'VILLENEUVE', transporteur: 'vinted' })), 'C3 sans nom, la rue et la ville lues (casse, sans code postal) : la même carte — jamais « pas encore connu »');
+  dit(un(points(NOMME, { id: 'v', nom: '10 Rue des Essais', adresse: '10 Rue des Essais, 35400 Villeneuve', transporteur: 'vinted' })), 'C4 même rue, même code postal : une carte');
+  dit(points(NOMME, { id: 'v', nom: '12 Rue des Essais', ville: 'Villeneuve' }).length === 2, 'C5 un AUTRE numéro de la même rue : deux points');
+  dit(points(NOMME, { id: 'v', nom: '10 Rue des Essais', ville: 'Autreville' }).length === 2, 'C6 la même rue dans une AUTRE ville : deux points');
+  dit(points(NOMME, { id: 'v', nom: '10 Rue des Essais', adresse: '10 Rue des Essais, 29000 Villeneuve' }).length === 2, 'C7 la même rue à un AUTRE code postal : deux points');
+  dit(points(NOMME, { id: 'v', nom: 'Tabac du Centre', adresse: '10 Rue des Essais, 35400 Villeneuve' }).length === 2, 'C8 deux VRAIS noms différents à la même adresse (une galerie) : deux points (jamais la ressemblance des noms)');
+  dit(points(NOMME, { id: 'v', nom: '10 Rue des Essais', ville: 'Villeneuve', sorte: 'consigne' }).length === 2, 'C9 une consigne et un comptoir à la même adresse : deux points');
+  dit(points(NOMME, { id: 'v', nom: '10 Rue des Essais', transporteur: 'vinted' }).length === 2, 'C10 la rue SANS ville ni code postal : rien ne prouve l\'adresse, deux points');
 }
 
 function cablage(dit) {
@@ -217,7 +232,12 @@ function cablage(dit) {
       ['témoins finis ignorés (règle d\'avant)', 'arrivee', (s) => s.replace('const doute = Array.isArray(temoins)', 'const doute = false')],
       ['adresse de réception ignorée', 'arrivee', (s) => s.replace('if (a.a && b.a) return a.a === b.a;\n  if (a.r && b.r) return a.r === b.r;', '')],
       ['fenêtre de jours ignorée', 'arrivee', (s) => s.replace('Math.abs(aw - at) <= fenetreJ * 86400000', 'true')],
-      ['commande sans n° jamais un doute', 'arrivee', (s) => s.replace("(!cmds[i] || (sansIdentite && sansIdentite(t, cmds[i])))", '!cmds[i]')],
+      ['commande sans n° jamais un doute', 'arrivee', (s) => s.split("(!cmds[i] || (sansIdentite && sansIdentite(t, cmds[i])))").join('!cmds[i]')],
+      ['points : la rue seule suffit (ni code postal ni ville)', 'relais', (s) => s.replace("if (p.cp && q.cp) return p.cp === q.cp;\n      const vp = normNomRelais(p.ville || ''), vq = normNomRelais(q.ville || '');\n      return !!vp && vp === vq;", 'return true;')],
+      ['points : deux vrais noms réunis', 'relais', (s) => s.replace('&& (nomEstRue(p) || nomEstRue(q) || normNomRelais(p.nom) === normNomRelais(q.nom))', '')],
+      ['points : consigne et comptoir réunis', 'relais', (s) => s.replace(' || consigneDe(p) !== consigneDe(q)) return false;', ') return false;')],
+      ['points : jamais réunis par l\'adresse (règle d\'avant)', 'relais', (s) => s.replace('if (memes.length !== 1) continue;                       // plusieurs candidats', 'if (true) continue;                       // plusieurs candidats')],
+      ['points : rue + ville sans code postal ⇒ « pas connu » (règle d\'avant)', 'relais', (s) => s.replace("        : rueOk && RUE.test(rueOk) && villeLue ? 'adr:' + sorteCle + normNomRelais(rueOk) + '|~' + normNomRelais(villeLue) : CLE_INCONNU);", '        : CLE_INCONNU);')],
       ['lieu : préfixe « Consigne Vinted Go » gardé', 'arrivee', (s) => s.replace("const sansPrefixe = s.replace(NOM_LIEU_PREFIXE, '');", 'const sansPrefixe = s;')],
     ];
     let rouges = 0;
