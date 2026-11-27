@@ -3643,3 +3643,35 @@ mot cassé sur deux lignes (coupe permise après - / ·) ; T4 dans « À envoyer
 CSS servi : conteneur retiré ⇒ O3 1008 rouge (T1, T2, T3) ; compte sans `min-width: 0` ⇒ O3 zoom T4 rouge ; `nowrap`
 remis sur `.sb-touche.vrm-rf-geste` ⇒ E12 rouge. `journee-1280` 12/12 vert. Captures regardées : 1008 clair, zoom 125 %,
 390 et 1512 clair/sombre.
+
+## 27 nov. — « Paires qui dorment », le plan (choix de Julien ; retenu le 11 oct. : « plan des paires qui dorment »)
+
+**Ce qui existait, gardé tel quel** : le segment « Dorment » d'Annonces (`filtrerArticles` etat 'dorment', seuil réglable =
+l'âge mini d'« À republier »), « À republier en priorité » (`src/republierPriorite.js`), la liste « Qui dorment » de l'écran
+Annonces Vinted d'hier (`src/quiDorment.js`, `src/dormantes.js`, monté caché), le filtre « Ancienneté » du tableau.
+
+**Ajouté** :
+- `src/pairesDorment.js` (règle pure) : un ARTICLE (tous sites) dont une annonce est EN LIGNE depuis PLUS DE 21 jours (date lue ;
+  inconnue ⇒ hors plan, comptée à part) ; masquée, à confirmer, vendue, bloquée, compte « achats » : jamais. Rangé par l'argent qui
+  dort = le prix d'achat CONNU (§2.5), du plus grand au plus petit ; inconnu ⇒ après, « — » et « Saisir l'achat » (la MÊME feuille
+  `FeuilleFait` qu'Annonces, exportée). Total = somme des achats connus, « au moins » + « achat connu : k sur n ».
+  Vues et favoris : le DERNIER jour LU de la courbe (`courbes_annonces_{uid}_{nav}`, ext. 5.428) — lignes de SON compte seulement,
+  un point sans vues ni favoris ne compte pas, jamais interpolé ; sinon le dressing ; sinon « — ». Lecture PROJETÉE
+  (`p0:data->a->"ID"`, 60 annonces au plus), seulement à l'ouverture de la feuille.
+- Gestes (`gestesLignePlan`), chacun par LA porte (`agirMaintenant`) : Republier (Vinted, `republierDansApp` + `confirmerRepub`),
+  « Baisser à X € » (X = SON plancher, `gardePlancher` : prix mini sinon achat + 10 %, à l'euro au-dessus ; sans plancher ⇒
+  « Pose un prix mini » ; la file `prix` APRÈS `askConfirm` avant → après · plancher, grosse chute dite — Vinted, Leboncoin,
+  Vestiaire), Favoris (Vinted, la page favoris du panneau sur CETTE annonce, porte `panneau` ; 0 lu ⇒ « Aucun favori », pas lus ⇒
+  éteint). La porte dit non ⇒ bouton éteint (gris clair comme sombre), la raison UNE fois : en tête si tout le plan est en
+  lecture seule, sinon sur la ligne du compte.
+- Vue `src/natif/ecrans/PairesDorment.jsx` (entrée sur « Dorment », téléphone et tableau de l'ordinateur, + feuille) ; styles
+  ajoutés à `republierPriorite.css` ; textes `pdo.*` en 5 langues (`src/i18n/langues/*/pairesDorment.js`) ; Quoi de neuf
+  `paires-qui-dorment`.
+
+**Preuves** : `scripts/audit-paires-dorment.cjs` (34 contrôles, dont 50 paires au même titre sur deux comptes et une courbe d'un
+autre compte au même identifiant ; `--prouve` : 11/11 mutations rougissent). Banc `scripts/bancs/paires-dorment.cjs` (88 verts,
+390/1512, clair/sombre, polices de la CI) : rouge sur `origin/main` (la vue n'existe pas), rouge par mutation (porte retirée ⇒ G et
+R rouges ; tri par âge ⇒ L rouge). Ajouté à la CI (part 2 ; `ci-controles --diff` : seulement deux ajouts). Captures regardées :
+entrée, plan, lecture seule à 390 et 1512, clair et sombre — « Baisser à 61 € » prend toute la largeur au téléphone (le prix
+coupé à trois colonnes), et un bouton éteint se voit enfin en clair (la règle de `finitions.css` le redessinait comme allumé :
+corrigé ici seulement, à regarder pour toute l'app).
