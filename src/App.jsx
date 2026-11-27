@@ -1755,7 +1755,7 @@ import frApp from "./i18n/langues/fr.js";
 ajouterSourceApp(frApp);
 import { detenteursAchat, quiDetient, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
 // ⟦→ ecrans/Comptabilite.jsx #114⟧   // (16 nov.) achats Leboncoin et Vestiaire dans « Relier »
-import { appliquerPrixPro, relevesParTx as relevesProParTx, SELECT_TXN_PRO } from "./vintedPro.js";
+import { appliquerPrixPro, relevesParTx as relevesProParTx, SELECT_TXN_PRO, SELECT_PROFIL_PRO, lectureProDeLignes } from "./vintedPro.js";
 // ⟦→ ecrans/Comptabilite.jsx #115⟧
 import './design/arnaque.css'; // (8 nov.) style de ./AlerteArnaque.jsx, gardé à sa place (son écran est chargé à la demande)
 import { noterLienDemande, oublierLienDemande, lienDemandeIci, adopterJetonsDuLien, MSG_LIEN_PAS_DEMANDE, MSG_LIEN_AUTRE_COMPTE } from "./lienEmail.js";
@@ -10325,13 +10325,17 @@ const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, exclu
     const v = (versements && tx != null) ? versements[String(tx)] : null;
     const t = v ? Date.parse(v) : 0;
     if (eur == null) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'Vinted', raison: 'prix pas lu', titre: o.title || '', manque: true, ts: t || null, tsVente: tsCommande(o) || null }); } continue; }
-    if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'Vinted', eur, titre: o.title || '', masquee: masq, o, dateVente: o.date }); } continue; }
+    // (16 nov. au soir, décision de Julien, lot deux-prix-compter) Une vente Pro à deux prix dont la liste
+    // dépasse l'article de 2 € au plus est COMPTÉE au prix de l'article (`o.price`, posé par src/vintedPro.js) ;
+    // l'écart (liste − article, centimes) suit la ligne (`ecartC`) pour être ÉCRIT à côté, jamais ajouté.
+    const ecartPro = o._prixPro && o._prixPro.compter === true && Number.isSafeInteger(o._prixPro.ecartC) && o._prixPro.ecartC > 0 ? { ecartC: o._prixPro.ecartC } : null;
+    if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'Vinted', eur, titre: o.title || '', masquee: masq, o, dateVente: o.date, ...ecartPro }); } continue; }
     // (11 nov., lot vinted-pro) Compte Vinted PRO : un prix que Vinted contredit (liste ≠ article,
     // relevé muet) n'est pas su ⇒ mise à part et NOMMÉE — sauf une vente déjà déclarée, qui garde son mois.
     // (16 nov., lot argent-mieux) Les deux prix LUS sont gardés à côté (`deux`, centimes) : la liste groupée
     // dit « au moins » la somme du plus bas (jamais un des deux choisi pour le total, qui reste sans elles).
     if (o._prixPro && o._prixPro.compter === false && !(idx && idx.get(id))) { if (!vus.has(id)) { vus.add(id); const pp = o._prixPro; const deux = Number.isSafeInteger(pp.listeC) && Number.isSafeInteger(pp.artC) ? { listeC: pp.listeC, artC: pp.artC, releveC: Number.isSafeInteger(pp.releveC) ? pp.releveC : null } : null; ecartees.push({ id, plateforme: 'Vinted', raison: pp.raison || 'prix pas lu', code: pp.code || '', ...(deux ? { deux, auMoinsC: Math.min(deux.listeC, deux.artC) } : {}), titre: o.title || '', manque: true, ts: t || null, tsVente: tsCommande(o) || null, itemId: o.item_id != null ? String(o.item_id) : '' }); } continue; }
-    const l = { id, plateforme: 'Vinted', ts: t, ym: ymDeTs(t), eur, titre: o.title || '', masquee: masq, o, dateVente: o.date };
+    const l = { id, plateforme: 'Vinted', ts: t, ym: ymDeTs(t), eur, titre: o.title || '', masquee: masq, o, dateVente: o.date, ...ecartPro };
     if (garde(l)) lignes.push(place(l));
   }
   for (const v of (lbc || [])) {
@@ -10477,7 +10481,9 @@ const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre, import
     if (eurV == null) { nonComptees.push({ plateforme: 'Vinted', raison: 'prix pas lu', ts: t }); continue; }
     // (31 oct.) `compte` : le compte qui a vendu (Statistiques → « Par compte »), le même nom que le relevé des ventes.
     // (4 nov.) `tx` et `uid` : l'identité de la vente et de son compte, pour les statistiques des offres (src/statsOffres.js).
-    lignes.push({ plateforme: 'Vinted', ts: t, eur: eurV, compte: String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), uid: String((o._acc && o._acc.vinted_user_id) || ''), tx: tx != null ? String(tx) : '' });
+    // (16 nov. au soir, décision de Julien) Vente Pro à deux prix comptée au prix de l'article : l'écart suit la ligne, jamais compté.
+    const ecartPro = o._prixPro && o._prixPro.compter === true && Number.isSafeInteger(o._prixPro.ecartC) && o._prixPro.ecartC > 0 ? { ecartC: o._prixPro.ecartC } : null;
+    lignes.push({ plateforme: 'Vinted', ts: t, eur: eurV, compte: String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), uid: String((o._acc && o._acc.vinted_user_id) || ''), tx: tx != null ? String(tx) : '', ...ecartPro });
   }
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v)) continue;
@@ -10854,16 +10860,15 @@ function etapeAchat(o, tk, { fini = false, retour = false } = {}) {
 const lecturePrixPro = (uid) => cachedRow(`prixpro_${uid}`, async () => {
   const u = String(uid || '');
   if (!/^\d{1,20}$/.test(u)) return { pro: null };
-  const p = await lireTout(`id=eq.harvest_${u}_profile&select=business:data->payload->user->business,business_account_id:data->payload->user->business_account_id,business_account:data->payload->user->business_account`, { strict: true }).catch(() => null);
-  const pro = Array.isArray(p) && p[0] ? typeCompteVinted({ user: p[0] }) : null;
-  if (pro !== true) return { pro };
+  // (16 nov. au soir) La mise en forme est celle du serveur (`lectureProDeLignes`, src/vintedPro.js) : une règle.
+  const p = await lireTout(`id=eq.harvest_${u}_profile&select=${SELECT_PROFIL_PRO}`, { strict: true }).catch(() => null);
+  const l0 = lectureProDeLignes({ profil: p, typeCompte: typeCompteVinted });
+  if (l0.pro !== true) return l0;
   const [t, r] = await Promise.all([
     lireTout(`id=like.harvest_${u}_txn_*&select=${SELECT_TXN_PRO}`, { strict: true }).catch(() => null),
     lireTout(`id=like.harvest_${u}_releve_*&select=id,l:data->lignes`, { strict: true }).catch(() => null),
   ]);
-  const txns = Array.isArray(t) ? new Map(t.filter((x) => x && x.tx).map((x) => [String(x.tx), x])) : null;
-  const releve = Array.isArray(r) ? relevesProParTx(r.flatMap((x) => (x && Array.isArray(x.l) ? x.l : []))) : null;
-  return { pro, txns, releve };
+  return lectureProDeLignes({ profil: p, txns: t, releves: r, typeCompte: typeCompteVinted });
 });
 const appliquerPrixProCompte = async (uid, items) => {
   try { const l = await lecturePrixPro(uid); return appliquerPrixPro(items, l || {}); } catch (_) { return items; }

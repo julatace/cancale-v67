@@ -505,6 +505,8 @@ export const NOUVEAUTES = Object.freeze([
   // (15 nov., maquettes validées : « tout est parfait ») docs/passation/2026-11-15-refonte-ventes.md
   // (16 nov., lot plateformes-restes) docs/passation/2026-11-16-plateformes-restes.md
   { id: 'douchette-ebay-lbc', date: '2026-11-16', titre: 'La douchette reconnaît eBay et Leboncoin', phrase: 'N° de commande, SKU VRM ou bordereau Mondial Relay : la vente s’ouvre.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // l'article, l'écart écrit à côté) docs/passation/2026-11-16-argent-mieux.md
+  { id: 'deux-prix-comptees', date: '2026-11-16', titre: 'Ventes Pro à deux prix : comptées', phrase: 'Au prix de l’article ; l’écart est écrit à côté.', tab: 'argent', pour: 'pro', mode: 'tous' },
   { id: 'relier-achats-sites', date: '2026-11-16', titre: 'Relie un achat Leboncoin ou Vestiaire', phrase: 'Ils sont dans la feuille « Relier un achat », avec les achats Vinted.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'facture-ebay-lot', date: '2026-11-16', titre: 'Facture d’une commande eBay à plusieurs articles', phrase: 'Une facture, une ligne par article.', tab: 'compta', pour: 'pro', mode: 'tous' },
   { id: 'ventes-verre', date: '2026-11-15', titre: 'Ventes : colis cochés, place dans le stock', phrase: 'Chaque colis dit où est le carton ; imprime les cochés.', tab: 'ventes', pour: 'tous', mode: 'tous' },

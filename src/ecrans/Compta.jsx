@@ -106,6 +106,7 @@ import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, text
 // ⟦← App.jsx #3⟧
 const Dac7Comptes = aLaDemande(() => import('../Dac7Comptes.jsx'));
 import MoisBoucle, { portesMoisBoucle } from '../MoisBoucle.jsx';
+import { ecartNonCompte } from '../vintedPro.js';   // (16 nov. au soir, lot deux-prix-compter)
 import NonComptees from '../composants/NonComptees.jsx';   // (16 nov., lot argent-mieux)   // (10 nov., lot BK)
 // (14 nov., lot argent-prix — 115 lien comptable, 116 révision du mois)
 import { LienComptable, RevisionMoisCarte } from '../ArgentPrix.jsx';
@@ -1686,7 +1687,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     ];
     const attente = lbcCoqueLu === undefined || ebayCommandes === undefined || ventesVc === undefined;
     // (1er nov., audits A2/A10) Les ventes dont l'argent ne se lit pas : dites, jamais 0 €.
-    return { etat: 'lu', vendu: vf.lignes, finalise, recu, aDater, venduSansDate: vf.sansDate, venduEbayEcartees: vf.ecartees || 0, finSansDate, manque, attente, venduNonComptees: vf.nonComptees || [], recuNonComptees: (decl.ecartees || []).filter((x) => x && x.manque) };
+    return { etat: 'lu', vendu: vf.lignes, finalise, recu, aDater, venduSansDate: vf.sansDate, venduEbayEcartees: vf.ecartees || 0, finSansDate, manque, attente, venduNonComptees: vf.nonComptees || [], recuNonComptees: (decl.ecartees || []).filter((x) => x && x.manque), ecart: ecartNonCompte([...decl.lignes, ...decl.aDater]) };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ventes, ventesVendu, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVc, excluAutre, decAilleurs]);
   const lignes = calc.etat === 'lu' ? caParPeriodes({ vendu: calc.vendu, finalise: calc.finalise, recu: calc.recu }, periode, 6) : null;
@@ -1762,7 +1763,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
               </tbody>
             </table>
           </div>}
-          {(partiel || calc.aDater.length > 0 || calc.venduSansDate > 0 || calc.venduEbayEcartees > 0 || versements === null || calc.venduNonComptees.length > 0 || calc.recuNonComptees.length > 0) && (
+          {(partiel || calc.aDater.length > 0 || calc.venduSansDate > 0 || calc.venduEbayEcartees > 0 || versements === null || calc.venduNonComptees.length > 0 || calc.recuNonComptees.length > 0 || calc.ecart.n > 0) && (
             <div data-ca-couverture style={{ padding: '10px 16px 13px', borderTop: `1px solid ${C.border}`, fontSize: 11, color: C.muted, lineHeight: 1.55 }}>
               {calc.manque.length > 0 && <div>{trj('compta.totauxPartielsSans', { x: calc.manque.join(', ') })}</div>}
               {!calc.manque.length && calc.attente && <div>{tr('compta.leboncoinEbayLit')}</div>}
@@ -1775,6 +1776,8 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
               {calc.venduNonComptees.length > 0 && <div data-ca-non-comptees={calc.venduNonComptees.length}>{trj('compta.dansVenduChaque', { phraseNonComptees: phraseNonComptees(calc.venduNonComptees) })}</div>}
               {/* (16 nov., lot argent-mieux) Groupées : une ligne par raison, le nombre, « au moins », le geste ; le détail replié. */}
               {calc.recuNonComptees.length > 0 && <div data-ca-recu-non-comptees={calc.recuNonComptees.length}><NonComptees liste={calc.recuNonComptees}/></div>}
+              {/* (16 nov. au soir, décision de Julien) Ventes Pro à deux prix COMPTÉES au prix de l'article : l'écart, dit, jamais compté. */}
+              {calc.ecart.n > 0 && <div data-ca-ecart-pro={calc.ecart.c} data-ca-ecart-n={calc.ecart.n}>{tr('nc.ecart', { n: calc.ecart.n, x: fmt(calc.ecart.c / 100) })}</div>}
             </div>
           )}
         </>)}
@@ -3296,6 +3299,8 @@ function CarteUrssafMois({ liveStats, onNav }) {
           // ici, des mêmes lignes que le total — le chiffre est un minimum (§5).
           // (16 nov., lot argent-mieux) Plus une phrase par vente (« le mur ») : une ligne par raison, groupée (src/composants/NonComptees.jsx).
           if (ncInfo && ncInfo.n > 0) morceaux.push(<div key="nc" data-urssaf-non-comptees={ncInfo.n}><NonComptees par={ncInfo.par} parC={ncInfo.parC} det={ncInfo.det}/>{ncInfo.par && Object.keys(ncInfo.par).some(k => k.startsWith('Vestiaire|')) ? <p className="vrm-nc-geste">{tr('compta.vrmSaitEncore').replace(/^\.\s*/, '')}.</p> : null}</div>);
+          // (16 nov. au soir, décision de Julien) Ventes Pro à deux prix COMPTÉES au prix de l'article : l'écart du mois (ligne publiée), dit, jamais compté.
+          if (Number(e.nEcart) > 0 && Number.isSafeInteger(e.ecartC)) morceaux.push(<Puce key="ec"><span data-urssaf-ecart-pro={e.ecartC} data-urssaf-ecart-n={e.nEcart}>{tr('nc.ecart', { n: Number(e.nEcart), x: fmt(e.ecartC / 100) })}</span></Puce>);
           // (15 nov., 5.390) Les ventes sans date de versement : UNE ligne, sans geste (ni « mets l’extension à jour », ni renvoi pour dater à la main).
           if (ad && Number(ad.n) > 0) morceaux.push(<Puce key="av"><LigneDatesVersement avecDelai={extSait('versementsauto') === 'ok'} as="span" ad={ad} style={{fontSize:'inherit',color:'inherit'}}/></Puce>);
           // (29 oct.) « Vestiaire Co : pas encore relié » retiré : affiché à tous, même sans compte Vestiaire, il n'apprenait rien.

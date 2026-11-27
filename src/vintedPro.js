@@ -162,11 +162,15 @@ export const SELECT_TXN_PRO = 'id,tx:data->payload->transaction->>id,side:data->
 //     crédit = prix de la liste ⇒ compté tel quel ; crédit = prix de l'article ⇒ le
 //     prix devient celui de l'article (`_prixListe` garde l'autre) ; sinon, ou pas de
 //     ligne ⇒ mise à part et NOMMÉE (« au moins ») ;
+//   · (16 nov. au soir, décision de Julien) liste AU-DESSUS de l'article de 2 € au plus, relevé
+//     muet ⇒ comptée au prix de l'ARTICLE, l'écart gardé à côté (`ecartC`, dit, jamais compté) ;
 //   · transaction pas lue ⇒ mise à part (« prix de l'article pas lu »).
 // Une vente DÉJÀ DÉCLARÉE garde sa place (son mois de déclaration) : on ne retire
 // jamais une vente d'une déclaration faite.
 export const RAISON_DEUX_PRIX = 'deux prix chez Vinted';
 export const RAISON_DEUX_PRIX_RELEVE = 'deux prix chez Vinted, le relevé en dit un troisième';
+// (16 nov. au soir, décision de Julien) L'écart liste − article COMPTÉ au prix de l'article : 2 € au plus.
+export const ECART_MAX_C = 200;
 export const RAISON_PRO_PAS_LU = 'prix de l’article pas lu (compte Pro)';
 export function prixVentePro(o, txn, ligneReleve) {
   const liste = centimesVinted(o && o.price);
@@ -179,6 +183,14 @@ export function prixVentePro(o, txn, ligneReleve) {
   const cr = ligneReleve ? centimesVinted(ligneReleve.montant) : null;
   if (cr != null && cr === liste) return { compter: true, tranche: 'releve' };
   if (cr != null && cr === art) return { compter: true, tranche: 'releve', prixArticle: art };
+  // (16 nov. au soir, DÉCISION DE JULIEN, lot deux-prix-compter) La liste AU-DESSUS de l'article de
+  // quelques centimes à 2 € (mesuré : 66 ventes Pro, +0,47 € à +1,45 €, toutes finalisées ; ce n'est PAS
+  // la protection acheteurs), relevé muet ⇒ COMPTÉE au prix de l'ARTICLE (le plus bas) ; l'écart
+  // (liste − article) est gardé à côté (`ecartC`) pour être ÉCRIT, jamais ajouté au total.
+  // Écart négatif, au-delà de 2 €, ou un relevé qui dit un troisième prix ⇒ à part comme avant.
+  if (cr == null && liste > art && liste - art <= ECART_MAX_C) {
+    return { compter: true, code: 'deux-prix-ecart', tranche: 'ecart', prixArticle: art, listeC: liste, artC: art, ecartC: liste - art };
+  }
   // (16 nov., lot argent-mieux) La raison est UNE phrase, la même pour toutes les ventes de ce cas : les
   // prix vivent à côté (`listeC`, `artC`, `releveC`, centimes). Avant, chaque vente portait ses deux prix
   // DANS sa raison : les ventes se groupant par raison, 60 ventes faisaient 60 groupes (« le mur »).
@@ -200,4 +212,37 @@ export function appliquerPrixPro(items, { pro = null, txns = null, releve = null
     if (r.prixArticle != null) { n._prixListe = o.price; n.price = { amount: (r.prixArticle / 100).toFixed(2), currency_code: 'EUR' }; }
     return n;
   });
+}
+
+// (16 nov. au soir, décision de Julien, lot deux-prix-compter) L'écart des ventes Pro COMPTÉES au prix
+// de l'article : la somme (centimes) et le nombre, sur des lignes de `ventesDeclarables` / `ventesFaites`
+// (`ecartC` posé par la règle). ÉCRIT à côté du total (« dont 44,37 € d'écart non compté »), jamais
+// ajouté. `garde` : un filtre (le mois, la période). → { n, c }
+export function ecartNonCompte(lignes, garde = null) {
+  let n = 0, c = 0;
+  for (const l of (lignes || [])) {
+    if (!l || !Number.isSafeInteger(l.ecartC) || l.ecartC <= 0) continue;
+    if (garde && !garde(l)) continue;
+    n += 1; c += l.ecartC;
+  }
+  return { n, c };
+}
+
+// ── LES LECTURES D'UN COMPTE PRO, MISES EN FORME (16 nov. au soir, lot deux-prix-compter) ──────────────
+// UNE mise en forme pour l'app (`lecturePrixPro`, au chargement des ventes) ET le serveur (bilan de la
+// semaine / du mois, preuve d'une facture Pro) : §5, une seule règle par notion. Les lectures restent
+// chez chacun (même projection, `SELECT_PROFIL_PRO` / `SELECT_TXN_PRO`) ; `typeCompte` est la règle
+// `typeCompteVinted` (App.jsx = background.js, recopiée au jeton près dans api/_lib/ventes-regle.js).
+//   profil  : lignes lues (`harvest_{uid}_profile`, projection) · null/undefined = lecture ratée ;
+//   txns    : lignes lues (`harvest_{uid}_txn_*`, SELECT_TXN_PRO) · null/undefined = ratée ;
+//   releves : lignes lues (`harvest_{uid}_releve_*`, `id,l`) · null/undefined = ratée.
+// → { pro, txns, releve } pour `appliquerPrixPro`. Profil pas lu ⇒ pro null (rien ne change) ;
+//   compte pas Pro ⇒ les transactions ne servent pas (`pro` seul).
+export const SELECT_PROFIL_PRO = 'business:data->payload->user->business,business_account_id:data->payload->user->business_account_id,business_account:data->payload->user->business_account';
+export function lectureProDeLignes({ profil, txns, releves, typeCompte } = {}) {
+  const pro = Array.isArray(profil) && profil[0] && typeof typeCompte === 'function' ? typeCompte({ user: profil[0] }) : null;
+  if (pro !== true) return { pro };
+  const t = Array.isArray(txns) ? new Map(txns.filter((x) => x && x.tx).map((x) => [String(x.tx), x])) : null;
+  const r = Array.isArray(releves) ? relevesParTx(releves.flatMap((x) => (x && Array.isArray(x.l) ? x.l : []))) : null;
+  return { pro, txns: t, releve: r };
 }

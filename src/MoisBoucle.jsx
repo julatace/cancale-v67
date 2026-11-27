@@ -83,6 +83,11 @@ export default function MoisBoucle({ portes = {} }) {
         {choix.map((m) => <option key={m} value={m}>{libelleMois(m)}</option>)}
       </select>}
       attrs={{ 'data-mois-boucle': K.ym, 'data-mb-etat': K.etat, 'data-mb-a-regler': K.aRegler, 'data-mb-montant': K.montant && K.montant.ca != null ? String(Math.round(K.montant.ca * 100)) : '', 'aria-label': `Mois bouclé : ${libelleMois(K.ym)}` }}>
+      {/* (16 nov. au soir, décision de Julien) Ventes Pro à deux prix COMPTÉES au prix de l'article : l'écart du mois
+          (la ligne publiée `vinted_urssaf_mois`), écrit à côté du montant, jamais ajouté. */}
+      {(() => { const m = ligneU && Array.isArray(ligneU.mois) ? ligneU.mois.find((x) => x && x.ym === K.ym) : null;
+        return m && Number(m.nEcart) > 0 && Number.isSafeInteger(m.ecartC)
+          ? <p className="vrm-mb-ecart" data-mb-ecart-pro={m.ecartC} data-mb-ecart-n={m.nEcart}>{tr('nc.ecart', { n: Number(m.nEcart), x: somme(m.ecartC / 100) })}</p> : null; })()}
       {K.etat === 'declare' ? null : K.lignes.map((l) => {
         const action = l.etat === 'manque' && typeof portes[l.cle] === 'function';
         const sous = l.etat === 'passu' ? (RAISONS[l.raison] || RAISONS.pasSu)

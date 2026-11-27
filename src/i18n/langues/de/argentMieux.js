@@ -59,5 +59,9 @@ export default {
   "nc.mb.prix": "Gib sie unter Anzeigen ein.",
   "nc.mb.comptes": "Öffne Vinted, angemeldet mit diesen Konten.",
   "nc.mb.frais": "Öffne Verkäufe: VRM liest die Gebühren neu.",
-  "nc.mb.montant": "Öffne Verkäufe: VRM rechnet neu."
+  "nc.mb.montant": "Öffne Verkäufe: VRM rechnet neu.",
+  "nc.ecart": {
+    "one": "davon {x} Differenz nicht gezählt ({n} Vinted-Pro-Verkauf zum Artikelpreis gezählt)",
+    "other": "davon {x} Differenz nicht gezählt ({n} Vinted-Pro-Verkäufe zum Artikelpreis gezählt)"
+  }
 };

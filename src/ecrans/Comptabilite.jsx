@@ -461,6 +461,7 @@ import { annoncesActuelles, annoncesVcStock, classerRangees } from "../stockAnno
 import { PasEnLigneDetail, texteCartePasEnLigne } from "../PasEnLigne.jsx";   // (11 nov., lot pas-en-ligne)
 import { DEMANDE_OUVRIR_ACHAT, candidatsPasEnLigne, jugerPasEnLigne, presentsDe as presentsPasEnLigne, seuilValide as seuilValidePasEnLigne, SEUIL_DEFAUT as SEUIL_PAS_EN_LIGNE_DEFAUT, CLE_SEUIL_PAS_EN_LIGNE } from "../pasEnLigne.js";
 // ⟦← App.jsx #93⟧
+import { ecartNonCompte } from "../vintedPro.js";   // (16 nov. au soir, lot deux-prix-compter) l’écart des ventes Pro à deux prix, dit, jamais compté
 import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois, raisonPasSu as raisonPasSuEnLigne } from "../enLigneDeuxFois.js";
 import { useAvisBas, AvisBasDetail, titreAvisBas, detailAvisBas } from "../AvisNegatifJournee.jsx";   // (11 nov., lot avis-negatif) la carte « Avis 2★ reçu »
 import { LIGNE_AVIS_BAS_VUS } from "../avisNegatif.js";
@@ -10879,6 +10880,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             // a changé depuis, sur les MÊMES lignes que le total (§5).
             nApres: m.nApres, caApres: r2(m.caApres), nDouble: m.nDouble, caDouble: r2(m.caDouble),
             nAilleurs: m.nAilleurs, caAilleurs: r2(m.caAilleurs), ailleurs: m.ailleurs,
+            // (16 nov. au soir, décision de Julien) Ventes Pro à deux prix COMPTÉES au prix de l'article :
+            // l'écart (centimes) publié à côté, jamais dans `ca` ; absent quand il n'y en a pas.
+            ...(() => { const ec = ecartNonCompte(lignes, (l) => l.ym === m.ym); return ec.n ? { nEcart: ec.n, ecartC: ec.c } : {}; })(),
             declare: d ?{ ca: d.ca, montant: d.montant != null ? d.montant : null, at: d.at || null } : null };
         })
         .sort((a,b)=> a.ym < b.ym ? 1 : -1);
@@ -18512,6 +18516,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // ⚠️ (revue du 6 octobre) Via `declRapport` : dates de versement illisibles,
     //    Leboncoin et eBay restent comptés et Vinted est DIT absent (`vinted`).
     let nApres=0, caApres=0, nDouble=0, caDouble=0, nAilleurs=0, caAilleurs=0, nVenteAvant=0, caVenteAvant=0;
+    // (16 nov. au soir, décision de Julien) Ventes Pro à deux prix comptées au prix de l'article : l'écart du mois, dit, jamais compté.
+    const ecartMois = ecartNonCompte(declRapport.lignes, (l) => l.ym === reportMonth);
     const ailleurs = {}, doubles = new Set(), venteAvant = {};
     const parPlateforme = { Vinted: { n: 0, ca: 0 } };
     for (const l of declRapport.lignes) {
@@ -18587,7 +18593,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // d'aujourd'hui (un compte lié depuis) ⇒ « lecture en cours », jamais noté.
     const incomplet = lectureIncomplete({ registre: declUrssaf, ventes: ventesComptees, ventesErreur: !!sales.error, comptesEchec, versements, lbc: lbcLu, ebay: ebayCmd, vestiaire: ventesVc });
     return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, nAttente, caAttente, caAttentePasLu, saleLines, buyLines, achatsTotal, achatsPasLu, parPlateforme, aDater, sourcesKO,
-      nApres, caApres, nDouble, caDouble, doubles: [...doubles].sort(), nAilleurs, caAilleurs, ailleurs, nVenteAvant, caVenteAvant, venteAvant, declaration, declarePasSu: declUrssaf == null, enCours,
+      nApres, caApres, nDouble, caDouble, doubles: [...doubles].sort(), nAilleurs, caAilleurs, ailleurs, nVenteAvant, caVenteAvant, venteAvant, declaration, declarePasSu: declUrssaf == null, enCours, nEcart: ecartMois.n, ecartC: ecartMois.c,
       vinted: declRapport.vinted, incomplet };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showReport, sales.items, sales.failedUids, sales.error, ventesComptees, accounts, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, declUrssaf, excluAutre, autresParIdRapport, ventesVc]);
@@ -31760,7 +31766,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               <div data-rapport-vinted={report.enCours ? 'encours' : report.vinted} style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
                 <StatBox label="CA des ventes finalisées" value={report.enCours ? '…' : (report.vinted === 'passu' && !report.nb) ? '—' : fmtE(report.ca)}
                   subColor={report.vinted === 'passu' ? C.warn : undefined}
-                  sub={report.enCours ? 'lecture des ventes en cours' : report.vinted === 'passu' ? `sans Vinted (dates de versement illisibles)${report.nb ? ` · ${report.nb} vente${report.nb>1?'s':''} Leboncoin/eBay` : ''}` : `${report.nb} vente${report.nb>1?'s':''}`}/>
+                  sub={report.enCours ? 'lecture des ventes en cours' : report.vinted === 'passu' ? `sans Vinted (dates de versement illisibles)${report.nb ? ` · ${report.nb} vente${report.nb>1?'s':''} Leboncoin/eBay` : ''}` : `${report.nb} vente${report.nb>1?'s':''}${report.nEcart ? ' · ' + tr('nc.ecart', { n: report.nEcart, x: fmtE(report.ecartC / 100) }) : ''}`}/>
                 {report.regime==='marge' ? (<>
                   <StatBox label="Marge TTC" value={inc ?? fmtE(report.marge)} color={inc ? C.muted : INV_STATUS.online.color}/>
                   <StatBox label={`TVA marge ${report.tvaRate}%`} value={inc ?? fmtE(report.tvaMarge)} color={inc ? C.muted : C.warn}/>
