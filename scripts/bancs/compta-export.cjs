@@ -153,7 +153,10 @@ const cts=(x)=>x==null||x===''?'':String(Math.round(Number(x)*100));
   try{
     if(CAP) fs.mkdirSync(CAP,{recursive:true});
     b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+    // BANC_MODES=0,2 : seulement ces tailles (les mutations se jouent sur la première) ; défaut : toutes.
+    const seuls=String(process.env.BANC_MODES||'').split(',').filter(Boolean).map(Number);
     for(const [iT,T] of MODES.entries()){
+      if(seuls.length&&!seuls.includes(iT)) continue;
       console.log(`\n══ ${T.nom}${T.hasTouch?' (tactile)':''}`);
       const nomCap=T.nom.replace(' ','-');
       for(const regime of (iT===0?['micro',null]:['micro'])){

@@ -2382,3 +2382,7 @@ Julien, après avoir lu le risque (requêtes sans le « bruit » de la page vs c
 
 - **25 nov. · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-25-passation-generale.md` (en ligne le 24-25 nov., train en cours et son ordre, décision du 24 nov. « tout faire depuis VRM si l'extension est connectée », maquettes C3/Monochrome dans `docs/design/maquettes-25nov/`), puis `2026-11-23-passation-generale.md`. Geste : extension 5.440.4 dès qu'elle est en ligne.
 - **26 nov. · « article » hors Sneakers partout (ext. 5.455.1)** : `historique-divers.md`, fin.
+
+### Passations à lire, d'avant le 22 nov. (déplacé tel quel de CLAUDE.md §9 le 27 nov., taille)
+
+puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passation-generale.md` (la plus complète : en ligne, prêt, en pause, en file, refusé, gestes), puis `2026-11-16-passation.md`, `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`).
