@@ -209,8 +209,12 @@ const toucher = async (pg, tel, sel) => { const l = pg.locator(sel).first(); if 
 // « Terminées » de Ventes (le segmenté natif) : un toucher pendant le calcul de l'écran peut se perdre — attendu, un 2ᵉ au plus (§6.5).
 const terminees = async (pg, tel) => {
   const vu = () => pg.waitForFunction(() => [...document.querySelectorAll('[data-vn-onglet="toutes"]')].some((x) => x.getClientRects().length), null, { timeout: 3000 }).then(() => true).catch(() => false);
-  await toucher(pg, tel, '[data-colis-onglet-choix="toutes"]'); if (await vu()) return true;
-  await toucher(pg, tel, '[data-colis-onglet-choix="toutes"]'); return vu();
+  // (27 nov.) Sous charge (quatre bancs à la fois), deux touchers tombaient tous deux pendant le calcul de l'écran (capture :
+  // « À envoyer » resté choisi, aucune rangée) : on attend d'abord que le segmenté soit VU, puis jusqu'à quatre touchers,
+  // chacun jugé sur l'onglet montré — jamais un délai qui décide à la place de l'écran.
+  await pg.waitForFunction(() => [...document.querySelectorAll('[data-colis-onglet-choix="toutes"]')].some((x) => x.getClientRects().length), null, { timeout: 15000 }).catch(() => {});
+  for (let k = 0; k < 4; k++) { await toucher(pg, tel, '[data-colis-onglet-choix="toutes"]:visible'); if (await vu()) return true; }
+  return false;
 };
 const lignesToutes = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-toutes-vente]')].filter((r) => r.getClientRects().length).map((r) => ({
   site: r.getAttribute('data-toutes-vente'), id: r.getAttribute('data-toutes-id'), texte: r.innerText || '',

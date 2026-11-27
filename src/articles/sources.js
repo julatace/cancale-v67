@@ -30,6 +30,8 @@ export function annoncesVinted(comptes) {
       out.push({ bloque, site: 'vinted', id: String(it.id), compte: str(c.uid), pseudo: str(c.pseudo), titre: str(it.title), photo: photoDe(it.photo),
       prix: it.price, taille: str(it.size), condition: str(it.condition), marque: str(it.brand), depuis: it.createdTs != null ? it.createdTs : (it.created_at_ts != null ? it.created_at_ts : null),
       favoris: nb(it.favourites), vues: nb(it.views), messages: null, etat, numero: '', vintedId: '', url: str(it.url),
+      // (27 nov.) « en vérification par Vinted » (`verifVinted`, LU dans le dressing — src/annoncesActions.js) : rien ne part dessus.
+      verif: it.verifVinted ? str(it.verifVinted) : '',
       // (20 nov.) `lu` : l'heure du dressing qui fait foi pour CE compte (`fetchVintedListings().lu`) — le point daté des vues.
       lu: Number.isFinite(c.lu) ? c.lu : null }); };
     const lus = c.ok ? c : {};

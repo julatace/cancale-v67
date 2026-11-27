@@ -466,7 +466,10 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   };
   const actions = ACTIONS.map((A) => ({
     cle: A.cle, libelle: tr(A.libelle), icone: A.icone, courante: !!A.courante, phrase: A.cle === 'agent' ? tr('agent.action.phrase') : tr('egalite.action.' + cleActionTr[A.cle] + '.phrase'),
-    pour: (a) => (A.tousSites ? !!a.numero && a.annonces.some((x) => x.etat === 'enligne') : (() => { const v = vintedDe(a); return !!v && A.etats.includes(v.etat); })()),
+    // (27 nov., banc annonces-actions S — règle du 5 nov., src/annoncesActions.js `raisonPasSelectionnable`) une annonce que Vinted
+    // VÉRIFIE (lu, jamais deviné) ne se coche pour aucune action Vinted, et la raison est dite sur sa rangée.
+    pour: (a) => (A.tousSites ? !!a.numero && a.annonces.some((x) => x.etat === 'enligne') : (() => { const v = vintedDe(a); return !!v && A.etats.includes(v.etat) && !v.verif; })()),
+    raisonLigne: A.tousSites ? null : (a) => { const v = vintedDe(a); return v && v.verif ? tr('egalite.action.verifVinted') : ''; },
     juger: (sel) => {
       if (!sel.length) return { ok: false, raison: tr('egalite.selection.aucune') };
       // (25 nov., e2e-extension-vert) Un geste du panneau, et l'extension d'ici ne sait pas ouvrir le panneau : fermé, dit.
@@ -511,7 +514,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     if (k === 'pauseLbc') { pauserLbc(choisis); return; }
     if (k === 'agent') { setAgent(choisis); return; }
     if (k === 'partout') { const nums = choisis.map((a) => a.numero).filter(Boolean); if (nums.length) { try { window.dispatchEvent(new CustomEvent('vrm:publier-partout', { detail: { nums } })); } catch (_) {} } return; }
-    const sel = choisis.map(vintedDe).filter(Boolean).map((v) => ({ uid: v.compte, id: v.id }));
+    const sel = choisis.map(vintedDe).filter((v) => v && !v.verif).map((v) => ({ uid: v.compte, id: v.id }));
     if (!sel.length) { toast(tr('egalite.action.vintedSeul')); return; }
     demanderActionAnnonces(k, sel);
   };

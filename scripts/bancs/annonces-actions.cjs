@@ -37,7 +37,8 @@
 // ne parte avant ni sur « Annuler » ; M (la feuille « à la main », la même) ; K/M (le N° attend que l'ancienne soit partie).
 // Retirés AVEC la feuille « Actions possibles » d'avant (plus montée par l'écran natif, 19 nov.) : V (ce qui manque paire par
 // paire, `data-act-paire`) et K-couleur (« pas lu » vs « absente ») — leur règle reste jugée par scripts/audit-annonces-actions.cjs ;
-// « en vérification par Vinted » non cochable : l'écran natif ne le sait pas (voir le rapport du 26 nov.).
+// « en vérification par Vinted » non cochable : rétabli le 27 nov. dans l'écran natif (src/ecrans/AnnoncesEgalite.jsx `pour` /
+// `raisonLigne`, `data-ad-raison`) — sur le code du 26 nov. ces deux contrôles S sont rouges.
 require('./_porte-banc.cjs');   // (26 nov.) la garde réseau du banc : rien ne sort
 require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs'), http = require('http'), os = require('os');
@@ -128,7 +129,7 @@ async function contexte(b, vp, sombre, etat) {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript((sb) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (sb && !localStorage.getItem('vinted_dark')) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, sombre);
+  await pg.addInitScript((sb) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (!localStorage.getItem('vinted_dark')) localStorage.setItem('vinted_dark', sb ? 'true' : 'false'); } catch (_) {} }, sombre);
   await pg.addInitScript(PONT, { version: VERSION });
   await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
     const t = r.request().resourceType();
@@ -205,7 +206,7 @@ const ecrituresDe = (u) => u.filter((x) => /republier|recreer|cmd_|file_/i.test(
           await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
           await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-article]')].some((x) => x.getClientRects().length), null, { timeout: 20000 }).catch(() => {});
           await pg.waitForTimeout(1200);
-          dit((await pg.evaluate(() => document.documentElement.getAttribute('data-theme'))) === (sombre ? 'dark' : 'light') || !sombre, `F ${T} thème ${sombre ? 'sombre' : 'clair'} posé`);
+          dit((await pg.evaluate(() => document.documentElement.getAttribute('data-theme'))) === (sombre ? 'dark' : 'light'), `F ${T} thème ${sombre ? 'sombre' : 'clair'} posé`);
           // S — en ligne et MASQUÉES (« En ligne »), BROUILLONS (« À publier »), chacun sous SON compte, avec son état.
           const L = Object.fromEntries((await articles(pg)).map((a) => [a.id, a]));
           dit(L['9102'] && L['9102'].etat === 'enligne' && L['9110'] && L['9110'].etat === 'masquee' && L['9102'].compte === 'vinted:111' && L['9301'] && L['9301'].compte === 'vinted:222', `S ${T} en ligne et masquée, chacune avec son état et SON compte`, JSON.stringify(Object.values(L).map((a) => a.id + ':' + a.etat + ':' + a.compte)));
@@ -226,6 +227,11 @@ const ecrituresDe = (u) => u.filter((x) => /republier|recreer|cmd_|file_/i.test(
             await cocher(pg, tel, '9110');
             let M = Object.fromEntries((await articles(pg)).map((a) => [a.id, a]));
             dit(M['9110'] && M['9110'].grise && M['9110'].coche === '0', `A ${T} Republier : une masquée ne se coche pas (grisée)`, JSON.stringify(M['9110']));
+            // S — « en vérification par Vinted » (lu : `is_processing`) : là, ne se coche pas, et SA rangée dit pourquoi (`data-ad-raison`).
+            await cocher(pg, tel, '9104');
+            M = Object.fromEntries((await articles(pg)).map((a) => [a.id, a]));
+            const raison9104 = await pg.evaluate(() => { const x = [...document.querySelectorAll('[data-eg-article="vinted#9104"]')].find((e) => e.getClientRects().length); const r = x && x.querySelector('[data-ad-raison]'); return r && r.getClientRects().length ? r.textContent.trim() : ''; });
+            dit(M['9104'] && M['9104'].grise && M['9104'].coche === '0' && /Vinted/.test(raison9104), `S ${T} « en vérification par Vinted » : là, ne se coche pas, et dit pourquoi`, JSON.stringify({ a: M['9104'], raison9104 }));
             await cocher(pg, tel, '9102'); await cocher(pg, tel, '9301');
             let l = await lancer(pg, tel, 'recreer');
             dit(!!l && l.off && l.n === '2' && l.raison.length > 5, `A ${T} deux comptes mélangés ⇒ « Republier » ne se lance pas, la raison dite`, JSON.stringify(l));
@@ -309,6 +315,14 @@ const ecrituresDe = (u) => u.filter((x) => /republier|recreer|cmd_|file_/i.test(
             dit(n === '42' && porteurs.length === 1, `M ${T} l’ancienne partie ⇒ la nouvelle porte le N°42 (une seule fois)`, JSON.stringify({ n, porteurs }));
           } else {
             // A (ordinateur) — le tableau : la sélection, puis les actions directes du bas (`data-tt-action-directe`).
+            // S — « en vérification par Vinted » : cochée seule, aucune action Vinted ne la prend (« Republier » éteint, rien compté).
+            {
+              const L0 = Object.fromEntries((await articles(pg)).map((a) => [a.id, a]));
+              await cocher(pg, tel, '9104');
+              const l0 = await lancer(pg, tel, 'recreer');
+              dit(!!L0['9104'] && !!l0 && l0.off && l0.n !== '1', `S ${T} « en vérification par Vinted » : là, et « Republier » ne la prend pas`, JSON.stringify({ vue: !!L0['9104'], l0 }));
+              await cocher(pg, tel, '9104');
+            }
             await cocher(pg, tel, '9102'); await cocher(pg, tel, '9301');
             let l = await lancer(pg, tel, 'recreer');
             dit(!!l && l.off && l.n === '2', `A ${T} deux comptes mélangés ⇒ « Republier » ne se lance pas`, JSON.stringify(l));
