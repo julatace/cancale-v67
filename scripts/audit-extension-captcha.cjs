@@ -50,7 +50,9 @@ async function connexion(reponseGoTrue) {
     dit(rep && rep.ok === false, 'la connexion est refusée', JSON.stringify(rep));
     dit(rep && rep.captcha === true, 'et le refus est marqué « captcha » (la fenêtre propose le bon geste)', JSON.stringify(rep));
     const msg = String((rep && rep.error) || '');
-    dit(/plus possible depuis l.extension/i.test(msg) && /Se connecter avec VRM/.test(msg), 'la phrase est en français et nomme « Se connecter avec VRM »', msg);
+    // 5.456 (27 nov.) : le refus captcha n'est plus « fermé pour de bon » — l'extension porte le jeton de vrm.center/verif-extension.html
+    //    (audit-connexion-panneau P1). Sans jeton, la phrase dit le geste : attendre la coche de la vérification, puis réessayer.
+    dit(/vérification anti-robot/i.test(msg) && /réessaie/i.test(msg), 'la phrase est en français et dit le geste (la vérification, puis réessayer)', msg);
     dit(!/captcha protection|request disallowed/i.test(msg), 'et ce n’est pas le message brut de GoTrue', msg);
     dit(!store.vrmSession, 'aucune session n’est rangée', JSON.stringify(store.vrmSession || null));
   });
