@@ -72,6 +72,7 @@ jobs:
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
+          bash scripts/ci-sans-source-microsoft.sh   # « 403 … no longer signed » de packages.microsoft.com (PR #1437)
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-common gnupg > /dev/null
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y > /dev/null
@@ -116,6 +117,7 @@ jobs:
           MAJEUR: ${{ needs.sauvegarde.outputs.majeur }}
         run: |
           docker run -d --name pg-jetable -e POSTGRES_PASSWORD=jetable -p 127.0.0.1:5432:5432 "postgres:$MAJEUR" > /dev/null
+          bash scripts/ci-sans-source-microsoft.sh   # « 403 … no longer signed » de packages.microsoft.com (PR #1437)
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-common gnupg > /dev/null
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y > /dev/null
