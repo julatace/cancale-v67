@@ -192,7 +192,8 @@ const vue=async(pg,cle)=>{
         const Tg=await pg.evaluate(()=>{ const t=document.querySelector('[data-gr-tuiles] [data-gr-net]'); return t?{ net:t.getAttribute('data-gr-net'), auPlus:t.getAttribute('data-gr-auplus'), texte:t.innerText.replace(/[\u00a0\u202f]/g,' ').replace(/\n/g,' | ') }:null; });
         dit(!!Tg&&Tg.auPlus==='1'&&/au plus/.test(Tg.texte),'V2 · la tuile « Gagné » dit aussi « au plus » (91002 aux frais pas confirmés)',Tg&&Tg.texte);
         const coupes=await pg.evaluate(()=>[...document.querySelectorAll('[data-ps-bloc="gains"] [role="radio"] .n-segmente-libelle')].filter(e=>e.scrollWidth>e.clientWidth+1).map(e=>e.textContent));
-        const noms=await pg.evaluate(()=>[...document.querySelectorAll('[data-ps-bloc="gains"] [role="radio"]')].map(e=>e.textContent.trim()));
+        // Le nom LU de chaque vue (le texte hors aria-hidden) : « Par … », même quand le téléphone montre le mot court.
+        const noms=await pg.evaluate(()=>[...document.querySelectorAll('[data-ps-bloc="gains"] [role="radio"]')].map(e=>{ const c=e.cloneNode(true); c.querySelectorAll('[aria-hidden="true"]').forEach(x=>x.remove()); return c.textContent.trim(); }));
         dit(coupes.length===0&&noms.length===5&&noms.every(n=>/^Par /.test(n)),'les cinq vues se lisent en entier (« Par … » reste le nom lu)',`${noms.join(' · ')}${coupes.length?' — coupées : '+coupes.join(', '):''}`);
         if(CAP){ await pg.locator('[data-ps-bloc="gains"]').screenshot({path:path.join(CAP,`vb-mois-${nomCap}.png`)}).catch(()=>{}); }
         // ── PAR COMPTE ──
@@ -216,8 +217,12 @@ const vue=async(pg,cle)=>{
           const t=pg.getByText('Baskets inventées '+tx,{exact:true}).first();
           if(!(await t.count())) return null;
           await t.scrollIntoViewIfNeeded().catch(()=>{});
-          await t.click().catch(()=>{});
-          await pg.locator('[data-ba-ligne="achat"]').first().waitFor({state:'visible',timeout:10000}).catch(()=>{});
+          // Un toucher qui tombe pendant un rendu peut ne rien ouvrir : un second essai, jamais plus.
+          for(let essai=0; essai<2; essai++){
+            await t.click().catch(()=>{});
+            const vu=await pg.locator('[data-ba-ligne="achat"]').first().waitFor({state:'visible',timeout:8000}).then(()=>true,()=>false);
+            if(vu) break;
+          }
           const r=await pg.evaluate(()=>{ const e=[...document.querySelectorAll('[data-ba-ligne="achat"]')].pop(); return e?{ port:e.getAttribute('data-vb-port-achat'), achat:e.getAttribute('data-ba-valeur'), texte:e.innerText.replace(/[\u00a0\u202f]/g,' ').replace(/\n/g,' | '),
             total:(()=>{ const t=[...document.querySelectorAll('.vrm-ba')].pop(); return t?t.getAttribute('data-benef-article-valeur'):null; })() }:null; });
           return r;

@@ -20,7 +20,7 @@ const garderVue = (v) => { try { localStorage.setItem('vrm_stats_gains_vue', v);
 const MAX_LISTE = 8, MAX_SANS = 5;
 // (27 nov., lot vrai-benefice) Cinq vues : au téléphone, « Par » se tait à l'écran (il reste lu par le lecteur d'écran),
 // « Article · Modèle · Source · Compte · Mois » tiennent sur la ligne (gains.css).
-const libelleVue = (t) => { const k = String(t).indexOf(' '); return k > 0 ? <><span className="n-gr-seg-pre">{t.slice(0, k + 1)}</span><span className="n-gr-seg-mot">{t.slice(k + 1)}</span></> : t; };
+const libelleVue = (t) => { const k = String(t).indexOf(' '); if (k <= 0) return t; const mot = t.slice(k + 1); return <><span className="n-gr-seg-long">{t}</span><span className="n-gr-seg-court" aria-hidden="true">{mot.charAt(0).toLocaleUpperCase() + mot.slice(1)}</span></>; };
 
 export default function StatsGains({ G, VB = undefined, sur = '', montant = (x) => String(x), Icon = null }) {
   const [vue, setVue] = React.useState(lireVue);

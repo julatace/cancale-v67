@@ -1735,11 +1735,12 @@ const jourBeneficeEnTableau = (b) => BENEF_CHAMPS.map((k) => b[k] || 0);
 // (11 nov., famille « une règle par notion ») `frais(fiche, plateforme)` : les frais SAISIS sur la fiche
 //    (emballage, port payé par le vendeur, autres…) — la règle de `beneficePaire` (src/beneficePaire.js),
 //    la même que Vinted ; sans ce paramètre, 0 (comportement d'avant).
-const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, numEbayLigne, excluAutre, frais = null, main } = {}) => {
+const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, numEbayLigne, excluAutre, frais = null, main, drapeaux = null } = {}) => {
   const out = [], vus = new Set();
   const achatDuNum = (k) => { const f = ficheUniqueDuNumero(numeros, k ? cleNum(k) : ''); if (!f) return null; const a = achat(f); return a != null && isFinite(Number(a)) ? Number(a) : null; };
   // (27 nov., lot vrai-benefice) Les drapeaux de SA fiche (frais confirmés, prix du reçu) : [12] du relevé.
-  const drDuNum = (k) => { const f = ficheUniqueDuNumero(numeros, k ? cleNum(k) : ''); return f ? drapeauxFiche(f) : ''; };
+  // `drapeaux` passé par l'appelant (`drapeauxFiche`) ; absent ⇒ aucun (frais pas confirmés : « au plus »).
+  const drDuNum = (k) => { if (typeof drapeaux !== 'function') return ''; const f = ficheUniqueDuNumero(numeros, k ? cleNum(k) : ''); return f ? drapeaux(f) : ''; };
   const fraisDuNum = (k, pl) => { if (typeof frais !== 'function') return 0; const f = ficheUniqueDuNumero(numeros, k ? cleNum(k) : ''); if (!f) return 0; const x = Number(frais(f, pl)); return isFinite(x) ? x : 0; };
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v) || !lbcFinalisee(v)) continue;
@@ -15772,7 +15773,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const fraisFicheAutres = (f, pl) => coutsVente(ficheDeLaRegle(pl, f)).total;   // (21 nov., lot rentabilite) eBay : jamais le port ; Vestiaire : jamais la commission notée (src/coutReel.js)
       return ventesAutresBenefice({ lbc: lbcVentes.ventes || [], ebay: ebayCmd, vestiaire: ventesVc || [], numeros,
         achat: (f) => achatDe(withBuyByNum(f)),
-        frais: fraisFicheAutres,
+        frais: fraisFicheAutres, drapeaux: drapeauxFiche,   // (27 nov.) [12] du relevé (src/vraiBenefice.js)
         numLbc: (v) => numeroLbcIdentite(v, lbcItemsBenef, liens),
         numEbayLigne: (o, li) => numLigneEbay(o, li), excluAutre, main: ventesAilleursDe(ventesComptees) });
     } catch (_) { return null; }
