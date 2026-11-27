@@ -173,8 +173,17 @@ const geste = async (pg, tel, sel) => { const l = pg.locator(sel + ':visible').f
 const reouvrirAnnonces = async (pg) => { for (const t of ['journee', 'cat_annonces']) { await pg.evaluate((t) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=' + t })); } catch (_) {} }, t);
   await pg.waitForFunction((t) => { const m = document.querySelector('.vrm-main'); return !!m && m.getAttribute('data-ecran') === (t === 'cat_annonces' ? 'annonces' : t); }, t, { timeout: 10000 }).catch(() => {}); } };
 const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+// ⚠️ (27 nov., cause du rouge intermittent « R 1512 … lancer demande SA confirmation ») L'écran d'Annonces s'ouvre derrière SON
+// attente (src/AttenteEcran.jsx : `data-attente="attente"`, l'hôte `.vrm-attente-cache` en `visibility: hidden`) jusqu'à ce que
+// ses données essentielles soient là, ou au plafond (2,5 s après le montage). Ses rangées y ont déjà des boîtes
+// (`getClientRects`), et le banc attendait SEULEMENT ces boîtes : sous charge (police CI) il cochait par `click()` JS dans l'écran
+// encore caché, puis le vrai clic sur « Republier · 2 » tombait sur une barre invisible, posée en haut de l'hôte caché
+// (y = 17, sous la barre du haut) — aucun clic reçu, aucune confirmation (mesuré : `data-attente=attente`,
+// `data-attente-manque=carte`, puis `plafond` à 3,9 s). On attend donc l'écran MONTRÉ (`pret` ou `plafond`), et une rangée VUE.
+const ecranMontre = (pg) => pg.waitForFunction(() => { const h = document.querySelector('.vrm-attente[data-attente-ecran="annonces"]');
+  return !!h && /^(pret|plafond)$/.test(h.getAttribute('data-attente') || '') && [...h.querySelectorAll('[data-eg-article]')].some((x) => x.getClientRects().length && x.checkVisibility({ visibilityProperty: true })); }, null, { timeout: 30000 }).catch(() => {});
 // Les articles montrés : téléphone = la liste groupée par compte (`[data-eg-groupe]`), ordinateur = le tableau de travail.
-const articles = (pg) => pg.evaluate(() => { const vus = new Set(); return [...document.querySelectorAll('[data-eg-article]')].filter((x) => x.getClientRects().length && !vus.has(x.getAttribute('data-eg-article')) && vus.add(x.getAttribute('data-eg-article'))).map((x) => {
+const articles = (pg) => pg.evaluate(() => { const vus = new Set(); return [...document.querySelectorAll('[data-eg-article]')].filter((x) => x.getClientRects().length && x.checkVisibility({ visibilityProperty: true }) && !vus.has(x.getAttribute('data-eg-article')) && vus.add(x.getAttribute('data-eg-article'))).map((x) => {
   const g = x.closest('[data-eg-groupe]');
   return { id: x.getAttribute('data-eg-article').replace(/^vinted#/, ''), compte: x.getAttribute('data-eg-compte') || '', groupe: g ? g.getAttribute('data-eg-groupe') : '',
     etat: x.getAttribute('data-ad-etat') || x.getAttribute('data-tt-statut-ligne') || '', coche: x.getAttribute('data-eg-coche') || x.getAttribute('data-tt-coche') || '0', grise: x.getAttribute('data-ad-grise') === '1', numero: x.getAttribute('data-eg-numero') || '' };
@@ -209,7 +218,7 @@ const ecrituresDe = (u) => u.filter((x) => /republier|recreer|cmd_|file_/i.test(
         const ecrits = []; pg.on('request', (r) => { if (r.method() !== 'GET' && /\/rest\/v1\//.test(r.url())) ecrits.push(r.url() + ' ' + (r.postData() || '').slice(0, 300)); });
         try {
           await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
-          await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-article]')].some((x) => x.getClientRects().length), null, { timeout: 20000 }).catch(() => {});
+          await ecranMontre(pg);
           await pg.waitForTimeout(1200);
           dit((await pg.evaluate(() => document.documentElement.getAttribute('data-theme'))) === (sombre ? 'dark' : 'light'), `F ${T} thème ${sombre ? 'sombre' : 'clair'} posé`);
           // S — en ligne et MASQUÉES (« En ligne »), BROUILLONS (« À publier »), chacun sous SON compte, avec son état.
@@ -259,7 +268,7 @@ const ecrituresDe = (u) => u.filter((x) => /republier|recreer|cmd_|file_/i.test(
             dit(ecrituresDe(ecrits) === avant && (await pg.evaluate(() => window.__envois.length)) === 0, `R ${T} « Annuler » ⇒ rien n’est parti`, ecrits.slice(-3).join(' | '));
             // A — « Remettre en ligne » : seuls les brouillons se cochent.
             await reouvrirAnnonces(pg);
-            await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-article]')].some((x) => x.getClientRects().length), null, { timeout: 20000 }).catch(() => {});
+            await ecranMontre(pg);
             await segment(pg, tel, 'enligne');
             await modeAction(pg, 'enLigne');
             await cocher(pg, tel, '9102');
@@ -272,7 +281,7 @@ const ecrituresDe = (u) => u.filter((x) => /republier|recreer|cmd_|file_/i.test(
             dit(M['9201'] && M['9201'].coche === '1' && !!l && !l.off, `A ${T} un brouillon ⇒ « Remettre en ligne » se coche et se lance`, JSON.stringify({ a: M['9201'], l }));
             // M — « Republier à la main » : deux comptes permis (une paire à la fois, chacune avec son compte).
             await reouvrirAnnonces(pg);
-            await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-article]')].some((x) => x.getClientRects().length), null, { timeout: 20000 }).catch(() => {});
+            await ecranMontre(pg);
             await segment(pg, tel, 'enligne');
             await modeAction(pg, 'main');
             await cocher(pg, tel, '9110'); await cocher(pg, tel, '9301');
@@ -305,7 +314,7 @@ const ecrituresDe = (u) => u.filter((x) => /republier|recreer|cmd_|file_/i.test(
             for (let i = 0; i < 40; i++) { if (await pg.evaluate(() => /"9102":\{[^}]*"nouvelId":"9120"/.test(localStorage.getItem('vrm_repub_main') || ''))) break; await pg.waitForTimeout(250); }
             await nouvelleOuverture(pg);
             await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
-            await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-article]')].some((x) => x.getClientRects().length), null, { timeout: 20000 }).catch(() => {});
+            await ecranMontre(pg);
             await pg.waitForTimeout(1500);
             // (27 nov.) Sous charge, les rangées montrées d'abord n'avaient pas encore leurs N° (« » rendu, rouge à tort) : on attend
             // qu'une rangée porte le N°42, 10 s au plus (§6.5) ; deux porteurs, ou la nouvelle seule, restent rouges.
@@ -315,7 +324,7 @@ const ecrituresDe = (u) => u.filter((x) => /republier|recreer|cmd_|file_/i.test(
             etat.sans9102 = true;
             await nouvelleOuverture(pg);
             await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
-            await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-article]')].some((x) => x.getClientRects().length), null, { timeout: 20000 }).catch(() => {});
+            await ecranMontre(pg);
             let n = '';
             for (let i = 0; i < 30; i++) { n = ((await articles(pg)).find((a) => a.id === '9120') || {}).numero || ''; if (n === '42') break; await pg.waitForTimeout(250); }
             await pg.screenshot({ path: nomF('apres') });
