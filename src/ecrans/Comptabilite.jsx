@@ -5461,11 +5461,12 @@ const fusionLignesMemeSuivi = (m, s) => {
   // en silence (src/sourcesRetrait.js).
   const codesLus = [...(Array.isArray(m.codesLus) && m.codesLus.length ? m.codesLus : [codeLuDeLigne(m)]), ...(Array.isArray(s.codesLus) && s.codesLus.length ? s.codesLus : [codeLuDeLigne(s)])];
   // (27 nov.) Les clés de TOUTES les moitiés réunies : « Retiré » les marque toutes (`clesDuColis`).
-  const clesMoities = [...new Set([...(Array.isArray(m.clesMoities) && m.clesMoities.length ? m.clesMoities : [colisKey(m)]), ...(Array.isArray(s.clesMoities) && s.clesMoities.length ? s.clesMoities : [colisKey(s)])].filter(Boolean))];
-  return { ...m, lieu: lieuF || null, codesLus, ...(clesMoities.length > 1 ? { clesMoities } : {}),
+  const cleDe = (x) => (Array.isArray(x.clesMoities) && x.clesMoities.length ? x.clesMoities : [typeof colisKey === 'function' ? colisKey(x) : '']);   // (les audits extraient cette fonction seule)
+  const clesMoities = [...new Set([...cleDe(m), ...cleDe(s)].filter(Boolean))];
+  return { ...m, lieu: lieuF || null, codesLus,
     code: src.code || null, code2: src.code2 || (memeCode ? autre.code2 : null) || null,
     qrB64: qrSrc.qrB64 || null, qrType: qrSrc.qrType || null, qrUrl: qrSrc.qrUrl || null, consigne: !!(m.consigne || s.consigne),
-    limite: p.limite || q.limite || null, limiteAt: p.limiteAt || q.limiteAt || null };
+    limite: p.limite || q.limite || null, limiteAt: p.limiteAt || q.limiteAt || null, ...(clesMoities.length > 1 ? { clesMoities } : {}) };
 };
 // ⟦← App.jsx #244⟧
 // DOSSIER de la photo, sans le nom de fichier. Quand une annonce est republiée
