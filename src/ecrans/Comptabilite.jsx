@@ -244,7 +244,7 @@ import { listesDesSuivisVinted, liensContredits } from '../memeColis.js';
 import {sourcesDuColis,codeLuDeLigne,verdictCode,codesDesLignes,NOMS_SOURCES,texteVerifie} from '../sourcesRetrait.js';
 import { dateLocale } from '../formatsDate.js';
 import {achatParConversation, regrouperArrivees, temoinsDe, texteDuBrut} from '../../api/_lib/achat-arrive-relais.js';
-import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis, absorberAVerifierParCode} from '../retraitPreuves.js';
+import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis, reunirParIdentite, grouperParIdentite} from '../retraitPreuves.js';
 // ⟦← App.jsx #17⟧
 import { statutAVerifier } from '../statutAVerifier.js';
 import { garderSelonAnnules, nombreAnnules, FILTRE_ANNULES } from '../achatsAnnules.js';
@@ -5460,10 +5460,13 @@ const fusionLignesMemeSuivi = (m, s) => {
   // carte dit d'où vient le code, « sûr » quand deux voix concordent, et un désaccord n'est jamais tranché
   // en silence (src/sourcesRetrait.js).
   const codesLus = [...(Array.isArray(m.codesLus) && m.codesLus.length ? m.codesLus : [codeLuDeLigne(m)]), ...(Array.isArray(s.codesLus) && s.codesLus.length ? s.codesLus : [codeLuDeLigne(s)])];
+  // (27 nov.) Les clés de TOUTES les moitiés réunies : « Retiré » les marque toutes (`clesDuColis`).
+  const cleDe = (x) => (Array.isArray(x.clesMoities) && x.clesMoities.length ? x.clesMoities : [typeof colisKey === 'function' ? colisKey(x) : '']);   // (les audits extraient cette fonction seule)
+  const clesMoities = [...new Set([...cleDe(m), ...cleDe(s)].filter(Boolean))];
   return { ...m, lieu: lieuF || null, codesLus,
     code: src.code || null, code2: src.code2 || (memeCode ? autre.code2 : null) || null,
     qrB64: qrSrc.qrB64 || null, qrType: qrSrc.qrType || null, qrUrl: qrSrc.qrUrl || null, consigne: !!(m.consigne || s.consigne),
-    limite: p.limite || q.limite || null, limiteAt: p.limiteAt || q.limiteAt || null };
+    limite: p.limite || q.limite || null, limiteAt: p.limiteAt || q.limiteAt || null, ...(clesMoities.length > 1 ? { clesMoities } : {}) };
 };
 // ⟦← App.jsx #244⟧
 // DOSSIER de la photo, sans le nom de fichier. Quand une annonce est republiée
@@ -7327,10 +7330,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const [collectedAt, setCollectedAt] = useStateCle('vrm_colis_collected_at', () => load('vrm_colis_collected_at', {}));
   // (6 nov., v36) « J'ai retiré » / « Remettre » : gestes annulables (src/gesteAnnulable.js) —
   // l'écran suit tout de suite, la pilule offre « Annuler » (l'ancien bandeau et son minuteur sont partis).
+  // (27 nov.) Un colis RÉUNI de plusieurs moitiés (`clesMoities`, src/retraitPreuves.js) : « Retiré » les marque TOUTES — sinon
+  // la moitié Vinted restée non cochée revenait seule, comptée « à retirer ».
+  const clesDuColis = (t) => [...new Set([colisKey(t), ...((t && Array.isArray(t.clesMoities)) ? t.clesMoities : [])].map((k) => String(k || '')).filter(Boolean))];
   const gesteCollecte = (t, oui) => {
-    const k = colisKey(t); if (!k) return;
-    const ops = [{ k: 'vrm_colis_collected', type: 'ensemble', id: k, apres: oui, avant: collected.has(k) },
-      { k: 'vrm_colis_collected_at', type: 'cle', id: k, apres: oui ? new Date().toISOString() : undefined, avant: collectedAt[k] }];
+    const ks = clesDuColis(t); if (!ks.length) return;
+    const ops = ks.flatMap((k) => [{ k: 'vrm_colis_collected', type: 'ensemble', id: k, apres: oui, avant: collected.has(k) },
+      { k: 'vrm_colis_collected_at', type: 'cle', id: k, apres: oui ? new Date().toISOString() : undefined, avant: collectedAt[k] }]);
     // (9 nov., lot AD) L'identifiant du geste est rendu : le mode relais offre son « Annuler » dans sa feuille.
     return gesteVrm(oui ? 'Colis retiré' : 'Colis remis dans « à retirer »', ops, { vrm_colis_collected: setCollected, vrm_colis_collected_at: setCollectedAt }, null, oui ? 'colis.retire' : '');
   };
@@ -7358,15 +7364,15 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // annulable (chaque colis posé avec sa valeur d'avant ; « Annuler » les remet tous exactement).
   const markAllCollected = (list) => {
     // (Comme avant : seule la liste des retirés change — pas de date posée par ce geste de lot.)
-    const vus = new Set(); const ops = [];
-    for (const t of (list || [])) { const k = colisKey(t); if (!k || vus.has(k) || collected.has(k)) continue; vus.add(k);
-      ops.push({ k: 'vrm_colis_collected', type: 'ensemble', id: k, apres: true, avant: false }); }
+    const vus = new Set(); const ops = []; let nColis = 0;
+    for (const t of (list || [])) { let neuf = false; for (const k of clesDuColis(t)) { if (!k || vus.has(k) || collected.has(k)) continue; vus.add(k); neuf = true;
+      ops.push({ k: 'vrm_colis_collected', type: 'ensemble', id: k, apres: true, avant: false }); } if (neuf) nColis++; }
     if (!ops.length) return;
     // (15 nov., atelier d'arrivée) Leurs achats (par identité) attendent leur N° dans Ma journée — aucune case.
     try { noterArrivees((list || []).map((t) => entreeArriveeColis(t)).filter((e) => e && e.tx)); } catch (_) {}
-    gesteVrm(vus.size > 1 ? `${vus.size} colis retirés` : 'Colis retiré', ops, { vrm_colis_collected: setCollected }, null, 'colis.retire');
+    gesteVrm(nColis > 1 ? `${nColis} colis retirés` : 'Colis retiré', ops, { vrm_colis_collected: setCollected }, null, 'colis.retire');
   };
-  const isCollected = (t) => collected.has(colisKey(t));
+  const isCollected = (t) => clesDuColis(t).some((k) => collected.has(k));
   // Un colis « à retirer » (available) qui traîne depuis > 14 j est forcément
   // déjà récupéré (un point relais ne garde pas un colis plus longtemps) : on
   // arrête de le compter, même si aucun email « retiré » n'est arrivé.
@@ -9055,10 +9061,21 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       }
       if (garderV.length !== aVerifier.length) aVerifier.splice(0, aVerifier.length, ...garderV);
     }
-    // (26 nov.) Un « à vérifier » au CODE d'un colis compté est ce colis (src/retraitPreuves.js) : une carte, pas deux.
-    { const ab = absorberAVerifierParCode(emailList, aVerifier, { codeDe: codeLigne, suiviDe: suiviDeLigne, fusion: fusionLignesMemeSuivi });
-      if (ab.liste !== emailList) {
-        ab.liste.forEach((t, i) => { const a = emailList[i]; if (a !== t && cmdParColis.has(colisKey(a)) && !cmdParColis.has(colisKey(t))) cmdParColis.set(colisKey(t), cmdParColis.get(colisKey(a))); });
+    // (27 nov., capture de Julien : « 978 216 » compté ET « à vérifier » au même point) UNE MOITIÉ « À VÉRIFIER » ET UNE
+    // MOITIÉ COMPTÉE QUI PARTAGENT UNE IDENTITÉ — le code (écrit sur la ligne OU lu dans la conversation de SA commande),
+    // le n° de suivi, la transaction — SONT UN COLIS (src/retraitPreuves.js `reunirParIdentite`) : la ligne du transporteur
+    // fait foi (date lue), la limite lue est gardée, puis le colis réuni est rejugé (limite lue et passée ⇒ « à vérifier »).
+    { const cmdLigne = new Map(); for (const x of aVerifier) if (x && x.t && x.o) cmdLigne.set(x.t, x.o);
+      const commandeLigne = (t) => { if (!t) return null; let o = cmdLigne.get(t) || cmdParColis.get(colisKey(t)) || commandeDuColis(t) || null;
+        if (!o) { try { o = achatDuColis(t, buysBase, indexSuivisAchats) || null; } catch (_) { o = null; } } return o; };
+      const codesLigne = (t) => { const o = commandeLigne(t); return [codeLigne(t), o ? normCode((colisRelais[String(o.transaction_id)] || {}).code) : '']; };
+      const txLigne = (t) => { const o = commandeLigne(t); return o && o.transaction_id != null ? String(o.transaction_id) : ''; };
+      const jugerReuni = (t) => { if (t.transpContradiction && t.status === 'available') return { etat: 'transporteur', contradiction: true, raison: t.transpConflit || '' };
+        const e = leverGarde(etatColisEmail(t, maintenant), t, maintenant); return estAVerifier(e) ? e : null; };
+      const ab = reunirParIdentite(emailList, aVerifier, { codesDe: codesLigne, suiviDe: suiviDeLigne, txDe: txLigne, score: scoreLigneRetrait,
+        fiable: (t) => t.source !== 'vinted-commande', fusion: fusionLignesMemeSuivi, juger: jugerReuni, cle: colisKey });
+      if (ab.liste !== emailList || ab.aVerifier !== aVerifier) {
+        for (const fu of ab.fusions) { const o = fu.o || fu.de.map(commandeLigne).find(Boolean) || null; if (o && !cmdParColis.has(colisKey(fu.t))) cmdParColis.set(colisKey(fu.t), o); }
         emailList.splice(0, emailList.length, ...ab.liste); aVerifier.splice(0, aVerifier.length, ...ab.aVerifier); } }
     // Le transporteur ÉCRIT que le colis repart (statut « retour », 23 oct.).
     // Gardé 30 jours : c'est le temps de vérifier le remboursement.
@@ -9105,6 +9122,18 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const vusEmail = [...emailList, ...aVerifier.map(x => x.t)];
     const codesEmail = new Set(vusEmail.map(t => normCode(t.code)).filter(Boolean));
     const txLiesEmail = new Set(); for (const t of vusEmail) { const c = commandeDuColis(t); if (c) txLiesEmail.add(String(c.transaction_id)); }
+    // (27 nov.) + la commande d'un « à vérifier » reliée par identité (`x.o`) : son achat Vinted n'en refait pas un 2e.
+    for (const x of aVerifier) if (x && x.kind === 'email' && x.o && x.o.transaction_id != null) txLiesEmail.add(String(x.o.transaction_id));
+    // (27 nov.) « Retiré » sur un colis réuni marque toutes ses lignes (`clesMoities`) : sa commande Vinted, encore « au point
+    // relais » chez Vinted tant qu'elle n'a pas enregistré le retrait, ne revient pas seule « à retirer ». Par identité seulement :
+    // la commande d'une ligne cochée (conversation, n° de suivi, code), ou le code de retrait d'une ligne cochée.
+    const txCoches = new Set(), codesCoches = new Set();
+    for (const t of lignesColis) {
+      if (!t || t.status !== 'available' || !collected || !collected.has(colisKey(t))) continue;
+      const c = commandeDuColis(t); if (c && c.transaction_id != null) txCoches.add(String(c.transaction_id));
+      const k = codeLigne(t); if (k) codesCoches.add(k);
+    }
+    for (const [tx, r] of Object.entries(colisRelais || {})) { const c = r ? normCode(r.code) : ''; if (c && codesCoches.has(c) && txParCode.get(c) === String(tx)) txCoches.add(String(tx)); }
     // ⚠️ (29 oct.) UN COLIS, UNE CARTE — PAR SON N° (§5). Un achat vu par Vinted
     // SANS code dont le n° de suivi est celui d'un colis déjà connu par un e-mail
     // (montré, coché, fini ou reparti) est CE colis : il ne s'affiche pas une
@@ -9143,6 +9172,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           if (tr && !ks.some(k => nRetourEmail.has(k)) && repartiAffichable(Date.parse(tr.etatAt || ''), maintenant)) repartis.push({ kind: 'vinted', o, statut: 'transporteur' }); }
         if (so) continue; }
       if (txLiesEmail.has(String(o.transaction_id))) continue;     // le même colis, déjà montré par son e-mail
+      if (txCoches.has(String(o.transaction_id))) continue;        // (27 nov.) son colis est coché « Retiré » (une de ses lignes, par identité)
       const r = colisRelais[String((o && o.transaction_id) || '')]; const c = r ? normCode(r.code) : '';
       if (c && codesEmail.has(c)) continue;
       if (!c && ks.some(k => nEmailConnus.has(k))) continue;       // (29 oct.) le même n° : déjà montré par son e-mail
@@ -9192,6 +9222,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const j = (Date.now() - new Date(quand).getTime()) / 86400000;
       return isFinite(j) && j <= PICKUP_CONFIRM_DAYS;
     });
+    // (27 nov.) Les moitiés d'UN colis cochées ensemble (« Retiré » marque toutes ses moitiés, `clesMoities`) : UNE ligne grise.
+    { const cmdA = (t) => commandeDuColis(t) || null;
+      const gr = grouperParIdentite(attenteMail, { codesDe: (t) => { const o = cmdA(t); return [codeLigne(t), o ? normCode((colisRelais[String(o.transaction_id)] || {}).code) : '']; }, suiviDe: suiviDeLigne, txDe: (t) => { const o = cmdA(t); return o && o.transaction_id != null ? String(o.transaction_id) : ''; } });
+      if (gr.length !== attenteMail.length) { const garde = gr.map((ids) => ids.map((i) => attenteMail[i]).sort((a, b) => ((b.source !== 'vinted-commande') - (a.source !== 'vinted-commande')) || scoreLigneRetrait(b) - scoreLigneRetrait(a))[0]);
+        attenteMail.splice(0, attenteMail.length, ...garde); } }
     // ── « À VÉRIFIER » (23 oct.) — remplace « colis jamais retirés » (> 14 j) ──
     // Un colis dont la date limite est passée, ou arrivé depuis plus que la
     // garde mesurée d'un point relais, n'est plus présenté « à retirer » : il

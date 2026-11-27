@@ -2374,3 +2374,8 @@ Julien, après avoir lu le risque (requêtes sans le « bruit » de la page vs c
   (sur le site de l'onglet de départ s'il est connu). **Preuve** : `audit-connexion-simple` S8 (5 contrôles, vrai
   background.js par `_fond-vm.cjs`) : 5 rouges sur la 5.455.1, verts après ; mutation (`ongletAuRepos` sans les gardes) :
   5 rouges ; S7 (5.453) inchangé et vert. Banc `e2e-extension` (attend `panneau_apres_connexion_*`, repris de 27ebb4d32).
+## Ligne déplacée telle quelle de CLAUDE.md §9 (27 nov., pour rester sous 60 Ko)
+
+- **26 nov. · Vestiaire/LBC fiables** : vente VC annulée ≠ « Vendue », lecture VC > 24 h = « à confirmer », Annonces lit `vc_ventes`, « LBC n » pas su sans ventes. `2026-11-26-fiabilite-vc-lbc.md`. Geste : aucun.
+
+- **26 nov. · « article » hors Sneakers partout (ext. 5.455.1)** : `historique-divers.md`, fin.

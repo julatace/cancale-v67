@@ -140,6 +140,11 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     if (idc) { if (vu.has(idc)) return; vu.add(idc); }
     let morceaux = x.adresse != null && x.rue == null ? decouperAdresse(x.adresse) : { rue: x.rue || '', cp: x.cp || '', ville: x.ville || '' };
     let nomLu = x.nom;
+    // (27 nov., capture de Julien : « 10 Rue du Bois Aurant · Vinted Go · Saint-Malo ») Le lieu du SUIVI Vinted Go, « <n° et rue>,
+    // <ville> », arrive coupé en nom = la rue, adresse = la ville seule : la rue est la RUE du point et la ville sa VILLE (une
+    // adresse, donc un endroit), plus un « nom » isolé sans adresse.
+    if (!String(morceaux.rue || '').match(RUE) && RUE.test(String(nomLu || '').trim()) && !morceaux.cp && !morceaux.ville && /^[A-Za-zÀ-ÿ'’ -]{2,40}$/.test(String(morceaux.rue || '').trim()))
+      morceaux = { rue: String(nomLu).trim(), cp: '', ville: String(morceaux.rue).trim() };
     // (1er nov.) L'adresse COLLÉE au nom (« TABAVAP 29 RUE HOCHE VANNES » : sans
     // code postal, `cleanLieu` garde tout comme nom) : le nom est ce qui précède le
     // numéro de la rue, l'adresse ce qui suit. Sans quoi ce point était un « nom »
@@ -183,7 +188,10 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     const sorteCle = x.sorte === 'consigne' ? 'consigne~' : '';
     const cle = nom
       ? (nomSeul ? `seul:${sorteCle}${normNomRelais(nom)}:${idc || points.size}` : sorteCle + normNomRelais(nom) + '|' + cp + '|' + rueCle + (cp ? '' : '|' + normNomRelais(villeLue)))
-      : (rueOk && cp ? 'adr:' + sorteCle + normNomRelais(rueOk) + '|' + cp : CLE_INCONNU);
+      : (rueOk && cp ? 'adr:' + sorteCle + normNomRelais(rueOk) + '|' + cp
+        // (27 nov.) Une rue AVEC son numéro et une ville lues, sans code postal (le suivi Vinted Go : « 10 Rue …, Saint-Malo ») :
+        // une adresse, donc un endroit — jamais « pas encore connu », où elle se mêlait aux colis sans lieu.
+        : rueOk && RUE.test(rueOk) && villeLue ? 'adr:' + sorteCle + normNomRelais(rueOk) + '|~' + normNomRelais(villeLue) : CLE_INCONNU);
     const inconnu = cle === CLE_INCONNU;
     const p = points.get(cle) || { cle, nom: inconnu ? '' : nom, nomConnu: !!nom, inconnu, adressePasLue: nomSeul, rue: '', cp, ville: '', transporteurs: [], arrives: [], attendus: [] };
     if (!inconnu) {
@@ -228,6 +236,37 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     for (const t of p.transporteurs) if (!q.transporteurs.includes(t)) q.transporteurs.push(t);
     q.rue = q.rue || p.rue; q.ville = q.ville || p.ville;
     points.delete(cle);
+  }
+  // (27 nov., capture de Julien : « Joubert Peintures · Transporteur, 10 Rue du Bois Aurant, 35400 Saint-Malo » ET « 10 Rue du
+  // Bois Aurant · Vinted Go · Saint-Malo », deux cartes) UN POINT = UNE CARTE, PAR SON ADRESSE. Le suivi Vinted Go d'un colis
+  // ne donne que « <n° et rue>, <ville> » (pas le nom du commerce) : son point se nommait de sa rue. Deux points se rejoignent
+  // quand leur ADRESSE est la même — la rue avec son numéro (`normRue`), et le même code postal si les deux l'ont lu, sinon la
+  // même ville lue des deux côtés — et qu'au plus l'un des deux a un vrai nom (l'autre n'a pour nom que sa rue, ou aucun) ;
+  // deux noms différents à la même adresse (deux commerces d'une galerie) restent deux points, une consigne et un comptoir
+  // aussi. JAMAIS par la ressemblance des noms.
+  {
+    const consigneDe = (p) => /(^|:)consigne~/.test(p.cle);
+    const rueDe = (p) => { const r = String(p.rue || '').trim(), n = String(p.nom || '').trim(); return RUE.test(r) ? normRue(r) : RUE.test(n) ? normRue(n) : ''; };
+    const nomEstRue = (p) => !p.nom || (RUE.test(String(p.nom).trim()) && normRue(p.nom) === rueDe(p));
+    const memeAdresse = (p, q) => {
+      const r = rueDe(p); if (!r || r !== rueDe(q) || consigneDe(p) !== consigneDe(q)) return false;
+      if (p.cp && q.cp) return p.cp === q.cp;
+      const vp = normNomRelais(p.ville || ''), vq = normNomRelais(q.ville || '');
+      return !!vp && vp === vq;
+    };
+    for (const [cle, p] of [...points.entries()]) {
+      if (p.inconnu || p.adressePasLue || !points.has(cle)) continue;
+      const memes = [...points.values()].filter((q) => q !== p && !q.inconnu && !q.adressePasLue && memeAdresse(p, q) && (nomEstRue(p) || nomEstRue(q) || normNomRelais(p.nom) === normNomRelais(q.nom)));
+      if (memes.length !== 1) continue;                       // plusieurs candidats : on ne choisit pas
+      const q = memes[0];
+      if (nomEstRue(q) && !nomEstRue(p)) continue;            // la carte qui reste est celle qui porte le vrai nom (traitée à son tour)
+      q.arrives.push(...p.arrives); q.attendus.push(...p.attendus);
+      for (const t of p.transporteurs) if (!q.transporteurs.includes(t)) q.transporteurs.push(t);
+      q.rue = q.rue || p.rue || (RUE.test(String(p.nom || '').trim()) ? p.nom : ''); q.ville = q.ville || p.ville; q.cp = q.cp || p.cp;
+      if (!q.nom && p.nom && !nomEstRue(p)) { q.nom = p.nom; q.nomConnu = true; }
+      (q.ecrituresRue = q.ecrituresRue || []).push(...(p.ecrituresRue || [])); (q.ecrituresVille = q.ecrituresVille || []).push(...(p.ecrituresVille || []));
+      points.delete(cle);
+    }
   }
   // (12 nov., Julien : « Rue de la Bretonniere » et « Rue de la Bretonnière » pour deux points du même magasin)
   // UNE ÉCRITURE PAR RUE : les écritures lues de la MÊME rue (même code postal, même rue une fois les accents, la
