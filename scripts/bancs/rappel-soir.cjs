@@ -29,6 +29,14 @@ require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heure
 //   • le passage du soir n'envoie NI le rappel du matin, NI l'URSSAF, NI le bilan,
 //     et le passage du matin n'envoie pas le rappel du soir ;
 //   • vercel.json porte le second cron vers la MÊME route.
+//   (16 nov., lot alerte-soir-colis) :
+//   • le corps nomme les N° PAR IDENTITÉ (transaction → item_id du détail lu →
+//     `vinted_annonce_numeros`) : « 1 avant 23 h 59 : N°215 · 1 déjà en retard : N°193 » ;
+//   • le lendemain soir, un colis déjà dit n'est PAS redit (ni N°215 ni N°193) ;
+//     seul le colis neuf l'est ; un colis déjà dit dont la limite LUE est le
+//     lendemain l'est encore ;
+//   • sans heure choisie, le défaut est 19 h (heure de Paris) : passage horaire
+//     de 18 h 05 ⇒ rien, de 19 h 05 ⇒ envoyé, le cron de 20 h 05 ne le redit pas.
 // Aucune fixture : tout est inventé ici.
 const path = require('path'), fs = require('fs');
 const RACINE = path.join(__dirname, '..', '..');
@@ -63,7 +71,11 @@ const vendeurs = () => ({
   A: {
     subs: [{ endpoint: 'https://fcm.googleapis.com/A1', keys: {} }], prefs: null,
     comptes: [{ vinted_user_id: '11', login: 'vendeuse_a' }],
-    main: { vinted_sales_hidden: [], vinted_accounts_hidden: [], vinted_ship_done: { 102: true }, vinted_bords_shipped: {}, vrm_widget_token: 'tokA' },
+    main: { vinted_sales_hidden: [], vinted_accounts_hidden: [], vinted_ship_done: { 102: true }, vinted_bords_shipped: {}, vrm_widget_token: 'tokA',
+      // (16 nov.) Les N° des annonces, par identifiant d'annonce (inventés).
+      vinted_annonce_numeros: { 9006: { numero: '215' }, 9007: { numero: '193' }, 9999: { numero: '777' } } },
+    // (16 nov.) Le détail lu de chaque transaction : son identifiant d'annonce (scalaire `meta`, comme en base).
+    txn: [{ tx: '106', item: '9006' }, { tx: '107', item: '9007' }],
     ventes: { 11: { cap: iso(SOIR - 3600000), txns: ['102', '106', '107', '108'], orders: [
       { transaction_id: 102, status: 'Le paiement a été validé', date: iso(SOIR - J), price: { amount: '23.5' }, transaction_user_status: 'needs_action' },
       { transaction_id: 106, status: 'Le paiement a été validé', date: iso(SOIR - J), price: { amount: '30' }, transaction_user_status: 'needs_action' },
@@ -107,7 +119,7 @@ function projette(ligne, select) {
   const out = {};
   for (const item of select.split(',')) {
     const [alias, expr] = item.includes(':') ? item.split(/:(.+)/) : [item, item];
-    const morceaux = expr.split(/->>?/);
+    const morceaux = expr.split(/->>?/).map((k) => k.replace(/^"(.*)"$/, "$1"));   // `->"9006"` = la clé 9006, comme PostgREST
     const b = morceaux.shift();
     let v = b === 'meta' ? ligne.meta : b === 'data' ? ligne.data : ligne[b];
     if (morceaux.length) v = chemin(v, morceaux);
@@ -122,6 +134,7 @@ const lignesDe = (o) => {
   for (const [uid, x] of Object.entries(v.ventes)) L.push({ id: `harvest_${uid}_orders_sold`, data: { capturedAt: x.cap, payload: { my_orders: x.orders }, resume: { txns: x.txns } } });
   for (const b of v.bords) L.push(b);
   for (const t of (v.tracks || [])) L.push(t);
+  for (const x of (v.txn || [])) L.push({ id: `harvest_11_txn_${x.tx}`, data: { payload: { transaction: { id: Number(x.tx), item_id: Number(x.item) } } }, meta: { id: x.tx, item_id: x.item } });
   if (v.vcOffres) L.push({ id: 'vc_offres', data: { capturedAt: iso(SOIR - 3600000), offres: v.vcOffres } });
   L.push({ id: 'ebay_orders', data: { orders: v.ebay } });
   L.push({ id: 'push_subs', data: { subs: v.subs } });
@@ -179,6 +192,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     dit(p.title === 'Demain : 2 colis à déposer', 'le titre dit « Demain : 2 colis à déposer » (1 limite lue demain + 1 en retard ; l’eBay dû dans 4 jours, la limite ESTIMÉE de demain et le colis coché « posté » ne sont pas dits)', p.title);
     dit(/^1 avant 23 h 59\b/.test(p.body || '') && /1 déjà en retard/.test(p.body || '') && !/2 déjà en retard|à poster/.test(p.body || ''), 'le corps : l’heure LUE de la limite de demain, puis 1 déjà en retard — le bordereau du colis coché « posté » n’est pas compté', p.body);
     dit((p.title || '').length <= 40 && (p.body || '').length <= 170, 'la forme passe par api/_lib/push.js (titre ≤ 40, corps ≤ 170)');
+    dit(/^1 avant 23 h 59 : N°215 · 1 déjà en retard : N°193$/.test(p.body || '') && !/N°777|N°12\b|N°14\b/.test(p.body || ''), '(16 nov.) le corps nomme les N° PAR IDENTITÉ (transaction → annonce → N°), jamais le n° lu dans le titre d’un e-mail', p.body);
     dit(p.url === '/?tab=ventes&cible=colonne&colonne=prets', 'le clic ouvre Ventes · À expédier, sur la colonne « Prêts à imprimer » (31 oct. ; 11 nov.)', p.url);
     dit(b.length === 0, 'B n’a rien à poster ⇒ rien pour B', `B=${b.length}`);
     const lect = lus.filter((u) => /orders_sold|email_bord|ebay_orders|ebay_comptes|vinted_accounts|soir_reminder_dedup/.test(u));
@@ -250,6 +264,25 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     await lancer(SOIR + J);
     dit(soirDe('A').length === 2, 'le lendemain soir : un nouveau rappel', `${soirDe('A').length}`);
   });
+  // (16 nov., lot alerte-soir-colis) Pas de relance le lendemain pour le même colis.
+  await essaie('pas de relance', async () => {
+    reset();
+    await lancer(SOIR);
+    const memo = (memos.A || {}).soir_reminder_dedup || {};
+    dit(memo.colis && memo.colis['v:106'] === '2026-10-21' && memo.colis['v:107'] === '2026-10-21' && !memo.colis['v:108'], 'le mémo du soir retient CHAQUE colis dit (par n° de transaction), pas celui qui n’a pas été dit', JSON.stringify(memo.colis));
+    await lancer(SOIR + J);
+    const l = soirDe('A');
+    const p = l[1] || {};
+    console.log(`     le lendemain, sur le téléphone de A : « ${p.title} » / « ${p.body} »`);
+    dit(l.length === 2 && !/N°215|N°193|en retard|2 colis/.test((p.title || '') + (p.body || '')) && /1 date estimée passée/.test(p.body || ''), 'le lendemain : N°215 (limite aujourd’hui, en retard) et N°193 déjà dits ne sont PAS redits ; seul le colis neuf (date estimée passée) l’est', `${p.title} / ${p.body}`);
+    reset();
+    await lancer(SOIR);
+    V.A.bords[1].data.dateLimite = '23/10/2026 12:00';   // le bordereau de 107 (déjà dit) donne une limite LUE au lendemain
+    V.A.bords[0].data.dateLimite = '24/10/2026 12:00';
+    await lancer(SOIR + J);
+    const q = soirDe('A')[1] || {};
+    dit(/N°193/.test(q.body || '') && /avant 12 h/.test(q.body || '') && !/N°215/.test(q.body || ''), 'un colis déjà dit dont la limite LUE tombe le lendemain est redit (N°193, avant 12 h) ; N°215 (limite plus tard) ne l’est pas', `${q.title} / ${q.body}`);
+  });
   await essaie('mémo non écrit', async () => {
     reset(); pannes.add('ecrire:A:soir_reminder_dedup');
     await lancer(SOIR);
@@ -298,10 +331,12 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
   });
   await essaie('heure par défaut', async () => {
     reset();
+    await lancer(SOIR - 2 * 3600000, horaire);
+    dit(soirDe('A').length === 0, '(16 nov.) sans heure choisie, le passage horaire de 18 h 05 ne fait rien (défaut 19 h)');
     await lancer(SOIR - 3600000, horaire);
-    dit(soirDe('A').length === 0, 'C8. sans heure choisie, le passage horaire ne fait rien (le cron d’avant décide)');
+    dit(soirDe('A').length === 1, '(16 nov.) sans heure choisie : 19 h 05 (heure de Paris), le défaut', `${soirDe('A').length}`);
     await lancer(SOIR);
-    dit(soirDe('A').length === 1, 'C8. sans heure choisie : 20 h 05, comme avant');
+    dit(soirDe('A').length === 1, '(16 nov.) le cron de 20 h 05 ne le redit pas (mémo du jour)');
   });
   await essaie('heure plus tôt', async () => {
     reset(); V.A.prefs = { soirHeure: 18 };
