@@ -15,9 +15,17 @@ const ext=fs.readFileSync(new URL('../../vinted-sync-extension/background.js',im
 
 test('la copie de l’extension est identique à celle de l’app',()=>{assert.equal(bloc(ext),bloc(app));});
 test('l’extension personnalise avec le pseudo du fil vérifié et utilise l’offre',()=>{
-  assert.match(ext,/personnaliserMessageFavori\(version\.texte,String\(c\?\.opposite_user\?\.login\|\|''\),undefined,infosMsg\)/);
-  assert.match(ext,/prixOffreFavori\(prixAnnonce,offre\)/);
-  assert.match(ext,/corpsReponseVinted\(texteFinal\)/);
+  // Le corps de `executerMessageFavori` seul (jusqu'à la fonction suivante au même niveau) : une formule ailleurs ne compte pas.
+  const corps=(()=>{const a=ext.indexOf('async function executerMessageFavori(');assert.ok(a>=0);const b=ext.indexOf('\nasync function ',a+10),c=ext.indexOf('\nfunction ',a+10);return ext.slice(a,Math.min(...[b,c].filter(x=>x>a)));})();
+  const detail=ext.slice(ext.indexOf('async function offreFavoriDetail('),ext.indexOf('async function offreFavoriDetail(')+400);
+  assert.match(corps,/personnaliserMessageFavori\(version\.texte,String\(c\?\.opposite_user\?\.login\|\|''\),undefined,infosMsg\)/);
+  // 5.410.8 : l'offre réglée passe par `offreAvecPlancher` (remontée au plancher), qui la calcule par `prixOffreFavori`.
+  assert.match(corps,/const op=choixP\.op\|\|\(id\(tx\)\?await offreAvecPlancher\(body\.itemId,prixAnnonce,offre\):\{raison:'offre_prix_inconnu'\}\);/);
+  assert.match(detail,/const p0 = prixOffreFavori\(prixAnnonce, offre\);\s*if \(!p0\) return \{ raison: 'offre_prix_inconnu' \};/);
+  assert.match(corps,/interfaceVinted\(acc,'offre',\{conv:String\(convId\),route:convRoute,tx:String\(tx\),prix:Number\(prix\)/);
+  // 5.414 (`toutinterface`) : le texte FINAL (personnalisé puis varié) est celui tapé dans CETTE conversation.
+  assert.match(corps,/const texteFinal=texteJamaisRepete\(texteBrut,/);
+  assert.match(corps,/interfaceVinted\(acc,'message',\{conv:String\(convId\),route:convRoute,texte:texteFinal,/);
   const ctx={};vm.runInNewContext(bloc(ext),ctx);assert.equal(ctx.personnaliserMessageFavori('Salut {username}','bob'),'Salut bob');
 });
 test('variables : {username} et {a|b}, le reste refusé',()=>{
