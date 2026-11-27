@@ -7,7 +7,7 @@ function rapport(j0) {
   const j = [...j0].sort((a, b) => a.t - b.t);
   const t0 = j.length ? j[0].t : 0;
   return JSON.stringify({
-    outil: 'VRM Observateur 2.0.0',
+    outil: 'VRM Observateur ' + chrome.runtime.getManifest().version,
     genereLe: new Date().toISOString(),
     n: j.length,
     // t = millisecondes depuis la première requête, d = depuis la précédente

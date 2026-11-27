@@ -4,6 +4,12 @@
 const OBS = (() => {
   const VINTED = /(^|\.)vinted\.[a-z.]+$/i;
   function estVinted(host) { return VINTED.test(host || ''); }
+  // 2.1 (27 nov.) : Vestiaire Collective est noté EXACTEMENT comme Vinted (mêmes règles d'anonymat) —
+  // `www.`, `fr.`, `apiv2.`… : tout sous-domaine de vestiairecollective.com, jamais un hôte qui l'imite.
+  const VESTIAIRE = /(^|\.)vestiairecollective\.com$/i;
+  function estVestiaire(host) { return VESTIAIRE.test(host || ''); }
+  // Un site SUIVI : ses chemins, ses paramètres et ses corps (en formes) sont notés ; ailleurs, l'hôte seul.
+  function estSuivi(host) { return estVinted(host) || estVestiaire(host); }
   // 1.1 (29 oct., messages aux favoris) : un identifiant devient une EMPREINTE
   // courte ({id:a3f9c1}), salée par un sel propre à cet ordinateur : on voit que
   // « la conversation créée » et « la réponse » visent la MÊME, sans la valeur.
@@ -25,6 +31,7 @@ const OBS = (() => {
         if (/\d{3,}/.test(s)) return '{id}';
         if (/^[0-9a-f]{16,}$/i.test(s)) return '{x}';
         if (s.length > 40) return '{x}';
+        if (/[@%]/.test(s)) return '{x}';   // 2.1 : une adresse e-mail ou un segment encodé ne se garde jamais
         return s;
       })
       .join('/');
@@ -92,13 +99,14 @@ const OBS = (() => {
     return n ? o : undefined;
   }
   function entree(details) {
+    // (2.1) `versVinted` / `depuisVinted` veulent dire « vers / depuis un site SUIVI » (Vinted ou Vestiaire).
     let u;
     try { u = new URL(details.url); } catch (_) { return null; }
     const init = details.initiator || details.documentUrl || '';
     let hInit = '';
     try { hInit = init ? new URL(init).hostname : ''; } catch (_) {}
-    const versVinted = estVinted(u.hostname);
-    const depuisVinted = estVinted(hInit);
+    const versVinted = estSuivi(u.hostname);
+    const depuisVinted = estSuivi(hInit);
     const depuisExt = /^chrome-extension:\/\//.test(init);
     if (!versVinted && !depuisVinted && !(depuisExt && versVinted)) return null;
     if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
@@ -109,6 +117,7 @@ const OBS = (() => {
       t: Math.round(details.timeStamp),
       m: details.method,
       h: u.hostname,
+      site: estVestiaire(u.hostname) ? 'vestiaire' : estVinted(u.hostname) ? 'vinted' : undefined,
       p: versVinted ? chemin : '',
       q: versVinted ? [...u.searchParams.keys()].slice(0, 20) : undefined,
       qid: versVinted ? qIds(u.searchParams) : undefined,
@@ -140,7 +149,7 @@ const OBS = (() => {
     if (el.aria) o.aria = propre(el.aria, 40);
     if (el.placeholder) o.indice = propre(el.placeholder, 40);
     if (bouton && el.texte) o.texte = propre(el.texte, 30);
-    if (el.href) { try { const u = new URL(el.href); o.lien = estVinted(u.hostname) ? cheminNormalise(u.pathname) : u.hostname; } catch (_) {} }
+    if (el.href) { try { const u = new URL(el.href); o.lien = estSuivi(u.hostname) ? cheminNormalise(u.pathname) : u.hostname; } catch (_) {} }
     if (Array.isArray(el.ancetres)) { const a = el.ancetres.map((x) => propre(x, 60)).filter(Boolean).slice(0, 4); if (a.length) o.dans = a; }
     return o;
   }
@@ -152,10 +161,10 @@ const OBS = (() => {
     if (g.k === 'frappe') e.longueur = Math.min(Number(g.longueur) || 0, 100000);
     if (g.k === 'touche') e.touche = ['lettre', 'chiffre', 'Enter', 'Backspace', 'Tab', 'Escape', 'espace', 'fleche', 'autre'].includes(g.touche) ? g.touche : 'autre';
     if (g.k === 'defile') e.y = Math.round(Number(g.y) || 0);
-    if (g.k === 'page' || g.k === 'onglet') { try { const u = new URL(g.url); e.h = u.hostname; e.p = estVinted(u.hostname) ? cheminNormalise(u.pathname) : ''; e.q = estVinted(u.hostname) ? [...u.searchParams.keys()].slice(0, 20) : undefined; } catch (_) { return null; } if (g.quoi) e.quoi = propre(g.quoi, 20); }
+    if (g.k === 'page' || g.k === 'onglet') { try { const u = new URL(g.url); e.h = u.hostname; e.p = estSuivi(u.hostname) ? cheminNormalise(u.pathname) : ''; e.q = estSuivi(u.hostname) ? [...u.searchParams.keys()].slice(0, 20) : undefined; } catch (_) { return null; } if (g.quoi) e.quoi = propre(g.quoi, 20); }
     if (g.k === 'visible') e.etat = g.etat === 'visible' ? 'visible' : 'cache';
     return e;
   }
-  return { cheminNormalise, forme, formeCorps, entree, estVinted, poserSel, empreinte, signature, geste };
+  return { cheminNormalise, forme, formeCorps, entree, estVinted, estVestiaire, estSuivi, poserSel, empreinte, signature, geste };
 })();
 if (typeof module !== 'undefined') module.exports = OBS;

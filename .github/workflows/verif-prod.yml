@@ -42,7 +42,7 @@ jobs:
       - name: Installer Chromium
         if: github.event_name != 'push' || steps.attente.outputs.deploye == 'true'
         run: |
-          npx playwright install --with-deps chromium
+          bash scripts/ci-installer-navigateurs.sh chromium   # sans la source apt de Microsoft, 4 essais (scripts/ci-installer-navigateurs.sh)
           echo "VRM_CHROMIUM_PATH=$(node -e 'console.log(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
       - name: Entrer dans l'app (exemple, puis compte de démonstration)
         if: github.event_name != 'push' || steps.attente.outputs.deploye == 'true'

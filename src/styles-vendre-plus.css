@@ -62,3 +62,11 @@ span.vrm-bc-case { width: 44px; height: 22px; }
   .vrm-rf-texte { flex: 1 1 calc(100% - 50px); }
   .vrm-rf-geste { flex: 1 1 100%; margin-left: 50px; }
 }
+/* (27 nov., zero-rouge-bancs-2) « Écrire aux favoris dans l'extension » (+ sa raison quand l'extension n'agit pas) ne passait
+   jamais à la ligne : à 1280 px, la colonne de droite d'Aujourd'hui (~265 px) le coupait de moitié (587 px de bouton). Le
+   geste garde sa ligne pleine mais ne dépasse plus de sa carte : il se tasse et son texte passe à la ligne. */
+/* (`.sb-touche` pose `nowrap` et vient après cette feuille : la règle est sur les deux classes.) */
+/* La raison (`<small>`, quand l'extension n'agit pas) va SOUS le verbe, jamais à côté ; on coupe entre les mots. */
+.sb-touche.vrm-rf-geste { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: break-word; text-align: center; height: auto; padding-block: 6px;
+  flex-direction: column; justify-content: center; gap: 2px; }
+@container (max-width: 380px) { .sb-touche.vrm-rf-geste { max-width: calc(100% - 50px); } }
