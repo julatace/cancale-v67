@@ -207,6 +207,11 @@ const MESURE = (pg, tel) => pg.evaluate((tel) => {
   return out;
 }, tel);
 
+// (27 nov.) Changer d'écran par le chemin de l'app (`vrm:aller`, comme _bt-commun.cjs `aller`), jamais par `pg.goto` pendant
+// que l'app tourne : WebKit refuse les lectures en vol pendant le rechargement (« due to access control checks », rendu en
+// `pageerror`) et E0 « aucune erreur JS » rougissait à tort sous NAVIGATEUR=webkit (CI). Les erreurs restent toutes comptées.
+const aller = (pg, t) => pg.evaluate((t) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=' + t })); } catch (_) {} }, t);
+
 // E4 — pixels : la couleur moyenne d'une zone de la capture (décodée dans le navigateur).
 async function moyenne(pg, nav, clip) {
   const png = await pg.screenshot({ clip });
@@ -357,7 +362,7 @@ async function tournee(nav, { W, theme, scenario }) {
     // (8 nov.) Depuis la vague 3 (6 nov.), un N° qui a SA case est visé sur la case (recherche vide) ;
     // sans case, la recherche s'ouvre sur lui. L'un OU l'autre, et seulement CE N°.
     dit(/42/.test(lieu.q) || (lieu.vise.length === 1 && lieu.vise[0] === '42'), 'E9', `${T} « Voir » ouvre le Stock sur le N°42`, JSON.stringify(lieu));
-    await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+    await aller(pg, 'journee');
     await pg.waitForSelector('.vrm-fu-journee', { timeout: 20000 }).catch(() => {});
     await pg.waitForTimeout(4000);
     const m2 = await MESURE(pg, tel);
@@ -365,8 +370,8 @@ async function tournee(nav, { W, theme, scenario }) {
   }
   // E6 sur Ventes (la même carte).
   if (scenario === 'plein') {
-    await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' });
-    await pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
+    await aller(pg, 'ventes');
+    await pg.waitForSelector('.vrm-main[data-ecran="ventes"]', { timeout: 20000 }).catch(() => {});
     await pg.waitForTimeout(3000);
     const v = await pg.evaluate(() => [...document.querySelectorAll('.vrm-fu-modifier')].length);
     const mv = await MESURE(pg, tel).catch(() => null);

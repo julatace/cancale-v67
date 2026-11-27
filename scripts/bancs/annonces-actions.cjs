@@ -299,7 +299,10 @@ const ecrituresDe = (u) => u.filter((x) => /republier|recreer|cmd_|file_/i.test(
             await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
             await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-article]')].some((x) => x.getClientRects().length), null, { timeout: 20000 }).catch(() => {});
             await pg.waitForTimeout(1500);
-            const n42 = (await articles(pg)).filter((a) => a.numero === '42').map((a) => a.id);
+            // (27 nov.) Sous charge, les rangées montrées d'abord n'avaient pas encore leurs N° (« » rendu, rouge à tort) : on attend
+            // qu'une rangée porte le N°42, 10 s au plus (§6.5) ; deux porteurs, ou la nouvelle seule, restent rouges.
+            let n42 = [];
+            for (let i = 0; i < 40; i++) { n42 = (await articles(pg)).filter((a) => a.numero === '42').map((a) => a.id); if (n42.length) break; await pg.waitForTimeout(250); }
             dit(n42.length === 1 && n42[0] === '9102', `M ${T} tant que l’ancienne est en ligne, le N°42 reste à elle seule`, n42.join(','));
             etat.sans9102 = true;
             await nouvelleOuverture(pg);

@@ -168,6 +168,11 @@ const ouvrirPage = async (ctx, query = '') => {
   });
   await pg.goto(`http://localhost:${PORT}/${query}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => document.querySelector('.vrm-main') || /pas pu s'afficher/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
+  // (27 nov., WebKit en CI) `.vrm-main` existe SOUS l'écran de démarrage (index.html `#vrm-demarrage`, `data-vrm-boot`) : sous
+  // WebKit chargé, il couvrait encore la page après 2,8 s (capture : « Ça prend plus de temps que d'habitude ») — la barre
+  // mesurée dessous, les touchers pris par lui (B1, B7, B8, R3 rouges). On attend qu'il soit parti (30 s au plus), comme
+  // _a11y-mesure.cjs `attendreDemarrage` ; s'il reste, les mesures le voient et rougissent.
+  await pg.waitForFunction(() => !document.getElementById('vrm-demarrage') && !document.documentElement.hasAttribute('data-vrm-boot'), null, { timeout: 30000 }).catch(() => {});
   await pg.waitForTimeout(2800);
   return { pg, errs };
 };
@@ -435,6 +440,8 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         await pg.waitForFunction(() => [...document.querySelectorAll('[data-compte-puce="222"][data-actif="1"]')].some((x) => x.getClientRects().length), null, { timeout: 4000 }).catch(() => {});
         const r1bavant = await ecran(pg);
         await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(3000);
+        // (27 nov., WebKit) l'écran de démarrage parti, puis la rangée des comptes montrée (10 s au plus) — une puce perdue reste « * ».
+        await pg.waitForFunction(() => !document.getElementById('vrm-demarrage') && [...document.querySelectorAll('[data-compte-puce][data-actif="1"]')].some((x) => x.getClientRects().length), null, { timeout: 10000 }).catch(() => {});
         const r1b = await ecran(pg);
         dit(r1bavant.puce === '222' && r1b.ecran === 'achats' && r1b.puce === '222', `R1 ${qui} : rechargé, même compte choisi`, JSON.stringify({ avant: r1bavant, apres: r1b }));
         await toucher(pg, '[data-compte-puce="*"]');
