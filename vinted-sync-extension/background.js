@@ -16649,6 +16649,18 @@ function ecritureFavoriPartie(x) { if (!x || x.rienParti) return false; const s 
 const REGISTRE_FAVORIS = 'vrmFavorisFaits';
 const cleRegistreFavori = (item, acheteur) => String(item) + ':' + String(acheteur);
 async function registreFavori(uid) { try { const m = (await chrome.storage.local.get(REGISTRE_FAVORIS))[REGISTRE_FAVORIS] || {}; const u = m[String(uid)]; return u && typeof u === 'object' ? u : {}; } catch (_) { return null; } }
+// 5.455.7 (Julien : « montre les actions faites sur chaque favori, comme Offre faite ») : CE QUI A ÉTÉ FAIT pour chaque favori,
+//    par son id de notification — l'offre (heure, montant envoyé), le message (heure, n° de version). Écrit AU GESTE, à la
+//    réponse de Vinted, jamais deviné ; lu par le panneau (`favorisPourCarte` → `faits`). 3 000 favoris au plus par compte.
+const FAITS_FAVORIS = 'vrmFavorisFaitsN';
+async function noterFaitFavori(uid, nid, quoi) {
+  if (typeof nid !== 'string' || !nid || nid.length > 160) return;
+  try { const m = (await chrome.storage.local.get(FAITS_FAVORIS))[FAITS_FAVORIS] || {}; const u = m[String(uid)] = m[String(uid)] && typeof m[String(uid)] === 'object' ? m[String(uid)] : {};
+    u[nid] = Object.assign({}, u[nid], quoi);
+    const cles = Object.keys(u); if (cles.length > 3000) for (const c of cles.slice(0, cles.length - 3000)) delete u[c];
+    await chrome.storage.local.set({ [FAITS_FAVORIS]: m }); } catch (_) {}
+}
+async function faitsFavoris(uid) { try { const m = (await chrome.storage.local.get(FAITS_FAVORIS))[FAITS_FAVORIS] || {}; const u = m[String(uid)]; return u && typeof u === 'object' ? u : {}; } catch (_) { return {}; } }
 async function effacerRegistreFavori(uid, item, acheteur, quoi) {
   try { const m = (await chrome.storage.local.get(REGISTRE_FAVORIS))[REGISTRE_FAVORIS] || {}; const u = m[String(uid)]; const k = cleRegistreFavori(item, acheteur); if (!u || !u[k]) return; delete u[k][quoi]; if (!Object.keys(u[k]).length) delete u[k]; await chrome.storage.local.set({ [REGISTRE_FAVORIS]: m }); } catch (_) {}
 }
@@ -22796,6 +22808,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
       const faite=!!(o.ok&&(o.json==null||o.json.code==null||Number(o.json.code)===0));
       noterDiag(faite?'favori_offre_ok':'favori_offre_refusee_'+o.status);
       if(faite||o.status>=500)await noterRegistreFavori(uid,body.itemId,body.recipientId,'o');   // 6b. faite (ou peut-être) : jamais une 2ᵉ
+      if(faite)await noterFaitFavori(uid,body.notificationId,{o:Date.now(),px:Number(op.prix)});
       if(!faite)return o.status>=400&&o.status<500||o.ok?rep('refuse',o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');
       attente=jeton;
       const att=await attendreOffreMessage(jeton,{uid:String(uid),convId:uuid,texte:texteV,variante:versionV.n,tRes,suivi:grant.suivi||null,itemId:body.itemId,recipientId:body.recipientId,requetes:true,acc},(nom,x)=>{if(grant.suivi)notifierApp({type:'favoris',uid:String(uid),suivi:grant.suivi,etape:nom,...(x||{})});});
@@ -22812,7 +22825,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     const r=await vintedPageFavori(acc,adresseMessagerieApi(acc.domain,`conversations/${uuid}/replies`),{content:texteV,is_personal_data_sharing_check_skipped:false,photo_temp_uuids:null});
     {const f=fin(r);if(f)return f;}
     if(r.incertain||!r.status){await noterTexteRecent(uid,texteV);return rep('incertain',0,'reponse_inconnue');}
-    if(r.ok){noterDiag('favori_req_envoye');variante=Number.isInteger(versionV.n)&&versionV.n>0?versionV.n:null;await noterVarianteDerniere(uid,'favori',variante);await noterChoixFavori(uid,body,uuid,versionV,!!op);await noterTexteRecent(uid,texteV);etape('confirmation');return rep('envoye',r.status);}
+    if(r.ok){noterDiag('favori_req_envoye');variante=Number.isInteger(versionV.n)&&versionV.n>0?versionV.n:null;await noterFaitFavori(uid,body.notificationId,{m:Date.now(),...(variante?{v:variante}:{})});await noterVarianteDerniere(uid,'favori',variante);await noterChoixFavori(uid,body,uuid,versionV,!!op);await noterTexteRecent(uid,texteV);etape('confirmation');return rep('envoye',r.status);}
     if(r.status>=400&&r.status<500)await effacerRegistreFavori(uid,body.itemId,body.recipientId,'m');   // refusé net : pas parti
     {const t=await telephone(r);if(t)return t;}
     if([400,422].includes(r.status)){await noterVersionRefusee(uid,versionV.modele||versionV.texte);noterDiag('favori_message_refuse_'+r.status);return rep('refuse',r.status,'texte_refuse');}
@@ -25534,7 +25547,7 @@ async function favorisPourCarte(uid, relire) {
       finally { _favorisCarteApercuEnVol = false; }
     })().catch(() => {});
   }
-  return { apercu: ap && Date.now() - Number(ap.at || 0) < 6 * 3600000 ? ap : null, file };
+  return { apercu: ap && Date.now() - Number(ap.at || 0) < 6 * 3600000 ? ap : null, file, faits: await faitsFavoris(uid) };
 }
 
 // ══ 5.376 : LES LIENS DE LA CARTE OUVRENT LE SITE, JAMAIS VRM ═══════════════════
@@ -32696,7 +32709,9 @@ async function departImport(uid, opts = {}) {
   } else {
     const rows = await sbGet(`app_data?id=in.(harvest_${uid}_orders_sold,harvest_${uid}_orders_purchased,harvest_${uid}_listings)&${SELECT_DEPART_IMPORT}`);
     if (rows === null || !Array.isArray(rows)) { noterDiag('import_base_muette'); return null; }   // pas su ⇒ rien
-    neuf = { v: 2, debut: t, demande: false, tout: false, at: t };
+    // 5.455.7 (Julien, 27 nov. 23:00 : « l'extension doit tout récupérer dans tous les cas ») : l'import de départ lit TOUT
+    //    l'historique (plus d'horizon de 12 mois ni de bouton « Tout récupérer »), dans les mêmes bornes de lecture.
+    neuf = { v: 2, debut: t, demande: false, tout: true, at: t };
     for (const [k, type] of IMPORT_TYPES) {
       const r = rows.find((x) => x && x.id === `harvest_${uid}_${type}`) || {};
       neuf[k] = departTypeImport(r.n, r.t);
@@ -32980,7 +32995,13 @@ async function tickImport() {
     if (await reculBase()) return 0;
     if (await compteNonCapte(uid)) return 0;
     const st = await lireImport(uid);
-    if (st === undefined || (st && importFini(st) && st.publie)) return 0;
+    if (st === undefined) return 0;
+    if (st && importFini(st) && st.publie) {
+      // 5.455.7 : un import de 12 mois déjà fini repart UNE fois pour tout le reste (sans horizon) ; fini « tout » ⇒ rien.
+      if (st.tout) return 0;
+      const n = await departImport(String(uid), { force: true }); if (!n) return 0;
+      await publierImport(String(uid), n); noterDiag('import_tout_auto');
+    }
     return await importerHistorique(uid);
   } catch (_) { return 0; }
 }
