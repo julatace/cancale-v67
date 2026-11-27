@@ -34,6 +34,9 @@
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 process.env.BANC_PORT = process.env.BANC_PORT || '9160';
+// (26 nov., bancs natifs) L'app RÉELLE (« VRM natif », 19 nov.) : jamais le DOM d'avant le 17 nov. (échafaudage
+// `vrm_banc_dom_ancien`, _garde-reseau.cjs). Ventes est l'écran natif : À envoyer · En route · Terminées.
+process.env.BANC_DESIGN_V2 = process.env.BANC_DESIGN_V2 || 'defaut';
 const path = require('path'), fs = require('fs');
 const NV = require('./nouveau-vendeur.cjs');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
@@ -112,7 +115,8 @@ const MESURE_BRUTE = (pg, { tel, sombre }) => pg.evaluate(({ tel, sombre }) => {
   const rouge = (c) => { const x = rgba(c); if (!x || x.a < 0.3) return false; const { h, s, l } = hsl(x); return (h >= 345 || h <= 12) && s >= 0.45 && l >= 0.25 && l <= 0.75; };
   const ambre = (c) => { const x = rgba(c); if (!x || x.a < 0.5) return false; const { h, s, l } = hsl(x); return h > 18 && h <= 48 && s >= 0.6 && l >= 0.3 && l <= 0.7; };
   const nom = (e) => ((e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).slice(0, 2).join('.') : e.tagName.toLowerCase()) + ' « ' + (e.innerText || e.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 40) + ' »');
-  const ZONES = '.vrm-ventes-toutes, [data-a-venir], .vrm-ventes-liste, .vrm-filtres-et-outils, .vrm-ventes-controles, .vrm-sales-analysis, [data-annulations-alerte]';
+  // (26 nov., natif) La zone jugée : l'écran Ventes entier (`[data-tache="ventes"]`), ce qui y est VISIBLE.
+  const ZONES = '[data-tache="ventes"]';
   const zones = [...document.querySelectorAll(ZONES)].filter(vis);
   const dans = (e) => zones.some((z) => z.contains(e));
   const tous = [...new Set(zones.flatMap((z) => [z, ...z.querySelectorAll('*')]))].filter((e) => !e.closest('svg') || e.tagName === 'svg');
@@ -122,23 +126,22 @@ const MESURE_BRUTE = (pg, { tel, sombre }) => pg.evaluate(({ tel, sombre }) => {
   const texteMain = main ? main.innerText : '';
   // V1 — « À venir ».
   const av = document.querySelector('[data-a-venir]');
-  const aVenir = av && vis(av) ? (() => {
+  const aVenir = av && vis(av) && dans(av) ? (() => {
     const total = (av.querySelector('[data-a-venir-total]') || av).innerText.replace(/au moins\s*/i, '').trim();
     const occ = total && total !== '—' ? (av.innerText.split(total).length - 1) : 0;
     return { groupes: Number(av.getAttribute('data-a-venir-groupes') || '-1'), lignes: av.querySelectorAll('[role="listitem"][data-a-venir-ligne]').length, resume: !!av.querySelector('[data-a-venir-resume]'), total, occ };
   })() : null;
-  // V2 — l'état de chaque vente de « Tous ».
+  // V2 — l'état de chaque vente de « Terminées » (natif : `MetaVente`, src/natif/ecrans/rangeeVente.jsx — l'état est un
+  // morceau de la 2ᵉ ligne, jamais rogné ; jugé : visible, entier, écrit UNE fois dans la rangée).
   const etats = [];
   for (const r of document.querySelectorAll('[data-toutes-vente]')) {
     if (!vis(r)) continue;
-    const meta = r.querySelector('.vrm-toutes-meta'), et = r.querySelector('.vrm-toutes-etat');
-    const attendu = !!(r.querySelector('[data-toutes-etat]'));
-    if (!attendu) continue;
-    const m = meta && vis(meta) ? meta.getBoundingClientRect() : null, e = et && vis(et) ? et.getBoundingClientRect() : null;
-    etats.push({ id: r.getAttribute('data-toutes-id'), vu: !!e, dessous: !!(m && e && e.top >= m.bottom - 1), entier: !!(et && et.scrollWidth <= et.clientWidth + 1 && !/ellipsis/.test(getComputedStyle(et).textOverflow)), dansMeta: !!(meta && et && (et.textContent || '').trim() && (meta.textContent || '').includes((et.textContent || '').trim())), texte: et ? (et.innerText || et.textContent || '').trim() : '' });
-    // (15 nov., rouges-connus) Les rangées de « Tous » sont en `content-visibility: auto` depuis la refonte des listes du
-    // 14 nov. (1 000 ventes, src/styles-listes.css) : une rangée hors de l'écran rend un innerText VIDE — le texte se lit
-    // par textContent (l'état n'était pas vide : c'est la lecture qui l'était).
+    const et = r.querySelector('[data-vr-etat]');
+    if (!et) continue;
+    const texte = (et.textContent || '').trim();
+    const mot = et.querySelector('.n-vr-mot') || et;
+    const fois = texte ? (r.textContent.split(texte).length - 1) : 0;
+    etats.push({ id: r.getAttribute('data-toutes-id'), cle: et.getAttribute('data-vr-etat'), vu: vis(et), entier: mot.scrollWidth <= mot.clientWidth + 1 && !/ellipsis/.test(getComputedStyle(mot).textOverflow), fois, texte });
   }
   // V3 — « jamais lu » ouvert, et « N sur N résultats ».
   const jamaisOuverts = [...document.querySelectorAll('[data-toutes-etat-site][data-etat="jamais"]')].filter((e) => vis(e) && !e.closest('[data-toutes-vide]')).map((e) => e.innerText.trim().slice(0, 60));
@@ -151,10 +154,14 @@ const MESURE_BRUTE = (pg, { tel, sombre }) => pg.evaluate(({ tel, sombre }) => {
   // V6 — les zéros.
   const zeros = (texteZones.match(/\d[\d   ]*,00\s?€/g) || []);
   // V7 — les composants.
-  const sansPhoto = [...document.querySelectorAll('[data-toutes-photo="0"]')].filter(vis);
-  const sansPhotoVide = sansPhoto.filter((e) => !e.querySelector('[data-photo-vide]')).length;
-  const pastillesMain = [...document.querySelectorAll('.vrm-ventes-liste .vrm-fu-num, .vrm-ventes-toutes [data-toutes-num]:not(:has([data-num]))')].filter(vis).length;
-  const nums = [...document.querySelectorAll('.vrm-ventes-liste [data-num], .vrm-ventes-toutes [data-num]')].filter(vis);
+  // (26 nov., natif) Une rangée de vente sans photo CHARGÉE porte la vignette vide commune (`Vignette`, `data-n-sans-photo`) —
+  // jamais une image cassée ni un carré vide improvisé.
+  const rangs = [...document.querySelectorAll('[data-toutes-vente], [data-vn-rang]')].filter(vis);
+  const sansPhoto = rangs.filter((r) => !r.querySelector('img') || ![...r.querySelectorAll('img')].some((i) => i.complete && i.naturalWidth > 0));
+  const sansPhotoVide = sansPhoto.filter((e) => !e.querySelector('[data-n-sans-photo]') || [...e.querySelectorAll('img')].some((i) => i.complete && i.naturalWidth === 0 && vis(i))).length;
+  const pastillesMain = 0;
+  // Les N° : la plaque native (`Plaque`, `.n-plaque`) des rangées de Ventes.
+  const nums = [...document.querySelectorAll('[data-tache="ventes"] .n-plaque')].filter(vis);
   // (16 nov., bancs-rouges-a) « Verre dépoli » (15 nov., maquette 9 choisie par Julien, studio-verre.css §10) : la plaque N°
   // est une plaquette BLANCHE en relief, l'encre sombre — partout, la nuit aussi. La règle d'avant (« jamais blanc en
   // sombre ») visait une pastille blanche au texte clair, illisible ; ce qui est jugé maintenant : le N° se LIT, encre
@@ -163,15 +170,17 @@ const MESURE_BRUTE = (pg, { tel, sombre }) => pg.evaluate(({ tel, sombre }) => {
   const contraste = (a, b) => { const l1 = lum(a), l2 = lum(b); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); };
   const numsBlancs = sombre ? nums.filter((e) => { const s = getComputedStyle(e); const f = rgba(s.backgroundColor), c = rgba(s.color); return f && c && f.a > 0.5 && contraste(f, c) < 4.5; }).length : 0;
   // V8 — les couleurs.
-  const ACCENT = sombre ? 'rgb(10, 132, 255)' : 'rgb(0, 113, 227)';
+  // (26 nov., natif) L'accent n'est plus bleu (encre / ardoise, NATIF.md) : « aucun texte bleu » se juge sur TOUT bleu saturé
+  // (plus strict que l'ancien seul bleu d'accent) ; le geste ambre porte le repère natif `data-n-ton="ambre"` en plus des anciens.
+  const bleu = (c) => { const x = rgba(c); if (!x || x.a < 0.5) return false; const { h, s, l } = hsl(x); return h >= 195 && h <= 245 && s >= 0.6 && l >= 0.3 && l <= 0.7; };
   const bleus = [], rouges = [], ambres = [];
-  const GESTE = '[data-ton="action"], [data-ton="urgent"], [data-achat-etat="manque"], [data-ventes-ko], [data-gestes-ligne], .vrm-fu-seg, [data-toutes-etat-site], [data-recap-litige], .vrm-sale-row[data-depose-attente]';
+  const GESTE = '[data-ton="action"], [data-ton="urgent"], [data-n-ton="ambre"], [data-achat-etat="manque"], [data-ventes-ko], [data-gestes-ligne], .vrm-fu-seg, [data-toutes-etat-site], [data-recap-litige], .vrm-sale-row[data-depose-attente]';
   for (const e of visibles) {
     const s = getComputedStyle(e);
     let t = ''; for (const n of e.childNodes) if (n.nodeType === 3) t += n.nodeValue;
     const aTexte = !!t.trim();
     const fond = s.backgroundColor.replace(/rgba\((\d+), (\d+), (\d+), 1\)/, 'rgb($1, $2, $3)');
-    if (aTexte && s.color.replace(/rgba\((\d+), (\d+), (\d+), 1\)/, 'rgb($1, $2, $3)') === ACCENT && fond !== ACCENT) bleus.push(nom(e));
+    if (aTexte && bleu(s.color) && !bleu(fond)) bleus.push(nom(e) + ' ' + s.color);
     for (const c of [aTexte ? s.color : '', s.backgroundColor, parseFloat(s.borderTopWidth) > 0 ? s.borderTopColor : '']) if (c && rouge(c)) { rouges.push(nom(e) + ' ' + c); break; }
     if (aTexte && ambre(s.color) && !e.closest(GESTE)) ambres.push(nom(e) + ' ' + s.color);
   }
@@ -184,20 +193,18 @@ const MESURE_BRUTE = (pg, { tel, sombre }) => pg.evaluate(({ tel, sombre }) => {
   // A — les annulations.
   const alertes = [...document.querySelectorAll('[data-annulations-alerte]')].filter(vis).map((a) => ({ uid: a.getAttribute('data-annulations-alerte'), n: a.getAttribute('data-annulations-n'), sur: a.getAttribute('data-annulations-sur'), ventes: [...a.querySelectorAll('[data-annulation-vente]')].map((x) => x.getAttribute('data-annulation-vente')), texte: a.innerText.slice(0, 160) }));
   // G — la liste longue.
-  const lignesToutes = document.querySelectorAll('[data-toutes-vente]').length;
+  // Les lignes de la page : la liste du téléphone les rend PAR PAQUETS (`ParPaquets`) — son nombre est `data-vt-liste-tel`.
+  const listeTel = document.querySelector('[data-vt-liste-tel]');
+  const lignesToutes = listeTel ? Number(listeTel.getAttribute('data-vt-liste-tel')) : document.querySelectorAll('[data-toutes-vente]').length;
   const plus = (document.querySelector('[data-toutes-plus]') || {}).innerText || '';
-  const debord = document.documentElement.scrollWidth > document.documentElement.clientWidth + 1 || [...document.querySelectorAll('.vrm-ventes-toutes *, .vrm-ventes-liste *')].some((e) => vis(e) && e.getBoundingClientRect().right > innerWidth + 1 && !(() => { for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(p).overflowX)) return true; return false; })());
-  const videTxt = ((document.querySelector('[data-toutes-vide]') || {}).innerText || '').trim();
-  return { aVenir, etats, jamaisOuverts, replis, resultats: resultats ? resultats[0] : '', pied, mots, zeros, sansPhoto: sansPhoto.length, sansPhotoVide, pastillesMain, nums: nums.length, numsBlancs, bleus, rouges, ambres, petits, alertes, lignesToutes, plus, debord, videTxt };
+  const plusN = (/(\d+)/.exec(plus) || [])[1] || '';
+  const ttNombre = (document.querySelector('[data-ventes-tableau] [data-tt-nombre], [data-tt-nombre]') || { getAttribute: () => null }).getAttribute('data-tt-nombre');
+  const debord = document.documentElement.scrollWidth > document.documentElement.clientWidth + 1 || [...document.querySelectorAll('[data-tache="ventes"] *')].some((e) => vis(e) && e.getBoundingClientRect().right > innerWidth + 1 && !(() => { for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(p).overflowX)) return true; return false; })());
+  const videEl = [...document.querySelectorAll('[data-toutes-vide], [data-tache="ventes"] .n-vide, [data-tache="ventes"] [data-tt-vide]')].find(vis);
+  const videTxt = ((videEl || {}).innerText || '').trim();
+  return { aVenir, etats, jamaisOuverts, replis, resultats: resultats ? resultats[0] : '', pied, mots, zeros, sansPhoto: sansPhoto.length, sansPhotoVide, pastillesMain, nums: nums.length, numsBlancs, bleus, rouges, ambres, petits, alertes, lignesToutes, plus, plusN, ttNombre, debord, videTxt };
 }, { tel, sombre });
 
-const allerSite = async (pg, site) => {
-  if (site === 'toutes') { const t = pg.locator('[data-selecteur-logos] button[data-site="toutes"]').first(); if (await t.count()) await t.click().catch(() => {}); }
-  else await pg.locator(`[data-selecteur-logos] button[data-site="${site}"]`).first().click();
-  await pg.waitForTimeout(1200);
-  if (site === 'vinted') await pg.waitForSelector('.vrm-ventes-liste [data-tx], [data-ventes-vide], [data-ventes-ko]', { timeout: 20000 }).catch(() => {});
-  await pg.waitForTimeout(1400);
-};
 const capture = async (pg, nom) => {
   if (!SHOTS) return;
   fs.mkdirSync(SHOTS, { recursive: true });
@@ -210,88 +217,122 @@ const capture = async (pg, nom) => {
   await pg.setViewportSize(avant);
 };
 
+// La liste « Terminées » (toutes les ventes, tous sites mêlés) : le segment natif de Ventes.
+const allerSegment = async (pg, seg) => {
+  // Un vendeur SANS vente (« vide ») n'a pas de segment : l'écran est son état vide, mesuré tel quel.
+  const b = pg.locator(`[data-colis-onglet-choix="${seg}"]`).first();
+  await b.waitFor({ timeout: 15000 }).catch(() => {});
+  if (!(await b.count())) return false;
+  await b.click({ timeout: 20000 });
+  await pg.waitForTimeout(600);
+  if (seg === 'toutes') await pg.waitForSelector('[data-ventes-toutes="lu"] [data-toutes-vente], [data-ventes-toutes="lu"] [data-toutes-vide], [data-ventes-toutes="lu"] [data-tt-vide], [data-ventes-toutes="lu"] [data-tt-etat="vide"]', { timeout: 25000 }).catch(() => {});
+  else await pg.waitForSelector(`[data-vn-onglet="${seg}"]`, { timeout: 20000 }).catch(() => {});
+  await pg.waitForTimeout(800);
+};
+// LES ANNULATIONS PAR COMPTE (Statistiques · « Annulations », src/ventesAnnulees.js, la règle de toutes les plateformes —
+// 22 nov., Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées »). La période de l'écran est
+// l'année (le jeu : ventes de 2 à 16 jours) ; chaque ligne par SON compte (uid), ses chiffres en data-*.
+const ANNUL = async (pg) => {
+  await pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
+  await pg.waitForSelector('[data-v2-stats-periode]', { timeout: 25000 });
+  await pg.selectOption('[data-v2-stats-periode]', 'annee');
+  await pg.waitForSelector('[data-stats-carte="sv-annulations"] [data-sv-annul]:not([data-sv-annul="encours"])', { timeout: 25000 }).catch(() => {});
+  await pg.waitForTimeout(800);
+  return pg.evaluate(() => {
+    const c = document.querySelector('[data-stats-carte="sv-annulations"]'); if (!c) return null;
+    const e = c.querySelector('[data-sv-annul]');
+    const note = c.querySelector('[data-sv-annul-manque]');
+    return { etat: e ? e.getAttribute('data-sv-annul') : null, pasLues: e ? e.getAttribute('data-sv-annul-pas-lues') : null, manque: note ? note.getAttribute('data-sv-annul-manque') : null, total: (c.querySelector('[data-sv-annul-total]') || { getAttribute: () => null }).getAttribute('data-sv-annul-total'),
+      comptes: [...c.querySelectorAll('[data-sv-annul-compte]')].map((d) => ({ uid: d.getAttribute('data-sv-annul-compte'), site: d.getAttribute('data-sv-annul-site'), n: d.getAttribute('data-n'), annulees: d.getAttribute('data-annulees'),
+        ventes: [...d.querySelectorAll('[data-sv-annul-vente]')].map((x) => x.getAttribute('data-sv-annul-vente')).sort() })),
+      texte: c.textContent.replace(/\s+/g, ' ').slice(0, 300) };
+  });
+};
+
 async function tournee(nav, { W, theme, scenario }) {
   const sombre = theme === 'sombre', tel = W < 600;
   const T = `[${scenario} ${W}px ${theme}]`;
   const J = JEUX[scenario];
   const base = { lignes: J.lignes(), comptes: J.comptes, ecritures: 0 };
   const o = await NV.ouvrir(nav, { W, sombre, base, tab: 'ventes' });
-  await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
-  await o.pg.waitForTimeout(2000);
-  // La liste est LUE (une vente, ou l'état vide) — jamais mesurée pendant le chargement.
-  await o.pg.waitForSelector('[data-ventes-toutes="lu"] [data-toutes-vente], [data-ventes-toutes="lu"] [data-toutes-vide]', { timeout: 25000 }).catch(() => {});
-  if (scenario !== 'vide') await o.pg.waitForSelector('[data-a-venir]', { timeout: 20000 }).catch(() => {});
-  await o.pg.waitForTimeout(800);
+  await o.pg.waitForSelector('[data-tache="ventes"]', { timeout: 25000 }).catch(() => {});
+  await o.pg.waitForTimeout(1500);
 
-  // ── Ventes · Tous ──
+  // ── Ventes · Terminées (toutes les ventes, tous sites) ──
+  await allerSegment(o.pg, 'toutes');
   const t = await MESURE(o.pg, { tel, sombre });
-  await capture(o.pg, `e2-${scenario}-${W}-${theme}-tous`);
+  await capture(o.pg, `e2-${scenario}-${W}-${theme}-terminees`);
   if (scenario === 'jeu') {
-    dit(t.aVenir && t.aVenir.groupes === 1 && t.aVenir.lignes === 0 && t.aVenir.resume && t.aVenir.occ === 1, 'V1', `${T} Tous : « À venir » d’un seul compte — aucune ligne par compte, le total écrit une fois`, JSON.stringify(t.aVenir));
-    if (tel) dit(t.etats.length >= 3 && t.etats.every((e) => e.vu && e.dessous && e.entier && !e.dansMeta), 'V2', `${T} Tous : l’état de chaque vente sur SA ligne, entier (${t.etats.length})`, JSON.stringify(t.etats.filter((e) => !(e.vu && e.dessous && e.entier && !e.dansMeta)).slice(0, 4)));
-    dit(t.etats.some((e) => e.texte === 'À envoyer') || !tel, 'V5', `${T} Tous : la vente à faire partir dit « À envoyer »`, JSON.stringify(t.etats.map((e) => e.texte)));
-    dit(!t.jamaisOuverts.length && t.replis.length === 1 && !t.replis[0].ouvert && t.replis[0].lignes === 1, 'V3', `${T} Tous : « jamais lu » replié en UNE ligne fermée`, JSON.stringify({ ouverts: t.jamaisOuverts, replis: t.replis }));
-    dit(t.sansPhoto > 0 && t.sansPhotoVide === 0, 'V7', `${T} Tous : chaque vignette sans photo est \`PhotoVide\` (${t.sansPhoto})`, `${t.sansPhotoVide} sans`);
+    // V1 : « À venir » a UNE place, Argent (« À venir » en cartes, 24 nov.) ; Ventes ne le répète pas.
+    dit(!t.aVenir, 'V1', `${T} Ventes : « À venir » n’est pas répété (sa place : Argent)`, JSON.stringify(t.aVenir));
+    if (tel) dit(t.etats.length >= 3 && t.etats.every((e) => e.vu && e.entier && e.fois === 1), 'V2', `${T} Terminées : l’état de chaque vente sur SA ligne, entier, écrit une fois (${t.etats.length})`, JSON.stringify(t.etats.filter((e) => !(e.vu && e.entier && e.fois === 1)).slice(0, 4)));
+    dit(!tel || t.etats.some((e) => e.cle === 'envoyer'), 'V5', `${T} Terminées : la vente à faire partir porte l’état « à envoyer »`, JSON.stringify(t.etats.map((e) => e.cle + ':' + e.texte)));
+    dit(!t.jamaisOuverts.length && t.replis.length === 1 && !t.replis[0].ouvert && t.replis[0].lignes === 1, 'V3', `${T} Terminées : « jamais lu » replié en UNE ligne fermée`, JSON.stringify({ ouverts: t.jamaisOuverts, replis: t.replis }));
+    dit(t.sansPhoto > 0 && t.sansPhotoVide === 0, 'V7', `${T} Terminées : chaque vignette sans photo est la vignette vide commune (${t.sansPhoto})`, `${t.sansPhotoVide} sans`);
+    dit(!t.pied.vendusAilleurs && !t.pied.bilan && !t.pied.compteMieux, 'V4', `${T} Ventes : ni « Vendus ailleurs », ni bilan des données, ni « Compte qui vend le mieux »`, JSON.stringify(t.pied));
   }
   if (scenario === 'jeu' || scenario === 'gros') {
-    dit(!t.resultats, 'V3', `${T} Tous : plus de « N sur N résultats »`, t.resultats);
-    dit(!t.mots.length, 'V5', `${T} Tous : aucun mot écarté`, t.mots.join(' ¦ '));
-    dit(!t.zeros.length, 'V6', `${T} Tous : aucun « ,00 € »`, t.zeros.join(' ¦ '));
-    dit(!t.bleus.length && !t.rouges.length && !t.ambres.length, 'V8', `${T} Tous : ni texte bleu d’aplat, ni rouge, ni ambre sans geste`, JSON.stringify({ bleus: t.bleus.slice(0, 4), rouges: t.rouges.slice(0, 4), ambres: t.ambres.slice(0, 4) }));
-    if (tel) dit(!t.petits.length, 'V9', `${T} Tous : commandes de 44 px au doigt`, t.petits.slice(0, 8).join(' ¦ '));
-    dit(!t.debord, 'G', `${T} Tous : rien ne déborde`);
+    dit(!t.resultats, 'V3', `${T} Terminées : plus de « N sur N résultats »`, t.resultats);
+    dit(!t.mots.length, 'V5', `${T} Terminées : aucun mot écarté`, t.mots.join(' ¦ '));
+    dit(!t.zeros.length, 'V6', `${T} Terminées : aucun « ,00 € »`, t.zeros.join(' ¦ '));
+    dit(!t.bleus.length && !t.rouges.length && !t.ambres.length, 'V8', `${T} Terminées : ni texte bleu, ni rouge, ni ambre sans geste`, JSON.stringify({ bleus: t.bleus.slice(0, 4), rouges: t.rouges.slice(0, 4), ambres: t.ambres.slice(0, 4) }));
+    if (tel) dit(!t.petits.length, 'V9', `${T} Terminées : commandes de 44 px au doigt`, t.petits.slice(0, 8).join(' ¦ '));
+    dit(!t.debord, 'G', `${T} Terminées : rien ne déborde`);
   }
   if (scenario === 'gros') {
-    dit(t.lignesToutes === 60 && /Afficher les 60 suivantes/.test(t.plus), 'G', `${T} Tous : 60 lignes puis « Afficher les 60 suivantes »`, JSON.stringify({ n: t.lignesToutes, plus: t.plus }));
-    const long = await o.pg.evaluate((L) => { const r = [...document.querySelectorAll('[data-toutes-vente]')].find((x) => (x.innerText || '').includes(L.slice(0, 30))); if (!r) return null; const p = r.querySelector('[data-toutes-prix]'); return { prix: p ? p.innerText : '', droite: Math.round(r.getBoundingClientRect().right) }; }, LONG);
-    dit(long && long.prix === '249,50\u00a0€' && long.droite <= W, 'G', `${T} Tous : titre très long à la ligne, prix « 249,50 € » entier`, JSON.stringify(long));
+    // Au téléphone, la liste se donne par 60 (`data-toutes-plus`) ; à l'ordinateur, le tableau de travail porte TOUTES les lignes
+    // (son nombre `data-tt-nombre`, la règle du tableau). Le titre très long passe à la ligne, le prix reste entier.
+    if (tel) dit(t.lignesToutes === 60 && t.plusN === '60', 'G', `${T} Terminées : 60 lignes puis « Afficher les 60 suivantes »`, JSON.stringify({ n: t.lignesToutes, plus: t.plusN }));
+    else { const attendu = base.lignes.filter((l) => /^harvest_\d+_orders_sold$/.test(l.id)).flatMap((l) => l.data.payload.my_orders).filter((x) => !/annul/i.test(x.status)).length;
+      dit(t.ttNombre === String(attendu), 'G', `${T} Terminées (tableau) : toutes les ventes comptées (${attendu})`, JSON.stringify({ n: t.ttNombre })); }
+    const long = await o.pg.evaluate((L) => { const r = [...document.querySelectorAll('[data-toutes-vente]')].find((x) => (x.textContent || '').includes(L.slice(0, 30))); if (!r) return null; const p = r.querySelector('[data-vt-prix], [data-tt-col="prix"]'); return { prix: p ? p.textContent.trim() : '', droite: Math.round(r.getBoundingClientRect().right), entier: p ? p.scrollWidth <= p.clientWidth + 1 : false }; }, LONG);
+    dit(long && long.prix === '249,50 €' && long.droite <= W && long.entier, 'G', `${T} Terminées : titre très long, prix « 249,50 € » entier`, JSON.stringify(long));
   }
   if (scenario === 'vide') {
-    dit(!t.jamaisOuverts.length && /extension/i.test(t.videTxt) && !/jamais lu/i.test(t.videTxt), 'G', `${T} Tous (vendeur neuf) : l’état vide dit quoi faire, sans phrase « jamais lu » ouverte`, JSON.stringify({ vide: t.videTxt, ouverts: t.jamaisOuverts }));
+    dit(!t.jamaisOuverts.length && /extension/i.test(t.videTxt) && !/jamais lu/i.test(t.videTxt), 'G', `${T} Terminées (vendeur neuf) : l’état vide dit quoi faire, sans phrase « jamais lu » ouverte`, JSON.stringify({ vide: t.videTxt, ouverts: t.jamaisOuverts }));
   }
 
-  // ── Ventes · Vinted ──
-  if (scenario !== 'vide') {
-    await allerSite(o.pg, 'vinted');
-    const v = await MESURE(o.pg, { tel, sombre });
-    await capture(o.pg, `e2-${scenario}-${W}-${theme}-vinted`);
-    if (scenario === 'jeu') {
-      dit(v.aVenir && v.aVenir.lignes === 0 && v.aVenir.occ === 1, 'V1', `${T} Vinted : « À venir » d’un seul compte — le total une fois, aucune ligne`, JSON.stringify(v.aVenir));
-      dit(!v.mots.length, 'V5', `${T} Vinted : aucun mot écarté (filtres, lignes)`, v.mots.join(' ¦ '));
-      dit(!v.zeros.length, 'V6', `${T} Vinted : aucun « ,00 € »`, v.zeros.join(' ¦ '));
-      dit(v.nums >= 3 && !v.pastillesMain && !v.numsBlancs, 'V7', `${T} Vinted : chaque N° est \`Numero\` (${v.nums}), lisible en sombre (encre/fond ≥ 4,5)`, JSON.stringify({ main: v.pastillesMain, blancs: v.numsBlancs }));
-      dit(!v.bleus.length && !v.rouges.length && !v.ambres.length, 'V8', `${T} Vinted : ni texte bleu d’aplat, ni rouge, ni ambre sans geste`, JSON.stringify({ bleus: v.bleus.slice(0, 4), rouges: v.rouges.slice(0, 4), ambres: v.ambres.slice(0, 4) }));
-      dit(!v.pied.vendusAilleurs && !v.pied.bilan, 'V4', `${T} Vinted : ni « Vendus ailleurs » ni le bilan des données en pied`, JSON.stringify(v.pied));
-      if (tel) dit(!v.petits.length, 'V9', `${T} Vinted : commandes de 44 px au doigt`, v.petits.slice(0, 8).join(' ¦ '));
-      dit(!v.debord, 'G', `${T} Vinted : rien ne déborde`);
-      // L'analyse dépliée : « Compte qui vend le mieux » n'y est plus (une place : Statistiques).
-      const b = o.pg.locator('.vrm-sales-analysis button[aria-expanded]').first();
-      if (await b.count()) { await b.click(); await o.pg.waitForTimeout(600); }
-      const v2 = await MESURE(o.pg, { tel, sombre });
-      dit(!v2.pied.compteMieux, 'V4', `${T} Vinted · Analyse : « Compte qui vend le mieux » n’est plus dans Ventes`, JSON.stringify(v2.pied));
-      dit(!v2.zeros.length && !v2.mots.length, 'V6', `${T} Vinted · Analyse : ni « ,00 € » ni mot écarté`, JSON.stringify({ z: v2.zeros.slice(0, 4), m: v2.mots }));
+  // ── Ventes · À envoyer et En route (les colis) : N° lisibles, couleurs, doigt ──
+  if (scenario === 'jeu') {
+    for (const seg of ['envoyer', 'envoyes']) {
+      await allerSegment(o.pg, seg);
+      const v = await MESURE(o.pg, { tel, sombre });
+      await capture(o.pg, `e2-${scenario}-${W}-${theme}-${seg}`);
+      dit(!v.mots.length, 'V5', `${T} ${seg} : aucun mot écarté`, v.mots.join(' ¦ '));
+      dit(!v.zeros.length, 'V6', `${T} ${seg} : aucun « ,00 € »`, v.zeros.join(' ¦ '));
+      dit(v.nums >= 1 && !v.numsBlancs, 'V7', `${T} ${seg} : chaque N° est une plaque lisible (${v.nums}), encre/fond ≥ 4,5 en sombre`, JSON.stringify({ blancs: v.numsBlancs }));
+      dit(!v.bleus.length && !v.rouges.length && !v.ambres.length, 'V8', `${T} ${seg} : ni texte bleu, ni rouge, ni ambre sans geste`, JSON.stringify({ bleus: v.bleus.slice(0, 4), rouges: v.rouges.slice(0, 4), ambres: v.ambres.slice(0, 4) }));
+      if (tel) dit(!v.petits.length, 'V9', `${T} ${seg} : commandes de 44 px au doigt`, v.petits.slice(0, 8).join(' ¦ '));
+      dit(!v.debord, 'G', `${T} ${seg} : rien ne déborde`);
     }
+    // V1 — Argent · « À venir » d'un seul compte : une carte par ÉTAPE, aucune ligne par compte.
+    await o.pg.goto(`http://localhost:${PORT}/?tab=argent`, { waitUntil: 'domcontentloaded' });
+    await o.pg.waitForSelector('[data-agv-avenir]', { timeout: 25000 }).catch(() => {});
+    await o.pg.waitForTimeout(800);
+    const av = await o.pg.evaluate(() => ({ cartes: document.querySelectorAll('[data-agv-avenir] [data-agv-etape]').length, parCompte: [...document.querySelectorAll('[data-a-venir-compte]')].filter((e) => e.getClientRects().length).length, ici: !!document.querySelector('[data-agv-avenir]') }));
+    dit(av.ici && av.parCompte === 0, 'V1', `${T} Argent : « À venir » d’un seul compte — aucune ligne par compte`, JSON.stringify(av));
+  }
+
+  // ── A : les annulations PAR COMPTE (Statistiques) ──
+  if (['annul', 'exclu', 'ko', 'egal'].includes(scenario)) {
+    const A = await ANNUL(o.pg);
+    await capture(o.pg, `e2-${scenario}-${W}-${theme}-annulations`);
+    const de = (uid) => (A && A.comptes.find((c) => c.uid === uid && c.site === 'vinted')) || null;
     if (scenario === 'annul') {
-      dit(v.alertes.length === 1 && v.alertes[0].uid === '222' && v.alertes[0].n === '3' && v.alertes[0].sur === '6', 'A', `${T} un compte à 50 % d’annulations contre 0 % : dit UNE fois (vendeuse_b, 3 sur 6)`, JSON.stringify(v.alertes));
-      const s = o.pg.locator('[data-annulations-alerte] summary').first();
-      if (await s.count()) { await s.click(); await o.pg.waitForTimeout(400); }
-      const v3 = await MESURE(o.pg, { tel, sombre });
-      const ids = (v3.alertes[0] || { ventes: [] }).ventes.slice().sort();
-      dit(JSON.stringify(ids) === JSON.stringify(ANNULEES_B.map(String).sort()), 'A', `${T} l’alerte liste SES ventes annulées (et seulement elles)`, JSON.stringify(ids));
-      dit(!v3.rouges.length && !v3.ambres.length, 'A', `${T} l’alerte n’a ni rouge ni ambre (aucun geste urgent)`, JSON.stringify({ r: v3.rouges.slice(0, 3), a: v3.ambres.slice(0, 3) }));
-      if (tel) dit(!v3.petits.length, 'A', `${T} l’alerte ouverte : 44 px au doigt`, v3.petits.slice(0, 6).join(' ¦ '));
-      await capture(o.pg, `e2-${scenario}-${W}-${theme}-vinted-alerte`);
-      // Le compte choisi : vendeuse_a ⇒ rien ; vendeuse_b ⇒ l'alerte.
-      const choisir = async (login) => { const c = o.pg.locator(`button:has-text("${login}")`).first(); if (await c.count()) { await c.click(); await o.pg.waitForTimeout(1200); return true; } return false; };
-      if (await choisir('vendeuse_a')) { const va = await MESURE(o.pg, { tel, sombre }); dit(!va.alertes.length, 'A', `${T} compte vendeuse_a choisi : pas d’alerte (elle n’annule pas)`, JSON.stringify(va.alertes)); }
-      if (await choisir('vendeuse_b')) { const vb = await MESURE(o.pg, { tel, sombre }); dit(vb.alertes.length === 1, 'A', `${T} compte vendeuse_b choisi : l’alerte est là`, JSON.stringify(vb.alertes)); }
+      const b = de('222'), a = de('111');
+      dit(!!b && b.annulees === '3' && b.n === '6', 'A', `${T} vendeuse_b : 3 annulées sur 6, sur SA ligne`, JSON.stringify(A));
+      dit(!!b && JSON.stringify(b.ventes) === JSON.stringify(ANNULEES_B.map(String).sort()), 'A', `${T} la ligne de vendeuse_b liste SES ventes annulées (et seulement elles)`, JSON.stringify(b));
+      dit(!!a && a.annulees === '0', 'A', `${T} vendeuse_a : aucune annulée`, JSON.stringify(a));
     }
-    if (scenario === 'exclu') dit(!v.alertes.length && !/vendeuse_b/.test(JSON.stringify(v.alertes)), 'A', `${T} le compte EXCLU : aucune alerte`, JSON.stringify(v.alertes));
-    if (scenario === 'egal') dit(!v.alertes.length, 'A', `${T} des parts proches (2/8 contre 3/9) : aucune alerte`, JSON.stringify(v.alertes));
+    if (scenario === 'egal') {
+      const b = de('222'), a = de('111');
+      dit(!!a && !!b && a.annulees === '2' && b.annulees === '3', 'A', `${T} des parts proches : chaque compte sur SA ligne (2 et 3 annulées)`, JSON.stringify(A));
+    }
+    if (scenario === 'exclu') dit(!!A && A.etat === 'lu' && !de('222') && !!de('111'), 'A', `${T} le compte EXCLU n’entre pas (aucune ligne, aucun total)`, JSON.stringify(A));
     if (scenario === 'ko') {
-      const koVu = await o.pg.evaluate(() => !!document.querySelector('[data-ventes-ko]'));
-      dit(koVu, 'A', `${T} (contrôle du banc) le compte vendeuse_c n’a pas pu être lu`);
-      dit(!v.alertes.length, 'A', `${T} un compte pas lu : « pas su », aucune alerte`, JSON.stringify(v.alertes));
+      dit(!!A && !de('333'), 'A', `${T} un compte pas lu : aucune ligne inventée pour lui`, JSON.stringify(A));
+      // Le compte pas lu est NOMMÉ par son identité dans la note de la carte (`data-sv-annul-manque`) : jamais un total qui se dit complet.
+      dit(!!A && (A.etat !== 'lu' || String(A.manque || '').split(',').includes('333')), 'A', `${T} un compte pas lu : nommé, la carte ne se présente pas comme complète`, JSON.stringify(A));
     }
   }
   dit(!o.journal.erreurs.length, 'V0', `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));

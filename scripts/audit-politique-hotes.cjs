@@ -248,6 +248,7 @@ const COUPLES = {
   'src/litiges.js|www.vinted.fr': ['lien', LIEN + ' — la conversation ou la transaction du litige'],
   'src/prixPartout.js|www.vinted.fr': ['lien', LIEN + ' — « À faire sur le site » de Changer le prix'],
   'src/prixPartout.js|www.ebay.fr': ['lien', LIEN + ' — l’annonce eBay de Changer le prix'],
+  'src/ecrans/FilsTous.jsx|www.ebay.fr': ['lien', LIEN + ' — « Voir sur eBay » d’un message eBay sans réponse possible dans VRM (sur SON clic)'],
   'src/prixPartout.js|www.leboncoin.fr': ['lien', LIEN + ' — l’annonce Leboncoin de Changer le prix'],
   'src/prixPartout.js|fr.vestiairecollective.com': ['lien', LIEN + ' — Vestiaire, « À faire sur le site »'],
   'src/communaute/accompagnement.js|vrm.center': ['vrm', 'VRM lui-même (origine par défaut du lien d’invitation)'],

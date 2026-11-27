@@ -34148,6 +34148,16 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   const jamais = etatsF.filter((e) => e[1] === 'jamais' && !(e[0] === 'vinted' && lignes.length === 0));
   const NOMS_SITES = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
   const listeNoms = (l) => l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' et ' + l[l.length - 1];
+  // (26 nov., bancs natifs) Les sites JAMAIS lus (« rien lu » ne vaut pas « rien », §5), en UNE ligne repliée : la même au
+  // téléphone et à l'ordinateur — le tableau de « Terminées » disait « 4 ventes » sans dire que Leboncoin n'avait jamais été lu.
+  const repliJamais = jamais.length > 0 ? (
+        <details className="vrm-toutes-repli" data-toutes-repli={jamais.map((e) => e[0]).join(',')}>
+          <summary className="vrm-toutes-repli-tete"><span className="vrm-toutes-repli-txt">{listeNoms(jamais.map((e) => NOMS_SITES[e[0]] || e[0]))} : pas encore {jamais.length > 1 ? 'lus' : 'lu'}</span><span className="vrm-toutes-repli-chevron" aria-hidden="true">›</span></summary>
+          <div className="vrm-toutes-repli-corps">
+            {jamais.map(([s, k, txt]) => <p key={s} data-toutes-etat-site={s} data-etat={k}>{txt.replace(' : jamais lu — ', ' : ')}</p>)}
+          </div>
+        </details>
+  ) : null;
   // L'état d'une vente : le mot retenu (« À envoyer », « En route »), et l'ambre
   // seulement quand il y a un geste à faire (un colis à envoyer, §7).
   const geste = (l) => l.etat === L.aEnvoyer || motEtatVente(l.etat) === L.aEnvoyer;
@@ -34181,6 +34191,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     const etatsT = visibles.length ? visibles.map(([, , txt]) => txt).join(' ') : '';
     return (
       <div className="vrm-ventes-toutes" data-ventes-toutes={enCours ? 'lecture' : 'lu'} data-n={String(lignes.length)}>
+        {repliJamais ? <div style={{ padding: '0 16px' }}>{repliJamais}</div> : null}
         <VentesTableau achatDe={achatToutes} netDe={(l) => (NET_VENTES.de ? NET_VENTES.de(l) : null)} euros={(c) => montant(c / 100)} lignes={lignesT} pied={etatsT} majLe={majLeT} onRafraichir={() => { setMajLeT(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }}
           compte={filtreT.compte} filtres={filtresT} prix={prix} motEtat={motEtatVente} nomSite={(x) => NOM[x] || x} logoSite={(x) => <LogoSite site={x}/>}
           logoTransporteur={(t) => (t && t.cle ? <LogoTransporteur cle={t.cle} taille={24}/> : null)} Icon={Icon}
@@ -34199,14 +34210,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
           {visibles.map(([s, k, txt]) => <div key={s} data-toutes-etat-site={s} data-etat={k} style={{ color: (k === 'pas-su' || k === 'partiel') ? C.warn : C.muted }}>{txt}</div>)}
         </div>
       )}
-      {jamais.length > 0 && (
-        <details className="vrm-toutes-repli" data-toutes-repli={jamais.map((e) => e[0]).join(',')}>
-          <summary className="vrm-toutes-repli-tete"><span className="vrm-toutes-repli-txt">{listeNoms(jamais.map((e) => NOMS_SITES[e[0]] || e[0]))} : pas encore {jamais.length > 1 ? 'lus' : 'lu'}</span><span className="vrm-toutes-repli-chevron" aria-hidden="true">›</span></summary>
-          <div className="vrm-toutes-repli-corps">
-            {jamais.map(([s, k, txt]) => <p key={s} data-toutes-etat-site={s} data-etat={k}>{txt.replace(' : jamais lu — ', ' : ')}</p>)}
-          </div>
-        </details>
-      )}
+      {repliJamais}
       {lignesTel.length === 0 && lignesAnnul.length > 0 ? null : lignes.length === 0
         ? <div data-toutes-vide="" className="vrm-toutes-vide" data-acc-vide="ventes">
             {enCours ? <p>{PAS_SU.enCours}</p>

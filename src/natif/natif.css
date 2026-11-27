@@ -615,11 +615,14 @@
   /* ── BarreLaterale (ordinateur) ─────────────────────────────────────────── */
   .n-laterale {
     position: sticky; top: 0; align-self: start; box-sizing: border-box; display: flex; flex-direction: column;
-    width: var(--n-l-laterale); height: 100dvh; padding: 12px; overflow-y: auto; overscroll-behavior: contain;
+    width: var(--n-l-laterale); height: 100dvh; padding: 12px; overflow: hidden;
     background: var(--n-laterale, var(--n-carte)); border-right: 1px solid var(--n-bord); color: var(--n-encre); font: var(--n-t-corps);
   }
   .n-laterale-tete { padding: 4px 8px 16px; }
-  .n-laterale-liste { flex: 1 1 auto; }
+  /* (26 nov., banc navigation-plateformes) Dans une fenêtre basse, SEULE la liste défile : la tête et le pied (la carte du compte,
+     l'entrée de Paramètres) restent à l'écran — avant, toute la colonne défilait et Paramètres sortait par le bas (1280×620).
+     4 px de marge intérieure : l'anneau de focus (outline-offset 2 px) n'est pas rogné par le défilement. */
+  .n-laterale-liste { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0 -4px; padding: 0 4px; }
   .n-laterale-groupe { margin-bottom: 20px; }
   .n-laterale-titre { margin: 0; padding: 0 8px 4px; font: 500 12px/16px var(--n-police); color: var(--n-encre-2); }
   .n-laterale-entree {
