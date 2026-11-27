@@ -4,7 +4,8 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 const scripts=path.resolve(__dirname,'..');
 let prefix=fs.readFileSync(path.join(scripts,'audit-exec.cjs'),'utf8').split('const REPONSE =')[0];
 prefix=prefix.split('\n').filter(l=>!l.includes('ctx.vintedSend =')&&!l.includes('ctx.vintedGet =')).join('\n');
-const bac={require,__dirname:scripts,console,setTimeout,clearTimeout,clearInterval,URL,TextDecoder,TextEncoder,Buffer};
+const bac={require:require('node:module').createRequire(path.join(scripts,'audit-exec.cjs')),__dirname:scripts,   // le préfixe d'audit-exec.cjs résout ses modules depuis scripts/
+ console,setTimeout,clearTimeout,clearInterval,URL,TextDecoder,TextEncoder,Buffer};
 vm.runInNewContext(prefix+'\nglobalThis.creer=faireCtx;',bac);
 const UID='3175765377',jeton='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 let controles=0;const check=(v,m)=>{assert.ok(v,m);controles++;};

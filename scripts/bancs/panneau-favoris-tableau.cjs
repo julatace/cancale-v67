@@ -338,8 +338,13 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
     const t2 = await ouvrir(nav, Object.assign({}, o, { AP: APJ }));
     await essaie(T + ' reprendre', async () => {
       await montrer(t2.pg, o.mobile); await clic(t2.pg, '.side6 [data-onglet-b="favoris"]'); await t2.pg.waitForTimeout(400);
-      await clic(t2.pg, '[data-fav6-continuer]'); await t2.pg.waitForTimeout(200);
-      await clic(t2.pg, '[data-fav6-annuler]'); await t2.pg.waitForTimeout(200);
+      // (27 nov.) Plus de délai fixe (§6.5) : sous charge le panneau se redessinait après « Reprendre » et « Annuler la file »
+      //    n'existait pas encore au clic (`clic` ne touche qu'un bouton présent) ⇒ rouge 2 fois sur 3 sous une charge de 40.
+      //    On attend que le bouton SOIT là, puis que les deux demandes soient parties (bornées, 10 s) — l'exigence ne change pas.
+      const la = (sel) => t2.pg.waitForFunction((x) => !!document.getElementById('vrm-badge').shadowRoot.querySelector(x), sel, { timeout: 10000 }).catch(() => {});
+      await la('[data-fav6-continuer]'); await clic(t2.pg, '[data-fav6-continuer]');
+      await la('[data-fav6-annuler]'); await clic(t2.pg, '[data-fav6-annuler]');
+      for (let i = 0; i < 50 && (await lireF(t2.pg)).autres.length < 2; i++) await t2.pg.waitForTimeout(200);
       const a = await lireF(t2.pg);
       dit(a.autres.join(',') === 'continuer,arreter', `${T} : « Reprendre » demande au fond de mener la file d’hier, « Annuler la file » l’arrête`, a.autres.join(','));
       dit(!t2.erreurs.length, `${T} : aucune erreur de page`, JSON.stringify(t2.erreurs));
