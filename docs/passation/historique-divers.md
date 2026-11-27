@@ -2388,8 +2388,9 @@ Julien, après avoir lu le risque (requêtes sans le « bruit » de la page vs c
 
 - **26 nov. soir · FAVORIS PAR REQUÊTES « comme Vintex » (Julien : « A, fais comme Vintex »), ext. 5.455.0** : inquiries → conversation → transaction → offre → message, depuis la page, SEULES écritures permises (`ECRITURES_FAVORI`) ; garde-fous inchangés ; clics en réserve (`vrmFavorisChemin: 'interface'`). Bleam fait pareil (ancienne messagerie). `historique-divers.md`, fin. Geste : installer 5.455.0.
 
-## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. soir (place sous 60 Ko)
+## Lignes de CLAUDE.md §9 déplacées telles quelles le 27 nov. soir (place pour la 5.455.3, sous 60 Ko)
 
+- **27 nov. · ext. 5.455.2** : police « Inter VRM » du panneau ; `<gardes-app>` dit « article » ; le panneau ne coupe plus un onglet qui charge. `historique-divers.md`, fin. Geste : installer 5.455.2.
 - **27 nov. · « 978 216 » deux fois, un point en deux cartes** : un colis = ses identités (code lu aussi dans SA commande, n°, transaction), « à vérifier » compris ; un point = son adresse. `historique-colis-retraits.md`, fin. Geste : aucun (après fusion).
 
 ## 27 nov. · Améliorations (branche `claude/ameliorations-27nov`, Julien : « Vas-y fais tout »)
@@ -2417,3 +2418,11 @@ Julien, après avoir lu le risque (requêtes sans le « bruit » de la page vs c
    avec l'extension). Budget de mots d'`aujourdhui-moins-texte` + 8 (déjà rouge sur main avant : 118 > 117 et la coupure
    « Saisis 2 prix › », réglée par main entre-temps).
 Banc `aujourdhui-portes-27nov` (390/1512, clair/sombre) : rouge sur l'avant (24) et sous mutation de chacune des règles.
+CI de la PR #1451 : « Chrome » en dur remplacé par « le navigateur où est l'extension VRM » (audit-chrome-en-dur, 5 langues : la
+phrase parle de l'ORDINATEUR, pas du navigateur d'ici) ; `conv` posé APRÈS `code:` dans `fusionLignesMemeSuivi`
+(audit-retraits-irreprochables lit `codesLus,` puis `code: src.code`) ; banc chiffres-coherents E : attendre le nombre réel
+de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
+
+## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. soir (ameliorations-27nov, place sous 60 Ko)
+
+- **27 nov. · TROIS FONCTIONS RENDUES (Julien)** : filtre « Compte » de Ventes au téléphone (retenu par vendeur), alerte « un compte annule plus » dans Statistiques (règle du 5 nov. importée, un compte pas lu jamais comparé), questions eBay sans réponse en tête de Messages « À répondre ». `2026-11-27-retour-fonctions.md`. Geste : aucun.
