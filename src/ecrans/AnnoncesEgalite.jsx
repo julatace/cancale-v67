@@ -17,14 +17,18 @@
 //  sinon `vrm_articles_sites` sous l'identifiant de l'annonce de SON site), relus juste avant : carte pas lue ⇒ rien.
 //  Les actions passent par l'écran Annonces Vinted d'hier (monté, caché) : `demanderActionAnnonces`.
 // ══════════════════════════════════════════════════════════════════════════
-import { agirMaintenant, envoyerSerie, dire, republierDansApp, useFaitsAgir } from '../agir/porte.js';   // (24 nov., lot agir-tout)
+import { agirMaintenant, envoyerSerie, envoyerGeste, dire, republierDansApp, useFaitsAgir } from '../agir/porte.js';   // (24 nov., lot agir-tout)
 import { texteRaison } from '../agir/Agir.jsx';
 import { useComptesBloques } from '../compteBloqueEtat.js';
 import { etatLienLu, propositionLu, relierDepuisListe, queSurCeSite, ouvrirLiaison, abonnerLiaison, demanderLiaison } from '../liaisonEtat.js';   // (20 nov.) relier depuis la liste
 import React from 'react';
 import { lazySur } from '../chargementSur.js';
 import { tr } from '../i18n/index.js';
-import VueAnnonces from '../natif/ecrans/Annonces.jsx';
+import VueAnnonces, { FeuilleFait } from '../natif/ecrans/Annonces.jsx';
+// (27 nov., choix de Julien) « Paires qui dorment » : LE plan (src/pairesDorment.js) et sa vue.
+import { planPairesDorment, selectCourbesPlan } from '../pairesDorment.js';
+import { EntreePairesDorment, FeuillePairesDorment } from '../natif/ecrans/PairesDorment.jsx';
+import { issueTexte as issueTexteAgir } from '../agir/Agir.jsx';
 import { Bouton as BoutonNatifAE } from '../natif/Bouton.jsx';   // (21 nov., ux-reglages) le geste de l'état vide
 import { LogoSite } from '../natif/LogoSite.jsx';   // (25 nov., logo-vinted-pp) le logo du site dans l'en-tête de chaque compte : le MÊME V que sur Ventes (couleur de marque, 20 px) — l'ancien (SelecteurSites, à l'encre) sortait noir
 import { poserSourcePhotosComptes } from '../natif/visuel/photosProfil.js';   // (25 nov.) la photo de profil de chaque compte, une lecture partagée
@@ -562,6 +566,44 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
         options: [{ cle: 'toutes', libelle: tr('photoDouble.toutes') }, { cle: 'photodouble', libelle: tr('egalite.etat.photodouble'), n: photoRes.groupes.length }] }] : []),
     ],
   };
+  // ── (27 nov., choix de Julien) « PAIRES QUI DORMENT », LE PLAN ── plus de 21 j en ligne, rangées par l'argent qui dort (l'achat
+  // CONNU), vues et favoris LUS (la courbe de l'annonce, sinon le dressing), trois gestes par LA porte (`peutAgir`) : republier
+  // (l'atelier, `republierDansApp`, SA confirmation), baisser jusqu'à SON plancher (la file `prix`, SA confirmation, la garde du
+  // prix), favoris (la page favoris du panneau, CETTE annonce). Pas connectée ⇒ lecture seule, la raison dite. Rien ne part seul.
+  const [planOuvert, setPlanOuvert] = React.useState(false);
+  const [courbesPlan, setCourbesPlan] = React.useState(undefined);   // undefined lecture · null pas su · { rows, alias }
+  const [saisiePlan, setSaisiePlan] = React.useState(null);
+  const planBase = React.useMemo(() => {
+    if (!modele) return modele;
+    const roles = load(CLE_ROLES_COMPTES, {}) || {};
+    const arts = siteP === 'tous' ? modele.articles : modele.articles.map((a) => ({ ...a, annonces: a.annonces.filter((x) => x.site === siteP) }));
+    return { arts, exclus: new Set(Object.keys(roles).filter((u) => roles[u] === 'achats')) };
+  }, [modele, siteP]);
+  const plan = React.useMemo(() => (planBase ? planPairesDorment(planBase.arts, { comptesExclus: planBase.exclus, courbes: courbesPlan || undefined }) : planBase), [planBase, courbesPlan]);
+  const sigCourbes = plan ? plan.lignes.filter((l) => l.site === 'vinted').map((l) => l.id).join(',') : '';
+  React.useEffect(() => {
+    // Les courbes ne se lisent qu'à l'OUVERTURE du plan (une requête projetée, jamais la ligne entière).
+    if (!planOuvert || !sigCourbes) return undefined;
+    const sel = selectCourbesPlan(sigCourbes.split(','));
+    if (!sel) return undefined;
+    let mort = false;
+    lireTout('id=like.courbes_annonces_*&select=' + sel.select, { strict: true }).then((rows) => { if (!mort) setCourbesPlan(Array.isArray(rows) ? { rows, alias: sel.alias } : null); }, () => { if (!mort) setCourbesPlan(null); });
+    return () => { mort = true; };
+  }, [planOuvert, sigCourbes]);
+  const jugerPlan = (site, compte, geste, par) => agirMaintenant(site, compte, geste, par);
+  const republierPlan = (l) => { (async () => {
+    const r = await republierDansApp([{ compte: l.compte, id: l.id, num: l.numero || '' }], confirmerRepub);
+    if (r.ok) { dire(tr('agir.envoi.ici')); return; }
+    if (!r.annule) dire(texteRaison(r.verdict) || tr('agir.envoi.base')); })(); };
+  const baisserPlan = (l, versC) => { if (!(versC > 0) || !(l.prixC > versC) || !l.plancher) return; (async () => {
+    const m = fmt(versC / 100);
+    const oui = await askConfirm({ title: tr('pdo.baisse.titre', { m }), desc: tr('pdo.baisse.desc', { avant: fmt(l.prixC / 100), apres: m, plancher: fmt(l.plancher.c / 100) }) + (l.aConfirmer ? ' ' + tr('pdo.baisse.garde') : ''), ok: tr('pdo.baisse.oui') });
+    if (!oui) return;
+    const r = await envoyerGeste({ site: l.site, compte: l.compte, geste: 'baisser', distGeste: 'prix', args: { id: l.id, prix: versC / 100, prixAvant: l.prixC / 100 }, num: l.numero || '', avant: l.prixC / 100 });
+    dire(issueTexteAgir(r)); })(); };
+  const favorisPlan = (l) => ouvrirPanneau({ site: 'vinted', compte: l.compte, page: 'favoris', ids: [l.id], action: 'envoyer' });
+  const entreeDorment = filtre.etat === 'dorment' || filtreT0.dort === 'dorment'
+    ? <EntreePairesDorment plan={plan} euros={(n) => fmt(n)} onOuvrir={() => setPlanOuvert(true)}/> : null;
   // (20 nov.) RELIER DEPUIS LA LISTE — Julien : « on ne peut pas relier des annonces comme ça, on est obligé d'appuyer dessus,
   // regarder la fiche ». L'état du lien et LA proposition de chaque annonce d'un autre site sont LUS (src/liaisonEtat.js, calculés
   // par les règles du parcours) ; SON toucher passe par `relierDepuisListe` (la proposition relue, le geste du parcours).
@@ -583,7 +625,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   };
   return (
     <>
-    <VueAnnonces parMail={modele && Array.isArray(modele.articles) ? modele.articles.filter((a) => a && a.venteMail) : null} priorite={priorite} photoDouble={photoDouble} plusVueDe={plusVueDe} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={logoDuSite} dortDe={dortDe} Photo={(src, o) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>}
+    <VueAnnonces dorment={entreeDorment ? { entree: entreeDorment } : null} parMail={modele && Array.isArray(modele.articles) ? modele.articles.filter((a) => a && a.venteMail) : null} priorite={priorite} photoDouble={photoDouble} plusVueDe={plusVueDe} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={logoDuSite} dortDe={dortDe} Photo={(src, o) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>}
       onCompleter={(sujet) => { try { window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet, num: '', lot: false, at: Date.now() } })); } catch (_) {} }} liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} fp={{ options: optionsTelP, valeur: effP, onChange: choisirP }} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
@@ -598,6 +640,10 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
       onFiche={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(a.numero) })); } catch (_) {} } }}
       onEcranSite={onEcranSite} limites={limites} manque={manque}
       euros={(n) => fmt(n)} depuisTexte={(ms) => tr('egalite.jours', { n: Math.max(0, Math.floor((Date.now() - ms) / JOUR)) })} nomSite={nomSite} Icon={Icon}/>
+    <FeuillePairesDorment ouverte={planOuvert} onFermer={() => setPlanOuvert(false)} plan={plan} juger={jugerPlan} euros={(n) => fmt(n)} texteRaison={texteRaison}
+      Photo={(src, o) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>}
+      onRepublier={republierPlan} onBaisser={baisserPlan} onFavoris={favorisPlan} onAchat={(l) => { setPlanOuvert(false); setSaisiePlan({ article: l.article, champ: 'buyPrice' }); }}/>
+    <FeuilleFait cible={saisiePlan} euros={(n) => fmt(n)} onFait={onFait} onFermer={() => { setSaisiePlan(null); setPlanOuvert(true); }}/>
     {agent ? <React.Suspense fallback={null}><PublierAgent ouverte articles={agent} onRetour={() => setAgent(null)}/></React.Suspense> : null}
     </>
   );
