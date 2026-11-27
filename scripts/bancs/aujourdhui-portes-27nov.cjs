@@ -10,7 +10,7 @@ require('./_porte-banc.cjs');
 //                        le geste dessous, « Pourquoi ? » replié, « Compris » ≥ 44 px la range ; rechargée : toujours rangée ; le
 //                        compte relu puis vieux de 6 jours (autre lecture) : elle revient (§2.10 — jamais une carte récurrente) ;
 //   4  ORDINATEUR ÉTEINT — « Ordinateur éteint · 07:37 » : UNE phrase visible de 8 mots au plus, « Pourquoi ? » replié qui dit ce
-//                        qui ne marche pas (À distance, lecture de Vinted) et quoi faire (Chrome avec l'extension).
+//                        qui ne marche pas (À distance, lecture de Vinted) et quoi faire (le navigateur où est l'extension).
 //  Jugé sur les data-* et les nombres rendus. 390 tactile et 1512, clair et sombre. `SHOTS=dossier` (captures à regarder),
 //  `BANC_DIST` (l'AVANT : rouge attendu).
 // ════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -75,8 +75,8 @@ const RELEVE = () => {
       dit(r.lecture && r.lecture.sous.length > 0 && r.lecture.pourquoi && r.lecture.hCompris >= 44, `${nom} : 3 le geste dessous, « Pourquoi ? » replié, « Compris » ≥ 44 px`, r.lecture);
       // 4. Ordinateur éteint.
       dit(r.ordi && r.ordi.sousVu && r.ordi.motsSous > 0 && r.ordi.motsSous <= 8, `${nom} : 4 « ${r.ordi && r.ordi.titre} » : UNE phrase visible de 8 mots au plus`, r.ordi);
-      dit(r.ordi && r.ordi.pourquoi && r.ordi.ferme && /Vinted/.test(r.ordi.manque) && /À distance/.test(r.ordi.manque) && /Chrome/.test(r.ordi.geste) && r.ordi.hSummary >= 44,
-        `${nom} : 4 « Pourquoi ? » replié dit ce qui ne marche pas (À distance, Vinted) et quoi faire (Chrome)`, r.ordi);
+      dit(r.ordi && r.ordi.pourquoi && r.ordi.ferme && /Vinted/.test(r.ordi.manque) && /À distance/.test(r.ordi.manque) && /extension VRM/.test(r.ordi.geste) && r.ordi.hSummary >= 44,
+        `${nom} : 4 « Pourquoi ? » replié dit ce qui ne marche pas (À distance, Vinted) et quoi faire (le navigateur de l'extension)`, r.ordi);
       await pg.screenshot({ path: path.join(SHOTS, `portes-${nom}.png`), fullPage: false }).catch(() => {});
       for (const [sel, q] of [['[data-lecture-ancienne]', 'lecture'], ['[data-pil-prix-manquants]', 'prix']]) {
         const el = await pg.$(sel); if (!el) continue;

@@ -5468,10 +5468,11 @@ const fusionLignesMemeSuivi = (m, s) => {
   // (`conv`, une identité) que seule la moitié Vinted porte était perdue à la réunion (`...m` garde la ligne du transporteur) :
   // la ligne réunie ne trouvait plus son achat. Elle la garde — une seule conversation, jamais deux (désaccord ⇒ aucune).
   const convs = [...new Set([m.conv, s.conv].map((v) => String(v || '').trim()).filter(Boolean))];
-  return { ...m, lieu: lieuF || null, codesLus, conv: convs.length === 1 ? convs[0] : '',
+  return { ...m, lieu: lieuF || null, codesLus,
     code: src.code || null, code2: src.code2 || (memeCode ? autre.code2 : null) || null,
     qrB64: qrSrc.qrB64 || null, qrType: qrSrc.qrType || null, qrUrl: qrSrc.qrUrl || null, consigne: !!(m.consigne || s.consigne),
-    limite: p.limite || q.limite || null, limiteAt: p.limiteAt || q.limiteAt || null, ...(clesMoities.length > 1 ? { clesMoities } : {}) };
+    limite: p.limite || q.limite || null, limiteAt: p.limiteAt || q.limiteAt || null, ...(clesMoities.length > 1 ? { clesMoities } : {}),
+    conv: convs.length === 1 ? convs[0] : '' };
 };
 // ⟦← App.jsx #244⟧
 // DOSSIER de la photo, sans le nom de fichier. Quand une annonce est republiée

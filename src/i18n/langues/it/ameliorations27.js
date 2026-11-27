@@ -8,8 +8,8 @@ export default {
     "one": "{site} non letto da {n} giorno",
     "other": "{site} non letto da {n} giorni"
   },
-  "lectAnc.geste": "Aprilo nel Chrome dell’estensione",
-  "lectAnc.pourquoi": "L’account {nom} su {site} non è stato riletto dal {date}. Vendite, annunci e messaggi possono essere vecchi; gli annunci online sono «da confermare». Apri {site} con questo account, nel Chrome dove è installata l’estensione VRM: lo rilegge da sola.",
+  "lectAnc.geste": "Aprilo nel browser dell’estensione",
+  "lectAnc.pourquoi": "L’account {nom} su {site} non è stato riletto dal {date}. Vendite, annunci e messaggi possono essere vecchi; gli annunci online sono «da confermare». Apri {site} con questo account, nel browser dove si trova l’estensione VRM: lo rilegge da sola.",
   "lectAnc.autre": {
     "one": "{site} · {nom} ({n} giorno)",
     "other": "{site} · {nom} ({n} giorni)"
@@ -18,5 +18,5 @@ export default {
   "lectAnc.compris": "Capito",
   "adist.jour.eteintSous": "Niente parte finché è spento",
   "adist.jour.pqManque": "Nel frattempo, le azioni «A distanza» (messaggi, offerte, prezzi, etichette) aspettano il tuo computer al massimo 24 h, e Vinted non viene più letto: vendite, offerte e messaggi arrivano in VRM in ritardo.",
-  "adist.jour.pqGeste": "Accendi il computer e apri Chrome con l’estensione VRM, connesso a Vinted: tutto riparte da solo."
+  "adist.jour.pqGeste": "Accendi il computer e apri il browser dove si trova l’estensione VRM, connesso a Vinted: tutto riparte da solo."
 };
