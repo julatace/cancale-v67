@@ -15,7 +15,7 @@
 //   · lireChoixPlateforme(ecran) / ecrireChoixPlateforme(ecran, choix) : le choix de CET appareil, par écran, dans UNE clé
 //     nommée (`vrm_filtre_plateformes`, jamais synchronisée : elle ne touche à aucune donnée).
 // Gardien : scripts/bancs/filtre-plateformes.cjs (rendu) et scripts/audit-filtre-plateformes.cjs (la règle).
-import { IDS_PLATEFORMES } from './plateformes.js';
+import { IDS_PLATEFORMES, nomPlateforme } from './plateformes.js';
 import { lireLocal, ecrireLocal, lireJSON } from './stockageSur.js';
 
 export const TOUTES = 'toutes';
@@ -71,22 +71,47 @@ export function ecrireChoixPlateforme(ecran, choix) {
 // les deux : une vente appartient au compte que SA lecture a posé sur sa ligne (`x.compte`, le compte sous lequel la vente
 // a été lue — jamais son titre, jamais une ressemblance, §5). Un compte exclu n'a aucune ligne (l'écran l'écarte avant,
 // `compteEcarte`) : il n'apparaît donc jamais ici.
-//   · comptesDeLignes(lignes) : les comptes présents, triés (fr) ; une ligne sans compte n'en ajoute aucun ;
+//   · comptesDeLignes(lignes) : les comptes présents [{ cle, libelle }] PAR IDENTITÉ (`cleCompteLigne`), triés (fr) ;
 //   · choixCompteEffectif(choix, comptes) : le choix retenu s'il est encore présent, sinon '' (« Tous les comptes ») ;
-//   · filtrerCompte(lignes, compte) : les lignes de CE compte ('' ⇒ toutes).
+//   · filtrerCompte(lignes, cle) : les lignes de CE compte ('' ⇒ toutes).
 // Le choix est retenu comme celui du site (la même clé `vrm_filtre_plateformes`, jamais synchronisée), mais PAR VENDEUR
 // (l'identifiant de sa session VRM) : un autre vendeur sur le même appareil repart de « Tous les comptes ».
 export const COMPTE_TOUS = '';
+// (27 nov., chasse aux bugs) UN COMPTE = SON IDENTITÉ, JAMAIS SON NOM. Le nom d'un compte Leboncoin est son nom AFFICHÉ
+// (`accountName`, souvent un prénom : deux comptes « Julien »), et un vendeur garde souvent le même pseudo sur Vinted et sur
+// eBay. Filtrer par le nom réunissait deux comptes en un choix (« Julien » montrait les ventes des DEUX comptes) — §5 : jamais
+// par ressemblance. La clé d'un compte est `x.compteCle` (posée par SA lecture : le site et l'identifiant du compte,
+// `vinted:{uid}`, `leboncoin:{id}`, `ebay:{réf}`) ; sans identifiant lu, le site et le nom (deux sites ne se mêlent jamais).
+// Le libellé est le nom ; un nom porté par plusieurs comptes dit son site, puis la fin de son identifiant (« Julien · Leboncoin · …4821 »).
+export const cleCompteLigne = (x) => {
+  // Une ligne sans NOM de compte lu n'entre dans aucun choix (comme avant) : on ne montre jamais un identifiant brut.
+  if (!x || typeof x !== 'object' || typeof x.compte !== 'string' || !x.compte) return '';
+  if (typeof x.compteCle === 'string' && x.compteCle) return x.compteCle;
+  return `${typeof x.site === 'string' ? x.site : ''}:nom:${x.compte}`;
+};
+// Rend [{ cle, libelle, nom, site }] triés par libellé (fr) ; une ligne sans compte n'en ajoute aucun.
 export function comptesDeLignes(lignes) {
-  return [...new Set((Array.isArray(lignes) ? lignes : []).map((x) => (x && typeof x.compte === 'string' ? x.compte : '')).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, 'fr'));
+  const par = new Map();
+  for (const x of Array.isArray(lignes) ? lignes : []) {
+    const cle = cleCompteLigne(x);
+    if (!cle || par.has(cle)) continue;
+    par.set(cle, { cle, nom: x.compte, site: typeof x.site === 'string' ? x.site : '' });
+  }
+  const C = [...par.values()];
+  const bas = (t) => t.toLocaleLowerCase('fr');
+  const compter = (f) => { const m = new Map(); for (const c of C) m.set(bas(f(c)), (m.get(bas(f(c))) || 0) + 1); return m; };
+  const parNom = compter((c) => c.nom);
+  for (const c of C) c.libelle = parNom.get(bas(c.nom)) > 1 ? `${c.nom} · ${nomPlateforme(c.site) || c.site}` : c.nom;
+  const parLib = compter((c) => c.libelle);
+  for (const c of C) if (parLib.get(bas(c.libelle)) > 1) { const id = c.cle.replace(/^[^:]*:(nom:)?/, ''); c.libelle = `${c.libelle} · …${id.slice(-4)}`; }
+  return C.sort((a, b) => a.libelle.localeCompare(b.libelle, 'fr') || a.cle.localeCompare(b.cle));
 }
 export function choixCompteEffectif(choix, comptes) {
-  return typeof choix === 'string' && choix && Array.isArray(comptes) && comptes.includes(choix) ? choix : COMPTE_TOUS;
+  return typeof choix === 'string' && choix && Array.isArray(comptes) && comptes.some((c) => c && c.cle === choix) ? choix : COMPTE_TOUS;
 }
 export function filtrerCompte(lignes, compte) {
   if (!Array.isArray(lignes) || !compte) return lignes;
-  return lignes.filter((x) => x && x.compte === compte);
+  return lignes.filter((x) => x && cleCompteLigne(x) === compte);
 }
 const cleCompte = (ecran) => 'compte:' + ecran;
 export function lireChoixCompte(ecran, vendeur) {

@@ -96,27 +96,27 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
             await pg.locator('[data-tt-filtre="compte"]:visible').first().click();
             await pg.waitForSelector('[data-tt-feuille="filtre:compte"] [data-tt-filtre-choix]', { timeout: 8000 }).catch(() => {});
             const opts = await pg.evaluate(() => [...document.querySelectorAll('[data-tt-feuille="filtre:compte"] [data-tt-filtre-choix]')].filter((x) => x.getClientRects().length).map((x) => { const r = x.getBoundingClientRect(); return { c: x.getAttribute('data-tt-filtre-choix'), h: Math.round(r.height) }; }));
-            dit(opts.map((o) => o.c).join(',') === 'compte:tous,compte:vendeuse_a,compte:vendeuse_b' && opts.every((o) => o.h >= 44), `A ${tag} : la feuille propose « Tous les comptes » puis chaque compte (44 px)`, JSON.stringify(opts));
+            dit(opts.map((o) => o.c).join(',') === 'compte:tous,compte:vinted:111,compte:vinted:222' && opts.every((o) => o.h >= 44), `A ${tag} : la feuille propose « Tous les comptes » puis chaque compte (44 px)`, JSON.stringify(opts));
             await capture(pg, `A-${tag}-feuille`);
-            await pg.locator('[data-tt-filtre-choix="compte:vendeuse_b"]:visible').first().click();
+            await pg.locator('[data-tt-filtre-choix="compte:vinted:222"]:visible').first().click();
             await attendre(600);
-          } else await choisirC('vendeuse_b');
+          } else await choisirC('vinted:222');
           const r1 = await rangees();
           dit(JSON.stringify(r1.map((x) => x.id).sort()) === JSON.stringify(tx222), `A ${tag} : le filtre « Compte » = vendeuse_b montre SES ventes et elles seules (par n° de transaction)`, JSON.stringify(r1));
-          dit(((await filtreC()) || {}).v === 'vendeuse_b', `A ${tag} : le filtre dit le compte choisi`);
+          dit(((await filtreC()) || {}).v === 'vinted:222', `A ${tag} : le filtre dit le compte choisi`);
           await capture(pg, `A-${tag}-choisi`);
           if (tel) {
             // Retenu PAR VENDEUR sur l'appareil, comme le choix du site (`vrm_filtre_plateformes`) : relu au retour.
             const memo = await pg.evaluate(() => { try { return { v: JSON.parse(localStorage.getItem('vrm_filtre_plateformes') || '{}')['compte:ventes'], uid: localStorage.getItem('vrm_local_owner') }; } catch (_) { return null; } });
-            dit(!!memo && memo.v && memo.v.compte === 'vendeuse_b' && memo.v.vendeur === memo.uid, `A ${tag} : le choix est retenu pour CE vendeur`, JSON.stringify(memo));
+            dit(!!memo && memo.v && memo.v.compte === 'vinted:222' && memo.v.vendeur === memo.uid, `A ${tag} : le choix est retenu pour CE vendeur`, JSON.stringify(memo));
             const recharger = async () => { await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.locator('[data-colis-onglet-choix="toutes"]').first().click({ timeout: 15000 }); await pg.waitForSelector('[data-toutes-vente]', { timeout: 15000 }).catch(() => {}); await attendre(900); };
             await recharger();
-            dit(JSON.stringify((await rangees()).map((x) => x.id).sort()) === JSON.stringify(tx222) && ((await filtreC()) || {}).v === 'vendeuse_b', `A ${tag} : relu au retour sur l'écran (même vendeur)`);
+            dit(JSON.stringify((await rangees()).map((x) => x.id).sort()) === JSON.stringify(tx222) && ((await filtreC()) || {}).v === 'vinted:222', `A ${tag} : relu au retour sur l'écran (même vendeur)`);
             // Un AUTRE vendeur sur le même appareil : son choix ne vaut pas pour lui ⇒ « Tous les comptes ».
             await pg.evaluate(() => { const o = JSON.parse(localStorage.getItem('vrm_filtre_plateformes') || '{}'); o['compte:ventes'] = { ...o['compte:ventes'], vendeur: 'un-autre-vendeur' }; localStorage.setItem('vrm_filtre_plateformes', JSON.stringify(o)); });
             await recharger();
             dit((await rangees()).length === ids0.length && ((await filtreC()) || {}).v === 'tous', `A ${tag} : le choix d'un autre vendeur ne s'applique pas`);
-            await pg.evaluate(() => { const o = JSON.parse(localStorage.getItem('vrm_filtre_plateformes') || '{}'); o['compte:ventes'] = { vendeur: localStorage.getItem('vrm_local_owner'), compte: 'vendeuse_b' }; localStorage.setItem('vrm_filtre_plateformes', JSON.stringify(o)); });
+            await pg.evaluate(() => { const o = JSON.parse(localStorage.getItem('vrm_filtre_plateformes') || '{}'); o['compte:ventes'] = { vendeur: localStorage.getItem('vrm_local_owner'), compte: 'vinted:222' }; localStorage.setItem('vrm_filtre_plateformes', JSON.stringify(o)); });
             await recharger();
           }
           await choisirC('tous');
@@ -124,7 +124,7 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
         }
         if (!tel) {
           // L'ordinateur ne change pas : le choix retenu au téléphone ne s'y applique pas (son tableau garde SON filtre).
-          await pg.evaluate(() => { const o = JSON.parse(localStorage.getItem('vrm_filtre_plateformes') || '{}'); o['compte:ventes'] = { vendeur: localStorage.getItem('vrm_local_owner'), compte: 'vendeuse_b' }; localStorage.setItem('vrm_filtre_plateformes', JSON.stringify(o)); });
+          await pg.evaluate(() => { const o = JSON.parse(localStorage.getItem('vrm_filtre_plateformes') || '{}'); o['compte:ventes'] = { vendeur: localStorage.getItem('vrm_local_owner'), compte: 'vinted:222' }; localStorage.setItem('vrm_filtre_plateformes', JSON.stringify(o)); });
           await pg.reload({ waitUntil: 'domcontentloaded' });
           await pg.locator('[data-colis-onglet-choix="toutes"]').first().click({ timeout: 15000 });
           await pg.waitForSelector('[data-toutes-vente]', { timeout: 15000 }).catch(() => {}); await attendre(900);
@@ -137,9 +137,28 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
           const o1 = await NV.ouvrir(nav, { W, sombre, base: b1, tab: 'ventes' });
           await o1.pg.locator('[data-colis-onglet-choix="toutes"]').first().click({ timeout: 15000 });
           await o1.pg.waitForSelector('[data-toutes-vente]', { timeout: 15000 }).catch(() => {}); await attendre(900);
-          const r = await o1.pg.evaluate(() => ({ comptes: [...new Set([...document.querySelectorAll('[data-toutes-vente]')].filter((x) => x.getClientRects().length).map((x) => x.getAttribute('data-toutes-compte')))], choix: document.querySelectorAll('[data-tt-filtre-choix="compte:vendeuse_b"]').length, filtre: document.querySelectorAll('[data-tt-filtre="compte"]').length }));
+          const r = await o1.pg.evaluate(() => ({ comptes: [...new Set([...document.querySelectorAll('[data-toutes-vente]')].filter((x) => x.getClientRects().length).map((x) => x.getAttribute('data-toutes-compte')))], choix: document.querySelectorAll('[data-tt-filtre-choix="compte:vinted:222"]').length, filtre: document.querySelectorAll('[data-tt-filtre="compte"]').length }));
           dit(r.comptes.join(',') === 'vendeuse_a' && r.choix === 0 && r.filtre === 0, `A ${tag} : un compte exclu n'apparaît jamais (ni ses ventes, ni un choix « Compte »)`, JSON.stringify(r));
           await o1.ctx.close();
+        }
+        // (27 nov., chasse aux bugs) DEUX COMPTES AU MÊME NOM (son étiquette « Julien » posée sur les deux, comme deux comptes
+        // Leboncoin au même prénom affiché) : deux choix, chacun SES ventes — par identité (uid), jamais par le nom.
+        {
+          const b2 = base(); const m2 = b2.lignes.find((l) => l.id === 'main'); m2.data.vinted_account_labels = { 111: 'Julien', 222: 'Julien' };
+          const o2 = await NV.ouvrir(nav, { W, sombre, base: b2, tab: 'ventes' });
+          await o2.pg.locator('[data-colis-onglet-choix="toutes"]').first().click({ timeout: 15000 });
+          await o2.pg.waitForSelector('[data-toutes-vente]', { timeout: 15000 }).catch(() => {}); await attendre(900);
+          await o2.pg.locator('[data-tt-filtre="compte"]:visible').first().click({ timeout: 8000 }).catch(() => {});
+          await o2.pg.waitForSelector('[data-tt-filtre-choix="compte:vinted:222"]', { timeout: 8000 }).catch(() => {});
+          const opts = await o2.pg.evaluate(() => [...document.querySelectorAll('[data-tt-filtre-choix^="compte:"]')].filter((x) => x.getClientRects().length).map((x) => ({ c: x.getAttribute('data-tt-filtre-choix'), t: (x.innerText || '').split('\n')[0].trim() })));
+          const libs = opts.filter((o) => o.c !== 'compte:tous').map((o) => o.t);
+          dit(opts.map((o) => o.c).join(',') === 'compte:tous,compte:vinted:111,compte:vinted:222' && new Set(libs).size === 2, `A ${tag} : deux comptes au même nom = deux choix, deux libellés`, JSON.stringify(opts));
+          await capture(o2.pg, `A-${tag}-meme-nom`);
+          await o2.pg.locator('[data-tt-filtre-choix="compte:vinted:222"]:visible').first().click({ timeout: 8000 }).catch(() => {});
+          await attendre(700);
+          const r2 = await o2.pg.evaluate(() => [...document.querySelectorAll('[data-toutes-vente="vinted"]')].filter((r) => r.getClientRects().length).map((r) => r.getAttribute('data-toutes-id')).sort());
+          dit(JSON.stringify(r2) === JSON.stringify(tx222), `A ${tag} : le 2e « Julien » montre SES ventes et elles seules (jamais celles de l'autre)`, JSON.stringify({ vu: r2, attendu: tx222 }));
+          await o2.ctx.close();
         }
       }
       // ── B. Cacher les montants ─────────────────────────────────────────────

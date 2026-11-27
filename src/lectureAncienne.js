@@ -20,6 +20,10 @@ export function lecturesAnciennes(f, maintenant) {
   const parCompte = new Map();
   for (const r of f.retards) {
     if (!r || (r.source !== 'compte' && r.source !== 'panne') || !r.plateforme || r.id == null || r.id === '') continue;
+    // (27 nov., chasse aux bugs) Seule la lecture DU COMPTE dit « pas lu depuis N jours ». La ligne de fraîcheur range aussi
+    // sous `source: 'compte'` les ACHATS d'un compte frais (`achats:vinted:{id}`, « achats pas relus depuis 3 j », daté de la
+    // lecture de SES ACHATS) : elle disait « Vinted pas lu depuis 3 jours » d'un compte relu il y a une heure.
+    if (r.source === 'compte' && !String(r.cle || '').startsWith('compte:')) continue;
     const d = Number(r.depuisMs);
     if (!Number.isFinite(d) || d <= 0 || d > maintenant) continue;   // « jamais relu » (0) n'est pas « pas relu depuis »
     const jours = Math.floor((maintenant - d) / JOUR_MS);
