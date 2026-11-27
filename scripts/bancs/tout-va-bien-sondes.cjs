@@ -50,7 +50,7 @@ async function partieA(fichier, fr, sortie = dit) {
   // A3
   const ap = (ilYa) => [{ nom: 'Chrome · Mac', at: T0 - ilYa, flux: { vinted: { okAt: T0 - ilYa } } }];
   const c0 = garde(S.sondeCapture(null, { maintenant: T0, quand: q })), c1 = garde(S.sondeCapture(ap(6 * MIN), { maintenant: T0, quand: q })), c2 = garde(S.sondeCapture(ap(30 * H), { maintenant: T0, quand: q }));
-  sortie(c0.etat === 'passu' && c0.valeur === '—' && c1.etat === 'ok' && c2.etat === 'geste' && c2.geste && /vinted\.fr/.test(c2.geste.lien) && garde(S.sondeCapture([], { maintenant: T0 })).etat === 'neutre',
+  sortie(c0.etat === 'passu' && c0.valeur === '—' && c1.etat === 'ok' && c2.etat === 'geste' && c2.geste && c2.geste.type === 'compte' && c2.geste.plateforme === 'vinted' && garde(S.sondeCapture([], { maintenant: T0 })).etat === 'neutre',
     'A3 capture : appareils pas lus ⇒ « — » ; 6 min ⇒ vert ; 30 h ⇒ « Ouvrir Vinted » ; aucune ⇒ neutre', `${c0.etat}/${c1.etat}/${c2.etat}`);
   // A4
   const carte = (o) => ({ active: false, attente: 0, incertains: 0, encours: 0, raison: '', ...o });

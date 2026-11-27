@@ -20,7 +20,6 @@
 export const SITES_SONDES = Object.freeze(['vinted', 'leboncoin', 'vestiaire', 'ebay']);
 export const CAPTURE_VIEILLE_MS = 24 * 3600e3;   // la même borne que « à relire » (src/comptesLies.js A_RELIRE_MS)
 const NOMS_SITE = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire Collective', ebay: 'eBay' };
-const LIEN_SITE = { vinted: 'https://www.vinted.fr', leboncoin: 'https://www.leboncoin.fr/compte/part/mes-annonces', vestiaire: 'https://www.vestiairecollective.com/' };
 const ts = (v) => { const n = typeof v === 'number' ? v : Date.parse(String(v || '')); return Number.isFinite(n) && n > 0 ? n : null; };
 const L = (k, v = {}) => ({ k, v });
 const PASSU = '—';
@@ -103,7 +102,7 @@ export function sondeCapture(appareils, { quand = String, maintenant = Date.now(
   if (!best) return { ...base, etat: 'neutre', sous: L('tvb.s.capture.aucune'), valeur: null, pourquoi: [L('tvb.s.capture.aucune.p')] };
   const p = [L('tvb.s.capture.p', { quand: quand(best.at), ou: best.ou })];
   if (maintenant - best.at > CAPTURE_VIEILLE_MS) return { ...base, etat: 'geste', sous: L('tvb.s.capture.vieille'), valeur: L('tvb.g.ouvrir', { site: 'Vinted' }),
-    pourquoi: [...p, L('tvb.s.capture.vieille.p')], geste: { type: 'lien', lien: LIEN_SITE.vinted } };
+    pourquoi: [...p, L('tvb.s.capture.vieille.p')], geste: { type: 'compte', plateforme: 'vinted' } };   // le lien du site : LIENS_SITE_TVB (src/ToutVaBien.jsx)
   return { ...base, etat: 'ok', sous: L('tvb.s.capture.ok', { quand: quand(best.at) }), valeur: null, pourquoi: p };
 }
 
