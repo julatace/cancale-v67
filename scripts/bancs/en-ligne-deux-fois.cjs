@@ -13,6 +13,12 @@
 //      ambre, et PAS le rouge « deux paires sous un N° » (c'est une paire, la carte suffit) ;
 //   E. le même N°12 sur deux photos différentes (peut-être deux paires) : le ROUGE, pas d'ambre ;
 //   F. comme D, le second compte lu il y a 30 h : l'ambre se tait ⇒ le ROUGE reste (jamais muets).
+//   (16 nov., lot doublons-meme-compte — mission 10)
+//   G. deux annonces du MÊME compte, la même photo à l'EMPREINTE (fichiers différents) ⇒ la carte
+//      « peut-être la même paire · à vérifier », « Voir les deux » ; dans Annonces, la marque « En double »
+//      sur les DEUX lignes ;
+//   H. comme A, mais l'atelier Republier de cet appareil est EN COURS sur l'une ⇒ aucune carte ;
+//   I. le même N°12 sur deux photos différentes du MÊME compte ⇒ le ROUGE seul (pas de seconde alerte).
 // `BANC_DIST=<dist>` : rendre un autre build (l'arbre d'avant, une mutation).
 // Lancer :
 //   npm run build && NODE_OPTIONS="--require $PWD/scripts/bancs/_porte-banc.cjs" BANC_PORT=9651 node scripts/bancs/en-ligne-deux-fois.cjs
@@ -67,6 +73,15 @@ SCENARIOS.D = { listings: SCENARIOS.X.listings, fiches: { ...SCENARIOS.X.fiches,
 SCENARIOS.E = { listings: SCENARIOS.X.listings, fiches: { ...SCENARIOS.X.fiches, 6000002: { ...SCENARIOS.X.fiches[6000002], numero: '12' } } };
 // F : D, le second compte lu il y a 30 h.
 SCENARIOS.F = { listings: SCENARIOS.C.listings, fiches: SCENARIOS.D.fiches };
+// (16 nov.) G : compte-alpha, 5000001 et 5000003 ont la même EMPREINTE (fichiers différents) ; les autres, aucune.
+const EMP = 'a3f1c07e9b2d4f6801c3e5a7b9d1f3e5'.repeat(3);
+// (Le second compte n'y garde que son Asics : aucune autre paire en double, sur aucun compte.)
+const SEUL_A = { [A]: SCENARIOS.X.listings[A], [B]: { cap: iso(2), items: [SCENARIOS.X.listings[B].items[1]] } };
+SCENARIOS.G = { listings: SEUL_A, fiches: SCENARIOS.X.fiches, empreintes: { [A]: { 5000001: { 'p/1': EMP }, 5000003: { 'p/3': EMP } } } };
+// H : A, et l'atelier Republier de CET appareil en cours sur 6000001 (`vrm_operation_repub`).
+SCENARIOS.H = { ...SCENARIOS.A, local: { vrm_operation_repub: JSON.stringify({ v: 1, action: 'recreer', debut: maintenant.toISOString(), majAt: maintenant.toISOString(), fini: false, paires: [{ id: 6000001, titre: 'Air Max 90 blanche', num: '40', etat: 'encours' }] }) } };
+// I : le N°12 sur deux photos différentes du MÊME compte (5000001 et 5000002).
+SCENARIOS.I = { listings: SEUL_A, fiches: { ...SCENARIOS.X.fiches, 5000002: { ...SCENARIOS.X.fiches[5000002], numero: '12' } } };
 
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d && !c ? ' — ' + d : '')); };
@@ -97,16 +112,17 @@ const projette = (row, sel) => {
   return out;
 };
 
-const ouvrir = async (b, vp, sc) => {
+const ouvrir = async (b, vp, sc, tab = 'journee') => {
   const tel = vp.width < 600;
   const ctx = await b.newContext({ viewport: vp, deviceScaleFactor: tel ? 2 : 1, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = [], ecritures = [];
   pg.on('pageerror', (e) => errs.push(e.message));
   await pg.clock.install({ time: maintenant });
-  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_prenom', JSON.stringify('Julien')); } catch (_) {} });
+  await pg.addInitScript((local) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_prenom', JSON.stringify('Julien')); for (const [k, v] of Object.entries(local || {})) localStorage.setItem(k, v); } catch (_) {} }, sc.local || {});
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : /api-adresse|openfreemap/.test(r.request().url()) ? r.abort() : r.continue()));
   const LIGNES = Object.entries(sc.listings).map(([uid, l]) => ({ id: `harvest_${uid}_listings`, data: { capturedAt: l.cap, uid, payload: { items: l.items, pagination: { total_entries: l.items.length } } } }));
+  for (const [uid, an] of Object.entries(sc.empreintes || {})) LIGNES.push({ id: `photo_emprunte_${uid}`, data: { capturedAt: iso(1), payload: { version: 1, annonces: an } } });
   const main = { vinted_annonce_numeros: sc.fiches };
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request();
@@ -124,7 +140,7 @@ const ouvrir = async (b, vp, sc) => {
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-  await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => document.querySelector('.vrm-fu-afaire, [data-tout-a-jour]') || /pas pu s'afficher/.test(document.body.innerText), null, { timeout: 25000 }).catch(() => {});
   // La lecture des annonces arrive après les cases du jour : on attend qu'elle ait rendu.
   await pg.waitForFunction(() => document.querySelector('[data-en-ligne-deux-fois]'), null, { timeout: 8000 }).catch(() => {});
@@ -154,14 +170,17 @@ const ouvrir = async (b, vp, sc) => {
             couleurNote: n && getComputedStyle(n).color, couleurTitre: t && getComputedStyle(t).color, warn: racine.getPropertyValue('--vrm-warn').trim(),
             gestes: (document.querySelector('[data-fu-gestes]') || {}).getAttribute ? document.querySelector('[data-fu-gestes]').getAttribute('data-fu-gestes') : null,
             nCartes: document.querySelectorAll('.vrm-day-task-list > .vrm-day-task, .vrm-day-task-list [data-job], .vrm-day-task-list [data-tuile]').length,
-            visible: box.width > 2 && box.height > 2, deborde: document.documentElement.scrollWidth > window.innerWidth + 1, h: Math.round(box.height) };
+            geste: (c.querySelector('.vrm-day-task-action-mot') || {}).textContent || '', visible: box.width > 2 && box.height > 2, deborde: document.documentElement.scrollWidth > window.innerWidth + 1, h: Math.round(box.height) };
         });
         dit(r.carte, 'même photo exacte deux fois sur UN compte : la carte « en ligne deux fois » est dans « À faire »', r.texte);
         if (r.carte) {
           dit(r.n === '1' && r.ids === '5000001+6000001', 'une paire, ses deux annonces (5000001 + 6000001)', `${r.n} ${r.ids}`);
-          dit(r.titre === 'N°12 en ligne deux fois', 'le titre : « N°12 en ligne deux fois »', r.titre);
-          dit(r.note === 'Même compte · supprimes-en une', 'la ligne : le même compte et le geste', r.note);
-          dit(/N°12 et N°40/.test(r.complet || '') && /deux annonces sur compte-alpha/.test(r.complet || ''), 'l’infobulle nomme les deux N° et le compte', r.complet);
+          // (16 nov., lot doublons-meme-compte) Le même compte : « N°12 · 2 annonces, 1 paire » / « Même compte · retire
+          // celle en trop » ; l'infobulle porte la phrase « 2 annonces de compte-alpha sont la même paire (N°12) » ET les deux N°.
+          dit(r.titre === 'N°12 · 2 annonces, 1 paire', 'le titre : « N°12 · 2 annonces, 1 paire »', r.titre);
+          dit(r.note === 'Même compte · retire celle en trop', 'la ligne : le même compte et le geste', r.note);
+          dit(/^2 annonces de compte-alpha sont la même paire \(N°12\)/.test(r.complet || '') && /N°12 et N°40/.test(r.complet || '') && /deux annonces sur compte-alpha/.test(r.complet || ''), 'l’infobulle : la phrase, les deux N° et le compte', r.complet);
+          dit(r.geste === 'Voir les deux', 'le geste : « Voir les deux »', r.geste);
           // (16 nov., intégration vague C) À l'ordinateur, la carte vit dans la colonne « À faire » de Ma journée
           // (refonte-journee, ≈ 340 px) où CHAQUE rangée garde sa ligne d'une ligne, coupée au besoin (« 4 annonces
           // numérotées… Saisis le prix ou relie l'achat (une… ») : là, la ligne peut être coupée SI l'infobulle porte la
@@ -240,6 +259,48 @@ const ouvrir = async (b, vp, sc) => {
         await pg.waitForTimeout(800);
         const r = await lireDR(pg);
         dit(r.rendu && !r.ambre && r.rouge, 'F comme D, un compte lu il y a 30 h : l’ambre se tait, le ROUGE reste (jamais les deux muets)', JSON.stringify(r));
+        dit(errs.length === 0, 'aucune erreur JS', errs.slice(0, 2).join(' | '));
+        await ctx.close();
+      });
+      await essaie(`G ${nomVp}`, async () => {
+        const { ctx, pg, errs } = await ouvrir(b, vp, SCENARIOS.G);
+        await pg.waitForFunction(() => document.querySelector('[data-doublons-compte]'), null, { timeout: 8000 }).catch(() => {});
+        if (CAPT) await pg.screenshot({ path: path.join(CAPT, `deux-fois-G-${nomVp}.png`) });
+        const r = await pg.evaluate(() => { const c = document.querySelector('[data-en-ligne-deux-fois]'); return c ? { d: c.getAttribute('data-doublons-compte'), titre: (c.querySelector('.vrm-day-task-title') || {}).textContent, note: (c.querySelector('.vrm-day-task-note') || {}).textContent, geste: (c.querySelector('.vrm-day-task-action-mot') || {}).textContent, complet: c.getAttribute('title') } : null; });
+        dit(r && r.d === 'verifier:5000001+5000003', 'G même EMPREINTE sur deux annonces du même compte : la carte, « à vérifier », ces deux annonces', JSON.stringify(r));
+        dit(r && r.titre === 'N°12 · 2 annonces, 1 paire' && r.note === 'Même compte · peut-être · à vérifier' && r.geste === 'Voir les deux' && /peut-être la même paire/.test(r.complet || ''), 'G … dit « peut-être », jamais « sûr » ; « Voir les deux »', JSON.stringify(r));
+        if (r) {
+          await pg.click('[data-en-ligne-deux-fois]').catch(() => {});
+          await pg.waitForSelector('[data-feuille-deux-fois]', { timeout: 5000 }).catch(() => {});
+          await pg.waitForTimeout(500);
+          if (CAPT) await pg.screenshot({ path: path.join(CAPT, `deux-fois-G-${nomVp}-feuille.png`) });
+          const f = await pg.evaluate(() => { const s = document.querySelector('[data-deux-fois-detail]'); return s ? { a: [...s.querySelectorAll('[data-deux-fois-annonce]')].map((e) => e.getAttribute('data-deux-fois-annonce')), preuves: (s.querySelector('[data-preuves]') || { getAttribute: () => '' }).getAttribute('data-preuves'), texte: s.innerText } : null; });
+          dit(f && f.a.join(',') === '5000001,5000003' && f.preuves === 'empreinte' && /presque identique/.test(f.texte), 'G « Voir les deux » : la feuille montre les deux annonces, la preuve « photo presque identique, à vérifier »', JSON.stringify(f && { a: f.a, p: f.preuves }));
+        }
+        dit(errs.length === 0, 'aucune erreur JS', errs.slice(0, 2).join(' | '));
+        await ctx.close();
+        const an = await ouvrir(b, vp, SCENARIOS.G, 'annonces');
+        await an.pg.waitForFunction(() => document.querySelector('[data-carte-annonce="5000001"]'), null, { timeout: 15000 }).catch(() => {});
+        await an.pg.waitForTimeout(1500);
+        if (CAPT) await an.pg.screenshot({ path: path.join(CAPT, `deux-fois-G-${nomVp}-annonces.png`) });
+        const m = await an.pg.evaluate(() => [...document.querySelectorAll('[data-carte-annonce]')].filter((c) => c.querySelector('[data-vignette-en-double]')).map((c) => c.getAttribute('data-carte-annonce')).sort());
+        dit(m.join(',') === '5000001,5000003', 'G Annonces : la marque « En double » sur les DEUX lignes, et seulement elles', m.join(','));
+        dit(an.errs.length === 0, 'aucune erreur JS (Annonces)', an.errs.slice(0, 2).join(' | '));
+        await an.ctx.close();
+      });
+      await essaie(`H ${nomVp}`, async () => {
+        const { ctx, pg, errs } = await ouvrir(b, vp, SCENARIOS.H);
+        await pg.waitForTimeout(800);
+        const r = await pg.evaluate(() => ({ carte: !!document.querySelector('[data-en-ligne-deux-fois]'), rendu: !!document.querySelector('.vrm-fu-afaire, [data-tout-a-jour]') }));
+        dit(r.rendu && !r.carte, 'H comme A, l’atelier Republier en cours sur l’une : aucune carte (une republication n’est pas un doublon)', JSON.stringify(r));
+        dit(errs.length === 0, 'aucune erreur JS', errs.slice(0, 2).join(' | '));
+        await ctx.close();
+      });
+      await essaie(`I ${nomVp}`, async () => {
+        const { ctx, pg, errs } = await ouvrir(b, vp, SCENARIOS.I);
+        await pg.waitForTimeout(800);
+        const r = await lireDR(pg);
+        dit(r.rendu && r.rouge && !r.ambre, 'I même N°12 sur deux photos du MÊME compte : le ROUGE seul, pas de seconde alerte', JSON.stringify(r));
         dit(errs.length === 0, 'aucune erreur JS', errs.slice(0, 2).join(' | '));
         await ctx.close();
       });

@@ -13,7 +13,7 @@ import { motsVendeur } from './profilVendeur.js';
 import { texteCarte, texteEuros, texteDepuis } from './enLigneDeuxFois.js';
 import './en-ligne-deux-fois.css';
 
-const PREUVE = { photo: 'même photo exacte', recree: 'recréée par VRM, l’ancienne pas supprimée', get fusion() { return tr('atelier.fusion.preuve'); } };
+const PREUVE = { photo: 'même photo exacte', recree: 'recréée par VRM, l’ancienne pas supprimée', get fusion() { return tr('atelier.fusion.preuve'); }, get empreinte() { return tr('doublons.preuveEmpreinte'); } };
 const lienVinted = (a) => (/^https:\/\/www\.vinted\.[a-z.]+\//.test(String(a.url || '')) ? a.url : `https://www.vinted.fr/items/${encodeURIComponent(a.id)}`);
 
 export function EnLigneDeuxFoisDetail({ groupes, manque = [], PhotoVinted = null, maintenant = Date.now() }) {

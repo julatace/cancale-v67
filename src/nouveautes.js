@@ -497,6 +497,8 @@ export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot barre-achats — Julien : « ajoute les Achats dans la barre » ; « je ne veux pas qu'on puisse glisser
   // entre les onglets ») docs/passation/2026-11-16-barre-achats.md
   { id: 'barre-achats', date: '2026-11-16', titre: 'Achats a son onglet dans la barre', phrase: 'Et glisser du doigt ne change plus d’onglet.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot doublons-meme-compte) docs/passation/2026-11-16-doublons-meme-compte.md
+  { id: 'doublons-meme-compte', date: '2026-11-16', titre: 'Deux annonces d’un compte, une paire', phrase: 'Même photo sur un compte : dit avant la double vente.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (16 nov., lot ventes-selection) docs/passation/2026-11-16-ventes-selection.md
   { id: 'selection-visible', date: '2026-11-16', titre: 'Sélection : seulement les lignes affichées', phrase: '« Tout sélectionner » prend ce que tu vois, rien de caché.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., stabilite-iphone — « l'app bug un peu » sur iPhone) docs/passation/2026-11-16-stabilite-iphone.md

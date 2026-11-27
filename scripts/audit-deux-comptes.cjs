@@ -31,7 +31,7 @@ const FICHIERS = ['src/deuxComptes.js', 'src/memePhoto.js', 'src/photoFine.js', 
 const MUTATIONS = {
   'pas-unique': ['src/deuxComptes.js', "    if (m.size !== 1) continue;                         // proche de plusieurs annonces : rien\n", ''],
   'pas-mutuel': ['src/deuxComptes.js', "    if (!my || my.size !== 1 || !my.has(x)) continue;   // l'appariement doit être mutuel et unique\n", ''],
-  'meme-compte': ['src/deuxComptes.js', [["    if (compteDe.get(x) === compteDe.get(y)) continue;  // même compte : pas « deux comptes »\n", ''], ["    if (new Set(annonces.map((a) => a.uid)).size < 2) return;   // le risque est entre DEUX comptes\n", '']]],
+  'meme-compte': ['src/deuxComptes.js', [["    if ((compteDe.get(x) === compteDe.get(y)) !== memeCompte) continue;  // même compte : pas « deux comptes » (ou SEULEMENT lui)\n", ''], ["    if (new Set(annonces.map((a) => a.uid)).size < 2) return;   // le risque est entre DEUX comptes\n", '']]],
   'seuil-large': ['src/deuxComptes.js', 'refus = {}, choix = {}, cle = cleDefaut, seuil = SEUIL_MEME_PHOTO } = {}) {', 'refus = {}, choix = {}, cle = cleDefaut, seuil = 16 } = {}) {'],
   'empreinte-sure': ['src/deuxComptes.js', "poser(x.ids, 'verifier', ['empreinte'], null, x.distance);", "poser(x.ids, 'sur', ['empreinte'], null, x.distance);"],
   'refus-ignore': ['src/deuxComptes.js', "    if (g.etat !== 'sur' && R[g.id]) continue;", '    if (false) continue;'],

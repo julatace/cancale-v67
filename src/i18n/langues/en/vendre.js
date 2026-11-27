@@ -62,4 +62,18 @@ export default {
   "vp.loupe.stockSeul": "Stored, no listing",
   "vp.loupe.retourInfo": "Return to send back",
   "vp.loupe.parRangement": "storage",
+  // (16 nov., lot doublons-meme-compte) deux annonces d’un même compte, une paire
+  "doublons.titre": "{n} listings from {compte} are the same pair",
+  "doublons.titreNum": "{n} listings from {compte} are the same pair (No.{num})",
+  "doublons.titreVerifier": "{n} listings from {compte} may be the same pair",
+  "doublons.titreVerifierNum": "{n} listings from {compte} may be the same pair (No.{num})",
+  "doublons.titrePlusieurs": "{n} pairs listed twice on an account",
+  "doublons.detailSur": "Same account · remove the extra one",
+  "doublons.detailVerifier": "Same account · maybe · to check",
+  "doublons.voirLesDeux": "See both",
+  "doublons.voir": "See",
+  "doublons.preuveEmpreinte": "almost identical photo, to check",
+  "doublons.carte": "{n} listings, 1 pair",
+  "doublons.carteNum": "No.{num} · {n} listings, 1 pair",
+  "doublons.geste": "Remove the extra one on Vinted.",
 };
