@@ -10,7 +10,8 @@
 // ventes Vinted finalisées et en cours, une Leboncoin, une Vestiaire, des
 // dépenses, un abonnement, des prix d'achat partiels — à 390 px tactile en
 // clair et 1512 px en sombre :
-//   Q. les trois questions, dans cet ordre (data-compta-question) ;
+//   Q. (27 nov., porté à Argent du 10 nov., src/argent.js) les réponses d'Argent dans l'ordre (vendu · reçu ·
+//      bénéfice · à déclarer, data-argent-q), « Le détail » après, « Ton bénéfice » (la carte « gagne ») en premier ;
 //   C. sous chaque réponse : un chiffre (data-compta-chiffre) PUIS une phrase
 //      (data-compta-phrase) qui le suit, non vide ;
 //   R. « Le détail » replié : chaque repli fermé tant qu'on ne l'ouvre pas ;
@@ -120,7 +121,8 @@ const visible = (pg, sel) => pg.evaluate((sel) => { const e = document.querySele
 
 // Le texte VISIBLE de l'écran Comptabilité (replis fermés exclus par le navigateur).
 const texteEcran = (pg) => pg.evaluate(() => { const e = document.querySelector('.vrm-finance-page'); return e ? e.innerText : ''; });
-const MONTANT = /-?\d{1,3}(?:[\u202f\u00a0 ]\d{3})*,\d{2}\s?€/g;
+// (27 nov.) Un montant rond s'écrit sans centimes (« 55 € ») depuis Argent (10 nov.) : il compte aussi.
+const MONTANT = /-?\d{1,3}(?:[\u202f\u00a0 ]\d{3})*(?:,\d{2})?[\u202f\u00a0 ]?€/g;
 
 async function preparer(pg) {
   // Ventes publie le bénéfice (`vrm_benefice_jours`) : on attend l'ÉTAT, pas un délai.
@@ -130,7 +132,11 @@ async function preparer(pg) {
   // (2 nov., 22 h) Les intitulés des questions et la carte URSSAF du mois ne s'affichent plus
   // (maquette FusionCompta) : on attend qu'ils soient DANS la page, pas visibles.
   await pg.locator('[data-compta-question="detail"]').first().waitFor({ state: 'attached', timeout: 40000 });
-  await pg.locator('[data-benef-etat="lu"]').first().waitFor({ timeout: 40000 });
+  // (27 nov., bancs-compta) Argent (10 nov., src/argent.js, Julien 9 nov. « Compta trop flou ») : le Résumé répond en
+  // tête (vendu · reçu · bénéfice · à déclarer) ; la carte « Ce que tu as gagné » vit dans le repli « Ton bénéfice ».
+  // On attend qu'elle soit CALCULÉE (dans la page), puis les réponses visibles.
+  await pg.locator('[data-benef-etat="lu"]').first().waitFor({ state: 'attached', timeout: 40000 });
+  await pg.locator('[data-argent-questions] [data-argent-q="benefice"]').first().waitFor({ timeout: 40000 });
   await pg.locator('[data-compta-chiffre="urssaf-mois"]').first().waitFor({ state: 'attached', timeout: 40000 });
   await pg.locator('[data-urssaf-declaree]').first().waitFor({ state: 'attached', timeout: 40000 });
   await pg.waitForTimeout(900);
@@ -149,11 +155,19 @@ async function captures(pg, vp, sombre, etiquette) {
 
 async function regleEcran(pg, nom, tel, errs) {
   // ── Q. trois questions, dans l'ordre
-  const qs = await pg.evaluate(() => [...document.querySelectorAll('[data-compta-question]')].map((e) => e.getAttribute('data-compta-question')));
-  check(JSON.stringify(qs) === JSON.stringify(['gagne', 'declarer', 'detail']), `${nom} — Q les trois questions, dans l'ordre : ${JSON.stringify(qs)}`);
+  // (27 nov.) Les réponses d'Argent, visibles, dans l'ordre de src/argent.js (`questionsArgent`) ; « Le détail »
+  // (les replis) ensuite, la carte « gagne » dans le premier d'entre eux (« Ton bénéfice »).
+  const qs = await pg.evaluate(() => [...document.querySelectorAll('[data-argent-questions] [data-argent-q]')].filter((e) => e.checkVisibility()).map((e) => e.getAttribute('data-argent-q')));
+  check(JSON.stringify(qs) === JSON.stringify(['vendu', 'recu', 'benefice', 'declarer']), `${nom} — Q les réponses d'Argent, dans l'ordre : ${JSON.stringify(qs)}`);
+  const premier = await pg.evaluate(() => { const d = document.querySelector('[data-compta-q="detail"] .vrm-compta-replis > details'); return d ? d.id : null; });
+  check(premier === 'compta-benefice' && await avant(pg, '[data-argent-questions]', '#compta-benefice') && !!(await pg.$('#compta-benefice [data-compta-q="gagne"]')), `${nom} — Q « Le détail » vient après, « Ton bénéfice » (la carte « gagne ») en premier : ${premier}`);
   // Les intitulés « 1 · Combien j'ai gagné ? »… ne s'affichent plus — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionCompta).
   for (const q of ['gagne', 'declarer', 'detail']) check(!(await visible(pg, `[data-compta-question="${q}"]`)), `${nom} — Q l'intitulé « ${q} » n'est plus affiché (retiré à la demande de Julien, 2 nov. 22 h (maquette FusionCompta))`);
-  check(await visible(pg, '[data-compta-q="gagne"] [data-fu-carte]'), `${nom} — Q la carte sombre « Ce que tu as gagné » est là`);
+  // (C et la carte « gagne » : jugés à la fin, une fois « Ton bénéfice » ouvert — R exige d'abord tout replié.)
+  const cartGagne = async () => {
+  await pg.locator('#compta-benefice > summary').first().click();
+  await pg.waitForFunction(() => { const d = document.getElementById('compta-benefice'); return !!(d && d.open); }, null, { timeout: 5000 }).catch(() => {});
+  check(await visible(pg, '[data-compta-q="gagne"] [data-fu-carte]'), `${nom} — Q un toucher sur « Ton bénéfice » : la carte « Ce que tu as gagné » est là`);
   // ── C. un chiffre, puis sa ligne (la carte URSSAF du mois n'est plus affichée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionCompta))
   for (const c of ['gagne']) {
     const r = await pg.evaluate((c) => { const n = document.querySelector(`[data-compta-chiffre="${c}"]`), p = document.querySelector(`[data-compta-phrase="${c}"]`); return { n: !!n, p: !!p, suit: !!(n && p && (n.compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING)), txt: p ? p.innerText.trim() : '', vis: !!(n && n.checkVisibility() && p && p.checkVisibility()) }; }, c);
@@ -162,6 +176,7 @@ async function regleEcran(pg, nom, tel, errs) {
     const n0 = await pg.evaluate(() => (document.querySelector('[data-benef-n]') || {}).getAttribute?.('data-benef-n'));
     check((r.n && r.p && r.suit && r.vis && r.txt.length > 0) || (r.n && !r.p && n0 === '0'), `${nom} — C « ${c} » : un chiffre puis une ligne courte dessous (« ${r.txt.slice(0, 90)} »)`);
   }
+  };
   // (« la prochaine déclaration avant ce qu'il faut mettre de côté » : la carte n'est plus affichée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionCompta))
   // ── R. le détail replié
   const replis = await pg.evaluate(() => [...document.querySelectorAll('[data-compta-q="detail"] details')].filter((d) => d.parentElement && d.parentElement.classList.contains('vrm-compta-replis')).map((d) => ({ id: d.id || d.getAttribute('data-micro-repli'), open: d.open })));
@@ -171,7 +186,14 @@ async function regleEcran(pg, nom, tel, errs) {
   }
   // ── U. chaque montant une fois
   const t = await texteEcran(pg);
-  const montants = (t.match(MONTANT) || []).map((x) => x.replace(/[\u202f\u00a0 ]/g, ' ').replace(/\s?€/, ' €'));
+  // (27 nov.) U compte les CHIFFRES de l'écran : les lignes d'une liste (« À venir » : chaque vente, son prix, le sous-total de son groupe,
+  // `[data-a-venir-ligne]`, `[data-av-vente]`, `.vg-av-groupe-eur`) détaillent un total, pas un chiffre redit. La base écrite sous l'URSSAF (« 12,4 % de
+  // 60 € reçus ») est rapportée à part (« À DÉCIDER ») quand elle redit un autre montant de l'écran.
+  const tU0 = await pg.evaluate(() => { const e = document.querySelector('.vrm-finance-page'); if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('[data-a-venir-ligne], [data-av-vente], .vg-av-groupe-eur').forEach((x) => x.remove()); c.style.cssText = 'position:absolute;left:-99999px;top:0;width:' + e.clientWidth + 'px'; document.body.appendChild(c); const r = c.innerText; c.remove(); return r; });
+  const base = [...tU0.matchAll(/\d+(?:,\d+)?[\u202f\u00a0 ]?% de (-?\d{1,3}(?:[\u202f\u00a0 ]\d{3})*(?:,\d{2})?[\u202f\u00a0 ]?€) reçus/g)].map((m) => m[1].replace(/[\u202f\u00a0 ]/g, ' ').replace(/\s?€/, ' €'));
+  const tU = tU0.replace(/\d+(?:,\d+)?[\u202f\u00a0 ]?% de -?\d{1,3}(?:[\u202f\u00a0 ]\d{3})*(?:,\d{2})?[\u202f\u00a0 ]?€ reçus/g, '');
+  const montants = (tU.match(MONTANT) || []).map((x) => x.replace(/[\u202f\u00a0 ]/g, ' ').replace(/\s?€/, ' €'));
+  for (const x of base) if (montants.includes(x)) console.log(`À DÉCIDER  ${nom} — U la base de l'URSSAF (« … % de ${x} reçus ») redit un montant déjà écrit sur l'écran`);
   const doubles = [...new Set(montants.filter((x, i) => montants.indexOf(x) !== i))];
   // (2 nov., 22 h : l'écran a moins de montants depuis la maquette FusionCompta — au moins 2.)
   check(montants.length >= 2 && doubles.length === 0, `${nom} — U chaque montant visible écrit une fois (${montants.length} montants${doubles.length ? ', redits : ' + doubles.join(' · ') : ''})`);
@@ -194,11 +216,15 @@ async function regleEcran(pg, nom, tel, errs) {
     const petits = await pg.evaluate(() => [...document.querySelectorAll('.vrm-finance-page :is(button, summary, a[href], [role="button"])')].filter((e) => {
       if (!e.checkVisibility || !e.checkVisibility()) return false;
       if (getComputedStyle(e).display === 'inline') return false;          // un lien DANS une phrase : la phrase est la cible
-      const r = e.getBoundingClientRect(); return r.height < 43.5;
+      // (27 nov.) La zone de toucher compte : un `::after` posé en absolu à insets négatifs l'agrandit (src/design/verre-ecrans.css, `.vg-a-ambre`).
+      const r = e.getBoundingClientRect(); const a = getComputedStyle(e, '::after'); const px = (v) => (/px$/.test(v) ? parseFloat(v) : 0);
+      const ext = a && a.content !== 'none' && a.position === 'absolute' ? Math.max(0, -px(a.top)) + Math.max(0, -px(a.bottom)) : 0;
+      return r.height + ext < 43.5;
     }).map((e) => `${(e.innerText || e.getAttribute('aria-label') || e.tagName).trim().slice(0, 28)} (${Math.round(e.getBoundingClientRect().height)} px)`));
     check(petits.length === 0, `${nom} — D cibles ≥ 44 px au doigt : ${JSON.stringify(petits)}`);
   }
   check(!errs.length, `${nom} — D aucune erreur JavaScript ni console${errs.length ? ' : ' + errs[0].slice(0, 200) : ''}`);
+  await cartGagne();
 }
 
 async function scenarioComplet(b, vp, sombre) {
