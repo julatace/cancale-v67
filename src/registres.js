@@ -108,6 +108,10 @@ export function livreDesRecettes({ decl, periode, numDe = () => '', compteDe = (
     compte: String(compteDe(String(l.id)) || ''), titre: String(l.titre || ''), raison: raison || '',
     // (11 nov., lot livre-registre) Le mois que la règle donne (`l.ym`) et le compte Vinted (uid) : par identité.
     ym: String(l.ym || ''), uid: l.o && l.o._acc && l.o._acc.vinted_user_id != null ? String(l.o._acc.vinted_user_id) : '',
+    // (27 nov., lot compta-export) Ce que le registre « J'ai déclaré » dit de la vente (posé par `ventesDeclarables`
+    // quand il lui est passé) : déclarée (son mois = celui de la déclaration ; `ymVers` = celui du versement) ou
+    // `apres` (dans un mois déjà déclaré sans y figurer : à régulariser). Rien ici ne le recalcule.
+    declaree: !!l.declaree, ymVers: String(l.ymVers || ''), apres: !!l.apres,
     // (9 nov.) Ce que la date de la ligne EST, selon la règle de `ventesDeclarables` :
     // le versement (Vinted, Vestiaire) ; la vente (Leboncoin) ; la commande (eBay).
     // La date de vente d'une ligne Vinted est celle de SA commande (`dateVente`).
