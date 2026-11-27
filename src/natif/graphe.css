@@ -262,6 +262,8 @@
     .n-heros-trio-porte:has(.n-heros-trio-pourquoi) { gap: 0; }
     .n-heros-trio-porte:has(.n-heros-trio-pourquoi) > :not(.n-heros-trio-pourquoi) { display: none; }
     .n-heros-trio-pourquoi { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--n-teinte); color: var(--n-sur-heros); text-decoration: none; font: 600 12px/18px var(--n-police); }
+    /* (27 nov.) « 5 prix manquants » : la porte du bénéfice va à la ligne plutôt que d'être coupée (case de 110 px au téléphone). */
+    [data-pil-prix-manquants] .n-heros-trio-pourquoi { white-space: normal; overflow: visible; text-overflow: clip; border-radius: 10px; }
     .n-actions-rondes { margin-bottom: 12px; }
     .n-action-ronde { gap: 4px; }
     .n-action-ronde-disque { width: 46px; height: 46px; }

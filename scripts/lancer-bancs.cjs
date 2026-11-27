@@ -67,7 +67,7 @@ const DUREES_CI = {
   'accessibilite-clavier': 370, 'chiffres-coherents': 365, 'defilement-navigation': 311, 'nouveau-vendeur': 294,
   'ventes-ligne-propre': 276, 'imprimer-compte-exact': 233, 'iphone-reprise': 179, 'annonces-actions': 173,
   'morceau-perime': 170, 'barre-achats': 141, 'statut-colis': 119, 'journee-coherence': 107, 'garde-ecrans': 59,
-  'colis-retirer-propre': 54, 'achats-annules': 48, 'retraits-suivi': 44, 'tout-imprimer': 27, 'connexion-claire': 16,
+  'colis-retirer-propre': 54, 'achats-annules': 48, 'retraits-suivi': 44, 'tout-imprimer': 27, 'connexion-claire': 16, 'retrait-contenu-code': 70, 'aujourdhui-portes-27nov': 200,
   'barre-depuis-journee': 15,
   'ecran-pret-une-fois': 80,   // (26 nov.) mesuré ici, seul : 77 s
 };

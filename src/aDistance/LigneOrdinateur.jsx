@@ -8,6 +8,7 @@
 import React from 'react';
 import { tr, heure as heureLoc } from '../i18n/index.js';
 import { Groupe, Rangee } from '../natif/index.js';
+import { Pourquoi } from '../natif/Actions.jsx';
 import { lirePresences, etatOrdinateurs, signalFrais } from '../aDistance.js';
 import { SUPABASE_URL, sbAuth } from '../App.jsx';
 
@@ -38,11 +39,19 @@ export default function LigneOrdinateur({ onNav, Icon = null, base = `${SUPABASE
   const titre = e.niveau === 'allume' ? tr('adist.jour.allume', { nom: nomOrdi(p), n: comptes }) : tr('adist.jour.eteint', { nom: nomOrdi(p), heure: heureLoc(p.atMs) });
   // (25 nov., « trop de texte ») Le titre court (« Ordinateur éteint · 07:37 ») ; la ligne dessous seulement quand des gestes
   // attendent l'ordinateur — le navigateur et ce qu'on peut faire à distance sont dans « Mes comptes » (›) et au lecteur d'écran.
-  const sous = attente ? tr('adist.jour.attente', { n: attente }) : '';
+  // (27 nov., Julien : « Ordinateur éteint · 21:20 » — « Vas-y fais tout ») ÉTEINT : UNE phrase visible de 8 mots au plus (ce qui
+  // en découle : rien ne part), le reste sous « Pourquoi ? » — ce qui ne marche pas pendant ce temps (les gestes « À distance »
+  // attendent, Vinted n'est plus relu) et le geste (ouvrir Chrome avec l'extension). Des gestes attendent : la phrase les compte.
+  const eteint = e.niveau === 'eteint';
+  const sous = attente ? tr('adist.jour.attente', { n: attente }) : eteint ? tr('adist.jour.eteintSous') : '';
   return (
     <Groupe attrs={{ 'data-adist-jour': e.niveau }}>
-      <Rangee icone={Icon ? <Icon name="link" size={22}/> : null} titre={titre} sousTitre={sous} sousLignes={2} ton={e.niveau === 'eteint' && attente ? 'ambre' : 'neutre'} fin="chevron"
-        onClick={() => { try { onNav && onNav('adistance'); } catch (_) {} }} attrs={{ 'data-adist-jour-rangee': '', 'data-adist-jour-attente': attente == null ? '' : String(attente), 'aria-label': [titre, nomOrdi(p), sous || tr('adist.jour.sous')].filter(Boolean).join(' · ') }}/>
+      <Rangee icone={Icon ? <Icon name="link" size={22}/> : null} titre={titre} sousTitre={sous} sousLignes={2} ton={eteint && attente ? 'ambre' : 'neutre'} fin="chevron"
+        onClick={() => { try { onNav && onNav('adistance'); } catch (_) {} }} attrs={{ 'data-adist-jour-rangee': '', 'data-adist-jour-attente': attente == null ? '' : String(attente), 'data-adist-jour-phrase': sous ? '' : undefined, 'aria-label': [titre, nomOrdi(p), sous || tr('adist.jour.sous')].filter(Boolean).join(' · ') }}/>
+      {eteint ? <Pourquoi attrs={{ 'data-adist-jour-pourquoi': '' }}>
+        <p data-adist-pourquoi="manque">{tr('adist.jour.pqManque')}</p>
+        <p data-adist-pourquoi="geste">{tr('adist.jour.pqGeste')}</p>
+      </Pourquoi> : null}
     </Groupe>
   );
 }

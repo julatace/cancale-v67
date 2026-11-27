@@ -39,7 +39,10 @@ const DSF = Number(process.env.DSF || 1);
 // « Gestes automatiques arrêtés » · « Offres, favoris, republications : rien ne part · depuis HH:MM » · « Pourquoi ? » à la place
 // de « En pause » (mesuré : +11 mots à 390 et à 1512 sur cette base). Le reste de l'écran garde son budget.
 const MOTS_CARTE_PAUSE = 11;
-const MOTS_MAX = (W) => Number(process.env.MOTS_MAX || (W < 600 ? 106 : 124) + MOTS_CARTE_PAUSE);
+// (27 nov., ameliorations-27nov — Julien : « Ordinateur éteint · 21:20 », « Vas-y fais tout ») + 8 : la phrase DEMANDÉE sous
+// « Ordinateur éteint » (« Rien ne part tant qu’il est éteint », 7 mots) et son « Pourquoi ? » (mesuré : +8 à 390 et à 1512).
+const MOTS_ORDI_ETEINT = 8;
+const MOTS_MAX = (W) => Number(process.env.MOTS_MAX || (W < 600 ? 106 : 124) + MOTS_CARTE_PAUSE + MOTS_ORDI_ETEINT);
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 600) : '')); } return c; };
 

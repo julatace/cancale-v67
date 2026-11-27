@@ -119,7 +119,9 @@ export function statsPeriodes({ valeur, precedente = null, raisonCourte = () => 
     //         la même règle sans les dépenses (elles se comptent au mois : `chargesAuMois`) — c'est dit.
     const Br = valeur('brut', p) || {};
     const mB = /^(\d+) sur (\d+)$/.exec(String(Br.couverture || ''));
-    let brut = lu(Br) ? { valeur: Br.valeur, partiel: !!Br.partiel, couverture: mB ? `${mB[1]}/${mB[2]}` : '', note: '', raison: '' } : { valeur: null, partiel: false, couverture: '', note: raisonCourte(Br) || '', raison: Br.raison || '' };
+    // (27 nov.) `prixManquants` : les ventes de la période sans prix d'achat (la publication, jamais deviné) — la porte de la tuile.
+    const pmB = Number.isFinite(Br.prixManquants) ? Br.prixManquants : null;
+    let brut = lu(Br) ? { valeur: Br.valeur, partiel: !!Br.partiel, couverture: mB ? `${mB[1]}/${mB[2]}` : '', note: '', raison: '', prixManquants: pmB } : { valeur: null, partiel: false, couverture: '', note: raisonCourte(Br) || '', raison: Br.raison || '', prixManquants: pmB };
     if (brut.valeur != null && Number.isFinite(Br.n) && entier(ventes) && ventes.valeur > Br.n) {
       brut = Br.n === 0 ? { valeur: null, partiel: false, couverture: '', note: raisonCourte({ valeur: null, raison: 'publication' }) || '', raison: 'publication' } : { ...brut, partiel: true, couverture: brut.couverture || `${Br.n}/${ventes.valeur}` };
     }
@@ -139,13 +141,15 @@ export function statsPeriodes({ valeur, precedente = null, raisonCourte = () => 
     if (p !== 'mois' && Vd && Vd.n > 0 && entier(ventes) && ventes.valeur > couvertesFin) {
       const total = Math.max(ventes.valeur, Vd.n);
       const manque = Vd.partiel || total > Vd.n;
-      brut = Vd.brut != null ? { valeur: Vd.brut, partiel: manque, couverture: manque ? `${Vd.nCout}/${total}` : '', note: '', raison: '', enCours: Vd.enCours }
-        : { valeur: null, partiel: false, couverture: '', note: raisonCourte({ valeur: null, raison: 'achats' }) || '', raison: 'achats' };
+      const pmV = Number.isFinite(Vd.prixManquants) ? Vd.prixManquants : pmB;
+      brut = Vd.brut != null ? { valeur: Vd.brut, partiel: manque, couverture: manque ? `${Vd.nCout}/${total}` : '', note: '', raison: '', enCours: Vd.enCours, prixManquants: pmV }
+        : { valeur: null, partiel: false, couverture: '', note: raisonCourte({ valeur: null, raison: 'achats' }) || '', raison: 'achats', prixManquants: pmV };
       if (!lu(Nt) || !(Nt.B && Number.isFinite(Nt.B.n) && Nt.B.n >= Vd.n)) {
         net = Vd.net != null ? { valeur: Vd.net, note: '', raison: '', avantDepenses: true, auMois: false, duJour: false, enCours: Vd.enCours }
-          : { valeur: null, note: raisonCourte({ valeur: null, raison: 'achats' }) || '', raison: 'achats', avantDepenses: false, auMois: false, duJour: false };
+          : { valeur: null, note: raisonCourte({ valeur: null, raison: 'achats' }) || '', raison: 'achats', avantDepenses: false, auMois: false, duJour: false, prixManquants: pmV };
       }
     }
+    if (net.prixManquants == null) net.prixManquants = Nt.B && Number.isFinite(Nt.B.n) && Number.isFinite(Nt.B.nCout) ? Math.max(0, Nt.B.n - Nt.B.nCout) : pmB;
     out[p] = { vendu, ventes, panier, benefice, brut, net, ecart };
   }
   return out;
