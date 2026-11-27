@@ -47,6 +47,15 @@ d'ici (les formes sont notées sur SA machine) ; toutes sont retirées.
 | garde de l'onglet | « Vinted a refusé » | sa raison (autre compte, pause, vérification) |
 | chronomètre | minuteur de la seule carte ouverte ; rangée « En attente · 18:42 » figée ; fenêtre perdue après mise à jour sur place | UNE horloge (vrm-badge.js, vrm-action.js) ; rangée « prochain dans 42 s » vivante |
 
+## « offer_request=true » et l'autre outil (Julien, 19:17)
+- Aucune ligne de VRM n'ouvre `/inbox/<uuid>?offer_request=true` ni la case « Faire une offre » (grep : `offer_request=` absent de
+  l'extension) ; la phrase « 1 message favoris envoyé automatiquement aujourd'hui » n'existe pas dans VRM : c'est celle d'un autre
+  outil installé dans ce Chrome (Bleam, icône « B »). Le chemin de VRM fait l'offre par l'API sur la transaction de la demande, au
+  prix calculé, la confirme (code 0), puis écrit le message (V37, V37b).
+- Deux outils sur les mêmes favoris = deux offres : le mode AUTO de VRM ne part pas tant qu'une page vinted.fr montre la trace
+  d'un autre outil de messages aux favoris (`autreOutilFavoris`, journal `favori_auto_autre_outil`). Un envoi qu'il lance reste
+  permis, protégé par la relecture et le registre.
+
 ## Preuves
 - `audit-favoris-requetes-vintex.cjs` (vrai background.js) : 48 verts ; sur la 5.455.3 : rouge sur V16b, V16c, V19, V21–V32 ;
   `--prouve` : chaque mutation rouge (voir le rapport de session).

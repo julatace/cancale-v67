@@ -25165,6 +25165,20 @@ async function eveilTick(maintenant = Date.now()) {
   try { await chrome.storage.local.set({ [EVEIL_CLE]: st }); } catch (_) {}
   return { garde: _eveilPose, liste, voulu };
 }
+// 5.455.4 (Julien, 27 nov. 19:17 : la page de sa messagerie dit « 1 message favoris envoyé automatiquement aujourd'hui » — une
+//    phrase qui n'est PAS de VRM, celle d'un autre outil installé dans ce Chrome) : deux outils qui écrivent aux mêmes favoris
+//    feraient deux offres ou deux messages. Le mode AUTO de VRM ne part pas tant qu'une page vinted.fr ouverte montre la trace
+//    d'un autre outil de messages aux favoris (lecture du texte de la page, rien d'écrit) ; c'est dit dans son journal. Un envoi
+//    qu'IL lance reste permis (son clic), protégé par la relecture de la conversation et le registre.
+const AUTRE_OUTIL_FAVORIS = /messages?\s+(?:aux\s+)?favoris\s+envoy[ée]s?\s+automatiquement|favorites?\s+messages?\s+sent\s+automatically/i;
+async function autreOutilFavoris() {
+  let tabs = []; try { tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.de/*'] }); } catch (_) { tabs = []; }
+  for (const t of (tabs || []).slice(0, 4)) {
+    if (!t || t.id == null || t.status !== 'complete') continue;
+    try { const r = await chrome.scripting.executeScript({ target: { tabId: t.id }, func: () => String((document.body && document.body.innerText) || '').slice(0, 200000) }); const txt = r && r[0] && r[0].result; if (typeof txt === 'string' && AUTRE_OUTIL_FAVORIS.test(txt)) return true; } catch (_) {}
+  }
+  return false;
+}
 async function piloteFavorisTick(maintenant = Date.now()) {
   if (_piloteEnVol) return { etat: 'en-vol' };
   _piloteEnVol = true;
@@ -25186,7 +25200,8 @@ async function piloteFavorisTick(maintenant = Date.now()) {
       else if (!r) return fin('vrm', { uid });          // pas su : rien n'est demandé
     }
     if (!r.actif) return fin('eteint', { uid });
-    if (await precieuxBloque(uid, 'favoris-auto')) return fin('precieux', { uid });   // 5.438 : « compte précieux » ⇒ favoris à la main seulement
+    if (await precieuxBloque(uid, 'favoris-auto')) return fin('precieux', { uid });
+    if (await autreOutilFavoris()) { noterDiag('favori_auto_autre_outil'); try { await noterJournal(uid, 'favori_auto_autre_outil', { auto: true }); } catch (_) {} return fin('autre_outil', { uid }); }   // 5.438 : « compte précieux » ⇒ favoris à la main seulement
     const av = await attenteAvantFavori(uid, 3);
     if (av && av.stop) return fin(av.stop, { uid });     // captcha ('verification'), Tout arrêter, stockage : ARRÊT
     if (av && av.ms > 0) return fin('garde', { uid, quoi: av.quoi });

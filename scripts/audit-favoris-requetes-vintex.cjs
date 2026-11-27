@@ -206,6 +206,17 @@ const court = (f, r) => JSON.stringify({ r: r && (r.json || r.erreur), v: f.j.vi
     dit(res(r).resultat === 'ignore' && res(r).raison === 'conversation_existante' && ecr(f).length === 1, 'V26b mode AUTO : la conversation porte déjà un message ⇒ rien n’est écrit', court(f, r)); }
   { const f = monter(Object.assign({}, MESUREE, { auto: true })); const r1 = await jouer(f); const n1 = ecr(f).length; const r2 = await jouer(f);
     dit(res(r1).resultat === 'envoye' && res(r2).resultat !== 'envoye' && ecr(f).length === n1, 'V26c mode AUTO : le même favori repris ⇒ jamais deux fois (rien de plus chez Vinted)', court(f, r2)); }
+  // Julien (27 nov. 19:17) : sur `/inbox/<uuid>?offer_request=true`, la case « Faire une offre » ouverte au PLEIN prix (55 €),
+  //    rien de tapé ni envoyé. Le chemin de VRM ne passe par aucune case : l'offre part par la transaction de la demande, au prix
+  //    calculé (55 € − 10 % = 49,50 €), puis le message — aucun clic, aucune fenêtre.
+  { const f = monter(Object.assign({}, MESUREE, { txBrute: Object.assign({}, MESUREE.txBrute, { item: { id: 101, price: { amount: '55.0', currency_code: 'EUR' } } }) })); const r = await jouer(f);
+    const o = ecr(f).find((x) => /\/offers$/.test(x.chemin)); let px = ''; try { px = JSON.parse(o.corps).offer.price; } catch (_) {}
+    const io = ecr(f).findIndex((x) => /\/offers$/.test(x.chemin)), im = ecr(f).findIndex((x) => /replies$/.test(x.chemin));
+    dit(res(r).resultat === 'envoye' && px === '49.5' && io >= 0 && im > io && !f.clics.length, 'V37 « offer_request » : l’offre faite par la transaction de la demande à 49,50 € (55 € − 10 %), confirmée, PUIS le message ; aucune case ouverte (aucun clic)', court(f, r) + ' prix=' + px); }
+  { const f = monter(Object.assign({}, MESUREE, { txBrute: Object.assign({}, MESUREE.txBrute, { item: { id: 101, price: { amount: '55.0', currency_code: 'EUR' } } }), offre: { status: 200, body: { code: 106, message: 'refus' } } })); const r = await jouer(f);
+    dit(res(r).resultat === 'refuse' && !ecr(f).some((x) => /replies$/.test(x.chemin)), 'V37b l’offre pas confirmée par Vinted (code ≠ 0) ⇒ AUCUN message qui annoncerait une offre absente', court(f, r)); }
+  { const src = fs.readFileSync(BG, 'utf8');
+    dit(/async function autreOutilFavoris\(/.test(src) && /if \(await autreOutilFavoris\(\)\)/.test(src.slice(src.indexOf('async function piloteFavorisTick'), src.indexOf("apiFavorisCarte(uid, 'suivant')", src.indexOf('async function piloteFavorisTick')))) && /envoy\[ée\]s\?\\s\+automatiquement/.test(src) || false, 'V38 le mode auto ne part pas si une page vinted.fr montre un autre outil de messages aux favoris (deux outils = deux offres)'); }
   // Julien (27 nov. 18:15) : « sur certains comptes, quand on ouvre le favori, l'offre est proposée directement ».
   for (const [nom, m] of [['invitation sans montant', { entity_type: 'offer_suggestion_message' }], ['message du système', { entity_type: 'status_message', content: '' }], ['invitation « offer » sans montant', { type: 'offer', data: {} }]]) {
     for (const auto of [false, true]) {
