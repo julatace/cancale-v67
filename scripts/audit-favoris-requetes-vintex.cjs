@@ -27,6 +27,12 @@
 //       deux transactions différentes ; ids en texte, le vendeur lui-même dans la liste ⇒ envoyé
 //   V17 {marque} inconnue ⇒ la version neutre part ; jamais « article ou destinataire pas confirmé »
 //   V18 transaction illisible ⇒ le prix de SON dressing (par l'identifiant), le plancher tenu, offre + message
+//  5.455.4 (Julien, 27 nov. 18:42, arthuror2 « autre article dans la conversation » ; « tout reprendre comme Vintex ») : le chemin
+//  RÉÉCRIT court — demande → conversation et transaction de SA réponse → une relecture (historique, personne) → offre (plancher)
+//  → message ; registre avant/après. V10 (ancienne conversation) retiré avec son code ; V18 : plus jamais le prix du dressing.
+//   V16b/c, V19–V21 une conversation rendue à propos d'un autre article ; V22–V24 4xx = rien d'écrit ; V25 offre déjà là ;
+//   V26 auto ; V27 devise ; V28 VRM injoignable ; V29–V31 relance = jamais deux fois ; V32 reprise uuid ; V33–V34 compte rendu
+//   rejoué ; V35 texte jugé avant l'offre.
 //  `AUDIT_BG=<chemin>` juge un autre background.js (le code d'avant : rouge).
 //  `--mutation=nom` ; `--prouve` : chaque mutation doit rendre l'audit rouge. Données inventées.
 // ════════════════════════════════════════════════════════════════════════════
@@ -36,14 +42,13 @@ const { faireFond } = require('./_fond-vm.cjs');
 let BG = process.env.AUDIT_BG || path.join(__dirname, '..', 'vinted-sync-extension', 'background.js');
 const MUTATIONS = {
   'sans-personne': ["if(personnes.length>1||(personnes.length===1&&personnes[0]!==body.recipientId)){noterDiag('favori_req_autre_personne');", "if(false){"],
-  'tx-creation-ignoree': ["const txQ=txCreationFavori(q.json);", "const txQ='';"],
   'une-seule-lecture': ["for(let k=0;k<3&&!cv;k++){", "for(let k=0;k<1&&!cv;k++){"],
-  'identite-stricte': ["if(!trLu)noterDiag(", "if(!trLu&&!(articles.length===1&&personnes.length===1))return rep('refuse',ln.status,'identite_non_confirmee');if(!trLu)noterDiag("],
   'fil-arrete': ["return rep('ignore',ln&&ln.status||0,'fil_non_relu');", "return rep('refuse',ln&&ln.status||0,'identite_non_confirmee');"],
-  'article-refuse': ["if(articles.length>1||(articles.length===1&&articles[0]!==body.itemId)){noterDiag('favori_req_conv_autre_article');", "if(articles.length>1||(articles.length===1&&articles[0]!==body.itemId)){return rep('refuse',ln.status,'article_different');"],
-  'tx-conversation-dabord': ["let tx=id(txQ)?txQ:id(txC)?txC:'';", "let tx=id(txC)?txC:id(txQ)?txQ:'';"],
-  'tx-conv-autre-article-gardee': ["if(tr&&typeof tr==='object'&&artTx&&artTx!==body.itemId&&!txDeLaDemande){", "if(false){"],
-  'tx-demande-autre-article': ["if(artTx!==body.itemId){noterDiag('favori_req_tx_autre_article');", "if(false){"],
+  'article-refuse': ["const personnes=personnesConvFavori(cv.opposite_users,uid);", "const personnes=personnesConvFavori(cv.opposite_users,uid);{const ar=(cv.data&&Array.isArray(cv.data.items)?cv.data.items:[]).map((x)=>articleLigneCommande(x).id).filter(Boolean);if(ar.length&&ar.some((a)=>a!==body.itemId))return rep('refuse',ln.status,'article_different');}"],
+  'tx-de-la-conversation': ["const uuid=uuidConversationCree(q.json),tx=txCreationFavori(q.json);", "const uuid=uuidConversationCree(q.json),tx=String((q.json&&q.json.x)||'')||'5001';"],
+  'texte-apres-offre': ["if(!texteSurVinted(texteV).ok){noterDiag('favori_texte_final_interdit');return rep('refuse',0,'texte_interdit');}\n    // 4c.", "    // 4c."],
+  'prix-dressing': ["if(!titre){const lu=await dressingLu(String(uid)).catch(()=>null);const it=lu&&Array.isArray(lu.items)?lu.items.find((x)=>x&&String(x.id)===body.itemId):null;if(it&&typeof it.title==='string')titre=it.title.slice(0,120);}", "{const lu=await dressingLu(String(uid)).catch(()=>null);const it=lu&&Array.isArray(lu.items)?lu.items.find((x)=>x&&String(x.id)===body.itemId):null;if(it&&!(Number(prixAnnonce)>0))prixAnnonce=Number(prixCarte(it.price));if(it&&!titre&&typeof it.title==='string')titre=it.title.slice(0,120);}"],
+  'tx-demande-autre-article': ["if(artTx&&artTx!==body.itemId){noterDiag('favori_req_tx_autre_article');", "if(false){"],
   'ecrit-sur-4xx': ["function ecritureFavoriPartie(x) { if (!x || x.rienParti) return false; const s = Number(x.status) || 0; return !(s >= 400 && s < 500); }", "function ecritureFavoriPartie(x) { return !!x && !x.rienParti; }"],
   'offre-pas-contact': ["    if (/offer/.test(t)) { n++; continue; }", ""],
   'auto-messages-systeme': ["if(body.auto===true&&cv.messages.length>0){", "if(false){"],
@@ -53,13 +58,11 @@ const MUTATIONS = {
   'reprise-uuid-jetee': ["(!uuidR && !/^[1-9]\\d{0,19}$/.test(String(e.convId || '')))", "!/^[1-9]\\d{0,19}$/.test(String(e.convId || ''))"],
   'terminer-perdu': ["if (!(await rejouerTerminers())) return attendre('vrm');", ""],
   'autorisation-incertaine': ["}catch{noterDiag('favori_autorisation_injoignable');return rep('refuse',0,'autorisation_expiree','autorisation');}", "}catch{return rep('incertain');}"],
-  'sans-prix-dressing': ["if(it&&!(Number(prixAnnonce)>0)){", "if(false){"],
   'variable-bloque': ["if (manques.size && [...manques].every((k) => NEUTRES.includes(k) && !val[k])) {", "if (false) {"],
   'sans-historique': ['if(ecritsAvant>0||(cv.pagination', 'if(false&&(cv.pagination'],
-  'sans-article-tx': ["if(artTx!==body.itemId){noterDiag('favori_req_tx_autre_article');", "if(false){"],
-  'offre-ignoree': ["if(!offreFaite)return o.status", "if(false)return o.status"],
+  'offre-ignoree': ["if(!faite)return o.status", "if(false)return o.status"],
   'porte-ouverte': ['function ecritureFavoriPermise(adresse) { const a = String(adresse || \'\'); return ECRITURES_FAVORI.some((re) => re.test(a)); }', 'function ecritureFavoriPermise(adresse) { return true; }'],
-  'telephone-ignore': ["if(await telephoneAVerifierVinted(acc)===true){", "if(false){"],
+  'telephone-ignore': ["x.status===400&&(await telephoneAVerifierVinted(acc))===true?", "false?"],
   'chemin-ignore': ["if((await cheminFavoris())==='requetes'){", "if(true){"],
 };
 const argMut = (() => { const a = process.argv.find((x) => x.startsWith('--mutation=')); return a ? a.slice(11) : ''; })();
@@ -90,7 +93,7 @@ function monter(o = {}) {
   const store = { __commeBleamDefaut: true, ...(o.chemin ? { vrmFavorisChemin: o.chemin } : { __favorisVintex: true }) };
   const f = faireFond({ src: BG, connecte: UID, comptes: [ACC], lignes, store,
     vinted: (e) => {
-      if (e.methode === 'POST' && e.chemin === '/messaging/main/inquiries') return o.inquiry || { status: 201, body: { id: UUID, conversation_id: UUID } };
+      if (e.methode === 'POST' && e.chemin === '/messaging/main/inquiries') return o.inquiry || { status: 201, body: { id: UUID, conversation_id: UUID, transaction_id: 5001 } };
       if (e.methode === 'GET' && e.chemin === `/messaging/main/conversations/${UUID}`) { lectures++; if (o.convJamais || lectures <= (o.conv404 || 0)) return { status: 404, body: { code: 404 } }; return { status: 200, body: o.convPlate ? conv : { conversation: conv } }; }
       if (e.methode === 'GET' && e.chemin === '/api/v2/conversations/301') return o.ancienne404 ? { status: 404, body: { code: 404 } } : { status: 200, body: { conversation: { id: 301, opposite_user: { id: 201 }, transaction: { id: 5001, item_id: 101 } } } };
       if (e.methode === 'GET' && /^\/api\/v2\/transactions\/\d+$/.test(e.chemin)) { if (o.tx404) return { status: 404, body: { code: 404 } }; return { status: 200, body: { transaction: o.txBrute || Object.assign({ id: 5001, item_id: 101, buyer_id: 201, item_title: 'Baskets banc', item: { id: 101, price: { amount: '50.0', currency_code: 'EUR' } } }, o.tx || {}) } }; }
@@ -156,8 +159,6 @@ const court = (f, r) => JSON.stringify({ r: r && (r.json || r.erreur), v: f.j.vi
     dit(f.clics.length > 0 && !f.j.vinted.some((x) => x.chemin === '/messaging/main/inquiries'), 'V8 réglage « interface » ⇒ l’ancien chemin par les clics (réserve), aucune requête Vintex', court(f, r)); }
   { const f = monter({ sansOnglet: true }); const r = await jouer(f);
     dit(res(r).resultat === 'refuse' && !ecr(f).length, 'V9 sans onglet vinted.fr sur ce compte ⇒ rien ne part', court(f, r)); }
-  { const f = monter({ conv: { data: { items: [{ id: 101 }] } } }); const r = await jouer(f);
-    dit(res(r).resultat === 'envoye' && f.j.vinted.some((x) => x.chemin === '/api/v2/conversations/301'), 'V10 transaction lue par l’ancien n° de CETTE conversation, vérifiée ⇒ envoyé', court(f, r)); }
   // ── 5.455.3 : la forme MESURÉE de la nouvelle messagerie ──
   const MESUREE = { inquiry: { status: 201, body: { inquiry_id: 'inq-1', transaction_id: 5002, conversation_id: UUID, read_after_write_token: 'eyJ.x.y' } },
     convBrute: { id: UUID, core_id_deprecated: 302, conversation_type: 'inquiry', allow_reply: true, is_read: true, opposite_users: [{ id: 201, photo: null }], data: { id: 'd-1', order_id: '26000001', escrow_order_id: '26000001' }, messages: [] },
@@ -210,7 +211,9 @@ const court = (f, r) => JSON.stringify({ r: r && (r.json || r.erreur), v: f.j.vi
     dit(res(r).resultat === 'envoye' && /^Ta paire te plaît \?$/.test(t), 'V17 {marque} inconnue ⇒ la version neutre part : ' + JSON.stringify(t), court(f, r)); }
   { const f = monter(Object.assign({}, MESUREE, { tx404: true, dressing: [{ id: 101, title: 'Baskets dressing', price: { amount: '60.0', currency_code: 'EUR' } }] })); const r = await jouer(f);
     const o = ecr(f).find((x) => /\/offers$/.test(x.chemin)); let px = ''; try { px = JSON.parse(o.corps).offer.price; } catch (_) {}
-    dit(res(r).resultat === 'envoye' && px === '54.0', 'V18 transaction illisible ⇒ prix de SON dressing (60 € − 10 % = 54), offre + message', court(f, r) + ' prix=' + px); }
+    dit(res(r).resultat === 'refuse' && res(r).raison === 'offre_prix_inconnu' && !px && !ecr(f).some((x) => /replies$/.test(x.chemin)), 'V18 transaction illisible ⇒ JAMAIS le prix (peut-être ancien) du dressing : ni offre ni message, sauté « prix pas lu »', court(f, r) + ' prix=' + px); }
+  { const f = monter(Object.assign({}, MESUREE, { message: 'Bonjour {pseudo} !', convBrute: Object.assign({}, MESUREE.convBrute, { opposite_users: [{ id: 201, login: 'lea.me' }] }) })); const r = await jouer(f);
+    dit(res(r).resultat === 'refuse' && !ecr(f).some((x) => /\/offers$/.test(x.chemin)), 'V35 le texte final refusé (pseudo « lea.me » pris pour un lien) ⇒ jugé AVANT l’offre : aucune offre faite pour rien', court(f, r)); }
   // ── 5.455.4 : une relance après N'IMPORTE QUELLE interruption ne refait jamais une offre ni un message (registre) ──
   { const f = monter(MESUREE); const r1 = await jouer(f); const n1 = ecr(f).length; const r2 = await jouer(f);
     dit(res(r1).resultat === 'envoye' && res(r2).resultat === 'ignore' && ecr(f).length === n1, 'V29 le même favori relancé après un envoi ⇒ sauté, rien de plus chez Vinted (ni demande, ni offre, ni message)', court(f, r2)); }
