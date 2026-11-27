@@ -156,8 +156,11 @@ function choisirMessageFavori(x) {
   }
   // 5.450 : le SEUL manque est le pseudo (la nouvelle messagerie ne l'a pas dit) ⇒ la version NEUTRE : la même, sans
   //    {pseudo} / {username} / {prénom} (« Bonjour {pseudo}, … » ⇒ « Bonjour, … ») — jamais un autre nom, jamais refusé pour ça.
-  if (manques.size && [...manques].every((k) => k === 'pseudo' || k === 'prenom') && !val.pseudo) {
-    const neutre = (m) => String(m).replace(/[ \t]*\{(?:pseudo|username|prénom|prenom)\}/g, '').replace(/ +([,.!?])/g, '$1');
+  //    5.455.3 (Julien, 27 nov. : « fais comme les concurrents », une variable ne bloque jamais) : de même pour {marque} et
+  //    {taille} que la fiche ne dit pas (« en taille {taille} » ⇒ rien) — jamais une valeur inventée.
+  const NEUTRES = ['pseudo', 'prenom', 'marque', 'taille'];
+  if (manques.size && [...manques].every((k) => NEUTRES.includes(k) && !val[k])) {
+    const neutre = (m) => String(m).replace(/[ \t]*\{(?:pseudo|username|prénom|prenom)\}/g, '').replace(/[ \t]*(?:\b(?:en|de)[ \t]+)?(?:\btaille[ \t]+)?\{taille\}/gi, '').replace(/[ \t]*(?:\b(?:le|la|les|ta|ton|tes|ce|cette|cet|ma|mon|mes)[ \t]+)?\{marque\}/gi, '').replace(/[ \t]{2,}/g, ' ').replace(/ +([,.])/g, '$1');   // « ? » et « ! » gardent leur espace (français)
     for (const g of groupes) {
       const possibles = [];
       for (const v of g.versions) {

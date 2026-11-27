@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { zipStocke } from './exportDonnees.js';
 import { xlsxClasseur } from './xlsxSimple.js';
-import { csvExportComptable, pdfExportComptable, resumeExport, couvertureExport, bornesPeriode, periodesExport } from './exportComptable.js';
+import { csvExportComptable, pdfExportComptable, resumeExport, couvertureExport, bornesPeriode, periodesExport, refAchatTexte, noteVente, csvImportComptable } from './exportComptable.js';
 import { lignesRegistre, csvRegistre, dansPeriode, SELECT_FACTURES_PRO } from './facturePro/registre.js';
 
 // « 4e trimestre 2026 » ⇒ « 4e-trimestre-2026 » (sans accent, sans espace).
@@ -51,9 +51,10 @@ export function feuillesExport(d) {
   if (cv.length) { resume.push([], [{ t: 'Ce qui manque', gras: true }]); for (const c of cv) resume.push([c]); }
   if (d.entreprise) resume.push([], [d.entreprise.nom], ...(d.entreprise.siret ? [[`SIRET ${d.entreprise.siret}`]] : []));
   resume.push([], [`Établi le ${d.etabliLe} par VRM`]);
-  const recettes = [['Date de versement', 'Date de vente', 'Plateforme', 'Compte', 'N°', 'Référence', 'Titre', 'Montant reçu (€)', 'Frais lus (€)', 'Note']];
-  for (const v of (d.ventes || [])) recettes.push([v.dateVersement, v.dateVente, v.plateforme, v.compte, v.num, v.reference, v.titre, n2(v.montant), n2(v.frais), v.note]);
-  if (d.ventes) recettes.push(['', '', '', '', '', '', { t: d.ventesCompletes ? 'Total' : 'Total (au moins)', gras: true }, { n: n2(d.totalVentes) }, null, '']);
+  // (27 nov., lot compta-export) + prix de vente, frais notés, prix d'achat, port, bénéfice, référence de l'achat (relevé de Ventes, par identité).
+  const recettes = [['Date de versement', 'Date de vente', 'Plateforme', 'Compte', 'N°', 'Référence', 'Titre', 'Montant reçu (€)', 'Frais lus (€)', 'Note', 'Prix de vente (€)', 'Frais notés (€)', 'Prix d’achat (€)', 'dont port (€)', 'Bénéfice (€)', 'Réf. achat']];
+  for (const v of (d.ventes || [])) recettes.push([v.dateVersement, v.dateVente, v.plateforme, v.compte, v.num, v.reference, v.titre, n2(v.montant), n2(v.frais), noteVente(v), n2(v.prixVente), n2(v.fraisNotes), n2(v.achat), n2(v.port), n2(v.benefice), refAchatTexte(v)]);
+  if (d.ventes) recettes.push(['', '', '', '', '', '', { t: d.ventesCompletes ? 'Total' : 'Total (au moins)', gras: true }, { n: n2(d.totalVentes) }, null, '', null, null, null, null, d.beneficeVentes == null ? null : { n: n2(d.beneficeVentes) }, d.nBenefice != null && d.nBenefice < d.nVentes ? `bénéfice sur ${d.nBenefice} sur ${d.nVentes}` : '']);
   const aDater = [['Date de vente', 'Plateforme', 'Compte', 'N°', 'Référence', 'Titre', 'Montant reçu (€)', 'Note']];
   for (const v of (d.aDater || [])) aDater.push([v.dateVente, v.plateforme, v.compte, v.num, v.reference, v.titre, n2(v.montant), v.note]);
   const achats = [['Date', 'Plateforme', 'Compte ou fournisseur', 'Référence', 'N°', 'Article', 'Coût saisi (€)', 'Montant lu (€)', 'Montant lu sur', 'Justificatif', 'Note']];
@@ -75,7 +76,7 @@ export function feuillesExport(d) {
     { nom: 'Résumé', lignes: resume, largeurs: [42, 30], entete: false },
     { nom: 'Reçu par site', lignes: sites, largeurs: [14, 14, 16, 14, 30] },
     ...(d.nDepenses !== undefined ? [{ nom: 'Dépenses', lignes: depenses, largeurs: [12, 10, 16, 36, 13, 12] }] : []),
-    { nom: 'Recettes', lignes: recettes, largeurs: [14, 13, 11, 16, 7, 14, 40, 15, 12, 30] },
+    { nom: 'Recettes', lignes: recettes, largeurs: [14, 13, 11, 16, 7, 14, 40, 15, 12, 30, 14, 13, 13, 11, 12, 22] },
     { nom: 'À dater', lignes: aDater, largeurs: [13, 11, 16, 7, 14, 40, 15, 30] },
     { nom: 'Achats', lignes: achats, largeurs: [12, 11, 22, 14, 7, 40, 14, 14, 18, 30, 30] },
     { nom: 'CA par mois', lignes: ca, largeurs: [22, 9, 16, 18, 12] },
@@ -138,6 +139,8 @@ export async function zipExportComptable(d, j = { ventes: [], registreCsv: null,
     { nom: `${dos}1-Recapitulatif-${lib}.pdf`, octets: new Uint8Array(await pdfExportComptable(dj, { PDFLib })) },
     { nom: `${dos}2-Tableur-${lib}.xlsx`, octets: xlsxClasseur(feuillesExport(dj), { titre: `Export comptable — ${d.libelle}`, quand }) },
     { nom: `${dos}2-Tableur-${lib}.csv`, texte: csvExportComptable(dj) },
+    // (27 nov.) Le tableau PLAT pour un logiciel (Pennylane, Tiime, Indy) : une ligne d'en-tête, une ligne par vente versée.
+    ...(d.detaille ? [{ nom: `${dos}3-Import-logiciel-${lib}.csv`, texte: csvImportComptable(dj) }] : []),
   ];
   if (j.registreCsv) f.push({ nom: `${dos}Factures-de-vente/Registre-des-factures-${lib}.csv`, texte: j.registreCsv });
   for (const x of j.ventes) f.push({ nom: `${dos}Factures-de-vente/${x.nom}`, octets: x.octets });

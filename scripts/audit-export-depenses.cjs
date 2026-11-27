@@ -83,7 +83,7 @@ async function verifier(EXP, ZIP, COMPTA) {
   const F = Z.feuillesExport(d);
   dit(F.some((f) => f.nom === 'Reçu par site') && F.some((f) => f.nom === 'Dépenses' && f.lignes.length === 5), 'C4 le classeur : feuilles « Reçu par site » et « Dépenses »');
   const c = sansCommentaires(COMPTA);
-  dit(/load\('vrm_compta', null\)/.test(c) && /compta = c == null \? \{\} : \(typeof c === 'object' && !Array\.isArray\(c\) \? c : null\)/.test(c) && /factures: facturesJointes, compta \}\)/.test(c), 'C5 Compta passe vrm_compta (illisible ⇒ null)');
+  dit(/load\('vrm_compta', null\)/.test(c) && /compta = c == null \? \{\} : \(typeof c === 'object' && !Array\.isArray\(c\) \? c : null\)/.test(c) && /factures: facturesJointes, compta(?: \}\)|, )/.test(c), 'C5 Compta passe vrm_compta (illisible ⇒ null)');
   return ko;
 }
 
@@ -99,7 +99,7 @@ async function verifier(EXP, ZIP, COMPTA) {
     ['fixes tus', 'exp', "  if (d.fixesNonDetailles) L.push(", "  if (0) L.push("],
     ['pas lu ⇒ 0', 'exp', "if (!compta || typeof compta !== 'object' || Array.isArray(compta) || !bornes) return null;", "if (!compta || typeof compta !== 'object') return { lignes: [], total: 0, fixes: 0, illisibles: 0 };"],
     ['site sans montant ⇒ 0', 'exp', '  for (const g of G.values()) if (g.sansMontant === g.n) g.montant = null;\n', ''],
-    ['Compta ne passe rien', 'compta', 'factures: facturesJointes, compta });', 'factures: facturesJointes });'],
+    ['Compta ne passe rien', 'compta', 'factures: facturesJointes, compta, releve:', 'factures: facturesJointes, releve:'],
   ];
   let rouges = 0;
   for (const [nom, ou, a, b] of MUT) {

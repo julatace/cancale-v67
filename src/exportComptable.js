@@ -28,6 +28,7 @@ import { mentionFacture, cleFactureLigne } from './factureAchat.js';
 import { PERIODE_OK, libellePeriode, moisDePeriode, jourFr, eurosTexte } from './registres.js';
 import { moisParis, moisRecents } from './dateParis.js';
 import { valeurSue } from './sommeConnue.js';
+import { margesPar } from './statsVentes.js';
 
 export { libellePeriode };
 export const TYPES_PERIODE = [['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];
@@ -63,6 +64,60 @@ const RAISON_URSSAF = {
 };
 export const raisonUrssaf = (regime) => (regime === 'micro' ? '' : (RAISON_URSSAF[regime] || RAISON_URSSAF.null));
 
+
+// ── (27 nov., lot compta-export — Julien : « Fait la compta ») LE DÉTAIL DE CHAQUE VENTE ─────────────
+// Le comptable veut, vente par vente : prix de vente, montant reçu, frais, prix d'achat, port, bénéfice.
+// AUCUNE RÈGLE NEUVE : tout vient du relevé de Ventes (`vrm_stats_ventes`, une ligne par vente finalisée :
+// [plateforme, compte, id, ts, vente €, achat €, frais notés €, titre, N°, versement, lot, détail des frais]),
+// retrouvé PAR L'IDENTITÉ de la vente (la clé de `recettesDe`), jamais par le titre. Le bénéfice d'une vente
+// = la règle des marges (`margesPar`, src/statsVentes.js : vente − achat − frais notés ; null si l'achat ou
+// un frais n'est pas su) — la même que Statistiques et le bénéfice du mois (avant URSSAF et dépenses).
+// Une identité portée par DEUX lignes du relevé : rien (jamais l'une des deux au hasard).
+export const cleReleve = (l) => (Array.isArray(l) && l[2] != null && String(l[2]) !== '' ? (l[0] === 'Vinted' ? 'vinted:' + l[2] : String(l[2])) : '');
+export function indexReleve(lignes) {
+  if (!Array.isArray(lignes)) return null;
+  const m = new Map();
+  for (const l of lignes) { const k = cleReleve(l); if (!k) continue; m.set(k, m.has(k) ? null : l); }
+  return m;
+}
+const nombreOuNull = (x) => (x == null || x === '' || !Number.isFinite(Number(x)) ? null : Math.round(Number(x) * 100) / 100);
+// Le détail d'une vente par SA ligne du relevé (pas de ligne : tout « — »).
+export function detailVenteReleve(r, plateforme) {
+  if (!Array.isArray(r)) return { prixVente: null, achat: null, fraisNotes: null, port: null, benefice: null };
+  const det = Array.isArray(r[11]) && r[11].length === 4 ? r[11] : null;
+  const fraisNotes = r[6] === null ? null : nombreOuNull(r[6]);
+  const achat = nombreOuNull(r[5]);
+  // eBay : le relevé porte ce que tu REÇOIS (`montantRecuEbay`), pas le prix payé par l'acheteur ⇒ « — ».
+  const prixVente = plateforme === 'eBay' ? null : nombreOuNull(r[4]);
+  const g = nombreOuNull(r[4]) == null ? null : margesPar([{ ts: Number(r[3]) || 1, eur: r[4], achat, frais: fraisNotes }], () => 'v');
+  const benefice = g && g.groupes[0] && g.groupes[0].net != null ? g.groupes[0].net : null;
+  // Le port payé par lui : seulement quand la fiche le DÉTAILLE (src/coutPlateformes.js `detailFraisFiche`).
+  const port = det && Number.isSafeInteger(det[1]) ? det[1] / 100 : null;
+  return { prixVente, achat, fraisNotes, port, benefice };
+}
+// La référence de L'ACHAT d'une vente : la ligne du registre des achats dont les fiches reliées (`buyFromId`,
+// SON clic) portent le N° de CETTE vente — UNE seule ligne, sinon rien ; Vinted seulement (le n° de
+// transaction est l'identité du reçu). « reçu » : le montant de cet achat vient de SON reçu (par son n°).
+const cleN = (n) => { const s = String(n == null ? '' : n).trim().toUpperCase().replace(/[\s\-_.]/g, ''); return /^\d+$/.test(s) ? String(parseInt(s, 10)) : s; };
+export function indexAchatsParNum(lignes) {
+  if (!Array.isArray(lignes)) return null;
+  const m = new Map();
+  for (const a of lignes) {
+    if (!a || !a.num) continue;
+    for (const n of String(a.num).split('+').map(cleN).filter(Boolean)) m.set(n, m.has(n) && m.get(n) !== a ? null : a);
+  }
+  return m;
+}
+export function achatDeVente(num, idx) {
+  const k = cleN(num);
+  if (!k || !idx) return null;
+  const a = idx.get(k);
+  if (!a || a.plateforme !== 'Vinted' || !a.reference) return null;
+  return { reference: String(a.reference), recu: a.source === 'recu' };
+}
+// Une vente dans une autre devise que l'euro (raison posée par `ventesDeclarables` / `montantRecuEbay`).
+export const HORS_EURO = /^(devise|autre devise)\b/i;
+
 // Les données de l'export. Entrées (déjà calculées par les règles de l'app) :
 //   periode      'AAAA' | 'AAAA-Tn' | 'AAAA-MM'
 //   recettes     `livreDesRecettes(...)` pour CETTE période (null = pas su)
@@ -74,7 +129,10 @@ export const raisonUrssaf = (regime) => (regime === 'micro' ? '' : (RAISON_URSSA
 //   libelleRegime(regime), entreprise ({ nom, siret } | null), maintenant
 // (10 nov., lot AN) `factures` : { clé → meta } des factures d'achat JOINTES (src/factureAchat.js), sans contenu ;
 // la ligne d'achat le MENTIONNE (« facture jointe (nom) ») — null = pas lu, aucune mention inventée.
-export function donneesExportComptable({ periode, recettes = null, achats = null, ligne = null, regime = null, taux = null, montantPeriode, aPayer, libelleRegime = (r) => String(r || ''), entreprise = null, maintenant = Date.now(), factures = null, compta } = {}) {
+// (27 nov.) `releve` : les lignes de `vrm_stats_ventes` (null = pas lu : prix de vente, achat, bénéfice « — » ;
+// non passé : pas de colonnes de détail) ; `achatsRef` : des lignes du registre des achats (les périodes utiles)
+// pour la référence d'achat d'une vente.
+export function donneesExportComptable({ periode, recettes = null, achats = null, ligne = null, regime = null, taux = null, montantPeriode, aPayer, libelleRegime = (r) => String(r || ''), entreprise = null, maintenant = Date.now(), factures = null, compta, releve, achatsRef = null } = {}) {
   if (!PERIODE_OK.test(String(periode || ''))) return null;
   const bornes = bornesPeriode(periode);
   const ymNow = moisParis(maintenant);   // (11 nov.) mois de PARIS
@@ -92,15 +150,37 @@ export function donneesExportComptable({ periode, recettes = null, achats = null
   const partielCa = !!(tot && tot.partiel);
   const urssaf = micro && caDeclare != null ? (tot.apayer != null ? tot.apayer : (typeof aPayer === 'function' ? aPayer(caDeclare, taux) : null)) : null;
   // Les ventes de la période (versées), et les « à dater ».
-  const ventes = recettes ? recettes.lignes.map((l) => ({
+  // (27 nov.) Le détail de chaque vente : par SON identité dans le relevé ; `releve` non passé ⇒ pas de colonnes.
+  const idxR = releve === undefined ? undefined : indexReleve(releve);
+  const idxA = indexAchatsParNum(achatsRef);
+  const detail = (l) => {
+    if (idxR === undefined) return {};
+    const d = detailVenteReleve(idxR ? idxR.get(String(l.id)) : null, l.plateforme);
+    const a = achatDeVente(l.num, idxA);
+    // Sans N° (aucune fiche reliée), « frais notés » n'a rien noté : « — », jamais 0,00 € (le bénéfice reste « — » : pas d'achat).
+    if (!l.num && d.achat == null) { d.fraisNotes = null; d.port = null; }
+    return { ...d, refAchat: a ? a.reference : '', recuAchat: !!(a && a.recu) };
+  };
+  // (27 nov.) Une vente dans une AUTRE devise (eBay) : jamais convertie, hors des lignes et des totaux, listée à part.
+  const estHorsEuro = (l) => HORS_EURO.test(String(l.raison || ''));
+  const horsEuroL = recettes ? [...recettes.lignes, ...recettes.horsPeriode].filter(estHorsEuro) : null;
+  const ventes = recettes ? recettes.lignes.filter((l) => !estHorsEuro(l)).map((l) => ({
     id: l.id, dateVente: l.tsVente != null ? jourFr(l.tsVente) : '', dateVersement: l.tsVersement != null ? jourFr(l.tsVersement) : (DATE_PAS_LUE[l.plateforme] || ''),
     plateforme: l.plateforme, compte: l.compte, num: l.num, reference: l.reference, titre: l.titre, montant: l.montant, note: l.raison || '',
     // (11 nov.) Les frais LUS de la plateforme (eBay) ; null = pas su (jamais 0).
     frais: Number.isFinite(l.frais) ? l.frais : null,
+    // (27 nov.) Le mois où elle COMPTE (sa déclaration s'il y en a une) et ce que le registre dit d'elle.
+    ym: l.ym || '', declaree: !!l.declaree, ymVers: l.ymVers || '', apres: !!l.apres, dateCompte: l.date || '',
+    ...detail(l),
   })) : null;
-  const aDater = recettes ? recettes.horsPeriode.map((l) => ({
+  const aDater = recettes ? recettes.horsPeriode.filter((l) => !estHorsEuro(l)).map((l) => ({
     id: l.id, dateVente: l.tsVente != null ? jourFr(l.tsVente) : '', plateforme: l.plateforme, compte: l.compte, num: l.num, reference: l.reference, titre: l.titre, montant: l.montant, note: l.raison || 'à dater',
   })) : null;
+  const horsEuro = horsEuroL ? horsEuroL.map((l) => ({ id: l.id, dateVente: l.tsVente != null ? jourFr(l.tsVente) : '', plateforme: l.plateforme, compte: l.compte, num: l.num, reference: l.reference, titre: l.titre, devise: String(l.raison || '').replace(/^(autre )?devise\s*/i, '') || 'autre devise' })) : null;
+  // Le bénéfice des ventes listées : la somme des bénéfices CONNUS, avec sa couverture (« 3 sur 5 ») — jamais « au moins »
+  // (une vente au prix d'achat inconnu peut être à perte). Aucun connu ⇒ « — ».
+  const avecBenef = ventes && idxR !== undefined ? ventes.filter((v) => v.benefice != null) : null;
+  const beneficeVentes = avecBenef && avecBenef.length ? Math.round(avecBenef.reduce((t, v) => t + Math.round(v.benefice * 100), 0)) / 100 : null;
   const achatsL = achats ? achats.lignes.map((l) => ({
     id: l.id, date: l.date, plateforme: l.plateforme, fournisseur: l.compte || l.fournisseur || '', reference: l.reference, num: l.num, titre: l.titre,
     saisi: l.saisi == null ? null : l.saisi, lu: l.source === 'saisi' ? null : l.montant, sourceLue: l.source === 'recu' ? 'reçu Vinted' : l.source === 'article' ? 'article seul (sans port ni frais)' : '', note: l.raison || '',
@@ -121,7 +201,9 @@ export function donneesExportComptable({ periode, recettes = null, achats = null
     regime: regime == null ? null : regime, regimeTexte: libelleRegime(regime), taux: micro ? taux : null, raisonUrssaf: raisonUrssaf(regime),
     caParMois, caDeclare, partielCa, urssaf, ligneLue: !!lu,
     ventes, nVentes: ventes ? ventes.length : null, totalVentes: recettes ? recettes.total : null, ventesCompletes: recettes ? recettes.complet : false, manqueVentes: recettes ? recettes.manque : [],
-    sansMontantVentes: recettes ? recettes.sansMontant : 0,
+    sansMontantVentes: recettes ? recettes.sansMontant - recettes.lignes.filter(estHorsEuro).length : 0,
+    horsEuro, nHorsEuro: horsEuro ? horsEuro.length : null,
+    detaille: idxR !== undefined, releveLu: !!idxR, beneficeVentes, nBenefice: avecBenef ? avecBenef.length : null,
     aDater, nADater: aDater ? aDater.length : null,
     achats: achatsL, nAchats: achatsL ? achatsL.length : null, sansCout, coutSaisi, manqueAchats: achats ? achats.manque : [],
     nonComptees,
@@ -188,6 +270,8 @@ export function resumeExport(d) {
   L.push(['CA déclaré (daté au versement)', d.caDeclare == null ? '—' : `${d.partielCa ? 'au moins ' : ''}${eurosTexte(d.caDeclare)}`, 'ca']);
   if (d.regime === 'micro') L.push([`URSSAF à payer (${String(d.taux).replace('.', ',')} %)`, d.urssaf == null ? '—' : `${d.partielCa ? 'au moins ' : ''}${eurosTexte(d.urssaf)}`, 'urssaf']);
   else L.push(['URSSAF', 'non calculée', 'urssaf']);
+  // (27 nov.) Le bénéfice des ventes listées (avant URSSAF et dépenses), sa couverture À CÔTÉ.
+  if (d.detaille) L.push(['Bénéfice de ces ventes (avant URSSAF et dépenses)', d.beneficeVentes == null ? '—' : `${eurosTexte(d.beneficeVentes)}${d.nBenefice < d.nVentes ? ` · ${d.nBenefice} sur ${d.nVentes}` : ''}`, 'benefice']);
   L.push(['Achats de la période', d.nAchats == null ? '—' : String(d.nAchats), 'n-achats']);
   // (11 nov.) La couverture À CÔTÉ du chiffre : « au moins 42,00 € · 1 sur 50 ».
   // (23 nov.) Les dépenses notées : pas lues ⇒ « — » (jamais 0) ; aucune notée ⇒ 0,00 € (lu : il n'en a noté aucune).
@@ -200,6 +284,9 @@ export function couvertureExport(d) {
   const L = [];
   if (d.sansCout) L.push(`${d.sansCout} achat${d.sansCout > 1 ? 's' : ''} sans coût saisi`);
   if (d.nADater) L.push(`${d.nADater} vente${d.nADater > 1 ? 's' : ''} à dater (sans date de versement : dans aucun mois)`);
+  if (d.nHorsEuro) L.push(`${d.nHorsEuro} vente${d.nHorsEuro > 1 ? 's' : ''} dans une autre devise : écartée${d.nHorsEuro > 1 ? 's' : ''}, jamais convertie${d.nHorsEuro > 1 ? 's' : ''} (listée${d.nHorsEuro > 1 ? 's' : ''} à part)`);
+  if (d.detaille && d.nVentes && d.nBenefice < d.nVentes) L.push(`${d.nVentes - d.nBenefice} vente${d.nVentes - d.nBenefice > 1 ? 's' : ''} sans bénéfice calculé (prix d’achat ou frais pas sus)`);
+  if (d.detaille && !d.releveLu) L.push('détail des ventes pas lu (prix d’achat, frais) : ouvre Ventes une fois');
   if (d.sansMontantVentes) L.push(`${d.sansMontantVentes} vente${d.sansMontantVentes > 1 ? 's' : ''} au montant pas lu`);
   if (d.nonComptees) L.push(`${d.nonComptees} vente${d.nonComptees > 1 ? 's' : ''} comptée${d.nonComptees > 1 ? 's' : ''} nulle part (montant pas lu)`);
   if (!d.ligneLue) L.push('CA déclaré pas encore calculé : ouvre Ventes une fois');
@@ -212,6 +299,8 @@ export function couvertureExport(d) {
   return L;
 }
 
+export const refAchatTexte = (v) => (v.refAchat ? `${v.refAchat}${v.recuAchat ? ' (reçu Vinted)' : ''}` : '');
+export const noteVente = (v) => [v.note, v.declaree && v.ymVers && v.ymVers !== v.ym ? `déclarée en ${libellePeriode(v.ym)}` : '', v.apres ? 'à régulariser (mois déjà déclaré)' : ''].filter(Boolean).join(' · ');
 const nbT = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : (Math.round(Number(x) * 100) / 100).toFixed(2).replace('.', ','));
 const cel = (v) => { const s = String(v == null ? '' : v).replace(/[  ]/g, ' '); return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 export function csvExportComptable(d) {
@@ -232,8 +321,8 @@ export function csvExportComptable(d) {
   L.push(['Total', '', nbT(d.caDeclare), d.regime === 'micro' ? nbT(d.urssaf) : '', '']);
   L.push([]);
   L.push(['VENTES VERSÉES SUR LA PÉRIODE']);
-  L.push(['Date de vente', 'Date de versement', 'Plateforme', 'Compte', 'N°', 'Référence', 'Titre', 'Montant reçu (€)', 'Frais lus (€)', 'Note']);
-  if (d.ventes) { for (const v of d.ventes) L.push([v.dateVente, v.dateVersement, v.plateforme, v.compte, v.num, v.reference, v.titre, nbT(v.montant), nbT(v.frais), v.note]); L.push(['', '', '', '', '', '', 'Total', nbT(d.totalVentes), '', d.ventesCompletes ? '' : 'au moins']); }
+  L.push(['Date de vente', 'Date de versement', 'Plateforme', 'Compte', 'N°', 'Référence', 'Titre', 'Prix de vente (€)', 'Montant reçu (€)', 'Frais lus (€)', 'Frais notés (€)', 'Prix d’achat (€)', 'dont port (€)', 'Bénéfice (€)', 'Réf. achat', 'Note']);
+  if (d.ventes) { for (const v of d.ventes) L.push([v.dateVente, v.dateVersement, v.plateforme, v.compte, v.num, v.reference, v.titre, nbT(v.prixVente), nbT(v.montant), nbT(v.frais), nbT(v.fraisNotes), nbT(v.achat), nbT(v.port), nbT(v.benefice), refAchatTexte(v), noteVente(v)]); L.push(['', '', '', '', '', '', 'Total', '', nbT(d.totalVentes), '', '', '', '', nbT(d.beneficeVentes), '', [d.ventesCompletes ? '' : 'au moins', d.detaille && d.nBenefice != null && d.nBenefice < d.nVentes ? `bénéfice sur ${d.nBenefice} vente${d.nBenefice > 1 ? 's' : ''} sur ${d.nVentes}` : ''].filter(Boolean).join(' · ')]); }
   else L.push(['—', 'ventes pas lues']);
   L.push([]);
   L.push(['REÇU PAR PLATEFORME (ventes versées sur la période)']);
@@ -246,6 +335,11 @@ export function csvExportComptable(d) {
   if (d.aDater) for (const v of d.aDater) L.push([v.dateVente, v.plateforme, v.compte, v.num, v.reference, v.titre, nbT(v.montant), v.note]);
   else L.push(['—']);
   L.push([]);
+  L.push(['VENTES DANS UNE AUTRE DEVISE (écartées, jamais converties)']);
+  L.push(['Date de vente', 'Plateforme', 'Compte', 'N°', 'Référence', 'Titre', 'Devise']);
+  if (d.horsEuro && d.horsEuro.length) for (const v of d.horsEuro) L.push([v.dateVente, v.plateforme, v.compte, v.num, v.reference, v.titre, v.devise]);
+  else L.push([d.horsEuro ? 'aucune' : '—']);
+  L.push([]);
   L.push(['ACHATS DE LA PÉRIODE']);
   L.push(['Date', 'Plateforme', 'Compte ou fournisseur', 'Référence', 'N°', 'Article', 'Coût saisi (€)', 'Montant lu (€)', 'Montant lu sur', 'Note']);
   if (d.achats) { for (const a of d.achats) L.push([a.date, a.plateforme, a.fournisseur, a.reference, a.num, a.titre, nbT(a.saisi), nbT(a.lu), a.sourceLue, [a.saisi == null ? (a.note || 'coût pas saisi') : a.note, a.facture].filter(Boolean).join(' · ')]); L.push(['', '', '', '', '', 'Total saisi', nbT(d.coutSaisi), '', '', d.sansCout ? `${d.sansCout} sans coût` : '']); }
@@ -256,6 +350,26 @@ export function csvExportComptable(d) {
     L.push(['Date', 'Sorte', 'Catégorie', 'Libellé', 'Montant (€)', 'Ticket joint']);
     if (d.depenses) { for (const x of d.depenses) L.push([x.date, x.sorte === 'pack' ? 'pack' : 'dépense', x.categorie, x.libelle, nbT(x.montant), x.ticket ? 'oui' : '']); L.push(['', '', '', 'Total', nbT(d.totalDepenses), '']); }
     else L.push(['—', 'dépenses pas lues']);
+  }
+  return '﻿' + L.map((r) => r.map(cel).join(';')).join('\r\n') + '\r\n';
+}
+
+// ── (27 nov.) LE FICHIER « POUR UN LOGICIEL » (Pennylane, Tiime, Indy) ────────────────────────────────
+// Ces logiciels importent un tableau PLAT : UNE ligne d'en-tête, UNE ligne par opération, une date, un libellé,
+// un montant (on choisit les colonnes à l'import). Ici : les ventes de la période, datées au jour où elles
+// COMPTENT (le versement ; Leboncoin la vente ; eBay le versement sinon la commande — la règle de
+// `ventesDeclarables`), au montant REÇU, en euros. Pas de sections, pas de total (il fausserait l'import).
+// Ce qui n'a pas sa place (à dater, montant pas lu, autre devise) n'est PAS dans ce fichier : le récap le nomme.
+export const nomFichierImport = (periode) => `Ventes-${periode}-import.csv`;
+export const ENTETE_IMPORT = ['Date', 'Date de vente', 'Pièce', 'Libellé', 'Plateforme', 'Compte', 'N°', 'Prix de vente', 'Montant reçu', 'Frais plateforme', 'Frais notés', 'Prix d’achat', 'Port', 'Bénéfice', 'Réf. achat', 'Devise'];
+export function lignesImport(d) {
+  return (d && d.ventes ? d.ventes : []).filter((v) => v.montant != null && /^\d{2}\/\d{2}\/\d{4}$/.test(v.dateCompte || ''));
+}
+export function csvImportComptable(d) {
+  const L = [ENTETE_IMPORT];
+  for (const v of lignesImport(d)) {
+    const lib = [`Vente ${v.plateforme}`, v.num ? `N°${v.num}` : '', v.titre].filter(Boolean).join(' · ');
+    L.push([v.dateCompte, v.dateVente, v.reference, lib, v.plateforme, v.compte, v.num, nbT(v.prixVente), nbT(v.montant), nbT(v.frais), nbT(v.fraisNotes), nbT(v.achat), nbT(v.port), nbT(v.benefice), v.refAchat || '', 'EUR']);
   }
   return '﻿' + L.map((r) => r.map(cel).join(';')).join('\r\n') + '\r\n';
 }
@@ -319,6 +433,7 @@ export async function pdfExportComptable(d, { PDFLib = null } = {}) {
   // Les manques nommés, une ligne chacun (pages suivantes).
   const listes = [
     ['Ventes à dater — dans aucun mois', 'Sans date de versement : à dater avant de les déclarer.', (d.aDater || []).map((v) => [v.dateVente || '—', v.plateforme, [v.num ? `N°${v.num}` : '', v.reference, v.titre].filter(Boolean).join(' · '), v.montant == null ? '—' : eurosTexte(v.montant)])],
+    ['Ventes dans une autre devise — jamais converties', 'Hors de tous les totaux : à voir avec ton comptable.', (d.horsEuro || []).map((v) => [v.dateVente || '—', v.plateforme, [v.num ? `N°${v.num}` : '', v.reference, v.titre].filter(Boolean).join(' · '), v.devise])],
     ['Achats sans coût saisi', 'Saisis leur prix dans VRM (Achats), ou joins la facture.', (d.achats || []).filter((a) => a.saisi == null).map((a) => [a.date || '—', a.plateforme, [a.num ? `N°${a.num}` : '', a.reference, a.titre].filter(Boolean).join(' · '), a.lu == null ? '—' : `lu : ${eurosTexte(a.lu)}`])],
   ];
   for (const [titre, sous, lignes] of listes) {

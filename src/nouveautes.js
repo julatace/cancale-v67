@@ -30,6 +30,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (27 nov., compta-export — Julien : « Fait la compta », « l'export comptable pour l'URSSAF ») src/exportComptable.js, src/exportUrssaf.js
+  { id: 'export-urssaf', date: '2026-11-27', titre: 'L’URSSAF : ta déclaration prête à recopier', phrase: 'Le montant, la ligne, le taux et les ventes, en PDF.', tab: 'compta', pour: 'pro', mode: 'tous' },
+  { id: 'export-comptable-detail', date: '2026-11-27', titre: 'Export comptable : bénéfice vente par vente', phrase: 'Prix, achat, port, bénéfice ; un fichier pour Pennylane, Tiime, Indy.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (27 nov., lot scan-ce-matin — choix de Julien) src/aujourdhui/ceMatin.js, src/arriveeAchat.js `achatDuRetraitScan`
   { id: 'ce-matin', date: '2026-11-27', titre: '« Ce matin » en tête d’Aujourd’hui', phrase: 'Acheteurs, bordereaux, colis, offres, comptes : dans l’ordre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'scan-point-relais', date: '2026-11-27', titre: 'Scanne au point relais : la paire en stock', phrase: 'Le code de retrait suffit : retiré, numéroté, « Écris N° ».', tab: 'achats', pour: 'tous', mode: 'tous',
@@ -38,6 +41,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'ventes-compte-telephone', date: '2026-11-27', titre: 'Ventes : « Toutes », et filtre par compte', phrase: '« Toutes » liste chaque vente ; un compte au choix, retenu.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'annulations-compte-alerte', date: '2026-11-27', titre: 'Un compte annule plus : VRM le dit', phrase: 'Dans Statistiques, au-dessus des taux d’annulation par compte.', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'ebay-questions-dabord', date: '2026-11-27', titre: 'Questions eBay sans réponse en premier', phrase: 'Dans Messages, la plus ancienne en tête, « À répondre ».', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (27 nov. 17:40, ext. 5.455.3 — Julien : « tu dois faire comme les concurrents ») docs/passation/2026-11-27-favoris-identite.md
+  { id: 'favoris-comme-concurrents', date: '2026-11-27', titre: 'Favoris : les messages repartent', phrase: 'Extension 5.455.3 : un favori douteux est sauté, la file continue.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (27 nov., Julien sur « ● En pause · Reprendre » : « je ne comprends pas à quoi ça sert ») src/Discretion.jsx ToutArreter
   { id: 'tout-arrete-clair', date: '2026-11-27', titre: 'Gestes automatiques arrêtés : dit clairement', phrase: 'Ce qui ne part plus, depuis quand, « Tout relancer ».', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (26 nov., fiabilite-vc-lbc — Julien : « les données doivent être fiables, pense à Vestiaire Co et Leboncoin ») src/enLigneVc.js
