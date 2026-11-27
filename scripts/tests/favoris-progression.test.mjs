@@ -40,3 +40,19 @@ test('5.455.3 : le cas de Julien sur la 5.455.2 (identité refusée à l’étap
  const {d,owner}=unLot();const f=terminerFile(d,{owner,jeton:'j1',resultat:'refuse',raison:'identite_non_confirmee',ecrits:1,etape:'conversation',maintenant:102000});
  assert.equal(f.valeur.active,false);assert.ok(f.valeur.raison.startsWith(RAISONS_FAVORIS.identite_non_confirmee));
 });
+// 5.455.4 : trois conversations ouvertes de suite sans pouvoir être relues ⇒ la file s'arrête (avant : « ignore » ne comptait
+//    pas, une messagerie illisible ouvrait une conversation vide avec CHAQUE acheteur) ; et un saut après écriture garde le rythme.
+test('5.455.4 : trois « conversation pas relue » de suite arrêtent la file ; le rythme est gardé',()=>{
+ const owner='owner-fixture',targets=[1,2,3,4].map(i=>({notificationId:'n'+i,itemId:String(100+i),recipientId:String(200+i),initiator:'native-fixture'}));
+ let d=lancerFile(null,{owner,targets,message:'Bonjour',intervalleMinutes:0,maintenant:100000,lot:'lot1'}).data;let t=100000,v=null;
+ for(let k=1;k<=3;k++){const r=reserverFile(d,{owner,maintenant:t,jeton:'j'+k,suivi:'s'});assert.ok(r.valeur.travail,'réservé '+k);d=r.data;d=consommerFile(d,{owner,maintenant:t,jeton:'j'+k}).data;
+  const f=terminerFile(d,{owner,jeton:'j'+k,resultat:'ignore',raison:'fil_non_relu',ecrits:1,etape:'verification',maintenant:t+2000});d=f.data;v=f.valeur;
+  if(k===1)assert.ok(v.prochain>t+2000,'rythme gardé après un saut qui a écrit');
+  t=Math.max(t+3000,v.prochain||0);}
+ assert.equal(v.active,false);assert.equal(v.raisonCode,'locaux_suite');assert.match(v.raison,/3 favoris de suite/);
+ assert.equal(v.jobs.filter(x=>x.etat==='attente').length,1);
+});
+test('5.455.4 : « prix pas lu en euros » saute CE favori (refus local nommé)',()=>{
+ const {d,owner}=unLot();const f=terminerFile(d,{owner,jeton:'j1',resultat:'refuse',raison:'offre_prix_inconnu',ecrits:1,etape:'historique',maintenant:102000});
+ assert.equal(f.valeur.active,true);assert.ok(f.valeur.raison.includes(MOTS_REFUS.offre_prix_inconnu));
+});

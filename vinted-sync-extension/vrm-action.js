@@ -339,11 +339,17 @@
   const numDe = (it) => (num && numPour === String(it.id || '') ? U.etiquette(num, true) : (it.num ? U.etiquette(it.num, true) : ''));
   // 5.423 : le temps écoulé de la modification en cours, chaque seconde (rien d'autre n'est redessiné).
   setInterval(() => { if (vue !== 'plein' || !action) return; const m = modifDe(action), tp = racine.querySelector('[data-modif-temps]'); if (m && tp) { const t = tempsTxt(action, m); if (tp.textContent !== t) tp.textContent = t; } }, 1000);
-  function minuter() {
-    clearInterval(minuteur); minuteur = null;
-    const dans = racine.querySelector('[data-action-dans]');
-    if (dans) minuteur = setInterval(() => { const t = Number(dans.getAttribute('data-action-dans')); if (!dans.isConnected) { clearInterval(minuteur); return; } if (t <= Date.now()) { clearInterval(minuteur); lire(); return; } dans.textContent = T('a_ensuite', { dans: U.duree(t - Date.now()) }); }, 1000);
+  // 5.455.4 (Julien, 27 nov. : « le chronomètre ne marche pas ») : UNE horloge, toujours là, qui avance CHAQUE compte à rebours
+  //    affiché (`data-action-dans`), quel que soit le dessin qui l'a posé (vue complète, mise à jour sur place `majPlein`, étape
+  //    des favoris). Avant : un minuteur attaché à UN élément, perdu dès qu'une mise à jour sur place le remplaçait.
+  let horlogeRelue = 0;
+  function tourHorloge() {
+    let l = []; try { l = [...racine.querySelectorAll('[data-action-dans]')]; } catch (_) { l = []; }
+    let echu = 0;
+    for (const el of l) { const t = Number(el.getAttribute('data-action-dans')); if (!(t > 0)) continue; if (t <= Date.now()) { echu = Math.max(echu, t); continue; } const x = T('a_ensuite', { dans: U.duree(t - Date.now()) }); if (el.textContent !== x) el.textContent = x; }
+    if (echu && echu !== horlogeRelue) { horlogeRelue = echu; lire(); }
   }
+  function minuter() { if (minuteur == null) minuteur = setInterval(tourHorloge, 1000); tourHorloge(); }
   // Un pas de plus (le compteur, la barre, l'article, la suite) : SUR PLACE, rien n'est démonté.
   function majPlein(a) {
     const it = a.item || {};

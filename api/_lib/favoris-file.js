@@ -2,7 +2,7 @@
 // recipients from native captures before passing targets here. No network IO
 // inside a CAS decision: a retry must never repeat a Vinted request.
 export class RefusFavoris extends Error { constructor(message,status=409){super(message);this.status=status;} }
-import {RAISONS_FAVORIS,bilanFavoris,ETAPE_ACCUSE,CAUSE_ACCUSE,refusLocal,REFUS_LOCAUX_MAX,MOTS_REFUS,phraseRaisonFile} from '../../src/favorisProgression.js';
+import {RAISONS_FAVORIS,bilanFavoris,ETAPE_ACCUSE,CAUSE_ACCUSE,refusLocal,REFUS_LOCAUX_MAX,MOTS_REFUS,phraseRaisonFile,sautSuspect} from '../../src/favorisProgression.js';
 import {AUTO_FREINS,AUTO_PAUSE_MS,AUTO_ESSAIS,AUTO_AVANT_ECRITURE,DEMANDES_AUTO,RAISONS_DEMANDE,dansPlageAuto,ecartAutoMs} from '../../src/favorisAuto.js';
 const entier=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v);
 const clone=v=>structuredClone(v);
@@ -173,7 +173,9 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
   if(!['envoye','ignore','refuse','incertain'].includes(resultat))throw new RefusFavoris('Accusé invalide.',400);
   if(['envoye','ignore'].includes(resultat)&&!e.autorise)throw new RefusFavoris('Cette tentative n’a pas été autorisée par le serveur.');
   const fin=Math.max(e.at,Number.isSafeInteger(maintenant)?maintenant:e.at);
-  if(resultat==='ignore'){
+  // 5.455.4 : un favori sauté APRÈS une écriture chez Vinted (la conversation ouverte) garde SON rythme (20–60 s au hasard) :
+  //    seul un saut sans rien d'écrit rend sa place et son temps.
+  if(resultat==='ignore'&&!(Number.isInteger(ecrits)&&ecrits>=1)){
     d.tentatives=d.tentatives.filter(t=>t!==e.at);g.prochain=e.prochainAvant||0;d.prochainGlobal=e.globalAvant||0;
   }else{d.tentatives=d.tentatives.map(t=>t===e.at?fin:t);g.prochain=Math.max(g.prochain||0,fin+(Number.isSafeInteger(e.delai)?e.delai:j.intervalleMinutes*60000));d.prochainGlobal=g.prochain;}
   const raisons=['article_vendu','ecran_inactif','compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue','onglet_vinted','offre_refusee','offre_prix_inconnu','offre_incertaine','conversation_existante','vinted_frein','vinted_robot','tout_arrete','trop_tard','annonce_indisponible','texte_interdit','texte_refuse','offre_sous_plancher','conversation_refusee','telephone_a_verifier','element_introuvable','favori_trop_ancien','notification_pas_trouvee','fil_non_relu','destinataire_different','article_different','variable_manquante'];
@@ -223,13 +225,18 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
     //    et un code la fait traduire par l'extension (`raisonCode`) — le texte français reste pour l'app.
     const rr=MOTS_REFUS[raison]?raison:'autre';g.raisonCode='local_saute';g.raisonRefus=rr;g.raison=phraseRaisonFile('local_saute',{refus:rr});if(!g.jobs.some(x=>x.etat==='attente')){g.active=false;g.raison='Sélection traitée ou file arrêtée.';g.raisonCode='traitee';}}
   else if(attendQuota){j.etat='attente';delete j.raison;delete j.traiteLe;j.attentesQuota=(Number(j.attentesQuota)||0)+1;const att=Number.isSafeInteger(apresMs)&&apresMs>=5000&&apresMs<=3600000?apresMs:QUOTA_ATTENTE_MS;g.prochain=Math.max(e.prochainAvant||0,fin+att);d.prochainGlobal=g.prochain;g.raison='La limite d’actions de l’heure est atteinte : les messages suivants partent dès qu’une place se libère.';}
+  // 5.455.4 : un saut « conversation ouverte mais pas relue / historique illisible » compte dans les refus de suite ; au 3ᵉ, la
+  //    file s'arrête et le dit (plus jamais une conversation vide ouverte avec chaque acheteur de la file).
+  else if(!j.auto&&sautSuspect({resultat,raison,ecrits:j.ecrits})){g.refusLocaux=(Number(g.refusLocaux)||0)+1;
+    if(g.refusLocaux>=REFUS_LOCAUX_MAX){g.active=false;g.raisonCode='locaux_suite';g.raisonRefus=raison;g.raisonN=g.refusLocaux;g.raison=phraseRaisonFile('locaux_suite',{refus:raison,n:g.refusLocaux});}
+    else if(!g.jobs.some(x=>x.etat==='attente')){g.active=false;g.raison='Sélection traitée ou file arrêtée.';g.raisonCode='traitee';}}
   else if(j.auto&&['envoye','ignore'].includes(resultat)){if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
   else if(!['envoye','ignore'].includes(resultat)){g.active=false;const suite=!j.auto&&refusLocal({resultat,raison,ecrits:j.ecrits,cause:j.cause,etape:j.etape});if(suite){g.raisonCode='locaux_suite';g.raisonRefus=MOTS_REFUS[raison]?raison:'autre';g.raisonN=(Number(g.refusLocaux)||0)+1;}g.raison=suite?phraseRaisonFile('locaux_suite',{refus:g.raisonRefus,n:g.raisonN}):raison==='article_vendu'?'Article vendu : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='annonce_indisponible'?'Annonce réservée, masquée, fermée ou supprimée : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='ecran_inactif'?'Écran des favoris quitté avant le départ. Les messages restants ne sont pas envoyés.':raison==='vinted_robot'&&!j.auto?'Vinted a refusé l’envoi (protection anti-robot) : la file est en pause, rien ne part. Si Vinted affiche une vérification sur vinted.fr, fais-la ; puis « Reprendre » sur la carte VRM de vinted.fr (on reprend plus doucement pendant 24 h).':resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':RAISONS_FAVORIS[raison]?`${RAISONS_FAVORIS[raison]} Les messages restants ne sont pas envoyés.`:'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
   else {if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;if(!g.active){g.raison='Sélection traitée ou file arrêtée.';g.raisonCode='traitee';}}
   // (28 oct.) La file vient de se TERMINER (finie ou interrompue) : son bilan,
   // une seule fois (la transition active → inactive), pour la notification.
   const valeur=vueFile(d,owner);if(nouvelleDemande)valeur.nouvelleDemande=nouvelleDemande;
-  if(etaitActive&&!g.active&&!j.auto){const lot=g.jobs.filter(x=>x.lot===g.lot);const n=k=>lot.filter(x=>x.etat===k).length;valeur.fin={lot:g.lot||null,total:lot.length,envoyes:n('envoye'),incertains:n('incertain'),interrompus:n('refuse'),interrompue:!['envoye','ignore'].includes(resultat)&&!autreVersion,bilan:bilanFavoris(lot)};}
+  if(etaitActive&&!g.active&&!j.auto){const lot=g.jobs.filter(x=>x.lot===g.lot);const n=k=>lot.filter(x=>x.etat===k).length;valeur.fin={lot:g.lot||null,total:lot.length,envoyes:n('envoye'),incertains:n('incertain'),interrompus:n('refuse'),interrompue:(!['envoye','ignore'].includes(resultat)&&!autreVersion)||g.raisonCode==='locaux_suite',bilan:bilanFavoris(lot)};}
   return {data:d,valeur};
 }
 // (29 oct., revue) Une offre (même un simple %) ne part que d'une extension ≥ 5.280 : avant, elle

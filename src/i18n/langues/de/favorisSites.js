@@ -53,5 +53,7 @@ export default {
   "fav.bilan.r.article_different": "anderer Artikel in der Unterhaltung",
   "fav.bilan.r.variable_manquante": "Nachrichtenvariable für diesen Artikel unbekannt",
   "fav.bilan.r.historique_non_verifie": "Unterhaltung nicht geprüft",
+  "fav.bilan.r.fil_non_relu": "Unterhaltung bei Vinted nicht gelesen",
+  "fav.bilan.r.offre_prix_inconnu": "Artikelpreis nicht in Euro gelesen",
   "fav.bilan.r.autre": "andere Ablehnung",
 };
