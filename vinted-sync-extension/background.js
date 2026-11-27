@@ -16757,16 +16757,24 @@ function raisonChoixFavori(ch) {
 }
 // Un message ÉCRIT par une personne (pas un message du système) : la forme la plus prudente — un type de texte connu,
 // ou un contenu texte non vide porté par un auteur. Forme inconnue ⇒ compté comme écrit (on n'écrit pas par-dessus).
+function montantMessageOffre(m) {
+  const e = m && typeof m === 'object' ? m : {};
+  const c = [e.price, e.amount, e.entity && e.entity.price, e.entity && e.entity.amount, e.data && e.data.price, e.offer && e.offer.price];
+  return c.some((v) => { const x = v && typeof v === 'object' ? Number(v.amount) : Number(v); return Number.isFinite(x) && x > 0; });
+}
 function messagesEcritsMessagerie(liste) {
   if (!Array.isArray(liste)) return -1;
   let n = 0;
   for (const m of liste) {
     if (!m || typeof m !== 'object') { n++; continue; }
     const t = String(m.entity_type || m.type || m.kind || '').toLowerCase();
-    if (/^(message|text|text_message|user_message|reply|offer_request_message)$/.test(t)) { n++; continue; }
-    // 5.455.4 : une OFFRE déjà dans la conversation (la sienne, `offer_message`, ou celle de l'acheteur) = déjà en contact :
-    //    jamais une 2ᵉ offre ni un message par-dessus (avant : `offer_message` passait pour un message du système).
-    if (/offer/.test(t)) { n++; continue; }
+    if (/^(message|text|text_message|user_message|reply)$/.test(t)) { n++; continue; }
+    // 5.455.4 : une OFFRE déjà faite dans la conversation (la sienne, `offer_message`, ou celle de l'acheteur,
+    //    `offer_request_message`) — une offre qui porte un MONTANT — = déjà en contact : jamais une 2ᵉ offre ni un message
+    //    par-dessus. Julien (27 nov. 18:15 : « sur certains comptes, quand on ouvre le favori, l'offre est proposée directement ») :
+    //    une INVITATION de Vinted à faire une offre (un type « offer… » SANS montant) n'est PAS un contact — l'offre part une
+    //    fois (registre), puis le message, comme Vintex. (Formes jamais mesurées : les types vus sont notés à la relecture.)
+    if (/offer/.test(t)) { if (montantMessageOffre(m)) n++; continue; }
     if (/(status|system|transaction|offer|event|action|notification|info)/.test(t)) continue;
     const contenu = typeof m.content === 'string' ? m.content : typeof m.body === 'string' ? m.body : (m.data && typeof m.data.content === 'string') ? m.data.content : '';
     if (contenu.trim() || !t) n++;
@@ -22655,6 +22663,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     if(!q.ok)return rep(q.status>=400&&q.status<500?'refuse':'incertain',q.status);
     // 2. La conversation et la transaction de la RÉPONSE.
     const uuid=uuidConversationCree(q.json),tx=txCreationFavori(q.json);
+    {const connues=['inquiry_id','transaction_id','conversation_id','read_after_write_token','id','conversation'];const autres=q.json&&typeof q.json==='object'?Object.keys(q.json).filter((k)=>!connues.includes(k)):[];if(autres.length){noterDiag('favori_req_inquiry_cles_neuves');await noterFormeFavori('inquiry','cles',formeCles(q.json));}}
     if(!uuid){noterDiag('favori_req_uuid_absent');await noterFormeFavori('inquiry','uuid_absent',formeCles(q.json));return rep('incertain',q.status,'creation_non_confirmee');}
     if(!tx){noterDiag('favori_req_sans_transaction');await noterFormeFavori('inquiry','transaction',formeCles(q.json));}
     // 3. Une relecture : l'historique (et la personne, si Vinted la dit).
@@ -22678,8 +22687,10 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     const ecritsAvant=messagesEcritsMessagerie(cv.messages);
     if(ecritsAvant<0){await noterFormeFavori('conversation','messages',formeCles(cv));return rep('ignore',ln.status,'historique_non_verifie');}
     if(ecritsAvant>0||(cv.pagination&&cv.pagination.has_next===true))return rep('ignore',ln.status,body.auto===true?'conversation_existante':'conversation_deja_contactee');
-    // Mode AUTO (garde-fou 5.309) : un message quel qu'il soit (même du système) ⇒ rien n'est écrit.
-    if(body.auto===true&&cv.messages.length>0){await noterFormeFavori('conversation','auto_types',[...new Set(cv.messages.slice(0,8).map((m)=>String(m&&typeof m==='object'?(m.entity_type||m.type||m.kind||'sans_type'):typeof m).replace(/[^a-z_]/gi,'').slice(0,24)))].join(','));return rep('ignore',ln.status,'conversation_existante');}
+    // Une conversation qui porte des messages du SYSTÈME (ou l'invitation de Vinted à faire une offre) : on continue, comme Vintex ;
+    //    leurs types (jamais un texte) sont notés pour la prochaine mesure. Mode auto compris (Julien, 27 nov. 18:15 : « 100 %
+    //    automatique ») : la règle du manuel — un message ÉCRIT ou une offre faite ⇒ sauté.
+    if(cv.messages.length>0){noterDiag('favori_req_messages_systeme');await noterFormeFavori('conversation','types',[...new Set(cv.messages.slice(0,8).map((m)=>String(m&&typeof m==='object'?(m.entity_type||m.type||m.kind||'sans_type'):typeof m).replace(/[^a-z_]/gi,'').slice(0,24)))].join(','));}
     const oppL=(Array.isArray(cv.opposite_users)?cv.opposite_users:[]).find((x)=>x&&typeof x==='object'&&idPersonneFavori(x)===body.recipientId);
     const login=oppL&&typeof oppL.login==='string'&&/^[\w.\-]{1,80}$/.test(oppL.login)?oppL.login:'';
     // 4a. La transaction de la réponse, relue (comme Vintex) : le prix de CET article, maintenant.

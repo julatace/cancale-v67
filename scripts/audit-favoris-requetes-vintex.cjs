@@ -50,8 +50,9 @@ const MUTATIONS = {
   'prix-dressing': ["if(!titre){const lu=await dressingLu(String(uid)).catch(()=>null);const it=lu&&Array.isArray(lu.items)?lu.items.find((x)=>x&&String(x.id)===body.itemId):null;if(it&&typeof it.title==='string')titre=it.title.slice(0,120);}", "{const lu=await dressingLu(String(uid)).catch(()=>null);const it=lu&&Array.isArray(lu.items)?lu.items.find((x)=>x&&String(x.id)===body.itemId):null;if(it&&!(Number(prixAnnonce)>0))prixAnnonce=Number(prixCarte(it.price));if(it&&!titre&&typeof it.title==='string')titre=it.title.slice(0,120);}"],
   'tx-demande-autre-article': ["if(artTx&&artTx!==body.itemId){noterDiag('favori_req_tx_autre_article');", "if(false){"],
   'ecrit-sur-4xx': ["function ecritureFavoriPartie(x) { if (!x || x.rienParti) return false; const s = Number(x.status) || 0; return !(s >= 400 && s < 500); }", "function ecritureFavoriPartie(x) { return !!x && !x.rienParti; }"],
-  'offre-pas-contact': ["    if (/offer/.test(t)) { n++; continue; }", ""],
-  'auto-messages-systeme': ["if(body.auto===true&&cv.messages.length>0){", "if(false){"],
+  'offre-pas-contact': ["    if (/offer/.test(t)) { if (montantMessageOffre(m)) n++; continue; }", "    if (/offer/.test(t)) continue;"],
+  'invitation-comptee': ["    if (/offer/.test(t)) { if (montantMessageOffre(m)) n++; continue; }", "    if (/offer/.test(t)) { n++; continue; }"],
+  'auto-saute-systeme': ["    if(cv.messages.length>0){noterDiag('favori_req_messages_systeme');", "    if(body.auto===true&&cv.messages.length>0)return rep('ignore',ln.status,'conversation_existante');if(cv.messages.length>0){noterDiag('favori_req_messages_systeme');"],
   'autre-devise': ["if(String(devise)!=='EUR'){", "if(false){"],
   'sans-registre': ["if(deja&&(deja.o||deja.m)){", "if(false){"],
   'registre-apres-message': ["    await noterRegistreFavori(uid,body.itemId,body.recipientId,'m');\n    if(attente){", "    if(attente){"],
@@ -197,9 +198,23 @@ const court = (f, r) => JSON.stringify({ r: r && (r.json || r.erreur), v: f.j.vi
   { const conv = Object.assign({}, MESUREE.convBrute, { messages: [{ entity_type: 'offer_message', entity: { price: { amount: '40.0' } } }] });
     const f = monter(Object.assign({}, MESUREE, { convBrute: conv })); const r = await jouer(f);
     dit(res(r).resultat === 'ignore' && !offreSur(f) && ecr(f).length === 1, 'V25 SA propre offre déjà dans la conversation (`offer_message`) ⇒ sauté, jamais une 2ᵉ offre', court(f, r)); }
-  { const conv = Object.assign({}, MESUREE.convBrute, { messages: [{ entity_type: 'status_message', content: '' }] });
+  // Le mode AUTO passe par le MÊME chemin (`favorisAuto` → pilote → `executerMessageFavori`, chemin des requêtes) :
+  { const f = monter(Object.assign({}, MESUREE, { auto: true })); const r = await jouer(f);
+    dit(res(r).resultat === 'envoye' && parti(f) && !f.clics.length, 'V26 mode AUTO, de bout en bout par le chemin de Vintex : demande, offre au plancher, message ; aucun clic', court(f, r)); }
+  { const conv = Object.assign({}, MESUREE.convBrute, { messages: [{ entity_type: 'message', content: 'Toujours dispo ?' }] });
     const f = monter(Object.assign({}, MESUREE, { convBrute: conv, auto: true })); const r = await jouer(f);
-    dit(res(r).resultat === 'ignore' && res(r).raison === 'conversation_existante' && ecr(f).length === 1, 'V26 mode AUTO : un message (même du système) ⇒ rien n’est écrit (garde-fou 5.309)', court(f, r)); }
+    dit(res(r).resultat === 'ignore' && res(r).raison === 'conversation_existante' && ecr(f).length === 1, 'V26b mode AUTO : la conversation porte déjà un message ⇒ rien n’est écrit', court(f, r)); }
+  { const f = monter(Object.assign({}, MESUREE, { auto: true })); const r1 = await jouer(f); const n1 = ecr(f).length; const r2 = await jouer(f);
+    dit(res(r1).resultat === 'envoye' && res(r2).resultat !== 'envoye' && ecr(f).length === n1, 'V26c mode AUTO : le même favori repris ⇒ jamais deux fois (rien de plus chez Vinted)', court(f, r2)); }
+  // Julien (27 nov. 18:15) : « sur certains comptes, quand on ouvre le favori, l'offre est proposée directement ».
+  for (const [nom, m] of [['invitation sans montant', { entity_type: 'offer_suggestion_message' }], ['message du système', { entity_type: 'status_message', content: '' }], ['invitation « offer » sans montant', { type: 'offer', data: {} }]]) {
+    for (const auto of [false, true]) {
+      const conv = Object.assign({}, MESUREE.convBrute, { messages: [m] });
+      const f = monter(Object.assign({}, MESUREE, { convBrute: conv, auto })); const r = await jouer(f);
+      const offres = ecr(f).filter((x) => /\/offers$/.test(x.chemin)).length;
+      dit(res(r).resultat === 'envoye' && offres === 1 && ecr(f).some((x) => /replies$/.test(x.chemin)), `V36 conversation ouverte avec ${nom}${auto ? ' (auto)' : ''} ⇒ pas « déjà en conversation » : UNE offre puis le message`, court(f, r));
+    }
+  }
   { const f = monter(Object.assign({}, MESUREE, { txBrute: Object.assign({}, MESUREE.txBrute, { item: { id: 101, price: { amount: '53.0', currency_code: 'GBP' } } }) })); const r = await jouer(f);
     dit(res(r).resultat === 'refuse' && res(r).raison === 'offre_prix_inconnu' && !offreSur(f), 'V27 prix dans une autre devise ⇒ aucune offre (jamais converti), dit', court(f, r)); }
   { const f = monter({ vrmInjoignable: true }); const r = await jouer(f);
