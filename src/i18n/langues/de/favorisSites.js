@@ -38,6 +38,8 @@ export default {
   "fav.bilan.s.conversation_deja_contactee": "schon im Gespräch",
   "fav.bilan.s.offre_sous_plancher": "Angebot unter dem Mindestpreis",
   "fav.bilan.s.conversation_refusee": "Gespräch von Vinted abgelehnt",
+  "fav.bilan.s.fil_non_relu": "Unterhaltung bei Vinted nicht gelesen",
+  "fav.bilan.s.historique_non_verifie": "Unterhaltung nicht geprüft",
   "fav.bilan.s.autre": "andere",
   "fav.bilan.r.texte_interdit": "Text mit Link, E-Mail, Telefonnummer oder Zahlung außerhalb von Vinted",
   "fav.bilan.r.texte_refuse": "Text von Vinted abgelehnt",
@@ -47,6 +49,9 @@ export default {
   "fav.bilan.r.element_introuvable": "Schaltfläche oder Feld auf der Vinted-Seite nicht gefunden",
   "fav.bilan.r.notification_pas_trouvee": "Benachrichtigung wird gesucht (VRM versucht es selbst erneut)",
   "fav.bilan.r.identite_non_confirmee": "Artikel oder Empfänger nicht bestätigt",
+  "fav.bilan.r.destinataire_different": "andere Person in der Unterhaltung",
+  "fav.bilan.r.article_different": "anderer Artikel in der Unterhaltung",
+  "fav.bilan.r.variable_manquante": "Nachrichtenvariable für diesen Artikel unbekannt",
   "fav.bilan.r.historique_non_verifie": "Unterhaltung nicht geprüft",
   "fav.bilan.r.autre": "andere Ablehnung",
 };
