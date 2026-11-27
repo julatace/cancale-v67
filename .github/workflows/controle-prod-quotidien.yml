@@ -59,7 +59,7 @@ jobs:
       - name: Installer Chromium
         if: steps.heure.outputs.joue == 'true'
         run: |
-          npx playwright install --with-deps chromium
+          bash scripts/ci-installer-navigateurs.sh chromium   # sans la source apt de Microsoft, 4 essais (scripts/ci-installer-navigateurs.sh)
           echo "VRM_CHROMIUM_PATH=$(node -e 'console.log(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
       - name: Contrôler vrm.center (rejoué une fois après 5 min s'il est rouge)
         id: controle

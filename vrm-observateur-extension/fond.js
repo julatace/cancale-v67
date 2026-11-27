@@ -56,7 +56,7 @@ chrome.runtime.onMessage.addListener((msg, snd, rep) => {
   // 2.0 : un geste de la page (page.js), passé par la règle avant d'être gardé.
   if (msg && msg.obs === 'geste' && actif !== false) { const e = OBS.geste(Object.assign({}, msg.g, { onglet: snd && snd.tab ? snd.tab.id : undefined })); if (e) file.push(e); }
 });
-// 2.0 : les onglets Vinted ouverts, changés, fermés (qui ouvre quoi pendant un envoi).
+// 2.0 : les onglets Vinted (2.1 : et Vestiaire) ouverts, changés, fermés (qui ouvre quoi pendant un envoi).
 chrome.tabs.onCreated.addListener((t) => { if (actif === false) return; const e = OBS.geste({ k: 'onglet', t: Date.now(), vrai: true, url: t.pendingUrl || t.url || 'about:blank', quoi: 'cree', onglet: t.id }); if (e) file.push(e); });
-chrome.tabs.onUpdated.addListener((id, ch) => { if (actif === false || !ch.url) return; const e = OBS.geste({ k: 'onglet', t: Date.now(), vrai: true, url: ch.url, quoi: 'adresse', onglet: id }); if (e && (e.p || OBS.estVinted(e.h))) file.push(e); });
+chrome.tabs.onUpdated.addListener((id, ch) => { if (actif === false || !ch.url) return; const e = OBS.geste({ k: 'onglet', t: Date.now(), vrai: true, url: ch.url, quoi: 'adresse', onglet: id }); if (e && (e.p || OBS.estSuivi(e.h))) file.push(e); });
 chrome.tabs.onRemoved.addListener((id) => { if (actif === false) return; file.push({ k: 'onglet', t: Date.now(), vrai: true, quoi: 'ferme', onglet: id }); });

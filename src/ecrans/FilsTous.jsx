@@ -15,7 +15,7 @@
 // demande (« Peut-être la même paire ? »), SON clic relie, « Délier » défait.
 import React from 'react';
 import { motsVendeur } from '../profilVendeur.js';
-import { C, Icon, PhotoVinted, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc, appelEbay, corpsCompteEbay, lireComptesEbay, askConfirm, verifierMessageAvantEnvoi, useCompteVcOuvert } from '../App.jsx';
+import { C, Icon, PhotoVinted, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc, appelEbay, corpsCompteEbay, lireComptesEbay, lireEbayTous, numEbayLu, askConfirm, verifierMessageAvantEnvoi, useCompteVcOuvert } from '../App.jsx';
 import { risquesMessage, phraseRisqueMessage } from '../messageSur.js';
 import { tr } from '../i18n/index.js';
 import { attrCible } from '../cibleNotif.js';   // (22 nov., ext. 5.435) la loupe mène à CE fil (Vinted, Leboncoin, Vestiaire)
@@ -169,8 +169,17 @@ function useEbayTous() {
     const res = await Promise.all(comptes.map(async (c) => { const ref = c.ref || 'principal'; const { j } = await appelEbay({ action: 'messages', page: 1, ...corpsCompteEbay(ref) }); return { ref, j }; }));
     if (stop) return;
     if (res.some((r) => !(r.j && r.j.ok && Array.isArray(r.j.messages)))) { setD(null); return; }
+    // (26 nov.) Les annonces captées de chaque compte (lecture projetée, §4.4) : le N° d'un échange vient de SON ItemID
+    // (le SKU `VRM-{n°}` de CETTE annonce, `numEbayLu`), comme l'écran Messages · eBay d'avant. Illisible ⇒ aucun N° (un blanc,
+    // jamais un faux) ; les messages restent.
+    let annonces = null;
+    try { annonces = await lireEbayTous('ebay_listings', 'items:data->items,capturedAt:data->>capturedAt', 'items', comptes); } catch (_) { annonces = null; }
+    if (stop) return;
+    const parItem = new Map();
+    for (const a of (annonces && Array.isArray(annonces.items) ? annonces.items : [])) { if (!a || a.itemId == null) continue; const k = (a._compte || 'principal') + ':' + String(a.itemId); if (!parItem.has(k)) parItem.set(k, a); }
+    const numDe = (m, ref) => { const id = m && m.itemId != null ? String(m.itemId).trim() : ''; if (!/^\d{1,19}$/.test(id)) return ''; const a = parItem.get(ref + ':' + id) || null; try { return numEbayLu(a && a.sku, id, null, a && a.depuis) || ''; } catch (_) { return ''; } };
     const messages = new Map(), items = [];
-    for (const { ref, j } of res) for (const m of j.messages) { items.push({ m, compte: ref }); messages.set(ref + ':' + m.id, { m, compte: ref }); }
+    for (const { ref, j } of res) for (const m of j.messages) { const x = { m, compte: ref, num: numDe(m, ref) }; items.push(x); messages.set(ref + ':' + m.id, x); }
     setD({ items, messages });
   })(); return () => { stop = true; }; }, [tick]);
   return [d, () => setTick((t) => t + 1)];
@@ -207,7 +216,7 @@ function FilEbay({ x, onFerme, onEnvoye }) {
         {risquesMessage(t, 'ebay').length > 0 && <p role="status" data-message-risque={risquesMessage(t, 'ebay').map((r) => r.code).join(' ')} style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.warn }}>{risquesMessage(t, 'ebay')[0].texte} · {phraseRisqueMessage('ebay')}</p>}
         <textarea data-fil-ebay-saisie value={t} onChange={(e) => setT(e.target.value.slice(0, 2000))} rows={3} aria-label={tr('ebay.fil.repondre')} placeholder={tr('ebay.fil.repondre')} style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 12, padding: 10, fontSize: 17, fontFamily: 'inherit', background: C.card, color: C.text }}/>
         <div><Bouton variante="primaire" occupe={occupe} disabled={!t.trim()} data-fil-ebay-envoyer="" onClick={envoyer}>{tr('ebay.fil.envoyer')}</Bouton></div>
-      </>) : <p data-fil-ebay-sans-reponse style={{ fontSize: 13, color: C.muted }}>{tr('ebay.fil.surEbay')}</p>}
+      </>) : <p data-fil-ebay-sans-reponse style={{ fontSize: 13, color: C.muted }}>{tr('ebay.fil.surEbay')}{/^\d{1,19}$/.test(String(m.itemId || '')) ? <>{' '}<a data-pied-ouvrir="" href={`https://www.ebay.fr/itm/${m.itemId}`} target="_blank" rel="noreferrer" style={{ color: C.text, fontWeight: 600, display: 'inline-block', minHeight: 44, lineHeight: '44px' }}>{tr('alertesEbay.voir')}</a></> : null}</p>}
       {msg && <p role="status" style={{ fontSize: 13, color: C.text }}>{msg}</p>}
     </div>
   );
@@ -239,7 +248,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
     for (const x of (Array.isArray(vinted) ? vinted : [])) { const e = convVinted(x.c, x.paire, undefined, x.dernier); if (e) { e.compteNom = x.compte || ''; if (x.offre && Number(x.offre.prix) > 0) e.offre = { prix: Number(x.offre.prix) }; parCle.set(e.cle, { e, c: x.c }); entrees.push(e); } }
     for (const f of ((autres.lbc && autres.lbc.fils) || [])) { const e = convLeboncoin(f); if (e) { e.compteNom = f.nom || ''; parCle.set(e.cle, { e }); entrees.push(e); } }
     for (const v of ((autres.vc && autres.vc.fils) || [])) { const e = convVestiaire(v); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
-    for (const x of ((ebayTous && ebayTous.items) || [])) { const e = convEbay(x.m, x.compte); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
+    for (const x of ((ebayTous && ebayTous.items) || [])) { const e = convEbay(x.m, x.compte, x.num); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
     const fils = regrouperFils(entrees, relies.liens);
     return { parCle, fils, propositions: suggestionsFils(fils, relies.liens, relies.refus) };
   }, [vinted, sigVinted, autres, ebayTous, relies]);
