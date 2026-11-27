@@ -33,12 +33,13 @@ import { aVenirPour } from '../argentAVenir.js';   // (15 nov., verre 2) la part
 import { resumeEtapes, ouvrirArgentAVenir, Groupe as GroupeAVenir } from '../ArgentAVenirEcran.jsx';
 import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le livre de police
 import { lireFactures, lireContenuFacture } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
-import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
+import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport, csvImportComptable, nomFichierImport, lignesImport } from '../exportComptable.js';
+import { rythmeChoisi, periodesUrssaf as periodesExportUrssaf, periodeUrssafParDefaut, donneesExportUrssaf, lignesARecopier, csvExportUrssaf, pdfExportUrssaf, nomFichierUrssaf } from '../exportUrssaf.js';   // (27 nov.) « Pour l'URSSAF »
 import { periodeBouclee, lireJustificatifs, zipExportComptable, partagerOuTelecharger } from '../exportComptableZip.js';   // (11 nov.) le zip « Pour mon comptable »
 import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ventesAilleursDe, lireComptaPourEcrire } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
-import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from '../microEntreprise.js';
+import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe,caAnnee as caAnneeLigne} from '../microEntreprise.js';
 import { moisAtteinte, dac7ParPlateforme } from '../seuilsAnnee.js';
 import { previsionUrssaf } from '../previsionUrssaf.js';
 import { prochainNumeroFacture, noterNumeroPris } from '../factureNumero.js';   // (11 nov.) numérotation continue, jamais réutilisée
@@ -1913,18 +1914,22 @@ const libelleYm = (ym) => { const [a, m] = String(ym).split('-'); return `${MOIS
 // écartés (`compteEcarte`, `excluAutre`). Pure : `scripts/audit-registres.cjs`
 // l'EXÉCUTE. Les ventes Vinted ne passent que si les dates de versement sont
 // lues (sinon une vente serait datée à tort).
-const declarablesCompta = ({ ventes, ko, lbc = [], ebay = [], vestiaire = [], rates = [], versements, hTx, hAcc, panelOff, excluAutre, loginDe = (u) => String(u), importees = [], main = [] }) => {
+// (27 nov., lot compta-export) `declare` : le registre « J'ai déclaré » (`vrm_urssaf_declare`) — passé par l'export
+// URSSAF seulement : une vente déclarée compte alors dans le mois de SA déclaration (la règle de `ventesDeclarables`).
+const declarablesCompta = ({ ventes, ko, lbc = [], ebay = [], vestiaire = [], rates = [], versements, hTx, hAcc, panelOff, excluAutre, loginDe = (u) => String(u), importees = [], main = [], declare = undefined }) => {
   const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
   const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
-  const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {}, importees, main });
+  const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {}, importees, main, declare });
   // (1er nov., audits A2/A10) Vestiaire pas lu, et les ventes dont l'argent ne
   // se lit pas : NOMMÉES dans ce qui manque (jamais un total partiel complet).
   const ncER = phraseNonComptees((decl.ecartees || []).filter((x) => x && x.manque));
   const manque = [...(ko || []).filter((uid) => !ecarte(uid)).map(loginDe), ...rates, ...(ncER ? [ncER] : [])];
   return { decl, manque };
 };
-function useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+function useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, avecDeclarations = false }) {
   const excluAutre = useExcluAutre();
+  // (27 nov., lot compta-export) L'export URSSAF lit AUSSI le registre de ses déclarations ; pas encore arrivé ⇒ « en cours ».
+  const [regDecl, regDeclPret] = useLigneSynchro('vrm_urssaf_declare', lireDeclarations);
   const { ventes, ko } = useVentesCoque();
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const ventesVcER = useVentesVestiaire();
@@ -1936,16 +1941,17 @@ function useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
   const calc = React.useMemo(() => {
     if (ventes === undefined) return { etat: 'encours' };
     if (!Array.isArray(ventes)) return { etat: 'passu' };
+    if (avecDeclarations && !regDeclPret) return { etat: 'encours' };
     const hTx = new Set(VENTES_MASQUEES_AUCUNE().map(String));
     const hAcc = comptesHorsTotaux(load('vinted_accounts_hidden', []) || [], load(CLE_ROLES_COMPTES, {}));   // (20 nov.) + les comptes PERSONNELS (src/rolesComptes.js)
     const loginDe = (uid) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
     const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
     const rates = [...(lbcCoqueLu === null ? ['Leboncoin'] : []), ...(ebayCommandes === null ? ['eBay'] : []), ...(ventesVcER === null ? ['Vestiaire'] : [])];
-    const { decl, manque } = declarablesCompta({ ventes, ko, lbc, ebay, vestiaire: ventesVcER || [], rates, versements, hTx, hAcc, panelOff, excluAutre, loginDe, importees: lireVentesImportees(), main: ventesAilleursDe(ventes) });
+    const { decl, manque } = declarablesCompta({ ventes, ko, lbc, ebay, vestiaire: ventesVcER || [], rates, versements, hTx, hAcc, panelOff, excluAutre, loginDe, importees: lireVentesImportees(), main: ventesAilleursDe(ventes), declare: avecDeclarations ? regDecl : undefined });
     return { etat: 'lu', decl, manque, attente: lbcCoqueLu === undefined || ebayCommandes === undefined || versements === undefined || ventesVcER === undefined };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVcER, excluAutre, decAilleurs]);
+  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVcER, excluAutre, decAilleurs, avecDeclarations, regDecl, regDeclPret]);
   return { calc, versements };
 }
 // ── (3 nov.) LES REGISTRES : LIVRE DES RECETTES ET REGISTRE DES ACHATS ──────
@@ -2022,6 +2028,7 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
   React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === CLE_FOURNISSEURS || k === 'vinted_annonce_numeros' || k === 'vinted_offvinted_buys' || k === CLE_HORS_MASQUES) setTicAchats((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   const recettes = React.useMemo(() => {
     if (calc.etat !== 'lu') return calc.etat === 'passu' ? null : undefined;
+    if (versements === undefined) return undefined;   // (27 nov.) dates de versement en lecture : aucune vente Vinted datée encore, jamais « 0 »
     return recettesDe({ calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER });
   }, [calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER]);
   const registreAchats = React.useMemo(() => (achats === undefined ? undefined : registreAchatsDe({ achats, recus, periode, panelOff })),
@@ -2182,17 +2189,23 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
   // (10 nov., lot AN) Les factures d'achat jointes (liste sans contenu) : mentionnées sur leur ligne d'achat ; pas lues ⇒ aucune mention.
   const [facturesJointes, setFacturesJointes] = React.useState(null);
   React.useEffect(() => { let mort = false; lireFactures({ fetch: (...a) => fetch(...a), url: SUPABASE_URL, auth: sbAuth }).then((m) => { if (!mort) setFacturesJointes(m); }); return () => { mort = true; }; }, []);
-  const pret = calc.etat !== 'encours' && achats !== undefined && recus !== undefined && regime !== undefined;
+  // (27 nov., lot compta-export) Le relevé de Ventes (prix de vente, prix d'achat, frais notés, par identité) : pas
+  // publié ⇒ null (les colonnes disent « — » et le récap le nomme).
+  const [releveV, relevePret] = useLigneSynchro('vrm_stats_ventes', lireReleveVentes);
+  const pret = calc.etat !== 'encours' && achats !== undefined && recus !== undefined && regime !== undefined && relevePret && versements !== undefined;   // (27 nov.) dates de versement encore en lecture ⇒ aucune vente Vinted n'est datée : on attend, jamais « 0 vente »
   const D = React.useMemo(() => {
     if (!pret) return undefined;
     const recettes = calc.etat === 'lu' ? recettesDe({ calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER }) : null;
     const registre = registreAchatsDe({ achats, recus, periode, panelOff });
+    // La référence de l'achat d'une vente : les achats de l'année de la période et de celle d'avant (le même registre).
+    const an = Number(String(periode).slice(0, 4));
+    const achatsRef = [String(an), String(an - 1)].flatMap((p) => { const r = registreAchatsDe({ achats, recus, periode: p, panelOff }); return r ? r.lignes : []; });
     // (23 nov., lot export-comptable) + les dépenses notées : la ligne de Comptabilité (`vrm_compta`, la même que « + Dépense ») ;
     // illisible ⇒ null (« dépenses pas lues », jamais 0). Jamais notée ⇒ {} (lue : aucune dépense).
     let compta = null;
     try { const c = load('vrm_compta', null); compta = c == null ? {} : (typeof c === 'object' && !Array.isArray(c) ? c : null); } catch (_) { compta = null; }
-    return donneesExportComptable({ periode, recettes, achats: registre, ligne, regime, taux: tauxUrssaf(), montantPeriode: montantPeriodeUrssaf, aPayer: aPayerUrssaf, libelleRegime, factures: facturesJointes, compta });
-  }, [pret, calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER, achats, recus, panelOff, ligne, regime, facturesJointes]);
+    return donneesExportComptable({ periode, recettes, achats: registre, ligne, regime, taux: tauxUrssaf(), montantPeriode: montantPeriodeUrssaf, aPayer: aPayerUrssaf, libelleRegime, factures: facturesJointes, compta, releve: releveV && Array.isArray(releveV.l) ? releveV.l : null, achatsRef });
+  }, [pret, calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER, achats, recus, panelOff, ligne, regime, facturesJointes, releveV]);
   const [enCours, setEnCours] = React.useState('');
   const telecharger = async (forme) => {
     if (!D || enCours) return;
@@ -2201,8 +2214,10 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
       let ent = null; try { ent = await lireReglage('vrm_pro_facture'); } catch (_) { ent = null; }
       const d = ent && String(ent.nom || '').trim() ? { ...D, entreprise: { nom: String(ent.nom).trim(), siret: String(ent.siret || '').trim() } } : D;
       if (forme === 'csv') telechargerFichier(new Blob([csvExportComptable(d)], { type: 'text/csv;charset=utf-8' }), nomFichierExport(periode, 'csv'), 'text/csv;charset=utf-8');
+      // (27 nov., lot compta-export) Le tableau PLAT pour Pennylane, Tiime, Indy : une ligne d'en-tête, une ligne par vente.
+      else if (forme === 'import') telechargerFichier(new Blob([csvImportComptable(d)], { type: 'text/csv;charset=utf-8' }), nomFichierImport(periode), 'text/csv;charset=utf-8');
       else telechargerFichier(new Blob([await pdfExportComptable(d)], { type: 'application/pdf' }), nomFichierExport(periode, 'pdf'), 'application/pdf');
-      accompagner('export.comptable', { vars: { nom: nomFichierExport(periode, forme) } }).fini();
+      accompagner('export.comptable', { vars: { nom: forme === 'import' ? nomFichierImport(periode) : nomFichierExport(periode, forme) } }).fini();
     } catch (err) { accompagner('export.comptable').echec(err, { reessayer: () => telecharger(forme) }); }
     setEnCours('');
   };
@@ -2234,7 +2249,8 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
     <div style={{ marginTop: 12 }} data-export-periode={periode} data-export-etat={D === undefined ? 'encours' : 'lu'}
       data-export-ca={D ? cts(D.caDeclare) : ''} data-export-urssaf={D ? cts(D.urssaf) : ''} data-export-ventes-total={D ? cts(D.totalVentes) : ''}
       data-export-ventes-n={D && D.nVentes != null ? D.nVentes : ''} data-export-achats-n={D && D.nAchats != null ? D.nAchats : ''}
-      data-export-sans-cout={D && D.sansCout != null ? D.sansCout : ''} data-export-adater={D && D.nADater != null ? D.nADater : ''}>
+      data-export-sans-cout={D && D.sansCout != null ? D.sansCout : ''} data-export-adater={D && D.nADater != null ? D.nADater : ''}
+      data-export-benefice={D ? cts(D.beneficeVentes) : ''} data-export-benefice-n={D && D.nBenefice != null ? D.nBenefice : ''} data-export-hors-euro={D && D.nHorsEuro != null ? D.nHorsEuro : ''}>
       <Segmente label={tr('compta.periodeExport')} value={type} onChange={setType} options={TYPES_PERIODE.map(([v, l]) => ({ v, l, data: { 'data-export-type': v } }))} />
       <select aria-label={tr('stats.periode')} data-export-choix="" value={periode} onChange={(e) => setPeriode(e.target.value)} style={{ marginTop: 10, width: '100%', height: 44, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, padding: '0 10px', fontFamily: 'inherit' }}>
         {choix.map((p) => <option key={p} value={p}>{libellePeriode(p)}</option>)}
@@ -2260,10 +2276,101 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           <Bouton variante="secondaire" icone="save" data-export-csv="" disabled={!D || !!enCours} onClick={() => telecharger('csv')} style={{ flex: '1 1 140px' }} title={tr('compta.fichierExcelNumbers')}>{enCours === 'csv' ? '…' : tr('compta.tableurCsv')}</Bouton>
           <Bouton variante="secondaire" icone="doc" data-export-pdf="" disabled={!D || !!enCours} onClick={() => telecharger('pdf')} style={{ flex: '1 1 140px' }}>{enCours === 'pdf' ? '…' : tr('compta.recapPdf')}</Bouton>
+          {/* (27 nov., lot compta-export) Le tableau plat qu'un logiciel de compta importe (Pennylane, Tiime, Indy). */}
+          <Bouton variante="secondaire" icone="save" data-export-import="" data-export-import-n={D ? lignesImport(D).length : ''} disabled={!D || !!enCours} onClick={() => telecharger('import')} style={{ flex: '1 1 140px' }} title={tr('cexp.logicielAide')}>{enCours === 'import' ? '…' : tr('cexp.logiciel')}</Bouton>
         </div>
       </details>
       {/* (14 nov., lot argent-prix — 115) Le lien lecture seule pour son comptable : la période choisie, réduite à la compta par le serveur. */}
       <LienComptable vue={D || null} appel={appelComptable} />
+    </div>
+  );
+}
+// ── (27 nov., lot compta-export — Julien : « Fais aussi l'export comptable pour l'URSSAF ») « POUR L'URSSAF » ──
+// UNE période de déclaration, selon SON rythme enregistré (`vinted_urssaf_freq` ; pas choisi ⇒ il le choisit ici,
+// jamais deviné). AUCUNE règle ici (src/exportUrssaf.js) : le montant = la ligne publiée par Ventes et
+// `montantPeriodeUrssaf` (la carte « Prochaine déclaration »), la cotisation = `aPayerUrssaf` (micro seulement),
+// les ventes = le livre des recettes sur `ventesDeclarables` AVEC le registre des déclarations (`avecDeclarations`).
+// Rien n'est lu avant « Préparer ».
+const lireRythmeUrssaf = () => rythmeChoisi(load('vinted_urssaf_freq', null));
+function ExportUrssafCarte(props) {
+  const [ouvert, setOuvert] = React.useState(false);
+  return (
+    <Card><div className="vrm-export-urssaf" data-export-urssaf={ouvert ? 'ouvert' : 'ferme'}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+          <div data-titre-section="" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 }}>{tr('cexp.urssafTitre')}</div>
+          <div style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>{tr('cexp.urssafSous')}</div>
+        </div>
+        {!ouvert && <Bouton variante="secondaire" icone="doc" data-urssaf-export-preparer="" onClick={() => setOuvert(true)}>{tr('compta.preparer')}</Bouton>}
+      </div>
+      {ouvert && <ExportUrssafCorps {...props} />}
+    </div></Card>
+  );
+}
+function ExportUrssafCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+  const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, avecDeclarations: true });
+  const ventesVcER = useVentesVestiaire();
+  const ligne = useLigneUrssaf();
+  const regime = useRegimeFiscal();
+  const [rythme] = useLigneSynchro('vinted_urssaf_freq', lireRythmeUrssaf);
+  const choix = React.useMemo(() => periodesExportUrssaf(rythme), [rythme]);
+  const [periodeBrute, setPeriode] = React.useState('');
+  const periode = choix.includes(periodeBrute) ? periodeBrute : (periodeUrssafParDefaut(rythme) || '');
+  const U = React.useMemo(() => {
+    if (calc.etat === 'encours' || versements === undefined || regime === undefined || ligne === undefined || !rythme || !periode) return undefined;
+    const recettes = calc.etat === 'lu' ? recettesDe({ calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER }) : null;
+    const D = donneesExportComptable({ periode, recettes, achats: null, ligne, regime, taux: tauxUrssaf(), montantPeriode: montantPeriodeUrssaf, aPayer: aPayerUrssaf, libelleRegime });
+    const an = Number(periode.slice(0, 4));
+    return donneesExportUrssaf(D, { rythme, caAn: caAnneeLigne(ligne, an), seuils: seuilsDe(an), dac7: dac7ParPlateforme({ ligne, annee: an }) });
+  }, [calc, regime, ligne, rythme, periode, versements, lbcVentes, ebayCommandes, ventesVcER]);
+  const [enCours, setEnCours] = React.useState('');
+  const telecharger = async (forme) => {
+    if (!U || enCours) return;
+    setEnCours(forme);
+    try {
+      let ent = null; try { ent = await lireReglage('vrm_pro_facture'); } catch (_) { ent = null; }
+      const u = ent && String(ent.nom || '').trim() ? { ...U, entreprise: { nom: String(ent.nom).trim(), siret: String(ent.siret || '').trim() } } : U;
+      if (forme === 'csv') telechargerFichier(new Blob([csvExportUrssaf(u)], { type: 'text/csv;charset=utf-8' }), nomFichierUrssaf(periode, 'csv'), 'text/csv;charset=utf-8');
+      else telechargerFichier(new Blob([await pdfExportUrssaf(u)], { type: 'application/pdf' }), nomFichierUrssaf(periode, 'pdf'), 'application/pdf');
+    } catch (err) { toast(tr('cexp.pasCree', { x: String((err && err.message) || err) })); }
+    setEnCours('');
+  };
+  const cts = (x) => (x == null ? '' : String(Math.round(x * 100)));
+  // Son rythme n'est pas enregistré : il le choisit (SON clic écrit `vinted_urssaf_freq`), rien n'est deviné.
+  if (!rythme) return (
+    <div data-urssaf-export-etat="rythme" style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <span style={{ fontSize: 15, color: C.text }}>{tr('cexp.rythmeAChoisir')}</span>
+      <Segmente label={tr('compta.rythmeDeclaration')} value={null} onChange={(f) => save('vinted_urssaf_freq', f)}
+        options={[{ v: 'mensuel', l: tr('cexp.parMois'), data: { 'data-urssaf-export-rythme': 'mensuel' } }, { v: 'trimestriel', l: tr('cexp.parTrimestre'), data: { 'data-urssaf-export-rythme': 'trimestriel' } }]} />
+    </div>
+  );
+  const recopier = U ? lignesARecopier(U) : [];
+  const valeur = (cle, v) => (cle === 'ligne' ? tr('cexp.ligneUrssaf') : cle === 'taux' && U.taux == null ? (U.regime == null ? tr('cexp.regimeAChoisir') : tr('cexp.nonCalcule')) : cle === 'periode' ? U.libelle : v);
+  return (
+    <div style={{ marginTop: 12 }} data-urssaf-export-periode={periode} data-urssaf-export-etat={U === undefined ? 'encours' : U.etat} data-urssaf-export-rythme-lu={rythme}
+      data-urssaf-export-montant={U ? cts(U.montant) : ''} data-urssaf-export-partiel={U && U.partiel ? '1' : ''} data-urssaf-export-cotisation={U ? cts(U.cotisation) : ''} data-urssaf-export-taux={U && U.taux != null ? String(U.taux) : ''}
+      data-urssaf-export-ventes-total={U ? cts(U.totalVentes) : ''} data-urssaf-export-ventes-n={U && U.nVentes != null ? U.nVentes : ''} data-urssaf-export-adater={U && U.nADater != null ? U.nADater : ''}
+      data-urssaf-export-declares={U ? U.declares.length : ''} data-urssaf-export-ids={U && U.ventes ? U.ventes.map((v) => v.id).join(',') : ''}>
+      <select aria-label={tr('cexp.periodeDeclaration')} data-urssaf-export-choix="" value={periode} onChange={(e) => setPeriode(e.target.value)} style={{ width: '100%', height: 44, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, padding: '0 10px', fontFamily: 'inherit' }}>
+        {choix.map((p) => <option key={p} value={p}>{libellePeriode(p)}</option>)}
+      </select>
+      <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column' }}>
+        {U === undefined ? <div style={{ fontSize: 13, color: C.muted, padding: '8px 0' }}>{tr('stats.jeLisVentes')}</div>
+          : recopier.map(([, v, cle]) => (
+            <div key={cle} data-urssaf-export-ligne={cle} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderTop: `1px solid ${C.border}`, fontSize: 15 }}>
+              <span style={{ color: C.muted }}>{tr('cexp.l.' + cle)}</span><span className="vrm-display" style={{ color: C.text, fontWeight: cle === 'montant' || cle === 'cotisation' ? 700 : 600, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{valeur(cle, v)}</span>
+            </div>))}
+      </div>
+      {U ? <div data-urssaf-export-notes="" style={{ margin: '8px 0 0', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
+        {U.nVentes != null ? tr('cexp.ventesDerriere', { n: String(U.nVentes) }) : tr('cexp.ventesPasLues')}
+        {U.nADater ? <> · {tr('cexp.aDaterJamais', { n: String(U.nADater) })}</> : null}
+        {U.declares.length ? <> · {tr('cexp.dejaDeclares', { x: U.declares.join(', ') })}</> : null}
+        {U.partiel ? <> · {tr('cexp.auMoins')}</> : null}
+      </div> : null}
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <Bouton variante="secondaire" icone="doc" data-urssaf-export-pdf="" disabled={!U || !!enCours} onClick={() => telecharger('pdf')} style={{ flex: '1 1 160px' }}>{enCours === 'pdf' ? '…' : tr('cexp.pdfRecopier')}</Bouton>
+        <Bouton variante="secondaire" icone="save" data-urssaf-export-csv="" disabled={!U || !!enCours} onClick={() => telecharger('csv')} style={{ flex: '1 1 140px' }}>{enCours === 'csv' ? '…' : tr('compta.tableurCsv')}</Bouton>
+      </div>
     </div>
   );
 }
@@ -5110,7 +5217,9 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         {/* (14 nov., lot argent-prix — 116) La révision du mois : chaque vente à compléter, une liste à vider (src/revisionMois.js). */}
         <RevisionMoisCompta onNav={onNav} ouvrirRepli={ouvrirRepliCompta} />
         <StatutFiscal partie="declarer" liveStats={liveStats} onNav={onNav} />
-        {exportDevant ? <div data-compta-export-devant="" style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
+        {/* (27 nov., lot compta-export) « Pour l'URSSAF » : la déclaration de la période, à recopier (PDF + tableur). */}
+        <ExportUrssafCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
+        {exportDevant ?<div data-compta-export-devant="" style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
           <ExportComptableCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
           <RegistresCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
         </div> : null}
