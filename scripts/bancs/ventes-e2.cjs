@@ -217,6 +217,14 @@ const capture = async (pg, nom) => {
   await pg.setViewportSize(avant);
 };
 
+// (27 nov., ventes-e2-webkit) Changer d'écran SANS recharger la page : le chemin des liens `?tab=` de l'app (`vrm:aller` → `goto`,
+// src/App.jsx), comme le toucher d'un onglet. Un `pg.goto` pendant que l'app tourne ouvrait une navigation PROVISOIRE : chaque
+// requête partie dans cette fenêtre (l'envoi de `main` comparé sur `rev`, la relecture de version) est refusée par WebKit, qui
+// l'écrit « Fetch API cannot load … due to access control checks. » comme une ERREUR JS (Playwright la rend en `pageerror`) —
+// même quand l'app l'attrape (mesuré : promesse rattrapée, aucun `unhandledrejection`). Ni un défaut de l'app, ni un en-tête
+// CORS manquant : un artefact du banc, qui rechargeait la page au milieu de son travail. V0 reste entier.
+const allerOnglet = (pg, t) => pg.evaluate((t) => { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=' + t })); }, t);
+
 // La liste « Terminées » (toutes les ventes, tous sites mêlés) : le segment natif de Ventes.
 const allerSegment = async (pg, seg) => {
   // Un vendeur SANS vente (« vide ») n'a pas de segment : l'écran est son état vide, mesuré tel quel.
@@ -233,7 +241,7 @@ const allerSegment = async (pg, seg) => {
 // 22 nov., Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées »). La période de l'écran est
 // l'année (le jeu : ventes de 2 à 16 jours) ; chaque ligne par SON compte (uid), ses chiffres en data-*.
 const ANNUL = async (pg) => {
-  await pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
+  await allerOnglet(pg, 'dashboard');
   await pg.waitForSelector('[data-v2-stats-periode]', { timeout: 25000 });
   await pg.selectOption('[data-v2-stats-periode]', 'annee');
   await pg.waitForSelector('[data-stats-carte="sv-annulations"] [data-sv-annul]:not([data-sv-annul="encours"])', { timeout: 25000 }).catch(() => {});
@@ -306,7 +314,7 @@ async function tournee(nav, { W, theme, scenario }) {
       dit(!v.debord, 'G', `${T} ${seg} : rien ne déborde`);
     }
     // V1 — Argent · « À venir » d'un seul compte : une carte par ÉTAPE, aucune ligne par compte.
-    await o.pg.goto(`http://localhost:${PORT}/?tab=argent`, { waitUntil: 'domcontentloaded' });
+    await allerOnglet(o.pg, 'argent');
     await o.pg.waitForSelector('[data-agv-avenir]', { timeout: 25000 }).catch(() => {});
     await o.pg.waitForTimeout(800);
     const av = await o.pg.evaluate(() => ({ cartes: document.querySelectorAll('[data-agv-avenir] [data-agv-etape]').length, parCompte: [...document.querySelectorAll('[data-a-venir-compte]')].filter((e) => e.getClientRects().length).length, ici: !!document.querySelector('[data-agv-avenir]') }));
