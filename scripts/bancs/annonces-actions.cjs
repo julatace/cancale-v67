@@ -167,6 +167,11 @@ const nouvelleOuverture = (pg) => pg.evaluate(() => { try { sessionStorage.remov
 // (26 nov., bancs natifs) Un toucher (téléphone) ou un clic (ordinateur) sur l'élément VU — un écran d'avant reste monté caché
 // sous l'écran natif, avec les mêmes repères (`:visible`).
 const geste = async (pg, tel, sel) => { const l = pg.locator(sel + ':visible').first(); if (!(await l.count())) return false; await l.scrollIntoViewIfNeeded().catch(() => {}); await (tel ? l.tap({ timeout: 5000 }) : l.click({ timeout: 5000 })).catch(() => {}); await pg.waitForTimeout(700); return true; };
+// (27 nov.) Revenir sur Annonces PAR L'APP (`vrm:aller`, comme _bt-commun.cjs `aller`), en passant par Aujourd'hui : jamais un
+// `pg.goto` pendant que l'app tourne (WebKit rend les lectures en vol en `pageerror`). Les deux `goto` qui restent plus bas suivent
+// `nouvelleOuverture` : c'est la RÉOUVERTURE de l'app que ces contrôles jugent (le N° après un nouveau chargement).
+const reouvrirAnnonces = async (pg) => { for (const t of ['journee', 'cat_annonces']) { await pg.evaluate((t) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=' + t })); } catch (_) {} }, t);
+  await pg.waitForFunction((t) => { const m = document.querySelector('.vrm-main'); return !!m && m.getAttribute('data-ecran') === (t === 'cat_annonces' ? 'annonces' : t); }, t, { timeout: 10000 }).catch(() => {}); } };
 const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 // Les articles montrés : téléphone = la liste groupée par compte (`[data-eg-groupe]`), ordinateur = le tableau de travail.
 const articles = (pg) => pg.evaluate(() => { const vus = new Set(); return [...document.querySelectorAll('[data-eg-article]')].filter((x) => x.getClientRects().length && !vus.has(x.getAttribute('data-eg-article')) && vus.add(x.getAttribute('data-eg-article'))).map((x) => {
@@ -250,7 +255,7 @@ const ecrituresDe = (u) => u.filter((x) => /republier|recreer|cmd_|file_/i.test(
             await annuler.click().catch(() => {}); await pg.waitForTimeout(800);
             dit(ecrituresDe(ecrits) === avant && (await pg.evaluate(() => window.__envois.length)) === 0, `R ${T} « Annuler » ⇒ rien n’est parti`, ecrits.slice(-3).join(' | '));
             // A — « Remettre en ligne » : seuls les brouillons se cochent.
-            await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+            await reouvrirAnnonces(pg);
             await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-article]')].some((x) => x.getClientRects().length), null, { timeout: 20000 }).catch(() => {});
             await segment(pg, tel, 'enligne');
             await modeAction(pg, 'enLigne');
@@ -263,7 +268,7 @@ const ecrituresDe = (u) => u.filter((x) => /republier|recreer|cmd_|file_/i.test(
             l = await lancer(pg, tel, 'enLigne');
             dit(M['9201'] && M['9201'].coche === '1' && !!l && !l.off, `A ${T} un brouillon ⇒ « Remettre en ligne » se coche et se lance`, JSON.stringify({ a: M['9201'], l }));
             // M — « Republier à la main » : deux comptes permis (une paire à la fois, chacune avec son compte).
-            await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+            await reouvrirAnnonces(pg);
             await pg.waitForFunction(() => [...document.querySelectorAll('[data-eg-article]')].some((x) => x.getClientRects().length), null, { timeout: 20000 }).catch(() => {});
             await segment(pg, tel, 'enligne');
             await modeAction(pg, 'main');
