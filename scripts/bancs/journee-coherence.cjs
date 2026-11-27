@@ -242,6 +242,10 @@ async function tournee(nav, { W, theme, scenario }) {
   // La lecture « Vendus ailleurs » part au montage : on la laisse répondre (et la publication des
   // ventes prouvées, pour la sortie du Stock).
   await pg.waitForTimeout(5200);
+  // (27 nov.) Sous charge (police CI, quatre bancs à la fois), « À faire » montrait encore ses squelettes après 5,2 s : rien
+  // à compter (E1 « dit null, vu 0 », E10). On attend que « À faire » ait DIT son nombre de gestes (`[data-fu-gestes]`),
+  // 15 s au plus ; sans lui la mesure juge ce qui est là (une section absente reste un rouge E1).
+  await pg.waitForFunction(() => !!document.querySelector('.vrm-fu-journee .vrm-fu-afaire [data-fu-gestes]'), null, { timeout: 15000 }).catch(() => {});
   if (scenario === 'plein') await pg.waitForSelector('[data-stock-sortie]', { timeout: 8000 }).catch(() => {});
   const m = await MESURE(pg, tel);
   if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, `e1-${scenario}-${W}-${theme}.png`), fullPage: true }); }

@@ -250,8 +250,11 @@ const lignesToutes = (pg) => pg.evaluate(() => [...document.querySelectorAll('[d
           dit(nVentes !== '' && pastille === Number(nVentes), 'Z. pastille de l\'icône de VRM = la pastille des colis à poster', JSON.stringify({ pastille, n: nVentes }));
           dit(await pg.evaluate(() => !!document.querySelector('[data-n-coque-messages]')), 'I. Messages à un toucher : la bulle en haut à droite (21 nov. : plus dans le Menu)');
           // Le MENU (l'ancien « Plus ») : la photo du compte ouvre l'écran Menu.
-          await toucher(pg, tel, '[data-n-coque-compte]');
-          const f = await pg.evaluate(() => { const m = document.querySelector('[data-n-menu]'); if (!m) return null;
+          // (27 nov.) Sous charge (police CI), le toucher sur la photo se perdait pendant le calcul de l'écran (capture : Aujourd'hui
+          // resté affiché) : jusqu'à trois touchers, chacun jugé sur le Menu MONTRÉ (§6.5), jamais sur un délai.
+          for (let k = 0; k < 3; k++) { await toucher(pg, tel, '[data-n-coque-compte]:visible');
+            if (await pg.waitForFunction(() => !!document.querySelector('[data-n-menu]'), null, { timeout: 5000 }).then(() => true).catch(() => false)) break; }
+          const f =await pg.evaluate(() => { const m = document.querySelector('[data-n-menu]'); if (!m) return null;
             return { ecran: document.querySelector('.vrm-main').getAttribute('data-ecran'), groupes: [...m.querySelectorAll('[data-n-menu-groupe]')].map((g) => ({ t: g.getAttribute('data-n-menu-groupe'), n: g.querySelectorAll('[data-n-plus-entree]').length, ids: [...g.querySelectorAll('[data-n-plus-entree]')].map((e) => e.getAttribute('data-nav-entree') || e.getAttribute('data-n-plus-entree')) })),
               entrees: [...m.querySelectorAll('[data-n-plus-entree]')].map((e) => e.getAttribute('data-nav-entree') || e.getAttribute('data-n-plus-entree')),
               petits: [...m.querySelectorAll('[data-n-plus-entree]')].filter((e) => e.getBoundingClientRect().height < 44).length,
