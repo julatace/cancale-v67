@@ -19,9 +19,10 @@ async function dom(){
  try{
   const p=await b.newPage();await p.route('**/*',r=>r.fulfill({contentType:'text/html; charset=utf-8',body:'<main></main>'}));
   await p.goto('https://www.vinted.fr/');await p.addScriptTag({content:fn});
-  const cas=async(html,stocke=STOCKE)=>{await p.evaluate(html=>{document.querySelector('main').innerHTML=html;window.clics=[];document.querySelector('main').onclick=e=>{e.preventDefault();window.clics.push(e.target.closest('a')?.getAttribute('href'));};},html);const r=await p.evaluate(u=>{try{return suivreFavoriAffiche(location.origin+u,true);}catch(e){return {erreur:String(e)};}},stocke);return {...r,clics:await p.evaluate(()=>clics)};};
+  const cas=async(html,stocke=STOCKE)=>{await p.evaluate(html=>{document.querySelector('main').innerHTML=html;window.clics=[];document.querySelector('main').onclick=e=>{e.preventDefault();window.clics.push(e.target.closest('a')?.getAttribute('href'));};},html);const r=await p.evaluate(u=>{try{return suivreFavoriAffiche(location.origin+u,true);}catch(e){return {erreur:String(e)};}},stocke);return {...r,clics:await p.evaluate(()=>clics),montre:await p.evaluate(()=>[...document.querySelectorAll('main a')].filter(a=>a.style.outlineStyle==='solid').map(a=>a.getAttribute('href')))};};
+  // (5.356, e83a41265) « plus de clic synthétique » : le lien retenu est MONTRÉ (défilé, entouré), c'est SON clic qui l'ouvre.
   let r=await cas(`<a data-testid="n" href="${NATIF}">Camille a ajouté ton article en favori</a>`);
-  ok(r.trouve===true&&r.clics.length===1,'le lien natif receiver_id/item_id du même article et du même destinataire est suivi');
+  ok(r.trouve===true&&r.clics.length===0&&r.montre.length===1&&r.montre[0]===NATIF,'le lien natif receiver_id/item_id du même article et du même destinataire est montré, jamais cliqué par VRM');
   ok(r.natif&&r.natif.chemin==='/inbox/want_it'&&r.natif.itemId==='101'&&r.natif.receiverId==='201','le résultat nomme le chemin, l’article et le destinataire natifs');
   r=await cas('<a href="/inbox/want_it?item_id=101&receiver_id=201">ordre inversé</a>');ok(r.trouve===true,'l’ordre des paramètres ne change rien');
   r=await cas('<a href="/inbox/want_it?receiver_id=999&item_id=101">autre</a>');
@@ -38,7 +39,7 @@ async function dom(){
   r=await cas(`<div aria-hidden="true"><a href="${NATIF}">x</a></div>`);ok(r.trouve===false&&r.clics.length===0,'lien masqué ARIA : refusé');
   r=await cas(`<a href="${NATIF}">x</a>`,'/items/101/want_it/new?offering_id=201&autre=3');ok(r.trouve===false&&r.clics.length===0,'lien enregistré à deux paramètres : aucune équivalence supposée');
   r=await cas('<a href="/inbox/want_it?receiver_id=101&item_id=101">x</a>','/items/101/want_it/new?offering_id=101');ok(r.trouve===false,'destinataire égal à l’article : refusé');
-  r=await cas(`<a href="${STOCKE}">exact</a><a href="${NATIF}">natif</a>`);ok(r.trouve===true&&r.clics[0]===STOCKE&&!r.natif,'le lien exact garde la priorité');
+  r=await cas(`<a href="${STOCKE}">exact</a><a href="${NATIF}">natif</a>`);ok(r.trouve===true&&r.clics.length===0&&r.montre.length===1&&r.montre[0]===STOCKE&&!r.natif,'le lien exact garde la priorité');
   r=await cas(`<a href="${STOCKE}" style="display:none">exact caché</a><a href="${NATIF}">natif</a>`);ok(r.trouve===false&&r.clics.length===0,'un lien exact présent mais masqué n’est pas remplacé par un autre');
  }finally{await b.close();}
 }

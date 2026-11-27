@@ -5,7 +5,7 @@ function creer(){
  const f=faireFond(),rows=new Map(),reseau=[];let owner='owner-A',refus=false,paginationFausse=false;
  Object.assign(f.ctx,{AbortSignal,TextEncoder,authToken:async()=>({user_id:owner,access_token:'fixture-token'}),loadSession:async()=>({user_id:owner}),compteConnecte:async()=> '111'});
  f.ctx.fetch=async(url,o={})=>{
-  const u=new URL(url);reseau.push({u,o});const j=(x,s=200)=>({ok:s>=200&&s<300,status:s,json:async()=>x});
+  const u=new URL(url);reseau.push({u,o});const j=(x,s=200)=>({ok:s>=200&&s<300,status:s,headers:new Headers({'content-type':'application/json'}),json:async()=>x,text:async()=>x==null?'':JSON.stringify(x)});   // (5.366) vintedGet lit le TEXTE d'abord (page de vérification) : la vraie forme d'une Response
   if(u.hostname.endsWith('vinted.fr')){
    assert.equal(u.hostname,'api.vinted.fr');assert.equal(o.method,'GET');if(refus)return j({},429);
    const page=Number(u.searchParams.get('page'));return j({code:0,notifications:[{id:'n'+page,user_id:201,body:'Camille a ajouté ton article à ses favoris.',link:'/items/101/conversation/new',updated_at:'2026-10-24T11:00:00Z'}],pagination:{current_page:paginationFausse?1:page,total_pages:3}});

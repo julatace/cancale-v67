@@ -11,7 +11,7 @@ concurrency:
 jobs:
   regles:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15   # (27 nov.) +5 min : le pas « Tous les tests unitaires » (~1 à 2 min)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,6 +36,14 @@ jobs:
           for audit in argent-a-venir comparer-mois frais-plateformes journal-semaine objectif-mois questions-ebay stats-offres achats-sourcing comptes-securite selection-bordereaux; do
             node "scripts/audit-$audit.cjs"
           done
+      # (27 nov., tests-unitaires-verts) TOUS les tests unitaires, pas une liste choisie : jusqu'ici la CI ne lançait
+      # qu'une douzaine des ~170 fichiers scripts/tests/*.test.mjs (les pas ci-dessus et parcours-critiques.yml), et
+      # neuf tests étaient rouges sur main sans que personne ne le voie. Ni navigateur ni dist/ (aucun ne s'en sert) ;
+      # Postgres sert vinted-accounts-preuve (déjà sur les machines ubuntu, installé sinon).
+      - name: Tous les tests unitaires (scripts/tests/*.test.mjs)
+        run: |
+          ls /usr/lib/postgresql/*/bin/initdb >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y postgresql)
+          node --test scripts/tests/*.test.mjs
   # (24 nov., ci-rapide) dist/ construit UNE fois pour les 7 écrans (avant : `npm run build`
   # dans chacun, ~1 min × 7). Même commande, même arbre, partagé comme dans verifier.yml.
   construire-ecrans:

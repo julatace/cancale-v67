@@ -11,7 +11,7 @@ concurrency:
 jobs:
   comptes-et-reception:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60   # (27 nov.) +30 min : le dernier pas lance TOUS les tests scripts/tests/*.cjs
     steps:
       - uses: actions/checkout@v4
       # (11 nov.) La garde réseau : un banc qui joint un vrai serveur (la production, Internet) est ROUGE.
@@ -171,5 +171,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql
           node scripts/audit-confidentialite-sql.cjs
+        env:
+          NODE_OPTIONS: --require=${{ github.workspace }}/scripts/bancs/_garde-reseau.cjs
+      # (27 nov., tests-unitaires-verts) TOUS les tests scripts/tests/*.cjs (sauf les modules « _… »), pas une liste choisie :
+      # la moitié n'était lancée par aucun workflow et 30 étaient rouges sur main sans que personne ne le voie. Ce job a déjà
+      # dist/, Chromium (VRM_CHROMIUM_PATH), pdf.js (VRM_PDFJS_DIR) et la garde réseau. Chaque test est lancé, un rouge ne
+      # cache pas les suivants, et le pas est rouge s'il en reste un.
+      - name: Tous les tests scripts/tests/*.cjs
+        run: |
+          rouges=""
+          for t in scripts/tests/[!_]*.cjs; do
+            echo "::group::$t"
+            node "$t" || rouges="$rouges $t"
+            echo "::endgroup::"
+          done
+          if [ -n "$rouges" ]; then echo "Rouges :$rouges"; exit 1; fi
         env:
           NODE_OPTIONS: --require=${{ github.workspace }}/scripts/bancs/_garde-reseau.cjs

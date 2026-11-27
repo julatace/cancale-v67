@@ -8,7 +8,8 @@ const fs=require('node:fs'),assert=require('node:assert/strict');const {chromium
  const url='/items/101/conversation/new?native_target=201';
  const cas=async(html)=>{await p.evaluate(html=>{document.querySelector('main').innerHTML=html;window.clics=0;document.querySelector('main').onclick=e=>{e.preventDefault();window.clics++;};},html);return p.evaluate(url=>suivreFavoriAffiche(location.origin+url,true),url);};
  let r=await cas(`<a style="display:contents" href="${url}"><span style="display:block">Notification visible</span></a>`);
- assert.equal(r.trouve,true);assert.equal(await p.evaluate(()=>clics),1);n+=2;
+ // (5.356, e83a41265) plus de clic synthétique : le lien visible est MONTRÉ (entouré), c'est SON clic qui l'ouvre.
+ assert.equal(r.trouve,true);assert.equal(await p.evaluate(()=>clics),0);assert.deepEqual(await p.evaluate(()=>[...document.querySelectorAll('main a')].filter(a=>a.style.outlineStyle==='solid').map(a=>a.getAttribute('href'))),[url]);n+=3;
  r=await cas(`<a href="${url}">Photo</a><a href="${url}">Texte</a>`);assert.equal(r.trouve,false);assert.equal(r.inspection.exacts,2);assert.equal(r.inspection.visibles,2);assert.equal(await p.evaluate(()=>clics),0);n+=4;
  r=await cas('<a href="/items/101/conversation/new?native_target=999">Autre destinataire</a>');assert.equal(r.trouve,false);assert.equal(r.inspection.memeArticle,1);assert.equal(r.inspection.exacts,0);assert.equal(await p.evaluate(()=>clics),0);n+=4;
  r=await cas(`<a href="${url}" style="display:none">Caché</a>`);assert.equal(r.trouve,false);assert.equal(r.inspection.exacts,1);assert.equal(r.inspection.visibles,0);n+=3;

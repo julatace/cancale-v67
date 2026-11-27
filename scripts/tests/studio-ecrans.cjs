@@ -14,64 +14,25 @@ s=s.replace(marker,fixtures+`
   if(process.env.STUDIO_DARK)await p.addInitScript(()=>localStorage.setItem('vinted_dark','true'));
   for(const width of (process.env.STUDIO_WIDTHS||'320,390,1512').split(',').map(Number)){
    await p.setViewportSize({width,height:900});
-   for(const [nom,tab,section] of [['ventes','plat_vinted','Ventes'],['annonces','plat_vinted','Annonces'],['achats','plat_vinted','Achats'],['messages','plat_vinted','Messages'],['annonces-ebay','plat_ebay','Annonces'],['messages-ebay','plat_ebay','Messages'],['colis','plat_leboncoin','Colis'],['retraits','cat_achats',null],['parametres','settings',null],['statistiques','dashboard',null],['comptabilite','compta',null],['stock','garage',null],['organisation','organisation',null]]){
+   // (27 nov., tests-unitaires-verts) PORTÉ sur la navigation et le dessin d'aujourd'hui. Ce banc (20 oct.) ouvrait les écrans
+   //  par l'ESPACE de site (plat_vinted puis l'onglet de section .vrm-platform-tabs) et mesurait le dessin du 20 oct.
+   //  (en-tête de tableau, recherche + tri d'Annonces, panneaux « stock » et « publication », colis compact, inspecteur de
+   //  vente en tiroir). Tout cela a été remplacé EXPRÈS : navigation par tâche (31 oct. : « plus d'espace de site à part »),
+   //  « VRM natif », le SEUL design (19 nov., docs/design/NATIF.md), le toucher d'une vente ouvre LA fiche (14 nov.,
+   //  proposition 62 — jugé par scripts/tests/fiche-vente-interface.cjs), une tâche montre tous ses sites (20 nov. soir).
+   //  Ces contrôles de dessin d'hier sont RETIRÉS avec leur objet ; restent, sur chaque écran d'aujourd'hui (ses vrais
+   //  identifiants de lien) : aucun débordement, chaque bouton nommé, le thème sombre posé, le code de retrait entier.
+   for(const [nom,tab] of [['ventes','ventes'],['annonces','annonces'],['achats','achats'],['messages','messages'],['annonces-ebay','ebay_annonces'],['messages-ebay','ebay_messages'],['colis','colis'],['retraits','cat_achats'],['parametres','settings'],['statistiques','dashboard'],['comptabilite','compta'],['stock','garage'],['organisation','organisation']]){
     if(process.env.STUDIO_SCREENS&&!process.env.STUDIO_SCREENS.split(',').includes(nom))continue;
     await p.goto(base+'/?tab='+tab);await p.locator('main').waitFor();await p.evaluate(()=>document.fonts.ready);
-    if(section)await p.locator('.vrm-platform-tabs').getByRole('button',{name:section,exact:true}).click();
-    if(nom==='retraits')await p.getByRole('button',{name:'Copier code de retrait 001234',exact:true}).waitFor();
-    if(nom==='messages')await p.locator('[data-conv="71"]').waitFor();
-    await p.waitForTimeout(400);await p.locator('main').evaluate(e=>e.scrollTop=0);
+    await p.waitForTimeout(600);await p.locator('main').evaluate(e=>e.scrollTop=0);
+    check(await p.locator('main').evaluate(e=>e.innerText.trim().length>0),'écran rendu '+nom+' '+width);
     if(process.env.STUDIO_DARK)check(await p.locator('html').getAttribute('data-theme')==='dark','thème sombre actif '+nom+' '+width);
     check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'aucun débordement '+nom+' '+width);
-    check(await p.locator('main button').evaluateAll(es=>es.filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height;}).every(e=>e.textContent.trim()||e.getAttribute('aria-label')||e.getAttribute('title')||e.querySelector('img[alt]'))),'boutons nommés '+nom+' '+width);
+    check(await p.locator('main button').evaluateAll(es=>es.filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height;}).every(e=>e.textContent.trim()||e.getAttribute('aria-label')||e.getAttribute('title')||e.getAttribute('aria-labelledby')||e.querySelector('img[alt]'))),'boutons nommés '+nom+' '+width);
+    if(nom==='retraits')await p.waitForFunction(()=>[...document.querySelectorAll('main [data-stream-type="code"]')].some(e=>e.textContent.replace(/\\s+/g,'')==='001234'),null,{timeout:10000}).catch(()=>{});
+    if(nom==='retraits')check(await p.locator('main [data-stream-type="code"]').evaluateAll(es=>es.some(e=>e.textContent.replace(/\\s+/g,'')==='001234')),'code de retrait entier, zéros initiaux conservés '+width);
     if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,nom+'-'+width+'.png')});}
-    if(section && width<768)check(await p.locator('.vrm-platform-tabs').evaluate(e=>{const lum=c=>{const a=c.match(/[0-9.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return a[0]*.2126+a[1]*.7152+a[2]*.0722;};const a=lum(getComputedStyle(e.closest('.vrm-seg-cadre')).backgroundColor);return [...e.querySelectorAll('button')].every(b=>{const v=lum(getComputedStyle(b).color);return (Math.max(a,v)+.05)/(Math.min(a,v)+.05)>=4.5;});}),'onglets contrastés '+nom+' '+width);
-    if((nom==='ventes'||nom==='annonces') && width<768){
-     check(await p.locator('.vrm-ledger-heading').evaluate(e=>{const lum=c=>{const a=c.match(/[0-9.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return a[0]*.2126+a[1]*.7152+a[2]*.0722;};const st=getComputedStyle(e),a=lum(st.color),b=lum(st.backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5;}),'en-tête du tableau lisible '+nom+' '+width);
-    }
-    if(nom==='annonces' && width<768){
-     const search=await p.locator('.vrm-ann-search').boundingBox(),tri=await p.locator('.vrm-ann-tri').boundingBox();
-     check(tri.x-search.x-search.width>=0&&tri.x-search.x-search.width<9,'recherche et tri sans colonne vide '+width);
-     const stock=p.locator('.vrm-ann-stock-tools'),pub=p.locator('[data-places-wrap]');const a=await stock.boundingBox(),b=await pub.boundingBox();
-     check(Math.abs(a.y-b.y)<2,'stock et publication sur une rangée '+width);
-     for(const panneau of [stock,pub]){await panneau.locator(':scope > summary').click();check(await panneau.evaluate(e=>e.open&&e.getBoundingClientRect().width>innerWidth*.75),'panneau gestion déplié pleine largeur '+width);await panneau.locator(':scope > summary').click();}
-    }
-    if(nom==='colis' && width<768){
-     check(await p.locator('.vrm-lbc-package').first().evaluate(e=>e.getBoundingClientRect().height<115),'colis à préparer compact '+width);
-     check(await p.locator('.vrm-lbc-package-primary').first().getAttribute('href')==='https://example.test/label.pdf','lien du bordereau conservé '+width);
-    }
-    if(nom==='retraits'){
-     check(await p.locator('.vrm-pickup-code').evaluateAll(es=>es.every(e=>{const n=e.querySelector('strong');return n.scrollWidth<=n.clientWidth+1&&e.scrollWidth<=e.clientWidth+1;})),'codes complets sans débordement '+width);
-     check(await p.getByRole('button',{name:'Copier code de retrait 001234',exact:true}).count()===1,'zéros initiaux conservés '+width);
-     if(width<768)check(await p.locator('.vrm-pickup-code:not([data-code-long]) strong').evaluateAll(es=>es.every(e=>e.getBoundingClientRect().height<30)),'code court sur une ligne '+width);
-    }
-    if(nom==='ventes'){
-     const ligne=p.locator('.vrm-ventes-liste .vrm-sale-row').first();
-     check(await ligne.evaluate(e=>e.getBoundingClientRect().height<=56),'vente sur une seule ligne '+width);
-     const ouvrir=ligne.locator('.vrm-ledger-sale-toggle');
-     check(await ouvrir.getAttribute('aria-expanded')==='false','actions repliées au départ '+width);
-     await ouvrir.click();
-     check(await ouvrir.getAttribute('aria-expanded')==='true','actions ouvrables au clic '+width);
-     check(await p.getByRole('dialog').isVisible(),'inspecteur visible '+width);
-     check(await p.getByRole('dialog').evaluate(e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1;}),'inspecteur dans la fenêtre '+width);
-     if(process.env.BANC_CAPTURES)await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'inspecteur-'+width+'.png')});
-    }
-    if(nom==='ventes'){
-     await p.locator('.vrm-ledger-drawer-host:not([hidden]) [data-cout-vente-saisir]').click();const cout=p.locator('[data-cout-vente-champ]');await cout.fill('12,50');await cout.press('Escape');check(await cout.count()===0&&await p.getByRole('dialog').count()===1,'Échap annule la saisie sans fermer la vente '+width);
-     await p.locator('.vrm-ledger-drawer-host:not([hidden]) [data-cout-vente-relier]').click();const rechercheAchat=p.getByPlaceholder('Chercher dans tes achats (titre, marque, taille…)');await rechercheAchat.fill('ordinateur');check(await rechercheAchat.isVisible(),'sélecteur achat utilisable au-dessus de l’inspecteur '+width);await p.getByRole('button',{name:'Fermer',exact:true}).click();
-     const bouton=p.getByRole('button',{name:"Envoyer une facture à l'acheteur",exact:true}).first();await bouton.click();const choix=p.getByRole('combobox',{name:'Facture de cette vente',exact:true});await choix.waitFor();
-     check(await choix.evaluate(e=>{const a=e.getBoundingClientRect(),m=document.querySelector('main').getBoundingClientRect();return a.left>=m.left&&a.right<=m.right;}),'panneau facture dans la largeur '+width);
-     check(await choix.inputValue()==='','aucune facture sélectionnée automatiquement '+width);
-     await bouton.click();check(await choix.count()===0,'facture repliable sans envoi '+width);
-     {const ligne=p.locator('.vrm-ventes-liste .vrm-sale-row').first();await p.getByRole('button',{name:'Fermer les détails de la vente',exact:true}).click();check(await ligne.locator('.vrm-ledger-sale-toggle').evaluate(e=>e===document.activeElement),'focus rendu à la vente '+width);check(await ligne.evaluate(e=>e.getBoundingClientRect().height<=56),'retour à une seule ligne '+width);}
-     const suivante=p.locator('main .vrm-ventes-liste .vrm-sale-row').nth(1).locator('.vrm-ledger-sale-toggle');await suivante.click();check(await p.getByRole('dialog').count()===1,'un seul inspecteur visible '+width);await p.keyboard.press('Escape');check(await p.getByRole('dialog').count()===0,'Échap ferme les détails '+width);check(await suivante.evaluate(e=>e===document.activeElement),'focus rendu après Échap '+width);
-    }
-    if(nom==='messages'){
-     await p.getByText('Client Vinted',{exact:true}).click();await p.getByText('Bonjour depuis Vinted',{exact:true}).waitFor();
-     if(process.env.STUDIO_DARK)check(await p.locator('html').getAttribute('data-theme')==='dark','thème sombre actif '+nom+' '+width);
-    check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'conversation sans débordement '+width);
-     if(process.env.BANC_CAPTURES)await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'conversation-'+width+'.png')});
-    }
    }
   }
   check(!errors.length,'aucune erreur JavaScript écrans secondaires');console.log(n+' contrôles Studio écrans réussis');return;
